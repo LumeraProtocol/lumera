@@ -1,0 +1,68 @@
+version: 1
+
+name: pastel
+app:
+  address_prefix: pastel
+
+build:
+  binary: pasteld
+
+# total supply: 20,000,000,000 psl
+# current supply: 10,000,000,000 psl
+accounts:
+  - name: pastel_foundation
+    coins: ['5000000000psl']      # 5,000,000,000 psl
+  - name: ecosystem_fund
+    coins: ['2000000000psl']      # 2,000,000,000 psl
+  - name: community_rewards
+    coins: ['1000000000psl']      # 1,000,000,000 psl
+  - name: public_sale
+    coins: ['1000000000psl']      # 1,000,000,000 psl
+  - name: private_investors
+    coins: ['1000000000psl']      # 1,000,000,000 psl
+  - name: faucet_account
+    coins: ['10000000psl']        # 10,000,000 psl
+  - name: genesis_validator1
+    coins: ['5000000psl']         # 5,000,000 psl
+
+faucet:
+  name: faucet_account
+  coins:
+    - '10000000psl'
+  coins_max:
+    - '1000psl'
+
+validators:
+  - name: genesis_validator1
+    bonded: '5000000psl'
+
+genesis:
+  chain_id: pasteld-1
+  app_state:
+    staking:
+      params:
+        bond_denom: psl
+    mint:
+      params:
+        mint_denom: psl
+    crisis:
+      constant_fee:
+        denom: psl
+        amount: '1000'
+    gov:
+      params:
+        burn_vote_quorum: false
+        burn_vote_veto: true
+        burn_proposal_deposit_prevote: false
+        min_deposit:                    # min deposit for proposal to enter voting period
+          - denom: psl
+            amount: '1000000'           # 1,000,000 psl
+        max_deposit_period: '172800s'   # 2 days
+        voting_period: '172800s'        # 2 days
+        quorum: '0.334000000000000000'          # 33.4%
+        threshold: '0.500000000000000000'       # 50%
+        veto_threshold: '0.334000000000000000'  # 33.4%
+
+client:
+  openapi:
+    path: docs/static/openapi.yml

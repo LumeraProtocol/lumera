@@ -1,0 +1,17 @@
+syntax = "proto3";
+package pasteld.pastelid;
+
+import "amino/amino.proto";
+import "gogoproto/gogo.proto";
+import "pasteld/pastelid/params.proto";
+
+option go_package = "github.com/pastelnetwork/pasteld/x/pastelid/types";
+
+// GenesisState defines the pastelid module's genesis state.
+message GenesisState {
+  // params defines all the parameters of the module.
+  Params params = 1 [
+    (gogoproto.nullable) = false,
+    (amino.dont_omitempty) = true
+  ];
+}

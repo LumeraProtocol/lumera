@@ -1,0 +1,15 @@
+syntax = "proto3";
+package pasteld.pastelid;
+
+import "amino/amino.proto";
+import "gogoproto/gogo.proto";
+
+option go_package = "github.com/pastelnetwork/pasteld/x/pastelid/types";
+
+// Params defines the parameters for the module.
+message Params {
+  option (amino.name) = "pasteld/x/pastelid/Params";
+  option (gogoproto.equal) = true;
+
+  
+}

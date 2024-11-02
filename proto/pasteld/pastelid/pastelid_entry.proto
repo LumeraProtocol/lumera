@@ -1,0 +1,16 @@
+syntax = "proto3";
+package pasteld.pastelid;
+
+option go_package = "github.com/pastelnetwork/pasteld/x/pastelid/types";
+
+message PastelidEntry {
+  string address = 1; 
+  string idType = 2; 
+  string pastelId = 3; 
+  string pqKey = 4; 
+  string signature = 5; 
+  string timeStamp = 6; 
+  uint64 version = 7; 
+  
+}
+

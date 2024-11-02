@@ -1,4 +1,5 @@
 syntax = "proto3";
+
 package pasteld.pastelid;
 
 import "amino/amino.proto";
@@ -6,25 +7,53 @@ import "gogoproto/gogo.proto";
 import "google/api/annotations.proto";
 import "cosmos/base/query/v1beta1/pagination.proto";
 import "pasteld/pastelid/params.proto";
+import "pasteld/pastelid/pastelid_entry.proto";
 
 option go_package = "github.com/pastelnetwork/pasteld/x/pastelid/types";
 
 // Query defines the gRPC querier service.
 service Query {
+  
   // Parameters queries the parameters of the module.
-  rpc Params(QueryParamsRequest) returns (QueryParamsResponse) {
+  rpc Params (QueryParamsRequest) returns (QueryParamsResponse) {
     option (google.api.http).get = "/pastelnetwork/pasteld/pastelid/params";
+  
+  }
+  
+  // Queries a list of PastelidEntry items.
+  rpc PastelidEntry    (QueryGetPastelidEntryRequest) returns (QueryGetPastelidEntryResponse) {
+    option (google.api.http).get = "/pastelnetwork/pasteld/pastelid/pastelid_entry/{address}";
+  
+  }
+  rpc PastelidEntryAll (QueryAllPastelidEntryRequest) returns (QueryAllPastelidEntryResponse) {
+    option (google.api.http).get = "/pastelnetwork/pasteld/pastelid/pastelid_entry";
+  
   }
 }
-
 // QueryParamsRequest is request type for the Query/Params RPC method.
 message QueryParamsRequest {}
 
 // QueryParamsResponse is response type for the Query/Params RPC method.
 message QueryParamsResponse {
+  
   // params holds all the parameters of this module.
-  Params params = 1 [
-    (gogoproto.nullable) = false,
-    (amino.dont_omitempty) = true
-  ];
+  Params params = 1 [(gogoproto.nullable) = false, (amino.dont_omitempty) = true];
 }
+
+message QueryGetPastelidEntryRequest {
+  string address = 1;
+}
+
+message QueryGetPastelidEntryResponse {
+  PastelidEntry pastelidEntry = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryAllPastelidEntryRequest {
+  cosmos.base.query.v1beta1.PageRequest pagination = 1;
+}
+
+message QueryAllPastelidEntryResponse {
+  repeated PastelidEntry                          pastelidEntry = 1 [(gogoproto.nullable) = false];
+           cosmos.base.query.v1beta1.PageResponse pagination    = 2;
+}
+

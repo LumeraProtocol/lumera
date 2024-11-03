@@ -39,19 +39,6 @@ func TestPastelidEntryGet(t *testing.T) {
 		)
 	}
 }
-func TestPastelidEntryRemove(t *testing.T) {
-	keeper, ctx := keepertest.PastelidKeeper(t)
-	items := createNPastelidEntry(keeper, ctx, 10)
-	for _, item := range items {
-		keeper.RemovePastelidEntry(ctx,
-			item.Address,
-		)
-		_, found := keeper.GetPastelidEntry(ctx,
-			item.Address,
-		)
-		require.False(t, found)
-	}
-}
 
 func TestPastelidEntryGetAll(t *testing.T) {
 	keeper, ctx := keepertest.PastelidKeeper(t)

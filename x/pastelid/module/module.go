@@ -2,8 +2,10 @@ package pastelid
 
 import (
 	"context"
+	"cosmossdk.io/client/v2/autocli"
 	"encoding/json"
 	"fmt"
+	"github.com/spf13/cobra"
 
 	"cosmossdk.io/core/appmodule"
 	"cosmossdk.io/core/store"
@@ -21,6 +23,7 @@ import (
 	// this line is used by starport scaffolding # 1
 
 	modulev1 "github.com/pastelnetwork/pasteld/api/pasteld/pastelid/module"
+	"github.com/pastelnetwork/pasteld/x/pastelid/client/cli"
 	"github.com/pastelnetwork/pasteld/x/pastelid/keeper"
 	"github.com/pastelnetwork/pasteld/x/pastelid/types"
 )
@@ -35,6 +38,8 @@ var (
 	_ appmodule.AppModule       = (*AppModule)(nil)
 	_ appmodule.HasBeginBlocker = (*AppModule)(nil)
 	_ appmodule.HasEndBlocker   = (*AppModule)(nil)
+
+	_ autocli.HasCustomTxCommand = (*AppModule)(nil)
 )
 
 // ----------------------------------------------------------------------------
@@ -98,6 +103,14 @@ type AppModule struct {
 	keeper        keeper.Keeper
 	accountKeeper types.AccountKeeper
 	bankKeeper    types.BankKeeper
+}
+
+func (am AppModule) HasCustomTxCommand() bool {
+	return true
+}
+
+func (am AppModule) GetTxCmd() *cobra.Command {
+	return cli.GetTxCmd()
 }
 
 func NewAppModule(

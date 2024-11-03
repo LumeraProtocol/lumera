@@ -39,15 +39,12 @@ func (k Keeper) GetPastelidEntry(
 	return val, true
 }
 
-// RemovePastelidEntry removes a pastelidEntry from the store
-func (k Keeper) RemovePastelidEntry(
-	ctx context.Context,
-	address string,
-
-) {
+// HasPastelidEntry checks if the pastelidEntry exists in the store
+func (k Keeper) HasPastelidEntry(ctx context.Context, address string) bool {
 	storeAdapter := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
 	store := prefix.NewStore(storeAdapter, types.KeyPrefix(types.PastelidEntryKeyPrefix))
-	store.Delete(types.PastelidEntryKey(
+
+	return store.Has(types.PastelidEntryKey(
 		address,
 	))
 }

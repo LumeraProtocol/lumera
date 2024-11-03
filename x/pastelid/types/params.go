@@ -1,6 +1,9 @@
 package types
 
 import (
+	"cosmossdk.io/math"
+	"fmt"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	paramtypes "github.com/cosmos/cosmos-sdk/x/params/types"
 )
 
@@ -12,13 +15,15 @@ func ParamKeyTable() paramtypes.KeyTable {
 }
 
 // NewParams creates a new Params instance
-func NewParams() Params {
-	return Params{}
+func NewParams(fee sdk.Coin) Params {
+	return Params{
+		PastelIdCreateFee: fee,
+	}
 }
 
 // DefaultParams returns a default set of parameters
 func DefaultParams() Params {
-	return NewParams()
+	return NewParams(sdk.NewCoin("upastel", math.NewInt(10000)))
 }
 
 // ParamSetPairs get the params.ParamSet
@@ -28,5 +33,15 @@ func (p *Params) ParamSetPairs() paramtypes.ParamSetPairs {
 
 // Validate validates the set of params
 func (p Params) Validate() error {
+	return validatePastelIDCreateFee(p.PastelIdCreateFee)
+}
+
+func validatePastelIDCreateFee(fee sdk.Coin) error {
+	if !fee.IsValid() {
+		return fmt.Errorf("invalid pastelID create fee: %s", fee)
+	}
+	if fee.IsZero() {
+		return fmt.Errorf("pastelID create fee cannot be zero")
+	}
 	return nil
 }

@@ -39,6 +39,13 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					RpcMethod: "UpdateParams",
 					Skip:      true, // skipped because authority gated
 				},
+				{
+					RpcMethod: "CreatePastelId",
+					Skip:      true, // skipped because use different command in x/pastelid/client/cli/tx_create_pastel_id.go
+					//Use:            "create-pastel-id [id-type] [pastel-id] [pq-key] [signature] [time-stamp] [version]",
+					//Short:          "Send a create-pastel-id tx",
+					//PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "idType"}, {ProtoField: "pastelId"}, {ProtoField: "pqKey"}, {ProtoField: "signature"}, {ProtoField: "timeStamp"}, {ProtoField: "version"}},
+				},
 				// this line is used by ignite scaffolding # autocli/tx
 			},
 		},

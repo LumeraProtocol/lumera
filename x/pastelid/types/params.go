@@ -23,7 +23,7 @@ func NewParams(fee sdk.Coin) Params {
 
 // DefaultParams returns a default set of parameters
 func DefaultParams() Params {
-	return NewParams(sdk.NewCoin("upastel", math.NewInt(10000)))
+	return NewParams(sdk.NewCoin("upsl", math.NewInt(10_000_000_000)))
 }
 
 // ParamSetPairs get the params.ParamSet

@@ -23,7 +23,7 @@ import (
 	"github.com/pastelnetwork/pasteld/app"
 )
 
-// NewRootCmd creates a new root command for pasteldd. It is called once in the main function.
+// NewRootCmd creates a new root command for pasteld. It is called once in the main function.
 func NewRootCmd() *cobra.Command {
 	var (
 		autoCliOpts        autocli.AppOptions

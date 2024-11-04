@@ -11,9 +11,9 @@ func (k msgServer) CreatePastelId(goCtx context.Context, msg *types.MsgCreatePas
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
 	// Validate address
-	addr, err := sdk.AccAddressFromBech32(msg.Creator)
+	addr, err := types.ValidateAddress(msg.Creator)
 	if err != nil {
-		return nil, sdkerrors.Wrapf(types.ErrInvalidAddress, "invalid address: %s", err)
+		return nil, err
 	}
 
 	// Check if PastelID exists

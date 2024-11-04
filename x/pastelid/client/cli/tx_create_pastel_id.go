@@ -34,6 +34,15 @@ func CmdCreatePastelID() *cobra.Command {
 
 			// Get the from address (funding address)
 			fromAddr := clientCtx.GetFromAddress()
+			if fromAddr.Empty() {
+				return fmt.Errorf("must specify --from address")
+			}
+
+			// Use shared validation
+			_, err = types.ValidateAddress(fromAddr.String())
+			if err != nil {
+				return fmt.Errorf("invalid from address: %w", err)
+			}
 
 			// Get passphrase for secure container (either from keyring or new)
 			passphrase := getPassphrase(newPassphrase, clientCtx) // Modified function

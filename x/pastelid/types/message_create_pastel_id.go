@@ -20,10 +20,20 @@ func NewMsgCreatePastelId(creator string, idType string, pastelId string, pqKey 
 	}
 }
 
-func (msg *MsgCreatePastelId) ValidateBasic() error {
-	_, err := sdk.AccAddressFromBech32(msg.Creator)
+// ValidateAddress performs basic validation of the creator address
+// Returns both the parsed address and error for flexibility in error handling
+func ValidateAddress(address string) (sdk.AccAddress, error) {
+	addr, err := sdk.AccAddressFromBech32(address)
 	if err != nil {
-		return errorsmod.Wrapf(sdkerrors.ErrInvalidAddress, "invalid creator address (%s)", err)
+		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidAddress, "invalid address (%s)", err)
+	}
+	return addr, nil
+}
+
+func (msg *MsgCreatePastelId) ValidateBasic() error {
+	_, err := ValidateAddress(msg.Creator)
+	if err != nil {
+		return err
 	}
 	return nil
 }

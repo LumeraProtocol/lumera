@@ -8,7 +8,7 @@ import (
 	svrcmd "github.com/cosmos/cosmos-sdk/server/cmd"
 
 	"github.com/pastelnetwork/pasteld/app"
-	"github.com/pastelnetwork/pasteld/cmd/pasteldd/cmd"
+	"github.com/pastelnetwork/pasteld/cmd/pasteld/cmd"
 )
 
 func main() {

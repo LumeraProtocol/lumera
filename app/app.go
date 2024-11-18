@@ -78,6 +78,8 @@ import (
 	pastelidmodulekeeper "github.com/pastelnetwork/pasteld/x/pastelid/keeper"
 	// this line is used by starport scaffolding # stargate/app/moduleImport
 
+	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
+	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	"github.com/pastelnetwork/pasteld/docs"
 )
 
@@ -142,6 +144,11 @@ type App struct {
 	ScopedKeepers             map[string]capabilitykeeper.ScopedKeeper
 
 	PastelidKeeper pastelidmodulekeeper.Keeper
+
+	// CosmWasm
+	WasmKeeper       wasmkeeper.Keeper
+	ScopedWasmKeeper capabilitykeeper.ScopedKeeper
+
 	// this line is used by starport scaffolding # stargate/app/keeperDeclaration
 
 	// simulation manager
@@ -294,7 +301,8 @@ func New(
 		return nil, err
 	}
 
-	return app, nil
+	return app, app.WasmKeeper.InitializePinnedCodes(app.NewUncachedContext(true, tmproto.Header{}))
+
 }
 
 // LegacyAmino returns App's amino codec.

@@ -3,7 +3,7 @@ package types_test
 import (
 	"testing"
 
-	"github.com/pastelnetwork/pasteld/x/pastelid/types"
+	"github.com/pastelnetwork/pastel/x/pastelid/types"
 	"github.com/stretchr/testify/require"
 )
 

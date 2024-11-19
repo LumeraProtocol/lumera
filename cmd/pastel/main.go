@@ -7,8 +7,8 @@ import (
 	clienthelpers "cosmossdk.io/client/v2/helpers"
 	svrcmd "github.com/cosmos/cosmos-sdk/server/cmd"
 
-	"github.com/pastelnetwork/pasteld/app"
-	"github.com/pastelnetwork/pasteld/cmd/pasteld/cmd"
+	"github.com/pastelnetwork/pastel/app"
+	"github.com/pastelnetwork/pastel/cmd/pastel/cmd"
 )
 
 func main() {

@@ -3,8 +3,8 @@ package pastelid
 import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
-	"github.com/pastelnetwork/pasteld/x/pastelid/keeper"
-	"github.com/pastelnetwork/pasteld/x/pastelid/types"
+	"github.com/pastelnetwork/pastel/x/pastelid/keeper"
+	"github.com/pastelnetwork/pastel/x/pastelid/types"
 )
 
 // InitGenesis initializes the module's state from a provided genesis state.

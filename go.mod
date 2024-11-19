@@ -1,4 +1,4 @@
-module github.com/pastelnetwork/pasteld
+module github.com/pastelnetwork/pastel
 
 go 1.22
 

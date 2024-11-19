@@ -7,7 +7,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/testutil/network"
 	"github.com/stretchr/testify/require"
 
-	"github.com/pastelnetwork/pasteld/app"
+	"github.com/pastelnetwork/pastel/app"
 )
 
 type (

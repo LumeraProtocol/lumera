@@ -75,17 +75,17 @@ import (
 	ibctransferkeeper "github.com/cosmos/ibc-go/v8/modules/apps/transfer/keeper"
 	ibckeeper "github.com/cosmos/ibc-go/v8/modules/core/keeper"
 
-	pastelidmodulekeeper "github.com/pastelnetwork/pasteld/x/pastelid/keeper"
+	pastelidmodulekeeper "github.com/pastelnetwork/pastel/x/pastelid/keeper"
 	// this line is used by starport scaffolding # stargate/app/moduleImport
 
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
-	"github.com/pastelnetwork/pasteld/docs"
+	"github.com/pastelnetwork/pastel/docs"
 )
 
 const (
 	AccountAddressPrefix = "pastel"
-	Name                 = "pasteld"
+	Name                 = "pastel"
 )
 
 var (

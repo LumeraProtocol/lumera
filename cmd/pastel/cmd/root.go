@@ -20,10 +20,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/pastelnetwork/pasteld/app"
+	"github.com/pastelnetwork/pastel/app"
 )
 
-// NewRootCmd creates a new root command for pasteld. It is called once in the main function.
+// NewRootCmd creates a new root command for pastel. It is called once in the main function.
 func NewRootCmd() *cobra.Command {
 	var (
 		autoCliOpts        autocli.AppOptions
@@ -49,7 +49,7 @@ func NewRootCmd() *cobra.Command {
 
 	rootCmd := &cobra.Command{
 		Use:           app.Name + "d",
-		Short:         "Start pasteld node",
+		Short:         "Start pastel node",
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			// set the default command outputs

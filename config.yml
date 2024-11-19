@@ -37,7 +37,7 @@ validators:
     bonded: '5000000000000upsl'
 
 genesis:
-  chain_id: pasteld-1
+  chain_id: pastel-1
   app_state:
     staking:
       params:

@@ -6,9 +6,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	keepertest "github.com/pastelnetwork/pasteld/testutil/keeper"
-	"github.com/pastelnetwork/pasteld/x/pastelid/keeper"
-	"github.com/pastelnetwork/pasteld/x/pastelid/types"
+	keepertest "github.com/pastelnetwork/pastel/testutil/keeper"
+	"github.com/pastelnetwork/pastel/x/pastelid/keeper"
+	"github.com/pastelnetwork/pastel/x/pastelid/types"
 )
 
 func setupMsgServer(t testing.TB) (keeper.Keeper, types.MsgServer, context.Context) {

@@ -17,8 +17,8 @@ import (
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	"github.com/stretchr/testify/require"
 
-	"github.com/pastelnetwork/pasteld/x/pastelid/keeper"
-	"github.com/pastelnetwork/pasteld/x/pastelid/types"
+	"github.com/pastelnetwork/pastel/x/pastelid/keeper"
+	"github.com/pastelnetwork/pastel/x/pastelid/types"
 )
 
 func PastelidKeeper(t testing.TB) (keeper.Keeper, sdk.Context) {

@@ -1,7 +1,7 @@
 package keeper
 
 import (
-	"github.com/pastelnetwork/pasteld/x/pastelid/types"
+	"github.com/pastelnetwork/pastel/x/pastelid/types"
 )
 
 type msgServer struct {

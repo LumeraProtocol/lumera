@@ -1,14 +1,14 @@
 syntax = "proto3";
 
-package pasteld.pastelid;
+package pastel.pastelid;
 
 import "amino/amino.proto";
 import "cosmos/msg/v1/msg.proto";
 import "cosmos_proto/cosmos.proto";
 import "gogoproto/gogo.proto";
-import "pasteld/pastelid/params.proto";
+import "pastel/pastelid/params.proto";
 
-option go_package = "github.com/pastelnetwork/pasteld/x/pastelid/types";
+option go_package = "github.com/pastelnetwork/pastel/x/pastelid/types";
 
 // Msg defines the Msg service.
 service Msg {
@@ -22,7 +22,7 @@ service Msg {
 // MsgUpdateParams is the Msg/UpdateParams request type.
 message MsgUpdateParams {
   option (cosmos.msg.v1.signer) =                          "authority";
-  option           (amino.name) = "pasteld/x/pastelid/MsgUpdateParams";
+  option           (amino.name) = "pastel/x/pastelid/MsgUpdateParams";
   
   // authority is the address that controls the module (defaults to x/gov unless overwritten).
   string authority = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];

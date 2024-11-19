@@ -5,10 +5,10 @@ import (
 	"strconv"
 	"testing"
 
-	keepertest "github.com/pastelnetwork/pasteld/testutil/keeper"
-	"github.com/pastelnetwork/pasteld/testutil/nullify"
-	"github.com/pastelnetwork/pasteld/x/pastelid/keeper"
-	"github.com/pastelnetwork/pasteld/x/pastelid/types"
+	keepertest "github.com/pastelnetwork/pastel/testutil/keeper"
+	"github.com/pastelnetwork/pastel/testutil/nullify"
+	"github.com/pastelnetwork/pastel/x/pastelid/keeper"
+	"github.com/pastelnetwork/pastel/x/pastelid/types"
 	"github.com/stretchr/testify/require"
 )
 

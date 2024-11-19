@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.3.0
 // - protoc             (unknown)
-// source: pasteld/pastelid/query.proto
+// source: pastel/pastelid/query.proto
 
 package pastelid
 
@@ -19,9 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	Query_Params_FullMethodName           = "/pasteld.pastelid.Query/Params"
-	Query_PastelidEntry_FullMethodName    = "/pasteld.pastelid.Query/PastelidEntry"
-	Query_PastelidEntryAll_FullMethodName = "/pasteld.pastelid.Query/PastelidEntryAll"
+	Query_Params_FullMethodName           = "/pastel.pastelid.Query/Params"
+	Query_PastelidEntry_FullMethodName    = "/pastel.pastelid.Query/PastelidEntry"
+	Query_PastelidEntryAll_FullMethodName = "/pastel.pastelid.Query/PastelidEntryAll"
 )
 
 // QueryClient is the client API for Query service.
@@ -166,7 +166,7 @@ func _Query_PastelidEntryAll_Handler(srv interface{}, ctx context.Context, dec f
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var Query_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "pasteld.pastelid.Query",
+	ServiceName: "pastel.pastelid.Query",
 	HandlerType: (*QueryServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -183,5 +183,5 @@ var Query_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "pasteld/pastelid/query.proto",
+	Metadata: "pastel/pastelid/query.proto",
 }

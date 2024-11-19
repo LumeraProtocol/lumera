@@ -8,9 +8,9 @@ import (
 	simtypes "github.com/cosmos/cosmos-sdk/types/simulation"
 	"github.com/cosmos/cosmos-sdk/x/simulation"
 
-	"github.com/pastelnetwork/pasteld/testutil/sample"
-	pastelidsimulation "github.com/pastelnetwork/pasteld/x/pastelid/simulation"
-	"github.com/pastelnetwork/pasteld/x/pastelid/types"
+	"github.com/pastelnetwork/pastel/testutil/sample"
+	pastelidsimulation "github.com/pastelnetwork/pastel/x/pastelid/simulation"
+	"github.com/pastelnetwork/pastel/x/pastelid/types"
 )
 
 // avoid unused import issue

@@ -32,11 +32,11 @@ import (
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 
-	"github.com/pastelnetwork/pasteld/app"
+	"github.com/pastelnetwork/pastel/app"
 )
 
 const (
-	SimAppChainID = "pasteld-simapp"
+	SimAppChainID = "pastel-simapp"
 )
 
 var FlagEnableStreamingValue bool

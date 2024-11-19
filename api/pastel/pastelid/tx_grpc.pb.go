@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.3.0
 // - protoc             (unknown)
-// source: pasteld/pastelid/tx.proto
+// source: pastel/pastelid/tx.proto
 
 package pastelid
 
@@ -19,8 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	Msg_UpdateParams_FullMethodName   = "/pasteld.pastelid.Msg/UpdateParams"
-	Msg_CreatePastelId_FullMethodName = "/pasteld.pastelid.Msg/CreatePastelId"
+	Msg_UpdateParams_FullMethodName   = "/pastel.pastelid.Msg/UpdateParams"
+	Msg_CreatePastelId_FullMethodName = "/pastel.pastelid.Msg/CreatePastelId"
 )
 
 // MsgClient is the client API for Msg service.
@@ -133,7 +133,7 @@ func _Msg_CreatePastelId_Handler(srv interface{}, ctx context.Context, dec func(
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var Msg_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "pasteld.pastelid.Msg",
+	ServiceName: "pastel.pastelid.Msg",
 	HandlerType: (*MsgServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -146,5 +146,5 @@ var Msg_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "pasteld/pastelid/tx.proto",
+	Metadata: "pastel/pastelid/tx.proto",
 }

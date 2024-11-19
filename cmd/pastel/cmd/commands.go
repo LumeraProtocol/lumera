@@ -25,7 +25,7 @@ import (
 
 	"github.com/CosmWasm/wasmd/x/wasm"
 	wasmcli "github.com/CosmWasm/wasmd/x/wasm/client/cli"
-	"github.com/pastelnetwork/pasteld/app"
+	"github.com/pastelnetwork/pastel/app"
 )
 
 func initRootCmd(

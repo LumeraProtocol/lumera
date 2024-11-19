@@ -52,9 +52,9 @@ import (
 	ibcfeetypes "github.com/cosmos/ibc-go/v8/modules/apps/29-fee/types"
 	ibctransfertypes "github.com/cosmos/ibc-go/v8/modules/apps/transfer/types"
 	ibcexported "github.com/cosmos/ibc-go/v8/modules/core/exported"
-	pastelidmodulev1 "github.com/pastelnetwork/pasteld/api/pasteld/pastelid/module"
-	_ "github.com/pastelnetwork/pasteld/x/pastelid/module" // import for side-effects
-	pastelidmoduletypes "github.com/pastelnetwork/pasteld/x/pastelid/types"
+	pastelidmodulev1 "github.com/pastelnetwork/pastel/api/pastel/pastelid/module"
+	_ "github.com/pastelnetwork/pastel/x/pastelid/module" // import for side-effects
+	pastelidmoduletypes "github.com/pastelnetwork/pastel/x/pastelid/types"
 	"google.golang.org/protobuf/types/known/durationpb"
 	// this line is used by starport scaffolding # stargate/app/moduleImport
 )

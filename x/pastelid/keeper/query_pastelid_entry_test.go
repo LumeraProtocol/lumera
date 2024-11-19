@@ -9,9 +9,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	keepertest "github.com/pastelnetwork/pasteld/testutil/keeper"
-	"github.com/pastelnetwork/pasteld/testutil/nullify"
-	"github.com/pastelnetwork/pasteld/x/pastelid/types"
+	keepertest "github.com/pastelnetwork/pastel/testutil/keeper"
+	"github.com/pastelnetwork/pastel/testutil/nullify"
+	"github.com/pastelnetwork/pastel/x/pastelid/types"
 )
 
 // Prevent strconv unused error

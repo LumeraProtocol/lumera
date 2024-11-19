@@ -21,8 +21,8 @@ var (
 )
 
 func init() {
-	file_pasteld_pastelid_query_proto_init()
-	md_QueryParamsRequest = File_pasteld_pastelid_query_proto.Messages().ByName("QueryParamsRequest")
+	file_pastel_pastelid_query_proto_init()
+	md_QueryParamsRequest = File_pastel_pastelid_query_proto.Messages().ByName("QueryParamsRequest")
 }
 
 var _ protoreflect.Message = (*fastReflection_QueryParamsRequest)(nil)
@@ -34,7 +34,7 @@ func (x *QueryParamsRequest) ProtoReflect() protoreflect.Message {
 }
 
 func (x *QueryParamsRequest) slowProtoReflect() protoreflect.Message {
-	mi := &file_pasteld_pastelid_query_proto_msgTypes[0]
+	mi := &file_pastel_pastelid_query_proto_msgTypes[0]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -107,9 +107,9 @@ func (x *fastReflection_QueryParamsRequest) Has(fd protoreflect.FieldDescriptor)
 	switch fd.FullName() {
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryParamsRequest"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryParamsRequest"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryParamsRequest does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryParamsRequest does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -123,9 +123,9 @@ func (x *fastReflection_QueryParamsRequest) Clear(fd protoreflect.FieldDescripto
 	switch fd.FullName() {
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryParamsRequest"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryParamsRequest"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryParamsRequest does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryParamsRequest does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -139,9 +139,9 @@ func (x *fastReflection_QueryParamsRequest) Get(descriptor protoreflect.FieldDes
 	switch descriptor.FullName() {
 	default:
 		if descriptor.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryParamsRequest"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryParamsRequest"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryParamsRequest does not contain field %s", descriptor.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryParamsRequest does not contain field %s", descriptor.FullName()))
 	}
 }
 
@@ -159,9 +159,9 @@ func (x *fastReflection_QueryParamsRequest) Set(fd protoreflect.FieldDescriptor,
 	switch fd.FullName() {
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryParamsRequest"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryParamsRequest"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryParamsRequest does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryParamsRequest does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -179,9 +179,9 @@ func (x *fastReflection_QueryParamsRequest) Mutable(fd protoreflect.FieldDescrip
 	switch fd.FullName() {
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryParamsRequest"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryParamsRequest"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryParamsRequest does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryParamsRequest does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -192,9 +192,9 @@ func (x *fastReflection_QueryParamsRequest) NewField(fd protoreflect.FieldDescri
 	switch fd.FullName() {
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryParamsRequest"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryParamsRequest"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryParamsRequest does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryParamsRequest does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -204,7 +204,7 @@ func (x *fastReflection_QueryParamsRequest) NewField(fd protoreflect.FieldDescri
 func (x *fastReflection_QueryParamsRequest) WhichOneof(d protoreflect.OneofDescriptor) protoreflect.FieldDescriptor {
 	switch d.FullName() {
 	default:
-		panic(fmt.Errorf("%s is not a oneof field in pasteld.pastelid.QueryParamsRequest", d.FullName()))
+		panic(fmt.Errorf("%s is not a oneof field in pastel.pastelid.QueryParamsRequest", d.FullName()))
 	}
 	panic("unreachable")
 }
@@ -378,8 +378,8 @@ var (
 )
 
 func init() {
-	file_pasteld_pastelid_query_proto_init()
-	md_QueryParamsResponse = File_pasteld_pastelid_query_proto.Messages().ByName("QueryParamsResponse")
+	file_pastel_pastelid_query_proto_init()
+	md_QueryParamsResponse = File_pastel_pastelid_query_proto.Messages().ByName("QueryParamsResponse")
 	fd_QueryParamsResponse_params = md_QueryParamsResponse.Fields().ByName("params")
 }
 
@@ -392,7 +392,7 @@ func (x *QueryParamsResponse) ProtoReflect() protoreflect.Message {
 }
 
 func (x *QueryParamsResponse) slowProtoReflect() protoreflect.Message {
-	mi := &file_pasteld_pastelid_query_proto_msgTypes[1]
+	mi := &file_pastel_pastelid_query_proto_msgTypes[1]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -469,13 +469,13 @@ func (x *fastReflection_QueryParamsResponse) Range(f func(protoreflect.FieldDesc
 // a repeated field is populated if it is non-empty.
 func (x *fastReflection_QueryParamsResponse) Has(fd protoreflect.FieldDescriptor) bool {
 	switch fd.FullName() {
-	case "pasteld.pastelid.QueryParamsResponse.params":
+	case "pastel.pastelid.QueryParamsResponse.params":
 		return x.Params != nil
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryParamsResponse"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryParamsResponse"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryParamsResponse does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryParamsResponse does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -487,13 +487,13 @@ func (x *fastReflection_QueryParamsResponse) Has(fd protoreflect.FieldDescriptor
 // Clear is a mutating operation and unsafe for concurrent use.
 func (x *fastReflection_QueryParamsResponse) Clear(fd protoreflect.FieldDescriptor) {
 	switch fd.FullName() {
-	case "pasteld.pastelid.QueryParamsResponse.params":
+	case "pastel.pastelid.QueryParamsResponse.params":
 		x.Params = nil
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryParamsResponse"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryParamsResponse"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryParamsResponse does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryParamsResponse does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -505,14 +505,14 @@ func (x *fastReflection_QueryParamsResponse) Clear(fd protoreflect.FieldDescript
 // of the value; to obtain a mutable reference, use Mutable.
 func (x *fastReflection_QueryParamsResponse) Get(descriptor protoreflect.FieldDescriptor) protoreflect.Value {
 	switch descriptor.FullName() {
-	case "pasteld.pastelid.QueryParamsResponse.params":
+	case "pastel.pastelid.QueryParamsResponse.params":
 		value := x.Params
 		return protoreflect.ValueOfMessage(value.ProtoReflect())
 	default:
 		if descriptor.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryParamsResponse"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryParamsResponse"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryParamsResponse does not contain field %s", descriptor.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryParamsResponse does not contain field %s", descriptor.FullName()))
 	}
 }
 
@@ -528,13 +528,13 @@ func (x *fastReflection_QueryParamsResponse) Get(descriptor protoreflect.FieldDe
 // Set is a mutating operation and unsafe for concurrent use.
 func (x *fastReflection_QueryParamsResponse) Set(fd protoreflect.FieldDescriptor, value protoreflect.Value) {
 	switch fd.FullName() {
-	case "pasteld.pastelid.QueryParamsResponse.params":
+	case "pastel.pastelid.QueryParamsResponse.params":
 		x.Params = value.Message().Interface().(*Params)
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryParamsResponse"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryParamsResponse"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryParamsResponse does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryParamsResponse does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -550,16 +550,16 @@ func (x *fastReflection_QueryParamsResponse) Set(fd protoreflect.FieldDescriptor
 // Mutable is a mutating operation and unsafe for concurrent use.
 func (x *fastReflection_QueryParamsResponse) Mutable(fd protoreflect.FieldDescriptor) protoreflect.Value {
 	switch fd.FullName() {
-	case "pasteld.pastelid.QueryParamsResponse.params":
+	case "pastel.pastelid.QueryParamsResponse.params":
 		if x.Params == nil {
 			x.Params = new(Params)
 		}
 		return protoreflect.ValueOfMessage(x.Params.ProtoReflect())
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryParamsResponse"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryParamsResponse"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryParamsResponse does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryParamsResponse does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -568,14 +568,14 @@ func (x *fastReflection_QueryParamsResponse) Mutable(fd protoreflect.FieldDescri
 // For lists, maps, and messages, this returns a new, empty, mutable value.
 func (x *fastReflection_QueryParamsResponse) NewField(fd protoreflect.FieldDescriptor) protoreflect.Value {
 	switch fd.FullName() {
-	case "pasteld.pastelid.QueryParamsResponse.params":
+	case "pastel.pastelid.QueryParamsResponse.params":
 		m := new(Params)
 		return protoreflect.ValueOfMessage(m.ProtoReflect())
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryParamsResponse"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryParamsResponse"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryParamsResponse does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryParamsResponse does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -585,7 +585,7 @@ func (x *fastReflection_QueryParamsResponse) NewField(fd protoreflect.FieldDescr
 func (x *fastReflection_QueryParamsResponse) WhichOneof(d protoreflect.OneofDescriptor) protoreflect.FieldDescriptor {
 	switch d.FullName() {
 	default:
-		panic(fmt.Errorf("%s is not a oneof field in pasteld.pastelid.QueryParamsResponse", d.FullName()))
+		panic(fmt.Errorf("%s is not a oneof field in pastel.pastelid.QueryParamsResponse", d.FullName()))
 	}
 	panic("unreachable")
 }
@@ -813,8 +813,8 @@ var (
 )
 
 func init() {
-	file_pasteld_pastelid_query_proto_init()
-	md_QueryGetPastelidEntryRequest = File_pasteld_pastelid_query_proto.Messages().ByName("QueryGetPastelidEntryRequest")
+	file_pastel_pastelid_query_proto_init()
+	md_QueryGetPastelidEntryRequest = File_pastel_pastelid_query_proto.Messages().ByName("QueryGetPastelidEntryRequest")
 	fd_QueryGetPastelidEntryRequest_address = md_QueryGetPastelidEntryRequest.Fields().ByName("address")
 }
 
@@ -827,7 +827,7 @@ func (x *QueryGetPastelidEntryRequest) ProtoReflect() protoreflect.Message {
 }
 
 func (x *QueryGetPastelidEntryRequest) slowProtoReflect() protoreflect.Message {
-	mi := &file_pasteld_pastelid_query_proto_msgTypes[2]
+	mi := &file_pastel_pastelid_query_proto_msgTypes[2]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -904,13 +904,13 @@ func (x *fastReflection_QueryGetPastelidEntryRequest) Range(f func(protoreflect.
 // a repeated field is populated if it is non-empty.
 func (x *fastReflection_QueryGetPastelidEntryRequest) Has(fd protoreflect.FieldDescriptor) bool {
 	switch fd.FullName() {
-	case "pasteld.pastelid.QueryGetPastelidEntryRequest.address":
+	case "pastel.pastelid.QueryGetPastelidEntryRequest.address":
 		return x.Address != ""
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryGetPastelidEntryRequest"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryGetPastelidEntryRequest"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryGetPastelidEntryRequest does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryGetPastelidEntryRequest does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -922,13 +922,13 @@ func (x *fastReflection_QueryGetPastelidEntryRequest) Has(fd protoreflect.FieldD
 // Clear is a mutating operation and unsafe for concurrent use.
 func (x *fastReflection_QueryGetPastelidEntryRequest) Clear(fd protoreflect.FieldDescriptor) {
 	switch fd.FullName() {
-	case "pasteld.pastelid.QueryGetPastelidEntryRequest.address":
+	case "pastel.pastelid.QueryGetPastelidEntryRequest.address":
 		x.Address = ""
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryGetPastelidEntryRequest"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryGetPastelidEntryRequest"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryGetPastelidEntryRequest does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryGetPastelidEntryRequest does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -940,14 +940,14 @@ func (x *fastReflection_QueryGetPastelidEntryRequest) Clear(fd protoreflect.Fiel
 // of the value; to obtain a mutable reference, use Mutable.
 func (x *fastReflection_QueryGetPastelidEntryRequest) Get(descriptor protoreflect.FieldDescriptor) protoreflect.Value {
 	switch descriptor.FullName() {
-	case "pasteld.pastelid.QueryGetPastelidEntryRequest.address":
+	case "pastel.pastelid.QueryGetPastelidEntryRequest.address":
 		value := x.Address
 		return protoreflect.ValueOfString(value)
 	default:
 		if descriptor.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryGetPastelidEntryRequest"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryGetPastelidEntryRequest"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryGetPastelidEntryRequest does not contain field %s", descriptor.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryGetPastelidEntryRequest does not contain field %s", descriptor.FullName()))
 	}
 }
 
@@ -963,13 +963,13 @@ func (x *fastReflection_QueryGetPastelidEntryRequest) Get(descriptor protoreflec
 // Set is a mutating operation and unsafe for concurrent use.
 func (x *fastReflection_QueryGetPastelidEntryRequest) Set(fd protoreflect.FieldDescriptor, value protoreflect.Value) {
 	switch fd.FullName() {
-	case "pasteld.pastelid.QueryGetPastelidEntryRequest.address":
+	case "pastel.pastelid.QueryGetPastelidEntryRequest.address":
 		x.Address = value.Interface().(string)
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryGetPastelidEntryRequest"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryGetPastelidEntryRequest"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryGetPastelidEntryRequest does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryGetPastelidEntryRequest does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -985,13 +985,13 @@ func (x *fastReflection_QueryGetPastelidEntryRequest) Set(fd protoreflect.FieldD
 // Mutable is a mutating operation and unsafe for concurrent use.
 func (x *fastReflection_QueryGetPastelidEntryRequest) Mutable(fd protoreflect.FieldDescriptor) protoreflect.Value {
 	switch fd.FullName() {
-	case "pasteld.pastelid.QueryGetPastelidEntryRequest.address":
-		panic(fmt.Errorf("field address of message pasteld.pastelid.QueryGetPastelidEntryRequest is not mutable"))
+	case "pastel.pastelid.QueryGetPastelidEntryRequest.address":
+		panic(fmt.Errorf("field address of message pastel.pastelid.QueryGetPastelidEntryRequest is not mutable"))
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryGetPastelidEntryRequest"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryGetPastelidEntryRequest"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryGetPastelidEntryRequest does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryGetPastelidEntryRequest does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -1000,13 +1000,13 @@ func (x *fastReflection_QueryGetPastelidEntryRequest) Mutable(fd protoreflect.Fi
 // For lists, maps, and messages, this returns a new, empty, mutable value.
 func (x *fastReflection_QueryGetPastelidEntryRequest) NewField(fd protoreflect.FieldDescriptor) protoreflect.Value {
 	switch fd.FullName() {
-	case "pasteld.pastelid.QueryGetPastelidEntryRequest.address":
+	case "pastel.pastelid.QueryGetPastelidEntryRequest.address":
 		return protoreflect.ValueOfString("")
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryGetPastelidEntryRequest"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryGetPastelidEntryRequest"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryGetPastelidEntryRequest does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryGetPastelidEntryRequest does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -1016,7 +1016,7 @@ func (x *fastReflection_QueryGetPastelidEntryRequest) NewField(fd protoreflect.F
 func (x *fastReflection_QueryGetPastelidEntryRequest) WhichOneof(d protoreflect.OneofDescriptor) protoreflect.FieldDescriptor {
 	switch d.FullName() {
 	default:
-		panic(fmt.Errorf("%s is not a oneof field in pasteld.pastelid.QueryGetPastelidEntryRequest", d.FullName()))
+		panic(fmt.Errorf("%s is not a oneof field in pastel.pastelid.QueryGetPastelidEntryRequest", d.FullName()))
 	}
 	panic("unreachable")
 }
@@ -1233,8 +1233,8 @@ var (
 )
 
 func init() {
-	file_pasteld_pastelid_query_proto_init()
-	md_QueryGetPastelidEntryResponse = File_pasteld_pastelid_query_proto.Messages().ByName("QueryGetPastelidEntryResponse")
+	file_pastel_pastelid_query_proto_init()
+	md_QueryGetPastelidEntryResponse = File_pastel_pastelid_query_proto.Messages().ByName("QueryGetPastelidEntryResponse")
 	fd_QueryGetPastelidEntryResponse_pastelidEntry = md_QueryGetPastelidEntryResponse.Fields().ByName("pastelidEntry")
 }
 
@@ -1247,7 +1247,7 @@ func (x *QueryGetPastelidEntryResponse) ProtoReflect() protoreflect.Message {
 }
 
 func (x *QueryGetPastelidEntryResponse) slowProtoReflect() protoreflect.Message {
-	mi := &file_pasteld_pastelid_query_proto_msgTypes[3]
+	mi := &file_pastel_pastelid_query_proto_msgTypes[3]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1324,13 +1324,13 @@ func (x *fastReflection_QueryGetPastelidEntryResponse) Range(f func(protoreflect
 // a repeated field is populated if it is non-empty.
 func (x *fastReflection_QueryGetPastelidEntryResponse) Has(fd protoreflect.FieldDescriptor) bool {
 	switch fd.FullName() {
-	case "pasteld.pastelid.QueryGetPastelidEntryResponse.pastelidEntry":
+	case "pastel.pastelid.QueryGetPastelidEntryResponse.pastelidEntry":
 		return x.PastelidEntry != nil
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryGetPastelidEntryResponse"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryGetPastelidEntryResponse"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryGetPastelidEntryResponse does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryGetPastelidEntryResponse does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -1342,13 +1342,13 @@ func (x *fastReflection_QueryGetPastelidEntryResponse) Has(fd protoreflect.Field
 // Clear is a mutating operation and unsafe for concurrent use.
 func (x *fastReflection_QueryGetPastelidEntryResponse) Clear(fd protoreflect.FieldDescriptor) {
 	switch fd.FullName() {
-	case "pasteld.pastelid.QueryGetPastelidEntryResponse.pastelidEntry":
+	case "pastel.pastelid.QueryGetPastelidEntryResponse.pastelidEntry":
 		x.PastelidEntry = nil
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryGetPastelidEntryResponse"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryGetPastelidEntryResponse"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryGetPastelidEntryResponse does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryGetPastelidEntryResponse does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -1360,14 +1360,14 @@ func (x *fastReflection_QueryGetPastelidEntryResponse) Clear(fd protoreflect.Fie
 // of the value; to obtain a mutable reference, use Mutable.
 func (x *fastReflection_QueryGetPastelidEntryResponse) Get(descriptor protoreflect.FieldDescriptor) protoreflect.Value {
 	switch descriptor.FullName() {
-	case "pasteld.pastelid.QueryGetPastelidEntryResponse.pastelidEntry":
+	case "pastel.pastelid.QueryGetPastelidEntryResponse.pastelidEntry":
 		value := x.PastelidEntry
 		return protoreflect.ValueOfMessage(value.ProtoReflect())
 	default:
 		if descriptor.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryGetPastelidEntryResponse"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryGetPastelidEntryResponse"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryGetPastelidEntryResponse does not contain field %s", descriptor.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryGetPastelidEntryResponse does not contain field %s", descriptor.FullName()))
 	}
 }
 
@@ -1383,13 +1383,13 @@ func (x *fastReflection_QueryGetPastelidEntryResponse) Get(descriptor protorefle
 // Set is a mutating operation and unsafe for concurrent use.
 func (x *fastReflection_QueryGetPastelidEntryResponse) Set(fd protoreflect.FieldDescriptor, value protoreflect.Value) {
 	switch fd.FullName() {
-	case "pasteld.pastelid.QueryGetPastelidEntryResponse.pastelidEntry":
+	case "pastel.pastelid.QueryGetPastelidEntryResponse.pastelidEntry":
 		x.PastelidEntry = value.Message().Interface().(*PastelidEntry)
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryGetPastelidEntryResponse"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryGetPastelidEntryResponse"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryGetPastelidEntryResponse does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryGetPastelidEntryResponse does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -1405,16 +1405,16 @@ func (x *fastReflection_QueryGetPastelidEntryResponse) Set(fd protoreflect.Field
 // Mutable is a mutating operation and unsafe for concurrent use.
 func (x *fastReflection_QueryGetPastelidEntryResponse) Mutable(fd protoreflect.FieldDescriptor) protoreflect.Value {
 	switch fd.FullName() {
-	case "pasteld.pastelid.QueryGetPastelidEntryResponse.pastelidEntry":
+	case "pastel.pastelid.QueryGetPastelidEntryResponse.pastelidEntry":
 		if x.PastelidEntry == nil {
 			x.PastelidEntry = new(PastelidEntry)
 		}
 		return protoreflect.ValueOfMessage(x.PastelidEntry.ProtoReflect())
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryGetPastelidEntryResponse"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryGetPastelidEntryResponse"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryGetPastelidEntryResponse does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryGetPastelidEntryResponse does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -1423,14 +1423,14 @@ func (x *fastReflection_QueryGetPastelidEntryResponse) Mutable(fd protoreflect.F
 // For lists, maps, and messages, this returns a new, empty, mutable value.
 func (x *fastReflection_QueryGetPastelidEntryResponse) NewField(fd protoreflect.FieldDescriptor) protoreflect.Value {
 	switch fd.FullName() {
-	case "pasteld.pastelid.QueryGetPastelidEntryResponse.pastelidEntry":
+	case "pastel.pastelid.QueryGetPastelidEntryResponse.pastelidEntry":
 		m := new(PastelidEntry)
 		return protoreflect.ValueOfMessage(m.ProtoReflect())
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryGetPastelidEntryResponse"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryGetPastelidEntryResponse"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryGetPastelidEntryResponse does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryGetPastelidEntryResponse does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -1440,7 +1440,7 @@ func (x *fastReflection_QueryGetPastelidEntryResponse) NewField(fd protoreflect.
 func (x *fastReflection_QueryGetPastelidEntryResponse) WhichOneof(d protoreflect.OneofDescriptor) protoreflect.FieldDescriptor {
 	switch d.FullName() {
 	default:
-		panic(fmt.Errorf("%s is not a oneof field in pasteld.pastelid.QueryGetPastelidEntryResponse", d.FullName()))
+		panic(fmt.Errorf("%s is not a oneof field in pastel.pastelid.QueryGetPastelidEntryResponse", d.FullName()))
 	}
 	panic("unreachable")
 }
@@ -1668,8 +1668,8 @@ var (
 )
 
 func init() {
-	file_pasteld_pastelid_query_proto_init()
-	md_QueryAllPastelidEntryRequest = File_pasteld_pastelid_query_proto.Messages().ByName("QueryAllPastelidEntryRequest")
+	file_pastel_pastelid_query_proto_init()
+	md_QueryAllPastelidEntryRequest = File_pastel_pastelid_query_proto.Messages().ByName("QueryAllPastelidEntryRequest")
 	fd_QueryAllPastelidEntryRequest_pagination = md_QueryAllPastelidEntryRequest.Fields().ByName("pagination")
 }
 
@@ -1682,7 +1682,7 @@ func (x *QueryAllPastelidEntryRequest) ProtoReflect() protoreflect.Message {
 }
 
 func (x *QueryAllPastelidEntryRequest) slowProtoReflect() protoreflect.Message {
-	mi := &file_pasteld_pastelid_query_proto_msgTypes[4]
+	mi := &file_pastel_pastelid_query_proto_msgTypes[4]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1759,13 +1759,13 @@ func (x *fastReflection_QueryAllPastelidEntryRequest) Range(f func(protoreflect.
 // a repeated field is populated if it is non-empty.
 func (x *fastReflection_QueryAllPastelidEntryRequest) Has(fd protoreflect.FieldDescriptor) bool {
 	switch fd.FullName() {
-	case "pasteld.pastelid.QueryAllPastelidEntryRequest.pagination":
+	case "pastel.pastelid.QueryAllPastelidEntryRequest.pagination":
 		return x.Pagination != nil
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryAllPastelidEntryRequest"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryAllPastelidEntryRequest"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryAllPastelidEntryRequest does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryAllPastelidEntryRequest does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -1777,13 +1777,13 @@ func (x *fastReflection_QueryAllPastelidEntryRequest) Has(fd protoreflect.FieldD
 // Clear is a mutating operation and unsafe for concurrent use.
 func (x *fastReflection_QueryAllPastelidEntryRequest) Clear(fd protoreflect.FieldDescriptor) {
 	switch fd.FullName() {
-	case "pasteld.pastelid.QueryAllPastelidEntryRequest.pagination":
+	case "pastel.pastelid.QueryAllPastelidEntryRequest.pagination":
 		x.Pagination = nil
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryAllPastelidEntryRequest"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryAllPastelidEntryRequest"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryAllPastelidEntryRequest does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryAllPastelidEntryRequest does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -1795,14 +1795,14 @@ func (x *fastReflection_QueryAllPastelidEntryRequest) Clear(fd protoreflect.Fiel
 // of the value; to obtain a mutable reference, use Mutable.
 func (x *fastReflection_QueryAllPastelidEntryRequest) Get(descriptor protoreflect.FieldDescriptor) protoreflect.Value {
 	switch descriptor.FullName() {
-	case "pasteld.pastelid.QueryAllPastelidEntryRequest.pagination":
+	case "pastel.pastelid.QueryAllPastelidEntryRequest.pagination":
 		value := x.Pagination
 		return protoreflect.ValueOfMessage(value.ProtoReflect())
 	default:
 		if descriptor.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryAllPastelidEntryRequest"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryAllPastelidEntryRequest"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryAllPastelidEntryRequest does not contain field %s", descriptor.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryAllPastelidEntryRequest does not contain field %s", descriptor.FullName()))
 	}
 }
 
@@ -1818,13 +1818,13 @@ func (x *fastReflection_QueryAllPastelidEntryRequest) Get(descriptor protoreflec
 // Set is a mutating operation and unsafe for concurrent use.
 func (x *fastReflection_QueryAllPastelidEntryRequest) Set(fd protoreflect.FieldDescriptor, value protoreflect.Value) {
 	switch fd.FullName() {
-	case "pasteld.pastelid.QueryAllPastelidEntryRequest.pagination":
+	case "pastel.pastelid.QueryAllPastelidEntryRequest.pagination":
 		x.Pagination = value.Message().Interface().(*v1beta1.PageRequest)
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryAllPastelidEntryRequest"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryAllPastelidEntryRequest"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryAllPastelidEntryRequest does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryAllPastelidEntryRequest does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -1840,16 +1840,16 @@ func (x *fastReflection_QueryAllPastelidEntryRequest) Set(fd protoreflect.FieldD
 // Mutable is a mutating operation and unsafe for concurrent use.
 func (x *fastReflection_QueryAllPastelidEntryRequest) Mutable(fd protoreflect.FieldDescriptor) protoreflect.Value {
 	switch fd.FullName() {
-	case "pasteld.pastelid.QueryAllPastelidEntryRequest.pagination":
+	case "pastel.pastelid.QueryAllPastelidEntryRequest.pagination":
 		if x.Pagination == nil {
 			x.Pagination = new(v1beta1.PageRequest)
 		}
 		return protoreflect.ValueOfMessage(x.Pagination.ProtoReflect())
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryAllPastelidEntryRequest"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryAllPastelidEntryRequest"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryAllPastelidEntryRequest does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryAllPastelidEntryRequest does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -1858,14 +1858,14 @@ func (x *fastReflection_QueryAllPastelidEntryRequest) Mutable(fd protoreflect.Fi
 // For lists, maps, and messages, this returns a new, empty, mutable value.
 func (x *fastReflection_QueryAllPastelidEntryRequest) NewField(fd protoreflect.FieldDescriptor) protoreflect.Value {
 	switch fd.FullName() {
-	case "pasteld.pastelid.QueryAllPastelidEntryRequest.pagination":
+	case "pastel.pastelid.QueryAllPastelidEntryRequest.pagination":
 		m := new(v1beta1.PageRequest)
 		return protoreflect.ValueOfMessage(m.ProtoReflect())
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryAllPastelidEntryRequest"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryAllPastelidEntryRequest"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryAllPastelidEntryRequest does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryAllPastelidEntryRequest does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -1875,7 +1875,7 @@ func (x *fastReflection_QueryAllPastelidEntryRequest) NewField(fd protoreflect.F
 func (x *fastReflection_QueryAllPastelidEntryRequest) WhichOneof(d protoreflect.OneofDescriptor) protoreflect.FieldDescriptor {
 	switch d.FullName() {
 	default:
-		panic(fmt.Errorf("%s is not a oneof field in pasteld.pastelid.QueryAllPastelidEntryRequest", d.FullName()))
+		panic(fmt.Errorf("%s is not a oneof field in pastel.pastelid.QueryAllPastelidEntryRequest", d.FullName()))
 	}
 	panic("unreachable")
 }
@@ -2155,8 +2155,8 @@ var (
 )
 
 func init() {
-	file_pasteld_pastelid_query_proto_init()
-	md_QueryAllPastelidEntryResponse = File_pasteld_pastelid_query_proto.Messages().ByName("QueryAllPastelidEntryResponse")
+	file_pastel_pastelid_query_proto_init()
+	md_QueryAllPastelidEntryResponse = File_pastel_pastelid_query_proto.Messages().ByName("QueryAllPastelidEntryResponse")
 	fd_QueryAllPastelidEntryResponse_pastelidEntry = md_QueryAllPastelidEntryResponse.Fields().ByName("pastelidEntry")
 	fd_QueryAllPastelidEntryResponse_pagination = md_QueryAllPastelidEntryResponse.Fields().ByName("pagination")
 }
@@ -2170,7 +2170,7 @@ func (x *QueryAllPastelidEntryResponse) ProtoReflect() protoreflect.Message {
 }
 
 func (x *QueryAllPastelidEntryResponse) slowProtoReflect() protoreflect.Message {
-	mi := &file_pasteld_pastelid_query_proto_msgTypes[5]
+	mi := &file_pastel_pastelid_query_proto_msgTypes[5]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2253,15 +2253,15 @@ func (x *fastReflection_QueryAllPastelidEntryResponse) Range(f func(protoreflect
 // a repeated field is populated if it is non-empty.
 func (x *fastReflection_QueryAllPastelidEntryResponse) Has(fd protoreflect.FieldDescriptor) bool {
 	switch fd.FullName() {
-	case "pasteld.pastelid.QueryAllPastelidEntryResponse.pastelidEntry":
+	case "pastel.pastelid.QueryAllPastelidEntryResponse.pastelidEntry":
 		return len(x.PastelidEntry) != 0
-	case "pasteld.pastelid.QueryAllPastelidEntryResponse.pagination":
+	case "pastel.pastelid.QueryAllPastelidEntryResponse.pagination":
 		return x.Pagination != nil
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryAllPastelidEntryResponse"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryAllPastelidEntryResponse"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryAllPastelidEntryResponse does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryAllPastelidEntryResponse does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -2273,15 +2273,15 @@ func (x *fastReflection_QueryAllPastelidEntryResponse) Has(fd protoreflect.Field
 // Clear is a mutating operation and unsafe for concurrent use.
 func (x *fastReflection_QueryAllPastelidEntryResponse) Clear(fd protoreflect.FieldDescriptor) {
 	switch fd.FullName() {
-	case "pasteld.pastelid.QueryAllPastelidEntryResponse.pastelidEntry":
+	case "pastel.pastelid.QueryAllPastelidEntryResponse.pastelidEntry":
 		x.PastelidEntry = nil
-	case "pasteld.pastelid.QueryAllPastelidEntryResponse.pagination":
+	case "pastel.pastelid.QueryAllPastelidEntryResponse.pagination":
 		x.Pagination = nil
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryAllPastelidEntryResponse"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryAllPastelidEntryResponse"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryAllPastelidEntryResponse does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryAllPastelidEntryResponse does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -2293,20 +2293,20 @@ func (x *fastReflection_QueryAllPastelidEntryResponse) Clear(fd protoreflect.Fie
 // of the value; to obtain a mutable reference, use Mutable.
 func (x *fastReflection_QueryAllPastelidEntryResponse) Get(descriptor protoreflect.FieldDescriptor) protoreflect.Value {
 	switch descriptor.FullName() {
-	case "pasteld.pastelid.QueryAllPastelidEntryResponse.pastelidEntry":
+	case "pastel.pastelid.QueryAllPastelidEntryResponse.pastelidEntry":
 		if len(x.PastelidEntry) == 0 {
 			return protoreflect.ValueOfList(&_QueryAllPastelidEntryResponse_1_list{})
 		}
 		listValue := &_QueryAllPastelidEntryResponse_1_list{list: &x.PastelidEntry}
 		return protoreflect.ValueOfList(listValue)
-	case "pasteld.pastelid.QueryAllPastelidEntryResponse.pagination":
+	case "pastel.pastelid.QueryAllPastelidEntryResponse.pagination":
 		value := x.Pagination
 		return protoreflect.ValueOfMessage(value.ProtoReflect())
 	default:
 		if descriptor.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryAllPastelidEntryResponse"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryAllPastelidEntryResponse"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryAllPastelidEntryResponse does not contain field %s", descriptor.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryAllPastelidEntryResponse does not contain field %s", descriptor.FullName()))
 	}
 }
 
@@ -2322,17 +2322,17 @@ func (x *fastReflection_QueryAllPastelidEntryResponse) Get(descriptor protorefle
 // Set is a mutating operation and unsafe for concurrent use.
 func (x *fastReflection_QueryAllPastelidEntryResponse) Set(fd protoreflect.FieldDescriptor, value protoreflect.Value) {
 	switch fd.FullName() {
-	case "pasteld.pastelid.QueryAllPastelidEntryResponse.pastelidEntry":
+	case "pastel.pastelid.QueryAllPastelidEntryResponse.pastelidEntry":
 		lv := value.List()
 		clv := lv.(*_QueryAllPastelidEntryResponse_1_list)
 		x.PastelidEntry = *clv.list
-	case "pasteld.pastelid.QueryAllPastelidEntryResponse.pagination":
+	case "pastel.pastelid.QueryAllPastelidEntryResponse.pagination":
 		x.Pagination = value.Message().Interface().(*v1beta1.PageResponse)
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryAllPastelidEntryResponse"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryAllPastelidEntryResponse"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryAllPastelidEntryResponse does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryAllPastelidEntryResponse does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -2348,22 +2348,22 @@ func (x *fastReflection_QueryAllPastelidEntryResponse) Set(fd protoreflect.Field
 // Mutable is a mutating operation and unsafe for concurrent use.
 func (x *fastReflection_QueryAllPastelidEntryResponse) Mutable(fd protoreflect.FieldDescriptor) protoreflect.Value {
 	switch fd.FullName() {
-	case "pasteld.pastelid.QueryAllPastelidEntryResponse.pastelidEntry":
+	case "pastel.pastelid.QueryAllPastelidEntryResponse.pastelidEntry":
 		if x.PastelidEntry == nil {
 			x.PastelidEntry = []*PastelidEntry{}
 		}
 		value := &_QueryAllPastelidEntryResponse_1_list{list: &x.PastelidEntry}
 		return protoreflect.ValueOfList(value)
-	case "pasteld.pastelid.QueryAllPastelidEntryResponse.pagination":
+	case "pastel.pastelid.QueryAllPastelidEntryResponse.pagination":
 		if x.Pagination == nil {
 			x.Pagination = new(v1beta1.PageResponse)
 		}
 		return protoreflect.ValueOfMessage(x.Pagination.ProtoReflect())
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryAllPastelidEntryResponse"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryAllPastelidEntryResponse"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryAllPastelidEntryResponse does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryAllPastelidEntryResponse does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -2372,17 +2372,17 @@ func (x *fastReflection_QueryAllPastelidEntryResponse) Mutable(fd protoreflect.F
 // For lists, maps, and messages, this returns a new, empty, mutable value.
 func (x *fastReflection_QueryAllPastelidEntryResponse) NewField(fd protoreflect.FieldDescriptor) protoreflect.Value {
 	switch fd.FullName() {
-	case "pasteld.pastelid.QueryAllPastelidEntryResponse.pastelidEntry":
+	case "pastel.pastelid.QueryAllPastelidEntryResponse.pastelidEntry":
 		list := []*PastelidEntry{}
 		return protoreflect.ValueOfList(&_QueryAllPastelidEntryResponse_1_list{list: &list})
-	case "pasteld.pastelid.QueryAllPastelidEntryResponse.pagination":
+	case "pastel.pastelid.QueryAllPastelidEntryResponse.pagination":
 		m := new(v1beta1.PageResponse)
 		return protoreflect.ValueOfMessage(m.ProtoReflect())
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pasteld.pastelid.QueryAllPastelidEntryResponse"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.pastelid.QueryAllPastelidEntryResponse"))
 		}
-		panic(fmt.Errorf("message pasteld.pastelid.QueryAllPastelidEntryResponse does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.pastelid.QueryAllPastelidEntryResponse does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -2392,7 +2392,7 @@ func (x *fastReflection_QueryAllPastelidEntryResponse) NewField(fd protoreflect.
 func (x *fastReflection_QueryAllPastelidEntryResponse) WhichOneof(d protoreflect.OneofDescriptor) protoreflect.FieldDescriptor {
 	switch d.FullName() {
 	default:
-		panic(fmt.Errorf("%s is not a oneof field in pasteld.pastelid.QueryAllPastelidEntryResponse", d.FullName()))
+		panic(fmt.Errorf("%s is not a oneof field in pastel.pastelid.QueryAllPastelidEntryResponse", d.FullName()))
 	}
 	panic("unreachable")
 }
@@ -2674,7 +2674,7 @@ func (x *fastReflection_QueryAllPastelidEntryResponse) ProtoMethods() *protoifac
 // versions:
 // 	protoc-gen-go v1.27.0
 // 	protoc        (unknown)
-// source: pasteld/pastelid/query.proto
+// source: pastel/pastelid/query.proto
 
 const (
 	// Verify that this generated code is sufficiently up-to-date.
@@ -2693,7 +2693,7 @@ type QueryParamsRequest struct {
 func (x *QueryParamsRequest) Reset() {
 	*x = QueryParamsRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_pasteld_pastelid_query_proto_msgTypes[0]
+		mi := &file_pastel_pastelid_query_proto_msgTypes[0]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2707,7 +2707,7 @@ func (*QueryParamsRequest) ProtoMessage() {}
 
 // Deprecated: Use QueryParamsRequest.ProtoReflect.Descriptor instead.
 func (*QueryParamsRequest) Descriptor() ([]byte, []int) {
-	return file_pasteld_pastelid_query_proto_rawDescGZIP(), []int{0}
+	return file_pastel_pastelid_query_proto_rawDescGZIP(), []int{0}
 }
 
 // QueryParamsResponse is response type for the Query/Params RPC method.
@@ -2723,7 +2723,7 @@ type QueryParamsResponse struct {
 func (x *QueryParamsResponse) Reset() {
 	*x = QueryParamsResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_pasteld_pastelid_query_proto_msgTypes[1]
+		mi := &file_pastel_pastelid_query_proto_msgTypes[1]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2737,7 +2737,7 @@ func (*QueryParamsResponse) ProtoMessage() {}
 
 // Deprecated: Use QueryParamsResponse.ProtoReflect.Descriptor instead.
 func (*QueryParamsResponse) Descriptor() ([]byte, []int) {
-	return file_pasteld_pastelid_query_proto_rawDescGZIP(), []int{1}
+	return file_pastel_pastelid_query_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *QueryParamsResponse) GetParams() *Params {
@@ -2758,7 +2758,7 @@ type QueryGetPastelidEntryRequest struct {
 func (x *QueryGetPastelidEntryRequest) Reset() {
 	*x = QueryGetPastelidEntryRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_pasteld_pastelid_query_proto_msgTypes[2]
+		mi := &file_pastel_pastelid_query_proto_msgTypes[2]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2772,7 +2772,7 @@ func (*QueryGetPastelidEntryRequest) ProtoMessage() {}
 
 // Deprecated: Use QueryGetPastelidEntryRequest.ProtoReflect.Descriptor instead.
 func (*QueryGetPastelidEntryRequest) Descriptor() ([]byte, []int) {
-	return file_pasteld_pastelid_query_proto_rawDescGZIP(), []int{2}
+	return file_pastel_pastelid_query_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *QueryGetPastelidEntryRequest) GetAddress() string {
@@ -2793,7 +2793,7 @@ type QueryGetPastelidEntryResponse struct {
 func (x *QueryGetPastelidEntryResponse) Reset() {
 	*x = QueryGetPastelidEntryResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_pasteld_pastelid_query_proto_msgTypes[3]
+		mi := &file_pastel_pastelid_query_proto_msgTypes[3]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2807,7 +2807,7 @@ func (*QueryGetPastelidEntryResponse) ProtoMessage() {}
 
 // Deprecated: Use QueryGetPastelidEntryResponse.ProtoReflect.Descriptor instead.
 func (*QueryGetPastelidEntryResponse) Descriptor() ([]byte, []int) {
-	return file_pasteld_pastelid_query_proto_rawDescGZIP(), []int{3}
+	return file_pastel_pastelid_query_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *QueryGetPastelidEntryResponse) GetPastelidEntry() *PastelidEntry {
@@ -2828,7 +2828,7 @@ type QueryAllPastelidEntryRequest struct {
 func (x *QueryAllPastelidEntryRequest) Reset() {
 	*x = QueryAllPastelidEntryRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_pasteld_pastelid_query_proto_msgTypes[4]
+		mi := &file_pastel_pastelid_query_proto_msgTypes[4]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2842,7 +2842,7 @@ func (*QueryAllPastelidEntryRequest) ProtoMessage() {}
 
 // Deprecated: Use QueryAllPastelidEntryRequest.ProtoReflect.Descriptor instead.
 func (*QueryAllPastelidEntryRequest) Descriptor() ([]byte, []int) {
-	return file_pasteld_pastelid_query_proto_rawDescGZIP(), []int{4}
+	return file_pastel_pastelid_query_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *QueryAllPastelidEntryRequest) GetPagination() *v1beta1.PageRequest {
@@ -2864,7 +2864,7 @@ type QueryAllPastelidEntryResponse struct {
 func (x *QueryAllPastelidEntryResponse) Reset() {
 	*x = QueryAllPastelidEntryResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_pasteld_pastelid_query_proto_msgTypes[5]
+		mi := &file_pastel_pastelid_query_proto_msgTypes[5]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -2878,7 +2878,7 @@ func (*QueryAllPastelidEntryResponse) ProtoMessage() {}
 
 // Deprecated: Use QueryAllPastelidEntryResponse.ProtoReflect.Descriptor instead.
 func (*QueryAllPastelidEntryResponse) Descriptor() ([]byte, []int) {
-	return file_pasteld_pastelid_query_proto_rawDescGZIP(), []int{5}
+	return file_pastel_pastelid_query_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *QueryAllPastelidEntryResponse) GetPastelidEntry() []*PastelidEntry {
@@ -2895,142 +2895,140 @@ func (x *QueryAllPastelidEntryResponse) GetPagination() *v1beta1.PageResponse {
 	return nil
 }
 
-var File_pasteld_pastelid_query_proto protoreflect.FileDescriptor
+var File_pastel_pastelid_query_proto protoreflect.FileDescriptor
 
-var file_pasteld_pastelid_query_proto_rawDesc = []byte{
-	0x0a, 0x1c, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x64, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c,
-	0x69, 0x64, 0x2f, 0x71, 0x75, 0x65, 0x72, 0x79, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x10,
-	0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x64, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64,
-	0x1a, 0x11, 0x61, 0x6d, 0x69, 0x6e, 0x6f, 0x2f, 0x61, 0x6d, 0x69, 0x6e, 0x6f, 0x2e, 0x70, 0x72,
-	0x6f, 0x74, 0x6f, 0x1a, 0x14, 0x67, 0x6f, 0x67, 0x6f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x67,
-	0x6f, 0x67, 0x6f, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x1a, 0x1c, 0x67, 0x6f, 0x6f, 0x67, 0x6c,
-	0x65, 0x2f, 0x61, 0x70, 0x69, 0x2f, 0x61, 0x6e, 0x6e, 0x6f, 0x74, 0x61, 0x74, 0x69, 0x6f, 0x6e,
-	0x73, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x1a, 0x2a, 0x63, 0x6f, 0x73, 0x6d, 0x6f, 0x73, 0x2f,
-	0x62, 0x61, 0x73, 0x65, 0x2f, 0x71, 0x75, 0x65, 0x72, 0x79, 0x2f, 0x76, 0x31, 0x62, 0x65, 0x74,
-	0x61, 0x31, 0x2f, 0x70, 0x61, 0x67, 0x69, 0x6e, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2e, 0x70, 0x72,
-	0x6f, 0x74, 0x6f, 0x1a, 0x1d, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x64, 0x2f, 0x70, 0x61, 0x73,
-	0x74, 0x65, 0x6c, 0x69, 0x64, 0x2f, 0x70, 0x61, 0x72, 0x61, 0x6d, 0x73, 0x2e, 0x70, 0x72, 0x6f,
-	0x74, 0x6f, 0x1a, 0x25, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x64, 0x2f, 0x70, 0x61, 0x73, 0x74,
-	0x65, 0x6c, 0x69, 0x64, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x5f, 0x65, 0x6e,
-	0x74, 0x72, 0x79, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0x14, 0x0a, 0x12, 0x51, 0x75, 0x65,
-	0x72, 0x79, 0x50, 0x61, 0x72, 0x61, 0x6d, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x22,
-	0x52, 0x0a, 0x13, 0x51, 0x75, 0x65, 0x72, 0x79, 0x50, 0x61, 0x72, 0x61, 0x6d, 0x73, 0x52, 0x65,
-	0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x3b, 0x0a, 0x06, 0x70, 0x61, 0x72, 0x61, 0x6d, 0x73,
-	0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x18, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x64,
-	0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x2e, 0x50, 0x61, 0x72, 0x61, 0x6d, 0x73,
-	0x42, 0x09, 0xc8, 0xde, 0x1f, 0x00, 0xa8, 0xe7, 0xb0, 0x2a, 0x01, 0x52, 0x06, 0x70, 0x61, 0x72,
-	0x61, 0x6d, 0x73, 0x22, 0x38, 0x0a, 0x1c, 0x51, 0x75, 0x65, 0x72, 0x79, 0x47, 0x65, 0x74, 0x50,
-	0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x52, 0x65, 0x71, 0x75,
-	0x65, 0x73, 0x74, 0x12, 0x18, 0x0a, 0x07, 0x61, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x18, 0x01,
-	0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x61, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x22, 0x6c, 0x0a,
-	0x1d, 0x51, 0x75, 0x65, 0x72, 0x79, 0x47, 0x65, 0x74, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69,
-	0x64, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x4b,
-	0x0a, 0x0d, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x18,
-	0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1f, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x64, 0x2e,
+var file_pastel_pastelid_query_proto_rawDesc = []byte{
+	0x0a, 0x1b, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69,
+	0x64, 0x2f, 0x71, 0x75, 0x65, 0x72, 0x79, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x0f, 0x70,
+	0x61, 0x73, 0x74, 0x65, 0x6c, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x1a, 0x11,
+	0x61, 0x6d, 0x69, 0x6e, 0x6f, 0x2f, 0x61, 0x6d, 0x69, 0x6e, 0x6f, 0x2e, 0x70, 0x72, 0x6f, 0x74,
+	0x6f, 0x1a, 0x14, 0x67, 0x6f, 0x67, 0x6f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x67, 0x6f, 0x67,
+	0x6f, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x1a, 0x1c, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2f,
+	0x61, 0x70, 0x69, 0x2f, 0x61, 0x6e, 0x6e, 0x6f, 0x74, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x2e,
+	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x1a, 0x2a, 0x63, 0x6f, 0x73, 0x6d, 0x6f, 0x73, 0x2f, 0x62, 0x61,
+	0x73, 0x65, 0x2f, 0x71, 0x75, 0x65, 0x72, 0x79, 0x2f, 0x76, 0x31, 0x62, 0x65, 0x74, 0x61, 0x31,
+	0x2f, 0x70, 0x61, 0x67, 0x69, 0x6e, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2e, 0x70, 0x72, 0x6f, 0x74,
+	0x6f, 0x1a, 0x1c, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c,
+	0x69, 0x64, 0x2f, 0x70, 0x61, 0x72, 0x61, 0x6d, 0x73, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x1a,
+	0x24, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64,
+	0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x5f, 0x65, 0x6e, 0x74, 0x72, 0x79, 0x2e,
+	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0x14, 0x0a, 0x12, 0x51, 0x75, 0x65, 0x72, 0x79, 0x50, 0x61,
+	0x72, 0x61, 0x6d, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x22, 0x51, 0x0a, 0x13, 0x51,
+	0x75, 0x65, 0x72, 0x79, 0x50, 0x61, 0x72, 0x61, 0x6d, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e,
+	0x73, 0x65, 0x12, 0x3a, 0x0a, 0x06, 0x70, 0x61, 0x72, 0x61, 0x6d, 0x73, 0x18, 0x01, 0x20, 0x01,
+	0x28, 0x0b, 0x32, 0x17, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2e, 0x70, 0x61, 0x73, 0x74,
+	0x65, 0x6c, 0x69, 0x64, 0x2e, 0x50, 0x61, 0x72, 0x61, 0x6d, 0x73, 0x42, 0x09, 0xc8, 0xde, 0x1f,
+	0x00, 0xa8, 0xe7, 0xb0, 0x2a, 0x01, 0x52, 0x06, 0x70, 0x61, 0x72, 0x61, 0x6d, 0x73, 0x22, 0x38,
+	0x0a, 0x1c, 0x51, 0x75, 0x65, 0x72, 0x79, 0x47, 0x65, 0x74, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c,
+	0x69, 0x64, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x18,
+	0x0a, 0x07, 0x61, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x07, 0x61, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x22, 0x6b, 0x0a, 0x1d, 0x51, 0x75, 0x65, 0x72,
+	0x79, 0x47, 0x65, 0x74, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x45, 0x6e, 0x74, 0x72,
+	0x79, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x4a, 0x0a, 0x0d, 0x70, 0x61, 0x73,
+	0x74, 0x65, 0x6c, 0x69, 0x64, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b,
+	0x32, 0x1e, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c,
+	0x69, 0x64, 0x2e, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x45, 0x6e, 0x74, 0x72, 0x79,
+	0x42, 0x04, 0xc8, 0xde, 0x1f, 0x00, 0x52, 0x0d, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64,
+	0x45, 0x6e, 0x74, 0x72, 0x79, 0x22, 0x66, 0x0a, 0x1c, 0x51, 0x75, 0x65, 0x72, 0x79, 0x41, 0x6c,
+	0x6c, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x52, 0x65,
+	0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x46, 0x0a, 0x0a, 0x70, 0x61, 0x67, 0x69, 0x6e, 0x61, 0x74,
+	0x69, 0x6f, 0x6e, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x26, 0x2e, 0x63, 0x6f, 0x73, 0x6d,
+	0x6f, 0x73, 0x2e, 0x62, 0x61, 0x73, 0x65, 0x2e, 0x71, 0x75, 0x65, 0x72, 0x79, 0x2e, 0x76, 0x31,
+	0x62, 0x65, 0x74, 0x61, 0x31, 0x2e, 0x50, 0x61, 0x67, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73,
+	0x74, 0x52, 0x0a, 0x70, 0x61, 0x67, 0x69, 0x6e, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x22, 0xb4, 0x01,
+	0x0a, 0x1d, 0x51, 0x75, 0x65, 0x72, 0x79, 0x41, 0x6c, 0x6c, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c,
+	0x69, 0x64, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12,
+	0x4a, 0x0a, 0x0d, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x45, 0x6e, 0x74, 0x72, 0x79,
+	0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x1e, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2e,
 	0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x2e, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69,
 	0x64, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x42, 0x04, 0xc8, 0xde, 0x1f, 0x00, 0x52, 0x0d, 0x70, 0x61,
-	0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x22, 0x66, 0x0a, 0x1c, 0x51,
-	0x75, 0x65, 0x72, 0x79, 0x41, 0x6c, 0x6c, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x45,
-	0x6e, 0x74, 0x72, 0x79, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x46, 0x0a, 0x0a, 0x70,
-	0x61, 0x67, 0x69, 0x6e, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32,
-	0x26, 0x2e, 0x63, 0x6f, 0x73, 0x6d, 0x6f, 0x73, 0x2e, 0x62, 0x61, 0x73, 0x65, 0x2e, 0x71, 0x75,
+	0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x12, 0x47, 0x0a, 0x0a, 0x70,
+	0x61, 0x67, 0x69, 0x6e, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32,
+	0x27, 0x2e, 0x63, 0x6f, 0x73, 0x6d, 0x6f, 0x73, 0x2e, 0x62, 0x61, 0x73, 0x65, 0x2e, 0x71, 0x75,
 	0x65, 0x72, 0x79, 0x2e, 0x76, 0x31, 0x62, 0x65, 0x74, 0x61, 0x31, 0x2e, 0x50, 0x61, 0x67, 0x65,
-	0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x52, 0x0a, 0x70, 0x61, 0x67, 0x69, 0x6e, 0x61, 0x74,
-	0x69, 0x6f, 0x6e, 0x22, 0xb5, 0x01, 0x0a, 0x1d, 0x51, 0x75, 0x65, 0x72, 0x79, 0x41, 0x6c, 0x6c,
-	0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x52, 0x65, 0x73,
-	0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x4b, 0x0a, 0x0d, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69,
-	0x64, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x1f, 0x2e, 0x70,
-	0x61, 0x73, 0x74, 0x65, 0x6c, 0x64, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x2e,
-	0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x42, 0x04, 0xc8,
-	0xde, 0x1f, 0x00, 0x52, 0x0d, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x45, 0x6e, 0x74,
-	0x72, 0x79, 0x12, 0x47, 0x0a, 0x0a, 0x70, 0x61, 0x67, 0x69, 0x6e, 0x61, 0x74, 0x69, 0x6f, 0x6e,
-	0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x27, 0x2e, 0x63, 0x6f, 0x73, 0x6d, 0x6f, 0x73, 0x2e,
-	0x62, 0x61, 0x73, 0x65, 0x2e, 0x71, 0x75, 0x65, 0x72, 0x79, 0x2e, 0x76, 0x31, 0x62, 0x65, 0x74,
-	0x61, 0x31, 0x2e, 0x50, 0x61, 0x67, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x52,
-	0x0a, 0x70, 0x61, 0x67, 0x69, 0x6e, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x32, 0xf2, 0x03, 0x0a, 0x05,
-	0x51, 0x75, 0x65, 0x72, 0x79, 0x12, 0x85, 0x01, 0x0a, 0x06, 0x50, 0x61, 0x72, 0x61, 0x6d, 0x73,
-	0x12, 0x24, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x64, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65,
-	0x6c, 0x69, 0x64, 0x2e, 0x51, 0x75, 0x65, 0x72, 0x79, 0x50, 0x61, 0x72, 0x61, 0x6d, 0x73, 0x52,
-	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x25, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x64,
-	0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x2e, 0x51, 0x75, 0x65, 0x72, 0x79, 0x50,
-	0x61, 0x72, 0x61, 0x6d, 0x73, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x2e, 0x82,
-	0xd3, 0xe4, 0x93, 0x02, 0x28, 0x12, 0x26, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x6e, 0x65,
-	0x74, 0x77, 0x6f, 0x72, 0x6b, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x64, 0x2f, 0x70, 0x61,
-	0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x2f, 0x70, 0x61, 0x72, 0x61, 0x6d, 0x73, 0x12, 0xb2, 0x01,
-	0x0a, 0x0d, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x12,
-	0x2e, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x64, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c,
-	0x69, 0x64, 0x2e, 0x51, 0x75, 0x65, 0x72, 0x79, 0x47, 0x65, 0x74, 0x50, 0x61, 0x73, 0x74, 0x65,
-	0x6c, 0x69, 0x64, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a,
-	0x2f, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x64, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c,
-	0x69, 0x64, 0x2e, 0x51, 0x75, 0x65, 0x72, 0x79, 0x47, 0x65, 0x74, 0x50, 0x61, 0x73, 0x74, 0x65,
-	0x6c, 0x69, 0x64, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65,
-	0x22, 0x40, 0x82, 0xd3, 0xe4, 0x93, 0x02, 0x3a, 0x12, 0x38, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65,
-	0x6c, 0x6e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x64,
-	0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c,
-	0x69, 0x64, 0x5f, 0x65, 0x6e, 0x74, 0x72, 0x79, 0x2f, 0x7b, 0x61, 0x64, 0x64, 0x72, 0x65, 0x73,
-	0x73, 0x7d, 0x12, 0xab, 0x01, 0x0a, 0x10, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x45,
-	0x6e, 0x74, 0x72, 0x79, 0x41, 0x6c, 0x6c, 0x12, 0x2e, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c,
-	0x64, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x2e, 0x51, 0x75, 0x65, 0x72, 0x79,
-	0x41, 0x6c, 0x6c, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x45, 0x6e, 0x74, 0x72, 0x79,
-	0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x2f, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c,
-	0x64, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x2e, 0x51, 0x75, 0x65, 0x72, 0x79,
-	0x41, 0x6c, 0x6c, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x45, 0x6e, 0x74, 0x72, 0x79,
-	0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x36, 0x82, 0xd3, 0xe4, 0x93, 0x02, 0x30,
-	0x12, 0x2e, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x6e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b,
-	0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x64, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69,
+	0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x52, 0x0a, 0x70, 0x61, 0x67, 0x69, 0x6e, 0x61,
+	0x74, 0x69, 0x6f, 0x6e, 0x32, 0xe9, 0x03, 0x0a, 0x05, 0x51, 0x75, 0x65, 0x72, 0x79, 0x12, 0x82,
+	0x01, 0x0a, 0x06, 0x50, 0x61, 0x72, 0x61, 0x6d, 0x73, 0x12, 0x23, 0x2e, 0x70, 0x61, 0x73, 0x74,
+	0x65, 0x6c, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x2e, 0x51, 0x75, 0x65, 0x72,
+	0x79, 0x50, 0x61, 0x72, 0x61, 0x6d, 0x73, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x24,
+	0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64,
+	0x2e, 0x51, 0x75, 0x65, 0x72, 0x79, 0x50, 0x61, 0x72, 0x61, 0x6d, 0x73, 0x52, 0x65, 0x73, 0x70,
+	0x6f, 0x6e, 0x73, 0x65, 0x22, 0x2d, 0x82, 0xd3, 0xe4, 0x93, 0x02, 0x27, 0x12, 0x25, 0x2f, 0x70,
+	0x61, 0x73, 0x74, 0x65, 0x6c, 0x6e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x2f, 0x70, 0x61, 0x73,
+	0x74, 0x65, 0x6c, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x2f, 0x70, 0x61, 0x72,
+	0x61, 0x6d, 0x73, 0x12, 0xaf, 0x01, 0x0a, 0x0d, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64,
+	0x45, 0x6e, 0x74, 0x72, 0x79, 0x12, 0x2d, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2e, 0x70,
+	0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x2e, 0x51, 0x75, 0x65, 0x72, 0x79, 0x47, 0x65, 0x74,
+	0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x52, 0x65, 0x71,
+	0x75, 0x65, 0x73, 0x74, 0x1a, 0x2e, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2e, 0x70, 0x61,
+	0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x2e, 0x51, 0x75, 0x65, 0x72, 0x79, 0x47, 0x65, 0x74, 0x50,
+	0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x52, 0x65, 0x73, 0x70,
+	0x6f, 0x6e, 0x73, 0x65, 0x22, 0x3f, 0x82, 0xd3, 0xe4, 0x93, 0x02, 0x39, 0x12, 0x37, 0x2f, 0x70,
+	0x61, 0x73, 0x74, 0x65, 0x6c, 0x6e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x2f, 0x70, 0x61, 0x73,
+	0x74, 0x65, 0x6c, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x2f, 0x70, 0x61, 0x73,
+	0x74, 0x65, 0x6c, 0x69, 0x64, 0x5f, 0x65, 0x6e, 0x74, 0x72, 0x79, 0x2f, 0x7b, 0x61, 0x64, 0x64,
+	0x72, 0x65, 0x73, 0x73, 0x7d, 0x12, 0xa8, 0x01, 0x0a, 0x10, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c,
+	0x69, 0x64, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x41, 0x6c, 0x6c, 0x12, 0x2d, 0x2e, 0x70, 0x61, 0x73,
+	0x74, 0x65, 0x6c, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x2e, 0x51, 0x75, 0x65,
+	0x72, 0x79, 0x41, 0x6c, 0x6c, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x45, 0x6e, 0x74,
+	0x72, 0x79, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x2e, 0x2e, 0x70, 0x61, 0x73, 0x74,
+	0x65, 0x6c, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x2e, 0x51, 0x75, 0x65, 0x72,
+	0x79, 0x41, 0x6c, 0x6c, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x45, 0x6e, 0x74, 0x72,
+	0x79, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x35, 0x82, 0xd3, 0xe4, 0x93, 0x02,
+	0x2f, 0x12, 0x2d, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x6e, 0x65, 0x74, 0x77, 0x6f, 0x72,
+	0x6b, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69,
 	0x64, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x5f, 0x65, 0x6e, 0x74, 0x72, 0x79,
-	0x42, 0xba, 0x01, 0x0a, 0x14, 0x63, 0x6f, 0x6d, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x64,
-	0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x42, 0x0a, 0x51, 0x75, 0x65, 0x72, 0x79,
-	0x50, 0x72, 0x6f, 0x74, 0x6f, 0x50, 0x01, 0x5a, 0x35, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e,
-	0x63, 0x6f, 0x6d, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x6e, 0x65, 0x74, 0x77, 0x6f, 0x72,
-	0x6b, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x64, 0x2f, 0x61, 0x70, 0x69, 0x2f, 0x70, 0x61,
-	0x73, 0x74, 0x65, 0x6c, 0x64, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0xa2, 0x02,
-	0x03, 0x50, 0x50, 0x58, 0xaa, 0x02, 0x10, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x64, 0x2e, 0x50,
-	0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0xca, 0x02, 0x10, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c,
-	0x64, 0x5c, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0xe2, 0x02, 0x1c, 0x50, 0x61, 0x73,
-	0x74, 0x65, 0x6c, 0x64, 0x5c, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x5c, 0x47, 0x50,
-	0x42, 0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0xea, 0x02, 0x11, 0x50, 0x61, 0x73, 0x74,
-	0x65, 0x6c, 0x64, 0x3a, 0x3a, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x62, 0x06, 0x70,
-	0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x42, 0xb3, 0x01, 0x0a, 0x13, 0x63, 0x6f, 0x6d, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2e,
+	0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x42, 0x0a, 0x51, 0x75, 0x65, 0x72, 0x79, 0x50,
+	0x72, 0x6f, 0x74, 0x6f, 0x50, 0x01, 0x5a, 0x33, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63,
+	0x6f, 0x6d, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x6e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b,
+	0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2f, 0x61, 0x70, 0x69, 0x2f, 0x70, 0x61, 0x73, 0x74,
+	0x65, 0x6c, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0xa2, 0x02, 0x03, 0x50, 0x50,
+	0x58, 0xaa, 0x02, 0x0f, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2e, 0x50, 0x61, 0x73, 0x74, 0x65,
+	0x6c, 0x69, 0x64, 0xca, 0x02, 0x0f, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x5c, 0x50, 0x61, 0x73,
+	0x74, 0x65, 0x6c, 0x69, 0x64, 0xe2, 0x02, 0x1b, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x5c, 0x50,
+	0x61, 0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x5c, 0x47, 0x50, 0x42, 0x4d, 0x65, 0x74, 0x61, 0x64,
+	0x61, 0x74, 0x61, 0xea, 0x02, 0x10, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x3a, 0x3a, 0x50, 0x61,
+	0x73, 0x74, 0x65, 0x6c, 0x69, 0x64, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
-	file_pasteld_pastelid_query_proto_rawDescOnce sync.Once
-	file_pasteld_pastelid_query_proto_rawDescData = file_pasteld_pastelid_query_proto_rawDesc
+	file_pastel_pastelid_query_proto_rawDescOnce sync.Once
+	file_pastel_pastelid_query_proto_rawDescData = file_pastel_pastelid_query_proto_rawDesc
 )
 
-func file_pasteld_pastelid_query_proto_rawDescGZIP() []byte {
-	file_pasteld_pastelid_query_proto_rawDescOnce.Do(func() {
-		file_pasteld_pastelid_query_proto_rawDescData = protoimpl.X.CompressGZIP(file_pasteld_pastelid_query_proto_rawDescData)
+func file_pastel_pastelid_query_proto_rawDescGZIP() []byte {
+	file_pastel_pastelid_query_proto_rawDescOnce.Do(func() {
+		file_pastel_pastelid_query_proto_rawDescData = protoimpl.X.CompressGZIP(file_pastel_pastelid_query_proto_rawDescData)
 	})
-	return file_pasteld_pastelid_query_proto_rawDescData
+	return file_pastel_pastelid_query_proto_rawDescData
 }
 
-var file_pasteld_pastelid_query_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
-var file_pasteld_pastelid_query_proto_goTypes = []interface{}{
-	(*QueryParamsRequest)(nil),            // 0: pasteld.pastelid.QueryParamsRequest
-	(*QueryParamsResponse)(nil),           // 1: pasteld.pastelid.QueryParamsResponse
-	(*QueryGetPastelidEntryRequest)(nil),  // 2: pasteld.pastelid.QueryGetPastelidEntryRequest
-	(*QueryGetPastelidEntryResponse)(nil), // 3: pasteld.pastelid.QueryGetPastelidEntryResponse
-	(*QueryAllPastelidEntryRequest)(nil),  // 4: pasteld.pastelid.QueryAllPastelidEntryRequest
-	(*QueryAllPastelidEntryResponse)(nil), // 5: pasteld.pastelid.QueryAllPastelidEntryResponse
-	(*Params)(nil),                        // 6: pasteld.pastelid.Params
-	(*PastelidEntry)(nil),                 // 7: pasteld.pastelid.PastelidEntry
+var file_pastel_pastelid_query_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_pastel_pastelid_query_proto_goTypes = []interface{}{
+	(*QueryParamsRequest)(nil),            // 0: pastel.pastelid.QueryParamsRequest
+	(*QueryParamsResponse)(nil),           // 1: pastel.pastelid.QueryParamsResponse
+	(*QueryGetPastelidEntryRequest)(nil),  // 2: pastel.pastelid.QueryGetPastelidEntryRequest
+	(*QueryGetPastelidEntryResponse)(nil), // 3: pastel.pastelid.QueryGetPastelidEntryResponse
+	(*QueryAllPastelidEntryRequest)(nil),  // 4: pastel.pastelid.QueryAllPastelidEntryRequest
+	(*QueryAllPastelidEntryResponse)(nil), // 5: pastel.pastelid.QueryAllPastelidEntryResponse
+	(*Params)(nil),                        // 6: pastel.pastelid.Params
+	(*PastelidEntry)(nil),                 // 7: pastel.pastelid.PastelidEntry
 	(*v1beta1.PageRequest)(nil),           // 8: cosmos.base.query.v1beta1.PageRequest
 	(*v1beta1.PageResponse)(nil),          // 9: cosmos.base.query.v1beta1.PageResponse
 }
-var file_pasteld_pastelid_query_proto_depIdxs = []int32{
-	6, // 0: pasteld.pastelid.QueryParamsResponse.params:type_name -> pasteld.pastelid.Params
-	7, // 1: pasteld.pastelid.QueryGetPastelidEntryResponse.pastelidEntry:type_name -> pasteld.pastelid.PastelidEntry
-	8, // 2: pasteld.pastelid.QueryAllPastelidEntryRequest.pagination:type_name -> cosmos.base.query.v1beta1.PageRequest
-	7, // 3: pasteld.pastelid.QueryAllPastelidEntryResponse.pastelidEntry:type_name -> pasteld.pastelid.PastelidEntry
-	9, // 4: pasteld.pastelid.QueryAllPastelidEntryResponse.pagination:type_name -> cosmos.base.query.v1beta1.PageResponse
-	0, // 5: pasteld.pastelid.Query.Params:input_type -> pasteld.pastelid.QueryParamsRequest
-	2, // 6: pasteld.pastelid.Query.PastelidEntry:input_type -> pasteld.pastelid.QueryGetPastelidEntryRequest
-	4, // 7: pasteld.pastelid.Query.PastelidEntryAll:input_type -> pasteld.pastelid.QueryAllPastelidEntryRequest
-	1, // 8: pasteld.pastelid.Query.Params:output_type -> pasteld.pastelid.QueryParamsResponse
-	3, // 9: pasteld.pastelid.Query.PastelidEntry:output_type -> pasteld.pastelid.QueryGetPastelidEntryResponse
-	5, // 10: pasteld.pastelid.Query.PastelidEntryAll:output_type -> pasteld.pastelid.QueryAllPastelidEntryResponse
+var file_pastel_pastelid_query_proto_depIdxs = []int32{
+	6, // 0: pastel.pastelid.QueryParamsResponse.params:type_name -> pastel.pastelid.Params
+	7, // 1: pastel.pastelid.QueryGetPastelidEntryResponse.pastelidEntry:type_name -> pastel.pastelid.PastelidEntry
+	8, // 2: pastel.pastelid.QueryAllPastelidEntryRequest.pagination:type_name -> cosmos.base.query.v1beta1.PageRequest
+	7, // 3: pastel.pastelid.QueryAllPastelidEntryResponse.pastelidEntry:type_name -> pastel.pastelid.PastelidEntry
+	9, // 4: pastel.pastelid.QueryAllPastelidEntryResponse.pagination:type_name -> cosmos.base.query.v1beta1.PageResponse
+	0, // 5: pastel.pastelid.Query.Params:input_type -> pastel.pastelid.QueryParamsRequest
+	2, // 6: pastel.pastelid.Query.PastelidEntry:input_type -> pastel.pastelid.QueryGetPastelidEntryRequest
+	4, // 7: pastel.pastelid.Query.PastelidEntryAll:input_type -> pastel.pastelid.QueryAllPastelidEntryRequest
+	1, // 8: pastel.pastelid.Query.Params:output_type -> pastel.pastelid.QueryParamsResponse
+	3, // 9: pastel.pastelid.Query.PastelidEntry:output_type -> pastel.pastelid.QueryGetPastelidEntryResponse
+	5, // 10: pastel.pastelid.Query.PastelidEntryAll:output_type -> pastel.pastelid.QueryAllPastelidEntryResponse
 	8, // [8:11] is the sub-list for method output_type
 	5, // [5:8] is the sub-list for method input_type
 	5, // [5:5] is the sub-list for extension type_name
@@ -3038,15 +3036,15 @@ var file_pasteld_pastelid_query_proto_depIdxs = []int32{
 	0, // [0:5] is the sub-list for field type_name
 }
 
-func init() { file_pasteld_pastelid_query_proto_init() }
-func file_pasteld_pastelid_query_proto_init() {
-	if File_pasteld_pastelid_query_proto != nil {
+func init() { file_pastel_pastelid_query_proto_init() }
+func file_pastel_pastelid_query_proto_init() {
+	if File_pastel_pastelid_query_proto != nil {
 		return
 	}
-	file_pasteld_pastelid_params_proto_init()
-	file_pasteld_pastelid_pastelid_entry_proto_init()
+	file_pastel_pastelid_params_proto_init()
+	file_pastel_pastelid_pastelid_entry_proto_init()
 	if !protoimpl.UnsafeEnabled {
-		file_pasteld_pastelid_query_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
+		file_pastel_pastelid_query_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*QueryParamsRequest); i {
 			case 0:
 				return &v.state
@@ -3058,7 +3056,7 @@ func file_pasteld_pastelid_query_proto_init() {
 				return nil
 			}
 		}
-		file_pasteld_pastelid_query_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
+		file_pastel_pastelid_query_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*QueryParamsResponse); i {
 			case 0:
 				return &v.state
@@ -3070,7 +3068,7 @@ func file_pasteld_pastelid_query_proto_init() {
 				return nil
 			}
 		}
-		file_pasteld_pastelid_query_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
+		file_pastel_pastelid_query_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*QueryGetPastelidEntryRequest); i {
 			case 0:
 				return &v.state
@@ -3082,7 +3080,7 @@ func file_pasteld_pastelid_query_proto_init() {
 				return nil
 			}
 		}
-		file_pasteld_pastelid_query_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
+		file_pastel_pastelid_query_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*QueryGetPastelidEntryResponse); i {
 			case 0:
 				return &v.state
@@ -3094,7 +3092,7 @@ func file_pasteld_pastelid_query_proto_init() {
 				return nil
 			}
 		}
-		file_pasteld_pastelid_query_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
+		file_pastel_pastelid_query_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*QueryAllPastelidEntryRequest); i {
 			case 0:
 				return &v.state
@@ -3106,7 +3104,7 @@ func file_pasteld_pastelid_query_proto_init() {
 				return nil
 			}
 		}
-		file_pasteld_pastelid_query_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
+		file_pastel_pastelid_query_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*QueryAllPastelidEntryResponse); i {
 			case 0:
 				return &v.state
@@ -3123,18 +3121,18 @@ func file_pasteld_pastelid_query_proto_init() {
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: file_pasteld_pastelid_query_proto_rawDesc,
+			RawDescriptor: file_pastel_pastelid_query_proto_rawDesc,
 			NumEnums:      0,
 			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_pasteld_pastelid_query_proto_goTypes,
-		DependencyIndexes: file_pasteld_pastelid_query_proto_depIdxs,
-		MessageInfos:      file_pasteld_pastelid_query_proto_msgTypes,
+		GoTypes:           file_pastel_pastelid_query_proto_goTypes,
+		DependencyIndexes: file_pastel_pastelid_query_proto_depIdxs,
+		MessageInfos:      file_pastel_pastelid_query_proto_msgTypes,
 	}.Build()
-	File_pasteld_pastelid_query_proto = out.File
-	file_pasteld_pastelid_query_proto_rawDesc = nil
-	file_pasteld_pastelid_query_proto_goTypes = nil
-	file_pasteld_pastelid_query_proto_depIdxs = nil
+	File_pastel_pastelid_query_proto = out.File
+	file_pastel_pastelid_query_proto_rawDesc = nil
+	file_pastel_pastelid_query_proto_goTypes = nil
+	file_pastel_pastelid_query_proto_depIdxs = nil
 }

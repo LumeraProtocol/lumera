@@ -4,7 +4,7 @@ import (
 	"context"
 	sdkerrors "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/pastelnetwork/pasteld/x/pastelid/types"
+	"github.com/pastelnetwork/pastel/x/pastelid/types"
 )
 
 func (k msgServer) CreatePastelId(goCtx context.Context, msg *types.MsgCreatePastelId) (*types.MsgCreatePastelIdResponse, error) {

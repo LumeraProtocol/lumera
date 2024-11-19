@@ -22,10 +22,10 @@ import (
 
 	// this line is used by starport scaffolding # 1
 
-	modulev1 "github.com/pastelnetwork/pasteld/api/pasteld/pastelid/module"
-	"github.com/pastelnetwork/pasteld/x/pastelid/client/cli"
-	"github.com/pastelnetwork/pasteld/x/pastelid/keeper"
-	"github.com/pastelnetwork/pasteld/x/pastelid/types"
+	modulev1 "github.com/pastelnetwork/pastel/api/pastel/pastelid/module"
+	"github.com/pastelnetwork/pastel/x/pastelid/client/cli"
+	"github.com/pastelnetwork/pastel/x/pastelid/keeper"
+	"github.com/pastelnetwork/pastel/x/pastelid/types"
 )
 
 var (

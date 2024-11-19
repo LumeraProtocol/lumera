@@ -3,7 +3,7 @@ package pastelid
 import (
 	autocliv1 "cosmossdk.io/api/cosmos/autocli/v1"
 
-	modulev1 "github.com/pastelnetwork/pasteld/api/pasteld/pastelid"
+	modulev1 "github.com/pastelnetwork/pastel/api/pastel/pastelid"
 )
 
 // AutoCLIOptions implements the autocli.HasAutoCLIConfig interface.

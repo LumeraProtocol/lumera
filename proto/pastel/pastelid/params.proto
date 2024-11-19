@@ -1,15 +1,15 @@
 syntax = "proto3";
-package pasteld.pastelid;
+package pastel.pastelid;
 
 import "amino/amino.proto";
 import "gogoproto/gogo.proto";
 import "cosmos/base/v1beta1/coin.proto";
 
-option go_package = "github.com/pastelnetwork/pasteld/x/pastelid/types";
+option go_package = "github.com/pastelnetwork/pastel/x/pastelid/types";
 
 // Params defines the parameters for the module.
 message Params {
-  option (amino.name) = "pasteld/x/pastelid/Params";
+  option (amino.name) = "pastel/x/pastelid/Params";
   option (gogoproto.equal) = true;
 
   cosmos.base.v1beta1.Coin pastel_id_create_fee = 1 [

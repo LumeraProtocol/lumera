@@ -3,10 +3,10 @@ package pastelid_test
 import (
 	"testing"
 
-	keepertest "github.com/pastelnetwork/pasteld/testutil/keeper"
-	"github.com/pastelnetwork/pasteld/testutil/nullify"
-	pastelid "github.com/pastelnetwork/pasteld/x/pastelid/module"
-	"github.com/pastelnetwork/pasteld/x/pastelid/types"
+	keepertest "github.com/pastelnetwork/pastel/testutil/keeper"
+	"github.com/pastelnetwork/pastel/testutil/nullify"
+	pastelid "github.com/pastelnetwork/pastel/x/pastelid/module"
+	"github.com/pastelnetwork/pastel/x/pastelid/types"
 	"github.com/stretchr/testify/require"
 )
 

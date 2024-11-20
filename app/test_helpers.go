@@ -26,7 +26,6 @@ func NewTestApp(
 		app        = &App{ScopedKeepers: make(map[string]capabilitykeeper.ScopedKeeper)}
 		appBuilder *runtime.AppBuilder
 
-		// configure dependency injection with your app settings
 		appConfig = depinject.Configs(
 			AppConfig(),
 			depinject.Supply(appOpts, logger, app.GetIBCKeeper, app.GetCapabilityScopedKeeper),
@@ -61,13 +60,11 @@ func NewTestApp(
 		return nil, err
 	}
 
-	// Ensure that BaseApp is initialized by building it with AppBuilder
 	app.App = appBuilder.Build(db, traceStore, baseAppOptions...)
 	if app.App == nil {
 		return nil, errors.New("failed to initialize BaseApp")
 	}
 
-	// Additional configuration if needed, such as loading the latest version
 	if loadLatest {
 		if err := app.LoadLatestVersion(); err != nil {
 			return nil, err
@@ -79,15 +76,10 @@ func NewTestApp(
 
 // Setup initializes a new App instance for testing.
 func Setup(t *testing.T) *App {
-	// Initialize an in-memory database for testing
 	db := dbm.NewMemDB()
 
-	// Set up a no-op logger for testing to avoid logging clutter
 	logger := log.NewNopLogger()
 
-	// Configure any other test-specific options if needed
-
-	// Instantiate the app with the in-memory database, no-op logger, and no trace store
 	app, err := NewTestApp(logger, db, nil, true, EmptyAppOptions{})
 	if err != nil {
 		t.Fatalf("failed to initialize test app: %v", err)

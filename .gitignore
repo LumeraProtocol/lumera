@@ -7,3 +7,5 @@ release/
 *.dot
 *.log
 *.ign
+*.test
+*.out

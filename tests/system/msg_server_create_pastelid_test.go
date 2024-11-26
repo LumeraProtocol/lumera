@@ -2,14 +2,16 @@ package system_test
 
 import (
 	"context"
-	sdkmath "cosmossdk.io/math"
+	"os"
 	"testing"
-	"time"
 
+	sdkmath "cosmossdk.io/math"
+	wasmvmtypes "github.com/CosmWasm/wasmvm/v2/types"
 	"github.com/cometbft/cometbft/crypto/secp256k1"
-	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/pastelnetwork/pastel/app"
+	"github.com/pastelnetwork/pastel/tests/ibctesting"
+	"github.com/pastelnetwork/pastel/tests/system"
 	"github.com/pastelnetwork/pastel/x/pastelid/keeper"
 	"github.com/pastelnetwork/pastel/x/pastelid/types"
 	"github.com/stretchr/testify/assert"
@@ -21,23 +23,37 @@ type SystemTestSuite struct {
 	ctx    context.Context
 }
 
-func (suite *SystemTestSuite) SetupSuite() {
-
-}
-
 func setupSystemSuite(t *testing.T) *SystemTestSuite {
+	os.Setenv("SYSTEM_TESTS", "true")
+
 	suite := &SystemTestSuite{}
-	suite.app = app.Setup(t)
+	coord := ibctesting.NewCoordinator(t, 1) // One chain setup
+	chain := coord.GetChain(ibctesting.GetChainID(1))
 
-	suite.sdkCtx = suite.app.BaseApp.NewContext(true).WithBlockHeader(tmproto.Header{
-		ChainID: "test-chain",
-		Height:  1,
-		Time:    time.Now(),
-	})
+	contractAddr := system.InstantiateReflectContract(t, chain)
+	chain.Fund(contractAddr, sdkmath.NewIntFromUint64(1_000_000_000))
 
-	suite.ctx = sdk.WrapSDKContext(suite.sdkCtx)
+	app := chain.App.(*app.App)
+	suite.app = app
 
-	err := suite.app.PastelidKeeper.SetParams(suite.sdkCtx, types.DefaultParams())
+	suite.ctx = sdk.WrapSDKContext(chain.GetContext())
+	suite.sdkCtx = sdk.UnwrapSDKContext(chain.GetContext())
+
+	// Delegate a high amount to the contract
+	delegateMsg := wasmvmtypes.CosmosMsg{
+		Staking: &wasmvmtypes.StakingMsg{
+			Delegate: &wasmvmtypes.DelegateMsg{
+				Validator: sdk.ValAddress(chain.Vals.Validators[0].Address).String(),
+				Amount: wasmvmtypes.Coin{
+					Denom:  sdk.DefaultBondDenom,
+					Amount: "1000000000",
+				},
+			},
+		},
+	}
+	system.MustExecViaReflectContract(t, chain, contractAddr, delegateMsg)
+
+	err := suite.app.PastelidKeeper.SetParams(chain.GetContext(), types.DefaultParams())
 	assert.NoError(t, err)
 
 	return suite

@@ -30,7 +30,7 @@ func TestGenesisState_Validate(t *testing.T) {
 						Address: "1",
 					},
 				},
-				// this line is used by starport scaffolding # types/genesis/validField
+				Params: types.DefaultParams(),
 			},
 			valid: true,
 		},

@@ -53,3 +53,65 @@ jobs:
 
       - name: Run integration tests
         run: go test -tags=integration ./tests/integration/... -v
+  system-tests:
+    name: system
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22'
+
+      - name: Install Ignite CLI
+        run: |
+          curl https://get.ignite.com/cli! | bash
+        env:
+          IGNITE_CLI_NO_ANALYTICS: 1
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Run system tests
+        run: go test -tags=system ./tests/system/... -v
+
+  simulation-tests:
+    name: simulation
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22'
+
+      - name: Install Ignite CLI
+        run: |
+          curl https://get.ignite.com/cli! | bash
+        env:
+          IGNITE_CLI_NO_ANALYTICS: 1
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Run pastelid simulation tests using ignite-cli
+        env:
+          GOMAXPROCS: 2
+          IGNITE_TELEMETRY_CONSENT: "no"
+        run: |
+          ignite chain simulate --verbose --numBlocks=50 --blockSize=10 > simulation.log 2>&1 || true
+          cat simulation.log
+
+      - name: Upload Simulation Logs
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: simulation-logs
+          path: simulation.log

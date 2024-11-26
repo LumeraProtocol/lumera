@@ -9,6 +9,9 @@ const (
 
 	// MemStoreKey defines the in-memory store key
 	MemStoreKey = "mem_pastelid"
+
+	// TypeMsgCreatePastelId defines the MsgCreatePastelID key
+	TypeMsgCreatePastelId = "create_pastel_id"
 )
 
 var (

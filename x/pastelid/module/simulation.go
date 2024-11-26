@@ -25,7 +25,7 @@ var (
 const (
 	opWeightMsgCreatePastelId = "op_weight_msg_create_pastel_id"
 	// TODO: Determine the simulation weight value
-	defaultWeightMsgCreatePastelId int = 100
+	defaultWeightMsgCreatePastelId int = 50
 
 	// this line is used by starport scaffolding # simapp/module/const
 )

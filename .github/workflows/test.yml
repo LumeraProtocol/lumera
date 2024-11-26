@@ -101,17 +101,9 @@ jobs:
       - name: Install dependencies
         run: go mod download
 
-      - name: Run pastelid simulation tests using ignite-cli
+      - name: Run simulation tests
         env:
           GOMAXPROCS: 2
           IGNITE_TELEMETRY_CONSENT: "no"
         run: |
-          ignite chain simulate --verbose --numBlocks=50 --blockSize=10 > simulation.log 2>&1 || true
-          cat simulation.log
-
-      - name: Upload Simulation Logs
-        if: failure()
-        uses: actions/upload-artifact@v3
-        with:
-          name: simulation-logs
-          path: simulation.log
+          go test -v -benchmem -run=^$ -bench ^BenchmarkSimulation -cpuprofile cpu.out ./app -Commit=true

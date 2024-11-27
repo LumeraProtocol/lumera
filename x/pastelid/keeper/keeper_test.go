@@ -17,9 +17,9 @@ import (
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	"github.com/golang/mock/gomock"
-	"github.com/pastelnetwork/pasteld/x/pastelid/keeper"
-	pastelidmocks "github.com/pastelnetwork/pasteld/x/pastelid/mocks"
-	"github.com/pastelnetwork/pasteld/x/pastelid/types"
+	"github.com/pastelnetwork/pastel/x/pastelid/keeper"
+	pastelidmocks "github.com/pastelnetwork/pastel/x/pastelid/mocks"
+	"github.com/pastelnetwork/pastel/x/pastelid/types"
 	"github.com/stretchr/testify/require"
 )
 

@@ -11,9 +11,9 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
-	"github.com/pastelnetwork/pasteld/app"
-	"github.com/pastelnetwork/pasteld/x/pastelid/keeper"
-	"github.com/pastelnetwork/pasteld/x/pastelid/types"
+	"github.com/pastelnetwork/pastel/app"
+	"github.com/pastelnetwork/pastel/x/pastelid/keeper"
+	"github.com/pastelnetwork/pastel/x/pastelid/types"
 	"github.com/stretchr/testify/assert"
 )
 

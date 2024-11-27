@@ -9,9 +9,9 @@ import (
 	"github.com/cometbft/cometbft/crypto/secp256k1"
 	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/pastelnetwork/pasteld/app"
-	"github.com/pastelnetwork/pasteld/x/pastelid/keeper"
-	"github.com/pastelnetwork/pasteld/x/pastelid/types"
+	"github.com/pastelnetwork/pastel/app"
+	"github.com/pastelnetwork/pastel/x/pastelid/keeper"
+	"github.com/pastelnetwork/pastel/x/pastelid/types"
 	"github.com/stretchr/testify/assert"
 )
 

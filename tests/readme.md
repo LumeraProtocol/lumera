@@ -70,7 +70,7 @@ We use `gomock` and `mockgen` to generate mock implementations of interfaces. Th
 go install github.com/golang/mock/mockgen@v1.6.0
 
 # Generate mocks for interfaces
-mockgen -destination=./x/pastelid/mocks/keeper.go -package=mocks github.com/pastelnetwork/pasteld/x/pastelid/types BankKeeper,AccountKeeper
+mockgen -destination=./x/pastelid/mocks/keeper.go -package=mocks github.com/pastelnetwork/pastel/x/pastelid/types BankKeeper,AccountKeeper
 ```
 
 #### Example Unit Test File

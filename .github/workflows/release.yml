@@ -1,31 +1,89 @@
-# This workflow is useful if you want to automate the process of:
-#
-# a) Creating a new prelease when you push a new tag with a "v" prefix (version).
-#
-#    This type of prerelease is meant to be used for production: alpha, beta, rc, etc. types of releases.
-#    After the prerelease is created, you need to make your changes on the release page at the relevant
-#    Github page and publish your release.
-#
-# b) Creating/updating the "latest" prerelease when you push to your default branch.
-#
-#    This type of prelease is useful to make your bleeding-edge binaries available to advanced users.
-#
-# The workflow will not run if there is no tag pushed with a "v" prefix and no change pushed to your
-# default branch.
+name: Release Workflow
 on: push
 
 jobs:
   might_release:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      - name: Configure Git Safe Directory
+        run: git config --global --add safe.directory $GITHUB_WORKSPACE
+
+      - name: Install Go
+        run: |
+          GO_VERSION="${{ steps.go-version.outputs.version }}"
+          echo "Installing Go version $GO_VERSION"
+          curl -Lo go.tar.gz "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz"
+          sudo rm -rf /usr/local/go
+          sudo tar -C /usr/local -xzf go.tar.gz
+          rm go.tar.gz
+          echo "/usr/local/go/bin" >> $GITHUB_PATH
+          export PATH=$PATH:/usr/local/go/bin
+          go version
+
+      # Custom release variables for local testing
       - name: Prepare Release Variables
         id: vars
-        uses: ignite/cli/actions/release/vars@main
+        run: |
+          # Get repository name from current directory
+          repo_name=$(basename $(pwd))
+          echo "Repository name: $repo_name"
+
+          # Get current branch name
+          if [ "$GITHUB_REF" != "" ]; then
+            ref_name=${GITHUB_REF##*/}
+          else
+            ref_name=$(git rev-parse --abbrev-ref HEAD || echo "main")
+          fi
+          echo "Reference name: $ref_name"
+
+          # Get default branch
+          if command -v git &> /dev/null && [ -d .git ]; then
+            if git remote -v &> /dev/null; then
+              default_branch=$(git remote show origin 2>/dev/null | awk '/HEAD branch/ {print $NF}' || echo "main")
+            else
+              default_branch="main"
+            fi
+          else
+            default_branch="main"
+          fi
+          echo "Default branch: $default_branch"
+
+          # Set release variables
+          should_release=true
+          is_release_type_latest=false
+          tag_name=""
+
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            tag_name=$ref_name
+          elif [[ $ref_name == $default_branch ]]; then
+            tag_name=latest
+            is_release_type_latest=true
+          else
+            should_release=false
+          fi
+
+          # For local testing, always set should_release to true
+          if [ "${ACT:-}" = "true" ]; then
+            should_release=true
+            tag_name="local-test"
+          fi
+
+          echo "should_release=$should_release" >> $GITHUB_OUTPUT
+          echo "is_release_type_latest=$is_release_type_latest" >> $GITHUB_OUTPUT
+          echo "tag_name=$tag_name" >> $GITHUB_OUTPUT
+          echo "tarball_prefix=${repo_name}_${tag_name}" >> $GITHUB_OUTPUT
+
+          # Debug output
+          echo "Output variables:"
+          echo "should_release: $should_release"
+          echo "is_release_type_latest: $is_release_type_latest"
+          echo "tag_name: $tag_name"
+          echo "tarball_prefix: ${repo_name}_${tag_name}"
 
       - name: Issue Release Assets
         uses: ignite/cli/actions/cli@main
@@ -34,9 +92,11 @@ jobs:
           args: chain build --release --release.prefix ${{ steps.vars.outputs.tarball_prefix }} -t linux:amd64 -t darwin:amd64 -t darwin:arm64 -y
         env:
           DO_NOT_TRACK: 1
+          GOFLAGS: "-buildvcs=false"
+          PATH: "/usr/local/go/bin:$PATH"
 
       - name: Delete the "latest" Release
-        uses: dev-drprasad/delete-tag-and-release@v0.2.1
+        uses: dev-drprasad/delete-tag-and-release@v1.0.1
         if: ${{ steps.vars.outputs.is_release_type_latest == 'true' }}
         with:
           tag_name: ${{ steps.vars.outputs.tag_name }}
@@ -45,7 +105,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish the Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v0.1.15
         if: ${{ steps.vars.outputs.should_release == 'true' }}
         with:
           tag_name: ${{ steps.vars.outputs.tag_name }}

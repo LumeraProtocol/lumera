@@ -1,5 +1,8 @@
 name: Release Workflow
-on: push
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
 
 jobs:
   might_release:
@@ -13,91 +16,57 @@ jobs:
       - name: Configure Git Safe Directory
         run: git config --global --add safe.directory $GITHUB_WORKSPACE
 
-      - name: Install Go
+      - name: Get Go version from toolchain
+        id: go-version
         run: |
-          GO_VERSION="${{ steps.go-version.outputs.version }}"
-          echo "Installing Go version $GO_VERSION"
-          curl -Lo go.tar.gz "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz"
-          sudo rm -rf /usr/local/go
-          sudo tar -C /usr/local -xzf go.tar.gz
-          rm go.tar.gz
-          echo "/usr/local/go/bin" >> $GITHUB_PATH
-          export PATH=$PATH:/usr/local/go/bin
-          go version
+          TOOLCHAIN_VERSION=$(grep -E '^toolchain go[0-9]+\.[0-9]+(\.[0-9]+)?$' go.mod | cut -d ' ' -f 2 | sed 's/^go//')
+          if [ -n "$TOOLCHAIN_VERSION" ]; then
+            echo "version=$TOOLCHAIN_VERSION" >> $GITHUB_OUTPUT
+          else
+            GO_VERSION=$(grep -E '^go [0-9]+\.[0-9]+(\.[0-9]+)?$' go.mod | cut -d ' ' -f 2)
+            echo "version=$GO_VERSION" >> $GITHUB_OUTPUT
+          fi
 
-      # Custom release variables for local testing
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ steps.go-version.outputs.version }}
+          cache: true
+
       - name: Prepare Release Variables
         id: vars
         run: |
-          # Get repository name from current directory
-          repo_name=$(basename $(pwd))
-          echo "Repository name: $repo_name"
-
-          # Get current branch name
-          if [ "$GITHUB_REF" != "" ]; then
-            ref_name=${GITHUB_REF##*/}
-          else
-            ref_name=$(git rev-parse --abbrev-ref HEAD || echo "main")
-          fi
-          echo "Reference name: $ref_name"
-
-          # Get default branch
-          if command -v git &> /dev/null && [ -d .git ]; then
-            if git remote -v &> /dev/null; then
-              default_branch=$(git remote show origin 2>/dev/null | awk '/HEAD branch/ {print $NF}' || echo "main")
-            else
-              default_branch="main"
-            fi
-          else
-            default_branch="main"
-          fi
-          echo "Default branch: $default_branch"
-
-          # Set release variables
-          should_release=true
-          is_release_type_latest=false
-          tag_name=""
-
+          repo_name=${GITHUB_REPOSITORY##*/}
+          
           if [[ $GITHUB_REF == refs/tags/* ]]; then
-            tag_name=$ref_name
-          elif [[ $ref_name == $default_branch ]]; then
+            # Tag push
+            tag_name=${GITHUB_REF#refs/tags/}
+            is_release_type_latest=false
+          elif [[ $GITHUB_REF == refs/heads/main ]]; then
+            # Main branch push
             tag_name=latest
             is_release_type_latest=true
           else
-            should_release=false
+            # Other pushes
+            echo "Not a release trigger"
+            exit 0
           fi
-
-          # For local testing, always set should_release to true
-          if [ "${ACT:-}" = "true" ]; then
-            should_release=true
-            tag_name="local-test"
-          fi
-
-          echo "should_release=$should_release" >> $GITHUB_OUTPUT
-          echo "is_release_type_latest=$is_release_type_latest" >> $GITHUB_OUTPUT
+          
           echo "tag_name=$tag_name" >> $GITHUB_OUTPUT
+          echo "is_release_type_latest=$is_release_type_latest" >> $GITHUB_OUTPUT
           echo "tarball_prefix=${repo_name}_${tag_name}" >> $GITHUB_OUTPUT
-
-          # Debug output
-          echo "Output variables:"
-          echo "should_release: $should_release"
-          echo "is_release_type_latest: $is_release_type_latest"
-          echo "tag_name: $tag_name"
-          echo "tarball_prefix: ${repo_name}_${tag_name}"
 
       - name: Issue Release Assets
         uses: ignite/cli/actions/cli@main
-        if: ${{ steps.vars.outputs.should_release == 'true' }}
         with:
           args: chain build --release --release.prefix ${{ steps.vars.outputs.tarball_prefix }} -t linux:amd64 -t darwin:amd64 -t darwin:arm64 -y
         env:
           DO_NOT_TRACK: 1
           GOFLAGS: "-buildvcs=false"
-          PATH: "/usr/local/go/bin:$PATH"
 
       - name: Delete the "latest" Release
+        if: steps.vars.outputs.is_release_type_latest == 'true'
         uses: dev-drprasad/delete-tag-and-release@v1.0.1
-        if: ${{ steps.vars.outputs.is_release_type_latest == 'true' }}
         with:
           tag_name: ${{ steps.vars.outputs.tag_name }}
           delete_release: true
@@ -106,7 +75,6 @@ jobs:
 
       - name: Publish the Release
         uses: softprops/action-gh-release@v0.1.15
-        if: ${{ steps.vars.outputs.should_release == 'true' }}
         with:
           tag_name: ${{ steps.vars.outputs.tag_name }}
           files: release/*

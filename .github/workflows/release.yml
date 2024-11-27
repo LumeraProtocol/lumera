@@ -1,14 +1,26 @@
 name: Release Workflow
 on:
   push:
-    branches:
-      - master
-    tags:
-      - 'v*'
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+  pull_request:
+    branches: [ master ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  packages: read
 
 jobs:
   might_release:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -23,9 +35,11 @@ jobs:
         run: |
           TOOLCHAIN_VERSION=$(grep -E '^toolchain go[0-9]+\.[0-9]+(\.[0-9]+)?$' go.mod | cut -d ' ' -f 2 | sed 's/^go//')
           if [ -n "$TOOLCHAIN_VERSION" ]; then
+            echo "Found toolchain version: $TOOLCHAIN_VERSION"
             echo "version=$TOOLCHAIN_VERSION" >> $GITHUB_OUTPUT
           else
             GO_VERSION=$(grep -E '^go [0-9]+\.[0-9]+(\.[0-9]+)?$' go.mod | cut -d ' ' -f 2)
+            echo "Found go directive version: $GO_VERSION"
             echo "version=$GO_VERSION" >> $GITHUB_OUTPUT
           fi
 
@@ -39,24 +53,34 @@ jobs:
         id: vars
         run: |
           repo_name=${GITHUB_REPOSITORY##*/}
+          echo "Repository name: $repo_name"
           
           if [[ $GITHUB_REF == refs/tags/* ]]; then
             # Tag push
             tag_name=${GITHUB_REF#refs/tags/}
             is_release_type_latest=false
-          elif [[ $GITHUB_REF == refs/heads/main ]]; then
-            # Main branch push
+            echo "Building release for tag: $tag_name"
+          elif [[ $GITHUB_REF == refs/heads/master ]]; then
+            # Master branch push
             tag_name=latest
             is_release_type_latest=true
+            echo "Building latest release"
           else
-            # Other pushes
-            echo "Not a release trigger"
-            exit 0
+            # Other pushes - use branch name or commit SHA
+            tag_name="test-${GITHUB_REF_NAME:-${GITHUB_SHA:0:7}}"
+            is_release_type_latest=false
+            echo "Building test release: $tag_name"
           fi
           
           echo "tag_name=$tag_name" >> $GITHUB_OUTPUT
           echo "is_release_type_latest=$is_release_type_latest" >> $GITHUB_OUTPUT
           echo "tarball_prefix=${repo_name}_${tag_name}" >> $GITHUB_OUTPUT
+          
+          # Debug output
+          echo "Output variables:"
+          echo "- tag_name: $tag_name"
+          echo "- is_release_type_latest: $is_release_type_latest"
+          echo "- tarball_prefix: ${repo_name}_${tag_name}"
 
       - name: Issue Release Assets
         uses: ignite/cli/actions/cli@main
@@ -80,6 +104,7 @@ jobs:
         with:
           tag_name: ${{ steps.vars.outputs.tag_name }}
           files: release/*
-          prerelease: true
+          prerelease: ${{ github.ref != 'refs/heads/master' }}
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

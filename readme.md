@@ -1,3 +1,6 @@
+# Pastel
+[![Release Workflow](https://github.com/innovatingcapital/pastel/actions/workflows/release.yml/badge.svg)](https://github.com/innovatingcapital/pastel/actions/workflows/release.yml)
+
 # pastel
 **pastel** is a blockchain built using Cosmos SDK and Tendermint and created with [Ignite CLI](https://ignite.com/cli).
 

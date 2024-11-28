@@ -90,21 +90,33 @@ jobs:
           DO_NOT_TRACK: 1
           GOFLAGS: "-buildvcs=false"
 
+      # Add this step to fix permissions
+      - name: Fix Release Directory Permissions
+        run: |
+          sudo chown -R $USER:$USER release/
+          sudo chmod -R 755 release/
+
       - name: Delete the "latest" Release
         if: steps.vars.outputs.is_release_type_latest == 'true'
         uses: dev-drprasad/delete-tag-and-release@v1.0.1
         with:
           tag_name: ${{ steps.vars.outputs.tag_name }}
           delete_release: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}  # Changed from env to with
 
       - name: Publish the Release
         uses: softprops/action-gh-release@v0.1.15
+        if: success()  # Added condition
         with:
           tag_name: ${{ steps.vars.outputs.tag_name }}
           files: release/*
           prerelease: ${{ github.ref != 'refs/heads/master' }}
           generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          body: |                    # Added detailed body
+            Release ${{ steps.vars.outputs.tag_name }}
+            
+            This release was automatically generated from ${{ github.ref_name }}.
+            
+            Commit: ${{ github.sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+

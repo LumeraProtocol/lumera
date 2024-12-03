@@ -1,0 +1,11 @@
+syntax = "proto3";
+package pastel.supernode;
+
+option go_package = "github.com/pastelnetwork/pastel/x/supernode/types";
+
+message MetricsAggregate {
+  
+  string metrics = 1; 
+  uint64 reportCount = 2; 
+  uint64 lastUpdated = 3; 
+}

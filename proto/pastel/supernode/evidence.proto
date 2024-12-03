@@ -1,0 +1,15 @@
+syntax = "proto3";
+package pastel.supernode;
+
+option go_package = "github.com/pastelnetwork/pastel/x/supernode/types";
+
+message Evidence {
+  
+  string reporter = 1; 
+  string validatorAddress = 2; 
+  string actionId = 3; 
+  string evidenceType = 4; 
+  string description = 5; 
+  uint64 severity = 6; 
+  uint64 timestamp = 7; 
+}

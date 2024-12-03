@@ -1,0 +1,11 @@
+syntax = "proto3";
+package pastel.supernode;
+
+option go_package = "github.com/pastelnetwork/pastel/x/supernode/types";
+
+message IpaddressHistory {
+  
+  string address = 1; 
+  uint64 updatedAt = 2; 
+  uint64 endedAt = 3; 
+}

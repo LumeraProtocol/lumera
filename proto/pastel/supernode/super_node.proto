@@ -1,0 +1,18 @@
+syntax = "proto3";
+package pastel.supernode;
+
+option go_package = "github.com/pastelnetwork/pastel/x/supernode/types";
+
+message SuperNode {
+  
+  string validatorAddress = 1; 
+  string ipAddress = 2; 
+  string state = 3; 
+  repeated string evidence = 4; 
+  uint64 lastTimeActive = 5; 
+  uint64 lastTimeDisabled = 6; 
+  uint64 startedAt = 7; 
+  repeated string prevIpAddresses = 8; 
+  string version = 9; 
+  string metrics = 10; 
+}

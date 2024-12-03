@@ -28,6 +28,36 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					RpcMethod: "UpdateParams",
 					Skip:      true, // skipped because authority gated
 				},
+				{
+					RpcMethod:      "RegisterSupernode",
+					Use:            "register-supernode [validator-address] [ip-address] [version]",
+					Short:          "Send a register-supernode tx",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validatorAddress"}, {ProtoField: "ipAddress"}, {ProtoField: "version"}},
+				},
+				{
+					RpcMethod:      "DeregisterSupernode",
+					Use:            "deregister-supernode [validator-address]",
+					Short:          "Send a deregister-supernode tx",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validatorAddress"}},
+				},
+				{
+					RpcMethod:      "StartSupernode",
+					Use:            "start-supernode [validator-address] [ip-address]",
+					Short:          "Send a start-supernode tx",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validatorAddress"}, {ProtoField: "ipAddress"}},
+				},
+				{
+					RpcMethod:      "StopSupernode",
+					Use:            "stop-supernode [validator-address] [reason]",
+					Short:          "Send a stop-supernode tx",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validatorAddress"}, {ProtoField: "reason"}},
+				},
+				{
+					RpcMethod:      "UpdateSupernode",
+					Use:            "update-supernode [validator-address] [ip-address] [version]",
+					Short:          "Send a update-supernode tx",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validatorAddress"}, {ProtoField: "ipAddress"}, {ProtoField: "version"}},
+				},
 				// this line is used by ignite scaffolding # autocli/tx
 			},
 		},

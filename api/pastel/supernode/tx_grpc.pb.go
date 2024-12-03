@@ -19,7 +19,12 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	Msg_UpdateParams_FullMethodName = "/pastel.supernode.Msg/UpdateParams"
+	Msg_UpdateParams_FullMethodName        = "/pastel.supernode.Msg/UpdateParams"
+	Msg_RegisterSupernode_FullMethodName   = "/pastel.supernode.Msg/RegisterSupernode"
+	Msg_DeregisterSupernode_FullMethodName = "/pastel.supernode.Msg/DeregisterSupernode"
+	Msg_StartSupernode_FullMethodName      = "/pastel.supernode.Msg/StartSupernode"
+	Msg_StopSupernode_FullMethodName       = "/pastel.supernode.Msg/StopSupernode"
+	Msg_UpdateSupernode_FullMethodName     = "/pastel.supernode.Msg/UpdateSupernode"
 )
 
 // MsgClient is the client API for Msg service.
@@ -29,6 +34,11 @@ type MsgClient interface {
 	// UpdateParams defines a (governance) operation for updating the module
 	// parameters. The authority defaults to the x/gov module account.
 	UpdateParams(ctx context.Context, in *MsgUpdateParams, opts ...grpc.CallOption) (*MsgUpdateParamsResponse, error)
+	RegisterSupernode(ctx context.Context, in *MsgRegisterSupernode, opts ...grpc.CallOption) (*MsgRegisterSupernodeResponse, error)
+	DeregisterSupernode(ctx context.Context, in *MsgDeregisterSupernode, opts ...grpc.CallOption) (*MsgDeregisterSupernodeResponse, error)
+	StartSupernode(ctx context.Context, in *MsgStartSupernode, opts ...grpc.CallOption) (*MsgStartSupernodeResponse, error)
+	StopSupernode(ctx context.Context, in *MsgStopSupernode, opts ...grpc.CallOption) (*MsgStopSupernodeResponse, error)
+	UpdateSupernode(ctx context.Context, in *MsgUpdateSupernode, opts ...grpc.CallOption) (*MsgUpdateSupernodeResponse, error)
 }
 
 type msgClient struct {
@@ -48,6 +58,51 @@ func (c *msgClient) UpdateParams(ctx context.Context, in *MsgUpdateParams, opts 
 	return out, nil
 }
 
+func (c *msgClient) RegisterSupernode(ctx context.Context, in *MsgRegisterSupernode, opts ...grpc.CallOption) (*MsgRegisterSupernodeResponse, error) {
+	out := new(MsgRegisterSupernodeResponse)
+	err := c.cc.Invoke(ctx, Msg_RegisterSupernode_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *msgClient) DeregisterSupernode(ctx context.Context, in *MsgDeregisterSupernode, opts ...grpc.CallOption) (*MsgDeregisterSupernodeResponse, error) {
+	out := new(MsgDeregisterSupernodeResponse)
+	err := c.cc.Invoke(ctx, Msg_DeregisterSupernode_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *msgClient) StartSupernode(ctx context.Context, in *MsgStartSupernode, opts ...grpc.CallOption) (*MsgStartSupernodeResponse, error) {
+	out := new(MsgStartSupernodeResponse)
+	err := c.cc.Invoke(ctx, Msg_StartSupernode_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *msgClient) StopSupernode(ctx context.Context, in *MsgStopSupernode, opts ...grpc.CallOption) (*MsgStopSupernodeResponse, error) {
+	out := new(MsgStopSupernodeResponse)
+	err := c.cc.Invoke(ctx, Msg_StopSupernode_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *msgClient) UpdateSupernode(ctx context.Context, in *MsgUpdateSupernode, opts ...grpc.CallOption) (*MsgUpdateSupernodeResponse, error) {
+	out := new(MsgUpdateSupernodeResponse)
+	err := c.cc.Invoke(ctx, Msg_UpdateSupernode_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MsgServer is the server API for Msg service.
 // All implementations must embed UnimplementedMsgServer
 // for forward compatibility
@@ -55,6 +110,11 @@ type MsgServer interface {
 	// UpdateParams defines a (governance) operation for updating the module
 	// parameters. The authority defaults to the x/gov module account.
 	UpdateParams(context.Context, *MsgUpdateParams) (*MsgUpdateParamsResponse, error)
+	RegisterSupernode(context.Context, *MsgRegisterSupernode) (*MsgRegisterSupernodeResponse, error)
+	DeregisterSupernode(context.Context, *MsgDeregisterSupernode) (*MsgDeregisterSupernodeResponse, error)
+	StartSupernode(context.Context, *MsgStartSupernode) (*MsgStartSupernodeResponse, error)
+	StopSupernode(context.Context, *MsgStopSupernode) (*MsgStopSupernodeResponse, error)
+	UpdateSupernode(context.Context, *MsgUpdateSupernode) (*MsgUpdateSupernodeResponse, error)
 	mustEmbedUnimplementedMsgServer()
 }
 
@@ -64,6 +124,21 @@ type UnimplementedMsgServer struct {
 
 func (UnimplementedMsgServer) UpdateParams(context.Context, *MsgUpdateParams) (*MsgUpdateParamsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateParams not implemented")
+}
+func (UnimplementedMsgServer) RegisterSupernode(context.Context, *MsgRegisterSupernode) (*MsgRegisterSupernodeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RegisterSupernode not implemented")
+}
+func (UnimplementedMsgServer) DeregisterSupernode(context.Context, *MsgDeregisterSupernode) (*MsgDeregisterSupernodeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeregisterSupernode not implemented")
+}
+func (UnimplementedMsgServer) StartSupernode(context.Context, *MsgStartSupernode) (*MsgStartSupernodeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StartSupernode not implemented")
+}
+func (UnimplementedMsgServer) StopSupernode(context.Context, *MsgStopSupernode) (*MsgStopSupernodeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StopSupernode not implemented")
+}
+func (UnimplementedMsgServer) UpdateSupernode(context.Context, *MsgUpdateSupernode) (*MsgUpdateSupernodeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateSupernode not implemented")
 }
 func (UnimplementedMsgServer) mustEmbedUnimplementedMsgServer() {}
 
@@ -96,6 +171,96 @@ func _Msg_UpdateParams_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Msg_RegisterSupernode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MsgRegisterSupernode)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServer).RegisterSupernode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Msg_RegisterSupernode_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServer).RegisterSupernode(ctx, req.(*MsgRegisterSupernode))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Msg_DeregisterSupernode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MsgDeregisterSupernode)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServer).DeregisterSupernode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Msg_DeregisterSupernode_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServer).DeregisterSupernode(ctx, req.(*MsgDeregisterSupernode))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Msg_StartSupernode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MsgStartSupernode)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServer).StartSupernode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Msg_StartSupernode_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServer).StartSupernode(ctx, req.(*MsgStartSupernode))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Msg_StopSupernode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MsgStopSupernode)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServer).StopSupernode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Msg_StopSupernode_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServer).StopSupernode(ctx, req.(*MsgStopSupernode))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Msg_UpdateSupernode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MsgUpdateSupernode)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServer).UpdateSupernode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Msg_UpdateSupernode_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServer).UpdateSupernode(ctx, req.(*MsgUpdateSupernode))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Msg_ServiceDesc is the grpc.ServiceDesc for Msg service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -106,6 +271,26 @@ var Msg_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateParams",
 			Handler:    _Msg_UpdateParams_Handler,
+		},
+		{
+			MethodName: "RegisterSupernode",
+			Handler:    _Msg_RegisterSupernode_Handler,
+		},
+		{
+			MethodName: "DeregisterSupernode",
+			Handler:    _Msg_DeregisterSupernode_Handler,
+		},
+		{
+			MethodName: "StartSupernode",
+			Handler:    _Msg_StartSupernode_Handler,
+		},
+		{
+			MethodName: "StopSupernode",
+			Handler:    _Msg_StopSupernode_Handler,
+		},
+		{
+			MethodName: "UpdateSupernode",
+			Handler:    _Msg_UpdateSupernode_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

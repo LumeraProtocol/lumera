@@ -35,8 +35,6 @@ const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 type MsgUpdateParams struct {
 	// authority is the address that controls the module (defaults to x/gov unless overwritten).
 	Authority string `protobuf:"bytes,1,opt,name=authority,proto3" json:"authority,omitempty"`
-	// params defines the module parameters to update.
-	//
 	// NOTE: All parameters must be supplied.
 	Params Params `protobuf:"bytes,2,opt,name=params,proto3" json:"params"`
 }
@@ -126,37 +124,552 @@ func (m *MsgUpdateParamsResponse) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_MsgUpdateParamsResponse proto.InternalMessageInfo
 
+type MsgRegisterSupernode struct {
+	Creator          string `protobuf:"bytes,1,opt,name=creator,proto3" json:"creator,omitempty"`
+	ValidatorAddress string `protobuf:"bytes,2,opt,name=validatorAddress,proto3" json:"validatorAddress,omitempty"`
+	IpAddress        string `protobuf:"bytes,3,opt,name=ipAddress,proto3" json:"ipAddress,omitempty"`
+	Version          string `protobuf:"bytes,4,opt,name=version,proto3" json:"version,omitempty"`
+}
+
+func (m *MsgRegisterSupernode) Reset()         { *m = MsgRegisterSupernode{} }
+func (m *MsgRegisterSupernode) String() string { return proto.CompactTextString(m) }
+func (*MsgRegisterSupernode) ProtoMessage()    {}
+func (*MsgRegisterSupernode) Descriptor() ([]byte, []int) {
+	return fileDescriptor_588b2b1f82696fba, []int{2}
+}
+func (m *MsgRegisterSupernode) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *MsgRegisterSupernode) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_MsgRegisterSupernode.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *MsgRegisterSupernode) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MsgRegisterSupernode.Merge(m, src)
+}
+func (m *MsgRegisterSupernode) XXX_Size() int {
+	return m.Size()
+}
+func (m *MsgRegisterSupernode) XXX_DiscardUnknown() {
+	xxx_messageInfo_MsgRegisterSupernode.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_MsgRegisterSupernode proto.InternalMessageInfo
+
+func (m *MsgRegisterSupernode) GetCreator() string {
+	if m != nil {
+		return m.Creator
+	}
+	return ""
+}
+
+func (m *MsgRegisterSupernode) GetValidatorAddress() string {
+	if m != nil {
+		return m.ValidatorAddress
+	}
+	return ""
+}
+
+func (m *MsgRegisterSupernode) GetIpAddress() string {
+	if m != nil {
+		return m.IpAddress
+	}
+	return ""
+}
+
+func (m *MsgRegisterSupernode) GetVersion() string {
+	if m != nil {
+		return m.Version
+	}
+	return ""
+}
+
+type MsgRegisterSupernodeResponse struct {
+}
+
+func (m *MsgRegisterSupernodeResponse) Reset()         { *m = MsgRegisterSupernodeResponse{} }
+func (m *MsgRegisterSupernodeResponse) String() string { return proto.CompactTextString(m) }
+func (*MsgRegisterSupernodeResponse) ProtoMessage()    {}
+func (*MsgRegisterSupernodeResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_588b2b1f82696fba, []int{3}
+}
+func (m *MsgRegisterSupernodeResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *MsgRegisterSupernodeResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_MsgRegisterSupernodeResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *MsgRegisterSupernodeResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MsgRegisterSupernodeResponse.Merge(m, src)
+}
+func (m *MsgRegisterSupernodeResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *MsgRegisterSupernodeResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_MsgRegisterSupernodeResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_MsgRegisterSupernodeResponse proto.InternalMessageInfo
+
+type MsgDeregisterSupernode struct {
+	Creator          string `protobuf:"bytes,1,opt,name=creator,proto3" json:"creator,omitempty"`
+	ValidatorAddress string `protobuf:"bytes,2,opt,name=validatorAddress,proto3" json:"validatorAddress,omitempty"`
+}
+
+func (m *MsgDeregisterSupernode) Reset()         { *m = MsgDeregisterSupernode{} }
+func (m *MsgDeregisterSupernode) String() string { return proto.CompactTextString(m) }
+func (*MsgDeregisterSupernode) ProtoMessage()    {}
+func (*MsgDeregisterSupernode) Descriptor() ([]byte, []int) {
+	return fileDescriptor_588b2b1f82696fba, []int{4}
+}
+func (m *MsgDeregisterSupernode) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *MsgDeregisterSupernode) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_MsgDeregisterSupernode.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *MsgDeregisterSupernode) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MsgDeregisterSupernode.Merge(m, src)
+}
+func (m *MsgDeregisterSupernode) XXX_Size() int {
+	return m.Size()
+}
+func (m *MsgDeregisterSupernode) XXX_DiscardUnknown() {
+	xxx_messageInfo_MsgDeregisterSupernode.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_MsgDeregisterSupernode proto.InternalMessageInfo
+
+func (m *MsgDeregisterSupernode) GetCreator() string {
+	if m != nil {
+		return m.Creator
+	}
+	return ""
+}
+
+func (m *MsgDeregisterSupernode) GetValidatorAddress() string {
+	if m != nil {
+		return m.ValidatorAddress
+	}
+	return ""
+}
+
+type MsgDeregisterSupernodeResponse struct {
+}
+
+func (m *MsgDeregisterSupernodeResponse) Reset()         { *m = MsgDeregisterSupernodeResponse{} }
+func (m *MsgDeregisterSupernodeResponse) String() string { return proto.CompactTextString(m) }
+func (*MsgDeregisterSupernodeResponse) ProtoMessage()    {}
+func (*MsgDeregisterSupernodeResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_588b2b1f82696fba, []int{5}
+}
+func (m *MsgDeregisterSupernodeResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *MsgDeregisterSupernodeResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_MsgDeregisterSupernodeResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *MsgDeregisterSupernodeResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MsgDeregisterSupernodeResponse.Merge(m, src)
+}
+func (m *MsgDeregisterSupernodeResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *MsgDeregisterSupernodeResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_MsgDeregisterSupernodeResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_MsgDeregisterSupernodeResponse proto.InternalMessageInfo
+
+type MsgStartSupernode struct {
+	Creator          string `protobuf:"bytes,1,opt,name=creator,proto3" json:"creator,omitempty"`
+	ValidatorAddress string `protobuf:"bytes,2,opt,name=validatorAddress,proto3" json:"validatorAddress,omitempty"`
+	IpAddress        string `protobuf:"bytes,3,opt,name=ipAddress,proto3" json:"ipAddress,omitempty"`
+}
+
+func (m *MsgStartSupernode) Reset()         { *m = MsgStartSupernode{} }
+func (m *MsgStartSupernode) String() string { return proto.CompactTextString(m) }
+func (*MsgStartSupernode) ProtoMessage()    {}
+func (*MsgStartSupernode) Descriptor() ([]byte, []int) {
+	return fileDescriptor_588b2b1f82696fba, []int{6}
+}
+func (m *MsgStartSupernode) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *MsgStartSupernode) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_MsgStartSupernode.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *MsgStartSupernode) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MsgStartSupernode.Merge(m, src)
+}
+func (m *MsgStartSupernode) XXX_Size() int {
+	return m.Size()
+}
+func (m *MsgStartSupernode) XXX_DiscardUnknown() {
+	xxx_messageInfo_MsgStartSupernode.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_MsgStartSupernode proto.InternalMessageInfo
+
+func (m *MsgStartSupernode) GetCreator() string {
+	if m != nil {
+		return m.Creator
+	}
+	return ""
+}
+
+func (m *MsgStartSupernode) GetValidatorAddress() string {
+	if m != nil {
+		return m.ValidatorAddress
+	}
+	return ""
+}
+
+func (m *MsgStartSupernode) GetIpAddress() string {
+	if m != nil {
+		return m.IpAddress
+	}
+	return ""
+}
+
+type MsgStartSupernodeResponse struct {
+}
+
+func (m *MsgStartSupernodeResponse) Reset()         { *m = MsgStartSupernodeResponse{} }
+func (m *MsgStartSupernodeResponse) String() string { return proto.CompactTextString(m) }
+func (*MsgStartSupernodeResponse) ProtoMessage()    {}
+func (*MsgStartSupernodeResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_588b2b1f82696fba, []int{7}
+}
+func (m *MsgStartSupernodeResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *MsgStartSupernodeResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_MsgStartSupernodeResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *MsgStartSupernodeResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MsgStartSupernodeResponse.Merge(m, src)
+}
+func (m *MsgStartSupernodeResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *MsgStartSupernodeResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_MsgStartSupernodeResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_MsgStartSupernodeResponse proto.InternalMessageInfo
+
+type MsgStopSupernode struct {
+	Creator          string `protobuf:"bytes,1,opt,name=creator,proto3" json:"creator,omitempty"`
+	ValidatorAddress string `protobuf:"bytes,2,opt,name=validatorAddress,proto3" json:"validatorAddress,omitempty"`
+	Reason           string `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
+}
+
+func (m *MsgStopSupernode) Reset()         { *m = MsgStopSupernode{} }
+func (m *MsgStopSupernode) String() string { return proto.CompactTextString(m) }
+func (*MsgStopSupernode) ProtoMessage()    {}
+func (*MsgStopSupernode) Descriptor() ([]byte, []int) {
+	return fileDescriptor_588b2b1f82696fba, []int{8}
+}
+func (m *MsgStopSupernode) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *MsgStopSupernode) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_MsgStopSupernode.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *MsgStopSupernode) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MsgStopSupernode.Merge(m, src)
+}
+func (m *MsgStopSupernode) XXX_Size() int {
+	return m.Size()
+}
+func (m *MsgStopSupernode) XXX_DiscardUnknown() {
+	xxx_messageInfo_MsgStopSupernode.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_MsgStopSupernode proto.InternalMessageInfo
+
+func (m *MsgStopSupernode) GetCreator() string {
+	if m != nil {
+		return m.Creator
+	}
+	return ""
+}
+
+func (m *MsgStopSupernode) GetValidatorAddress() string {
+	if m != nil {
+		return m.ValidatorAddress
+	}
+	return ""
+}
+
+func (m *MsgStopSupernode) GetReason() string {
+	if m != nil {
+		return m.Reason
+	}
+	return ""
+}
+
+type MsgStopSupernodeResponse struct {
+}
+
+func (m *MsgStopSupernodeResponse) Reset()         { *m = MsgStopSupernodeResponse{} }
+func (m *MsgStopSupernodeResponse) String() string { return proto.CompactTextString(m) }
+func (*MsgStopSupernodeResponse) ProtoMessage()    {}
+func (*MsgStopSupernodeResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_588b2b1f82696fba, []int{9}
+}
+func (m *MsgStopSupernodeResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *MsgStopSupernodeResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_MsgStopSupernodeResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *MsgStopSupernodeResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MsgStopSupernodeResponse.Merge(m, src)
+}
+func (m *MsgStopSupernodeResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *MsgStopSupernodeResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_MsgStopSupernodeResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_MsgStopSupernodeResponse proto.InternalMessageInfo
+
+type MsgUpdateSupernode struct {
+	Creator          string `protobuf:"bytes,1,opt,name=creator,proto3" json:"creator,omitempty"`
+	ValidatorAddress string `protobuf:"bytes,2,opt,name=validatorAddress,proto3" json:"validatorAddress,omitempty"`
+	IpAddress        string `protobuf:"bytes,3,opt,name=ipAddress,proto3" json:"ipAddress,omitempty"`
+	Version          string `protobuf:"bytes,4,opt,name=version,proto3" json:"version,omitempty"`
+}
+
+func (m *MsgUpdateSupernode) Reset()         { *m = MsgUpdateSupernode{} }
+func (m *MsgUpdateSupernode) String() string { return proto.CompactTextString(m) }
+func (*MsgUpdateSupernode) ProtoMessage()    {}
+func (*MsgUpdateSupernode) Descriptor() ([]byte, []int) {
+	return fileDescriptor_588b2b1f82696fba, []int{10}
+}
+func (m *MsgUpdateSupernode) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *MsgUpdateSupernode) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_MsgUpdateSupernode.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *MsgUpdateSupernode) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MsgUpdateSupernode.Merge(m, src)
+}
+func (m *MsgUpdateSupernode) XXX_Size() int {
+	return m.Size()
+}
+func (m *MsgUpdateSupernode) XXX_DiscardUnknown() {
+	xxx_messageInfo_MsgUpdateSupernode.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_MsgUpdateSupernode proto.InternalMessageInfo
+
+func (m *MsgUpdateSupernode) GetCreator() string {
+	if m != nil {
+		return m.Creator
+	}
+	return ""
+}
+
+func (m *MsgUpdateSupernode) GetValidatorAddress() string {
+	if m != nil {
+		return m.ValidatorAddress
+	}
+	return ""
+}
+
+func (m *MsgUpdateSupernode) GetIpAddress() string {
+	if m != nil {
+		return m.IpAddress
+	}
+	return ""
+}
+
+func (m *MsgUpdateSupernode) GetVersion() string {
+	if m != nil {
+		return m.Version
+	}
+	return ""
+}
+
+type MsgUpdateSupernodeResponse struct {
+}
+
+func (m *MsgUpdateSupernodeResponse) Reset()         { *m = MsgUpdateSupernodeResponse{} }
+func (m *MsgUpdateSupernodeResponse) String() string { return proto.CompactTextString(m) }
+func (*MsgUpdateSupernodeResponse) ProtoMessage()    {}
+func (*MsgUpdateSupernodeResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_588b2b1f82696fba, []int{11}
+}
+func (m *MsgUpdateSupernodeResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *MsgUpdateSupernodeResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_MsgUpdateSupernodeResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *MsgUpdateSupernodeResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MsgUpdateSupernodeResponse.Merge(m, src)
+}
+func (m *MsgUpdateSupernodeResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *MsgUpdateSupernodeResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_MsgUpdateSupernodeResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_MsgUpdateSupernodeResponse proto.InternalMessageInfo
+
 func init() {
 	proto.RegisterType((*MsgUpdateParams)(nil), "pastel.supernode.MsgUpdateParams")
 	proto.RegisterType((*MsgUpdateParamsResponse)(nil), "pastel.supernode.MsgUpdateParamsResponse")
+	proto.RegisterType((*MsgRegisterSupernode)(nil), "pastel.supernode.MsgRegisterSupernode")
+	proto.RegisterType((*MsgRegisterSupernodeResponse)(nil), "pastel.supernode.MsgRegisterSupernodeResponse")
+	proto.RegisterType((*MsgDeregisterSupernode)(nil), "pastel.supernode.MsgDeregisterSupernode")
+	proto.RegisterType((*MsgDeregisterSupernodeResponse)(nil), "pastel.supernode.MsgDeregisterSupernodeResponse")
+	proto.RegisterType((*MsgStartSupernode)(nil), "pastel.supernode.MsgStartSupernode")
+	proto.RegisterType((*MsgStartSupernodeResponse)(nil), "pastel.supernode.MsgStartSupernodeResponse")
+	proto.RegisterType((*MsgStopSupernode)(nil), "pastel.supernode.MsgStopSupernode")
+	proto.RegisterType((*MsgStopSupernodeResponse)(nil), "pastel.supernode.MsgStopSupernodeResponse")
+	proto.RegisterType((*MsgUpdateSupernode)(nil), "pastel.supernode.MsgUpdateSupernode")
+	proto.RegisterType((*MsgUpdateSupernodeResponse)(nil), "pastel.supernode.MsgUpdateSupernodeResponse")
 }
 
 func init() { proto.RegisterFile("pastel/supernode/tx.proto", fileDescriptor_588b2b1f82696fba) }
 
 var fileDescriptor_588b2b1f82696fba = []byte{
-	// 344 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0x92, 0x2c, 0x48, 0x2c, 0x2e,
-	0x49, 0xcd, 0xd1, 0x2f, 0x2e, 0x2d, 0x48, 0x2d, 0xca, 0xcb, 0x4f, 0x49, 0xd5, 0x2f, 0xa9, 0xd0,
-	0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0x12, 0x80, 0x48, 0xe9, 0xc1, 0xa5, 0xa4, 0x04, 0x13, 0x73,
-	0x33, 0xf3, 0xf2, 0xf5, 0xc1, 0x24, 0x44, 0x91, 0x94, 0x78, 0x72, 0x7e, 0x71, 0x6e, 0x7e, 0xb1,
-	0x7e, 0x6e, 0x71, 0xba, 0x7e, 0x99, 0x21, 0x88, 0x82, 0x4a, 0x48, 0x42, 0x24, 0xe2, 0xc1, 0x3c,
-	0x7d, 0x08, 0x07, 0x2a, 0x25, 0x92, 0x9e, 0x9f, 0x9e, 0x0f, 0x11, 0x07, 0xb1, 0xa0, 0xa2, 0xb2,
-	0x18, 0x2e, 0x29, 0x48, 0x2c, 0x4a, 0xcc, 0x85, 0x6a, 0x52, 0xda, 0xcb, 0xc8, 0xc5, 0xef, 0x5b,
-	0x9c, 0x1e, 0x5a, 0x90, 0x92, 0x58, 0x92, 0x1a, 0x00, 0x96, 0x11, 0x32, 0xe3, 0xe2, 0x4c, 0x2c,
-	0x2d, 0xc9, 0xc8, 0x2f, 0xca, 0x2c, 0xa9, 0x94, 0x60, 0x54, 0x60, 0xd4, 0xe0, 0x74, 0x92, 0xb8,
-	0xb4, 0x45, 0x57, 0x04, 0x6a, 0x9b, 0x63, 0x4a, 0x4a, 0x51, 0x6a, 0x71, 0x71, 0x70, 0x49, 0x51,
-	0x66, 0x5e, 0x7a, 0x10, 0x42, 0xa9, 0x90, 0x35, 0x17, 0x1b, 0xc4, 0x6c, 0x09, 0x26, 0x05, 0x46,
-	0x0d, 0x6e, 0x23, 0x09, 0x3d, 0x74, 0xaf, 0xea, 0x41, 0x6c, 0x70, 0xe2, 0x3c, 0x71, 0x4f, 0x9e,
-	0x61, 0xc5, 0xf3, 0x0d, 0x5a, 0x8c, 0x41, 0x50, 0x2d, 0x56, 0xa6, 0x4d, 0xcf, 0x37, 0x68, 0x21,
-	0x0c, 0xeb, 0x7a, 0xbe, 0x41, 0x4b, 0x09, 0xea, 0xf4, 0x0a, 0x24, 0xc7, 0xa3, 0xb9, 0x55, 0x49,
-	0x92, 0x4b, 0x1c, 0x4d, 0x28, 0x28, 0xb5, 0xb8, 0x20, 0x3f, 0xaf, 0x38, 0xd5, 0x28, 0x8b, 0x8b,
-	0xd9, 0xb7, 0x38, 0x5d, 0x28, 0x86, 0x8b, 0x07, 0xc5, 0x77, 0x8a, 0x98, 0xae, 0x42, 0x33, 0x41,
-	0x4a, 0x93, 0xa0, 0x12, 0x98, 0x25, 0x52, 0xac, 0x0d, 0x20, 0x5f, 0x38, 0x79, 0x9f, 0x78, 0x24,
-	0xc7, 0x78, 0xe1, 0x91, 0x1c, 0xe3, 0x83, 0x47, 0x72, 0x8c, 0x13, 0x1e, 0xcb, 0x31, 0x5c, 0x78,
-	0x2c, 0xc7, 0x70, 0xe3, 0xb1, 0x1c, 0x43, 0x94, 0x61, 0x7a, 0x66, 0x49, 0x46, 0x69, 0x92, 0x5e,
-	0x72, 0x7e, 0xae, 0x3e, 0xc4, 0xd4, 0xbc, 0xd4, 0x92, 0xf2, 0xfc, 0xa2, 0x6c, 0x7d, 0x2c, 0xbe,
-	0x2b, 0xa9, 0x2c, 0x48, 0x2d, 0x4e, 0x62, 0x03, 0x47, 0x8d, 0x31, 0x20, 0x00, 0x00, 0xff, 0xff,
-	0x08, 0x48, 0x40, 0x46, 0x45, 0x02, 0x00, 0x00,
+	// 614 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xcc, 0x55, 0xb1, 0x6f, 0xd3, 0x4e,
+	0x14, 0x8e, 0x7f, 0xed, 0xaf, 0x28, 0x8f, 0x42, 0x13, 0x13, 0xb5, 0x8e, 0x09, 0x26, 0x18, 0x84,
+	0x42, 0x00, 0x9b, 0x16, 0xc1, 0x50, 0x26, 0x22, 0x36, 0x14, 0x09, 0x39, 0x62, 0x41, 0x48, 0x95,
+	0x93, 0x9c, 0xae, 0x56, 0x13, 0x9f, 0xb9, 0xbb, 0x84, 0x76, 0x41, 0x08, 0x89, 0x85, 0x89, 0x3f,
+	0x01, 0x31, 0x31, 0x66, 0x60, 0x65, 0xef, 0x58, 0x31, 0x31, 0x21, 0x94, 0x0c, 0xf9, 0x0f, 0x98,
+	0x91, 0xed, 0xb3, 0xd3, 0xd8, 0x86, 0x66, 0x00, 0xc4, 0x92, 0xe4, 0xbd, 0xf7, 0xbd, 0xf7, 0x7d,
+	0x5f, 0x7c, 0xcf, 0x07, 0x65, 0xcf, 0x66, 0x1c, 0xf5, 0x4c, 0x36, 0xf0, 0x10, 0x75, 0x49, 0x17,
+	0x99, 0x7c, 0xdf, 0xf0, 0x28, 0xe1, 0x44, 0x2e, 0x84, 0x25, 0x23, 0x2e, 0xa9, 0x45, 0xbb, 0xef,
+	0xb8, 0xc4, 0x0c, 0x3e, 0x43, 0x90, 0xba, 0xd1, 0x21, 0xac, 0x4f, 0x98, 0xd9, 0x67, 0xd8, 0x1c,
+	0x6e, 0xfa, 0x5f, 0xa2, 0x50, 0x0e, 0x0b, 0x3b, 0x41, 0x64, 0x86, 0x81, 0x28, 0x95, 0x30, 0xc1,
+	0x24, 0xcc, 0xfb, 0xbf, 0x44, 0xf6, 0x42, 0x4a, 0x89, 0x67, 0x53, 0xbb, 0x2f, 0x9a, 0xf4, 0x4f,
+	0x12, 0xac, 0x35, 0x19, 0x7e, 0xec, 0x75, 0x6d, 0x8e, 0x1e, 0x05, 0x15, 0xf9, 0x2e, 0xe4, 0xed,
+	0x01, 0xdf, 0x25, 0xd4, 0xe1, 0x07, 0x8a, 0x54, 0x95, 0x6a, 0xf9, 0x86, 0xf2, 0xf9, 0xe3, 0xcd,
+	0x92, 0x60, 0xbb, 0xdf, 0xed, 0x52, 0xc4, 0x58, 0x8b, 0x53, 0xc7, 0xc5, 0xd6, 0x0c, 0x2a, 0xdf,
+	0x83, 0x95, 0x70, 0xb6, 0xf2, 0x5f, 0x55, 0xaa, 0x9d, 0xde, 0x52, 0x8c, 0xa4, 0x55, 0x23, 0x64,
+	0x68, 0xe4, 0x0f, 0xbf, 0x5e, 0xcc, 0x7d, 0x98, 0x8e, 0xea, 0x92, 0x25, 0x5a, 0xb6, 0xef, 0xbc,
+	0x9a, 0x8e, 0xea, 0xb3, 0x61, 0x6f, 0xa6, 0xa3, 0xba, 0x2e, 0xa4, 0xef, 0x1f, 0x13, 0x9f, 0xd0,
+	0xaa, 0x97, 0x61, 0x23, 0x91, 0xb2, 0x10, 0xf3, 0x88, 0xcb, 0x90, 0xfe, 0x5e, 0x82, 0x52, 0x93,
+	0x61, 0x0b, 0x61, 0x87, 0x71, 0x44, 0x5b, 0xd1, 0x0c, 0x59, 0x81, 0x53, 0x1d, 0x8a, 0x6c, 0x4e,
+	0x68, 0xe8, 0xce, 0x8a, 0x42, 0xb9, 0x0e, 0x85, 0xa1, 0xdd, 0x73, 0xba, 0x7e, 0x20, 0x6c, 0x06,
+	0x5e, 0xf2, 0x56, 0x2a, 0x2f, 0x57, 0x20, 0xef, 0x78, 0x11, 0x68, 0x29, 0x00, 0xcd, 0x12, 0x3e,
+	0xc7, 0x10, 0x51, 0xe6, 0x10, 0x57, 0x59, 0x0e, 0x39, 0x44, 0xb8, 0xbd, 0xea, 0x1b, 0x8d, 0x18,
+	0x75, 0x0d, 0x2a, 0x59, 0x1a, 0x63, 0x13, 0x3d, 0x58, 0x6f, 0x32, 0xfc, 0x00, 0xd1, 0x3f, 0xe3,
+	0x22, 0xa1, 0xa6, 0x0a, 0x5a, 0x36, 0x5b, 0xac, 0xe7, 0xb5, 0x04, 0xc5, 0x26, 0xc3, 0x2d, 0x6e,
+	0x53, 0xfe, 0x57, 0xff, 0xd1, 0x84, 0xd2, 0xf3, 0x50, 0x4e, 0xc9, 0x88, 0x45, 0xbe, 0x80, 0x42,
+	0x50, 0x24, 0xde, 0xef, 0x96, 0xb8, 0x0e, 0x2b, 0x14, 0xd9, 0x8c, 0xb8, 0x42, 0x9f, 0x88, 0x12,
+	0xe2, 0x54, 0x50, 0x92, 0xfc, 0xb1, 0xb6, 0x77, 0x12, 0xc8, 0xf1, 0x89, 0xfd, 0x37, 0xcf, 0x64,
+	0x05, 0xd4, 0xb4, 0xc2, 0xc8, 0xc0, 0xd6, 0xf7, 0x65, 0x58, 0x6a, 0x32, 0x2c, 0x3f, 0x85, 0xd5,
+	0xb9, 0xb7, 0xc6, 0xa5, 0xf4, 0xb6, 0x27, 0x36, 0x53, 0xbd, 0x76, 0x22, 0x24, 0x62, 0x91, 0xf7,
+	0xa0, 0x98, 0x5e, 0xdc, 0xab, 0x99, 0xfd, 0x29, 0x9c, 0x6a, 0x2c, 0x86, 0x8b, 0xc9, 0x9e, 0xc1,
+	0xb9, 0xac, 0x0d, 0xab, 0x65, 0x8e, 0xc9, 0x40, 0xaa, 0xb7, 0x16, 0x45, 0xc6, 0x94, 0x6d, 0x38,
+	0x9b, 0xd8, 0xa1, 0xcb, 0x99, 0x33, 0xe6, 0x41, 0xea, 0xf5, 0x05, 0x40, 0x31, 0xc7, 0x0e, 0x9c,
+	0x99, 0xdf, 0x01, 0xfd, 0x27, 0xdd, 0xc7, 0x30, 0x6a, 0xfd, 0x64, 0x4c, 0x4c, 0x80, 0x60, 0x2d,
+	0x79, 0x8e, 0xaf, 0xfc, 0xe2, 0x11, 0xcf, 0x48, 0x6e, 0x2c, 0x82, 0x8a, 0x68, 0xd4, 0xff, 0x5f,
+	0xfa, 0x37, 0x45, 0xe3, 0xe1, 0xe1, 0x58, 0x93, 0x8e, 0xc6, 0x9a, 0xf4, 0x6d, 0xac, 0x49, 0x6f,
+	0x27, 0x5a, 0xee, 0x68, 0xa2, 0xe5, 0xbe, 0x4c, 0xb4, 0xdc, 0x93, 0x4d, 0xec, 0xf0, 0xdd, 0x41,
+	0xdb, 0xe8, 0x90, 0xbe, 0x19, 0x0e, 0x76, 0x11, 0x7f, 0x4e, 0xe8, 0x9e, 0x99, 0x71, 0x83, 0xf0,
+	0x03, 0x0f, 0xb1, 0xf6, 0x4a, 0x70, 0xfd, 0xdd, 0xfe, 0x11, 0x00, 0x00, 0xff, 0xff, 0xdd, 0xc6,
+	0x07, 0x04, 0xa9, 0x07, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -174,6 +687,11 @@ type MsgClient interface {
 	// UpdateParams defines a (governance) operation for updating the module
 	// parameters. The authority defaults to the x/gov module account.
 	UpdateParams(ctx context.Context, in *MsgUpdateParams, opts ...grpc.CallOption) (*MsgUpdateParamsResponse, error)
+	RegisterSupernode(ctx context.Context, in *MsgRegisterSupernode, opts ...grpc.CallOption) (*MsgRegisterSupernodeResponse, error)
+	DeregisterSupernode(ctx context.Context, in *MsgDeregisterSupernode, opts ...grpc.CallOption) (*MsgDeregisterSupernodeResponse, error)
+	StartSupernode(ctx context.Context, in *MsgStartSupernode, opts ...grpc.CallOption) (*MsgStartSupernodeResponse, error)
+	StopSupernode(ctx context.Context, in *MsgStopSupernode, opts ...grpc.CallOption) (*MsgStopSupernodeResponse, error)
+	UpdateSupernode(ctx context.Context, in *MsgUpdateSupernode, opts ...grpc.CallOption) (*MsgUpdateSupernodeResponse, error)
 }
 
 type msgClient struct {
@@ -193,11 +711,61 @@ func (c *msgClient) UpdateParams(ctx context.Context, in *MsgUpdateParams, opts 
 	return out, nil
 }
 
+func (c *msgClient) RegisterSupernode(ctx context.Context, in *MsgRegisterSupernode, opts ...grpc.CallOption) (*MsgRegisterSupernodeResponse, error) {
+	out := new(MsgRegisterSupernodeResponse)
+	err := c.cc.Invoke(ctx, "/pastel.supernode.Msg/RegisterSupernode", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *msgClient) DeregisterSupernode(ctx context.Context, in *MsgDeregisterSupernode, opts ...grpc.CallOption) (*MsgDeregisterSupernodeResponse, error) {
+	out := new(MsgDeregisterSupernodeResponse)
+	err := c.cc.Invoke(ctx, "/pastel.supernode.Msg/DeregisterSupernode", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *msgClient) StartSupernode(ctx context.Context, in *MsgStartSupernode, opts ...grpc.CallOption) (*MsgStartSupernodeResponse, error) {
+	out := new(MsgStartSupernodeResponse)
+	err := c.cc.Invoke(ctx, "/pastel.supernode.Msg/StartSupernode", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *msgClient) StopSupernode(ctx context.Context, in *MsgStopSupernode, opts ...grpc.CallOption) (*MsgStopSupernodeResponse, error) {
+	out := new(MsgStopSupernodeResponse)
+	err := c.cc.Invoke(ctx, "/pastel.supernode.Msg/StopSupernode", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *msgClient) UpdateSupernode(ctx context.Context, in *MsgUpdateSupernode, opts ...grpc.CallOption) (*MsgUpdateSupernodeResponse, error) {
+	out := new(MsgUpdateSupernodeResponse)
+	err := c.cc.Invoke(ctx, "/pastel.supernode.Msg/UpdateSupernode", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MsgServer is the server API for Msg service.
 type MsgServer interface {
 	// UpdateParams defines a (governance) operation for updating the module
 	// parameters. The authority defaults to the x/gov module account.
 	UpdateParams(context.Context, *MsgUpdateParams) (*MsgUpdateParamsResponse, error)
+	RegisterSupernode(context.Context, *MsgRegisterSupernode) (*MsgRegisterSupernodeResponse, error)
+	DeregisterSupernode(context.Context, *MsgDeregisterSupernode) (*MsgDeregisterSupernodeResponse, error)
+	StartSupernode(context.Context, *MsgStartSupernode) (*MsgStartSupernodeResponse, error)
+	StopSupernode(context.Context, *MsgStopSupernode) (*MsgStopSupernodeResponse, error)
+	UpdateSupernode(context.Context, *MsgUpdateSupernode) (*MsgUpdateSupernodeResponse, error)
 }
 
 // UnimplementedMsgServer can be embedded to have forward compatible implementations.
@@ -206,6 +774,21 @@ type UnimplementedMsgServer struct {
 
 func (*UnimplementedMsgServer) UpdateParams(ctx context.Context, req *MsgUpdateParams) (*MsgUpdateParamsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateParams not implemented")
+}
+func (*UnimplementedMsgServer) RegisterSupernode(ctx context.Context, req *MsgRegisterSupernode) (*MsgRegisterSupernodeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RegisterSupernode not implemented")
+}
+func (*UnimplementedMsgServer) DeregisterSupernode(ctx context.Context, req *MsgDeregisterSupernode) (*MsgDeregisterSupernodeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeregisterSupernode not implemented")
+}
+func (*UnimplementedMsgServer) StartSupernode(ctx context.Context, req *MsgStartSupernode) (*MsgStartSupernodeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StartSupernode not implemented")
+}
+func (*UnimplementedMsgServer) StopSupernode(ctx context.Context, req *MsgStopSupernode) (*MsgStopSupernodeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StopSupernode not implemented")
+}
+func (*UnimplementedMsgServer) UpdateSupernode(ctx context.Context, req *MsgUpdateSupernode) (*MsgUpdateSupernodeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateSupernode not implemented")
 }
 
 func RegisterMsgServer(s grpc1.Server, srv MsgServer) {
@@ -230,6 +813,96 @@ func _Msg_UpdateParams_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Msg_RegisterSupernode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MsgRegisterSupernode)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServer).RegisterSupernode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/pastel.supernode.Msg/RegisterSupernode",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServer).RegisterSupernode(ctx, req.(*MsgRegisterSupernode))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Msg_DeregisterSupernode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MsgDeregisterSupernode)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServer).DeregisterSupernode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/pastel.supernode.Msg/DeregisterSupernode",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServer).DeregisterSupernode(ctx, req.(*MsgDeregisterSupernode))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Msg_StartSupernode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MsgStartSupernode)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServer).StartSupernode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/pastel.supernode.Msg/StartSupernode",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServer).StartSupernode(ctx, req.(*MsgStartSupernode))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Msg_StopSupernode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MsgStopSupernode)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServer).StopSupernode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/pastel.supernode.Msg/StopSupernode",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServer).StopSupernode(ctx, req.(*MsgStopSupernode))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Msg_UpdateSupernode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MsgUpdateSupernode)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServer).UpdateSupernode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/pastel.supernode.Msg/UpdateSupernode",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServer).UpdateSupernode(ctx, req.(*MsgUpdateSupernode))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var Msg_serviceDesc = _Msg_serviceDesc
 var _Msg_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "pastel.supernode.Msg",
@@ -238,6 +911,26 @@ var _Msg_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateParams",
 			Handler:    _Msg_UpdateParams_Handler,
+		},
+		{
+			MethodName: "RegisterSupernode",
+			Handler:    _Msg_RegisterSupernode_Handler,
+		},
+		{
+			MethodName: "DeregisterSupernode",
+			Handler:    _Msg_DeregisterSupernode_Handler,
+		},
+		{
+			MethodName: "StartSupernode",
+			Handler:    _Msg_StartSupernode_Handler,
+		},
+		{
+			MethodName: "StopSupernode",
+			Handler:    _Msg_StopSupernode_Handler,
+		},
+		{
+			MethodName: "UpdateSupernode",
+			Handler:    _Msg_UpdateSupernode_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -307,6 +1000,348 @@ func (m *MsgUpdateParamsResponse) MarshalToSizedBuffer(dAtA []byte) (int, error)
 	return len(dAtA) - i, nil
 }
 
+func (m *MsgRegisterSupernode) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *MsgRegisterSupernode) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *MsgRegisterSupernode) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Version) > 0 {
+		i -= len(m.Version)
+		copy(dAtA[i:], m.Version)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.Version)))
+		i--
+		dAtA[i] = 0x22
+	}
+	if len(m.IpAddress) > 0 {
+		i -= len(m.IpAddress)
+		copy(dAtA[i:], m.IpAddress)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.IpAddress)))
+		i--
+		dAtA[i] = 0x1a
+	}
+	if len(m.ValidatorAddress) > 0 {
+		i -= len(m.ValidatorAddress)
+		copy(dAtA[i:], m.ValidatorAddress)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.ValidatorAddress)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if len(m.Creator) > 0 {
+		i -= len(m.Creator)
+		copy(dAtA[i:], m.Creator)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.Creator)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *MsgRegisterSupernodeResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *MsgRegisterSupernodeResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *MsgRegisterSupernodeResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	return len(dAtA) - i, nil
+}
+
+func (m *MsgDeregisterSupernode) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *MsgDeregisterSupernode) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *MsgDeregisterSupernode) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.ValidatorAddress) > 0 {
+		i -= len(m.ValidatorAddress)
+		copy(dAtA[i:], m.ValidatorAddress)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.ValidatorAddress)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if len(m.Creator) > 0 {
+		i -= len(m.Creator)
+		copy(dAtA[i:], m.Creator)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.Creator)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *MsgDeregisterSupernodeResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *MsgDeregisterSupernodeResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *MsgDeregisterSupernodeResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	return len(dAtA) - i, nil
+}
+
+func (m *MsgStartSupernode) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *MsgStartSupernode) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *MsgStartSupernode) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.IpAddress) > 0 {
+		i -= len(m.IpAddress)
+		copy(dAtA[i:], m.IpAddress)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.IpAddress)))
+		i--
+		dAtA[i] = 0x1a
+	}
+	if len(m.ValidatorAddress) > 0 {
+		i -= len(m.ValidatorAddress)
+		copy(dAtA[i:], m.ValidatorAddress)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.ValidatorAddress)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if len(m.Creator) > 0 {
+		i -= len(m.Creator)
+		copy(dAtA[i:], m.Creator)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.Creator)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *MsgStartSupernodeResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *MsgStartSupernodeResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *MsgStartSupernodeResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	return len(dAtA) - i, nil
+}
+
+func (m *MsgStopSupernode) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *MsgStopSupernode) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *MsgStopSupernode) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Reason) > 0 {
+		i -= len(m.Reason)
+		copy(dAtA[i:], m.Reason)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.Reason)))
+		i--
+		dAtA[i] = 0x1a
+	}
+	if len(m.ValidatorAddress) > 0 {
+		i -= len(m.ValidatorAddress)
+		copy(dAtA[i:], m.ValidatorAddress)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.ValidatorAddress)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if len(m.Creator) > 0 {
+		i -= len(m.Creator)
+		copy(dAtA[i:], m.Creator)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.Creator)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *MsgStopSupernodeResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *MsgStopSupernodeResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *MsgStopSupernodeResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	return len(dAtA) - i, nil
+}
+
+func (m *MsgUpdateSupernode) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *MsgUpdateSupernode) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *MsgUpdateSupernode) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Version) > 0 {
+		i -= len(m.Version)
+		copy(dAtA[i:], m.Version)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.Version)))
+		i--
+		dAtA[i] = 0x22
+	}
+	if len(m.IpAddress) > 0 {
+		i -= len(m.IpAddress)
+		copy(dAtA[i:], m.IpAddress)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.IpAddress)))
+		i--
+		dAtA[i] = 0x1a
+	}
+	if len(m.ValidatorAddress) > 0 {
+		i -= len(m.ValidatorAddress)
+		copy(dAtA[i:], m.ValidatorAddress)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.ValidatorAddress)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if len(m.Creator) > 0 {
+		i -= len(m.Creator)
+		copy(dAtA[i:], m.Creator)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.Creator)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *MsgUpdateSupernodeResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *MsgUpdateSupernodeResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *MsgUpdateSupernodeResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	return len(dAtA) - i, nil
+}
+
 func encodeVarintTx(dAtA []byte, offset int, v uint64) int {
 	offset -= sovTx(v)
 	base := offset
@@ -334,6 +1369,160 @@ func (m *MsgUpdateParams) Size() (n int) {
 }
 
 func (m *MsgUpdateParamsResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	return n
+}
+
+func (m *MsgRegisterSupernode) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Creator)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	l = len(m.ValidatorAddress)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	l = len(m.IpAddress)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	l = len(m.Version)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	return n
+}
+
+func (m *MsgRegisterSupernodeResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	return n
+}
+
+func (m *MsgDeregisterSupernode) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Creator)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	l = len(m.ValidatorAddress)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	return n
+}
+
+func (m *MsgDeregisterSupernodeResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	return n
+}
+
+func (m *MsgStartSupernode) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Creator)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	l = len(m.ValidatorAddress)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	l = len(m.IpAddress)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	return n
+}
+
+func (m *MsgStartSupernodeResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	return n
+}
+
+func (m *MsgStopSupernode) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Creator)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	l = len(m.ValidatorAddress)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	l = len(m.Reason)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	return n
+}
+
+func (m *MsgStopSupernodeResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	return n
+}
+
+func (m *MsgUpdateSupernode) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Creator)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	l = len(m.ValidatorAddress)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	l = len(m.IpAddress)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	l = len(m.Version)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	return n
+}
+
+func (m *MsgUpdateSupernodeResponse) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -490,6 +1679,1018 @@ func (m *MsgUpdateParamsResponse) Unmarshal(dAtA []byte) error {
 		}
 		if fieldNum <= 0 {
 			return fmt.Errorf("proto: MsgUpdateParamsResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTx(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthTx
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *MsgRegisterSupernode) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTx
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MsgRegisterSupernode: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MsgRegisterSupernode: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Creator", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Creator = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ValidatorAddress", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ValidatorAddress = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field IpAddress", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.IpAddress = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Version", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Version = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTx(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthTx
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *MsgRegisterSupernodeResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTx
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MsgRegisterSupernodeResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MsgRegisterSupernodeResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTx(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthTx
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *MsgDeregisterSupernode) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTx
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MsgDeregisterSupernode: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MsgDeregisterSupernode: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Creator", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Creator = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ValidatorAddress", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ValidatorAddress = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTx(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthTx
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *MsgDeregisterSupernodeResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTx
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MsgDeregisterSupernodeResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MsgDeregisterSupernodeResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTx(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthTx
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *MsgStartSupernode) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTx
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MsgStartSupernode: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MsgStartSupernode: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Creator", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Creator = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ValidatorAddress", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ValidatorAddress = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field IpAddress", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.IpAddress = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTx(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthTx
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *MsgStartSupernodeResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTx
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MsgStartSupernodeResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MsgStartSupernodeResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTx(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthTx
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *MsgStopSupernode) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTx
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MsgStopSupernode: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MsgStopSupernode: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Creator", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Creator = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ValidatorAddress", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ValidatorAddress = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Reason", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Reason = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTx(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthTx
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *MsgStopSupernodeResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTx
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MsgStopSupernodeResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MsgStopSupernodeResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTx(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthTx
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *MsgUpdateSupernode) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTx
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MsgUpdateSupernode: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MsgUpdateSupernode: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Creator", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Creator = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ValidatorAddress", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ValidatorAddress = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field IpAddress", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.IpAddress = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Version", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Version = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTx(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthTx
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *MsgUpdateSupernodeResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTx
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MsgUpdateSupernodeResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MsgUpdateSupernodeResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		default:

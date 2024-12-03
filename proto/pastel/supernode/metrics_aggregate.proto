@@ -3,9 +3,12 @@ package pastel.supernode;
 
 option go_package = "github.com/pastelnetwork/pastel/x/supernode/types";
 
+import "google/protobuf/timestamp.proto";
+import "gogoproto/gogo.proto";
+
 message MetricsAggregate {
-  
-  string metrics = 1; 
-  uint64 reportCount = 2; 
-  uint64 lastUpdated = 3; 
+
+  map<string, double> metrics = 1;
+  uint64 report_count = 2;
+  google.protobuf.Timestamp last_updated = 3 [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
 }

@@ -1,9 +1,0 @@
-syntax = "proto3";
-package pastel.supernode;
-
-option go_package = "github.com/pastelnetwork/pastel/x/supernode/types";
-
-message SuperNodeState {
-  
-  string state = 1; 
-}

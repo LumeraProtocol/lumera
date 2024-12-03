@@ -2,11 +2,15 @@
 package supernode
 
 import (
+	_ "cosmossdk.io/api/cosmos/base/v1beta1"
 	fmt "fmt"
+	_ "github.com/cosmos/cosmos-proto"
 	runtime "github.com/cosmos/cosmos-proto/runtime"
+	_ "github.com/cosmos/gogoproto/gogoproto"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoiface "google.golang.org/protobuf/runtime/protoiface"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	io "io"
 	reflect "reflect"
 	sync "sync"
@@ -15,7 +19,7 @@ import (
 var _ protoreflect.List = (*_SuperNode_4_list)(nil)
 
 type _SuperNode_4_list struct {
-	list *[]string
+	list *[]*Evidence
 }
 
 func (x *_SuperNode_4_list) Len() int {
@@ -26,32 +30,37 @@ func (x *_SuperNode_4_list) Len() int {
 }
 
 func (x *_SuperNode_4_list) Get(i int) protoreflect.Value {
-	return protoreflect.ValueOfString((*x.list)[i])
+	return protoreflect.ValueOfMessage((*x.list)[i].ProtoReflect())
 }
 
 func (x *_SuperNode_4_list) Set(i int, value protoreflect.Value) {
-	valueUnwrapped := value.String()
-	concreteValue := valueUnwrapped
+	valueUnwrapped := value.Message()
+	concreteValue := valueUnwrapped.Interface().(*Evidence)
 	(*x.list)[i] = concreteValue
 }
 
 func (x *_SuperNode_4_list) Append(value protoreflect.Value) {
-	valueUnwrapped := value.String()
-	concreteValue := valueUnwrapped
+	valueUnwrapped := value.Message()
+	concreteValue := valueUnwrapped.Interface().(*Evidence)
 	*x.list = append(*x.list, concreteValue)
 }
 
 func (x *_SuperNode_4_list) AppendMutable() protoreflect.Value {
-	panic(fmt.Errorf("AppendMutable can not be called on message SuperNode at list field Evidence as it is not of Message kind"))
+	v := new(Evidence)
+	*x.list = append(*x.list, v)
+	return protoreflect.ValueOfMessage(v.ProtoReflect())
 }
 
 func (x *_SuperNode_4_list) Truncate(n int) {
+	for i := n; i < len(*x.list); i++ {
+		(*x.list)[i] = nil
+	}
 	*x.list = (*x.list)[:n]
 }
 
 func (x *_SuperNode_4_list) NewElement() protoreflect.Value {
-	v := ""
-	return protoreflect.ValueOfString(v)
+	v := new(Evidence)
+	return protoreflect.ValueOfMessage(v.ProtoReflect())
 }
 
 func (x *_SuperNode_4_list) IsValid() bool {
@@ -61,7 +70,7 @@ func (x *_SuperNode_4_list) IsValid() bool {
 var _ protoreflect.List = (*_SuperNode_8_list)(nil)
 
 type _SuperNode_8_list struct {
-	list *[]string
+	list *[]*IPAddressHistory
 }
 
 func (x *_SuperNode_8_list) Len() int {
@@ -72,32 +81,37 @@ func (x *_SuperNode_8_list) Len() int {
 }
 
 func (x *_SuperNode_8_list) Get(i int) protoreflect.Value {
-	return protoreflect.ValueOfString((*x.list)[i])
+	return protoreflect.ValueOfMessage((*x.list)[i].ProtoReflect())
 }
 
 func (x *_SuperNode_8_list) Set(i int, value protoreflect.Value) {
-	valueUnwrapped := value.String()
-	concreteValue := valueUnwrapped
+	valueUnwrapped := value.Message()
+	concreteValue := valueUnwrapped.Interface().(*IPAddressHistory)
 	(*x.list)[i] = concreteValue
 }
 
 func (x *_SuperNode_8_list) Append(value protoreflect.Value) {
-	valueUnwrapped := value.String()
-	concreteValue := valueUnwrapped
+	valueUnwrapped := value.Message()
+	concreteValue := valueUnwrapped.Interface().(*IPAddressHistory)
 	*x.list = append(*x.list, concreteValue)
 }
 
 func (x *_SuperNode_8_list) AppendMutable() protoreflect.Value {
-	panic(fmt.Errorf("AppendMutable can not be called on message SuperNode at list field PrevIpAddresses as it is not of Message kind"))
+	v := new(IPAddressHistory)
+	*x.list = append(*x.list, v)
+	return protoreflect.ValueOfMessage(v.ProtoReflect())
 }
 
 func (x *_SuperNode_8_list) Truncate(n int) {
+	for i := n; i < len(*x.list); i++ {
+		(*x.list)[i] = nil
+	}
 	*x.list = (*x.list)[:n]
 }
 
 func (x *_SuperNode_8_list) NewElement() protoreflect.Value {
-	v := ""
-	return protoreflect.ValueOfString(v)
+	v := new(IPAddressHistory)
+	return protoreflect.ValueOfMessage(v.ProtoReflect())
 }
 
 func (x *_SuperNode_8_list) IsValid() bool {
@@ -105,30 +119,30 @@ func (x *_SuperNode_8_list) IsValid() bool {
 }
 
 var (
-	md_SuperNode                  protoreflect.MessageDescriptor
-	fd_SuperNode_validatorAddress protoreflect.FieldDescriptor
-	fd_SuperNode_ipAddress        protoreflect.FieldDescriptor
-	fd_SuperNode_state            protoreflect.FieldDescriptor
-	fd_SuperNode_evidence         protoreflect.FieldDescriptor
-	fd_SuperNode_lastTimeActive   protoreflect.FieldDescriptor
-	fd_SuperNode_lastTimeDisabled protoreflect.FieldDescriptor
-	fd_SuperNode_startedAt        protoreflect.FieldDescriptor
-	fd_SuperNode_prevIpAddresses  protoreflect.FieldDescriptor
-	fd_SuperNode_version          protoreflect.FieldDescriptor
-	fd_SuperNode_metrics          protoreflect.FieldDescriptor
+	md_SuperNode                    protoreflect.MessageDescriptor
+	fd_SuperNode_validator_address  protoreflect.FieldDescriptor
+	fd_SuperNode_ip_address         protoreflect.FieldDescriptor
+	fd_SuperNode_state              protoreflect.FieldDescriptor
+	fd_SuperNode_evidence           protoreflect.FieldDescriptor
+	fd_SuperNode_last_time_active   protoreflect.FieldDescriptor
+	fd_SuperNode_last_time_disabled protoreflect.FieldDescriptor
+	fd_SuperNode_started_at         protoreflect.FieldDescriptor
+	fd_SuperNode_prev_ip_addresses  protoreflect.FieldDescriptor
+	fd_SuperNode_version            protoreflect.FieldDescriptor
+	fd_SuperNode_metrics            protoreflect.FieldDescriptor
 )
 
 func init() {
 	file_pastel_supernode_super_node_proto_init()
 	md_SuperNode = File_pastel_supernode_super_node_proto.Messages().ByName("SuperNode")
-	fd_SuperNode_validatorAddress = md_SuperNode.Fields().ByName("validatorAddress")
-	fd_SuperNode_ipAddress = md_SuperNode.Fields().ByName("ipAddress")
+	fd_SuperNode_validator_address = md_SuperNode.Fields().ByName("validator_address")
+	fd_SuperNode_ip_address = md_SuperNode.Fields().ByName("ip_address")
 	fd_SuperNode_state = md_SuperNode.Fields().ByName("state")
 	fd_SuperNode_evidence = md_SuperNode.Fields().ByName("evidence")
-	fd_SuperNode_lastTimeActive = md_SuperNode.Fields().ByName("lastTimeActive")
-	fd_SuperNode_lastTimeDisabled = md_SuperNode.Fields().ByName("lastTimeDisabled")
-	fd_SuperNode_startedAt = md_SuperNode.Fields().ByName("startedAt")
-	fd_SuperNode_prevIpAddresses = md_SuperNode.Fields().ByName("prevIpAddresses")
+	fd_SuperNode_last_time_active = md_SuperNode.Fields().ByName("last_time_active")
+	fd_SuperNode_last_time_disabled = md_SuperNode.Fields().ByName("last_time_disabled")
+	fd_SuperNode_started_at = md_SuperNode.Fields().ByName("started_at")
+	fd_SuperNode_prev_ip_addresses = md_SuperNode.Fields().ByName("prev_ip_addresses")
 	fd_SuperNode_version = md_SuperNode.Fields().ByName("version")
 	fd_SuperNode_metrics = md_SuperNode.Fields().ByName("metrics")
 }
@@ -200,18 +214,18 @@ func (x *fastReflection_SuperNode) Interface() protoreflect.ProtoMessage {
 func (x *fastReflection_SuperNode) Range(f func(protoreflect.FieldDescriptor, protoreflect.Value) bool) {
 	if x.ValidatorAddress != "" {
 		value := protoreflect.ValueOfString(x.ValidatorAddress)
-		if !f(fd_SuperNode_validatorAddress, value) {
+		if !f(fd_SuperNode_validator_address, value) {
 			return
 		}
 	}
 	if x.IpAddress != "" {
 		value := protoreflect.ValueOfString(x.IpAddress)
-		if !f(fd_SuperNode_ipAddress, value) {
+		if !f(fd_SuperNode_ip_address, value) {
 			return
 		}
 	}
-	if x.State != "" {
-		value := protoreflect.ValueOfString(x.State)
+	if x.State != 0 {
+		value := protoreflect.ValueOfEnum((protoreflect.EnumNumber)(x.State))
 		if !f(fd_SuperNode_state, value) {
 			return
 		}
@@ -222,27 +236,27 @@ func (x *fastReflection_SuperNode) Range(f func(protoreflect.FieldDescriptor, pr
 			return
 		}
 	}
-	if x.LastTimeActive != uint64(0) {
-		value := protoreflect.ValueOfUint64(x.LastTimeActive)
-		if !f(fd_SuperNode_lastTimeActive, value) {
+	if x.LastTimeActive != nil {
+		value := protoreflect.ValueOfMessage(x.LastTimeActive.ProtoReflect())
+		if !f(fd_SuperNode_last_time_active, value) {
 			return
 		}
 	}
-	if x.LastTimeDisabled != uint64(0) {
-		value := protoreflect.ValueOfUint64(x.LastTimeDisabled)
-		if !f(fd_SuperNode_lastTimeDisabled, value) {
+	if x.LastTimeDisabled != nil {
+		value := protoreflect.ValueOfMessage(x.LastTimeDisabled.ProtoReflect())
+		if !f(fd_SuperNode_last_time_disabled, value) {
 			return
 		}
 	}
-	if x.StartedAt != uint64(0) {
-		value := protoreflect.ValueOfUint64(x.StartedAt)
-		if !f(fd_SuperNode_startedAt, value) {
+	if x.StartedAt != nil {
+		value := protoreflect.ValueOfMessage(x.StartedAt.ProtoReflect())
+		if !f(fd_SuperNode_started_at, value) {
 			return
 		}
 	}
 	if len(x.PrevIpAddresses) != 0 {
 		value := protoreflect.ValueOfList(&_SuperNode_8_list{list: &x.PrevIpAddresses})
-		if !f(fd_SuperNode_prevIpAddresses, value) {
+		if !f(fd_SuperNode_prev_ip_addresses, value) {
 			return
 		}
 	}
@@ -252,8 +266,8 @@ func (x *fastReflection_SuperNode) Range(f func(protoreflect.FieldDescriptor, pr
 			return
 		}
 	}
-	if x.Metrics != "" {
-		value := protoreflect.ValueOfString(x.Metrics)
+	if x.Metrics != nil {
+		value := protoreflect.ValueOfMessage(x.Metrics.ProtoReflect())
 		if !f(fd_SuperNode_metrics, value) {
 			return
 		}
@@ -273,26 +287,26 @@ func (x *fastReflection_SuperNode) Range(f func(protoreflect.FieldDescriptor, pr
 // a repeated field is populated if it is non-empty.
 func (x *fastReflection_SuperNode) Has(fd protoreflect.FieldDescriptor) bool {
 	switch fd.FullName() {
-	case "pastel.supernode.SuperNode.validatorAddress":
+	case "pastel.supernode.SuperNode.validator_address":
 		return x.ValidatorAddress != ""
-	case "pastel.supernode.SuperNode.ipAddress":
+	case "pastel.supernode.SuperNode.ip_address":
 		return x.IpAddress != ""
 	case "pastel.supernode.SuperNode.state":
-		return x.State != ""
+		return x.State != 0
 	case "pastel.supernode.SuperNode.evidence":
 		return len(x.Evidence) != 0
-	case "pastel.supernode.SuperNode.lastTimeActive":
-		return x.LastTimeActive != uint64(0)
-	case "pastel.supernode.SuperNode.lastTimeDisabled":
-		return x.LastTimeDisabled != uint64(0)
-	case "pastel.supernode.SuperNode.startedAt":
-		return x.StartedAt != uint64(0)
-	case "pastel.supernode.SuperNode.prevIpAddresses":
+	case "pastel.supernode.SuperNode.last_time_active":
+		return x.LastTimeActive != nil
+	case "pastel.supernode.SuperNode.last_time_disabled":
+		return x.LastTimeDisabled != nil
+	case "pastel.supernode.SuperNode.started_at":
+		return x.StartedAt != nil
+	case "pastel.supernode.SuperNode.prev_ip_addresses":
 		return len(x.PrevIpAddresses) != 0
 	case "pastel.supernode.SuperNode.version":
 		return x.Version != ""
 	case "pastel.supernode.SuperNode.metrics":
-		return x.Metrics != ""
+		return x.Metrics != nil
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.SuperNode"))
@@ -309,26 +323,26 @@ func (x *fastReflection_SuperNode) Has(fd protoreflect.FieldDescriptor) bool {
 // Clear is a mutating operation and unsafe for concurrent use.
 func (x *fastReflection_SuperNode) Clear(fd protoreflect.FieldDescriptor) {
 	switch fd.FullName() {
-	case "pastel.supernode.SuperNode.validatorAddress":
+	case "pastel.supernode.SuperNode.validator_address":
 		x.ValidatorAddress = ""
-	case "pastel.supernode.SuperNode.ipAddress":
+	case "pastel.supernode.SuperNode.ip_address":
 		x.IpAddress = ""
 	case "pastel.supernode.SuperNode.state":
-		x.State = ""
+		x.State = 0
 	case "pastel.supernode.SuperNode.evidence":
 		x.Evidence = nil
-	case "pastel.supernode.SuperNode.lastTimeActive":
-		x.LastTimeActive = uint64(0)
-	case "pastel.supernode.SuperNode.lastTimeDisabled":
-		x.LastTimeDisabled = uint64(0)
-	case "pastel.supernode.SuperNode.startedAt":
-		x.StartedAt = uint64(0)
-	case "pastel.supernode.SuperNode.prevIpAddresses":
+	case "pastel.supernode.SuperNode.last_time_active":
+		x.LastTimeActive = nil
+	case "pastel.supernode.SuperNode.last_time_disabled":
+		x.LastTimeDisabled = nil
+	case "pastel.supernode.SuperNode.started_at":
+		x.StartedAt = nil
+	case "pastel.supernode.SuperNode.prev_ip_addresses":
 		x.PrevIpAddresses = nil
 	case "pastel.supernode.SuperNode.version":
 		x.Version = ""
 	case "pastel.supernode.SuperNode.metrics":
-		x.Metrics = ""
+		x.Metrics = nil
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.SuperNode"))
@@ -345,31 +359,31 @@ func (x *fastReflection_SuperNode) Clear(fd protoreflect.FieldDescriptor) {
 // of the value; to obtain a mutable reference, use Mutable.
 func (x *fastReflection_SuperNode) Get(descriptor protoreflect.FieldDescriptor) protoreflect.Value {
 	switch descriptor.FullName() {
-	case "pastel.supernode.SuperNode.validatorAddress":
+	case "pastel.supernode.SuperNode.validator_address":
 		value := x.ValidatorAddress
 		return protoreflect.ValueOfString(value)
-	case "pastel.supernode.SuperNode.ipAddress":
+	case "pastel.supernode.SuperNode.ip_address":
 		value := x.IpAddress
 		return protoreflect.ValueOfString(value)
 	case "pastel.supernode.SuperNode.state":
 		value := x.State
-		return protoreflect.ValueOfString(value)
+		return protoreflect.ValueOfEnum((protoreflect.EnumNumber)(value))
 	case "pastel.supernode.SuperNode.evidence":
 		if len(x.Evidence) == 0 {
 			return protoreflect.ValueOfList(&_SuperNode_4_list{})
 		}
 		listValue := &_SuperNode_4_list{list: &x.Evidence}
 		return protoreflect.ValueOfList(listValue)
-	case "pastel.supernode.SuperNode.lastTimeActive":
+	case "pastel.supernode.SuperNode.last_time_active":
 		value := x.LastTimeActive
-		return protoreflect.ValueOfUint64(value)
-	case "pastel.supernode.SuperNode.lastTimeDisabled":
+		return protoreflect.ValueOfMessage(value.ProtoReflect())
+	case "pastel.supernode.SuperNode.last_time_disabled":
 		value := x.LastTimeDisabled
-		return protoreflect.ValueOfUint64(value)
-	case "pastel.supernode.SuperNode.startedAt":
+		return protoreflect.ValueOfMessage(value.ProtoReflect())
+	case "pastel.supernode.SuperNode.started_at":
 		value := x.StartedAt
-		return protoreflect.ValueOfUint64(value)
-	case "pastel.supernode.SuperNode.prevIpAddresses":
+		return protoreflect.ValueOfMessage(value.ProtoReflect())
+	case "pastel.supernode.SuperNode.prev_ip_addresses":
 		if len(x.PrevIpAddresses) == 0 {
 			return protoreflect.ValueOfList(&_SuperNode_8_list{})
 		}
@@ -380,7 +394,7 @@ func (x *fastReflection_SuperNode) Get(descriptor protoreflect.FieldDescriptor) 
 		return protoreflect.ValueOfString(value)
 	case "pastel.supernode.SuperNode.metrics":
 		value := x.Metrics
-		return protoreflect.ValueOfString(value)
+		return protoreflect.ValueOfMessage(value.ProtoReflect())
 	default:
 		if descriptor.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.SuperNode"))
@@ -401,30 +415,30 @@ func (x *fastReflection_SuperNode) Get(descriptor protoreflect.FieldDescriptor) 
 // Set is a mutating operation and unsafe for concurrent use.
 func (x *fastReflection_SuperNode) Set(fd protoreflect.FieldDescriptor, value protoreflect.Value) {
 	switch fd.FullName() {
-	case "pastel.supernode.SuperNode.validatorAddress":
+	case "pastel.supernode.SuperNode.validator_address":
 		x.ValidatorAddress = value.Interface().(string)
-	case "pastel.supernode.SuperNode.ipAddress":
+	case "pastel.supernode.SuperNode.ip_address":
 		x.IpAddress = value.Interface().(string)
 	case "pastel.supernode.SuperNode.state":
-		x.State = value.Interface().(string)
+		x.State = (SuperNodeState)(value.Enum())
 	case "pastel.supernode.SuperNode.evidence":
 		lv := value.List()
 		clv := lv.(*_SuperNode_4_list)
 		x.Evidence = *clv.list
-	case "pastel.supernode.SuperNode.lastTimeActive":
-		x.LastTimeActive = value.Uint()
-	case "pastel.supernode.SuperNode.lastTimeDisabled":
-		x.LastTimeDisabled = value.Uint()
-	case "pastel.supernode.SuperNode.startedAt":
-		x.StartedAt = value.Uint()
-	case "pastel.supernode.SuperNode.prevIpAddresses":
+	case "pastel.supernode.SuperNode.last_time_active":
+		x.LastTimeActive = value.Message().Interface().(*timestamppb.Timestamp)
+	case "pastel.supernode.SuperNode.last_time_disabled":
+		x.LastTimeDisabled = value.Message().Interface().(*timestamppb.Timestamp)
+	case "pastel.supernode.SuperNode.started_at":
+		x.StartedAt = value.Message().Interface().(*timestamppb.Timestamp)
+	case "pastel.supernode.SuperNode.prev_ip_addresses":
 		lv := value.List()
 		clv := lv.(*_SuperNode_8_list)
 		x.PrevIpAddresses = *clv.list
 	case "pastel.supernode.SuperNode.version":
 		x.Version = value.Interface().(string)
 	case "pastel.supernode.SuperNode.metrics":
-		x.Metrics = value.Interface().(string)
+		x.Metrics = value.Message().Interface().(*MetricsAggregate)
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.SuperNode"))
@@ -447,32 +461,44 @@ func (x *fastReflection_SuperNode) Mutable(fd protoreflect.FieldDescriptor) prot
 	switch fd.FullName() {
 	case "pastel.supernode.SuperNode.evidence":
 		if x.Evidence == nil {
-			x.Evidence = []string{}
+			x.Evidence = []*Evidence{}
 		}
 		value := &_SuperNode_4_list{list: &x.Evidence}
 		return protoreflect.ValueOfList(value)
-	case "pastel.supernode.SuperNode.prevIpAddresses":
+	case "pastel.supernode.SuperNode.last_time_active":
+		if x.LastTimeActive == nil {
+			x.LastTimeActive = new(timestamppb.Timestamp)
+		}
+		return protoreflect.ValueOfMessage(x.LastTimeActive.ProtoReflect())
+	case "pastel.supernode.SuperNode.last_time_disabled":
+		if x.LastTimeDisabled == nil {
+			x.LastTimeDisabled = new(timestamppb.Timestamp)
+		}
+		return protoreflect.ValueOfMessage(x.LastTimeDisabled.ProtoReflect())
+	case "pastel.supernode.SuperNode.started_at":
+		if x.StartedAt == nil {
+			x.StartedAt = new(timestamppb.Timestamp)
+		}
+		return protoreflect.ValueOfMessage(x.StartedAt.ProtoReflect())
+	case "pastel.supernode.SuperNode.prev_ip_addresses":
 		if x.PrevIpAddresses == nil {
-			x.PrevIpAddresses = []string{}
+			x.PrevIpAddresses = []*IPAddressHistory{}
 		}
 		value := &_SuperNode_8_list{list: &x.PrevIpAddresses}
 		return protoreflect.ValueOfList(value)
-	case "pastel.supernode.SuperNode.validatorAddress":
-		panic(fmt.Errorf("field validatorAddress of message pastel.supernode.SuperNode is not mutable"))
-	case "pastel.supernode.SuperNode.ipAddress":
-		panic(fmt.Errorf("field ipAddress of message pastel.supernode.SuperNode is not mutable"))
+	case "pastel.supernode.SuperNode.metrics":
+		if x.Metrics == nil {
+			x.Metrics = new(MetricsAggregate)
+		}
+		return protoreflect.ValueOfMessage(x.Metrics.ProtoReflect())
+	case "pastel.supernode.SuperNode.validator_address":
+		panic(fmt.Errorf("field validator_address of message pastel.supernode.SuperNode is not mutable"))
+	case "pastel.supernode.SuperNode.ip_address":
+		panic(fmt.Errorf("field ip_address of message pastel.supernode.SuperNode is not mutable"))
 	case "pastel.supernode.SuperNode.state":
 		panic(fmt.Errorf("field state of message pastel.supernode.SuperNode is not mutable"))
-	case "pastel.supernode.SuperNode.lastTimeActive":
-		panic(fmt.Errorf("field lastTimeActive of message pastel.supernode.SuperNode is not mutable"))
-	case "pastel.supernode.SuperNode.lastTimeDisabled":
-		panic(fmt.Errorf("field lastTimeDisabled of message pastel.supernode.SuperNode is not mutable"))
-	case "pastel.supernode.SuperNode.startedAt":
-		panic(fmt.Errorf("field startedAt of message pastel.supernode.SuperNode is not mutable"))
 	case "pastel.supernode.SuperNode.version":
 		panic(fmt.Errorf("field version of message pastel.supernode.SuperNode is not mutable"))
-	case "pastel.supernode.SuperNode.metrics":
-		panic(fmt.Errorf("field metrics of message pastel.supernode.SuperNode is not mutable"))
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.SuperNode"))
@@ -486,28 +512,32 @@ func (x *fastReflection_SuperNode) Mutable(fd protoreflect.FieldDescriptor) prot
 // For lists, maps, and messages, this returns a new, empty, mutable value.
 func (x *fastReflection_SuperNode) NewField(fd protoreflect.FieldDescriptor) protoreflect.Value {
 	switch fd.FullName() {
-	case "pastel.supernode.SuperNode.validatorAddress":
+	case "pastel.supernode.SuperNode.validator_address":
 		return protoreflect.ValueOfString("")
-	case "pastel.supernode.SuperNode.ipAddress":
+	case "pastel.supernode.SuperNode.ip_address":
 		return protoreflect.ValueOfString("")
 	case "pastel.supernode.SuperNode.state":
-		return protoreflect.ValueOfString("")
+		return protoreflect.ValueOfEnum(0)
 	case "pastel.supernode.SuperNode.evidence":
-		list := []string{}
+		list := []*Evidence{}
 		return protoreflect.ValueOfList(&_SuperNode_4_list{list: &list})
-	case "pastel.supernode.SuperNode.lastTimeActive":
-		return protoreflect.ValueOfUint64(uint64(0))
-	case "pastel.supernode.SuperNode.lastTimeDisabled":
-		return protoreflect.ValueOfUint64(uint64(0))
-	case "pastel.supernode.SuperNode.startedAt":
-		return protoreflect.ValueOfUint64(uint64(0))
-	case "pastel.supernode.SuperNode.prevIpAddresses":
-		list := []string{}
+	case "pastel.supernode.SuperNode.last_time_active":
+		m := new(timestamppb.Timestamp)
+		return protoreflect.ValueOfMessage(m.ProtoReflect())
+	case "pastel.supernode.SuperNode.last_time_disabled":
+		m := new(timestamppb.Timestamp)
+		return protoreflect.ValueOfMessage(m.ProtoReflect())
+	case "pastel.supernode.SuperNode.started_at":
+		m := new(timestamppb.Timestamp)
+		return protoreflect.ValueOfMessage(m.ProtoReflect())
+	case "pastel.supernode.SuperNode.prev_ip_addresses":
+		list := []*IPAddressHistory{}
 		return protoreflect.ValueOfList(&_SuperNode_8_list{list: &list})
 	case "pastel.supernode.SuperNode.version":
 		return protoreflect.ValueOfString("")
 	case "pastel.supernode.SuperNode.metrics":
-		return protoreflect.ValueOfString("")
+		m := new(MetricsAggregate)
+		return protoreflect.ValueOfMessage(m.ProtoReflect())
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.SuperNode"))
@@ -585,28 +615,30 @@ func (x *fastReflection_SuperNode) ProtoMethods() *protoiface.Methods {
 		if l > 0 {
 			n += 1 + l + runtime.Sov(uint64(l))
 		}
-		l = len(x.State)
-		if l > 0 {
-			n += 1 + l + runtime.Sov(uint64(l))
+		if x.State != 0 {
+			n += 1 + runtime.Sov(uint64(x.State))
 		}
 		if len(x.Evidence) > 0 {
-			for _, s := range x.Evidence {
-				l = len(s)
+			for _, e := range x.Evidence {
+				l = options.Size(e)
 				n += 1 + l + runtime.Sov(uint64(l))
 			}
 		}
-		if x.LastTimeActive != 0 {
-			n += 1 + runtime.Sov(uint64(x.LastTimeActive))
+		if x.LastTimeActive != nil {
+			l = options.Size(x.LastTimeActive)
+			n += 1 + l + runtime.Sov(uint64(l))
 		}
-		if x.LastTimeDisabled != 0 {
-			n += 1 + runtime.Sov(uint64(x.LastTimeDisabled))
+		if x.LastTimeDisabled != nil {
+			l = options.Size(x.LastTimeDisabled)
+			n += 1 + l + runtime.Sov(uint64(l))
 		}
-		if x.StartedAt != 0 {
-			n += 1 + runtime.Sov(uint64(x.StartedAt))
+		if x.StartedAt != nil {
+			l = options.Size(x.StartedAt)
+			n += 1 + l + runtime.Sov(uint64(l))
 		}
 		if len(x.PrevIpAddresses) > 0 {
-			for _, s := range x.PrevIpAddresses {
-				l = len(s)
+			for _, e := range x.PrevIpAddresses {
+				l = options.Size(e)
 				n += 1 + l + runtime.Sov(uint64(l))
 			}
 		}
@@ -614,8 +646,8 @@ func (x *fastReflection_SuperNode) ProtoMethods() *protoiface.Methods {
 		if l > 0 {
 			n += 1 + l + runtime.Sov(uint64(l))
 		}
-		l = len(x.Metrics)
-		if l > 0 {
+		if x.Metrics != nil {
+			l = options.Size(x.Metrics)
 			n += 1 + l + runtime.Sov(uint64(l))
 		}
 		if x.unknownFields != nil {
@@ -647,10 +679,17 @@ func (x *fastReflection_SuperNode) ProtoMethods() *protoiface.Methods {
 			i -= len(x.unknownFields)
 			copy(dAtA[i:], x.unknownFields)
 		}
-		if len(x.Metrics) > 0 {
-			i -= len(x.Metrics)
-			copy(dAtA[i:], x.Metrics)
-			i = runtime.EncodeVarint(dAtA, i, uint64(len(x.Metrics)))
+		if x.Metrics != nil {
+			encoded, err := options.Marshal(x.Metrics)
+			if err != nil {
+				return protoiface.MarshalOutput{
+					NoUnkeyedLiterals: input.NoUnkeyedLiterals,
+					Buf:               input.Buf,
+				}, err
+			}
+			i -= len(encoded)
+			copy(dAtA[i:], encoded)
+			i = runtime.EncodeVarint(dAtA, i, uint64(len(encoded)))
 			i--
 			dAtA[i] = 0x52
 		}
@@ -663,43 +702,82 @@ func (x *fastReflection_SuperNode) ProtoMethods() *protoiface.Methods {
 		}
 		if len(x.PrevIpAddresses) > 0 {
 			for iNdEx := len(x.PrevIpAddresses) - 1; iNdEx >= 0; iNdEx-- {
-				i -= len(x.PrevIpAddresses[iNdEx])
-				copy(dAtA[i:], x.PrevIpAddresses[iNdEx])
-				i = runtime.EncodeVarint(dAtA, i, uint64(len(x.PrevIpAddresses[iNdEx])))
+				encoded, err := options.Marshal(x.PrevIpAddresses[iNdEx])
+				if err != nil {
+					return protoiface.MarshalOutput{
+						NoUnkeyedLiterals: input.NoUnkeyedLiterals,
+						Buf:               input.Buf,
+					}, err
+				}
+				i -= len(encoded)
+				copy(dAtA[i:], encoded)
+				i = runtime.EncodeVarint(dAtA, i, uint64(len(encoded)))
 				i--
 				dAtA[i] = 0x42
 			}
 		}
-		if x.StartedAt != 0 {
-			i = runtime.EncodeVarint(dAtA, i, uint64(x.StartedAt))
+		if x.StartedAt != nil {
+			encoded, err := options.Marshal(x.StartedAt)
+			if err != nil {
+				return protoiface.MarshalOutput{
+					NoUnkeyedLiterals: input.NoUnkeyedLiterals,
+					Buf:               input.Buf,
+				}, err
+			}
+			i -= len(encoded)
+			copy(dAtA[i:], encoded)
+			i = runtime.EncodeVarint(dAtA, i, uint64(len(encoded)))
 			i--
-			dAtA[i] = 0x38
+			dAtA[i] = 0x3a
 		}
-		if x.LastTimeDisabled != 0 {
-			i = runtime.EncodeVarint(dAtA, i, uint64(x.LastTimeDisabled))
+		if x.LastTimeDisabled != nil {
+			encoded, err := options.Marshal(x.LastTimeDisabled)
+			if err != nil {
+				return protoiface.MarshalOutput{
+					NoUnkeyedLiterals: input.NoUnkeyedLiterals,
+					Buf:               input.Buf,
+				}, err
+			}
+			i -= len(encoded)
+			copy(dAtA[i:], encoded)
+			i = runtime.EncodeVarint(dAtA, i, uint64(len(encoded)))
 			i--
-			dAtA[i] = 0x30
+			dAtA[i] = 0x32
 		}
-		if x.LastTimeActive != 0 {
-			i = runtime.EncodeVarint(dAtA, i, uint64(x.LastTimeActive))
+		if x.LastTimeActive != nil {
+			encoded, err := options.Marshal(x.LastTimeActive)
+			if err != nil {
+				return protoiface.MarshalOutput{
+					NoUnkeyedLiterals: input.NoUnkeyedLiterals,
+					Buf:               input.Buf,
+				}, err
+			}
+			i -= len(encoded)
+			copy(dAtA[i:], encoded)
+			i = runtime.EncodeVarint(dAtA, i, uint64(len(encoded)))
 			i--
-			dAtA[i] = 0x28
+			dAtA[i] = 0x2a
 		}
 		if len(x.Evidence) > 0 {
 			for iNdEx := len(x.Evidence) - 1; iNdEx >= 0; iNdEx-- {
-				i -= len(x.Evidence[iNdEx])
-				copy(dAtA[i:], x.Evidence[iNdEx])
-				i = runtime.EncodeVarint(dAtA, i, uint64(len(x.Evidence[iNdEx])))
+				encoded, err := options.Marshal(x.Evidence[iNdEx])
+				if err != nil {
+					return protoiface.MarshalOutput{
+						NoUnkeyedLiterals: input.NoUnkeyedLiterals,
+						Buf:               input.Buf,
+					}, err
+				}
+				i -= len(encoded)
+				copy(dAtA[i:], encoded)
+				i = runtime.EncodeVarint(dAtA, i, uint64(len(encoded)))
 				i--
 				dAtA[i] = 0x22
 			}
 		}
-		if len(x.State) > 0 {
-			i -= len(x.State)
-			copy(dAtA[i:], x.State)
-			i = runtime.EncodeVarint(dAtA, i, uint64(len(x.State)))
+		if x.State != 0 {
+			i = runtime.EncodeVarint(dAtA, i, uint64(x.State))
 			i--
-			dAtA[i] = 0x1a
+			dAtA[i] = 0x18
 		}
 		if len(x.IpAddress) > 0 {
 			i -= len(x.IpAddress)
@@ -829,10 +907,10 @@ func (x *fastReflection_SuperNode) ProtoMethods() *protoiface.Methods {
 				x.IpAddress = string(dAtA[iNdEx:postIndex])
 				iNdEx = postIndex
 			case 3:
-				if wireType != 2 {
+				if wireType != 0 {
 					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: wrong wireType = %d for field State", wireType)
 				}
-				var stringLen uint64
+				x.State = 0
 				for shift := uint(0); ; shift += 7 {
 					if shift >= 64 {
 						return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrIntOverflow
@@ -842,29 +920,16 @@ func (x *fastReflection_SuperNode) ProtoMethods() *protoiface.Methods {
 					}
 					b := dAtA[iNdEx]
 					iNdEx++
-					stringLen |= uint64(b&0x7F) << shift
+					x.State |= SuperNodeState(b&0x7F) << shift
 					if b < 0x80 {
 						break
 					}
 				}
-				intStringLen := int(stringLen)
-				if intStringLen < 0 {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
-				}
-				postIndex := iNdEx + intStringLen
-				if postIndex < 0 {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
-				}
-				if postIndex > l {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
-				}
-				x.State = string(dAtA[iNdEx:postIndex])
-				iNdEx = postIndex
 			case 4:
 				if wireType != 2 {
 					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: wrong wireType = %d for field Evidence", wireType)
 				}
-				var stringLen uint64
+				var msglen int
 				for shift := uint(0); ; shift += 7 {
 					if shift >= 64 {
 						return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrIntOverflow
@@ -874,29 +939,31 @@ func (x *fastReflection_SuperNode) ProtoMethods() *protoiface.Methods {
 					}
 					b := dAtA[iNdEx]
 					iNdEx++
-					stringLen |= uint64(b&0x7F) << shift
+					msglen |= int(b&0x7F) << shift
 					if b < 0x80 {
 						break
 					}
 				}
-				intStringLen := int(stringLen)
-				if intStringLen < 0 {
+				if msglen < 0 {
 					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
 				}
-				postIndex := iNdEx + intStringLen
+				postIndex := iNdEx + msglen
 				if postIndex < 0 {
 					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
 				}
 				if postIndex > l {
 					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
 				}
-				x.Evidence = append(x.Evidence, string(dAtA[iNdEx:postIndex]))
+				x.Evidence = append(x.Evidence, &Evidence{})
+				if err := options.Unmarshal(dAtA[iNdEx:postIndex], x.Evidence[len(x.Evidence)-1]); err != nil {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, err
+				}
 				iNdEx = postIndex
 			case 5:
-				if wireType != 0 {
+				if wireType != 2 {
 					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: wrong wireType = %d for field LastTimeActive", wireType)
 				}
-				x.LastTimeActive = 0
+				var msglen int
 				for shift := uint(0); ; shift += 7 {
 					if shift >= 64 {
 						return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrIntOverflow
@@ -906,16 +973,33 @@ func (x *fastReflection_SuperNode) ProtoMethods() *protoiface.Methods {
 					}
 					b := dAtA[iNdEx]
 					iNdEx++
-					x.LastTimeActive |= uint64(b&0x7F) << shift
+					msglen |= int(b&0x7F) << shift
 					if b < 0x80 {
 						break
 					}
 				}
+				if msglen < 0 {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
+				}
+				postIndex := iNdEx + msglen
+				if postIndex < 0 {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
+				}
+				if postIndex > l {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
+				}
+				if x.LastTimeActive == nil {
+					x.LastTimeActive = &timestamppb.Timestamp{}
+				}
+				if err := options.Unmarshal(dAtA[iNdEx:postIndex], x.LastTimeActive); err != nil {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, err
+				}
+				iNdEx = postIndex
 			case 6:
-				if wireType != 0 {
+				if wireType != 2 {
 					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: wrong wireType = %d for field LastTimeDisabled", wireType)
 				}
-				x.LastTimeDisabled = 0
+				var msglen int
 				for shift := uint(0); ; shift += 7 {
 					if shift >= 64 {
 						return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrIntOverflow
@@ -925,16 +1009,33 @@ func (x *fastReflection_SuperNode) ProtoMethods() *protoiface.Methods {
 					}
 					b := dAtA[iNdEx]
 					iNdEx++
-					x.LastTimeDisabled |= uint64(b&0x7F) << shift
+					msglen |= int(b&0x7F) << shift
 					if b < 0x80 {
 						break
 					}
 				}
+				if msglen < 0 {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
+				}
+				postIndex := iNdEx + msglen
+				if postIndex < 0 {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
+				}
+				if postIndex > l {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
+				}
+				if x.LastTimeDisabled == nil {
+					x.LastTimeDisabled = &timestamppb.Timestamp{}
+				}
+				if err := options.Unmarshal(dAtA[iNdEx:postIndex], x.LastTimeDisabled); err != nil {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, err
+				}
+				iNdEx = postIndex
 			case 7:
-				if wireType != 0 {
+				if wireType != 2 {
 					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: wrong wireType = %d for field StartedAt", wireType)
 				}
-				x.StartedAt = 0
+				var msglen int
 				for shift := uint(0); ; shift += 7 {
 					if shift >= 64 {
 						return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrIntOverflow
@@ -944,16 +1045,33 @@ func (x *fastReflection_SuperNode) ProtoMethods() *protoiface.Methods {
 					}
 					b := dAtA[iNdEx]
 					iNdEx++
-					x.StartedAt |= uint64(b&0x7F) << shift
+					msglen |= int(b&0x7F) << shift
 					if b < 0x80 {
 						break
 					}
 				}
+				if msglen < 0 {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
+				}
+				postIndex := iNdEx + msglen
+				if postIndex < 0 {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
+				}
+				if postIndex > l {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
+				}
+				if x.StartedAt == nil {
+					x.StartedAt = &timestamppb.Timestamp{}
+				}
+				if err := options.Unmarshal(dAtA[iNdEx:postIndex], x.StartedAt); err != nil {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, err
+				}
+				iNdEx = postIndex
 			case 8:
 				if wireType != 2 {
 					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: wrong wireType = %d for field PrevIpAddresses", wireType)
 				}
-				var stringLen uint64
+				var msglen int
 				for shift := uint(0); ; shift += 7 {
 					if shift >= 64 {
 						return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrIntOverflow
@@ -963,23 +1081,25 @@ func (x *fastReflection_SuperNode) ProtoMethods() *protoiface.Methods {
 					}
 					b := dAtA[iNdEx]
 					iNdEx++
-					stringLen |= uint64(b&0x7F) << shift
+					msglen |= int(b&0x7F) << shift
 					if b < 0x80 {
 						break
 					}
 				}
-				intStringLen := int(stringLen)
-				if intStringLen < 0 {
+				if msglen < 0 {
 					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
 				}
-				postIndex := iNdEx + intStringLen
+				postIndex := iNdEx + msglen
 				if postIndex < 0 {
 					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
 				}
 				if postIndex > l {
 					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
 				}
-				x.PrevIpAddresses = append(x.PrevIpAddresses, string(dAtA[iNdEx:postIndex]))
+				x.PrevIpAddresses = append(x.PrevIpAddresses, &IPAddressHistory{})
+				if err := options.Unmarshal(dAtA[iNdEx:postIndex], x.PrevIpAddresses[len(x.PrevIpAddresses)-1]); err != nil {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, err
+				}
 				iNdEx = postIndex
 			case 9:
 				if wireType != 2 {
@@ -1017,7 +1137,7 @@ func (x *fastReflection_SuperNode) ProtoMethods() *protoiface.Methods {
 				if wireType != 2 {
 					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: wrong wireType = %d for field Metrics", wireType)
 				}
-				var stringLen uint64
+				var msglen int
 				for shift := uint(0); ; shift += 7 {
 					if shift >= 64 {
 						return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrIntOverflow
@@ -1027,23 +1147,27 @@ func (x *fastReflection_SuperNode) ProtoMethods() *protoiface.Methods {
 					}
 					b := dAtA[iNdEx]
 					iNdEx++
-					stringLen |= uint64(b&0x7F) << shift
+					msglen |= int(b&0x7F) << shift
 					if b < 0x80 {
 						break
 					}
 				}
-				intStringLen := int(stringLen)
-				if intStringLen < 0 {
+				if msglen < 0 {
 					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
 				}
-				postIndex := iNdEx + intStringLen
+				postIndex := iNdEx + msglen
 				if postIndex < 0 {
 					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
 				}
 				if postIndex > l {
 					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
 				}
-				x.Metrics = string(dAtA[iNdEx:postIndex])
+				if x.Metrics == nil {
+					x.Metrics = &MetricsAggregate{}
+				}
+				if err := options.Unmarshal(dAtA[iNdEx:postIndex], x.Metrics); err != nil {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, err
+				}
 				iNdEx = postIndex
 			default:
 				iNdEx = preIndex
@@ -1098,16 +1222,16 @@ type SuperNode struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ValidatorAddress string   `protobuf:"bytes,1,opt,name=validatorAddress,proto3" json:"validatorAddress,omitempty"`
-	IpAddress        string   `protobuf:"bytes,2,opt,name=ipAddress,proto3" json:"ipAddress,omitempty"`
-	State            string   `protobuf:"bytes,3,opt,name=state,proto3" json:"state,omitempty"`
-	Evidence         []string `protobuf:"bytes,4,rep,name=evidence,proto3" json:"evidence,omitempty"`
-	LastTimeActive   uint64   `protobuf:"varint,5,opt,name=lastTimeActive,proto3" json:"lastTimeActive,omitempty"`
-	LastTimeDisabled uint64   `protobuf:"varint,6,opt,name=lastTimeDisabled,proto3" json:"lastTimeDisabled,omitempty"`
-	StartedAt        uint64   `protobuf:"varint,7,opt,name=startedAt,proto3" json:"startedAt,omitempty"`
-	PrevIpAddresses  []string `protobuf:"bytes,8,rep,name=prevIpAddresses,proto3" json:"prevIpAddresses,omitempty"`
-	Version          string   `protobuf:"bytes,9,opt,name=version,proto3" json:"version,omitempty"`
-	Metrics          string   `protobuf:"bytes,10,opt,name=metrics,proto3" json:"metrics,omitempty"`
+	ValidatorAddress string                 `protobuf:"bytes,1,opt,name=validator_address,json=validatorAddress,proto3" json:"validator_address,omitempty"`
+	IpAddress        string                 `protobuf:"bytes,2,opt,name=ip_address,json=ipAddress,proto3" json:"ip_address,omitempty"`
+	State            SuperNodeState         `protobuf:"varint,3,opt,name=state,proto3,enum=pastel.supernode.SuperNodeState" json:"state,omitempty"`
+	Evidence         []*Evidence            `protobuf:"bytes,4,rep,name=evidence,proto3" json:"evidence,omitempty"`
+	LastTimeActive   *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=last_time_active,json=lastTimeActive,proto3" json:"last_time_active,omitempty"`
+	LastTimeDisabled *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=last_time_disabled,json=lastTimeDisabled,proto3" json:"last_time_disabled,omitempty"`
+	StartedAt        *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+	PrevIpAddresses  []*IPAddressHistory    `protobuf:"bytes,8,rep,name=prev_ip_addresses,json=prevIpAddresses,proto3" json:"prev_ip_addresses,omitempty"`
+	Version          string                 `protobuf:"bytes,9,opt,name=version,proto3" json:"version,omitempty"`
+	Metrics          *MetricsAggregate      `protobuf:"bytes,10,opt,name=metrics,proto3" json:"metrics,omitempty"`
 }
 
 func (x *SuperNode) Reset() {
@@ -1144,42 +1268,42 @@ func (x *SuperNode) GetIpAddress() string {
 	return ""
 }
 
-func (x *SuperNode) GetState() string {
+func (x *SuperNode) GetState() SuperNodeState {
 	if x != nil {
 		return x.State
 	}
-	return ""
+	return SuperNodeState_SUPERNODE_STATE_UNSPECIFIED
 }
 
-func (x *SuperNode) GetEvidence() []string {
+func (x *SuperNode) GetEvidence() []*Evidence {
 	if x != nil {
 		return x.Evidence
 	}
 	return nil
 }
 
-func (x *SuperNode) GetLastTimeActive() uint64 {
+func (x *SuperNode) GetLastTimeActive() *timestamppb.Timestamp {
 	if x != nil {
 		return x.LastTimeActive
 	}
-	return 0
+	return nil
 }
 
-func (x *SuperNode) GetLastTimeDisabled() uint64 {
+func (x *SuperNode) GetLastTimeDisabled() *timestamppb.Timestamp {
 	if x != nil {
 		return x.LastTimeDisabled
 	}
-	return 0
+	return nil
 }
 
-func (x *SuperNode) GetStartedAt() uint64 {
+func (x *SuperNode) GetStartedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.StartedAt
 	}
-	return 0
+	return nil
 }
 
-func (x *SuperNode) GetPrevIpAddresses() []string {
+func (x *SuperNode) GetPrevIpAddresses() []*IPAddressHistory {
 	if x != nil {
 		return x.PrevIpAddresses
 	}
@@ -1193,11 +1317,11 @@ func (x *SuperNode) GetVersion() string {
 	return ""
 }
 
-func (x *SuperNode) GetMetrics() string {
+func (x *SuperNode) GetMetrics() *MetricsAggregate {
 	if x != nil {
 		return x.Metrics
 	}
-	return ""
+	return nil
 }
 
 var File_pastel_supernode_super_node_proto protoreflect.FileDescriptor
@@ -1206,41 +1330,77 @@ var file_pastel_supernode_super_node_proto_rawDesc = []byte{
 	0x0a, 0x21, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2f, 0x73, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f,
 	0x64, 0x65, 0x2f, 0x73, 0x75, 0x70, 0x65, 0x72, 0x5f, 0x6e, 0x6f, 0x64, 0x65, 0x2e, 0x70, 0x72,
 	0x6f, 0x74, 0x6f, 0x12, 0x10, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2e, 0x73, 0x75, 0x70, 0x65,
-	0x72, 0x6e, 0x6f, 0x64, 0x65, 0x22, 0xd7, 0x02, 0x0a, 0x09, 0x53, 0x75, 0x70, 0x65, 0x72, 0x4e,
-	0x6f, 0x64, 0x65, 0x12, 0x2a, 0x0a, 0x10, 0x76, 0x61, 0x6c, 0x69, 0x64, 0x61, 0x74, 0x6f, 0x72,
-	0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x10, 0x76,
-	0x61, 0x6c, 0x69, 0x64, 0x61, 0x74, 0x6f, 0x72, 0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x12,
-	0x1c, 0x0a, 0x09, 0x69, 0x70, 0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x18, 0x02, 0x20, 0x01,
-	0x28, 0x09, 0x52, 0x09, 0x69, 0x70, 0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x12, 0x14, 0x0a,
-	0x05, 0x73, 0x74, 0x61, 0x74, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x73, 0x74,
-	0x61, 0x74, 0x65, 0x12, 0x1a, 0x0a, 0x08, 0x65, 0x76, 0x69, 0x64, 0x65, 0x6e, 0x63, 0x65, 0x18,
-	0x04, 0x20, 0x03, 0x28, 0x09, 0x52, 0x08, 0x65, 0x76, 0x69, 0x64, 0x65, 0x6e, 0x63, 0x65, 0x12,
-	0x26, 0x0a, 0x0e, 0x6c, 0x61, 0x73, 0x74, 0x54, 0x69, 0x6d, 0x65, 0x41, 0x63, 0x74, 0x69, 0x76,
-	0x65, 0x18, 0x05, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0e, 0x6c, 0x61, 0x73, 0x74, 0x54, 0x69, 0x6d,
-	0x65, 0x41, 0x63, 0x74, 0x69, 0x76, 0x65, 0x12, 0x2a, 0x0a, 0x10, 0x6c, 0x61, 0x73, 0x74, 0x54,
-	0x69, 0x6d, 0x65, 0x44, 0x69, 0x73, 0x61, 0x62, 0x6c, 0x65, 0x64, 0x18, 0x06, 0x20, 0x01, 0x28,
-	0x04, 0x52, 0x10, 0x6c, 0x61, 0x73, 0x74, 0x54, 0x69, 0x6d, 0x65, 0x44, 0x69, 0x73, 0x61, 0x62,
-	0x6c, 0x65, 0x64, 0x12, 0x1c, 0x0a, 0x09, 0x73, 0x74, 0x61, 0x72, 0x74, 0x65, 0x64, 0x41, 0x74,
-	0x18, 0x07, 0x20, 0x01, 0x28, 0x04, 0x52, 0x09, 0x73, 0x74, 0x61, 0x72, 0x74, 0x65, 0x64, 0x41,
-	0x74, 0x12, 0x28, 0x0a, 0x0f, 0x70, 0x72, 0x65, 0x76, 0x49, 0x70, 0x41, 0x64, 0x64, 0x72, 0x65,
-	0x73, 0x73, 0x65, 0x73, 0x18, 0x08, 0x20, 0x03, 0x28, 0x09, 0x52, 0x0f, 0x70, 0x72, 0x65, 0x76,
-	0x49, 0x70, 0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x65, 0x73, 0x12, 0x18, 0x0a, 0x07, 0x76,
-	0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x18, 0x09, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x76, 0x65,
-	0x72, 0x73, 0x69, 0x6f, 0x6e, 0x12, 0x18, 0x0a, 0x07, 0x6d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x73,
-	0x18, 0x0a, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x6d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x73, 0x42,
-	0xbd, 0x01, 0x0a, 0x14, 0x63, 0x6f, 0x6d, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2e, 0x73,
-	0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0x42, 0x0e, 0x53, 0x75, 0x70, 0x65, 0x72, 0x4e,
-	0x6f, 0x64, 0x65, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x50, 0x01, 0x5a, 0x34, 0x67, 0x69, 0x74, 0x68,
-	0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x6e, 0x65, 0x74,
-	0x77, 0x6f, 0x72, 0x6b, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2f, 0x61, 0x70, 0x69, 0x2f,
-	0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2f, 0x73, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65,
-	0xa2, 0x02, 0x03, 0x50, 0x53, 0x58, 0xaa, 0x02, 0x10, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2e,
-	0x53, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0xca, 0x02, 0x10, 0x50, 0x61, 0x73, 0x74,
-	0x65, 0x6c, 0x5c, 0x53, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0xe2, 0x02, 0x1c, 0x50,
-	0x61, 0x73, 0x74, 0x65, 0x6c, 0x5c, 0x53, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0x5c,
-	0x47, 0x50, 0x42, 0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0xea, 0x02, 0x11, 0x50, 0x61,
-	0x73, 0x74, 0x65, 0x6c, 0x3a, 0x3a, 0x53, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0x62,
-	0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x72, 0x6e, 0x6f, 0x64, 0x65, 0x1a, 0x1e, 0x63, 0x6f, 0x73, 0x6d, 0x6f, 0x73, 0x2f, 0x62, 0x61,
+	0x73, 0x65, 0x2f, 0x76, 0x31, 0x62, 0x65, 0x74, 0x61, 0x31, 0x2f, 0x63, 0x6f, 0x69, 0x6e, 0x2e,
+	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x1a, 0x19, 0x63, 0x6f, 0x73, 0x6d, 0x6f, 0x73, 0x5f, 0x70, 0x72,
+	0x6f, 0x74, 0x6f, 0x2f, 0x63, 0x6f, 0x73, 0x6d, 0x6f, 0x73, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f,
+	0x1a, 0x1f, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75,
+	0x66, 0x2f, 0x74, 0x69, 0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x2e, 0x70, 0x72, 0x6f, 0x74,
+	0x6f, 0x1a, 0x14, 0x67, 0x6f, 0x67, 0x6f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x67, 0x6f, 0x67,
+	0x6f, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x1a, 0x1f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2f,
+	0x73, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0x2f, 0x65, 0x76, 0x69, 0x64, 0x65, 0x6e,
+	0x63, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x1a, 0x28, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c,
+	0x2f, 0x73, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0x2f, 0x6d, 0x65, 0x74, 0x72, 0x69,
+	0x63, 0x73, 0x5f, 0x61, 0x67, 0x67, 0x72, 0x65, 0x67, 0x61, 0x74, 0x65, 0x2e, 0x70, 0x72, 0x6f,
+	0x74, 0x6f, 0x1a, 0x29, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2f, 0x73, 0x75, 0x70, 0x65, 0x72,
+	0x6e, 0x6f, 0x64, 0x65, 0x2f, 0x69, 0x70, 0x5f, 0x61, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x5f,
+	0x68, 0x69, 0x73, 0x74, 0x6f, 0x72, 0x79, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x1a, 0x26, 0x70,
+	0x61, 0x73, 0x74, 0x65, 0x6c, 0x2f, 0x73, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0x2f,
+	0x73, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0x5f, 0x73, 0x74, 0x61, 0x74, 0x65, 0x2e,
+	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0x8d, 0x05, 0x0a, 0x09, 0x53, 0x75, 0x70, 0x65, 0x72, 0x4e,
+	0x6f, 0x64, 0x65, 0x12, 0x4e, 0x0a, 0x11, 0x76, 0x61, 0x6c, 0x69, 0x64, 0x61, 0x74, 0x6f, 0x72,
+	0x5f, 0x61, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x42, 0x21,
+	0xd2, 0xb4, 0x2d, 0x1d, 0x63, 0x6f, 0x73, 0x6d, 0x6f, 0x73, 0x2e, 0x56, 0x61, 0x6c, 0x69, 0x64,
+	0x61, 0x74, 0x6f, 0x72, 0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x53, 0x74, 0x72, 0x69, 0x6e,
+	0x67, 0x52, 0x10, 0x76, 0x61, 0x6c, 0x69, 0x64, 0x61, 0x74, 0x6f, 0x72, 0x41, 0x64, 0x64, 0x72,
+	0x65, 0x73, 0x73, 0x12, 0x1d, 0x0a, 0x0a, 0x69, 0x70, 0x5f, 0x61, 0x64, 0x64, 0x72, 0x65, 0x73,
+	0x73, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09, 0x69, 0x70, 0x41, 0x64, 0x64, 0x72, 0x65,
+	0x73, 0x73, 0x12, 0x48, 0x0a, 0x05, 0x73, 0x74, 0x61, 0x74, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28,
+	0x0e, 0x32, 0x20, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2e, 0x73, 0x75, 0x70, 0x65, 0x72,
+	0x6e, 0x6f, 0x64, 0x65, 0x2e, 0x53, 0x75, 0x70, 0x65, 0x72, 0x4e, 0x6f, 0x64, 0x65, 0x53, 0x74,
+	0x61, 0x74, 0x65, 0x42, 0x10, 0xf2, 0xde, 0x1f, 0x0c, 0x79, 0x61, 0x6d, 0x6c, 0x3a, 0x22, 0x73,
+	0x74, 0x61, 0x74, 0x65, 0x22, 0x52, 0x05, 0x73, 0x74, 0x61, 0x74, 0x65, 0x12, 0x36, 0x0a, 0x08,
+	0x65, 0x76, 0x69, 0x64, 0x65, 0x6e, 0x63, 0x65, 0x18, 0x04, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x1a,
+	0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2e, 0x73, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64,
+	0x65, 0x2e, 0x45, 0x76, 0x69, 0x64, 0x65, 0x6e, 0x63, 0x65, 0x52, 0x08, 0x65, 0x76, 0x69, 0x64,
+	0x65, 0x6e, 0x63, 0x65, 0x12, 0x4e, 0x0a, 0x10, 0x6c, 0x61, 0x73, 0x74, 0x5f, 0x74, 0x69, 0x6d,
+	0x65, 0x5f, 0x61, 0x63, 0x74, 0x69, 0x76, 0x65, 0x18, 0x05, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1a,
+	0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66,
+	0x2e, 0x54, 0x69, 0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x42, 0x08, 0xc8, 0xde, 0x1f, 0x00,
+	0x90, 0xdf, 0x1f, 0x01, 0x52, 0x0e, 0x6c, 0x61, 0x73, 0x74, 0x54, 0x69, 0x6d, 0x65, 0x41, 0x63,
+	0x74, 0x69, 0x76, 0x65, 0x12, 0x52, 0x0a, 0x12, 0x6c, 0x61, 0x73, 0x74, 0x5f, 0x74, 0x69, 0x6d,
+	0x65, 0x5f, 0x64, 0x69, 0x73, 0x61, 0x62, 0x6c, 0x65, 0x64, 0x18, 0x06, 0x20, 0x01, 0x28, 0x0b,
+	0x32, 0x1a, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62,
+	0x75, 0x66, 0x2e, 0x54, 0x69, 0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x42, 0x08, 0xc8, 0xde,
+	0x1f, 0x00, 0x90, 0xdf, 0x1f, 0x01, 0x52, 0x10, 0x6c, 0x61, 0x73, 0x74, 0x54, 0x69, 0x6d, 0x65,
+	0x44, 0x69, 0x73, 0x61, 0x62, 0x6c, 0x65, 0x64, 0x12, 0x43, 0x0a, 0x0a, 0x73, 0x74, 0x61, 0x72,
+	0x74, 0x65, 0x64, 0x5f, 0x61, 0x74, 0x18, 0x07, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1a, 0x2e, 0x67,
+	0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x54,
+	0x69, 0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x42, 0x08, 0xc8, 0xde, 0x1f, 0x00, 0x90, 0xdf,
+	0x1f, 0x01, 0x52, 0x09, 0x73, 0x74, 0x61, 0x72, 0x74, 0x65, 0x64, 0x41, 0x74, 0x12, 0x4e, 0x0a,
+	0x11, 0x70, 0x72, 0x65, 0x76, 0x5f, 0x69, 0x70, 0x5f, 0x61, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73,
+	0x65, 0x73, 0x18, 0x08, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x22, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65,
+	0x6c, 0x2e, 0x73, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0x2e, 0x49, 0x50, 0x41, 0x64,
+	0x64, 0x72, 0x65, 0x73, 0x73, 0x48, 0x69, 0x73, 0x74, 0x6f, 0x72, 0x79, 0x52, 0x0f, 0x70, 0x72,
+	0x65, 0x76, 0x49, 0x70, 0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x65, 0x73, 0x12, 0x18, 0x0a,
+	0x07, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x18, 0x09, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07,
+	0x76, 0x65, 0x72, 0x73, 0x69, 0x6f, 0x6e, 0x12, 0x3c, 0x0a, 0x07, 0x6d, 0x65, 0x74, 0x72, 0x69,
+	0x63, 0x73, 0x18, 0x0a, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x22, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65,
+	0x6c, 0x2e, 0x73, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0x2e, 0x4d, 0x65, 0x74, 0x72,
+	0x69, 0x63, 0x73, 0x41, 0x67, 0x67, 0x72, 0x65, 0x67, 0x61, 0x74, 0x65, 0x52, 0x07, 0x6d, 0x65,
+	0x74, 0x72, 0x69, 0x63, 0x73, 0x42, 0xbd, 0x01, 0x0a, 0x14, 0x63, 0x6f, 0x6d, 0x2e, 0x70, 0x61,
+	0x73, 0x74, 0x65, 0x6c, 0x2e, 0x73, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0x42, 0x0e,
+	0x53, 0x75, 0x70, 0x65, 0x72, 0x4e, 0x6f, 0x64, 0x65, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x50, 0x01,
+	0x5a, 0x34, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x70, 0x61, 0x73,
+	0x74, 0x65, 0x6c, 0x6e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65,
+	0x6c, 0x2f, 0x61, 0x70, 0x69, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2f, 0x73, 0x75, 0x70,
+	0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0xa2, 0x02, 0x03, 0x50, 0x53, 0x58, 0xaa, 0x02, 0x10, 0x50,
+	0x61, 0x73, 0x74, 0x65, 0x6c, 0x2e, 0x53, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0xca,
+	0x02, 0x10, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x5c, 0x53, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f,
+	0x64, 0x65, 0xe2, 0x02, 0x1c, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x5c, 0x53, 0x75, 0x70, 0x65,
+	0x72, 0x6e, 0x6f, 0x64, 0x65, 0x5c, 0x47, 0x50, 0x42, 0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74,
+	0x61, 0xea, 0x02, 0x11, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x3a, 0x3a, 0x53, 0x75, 0x70, 0x65,
+	0x72, 0x6e, 0x6f, 0x64, 0x65, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -1257,14 +1417,26 @@ func file_pastel_supernode_super_node_proto_rawDescGZIP() []byte {
 
 var file_pastel_supernode_super_node_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
 var file_pastel_supernode_super_node_proto_goTypes = []interface{}{
-	(*SuperNode)(nil), // 0: pastel.supernode.SuperNode
+	(*SuperNode)(nil),             // 0: pastel.supernode.SuperNode
+	(SuperNodeState)(0),           // 1: pastel.supernode.SuperNodeState
+	(*Evidence)(nil),              // 2: pastel.supernode.Evidence
+	(*timestamppb.Timestamp)(nil), // 3: google.protobuf.Timestamp
+	(*IPAddressHistory)(nil),      // 4: pastel.supernode.IPAddressHistory
+	(*MetricsAggregate)(nil),      // 5: pastel.supernode.MetricsAggregate
 }
 var file_pastel_supernode_super_node_proto_depIdxs = []int32{
-	0, // [0:0] is the sub-list for method output_type
-	0, // [0:0] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	1, // 0: pastel.supernode.SuperNode.state:type_name -> pastel.supernode.SuperNodeState
+	2, // 1: pastel.supernode.SuperNode.evidence:type_name -> pastel.supernode.Evidence
+	3, // 2: pastel.supernode.SuperNode.last_time_active:type_name -> google.protobuf.Timestamp
+	3, // 3: pastel.supernode.SuperNode.last_time_disabled:type_name -> google.protobuf.Timestamp
+	3, // 4: pastel.supernode.SuperNode.started_at:type_name -> google.protobuf.Timestamp
+	4, // 5: pastel.supernode.SuperNode.prev_ip_addresses:type_name -> pastel.supernode.IPAddressHistory
+	5, // 6: pastel.supernode.SuperNode.metrics:type_name -> pastel.supernode.MetricsAggregate
+	7, // [7:7] is the sub-list for method output_type
+	7, // [7:7] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_pastel_supernode_super_node_proto_init() }
@@ -1272,6 +1444,10 @@ func file_pastel_supernode_super_node_proto_init() {
 	if File_pastel_supernode_super_node_proto != nil {
 		return
 	}
+	file_pastel_supernode_evidence_proto_init()
+	file_pastel_supernode_metrics_aggregate_proto_init()
+	file_pastel_supernode_ip_address_history_proto_init()
+	file_pastel_supernode_supernode_state_proto_init()
 	if !protoimpl.UnsafeEnabled {
 		file_pastel_supernode_super_node_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*SuperNode); i {

@@ -10,13 +10,12 @@ option go_package = "github.com/pastelnetwork/pastel/x/supernode/types";
 message Params {
   option (amino.name) = "pastel/x/supernode/Params";
   option (gogoproto.equal) = true;
-
   
-  uint64 minimumStakeForSn = 1 [(gogoproto.moretags) = "yaml:\"minimum_stake_for_sn\""];
-  uint64 reportingThreshold = 2 [(gogoproto.moretags) = "yaml:\"reporting_threshold\""];
-  uint64 slashingThreshold = 3 [(gogoproto.moretags) = "yaml:\"slashing_threshold\""];
-  string metricsThresholds = 4 [(gogoproto.moretags) = "yaml:\"metrics_thresholds\""];
-  string evidenceRetentionPeriod = 5 [(gogoproto.moretags) = "yaml:\"evidence_retention_period\""];
-  string slashingFraction = 6 [(gogoproto.moretags) = "yaml:\"slashing_fraction\""];
-  string inactivityPenaltyPeriod = 7 [(gogoproto.moretags) = "yaml:\"inactivity_penalty_period\""];
+  uint64 minimum_stake_for_sn = 1 [(gogoproto.moretags) = "yaml:\"minimum_stake_for_sn\""];
+  uint64 reporting_threshold = 2 [(gogoproto.moretags) = "yaml:\"reporting_threshold\""];
+  uint64 slashing_threshold = 3 [(gogoproto.moretags) = "yaml:\"slashing_threshold\""];
+  string metrics_thresholds = 4 [(gogoproto.moretags) = "yaml:\"metrics_thresholds\""];
+  string evidence_retention_period = 5 [(gogoproto.moretags) = "yaml:\"evidence_retention_period\""];
+  string slashing_fraction = 6 [(gogoproto.moretags) = "yaml:\"slashing_fraction\""];
+  string inactivity_penalty_period = 7 [(gogoproto.moretags) = "yaml:\"inactivity_penalty_period\""];
 }

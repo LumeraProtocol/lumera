@@ -2,29 +2,116 @@
 package supernode
 
 import (
+	binary "encoding/binary"
 	fmt "fmt"
 	runtime "github.com/cosmos/cosmos-proto/runtime"
+	_ "github.com/cosmos/gogoproto/gogoproto"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoiface "google.golang.org/protobuf/runtime/protoiface"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	io "io"
+	math "math"
 	reflect "reflect"
+	sort "sort"
 	sync "sync"
 )
 
+var _ protoreflect.Map = (*_MetricsAggregate_1_map)(nil)
+
+type _MetricsAggregate_1_map struct {
+	m *map[string]float64
+}
+
+func (x *_MetricsAggregate_1_map) Len() int {
+	if x.m == nil {
+		return 0
+	}
+	return len(*x.m)
+}
+
+func (x *_MetricsAggregate_1_map) Range(f func(protoreflect.MapKey, protoreflect.Value) bool) {
+	if x.m == nil {
+		return
+	}
+	for k, v := range *x.m {
+		mapKey := (protoreflect.MapKey)(protoreflect.ValueOfString(k))
+		mapValue := protoreflect.ValueOfFloat64(v)
+		if !f(mapKey, mapValue) {
+			break
+		}
+	}
+}
+
+func (x *_MetricsAggregate_1_map) Has(key protoreflect.MapKey) bool {
+	if x.m == nil {
+		return false
+	}
+	keyUnwrapped := key.String()
+	concreteValue := keyUnwrapped
+	_, ok := (*x.m)[concreteValue]
+	return ok
+}
+
+func (x *_MetricsAggregate_1_map) Clear(key protoreflect.MapKey) {
+	if x.m == nil {
+		return
+	}
+	keyUnwrapped := key.String()
+	concreteKey := keyUnwrapped
+	delete(*x.m, concreteKey)
+}
+
+func (x *_MetricsAggregate_1_map) Get(key protoreflect.MapKey) protoreflect.Value {
+	if x.m == nil {
+		return protoreflect.Value{}
+	}
+	keyUnwrapped := key.String()
+	concreteKey := keyUnwrapped
+	v, ok := (*x.m)[concreteKey]
+	if !ok {
+		return protoreflect.Value{}
+	}
+	return protoreflect.ValueOfFloat64(v)
+}
+
+func (x *_MetricsAggregate_1_map) Set(key protoreflect.MapKey, value protoreflect.Value) {
+	if !key.IsValid() || !value.IsValid() {
+		panic("invalid key or value provided")
+	}
+	keyUnwrapped := key.String()
+	concreteKey := keyUnwrapped
+	valueUnwrapped := value.Float()
+	concreteValue := valueUnwrapped
+	(*x.m)[concreteKey] = concreteValue
+}
+
+func (x *_MetricsAggregate_1_map) Mutable(key protoreflect.MapKey) protoreflect.Value {
+	panic("should not call Mutable on protoreflect.Map whose value is not of type protoreflect.Message")
+}
+
+func (x *_MetricsAggregate_1_map) NewValue() protoreflect.Value {
+	v := float64(0)
+	return protoreflect.ValueOfFloat64(v)
+}
+
+func (x *_MetricsAggregate_1_map) IsValid() bool {
+	return x.m != nil
+}
+
 var (
-	md_MetricsAggregate             protoreflect.MessageDescriptor
-	fd_MetricsAggregate_metrics     protoreflect.FieldDescriptor
-	fd_MetricsAggregate_reportCount protoreflect.FieldDescriptor
-	fd_MetricsAggregate_lastUpdated protoreflect.FieldDescriptor
+	md_MetricsAggregate              protoreflect.MessageDescriptor
+	fd_MetricsAggregate_metrics      protoreflect.FieldDescriptor
+	fd_MetricsAggregate_report_count protoreflect.FieldDescriptor
+	fd_MetricsAggregate_last_updated protoreflect.FieldDescriptor
 )
 
 func init() {
 	file_pastel_supernode_metrics_aggregate_proto_init()
 	md_MetricsAggregate = File_pastel_supernode_metrics_aggregate_proto.Messages().ByName("MetricsAggregate")
 	fd_MetricsAggregate_metrics = md_MetricsAggregate.Fields().ByName("metrics")
-	fd_MetricsAggregate_reportCount = md_MetricsAggregate.Fields().ByName("reportCount")
-	fd_MetricsAggregate_lastUpdated = md_MetricsAggregate.Fields().ByName("lastUpdated")
+	fd_MetricsAggregate_report_count = md_MetricsAggregate.Fields().ByName("report_count")
+	fd_MetricsAggregate_last_updated = md_MetricsAggregate.Fields().ByName("last_updated")
 }
 
 var _ protoreflect.Message = (*fastReflection_MetricsAggregate)(nil)
@@ -92,21 +179,21 @@ func (x *fastReflection_MetricsAggregate) Interface() protoreflect.ProtoMessage 
 // While iterating, mutating operations may only be performed
 // on the current field descriptor.
 func (x *fastReflection_MetricsAggregate) Range(f func(protoreflect.FieldDescriptor, protoreflect.Value) bool) {
-	if x.Metrics != "" {
-		value := protoreflect.ValueOfString(x.Metrics)
+	if len(x.Metrics) != 0 {
+		value := protoreflect.ValueOfMap(&_MetricsAggregate_1_map{m: &x.Metrics})
 		if !f(fd_MetricsAggregate_metrics, value) {
 			return
 		}
 	}
 	if x.ReportCount != uint64(0) {
 		value := protoreflect.ValueOfUint64(x.ReportCount)
-		if !f(fd_MetricsAggregate_reportCount, value) {
+		if !f(fd_MetricsAggregate_report_count, value) {
 			return
 		}
 	}
-	if x.LastUpdated != uint64(0) {
-		value := protoreflect.ValueOfUint64(x.LastUpdated)
-		if !f(fd_MetricsAggregate_lastUpdated, value) {
+	if x.LastUpdated != nil {
+		value := protoreflect.ValueOfMessage(x.LastUpdated.ProtoReflect())
+		if !f(fd_MetricsAggregate_last_updated, value) {
 			return
 		}
 	}
@@ -126,11 +213,11 @@ func (x *fastReflection_MetricsAggregate) Range(f func(protoreflect.FieldDescrip
 func (x *fastReflection_MetricsAggregate) Has(fd protoreflect.FieldDescriptor) bool {
 	switch fd.FullName() {
 	case "pastel.supernode.MetricsAggregate.metrics":
-		return x.Metrics != ""
-	case "pastel.supernode.MetricsAggregate.reportCount":
+		return len(x.Metrics) != 0
+	case "pastel.supernode.MetricsAggregate.report_count":
 		return x.ReportCount != uint64(0)
-	case "pastel.supernode.MetricsAggregate.lastUpdated":
-		return x.LastUpdated != uint64(0)
+	case "pastel.supernode.MetricsAggregate.last_updated":
+		return x.LastUpdated != nil
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.MetricsAggregate"))
@@ -148,11 +235,11 @@ func (x *fastReflection_MetricsAggregate) Has(fd protoreflect.FieldDescriptor) b
 func (x *fastReflection_MetricsAggregate) Clear(fd protoreflect.FieldDescriptor) {
 	switch fd.FullName() {
 	case "pastel.supernode.MetricsAggregate.metrics":
-		x.Metrics = ""
-	case "pastel.supernode.MetricsAggregate.reportCount":
+		x.Metrics = nil
+	case "pastel.supernode.MetricsAggregate.report_count":
 		x.ReportCount = uint64(0)
-	case "pastel.supernode.MetricsAggregate.lastUpdated":
-		x.LastUpdated = uint64(0)
+	case "pastel.supernode.MetricsAggregate.last_updated":
+		x.LastUpdated = nil
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.MetricsAggregate"))
@@ -170,14 +257,17 @@ func (x *fastReflection_MetricsAggregate) Clear(fd protoreflect.FieldDescriptor)
 func (x *fastReflection_MetricsAggregate) Get(descriptor protoreflect.FieldDescriptor) protoreflect.Value {
 	switch descriptor.FullName() {
 	case "pastel.supernode.MetricsAggregate.metrics":
-		value := x.Metrics
-		return protoreflect.ValueOfString(value)
-	case "pastel.supernode.MetricsAggregate.reportCount":
+		if len(x.Metrics) == 0 {
+			return protoreflect.ValueOfMap(&_MetricsAggregate_1_map{})
+		}
+		mapValue := &_MetricsAggregate_1_map{m: &x.Metrics}
+		return protoreflect.ValueOfMap(mapValue)
+	case "pastel.supernode.MetricsAggregate.report_count":
 		value := x.ReportCount
 		return protoreflect.ValueOfUint64(value)
-	case "pastel.supernode.MetricsAggregate.lastUpdated":
+	case "pastel.supernode.MetricsAggregate.last_updated":
 		value := x.LastUpdated
-		return protoreflect.ValueOfUint64(value)
+		return protoreflect.ValueOfMessage(value.ProtoReflect())
 	default:
 		if descriptor.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.MetricsAggregate"))
@@ -199,11 +289,13 @@ func (x *fastReflection_MetricsAggregate) Get(descriptor protoreflect.FieldDescr
 func (x *fastReflection_MetricsAggregate) Set(fd protoreflect.FieldDescriptor, value protoreflect.Value) {
 	switch fd.FullName() {
 	case "pastel.supernode.MetricsAggregate.metrics":
-		x.Metrics = value.Interface().(string)
-	case "pastel.supernode.MetricsAggregate.reportCount":
+		mv := value.Map()
+		cmv := mv.(*_MetricsAggregate_1_map)
+		x.Metrics = *cmv.m
+	case "pastel.supernode.MetricsAggregate.report_count":
 		x.ReportCount = value.Uint()
-	case "pastel.supernode.MetricsAggregate.lastUpdated":
-		x.LastUpdated = value.Uint()
+	case "pastel.supernode.MetricsAggregate.last_updated":
+		x.LastUpdated = value.Message().Interface().(*timestamppb.Timestamp)
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.MetricsAggregate"))
@@ -225,11 +317,18 @@ func (x *fastReflection_MetricsAggregate) Set(fd protoreflect.FieldDescriptor, v
 func (x *fastReflection_MetricsAggregate) Mutable(fd protoreflect.FieldDescriptor) protoreflect.Value {
 	switch fd.FullName() {
 	case "pastel.supernode.MetricsAggregate.metrics":
-		panic(fmt.Errorf("field metrics of message pastel.supernode.MetricsAggregate is not mutable"))
-	case "pastel.supernode.MetricsAggregate.reportCount":
-		panic(fmt.Errorf("field reportCount of message pastel.supernode.MetricsAggregate is not mutable"))
-	case "pastel.supernode.MetricsAggregate.lastUpdated":
-		panic(fmt.Errorf("field lastUpdated of message pastel.supernode.MetricsAggregate is not mutable"))
+		if x.Metrics == nil {
+			x.Metrics = make(map[string]float64)
+		}
+		value := &_MetricsAggregate_1_map{m: &x.Metrics}
+		return protoreflect.ValueOfMap(value)
+	case "pastel.supernode.MetricsAggregate.last_updated":
+		if x.LastUpdated == nil {
+			x.LastUpdated = new(timestamppb.Timestamp)
+		}
+		return protoreflect.ValueOfMessage(x.LastUpdated.ProtoReflect())
+	case "pastel.supernode.MetricsAggregate.report_count":
+		panic(fmt.Errorf("field report_count of message pastel.supernode.MetricsAggregate is not mutable"))
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.MetricsAggregate"))
@@ -244,11 +343,13 @@ func (x *fastReflection_MetricsAggregate) Mutable(fd protoreflect.FieldDescripto
 func (x *fastReflection_MetricsAggregate) NewField(fd protoreflect.FieldDescriptor) protoreflect.Value {
 	switch fd.FullName() {
 	case "pastel.supernode.MetricsAggregate.metrics":
-		return protoreflect.ValueOfString("")
-	case "pastel.supernode.MetricsAggregate.reportCount":
+		m := make(map[string]float64)
+		return protoreflect.ValueOfMap(&_MetricsAggregate_1_map{m: &m})
+	case "pastel.supernode.MetricsAggregate.report_count":
 		return protoreflect.ValueOfUint64(uint64(0))
-	case "pastel.supernode.MetricsAggregate.lastUpdated":
-		return protoreflect.ValueOfUint64(uint64(0))
+	case "pastel.supernode.MetricsAggregate.last_updated":
+		m := new(timestamppb.Timestamp)
+		return protoreflect.ValueOfMessage(m.ProtoReflect())
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.MetricsAggregate"))
@@ -318,15 +419,33 @@ func (x *fastReflection_MetricsAggregate) ProtoMethods() *protoiface.Methods {
 		var n int
 		var l int
 		_ = l
-		l = len(x.Metrics)
-		if l > 0 {
-			n += 1 + l + runtime.Sov(uint64(l))
+		if len(x.Metrics) > 0 {
+			SiZeMaP := func(k string, v float64) {
+				mapEntrySize := 1 + len(k) + runtime.Sov(uint64(len(k))) + 1 + 8
+				n += mapEntrySize + 1 + runtime.Sov(uint64(mapEntrySize))
+			}
+			if options.Deterministic {
+				sortme := make([]string, 0, len(x.Metrics))
+				for k := range x.Metrics {
+					sortme = append(sortme, k)
+				}
+				sort.Strings(sortme)
+				for _, k := range sortme {
+					v := x.Metrics[k]
+					SiZeMaP(k, v)
+				}
+			} else {
+				for k, v := range x.Metrics {
+					SiZeMaP(k, v)
+				}
+			}
 		}
 		if x.ReportCount != 0 {
 			n += 1 + runtime.Sov(uint64(x.ReportCount))
 		}
-		if x.LastUpdated != 0 {
-			n += 1 + runtime.Sov(uint64(x.LastUpdated))
+		if x.LastUpdated != nil {
+			l = options.Size(x.LastUpdated)
+			n += 1 + l + runtime.Sov(uint64(l))
 		}
 		if x.unknownFields != nil {
 			n += len(x.unknownFields)
@@ -357,10 +476,19 @@ func (x *fastReflection_MetricsAggregate) ProtoMethods() *protoiface.Methods {
 			i -= len(x.unknownFields)
 			copy(dAtA[i:], x.unknownFields)
 		}
-		if x.LastUpdated != 0 {
-			i = runtime.EncodeVarint(dAtA, i, uint64(x.LastUpdated))
+		if x.LastUpdated != nil {
+			encoded, err := options.Marshal(x.LastUpdated)
+			if err != nil {
+				return protoiface.MarshalOutput{
+					NoUnkeyedLiterals: input.NoUnkeyedLiterals,
+					Buf:               input.Buf,
+				}, err
+			}
+			i -= len(encoded)
+			copy(dAtA[i:], encoded)
+			i = runtime.EncodeVarint(dAtA, i, uint64(len(encoded)))
 			i--
-			dAtA[i] = 0x18
+			dAtA[i] = 0x1a
 		}
 		if x.ReportCount != 0 {
 			i = runtime.EncodeVarint(dAtA, i, uint64(x.ReportCount))
@@ -368,11 +496,46 @@ func (x *fastReflection_MetricsAggregate) ProtoMethods() *protoiface.Methods {
 			dAtA[i] = 0x10
 		}
 		if len(x.Metrics) > 0 {
-			i -= len(x.Metrics)
-			copy(dAtA[i:], x.Metrics)
-			i = runtime.EncodeVarint(dAtA, i, uint64(len(x.Metrics)))
-			i--
-			dAtA[i] = 0xa
+			MaRsHaLmAp := func(k string, v float64) (protoiface.MarshalOutput, error) {
+				baseI := i
+				i -= 8
+				binary.LittleEndian.PutUint64(dAtA[i:], uint64(math.Float64bits(float64(v))))
+				i--
+				dAtA[i] = 0x11
+				i -= len(k)
+				copy(dAtA[i:], k)
+				i = runtime.EncodeVarint(dAtA, i, uint64(len(k)))
+				i--
+				dAtA[i] = 0xa
+				i = runtime.EncodeVarint(dAtA, i, uint64(baseI-i))
+				i--
+				dAtA[i] = 0xa
+				return protoiface.MarshalOutput{}, nil
+			}
+			if options.Deterministic {
+				keysForMetrics := make([]string, 0, len(x.Metrics))
+				for k := range x.Metrics {
+					keysForMetrics = append(keysForMetrics, string(k))
+				}
+				sort.Slice(keysForMetrics, func(i, j int) bool {
+					return keysForMetrics[i] < keysForMetrics[j]
+				})
+				for iNdEx := len(keysForMetrics) - 1; iNdEx >= 0; iNdEx-- {
+					v := x.Metrics[string(keysForMetrics[iNdEx])]
+					out, err := MaRsHaLmAp(keysForMetrics[iNdEx], v)
+					if err != nil {
+						return out, err
+					}
+				}
+			} else {
+				for k := range x.Metrics {
+					v := x.Metrics[k]
+					out, err := MaRsHaLmAp(k, v)
+					if err != nil {
+						return out, err
+					}
+				}
+			}
 		}
 		if input.Buf != nil {
 			input.Buf = append(input.Buf, dAtA...)
@@ -427,7 +590,7 @@ func (x *fastReflection_MetricsAggregate) ProtoMethods() *protoiface.Methods {
 				if wireType != 2 {
 					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: wrong wireType = %d for field Metrics", wireType)
 				}
-				var stringLen uint64
+				var msglen int
 				for shift := uint(0); ; shift += 7 {
 					if shift >= 64 {
 						return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrIntOverflow
@@ -437,23 +600,97 @@ func (x *fastReflection_MetricsAggregate) ProtoMethods() *protoiface.Methods {
 					}
 					b := dAtA[iNdEx]
 					iNdEx++
-					stringLen |= uint64(b&0x7F) << shift
+					msglen |= int(b&0x7F) << shift
 					if b < 0x80 {
 						break
 					}
 				}
-				intStringLen := int(stringLen)
-				if intStringLen < 0 {
+				if msglen < 0 {
 					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
 				}
-				postIndex := iNdEx + intStringLen
+				postIndex := iNdEx + msglen
 				if postIndex < 0 {
 					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
 				}
 				if postIndex > l {
 					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
 				}
-				x.Metrics = string(dAtA[iNdEx:postIndex])
+				if x.Metrics == nil {
+					x.Metrics = make(map[string]float64)
+				}
+				var mapkey string
+				var mapvalue float64
+				for iNdEx < postIndex {
+					entryPreIndex := iNdEx
+					var wire uint64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrIntOverflow
+						}
+						if iNdEx >= l {
+							return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						wire |= uint64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					fieldNum := int32(wire >> 3)
+					if fieldNum == 1 {
+						var stringLenmapkey uint64
+						for shift := uint(0); ; shift += 7 {
+							if shift >= 64 {
+								return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrIntOverflow
+							}
+							if iNdEx >= l {
+								return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
+							}
+							b := dAtA[iNdEx]
+							iNdEx++
+							stringLenmapkey |= uint64(b&0x7F) << shift
+							if b < 0x80 {
+								break
+							}
+						}
+						intStringLenmapkey := int(stringLenmapkey)
+						if intStringLenmapkey < 0 {
+							return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
+						}
+						postStringIndexmapkey := iNdEx + intStringLenmapkey
+						if postStringIndexmapkey < 0 {
+							return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
+						}
+						if postStringIndexmapkey > l {
+							return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
+						}
+						mapkey = string(dAtA[iNdEx:postStringIndexmapkey])
+						iNdEx = postStringIndexmapkey
+					} else if fieldNum == 2 {
+						var mapvaluetemp uint64
+						if (iNdEx + 8) > l {
+							return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
+						}
+						mapvaluetemp = uint64(binary.LittleEndian.Uint64(dAtA[iNdEx:]))
+						iNdEx += 8
+						mapvalue = math.Float64frombits(mapvaluetemp)
+					} else {
+						iNdEx = entryPreIndex
+						skippy, err := runtime.Skip(dAtA[iNdEx:])
+						if err != nil {
+							return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, err
+						}
+						if (skippy < 0) || (iNdEx+skippy) < 0 {
+							return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
+						}
+						if (iNdEx + skippy) > postIndex {
+							return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
+						}
+						iNdEx += skippy
+					}
+				}
+				x.Metrics[mapkey] = mapvalue
 				iNdEx = postIndex
 			case 2:
 				if wireType != 0 {
@@ -475,10 +712,10 @@ func (x *fastReflection_MetricsAggregate) ProtoMethods() *protoiface.Methods {
 					}
 				}
 			case 3:
-				if wireType != 0 {
+				if wireType != 2 {
 					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: wrong wireType = %d for field LastUpdated", wireType)
 				}
-				x.LastUpdated = 0
+				var msglen int
 				for shift := uint(0); ; shift += 7 {
 					if shift >= 64 {
 						return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrIntOverflow
@@ -488,11 +725,28 @@ func (x *fastReflection_MetricsAggregate) ProtoMethods() *protoiface.Methods {
 					}
 					b := dAtA[iNdEx]
 					iNdEx++
-					x.LastUpdated |= uint64(b&0x7F) << shift
+					msglen |= int(b&0x7F) << shift
 					if b < 0x80 {
 						break
 					}
 				}
+				if msglen < 0 {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
+				}
+				postIndex := iNdEx + msglen
+				if postIndex < 0 {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
+				}
+				if postIndex > l {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
+				}
+				if x.LastUpdated == nil {
+					x.LastUpdated = &timestamppb.Timestamp{}
+				}
+				if err := options.Unmarshal(dAtA[iNdEx:postIndex], x.LastUpdated); err != nil {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, err
+				}
+				iNdEx = postIndex
 			default:
 				iNdEx = preIndex
 				skippy, err := runtime.Skip(dAtA[iNdEx:])
@@ -546,9 +800,9 @@ type MetricsAggregate struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Metrics     string `protobuf:"bytes,1,opt,name=metrics,proto3" json:"metrics,omitempty"`
-	ReportCount uint64 `protobuf:"varint,2,opt,name=reportCount,proto3" json:"reportCount,omitempty"`
-	LastUpdated uint64 `protobuf:"varint,3,opt,name=lastUpdated,proto3" json:"lastUpdated,omitempty"`
+	Metrics     map[string]float64     `protobuf:"bytes,1,rep,name=metrics,proto3" json:"metrics,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"fixed64,2,opt,name=value,proto3"`
+	ReportCount uint64                 `protobuf:"varint,2,opt,name=report_count,json=reportCount,proto3" json:"report_count,omitempty"`
+	LastUpdated *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=last_updated,json=lastUpdated,proto3" json:"last_updated,omitempty"`
 }
 
 func (x *MetricsAggregate) Reset() {
@@ -571,11 +825,11 @@ func (*MetricsAggregate) Descriptor() ([]byte, []int) {
 	return file_pastel_supernode_metrics_aggregate_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *MetricsAggregate) GetMetrics() string {
+func (x *MetricsAggregate) GetMetrics() map[string]float64 {
 	if x != nil {
 		return x.Metrics
 	}
-	return ""
+	return nil
 }
 
 func (x *MetricsAggregate) GetReportCount() uint64 {
@@ -585,11 +839,11 @@ func (x *MetricsAggregate) GetReportCount() uint64 {
 	return 0
 }
 
-func (x *MetricsAggregate) GetLastUpdated() uint64 {
+func (x *MetricsAggregate) GetLastUpdated() *timestamppb.Timestamp {
 	if x != nil {
 		return x.LastUpdated
 	}
-	return 0
+	return nil
 }
 
 var File_pastel_supernode_metrics_aggregate_proto protoreflect.FileDescriptor
@@ -598,27 +852,40 @@ var file_pastel_supernode_metrics_aggregate_proto_rawDesc = []byte{
 	0x0a, 0x28, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2f, 0x73, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f,
 	0x64, 0x65, 0x2f, 0x6d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x73, 0x5f, 0x61, 0x67, 0x67, 0x72, 0x65,
 	0x67, 0x61, 0x74, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x10, 0x70, 0x61, 0x73, 0x74,
-	0x65, 0x6c, 0x2e, 0x73, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0x22, 0x70, 0x0a, 0x10,
-	0x4d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x73, 0x41, 0x67, 0x67, 0x72, 0x65, 0x67, 0x61, 0x74, 0x65,
-	0x12, 0x18, 0x0a, 0x07, 0x6d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28,
-	0x09, 0x52, 0x07, 0x6d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x73, 0x12, 0x20, 0x0a, 0x0b, 0x72, 0x65,
-	0x70, 0x6f, 0x72, 0x74, 0x43, 0x6f, 0x75, 0x6e, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x52,
-	0x0b, 0x72, 0x65, 0x70, 0x6f, 0x72, 0x74, 0x43, 0x6f, 0x75, 0x6e, 0x74, 0x12, 0x20, 0x0a, 0x0b,
-	0x6c, 0x61, 0x73, 0x74, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x64, 0x18, 0x03, 0x20, 0x01, 0x28,
-	0x04, 0x52, 0x0b, 0x6c, 0x61, 0x73, 0x74, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x64, 0x42, 0xc4,
-	0x01, 0x0a, 0x14, 0x63, 0x6f, 0x6d, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2e, 0x73, 0x75,
-	0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0x42, 0x15, 0x4d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x73,
-	0x41, 0x67, 0x67, 0x72, 0x65, 0x67, 0x61, 0x74, 0x65, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x50, 0x01,
-	0x5a, 0x34, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x70, 0x61, 0x73,
-	0x74, 0x65, 0x6c, 0x6e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65,
-	0x6c, 0x2f, 0x61, 0x70, 0x69, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2f, 0x73, 0x75, 0x70,
-	0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0xa2, 0x02, 0x03, 0x50, 0x53, 0x58, 0xaa, 0x02, 0x10, 0x50,
-	0x61, 0x73, 0x74, 0x65, 0x6c, 0x2e, 0x53, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0xca,
-	0x02, 0x10, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x5c, 0x53, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f,
-	0x64, 0x65, 0xe2, 0x02, 0x1c, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x5c, 0x53, 0x75, 0x70, 0x65,
-	0x72, 0x6e, 0x6f, 0x64, 0x65, 0x5c, 0x47, 0x50, 0x42, 0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74,
-	0x61, 0xea, 0x02, 0x11, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x3a, 0x3a, 0x53, 0x75, 0x70, 0x65,
-	0x72, 0x6e, 0x6f, 0x64, 0x65, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x65, 0x6c, 0x2e, 0x73, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0x1a, 0x1f, 0x67, 0x6f,
+	0x6f, 0x67, 0x6c, 0x65, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2f, 0x74, 0x69,
+	0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x1a, 0x14, 0x67,
+	0x6f, 0x67, 0x6f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x67, 0x6f, 0x67, 0x6f, 0x2e, 0x70, 0x72,
+	0x6f, 0x74, 0x6f, 0x22, 0x85, 0x02, 0x0a, 0x10, 0x4d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x73, 0x41,
+	0x67, 0x67, 0x72, 0x65, 0x67, 0x61, 0x74, 0x65, 0x12, 0x49, 0x0a, 0x07, 0x6d, 0x65, 0x74, 0x72,
+	0x69, 0x63, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x2f, 0x2e, 0x70, 0x61, 0x73, 0x74,
+	0x65, 0x6c, 0x2e, 0x73, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0x2e, 0x4d, 0x65, 0x74,
+	0x72, 0x69, 0x63, 0x73, 0x41, 0x67, 0x67, 0x72, 0x65, 0x67, 0x61, 0x74, 0x65, 0x2e, 0x4d, 0x65,
+	0x74, 0x72, 0x69, 0x63, 0x73, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x52, 0x07, 0x6d, 0x65, 0x74, 0x72,
+	0x69, 0x63, 0x73, 0x12, 0x21, 0x0a, 0x0c, 0x72, 0x65, 0x70, 0x6f, 0x72, 0x74, 0x5f, 0x63, 0x6f,
+	0x75, 0x6e, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0b, 0x72, 0x65, 0x70, 0x6f, 0x72,
+	0x74, 0x43, 0x6f, 0x75, 0x6e, 0x74, 0x12, 0x47, 0x0a, 0x0c, 0x6c, 0x61, 0x73, 0x74, 0x5f, 0x75,
+	0x70, 0x64, 0x61, 0x74, 0x65, 0x64, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1a, 0x2e, 0x67,
+	0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x54,
+	0x69, 0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x42, 0x08, 0xc8, 0xde, 0x1f, 0x00, 0x90, 0xdf,
+	0x1f, 0x01, 0x52, 0x0b, 0x6c, 0x61, 0x73, 0x74, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x64, 0x1a,
+	0x3a, 0x0a, 0x0c, 0x4d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x73, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x12,
+	0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x6b, 0x65,
+	0x79, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x01,
+	0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38, 0x01, 0x42, 0xc4, 0x01, 0x0a, 0x14,
+	0x63, 0x6f, 0x6d, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2e, 0x73, 0x75, 0x70, 0x65, 0x72,
+	0x6e, 0x6f, 0x64, 0x65, 0x42, 0x15, 0x4d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x73, 0x41, 0x67, 0x67,
+	0x72, 0x65, 0x67, 0x61, 0x74, 0x65, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x50, 0x01, 0x5a, 0x34, 0x67,
+	0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c,
+	0x6e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2f, 0x61,
+	0x70, 0x69, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2f, 0x73, 0x75, 0x70, 0x65, 0x72, 0x6e,
+	0x6f, 0x64, 0x65, 0xa2, 0x02, 0x03, 0x50, 0x53, 0x58, 0xaa, 0x02, 0x10, 0x50, 0x61, 0x73, 0x74,
+	0x65, 0x6c, 0x2e, 0x53, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0xca, 0x02, 0x10, 0x50,
+	0x61, 0x73, 0x74, 0x65, 0x6c, 0x5c, 0x53, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0xe2,
+	0x02, 0x1c, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x5c, 0x53, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f,
+	0x64, 0x65, 0x5c, 0x47, 0x50, 0x42, 0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0xea, 0x02,
+	0x11, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x3a, 0x3a, 0x53, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f,
+	0x64, 0x65, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -633,16 +900,20 @@ func file_pastel_supernode_metrics_aggregate_proto_rawDescGZIP() []byte {
 	return file_pastel_supernode_metrics_aggregate_proto_rawDescData
 }
 
-var file_pastel_supernode_metrics_aggregate_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
+var file_pastel_supernode_metrics_aggregate_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_pastel_supernode_metrics_aggregate_proto_goTypes = []interface{}{
-	(*MetricsAggregate)(nil), // 0: pastel.supernode.MetricsAggregate
+	(*MetricsAggregate)(nil),      // 0: pastel.supernode.MetricsAggregate
+	nil,                           // 1: pastel.supernode.MetricsAggregate.MetricsEntry
+	(*timestamppb.Timestamp)(nil), // 2: google.protobuf.Timestamp
 }
 var file_pastel_supernode_metrics_aggregate_proto_depIdxs = []int32{
-	0, // [0:0] is the sub-list for method output_type
-	0, // [0:0] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	1, // 0: pastel.supernode.MetricsAggregate.metrics:type_name -> pastel.supernode.MetricsAggregate.MetricsEntry
+	2, // 1: pastel.supernode.MetricsAggregate.last_updated:type_name -> google.protobuf.Timestamp
+	2, // [2:2] is the sub-list for method output_type
+	2, // [2:2] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_pastel_supernode_metrics_aggregate_proto_init() }
@@ -670,7 +941,7 @@ func file_pastel_supernode_metrics_aggregate_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_pastel_supernode_metrics_aggregate_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   1,
+			NumMessages:   2,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

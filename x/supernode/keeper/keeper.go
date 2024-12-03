@@ -24,6 +24,8 @@ type (
 		bankKeeper     types.BankKeeper
 		stakingKeeper  types.StakingKeeper
 		slashingKeeper types.SlashingKeeper
+
+		//auditKeeper     types.AuditKeeper // future Audit module
 	}
 )
 

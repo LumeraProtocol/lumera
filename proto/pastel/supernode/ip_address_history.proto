@@ -3,9 +3,12 @@ package pastel.supernode;
 
 option go_package = "github.com/pastelnetwork/pastel/x/supernode/types";
 
-message IpaddressHistory {
+import "google/protobuf/timestamp.proto";
+import "gogoproto/gogo.proto";
+
+message IPAddressHistory {
   
   string address = 1; 
-  uint64 updatedAt = 2; 
-  uint64 endedAt = 3; 
+  google.protobuf.Timestamp updated_at = 2 [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
+  google.protobuf.Timestamp ended_at = 3 [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
 }

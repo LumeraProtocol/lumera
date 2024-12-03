@@ -4,17 +4,23 @@
 package types
 
 import (
+	encoding_binary "encoding/binary"
 	fmt "fmt"
+	_ "github.com/cosmos/gogoproto/gogoproto"
 	proto "github.com/cosmos/gogoproto/proto"
+	github_com_cosmos_gogoproto_types "github.com/cosmos/gogoproto/types"
+	_ "google.golang.org/protobuf/types/known/timestamppb"
 	io "io"
 	math "math"
 	math_bits "math/bits"
+	time "time"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
+var _ = time.Kitchen
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -23,9 +29,9 @@ var _ = math.Inf
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
 type MetricsAggregate struct {
-	Metrics     string `protobuf:"bytes,1,opt,name=metrics,proto3" json:"metrics,omitempty"`
-	ReportCount uint64 `protobuf:"varint,2,opt,name=reportCount,proto3" json:"reportCount,omitempty"`
-	LastUpdated uint64 `protobuf:"varint,3,opt,name=lastUpdated,proto3" json:"lastUpdated,omitempty"`
+	Metrics     map[string]float64 `protobuf:"bytes,1,rep,name=metrics,proto3" json:"metrics,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"fixed64,2,opt,name=value,proto3"`
+	ReportCount uint64             `protobuf:"varint,2,opt,name=report_count,json=reportCount,proto3" json:"report_count,omitempty"`
+	LastUpdated time.Time          `protobuf:"bytes,3,opt,name=last_updated,json=lastUpdated,proto3,stdtime" json:"last_updated"`
 }
 
 func (m *MetricsAggregate) Reset()         { *m = MetricsAggregate{} }
@@ -61,11 +67,11 @@ func (m *MetricsAggregate) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_MetricsAggregate proto.InternalMessageInfo
 
-func (m *MetricsAggregate) GetMetrics() string {
+func (m *MetricsAggregate) GetMetrics() map[string]float64 {
 	if m != nil {
 		return m.Metrics
 	}
-	return ""
+	return nil
 }
 
 func (m *MetricsAggregate) GetReportCount() uint64 {
@@ -75,15 +81,16 @@ func (m *MetricsAggregate) GetReportCount() uint64 {
 	return 0
 }
 
-func (m *MetricsAggregate) GetLastUpdated() uint64 {
+func (m *MetricsAggregate) GetLastUpdated() time.Time {
 	if m != nil {
 		return m.LastUpdated
 	}
-	return 0
+	return time.Time{}
 }
 
 func init() {
 	proto.RegisterType((*MetricsAggregate)(nil), "pastel.supernode.MetricsAggregate")
+	proto.RegisterMapType((map[string]float64)(nil), "pastel.supernode.MetricsAggregate.MetricsEntry")
 }
 
 func init() {
@@ -91,20 +98,28 @@ func init() {
 }
 
 var fileDescriptor_f954e079082b9d37 = []byte{
-	// 207 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xd2, 0x28, 0x48, 0x2c, 0x2e,
-	0x49, 0xcd, 0xd1, 0x2f, 0x2e, 0x2d, 0x48, 0x2d, 0xca, 0xcb, 0x4f, 0x49, 0xd5, 0xcf, 0x4d, 0x2d,
-	0x29, 0xca, 0x4c, 0x2e, 0x8e, 0x4f, 0x4c, 0x4f, 0x2f, 0x4a, 0x4d, 0x4f, 0x2c, 0x49, 0xd5, 0x2b,
-	0x28, 0xca, 0x2f, 0xc9, 0x17, 0x12, 0x80, 0xa8, 0xd4, 0x83, 0xab, 0x54, 0x2a, 0xe0, 0x12, 0xf0,
-	0x85, 0x28, 0x76, 0x84, 0xa9, 0x15, 0x92, 0xe0, 0x62, 0x87, 0x1a, 0x20, 0xc1, 0xa8, 0xc0, 0xa8,
-	0xc1, 0x19, 0x04, 0xe3, 0x0a, 0x29, 0x70, 0x71, 0x17, 0xa5, 0x16, 0xe4, 0x17, 0x95, 0x38, 0xe7,
-	0x97, 0xe6, 0x95, 0x48, 0x30, 0x29, 0x30, 0x6a, 0xb0, 0x04, 0x21, 0x0b, 0x81, 0x54, 0xe4, 0x24,
-	0x16, 0x97, 0x84, 0x16, 0xa4, 0x24, 0x96, 0xa4, 0xa6, 0x48, 0x30, 0x43, 0x54, 0x20, 0x09, 0x39,
-	0x79, 0x9f, 0x78, 0x24, 0xc7, 0x78, 0xe1, 0x91, 0x1c, 0xe3, 0x83, 0x47, 0x72, 0x8c, 0x13, 0x1e,
-	0xcb, 0x31, 0x5c, 0x78, 0x2c, 0xc7, 0x70, 0xe3, 0xb1, 0x1c, 0x43, 0x94, 0x61, 0x7a, 0x66, 0x49,
-	0x46, 0x69, 0x92, 0x5e, 0x72, 0x7e, 0xae, 0x3e, 0xc4, 0xa1, 0x79, 0xa9, 0x25, 0xe5, 0xf9, 0x45,
-	0xd9, 0x50, 0x9e, 0x7e, 0x05, 0x92, 0x17, 0x4b, 0x2a, 0x0b, 0x52, 0x8b, 0x93, 0xd8, 0xc0, 0xfe,
-	0x32, 0x06, 0x04, 0x00, 0x00, 0xff, 0xff, 0x01, 0xd4, 0xcc, 0xf5, 0x03, 0x01, 0x00, 0x00,
+	// 331 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x5c, 0x51, 0x3f, 0x4f, 0xfb, 0x30,
+	0x14, 0x8c, 0xdb, 0xdf, 0x8f, 0x3f, 0x4e, 0x87, 0x2a, 0xea, 0x10, 0x65, 0x48, 0x03, 0x53, 0x26,
+	0x5b, 0x94, 0x05, 0x75, 0xa3, 0x08, 0x21, 0x84, 0x58, 0x22, 0x58, 0x58, 0xaa, 0xb4, 0x7d, 0x98,
+	0xaa, 0x49, 0x6c, 0x39, 0x2f, 0x40, 0x3f, 0x00, 0x7b, 0x3f, 0x56, 0xc7, 0x8e, 0x4c, 0x80, 0xda,
+	0x2f, 0x82, 0x12, 0x37, 0xa8, 0xea, 0x76, 0xef, 0xfc, 0x4e, 0x77, 0xe7, 0x47, 0x43, 0x15, 0xe7,
+	0x08, 0x09, 0xcf, 0x0b, 0x05, 0x3a, 0x93, 0x13, 0xe0, 0x29, 0xa0, 0x9e, 0x8e, 0xf3, 0x61, 0x2c,
+	0x84, 0x06, 0x11, 0x23, 0x30, 0xa5, 0x25, 0x4a, 0xa7, 0x6d, 0x36, 0xd9, 0xdf, 0xa6, 0xd7, 0x15,
+	0x52, 0x8a, 0x04, 0x78, 0xf5, 0x3e, 0x2a, 0x9e, 0x39, 0x4e, 0x53, 0xc8, 0x31, 0x4e, 0x95, 0x91,
+	0x78, 0x1d, 0x21, 0x85, 0xac, 0x20, 0x2f, 0x91, 0x61, 0x4f, 0x3f, 0x1a, 0xb4, 0x7d, 0x6f, 0x4c,
+	0x2e, 0x6b, 0x0f, 0xe7, 0x96, 0x1e, 0x6e, 0x8d, 0x5d, 0x12, 0x34, 0x43, 0xbb, 0xc7, 0xd9, 0xbe,
+	0x1f, 0xdb, 0x17, 0xd5, 0xc4, 0x75, 0x86, 0x7a, 0x1e, 0xd5, 0x7a, 0xe7, 0x84, 0xb6, 0x34, 0x28,
+	0xa9, 0x71, 0x38, 0x96, 0x45, 0x86, 0x6e, 0x23, 0x20, 0xe1, 0xbf, 0xc8, 0x36, 0xdc, 0x55, 0x49,
+	0x39, 0x37, 0xb4, 0x95, 0xc4, 0x39, 0x0e, 0x0b, 0x35, 0x89, 0x11, 0x26, 0x6e, 0x33, 0x20, 0xa1,
+	0xdd, 0xf3, 0x98, 0x29, 0xc4, 0xea, 0x42, 0xec, 0xa1, 0x2e, 0x34, 0x38, 0x5a, 0x7e, 0x75, 0xad,
+	0xc5, 0x77, 0x97, 0x44, 0x76, 0xa9, 0x7c, 0x34, 0x42, 0xaf, 0x4f, 0x5b, 0xbb, 0x21, 0x9c, 0x36,
+	0x6d, 0xce, 0x60, 0xee, 0x92, 0x80, 0x84, 0xc7, 0x51, 0x09, 0x9d, 0x0e, 0xfd, 0xff, 0x1a, 0x27,
+	0x05, 0x54, 0x31, 0x48, 0x64, 0x86, 0x7e, 0xe3, 0x82, 0x0c, 0xee, 0x96, 0x6b, 0x9f, 0xac, 0xd6,
+	0x3e, 0xf9, 0x59, 0xfb, 0x64, 0xb1, 0xf1, 0xad, 0xd5, 0xc6, 0xb7, 0x3e, 0x37, 0xbe, 0xf5, 0x74,
+	0x26, 0xa6, 0xf8, 0x52, 0x8c, 0xd8, 0x58, 0xa6, 0xdc, 0xfc, 0x42, 0x06, 0xf8, 0x26, 0xf5, 0x6c,
+	0x3b, 0xf1, 0xf7, 0x9d, 0x7b, 0xe1, 0x5c, 0x41, 0x3e, 0x3a, 0xa8, 0x32, 0x9f, 0xff, 0x06, 0x00,
+	0x00, 0xff, 0xff, 0x5c, 0xc7, 0x4d, 0x49, 0xd0, 0x01, 0x00, 0x00,
 }
 
 func (m *MetricsAggregate) Marshal() (dAtA []byte, err error) {
@@ -127,22 +142,36 @@ func (m *MetricsAggregate) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if m.LastUpdated != 0 {
-		i = encodeVarintMetricsAggregate(dAtA, i, uint64(m.LastUpdated))
-		i--
-		dAtA[i] = 0x18
+	n1, err1 := github_com_cosmos_gogoproto_types.StdTimeMarshalTo(m.LastUpdated, dAtA[i-github_com_cosmos_gogoproto_types.SizeOfStdTime(m.LastUpdated):])
+	if err1 != nil {
+		return 0, err1
 	}
+	i -= n1
+	i = encodeVarintMetricsAggregate(dAtA, i, uint64(n1))
+	i--
+	dAtA[i] = 0x1a
 	if m.ReportCount != 0 {
 		i = encodeVarintMetricsAggregate(dAtA, i, uint64(m.ReportCount))
 		i--
 		dAtA[i] = 0x10
 	}
 	if len(m.Metrics) > 0 {
-		i -= len(m.Metrics)
-		copy(dAtA[i:], m.Metrics)
-		i = encodeVarintMetricsAggregate(dAtA, i, uint64(len(m.Metrics)))
-		i--
-		dAtA[i] = 0xa
+		for k := range m.Metrics {
+			v := m.Metrics[k]
+			baseI := i
+			i -= 8
+			encoding_binary.LittleEndian.PutUint64(dAtA[i:], uint64(math.Float64bits(float64(v))))
+			i--
+			dAtA[i] = 0x11
+			i -= len(k)
+			copy(dAtA[i:], k)
+			i = encodeVarintMetricsAggregate(dAtA, i, uint64(len(k)))
+			i--
+			dAtA[i] = 0xa
+			i = encodeVarintMetricsAggregate(dAtA, i, uint64(baseI-i))
+			i--
+			dAtA[i] = 0xa
+		}
 	}
 	return len(dAtA) - i, nil
 }
@@ -164,16 +193,19 @@ func (m *MetricsAggregate) Size() (n int) {
 	}
 	var l int
 	_ = l
-	l = len(m.Metrics)
-	if l > 0 {
-		n += 1 + l + sovMetricsAggregate(uint64(l))
+	if len(m.Metrics) > 0 {
+		for k, v := range m.Metrics {
+			_ = k
+			_ = v
+			mapEntrySize := 1 + len(k) + sovMetricsAggregate(uint64(len(k))) + 1 + 8
+			n += mapEntrySize + 1 + sovMetricsAggregate(uint64(mapEntrySize))
+		}
 	}
 	if m.ReportCount != 0 {
 		n += 1 + sovMetricsAggregate(uint64(m.ReportCount))
 	}
-	if m.LastUpdated != 0 {
-		n += 1 + sovMetricsAggregate(uint64(m.LastUpdated))
-	}
+	l = github_com_cosmos_gogoproto_types.SizeOfStdTime(m.LastUpdated)
+	n += 1 + l + sovMetricsAggregate(uint64(l))
 	return n
 }
 
@@ -216,7 +248,7 @@ func (m *MetricsAggregate) Unmarshal(dAtA []byte) error {
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Metrics", wireType)
 			}
-			var stringLen uint64
+			var msglen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowMetricsAggregate
@@ -226,23 +258,97 @@ func (m *MetricsAggregate) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
+				msglen |= int(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
+			if msglen < 0 {
 				return ErrInvalidLengthMetricsAggregate
 			}
-			postIndex := iNdEx + intStringLen
+			postIndex := iNdEx + msglen
 			if postIndex < 0 {
 				return ErrInvalidLengthMetricsAggregate
 			}
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Metrics = string(dAtA[iNdEx:postIndex])
+			if m.Metrics == nil {
+				m.Metrics = make(map[string]float64)
+			}
+			var mapkey string
+			var mapvalue float64
+			for iNdEx < postIndex {
+				entryPreIndex := iNdEx
+				var wire uint64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowMetricsAggregate
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					wire |= uint64(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				fieldNum := int32(wire >> 3)
+				if fieldNum == 1 {
+					var stringLenmapkey uint64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowMetricsAggregate
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						stringLenmapkey |= uint64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					intStringLenmapkey := int(stringLenmapkey)
+					if intStringLenmapkey < 0 {
+						return ErrInvalidLengthMetricsAggregate
+					}
+					postStringIndexmapkey := iNdEx + intStringLenmapkey
+					if postStringIndexmapkey < 0 {
+						return ErrInvalidLengthMetricsAggregate
+					}
+					if postStringIndexmapkey > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapkey = string(dAtA[iNdEx:postStringIndexmapkey])
+					iNdEx = postStringIndexmapkey
+				} else if fieldNum == 2 {
+					var mapvaluetemp uint64
+					if (iNdEx + 8) > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapvaluetemp = uint64(encoding_binary.LittleEndian.Uint64(dAtA[iNdEx:]))
+					iNdEx += 8
+					mapvalue = math.Float64frombits(mapvaluetemp)
+				} else {
+					iNdEx = entryPreIndex
+					skippy, err := skipMetricsAggregate(dAtA[iNdEx:])
+					if err != nil {
+						return err
+					}
+					if (skippy < 0) || (iNdEx+skippy) < 0 {
+						return ErrInvalidLengthMetricsAggregate
+					}
+					if (iNdEx + skippy) > postIndex {
+						return io.ErrUnexpectedEOF
+					}
+					iNdEx += skippy
+				}
+			}
+			m.Metrics[mapkey] = mapvalue
 			iNdEx = postIndex
 		case 2:
 			if wireType != 0 {
@@ -264,10 +370,10 @@ func (m *MetricsAggregate) Unmarshal(dAtA []byte) error {
 				}
 			}
 		case 3:
-			if wireType != 0 {
+			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field LastUpdated", wireType)
 			}
-			m.LastUpdated = 0
+			var msglen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowMetricsAggregate
@@ -277,11 +383,25 @@ func (m *MetricsAggregate) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.LastUpdated |= uint64(b&0x7F) << shift
+				msglen |= int(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
+			if msglen < 0 {
+				return ErrInvalidLengthMetricsAggregate
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthMetricsAggregate
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := github_com_cosmos_gogoproto_types.StdTimeUnmarshal(&m.LastUpdated, dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipMetricsAggregate(dAtA[iNdEx:])

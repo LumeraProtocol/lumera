@@ -4,38 +4,40 @@ package supernode
 import (
 	fmt "fmt"
 	runtime "github.com/cosmos/cosmos-proto/runtime"
+	_ "github.com/cosmos/gogoproto/gogoproto"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoiface "google.golang.org/protobuf/runtime/protoiface"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	io "io"
 	reflect "reflect"
 	sync "sync"
 )
 
 var (
-	md_IpaddressHistory           protoreflect.MessageDescriptor
-	fd_IpaddressHistory_address   protoreflect.FieldDescriptor
-	fd_IpaddressHistory_updatedAt protoreflect.FieldDescriptor
-	fd_IpaddressHistory_endedAt   protoreflect.FieldDescriptor
+	md_IPAddressHistory            protoreflect.MessageDescriptor
+	fd_IPAddressHistory_address    protoreflect.FieldDescriptor
+	fd_IPAddressHistory_updated_at protoreflect.FieldDescriptor
+	fd_IPAddressHistory_ended_at   protoreflect.FieldDescriptor
 )
 
 func init() {
 	file_pastel_supernode_ip_address_history_proto_init()
-	md_IpaddressHistory = File_pastel_supernode_ip_address_history_proto.Messages().ByName("IpaddressHistory")
-	fd_IpaddressHistory_address = md_IpaddressHistory.Fields().ByName("address")
-	fd_IpaddressHistory_updatedAt = md_IpaddressHistory.Fields().ByName("updatedAt")
-	fd_IpaddressHistory_endedAt = md_IpaddressHistory.Fields().ByName("endedAt")
+	md_IPAddressHistory = File_pastel_supernode_ip_address_history_proto.Messages().ByName("IPAddressHistory")
+	fd_IPAddressHistory_address = md_IPAddressHistory.Fields().ByName("address")
+	fd_IPAddressHistory_updated_at = md_IPAddressHistory.Fields().ByName("updated_at")
+	fd_IPAddressHistory_ended_at = md_IPAddressHistory.Fields().ByName("ended_at")
 }
 
-var _ protoreflect.Message = (*fastReflection_IpaddressHistory)(nil)
+var _ protoreflect.Message = (*fastReflection_IPAddressHistory)(nil)
 
-type fastReflection_IpaddressHistory IpaddressHistory
+type fastReflection_IPAddressHistory IPAddressHistory
 
-func (x *IpaddressHistory) ProtoReflect() protoreflect.Message {
-	return (*fastReflection_IpaddressHistory)(x)
+func (x *IPAddressHistory) ProtoReflect() protoreflect.Message {
+	return (*fastReflection_IPAddressHistory)(x)
 }
 
-func (x *IpaddressHistory) slowProtoReflect() protoreflect.Message {
+func (x *IPAddressHistory) slowProtoReflect() protoreflect.Message {
 	mi := &file_pastel_supernode_ip_address_history_proto_msgTypes[0]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -47,43 +49,43 @@ func (x *IpaddressHistory) slowProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-var _fastReflection_IpaddressHistory_messageType fastReflection_IpaddressHistory_messageType
-var _ protoreflect.MessageType = fastReflection_IpaddressHistory_messageType{}
+var _fastReflection_IPAddressHistory_messageType fastReflection_IPAddressHistory_messageType
+var _ protoreflect.MessageType = fastReflection_IPAddressHistory_messageType{}
 
-type fastReflection_IpaddressHistory_messageType struct{}
+type fastReflection_IPAddressHistory_messageType struct{}
 
-func (x fastReflection_IpaddressHistory_messageType) Zero() protoreflect.Message {
-	return (*fastReflection_IpaddressHistory)(nil)
+func (x fastReflection_IPAddressHistory_messageType) Zero() protoreflect.Message {
+	return (*fastReflection_IPAddressHistory)(nil)
 }
-func (x fastReflection_IpaddressHistory_messageType) New() protoreflect.Message {
-	return new(fastReflection_IpaddressHistory)
+func (x fastReflection_IPAddressHistory_messageType) New() protoreflect.Message {
+	return new(fastReflection_IPAddressHistory)
 }
-func (x fastReflection_IpaddressHistory_messageType) Descriptor() protoreflect.MessageDescriptor {
-	return md_IpaddressHistory
+func (x fastReflection_IPAddressHistory_messageType) Descriptor() protoreflect.MessageDescriptor {
+	return md_IPAddressHistory
 }
 
 // Descriptor returns message descriptor, which contains only the protobuf
 // type information for the message.
-func (x *fastReflection_IpaddressHistory) Descriptor() protoreflect.MessageDescriptor {
-	return md_IpaddressHistory
+func (x *fastReflection_IPAddressHistory) Descriptor() protoreflect.MessageDescriptor {
+	return md_IPAddressHistory
 }
 
 // Type returns the message type, which encapsulates both Go and protobuf
 // type information. If the Go type information is not needed,
 // it is recommended that the message descriptor be used instead.
-func (x *fastReflection_IpaddressHistory) Type() protoreflect.MessageType {
-	return _fastReflection_IpaddressHistory_messageType
+func (x *fastReflection_IPAddressHistory) Type() protoreflect.MessageType {
+	return _fastReflection_IPAddressHistory_messageType
 }
 
 // New returns a newly allocated and mutable empty message.
-func (x *fastReflection_IpaddressHistory) New() protoreflect.Message {
-	return new(fastReflection_IpaddressHistory)
+func (x *fastReflection_IPAddressHistory) New() protoreflect.Message {
+	return new(fastReflection_IPAddressHistory)
 }
 
 // Interface unwraps the message reflection interface and
 // returns the underlying ProtoMessage interface.
-func (x *fastReflection_IpaddressHistory) Interface() protoreflect.ProtoMessage {
-	return (*IpaddressHistory)(x)
+func (x *fastReflection_IPAddressHistory) Interface() protoreflect.ProtoMessage {
+	return (*IPAddressHistory)(x)
 }
 
 // Range iterates over every populated field in an undefined order,
@@ -91,22 +93,22 @@ func (x *fastReflection_IpaddressHistory) Interface() protoreflect.ProtoMessage 
 // Range returns immediately if f returns false.
 // While iterating, mutating operations may only be performed
 // on the current field descriptor.
-func (x *fastReflection_IpaddressHistory) Range(f func(protoreflect.FieldDescriptor, protoreflect.Value) bool) {
+func (x *fastReflection_IPAddressHistory) Range(f func(protoreflect.FieldDescriptor, protoreflect.Value) bool) {
 	if x.Address != "" {
 		value := protoreflect.ValueOfString(x.Address)
-		if !f(fd_IpaddressHistory_address, value) {
+		if !f(fd_IPAddressHistory_address, value) {
 			return
 		}
 	}
-	if x.UpdatedAt != uint64(0) {
-		value := protoreflect.ValueOfUint64(x.UpdatedAt)
-		if !f(fd_IpaddressHistory_updatedAt, value) {
+	if x.UpdatedAt != nil {
+		value := protoreflect.ValueOfMessage(x.UpdatedAt.ProtoReflect())
+		if !f(fd_IPAddressHistory_updated_at, value) {
 			return
 		}
 	}
-	if x.EndedAt != uint64(0) {
-		value := protoreflect.ValueOfUint64(x.EndedAt)
-		if !f(fd_IpaddressHistory_endedAt, value) {
+	if x.EndedAt != nil {
+		value := protoreflect.ValueOfMessage(x.EndedAt.ProtoReflect())
+		if !f(fd_IPAddressHistory_ended_at, value) {
 			return
 		}
 	}
@@ -123,19 +125,19 @@ func (x *fastReflection_IpaddressHistory) Range(f func(protoreflect.FieldDescrip
 // In other cases (aside from the nullable cases above),
 // a proto3 scalar field is populated if it contains a non-zero value, and
 // a repeated field is populated if it is non-empty.
-func (x *fastReflection_IpaddressHistory) Has(fd protoreflect.FieldDescriptor) bool {
+func (x *fastReflection_IPAddressHistory) Has(fd protoreflect.FieldDescriptor) bool {
 	switch fd.FullName() {
-	case "pastel.supernode.IpaddressHistory.address":
+	case "pastel.supernode.IPAddressHistory.address":
 		return x.Address != ""
-	case "pastel.supernode.IpaddressHistory.updatedAt":
-		return x.UpdatedAt != uint64(0)
-	case "pastel.supernode.IpaddressHistory.endedAt":
-		return x.EndedAt != uint64(0)
+	case "pastel.supernode.IPAddressHistory.updated_at":
+		return x.UpdatedAt != nil
+	case "pastel.supernode.IPAddressHistory.ended_at":
+		return x.EndedAt != nil
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.IpaddressHistory"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.IPAddressHistory"))
 		}
-		panic(fmt.Errorf("message pastel.supernode.IpaddressHistory does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.supernode.IPAddressHistory does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -145,19 +147,19 @@ func (x *fastReflection_IpaddressHistory) Has(fd protoreflect.FieldDescriptor) b
 // associated with the given field number.
 //
 // Clear is a mutating operation and unsafe for concurrent use.
-func (x *fastReflection_IpaddressHistory) Clear(fd protoreflect.FieldDescriptor) {
+func (x *fastReflection_IPAddressHistory) Clear(fd protoreflect.FieldDescriptor) {
 	switch fd.FullName() {
-	case "pastel.supernode.IpaddressHistory.address":
+	case "pastel.supernode.IPAddressHistory.address":
 		x.Address = ""
-	case "pastel.supernode.IpaddressHistory.updatedAt":
-		x.UpdatedAt = uint64(0)
-	case "pastel.supernode.IpaddressHistory.endedAt":
-		x.EndedAt = uint64(0)
+	case "pastel.supernode.IPAddressHistory.updated_at":
+		x.UpdatedAt = nil
+	case "pastel.supernode.IPAddressHistory.ended_at":
+		x.EndedAt = nil
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.IpaddressHistory"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.IPAddressHistory"))
 		}
-		panic(fmt.Errorf("message pastel.supernode.IpaddressHistory does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.supernode.IPAddressHistory does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -167,22 +169,22 @@ func (x *fastReflection_IpaddressHistory) Clear(fd protoreflect.FieldDescriptor)
 // the default value of a bytes scalar is guaranteed to be a copy.
 // For unpopulated composite types, it returns an empty, read-only view
 // of the value; to obtain a mutable reference, use Mutable.
-func (x *fastReflection_IpaddressHistory) Get(descriptor protoreflect.FieldDescriptor) protoreflect.Value {
+func (x *fastReflection_IPAddressHistory) Get(descriptor protoreflect.FieldDescriptor) protoreflect.Value {
 	switch descriptor.FullName() {
-	case "pastel.supernode.IpaddressHistory.address":
+	case "pastel.supernode.IPAddressHistory.address":
 		value := x.Address
 		return protoreflect.ValueOfString(value)
-	case "pastel.supernode.IpaddressHistory.updatedAt":
+	case "pastel.supernode.IPAddressHistory.updated_at":
 		value := x.UpdatedAt
-		return protoreflect.ValueOfUint64(value)
-	case "pastel.supernode.IpaddressHistory.endedAt":
+		return protoreflect.ValueOfMessage(value.ProtoReflect())
+	case "pastel.supernode.IPAddressHistory.ended_at":
 		value := x.EndedAt
-		return protoreflect.ValueOfUint64(value)
+		return protoreflect.ValueOfMessage(value.ProtoReflect())
 	default:
 		if descriptor.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.IpaddressHistory"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.IPAddressHistory"))
 		}
-		panic(fmt.Errorf("message pastel.supernode.IpaddressHistory does not contain field %s", descriptor.FullName()))
+		panic(fmt.Errorf("message pastel.supernode.IPAddressHistory does not contain field %s", descriptor.FullName()))
 	}
 }
 
@@ -196,19 +198,19 @@ func (x *fastReflection_IpaddressHistory) Get(descriptor protoreflect.FieldDescr
 // empty, read-only value, then it panics.
 //
 // Set is a mutating operation and unsafe for concurrent use.
-func (x *fastReflection_IpaddressHistory) Set(fd protoreflect.FieldDescriptor, value protoreflect.Value) {
+func (x *fastReflection_IPAddressHistory) Set(fd protoreflect.FieldDescriptor, value protoreflect.Value) {
 	switch fd.FullName() {
-	case "pastel.supernode.IpaddressHistory.address":
+	case "pastel.supernode.IPAddressHistory.address":
 		x.Address = value.Interface().(string)
-	case "pastel.supernode.IpaddressHistory.updatedAt":
-		x.UpdatedAt = value.Uint()
-	case "pastel.supernode.IpaddressHistory.endedAt":
-		x.EndedAt = value.Uint()
+	case "pastel.supernode.IPAddressHistory.updated_at":
+		x.UpdatedAt = value.Message().Interface().(*timestamppb.Timestamp)
+	case "pastel.supernode.IPAddressHistory.ended_at":
+		x.EndedAt = value.Message().Interface().(*timestamppb.Timestamp)
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.IpaddressHistory"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.IPAddressHistory"))
 		}
-		panic(fmt.Errorf("message pastel.supernode.IpaddressHistory does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.supernode.IPAddressHistory does not contain field %s", fd.FullName()))
 	}
 }
 
@@ -222,48 +224,56 @@ func (x *fastReflection_IpaddressHistory) Set(fd protoreflect.FieldDescriptor, v
 // It panics if the field does not contain a composite type.
 //
 // Mutable is a mutating operation and unsafe for concurrent use.
-func (x *fastReflection_IpaddressHistory) Mutable(fd protoreflect.FieldDescriptor) protoreflect.Value {
+func (x *fastReflection_IPAddressHistory) Mutable(fd protoreflect.FieldDescriptor) protoreflect.Value {
 	switch fd.FullName() {
-	case "pastel.supernode.IpaddressHistory.address":
-		panic(fmt.Errorf("field address of message pastel.supernode.IpaddressHistory is not mutable"))
-	case "pastel.supernode.IpaddressHistory.updatedAt":
-		panic(fmt.Errorf("field updatedAt of message pastel.supernode.IpaddressHistory is not mutable"))
-	case "pastel.supernode.IpaddressHistory.endedAt":
-		panic(fmt.Errorf("field endedAt of message pastel.supernode.IpaddressHistory is not mutable"))
+	case "pastel.supernode.IPAddressHistory.updated_at":
+		if x.UpdatedAt == nil {
+			x.UpdatedAt = new(timestamppb.Timestamp)
+		}
+		return protoreflect.ValueOfMessage(x.UpdatedAt.ProtoReflect())
+	case "pastel.supernode.IPAddressHistory.ended_at":
+		if x.EndedAt == nil {
+			x.EndedAt = new(timestamppb.Timestamp)
+		}
+		return protoreflect.ValueOfMessage(x.EndedAt.ProtoReflect())
+	case "pastel.supernode.IPAddressHistory.address":
+		panic(fmt.Errorf("field address of message pastel.supernode.IPAddressHistory is not mutable"))
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.IpaddressHistory"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.IPAddressHistory"))
 		}
-		panic(fmt.Errorf("message pastel.supernode.IpaddressHistory does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.supernode.IPAddressHistory does not contain field %s", fd.FullName()))
 	}
 }
 
 // NewField returns a new value that is assignable to the field
 // for the given descriptor. For scalars, this returns the default value.
 // For lists, maps, and messages, this returns a new, empty, mutable value.
-func (x *fastReflection_IpaddressHistory) NewField(fd protoreflect.FieldDescriptor) protoreflect.Value {
+func (x *fastReflection_IPAddressHistory) NewField(fd protoreflect.FieldDescriptor) protoreflect.Value {
 	switch fd.FullName() {
-	case "pastel.supernode.IpaddressHistory.address":
+	case "pastel.supernode.IPAddressHistory.address":
 		return protoreflect.ValueOfString("")
-	case "pastel.supernode.IpaddressHistory.updatedAt":
-		return protoreflect.ValueOfUint64(uint64(0))
-	case "pastel.supernode.IpaddressHistory.endedAt":
-		return protoreflect.ValueOfUint64(uint64(0))
+	case "pastel.supernode.IPAddressHistory.updated_at":
+		m := new(timestamppb.Timestamp)
+		return protoreflect.ValueOfMessage(m.ProtoReflect())
+	case "pastel.supernode.IPAddressHistory.ended_at":
+		m := new(timestamppb.Timestamp)
+		return protoreflect.ValueOfMessage(m.ProtoReflect())
 	default:
 		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.IpaddressHistory"))
+			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.IPAddressHistory"))
 		}
-		panic(fmt.Errorf("message pastel.supernode.IpaddressHistory does not contain field %s", fd.FullName()))
+		panic(fmt.Errorf("message pastel.supernode.IPAddressHistory does not contain field %s", fd.FullName()))
 	}
 }
 
 // WhichOneof reports which field within the oneof is populated,
 // returning nil if none are populated.
 // It panics if the oneof descriptor does not belong to this message.
-func (x *fastReflection_IpaddressHistory) WhichOneof(d protoreflect.OneofDescriptor) protoreflect.FieldDescriptor {
+func (x *fastReflection_IPAddressHistory) WhichOneof(d protoreflect.OneofDescriptor) protoreflect.FieldDescriptor {
 	switch d.FullName() {
 	default:
-		panic(fmt.Errorf("%s is not a oneof field in pastel.supernode.IpaddressHistory", d.FullName()))
+		panic(fmt.Errorf("%s is not a oneof field in pastel.supernode.IPAddressHistory", d.FullName()))
 	}
 	panic("unreachable")
 }
@@ -271,7 +281,7 @@ func (x *fastReflection_IpaddressHistory) WhichOneof(d protoreflect.OneofDescrip
 // GetUnknown retrieves the entire list of unknown fields.
 // The caller may only mutate the contents of the RawFields
 // if the mutated bytes are stored back into the message with SetUnknown.
-func (x *fastReflection_IpaddressHistory) GetUnknown() protoreflect.RawFields {
+func (x *fastReflection_IPAddressHistory) GetUnknown() protoreflect.RawFields {
 	return x.unknownFields
 }
 
@@ -282,7 +292,7 @@ func (x *fastReflection_IpaddressHistory) GetUnknown() protoreflect.RawFields {
 // An empty RawFields may be passed to clear the fields.
 //
 // SetUnknown is a mutating operation and unsafe for concurrent use.
-func (x *fastReflection_IpaddressHistory) SetUnknown(fields protoreflect.RawFields) {
+func (x *fastReflection_IPAddressHistory) SetUnknown(fields protoreflect.RawFields) {
 	x.unknownFields = fields
 }
 
@@ -294,7 +304,7 @@ func (x *fastReflection_IpaddressHistory) SetUnknown(fields protoreflect.RawFiel
 // message type, but the details are implementation dependent.
 // Validity is not part of the protobuf data model, and may not
 // be preserved in marshaling or other operations.
-func (x *fastReflection_IpaddressHistory) IsValid() bool {
+func (x *fastReflection_IPAddressHistory) IsValid() bool {
 	return x != nil
 }
 
@@ -304,9 +314,9 @@ func (x *fastReflection_IpaddressHistory) IsValid() bool {
 // The returned methods type is identical to
 // "google.golang.org/protobuf/runtime/protoiface".Methods.
 // Consult the protoiface package documentation for details.
-func (x *fastReflection_IpaddressHistory) ProtoMethods() *protoiface.Methods {
+func (x *fastReflection_IPAddressHistory) ProtoMethods() *protoiface.Methods {
 	size := func(input protoiface.SizeInput) protoiface.SizeOutput {
-		x := input.Message.Interface().(*IpaddressHistory)
+		x := input.Message.Interface().(*IPAddressHistory)
 		if x == nil {
 			return protoiface.SizeOutput{
 				NoUnkeyedLiterals: input.NoUnkeyedLiterals,
@@ -322,11 +332,13 @@ func (x *fastReflection_IpaddressHistory) ProtoMethods() *protoiface.Methods {
 		if l > 0 {
 			n += 1 + l + runtime.Sov(uint64(l))
 		}
-		if x.UpdatedAt != 0 {
-			n += 1 + runtime.Sov(uint64(x.UpdatedAt))
+		if x.UpdatedAt != nil {
+			l = options.Size(x.UpdatedAt)
+			n += 1 + l + runtime.Sov(uint64(l))
 		}
-		if x.EndedAt != 0 {
-			n += 1 + runtime.Sov(uint64(x.EndedAt))
+		if x.EndedAt != nil {
+			l = options.Size(x.EndedAt)
+			n += 1 + l + runtime.Sov(uint64(l))
 		}
 		if x.unknownFields != nil {
 			n += len(x.unknownFields)
@@ -338,7 +350,7 @@ func (x *fastReflection_IpaddressHistory) ProtoMethods() *protoiface.Methods {
 	}
 
 	marshal := func(input protoiface.MarshalInput) (protoiface.MarshalOutput, error) {
-		x := input.Message.Interface().(*IpaddressHistory)
+		x := input.Message.Interface().(*IPAddressHistory)
 		if x == nil {
 			return protoiface.MarshalOutput{
 				NoUnkeyedLiterals: input.NoUnkeyedLiterals,
@@ -357,15 +369,33 @@ func (x *fastReflection_IpaddressHistory) ProtoMethods() *protoiface.Methods {
 			i -= len(x.unknownFields)
 			copy(dAtA[i:], x.unknownFields)
 		}
-		if x.EndedAt != 0 {
-			i = runtime.EncodeVarint(dAtA, i, uint64(x.EndedAt))
+		if x.EndedAt != nil {
+			encoded, err := options.Marshal(x.EndedAt)
+			if err != nil {
+				return protoiface.MarshalOutput{
+					NoUnkeyedLiterals: input.NoUnkeyedLiterals,
+					Buf:               input.Buf,
+				}, err
+			}
+			i -= len(encoded)
+			copy(dAtA[i:], encoded)
+			i = runtime.EncodeVarint(dAtA, i, uint64(len(encoded)))
 			i--
-			dAtA[i] = 0x18
+			dAtA[i] = 0x1a
 		}
-		if x.UpdatedAt != 0 {
-			i = runtime.EncodeVarint(dAtA, i, uint64(x.UpdatedAt))
+		if x.UpdatedAt != nil {
+			encoded, err := options.Marshal(x.UpdatedAt)
+			if err != nil {
+				return protoiface.MarshalOutput{
+					NoUnkeyedLiterals: input.NoUnkeyedLiterals,
+					Buf:               input.Buf,
+				}, err
+			}
+			i -= len(encoded)
+			copy(dAtA[i:], encoded)
+			i = runtime.EncodeVarint(dAtA, i, uint64(len(encoded)))
 			i--
-			dAtA[i] = 0x10
+			dAtA[i] = 0x12
 		}
 		if len(x.Address) > 0 {
 			i -= len(x.Address)
@@ -385,7 +415,7 @@ func (x *fastReflection_IpaddressHistory) ProtoMethods() *protoiface.Methods {
 		}, nil
 	}
 	unmarshal := func(input protoiface.UnmarshalInput) (protoiface.UnmarshalOutput, error) {
-		x := input.Message.Interface().(*IpaddressHistory)
+		x := input.Message.Interface().(*IPAddressHistory)
 		if x == nil {
 			return protoiface.UnmarshalOutput{
 				NoUnkeyedLiterals: input.NoUnkeyedLiterals,
@@ -417,10 +447,10 @@ func (x *fastReflection_IpaddressHistory) ProtoMethods() *protoiface.Methods {
 			fieldNum := int32(wire >> 3)
 			wireType := int(wire & 0x7)
 			if wireType == 4 {
-				return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: IpaddressHistory: wiretype end group for non-group")
+				return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: IPAddressHistory: wiretype end group for non-group")
 			}
 			if fieldNum <= 0 {
-				return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: IpaddressHistory: illegal tag %d (wire type %d)", fieldNum, wire)
+				return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: IPAddressHistory: illegal tag %d (wire type %d)", fieldNum, wire)
 			}
 			switch fieldNum {
 			case 1:
@@ -456,10 +486,10 @@ func (x *fastReflection_IpaddressHistory) ProtoMethods() *protoiface.Methods {
 				x.Address = string(dAtA[iNdEx:postIndex])
 				iNdEx = postIndex
 			case 2:
-				if wireType != 0 {
+				if wireType != 2 {
 					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: wrong wireType = %d for field UpdatedAt", wireType)
 				}
-				x.UpdatedAt = 0
+				var msglen int
 				for shift := uint(0); ; shift += 7 {
 					if shift >= 64 {
 						return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrIntOverflow
@@ -469,16 +499,33 @@ func (x *fastReflection_IpaddressHistory) ProtoMethods() *protoiface.Methods {
 					}
 					b := dAtA[iNdEx]
 					iNdEx++
-					x.UpdatedAt |= uint64(b&0x7F) << shift
+					msglen |= int(b&0x7F) << shift
 					if b < 0x80 {
 						break
 					}
 				}
+				if msglen < 0 {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
+				}
+				postIndex := iNdEx + msglen
+				if postIndex < 0 {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
+				}
+				if postIndex > l {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
+				}
+				if x.UpdatedAt == nil {
+					x.UpdatedAt = &timestamppb.Timestamp{}
+				}
+				if err := options.Unmarshal(dAtA[iNdEx:postIndex], x.UpdatedAt); err != nil {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, err
+				}
+				iNdEx = postIndex
 			case 3:
-				if wireType != 0 {
+				if wireType != 2 {
 					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: wrong wireType = %d for field EndedAt", wireType)
 				}
-				x.EndedAt = 0
+				var msglen int
 				for shift := uint(0); ; shift += 7 {
 					if shift >= 64 {
 						return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrIntOverflow
@@ -488,11 +535,28 @@ func (x *fastReflection_IpaddressHistory) ProtoMethods() *protoiface.Methods {
 					}
 					b := dAtA[iNdEx]
 					iNdEx++
-					x.EndedAt |= uint64(b&0x7F) << shift
+					msglen |= int(b&0x7F) << shift
 					if b < 0x80 {
 						break
 					}
 				}
+				if msglen < 0 {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
+				}
+				postIndex := iNdEx + msglen
+				if postIndex < 0 {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
+				}
+				if postIndex > l {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
+				}
+				if x.EndedAt == nil {
+					x.EndedAt = &timestamppb.Timestamp{}
+				}
+				if err := options.Unmarshal(dAtA[iNdEx:postIndex], x.EndedAt); err != nil {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, err
+				}
+				iNdEx = postIndex
 			default:
 				iNdEx = preIndex
 				skippy, err := runtime.Skip(dAtA[iNdEx:])
@@ -541,18 +605,18 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type IpaddressHistory struct {
+type IPAddressHistory struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Address   string `protobuf:"bytes,1,opt,name=address,proto3" json:"address,omitempty"`
-	UpdatedAt uint64 `protobuf:"varint,2,opt,name=updatedAt,proto3" json:"updatedAt,omitempty"`
-	EndedAt   uint64 `protobuf:"varint,3,opt,name=endedAt,proto3" json:"endedAt,omitempty"`
+	Address   string                 `protobuf:"bytes,1,opt,name=address,proto3" json:"address,omitempty"`
+	UpdatedAt *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	EndedAt   *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=ended_at,json=endedAt,proto3" json:"ended_at,omitempty"`
 }
 
-func (x *IpaddressHistory) Reset() {
-	*x = IpaddressHistory{}
+func (x *IPAddressHistory) Reset() {
+	*x = IPAddressHistory{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_pastel_supernode_ip_address_history_proto_msgTypes[0]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -560,36 +624,36 @@ func (x *IpaddressHistory) Reset() {
 	}
 }
 
-func (x *IpaddressHistory) String() string {
+func (x *IPAddressHistory) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*IpaddressHistory) ProtoMessage() {}
+func (*IPAddressHistory) ProtoMessage() {}
 
-// Deprecated: Use IpaddressHistory.ProtoReflect.Descriptor instead.
-func (*IpaddressHistory) Descriptor() ([]byte, []int) {
+// Deprecated: Use IPAddressHistory.ProtoReflect.Descriptor instead.
+func (*IPAddressHistory) Descriptor() ([]byte, []int) {
 	return file_pastel_supernode_ip_address_history_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *IpaddressHistory) GetAddress() string {
+func (x *IPAddressHistory) GetAddress() string {
 	if x != nil {
 		return x.Address
 	}
 	return ""
 }
 
-func (x *IpaddressHistory) GetUpdatedAt() uint64 {
+func (x *IPAddressHistory) GetUpdatedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.UpdatedAt
 	}
-	return 0
+	return nil
 }
 
-func (x *IpaddressHistory) GetEndedAt() uint64 {
+func (x *IPAddressHistory) GetEndedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.EndedAt
 	}
-	return 0
+	return nil
 }
 
 var File_pastel_supernode_ip_address_history_proto protoreflect.FileDescriptor
@@ -598,27 +662,35 @@ var file_pastel_supernode_ip_address_history_proto_rawDesc = []byte{
 	0x0a, 0x29, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2f, 0x73, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f,
 	0x64, 0x65, 0x2f, 0x69, 0x70, 0x5f, 0x61, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x5f, 0x68, 0x69,
 	0x73, 0x74, 0x6f, 0x72, 0x79, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x10, 0x70, 0x61, 0x73,
-	0x74, 0x65, 0x6c, 0x2e, 0x73, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0x22, 0x64, 0x0a,
-	0x10, 0x49, 0x70, 0x61, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x48, 0x69, 0x73, 0x74, 0x6f, 0x72,
-	0x79, 0x12, 0x18, 0x0a, 0x07, 0x61, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x18, 0x01, 0x20, 0x01,
-	0x28, 0x09, 0x52, 0x07, 0x61, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x12, 0x1c, 0x0a, 0x09, 0x75,
-	0x70, 0x64, 0x61, 0x74, 0x65, 0x64, 0x41, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x52, 0x09,
-	0x75, 0x70, 0x64, 0x61, 0x74, 0x65, 0x64, 0x41, 0x74, 0x12, 0x18, 0x0a, 0x07, 0x65, 0x6e, 0x64,
-	0x65, 0x64, 0x41, 0x74, 0x18, 0x03, 0x20, 0x01, 0x28, 0x04, 0x52, 0x07, 0x65, 0x6e, 0x64, 0x65,
-	0x64, 0x41, 0x74, 0x42, 0xc4, 0x01, 0x0a, 0x14, 0x63, 0x6f, 0x6d, 0x2e, 0x70, 0x61, 0x73, 0x74,
-	0x65, 0x6c, 0x2e, 0x73, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0x42, 0x15, 0x49, 0x70,
-	0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x48, 0x69, 0x73, 0x74, 0x6f, 0x72, 0x79, 0x50, 0x72,
-	0x6f, 0x74, 0x6f, 0x50, 0x01, 0x5a, 0x34, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f,
-	0x6d, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x6e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x2f,
-	0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2f, 0x61, 0x70, 0x69, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65,
-	0x6c, 0x2f, 0x73, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0xa2, 0x02, 0x03, 0x50, 0x53,
-	0x58, 0xaa, 0x02, 0x10, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2e, 0x53, 0x75, 0x70, 0x65, 0x72,
-	0x6e, 0x6f, 0x64, 0x65, 0xca, 0x02, 0x10, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x5c, 0x53, 0x75,
-	0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0xe2, 0x02, 0x1c, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c,
-	0x5c, 0x53, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0x5c, 0x47, 0x50, 0x42, 0x4d, 0x65,
-	0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0xea, 0x02, 0x11, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x3a,
-	0x3a, 0x53, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74,
-	0x6f, 0x33,
+	0x74, 0x65, 0x6c, 0x2e, 0x73, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0x1a, 0x1f, 0x67,
+	0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2f, 0x74,
+	0x69, 0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x1a, 0x14,
+	0x67, 0x6f, 0x67, 0x6f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x67, 0x6f, 0x67, 0x6f, 0x2e, 0x70,
+	0x72, 0x6f, 0x74, 0x6f, 0x22, 0xb2, 0x01, 0x0a, 0x10, 0x49, 0x50, 0x41, 0x64, 0x64, 0x72, 0x65,
+	0x73, 0x73, 0x48, 0x69, 0x73, 0x74, 0x6f, 0x72, 0x79, 0x12, 0x18, 0x0a, 0x07, 0x61, 0x64, 0x64,
+	0x72, 0x65, 0x73, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x61, 0x64, 0x64, 0x72,
+	0x65, 0x73, 0x73, 0x12, 0x43, 0x0a, 0x0a, 0x75, 0x70, 0x64, 0x61, 0x74, 0x65, 0x64, 0x5f, 0x61,
+	0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1a, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65,
+	0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x54, 0x69, 0x6d, 0x65, 0x73, 0x74,
+	0x61, 0x6d, 0x70, 0x42, 0x08, 0xc8, 0xde, 0x1f, 0x00, 0x90, 0xdf, 0x1f, 0x01, 0x52, 0x09, 0x75,
+	0x70, 0x64, 0x61, 0x74, 0x65, 0x64, 0x41, 0x74, 0x12, 0x3f, 0x0a, 0x08, 0x65, 0x6e, 0x64, 0x65,
+	0x64, 0x5f, 0x61, 0x74, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1a, 0x2e, 0x67, 0x6f, 0x6f,
+	0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x54, 0x69, 0x6d,
+	0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x42, 0x08, 0xc8, 0xde, 0x1f, 0x00, 0x90, 0xdf, 0x1f, 0x01,
+	0x52, 0x07, 0x65, 0x6e, 0x64, 0x65, 0x64, 0x41, 0x74, 0x42, 0xc4, 0x01, 0x0a, 0x14, 0x63, 0x6f,
+	0x6d, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2e, 0x73, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f,
+	0x64, 0x65, 0x42, 0x15, 0x49, 0x70, 0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x48, 0x69, 0x73,
+	0x74, 0x6f, 0x72, 0x79, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x50, 0x01, 0x5a, 0x34, 0x67, 0x69, 0x74,
+	0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x6e, 0x65,
+	0x74, 0x77, 0x6f, 0x72, 0x6b, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2f, 0x61, 0x70, 0x69,
+	0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2f, 0x73, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64,
+	0x65, 0xa2, 0x02, 0x03, 0x50, 0x53, 0x58, 0xaa, 0x02, 0x10, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c,
+	0x2e, 0x53, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0xca, 0x02, 0x10, 0x50, 0x61, 0x73,
+	0x74, 0x65, 0x6c, 0x5c, 0x53, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0xe2, 0x02, 0x1c,
+	0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x5c, 0x53, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65,
+	0x5c, 0x47, 0x50, 0x42, 0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0xea, 0x02, 0x11, 0x50,
+	0x61, 0x73, 0x74, 0x65, 0x6c, 0x3a, 0x3a, 0x53, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65,
+	0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -635,14 +707,17 @@ func file_pastel_supernode_ip_address_history_proto_rawDescGZIP() []byte {
 
 var file_pastel_supernode_ip_address_history_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
 var file_pastel_supernode_ip_address_history_proto_goTypes = []interface{}{
-	(*IpaddressHistory)(nil), // 0: pastel.supernode.IpaddressHistory
+	(*IPAddressHistory)(nil),      // 0: pastel.supernode.IPAddressHistory
+	(*timestamppb.Timestamp)(nil), // 1: google.protobuf.Timestamp
 }
 var file_pastel_supernode_ip_address_history_proto_depIdxs = []int32{
-	0, // [0:0] is the sub-list for method output_type
-	0, // [0:0] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	1, // 0: pastel.supernode.IPAddressHistory.updated_at:type_name -> google.protobuf.Timestamp
+	1, // 1: pastel.supernode.IPAddressHistory.ended_at:type_name -> google.protobuf.Timestamp
+	2, // [2:2] is the sub-list for method output_type
+	2, // [2:2] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_pastel_supernode_ip_address_history_proto_init() }
@@ -652,7 +727,7 @@ func file_pastel_supernode_ip_address_history_proto_init() {
 	}
 	if !protoimpl.UnsafeEnabled {
 		file_pastel_supernode_ip_address_history_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*IpaddressHistory); i {
+			switch v := v.(*IPAddressHistory); i {
 			case 0:
 				return &v.state
 			case 1:

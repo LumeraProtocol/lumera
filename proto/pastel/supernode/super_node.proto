@@ -3,16 +3,25 @@ package pastel.supernode;
 
 option go_package = "github.com/pastelnetwork/pastel/x/supernode/types";
 
+import "cosmos/base/v1beta1/coin.proto";
+import "cosmos_proto/cosmos.proto";
+import "google/protobuf/timestamp.proto";
+import "gogoproto/gogo.proto";
+import "pastel/supernode/evidence.proto";
+import "pastel/supernode/metrics_aggregate.proto";
+import "pastel/supernode/ip_address_history.proto";
+import "pastel/supernode/supernode_state.proto";
+
 message SuperNode {
-  
-  string validatorAddress = 1; 
-  string ipAddress = 2; 
-  string state = 3; 
-  repeated string evidence = 4; 
-  uint64 lastTimeActive = 5; 
-  uint64 lastTimeDisabled = 6; 
-  uint64 startedAt = 7; 
-  repeated string prevIpAddresses = 8; 
-  string version = 9; 
-  string metrics = 10; 
+
+  string validator_address = 1 [(cosmos_proto.scalar) = "cosmos.ValidatorAddressString"];
+  string ip_address = 2;
+  SuperNodeState state = 3 [(gogoproto.moretags) = "yaml:\"state\""];
+  repeated Evidence evidence = 4;
+  google.protobuf.Timestamp last_time_active = 5 [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
+  google.protobuf.Timestamp last_time_disabled = 6 [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
+  google.protobuf.Timestamp started_at = 7 [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
+  repeated IPAddressHistory prev_ip_addresses = 8;
+  string version = 9;
+  MetricsAggregate metrics = 10;
 }

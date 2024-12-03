@@ -27,15 +27,20 @@ deps:
     commit: dc427cb4519143d8996361c045a29ad7
     digest: shake256:f6611c56170e2cb6354fa6e367a225fed7b8b0defca3252f05e842fe311be46997680ebf57d8644b52c1f2cca49b366ffe89ce5e8db5fd055a15259c88e4e41e
   - remote: buf.build
+    owner: cosmwasm
+    repository: wasmd
+    commit: 193990ad71b74a7cbc0acf56bb2e808b
+    digest: shake256:83c37b5591f7d8cc99e46bdd25c40cb19754ba8ebd2f191d99b7586c6bea45050a459ce1ace9539381cfae32f3ae1cedf0f7f9bbfbfbc7d750dcb8b9535d41a7
+  - remote: buf.build
     owner: googleapis
     repository: googleapis
-    commit: f52d4f76a8434cc5966798b1d3b4f110
-    digest: shake256:71566dd80e39b7d85fdaa9b7f82107385181d5b6d17ea56c0aacce61099b35f9f1bcf7333ad9838ca19d24d7f076b039de7c9c09c55d23bb4c2fddfceff4d2c2
+    commit: c0913f24652a4cfc95f77d97443a5005
+    digest: shake256:0ef3248c6235d420fe61f373154adcde6b94e3297f82472b1d8d8c3747240b61b4a10405e2a6f8ac1c98816ac6e690ea7871024aa5ae0e035cd540214667ceed
   - remote: buf.build
     owner: protocolbuffers
     repository: wellknowntypes
-    commit: d59b7d45e69d4e129a1b797e2766f067
-    digest: shake256:e4bb315f5a90aace88fe39709c831eda8eb0ce66b4cf947065888100b9867c2eb9a0f61f6b8d73c51b1fcccdfe8611090f55ce5db1aee6901ec9b4e6d8fa8e52
+    commit: 384f8deef6ae4110b57d996aad0032c4
+    digest: shake256:2ed272f48ab530c2581a71237043ce20e93724aa2e84f0ac555e82d7dca8061ee530d0e5f91835f1b7374b8db179ab2a75e8452af71ceb2285f411de8816bec3
   - remote: buf.build
     owner: tendermint
     repository: tendermint

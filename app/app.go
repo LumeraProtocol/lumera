@@ -76,6 +76,8 @@ import (
 	ibckeeper "github.com/cosmos/ibc-go/v8/modules/core/keeper"
 
 	pastelidmodulekeeper "github.com/pastelnetwork/pastel/x/pastelid/keeper"
+	supernodemodulekeeper "github.com/pastelnetwork/pastel/x/supernode/keeper"
+
 	// this line is used by starport scaffolding # stargate/app/moduleImport
 
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
@@ -149,6 +151,7 @@ type App struct {
 	WasmKeeper       wasmkeeper.Keeper
 	ScopedWasmKeeper capabilitykeeper.ScopedKeeper
 
+	SupernodeKeeper supernodemodulekeeper.Keeper
 	// this line is used by starport scaffolding # stargate/app/keeperDeclaration
 
 	// simulation manager
@@ -253,6 +256,7 @@ func New(
 		&app.GroupKeeper,
 		&app.CircuitBreakerKeeper,
 		&app.PastelidKeeper,
+		&app.SupernodeKeeper,
 		// this line is used by starport scaffolding # stargate/app/keeperDefinition
 	); err != nil {
 		panic(err)

@@ -1,12 +1,9 @@
-package pastelid
+package supernode
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-
-	"cosmossdk.io/client/v2/autocli"
-	"github.com/spf13/cobra"
 
 	"cosmossdk.io/core/appmodule"
 	"cosmossdk.io/core/store"
@@ -23,10 +20,9 @@ import (
 
 	// this line is used by starport scaffolding # 1
 
-	modulev1 "github.com/pastelnetwork/pastel/api/pastel/pastelid/module"
-	"github.com/pastelnetwork/pastel/x/pastelid/client/cli"
-	"github.com/pastelnetwork/pastel/x/pastelid/keeper"
-	"github.com/pastelnetwork/pastel/x/pastelid/types"
+	modulev1 "github.com/pastelnetwork/pastel/api/pastel/supernode/module"
+	"github.com/pastelnetwork/pastel/x/supernode/keeper"
+	"github.com/pastelnetwork/pastel/x/supernode/types"
 )
 
 var (
@@ -39,8 +35,6 @@ var (
 	_ appmodule.AppModule       = (*AppModule)(nil)
 	_ appmodule.HasBeginBlocker = (*AppModule)(nil)
 	_ appmodule.HasEndBlocker   = (*AppModule)(nil)
-
-	_ autocli.HasCustomTxCommand = (*AppModule)(nil)
 )
 
 // ----------------------------------------------------------------------------
@@ -104,14 +98,6 @@ type AppModule struct {
 	keeper        keeper.Keeper
 	accountKeeper types.AccountKeeper
 	bankKeeper    types.BankKeeper
-}
-
-func (am AppModule) HasCustomTxCommand() bool {
-	return true
-}
-
-func (am AppModule) GetTxCmd() *cobra.Command {
-	return cli.GetTxCmd()
 }
 
 func NewAppModule(
@@ -194,15 +180,17 @@ type ModuleInputs struct {
 	Config       *modulev1.Module
 	Logger       log.Logger
 
-	AccountKeeper types.AccountKeeper
-	BankKeeper    types.BankKeeper
+	AccountKeeper  types.AccountKeeper
+	BankKeeper     types.BankKeeper
+	StakingKeeper  types.StakingKeeper
+	SlashingKeeper types.SlashingKeeper
 }
 
 type ModuleOutputs struct {
 	depinject.Out
 
-	PastelidKeeper keeper.Keeper
-	Module         appmodule.AppModule
+	SupernodeKeeper keeper.Keeper
+	Module          appmodule.AppModule
 }
 
 func ProvideModule(in ModuleInputs) ModuleOutputs {
@@ -217,7 +205,8 @@ func ProvideModule(in ModuleInputs) ModuleOutputs {
 		in.Logger,
 		authority.String(),
 		in.BankKeeper,
-		in.AccountKeeper,
+		in.StakingKeeper,
+		in.SlashingKeeper,
 	)
 	m := NewAppModule(
 		in.Cdc,
@@ -226,5 +215,5 @@ func ProvideModule(in ModuleInputs) ModuleOutputs {
 		in.BankKeeper,
 	)
 
-	return ModuleOutputs{PastelidKeeper: k, Module: m}
+	return ModuleOutputs{SupernodeKeeper: k, Module: m}
 }

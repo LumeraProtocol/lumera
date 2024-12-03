@@ -5,6 +5,7 @@ app:
   address_prefix: pastel
 
 build:
+  main: cmd/pastel
   binary: pasteld
 
 # total supply: 20,000,000,000 psl    --> 20,000,000,000,000,000 upsl

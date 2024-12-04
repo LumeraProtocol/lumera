@@ -1,0 +1,33 @@
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y \
+    curl \
+    jq \
+    bash \
+    sed \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy binary and make it executable 
+COPY pasteld /usr/local/bin/pasteld
+COPY libwasmvm.x86_64.so /usr/lib/
+RUN chmod +x /usr/local/bin/pasteld && ldconfig
+
+# Create scripts directory and copy scripts
+RUN mkdir -p /root/scripts
+
+# Copy scripts with correct paths
+COPY primary-validator.sh /root/scripts/primary-validator.sh
+COPY secondary-validator.sh /root/scripts/secondary-validator.sh
+
+RUN chmod +x /root/scripts/primary-validator.sh && \
+    chmod +x /root/scripts/secondary-validator.sh
+
+# Expose necessary ports
+EXPOSE 26656 26657 1317 9090
+
+# Set working directory
+WORKDIR /root
+
+# Create directory for chain data
+RUN mkdir -p /root/.pasteld

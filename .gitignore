@@ -9,3 +9,8 @@ release/
 *.ign
 *.test
 *.out
+devnet/docker-compose.yml
+libwasmvm.x86_64.so
+pasteld
+devnet/primary-validator.sh
+devnet/secondary-validator.sh

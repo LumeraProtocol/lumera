@@ -166,7 +166,7 @@ Key initialization sequence from `primary-validator.go`
 ```bash
 # 1. Initialize chain with configuration
 mkdir -p /root/.pastel/config
-pasteld init validator1 --chain-id pastel-testnet --overwrite
+pasteld init validator1 --chain-id pastel-devnet --overwrite
 
 # 2. Update denominations in genesis
 cat /root/.pastel/config/genesis.json | jq '.app_state.staking.params.bond_denom = "upsl"' > tmp_genesis.json
@@ -202,7 +202,7 @@ echo "true" > /shared/genesis_accounts_ready
 
 # 5. Create primary gentx
 pasteld genesis gentx alice 900000000000000upsl \
-    --chain-id pastel-testnet \
+    --chain-id pastel-devnet \
     --keyring-backend test
 
 # 6. Wait for other validators
@@ -265,14 +265,14 @@ done
 cp -r /shared/keyring-test /root/.pastel/keyring-test
 
 # 4. Initialize chain
-pasteld init $MONIKER --chain-id pastel-testnet --overwrite
+pasteld init $MONIKER --chain-id pastel-devnet --overwrite
 
 # 5. Copy initial genesis
 cp /shared/genesis.json /root/.pastel/config/genesis.json
 
 # 6. Create and share gentx
 pasteld genesis gentx $KEY_NAME $STAKE_AMOUNT \
-    --chain-id pastel-testnet \
+    --chain-id pastel-devnet \
     --keyring-backend test
 
 mkdir -p /shared/gentx
@@ -438,7 +438,7 @@ VALIDATOR1_IP=$(cat ~/shared/validator1_ip)
 rm -rf ~/.pasteld
 
 # Initialize node with same chain-id
-pasteld init my-local-node --chain-id pastel-testnet
+pasteld init my-local-node --chain-id pastel-devnet
 ```
 
 #### 3. Copy Genesis
@@ -497,7 +497,7 @@ pasteld query staking validators
 pasteld query gov proposals
 
 # Transaction commands
-pasteld tx bank send <from> <to> 1000upsl --chain-id pastel-testnet --keyring-backend test
+pasteld tx bank send <from> <to> 1000upsl --chain-id pastel-devnet --keyring-backend test
 ```
 
 #### Common Operations

@@ -1,4 +1,5 @@
 syntax = "proto3";
+
 package pastel.supernode;
 
 import "amino/amino.proto";
@@ -6,25 +7,55 @@ import "gogoproto/gogo.proto";
 import "google/api/annotations.proto";
 import "cosmos/base/query/v1beta1/pagination.proto";
 import "pastel/supernode/params.proto";
+import "pastel/supernode/super_node.proto";
 
 option go_package = "github.com/pastelnetwork/pastel/x/supernode/types";
 
 // Query defines the gRPC querier service.
 service Query {
+  
   // Parameters queries the parameters of the module.
-  rpc Params(QueryParamsRequest) returns (QueryParamsResponse) {
+  rpc Params (QueryParamsRequest) returns (QueryParamsResponse) {
     option (google.api.http).get = "/pastelnetwork/pastel/supernode/params";
+  
+  }
+  
+  // Queries a list of GetSuperNode items.
+  rpc GetSuperNode (QueryGetSuperNodeRequest) returns (QueryGetSuperNodeResponse) {
+    option (google.api.http).get = "/pastelnetwork/pastel/supernode/get_super_node/{validatorAddress}";
+  
+  }
+  
+  // Queries a list of ListSuperNodes items.
+  rpc ListSuperNodes (QueryListSuperNodesRequest) returns (QueryListSuperNodesResponse) {
+    option (google.api.http).get = "/pastelnetwork/pastel/supernode/list_super_nodes";
+  
   }
 }
-
 // QueryParamsRequest is request type for the Query/Params RPC method.
 message QueryParamsRequest {}
 
 // QueryParamsResponse is response type for the Query/Params RPC method.
 message QueryParamsResponse {
+  
   // params holds all the parameters of this module.
-  Params params = 1 [
-    (gogoproto.nullable) = false,
-    (amino.dont_omitempty) = true
-  ];
+  Params params = 1 [(gogoproto.nullable) = false, (amino.dont_omitempty) = true];
 }
+
+message QueryGetSuperNodeRequest {
+  string validatorAddress = 1;
+}
+
+message QueryGetSuperNodeResponse {
+  string supernode = 1;
+}
+
+message QueryListSuperNodesRequest {
+  cosmos.base.query.v1beta1.PageRequest pagination = 1;
+}
+
+message QueryListSuperNodesResponse {
+  SuperNode                              supernodes = 1;
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+

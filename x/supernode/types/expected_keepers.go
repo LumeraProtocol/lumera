@@ -1,9 +1,12 @@
 package types
 
+//go:generate mockgen -destination=../mocks/expected_keepers_mock.go -package=supernodemocks -source=expected_keepers.go
+
 import (
 	"context"
-	sdkmath "cosmossdk.io/math"
 	"time"
+
+	sdkmath "cosmossdk.io/math"
 
 	"cosmossdk.io/core/address"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -13,7 +16,8 @@ import (
 // StakingKeeper defines the expected interface for the Staking module.
 type StakingKeeper interface {
 	ConsensusAddressCodec() address.Codec
-	ValidatorByConsAddr(context.Context, sdk.ConsAddress) (stakingtypes.ValidatorI, error)
+	Validator(context.Context, sdk.ValAddress) (stakingtypes.ValidatorI, error)            // get a particular validator by operator address
+	ValidatorByConsAddr(context.Context, sdk.ConsAddress) (stakingtypes.ValidatorI, error) // get a particular validator by consensus address
 }
 
 // SlashingKeeper defines the expected interface for the Slashing module.

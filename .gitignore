@@ -19,4 +19,4 @@ __devnet_deploy_test
 devnet-deploy.tar.gz
 
 repomix-*
-
+.repomixignore

@@ -1,14 +1,17 @@
 package types
 
 import (
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"testing"
 
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
-	"github.com/pastelnetwork/pastel/testutil/sample"
 	"github.com/stretchr/testify/require"
 )
 
 func TestMsgRegisterSupernode_ValidateBasic(t *testing.T) {
+	valAddr := sdk.ValAddress([]byte("validator"))
+	creatorAddr := sdk.AccAddress(valAddr)
+
 	tests := []struct {
 		name string
 		msg  MsgRegisterSupernode
@@ -17,13 +20,17 @@ func TestMsgRegisterSupernode_ValidateBasic(t *testing.T) {
 		{
 			name: "invalid address",
 			msg: MsgRegisterSupernode{
-				Creator: "invalid_address",
+				Creator:          "invalid_address",
+				ValidatorAddress: valAddr.String(),
 			},
 			err: sdkerrors.ErrInvalidAddress,
 		}, {
 			name: "valid address",
 			msg: MsgRegisterSupernode{
-				Creator: sample.AccAddress(),
+				Creator:          creatorAddr.String(),
+				ValidatorAddress: valAddr.String(),
+				IpAddress:        "192.168.1.1",
+				Version:          "1.0.0",
 			},
 		},
 	}

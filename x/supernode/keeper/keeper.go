@@ -64,3 +64,8 @@ func (k Keeper) GetAuthority() string {
 func (k Keeper) Logger() log.Logger {
 	return k.logger.With("module", fmt.Sprintf("x/%s", types.ModuleName))
 }
+
+// GetCodec returns the codec
+func (k Keeper) GetCodec() codec.BinaryCodec {
+	return k.cdc
+}

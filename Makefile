@@ -3,8 +3,8 @@
 # Find validator directories dynamically
 VALIDATOR_DIRS := $(wildcard ~/validator*-data)
 
-
-build:
+### Devnet
+devnet-build:
 	go get github.com/CosmWasm/wasmvm/v2@v2.1.2 && \
 	ignite chain build --release -t linux:amd64 && \
 	tar -xf release/pastel*.tar.gz -C release && \
@@ -15,17 +15,17 @@ build:
 	go run . && \
 	docker-compose build
 
-up:
+devnet-up:
 	cd devnet && \
 	docker-compose build && \
 	docker-compose up
 
-up-detach:
+devnet-up-detach:
 	cd devnet && \
 	docker-compose build && \
 	docker-compose up -d
 
-up-clean:
+devnet-up-clean:
 	rm -rf ~/shared $(VALIDATOR_DIRS) && \
 	cd devnet && \
 	go mod tidy && \
@@ -33,13 +33,13 @@ up-clean:
 	docker-compose build && \
 	docker-compose up
 
-
-down:
+devnet-down:
 	cd devnet && \
 	docker-compose down --remove-orphans
 
-clean:
+devnet-clean:
 	sudo rm -rf ~/shared $(VALIDATOR_DIRS)
+
 ### Testing
 unit-tests:
 	@echo "Running unit tests..."

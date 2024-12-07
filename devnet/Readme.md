@@ -377,9 +377,18 @@ services:
 ## 7. Usage Guide
 
 ### 7.1 Build and Setup
+
+> Be sure there is only ONE version of the `wasmvm` go package.
+> ```bash
+> ls -l ~/go/pkg/mod/github.com/\!cosm\!wasm/wasmvm/
+> total 4.0K
+> dr-xr-xr-x 13 user user 4.0K Oct 22 13:56 v2@v2.1.2
+> ```
+> If you have multiple versions, remove all of them and run `make devnet-build` again.  
+
 ```bash
 # Full build process
-make build    
+make devnet-build    
 # 1. Downloads WasmVM v2.1.2 library
 # 2. Builds chain binary with Ignite
 # 3. Extracts binary from release archive
@@ -390,22 +399,22 @@ make build
 # 6. Builds Docker images
 
 # Clean old data
-make clean   # Removes ~/shared and all ~/validator*-data directories
+make devnet-clean   # Removes ~/shared and all ~/validator*-data directories
 ```
 
 ### 7.2 Network Operations
 ```bash
 # Start network with console output
-make up
+make devnet-up
 
 # Start network in background
-make up-detach
+make devnet-up-detach
 
 # Clean start (removes old data and regenerates configs)
-make up-clean
+make devnet-up-clean
 
 # Stop network and cleanup containers
-make down
+make devnet-down
 ```
 
 ### 7.3 Network Files Location
@@ -432,6 +441,12 @@ VALIDATOR1_IP=$(cat ~/shared/validator1_ip)
 # e.g., 172.20.0.2
 ```
 
+> NOTE: It might be better to use `localhost` instead of validators internal docker IP address.
+> ```bash
+> VALIDATOR1_IP=localhost
+> ```
+
+
 #### 2. Initialize New Node
 ```bash
 # Clean previous data (if needed)
@@ -444,7 +459,7 @@ pasteld init my-local-node --chain-id pastel-devnet
 #### 3. Copy Genesis
 ```bash
 # Copy from validator1's data directory /shared
-cp ~/validator1-data/config/genesis.json ~/.pasteld/config/
+cp ~/validator1-data/config/genesis.json ~/.pastel/config/
 ```
 
 #### 4. Start Node

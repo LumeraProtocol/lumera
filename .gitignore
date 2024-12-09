@@ -14,3 +14,9 @@ libwasmvm.x86_64.so
 pasteld
 devnet/primary-validator.sh
 devnet/secondary-validator.sh
+
+__devnet_deploy_test
+devnet-deploy.tar.gz
+
+repomix-*
+

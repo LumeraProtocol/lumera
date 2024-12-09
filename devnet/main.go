@@ -1,19 +1,45 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"gen/config"
 	"gen/generators"
 	"log"
+	"os"
 )
 
 func main() {
-	config, validators, err := config.LoadConfigs()
+	useExistingGenesis := os.Getenv("EXTERNAL_GENESIS_FILE") == "1"
+	fmt.Printf("Use existing genesis: %v\n", useExistingGenesis)
+
+	cfg, validators, err := config.LoadConfigs()
 	if err != nil {
 		log.Fatalf("Failed to load configurations: %v", err)
 	}
 
-	compose, err := generators.GenerateDockerCompose(config, validators)
+	if useExistingGenesis {
+		data, err := os.ReadFile("/tmp/pastel-devnet/shared/external_genesis.json")
+		if err != nil {
+			log.Fatalf("Failed to read existing genesis file: %v", err)
+		}
+		var genesis map[string]interface{}
+		if err := json.Unmarshal(data, &genesis); err != nil {
+			log.Fatalf("Failed to parse existing genesis file: %v", err)
+		}
+
+		genesisChainID, ok := genesis["chain_id"].(string)
+		if !ok {
+			log.Fatalf("chain_id not found or not a string in existing genesis")
+		}
+
+		if genesisChainID != cfg.Chain.ID {
+			log.Fatalf("Existing genesis chain_id (%s) does not match config chain_id (%s)",
+				genesisChainID, cfg.Chain.ID)
+		}
+	}
+
+	compose, err := generators.GenerateDockerCompose(cfg, validators, useExistingGenesis)
 	if err != nil {
 		log.Fatalf("Failed to generate docker-compose configuration: %v", err)
 	}
@@ -23,14 +49,14 @@ func main() {
 		log.Fatalf("Failed to write docker-compose.yml: %v", err)
 	}
 
-	err = generators.GeneratePrimaryValidatorScript(config, validators)
+	err = generators.GeneratePrimaryValidatorScript(cfg, validators, useExistingGenesis)
 	if err != nil {
-		log.Fatalf("Failed to generate validator script: %v", err)
+		log.Fatalf("Failed to generate primary validator script: %v", err)
 	}
 
-	err = generators.GenerateSecondaryValidatorScript(config, validators)
+	err = generators.GenerateSecondaryValidatorScript(cfg, validators)
 	if err != nil {
-		log.Fatalf("Failed to generate validator script: %v", err)
+		log.Fatalf("Failed to generate secondary validator script: %v", err)
 	}
 
 	fmt.Println("Successfully generated docker-compose.yml")

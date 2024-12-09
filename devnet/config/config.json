@@ -1,6 +1,6 @@
 {
     "chain": {
-        "id": "pastel-devnet",
+        "id": "pastel-devnet-1",
         "denom": {
             "bond": "upsl",
             "mint": "upsl",

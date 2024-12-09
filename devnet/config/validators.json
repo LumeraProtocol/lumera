@@ -2,7 +2,7 @@
   {
     "name": "validator1",
     "moniker": "validator1",
-    "key_name": "alice",
+    "key_name": "validator1_key",
     "port": 26656,
     "rpc_port": 26657,
     "rest_port": 1317,
@@ -15,7 +15,7 @@
   {
     "name": "validator2",
     "moniker": "validator2",
-    "key_name": "bob",
+    "key_name": "validator2_key",
     "port": 26666,
     "rpc_port": 26667,
     "rest_port": 1327,
@@ -28,7 +28,7 @@
   {
     "name": "validator3",
     "moniker": "validator3",
-    "key_name": "carol",
+    "key_name": "validator3_key",
     "port": 26676,
     "rpc_port": 26677,
     "rest_port": 1337,
@@ -41,7 +41,7 @@
   {
     "name": "validator4",
     "moniker": "validator4",
-    "key_name": "dave",
+    "key_name": "validator4_key",
     "port": 26686,
     "rpc_port": 26687,
     "rest_port": 1347,
@@ -54,7 +54,7 @@
   {
     "name": "validator5",
     "moniker": "validator5",
-    "key_name": "eve",
+    "key_name": "validator5_key",
     "port": 26696,
     "rpc_port": 26697,
     "rest_port": 1357,

@@ -23,9 +23,9 @@ func NewSecondaryScriptBuilder(config *confg.ChainConfig, validators []confg.Val
 
 func (sb *SecondaryScriptBuilder) addScriptParameters() {
 	sb.lines = append(sb.lines, []string{
-		`if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then`,
-		`    echo "Error: Key name, stake amount, and moniker are required"`,
-		`    echo "Usage: $0 <key-name> <stake-amount> <moniker>"`,
+		`if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ] || [ -z "$4" ]; then`,
+		`    echo "Error: Key name, stake amount, moniker, and balance are required"`,
+		`    echo "Usage: $0 <key-name> <stake-amount> <moniker> <balance>"`,
 		"    exit 1",
 		"fi",
 		"",
@@ -34,6 +34,7 @@ func (sb *SecondaryScriptBuilder) addScriptParameters() {
 		"KEY_NAME=$1",
 		"STAKE_AMOUNT=$2",
 		"MONIKER=$3",
+		"BALANCE=$4",
 		"",
 		fmt.Sprintf("mkdir -p /root/%s/config", sb.config.Paths.Directories.Daemon),
 	}...)
@@ -41,14 +42,11 @@ func (sb *SecondaryScriptBuilder) addScriptParameters() {
 
 func (sb *SecondaryScriptBuilder) waitForPrimaryInit() {
 	sb.lines = append(sb.lines, []string{
-		"# Wait for primary validator setup and files",
+		"# Wait for primary validator to set up accounts",
 		`echo "Waiting for primary validator to set up accounts..."`,
 		"while [ ! -f /shared/genesis_accounts_ready ]; do",
 		"    sleep 1",
 		"done",
-		"",
-		"# Copy keyring",
-		fmt.Sprintf("cp -r /shared/keyring-test /root/%s/keyring-test", sb.config.Paths.Directories.Daemon),
 		"",
 	}...)
 }
@@ -62,16 +60,26 @@ func (sb *SecondaryScriptBuilder) initAndCreateGentx() {
 			sb.config.Daemon.Binary, sb.config.Chain.ID),
 		"",
 		fmt.Sprintf("    cp /shared/genesis.json /root/%s/config/genesis.json", sb.config.Paths.Directories.Daemon),
-		"    # Verify account exists and has balance before creating gentx",
-		`    echo "Verifying account balance..."`,
 		"",
-		"    # Create gentx with mandatory parameters",
+		fmt.Sprintf("	%s keys add $KEY_NAME --keyring-backend %s",
+			sb.config.Daemon.Binary, sb.config.Daemon.KeyringBackend),
+		"",
+		fmt.Sprintf(`    echo "Adding genesis account for $KEY_NAME..."`),
+		fmt.Sprintf("    ADDR=$(%s keys show $KEY_NAME -a --keyring-backend %s)",
+			sb.config.Daemon.Binary, sb.config.Daemon.KeyringBackend),
+		fmt.Sprintf("    %s genesis add-genesis-account $ADDR $BALANCE",
+			sb.config.Daemon.Binary),
+		`    echo "Creating gentx for ${MONIKER}..."`,
 		fmt.Sprintf("    %s genesis gentx $KEY_NAME $STAKE_AMOUNT \\", sb.config.Daemon.Binary),
 		fmt.Sprintf("        --chain-id %s \\", sb.config.Chain.ID),
-		fmt.Sprintf("        --keyring-backend %s \\", sb.config.Daemon.KeyringBackend),
-		"    # Share gentx",
+		fmt.Sprintf("        --keyring-backend %s", sb.config.Daemon.KeyringBackend),
+
+		"    # Share gentx and address with primary validator",
+		"    mkdir -p /shared/addresses",
+		fmt.Sprintf("    echo $BALANCE > /shared/addresses/${ADDR}"),
 		"    mkdir -p /shared/gentx",
 		fmt.Sprintf("    cp /root/%s/config/gentx/* /shared/gentx/${MONIKER}_gentx.json", sb.config.Paths.Directories.Daemon),
+
 		"else",
 		`    echo "Secondary validator $MONIKER already initialized..."`,
 		"fi",
@@ -104,7 +112,7 @@ func (sb *SecondaryScriptBuilder) setupPeers() {
 		"# Initialize empty PEERS string",
 		`PEERS=""`,
 		"",
-		"# Wait for and collect all other validators' node IDs",
+		"# Wait for and collect all other validators' node IDs and IPs",
 	}...)
 
 	var waitConditions []string
@@ -113,7 +121,6 @@ func (sb *SecondaryScriptBuilder) setupPeers() {
 			fmt.Sprintf("/shared/%s_nodeid", validator.Name),
 			fmt.Sprintf("/shared/%s_ip", validator.Name))
 	}
-
 	sb.lines = append(sb.lines, fmt.Sprintf(
 		"while [[ ! -f %s ]]; do",
 		strings.Join(waitConditions, " || ! -f "),

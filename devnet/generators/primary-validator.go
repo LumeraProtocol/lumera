@@ -8,30 +8,46 @@ import (
 )
 
 type PrimaryScriptBuilder struct {
-	config     *confg.ChainConfig
-	validators []confg.Validator
-	lines      []string
+	config             *confg.ChainConfig
+	validators         []confg.Validator
+	lines              []string
+	useExistingGenesis bool
 }
 
-func NewPrimaryScriptBuilder(config *confg.ChainConfig, validators []confg.Validator) *PrimaryScriptBuilder {
+func NewPrimaryScriptBuilder(config *confg.ChainConfig, validators []confg.Validator, useExistingGenesis bool) *PrimaryScriptBuilder {
 	return &PrimaryScriptBuilder{
-		config:     config,
-		validators: validators,
-		lines:      []string{"#!/bin/bash", "set -e\n"},
+		config:             config,
+		validators:         validators,
+		lines:              []string{"#!/bin/bash", "set -e\n"},
+		useExistingGenesis: useExistingGenesis,
 	}
 }
 
 func (sb *PrimaryScriptBuilder) addInitAndDenom() {
 	sb.lines = append(sb.lines, []string{
-		fmt.Sprintf("mkdir -p /root/%s/config", sb.config.Paths.Directories.Daemon),
-		"",
 		fmt.Sprintf(`if [[ ! -f /root/%s/config/genesis.json ]] || [[ ! -f /root/%s/config/priv_validator_key.json ]]; then`,
 			sb.config.Paths.Directories.Daemon, sb.config.Paths.Directories.Daemon),
 		fmt.Sprintf(`    echo "First time initialization for primary validator %s..."`, sb.validators[0].Moniker),
 		"",
+		fmt.Sprintf("mkdir -p /root/%s/config", sb.config.Paths.Directories.Daemon),
+		"",
 		fmt.Sprintf("    %s init %s --chain-id %s --overwrite",
 			sb.config.Daemon.Binary, sb.validators[0].Moniker, sb.config.Chain.ID),
 		"",
+	}...)
+
+	if sb.useExistingGenesis {
+		sb.lines = append(sb.lines, []string{
+			`if [ ! -f /shared/external_genesis.json ]; then`,
+			`    echo "ERROR: /shared/external_genesis.json not found. Please provide an existing genesis."`,
+			`    exit 1`,
+			`fi`,
+			`echo "Copying existing genesis file..."`,
+			fmt.Sprintf("cp /shared/external_genesis.json /root/%s/config/genesis.json", sb.config.Paths.Directories.Daemon),
+		}...)
+	}
+
+	sb.lines = append(sb.lines, []string{
 		"    # Update bond denomination",
 		fmt.Sprintf(`    cat /root/%s/config/genesis.json | jq '.app_state.staking.params.bond_denom = "%s"' > /root/%s/config/tmp_genesis.json`,
 			sb.config.Paths.Directories.Daemon, sb.config.Chain.Denom.Bond, sb.config.Paths.Directories.Daemon),
@@ -64,29 +80,26 @@ func (sb *PrimaryScriptBuilder) addInitAndDenom() {
 	}...)
 }
 
-func (sb *PrimaryScriptBuilder) addAccountsAndGenesis() {
-	sb.lines = append(sb.lines, "\n    # Create all accounts and add to genesis")
-	for _, validator := range sb.validators {
-		sb.lines = append(sb.lines,
-			fmt.Sprintf(`    echo "Creating key for %s..."`, validator.KeyName),
-			fmt.Sprintf("    %s keys add %s --keyring-backend %s",
-				sb.config.Daemon.Binary, validator.KeyName, sb.config.Daemon.KeyringBackend),
-			"",
-			fmt.Sprintf(`    echo "Adding genesis account for %s..."`, validator.KeyName),
-			fmt.Sprintf("    ADDR=$(%s keys show %s -a --keyring-backend %s)",
-				sb.config.Daemon.Binary, validator.KeyName, sb.config.Daemon.KeyringBackend),
-			fmt.Sprintf("    %s genesis add-genesis-account $ADDR %s",
-				sb.config.Daemon.Binary, validator.InitialDistribution.AccountBalance),
-			"")
-	}
+func (sb *PrimaryScriptBuilder) addOwnAccountAndGenesis() {
+	sb.lines = append(sb.lines, "\n    # Create account for ${} and add to genesis")
+	sb.lines = append(sb.lines,
+		fmt.Sprintf(`    echo "Creating key for %s..."`, sb.validators[0].KeyName),
+		fmt.Sprintf("    %s keys add %s --keyring-backend %s",
+			sb.config.Daemon.Binary, sb.validators[0].KeyName, sb.config.Daemon.KeyringBackend),
+		"",
+		fmt.Sprintf(`    echo "Adding genesis account for %s..."`, sb.validators[0].KeyName),
+		fmt.Sprintf("    ADDR=$(%s keys show %s -a --keyring-backend %s)",
+			sb.config.Daemon.Binary, sb.validators[0].KeyName, sb.config.Daemon.KeyringBackend),
+		fmt.Sprintf("    %s genesis add-genesis-account $ADDR %s",
+			sb.config.Daemon.Binary, sb.validators[0].InitialDistribution.AccountBalance),
+		"")
 }
 
 func (sb *PrimaryScriptBuilder) shareAndCreateGentx() {
 	sb.lines = append(sb.lines, []string{
 		"    # Share keyring and genesis",
-		`    echo "Primary validator sharing keyring and genesis..."`,
+		`    echo "Primary validator sharing genesis..."`,
 		"    mkdir -p /shared",
-		fmt.Sprintf("    cp -r /root/%s/keyring-test /shared/keyring-test", sb.config.Paths.Directories.Daemon),
 		fmt.Sprintf("    cp /root/%s/config/genesis.json /shared/genesis.json", sb.config.Paths.Directories.Daemon),
 		"",
 		"    mkdir -p /shared/gentx",
@@ -112,10 +125,23 @@ func (sb *PrimaryScriptBuilder) waitAndCollectGentx() {
 		"        sleep 2",
 		"    done",
 		"",
+		`    echo "Primary validator collecting validators addresses..."`,
+		fmt.Sprintf("for file in /shared/addresses/*; do"),
+		fmt.Sprintf("    echo Processing $file"),
+		fmt.Sprintf("    if [[ -f \"$file\" ]]; then"),
+		fmt.Sprintf("        BALANCE=$(cat \"$file\")"),
+		fmt.Sprintf("        ADDR=$(basename $file)"),
+		fmt.Sprintf("        echo Adding $ADDR with balance $BALANCE"),
+		fmt.Sprintf("        %s genesis add-genesis-account $ADDR $BALANCE", sb.config.Daemon.Binary),
+		fmt.Sprintf("    fi"),
+		fmt.Sprintf("done"),
+
 		`    echo "Primary validator collecting gentxs..."`,
 		fmt.Sprintf("    mkdir -p /root/%s/config/gentx", sb.config.Paths.Directories.Daemon),
 		fmt.Sprintf("    cp /shared/gentx/*.json /root/%s/config/gentx/", sb.config.Paths.Directories.Daemon),
 		fmt.Sprintf("    %s genesis collect-gentxs", sb.config.Daemon.Binary),
+		"",
+		"    # Distribute final genesis",
 		fmt.Sprintf("    cp /root/%s/config/genesis.json /shared/final_genesis.json", sb.config.Paths.Directories.Daemon),
 		`    echo "true" > /shared/setup_complete`,
 		"else",
@@ -184,11 +210,11 @@ func (sb *PrimaryScriptBuilder) addStartCommand() {
 	}...)
 }
 
-func GeneratePrimaryValidatorScript(config *confg.ChainConfig, validators []confg.Validator) error {
-	sb := NewPrimaryScriptBuilder(config, validators)
+func GeneratePrimaryValidatorScript(config *confg.ChainConfig, validators []confg.Validator, useExistingGenesis bool) error {
+	sb := NewPrimaryScriptBuilder(config, validators, useExistingGenesis)
 
 	sb.addInitAndDenom()
-	sb.addAccountsAndGenesis()
+	sb.addOwnAccountAndGenesis()
 	sb.shareAndCreateGentx()
 	sb.waitAndCollectGentx()
 	sb.setupPeers()

@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"os"
 
 	storetypes "cosmossdk.io/store/types"
 	"github.com/CosmWasm/wasmd/x/wasm"
@@ -40,6 +41,9 @@ func (app *App) registerWasmModules(
 		return nil, fmt.Errorf("error while reading wasm config: %s", err)
 	}
 
+	if os.Getenv("SYSTEM_TESTS") == "true" {
+		DefaultNodeHome = setupEnv()
+	}
 	// The last arguments can contain custom message handlers, and custom query handlers,
 	// if we want to allow any custom callbacks
 	app.WasmKeeper = wasmkeeper.NewKeeper(
@@ -149,4 +153,13 @@ func (app *App) setAnteHandler(txConfig client.TxConfig, wasmConfig wasmtypes.Wa
 	// Set the AnteHandler for the app
 	app.SetAnteHandler(anteHandler)
 	return nil
+}
+
+func setupEnv() string {
+	tempDir, err := os.MkdirTemp("", "test-env-*")
+	if err != nil {
+		return ""
+	}
+	os.RemoveAll(tempDir)
+	return tempDir
 }

@@ -26,6 +26,8 @@ type KeeperIntegrationSuite struct {
 
 // SetupSuite initializes the integration test suite
 func (suite *KeeperIntegrationSuite) SetupSuite() {
+	os.Setenv("SYSTEM_TESTS", "true")
+
 	suite.app = app.Setup(suite.T())
 	suite.ctx = suite.app.BaseApp.NewContext(true)
 
@@ -54,6 +56,7 @@ func (suite *KeeperIntegrationSuite) TestGetAuthorityIntegration() {
 
 // TestLoggerIntegration tests the Logger method in an integration context
 func (suite *KeeperIntegrationSuite) TestLoggerIntegration() {
+
 	testCases := []struct {
 		name   string
 		logger log.Logger

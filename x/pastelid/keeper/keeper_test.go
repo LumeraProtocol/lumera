@@ -1,12 +1,13 @@
 package keeper_test
 
 import (
+	"os"
+	"testing"
+
 	"cosmossdk.io/log"
 	"cosmossdk.io/store"
 	"cosmossdk.io/store/metrics"
 	storetypes "cosmossdk.io/store/types"
-	"os"
-	"testing"
 
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	dbm "github.com/cosmos/cosmos-db"

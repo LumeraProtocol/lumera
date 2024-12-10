@@ -1,9 +1,6 @@
 package app
 
 import (
-	"cosmossdk.io/depinject"
-	"cosmossdk.io/log"
-	sdkmath "cosmossdk.io/math"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +9,10 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"cosmossdk.io/depinject"
+	"cosmossdk.io/log"
+	sdkmath "cosmossdk.io/math"
 
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	abci "github.com/cometbft/cometbft/abci/types"

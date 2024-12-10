@@ -1,0 +1,24 @@
+syntax = "proto3";
+package pastel.claim;
+
+import "amino/amino.proto";
+import "gogoproto/gogo.proto";
+import "pastel/claim/params.proto";
+import "pastel/claim/claim_record.proto";
+import "cosmos_proto/cosmos.proto";
+import "cosmos/base/v1beta1/coin.proto";
+
+
+option go_package = "github.com/pastelnetwork/pastel/x/claim/types";
+
+// GenesisState defines the claim module's genesis state.
+message GenesisState {
+  // params defines all the parameters of the module.
+  Params params = 1 [
+    (gogoproto.nullable) = false,
+    (amino.dont_omitempty) = true
+  ];
+  repeated ClaimRecord claim_records = 2 [(gogoproto.nullable) = false];
+  string module_account = 3 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  uint64 total_claimable_amount = 4;
+}

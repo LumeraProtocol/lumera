@@ -1,0 +1,21 @@
+syntax = "proto3";
+package pastel.claim;
+
+option go_package = "github.com/pastelnetwork/pastel/x/claim/types";
+import "gogoproto/gogo.proto";
+import "cosmos/base/v1beta1/coin.proto";
+import "amino/amino.proto";
+import "google/protobuf/timestamp.proto";
+
+
+message ClaimRecord {
+  string oldAddress = 1;
+  repeated cosmos.base.v1beta1.Coin balance = 2 [
+    (gogoproto.nullable) = false,
+    (amino.dont_omitempty) = true,
+    (gogoproto.castrepeated) = "github.com/cosmos/cosmos-sdk/types.Coins",
+    (amino.encoding) = "legacy_coins"
+  ];
+  bool claimed = 3 [(gogoproto.jsontag) = "claimed", (amino.dont_omitempty) = true];
+  int64 claimTime = 4 ;
+}

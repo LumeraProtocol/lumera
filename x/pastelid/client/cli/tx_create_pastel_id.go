@@ -4,9 +4,10 @@ import (
 	"bufio"
 	"encoding/hex"
 	"fmt"
-	"github.com/spf13/cobra"
 	"os"
 	"time"
+
+	"github.com/spf13/cobra"
 
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/flags"

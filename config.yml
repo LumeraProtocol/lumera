@@ -38,14 +38,32 @@ validators:
     bonded: '5000000000000upsl'
 
 genesis:
-  chain_id: pastel-1
+  chain_id: pastel-devnet-1
   app_state:
+    distribution:
+      params:
+        community_tax: 0.020000000000000000,
+        base_proposer_reward: 0.010000000000000000,
+        bonus_proposer_reward: 0.040000000000000000
     staking:
       params:
         bond_denom: upsl
+        max_validators: 100
+        unbonding_time: '1814400s'
     mint:
       params:
         mint_denom: upsl
+        inflation_min: 0.050000000000000000,
+        inflation_max: 0.200000000000000000,
+        inflation_rate_change: 0.150000000000000000,
+        goal_bonded: 0.670000000000000000,
+        blocks_per_year”: 3942000
+    slashing:
+      params:
+        downtime_jail_duration: 600s,
+        min_signed_per_window: 0.500000000000000000,
+        slash_fraction_double_sign: 0.050000000000000000,
+        slash_fraction_downtime: 0.010000000000000000
     crisis:
       constant_fee:
         denom: upsl

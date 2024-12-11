@@ -82,15 +82,39 @@ jobs:
           echo "- is_release_type_latest: $is_release_type_latest"
           echo "- tarball_prefix: ${repo_name}_${tag_name}"
 
-      - name: Issue Release Assets
-        uses: ignite/cli/actions/cli@main
-        with:
-          args: chain build --release --release.prefix ${{ steps.vars.outputs.tarball_prefix }} -y -t linux:amd64 #-t darwin:amd64 -t darwin:arm64 -y
+      - name: Install Specific Ignite CLI Version
+        run: |
+          IGNITE_VERSION="v0.28.6"  # Corrected latest version
+          ARCH="linux_amd64"
+
+          # Download the checksum file
+          curl -L "https://github.com/ignite/cli/releases/download/${IGNITE_VERSION}/ignite_${IGNITE_VERSION#v}_checksums.txt" -o checksums.txt
+
+          # Extract the expected checksum for the specific architecture from the checksum file
+          EXPECTED_CHECKSUM=$(grep "ignite_${IGNITE_VERSION#v}_${ARCH}.tar.gz" checksums.txt | awk '{print $1}')
+
+          # Download the Ignite CLI release tarball
+          curl -L "https://github.com/ignite/cli/releases/download/${IGNITE_VERSION}/ignite_${IGNITE_VERSION#v}_${ARCH}.tar.gz" -o ignite.tar.gz
+
+          # Verify the checksum
+          ACTUAL_CHECKSUM=$(sha256sum ignite.tar.gz | awk '{print $1}')
+          if [ "$ACTUAL_CHECKSUM" != "$EXPECTED_CHECKSUM" ]; then
+            echo "Error: Checksum mismatch!"
+            exit 1
+          fi
+
+          # Extract and make executable
+          tar -xzf ignite.tar.gz
+          chmod +x ignite
+
+      - name: Build with Ignite CLI
+        run: |
+          ./ignite chain build --release --release.prefix ${{ steps.vars.outputs.tarball_prefix }} -y -t linux:amd64 #-t darwin:amd64 -t darwin:arm64 -y
         env:
           DO_NOT_TRACK: 1
           GOFLAGS: "-buildvcs=false"
 
-      # Add this step to fix permissions
+      # Fix permissions
       - name: Fix Release Directory Permissions
         run: |
           sudo chown -R $USER:$USER release/
@@ -102,17 +126,17 @@ jobs:
         with:
           tag_name: ${{ steps.vars.outputs.tag_name }}
           delete_release: true
-          github_token: ${{ secrets.GITHUB_TOKEN }}  # Changed from env to with
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish the Release
         uses: softprops/action-gh-release@v0.1.15
-        if: success()  # Added condition
+        if: success()
         with:
           tag_name: ${{ steps.vars.outputs.tag_name }}
           files: release/*
           prerelease: ${{ github.ref != 'refs/heads/master' }}
           generate_release_notes: true
-          body: |                    # Added detailed body
+          body: |
             Release ${{ steps.vars.outputs.tag_name }}
             
             This release was automatically generated from ${{ github.ref_name }}.

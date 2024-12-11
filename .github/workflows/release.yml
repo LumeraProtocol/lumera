@@ -84,7 +84,7 @@ jobs:
 
       - name: Install Specific Ignite CLI Version
         run: |
-          IGNITE_VERSION="v0.28.6"  # Corrected latest version
+          IGNITE_VERSION="v28.6.0"
           ARCH="linux_amd64"
 
           # Download the checksum file

@@ -67,7 +67,7 @@ jobs:
             echo "Building latest release"
           else
             # Other pushes - use branch name or commit SHA
-            tag_name="test-${GITHUB_REF_NAME:-${GITHUB_SHA:0:7}}"
+            tag_name="test-${GITHUB_REF_NAME//\//_:-${GITHUB_SHA:0:7}}"
             is_release_type_latest=false
             echo "Building test release: $tag_name"
           fi

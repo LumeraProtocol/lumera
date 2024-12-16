@@ -31,6 +31,12 @@ service Query {
     option (google.api.http).get = "/pastelnetwork/pastel/supernode/list_super_nodes";
   
   }
+  
+  // Queries a list of GetTopSuperNodesForBlock items.
+  rpc GetTopSuperNodesForBlock (QueryGetTopSuperNodesForBlockRequest) returns (QueryGetTopSuperNodesForBlockResponse) {
+    option (google.api.http).get = "/pastelnetwork/pastel/supernode/get_top_super_nodes_for_block/{blockHeight}";
+  
+  }
 }
 // QueryParamsRequest is request type for the Query/Params RPC method.
 message QueryParamsRequest {}
@@ -57,5 +63,13 @@ message QueryListSuperNodesRequest {
 message QueryListSuperNodesResponse {
   SuperNode                              supernodes = 1;
   cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+message QueryGetTopSuperNodesForBlockRequest {
+  int32 blockHeight = 1;
+}
+
+message QueryGetTopSuperNodesForBlockResponse {
+  SuperNode supernodes = 1;
 }
 

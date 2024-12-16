@@ -1,10 +1,11 @@
 package keeper_test
 
 import (
+	"testing"
+
 	"cosmossdk.io/math"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	"testing"
 
 	"cosmossdk.io/log"
 	"cosmossdk.io/store"
@@ -22,7 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/pastelnetwork/pastel/x/supernode/keeper"
-	"github.com/pastelnetwork/pastel/x/supernode/mocks"
+	supernodemocks "github.com/pastelnetwork/pastel/x/supernode/mocks"
 	"github.com/pastelnetwork/pastel/x/supernode/types"
 )
 

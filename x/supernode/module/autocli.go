@@ -31,6 +31,13 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{},
 				},
 
+				{
+					RpcMethod:      "GetTopSuperNodesForBlock",
+					Use:            "get-top-super-nodes-for-block [block-height]",
+					Short:          "Query get-top-super-nodes-for-block",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "blockHeight"}},
+				},
+
 				// this line is used by ignite scaffolding # autocli/query
 			},
 		},

@@ -1,9 +1,10 @@
 package system_test
 
 import (
-	"github.com/pastelnetwork/pastel/tests/system"
 	"testing"
 	"time"
+
+	"github.com/pastelnetwork/pastel/tests/system"
 
 	"github.com/cometbft/cometbft/libs/rand"
 	"github.com/stretchr/testify/assert"

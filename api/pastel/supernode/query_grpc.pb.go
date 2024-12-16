@@ -8,6 +8,7 @@ package supernode
 
 import (
 	context "context"
+
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -19,9 +20,10 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	Query_Params_FullMethodName         = "/pastel.supernode.Query/Params"
-	Query_GetSuperNode_FullMethodName   = "/pastel.supernode.Query/GetSuperNode"
-	Query_ListSuperNodes_FullMethodName = "/pastel.supernode.Query/ListSuperNodes"
+	Query_Params_FullMethodName                   = "/pastel.supernode.Query/Params"
+	Query_GetSuperNode_FullMethodName             = "/pastel.supernode.Query/GetSuperNode"
+	Query_ListSuperNodes_FullMethodName           = "/pastel.supernode.Query/ListSuperNodes"
+	Query_GetTopSuperNodesForBlock_FullMethodName = "/pastel.supernode.Query/GetTopSuperNodesForBlock"
 )
 
 // QueryClient is the client API for Query service.
@@ -34,6 +36,8 @@ type QueryClient interface {
 	GetSuperNode(ctx context.Context, in *QueryGetSuperNodeRequest, opts ...grpc.CallOption) (*QueryGetSuperNodeResponse, error)
 	// Queries a list of ListSuperNodes items.
 	ListSuperNodes(ctx context.Context, in *QueryListSuperNodesRequest, opts ...grpc.CallOption) (*QueryListSuperNodesResponse, error)
+	// Queries a list of GetTopSuperNodesForBlock items.
+	GetTopSuperNodesForBlock(ctx context.Context, in *QueryGetTopSuperNodesForBlockRequest, opts ...grpc.CallOption) (*QueryGetTopSuperNodesForBlockResponse, error)
 }
 
 type queryClient struct {
@@ -71,6 +75,15 @@ func (c *queryClient) ListSuperNodes(ctx context.Context, in *QueryListSuperNode
 	return out, nil
 }
 
+func (c *queryClient) GetTopSuperNodesForBlock(ctx context.Context, in *QueryGetTopSuperNodesForBlockRequest, opts ...grpc.CallOption) (*QueryGetTopSuperNodesForBlockResponse, error) {
+	out := new(QueryGetTopSuperNodesForBlockResponse)
+	err := c.cc.Invoke(ctx, Query_GetTopSuperNodesForBlock_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // QueryServer is the server API for Query service.
 // All implementations must embed UnimplementedQueryServer
 // for forward compatibility
@@ -81,6 +94,8 @@ type QueryServer interface {
 	GetSuperNode(context.Context, *QueryGetSuperNodeRequest) (*QueryGetSuperNodeResponse, error)
 	// Queries a list of ListSuperNodes items.
 	ListSuperNodes(context.Context, *QueryListSuperNodesRequest) (*QueryListSuperNodesResponse, error)
+	// Queries a list of GetTopSuperNodesForBlock items.
+	GetTopSuperNodesForBlock(context.Context, *QueryGetTopSuperNodesForBlockRequest) (*QueryGetTopSuperNodesForBlockResponse, error)
 	mustEmbedUnimplementedQueryServer()
 }
 
@@ -96,6 +111,9 @@ func (UnimplementedQueryServer) GetSuperNode(context.Context, *QueryGetSuperNode
 }
 func (UnimplementedQueryServer) ListSuperNodes(context.Context, *QueryListSuperNodesRequest) (*QueryListSuperNodesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListSuperNodes not implemented")
+}
+func (UnimplementedQueryServer) GetTopSuperNodesForBlock(context.Context, *QueryGetTopSuperNodesForBlockRequest) (*QueryGetTopSuperNodesForBlockResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetTopSuperNodesForBlock not implemented")
 }
 func (UnimplementedQueryServer) mustEmbedUnimplementedQueryServer() {}
 
@@ -164,6 +182,24 @@ func _Query_ListSuperNodes_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Query_GetTopSuperNodesForBlock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryGetTopSuperNodesForBlockRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(QueryServer).GetTopSuperNodesForBlock(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Query_GetTopSuperNodesForBlock_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(QueryServer).GetTopSuperNodesForBlock(ctx, req.(*QueryGetTopSuperNodesForBlockRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Query_ServiceDesc is the grpc.ServiceDesc for Query service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -182,6 +218,10 @@ var Query_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListSuperNodes",
 			Handler:    _Query_ListSuperNodes_Handler,
+		},
+		{
+			MethodName: "GetTopSuperNodesForBlock",
+			Handler:    _Query_GetTopSuperNodesForBlock_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -142,7 +142,7 @@ func (sb *SecondaryScriptBuilder) setupPeers() {
 		`        if [ ! -z "$PEERS" ]; then`,
 		`            PEERS="$PEERS,"`,
 		"        fi",
-		`        PEERS="${PEERS}${NODE_ID}@${NODE_IP}:26656"`,
+		`        PEERS="${PEERS}${NODE_ID}@${NODE_IP}:$(cat /shared/${v}_port)"`,
 		"    fi",
 		"done",
 		"",

@@ -19,13 +19,13 @@ devnet-build:
 		echo "No external genesis file provided or file not found. Using default initialization..."; \
 		export EXTERNAL_GENESIS_FILE=0; \
 	fi; \
-	go get github.com/CosmWasm/wasmvm/v2@v2.1.2 && \
-	ignite chain build --release -t linux:amd64 && \
-	tar -xf release/pastel*.tar.gz -C release && \
-	cp release/pasteld devnet/ && \
+#	go get github.com/CosmWasm/wasmvm/v2@v2.1.2 && \
+#	ignite chain build --release -t linux:amd64 && \
+#	tar -xf release/pastel*.tar.gz -C release && \
+#	cp release/pasteld devnet/ && \
 	cd devnet && \
-	find $$(go env GOPATH)/pkg/mod -name "libwasmvm.x86_64.so" -exec cp {} ./libwasmvm.x86_64.so \; && \
-	go mod tidy && \
+#	find $$(go env GOPATH)/pkg/mod -name "libwasmvm.x86_64.so" -exec cp {} ./libwasmvm.x86_64.so \; && \
+#	go mod tidy && \
 	go run . && \
 	docker-compose build
 

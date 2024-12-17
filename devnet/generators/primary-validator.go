@@ -151,12 +151,18 @@ func (sb *PrimaryScriptBuilder) waitAndCollectGentx() {
 }
 
 func (sb *PrimaryScriptBuilder) setupPeers() {
+	for _, validator := range sb.validators {
+		sb.lines = append(sb.lines, []string{
+			fmt.Sprintf("echo %d > /shared/%s_port", validator.Port, validator.Name),
+		}...)
+	}
+
 	sb.lines = append(sb.lines, []string{
 		"# Setup peer connections",
 		fmt.Sprintf("nodeid=$(%s tendermint show-node-id)", sb.config.Daemon.Binary),
-		"echo $nodeid > /shared/validator1_nodeid",
+		fmt.Sprintf("echo $nodeid > /shared/%s_nodeid", sb.validators[0].Name),
 		"ip=$(hostname -i)",
-		"echo $ip > /shared/validator1_ip",
+		fmt.Sprintf("echo $ip > /shared/%s_ip", sb.validators[0].Name),
 		"",
 		"# Wait for other validators' node IDs and IPs",
 	}...)
@@ -187,7 +193,7 @@ func (sb *PrimaryScriptBuilder) setupPeers() {
 		sb.lines = append(sb.lines,
 			fmt.Sprintf(`%s=$(cat /shared/%s_nodeid)`, nodeVars[i], validator.Name),
 			fmt.Sprintf(`%s_IP=$(cat /shared/%s_ip)`, validator.Name, validator.Name),
-			fmt.Sprintf(`peerPart%d="${%s}@${%s_IP}:26656"`, i, nodeVars[i], validator.Name))
+			fmt.Sprintf(`peerPart%d="${%s}@${%s_IP}:%d"`, i, nodeVars[i], validator.Name, validator.Port))
 		peerParts = append(peerParts, fmt.Sprintf("$peerPart%d", i))
 	}
 

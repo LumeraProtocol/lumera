@@ -53,7 +53,7 @@ message QueryGetSuperNodeRequest {
 }
 
 message QueryGetSuperNodeResponse {
-  string supernode = 1;
+  SuperNode supernode = 1;
 }
 
 message QueryListSuperNodesRequest {
@@ -61,7 +61,7 @@ message QueryListSuperNodesRequest {
 }
 
 message QueryListSuperNodesResponse {
-  SuperNode                              supernodes = 1;
+  repeated SuperNode                              supernodes = 1;
   cosmos.base.query.v1beta1.PageResponse pagination = 2;
 }
 
@@ -70,6 +70,6 @@ message QueryGetTopSuperNodesForBlockRequest {
 }
 
 message QueryGetTopSuperNodesForBlockResponse {
-  SuperNode supernodes = 1;
+  repeated SuperNode supernodes = 1;
 }
 

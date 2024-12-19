@@ -4,18 +4,17 @@ package supernode
 import (
 	binary "encoding/binary"
 	fmt "fmt"
-	io "io"
-	math "math"
-	reflect "reflect"
-	sort "sort"
-	sync "sync"
-
 	runtime "github.com/cosmos/cosmos-proto/runtime"
 	_ "github.com/cosmos/gogoproto/gogoproto"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoiface "google.golang.org/protobuf/runtime/protoiface"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	io "io"
+	math "math"
+	reflect "reflect"
+	sort "sort"
+	sync "sync"
 )
 
 var _ protoreflect.Map = (*_MetricsAggregate_1_map)(nil)

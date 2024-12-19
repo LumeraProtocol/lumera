@@ -4,16 +4,17 @@ import (
 	"testing"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/stretchr/testify/require"
-
 	"github.com/pastelnetwork/pastel/x/supernode/types"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMsgUpdateParams(t *testing.T) {
 	k, ms, ctx := setupMsgServer(t)
 	params := types.DefaultParams()
-	require.NoError(t, k.SetParams(ctx, params))
 	wctx := sdk.UnwrapSDKContext(ctx)
+
+	// Use wctx instead of sdk.Context{}
+	require.NoError(t, k.SetParams(wctx, params))
 
 	// default params
 	testCases := []struct {
@@ -32,7 +33,7 @@ func TestMsgUpdateParams(t *testing.T) {
 			expErrMsg: "invalid authority",
 		},
 		{
-			name: "send enabled param",
+			name: "empty params but valid authority",
 			input: &types.MsgUpdateParams{
 				Authority: k.GetAuthority(),
 				Params:    types.Params{},
@@ -50,8 +51,9 @@ func TestMsgUpdateParams(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := ms.UpdateParams(wctx, tc.input)
+			_, err := ms.UpdateParams(ctx, tc.input)
 
 			if tc.expErr {
 				require.Error(t, err)

@@ -93,7 +93,7 @@ func (m *SuperNode) GetState() SuperNodeState {
 	if m != nil {
 		return m.State
 	}
-	return Unspecified
+	return SuperNodeStateUnspecified
 }
 
 func (m *SuperNode) GetEvidence() []*Evidence {

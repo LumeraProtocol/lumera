@@ -22,7 +22,7 @@ func (s *SuperNode) Validate() error {
 	}
 
 	// Check if state is valid (not unspecified)
-	if s.State == Unspecified {
+	if s.State == SuperNodeStateUnspecified {
 		return ErrInvalidSuperNodeState
 	}
 

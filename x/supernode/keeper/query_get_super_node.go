@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// GetSuperNode returns the supernode for the given validator address
 func (k Keeper) GetSuperNode(goCtx context.Context, req *types.QueryGetSuperNodeRequest) (*types.QueryGetSuperNodeResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
@@ -16,8 +17,15 @@ func (k Keeper) GetSuperNode(goCtx context.Context, req *types.QueryGetSuperNode
 
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
-	// TODO: Process the query
-	_ = ctx
+	valOperAddr, err := sdk.ValAddressFromBech32(req.ValidatorAddress)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid validator address: %v", err)
+	}
 
-	return &types.QueryGetSuperNodeResponse{}, nil
+	sn, found := k.QuerySuperNode(ctx, valOperAddr)
+	if !found {
+		return nil, status.Errorf(codes.NotFound, "no supernode found for validator %s", req.ValidatorAddress)
+	}
+
+	return &types.QueryGetSuperNodeResponse{Supernode: &sn}, nil
 }

@@ -26,7 +26,7 @@ func TestSuperNodeValidation(t *testing.T) {
 			supernode: types.SuperNode{
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "192.168.1.1",
-				State:            types.Active,
+				State:            types.SuperNodeStateActive,
 				Evidence:         []*types.Evidence{},
 				LastTimeActive:   currentTime,
 				StartedAt:        currentTime,
@@ -44,7 +44,7 @@ func TestSuperNodeValidation(t *testing.T) {
 			supernode: types.SuperNode{
 				ValidatorAddress: "invalid",
 				IpAddress:        "192.168.1.1",
-				State:            types.Active,
+				State:            types.SuperNodeStateActive,
 				Version:          "1.0.0",
 			},
 			expectError: true,
@@ -54,7 +54,7 @@ func TestSuperNodeValidation(t *testing.T) {
 			supernode: types.SuperNode{
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "",
-				State:            types.Active,
+				State:            types.SuperNodeStateActive,
 				Version:          "1.0.0",
 			},
 			expectError: true,
@@ -65,7 +65,7 @@ func TestSuperNodeValidation(t *testing.T) {
 			supernode: types.SuperNode{
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "192.168.1.1",
-				State:            types.Unspecified,
+				State:            types.SuperNodeStateUnspecified,
 				Version:          "1.0.0",
 			},
 			expectError: true,
@@ -76,7 +76,7 @@ func TestSuperNodeValidation(t *testing.T) {
 			supernode: types.SuperNode{
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "192.168.1.1",
-				State:            types.Active,
+				State:            types.SuperNodeStateActive,
 				Version:          "",
 			},
 			expectError: true,

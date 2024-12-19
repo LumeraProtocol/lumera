@@ -4,7 +4,6 @@ import (
 	"context"
 
 	errorsmod "cosmossdk.io/errors"
-	"cosmossdk.io/math"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -32,56 +31,26 @@ func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types.MsgRegist
 			"validator %s is jailed and cannot register a supernode", msg.ValidatorAddress)
 	}
 
-	// Convert creator address (cosmos1...) to AccAddress for comparison
-	creatorAddr, err := sdk.AccAddressFromBech32(msg.Creator)
-	if err != nil {
-		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidAddress, "invalid creator address: %s", err)
-	}
-
-	// Verify the creator matches the validator's operator account
-	valAccAddr := sdk.AccAddress(valOperAddr) // Convert ValAddress to AccAddress for comparison
-	if !creatorAddr.Equals(valAccAddr) {
-		return nil, errorsmod.Wrapf(sdkerrors.ErrUnauthorized,
-			"creator account %s is not the validator operator account %s",
-			creatorAddr, valAccAddr)
-	}
-
-	// Get store from storeService
-	store := k.storeService.OpenKVStore(ctx)
-
-	// Check if a SuperNode already exists for this validator
-	key := types.GetSupernodeKey(valOperAddr)
-	has, err := store.Has(key)
-	if err != nil {
+	// Verify the signer is authorized
+	if err := k.verifyValidatorOperator(ctx, valOperAddr, msg.Creator); err != nil {
 		return nil, err
 	}
-	if has {
+
+	// Check if a SuperNode already exists
+	_, found := k.QuerySuperNode(ctx, valOperAddr) // assume we have GetSuperNode implemented
+	if found {
 		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode already exists for validator %s", msg.ValidatorAddress)
 	}
 
-	// Check eligibility: either bonded (in active set) OR has minimum stake
-	isBonded := validator.IsBonded()
-	if !isBonded {
-		// Not in active set, check minimum stake
-		minStake := k.GetParams(ctx).MinimumStakeForSn
-		stake := validator.GetTokens()
-		minStakeInt := math.NewIntFromUint64(minStake)
-		if stake.LT(minStakeInt) {
-			return nil, errorsmod.Wrapf(
-				sdkerrors.ErrInvalidRequest,
-				"validator %s is not in active set and does not meet minimum stake requirement. Required: %d, Got: %s",
-				msg.ValidatorAddress,
-				minStake,
-				stake,
-			)
-		}
+	if err := k.checkValidatorSupernodeEligibility(ctx, validator, msg.ValidatorAddress); err != nil {
+		return nil, err
 	}
 
 	// Create new SuperNode
 	supernode := types.SuperNode{
 		ValidatorAddress: msg.ValidatorAddress,
 		IpAddress:        msg.IpAddress,
-		State:            types.Active,
+		State:            types.SuperNodeStateActive,
 		Evidence:         []*types.Evidence{},
 		LastTimeActive:   ctx.BlockTime(),
 		StartedAt:        ctx.BlockTime(),
@@ -91,6 +60,7 @@ func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types.MsgRegist
 			ReportCount: 0,
 			LastUpdated: ctx.BlockTime(),
 		},
+		PrevIpAddresses: make([]*types.IPAddressHistory, 0),
 	}
 
 	// Validate the SuperNode struct
@@ -98,11 +68,9 @@ func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types.MsgRegist
 		return nil, err
 	}
 
-	// Store the SuperNode
-	bz := k.cdc.MustMarshal(&supernode)
-	err = store.Set(key, bz)
-	if err != nil {
-		return nil, err
+	// Use SetSuperNode to store the SuperNode
+	if err := k.SetSuperNode(ctx, supernode); err != nil {
+		return nil, errorsmod.Wrapf(sdkerrors.ErrIO, "error setting supernode: %s", err)
 	}
 
 	// Emit event

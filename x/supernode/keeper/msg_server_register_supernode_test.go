@@ -2,6 +2,7 @@ package keeper_test
 
 import (
 	"testing"
+	"time"
 
 	"cosmossdk.io/math"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
@@ -30,6 +31,9 @@ import (
 func TestMsgServer_RegisterSupernode(t *testing.T) {
 	valAddr := sdk.ValAddress([]byte("validator"))
 	creatorAddr := sdk.AccAddress(valAddr)
+
+	otherValAddr := sdk.ValAddress([]byte("other-validator"))
+	otherCreatorAddr := sdk.AccAddress(otherValAddr)
 
 	testCases := []struct {
 		name          string
@@ -66,6 +70,26 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 				Version:          "1.0.0",
 			},
 			expectedError: sdkerrors.ErrInvalidAddress,
+		},
+		{
+			name: "unauthorized",
+			msg: &types.MsgRegisterSupernode{
+				Creator:          otherCreatorAddr.String(),
+				ValidatorAddress: valAddr.String(),
+				IpAddress:        "192.168.1.1",
+				Version:          "1.0.0",
+			},
+			mockSetup: func(sk *supernodemocks.MockStakingKeeper, slk *supernodemocks.MockSlashingKeeper, bk *supernodemocks.MockBankKeeper) {
+				sk.EXPECT().
+					Validator(gomock.Any(), valAddr).
+					Return(&stakingtypes.Validator{
+						OperatorAddress: valAddr.String(),
+						Status:          stakingtypes.Bonded,
+						Tokens:          math.NewInt(2000000),
+						Jailed:          false,
+					}, nil)
+			},
+			expectedError: sdkerrors.ErrUnauthorized,
 		},
 		{
 			name: "empty ip address",
@@ -122,6 +146,46 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 			},
 			expectedError: sdkerrors.ErrInvalidRequest,
 		},
+		{
+			name: "validator not bonded and insufficient stake",
+			msg: &types.MsgRegisterSupernode{
+				Creator:          creatorAddr.String(),
+				ValidatorAddress: valAddr.String(),
+				IpAddress:        "192.168.1.1",
+				Version:          "1.0.0",
+			},
+			mockSetup: func(sk *supernodemocks.MockStakingKeeper, slk *supernodemocks.MockSlashingKeeper, bk *supernodemocks.MockBankKeeper) {
+				sk.EXPECT().
+					Validator(gomock.Any(), valAddr).
+					Return(&stakingtypes.Validator{
+						OperatorAddress: valAddr.String(),
+						Status:          stakingtypes.Unbonded, // not bonded
+						Tokens:          math.NewInt(500000),   // less than 1,000,000 required
+						Jailed:          false,
+					}, nil)
+			},
+			expectedError: sdkerrors.ErrInvalidRequest,
+		},
+		{
+			name: "validator not bonded but sufficient stake",
+			msg: &types.MsgRegisterSupernode{
+				Creator:          creatorAddr.String(),
+				ValidatorAddress: valAddr.String(),
+				IpAddress:        "192.168.1.1",
+				Version:          "1.0.0",
+			},
+			mockSetup: func(sk *supernodemocks.MockStakingKeeper, slk *supernodemocks.MockSlashingKeeper, bk *supernodemocks.MockBankKeeper) {
+				sk.EXPECT().
+					Validator(gomock.Any(), valAddr).
+					Return(&stakingtypes.Validator{
+						OperatorAddress: valAddr.String(),
+						Status:          stakingtypes.Unbonded, // not bonded
+						Tokens:          math.NewInt(2000000),  // meets requirement
+						Jailed:          false,
+					}, nil)
+			},
+			expectedError: nil,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -151,9 +215,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 	}
 }
 
-func setupKeeperForTest(t testing.TB,
-	stakingKeeper types.StakingKeeper,
-	slashingKeeper types.SlashingKeeper,
+func setupKeeperForTest(t testing.TB, stakingKeeper types.StakingKeeper, slashingKeeper types.SlashingKeeper,
 	bankKeeper types.BankKeeper) (keeper.Keeper, sdk.Context) {
 
 	storeKey := storetypes.NewKVStoreKey(types.StoreKey)
@@ -178,6 +240,7 @@ func setupKeeperForTest(t testing.TB,
 	)
 
 	ctx := sdk.NewContext(stateStore, cmtproto.Header{}, false, log.NewNopLogger())
+	ctx = ctx.WithBlockTime(time.Now())
 
 	// Set default params
 	params := types.DefaultParams()

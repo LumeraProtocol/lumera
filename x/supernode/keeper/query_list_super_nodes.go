@@ -16,8 +16,10 @@ func (k Keeper) ListSuperNodes(goCtx context.Context, req *types.QueryListSuperN
 
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
-	// TODO: Process the query
-	_ = ctx
+	supernodes, pageRes, err := k.GetSuperNodesPaginated(ctx, req.Pagination)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to list supernodes: %v", err)
+	}
 
-	return &types.QueryListSuperNodesResponse{}, nil
+	return &types.QueryListSuperNodesResponse{Supernodes: supernodes, Pagination: pageRes}, nil
 }

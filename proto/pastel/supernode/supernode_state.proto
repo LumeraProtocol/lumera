@@ -9,9 +9,9 @@ enum SuperNodeState {
   option (gogoproto.goproto_enum_prefix) = false;
   option (gogoproto.goproto_enum_stringer) = true;
 
-  SUPERNODE_STATE_UNSPECIFIED = 0 [(gogoproto.enumvalue_customname) = "Unspecified"];
-  SUPERNODE_STATE_ACTIVE = 1 [(gogoproto.enumvalue_customname) = "Active"];
-  SUPERNODE_STATE_DISABLED = 2 [(gogoproto.enumvalue_customname) = "Disabled"];
-  SUPERNODE_STATE_STOPPED = 3 [(gogoproto.enumvalue_customname) = "Stopped"];
-  SUPERNODE_STATE_PENALIZED = 4 [(gogoproto.enumvalue_customname) = "Penalized"];
+  SUPERNODE_STATE_UNSPECIFIED = 0 [(gogoproto.enumvalue_customname) = "SuperNodeStateUnspecified"];
+  SUPERNODE_STATE_ACTIVE = 1 [(gogoproto.enumvalue_customname) = "SuperNodeStateActive"];
+  SUPERNODE_STATE_DISABLED = 2 [(gogoproto.enumvalue_customname) = "SuperNodeStateDisabled"];
+  SUPERNODE_STATE_STOPPED = 3 [(gogoproto.enumvalue_customname) = "SuperNodeStateStopped"];
+  SUPERNODE_STATE_PENALIZED = 4 [(gogoproto.enumvalue_customname) = "SuperNodeStatePenalized"];
 }

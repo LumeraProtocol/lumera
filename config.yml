@@ -42,32 +42,32 @@ genesis:
   app_state:
     distribution:
       params:
-        community_tax: 0.020000000000000000,
-        base_proposer_reward: 0.010000000000000000,
-        bonus_proposer_reward: 0.040000000000000000
+        community_tax: "0.020000000000000000"
+        base_proposer_reward: "0.010000000000000000"
+        bonus_proposer_reward: "0.040000000000000000"
     staking:
       params:
         bond_denom: upsl
         max_validators: 100
-        unbonding_time: '1814400s'
+        unbonding_time: "1814400s"
     mint:
       params:
         mint_denom: upsl
-        inflation_min: 0.050000000000000000,
-        inflation_max: 0.200000000000000000,
-        inflation_rate_change: 0.150000000000000000,
-        goal_bonded: 0.670000000000000000,
-        blocks_per_year”: 3942000
+        inflation_min: "0.050000000000000000"
+        inflation_max: "0.200000000000000000"
+        inflation_rate_change: "0.150000000000000000"
+        goal_bonded: "0.670000000000000000"
+        blocks_per_year: 3942000
     slashing:
       params:
-        downtime_jail_duration: 600s,
-        min_signed_per_window: 0.500000000000000000,
-        slash_fraction_double_sign: 0.050000000000000000,
-        slash_fraction_downtime: 0.010000000000000000
+        downtime_jail_duration: "600s"
+        min_signed_per_window: "0.500000000000000000"
+        slash_fraction_double_sign: "0.050000000000000000"
+        slash_fraction_downtime: "0.010000000000000000"
     crisis:
       constant_fee:
         denom: upsl
-        amount: '500000000' # 500,000 upsl --> 500 psl
+        amount: "500000000"  # 500,000 upsl --> 500 psl
     gov:
       params:
         burn_vote_quorum: false
@@ -75,12 +75,12 @@ genesis:
         burn_proposal_deposit_prevote: false
         min_deposit:                    # min deposit for proposal to enter voting period
           - denom: upsl
-            amount: '1000000000000'     # 1,000,000,000,000 upsl  --> 1,000,000 psl
-        max_deposit_period: '172800s'   # 2 days
-        voting_period: '172800s'        # 2 days
-        quorum: '0.334000000000000000'          # 33.4%
-        threshold: '0.500000000000000000'       # 50%
-        veto_threshold: '0.334000000000000000'  # 33.4%
+            amount: "1000000000000"     # 1,000,000,000,000 upsl  --> 1,000,000 psl
+        max_deposit_period: "172800s"   # 2 days
+        voting_period: "172800s"        # 2 days
+        quorum: "0.334000000000000000"          # 33.4%
+        threshold: "0.500000000000000000"       # 50%
+        veto_threshold: "0.334000000000000000"  # 33.4%
 
 client:
   openapi:

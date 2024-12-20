@@ -194,11 +194,11 @@ type ModuleOutputs struct {
 }
 
 func ProvideModule(in ModuleInputs) ModuleOutputs {
-	// default to governance authority if not provided
 	authority := authtypes.NewModuleAddress(govtypes.ModuleName)
 	if in.Config.Authority != "" {
 		authority = authtypes.NewModuleAddressOrBech32Address(in.Config.Authority)
 	}
+
 	k := keeper.NewKeeper(
 		in.Cdc,
 		in.StoreService,
@@ -208,6 +208,12 @@ func ProvideModule(in ModuleInputs) ModuleOutputs {
 		in.StakingKeeper,
 		in.SlashingKeeper,
 	)
+
+	// Create hooks instance
+	hooks := keeper.NewSupernodeHooks(k)
+	// Set hooks
+	k.AddStakingHooks(types.NewStakingHooksWrapper(hooks))
+
 	m := NewAppModule(
 		in.Cdc,
 		k,
@@ -217,3 +223,16 @@ func ProvideModule(in ModuleInputs) ModuleOutputs {
 
 	return ModuleOutputs{SupernodeKeeper: k, Module: m}
 }
+
+// Remove or modify InvokeSetStakingHooks since we're now setting hooks in ProvideModule
+
+// // InvokeSetStakingHooks is the invoker for staking hooks
+// func InvokeSetStakingHooks(
+// 	keeper *keeper.Keeper,
+// 	stakingHooks map[string]types.StakingHooksWrapper,
+// ) error {
+// 	for k := range stakingHooks {
+// 		keeper.AddStakingHooks(stakingHooks[k])
+// 	}
+// 	return nil
+// }

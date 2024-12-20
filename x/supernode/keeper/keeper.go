@@ -24,6 +24,7 @@ type (
 		bankKeeper     types.BankKeeper
 		stakingKeeper  types.StakingKeeper
 		slashingKeeper types.SlashingKeeper
+		hooks          types.StakingHooksWrapper
 
 		//auditKeeper     types.AuditKeeper // future Audit module
 	}
@@ -68,4 +69,16 @@ func (k Keeper) Logger() log.Logger {
 // GetCodec returns the codec
 func (k Keeper) GetCodec() codec.BinaryCodec {
 	return k.cdc
+}
+func (k *Keeper) AddStakingHooks(hooks types.StakingHooksWrapper) {
+	if !k.hooks.IsNil() {
+		panic("cannot set staking hooks twice")
+	}
+
+	k.hooks = hooks
+}
+
+// GetHooks returns the staking hooks
+func (k Keeper) GetHooks() types.StakingHooksWrapper {
+	return k.hooks
 }

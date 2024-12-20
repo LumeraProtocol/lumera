@@ -1,9 +1,10 @@
 package integration_test
 
 import (
-	"cosmossdk.io/log"
 	"os"
 	"testing"
+
+	"cosmossdk.io/log"
 
 	"github.com/cosmos/cosmos-sdk/runtime"
 	sdk "github.com/cosmos/cosmos-sdk/types"

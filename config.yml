@@ -28,8 +28,8 @@ faucet:
     - '100upsl'
 
 #validators:
-# supernova_validator_1, supernova_validator_2, supernova_validator_3, supernova_validator_4, supernova_validator_5
-# for devnet are created by devnet docker setup scripts - each with 1M psl
+#  - name: genesis_validator1
+#    bonded: '5000000000000upsl'
 
 
 genesis:
@@ -70,10 +70,10 @@ genesis:
         burn_proposal_deposit_prevote: false
         min_deposit:                    # min deposit for proposal to enter voting period
           - denom: upsl
-            amount: '1.000.000.000'  # 1,000 psl (1,000,000,000 upsl) for devnet; 10,000 psl (10,000,000,000 upsl) for testnet; 100,000 psl (100,000,000,000 upsl) for mainnet
+            amount: '1000000000'  # 1,000 psl (1,000,000,000 upsl) for devnet; 10,000 psl (10,000,000,000 upsl) for testnet; 100,000 psl (100,000,000,000 upsl) for mainnet
         expedited_min_deposit:
-          - amount: '5.000.000.000'  # 5,000 psl (5,000,000,000 upsl) for devnet; 50,000 psl (50,000,000,000 upsl) for testnet; 500,000 psl (500,000,000,000 upsl) for mainnet
-            denom": upsl
+          - amount: '5000000000'  # 5,000 psl (5,000,000,000 upsl) for devnet; 50,000 psl (50,000,000,000 upsl) for testnet; 500,000 psl (500,000,000,000 upsl) for mainnet
+            denom: upsl
         max_deposit_period: '172800s'   # 2 days (172800s) for devnet; 7 days (604800s) for testnet; 14 days (1209600) for mainnet
         voting_period: '172800s'        # 2 days (172800s) for devnet; 7 days (604800s) for testnet; 14 days (1209600) for mainnet
         quorum:         '0.334000000000000000'          # 33.4%

@@ -2,9 +2,10 @@ package pastelid
 
 import (
 	"context"
-	"cosmossdk.io/client/v2/autocli"
 	"encoding/json"
 	"fmt"
+
+	"cosmossdk.io/client/v2/autocli"
 	"github.com/spf13/cobra"
 
 	"cosmossdk.io/core/appmodule"

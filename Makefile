@@ -94,7 +94,7 @@ unit-tests:
 
 integration-tests:
 	@echo "Running integration tests..."
-	go test -tags=integration ./tests/integration/... -v
+	go test ./tests/integration/... -v
 
 system-tests:
 	@echo "Running system tests..."

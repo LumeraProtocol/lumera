@@ -8,32 +8,34 @@ build:
   main: cmd/pastel
   binary: pasteld
 
-# total supply: 250,000,000,000,000 upsl --> 250,000,000 psl
+# total supply: 20,000,000,000 psl    --> 20,000,000,000,000,000 upsl
+# current supply: 10,000,000,000 psl  --> 10,000,000,000,000,000 upsl
 accounts:
-  - name: validator_pool
-    coins: ['25000000000000upsl']       # 27,000,000,000,000 upsl --> 27,000,000 psl
-
-  #  - name: for claiming - mined by Claiming module at genesis
-  #    coins: ['12500000000000upsl']       # 12,500,000,000,000 upsl --> 12,500,000 psl
-
-  # Testnet and Devnet only
+  - name: pastel_foundation
+    coins: ['5000000000000000upsl']      # 5,000,000,000,000,000 upsl --> 5,000,000,000 psl
+  - name: ecosystem_fund
+    coins: ['2000000000000000upsl']      # 2,000,000,000,000,000 upsl --> 2,000,000,000 psl
+  - name: community_rewards
+    coins: ['1000000000000000upsl']      # 1,000,000,000,000,000 upsl --> 1,000,000,000 psl
+  - name: public_sale
+    coins: ['1000000000000000upsl']      # 1,000,000,000,000,000 upsl --> 1,000,000,000 psl
+  - name: private_investors
+    coins: ['1000000000000000upsl']      # 1,000,000,000,000,000 upsl --> 1,000,000,000 psl
   - name: faucet_account
-    coins: ['1000000upsl']              # 1,000,000 upsl    --> 1 psl
-
+    coins: ['10000000000000upsl']        # 10,000,000,000,000 upsl    --> 10,000,000 psl
   - name: genesis_validator1
-    coins: ['100000000000upsl']       # 1,000,000,000,000 upsl --> 1,000,000 psl
+    coins: ['5000000000000upsl']         # 5,000,000,000,000 upsl     --> 5,000,000 psl
 
 faucet:
   name: faucet_account
   coins:
-    - '1000000upsl'
+    - '10000000000000upsl'
   coins_max:
-    - '100upsl'
+    - '1000000000upsl'
 
 validators:
   - name: genesis_validator1
-    bonded: '100000000000upsl'
-
+    bonded: '5000000000000upsl'
 
 genesis:
   chain_id: pastel-devnet-1
@@ -44,32 +46,32 @@ genesis:
         claim_end_time: '1746071999' # April 30 2025, 23:59:59
     distribution:
       params:
-        community_tax:         '0.020000000000000000'
-        base_proposer_reward:  '0.000000000000000000'
-        bonus_proposer_reward: '0.000000000000000000'
+        community_tax: "0.020000000000000000"
+        base_proposer_reward: "0.010000000000000000"
+        bonus_proposer_reward: "0.040000000000000000"
     staking:
       params:
         bond_denom: upsl
-        max_validators: '100'
-        unbonding_time: '1814400s'
+        max_validators: 100
+        unbonding_time: "1814400s"
     mint:
       params:
         mint_denom: upsl
-        inflation_min:          '0.050000000000000000'
-        inflation_max:          '0.200000000000000000'
-        inflation_rate_change:  '0.150000000000000000'
-        goal_bonded:            '0.670000000000000000'
-        blocks_per_year: '3942000'
+        inflation_min: "0.050000000000000000"
+        inflation_max: "0.200000000000000000"
+        inflation_rate_change: "0.150000000000000000"
+        goal_bonded: "0.670000000000000000"
+        blocks_per_year: 3942000
     slashing:
       params:
-        downtime_jail_duration: '600s'
-        min_signed_per_window:      '0.500000000000000000'
-        slash_fraction_double_sign: '0.050000000000000000'
-        slash_fraction_downtime:    '0.010000000000000000'
+        downtime_jail_duration: "600s"
+        min_signed_per_window: "0.500000000000000000"
+        slash_fraction_double_sign: "0.050000000000000000"
+        slash_fraction_downtime: "0.010000000000000000"
     crisis:
       constant_fee:
         denom: upsl
-        amount: '500000000' # 500,000 upsl --> 500 psl
+        amount: "500000000"  # 500,000 upsl --> 500 psl
     gov:
       params:
         burn_vote_quorum: false
@@ -77,40 +79,13 @@ genesis:
         burn_proposal_deposit_prevote: false
         min_deposit:                    # min deposit for proposal to enter voting period
           - denom: upsl
-            amount: '1000000000'  # 1,000 psl (1,000,000,000 upsl) for devnet; 10,000 psl (10,000,000,000 upsl) for testnet; 100,000 psl (100,000,000,000 upsl) for mainnet
-        expedited_min_deposit:
-          - amount: '5000000000'  # 5,000 psl (5,000,000,000 upsl) for devnet; 50,000 psl (50,000,000,000 upsl) for testnet; 500,000 psl (500,000,000,000 upsl) for mainnet
-            denom: upsl
-        max_deposit_period: '172800s'   # 2 days (172800s) for devnet; 7 days (604800s) for testnet; 14 days (1209600) for mainnet
-        voting_period: '172800s'        # 2 days (172800s) for devnet; 7 days (604800s) for testnet; 14 days (1209600) for mainnet
-        quorum:         '0.334000000000000000'          # 33.4%
-        threshold:      '0.500000000000000000'       # 50%
-        veto_threshold: '0.334000000000000000'  # 33.4%
+            amount: "1000000000000"     # 1,000,000,000,000 upsl  --> 1,000,000 psl
+        max_deposit_period: "172800s"   # 2 days
+        voting_period: "172800s"        # 2 days
+        quorum: "0.334000000000000000"          # 33.4%
+        threshold: "0.500000000000000000"       # 50%
+        veto_threshold: "0.334000000000000000"  # 33.4%
 
 client:
   openapi:
     path: docs/static/openapi.yml
-
-
-
-#pasteld genesis add-genesis-account pastel_foundation_1 14375000000000upsl --vesting-amount 14375000000000upsl --vesting-end-time  518400 //6 days
-#pasteld genesis add-genesis-account pastel_foundation_2 14375000000000upsl --vesting-amount 14375000000000upsl --vesting-end-time  518400 //6 days
-#pasteld genesis add-genesis-account pastel_foundation_3 14375000000000upsl --vesting-amount 14375000000000upsl --vesting-end-time  518400 //6 days
-#pasteld genesis add-genesis-account pastel_foundation_4 14375000000000upsl --vesting-amount 14375000000000upsl --vesting-end-time  518400 //6 days
-#pasteld genesis add-genesis-account pastel_foundation_5 25000000000000upsl --vesting-amount 25000000000000upsl --vesting-end-time 1036800 //12 days
-#pasteld genesis add-genesis-account pastel_foundation_6 28125000000000upsl --vesting-amount 28125000000000upsl --vesting-end-time 2073600 //24 days
-#pasteld genesis add-genesis-account pastel_foundation_7 28125000000000upsl --vesting-amount 28125000000000upsl --vesting-end-time 2073600 //24 days
-#pasteld genesis add-genesis-account pastel_foundation_8  6250000000000upsl --vesting-amount 6250000000000upsl  --vesting-end-time 2073600 //24 days
-#pasteld genesis add-genesis-account private_investors_1 25000000000000upsl --vesting-amount 25000000000000upsl --vesting-end-time 1555200 //18 days
-#pasteld genesis add-genesis-account private_investors_2 37500000000000upsl --vesting-amount 37500000000000upsl --vesting-end-time 1555200 //18 days
-
-#pasteld keys add pastel_foundation_1
-#pasteld keys add pastel_foundation_2
-#pasteld keys add pastel_foundation_3
-#pasteld keys add pastel_foundation_4
-#pasteld keys add pastel_foundation_5
-#pasteld keys add pastel_foundation_6
-#pasteld keys add pastel_foundation_7
-#pasteld keys add pastel_foundation_8
-#pasteld keys add private_investors_1
-#pasteld keys add private_investors_2

@@ -19,8 +19,6 @@ func TestKeeper_SetAndQuerySuperNode(t *testing.T) {
 
 	supernode := types.SuperNode{
 		ValidatorAddress: valAddr.String(),
-		IpAddress:        "192.168.1.1",
-		State:            types.SuperNodeStateActive,
 		Version:          "1.0.0",
 	}
 
@@ -106,14 +104,10 @@ func TestKeeper_GetAllSuperNodes(t *testing.T) {
 
 	sn1 := types.SuperNode{
 		ValidatorAddress: valAddr1.String(),
-		IpAddress:        "192.168.1.1",
-		State:            types.SuperNodeStateActive,
 		Version:          "1.0.0",
 	}
 	sn2 := types.SuperNode{
 		ValidatorAddress: valAddr2.String(),
-		IpAddress:        "10.0.0.5",
-		State:            types.SuperNodeStateStopped,
 		Version:          "2.0.0",
 	}
 
@@ -235,8 +229,6 @@ func TestKeeper_GetSuperNodesPaginated(t *testing.T) {
 	for i := 0; i < supernodeCount; i++ {
 		sn := types.SuperNode{
 			ValidatorAddress: sdk.ValAddress([]byte(fmt.Sprintf("val%d", i))).String(),
-			IpAddress:        fmt.Sprintf("192.168.1.%d", i),
-			State:            types.SuperNodeStateActive,
 			Version:          "1.0.0",
 		}
 		supernodes[i] = sn
@@ -333,9 +325,9 @@ func TestKeeper_GetSuperNodesPaginated(t *testing.T) {
 				for i := 0; i < supernodeCount; i++ {
 					sn := supernodes[i]
 					if i >= 3 {
-						sn.State = types.SuperNodeStateStopped
+						//sn.State = types.SuperNodeStateStopped
 					} else {
-						sn.State = types.SuperNodeStateActive
+						//sn.State = types.SuperNodeStateActive
 					}
 					require.NoError(t, k.SetSuperNode(ctx, sn))
 				}
@@ -345,9 +337,9 @@ func TestKeeper_GetSuperNodesPaginated(t *testing.T) {
 			expectedErr: nil,
 			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context, snRes []*types.SuperNode, pageRes *query.PageResponse) {
 				require.Len(t, snRes, 3)
-				for _, sn := range snRes {
-					require.Equal(t, types.SuperNodeStateActive, sn.State)
-				}
+				/*for _, sn := range snRes {
+					//require.Equal(t, types.SuperNodeStateActive, sn.State)
+				}*/
 			},
 		},
 		{

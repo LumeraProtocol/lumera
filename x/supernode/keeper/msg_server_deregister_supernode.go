@@ -19,19 +19,30 @@ func (k msgServer) DeregisterSupernode(goCtx context.Context, msg *types.MsgDere
 		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidAddress, "invalid validator address: %s", err)
 	}
 
+	// Verify the signer is authorized
+	if err := k.verifyValidatorOperator(ctx, valOperAddr, msg.Creator); err != nil {
+		return nil, err
+	}
+
 	// Get existing supernode
 	supernode, found := k.QuerySuperNode(ctx, valOperAddr)
 	if !found {
 		return nil, errorsmod.Wrapf(sdkerrors.ErrNotFound, "no supernode found for validator %s", msg.ValidatorAddress)
 	}
 
-	// Verify the signer is authorized
-	if err := k.verifyValidatorOperator(ctx, valOperAddr, msg.Creator); err != nil {
-		return nil, err
+	if len(supernode.States) == 0 {
+		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode is in an invalid state")
+	}
+
+	if supernode.States[len(supernode.States)-1].State == types.SuperNodeStateDisabled {
+		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode already disabled for validator %s", msg.ValidatorAddress)
 	}
 
 	// Update supernode state
-	supernode.State = types.SuperNodeStateDisabled
+	supernode.States = append(supernode.States, &types.SuperNodeStateRecord{
+		State:  types.SuperNodeStateDisabled,
+		Height: ctx.BlockHeight(),
+	})
 
 	// Re-save the supernode using SetSuperNode
 	if err := k.SetSuperNode(ctx, supernode); err != nil {

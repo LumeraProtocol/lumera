@@ -16,19 +16,19 @@ func (s *SuperNode) Validate() error {
 		return err
 	}
 
-	// Check if IP address is not empty
-	if s.IpAddress == "" {
-		return ErrEmptyIPAddress
-	}
-
-	// Check if state is valid (not unspecified)
-	if s.State == SuperNodeStateUnspecified {
-		return ErrInvalidSuperNodeState
-	}
-
 	// Check if version is not empty
 	if s.Version == "" {
 		return ErrEmptyVersion
+	}
+
+	// Check if state is valid (not unspecified)
+	if len(s.States) == 0 || s.States[0].State != SuperNodeStateActive {
+		return ErrInvalidSuperNodeState
+	}
+
+	// Check if IP address is not empty
+	if len(s.PrevIpAddresses) == 0 || s.PrevIpAddresses[0].Address == "" {
+		return ErrEmptyIPAddress
 	}
 
 	// Note: timestamps are validated by protobuf (non-nullable)

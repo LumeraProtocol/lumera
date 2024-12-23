@@ -24,6 +24,7 @@ func TestMsgServer_DeRegisterSupernode(t *testing.T) {
 	testCases := []struct {
 		name          string
 		msg           *types.MsgDeregisterSupernode
+		currentState  types.SuperNodeState
 		expectedError error
 	}{
 		{
@@ -32,6 +33,7 @@ func TestMsgServer_DeRegisterSupernode(t *testing.T) {
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 			},
+			currentState:  types.SuperNodeStateActive,
 			expectedError: nil,
 		},
 		{
@@ -76,9 +78,13 @@ func TestMsgServer_DeRegisterSupernode(t *testing.T) {
 			if tc.expectedError != sdkerrors.ErrNotFound {
 				k.SetSuperNode(ctx, types.SuperNode{
 					ValidatorAddress: valAddr.String(),
-					IpAddress:        "",
-					State:            types.SuperNodeStateActive,
 					Version:          "1.0.0",
+					States: []*types.SuperNodeStateRecord{
+						{
+							State:  types.SuperNodeStateActive,
+							Height: ctx.BlockHeight(),
+						},
+					},
 				})
 			}
 

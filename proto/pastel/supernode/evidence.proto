@@ -15,5 +15,5 @@ message Evidence {
   string evidence_type = 4;
   string description = 5;
   uint64 severity = 6;
-  google.protobuf.Timestamp timestamp = 7 [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
+  int32 height = 7; 
 }

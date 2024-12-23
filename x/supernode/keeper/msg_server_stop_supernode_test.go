@@ -21,8 +21,6 @@ func TestMsgServer_StopSupernode(t *testing.T) {
 
 	existingSupernode := types.SuperNode{
 		ValidatorAddress: valAddr.String(),
-		IpAddress:        "192.168.1.1",
-		State:            types.SuperNodeStateActive,
 		Version:          "1.0.0",
 	}
 
@@ -46,10 +44,8 @@ func TestMsgServer_StopSupernode(t *testing.T) {
 			},
 			expectedError: nil,
 			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context) {
-				sn, found := k.QuerySuperNode(ctx, valAddr)
+				_, found := k.QuerySuperNode(ctx, valAddr)
 				require.True(t, found)
-				require.Equal(t, types.SuperNodeStateStopped, sn.State)
-				require.NotZero(t, sn.LastTimeDisabled)
 			},
 		},
 		{

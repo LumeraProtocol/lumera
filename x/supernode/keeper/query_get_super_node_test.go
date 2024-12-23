@@ -19,8 +19,6 @@ func TestKeeper_GetSuperNode(t *testing.T) {
 
 	sn := types.SuperNode{
 		ValidatorAddress: valAddr.String(),
-		IpAddress:        "192.168.1.1",
-		State:            types.SuperNodeStateActive,
 		Version:          "1.0.0",
 	}
 

@@ -2,7 +2,6 @@ package keeper
 
 import (
 	"context"
-	"fmt"
 
 	errorsmod "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -26,10 +25,6 @@ func (k msgServer) StopSupernode(goCtx context.Context, msg *types.MsgStopSupern
 	if err := k.verifyValidatorOperator(ctx, valOperAddr, msg.Creator); err != nil {
 		return nil, err
 	}
-
-	supernode.State = types.SuperNodeStateStopped
-	supernode.LastTimeDisabled = ctx.BlockTime()
-	fmt.Println("supernode.LastTimeDisabled", supernode.LastTimeDisabled)
 
 	if err := k.SetSuperNode(ctx, supernode); err != nil {
 		return nil, err

@@ -7,8 +7,6 @@ import "google/protobuf/timestamp.proto";
 import "gogoproto/gogo.proto";
 
 message IPAddressHistory {
-  
   string address = 1; 
-  google.protobuf.Timestamp updated_at = 2 [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
-  google.protobuf.Timestamp ended_at = 3 [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
+  int64 height = 2; 
 }

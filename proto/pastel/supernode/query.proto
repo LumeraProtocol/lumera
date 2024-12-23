@@ -8,6 +8,7 @@ import "google/api/annotations.proto";
 import "cosmos/base/query/v1beta1/pagination.proto";
 import "pastel/supernode/params.proto";
 import "pastel/supernode/super_node.proto";
+import "pastel/supernode/supernode_state.proto";
 
 option go_package = "github.com/pastelnetwork/pastel/x/supernode/types";
 
@@ -61,12 +62,14 @@ message QueryListSuperNodesRequest {
 }
 
 message QueryListSuperNodesResponse {
-  repeated SuperNode                              supernodes = 1;
+  repeated SuperNode supernodes = 1;
   cosmos.base.query.v1beta1.PageResponse pagination = 2;
 }
 
 message QueryGetTopSuperNodesForBlockRequest {
   int32 blockHeight = 1;
+  int32 limit = 2;
+  SuperNodeState state = 3 [(gogoproto.moretags) = "yaml:\"state\""];
 }
 
 message QueryGetTopSuperNodesForBlockResponse {

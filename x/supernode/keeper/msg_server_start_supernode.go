@@ -26,18 +26,6 @@ func (k msgServer) StartSupernode(goCtx context.Context, msg *types.MsgStartSupe
 		return nil, err
 	}
 
-	supernode.State = types.SuperNodeStateActive
-	supernode.LastTimeActive = ctx.BlockTime()
-
-	if msg.IpAddress != "" && supernode.IpAddress != msg.IpAddress {
-		supernode.PrevIpAddresses = append(supernode.PrevIpAddresses, &types.IPAddressHistory{
-			Address:   supernode.IpAddress,
-			UpdatedAt: ctx.BlockTime(),
-			EndedAt:   ctx.BlockTime(),
-		})
-		supernode.IpAddress = msg.IpAddress
-	}
-
 	if err := k.SetSuperNode(ctx, supernode); err != nil {
 		return nil, err
 	}
@@ -46,7 +34,6 @@ func (k msgServer) StartSupernode(goCtx context.Context, msg *types.MsgStartSupe
 		sdk.NewEvent(
 			types.EventTypeSupernodeStarted,
 			sdk.NewAttribute(types.AttributeKeyValidatorAddress, msg.ValidatorAddress),
-			sdk.NewAttribute(types.AttributeKeyIPAddress, supernode.IpAddress),
 		),
 	)
 

@@ -15,3 +15,8 @@ enum SuperNodeState {
   SUPERNODE_STATE_STOPPED = 3 [(gogoproto.enumvalue_customname) = "SuperNodeStateStopped"];
   SUPERNODE_STATE_PENALIZED = 4 [(gogoproto.enumvalue_customname) = "SuperNodeStatePenalized"];
 }
+
+message SuperNodeStateRecord { 
+  SuperNodeState state = 1 [(gogoproto.moretags) = "yaml:\"state\""];
+  int64 height = 2; 
+}

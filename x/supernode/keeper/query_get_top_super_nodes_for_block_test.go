@@ -31,13 +31,10 @@ func TestKeeper_GetTopSuperNodesForBlock(t *testing.T) {
 
 		return types.SuperNode{
 			ValidatorAddress: valStr,
-			IpAddress:        "192.168.1.1",
-			State:            types.SuperNodeStateActive,
 			Version:          "1.0.0",
 			Metrics: &types.MetricsAggregate{
 				Metrics:     map[string]float64{},
 				ReportCount: 0,
-				LastUpdated: ctx.BlockTime(),
 			},
 			PrevIpAddresses: []*types.IPAddressHistory{},
 		}

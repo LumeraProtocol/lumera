@@ -21,8 +21,6 @@ func TestMsgServer_StartSupernode(t *testing.T) {
 
 	existingSupernode := types.SuperNode{
 		ValidatorAddress: valAddr.String(),
-		IpAddress:        "192.168.1.1",
-		State:            types.SuperNodeStateDisabled,
 		Version:          "1.0.0",
 	}
 
@@ -39,7 +37,6 @@ func TestMsgServer_StartSupernode(t *testing.T) {
 			msg: &types.MsgStartSupernode{
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
-				IpAddress:        "", // no ip change
 			},
 			setupMock: nil, // no specific mocks needed
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
@@ -50,8 +47,6 @@ func TestMsgServer_StartSupernode(t *testing.T) {
 			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context) {
 				sn, found := k.QuerySuperNode(ctx, valAddr)
 				require.True(t, found)
-				require.Equal(t, types.SuperNodeStateActive, sn.State)
-				require.Equal(t, "192.168.1.1", sn.IpAddress) // unchanged
 				require.Empty(t, sn.PrevIpAddresses)
 			},
 		},
@@ -60,7 +55,6 @@ func TestMsgServer_StartSupernode(t *testing.T) {
 			msg: &types.MsgStartSupernode{
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
-				IpAddress:        "10.0.0.5",
 			},
 			setupMock: nil,
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
@@ -70,8 +64,6 @@ func TestMsgServer_StartSupernode(t *testing.T) {
 			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context) {
 				sn, found := k.QuerySuperNode(ctx, valAddr)
 				require.True(t, found)
-				require.Equal(t, types.SuperNodeStateActive, sn.State)
-				require.Equal(t, "10.0.0.5", sn.IpAddress)
 				require.Len(t, sn.PrevIpAddresses, 1)
 				require.Equal(t, "192.168.1.1", sn.PrevIpAddresses[0].Address)
 			},

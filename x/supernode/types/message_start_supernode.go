@@ -12,7 +12,6 @@ func NewMsgStartSupernode(creator string, validatorAddress string, ipAddress str
 	return &MsgStartSupernode{
 		Creator:          creator,
 		ValidatorAddress: validatorAddress,
-		IpAddress:        ipAddress,
 	}
 }
 

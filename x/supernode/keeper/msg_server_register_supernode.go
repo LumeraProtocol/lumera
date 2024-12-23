@@ -49,18 +49,24 @@ func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types.MsgRegist
 	// Create new SuperNode
 	supernode := types.SuperNode{
 		ValidatorAddress: msg.ValidatorAddress,
-		IpAddress:        msg.IpAddress,
-		State:            types.SuperNodeStateActive,
 		Evidence:         []*types.Evidence{},
-		LastTimeActive:   ctx.BlockTime(),
-		StartedAt:        ctx.BlockTime(),
 		Version:          msg.Version,
 		Metrics: &types.MetricsAggregate{
 			Metrics:     make(map[string]float64),
 			ReportCount: 0,
-			LastUpdated: ctx.BlockTime(),
 		},
-		PrevIpAddresses: make([]*types.IPAddressHistory, 0),
+		States: []*types.SuperNodeStateRecord{
+			{
+				State:  types.SuperNodeStateActive,
+				Height: ctx.BlockHeight(),
+			},
+		},
+		PrevIpAddresses: []*types.IPAddressHistory{
+			{
+				Address: msg.IpAddress,
+				Height:  ctx.BlockHeight(),
+			},
+		},
 	}
 
 	// Validate the SuperNode struct

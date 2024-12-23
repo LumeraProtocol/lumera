@@ -27,15 +27,13 @@ func (k msgServer) UpdateSupernode(goCtx context.Context, msg *types.MsgUpdateSu
 	}
 
 	// Update fields
-	if msg.IpAddress != "" && supernode.IpAddress != msg.IpAddress {
+	/*if msg.IpAddress != "" && supernode.IpAddress != msg.IpAddress {
 		supernode.PrevIpAddresses = append(supernode.PrevIpAddresses, &types.IPAddressHistory{
-			Address:   supernode.IpAddress,
-			UpdatedAt: ctx.BlockTime(),
-			EndedAt:   ctx.BlockTime(),
+			Address: supernode.IpAddress,
 		})
 		supernode.IpAddress = msg.IpAddress
 	}
-
+	*/
 	if msg.Version != "" {
 		supernode.Version = msg.Version
 	}
@@ -50,7 +48,6 @@ func (k msgServer) UpdateSupernode(goCtx context.Context, msg *types.MsgUpdateSu
 		sdk.NewEvent(
 			types.EventTypeSupernodeUpdated,
 			sdk.NewAttribute(types.AttributeKeyValidatorAddress, msg.ValidatorAddress),
-			sdk.NewAttribute(types.AttributeKeyIPAddress, supernode.IpAddress),
 			sdk.NewAttribute(types.AttributeKeyVersion, supernode.Version),
 		),
 	)

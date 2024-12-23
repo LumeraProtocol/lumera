@@ -13,15 +13,10 @@ import "pastel/supernode/ip_address_history.proto";
 import "pastel/supernode/supernode_state.proto";
 
 message SuperNode {
-
   string validator_address = 1 [(cosmos_proto.scalar) = "cosmos.ValidatorAddressString"];
-  string ip_address = 2;
-  SuperNodeState state = 3 [(gogoproto.moretags) = "yaml:\"state\""];
-  repeated Evidence evidence = 4;
-  google.protobuf.Timestamp last_time_active = 5 [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
-  google.protobuf.Timestamp last_time_disabled = 6 [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
-  google.protobuf.Timestamp started_at = 7 [(gogoproto.nullable) = false, (gogoproto.stdtime) = true];
-  repeated IPAddressHistory prev_ip_addresses = 8;
-  string version = 9;
-  MetricsAggregate metrics = 10;
+  repeated SuperNodeStateRecord states = 2;
+  repeated Evidence evidence = 3;
+  repeated IPAddressHistory prev_ip_addresses = 4;
+  string version = 5;
+  MetricsAggregate metrics = 6;
 }

@@ -18,14 +18,10 @@ func TestKeeper_ListSuperNodes(t *testing.T) {
 	// Create sample supernodes
 	sn1 := types.SuperNode{
 		ValidatorAddress: sdk.ValAddress([]byte("val1")).String(),
-		IpAddress:        "192.168.1.1",
-		State:            types.SuperNodeStateActive,
 		Version:          "1.0.0",
 	}
 	sn2 := types.SuperNode{
 		ValidatorAddress: sdk.ValAddress([]byte("val2")).String(),
-		IpAddress:        "192.168.1.2",
-		State:            types.SuperNodeStateStopped,
 		Version:          "2.0.0",
 	}
 

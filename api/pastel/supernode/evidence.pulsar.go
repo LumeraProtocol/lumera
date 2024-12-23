@@ -9,7 +9,7 @@ import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoiface "google.golang.org/protobuf/runtime/protoiface"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	_ "google.golang.org/protobuf/types/known/timestamppb"
 	io "io"
 	reflect "reflect"
 	sync "sync"
@@ -23,7 +23,7 @@ var (
 	fd_Evidence_evidence_type     protoreflect.FieldDescriptor
 	fd_Evidence_description       protoreflect.FieldDescriptor
 	fd_Evidence_severity          protoreflect.FieldDescriptor
-	fd_Evidence_timestamp         protoreflect.FieldDescriptor
+	fd_Evidence_height            protoreflect.FieldDescriptor
 )
 
 func init() {
@@ -35,7 +35,7 @@ func init() {
 	fd_Evidence_evidence_type = md_Evidence.Fields().ByName("evidence_type")
 	fd_Evidence_description = md_Evidence.Fields().ByName("description")
 	fd_Evidence_severity = md_Evidence.Fields().ByName("severity")
-	fd_Evidence_timestamp = md_Evidence.Fields().ByName("timestamp")
+	fd_Evidence_height = md_Evidence.Fields().ByName("height")
 }
 
 var _ protoreflect.Message = (*fastReflection_Evidence)(nil)
@@ -139,9 +139,9 @@ func (x *fastReflection_Evidence) Range(f func(protoreflect.FieldDescriptor, pro
 			return
 		}
 	}
-	if x.Timestamp != nil {
-		value := protoreflect.ValueOfMessage(x.Timestamp.ProtoReflect())
-		if !f(fd_Evidence_timestamp, value) {
+	if x.Height != int32(0) {
+		value := protoreflect.ValueOfInt32(x.Height)
+		if !f(fd_Evidence_height, value) {
 			return
 		}
 	}
@@ -172,8 +172,8 @@ func (x *fastReflection_Evidence) Has(fd protoreflect.FieldDescriptor) bool {
 		return x.Description != ""
 	case "pastel.supernode.Evidence.severity":
 		return x.Severity != uint64(0)
-	case "pastel.supernode.Evidence.timestamp":
-		return x.Timestamp != nil
+	case "pastel.supernode.Evidence.height":
+		return x.Height != int32(0)
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.Evidence"))
@@ -202,8 +202,8 @@ func (x *fastReflection_Evidence) Clear(fd protoreflect.FieldDescriptor) {
 		x.Description = ""
 	case "pastel.supernode.Evidence.severity":
 		x.Severity = uint64(0)
-	case "pastel.supernode.Evidence.timestamp":
-		x.Timestamp = nil
+	case "pastel.supernode.Evidence.height":
+		x.Height = int32(0)
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.Evidence"))
@@ -238,9 +238,9 @@ func (x *fastReflection_Evidence) Get(descriptor protoreflect.FieldDescriptor) p
 	case "pastel.supernode.Evidence.severity":
 		value := x.Severity
 		return protoreflect.ValueOfUint64(value)
-	case "pastel.supernode.Evidence.timestamp":
-		value := x.Timestamp
-		return protoreflect.ValueOfMessage(value.ProtoReflect())
+	case "pastel.supernode.Evidence.height":
+		value := x.Height
+		return protoreflect.ValueOfInt32(value)
 	default:
 		if descriptor.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.Evidence"))
@@ -273,8 +273,8 @@ func (x *fastReflection_Evidence) Set(fd protoreflect.FieldDescriptor, value pro
 		x.Description = value.Interface().(string)
 	case "pastel.supernode.Evidence.severity":
 		x.Severity = value.Uint()
-	case "pastel.supernode.Evidence.timestamp":
-		x.Timestamp = value.Message().Interface().(*timestamppb.Timestamp)
+	case "pastel.supernode.Evidence.height":
+		x.Height = int32(value.Int())
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.Evidence"))
@@ -295,11 +295,6 @@ func (x *fastReflection_Evidence) Set(fd protoreflect.FieldDescriptor, value pro
 // Mutable is a mutating operation and unsafe for concurrent use.
 func (x *fastReflection_Evidence) Mutable(fd protoreflect.FieldDescriptor) protoreflect.Value {
 	switch fd.FullName() {
-	case "pastel.supernode.Evidence.timestamp":
-		if x.Timestamp == nil {
-			x.Timestamp = new(timestamppb.Timestamp)
-		}
-		return protoreflect.ValueOfMessage(x.Timestamp.ProtoReflect())
 	case "pastel.supernode.Evidence.reporter_address":
 		panic(fmt.Errorf("field reporter_address of message pastel.supernode.Evidence is not mutable"))
 	case "pastel.supernode.Evidence.validator_address":
@@ -312,6 +307,8 @@ func (x *fastReflection_Evidence) Mutable(fd protoreflect.FieldDescriptor) proto
 		panic(fmt.Errorf("field description of message pastel.supernode.Evidence is not mutable"))
 	case "pastel.supernode.Evidence.severity":
 		panic(fmt.Errorf("field severity of message pastel.supernode.Evidence is not mutable"))
+	case "pastel.supernode.Evidence.height":
+		panic(fmt.Errorf("field height of message pastel.supernode.Evidence is not mutable"))
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.Evidence"))
@@ -337,9 +334,8 @@ func (x *fastReflection_Evidence) NewField(fd protoreflect.FieldDescriptor) prot
 		return protoreflect.ValueOfString("")
 	case "pastel.supernode.Evidence.severity":
 		return protoreflect.ValueOfUint64(uint64(0))
-	case "pastel.supernode.Evidence.timestamp":
-		m := new(timestamppb.Timestamp)
-		return protoreflect.ValueOfMessage(m.ProtoReflect())
+	case "pastel.supernode.Evidence.height":
+		return protoreflect.ValueOfInt32(int32(0))
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.Evidence"))
@@ -432,9 +428,8 @@ func (x *fastReflection_Evidence) ProtoMethods() *protoiface.Methods {
 		if x.Severity != 0 {
 			n += 1 + runtime.Sov(uint64(x.Severity))
 		}
-		if x.Timestamp != nil {
-			l = options.Size(x.Timestamp)
-			n += 1 + l + runtime.Sov(uint64(l))
+		if x.Height != 0 {
+			n += 1 + runtime.Sov(uint64(x.Height))
 		}
 		if x.unknownFields != nil {
 			n += len(x.unknownFields)
@@ -465,19 +460,10 @@ func (x *fastReflection_Evidence) ProtoMethods() *protoiface.Methods {
 			i -= len(x.unknownFields)
 			copy(dAtA[i:], x.unknownFields)
 		}
-		if x.Timestamp != nil {
-			encoded, err := options.Marshal(x.Timestamp)
-			if err != nil {
-				return protoiface.MarshalOutput{
-					NoUnkeyedLiterals: input.NoUnkeyedLiterals,
-					Buf:               input.Buf,
-				}, err
-			}
-			i -= len(encoded)
-			copy(dAtA[i:], encoded)
-			i = runtime.EncodeVarint(dAtA, i, uint64(len(encoded)))
+		if x.Height != 0 {
+			i = runtime.EncodeVarint(dAtA, i, uint64(x.Height))
 			i--
-			dAtA[i] = 0x3a
+			dAtA[i] = 0x38
 		}
 		if x.Severity != 0 {
 			i = runtime.EncodeVarint(dAtA, i, uint64(x.Severity))
@@ -748,10 +734,10 @@ func (x *fastReflection_Evidence) ProtoMethods() *protoiface.Methods {
 					}
 				}
 			case 7:
-				if wireType != 2 {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: wrong wireType = %d for field Timestamp", wireType)
+				if wireType != 0 {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: wrong wireType = %d for field Height", wireType)
 				}
-				var msglen int
+				x.Height = 0
 				for shift := uint(0); ; shift += 7 {
 					if shift >= 64 {
 						return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrIntOverflow
@@ -761,28 +747,11 @@ func (x *fastReflection_Evidence) ProtoMethods() *protoiface.Methods {
 					}
 					b := dAtA[iNdEx]
 					iNdEx++
-					msglen |= int(b&0x7F) << shift
+					x.Height |= int32(b&0x7F) << shift
 					if b < 0x80 {
 						break
 					}
 				}
-				if msglen < 0 {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
-				}
-				postIndex := iNdEx + msglen
-				if postIndex < 0 {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
-				}
-				if postIndex > l {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
-				}
-				if x.Timestamp == nil {
-					x.Timestamp = &timestamppb.Timestamp{}
-				}
-				if err := options.Unmarshal(dAtA[iNdEx:postIndex], x.Timestamp); err != nil {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, err
-				}
-				iNdEx = postIndex
 			default:
 				iNdEx = preIndex
 				skippy, err := runtime.Skip(dAtA[iNdEx:])
@@ -836,13 +805,13 @@ type Evidence struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ReporterAddress  string                 `protobuf:"bytes,1,opt,name=reporter_address,json=reporterAddress,proto3" json:"reporter_address,omitempty"`
-	ValidatorAddress string                 `protobuf:"bytes,2,opt,name=validator_address,json=validatorAddress,proto3" json:"validator_address,omitempty"`
-	ActionId         string                 `protobuf:"bytes,3,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
-	EvidenceType     string                 `protobuf:"bytes,4,opt,name=evidence_type,json=evidenceType,proto3" json:"evidence_type,omitempty"`
-	Description      string                 `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
-	Severity         uint64                 `protobuf:"varint,6,opt,name=severity,proto3" json:"severity,omitempty"`
-	Timestamp        *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	ReporterAddress  string `protobuf:"bytes,1,opt,name=reporter_address,json=reporterAddress,proto3" json:"reporter_address,omitempty"`
+	ValidatorAddress string `protobuf:"bytes,2,opt,name=validator_address,json=validatorAddress,proto3" json:"validator_address,omitempty"`
+	ActionId         string `protobuf:"bytes,3,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
+	EvidenceType     string `protobuf:"bytes,4,opt,name=evidence_type,json=evidenceType,proto3" json:"evidence_type,omitempty"`
+	Description      string `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
+	Severity         uint64 `protobuf:"varint,6,opt,name=severity,proto3" json:"severity,omitempty"`
+	Height           int32  `protobuf:"varint,7,opt,name=height,proto3" json:"height,omitempty"`
 }
 
 func (x *Evidence) Reset() {
@@ -907,11 +876,11 @@ func (x *Evidence) GetSeverity() uint64 {
 	return 0
 }
 
-func (x *Evidence) GetTimestamp() *timestamppb.Timestamp {
+func (x *Evidence) GetHeight() int32 {
 	if x != nil {
-		return x.Timestamp
+		return x.Height
 	}
-	return nil
+	return 0
 }
 
 var File_pastel_supernode_evidence_proto protoreflect.FileDescriptor
@@ -925,7 +894,7 @@ var file_pastel_supernode_evidence_proto_rawDesc = []byte{
 	0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2f,
 	0x74, 0x69, 0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x1a,
 	0x14, 0x67, 0x6f, 0x67, 0x6f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x67, 0x6f, 0x67, 0x6f, 0x2e,
-	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0xe3, 0x02, 0x0a, 0x08, 0x45, 0x76, 0x69, 0x64, 0x65, 0x6e,
+	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0xb7, 0x02, 0x0a, 0x08, 0x45, 0x76, 0x69, 0x64, 0x65, 0x6e,
 	0x63, 0x65, 0x12, 0x43, 0x0a, 0x10, 0x72, 0x65, 0x70, 0x6f, 0x72, 0x74, 0x65, 0x72, 0x5f, 0x61,
 	0x64, 0x64, 0x72, 0x65, 0x73, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x42, 0x18, 0xd2, 0xb4,
 	0x2d, 0x14, 0x63, 0x6f, 0x73, 0x6d, 0x6f, 0x73, 0x2e, 0x41, 0x64, 0x64, 0x72, 0x65, 0x73, 0x73,
@@ -943,24 +912,21 @@ var file_pastel_supernode_evidence_proto_rawDesc = []byte{
 	0x63, 0x72, 0x69, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x18, 0x05, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0b,
 	0x64, 0x65, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x12, 0x1a, 0x0a, 0x08, 0x73,
 	0x65, 0x76, 0x65, 0x72, 0x69, 0x74, 0x79, 0x18, 0x06, 0x20, 0x01, 0x28, 0x04, 0x52, 0x08, 0x73,
-	0x65, 0x76, 0x65, 0x72, 0x69, 0x74, 0x79, 0x12, 0x42, 0x0a, 0x09, 0x74, 0x69, 0x6d, 0x65, 0x73,
-	0x74, 0x61, 0x6d, 0x70, 0x18, 0x07, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1a, 0x2e, 0x67, 0x6f, 0x6f,
-	0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x54, 0x69, 0x6d,
-	0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x42, 0x08, 0xc8, 0xde, 0x1f, 0x00, 0x90, 0xdf, 0x1f, 0x01,
-	0x52, 0x09, 0x74, 0x69, 0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x42, 0xbc, 0x01, 0x0a, 0x14,
-	0x63, 0x6f, 0x6d, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2e, 0x73, 0x75, 0x70, 0x65, 0x72,
-	0x6e, 0x6f, 0x64, 0x65, 0x42, 0x0d, 0x45, 0x76, 0x69, 0x64, 0x65, 0x6e, 0x63, 0x65, 0x50, 0x72,
-	0x6f, 0x74, 0x6f, 0x50, 0x01, 0x5a, 0x34, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f,
-	0x6d, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x6e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x2f,
-	0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2f, 0x61, 0x70, 0x69, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65,
-	0x6c, 0x2f, 0x73, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0xa2, 0x02, 0x03, 0x50, 0x53,
-	0x58, 0xaa, 0x02, 0x10, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2e, 0x53, 0x75, 0x70, 0x65, 0x72,
-	0x6e, 0x6f, 0x64, 0x65, 0xca, 0x02, 0x10, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x5c, 0x53, 0x75,
-	0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0xe2, 0x02, 0x1c, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c,
-	0x5c, 0x53, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0x5c, 0x47, 0x50, 0x42, 0x4d, 0x65,
-	0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0xea, 0x02, 0x11, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x3a,
-	0x3a, 0x53, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74,
-	0x6f, 0x33,
+	0x65, 0x76, 0x65, 0x72, 0x69, 0x74, 0x79, 0x12, 0x16, 0x0a, 0x06, 0x68, 0x65, 0x69, 0x67, 0x68,
+	0x74, 0x18, 0x07, 0x20, 0x01, 0x28, 0x05, 0x52, 0x06, 0x68, 0x65, 0x69, 0x67, 0x68, 0x74, 0x42,
+	0xbc, 0x01, 0x0a, 0x14, 0x63, 0x6f, 0x6d, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2e, 0x73,
+	0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0x42, 0x0d, 0x45, 0x76, 0x69, 0x64, 0x65, 0x6e,
+	0x63, 0x65, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x50, 0x01, 0x5a, 0x34, 0x67, 0x69, 0x74, 0x68, 0x75,
+	0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x6e, 0x65, 0x74, 0x77,
+	0x6f, 0x72, 0x6b, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2f, 0x61, 0x70, 0x69, 0x2f, 0x70,
+	0x61, 0x73, 0x74, 0x65, 0x6c, 0x2f, 0x73, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0xa2,
+	0x02, 0x03, 0x50, 0x53, 0x58, 0xaa, 0x02, 0x10, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2e, 0x53,
+	0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0xca, 0x02, 0x10, 0x50, 0x61, 0x73, 0x74, 0x65,
+	0x6c, 0x5c, 0x53, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0xe2, 0x02, 0x1c, 0x50, 0x61,
+	0x73, 0x74, 0x65, 0x6c, 0x5c, 0x53, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0x5c, 0x47,
+	0x50, 0x42, 0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0xea, 0x02, 0x11, 0x50, 0x61, 0x73,
+	0x74, 0x65, 0x6c, 0x3a, 0x3a, 0x53, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0x62, 0x06,
+	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -977,16 +943,14 @@ func file_pastel_supernode_evidence_proto_rawDescGZIP() []byte {
 
 var file_pastel_supernode_evidence_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
 var file_pastel_supernode_evidence_proto_goTypes = []interface{}{
-	(*Evidence)(nil),              // 0: pastel.supernode.Evidence
-	(*timestamppb.Timestamp)(nil), // 1: google.protobuf.Timestamp
+	(*Evidence)(nil), // 0: pastel.supernode.Evidence
 }
 var file_pastel_supernode_evidence_proto_depIdxs = []int32{
-	1, // 0: pastel.supernode.Evidence.timestamp:type_name -> google.protobuf.Timestamp
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	0, // [0:0] is the sub-list for method output_type
+	0, // [0:0] is the sub-list for method input_type
+	0, // [0:0] is the sub-list for extension type_name
+	0, // [0:0] is the sub-list for extension extendee
+	0, // [0:0] is the sub-list for field type_name
 }
 
 func init() { file_pastel_supernode_evidence_proto_init() }

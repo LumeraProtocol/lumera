@@ -9,7 +9,7 @@ import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoiface "google.golang.org/protobuf/runtime/protoiface"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	_ "google.golang.org/protobuf/types/known/timestamppb"
 	io "io"
 	math "math"
 	reflect "reflect"
@@ -103,7 +103,7 @@ var (
 	md_MetricsAggregate              protoreflect.MessageDescriptor
 	fd_MetricsAggregate_metrics      protoreflect.FieldDescriptor
 	fd_MetricsAggregate_report_count protoreflect.FieldDescriptor
-	fd_MetricsAggregate_last_updated protoreflect.FieldDescriptor
+	fd_MetricsAggregate_height       protoreflect.FieldDescriptor
 )
 
 func init() {
@@ -111,7 +111,7 @@ func init() {
 	md_MetricsAggregate = File_pastel_supernode_metrics_aggregate_proto.Messages().ByName("MetricsAggregate")
 	fd_MetricsAggregate_metrics = md_MetricsAggregate.Fields().ByName("metrics")
 	fd_MetricsAggregate_report_count = md_MetricsAggregate.Fields().ByName("report_count")
-	fd_MetricsAggregate_last_updated = md_MetricsAggregate.Fields().ByName("last_updated")
+	fd_MetricsAggregate_height = md_MetricsAggregate.Fields().ByName("height")
 }
 
 var _ protoreflect.Message = (*fastReflection_MetricsAggregate)(nil)
@@ -191,9 +191,9 @@ func (x *fastReflection_MetricsAggregate) Range(f func(protoreflect.FieldDescrip
 			return
 		}
 	}
-	if x.LastUpdated != nil {
-		value := protoreflect.ValueOfMessage(x.LastUpdated.ProtoReflect())
-		if !f(fd_MetricsAggregate_last_updated, value) {
+	if x.Height != int64(0) {
+		value := protoreflect.ValueOfInt64(x.Height)
+		if !f(fd_MetricsAggregate_height, value) {
 			return
 		}
 	}
@@ -216,8 +216,8 @@ func (x *fastReflection_MetricsAggregate) Has(fd protoreflect.FieldDescriptor) b
 		return len(x.Metrics) != 0
 	case "pastel.supernode.MetricsAggregate.report_count":
 		return x.ReportCount != uint64(0)
-	case "pastel.supernode.MetricsAggregate.last_updated":
-		return x.LastUpdated != nil
+	case "pastel.supernode.MetricsAggregate.height":
+		return x.Height != int64(0)
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.MetricsAggregate"))
@@ -238,8 +238,8 @@ func (x *fastReflection_MetricsAggregate) Clear(fd protoreflect.FieldDescriptor)
 		x.Metrics = nil
 	case "pastel.supernode.MetricsAggregate.report_count":
 		x.ReportCount = uint64(0)
-	case "pastel.supernode.MetricsAggregate.last_updated":
-		x.LastUpdated = nil
+	case "pastel.supernode.MetricsAggregate.height":
+		x.Height = int64(0)
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.MetricsAggregate"))
@@ -265,9 +265,9 @@ func (x *fastReflection_MetricsAggregate) Get(descriptor protoreflect.FieldDescr
 	case "pastel.supernode.MetricsAggregate.report_count":
 		value := x.ReportCount
 		return protoreflect.ValueOfUint64(value)
-	case "pastel.supernode.MetricsAggregate.last_updated":
-		value := x.LastUpdated
-		return protoreflect.ValueOfMessage(value.ProtoReflect())
+	case "pastel.supernode.MetricsAggregate.height":
+		value := x.Height
+		return protoreflect.ValueOfInt64(value)
 	default:
 		if descriptor.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.MetricsAggregate"))
@@ -294,8 +294,8 @@ func (x *fastReflection_MetricsAggregate) Set(fd protoreflect.FieldDescriptor, v
 		x.Metrics = *cmv.m
 	case "pastel.supernode.MetricsAggregate.report_count":
 		x.ReportCount = value.Uint()
-	case "pastel.supernode.MetricsAggregate.last_updated":
-		x.LastUpdated = value.Message().Interface().(*timestamppb.Timestamp)
+	case "pastel.supernode.MetricsAggregate.height":
+		x.Height = value.Int()
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.MetricsAggregate"))
@@ -322,13 +322,10 @@ func (x *fastReflection_MetricsAggregate) Mutable(fd protoreflect.FieldDescripto
 		}
 		value := &_MetricsAggregate_1_map{m: &x.Metrics}
 		return protoreflect.ValueOfMap(value)
-	case "pastel.supernode.MetricsAggregate.last_updated":
-		if x.LastUpdated == nil {
-			x.LastUpdated = new(timestamppb.Timestamp)
-		}
-		return protoreflect.ValueOfMessage(x.LastUpdated.ProtoReflect())
 	case "pastel.supernode.MetricsAggregate.report_count":
 		panic(fmt.Errorf("field report_count of message pastel.supernode.MetricsAggregate is not mutable"))
+	case "pastel.supernode.MetricsAggregate.height":
+		panic(fmt.Errorf("field height of message pastel.supernode.MetricsAggregate is not mutable"))
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.MetricsAggregate"))
@@ -347,9 +344,8 @@ func (x *fastReflection_MetricsAggregate) NewField(fd protoreflect.FieldDescript
 		return protoreflect.ValueOfMap(&_MetricsAggregate_1_map{m: &m})
 	case "pastel.supernode.MetricsAggregate.report_count":
 		return protoreflect.ValueOfUint64(uint64(0))
-	case "pastel.supernode.MetricsAggregate.last_updated":
-		m := new(timestamppb.Timestamp)
-		return protoreflect.ValueOfMessage(m.ProtoReflect())
+	case "pastel.supernode.MetricsAggregate.height":
+		return protoreflect.ValueOfInt64(int64(0))
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: pastel.supernode.MetricsAggregate"))
@@ -443,9 +439,8 @@ func (x *fastReflection_MetricsAggregate) ProtoMethods() *protoiface.Methods {
 		if x.ReportCount != 0 {
 			n += 1 + runtime.Sov(uint64(x.ReportCount))
 		}
-		if x.LastUpdated != nil {
-			l = options.Size(x.LastUpdated)
-			n += 1 + l + runtime.Sov(uint64(l))
+		if x.Height != 0 {
+			n += 1 + runtime.Sov(uint64(x.Height))
 		}
 		if x.unknownFields != nil {
 			n += len(x.unknownFields)
@@ -476,19 +471,10 @@ func (x *fastReflection_MetricsAggregate) ProtoMethods() *protoiface.Methods {
 			i -= len(x.unknownFields)
 			copy(dAtA[i:], x.unknownFields)
 		}
-		if x.LastUpdated != nil {
-			encoded, err := options.Marshal(x.LastUpdated)
-			if err != nil {
-				return protoiface.MarshalOutput{
-					NoUnkeyedLiterals: input.NoUnkeyedLiterals,
-					Buf:               input.Buf,
-				}, err
-			}
-			i -= len(encoded)
-			copy(dAtA[i:], encoded)
-			i = runtime.EncodeVarint(dAtA, i, uint64(len(encoded)))
+		if x.Height != 0 {
+			i = runtime.EncodeVarint(dAtA, i, uint64(x.Height))
 			i--
-			dAtA[i] = 0x1a
+			dAtA[i] = 0x18
 		}
 		if x.ReportCount != 0 {
 			i = runtime.EncodeVarint(dAtA, i, uint64(x.ReportCount))
@@ -712,10 +698,10 @@ func (x *fastReflection_MetricsAggregate) ProtoMethods() *protoiface.Methods {
 					}
 				}
 			case 3:
-				if wireType != 2 {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: wrong wireType = %d for field LastUpdated", wireType)
+				if wireType != 0 {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: wrong wireType = %d for field Height", wireType)
 				}
-				var msglen int
+				x.Height = 0
 				for shift := uint(0); ; shift += 7 {
 					if shift >= 64 {
 						return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrIntOverflow
@@ -725,28 +711,11 @@ func (x *fastReflection_MetricsAggregate) ProtoMethods() *protoiface.Methods {
 					}
 					b := dAtA[iNdEx]
 					iNdEx++
-					msglen |= int(b&0x7F) << shift
+					x.Height |= int64(b&0x7F) << shift
 					if b < 0x80 {
 						break
 					}
 				}
-				if msglen < 0 {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
-				}
-				postIndex := iNdEx + msglen
-				if postIndex < 0 {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
-				}
-				if postIndex > l {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
-				}
-				if x.LastUpdated == nil {
-					x.LastUpdated = &timestamppb.Timestamp{}
-				}
-				if err := options.Unmarshal(dAtA[iNdEx:postIndex], x.LastUpdated); err != nil {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, err
-				}
-				iNdEx = postIndex
 			default:
 				iNdEx = preIndex
 				skippy, err := runtime.Skip(dAtA[iNdEx:])
@@ -800,9 +769,9 @@ type MetricsAggregate struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Metrics     map[string]float64     `protobuf:"bytes,1,rep,name=metrics,proto3" json:"metrics,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"fixed64,2,opt,name=value,proto3"`
-	ReportCount uint64                 `protobuf:"varint,2,opt,name=report_count,json=reportCount,proto3" json:"report_count,omitempty"`
-	LastUpdated *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=last_updated,json=lastUpdated,proto3" json:"last_updated,omitempty"`
+	Metrics     map[string]float64 `protobuf:"bytes,1,rep,name=metrics,proto3" json:"metrics,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"fixed64,2,opt,name=value,proto3"`
+	ReportCount uint64             `protobuf:"varint,2,opt,name=report_count,json=reportCount,proto3" json:"report_count,omitempty"`
+	Height      int64              `protobuf:"varint,3,opt,name=height,proto3" json:"height,omitempty"`
 }
 
 func (x *MetricsAggregate) Reset() {
@@ -839,11 +808,11 @@ func (x *MetricsAggregate) GetReportCount() uint64 {
 	return 0
 }
 
-func (x *MetricsAggregate) GetLastUpdated() *timestamppb.Timestamp {
+func (x *MetricsAggregate) GetHeight() int64 {
 	if x != nil {
-		return x.LastUpdated
+		return x.Height
 	}
-	return nil
+	return 0
 }
 
 var File_pastel_supernode_metrics_aggregate_proto protoreflect.FileDescriptor
@@ -856,7 +825,7 @@ var file_pastel_supernode_metrics_aggregate_proto_rawDesc = []byte{
 	0x6f, 0x67, 0x6c, 0x65, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2f, 0x74, 0x69,
 	0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x1a, 0x14, 0x67,
 	0x6f, 0x67, 0x6f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x67, 0x6f, 0x67, 0x6f, 0x2e, 0x70, 0x72,
-	0x6f, 0x74, 0x6f, 0x22, 0x85, 0x02, 0x0a, 0x10, 0x4d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x73, 0x41,
+	0x6f, 0x74, 0x6f, 0x22, 0xd4, 0x01, 0x0a, 0x10, 0x4d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x73, 0x41,
 	0x67, 0x67, 0x72, 0x65, 0x67, 0x61, 0x74, 0x65, 0x12, 0x49, 0x0a, 0x07, 0x6d, 0x65, 0x74, 0x72,
 	0x69, 0x63, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x2f, 0x2e, 0x70, 0x61, 0x73, 0x74,
 	0x65, 0x6c, 0x2e, 0x73, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0x2e, 0x4d, 0x65, 0x74,
@@ -864,28 +833,25 @@ var file_pastel_supernode_metrics_aggregate_proto_rawDesc = []byte{
 	0x74, 0x72, 0x69, 0x63, 0x73, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x52, 0x07, 0x6d, 0x65, 0x74, 0x72,
 	0x69, 0x63, 0x73, 0x12, 0x21, 0x0a, 0x0c, 0x72, 0x65, 0x70, 0x6f, 0x72, 0x74, 0x5f, 0x63, 0x6f,
 	0x75, 0x6e, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x52, 0x0b, 0x72, 0x65, 0x70, 0x6f, 0x72,
-	0x74, 0x43, 0x6f, 0x75, 0x6e, 0x74, 0x12, 0x47, 0x0a, 0x0c, 0x6c, 0x61, 0x73, 0x74, 0x5f, 0x75,
-	0x70, 0x64, 0x61, 0x74, 0x65, 0x64, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1a, 0x2e, 0x67,
-	0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x54,
-	0x69, 0x6d, 0x65, 0x73, 0x74, 0x61, 0x6d, 0x70, 0x42, 0x08, 0xc8, 0xde, 0x1f, 0x00, 0x90, 0xdf,
-	0x1f, 0x01, 0x52, 0x0b, 0x6c, 0x61, 0x73, 0x74, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x64, 0x1a,
-	0x3a, 0x0a, 0x0c, 0x4d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x73, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x12,
-	0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x6b, 0x65,
-	0x79, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x01,
-	0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38, 0x01, 0x42, 0xc4, 0x01, 0x0a, 0x14,
-	0x63, 0x6f, 0x6d, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2e, 0x73, 0x75, 0x70, 0x65, 0x72,
-	0x6e, 0x6f, 0x64, 0x65, 0x42, 0x15, 0x4d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x73, 0x41, 0x67, 0x67,
-	0x72, 0x65, 0x67, 0x61, 0x74, 0x65, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x50, 0x01, 0x5a, 0x34, 0x67,
-	0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c,
-	0x6e, 0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2f, 0x61,
-	0x70, 0x69, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2f, 0x73, 0x75, 0x70, 0x65, 0x72, 0x6e,
-	0x6f, 0x64, 0x65, 0xa2, 0x02, 0x03, 0x50, 0x53, 0x58, 0xaa, 0x02, 0x10, 0x50, 0x61, 0x73, 0x74,
-	0x65, 0x6c, 0x2e, 0x53, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0xca, 0x02, 0x10, 0x50,
-	0x61, 0x73, 0x74, 0x65, 0x6c, 0x5c, 0x53, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0xe2,
-	0x02, 0x1c, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x5c, 0x53, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f,
-	0x64, 0x65, 0x5c, 0x47, 0x50, 0x42, 0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0xea, 0x02,
-	0x11, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x3a, 0x3a, 0x53, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f,
-	0x64, 0x65, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x74, 0x43, 0x6f, 0x75, 0x6e, 0x74, 0x12, 0x16, 0x0a, 0x06, 0x68, 0x65, 0x69, 0x67, 0x68, 0x74,
+	0x18, 0x03, 0x20, 0x01, 0x28, 0x03, 0x52, 0x06, 0x68, 0x65, 0x69, 0x67, 0x68, 0x74, 0x1a, 0x3a,
+	0x0a, 0x0c, 0x4d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x73, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x12, 0x10,
+	0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x6b, 0x65, 0x79,
+	0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x01, 0x52,
+	0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38, 0x01, 0x42, 0xc4, 0x01, 0x0a, 0x14, 0x63,
+	0x6f, 0x6d, 0x2e, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2e, 0x73, 0x75, 0x70, 0x65, 0x72, 0x6e,
+	0x6f, 0x64, 0x65, 0x42, 0x15, 0x4d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x73, 0x41, 0x67, 0x67, 0x72,
+	0x65, 0x67, 0x61, 0x74, 0x65, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x50, 0x01, 0x5a, 0x34, 0x67, 0x69,
+	0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x6e,
+	0x65, 0x74, 0x77, 0x6f, 0x72, 0x6b, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2f, 0x61, 0x70,
+	0x69, 0x2f, 0x70, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x2f, 0x73, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f,
+	0x64, 0x65, 0xa2, 0x02, 0x03, 0x50, 0x53, 0x58, 0xaa, 0x02, 0x10, 0x50, 0x61, 0x73, 0x74, 0x65,
+	0x6c, 0x2e, 0x53, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0xca, 0x02, 0x10, 0x50, 0x61,
+	0x73, 0x74, 0x65, 0x6c, 0x5c, 0x53, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64, 0x65, 0xe2, 0x02,
+	0x1c, 0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x5c, 0x53, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64,
+	0x65, 0x5c, 0x47, 0x50, 0x42, 0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0xea, 0x02, 0x11,
+	0x50, 0x61, 0x73, 0x74, 0x65, 0x6c, 0x3a, 0x3a, 0x53, 0x75, 0x70, 0x65, 0x72, 0x6e, 0x6f, 0x64,
+	0x65, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -902,18 +868,16 @@ func file_pastel_supernode_metrics_aggregate_proto_rawDescGZIP() []byte {
 
 var file_pastel_supernode_metrics_aggregate_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_pastel_supernode_metrics_aggregate_proto_goTypes = []interface{}{
-	(*MetricsAggregate)(nil),      // 0: pastel.supernode.MetricsAggregate
-	nil,                           // 1: pastel.supernode.MetricsAggregate.MetricsEntry
-	(*timestamppb.Timestamp)(nil), // 2: google.protobuf.Timestamp
+	(*MetricsAggregate)(nil), // 0: pastel.supernode.MetricsAggregate
+	nil,                      // 1: pastel.supernode.MetricsAggregate.MetricsEntry
 }
 var file_pastel_supernode_metrics_aggregate_proto_depIdxs = []int32{
 	1, // 0: pastel.supernode.MetricsAggregate.metrics:type_name -> pastel.supernode.MetricsAggregate.MetricsEntry
-	2, // 1: pastel.supernode.MetricsAggregate.last_updated:type_name -> google.protobuf.Timestamp
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	1, // [1:1] is the sub-list for method output_type
+	1, // [1:1] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_pastel_supernode_metrics_aggregate_proto_init() }

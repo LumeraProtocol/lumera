@@ -11,15 +11,27 @@ import (
 )
 
 // GetAddressFromPubKey generates a base58-encoded address from a hex-encoded public key.
-// It follows these steps:
-// 1. Decode the hex public key
-// 2. Perform SHA256 hash on the public key
-// 3. Perform RIPEMD160 hash on the result of SHA256
-// 4. Prepend version bytes
-// 5. Calculate checksum (double SHA256)
-// 6. Append checksum to versioned payload
-// 7. Encode the result in base58
+// The function implements the following address generation algorithm:
+// 1. Decode the hex-encoded public key string to bytes
+// 2. Compute SHA256 hash of the public key bytes
+// 3. Compute RIPEMD160 hash of the SHA256 result
+// 4. Prepend version bytes (0x0c, 0xe3)
+// 5. Compute checksum by double SHA256 of the versioned payload
+// 6. Append 4-byte checksum to the versioned payload
+// 7. Encode final bytes in base58
+//
+// Parameters:
+//   - pubKey: Hex-encoded string of the public key
+//
+// Returns:
+//   - string: Base58-encoded address
+//   - error: Error if public key is empty, invalid hex, or processing fails
 func GetAddressFromPubKey(pubKey string) (string, error) {
+	// Check for empty public key
+	if pubKey == "" {
+		return "", fmt.Errorf("public key cannot be empty")
+	}
+
 	// Decode the hex-encoded public key
 	publicKeyBytes, err := hex.DecodeString(pubKey)
 	if err != nil {
@@ -52,9 +64,16 @@ func GetAddressFromPubKey(pubKey string) (string, error) {
 	return address, nil
 }
 
-// VerifySignature verifies a signature against a message using a given public key.
-// It takes hex-encoded strings for the public key and signature, and a plain string for the message.
-// Returns true if the signature is valid, false otherwise.
+// VerifySignature verifies a secp256k1 signature against a message using a given public key.
+//
+// Parameters:
+//   - compressedPubKeyHex: Hex-encoded 33-byte compressed public key (starting with 0x02 or 0x03)
+//   - message: Plain text message that was signed
+//   - signatureHex: Hex-encoded 65-byte signature (1 byte recovery ID + 64 bytes signature)
+//
+// Returns:
+//   - bool: True if signature is valid, false otherwise
+//   - error: Error if inputs are invalid (wrong length, format) or processing fails
 func VerifySignature(compressedPubKeyHex string, message string, signatureHex string) (bool, error) {
 	// Decode the hex-encoded public key
 	compressedPubKey, err := hex.DecodeString(compressedPubKeyHex)
@@ -91,4 +110,47 @@ func VerifySignature(compressedPubKeyHex string, message string, signatureHex st
 
 	// Verify the signature
 	return pubKey.VerifySignature(messageHash[:], signatureToVerify), nil
+}
+
+// GenerateKeyPair generates a new secp256k1 private/public key pair.
+//
+// Returns:
+//   - *secp256k1.PrivKey: Generated private key
+//   - *secp256k1.PubKey: Corresponding public key
+func GenerateKeyPair() (*secp256k1.PrivKey, *secp256k1.PubKey) {
+	privKey := secp256k1.GenPrivKey()
+	pubKey := privKey.PubKey().(*secp256k1.PubKey)
+	return privKey, pubKey
+}
+
+// SignMessage signs a message using the secp256k1 private key.
+// The message is first hashed with SHA256, then signed.
+// A recovery byte (27) is prepended to the signature for compatibility.
+//
+// Parameters:
+//   - privKey: secp256k1 private key used for signing
+//   - message: Plain text message to sign
+//
+// Returns:
+//   - string: Hex-encoded 65-byte signature (1 byte recovery ID + 64 bytes signature)
+//   - error: Error if private key is nil or signing fails
+func SignMessage(privKey *secp256k1.PrivKey, message string) (string, error) {
+	if privKey == nil {
+		return "", fmt.Errorf("private key cannot be nil")
+	}
+
+	// Hash the message first as per the verification function
+	messageHash := sha256.Sum256([]byte(message))
+
+	// Sign the hash
+	signature, err := privKey.Sign(messageHash[:])
+	if err != nil {
+		return "", fmt.Errorf("failed to sign message: %w", err)
+	}
+
+	// Convert to hex string
+	// Add recovery byte (27 + recovery_id) at the beginning
+	// Default to 27 (recovery_id = 0) for simplicity
+	signatureWithRecovery := append([]byte{27}, signature...)
+	return hex.EncodeToString(signatureWithRecovery), nil
 }

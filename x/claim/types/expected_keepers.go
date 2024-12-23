@@ -13,6 +13,7 @@ type AccountKeeper interface {
 	SetAccount(context.Context, sdk.AccountI)
 	GetModuleAccount(ctx context.Context, moduleName string) sdk.ModuleAccountI
 	SetModuleAccount(ctx context.Context, macc sdk.ModuleAccountI)
+	NewAccountWithAddress(context.Context, sdk.AccAddress) sdk.AccountI
 }
 
 // BankKeeper defines expected bank keeper methods

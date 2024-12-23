@@ -20,6 +20,9 @@ accounts:
   - name: faucet_account
     coins: ['1000000upsl']              # 1,000,000 upsl    --> 1 psl
 
+  - name: genesis_validator1
+    coins: ['100000000000upsl']       # 1,000,000,000,000 upsl --> 1,000,000 psl
+
 faucet:
   name: faucet_account
   coins:
@@ -27,14 +30,18 @@ faucet:
   coins_max:
     - '100upsl'
 
-#validators:
-#  - name: genesis_validator1
-#    bonded: '5000000000000upsl'
+validators:
+  - name: genesis_validator1
+    bonded: '100000000000upsl'
 
 
 genesis:
   chain_id: pastel-devnet-1
   app_state:
+    claim:
+      total_claimable_amount: '12499999971624' # 12,500,000,000,000 upsl --> 12,500,000 psl
+      params:
+        claim_end_time: '1746071999' # April 30 2025, 23:59:59
     distribution:
       params:
         community_tax:         '0.020000000000000000'

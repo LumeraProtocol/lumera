@@ -120,17 +120,15 @@ func loadClaimRecordsFromCSV() ([]types.ClaimRecord, error) {
 	records := make([]types.ClaimRecord, 0, len(rows)-1) // Pre-allocate with capacity
 	for _, row := range rows[1:] {                       // Skip header row
 		if len(row) < 2 { // Minimum required fields: address and balance
-			continue
+			panic(fmt.Sprintf("invalid CSV row: %v", row))
 		}
 
-		coin, err := sdk.ParseCoinNormalized(row[1]) // Balance is in second column
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse coin: %w", err)
+		balance, ok := math.NewIntFromString(row[1]) // Balance is in second column
+		if !ok {
+			panic(fmt.Sprintf("invalid balance in CSV row: %v", row))
 		}
 
-		if coin.Amount.IsZero() {
-			continue
-		}
+		coin := sdk.NewCoin(types.DefaultDenom, balance)
 
 		records = append(records, types.ClaimRecord{
 			OldAddress: row[0], // Address is in first column

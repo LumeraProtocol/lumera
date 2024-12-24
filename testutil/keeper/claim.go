@@ -107,6 +107,10 @@ func (k *MockAccountKeeper) SetModuleAccount(ctx context.Context, macc sdk.Modul
 	k.moduleAccounts[macc.GetName()] = macc
 }
 
+func (k *MockAccountKeeper) NewAccountWithAddress(ctx context.Context, addr sdk.AccAddress) sdk.AccountI {
+	return authtypes.NewBaseAccountWithAddress(addr)
+}
+
 func ClaimKeeper(t testing.TB) (keeper.Keeper, sdk.Context) {
 	storeKey := storetypes.NewKVStoreKey(types.StoreKey)
 

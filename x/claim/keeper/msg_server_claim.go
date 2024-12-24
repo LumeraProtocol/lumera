@@ -78,6 +78,14 @@ func (k msgServer) Claim(goCtx context.Context, msg *types.MsgClaim) (*types.Msg
 	if err != nil {
 		return nil, err
 	}
+
+	// Check if account exists, create if it doesn't
+	acc := k.accountKeeper.GetAccount(ctx, destAddr)
+	if acc == nil {
+		acc = k.accountKeeper.NewAccountWithAddress(ctx, destAddr)
+		k.accountKeeper.SetAccount(ctx, acc)
+	}
+
 	// Send coins from module to the new address
 	err = k.bankKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, destAddr, claimRecord.Balance)
 	if err != nil {

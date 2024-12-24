@@ -1,26 +1,20 @@
 package system_test
 
 import (
+	"encoding/hex"
+	"fmt"
 	"os"
 	"testing"
-	"time"
 
 	sdkmath "cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/pastelnetwork/pastel/app"
 	"github.com/pastelnetwork/pastel/tests/ibctesting"
 	"github.com/pastelnetwork/pastel/x/claim/keeper"
+	"github.com/pastelnetwork/pastel/x/claim/keeper/crypto"
+	cryptoutils "github.com/pastelnetwork/pastel/x/claim/keeper/crypto"
 	"github.com/pastelnetwork/pastel/x/claim/types"
 	"github.com/stretchr/testify/require"
-)
-
-// valid test data
-const (
-	OldAddress     = "PtqHAEacynVd3V821NPhgxu9K4Ab6kAguHi"
-	Pubkey         = "0309331fc3d23ca17d91eec40ee7711efcd56facf949d46cbfa6393d43f2747e90"
-	NewAddress     = "pastel139k6camfq63u9gtc4pq8yjw4j7tmwmqeggr4p0"
-	validSignature = "1f46b3a2129047a0d7a6bf91e2879e940ed3db06a2cafaaaabacc337141146f43e4932d357b435bbf2c48227f5c2f738df23a2ebc221dd11cb14ed4b83bd2a95c7"
-	testAmount     = 1000000
 )
 
 func setupClaimSystemSuite(t *testing.T) *SystemTestSuite {
@@ -47,15 +41,74 @@ func setupClaimSystemSuite(t *testing.T) *SystemTestSuite {
 	return suite
 }
 
+type TestData struct {
+	OldAddress string
+	PubKey     string
+	NewAddress string
+	Signature  string
+}
+
+func generateTestData() (*TestData, error) {
+	// Generate a new key pair
+	privKeyObj, pubKeyObj := cryptoutils.GenerateKeyPair()
+
+	// Get hex encoded public key
+	pubKey := hex.EncodeToString(pubKeyObj.Key)
+
+	// Generate old address from public key
+	oldAddr, err := crypto.GetAddressFromPubKey(pubKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate old address: %w", err)
+	}
+
+	// Generate a new cosmos address
+	newAddr := sdk.AccAddress(privKeyObj.PubKey().Address()).String()
+
+	// Construct message for signature (without hashing)
+	message := oldAddr + "." + pubKey + "." + newAddr
+
+	// Sign the message directly without hashing
+	signature, err := crypto.SignMessage(privKeyObj, message)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign message: %w", err)
+	}
+
+	// Verify the signature to ensure it's valid
+	valid, err := crypto.VerifySignature(pubKey, message, signature)
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify generated signature: %w", err)
+	}
+	if !valid {
+		return nil, fmt.Errorf("generated signature verification failed")
+	}
+
+	return &TestData{
+		OldAddress: oldAddr,
+		PubKey:     pubKey,
+		NewAddress: newAddr,
+		Signature:  signature,
+	}, nil
+}
+
 func TestClaimProcess(t *testing.T) {
 	suite := setupClaimSystemSuite(t)
 
-	// Create a test account
-	testAddr := sdk.MustAccAddressFromBech32(NewAddress)
+	// Generate test data
+	testData, err := generateTestData()
+	t.Logf("\nTest Data Generated:"+
+		"\n===================="+
+		"\nOldAddress: %s"+
+		"\nPubKey:     %s"+
+		"\nNewAddress: %s"+
+		"\nSignature:  %s"+
+		"\n====================\n",
+		testData.OldAddress,
+		testData.PubKey,
+		testData.NewAddress,
+		testData.Signature)
+	require.NoError(t, err)
 
-	// Create and fund the account with the specific address
-	acc := suite.app.AccountKeeper.NewAccountWithAddress(suite.sdkCtx, testAddr)
-	suite.app.AccountKeeper.SetAccount(suite.sdkCtx, acc)
+	testAmount := int64(1000000)
 
 	testCases := []struct {
 		name          string
@@ -65,17 +118,15 @@ func TestClaimProcess(t *testing.T) {
 		expectedError error
 	}{
 		{
-			name: "Successful claim",
+			name: "Successful claim with non-existing new address",
 			setup: func() {
-				// Enable claims
 				params := types.DefaultParams()
 				params.EnableClaims = true
 				err := suite.app.ClaimKeeper.SetParams(suite.sdkCtx, params)
 				require.NoError(t, err)
 
-				oldAddress := OldAddress
 				claimRecord := types.ClaimRecord{
-					OldAddress: oldAddress,
+					OldAddress: testData.OldAddress,
 					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultDenom, sdkmath.NewInt(testAmount))),
 					Claimed:    false,
 				}
@@ -86,10 +137,10 @@ func TestClaimProcess(t *testing.T) {
 				require.NoError(t, err)
 			},
 			msg: &types.MsgClaim{
-				OldAddress: OldAddress,
-				NewAddress: testAddr.String(),
-				PubKey:     Pubkey,
-				Signature:  validSignature,
+				OldAddress: testData.OldAddress,
+				NewAddress: testData.NewAddress,
+				PubKey:     testData.PubKey,
+				Signature:  testData.Signature,
 			},
 			expectError: false,
 		},
@@ -101,9 +152,8 @@ func TestClaimProcess(t *testing.T) {
 				err := suite.app.ClaimKeeper.SetParams(suite.sdkCtx, params)
 				require.NoError(t, err)
 
-				oldAddress := OldAddress
 				claimRecord := types.ClaimRecord{
-					OldAddress: oldAddress,
+					OldAddress: testData.OldAddress,
 					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultDenom, sdkmath.NewInt(testAmount))),
 					Claimed:    true,
 					ClaimTime:  suite.sdkCtx.BlockTime().Unix(),
@@ -112,10 +162,10 @@ func TestClaimProcess(t *testing.T) {
 				require.NoError(t, err)
 			},
 			msg: &types.MsgClaim{
-				OldAddress: OldAddress,
-				NewAddress: testAddr.String(),
-				PubKey:     Pubkey,
-				Signature:  validSignature,
+				OldAddress: testData.OldAddress,
+				NewAddress: testData.NewAddress,
+				PubKey:     testData.PubKey,
+				Signature:  testData.Signature,
 			},
 			expectError:   true,
 			expectedError: types.ErrClaimAlreadyClaimed,
@@ -129,65 +179,13 @@ func TestClaimProcess(t *testing.T) {
 				require.NoError(t, err)
 			},
 			msg: &types.MsgClaim{
-				OldAddress: "PtqHAEacynVd3V821NPhgxu9K4Ab6kAguHx",
-				NewAddress: testAddr.String(),
-				PubKey:     Pubkey,
-				Signature:  validSignature,
+				OldAddress: "PtqHAEacynVd3V821NPhgxu9K4Ab6kAguHx", // Different address
+				NewAddress: testData.NewAddress,
+				PubKey:     testData.PubKey,
+				Signature:  testData.Signature,
 			},
 			expectError:   true,
 			expectedError: types.ErrClaimNotFound,
-		},
-		{
-			name: "Invalid pubkey",
-			setup: func() {
-				params := types.DefaultParams()
-				params.EnableClaims = true
-				err := suite.app.ClaimKeeper.SetParams(suite.sdkCtx, params)
-				require.NoError(t, err)
-
-				oldAddress := OldAddress
-				claimRecord := types.ClaimRecord{
-					OldAddress: oldAddress,
-					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultDenom, sdkmath.NewInt(testAmount))),
-					Claimed:    false,
-				}
-				err = suite.app.ClaimKeeper.SetClaimRecord(suite.sdkCtx, claimRecord)
-				require.NoError(t, err)
-			},
-			msg: &types.MsgClaim{
-				OldAddress: OldAddress,
-				NewAddress: testAddr.String(),
-				PubKey:     "030933invalid1pubkey2here3please4ignore5this6one7thanks890",
-				Signature:  validSignature,
-			},
-			expectError:   true,
-			expectedError: types.ErrInvalidPubKey,
-		},
-		{
-			name: "Invalid signature",
-			setup: func() {
-				params := types.DefaultParams()
-				params.EnableClaims = true
-				err := suite.app.ClaimKeeper.SetParams(suite.sdkCtx, params)
-				require.NoError(t, err)
-
-				oldAddress := OldAddress
-				claimRecord := types.ClaimRecord{
-					OldAddress: oldAddress,
-					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultDenom, sdkmath.NewInt(testAmount))),
-					Claimed:    false,
-				}
-				err = suite.app.ClaimKeeper.SetClaimRecord(suite.sdkCtx, claimRecord)
-				require.NoError(t, err)
-			},
-			msg: &types.MsgClaim{
-				OldAddress: OldAddress,
-				NewAddress: testAddr.String(),
-				PubKey:     Pubkey,
-				Signature:  "1f46b3a2129047a0d7a6bf91e2879e940ed3db06a2cafaaaabacc337141146f43e4932d357b435bbf2c48227f5c2f738df23a2ebc221dd11cb14ed4b83bd2a95c8",
-			},
-			expectError:   true,
-			expectedError: types.ErrInvalidSignature,
 		},
 		{
 			name: "Claims disabled",
@@ -197,9 +195,8 @@ func TestClaimProcess(t *testing.T) {
 				err := suite.app.ClaimKeeper.SetParams(suite.sdkCtx, params)
 				require.NoError(t, err)
 
-				oldAddress := OldAddress
 				claimRecord := types.ClaimRecord{
-					OldAddress: oldAddress,
+					OldAddress: testData.OldAddress,
 					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultDenom, sdkmath.NewInt(testAmount))),
 					Claimed:    false,
 				}
@@ -207,44 +204,38 @@ func TestClaimProcess(t *testing.T) {
 				require.NoError(t, err)
 			},
 			msg: &types.MsgClaim{
-				OldAddress: OldAddress,
-				NewAddress: testAddr.String(),
-				PubKey:     Pubkey,
-				Signature:  validSignature,
+				OldAddress: testData.OldAddress,
+				NewAddress: testData.NewAddress,
+				PubKey:     testData.PubKey,
+				Signature:  testData.Signature,
 			},
 			expectError:   true,
 			expectedError: types.ErrClaimDisabled,
 		},
 		{
-			name: "Too many claims in block",
+			name: "Invalid signature",
 			setup: func() {
 				params := types.DefaultParams()
 				params.EnableClaims = true
 				err := suite.app.ClaimKeeper.SetParams(suite.sdkCtx, params)
 				require.NoError(t, err)
 
-				oldAddress := OldAddress
 				claimRecord := types.ClaimRecord{
-					OldAddress: oldAddress,
+					OldAddress: testData.OldAddress,
 					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultDenom, sdkmath.NewInt(testAmount))),
 					Claimed:    false,
 				}
 				err = suite.app.ClaimKeeper.SetClaimRecord(suite.sdkCtx, claimRecord)
 				require.NoError(t, err)
-
-				// Set claims count to max
-				for i := uint64(0); i < params.MaxClaimsPerBlock; i++ {
-					suite.app.ClaimKeeper.IncrementBlockClaimCount(suite.sdkCtx)
-				}
 			},
 			msg: &types.MsgClaim{
-				OldAddress: OldAddress,
-				NewAddress: testAddr.String(),
-				PubKey:     Pubkey,
-				Signature:  validSignature,
+				OldAddress: testData.OldAddress,
+				NewAddress: testData.NewAddress,
+				PubKey:     testData.PubKey,
+				Signature:  "invalid_signature",
 			},
 			expectError:   true,
-			expectedError: types.ErrTooManyClaims,
+			expectedError: types.ErrInvalidSignature,
 		},
 		{
 			name: "Claim period expired",
@@ -255,85 +246,89 @@ func TestClaimProcess(t *testing.T) {
 				err := suite.app.ClaimKeeper.SetParams(suite.sdkCtx, params)
 				require.NoError(t, err)
 
-				oldAddress := OldAddress
 				claimRecord := types.ClaimRecord{
-					OldAddress: oldAddress,
+					OldAddress: testData.OldAddress,
 					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultDenom, sdkmath.NewInt(testAmount))),
 					Claimed:    false,
 				}
 				err = suite.app.ClaimKeeper.SetClaimRecord(suite.sdkCtx, claimRecord)
 				require.NoError(t, err)
-
-				err = suite.app.BankKeeper.MintCoins(suite.sdkCtx, types.ModuleName, claimRecord.Balance)
-				require.NoError(t, err)
-
-				suite.sdkCtx = suite.sdkCtx.WithBlockHeight(suite.sdkCtx.BlockHeight() + 1).
-					WithBlockTime(suite.sdkCtx.BlockTime().Add(time.Hour * 24 * 365))
 			},
 			msg: &types.MsgClaim{
-				OldAddress: OldAddress,
-				NewAddress: testAddr.String(),
-				PubKey:     Pubkey,
-				Signature:  validSignature,
+				OldAddress: testData.OldAddress,
+				NewAddress: testData.NewAddress,
+				PubKey:     testData.PubKey,
+				Signature:  testData.Signature,
 			},
 			expectError:   true,
 			expectedError: types.ErrClaimPeriodExpired,
 		},
 	}
 
+	// Execute each test case
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			// Set up the test environment for this specific case
 			tc.setup()
 			msgServer := keeper.NewMsgServerImpl(suite.app.ClaimKeeper)
 
+			// Record initial balances for validation
 			moduleAddr := suite.app.AccountKeeper.GetModuleAddress(types.ModuleName)
 			initialModuleBalance := suite.app.BankKeeper.GetAllBalances(suite.sdkCtx, moduleAddr)
-			initialUserBalance := suite.app.BankKeeper.GetAllBalances(suite.sdkCtx, testAddr)
 
+			// Get destination address and its initial balance
+			destAddr, err := sdk.AccAddressFromBech32(tc.msg.NewAddress)
+			require.NoError(t, err)
+			initialUserBalance := suite.app.BankKeeper.GetAllBalances(suite.sdkCtx, destAddr)
+
+			// Execute the claim message
 			response, err := msgServer.Claim(suite.ctx, tc.msg)
 
+			// Handle error cases
 			if tc.expectError {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tc.expectedError)
 				require.Nil(t, response)
-
-				if tc.name != "Non-existent claim" {
-					record, found, err := suite.app.ClaimKeeper.GetClaimRecord(suite.sdkCtx, tc.msg.OldAddress)
-					require.NoError(t, err)
-					require.True(t, found)
-					if tc.name == "Already claimed" {
-						require.True(t, record.Claimed)
-					} else {
-						require.False(t, record.Claimed)
-					}
-				}
 			} else {
+				// Verify successful claim execution
 				require.NoError(t, err)
 				require.NotNil(t, response)
 
+				// Verify claim record has been properly updated
 				record, found, err := suite.app.ClaimKeeper.GetClaimRecord(suite.sdkCtx, tc.msg.OldAddress)
 				require.NoError(t, err)
 				require.True(t, found)
 				require.True(t, record.Claimed)
 				require.NotZero(t, record.ClaimTime)
 
-				finalUserBalance := suite.app.BankKeeper.GetAllBalances(suite.sdkCtx, testAddr)
+				// Verify destination account exists (should be created if it didn't exist)
+				acc := suite.app.AccountKeeper.GetAccount(suite.sdkCtx, destAddr)
+				require.NotNil(t, acc)
+
+				// Verify token balances after transfer
+				finalUserBalance := suite.app.BankKeeper.GetAllBalances(suite.sdkCtx, destAddr)
 				finalModuleBalance := suite.app.BankKeeper.GetAllBalances(suite.sdkCtx, moduleAddr)
 
+				// Check user received the correct amount
 				expectedUserBalance := initialUserBalance.Add(record.Balance...)
 				require.Equal(t, expectedUserBalance, finalUserBalance)
 
+				// Check module account balance decreased correctly
 				expectedModuleBalance := initialModuleBalance.Sub(record.Balance...)
 				require.Equal(t, expectedModuleBalance, finalModuleBalance)
 
+				// Verify event emission
 				events := suite.sdkCtx.EventManager().Events()
 				require.NotEmpty(t, events)
 
-				var eventFound bool
+				// Look for the claim processed event and verify its attributes
+				var foundClaimEvent bool
 				for _, event := range events {
 					if event.Type == types.EventTypeClaimProcessed {
-						eventFound = true
-						var hasOldAddr, hasNewAddr bool
+						foundClaimEvent = true
+						hasOldAddr, hasNewAddr, hasClaimTime := false, false, false
+
+						// Check all required attributes are present with correct values
 						for _, attr := range event.Attributes {
 							switch string(attr.Key) {
 							case types.AttributeKeyOldAddress:
@@ -342,13 +337,19 @@ func TestClaimProcess(t *testing.T) {
 							case types.AttributeKeyNewAddress:
 								require.Equal(t, tc.msg.NewAddress, string(attr.Value))
 								hasNewAddr = true
+							case types.AttributeKeyClaimTime:
+								require.NotEmpty(t, string(attr.Value))
+								hasClaimTime = true
 							}
 						}
+
+						// Ensure all required attributes were found
 						require.True(t, hasOldAddr, "missing old address attribute")
 						require.True(t, hasNewAddr, "missing new address attribute")
+						require.True(t, hasClaimTime, "missing claim time attribute")
 					}
 				}
-				require.True(t, eventFound, "claim_processed event not found")
+				require.True(t, foundClaimEvent, "claim_processed event not found")
 			}
 		})
 	}

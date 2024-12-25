@@ -99,16 +99,33 @@ func TestKeeper_SetAndQuerySuperNode(t *testing.T) {
 }
 
 func TestKeeper_GetAllSuperNodes(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// We'll add at least one state record so the SuperNode won't be skipped.
 	valAddr1 := sdk.ValAddress([]byte("val1"))
 	valAddr2 := sdk.ValAddress([]byte("val2"))
 
 	sn1 := types.SuperNode{
 		ValidatorAddress: valAddr1.String(),
 		Version:          "1.0.0",
+		States: []*types.SuperNodeStateRecord{
+			{
+				State:  types.SuperNodeStateActive,
+				Height: 1, // or any block height, e.g. 1
+			},
+		},
 	}
+
 	sn2 := types.SuperNode{
 		ValidatorAddress: valAddr2.String(),
 		Version:          "2.0.0",
+		States: []*types.SuperNodeStateRecord{
+			{
+				State:  types.SuperNodeStateActive,
+				Height: 1,
+			},
+		},
 	}
 
 	testCases := []struct {
@@ -121,7 +138,7 @@ func TestKeeper_GetAllSuperNodes(t *testing.T) {
 		{
 			name: "no supernodes",
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
-				// no setup
+				// no setup => store is empty
 			},
 			run: func(k keeper.Keeper, ctx sdk.Context) (interface{}, error) {
 				return k.GetAllSuperNodes(ctx)
@@ -162,8 +179,14 @@ func TestKeeper_GetAllSuperNodes(t *testing.T) {
 		{
 			name: "filter by state - only active",
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
+				sn2Updated := sn2
+				sn2Updated.States = append(sn2Updated.States, &types.SuperNodeStateRecord{
+					State:  types.SuperNodeStateDisabled,
+					Height: 2, // so the last state is Disabled
+				})
+
 				require.NoError(t, k.SetSuperNode(ctx, sn1))
-				require.NoError(t, k.SetSuperNode(ctx, sn2))
+				require.NoError(t, k.SetSuperNode(ctx, sn2Updated))
 			},
 			run: func(k keeper.Keeper, ctx sdk.Context) (interface{}, error) {
 				// Only return active supernodes
@@ -190,6 +213,22 @@ func TestKeeper_GetAllSuperNodes(t *testing.T) {
 			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context, result interface{}) {
 				snList := result.([]types.SuperNode)
 				require.Len(t, snList, 2)
+			},
+		},
+		{
+			name: "filter by state - skip non-active",
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
+				sn2Updated := sn2
+				sn2Updated.States = make([]*types.SuperNodeStateRecord, 0)
+				require.NoError(t, k.SetSuperNode(ctx, sn2Updated))
+			},
+			run: func(k keeper.Keeper, ctx sdk.Context) (interface{}, error) {
+				return k.GetAllSuperNodes(ctx, types.SuperNodeStateActive)
+			},
+			expectedErr: nil,
+			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context, result interface{}) {
+				snList := result.([]types.SuperNode)
+				require.Len(t, snList, 0)
 			},
 		},
 	}
@@ -223,33 +262,49 @@ func TestKeeper_GetAllSuperNodes(t *testing.T) {
 	}
 }
 
+// We define a helper to create a supernode with an initial state record.
+func makeSuperNodeWithOneState(valIndex int, state types.SuperNodeState) types.SuperNode {
+	// Use valIndex to produce a stable unique address
+	valAddr := sdk.ValAddress([]byte(fmt.Sprintf("val%d", valIndex)))
+	sn := types.SuperNode{
+		ValidatorAddress: valAddr.String(),
+		Version:          "1.0.0",
+		// Must have at least one record so we don't skip it
+		States: []*types.SuperNodeStateRecord{
+			{
+				State:  state, // e.g. Active, Stopped, etc.
+				Height: 1,     // arbitrary block for the "registration"
+			},
+		},
+	}
+	return sn
+}
+
 func TestKeeper_GetSuperNodesPaginated(t *testing.T) {
+	// We'll build a set of 5 supernodes. By default, let's make them all "Active" at Height=1.
 	supernodeCount := 5
 	supernodes := make([]types.SuperNode, supernodeCount)
 	for i := 0; i < supernodeCount; i++ {
-		sn := types.SuperNode{
-			ValidatorAddress: sdk.ValAddress([]byte(fmt.Sprintf("val%d", i))).String(),
-			Version:          "1.0.0",
-		}
+		sn := makeSuperNodeWithOneState(i, types.SuperNodeStateActive)
 		supernodes[i] = sn
 	}
 
 	testCases := []struct {
-		name        string
-		setupState  func(k keeper.Keeper, ctx sdk.Context)
-		pagination  *query.PageRequest
-		stateFilter []types.SuperNodeState
-		expectedErr error
-		checkResult func(t *testing.T, k keeper.Keeper, ctx sdk.Context, snRes []*types.SuperNode, pageRes *query.PageResponse)
+		name         string
+		setupState   func(k keeper.Keeper, ctx sdk.Context)
+		pagination   *query.PageRequest
+		stateFilters []types.SuperNodeState
+		expectedErr  error
+		checkResult  func(t *testing.T, k keeper.Keeper, ctx sdk.Context, snRes []*types.SuperNode, pageRes *query.PageResponse)
 	}{
 		{
 			name: "empty store, no results",
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
-				// no supernodes set
+				// no supernodes set => store is empty
 			},
-			pagination:  &query.PageRequest{Limit: 10},
-			stateFilter: []types.SuperNodeState{}, // no filter
-			expectedErr: nil,
+			pagination:   &query.PageRequest{Limit: 10},
+			stateFilters: []types.SuperNodeState{}, // no filter
+			expectedErr:  nil,
 			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context, snRes []*types.SuperNode, pageRes *query.PageResponse) {
 				require.Empty(t, snRes)
 				require.Nil(t, pageRes.NextKey)
@@ -258,13 +313,13 @@ func TestKeeper_GetSuperNodesPaginated(t *testing.T) {
 		{
 			name: "less results than limit",
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
-				// Set fewer supernodes than limit
+				// Set fewer supernodes than limit => only 2
 				require.NoError(t, k.SetSuperNode(ctx, supernodes[0]))
 				require.NoError(t, k.SetSuperNode(ctx, supernodes[1]))
 			},
-			pagination:  &query.PageRequest{Limit: 10}, // limit > total supernodes = 2
-			stateFilter: []types.SuperNodeState{},
-			expectedErr: nil,
+			pagination:   &query.PageRequest{Limit: 10}, // limit > total supernodes = 2
+			stateFilters: []types.SuperNodeState{},
+			expectedErr:  nil,
 			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context, snRes []*types.SuperNode, pageRes *query.PageResponse) {
 				require.Len(t, snRes, 2)
 				require.Nil(t, pageRes.NextKey)
@@ -277,9 +332,9 @@ func TestKeeper_GetSuperNodesPaginated(t *testing.T) {
 					require.NoError(t, k.SetSuperNode(ctx, sn))
 				}
 			},
-			pagination:  &query.PageRequest{Limit: uint64(supernodeCount)}, // exactly 5
-			stateFilter: []types.SuperNodeState{},
-			expectedErr: nil,
+			pagination:   &query.PageRequest{Limit: uint64(supernodeCount)}, // exactly 5
+			stateFilters: []types.SuperNodeState{},
+			expectedErr:  nil,
 			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context, snRes []*types.SuperNode, pageRes *query.PageResponse) {
 				require.Len(t, snRes, supernodeCount)
 				require.Nil(t, pageRes.NextKey)
@@ -292,14 +347,15 @@ func TestKeeper_GetSuperNodesPaginated(t *testing.T) {
 					require.NoError(t, k.SetSuperNode(ctx, sn))
 				}
 			},
-			pagination:  &query.PageRequest{Limit: 2},
-			stateFilter: []types.SuperNodeState{},
-			expectedErr: nil,
+			pagination:   &query.PageRequest{Limit: 2},
+			stateFilters: []types.SuperNodeState{},
+			expectedErr:  nil,
 			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context, snRes []*types.SuperNode, pageRes *query.PageResponse) {
+				// first call => 2 results
 				require.Len(t, snRes, 2)
 				require.NotNil(t, pageRes.NextKey)
 
-				// Fetch second page
+				// second page
 				secondPageSn, secondPageRes, err := k.GetSuperNodesPaginated(ctx, &query.PageRequest{
 					Key:   pageRes.NextKey,
 					Limit: 2,
@@ -308,7 +364,7 @@ func TestKeeper_GetSuperNodesPaginated(t *testing.T) {
 				require.Len(t, secondPageSn, 2)
 				require.NotNil(t, secondPageRes.NextKey)
 
-				// Third page
+				// third page => only 1 left
 				thirdPageSn, thirdPageRes, err := k.GetSuperNodesPaginated(ctx, &query.PageRequest{
 					Key:   secondPageRes.NextKey,
 					Limit: 2,
@@ -321,25 +377,26 @@ func TestKeeper_GetSuperNodesPaginated(t *testing.T) {
 		{
 			name: "filter by state (only active)",
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
-				// Set 3 active, 2 stopped
+				// We'll set 3 as active, 2 as stopped
+				// The first 3 are active, the last 2 become stopped
 				for i := 0; i < supernodeCount; i++ {
 					sn := supernodes[i]
 					if i >= 3 {
-						//sn.State = types.SuperNodeStateStopped
+						// override last state to be Stopped
+						sn.States[len(sn.States)-1].State = types.SuperNodeStateStopped
 					} else {
-						//sn.State = types.SuperNodeStateActive
+						// keep them active
+						sn.States[len(sn.States)-1].State = types.SuperNodeStateActive
 					}
 					require.NoError(t, k.SetSuperNode(ctx, sn))
 				}
 			},
-			pagination:  &query.PageRequest{Limit: 10},
-			stateFilter: []types.SuperNodeState{types.SuperNodeStateActive},
-			expectedErr: nil,
+			pagination:   &query.PageRequest{Limit: 10},
+			stateFilters: []types.SuperNodeState{types.SuperNodeStateActive},
+			expectedErr:  nil,
 			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context, snRes []*types.SuperNode, pageRes *query.PageResponse) {
+				// The first 3 are active, the last 2 are stopped => we expect 3
 				require.Len(t, snRes, 3)
-				/*for _, sn := range snRes {
-					//require.Equal(t, types.SuperNodeStateActive, sn.State)
-				}*/
 			},
 		},
 		{
@@ -349,11 +406,11 @@ func TestKeeper_GetSuperNodesPaginated(t *testing.T) {
 					require.NoError(t, k.SetSuperNode(ctx, sn))
 				}
 			},
-			pagination:  &query.PageRequest{Limit: 10},
-			stateFilter: []types.SuperNodeState{types.SuperNodeStateUnspecified},
-			expectedErr: nil,
+			pagination:   &query.PageRequest{Limit: 10},
+			stateFilters: []types.SuperNodeState{types.SuperNodeStateUnspecified},
+			expectedErr:  nil,
 			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context, snRes []*types.SuperNode, pageRes *query.PageResponse) {
-				require.Len(t, snRes, supernodeCount) // no filtering
+				require.Len(t, snRes, supernodeCount) // no filtering, so all 5
 			},
 		},
 	}
@@ -374,7 +431,7 @@ func TestKeeper_GetSuperNodesPaginated(t *testing.T) {
 				tc.setupState(k, ctx)
 			}
 
-			snRes, pageRes, err := k.GetSuperNodesPaginated(ctx, tc.pagination, tc.stateFilter...)
+			snRes, pageRes, err := k.GetSuperNodesPaginated(ctx, tc.pagination, tc.stateFilters...)
 			if tc.expectedErr != nil {
 				require.ErrorIs(t, err, tc.expectedErr)
 			} else {

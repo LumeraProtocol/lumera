@@ -33,31 +33,18 @@ func TestMsgServer_StartSupernode(t *testing.T) {
 		checkResult   func(t *testing.T, k keeper.Keeper, ctx sdk.Context)
 	}{
 		{
-			name: "successful start without ip change",
-			msg: &types.MsgStartSupernode{
-				Creator:          creatorAddr.String(),
-				ValidatorAddress: valAddr.String(),
-			},
-			setupMock: nil, // no specific mocks needed
-			setupState: func(k keeper.Keeper, ctx sdk.Context) {
-				// Put supernode in store
-				require.NoError(t, k.SetSuperNode(ctx, existingSupernode))
-			},
-			expectedError: nil,
-			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context) {
-				sn, found := k.QuerySuperNode(ctx, valAddr)
-				require.True(t, found)
-				require.Empty(t, sn.PrevIpAddresses)
-			},
-		},
-		{
-			name: "successful start with ip change",
+			name: "successful start",
 			msg: &types.MsgStartSupernode{
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 			},
 			setupMock: nil,
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
+				existingSupernode.PrevIpAddresses = []*types.IPAddressHistory{
+					{
+						Address: "192.168.1.1",
+					},
+				}
 				require.NoError(t, k.SetSuperNode(ctx, existingSupernode))
 			},
 			expectedError: nil,
@@ -95,6 +82,29 @@ func TestMsgServer_StartSupernode(t *testing.T) {
 			},
 			expectedError: sdkerrors.ErrUnauthorized,
 		},
+		{
+			name: "supernode already active",
+			msg: &types.MsgStartSupernode{
+				Creator:          creatorAddr.String(),
+				ValidatorAddress: valAddr.String(),
+			},
+			setupMock: nil,
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
+				existingSupernode.PrevIpAddresses = []*types.IPAddressHistory{
+					{
+						Address: "192.168.1.1",
+					},
+				}
+				existingSupernode.States = []*types.SuperNodeStateRecord{
+					{
+						State:  types.SuperNodeStateActive,
+						Height: 1,
+					},
+				}
+				require.NoError(t, k.SetSuperNode(ctx, existingSupernode))
+			},
+			expectedError: sdkerrors.ErrInvalidRequest,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -117,7 +127,7 @@ func TestMsgServer_StartSupernode(t *testing.T) {
 			}
 
 			msgServer := keeper.NewMsgServerImpl(k)
-			_, err := msgServer.StartSupernode(sdk.WrapSDKContext(ctx), tc.msg)
+			_, err := msgServer.StartSupernode(ctx, tc.msg)
 
 			if tc.expectedError != nil {
 				require.ErrorIs(t, err, tc.expectedError)

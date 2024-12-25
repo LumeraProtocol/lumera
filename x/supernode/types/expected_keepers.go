@@ -18,6 +18,7 @@ type StakingKeeper interface {
 	ConsensusAddressCodec() address.Codec
 	Validator(context.Context, sdk.ValAddress) (stakingtypes.ValidatorI, error)            // get a particular validator by operator address
 	ValidatorByConsAddr(context.Context, sdk.ConsAddress) (stakingtypes.ValidatorI, error) // get a particular validator by consensus address
+	Delegation(ctx context.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) (stakingtypes.Delegation, bool)
 }
 
 // SlashingKeeper defines the expected interface for the Slashing module.

@@ -63,7 +63,7 @@ func (k Keeper) GetAllSuperNodes(ctx sdk.Context, stateFilters ...types.SuperNod
 	defer iterator.Close()
 
 	var supernodes []types.SuperNode
-	//filtering := shouldFilter(stateFilters...)
+	filtering := shouldFilter(stateFilters...)
 
 	for ; iterator.Valid(); iterator.Next() {
 		bz := iterator.Value()
@@ -72,10 +72,13 @@ func (k Keeper) GetAllSuperNodes(ctx sdk.Context, stateFilters ...types.SuperNod
 			return nil, fmt.Errorf("failed to unmarshal supernode: %w", err)
 		}
 
-		/*
-			if !filtering || stateIn(sn.State, stateFilters...) {
-				supernodes = append(supernodes, sn)
-			}*/
+		if len(sn.States) == 0 {
+			continue
+		}
+
+		if !filtering || stateIn(sn.States[len(sn.States)-1].State, stateFilters...) {
+			supernodes = append(supernodes, sn)
+		}
 	}
 
 	return supernodes, nil
@@ -87,16 +90,21 @@ func (k Keeper) GetSuperNodesPaginated(ctx sdk.Context, pagination *query.PageRe
 	store := prefix.NewStore(storeAdapter, []byte(types.SuperNodeKey))
 
 	var supernodes []*types.SuperNode
-	//filtering := shouldFilter(stateFilters...)
+	filtering := shouldFilter(stateFilters...)
 
 	pageRes, err := query.Paginate(store, pagination, func(key, value []byte) error {
 		var sn types.SuperNode
 		if err := k.cdc.Unmarshal(value, &sn); err != nil {
 			return err
 		}
-		/*if !filtering || stateIn(sn.State, stateFilters...) {
+
+		if len(sn.States) == 0 {
+			return nil
+		}
+
+		if !filtering || stateIn(sn.States[len(sn.States)-1].State, stateFilters...) {
 			supernodes = append(supernodes, &sn)
-		}*/
+		}
 		return nil
 	})
 	if err != nil {

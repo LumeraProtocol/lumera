@@ -53,6 +53,21 @@ func (mr *MockStakingKeeperMockRecorder) ConsensusAddressCodec() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConsensusAddressCodec", reflect.TypeOf((*MockStakingKeeper)(nil).ConsensusAddressCodec))
 }
 
+// Delegation mocks base method.
+func (m *MockStakingKeeper) Delegation(ctx context.Context, delAddr types.AccAddress, valAddr types.ValAddress) (types0.Delegation, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Delegation", ctx, delAddr, valAddr)
+	ret0, _ := ret[0].(types0.Delegation)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// Delegation indicates an expected call of Delegation.
+func (mr *MockStakingKeeperMockRecorder) Delegation(ctx, delAddr, valAddr interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delegation", reflect.TypeOf((*MockStakingKeeper)(nil).Delegation), ctx, delAddr, valAddr)
+}
+
 // Validator mocks base method.
 func (m *MockStakingKeeper) Validator(arg0 context.Context, arg1 types.ValAddress) (types0.ValidatorI, error) {
 	m.ctrl.T.Helper()

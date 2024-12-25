@@ -26,6 +26,15 @@ func (k msgServer) StartSupernode(goCtx context.Context, msg *types.MsgStartSupe
 		return nil, err
 	}
 
+	if len(supernode.States) == 0 || supernode.States[len(supernode.States)-1].State != types.SuperNodeStateActive {
+		supernode.States = append(supernode.States, &types.SuperNodeStateRecord{
+			State:  types.SuperNodeStateActive,
+			Height: ctx.BlockHeight(),
+		})
+	} else {
+		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode is already started")
+	}
+
 	if err := k.SetSuperNode(ctx, supernode); err != nil {
 		return nil, err
 	}

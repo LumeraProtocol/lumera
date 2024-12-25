@@ -26,6 +26,22 @@ func (k msgServer) StopSupernode(goCtx context.Context, msg *types.MsgStopSupern
 		return nil, err
 	}
 
+	if len(supernode.States) == 0 {
+		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode is in an invalid state")
+	}
+
+	switch supernode.States[len(supernode.States)-1].State {
+	case types.SuperNodeStateStopped:
+		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode is already stopped")
+	case types.SuperNodeStateDisabled:
+		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode is disabled")
+	}
+
+	supernode.States = append(supernode.States, &types.SuperNodeStateRecord{
+		State:  types.SuperNodeStateStopped,
+		Height: ctx.BlockHeight(),
+	})
+
 	if err := k.SetSuperNode(ctx, supernode); err != nil {
 		return nil, err
 	}

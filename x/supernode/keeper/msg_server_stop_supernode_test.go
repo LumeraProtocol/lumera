@@ -40,7 +40,14 @@ func TestMsgServer_StopSupernode(t *testing.T) {
 				Reason:           "maintenance",
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
+				existingSupernode.States = []*types.SuperNodeStateRecord{
+					{
+						State:  types.SuperNodeStateActive,
+						Height: 1,
+					},
+				}
 				require.NoError(t, k.SetSuperNode(ctx, existingSupernode))
+
 			},
 			expectedError: nil,
 			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context) {
@@ -77,6 +84,60 @@ func TestMsgServer_StopSupernode(t *testing.T) {
 				require.NoError(t, k.SetSuperNode(ctx, existingSupernode))
 			},
 			expectedError: sdkerrors.ErrUnauthorized,
+		},
+		{
+			name: "supernode already stopped",
+			msg: &types.MsgStopSupernode{
+				Creator:          creatorAddr.String(),
+				ValidatorAddress: valAddr.String(),
+				Reason:           "maintenance",
+			},
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
+				existingSupernode.States = []*types.SuperNodeStateRecord{
+					{
+						State:  types.SuperNodeStateActive,
+						Height: 1,
+					},
+					{
+						State:  types.SuperNodeStateStopped,
+						Height: 2,
+					},
+				}
+				require.NoError(t, k.SetSuperNode(ctx, existingSupernode))
+
+			},
+			expectedError: sdkerrors.ErrInvalidRequest,
+			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context) {
+				_, found := k.QuerySuperNode(ctx, valAddr)
+				require.True(t, found)
+			},
+		},
+		{
+			name: "supernode disabled",
+			msg: &types.MsgStopSupernode{
+				Creator:          creatorAddr.String(),
+				ValidatorAddress: valAddr.String(),
+				Reason:           "maintenance",
+			},
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
+				existingSupernode.States = []*types.SuperNodeStateRecord{
+					{
+						State:  types.SuperNodeStateActive,
+						Height: 1,
+					},
+					{
+						State:  types.SuperNodeStateDisabled,
+						Height: 2,
+					},
+				}
+				require.NoError(t, k.SetSuperNode(ctx, existingSupernode))
+
+			},
+			expectedError: sdkerrors.ErrInvalidRequest,
+			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context) {
+				_, found := k.QuerySuperNode(ctx, valAddr)
+				require.True(t, found)
+			},
 		},
 	}
 

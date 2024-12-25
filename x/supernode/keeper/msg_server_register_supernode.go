@@ -42,7 +42,7 @@ func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types.MsgRegist
 		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode already exists for validator %s", msg.ValidatorAddress)
 	}
 
-	if err := k.checkValidatorSupernodeEligibility(ctx, validator, msg.ValidatorAddress); err != nil {
+	if err := k.CheckValidatorSupernodeEligibility(ctx, validator, msg.ValidatorAddress); err != nil {
 		return nil, err
 	}
 

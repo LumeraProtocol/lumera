@@ -34,15 +34,13 @@ func (k msgServer) DeregisterSupernode(goCtx context.Context, msg *types.MsgDere
 		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode is in an invalid state")
 	}
 
-	if supernode.States[len(supernode.States)-1].State == types.SuperNodeStateDisabled {
-		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode already disabled for validator %s", msg.ValidatorAddress)
+	if supernode.States[len(supernode.States)-1].State != types.SuperNodeStateDisabled {
+		// Update supernode state
+		supernode.States = append(supernode.States, &types.SuperNodeStateRecord{
+			State:  types.SuperNodeStateDisabled,
+			Height: ctx.BlockHeight(),
+		})
 	}
-
-	// Update supernode state
-	supernode.States = append(supernode.States, &types.SuperNodeStateRecord{
-		State:  types.SuperNodeStateDisabled,
-		Height: ctx.BlockHeight(),
-	})
 
 	// Re-save the supernode using SetSuperNode
 	if err := k.SetSuperNode(ctx, supernode); err != nil {

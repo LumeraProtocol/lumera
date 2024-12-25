@@ -57,6 +57,26 @@ func TestKeeper_ListSuperNodes(t *testing.T) {
 				Pagination: &query.PageRequest{Limit: 10},
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
+				sn1.States = []*types.SuperNodeStateRecord{
+					{
+						State:  types.SuperNodeStateActive,
+						Height: 1,
+					},
+					{
+						State:  types.SuperNodeStateDisabled,
+						Height: 2,
+					},
+				}
+				sn2.States = []*types.SuperNodeStateRecord{
+					{
+						State:  types.SuperNodeStateActive,
+						Height: 1,
+					},
+					{
+						State:  types.SuperNodeStatePenalized,
+						Height: 2,
+					},
+				}
 				require.NoError(t, k.SetSuperNode(ctx, sn1))
 				require.NoError(t, k.SetSuperNode(ctx, sn2))
 			},
@@ -106,7 +126,7 @@ func TestKeeper_ListSuperNodes(t *testing.T) {
 				tc.setupState(k, ctx)
 			}
 
-			resp, err := k.ListSuperNodes(sdk.WrapSDKContext(ctx), tc.req)
+			resp, err := k.ListSuperNodes(ctx, tc.req)
 
 			if tc.expectedErr != nil {
 				require.Error(t, err)

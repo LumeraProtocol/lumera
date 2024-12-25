@@ -27,13 +27,15 @@ func (k msgServer) UpdateSupernode(goCtx context.Context, msg *types.MsgUpdateSu
 	}
 
 	// Update fields
-	/*if msg.IpAddress != "" && supernode.IpAddress != msg.IpAddress {
-		supernode.PrevIpAddresses = append(supernode.PrevIpAddresses, &types.IPAddressHistory{
-			Address: supernode.IpAddress,
-		})
-		supernode.IpAddress = msg.IpAddress
+	if msg.IpAddress != "" {
+		if len(supernode.PrevIpAddresses) == 0 || supernode.PrevIpAddresses[len(supernode.PrevIpAddresses)-1].Address != msg.IpAddress {
+			supernode.PrevIpAddresses = append(supernode.PrevIpAddresses, &types.IPAddressHistory{
+				Address: msg.IpAddress,
+				Height:  ctx.BlockHeight(),
+			})
+		}
 	}
-	*/
+
 	if msg.Version != "" {
 		supernode.Version = msg.Version
 	}

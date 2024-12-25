@@ -42,6 +42,7 @@ func TestMsgServer_DeRegisterSupernode(t *testing.T) {
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: "invalid",
 			},
+			currentState:  types.SuperNodeStateActive,
 			expectedError: sdkerrors.ErrInvalidAddress,
 		},
 		{
@@ -59,6 +60,17 @@ func TestMsgServer_DeRegisterSupernode(t *testing.T) {
 				Creator:          otherCreatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 			},
+			currentState: types.SuperNodeStateActive,
+
+			expectedError: sdkerrors.ErrUnauthorized,
+		},
+		{
+			name: "supernode already deregistered",
+			msg: &types.MsgDeregisterSupernode{
+				Creator:          otherCreatorAddr.String(),
+				ValidatorAddress: valAddr.String(),
+			},
+			currentState: types.SuperNodeStateDisabled,
 
 			expectedError: sdkerrors.ErrUnauthorized,
 		},
@@ -81,7 +93,7 @@ func TestMsgServer_DeRegisterSupernode(t *testing.T) {
 					Version:          "1.0.0",
 					States: []*types.SuperNodeStateRecord{
 						{
-							State:  types.SuperNodeStateActive,
+							State:  tc.currentState,
 							Height: ctx.BlockHeight(),
 						},
 					},

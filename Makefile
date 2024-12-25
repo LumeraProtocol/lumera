@@ -5,10 +5,11 @@ DEVNET_DIR := /tmp/pastel-devnet
 SHARED_DIR := ${DEVNET_DIR}/shared
 VALIDATOR_DIRS := $(wildcard ${DEVNET_DIR}/validator*-data)
 EXTERNAL_GENESIS := $(SHARED_DIR)/external_genesis.json
+CLAIMS_FILE := $(SHARED_DIR)/claims.csv
 
 ### Devnet
 # To use external genesis- provide path to it via EXTERNAL_GENESIS_FILE
-# example: make devnet-build EXTERNAL_GENESIS_FILE=~/genesis.json
+# example: make devnet-build EXTERNAL_CLAIMS_FILE=~/claims.csv EXTERNAL_GENESIS_FILE=~/genesis.json
 devnet-build:
 	mkdir -p $(SHARED_DIR)
 	@if [ -n "$(EXTERNAL_GENESIS_FILE)" ] && [ -f "$(EXTERNAL_GENESIS_FILE)" ]; then \
@@ -19,6 +20,7 @@ devnet-build:
 		echo "No external genesis file provided or file not found. Using default initialization..."; \
 		export EXTERNAL_GENESIS_FILE=0; \
 	fi; \
+	cp "${EXTERNAL_CLAIMS_FILE}" "${CLAIMS_FILE}"; \
 #	go get github.com/CosmWasm/wasmvm/v2@v2.1.2 && \
 #	ignite chain build --release -t linux:amd64 && \
 #	tar -xf release/pastel*.tar.gz -C release && \
@@ -26,7 +28,7 @@ devnet-build:
 	cd devnet && \
 #	find $$(go env GOPATH)/pkg/mod -name "libwasmvm.x86_64.so" -exec cp {} ./libwasmvm.x86_64.so \; && \
 #	go mod tidy && \
-	go run . && \
+#	go run . && \
 	docker-compose build
 
 devnet-rebuild:
@@ -70,6 +72,8 @@ devnet-deploy-tar:
 		cp "$(EXTERNAL_GENESIS_FILE)" devnet/external_genesis.json; \
 	fi
 
+	cp "${EXTERNAL_CLAIMS_FILE}" devnet/claims.csv; \
+
 	# Create the tar archive
 	tar -czf devnet-deploy.tar.gz \
 		-C devnet dockerfile \
@@ -79,6 +83,7 @@ devnet-deploy-tar:
 		pasteld \
 		libwasmvm.x86_64.so \
 		devnet-deploy.sh \
+		claims.csv \
 		$(if $(shell [ -f "$(EXTERNAL_GENESIS_FILE)" ] && echo 1),external_genesis.json)
 
 	@if [ -f "devnet/external_genesis.json" ]; then \

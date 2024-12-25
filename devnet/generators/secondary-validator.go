@@ -61,6 +61,8 @@ func (sb *SecondaryScriptBuilder) initAndCreateGentx() {
 		"",
 		fmt.Sprintf("    cp /shared/genesis.json /root/%s/config/genesis.json", sb.config.Paths.Directories.Daemon),
 		"",
+		fmt.Sprintf("cp /shared/claims.csv /root/%s/config/claims.csv", sb.config.Paths.Directories.Daemon),
+		"",
 		fmt.Sprintf("	%s keys add $KEY_NAME --keyring-backend %s",
 			sb.config.Daemon.Binary, sb.config.Daemon.KeyringBackend),
 		"",

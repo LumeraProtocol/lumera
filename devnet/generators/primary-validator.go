@@ -48,6 +48,10 @@ func (sb *PrimaryScriptBuilder) addInitAndDenom() {
 	}
 
 	sb.lines = append(sb.lines, []string{
+		fmt.Sprintf("cp /shared/claims.csv /root/%s/config/claims.csv", sb.config.Paths.Directories.Daemon),
+	}...)
+
+	sb.lines = append(sb.lines, []string{
 		"    # Update bond denomination",
 		fmt.Sprintf(`    cat /root/%s/config/genesis.json | jq '.app_state.staking.params.bond_denom = "%s"' > /root/%s/config/tmp_genesis.json`,
 			sb.config.Paths.Directories.Daemon, sb.config.Chain.Denom.Bond, sb.config.Paths.Directories.Daemon),

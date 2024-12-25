@@ -11,6 +11,8 @@ This tool automates the creation of blockchain validator networks by generating 
 - Docker-based deployment system
 
 The system takes `config.json` and `validators.json` as inputs to generate Docker Compose files and validator scripts, enabling rapid deployment of distributed validator networks of any size.
+The system take `claims.json` as input to be used by Claim module on genesis initialization.
+The system CAN take existing `genesis.json` as input to be extended to include new validators. 
 
 ## 2. Directory Structure
 
@@ -29,7 +31,7 @@ The `config.json` file defines the global configuration for the validator networ
         "denom": {
             "bond": "token",       // Staking token denomination
             "mint": "token",       // Minting token denomination
-            "minimum_gas_price": "0token" // Minimum transaction fee
+            "minimum_gas_price": "0upsl" // Minimum transaction fee
         }
     },
     "docker": {
@@ -66,8 +68,8 @@ The `config.json` file defines the global configuration for the validator networ
         "rest_port": 1317,  // Default REST port
         "grpc_port": 9090,  // Default gRPC port
         "initial_distribution": {
-            "account_balance": "1000token",
-            "validator_stake": "900token"
+            "account_balance": "1000",
+            "validator_stake": "900upsl"
         }
     },
     {
@@ -80,8 +82,8 @@ The `config.json` file defines the global configuration for the validator networ
         "rest_port": 1327,  // REST: 1317 + 10
         "grpc_port": 9091,  // gRPC: 9090 + 1
         "initial_distribution": {
-            "account_balance": "1000token",
-            "validator_stake": "900token"
+            "account_balance": "1000upsl",
+            "validator_stake": "900upsl"
         }
     }
 ]
@@ -117,13 +119,6 @@ Core configuration management system that handles:
 - Data models for chain and validator settings
 - Configuration validation
 
-```go
-// Key structures
-type ChainConfig struct {...}    // Global chain configuration
-type Validator struct {...}      // Individual validator config
-func LoadConfigs() {...}         // Configuration loader
-```
-
 ### 4.2 Generators Package
 Set of generators that create deployment configurations and scripts.
 
@@ -136,190 +131,22 @@ Creates Docker network configuration:
 
 #### 4.2.2 Validator Script Generators
 Produces initialization and startup scripts:
-
 1. Primary Validator (`primary-validator.go`)
-   ```bash
-   # Key responsibilities:
    - Chain initialization
    - Genesis configuration
    - Account creation
    - Network bootstrapping
-   ```
-
 2. Secondary Validator (`secondary-validator.go`)
-   ```bash
-   # Key responsibilities:
    - Validator initialization
    - Genesis synchronization
    - Peer discovery
    - Network joining
-   ```
 
 Each generator uses the config package structures to ensure consistent network setup across all components.
 
-# 5. Generated Scripts Guide
+## 5. Docker Components
 
-## 5.1 Primary Validator Script
-Key initialization sequence from `primary-validator.go`
-
-### Chain Initialization
-```bash
-# 1. Initialize chain with configuration
-mkdir -p /root/.pastel/config
-pasteld init validator1 --chain-id pastel-devnet --overwrite
-
-# 2. Update denominations in genesis
-cat /root/.pastel/config/genesis.json | jq '.app_state.staking.params.bond_denom = "upsl"' > tmp_genesis.json
-mv tmp_genesis.json /root/.pastel/config/genesis.json
-
-# Same process for:
-# - mint_denom
-# - crisis constant fee
-# - gov min deposit
-# - gov expedited min deposit
-```
-
-### Account & Genesis Setup
-```bash
-# 3. Create validator accounts
-for VALIDATOR in "alice" "bob" "carol" "dave" "eve"; do
-    echo "Creating key for $VALIDATOR..."
-    pasteld keys add $VALIDATOR --keyring-backend test
-    
-    ADDR=$(pasteld keys show $VALIDATOR -a --keyring-backend test)
-    pasteld genesis add-genesis-account $ADDR 1000000000000000upsl
-done
-```
-
-### File Sharing & Network Setup
-```bash
-# 4. Share necessary files
-mkdir -p /shared
-cp -r /root/.pastel/keyring-test /shared/keyring-test
-cp /root/.pastel/config/genesis.json /shared/genesis.json
-mkdir -p /shared/gentx
-echo "true" > /shared/genesis_accounts_ready
-
-# 5. Create primary gentx
-pasteld genesis gentx alice 900000000000000upsl \
-    --chain-id pastel-devnet \
-    --keyring-backend test
-
-# 6. Wait for other validators
-while [[ $(ls /shared/gentx/* 2>/dev/null | wc -l) -lt 4 ]]; do
-    echo "Found $(ls /shared/gentx/* 2>/dev/null | wc -l) of 4 gentx files..."
-    sleep 2
-done
-
-# 7. Finalize genesis
-mkdir -p /root/.pastel/config/gentx
-cp /shared/gentx/*.json /root/.pastel/config/gentx/
-pasteld genesis collect-gentxs
-cp /root/.pastel/config/genesis.json /shared/final_genesis.json
-echo "true" > /shared/setup_complete
-```
-
-### Peer Configuration
-```bash
-# 8. Share node ID and IP
-nodeid=$(pasteld tendermint show-node-id)
-echo $nodeid > /shared/validator1_nodeid
-ip=$(hostname -i)
-echo $ip > /shared/validator1_ip
-
-# 9. Wait for other validators
-while [[ ! -f /shared/validator2_nodeid || ! -f /shared/validator2_ip ]]; do
-    sleep 1
-done
-
-# 10. Configure persistent peers
-NODE_ID=$(cat /shared/validator2_nodeid)
-NODE_IP=$(cat /shared/validator2_ip)
-PEERS="${NODE_ID}@${NODE_IP}:26656"
-sed -i "s/^persistent_peers *=.*/persistent_peers = \"$PEERS\"/" /root/.pastel/config/config.toml
-```
-
-## 5.2 Secondary Validator Script
-
-### Initial Setup
-```bash
-# 1. Validate input parameters
-if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then
-    echo "Usage: $0 <key-name> <stake-amount> <moniker>"
-    exit 1
-fi
-
-KEY_NAME=$1
-STAKE_AMOUNT=$2
-MONIKER=$3
-```
-
-### Chain & Genesis Setup
-```bash
-# 2. Wait for primary initialization
-while [ ! -f /shared/genesis_accounts_ready ]; do
-    sleep 1
-done
-
-# 3. Copy keyring
-cp -r /shared/keyring-test /root/.pastel/keyring-test
-
-# 4. Initialize chain
-pasteld init $MONIKER --chain-id pastel-devnet --overwrite
-
-# 5. Copy initial genesis
-cp /shared/genesis.json /root/.pastel/config/genesis.json
-
-# 6. Create and share gentx
-pasteld genesis gentx $KEY_NAME $STAKE_AMOUNT \
-    --chain-id pastel-devnet \
-    --keyring-backend test
-
-mkdir -p /shared/gentx
-cp /root/.pastel/config/gentx/* /shared/gentx/${MONIKER}_gentx.json
-```
-
-### Network Integration
-```bash
-# 7. Wait for final genesis
-while [ ! -f /shared/final_genesis.json ]; do
-    sleep 1
-done
-cp /shared/final_genesis.json /root/.pastel/config/genesis.json
-
-# 8. Share node information
-nodeid=$(pasteld tendermint show-node-id)
-echo $nodeid > /shared/${MONIKER}_nodeid
-ip=$(hostname -i)
-echo $ip > /shared/${MONIKER}_ip
-
-# 9. Configure peers (excluding self)
-for v in validator1 validator2 validator3 validator4 validator5; do
-    if [ "$v" != "${MONIKER}" ]; then
-        NODE_ID=$(cat /shared/${v}_nodeid)
-        NODE_IP=$(cat /shared/${v}_ip)
-        PEERS="${PEERS}${NODE_ID}@${NODE_IP}:26656,"
-    fi
-done
-
-# 10. Update peer configuration
-sed -i "s/^persistent_peers *=.*/persistent_peers = \"$PEERS\"/" /root/.pastel/config/config.toml
-
-# 11. Wait for network setup
-while [ ! -f /shared/setup_complete ]; do
-    sleep 1
-done
-```
-
-### Start Chain
-```bash
-# 12. Start validator node
-pasteld start --minimum-gas-prices 0upsl
-```
-
-## 6. Docker Components
-
-### 6.1 Dockerfile Structure
+### 5.1 Dockerfile Structure
 From [dockerfile](dockerfile):
 ```dockerfile
 FROM debian:bookworm-slim
@@ -348,7 +175,7 @@ EXPOSE 26656 26657 1317 9090  # P2P, RPC, REST, gRPC respectively
 WORKDIR /root
 ```
 
-### 6.2 Docker Compose
+### 5.2 Docker Compose
 Generated from `docker-compose.go`
 ```yaml
 services:
@@ -361,8 +188,8 @@ services:
       - "1317:1317"    # REST API
       - "9090:9090"    # gRPC
     volumes:
-      - ~/validator1-data:/root/.pastel  # Chain data directory
-      - ~/shared:/shared                 # Shared directory for validator coordination
+      - /tmp/pastel-devnet/validator1-data:/root/.pastel  # Chain data directory
+      - /tmp/pastel-devnet/shared:/shared                 # Shared directory for validator coordination
     environment:
       MONIKER: validator1
     command: bash /root/scripts/primary-validator.sh
@@ -374,9 +201,9 @@ services:
     command: bash /root/scripts/secondary-validator.sh bob 900000000000000upsl validator2
 ```
 
-## 7. Usage Guide
+## 6. Usage Guide
 
-### 7.1 Build and Setup
+### 6.1 Build and Setup
 
 > Be sure there is only ONE version of the `wasmvm` go package.
 > ```bash
@@ -388,21 +215,24 @@ services:
 
 ```bash
 # Full build process
-make devnet-build    
+make devnet-build EXTERNAL_CLAIMS_FILE=/paht-to/claims.csv EXTERNAL_GENESIS_FILE=/paht-to/genesis-template.json
+# NOTE: if EXTERNAL_GENESIS_FILE is not provided, new genesis will be generated based on the validators.json file
+# NOTE: if EXTERNAL_GENESIS_FILE is provided, new validators will be added to the existing genesis file
 # 1. Downloads WasmVM v2.1.2 library
 # 2. Builds chain binary with Ignite
 # 3. Extracts binary from release archive
 # 4. Copies files to devnet/:
 #    - pasteld binary
 #    - libwasmvm.x86_64.so
+#    - claims.csv
 # 5. Generates network configuration
 # 6. Builds Docker images
 
 # Clean old data
-make devnet-clean   # Removes ~/shared and all ~/validator*-data directories
+make devnet-clean   # Removes /tmp/pastel-devnet/shared and all ~/validator*-data directories
 ```
 
-### 7.2 Network Operations
+### 6.2 Network Operations
 ```bash
 # Start network with console output
 make devnet-up
@@ -417,27 +247,28 @@ make devnet-up-clean
 make devnet-down
 ```
 
-### 7.3 Network Files Location
+### 6.3 Network Files Location
 ```bash
 # Final Genesis File
-~/validator1-data/config/genesis.json   # On host machine
+/tmp/pastel-devnet/validator1-data/config/genesis.json   # On host machine
 /root/.pastel/config/genesis.json       # Inside containers
 
-# Node IDs and IPs
-~/shared/validator*_nodeid              # Node IDs 
-~/shared/validator*_ip                  # Container IPs
+# Node IDs, IPs and Ports
+/tmp/pastel-devnet/shared/validator*_nodeid              # Node IDs 
+/tmp/pastel-devnet/shared/validator*_ip                  # Container IPs
+/tmp/pastel-devnet/shared/validator*_port                  # Container P2P Ports
 ```
 
-### 7.4 Joining New Node to Network
+### 6.4 Joining New Node to Network
 
 #### 1. Get Validator Info
 ```bash
 # Get node ID
-VALIDATOR1_ID=$(cat ~/shared/validator1_nodeid)
+VALIDATOR1_ID=$(cat /tmp/pastel-devnet/shared/validator1_nodeid)
 # e.g., 4cb8e2eb7bb90fd026e02f693927230fe3fb9c89
 
 # Get container IP
-VALIDATOR1_IP=$(cat ~/shared/validator1_ip) 
+VALIDATOR1_IP=$(cat /tmp/pastel-devnet/shared/validator1_ip) 
 # e.g., 172.20.0.2
 ```
 
@@ -459,7 +290,7 @@ pasteld init my-local-node --chain-id pastel-devnet
 #### 3. Copy Genesis
 ```bash
 # Copy from validator1's data directory /shared
-cp ~/validator1-data/config/genesis.json ~/.pastel/config/
+cp /tmp/pastel-devnet/validator1-data/config/genesis.json ~/.pastel/config/
 ```
 
 #### 4. Start Node
@@ -473,7 +304,7 @@ pasteld start --minimum-gas-prices 0upsl \
 
 *Note: You can use any validator as a peer by using their respective node ID and IP from the shared directory.*
 
-### 7.5 Verify Connection
+### 6.5 Verify Connection
 ```bash
 # Check peer connections
 pasteld net-info
@@ -482,7 +313,7 @@ pasteld net-info
 pasteld status | jq .SyncInfo
 ```
 
-### 7.6 CLI Sessions
+### 6.6 CLI Sessions
 
 #### Access Container Shell
 ```bash

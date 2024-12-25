@@ -213,22 +213,33 @@ services:
 > ```
 > If you have multiple versions, remove all of them and run `make devnet-build` again.  
 
-```bash
-# Full build process
-make devnet-build EXTERNAL_CLAIMS_FILE=/paht-to/claims.csv EXTERNAL_GENESIS_FILE=/paht-to/genesis-template.json
-# NOTE: if EXTERNAL_GENESIS_FILE is not provided, new genesis will be generated based on the validators.json file
-# NOTE: if EXTERNAL_GENESIS_FILE is provided, new validators will be added to the existing genesis file
-# 1. Downloads WasmVM v2.1.2 library
-# 2. Builds chain binary with Ignite
-# 3. Extracts binary from release archive
-# 4. Copies files to devnet/:
-#    - pasteld binary
-#    - libwasmvm.x86_64.so
-#    - claims.csv
-# 5. Generates network configuration
-# 6. Builds Docker images
+#### Full build process
 
-# Clean old data
+1. If using pre-existing genesis file
+```bash
+make devnet-build EXTERNAL_CLAIMS_FILE=/paht-to/claims.csv EXTERNAL_GENESIS_FILE=/paht-to/genesis-template.json
+```
+> NOTE: if EXTERNAL_GENESIS_FILE is provided, new validators will be added to the existing genesis file
+
+2. Creating fresh genesis file
+```bash
+make devnet-build EXTERNAL_CLAIMS_FILE=/paht-to/claims.csv EXTERNAL_GENESIS_FILE=/paht-to/genesis-template.json
+```
+> NOTE: if EXTERNAL_GENESIS_FILE is not provided, new genesis will be generated based on the validators.json file
+
+These will:
+1. Downloads WasmVM v2.1.2 library
+2. Builds chain binary with Ignite
+3. Extracts binary from release archive
+4. Copies files to devnet/:
+   - pasteld binary
+   - libwasmvm.x86_64.so
+   - claims.csv
+5. Generates network configuration
+6. Builds Docker images
+
+#### Clean old data
+```bash
 make devnet-clean   # Removes /tmp/pastel-devnet/shared and all ~/validator*-data directories
 ```
 

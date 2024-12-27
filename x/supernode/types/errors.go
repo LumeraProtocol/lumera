@@ -16,6 +16,8 @@ var (
 	ErrEmptyVersion          = sdkerrors.Register(ModuleName, 1104, "version cannot be empty")
 	ErrValidatorNotFound     = sdkerrors.Register(ModuleName, 1105, "validator not found")
 
-	ErrEmptyEvidenceType = sdkerrors.Register(ModuleName, 1106, "evidence type cannot be empty")
-	ErrEmptyDescription  = sdkerrors.Register(ModuleName, 1107, "evidence description cannot be empty")
+	ErrEmptyEvidenceType           = sdkerrors.Register(ModuleName, 1106, "evidence type cannot be empty")
+	ErrEmptyDescription            = sdkerrors.Register(ModuleName, 1107, "evidence description cannot be empty")
+	ErrSupernodeAccountUnspecified = sdkerrors.Register(ModuleName, 1108, "supernode account unspecified")
+	ErrInvalidSupernodeAddress     = sdkerrors.Register(ModuleName, 1109, "invalid supernode address")
 )

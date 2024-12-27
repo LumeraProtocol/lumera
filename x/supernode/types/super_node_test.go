@@ -12,6 +12,7 @@ import (
 
 func TestSuperNodeValidation(t *testing.T) {
 	valAddr := sdk.ValAddress([]byte("validator"))
+	accAddr := sdk.AccAddress(valAddr)
 
 	testCases := []struct {
 		name        string
@@ -23,6 +24,7 @@ func TestSuperNodeValidation(t *testing.T) {
 			name: "valid supernode",
 			supernode: types.SuperNode{
 				ValidatorAddress: valAddr.String(),
+				SupernodeAccount: accAddr.String(),
 				Evidence:         []*types.Evidence{},
 				Version:          "1.0.0",
 				Metrics: &types.MetricsAggregate{
@@ -47,6 +49,7 @@ func TestSuperNodeValidation(t *testing.T) {
 		{
 			name: "invalid validator address",
 			supernode: types.SuperNode{
+				SupernodeAccount: accAddr.String(),
 				ValidatorAddress: "invalid",
 				Version:          "1.0.0",
 			},
@@ -56,6 +59,7 @@ func TestSuperNodeValidation(t *testing.T) {
 			name: "empty ip address",
 			supernode: types.SuperNode{
 				ValidatorAddress: valAddr.String(),
+				SupernodeAccount: accAddr.String(),
 				Version:          "1.0.0",
 				States: []*types.SuperNodeStateRecord{
 					{
@@ -70,6 +74,7 @@ func TestSuperNodeValidation(t *testing.T) {
 		{
 			name: "unspecified state",
 			supernode: types.SuperNode{
+				SupernodeAccount: accAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				Version:          "1.0.0",
 			},
@@ -79,6 +84,7 @@ func TestSuperNodeValidation(t *testing.T) {
 		{
 			name: "empty version",
 			supernode: types.SuperNode{
+				SupernodeAccount: accAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				Version:          "",
 			},

@@ -88,13 +88,26 @@ func TestMsgServer_DeRegisterSupernode(t *testing.T) {
 
 			k, ctx := setupKeeperForTest(t, stakingKeeper, slashingKeeper, bankKeeper)
 			if tc.expectedError != sdkerrors.ErrNotFound {
+
 				k.SetSuperNode(ctx, types.SuperNode{
+					SupernodeAccount: creatorAddr.String(),
 					ValidatorAddress: valAddr.String(),
 					Version:          "1.0.0",
 					States: []*types.SuperNodeStateRecord{
 						{
+							State:  types.SuperNodeStateActive,
+							Height: ctx.BlockHeight(),
+						},
+
+						{
 							State:  tc.currentState,
 							Height: ctx.BlockHeight(),
+						},
+					},
+					PrevIpAddresses: []*types.IPAddressHistory{
+						{
+							Address: "1022.145.1.1",
+							Height:  1,
 						},
 					},
 				})
@@ -102,7 +115,7 @@ func TestMsgServer_DeRegisterSupernode(t *testing.T) {
 
 			msgServer := keeper.NewMsgServerImpl(k)
 
-			_, err := msgServer.DeregisterSupernode(sdk.WrapSDKContext(ctx), tc.msg)
+			_, err := msgServer.DeregisterSupernode(ctx, tc.msg)
 			if tc.expectedError != nil {
 				require.ErrorIs(t, err, tc.expectedError)
 			} else {

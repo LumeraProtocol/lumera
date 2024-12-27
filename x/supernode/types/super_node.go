@@ -16,6 +16,15 @@ func (s *SuperNode) Validate() error {
 		return err
 	}
 
+	if s.SupernodeAccount == "" {
+		return ErrSupernodeAccountUnspecified
+	}
+
+	_, err := sdk.AccAddressFromBech32(s.SupernodeAccount)
+	if err != nil {
+		return ErrInvalidSupernodeAddress
+	}
+
 	// Check if version is not empty
 	if s.Version == "" {
 		return ErrEmptyVersion

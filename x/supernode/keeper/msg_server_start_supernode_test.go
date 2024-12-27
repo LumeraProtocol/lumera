@@ -20,8 +20,19 @@ func TestMsgServer_StartSupernode(t *testing.T) {
 	otherCreatorAddr := sdk.AccAddress(otherValAddr)
 
 	existingSupernode := types.SuperNode{
+		SupernodeAccount: creatorAddr.String(),
 		ValidatorAddress: valAddr.String(),
 		Version:          "1.0.0",
+		States: []*types.SuperNodeStateRecord{
+			{
+				State:  types.SuperNodeStateActive,
+				Height: 1,
+			},
+			{
+				State:  types.SuperNodeStateStopped,
+				Height: 1,
+			},
+		},
 	}
 
 	testCases := []struct {

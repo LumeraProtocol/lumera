@@ -49,6 +49,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 		{
 			name: "successful registration (bonded validator -> skip checks)",
 			msg: &types.MsgRegisterSupernode{
+				SupernodeAccount: creatorAddr.String(),
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "192.168.1.1",
@@ -71,6 +72,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 		{
 			name: "invalid validator address",
 			msg: &types.MsgRegisterSupernode{
+				SupernodeAccount: creatorAddr.String(),
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: "invalid", // not bech32 => error
 				IpAddress:        "192.168.1.1",
@@ -82,6 +84,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 		{
 			name: "unauthorized => msg.Creator != validator operator address",
 			msg: &types.MsgRegisterSupernode{
+				SupernodeAccount: creatorAddr.String(),
 				Creator:          otherCreatorAddr.String(), // different from valAddr
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "192.168.1.1",
@@ -103,6 +106,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 		{
 			name: "empty ip address => error from supernode.Validate()",
 			msg: &types.MsgRegisterSupernode{
+				SupernodeAccount: creatorAddr.String(),
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "", // triggers types.ErrEmptyIPAddress
@@ -124,6 +128,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 		{
 			name: "validator not found",
 			msg: &types.MsgRegisterSupernode{
+				SupernodeAccount: creatorAddr.String(),
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "192.168.1.1",
@@ -139,6 +144,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 		{
 			name: "jailed validator => error",
 			msg: &types.MsgRegisterSupernode{
+				SupernodeAccount: creatorAddr.String(),
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "192.168.1.1",
@@ -160,6 +166,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 		{
 			name: "validator unbonded, zero delegator shares => immediate error (no self-stake)",
 			msg: &types.MsgRegisterSupernode{
+				SupernodeAccount: creatorAddr.String(),
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "192.168.1.1",
@@ -183,6 +190,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 		{
 			name: "validator unbonded and insufficient stake => fails eligibility check",
 			msg: &types.MsgRegisterSupernode{
+				SupernodeAccount: creatorAddr.String(),
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "192.168.1.1",
@@ -204,6 +212,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 		{
 			name: "validator unbonded but sufficient stake => no error",
 			msg: &types.MsgRegisterSupernode{
+				SupernodeAccount: creatorAddr.String(),
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "192.168.1.1",

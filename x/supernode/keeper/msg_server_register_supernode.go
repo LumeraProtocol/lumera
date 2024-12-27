@@ -49,6 +49,7 @@ func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types.MsgRegist
 	// Create new SuperNode
 	supernode := types.SuperNode{
 		ValidatorAddress: msg.ValidatorAddress,
+		SupernodeAccount: msg.SupernodeAccount,
 		Evidence:         []*types.Evidence{},
 		Version:          msg.Version,
 		Metrics: &types.MetricsAggregate{

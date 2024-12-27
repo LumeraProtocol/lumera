@@ -1,9 +1,9 @@
 package keeper_test
 
 import (
-	"context"
 	"testing"
 
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/stretchr/testify/require"
 
 	keepertest "github.com/pastelnetwork/pastel/testutil/keeper"
@@ -11,7 +11,7 @@ import (
 	"github.com/pastelnetwork/pastel/x/claim/types"
 )
 
-func setupMsgServer(t testing.TB) (keeper.Keeper, types.MsgServer, context.Context) {
+func setupMsgServer(t testing.TB) (keeper.Keeper, types.MsgServer, sdk.Context) {
 	k, ctx := keepertest.ClaimKeeper(t)
 	return k, keeper.NewMsgServerImpl(k), ctx
 }

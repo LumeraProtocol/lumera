@@ -1,3 +1,4 @@
 package types
 
-const DefaultDenom = "upsl"
+const ClaimGasPrice = "claim_gas_price"
+const ClaimTxFee = "claim_tx_fee"

@@ -32,7 +32,7 @@ func setupClaimSystemSuite(t *testing.T) *SystemTestSuite {
 
 	baseCtx := chain.GetContext()
 	suite.sdkCtx = baseCtx
-	suite.ctx = sdk.WrapSDKContext(baseCtx)
+	suite.ctx = baseCtx
 
 	// Set up default parameters
 	err := suite.app.ClaimKeeper.SetParams(chain.GetContext(), types.DefaultParams())
@@ -93,6 +93,8 @@ func generateTestData() (*TestData, error) {
 func TestClaimProcess(t *testing.T) {
 	suite := setupClaimSystemSuite(t)
 
+	validFee := sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.NewInt(1000)))
+
 	// Generate test data
 	testData, err := generateTestData()
 	t.Logf("\nTest Data Generated:"+
@@ -127,7 +129,7 @@ func TestClaimProcess(t *testing.T) {
 
 				claimRecord := types.ClaimRecord{
 					OldAddress: testData.OldAddress,
-					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultDenom, sdkmath.NewInt(testAmount))),
+					Balance:    sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.NewInt(testAmount))),
 					Claimed:    false,
 				}
 				err = suite.app.ClaimKeeper.SetClaimRecord(suite.sdkCtx, claimRecord)
@@ -135,6 +137,10 @@ func TestClaimProcess(t *testing.T) {
 
 				err = suite.app.BankKeeper.MintCoins(suite.sdkCtx, types.ModuleName, claimRecord.Balance)
 				require.NoError(t, err)
+
+				// Add fee to context
+				fee := sdk.NewCoins(validFee...) // Small fee
+				suite.sdkCtx = suite.sdkCtx.WithValue(types.ClaimTxFee, fee)
 			},
 			msg: &types.MsgClaim{
 				OldAddress: testData.OldAddress,
@@ -154,7 +160,7 @@ func TestClaimProcess(t *testing.T) {
 
 				claimRecord := types.ClaimRecord{
 					OldAddress: testData.OldAddress,
-					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultDenom, sdkmath.NewInt(testAmount))),
+					Balance:    sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.NewInt(testAmount))),
 					Claimed:    true,
 					ClaimTime:  suite.sdkCtx.BlockTime().Unix(),
 				}
@@ -197,7 +203,7 @@ func TestClaimProcess(t *testing.T) {
 
 				claimRecord := types.ClaimRecord{
 					OldAddress: testData.OldAddress,
-					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultDenom, sdkmath.NewInt(testAmount))),
+					Balance:    sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.NewInt(testAmount))),
 					Claimed:    false,
 				}
 				err = suite.app.ClaimKeeper.SetClaimRecord(suite.sdkCtx, claimRecord)
@@ -222,7 +228,7 @@ func TestClaimProcess(t *testing.T) {
 
 				claimRecord := types.ClaimRecord{
 					OldAddress: testData.OldAddress,
-					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultDenom, sdkmath.NewInt(testAmount))),
+					Balance:    sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.NewInt(testAmount))),
 					Claimed:    false,
 				}
 				err = suite.app.ClaimKeeper.SetClaimRecord(suite.sdkCtx, claimRecord)
@@ -248,7 +254,7 @@ func TestClaimProcess(t *testing.T) {
 
 				claimRecord := types.ClaimRecord{
 					OldAddress: testData.OldAddress,
-					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultDenom, sdkmath.NewInt(testAmount))),
+					Balance:    sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.NewInt(testAmount))),
 					Claimed:    false,
 				}
 				err = suite.app.ClaimKeeper.SetClaimRecord(suite.sdkCtx, claimRecord)
@@ -282,7 +288,7 @@ func TestClaimProcess(t *testing.T) {
 			initialUserBalance := suite.app.BankKeeper.GetAllBalances(suite.sdkCtx, destAddr)
 
 			// Execute the claim message
-			response, err := msgServer.Claim(suite.ctx, tc.msg)
+			response, err := msgServer.Claim(suite.sdkCtx, tc.msg)
 
 			// Handle error cases
 			if tc.expectError {
@@ -309,8 +315,8 @@ func TestClaimProcess(t *testing.T) {
 				finalUserBalance := suite.app.BankKeeper.GetAllBalances(suite.sdkCtx, destAddr)
 				finalModuleBalance := suite.app.BankKeeper.GetAllBalances(suite.sdkCtx, moduleAddr)
 
-				// Check user received the correct amount
-				expectedUserBalance := initialUserBalance.Add(record.Balance...)
+				// Check user received the correct amount (minus fee)
+				expectedUserBalance := initialUserBalance.Add(record.Balance...).Sub(validFee...)
 				require.Equal(t, expectedUserBalance, finalUserBalance)
 
 				// Check module account balance decreased correctly

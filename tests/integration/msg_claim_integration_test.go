@@ -45,6 +45,8 @@ func (s *MsgClaimIntegrationTestSuite) SetupTest() {
 }
 
 func (s *MsgClaimIntegrationTestSuite) TestClaimIntegration() {
+
+	validFee := sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, math.NewInt(1000)))
 	testCases := []struct {
 		name      string
 		setup     func()
@@ -58,7 +60,7 @@ func (s *MsgClaimIntegrationTestSuite) TestClaimIntegration() {
 				// Create and store claim record
 				claimRecord := types.ClaimRecord{
 					OldAddress: s.oldAddress,
-					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultDenom, math.NewInt(1000000))),
+					Balance:    sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, math.NewInt(1000000))),
 					Claimed:    false,
 				}
 				err := s.keeper.SetClaimRecord(s.ctx, claimRecord)
@@ -82,7 +84,7 @@ func (s *MsgClaimIntegrationTestSuite) TestClaimIntegration() {
 				// Create and store claimed record
 				claimRecord := types.ClaimRecord{
 					OldAddress: s.oldAddress,
-					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultDenom, math.NewInt(1000000))),
+					Balance:    sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, math.NewInt(1000000))),
 					Claimed:    true,
 					ClaimTime:  time.Now().Add(-15).Unix(),
 				}
@@ -120,7 +122,7 @@ func (s *MsgClaimIntegrationTestSuite) TestClaimIntegration() {
 				// Add a claim record to ensure the check happens before record lookup
 				claimRecord := types.ClaimRecord{
 					OldAddress: s.oldAddress,
-					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultDenom, math.NewInt(1000000))),
+					Balance:    sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, math.NewInt(1000000))),
 					Claimed:    false,
 				}
 				err := s.keeper.SetClaimRecord(s.ctx, claimRecord)
@@ -140,7 +142,7 @@ func (s *MsgClaimIntegrationTestSuite) TestClaimIntegration() {
 			setup: func() {
 				claimRecord := types.ClaimRecord{
 					OldAddress: s.oldAddress,
-					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultDenom, math.NewInt(1000000))),
+					Balance:    sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, math.NewInt(1000000))),
 					Claimed:    false,
 				}
 				err := s.keeper.SetClaimRecord(s.ctx, claimRecord)
@@ -165,6 +167,9 @@ func (s *MsgClaimIntegrationTestSuite) TestClaimIntegration() {
 			}
 
 			// Execute claim
+
+			// Set fee in context
+			s.ctx = s.ctx.WithValue(types.ClaimTxFee, validFee)
 			resp, err := s.msgServer.Claim(s.ctx, tc.msg)
 
 			if tc.expErr {

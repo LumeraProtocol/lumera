@@ -111,6 +111,10 @@ func (k *MockAccountKeeper) NewAccountWithAddress(ctx context.Context, addr sdk.
 	return authtypes.NewBaseAccountWithAddress(addr)
 }
 
+func (k *MockBankKeeper) SendCoinsFromAccountToModule(ctx context.Context, senderAddr sdk.AccAddress, recipientModule string, amt sdk.Coins) error {
+	return nil
+}
+
 func ClaimKeeper(t testing.TB) (keeper.Keeper, sdk.Context) {
 	storeKey := storetypes.NewKVStoreKey(types.StoreKey)
 

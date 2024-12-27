@@ -46,7 +46,7 @@ func InitGenesis(ctx sdk.Context, k keeper.Keeper, genState types.GenesisState) 
 			if err := k.SetClaimRecord(ctx, record); err != nil {
 				panic(fmt.Sprintf("failed to set claim record: %s", err))
 			}
-			totalCoins = totalCoins.Add(record.Balance.AmountOf(types.DefaultDenom))
+			totalCoins = totalCoins.Add(record.Balance.AmountOf(sdk.DefaultBondDenom))
 		}
 
 		// Only check and mint coins if we have a positive total
@@ -60,7 +60,7 @@ func InitGenesis(ctx sdk.Context, k keeper.Keeper, genState types.GenesisState) 
 			if err := bankKeeper.MintCoins(
 				ctx,
 				types.ModuleName,
-				sdk.NewCoins(sdk.NewCoin(types.DefaultDenom, totalCoins)),
+				sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, totalCoins)),
 			); err != nil {
 				panic(fmt.Sprintf("failed to mint coins: %s", err))
 			}
@@ -113,12 +113,8 @@ func loadClaimRecordsFromCSV() ([]types.ClaimRecord, error) {
 		return nil, fmt.Errorf("failed to read CSV: %w", err)
 	}
 
-	if len(rows) <= 1 { // Empty or only header
-		return []types.ClaimRecord{}, nil
-	}
-
 	records := make([]types.ClaimRecord, 0, len(rows)-1) // Pre-allocate with capacity
-	for _, row := range rows[1:] {                       // Skip header row
+	for _, row := range rows {                           // Skip header row
 		if len(row) < 2 { // Minimum required fields: address and balance
 			panic(fmt.Sprintf("invalid CSV row: %v", row))
 		}
@@ -128,7 +124,7 @@ func loadClaimRecordsFromCSV() ([]types.ClaimRecord, error) {
 			panic(fmt.Sprintf("invalid balance in CSV row: %v", row))
 		}
 
-		coin := sdk.NewCoin(types.DefaultDenom, balance)
+		coin := sdk.NewCoin(sdk.DefaultBondDenom, balance)
 
 		records = append(records, types.ClaimRecord{
 			OldAddress: row[0], // Address is in first column

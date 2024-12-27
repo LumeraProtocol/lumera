@@ -36,6 +36,10 @@ func (k msgServer) UpdateSupernode(goCtx context.Context, msg *types.MsgUpdateSu
 		}
 	}
 
+	if msg.SupernodeAccount != "" {
+		supernode.SupernodeAccount = msg.SupernodeAccount
+	}
+
 	if msg.Version != "" {
 		supernode.Version = msg.Version
 	}

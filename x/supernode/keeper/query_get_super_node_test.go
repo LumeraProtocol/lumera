@@ -16,10 +16,24 @@ import (
 func TestKeeper_GetSuperNode(t *testing.T) {
 	valAddr := sdk.ValAddress([]byte("validator"))
 	anotherValAddr := sdk.ValAddress([]byte("another-validator"))
+	creatorAddr := sdk.AccAddress(valAddr)
 
 	sn := types.SuperNode{
+		SupernodeAccount: string(creatorAddr.String()),
 		ValidatorAddress: valAddr.String(),
 		Version:          "1.0.0",
+		PrevIpAddresses: []*types.IPAddressHistory{
+			{
+				Address: "1022.145.1.1",
+				Height:  1,
+			},
+		},
+		States: []*types.SuperNodeStateRecord{
+			{
+				State:  types.SuperNodeStateActive,
+				Height: 1,
+			},
+		},
 	}
 
 	testCases := []struct {

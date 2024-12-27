@@ -47,6 +47,7 @@ message MsgRegisterSupernode {
   string validatorAddress = 2;
   string ipAddress        = 3;
   string version          = 4;
+  string supernodeAccount = 5;
 }
 
 message MsgRegisterSupernodeResponse {}
@@ -82,6 +83,7 @@ message MsgUpdateSupernode {
   string validatorAddress = 2;
   string ipAddress        = 3;
   string version          = 4;
+  string supernodeAccount = 5;
 }
 
 message MsgUpdateSupernodeResponse {}

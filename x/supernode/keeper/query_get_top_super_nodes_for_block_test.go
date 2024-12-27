@@ -1,7 +1,6 @@
 package keeper_test
 
 import (
-	"fmt"
 	"testing"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -156,25 +155,36 @@ func TestKeeper_GetTopSuperNodesForBlock(t *testing.T) {
 		valAddr := sdk.ValAddress(valBz)
 		return valAddr.String() // guaranteed valid bech32 if TestMain sets the prefix
 	}
+	makeSnAddr := func(id string) string {
+		valBz := []byte(id + "_unique")
+		valAddr := sdk.ValAddress(valBz)
+		return sdk.AccAddress(valAddr).String() // guaranteed valid bech32 if TestMain sets the prefix
+	}
 
 	// Helper to store supernodes
 	storeSuperNodes := func(sns []types.SuperNode) {
 		for _, sn := range sns {
 			err := k.SetSuperNode(ctx, sn)
 			require.NoError(t, err)
-			fmt.Printf("Stored supernode: %s\n", sn.ValidatorAddress)
 		}
 	}
 
 	// Creates a supernode with a first state record = (Active, someHeight).
 	makeSuperNode := func(label string, registrationHeight int64) types.SuperNode {
 		return types.SuperNode{
+			SupernodeAccount: makeSnAddr(label),
 			ValidatorAddress: makeValAddr(label),
 			Version:          "1.0",
 			States: []*types.SuperNodeStateRecord{
 				{
 					State:  types.SuperNodeStateActive,
 					Height: registrationHeight, // must be <= query block to be recognized
+				},
+			},
+			PrevIpAddresses: []*types.IPAddressHistory{
+				{
+					Address: "1022.145.1.1",
+					Height:  1,
 				},
 			},
 		}
@@ -288,52 +298,97 @@ func TestKeeper_GetTopSuperNodesForBlock(t *testing.T) {
 				clearStore()
 				// sn1: active@10, changes to disabled@200 => at 150 => Active
 				sn1 := types.SuperNode{
+					Version:          "1.0",
+					SupernodeAccount: makeSnAddr("sn1"),
 					ValidatorAddress: makeValAddr("sn1"),
 					States: []*types.SuperNodeStateRecord{
 						{State: types.SuperNodeStateActive, Height: 10},
 						{State: types.SuperNodeStateDisabled, Height: 200},
 					},
+					PrevIpAddresses: []*types.IPAddressHistory{
+						{
+							Address: "1022.145.1.1",
+							Height:  1,
+						},
+					},
 				}
 
 				// sn2: always Active
 				sn2 := types.SuperNode{
+					Version:          "1.0",
+					SupernodeAccount: makeSnAddr("sn2"),
 					ValidatorAddress: makeValAddr("sn2"),
 					States: []*types.SuperNodeStateRecord{
 						{State: types.SuperNodeStateActive, Height: 10},
 					},
+					PrevIpAddresses: []*types.IPAddressHistory{
+						{
+							Address: "1022.145.1.1",
+							Height:  1,
+						},
+					},
 				}
 				// sn3: active@10 => penalized@100 => so at 150 => penalized => skip if user wants Active
 				sn3 := types.SuperNode{
+					Version:          "1.0",
+					SupernodeAccount: makeSnAddr("sn3"),
 					ValidatorAddress: makeValAddr("sn3"),
 					States: []*types.SuperNodeStateRecord{
 						{State: types.SuperNodeStateActive, Height: 10},
 						{State: types.SuperNodeStatePenalized, Height: 100},
 					},
-				}
-				sn4 := types.SuperNode{
-					ValidatorAddress: makeValAddr("sn4"),
-					States:           []*types.SuperNodeStateRecord{},
+					PrevIpAddresses: []*types.IPAddressHistory{
+						{
+							Address: "1022.145.1.1",
+							Height:  1,
+						},
+					},
 				}
 				sn5 := types.SuperNode{
+					Version:          "1.0",
+					SupernodeAccount: makeSnAddr("sn5"),
 					ValidatorAddress: makeValAddr("sn5"),
 					States: []*types.SuperNodeStateRecord{
+						{State: types.SuperNodeStateActive, Height: 1},
 						{State: types.SuperNodeStateDisabled, Height: 10},
+					},
+					PrevIpAddresses: []*types.IPAddressHistory{
+						{
+							Address: "1022.145.1.1",
+							Height:  1,
+						},
 					},
 				}
 				sn6 := types.SuperNode{
+					Version:          "1.0",
+					SupernodeAccount: makeSnAddr("sn6"),
 					ValidatorAddress: makeValAddr("sn6"),
 					States: []*types.SuperNodeStateRecord{
 						{State: types.SuperNodeStateActive, Height: 1000},
 					},
+					PrevIpAddresses: []*types.IPAddressHistory{
+						{
+							Address: "1022.145.1.1",
+							Height:  1,
+						},
+					},
 				}
 				sn7 := types.SuperNode{
+					Version:          "1.0",
+					SupernodeAccount: makeSnAddr("sn7"),
 					ValidatorAddress: makeValAddr("sn7"),
 					States: []*types.SuperNodeStateRecord{
 						{State: types.SuperNodeStateActive, Height: 5},
 						{State: types.SuperNodeStateUnspecified, Height: 10},
 					},
+					PrevIpAddresses: []*types.IPAddressHistory{
+						{
+							Address: "1022.145.1.1",
+							Height:  1,
+						},
+					},
 				}
-				storeSuperNodes([]types.SuperNode{sn1, sn2, sn3, sn4, sn5, sn6, sn7})
+				storeSuperNodes([]types.SuperNode{sn1, sn2, sn3, sn5, sn6, sn7})
 			},
 			expectedErr: nil,
 			checkResult: func(t *testing.T, resp *types.QueryGetTopSuperNodesForBlockResponse) {

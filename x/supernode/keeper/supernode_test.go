@@ -19,7 +19,20 @@ func TestKeeper_SetAndQuerySuperNode(t *testing.T) {
 
 	supernode := types.SuperNode{
 		ValidatorAddress: valAddr.String(),
+		SupernodeAccount: sdk.AccAddress(valAddr).String(),
 		Version:          "1.0.0",
+		PrevIpAddresses: []*types.IPAddressHistory{
+			{
+				Address: "1022.145.1.1",
+				Height:  1,
+			},
+		},
+		States: []*types.SuperNodeStateRecord{
+			{
+				State:  types.SuperNodeStateActive,
+				Height: 1,
+			},
+		},
 	}
 
 	testCases := []struct {
@@ -105,8 +118,10 @@ func TestKeeper_GetAllSuperNodes(t *testing.T) {
 	// We'll add at least one state record so the SuperNode won't be skipped.
 	valAddr1 := sdk.ValAddress([]byte("val1"))
 	valAddr2 := sdk.ValAddress([]byte("val2"))
+	accAddr := sdk.AccAddress([]byte("acc1")).String()
 
 	sn1 := types.SuperNode{
+		SupernodeAccount: accAddr,
 		ValidatorAddress: valAddr1.String(),
 		Version:          "1.0.0",
 		States: []*types.SuperNodeStateRecord{
@@ -115,15 +130,28 @@ func TestKeeper_GetAllSuperNodes(t *testing.T) {
 				Height: 1, // or any block height, e.g. 1
 			},
 		},
+		PrevIpAddresses: []*types.IPAddressHistory{
+			{
+				Address: "1022.145.1.1",
+				Height:  1,
+			},
+		},
 	}
 
 	sn2 := types.SuperNode{
+		SupernodeAccount: accAddr,
 		ValidatorAddress: valAddr2.String(),
 		Version:          "2.0.0",
 		States: []*types.SuperNodeStateRecord{
 			{
 				State:  types.SuperNodeStateActive,
 				Height: 1,
+			},
+		},
+		PrevIpAddresses: []*types.IPAddressHistory{
+			{
+				Address: "1022.145.1.1",
+				Height:  1,
 			},
 		},
 	}
@@ -219,7 +247,10 @@ func TestKeeper_GetAllSuperNodes(t *testing.T) {
 			name: "filter by state - skip non-active",
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
 				sn2Updated := sn2
-				sn2Updated.States = make([]*types.SuperNodeStateRecord, 0)
+				sn2Updated.States = append(sn2Updated.States, &types.SuperNodeStateRecord{
+					State:  types.SuperNodeStateDisabled,
+					Height: 2, // so the last state is Disabled
+				})
 				require.NoError(t, k.SetSuperNode(ctx, sn2Updated))
 			},
 			run: func(k keeper.Keeper, ctx sdk.Context) (interface{}, error) {
@@ -266,14 +297,26 @@ func TestKeeper_GetAllSuperNodes(t *testing.T) {
 func makeSuperNodeWithOneState(valIndex int, state types.SuperNodeState) types.SuperNode {
 	// Use valIndex to produce a stable unique address
 	valAddr := sdk.ValAddress([]byte(fmt.Sprintf("val%d", valIndex)))
+	accAddr := sdk.AccAddress([]byte(fmt.Sprintf("acc%d", valIndex)))
 	sn := types.SuperNode{
 		ValidatorAddress: valAddr.String(),
+		SupernodeAccount: accAddr.String(),
 		Version:          "1.0.0",
 		// Must have at least one record so we don't skip it
 		States: []*types.SuperNodeStateRecord{
 			{
+				State:  types.SuperNodeStateActive, // e.g. Active, Stopped, etc.
+				Height: 1,                          // arbitrary block for the "registration"
+			},
+			{
 				State:  state, // e.g. Active, Stopped, etc.
 				Height: 1,     // arbitrary block for the "registration"
+			},
+		},
+		PrevIpAddresses: []*types.IPAddressHistory{
+			{
+				Address: "1022.145.1.1",
+				Height:  1,
 			},
 		},
 	}

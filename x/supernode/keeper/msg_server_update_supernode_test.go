@@ -20,8 +20,21 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 	otherCreatorAddr := sdk.AccAddress(otherValAddr)
 
 	existingSupernode := types.SuperNode{
+		SupernodeAccount: otherCreatorAddr.String(),
 		ValidatorAddress: valAddr.String(),
 		Version:          "1.0.0",
+		PrevIpAddresses: []*types.IPAddressHistory{
+			{
+				Address: "1022.145.1.1",
+				Height:  1,
+			},
+		},
+		States: []*types.SuperNodeStateRecord{
+			{
+				State:  types.SuperNodeStateActive,
+				Height: 1,
+			},
+		},
 	}
 
 	testCases := []struct {
@@ -48,7 +61,6 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 				sn, found := k.QuerySuperNode(ctx, valAddr)
 				require.True(t, found)
 				require.Equal(t, "1.0.0", sn.Version)
-				require.Empty(t, sn.PrevIpAddresses)
 			},
 		},
 		{
@@ -61,12 +73,19 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
 				newSupernode := types.SuperNode{
+					SupernodeAccount: otherCreatorAddr.String(),
 					ValidatorAddress: valAddr.String(),
 					Version:          "1.0.0",
 					PrevIpAddresses: []*types.IPAddressHistory{
 						{
 							Address: "10.0.1.1",
 							Height:  1,
+						},
+					},
+					States: []*types.SuperNodeStateRecord{
+						{
+							State:  types.SuperNodeStateActive,
+							Height: 1,
 						},
 					},
 				}
@@ -80,6 +99,47 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 				require.Len(t, sn.PrevIpAddresses, 2)
 				require.Equal(t, "10.0.1.1", sn.PrevIpAddresses[0].Address)
 				require.Equal(t, "192.168.1.1", sn.PrevIpAddresses[1].Address)
+			},
+		},
+		{
+			name: "successful update with supernode account change",
+			msg: &types.MsgUpdateSupernode{
+				Creator:          creatorAddr.String(),
+				ValidatorAddress: valAddr.String(),
+				IpAddress:        "192.168.1.1",
+				Version:          "1.1.0",
+				SupernodeAccount: creatorAddr.String(),
+			},
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
+				newSupernode := types.SuperNode{
+					SupernodeAccount: otherCreatorAddr.String(),
+					ValidatorAddress: valAddr.String(),
+					Version:          "1.0.0",
+					PrevIpAddresses: []*types.IPAddressHistory{
+						{
+							Address: "10.0.1.1",
+							Height:  1,
+						},
+					},
+					States: []*types.SuperNodeStateRecord{
+						{
+							State:  types.SuperNodeStateActive,
+							Height: 1,
+						},
+					},
+				}
+				require.NoError(t, k.SetSuperNode(ctx, newSupernode))
+			},
+			expectedError: nil,
+			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context) {
+				sn, found := k.QuerySuperNode(ctx, valAddr)
+				require.True(t, found)
+				require.Equal(t, "1.1.0", sn.Version)
+				require.Len(t, sn.PrevIpAddresses, 2)
+				require.Equal(t, "10.0.1.1", sn.PrevIpAddresses[0].Address)
+				require.Equal(t, "192.168.1.1", sn.PrevIpAddresses[1].Address)
+				require.Equal(t, sn.SupernodeAccount, creatorAddr.String())
+
 			},
 		},
 		{

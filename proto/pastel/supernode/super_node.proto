@@ -19,4 +19,5 @@ message SuperNode {
   repeated IPAddressHistory prev_ip_addresses = 4;
   string version = 5;
   MetricsAggregate metrics = 6;
+  string supernode_account = 7 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
 }

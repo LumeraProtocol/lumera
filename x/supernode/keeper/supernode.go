@@ -12,6 +12,10 @@ import (
 
 // SetSuperNode sets a supernode record in the store
 func (k Keeper) SetSuperNode(ctx sdk.Context, supernode types.SuperNode) error {
+	if err := supernode.Validate(); err != nil {
+		return err
+	}
+
 	// Convert context store to a KVStore interface
 	storeAdapter := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
 	// Create a prefix store so that all keys are under SuperNodeKey

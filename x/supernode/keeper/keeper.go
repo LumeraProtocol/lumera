@@ -1,13 +1,15 @@
 package keeper
 
 import (
+	"cosmossdk.io/core/store"
+	errorsmod "cosmossdk.io/errors"
+	"cosmossdk.io/log"
+	sdkmath "cosmossdk.io/math"
 	"fmt"
 
-	"cosmossdk.io/core/store"
-	"cosmossdk.io/log"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-
+	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/pastelnetwork/pastel/x/supernode/types"
 )
 
@@ -81,4 +83,85 @@ func (k *Keeper) AddStakingHooks(hooks types.StakingHooksWrapper) {
 // GetHooks returns the staking hooks
 func (k Keeper) GetHooks() types.StakingHooksWrapper {
 	return k.hooks
+}
+
+// EnableSuperNode enables a validator's SuperNode status
+func (k Keeper) EnableSuperNode(ctx sdk.Context, valAddr sdk.ValAddress) error {
+	supernode, found := k.QuerySuperNode(ctx, valAddr)
+	if !found {
+		return errorsmod.Wrapf(sdkerrors.ErrNotFound, "no supernode found for validator")
+	}
+
+	if len(supernode.States) == 0 {
+		return errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode is in an invalid state")
+	}
+
+	if supernode.States[len(supernode.States)-1].State != types.SuperNodeStateActive {
+		supernode.States = append(supernode.States, &types.SuperNodeStateRecord{
+			State:  types.SuperNodeStateActive,
+			Height: ctx.BlockHeight(),
+		})
+	}
+	if err := k.SetSuperNode(ctx, supernode); err != nil {
+		k.logger.With("module", fmt.Sprintf("error updating supernode state: %s", valAddr)).Error(fmt.Sprintf("x/%s", types.ModuleName))
+		return errorsmod.Wrapf(sdkerrors.ErrNotFound, "eror updating supernode state")
+	}
+
+	return nil
+}
+
+// DisableSuperNode disables a validator's SuperNode status
+func (k Keeper) DisableSuperNode(ctx sdk.Context, valAddr sdk.ValAddress) error {
+	supernode, found := k.QuerySuperNode(ctx, valAddr)
+	if !found {
+		return errorsmod.Wrapf(sdkerrors.ErrNotFound, "no supernode found for validator")
+	}
+
+	if len(supernode.States) == 0 {
+		return errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode is in an invalid state")
+	}
+
+	if supernode.States[len(supernode.States)-1].State != types.SuperNodeStateDisabled {
+		supernode.States = append(supernode.States, &types.SuperNodeStateRecord{
+			State:  types.SuperNodeStateDisabled,
+			Height: ctx.BlockHeight(),
+		})
+	}
+
+	if err := k.SetSuperNode(ctx, supernode); err != nil {
+		k.logger.With("module", fmt.Sprintf("error updating supernode state: %s", valAddr)).Error(fmt.Sprintf("x/%s", types.ModuleName))
+		return errorsmod.Wrapf(sdkerrors.ErrNotFound, "eror updating supernode state")
+	}
+
+	return nil
+}
+
+func (k Keeper) IsSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress) bool {
+	supernode, found := k.QuerySuperNode(ctx, valAddr)
+	if !found {
+		return false
+	}
+
+	if len(supernode.States) == 0 {
+		return false
+	}
+
+	return supernode.States[len(supernode.States)-1].State == types.SuperNodeStateActive
+}
+
+func (k Keeper) MeetsSuperNodeRequirements(ctx sdk.Context, valAddr sdk.ValAddress) bool {
+	validator, err := k.stakingKeeper.Validator(ctx, valAddr)
+	if err != nil || validator == nil {
+		return false
+	}
+
+	err = k.CheckValidatorSupernodeEligibility(ctx, validator, valAddr.String())
+	return err == nil
+}
+
+func (k Keeper) GetMinStake(ctx sdk.Context) sdkmath.Int {
+	minStake := k.GetParams(ctx).MinimumStakeForSn
+	minStakeInt := sdkmath.NewIntFromUint64(minStake)
+
+	return minStakeInt
 }

@@ -13,12 +13,21 @@ import (
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 )
 
+// SupernodeKeeper defines the expected interface for the Supernode module.
+
+type SupernodeKeeper interface {
+	EnableSuperNode(ctx sdk.Context, valAddr sdk.ValAddress) error
+	DisableSuperNode(ctx sdk.Context, valAddr sdk.ValAddress) error
+	IsSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress) bool
+	MeetsSuperNodeRequirements(ctx sdk.Context, valAddr sdk.ValAddress) bool
+}
+
 // StakingKeeper defines the expected interface for the Staking module.
 type StakingKeeper interface {
 	ConsensusAddressCodec() address.Codec
 	Validator(context.Context, sdk.ValAddress) (stakingtypes.ValidatorI, error)            // get a particular validator by operator address
 	ValidatorByConsAddr(context.Context, sdk.ConsAddress) (stakingtypes.ValidatorI, error) // get a particular validator by consensus address
-	Delegation(ctx context.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) (stakingtypes.Delegation, bool)
+	Delegation(ctx context.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) (stakingtypes.DelegationI, error)
 }
 
 // SlashingKeeper defines the expected interface for the Slashing module.
@@ -44,4 +53,8 @@ type BankKeeper interface {
 type ParamSubspace interface {
 	Get(context.Context, []byte, interface{})
 	Set(context.Context, []byte, interface{})
+}
+
+type StalkingHooks interface {
+	BeforeDelegationSharesModified(ctx context.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) error
 }

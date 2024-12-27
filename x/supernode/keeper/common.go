@@ -25,7 +25,7 @@ func (k msgServer) verifyValidatorOperator(_ sdk.Context, valOperAddr sdk.ValAdd
 }
 
 // CheckValidatorSupernodeEligibility ensures the validator has enough self-stake.
-func (k msgServer) CheckValidatorSupernodeEligibility(ctx sdk.Context, validator types.ValidatorI, valAddr string) error {
+func (k Keeper) CheckValidatorSupernodeEligibility(ctx sdk.Context, validator types.ValidatorI, valAddr string) error {
 	// If the validator is already bonded, skip the stake check
 	if validator.IsBonded() {
 		return nil
@@ -44,8 +44,8 @@ func (k msgServer) CheckValidatorSupernodeEligibility(ctx sdk.Context, validator
 	valAccAddr := sdk.AccAddress(valOperatorAddr)
 
 	// 3. Get self-delegation record
-	selfDelegation, found := k.stakingKeeper.Delegation(ctx, valAccAddr, valOperatorAddr)
-	if !found {
+	selfDelegation, err := k.stakingKeeper.Delegation(ctx, valAccAddr, valOperatorAddr)
+	if err != nil {
 		return errorsmod.Wrapf(
 			sdkerrors.ErrInvalidRequest,
 			"validator %s has no self-delegation; cannot meet minimum self-stake requirement",

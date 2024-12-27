@@ -2,6 +2,7 @@ package keeper_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	sdkmath "cosmossdk.io/math"
@@ -103,15 +104,15 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 
 			stakingKeeper.EXPECT().
 				Delegation(gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(_ context.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) (stakingtypes.Delegation, bool) {
+				DoAndReturn(func(_ context.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) (stakingtypes.Delegation, error) {
 					if tc.selfDelegationFound {
 						return stakingtypes.Delegation{
 							DelegatorAddress: delAddr.String(),
 							ValidatorAddress: valAddr.String(),
 							Shares:           tc.selfDelegationShares,
-						}, true
+						}, nil
 					}
-					return stakingtypes.Delegation{}, false
+					return stakingtypes.Delegation{}, errors.New("no self-delegation")
 				}).
 				MaxTimes(1)
 

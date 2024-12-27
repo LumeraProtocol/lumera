@@ -16,6 +16,85 @@ import (
 	gomock "github.com/golang/mock/gomock"
 )
 
+// MockSupernodeKeeper is a mock of SupernodeKeeper interface.
+type MockSupernodeKeeper struct {
+	ctrl     *gomock.Controller
+	recorder *MockSupernodeKeeperMockRecorder
+}
+
+// MockSupernodeKeeperMockRecorder is the mock recorder for MockSupernodeKeeper.
+type MockSupernodeKeeperMockRecorder struct {
+	mock *MockSupernodeKeeper
+}
+
+// NewMockSupernodeKeeper creates a new mock instance.
+func NewMockSupernodeKeeper(ctrl *gomock.Controller) *MockSupernodeKeeper {
+	mock := &MockSupernodeKeeper{ctrl: ctrl}
+	mock.recorder = &MockSupernodeKeeperMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockSupernodeKeeper) EXPECT() *MockSupernodeKeeperMockRecorder {
+	return m.recorder
+}
+
+// DisableSuperNode mocks base method.
+func (m *MockSupernodeKeeper) DisableSuperNode(ctx types.Context, valAddr types.ValAddress) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DisableSuperNode", ctx, valAddr)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DisableSuperNode indicates an expected call of DisableSuperNode.
+func (mr *MockSupernodeKeeperMockRecorder) DisableSuperNode(ctx, valAddr interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DisableSuperNode", reflect.TypeOf((*MockSupernodeKeeper)(nil).DisableSuperNode), ctx, valAddr)
+}
+
+// EnableSuperNode mocks base method.
+func (m *MockSupernodeKeeper) EnableSuperNode(ctx types.Context, valAddr types.ValAddress) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "EnableSuperNode", ctx, valAddr)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// EnableSuperNode indicates an expected call of EnableSuperNode.
+func (mr *MockSupernodeKeeperMockRecorder) EnableSuperNode(ctx, valAddr interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnableSuperNode", reflect.TypeOf((*MockSupernodeKeeper)(nil).EnableSuperNode), ctx, valAddr)
+}
+
+// IsSuperNodeActive mocks base method.
+func (m *MockSupernodeKeeper) IsSuperNodeActive(ctx types.Context, valAddr types.ValAddress) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsSuperNodeActive", ctx, valAddr)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// IsSuperNodeActive indicates an expected call of IsSuperNodeActive.
+func (mr *MockSupernodeKeeperMockRecorder) IsSuperNodeActive(ctx, valAddr interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsSuperNodeActive", reflect.TypeOf((*MockSupernodeKeeper)(nil).IsSuperNodeActive), ctx, valAddr)
+}
+
+// MeetsSuperNodeRequirements mocks base method.
+func (m *MockSupernodeKeeper) MeetsSuperNodeRequirements(ctx types.Context, valAddr types.ValAddress) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MeetsSuperNodeRequirements", ctx, valAddr)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// MeetsSuperNodeRequirements indicates an expected call of MeetsSuperNodeRequirements.
+func (mr *MockSupernodeKeeperMockRecorder) MeetsSuperNodeRequirements(ctx, valAddr interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MeetsSuperNodeRequirements", reflect.TypeOf((*MockSupernodeKeeper)(nil).MeetsSuperNodeRequirements), ctx, valAddr)
+}
+
 // MockStakingKeeper is a mock of StakingKeeper interface.
 type MockStakingKeeper struct {
 	ctrl     *gomock.Controller
@@ -54,11 +133,11 @@ func (mr *MockStakingKeeperMockRecorder) ConsensusAddressCodec() *gomock.Call {
 }
 
 // Delegation mocks base method.
-func (m *MockStakingKeeper) Delegation(ctx context.Context, delAddr types.AccAddress, valAddr types.ValAddress) (types0.Delegation, bool) {
+func (m *MockStakingKeeper) Delegation(ctx context.Context, delAddr types.AccAddress, valAddr types.ValAddress) (types0.DelegationI, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Delegation", ctx, delAddr, valAddr)
-	ret0, _ := ret[0].(types0.Delegation)
-	ret1, _ := ret[1].(bool)
+	ret0, _ := ret[0].(types0.DelegationI)
+	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
@@ -310,4 +389,41 @@ func (m *MockParamSubspace) Set(arg0 context.Context, arg1 []byte, arg2 interfac
 func (mr *MockParamSubspaceMockRecorder) Set(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Set", reflect.TypeOf((*MockParamSubspace)(nil).Set), arg0, arg1, arg2)
+}
+
+// MockStalkingHooks is a mock of StalkingHooks interface.
+type MockStalkingHooks struct {
+	ctrl     *gomock.Controller
+	recorder *MockStalkingHooksMockRecorder
+}
+
+// MockStalkingHooksMockRecorder is the mock recorder for MockStalkingHooks.
+type MockStalkingHooksMockRecorder struct {
+	mock *MockStalkingHooks
+}
+
+// NewMockStalkingHooks creates a new mock instance.
+func NewMockStalkingHooks(ctrl *gomock.Controller) *MockStalkingHooks {
+	mock := &MockStalkingHooks{ctrl: ctrl}
+	mock.recorder = &MockStalkingHooksMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockStalkingHooks) EXPECT() *MockStalkingHooksMockRecorder {
+	return m.recorder
+}
+
+// BeforeDelegationSharesModified mocks base method.
+func (m *MockStalkingHooks) BeforeDelegationSharesModified(ctx context.Context, delAddr types.AccAddress, valAddr types.ValAddress) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BeforeDelegationSharesModified", ctx, delAddr, valAddr)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// BeforeDelegationSharesModified indicates an expected call of BeforeDelegationSharesModified.
+func (mr *MockStalkingHooksMockRecorder) BeforeDelegationSharesModified(ctx, delAddr, valAddr interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BeforeDelegationSharesModified", reflect.TypeOf((*MockStalkingHooks)(nil).BeforeDelegationSharesModified), ctx, delAddr, valAddr)
 }

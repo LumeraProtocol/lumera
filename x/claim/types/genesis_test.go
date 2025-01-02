@@ -1,6 +1,7 @@
 package types_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -40,7 +41,7 @@ func TestGenesisState_Validate(t *testing.T) {
 				},
 				[]types.ClaimRecord{}, // Should always be empty in genesis
 				moduleAcc,
-				99999999, // Fixed claimable amount
+				types.DefaultClaimableAmountConst, // Fixed claimable amount
 			),
 			expErr: false,
 		},
@@ -54,7 +55,7 @@ func TestGenesisState_Validate(t *testing.T) {
 				},
 				[]types.ClaimRecord{},
 				moduleAcc,
-				99999999,
+				types.DefaultClaimableAmountConst,
 			),
 			expErr: true,
 		},
@@ -68,7 +69,7 @@ func TestGenesisState_Validate(t *testing.T) {
 				},
 				[]types.ClaimRecord{},
 				moduleAcc,
-				99999999,
+				types.DefaultClaimableAmountConst,
 			),
 			expErr: true,
 		},
@@ -93,7 +94,7 @@ func TestDefaultGenesis(t *testing.T) {
 	require.NotNil(t, genState)
 	require.Equal(t, types.DefaultParams(), genState.Params)
 	require.Empty(t, genState.ClaimRecords, "Genesis claim records should be empty")
-	require.Equal(t, uint64(99999999), genState.TotalClaimableAmount, "Total claimable amount should be fixed at 99999999")
+	require.Equal(t, uint64(types.DefaultClaimableAmountConst), genState.TotalClaimableAmount, fmt.Sprintf("total claimable amount should be fixed at %d", types.DefaultClaimableAmountConst))
 
 	// Validate default genesis state
 	require.NoError(t, genState.Validate())
@@ -111,12 +112,12 @@ func TestNewGenesisState(t *testing.T) {
 		params,
 		[]types.ClaimRecord{}, // Should be empty in genesis
 		moduleAcc,
-		99999999, // Fixed claimable amount
+		types.DefaultClaimableAmountConst, // Fixed claimable amount
 	)
 
 	require.NotNil(t, genState)
 	require.Equal(t, params, genState.Params)
 	require.Empty(t, genState.ClaimRecords, "Genesis claim records should be empty")
 	require.Equal(t, moduleAcc.String(), genState.ModuleAccount)
-	require.Equal(t, uint64(99999999), genState.TotalClaimableAmount, "Total claimable amount should be fixed at 99999999")
+	require.Equal(t, uint64(types.DefaultClaimableAmountConst), genState.TotalClaimableAmount, fmt.Sprintf("Total claimable amount should be fixed at %d", types.DefaultClaimableAmountConst))
 }

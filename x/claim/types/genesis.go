@@ -7,7 +7,7 @@ import (
 // DefaultIndex is the default global index
 const DefaultIndex uint64 = 1
 
-const claimableAmount = 12500000000000
+const DefaultClaimableAmountConst = 10329310842542
 
 // DefaultGenesis returns the default genesis state
 func DefaultGenesis() *GenesisState {
@@ -25,7 +25,7 @@ func DefaultGenesis() *GenesisState {
 		Params:               DefaultParams(),
 		ClaimRecords:         []ClaimRecord{}, //representation only
 		ModuleAccount:        moduleAcc.String(),
-		TotalClaimableAmount: claimableAmount,
+		TotalClaimableAmount: DefaultClaimableAmountConst,
 	}
 }
 

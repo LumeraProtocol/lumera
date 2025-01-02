@@ -379,7 +379,7 @@ func TestKeeper_GetTopSuperNodesForBlock(t *testing.T) {
 					ValidatorAddress: makeValAddr("sn7"),
 					States: []*types.SuperNodeStateRecord{
 						{State: types.SuperNodeStateActive, Height: 5},
-						{State: types.SuperNodeStateUnspecified, Height: 10},
+						{State: types.SuperNodeStateDisabled, Height: 10},
 					},
 					PrevIpAddresses: []*types.IPAddressHistory{
 						{

@@ -91,15 +91,8 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 				Version:          "1.0.0",
 			},
 			mockSetup: func(sk *supernodemocks.MockStakingKeeper, slk *supernodemocks.MockSlashingKeeper, bk *supernodemocks.MockBankKeeper) {
-				sk.EXPECT().
-					Validator(gomock.Any(), valAddr).
-					Return(&stakingtypes.Validator{
-						OperatorAddress: valAddr.String(),
-						Status:          stakingtypes.Bonded,
-						Tokens:          math.NewInt(2_000_000),
-						DelegatorShares: math.LegacyNewDec(2_000_000),
-						Jailed:          false,
-					}, nil)
+				// No expectations here, because the code immediately returns unauthorized
+				// before calling sk.Validator(...)
 			},
 			expectedError: sdkerrors.ErrUnauthorized,
 		},

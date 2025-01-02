@@ -87,7 +87,12 @@ func (k Keeper) GetHooks() types.StakingHooksWrapper {
 
 // EnableSuperNode enables a validator's SuperNode status
 func (k Keeper) EnableSuperNode(ctx sdk.Context, valAddr sdk.ValAddress) error {
-	supernode, found := k.QuerySuperNode(ctx, valAddr)
+	valOperAddr, err := sdk.ValAddressFromBech32(valAddr.String())
+	if err != nil {
+		return errorsmod.Wrapf(sdkerrors.ErrInvalidAddress, "invalid validator address: %s", err)
+	}
+
+	supernode, found := k.QuerySuperNode(ctx, valOperAddr)
 	if !found {
 		return errorsmod.Wrapf(sdkerrors.ErrNotFound, "no supernode found for validator")
 	}
@@ -112,7 +117,12 @@ func (k Keeper) EnableSuperNode(ctx sdk.Context, valAddr sdk.ValAddress) error {
 
 // DisableSuperNode disables a validator's SuperNode status
 func (k Keeper) DisableSuperNode(ctx sdk.Context, valAddr sdk.ValAddress) error {
-	supernode, found := k.QuerySuperNode(ctx, valAddr)
+	valOperAddr, err := sdk.ValAddressFromBech32(valAddr.String())
+	if err != nil {
+		return errorsmod.Wrapf(sdkerrors.ErrInvalidAddress, "invalid validator address: %s", err)
+	}
+
+	supernode, found := k.QuerySuperNode(ctx, valOperAddr)
 	if !found {
 		return errorsmod.Wrapf(sdkerrors.ErrNotFound, "no supernode found for validator")
 	}
@@ -137,7 +147,12 @@ func (k Keeper) DisableSuperNode(ctx sdk.Context, valAddr sdk.ValAddress) error 
 }
 
 func (k Keeper) IsSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress) bool {
-	supernode, found := k.QuerySuperNode(ctx, valAddr)
+	valOperAddr, err := sdk.ValAddressFromBech32(valAddr.String())
+	if err != nil {
+		return false
+	}
+
+	supernode, found := k.QuerySuperNode(ctx, valOperAddr)
 	if !found {
 		return false
 	}

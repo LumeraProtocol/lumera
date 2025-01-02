@@ -63,9 +63,9 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 				},
 				{
 					RpcMethod:      "StartSupernode",
-					Use:            "start-supernode [validator-address] [ip-address]",
+					Use:            "start-supernode [validator-address]",
 					Short:          "Send a start-supernode tx",
-					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validatorAddress"}, {ProtoField: "ipAddress"}},
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validatorAddress"}},
 				},
 				{
 					RpcMethod:      "StopSupernode",

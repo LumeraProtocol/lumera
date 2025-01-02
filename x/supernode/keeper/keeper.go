@@ -165,3 +165,7 @@ func (k Keeper) GetMinStake(ctx sdk.Context) sdkmath.Int {
 
 	return minStakeInt
 }
+
+func (k Keeper) GetStakingKeeper() types.StakingKeeper {
+	return k.stakingKeeper
+}

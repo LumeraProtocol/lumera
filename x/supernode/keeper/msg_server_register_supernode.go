@@ -19,27 +19,27 @@ func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types.MsgRegist
 		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidAddress, "invalid validator address: %s", err)
 	}
 
-	// Get the validator by operator address using the correct method
+	// Authorization check
+	if err := k.verifyValidatorOperator(ctx, valOperAddr, msg.Creator); err != nil {
+		return nil, err
+	}
+
+	//  Check if supernode exists
+	_, found := k.QuerySuperNode(ctx, valOperAddr)
+	if found {
+		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode already exists for validator %s", msg.ValidatorAddress)
+	}
+
+	// Get validator
 	validator, err := k.stakingKeeper.Validator(ctx, valOperAddr)
 	if err != nil {
 		return nil, errorsmod.Wrapf(sdkerrors.ErrNotFound, "validator not found for operator address %s: %s", msg.ValidatorAddress, err)
 	}
 
-	// First check: reject if validator is jailed
+	// State-dependent validations
 	if validator.IsJailed() {
 		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest,
 			"validator %s is jailed and cannot register a supernode", msg.ValidatorAddress)
-	}
-
-	// Verify the signer is authorized
-	if err := k.verifyValidatorOperator(ctx, valOperAddr, msg.Creator); err != nil {
-		return nil, err
-	}
-
-	// Check if a SuperNode already exists
-	_, found := k.QuerySuperNode(ctx, valOperAddr) // assume we have GetSuperNode implemented
-	if found {
-		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode already exists for validator %s", msg.ValidatorAddress)
 	}
 
 	if err := k.CheckValidatorSupernodeEligibility(ctx, validator, msg.ValidatorAddress); err != nil {

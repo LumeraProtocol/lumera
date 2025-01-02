@@ -391,39 +391,5 @@ func (mr *MockParamSubspaceMockRecorder) Set(arg0, arg1, arg2 interface{}) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Set", reflect.TypeOf((*MockParamSubspace)(nil).Set), arg0, arg1, arg2)
 }
 
-// MockStalkingHooks is a mock of StalkingHooks interface.
-type MockStalkingHooks struct {
-	ctrl     *gomock.Controller
-	recorder *MockStalkingHooksMockRecorder
-}
 
-// MockStalkingHooksMockRecorder is the mock recorder for MockStalkingHooks.
-type MockStalkingHooksMockRecorder struct {
-	mock *MockStalkingHooks
-}
 
-// NewMockStalkingHooks creates a new mock instance.
-func NewMockStalkingHooks(ctrl *gomock.Controller) *MockStalkingHooks {
-	mock := &MockStalkingHooks{ctrl: ctrl}
-	mock.recorder = &MockStalkingHooksMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockStalkingHooks) EXPECT() *MockStalkingHooksMockRecorder {
-	return m.recorder
-}
-
-// BeforeDelegationSharesModified mocks base method.
-func (m *MockStalkingHooks) BeforeDelegationSharesModified(ctx context.Context, delAddr types.AccAddress, valAddr types.ValAddress) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BeforeDelegationSharesModified", ctx, delAddr, valAddr)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// BeforeDelegationSharesModified indicates an expected call of BeforeDelegationSharesModified.
-func (mr *MockStalkingHooksMockRecorder) BeforeDelegationSharesModified(ctx, delAddr, valAddr interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BeforeDelegationSharesModified", reflect.TypeOf((*MockStalkingHooks)(nil).BeforeDelegationSharesModified), ctx, delAddr, valAddr)
-}

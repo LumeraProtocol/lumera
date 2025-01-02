@@ -223,16 +223,3 @@ func ProvideModule(in ModuleInputs) ModuleOutputs {
 
 	return ModuleOutputs{SupernodeKeeper: k, Module: m}
 }
-
-// Remove or modify InvokeSetStakingHooks since we're now setting hooks in ProvideModule
-
-// // InvokeSetStakingHooks is the invoker for staking hooks
-// func InvokeSetStakingHooks(
-// 	keeper *keeper.Keeper,
-// 	stakingHooks map[string]types.StakingHooksWrapper,
-// ) error {
-// 	for k := range stakingHooks {
-// 		keeper.AddStakingHooks(stakingHooks[k])
-// 	}
-// 	return nil
-// }

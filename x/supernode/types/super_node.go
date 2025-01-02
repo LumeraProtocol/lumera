@@ -31,8 +31,13 @@ func (s *SuperNode) Validate() error {
 	}
 
 	// Check if state is valid (not unspecified)
-	if len(s.States) == 0 || s.States[0].State != SuperNodeStateActive {
+	if len(s.States) == 0 {
 		return ErrInvalidSuperNodeState
+	}
+	for _, st := range s.States {
+		if st.State == SuperNodeStateUnspecified {
+			return ErrInvalidSuperNodeState
+		}
 	}
 
 	// Check if IP address is not empty

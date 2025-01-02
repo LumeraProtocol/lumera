@@ -10,6 +10,10 @@ import (
 	"github.com/pastelnetwork/pastel/x/supernode/types"
 )
 
+const (
+	TypeMsgStartSupernode = "start_supernode"
+)
+
 func SimulateMsgStartSupernode(
 	ak types.AccountKeeper,
 	bk types.BankKeeper,
@@ -17,13 +21,55 @@ func SimulateMsgStartSupernode(
 ) simtypes.Operation {
 	return func(r *rand.Rand, app *baseapp.BaseApp, ctx sdk.Context, accs []simtypes.Account, chainID string,
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
-		simAccount, _ := simtypes.RandomAcc(r, accs)
-		msg := &types.MsgStartSupernode{
-			Creator: simAccount.Address.String(),
+		// Find a validator with a non-active supernode
+		var simAccount simtypes.Account
+		var found bool
+		var validatorAddress string
+
+		stakingkeepr := k.GetStakingKeeper()
+		// Try up to 10 times to find an eligible validator
+		for i := 0; i < 10; i++ {
+			simAccount, _ = simtypes.RandomAcc(r, accs)
+			valAddr := sdk.ValAddress(simAccount.Address)
+
+			validator, err := stakingkeepr.Validator(ctx, valAddr)
+			if err != nil {
+				continue
+			}
+
+			// Check if supernode exists
+			supernode, exists := k.QuerySuperNode(ctx, valAddr)
+			if !exists {
+				continue
+			}
+
+			// Skip if supernode is already active
+			if len(supernode.States) > 0 && supernode.States[len(supernode.States)-1].State == types.SuperNodeStateActive {
+				continue
+			}
+
+			validatorAddress = validator.GetOperator()
+			found = true
+			break
 		}
 
-		// TODO: Handling the StartSupernode simulation
+		// If we couldn't find an eligible supernode, skip this operation
+		if !found {
+			return simtypes.NoOpMsg(types.ModuleName, TypeMsgStartSupernode, "no eligible supernode found"), nil, nil
+		}
 
-		return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), "StartSupernode simulation not implemented"), nil, nil
+		msg := &types.MsgStartSupernode{
+			Creator:          simAccount.Address.String(),
+			ValidatorAddress: validatorAddress,
+		}
+
+		// Execute the message
+		msgServer := keeper.NewMsgServerImpl(k)
+		_, err := msgServer.StartSupernode(sdk.WrapSDKContext(ctx), msg)
+		if err != nil {
+			return simtypes.NoOpMsg(types.ModuleName, TypeMsgStartSupernode, err.Error()), nil, err
+		}
+
+		return simtypes.NewOperationMsg(msg, true, "success"), nil, nil
 	}
 }

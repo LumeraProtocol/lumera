@@ -51,9 +51,9 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 				},
 				{
 					RpcMethod:      "RegisterSupernode",
-					Use:            "register-supernode [validator-address] [ip-address] [version]",
+					Use:            "register-supernode [validator-address] [ip-address] [version] [supernode-account]",
 					Short:          "Send a register-supernode tx",
-					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validatorAddress"}, {ProtoField: "ipAddress"}, {ProtoField: "version"}},
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validatorAddress"}, {ProtoField: "ipAddress"}, {ProtoField: "version"}, {ProtoField: "supernodeAccount"}},
 				},
 				{
 					RpcMethod:      "DeregisterSupernode",
@@ -75,9 +75,9 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 				},
 				{
 					RpcMethod:      "UpdateSupernode",
-					Use:            "update-supernode [validator-address] [ip-address] [version]",
-					Short:          "Send a update-supernode tx",
-					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validatorAddress"}, {ProtoField: "ipAddress"}, {ProtoField: "version"}},
+					Use:            "update-supernode [validator-address] [ip-address] [version] [supernode-account]",
+					Short:          "Send an update-supernode tx",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validatorAddress"}, {ProtoField: "ipAddress"}, {ProtoField: "version"}, {ProtoField: "supernodeAccount"}},
 				},
 				// this line is used by ignite scaffolding # autocli/tx
 			},

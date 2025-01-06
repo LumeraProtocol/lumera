@@ -2,7 +2,6 @@ package keeper_test
 
 import (
 	"testing"
-	"time"
 
 	"cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -14,14 +13,13 @@ import (
 func TestMsgClaim(t *testing.T) {
 	k, ms, ctx := setupMsgServer(t)
 
-	// Define valid claim record - will be used as template
+	// Define valid claim record with proper coin denomination
 	validClaimRecord := types.ClaimRecord{
 		OldAddress: "PtqHAEacynVd3V821NPhgxu9K4Ab6kAguHi",
-		Balance:    sdk.NewCoins(sdk.NewCoin("upastel", math.NewInt(1000000))),
+		Balance:    sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, math.NewInt(1000000))),
 		Claimed:    false,
 	}
 
-	// Define test cases
 	testCases := []struct {
 		name      string
 		msg       *types.MsgClaim
@@ -38,13 +36,19 @@ func TestMsgClaim(t *testing.T) {
 				Signature:  "1f46b3a2129047a0d7a6bf91e2879e940ed3db06a2cafaaaabacc337141146f43e4932d357b435bbf2c48227f5c2f738df23a2ebc221dd11cb14ed4b83bd2a95c7",
 			},
 			setup: func() {
+				sdkCtx := sdk.UnwrapSDKContext(ctx)
 				params := types.DefaultParams()
 				params.EnableClaims = true
 				params.MaxClaimsPerBlock = 10
-				params.ClaimEndTime = time.Now().Add(time.Hour).Unix()
-				require.NoError(t, k.SetParams(ctx, params))
+				params.ClaimEndTime = sdkCtx.BlockTime().Unix() + 3600 // 1 hour from now
+				require.NoError(t, k.SetParams(sdkCtx, params))
+
 				// Set fresh claim record
-				require.NoError(t, k.SetClaimRecord(ctx.(sdk.Context), validClaimRecord))
+				require.NoError(t, k.SetClaimRecord(sdkCtx, validClaimRecord))
+
+				// Set fee in context
+				fee := sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, math.NewInt(1000)))
+				ctx = sdkCtx.WithValue(types.ClaimTxFee, fee)
 			},
 			expErr: false,
 		},
@@ -57,13 +61,11 @@ func TestMsgClaim(t *testing.T) {
 				Signature:  "1f46b3a2129047a0d7a6bf91e2879e940ed3db06a2cafaaaabacc337141146f43e4932d357b435bbf2c48227f5c2f738df23a2ebc221dd11cb14ed4b83bd2a95c7",
 			},
 			setup: func() {
+				sdkCtx := sdk.UnwrapSDKContext(ctx)
 				params := types.DefaultParams()
 				params.EnableClaims = false
-				params.MaxClaimsPerBlock = 10
-				params.ClaimEndTime = time.Now().Add(time.Hour).Unix()
-				require.NoError(t, k.SetParams(ctx, params))
-				// Set fresh claim record
-				require.NoError(t, k.SetClaimRecord(ctx.(sdk.Context), validClaimRecord))
+				require.NoError(t, k.SetParams(sdkCtx, params))
+				require.NoError(t, k.SetClaimRecord(sdkCtx, validClaimRecord))
 			},
 			expErr:    true,
 			expErrMsg: types.ErrClaimDisabled.Error(),
@@ -77,16 +79,15 @@ func TestMsgClaim(t *testing.T) {
 				Signature:  "1f46b3a2129047a0d7a6bf91e2879e940ed3db06a2cafaaaabacc337141146f43e4932d357b435bbf2c48227f5c2f738df23a2ebc221dd11cb14ed4b83bd2a95c7",
 			},
 			setup: func() {
+				sdkCtx := sdk.UnwrapSDKContext(ctx)
 				params := types.DefaultParams()
 				params.EnableClaims = true
-				params.MaxClaimsPerBlock = 10
-				params.ClaimEndTime = time.Now().Add(-time.Hour).Unix() // Set negative duration to ensure expiration
-				require.NoError(t, k.SetParams(ctx, params))
-				// Set fresh claim record
-				require.NoError(t, k.SetClaimRecord(ctx.(sdk.Context), validClaimRecord))
+				params.ClaimEndTime = sdkCtx.BlockTime().Unix() - 3600 // 1 hour ago
+				require.NoError(t, k.SetParams(sdkCtx, params))
+				require.NoError(t, k.SetClaimRecord(sdkCtx, validClaimRecord))
 			},
 			expErr:    true,
-			expErrMsg: "claim period has expired",
+			expErrMsg: types.ErrClaimPeriodExpired.Error(),
 		},
 		{
 			name: "already claimed",
@@ -97,18 +98,17 @@ func TestMsgClaim(t *testing.T) {
 				Signature:  "1f46b3a2129047a0d7a6bf91e2879e940ed3db06a2cafaaaabacc337141146f43e4932d357b435bbf2c48227f5c2f738df23a2ebc221dd11cb14ed4b83bd2a95c7",
 			},
 			setup: func() {
+				sdkCtx := sdk.UnwrapSDKContext(ctx)
 				params := types.DefaultParams()
 				params.EnableClaims = true
-				params.MaxClaimsPerBlock = 10
-				params.ClaimEndTime = time.Now().Add(time.Hour).Unix()
-				require.NoError(t, k.SetParams(ctx, params))
-				// Set claimed record
+				require.NoError(t, k.SetParams(sdkCtx, params))
+
 				claimedRecord := validClaimRecord
 				claimedRecord.Claimed = true
-				require.NoError(t, k.SetClaimRecord(ctx.(sdk.Context), claimedRecord))
+				require.NoError(t, k.SetClaimRecord(sdkCtx, claimedRecord))
 			},
 			expErr:    true,
-			expErrMsg: "claim already claimed",
+			expErrMsg: types.ErrClaimAlreadyClaimed.Error(),
 		},
 	}
 
@@ -129,11 +129,12 @@ func TestMsgClaim(t *testing.T) {
 				require.NotNil(t, resp)
 
 				// Check claim record was updated
-				record, found, err := k.GetClaimRecord(ctx.(sdk.Context), tc.msg.OldAddress)
+				sdkCtx := sdk.UnwrapSDKContext(ctx)
+				record, found, err := k.GetClaimRecord(sdkCtx, tc.msg.OldAddress)
 				require.NoError(t, err)
 				require.True(t, found)
 				require.True(t, record.Claimed)
-				require.NotNil(t, record.ClaimTime)
+				require.NotZero(t, record.ClaimTime)
 			}
 		})
 	}

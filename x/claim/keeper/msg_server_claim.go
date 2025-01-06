@@ -2,12 +2,19 @@ package keeper
 
 import (
 	"context"
+
 	"strconv"
 	"time"
+
+	errorsmod "cosmossdk.io/errors"
+	math "cosmossdk.io/math"
+
+	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/pastelnetwork/pastel/x/claim/types"
 
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	crypto "github.com/pastelnetwork/pastel/x/claim/keeper/crypto"
 )
 
@@ -23,11 +30,6 @@ func (k msgServer) Claim(goCtx context.Context, msg *types.MsgClaim) (*types.Msg
 	claimEndTime := time.Unix(params.ClaimEndTime, 0)
 	if ctx.BlockTime().After(claimEndTime) {
 		return nil, types.ErrClaimPeriodExpired
-	}
-
-	// check is claims are enabled
-	if !params.EnableClaims {
-		return nil, types.ErrClaimDisabled
 	}
 
 	// Check claims per block limit
@@ -86,12 +88,26 @@ func (k msgServer) Claim(goCtx context.Context, msg *types.MsgClaim) (*types.Msg
 		k.accountKeeper.SetAccount(ctx, acc)
 	}
 
-	// Send coins from module to the new address
+	// Get fee from context
+	minGasPrice := ctx.MinGasPrices().AmountOf(sdk.DefaultBondDenom)
+	gasConsumed := math.LegacyNewDec(int64(ctx.GasMeter().GasConsumed()))
+
+	feeAmount := gasConsumed.Mul(minGasPrice)
+
+	fee := sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, feeAmount.RoundInt()))
+
 	err = k.bankKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, destAddr, claimRecord.Balance)
 	if err != nil {
 		return nil, err
 	}
-	// Update claim record
+
+	// deduct the fee from the new account
+	err = deductClaimFee(k.bankKeeper, ctx, acc, fee)
+	if err != nil {
+		return nil, err
+	}
+
+	// Mark the claim as processed
 	claimRecord.Claimed = true
 	claimRecord.ClaimTime = ctx.BlockTime().Unix()
 	ClaimTimeString := strconv.FormatInt(claimRecord.ClaimTime, 10)
@@ -112,4 +128,25 @@ func (k msgServer) Claim(goCtx context.Context, msg *types.MsgClaim) (*types.Msg
 	)
 
 	return &types.MsgClaimResponse{}, nil
+}
+
+func deductClaimFee(bankKeeper types.BankKeeper, ctx sdk.Context, acc sdk.AccountI, fees sdk.Coins) error {
+	if !fees.IsValid() {
+		return errorsmod.Wrapf(sdkerrors.ErrInsufficientFee, "invalid fee amount: %s", fees)
+	}
+
+	err := bankKeeper.SendCoinsFromAccountToModule(ctx, acc.GetAddress(), authtypes.FeeCollectorName, fees)
+	if err != nil {
+		return errorsmod.Wrapf(sdkerrors.ErrInsufficientFunds, "%s", err.Error())
+	}
+
+	events := sdk.Events{
+		sdk.NewEvent(
+			sdk.EventTypeTx,
+			sdk.NewAttribute(sdk.AttributeKeyFee, fees.String()),
+			sdk.NewAttribute(sdk.AttributeKeyFeePayer, acc.String()),
+		),
+	}
+	ctx.EventManager().EmitEvents(events)
+	return nil
 }

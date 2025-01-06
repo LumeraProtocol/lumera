@@ -2,10 +2,12 @@ package keeper
 
 import (
 	"context"
+
 	"strconv"
 	"time"
 
 	errorsmod "cosmossdk.io/errors"
+	math "cosmossdk.io/math"
 
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 
@@ -87,16 +89,12 @@ func (k msgServer) Claim(goCtx context.Context, msg *types.MsgClaim) (*types.Msg
 	}
 
 	// Get fee from context
-	feeValue := ctx.Value(types.ClaimTxFee)
-	fee, ok := feeValue.(sdk.Coins)
-	if !ok {
-		return nil, sdkerrors.ErrInvalidCoins
-	}
+	minGasPrice := ctx.MinGasPrices().AmountOf(sdk.DefaultBondDenom)
+	gasConsumed := math.LegacyNewDec(int64(ctx.GasMeter().GasConsumed()))
 
-	// fee should be smaller than the claim balance
-	if fee.IsAllGTE(claimRecord.Balance) {
-		return nil, sdkerrors.ErrInsufficientFee
-	}
+	feeAmount := gasConsumed.Mul(minGasPrice)
+
+	fee := sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, feeAmount.RoundInt()))
 
 	err = k.bankKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, destAddr, claimRecord.Balance)
 	if err != nil {
@@ -139,7 +137,7 @@ func deductClaimFee(bankKeeper types.BankKeeper, ctx sdk.Context, acc sdk.Accoun
 
 	err := bankKeeper.SendCoinsFromAccountToModule(ctx, acc.GetAddress(), authtypes.FeeCollectorName, fees)
 	if err != nil {
-		return errorsmod.Wrapf(sdkerrors.ErrInsufficientFunds, err.Error())
+		return errorsmod.Wrapf(sdkerrors.ErrInsufficientFunds, "%s", err.Error())
 	}
 
 	events := sdk.Events{

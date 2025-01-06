@@ -93,8 +93,6 @@ func generateTestData() (*TestData, error) {
 func TestClaimProcess(t *testing.T) {
 	suite := setupClaimSystemSuite(t)
 
-	validFee := sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.NewInt(1000)))
-
 	// Generate test data
 	testData, err := generateTestData()
 	t.Logf("\nTest Data Generated:"+
@@ -137,10 +135,6 @@ func TestClaimProcess(t *testing.T) {
 
 				err = suite.app.BankKeeper.MintCoins(suite.sdkCtx, types.ModuleName, claimRecord.Balance)
 				require.NoError(t, err)
-
-				// Add fee to context
-				fee := sdk.NewCoins(validFee...) // Small fee
-				suite.sdkCtx = suite.sdkCtx.WithValue(types.ClaimTxFee, fee)
 			},
 			msg: &types.MsgClaim{
 				OldAddress: testData.OldAddress,
@@ -315,8 +309,8 @@ func TestClaimProcess(t *testing.T) {
 				finalUserBalance := suite.app.BankKeeper.GetAllBalances(suite.sdkCtx, destAddr)
 				finalModuleBalance := suite.app.BankKeeper.GetAllBalances(suite.sdkCtx, moduleAddr)
 
-				// Check user received the correct amount (minus fee)
-				expectedUserBalance := initialUserBalance.Add(record.Balance...).Sub(validFee...)
+				// Check user received the correct amount
+				expectedUserBalance := initialUserBalance.Add(record.Balance...)
 				require.Equal(t, expectedUserBalance, finalUserBalance)
 
 				// Check module account balance decreased correctly

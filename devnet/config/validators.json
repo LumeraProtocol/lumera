@@ -8,8 +8,8 @@
     "rest_port": 1317,
     "grpc_port": 9090,
     "initial_distribution": {
-      "account_balance": "1000000000000000upsl", 
-      "validator_stake": "900000000000000upsl"   
+      "account_balance": "1000000000000upsl", 
+      "validator_stake": "824637515648upsl"   
     }
   },
   {
@@ -21,8 +21,8 @@
     "rest_port": 1327,
     "grpc_port": 9091,
     "initial_distribution": {
-      "account_balance": "1000000000000000upsl",  
-      "validator_stake": "900000000000000upsl"    
+      "account_balance": "1000000000000upsl",  
+      "validator_stake": "824637515648upsl"    
     }
   },
   {
@@ -34,8 +34,8 @@
     "rest_port": 1337,
     "grpc_port": 9092,
     "initial_distribution": {
-      "account_balance": "1000000000000000upsl",  
-      "validator_stake": "900000000000000upsl"    
+      "account_balance": "1000000000000upsl",  
+      "validator_stake": "824637515648upsl"    
     }
   },
   {
@@ -47,8 +47,8 @@
     "rest_port": 1347,
     "grpc_port": 9093,
     "initial_distribution": {
-      "account_balance": "1000000000000000upsl",  
-      "validator_stake": "900000000000000upsl"    
+      "account_balance": "1000000000000upsl",  
+      "validator_stake": "824637515648upsl"    
     }
   },
   {
@@ -60,8 +60,8 @@
     "rest_port": 1357,
     "grpc_port": 9094,
     "initial_distribution": {
-      "account_balance": "1000000000000000upsl",  
-      "validator_stake": "900000000000000upsl"    
+      "account_balance": "1000000000000upsl",  
+      "validator_stake": "824637515648upsl"    
     }
   }
 ]

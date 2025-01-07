@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func (suite *KeeperIntegrationSuite) TestAfterValidatorCreatedHook() {
+func (suite *KeeperIntegrationSuite) TestAfterValidatorBondedHook() {
 	tests := []struct {
 		name          string
 		setup         func()
@@ -20,7 +20,7 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorCreatedHook() {
 		expectSuccess bool
 	}{
 		{
-			name: "when validator is created and meet supernode requirements, it should be active",
+			name: "when validator is bonded and meet supernode requirements, it should be active",
 			setup: func() {
 				params := types.Params{
 					MinimumStakeForSn: 1000000,
@@ -52,7 +52,7 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorCreatedHook() {
 				suite.app.StakingKeeper.SetDelegation(suite.ctx, selfDelegation)
 			},
 			execute: func() error {
-				return suite.keeper.GetHooks().Hooks().AfterValidatorCreated(suite.ctx, sdk.ValAddress("validator1c"))
+				return suite.keeper.Hooks().AfterValidatorBonded(suite.ctx, sdk.ConsAddress("cons2"), sdk.ValAddress("validator1c"))
 			},
 			validate: func() error {
 				result, found := suite.keeper.QuerySuperNode(suite.ctx, sdk.ValAddress("validator1c"))
@@ -60,6 +60,54 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorCreatedHook() {
 					return fmt.Errorf("SuperNode not found")
 				}
 				if result.States[len(result.States)-1].State != types.SuperNodeStateActive {
+					return fmt.Errorf("expected SuperNode to be active")
+				}
+				return nil
+			},
+			expectSuccess: true,
+		},
+		{
+			name: "when the validator is bonded but jailed, it should disabled",
+			setup: func() {
+				params := types.Params{
+					MinimumStakeForSn: 1000000,
+				}
+				suite.keeper.SetParams(suite.ctx, params)
+
+				supernode := types.SuperNode{
+					ValidatorAddress: sdk.ValAddress([]byte("validator1j")).String(),
+					SupernodeAccount: sdk.AccAddress([]byte("validator1j")).String(),
+					Version:          "1.0.0",
+					States:           []*types.SuperNodeStateRecord{{State: types.SuperNodeStateActive}},
+					PrevIpAddresses:  []*types.IPAddressHistory{{Address: "192.168.1.1"}},
+				}
+				suite.keeper.SetSuperNode(suite.ctx, supernode)
+
+				validator := stakingtypes.Validator{
+					OperatorAddress: sdk.ValAddress("validator1j").String(),
+					Tokens:          sdkmath.NewInt(2000000),
+					DelegatorShares: sdkmath.LegacyNewDec(2000000), // Ensure shares match self-delegation
+					Jailed:          true,
+				}
+				suite.app.StakingKeeper.SetValidator(suite.ctx, validator)
+
+				// Set self-delegation
+				selfDelegation := stakingtypes.Delegation{
+					DelegatorAddress: sdk.AccAddress(("validator1j")).String(),
+					ValidatorAddress: sdk.ValAddress("validator1j").String(),
+					Shares:           sdkmath.LegacyNewDec(2000000), // Self-delegation should match shares
+				}
+				suite.app.StakingKeeper.SetDelegation(suite.ctx, selfDelegation)
+			},
+			execute: func() error {
+				return suite.keeper.Hooks().AfterValidatorBonded(suite.ctx, sdk.ConsAddress("cons2"), sdk.ValAddress("validator1j"))
+			},
+			validate: func() error {
+				result, found := suite.keeper.QuerySuperNode(suite.ctx, sdk.ValAddress("validator1j"))
+				if !found {
+					return fmt.Errorf("SuperNode not found")
+				}
+				if result.States[len(result.States)-1].State != types.SuperNodeStateDisabled {
 					return fmt.Errorf("expected SuperNode to be active")
 				}
 				return nil
@@ -94,7 +142,7 @@ func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
 	}{
 
 		{
-			name: "when the validator begins un-bonding and is active, it should be disabled",
+			name: "when the validator begins un-bonding and the stake falls below minimum but is not jailed, it should be disabled",
 			setup: func() {
 				params := types.Params{
 					MinimumStakeForSn: 1000000,
@@ -112,12 +160,12 @@ func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
 
 				validator := stakingtypes.Validator{
 					OperatorAddress: sdk.ValAddress("validator1bu").String(),
-					Tokens:          sdkmath.NewInt(2000000),
+					Tokens:          sdkmath.NewInt(500000),
 				}
 				suite.app.StakingKeeper.SetValidator(suite.ctx, validator)
 			},
 			execute: func() error {
-				return suite.keeper.GetHooks().Hooks().AfterValidatorBeginUnbonding(suite.ctx, sdk.ConsAddress("cons2"), sdk.ValAddress("validator1bu"))
+				return suite.keeper.Hooks().AfterValidatorBeginUnbonding(suite.ctx, sdk.ConsAddress("cons2"), sdk.ValAddress("validator1bu"))
 			},
 			validate: func() error {
 				result, found := suite.keeper.QuerySuperNode(suite.ctx, sdk.ValAddress("validator1bu"))
@@ -126,6 +174,101 @@ func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
 				}
 				if result.States[len(result.States)-1].State != types.SuperNodeStateDisabled {
 					return fmt.Errorf("expected SuperNode to be disabled")
+				}
+				return nil
+			},
+			expectSuccess: true,
+		},
+		{
+			name: "when the validator begins un-bonding and stake does not fall below minimum but is jailed, it should be disabled",
+			setup: func() {
+				params := types.Params{
+					MinimumStakeForSn: 1000000,
+				}
+				suite.keeper.SetParams(suite.ctx, params)
+
+				supernode := types.SuperNode{
+					ValidatorAddress: sdk.ValAddress([]byte("validator1ju")).String(),
+					SupernodeAccount: sdk.AccAddress([]byte("validator1ju")).String(),
+					Version:          "1.0.0",
+					States:           []*types.SuperNodeStateRecord{{State: types.SuperNodeStateActive}},
+					PrevIpAddresses:  []*types.IPAddressHistory{{Address: "192.168.1.1"}},
+				}
+				suite.keeper.SetSuperNode(suite.ctx, supernode)
+
+				validator := stakingtypes.Validator{
+					OperatorAddress: sdk.ValAddress("validator1ju").String(),
+					Tokens:          sdkmath.NewInt(2000000),
+					Jailed:          true,
+					DelegatorShares: sdkmath.LegacyNewDec(2000000),
+				}
+				suite.app.StakingKeeper.SetValidator(suite.ctx, validator)
+
+				// Set self-delegation
+				selfDelegation := stakingtypes.Delegation{
+					DelegatorAddress: sdk.AccAddress(("validator1jua")).String(),
+					ValidatorAddress: sdk.ValAddress("validator1jua").String(),
+					Shares:           sdkmath.LegacyNewDec(2000000), // Self-delegation should match shares
+				}
+				suite.app.StakingKeeper.SetDelegation(suite.ctx, selfDelegation)
+			},
+			execute: func() error {
+				return suite.keeper.Hooks().AfterValidatorBeginUnbonding(suite.ctx, sdk.ConsAddress("cons2"), sdk.ValAddress("validator1ju"))
+			},
+			validate: func() error {
+				result, found := suite.keeper.QuerySuperNode(suite.ctx, sdk.ValAddress("validator1ju"))
+				if !found {
+					return fmt.Errorf("SuperNode not found")
+				}
+				if result.States[len(result.States)-1].State != types.SuperNodeStateDisabled {
+					return fmt.Errorf("expected SuperNode to be disabled")
+				}
+				return nil
+			},
+			expectSuccess: true,
+		},
+		{
+			name: "when the validator begins un-bonding but stake does not fall below minimum and is not jailed, it should not be disabled",
+			setup: func() {
+				params := types.Params{
+					MinimumStakeForSn: 1000000,
+				}
+				suite.keeper.SetParams(suite.ctx, params)
+
+				supernode := types.SuperNode{
+					ValidatorAddress: sdk.ValAddress([]byte("validator1jua")).String(),
+					SupernodeAccount: sdk.AccAddress([]byte("validator1jua")).String(),
+					Version:          "1.0.0",
+					States:           []*types.SuperNodeStateRecord{{State: types.SuperNodeStateActive}},
+					PrevIpAddresses:  []*types.IPAddressHistory{{Address: "192.168.1.1"}},
+				}
+				suite.keeper.SetSuperNode(suite.ctx, supernode)
+
+				validator := stakingtypes.Validator{
+					OperatorAddress: sdk.ValAddress("validator1jua").String(),
+					Tokens:          sdkmath.NewInt(2000000),
+					DelegatorShares: sdkmath.LegacyNewDec(2000000),
+				}
+				suite.app.StakingKeeper.SetValidator(suite.ctx, validator)
+
+				// Set self-delegation
+				selfDelegation := stakingtypes.Delegation{
+					DelegatorAddress: sdk.AccAddress(("validator1jua")).String(),
+					ValidatorAddress: sdk.ValAddress("validator1jua").String(),
+					Shares:           sdkmath.LegacyNewDec(2000000), // Self-delegation should match shares
+				}
+				suite.app.StakingKeeper.SetDelegation(suite.ctx, selfDelegation)
+			},
+			execute: func() error {
+				return suite.keeper.Hooks().AfterValidatorBeginUnbonding(suite.ctx, sdk.ConsAddress("cons32"), sdk.ValAddress("validator1jua"))
+			},
+			validate: func() error {
+				result, found := suite.keeper.QuerySuperNode(suite.ctx, sdk.ValAddress("validator1jua"))
+				if !found {
+					return fmt.Errorf("SuperNode not found")
+				}
+				if result.States[len(result.States)-1].State != types.SuperNodeStateActive {
+					return fmt.Errorf("expected SuperNode to be active")
 				}
 				return nil
 			},
@@ -170,7 +313,7 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorRemovedHook() {
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
 			},
 			execute: func() error {
-				return suite.keeper.GetHooks().Hooks().AfterValidatorRemoved(suite.ctx, sdk.ConsAddress("cons1"), sdk.ValAddress("validator1r"))
+				return suite.keeper.Hooks().AfterValidatorRemoved(suite.ctx, sdk.ConsAddress("cons1"), sdk.ValAddress("validator1r"))
 			},
 			validate: func() error {
 				result, found := suite.keeper.QuerySuperNode(suite.ctx, sdk.ValAddress("validator1r"))
@@ -179,117 +322,6 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorRemovedHook() {
 				}
 				if result.States[len(result.States)-1].State != types.SuperNodeStateDisabled {
 					return fmt.Errorf("expected SuperNode to be disabled")
-				}
-				return nil
-			},
-			expectSuccess: true,
-		},
-	}
-
-	for _, tc := range tests {
-		suite.Run(tc.name, func() {
-			tc.setup()
-			err := tc.execute()
-			if tc.expectSuccess {
-				require.NoError(suite.T(), err)
-				if tc.validate != nil {
-					require.NoError(suite.T(), tc.validate())
-				}
-			} else {
-				require.Error(suite.T(), err)
-			}
-		})
-	}
-}
-
-func (suite *KeeperIntegrationSuite) TestBeforeValidatorModifiedHook() {
-	tests := []struct {
-		name          string
-		setup         func()
-		execute       func() error
-		validate      func() error
-		expectSuccess bool
-	}{
-		{
-			name: "before the validator is modified, if the validator do not meet supernode requirements, it should be disabled",
-			setup: func() {
-				supernode := types.SuperNode{
-					ValidatorAddress: sdk.ValAddress([]byte("validator1m")).String(),
-					SupernodeAccount: sdk.AccAddress([]byte("validator1m")).String(),
-					Version:          "1.0.0",
-					States:           []*types.SuperNodeStateRecord{{State: types.SuperNodeStateActive}},
-					PrevIpAddresses:  []*types.IPAddressHistory{{Address: "192.168.1.1"}},
-				}
-				suite.keeper.SetSuperNode(suite.ctx, supernode)
-
-				params := types.Params{
-					MinimumStakeForSn: 1000000,
-				}
-				suite.keeper.SetParams(suite.ctx, params)
-
-				validator := stakingtypes.Validator{
-					OperatorAddress: sdk.ValAddress("validator1m").String(),
-					Tokens:          sdkmath.NewInt(500000),
-				}
-				suite.app.StakingKeeper.SetValidator(suite.ctx, validator)
-			},
-			execute: func() error {
-				return suite.keeper.GetHooks().Hooks().BeforeValidatorModified(suite.ctx, sdk.ValAddress("validator1m"))
-			},
-			validate: func() error {
-				result, found := suite.keeper.QuerySuperNode(suite.ctx, sdk.ValAddress("validator1m"))
-				if !found {
-					return fmt.Errorf("SuperNode not found")
-				}
-				if result.States[len(result.States)-1].State != types.SuperNodeStateDisabled {
-					return fmt.Errorf("expected SuperNode to be disabled")
-				}
-				return nil
-			},
-			expectSuccess: true,
-		},
-		{
-			name: "before the validator is modified, if the validator meet supernode requirements, it should be active",
-			setup: func() {
-				supernode := types.SuperNode{
-					ValidatorAddress: sdk.ValAddress([]byte("validator1bm")).String(),
-					SupernodeAccount: sdk.AccAddress([]byte("validator1bm")).String(),
-					Version:          "1.0.0",
-					States:           []*types.SuperNodeStateRecord{{State: types.SuperNodeStateActive}},
-					PrevIpAddresses:  []*types.IPAddressHistory{{Address: "192.168.1.1"}},
-				}
-				suite.keeper.SetSuperNode(suite.ctx, supernode)
-
-				params := types.Params{
-					MinimumStakeForSn: 1000000,
-				}
-				suite.keeper.SetParams(suite.ctx, params)
-
-				validator := stakingtypes.Validator{
-					OperatorAddress: sdk.ValAddress("validator1bm").String(),
-					Tokens:          sdkmath.NewInt(2000000),
-					DelegatorShares: sdkmath.LegacyNewDec(2000000), // Ensure shares match self-delegation
-				}
-				suite.app.StakingKeeper.SetValidator(suite.ctx, validator)
-
-				// Set self-delegation
-				selfDelegation := stakingtypes.Delegation{
-					DelegatorAddress: sdk.AccAddress(("validator1bm")).String(),
-					ValidatorAddress: sdk.ValAddress("validator1bm").String(),
-					Shares:           sdkmath.LegacyNewDec(2000000), // Self-delegation should match shares
-				}
-				suite.app.StakingKeeper.SetDelegation(suite.ctx, selfDelegation)
-			},
-			execute: func() error {
-				return suite.keeper.GetHooks().Hooks().BeforeValidatorModified(suite.ctx, sdk.ValAddress("validator1bm"))
-			},
-			validate: func() error {
-				result, found := suite.keeper.QuerySuperNode(suite.ctx, sdk.ValAddress("validator1bm"))
-				if !found {
-					return fmt.Errorf("SuperNode not found")
-				}
-				if result.States[len(result.States)-1].State != types.SuperNodeStateActive {
-					return fmt.Errorf("expected SuperNode to be active")
 				}
 				return nil
 			},
@@ -353,7 +385,7 @@ func (suite *KeeperIntegrationSuite) TestBeforeDelegationSharesModifiedHook() {
 				suite.app.StakingKeeper.SetDelegation(suite.ctx, selfDelegation)
 			},
 			execute: func() error {
-				return suite.keeper.GetHooks().Hooks().BeforeDelegationSharesModified(suite.ctx, sdk.AccAddress("validator3"), sdk.ValAddress("validator3"))
+				return suite.keeper.Hooks().BeforeDelegationSharesModified(suite.ctx, sdk.AccAddress("validator3"), sdk.ValAddress("validator3"))
 			},
 			validate: func() error {
 				result, found := suite.keeper.QuerySuperNode(suite.ctx, sdk.ValAddress("validator3"))

@@ -20,7 +20,7 @@ func (k msgServer) DeregisterSupernode(goCtx context.Context, msg *types.MsgDere
 	}
 
 	// Verify the signer is authorized
-	if err := k.verifyValidatorOperator(ctx, valOperAddr, msg.Creator); err != nil {
+	if err := VerifyValidatorOperator(valOperAddr, msg.Creator); err != nil {
 		return nil, err
 	}
 

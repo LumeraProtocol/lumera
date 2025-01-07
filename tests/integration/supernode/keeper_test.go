@@ -1,12 +1,8 @@
 package integration_test
 
 import (
-	"fmt"
-	"os"
-	"testing"
-
 	sdkmath "cosmossdk.io/math"
-
+	"fmt"
 	"github.com/cosmos/cosmos-sdk/runtime"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
@@ -17,6 +13,8 @@ import (
 	"github.com/pastelnetwork/pastel/x/supernode/types"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"os"
+	"testing"
 )
 
 type KeeperIntegrationSuite struct {
@@ -46,9 +44,6 @@ func (suite *KeeperIntegrationSuite) SetupSuite() {
 		suite.app.StakingKeeper,
 		suite.app.SlashingKeeper,
 	)
-	hooks := keeper.NewSupernodeHooks(k)
-	k.AddStakingHooks(types.NewStakingHooksWrapper(hooks))
-
 	suite.keeper = k
 }
 
@@ -244,7 +239,7 @@ func (suite *KeeperIntegrationSuite) TestMeetSupernodeRequirements() {
 				suite.app.StakingKeeper.SetDelegation(suite.ctx, selfDelegation)
 			},
 			execute: func() error {
-				meets := suite.keeper.MeetsSuperNodeRequirements(suite.ctx, sdk.ValAddress("validator1"))
+				meets := suite.keeper.IsEligibleAndNotJailedValidator(suite.ctx, sdk.ValAddress("validator1"))
 				if !meets {
 					return fmt.Errorf("expected validator to meet SuperNode requirements")
 				}
@@ -268,7 +263,7 @@ func (suite *KeeperIntegrationSuite) TestMeetSupernodeRequirements() {
 				suite.app.StakingKeeper.SetValidator(suite.ctx, validator)
 			},
 			execute: func() error {
-				meets := suite.keeper.MeetsSuperNodeRequirements(suite.ctx, sdk.ValAddress("validator1"))
+				meets := suite.keeper.IsEligibleAndNotJailedValidator(suite.ctx, sdk.ValAddress("validator1"))
 				if meets {
 					return fmt.Errorf("expected validator not to meet SuperNode requirements")
 				}

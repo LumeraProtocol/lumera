@@ -36,6 +36,7 @@ func (k Keeper) SetSuperNode(ctx sdk.Context, supernode types.SuperNode) error {
 	valOperAddr, err := sdk.ValAddressFromBech32(supernode.ValidatorAddress)
 	if err != nil {
 		return errorsmod.Wrapf(err, "invalid validator address: %s", err)
+		return errorsmod.Wrapf(err, "invalid validator address: %s", err)
 	}
 
 	// Set the supernode record under [SuperNodeKeyPrefix + valOperAddr]
@@ -45,7 +46,7 @@ func (k Keeper) SetSuperNode(ctx sdk.Context, supernode types.SuperNode) error {
 	return nil
 }
 
-// GetSuperNode returns the supernode record for a given validator address
+// QuerySuperNode returns the supernode record for a given validator address
 func (k Keeper) QuerySuperNode(ctx sdk.Context, valOperAddr sdk.ValAddress) (sn types.SuperNode, exists bool) {
 	storeAdapter := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
 	store := prefix.NewStore(storeAdapter, []byte(types.SuperNodeKey))
@@ -82,10 +83,12 @@ func (k Keeper) GetAllSuperNodes(ctx sdk.Context, stateFilters ...types.SuperNod
 		}
 
 		// skip if no states at all
+		// skip if no states at all
 		if len(sn.States) == 0 {
 			continue
 		}
 
+		// if we're not filtering or the current state is in the filter list, add it
 		// if we're not filtering or the current state is in the filter list, add it
 		if !filtering || stateIn(sn.States[len(sn.States)-1].State, stateFilters...) {
 			supernodes = append(supernodes, sn)

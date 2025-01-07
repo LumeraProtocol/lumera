@@ -5,6 +5,7 @@ import (
 
 	errorsmod "cosmossdk.io/errors"
 	"cosmossdk.io/math"
+
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/pastelnetwork/pastel/x/supernode/types"
@@ -12,19 +13,15 @@ import (
 
 var _ types.StakingHooks = Hooks{}
 
-// Hooks wrapper struct for supernode keeper
 type Hooks struct {
 	k Keeper
 }
 
-// Return the supernode hooks
 func (k Keeper) Hooks() Hooks {
 	return Hooks{k}
 }
 
-// -----------------------------------------------------------------------------
 // Required Hooks
-// -----------------------------------------------------------------------------
 
 // AfterValidatorBonded: called AFTER a validator transitions from unbonded -> bonded (joins active set).
 func (h Hooks) AfterValidatorBonded(ctx context.Context, consAddr sdk.ConsAddress, valAddr sdk.ValAddress) error {
@@ -66,7 +63,7 @@ func (h Hooks) AfterValidatorBeginUnbonding(ctx context.Context, consAddr sdk.Co
 		return nil
 	}
 
-	if h.k.IsSuperNodeActive(sdkCtx, valAddr) {
+	if h.k.IsSuperNodeActive(sdkCtx, valAddr) && !h.k.IsEligibleAndNotJailedValidator(sdkCtx, valAddr) {
 		if err := h.k.DisableSuperNode(sdkCtx, valAddr); err != nil {
 			return errorsmod.Wrap(err, "failed to disable supernode after validator begin unbonding")
 		}
@@ -123,9 +120,7 @@ func (h Hooks) AfterValidatorRemoved(ctx context.Context, consAddr sdk.ConsAddre
 	return nil
 }
 
-// -----------------------------------------------------------------------------
 // Hooks we do NOT use: no-ops
-// -----------------------------------------------------------------------------
 
 func (h Hooks) AfterValidatorCreated(ctx context.Context, valAddr sdk.ValAddress) error {
 	return nil

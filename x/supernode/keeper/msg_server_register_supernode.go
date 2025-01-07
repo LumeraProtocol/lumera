@@ -20,7 +20,7 @@ func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types.MsgRegist
 	}
 
 	// Authorization check
-	if err := k.verifyValidatorOperator(ctx, valOperAddr, msg.Creator); err != nil {
+	if err := VerifyValidatorOperator(valOperAddr, msg.Creator); err != nil {
 		return nil, err
 	}
 

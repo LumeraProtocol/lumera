@@ -22,7 +22,7 @@ func (k msgServer) StopSupernode(goCtx context.Context, msg *types.MsgStopSupern
 		return nil, errorsmod.Wrapf(sdkerrors.ErrNotFound, "no supernode found for validator %s", msg.ValidatorAddress)
 	}
 
-	if err := k.verifyValidatorOperator(ctx, valOperAddr, msg.Creator); err != nil {
+	if err := VerifyValidatorOperator(valOperAddr, msg.Creator); err != nil {
 		return nil, err
 	}
 

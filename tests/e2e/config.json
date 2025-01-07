@@ -1,0 +1,28 @@
+{
+    "chain": {
+        "id": "pastel-devnet-1",
+        "denom": {
+            "bond": "upsl",
+            "mint": "upsl",
+            "minimum_gas_price": "0upsl"
+        }
+    },
+    "docker": {
+        "network_name": "pastel-network",
+        "container_prefix": "pastel",
+        "volume_prefix": "pastel"
+    },
+    "paths": {
+        "base": {
+            "host": "~",
+            "container": "/root"
+        },
+        "directories": {
+            "daemon": ".pastel"
+        }
+    },
+    "daemon": {
+        "binary": "pasteld",
+        "keyring_backend": "test"
+    }
+}

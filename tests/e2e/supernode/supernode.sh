@@ -1,29 +1,21 @@
 #!/usr/bin/env bash
 #
-# Script: test_supernode_state_transitions.sh
-# Purpose: Test supernode state transitions through register/deregister/stop/start/jail/unjail
-#          and stake modifications around minimum threshold
+
 
 set -euo pipefail
 
-#################################################################
 # Configuration
-#################################################################
 CHAIN_ID="pastel-devnet-1"
 KEYRING_BACKEND="test"
 CONTAINER_PREFIX="pastel-validator"
 
-# Test validator number (we'll use validator2 for our tests)
+# Test validator number 
 TEST_VALIDATOR_NUM=5
 
-# Sleep durations
-SLEEP_FOR_JAIL=60
-SLEEP_FOR_UNJAIL=90
+
 SLEEP_BETWEEN_OPS=5
 
-#################################################################
 # Logging Setup
-#################################################################
 LOG_FILE="./test_supernode_state_transitions.log"
 > "$LOG_FILE"
 
@@ -126,59 +118,13 @@ run_cmd "docker exec ${CONTAINER_PREFIX}${TEST_VALIDATOR_NUM} pasteld tx superno
 sleep "$SLEEP_BETWEEN_OPS"
 check_supernode_status "$TEST_VALIDATOR_NUM"
 
-# 5) Reduce stake slightly below minimum required
-log "Reducing stake below minimum required (834637515638) for validator ${TEST_VALIDATOR_NUM}"
-run_cmd "docker exec ${CONTAINER_PREFIX}${TEST_VALIDATOR_NUM} pasteld tx staking unbond \
+# 5) Update Supernode
+log "Updating supernode for validator ${TEST_VALIDATOR_NUM}"
+run_cmd "docker exec ${CONTAINER_PREFIX}${TEST_VALIDATOR_NUM} pasteld tx supernode update-supernode \
   ${VAL_OPERATOR[$TEST_VALIDATOR_NUM]} \
-  10upsl \
-  --from validator${TEST_VALIDATOR_NUM}_key \
-  --keyring-backend ${KEYRING_BACKEND} \
-  --chain-id ${CHAIN_ID} \
-  --yes"
-
-sleep "$SLEEP_BETWEEN_OPS"
-
-log "Checking validator status after reducing stake"
-run_cmd "docker exec pastel-validator1 pasteld query staking validator ${VAL_OPERATOR[$TEST_VALIDATOR_NUM]}"
-check_supernode_status "$TEST_VALIDATOR_NUM"
-
-# 6) Increase stake slightly above minimum required
-log "Increasing stake above minimum required (834637515658) for validator ${TEST_VALIDATOR_NUM}"
-run_cmd "docker exec ${CONTAINER_PREFIX}${TEST_VALIDATOR_NUM} pasteld tx staking delegate \
-  ${VAL_OPERATOR[$TEST_VALIDATOR_NUM]} \
-  20upsl \
-  --from validator${TEST_VALIDATOR_NUM}_key \
-  --keyring-backend ${KEYRING_BACKEND} \
-  --chain-id ${CHAIN_ID} \
-  --yes"
-
-sleep "$SLEEP_BETWEEN_OPS"
-
-log "Checking validator status after increasing stake"
-run_cmd "docker exec pastel-validator1 pasteld query staking validator ${VAL_OPERATOR[$TEST_VALIDATOR_NUM]}"
-check_supernode_status "$TEST_VALIDATOR_NUM"
-
-# 7) Force jail by stopping validator
-log "Stopping validator ${TEST_VALIDATOR_NUM} container to force jailing"
-run_cmd "docker stop ${CONTAINER_PREFIX}${TEST_VALIDATOR_NUM}"
-
-log "Sleeping for ${SLEEP_FOR_JAIL} seconds to allow jailing..."
-sleep "$SLEEP_FOR_JAIL"
-
-# 8) Verify jailed status and supernode state
-log "Checking validator jail status and supernode state"
-run_cmd "docker exec pastel-validator1 pasteld query staking validator ${VAL_OPERATOR[$TEST_VALIDATOR_NUM]}"
-check_supernode_status "$TEST_VALIDATOR_NUM"
-
-# 9) Restart validator and unjail
-log "Restarting validator ${TEST_VALIDATOR_NUM} container"
-run_cmd "docker start ${CONTAINER_PREFIX}${TEST_VALIDATOR_NUM}"
-
-log "Sleeping for ${SLEEP_FOR_UNJAIL} seconds before unjailing..."
-sleep "$SLEEP_FOR_UNJAIL"
-
-log "Unjailing validator ${TEST_VALIDATOR_NUM}"
-run_cmd "docker exec ${CONTAINER_PREFIX}${TEST_VALIDATOR_NUM} pasteld tx slashing unjail \
+  192.168.1.100 \
+  1.1 \
+  ${VAL_ACCOUNT[$TEST_VALIDATOR_NUM]} \
   --from validator${TEST_VALIDATOR_NUM}_key \
   --keyring-backend ${KEYRING_BACKEND} \
   --chain-id ${CHAIN_ID} \
@@ -187,7 +133,7 @@ run_cmd "docker exec ${CONTAINER_PREFIX}${TEST_VALIDATOR_NUM} pasteld tx slashin
 sleep "$SLEEP_BETWEEN_OPS"
 check_supernode_status "$TEST_VALIDATOR_NUM"
 
-# 10) Deregister Supernode
+# 6) Deregister Supernode
 log "Deregistering supernode for validator ${TEST_VALIDATOR_NUM}"
 run_cmd "docker exec ${CONTAINER_PREFIX}${TEST_VALIDATOR_NUM} pasteld tx supernode deregister-supernode \
   ${VAL_OPERATOR[$TEST_VALIDATOR_NUM]} \

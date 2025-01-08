@@ -232,9 +232,6 @@ func (k Keeper) IsSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress) bool 
 
 // CheckValidatorSupernodeEligibility ensures the validator has enough self-stake.
 func (k Keeper) CheckValidatorSupernodeEligibility(ctx sdk.Context, validator stakingtypes.ValidatorI, valAddr string) error {
-	if validator.IsBonded() {
-		return nil
-	}
 
 	// 1. Get chain's configured minimum self-stake
 	minStake := k.GetParams(ctx).MinimumStakeForSn

@@ -1,95 +1,125 @@
 # Pastel DevNet Test Scripts
 
-This repository contains scripts for testing various aspects of the Pastel DevNet network.
+## Prerequisites
+
+- **Docker**: Ensure Docker is installed and up to date.  
+
+      sudo apt-get update
+      sudo apt-get install docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+  
+  If you still see old references to `docker-compose`, update to the latest Docker & Docker Compose plugin.
+
+## Building the DevNet
+
+Use the `make` target to build the DevNet with a custom genesis file:
+
+    # For example:
+
+    make devnet-build EXTERNAL_GENESIS_FILE=/home/desktop/Documents/pastel/tests/e2e/supernode/test_genesis_supernode.json
+
+    make devnet-up
+
+    # For clean up
+
+    make devnet-down
+
+    make devnet-clean
+
+
 
 ## Genesis Configuration
 
-The DevNet uses a custom genesis file with the following key parameters:(using the custom genesis file)
+The DevNet uses a custom genesis file with the following key parameters (feel free to update them): 
 
 - **Slashing**:
   - Signed blocks window: 10 blocks
   - Downtime jail duration: 60 seconds
-
 - **Staking**:
   - Unbonding time: 60 seconds
   - Bond denomination: `upsl`
-
 - **Supernode**:
   - Minimum stake requirement: 834,637,515,648 upsl
-  - Default power reduction: 824,637,515,648 upsl (allows validators to operate below supernode threshold)
+  - Default power reduction: 824,637,515,648 upsl 
+
+---
 
 ## Available Scripts
 
-### 1. setup_five_supernodes.sh
-- Sets up 5 supernodes on the network
-- Prerequisite for other test scripts
-- No additional setup required; can be run after DevNet is operational
+1. **supernode.sh**  
+   Tests supernode lifecycle operations:
+   - Registration
+   - Start/Stop operations
+   - Status updates
+   - Deregistration  
+   Run **after** the DevNet is operational.
 
-### 2. supernode.sh
-- Tests supernode lifecycle operations:
-  - Registration
-  - Start/Stop operations
-  - Status updates
-  - Deregistration
-- Run after DevNet is operational
+2. **jailing.sh**  
+   Tests validator jailing and unjailing mechanisms.
+   - **Requires**:
+     - `setup_five_supernodes.sh`
+     - Active validator setup
+     - (Optional) Changing the default validator number
 
-### 3. jailing.sh
-- Tests validator jailing and unjailing mechanisms
-- Requires:
-  - Active validator setup
-  - Validator number as parameter
+3. **delegation.sh**  
+   Tests self-delegation changes and their effects on supernode status.
+   - **Requires**:
+     - `setup_five_supernodes.sh`
+     - Active validator setup
+     - (Optional) Changing the default validator number
 
-### 4. delegation.sh
-- Tests self-delegation changes and their effects on supernode status
-- Requires:
-  - Active validator setup
-  - Validator number as parameter
+4. **Helper Scripts**  
+   - **setup_five_supernodes.sh**  
+     Sets up 5 supernodes on the network.
+     - Prerequisite for `jailing.sh` and `delegation.sh`
+     - Can be run after the DevNet is operational
+
+---
 
 ## Usage
 
-1. Start the DevNet
-2. Run `setup_five_supernodes.sh` first
-3. Run other test scripts as needed, providing validator numbers where required
+1. **Start the DevNet** (using `docker compose up` or your chosen method).
+2. **Run `setup_five_supernodes.sh`** to configure five supernodes.
+3. **Run other test scripts** as needed, providing validator numbers where required:
+   
+       ./jailing.sh    
+       ./delegation.sh 
 
-For jailing and delegation tests:
-```bash
-./jailing.sh    # Uses validator 5 by default
-./delegation.sh # Uses validator 2 by default
-```
+---
 
 ## Available Commands
 
+Below are the commands for interacting with the Supernode module .
+
 ### Query Commands
-```bash
-# Get module parameters
-pasteld query supernode params
 
-# Get supernode information
-pasteld query supernode get-super-node [validator-address]
+    # Get module parameters
+    pasteld query supernode params
 
-# List all supernodes
-pasteld query supernode list-super-nodes
+    # Get supernode information
+    pasteld query supernode get-super-node [validator-address]
 
-# Get top supernodes for a specific block
-pasteld query supernode get-top-super-nodes-for-block [block-height]
-```
+    # List all supernodes
+    pasteld query supernode list-super-nodes
+
+    # Get top supernodes for a specific block
+    pasteld query supernode get-top-super-nodes-for-block [block-height]
 
 ### Transaction Commands
-```bash
-# Register a new supernode
-pasteld tx supernode register-supernode [validator-address] [ip-address] [version] [supernode-account]
 
-# Deregister a supernode
-pasteld tx supernode deregister-supernode [validator-address]
+    # Register a new supernode
+    pasteld tx supernode register-supernode [validator-address] [ip-address] [version] [supernode-account]
 
-# Start a supernode
-pasteld tx supernode start-supernode [validator-address]
+    # Deregister a supernode
+    pasteld tx supernode deregister-supernode [validator-address]
 
-# Stop a supernode
-pasteld tx supernode stop-supernode [validator-address] [reason]
+    # Start a supernode
+    pasteld tx supernode start-supernode [validator-address]
 
-# Update supernode information
-pasteld tx supernode update-supernode [validator-address] [ip-address] [version] [supernode-account]
-```
+    # Stop a supernode
+    pasteld tx supernode stop-supernode [validator-address] [reason]
 
-Note: All transaction commands will require additional flags such as `--from`, `--chain-id`, and `--keyring-backend` as shown in the test scripts.
+    # Update supernode information
+    pasteld tx supernode update-supernode [validator-address] [ip-address] [version] [supernode-account]
+
+

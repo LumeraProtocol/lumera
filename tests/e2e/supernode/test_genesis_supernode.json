@@ -631,7 +631,7 @@
     },
     "staking": {
       "params": {
-        "unbonding_time": "60s",
+        "unbonding_time": "60000s",
         "max_validators": 100,
         "max_entries": 7,
         "historical_entries": 10000,
@@ -651,10 +651,10 @@
         "minimum_stake_for_sn": "834637515648",
         "reporting_threshold": "0",
         "slashing_threshold": "0",
-        "metrics_thresholds": "metrics_thresholds",
-        "evidence_retention_period": "evidence_retention_period",
-        "slashing_fraction": "slashing_fraction",
-        "inactivity_penalty_period": "inactivity_penalty_period"
+        "metrics_thresholds": "0",
+        "evidence_retention_period": "600s",
+        "slashing_fraction": "",
+        "inactivity_penalty_period": ""
       }
     },
     "transfer": {

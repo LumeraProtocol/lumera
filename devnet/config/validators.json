@@ -61,7 +61,7 @@
     "grpc_port": 9094,
     "initial_distribution": {
       "account_balance": "1000000000000upsl",  
-      "validator_stake": "834637515648upsl"    
+      "validator_stake": "1000000000000upsl"    
     }
   }
 ]

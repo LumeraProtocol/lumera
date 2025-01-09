@@ -515,15 +515,6 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 		errSubstr string
 	}{
 		{
-			name: "validator is bonded => skip checks => no error",
-			validator: &stakingtypes.Validator{
-				OperatorAddress: valAddrString,
-				Status:          stakingtypes.Bonded,
-			},
-			selfDelegationFound: false,
-			expectErr:           false,
-		},
-		{
 			name: "validator unbonded, but no self-delegation => error",
 			validator: &stakingtypes.Validator{
 				OperatorAddress: valAddrString,

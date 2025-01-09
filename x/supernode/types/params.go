@@ -29,25 +29,25 @@ var (
 var (
 	KeyMetricsThresholds = []byte("MetricsThresholds")
 	// TODO: Determine the default value
-	DefaultMetricsThresholds string = "metrics_thresholds"
+	DefaultMetricsThresholds string = ""
 )
 
 var (
 	KeyEvidenceRetentionPeriod = []byte("EvidenceRetentionPeriod")
 	// TODO: Determine the default value
-	DefaultEvidenceRetentionPeriod string = "evidence_retention_period"
+	DefaultEvidenceRetentionPeriod string = ""
 )
 
 var (
 	KeySlashingFraction = []byte("SlashingFraction")
 	// TODO: Determine the default value
-	DefaultSlashingFraction string = "slashing_fraction"
+	DefaultSlashingFraction string = ""
 )
 
 var (
 	KeyInactivityPenaltyPeriod = []byte("InactivityPenaltyPeriod")
 	// TODO: Determine the default value
-	DefaultInactivityPenaltyPeriod string = "inactivity_penalty_period"
+	DefaultInactivityPenaltyPeriod string = ""
 )
 
 // ParamKeyTable the param key table for launch module

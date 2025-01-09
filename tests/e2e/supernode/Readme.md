@@ -60,6 +60,8 @@ The DevNet uses a custom genesis file with the following key parameters (feel fr
      - `setup_five_supernodes.sh`
      - Active validator setup
      - (Optional) Changing the default validator number
+     - Make sure has enough stake to withstand slashing
+    - We increase the unbonding time (like 600s) to a value greater than jail time (eg: 60s) to make sure that the validator is not fully removed     while being jailed, as it will add an extra step of making a validator validator request again (which we dont have support yet, requires to a have submit json setting file with validator request, will add this in futre though in devnet docker file) in both scenarios, the same hooks is triggered `AfterValidatorBonded` so fulfills the purpose.
 
 3. **delegation.sh**  
    Tests self-delegation changes and their effects on supernode status.

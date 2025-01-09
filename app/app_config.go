@@ -102,7 +102,11 @@ var (
 		pastelidmoduletypes.ModuleName,
 		wasmtypes.ModuleName,
 		claimmoduletypes.ModuleName,
+		supernodemoduletypes.ModuleName,
+
+		// this line is used by starport scaffolding # stargate/app/initGenesis
 	}
+
 	// During begin block slashing happens after distr.BeginBlocker so that
 	// there is nothing left over in the validator fee pool, so as to keep the
 	// CanWithdrawInvariant invariant.

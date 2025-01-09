@@ -69,7 +69,7 @@ genesis:
     crisis:
       constant_fee:
         denom: upsl
-        amount: '500000000' # 500,000 upsl --> 500 psl
+        amount: "500000000"  # 500,000 upsl --> 500 psl
     gov:
       params:
         burn_vote_quorum: false

@@ -77,6 +77,7 @@ import (
 
 	claimmodulekeeper "github.com/pastelnetwork/pastel/x/claim/keeper"
 	pastelidmodulekeeper "github.com/pastelnetwork/pastel/x/pastelid/keeper"
+	supernodemodulekeeper "github.com/pastelnetwork/pastel/x/supernode/keeper"
 
 	// this line is used by starport scaffolding # stargate/app/moduleImport
 
@@ -151,7 +152,8 @@ type App struct {
 	WasmKeeper       wasmkeeper.Keeper
 	ScopedWasmKeeper capabilitykeeper.ScopedKeeper
 
-	ClaimKeeper claimmodulekeeper.Keeper
+	ClaimKeeper     claimmodulekeeper.Keeper
+	SupernodeKeeper supernodemodulekeeper.Keeper
 	// this line is used by starport scaffolding # stargate/app/keeperDeclaration
 
 	// simulation manager
@@ -257,6 +259,7 @@ func New(
 		&app.CircuitBreakerKeeper,
 		&app.PastelidKeeper,
 		&app.ClaimKeeper,
+		&app.SupernodeKeeper,
 		// this line is used by starport scaffolding # stargate/app/keeperDefinition
 	); err != nil {
 		panic(err)

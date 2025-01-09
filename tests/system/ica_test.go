@@ -1,10 +1,11 @@
 package system_test
 
 import (
-	pApp "github.com/pastelnetwork/pastel/app"
 	"os"
 	"testing"
 	"time"
+
+	pApp "github.com/pastelnetwork/pastel/app"
 
 	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/cometbft/cometbft/libs/rand"

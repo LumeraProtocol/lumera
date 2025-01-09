@@ -21,15 +21,15 @@ devnet-build:
 		export EXTERNAL_GENESIS_FILE=0; \
 	fi; \
 	cp "${EXTERNAL_CLAIMS_FILE}" "${CLAIMS_FILE}"; \
-#	go get github.com/CosmWasm/wasmvm/v2@v2.1.2 && \
-#	ignite chain build --release -t linux:amd64 && \
-#	tar -xf release/pastel*.tar.gz -C release && \
-#	cp release/pasteld devnet/ && \
+	go get github.com/CosmWasm/wasmvm/v2@v2.1.2 && \
+	ignite chain build --release -t linux:amd64 && \
+	tar -xf release/pastel*.tar.gz -C release && \
+	cp release/pasteld devnet/ && \
 	cd devnet && \
-#	find $$(go env GOPATH)/pkg/mod -name "libwasmvm.x86_64.so" -exec cp {} ./libwasmvm.x86_64.so \; && \
-#	go mod tidy && \
-#	go run . && \
-	docker-compose build
+	find $$(go env GOPATH)/pkg/mod -name "libwasmvm.x86_64.so" -exec cp {} ./libwasmvm.x86_64.so \; && \
+	go mod tidy && \
+	go run . && \
+	docker compose build
 
 devnet-rebuild:
 	sudo rm -rf $(SHARED_DIR) $(VALIDATOR_DIRS)
@@ -43,26 +43,26 @@ devnet-rebuild:
 	cd devnet && \
 	go mod tidy && \
 	go run . && \
-	docker-compose build
+	docker compose build
 
 devnet-up:
 	cd devnet && \
-	docker-compose up
+	docker compose up
 
 devnet-up-detach:
 	cd devnet && \
-	docker-compose up -d
+	docker compose up -d
 
 devnet-down:
 	cd devnet && \
-	docker-compose down --remove-orphans
+	docker compose down --remove-orphans
 
 devnet-clean:
 	sudo rm -rf $(SHARED_DIR) $(VALIDATOR_DIRS)
 
 devnet-deploy-tar:
 	# Ensure required files exist from previous build
-	@if [ ! -f "devnet/docker-compose.yml" ] || [ ! -f "devnet/pasteld" ] || [ ! -f "devnet/libwasmvm.x86_64.so" ]; then \
+	@if [ ! -f "devnet/docker compose.yml" ] || [ ! -f "devnet/pasteld" ] || [ ! -f "devnet/libwasmvm.x86_64.so" ]; then \
 		echo "Please run 'make devnet-build' first to generate required files."; \
 		exit 1; \
 	fi
@@ -77,7 +77,7 @@ devnet-deploy-tar:
 	# Create the tar archive
 	tar -czf devnet-deploy.tar.gz \
 		-C devnet dockerfile \
-		docker-compose.yml \
+		docker compose.yml \
 		primary-validator.sh \
 		secondary-validator.sh \
 		pasteld \

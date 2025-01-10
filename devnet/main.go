@@ -13,7 +13,11 @@ func main() {
 	useExistingGenesis := os.Getenv("EXTERNAL_GENESIS_FILE") == "1"
 	fmt.Printf("Use existing genesis: %v\n", useExistingGenesis)
 
-	cfg, validators, err := config.LoadConfigs()
+	// Get config paths from environment variables
+	configPath := os.Getenv("CONFIG_JSON")
+	validatorsPath := os.Getenv("VALIDATORS_JSON")
+
+	cfg, validators, err := config.LoadConfigs(configPath, validatorsPath)
 	if err != nil {
 		log.Fatalf("Failed to load configurations: %v", err)
 	}

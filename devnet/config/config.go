@@ -50,11 +50,17 @@ type Validator struct {
 	} `json:"initial_distribution"`
 }
 
-func LoadConfigs() (*ChainConfig, []Validator, error) {
-	// Load main config
-	configFile, err := os.ReadFile("config/config.json")
+func LoadConfigs(configPath, validatorsPath string) (*ChainConfig, []Validator, error) {
+	if configPath == "" {
+		configPath = "config/config.json"
+	}
+	if validatorsPath == "" {
+		validatorsPath = "config/validators.json"
+	}
+
+	configFile, err := os.ReadFile(configPath)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error reading config.json: %v", err)
+		return nil, nil, fmt.Errorf("error reading config.json from %s: %v", configPath, err)
 	}
 
 	var config ChainConfig
@@ -62,10 +68,9 @@ func LoadConfigs() (*ChainConfig, []Validator, error) {
 		return nil, nil, fmt.Errorf("error parsing config.json: %v", err)
 	}
 
-	// Load validators config
-	validatorsFile, err := os.ReadFile("config/validators.json")
+	validatorsFile, err := os.ReadFile(validatorsPath)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error reading validators.json: %v", err)
+		return nil, nil, fmt.Errorf("error reading validators.json from %s: %v", validatorsPath, err)
 	}
 
 	var validators []Validator

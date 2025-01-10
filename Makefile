@@ -1,5 +1,20 @@
 .PHONY: all up up-detach down
 
+### Devnet
+# To use external genesis - provide path to it via EXTERNAL_GENESIS_FILE
+# Examples:
+## Using default config files
+## make devnet-build \
+## 		EXTERNAL_CLAIMS_FILE=~/claims.csv \
+## 		EXTERNAL_GENESIS_FILE=~/genesis.json
+##
+## Using custom config files
+## make devnet-build \
+## 		CONFIG_JSON=path/to/custom/config.json \
+## 		VALIDATORS_JSON=path/to/custom/validators.json \
+## 		EXTERNAL_CLAIMS_FILE=claims.csv \
+## 		EXTERNAL_GENESIS_FILE=template_genesis.json
+
 # Find validator directories dynamically
 DEVNET_DIR := /tmp/pastel-devnet
 SHARED_DIR := ${DEVNET_DIR}/shared
@@ -7,9 +22,10 @@ VALIDATOR_DIRS := $(wildcard ${DEVNET_DIR}/validator*-data)
 EXTERNAL_GENESIS := $(SHARED_DIR)/external_genesis.json
 CLAIMS_FILE := $(SHARED_DIR)/claims.csv
 
-### Devnet
-# To use external genesis- provide path to it via EXTERNAL_GENESIS_FILE
-# example: make devnet-build EXTERNAL_CLAIMS_FILE=~/claims.csv EXTERNAL_GENESIS_FILE=~/genesis.json
+# Default paths for configuration files
+DEFAULT_CONFIG_JSON := config/config.json
+DEFAULT_VALIDATORS_JSON := config/validators.json
+
 devnet-build:
 	mkdir -p $(SHARED_DIR)
 	@if [ -n "$(EXTERNAL_GENESIS_FILE)" ] && [ -f "$(EXTERNAL_GENESIS_FILE)" ]; then \
@@ -25,9 +41,11 @@ devnet-build:
 	ignite chain build --release -t linux:amd64 && \
 	tar -xf release/pastel*.tar.gz -C release && \
 	cp release/pasteld devnet/ && \
+	find $$(go env GOPATH)/pkg/mod -name "libwasmvm.x86_64.so" -exec cp {} devnet/libwasmvm.x86_64.so \; && \
 	cd devnet && \
-	find $$(go env GOPATH)/pkg/mod -name "libwasmvm.x86_64.so" -exec cp {} ./libwasmvm.x86_64.so \; && \
 	go mod tidy && \
+	CONFIG_JSON="$${CONFIG_JSON:-$(DEFAULT_CONFIG_JSON)}" \
+	VALIDATORS_JSON="$${VALIDATORS_JSON:-$(DEFAULT_VALIDATORS_JSON)}" \
 	go run . && \
 	docker compose build
 

@@ -1,4 +1,4 @@
-name: Release Workflow
+name: Build and Release Workflow
 on:
   push:
     paths-ignore:
@@ -17,7 +17,7 @@ permissions:
   packages: read
 
 jobs:
-  might_release:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -49,38 +49,20 @@ jobs:
           go-version: ${{ steps.go-version.outputs.version }}
           cache: true
 
-      - name: Prepare Release Variables
+      - name: Prepare Build Variables
         id: vars
         run: |
           repo_name=${GITHUB_REPOSITORY##*/}
-          echo "Repository name: $repo_name"
           
-          if [[ $GITHUB_REF == refs/tags/* ]]; then
-            # Tag push
-            tag_name=${GITHUB_REF#refs/tags/}
-            is_release_type_latest=false
-            echo "Building release for tag: $tag_name"
-          elif [[ $GITHUB_REF == refs/heads/master ]]; then
-            # Master branch push
-            tag_name=latest
-            is_release_type_latest=true
-            echo "Building latest release"
-          else
-            # Other pushes - use branch name or commit SHA
-            tag_name="test-${GITHUB_REF_NAME//\//_:-${GITHUB_SHA:0:7}}"
-            is_release_type_latest=false
-            echo "Building test release: $tag_name"
-          fi
-          
-          echo "tag_name=$tag_name" >> $GITHUB_OUTPUT
-          echo "is_release_type_latest=$is_release_type_latest" >> $GITHUB_OUTPUT
-          echo "tarball_prefix=${repo_name}_${tag_name}" >> $GITHUB_OUTPUT
+          # For non-tag builds, use commit SHA as identifier
+          build_id=${GITHUB_SHA::7}
+          echo "build_id=$build_id" >> $GITHUB_OUTPUT
+          echo "tarball_prefix=${repo_name}_${build_id}" >> $GITHUB_OUTPUT
           
           # Debug output
           echo "Output variables:"
-          echo "- tag_name: $tag_name"
-          echo "- is_release_type_latest: $is_release_type_latest"
-          echo "- tarball_prefix: ${repo_name}_${tag_name}"
+          echo "- build_id: $build_id"
+          echo "- tarball_prefix: ${repo_name}_${build_id}"
 
       - name: Install Specific Ignite CLI Version
         run: |
@@ -120,27 +102,124 @@ jobs:
           sudo chown -R $USER:$USER release/
           sudo chmod -R 755 release/
 
-      - name: Delete the "latest" Release
-        if: steps.vars.outputs.is_release_type_latest == 'true'
-        uses: dev-drprasad/delete-tag-and-release@v1.0.1
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v') && (github.ref_type == 'tag') && (contains(github.ref, '.') && (contains(github.ref, 'v')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
-          tag_name: ${{ steps.vars.outputs.tag_name }}
-          delete_release: true
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Get tag information
+        id: tag_info
+        run: |
+          # Get the tag name
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+          
+          # Get the tag message
+          TAG_MESSAGE=$(git tag -l --format='%(contents)' $TAG_NAME)
+          # If tag message is empty, use the tag name as message
+          if [ -z "$TAG_MESSAGE" ]; then
+            TAG_MESSAGE="Release $TAG_NAME"
+          fi
+          # Handle multiline tag messages
+          TAG_MESSAGE="${TAG_MESSAGE//'%'/'%25'}"
+          TAG_MESSAGE="${TAG_MESSAGE//$'\n'/'%0A'}"
+          TAG_MESSAGE="${TAG_MESSAGE//$'\r'/'%0D'}"
+          echo "tag_message=$TAG_MESSAGE" >> $GITHUB_OUTPUT
+          
+          # Get the annotated tag commit
+          TAG_COMMIT=$(git rev-list -n 1 $TAG_NAME)
+          echo "tag_commit=$TAG_COMMIT" >> $GITHUB_OUTPUT
+          
+          # Debug output
+          echo "Tag name: $TAG_NAME"
+          echo "Tag commit: $TAG_COMMIT"
+          echo "Tag message:"
+          git tag -l --format='%(contents)' $TAG_NAME
+
+      - name: Prepare Release Variables
+        id: vars
+        run: |
+          repo_name=${GITHUB_REPOSITORY##*/}
+          echo "tarball_prefix=${repo_name}_${{ steps.tag_info.outputs.tag_name }}" >> $GITHUB_OUTPUT
+
+      - name: Configure Git Safe Directory
+        run: git config --global --add safe.directory $GITHUB_WORKSPACE
+
+      - name: Get Go version from toolchain
+        id: go-version
+        run: |
+          TOOLCHAIN_VERSION=$(grep -E '^toolchain go[0-9]+\.[0-9]+(\.[0-9]+)?$' go.mod | cut -d ' ' -f 2 | sed 's/^go//')
+          if [ -n "$TOOLCHAIN_VERSION" ]; then
+            echo "Found toolchain version: $TOOLCHAIN_VERSION"
+            echo "version=$TOOLCHAIN_VERSION" >> $GITHUB_OUTPUT
+          else
+            GO_VERSION=$(grep -E '^go [0-9]+\.[0-9]+(\.[0-9]+)?$' go.mod | cut -d ' ' -f 2)
+            echo "Found go directive version: $GO_VERSION"
+            echo "version=$GO_VERSION" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ steps.go-version.outputs.version }}
+          cache: true
+
+      - name: Install Specific Ignite CLI Version
+        run: |
+          IGNITE_VERSION="v28.6.0"
+          ARCH="linux_amd64"
+
+          # Download the checksum file
+          curl -L "https://github.com/ignite/cli/releases/download/${IGNITE_VERSION}/ignite_${IGNITE_VERSION#v}_checksums.txt" -o checksums.txt
+
+          # Extract the expected checksum for the specific architecture from the checksum file
+          EXPECTED_CHECKSUM=$(grep "ignite_${IGNITE_VERSION#v}_${ARCH}.tar.gz" checksums.txt | awk '{print $1}')
+
+          # Download the Ignite CLI release tarball
+          curl -L "https://github.com/ignite/cli/releases/download/${IGNITE_VERSION}/ignite_${IGNITE_VERSION#v}_${ARCH}.tar.gz" -o ignite.tar.gz
+
+          # Verify the checksum
+          ACTUAL_CHECKSUM=$(sha256sum ignite.tar.gz | awk '{print $1}')
+          if [ "$ACTUAL_CHECKSUM" != "$EXPECTED_CHECKSUM" ]; then
+            echo "Error: Checksum mismatch!"
+            exit 1
+          fi
+
+          # Extract and make executable
+          tar -xzf ignite.tar.gz
+          chmod +x ignite
+
+      - name: Build Release Version
+        run: |
+          ./ignite chain build --release --release.prefix ${{ steps.vars.outputs.tarball_prefix }} -y -t linux:amd64 #-t darwin:amd64 -t darwin:arm64 -y
+        env:
+          DO_NOT_TRACK: 1
+          GOFLAGS: "-buildvcs=false"
+
+      # Fix permissions
+      - name: Fix Release Directory Permissions
+        run: |
+          sudo chown -R $USER:$USER release/
+          sudo chmod -R 755 release/
 
       - name: Publish the Release
         uses: softprops/action-gh-release@v0.1.15
         if: success()
         with:
-          tag_name: ${{ steps.vars.outputs.tag_name }}
+          tag_name: ${{ steps.tag_info.outputs.tag_name }}
           files: release/*
-          prerelease: ${{ github.ref != 'refs/heads/master' }}
-          generate_release_notes: true
+          prerelease: ${{ contains(steps.tag_info.outputs.tag_name, '-beta') }}
+          generate_release_notes: false
           body: |
-            Release ${{ steps.vars.outputs.tag_name }}
+            ${{ steps.tag_info.outputs.tag_message }}
             
-            This release was automatically generated from ${{ github.ref_name }}.
-            
-            Commit: ${{ github.sha }}
+            Tag: ${{ steps.tag_info.outputs.tag_name }}
+            Commit: ${{ steps.tag_info.outputs.tag_commit }}
           token: ${{ secrets.GITHUB_TOKEN }}
-

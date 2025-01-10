@@ -198,7 +198,15 @@ jobs:
 
       - name: Build Release Version
         run: |
-          ./ignite chain build --release --release.prefix ${{ steps.vars.outputs.tarball_prefix }} -y -t linux:amd64 #-t darwin:amd64 -t darwin:arm64 -y
+          # Set WASMVM version
+          WASMVM_VERSION="v2.1.2"  # !!! Make sure this matches go.mod version !!!
+          
+          # Download and install libwasmvm
+          wget https://github.com/CosmWasm/wasmvm/releases/download/${WASMVM_VERSION}/libwasmvm.x86_64.so
+          sudo cp libwasmvm.x86_64.so /usr/lib/
+          
+          # Build with correct RUNPATH
+          CGO_LDFLAGS="-Wl,-rpath,/usr/lib" ./ignite chain build --release --release.prefix ${{ steps.vars.outputs.tarball_prefix }} -y -t linux:amd64
         env:
           DO_NOT_TRACK: 1
           GOFLAGS: "-buildvcs=false"
@@ -208,6 +216,27 @@ jobs:
         run: |
           sudo chown -R $USER:$USER release/
           sudo chmod -R 755 release/
+
+      - name: Prepare Release
+        run: |
+          cd release
+          
+          # Copy libwasmvm to release directory
+          cp /usr/lib/libwasmvm.x86_64.so .
+          
+          # Create installation script
+          cat > install.sh << 'EOF'
+          #!/bin/bash
+          if [ "$EUID" -ne 0 ]; then 
+            echo "Please run as root or with sudo"
+            exit 1
+          fi
+          cp libwasmvm.x86_64.so /usr/lib/
+          ldconfig
+          echo "WASM library installed successfully"
+          EOF
+          
+          chmod +x install.sh
 
       - name: Publish the Release
         uses: softprops/action-gh-release@v0.1.15

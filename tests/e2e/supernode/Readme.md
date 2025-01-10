@@ -16,7 +16,7 @@ Use the `make` target to build the DevNet with a custom genesis file:
 
     # For example:
 
-    make devnet-build EXTERNAL_GENESIS_FILE=/home/desktop/Documents/pastel/tests/e2e/supernode/test_genesis_supernode.json
+    make make devnet-build EXTERNAL_CLAIMS_FILE=/home/desktop/Documents/pastel/claims.csv EXTERNAL_GENESIS_FILE=/home/desktop/Documents/pastel/tests/e2e/supernode/test_genesis_supernode.json
 
     make devnet-up
 

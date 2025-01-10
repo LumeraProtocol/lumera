@@ -199,14 +199,17 @@ jobs:
       - name: Build Release Version
         run: |
           # Set WASMVM version
-          WASMVM_VERSION="v2.1.2"  # !!! Make sure this matches go.mod version !!!
+          WASMVM_VERSION="v2.1.2"  # Make sure this matches your go.mod version
           
           # Download and install libwasmvm
           wget https://github.com/CosmWasm/wasmvm/releases/download/${WASMVM_VERSION}/libwasmvm.x86_64.so
           sudo cp libwasmvm.x86_64.so /usr/lib/
           
-          # Build with correct RUNPATH
-          CGO_LDFLAGS="-Wl,-rpath,/usr/lib" ./ignite chain build --release --release.prefix ${{ steps.vars.outputs.tarball_prefix }} -y -t linux:amd64
+          # Unset GOMODCACHE to prevent its path from being included in RUNPATH
+          unset GOMODCACHE
+          
+          # Build with only /usr/lib in RUNPATH
+          CGO_LDFLAGS="-Wl,-rpath,/usr/lib -Wl,--disable-new-dtags" ./ignite chain build --release --release.prefix ${{ steps.vars.outputs.tarball_prefix }} -y -t linux:amd64
         env:
           DO_NOT_TRACK: 1
           GOFLAGS: "-buildvcs=false"
@@ -221,11 +224,17 @@ jobs:
         run: |
           cd release
           
-          # Copy libwasmvm to release directory
-          cp /usr/lib/libwasmvm.x86_64.so .
+          # Extract the existing tar file
+          tar_file=$(ls *.tar.gz)
+          mkdir -p temp
+          tar xzf "$tar_file" -C temp/
+          rm "$tar_file"
+          
+          # Copy libwasmvm and create install script
+          cp /usr/lib/libwasmvm.x86_64.so temp/
           
           # Create installation script
-          cat > install.sh << 'EOF'
+          cat > temp/install.sh << 'EOF'
           #!/bin/bash
           if [ "$EUID" -ne 0 ]; then 
             echo "Please run as root or with sudo"
@@ -236,7 +245,19 @@ jobs:
           echo "WASM library installed successfully"
           EOF
           
-          chmod +x install.sh
+          # Make script executable
+          chmod +x temp/install.sh
+          
+          # Create new tar file with all contents
+          cd temp
+          tar czf "../$tar_file" ./*
+          cd ..
+          
+          # Clean up
+          rm -rf temp
+          
+          # Verify the final tar contents
+          tar tvf "$tar_file"
 
       - name: Publish the Release
         uses: softprops/action-gh-release@v0.1.15
@@ -251,4 +272,9 @@ jobs:
             
             Tag: ${{ steps.tag_info.outputs.tag_name }}
             Commit: ${{ steps.tag_info.outputs.tag_commit }}
+            
+            Installation:
+            1. Extract the archive
+            2. Run `sudo ./install.sh` to install required libraries
+            3. Run the binary: `./pasteld`
           token: ${{ secrets.GITHUB_TOKEN }}

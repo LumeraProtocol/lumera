@@ -54,10 +54,13 @@ import (
 	ibcexported "github.com/cosmos/ibc-go/v8/modules/core/exported"
 	claimmodulev1 "github.com/pastelnetwork/pastel/api/pastel/claim/module"
 	pastelidmodulev1 "github.com/pastelnetwork/pastel/api/pastel/pastelid/module"
+	supernodemodulev1 "github.com/pastelnetwork/pastel/api/pastel/supernode/module"
 	_ "github.com/pastelnetwork/pastel/x/claim/module" // import for side-effects
 	claimmoduletypes "github.com/pastelnetwork/pastel/x/claim/types"
 	_ "github.com/pastelnetwork/pastel/x/pastelid/module" // import for side-effects
 	pastelidmoduletypes "github.com/pastelnetwork/pastel/x/pastelid/types"
+	_ "github.com/pastelnetwork/pastel/x/supernode/module" // import for side-effects
+	supernodemoduletypes "github.com/pastelnetwork/pastel/x/supernode/types"
 	"google.golang.org/protobuf/types/known/durationpb"
 	// this line is used by starport scaffolding # stargate/app/moduleImport
 )
@@ -99,6 +102,8 @@ var (
 		pastelidmoduletypes.ModuleName,
 		wasmtypes.ModuleName,
 		claimmoduletypes.ModuleName,
+		supernodemoduletypes.ModuleName,
+
 		// this line is used by starport scaffolding # stargate/app/initGenesis
 	}
 
@@ -126,6 +131,7 @@ var (
 		pastelidmoduletypes.ModuleName,
 		wasmtypes.ModuleName,
 		claimmoduletypes.ModuleName,
+		supernodemoduletypes.ModuleName,
 		// this line is used by starport scaffolding # stargate/app/beginBlockers
 	}
 
@@ -147,6 +153,7 @@ var (
 		pastelidmoduletypes.ModuleName,
 		wasmtypes.ModuleName,
 		claimmoduletypes.ModuleName,
+		supernodemoduletypes.ModuleName,
 		// this line is used by starport scaffolding # stargate/app/endBlockers
 	}
 
@@ -170,6 +177,7 @@ var (
 		{Account: pastelidmoduletypes.ModuleName, Permissions: []string{authtypes.Minter, authtypes.Burner, authtypes.Staking}},
 		{Account: wasmtypes.ModuleName, Permissions: []string{authtypes.Burner}},
 		{Account: claimmoduletypes.ModuleName, Permissions: []string{authtypes.Minter, authtypes.Burner, authtypes.Staking}},
+		{Account: supernodemoduletypes.ModuleName, Permissions: []string{authtypes.Minter, authtypes.Burner, authtypes.Staking}},
 		// this line is used by starport scaffolding # stargate/app/maccPerms
 	}
 
@@ -312,6 +320,10 @@ var (
 			{
 				Name:   claimmoduletypes.ModuleName,
 				Config: appconfig.WrapAny(&claimmodulev1.Module{}),
+			},
+			{
+				Name:   supernodemoduletypes.ModuleName,
+				Config: appconfig.WrapAny(&supernodemodulev1.Module{}),
 			},
 			// this line is used by starport scaffolding # stargate/app/moduleConfig
 		},

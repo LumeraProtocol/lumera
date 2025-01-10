@@ -39,7 +39,7 @@ genesis:
   chain_id: pastel-devnet-1
   app_state:
     claim:
-      total_claimable_amount: '12499999979315' # 12,500,000,000,000 upsl --> 12,500,000 psl
+      total_claimable_amount: '12499999971624' # 12,500,000,000,000 upsl --> 12,500,000 psl
       params:
         claim_end_time: '1746071999' # April 30 2025, 23:59:59
     distribution:
@@ -69,7 +69,7 @@ genesis:
     crisis:
       constant_fee:
         denom: upsl
-        amount: '500000000' # 500,000 upsl --> 500 psl
+        amount: "500000000"  # 500,000 upsl --> 500 psl
     gov:
       params:
         burn_vote_quorum: false

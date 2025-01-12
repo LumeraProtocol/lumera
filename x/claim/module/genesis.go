@@ -114,7 +114,7 @@ func loadClaimRecordsFromCSV() ([]types.ClaimRecord, error) {
 	}
 
 	records := make([]types.ClaimRecord, 0, len(rows)-1) // Pre-allocate with capacity
-	for _, row := range rows {                           // Skip header row
+	for _, row := range rows {
 		if len(row) < 2 { // Minimum required fields: address and balance
 			panic(fmt.Sprintf("invalid CSV row: %v", row))
 		}

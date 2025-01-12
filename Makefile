@@ -80,7 +80,7 @@ devnet-clean:
 
 devnet-deploy-tar:
 	# Ensure required files exist from previous build
-	@if [ ! -f "devnet/docker compose.yml" ] || [ ! -f "devnet/pasteld" ] || [ ! -f "devnet/libwasmvm.x86_64.so" ]; then \
+	@if [ ! -f "devnet/docker-compose.yml" ] || [ ! -f "devnet/pasteld" ] || [ ! -f "devnet/libwasmvm.x86_64.so" ]; then \
 		echo "Please run 'make devnet-build' first to generate required files."; \
 		exit 1; \
 	fi
@@ -95,7 +95,7 @@ devnet-deploy-tar:
 	# Create the tar archive
 	tar -czf devnet-deploy.tar.gz \
 		-C devnet dockerfile \
-		docker compose.yml \
+		docker-compose.yml \
 		primary-validator.sh \
 		secondary-validator.sh \
 		pasteld \

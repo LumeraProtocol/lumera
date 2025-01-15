@@ -20,3 +20,5 @@ devnet-deploy.tar.gz
 
 repomix-*
 .repomixignore
+
+tests/systemtests/testnet

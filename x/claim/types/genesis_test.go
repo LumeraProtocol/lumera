@@ -42,6 +42,7 @@ func TestGenesisState_Validate(t *testing.T) {
 				[]types.ClaimRecord{}, // Should always be empty in genesis
 				moduleAcc,
 				types.DefaultClaimableAmountConst, // Fixed claimable amount
+				types.DefaultClaimsDenom,
 			),
 			expErr: false,
 		},
@@ -56,6 +57,7 @@ func TestGenesisState_Validate(t *testing.T) {
 				[]types.ClaimRecord{},
 				moduleAcc,
 				types.DefaultClaimableAmountConst,
+				types.DefaultClaimsDenom,
 			),
 			expErr: true,
 		},
@@ -70,6 +72,7 @@ func TestGenesisState_Validate(t *testing.T) {
 				[]types.ClaimRecord{},
 				moduleAcc,
 				types.DefaultClaimableAmountConst,
+				types.DefaultClaimsDenom,
 			),
 			expErr: true,
 		},
@@ -113,6 +116,7 @@ func TestNewGenesisState(t *testing.T) {
 		[]types.ClaimRecord{}, // Should be empty in genesis
 		moduleAcc,
 		types.DefaultClaimableAmountConst, // Fixed claimable amount
+		types.DefaultClaimsDenom,
 	)
 
 	require.NotNil(t, genState)

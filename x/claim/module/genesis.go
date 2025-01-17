@@ -26,13 +26,14 @@ func InitGenesis(ctx sdk.Context, k keeper.Keeper, genState types.GenesisState) 
 		panic(err)
 	}
 
+	genesisClaimsDenom := genState.ClaimsDenom
 	if err := initModuleAccount(ctx, k); err != nil {
 		panic(fmt.Sprintf("failed to initialize module account: %s", err))
 	}
 
 	// Only attempt to load CSV records if TotalClaimableAmount > 0
 	if genState.TotalClaimableAmount > 0 {
-		records, err := loadClaimRecordsFromCSV()
+		records, err := loadClaimRecordsFromCSV(genesisClaimsDenom)
 		if err != nil {
 			if !os.IsNotExist(err) {
 				panic(fmt.Sprintf("failed to load CSV: %s", err))
@@ -46,7 +47,7 @@ func InitGenesis(ctx sdk.Context, k keeper.Keeper, genState types.GenesisState) 
 			if err := k.SetClaimRecord(ctx, record); err != nil {
 				panic(fmt.Sprintf("failed to set claim record: %s", err))
 			}
-			totalCoins = totalCoins.Add(record.Balance.AmountOf(types.DefaultDenom))
+			totalCoins = totalCoins.Add(record.Balance.AmountOf(genesisClaimsDenom))
 		}
 
 		// Only check and mint coins if we have a positive total
@@ -60,7 +61,7 @@ func InitGenesis(ctx sdk.Context, k keeper.Keeper, genState types.GenesisState) 
 			if err := bankKeeper.MintCoins(
 				ctx,
 				types.ModuleName,
-				sdk.NewCoins(sdk.NewCoin(types.DefaultDenom, totalCoins)),
+				sdk.NewCoins(sdk.NewCoin(genesisClaimsDenom, totalCoins)),
 			); err != nil {
 				panic(fmt.Sprintf("failed to mint coins: %s", err))
 			}
@@ -95,7 +96,7 @@ func ExportGenesis(ctx sdk.Context, k keeper.Keeper) *types.GenesisState {
 	return genesis
 }
 
-func loadClaimRecordsFromCSV() ([]types.ClaimRecord, error) {
+func loadClaimRecordsFromCSV(claimsDenom string) ([]types.ClaimRecord, error) {
 	filepath, err := getConfigPath()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get config path: %w", err)
@@ -124,7 +125,7 @@ func loadClaimRecordsFromCSV() ([]types.ClaimRecord, error) {
 			panic(fmt.Sprintf("invalid balance in CSV row: %v", row))
 		}
 
-		coin := sdk.NewCoin(types.DefaultDenom, balance)
+		coin := sdk.NewCoin(claimsDenom, balance)
 
 		records = append(records, types.ClaimRecord{
 			OldAddress: row[0], // Address is in first column

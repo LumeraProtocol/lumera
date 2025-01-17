@@ -49,12 +49,12 @@ genesis:
         bonus_proposer_reward: '0.000000000000000000'
     staking:
       params:
-        bond_denom: upsl
+        bond_denom: "upsl"
         max_validators: '100'
         unbonding_time: '1814400s'
     mint:
       params:
-        mint_denom: upsl
+        mint_denom: "upsl"
         inflation_min:          '0.050000000000000000'
         inflation_max:          '0.200000000000000000'
         inflation_rate_change:  '0.150000000000000000'
@@ -68,7 +68,7 @@ genesis:
         slash_fraction_downtime:    '0.010000000000000000'
     crisis:
       constant_fee:
-        denom: upsl
+        denom: "upsl"
         amount: "500000000"  # 500,000 upsl --> 500 psl
     gov:
       params:
@@ -76,11 +76,11 @@ genesis:
         burn_vote_veto: true
         burn_proposal_deposit_prevote: false
         min_deposit:                    # min deposit for proposal to enter voting period
-          - denom: upsl
+          - denom: "upsl"
             amount: '1000000000'  # 1,000 psl (1,000,000,000 upsl) for devnet; 10,000 psl (10,000,000,000 upsl) for testnet; 100,000 psl (100,000,000,000 upsl) for mainnet
         expedited_min_deposit:
           - amount: '5000000000'  # 5,000 psl (5,000,000,000 upsl) for devnet; 50,000 psl (50,000,000,000 upsl) for testnet; 500,000 psl (500,000,000,000 upsl) for mainnet
-            denom: upsl
+            denom: "upsl"
         max_deposit_period: '172800s'   # 2 days (172800s) for devnet; 7 days (604800s) for testnet; 14 days (1209600) for mainnet
         voting_period: '172800s'        # 2 days (172800s) for devnet; 7 days (604800s) for testnet; 14 days (1209600) for mainnet
         quorum:         '0.334000000000000000'          # 33.4%

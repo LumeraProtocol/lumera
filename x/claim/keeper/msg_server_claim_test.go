@@ -16,7 +16,7 @@ func TestMsgClaim(t *testing.T) {
 	// Define valid claim record with proper coin denomination
 	validClaimRecord := types.ClaimRecord{
 		OldAddress: "PtqHAEacynVd3V821NPhgxu9K4Ab6kAguHi",
-		Balance:    sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, math.NewInt(1000000))),
+		Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultDenom, math.NewInt(1000000))),
 		Claimed:    false,
 	}
 
@@ -47,7 +47,7 @@ func TestMsgClaim(t *testing.T) {
 				require.NoError(t, k.SetClaimRecord(sdkCtx, validClaimRecord))
 
 				// Set fee in context
-				fee := sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, math.NewInt(1000)))
+				fee := sdk.NewCoins(sdk.NewCoin(types.DefaultDenom, math.NewInt(1000)))
 				ctx = sdkCtx.WithValue(types.ClaimTxFee, fee)
 			},
 			expErr: false,

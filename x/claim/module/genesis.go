@@ -46,7 +46,7 @@ func InitGenesis(ctx sdk.Context, k keeper.Keeper, genState types.GenesisState) 
 			if err := k.SetClaimRecord(ctx, record); err != nil {
 				panic(fmt.Sprintf("failed to set claim record: %s", err))
 			}
-			totalCoins = totalCoins.Add(record.Balance.AmountOf(sdk.DefaultBondDenom))
+			totalCoins = totalCoins.Add(record.Balance.AmountOf(types.DefaultDenom))
 		}
 
 		// Only check and mint coins if we have a positive total
@@ -60,7 +60,7 @@ func InitGenesis(ctx sdk.Context, k keeper.Keeper, genState types.GenesisState) 
 			if err := bankKeeper.MintCoins(
 				ctx,
 				types.ModuleName,
-				sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, totalCoins)),
+				sdk.NewCoins(sdk.NewCoin(types.DefaultDenom, totalCoins)),
 			); err != nil {
 				panic(fmt.Sprintf("failed to mint coins: %s", err))
 			}
@@ -124,7 +124,7 @@ func loadClaimRecordsFromCSV() ([]types.ClaimRecord, error) {
 			panic(fmt.Sprintf("invalid balance in CSV row: %v", row))
 		}
 
-		coin := sdk.NewCoin(sdk.DefaultBondDenom, balance)
+		coin := sdk.NewCoin(types.DefaultDenom, balance)
 
 		records = append(records, types.ClaimRecord{
 			OldAddress: row[0], // Address is in first column

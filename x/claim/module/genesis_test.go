@@ -19,6 +19,7 @@ func TestGenesis(t *testing.T) {
 		TotalClaimableAmount: defaultGenState.TotalClaimableAmount, // Match the default amount
 		ModuleAccount:        "",                                   // Will be populated during initialization
 		ClaimRecords:         []types.ClaimRecord{},                // Empty records for test
+		ClaimsDenom:          types.DefaultClaimsDenom,
 	}
 
 	k, ctx := keepertest.ClaimKeeper(t)

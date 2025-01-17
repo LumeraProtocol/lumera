@@ -21,7 +21,7 @@ System tests cover the full stack via CLI and a running (multi node) network. Th
 to run compared to unit or integration tests. 
 Therefore, we focus on the **critical path** and do not cover every condition.
 
-#### USES BINARY from the go path. You can build a new one with `ignite chain build`
+#### These tests USES BINARY from the go path. You can build a new one with `ignite chain build`
 
 ### Execute a single test
 

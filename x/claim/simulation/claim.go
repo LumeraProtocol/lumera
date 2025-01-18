@@ -49,7 +49,7 @@ func SimulateMsgClaim(
 		if !found {
 			claimRecord := types.ClaimRecord{
 				OldAddress: oldAddress,
-				Balance:    sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, math.NewInt(1000000))),
+				Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(1000000))),
 				Claimed:    false,
 			}
 			err = k.SetClaimRecord(ctx, claimRecord)

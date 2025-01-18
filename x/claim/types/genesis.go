@@ -26,6 +26,7 @@ func DefaultGenesis() *GenesisState {
 		ClaimRecords:         []ClaimRecord{}, //representation only
 		ModuleAccount:        moduleAcc.String(),
 		TotalClaimableAmount: DefaultClaimableAmountConst,
+		ClaimsDenom:          DefaultClaimsDenom,
 	}
 }
 
@@ -39,11 +40,12 @@ func (gs GenesisState) Validate() error {
 }
 
 // NewGenesisState creates a new genesis state with provided values
-func NewGenesisState(params Params, records []ClaimRecord, moduleAcc *authtypes.ModuleAccount, amount uint64) *GenesisState {
+func NewGenesisState(params Params, records []ClaimRecord, moduleAcc *authtypes.ModuleAccount, amount uint64, claimDenom string) *GenesisState {
 	return &GenesisState{
 		Params:               params,
 		ClaimRecords:         records,
 		ModuleAccount:        moduleAcc.String(),
 		TotalClaimableAmount: amount,
+		ClaimsDenom:          claimDenom,
 	}
 }

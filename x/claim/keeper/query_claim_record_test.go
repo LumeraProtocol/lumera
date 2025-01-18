@@ -18,7 +18,7 @@ func TestClaimRecordQuery(t *testing.T) {
 	// Define a valid claim record using real Pastel network values
 	validRecord := types.ClaimRecord{
 		OldAddress: "PtqHAEacynVd3V821NPhgxu9K4Ab6kAguHi",
-		Balance:    sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, math.NewInt(1000000))),
+		Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(1000000))),
 		Claimed:    false,
 	}
 

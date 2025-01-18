@@ -31,7 +31,7 @@ func TestGetClaimRecord(t *testing.T) {
 			name: "existing record",
 			setupRecord: &types.ClaimRecord{
 				OldAddress: "test_address",
-				Balance:    sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, math.NewInt(100))),
+				Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(100))),
 				Claimed:    false,
 			},
 			queryAddress: "test_address",
@@ -42,7 +42,7 @@ func TestGetClaimRecord(t *testing.T) {
 			name: "query wrong address",
 			setupRecord: &types.ClaimRecord{
 				OldAddress: "test_address",
-				Balance:    sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, math.NewInt(100))),
+				Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(100))),
 				Claimed:    false,
 			},
 			queryAddress: "wrong_address",
@@ -91,7 +91,7 @@ func TestSetClaimRecord(t *testing.T) {
 			initialRecord: nil,
 			recordToSet: types.ClaimRecord{
 				OldAddress: "test_address",
-				Balance:    sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, math.NewInt(100))),
+				Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(100))),
 				Claimed:    false,
 			},
 			expectErr: false,
@@ -100,12 +100,12 @@ func TestSetClaimRecord(t *testing.T) {
 			name: "update existing record",
 			initialRecord: &types.ClaimRecord{
 				OldAddress: "test_address",
-				Balance:    sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, math.NewInt(100))),
+				Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(100))),
 				Claimed:    false,
 			},
 			recordToSet: types.ClaimRecord{
 				OldAddress: "test_address",
-				Balance:    sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, math.NewInt(100))),
+				Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(100))),
 				Claimed:    true,
 			},
 			expectErr: false,
@@ -157,12 +157,12 @@ func TestListClaimRecords(t *testing.T) {
 			setupRecords: []types.ClaimRecord{
 				{
 					OldAddress: "address1",
-					Balance:    sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, math.NewInt(100))),
+					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(100))),
 					Claimed:    false,
 				},
 				{
 					OldAddress: "address2",
-					Balance:    sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, math.NewInt(200))),
+					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(200))),
 					Claimed:    true,
 				},
 			},
@@ -215,12 +215,12 @@ func TestGetClaimRecordCount(t *testing.T) {
 			setupRecords: []types.ClaimRecord{
 				{
 					OldAddress: "address1",
-					Balance:    sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, math.NewInt(100))),
+					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(100))),
 					Claimed:    false,
 				},
 				{
 					OldAddress: "address2",
-					Balance:    sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, math.NewInt(200))),
+					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(200))),
 					Claimed:    false,
 				},
 			},

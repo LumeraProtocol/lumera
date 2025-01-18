@@ -1,8 +1,6 @@
 package system_test
 
 import (
-	"encoding/hex"
-	"fmt"
 	"os"
 	"testing"
 
@@ -11,10 +9,10 @@ import (
 	"github.com/pastelnetwork/pastel/app"
 	"github.com/pastelnetwork/pastel/tests/ibctesting"
 	"github.com/pastelnetwork/pastel/x/claim/keeper"
-	"github.com/pastelnetwork/pastel/x/claim/keeper/crypto"
-	cryptoutils "github.com/pastelnetwork/pastel/x/claim/keeper/crypto"
 	"github.com/pastelnetwork/pastel/x/claim/types"
 	"github.com/stretchr/testify/require"
+
+	claimtestutils "github.com/pastelnetwork/pastel/x/claim/testutils"
 )
 
 func setupClaimSystemSuite(t *testing.T) *SystemTestSuite {
@@ -41,60 +39,11 @@ func setupClaimSystemSuite(t *testing.T) *SystemTestSuite {
 	return suite
 }
 
-type TestData struct {
-	OldAddress string
-	PubKey     string
-	NewAddress string
-	Signature  string
-}
-
-func generateTestData() (*TestData, error) {
-	// Generate a new key pair
-	privKeyObj, pubKeyObj := cryptoutils.GenerateKeyPair()
-
-	// Get hex encoded public key
-	pubKey := hex.EncodeToString(pubKeyObj.Key)
-
-	// Generate old address from public key
-	oldAddr, err := crypto.GetAddressFromPubKey(pubKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate old address: %w", err)
-	}
-
-	// Generate a new cosmos address
-	newAddr := sdk.AccAddress(privKeyObj.PubKey().Address()).String()
-
-	// Construct message for signature (without hashing)
-	message := oldAddr + "." + pubKey + "." + newAddr
-
-	// Sign the message directly without hashing
-	signature, err := crypto.SignMessage(privKeyObj, message)
-	if err != nil {
-		return nil, fmt.Errorf("failed to sign message: %w", err)
-	}
-
-	// Verify the signature to ensure it's valid
-	valid, err := crypto.VerifySignature(pubKey, message, signature)
-	if err != nil {
-		return nil, fmt.Errorf("failed to verify generated signature: %w", err)
-	}
-	if !valid {
-		return nil, fmt.Errorf("generated signature verification failed")
-	}
-
-	return &TestData{
-		OldAddress: oldAddr,
-		PubKey:     pubKey,
-		NewAddress: newAddr,
-		Signature:  signature,
-	}, nil
-}
-
 func TestClaimProcess(t *testing.T) {
 	suite := setupClaimSystemSuite(t)
 
 	// Generate test data
-	testData, err := generateTestData()
+	testData, err := claimtestutils.GenerateClaimingTestData()
 	t.Logf("\nTest Data Generated:"+
 		"\n===================="+
 		"\nOldAddress: %s"+

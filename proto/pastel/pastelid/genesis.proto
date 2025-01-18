@@ -5,7 +5,6 @@ package pastel.pastelid;
 import "amino/amino.proto";
 import "gogoproto/gogo.proto";
 import "pastel/pastelid/params.proto";
-import "pastel/pastelid/pastelid_entry.proto";
 
 option go_package = "github.com/pastelnetwork/pastel/x/pastelid/types";
 
@@ -14,6 +13,5 @@ message GenesisState {
   
   // params defines all the parameters of the module.
            Params        params            = 1 [(gogoproto.nullable) = false, (amino.dont_omitempty) = true];
-  repeated PastelidEntry pastelidEntryList = 2 [(gogoproto.nullable) = false] ;
 }
 

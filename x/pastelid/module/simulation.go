@@ -23,10 +23,6 @@ var (
 )
 
 const (
-	opWeightMsgCreatePastelId = "op_weight_msg_create_pastel_id"
-	// TODO: Determine the simulation weight value
-	defaultWeightMsgCreatePastelId int = 50
-
 	// this line is used by starport scaffolding # simapp/module/const
 )
 
@@ -49,18 +45,6 @@ func (am AppModule) RegisterStoreDecoder(_ simtypes.StoreDecoderRegistry) {}
 // WeightedOperations returns the all the gov module operations with their respective weights.
 func (am AppModule) WeightedOperations(simState module.SimulationState) []simtypes.WeightedOperation {
 	operations := make([]simtypes.WeightedOperation, 0)
-
-	var weightMsgCreatePastelId int
-	simState.AppParams.GetOrGenerate(opWeightMsgCreatePastelId, &weightMsgCreatePastelId, nil,
-		func(_ *rand.Rand) {
-			weightMsgCreatePastelId = defaultWeightMsgCreatePastelId
-		},
-	)
-	operations = append(operations, simulation.NewWeightedOperation(
-		weightMsgCreatePastelId,
-		pastelidsimulation.SimulateMsgCreatePastelId(am.accountKeeper, am.bankKeeper, am.keeper),
-	))
-
 	// this line is used by starport scaffolding # simapp/module/operation
 
 	return operations
@@ -68,15 +52,5 @@ func (am AppModule) WeightedOperations(simState module.SimulationState) []simtyp
 
 // ProposalMsgs returns msgs used for governance proposals for simulations.
 func (am AppModule) ProposalMsgs(simState module.SimulationState) []simtypes.WeightedProposalMsg {
-	return []simtypes.WeightedProposalMsg{
-		simulation.NewWeightedProposalMsg(
-			opWeightMsgCreatePastelId,
-			defaultWeightMsgCreatePastelId,
-			func(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account) sdk.Msg {
-				pastelidsimulation.SimulateMsgCreatePastelId(am.accountKeeper, am.bankKeeper, am.keeper)
-				return nil
-			},
-		),
-		// this line is used by starport scaffolding # simapp/module/OpMsg
-	}
+	return nil
 }

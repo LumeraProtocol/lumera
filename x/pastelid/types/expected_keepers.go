@@ -6,6 +6,7 @@ import (
 	"context"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	legroast "github.com/pastelnetwork/pastel/x/pastelid/module/legroast"
 )
 
 // AccountKeeper defines the expected interface for the Account module.
@@ -28,4 +29,9 @@ type BankKeeper interface {
 type ParamSubspace interface {
 	Get(context.Context, []byte, interface{})
 	Set(context.Context, []byte, interface{})
+}
+
+// LegRoast is the interface that wraps the basic LegRoast methods.
+type LegRoast interface {
+	legroast.LegRoastInterface
 }

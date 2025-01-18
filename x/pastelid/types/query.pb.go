@@ -6,7 +6,6 @@ package types
 import (
 	context "context"
 	fmt "fmt"
-	query "github.com/cosmos/cosmos-sdk/types/query"
 	_ "github.com/cosmos/cosmos-sdk/types/tx/amino"
 	_ "github.com/cosmos/gogoproto/gogoproto"
 	grpc1 "github.com/cosmos/gogoproto/grpc"
@@ -114,236 +113,33 @@ func (m *QueryParamsResponse) GetParams() Params {
 	return Params{}
 }
 
-type QueryGetPastelidEntryRequest struct {
-	Address string `protobuf:"bytes,1,opt,name=address,proto3" json:"address,omitempty"`
-}
-
-func (m *QueryGetPastelidEntryRequest) Reset()         { *m = QueryGetPastelidEntryRequest{} }
-func (m *QueryGetPastelidEntryRequest) String() string { return proto.CompactTextString(m) }
-func (*QueryGetPastelidEntryRequest) ProtoMessage()    {}
-func (*QueryGetPastelidEntryRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e6cb0f1f20524e99, []int{2}
-}
-func (m *QueryGetPastelidEntryRequest) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *QueryGetPastelidEntryRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	if deterministic {
-		return xxx_messageInfo_QueryGetPastelidEntryRequest.Marshal(b, m, deterministic)
-	} else {
-		b = b[:cap(b)]
-		n, err := m.MarshalToSizedBuffer(b)
-		if err != nil {
-			return nil, err
-		}
-		return b[:n], nil
-	}
-}
-func (m *QueryGetPastelidEntryRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_QueryGetPastelidEntryRequest.Merge(m, src)
-}
-func (m *QueryGetPastelidEntryRequest) XXX_Size() int {
-	return m.Size()
-}
-func (m *QueryGetPastelidEntryRequest) XXX_DiscardUnknown() {
-	xxx_messageInfo_QueryGetPastelidEntryRequest.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_QueryGetPastelidEntryRequest proto.InternalMessageInfo
-
-func (m *QueryGetPastelidEntryRequest) GetAddress() string {
-	if m != nil {
-		return m.Address
-	}
-	return ""
-}
-
-type QueryGetPastelidEntryResponse struct {
-	PastelidEntry PastelidEntry `protobuf:"bytes,1,opt,name=pastelidEntry,proto3" json:"pastelidEntry"`
-}
-
-func (m *QueryGetPastelidEntryResponse) Reset()         { *m = QueryGetPastelidEntryResponse{} }
-func (m *QueryGetPastelidEntryResponse) String() string { return proto.CompactTextString(m) }
-func (*QueryGetPastelidEntryResponse) ProtoMessage()    {}
-func (*QueryGetPastelidEntryResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e6cb0f1f20524e99, []int{3}
-}
-func (m *QueryGetPastelidEntryResponse) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *QueryGetPastelidEntryResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	if deterministic {
-		return xxx_messageInfo_QueryGetPastelidEntryResponse.Marshal(b, m, deterministic)
-	} else {
-		b = b[:cap(b)]
-		n, err := m.MarshalToSizedBuffer(b)
-		if err != nil {
-			return nil, err
-		}
-		return b[:n], nil
-	}
-}
-func (m *QueryGetPastelidEntryResponse) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_QueryGetPastelidEntryResponse.Merge(m, src)
-}
-func (m *QueryGetPastelidEntryResponse) XXX_Size() int {
-	return m.Size()
-}
-func (m *QueryGetPastelidEntryResponse) XXX_DiscardUnknown() {
-	xxx_messageInfo_QueryGetPastelidEntryResponse.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_QueryGetPastelidEntryResponse proto.InternalMessageInfo
-
-func (m *QueryGetPastelidEntryResponse) GetPastelidEntry() PastelidEntry {
-	if m != nil {
-		return m.PastelidEntry
-	}
-	return PastelidEntry{}
-}
-
-type QueryAllPastelidEntryRequest struct {
-	Pagination *query.PageRequest `protobuf:"bytes,1,opt,name=pagination,proto3" json:"pagination,omitempty"`
-}
-
-func (m *QueryAllPastelidEntryRequest) Reset()         { *m = QueryAllPastelidEntryRequest{} }
-func (m *QueryAllPastelidEntryRequest) String() string { return proto.CompactTextString(m) }
-func (*QueryAllPastelidEntryRequest) ProtoMessage()    {}
-func (*QueryAllPastelidEntryRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e6cb0f1f20524e99, []int{4}
-}
-func (m *QueryAllPastelidEntryRequest) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *QueryAllPastelidEntryRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	if deterministic {
-		return xxx_messageInfo_QueryAllPastelidEntryRequest.Marshal(b, m, deterministic)
-	} else {
-		b = b[:cap(b)]
-		n, err := m.MarshalToSizedBuffer(b)
-		if err != nil {
-			return nil, err
-		}
-		return b[:n], nil
-	}
-}
-func (m *QueryAllPastelidEntryRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_QueryAllPastelidEntryRequest.Merge(m, src)
-}
-func (m *QueryAllPastelidEntryRequest) XXX_Size() int {
-	return m.Size()
-}
-func (m *QueryAllPastelidEntryRequest) XXX_DiscardUnknown() {
-	xxx_messageInfo_QueryAllPastelidEntryRequest.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_QueryAllPastelidEntryRequest proto.InternalMessageInfo
-
-func (m *QueryAllPastelidEntryRequest) GetPagination() *query.PageRequest {
-	if m != nil {
-		return m.Pagination
-	}
-	return nil
-}
-
-type QueryAllPastelidEntryResponse struct {
-	PastelidEntry []PastelidEntry     `protobuf:"bytes,1,rep,name=pastelidEntry,proto3" json:"pastelidEntry"`
-	Pagination    *query.PageResponse `protobuf:"bytes,2,opt,name=pagination,proto3" json:"pagination,omitempty"`
-}
-
-func (m *QueryAllPastelidEntryResponse) Reset()         { *m = QueryAllPastelidEntryResponse{} }
-func (m *QueryAllPastelidEntryResponse) String() string { return proto.CompactTextString(m) }
-func (*QueryAllPastelidEntryResponse) ProtoMessage()    {}
-func (*QueryAllPastelidEntryResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e6cb0f1f20524e99, []int{5}
-}
-func (m *QueryAllPastelidEntryResponse) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *QueryAllPastelidEntryResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	if deterministic {
-		return xxx_messageInfo_QueryAllPastelidEntryResponse.Marshal(b, m, deterministic)
-	} else {
-		b = b[:cap(b)]
-		n, err := m.MarshalToSizedBuffer(b)
-		if err != nil {
-			return nil, err
-		}
-		return b[:n], nil
-	}
-}
-func (m *QueryAllPastelidEntryResponse) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_QueryAllPastelidEntryResponse.Merge(m, src)
-}
-func (m *QueryAllPastelidEntryResponse) XXX_Size() int {
-	return m.Size()
-}
-func (m *QueryAllPastelidEntryResponse) XXX_DiscardUnknown() {
-	xxx_messageInfo_QueryAllPastelidEntryResponse.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_QueryAllPastelidEntryResponse proto.InternalMessageInfo
-
-func (m *QueryAllPastelidEntryResponse) GetPastelidEntry() []PastelidEntry {
-	if m != nil {
-		return m.PastelidEntry
-	}
-	return nil
-}
-
-func (m *QueryAllPastelidEntryResponse) GetPagination() *query.PageResponse {
-	if m != nil {
-		return m.Pagination
-	}
-	return nil
-}
-
 func init() {
 	proto.RegisterType((*QueryParamsRequest)(nil), "pastel.pastelid.QueryParamsRequest")
 	proto.RegisterType((*QueryParamsResponse)(nil), "pastel.pastelid.QueryParamsResponse")
-	proto.RegisterType((*QueryGetPastelidEntryRequest)(nil), "pastel.pastelid.QueryGetPastelidEntryRequest")
-	proto.RegisterType((*QueryGetPastelidEntryResponse)(nil), "pastel.pastelid.QueryGetPastelidEntryResponse")
-	proto.RegisterType((*QueryAllPastelidEntryRequest)(nil), "pastel.pastelid.QueryAllPastelidEntryRequest")
-	proto.RegisterType((*QueryAllPastelidEntryResponse)(nil), "pastel.pastelid.QueryAllPastelidEntryResponse")
 }
 
 func init() { proto.RegisterFile("pastel/pastelid/query.proto", fileDescriptor_e6cb0f1f20524e99) }
 
 var fileDescriptor_e6cb0f1f20524e99 = []byte{
-	// 523 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x94, 0x4d, 0x6b, 0x14, 0x31,
-	0x18, 0xc7, 0x37, 0xad, 0xae, 0x34, 0x52, 0xd4, 0x58, 0xb0, 0xac, 0x75, 0x94, 0x58, 0xad, 0x14,
-	0x36, 0xb1, 0x15, 0xf1, 0xe5, 0x22, 0x5d, 0xd0, 0x42, 0x4f, 0xdb, 0x39, 0x7a, 0x91, 0x6c, 0x37,
-	0x8e, 0x43, 0x67, 0x93, 0x74, 0x92, 0x55, 0x8b, 0x78, 0xe9, 0x27, 0x10, 0xfc, 0x12, 0xbd, 0xe9,
-	0xc1, 0x0f, 0xd1, 0x63, 0xc1, 0x8b, 0x27, 0x91, 0x5d, 0x41, 0xfc, 0x16, 0x32, 0x49, 0x86, 0xce,
-	0x74, 0x67, 0xac, 0xf6, 0xb2, 0x9b, 0xcd, 0xf3, 0xf2, 0xff, 0x3d, 0xfb, 0xfc, 0x67, 0xe0, 0x55,
-	0xc5, 0xb4, 0xe1, 0x09, 0x75, 0x5f, 0x71, 0x9f, 0xee, 0x0c, 0x79, 0xba, 0x4b, 0x54, 0x2a, 0x8d,
-	0x44, 0x17, 0xdc, 0x2d, 0xc9, 0x83, 0xad, 0x4b, 0x6c, 0x10, 0x0b, 0x49, 0xed, 0xa7, 0xcb, 0x69,
-	0xcd, 0x45, 0x32, 0x92, 0xf6, 0x48, 0xb3, 0x93, 0xbf, 0x5d, 0x88, 0xa4, 0x8c, 0x12, 0x4e, 0x99,
-	0x8a, 0x29, 0x13, 0x42, 0x1a, 0x66, 0x62, 0x29, 0xb4, 0x8f, 0x2e, 0x6f, 0x49, 0x3d, 0x90, 0x9a,
-	0xf6, 0x98, 0xe6, 0x4e, 0x90, 0xbe, 0x5e, 0xe9, 0x71, 0xc3, 0x56, 0xa8, 0x62, 0x51, 0x2c, 0x6c,
-	0x72, 0xde, 0xe9, 0x38, 0xa0, 0x62, 0x29, 0x1b, 0xe4, 0x9d, 0x16, 0x27, 0xa3, 0xee, 0xf0, 0x82,
-	0x0b, 0x93, 0xcf, 0x81, 0xe7, 0x20, 0xda, 0xcc, 0x54, 0xba, 0xb6, 0x34, 0xe4, 0x3b, 0x43, 0xae,
-	0x0d, 0xde, 0x84, 0x97, 0x4b, 0xb7, 0x5a, 0x49, 0xa1, 0x39, 0x7a, 0x0c, 0x9b, 0x4e, 0x62, 0x1e,
-	0xdc, 0x00, 0x77, 0xce, 0xaf, 0x5e, 0x21, 0xc7, 0xfe, 0x05, 0xe2, 0x0a, 0x3a, 0x33, 0x07, 0xdf,
-	0xaf, 0x37, 0xf6, 0x7f, 0x7d, 0x5e, 0x06, 0xa1, 0xaf, 0xc0, 0x0f, 0xe1, 0x82, 0x6d, 0xb9, 0xce,
-	0x4d, 0xd7, 0x67, 0x3f, 0xcd, 0x38, 0xbc, 0x24, 0x9a, 0x87, 0xe7, 0x58, 0xbf, 0x9f, 0x72, 0xed,
-	0x9a, 0xcf, 0x84, 0xf9, 0x4f, 0xbc, 0x0d, 0xaf, 0xd5, 0x54, 0x7a, 0xac, 0x0d, 0x38, 0xab, 0x8a,
-	0x01, 0x4f, 0x17, 0x54, 0xd0, 0x15, 0xb2, 0x3a, 0x67, 0x32, 0xc8, 0xb0, 0x5c, 0x8a, 0x5f, 0x7a,
-	0xcc, 0xb5, 0x24, 0xa9, 0xc4, 0x7c, 0x06, 0xe1, 0xd1, 0x1e, 0xbc, 0xd0, 0x6d, 0xe2, 0x96, 0x46,
-	0xb2, 0xa5, 0x11, 0xe7, 0x12, 0xbf, 0x34, 0xd2, 0x65, 0x11, 0xf7, 0xb5, 0x61, 0xa1, 0x12, 0x7f,
-	0x01, 0x7e, 0xaa, 0x49, 0xa1, 0xfa, 0xa9, 0xa6, 0x4f, 0x39, 0x15, 0x5a, 0x2f, 0x51, 0x4f, 0x59,
-	0xea, 0xa5, 0x13, 0xa9, 0x1d, 0x48, 0x11, 0x7b, 0xf5, 0xf7, 0x34, 0x3c, 0x6b, 0xb1, 0xd1, 0x1e,
-	0x80, 0x4d, 0xb7, 0x6d, 0x74, 0x73, 0x02, 0x69, 0xd2, 0x52, 0xad, 0xc5, 0xbf, 0x27, 0x39, 0x2d,
-	0xdc, 0xde, 0xfb, 0xfa, 0xf3, 0xe3, 0xd4, 0x12, 0xba, 0xe5, 0xdd, 0x2a, 0xb8, 0x79, 0x23, 0xd3,
-	0x6d, 0x5a, 0xed, 0x74, 0xf4, 0x09, 0xc0, 0xd9, 0xd2, 0xf8, 0xa8, 0x5d, 0x2d, 0x53, 0xe3, 0xba,
-	0x16, 0xf9, 0xd7, 0x74, 0xcf, 0xf7, 0xc4, 0xf2, 0x3d, 0x42, 0x0f, 0x4e, 0xe4, 0x2b, 0x3e, 0x6b,
-	0xf4, 0x9d, 0xf7, 0xf2, 0x7b, 0xb4, 0x0f, 0xe0, 0xc5, 0x52, 0xeb, 0xb5, 0x24, 0xa9, 0x83, 0xae,
-	0xf1, 0x60, 0x1d, 0x74, 0x9d, 0x93, 0xf0, 0x7d, 0x0b, 0x4d, 0x51, 0xfb, 0xbf, 0xa0, 0x3b, 0x1b,
-	0x07, 0xa3, 0x00, 0x1c, 0x8e, 0x02, 0xf0, 0x63, 0x14, 0x80, 0x0f, 0xe3, 0xa0, 0x71, 0x38, 0x0e,
-	0x1a, 0xdf, 0xc6, 0x41, 0xe3, 0xf9, 0xdd, 0x28, 0x36, 0xaf, 0x86, 0x3d, 0xb2, 0x25, 0x07, 0xd5,
-	0x2d, 0xdf, 0x1e, 0x35, 0x35, 0xbb, 0x8a, 0xeb, 0x5e, 0xd3, 0xbe, 0x6d, 0xee, 0xfd, 0x09, 0x00,
-	0x00, 0xff, 0xff, 0x98, 0xe3, 0xb3, 0xf5, 0x54, 0x05, 0x00, 0x00,
+	// 283 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0x92, 0x2e, 0x48, 0x2c, 0x2e,
+	0x49, 0xcd, 0xd1, 0x87, 0x50, 0x99, 0x29, 0xfa, 0x85, 0xa5, 0xa9, 0x45, 0x95, 0x7a, 0x05, 0x45,
+	0xf9, 0x25, 0xf9, 0x42, 0xfc, 0x10, 0x51, 0x3d, 0x98, 0xa4, 0x94, 0x60, 0x62, 0x6e, 0x66, 0x5e,
+	0xbe, 0x3e, 0x98, 0x84, 0xa8, 0x91, 0x12, 0x49, 0xcf, 0x4f, 0xcf, 0x07, 0x33, 0xf5, 0x41, 0x2c,
+	0xa8, 0xa8, 0x4c, 0x7a, 0x7e, 0x7e, 0x7a, 0x4e, 0xaa, 0x7e, 0x62, 0x41, 0xa6, 0x7e, 0x62, 0x5e,
+	0x5e, 0x7e, 0x49, 0x62, 0x49, 0x66, 0x7e, 0x5e, 0x31, 0x4c, 0x16, 0xdd, 0xd2, 0x82, 0xc4, 0xa2,
+	0xc4, 0x5c, 0xa8, 0xac, 0x92, 0x08, 0x97, 0x50, 0x20, 0xc8, 0x11, 0x01, 0x60, 0xc1, 0xa0, 0xd4,
+	0xc2, 0xd2, 0xd4, 0xe2, 0x12, 0xa5, 0x40, 0x2e, 0x61, 0x14, 0xd1, 0xe2, 0x82, 0xfc, 0xbc, 0xe2,
+	0x54, 0x21, 0x2b, 0x2e, 0x36, 0x88, 0x66, 0x09, 0x46, 0x05, 0x46, 0x0d, 0x6e, 0x23, 0x71, 0x3d,
+	0x34, 0x37, 0xeb, 0x41, 0x34, 0x38, 0x71, 0x9e, 0xb8, 0x27, 0xcf, 0xb0, 0xe2, 0xf9, 0x06, 0x2d,
+	0xc6, 0x20, 0xa8, 0x0e, 0xa3, 0x1e, 0x46, 0x2e, 0x56, 0xb0, 0x99, 0x42, 0x4d, 0x8c, 0x5c, 0x6c,
+	0x10, 0x75, 0x42, 0xca, 0x18, 0x06, 0x60, 0x3a, 0x46, 0x4a, 0x05, 0xbf, 0x22, 0x88, 0xdb, 0x94,
+	0x74, 0x9b, 0x2e, 0x3f, 0x99, 0xcc, 0xa4, 0x2e, 0xa4, 0x0a, 0xf5, 0x68, 0x5e, 0x6a, 0x49, 0x79,
+	0x7e, 0x51, 0xb6, 0x3e, 0x76, 0xdf, 0x3b, 0x79, 0x9d, 0x78, 0x24, 0xc7, 0x78, 0xe1, 0x91, 0x1c,
+	0xe3, 0x83, 0x47, 0x72, 0x8c, 0x13, 0x1e, 0xcb, 0x31, 0x5c, 0x78, 0x2c, 0xc7, 0x70, 0xe3, 0xb1,
+	0x1c, 0x43, 0x94, 0x41, 0x7a, 0x66, 0x49, 0x46, 0x69, 0x92, 0x5e, 0x72, 0x7e, 0x2e, 0x76, 0xa3,
+	0x2a, 0x10, 0x86, 0x95, 0x54, 0x16, 0xa4, 0x16, 0x27, 0xb1, 0x81, 0x83, 0xd2, 0x18, 0x10, 0x00,
+	0x00, 0xff, 0xff, 0x1d, 0x83, 0x17, 0x09, 0xdf, 0x01, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -360,9 +156,6 @@ const _ = grpc.SupportPackageIsVersion4
 type QueryClient interface {
 	// Parameters queries the parameters of the module.
 	Params(ctx context.Context, in *QueryParamsRequest, opts ...grpc.CallOption) (*QueryParamsResponse, error)
-	// Queries a list of PastelidEntry items.
-	PastelidEntry(ctx context.Context, in *QueryGetPastelidEntryRequest, opts ...grpc.CallOption) (*QueryGetPastelidEntryResponse, error)
-	PastelidEntryAll(ctx context.Context, in *QueryAllPastelidEntryRequest, opts ...grpc.CallOption) (*QueryAllPastelidEntryResponse, error)
 }
 
 type queryClient struct {
@@ -382,31 +175,10 @@ func (c *queryClient) Params(ctx context.Context, in *QueryParamsRequest, opts .
 	return out, nil
 }
 
-func (c *queryClient) PastelidEntry(ctx context.Context, in *QueryGetPastelidEntryRequest, opts ...grpc.CallOption) (*QueryGetPastelidEntryResponse, error) {
-	out := new(QueryGetPastelidEntryResponse)
-	err := c.cc.Invoke(ctx, "/pastel.pastelid.Query/PastelidEntry", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *queryClient) PastelidEntryAll(ctx context.Context, in *QueryAllPastelidEntryRequest, opts ...grpc.CallOption) (*QueryAllPastelidEntryResponse, error) {
-	out := new(QueryAllPastelidEntryResponse)
-	err := c.cc.Invoke(ctx, "/pastel.pastelid.Query/PastelidEntryAll", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // QueryServer is the server API for Query service.
 type QueryServer interface {
 	// Parameters queries the parameters of the module.
 	Params(context.Context, *QueryParamsRequest) (*QueryParamsResponse, error)
-	// Queries a list of PastelidEntry items.
-	PastelidEntry(context.Context, *QueryGetPastelidEntryRequest) (*QueryGetPastelidEntryResponse, error)
-	PastelidEntryAll(context.Context, *QueryAllPastelidEntryRequest) (*QueryAllPastelidEntryResponse, error)
 }
 
 // UnimplementedQueryServer can be embedded to have forward compatible implementations.
@@ -415,12 +187,6 @@ type UnimplementedQueryServer struct {
 
 func (*UnimplementedQueryServer) Params(ctx context.Context, req *QueryParamsRequest) (*QueryParamsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Params not implemented")
-}
-func (*UnimplementedQueryServer) PastelidEntry(ctx context.Context, req *QueryGetPastelidEntryRequest) (*QueryGetPastelidEntryResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method PastelidEntry not implemented")
-}
-func (*UnimplementedQueryServer) PastelidEntryAll(ctx context.Context, req *QueryAllPastelidEntryRequest) (*QueryAllPastelidEntryResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method PastelidEntryAll not implemented")
 }
 
 func RegisterQueryServer(s grpc1.Server, srv QueryServer) {
@@ -445,42 +211,6 @@ func _Query_Params_Handler(srv interface{}, ctx context.Context, dec func(interf
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Query_PastelidEntry_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(QueryGetPastelidEntryRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(QueryServer).PastelidEntry(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/pastel.pastelid.Query/PastelidEntry",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(QueryServer).PastelidEntry(ctx, req.(*QueryGetPastelidEntryRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Query_PastelidEntryAll_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(QueryAllPastelidEntryRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(QueryServer).PastelidEntryAll(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/pastel.pastelid.Query/PastelidEntryAll",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(QueryServer).PastelidEntryAll(ctx, req.(*QueryAllPastelidEntryRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 var Query_serviceDesc = _Query_serviceDesc
 var _Query_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "pastel.pastelid.Query",
@@ -489,14 +219,6 @@ var _Query_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Params",
 			Handler:    _Query_Params_Handler,
-		},
-		{
-			MethodName: "PastelidEntry",
-			Handler:    _Query_PastelidEntry_Handler,
-		},
-		{
-			MethodName: "PastelidEntryAll",
-			Handler:    _Query_PastelidEntryAll_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -559,153 +281,6 @@ func (m *QueryParamsResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
-func (m *QueryGetPastelidEntryRequest) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalToSizedBuffer(dAtA[:size])
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *QueryGetPastelidEntryRequest) MarshalTo(dAtA []byte) (int, error) {
-	size := m.Size()
-	return m.MarshalToSizedBuffer(dAtA[:size])
-}
-
-func (m *QueryGetPastelidEntryRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
-	i := len(dAtA)
-	_ = i
-	var l int
-	_ = l
-	if len(m.Address) > 0 {
-		i -= len(m.Address)
-		copy(dAtA[i:], m.Address)
-		i = encodeVarintQuery(dAtA, i, uint64(len(m.Address)))
-		i--
-		dAtA[i] = 0xa
-	}
-	return len(dAtA) - i, nil
-}
-
-func (m *QueryGetPastelidEntryResponse) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalToSizedBuffer(dAtA[:size])
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *QueryGetPastelidEntryResponse) MarshalTo(dAtA []byte) (int, error) {
-	size := m.Size()
-	return m.MarshalToSizedBuffer(dAtA[:size])
-}
-
-func (m *QueryGetPastelidEntryResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
-	i := len(dAtA)
-	_ = i
-	var l int
-	_ = l
-	{
-		size, err := m.PastelidEntry.MarshalToSizedBuffer(dAtA[:i])
-		if err != nil {
-			return 0, err
-		}
-		i -= size
-		i = encodeVarintQuery(dAtA, i, uint64(size))
-	}
-	i--
-	dAtA[i] = 0xa
-	return len(dAtA) - i, nil
-}
-
-func (m *QueryAllPastelidEntryRequest) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalToSizedBuffer(dAtA[:size])
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *QueryAllPastelidEntryRequest) MarshalTo(dAtA []byte) (int, error) {
-	size := m.Size()
-	return m.MarshalToSizedBuffer(dAtA[:size])
-}
-
-func (m *QueryAllPastelidEntryRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
-	i := len(dAtA)
-	_ = i
-	var l int
-	_ = l
-	if m.Pagination != nil {
-		{
-			size, err := m.Pagination.MarshalToSizedBuffer(dAtA[:i])
-			if err != nil {
-				return 0, err
-			}
-			i -= size
-			i = encodeVarintQuery(dAtA, i, uint64(size))
-		}
-		i--
-		dAtA[i] = 0xa
-	}
-	return len(dAtA) - i, nil
-}
-
-func (m *QueryAllPastelidEntryResponse) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalToSizedBuffer(dAtA[:size])
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *QueryAllPastelidEntryResponse) MarshalTo(dAtA []byte) (int, error) {
-	size := m.Size()
-	return m.MarshalToSizedBuffer(dAtA[:size])
-}
-
-func (m *QueryAllPastelidEntryResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
-	i := len(dAtA)
-	_ = i
-	var l int
-	_ = l
-	if m.Pagination != nil {
-		{
-			size, err := m.Pagination.MarshalToSizedBuffer(dAtA[:i])
-			if err != nil {
-				return 0, err
-			}
-			i -= size
-			i = encodeVarintQuery(dAtA, i, uint64(size))
-		}
-		i--
-		dAtA[i] = 0x12
-	}
-	if len(m.PastelidEntry) > 0 {
-		for iNdEx := len(m.PastelidEntry) - 1; iNdEx >= 0; iNdEx-- {
-			{
-				size, err := m.PastelidEntry[iNdEx].MarshalToSizedBuffer(dAtA[:i])
-				if err != nil {
-					return 0, err
-				}
-				i -= size
-				i = encodeVarintQuery(dAtA, i, uint64(size))
-			}
-			i--
-			dAtA[i] = 0xa
-		}
-	}
-	return len(dAtA) - i, nil
-}
-
 func encodeVarintQuery(dAtA []byte, offset int, v uint64) int {
 	offset -= sovQuery(v)
 	base := offset
@@ -734,62 +309,6 @@ func (m *QueryParamsResponse) Size() (n int) {
 	_ = l
 	l = m.Params.Size()
 	n += 1 + l + sovQuery(uint64(l))
-	return n
-}
-
-func (m *QueryGetPastelidEntryRequest) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	l = len(m.Address)
-	if l > 0 {
-		n += 1 + l + sovQuery(uint64(l))
-	}
-	return n
-}
-
-func (m *QueryGetPastelidEntryResponse) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	l = m.PastelidEntry.Size()
-	n += 1 + l + sovQuery(uint64(l))
-	return n
-}
-
-func (m *QueryAllPastelidEntryRequest) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	if m.Pagination != nil {
-		l = m.Pagination.Size()
-		n += 1 + l + sovQuery(uint64(l))
-	}
-	return n
-}
-
-func (m *QueryAllPastelidEntryResponse) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	if len(m.PastelidEntry) > 0 {
-		for _, e := range m.PastelidEntry {
-			l = e.Size()
-			n += 1 + l + sovQuery(uint64(l))
-		}
-	}
-	if m.Pagination != nil {
-		l = m.Pagination.Size()
-		n += 1 + l + sovQuery(uint64(l))
-	}
 	return n
 }
 
@@ -908,377 +427,6 @@ func (m *QueryParamsResponse) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if err := m.Params.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipQuery(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if (skippy < 0) || (iNdEx+skippy) < 0 {
-				return ErrInvalidLengthQuery
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *QueryGetPastelidEntryRequest) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowQuery
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= uint64(b&0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: QueryGetPastelidEntryRequest: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: QueryGetPastelidEntryRequest: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Address", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowQuery
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthQuery
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return ErrInvalidLengthQuery
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Address = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipQuery(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if (skippy < 0) || (iNdEx+skippy) < 0 {
-				return ErrInvalidLengthQuery
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *QueryGetPastelidEntryResponse) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowQuery
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= uint64(b&0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: QueryGetPastelidEntryResponse: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: QueryGetPastelidEntryResponse: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field PastelidEntry", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowQuery
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthQuery
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthQuery
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if err := m.PastelidEntry.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipQuery(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if (skippy < 0) || (iNdEx+skippy) < 0 {
-				return ErrInvalidLengthQuery
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *QueryAllPastelidEntryRequest) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowQuery
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= uint64(b&0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: QueryAllPastelidEntryRequest: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: QueryAllPastelidEntryRequest: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Pagination", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowQuery
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthQuery
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthQuery
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if m.Pagination == nil {
-				m.Pagination = &query.PageRequest{}
-			}
-			if err := m.Pagination.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipQuery(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if (skippy < 0) || (iNdEx+skippy) < 0 {
-				return ErrInvalidLengthQuery
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *QueryAllPastelidEntryResponse) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowQuery
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= uint64(b&0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: QueryAllPastelidEntryResponse: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: QueryAllPastelidEntryResponse: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field PastelidEntry", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowQuery
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthQuery
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthQuery
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.PastelidEntry = append(m.PastelidEntry, PastelidEntry{})
-			if err := m.PastelidEntry[len(m.PastelidEntry)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Pagination", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowQuery
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthQuery
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthQuery
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			if m.Pagination == nil {
-				m.Pagination = &query.PageResponse{}
-			}
-			if err := m.Pagination.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex

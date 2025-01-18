@@ -40,7 +40,7 @@ var (
 	_ appmodule.HasBeginBlocker = (*AppModule)(nil)
 	_ appmodule.HasEndBlocker   = (*AppModule)(nil)
 
-	_ autocli.HasCustomTxCommand = (*AppModule)(nil)
+	_ autocli.HasCustomQueryCommand = (*AppModule)(nil)
 )
 
 // ----------------------------------------------------------------------------
@@ -93,6 +93,12 @@ func (AppModuleBasic) RegisterGRPCGatewayRoutes(clientCtx client.Context, mux *r
 	}
 }
 
+// GetQueryCmd returns the custom query commands for the pastelid modules.
+// This command will be enhanced by AutoCLI as defined in the AutoCLIOptions() method.
+func (ab AppModuleBasic) GetQueryCmd() *cobra.Command {
+	return cli.GetCustomQueryCmd()
+}
+
 // ----------------------------------------------------------------------------
 // AppModule
 // ----------------------------------------------------------------------------
@@ -106,12 +112,8 @@ type AppModule struct {
 	bankKeeper    types.BankKeeper
 }
 
-func (am AppModule) HasCustomTxCommand() bool {
+func (am AppModule) HasCustomQueryCommand() bool {
 	return true
-}
-
-func (am AppModule) GetTxCmd() *cobra.Command {
-	return cli.GetTxCmd()
 }
 
 func NewAppModule(

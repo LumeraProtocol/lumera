@@ -5,9 +5,7 @@ package pastel.pastelid;
 import "amino/amino.proto";
 import "gogoproto/gogo.proto";
 import "google/api/annotations.proto";
-import "cosmos/base/query/v1beta1/pagination.proto";
 import "pastel/pastelid/params.proto";
-import "pastel/pastelid/pastelid_entry.proto";
 
 option go_package = "github.com/pastelnetwork/pastel/x/pastelid/types";
 
@@ -20,15 +18,6 @@ service Query {
   
   }
   
-  // Queries a list of PastelidEntry items.
-  rpc PastelidEntry    (QueryGetPastelidEntryRequest) returns (QueryGetPastelidEntryResponse) {
-    option (google.api.http).get = "/pastelnetwork/pastel/pastelid/pastelid_entry/{address}";
-  
-  }
-  rpc PastelidEntryAll (QueryAllPastelidEntryRequest) returns (QueryAllPastelidEntryResponse) {
-    option (google.api.http).get = "/pastelnetwork/pastel/pastelid/pastelid_entry";
-  
-  }
 }
 // QueryParamsRequest is request type for the Query/Params RPC method.
 message QueryParamsRequest {}
@@ -40,20 +29,4 @@ message QueryParamsResponse {
   Params params = 1 [(gogoproto.nullable) = false, (amino.dont_omitempty) = true];
 }
 
-message QueryGetPastelidEntryRequest {
-  string address = 1;
-}
-
-message QueryGetPastelidEntryResponse {
-  PastelidEntry pastelidEntry = 1 [(gogoproto.nullable) = false];
-}
-
-message QueryAllPastelidEntryRequest {
-  cosmos.base.query.v1beta1.PageRequest pagination = 1;
-}
-
-message QueryAllPastelidEntryResponse {
-  repeated PastelidEntry                          pastelidEntry = 1 [(gogoproto.nullable) = false];
-           cosmos.base.query.v1beta1.PageResponse pagination    = 2;
-}
 

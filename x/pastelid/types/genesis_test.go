@@ -18,36 +18,6 @@ func TestGenesisState_Validate(t *testing.T) {
 			genState: types.DefaultGenesis(),
 			valid:    true,
 		},
-		{
-			desc: "valid genesis state",
-			genState: &types.GenesisState{
-
-				PastelidEntryList: []types.PastelidEntry{
-					{
-						Address: "0",
-					},
-					{
-						Address: "1",
-					},
-				},
-				Params: types.DefaultParams(),
-			},
-			valid: true,
-		},
-		{
-			desc: "duplicated pastelidEntry",
-			genState: &types.GenesisState{
-				PastelidEntryList: []types.PastelidEntry{
-					{
-						Address: "0",
-					},
-					{
-						Address: "0",
-					},
-				},
-			},
-			valid: false,
-		},
 		// this line is used by starport scaffolding # types/genesis/testcase
 	}
 	for _, tc := range tests {

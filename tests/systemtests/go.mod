@@ -6,10 +6,10 @@ replace github.com/pastelnetwork/pastel => ../../
 
 require (
 	github.com/cosmos/cosmos-proto v1.0.0-beta.5 // indirect
-	github.com/cosmos/cosmos-sdk v0.50.10
+	github.com/cosmos/cosmos-sdk v0.50.11
 	github.com/cosmos/gogogateway v1.2.0 // indirect
-	github.com/cosmos/gogoproto v1.7.0 // indirect
-	github.com/cosmos/iavl v1.2.0 // indirect
+	github.com/cosmos/gogoproto v1.7.0
+	github.com/cosmos/iavl v1.2.2 // indirect
 	github.com/dvsekhvalnov/jose2go v1.6.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
@@ -27,6 +27,8 @@ require (
 
 require (
 	cosmossdk.io/math v1.4.0
+	github.com/CosmWasm/wasmd v0.53.0
+	github.com/CosmWasm/wasmvm/v2 v2.1.2
 	github.com/cometbft/cometbft v0.38.15
 	github.com/pastelnetwork/pastel v0.0.0-00010101000000-000000000000
 	github.com/tidwall/gjson v1.14.2
@@ -35,7 +37,14 @@ require (
 )
 
 require (
-	cosmossdk.io/api v0.7.5 // indirect
+	cloud.google.com/go v0.115.0 // indirect
+	cloud.google.com/go/auth v0.6.0 // indirect
+	cloud.google.com/go/auth/oauth2adapt v0.2.2 // indirect
+	cloud.google.com/go/compute/metadata v0.5.0 // indirect
+	cloud.google.com/go/iam v1.1.9 // indirect
+	cloud.google.com/go/storage v1.41.0 // indirect
+	cosmossdk.io/api v0.7.6 // indirect
+	cosmossdk.io/client/v2 v2.0.0-beta.5 // indirect
 	cosmossdk.io/collections v0.4.0 // indirect
 	cosmossdk.io/core v0.11.1 // indirect
 	cosmossdk.io/depinject v1.0.0 // indirect

@@ -3,6 +3,7 @@ package system_test
 import (
 	"os"
 	"testing"
+	"context"
 
 	sdkmath "cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -14,6 +15,12 @@ import (
 
 	claimtestutils "github.com/pastelnetwork/pastel/x/claim/testutils"
 )
+
+type SystemTestSuite struct {
+	app    *app.App
+	sdkCtx sdk.Context
+	ctx    context.Context
+}
 
 func setupClaimSystemSuite(t *testing.T) *SystemTestSuite {
 	os.Setenv("SYSTEM_TESTS", "true")

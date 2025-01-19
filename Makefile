@@ -16,7 +16,7 @@
 ## 		EXTERNAL_GENESIS_FILE=template_genesis.json
 
 # Find validator directories dynamically
-DEVNET_DIR := /tmp/pastel-devnet
+DEVNET_DIR := /tmp/lumera-devnet
 SHARED_DIR := ${DEVNET_DIR}/shared
 VALIDATOR_DIRS := $(wildcard ${DEVNET_DIR}/validator*-data)
 EXTERNAL_GENESIS := $(SHARED_DIR)/external_genesis.json
@@ -39,8 +39,8 @@ devnet-build:
 	cp "${EXTERNAL_CLAIMS_FILE}" "${CLAIMS_FILE}"; \
 	go get github.com/CosmWasm/wasmvm/v2@v2.1.2 && \
 	ignite chain build --release -t linux:amd64 && \
-	tar -xf release/pastel*.tar.gz -C release && \
-	cp release/pasteld devnet/ && \
+	tar -xf release/lumera*.tar.gz -C release && \
+	cp release/lumerad devnet/ && \
 	find $$(go env GOPATH)/pkg/mod -name "libwasmvm.x86_64.so" -exec cp {} devnet/libwasmvm.x86_64.so \; && \
 	cd devnet && \
 	go mod tidy && \
@@ -80,7 +80,7 @@ devnet-clean:
 
 devnet-deploy-tar:
 	# Ensure required files exist from previous build
-	@if [ ! -f "devnet/docker-compose.yml" ] || [ ! -f "devnet/pasteld" ] || [ ! -f "devnet/libwasmvm.x86_64.so" ]; then \
+	@if [ ! -f "devnet/docker-compose.yml" ] || [ ! -f "devnet/lumerad" ] || [ ! -f "devnet/libwasmvm.x86_64.so" ]; then \
 		echo "Please run 'make devnet-build' first to generate required files."; \
 		exit 1; \
 	fi
@@ -98,7 +98,7 @@ devnet-deploy-tar:
 		docker-compose.yml \
 		primary-validator.sh \
 		secondary-validator.sh \
-		pasteld \
+		lumerad \
 		libwasmvm.x86_64.so \
 		devnet-deploy.sh \
 		claims.csv \

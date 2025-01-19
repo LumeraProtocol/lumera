@@ -25,9 +25,9 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/pastelnetwork/pastel/x/supernode/keeper"
-	supernodemocks "github.com/pastelnetwork/pastel/x/supernode/mocks"
-	"github.com/pastelnetwork/pastel/x/supernode/types"
+	"github.com/LumeraProtocol/lumera/x/supernode/keeper"
+	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/mocks"
+	"github.com/LumeraProtocol/lumera/x/supernode/types"
 )
 
 func TestMsgServer_RegisterSupernode(t *testing.T) {

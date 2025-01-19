@@ -1,19 +1,19 @@
 package system_test
 
 import (
+	"context"
 	"os"
 	"testing"
-	"context"
 
 	sdkmath "cosmossdk.io/math"
+	"github.com/LumeraProtocol/lumera/app"
+	"github.com/LumeraProtocol/lumera/tests/ibctesting"
+	"github.com/LumeraProtocol/lumera/x/claim/keeper"
+	"github.com/LumeraProtocol/lumera/x/claim/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/pastelnetwork/pastel/app"
-	"github.com/pastelnetwork/pastel/tests/ibctesting"
-	"github.com/pastelnetwork/pastel/x/claim/keeper"
-	"github.com/pastelnetwork/pastel/x/claim/types"
 	"github.com/stretchr/testify/require"
 
-	claimtestutils "github.com/pastelnetwork/pastel/x/claim/testutils"
+	claimtestutils "github.com/LumeraProtocol/lumera/x/claim/testutils"
 )
 
 type SystemTestSuite struct {

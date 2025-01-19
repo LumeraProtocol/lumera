@@ -74,11 +74,11 @@ Important implementation details:
 - Instead, they are loaded from a required CSV file during application startup
 - The CSV file must:
   - Be named `claims.csv`
-  - Be located in the same dir as geneis file `{homeDir}/.pastel/config`
+  - Be located in the same dir as geneis file `{homeDir}/.lumera/config`
   - Follow this format:
     ```csv
     oldAddress,balance
-    PtqHAEacynVd3V821NPhgxu9K4Ab6kAguHi,99999999upsl
+    PtqHAEacynVd3V821NPhgxu9K4Ab6kAguHi,99999999ulumen
     ```
 - The application performs validation:
   - Panics if CSV file is not found
@@ -110,7 +110,7 @@ The claim process involves these steps:
 1. User generates proof materials:
    ```bash
    # Using old chain CLI
-   pasteld signclaim "old-address" "new-address"
+   lumerad signclaim "old-address" "new-address"
    
    # Or using web portal with WASM wallet
    ```
@@ -118,8 +118,8 @@ The claim process involves these steps:
 2. Submit claim transaction with:
    - Old address: Base58 format, 34 characters  
      Example: `PtqHAEacynVd3V821NPhgxu9K4Ab6kAguHi`
-   - New address: Bech32 format with 'pastel' prefix  
-     Example: `pastel139k6camfq63u9gtc4pq8yjw4j7tmwmqeggr4p0`
+   - New address: Bech32 format with 'lumera' prefix  
+     Example: `lumera1zvnc27832srgxa207y5hu2agy83wazfzurufyp`
    - Public key: 33-byte compressed SECP256K1 public key in hex format  
      Example: `0309331fc3d23ca17d91eec40ee7711efcd56facf949d46cbfa6393d43f2747e90`
    - Signature: 65-byte hex format, signs message "{old_address}.{pub_key}.{new_address}"  
@@ -185,7 +185,7 @@ message MsgClaim {
 
 Required fields:
 - `old_address`: Base58 address (e.g. "PtqHAEacynVd3V821NPhgxu9K4Ab6kAguHi")
-- `new_address`: Bech32 address (e.g. "pastel139k6camfq63u9gtc4pq8yjw4j7tmwmqeggr4p0")
+- `new_address`: Bech32 address (e.g. "lumera1zvnc27832srgxa207y5hu2agy83wazfzurufyp")
 - `pub_key`: 33-byte compressed public key (hex)
 - `signature`: 65-byte signature of "old_address.pub_key.new_address"
 
@@ -255,8 +255,8 @@ Parameter update governance proposal:
 ```json
 {
     "messages": [{
-        "@type": "/pastel.claim.MsgUpdateParams",
-        "authority": "pastel10d07y265gmmuvt4z0w9aw880jnsr700jn3q4fc",
+        "@type": "/lumera.claim.MsgUpdateParams",
+        "authority": "lumera1zvnc27832srgxa207y5hu2agy83wazfzurufyp",
         "params": {
             "enable_claims": true,
             "claim_duration": "4380h",
@@ -264,7 +264,7 @@ Parameter update governance proposal:
         }
     }],
     "metadata": "ipfs://CID",
-    "deposit": "10000upsl",
+    "deposit": "10000ulumen",
     "title": "Update Claim Parameters",
     "summary": "Enable claims and set duration to 6 months"
 }
@@ -277,22 +277,22 @@ Parameter update governance proposal:
 Query commands:
 ```bash
 # Query module parameters
-pasteld query claim params
+lumerad query claim params
 
 # Get claim record for address
-pasteld query claim claim-record [address]
+lumerad query claim claim-record [address]
 
 # List all claim records with pagination
-pasteld query claim claim-records
+lumerad query claim claim-records
 
 # Get module account balance
-pasteld query bank balances $(pasteld keys show -a claim)
+lumerad query bank balances $(lumerad keys show -a claim)
 ```
 
 Transaction commands:
 ```bash
 # Submit claim
-pasteld tx claim claim \
+lumerad tx claim claim \
   [old-address] \
   [new-address] \
   [pub-key] \
@@ -301,7 +301,7 @@ pasteld tx claim claim \
   --chain-id [chain-id]
 
 # Submit parameter change proposal
-pasteld tx gov submit-proposal [proposal-file] \
+lumerad tx gov submit-proposal [proposal-file] \
   --from [key] \
   --chain-id [chain-id]
 ```
@@ -312,12 +312,12 @@ pasteld tx gov submit-proposal [proposal-file] \
 service Query {
     // Parameters queries the parameters of the module.
     rpc Params(QueryParamsRequest) returns (QueryParamsResponse) {
-        option (google.api.http).get = "/pastel/claim/params";
+        option (google.api.http).get = "/lumera/claim/params";
     }
 
     // ClaimRecord queries the claim record for an address.  
     rpc ClaimRecord(QueryClaimRecordRequest) returns (QueryClaimRecordResponse) {
-        option (google.api.http).get = "/pastel/claim/claim_record/{address}";
+        option (google.api.http).get = "/lumera/claim/claim_record/{address}";
     }
 }
 
@@ -335,6 +335,6 @@ service Msg {
 Endpoints are mounted on the REST API:
 
 ```
-GET /pastel/claim/params            # Query parameters
-GET /pastel/claim/claim_record/{address} # Get claim record
+GET /lumera/claim/params            # Query parameters
+GET /lumera/claim/claim_record/{address} # Get claim record
 ```

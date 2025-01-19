@@ -32,6 +32,15 @@ import (
 	"cosmossdk.io/x/nft"
 	upgradetypes "cosmossdk.io/x/upgrade/types"
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
+	claimmodulev1 "github.com/LumeraProtocol/lumera/api/lumera/claim/module"
+	lumeraidmodulev1 "github.com/LumeraProtocol/lumera/api/lumera/lumeraid/module"
+	supernodemodulev1 "github.com/LumeraProtocol/lumera/api/lumera/supernode/module"
+	_ "github.com/LumeraProtocol/lumera/x/claim/module" // import for side-effects
+	claimmoduletypes "github.com/LumeraProtocol/lumera/x/claim/types"
+	_ "github.com/LumeraProtocol/lumera/x/lumeraid/module" // import for side-effects
+	lumeraidmoduletypes "github.com/LumeraProtocol/lumera/x/lumeraid/types"
+	_ "github.com/LumeraProtocol/lumera/x/supernode/module" // import for side-effects
+	supernodemoduletypes "github.com/LumeraProtocol/lumera/x/supernode/types"
 	"github.com/cosmos/cosmos-sdk/runtime"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	vestingtypes "github.com/cosmos/cosmos-sdk/x/auth/vesting/types"
@@ -52,15 +61,6 @@ import (
 	ibcfeetypes "github.com/cosmos/ibc-go/v8/modules/apps/29-fee/types"
 	ibctransfertypes "github.com/cosmos/ibc-go/v8/modules/apps/transfer/types"
 	ibcexported "github.com/cosmos/ibc-go/v8/modules/core/exported"
-	claimmodulev1 "github.com/pastelnetwork/pastel/api/pastel/claim/module"
-	pastelidmodulev1 "github.com/pastelnetwork/pastel/api/pastel/pastelid/module"
-	supernodemodulev1 "github.com/pastelnetwork/pastel/api/pastel/supernode/module"
-	_ "github.com/pastelnetwork/pastel/x/claim/module" // import for side-effects
-	claimmoduletypes "github.com/pastelnetwork/pastel/x/claim/types"
-	_ "github.com/pastelnetwork/pastel/x/pastelid/module" // import for side-effects
-	pastelidmoduletypes "github.com/pastelnetwork/pastel/x/pastelid/types"
-	_ "github.com/pastelnetwork/pastel/x/supernode/module" // import for side-effects
-	supernodemoduletypes "github.com/pastelnetwork/pastel/x/supernode/types"
 	"google.golang.org/protobuf/types/known/durationpb"
 	// this line is used by starport scaffolding # stargate/app/moduleImport
 )
@@ -99,7 +99,7 @@ var (
 		consensustypes.ModuleName,
 		circuittypes.ModuleName,
 		// chain modules
-		pastelidmoduletypes.ModuleName,
+		lumeraidmoduletypes.ModuleName,
 		wasmtypes.ModuleName,
 		claimmoduletypes.ModuleName,
 		supernodemoduletypes.ModuleName,
@@ -128,7 +128,7 @@ var (
 		icatypes.ModuleName,
 		ibcfeetypes.ModuleName,
 		// chain modules
-		pastelidmoduletypes.ModuleName,
+		lumeraidmoduletypes.ModuleName,
 		wasmtypes.ModuleName,
 		claimmoduletypes.ModuleName,
 		supernodemoduletypes.ModuleName,
@@ -150,7 +150,7 @@ var (
 		icatypes.ModuleName,
 		ibcfeetypes.ModuleName,
 		// chain modules
-		pastelidmoduletypes.ModuleName,
+		lumeraidmoduletypes.ModuleName,
 		wasmtypes.ModuleName,
 		claimmoduletypes.ModuleName,
 		supernodemoduletypes.ModuleName,
@@ -174,7 +174,7 @@ var (
 		{Account: ibctransfertypes.ModuleName, Permissions: []string{authtypes.Minter, authtypes.Burner}},
 		{Account: ibcfeetypes.ModuleName},
 		{Account: icatypes.ModuleName},
-		{Account: pastelidmoduletypes.ModuleName, Permissions: []string{authtypes.Minter, authtypes.Burner, authtypes.Staking}},
+		{Account: lumeraidmoduletypes.ModuleName, Permissions: []string{authtypes.Minter, authtypes.Burner, authtypes.Staking}},
 		{Account: wasmtypes.ModuleName, Permissions: []string{authtypes.Burner}},
 		{Account: claimmoduletypes.ModuleName, Permissions: []string{authtypes.Minter, authtypes.Burner, authtypes.Staking}},
 		{Account: supernodemoduletypes.ModuleName, Permissions: []string{authtypes.Minter, authtypes.Burner, authtypes.Staking}},
@@ -314,8 +314,8 @@ var (
 				Config: appconfig.WrapAny(&circuitmodulev1.Module{}),
 			},
 			{
-				Name:   pastelidmoduletypes.ModuleName,
-				Config: appconfig.WrapAny(&pastelidmodulev1.Module{}),
+				Name:   lumeraidmoduletypes.ModuleName,
+				Config: appconfig.WrapAny(&lumeraidmodulev1.Module{}),
 			},
 			{
 				Name:   claimmoduletypes.ModuleName,

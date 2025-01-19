@@ -3,9 +3,9 @@ package claim_test
 import (
 	"testing"
 
-	keepertest "github.com/pastelnetwork/pastel/testutil/keeper"
-	claim "github.com/pastelnetwork/pastel/x/claim/module"
-	"github.com/pastelnetwork/pastel/x/claim/types"
+	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
+	claim "github.com/LumeraProtocol/lumera/x/claim/module"
+	"github.com/LumeraProtocol/lumera/x/claim/types"
 	"github.com/stretchr/testify/require"
 )
 

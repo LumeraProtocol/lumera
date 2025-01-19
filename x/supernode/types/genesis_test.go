@@ -3,7 +3,7 @@ package types_test
 import (
 	"testing"
 
-	"github.com/pastelnetwork/pastel/x/supernode/types"
+	"github.com/LumeraProtocol/lumera/x/supernode/types"
 	"github.com/stretchr/testify/require"
 )
 

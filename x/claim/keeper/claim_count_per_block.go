@@ -1,8 +1,8 @@
 package keeper
 
 import (
+	"github.com/LumeraProtocol/lumera/x/claim/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/pastelnetwork/pastel/x/claim/types"
 
 	"cosmossdk.io/store/prefix"
 	"github.com/cosmos/cosmos-sdk/runtime"

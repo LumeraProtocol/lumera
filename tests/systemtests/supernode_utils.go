@@ -5,11 +5,11 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/pastelnetwork/pastel/x/supernode/types"
+	"github.com/LumeraProtocol/lumera/x/supernode/types"
 )
 
 // GetSuperNodeResponse queries and returns a supernode response
-func GetSuperNodeResponse(t *testing.T, cli *PasteldCli, validatorAddr string) *types.SuperNode {
+func GetSuperNodeResponse(t *testing.T, cli *LumeradCli, validatorAddr string) *types.SuperNode {
 	queryCmd := []string{
 		"q", "supernode", "get-super-node",
 		validatorAddr,

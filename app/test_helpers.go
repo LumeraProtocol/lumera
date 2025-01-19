@@ -87,7 +87,7 @@ func NewTestApp(
 		&app.NFTKeeper,
 		&app.GroupKeeper,
 		&app.CircuitBreakerKeeper,
-		&app.PastelidKeeper,
+		&app.LumeraidKeeper,
 	); err != nil {
 		return nil, err
 	}
@@ -337,7 +337,7 @@ func GenesisStateWithValSet(
 }
 
 func NewTestNetworkFixture() network.TestFixture {
-	dir, err := os.MkdirTemp("", "pastel")
+	dir, err := os.MkdirTemp("", "lumera")
 	if err != nil {
 		panic(fmt.Sprintf("failed creating temporary directory: %v", err))
 	}

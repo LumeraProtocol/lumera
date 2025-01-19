@@ -12,7 +12,7 @@ import (
 
 	errorsmod "cosmossdk.io/errors"
 	sdkmath "cosmossdk.io/math"
-	"github.com/pastelnetwork/pastel/tests/system"
+	"github.com/LumeraProtocol/lumera/tests/system"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
@@ -21,7 +21,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/authz"
 
 	"github.com/CosmWasm/wasmd/x/wasm/types"
-	"github.com/pastelnetwork/pastel/tests/ibctesting"
+	"github.com/LumeraProtocol/lumera/tests/ibctesting"
 )
 
 func TestGrants(t *testing.T) {

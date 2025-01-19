@@ -21,9 +21,9 @@ import (
 
 	// this line is used by starport scaffolding # 1
 
-	modulev1 "github.com/pastelnetwork/pastel/api/pastel/supernode/module"
-	"github.com/pastelnetwork/pastel/x/supernode/keeper"
-	"github.com/pastelnetwork/pastel/x/supernode/types"
+	modulev1 "github.com/LumeraProtocol/lumera/api/lumera/supernode/module"
+	"github.com/LumeraProtocol/lumera/x/supernode/keeper"
+	"github.com/LumeraProtocol/lumera/x/supernode/types"
 )
 
 var (

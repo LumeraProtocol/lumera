@@ -5,9 +5,9 @@
 set -euo pipefail
 
 # Configuration
-CHAIN_ID="pastel-devnet-1"
+CHAIN_ID="lumera-devnet-1"
 KEYRING_BACKEND="test"
-CONTAINER_PREFIX="pastel-validator"
+CONTAINER_PREFIX="lumera-validator"
 
 # Test validator number 
 TEST_VALIDATOR_NUM=5
@@ -48,12 +48,12 @@ query_addresses() {
   local container="${CONTAINER_PREFIX}${i}"
 
   VAL_ACCOUNT["$i"]="$(
-    docker exec "$container" pasteld keys show validator${i}_key \
+    docker exec "$container" lumerad keys show validator${i}_key \
       --keyring-backend "$KEYRING_BACKEND" -a
   )"
 
   VAL_OPERATOR["$i"]="$(
-    docker exec "$container" pasteld keys show validator${i}_key \
+    docker exec "$container" lumerad keys show validator${i}_key \
       --keyring-backend "$KEYRING_BACKEND" --bech val -a
   )"
 }
@@ -63,7 +63,7 @@ check_supernode_status() {
   local valop="${VAL_OPERATOR[$i]}"
   
   log "Checking supernode status for validator ${i} (${valop})"
-  run_cmd "docker exec pastel-validator1 pasteld query supernode get-super-node ${valop}"
+  run_cmd "docker exec lumera-validator1 lumerad query supernode get-super-node ${valop}"
 }
 
 #################################################################
@@ -80,7 +80,7 @@ log "  Validator ${TEST_VALIDATOR_NUM} Operator: ${VAL_OPERATOR[$TEST_VALIDATOR_
 
 # 2) Register Supernode
 log "Registering supernode for validator ${TEST_VALIDATOR_NUM}"
-run_cmd "docker exec ${CONTAINER_PREFIX}${TEST_VALIDATOR_NUM} pasteld tx supernode register-supernode \
+run_cmd "docker exec ${CONTAINER_PREFIX}${TEST_VALIDATOR_NUM} lumerad tx supernode register-supernode \
   ${VAL_OPERATOR[$TEST_VALIDATOR_NUM]} \
   192.168.1.${TEST_VALIDATOR_NUM} \
   1.0 \
@@ -95,7 +95,7 @@ check_supernode_status "$TEST_VALIDATOR_NUM"
 
 # 3) Stop Supernode
 log "Stopping supernode for validator ${TEST_VALIDATOR_NUM}"
-run_cmd "docker exec ${CONTAINER_PREFIX}${TEST_VALIDATOR_NUM} pasteld tx supernode stop-supernode \
+run_cmd "docker exec ${CONTAINER_PREFIX}${TEST_VALIDATOR_NUM} lumerad tx supernode stop-supernode \
   ${VAL_OPERATOR[$TEST_VALIDATOR_NUM]} \
   'maintenance' \
   --from validator${TEST_VALIDATOR_NUM}_key \
@@ -108,7 +108,7 @@ check_supernode_status "$TEST_VALIDATOR_NUM"
 
 # 4) Start Supernode
 log "Starting supernode for validator ${TEST_VALIDATOR_NUM}"
-run_cmd "docker exec ${CONTAINER_PREFIX}${TEST_VALIDATOR_NUM} pasteld tx supernode start-supernode \
+run_cmd "docker exec ${CONTAINER_PREFIX}${TEST_VALIDATOR_NUM} lumerad tx supernode start-supernode \
   ${VAL_OPERATOR[$TEST_VALIDATOR_NUM]} \
   --from validator${TEST_VALIDATOR_NUM}_key \
   --keyring-backend ${KEYRING_BACKEND} \
@@ -120,7 +120,7 @@ check_supernode_status "$TEST_VALIDATOR_NUM"
 
 # 5) Update Supernode
 log "Updating supernode for validator ${TEST_VALIDATOR_NUM}"
-run_cmd "docker exec ${CONTAINER_PREFIX}${TEST_VALIDATOR_NUM} pasteld tx supernode update-supernode \
+run_cmd "docker exec ${CONTAINER_PREFIX}${TEST_VALIDATOR_NUM} lumerad tx supernode update-supernode \
   ${VAL_OPERATOR[$TEST_VALIDATOR_NUM]} \
   192.168.1.100 \
   1.1 \
@@ -135,7 +135,7 @@ check_supernode_status "$TEST_VALIDATOR_NUM"
 
 # 6) Deregister Supernode
 log "Deregistering supernode for validator ${TEST_VALIDATOR_NUM}"
-run_cmd "docker exec ${CONTAINER_PREFIX}${TEST_VALIDATOR_NUM} pasteld tx supernode deregister-supernode \
+run_cmd "docker exec ${CONTAINER_PREFIX}${TEST_VALIDATOR_NUM} lumerad tx supernode deregister-supernode \
   ${VAL_OPERATOR[$TEST_VALIDATOR_NUM]} \
   --from validator${TEST_VALIDATOR_NUM}_key \
   --keyring-backend ${KEYRING_BACKEND} \

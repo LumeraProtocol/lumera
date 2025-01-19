@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
+	pApp "github.com/LumeraProtocol/lumera/app"
 	ibcfee "github.com/cosmos/ibc-go/v8/modules/apps/29-fee/types"
 	ibctransfertypes "github.com/cosmos/ibc-go/v8/modules/apps/transfer/types"
 	clienttypes "github.com/cosmos/ibc-go/v8/modules/core/02-client/types" //nolint:staticcheck
 	channeltypes "github.com/cosmos/ibc-go/v8/modules/core/04-channel/types"
 	ibctesting "github.com/cosmos/ibc-go/v8/testing"
-	pApp "github.com/pastelnetwork/pastel/app"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -24,7 +24,7 @@ import (
 
 	"github.com/CosmWasm/wasmd/app"
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
-	pibctesting "github.com/pastelnetwork/pastel/tests/ibctesting"
+	pibctesting "github.com/LumeraProtocol/lumera/tests/ibctesting"
 )
 
 func TestIBCFeesTransfer(t *testing.T) {

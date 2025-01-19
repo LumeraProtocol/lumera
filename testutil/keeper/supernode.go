@@ -17,8 +17,8 @@ import (
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	"github.com/stretchr/testify/require"
 
-	"github.com/pastelnetwork/pastel/x/supernode/keeper"
-	"github.com/pastelnetwork/pastel/x/supernode/types"
+	"github.com/LumeraProtocol/lumera/x/supernode/keeper"
+	"github.com/LumeraProtocol/lumera/x/supernode/types"
 )
 
 func SupernodeKeeper(t testing.TB) (keeper.Keeper, sdk.Context) {

@@ -32,11 +32,11 @@ import (
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 
-	"github.com/pastelnetwork/pastel/app"
+	"github.com/LumeraProtocol/lumera/app"
 )
 
 const (
-	SimAppChainID = "pastel-simapp"
+	SimAppChainID = "lumera-simapp"
 )
 
 var FlagEnableStreamingValue bool

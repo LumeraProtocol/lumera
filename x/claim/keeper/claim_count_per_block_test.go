@@ -3,7 +3,7 @@ package keeper_test
 import (
 	"testing"
 
-	keepertest "github.com/pastelnetwork/pastel/testutil/keeper"
+	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
 	"github.com/stretchr/testify/require"
 )
 

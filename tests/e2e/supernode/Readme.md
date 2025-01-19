@@ -1,4 +1,4 @@
-# Pastel DevNet Test Scripts
+# Lumera DevNet Test Scripts
 
 ## Prerequisites
 
@@ -16,7 +16,7 @@ Use the `make` target to build the DevNet with a custom genesis file:
 
     # For example:
 
-    make make devnet-build EXTERNAL_CLAIMS_FILE=/home/desktop/Documents/pastel/claims.csv EXTERNAL_GENESIS_FILE=/home/desktop/Documents/pastel/tests/e2e/supernode/test_genesis_supernode.json
+    make make devnet-build EXTERNAL_CLAIMS_FILE=/home/desktop/Documents/lumera/claims.csv EXTERNAL_GENESIS_FILE=/home/desktop/Documents/lumera/tests/e2e/supernode/test_genesis_supernode.json
 
     make devnet-up
 
@@ -37,10 +37,10 @@ The DevNet uses a custom genesis file with the following key parameters (feel fr
   - Downtime jail duration: 60 seconds
 - **Staking**:
   - Unbonding time: 60 seconds
-  - Bond denomination: `upsl`
+  - Bond denomination: `ulumen`
 - **Supernode**:
-  - Minimum stake requirement: 834,637,515,648 upsl
-  - Default power reduction: 824,637,515,648 upsl 
+  - Minimum stake requirement: 834,637,515,648 ulumen
+  - Default power reduction: 824,637,515,648 ulumen 
 
 ---
 
@@ -96,32 +96,32 @@ Below are the commands for interacting with the Supernode module .
 ### Query Commands
 
     # Get module parameters
-    pasteld query supernode params
+    lumerad query supernode params
 
     # Get supernode information
-    pasteld query supernode get-super-node [validator-address]
+    lumerad query supernode get-super-node [validator-address]
 
     # List all supernodes
-    pasteld query supernode list-super-nodes
+    lumerad query supernode list-super-nodes
 
     # Get top supernodes for a specific block
-    pasteld query supernode get-top-super-nodes-for-block [block-height]
+    lumerad query supernode get-top-super-nodes-for-block [block-height]
 
 ### Transaction Commands
 
     # Register a new supernode
-    pasteld tx supernode register-supernode [validator-address] [ip-address] [version] [supernode-account]
+    lumerad tx supernode register-supernode [validator-address] [ip-address] [version] [supernode-account]
 
     # Deregister a supernode
-    pasteld tx supernode deregister-supernode [validator-address]
+    lumerad tx supernode deregister-supernode [validator-address]
 
     # Start a supernode
-    pasteld tx supernode start-supernode [validator-address]
+    lumerad tx supernode start-supernode [validator-address]
 
     # Stop a supernode
-    pasteld tx supernode stop-supernode [validator-address] [reason]
+    lumerad tx supernode stop-supernode [validator-address] [reason]
 
     # Update supernode information
-    pasteld tx supernode update-supernode [validator-address] [ip-address] [version] [supernode-account]
+    lumerad tx supernode update-supernode [validator-address] [ip-address] [version] [supernode-account]
 
 

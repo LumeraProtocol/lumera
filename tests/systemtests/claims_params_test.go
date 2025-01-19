@@ -38,7 +38,7 @@ func TestClaimsUpdateParamsProposal(t *testing.T) {
 	sut.StartChain(t)
 
 	// Create CLI helper
-	cli := NewPasteldCLI(t, sut, true)
+	cli := NewLumeradCLI(t, sut, true)
 
 	// Get and verify initial parameters
 	initialParams := cli.CustomQuery("q", "claim", "params")
@@ -57,7 +57,7 @@ func TestClaimsUpdateParamsProposal(t *testing.T) {
 	// Create governance proposal to update parameters
 	proposalJson := fmt.Sprintf(`{
 		"messages": [{
-			"@type": "/pastel.claim.MsgUpdateParams",
+			"@type": "/lumera.claim.MsgUpdateParams",
 			"authority": "%s",
 			"params": {
 				"enable_claims": false,

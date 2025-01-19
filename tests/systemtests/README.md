@@ -43,8 +43,8 @@ Test CLI parameters:
 * `-wait-time` duration - time to wait for chain events (default 30s)
 * `-nodes-count` int - number of nodes in the cluster (default 4)
 * `-block-time` duration - target block creation time (default 1s)
-* `-binary` string - executable binary for server/client side (default "pasteld")
-* `-bech32` string - bech32 prefix to be used with addresses (default "pastel")
+* `-binary` string - executable binary for server/client side (default "lumerad")
+* `-bech32` string - bech32 prefix to be used with addresses (default "lumera")
 
 # Port ranges
 With *n* nodes:

@@ -3,10 +3,10 @@ package supernode_test
 import (
 	"testing"
 
-	keepertest "github.com/pastelnetwork/pastel/testutil/keeper"
-	"github.com/pastelnetwork/pastel/testutil/nullify"
-	supernode "github.com/pastelnetwork/pastel/x/supernode/module"
-	"github.com/pastelnetwork/pastel/x/supernode/types"
+	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
+	"github.com/LumeraProtocol/lumera/testutil/nullify"
+	supernode "github.com/LumeraProtocol/lumera/x/supernode/module"
+	"github.com/LumeraProtocol/lumera/x/supernode/types"
 	"github.com/stretchr/testify/require"
 )
 

@@ -5,7 +5,7 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/runtime"
 
-	"github.com/pastelnetwork/pastel/x/claim/types"
+	"github.com/LumeraProtocol/lumera/x/claim/types"
 )
 
 // GetParams get all parameters as types.Params

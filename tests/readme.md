@@ -1,6 +1,6 @@
-# Testing Strategy for the `pastelid` Module
+# Testing Strategy for the `lumeraid` Module
 
-This document outlines the testing strategy for the `pastelid` module, detailing the different types of tests implemented, their purposes, and instructions on how to run them. The testing strategy includes:
+This document outlines the testing strategy for the `lumeraid` module, detailing the different types of tests implemented, their purposes, and instructions on how to run them. The testing strategy includes:
 
 - **Unit Tests**
 - **Integration Tests**
@@ -37,7 +37,7 @@ Each test type serves a specific purpose in ensuring the reliability, correctnes
 
 ## Introduction
 
-Testing is a critical aspect of software development, ensuring that code behaves as expected and reducing the likelihood of bugs. In the context of the `pastelid` module, we have implemented four levels of testing:
+Testing is a critical aspect of software development, ensuring that code behaves as expected and reducing the likelihood of bugs. In the context of the `lumeraid` module, we have implemented four levels of testing:
 
 1. **Unit Tests**: Test individual components in isolation using mocks.
 2. **Integration Tests**: Test the interaction between components without external dependencies.
@@ -70,12 +70,12 @@ We use `gomock` and `mockgen` to generate mock implementations of interfaces. Th
 go install github.com/golang/mock/mockgen@v1.6.0
 
 # Generate mocks for interfaces
-mockgen -destination=./x/pastelid/mocks/keeper.go -package=mocks github.com/pastelnetwork/pastel/x/pastelid/types BankKeeper,AccountKeeper
+mockgen -destination=./x/lumeraid/mocks/keeper.go -package=mocks github.com/LumeraProtocol/lumera/x/lumeraid/types BankKeeper,AccountKeeper
 ```
 
 #### Example Unit Test File
 
-- `x/pastelid/keeper/keeper_test.go`: Contains unit tests for the `Keeper` methods.
+- `x/lumeraid/keeper/keeper_test.go`: Contains unit tests for the `Keeper` methods.
 
 ```go
 func TestKeeper_GetAuthority(t *testing.T) {
@@ -88,7 +88,7 @@ func TestKeeper_GetAuthority(t *testing.T) {
 You can run all unit tests using the following command:
 
 ```bash
-go test ./x/pastelid/keeper/... -v
+go test ./x/lumeraid/keeper/... -v
 ```
 
 Alternatively, use the provided Makefile command:
@@ -112,8 +112,7 @@ make test-unit
 
 #### Example Integration Test Files
 
-- `tests/integration/pastelid_keeper_test.go`: Tests the `Keeper` methods in an integration context.
-- `tests/integration/msg_server_create_pastel_id_test.go`: Tests the `MsgServer` methods for creating a PastelID.
+- `tests/integration/lumera_id_keeper_test.go`: Tests the `Keeper` methods in an integration context.
 
 ```go
 func (suite *KeeperIntegrationSuite) TestGetAuthorityIntegration() {
@@ -151,10 +150,10 @@ make test-integration
 
 #### Example System Test Files
 
-- `tests/system/msg_server_create_pastelid_test.go`: Tests the `MsgServer` methods in a system context.
+- `tests/system/msg_server_create_lumeraid_test.go`: Tests the `MsgServer` methods in a system context.
 
 ```go
-func TestCreatePastelId(t *testing.T) {
+func TestCreateLumeraId(t *testing.T) {
     // System test logic...
 }
 ```
@@ -189,8 +188,8 @@ make test-system
 
 #### Implementing Simulation Tests
 
-- **Define Simulation Operations**: In `x/pastelid/simulation/{func_name}.go`, implement functions like `SimulateMsgCreatePastelId`.
-- **Register Operations**: In `x/pastelid/module/simulation.go`, register the simulation operations.
+- **Define Simulation Operations**: In `x/lumeraid/simulation/{func_name}.go`, implement functions like `SimulateMsgCreateLumeraId`.
+- **Register Operations**: In `x/lumeraid/module/simulation.go`, register the simulation operations.
 
 ```go
 func (am AppModule) GenerateGenesisState(simState *module.SimulationState) {
@@ -198,7 +197,7 @@ func (am AppModule) GenerateGenesisState(simState *module.SimulationState) {
 }
 
 func (am AppModule) WeightedOperations(simState module.SimulationState) []simtypes.WeightedOperation {
-    return pastelidsimulation.WeightedOperations(simState.AppParams, simState.Cdc, am.accountKeeper, am.bankKeeper, am.keeper)
+    return lumeraidsimulation.WeightedOperations(simState.AppParams, simState.Cdc, am.accountKeeper, am.bankKeeper, am.keeper)
 }
 ```
 
@@ -229,7 +228,7 @@ To simplify running tests, you can use the following Makefile commands:
   ```makefile
   test-unit:
       @echo "Running unit tests..."
-      @go test ./x/pastelid/keeper/... -v
+      @go test ./x/lumeraid/keeper/... -v
   ```
 
   Run with:
@@ -284,14 +283,14 @@ To simplify running tests, you can use the following Makefile commands:
 
 ## Conclusion
 
-Implementing a comprehensive testing strategy is crucial for building reliable and secure blockchain modules. By covering unit, integration, system, and simulation tests, we ensure that the `pastelid` module functions correctly under various conditions and scenarios.
+Implementing a comprehensive testing strategy is crucial for building reliable and secure blockchain modules. By covering unit, integration, system, and simulation tests, we ensure that the `lumeraid` module functions correctly under various conditions and scenarios.
 
 - **Unit Tests** help catch issues at the component level using mocks.
 - **Integration Tests** verify interactions between components in a controlled environment.
 - **System Tests** validate the module's behavior in a realistic application context.
 - **Simulation Tests** stress-test the module over numerous randomized transactions and blocks.
 
-By following the instructions provided, developers can run and extend these tests to maintain and improve the quality of the `pastelid` module.
+By following the instructions provided, developers can run and extend these tests to maintain and improve the quality of the `lumeraid` module.
 
 ---
 

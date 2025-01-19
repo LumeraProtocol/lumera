@@ -6,7 +6,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/stretchr/testify/require"
 
-	"github.com/pastelnetwork/pastel/x/claim/types"
+	"github.com/LumeraProtocol/lumera/x/claim/types"
 )
 
 func TestMsgUpdateParams(t *testing.T) {

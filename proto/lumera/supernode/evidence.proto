@@ -1,0 +1,19 @@
+syntax = "proto3";
+package lumera.supernode;
+
+option go_package = "github.com/LumeraProtocol/lumera/x/supernode/types";
+
+import "cosmos_proto/cosmos.proto";
+import "google/protobuf/timestamp.proto";
+import "gogoproto/gogo.proto";
+
+message Evidence {
+
+  string reporter_address = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  string validator_address = 2 [(cosmos_proto.scalar) = "cosmos.ValidatorAddressString"];
+  string action_id = 3;
+  string evidence_type = 4;
+  string description = 5;
+  uint64 severity = 6;
+  int32 height = 7; 
+}

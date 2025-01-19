@@ -4,14 +4,14 @@ set -euo pipefail
 
 # Step 1: Basic Configuration
 echo "Step 1: Setting up configuration..."
-CHAIN_ID="pastel-devnet-1"
+CHAIN_ID="lumera-devnet-1"
 KEYRING_BACKEND="test"
 VALIDATOR_NUM=2
-VALIDATOR_CONTAINER="pastel-validator${VALIDATOR_NUM}"
+VALIDATOR_CONTAINER="lumera-validator${VALIDATOR_NUM}"
 
 # Delegation amount constants
-REDUCE_AMOUNT="10upsl"
-RESTORE_AMOUNT="10upsl"
+REDUCE_AMOUNT="10ulumen"
+RESTORE_AMOUNT="10ulumen"
 
 # Create a timestamped log file
 LOG_FILE="stake_test_.log"
@@ -36,24 +36,24 @@ log "Starting stake test for validator ${VALIDATOR_NUM}"
 # Step 3: Get Validator Addresses
 log "Step 3: Getting validator addresses..."
 
-VALIDATOR_ACCOUNT=$(docker exec "$VALIDATOR_CONTAINER" pasteld keys show validator${VALIDATOR_NUM}_key \
+VALIDATOR_ACCOUNT=$(docker exec "$VALIDATOR_CONTAINER" lumerad keys show validator${VALIDATOR_NUM}_key \
     --keyring-backend "$KEYRING_BACKEND" -a)
 log "Validator Account: $VALIDATOR_ACCOUNT"
 
-VALIDATOR_OPERATOR=$(docker exec "$VALIDATOR_CONTAINER" pasteld keys show validator${VALIDATOR_NUM}_key \
+VALIDATOR_OPERATOR=$(docker exec "$VALIDATOR_CONTAINER" lumerad keys show validator${VALIDATOR_NUM}_key \
     --keyring-backend "$KEYRING_BACKEND" --bech val -a)
 log "Validator Operator: $VALIDATOR_OPERATOR"
 
 # Step 4: Check Initial Status
 log "Step 4: Checking initial validator status..."
-log_cmd "docker exec pastel-validator1 pasteld query staking validator $VALIDATOR_OPERATOR"
+log_cmd "docker exec lumera-validator1 lumerad query staking validator $VALIDATOR_OPERATOR"
 
 log "Checking initial supernode status..."
-log_cmd "docker exec pastel-validator1 pasteld query supernode get-super-node $VALIDATOR_OPERATOR"
+log_cmd "docker exec lumera-validator1 lumerad query supernode get-super-node $VALIDATOR_OPERATOR"
 
 # Step 5: Reduce Stake
 log "Step 5: Reducing stake by ${REDUCE_AMOUNT}..."
-log_cmd "docker exec $VALIDATOR_CONTAINER pasteld tx staking unbond \
+log_cmd "docker exec $VALIDATOR_CONTAINER lumerad tx staking unbond \
     $VALIDATOR_OPERATOR \
     $REDUCE_AMOUNT \
     --from validator${VALIDATOR_NUM}_key \
@@ -69,14 +69,14 @@ sleep 10
 
 # Step 6: Check Status After Reduction
 log "Step 6: Checking validator status after stake reduction..."
-log_cmd "docker exec pastel-validator1 pasteld query staking validator $VALIDATOR_OPERATOR"
+log_cmd "docker exec lumera-validator1 lumerad query staking validator $VALIDATOR_OPERATOR"
 
 log "Checking supernode status after stake reduction..."
-log_cmd "docker exec pastel-validator1 pasteld query supernode get-super-node $VALIDATOR_OPERATOR"
+log_cmd "docker exec lumera-validator1 lumerad query supernode get-super-node $VALIDATOR_OPERATOR"
 
 # Step 7: Restore Stake 
 log "Step 7: Restoring stake by delegating ${RESTORE_AMOUNT} back..."
-log_cmd "docker exec $VALIDATOR_CONTAINER pasteld tx staking delegate \
+log_cmd "docker exec $VALIDATOR_CONTAINER lumerad tx staking delegate \
     $VALIDATOR_OPERATOR \
     $RESTORE_AMOUNT \
     --from validator${VALIDATOR_NUM}_key \
@@ -93,10 +93,10 @@ sleep 10
 # Step 8: Final Status Check
 log "Step 8: Performing final status check..."
 log "Checking final validator status..."
-log_cmd "docker exec pastel-validator1 pasteld query staking validator $VALIDATOR_OPERATOR"
+log_cmd "docker exec lumera-validator1 lumerad query staking validator $VALIDATOR_OPERATOR"
 
 log "Checking final supernode status..."
-log_cmd "docker exec pastel-validator1 pasteld query supernode get-super-node $VALIDATOR_OPERATOR"
+log_cmd "docker exec lumera-validator1 lumerad query supernode get-super-node $VALIDATOR_OPERATOR"
 
 # Step 9: Complete
 log "Test completed successfully. All output has been saved to $LOG_FILE"

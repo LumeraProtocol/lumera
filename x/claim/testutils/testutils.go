@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	cryptoutils "github.com/pastelnetwork/pastel/x/claim/keeper/crypto"
+	cryptoutils "github.com/LumeraProtocol/lumera/x/claim/keeper/crypto"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )

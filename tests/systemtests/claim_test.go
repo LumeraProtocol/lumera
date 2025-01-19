@@ -13,7 +13,7 @@ import (
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 
-	claimtestutils "github.com/pastelnetwork/pastel/x/claim/testutils"
+	claimtestutils "github.com/LumeraProtocol/lumera/x/claim/testutils"
 )
 
 func TestClaimsSystem(t *testing.T) {
@@ -158,7 +158,7 @@ func TestClaimsSystem(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 
 			sut.ResetChain(t)
-			cli := NewPasteldCLI(t, sut, true)
+			cli := NewLumeradCLI(t, sut, true)
 
 			// Get test data and CSV address
 			testData, csvAddress := tc.setupFn(t)

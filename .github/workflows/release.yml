@@ -276,5 +276,5 @@ jobs:
             Installation:
             1. Extract the archive
             2. Run `sudo ./install.sh` to install required libraries
-            3. Run the binary: `./pasteld`
+            3. Run the binary: `./lumerad`
           token: ${{ secrets.GITHUB_TOKEN }}

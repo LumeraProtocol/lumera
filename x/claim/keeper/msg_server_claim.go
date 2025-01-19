@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/LumeraProtocol/lumera/x/claim/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/pastelnetwork/pastel/x/claim/types"
 
-	crypto "github.com/pastelnetwork/pastel/x/claim/keeper/crypto"
+	crypto "github.com/LumeraProtocol/lumera/x/claim/keeper/crypto"
 )
 
 func (k msgServer) Claim(goCtx context.Context, msg *types.MsgClaim) (*types.MsgClaimResponse, error) {

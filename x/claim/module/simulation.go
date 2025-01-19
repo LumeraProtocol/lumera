@@ -8,9 +8,9 @@ import (
 	simtypes "github.com/cosmos/cosmos-sdk/types/simulation"
 	"github.com/cosmos/cosmos-sdk/x/simulation"
 
-	"github.com/pastelnetwork/pastel/testutil/sample"
-	claimsimulation "github.com/pastelnetwork/pastel/x/claim/simulation"
-	"github.com/pastelnetwork/pastel/x/claim/types"
+	"github.com/LumeraProtocol/lumera/testutil/sample"
+	claimsimulation "github.com/LumeraProtocol/lumera/x/claim/simulation"
+	"github.com/LumeraProtocol/lumera/x/claim/types"
 )
 
 // avoid unused import issue

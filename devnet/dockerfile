@@ -9,9 +9,9 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy binary and make it executable 
-COPY pasteld /usr/local/bin/pasteld
+COPY lumerad /usr/local/bin/lumerad
 COPY libwasmvm.x86_64.so /usr/lib/
-RUN chmod +x /usr/local/bin/pasteld && ldconfig
+RUN chmod +x /usr/local/bin/lumerad && ldconfig
 
 # Create scripts directory and copy scripts
 RUN mkdir -p /root/scripts
@@ -30,4 +30,4 @@ EXPOSE 26656 26657 1317 9090
 WORKDIR /root
 
 # Create directory for chain data
-RUN mkdir -p /root/.pasteld
+RUN mkdir -p /root/.lumerad

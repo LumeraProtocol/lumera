@@ -15,7 +15,7 @@ import (
 
 	"github.com/CosmWasm/wasmd/x/wasm/keeper/testdata"
 	"github.com/CosmWasm/wasmd/x/wasm/types"
-	"github.com/pastelnetwork/pastel/tests/ibctesting"
+	"github.com/LumeraProtocol/lumera/tests/ibctesting"
 )
 
 // InstantiateStargateReflectContract stores and instantiates the reflect contract shipped with CosmWasm 1.5.3.

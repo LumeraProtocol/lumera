@@ -20,9 +20,9 @@ import (
 
 	// this line is used by starport scaffolding # 1
 
-	modulev1 "github.com/pastelnetwork/pastel/api/pastel/claim/module"
-	"github.com/pastelnetwork/pastel/x/claim/keeper"
-	"github.com/pastelnetwork/pastel/x/claim/types"
+	modulev1 "github.com/LumeraProtocol/lumera/api/lumera/claim/module"
+	"github.com/LumeraProtocol/lumera/x/claim/keeper"
+	"github.com/LumeraProtocol/lumera/x/claim/types"
 )
 
 var (

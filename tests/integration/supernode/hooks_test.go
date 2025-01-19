@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	_ "cosmossdk.io/log"
+	"github.com/LumeraProtocol/lumera/x/supernode/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	"github.com/pastelnetwork/pastel/x/supernode/types"
 	"github.com/stretchr/testify/require"
 )
 

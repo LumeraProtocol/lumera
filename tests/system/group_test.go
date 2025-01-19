@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pastelnetwork/pastel/tests/system"
+	"github.com/LumeraProtocol/lumera/tests/system"
 
 	"github.com/cometbft/cometbft/libs/rand"
 	"github.com/stretchr/testify/assert"
@@ -18,7 +18,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/group"
 
 	"github.com/CosmWasm/wasmd/x/wasm/types"
-	"github.com/pastelnetwork/pastel/tests/ibctesting"
+	"github.com/LumeraProtocol/lumera/tests/ibctesting"
 )
 
 func TestGroupWithContract(t *testing.T) {

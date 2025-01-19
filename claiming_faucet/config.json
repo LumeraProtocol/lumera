@@ -1,11 +1,11 @@
 {
   "node_url": "http://localhost:1317",
   "faucet_key_name": "faucet",
-  "faucet_address": "pastel1mfyfyn0gh447wmjt2v3q5zchuyaq6nddvtrlxz",
-  "faucet_mnemonic": "drift equal entry raven small tray dynamic close theme inspire open drama reveal afford warrior cabin choose machine kidney perfect raw fashion home wire",
-  "fee_amount": [{"denom": "upsl", "amount": "200000"}],
-  "chain_id": "pastel-devnet-1",
+  "faucet_address": "lumera1zvnc27832srgxa207y5hu2agy83wazfzurufyp",
+  "faucet_mnemonic": "erosion inside minor one energy pink critic half essay video what car fuel shrimp fall head uphold congress heavy autumn old task effort document",
+  "fee_amount": [{"denom": "ulumen", "amount": "200000"}],
+  "chain_id": "lumera-devnet-1",
   "gas": 100000,
   "gas_adjustment": 1.5,
-  "gas_price": [{"denom": "upsl", "amount": "0.025"}]
+  "gas_price": [{"denom": "ulumen", "amount": "0.025"}]
 }

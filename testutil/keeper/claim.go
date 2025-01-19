@@ -20,9 +20,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/pastelnetwork/pastel/app"
-	"github.com/pastelnetwork/pastel/x/claim/keeper"
-	"github.com/pastelnetwork/pastel/x/claim/types"
+	"github.com/LumeraProtocol/lumera/app"
+	"github.com/LumeraProtocol/lumera/x/claim/keeper"
+	"github.com/LumeraProtocol/lumera/x/claim/types"
 )
 
 type TestSuite struct {

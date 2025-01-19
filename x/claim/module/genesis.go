@@ -11,8 +11,8 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 
-	"github.com/pastelnetwork/pastel/x/claim/keeper"
-	"github.com/pastelnetwork/pastel/x/claim/types"
+	"github.com/LumeraProtocol/lumera/x/claim/keeper"
+	"github.com/LumeraProtocol/lumera/x/claim/types"
 )
 
 // InitGenesis initializes the module's state from a provided genesis state.
@@ -146,7 +146,7 @@ func getConfigPath() (string, error) {
 
 	// Define potential paths
 	paths := []string{
-		filepath.Join(homeDir, ".pastel", "config", "claims.csv"),
+		filepath.Join(homeDir, ".lumera", "config", "claims.csv"),
 		filepath.Join(homeDir, "claims.csv"),
 		"../../claims.csv",
 		"../../../claims.csv",

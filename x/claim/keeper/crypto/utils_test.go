@@ -17,8 +17,8 @@ func TestGetAddressFromPubKey(t *testing.T) {
 	}{
 		{
 			name:            "Valid public key",
-			pubKey:          "0309331fc3d23ca17d91eec40ee7711efcd56facf949d46cbfa6393d43f2747e90",
-			expectedAddress: "PtqHAEacynVd3V821NPhgxu9K4Ab6kAguHi",
+			pubKey:          "038685010ec7ce724c1f83ba333564135feadf70eade12036546f20b95ce276a12",
+			expectedAddress: "Ptko7ZkiQXyT9Db45GtsewpnhnRRwpHkHBc",
 			expectError:     false,
 		},
 		{
@@ -83,16 +83,16 @@ func TestVerifySignature(t *testing.T) {
 	}{
 		{
 			name:        "Valid signature",
-			pubKey:      "0309331fc3d23ca17d91eec40ee7711efcd56facf949d46cbfa6393d43f2747e90",
-			message:     "PtqHAEacynVd3V821NPhgxu9K4Ab6kAguHi.0309331fc3d23ca17d91eec40ee7711efcd56facf949d46cbfa6393d43f2747e90.pastel139k6camfq63u9gtc4pq8yjw4j7tmwmqeggr4p0",
-			signature:   "1f46b3a2129047a0d7a6bf91e2879e940ed3db06a2cafaaaabacc337141146f43e4932d357b435bbf2c48227f5c2f738df23a2ebc221dd11cb14ed4b83bd2a95c7",
+			pubKey:      "038685010ec7ce724c1f83ba333564135feadf70eade12036546f20b95ce276a12",
+			message:     "Ptko7ZkiQXyT9Db45GtsewpnhnRRwpHkHBc.038685010ec7ce724c1f83ba333564135feadf70eade12036546f20b95ce276a12.lumera1zvnc27832srgxa207y5hu2agy83wazfzurufyp",
+			signature:   "1f4926307e7d94f5290058f8836429963431b3f7fc091567f1621a510d25cbcb71240f9c4488d9cafa16c8c3457d07c263afcfe4c77e0081a4e75bb618e99e1cd3",
 			expectValid: true,
 			expectError: false,
 		},
 		{
 			name:        "Modified signature",
-			pubKey:      "0309331fc3d23ca17d91eec40ee7711efcd56facf949d46cbfa6393d43f2747e90",
-			message:     "PtqHAEacynVd3V821NPhgxu9K4Ab6kAguHi.0309331fc3d23ca17d91eec40ee7711efcd56facf949d46cbfa6393d43f2747e90.pastel139k6camfq63u9gtc4pq8yjw4j7tmwmqeggr4p0",
+			pubKey:      "038685010ec7ce724c1f83ba333564135feadf70eade12036546f20b95ce276a12",
+			message:     "Ptko7ZkiQXyT9Db45GtsewpnhnRRwpHkHBc.038685010ec7ce724c1f83ba333564135feadf70eade12036546f20b95ce276a12.lumera1zvnc27832srgxa207y5hu2agy83wazfzurufyp",
 			signature:   "1f46b3a2129047a0d7a6bf91e2879e940ed3db06a2cafaaaabacc337141146f43e4932d357b435bbf2c48227f5c2f738df23a2ebc221dd11cb14ed4b83bd2a95c8",
 			expectValid: false,
 			expectError: false,
@@ -101,7 +101,7 @@ func TestVerifySignature(t *testing.T) {
 			name:        "Invalid public key hex",
 			pubKey:      "invalid",
 			message:     "test",
-			signature:   "1f46b3a2129047a0d7a6bf91e2879e940ed3db06a2cafaaaabacc337141146f43e4932d357b435bbf2c48227f5c2f738df23a2ebc221dd11cb14ed4b83bd2a95c7",
+			signature:   "1f4926307e7d94f5290058f8836429963431b3f7fc091567f1621a510d25cbcb71240f9c4488d9cafa16c8c3457d07c263afcfe4c77e0081a4e75bb618e99e1cd3",
 			expectValid: false,
 			expectError: true,
 		},
@@ -115,7 +115,7 @@ func TestVerifySignature(t *testing.T) {
 		},
 		{
 			name:        "Invalid signature hex",
-			pubKey:      "0309331fc3d23ca17d91eec40ee7711efcd56facf949d46cbfa6393d43f2747e90",
+			pubKey:      "038685010ec7ce724c1f83ba333564135feadf70eade12036546f20b95ce276a12",
 			message:     "test",
 			signature:   "invalid",
 			expectValid: false,
@@ -123,7 +123,7 @@ func TestVerifySignature(t *testing.T) {
 		},
 		{
 			name:        "Empty signature",
-			pubKey:      "0309331fc3d23ca17d91eec40ee7711efcd56facf949d46cbfa6393d43f2747e90",
+			pubKey:      "038685010ec7ce724c1f83ba333564135feadf70eade12036546f20b95ce276a12",
 			message:     "test",
 			signature:   "",
 			expectValid: false,
@@ -131,7 +131,7 @@ func TestVerifySignature(t *testing.T) {
 		},
 		{
 			name:        "Empty message",
-			pubKey:      "0309331fc3d23ca17d91eec40ee7711efcd56facf949d46cbfa6393d43f2747e90",
+			pubKey:      "038685010ec7ce724c1f83ba333564135feadf70eade12036546f20b95ce276a12",
 			message:     "",
 			signature:   "1f46b3a2129047a0d7a6bf91e2879e940ed3db06a2cafaaaabacc337141146f43e4932d357b435bbf2c48227f5c2f738df23a2ebc221dd11cb14ed4b83bd2a95c7",
 			expectValid: false,
@@ -139,7 +139,7 @@ func TestVerifySignature(t *testing.T) {
 		},
 		{
 			name:        "Wrong length signature (64 bytes)",
-			pubKey:      "0309331fc3d23ca17d91eec40ee7711efcd56facf949d46cbfa6393d43f2747e90",
+			pubKey:      "038685010ec7ce724c1f83ba333564135feadf70eade12036546f20b95ce276a12",
 			message:     "test",
 			signature:   strings.Repeat("00", 64),
 			expectValid: false,

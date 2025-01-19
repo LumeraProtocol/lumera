@@ -29,8 +29,8 @@ func TestMain(m *testing.M) {
 	waitTime := flag.Duration("wait-time", DefaultWaitTime, "time to wait for chain events")
 	nodesCount := flag.Int("v", 4, "number of nodes in the cluster")
 	blockTime := flag.Duration("block-time", 1000*time.Millisecond, "block creation time")
-	execBinary := flag.String("binary", "pasteld", "executable binary for server/ client side")
-	bech32Prefix := flag.String("bech32", "pastel", "bech32 prefix to be used with addresses")
+	execBinary := flag.String("binary", "lumerad", "executable binary for server/ client side")
+	bech32Prefix := flag.String("bech32", "lumera", "bech32 prefix to be used with addresses")
 	flag.BoolVar(&verbose, "verbose", true, "verbose output")
 	flag.Parse()
 

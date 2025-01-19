@@ -7,7 +7,7 @@ version: v1
 managed:
   enabled: true
   go_package_prefix:
-    default: github.com/pastelnetwork/pastel/api
+    default: github.com/LumeraProtocol/lumera/api
     except:
       - buf.build/googleapis/googleapis
       - buf.build/cosmos/gogo-proto

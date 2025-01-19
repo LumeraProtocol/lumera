@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	pApp "github.com/pastelnetwork/pastel/app"
+	pApp "github.com/LumeraProtocol/lumera/app"
 
 	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/cometbft/cometbft/libs/rand"
@@ -25,7 +25,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/address"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 
-	pibctesting "github.com/pastelnetwork/pastel/tests/ibctesting"
+	pibctesting "github.com/LumeraProtocol/lumera/tests/ibctesting"
 )
 
 func TestICA(t *testing.T) {

@@ -7,8 +7,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/LumeraProtocol/lumera/x/supernode/types"
 	"github.com/cosmos/cosmos-sdk/types/query"
-	"github.com/pastelnetwork/pastel/x/supernode/types"
 
 	sdkmath "cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -17,8 +17,8 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/pastelnetwork/pastel/x/supernode/keeper"
-	supernodemocks "github.com/pastelnetwork/pastel/x/supernode/mocks"
+	"github.com/LumeraProtocol/lumera/x/supernode/keeper"
+	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/mocks"
 )
 
 func TestKeeper_SetAndQuerySuperNode(t *testing.T) {

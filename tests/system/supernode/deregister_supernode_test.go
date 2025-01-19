@@ -6,14 +6,14 @@ import (
 	"testing"
 
 	sdkmath "cosmossdk.io/math"
+	"github.com/LumeraProtocol/lumera/app"
+	"github.com/LumeraProtocol/lumera/tests/ibctesting"
+	"github.com/LumeraProtocol/lumera/x/supernode/keeper"
+	"github.com/LumeraProtocol/lumera/x/supernode/types"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	"github.com/pastelnetwork/pastel/app"
-	"github.com/pastelnetwork/pastel/tests/ibctesting"
-	"github.com/pastelnetwork/pastel/x/supernode/keeper"
-	"github.com/pastelnetwork/pastel/x/supernode/types"
 	"github.com/stretchr/testify/require"
 )
 

@@ -3,7 +3,7 @@ package supernode
 import (
 	autocliv1 "cosmossdk.io/api/cosmos/autocli/v1"
 
-	modulev1 "github.com/pastelnetwork/pastel/api/pastel/supernode"
+	modulev1 "github.com/LumeraProtocol/lumera/api/lumera/supernode"
 )
 
 // AutoCLIOptions implements the autocli.HasAutoCLIConfig interface.

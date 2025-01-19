@@ -1,7 +1,7 @@
 package keeper
 
 import (
-	"github.com/pastelnetwork/pastel/x/claim/types"
+	"github.com/LumeraProtocol/lumera/x/claim/types"
 )
 
 var _ types.QueryServer = Keeper{}

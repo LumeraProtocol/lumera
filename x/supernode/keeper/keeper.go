@@ -6,9 +6,9 @@ import (
 	"cosmossdk.io/core/store"
 	"cosmossdk.io/log"
 
+	"github.com/LumeraProtocol/lumera/x/supernode/types"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/pastelnetwork/pastel/x/supernode/types"
 )
 
 type (

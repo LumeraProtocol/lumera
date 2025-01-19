@@ -42,7 +42,7 @@ This command signs a message using a private key derived deterministically from 
 
 #### Usage:
 ```bash
-pasteld query pastelid legroast-sign [address] [text] --algo [algorithm] --output [json|text]
+lumerad query lumeraid legroast-sign [address] [text] --algo [algorithm] --output [json|text]
 ```
 
 #### Parameters:
@@ -55,7 +55,7 @@ pasteld query pastelid legroast-sign [address] [text] --algo [algorithm] --outpu
 - **JSON format (default)**:
 ```json
 {
-  "address": "pastel1w20t57xfn90zhxllgl0fdeaq0555n6m48x7xgd"
+  "address": "lumera1zvnc27832srgxa207y5hu2agy83wazfzurufyp"
   "algorithm": "LegendreFast",
   "public_key": "Base64EncodedPublicKey"
   "signature": "Base64EncodedSignature",
@@ -64,7 +64,7 @@ pasteld query pastelid legroast-sign [address] [text] --algo [algorithm] --outpu
 
 #### Example:
 ```bash
-pasteld query pastelid legroast-sign pastel1w20t57xfn90zhxllgl0fdeaq0555n6m48x7xgd "Hello, LegRoast!" --algo LegendreFast --output json
+lumerad query lumeraid legroast-sign lumera1zvnc27832srgxa207y5hu2agy83wazfzurufyp "Hello, LegRoast!" --algo LegendreFast --output json
 ```
 
 #### **Text Output Example**:
@@ -86,7 +86,7 @@ This command verifies a message against a given signature and public key using t
 
 #### Usage:
 ```bash
-pasteld query pastelid legroast-verify [text] [pubkey] [signature] --output [json|text]
+lumerad query lumeraid legroast-verify [text] [pubkey] [signature] --output [json|text]
 ```
 
 #### Parameters:
@@ -105,7 +105,7 @@ pasteld query pastelid legroast-verify [text] [pubkey] [signature] --output [jso
 
 #### Example:
 ```bash
-pasteld query pastelid legroast-verify "Hello, LegRoast!" "Base64EncodedPubKey" "Base64EncodedSignature" --output text
+lumerad query lumeraid legroast-verify "Hello, LegRoast!" "Base64EncodedPubKey" "Base64EncodedSignature" --output text
 ```
 
 #### **Text Output Example**:

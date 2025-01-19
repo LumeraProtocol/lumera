@@ -11,23 +11,23 @@ import (
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 
-	"github.com/pastelnetwork/pastel/x/supernode/types"
+	"github.com/LumeraProtocol/lumera/x/supernode/types"
 )
 
 func TestSupernodeRegistrationSuccess(t *testing.T) {
 	testCases := []struct {
 		name    string
-		setupFn func(t *testing.T, cli *PasteldCli) string
+		setupFn func(t *testing.T, cli *LumeradCli) string
 	}{
 		{
 			name: "register_with_validator_account",
-			setupFn: func(t *testing.T, cli *PasteldCli) string {
+			setupFn: func(t *testing.T, cli *LumeradCli) string {
 				return cli.GetKeyAddr("node0") // return validator account
 			},
 		},
 		{
 			name: "register_with_new_account",
-			setupFn: func(t *testing.T, cli *PasteldCli) string {
+			setupFn: func(t *testing.T, cli *LumeradCli) string {
 				return cli.AddKey("supernode_account") // create and return new account
 			},
 		},
@@ -52,7 +52,7 @@ func TestSupernodeRegistrationSuccess(t *testing.T) {
 			sut.StartChain(t)
 
 			// Create CLI helper
-			cli := NewPasteldCLI(t, sut, true)
+			cli := NewLumeradCLI(t, sut, true)
 
 			// Get validator address and create/get supernode account
 			accountAddr := cli.GetKeyAddr("node0")
@@ -113,13 +113,13 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 	testCases := []struct {
 		name          string
 		minimumStake  string
-		setupFn       func(t *testing.T, cli *PasteldCli) (string, string, string) // returns (valAddr, accountAddr, keyName)
+		setupFn       func(t *testing.T, cli *LumeradCli) (string, string, string) // returns (valAddr, accountAddr, keyName)
 		expectedError string
 	}{
 		{
 			name:         "insufficient_self_stake",
 			minimumStake: "100000000000", // Set very high minimum stake requirement
-			setupFn: func(t *testing.T, cli *PasteldCli) (string, string, string) {
+			setupFn: func(t *testing.T, cli *LumeradCli) (string, string, string) {
 				valAddr := strings.TrimSpace(cli.Keys("keys", "show", "node0", "--bech", "val", "-a"))
 				accountAddr := cli.GetKeyAddr("node0")
 				return valAddr, accountAddr, "node0"
@@ -129,7 +129,7 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 		{
 			name:         "non_validator_registration",
 			minimumStake: "1000000", // Normal minimum stake
-			setupFn: func(t *testing.T, cli *PasteldCli) (string, string, string) {
+			setupFn: func(t *testing.T, cli *LumeradCli) (string, string, string) {
 				keyName := "non_validator"
 				// Create new account that is not a validator
 				accountAddr := cli.AddKey(keyName)
@@ -170,7 +170,7 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 			sut.StartChain(t)
 
 			// Create CLI helper
-			cli := NewPasteldCLI(t, sut, true)
+			cli := NewLumeradCLI(t, sut, true)
 
 			// Run test-specific setup and get addresses
 			valAddr, accountAddr, keyName := tc.setupFn(t, cli)

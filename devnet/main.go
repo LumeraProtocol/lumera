@@ -23,7 +23,7 @@ func main() {
 	}
 
 	if useExistingGenesis {
-		data, err := os.ReadFile("/tmp/pastel-devnet/shared/external_genesis.json")
+		data, err := os.ReadFile("/tmp/lumera-devnet/shared/external_genesis.json")
 		if err != nil {
 			log.Fatalf("Failed to read existing genesis file: %v", err)
 		}

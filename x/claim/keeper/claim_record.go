@@ -4,9 +4,9 @@ import (
 	"encoding/binary"
 
 	"cosmossdk.io/store/prefix"
+	"github.com/LumeraProtocol/lumera/x/claim/types"
 	"github.com/cosmos/cosmos-sdk/runtime"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/pastelnetwork/pastel/x/claim/types"
 )
 
 // GetClaimRecord retrieves a claim record by address

@@ -15,8 +15,8 @@ import (
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 
-	"github.com/pastelnetwork/pastel/app"
-	claimtypes "github.com/pastelnetwork/pastel/x/claim/types"
+	"github.com/LumeraProtocol/lumera/app"
+	claimtypes "github.com/LumeraProtocol/lumera/x/claim/types"
 )
 
 type IntegrationTestSuite struct {

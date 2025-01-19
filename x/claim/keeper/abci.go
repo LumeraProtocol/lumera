@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/LumeraProtocol/lumera/x/claim/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/pastelnetwork/pastel/x/claim/types"
 )
 
 func (k Keeper) BeginBlocker(ctx context.Context) error {

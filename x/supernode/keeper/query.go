@@ -1,7 +1,7 @@
 package keeper
 
 import (
-	"github.com/pastelnetwork/pastel/x/supernode/types"
+	"github.com/LumeraProtocol/lumera/x/supernode/types"
 )
 
 var _ types.QueryServer = Keeper{}

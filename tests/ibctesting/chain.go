@@ -46,7 +46,7 @@ import (
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
-	"github.com/pastelnetwork/pastel/app"
+	"github.com/LumeraProtocol/lumera/app"
 )
 
 var MaxAccounts = 10

@@ -8,9 +8,9 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/pastelnetwork/pastel/x/supernode/keeper"
-	supernodemocks "github.com/pastelnetwork/pastel/x/supernode/mocks"
-	"github.com/pastelnetwork/pastel/x/supernode/types"
+	"github.com/LumeraProtocol/lumera/x/supernode/keeper"
+	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/mocks"
+	"github.com/LumeraProtocol/lumera/x/supernode/types"
 )
 
 func TestDetermineStateAtBlock(t *testing.T) {
@@ -149,7 +149,7 @@ func TestKeeper_GetTopSuperNodesForBlock(t *testing.T) {
 	k, ctx := setupKeeperForTest(t, stakingKeeper, slashingKeeper, bankKeeper)
 	queryServer := keeper.Keeper(k)
 
-	// Helper to create a valid pastelvaloper address (via sdk.ValAddress)
+	// Helper to create a valid lumeravaloper address (via sdk.ValAddress)
 	makeValAddr := func(id string) string {
 		valBz := []byte(id + "_unique")
 		valAddr := sdk.ValAddress(valBz)

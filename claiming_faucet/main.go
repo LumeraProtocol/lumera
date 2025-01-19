@@ -16,6 +16,7 @@ import (
 	"github.com/gorilla/mux"
 
 	"cosmossdk.io/math"
+	lumeracrypto "github.com/LumeraProtocol/lumera/x/claim/keeper/crypto"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -28,7 +29,6 @@ import (
 	authtx "github.com/cosmos/cosmos-sdk/x/auth/tx"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
-	pastelcrypto "github.com/pastelnetwork/pastel/x/claim/keeper/crypto"
 )
 
 type StringInt64 int64
@@ -83,7 +83,7 @@ type EncodingConfig struct {
 
 // Config - Configuration struct
 type Config struct {
-	NodeURL        string       `json:"node_url"`        // URL for local pasteld node
+	NodeURL        string       `json:"node_url"`        // URL for local lumerad node
 	FaucetKeyName  string       `json:"faucet_key_name"` // Name of faucet account
 	FaucetAddress  string       `json:"faucet_address"`  // Address to send from
 	FaucetMnemonic string       `json:"faucet_mnemonic"` // Mnemonic for faucet account
@@ -142,14 +142,14 @@ func makeEncodingConfig() EncodingConfig {
 func createClientContext(config Config, encodingConfig EncodingConfig) (client.Context, error) {
 	// Initialize SDK configuration
 	sdkConfig := sdk.GetConfig()
-	sdkConfig.SetBech32PrefixForAccount("pastel", "pastelpub")
-	sdkConfig.SetBech32PrefixForValidator("pastelvaloper", "pastelvaloperpub")
-	sdkConfig.SetBech32PrefixForConsensusNode("pastelvalcons", "pastelvalconspub")
+	sdkConfig.SetBech32PrefixForAccount("lumera", "lumerapub")
+	sdkConfig.SetBech32PrefixForValidator("lumeravaloper", "lumeravaloperpub")
+	sdkConfig.SetBech32PrefixForConsensusNode("lumeravalcons", "lumeravalconspub")
 	sdkConfig.Seal()
 
 	// Create keyring
 	kb, err := keyring.New(
-		"pastel",
+		"lumera",
 		keyring.BackendMemory,
 		"",
 		nil,
@@ -181,7 +181,7 @@ func createClientContext(config Config, encodingConfig EncodingConfig) (client.C
 		WithOutput(os.Stdout).
 		WithAccountRetriever(authtypes.AccountRetriever{}).
 		WithBroadcastMode("block").
-		WithHomeDir(os.ExpandEnv("$HOME/.pastel")).
+		WithHomeDir(os.ExpandEnv("$HOME/.lumera")).
 		WithKeyring(kb).
 		WithChainID(config.ChainID).
 		WithNodeURI(config.NodeURL)
@@ -253,7 +253,7 @@ func (s *Server) handleGetFeeForClaiming(w http.ResponseWriter, r *http.Request)
 	}
 
 	// 2. Query claim record
-	claimRecordURL := fmt.Sprintf("%s/pastelnetwork/pastel/claim/claim_record/%s", s.config.NodeURL, req.OldAddress)
+	claimRecordURL := fmt.Sprintf("%s/LumeraProtocol/lumera/claim/claim_record/%s", s.config.NodeURL, req.OldAddress)
 
 	resp, err = http.Get(claimRecordURL)
 	if err != nil {
@@ -304,7 +304,7 @@ func (s *Server) handleGetFeeForClaiming(w http.ResponseWriter, r *http.Request)
 
 	// 3. Verify signature
 	// Verify address reconstruction and signature
-	reconstructedAddress, err := pastelcrypto.GetAddressFromPubKey(req.OldPubKey)
+	reconstructedAddress, err := lumeracrypto.GetAddressFromPubKey(req.OldPubKey)
 	if err != nil {
 		http.Error(w, "Invalid public key", http.StatusBadRequest)
 		return
@@ -316,7 +316,7 @@ func (s *Server) handleGetFeeForClaiming(w http.ResponseWriter, r *http.Request)
 	}
 
 	verificationMessage := req.OldAddress + "." + req.OldPubKey + "." + req.NewAddress
-	valid, err := pastelcrypto.VerifySignature(req.OldPubKey, verificationMessage, req.Signature)
+	valid, err := lumeracrypto.VerifySignature(req.OldPubKey, verificationMessage, req.Signature)
 	if err != nil || !valid {
 		http.Error(w, "Invalid signature", http.StatusBadRequest)
 		return

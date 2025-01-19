@@ -7,7 +7,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/testutil/network"
 	"github.com/stretchr/testify/require"
 
-	"github.com/pastelnetwork/pastel/app"
+	"github.com/LumeraProtocol/lumera/app"
 )
 
 type (

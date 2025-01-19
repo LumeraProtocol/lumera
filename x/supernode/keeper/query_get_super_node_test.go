@@ -3,11 +3,11 @@ package keeper_test
 import (
 	"testing"
 
+	"github.com/LumeraProtocol/lumera/x/supernode/keeper"
+	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/mocks"
+	"github.com/LumeraProtocol/lumera/x/supernode/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/golang/mock/gomock"
-	"github.com/pastelnetwork/pastel/x/supernode/keeper"
-	supernodemocks "github.com/pastelnetwork/pastel/x/supernode/mocks"
-	"github.com/pastelnetwork/pastel/x/supernode/types"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

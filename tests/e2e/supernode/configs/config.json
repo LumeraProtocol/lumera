@@ -1,16 +1,16 @@
 {
     "chain": {
-        "id": "pastel-devnet-1",
+        "id": "lumera-devnet-1",
         "denom": {
-            "bond": "upsl",
-            "mint": "upsl",
-            "minimum_gas_price": "0upsl"
+            "bond": "ulumen",
+            "mint": "ulumen",
+            "minimum_gas_price": "0ulumen"
         }
     },
     "docker": {
-        "network_name": "pastel-network",
-        "container_prefix": "pastel",
-        "volume_prefix": "pastel"
+        "network_name": "lumera-network",
+        "container_prefix": "lumera",
+        "volume_prefix": "lumera"
     },
     "paths": {
         "base": {
@@ -18,11 +18,11 @@
             "container": "/root"
         },
         "directories": {
-            "daemon": ".pastel"
+            "daemon": ".lumera"
         }
     },
     "daemon": {
-        "binary": "pasteld",
+        "binary": "lumerad",
         "keyring_backend": "test"
     }
 }

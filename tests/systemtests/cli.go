@@ -30,24 +30,9 @@ type (
 	RunErrorAssert func(t assert.TestingT, err error, msgAndArgs ...interface{}) (ok bool)
 )
 
-// PasteldCli wraps the command line interface
-type PasteldCli struct {
-	t              *testing.T
-	nodeAddress    string
-	chainID        string
-	homeDir        string
-	fees           string
-	Debug          bool
-	assertErrorFn  RunErrorAssert
-	awaitNextBlock awaitNextBlock
-	expTXCommitted bool
-	execBinary     string
-	nodesCount     int
-}
-
-// NewPasteldCLI constructor
-func NewPasteldCLI(t *testing.T, sut *SystemUnderTest, verbose bool) *PasteldCli {
-	return NewPasteldCLIx(
+// NewLumeradCLI constructor
+func NewLumeradCLI(t *testing.T, sut *SystemUnderTest, verbose bool) *LumeradCli {
+	return NewLumeradCLIx(
 		t,
 		sut.ExecBinary,
 		sut.rpcAddr,
@@ -62,8 +47,23 @@ func NewPasteldCLI(t *testing.T, sut *SystemUnderTest, verbose bool) *PasteldCli
 	)
 }
 
-// NewPasteldCLIx extended constructor
-func NewPasteldCLIx(
+// LumeradCli wraps the command line interface
+type LumeradCli struct {
+	t              *testing.T
+	nodeAddress    string
+	chainID        string
+	homeDir        string
+	fees           string
+	Debug          bool
+	assertErrorFn  RunErrorAssert
+	awaitNextBlock awaitNextBlock
+	expTXCommitted bool
+	execBinary     string
+	nodesCount     int
+}
+
+// NewLumeradCLIx extended constructor
+func NewLumeradCLIx(
 	t *testing.T,
 	execBinary string,
 	nodeAddress string,
@@ -75,11 +75,11 @@ func NewPasteldCLIx(
 	debug bool,
 	assertErrorFn RunErrorAssert,
 	expTXCommitted bool,
-) *PasteldCli {
+) *LumeradCli {
 	if strings.TrimSpace(execBinary) == "" {
 		panic("executable binary name must not be empty")
 	}
-	return &PasteldCli{
+	return &LumeradCli{
 		t:              t,
 		execBinary:     execBinary,
 		nodeAddress:    nodeAddress,
@@ -95,15 +95,15 @@ func NewPasteldCLIx(
 }
 
 // WithRunErrorsIgnored does not fail on any error
-func (c PasteldCli) WithRunErrorsIgnored() PasteldCli {
+func (c LumeradCli) WithRunErrorsIgnored() LumeradCli {
 	return c.WithRunErrorMatcher(func(t assert.TestingT, err error, msgAndArgs ...interface{}) bool {
 		return true
 	})
 }
 
 // WithRunErrorMatcher assert function to ensure run command error value
-func (c PasteldCli) WithRunErrorMatcher(f RunErrorAssert) PasteldCli {
-	return *NewPasteldCLIx(
+func (c LumeradCli) WithRunErrorMatcher(f RunErrorAssert) LumeradCli {
+	return *NewLumeradCLIx(
 		c.t,
 		c.execBinary,
 		c.nodeAddress,
@@ -118,8 +118,8 @@ func (c PasteldCli) WithRunErrorMatcher(f RunErrorAssert) PasteldCli {
 	)
 }
 
-func (c PasteldCli) WithNodeAddress(nodeAddr string) PasteldCli {
-	return *NewPasteldCLIx(
+func (c LumeradCli) WithNodeAddress(nodeAddr string) LumeradCli {
+	return *NewLumeradCLIx(
 		c.t,
 		c.execBinary,
 		nodeAddr,
@@ -134,8 +134,8 @@ func (c PasteldCli) WithNodeAddress(nodeAddr string) PasteldCli {
 	)
 }
 
-func (c PasteldCli) WithAssertTXUncommitted() PasteldCli {
-	return *NewPasteldCLIx(
+func (c LumeradCli) WithAssertTXUncommitted() LumeradCli {
+	return *NewLumeradCLIx(
 		c.t,
 		c.execBinary,
 		c.nodeAddress,
@@ -150,9 +150,9 @@ func (c PasteldCli) WithAssertTXUncommitted() PasteldCli {
 	)
 }
 
-// CustomCommand main entry for executing pasteld cli commands.
+// CustomCommand main entry for executing lumerad cli commands.
 // When configured, method blocks until tx is committed.
-func (c PasteldCli) CustomCommand(args ...string) string {
+func (c LumeradCli) CustomCommand(args ...string) string {
 	if c.fees != "" && !slices.ContainsFunc(args, func(s string) bool {
 		return strings.HasPrefix(s, "--fees")
 	}) {
@@ -170,7 +170,7 @@ func (c PasteldCli) CustomCommand(args ...string) string {
 }
 
 // wait for tx committed on chain
-func (c PasteldCli) awaitTxCommitted(submitResp string, timeout ...time.Duration) (string, bool) {
+func (c LumeradCli) awaitTxCommitted(submitResp string, timeout ...time.Duration) (string, bool) {
 	RequireTxSuccess(c.t, submitResp)
 	txHash := gjson.Get(submitResp, "txhash")
 	require.True(c.t, txHash.Exists())
@@ -189,25 +189,25 @@ func (c PasteldCli) awaitTxCommitted(submitResp string, timeout ...time.Duration
 }
 
 // keys CLI command
-func (c PasteldCli) Keys(args ...string) string {
+func (c LumeradCli) Keys(args ...string) string {
 	args = c.withKeyringFlags(args...)
 	out, _ := c.run(args)
 	return out
 }
 
-// CustomQuery main entrypoint for pasteld CLI queries
-func (c PasteldCli) CustomQuery(args ...string) string {
+// CustomQuery main entrypoint for lumerad CLI queries
+func (c LumeradCli) CustomQuery(args ...string) string {
 	args = c.withQueryFlags(args...)
 	out, _ := c.run(args)
 	return out
 }
 
 // execute shell command
-func (c PasteldCli) run(args []string) (output string, ok bool) {
+func (c LumeradCli) run(args []string) (output string, ok bool) {
 	return c.runWithInput(args, nil)
 }
 
-func (c PasteldCli) runWithInput(args []string, input io.Reader) (output string, ok bool) {
+func (c LumeradCli) runWithInput(args []string, input io.Reader) (output string, ok bool) {
 	if c.Debug {
 		c.t.Logf("+++ running `%s %s`", c.execBinary, strings.Join(args, " "))
 	}
@@ -226,12 +226,12 @@ func (c PasteldCli) runWithInput(args []string, input io.Reader) (output string,
 	return strings.TrimSpace(string(gotOut)), ok
 }
 
-func (c PasteldCli) withQueryFlags(args ...string) []string {
+func (c LumeradCli) withQueryFlags(args ...string) []string {
 	args = append(args, "--output", "json")
 	return c.withChainFlags(args...)
 }
 
-func (c PasteldCli) withTXFlags(args ...string) []string {
+func (c LumeradCli) withTXFlags(args ...string) []string {
 	args = append(args,
 		"--broadcast-mode", "sync",
 		"--output", "json",
@@ -242,7 +242,7 @@ func (c PasteldCli) withTXFlags(args ...string) []string {
 	return c.withChainFlags(args...)
 }
 
-func (c PasteldCli) withKeyringFlags(args ...string) []string {
+func (c LumeradCli) withKeyringFlags(args ...string) []string {
 	r := append(args,
 		"--home", c.homeDir,
 		"--keyring-backend", "test",
@@ -255,14 +255,14 @@ func (c PasteldCli) withKeyringFlags(args ...string) []string {
 	return append(r, "--output", "json")
 }
 
-func (c PasteldCli) withChainFlags(args ...string) []string {
+func (c LumeradCli) withChainFlags(args ...string) []string {
 	return append(args,
 		"--node", c.nodeAddress,
 	)
 }
 
 // AddKey add key to default keyring. Returns address
-func (c PasteldCli) AddKey(name string) string {
+func (c LumeradCli) AddKey(name string) string {
 	cmd := c.withKeyringFlags("keys", "add", name, "--no-backup")
 	out, _ := c.run(cmd)
 	addr := gjson.Get(out, "address").String()
@@ -271,7 +271,7 @@ func (c PasteldCli) AddKey(name string) string {
 }
 
 // AddKeyFromSeed recovers the key from given seed and add it to default keyring. Returns address
-func (c PasteldCli) AddKeyFromSeed(name, mnemoic string) string {
+func (c LumeradCli) AddKeyFromSeed(name, mnemoic string) string {
 	cmd := c.withKeyringFlags("keys", "add", name, "--recover")
 	out, _ := c.runWithInput(cmd, strings.NewReader(mnemoic))
 	addr := gjson.Get(out, "address").String()
@@ -280,7 +280,7 @@ func (c PasteldCli) AddKeyFromSeed(name, mnemoic string) string {
 }
 
 // GetKeyAddr returns address
-func (c PasteldCli) GetKeyAddr(name string) string {
+func (c LumeradCli) GetKeyAddr(name string) string {
 	cmd := c.withKeyringFlags("keys", "show", name, "-a")
 	out, _ := c.run(cmd)
 	addr := strings.Trim(out, "\n")
@@ -291,7 +291,7 @@ func (c PasteldCli) GetKeyAddr(name string) string {
 const defaultSrcAddr = "node0"
 
 // FundAddress sends the token amount to the destination address
-func (c PasteldCli) FundAddress(destAddr, amount string) string {
+func (c LumeradCli) FundAddress(destAddr, amount string) string {
 	require.NotEmpty(c.t, destAddr)
 	require.NotEmpty(c.t, amount)
 	cmd := []string{"tx", "bank", "send", defaultSrcAddr, destAddr, amount}
@@ -300,13 +300,13 @@ func (c PasteldCli) FundAddress(destAddr, amount string) string {
 	return rsp
 }
 
-func (c PasteldCli) QueryBalances(addr string) string {
+func (c LumeradCli) QueryBalances(addr string) string {
 	return c.CustomQuery("q", "bank", "balances", addr)
 }
 
 // QueryBalance returns balance amount for given denom.
 // 0 when not found
-func (c PasteldCli) QueryBalance(addr, denom string) int64 {
+func (c LumeradCli) QueryBalance(addr, denom string) int64 {
 	raw := c.CustomQuery("q", "bank", "balance", addr, denom)
 	require.Contains(c.t, raw, "amount", raw)
 	return gjson.Get(raw, "balance.amount").Int()
@@ -314,13 +314,13 @@ func (c PasteldCli) QueryBalance(addr, denom string) int64 {
 
 // QueryTotalSupply returns total amount of tokens for a given denom.
 // 0 when not found
-func (c PasteldCli) QueryTotalSupply(denom string) int64 {
+func (c LumeradCli) QueryTotalSupply(denom string) int64 {
 	raw := c.CustomQuery("q", "bank", "total-supply")
 	require.Contains(c.t, raw, "amount", raw)
 	return gjson.Get(raw, fmt.Sprintf("supply.#(denom==%q).amount", denom)).Int()
 }
 
-func (c PasteldCli) GetCometBFTValidatorSet() cmtservice.GetLatestValidatorSetResponse {
+func (c LumeradCli) GetCometBFTValidatorSet() cmtservice.GetLatestValidatorSetResponse {
 	args := []string{"q", "comet-validator-set"}
 	got := c.CustomQuery(args...)
 
@@ -336,7 +336,7 @@ func (c PasteldCli) GetCometBFTValidatorSet() cmtservice.GetLatestValidatorSetRe
 }
 
 // IsInCometBftValset returns true when the given pub key is in the current active tendermint validator set
-func (c PasteldCli) IsInCometBftValset(valPubKey cryptotypes.PubKey) (cmtservice.GetLatestValidatorSetResponse, bool) {
+func (c LumeradCli) IsInCometBftValset(valPubKey cryptotypes.PubKey) (cmtservice.GetLatestValidatorSetResponse, bool) {
 	valResult := c.GetCometBFTValidatorSet()
 	var found bool
 	for _, v := range valResult.Validators {
@@ -349,7 +349,7 @@ func (c PasteldCli) IsInCometBftValset(valPubKey cryptotypes.PubKey) (cmtservice
 }
 
 // SubmitGovProposal submit a gov v1 proposal
-func (c PasteldCli) SubmitGovProposal(proposalJson string, args ...string) string {
+func (c LumeradCli) SubmitGovProposal(proposalJson string, args ...string) string {
 	if len(args) == 0 {
 		args = []string{"--from=" + defaultSrcAddr}
 	}
@@ -362,7 +362,7 @@ func (c PasteldCli) SubmitGovProposal(proposalJson string, args ...string) strin
 }
 
 // SubmitAndVoteGovProposal submit proposal, let all validators vote yes and return proposal id
-func (c PasteldCli) SubmitAndVoteGovProposal(proposalJson string, args ...string) string {
+func (c LumeradCli) SubmitAndVoteGovProposal(proposalJson string, args ...string) string {
 	rsp := c.SubmitGovProposal(proposalJson, args...)
 	RequireTxSuccess(c.t, rsp)
 	raw := c.CustomQuery("q", "gov", "proposals", "--depositor", c.GetKeyAddr(defaultSrcAddr))
@@ -380,7 +380,7 @@ func (c PasteldCli) SubmitAndVoteGovProposal(proposalJson string, args ...string
 }
 
 // Version returns the current version of the client binary
-func (c PasteldCli) Version() string {
+func (c LumeradCli) Version() string {
 	v, ok := c.run([]string{"version"})
 	require.True(c.t, ok)
 	return v

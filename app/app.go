@@ -75,20 +75,20 @@ import (
 	ibctransferkeeper "github.com/cosmos/ibc-go/v8/modules/apps/transfer/keeper"
 	ibckeeper "github.com/cosmos/ibc-go/v8/modules/core/keeper"
 
-	claimmodulekeeper "github.com/pastelnetwork/pastel/x/claim/keeper"
-	pastelidmodulekeeper "github.com/pastelnetwork/pastel/x/pastelid/keeper"
-	supernodemodulekeeper "github.com/pastelnetwork/pastel/x/supernode/keeper"
+	claimmodulekeeper "github.com/LumeraProtocol/lumera/x/claim/keeper"
+	lumeraidmodulekeeper "github.com/LumeraProtocol/lumera/x/lumeraid/keeper"
+	supernodemodulekeeper "github.com/LumeraProtocol/lumera/x/supernode/keeper"
 
 	// this line is used by starport scaffolding # stargate/app/moduleImport
 
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
+	"github.com/LumeraProtocol/lumera/docs"
 	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
-	"github.com/pastelnetwork/pastel/docs"
 )
 
 const (
-	AccountAddressPrefix = "pastel"
-	Name                 = "pastel"
+	AccountAddressPrefix = "lumera"
+	Name                 = "lumera"
 )
 
 var (
@@ -146,7 +146,7 @@ type App struct {
 	ScopedICAHostKeeper       capabilitykeeper.ScopedKeeper
 	ScopedKeepers             map[string]capabilitykeeper.ScopedKeeper
 
-	PastelidKeeper pastelidmodulekeeper.Keeper
+	LumeraidKeeper lumeraidmodulekeeper.Keeper
 
 	// CosmWasm
 	WasmKeeper       wasmkeeper.Keeper
@@ -257,7 +257,7 @@ func New(
 		&app.NFTKeeper,
 		&app.GroupKeeper,
 		&app.CircuitBreakerKeeper,
-		&app.PastelidKeeper,
+		&app.LumeraidKeeper,
 		&app.ClaimKeeper,
 		&app.SupernodeKeeper,
 		// this line is used by starport scaffolding # stargate/app/keeperDefinition

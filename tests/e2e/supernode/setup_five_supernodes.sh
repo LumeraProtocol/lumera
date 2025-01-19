@@ -3,9 +3,9 @@
 set -euo pipefail
 
 # Configuration
-CHAIN_ID="pastel-devnet-1"
+CHAIN_ID="lumera-devnet-1"
 KEYRING_BACKEND="test"
-CONTAINER_PREFIX="pastel-validator"
+CONTAINER_PREFIX="lumera-validator"
 
 # IP address mapping
 declare -A VALIDATOR_IPS=(
@@ -44,12 +44,12 @@ query_addresses() {
   local container="${CONTAINER_PREFIX}${i}"
 
   VAL_ACCOUNT["$i"]="$(
-    docker exec "$container" pasteld keys show validator${i}_key \
+    docker exec "$container" lumerad keys show validator${i}_key \
       --keyring-backend "$KEYRING_BACKEND" -a
   )"
 
   VAL_OPERATOR["$i"]="$(
-    docker exec "$container" pasteld keys show validator${i}_key \
+    docker exec "$container" lumerad keys show validator${i}_key \
       --keyring-backend "$KEYRING_BACKEND" --bech val -a
   )"
 }
@@ -62,7 +62,7 @@ register_supernode() {
   local ip="${VALIDATOR_IPS[$i]}"
 
   log "Registering supernode on ${container} (ValOp: ${valop}, Account: ${valacct}, IP: ${ip})"
-  run_cmd "docker exec ${container} pasteld tx supernode register-supernode \
+  run_cmd "docker exec ${container} lumerad tx supernode register-supernode \
     ${valop} \
     ${ip} \
     1.0 \
@@ -92,7 +92,7 @@ for i in {1..5}; do
   sleep 3
 done
 
-log "Querying the list of registered supernodes (via pastel-validator1) ..."
-run_cmd "docker exec pastel-validator1 pasteld query supernode list-super-nodes"
+log "Querying the list of registered supernodes (via lumera-validator1) ..."
+run_cmd "docker exec lumera-validator1 lumerad query supernode list-super-nodes"
 
 log "===== Supernode Registration Complete ====="

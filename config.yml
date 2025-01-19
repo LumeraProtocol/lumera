@@ -1,45 +1,45 @@
 version: 1
 
-name: pastel
+name: lumera
 app:
-  address_prefix: pastel
+  address_prefix: lumera
 
 build:
-  main: cmd/pastel
-  binary: pasteld
+  main: cmd/lumera
+  binary: lumerad
 
-# total supply: 250,000,000,000,000 upsl --> 250,000,000 psl
+# total supply: 250,000,000,000,000 ulumen --> 250,000,000 lumen
 accounts:
   - name: validator_pool
-    coins: ['25000000000000upsl']       # 27,000,000,000,000 upsl --> 27,000,000 psl
+    coins: ['25000000000000ulumen']       # 27,000,000,000,000 ulumen --> 27,000,000 lumen
 
   #  - name: for claiming - mined by Claiming module at genesis
-  #    coins: ['12500000000000upsl']       # 12,500,000,000,000 upsl --> 12,500,000 psl
+  #    coins: ['12500000000000ulumen']       # 12,500,000,000,000 ulumen --> 12,500,000 lumen
 
   # Testnet and Devnet only
   - name: faucet_account
-    coins: ['1000000upsl']              # 1,000,000 upsl    --> 1 psl
+    coins: ['1000000ulumen']              # 1,000,000 ulumen    --> 1 lumen
 
   - name: genesis_validator1
-    coins: ['100000000000upsl']       # 1,000,000,000,000 upsl --> 1,000,000 psl
+    coins: ['100000000000ulumen']       # 1,000,000,000,000 ulumen --> 1,000,000 lumen
 
 faucet:
   name: faucet_account
   coins:
-    - '1000000upsl'
+    - '1000000ulumen'
   coins_max:
-    - '100upsl'
+    - '100ulumen'
 
 validators:
   - name: genesis_validator1
-    bonded: '100000000000upsl'
+    bonded: '100000000000ulumen'
 
 
 genesis:
-  chain_id: pastel-devnet-1
+  chain_id: lumera-devnet-1
   app_state:
     claim:
-      total_claimable_amount: '12499999971624' # 12,500,000,000,000 upsl --> 12,500,000 psl
+      total_claimable_amount: '12499999971624' # 12,500,000,000,000 ulumen --> 12,500,000 lumen
       params:
         claim_end_time: '1746071999' # April 30 2025, 23:59:59
     distribution:
@@ -49,12 +49,12 @@ genesis:
         bonus_proposer_reward: '0.000000000000000000'
     staking:
       params:
-        bond_denom: "upsl"
+        bond_denom: "ulumen"
         max_validators: '100'
         unbonding_time: '1814400s'
     mint:
       params:
-        mint_denom: "upsl"
+        mint_denom: "ulumen"
         inflation_min:          '0.050000000000000000'
         inflation_max:          '0.200000000000000000'
         inflation_rate_change:  '0.150000000000000000'
@@ -68,19 +68,19 @@ genesis:
         slash_fraction_downtime:    '0.010000000000000000'
     crisis:
       constant_fee:
-        denom: "upsl"
-        amount: "500000000"  # 500,000 upsl --> 500 psl
+        denom: "ulumen"
+        amount: "500000000"  # 500,000 ulumen --> 500 lumen
     gov:
       params:
         burn_vote_quorum: false
         burn_vote_veto: true
         burn_proposal_deposit_prevote: false
         min_deposit:                    # min deposit for proposal to enter voting period
-          - denom: "upsl"
-            amount: '1000000000'  # 1,000 psl (1,000,000,000 upsl) for devnet; 10,000 psl (10,000,000,000 upsl) for testnet; 100,000 psl (100,000,000,000 upsl) for mainnet
+          - denom: "ulumen"
+            amount: '1000000000'  # 1,000 lumen (1,000,000,000 ulumen) for devnet; 10,000 lumen (10,000,000,000 ulumen) for testnet; 100,000 lumen (100,000,000,000 ulumen) for mainnet
         expedited_min_deposit:
-          - amount: '5000000000'  # 5,000 psl (5,000,000,000 upsl) for devnet; 50,000 psl (50,000,000,000 upsl) for testnet; 500,000 psl (500,000,000,000 upsl) for mainnet
-            denom: "upsl"
+          - amount: '5000000000'  # 5,000 lumen (5,000,000,000 ulumen) for devnet; 50,000 lumen (50,000,000,000 ulumen) for testnet; 500,000 lumen (500,000,000,000 ulumen) for mainnet
+            denom: "ulumen"
         max_deposit_period: '172800s'   # 2 days (172800s) for devnet; 7 days (604800s) for testnet; 14 days (1209600) for mainnet
         voting_period: '172800s'        # 2 days (172800s) for devnet; 7 days (604800s) for testnet; 14 days (1209600) for mainnet
         quorum:         '0.334000000000000000'          # 33.4%
@@ -93,24 +93,24 @@ client:
 
 
 
-#pasteld genesis add-genesis-account pastel_foundation_1 14375000000000upsl --vesting-amount 14375000000000upsl --vesting-end-time  518400 //6 days
-#pasteld genesis add-genesis-account pastel_foundation_2 14375000000000upsl --vesting-amount 14375000000000upsl --vesting-end-time  518400 //6 days
-#pasteld genesis add-genesis-account pastel_foundation_3 14375000000000upsl --vesting-amount 14375000000000upsl --vesting-end-time  518400 //6 days
-#pasteld genesis add-genesis-account pastel_foundation_4 14375000000000upsl --vesting-amount 14375000000000upsl --vesting-end-time  518400 //6 days
-#pasteld genesis add-genesis-account pastel_foundation_5 25000000000000upsl --vesting-amount 25000000000000upsl --vesting-end-time 1036800 //12 days
-#pasteld genesis add-genesis-account pastel_foundation_6 28125000000000upsl --vesting-amount 28125000000000upsl --vesting-end-time 2073600 //24 days
-#pasteld genesis add-genesis-account pastel_foundation_7 28125000000000upsl --vesting-amount 28125000000000upsl --vesting-end-time 2073600 //24 days
-#pasteld genesis add-genesis-account pastel_foundation_8  6250000000000upsl --vesting-amount 6250000000000upsl  --vesting-end-time 2073600 //24 days
-#pasteld genesis add-genesis-account private_investors_1 25000000000000upsl --vesting-amount 25000000000000upsl --vesting-end-time 1555200 //18 days
-#pasteld genesis add-genesis-account private_investors_2 37500000000000upsl --vesting-amount 37500000000000upsl --vesting-end-time 1555200 //18 days
+#lumerad genesis add-genesis-account lumera_foundation_1 14375000000000ulumen --vesting-amount 14375000000000ulumen --vesting-end-time  518400 //6 days
+#lumerad genesis add-genesis-account lumera_foundation_2 14375000000000ulumen --vesting-amount 14375000000000ulumen --vesting-end-time  518400 //6 days
+#lumerad genesis add-genesis-account lumera_foundation_3 14375000000000ulumen --vesting-amount 14375000000000ulumen --vesting-end-time  518400 //6 days
+#lumerad genesis add-genesis-account lumera_foundation_4 14375000000000ulumen --vesting-amount 14375000000000ulumen --vesting-end-time  518400 //6 days
+#lumerad genesis add-genesis-account lumera_foundation_5 25000000000000ulumen --vesting-amount 25000000000000ulumen --vesting-end-time 1036800 //12 days
+#lumerad genesis add-genesis-account lumera_foundation_6 28125000000000ulumen --vesting-amount 28125000000000ulumen --vesting-end-time 2073600 //24 days
+#lumerad genesis add-genesis-account lumera_foundation_7 28125000000000ulumen --vesting-amount 28125000000000ulumen --vesting-end-time 2073600 //24 days
+#lumerad genesis add-genesis-account lumera_foundation_8  6250000000000ulumen --vesting-amount 6250000000000ulumen  --vesting-end-time 2073600 //24 days
+#lumerad genesis add-genesis-account private_investors_1 25000000000000ulumen --vesting-amount 25000000000000ulumen --vesting-end-time 1555200 //18 days
+#lumerad genesis add-genesis-account private_investors_2 37500000000000ulumen --vesting-amount 37500000000000ulumen --vesting-end-time 1555200 //18 days
 
-#pasteld keys add pastel_foundation_1
-#pasteld keys add pastel_foundation_2
-#pasteld keys add pastel_foundation_3
-#pasteld keys add pastel_foundation_4
-#pasteld keys add pastel_foundation_5
-#pasteld keys add pastel_foundation_6
-#pasteld keys add pastel_foundation_7
-#pasteld keys add pastel_foundation_8
-#pasteld keys add private_investors_1
-#pasteld keys add private_investors_2
+#lumerad keys add lumera_foundation_1
+#lumerad keys add lumera_foundation_2
+#lumerad keys add lumera_foundation_3
+#lumerad keys add lumera_foundation_4
+#lumerad keys add lumera_foundation_5
+#lumerad keys add lumera_foundation_6
+#lumerad keys add lumera_foundation_7
+#lumerad keys add lumera_foundation_8
+#lumerad keys add private_investors_1
+#lumerad keys add private_investors_2

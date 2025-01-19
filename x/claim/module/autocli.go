@@ -3,7 +3,7 @@ package claim
 import (
 	autocliv1 "cosmossdk.io/api/cosmos/autocli/v1"
 
-	modulev1 "github.com/pastelnetwork/pastel/api/pastel/claim"
+	modulev1 "github.com/LumeraProtocol/lumera/api/lumera/claim"
 )
 
 // AutoCLIOptions implements the autocli.HasAutoCLIConfig interface.

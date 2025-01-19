@@ -75,7 +75,7 @@ import (
 	ibckeeper "github.com/cosmos/ibc-go/v8/modules/core/keeper"
 )
 
-const pastelBech32MainPrefix = "pastel"
+const lumeraBech32MainPrefix = "lumera"
 
 // ensure store code returns the expected response
 func assertStoreCodeResponse(t *testing.T, data []byte, expected uint64) {
@@ -367,8 +367,8 @@ func createTestInput(
 		runtime.NewKVStoreService(keys[authtypes.StoreKey]),
 		authtypes.ProtoBaseAccount,
 		maccPerms,
-		authcodec.NewBech32Codec(pastelBech32MainPrefix),
-		pastelBech32MainPrefix,
+		authcodec.NewBech32Codec(lumeraBech32MainPrefix),
+		lumeraBech32MainPrefix,
 		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
 	)
 	blockedAddrs := make(map[string]bool)

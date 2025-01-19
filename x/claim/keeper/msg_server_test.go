@@ -6,9 +6,9 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/stretchr/testify/require"
 
-	keepertest "github.com/pastelnetwork/pastel/testutil/keeper"
-	"github.com/pastelnetwork/pastel/x/claim/keeper"
-	"github.com/pastelnetwork/pastel/x/claim/types"
+	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
+	"github.com/LumeraProtocol/lumera/x/claim/keeper"
+	"github.com/LumeraProtocol/lumera/x/claim/types"
 )
 
 func setupMsgServer(t testing.TB) (keeper.Keeper, types.MsgServer, sdk.Context) {

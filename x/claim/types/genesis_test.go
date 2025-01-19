@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/LumeraProtocol/lumera/x/claim/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
-	"github.com/pastelnetwork/pastel/x/claim/types"
 	"github.com/stretchr/testify/require"
 )
 

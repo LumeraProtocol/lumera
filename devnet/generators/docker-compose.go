@@ -65,8 +65,8 @@ func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validat
 				fmt.Sprintf("%d:%d", validator.GRPCPort, DefaultGRPCPort),
 			},
 			Volumes: []string{
-				fmt.Sprintf("/tmp/pastel-devnet/%s-data:/root/%s", validator.Name, config.Paths.Directories.Daemon),
-				"/tmp/pastel-devnet/shared:/shared",
+				fmt.Sprintf("/tmp/lumera-devnet/%s-data:/root/%s", validator.Name, config.Paths.Directories.Daemon),
+				"/tmp/lumera-devnet/shared:/shared",
 			},
 			Environment: env,
 		}

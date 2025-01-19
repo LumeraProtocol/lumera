@@ -10,13 +10,13 @@ import (
 	"github.com/CosmWasm/wasmd/app"
 	"github.com/CosmWasm/wasmd/x/wasm/types"
 	wasmvmtypes "github.com/CosmWasm/wasmvm/v2/types"
+	lumeraibc "github.com/LumeraProtocol/lumera/tests/ibctesting"
+	"github.com/LumeraProtocol/lumera/tests/system"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	ibcfee "github.com/cosmos/ibc-go/v8/modules/apps/29-fee/types"
 	ibctransfertypes "github.com/cosmos/ibc-go/v8/modules/apps/transfer/types"
 	channeltypes "github.com/cosmos/ibc-go/v8/modules/core/04-channel/types"
 	ibctesting "github.com/cosmos/ibc-go/v8/testing"
-	pastelibc "github.com/pastelnetwork/pastel/tests/ibctesting"
-	"github.com/pastelnetwork/pastel/tests/system"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -34,14 +34,14 @@ func TestIBCCallbacks(t *testing.T) {
 
 	os.Setenv("SYSTEM_TESTS", "true")
 	marshaler := app.MakeEncodingConfig(t).Codec
-	coord := pastelibc.NewCoordinator(t, 2)
-	chainA := coord.GetChain(pastelibc.GetChainID(1))
-	chainB := coord.GetChain(pastelibc.GetChainID(2))
+	coord := lumeraibc.NewCoordinator(t, 2)
+	chainA := coord.GetChain(lumeraibc.GetChainID(1))
+	chainB := coord.GetChain(lumeraibc.GetChainID(2))
 
 	actorChainA := sdk.AccAddress(chainA.SenderPrivKey.PubKey().Address())
 	oneToken := sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.NewInt(1)))
 
-	path := pastelibc.NewPath(chainA, chainB)
+	path := lumeraibc.NewPath(chainA, chainB)
 	path.EndpointA.ChannelConfig = &ibctesting.ChannelConfig{
 		PortID:  ibctransfertypes.PortID,
 		Version: string(marshaler.MustMarshalJSON(&ibcfee.Metadata{FeeVersion: ibcfee.Version, AppVersion: ibctransfertypes.Version})),
@@ -147,13 +147,13 @@ func TestIBCCallbacksWithoutEntrypoints(t *testing.T) {
 	//   and should try to call the callback on A and fail gracefully
 	os.Setenv("SYSTEM_TESTS", "true")
 	marshaler := app.MakeEncodingConfig(t).Codec
-	coord := pastelibc.NewCoordinator(t, 2)
-	chainA := coord.GetChain(pastelibc.GetChainID(1))
-	chainB := coord.GetChain(pastelibc.GetChainID(2))
+	coord := lumeraibc.NewCoordinator(t, 2)
+	chainA := coord.GetChain(lumeraibc.GetChainID(1))
+	chainB := coord.GetChain(lumeraibc.GetChainID(2))
 
 	oneToken := sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.NewInt(1))
 
-	path := pastelibc.NewPath(chainA, chainB)
+	path := lumeraibc.NewPath(chainA, chainB)
 	path.EndpointA.ChannelConfig = &ibctesting.ChannelConfig{
 		PortID:  ibctransfertypes.PortID,
 		Version: string(marshaler.MustMarshalJSON(&ibcfee.Metadata{FeeVersion: ibcfee.Version, AppVersion: ibctransfertypes.Version})),

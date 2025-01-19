@@ -1,4 +1,4 @@
-# Pastel Network Devnet Setup
+# Lumera Protocol Devnet Setup
 
 ## 1. Overview
 
@@ -31,7 +31,7 @@ The `config.json` file defines the global configuration for the validator networ
         "denom": {
             "bond": "token",       // Staking token denomination
             "mint": "token",       // Minting token denomination
-            "minimum_gas_price": "0upsl" // Minimum transaction fee
+            "minimum_gas_price": "0ulumen" // Minimum transaction fee
         }
     },
     "docker": {
@@ -69,7 +69,7 @@ The `config.json` file defines the global configuration for the validator networ
         "grpc_port": 9090,  // Default gRPC port
         "initial_distribution": {
             "account_balance": "1000",
-            "validator_stake": "900upsl"
+            "validator_stake": "900ulumen"
         }
     },
     {
@@ -82,8 +82,8 @@ The `config.json` file defines the global configuration for the validator networ
         "rest_port": 1327,  // REST: 1317 + 10
         "grpc_port": 9091,  // gRPC: 9090 + 1
         "initial_distribution": {
-            "account_balance": "1000upsl",
-            "validator_stake": "900upsl"
+            "account_balance": "1000ulumen",
+            "validator_stake": "900ulumen"
         }
     }
 ]
@@ -160,9 +160,9 @@ RUN apt-get update && apt-get install -y \
     ca-certificates
 
 # Copy chain binary and WASM library
-COPY pasteld /usr/local/bin/pasteld            # Chain binary executable
+COPY lumerad /usr/local/bin/lumerad            # Chain binary executable
 COPY libwasmvm.x86_64.so /usr/lib/            # Required for WASM contract support
-RUN chmod +x /usr/local/bin/pasteld && ldconfig
+RUN chmod +x /usr/local/bin/lumerad && ldconfig
 
 # Copy validator scripts
 COPY primary-validator.sh /root/scripts/
@@ -181,15 +181,15 @@ Generated from `docker-compose.go`
 services:
   validator1:
     build: .
-    container_name: pastel-validator1
+    container_name: lumera-validator1
     ports:
       - "26656:26656"  # P2P
       - "26657:26657"  # RPC
       - "1317:1317"    # REST API
       - "9090:9090"    # gRPC
     volumes:
-      - /tmp/pastel-devnet/validator1-data:/root/.pastel  # Chain data directory
-      - /tmp/pastel-devnet/shared:/shared                 # Shared directory for validator coordination
+      - /tmp/lumera-devnet/validator1-data:/root/.lumera  # Chain data directory
+      - /tmp/lumera-devnet/shared:/shared                 # Shared directory for validator coordination
     environment:
       MONIKER: validator1
     command: bash /root/scripts/primary-validator.sh
@@ -198,7 +198,7 @@ services:
     # ... similar config with incremented ports
     depends_on:
       - validator1
-    command: bash /root/scripts/secondary-validator.sh bob 900000000000000upsl validator2
+    command: bash /root/scripts/secondary-validator.sh bob 900000000000000ulumen validator2
 ```
 
 ## 6. Usage Guide
@@ -232,7 +232,7 @@ These will:
 2. Builds chain binary with Ignite
 3. Extracts binary from release archive
 4. Copies files to devnet/:
-   - pasteld binary
+   - lumerad binary
    - libwasmvm.x86_64.so
    - claims.csv
 5. Generates network configuration
@@ -240,7 +240,7 @@ These will:
 
 #### Clean old data
 ```bash
-make devnet-clean   # Removes /tmp/pastel-devnet/shared and all ~/validator*-data directories
+make devnet-clean   # Removes /tmp/lumera-devnet/shared and all ~/validator*-data directories
 ```
 
 ### 6.2 Network Operations
@@ -261,13 +261,13 @@ make devnet-down
 ### 6.3 Network Files Location
 ```bash
 # Final Genesis File
-/tmp/pastel-devnet/validator1-data/config/genesis.json   # On host machine
-/root/.pastel/config/genesis.json       # Inside containers
+/tmp/lumera-devnet/validator1-data/config/genesis.json   # On host machine
+/root/.lumera/config/genesis.json       # Inside containers
 
 # Node IDs, IPs and Ports
-/tmp/pastel-devnet/shared/validator*_nodeid              # Node IDs 
-/tmp/pastel-devnet/shared/validator*_ip                  # Container IPs
-/tmp/pastel-devnet/shared/validator*_port                  # Container P2P Ports
+/tmp/lumera-devnet/shared/validator*_nodeid              # Node IDs 
+/tmp/lumera-devnet/shared/validator*_ip                  # Container IPs
+/tmp/lumera-devnet/shared/validator*_port                  # Container P2P Ports
 ```
 
 ### 6.4 Joining New Node to Network
@@ -275,11 +275,11 @@ make devnet-down
 #### 1. Get Validator Info
 ```bash
 # Get node ID
-VALIDATOR1_ID=$(cat /tmp/pastel-devnet/shared/validator1_nodeid)
+VALIDATOR1_ID=$(cat /tmp/lumera-devnet/shared/validator1_nodeid)
 # e.g., 4cb8e2eb7bb90fd026e02f693927230fe3fb9c89
 
 # Get container IP
-VALIDATOR1_IP=$(cat /tmp/pastel-devnet/shared/validator1_ip) 
+VALIDATOR1_IP=$(cat /tmp/lumera-devnet/shared/validator1_ip) 
 # e.g., 172.20.0.2
 ```
 
@@ -292,22 +292,22 @@ VALIDATOR1_IP=$(cat /tmp/pastel-devnet/shared/validator1_ip)
 #### 2. Initialize New Node
 ```bash
 # Clean previous data (if needed)
-rm -rf ~/.pasteld
+rm -rf ~/.lumerad
 
 # Initialize node with same chain-id
-pasteld init my-local-node --chain-id pastel-devnet
+lumerad init my-local-node --chain-id lumera-devnet
 ```
 
 #### 3. Copy Genesis
 ```bash
 # Copy from validator1's data directory /shared
-cp /tmp/pastel-devnet/validator1-data/config/genesis.json ~/.pastel/config/
+cp /tmp/lumera-devnet/validator1-data/config/genesis.json ~/.lumera/config/
 ```
 
 #### 4. Start Node
 ```bash
 # Start with container IP peer connection
-pasteld start --minimum-gas-prices 0upsl \
+lumerad start --minimum-gas-prices 0ulumen \
     --p2p.persistent_peers "${VALIDATOR1_ID}@${VALIDATOR1_IP}:26656" \
     --p2p.laddr tcp://0.0.0.0:26626 \
     --rpc.laddr tcp://127.0.0.1:26627
@@ -318,10 +318,10 @@ pasteld start --minimum-gas-prices 0upsl \
 ### 6.5 Verify Connection
 ```bash
 # Check peer connections
-pasteld net-info
+lumerad net-info
 
 # Check sync status 
-pasteld status | jq .SyncInfo
+lumerad status | jq .SyncInfo
 ```
 
 ### 6.6 CLI Sessions
@@ -329,44 +329,44 @@ pasteld status | jq .SyncInfo
 #### Access Container Shell
 ```bash
 # Access primary validator
-docker exec -it pastel-validator1 bash
+docker exec -it lumera-validator1 bash
 
 # Access any validator (n = 1-5)
-docker exec -it pastel-validator{n} bash
+docker exec -it lumera-validator{n} bash
 ```
 
 #### Direct CLI Commands
 ```bash
 # Primary validator commands
-docker exec -it pastel-validator1 pasteld keys list --keyring-backend test
-docker exec -it pastel-validator1 pasteld query bank balances <address>
+docker exec -it lumera-validator1 lumerad keys list --keyring-backend test
+docker exec -it lumera-validator1 lumerad query bank balances <address>
 
 # Secondary validator commands (n = 2-5)
-docker exec -it pastel-validator{n} pasteld status
+docker exec -it lumera-validator{n} lumerad status
 ```
 
 #### Interactive CLI Sessions
-From inside container after `docker exec -it pastel-validator1 bash`:
+From inside container after `docker exec -it lumera-validator1 bash`:
 ```bash
 # Query commands
-pasteld query bank balances <address>
-pasteld query staking validators
-pasteld query gov proposals
+lumerad query bank balances <address>
+lumerad query staking validators
+lumerad query gov proposals
 
 # Transaction commands
-pasteld tx bank send <from> <to> 1000upsl --chain-id pastel-devnet --keyring-backend test
+lumerad tx bank send <from> <to> 1000ulumen --chain-id lumera-devnet --keyring-backend test
 ```
 
 #### Common Operations
 ```bash
 # View logs
-docker exec -it pastel-validator1 tail -f /root/.pastel/pastel.log
+docker exec -it lumera-validator1 tail -f /root/.lumera/lumera.log
 
 # Check config
-docker exec -it pastel-validator1 cat /root/.pastel/config/config.toml
+docker exec -it lumera-validator1 cat /root/.lumera/config/config.toml
 
 # Monitor sync status
-docker exec -it pastel-validator1 watch 'pasteld status | jq .SyncInfo'
+docker exec -it lumera-validator1 watch 'lumerad status | jq .SyncInfo'
 ```
 
 *Note: The keyring-backend is set to 'test' in the dev environment, so no password prompts appear. For production, use 'file' or 'os' backend.*

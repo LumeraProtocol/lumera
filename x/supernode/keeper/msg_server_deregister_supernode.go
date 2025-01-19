@@ -4,9 +4,9 @@ import (
 	"context"
 
 	errorsmod "cosmossdk.io/errors"
+	"github.com/LumeraProtocol/lumera/x/supernode/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
-	"github.com/pastelnetwork/pastel/x/supernode/types"
 )
 
 // DeregisterSupernode defines a method to deregister a supernode

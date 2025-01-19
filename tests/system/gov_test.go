@@ -8,13 +8,13 @@ import (
 	sdkmath "cosmossdk.io/math"
 
 	wasmvmtypes "github.com/CosmWasm/wasmvm/v2/types"
+	"github.com/LumeraProtocol/lumera/app"
+	"github.com/LumeraProtocol/lumera/tests/ibctesting"
+	"github.com/LumeraProtocol/lumera/tests/system"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	distributiontypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 	v1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
-	"github.com/pastelnetwork/pastel/app"
-	"github.com/pastelnetwork/pastel/tests/ibctesting"
-	"github.com/pastelnetwork/pastel/tests/system"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

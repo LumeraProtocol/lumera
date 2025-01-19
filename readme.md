@@ -1,8 +1,8 @@
-# Pastel
-[![Release Workflow](https://github.com/innovatingcapital/pastel/actions/workflows/release.yml/badge.svg)](https://github.com/innovatingcapital/pastel/actions/workflows/release.yml)
+# Lumera
+[![Release Workflow](https://github.com/LumeraProtocol/lumera/actions/workflows/release.yml/badge.svg)](https://github.com/LumeraProtocol/lumera/actions/workflows/release.yml)
 
-# pastel
-**pastel** is a blockchain built using Cosmos SDK and Tendermint and created with [Ignite CLI](https://ignite.com/cli).
+# lumera
+**lumera** is a blockchain built using Cosmos SDK and Tendermint and created with [Ignite CLI](https://ignite.com/cli).
 
 ## Get started
 
@@ -31,7 +31,7 @@ ignite chain init
 ### Get latest `genesis.json`
 
 ```bash
-curl https://raw.githubusercontent.com/innovatingcapital/pastel-genesis/refs/heads/main/genesis.json > ~/.pastel/config/genesis.json
+curl https://raw.githubusercontent.com/innovatingcapital/lumera-genesis/refs/heads/main/genesis.json > ~/.lumera/config/genesis.json
 ```
 
 ### Start
@@ -42,7 +42,7 @@ ignite chain serve
 
 `serve` command installs dependencies, builds, initializes, and starts your blockchain in development.
 
-> Note: you still can start with `pasteld start`
+> Note: you still can start with `lumerad start`
 
 ### Configure
 
@@ -73,9 +73,9 @@ After a draft release is created, make your final changes from the release page 
 To install the latest version of your blockchain node's binary, execute the following command on your machine:
 
 ```
-curl https://get.ignite.com/pastelnetwork/pastel@latest! | sudo bash
+curl https://get.ignite.com/LumeraProtocol/lumera@latest! | sudo bash
 ```
-`pastelnetwork/pastel` should match the `username` and `repo_name` of the Github repository to which the source code was pushed. Learn more about [the install process](https://github.com/allinbits/starport-installer).
+`LumeraProtocol/lumera` should match the `username` and `repo_name` of the Github repository to which the source code was pushed. Learn more about [the install process](https://github.com/allinbits/starport-installer).
 
 ## Learn more
 

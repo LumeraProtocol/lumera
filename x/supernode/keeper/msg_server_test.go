@@ -6,9 +6,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	keepertest "github.com/pastelnetwork/pastel/testutil/keeper"
-	"github.com/pastelnetwork/pastel/x/supernode/keeper"
-	"github.com/pastelnetwork/pastel/x/supernode/types"
+	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
+	"github.com/LumeraProtocol/lumera/x/supernode/keeper"
+	"github.com/LumeraProtocol/lumera/x/supernode/types"
 )
 
 func setupMsgServer(t testing.TB) (keeper.Keeper, types.MsgServer, context.Context) {

@@ -3,8 +3,8 @@ package supernode
 import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
-	"github.com/pastelnetwork/pastel/x/supernode/keeper"
-	"github.com/pastelnetwork/pastel/x/supernode/types"
+	"github.com/LumeraProtocol/lumera/x/supernode/keeper"
+	"github.com/LumeraProtocol/lumera/x/supernode/types"
 )
 
 // InitGenesis initializes the module's state from a provided genesis state.

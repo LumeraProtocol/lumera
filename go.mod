@@ -1,4 +1,4 @@
-module github.com/pastelnetwork/pastel
+module github.com/LumeraProtocol/lumera
 
 go 1.22
 

@@ -61,4 +61,4 @@ For example Node *3* listens on `26660` for RPC calls
 
 ## Acknowledgments
 
-The initial code was contributed from wasmd
+The initial code was taken from wasmd.

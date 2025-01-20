@@ -39,7 +39,7 @@ genesis:
   chain_id: lumera-devnet-1
   app_state:
     claim:
-      total_claimable_amount: '12499999971624' # 12,500,000,000,000 ulumen --> 12,500,000 lumen
+      total_claimable_amount: '12383801540459' # 12,500,000,000,000 ulumen --> 12,500,000 lumen
       params:
         claim_end_time: '1746071999' # April 30 2025, 23:59:59
     distribution:
@@ -91,26 +91,3 @@ client:
   openapi:
     path: docs/static/openapi.yml
 
-
-
-#lumerad genesis add-genesis-account lumera_foundation_1 14375000000000ulumen --vesting-amount 14375000000000ulumen --vesting-end-time  518400 //6 days
-#lumerad genesis add-genesis-account lumera_foundation_2 14375000000000ulumen --vesting-amount 14375000000000ulumen --vesting-end-time  518400 //6 days
-#lumerad genesis add-genesis-account lumera_foundation_3 14375000000000ulumen --vesting-amount 14375000000000ulumen --vesting-end-time  518400 //6 days
-#lumerad genesis add-genesis-account lumera_foundation_4 14375000000000ulumen --vesting-amount 14375000000000ulumen --vesting-end-time  518400 //6 days
-#lumerad genesis add-genesis-account lumera_foundation_5 25000000000000ulumen --vesting-amount 25000000000000ulumen --vesting-end-time 1036800 //12 days
-#lumerad genesis add-genesis-account lumera_foundation_6 28125000000000ulumen --vesting-amount 28125000000000ulumen --vesting-end-time 2073600 //24 days
-#lumerad genesis add-genesis-account lumera_foundation_7 28125000000000ulumen --vesting-amount 28125000000000ulumen --vesting-end-time 2073600 //24 days
-#lumerad genesis add-genesis-account lumera_foundation_8  6250000000000ulumen --vesting-amount 6250000000000ulumen  --vesting-end-time 2073600 //24 days
-#lumerad genesis add-genesis-account private_investors_1 25000000000000ulumen --vesting-amount 25000000000000ulumen --vesting-end-time 1555200 //18 days
-#lumerad genesis add-genesis-account private_investors_2 37500000000000ulumen --vesting-amount 37500000000000ulumen --vesting-end-time 1555200 //18 days
-
-#lumerad keys add lumera_foundation_1
-#lumerad keys add lumera_foundation_2
-#lumerad keys add lumera_foundation_3
-#lumerad keys add lumera_foundation_4
-#lumerad keys add lumera_foundation_5
-#lumerad keys add lumera_foundation_6
-#lumerad keys add lumera_foundation_7
-#lumerad keys add lumera_foundation_8
-#lumerad keys add private_investors_1
-#lumerad keys add private_investors_2

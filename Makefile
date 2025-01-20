@@ -30,38 +30,54 @@ devnet-build:
 	mkdir -p $(SHARED_DIR)
 	@if [ -n "$(EXTERNAL_GENESIS_FILE)" ] && [ -f "$(EXTERNAL_GENESIS_FILE)" ]; then \
 		echo "Starting devnet with existing genesis from $(EXTERNAL_GENESIS_FILE) ..."; \
-		cp "${EXTERNAL_GENESIS_FILE}" "${EXTERNAL_GENESIS}"; \
+		cp "$(EXTERNAL_GENESIS_FILE)" "$(EXTERNAL_GENESIS)"; \
 		export EXTERNAL_GENESIS_FILE=1; \
 	else \
 		echo "No external genesis file provided or file not found. Using default initialization..."; \
 		export EXTERNAL_GENESIS_FILE=0; \
 	fi; \
-	cp "${EXTERNAL_CLAIMS_FILE}" "${CLAIMS_FILE}"; \
-	go get github.com/CosmWasm/wasmvm/v2@v2.1.2 && \
-	ignite chain build --release -t linux:amd64 && \
-	tar -xf release/lumera*.tar.gz -C release && \
-	cp release/lumerad devnet/ && \
-	find $$(go env GOPATH)/pkg/mod -name "libwasmvm.x86_64.so" -exec cp {} devnet/libwasmvm.x86_64.so \; && \
-	cd devnet && \
-	go mod tidy && \
-	CONFIG_JSON="$${CONFIG_JSON:-$(DEFAULT_CONFIG_JSON)}" \
-	VALIDATORS_JSON="$${VALIDATORS_JSON:-$(DEFAULT_VALIDATORS_JSON)}" \
-	go run . && \
-	docker compose build
+	if [ -n "$(EXTERNAL_CLAIMS_FILE)" ] && [ -f "$(EXTERNAL_CLAIMS_FILE)" ]; then \
+		cp "$(EXTERNAL_CLAIMS_FILE)" "$(CLAIMS_FILE)" && \
+		EXTERNAL_GENESIS_FILE=$${EXTERNAL_GENESIS_FILE} \
+		go get github.com/CosmWasm/wasmvm/v2@v2.1.2 && \
+		ignite chain build --release -t linux:amd64 && \
+		tar -xf release/lumera*.tar.gz -C release && \
+		cp release/lumerad devnet/ && \
+		find $$(go env GOPATH)/pkg/mod -name "libwasmvm.x86_64.so" -exec cp {} devnet/libwasmvm.x86_64.so \; && \
+		cd devnet && \
+		go mod tidy && \
+		CONFIG_JSON="$${CONFIG_JSON:-$(DEFAULT_CONFIG_JSON)}" \
+		VALIDATORS_JSON="$${VALIDATORS_JSON:-$(DEFAULT_VALIDATORS_JSON)}" \
+		go run . && \
+		docker compose build; \
+	else \
+		echo "No external claims file provided or file not found."; \
+		exit 1; \
+	fi
 
 devnet-rebuild:
-	sudo rm -rf $(SHARED_DIR) $(VALIDATOR_DIRS)
-	@if [ -f "$(EXTERNAL_GENESIS)" ]; then \
-		echo "Starting devnet with existing genesis found $(EXTERNAL_GENESIS) ..."; \
+	mkdir -p $(SHARED_DIR)
+	@if [ -n "$(EXTERNAL_GENESIS_FILE)" ] && [ -f "$(EXTERNAL_GENESIS_FILE)" ]; then \
+		echo "Starting devnet with existing genesis from $(EXTERNAL_GENESIS_FILE) ..."; \
+		cp "$(EXTERNAL_GENESIS_FILE)" "$(EXTERNAL_GENESIS)"; \
 		export EXTERNAL_GENESIS_FILE=1; \
 	else \
-		echo "No external genesis found. Using default initialization..."; \
+		echo "No external genesis file provided or file not found. Using default initialization..."; \
 		export EXTERNAL_GENESIS_FILE=0; \
 	fi; \
-	cd devnet && \
-	go mod tidy && \
-	go run . && \
-	docker compose build
+	if [ -n "$(EXTERNAL_CLAIMS_FILE)" ] && [ -f "$(EXTERNAL_CLAIMS_FILE)" ]; then \
+		cp "$(EXTERNAL_CLAIMS_FILE)" "$(CLAIMS_FILE)" && \
+		EXTERNAL_GENESIS_FILE=$${EXTERNAL_GENESIS_FILE} \
+		cd devnet && \
+		go mod tidy && \
+		CONFIG_JSON="$${CONFIG_JSON:-$(DEFAULT_CONFIG_JSON)}" \
+		VALIDATORS_JSON="$${VALIDATORS_JSON:-$(DEFAULT_VALIDATORS_JSON)}" \
+		go run . && \
+		docker compose build; \
+	else \
+		echo "No external claims file provided or file not found."; \
+		exit 1; \
+	fi
 
 devnet-up:
 	cd devnet && \
@@ -90,7 +106,12 @@ devnet-deploy-tar:
 		cp "$(EXTERNAL_GENESIS_FILE)" devnet/external_genesis.json; \
 	fi
 
-	cp "${EXTERNAL_CLAIMS_FILE}" devnet/claims.csv; \
+	if [ -n "$(EXTERNAL_CLAIMS_FILE)" ] && [ -f "$(EXTERNAL_CLAIMS_FILE)" ]; then \
+		cp "${EXTERNAL_CLAIMS_FILE}" devnet/claims.csv; \
+	else \
+		echo "No external claims file provided or file not found."; \
+		exit 1; \
+	fi
 
 	# Create the tar archive
 	tar -czf devnet-deploy.tar.gz \

@@ -157,7 +157,7 @@ func (sb *PrimaryScriptBuilder) waitAndCollectGentx() {
 func (sb *PrimaryScriptBuilder) setupPeers() {
 	for _, validator := range sb.validators {
 		sb.lines = append(sb.lines, []string{
-			fmt.Sprintf("echo %d > /shared/%s_port", validator.Port, validator.Name),
+			fmt.Sprintf("echo %d > /shared/%s_port", 26656 /*validator.Port*/, validator.Name),
 		}...)
 	}
 
@@ -197,7 +197,7 @@ func (sb *PrimaryScriptBuilder) setupPeers() {
 		sb.lines = append(sb.lines,
 			fmt.Sprintf(`%s=$(cat /shared/%s_nodeid)`, nodeVars[i], validator.Name),
 			fmt.Sprintf(`%s_IP=$(cat /shared/%s_ip)`, validator.Name, validator.Name),
-			fmt.Sprintf(`peerPart%d="${%s}@${%s_IP}:%d"`, i, nodeVars[i], validator.Name, validator.Port))
+			fmt.Sprintf(`peerPart%d="${%s}@${%s_IP}:%d"`, i, nodeVars[i], validator.Name, 26656 /*validator.Port*/))
 		peerParts = append(peerParts, fmt.Sprintf("$peerPart%d", i))
 	}
 

@@ -37,10 +37,10 @@ The DevNet uses a custom genesis file with the following key parameters (feel fr
   - Downtime jail duration: 60 seconds
 - **Staking**:
   - Unbonding time: 60 seconds
-  - Bond denomination: `ulumen`
+  - Bond denomination: `ulume`
 - **Supernode**:
-  - Minimum stake requirement: 834,637,515,648 ulumen
-  - Default power reduction: 824,637,515,648 ulumen 
+  - Minimum stake requirement: 834,637,515,648 ulume
+  - Default power reduction: 824,637,515,648 ulume 
 
 ---
 

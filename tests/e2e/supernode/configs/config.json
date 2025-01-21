@@ -2,8 +2,8 @@
     "chain": {
         "id": "lumera-devnet-1",
         "denom": {
-            "bond": "ulumen",
-            "mint": "ulumen",
+            "bond": "ulume",
+            "mint": "ulume",
             "minimum_gas_price": "0ulumen"
         }
     },

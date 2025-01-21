@@ -31,7 +31,7 @@ The `config.json` file defines the global configuration for the validator networ
         "denom": {
             "bond": "token",       // Staking token denomination
             "mint": "token",       // Minting token denomination
-            "minimum_gas_price": "0ulumen" // Minimum transaction fee
+            "minimum_gas_price": "0ulume" // Minimum transaction fee
         }
     },
     "docker": {
@@ -69,7 +69,7 @@ The `config.json` file defines the global configuration for the validator networ
         "grpc_port": 9090,  // Default gRPC port
         "initial_distribution": {
             "account_balance": "1000",
-            "validator_stake": "900ulumen"
+            "validator_stake": "900ulume"
         }
     },
     {
@@ -82,8 +82,8 @@ The `config.json` file defines the global configuration for the validator networ
         "rest_port": 1327,  // REST: 1317 + 10
         "grpc_port": 9091,  // gRPC: 9090 + 1
         "initial_distribution": {
-            "account_balance": "1000ulumen",
-            "validator_stake": "900ulumen"
+            "account_balance": "1000ulume",
+            "validator_stake": "900ulume"
         }
     }
 ]
@@ -198,7 +198,7 @@ services:
     # ... similar config with incremented ports
     depends_on:
       - validator1
-    command: bash /root/scripts/secondary-validator.sh bob 900000000000000ulumen validator2
+    command: bash /root/scripts/secondary-validator.sh bob 900000000000000ulume validator2
 ```
 
 ## 6. Usage Guide
@@ -307,7 +307,7 @@ cp /tmp/lumera-devnet/validator1-data/config/genesis.json ~/.lumera/config/
 #### 4. Start Node
 ```bash
 # Start with container IP peer connection
-lumerad start --minimum-gas-prices 0ulumen \
+lumerad start --minimum-gas-prices 0ulume \
     --p2p.persistent_peers "${VALIDATOR1_ID}@${VALIDATOR1_IP}:26656" \
     --p2p.laddr tcp://0.0.0.0:26626 \
     --rpc.laddr tcp://127.0.0.1:26627
@@ -354,7 +354,7 @@ lumerad query staking validators
 lumerad query gov proposals
 
 # Transaction commands
-lumerad tx bank send <from> <to> 1000ulumen --chain-id lumera-devnet --keyring-backend test
+lumerad tx bank send <from> <to> 1000ulume --chain-id lumera-devnet --keyring-backend test
 ```
 
 #### Common Operations

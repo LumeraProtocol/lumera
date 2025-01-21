@@ -4,7 +4,7 @@
         "denom": {
             "bond": "ulume",
             "mint": "ulume",
-            "minimum_gas_price": "0.25ulumen"
+            "minimum_gas_price": "0.25ulume"
         }
     },
     "docker": {

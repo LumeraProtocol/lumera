@@ -11,28 +11,28 @@ build:
 # total supply: 250,000,000,000,000 ulume --> 250,000,000 lume
 accounts:
   - name: validator_pool
-    coins: ['25000000000000ulumen']       # 27,000,000,000,000 ulume --> 27,000,000 lume
+    coins: ['25000000000000ulume']       # 27,000,000,000,000 ulume --> 27,000,000 lume
 
   #  - name: for claiming - mined by Claiming module at genesis
-  #    coins: ['12500000000000ulumen']       # 12,500,000,000,000 ulume --> 12,500,000 lume
+  #    coins: ['12500000000000ulume']       # 12,500,000,000,000 ulume --> 12,500,000 lume
 
   # Testnet and Devnet only
   - name: faucet_account
-    coins: ['1000000ulumen']              # 1,000,000 ulume    --> 1 lume
+    coins: ['1000000ulume']              # 1,000,000 ulume    --> 1 lume
 
   - name: genesis_validator1
-    coins: ['100000000000ulumen']       # 1,000,000,000,000 ulume --> 1,000,000 lume
+    coins: ['100000000000ulume']       # 1,000,000,000,000 ulume --> 1,000,000 lume
 
 faucet:
   name: faucet_account
   coins:
-    - '1000000ulumen'
+    - '1000000ulume'
   coins_max:
-    - '100ulumen'
+    - '100ulume'
 
 validators:
   - name: genesis_validator1
-    bonded: '100000000000ulumen'
+    bonded: '100000000000ulume'
 
 
 genesis:

@@ -1,0 +1,17 @@
+syntax = "proto3";
+package lumera.supernode;
+
+import "amino/amino.proto";
+import "gogoproto/gogo.proto";
+import "lumera/supernode/params.proto";
+
+option go_package = "github.com/LumeraProtocol/lumera/x/supernode/types";
+
+// GenesisState defines the supernode module's genesis state.
+message GenesisState {
+  // params defines all the parameters of the module.
+  Params params = 1 [
+    (gogoproto.nullable) = false,
+    (amino.dont_omitempty) = true
+  ];
+}

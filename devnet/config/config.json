@@ -1,0 +1,28 @@
+{
+    "chain": {
+        "id": "lumera-devnet-1",
+        "denom": {
+            "bond": "ulume",
+            "mint": "ulume",
+            "minimum_gas_price": "0.25ulume"
+        }
+    },
+    "docker": {
+        "network_name": "lumera-network",
+        "container_prefix": "lumera",
+        "volume_prefix": "lumera"
+    },
+    "paths": {
+        "base": {
+            "host": "~",
+            "container": "/root"
+        },
+        "directories": {
+            "daemon": ".lumera"
+        }
+    },
+    "daemon": {
+        "binary": "lumerad",
+        "keyring_backend": "test"
+    }
+}

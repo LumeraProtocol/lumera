@@ -171,10 +171,10 @@ func (sb *SecondaryScriptBuilder) addStartCommand() {
 		"    sleep 1",
 		"done",
 		"",
-		fmt.Sprintf(`echo "Starting secondary validator %s..."`, sb.config.Daemon.Binary),
-		fmt.Sprintf("%s start --minimum-gas-prices %s",
-			sb.config.Daemon.Binary,
-			sb.config.Chain.Denom.MinimumGasPrice),
+		// fmt.Sprintf(`echo "Starting secondary validator %s..."`, sb.config.Daemon.Binary),
+		// fmt.Sprintf("%s start --minimum-gas-prices %s",
+		// 	sb.config.Daemon.Binary,
+		// 	sb.config.Chain.Denom.MinimumGasPrice),
 	}...)
 }
 

@@ -8,9 +8,9 @@ import (
 	context "context"
 	reflect "reflect"
 
+	legroast "github.com/LumeraProtocol/lumera/x/lumeraid/module/legroast"
 	types "github.com/cosmos/cosmos-sdk/types"
 	gomock "github.com/golang/mock/gomock"
-	legroast "github.com/LumeraProtocol/lumera/x/lumeraid/module/legroast"
 )
 
 // MockAccountKeeper is a mock of AccountKeeper interface.

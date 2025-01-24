@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-
 type LegRoastTestSuite struct {
 	suite.Suite
 	tests []struct {
@@ -63,7 +62,7 @@ func (suite *LegRoastTestSuite) TestFixedSeed() {
 	arr := [16]byte{42, 27, 251, 236, 198, 244, 224, 12, 145, 63, 239, 83, 159, 251, 242, 158}
 	seed := arr[:]
 	for _, tt := range suite.tests {
-		suite.Run(tt.name + " - Fixed Seed", func() {
+		suite.Run(tt.name+" - Fixed Seed", func() {
 			suite.T().Parallel()
 			suite.runSignAndVerify(tt, seed)
 		})
@@ -72,7 +71,7 @@ func (suite *LegRoastTestSuite) TestFixedSeed() {
 
 func (suite *LegRoastTestSuite) TestRandomSeed() {
 	for _, tt := range suite.tests {
-		suite.Run(tt.name + " - Random Seed", func() {
+		suite.Run(tt.name+" - Random Seed", func() {
 			suite.runSignAndVerify(tt, nil)
 		})
 	}
@@ -99,7 +98,7 @@ func (suite *LegRoastTestSuite) TestInvalidProver() {
 	suite.Error(err, "Signing should return an error")
 
 	err = lr.Verify([]byte("test message"), []byte("signature"))
-	suite.Error(err, "Verification should return an error")	
+	suite.Error(err, "Verification should return an error")
 }
 
 func (suite *LegRoastTestSuite) TestVerify() {
@@ -123,7 +122,7 @@ func (suite *LegRoastTestSuite) TestVerify() {
 	signature, err := lr.Sign([]byte("test message"))
 	suite.NoError(err, "Signing should succeed")
 	err = lr.Verify([]byte("test message"), signature)
-	suite.Error(err, "Verification should return an error")	
+	suite.Error(err, "Verification should return an error")
 }
 
 func (suite *LegRoastTestSuite) TestInvalidSignature() {
@@ -143,4 +142,3 @@ func (suite *LegRoastTestSuite) TestInvalidSignature() {
 func TestLegRoastTestSuite(t *testing.T) {
 	suite.Run(t, new(LegRoastTestSuite))
 }
-

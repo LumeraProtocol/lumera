@@ -1,0 +1,15 @@
+syntax = "proto3";
+package lumera.action;
+
+import "amino/amino.proto";
+import "gogoproto/gogo.proto";
+
+option go_package = "github.com/LumeraProtocol/lumera/x/action/types";
+
+// Params defines the parameters for the module.
+message Params {
+  option (amino.name) = "lumera/x/action/Params";
+  option (gogoproto.equal) = true;
+
+  
+}

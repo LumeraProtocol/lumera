@@ -12,82 +12,82 @@ import (
 	"github.com/tidwall/gjson"
 )
 
-// func TestQueryGetTopSuperNodesForBlock(t *testing.T) {
-// 	// Initialize and reset chain
-// 	sut.ResetChain(t)
+func TestQueryGetTopSuperNodesForBlock(t *testing.T) {
+	// Initialize and reset chain
+	sut.ResetChain(t)
 
-// 	// Create CLI helper
-// 	cli := NewLumeradCLI(t, sut, true)
+	// Create CLI helper
+	cli := NewLumeradCLI(t, sut, true)
 
-// 	// Start the chain
-// 	sut.StartChain(t)
+	// Start the chain
+	sut.StartChain(t)
 
-// 	// Register all 4 validator nodes as supernodes
-// 	var valAddrs []string
-// 	for i := 0; i < 4; i++ {
-// 		nodeName := "node" + string(rune(i+'0'))
-// 		accountAddr := cli.GetKeyAddr(nodeName)
-// 		valAddr := strings.TrimSpace(cli.Keys("keys", "show", nodeName, "--bech", "val", "-a"))
-// 		valAddrs = append(valAddrs, valAddr)
+	// Register all 4 validator nodes as supernodes
+	var valAddrs []string
+	for i := 0; i < 4; i++ {
+		nodeName := "node" + string(rune(i+'0'))
+		accountAddr := cli.GetKeyAddr(nodeName)
+		valAddr := strings.TrimSpace(cli.Keys("keys", "show", nodeName, "--bech", "val", "-a"))
+		valAddrs = append(valAddrs, valAddr)
 
-// 		// Register supernode
-// 		registerResp := cli.CustomCommand(
-// 			"tx", "supernode", "register-supernode",
-// 			valAddr,       // validator address
-// 			"192.168.1.1", // IP address
-// 			"1.0.0",       // version
-// 			accountAddr,   // supernode account
-// 			"--from", nodeName,
-// 		)
-// 		RequireTxSuccess(t, registerResp)
-// 	}
+		// Register supernode
+		registerResp := cli.CustomCommand(
+			"tx", "supernode", "register-supernode",
+			valAddr,       // validator address
+			"192.168.1.1", // IP address
+			"1.0.0",       // version
+			accountAddr,   // supernode account
+			"--from", nodeName,
+		)
+		RequireTxSuccess(t, registerResp)
+	}
 
-// 	// Wait for registrations to be processed
-// 	sut.AwaitNextBlock(t)
+	// Wait for registrations to be processed
+	sut.AwaitNextBlock(t)
 
-// 	// Get our query height (current height after registrations)
-// 	queryHeight := sut.AwaitNextBlock(t)
-// 	t.Logf("Using query height: %d", queryHeight)
+	// Get our query height (current height after registrations)
+	queryHeight := sut.AwaitNextBlock(t)
+	t.Logf("Using query height: %d", queryHeight)
 
-// 	// Get initial response using default ACTIVE filter
-// 	args := []string{
-// 		"query",
-// 		"supernode",
-// 		"get-top-super-nodes-for-block",
-// 		fmt.Sprint(queryHeight),
-// 		"--output", "json",
-// 	}
+	// Get initial response using default ACTIVE filter
+	args := []string{
+		"query",
+		"supernode",
+		"get-top-super-nodes-for-block",
+		fmt.Sprint(queryHeight),
+		"--output", "json",
+	}
 
-// 	// Get initial response to compare against
-// 	initialResp := cli.CustomQuery(args...)
-// 	initialHash := fmt.Sprintf("%x", sha256.Sum256([]byte(initialResp)))
+	// Get initial response to compare against
+	initialResp := cli.CustomQuery(args...)
+	initialHash := fmt.Sprintf("%x", sha256.Sum256([]byte(initialResp)))
 
-// 	// Validate initial response
-// 	initialNodes := gjson.Get(initialResp, "supernodes").Array()
-// 	require.NotEmpty(t, initialNodes, "Response should not be empty")
-// 	require.Len(t, initialNodes, 4, "Should have exactly 4 supernodes")
+	// Validate initial response
+	initialNodes := gjson.Get(initialResp, "supernodes").Array()
+	require.NotEmpty(t, initialNodes, "Response should not be empty")
+	require.Len(t, initialNodes, 4, "Should have exactly 4 supernodes")
 
-// 	// Query same height in next few blocks to verify deterministic results
-// 	for i := 0; i < 3; i++ {
-// 		currentHeight := sut.AwaitNextBlock(t)
-// 		t.Logf("Querying height %d from block %d", queryHeight, currentHeight)
+	// Query same height in next few blocks to verify deterministic results
+	for i := 0; i < 3; i++ {
+		currentHeight := sut.AwaitNextBlock(t)
+		t.Logf("Querying height %d from block %d", queryHeight, currentHeight)
 
-// 		resp := cli.CustomQuery(args...)
-// 		currentHash := fmt.Sprintf("%x", sha256.Sum256([]byte(resp)))
+		resp := cli.CustomQuery(args...)
+		currentHash := fmt.Sprintf("%x", sha256.Sum256([]byte(resp)))
 
-// 		// Verify the response isn't empty and has correct number of nodes
-// 		nodes := gjson.Get(resp, "supernodes").Array()
-// 		require.NotEmpty(t, nodes, "Response should not be empty")
-// 		require.Len(t, nodes, 4, "Should have exactly 4 supernodes")
+		// Verify the response isn't empty and has correct number of nodes
+		nodes := gjson.Get(resp, "supernodes").Array()
+		require.NotEmpty(t, nodes, "Response should not be empty")
+		require.Len(t, nodes, 4, "Should have exactly 4 supernodes")
 
-// 		// Verify response is deterministic
-// 		if initialHash != currentHash {
-// 			t.Logf("Initial response: %s", initialResp)
-// 			t.Logf("Current response: %s", resp)
-// 			t.Fatal("Response hash mismatch - results are not deterministic")
-// 		}
-// 	}
-// }
+		// Verify response is deterministic
+		if initialHash != currentHash {
+			t.Logf("Initial response: %s", initialResp)
+			t.Logf("Current response: %s", resp)
+			t.Fatal("Response hash mismatch - results are not deterministic")
+		}
+	}
+}
 
 func TestQueryGetTopSuperNodesForBlockFlags(t *testing.T) {
 	// Initialize and reset chain

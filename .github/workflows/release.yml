@@ -6,7 +6,9 @@ on:
       - 'docs/**'
       - '.gitignore'
   pull_request:
-    branches: [ master ]
+    branches:
+      - master
+      - release-v*
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

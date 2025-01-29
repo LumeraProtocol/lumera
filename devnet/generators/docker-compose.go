@@ -98,3 +98,40 @@ func WriteDockerCompose(compose *DockerComposeConfig, filename string) error {
 	}
 	return nil
 }
+
+func GenerateStartDockerCompose(config *confg.ChainConfig, validators []confg.Validator) (*DockerComposeConfig, error) {
+	compose := &DockerComposeConfig{
+		Services: make(map[string]DockerComposeService),
+		Networks: map[string]DockerComposeNetwork{
+			"default": {
+				Name: config.Docker.NetworkName,
+			},
+		},
+	}
+
+	for index, validator := range validators {
+		serviceName := fmt.Sprintf("%s-%s", config.Docker.ContainerPrefix, validator.Name)
+
+		service := DockerComposeService{
+			ContainerName: serviceName,
+			Ports: []string{
+				fmt.Sprintf("%d:%d", validator.Port, DefaultP2PPort),
+				fmt.Sprintf("%d:%d", validator.RPCPort, DefaultRPCPort),
+				fmt.Sprintf("%d:%d", validator.RESTPort, DefaultRESTPort),
+				fmt.Sprintf("%d:%d", validator.GRPCPort, DefaultGRPCPort),
+			},
+			Volumes: []string{
+				fmt.Sprintf("/tmp/lumera-devnet/%s-data:/root/%s", validator.Name, config.Paths.Directories.Daemon),
+				"/tmp/lumera-devnet/shared:/shared",
+			},
+			Command: "bash /root/scripts/start.sh",
+		}
+
+		if index > 0 {
+			service.DependsOn = []string{validators[0].Name}
+		}
+
+		compose.Services[validator.Name] = service
+	}
+	return compose, nil
+}

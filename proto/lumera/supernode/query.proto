@@ -69,7 +69,7 @@ message QueryListSuperNodesResponse {
 message QueryGetTopSuperNodesForBlockRequest {
   int32 blockHeight = 1;
   int32 limit = 2;
-  SuperNodeState state = 3 [(gogoproto.moretags) = "yaml:\"state\""];
+  string state = 3 [(gogoproto.moretags) = "yaml:\"state\""];
 }
 
 message QueryGetTopSuperNodesForBlockResponse {

@@ -78,7 +78,7 @@ Important implementation details:
   - Follow this format:
     ```csv
     oldAddress,balance
-    PtqHAEacynVd3V821NPhgxu9K4Ab6kAguHi,99999999ulumen
+    PtqHAEacynVd3V821NPhgxu9K4Ab6kAguHi,99999999ulume
     ```
 - The application performs validation:
   - Panics if CSV file is not found
@@ -264,7 +264,7 @@ Parameter update governance proposal:
         }
     }],
     "metadata": "ipfs://CID",
-    "deposit": "10000ulumen",
+    "deposit": "10000ulume",
     "title": "Update Claim Parameters",
     "summary": "Enable claims and set duration to 6 months"
 }

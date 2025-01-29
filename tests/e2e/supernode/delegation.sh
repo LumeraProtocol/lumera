@@ -10,8 +10,8 @@ VALIDATOR_NUM=2
 VALIDATOR_CONTAINER="lumera-validator${VALIDATOR_NUM}"
 
 # Delegation amount constants
-REDUCE_AMOUNT="10ulumen"
-RESTORE_AMOUNT="10ulumen"
+REDUCE_AMOUNT="10ulume"
+RESTORE_AMOUNT="10ulume"
 
 # Create a timestamped log file
 LOG_FILE="stake_test_.log"

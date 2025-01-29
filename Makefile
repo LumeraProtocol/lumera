@@ -49,7 +49,12 @@ devnet-build:
 		CONFIG_JSON="$${CONFIG_JSON:-$(DEFAULT_CONFIG_JSON)}" \
 		VALIDATORS_JSON="$${VALIDATORS_JSON:-$(DEFAULT_VALIDATORS_JSON)}" \
 		go run . && \
-		docker compose build; \
+		docker compose build && \
+		docker compose up -d && \
+		echo "Waiting for initialization to complete..." && \
+		while [ ! -f "$(SHARED_DIR)/setup_complete" ]; do sleep 1; done && \
+		docker compose down && \
+		echo "Initialization complete. Ready to start nodes."; \
 	else \
 		echo "No external claims file provided or file not found."; \
 		exit 1; \
@@ -81,7 +86,7 @@ devnet-rebuild:
 
 devnet-up:
 	cd devnet && \
-	docker compose up
+	docker compose -f docker-compose.start.yml up
 
 devnet-up-detach:
 	cd devnet && \

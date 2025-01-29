@@ -2,9 +2,9 @@
     "chain": {
         "id": "lumera-devnet-1",
         "denom": {
-            "bond": "ulumen",
-            "mint": "ulumen",
-            "minimum_gas_price": "0.25ulumen"
+            "bond": "ulume",
+            "mint": "ulume",
+            "minimum_gas_price": "0.025ulume"
         }
     },
     "docker": {

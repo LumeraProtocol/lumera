@@ -240,6 +240,7 @@ jobs:
             echo "Please run as root or with sudo"
             exit 1
           fi
+          cp lumerad /usr/local/bin
           cp libwasmvm.x86_64.so /usr/lib/
           ldconfig
           echo "WASM library installed successfully"

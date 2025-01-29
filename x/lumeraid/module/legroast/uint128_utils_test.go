@@ -98,12 +98,12 @@ func TestLegendreSymbolCT(t *testing.T) {
 		input    uint128.Uint128
 		expected byte
 	}{
-		{uint128.From64(0), 0},             
-		{uint128.From64(2), 0},             
-		{uint128.From64(3), 1},             
-		{m127.Sub(uint128.From64(1)), 1},   
-		{uint128.From64(16), 0},            
-		{uint128.From64(17), 0},          
+		{uint128.From64(0), 0},
+		{uint128.From64(2), 0},
+		{uint128.From64(3), 1},
+		{m127.Sub(uint128.From64(1)), 1},
+		{uint128.From64(16), 0},
+		{uint128.From64(17), 0},
 	}
 
 	for _, tt := range tests {

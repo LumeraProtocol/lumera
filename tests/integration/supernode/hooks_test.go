@@ -1,8 +1,9 @@
 package integration_test
 
 import (
-	sdkmath "cosmossdk.io/math"
 	"fmt"
+
+	sdkmath "cosmossdk.io/math"
 
 	_ "cosmossdk.io/log"
 	"github.com/LumeraProtocol/lumera/x/supernode/types"

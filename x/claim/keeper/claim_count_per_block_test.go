@@ -28,49 +28,50 @@ func TestBlockClaimCount(t *testing.T) {
 			operations:    []string{"increment", "increment", "increment"},
 			expectedCount: 3,
 		},
-		{
-			name:          "reset after increment",
-			operations:    []string{"increment", "increment", "reset"},
-			expectedCount: 0,
-		},
-		{
-			name:          "increment after reset",
-			operations:    []string{"increment", "increment", "reset", "increment"},
-			expectedCount: 1,
-		},
-		{
-			name:          "multiple resets",
-			operations:    []string{"increment", "reset", "increment", "increment", "reset"},
-			expectedCount: 0,
-		},
-		{
-			name:          "reset with no prior increments",
-			operations:    []string{"reset"},
-			expectedCount: 0,
-		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			keeper, ctx := keepertest.ClaimKeeper(t)
 
-			// Initial count should be zero
-			count := keeper.GetBlockClaimCount(ctx)
+			// Initial count should be zero.
+			count, err := keeper.GetBlockClaimCount(ctx)
+			require.NoError(t, err)
 			require.Equal(t, uint64(0), count, "initial count should be zero")
 
-			// Perform operations
+			// Perform operations.
 			for _, op := range tc.operations {
-				switch op {
-				case "increment":
-					keeper.IncrementBlockClaimCount(ctx)
-				case "reset":
-					keeper.ResetBlockClaimCount(ctx)
+				if op == "increment" {
+					err := keeper.IncrementBlockClaimCount(ctx)
+					require.NoError(t, err)
 				}
 			}
 
-			// Check final count
-			count = keeper.GetBlockClaimCount(ctx)
+			// Check final count.
+			count, err = keeper.GetBlockClaimCount(ctx)
+			require.NoError(t, err)
 			require.Equal(t, tc.expectedCount, count, "unexpected final count")
 		})
 	}
+}
+
+// Optional: Test block transition behavior
+func TestBlockClaimCountReset(t *testing.T) {
+	keeper, ctx := keepertest.ClaimKeeper(t)
+
+	// Increment in current block.
+	err := keeper.IncrementBlockClaimCount(ctx)
+	require.NoError(t, err)
+
+	count, err := keeper.GetBlockClaimCount(ctx)
+	require.NoError(t, err)
+	require.Equal(t, uint64(1), count)
+
+	// Simulate new block by creating a new context.
+	newCtx := ctx.WithBlockHeight(ctx.BlockHeight() + 1)
+
+	// Count should be reset in new block.
+	count, err = keeper.GetBlockClaimCount(newCtx)
+	require.NoError(t, err)
+	require.Equal(t, uint64(0), count)
 }

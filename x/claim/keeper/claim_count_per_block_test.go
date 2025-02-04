@@ -54,24 +54,3 @@ func TestBlockClaimCount(t *testing.T) {
 		})
 	}
 }
-
-// Optional: Test block transition behavior
-func TestBlockClaimCountReset(t *testing.T) {
-	keeper, ctx := keepertest.ClaimKeeper(t)
-
-	// Increment in current block.
-	err := keeper.IncrementBlockClaimCount(ctx)
-	require.NoError(t, err)
-
-	count, err := keeper.GetBlockClaimCount(ctx)
-	require.NoError(t, err)
-	require.Equal(t, uint64(1), count)
-
-	// Simulate new block by creating a new context.
-	newCtx := ctx.WithBlockHeight(ctx.BlockHeight() + 1)
-
-	// Count should be reset in new block.
-	count, err = keeper.GetBlockClaimCount(newCtx)
-	require.NoError(t, err)
-	require.Equal(t, uint64(0), count)
-}

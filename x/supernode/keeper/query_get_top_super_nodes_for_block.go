@@ -30,6 +30,15 @@ func (k Keeper) GetTopSuperNodesForBlock(
 		return nil, errorsmod.Wrap(sdkerrors.ErrInvalidRequest, "nil request")
 	}
 
+	// 0) Parse the state filter since auto cli doesn't support enum
+	var superNodeStateFilter types.SuperNodeState
+	stateValue, ok := types.SuperNodeState_value[req.State]
+	if !ok {
+		superNodeStateFilter = types.SuperNodeStateUnspecified
+	} else {
+		superNodeStateFilter = types.SuperNodeState(stateValue)
+	}
+
 	ctx := sdk.UnwrapSDKContext(goCtx)
 	blockHeight := int64(req.BlockHeight)
 
@@ -56,8 +65,6 @@ func (k Keeper) GetTopSuperNodesForBlock(
 		)
 	}
 
-	fmt.Println("allSNs", allSns)
-
 	// 4) Filter supernodes
 	validSns := make([]types.SuperNode, 0)
 	for _, sn := range allSns {
@@ -65,27 +72,25 @@ func (k Keeper) GetTopSuperNodesForBlock(
 		if len(sn.States) == 0 {
 			continue
 		}
-		// Must be originally registered as Active at a block <= blockHeight
+
+		// 4.2) Must have a state record at or before the requested block height
 		if sn.States[0].Height > blockHeight {
 			continue
 		}
-		if sn.States[0].State != types.SuperNodeStateActive {
-			continue
-		}
 
-		// 4.2) Determine supernode's state at blockHeight
+		// 4.3) Determine supernode's state at blockHeight
 		stateAtBlock, ok := DetermineStateAtBlock(sn.States, blockHeight)
 		if !ok {
 			continue
 		}
 
-		// 4.3) State must not be Unspecified
+		// 4.4) State must not be Unspecified
 		if stateAtBlock == types.SuperNodeStateUnspecified {
 			continue
 		}
 
-		// 5) If request.State != Unspecified, we must match
-		if req.State != types.SuperNodeStateUnspecified && stateAtBlock != req.State {
+		// 4.5) Must match requested state if specified
+		if superNodeStateFilter != types.SuperNodeStateUnspecified && stateAtBlock != superNodeStateFilter {
 			continue
 		}
 
@@ -93,7 +98,7 @@ func (k Keeper) GetTopSuperNodesForBlock(
 		validSns = append(validSns, sn)
 	}
 
-	// 6) Compute XOR distances
+	// 5) Compute XOR distances and rank
 	blockHash, err := k.GetBlockHashForHeight(ctx, blockHeight)
 	if err != nil {
 		return nil, errorsmod.Wrapf(
@@ -102,10 +107,10 @@ func (k Keeper) GetTopSuperNodesForBlock(
 		)
 	}
 
-	// 7) Rank supernodes by distance
+	// 6) Rank supernodes by distance
 	topNodes := k.rankSuperNodesByDistance(blockHash, validSns, int(limit))
 
-	// 8) Build the response
+	// 7) Build the response
 	topPointers := make([]*types.SuperNode, len(topNodes))
 	for i := range topNodes {
 		topPointers[i] = &topNodes[i]

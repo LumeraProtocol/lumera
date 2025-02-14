@@ -1,0 +1,17 @@
+syntax = "proto3";
+package lumera.action;
+
+option go_package = "github.com/LumeraProtocol/lumera/x/action/types";
+
+import "lumera/action/metadata.proto";
+import "lumera/action/action_state.proto";
+
+message Action {
+  string creator = 1;
+  string actionID = 2;
+  Metadata metadata = 3;
+  string price = 4;
+  string expirationTime = 5;
+  int64 blockHeight = 6;
+  ActionState state = 7;
+}

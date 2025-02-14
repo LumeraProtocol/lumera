@@ -114,15 +114,107 @@ func (m *QueryParamsResponse) GetParams() Params {
 	return Params{}
 }
 
+// Request type for GetAction
+type QueryGetActionRequest struct {
+	ActionID string `protobuf:"bytes,1,opt,name=actionID,proto3" json:"actionID,omitempty"`
+}
+
+func (m *QueryGetActionRequest) Reset()         { *m = QueryGetActionRequest{} }
+func (m *QueryGetActionRequest) String() string { return proto.CompactTextString(m) }
+func (*QueryGetActionRequest) ProtoMessage()    {}
+func (*QueryGetActionRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_55b16f9ed8860b40, []int{2}
+}
+func (m *QueryGetActionRequest) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *QueryGetActionRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_QueryGetActionRequest.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *QueryGetActionRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_QueryGetActionRequest.Merge(m, src)
+}
+func (m *QueryGetActionRequest) XXX_Size() int {
+	return m.Size()
+}
+func (m *QueryGetActionRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_QueryGetActionRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_QueryGetActionRequest proto.InternalMessageInfo
+
+func (m *QueryGetActionRequest) GetActionID() string {
+	if m != nil {
+		return m.ActionID
+	}
+	return ""
+}
+
+// Response type for GetAction
+type QueryGetActionResponse struct {
+	Action *Action `protobuf:"bytes,1,opt,name=action,proto3" json:"action,omitempty"`
+}
+
+func (m *QueryGetActionResponse) Reset()         { *m = QueryGetActionResponse{} }
+func (m *QueryGetActionResponse) String() string { return proto.CompactTextString(m) }
+func (*QueryGetActionResponse) ProtoMessage()    {}
+func (*QueryGetActionResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_55b16f9ed8860b40, []int{3}
+}
+func (m *QueryGetActionResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *QueryGetActionResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_QueryGetActionResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *QueryGetActionResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_QueryGetActionResponse.Merge(m, src)
+}
+func (m *QueryGetActionResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *QueryGetActionResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_QueryGetActionResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_QueryGetActionResponse proto.InternalMessageInfo
+
+func (m *QueryGetActionResponse) GetAction() *Action {
+	if m != nil {
+		return m.Action
+	}
+	return nil
+}
+
 func init() {
 	proto.RegisterType((*QueryParamsRequest)(nil), "lumera.action.QueryParamsRequest")
 	proto.RegisterType((*QueryParamsResponse)(nil), "lumera.action.QueryParamsResponse")
+	proto.RegisterType((*QueryGetActionRequest)(nil), "lumera.action.QueryGetActionRequest")
+	proto.RegisterType((*QueryGetActionResponse)(nil), "lumera.action.QueryGetActionResponse")
 }
 
 func init() { proto.RegisterFile("lumera/action/query.proto", fileDescriptor_55b16f9ed8860b40) }
 
 var fileDescriptor_55b16f9ed8860b40 = []byte{
-	// 317 bytes of a gzipped FileDescriptorProto
+	// 410 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0x92, 0xcc, 0x29, 0xcd, 0x4d,
 	0x2d, 0x4a, 0xd4, 0x4f, 0x4c, 0x2e, 0xc9, 0xcc, 0xcf, 0xd3, 0x2f, 0x2c, 0x4d, 0x2d, 0xaa, 0xd4,
 	0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0xe2, 0x85, 0x48, 0xe9, 0x41, 0xa4, 0xa4, 0x04, 0x13, 0x73,
@@ -131,18 +223,24 @@ var fileDescriptor_55b16f9ed8860b40 = []byte{
 	0x13, 0xf3, 0xf2, 0xf2, 0x4b, 0x12, 0x41, 0xfa, 0x8b, 0xa1, 0xb2, 0x5a, 0xc9, 0xf9, 0xc5, 0xb9,
 	0xf9, 0xc5, 0xfa, 0x49, 0x89, 0xc5, 0xa9, 0x10, 0xeb, 0xf4, 0xcb, 0x0c, 0x93, 0x52, 0x4b, 0x12,
 	0x0d, 0xf5, 0x0b, 0x12, 0xd3, 0x33, 0xf3, 0xc0, 0x8a, 0xa1, 0x6a, 0xa5, 0x50, 0x1d, 0x57, 0x90,
-	0x58, 0x94, 0x98, 0x0b, 0x35, 0x47, 0x49, 0x84, 0x4b, 0x28, 0x10, 0xa4, 0x3b, 0x00, 0x2c, 0x18,
-	0x94, 0x5a, 0x58, 0x9a, 0x5a, 0x5c, 0xa2, 0xe4, 0xcf, 0x25, 0x8c, 0x22, 0x5a, 0x5c, 0x90, 0x9f,
-	0x57, 0x9c, 0x2a, 0x64, 0xc1, 0xc5, 0x06, 0xd1, 0x2c, 0xc1, 0xa8, 0xc0, 0xa8, 0xc1, 0x6d, 0x24,
-	0xaa, 0x87, 0xe2, 0x37, 0x3d, 0x88, 0x72, 0x27, 0xce, 0x13, 0xf7, 0xe4, 0x19, 0x56, 0x3c, 0xdf,
-	0xa0, 0xc5, 0x18, 0x04, 0x55, 0x6f, 0xd4, 0xc6, 0xc8, 0xc5, 0x0a, 0x36, 0x51, 0xa8, 0x96, 0x8b,
-	0x0d, 0xa2, 0x4c, 0x48, 0x11, 0x4d, 0x37, 0xa6, 0x3b, 0xa4, 0x94, 0xf0, 0x29, 0x81, 0x38, 0x4a,
-	0x49, 0xa7, 0xe9, 0xf2, 0x93, 0xc9, 0x4c, 0x6a, 0x42, 0x2a, 0xfa, 0x3e, 0x60, 0xb5, 0x01, 0x20,
-	0x7f, 0x25, 0xe7, 0xe7, 0xe8, 0x63, 0xf3, 0xb5, 0x93, 0xe7, 0x89, 0x47, 0x72, 0x8c, 0x17, 0x1e,
-	0xc9, 0x31, 0x3e, 0x78, 0x24, 0xc7, 0x38, 0xe1, 0xb1, 0x1c, 0xc3, 0x85, 0xc7, 0x72, 0x0c, 0x37,
-	0x1e, 0xcb, 0x31, 0x44, 0xe9, 0xa7, 0x67, 0x96, 0x64, 0x94, 0x26, 0xe9, 0x25, 0xe7, 0xe7, 0xe2,
-	0x30, 0xa9, 0x02, 0x66, 0x56, 0x49, 0x65, 0x41, 0x6a, 0x71, 0x12, 0x1b, 0x38, 0x04, 0x8d, 0x01,
-	0x01, 0x00, 0x00, 0xff, 0xff, 0x00, 0xea, 0x3a, 0x53, 0xfc, 0x01, 0x00, 0x00,
+	0x58, 0x94, 0x98, 0x5b, 0x8c, 0x5d, 0x0e, 0x42, 0x41, 0xe4, 0x94, 0x44, 0xb8, 0x84, 0x02, 0x41,
+	0x26, 0x07, 0x80, 0x35, 0x04, 0xa5, 0x16, 0x96, 0xa6, 0x16, 0x97, 0x28, 0xf9, 0x73, 0x09, 0xa3,
+	0x88, 0x16, 0x17, 0xe4, 0xe7, 0x15, 0xa7, 0x0a, 0x59, 0x70, 0xb1, 0x41, 0x0c, 0x96, 0x60, 0x54,
+	0x60, 0xd4, 0xe0, 0x36, 0x12, 0xd5, 0x43, 0xf1, 0xb7, 0x1e, 0x44, 0xb9, 0x13, 0xe7, 0x89, 0x7b,
+	0xf2, 0x0c, 0x2b, 0x9e, 0x6f, 0xd0, 0x62, 0x0c, 0x82, 0xaa, 0x57, 0x32, 0xe6, 0x12, 0x05, 0x1b,
+	0xe8, 0x9e, 0x5a, 0xe2, 0x08, 0x56, 0x0b, 0xb5, 0x49, 0x48, 0x8a, 0x8b, 0x03, 0xa2, 0xd9, 0xd3,
+	0x05, 0x6c, 0x28, 0x67, 0x10, 0x9c, 0xaf, 0xe4, 0xce, 0x25, 0x86, 0xae, 0x09, 0xea, 0x10, 0x5d,
+	0x2e, 0x36, 0x88, 0x2a, 0x1c, 0x0e, 0x81, 0x2a, 0x87, 0x2a, 0x32, 0x9a, 0xc7, 0xc4, 0xc5, 0x0a,
+	0x36, 0x49, 0xa8, 0x96, 0x8b, 0x0d, 0xe2, 0x48, 0x21, 0x45, 0x34, 0x2d, 0x98, 0xa1, 0x20, 0xa5,
+	0x84, 0x4f, 0x09, 0xc4, 0x25, 0x4a, 0x3a, 0x4d, 0x97, 0x9f, 0x4c, 0x66, 0x52, 0x13, 0x52, 0xd1,
+	0xf7, 0x01, 0xab, 0x0d, 0x00, 0x85, 0x6a, 0x72, 0x7e, 0x8e, 0x3e, 0xb6, 0xf8, 0x10, 0x9a, 0xca,
+	0xc8, 0xc5, 0x09, 0xf7, 0x8d, 0x90, 0x0a, 0x36, 0xf3, 0xd1, 0x43, 0x48, 0x4a, 0x95, 0x80, 0x2a,
+	0xa8, 0x43, 0xac, 0xc1, 0x0e, 0x31, 0x15, 0x32, 0xc6, 0xef, 0x90, 0xf4, 0xd4, 0x92, 0x78, 0x28,
+	0xb3, 0x1a, 0x16, 0xd0, 0xb5, 0x4e, 0x9e, 0x27, 0x1e, 0xc9, 0x31, 0x5e, 0x78, 0x24, 0xc7, 0xf8,
+	0xe0, 0x91, 0x1c, 0xe3, 0x84, 0xc7, 0x72, 0x0c, 0x17, 0x1e, 0xcb, 0x31, 0xdc, 0x78, 0x2c, 0xc7,
+	0x10, 0xa5, 0x9f, 0x9e, 0x59, 0x92, 0x51, 0x9a, 0xa4, 0x97, 0x9c, 0x9f, 0x8b, 0xc3, 0xe0, 0x0a,
+	0x98, 0xd1, 0x25, 0x95, 0x05, 0xa9, 0xc5, 0x49, 0x6c, 0xe0, 0x74, 0x65, 0x0c, 0x08, 0x00, 0x00,
+	0xff, 0xff, 0x8f, 0x0c, 0x33, 0xfa, 0x2e, 0x03, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -159,6 +257,8 @@ const _ = grpc.SupportPackageIsVersion4
 type QueryClient interface {
 	// Parameters queries the parameters of the module.
 	Params(ctx context.Context, in *QueryParamsRequest, opts ...grpc.CallOption) (*QueryParamsResponse, error)
+	// GetAction queries a single action by ID.
+	GetAction(ctx context.Context, in *QueryGetActionRequest, opts ...grpc.CallOption) (*QueryGetActionResponse, error)
 }
 
 type queryClient struct {
@@ -178,10 +278,21 @@ func (c *queryClient) Params(ctx context.Context, in *QueryParamsRequest, opts .
 	return out, nil
 }
 
+func (c *queryClient) GetAction(ctx context.Context, in *QueryGetActionRequest, opts ...grpc.CallOption) (*QueryGetActionResponse, error) {
+	out := new(QueryGetActionResponse)
+	err := c.cc.Invoke(ctx, "/lumera.action.Query/GetAction", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // QueryServer is the server API for Query service.
 type QueryServer interface {
 	// Parameters queries the parameters of the module.
 	Params(context.Context, *QueryParamsRequest) (*QueryParamsResponse, error)
+	// GetAction queries a single action by ID.
+	GetAction(context.Context, *QueryGetActionRequest) (*QueryGetActionResponse, error)
 }
 
 // UnimplementedQueryServer can be embedded to have forward compatible implementations.
@@ -190,6 +301,9 @@ type UnimplementedQueryServer struct {
 
 func (*UnimplementedQueryServer) Params(ctx context.Context, req *QueryParamsRequest) (*QueryParamsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Params not implemented")
+}
+func (*UnimplementedQueryServer) GetAction(ctx context.Context, req *QueryGetActionRequest) (*QueryGetActionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAction not implemented")
 }
 
 func RegisterQueryServer(s grpc1.Server, srv QueryServer) {
@@ -214,6 +328,24 @@ func _Query_Params_Handler(srv interface{}, ctx context.Context, dec func(interf
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Query_GetAction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryGetActionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(QueryServer).GetAction(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/lumera.action.Query/GetAction",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(QueryServer).GetAction(ctx, req.(*QueryGetActionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var Query_serviceDesc = _Query_serviceDesc
 var _Query_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "lumera.action.Query",
@@ -222,6 +354,10 @@ var _Query_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Params",
 			Handler:    _Query_Params_Handler,
+		},
+		{
+			MethodName: "GetAction",
+			Handler:    _Query_GetAction_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -284,6 +420,71 @@ func (m *QueryParamsResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+func (m *QueryGetActionRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *QueryGetActionRequest) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *QueryGetActionRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.ActionID) > 0 {
+		i -= len(m.ActionID)
+		copy(dAtA[i:], m.ActionID)
+		i = encodeVarintQuery(dAtA, i, uint64(len(m.ActionID)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *QueryGetActionResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *QueryGetActionResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *QueryGetActionResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.Action != nil {
+		{
+			size, err := m.Action.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintQuery(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
 func encodeVarintQuery(dAtA []byte, offset int, v uint64) int {
 	offset -= sovQuery(v)
 	base := offset
@@ -312,6 +513,32 @@ func (m *QueryParamsResponse) Size() (n int) {
 	_ = l
 	l = m.Params.Size()
 	n += 1 + l + sovQuery(uint64(l))
+	return n
+}
+
+func (m *QueryGetActionRequest) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.ActionID)
+	if l > 0 {
+		n += 1 + l + sovQuery(uint64(l))
+	}
+	return n
+}
+
+func (m *QueryGetActionResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.Action != nil {
+		l = m.Action.Size()
+		n += 1 + l + sovQuery(uint64(l))
+	}
 	return n
 }
 
@@ -430,6 +657,174 @@ func (m *QueryParamsResponse) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if err := m.Params.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipQuery(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *QueryGetActionRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowQuery
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: QueryGetActionRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: QueryGetActionRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ActionID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthQuery
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ActionID = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipQuery(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *QueryGetActionResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowQuery
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: QueryGetActionResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: QueryGetActionResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Action", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthQuery
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Action == nil {
+				m.Action = &Action{}
+			}
+			if err := m.Action.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex

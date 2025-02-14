@@ -1,0 +1,27 @@
+syntax = "proto3";
+package lumera.action;
+
+option go_package = "github.com/LumeraProtocol/lumera/x/action/types";
+
+message SenseMetadata {
+  string data_hash = 1;
+  int32 dd_and_fingerprints_ic = 2;
+  int32 dd_and_fingerprints_max = 3;
+  repeated string dd_and_fingerprints_ids = 4;
+}
+
+message CascadeMetadata {
+  string data_hash = 1;
+  string file_name = 2;
+  repeated string rq_ids = 3;
+  int32 rq_max = 4;
+  int32 rq_ic = 5;
+  bytes rq_oti = 6;
+}
+
+message Metadata {
+  oneof metadata_type {
+    SenseMetadata sense_metadata = 1;
+    CascadeMetadata cascade_metadata = 2;
+  }
+}

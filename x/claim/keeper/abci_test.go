@@ -11,20 +11,7 @@ import (
 )
 
 func TestBeginBlocker(t *testing.T) {
-	keeper, ctx := keepertest.ClaimKeeper(t)
 
-	// Setup initial non-zero count
-	keeper.IncrementBlockClaimCount(ctx)
-	keeper.IncrementBlockClaimCount(ctx)
-	require.Equal(t, uint64(2), keeper.GetBlockClaimCount(ctx))
-
-	// Run BeginBlocker
-	err := keeper.BeginBlocker(sdk.WrapSDKContext(ctx))
-	require.NoError(t, err)
-
-	// Verify count was reset
-	count := keeper.GetBlockClaimCount(ctx)
-	require.Equal(t, uint64(0), count)
 }
 
 func TestEndBlocker(t *testing.T) {

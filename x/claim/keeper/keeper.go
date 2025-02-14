@@ -17,6 +17,7 @@ type (
 	Keeper struct {
 		cdc           codec.BinaryCodec
 		storeService  store.KVStoreService
+		tstoreService store.TransientStoreService
 		logger        log.Logger
 		authority     string
 		bankKeeper    types.BankKeeper
@@ -27,6 +28,7 @@ type (
 func NewKeeper(
 	cdc codec.BinaryCodec,
 	storeService store.KVStoreService,
+	tstoreService store.TransientStoreService,
 	logger log.Logger,
 	authority string,
 
@@ -38,10 +40,11 @@ func NewKeeper(
 	}
 
 	return Keeper{
-		cdc:          cdc,
-		storeService: storeService,
-		authority:    authority,
-		logger:       logger,
+		cdc:           cdc,
+		storeService:  storeService,
+		tstoreService: tstoreService,
+		authority:     authority,
+		logger:        logger,
 
 		bankKeeper:    bankKeeper,
 		accountKeeper: accountKeeper,

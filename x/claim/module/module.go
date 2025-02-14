@@ -175,10 +175,11 @@ func init() {
 type ModuleInputs struct {
 	depinject.In
 
-	StoreService store.KVStoreService
-	Cdc          codec.Codec
-	Config       *modulev1.Module
-	Logger       log.Logger
+	StoreService  store.KVStoreService
+	TStoreService store.TransientStoreService
+	Cdc           codec.Codec
+	Config        *modulev1.Module
+	Logger        log.Logger
 
 	AccountKeeper types.AccountKeeper
 	BankKeeper    types.BankKeeper
@@ -200,6 +201,7 @@ func ProvideModule(in ModuleInputs) ModuleOutputs {
 	k := keeper.NewKeeper(
 		in.Cdc,
 		in.StoreService,
+		in.TStoreService,
 		in.Logger,
 		authority.String(),
 		in.BankKeeper,

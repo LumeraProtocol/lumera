@@ -7,6 +7,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/codec/types"
 	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
+	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	"github.com/cosmos/go-bip39"
 	"github.com/golang/mock/gomock"
 	"github.com/pkg/errors"
@@ -51,7 +52,7 @@ func addTestAccountToKeyring(kr keyring.Keyring, accountName string) error {
 	if err != nil {
 		return err
 	}
-	hdPath := "m/44'/118'/0'/0/0" // Standard Cosmos HD path
+	hdPath := hd.CreateHDPath(118, 0, 0).String() // "118" is Cosmos coin type
 
 	_, err = kr.NewAccount(accountName, mnemonic, "", hdPath, signingAlgo)
 	if err != nil {

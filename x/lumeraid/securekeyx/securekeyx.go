@@ -1,3 +1,5 @@
+//go:generate mockgen -destination=securekeyx_mock.go -package=securekeyx -source=securekeyx.go
+
 package securekeyx
 
 import (
@@ -21,7 +23,7 @@ const (
 	Supernode
 )
 
-type ECDHKeyExchange interface {
+type KeyExchanger interface {
 	// CreateRequest generates handshake info and signs it with the specified Cosmos account.
 	CreateRequest(remoteAddress string) ([]byte, []byte, error)
 	// ComputeSharedSecret computes the shared secret using the ephemeral private key and the remote public key.
@@ -39,8 +41,6 @@ type SecureKeyExchange struct {
 	curve         ecdh.Curve	   // curve used for ECDH key exchange
 	mutex         sync.Mutex
 	ephemeralKeys map[string]*ecdh.PrivateKey // map of [remote_address -> ephemeral private keys]
-
-	ECDHKeyExchange
 }
 
 /*

@@ -2,8 +2,6 @@ module github.com/LumeraProtocol/lumera
 
 go 1.23.5
 
-toolchain go1.23.5
-
 replace (
 	github.com/btcsuite/btcd => github.com/btcsuite/btcd v0.23.4
 	github.com/btcsuite/btcd/chaincfg/chainhash => github.com/btcsuite/btcd/chaincfg/chainhash v1.0.1

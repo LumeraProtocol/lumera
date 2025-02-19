@@ -1,3 +1,5 @@
+//go:generate mockgen -destination=../mocks/legroast_mocks.go -package=lumeraidmocks -source=legroast.go
+
 package legroast
 
 /**********************************************************************

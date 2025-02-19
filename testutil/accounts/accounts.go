@@ -1,3 +1,5 @@
+//go:generate mockgen -destination=../mocks/keyring_mocks.go -package=testutilsmocks github.com/cosmos/cosmos-sdk/crypto/keyring Keyring
+
 package accounts
 
 import (
@@ -11,7 +13,12 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
 )
-	
+
+const (
+	TestAddress1 = "lumera1zvnc27832srgxa207y5hu2agy83wazfzurufyp"
+	TestAddress2 = "lumera1evlkjnp072q8u0yftk65ualx49j6mdz66p2073"
+)
+
 func generateMnemonic() (string, error) {
 	entropy, err := bip39.NewEntropy(128) // 128 bits for a 12-word mnemonic
 	if err != nil {

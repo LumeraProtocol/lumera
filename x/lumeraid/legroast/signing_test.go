@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	lumeraidmocks "github.com/LumeraProtocol/lumera/x/lumeraid/mocks"
-	. "github.com/LumeraProtocol/lumera/x/lumeraid/module/legroast"
+	. "github.com/LumeraProtocol/lumera/x/lumeraid/legroast"
 )
 
 func generateMnemonic() (string, error) {
@@ -182,7 +182,7 @@ func TestSignKeygenFailed(t *testing.T) {
 	ctl := gomock.NewController(t)
 	defer ctl.Finish()
 
-	lrMock := lumeraidmocks.NewMockLegRoast(ctl)
+	lrMock := lumeraidmocks.NewMockLegRoastInterface(ctl)
 	lrMock.EXPECT().Keygen(gomock.Any()).Return(errors.New("keygen failed"))
 
 	// replace NewLegRoast with the mock
@@ -209,7 +209,7 @@ func TestSignSignFailed(t *testing.T) {
 	ctl := gomock.NewController(t)
 	defer ctl.Finish()
 
-	lrMock := lumeraidmocks.NewMockLegRoast(ctl)
+	lrMock := lumeraidmocks.NewMockLegRoastInterface(ctl)
 	lrMock.EXPECT().Keygen(gomock.Any()).Return(nil)
 	lrMock.EXPECT().Sign(gomock.Any()).Return(nil, errors.New("sign failed"))
 
@@ -251,7 +251,7 @@ func TestVerifyInvalidPublicKey(t *testing.T) {
 	ctl := gomock.NewController(t)
 	defer ctl.Finish()
 
-	lrMock := lumeraidmocks.NewMockLegRoast(ctl)
+	lrMock := lumeraidmocks.NewMockLegRoastInterface(ctl)
 	lrMock.EXPECT().SetPublicKey(gomock.Any()).Return(errors.New("set public key failed"))
 
 	// replace NewLegRoast with the mock
@@ -279,7 +279,7 @@ func TestVerifyInvalidSignature(t *testing.T) {
 	ctl := gomock.NewController(t)
 	defer ctl.Finish()
 
-	lrMock := lumeraidmocks.NewMockLegRoast(ctl)
+	lrMock := lumeraidmocks.NewMockLegRoastInterface(ctl)
 	lrMock.EXPECT().SetPublicKey(gomock.Any()).Return(nil)
 	lrMock.EXPECT().Verify(gomock.Any(), gomock.Any()).Return(errors.New("verify failed"))
 

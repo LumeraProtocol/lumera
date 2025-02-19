@@ -1,4 +1,4 @@
-//go:generate mockgen -destination=securekeyx_mock.go -package=securekeyx -source=securekeyx.go
+//go:generate mockgen -destination=../mocks/securekeyx_mocks.go -package=lumeraidmocks -source=securekeyx.go
 
 package securekeyx
 
@@ -157,7 +157,7 @@ func (s *SecureKeyExchange) LocalAddress() string {
 	return s.accAddress.String()
 }
 
-// CreateRequest generates handshake info and signs it with the specified Cosmos account.
+// CreateRequest generates handshake info and signs it with the local address.
 //
 // Parameters:
 //   - remoteAddress: the address of the remote peer
@@ -184,7 +184,7 @@ func (s *SecureKeyExchange) CreateRequest(remoteAddress string) ([]byte, []byte,
 
 	// Create handshake info
 	handshakeInfo := &lumeraidtypes.HandshakeInfo{
-		Address:   s.accAddress.String(),
+		Address:   s.LocalAddress(),
 		PeerType:  int32(s.peerType),
 		PublicKey: privKey.PublicKey().Bytes(),
 		Curve:     s.getCurveName(),

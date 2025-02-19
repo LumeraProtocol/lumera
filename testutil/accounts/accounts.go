@@ -80,6 +80,7 @@ func SetupTestAccounts(t *testing.T, kr keyring.Keyring, accountNames []string) 
 
 		addresses = append(addresses, address.String())
 	}
+	require.Len(t, addresses, len(accountNames), "unexpected number of test accounts")
 
 	return addresses
 }

@@ -1,0 +1,8 @@
+{
+    "go.useLanguageServer": true,
+    "go.toolsManagement.autoUpdate": true,
+    "go.formatTool": "gofmt",
+    "go.vetOnSave": "package",
+    "go.testOnSave": false,
+    "go.coverOnSave": false,
+}

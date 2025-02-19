@@ -23,10 +23,9 @@ func TestCreateRequest(t *testing.T) {
 	defer ctrl.Finish()
 
 	kr := accounts.CreateTestKeyring()
+	
 	// Create test accounts
-	accountNames := []string{"test-client", "test-server"}
-	addresses := accounts.SetupTestAccounts(t, kr, accountNames)
-	require.Len(t, addresses, 2)
+	addresses := accounts.SetupTestAccounts(t, kr, []string{"test-client", "test-server"})
 	localAddress := addresses[0]
 	remoteAddress := addresses[1]
 
@@ -189,6 +188,12 @@ func TestValidateSignature_KeyByAddressFails(t *testing.T) {
 	assert.Error(t, err)
 	assert.False(t, isValid)
 	assert.Contains(t, err.Error(), "address not found in keyring")
+}
+
+func TestComputeSharedSecret_CurveNotSet(t *testing.T) {
+	ke := &SecureKeyExchange{}
+	_, err := ke.ComputeSharedSecret([]byte("handshake"), []byte("signature"))
+	assert.Error(t, err)
 }
 
 func TestComputeSharedSecret_InvalidHandshakeBytes(t *testing.T) {

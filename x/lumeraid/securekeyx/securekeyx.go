@@ -1,4 +1,4 @@
-//go:generate mockgen -destination=../mocks/securekeyx_mocks.go -package=lumeraidmocks -source=securekeyx.go
+//go:generate mockgen -copyright_file=../../../testutil/mock_header.txt -destination=../mocks/securekeyx_mocks.go -package=lumeraidmocks -source=securekeyx.go
 
 package securekeyx
 
@@ -23,6 +23,7 @@ const (
 	Supernode
 )
 
+// KeyExchanger defines the interface for secure key exchange between peers using Cosmos accounts.
 type KeyExchanger interface {
 	// CreateRequest generates handshake info and signs it with the specified Cosmos account.
 	CreateRequest(remoteAddress string) ([]byte, []byte, error)
@@ -35,11 +36,12 @@ type KeyExchanger interface {
 }
 
 type SecureKeyExchange struct {
-	keyring       keyring.Keyring
+	keyring       keyring.Keyring  // keyring to access Cosmos accounts
 	accAddress    types.AccAddress // local Cosmos address
 	peerType      PeerType	       // local peer type (Simplenode or Supernode)	
 	curve         ecdh.Curve	   // curve used for ECDH key exchange
-	mutex         sync.Mutex
+
+	mutex         sync.Mutex	   // mutex to protect ephemeralKeys
 	ephemeralKeys map[string]*ecdh.PrivateKey // map of [remote_address -> ephemeral private keys]
 }
 
@@ -75,7 +77,17 @@ func validateSupernode(address string, isLocal bool) (bool, error) {
 	return true, nil
 }
 
-// NewSecureKeyExchange creates a new instance of SecureCommManager
+// NewSecureKeyExchange creates a new instance of SecureCommManager.
+// 
+// Parameters:
+//   - kr: keyring to access Cosmos accounts
+//   - localAddress: the Cosmos address of the local peer
+//   - localPeerType: the type of the local peer (Simplenode or Supernode)
+//   - curve: the curve to be used for ECDH key exchange (default is P256)
+//
+// Returns:
+//   - SecureKeyExchange: the instance of SecureKeyExchange
+//   - error: if any error occurs
 func NewSecureKeyExchange(kr keyring.Keyring, localAddress string, localPeerType PeerType, curve ecdh.Curve) (*SecureKeyExchange, error) {
 	accAddress, err := types.AccAddressFromBech32(localAddress)
 	if err != nil {

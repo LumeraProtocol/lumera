@@ -1,4 +1,4 @@
-//go:generate mockgen -destination=../mocks/legroast_mocks.go -package=lumeraidmocks -source=legroast.go
+//go:generate mockgen --copyright_file=../../../testutil/mock_header.txt -destination=../mocks/legroast_mocks.go -package=lumeraidmocks -source=legroast.go
 
 package legroast
 

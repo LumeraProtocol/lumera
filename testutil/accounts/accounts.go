@@ -1,4 +1,4 @@
-//go:generate mockgen -destination=../mocks/keyring_mocks.go -package=testutilsmocks github.com/cosmos/cosmos-sdk/crypto/keyring Keyring
+//go:generate mockgen -copyright_file=../mock_header.txt -destination=../mocks/keyring_mocks.go -package=testutilsmocks github.com/cosmos/cosmos-sdk/crypto/keyring Keyring
 
 package accounts
 

@@ -1,8 +1,6 @@
 module github.com/LumeraProtocol/lumera
 
-go 1.22
-
-toolchain go1.23.2
+go 1.23.5
 
 replace (
 	github.com/btcsuite/btcd => github.com/btcsuite/btcd v0.23.4

@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"lukechampine.com/uint128"
 
-	. "github.com/LumeraProtocol/lumera/x/lumeraid/module/legroast"
+	. "github.com/LumeraProtocol/lumera/x/lumeraid/legroast"
 )
 
 func TestNewUint128Matrix(t *testing.T) {

@@ -13,9 +13,8 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func TestKeeper_GetSuperNode(t *testing.T) {
+func TestKeeper_GetSuperNodeBySuperNodeAddress(t *testing.T) {
 	valAddr := sdk.ValAddress([]byte("validator"))
-	anotherValAddr := sdk.ValAddress([]byte("another-validator"))
 	creatorAddr := sdk.AccAddress(valAddr)
 
 	sn := types.SuperNode{
@@ -38,10 +37,10 @@ func TestKeeper_GetSuperNode(t *testing.T) {
 
 	testCases := []struct {
 		name        string
-		req         *types.QueryGetSuperNodeRequest
+		req         *types.QueryGetSuperNodeBySuperNodeAddressRequest
 		setupState  func(k keeper.Keeper, ctx sdk.Context)
 		expectedErr error
-		checkResult func(t *testing.T, resp *types.QueryGetSuperNodeResponse)
+		checkResult func(t *testing.T, resp *types.QueryGetSuperNodeBySuperNodeAddressResponse)
 	}{
 		{
 			name:        "invalid request (nil)",
@@ -49,29 +48,22 @@ func TestKeeper_GetSuperNode(t *testing.T) {
 			expectedErr: status.Error(codes.InvalidArgument, "invalid request"),
 		},
 		{
-			name: "invalid validator address",
-			req: &types.QueryGetSuperNodeRequest{
-				ValidatorAddress: "invalid",
-			},
-			expectedErr: status.Error(codes.InvalidArgument, "invalid validator address"),
-		},
-		{
 			name: "supernode not found",
-			req: &types.QueryGetSuperNodeRequest{
-				ValidatorAddress: anotherValAddr.String(),
+			req: &types.QueryGetSuperNodeBySuperNodeAddressRequest{
+				SupernodeAddress: "non-existent-address",
 			},
-			expectedErr: status.Error(codes.NotFound, "no supernode found"),
+			expectedErr: status.Error(codes.NotFound, "supernode not found"),
 		},
 		{
 			name: "supernode found",
-			req: &types.QueryGetSuperNodeRequest{
-				ValidatorAddress: valAddr.String(),
+			req: &types.QueryGetSuperNodeBySuperNodeAddressRequest{
+				SupernodeAddress: creatorAddr.String(),
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
 				require.NoError(t, k.SetSuperNode(ctx, sn))
 			},
 			expectedErr: nil,
-			checkResult: func(t *testing.T, resp *types.QueryGetSuperNodeResponse) {
+			checkResult: func(t *testing.T, resp *types.QueryGetSuperNodeBySuperNodeAddressResponse) {
 				require.NotNil(t, resp.Supernode)
 				require.Equal(t, sn, *resp.Supernode)
 			},
@@ -94,11 +86,10 @@ func TestKeeper_GetSuperNode(t *testing.T) {
 				tc.setupState(k, ctx)
 			}
 
-			resp, err := k.GetSuperNode(ctx, tc.req)
+			resp, err := k.GetSuperNodeBySuperNodeAddress(ctx, tc.req)
 
 			if tc.expectedErr != nil {
 				require.Error(t, err)
-				// Since the error might contain additional text, use Contains to verify the code
 				st, _ := status.FromError(err)
 				expectedStatus, _ := status.FromError(tc.expectedErr)
 				require.Equal(t, expectedStatus.Code(), st.Code())

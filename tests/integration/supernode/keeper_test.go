@@ -24,6 +24,7 @@ type KeeperIntegrationSuite struct {
 	ctx       sdk.Context
 	keeper    keeper.Keeper
 	authority sdk.AccAddress
+	validator sdk.ValAddress
 }
 
 // SetupSuite initializes the integration test suite
@@ -305,6 +306,82 @@ func (suite *KeeperIntegrationSuite) TestSetSuperNodeAndQuerySupernode() {
 	result, found := suite.keeper.QuerySuperNode(suite.ctx, sdk.ValAddress("validator1"))
 	require.True(suite.T(), found, "SuperNode should exist after being set")
 	require.Equal(suite.T(), types.SuperNodeStateActive, result.States[len(result.States)-1].State, "SuperNode state should match")
+}
+
+func (suite *KeeperIntegrationSuite) TestGetSuperNodeBySuperNodeAddress() {
+	tests := []struct {
+		name          string
+		setup         func()
+		execute       func() (*types.QueryGetSuperNodeBySuperNodeAddressResponse, error)
+		validate      func(response *types.QueryGetSuperNodeBySuperNodeAddressResponse) error
+		expectSuccess bool
+	}{
+		{
+			name: "when supernode is found by address, it should return the supernode",
+			setup: func() {
+				suite.validator = sdk.ValAddress([]byte("validator1f"))
+				suite.authority = sdk.AccAddress(suite.validator)
+				supernode := types.SuperNode{
+					SupernodeAccount: suite.authority.String(),
+					ValidatorAddress: suite.validator.String(),
+					Version:          "1.0.0",
+					States:           []*types.SuperNodeStateRecord{{State: types.SuperNodeStateActive}},
+					PrevIpAddresses:  []*types.IPAddressHistory{{Address: "192.168.1.1"}},
+				}
+				require.NoError(suite.T(), suite.keeper.SetSuperNode(suite.ctx, supernode))
+			},
+			execute: func() (*types.QueryGetSuperNodeBySuperNodeAddressResponse, error) {
+				req := &types.QueryGetSuperNodeBySuperNodeAddressRequest{
+					SupernodeAddress: suite.authority.String(),
+				}
+				return suite.keeper.GetSuperNodeBySuperNodeAddress(suite.ctx, req)
+			},
+			validate: func(response *types.QueryGetSuperNodeBySuperNodeAddressResponse) error {
+				if response.Supernode == nil {
+					return fmt.Errorf("supernode should not be nil")
+				}
+				if response.Supernode.SupernodeAccount != suite.authority.String() {
+					return fmt.Errorf("expected supernode account '%v', got: %v", suite.authority.String(), response.Supernode.SupernodeAccount)
+				}
+				return nil
+			},
+			expectSuccess: true,
+		},
+		{
+			name: "when supernode is not found by address, it should return an error",
+			setup: func() {
+				// No setup needed, as no supernode will be added for this test.
+			},
+			execute: func() (*types.QueryGetSuperNodeBySuperNodeAddressResponse, error) {
+				req := &types.QueryGetSuperNodeBySuperNodeAddressRequest{
+					SupernodeAddress: "nonexistent-supernode",
+				}
+				return suite.keeper.GetSuperNodeBySuperNodeAddress(suite.ctx, req)
+			},
+			validate: func(response *types.QueryGetSuperNodeBySuperNodeAddressResponse) error {
+				if response != nil {
+					return fmt.Errorf("expected nil response, got: %v", response)
+				}
+				return nil
+			},
+			expectSuccess: false,
+		},
+	}
+
+	for _, tc := range tests {
+		suite.Run(tc.name, func() {
+			tc.setup()
+			resp, err := tc.execute()
+			if tc.expectSuccess {
+				require.NoError(suite.T(), err)
+				if tc.validate != nil {
+					require.NoError(suite.T(), tc.validate(resp))
+				}
+			} else {
+				require.Error(suite.T(), err)
+			}
+		})
+	}
 }
 
 func TestKeeperIntegrationSuite(t *testing.T) {

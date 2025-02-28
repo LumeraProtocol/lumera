@@ -21,13 +21,19 @@ service Query {
   
   }
   
-  // Queries a list of GetSuperNode items.
+  // Queries a SuperNode by validatorAddress.
   rpc GetSuperNode (QueryGetSuperNodeRequest) returns (QueryGetSuperNodeResponse) {
     option (google.api.http).get = "/LumeraProtocol/lumera/supernode/get_super_node/{validatorAddress}";
   
   }
+
+  // Queries a SuperNode by supernodeAddress.
+  rpc GetSuperNodeBySuperNodeAddress (QueryGetSuperNodeBySuperNodeAddressRequest) returns (QueryGetSuperNodeBySuperNodeAddressResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/supernode/get_super_node_by_address/{supernodeAddress}";
   
-  // Queries a list of ListSuperNodes items.
+  }
+  
+  // Queries a list of SuperNodes.
   rpc ListSuperNodes (QueryListSuperNodesRequest) returns (QueryListSuperNodesResponse) {
     option (google.api.http).get = "/LumeraProtocol/lumera/supernode/list_super_nodes";
   
@@ -39,6 +45,7 @@ service Query {
   
   }
 }
+
 // QueryParamsRequest is request type for the Query/Params RPC method.
 message QueryParamsRequest {}
 
@@ -54,6 +61,14 @@ message QueryGetSuperNodeRequest {
 }
 
 message QueryGetSuperNodeResponse {
+  SuperNode supernode = 1;
+}
+
+message QueryGetSuperNodeBySuperNodeAddressRequest {
+  string supernodeAddress = 1;
+}
+
+message QueryGetSuperNodeBySuperNodeAddressResponse {
   SuperNode supernode = 1;
 }
 

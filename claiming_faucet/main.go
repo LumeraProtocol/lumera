@@ -219,6 +219,9 @@ func NewServer(configPath string) (*Server, error) {
 }
 
 func (s *Server) handleGetFeeForClaiming(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		return // Middleware already handled it
+	}
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -247,10 +250,10 @@ func (s *Server) handleGetFeeForClaiming(w http.ResponseWriter, r *http.Request)
 	}(resp.Body)
 
 	// If account exists and response is 200, return error
-	if resp.StatusCode == http.StatusOK {
-		http.Error(w, "Account already exists", http.StatusBadRequest)
-		return
-	}
+	//if resp.StatusCode == http.StatusOK {
+	//	http.Error(w, "Account already exists", http.StatusBadRequest)
+	//	return
+	//}
 
 	// 2. Query claim record
 	claimRecordURL := fmt.Sprintf("%s/LumeraProtocol/lumera/claim/claim_record/%s", s.config.NodeURL, req.OldAddress)
@@ -498,6 +501,19 @@ func recoveryMiddleware(logger *log.Logger) mux.MiddlewareFunc {
 	}
 }
 
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		if r.Method == http.MethodOptions {
+			w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func main() {
 	// Create server
 	server, err := NewServer("config.json")
@@ -507,11 +523,12 @@ func main() {
 
 	// Create router
 	r := mux.NewRouter()
-	r.HandleFunc("/api/getfeeforclaiming", server.handleGetFeeForClaiming).Methods("POST")
+	r.HandleFunc("/api/getfeeforclaiming", server.handleGetFeeForClaiming).Methods("POST", "OPTIONS")
 
 	// Add middleware
 	r.Use(loggingMiddleware(server.logger))
 	r.Use(recoveryMiddleware(server.logger))
+	r.Use(corsMiddleware)
 
 	// Start server
 	addr := ":8080"

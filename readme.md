@@ -16,7 +16,7 @@ curl https://get.ignite.com/cli! | bash
 ### Build
 
 ```bash
-ignite build
+ignite chain build
 ```
 
 > **Note:** You can still build directly with go: `go build cmd`, but it won't build protobuf files.

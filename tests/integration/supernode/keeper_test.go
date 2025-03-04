@@ -1,8 +1,11 @@
 package integration_test
 
 import (
-	sdkmath "cosmossdk.io/math"
 	"fmt"
+	"os"
+	"testing"
+
+	sdkmath "cosmossdk.io/math"
 	"github.com/LumeraProtocol/lumera/app"
 	"github.com/LumeraProtocol/lumera/x/supernode/keeper"
 	"github.com/LumeraProtocol/lumera/x/supernode/types"
@@ -13,8 +16,6 @@ import (
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"os"
-	"testing"
 )
 
 type KeeperIntegrationSuite struct {

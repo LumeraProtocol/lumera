@@ -24,17 +24,15 @@ Therefore, we focus on the **critical path** and do not cover every condition.
 #### These tests USES BINARY from the go path. You can build a new one with `ignite chain build`
 
 ### Execute a single test
-
-
 ```sh
 cd tests/systemtests
 go test -tags=system_test -v . -test.run=TestSupernodeRegistrationFailures
 ```
 
-* Force a binary rebuild before running the test:
+### Execute all system tests
 ```sh
 cd tests/systemtests
-go test -tags=system_test -v . -test.run=TestSupernodeRegistrationFailures -rebuild
+go test -tags=system_test -v . 
 ```
 
 Test CLI parameters:
@@ -61,4 +59,4 @@ For example Node *3* listens on `26660` for RPC calls
 
 ## Acknowledgments
 
-The initial code was contributed from wasmd
+The initial code was taken from wasmd.

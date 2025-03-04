@@ -1,0 +1,45 @@
+syntax = "proto3";
+package lumera.action;
+
+import "amino/amino.proto";
+import "gogoproto/gogo.proto";
+import "google/api/annotations.proto";
+import "cosmos/base/query/v1beta1/pagination.proto";
+import "lumera/action/params.proto";
+import "lumera/action/action.proto";
+
+option go_package = "github.com/LumeraProtocol/lumera/x/action/types";
+
+// Query defines the gRPC querier service.
+service Query {
+  // Parameters queries the parameters of the module.
+  rpc Params(QueryParamsRequest) returns (QueryParamsResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/action/params";
+  }
+  // GetAction queries a single action by ID.
+  rpc GetAction(QueryGetActionRequest) returns (QueryGetActionResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/action/get_action/{actionID}";
+  }
+}
+
+// QueryParamsRequest is request type for the Query/Params RPC method.
+message QueryParamsRequest {}
+
+// QueryParamsResponse is response type for the Query/Params RPC method.
+message QueryParamsResponse {
+  // params holds all the parameters of this module.
+  Params params = 1 [
+    (gogoproto.nullable) = false,
+    (amino.dont_omitempty) = true
+  ];
+}
+
+// Request type for GetAction
+message QueryGetActionRequest {
+  string actionID= 1;  // The ID of the action to query
+}
+
+// Response type for GetAction
+message QueryGetActionResponse {
+  Action action = 1;
+}

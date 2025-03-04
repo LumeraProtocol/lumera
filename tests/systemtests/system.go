@@ -245,21 +245,26 @@ func isLogNoise(text string) bool {
 	return false
 }
 
-// AwaitUpgradeInfo blocks util an upgrade info file is persisted to disk
+// AwaitUpgradeInfo blocks until an upgrade info file is persisted to disk
 func (s *SystemUnderTest) AwaitUpgradeInfo(t *testing.T) {
-	var found bool
+	var (
+		found bool
+		err   error
+	)
+
 	for !found {
 		s.withEachNodeHome(func(i int, home string) {
-			_, err := os.Stat(filepath.Join(s.nodePath(0), "data", "upgrade-info.json"))
-			switch {
-			case err == nil:
+			_, err = os.Stat(filepath.Join(s.nodePath(0), "data", "upgrade-info.json"))
+			if err == nil {
 				found = true
-			case !os.IsNotExist(err):
-				t.Fatalf(err.Error())
+			} else if !os.IsNotExist(err) {
+				t.Errorf("Unexpected error checking upgrade-info.json: %v", err)
 			}
 		})
 		time.Sleep(s.blockTime / 2)
 	}
+
+	require.NoError(t, err, "Unexpected error while checking upgrade-info.json")
 }
 
 func (s *SystemUnderTest) AwaitChainStopped() {

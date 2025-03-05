@@ -19,10 +19,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Query_Params_FullMethodName                   = "/lumera.supernode.Query/Params"
-	Query_GetSuperNode_FullMethodName             = "/lumera.supernode.Query/GetSuperNode"
-	Query_ListSuperNodes_FullMethodName           = "/lumera.supernode.Query/ListSuperNodes"
-	Query_GetTopSuperNodesForBlock_FullMethodName = "/lumera.supernode.Query/GetTopSuperNodesForBlock"
+	Query_Params_FullMethodName                         = "/lumera.supernode.Query/Params"
+	Query_GetSuperNode_FullMethodName                   = "/lumera.supernode.Query/GetSuperNode"
+	Query_GetSuperNodeBySuperNodeAddress_FullMethodName = "/lumera.supernode.Query/GetSuperNodeBySuperNodeAddress"
+	Query_ListSuperNodes_FullMethodName                 = "/lumera.supernode.Query/ListSuperNodes"
+	Query_GetTopSuperNodesForBlock_FullMethodName       = "/lumera.supernode.Query/GetTopSuperNodesForBlock"
 )
 
 // QueryClient is the client API for Query service.
@@ -33,9 +34,11 @@ const (
 type QueryClient interface {
 	// Parameters queries the parameters of the module.
 	Params(ctx context.Context, in *QueryParamsRequest, opts ...grpc.CallOption) (*QueryParamsResponse, error)
-	// Queries a list of GetSuperNode items.
+	// Queries a SuperNode by validatorAddress.
 	GetSuperNode(ctx context.Context, in *QueryGetSuperNodeRequest, opts ...grpc.CallOption) (*QueryGetSuperNodeResponse, error)
-	// Queries a list of ListSuperNodes items.
+	// Queries a SuperNode by supernodeAddress.
+	GetSuperNodeBySuperNodeAddress(ctx context.Context, in *QueryGetSuperNodeBySuperNodeAddressRequest, opts ...grpc.CallOption) (*QueryGetSuperNodeBySuperNodeAddressResponse, error)
+	// Queries a list of SuperNodes.
 	ListSuperNodes(ctx context.Context, in *QueryListSuperNodesRequest, opts ...grpc.CallOption) (*QueryListSuperNodesResponse, error)
 	// Queries a list of GetTopSuperNodesForBlock items.
 	GetTopSuperNodesForBlock(ctx context.Context, in *QueryGetTopSuperNodesForBlockRequest, opts ...grpc.CallOption) (*QueryGetTopSuperNodesForBlockResponse, error)
@@ -63,6 +66,15 @@ func (c *queryClient) GetSuperNode(ctx context.Context, in *QueryGetSuperNodeReq
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(QueryGetSuperNodeResponse)
 	err := c.cc.Invoke(ctx, Query_GetSuperNode_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *queryClient) GetSuperNodeBySuperNodeAddress(ctx context.Context, in *QueryGetSuperNodeBySuperNodeAddressRequest, opts ...grpc.CallOption) (*QueryGetSuperNodeBySuperNodeAddressResponse, error) {
+	out := new(QueryGetSuperNodeBySuperNodeAddressResponse)
+	err := c.cc.Invoke(ctx, Query_GetSuperNodeBySuperNodeAddress_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -97,9 +109,11 @@ func (c *queryClient) GetTopSuperNodesForBlock(ctx context.Context, in *QueryGet
 type QueryServer interface {
 	// Parameters queries the parameters of the module.
 	Params(context.Context, *QueryParamsRequest) (*QueryParamsResponse, error)
-	// Queries a list of GetSuperNode items.
+	// Queries a SuperNode by validatorAddress.
 	GetSuperNode(context.Context, *QueryGetSuperNodeRequest) (*QueryGetSuperNodeResponse, error)
-	// Queries a list of ListSuperNodes items.
+	// Queries a SuperNode by supernodeAddress.
+	GetSuperNodeBySuperNodeAddress(context.Context, *QueryGetSuperNodeBySuperNodeAddressRequest) (*QueryGetSuperNodeBySuperNodeAddressResponse, error)
+	// Queries a list of SuperNodes.
 	ListSuperNodes(context.Context, *QueryListSuperNodesRequest) (*QueryListSuperNodesResponse, error)
 	// Queries a list of GetTopSuperNodesForBlock items.
 	GetTopSuperNodesForBlock(context.Context, *QueryGetTopSuperNodesForBlockRequest) (*QueryGetTopSuperNodesForBlockResponse, error)
@@ -118,6 +132,9 @@ func (UnimplementedQueryServer) Params(context.Context, *QueryParamsRequest) (*Q
 }
 func (UnimplementedQueryServer) GetSuperNode(context.Context, *QueryGetSuperNodeRequest) (*QueryGetSuperNodeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetSuperNode not implemented")
+}
+func (UnimplementedQueryServer) GetSuperNodeBySuperNodeAddress(context.Context, *QueryGetSuperNodeBySuperNodeAddressRequest) (*QueryGetSuperNodeBySuperNodeAddressResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetSuperNodeBySuperNodeAddress not implemented")
 }
 func (UnimplementedQueryServer) ListSuperNodes(context.Context, *QueryListSuperNodesRequest) (*QueryListSuperNodesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListSuperNodes not implemented")
@@ -182,6 +199,24 @@ func _Query_GetSuperNode_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Query_GetSuperNodeBySuperNodeAddress_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryGetSuperNodeBySuperNodeAddressRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(QueryServer).GetSuperNodeBySuperNodeAddress(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Query_GetSuperNodeBySuperNodeAddress_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(QueryServer).GetSuperNodeBySuperNodeAddress(ctx, req.(*QueryGetSuperNodeBySuperNodeAddressRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Query_ListSuperNodes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(QueryListSuperNodesRequest)
 	if err := dec(in); err != nil {
@@ -232,6 +267,10 @@ var Query_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetSuperNode",
 			Handler:    _Query_GetSuperNode_Handler,
+		},
+		{
+			MethodName: "GetSuperNodeBySuperNodeAddress",
+			Handler:    _Query_GetSuperNodeBySuperNodeAddress_Handler,
 		},
 		{
 			MethodName: "ListSuperNodes",

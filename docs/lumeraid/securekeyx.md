@@ -11,6 +11,7 @@ The SecureKeyX implementation provides secure key exchange between different typ
 ## **Peer Types**
 
 The system supports two types of peers:
+
 - **Simplenode**: Regular node in the network
 - **Supernode**: Validator node with additional privileges (verified against chain state)
 
@@ -25,9 +26,9 @@ The `SecureKeyExchange` type implements the `KeyExchanger` interface, which prov
 ```go
 // Initialize a SecureKeyExchange instance
 keyExchanger, err := NewSecureKeyExchange(
-    keyring,           // cosmos-sdk keyring.Keyring
+    kr,                // cosmos-sdk keyring.Keyring
     localAddress,      // string - local Cosmos address (bech32)
-    peerType,          // PeerType - Simplenode or Supernode
+    localPeerType,     // PeerType - Simplenode or Supernode
     curve,             // ecdh.Curve - optional, defaults to P256
 )
 ```
@@ -48,10 +49,11 @@ if err != nil {
 ```
 
 The handshake info contains:
+
 - Local address
-- Peer type
+- Local Peer type
 - Ephemeral public key
-- Curve information
+- Curve information (as a string: "P256", "P384", or "P521")
 
 ### **3. Processing a Key Exchange Request**
 
@@ -68,10 +70,12 @@ if err != nil {
 ```
 
 This method:
+
 1. Deserializes the handshake info
-2. Validates the signature using the remote peer's Cosmos account
-3. Verifies supernode status if applicable
-4. Computes and returns the shared secret
+2. Retrieves the ephemeral private key for the corresponding remote address
+3. Validates the signature using the remote peer's Cosmos account
+4. Verifies supernode status if applicable
+5. Computes and returns the shared secret
 
 ### **4. Getting Local Information**
 
@@ -91,7 +95,8 @@ address := keyExchanger.LocalAddress()
 
 A complete key exchange between two peers involves the following steps:
 
-### **Peer A's Side:**
+### **Peer A (Initiator):**
+
 ```go
 // 1. Create key exchanger for Peer A
 keyExchangerA, err := NewSecureKeyExchange(keyringA, addressA, peerTypeA, nil)
@@ -120,7 +125,8 @@ if err != nil {
 // 8. Use shared secret for secure communication
 ```
 
-### **Peer B's Side:**
+### **Peer B (Responder):**
+
 ```go
 // 4. Create key exchanger for Peer B
 keyExchangerB, err := NewSecureKeyExchange(keyringB, addressB, peerTypeB, nil)
@@ -128,15 +134,7 @@ if err != nil {
     // Handle error
 }
 
-// Receive handshake data from Peer A
-// ...communication code...
-
-// 5. Compute shared secret from Peer A's data and create response
-sharedSecret, err := keyExchangerB.ComputeSharedSecret(handshakeBytesA, signatureA)
-if err != nil {
-    // Handle error
-}
-
+// 5. Create request to send to Peer A
 handshakeBytesB, signatureB, err := keyExchangerB.CreateRequest(addressA)
 if err != nil {
     // Handle error
@@ -144,7 +142,18 @@ if err != nil {
 
 // Send handshakeBytesB and signatureB to Peer A
 // ...communication code...
+
+// Receive handshake data from Peer A
+// ...communication code...
+
+// Compute shared secret from Peer A's data
+sharedSecret, err := keyExchangerB.ComputeSharedSecret(handshakeBytesA, signatureA)
+if err != nil {
+    // Handle error
+}
 ```
+
+**Important Note**: Both peers must call `CreateRequest()` with the other peer's address and exchange the resulting handshake bytes and signatures. Each peer then calls `ComputeSharedSecret()` with the received handshake bytes and signature. The same shared secret will be computed on both sides.
 
 ---
 
@@ -183,7 +192,7 @@ if err != nil {
 
 3. **Error Handling**:
    - The API provides detailed error messages to help diagnose issues
-   - Common errors include invalid addresses, signature verification failures, and unauthorized supernode claims
+   - Common errors include invalid addresses, signature verification failures, missing ephemeral keys, and unauthorized supernode claims
 
 4. **Performance Considerations**:
    - P256 is the default curve and provides good performance for most use cases
@@ -193,7 +202,12 @@ if err != nil {
    - The shared secret should be used with appropriate key derivation functions before using it for encryption
    - For long-term sessions, periodic re-keying is recommended
    - Always validate both ends of the communication
+   - The ephemeral keys are stored in memory until `ComputeSharedSecret` is called, so it's important to complete the exchange process
+
+6. **Error Scenarios**:
+   - If `CreateRequest` is called multiple times for the same remote address before completing the exchange, the previous ephemeral key will be overwritten
+   - If the ephemeral key for a remote address is not found when calling `ComputeSharedSecret`, an error will be returned
 
 ---
 
-For further assistance or feedback, please contact the Lumeraid team.
+For further assistance or feedback, please contact the LumeraNetwork team.

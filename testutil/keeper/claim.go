@@ -117,10 +117,13 @@ func (k *MockBankKeeper) SendCoinsFromAccountToModule(ctx context.Context, sende
 
 func ClaimKeeper(t testing.TB) (keeper.Keeper, sdk.Context) {
 	storeKey := storetypes.NewKVStoreKey(types.StoreKey)
+	tstoreKey := storetypes.NewTransientStoreKey("t_" + types.StoreKey)
 
 	db := dbm.NewMemDB()
 	stateStore := store.NewCommitMultiStore(db, log.NewNopLogger(), metrics.NewNoOpMetrics())
 	stateStore.MountStoreWithDB(storeKey, storetypes.StoreTypeIAVL, db)
+	// Add this line to mount the transient store
+	stateStore.MountStoreWithDB(tstoreKey, storetypes.StoreTypeTransient, nil)
 	require.NoError(t, stateStore.LoadLatestVersion())
 
 	registry := codectypes.NewInterfaceRegistry()
@@ -139,6 +142,7 @@ func ClaimKeeper(t testing.TB) (keeper.Keeper, sdk.Context) {
 	k := keeper.NewKeeper(
 		cdc,
 		runtime.NewKVStoreService(storeKey),
+		runtime.NewTransientStoreService(tstoreKey),
 		log.NewNopLogger(),
 		authority.String(),
 		bk,

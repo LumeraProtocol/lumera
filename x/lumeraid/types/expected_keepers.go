@@ -5,7 +5,6 @@ package types
 import (
 	"context"
 
-	legroast "github.com/LumeraProtocol/lumera/x/lumeraid/module/legroast"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
@@ -29,9 +28,4 @@ type BankKeeper interface {
 type ParamSubspace interface {
 	Get(context.Context, []byte, interface{})
 	Set(context.Context, []byte, interface{})
-}
-
-// LegRoast is the interface that wraps the basic LegRoast methods.
-type LegRoast interface {
-	legroast.LegRoastInterface
 }

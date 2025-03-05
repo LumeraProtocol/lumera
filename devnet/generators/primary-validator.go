@@ -228,8 +228,19 @@ func GeneratePrimaryValidatorScript(config *confg.ChainConfig, validators []conf
 	sb.shareAndCreateGentx()
 	sb.waitAndCollectGentx()
 	sb.setupPeers()
-	sb.addStartCommand()
+	// sb.addStartCommand()
 
 	script := strings.Join(sb.lines, "\n")
 	return os.WriteFile("primary-validator.sh", []byte(script), 0755)
+}
+
+func GenerateStartScript(config *confg.ChainConfig) error {
+	script := fmt.Sprintf(`#!/bin/bash
+set -e
+
+echo "Starting validator %s..."
+%s start --minimum-gas-prices %s
+`, config.Daemon.Binary, config.Daemon.Binary, config.Chain.Denom.MinimumGasPrice)
+
+	return os.WriteFile("start.sh", []byte(script), 0755)
 }

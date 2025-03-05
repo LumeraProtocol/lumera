@@ -19,9 +19,11 @@ RUN mkdir -p /root/scripts
 # Copy scripts with correct paths
 COPY primary-validator.sh /root/scripts/primary-validator.sh
 COPY secondary-validator.sh /root/scripts/secondary-validator.sh
+COPY start.sh /root/scripts/start.sh
 
 RUN chmod +x /root/scripts/primary-validator.sh && \
-    chmod +x /root/scripts/secondary-validator.sh
+    chmod +x /root/scripts/secondary-validator.sh && \
+    chmod +x /root/scripts/start.sh
 
 # Expose necessary ports
 EXPOSE 26656 26657 1317 9090

@@ -3,7 +3,7 @@ package legroast_test
 import (
 	"testing"
 
-	. "github.com/LumeraProtocol/lumera/x/lumeraid/module/legroast"
+	. "github.com/LumeraProtocol/lumera/x/lumeraid/legroast"
 
 	"github.com/stretchr/testify/require"
 )

@@ -202,6 +202,102 @@ func (m *QueryGetSuperNodeResponse) GetSupernode() *SuperNode {
 	return nil
 }
 
+type QueryGetSuperNodeBySuperNodeAddressRequest struct {
+	SupernodeAddress string `protobuf:"bytes,1,opt,name=supernodeAddress,proto3" json:"supernodeAddress,omitempty"`
+}
+
+func (m *QueryGetSuperNodeBySuperNodeAddressRequest) Reset() {
+	*m = QueryGetSuperNodeBySuperNodeAddressRequest{}
+}
+func (m *QueryGetSuperNodeBySuperNodeAddressRequest) String() string {
+	return proto.CompactTextString(m)
+}
+func (*QueryGetSuperNodeBySuperNodeAddressRequest) ProtoMessage() {}
+func (*QueryGetSuperNodeBySuperNodeAddressRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_6f2a532d05351cde, []int{4}
+}
+func (m *QueryGetSuperNodeBySuperNodeAddressRequest) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *QueryGetSuperNodeBySuperNodeAddressRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_QueryGetSuperNodeBySuperNodeAddressRequest.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *QueryGetSuperNodeBySuperNodeAddressRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_QueryGetSuperNodeBySuperNodeAddressRequest.Merge(m, src)
+}
+func (m *QueryGetSuperNodeBySuperNodeAddressRequest) XXX_Size() int {
+	return m.Size()
+}
+func (m *QueryGetSuperNodeBySuperNodeAddressRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_QueryGetSuperNodeBySuperNodeAddressRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_QueryGetSuperNodeBySuperNodeAddressRequest proto.InternalMessageInfo
+
+func (m *QueryGetSuperNodeBySuperNodeAddressRequest) GetSupernodeAddress() string {
+	if m != nil {
+		return m.SupernodeAddress
+	}
+	return ""
+}
+
+type QueryGetSuperNodeBySuperNodeAddressResponse struct {
+	Supernode *SuperNode `protobuf:"bytes,1,opt,name=supernode,proto3" json:"supernode,omitempty"`
+}
+
+func (m *QueryGetSuperNodeBySuperNodeAddressResponse) Reset() {
+	*m = QueryGetSuperNodeBySuperNodeAddressResponse{}
+}
+func (m *QueryGetSuperNodeBySuperNodeAddressResponse) String() string {
+	return proto.CompactTextString(m)
+}
+func (*QueryGetSuperNodeBySuperNodeAddressResponse) ProtoMessage() {}
+func (*QueryGetSuperNodeBySuperNodeAddressResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_6f2a532d05351cde, []int{5}
+}
+func (m *QueryGetSuperNodeBySuperNodeAddressResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *QueryGetSuperNodeBySuperNodeAddressResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_QueryGetSuperNodeBySuperNodeAddressResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *QueryGetSuperNodeBySuperNodeAddressResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_QueryGetSuperNodeBySuperNodeAddressResponse.Merge(m, src)
+}
+func (m *QueryGetSuperNodeBySuperNodeAddressResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *QueryGetSuperNodeBySuperNodeAddressResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_QueryGetSuperNodeBySuperNodeAddressResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_QueryGetSuperNodeBySuperNodeAddressResponse proto.InternalMessageInfo
+
+func (m *QueryGetSuperNodeBySuperNodeAddressResponse) GetSupernode() *SuperNode {
+	if m != nil {
+		return m.Supernode
+	}
+	return nil
+}
+
 type QueryListSuperNodesRequest struct {
 	Pagination *query.PageRequest `protobuf:"bytes,1,opt,name=pagination,proto3" json:"pagination,omitempty"`
 }
@@ -210,7 +306,7 @@ func (m *QueryListSuperNodesRequest) Reset()         { *m = QueryListSuperNodesR
 func (m *QueryListSuperNodesRequest) String() string { return proto.CompactTextString(m) }
 func (*QueryListSuperNodesRequest) ProtoMessage()    {}
 func (*QueryListSuperNodesRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_6f2a532d05351cde, []int{4}
+	return fileDescriptor_6f2a532d05351cde, []int{6}
 }
 func (m *QueryListSuperNodesRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -255,7 +351,7 @@ func (m *QueryListSuperNodesResponse) Reset()         { *m = QueryListSuperNodes
 func (m *QueryListSuperNodesResponse) String() string { return proto.CompactTextString(m) }
 func (*QueryListSuperNodesResponse) ProtoMessage()    {}
 func (*QueryListSuperNodesResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_6f2a532d05351cde, []int{5}
+	return fileDescriptor_6f2a532d05351cde, []int{7}
 }
 func (m *QueryListSuperNodesResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -299,16 +395,16 @@ func (m *QueryListSuperNodesResponse) GetPagination() *query.PageResponse {
 }
 
 type QueryGetTopSuperNodesForBlockRequest struct {
-	BlockHeight int32          `protobuf:"varint,1,opt,name=blockHeight,proto3" json:"blockHeight,omitempty"`
-	Limit       int32          `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
-	State       SuperNodeState `protobuf:"varint,3,opt,name=state,proto3,enum=lumera.supernode.SuperNodeState" json:"state,omitempty" yaml:"state"`
+	BlockHeight int32  `protobuf:"varint,1,opt,name=blockHeight,proto3" json:"blockHeight,omitempty"`
+	Limit       int32  `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
+	State       string `protobuf:"bytes,3,opt,name=state,proto3" json:"state,omitempty" yaml:"state"`
 }
 
 func (m *QueryGetTopSuperNodesForBlockRequest) Reset()         { *m = QueryGetTopSuperNodesForBlockRequest{} }
 func (m *QueryGetTopSuperNodesForBlockRequest) String() string { return proto.CompactTextString(m) }
 func (*QueryGetTopSuperNodesForBlockRequest) ProtoMessage()    {}
 func (*QueryGetTopSuperNodesForBlockRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_6f2a532d05351cde, []int{6}
+	return fileDescriptor_6f2a532d05351cde, []int{8}
 }
 func (m *QueryGetTopSuperNodesForBlockRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -351,11 +447,11 @@ func (m *QueryGetTopSuperNodesForBlockRequest) GetLimit() int32 {
 	return 0
 }
 
-func (m *QueryGetTopSuperNodesForBlockRequest) GetState() SuperNodeState {
+func (m *QueryGetTopSuperNodesForBlockRequest) GetState() string {
 	if m != nil {
 		return m.State
 	}
-	return SuperNodeStateUnspecified
+	return ""
 }
 
 type QueryGetTopSuperNodesForBlockResponse struct {
@@ -366,7 +462,7 @@ func (m *QueryGetTopSuperNodesForBlockResponse) Reset()         { *m = QueryGetT
 func (m *QueryGetTopSuperNodesForBlockResponse) String() string { return proto.CompactTextString(m) }
 func (*QueryGetTopSuperNodesForBlockResponse) ProtoMessage()    {}
 func (*QueryGetTopSuperNodesForBlockResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_6f2a532d05351cde, []int{7}
+	return fileDescriptor_6f2a532d05351cde, []int{9}
 }
 func (m *QueryGetTopSuperNodesForBlockResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -407,6 +503,8 @@ func init() {
 	proto.RegisterType((*QueryParamsResponse)(nil), "lumera.supernode.QueryParamsResponse")
 	proto.RegisterType((*QueryGetSuperNodeRequest)(nil), "lumera.supernode.QueryGetSuperNodeRequest")
 	proto.RegisterType((*QueryGetSuperNodeResponse)(nil), "lumera.supernode.QueryGetSuperNodeResponse")
+	proto.RegisterType((*QueryGetSuperNodeBySuperNodeAddressRequest)(nil), "lumera.supernode.QueryGetSuperNodeBySuperNodeAddressRequest")
+	proto.RegisterType((*QueryGetSuperNodeBySuperNodeAddressResponse)(nil), "lumera.supernode.QueryGetSuperNodeBySuperNodeAddressResponse")
 	proto.RegisterType((*QueryListSuperNodesRequest)(nil), "lumera.supernode.QueryListSuperNodesRequest")
 	proto.RegisterType((*QueryListSuperNodesResponse)(nil), "lumera.supernode.QueryListSuperNodesResponse")
 	proto.RegisterType((*QueryGetTopSuperNodesForBlockRequest)(nil), "lumera.supernode.QueryGetTopSuperNodesForBlockRequest")
@@ -416,51 +514,55 @@ func init() {
 func init() { proto.RegisterFile("lumera/supernode/query.proto", fileDescriptor_6f2a532d05351cde) }
 
 var fileDescriptor_6f2a532d05351cde = []byte{
-	// 698 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x95, 0xcf, 0x4f, 0x13, 0x41,
-	0x14, 0xc7, 0x3b, 0x90, 0x92, 0x30, 0x10, 0x82, 0x23, 0x87, 0xba, 0x60, 0xa9, 0x1b, 0x7e, 0x59,
-	0x75, 0x27, 0x94, 0x44, 0x83, 0x9e, 0x6c, 0x0c, 0x10, 0xd3, 0x10, 0x5c, 0x88, 0x07, 0x2f, 0xcd,
-	0xb4, 0x3b, 0x2e, 0x1b, 0x77, 0x77, 0x96, 0x9d, 0x29, 0x91, 0x10, 0x2e, 0x1e, 0x3c, 0x9b, 0xf8,
-	0x27, 0x78, 0xe1, 0x68, 0xe2, 0x3f, 0xc1, 0x91, 0xc4, 0x98, 0x78, 0x22, 0x0a, 0x26, 0xde, 0xfd,
-	0x0b, 0xcc, 0xce, 0x4c, 0xdb, 0x2d, 0x6d, 0x29, 0x26, 0x5e, 0x9a, 0xd9, 0x99, 0xef, 0x7b, 0xef,
-	0xf3, 0xde, 0xbc, 0x37, 0x85, 0x33, 0x7e, 0x23, 0xa0, 0x31, 0xc1, 0xbc, 0x11, 0xd1, 0x38, 0x64,
-	0x0e, 0xc5, 0x7b, 0x0d, 0x1a, 0x1f, 0x58, 0x51, 0xcc, 0x04, 0x43, 0x93, 0xea, 0xd4, 0x6a, 0x9d,
-	0x1a, 0x37, 0x48, 0xe0, 0x85, 0x0c, 0xcb, 0x5f, 0x25, 0x32, 0xa6, 0x5c, 0xe6, 0x32, 0xb9, 0xc4,
-	0xc9, 0x4a, 0xef, 0xce, 0xb8, 0x8c, 0xb9, 0x3e, 0xc5, 0x24, 0xf2, 0x30, 0x09, 0x43, 0x26, 0x88,
-	0xf0, 0x58, 0xc8, 0xf5, 0x69, 0xb1, 0xce, 0x78, 0xc0, 0x38, 0xae, 0x11, 0xae, 0x23, 0xe2, 0xfd,
-	0xe5, 0x1a, 0x15, 0x64, 0x19, 0x47, 0xc4, 0xf5, 0x42, 0x29, 0xd6, 0xda, 0xdb, 0x5d, 0x88, 0x11,
-	0x89, 0x49, 0xd0, 0x74, 0x75, 0xa7, 0xeb, 0x58, 0xae, 0xaa, 0xc9, 0x52, 0x4b, 0x16, 0x7a, 0x4b,
-	0x92, 0x55, 0x95, 0x0b, 0x22, 0xb4, 0xce, 0x9c, 0x82, 0xe8, 0x45, 0xc2, 0xb2, 0x25, 0xfd, 0xdb,
-	0x74, 0xaf, 0x41, 0xb9, 0x30, 0x6d, 0x78, 0xb3, 0x63, 0x97, 0x47, 0x2c, 0xe4, 0x14, 0x3d, 0x81,
-	0x23, 0x8a, 0x23, 0x07, 0x0a, 0x60, 0x69, 0xac, 0x94, 0xb3, 0x2e, 0x17, 0xcb, 0x52, 0x16, 0xe5,
-	0xd1, 0x93, 0xb3, 0xd9, 0xcc, 0xf1, 0xef, 0xcf, 0x45, 0x60, 0x6b, 0x13, 0x73, 0x0d, 0xe6, 0xa4,
-	0xcf, 0x75, 0x2a, 0xb6, 0x13, 0xf9, 0x26, 0x73, 0xa8, 0x8e, 0x87, 0x8a, 0x70, 0x72, 0x9f, 0xf8,
-	0x9e, 0x43, 0x04, 0x8b, 0x9f, 0x3a, 0x4e, 0x4c, 0xb9, 0x0a, 0x31, 0x6a, 0x77, 0xed, 0x9b, 0x2f,
-	0xe1, 0xad, 0x1e, 0x7e, 0x34, 0xe1, 0x2a, 0x1c, 0x6d, 0xb1, 0x68, 0xc8, 0xe9, 0x6e, 0xc8, 0xb6,
-	0x5d, 0x5b, 0x6d, 0x3a, 0xd0, 0x90, 0x7e, 0x2b, 0x1e, 0x6f, 0x3b, 0x6e, 0x56, 0x04, 0xad, 0x41,
-	0xd8, 0xbe, 0x25, 0xed, 0x79, 0xc1, 0x52, 0x57, 0x6a, 0x25, 0x57, 0x6a, 0xa9, 0x26, 0xd2, 0x57,
-	0x6a, 0x6d, 0x11, 0xb7, 0x99, 0x9d, 0x9d, 0xb2, 0x34, 0x3f, 0x01, 0x38, 0xdd, 0x33, 0x4c, 0xab,
-	0xc4, 0xb0, 0x85, 0x94, 0xd4, 0x60, 0x78, 0x50, 0x06, 0x29, 0x39, 0x5a, 0xef, 0x80, 0x1c, 0x92,
-	0x90, 0x8b, 0x03, 0x21, 0x55, 0xe4, 0x0e, 0xca, 0x63, 0x00, 0xe7, 0x9a, 0x45, 0xde, 0x61, 0x51,
-	0x9b, 0x73, 0x8d, 0xc5, 0x65, 0x9f, 0xd5, 0xdf, 0x34, 0xcb, 0x52, 0x80, 0x63, 0xb5, 0xe4, 0x7b,
-	0x83, 0x7a, 0xee, 0xae, 0x90, 0x75, 0xc9, 0xda, 0xe9, 0x2d, 0x34, 0x05, 0xb3, 0xbe, 0x17, 0x78,
-	0x42, 0xe2, 0x64, 0x6d, 0xf5, 0x81, 0x36, 0x60, 0x56, 0x76, 0x61, 0x6e, 0xb8, 0x00, 0x96, 0x26,
-	0x4a, 0x85, 0x2b, 0x32, 0xdc, 0x4e, 0x74, 0xe5, 0xc9, 0x3f, 0x67, 0xb3, 0xe3, 0x07, 0x24, 0xf0,
-	0x1f, 0x9b, 0xd2, 0xd0, 0xb4, 0x95, 0x03, 0xd3, 0x81, 0xf3, 0x03, 0x48, 0xff, 0x43, 0x65, 0x4b,
-	0xdf, 0xb2, 0x30, 0x2b, 0xc3, 0xa0, 0xf7, 0x00, 0x8e, 0xa8, 0x26, 0x47, 0x73, 0xdd, 0xd6, 0xdd,
-	0xb3, 0x64, 0xcc, 0x0f, 0x50, 0x29, 0x3c, 0x13, 0xbf, 0xfb, 0xfa, 0xeb, 0xe3, 0xd0, 0x5d, 0xb4,
-	0x88, 0x2b, 0x52, 0xbe, 0x95, 0x8c, 0x67, 0x9d, 0xf9, 0xb8, 0xcf, 0x53, 0x80, 0xbe, 0x00, 0x38,
-	0x9e, 0x9e, 0x01, 0x54, 0xec, 0x13, 0xa8, 0xc7, 0xc0, 0x19, 0xf7, 0xae, 0xa5, 0xd5, 0x68, 0xcf,
-	0x25, 0xda, 0x33, 0x54, 0x1e, 0x88, 0xe6, 0x52, 0x51, 0x6d, 0x3f, 0x45, 0xf8, 0xf0, 0xf2, 0xf0,
-	0x1e, 0xa1, 0x63, 0x00, 0x27, 0x3a, 0x5b, 0x1f, 0xdd, 0xef, 0xc3, 0xd2, 0x73, 0x10, 0x8d, 0x07,
-	0xd7, 0x54, 0x6b, 0xf6, 0x55, 0xc9, 0xbe, 0x82, 0x96, 0x07, 0xb2, 0xfb, 0x1e, 0x4f, 0xc3, 0x73,
-	0xf4, 0x13, 0xc0, 0x5c, 0xbf, 0xae, 0x42, 0x0f, 0xfb, 0x17, 0xf0, 0xaa, 0x81, 0x31, 0x1e, 0xfd,
-	0xb3, 0x9d, 0x4e, 0x64, 0x47, 0x26, 0xb2, 0x89, 0x2a, 0xd7, 0xba, 0x04, 0xc1, 0xa2, 0x74, 0x2e,
-	0xd5, 0xd7, 0x2c, 0xae, 0xca, 0xa9, 0xc4, 0x87, 0xa9, 0xe1, 0x3c, 0x2a, 0x57, 0x4e, 0xce, 0xf3,
-	0xe0, 0xf4, 0x3c, 0x0f, 0x7e, 0x9c, 0xe7, 0xc1, 0x87, 0x8b, 0x7c, 0xe6, 0xf4, 0x22, 0x9f, 0xf9,
-	0x7e, 0x91, 0xcf, 0xbc, 0x2a, 0xb9, 0x9e, 0xd8, 0x6d, 0xd4, 0xac, 0x3a, 0x0b, 0xfa, 0x44, 0x7c,
-	0x9b, 0x8a, 0x29, 0x0e, 0x22, 0xca, 0x6b, 0x23, 0xf2, 0x3f, 0x65, 0xe5, 0x6f, 0x00, 0x00, 0x00,
-	0xff, 0xff, 0x30, 0xe2, 0xaf, 0x97, 0x62, 0x07, 0x00, 0x00,
+	// 764 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x95, 0xcd, 0x6e, 0xd3, 0x4a,
+	0x14, 0xc7, 0xe3, 0x56, 0xe9, 0x55, 0xa7, 0xd5, 0x55, 0xef, 0xdc, 0x2e, 0x72, 0xdd, 0xde, 0xb4,
+	0x58, 0xfd, 0x80, 0x14, 0x3c, 0x6a, 0x2b, 0x81, 0xca, 0xc7, 0x82, 0x08, 0xb5, 0x08, 0x85, 0x52,
+	0x4c, 0x41, 0x88, 0x4d, 0x34, 0x49, 0x06, 0xd7, 0xc2, 0xf6, 0xb8, 0x9e, 0x49, 0x45, 0x54, 0x75,
+	0xc3, 0xa2, 0x6b, 0x24, 0x1e, 0x81, 0x4d, 0x97, 0x48, 0xbc, 0x44, 0x17, 0x2c, 0x2a, 0xb1, 0x61,
+	0x55, 0x41, 0x8b, 0xc4, 0x1e, 0xf1, 0x00, 0xc8, 0xe3, 0x89, 0xe3, 0xc4, 0x71, 0x93, 0x02, 0x9b,
+	0x68, 0x3c, 0xf3, 0x3f, 0xe7, 0xfc, 0xce, 0x99, 0x39, 0x27, 0x60, 0xd2, 0xae, 0x3b, 0xc4, 0xc7,
+	0x88, 0xd5, 0x3d, 0xe2, 0xbb, 0xb4, 0x46, 0xd0, 0x76, 0x9d, 0xf8, 0x0d, 0xdd, 0xf3, 0x29, 0xa7,
+	0x70, 0x2c, 0x3c, 0xd5, 0xa3, 0x53, 0xf5, 0x1f, 0xec, 0x58, 0x2e, 0x45, 0xe2, 0x37, 0x14, 0xa9,
+	0xe3, 0x26, 0x35, 0xa9, 0x58, 0xa2, 0x60, 0x25, 0x77, 0x27, 0x4d, 0x4a, 0x4d, 0x9b, 0x20, 0xec,
+	0x59, 0x08, 0xbb, 0x2e, 0xe5, 0x98, 0x5b, 0xd4, 0x65, 0xf2, 0xb4, 0x50, 0xa5, 0xcc, 0xa1, 0x0c,
+	0x55, 0x30, 0x93, 0x11, 0xd1, 0xce, 0x62, 0x85, 0x70, 0xbc, 0x88, 0x3c, 0x6c, 0x5a, 0xae, 0x10,
+	0x4b, 0xed, 0xff, 0x09, 0x44, 0x0f, 0xfb, 0xd8, 0x69, 0xba, 0xba, 0x90, 0x38, 0x16, 0xab, 0x72,
+	0xb0, 0x94, 0x92, 0xb9, 0xee, 0x92, 0x60, 0x55, 0x66, 0x1c, 0x73, 0xa9, 0xd3, 0xc6, 0x01, 0x7c,
+	0x18, 0xb0, 0x6c, 0x08, 0xff, 0x06, 0xd9, 0xae, 0x13, 0xc6, 0x35, 0x03, 0xfc, 0xdb, 0xb6, 0xcb,
+	0x3c, 0xea, 0x32, 0x02, 0x6f, 0x80, 0xa1, 0x90, 0x23, 0xa7, 0x4c, 0x2b, 0x17, 0x47, 0x96, 0x72,
+	0x7a, 0x67, 0xb1, 0xf4, 0xd0, 0xa2, 0x38, 0x7c, 0x78, 0x3c, 0x95, 0x39, 0xf8, 0xf6, 0xae, 0xa0,
+	0x18, 0xd2, 0x44, 0x5b, 0x05, 0x39, 0xe1, 0x73, 0x8d, 0xf0, 0x47, 0x81, 0x7c, 0x9d, 0xd6, 0x88,
+	0x8c, 0x07, 0x0b, 0x60, 0x6c, 0x07, 0xdb, 0x56, 0x0d, 0x73, 0xea, 0xdf, 0xae, 0xd5, 0x7c, 0xc2,
+	0xc2, 0x10, 0xc3, 0x46, 0x62, 0x5f, 0x7b, 0x02, 0xfe, 0xeb, 0xe2, 0x47, 0x12, 0xae, 0x80, 0xe1,
+	0x88, 0x45, 0x42, 0x4e, 0x24, 0x21, 0x5b, 0x76, 0x2d, 0xb5, 0xf6, 0x14, 0x14, 0x12, 0x7e, 0x8b,
+	0x8d, 0x68, 0x29, 0xc3, 0xc7, 0x88, 0x23, 0xd3, 0x0e, 0xe2, 0xce, 0x7d, 0x6d, 0x0b, 0x2c, 0xf4,
+	0xe5, 0xf9, 0xf7, 0x73, 0xa8, 0x01, 0x55, 0x44, 0x2a, 0x59, 0xac, 0x15, 0x2a, 0x62, 0x5e, 0x05,
+	0xa0, 0xf5, 0xd2, 0xa4, 0xe7, 0x39, 0x3d, 0x7c, 0x96, 0x7a, 0xf0, 0x2c, 0xf5, 0xb0, 0x11, 0xe4,
+	0xb3, 0xd4, 0x37, 0xb0, 0xd9, 0xbc, 0x21, 0x23, 0x66, 0xa9, 0xbd, 0x55, 0xc0, 0x44, 0xd7, 0x30,
+	0xd1, 0x33, 0x01, 0x11, 0x52, 0x50, 0x95, 0xc1, 0x5e, 0x19, 0xc4, 0xe4, 0x70, 0xad, 0x0d, 0x72,
+	0x40, 0x40, 0xce, 0xf7, 0x84, 0x0c, 0x23, 0xb7, 0x51, 0xee, 0x2b, 0x60, 0xa6, 0x59, 0xf6, 0x4d,
+	0xea, 0xb5, 0x38, 0x57, 0xa9, 0x5f, 0xb4, 0x69, 0xf5, 0x45, 0xb3, 0x2c, 0xd3, 0x60, 0xa4, 0x12,
+	0x7c, 0xdf, 0x25, 0x96, 0xb9, 0xc5, 0x45, 0x5d, 0xb2, 0x46, 0x7c, 0x0b, 0x8e, 0x83, 0xac, 0x6d,
+	0x39, 0x16, 0x17, 0x38, 0x59, 0x23, 0xfc, 0x80, 0x73, 0x20, 0x2b, 0x3a, 0x29, 0x37, 0x18, 0xdc,
+	0x7b, 0x71, 0xec, 0xfb, 0xf1, 0xd4, 0x68, 0x03, 0x3b, 0xf6, 0x75, 0x4d, 0x6c, 0x6b, 0x46, 0x78,
+	0xac, 0xd5, 0xc0, 0x6c, 0x0f, 0x8e, 0x3f, 0x50, 0xb7, 0xa5, 0x0f, 0x7f, 0x81, 0xac, 0x08, 0x03,
+	0xf7, 0x15, 0x30, 0x14, 0xb6, 0x21, 0x9c, 0x49, 0x5a, 0x27, 0xbb, 0x5d, 0x9d, 0xed, 0xa1, 0x0a,
+	0xf1, 0x34, 0xf4, 0xea, 0xe3, 0xd7, 0x37, 0x03, 0x97, 0xe0, 0x3c, 0x2a, 0x09, 0xf9, 0x46, 0x30,
+	0x40, 0xaa, 0xd4, 0x46, 0x29, 0xc3, 0x0a, 0xbe, 0x57, 0xc0, 0x68, 0xfc, 0xcd, 0xc3, 0x42, 0x4a,
+	0xa0, 0x2e, 0x23, 0x41, 0x5d, 0xe8, 0x4b, 0x2b, 0xd1, 0xee, 0x09, 0xb4, 0x3b, 0xb0, 0xd8, 0x13,
+	0xcd, 0x24, 0xbc, 0xdc, 0x1a, 0x96, 0x68, 0xb7, 0x73, 0xbc, 0xec, 0xc1, 0x1f, 0x0a, 0xc8, 0x9f,
+	0xdd, 0xa9, 0xf0, 0x66, 0x1f, 0x6c, 0xa9, 0xa3, 0x43, 0xbd, 0xf5, 0x8b, 0xd6, 0x32, 0xd7, 0xc7,
+	0x22, 0xd7, 0x07, 0xf0, 0xfe, 0x39, 0x73, 0x2d, 0x57, 0x1a, 0x65, 0x1c, 0xfa, 0x42, 0xbb, 0x9d,
+	0x33, 0x6a, 0x0f, 0x1e, 0x28, 0xe0, 0xef, 0xf6, 0x7e, 0x86, 0x97, 0x53, 0x40, 0xbb, 0x4e, 0x17,
+	0xf5, 0x4a, 0x9f, 0x6a, 0x99, 0xc6, 0x8a, 0x48, 0x63, 0x19, 0x2e, 0xf6, 0x4c, 0xc3, 0xb6, 0x58,
+	0x3c, 0x0f, 0x06, 0xbf, 0x28, 0x20, 0x97, 0xd6, 0x4c, 0xf0, 0x6a, 0x7a, 0x75, 0xcf, 0x9a, 0x02,
+	0xea, 0xb5, 0x73, 0xdb, 0xc9, 0x44, 0x36, 0x45, 0x22, 0xeb, 0xb0, 0xd4, 0xd7, 0x7d, 0x70, 0xea,
+	0xc5, 0x73, 0x29, 0x3f, 0xa7, 0x7e, 0x59, 0x8c, 0x1a, 0xb4, 0x1b, 0x9b, 0x38, 0x7b, 0xc5, 0xd2,
+	0xe1, 0x49, 0x5e, 0x39, 0x3a, 0xc9, 0x2b, 0x9f, 0x4f, 0xf2, 0xca, 0xeb, 0xd3, 0x7c, 0xe6, 0xe8,
+	0x34, 0x9f, 0xf9, 0x74, 0x9a, 0xcf, 0x3c, 0x5b, 0x32, 0x2d, 0xbe, 0x55, 0xaf, 0xe8, 0x55, 0xea,
+	0xa4, 0x44, 0x7c, 0x19, 0x8b, 0xc9, 0x1b, 0x1e, 0x61, 0x95, 0x21, 0xf1, 0x67, 0xbf, 0xfc, 0x33,
+	0x00, 0x00, 0xff, 0xff, 0x14, 0xa4, 0x11, 0xb2, 0xfb, 0x08, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -477,9 +579,11 @@ const _ = grpc.SupportPackageIsVersion4
 type QueryClient interface {
 	// Parameters queries the parameters of the module.
 	Params(ctx context.Context, in *QueryParamsRequest, opts ...grpc.CallOption) (*QueryParamsResponse, error)
-	// Queries a list of GetSuperNode items.
+	// Queries a SuperNode by validatorAddress.
 	GetSuperNode(ctx context.Context, in *QueryGetSuperNodeRequest, opts ...grpc.CallOption) (*QueryGetSuperNodeResponse, error)
-	// Queries a list of ListSuperNodes items.
+	// Queries a SuperNode by supernodeAddress.
+	GetSuperNodeBySuperNodeAddress(ctx context.Context, in *QueryGetSuperNodeBySuperNodeAddressRequest, opts ...grpc.CallOption) (*QueryGetSuperNodeBySuperNodeAddressResponse, error)
+	// Queries a list of SuperNodes.
 	ListSuperNodes(ctx context.Context, in *QueryListSuperNodesRequest, opts ...grpc.CallOption) (*QueryListSuperNodesResponse, error)
 	// Queries a list of GetTopSuperNodesForBlock items.
 	GetTopSuperNodesForBlock(ctx context.Context, in *QueryGetTopSuperNodesForBlockRequest, opts ...grpc.CallOption) (*QueryGetTopSuperNodesForBlockResponse, error)
@@ -511,6 +615,15 @@ func (c *queryClient) GetSuperNode(ctx context.Context, in *QueryGetSuperNodeReq
 	return out, nil
 }
 
+func (c *queryClient) GetSuperNodeBySuperNodeAddress(ctx context.Context, in *QueryGetSuperNodeBySuperNodeAddressRequest, opts ...grpc.CallOption) (*QueryGetSuperNodeBySuperNodeAddressResponse, error) {
+	out := new(QueryGetSuperNodeBySuperNodeAddressResponse)
+	err := c.cc.Invoke(ctx, "/lumera.supernode.Query/GetSuperNodeBySuperNodeAddress", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *queryClient) ListSuperNodes(ctx context.Context, in *QueryListSuperNodesRequest, opts ...grpc.CallOption) (*QueryListSuperNodesResponse, error) {
 	out := new(QueryListSuperNodesResponse)
 	err := c.cc.Invoke(ctx, "/lumera.supernode.Query/ListSuperNodes", in, out, opts...)
@@ -533,9 +646,11 @@ func (c *queryClient) GetTopSuperNodesForBlock(ctx context.Context, in *QueryGet
 type QueryServer interface {
 	// Parameters queries the parameters of the module.
 	Params(context.Context, *QueryParamsRequest) (*QueryParamsResponse, error)
-	// Queries a list of GetSuperNode items.
+	// Queries a SuperNode by validatorAddress.
 	GetSuperNode(context.Context, *QueryGetSuperNodeRequest) (*QueryGetSuperNodeResponse, error)
-	// Queries a list of ListSuperNodes items.
+	// Queries a SuperNode by supernodeAddress.
+	GetSuperNodeBySuperNodeAddress(context.Context, *QueryGetSuperNodeBySuperNodeAddressRequest) (*QueryGetSuperNodeBySuperNodeAddressResponse, error)
+	// Queries a list of SuperNodes.
 	ListSuperNodes(context.Context, *QueryListSuperNodesRequest) (*QueryListSuperNodesResponse, error)
 	// Queries a list of GetTopSuperNodesForBlock items.
 	GetTopSuperNodesForBlock(context.Context, *QueryGetTopSuperNodesForBlockRequest) (*QueryGetTopSuperNodesForBlockResponse, error)
@@ -550,6 +665,9 @@ func (*UnimplementedQueryServer) Params(ctx context.Context, req *QueryParamsReq
 }
 func (*UnimplementedQueryServer) GetSuperNode(ctx context.Context, req *QueryGetSuperNodeRequest) (*QueryGetSuperNodeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetSuperNode not implemented")
+}
+func (*UnimplementedQueryServer) GetSuperNodeBySuperNodeAddress(ctx context.Context, req *QueryGetSuperNodeBySuperNodeAddressRequest) (*QueryGetSuperNodeBySuperNodeAddressResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetSuperNodeBySuperNodeAddress not implemented")
 }
 func (*UnimplementedQueryServer) ListSuperNodes(ctx context.Context, req *QueryListSuperNodesRequest) (*QueryListSuperNodesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListSuperNodes not implemented")
@@ -594,6 +712,24 @@ func _Query_GetSuperNode_Handler(srv interface{}, ctx context.Context, dec func(
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(QueryServer).GetSuperNode(ctx, req.(*QueryGetSuperNodeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Query_GetSuperNodeBySuperNodeAddress_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryGetSuperNodeBySuperNodeAddressRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(QueryServer).GetSuperNodeBySuperNodeAddress(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/lumera.supernode.Query/GetSuperNodeBySuperNodeAddress",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(QueryServer).GetSuperNodeBySuperNodeAddress(ctx, req.(*QueryGetSuperNodeBySuperNodeAddressRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -646,6 +782,10 @@ var _Query_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetSuperNode",
 			Handler:    _Query_GetSuperNode_Handler,
+		},
+		{
+			MethodName: "GetSuperNodeBySuperNodeAddress",
+			Handler:    _Query_GetSuperNodeBySuperNodeAddress_Handler,
 		},
 		{
 			MethodName: "ListSuperNodes",
@@ -781,6 +921,71 @@ func (m *QueryGetSuperNodeResponse) MarshalToSizedBuffer(dAtA []byte) (int, erro
 	return len(dAtA) - i, nil
 }
 
+func (m *QueryGetSuperNodeBySuperNodeAddressRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *QueryGetSuperNodeBySuperNodeAddressRequest) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *QueryGetSuperNodeBySuperNodeAddressRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.SupernodeAddress) > 0 {
+		i -= len(m.SupernodeAddress)
+		copy(dAtA[i:], m.SupernodeAddress)
+		i = encodeVarintQuery(dAtA, i, uint64(len(m.SupernodeAddress)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *QueryGetSuperNodeBySuperNodeAddressResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *QueryGetSuperNodeBySuperNodeAddressResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *QueryGetSuperNodeBySuperNodeAddressResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.Supernode != nil {
+		{
+			size, err := m.Supernode.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintQuery(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
 func (m *QueryListSuperNodesRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -885,10 +1090,12 @@ func (m *QueryGetTopSuperNodesForBlockRequest) MarshalToSizedBuffer(dAtA []byte)
 	_ = i
 	var l int
 	_ = l
-	if m.State != 0 {
-		i = encodeVarintQuery(dAtA, i, uint64(m.State))
+	if len(m.State) > 0 {
+		i -= len(m.State)
+		copy(dAtA[i:], m.State)
+		i = encodeVarintQuery(dAtA, i, uint64(len(m.State)))
 		i--
-		dAtA[i] = 0x18
+		dAtA[i] = 0x1a
 	}
 	if m.Limit != 0 {
 		i = encodeVarintQuery(dAtA, i, uint64(m.Limit))
@@ -997,6 +1204,32 @@ func (m *QueryGetSuperNodeResponse) Size() (n int) {
 	return n
 }
 
+func (m *QueryGetSuperNodeBySuperNodeAddressRequest) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.SupernodeAddress)
+	if l > 0 {
+		n += 1 + l + sovQuery(uint64(l))
+	}
+	return n
+}
+
+func (m *QueryGetSuperNodeBySuperNodeAddressResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.Supernode != nil {
+		l = m.Supernode.Size()
+		n += 1 + l + sovQuery(uint64(l))
+	}
+	return n
+}
+
 func (m *QueryListSuperNodesRequest) Size() (n int) {
 	if m == nil {
 		return 0
@@ -1041,8 +1274,9 @@ func (m *QueryGetTopSuperNodesForBlockRequest) Size() (n int) {
 	if m.Limit != 0 {
 		n += 1 + sovQuery(uint64(m.Limit))
 	}
-	if m.State != 0 {
-		n += 1 + sovQuery(uint64(m.State))
+	l = len(m.State)
+	if l > 0 {
+		n += 1 + l + sovQuery(uint64(l))
 	}
 	return n
 }
@@ -1310,6 +1544,174 @@ func (m *QueryGetSuperNodeResponse) Unmarshal(dAtA []byte) error {
 		}
 		if fieldNum <= 0 {
 			return fmt.Errorf("proto: QueryGetSuperNodeResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Supernode", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthQuery
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Supernode == nil {
+				m.Supernode = &SuperNode{}
+			}
+			if err := m.Supernode.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipQuery(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *QueryGetSuperNodeBySuperNodeAddressRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowQuery
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: QueryGetSuperNodeBySuperNodeAddressRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: QueryGetSuperNodeBySuperNodeAddressRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SupernodeAddress", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthQuery
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SupernodeAddress = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipQuery(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *QueryGetSuperNodeBySuperNodeAddressResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowQuery
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: QueryGetSuperNodeBySuperNodeAddressResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: QueryGetSuperNodeBySuperNodeAddressResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -1643,10 +2045,10 @@ func (m *QueryGetTopSuperNodesForBlockRequest) Unmarshal(dAtA []byte) error {
 				}
 			}
 		case 3:
-			if wireType != 0 {
+			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field State", wireType)
 			}
-			m.State = 0
+			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowQuery
@@ -1656,11 +2058,24 @@ func (m *QueryGetTopSuperNodesForBlockRequest) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.State |= SuperNodeState(b&0x7F) << shift
+				stringLen |= uint64(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthQuery
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.State = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipQuery(dAtA[iNdEx:])

@@ -8,7 +8,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/spf13/cobra"
 
-	"github.com/LumeraProtocol/lumera/x/lumeraid/module/legroast"
+	"github.com/LumeraProtocol/lumera/x/lumeraid/legroast"
 )
 
 func CmdLegroastVerify() *cobra.Command {

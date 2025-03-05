@@ -2,7 +2,6 @@ vue/node_modules
 vue/dist
 release/
 .idea/
-.vscode/
 .DS_Store
 *.dot
 *.log
@@ -22,3 +21,5 @@ repomix-*
 .repomixignore
 
 tests/systemtests/testnet
+devnet/docker-compose.start.yml
+devnet/start.sh

@@ -27,7 +27,10 @@ func (k msgServer) Claim(goCtx context.Context, msg *types.MsgClaim) (*types.Msg
 	}
 
 	// Check claims per block limit
-	claimsCount := k.GetBlockClaimCount(ctx)
+	claimsCount, err := k.GetBlockClaimCount(ctx)
+	if err != nil {
+		return nil, err
+	}
 	if claimsCount >= params.MaxClaimsPerBlock {
 		return nil, types.ErrTooManyClaims
 	}

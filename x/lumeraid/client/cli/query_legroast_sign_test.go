@@ -13,7 +13,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 
 	"github.com/LumeraProtocol/lumera/x/lumeraid/client/cli"
-	"github.com/LumeraProtocol/lumera/x/lumeraid/module/legroast"
+	"github.com/LumeraProtocol/lumera/x/lumeraid/legroast"
 )
 
 func TestCmdLegroastSign(t *testing.T) {

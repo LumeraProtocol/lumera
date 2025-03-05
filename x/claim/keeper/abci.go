@@ -9,8 +9,6 @@ import (
 )
 
 func (k Keeper) BeginBlocker(ctx context.Context) error {
-	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	k.ResetBlockClaimCount(sdkCtx)
 	return nil
 }
 

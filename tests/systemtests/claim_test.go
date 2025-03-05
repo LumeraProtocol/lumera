@@ -8,12 +8,13 @@ import (
 	"testing"
 	"time"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 
 	claimtestutils "github.com/LumeraProtocol/lumera/x/claim/testutils"
+	claimtypes "github.com/LumeraProtocol/lumera/x/claim/types"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 )
 
 func TestClaimsSystem(t *testing.T) {
@@ -232,7 +233,7 @@ func TestClaimsSystem(t *testing.T) {
 							case "module":
 								require.Equal(t, "claim", value)
 							case "amount":
-								require.Equal(t, tc.balanceToClaim+"stake", value)
+								require.Equal(t, tc.balanceToClaim+claimtypes.DefaultClaimsDenom, value)
 							case "old_address":
 								require.Equal(t, testData.OldAddress, value)
 							case "new_address":
@@ -244,10 +245,16 @@ func TestClaimsSystem(t *testing.T) {
 				require.True(t, foundClaimEvent, "claim_processed event not found")
 
 				// Check if the amount has been transferred to the new address
-				bal := cli.QueryBalance(testData.NewAddress, sdk.DefaultBondDenom)
+				bal := cli.QueryBalance(testData.NewAddress, claimtypes.DefaultClaimsDenom)
 				expectedBal, err := strconv.ParseInt(tc.balanceToClaim, 10, 64)
 				require.NoError(t, err)
 				require.Equal(t, expectedBal, bal)
+
+				// Verify the amount was deducted from the claims account
+				claimsModuleAddr := authtypes.NewModuleAddress(claimtypes.ModuleName).String()
+				claimsAccBal := cli.QueryBalance(claimsModuleAddr, claimtypes.DefaultClaimsDenom)
+				expectedClaimsAccBal := cli.QueryTotalSupply(claimtypes.DefaultClaimsDenom) - expectedBal
+				require.Equal(t, expectedClaimsAccBal, claimsAccBal, "claims account balance incorrect after claim")
 			} else {
 				RequireTxFailure(t, lastResp, tc.expectedError)
 			}

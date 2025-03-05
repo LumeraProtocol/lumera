@@ -79,14 +79,17 @@ func SimulateMsgClaim(
 		}
 
 		// Check if we've hit the claims per block limit
-		claimsInBlock := k.GetBlockClaimCount(ctx)
+		claimsInBlock, err := k.GetBlockClaimCount(ctx)
+		if err != nil {
+			return simtypes.NoOpMsg(types.ModuleName, TypeMsgClaim, "failed to get block claim count"), nil, err
+		}
 		if claimsInBlock >= params.MaxClaimsPerBlock {
 			return simtypes.NoOpMsg(types.ModuleName, TypeMsgClaim, "max claims per block reached"), nil, nil
 		}
 
 		// Execute the message
 		msgServer := keeper.NewMsgServerImpl(k)
-		_, err = msgServer.Claim(sdk.WrapSDKContext(ctx), &msg)
+		_, err = msgServer.Claim(ctx, &msg)
 		if err != nil {
 			return simtypes.NoOpMsg(types.ModuleName, TypeMsgClaim, err.Error()), nil, err
 		}

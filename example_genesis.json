@@ -83,7 +83,37 @@
           "amount": "25100001000000"
         }
       ],
-      "denom_metadata": [],
+      "denom_metadata": [
+        {
+          "name": "lume",
+          "description": "The native token of lumera",
+          "denom_units": [
+            {
+              "denom": "ulume",
+              "exponent": 0,
+              "aliases": [
+                "microlume"
+              ]
+            },
+            {
+              "denom": "mlume",
+              "exponent": 3,
+              "aliases": [
+                "millilume"
+              ]
+            },
+            {
+              "denom": "lume",
+              "exponent": 6
+            }
+          ],
+          "symbol": "LUME",
+          "base": "ulume",
+          "display": "lume",
+          "uri": "",
+          "uri_hash": ""
+        }
+      ],
       "send_enabled": []
     },
     "capability": {

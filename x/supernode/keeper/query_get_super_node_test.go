@@ -94,7 +94,7 @@ func TestKeeper_GetSuperNode(t *testing.T) {
 				tc.setupState(k, ctx)
 			}
 
-			resp, err := k.GetSuperNode(sdk.WrapSDKContext(ctx), tc.req)
+			resp, err := k.GetSuperNode(ctx, tc.req)
 
 			if tc.expectedErr != nil {
 				require.Error(t, err)

@@ -79,6 +79,7 @@ import (
 	lumeraidmodulekeeper "github.com/LumeraProtocol/lumera/x/lumeraid/keeper"
 	supernodemodulekeeper "github.com/LumeraProtocol/lumera/x/supernode/keeper"
 
+	actionmodulekeeper "github.com/LumeraProtocol/lumera/x/action/keeper"
 	// this line is used by starport scaffolding # stargate/app/moduleImport
 
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
@@ -154,6 +155,7 @@ type App struct {
 
 	ClaimKeeper     claimmodulekeeper.Keeper
 	SupernodeKeeper supernodemodulekeeper.Keeper
+	ActionKeeper    actionmodulekeeper.Keeper
 	// this line is used by starport scaffolding # stargate/app/keeperDeclaration
 
 	// simulation manager
@@ -260,6 +262,7 @@ func New(
 		&app.LumeraidKeeper,
 		&app.ClaimKeeper,
 		&app.SupernodeKeeper,
+		&app.ActionKeeper,
 		// this line is used by starport scaffolding # stargate/app/keeperDefinition
 	); err != nil {
 		panic(err)

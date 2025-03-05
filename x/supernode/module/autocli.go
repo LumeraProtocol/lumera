@@ -32,10 +32,29 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 				},
 
 				{
-					RpcMethod:      "GetTopSuperNodesForBlock",
-					Use:            "get-top-super-nodes-for-block [block-height]",
-					Short:          "Query get-top-super-nodes-for-block",
-					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "blockHeight"}},
+					RpcMethod: "GetTopSuperNodesForBlock",
+					Use:       "get-top-super-nodes-for-block [block-height]",
+					Short:     "Query get-top-super-nodes-for-block",
+					Long: "Query get-top-super-nodes-for-block with the following states:\n" +
+						"  - SUPERNODE_STATE_ACTIVE\n" +
+						"  - SUPERNODE_STATE_DISABLED\n" +
+						"  - SUPERNODE_STATE_STOPPED\n" +
+						"  - SUPERNODE_STATE_PENALIZED",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{
+						{ProtoField: "blockHeight"},
+					},
+					FlagOptions: map[string]*autocliv1.FlagOptions{
+						"limit": {
+							Name:         "limit",
+							Usage:        "Optional limit for number of super nodes",
+							DefaultValue: "25",
+						},
+						"state": {
+							Name:         "state",
+							Usage:        "Optional state filter (SUPERNODE_STATE_ACTIVE, SUPERNODE_STATE_DISABLED, SUPERNODE_STATE_STOPPED, SUPERNODE_STATE_PENALIZED)",
+							DefaultValue: "SUPERNODE_STATE_ACTIVE",
+						},
+					},
 				},
 
 				// this line is used by ignite scaffolding # autocli/query

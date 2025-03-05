@@ -219,6 +219,9 @@ func NewServer(configPath string) (*Server, error) {
 }
 
 func (s *Server) handleGetFeeForClaiming(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		return // Middleware already handled it
+	}
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -227,6 +230,7 @@ func (s *Server) handleGetFeeForClaiming(w http.ResponseWriter, r *http.Request)
 	// Parse request
 	var req FaucetRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.logger.Printf("Failed to decode request: %v", err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
@@ -236,38 +240,44 @@ func (s *Server) handleGetFeeForClaiming(w http.ResponseWriter, r *http.Request)
 
 	resp, err := http.Get(accountURL)
 	if err != nil {
+		s.logger.Printf("Failed to query account: %v", err)
 		http.Error(w, "Failed to query account", http.StatusInternalServerError)
 		return
 	}
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
+			s.logger.Printf("Failed to close response body: %v", err)
 			http.Error(w, "Failed to close response body", http.StatusInternalServerError)
 		}
 	}(resp.Body)
 
 	// If account exists and response is 200, return error
-	if resp.StatusCode == http.StatusOK {
-		http.Error(w, "Account already exists", http.StatusBadRequest)
-		return
-	}
+	//if resp.StatusCode == http.StatusOK {
+	//	s.logger.Printf("Account already exists")
+	//	http.Error(w, "Account already exists", http.StatusBadRequest)
+	//	return
+	//}
 
 	// 2. Query claim record
 	claimRecordURL := fmt.Sprintf("%s/LumeraProtocol/lumera/claim/claim_record/%s", s.config.NodeURL, req.OldAddress)
 
 	resp, err = http.Get(claimRecordURL)
 	if err != nil {
+		s.logger.Printf("Failed to query claim record: %v", err)
 		http.Error(w, "Failed to query claim record", http.StatusInternalServerError)
 		return
 	}
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
+			s.logger.Printf("Failed to close response body: %v", err)
 			http.Error(w, "Failed to close response body", http.StatusInternalServerError)
 		}
 	}(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
+		s.logger.Printf("Claim record not found")
 		http.Error(w, "Claim record not found", http.StatusBadRequest)
 		return
 	}
@@ -284,20 +294,24 @@ func (s *Server) handleGetFeeForClaiming(w http.ResponseWriter, r *http.Request)
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&claimResp); err != nil {
+		s.logger.Printf("Failed to decode claim record: %v", err)
 		http.Error(w, "Failed to decode claim record", http.StatusInternalServerError)
 		return
 	}
 
 	// Check if claim exists and is not claimed
 	if claimResp.Record.Claimed {
+		s.logger.Printf("Claim already processed")
 		http.Error(w, "Claim already processed", http.StatusBadRequest)
 		return
 	}
 	if claimResp.Record.OldAddress != req.OldAddress {
+		s.logger.Printf("Mismatch in claim address")
 		http.Error(w, "Mismatch in claim address", http.StatusBadRequest)
 		return
 	}
 	if len(claimResp.Record.Balance) == 0 {
+		s.logger.Printf("Claim record has no balance")
 		http.Error(w, "Claim record has no balance", http.StatusBadRequest)
 		return
 	}
@@ -306,11 +320,13 @@ func (s *Server) handleGetFeeForClaiming(w http.ResponseWriter, r *http.Request)
 	// Verify address reconstruction and signature
 	reconstructedAddress, err := lumeracrypto.GetAddressFromPubKey(req.OldPubKey)
 	if err != nil {
+		s.logger.Printf("Failed to reconstruct address: %v", err)
 		http.Error(w, "Invalid public key", http.StatusBadRequest)
 		return
 	}
 
 	if reconstructedAddress != req.OldAddress {
+		s.logger.Printf("Mismatch in reconstructed address")
 		http.Error(w, "Mismatch in reconstructed address", http.StatusBadRequest)
 		return
 	}
@@ -318,6 +334,7 @@ func (s *Server) handleGetFeeForClaiming(w http.ResponseWriter, r *http.Request)
 	verificationMessage := req.OldAddress + "." + req.OldPubKey + "." + req.NewAddress
 	valid, err := lumeracrypto.VerifySignature(req.OldPubKey, verificationMessage, req.Signature)
 	if err != nil || !valid {
+		s.logger.Printf("Invalid signature: %v", err)
 		http.Error(w, "Invalid signature", http.StatusBadRequest)
 		return
 	}
@@ -332,6 +349,7 @@ func (s *Server) handleGetFeeForClaiming(w http.ResponseWriter, r *http.Request)
 	// Create and sign transaction
 	txHash, err := s.broadcastTx(msg)
 	if err != nil {
+		s.logger.Printf("Failed to send transaction: %v", err)
 		http.Error(w, fmt.Sprintf("Failed to send transaction: %v", err), http.StatusInternalServerError)
 		return
 	}
@@ -345,6 +363,7 @@ func (s *Server) handleGetFeeForClaiming(w http.ResponseWriter, r *http.Request)
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(response)
 	if err != nil {
+		s.logger.Printf("Failed to encode response: %v", err)
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		return
 	}
@@ -498,6 +517,19 @@ func recoveryMiddleware(logger *log.Logger) mux.MiddlewareFunc {
 	}
 }
 
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		if r.Method == http.MethodOptions {
+			w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func main() {
 	// Create server
 	server, err := NewServer("config.json")
@@ -507,11 +539,12 @@ func main() {
 
 	// Create router
 	r := mux.NewRouter()
-	r.HandleFunc("/api/getfeeforclaiming", server.handleGetFeeForClaiming).Methods("POST")
+	r.HandleFunc("/api/getfeeforclaiming", server.handleGetFeeForClaiming).Methods("POST", "OPTIONS")
 
 	// Add middleware
 	r.Use(loggingMiddleware(server.logger))
 	r.Use(recoveryMiddleware(server.logger))
+	r.Use(corsMiddleware)
 
 	// Start server
 	addr := ":8080"

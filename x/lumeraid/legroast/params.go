@@ -144,7 +144,7 @@ func GetLegRoastParams(alg LegRoastAlgorithm) *LegRoastParams {
 }
 
 // GetAlgorithmBySigSize returns the algorithm based on the signature size.
-var GetAlgorithmBySigSize = func (sigSize int) (LegRoastAlgorithm, error) {
+var GetAlgorithmBySigSize = func(sigSize int) (LegRoastAlgorithm, error) {
 	for i, params := range legRoastParamsList {
 		if params.SigBytes == uint32(sigSize) {
 			return LegRoastAlgorithm(i), nil

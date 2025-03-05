@@ -73,8 +73,9 @@ func (c *queryClient) GetSuperNode(ctx context.Context, in *QueryGetSuperNodeReq
 }
 
 func (c *queryClient) GetSuperNodeBySuperNodeAddress(ctx context.Context, in *QueryGetSuperNodeBySuperNodeAddressRequest, opts ...grpc.CallOption) (*QueryGetSuperNodeBySuperNodeAddressResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(QueryGetSuperNodeBySuperNodeAddressResponse)
-	err := c.cc.Invoke(ctx, Query_GetSuperNodeBySuperNodeAddress_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, Query_GetSuperNodeBySuperNodeAddress_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}

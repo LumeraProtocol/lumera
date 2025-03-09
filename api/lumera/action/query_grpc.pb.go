@@ -19,8 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Query_Params_FullMethodName    = "/lumera.action.Query/Params"
-	Query_GetAction_FullMethodName = "/lumera.action.Query/GetAction"
+	Query_Params_FullMethodName       = "/lumera.action.Query/Params"
+	Query_GetAction_FullMethodName    = "/lumera.action.Query/GetAction"
+	Query_GetActionFee_FullMethodName = "/lumera.action.Query/GetActionFee"
 )
 
 // QueryClient is the client API for Query service.
@@ -33,6 +34,8 @@ type QueryClient interface {
 	Params(ctx context.Context, in *QueryParamsRequest, opts ...grpc.CallOption) (*QueryParamsResponse, error)
 	// GetAction queries a single action by ID.
 	GetAction(ctx context.Context, in *QueryGetActionRequest, opts ...grpc.CallOption) (*QueryGetActionResponse, error)
+	// Queries a list of GetActionFee items.
+	GetActionFee(ctx context.Context, in *QueryGetActionFeeRequest, opts ...grpc.CallOption) (*QueryGetActionFeeResponse, error)
 }
 
 type queryClient struct {
@@ -63,6 +66,16 @@ func (c *queryClient) GetAction(ctx context.Context, in *QueryGetActionRequest, 
 	return out, nil
 }
 
+func (c *queryClient) GetActionFee(ctx context.Context, in *QueryGetActionFeeRequest, opts ...grpc.CallOption) (*QueryGetActionFeeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryGetActionFeeResponse)
+	err := c.cc.Invoke(ctx, Query_GetActionFee_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // QueryServer is the server API for Query service.
 // All implementations must embed UnimplementedQueryServer
 // for forward compatibility.
@@ -73,6 +86,8 @@ type QueryServer interface {
 	Params(context.Context, *QueryParamsRequest) (*QueryParamsResponse, error)
 	// GetAction queries a single action by ID.
 	GetAction(context.Context, *QueryGetActionRequest) (*QueryGetActionResponse, error)
+	// Queries a list of GetActionFee items.
+	GetActionFee(context.Context, *QueryGetActionFeeRequest) (*QueryGetActionFeeResponse, error)
 	mustEmbedUnimplementedQueryServer()
 }
 
@@ -88,6 +103,9 @@ func (UnimplementedQueryServer) Params(context.Context, *QueryParamsRequest) (*Q
 }
 func (UnimplementedQueryServer) GetAction(context.Context, *QueryGetActionRequest) (*QueryGetActionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAction not implemented")
+}
+func (UnimplementedQueryServer) GetActionFee(context.Context, *QueryGetActionFeeRequest) (*QueryGetActionFeeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetActionFee not implemented")
 }
 func (UnimplementedQueryServer) mustEmbedUnimplementedQueryServer() {}
 func (UnimplementedQueryServer) testEmbeddedByValue()               {}
@@ -146,6 +164,24 @@ func _Query_GetAction_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Query_GetActionFee_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryGetActionFeeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(QueryServer).GetActionFee(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Query_GetActionFee_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(QueryServer).GetActionFee(ctx, req.(*QueryGetActionFeeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Query_ServiceDesc is the grpc.ServiceDesc for Query service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -160,6 +196,10 @@ var Query_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetAction",
 			Handler:    _Query_GetAction_Handler,
+		},
+		{
+			MethodName: "GetActionFee",
+			Handler:    _Query_GetActionFee_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

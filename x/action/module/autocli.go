@@ -17,6 +17,13 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					Use:       "params",
 					Short:     "Shows the parameters of the module",
 				},
+				{
+					RpcMethod:      "GetActionFee",
+					Use:            "get-action-fee [data-size]",
+					Short:          "Query get-action-fee",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "dataSize"}},
+				},
+
 				// this line is used by ignite scaffolding # autocli/query
 			},
 		},

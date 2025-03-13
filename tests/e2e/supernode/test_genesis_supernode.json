@@ -103,7 +103,7 @@
         "enable_claims": true,
         "max_claims_per_block": "100"
       },
-      "total_claimable_amount": "12383801540459"
+      "total_claimable_amount": "18749999981413"
     },
     "consensus": null,
     "crisis": {

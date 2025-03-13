@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func (k Keeper) GetActionFee(goCtx context.Context, req *types.QueryGetActionFeeRequest) (*types.QueryGetActionFeeResponse, error) {
+func (k *Keeper) GetActionFee(goCtx context.Context, req *types.QueryGetActionFeeRequest) (*types.QueryGetActionFeeResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
 	}

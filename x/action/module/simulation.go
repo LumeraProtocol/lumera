@@ -23,7 +23,19 @@ var (
 )
 
 const (
-// this line is used by starport scaffolding # simapp/module/const
+	opWeightMsgRequestAction = "op_weight_msg_request_action"
+	// TODO: Determine the simulation weight value
+	defaultWeightMsgRequestAction int = 100
+
+	opWeightMsgFinalizeAction = "op_weight_msg_finalize_action"
+	// TODO: Determine the simulation weight value
+	defaultWeightMsgFinalizeAction int = 100
+
+	opWeightMsgApproveAction = "op_weight_msg_approve_action"
+	// TODO: Determine the simulation weight value
+	defaultWeightMsgApproveAction int = 100
+
+	// this line is used by starport scaffolding # simapp/module/const
 )
 
 // GenerateGenesisState creates a randomized GenState of the module.
@@ -46,6 +58,39 @@ func (am AppModule) RegisterStoreDecoder(_ simtypes.StoreDecoderRegistry) {}
 func (am AppModule) WeightedOperations(simState module.SimulationState) []simtypes.WeightedOperation {
 	operations := make([]simtypes.WeightedOperation, 0)
 
+	var weightMsgRequestAction int
+	simState.AppParams.GetOrGenerate(opWeightMsgRequestAction, &weightMsgRequestAction, nil,
+		func(_ *rand.Rand) {
+			weightMsgRequestAction = defaultWeightMsgRequestAction
+		},
+	)
+	operations = append(operations, simulation.NewWeightedOperation(
+		weightMsgRequestAction,
+		actionsimulation.SimulateMsgRequestAction(am.accountKeeper, am.bankKeeper, am.keeper),
+	))
+
+	var weightMsgFinalizeAction int
+	simState.AppParams.GetOrGenerate(opWeightMsgFinalizeAction, &weightMsgFinalizeAction, nil,
+		func(_ *rand.Rand) {
+			weightMsgFinalizeAction = defaultWeightMsgFinalizeAction
+		},
+	)
+	operations = append(operations, simulation.NewWeightedOperation(
+		weightMsgFinalizeAction,
+		actionsimulation.SimulateMsgFinalizeAction(am.accountKeeper, am.bankKeeper, am.keeper),
+	))
+
+	var weightMsgApproveAction int
+	simState.AppParams.GetOrGenerate(opWeightMsgApproveAction, &weightMsgApproveAction, nil,
+		func(_ *rand.Rand) {
+			weightMsgApproveAction = defaultWeightMsgApproveAction
+		},
+	)
+	operations = append(operations, simulation.NewWeightedOperation(
+		weightMsgApproveAction,
+		actionsimulation.SimulateMsgApproveAction(am.accountKeeper, am.bankKeeper, am.keeper),
+	))
+
 	// this line is used by starport scaffolding # simapp/module/operation
 
 	return operations
@@ -54,6 +99,30 @@ func (am AppModule) WeightedOperations(simState module.SimulationState) []simtyp
 // ProposalMsgs returns msgs used for governance proposals for simulations.
 func (am AppModule) ProposalMsgs(simState module.SimulationState) []simtypes.WeightedProposalMsg {
 	return []simtypes.WeightedProposalMsg{
+		simulation.NewWeightedProposalMsg(
+			opWeightMsgRequestAction,
+			defaultWeightMsgRequestAction,
+			func(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account) sdk.Msg {
+				actionsimulation.SimulateMsgRequestAction(am.accountKeeper, am.bankKeeper, am.keeper)
+				return nil
+			},
+		),
+		simulation.NewWeightedProposalMsg(
+			opWeightMsgFinalizeAction,
+			defaultWeightMsgFinalizeAction,
+			func(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account) sdk.Msg {
+				actionsimulation.SimulateMsgFinalizeAction(am.accountKeeper, am.bankKeeper, am.keeper)
+				return nil
+			},
+		),
+		simulation.NewWeightedProposalMsg(
+			opWeightMsgApproveAction,
+			defaultWeightMsgApproveAction,
+			func(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account) sdk.Msg {
+				actionsimulation.SimulateMsgApproveAction(am.accountKeeper, am.bankKeeper, am.keeper)
+				return nil
+			},
+		),
 		// this line is used by starport scaffolding # simapp/module/OpMsg
 	}
 }

@@ -23,7 +23,7 @@ func TestCreateRequest(t *testing.T) {
 	defer ctrl.Finish()
 
 	kr := accounts.CreateTestKeyring()
-	
+
 	// Create test accounts
 	addresses := accounts.SetupTestAccounts(t, kr, []string{"test-client", "test-server"})
 	localAddress := addresses[0]
@@ -34,7 +34,7 @@ func TestCreateRequest(t *testing.T) {
 
 	ske, err := NewSecureKeyExchange(kr, localAddress, peerType, curve)
 	require.NoError(t, err)
-	
+
 	handshakeBytes, signature, err := ske.CreateRequest(remoteAddress)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, handshakeBytes)
@@ -53,7 +53,7 @@ func TestCreateRequest_SignWithKeyringFails(t *testing.T) {
 
 	mockKeyring := mocks.NewMockKeyring(ctrl)
 	mockKeyring.EXPECT().KeyByAddress(gomock.Any()).Return(nil, nil)
-	
+
 	ske, err := NewSecureKeyExchange(mockKeyring, accounts.TestAddress1, Simplenode, nil)
 	require.NoError(t, err)
 
@@ -284,5 +284,5 @@ func TestComputeSharedSecret(t *testing.T) {
 	sharedSecret, err := skeLocal.ComputeSharedSecret(handshakeRemoteBytes, signatureRemote)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, sharedSecret)
-	assert.Len(t, sharedSecret, 32)	
+	assert.Len(t, sharedSecret, 32)
 }

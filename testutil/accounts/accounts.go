@@ -4,14 +4,15 @@ package accounts
 
 import (
 	"testing"
+
 	"github.com/stretchr/testify/require"
 
-	"github.com/cosmos/go-bip39"
 	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
+	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
-	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
+	"github.com/cosmos/go-bip39"
 )
 
 const (
@@ -64,7 +65,7 @@ func addTestAccountToKeyring(kr keyring.Keyring, accountName string) error {
 	return nil
 }
 
-// setupTestAccounts creates test accounts in keyring
+// SetupTestAccounts creates test accounts in keyring
 func SetupTestAccounts(t *testing.T, kr keyring.Keyring, accountNames []string) []string {
 	var addresses []string
 

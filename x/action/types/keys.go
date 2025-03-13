@@ -9,6 +9,9 @@ const (
 
 	// MemStoreKey defines the in-memory store key
 	MemStoreKey = "mem_action"
+
+	// ModuleAccountName defines the module account name for fee distribution
+	ModuleAccountName = ModuleName
 )
 
 var (

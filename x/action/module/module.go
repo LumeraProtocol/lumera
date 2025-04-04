@@ -95,11 +95,12 @@ func (AppModuleBasic) RegisterGRPCGatewayRoutes(clientCtx client.Context, mux *r
 type AppModule struct {
 	AppModuleBasic
 
-	keeper          keeper.Keeper
-	accountKeeper   types.AccountKeeper
-	bankKeeper      types.BankKeeper
-	stakingKeeper   types.StakingKeeper
-	supernodeKeeper types.SupernodeKeeper
+	keeper             keeper.Keeper
+	accountKeeper      types.AccountKeeper
+	bankKeeper         types.BankKeeper
+	stakingKeeper      types.StakingKeeper
+	distributionKeeper types.DistributionKeeper
+	supernodeKeeper    types.SupernodeKeeper
 }
 
 func NewAppModule(
@@ -108,15 +109,17 @@ func NewAppModule(
 	accountKeeper types.AccountKeeper,
 	bankKeeper types.BankKeeper,
 	stakingKeeper types.StakingKeeper,
+	distributionKeeper types.DistributionKeeper,
 	supernodeKeeper types.SupernodeKeeper,
 ) AppModule {
 	return AppModule{
-		AppModuleBasic:  NewAppModuleBasic(cdc),
-		keeper:          keeper,
-		accountKeeper:   accountKeeper,
-		bankKeeper:      bankKeeper,
-		stakingKeeper:   stakingKeeper,
-		supernodeKeeper: supernodeKeeper,
+		AppModuleBasic:     NewAppModuleBasic(cdc),
+		keeper:             keeper,
+		accountKeeper:      accountKeeper,
+		bankKeeper:         bankKeeper,
+		stakingKeeper:      stakingKeeper,
+		distributionKeeper: distributionKeeper,
+		supernodeKeeper:    supernodeKeeper,
 	}
 }
 
@@ -204,10 +207,11 @@ type ModuleInputs struct {
 	Config       *modulev1.Module
 	Logger       log.Logger
 
-	AccountKeeper   types.AccountKeeper
-	BankKeeper      types.BankKeeper
-	StakingKeeper   types.StakingKeeper
-	SupernodeKeeper types.SupernodeKeeper
+	AccountKeeper      types.AccountKeeper
+	BankKeeper         types.BankKeeper
+	StakingKeeper      types.StakingKeeper
+	distributionKeeper types.DistributionKeeper
+	SupernodeKeeper    types.SupernodeKeeper
 }
 
 type ModuleOutputs struct {
@@ -231,6 +235,7 @@ func ProvideModule(in ModuleInputs) ModuleOutputs {
 		in.BankKeeper,
 		in.AccountKeeper,
 		in.StakingKeeper,
+		in.distributionKeeper,
 		in.SupernodeKeeper,
 	)
 	m := NewAppModule(
@@ -239,6 +244,7 @@ func ProvideModule(in ModuleInputs) ModuleOutputs {
 		in.AccountKeeper,
 		in.BankKeeper,
 		in.StakingKeeper,
+		in.distributionKeeper,
 		in.SupernodeKeeper,
 	)
 

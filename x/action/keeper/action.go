@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"cosmossdk.io/errors"
+	"cosmossdk.io/math"
 	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
 	"github.com/LumeraProtocol/lumera/x/action/types"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/types"
@@ -558,6 +559,41 @@ func (k *Keeper) DistributeFees(ctx sdk.Context, actionID string) error {
 
 	if numSupernodes == 0 {
 		return nil // No supernodes to pay
+	}
+
+	params := k.GetParams(ctx)
+	if params.FoundationFeeShare != "" {
+		foundationFeeShareDec, err := math.LegacyNewDecFromStr(params.FoundationFeeShare)
+		if err != nil {
+			return errors.Wrapf(sdkerrors.ErrInvalidRequest, "invalid foundation fee share: %s", err)
+		}
+		if !foundationFeeShareDec.IsZero() {
+			// Calculate foundation fee - convert fee amount to Dec and calculate share
+			k.Logger().Info("Foundation fee calculation starting values",
+				"fee_amount", fee.Amount.String(),
+				"fee_denom", fee.Denom,
+				"foundation_share_percentage", foundationFeeShareDec.String())
+
+			// Convert fee amount to Dec
+			feeDec := math.LegacyNewDecFromInt(fee.Amount)
+			k.Logger().Info("Fee converted to Dec", "fee_dec", feeDec.String())
+
+			// Calculate foundation's portion
+			foundationShare := feeDec.Mul(foundationFeeShareDec)
+			k.Logger().Info("Foundation share calculated", "foundation_share", foundationShare.String())
+
+			foundationCoin := sdk.NewCoin(fee.Denom, foundationShare.TruncateInt())
+			k.Logger().Info("Foundation coin created", "foundation_coin", foundationCoin.String())
+			err = k.distributionKeeper.FundCommunityPool(
+				ctx,
+				sdk.NewCoins(foundationCoin),
+				sdk.AccAddress(types.ModuleAccountName),
+			)
+			if err != nil {
+				return errors.Wrapf(sdkerrors.ErrInsufficientFunds, "failed to send foundation fee: %s", err)
+			}
+			fee.Amount = fee.Amount.Sub(foundationShare.TruncateInt())
+		}
 	}
 
 	// Distribute the fee to each unique supernode

@@ -4,6 +4,7 @@ package types
 
 import (
 	"context"
+
 	supernodetypes "github.com/LumeraProtocol/lumera/x/supernode/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
@@ -32,6 +33,10 @@ type SupernodeKeeper interface {
 	GetTopSuperNodesForBlock(goCtx context.Context, req *supernodetypes.QueryGetTopSuperNodesForBlockRequest) (*supernodetypes.QueryGetTopSuperNodesForBlockResponse, error)
 	IsSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress) bool
 	QuerySuperNode(ctx sdk.Context, valOperAddr sdk.ValAddress) (sn supernodetypes.SuperNode, exists bool)
+}
+
+type DistributionKeeper interface {
+	FundCommunityPool(ctx context.Context, amount sdk.Coins, sender sdk.AccAddress) error
 }
 
 // ParamSubspace defines the expected Subspace interface for parameters.

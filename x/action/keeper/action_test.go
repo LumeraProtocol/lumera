@@ -3,6 +3,7 @@ package keeper_test
 import (
 	"errors"
 	"fmt"
+
 	"github.com/LumeraProtocol/lumera/x/action/common"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
@@ -737,6 +738,6 @@ func (suite *KeeperTestSuite) TestFeeDistribution() {
 
 	// Get balance on the supernode account before distribution
 	balanceAfter := suite.keeper.GetBankKeeper().GetBalance(suite.ctx, snAcc, "ulume")
-	shouldBe = balanceBefore.Amount.Int64() + 100000
+	shouldBe = balanceBefore.Amount.Int64() + (100000 * 0.9) // 90% of the fee, 10% to Community Pool
 	suite.Equal(shouldBe, balanceAfter.Amount.Int64(), "Supernode should receive the fee")
 }

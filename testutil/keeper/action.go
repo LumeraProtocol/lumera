@@ -2,10 +2,11 @@ package keeper
 
 import (
 	"context"
+	"testing"
+
 	"cosmossdk.io/math"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	"testing"
 
 	"cosmossdk.io/log"
 	"cosmossdk.io/store"
@@ -107,6 +108,14 @@ func (m *ActionBankKeeper) GetBalance(ctx context.Context, addr sdk.AccAddress, 
 	return sdk.Coin{}
 }
 
+type MockDistributionKeeper struct {
+	mock.Mock
+}
+
+func (m *MockDistributionKeeper) FundCommunityPool(ctx context.Context, amount sdk.Coins, sender sdk.AccAddress) error {
+	return nil
+}
+
 type MockStakingKeeper struct {
 	mock.Mock
 }
@@ -146,6 +155,8 @@ func ActionKeeperWithAddress(t testing.TB, accounts []AccountPair) (keeper.Keepe
 
 	supernodeKeeper := new(ActionMockSupernodeKeeper)
 
+	distributionKeeper := new(MockDistributionKeeper)
+
 	// Setup supernode mock for GetTopSuperNodesForBlock (used in validateSupernodeAuthorization)
 	supernodeKeeper.On("GetTopSuperNodesForBlock", mock.Anything, mock.Anything).Return(
 		&sntypes.QueryGetTopSuperNodesForBlockResponse{
@@ -173,11 +184,15 @@ func ActionKeeperWithAddress(t testing.TB, accounts []AccountPair) (keeper.Keepe
 		bankKeeper,
 		accountKeeper,
 		stakingKeeper,
+		distributionKeeper,
 		supernodeKeeper,
 	)
 
 	// Initialize params
-	if err := k.SetParams(ctx, types.DefaultParams()); err != nil {
+	params := types.DefaultParams()
+	params.FoundationFeeShare = "0.1"
+	params.SuperNodeFeeShare = "0.9"
+	if err := k.SetParams(ctx, params); err != nil {
 		panic(err)
 	}
 

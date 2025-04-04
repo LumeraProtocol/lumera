@@ -1,9 +1,10 @@
 package keeper
 
 import (
+	"fmt"
+
 	"cosmossdk.io/core/store"
 	"cosmossdk.io/log"
-	"fmt"
 	"github.com/LumeraProtocol/lumera/x/action/types"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -19,10 +20,11 @@ type (
 		// should be the x/gov module account.
 		authority string
 
-		bankKeeper      types.BankKeeper
-		accountKeeper   types.AccountKeeper
-		stakingKeeper   types.StakingKeeper
-		supernodeKeeper types.SupernodeKeeper
+		bankKeeper         types.BankKeeper
+		accountKeeper      types.AccountKeeper
+		stakingKeeper      types.StakingKeeper
+		distributionKeeper types.DistributionKeeper
+		supernodeKeeper    types.SupernodeKeeper
 
 		// Action handling
 		actionRegistry *ActionRegistry
@@ -38,6 +40,7 @@ func NewKeeper(
 	bankKeeper types.BankKeeper,
 	accountKeeper types.AccountKeeper,
 	stakingKeeper types.StakingKeeper,
+	distributionKeeper types.DistributionKeeper,
 	supernodeKeeper types.SupernodeKeeper,
 ) Keeper {
 	if _, err := sdk.AccAddressFromBech32(authority); err != nil {
@@ -46,14 +49,15 @@ func NewKeeper(
 
 	// Create the keeper instance
 	keeper := Keeper{
-		cdc:             cdc,
-		storeService:    storeService,
-		logger:          logger,
-		authority:       authority,
-		bankKeeper:      bankKeeper,
-		accountKeeper:   accountKeeper,
-		stakingKeeper:   stakingKeeper,
-		supernodeKeeper: supernodeKeeper,
+		cdc:                cdc,
+		storeService:       storeService,
+		logger:             logger,
+		authority:          authority,
+		bankKeeper:         bankKeeper,
+		accountKeeper:      accountKeeper,
+		stakingKeeper:      stakingKeeper,
+		distributionKeeper: distributionKeeper,
+		supernodeKeeper:    supernodeKeeper,
 	}
 
 	// Initialize action registry (requires keeper to be initialized first)

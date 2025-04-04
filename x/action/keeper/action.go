@@ -587,7 +587,7 @@ func (k *Keeper) DistributeFees(ctx sdk.Context, actionID string) error {
 			err = k.distributionKeeper.FundCommunityPool(
 				ctx,
 				sdk.NewCoins(foundationCoin),
-				sdk.AccAddress(types.ModuleAccountName),
+				types.ModuleAccountAddress,
 			)
 			if err != nil {
 				return errors.Wrapf(sdkerrors.ErrInsufficientFunds, "failed to send foundation fee: %s", err)

@@ -1,5 +1,9 @@
 package types
 
+import (
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+)
+
 const (
 	// ModuleName defines the module name
 	ModuleName = "action"
@@ -16,6 +20,8 @@ const (
 
 var (
 	ParamsKey = []byte("p_action")
+
+	ModuleAccountAddress = authtypes.NewModuleAddress(ModuleAccountName)
 )
 
 func KeyPrefix(p string) []byte {

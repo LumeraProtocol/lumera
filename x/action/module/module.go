@@ -159,17 +159,6 @@ func (AppModule) RegisterForInitGenesis() map[string]struct{} {
 	}
 }
 
-// ModuleAccountPermissions returns permissions granted to the module account
-func (AppModule) ModuleAccountPermissions() map[string][]string {
-	return map[string][]string{
-		types.ModuleAccountName: {
-			// Permissions needed for fee distribution
-			authtypes.Minter,
-			authtypes.Burner,
-		},
-	}
-}
-
 // BeginBlock contains the logic that is automatically triggered at the beginning of each block.
 // The begin block implementation is optional.
 func (am AppModule) BeginBlock(_ context.Context) error {

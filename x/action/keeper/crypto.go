@@ -44,6 +44,10 @@ func (k *Keeper) VerifySignature(ctx sdk.Context, data string, signature string,
 			"account not found for address: %s", signerAddress)
 	}
 	pubKey := account.GetPubKey()
+	if pubKey == nil {
+		return errorsmod.Wrapf(types.ErrInvalidSignature,
+			"account has no public key: %s", signerAddress)
+	}
 
 	// 2. Decode the base64 signature
 	sigBytes, err := base64.StdEncoding.DecodeString(signature)

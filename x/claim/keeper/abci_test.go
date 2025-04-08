@@ -56,15 +56,15 @@ func TestEndBlocker(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Setup test case
 			ctx = ctx.WithBlockTime(tc.blockTime)
-			err := keeper.SetParams(sdk.WrapSDKContext(ctx), tc.setupParams)
+			err := keeper.SetParams(ctx, tc.setupParams)
 			require.NoError(t, err)
 
 			// Run EndBlocker
-			err = keeper.EndBlocker(sdk.WrapSDKContext(ctx))
+			err = keeper.EndBlocker(ctx)
 			require.NoError(t, err)
 
 			// Verify final state
-			params := keeper.GetParams(sdk.WrapSDKContext(ctx))
+			params := keeper.GetParams(ctx)
 			if tc.expectDisable {
 				require.False(t, params.EnableClaims, "claims should be disabled")
 			} else {

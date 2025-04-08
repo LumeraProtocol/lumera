@@ -2,7 +2,7 @@ package keeper_test
 
 import (
 	"fmt"
-	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	"testing"
 
 	"github.com/LumeraProtocol/lumera/testutil/sample"
@@ -47,7 +47,7 @@ func (config *KeeperTestSuiteConfig) SetupTestSuite(suite *suite.Suite) {
 	pairs := make([]keepertest.AccountPair, 6)
 
 	// Create test supernodes
-	snKeys := make([]ed25519.PrivKey, 3)
+	snKeys := make([]secp256k1.PrivKey, 3)
 	config.supernodes = make([]*supernodetypes.SuperNode, 5)
 	for i := 0; i < 5; i++ {
 		key, address, valAddress := sample.SupernodeAddresses()
@@ -76,7 +76,7 @@ func (config *KeeperTestSuiteConfig) SetupTestSuite(suite *suite.Suite) {
 	key, address := sample.KeyAndAddress()
 	pubKey := key.PubKey()
 	pairs[3] = keepertest.AccountPair{Address: address, PubKey: pubKey}
-	config.signatureCascade, err = sample.CreateSignatureString([]ed25519.PrivKey{key}, 50)
+	config.signatureCascade, err = sample.CreateSignatureString([]secp256k1.PrivKey{key}, 50)
 	suite.Require().NoError(err)
 	config.creatorAddress = address
 

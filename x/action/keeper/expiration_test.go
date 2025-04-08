@@ -2,7 +2,7 @@ package keeper_test
 
 import (
 	"github.com/LumeraProtocol/lumera/x/action/types"
-	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	"testing"
 	"time"
 
@@ -33,7 +33,7 @@ func (suite *ExpirationTestSuite) SetupTest() {
 	suite.keeper, suite.ctx = keepertest.ActionKeeperWithAddress(suite.T(), pairs)
 
 	var err error
-	suite.signature, err = sample.CreateSignatureString([]ed25519.PrivKey{key}, 50)
+	suite.signature, err = sample.CreateSignatureString([]secp256k1.PrivKey{key}, 50)
 	suite.Require().NoError(err)
 
 	// Setup test address

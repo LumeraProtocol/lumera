@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"io"
 )
@@ -15,34 +16,32 @@ func AccAddress() string {
 }
 
 func AccAddressAcc() sdk.AccAddress {
-	pk := ed25519.GenPrivKey().PubKey()
-	addr := pk.Address()
-	return sdk.AccAddress(addr)
+	_, addr := KeyAndAddress()
+	return addr
 }
 
-func ValAddress() string {
-	return ValAddressVal().String()
+func ValConsensusAddress() string {
+	return ValConsensusAddressVal().String()
 }
 
-func ValAddressVal() sdk.ValAddress {
+func ValConsensusAddressVal() sdk.ValAddress {
 	pk := ed25519.GenPrivKey().PubKey()
 	addr := pk.Address()
 	return sdk.ValAddress(addr)
 }
 
-func SupernodeAddresses() (ed25519.PrivKey, sdk.AccAddress, sdk.ValAddress) {
-	key := ed25519.GenPrivKey()
-	addr := key.PubKey().Address()
-	return *key, sdk.AccAddress(addr), sdk.ValAddress(addr)
+func SupernodeAddresses() (secp256k1.PrivKey, sdk.AccAddress, sdk.ValAddress) {
+	key, addr := KeyAndAddress()
+	return key, addr, sdk.ValAddress(addr)
 }
 
-func KeyAndAddress() (ed25519.PrivKey, sdk.AccAddress) {
-	key := ed25519.GenPrivKey()
+func KeyAndAddress() (secp256k1.PrivKey, sdk.AccAddress) {
+	key := secp256k1.GenPrivKey()
 	addr := key.PubKey().Address()
 	return *key, sdk.AccAddress(addr)
 }
 
-func SignString(privKey ed25519.PrivKey, data string) (string, error) {
+func SignString(privKey secp256k1.PrivKey, data string) (string, error) {
 	signatureBytes, err := privKey.Sign([]byte(data))
 	if err != nil {
 		return "", fmt.Errorf("failed to sign data: %w", err)
@@ -52,7 +51,7 @@ func SignString(privKey ed25519.PrivKey, data string) (string, error) {
 	return signatureB64, nil
 }
 
-func CreateSignatureString(privKeys []ed25519.PrivKey, dataLen int) (string, error) {
+func CreateSignatureString(privKeys []secp256k1.PrivKey, dataLen int) (string, error) {
 	// 1. Generate arbitrary data
 	data := make([]byte, dataLen)
 	if _, err := io.ReadFull(rand.Reader, data); err != nil {

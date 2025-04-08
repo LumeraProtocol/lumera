@@ -3,7 +3,7 @@ package keeper_test
 import (
 	"fmt"
 	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
-	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	"testing"
 
 	"github.com/LumeraProtocol/lumera/testutil/sample"
@@ -72,7 +72,7 @@ func TestVerifyKademliaID(t *testing.T) {
 	key, _ := sample.KeyAndAddress()
 
 	var err error
-	validSignature, err := sample.CreateSignatureString([]ed25519.PrivKey{key}, 50)
+	validSignature, err := sample.CreateSignatureString([]secp256k1.PrivKey{key}, 50)
 	require.NoError(t, err)
 
 	validIC := uint64(111)

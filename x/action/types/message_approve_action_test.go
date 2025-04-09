@@ -3,13 +3,13 @@ package types
 import (
 	"testing"
 
-	"github.com/LumeraProtocol/lumera/testutil/sample"
+	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/stretchr/testify/require"
 )
 
 func TestMsgApproveAction_ValidateBasic(t *testing.T) {
-	validAddress := sample.AccAddress()
+	validAddress := cryptotestutils.AccAddress()
 	validActionID := "action-123"
 
 	tests := []struct {

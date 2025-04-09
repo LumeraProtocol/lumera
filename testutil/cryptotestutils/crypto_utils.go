@@ -1,4 +1,4 @@
-package sample
+package cryptotestutils
 
 import (
 	"crypto/rand"
@@ -10,7 +10,7 @@ import (
 	"io"
 )
 
-// AccAddress returns a sample account address
+// AccAddress returns a action account address
 func AccAddress() string {
 	return AccAddressAcc().String()
 }

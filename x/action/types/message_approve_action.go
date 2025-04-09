@@ -8,7 +8,7 @@ import (
 
 var _ sdk.Msg = &MsgApproveAction{}
 
-func NewMsgApproveAction(creator string, actionId string, signature string) *MsgApproveAction {
+func NewMsgApproveAction(creator string, actionId string) *MsgApproveAction {
 	return &MsgApproveAction{
 		Creator:  creator,
 		ActionId: actionId,

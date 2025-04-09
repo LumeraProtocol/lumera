@@ -5,22 +5,247 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/LumeraProtocol/lumera/testutil/sample"
-
-	//"github.com/LumeraProtocol/lumera/testutil/sample"
-	//"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	"math/rand"
 	"strconv"
 	"time"
 
 	"cosmossdk.io/math"
-	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
-	"github.com/LumeraProtocol/lumera/x/action/keeper"
-	"github.com/LumeraProtocol/lumera/x/action/types"
-	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	simtypes "github.com/cosmos/cosmos-sdk/types/simulation"
+
+	"google.golang.org/protobuf/proto"
+
+	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
+	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
+	"github.com/LumeraProtocol/lumera/x/action/keeper"
+	"github.com/LumeraProtocol/lumera/x/action/types"
+	supernodetypes "github.com/LumeraProtocol/lumera/x/supernode/types"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 )
+
+// registerSenseAction creates a new SENSE action in PENDING state for the simulation
+func registerSenseAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, bk types.BankKeeper, k keeper.Keeper, ak types.AccountKeeper) (string, *types.MsgRequestAction) {
+	params := k.GetParams(ctx)
+
+	// 1. Select random account with enough balance
+	simAccount := selectRandomAccountWithSufficientFunds(r, ctx, accs, bk, ak, []string{""})
+
+	// 2. Generate random valid SENSE metadata
+	dataHash := generateRandomHash(r)
+	senseMetadata := generateRequestActionSenseMetadata(dataHash)
+
+	// 3. Determine fee amount (within valid range)
+	feeAmount := generateRandomFee(r, ctx, params.BaseActionFee)
+
+	// 4. Generate an expiration time (current time + random duration >= expiration_duration)
+	expirationTime := getRandomExpirationTime(ctx, r, params)
+
+	// 5. Create message
+	msg := types.NewMsgRequestAction(
+		simAccount.Address.String(),
+		actionapi.ActionType_ACTION_TYPE_SENSE.String(),
+		senseMetadata,
+		feeAmount.String(),
+		strconv.FormatInt(expirationTime, 10),
+	)
+
+	// 6. Cache keeper state for simulation
+	msgServSim := keeper.NewMsgServerImpl(k)
+
+	// 7. Deliver transaction
+	result, err := msgServSim.RequestAction(ctx, msg)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create SENSE action for finalization test: %v", err))
+	}
+
+	return result.ActionId, msg
+}
+
+// registerCascadeAction creates a new CASCADE action in PENDING state for the simulation
+func registerCascadeAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, bk types.BankKeeper, k keeper.Keeper, ak types.AccountKeeper) (string, *types.MsgRequestAction) {
+	params := k.GetParams(ctx)
+
+	// 1. Select random account with enough balance
+	simAccount := selectRandomAccountWithSufficientFunds(r, ctx, accs, bk, ak, []string{""})
+
+	// 2. Set account public key
+	err := addPubKeyToAccount(ctx, simAccount, ak)
+	if err != nil {
+		panic(fmt.Sprintf("failed to set account public key: %v", err))
+	}
+
+	// 2. Generate random valid CASCADE metadata
+	dataHash := generateRandomHash(r)
+	fileName := generateRandomFileName(r)
+	cascadeMetadata := generateRequestActionCascadeMetadata(dataHash, fileName, simAccount)
+
+	// 3. Determine fee amount (within valid range)
+	feeAmount := generateRandomFee(r, ctx, params.BaseActionFee)
+
+	// 4. Generate an expiration time (current time + random duration)
+	expirationTime := getRandomExpirationTime(ctx, r, params)
+
+	// 5. Create message
+	msg := types.NewMsgRequestAction(
+		simAccount.Address.String(),
+		actionapi.ActionType_ACTION_TYPE_CASCADE.String(),
+		cascadeMetadata,
+		feeAmount.String(),
+		strconv.FormatInt(expirationTime, 10),
+	)
+
+	// 6. Cache keeper state for simulation
+	msgServSim := keeper.NewMsgServerImpl(k)
+
+	// 7. Deliver transaction
+	result, err := msgServSim.RequestAction(ctx, msg)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create CASCADE action for finalization test: %v", err))
+	}
+
+	return result.ActionId, msg
+}
+
+// finalizeSenseAction finalizes a SENSE action by submitting 3 matching metadata entries
+func finalizeSenseAction(ctx sdk.Context, k keeper.Keeper, bk types.BankKeeper, actionID string, supernodes []simtypes.Account) *types.MsgFinalizeAction {
+	// 1. Get the action to verify it exists
+	_, found := k.GetActionByID(ctx, actionID)
+	if !found {
+		panic(fmt.Sprintf("action with ID %s not found", actionID))
+	}
+
+	// 3. Submit from all three supernodes
+	msgServSim := keeper.NewMsgServerImpl(k)
+
+	var finalMsg *types.MsgFinalizeAction
+
+	// Create finalization metadata with signature
+	metadata := generateFinalizeMetadataForSense(ctx, k, actionID, supernodes)
+
+	for i, supernode := range supernodes {
+		// Get supernode's initial balance to verify no fee distribution
+		feeDenom := k.GetParams(ctx).BaseActionFee.Denom
+		initialBalance := bk.GetBalance(ctx, supernode.Address, feeDenom)
+
+		// Create and submit finalization message
+		msg := types.NewMsgFinalizeAction(
+			supernode.Address.String(),
+			actionID,
+			actionapi.ActionType_ACTION_TYPE_SENSE.String(),
+			metadata,
+		)
+
+		_, err := msgServSim.FinalizeAction(ctx, msg)
+		if err != nil {
+			panic(fmt.Sprintf("failed to finalize SENSE action %s with supernode %d: %v", actionID, i+1, err))
+		}
+
+		updatedAction, found := k.GetActionByID(ctx, actionID)
+		if !found {
+			panic(fmt.Sprintf("action with ID %s not found after finalization", actionID))
+		}
+
+		if i < 2 && updatedAction.State != actionapi.ActionState_ACTION_STATE_PROCESSING {
+			panic(fmt.Sprintf("action %s not in PROCESSING state after %d FinalizeAction: %s", actionID, i+1, updatedAction.State))
+		}
+
+		if i < 2 {
+			finalBalance := bk.GetBalance(ctx, supernode.Address, feeDenom)
+			if !finalBalance.Equal(initialBalance) {
+				panic(fmt.Sprintf("supernode %d balance changed after %d FinalizeAction, expected no fee distribution", i+1, i+1))
+			}
+		}
+
+		finalMsg = msg
+	}
+
+	// 4. Verify action is in DONE state
+	finalAction, found := k.GetActionByID(ctx, actionID)
+	if !found {
+		panic(fmt.Sprintf("action with ID %s not found after finalization", actionID))
+	}
+
+	if finalAction.State != actionapi.ActionState_ACTION_STATE_DONE {
+		panic(fmt.Sprintf("action %s not in DONE state after finalization: %s", actionID, finalAction.State))
+	}
+
+	return finalMsg
+}
+
+// finalizeCascadeAction finalizes a CASCADE action with a single supernode
+func finalizeCascadeAction(ctx sdk.Context, k keeper.Keeper, actionID string, supernodes []simtypes.Account) *types.MsgFinalizeAction {
+	// 1. Get the action
+	_, found := k.GetActionByID(ctx, actionID)
+	if !found {
+		panic(fmt.Sprintf("action with ID %s not found", actionID))
+	}
+
+	// 2. Generate finalization data
+	metadata := generateFinalizeMetadataForCascade(ctx, k, actionID, supernodes)
+
+	// 3. Create and submit finalization message
+	msg := types.NewMsgFinalizeAction(
+		supernodes[0].Address.String(),
+		actionID,
+		actionapi.ActionType_ACTION_TYPE_CASCADE.String(),
+		metadata,
+	)
+
+	// 4. Deliver transaction
+	msgServSim := keeper.NewMsgServerImpl(k)
+	_, err := msgServSim.FinalizeAction(ctx, msg)
+	if err != nil {
+		panic(fmt.Sprintf("failed to finalize CASCADE action %s: %v", actionID, err))
+	}
+
+	// 5. Verify action is in DONE state
+	finalAction, found := k.GetActionByID(ctx, actionID)
+	if !found {
+		panic(fmt.Sprintf("action with ID %s not found after finalization", actionID))
+	}
+
+	if finalAction.State != actionapi.ActionState_ACTION_STATE_DONE {
+		panic(fmt.Sprintf("action %s not in DONE state after finalization: %s", actionID, finalAction.State))
+	}
+
+	return msg
+}
+
+// registerSenseOrCascadeAction finds an existing action in PENDING state or creates a new one
+func registerSenseOrCascadeAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, k keeper.Keeper, bk types.BankKeeper, ak types.AccountKeeper) (string, *actionapi.Action) {
+	// Randomly choose between SENSE and CASCADE
+	var actionID string
+	if r.Intn(2) == 0 {
+		actionID, _ = registerSenseAction(r, ctx, accs, bk, k, ak)
+	} else {
+		actionID, _ = registerCascadeAction(r, ctx, accs, bk, k, ak)
+	}
+
+	action, found := k.GetActionByID(ctx, actionID)
+	if !found {
+		panic(fmt.Sprintf("failed to find created action with ID %s", actionID))
+	}
+	return actionID, action
+}
+
+func finalizeAction(r *rand.Rand, ctx sdk.Context, k keeper.Keeper, ak types.AccountKeeper, bk types.BankKeeper, actionID string, actionType actionapi.ActionType, accs []simtypes.Account) ([]simtypes.Account, error) {
+	if actionType == actionapi.ActionType_ACTION_TYPE_SENSE {
+		supernodes, err := getRandomActiveSupernodes(r, ctx, 3, ak, k, accs)
+		if err != nil {
+			return nil, err
+		}
+		finalizeSenseAction(ctx, k, bk, actionID, supernodes)
+		return supernodes, nil
+	} else if actionType == actionapi.ActionType_ACTION_TYPE_CASCADE {
+		supernodes, err := getRandomActiveSupernodes(r, ctx, 1, ak, k, accs)
+		if err != nil {
+			return nil, err
+		}
+		finalizeCascadeAction(ctx, k, actionID, supernodes)
+		return supernodes, nil
+	}
+	panic("invalid action type")
+}
 
 // FindAccount find a specific address from an account list
 func FindAccount(accs []simtypes.Account, address string) (simtypes.Account, bool) {
@@ -31,10 +256,29 @@ func FindAccount(accs []simtypes.Account, address string) (simtypes.Account, boo
 	return simtypes.FindAccount(accs, creator)
 }
 
+func addPubKeyToAccount(ctx sdk.Context, simAccount simtypes.Account, ak types.AccountKeeper) error {
+	acc := ak.GetAccount(ctx, simAccount.Address)
+	if acc != nil {
+		err := acc.SetPubKey(simAccount.PubKey)
+		if err != nil {
+			return fmt.Errorf("failed to set pubkey for account %s: %w", simAccount.Address, err)
+		}
+		ak.SetAccount(ctx, acc)
+		return nil
+	}
+	return fmt.Errorf("failed to set pubkey for account %s: account not found in account keeper", simAccount.Address)
+}
+
 // selectRandomAccountWithSufficientFunds selects a random account that has enough balance to cover the specified fee amount
-func selectRandomAccountWithSufficientFunds(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, bk types.BankKeeper, ak types.AccountKeeper) simtypes.Account {
+func selectRandomAccountWithSufficientFunds(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, bk types.BankKeeper, ak types.AccountKeeper, skipAddresses []string) simtypes.Account {
 	// Get a random account
 	simAccount, _ := simtypes.RandomAcc(r, accs)
+
+	for _, skipAddress := range skipAddresses {
+		if simAccount.Address.String() == skipAddress {
+			return selectRandomAccountWithSufficientFunds(r, ctx, accs, bk, ak, skipAddresses)
+		}
+	}
 
 	// Check if the account has enough balance
 	denom := sdk.DefaultBondDenom
@@ -43,16 +287,12 @@ func selectRandomAccountWithSufficientFunds(r *rand.Rand, ctx sdk.Context, accs 
 	// Ensure account has enough funds for gas + fees
 	if balance.IsZero() || balance.Amount.LT(math.NewInt(1000000)) {
 		// If the account doesn't have enough funds, recursively try another account
-		return selectRandomAccountWithSufficientFunds(r, ctx, accs, bk, ak)
+		return selectRandomAccountWithSufficientFunds(r, ctx, accs, bk, ak, skipAddresses)
 	}
 
-	acc := ak.GetAccount(ctx, simAccount.Address)
-	if acc != nil {
-		err := acc.SetPubKey(simAccount.PubKey)
-		if err != nil {
-			return simAccount
-		}
-		ak.SetAccount(ctx, acc)
+	err := addPubKeyToAccount(ctx, simAccount, ak)
+	if err != nil {
+		panic(err)
 	}
 
 	return simAccount
@@ -96,22 +336,6 @@ func generateRandomHash(r *rand.Rand) string {
 	return hex.EncodeToString(hash[:])
 }
 
-// generateRequestActionSenseMetadata creates valid SENSE metadata for simulation
-func generateRequestActionSenseMetadata(dataHash string) string {
-	metadata := actionapi.SenseMetadata{
-		DataHash:            dataHash,
-		DdAndFingerprintsIc: rand.Uint64(),
-	}
-
-	// Marshal to JSON
-	metadataBytes, err := json.Marshal(&metadata)
-	if err != nil {
-		panic(fmt.Sprintf("failed to marshal SENSE metadata: %v", err))
-	}
-
-	return string(metadataBytes)
-}
-
 // generateRandomFileName generates a random file name for use in CASCADE metadata
 func generateRandomFileName(r *rand.Rand) string {
 	// Define a list of common file extensions
@@ -132,31 +356,27 @@ func generateRandomFileName(r *rand.Rand) string {
 	return string(nameBytes) + extension
 }
 
-func getCascadeSignature(simAccount simtypes.Account) string {
+func generateCascadeSignature(simAccount simtypes.Account) string {
 	privKey := secp256k1.PrivKey{Key: simAccount.PrivKey.Bytes()}
-	signatureCascade, err := sample.CreateSignatureString([]secp256k1.PrivKey{privKey}, 50)
+	privKeys := []secp256k1.PrivKey{privKey}
+	signatureCascade, err := cryptotestutils.CreateSignatureString(privKeys, 50)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create CASCADE signature: %v", err))
 	}
 	return signatureCascade
 }
 
-// generateCascadeMetadata creates valid CASCADE metadata for simulation
-func generateRequestActionCascadeMetadata(dataHash string, fileName string, simAccount simtypes.Account) string {
-	metadata := actionapi.CascadeMetadata{
-		DataHash:   dataHash,
-		FileName:   fileName,
-		RqIdsIc:    rand.Uint64(),
-		Signatures: getCascadeSignature(simAccount),
+func generateSenseSignature(simAccounts []simtypes.Account) string {
+	privKeys := make([]secp256k1.PrivKey, len(simAccounts))
+	for i, simAccount := range simAccounts {
+		privKey := secp256k1.PrivKey{Key: simAccount.PrivKey.Bytes()}
+		privKeys[i] = privKey
 	}
-
-	// Marshal to JSON
-	metadataBytes, err := json.Marshal(&metadata)
+	signatureSense, err := cryptotestutils.CreateSignatureString(privKeys, 50)
 	if err != nil {
-		panic(fmt.Sprintf("failed to marshal CASCADE metadata: %v", err))
+		panic(fmt.Sprintf("failed to create SENSE signature: %v", err))
 	}
-
-	return string(metadataBytes)
+	return signatureSense
 }
 
 func getRandomExpirationTime(ctx sdk.Context, r *rand.Rand, params types.Params) int64 {
@@ -186,6 +406,93 @@ func selectRandomActionType(r *rand.Rand) string {
 	return actionTypes[r.Intn(len(actionTypes))]
 }
 
+// generateRandomOtiValues generates n random bytes as OTI value for CASCADE metadata
+func generateRandomOtiValues(n int) []byte {
+	return make([]byte, n)
+}
+
+// getRandomActiveSupernodes simulates getting a list of active supernodes from the system
+func getRandomActiveSupernodes(r *rand.Rand, ctx sdk.Context, numSupernodes int, ak types.AccountKeeper, k keeper.Keeper, accs []simtypes.Account) ([]simtypes.Account, error) {
+	top10 := getTop10Supernodes(ctx, k)
+	if len(top10) < 10 {
+		for i := 0; i < 10-len(top10); i++ {
+			_, err := registerSupernode(r, ctx, k, accs)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	top10 = getTop10Supernodes(ctx, k)
+	if len(top10) < numSupernodes {
+		return nil, fmt.Errorf("not enough active supernodes to satisfy request")
+	}
+	// Randomly select numSupernodes from top10
+	// shuffle top10 and select first numSupernodes
+	r.Shuffle(len(top10), func(i, j int) {
+		top10[i], top10[j] = top10[j], top10[i]
+	})
+
+	selectedSupernodes := make([]simtypes.Account, numSupernodes)
+	for i := 0; i < numSupernodes; i++ {
+		simAccount, found := simtypes.FindAccount(accs, top10[i])
+		if !found {
+			panic(fmt.Sprintf("failed to find account for supernode %s", top10[i]))
+		}
+		selectedSupernodes[i] = simAccount
+		err := addPubKeyToAccount(ctx, simAccount, ak)
+		if err != nil {
+			panic(err)
+		}
+	}
+	return selectedSupernodes, nil
+}
+
+func generateKademliaIDs(ic uint64, max uint64, signature string) []string {
+	var ids []string
+	for i := ic; i < ic+max; i++ {
+		id, err := keeper.CreateKademliaID(signature, i)
+		if err != nil {
+			panic(fmt.Sprintf("failed to create Kademlia ID: %v", err))
+		}
+		ids = append(ids, id)
+	}
+	return ids
+}
+
+// generateRequestActionSenseMetadata creates valid SENSE metadata for simulation
+func generateRequestActionSenseMetadata(dataHash string) string {
+	metadata := actionapi.SenseMetadata{
+		DataHash:            dataHash,
+		DdAndFingerprintsIc: rand.Uint64(),
+	}
+
+	// Marshal to JSON
+	metadataBytes, err := json.Marshal(&metadata)
+	if err != nil {
+		panic(fmt.Sprintf("failed to marshal SENSE metadata: %v", err))
+	}
+
+	return string(metadataBytes)
+}
+
+// generateCascadeMetadata creates valid CASCADE metadata for simulation
+func generateRequestActionCascadeMetadata(dataHash string, fileName string, simAccount simtypes.Account) string {
+	metadata := actionapi.CascadeMetadata{
+		DataHash:   dataHash,
+		FileName:   fileName,
+		RqIdsIc:    rand.Uint64(),
+		Signatures: generateCascadeSignature(simAccount),
+	}
+
+	// Marshal to JSON
+	metadataBytes, err := json.Marshal(&metadata)
+	if err != nil {
+		panic(fmt.Sprintf("failed to marshal CASCADE metadata: %v", err))
+	}
+
+	return string(metadataBytes)
+}
+
 // generateRequestActionValidMetadata generates valid metadata based on the action type
 func generateRequestActionValidMetadata(r *rand.Rand, actionType string, simAccount simtypes.Account) string {
 	switch actionType {
@@ -196,18 +503,6 @@ func generateRequestActionValidMetadata(r *rand.Rand, actionType string, simAcco
 		dataHash := generateRandomHash(r)
 		fileName := generateRandomFileName(r)
 		return generateRequestActionCascadeMetadata(dataHash, fileName, simAccount)
-	default:
-		panic(fmt.Sprintf("unsupported action type: %s", actionType))
-	}
-}
-
-// generateInvalidMetadata generates invalid metadata based on the action type
-func generateInvalidMetadata(r *rand.Rand, actionType string, simAccount simtypes.Account) string {
-	switch actionType {
-	case actionapi.ActionType_ACTION_TYPE_SENSE.String():
-		return generateInvalidRequestActionSenseMetadata(r)
-	case actionapi.ActionType_ACTION_TYPE_CASCADE.String():
-		return generateInvalidRequestActionCascadeMetadata(r, simAccount)
 	default:
 		panic(fmt.Sprintf("unsupported action type: %s", actionType))
 	}
@@ -256,7 +551,7 @@ func generateInvalidRequestActionCascadeMetadata(r *rand.Rand, simAccount simtyp
 	case 2:
 		metadata.RqIdsIc = 0 // Invalid value, must be positive
 	case 3:
-		metadata.Signatures = getCascadeSignature(simAccount)
+		metadata.Signatures = generateCascadeSignature(simAccount)
 	}
 
 	// Marshal to JSON
@@ -268,284 +563,98 @@ func generateInvalidRequestActionCascadeMetadata(r *rand.Rand, simAccount simtyp
 	return string(metadataBytes)
 }
 
-// createPendingSenseAction creates a new SENSE action in PENDING state for the simulation
-func createPendingSenseAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, bk types.BankKeeper, k keeper.Keeper, ak types.AccountKeeper) string {
-	// Create a new SENSE action
-	simAccount := selectRandomAccountWithSufficientFunds(r, ctx, accs, bk, ak)
-	dataHash := generateRandomHash(r)
-	params := k.GetParams(ctx)
-	senseMetadata := generateRequestActionSenseMetadata(dataHash)
-	feeAmount := generateRandomFee(r, ctx, params.BaseActionFee)
-	expirationDuration := time.Duration(r.Int63n(int64(params.ExpirationDuration)))
-	expirationTime := ctx.BlockTime().Add(expirationDuration).Unix()
-
-	msg := types.NewMsgRequestAction(
-		simAccount.Address.String(),
-		actionapi.ActionType_ACTION_TYPE_SENSE.String(),
-		senseMetadata,
-		feeAmount.String(),
-		strconv.FormatInt(expirationTime, 10),
-	)
-
-	msgServSim := keeper.NewMsgServerImpl(k)
-	result, err := msgServSim.RequestAction(ctx, msg)
-	if err != nil {
-		panic(fmt.Sprintf("failed to create SENSE action for finalization test: %v", err))
+// generateRequestActionInvalidMetadata generates invalid metadata based on the action type
+func generateRequestActionInvalidMetadata(r *rand.Rand, actionType string, simAccount simtypes.Account) string {
+	switch actionType {
+	case actionapi.ActionType_ACTION_TYPE_SENSE.String():
+		return generateInvalidRequestActionSenseMetadata(r)
+	case actionapi.ActionType_ACTION_TYPE_CASCADE.String():
+		return generateInvalidRequestActionCascadeMetadata(r, simAccount)
+	default:
+		panic(fmt.Sprintf("unsupported action type: %s", actionType))
 	}
-
-	return result.ActionId
-}
-
-// selectRandomSupernodes selects n random accounts to act as supernodes for the simulation
-func selectRandomSupernodes(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, n int) []simtypes.Account {
-	if len(accs) < n {
-		panic(fmt.Sprintf("not enough accounts to select %d supernodes", n))
-	}
-
-	// Shuffle the accounts to ensure randomness
-	shuffledAccs := make([]simtypes.Account, len(accs))
-	copy(shuffledAccs, accs)
-	r.Shuffle(len(shuffledAccs), func(i, j int) {
-		shuffledAccs[i], shuffledAccs[j] = shuffledAccs[j], shuffledAccs[i]
-	})
-
-	// Select the first n accounts
-	return shuffledAccs[:n]
-}
-
-// generateRandomKademliaIDs generates n random Kademlia IDs
-func generateRandomKademliaIDs(r *rand.Rand, n int) []string {
-	ids := make([]string, n)
-	for i := 0; i < n; i++ {
-		// Generate a random hash as a Kademlia ID
-		ids[i] = generateRandomHash(r)
-	}
-	return ids
-}
-
-// generateConsistentFingerprintResults generates a consistent set of fingerprint results for the supernodes
-func generateConsistentFingerprintResults(r *rand.Rand) map[string]string {
-	// Create a map to store the fingerprint results
-	// For the simulation, we'll use simple mock data with consistent results
-	results := make(map[string]string)
-
-	// Generate between 1-5 fingerprint results
-	numResults := 1 + r.Intn(5)
-	for i := 0; i < numResults; i++ {
-		key := fmt.Sprintf("feature_%d", i)
-		value := generateRandomHash(r)[:10] // Use part of a hash as the feature value
-		results[key] = value
-	}
-
-	return results
 }
 
 // generateFinalizeMetadataForSense creates finalization metadata for a SENSE action
-func generateFinalizeMetadataForSense(r *rand.Rand, ctx sdk.Context, k keeper.Keeper, actionID string, fingerprintResults map[string]string, ddIds []string) string {
-	// Get the action using its ID
+func generateFinalizeMetadataForSense(ctx sdk.Context, k keeper.Keeper, actionID string, supernodes []simtypes.Account) string {
+	// 1. Get the action using its ID
 	action, found := k.GetActionByID(ctx, actionID)
 	if !found {
 		panic(fmt.Sprintf("action with ID %s not found", actionID))
 	}
 
-	// Parse existing metadata
+	// 2. Parse existing metadata
 	var existingMetadata actionapi.SenseMetadata
-	err := json.Unmarshal([]byte(action.Metadata), &existingMetadata)
+	err := proto.Unmarshal(action.Metadata, &existingMetadata)
 	if err != nil {
 		panic(fmt.Sprintf("failed to unmarshal existing SENSE metadata: %v", err))
 	}
 
-	// Create finalization metadata
-	metadata := actionapi.SenseMetadata{
-		DataHash:              existingMetadata.DataHash,
-		DdAndFingerprintsIc:   uint64(len(ddIds)),
-		CollectionId:          existingMetadata.CollectionId,
-		GroupId:               existingMetadata.GroupId,
-		DdAndFingerprintsIds:  ddIds,
-		Signatures:            "",
-		SupernodeFingerprints: fingerprintResults,
-	}
-
-	// Marshal to JSON
-	metadataBytes, err := json.Marshal(&metadata)
-	if err != nil {
-		panic(fmt.Sprintf("failed to marshal SENSE finalization metadata: %v", err))
-	}
-
-	return string(metadataBytes)
-}
-
-// signMetadata simulates signing the metadata with a supernode's key
-func signMetadata(supernode simtypes.Account, metadata string) string {
-	// In a real implementation, this would use the supernode's private key to sign the metadata
-	// For simulation, we'll create a mock signature
-	hash := sha256.Sum256([]byte(metadata + supernode.Address.String()))
-	return hex.EncodeToString(hash[:])
-}
-
-// addSignatureToMetadata adds a signature to the metadata
-func addSignatureToMetadata(metadata string, signature string) string {
-	// Try to unmarshal as SenseMetadata first
-	var senseMetadata actionapi.SenseMetadata
-	senseErr := json.Unmarshal([]byte(metadata), &senseMetadata)
-	if senseErr == nil {
-		// It's SenseMetadata
-		if senseMetadata.Signatures == "" {
-			senseMetadata.Signatures = signature
-		} else {
-			senseMetadata.Signatures += "," + signature
-		}
-
-		// Marshal back to JSON
-		metadataBytes, err := json.Marshal(&senseMetadata)
-		if err != nil {
-			panic(fmt.Sprintf("failed to marshal SENSE metadata with signature: %v", err))
-		}
-
-		return string(metadataBytes)
-	}
-
-	// If not SenseMetadata, try CascadeMetadata
-	var cascadeMetadata actionapi.CascadeMetadata
-	cascadeErr := json.Unmarshal([]byte(metadata), &cascadeMetadata)
-	if cascadeErr == nil {
-		// It's CascadeMetadata
-		if cascadeMetadata.Signatures == "" {
-			cascadeMetadata.Signatures = signature
-		} else {
-			cascadeMetadata.Signatures += "," + signature
-		}
-
-		// Marshal back to JSON
-		metadataBytes, err := json.Marshal(&cascadeMetadata)
-		if err != nil {
-			panic(fmt.Sprintf("failed to marshal CASCADE metadata with signature: %v", err))
-		}
-
-		return string(metadataBytes)
-	}
-
-	// If we get here, both unmarshal attempts failed
-	panic(fmt.Sprintf("failed to unmarshal metadata: %v, %v", senseErr, cascadeErr))
-}
-
-// createPendingCascadeAction creates a new CASCADE action in PENDING state for the simulation
-func createPendingCascadeAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, bk types.BankKeeper, k keeper.Keeper, ak types.AccountKeeper) string {
-	// Create a new CASCADE action
-	simAccount := selectRandomAccountWithSufficientFunds(r, ctx, accs, bk, ak)
-	dataHash := generateRandomHash(r)
-	fileName := generateRandomFileName(r)
-	cascadeMetadata := generateRequestActionCascadeMetadata(dataHash, fileName, simAccount)
-	feeAmount := generateRandomFee(r, ctx, k.GetParams(ctx).BaseActionFee)
-	expirationDuration := time.Duration(r.Int63n(int64(k.GetParams(ctx).ExpirationDuration)))
-	expirationTime := ctx.BlockTime().Add(expirationDuration).Unix()
-
-	msg := types.NewMsgRequestAction(
-		simAccount.Address.String(),
-		actionapi.ActionType_ACTION_TYPE_CASCADE.String(),
-		cascadeMetadata,
-		feeAmount.String(),
-		strconv.FormatInt(expirationTime, 10),
-	)
-
-	msgServSim := keeper.NewMsgServerImpl(k)
-	result, err := msgServSim.RequestAction(ctx, msg)
-	if err != nil {
-		panic(fmt.Sprintf("failed to create CASCADE action for finalization test: %v", err))
-	}
-
-	return result.ActionId
-}
-
-// selectRandomSupernode selects a single random account to act as a supernode
-func selectRandomSupernode(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account) simtypes.Account {
-	supernodes := selectRandomSupernodes(r, ctx, accs, 1)
-	return supernodes[0]
-}
-
-// generateRandomRqIds generates n random request IDs for CASCADE metadata
-func generateRandomRqIds(r *rand.Rand, n int) []string {
-	ids := make([]string, n)
-	for i := 0; i < n; i++ {
-		// Generate a random hash as a request ID
-		ids[i] = generateRandomHash(r)
-	}
-	return ids
-}
-
-// generateRandomOtiValues generates n random OTI values for CASCADE metadata
-func generateRandomOtiValues(r *rand.Rand, n int) []string {
-	values := make([]string, n)
-	for i := 0; i < n; i++ {
-		// Generate a random OTI value (we'll use a hash substring for simulation)
-		values[i] = generateRandomHash(r)[:16]
-	}
-	return values
+	return generateValidFinalizeMetadata(
+		existingMetadata.DdAndFingerprintsIc,
+		existingMetadata.DdAndFingerprintsMax,
+		actionapi.ActionType_ACTION_TYPE_SENSE.String(),
+		supernodes,
+		"")
 }
 
 // generateFinalizeMetadataForCascade creates finalization metadata for a CASCADE action
-func generateFinalizeMetadataForCascade(action *actionapi.Action, rqIds []string, otiValues []string) string {
-	// Parse existing metadata
+func generateFinalizeMetadataForCascade(ctx sdk.Context, k keeper.Keeper, actionID string, supernodes []simtypes.Account) string {
+	// 1. Get the action using its ID
+	action, found := k.GetActionByID(ctx, actionID)
+	if !found {
+		panic(fmt.Sprintf("action with ID %s not found", actionID))
+	}
+
+	// 2. Parse existing metadata
 	var existingMetadata actionapi.CascadeMetadata
-	err := json.Unmarshal([]byte(action.Metadata), &existingMetadata)
+	err := proto.Unmarshal(action.Metadata, &existingMetadata)
 	if err != nil {
 		panic(fmt.Sprintf("failed to unmarshal existing CASCADE metadata: %v", err))
 	}
 
-	// Create finalization metadata
-	metadata := actionapi.CascadeMetadata{
-		DataHash:   existingMetadata.DataHash,
-		FileName:   existingMetadata.FileName,
-		RqIdsIc:    uint64(len(rqIds)),
-		RqIdsIds:   rqIds,
-		Signatures: "",
-		// Note: RqIdsOti field is omitted for simulation purposes
+	return generateValidFinalizeMetadata(
+		existingMetadata.RqIdsIc,
+		existingMetadata.RqIdsMax,
+		actionapi.ActionType_ACTION_TYPE_CASCADE.String(),
+		supernodes,
+		existingMetadata.Signatures)
+}
+
+// generateValidFinalizeMetadata generates valid finalization metadata
+func generateValidFinalizeMetadata(ic uint64, max uint64, actionType string, supernodes []simtypes.Account, existingSignature string) string {
+	var metadataBytes []byte
+	var err error
+	switch actionType {
+	case actionapi.ActionType_ACTION_TYPE_SENSE.String():
+		// Create SENSE finalization metadata
+		signature := generateSenseSignature(supernodes)
+		ids := generateKademliaIDs(ic, max, signature)
+		metadata := actionapi.SenseMetadata{
+			DdAndFingerprintsIds: ids,
+			Signatures:           signature,
+		}
+		metadataBytes, err = json.Marshal(&metadata)
+
+	case actionapi.ActionType_ACTION_TYPE_CASCADE.String():
+		// Create CASCADE finalization metadata
+		ids := generateKademliaIDs(ic, max, existingSignature)
+		metadata := actionapi.CascadeMetadata{
+			RqIdsIds: ids,
+			RqIdsOti: generateRandomOtiValues(12),
+		}
+
+		metadataBytes, err = json.Marshal(&metadata)
+
+	default:
+		panic(fmt.Sprintf("unsupported action type: %s", actionType))
 	}
 
-	// Marshal to JSON
-	metadataBytes, err := json.Marshal(&metadata)
 	if err != nil {
-		panic(fmt.Sprintf("failed to marshal CASCADE finalization metadata: %v", err))
+		panic(fmt.Sprintf("failed to marshal %s finalization metadata: %v", actionType, err))
 	}
 
 	return string(metadataBytes)
-}
-
-// encodeMapToJSON encodes a map to a JSON string
-func encodeMapToJSON(m map[string]string) string {
-	jsonBytes, err := json.Marshal(m)
-	if err != nil {
-		panic(fmt.Sprintf("failed to marshal map to JSON: %v", err))
-	}
-	return string(jsonBytes)
-}
-
-// generateNonMatchingFingerprintResults generates fingerprint results that are different from the original
-// This is useful for testing consensus failure scenarios in SENSE actions
-func generateNonMatchingFingerprintResults(r *rand.Rand, originalResults map[string]string) map[string]string {
-	nonMatchingResults := make(map[string]string)
-
-	// Copy all the original key-value pairs
-	for k, v := range originalResults {
-		nonMatchingResults[k] = v
-	}
-
-	// Modify at least one value to make results non-matching
-	// Either modify an existing value or add a new one
-	if len(nonMatchingResults) > 0 && r.Intn(2) == 0 {
-		// Modify an existing value
-		for k := range nonMatchingResults {
-			nonMatchingResults[k] = nonMatchingResults[k] + "_modified"
-			break // just modify one key
-		}
-	} else {
-		// Add a new key-value pair
-		newKey := fmt.Sprintf("feature_%d", len(nonMatchingResults))
-		newValue := generateRandomHash(r)[:10] // Use part of a hash as the feature value
-		nonMatchingResults[newKey] = newValue
-	}
-
-	return nonMatchingResults
 }
 
 // generateNonExistentActionID generates an action ID that doesn't exist in the state
@@ -564,133 +673,18 @@ func generateNonExistentActionID(r *rand.Rand, ctx sdk.Context, k keeper.Keeper)
 	}
 }
 
-// generateValidFinalizeMetadata generates valid finalization metadata
-// Since we're testing with an invalid action ID, the content doesn't matter much
-func generateValidFinalizeMetadata(r *rand.Rand) string {
-	// Randomly choose between SENSE and CASCADE metadata
-	actionType := selectRandomActionType(r)
+func findOrCreateDoneActionWithCreator(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, k keeper.Keeper, bk types.BankKeeper, ak types.AccountKeeper) (string, *actionapi.Action, simtypes.Account, error) {
+	// Create a PENDING action
+	actionID, _ := registerCascadeAction(r, ctx, accs, bk, k, ak)
 
-	switch actionType {
-	case actionapi.ActionType_ACTION_TYPE_SENSE.String():
-		// Create valid SENSE finalization metadata
-		metadata := actionapi.SenseMetadata{
-			DataHash:              generateRandomHash(r),
-			DdAndFingerprintsIc:   3,
-			DdAndFingerprintsIds:  generateRandomKademliaIDs(r, 3),
-			Signatures:            "",
-			SupernodeFingerprints: generateConsistentFingerprintResults(r),
-		}
-
-		metadataBytes, err := json.Marshal(&metadata)
-		if err != nil {
-			panic(fmt.Sprintf("failed to marshal SENSE finalization metadata: %v", err))
-		}
-
-		return string(metadataBytes)
-
-	case actionapi.ActionType_ACTION_TYPE_CASCADE.String():
-		// Create valid CASCADE finalization metadata
-		metadata := actionapi.CascadeMetadata{
-			DataHash:   generateRandomHash(r),
-			FileName:   generateRandomFileName(r),
-			RqIdsIc:    5,
-			RqIdsIds:   generateRandomRqIds(r, 5),
-			Signatures: "",
-		}
-
-		metadataBytes, err := json.Marshal(&metadata)
-		if err != nil {
-			panic(fmt.Sprintf("failed to marshal CASCADE finalization metadata: %v", err))
-		}
-
-		return string(metadataBytes)
-
-	default:
-		panic(fmt.Sprintf("unsupported action type: %s", actionType))
-	}
-}
-
-// createDoneAction creates a new action in the DONE state for testing purposes
-func createDoneAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, k keeper.Keeper, bk types.BankKeeper, ak types.AccountKeeper) (string, *actionapi.Action) {
-	// Create a pending action first
-	actionID := createPendingSenseAction(r, ctx, accs, bk, k, ak)
-
-	// Get the created action
-	action, found := k.GetActionByID(ctx, actionID)
-	if !found {
-		panic("Created action not found")
+	// Select three random supernode accounts
+	supernodes, err := getRandomActiveSupernodes(r, ctx, 1, ak, k, accs)
+	if err != nil {
+		return "", nil, simtypes.Account{}, err
 	}
 
-	// For simulation testing purposes, we just return the action with a modified state
-	// We don't actually modify it in the store, as this is just for testing
-	// The simulation code will verify that attempting to finalize this action will fail
-	// due to its invalid state, even though we're only changing it in memory
-	simulatedAction := action
-	simulatedAction.State = actionapi.ActionState_ACTION_STATE_DONE
-
-	return actionID, simulatedAction
-}
-
-// findOrCreatePendingAction finds an existing action in PENDING state or creates a new one
-func findOrCreatePendingAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, k keeper.Keeper, bk types.BankKeeper, ak types.AccountKeeper) (string, *actionapi.Action) {
-	// For simulation purposes, we'll just create a new pending action
-	// Randomly choose between SENSE and CASCADE
-	var actionID string
-	if r.Intn(2) == 0 {
-		actionID = createPendingSenseAction(r, ctx, accs, bk, k, ak)
-	} else {
-		actionID = createPendingCascadeAction(r, ctx, accs, bk, k, ak)
-	}
-
-	action, found := k.GetActionByID(ctx, actionID)
-	if !found {
-		panic(fmt.Sprintf("failed to find created action with ID %s", actionID))
-	}
-	return actionID, action
-}
-
-// selectRandomNonSupernode selects a random account that is not registered as a supernode
-func selectRandomNonSupernode(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account) simtypes.Account {
-	// For simulation purposes, we'll use a simple approach:
-	// - We'll shuffle all accounts
-	// - Then pick from the second half of accounts, assuming first half are supernodes
-
-	// If we only have few accounts, return a random one as a fallback
-	if len(accs) < 3 {
-		randomAccount, _ := simtypes.RandomAcc(r, accs)
-		return randomAccount
-	}
-
-	// Shuffle the accounts to ensure randomness
-	shuffledAccs := make([]simtypes.Account, len(accs))
-	copy(shuffledAccs, accs)
-	r.Shuffle(len(shuffledAccs), func(i, j int) {
-		shuffledAccs[i], shuffledAccs[j] = shuffledAccs[j], shuffledAccs[i]
-	})
-
-	// For simulation purposes, we'll assume the first 1/3 of shuffled accounts are supernodes
-	// and the rest are regular accounts
-	supernodeCount := len(shuffledAccs) / 3
-	if supernodeCount < 1 {
-		supernodeCount = 1
-	}
-
-	// Select a random account from the non-supernode accounts
-	nonSupernodeIndex := supernodeCount + r.Intn(len(shuffledAccs)-supernodeCount)
-	if nonSupernodeIndex >= len(shuffledAccs) {
-		// Fallback if we somehow go out of bounds
-		nonSupernodeIndex = len(shuffledAccs) - 1
-	}
-
-	return shuffledAccs[nonSupernodeIndex]
-}
-
-// findOrCreateDoneActionWithCreator finds an action in DONE state or creates one,
-// and returns its ID, the action itself, and the creator account
-func findOrCreateDoneActionWithCreator(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, k keeper.Keeper, bk types.BankKeeper, ak types.AccountKeeper) (string, *actionapi.Action, simtypes.Account) {
-	// For simplicity in the simulation, we'll create a new action and set it to DONE state
-	// Create a PENDING action first
-	actionID := createPendingSenseAction(r, ctx, accs, bk, k, ak)
+	// Finalize action by supernode
+	finalizeCascadeAction(ctx, k, actionID, supernodes)
 
 	// Get the created action
 	action, found := k.GetActionByID(ctx, actionID)
@@ -704,35 +698,19 @@ func findOrCreateDoneActionWithCreator(r *rand.Rand, ctx sdk.Context, accs []sim
 		panic("Creator account not found")
 	}
 
-	// For simulation, manually update the action state to DONE
-	// We create a modified copy to return, but don't modify the actual store
-	doneAction := action
-	doneAction.State = actionapi.ActionState_ACTION_STATE_DONE
-	// Update the action in the store
-	_ = k.SetAction(ctx, doneAction)
-
-	// Verify the action is now in DONE state
-	finalAction, found := k.GetActionByID(ctx, actionID)
-	if !found || finalAction.State != actionapi.ActionState_ACTION_STATE_DONE {
-		panic("Failed to set action to DONE state")
+	// Verify the action is in a DONE state
+	if action.State != actionapi.ActionState_ACTION_STATE_DONE {
+		panic("Expected DONE action state, but action is in DONE state")
 	}
 
-	return actionID, doneAction, creator
-}
-
-// generateApprovalSignature generates a valid signature for action approval
-func generateApprovalSignature(creator simtypes.Account, actionID string) string {
-	// In a real implementation, this would use the creator's private key to sign the action ID
-	// For simulation, we create a mock signature
-	hash := sha256.Sum256([]byte(actionID + creator.Address.String()))
-	return hex.EncodeToString(hash[:])
+	return actionID, action, creator, nil
 }
 
 // findOrCreateActionNotInDoneState finds an action that is NOT in DONE state or creates one
 // Returns the action ID, the action object, and the creator account
 func findOrCreateActionNotInDoneState(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, k keeper.Keeper, bk types.BankKeeper, ak types.AccountKeeper) (string, *actionapi.Action, simtypes.Account) {
 	// Create a PENDING action
-	actionID := createPendingSenseAction(r, ctx, accs, bk, k, ak)
+	actionID, _ := registerSenseAction(r, ctx, accs, bk, k, ak)
 
 	// Get the created action
 	action, found := k.GetActionByID(ctx, actionID)
@@ -746,7 +724,7 @@ func findOrCreateActionNotInDoneState(r *rand.Rand, ctx sdk.Context, accs []simt
 		panic("Creator account not found")
 	}
 
-	// Verify the action is in a non-DONE state (should be PENDING from createPendingSenseAction)
+	// Verify the action is in a non-DONE state (should be PENDING from registerSenseAction)
 	if action.State == actionapi.ActionState_ACTION_STATE_DONE {
 		panic("Expected non-DONE action state, but action is in DONE state")
 	}
@@ -756,24 +734,22 @@ func findOrCreateActionNotInDoneState(r *rand.Rand, ctx sdk.Context, accs []simt
 
 // Helper functions for generating various types of invalid metadata for SENSE actions
 
-// generateSenseMetadataMissingDdIds creates SENSE metadata without the required DdAndFingerprintsIds field
-func generateSenseMetadataMissingDdIds(action *actionapi.Action) string {
+// generateFinalizeSenseMetadataMissingDdIds creates SENSE metadata without the required DdAndFingerprintsIds field
+func generateFinalizeSenseMetadataMissingDdIds(action *actionapi.Action, supernodes []simtypes.Account) string {
 	// Parse existing metadata
 	var existingMetadata actionapi.SenseMetadata
-	err := json.Unmarshal([]byte(action.Metadata), &existingMetadata)
+	err := proto.Unmarshal([]byte(action.Metadata), &existingMetadata)
 	if err != nil {
 		panic(fmt.Sprintf("failed to unmarshal existing SENSE metadata: %v", err))
 	}
 
+	signature := generateSenseSignature(supernodes)
+	//ids := generateKademliaIDs(ic, max, signature)
+
 	// Create invalid metadata with missing DdAndFingerprintsIds field
 	metadata := actionapi.SenseMetadata{
-		DataHash:            existingMetadata.DataHash,
-		DdAndFingerprintsIc: 3, // Claiming 3 ids but not providing any
-		CollectionId:        existingMetadata.CollectionId,
-		GroupId:             existingMetadata.GroupId,
 		// DdAndFingerprintsIds intentionally omitted
-		Signatures:            "",
-		SupernodeFingerprints: make(map[string]string),
+		Signatures: signature,
 	}
 
 	metadataBytes, _ := json.Marshal(&metadata)
@@ -781,23 +757,24 @@ func generateSenseMetadataMissingDdIds(action *actionapi.Action) string {
 }
 
 // generateSenseMetadataEmptyDdIds creates SENSE metadata with empty DdAndFingerprintsIds
-func generateSenseMetadataEmptyDdIds(action *actionapi.Action) string {
+func generateSenseMetadataEmptyDdIds(action *actionapi.Action, supernodes []simtypes.Account) string {
 	// Parse existing metadata
 	var existingMetadata actionapi.SenseMetadata
-	err := json.Unmarshal([]byte(action.Metadata), &existingMetadata)
+	err := proto.Unmarshal([]byte(action.Metadata), &existingMetadata)
 	if err != nil {
 		panic(fmt.Sprintf("failed to unmarshal existing SENSE metadata: %v", err))
 	}
 
+	signature := generateSenseSignature(supernodes)
+	ids := generateKademliaIDs(existingMetadata.DdAndFingerprintsIc, existingMetadata.DdAndFingerprintsMax, signature)
+	for i := 0; i < len(ids); i++ {
+		ids[i] = ""
+	}
+
 	// Create invalid metadata with empty DdAndFingerprintsIds array
 	metadata := actionapi.SenseMetadata{
-		DataHash:              existingMetadata.DataHash,
-		DdAndFingerprintsIc:   3, // Claiming 3 ids but providing empty array
-		CollectionId:          existingMetadata.CollectionId,
-		GroupId:               existingMetadata.GroupId,
-		DdAndFingerprintsIds:  []string{}, // Empty array
-		Signatures:            "",
-		SupernodeFingerprints: make(map[string]string),
+		DdAndFingerprintsIds: ids,
+		Signatures:           signature,
 	}
 
 	metadataBytes, _ := json.Marshal(&metadata)
@@ -805,80 +782,66 @@ func generateSenseMetadataEmptyDdIds(action *actionapi.Action) string {
 }
 
 // generateSenseMetadataInvalidDdIc creates SENSE metadata with invalid DdAndFingerprintsIc count
-func generateSenseMetadataInvalidDdIc(action *actionapi.Action) string {
+func generateSenseMetadataInvalidDdIc(action *actionapi.Action, supernodes []simtypes.Account) string {
 	// Parse existing metadata
 	var existingMetadata actionapi.SenseMetadata
-	err := json.Unmarshal([]byte(action.Metadata), &existingMetadata)
+	err := proto.Unmarshal([]byte(action.Metadata), &existingMetadata)
 	if err != nil {
 		panic(fmt.Sprintf("failed to unmarshal existing SENSE metadata: %v", err))
 	}
 
-	// Generate some valid IDs
-	ids := []string{"id1", "id2", "id3"}
+	// Generate valid IDs but less with wrong initial count
+	signature := generateSenseSignature(supernodes)
+	ids := generateKademliaIDs(existingMetadata.DdAndFingerprintsIc*2, existingMetadata.DdAndFingerprintsMax, signature)
 
-	// Create invalid metadata with mismatched IC count (5) vs actual ID count (3)
 	metadata := actionapi.SenseMetadata{
-		DataHash:              existingMetadata.DataHash,
-		DdAndFingerprintsIc:   5, // Claiming 5 ids but only providing 3
-		CollectionId:          existingMetadata.CollectionId,
-		GroupId:               existingMetadata.GroupId,
-		DdAndFingerprintsIds:  ids,
-		Signatures:            "",
-		SupernodeFingerprints: make(map[string]string),
+		DdAndFingerprintsIds: ids,
+		Signatures:           signature,
 	}
 
 	metadataBytes, _ := json.Marshal(&metadata)
 	return string(metadataBytes)
 }
 
-// generateSenseMetadataMissingFingerprints creates SENSE metadata without the required SupernodeFingerprints field
-func generateSenseMetadataMissingFingerprints(action *actionapi.Action) string {
+// generateSenseMetadataMissingIds creates SENSE metadata without the required SupernodeFingerprints field
+func generateSenseMetadataMissingIds(action *actionapi.Action, supernodes []simtypes.Account) string {
 	// Parse existing metadata
 	var existingMetadata actionapi.SenseMetadata
-	err := json.Unmarshal([]byte(action.Metadata), &existingMetadata)
+	err := proto.Unmarshal([]byte(action.Metadata), &existingMetadata)
 	if err != nil {
 		panic(fmt.Sprintf("failed to unmarshal existing SENSE metadata: %v", err))
 	}
 
 	// Generate some valid IDs
-	ids := []string{"id1", "id2", "id3"}
+	signature := generateSenseSignature(supernodes)
+	ids := generateKademliaIDs(existingMetadata.DdAndFingerprintsIc, existingMetadata.DdAndFingerprintsMax/2, signature)
 
 	// Create invalid metadata with missing SupernodeFingerprints
 	metadata := actionapi.SenseMetadata{
-		DataHash:             existingMetadata.DataHash,
-		DdAndFingerprintsIc:  uint64(len(ids)),
-		CollectionId:         existingMetadata.CollectionId,
-		GroupId:              existingMetadata.GroupId,
 		DdAndFingerprintsIds: ids,
-		Signatures:           "",
-		// SupernodeFingerprints intentionally omitted
+		Signatures:           signature,
 	}
 
 	metadataBytes, _ := json.Marshal(&metadata)
 	return string(metadataBytes)
 }
 
-// generateSenseMetadataDataHashMismatch creates SENSE metadata with incorrect DataHash
-func generateSenseMetadataDataHashMismatch(action *actionapi.Action) string {
+// generateSenseMetadataSignatureMismatch creates SENSE metadata with incorrect DataHash
+func generateSenseMetadataSignatureMismatch(action *actionapi.Action, supernodes []simtypes.Account) string {
 	// Parse existing metadata
 	var existingMetadata actionapi.SenseMetadata
-	err := json.Unmarshal([]byte(action.Metadata), &existingMetadata)
+	err := proto.Unmarshal([]byte(action.Metadata), &existingMetadata)
 	if err != nil {
 		panic(fmt.Sprintf("failed to unmarshal existing SENSE metadata: %v", err))
 	}
 
-	// Generate some valid IDs
-	ids := []string{"id1", "id2", "id3"}
+	signature := generateSenseSignature(supernodes)
+	ids := generateKademliaIDs(existingMetadata.DdAndFingerprintsIc, existingMetadata.DdAndFingerprintsMax, "wrong signature")
 
 	// Create invalid metadata with different DataHash than the original action
 	metadata := actionapi.SenseMetadata{
-		DataHash:              existingMetadata.DataHash + "invalidated", // Changed DataHash
-		DdAndFingerprintsIc:   uint64(len(ids)),
-		CollectionId:          existingMetadata.CollectionId,
-		GroupId:               existingMetadata.GroupId,
-		DdAndFingerprintsIds:  ids,
-		Signatures:            "",
-		SupernodeFingerprints: make(map[string]string),
+		DdAndFingerprintsIds: ids,
+		Signatures:           signature,
 	}
 
 	metadataBytes, _ := json.Marshal(&metadata)
@@ -891,18 +854,17 @@ func generateSenseMetadataDataHashMismatch(action *actionapi.Action) string {
 func generateCascadeMetadataMissingRqIds(action *actionapi.Action) string {
 	// Parse existing metadata
 	var existingMetadata actionapi.CascadeMetadata
-	err := json.Unmarshal([]byte(action.Metadata), &existingMetadata)
+	err := proto.Unmarshal([]byte(action.Metadata), &existingMetadata)
 	if err != nil {
 		panic(fmt.Sprintf("failed to unmarshal existing CASCADE metadata: %v", err))
 	}
 
+	//ids := generateKademliaIDs(ic, max, existingMetadata.Signatures)
+
 	// Create invalid metadata with missing RqIdsIds field
 	metadata := actionapi.CascadeMetadata{
-		DataHash: existingMetadata.DataHash,
-		FileName: existingMetadata.FileName,
-		RqIdsIc:  5, // Claiming 5 ids but not providing any
 		// RqIdsIds intentionally omitted
-		Signatures: "",
+		RqIdsOti: generateRandomOtiValues(12),
 	}
 
 	metadataBytes, _ := json.Marshal(&metadata)
@@ -913,19 +875,20 @@ func generateCascadeMetadataMissingRqIds(action *actionapi.Action) string {
 func generateCascadeMetadataEmptyRqIds(action *actionapi.Action) string {
 	// Parse existing metadata
 	var existingMetadata actionapi.CascadeMetadata
-	err := json.Unmarshal([]byte(action.Metadata), &existingMetadata)
+	err := proto.Unmarshal([]byte(action.Metadata), &existingMetadata)
 	if err != nil {
 		panic(fmt.Sprintf("failed to unmarshal existing CASCADE metadata: %v", err))
 	}
 
+	ids := generateKademliaIDs(existingMetadata.RqIdsIc, existingMetadata.RqIdsMax, existingMetadata.Signatures)
+	for i := 0; i < len(ids); i++ {
+		ids[i] = ""
+	}
+
 	// Create invalid metadata with empty RqIdsIds array
 	metadata := actionapi.CascadeMetadata{
-		DataHash:   existingMetadata.DataHash,
-		FileName:   existingMetadata.FileName,
-		RqIdsIc:    5,          // Claiming 5 ids but providing empty array
-		RqIdsIds:   []string{}, // Empty array
-		RqIdsOti:   []byte{},   // Empty array as bytes
-		Signatures: "",
+		RqIdsIds: ids,
+		RqIdsOti: generateRandomOtiValues(12),
 	}
 
 	metadataBytes, _ := json.Marshal(&metadata)
@@ -936,74 +899,61 @@ func generateCascadeMetadataEmptyRqIds(action *actionapi.Action) string {
 func generateCascadeMetadataInvalidRqIc(action *actionapi.Action) string {
 	// Parse existing metadata
 	var existingMetadata actionapi.CascadeMetadata
-	err := json.Unmarshal([]byte(action.Metadata), &existingMetadata)
+	err := proto.Unmarshal([]byte(action.Metadata), &existingMetadata)
 	if err != nil {
 		panic(fmt.Sprintf("failed to unmarshal existing CASCADE metadata: %v", err))
 	}
 
 	// Generate some valid IDs
-	ids := []string{"id1", "id2", "id3"}
+	ids := generateKademliaIDs(existingMetadata.RqIdsIc*2, existingMetadata.RqIdsMax, existingMetadata.Signatures)
 
 	// Create invalid metadata with mismatched IC count (5) vs actual ID count (3)
 	metadata := actionapi.CascadeMetadata{
-		DataHash:   existingMetadata.DataHash,
-		FileName:   existingMetadata.FileName,
-		RqIdsIc:    5, // Claiming 5 ids but only providing 3
-		RqIdsIds:   ids,
-		RqIdsOti:   []byte("oti_data"), // Add some byte data
-		Signatures: "",
+		RqIdsIds: ids,
+		RqIdsOti: generateRandomOtiValues(12),
 	}
 
 	metadataBytes, _ := json.Marshal(&metadata)
 	return string(metadataBytes)
 }
 
-// generateCascadeMetadataDataHashMismatch creates CASCADE metadata with incorrect DataHash
-func generateCascadeMetadataDataHashMismatch(action *actionapi.Action) string {
+// generateCascadeMetadataMissingIds creates CASCADE metadata with incorrect DataHash
+func generateCascadeMetadataMissingIds(action *actionapi.Action) string {
 	// Parse existing metadata
 	var existingMetadata actionapi.CascadeMetadata
-	err := json.Unmarshal([]byte(action.Metadata), &existingMetadata)
+	err := proto.Unmarshal([]byte(action.Metadata), &existingMetadata)
 	if err != nil {
 		panic(fmt.Sprintf("failed to unmarshal existing CASCADE metadata: %v", err))
 	}
 
 	// Generate some valid IDs
-	ids := []string{"id1", "id2", "id3"}
+	ids := generateKademliaIDs(existingMetadata.RqIdsIc, existingMetadata.RqIdsMax/2, existingMetadata.Signatures)
 
 	// Create invalid metadata with different DataHash than the original action
 	metadata := actionapi.CascadeMetadata{
-		DataHash:   existingMetadata.DataHash + "invalidated", // Changed DataHash
-		FileName:   existingMetadata.FileName,
-		RqIdsIc:    uint64(len(ids)),
-		RqIdsIds:   ids,
-		RqIdsOti:   []byte("oti_data"), // Add some byte data
-		Signatures: "",
+		RqIdsIds: ids,
+		RqIdsOti: generateRandomOtiValues(12),
 	}
 
 	metadataBytes, _ := json.Marshal(&metadata)
 	return string(metadataBytes)
 }
 
-// generateCascadeMetadataFileNameMismatch creates CASCADE metadata with incorrect FileName
-func generateCascadeMetadataFileNameMismatch(action *actionapi.Action) string {
+// generateCascadeMetadataSignatureMismatch creates CASCADE metadata with incorrect FileName
+func generateCascadeMetadataSignatureMismatch(action *actionapi.Action) string {
 	// Parse existing metadata
 	var existingMetadata actionapi.CascadeMetadata
-	err := json.Unmarshal([]byte(action.Metadata), &existingMetadata)
+	err := proto.Unmarshal([]byte(action.Metadata), &existingMetadata)
 	if err != nil {
 		panic(fmt.Sprintf("failed to unmarshal existing CASCADE metadata: %v", err))
 	}
 
-	// Generate some valid IDs
-	ids := []string{"id1", "id2", "id3"}
+	ids := generateKademliaIDs(existingMetadata.RqIdsIc, existingMetadata.RqIdsMax, "wrong signature")
 
 	// Create invalid metadata with different FileName than the original action
 	metadata := actionapi.CascadeMetadata{
-		DataHash:   existingMetadata.DataHash,
-		FileName:   existingMetadata.FileName + ".wrong", // Changed FileName
-		RqIdsIc:    uint64(len(ids)),
-		RqIdsIds:   ids,
-		RqIdsOti:   []byte("oti_data"), // Add some byte data
-		Signatures: "",
+		RqIdsIds: ids,
+		RqIdsOti: generateRandomOtiValues(12),
 	}
 
 	metadataBytes, _ := json.Marshal(&metadata)
@@ -1031,176 +981,103 @@ func selectRandomAccountExcept(r *rand.Rand, accs []simtypes.Account, excludeAdd
 	}
 }
 
-// selectAccountWithoutPermission selects a random account that hypothetically lacks permissions
-// for requesting an action. Since the actual permission mechanism isn't defined yet,
-// this simply selects a random account for now.
+// selectAccountWithoutPermission selects a random account that doesn't have PublicKey in the account state
 func selectAccountWithoutPermission(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account) simtypes.Account {
 	// For now, just select a random account since the permission checking is hypothetical
 	simAccount, _ := simtypes.RandomAcc(r, accs)
 	return simAccount
 }
 
-// generateValidFinalizationMetadata generates valid finalization metadata for verification attempts
-func generateValidFinalizationMetadata(r *rand.Rand, actionType string, originalMetadata string) string {
-	switch actionType {
-	case actionapi.ActionType_ACTION_TYPE_SENSE.String():
-		var existingMetadata actionapi.SenseMetadata
-		_ = json.Unmarshal([]byte(originalMetadata), &existingMetadata)
-
-		ddIds := generateRandomKademliaIDs(r, 3)
-		fingerprintResults := generateConsistentFingerprintResults(r)
-
-		metadata := actionapi.SenseMetadata{
-			DataHash:              existingMetadata.DataHash,
-			DdAndFingerprintsIc:   uint64(len(ddIds)),
-			CollectionId:          existingMetadata.CollectionId,
-			GroupId:               existingMetadata.GroupId,
-			DdAndFingerprintsIds:  ddIds,
-			Signatures:            "",
-			SupernodeFingerprints: fingerprintResults,
-		}
-
-		metadataBytes, _ := json.Marshal(&metadata)
-		return string(metadataBytes)
-
-	case actionapi.ActionType_ACTION_TYPE_CASCADE.String():
-		var existingMetadata actionapi.CascadeMetadata
-		_ = json.Unmarshal([]byte(originalMetadata), &existingMetadata)
-
-		rqIds := generateRandomRqIds(r, 3)
-
-		metadata := actionapi.CascadeMetadata{
-			DataHash:   existingMetadata.DataHash,
-			FileName:   existingMetadata.FileName,
-			RqIdsIc:    uint64(len(rqIds)),
-			RqIdsIds:   rqIds,
-			Signatures: "",
-		}
-
-		metadataBytes, _ := json.Marshal(&metadata)
-		return string(metadataBytes)
-
-	default:
-		panic(fmt.Sprintf("unsupported action type: %s", actionType))
+func getTop10Supernodes(ctx sdk.Context, k keeper.Keeper) []sdk.Address {
+	// Query top-10 SuperNodes for action's block height
+	topSuperNodesReq := &supernodetypes.QueryGetTopSuperNodesForBlockRequest{
+		BlockHeight: int32(ctx.BlockHeight()),
+		Limit:       10,
 	}
-}
-
-// getRandomActiveSupernodes simulates getting a list of active supernodes from the system
-func getRandomActiveSupernodes(r *rand.Rand, ctx sdk.Context, actionType string) []simtypes.Account {
-	// For the simulation, we'll just return random accounts as supernodes
-	// In a real implementation, this would query the supernode keeper
-
-	// Determine number of supernodes to return based on action type
-	numSupernodes := 1 // Default for CASCADE
-	if actionType == actionapi.ActionType_ACTION_TYPE_SENSE.String() {
-		numSupernodes = 3 // SENSE requires 3 supernodes
+	topSuperNodesResp, err := k.GetSupernodeKeeper().GetTopSuperNodesForBlock(ctx, topSuperNodesReq)
+	if err != nil {
+		panic(err)
 	}
 
-	// Create dummy accounts to represent supernodes
-	supernodes := make([]simtypes.Account, numSupernodes)
-	for i := 0; i < numSupernodes; i++ {
-		// Generate a random address
-		privateKey := make([]byte, 32)
-		r.Read(privateKey)
-		simAccount := simtypes.Account{
-			PrivKey: secp256k1.GenPrivKeyFromSecret(privateKey),
-			PubKey:  secp256k1.GenPrivKeyFromSecret(privateKey).PubKey(),
-			Address: sdk.AccAddress(secp256k1.GenPrivKeyFromSecret(privateKey).PubKey().Address()),
-		}
-		supernodes[i] = simAccount
+	supernodes := make([]sdk.Address, len(topSuperNodesResp.Supernodes))
+	for i, sn := range topSuperNodesResp.Supernodes {
+		supernodes[i] = sdk.MustAccAddressFromBech32(sn.SupernodeAccount)
 	}
 
 	return supernodes
 }
 
-// finalizeSenseActionWithConsensus finalizes a SENSE action by submitting 3 matching metadata entries
-// from different supernodes, establishing consensus
-func finalizeSenseActionWithConsensus(ctx sdk.Context, k keeper.Keeper, actionID string, supernodes []simtypes.Account) {
-	// 1. Get the action to verify it exists
-	_, found := k.GetActionByID(ctx, actionID)
-	if !found {
-		panic(fmt.Sprintf("action with ID %s not found", actionID))
-	}
+func registerSupernode(r *rand.Rand, ctx sdk.Context, k keeper.Keeper, accs []simtypes.Account) (simtypes.Account, error) {
+	var simAccount simtypes.Account
+	var found bool
+	stakingKeeper := k.GetStakingKeeper()
 
-	// 2. Generate consensus data (same for all supernodes)
-	r := rand.New(rand.NewSource(ctx.BlockTime().UnixNano())) // Create deterministic random source
-	ddIds := generateRandomKademliaIDs(r, 3)
-	fingerprintResults := generateConsistentFingerprintResults(r)
+	// Try up to 10 times to find an eligible validator
+	for i := 0; i < len(accs); i++ {
+		simAccount, _ = simtypes.RandomAcc(r, accs)
+		valAddr := sdk.ValAddress(simAccount.Address)
 
-	// 3. Submit from all three supernodes
-	msgServSim := keeper.NewMsgServerImpl(k)
-
-	for i, supernode := range supernodes[:3] { // Ensure we only use the first 3 supernodes
-		// Create finalization metadata with signature
-		metadata := generateFinalizeMetadataForSense(r, ctx, k, actionID, fingerprintResults, ddIds)
-		signature := signMetadata(supernode, metadata)
-		metadataWithSig := addSignatureToMetadata(metadata, signature)
-
-		// Create and submit finalization message
-		msg := types.NewMsgFinalizeAction(
-			supernode.Address.String(),
-			actionID,
-			actionapi.ActionType_ACTION_TYPE_SENSE.String(),
-			metadataWithSig,
-		)
-
-		_, err := msgServSim.FinalizeAction(ctx, msg)
+		validator, err := stakingKeeper.GetValidator(ctx, valAddr)
 		if err != nil {
-			panic(fmt.Sprintf("failed to finalize SENSE action %s with supernode %d: %v", actionID, i+1, err))
+			continue
 		}
+
+		if validator.IsJailed() {
+			continue
+		}
+
+		// Check if supernode already exists
+		_, superNodeExists := k.GetSupernodeKeeper().QuerySuperNode(ctx, valAddr)
+		if superNodeExists {
+			continue
+		}
+
+		found = true
+		break
 	}
 
-	// 4. Verify action is in DONE state
-	finalAction, found := k.GetActionByID(ctx, actionID)
 	if !found {
-		panic(fmt.Sprintf("action with ID %s not found after finalization", actionID))
+		return simtypes.Account{}, fmt.Errorf("no eligible validator found")
 	}
 
-	if finalAction.State != actionapi.ActionState_ACTION_STATE_DONE {
-		panic(fmt.Sprintf("action %s not in DONE state after finalization: %s", actionID, finalAction.State))
+	valAddr := sdk.ValAddress(simAccount.Address)
+	validatorAddress := valAddr.String()
+
+	// Generate a random IP address
+	ipAddress := fmt.Sprintf("%d.%d.%d.%d",
+		r.Intn(256), r.Intn(256), r.Intn(256), r.Intn(256))
+
+	// Generate a random version
+	version := fmt.Sprintf("v%d.%d.%d", r.Intn(10), r.Intn(10), r.Intn(10))
+
+	supernode := supernodetypes.SuperNode{
+		ValidatorAddress: validatorAddress,
+		SupernodeAccount: simAccount.Address.String(),
+		Evidence:         []*supernodetypes.Evidence{},
+		Version:          version,
+		Metrics: &supernodetypes.MetricsAggregate{
+			Metrics:     make(map[string]float64),
+			ReportCount: 0,
+		},
+		States: []*supernodetypes.SuperNodeStateRecord{
+			{
+				State:  supernodetypes.SuperNodeStateActive,
+				Height: ctx.BlockHeight(),
+			},
+		},
+		PrevIpAddresses: []*supernodetypes.IPAddressHistory{
+			{
+				Address: ipAddress,
+				Height:  ctx.BlockHeight(),
+			},
+		},
 	}
-}
 
-// finalizeCascadeAction finalizes a CASCADE action with a single supernode
-func finalizeCascadeAction(ctx sdk.Context, k keeper.Keeper, actionID string, supernode simtypes.Account) {
-	// 1. Get the action
-	action, found := k.GetActionByID(ctx, actionID)
-	if !found {
-		panic(fmt.Sprintf("action with ID %s not found", actionID))
-	}
-
-	// 2. Generate finalization data
-	r := rand.New(rand.NewSource(ctx.BlockTime().UnixNano())) // Create deterministic random source
-	rqIds := generateRandomRqIds(r, 5)
-	otiValues := generateRandomOtiValues(r, 5)
-
-	// 3. Create finalization metadata with signature
-	metadata := generateFinalizeMetadataForCascade(action, rqIds, otiValues)
-	signature := signMetadata(supernode, metadata)
-	metadataWithSig := addSignatureToMetadata(metadata, signature)
-
-	// 4. Create and submit finalization message
-	msg := types.NewMsgFinalizeAction(
-		supernode.Address.String(),
-		actionID,
-		actionapi.ActionType_ACTION_TYPE_CASCADE.String(),
-		metadataWithSig,
-	)
-
-	// 5. Deliver transaction
-	msgServSim := keeper.NewMsgServerImpl(k)
-	_, err := msgServSim.FinalizeAction(ctx, msg)
+	sk := k.GetSupernodeKeeper()
+	err := sk.SetSuperNode(ctx, supernode)
 	if err != nil {
-		panic(fmt.Sprintf("failed to finalize CASCADE action %s: %v", actionID, err))
+		panic(err)
 	}
 
-	// 6. Verify action is in DONE state
-	finalAction, found := k.GetActionByID(ctx, actionID)
-	if !found {
-		panic(fmt.Sprintf("action with ID %s not found after finalization", actionID))
-	}
-
-	if finalAction.State != actionapi.ActionState_ACTION_STATE_DONE {
-		panic(fmt.Sprintf("action %s not in DONE state after finalization: %s", actionID, finalAction.State))
-	}
+	return simAccount, nil
 }

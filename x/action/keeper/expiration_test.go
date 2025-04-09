@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
+	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
 	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
-	"github.com/LumeraProtocol/lumera/testutil/sample"
 	"github.com/LumeraProtocol/lumera/x/action/keeper"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
@@ -27,13 +27,13 @@ type ExpirationTestSuite struct {
 }
 
 func (suite *ExpirationTestSuite) SetupTest() {
-	key, address := sample.KeyAndAddress()
+	key, address := cryptotestutils.KeyAndAddress()
 	pubKey := key.PubKey()
 	pairs := []keepertest.AccountPair{{Address: address, PubKey: pubKey}}
 	suite.keeper, suite.ctx = keepertest.ActionKeeperWithAddress(suite.T(), pairs)
 
 	var err error
-	suite.signature, err = sample.CreateSignatureString([]secp256k1.PrivKey{key}, 50)
+	suite.signature, err = cryptotestutils.CreateSignatureString([]secp256k1.PrivKey{key}, 50)
 	suite.Require().NoError(err)
 
 	// Setup test address

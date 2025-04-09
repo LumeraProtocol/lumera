@@ -6,19 +6,19 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	"testing"
 
-	"github.com/LumeraProtocol/lumera/testutil/sample"
+	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
 	"github.com/LumeraProtocol/lumera/x/action/keeper"
 	"github.com/stretchr/testify/require"
 )
 
 func TestVerifySignature(t *testing.T) {
-	key, address := sample.KeyAndAddress()
+	key, address := cryptotestutils.KeyAndAddress()
 	pubKey := key.PubKey()
 	pairs := []keepertest.AccountPair{{Address: address, PubKey: pubKey}}
 	k, ctx := keepertest.ActionKeeperWithAddress(t, pairs)
 
 	data := "test_data"
-	validSignature, err := sample.SignString(key, data)
+	validSignature, err := cryptotestutils.SignString(key, data)
 	require.NoError(t, err)
 
 	validAddress := address.String()
@@ -69,10 +69,10 @@ func TestVerifySignature(t *testing.T) {
 }
 
 func TestVerifyKademliaID(t *testing.T) {
-	key, _ := sample.KeyAndAddress()
+	key, _ := cryptotestutils.KeyAndAddress()
 
 	var err error
-	validSignature, err := sample.CreateSignatureString([]secp256k1.PrivKey{key}, 50)
+	validSignature, err := cryptotestutils.CreateSignatureString([]secp256k1.PrivKey{key}, 50)
 	require.NoError(t, err)
 
 	validIC := uint64(111)

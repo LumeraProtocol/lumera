@@ -1,7 +1,6 @@
 package simulation
 
 import (
-	"encoding/json"
 	"fmt"
 	"math/rand"
 	"strings"
@@ -12,119 +11,37 @@ import (
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	simtypes "github.com/cosmos/cosmos-sdk/types/simulation"
+
+	"google.golang.org/protobuf/proto"
 )
 
-// SimulateMsgFinalizeAction_Success_Sense simulates a successful finalization of a SENSE action
-func SimulateMsgFinalizeAction_Success_Sense(
+// SimulateMsgFinalizeActionSuccessSense simulates a successful finalization of a SENSE action
+func SimulateMsgFinalizeActionSuccessSense(
 	ak types.AccountKeeper,
 	bk types.BankKeeper,
 	k keeper.Keeper,
 ) simtypes.Operation {
 	return func(r *rand.Rand, app *baseapp.BaseApp, ctx sdk.Context, accs []simtypes.Account, chainID string,
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
-		// 1. Create a PENDING SENSE action
-		actionID := createPendingSenseAction(r, ctx, accs, bk, k, ak)
+		// 1. Register Action
+		actionID, _ := registerSenseAction(r, ctx, accs, bk, k, ak)
 
 		// 2. Select three random supernode accounts
-		supernodes := selectRandomSupernodes(r, ctx, accs, 3)
-
-		// 3. Generate consistent finalization results for all supernodes
-		ddIds := generateRandomKademliaIDs(r, 3)
-		fingerprintResults := generateConsistentFingerprintResults(r)
-
-		// 4. Create finalization metadata with supernode1's signature
-		metadata1 := generateFinalizeMetadataForSense(r, ctx, k, actionID, fingerprintResults, ddIds)
-		signature1 := signMetadata(supernodes[0], metadata1)
-		metadata1WithSig := addSignatureToMetadata(metadata1, signature1)
-
-		// 5. Create first finalization message
-		msg1 := types.NewMsgFinalizeAction(
-			supernodes[0].Address.String(),
-			actionID,
-			actionapi.ActionType_ACTION_TYPE_SENSE.String(),
-			metadata1WithSig,
-		)
-
-		// 6. Deliver first transaction
-		msgServSim := keeper.NewMsgServerImpl(k)
-		_, err1 := msgServSim.FinalizeAction(ctx, msg1)
-		if err1 != nil {
-			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg1), err1.Error()), nil, err1
+		supernodes, err := getRandomActiveSupernodes(r, ctx, 3, ak, k, accs)
+		if err != nil {
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(&types.MsgFinalizeAction{}), "failed to get random supernodes"), nil, nil
 		}
 
-		// 7. Verify action moved to PROCESSING state
-		updatedAction, found := k.GetActionByID(ctx, actionID)
-		if !found {
-			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg1), "action not found after first finalization"), nil, nil
-		}
-
-		if updatedAction.State != actionapi.ActionState_ACTION_STATE_PROCESSING {
-			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg1), "action not in PROCESSING state after first finalization"), nil, nil
-		}
-
-		// 8. Create second finalization message with supernode2's signature
-		metadata2 := generateFinalizeMetadataForSense(r, ctx, k, actionID, fingerprintResults, ddIds)
-		signature2 := signMetadata(supernodes[1], metadata2)
-		metadata2WithSig := addSignatureToMetadata(metadata2, signature2)
-
-		msg2 := types.NewMsgFinalizeAction(
-			supernodes[1].Address.String(),
-			actionID,
-			actionapi.ActionType_ACTION_TYPE_SENSE.String(),
-			metadata2WithSig,
-		)
-
-		// 9. Deliver second transaction
-		_, err2 := msgServSim.FinalizeAction(ctx, msg2)
-		if err2 != nil {
-			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg2), err2.Error()), nil, err2
-		}
-
-		// 10. Verify action is still in PROCESSING state
-		updatedAction2, found := k.GetActionByID(ctx, actionID)
-		if !found {
-			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg2), "action not found after second finalization"), nil, nil
-		}
-
-		if updatedAction2.State != actionapi.ActionState_ACTION_STATE_PROCESSING {
-			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg2), "action not in PROCESSING state after second finalization"), nil, nil
-		}
-
-		// 11. Create third finalization message with supernode3's signature
-		metadata3 := generateFinalizeMetadataForSense(r, ctx, k, actionID, fingerprintResults, ddIds)
-		signature3 := signMetadata(supernodes[2], metadata3)
-		metadata3WithSig := addSignatureToMetadata(metadata3, signature3)
-
-		msg3 := types.NewMsgFinalizeAction(
-			supernodes[2].Address.String(),
-			actionID,
-			actionapi.ActionType_ACTION_TYPE_SENSE.String(),
-			metadata3WithSig,
-		)
-
-		// 12. Store initial balances of supernodes to check fee distribution later
+		// 3. Store initial balances of supernodes to check fee distribution later
 		feeDenom := k.GetParams(ctx).BaseActionFee.Denom
 		initialBalance1 := bk.GetBalance(ctx, supernodes[0].Address, feeDenom)
 		initialBalance2 := bk.GetBalance(ctx, supernodes[1].Address, feeDenom)
 		initialBalance3 := bk.GetBalance(ctx, supernodes[2].Address, feeDenom)
 
-		// 13. Deliver third transaction
-		_, err3 := msgServSim.FinalizeAction(ctx, msg3)
-		if err3 != nil {
-			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg3), err3.Error()), nil, err3
-		}
+		// 4. Finalize action by all 3 supernodes
+		msg := finalizeSenseAction(ctx, k, bk, actionID, supernodes)
 
-		// 14. Verify action is now in DONE state
-		finalAction, found := k.GetActionByID(ctx, actionID)
-		if !found {
-			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg3), "action not found after third finalization"), nil, nil
-		}
-
-		if finalAction.State != actionapi.ActionState_ACTION_STATE_DONE {
-			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg3), "action not in DONE state after third finalization"), nil, nil
-		}
-
-		// 15. Check supernode balances to confirm fee distribution
+		// 5. Check supernode balances to confirm fee distribution
 		finalBalance1 := bk.GetBalance(ctx, supernodes[0].Address, feeDenom)
 		finalBalance2 := bk.GetBalance(ctx, supernodes[1].Address, feeDenom)
 		finalBalance3 := bk.GetBalance(ctx, supernodes[2].Address, feeDenom)
@@ -133,16 +50,16 @@ func SimulateMsgFinalizeAction_Success_Sense(
 		if !finalBalance1.Amount.GT(initialBalance1.Amount) ||
 			!finalBalance2.Amount.GT(initialBalance2.Amount) ||
 			!finalBalance3.Amount.GT(initialBalance3.Amount) {
-			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg3), "fee distribution not as expected"), nil, nil
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), "fee distribution not as expected"), nil, nil
 		}
 
 		// 16. Return successful operation message
-		return simtypes.NewOperationMsg(msg3, true, "success"), nil, nil
+		return simtypes.NewOperationMsg(msg, true, "success"), nil, nil
 	}
 }
 
-// SimulateMsgFinalizeAction_Success_Cascade simulates a successful finalization of a CASCADE action
-func SimulateMsgFinalizeAction_Success_Cascade(
+// SimulateMsgFinalizeActionSuccessCascade simulates a successful finalization of a CASCADE action
+func SimulateMsgFinalizeActionSuccessCascade(
 	ak types.AccountKeeper,
 	bk types.BankKeeper,
 	k keeper.Keeper,
@@ -150,102 +67,70 @@ func SimulateMsgFinalizeAction_Success_Cascade(
 	return func(r *rand.Rand, app *baseapp.BaseApp, ctx sdk.Context, accs []simtypes.Account, chainID string,
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
 		// 1. Create a PENDING CASCADE action
-		actionID := createPendingCascadeAction(r, ctx, accs, bk, k, ak)
+		actionID, _ := registerCascadeAction(r, ctx, accs, bk, k, ak)
 
-		// 2. Select single random supernode account
-		supernode := selectRandomSupernode(r, ctx, accs)
-
-		// 3. Generate random RQ IDs and OTI values for storage results
-		rqIds := generateRandomRqIds(r, 5)
-		otiValues := generateRandomOtiValues(r, 5)
-
-		// 4. Store initial balance of supernode to check fee distribution later
-		feeDenom := k.GetParams(ctx).BaseActionFee.Denom
-		initialBalance := bk.GetBalance(ctx, supernode.Address, feeDenom)
-
-		// 5. Get the action to create finalization metadata
-		action, found := k.GetActionByID(ctx, actionID)
-		if !found {
-			return simtypes.NoOpMsg(types.ModuleName, "FinalizeAction", "action not found"), nil, nil
-		}
-
-		// 6. Create finalization metadata with signature
-		metadata := generateFinalizeMetadataForCascade(action, rqIds, otiValues)
-		signature := signMetadata(supernode, metadata)
-		metadataWithSig := addSignatureToMetadata(metadata, signature)
-
-		// 7. Create finalization message
-		msg := types.NewMsgFinalizeAction(
-			supernode.Address.String(),
-			actionID,
-			actionapi.ActionType_ACTION_TYPE_CASCADE.String(),
-			metadataWithSig,
-		)
-
-		// 8. Deliver transaction
-		msgServSim := keeper.NewMsgServerImpl(k)
-		_, err := msgServSim.FinalizeAction(ctx, msg)
+		// 2. Select three random supernode accounts
+		supernodes, err := getRandomActiveSupernodes(r, ctx, 1, ak, k, accs)
 		if err != nil {
-			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), err.Error()), nil, err
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(&types.MsgFinalizeAction{}), "failed to get random supernodes"), nil, nil
 		}
 
-		// 9. Verify action moved to DONE state
-		finalizedAction, found := k.GetActionByID(ctx, actionID)
-		if !found {
-			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), "action not found after finalization"), nil, nil
-		}
+		// 3. Store initial balance of supernode to check fee distribution later
+		feeDenom := k.GetParams(ctx).BaseActionFee.Denom
+		initialBalance := bk.GetBalance(ctx, supernodes[0].Address, feeDenom)
 
-		if finalizedAction.State != actionapi.ActionState_ACTION_STATE_DONE {
-			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), "action not in DONE state after finalization"), nil, nil
-		}
+		// 4. Finalize action by supernode
+		msg := finalizeCascadeAction(ctx, k, actionID, supernodes)
 
-		// 10. Check supernode balance to confirm fee distribution
-		finalBalance := bk.GetBalance(ctx, supernode.Address, feeDenom)
+		// 5. Check supernode balance to confirm fee distribution
+		finalBalance := bk.GetBalance(ctx, supernodes[0].Address, feeDenom)
 		if !finalBalance.Amount.GT(initialBalance.Amount) {
 			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), "fee distribution not as expected"), nil, nil
 		}
 
-		// 11. Return successful operation message
+		// 6. Return successful operation message
 		return simtypes.NewOperationMsg(msg, true, "success"), nil, nil
 	}
 }
 
-// SimulateMsgFinalizeAction_Invalid_ID simulates attempting to finalize an action with a non-existent ID
-func SimulateMsgFinalizeAction_Invalid_ID(
+// SimulateMsgFinalizeActionInvalidID simulates attempting to finalize an action with a non-existent ID
+func SimulateMsgFinalizeActionInvalidID(
 	ak types.AccountKeeper,
 	bk types.BankKeeper,
 	k keeper.Keeper,
 ) simtypes.Operation {
 	return func(r *rand.Rand, app *baseapp.BaseApp, ctx sdk.Context, accs []simtypes.Account, chainID string,
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
+		// Randomly choose between SENSE and CASCADE metadata
+		actionType := selectRandomActionType(r)
+
 		// 1. Select random supernode account
-		supernode := selectRandomSupernode(r, ctx, accs)
+		supernodes, err := getRandomActiveSupernodes(r, ctx, 1, ak, k, accs)
+		if err != nil {
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(&types.MsgFinalizeAction{}), "failed to get random supernodes"), nil, nil
+		}
 
 		// 2. Generate non-existent action ID
 		invalidActionID := generateNonExistentActionID(r, ctx, k)
 
 		// 3. Get initial supernode balance
 		feeDenom := k.GetParams(ctx).BaseActionFee.Denom
-		initialBalance := bk.GetBalance(ctx, supernode.Address, feeDenom)
+		initialBalance := bk.GetBalance(ctx, supernodes[0].Address, feeDenom)
 
 		// 4. Create valid metadata (doesn't matter since ID is invalid)
-		metadata := generateValidFinalizeMetadata(r)
-		signature := signMetadata(supernode, metadata)
-		metadataWithSig := addSignatureToMetadata(metadata, signature)
+		metadata := generateValidFinalizeMetadata(1, 50, actionType, supernodes, "")
 
 		// 5. Create finalization message
-		// We need to randomly select an action type for the message
-		actionType := selectRandomActionType(r)
 		msg := types.NewMsgFinalizeAction(
-			supernode.Address.String(),
+			supernodes[0].Address.String(),
 			invalidActionID,
 			actionType,
-			metadataWithSig,
+			metadata,
 		)
 
 		// 6. Deliver transaction, expecting error
 		msgServSim := keeper.NewMsgServerImpl(k)
-		_, err := msgServSim.FinalizeAction(ctx, msg)
+		_, err = msgServSim.FinalizeAction(ctx, msg)
 
 		// 7. Check that an error occurred (should be about invalid action ID)
 		if err == nil {
@@ -253,7 +138,7 @@ func SimulateMsgFinalizeAction_Invalid_ID(
 		}
 
 		// 8. Verify supernode balance remains unchanged
-		finalBalance := bk.GetBalance(ctx, supernode.Address, feeDenom)
+		finalBalance := bk.GetBalance(ctx, supernodes[0].Address, feeDenom)
 		if !finalBalance.Equal(initialBalance) {
 			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), "balance changed despite error"), nil, nil
 		}
@@ -263,40 +148,39 @@ func SimulateMsgFinalizeAction_Invalid_ID(
 	}
 }
 
-// SimulateMsgFinalizeAction_InvalidState simulates attempting to finalize an action that is not in PENDING state
-func SimulateMsgFinalizeAction_InvalidState(
+// SimulateMsgFinalizeActionInvalidState simulates attempting to finalize an action that is not in PENDING state
+func SimulateMsgFinalizeActionInvalidState(
 	ak types.AccountKeeper,
 	bk types.BankKeeper,
 	k keeper.Keeper,
 ) simtypes.Operation {
 	return func(r *rand.Rand, app *baseapp.BaseApp, ctx sdk.Context, accs []simtypes.Account, chainID string,
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
-		// 1. Find or create an action in DONE state
-		actionID, action := createDoneAction(r, ctx, accs, k, bk, ak)
+		// 1. Create a DONE action
+		actionID, action := registerSenseOrCascadeAction(r, ctx, accs, k, bk, ak)
+		supernodes, err := finalizeAction(r, ctx, k, ak, bk, actionID, action.ActionType, accs)
+		if err != nil {
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(&types.MsgFinalizeAction{}), "failed to get random supernodes"), nil, nil
+		}
 
-		// 2. Select random supernode account
-		supernode := selectRandomSupernode(r, ctx, accs)
-
-		// 3. Get initial supernode balance
+		// 2. Get initial supernode balance
 		feeDenom := k.GetParams(ctx).BaseActionFee.Denom
-		initialBalance := bk.GetBalance(ctx, supernode.Address, feeDenom)
+		initialBalance := bk.GetBalance(ctx, supernodes[0].Address, feeDenom)
 
-		// 4. Create valid metadata
-		metadata := generateValidFinalizeMetadata(r)
-		signature := signMetadata(supernode, metadata)
-		metadataWithSig := addSignatureToMetadata(metadata, signature)
+		// 3. Create valid metadata
+		metadata := generateValidFinalizeMetadata(1, 50, action.ActionType.String(), supernodes, "")
 
-		// 5. Create finalization message
+		// 4. Create finalization message
 		msg := types.NewMsgFinalizeAction(
-			supernode.Address.String(),
+			supernodes[0].Address.String(),
 			actionID,
 			action.ActionType.String(),
-			metadataWithSig,
+			metadata,
 		)
 
 		// 6. Deliver transaction, expecting error
 		msgServSim := keeper.NewMsgServerImpl(k)
-		_, err := msgServSim.FinalizeAction(ctx, msg)
+		_, err = msgServSim.FinalizeAction(ctx, msg)
 
 		// 7. Check that an error occurred (should be about invalid action state)
 		if err == nil {
@@ -309,7 +193,7 @@ func SimulateMsgFinalizeAction_InvalidState(
 		}
 
 		// 8. Verify supernode balance remains unchanged
-		finalBalance := bk.GetBalance(ctx, supernode.Address, feeDenom)
+		finalBalance := bk.GetBalance(ctx, supernodes[0].Address, feeDenom)
 		if !finalBalance.Equal(initialBalance) {
 			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), "balance changed despite error"), nil, nil
 		}
@@ -330,31 +214,26 @@ func SimulateMsgFinalizeAction_InvalidState(
 	}
 }
 
-// SimulateMsgFinalizeAction_Unauthorized simulates attempting to finalize an action by a non-supernode account
-func SimulateMsgFinalizeAction_Unauthorized(
+// SimulateMsgFinalizeActionUnauthorized simulates attempting to finalize an action by a non-supernode account
+func SimulateMsgFinalizeActionUnauthorized(
 	ak types.AccountKeeper,
 	bk types.BankKeeper,
 	k keeper.Keeper,
 ) simtypes.Operation {
 	return func(r *rand.Rand, app *baseapp.BaseApp, ctx sdk.Context, accs []simtypes.Account, chainID string,
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
-		// 1. Find or create a PENDING action
-		actionID, action := findOrCreatePendingAction(r, ctx, accs, k, bk, ak)
+		// 1. Create a PENDING action
+		actionID, action := registerSenseOrCascadeAction(r, ctx, accs, k, bk, ak)
 
-		// 2. Select random non-supernode account
-		regularAccount := selectRandomNonSupernode(r, ctx, accs)
-
-		// 3. Create valid metadata
-		metadata := generateValidFinalizeMetadata(r)
-		signature := signMetadata(regularAccount, metadata)
-		metadataWithSig := addSignatureToMetadata(metadata, signature)
+		// 2. Create valid metadata using regular NON supernode accounts
+		metadata := generateValidFinalizeMetadata(1, 50, action.ActionType.String(), accs, "")
 
 		// 4. Create finalization message
 		msg := types.NewMsgFinalizeAction(
-			regularAccount.Address.String(),
+			accs[0].Address.String(),
 			actionID,
 			action.ActionType.String(),
-			metadataWithSig,
+			metadata,
 		)
 
 		// 5. Deliver transaction, expecting error
@@ -386,9 +265,9 @@ func SimulateMsgFinalizeAction_Unauthorized(
 	}
 }
 
-// SimulateMsgFinalizeAction_SenseConsensus simulates the consensus requirement for SENSE actions
+// SimulateMsgFinalizeActionSenseConsensus simulates the consensus requirement for SENSE actions
 // Testing different scenarios of matching and non-matching results from multiple supernodes
-func SimulateMsgFinalizeAction_SenseConsensus(
+func SimulateMsgFinalizeActionSenseConsensus(
 	ak types.AccountKeeper,
 	bk types.BankKeeper,
 	k keeper.Keeper,
@@ -399,10 +278,13 @@ func SimulateMsgFinalizeAction_SenseConsensus(
 		scenario := r.Intn(4) + 1
 
 		// 1. Create a PENDING SENSE action
-		actionID := createPendingSenseAction(r, ctx, accs, bk, k, ak)
+		actionID, msg := registerSenseAction(r, ctx, accs, bk, k, ak)
 
-		// 2. Select required number of supernode accounts (at least 5 for all scenarios)
-		supernodes := selectRandomSupernodes(r, ctx, accs, 5)
+		// 2. Select three random supernode accounts
+		supernodes, err := getRandomActiveSupernodes(r, ctx, 3, ak, k, accs)
+		if err != nil {
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(&types.MsgFinalizeAction{}), "failed to get random supernodes"), nil, nil
+		}
 
 		// Store initial balances to verify fee distribution
 		feeDenom := k.GetParams(ctx).BaseActionFee.Denom
@@ -411,84 +293,33 @@ func SimulateMsgFinalizeAction_SenseConsensus(
 			initialBalances[supernodes[i].Address.String()] = bk.GetBalance(ctx, supernodes[i].Address, feeDenom)
 		}
 
+		var existingMetadata actionapi.SenseMetadata
+		err = proto.Unmarshal([]byte(msg.Metadata), &existingMetadata)
+		if err != nil {
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(&types.MsgFinalizeAction{}),
+				fmt.Sprintf("failed to unmarshal existing metadata: %v", err)), nil, nil
+		}
+
 		msgServSim := keeper.NewMsgServerImpl(k)
 
 		switch scenario {
 		case 1:
-			// Scenario 1: 3 supernodes submit matching results (should succeed)
-			// Generate consistent data for all three supernodes
-			ddIds := generateRandomKademliaIDs(r, 3)
-			fingerprintResults := generateConsistentFingerprintResults(r)
-
-			// Process 3 matching submissions
-			for i := 0; i < 3; i++ {
-				metadata := generateFinalizeMetadataForSense(r, ctx, k, actionID, fingerprintResults, ddIds)
-				signature := signMetadata(supernodes[i], metadata)
-				metadataWithSig := addSignatureToMetadata(metadata, signature)
-
-				msg := types.NewMsgFinalizeAction(
-					supernodes[i].Address.String(),
-					actionID,
-					actionapi.ActionType_ACTION_TYPE_SENSE.String(),
-					metadataWithSig,
-				)
-
-				_, err := msgServSim.FinalizeAction(ctx, msg)
-				if err != nil {
-					return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), err.Error()), nil, err
-				}
-
-				// Check state after each submission
-				action, found := k.GetActionByID(ctx, actionID)
-				if !found {
-					return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), "action not found"), nil, nil
-				}
-
-				expectedState := actionapi.ActionState_ACTION_STATE_PROCESSING
-				if i == 2 {
-					// After 3rd matching submission, state should be DONE
-					expectedState = actionapi.ActionState_ACTION_STATE_DONE
-				}
-
-				if action.State != expectedState {
-					return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg),
-						fmt.Sprintf("unexpected state after submission %d: got %s, expected %s",
-							i+1, action.State, expectedState)), nil, nil
-				}
-			}
-
-			// Verify fees were distributed to all three supernodes
-			for i := 0; i < 3; i++ {
-				finalBalance := bk.GetBalance(ctx, supernodes[i].Address, feeDenom)
-				if !finalBalance.Amount.GT(initialBalances[supernodes[i].Address.String()].Amount) {
-					return simtypes.NoOpMsg(types.ModuleName, "FinalizeAction",
-						"fee not distributed to supernode"), nil, nil
-				}
-			}
-
-			return simtypes.NewOperationMsg(&types.MsgFinalizeAction{}, true, "success - 3 matching results"), nil, nil
-
-		case 2:
-			// Scenario 2: 2 supernodes submit matching results, 1 submits different results (should fail/remain in PROCESSING)
+			// Scenario 1: 2 supernodes submit matching results, 1 submits different results (should fail/remain in PROCESSING)
 			// Generate consistent data for first two supernodes
-			ddIds1 := generateRandomKademliaIDs(r, 3)
-			fingerprintResults1 := generateConsistentFingerprintResults(r)
-
-			// Generate different data for third supernode
-			ddIds2 := generateRandomKademliaIDs(r, 3)
-			fingerprintResults2 := generateNonMatchingFingerprintResults(r, fingerprintResults1)
+			metadata1 := generateValidFinalizeMetadata(
+				existingMetadata.DdAndFingerprintsIc,
+				existingMetadata.DdAndFingerprintsMax,
+				actionapi.ActionType_ACTION_TYPE_SENSE.String(),
+				supernodes,
+				"")
 
 			// First two supernodes submit matching results
 			for i := 0; i < 2; i++ {
-				metadata := generateFinalizeMetadataForSense(r, ctx, k, actionID, fingerprintResults1, ddIds1)
-				signature := signMetadata(supernodes[i], metadata)
-				metadataWithSig := addSignatureToMetadata(metadata, signature)
-
 				msg := types.NewMsgFinalizeAction(
 					supernodes[i].Address.String(),
 					actionID,
 					actionapi.ActionType_ACTION_TYPE_SENSE.String(),
-					metadataWithSig,
+					metadata1,
 				)
 
 				_, err := msgServSim.FinalizeAction(ctx, msg)
@@ -503,17 +334,29 @@ func SimulateMsgFinalizeAction_SenseConsensus(
 						"unexpected state after submission"), nil, nil
 				}
 			}
+			// Verify no fees were distributed
+			for i := 0; i < 2; i++ {
+				finalBalance := bk.GetBalance(ctx, supernodes[i].Address, feeDenom)
+				if !finalBalance.Equal(initialBalances[supernodes[i].Address.String()]) {
+					return simtypes.NoOpMsg(types.ModuleName, "FinalizeAction",
+						"fee distributed before consensus reached"), nil, nil
+				}
+			}
 
 			// Third supernode submits different results
-			metadata3 := generateFinalizeMetadataForSense(r, ctx, k, actionID, fingerprintResults2, ddIds2)
-			signature3 := signMetadata(supernodes[2], metadata3)
-			metadataWithSig3 := addSignatureToMetadata(metadata3, signature3)
+			// Each call to generateValidFinalizeMetadata/generateSenseSignature/cryptotestutils.CreateSignatureString generate random Signature String
+			metadata3 := generateValidFinalizeMetadata(
+				existingMetadata.DdAndFingerprintsIc,
+				existingMetadata.DdAndFingerprintsMax,
+				actionapi.ActionType_ACTION_TYPE_SENSE.String(),
+				supernodes,
+				"")
 
 			msg3 := types.NewMsgFinalizeAction(
 				supernodes[2].Address.String(),
 				actionID,
 				actionapi.ActionType_ACTION_TYPE_SENSE.String(),
-				metadataWithSig3,
+				metadata3,
 			)
 
 			_, err := msgServSim.FinalizeAction(ctx, msg3)
@@ -521,14 +364,14 @@ func SimulateMsgFinalizeAction_SenseConsensus(
 				return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg3), err.Error()), nil, err
 			}
 
-			// After 3rd non-matching submission, state should still be PROCESSING
+			// After 3rd non-matching submission, state should be FAILED
 			action, _ := k.GetActionByID(ctx, actionID)
-			if action.State != actionapi.ActionState_ACTION_STATE_PROCESSING {
+			if action.State != actionapi.ActionState_ACTION_STATE_FAILED {
 				return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg3),
 					"unexpected state after non-matching submission"), nil, nil
 			}
 
-			// Verify no fees were distributed yet
+			// Verify no fees were distributed
 			for i := 0; i < 3; i++ {
 				finalBalance := bk.GetBalance(ctx, supernodes[i].Address, feeDenom)
 				if !finalBalance.Equal(initialBalances[supernodes[i].Address.String()]) {
@@ -539,80 +382,24 @@ func SimulateMsgFinalizeAction_SenseConsensus(
 
 			return simtypes.NewOperationMsg(&types.MsgFinalizeAction{}, true, "success - no consensus with conflicting results"), nil, nil
 
-		case 3:
-			// Scenario 3: Only 2 supernodes submit matching results (should remain in PROCESSING)
-			// Generate consistent data for both supernodes
-			ddIds := generateRandomKademliaIDs(r, 3)
-			fingerprintResults := generateConsistentFingerprintResults(r)
-
-			// Only two supernodes submit results
-			for i := 0; i < 2; i++ {
-				metadata := generateFinalizeMetadataForSense(r, ctx, k, actionID, fingerprintResults, ddIds)
-				signature := signMetadata(supernodes[i], metadata)
-				metadataWithSig := addSignatureToMetadata(metadata, signature)
-
-				msg := types.NewMsgFinalizeAction(
-					supernodes[i].Address.String(),
-					actionID,
-					actionapi.ActionType_ACTION_TYPE_SENSE.String(),
-					metadataWithSig,
-				)
-
-				_, err := msgServSim.FinalizeAction(ctx, msg)
-				if err != nil {
-					return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), err.Error()), nil, err
-				}
-			}
-
-			// After only 2 submissions, state should still be PROCESSING
-			action, _ := k.GetActionByID(ctx, actionID)
-			if action.State != actionapi.ActionState_ACTION_STATE_PROCESSING {
-				return simtypes.NoOpMsg(types.ModuleName, "FinalizeAction",
-					fmt.Sprintf("unexpected state after 2 submissions: got %s, expected PROCESSING",
-						action.State)), nil, nil
-			}
-
-			// Verify no fees were distributed
-			for i := 0; i < 2; i++ {
-				finalBalance := bk.GetBalance(ctx, supernodes[i].Address, feeDenom)
-				if !finalBalance.Equal(initialBalances[supernodes[i].Address.String()]) {
-					return simtypes.NoOpMsg(types.ModuleName, "FinalizeAction",
-						"fee distributed before consensus reached"), nil, nil
-				}
-			}
-
-			return simtypes.NewOperationMsg(&types.MsgFinalizeAction{}, true, "success - insufficient submissions"), nil, nil
-
-		case 4:
+		case 2:
 			// Scenario 4: 3 supernodes submit completely different results (should fail/remain in PROCESSING)
 			// Three different sets of data
 			for i := 0; i < 3; i++ {
-				ddIds := generateRandomKademliaIDs(r, 3)
-				// For first supernode, generate a base set of fingerprints
-				// For subsequent supernodes, ensure each set is unique
-				var fingerprintResults map[string]string
-				if i == 0 {
-					fingerprintResults = generateConsistentFingerprintResults(r)
-				} else {
-					// Get previous supernode's fingerprint results and modify them
-					prevAction, _ := k.GetActionByID(ctx, actionID)
-					var prevMetadata actionapi.SenseMetadata
-					err := json.Unmarshal([]byte(prevAction.Metadata), &prevMetadata)
-					if err != nil {
-						return simtypes.NoOpMsg(types.ModuleName, "FinalizeAction", "failed to unmarshal metadata"), nil, err
-					}
-					fingerprintResults = generateNonMatchingFingerprintResults(r, prevMetadata.SupernodeFingerprints)
-				}
-
-				metadata := generateFinalizeMetadataForSense(r, ctx, k, actionID, fingerprintResults, ddIds)
-				signature := signMetadata(supernodes[i], metadata)
-				metadataWithSig := addSignatureToMetadata(metadata, signature)
+				// Generate different data for third supernode
+				// Each call to generateValidFinalizeMetadata/generateSenseSignature/cryptotestutils.CreateSignatureString generate random Signature String
+				metadata := generateValidFinalizeMetadata(
+					existingMetadata.DdAndFingerprintsIc,
+					existingMetadata.DdAndFingerprintsMax,
+					actionapi.ActionType_ACTION_TYPE_SENSE.String(),
+					supernodes,
+					"")
 
 				msg := types.NewMsgFinalizeAction(
 					supernodes[i].Address.String(),
 					actionID,
 					actionapi.ActionType_ACTION_TYPE_SENSE.String(),
-					metadataWithSig,
+					metadata,
 				)
 
 				_, err := msgServSim.FinalizeAction(ctx, msg)
@@ -621,11 +408,11 @@ func SimulateMsgFinalizeAction_SenseConsensus(
 				}
 			}
 
-			// After 3 different submissions, state should still be PROCESSING
+			// After 3 different submissions, state should still be FAILED
 			action, _ := k.GetActionByID(ctx, actionID)
-			if action.State != actionapi.ActionState_ACTION_STATE_PROCESSING {
+			if action.State != actionapi.ActionState_ACTION_STATE_FAILED {
 				return simtypes.NoOpMsg(types.ModuleName, "FinalizeAction",
-					fmt.Sprintf("unexpected state after 3 different submissions: got %s, expected PROCESSING",
+					fmt.Sprintf("unexpected state after 3 different submissions: got %s, expected FAILED",
 						action.State)), nil, nil
 			}
 
@@ -646,9 +433,9 @@ func SimulateMsgFinalizeAction_SenseConsensus(
 	}
 }
 
-// SimulateMsgFinalizeAction_MetadataValidation simulates attempting to finalize actions with invalid metadata
+// SimulateMsgFinalizeActionMetadataValidation simulates attempting to finalize actions with invalid metadata
 // This tests that invalid or incomplete metadata submitted during MsgFinalizeAction is correctly rejected
-func SimulateMsgFinalizeAction_MetadataValidation(
+func SimulateMsgFinalizeActionMetadataValidation(
 	ak types.AccountKeeper,
 	bk types.BankKeeper,
 	k keeper.Keeper,
@@ -665,10 +452,10 @@ func SimulateMsgFinalizeAction_MetadataValidation(
 		// 1. Create the appropriate type of PENDING action
 		if scenarioType == 0 {
 			// SENSE action
-			actionID = createPendingSenseAction(r, ctx, accs, bk, k, ak)
+			actionID, _ = registerSenseAction(r, ctx, accs, bk, k, ak)
 		} else {
 			// CASCADE action
-			actionID = createPendingCascadeAction(r, ctx, accs, bk, k, ak)
+			actionID, _ = registerCascadeAction(r, ctx, accs, bk, k, ak)
 		}
 
 		// 2. Get the created action
@@ -678,11 +465,14 @@ func SimulateMsgFinalizeAction_MetadataValidation(
 		}
 
 		// 3. Select a random supernode account
-		supernode := selectRandomSupernode(r, ctx, accs)
+		supernodes, err := getRandomActiveSupernodes(r, ctx, 3, ak, k, accs)
+		if err != nil {
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(&types.MsgFinalizeAction{}), "failed to get random supernodes"), nil, nil
+		}
 
 		// 4. Get initial supernode balance to verify no fees are distributed
 		feeDenom := k.GetParams(ctx).BaseActionFee.Denom
-		initialBalance := bk.GetBalance(ctx, supernode.Address, feeDenom)
+		initialBalance := bk.GetBalance(ctx, supernodes[0].Address, feeDenom)
 
 		// 5. Generate invalid metadata based on action type and invalidation type
 		var invalidMetadata string
@@ -692,19 +482,19 @@ func SimulateMsgFinalizeAction_MetadataValidation(
 			switch invalidationType {
 			case 0:
 				// Missing DdAndFingerprintsIds
-				invalidMetadata = generateSenseMetadataMissingDdIds(action)
+				invalidMetadata = generateFinalizeSenseMetadataMissingDdIds(action, supernodes)
 			case 1:
 				// Empty DdAndFingerprintsIds
-				invalidMetadata = generateSenseMetadataEmptyDdIds(action)
+				invalidMetadata = generateSenseMetadataEmptyDdIds(action, supernodes)
 			case 2:
 				// Invalid DdAndFingerprintsIc count
-				invalidMetadata = generateSenseMetadataInvalidDdIc(action)
+				invalidMetadata = generateSenseMetadataInvalidDdIc(action, supernodes)
 			case 3:
 				// Missing SupernodeFingerprints
-				invalidMetadata = generateSenseMetadataMissingFingerprints(action)
+				invalidMetadata = generateSenseMetadataMissingIds(action, supernodes)
 			case 4:
 				// DataHash mismatch
-				invalidMetadata = generateSenseMetadataDataHashMismatch(action)
+				invalidMetadata = generateSenseMetadataSignatureMismatch(action, supernodes)
 			}
 		} else {
 			// CASCADE action invalid metadata
@@ -720,28 +510,24 @@ func SimulateMsgFinalizeAction_MetadataValidation(
 				invalidMetadata = generateCascadeMetadataInvalidRqIc(action)
 			case 3:
 				// DataHash mismatch
-				invalidMetadata = generateCascadeMetadataDataHashMismatch(action)
+				invalidMetadata = generateCascadeMetadataMissingIds(action)
 			case 4:
 				// FileName mismatch
-				invalidMetadata = generateCascadeMetadataFileNameMismatch(action)
+				invalidMetadata = generateCascadeMetadataSignatureMismatch(action)
 			}
 		}
 
-		// 6. Add supernode signature
-		signature := signMetadata(supernode, invalidMetadata)
-		metadataWithSig := addSignatureToMetadata(invalidMetadata, signature)
-
-		// 7. Create finalization message
+		// 6. Create finalization message
 		msg := types.NewMsgFinalizeAction(
-			supernode.Address.String(),
+			supernodes[0].Address.String(),
 			actionID,
 			action.ActionType.String(),
-			metadataWithSig,
+			invalidMetadata,
 		)
 
 		// 8. Deliver transaction, expecting error
 		msgServSim := keeper.NewMsgServerImpl(k)
-		_, err := msgServSim.FinalizeAction(ctx, msg)
+		_, err = msgServSim.FinalizeAction(ctx, msg)
 
 		// 9. Check that an error occurred
 		if err == nil {
@@ -771,7 +557,7 @@ func SimulateMsgFinalizeAction_MetadataValidation(
 		}
 
 		// 11. Verify supernode balance remains unchanged (no fees distributed)
-		finalBalance := bk.GetBalance(ctx, supernode.Address, feeDenom)
+		finalBalance := bk.GetBalance(ctx, supernodes[0].Address, feeDenom)
 		if !finalBalance.Equal(initialBalance) {
 			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg),
 				"balance changed despite error"), nil, nil

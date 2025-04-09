@@ -97,3 +97,7 @@ func (k *Keeper) GetAccountKeeper() types.AccountKeeper {
 func (k *Keeper) GetActionRegistry() *ActionRegistry {
 	return k.actionRegistry
 }
+
+func (k *Keeper) GetStakingKeeper() types.StakingKeeper {
+	return k.stakingKeeper
+}

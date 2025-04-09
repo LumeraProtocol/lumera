@@ -3,12 +3,12 @@ package types
 import (
 	"testing"
 
-	"github.com/LumeraProtocol/lumera/testutil/sample"
+	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
 	"github.com/stretchr/testify/require"
 )
 
 func TestMsgFinalizeAction_ValidateBasic(t *testing.T) {
-	validCreator := sample.AccAddress()
+	validCreator := cryptotestutils.AccAddress()
 	validActionId := "action123"
 
 	// Create valid metadata for SENSE action type

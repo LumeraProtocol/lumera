@@ -5,7 +5,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	"testing"
 
-	"github.com/LumeraProtocol/lumera/testutil/sample"
+	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -50,7 +50,7 @@ func (config *KeeperTestSuiteConfig) SetupTestSuite(suite *suite.Suite) {
 	snKeys := make([]secp256k1.PrivKey, 3)
 	config.supernodes = make([]*supernodetypes.SuperNode, 5)
 	for i := 0; i < 5; i++ {
-		key, address, valAddress := sample.SupernodeAddresses()
+		key, address, valAddress := cryptotestutils.SupernodeAddresses()
 		config.supernodes[i] = &supernodetypes.SuperNode{
 			ValidatorAddress: valAddress.String(),
 			SupernodeAccount: address.String(),
@@ -60,23 +60,23 @@ func (config *KeeperTestSuiteConfig) SetupTestSuite(suite *suite.Suite) {
 		}
 		pairs[i] = keepertest.AccountPair{Address: address, PubKey: key.PubKey()}
 	}
-	config.signatureSense, err = sample.CreateSignatureString(snKeys, 50)
+	config.signatureSense, err = cryptotestutils.CreateSignatureString(snKeys, 50)
 	suite.Require().NoError(err)
-	config.signatureSenseBad1, err = sample.CreateSignatureString(snKeys, 50)
+	config.signatureSenseBad1, err = cryptotestutils.CreateSignatureString(snKeys, 50)
 	suite.Require().NoError(err)
-	config.signatureSenseBad2, err = sample.CreateSignatureString(snKeys, 50)
+	config.signatureSenseBad2, err = cryptotestutils.CreateSignatureString(snKeys, 50)
 	suite.Require().NoError(err)
 
-	_, badSNAddress, badSNValAddress := sample.SupernodeAddresses()
+	_, badSNAddress, badSNValAddress := cryptotestutils.SupernodeAddresses()
 	config.badSupernode = supernodetypes.SuperNode{
 		ValidatorAddress: badSNValAddress.String(),
 		SupernodeAccount: badSNAddress.String(),
 	}
 
-	key, address := sample.KeyAndAddress()
+	key, address := cryptotestutils.KeyAndAddress()
 	pubKey := key.PubKey()
 	pairs[3] = keepertest.AccountPair{Address: address, PubKey: pubKey}
-	config.signatureCascade, err = sample.CreateSignatureString([]secp256k1.PrivKey{key}, 50)
+	config.signatureCascade, err = cryptotestutils.CreateSignatureString([]secp256k1.PrivKey{key}, 50)
 	suite.Require().NoError(err)
 	config.creatorAddress = address
 
@@ -85,7 +85,7 @@ func (config *KeeperTestSuiteConfig) SetupTestSuite(suite *suite.Suite) {
 	config.ic = 20
 	config.max = 50
 
-	config.imposterAddress = sample.AccAddressAcc()
+	config.imposterAddress = cryptotestutils.AccAddressAcc()
 
 	// Set context with block height for consistent testing
 	config.ctx = config.ctx.WithBlockHeight(1)

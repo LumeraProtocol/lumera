@@ -19,50 +19,22 @@ func SimulateMsgRequestActionSuccessSense(
 ) simtypes.Operation {
 	return func(r *rand.Rand, app *baseapp.BaseApp, ctx sdk.Context, accs []simtypes.Account, chainID string,
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
-		// 1. Select random account with enough balance
-		simAccount := selectRandomAccountWithSufficientFunds(r, ctx, accs, bk, ak)
-		// 2. Generate random valid SENSE metadata
-		dataHash := generateRandomHash(r)
-		senseMetadata := generateRequestActionSenseMetadata(dataHash)
 
-		params := k.GetParams(ctx)
+		// 1. Register Action
+		actionId, msg := registerSenseAction(r, ctx, accs, bk, k, ak)
 
-		// 3. Determine fee amount (within valid range)
-		feeAmount := generateRandomFee(r, ctx, params.BaseActionFee)
-
-		// 4. Generate an expiration time (current time + random duration >= expiration_duration)
-		expirationTime := getRandomExpirationTime(ctx, r, params)
-
-		// 5. Create message
-		msg := types.NewMsgRequestAction(
-			simAccount.Address.String(),
-			actionapi.ActionType_ACTION_TYPE_SENSE.String(),
-			senseMetadata,
-			feeAmount.String(),
-			strconv.FormatInt(expirationTime, 10),
-		)
-
-		// 6. Cache keeper state for simulation
-		msgServSim := keeper.NewMsgServerImpl(k)
-
-		// 7. Deliver transaction
-		result, err := msgServSim.RequestAction(ctx, msg)
-		if err != nil {
-			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), err.Error()), nil, err
-		}
-
-		// 8. Verify results: action created, funds deducted, proper state
-		action, found := k.GetActionByID(ctx, result.ActionId)
+		// 2. Verify results: action created, funds deducted, proper state
+		action, found := k.GetActionByID(ctx, actionId)
 		if !found {
 			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), "action not found"), nil, nil
 		}
 
-		// 9. Verify action is in PENDING state
+		// 3. Verify action is in PENDING state
 		if action.State != actionapi.ActionState_ACTION_STATE_PENDING {
 			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), "action not in PENDING state"), nil, nil
 		}
 
-		// 10. Return successful operation message
+		// 4. Return successful operation message
 		return simtypes.NewOperationMsg(msg, true, "success"), nil, nil
 	}
 }
@@ -75,50 +47,11 @@ func SimulateMsgRequestActionSuccessCascade(
 ) simtypes.Operation {
 	return func(r *rand.Rand, app *baseapp.BaseApp, ctx sdk.Context, accs []simtypes.Account, chainID string,
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
-		// 1. Select random account with enough balance
-		simAccount := selectRandomAccountWithSufficientFunds(r, ctx, accs, bk, ak)
-		acc := ak.GetAccount(ctx, simAccount.Address)
-		if acc != nil {
-			err := acc.SetPubKey(simAccount.PubKey)
-			if err != nil {
-				return simtypes.NoOpMsg(types.ModuleName, "NewMsgRequestAction", err.Error()), nil, err
-			}
-			ak.SetAccount(ctx, acc)
-		}
-
-		params := k.GetParams(ctx)
-
-		// 2. Generate random valid CASCADE metadata
-		dataHash := generateRandomHash(r)
-		fileName := generateRandomFileName(r)
-		cascadeMetadata := generateRequestActionCascadeMetadata(dataHash, fileName, simAccount)
-
-		// 3. Determine fee amount (within valid range)
-		feeAmount := generateRandomFee(r, ctx, params.BaseActionFee)
-
-		// 4. Generate an expiration time (current time + random duration)
-		expirationTime := getRandomExpirationTime(ctx, r, params)
-
-		// 5. Create message
-		msg := types.NewMsgRequestAction(
-			simAccount.Address.String(),
-			actionapi.ActionType_ACTION_TYPE_CASCADE.String(),
-			cascadeMetadata,
-			feeAmount.String(),
-			strconv.FormatInt(expirationTime, 10),
-		)
-
-		// 6. Cache keeper state for simulation
-		msgServSim := keeper.NewMsgServerImpl(k)
-
-		// 7. Deliver transaction
-		result, err := msgServSim.RequestAction(ctx, msg)
-		if err != nil {
-			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), err.Error()), nil, err
-		}
+		// 1. Register Action
+		actionId, msg := registerCascadeAction(r, ctx, accs, bk, k, ak)
 
 		// 8. Verify results: action created, funds deducted, proper state
-		action, found := k.GetActionByID(ctx, result.ActionId)
+		action, found := k.GetActionByID(ctx, actionId)
 		if !found {
 			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), "action not found"), nil, nil
 		}
@@ -142,7 +75,7 @@ func SimulateMsgRequestActionInvalidMetadata(
 	return func(r *rand.Rand, app *baseapp.BaseApp, ctx sdk.Context, accs []simtypes.Account, chainID string,
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
 		// 1. Select random account with enough balance
-		simAccount := selectRandomAccountWithSufficientFunds(r, ctx, accs, bk, ak)
+		simAccount := selectRandomAccountWithSufficientFunds(r, ctx, accs, bk, ak, []string{""})
 
 		params := k.GetParams(ctx)
 
@@ -154,7 +87,7 @@ func SimulateMsgRequestActionInvalidMetadata(
 		actionType := selectRandomActionType(r)
 
 		// 4. Generate invalid metadata based on action type
-		invalidMetadata := generateInvalidMetadata(r, actionType, simAccount)
+		invalidMetadata := generateRequestActionInvalidMetadata(r, actionType, simAccount)
 
 		// 5. Determine fee amount
 		feeAmount := generateRandomFee(r, ctx, params.BaseActionFee)

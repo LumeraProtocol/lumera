@@ -26,13 +26,13 @@ func SimulateMsgRegisterSupernode(
 		var simAccount simtypes.Account
 		var found bool
 
-		stakingkeepr := k.GetStakingKeeper()
+		stakingkeeper := k.GetStakingKeeper()
 		// Try up to 10 times to find an eligible validator
 		for i := 0; i < 10; i++ {
 			simAccount, _ = simtypes.RandomAcc(r, accs)
 			valAddr := sdk.ValAddress(simAccount.Address)
 
-			validator, err := stakingkeepr.Validator(ctx, valAddr)
+			validator, err := stakingkeeper.Validator(ctx, valAddr)
 			if err != nil {
 				continue
 			}

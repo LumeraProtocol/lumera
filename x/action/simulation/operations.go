@@ -20,13 +20,10 @@ func WeightedOperations(
 	k keeper.Keeper,
 ) simulation.WeightedOperations {
 	var (
-		weightMsgRequestAction int
-		//weightMsgFinalizeAction   int
-		//weightMsgApproveAction    int
-		//weightActionExpirationSim int
-		//weightActionFailureSim    int
-		//weightProcessingStateSim  int
-		//weightFeeDistributionSim  int
+		weightMsgRequestAction    int
+		weightMsgFinalizeAction   int
+		weightMsgApproveAction    int
+		weightActionExpirationSim int
 	)
 
 	appParams.GetOrGenerate(
@@ -36,47 +33,26 @@ func WeightedOperations(
 		func(r *rand.Rand) { weightMsgRequestAction = 100 },
 	)
 
-	//appParams.GetOrGenerate(
-	//	"action",
-	//	&weightMsgFinalizeAction,
-	//	nil,
-	//	func(r *rand.Rand) { weightMsgFinalizeAction = 50 },
-	//)
-	//
-	//appParams.GetOrGenerate(
-	//	"action",
-	//	&weightMsgApproveAction,
-	//	nil,
-	//	func(r *rand.Rand) { weightMsgApproveAction = 50 },
-	//)
-	//
-	//appParams.GetOrGenerate(
-	//	"action",
-	//	&weightActionExpirationSim,
-	//	nil,
-	//	func(r *rand.Rand) { weightActionExpirationSim = 25 }, // Lower weight for state transition simulation
-	//)
-	//
-	//appParams.GetOrGenerate(
-	//	"action",
-	//	&weightActionFailureSim,
-	//	nil,
-	//	func(r *rand.Rand) { weightActionFailureSim = 25 }, // Equal weight for action failure simulation
-	//)
-	//
-	//appParams.GetOrGenerate(
-	//	"action",
-	//	&weightProcessingStateSim,
-	//	nil,
-	//	func(r *rand.Rand) { weightProcessingStateSim = 25 }, // Equal weight for processing state simulation
-	//)
-	//
-	//appParams.GetOrGenerate(
-	//	"action",
-	//	&weightFeeDistributionSim,
-	//	nil,
-	//	func(r *rand.Rand) { weightFeeDistributionSim = 25 }, // Equal weight for fee distribution simulation
-	//)
+	appParams.GetOrGenerate(
+		"action",
+		&weightMsgFinalizeAction,
+		nil,
+		func(r *rand.Rand) { weightMsgFinalizeAction = 50 },
+	)
+
+	appParams.GetOrGenerate(
+		"action",
+		&weightMsgApproveAction,
+		nil,
+		func(r *rand.Rand) { weightMsgApproveAction = 50 },
+	)
+
+	appParams.GetOrGenerate(
+		"action",
+		&weightActionExpirationSim,
+		nil,
+		func(r *rand.Rand) { weightActionExpirationSim = 25 }, // Lower weight for state transition simulation
+	)
 
 	operations := simulation.WeightedOperations{
 		simulation.NewWeightedOperation(
@@ -99,73 +75,53 @@ func WeightedOperations(
 			weightMsgRequestAction, // Using the same weight for Permission simulation
 			SimulateMsgRequestActionPermission(ak, bk, k),
 		),
-		//simulation.NewWeightedOperation(
-		//	weightMsgFinalizeAction,
-		//	SimulateMsgFinalizeAction_Success_Sense(ak, bk, k),
-		//),
-		//simulation.NewWeightedOperation(
-		//	weightMsgFinalizeAction, // Using the same weight for CASCADE finalization
-		//	SimulateMsgFinalizeAction_Success_Cascade(ak, bk, k),
-		//),
+		simulation.NewWeightedOperation(
+			weightMsgFinalizeAction,
+			SimulateMsgFinalizeActionSuccessSense(ak, bk, k),
+		),
+		simulation.NewWeightedOperation(
+			weightMsgFinalizeAction, // Using the same weight for CASCADE finalization
+			SimulateMsgFinalizeActionSuccessCascade(ak, bk, k),
+		),
 		//simulation.NewWeightedOperation(
 		//	weightMsgFinalizeAction, // Using the same weight for Invalid ID finalization
-		//	SimulateMsgFinalizeAction_Invalid_ID(ak, bk, k),
+		//	SimulateMsgFinalizeActionInvalidID(ak, bk, k),
 		//),
 		//simulation.NewWeightedOperation(
 		//	weightMsgFinalizeAction, // Using the same weight for Invalid State finalization
-		//	SimulateMsgFinalizeAction_InvalidState(ak, bk, k),
+		//	SimulateMsgFinalizeActionInvalidState(ak, bk, k),
 		//),
 		//simulation.NewWeightedOperation(
 		//	weightMsgFinalizeAction, // Using the same weight for Unauthorized finalization
-		//	SimulateMsgFinalizeAction_Unauthorized(ak, bk, k),
+		//	SimulateMsgFinalizeActionUnauthorized(ak, bk, k),
 		//),
 		//simulation.NewWeightedOperation(
 		//	weightMsgFinalizeAction, // Using the same weight for SenseConsensus simulation
-		//	SimulateMsgFinalizeAction_SenseConsensus(ak, bk, k),
+		//	SimulateMsgFinalizeActionSenseConsensus(ak, bk, k),
 		//),
 		//simulation.NewWeightedOperation(
 		//	weightMsgFinalizeAction, // Using the same weight for MetadataValidation simulation
-		//	SimulateMsgFinalizeAction_MetadataValidation(ak, bk, k),
+		//	SimulateMsgFinalizeActionMetadataValidation(ak, bk, k),
 		//),
 		//simulation.NewWeightedOperation(
 		//	weightMsgApproveAction,
-		//	SimulateMsgApproveAction_Success(ak, bk, k),
+		//	SimulateMsgApproveActionSuccess(ak, bk, k),
 		//),
 		//simulation.NewWeightedOperation(
 		//	weightMsgApproveAction, // Using the same weight for Invalid ID approval simulation
-		//	SimulateMsgApproveAction_Invalid_ID(ak, bk, k),
+		//	SimulateMsgApproveActionInvalidID(ak, bk, k),
 		//),
 		//simulation.NewWeightedOperation(
 		//	weightMsgApproveAction, // Using the same weight for Invalid State approval simulation
-		//	SimulateMsgApproveAction_InvalidState(ak, bk, k),
+		//	SimulateMsgApproveActionInvalidState(ak, bk, k),
 		//),
 		//simulation.NewWeightedOperation(
 		//	weightMsgApproveAction, // Using the same weight for Unauthorized approval simulation
-		//	SimulateMsgApproveAction_Unauthorized(ak, bk, k),
-		//),
-		//simulation.NewWeightedOperation(
-		//	weightMsgApproveAction, // Using the same weight for SignatureValidation simulation
-		//	SimulateMsgApproveAction_SignatureValidation(ak, bk, k),
+		//	SimulateMsgApproveActionUnauthorized(ak, bk, k),
 		//),
 		//simulation.NewWeightedOperation(
 		//	weightActionExpirationSim, // Lower weight for state transition simulation
 		//	SimulateActionExpiration(ak, bk, k),
-		//),
-		//simulation.NewWeightedOperation(
-		//	weightActionFailureSim, // Equal weight for action failure simulation
-		//	SimulateActionFailure(ak, bk, k),
-		//),
-		//simulation.NewWeightedOperation(
-		//	weightProcessingStateSim, // Equal weight for processing state simulation
-		//	SimulateProcessingState(ak, bk, k),
-		//),
-		//simulation.NewWeightedOperation(
-		//	weightFeeDistributionSim, // Equal weight for fee distribution simulation
-		//	SimulateFeeDistribution_Success(ak, bk, k),
-		//),
-		//simulation.NewWeightedOperation(
-		//	weightFeeDistributionSim, // Equal weight for multiple supernodes fee distribution simulation
-		//	SimulateFeeDistribution_MultipleSuperNodes(ak, bk, k),
 		//),
 	}
 

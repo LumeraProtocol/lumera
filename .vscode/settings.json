@@ -5,4 +5,12 @@
     "go.vetOnSave": "package",
     "go.testOnSave": false,
     "go.coverOnSave": false,
+    "protoc": {
+        "path": "protoc",
+        "compile_on_save": false,
+        "options": [
+            "--proto_path=${workspaceFolder}/proto",
+            "--proto_path=${env:HOME}/.cache/buf/v1"
+        ]
+    }
 }

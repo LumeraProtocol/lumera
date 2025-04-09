@@ -30,18 +30,18 @@ type KeyExchanger interface {
 	// ComputeSharedSecret computes the shared secret using the ephemeral private key and the remote public key.
 	ComputeSharedSecret(handshakeBytes, signature []byte) ([]byte, error)
 	// PeerType returns the type of the local peer
-	PeerType() PeerType 
+	PeerType() PeerType
 	// LocalAddress returns the local Cosmos address
 	LocalAddress() string
 }
 
 type SecureKeyExchange struct {
-	keyring       keyring.Keyring  // keyring to access Cosmos accounts
-	accAddress    types.AccAddress // local Cosmos address
-	peerType      PeerType	       // local peer type (Simplenode or Supernode)	
-	curve         ecdh.Curve	   // curve used for ECDH key exchange
+	keyring    keyring.Keyring  // keyring to access Cosmos accounts
+	accAddress types.AccAddress // local Cosmos address
+	peerType   PeerType         // local peer type (Simplenode or Supernode)
+	curve      ecdh.Curve       // curve used for ECDH key exchange
 
-	mutex         sync.Mutex	   // mutex to protect ephemeralKeys
+	mutex         sync.Mutex                  // mutex to protect ephemeralKeys
 	ephemeralKeys map[string]*ecdh.PrivateKey // map of [remote_address -> ephemeral private keys]
 }
 
@@ -78,7 +78,7 @@ func validateSupernode(address string, isLocal bool) (bool, error) {
 }
 
 // NewSecureKeyExchange creates a new instance of SecureCommManager.
-// 
+//
 // Parameters:
 //   - kr: keyring to access Cosmos accounts
 //   - localAddress: the Cosmos address of the local peer

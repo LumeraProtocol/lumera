@@ -35,6 +35,24 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					RpcMethod: "UpdateParams",
 					Skip:      true, // skipped because authority gated
 				},
+				{
+					RpcMethod:      "RequestAction",
+					Use:            "request-action [action-type] [metadata] [price] [expiration-time]",
+					Short:          "Send a request-action tx",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "actionType"}, {ProtoField: "metadata"}, {ProtoField: "price"}, {ProtoField: "expirationTime"}},
+				},
+				{
+					RpcMethod:      "FinalizeAction",
+					Use:            "finalize-action [super-node] [action-id] [metadata]",
+					Short:          "Send a finalize-action tx",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "actionId"}, {ProtoField: "actionType"}, {ProtoField: "metadata"}},
+				},
+				{
+					RpcMethod:      "ApproveAction",
+					Use:            "approve-action [action-id] [signature]",
+					Short:          "Send a approve-action tx",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "actionId"}},
+				},
 				// this line is used by ignite scaffolding # autocli/tx
 			},
 		},

@@ -1,0 +1,23 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Ignite Chain Build",
+      "type": "shell",
+      "command": "ignite chain build",
+      "group": "build",
+      "problemMatcher": [
+        {
+          "owner": "go",
+          "fileLocation": ["relative", "${workspaceFolder}"],
+          "pattern": {
+            "regexp": "^(.*\\.go):(\\d+):\\d+: (.*)$",
+            "file": 1,
+            "line": 2,
+            "message": 3
+          }
+        }
+      ]
+    }
+  ]
+}

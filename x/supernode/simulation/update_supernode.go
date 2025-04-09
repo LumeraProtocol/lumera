@@ -86,7 +86,7 @@ func SimulateMsgUpdateSupernode(
 
 		// Execute the message
 		msgServer := keeper.NewMsgServerImpl(k)
-		_, err := msgServer.UpdateSupernode(sdk.WrapSDKContext(ctx), msg)
+		_, err := msgServer.UpdateSupernode(ctx, msg)
 		if err != nil {
 			return simtypes.NoOpMsg(types.ModuleName, TypeMsgUpdateSupernode, err.Error()), nil, err
 		}

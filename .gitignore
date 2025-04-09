@@ -19,7 +19,13 @@ devnet-deploy.tar.gz
 
 repomix-*
 .repomixignore
+memory-bank
+.clinerules-*
+.roomodes
+projectBrief.md
 
 tests/systemtests/testnet
 devnet/docker-compose.start.yml
 devnet/start.sh
+
+

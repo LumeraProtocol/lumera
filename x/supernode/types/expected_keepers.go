@@ -1,7 +1,5 @@
 package types
 
-//go:generate mockgen -destination=../mocks/expected_keepers_mock.go -package=supernodemocks -source=expected_keepers.go
-
 import (
 	"context"
 	"time"

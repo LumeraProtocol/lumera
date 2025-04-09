@@ -9,7 +9,7 @@ import (
 )
 
 // GetAction returns the action for the given action-id
-func (k Keeper) GetAction(goCtx context.Context, req *types.QueryGetActionRequest) (*types.QueryGetActionResponse, error) {
+func (k *Keeper) GetAction(goCtx context.Context, req *types.QueryGetActionRequest) (*types.QueryGetActionResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
 	}

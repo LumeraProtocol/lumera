@@ -7,7 +7,7 @@ import (
 // DefaultIndex is the default global index
 const DefaultIndex uint64 = 1
 
-const DefaultClaimableAmountConst = 18749999981413
+const DefaultClaimableAmountConst = 12383801540459
 
 // DefaultGenesis returns the default genesis state
 func DefaultGenesis() *GenesisState {

@@ -49,6 +49,11 @@ func (m *ActionMockSupernodeKeeper) QuerySuperNode(ctx sdk.Context, valOperAddr 
 	return args.Get(0).(sntypes.SuperNode), args.Bool(1)
 }
 
+func (m *ActionMockSupernodeKeeper) SetSuperNode(ctx sdk.Context, superNode sntypes.SuperNode) error {
+	args := m.Called(ctx, superNode)
+	return args.Error(0)
+}
+
 // ActionBankKeeper extends the existing MockBankKeeper with the SpendableCoins method
 type ActionBankKeeper struct {
 	mock.Mock
@@ -123,6 +128,11 @@ type MockStakingKeeper struct {
 func (m *MockStakingKeeper) GetValidator(ctx context.Context, addr sdk.ValAddress) (validator stakingtypes.Validator, err error) {
 	args := m.Called(ctx, addr)
 	return args.Get(0).(stakingtypes.Validator), args.Error(1)
+}
+
+func (m *MockStakingKeeper) Validator(ctx context.Context, addr sdk.ValAddress) (stakingtypes.ValidatorI, error) {
+	args := m.Called(ctx, addr)
+	return args.Get(0).(stakingtypes.ValidatorI), args.Error(1)
 }
 
 type AccountPair struct {

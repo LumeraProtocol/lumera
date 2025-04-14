@@ -55,7 +55,8 @@ genesis:
         max_processing_time: 1h0m0s
         expiration_duration: 24h0m0s
     claim:
-      total_claimable_amount: '18749999981413'
+      # total_claimable_amount: '18749999981413'
+      total_claimable_amount: '12383801540459'
       params:
         claim_end_time: '1746071999' # April 30 2025, 23:59:59
     distribution:

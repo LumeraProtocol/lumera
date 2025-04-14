@@ -4,7 +4,7 @@
 package lumera_action_module
 
 import (
-	_ "cosmos/app/v1alpha1"
+	_ "cosmossdk.io/api/cosmos/app/v1alpha1"
 	fmt "fmt"
 	proto "github.com/cosmos/gogoproto/proto"
 	io "io"

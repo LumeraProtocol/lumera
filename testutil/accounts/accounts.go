@@ -4,7 +4,6 @@ package accounts
 
 import (
 	"testing"
-	"crypto/ecdh"
 	"github.com/stretchr/testify/require"
 
 	"github.com/cosmos/go-bip39"
@@ -14,8 +13,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
-
-	"github.com/LumeraProtocol/lumera/x/lumeraid/securekeyx"
 )
 
 const (
@@ -30,13 +27,6 @@ type TestAccount struct {
 	PubKey  cryptotypes.PubKey
 }
 	
-// setupTestKeyExchange creates a key exchange instance for testing
-func SetupTestKeyExchange(t *testing.T, kb keyring.Keyring, addr string, peerType securekeyx.PeerType) *securekeyx.SecureKeyExchange {
-	ke, err := securekeyx.NewSecureKeyExchange(kb, addr, peerType, ecdh.P256())
-	require.NoError(t, err)
-	return ke
-}
-
 func generateMnemonic() (string, error) {
 	entropy, err := bip39.NewEntropy(128) // 128 bits for a 12-word mnemonic
 	if err != nil {

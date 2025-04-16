@@ -10,5 +10,5 @@ message HandshakeInfo {
     int32 peer_type = 2;          // Peer type (0 = Simplenode, 1 = Supernode)
     bytes public_key = 3;         // ephemeral public key
     bytes account_public_key = 4; // Cosmos account public key
-    string curve = 5;          // Curve type (e.g., P256, P384, P521)
+    string curve = 5;             // Curve type (e.g., P256, P384, P521)
 }

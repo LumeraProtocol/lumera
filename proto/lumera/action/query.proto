@@ -7,6 +7,8 @@ import "gogoproto/gogo.proto";
 import "google/api/annotations.proto";
 import "cosmos/base/query/v1beta1/pagination.proto";
 import "lumera/action/params.proto";
+import "lumera/action/action_type.proto";
+import "lumera/action/action_state.proto";
 import "lumera/action/action.proto";
 
 option go_package = "github.com/LumeraProtocol/lumera/x/action/types";
@@ -31,6 +33,32 @@ service Query {
     option (google.api.http).get = "/LumeraProtocol/lumera/action/get_action_fee/{dataSize}";
   
   }
+
+  // List actions with optional type and state filters.
+  rpc ListActions (QueryListActionsRequest) returns (QueryListActionsResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/action/list_actions";
+  }
+
+  // List actions for a specific supernode.
+  rpc ListActionsBySuperNode (QueryListActionsBySuperNodeRequest) returns (QueryListActionsResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/action/list_actions_by_supernode/{superNodeAddress}";
+  }
+
+  // List actions created at a specific block height.
+  rpc ListActionsByBlockHeight (QueryListActionsByBlockHeightRequest) returns (QueryListActionsResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/action/list_actions_by_block_height/{blockHeight}";
+  }
+
+  // List expired actions.
+  rpc ListExpiredActions (QueryListExpiredActionsRequest) returns (QueryListActionsResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/action/list_expired_actions";
+  }
+
+  // Query actions based on metadata.
+  rpc QueryActionByMetadata (QueryActionByMetadataRequest) returns (QueryListActionsResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/action/query_action_by_metadata";
+  }
+  
 }
 // QueryParamsRequest is request type for the Query/Params RPC method.
 message QueryParamsRequest {}
@@ -60,3 +88,39 @@ message QueryGetActionFeeResponse {
   string amount = 1;
 }
 
+// List actions with optional type and state filters
+message QueryListActionsRequest {
+  ActionType actionType = 1;
+  ActionState actionState = 2;
+  cosmos.base.query.v1beta1.PageRequest pagination = 3;
+}
+
+message QueryListActionsResponse {
+  repeated Action actions = 1;
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+  uint64 total = 3;
+}
+
+// List actions for a specific supernode
+message QueryListActionsBySuperNodeRequest {
+  string superNodeAddress = 1;
+  cosmos.base.query.v1beta1.PageRequest pagination = 2;
+}
+
+// List actions by block height
+message QueryListActionsByBlockHeightRequest {
+  int64 blockHeight = 1;
+  cosmos.base.query.v1beta1.PageRequest pagination = 2;
+}
+
+// List expired actions
+message QueryListExpiredActionsRequest {
+  cosmos.base.query.v1beta1.PageRequest pagination = 1;
+}
+
+// Query actions by metadata field
+message QueryActionByMetadataRequest {
+  ActionType actionType = 1;
+  string metadataQuery = 2; // e.g., "field=value"
+  cosmos.base.query.v1beta1.PageRequest pagination = 3;
+}

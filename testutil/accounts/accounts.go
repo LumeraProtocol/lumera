@@ -4,6 +4,7 @@ package accounts
 
 import (
 	"testing"
+	"crypto/ecdh"
 	"github.com/stretchr/testify/require"
 
 	"github.com/cosmos/go-bip39"
@@ -12,12 +13,29 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
+	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
+
+	"github.com/LumeraProtocol/lumera/x/lumeraid/securekeyx"
 )
 
 const (
 	TestAddress1 = "lumera1zvnc27832srgxa207y5hu2agy83wazfzurufyp"
 	TestAddress2 = "lumera1evlkjnp072q8u0yftk65ualx49j6mdz66p2073"
 )
+
+// TestAccount struct
+type TestAccount struct {
+	Name    string
+	Address string
+	PubKey  cryptotypes.PubKey
+}
+	
+// setupTestKeyExchange creates a key exchange instance for testing
+func SetupTestKeyExchange(t *testing.T, kb keyring.Keyring, addr string, peerType securekeyx.PeerType) *securekeyx.SecureKeyExchange {
+	ke, err := securekeyx.NewSecureKeyExchange(kb, addr, peerType, ecdh.P256())
+	require.NoError(t, err)
+	return ke
+}
 
 func generateMnemonic() (string, error) {
 	entropy, err := bip39.NewEntropy(128) // 128 bits for a 12-word mnemonic
@@ -65,8 +83,8 @@ func addTestAccountToKeyring(kr keyring.Keyring, accountName string) error {
 }
 
 // setupTestAccounts creates test accounts in keyring
-func SetupTestAccounts(t *testing.T, kr keyring.Keyring, accountNames []string) []string {
-	var addresses []string
+func SetupTestAccounts(t *testing.T, kr keyring.Keyring, accountNames []string) []TestAccount {
+	testAccounts := make([]TestAccount, 0, len(accountNames))
 
 	for _, accountName := range accountNames {
 		err := addTestAccountToKeyring(kr, accountName)
@@ -78,9 +96,16 @@ func SetupTestAccounts(t *testing.T, kr keyring.Keyring, accountNames []string) 
 		address, err := keyInfo.GetAddress()
 		require.NoError(t, err, "failed to get address for account %s", accountName)
 
-		addresses = append(addresses, address.String())
-	}
-	require.Len(t, addresses, len(accountNames), "unexpected number of test accounts")
+		pubKey, err := keyInfo.GetPubKey()
+		require.NoError(t, err, "failed to get public key for account %s", accountName)
 
-	return addresses
+		testAccounts = append(testAccounts, TestAccount{
+			Name:    accountName,
+			Address: address.String(),
+			PubKey:  pubKey,
+		})
+	}
+
+	require.Len(t, testAccounts, len(accountNames), "unexpected number of test accounts")
+	return testAccounts
 }

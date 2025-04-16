@@ -13,11 +13,12 @@ import (
 )
 
 var (
-	md_HandshakeInfo            protoreflect.MessageDescriptor
-	fd_HandshakeInfo_address    protoreflect.FieldDescriptor
-	fd_HandshakeInfo_peer_type  protoreflect.FieldDescriptor
-	fd_HandshakeInfo_public_key protoreflect.FieldDescriptor
-	fd_HandshakeInfo_curve      protoreflect.FieldDescriptor
+	md_HandshakeInfo                    protoreflect.MessageDescriptor
+	fd_HandshakeInfo_address            protoreflect.FieldDescriptor
+	fd_HandshakeInfo_peer_type          protoreflect.FieldDescriptor
+	fd_HandshakeInfo_public_key         protoreflect.FieldDescriptor
+	fd_HandshakeInfo_account_public_key protoreflect.FieldDescriptor
+	fd_HandshakeInfo_curve              protoreflect.FieldDescriptor
 )
 
 func init() {
@@ -26,6 +27,7 @@ func init() {
 	fd_HandshakeInfo_address = md_HandshakeInfo.Fields().ByName("address")
 	fd_HandshakeInfo_peer_type = md_HandshakeInfo.Fields().ByName("peer_type")
 	fd_HandshakeInfo_public_key = md_HandshakeInfo.Fields().ByName("public_key")
+	fd_HandshakeInfo_account_public_key = md_HandshakeInfo.Fields().ByName("account_public_key")
 	fd_HandshakeInfo_curve = md_HandshakeInfo.Fields().ByName("curve")
 }
 

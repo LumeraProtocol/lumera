@@ -136,6 +136,11 @@ devnet-deploy-tar:
 
 	@echo "Created devnet-deploy.tar.gz with the required files."
 
+gen-proto:
+	@echo "Processing proto files..."
+	ignite generate proto-go --yes
+	ignite generate openapi --yes
+
 ### Testing
 unit-tests:
 	@echo "Running unit tests..."

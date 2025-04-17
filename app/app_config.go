@@ -65,6 +65,9 @@ import (
 	ibctransfertypes "github.com/cosmos/ibc-go/v8/modules/apps/transfer/types"
 	ibcexported "github.com/cosmos/ibc-go/v8/modules/core/exported"
 	"google.golang.org/protobuf/types/known/durationpb"
+	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
+	feemarkettypes "github.com/evmos/evmos/v20/x/feemarket/types"
+	erc20types "github.com/evmos/evmos/v20/x/erc20/types"
 	// this line is used by starport scaffolding # stargate/app/moduleImport
 )
 
@@ -101,6 +104,12 @@ var (
 		group.ModuleName,
 		consensustypes.ModuleName,
 		circuittypes.ModuleName,
+
+		// EVM-related modules
+		feemarkettypes.ModuleName,
+		evmtypes.ModuleName,
+		erc20types.ModuleName,
+
 		// chain modules
 		lumeraidmoduletypes.ModuleName,
 		wasmtypes.ModuleName,
@@ -130,6 +139,11 @@ var (
 		ibctransfertypes.ModuleName,
 		icatypes.ModuleName,
 		ibcfeetypes.ModuleName,
+
+		// EVM-related modules
+		feemarkettypes.ModuleName,
+		evmtypes.ModuleName,
+
 		// chain modules
 		lumeraidmoduletypes.ModuleName,
 		wasmtypes.ModuleName,
@@ -144,6 +158,11 @@ var (
 		crisistypes.ModuleName,
 		govtypes.ModuleName,
 		stakingtypes.ModuleName,
+
+		// EVM-related modules
+		feemarkettypes.ModuleName,
+		evmtypes.ModuleName,
+
 		feegrant.ModuleName,
 		group.ModuleName,
 		genutiltypes.ModuleName,
@@ -179,6 +198,8 @@ var (
 		{Account: ibctransfertypes.ModuleName, Permissions: []string{authtypes.Minter, authtypes.Burner}},
 		{Account: ibcfeetypes.ModuleName},
 		{Account: icatypes.ModuleName},
+		{Account: evmtypes.ModuleName, Permissions: []string{authtypes.Minter, authtypes.Burner}},
+		{Account: erc20types.ModuleName, Permissions: []string{authtypes.Minter, authtypes.Burner}},
 		{Account: lumeraidmoduletypes.ModuleName, Permissions: []string{authtypes.Minter, authtypes.Burner, authtypes.Staking}},
 		{Account: wasmtypes.ModuleName, Permissions: []string{authtypes.Burner}},
 		{Account: claimmoduletypes.ModuleName, Permissions: []string{authtypes.Minter, authtypes.Burner, authtypes.Staking}},

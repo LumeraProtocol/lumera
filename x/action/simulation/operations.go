@@ -83,46 +83,46 @@ func WeightedOperations(
 			weightMsgFinalizeAction, // Using the same weight for CASCADE finalization
 			SimulateMsgFinalizeActionSuccessCascade(ak, bk, k),
 		),
-		//simulation.NewWeightedOperation(
-		//	weightMsgFinalizeAction, // Using the same weight for Invalid ID finalization
-		//	SimulateMsgFinalizeActionInvalidID(ak, bk, k),
-		//),
-		//simulation.NewWeightedOperation(
-		//	weightMsgFinalizeAction, // Using the same weight for Invalid State finalization
-		//	SimulateMsgFinalizeActionInvalidState(ak, bk, k),
-		//),
-		//simulation.NewWeightedOperation(
-		//	weightMsgFinalizeAction, // Using the same weight for Unauthorized finalization
-		//	SimulateMsgFinalizeActionUnauthorized(ak, bk, k),
-		//),
-		//simulation.NewWeightedOperation(
-		//	weightMsgFinalizeAction, // Using the same weight for SenseConsensus simulation
-		//	SimulateMsgFinalizeActionSenseConsensus(ak, bk, k),
-		//),
-		//simulation.NewWeightedOperation(
-		//	weightMsgFinalizeAction, // Using the same weight for MetadataValidation simulation
-		//	SimulateMsgFinalizeActionMetadataValidation(ak, bk, k),
-		//),
-		//simulation.NewWeightedOperation(
-		//	weightMsgApproveAction,
-		//	SimulateMsgApproveActionSuccess(ak, bk, k),
-		//),
-		//simulation.NewWeightedOperation(
-		//	weightMsgApproveAction, // Using the same weight for Invalid ID approval simulation
-		//	SimulateMsgApproveActionInvalidID(ak, bk, k),
-		//),
-		//simulation.NewWeightedOperation(
-		//	weightMsgApproveAction, // Using the same weight for Invalid State approval simulation
-		//	SimulateMsgApproveActionInvalidState(ak, bk, k),
-		//),
-		//simulation.NewWeightedOperation(
-		//	weightMsgApproveAction, // Using the same weight for Unauthorized approval simulation
-		//	SimulateMsgApproveActionUnauthorized(ak, bk, k),
-		//),
-		//simulation.NewWeightedOperation(
-		//	weightActionExpirationSim, // Lower weight for state transition simulation
-		//	SimulateActionExpiration(ak, bk, k),
-		//),
+		simulation.NewWeightedOperation(
+			weightMsgFinalizeAction, // Using the same weight for Invalid ID finalization
+			SimulateMsgFinalizeActionInvalidID(ak, bk, k),
+		),
+		simulation.NewWeightedOperation(
+			weightMsgFinalizeAction, // Using the same weight for Invalid State finalization
+			SimulateMsgFinalizeActionInvalidState(ak, bk, k),
+		),
+		simulation.NewWeightedOperation(
+			weightMsgFinalizeAction, // Using the same weight for Unauthorized finalization
+			SimulateMsgFinalizeActionUnauthorized(ak, bk, k),
+		),
+		simulation.NewWeightedOperation(
+			weightMsgFinalizeAction, // Using the same weight for SenseConsensus simulation
+			SimulateMsgFinalizeActionSenseConsensus(ak, bk, k),
+		),
+		simulation.NewWeightedOperation(
+			weightMsgFinalizeAction, // Using the same weight for MetadataValidation simulation
+			SimulateMsgFinalizeActionMetadataValidation(ak, bk, k),
+		),
+		simulation.NewWeightedOperation(
+			weightMsgApproveAction,
+			SimulateMsgApproveActionSuccess(ak, bk, k),
+		),
+		simulation.NewWeightedOperation(
+			weightMsgApproveAction, // Using the same weight for Invalid ID approval simulation
+			SimulateMsgApproveActionInvalidID(ak, bk, k),
+		),
+		simulation.NewWeightedOperation(
+			weightMsgApproveAction, // Using the same weight for Invalid State approval simulation
+			SimulateMsgApproveActionInvalidState(ak, bk, k),
+		),
+		simulation.NewWeightedOperation(
+			weightMsgApproveAction, // Using the same weight for Unauthorized approval simulation
+			SimulateMsgApproveActionUnauthorized(ak, bk, k),
+		),
+		simulation.NewWeightedOperation(
+			weightActionExpirationSim, // Lower weight for state transition simulation
+			SimulateActionExpiration(ak, bk, k),
+		),
 	}
 
 	return operations

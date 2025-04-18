@@ -1,37 +1,80 @@
 package action_test
 
 import (
+	"encoding/base64"
+	"fmt"
+	supernodetypes "github.com/LumeraProtocol/lumera/x/supernode/types"
+	"strings"
 	"testing"
+	"time"
 
-	"github.com/stretchr/testify/suite"
-
-	sdk "github.com/cosmos/cosmos-sdk/types"
-
+	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
+	lumeraapp "github.com/LumeraProtocol/lumera/app"
 	actionkeeper "github.com/LumeraProtocol/lumera/x/action/keeper"
+	"github.com/LumeraProtocol/lumera/x/action/types"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
 // ActionIntegrationTestSuite is a test suite to test action module integration
 type ActionIntegrationTestSuite struct {
 	suite.Suite
 
-	ctx    sdk.Context
-	keeper actionkeeper.Keeper
+	ctx       sdk.Context
+	keeper    actionkeeper.Keeper
+	msgServer types.MsgServer
 
 	// Test accounts for simulation
 	testAddrs    []sdk.AccAddress
 	testValAddrs []sdk.ValAddress
+	privKeys     []*secp256k1.PrivKey
 }
 
 // SetupTest sets up a test suite
+
 func (suite *ActionIntegrationTestSuite) SetupTest() {
 	// Setup would normally create a test keeper and context
 	// For now we just create empty structs since we're only setting up the test structure
-	suite.ctx = sdk.Context{}
-	suite.keeper = actionkeeper.Keeper{}
+	app := lumeraapp.Setup(suite.T()) // Proper app initialization
+	ctx := app.BaseApp.NewContext(false).WithBlockHeight(1)
+
+	suite.ctx = ctx
+	suite.keeper = app.ActionKeeper
+	suite.msgServer = actionkeeper.NewMsgServerImpl(suite.keeper)
 
 	// Create test accounts
-	suite.testAddrs = createTestAddrs(5)
-	suite.testValAddrs = createTestValAddrs(5)
+	//var baseAccounts []*authtypes.BaseAccount
+	initCoins := sdk.NewCoins(sdk.NewInt64Coin("token", 1_000_000))
+
+	suite.testAddrs, suite.privKeys, _ = createTestAddAddrsWithKeys(5)
+	for i, addr := range suite.testAddrs {
+		acc := app.AccountKeeper.GetAccount(suite.ctx, addr)
+		if acc == nil {
+			account := app.AccountKeeper.NewAccountWithAddress(suite.ctx, addr)
+			baseAcc := account.(*authtypes.BaseAccount)
+			baseAcc.SetPubKey(suite.privKeys[i].PubKey())
+			app.AccountKeeper.SetAccount(suite.ctx, baseAcc)
+		}
+		require.NoError(suite.T(), app.BankKeeper.MintCoins(suite.ctx, types.ModuleName, initCoins))
+		require.NoError(suite.T(), app.BankKeeper.SendCoinsFromModuleToAccount(suite.ctx, types.ModuleName, addr, initCoins))
+	}
+
+	valAddr := sdk.ValAddress(suite.privKeys[1].PubKey().Address())
+	sn := supernodetypes.SuperNode{
+		ValidatorAddress: valAddr.String(),
+		SupernodeAccount: suite.testAddrs[1].String(),
+		Version:          "1.0.0",
+		States:           []*supernodetypes.SuperNodeStateRecord{{State: supernodetypes.SuperNodeStateActive}},
+		PrevIpAddresses:  []*supernodetypes.IPAddressHistory{{Address: "192.168.1.1"}},
+	}
+	require.NoError(suite.T(), app.SupernodeKeeper.SetSuperNode(suite.ctx, sn))
+
+	// Set default params
+	err := suite.keeper.SetParams(ctx, types.DefaultParams())
+	require.NoError(suite.T(), err)
 }
 
 // createTestAddrs creates test addresses
@@ -43,6 +86,23 @@ func createTestAddrs(numAddrs int) []sdk.AccAddress {
 		addrs[i] = sdk.AccAddress(addr)
 	}
 	return addrs
+}
+
+func createTestAddAddrsWithKeys(num int) ([]sdk.AccAddress, []*secp256k1.PrivKey, []*authtypes.BaseAccount) {
+	addrs := make([]sdk.AccAddress, num)
+	privs := make([]*secp256k1.PrivKey, num)
+	baseAccounts := make([]*authtypes.BaseAccount, num)
+
+	for i := 0; i < num; i++ {
+		priv := secp256k1.GenPrivKey()
+		pubKey := priv.PubKey()
+
+		baseAcc, _ := authtypes.NewBaseAccountWithPubKey(pubKey)
+		addrs[i] = baseAcc.GetAddress()
+		privs[i] = priv
+		baseAccounts[i] = baseAcc
+	}
+	return addrs, privs, baseAccounts
 }
 
 // createTestValAddrs creates test validator addresses
@@ -58,28 +118,133 @@ func createTestValAddrs(numAddrs int) []sdk.ValAddress {
 
 // TestActionLifecycle tests the full action lifecycle
 func (suite *ActionIntegrationTestSuite) TestActionLifecycle() {
-	// This is a placeholder test that demonstrates what a full action lifecycle test would look like
-	suite.T().Log("Action lifecycle test - placeholder")
+	txCreator := suite.testAddrs[0].String()
+	sn := suite.testAddrs[1].String() // Simulated supernode account
 
-	// In a real test, we would:
-	// 1. Create and register an action
-	// 2. Finalize the action
-	// 3. Approve the action
-	// 4. Verify each state
+	var actionID string
+	//var signatureDataPart string
+
+	suite.Run("Request Cascade Action", func() {
+		sigStr, err := createValidCascadeSignatureString(suite.privKeys[0], 1)
+		require.NoError(suite.T(), err)
+
+		//signatureDataPart = strings.Split(sigStr, ".")[0] // <-- Add this
+
+		metadata := fmt.Sprintf(`{"data_hash":"abc123","file_name":"file.txt","rq_ids_ic":1,"signatures":"%s"}`, sigStr)
+		msg := &types.MsgRequestAction{
+			Creator:        txCreator,
+			ActionType:     actionapi.ActionType_ACTION_TYPE_CASCADE.String(),
+			Metadata:       metadata,
+			Price:          "10token",
+			ExpirationTime: fmt.Sprintf("%d", time.Now().Add(10*time.Minute).Unix()),
+		}
+		res, err := suite.msgServer.RequestAction(suite.ctx, msg)
+		require.NoError(suite.T(), err)
+		actionID = res.ActionId
+		require.NotEmpty(suite.T(), actionID)
+	})
+
+	suite.Run("Finalize Cascade Action", func() {
+		sigStr, err := createValidCascadeSignatureString(suite.privKeys[0], 1)
+		require.NoError(suite.T(), err)
+
+		ids, err := generateValidCascadeIDs(sigStr, 1, 50) // pass full sigStr here
+		require.NoError(suite.T(), err)
+
+		// OTI should be a valid 12-byte base64 string
+		oti := base64.StdEncoding.EncodeToString(make([]byte, 12))
+
+		metadata := fmt.Sprintf(`{"rq_ids_ids":%s,"rq_ids_oti":"%s","rq_ids_ic":1,"rq_ids_max":50}`, toJSONStringArray(ids), oti)
+
+		msg := &types.MsgFinalizeAction{
+			ActionId:   actionID,
+			Creator:    sn,
+			ActionType: actionapi.ActionType_ACTION_TYPE_CASCADE.String(),
+			Metadata:   metadata,
+		}
+		_, err = suite.msgServer.FinalizeAction(suite.ctx, msg)
+		require.NoError(suite.T(), err)
+		action, found := suite.keeper.GetActionByID(suite.ctx, actionID)
+		require.True(suite.T(), found)
+		require.Equal(suite.T(), actionapi.ActionState_ACTION_STATE_DONE, action.State)
+	})
+
+	suite.Run("Approve Cascade Action", func() {
+		msg := &types.MsgApproveAction{
+			ActionId: actionID,
+			Creator:  txCreator,
+		}
+		_, err := suite.msgServer.ApproveAction(suite.ctx, msg)
+		require.NoError(suite.T(), err)
+		action, found := suite.keeper.GetActionByID(suite.ctx, actionID)
+		require.True(suite.T(), found)
+		require.Equal(suite.T(), actionapi.ActionState_ACTION_STATE_APPROVED, action.State)
+	})
 }
 
-// TestInvalidActionLifecycle tests various failure cases in the action lifecycle
 func (suite *ActionIntegrationTestSuite) TestInvalidActionLifecycle() {
-	// This is a placeholder test that demonstrates what invalid action tests would look like
-	suite.T().Log("Invalid action cases test - placeholder")
+	suite.Run("Missing Metadata", func() {
+		msg := &types.MsgRequestAction{
+			Creator:    suite.testAddrs[0].String(),
+			ActionType: actionapi.ActionType_ACTION_TYPE_SENSE.String(),
+			Metadata:   "",
+			Price:      "10token",
+		}
+		_, err := suite.msgServer.RequestAction(suite.ctx, msg)
+		require.Error(suite.T(), err)
+	})
 
-	// In a real test, we would:
-	// 1. Test missing metadata
-	// 2. Test unauthorized access
-	// 3. Test invalid state transitions
-	// 4. Test other edge cases
+	suite.Run("Unauthorized Approval", func() {
+		err := suite.keeper.ApproveAction(suite.ctx, "9999", suite.testAddrs[1].String())
+		require.Error(suite.T(), err)
+	})
+
+	suite.Run("Invalid State Transition", func() {
+		action := &actionapi.Action{
+			ActionID: "8888",
+			Creator:  suite.testAddrs[0].String(),
+			State:    actionapi.ActionState_ACTION_STATE_APPROVED,
+		}
+		suite.keeper.SetAction(suite.ctx, action)
+		err := suite.keeper.ApproveAction(suite.ctx, action.ActionID, action.Creator)
+		require.Error(suite.T(), err)
+	})
 }
 
 func TestActionIntegrationTestSuite(t *testing.T) {
 	suite.Run(t, new(ActionIntegrationTestSuite))
+}
+
+func createValidCascadeSignatureString(priv *secp256k1.PrivKey, ic int) (string, error) {
+	rawData := fmt.Sprintf("rqid-%d", ic)
+	dataBase64 := base64.StdEncoding.EncodeToString([]byte(rawData))
+
+	sig, err := priv.Sign([]byte(dataBase64)) // sign base64 ONCE
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s.%s",
+		dataBase64,
+		base64.StdEncoding.EncodeToString(sig),
+	), nil
+}
+
+func toJSONStringArray(values []string) string {
+	quoted := make([]string, len(values))
+	for i, v := range values {
+		quoted[i] = fmt.Sprintf(`"%s"`, v)
+	}
+	return fmt.Sprintf("[%s]", strings.Join(quoted, ","))
+}
+
+func generateValidCascadeIDs(signature string, ic, count int) ([]string, error) {
+	var ids []string
+	for i := 0; i < count; i++ {
+		id, err := actionkeeper.CreateKademliaID(signature, uint64(ic+i))
+		if err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
 }

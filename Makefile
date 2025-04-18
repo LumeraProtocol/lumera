@@ -143,8 +143,8 @@ gen-proto:
 
 ### Testing
 unit-tests:
-	@echo "Running unit tests..."
-	go test ./... -v
+	@echo "Running unit tests in x/..."
+	go test ./x/... -v
 
 integration-tests:
 	@echo "Running integration tests..."

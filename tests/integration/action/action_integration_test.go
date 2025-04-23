@@ -3,7 +3,6 @@ package action_test
 import (
 	"encoding/base64"
 	"fmt"
-	supernodetypes "github.com/LumeraProtocol/lumera/x/supernode/types"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +11,7 @@ import (
 	lumeraapp "github.com/LumeraProtocol/lumera/app"
 	actionkeeper "github.com/LumeraProtocol/lumera/x/action/keeper"
 	"github.com/LumeraProtocol/lumera/x/action/types"
+	supernodetypes "github.com/LumeraProtocol/lumera/x/supernode/types"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"

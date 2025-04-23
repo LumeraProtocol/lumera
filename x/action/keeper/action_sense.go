@@ -6,7 +6,6 @@ import (
 	"github.com/LumeraProtocol/lumera/x/action/common"
 	"google.golang.org/protobuf/encoding/protojson"
 	"reflect"
-	"slices"
 	"strings"
 
 	"cosmossdk.io/errors"
@@ -113,6 +112,10 @@ func (h SenseActionHandler) FinalizeAction(ctx sdk.Context, action *actionapi.Ac
 		"current_state", action.State.String(),
 		"previous supernodes_count", len(action.SuperNodes))
 
+	if action.GetState() == actionapi.ActionState_ACTION_STATE_PENDING {
+		action.State = actionapi.ActionState_ACTION_STATE_PROCESSING
+	}
+
 	// Verify Registration Metadata exists
 	var existingSenseMeta actionapi.SenseMetadata
 	if len(action.Metadata) > 0 {
@@ -180,133 +183,19 @@ func (h SenseActionHandler) FinalizeAction(ctx sdk.Context, action *actionapi.Ac
 			errors.Wrap(types.ErrInvalidMetadata, fmt.Sprintf("failed to verify dd_and_pf_ids: %v", err))
 	}
 
-	// 3. State management based on number of supernodes
-	// We need to track fingerprint submissions from each supernode
-	// Get existing metadata from the action's embedded metadata
-	// TODO: MAYBE for Sense too we can just require single SN Finalize request - it will include all 3 signatures anyway
-
-	// First, determine state transitions
-	if action.State == actionapi.ActionState_ACTION_STATE_PENDING {
-		// First supernode - transition to PROCESSING
-		// Initialize the map if not already present
-		if existingSenseMeta.SupernodeFingerprints == nil {
-			existingSenseMeta.SupernodeFingerprints = make(map[string]string)
-		}
-
-		// Update the map with the current values (this will be stored by the keeper)
-		existingSenseMeta.SupernodeFingerprints[superNodeAccount] = strings.Join(newSenseMeta.DdAndFingerprintsIds, "")
-
-		// Marshal the updated metadata so the keeper can store it
-		updatedMetadataBytes, err := proto.Marshal(&existingSenseMeta)
-		if err != nil {
-			return actionapi.ActionState_ACTION_STATE_UNSPECIFIED,
-				errors.Wrap(types.ErrInvalidMetadata, fmt.Sprintf("failed to marshal updated sense metadata: %v", err))
-		}
-
-		// Set the updated metadata (will be stored by the keeper)
-		action.Metadata = updatedMetadataBytes
-
-		// Return PROCESSING state to indicate state change needed
-		return actionapi.ActionState_ACTION_STATE_PROCESSING, nil
-	} else {
-		// Already processing, update the map with current supernode
-		if existingSenseMeta.SupernodeFingerprints == nil {
-			return actionapi.ActionState_ACTION_STATE_UNSPECIFIED,
-				errors.Wrap(types.ErrInvalidMetadata, "supernode_fingerprints is required in existing metadata")
-		}
-
-		// Update the map
-		existingSenseMeta.SupernodeFingerprints[superNodeAccount] = strings.Join(newSenseMeta.DdAndFingerprintsIds, "")
-
-		// Check if we have submissions from 3 different supernodes
-		if len(existingSenseMeta.SupernodeFingerprints) >= 3 {
-			// Validate that all sets match
-			if ok, badSNs := compareFingerprints(existingSenseMeta.SupernodeFingerprints); ok {
-				h.keeper.Logger().Info("All 3 supernodes have submitted matching data - finalizing Sense action",
-					"action_id", action.ActionID)
-
-				// Update signature with the latest submission
-				existingSenseMeta.Signatures = newSenseMeta.Signatures
-
-				// Clear up the map
-				for f := range existingSenseMeta.SupernodeFingerprints {
-					delete(existingSenseMeta.SupernodeFingerprints, f)
-				}
-
-				// Marshal the updated metadata
-				updatedMetadataBytes, err := proto.Marshal(&existingSenseMeta)
-				if err != nil {
-					return actionapi.ActionState_ACTION_STATE_UNSPECIFIED,
-						errors.Wrap(types.ErrInvalidMetadata, fmt.Sprintf("failed to marshal updated sense metadata: %v", err))
-				}
-
-				// Set the updated metadata (will be stored by the keeper)
-				action.Metadata = updatedMetadataBytes
-
-				// Return DONE state to indicate completion
-				return actionapi.ActionState_ACTION_STATE_DONE, nil
-			} else {
-				// TODO: add evidence processing for mismatched fingerprints
-
-				h.keeper.Logger().Error("Supernode submissions do not match",
-					"action_id", action.ActionID)
-
-				// There can be only 2 bad choices:
-				// 1. all 3 supernodes are different
-				var actionState actionapi.ActionState
-				if len(badSNs) == 3 {
-					// all is really bad
-					h.keeper.Logger().Error("All supernodes have provided different fingerprints",
-						"action_id", action.ActionID,
-						"bad_supernodes", badSNs)
-					actionState = actionapi.ActionState_ACTION_STATE_FAILED
-				} else {
-					// We still can wait for one more good SN
-					h.keeper.Logger().Info("Waiting for more supernodes to submit matching fingerprints",
-						"action_id", action.ActionID,
-						"bad_supernodes", badSNs,
-						"remaining_supernodes", len(existingSenseMeta.SupernodeFingerprints)-len(badSNs))
-					actionState = actionapi.ActionState_ACTION_STATE_PROCESSING
-
-					for i, sn := range action.SuperNodes {
-						if slices.Contains(badSNs, sn) {
-							action.SuperNodes[i] = fmt.Sprintf("%s (bad)", sn)
-						}
-					}
-				}
-
-				// Remove the bad supernodes from the map
-				for _, badSN := range badSNs {
-					delete(existingSenseMeta.SupernodeFingerprints, badSN)
-				}
-
-				// Update the metadata
-				updatedMetadataBytes, err := proto.Marshal(&existingSenseMeta)
-				if err != nil {
-					return actionapi.ActionState_ACTION_STATE_UNSPECIFIED,
-						errors.Wrap(types.ErrInvalidMetadata, fmt.Sprintf("failed to marshal updated sense metadata: %v", err))
-				}
-
-				// Set the updated metadata (will be stored by the keeper)
-				action.Metadata = updatedMetadataBytes
-
-				return actionState, nil
-			}
-		} else {
-			// Not enough supernodes yet, just update the metadata
-			updatedMetadataBytes, err := proto.Marshal(&existingSenseMeta)
-			if err != nil {
-				return actionapi.ActionState_ACTION_STATE_UNSPECIFIED,
-					errors.Wrap(types.ErrInvalidMetadata, fmt.Sprintf("failed to marshal updated sense metadata: %v", err))
-			}
-
-			// Set the updated metadata (will be stored by the keeper)
-			action.Metadata = updatedMetadataBytes
-
-			// No state change
-			return actionapi.ActionState_ACTION_STATE_PROCESSING, nil
-		}
+	existingSenseMeta.Signatures = newSenseMeta.Signatures
+	updatedMetadataBytes, err := proto.Marshal(&existingSenseMeta)
+	if err != nil {
+		return actionapi.ActionState_ACTION_STATE_UNSPECIFIED,
+			errors.Wrap(types.ErrInvalidMetadata, fmt.Sprintf("failed to marshal updated sense metadata: %v", err))
 	}
+
+	action.Metadata = updatedMetadataBytes
+	h.keeper.Logger().Info("Finalized Sense action with single supernode",
+		"action_id", action.ActionID,
+		"supernode", superNodeAccount)
+
+	return actionapi.ActionState_ACTION_STATE_DONE, nil
 }
 
 // ValidateApproval validates approval data for Sense actions

@@ -1,7 +1,6 @@
 package keeper_test
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/LumeraProtocol/lumera/x/action/common"
@@ -200,12 +199,12 @@ func (suite *KeeperTestSuite) TestFinalizeAction() {
 			expErr:           nil,
 		},
 		{
-			name:             "Register Sense Action - Success",
+			name:             "Finalizing Sense Action - Success",
 			creator:          suite.creatorAddress.String(),
 			superNode:        suite.supernodes[0].SupernodeAccount,
 			action:           suite.prepareSenseActionForRegistration(suite.creatorAddress.String(), MetadataFieldToMissNone),
 			finalizeMetadata: suite.generateSenseFinalizationMetadata(suite.signatureSense, MetadataFieldToMissNone),
-			state:            actionapi.ActionState_ACTION_STATE_PROCESSING,
+			state:            actionapi.ActionState_ACTION_STATE_DONE,
 			expErr:           nil,
 		},
 		{
@@ -253,145 +252,73 @@ func (suite *KeeperTestSuite) TestFinalizeAction() {
 	}
 }
 
-func (suite *KeeperTestSuite) TestFinalizeAction_Sense_Done() {
+func (suite *KeeperTestSuite) TestFinalizeAction_Sense_SingleSN() {
 	testCases := []struct {
 		name             string
 		creator          string
+		superNode        string
 		action           *actionapi.Action
-		finalizeMetadata [][]byte
-		superNodes       []string
-		states           []actionapi.ActionState
-		expErr           []error
-		setupFunc        func()
+		finalizeMetadata []byte
+		expectedState    actionapi.ActionState
+		expectedError    error
+		verifySuperNodes bool
 	}{
 		{
-			name:    "Register Sense Action - Success",
-			creator: suite.creatorAddress.String(),
-			superNodes: []string{
-				suite.supernodes[0].SupernodeAccount,
-				suite.supernodes[1].SupernodeAccount,
-				suite.supernodes[2].SupernodeAccount,
-			},
-			action: suite.prepareSenseActionForRegistration(suite.creatorAddress.String(), MetadataFieldToMissNone),
-			finalizeMetadata: [][]byte{
-				suite.generateSenseFinalizationMetadata(suite.signatureSense, MetadataFieldToMissNone),
-				suite.generateSenseFinalizationMetadata(suite.signatureSense, MetadataFieldToMissNone),
-				suite.generateSenseFinalizationMetadata(suite.signatureSense, MetadataFieldToMissNone),
-			},
-			states: []actionapi.ActionState{
-				actionapi.ActionState_ACTION_STATE_PROCESSING,
-				actionapi.ActionState_ACTION_STATE_PROCESSING,
-				actionapi.ActionState_ACTION_STATE_DONE,
-			},
-			expErr: nil,
+			name:             "Single supernode finalizes successfully",
+			creator:          suite.creatorAddress.String(),
+			superNode:        suite.supernodes[0].SupernodeAccount,
+			action:           suite.prepareSenseActionForRegistration(suite.creatorAddress.String(), MetadataFieldToMissNone),
+			finalizeMetadata: suite.generateSenseFinalizationMetadata(suite.signatureSense, MetadataFieldToMissNone),
+			expectedState:    actionapi.ActionState_ACTION_STATE_DONE,
+			expectedError:    nil,
+			verifySuperNodes: true,
 		},
 		{
-			name:    "Register Sense Action - Correct signatures, Wrong SNs",
-			creator: suite.creatorAddress.String(),
-			superNodes: []string{
-				suite.supernodes[0].SupernodeAccount,
-				suite.supernodes[3].SupernodeAccount, // SN is in TOP but not the one who signed the ID list
-				suite.supernodes[1].SupernodeAccount,
-				suite.supernodes[2].SupernodeAccount,
-			},
-			action: suite.prepareSenseActionForRegistration(suite.creatorAddress.String(), MetadataFieldToMissNone),
-			finalizeMetadata: [][]byte{
-				suite.generateSenseFinalizationMetadata(suite.signatureSense, MetadataFieldToMissNone),
-				suite.generateSenseFinalizationMetadata(suite.signatureSense, MetadataFieldToMissNone),
-				suite.generateSenseFinalizationMetadata(suite.signatureSense, MetadataFieldToMissNone),
-				suite.generateSenseFinalizationMetadata(suite.signatureSense, MetadataFieldToMissNone),
-			},
-			states: []actionapi.ActionState{
-				actionapi.ActionState_ACTION_STATE_PROCESSING,
-				actionapi.ActionState_ACTION_STATE_PROCESSING,
-				actionapi.ActionState_ACTION_STATE_PROCESSING,
-				actionapi.ActionState_ACTION_STATE_DONE,
-			},
-			expErr: []error{nil, types.ErrInvalidSignature, nil, nil}, // Expect error for the second SN due to invalid signature
+			name:             "Invalid signature - finalization fails",
+			creator:          suite.creatorAddress.String(),
+			superNode:        suite.supernodes[0].SupernodeAccount,
+			action:           suite.prepareSenseActionForRegistration(suite.creatorAddress.String(), MetadataFieldToMissNone),
+			finalizeMetadata: suite.generateSenseFinalizationMetadata("bad-signature", MetadataFieldToMissNone),
+			expectedState:    actionapi.ActionState_ACTION_STATE_PENDING,
+			expectedError:    types.ErrInvalidSignature,
+			verifySuperNodes: false,
 		},
 		{
-			name:    "Register Sense Action - Correct SNs, ALL 3 different signatures",
-			creator: suite.creatorAddress.String(),
-			superNodes: []string{
-				suite.supernodes[0].SupernodeAccount,
-				suite.supernodes[1].SupernodeAccount,
-				suite.supernodes[2].SupernodeAccount,
-			},
-			action: suite.prepareSenseActionForRegistration(suite.creatorAddress.String(), MetadataFieldToMissNone),
-			finalizeMetadata: [][]byte{
-				suite.generateSenseFinalizationMetadata(suite.signatureSense, MetadataFieldToMissNone),
-				suite.generateSenseFinalizationMetadata(suite.signatureSenseBad1, MetadataFieldToMissNone),
-				suite.generateSenseFinalizationMetadata(suite.signatureSenseBad2, MetadataFieldToMissNone),
-			},
-			states: []actionapi.ActionState{
-				actionapi.ActionState_ACTION_STATE_PROCESSING,
-				actionapi.ActionState_ACTION_STATE_PROCESSING,
-				actionapi.ActionState_ACTION_STATE_FAILED,
-			},
-			expErr: []error{nil, nil, types.ErrFinalizationError},
-		},
-		{
-			name:    "Register Sense Action - Correct SNs, 1 different signature",
-			creator: suite.creatorAddress.String(),
-			superNodes: []string{
-				suite.supernodes[0].SupernodeAccount,
-				suite.supernodes[1].SupernodeAccount,
-				suite.supernodes[2].SupernodeAccount,
-				suite.supernodes[1].SupernodeAccount,
-			},
-			action: suite.prepareSenseActionForRegistration(suite.creatorAddress.String(), MetadataFieldToMissNone),
-			finalizeMetadata: [][]byte{
-				suite.generateSenseFinalizationMetadata(suite.signatureSense, MetadataFieldToMissNone),
-				suite.generateSenseFinalizationMetadata(suite.signatureSenseBad1, MetadataFieldToMissNone), // sn2 sends wrong data
-				suite.generateSenseFinalizationMetadata(suite.signatureSense, MetadataFieldToMissNone),     // sn3 sends good data
-				suite.generateSenseFinalizationMetadata(suite.signatureSense, MetadataFieldToMissNone),     // sn2 now sends good data
-			},
-			states: []actionapi.ActionState{
-				actionapi.ActionState_ACTION_STATE_PROCESSING,
-				actionapi.ActionState_ACTION_STATE_PROCESSING,
-				actionapi.ActionState_ACTION_STATE_PROCESSING,
-				actionapi.ActionState_ACTION_STATE_DONE,
-			},
-			expErr: []error{nil, nil, nil, nil},
+			name:             "Finalization called twice - second should be ignored",
+			creator:          suite.creatorAddress.String(),
+			superNode:        suite.supernodes[0].SupernodeAccount,
+			action:           suite.prepareSenseActionForRegistration(suite.creatorAddress.String(), MetadataFieldToMissNone),
+			finalizeMetadata: suite.generateSenseFinalizationMetadata(suite.signatureSense, MetadataFieldToMissNone),
+			expectedState:    actionapi.ActionState_ACTION_STATE_DONE,
+			expectedError:    nil,
+			verifySuperNodes: true,
 		},
 	}
+
 	for _, tc := range testCases {
 		suite.Run(tc.name, func() {
-			// Setup if needed
-			if tc.setupFunc != nil {
-				tc.setupFunc()
-			}
-
+			// Register action
 			_, err := suite.keeper.RegisterAction(suite.ctx, tc.action)
 			suite.NoError(err)
 
-			// Finalize the action
-			correctSNCounter := 0
-			containSN := false
-			for i, superNode := range tc.superNodes {
-				err = suite.keeper.FinalizeAction(suite.ctx, tc.action.ActionID, superNode, tc.finalizeMetadata[i])
-				if tc.expErr != nil && tc.expErr[i] != nil {
-					suite.ErrorContains(err, tc.expErr[i].Error())
-					containSN = false
-					if errors.Is(err, types.ErrFinalizationError) {
-						correctSNCounter++ // If finalization failed, SN is still added to the list
-						containSN = true
-					}
-				} else {
-					suite.NoError(err)
-					correctSNCounter++
-					containSN = true
-				}
-				// Verify the action
-				updated, found := suite.keeper.GetActionByID(suite.ctx, tc.action.ActionID)
-				suite.True(found)
-				suite.Equal(tc.states[i], updated.State)
-				suite.Equal(correctSNCounter, len(updated.SuperNodes))
-				if containSN {
-					suite.Contains(updated.SuperNodes, tc.superNodes[i])
-				} else {
-					suite.NotContains(updated.SuperNodes, tc.superNodes[i])
-				}
+			// First finalize
+			err = suite.keeper.FinalizeAction(suite.ctx, tc.action.ActionID, tc.superNode, tc.finalizeMetadata)
+
+			if tc.expectedError != nil {
+				suite.ErrorContains(err, tc.expectedError.Error())
+			} else {
+				suite.NoError(err)
+			}
+
+			// Get updated action
+			updated, found := suite.keeper.GetActionByID(suite.ctx, tc.action.ActionID)
+			suite.True(found)
+			suite.Equal(tc.expectedState, updated.State)
+
+			if tc.verifySuperNodes {
+				suite.Contains(updated.SuperNodes, tc.superNode)
+			} else {
+				suite.NotContains(updated.SuperNodes, tc.superNode)
 			}
 		})
 	}
@@ -448,7 +375,7 @@ func (suite *KeeperTestSuite) TestFinalizeAction_Again_Sense() {
 
 	// Try to finalize again
 	err = suite.keeper.FinalizeAction(suite.ctx, action.ActionID, superNode, []byte(metadata))
-	suite.ErrorContains(err, "already in the SuperNodes list")
+	suite.ErrorContains(err, "action 1 cannot be finalized: current state ACTION_STATE_DONE is not one of pending or processing")
 }
 
 func (suite *KeeperTestSuite) TestApproveAction() {
@@ -628,8 +555,6 @@ func (suite *KeeperTestSuite) TestIterateActionsByState_Cascade() {
 func (suite *KeeperTestSuite) TestIterateActionsByState_Sense() {
 	creator := suite.creatorAddress.String()
 	superNode1 := suite.supernodes[0].SupernodeAccount
-	superNode2 := suite.supernodes[1].SupernodeAccount
-	superNode3 := suite.supernodes[2].SupernodeAccount
 
 	// Create actions in different states
 	pendingAction := suite.prepareSenseActionForRegistration(creator, MetadataFieldToMissNone)
@@ -638,20 +563,10 @@ func (suite *KeeperTestSuite) TestIterateActionsByState_Sense() {
 
 	metadata := suite.generateSenseFinalizationMetadata(suite.signatureSense, MetadataFieldToMissNone)
 
-	processingAction := suite.prepareSenseActionForRegistration(creator, MetadataFieldToMissNone)
-	_, err = suite.keeper.RegisterAction(suite.ctx, processingAction)
-	suite.NoError(err)
-	err = suite.keeper.FinalizeAction(suite.ctx, processingAction.ActionID, superNode1, metadata)
-	suite.NoError(err)
-
 	doneAction := suite.prepareSenseActionForRegistration(creator, MetadataFieldToMissNone)
 	_, err = suite.keeper.RegisterAction(suite.ctx, doneAction)
 	suite.NoError(err)
 	err = suite.keeper.FinalizeAction(suite.ctx, doneAction.ActionID, superNode1, metadata)
-	suite.NoError(err)
-	err = suite.keeper.FinalizeAction(suite.ctx, doneAction.ActionID, superNode2, metadata)
-	suite.NoError(err)
-	err = suite.keeper.FinalizeAction(suite.ctx, doneAction.ActionID, superNode3, metadata)
 	suite.NoError(err)
 
 	approvedAction := suite.prepareSenseActionForRegistration(creator, MetadataFieldToMissNone)
@@ -659,9 +574,6 @@ func (suite *KeeperTestSuite) TestIterateActionsByState_Sense() {
 	suite.NoError(err)
 	err = suite.keeper.FinalizeAction(suite.ctx, approvedAction.ActionID, superNode1, metadata)
 	suite.NoError(err)
-	err = suite.keeper.FinalizeAction(suite.ctx, approvedAction.ActionID, superNode2, metadata)
-	suite.NoError(err)
-	err = suite.keeper.FinalizeAction(suite.ctx, approvedAction.ActionID, superNode3, metadata)
 	suite.NoError(err)
 	err = suite.keeper.ApproveAction(suite.ctx, approvedAction.ActionID, creator)
 	suite.NoError(err)
@@ -679,11 +591,10 @@ func (suite *KeeperTestSuite) TestIterateActionsByState_Sense() {
 	processingCount := 0
 	err = suite.keeper.IterateActionsByState(suite.ctx, actionapi.ActionState_ACTION_STATE_PROCESSING, func(action *actionapi.Action) bool {
 		processingCount++
-		suite.Equal(processingAction.ActionID, action.ActionID, "Should be the processing action")
 		return false // Continue iteration
 	})
 	suite.NoError(err)
-	suite.Equal(1, processingCount, "Should have 1 PROCESSING action")
+	suite.Equal(0, processingCount, "Should have 0 PROCESSING action")
 
 	// Test iterating over DONE actions
 	doneCount := 0

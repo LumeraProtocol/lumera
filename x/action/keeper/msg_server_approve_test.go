@@ -41,9 +41,6 @@ func (suite *MsgServerTestSuite) TestMsgApproveActionErrors() {
 
 	actionIDPending := suite.registerCascadeAction()
 
-	actionIDProcessing := suite.registerSenseAction()
-	suite.finalizeSenseAction(actionIDProcessing, suite.supernodes[0].SupernodeAccount, actionapi.ActionState_ACTION_STATE_PROCESSING)
-
 	testCases := []struct {
 		name          string
 		creator       string
@@ -67,12 +64,6 @@ func (suite *MsgServerTestSuite) TestMsgApproveActionErrors() {
 			name:          "Action not in DONE state - Pending",
 			creator:       suite.creatorAddress.String(),
 			actionId:      actionIDPending,
-			errorContains: "cannot be approved",
-		},
-		{
-			name:          "Action not in DONE state - Processing",
-			creator:       suite.creatorAddress.String(),
-			actionId:      actionIDProcessing,
 			errorContains: "cannot be approved",
 		},
 		{

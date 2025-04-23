@@ -651,7 +651,6 @@ func (k *Keeper) DistributeFees(ctx sdk.Context, actionID string) error {
 }
 
 // CheckExpiration checks for expired actions in PENDING and PROCESSING states
-// TODO: This is meant to be called in EndBlocker
 func (k *Keeper) CheckExpiration(ctx sdk.Context) {
 	currentTime := ctx.BlockTime().Unix()
 	expiredCount := 0

@@ -122,41 +122,21 @@ func finalizeSenseAction(ctx sdk.Context, k keeper.Keeper, bk types.BankKeeper, 
 	// Create finalization metadata with signature
 	metadata := generateFinalizeMetadataForSense(ctx, k, actionID, supernodes)
 
-	for i, supernode := range supernodes {
-		// Get supernode's initial balance to verify no fee distribution
-		feeDenom := k.GetParams(ctx).BaseActionFee.Denom
-		initialBalance := bk.GetBalance(ctx, supernode.Address, feeDenom)
+	// Get supernode's initial balance to verify no fee distribution
+	feeDenom := k.GetParams(ctx).BaseActionFee.Denom
+	initialBalance := bk.GetBalance(ctx, supernodes[0].Address, feeDenom)
 
-		// Create and submit finalization message
-		msg := types.NewMsgFinalizeAction(
-			supernode.Address.String(),
-			actionID,
-			actionapi.ActionType_ACTION_TYPE_SENSE.String(),
-			metadata,
-		)
+	// Create and submit finalization message
+	msg := types.NewMsgFinalizeAction(
+		supernodes[0].Address.String(),
+		actionID,
+		actionapi.ActionType_ACTION_TYPE_SENSE.String(),
+		metadata,
+	)
 
-		_, err := msgServSim.FinalizeAction(ctx, msg)
-		if err != nil {
-			panic(fmt.Sprintf("failed to finalize SENSE action %s with supernode %d: %v", actionID, i+1, err))
-		}
-
-		updatedAction, found := k.GetActionByID(ctx, actionID)
-		if !found {
-			panic(fmt.Sprintf("action with ID %s not found after finalization", actionID))
-		}
-
-		if i < 2 && updatedAction.State != actionapi.ActionState_ACTION_STATE_PROCESSING {
-			panic(fmt.Sprintf("action %s not in PROCESSING state after %d FinalizeAction: %s", actionID, i+1, updatedAction.State))
-		}
-
-		if i < 2 {
-			finalBalance := bk.GetBalance(ctx, supernode.Address, feeDenom)
-			if !finalBalance.Equal(initialBalance) {
-				panic(fmt.Sprintf("supernode %d balance changed after %d FinalizeAction, expected no fee distribution", i+1, i+1))
-			}
-		}
-
-		finalMsg = msg
+	_, err := msgServSim.FinalizeAction(ctx, msg)
+	if err != nil {
+		panic(fmt.Sprintf("failed to finalize SENSE action %s with supernode %s: %v", actionID, supernodes[0].Address.String(), err))
 	}
 
 	// 4. Verify action is in DONE state
@@ -167,6 +147,11 @@ func finalizeSenseAction(ctx sdk.Context, k keeper.Keeper, bk types.BankKeeper, 
 
 	if finalAction.State != actionapi.ActionState_ACTION_STATE_DONE {
 		panic(fmt.Sprintf("action %s not in DONE state after finalization: %s", actionID, finalAction.State))
+	}
+
+	finalBalance := bk.GetBalance(ctx, supernodes[0].Address, feeDenom)
+	if !finalBalance.Equal(initialBalance) {
+		panic(fmt.Sprintf("supernode %s balance changed after FinalizeAction, expected no fee distribution", supernodes[0].Address.String()))
 	}
 
 	return finalMsg

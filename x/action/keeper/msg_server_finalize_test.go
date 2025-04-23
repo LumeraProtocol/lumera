@@ -29,9 +29,7 @@ func (suite *MsgServerTestSuite) TestMsgFinalizeActionSense() {
 	suite.ctx = suite.ctx.WithEventManager(sdk.NewEventManager())
 
 	actionID := suite.registerSenseAction()
-	suite.finalizeSenseAction(actionID, suite.supernodes[0].SupernodeAccount, actionapi.ActionState_ACTION_STATE_PROCESSING)
-	suite.finalizeSenseAction(actionID, suite.supernodes[1].SupernodeAccount, actionapi.ActionState_ACTION_STATE_PROCESSING)
-	suite.finalizeSenseAction(actionID, suite.supernodes[2].SupernodeAccount, actionapi.ActionState_ACTION_STATE_DONE)
+	suite.finalizeSenseAction(actionID, suite.supernodes[0].SupernodeAccount, actionapi.ActionState_ACTION_STATE_DONE)
 
 	// Verify events were emitted
 	events := suite.ctx.EventManager().Events()

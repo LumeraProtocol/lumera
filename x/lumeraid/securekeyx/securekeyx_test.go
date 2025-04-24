@@ -1,12 +1,15 @@
 package securekeyx
 
 import (
+	"bytes"
 	"crypto/ecdh"
 	"crypto/rand"
 	"errors"
 	"testing"
 
-	"github.com/cosmos/cosmos-sdk/types"
+	//	"github.com/cometbft/cometbft/abci/server"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	proto "github.com/cosmos/gogoproto/proto"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -25,9 +28,9 @@ func TestCreateRequest(t *testing.T) {
 	kr := accounts.CreateTestKeyring()
 
 	// Create test accounts
-	addresses := accounts.SetupTestAccounts(t, kr, []string{"test-client", "test-server"})
-	localAddress := addresses[0]
-	remoteAddress := addresses[1]
+	testAccounts := accounts.SetupTestAccounts(t, kr, []string{"test-client", "test-server"})
+	localAddress := testAccounts[0].Address
+	remoteAddress := testAccounts[1].Address
 
 	peerType := Simplenode
 	curve := ecdh.P256()
@@ -51,18 +54,33 @@ func TestCreateRequest_SignWithKeyringFails(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockKeyring := mocks.NewMockKeyring(ctrl)
-	mockKeyring.EXPECT().KeyByAddress(gomock.Any()).Return(nil, nil)
+	// Use real keyring to generate a valid test account
+	kr := accounts.CreateTestKeyring()
+	testAccounts := accounts.SetupTestAccounts(t, kr, []string{"test-client"})
+	clientAccount := testAccounts[0]
 
-	ske, err := NewSecureKeyExchange(mockKeyring, accounts.TestAddress1, Simplenode, nil)
+	keyInfo, err := kr.Key(clientAccount.Name)
 	require.NoError(t, err)
 
+	accAddr, err := sdk.AccAddressFromBech32(clientAccount.Address)
+	require.NoError(t, err)
+
+	mockKeyring := mocks.NewMockKeyring(ctrl)
+	mockKeyring.EXPECT().
+		KeyByAddress(accAddr).
+		Return(keyInfo, nil).
+		Times(2)
 	// Simulate signing failure
-	mockKeyring.EXPECT().SignByAddress(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil, errors.New("failed to sign handshake info"))
+	mockKeyring.EXPECT().
+		SignByAddress(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil, nil, errors.New("simulated sign failure"))
+
+	ske, err := NewSecureKeyExchange(mockKeyring, clientAccount.Address, Simplenode, nil)
+	require.NoError(t, err)
 
 	_, _, err = ske.CreateRequest(accounts.TestAddress2)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to sign handshake info")
+	assert.Contains(t, err.Error(), "simulated sign failure")
 }
 
 func TestGetCurveName(t *testing.T) {
@@ -84,10 +102,8 @@ func TestGetCurveName(t *testing.T) {
 
 func TestNewSecureKeyExchange(t *testing.T) {
 	kr := accounts.CreateTestKeyring()
-	accountNames := []string{"test-client"}
-	addresses := accounts.SetupTestAccounts(t, kr, accountNames)
-	require.Len(t, addresses, 1)
-	localAddress := addresses[0]
+	testAccounts := accounts.SetupTestAccounts(t, kr, []string{"test-client"})
+	localAddress := testAccounts[0].Address
 	curve := ecdh.P256()
 
 	ske, err := NewSecureKeyExchange(kr, localAddress, Simplenode, curve)
@@ -111,7 +127,7 @@ func TestNewSecureKeyExchange_InvalidAddress(t *testing.T) {
 func TestNewSecureKeyExchange_MissingKeyInKeyring(t *testing.T) {
 	kr := accounts.CreateTestKeyring()
 	// Generate a valid Bech32 formatted address that isn't in the keyring
-	validAddress, err := types.AccAddressFromBech32(accounts.TestAddress1)
+	validAddress, err := sdk.AccAddressFromBech32(accounts.TestAddress1)
 	require.NoError(t, err)
 	curve := ecdh.P256()
 
@@ -123,10 +139,8 @@ func TestNewSecureKeyExchange_MissingKeyInKeyring(t *testing.T) {
 
 func TestNewSecureKeyExchange_DefaultCurve(t *testing.T) {
 	kr := accounts.CreateTestKeyring()
-	accountNames := []string{"test-client"}
-	addresses := accounts.SetupTestAccounts(t, kr, accountNames)
-	require.Len(t, addresses, 1)
-	localAddress := addresses[0]
+	testAccounts := accounts.SetupTestAccounts(t, kr, []string{"test-client"})
+	localAddress := testAccounts[0].Address
 
 	ske, err := NewSecureKeyExchange(kr, localAddress, Simplenode, nil)
 	require.NoError(t, err)
@@ -135,59 +149,46 @@ func TestNewSecureKeyExchange_DefaultCurve(t *testing.T) {
 
 func TestValidateSignature(t *testing.T) {
 	kr := accounts.CreateTestKeyring()
-	accountNames := []string{"test-client"}
-	addresses := accounts.SetupTestAccounts(t, kr, accountNames)
-	require.Len(t, addresses, 1)
-	localAddress := addresses[0]
+	testAccounts := accounts.SetupTestAccounts(t, kr, []string{"test-client"})
+	localAddress := testAccounts[0].Address
 	curve := ecdh.P256()
+
 	ske, err := NewSecureKeyExchange(kr, localAddress, Simplenode, curve)
 	require.NoError(t, err)
 
 	validData := []byte("valid-data")
 	validSignature, _ := ske.signWithKeyring(validData)
 
-	isValid, err := ske.validateSignature(localAddress, validData, validSignature)
+	isValid, err := ske.validateSignature(testAccounts[0].PubKey, validData, validSignature)
 	assert.NoError(t, err)
 	assert.True(t, isValid)
 
 	invalidSignature := []byte("invalid-signature")
-	isValid, err = ske.validateSignature(localAddress, validData, invalidSignature)
+	isValid, err = ske.validateSignature(testAccounts[0].PubKey, validData, invalidSignature)
 	assert.Error(t, err)
 	assert.False(t, isValid)
 }
 
 func TestValidateSignature_InvalidAddress(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	ske := &SecureKeyExchange{}
 
-	mockKeyring := mocks.NewMockKeyring(ctrl)
-	ske := &SecureKeyExchange{keyring: mockKeyring}
-
-	invalidAddress := "invalid-address"
 	validData := []byte("valid-data")
 	validSignature := []byte("valid-signature")
 
-	isValid, err := ske.validateSignature(invalidAddress, validData, validSignature)
+	// Test with nil pubkey
+	isValid, err := ske.validateSignature(nil, validData, validSignature)
 	assert.Error(t, err)
 	assert.False(t, isValid)
-	assert.Contains(t, err.Error(), "invalid address")
-}
+	assert.Contains(t, err.Error(), "public key is nil")
 
-func TestValidateSignature_KeyByAddressFails(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	// Test with an invalid pubkey that doesn't verify the signature
+	var wrongPubKey secp256k1.PubKey
+	copy(wrongPubKey.Key[:], bytes.Repeat([]byte{0x01}, 32)) // invalid or wrong key
 
-	mockKeyring := mocks.NewMockKeyring(ctrl)
-	validData := []byte("valid-data")
-	validSignature := []byte("valid-signature")
-
-	mockKeyring.EXPECT().KeyByAddress(gomock.Any()).Return(nil, errors.New("key not found"))
-
-	ske := &SecureKeyExchange{keyring: mockKeyring}
-	isValid, err := ske.validateSignature(accounts.TestAddress1, validData, validSignature)
+	isValid, err = ske.validateSignature(&wrongPubKey, validData, validSignature)
 	assert.Error(t, err)
 	assert.False(t, isValid)
-	assert.Contains(t, err.Error(), "address not found in keyring")
+	assert.Contains(t, err.Error(), "invalid signature")
 }
 
 func TestComputeSharedSecret_CurveNotSet(t *testing.T) {
@@ -212,73 +213,107 @@ func TestComputeSharedSecret_InvalidHandshakeBytes(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to deserialize handshake info")
 }
 
-func createValidHandshake(t *testing.T, ske *SecureKeyExchange) []byte {
+type createHandshakeType int
+
+// createHandshake enum
+const (
+	hsValid createHandshakeType = iota
+	hsMissingEphemeralKey
+	hsNilAccountPublicKey
+	hsInvalidAccountPublicKey
+	hsOtherAccountPublicKey
+)
+
+func createTestHandshake(t *testing.T, ske *SecureKeyExchange, remoteAddress string, remoteAccount accounts.TestAccount, hsType createHandshakeType) []byte {
 	privKey, err := ske.curve.GenerateKey(rand.Reader)
 	require.NoError(t, err)
-	ske.ephemeralKeys[ske.LocalAddress()] = privKey
+	if hsType != hsMissingEphemeralKey {
+		ske.ephemeralKeys[remoteAddress] = privKey
+	}
+
+	var accountPubKey []byte
+	switch hsType {
+	case hsValid, hsMissingEphemeralKey, hsOtherAccountPublicKey:
+		accountPubKey, err = ske.codec.MarshalInterface(remoteAccount.PubKey)
+		require.NoError(t, err)
+	case hsNilAccountPublicKey:
+		accountPubKey = nil
+	case hsInvalidAccountPublicKey:
+		accountPubKey = []byte("invalid-account-public-key")
+	}
 
 	handshakeInfo := &lumeraidtypes.HandshakeInfo{
-		Address:   ske.LocalAddress(),
-		PeerType:  int32(ske.PeerType()),
-		PublicKey: privKey.PublicKey().Bytes(),
-		Curve:     ske.getCurveName(),
+		Address:          remoteAddress,
+		PeerType:         int32(Supernode),
+		PublicKey:        privKey.PublicKey().Bytes(),
+		AccountPublicKey: accountPubKey,
+		Curve:            ske.getCurveName(),
 	}
 	handshakeBytes, err := proto.Marshal(handshakeInfo)
 	require.NoError(t, err)
 	return handshakeBytes
 }
 
-func TestComputeSharedSecret_EphemeralKeyNotFound(t *testing.T) {
+func TestComputeSharedSecret_Failure(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockKeyring := mocks.NewMockKeyring(ctrl)
-	mockKeyring.EXPECT().KeyByAddress(gomock.Any()).Return(nil, nil)
+	testCases := []struct {
+		name    string
+		hsType  createHandshakeType
+		wantErr string
+	}{
+		{"MissingEphemeralKey", hsMissingEphemeralKey, "ephemeral private key not found for address"},
+		{"NilAccountPubKey", hsNilAccountPublicKey, "account public key is nil"},
+		{"InvalidAccountPubKey", hsInvalidAccountPublicKey, "failed to unmarshal remote account's public key"},
+		{"OtherAccountPubKey", hsOtherAccountPublicKey, "address mismatch"},
+		{"InvalidSignature", hsValid, "signature validation failed"},
+	}
 
-	ske, err := NewSecureKeyExchange(mockKeyring, accounts.TestAddress1, Simplenode, nil)
-	require.NoError(t, err)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			clientKr := accounts.CreateTestKeyring()
+			testClientAccounts := accounts.SetupTestAccounts(t, clientKr, []string{"test-client"})
 
-	handshakeBytes := createValidHandshake(t, ske)
-	delete(ske.ephemeralKeys, ske.LocalAddress())
+			serverKr := accounts.CreateTestKeyring()
+			testServerAccounts := accounts.SetupTestAccounts(t, serverKr, []string{"test-server", "test-other-server"})
 
-	_, err = ske.ComputeSharedSecret(handshakeBytes, []byte("signature"))
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "ephemeral private key not found for address")
-}
+			ske, err := NewSecureKeyExchange(clientKr, testClientAccounts[0].Address, Simplenode, nil)
+			require.NoError(t, err)
 
-func TestComputeSharedSecret_ValidateSignatureFails(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+			remoteAddress := testServerAccounts[0].Address
+			var remoteAccount accounts.TestAccount
+			if tc.hsType == hsOtherAccountPublicKey {
+				remoteAccount = testServerAccounts[1]
+			} else {
+				remoteAccount = testServerAccounts[0]
+			}
 
-	mockKeyring := mocks.NewMockKeyring(ctrl)
-	mockKeyring.EXPECT().KeyByAddress(gomock.Any()).Return(nil, nil)
-
-	ske, err := NewSecureKeyExchange(mockKeyring, accounts.TestAddress1, Simplenode, nil)
-	require.NoError(t, err)
-
-	mockKeyring.EXPECT().KeyByAddress(gomock.Any()).Return(nil, errors.New("failed to validate signature"))
-
-	handshakeBytes := createValidHandshake(t, ske)
-	_, err = ske.ComputeSharedSecret(handshakeBytes, []byte("signature"))
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "signature validation failed")
+			handshakeBytes := createTestHandshake(t, ske, remoteAddress, remoteAccount, tc.hsType)
+			_, err = ske.ComputeSharedSecret(handshakeBytes, []byte("signature"))
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), tc.wantErr)
+		})
+	}
 }
 
 func TestComputeSharedSecret(t *testing.T) {
 	kr := accounts.CreateTestKeyring()
-	accountNames := []string{"test-client", "test-server"}
-	addresses := accounts.SetupTestAccounts(t, kr, accountNames)
+	testAccounts := accounts.SetupTestAccounts(t, kr, []string{"test-client", "test-server"})
 
-	skeLocal, err := NewSecureKeyExchange(kr, addresses[0], Simplenode, nil)
+	clientAddress := testAccounts[0].Address
+	serverAddress := testAccounts[1].Address
+
+	skeLocal, err := NewSecureKeyExchange(kr, clientAddress, Simplenode, nil)
 	require.NoError(t, err)
 
-	skeRemote, err := NewSecureKeyExchange(kr, addresses[1], Supernode, nil)
+	skeRemote, err := NewSecureKeyExchange(kr, serverAddress, Supernode, nil)
 	require.NoError(t, err)
 
-	_, _, err = skeLocal.CreateRequest(addresses[1])
+	_, _, err = skeLocal.CreateRequest(serverAddress)
 	require.NoError(t, err)
 
-	handshakeRemoteBytes, signatureRemote, err := skeRemote.CreateRequest(addresses[0])
+	handshakeRemoteBytes, signatureRemote, err := skeRemote.CreateRequest(clientAddress)
 	require.NoError(t, err)
 
 	sharedSecret, err := skeLocal.ComputeSharedSecret(handshakeRemoteBytes, signatureRemote)

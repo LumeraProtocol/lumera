@@ -16,10 +16,10 @@ import (
 // TestGenerateLegRoastKeySeed tests the GenerateLegRoastKeySeed function
 func TestGenerateLegRoastKeySeed(t *testing.T) {
 	kr := accounts.CreateTestKeyring()
-	addresses := accounts.SetupTestAccounts(t, kr, []string{"test-account"})
+	testAccounts := accounts.SetupTestAccounts(t, kr, []string{"test-account"})
 
 	// Generate a seed for the LegRoast key generation from address
-	seed, err := GenerateLegRoastKeySeed(addresses[0], kr)
+	seed, err := GenerateLegRoastKeySeed(testAccounts[0].Address, kr)
 	require.NoError(t, err, "GenerateLegRoastKeySeed should not return an error")
 	require.NotNil(t, seed, "Seed should not be nil")
 	require.Equal(t, 16, len(seed), "Seed length should be 16")
@@ -51,12 +51,12 @@ func TestSignAndVerify(t *testing.T) {
 	}
 
 	kr := accounts.CreateTestKeyring()
-	addresses := accounts.SetupTestAccounts(t, kr, []string{"test-account"})
+	testAccounts := accounts.SetupTestAccounts(t, kr, []string{"test-account"})
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Sign and Verify
-			signature, pubkey, err := Sign(addresses[0], kr, []byte(tt.message), tt.algorithm)
+			signature, pubkey, err := Sign(testAccounts[0].Address, kr, []byte(tt.message), tt.algorithm)
 			require.NoError(t, err, "Sign should not return an error")
 			require.NotNil(t, signature, "Signature should not be nil")
 			require.NotNil(t, pubkey, "Public key should not be nil")
@@ -79,20 +79,19 @@ func TestSignInvalidAddress(t *testing.T) {
 
 func TestSignKeyRingNotSet(t *testing.T) {
 	kr := accounts.CreateTestKeyring()
-	accountName := "test-account"
-	addresses := accounts.SetupTestAccounts(t, kr, []string{accountName})
+	testAccounts := accounts.SetupTestAccounts(t, kr, []string{"test-account"})
 
 	// Call the function with a nil keyring
-	_, _, err := Sign(addresses[0], nil, []byte("test message"), LegendreMiddle)
+	_, _, err := Sign(testAccounts[0].Address, nil, []byte("test message"), LegendreMiddle)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "keyring is not set")
 
 	// remove address from keyring
-	err = kr.Delete(accountName)
+	err = kr.Delete(testAccounts[0].Name)
 	require.NoError(t, err)
 
 	// Call the function with a keyring that does not contain the address
-	_, _, err = Sign(addresses[0], kr, []byte("test message"), LegendreMiddle)
+	_, _, err = Sign(testAccounts[0].Address, kr, []byte("test message"), LegendreMiddle)
 	require.Error(t, err)
 }
 

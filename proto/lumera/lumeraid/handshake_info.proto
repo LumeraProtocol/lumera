@@ -6,8 +6,9 @@ option go_package = "github.com/LumeraProtocol/lumera/x/lumeraid/types";
 
 // HandshakeInfo message
 message HandshakeInfo {
-    string address = 1;        // Cosmos account address
-    int32 peer_type = 2;       // Peer type (0 = Simplenode, 1 = Supernode)
-    bytes public_key = 3;      // ephemeral public key
-    string curve = 4;          // Curve type (e.g., P256, P384, P521)
+    string address = 1;           // Cosmos account address
+    int32 peer_type = 2;          // Peer type (0 = Simplenode, 1 = Supernode)
+    bytes public_key = 3;         // ephemeral public key
+    bytes account_public_key = 4; // Cosmos account public key
+    string curve = 5;             // Curve type (e.g., P256, P384, P521)
 }

@@ -8,8 +8,12 @@ import (
 	"fmt"
 	"sync"
 
+	sdkcodec "github.com/cosmos/cosmos-sdk/codec"
+	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
+	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
-	"github.com/cosmos/cosmos-sdk/types"
+	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	signingtypes "github.com/cosmos/cosmos-sdk/types/tx/signing"
 	proto "github.com/cosmos/gogoproto/proto"
 
@@ -36,13 +40,14 @@ type KeyExchanger interface {
 }
 
 type SecureKeyExchange struct {
-	keyring    keyring.Keyring  // keyring to access Cosmos accounts
-	accAddress types.AccAddress // local Cosmos address
-	peerType   PeerType         // local peer type (Simplenode or Supernode)
-	curve      ecdh.Curve       // curve used for ECDH key exchange
+	keyring    keyring.Keyring // keyring to access Cosmos accounts
+	accAddress sdk.AccAddress  // local Cosmos address
+	peerType   PeerType        // local peer type (Simplenode or Supernode)
+	curve      ecdh.Curve      // curve used for ECDH key exchange
 
 	mutex         sync.Mutex                  // mutex to protect ephemeralKeys
 	ephemeralKeys map[string]*ecdh.PrivateKey // map of [remote_address -> ephemeral private keys]
+	codec         *sdkcodec.ProtoCodec        // codec for serialization/deserialization
 }
 
 /*
@@ -89,7 +94,7 @@ func validateSupernode(address string, isLocal bool) (bool, error) {
 //   - SecureKeyExchange: the instance of SecureKeyExchange
 //   - error: if any error occurs
 func NewSecureKeyExchange(kr keyring.Keyring, localAddress string, localPeerType PeerType, curve ecdh.Curve) (*SecureKeyExchange, error) {
-	accAddress, err := types.AccAddressFromBech32(localAddress)
+	accAddress, err := sdk.AccAddressFromBech32(localAddress)
 	if err != nil {
 		return nil, fmt.Errorf("invalid address: %w", err)
 	}
@@ -108,12 +113,17 @@ func NewSecureKeyExchange(kr keyring.Keyring, localAddress string, localPeerType
 		}
 	}
 
+	interfaceRegistry := codectypes.NewInterfaceRegistry()
+	cryptocodec.RegisterInterfaces(interfaceRegistry)
+	protoCodec := sdkcodec.NewProtoCodec(interfaceRegistry)
+
 	return &SecureKeyExchange{
 		keyring:       kr,
 		accAddress:    accAddress,
 		peerType:      localPeerType,
 		curve:         curve,
 		ephemeralKeys: make(map[string]*ecdh.PrivateKey),
+		codec:         protoCodec,
 	}, nil
 }
 
@@ -130,27 +140,16 @@ func (s *SecureKeyExchange) signWithKeyring(data []byte) ([]byte, error) {
 // Helper to validate signature received from remote peer.
 //
 // Parameters:
-//   - address: the Cosmos address of the remote peer
+//   - pubKey: public key of the remote peer's Cosmos account
 //   - data: the data to be verified
 //   - signature: signature
 //
 // Returns:
 //   - true if the signature is valid
 //   - error if any
-func (s *SecureKeyExchange) validateSignature(address string, data, signature []byte) (bool, error) {
-	addr, err := types.AccAddressFromBech32(address)
-	if err != nil {
-		return false, fmt.Errorf("invalid address: %w", err)
-	}
-
-	keyInfo, err := s.keyring.KeyByAddress(addr)
-	if err != nil {
-		return false, fmt.Errorf("address not found in keyring: %w", err)
-	}
-
-	pubKey, err := keyInfo.GetPubKey()
-	if err != nil {
-		return false, fmt.Errorf("failed to get public key: %w", err)
+func (s *SecureKeyExchange) validateSignature(pubKey cryptotypes.PubKey, data, signature []byte) (bool, error) {
+	if pubKey == nil {
+		return false, fmt.Errorf("public key is nil")
 	}
 
 	if !pubKey.VerifySignature(data, signature) {
@@ -167,6 +166,22 @@ func (s *SecureKeyExchange) PeerType() PeerType {
 // LocalAddress returns the local address
 func (s *SecureKeyExchange) LocalAddress() string {
 	return s.accAddress.String()
+}
+
+func (s *SecureKeyExchange) getLocalPubKey() (cryptotypes.PubKey, error) {
+	cryptoLocalAddr := sdk.AccAddress(s.accAddress)
+	// Get public key for the local Cosmos account
+	keyInfo, err := s.keyring.KeyByAddress(cryptoLocalAddr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get key info for local address: %w", err)
+	}
+
+	pubKey, err := keyInfo.GetPubKey()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get public key for local address: %w", err)
+	}
+
+	return pubKey, nil
 }
 
 // CreateRequest generates handshake info and signs it with the local address.
@@ -194,12 +209,24 @@ func (s *SecureKeyExchange) CreateRequest(remoteAddress string) ([]byte, []byte,
 	s.ephemeralKeys[remoteAddress] = privKey
 	s.mutex.Unlock()
 
+	// Get public key for the local Cosmos account
+	accountPubKey, err := s.getLocalPubKey()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	accountPubKeyBytes, err := s.codec.MarshalInterface(accountPubKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to marshal local account public key: %w", err)
+	}
+
 	// Create handshake info
 	handshakeInfo := &lumeraidtypes.HandshakeInfo{
-		Address:   s.LocalAddress(),
-		PeerType:  int32(s.peerType),
-		PublicKey: privKey.PublicKey().Bytes(),
-		Curve:     s.getCurveName(),
+		Address:          s.LocalAddress(),
+		PeerType:         int32(s.peerType),
+		PublicKey:        privKey.PublicKey().Bytes(),
+		AccountPublicKey: accountPubKeyBytes,
+		Curve:            s.getCurveName(),
 	}
 
 	// Serialize HandshakeInfo
@@ -250,9 +277,23 @@ func (s *SecureKeyExchange) ComputeSharedSecret(handshakeBytes, signature []byte
 		return nil, fmt.Errorf("ephemeral private key not found for address: %s", handshake.Address)
 	}
 
+	if handshake.AccountPublicKey == nil {
+		return nil, fmt.Errorf("account public key is nil")
+	}
+
+	var accountPubKey cryptotypes.PubKey
+	if err := s.codec.UnmarshalInterface(handshake.AccountPublicKey, &accountPubKey); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal remote account's public key: %w", err)
+	}
+
+	derivedAddr := sdk.AccAddress(accountPubKey.Address()).String()
+	if derivedAddr != handshake.Address {
+		return nil, fmt.Errorf("address mismatch: expected %s, got %s", derivedAddr, handshake.Address)
+	}
+
 	// Validate signature for the handshake info from the remote peer
-	isValid, err := s.validateSignature(handshake.Address, handshakeBytes, signature)
-	if !isValid {
+	isValid, err := s.validateSignature(accountPubKey, handshakeBytes, signature)
+	if err != nil || !isValid {
 		return nil, fmt.Errorf("signature validation failed: %w", err)
 	}
 

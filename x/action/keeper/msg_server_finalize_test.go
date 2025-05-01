@@ -96,16 +96,6 @@ func (suite *MsgServerTestSuite) TestMsgFinalizeActionCascadeErrors() {
 			errorContains: "invalid metadata",
 		},
 		{
-			name:          "Missing required metadata fields - RQ_OTI",
-			actionId:      actionID,
-			actionType:    "CASCADE",
-			superNode:     suite.supernodes[0].SupernodeAccount,
-			badMetadata:   "",
-			badIDsOti:     true,
-			badIDs:        false,
-			errorContains: "invalid metadata",
-		},
-		{
 			name:          "Missing required metadata fields - IDs",
 			actionId:      actionID,
 			actionType:    "CASCADE",

@@ -247,14 +247,8 @@ func (suite *KeeperTestSuite) generateCascadeFinalizationMetadata(missing Metada
 		}
 	}
 
-	var rqOti []byte
-	if missing != MetadataFieldToMissRqOti {
-		rqOti = make([]byte, 12)
-	}
-
 	senseMetadata := &actionapi.CascadeMetadata{
 		RqIdsIds: validIDs,
-		RqIdsOti: rqOti,
 	}
 
 	// Marshal metadata to bytes

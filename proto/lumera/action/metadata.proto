@@ -39,7 +39,7 @@ message SenseMetadata {
 // Keeper will add:
 //   - rq_ids_max (from module params)
 // For FinalizeAction:
-//   - Required: rq_ids_ids, rq_ids_oti
+//   - Required: rq_ids_ids
 message CascadeMetadata {
   // RequestAction required fields
   string data_hash = 1 [json_name = "data_hash"];
@@ -51,9 +51,7 @@ message CascadeMetadata {
   
   // FinalizeAction fields
   repeated string rq_ids_ids = 5 [json_name = "rq_ids_ids", (gogoproto.nullable) = true];
-  bytes rq_ids_oti = 6 [json_name = "rq_ids_oti", (gogoproto.nullable) = true];
-
   // RequestAction required field
-  string signatures = 7 [json_name = "signatures"];
+  string signatures = 6 [json_name = "signatures"];
 }
 

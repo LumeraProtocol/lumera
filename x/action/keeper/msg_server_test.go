@@ -207,7 +207,6 @@ func (suite *MsgServerTestSuite) finalizeCascadeAction(actionID string) {
 
 	finalizeMetadata := actionapi.CascadeMetadata{
 		RqIdsIds: validIDs,
-		RqIdsOti: make([]byte, 12),
 	}
 
 	finalizeMetadataBytes, err := protojson.Marshal(&finalizeMetadata)
@@ -276,16 +275,8 @@ func (suite *MsgServerTestSuite) makeFinalizeCascadeActionMessage(actionID strin
 		}
 	}
 
-	var rqIdsOti []byte
-	if !rqIdsOtiBad {
-		rqIdsOti = make([]byte, 12)
-	} else {
-		rqIdsOti = nil
-	}
-
 	finalizeMetadata := actionapi.CascadeMetadata{
 		RqIdsIds: validIDs,
-		RqIdsOti: rqIdsOti,
 	}
 
 	finalizeMetadataBytes, err := protojson.Marshal(&finalizeMetadata)

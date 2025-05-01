@@ -45,9 +45,6 @@ func (v *CascadeValidator) ValidateBasic(metadataStr string, msgType common.Mess
 		if len(metadata.RqIdsIds) == 0 {
 			return fmt.Errorf("rq_ids_ids is required for cascade metadata")
 		}
-		if len(metadata.RqIdsOti) == 0 {
-			return fmt.Errorf("rq_ids_oti is required for cascade metadata")
-		}
 	}
 	return nil
 }

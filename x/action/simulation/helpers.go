@@ -626,7 +626,6 @@ func generateValidFinalizeMetadata(ic uint64, max uint64, actionType string, sup
 		ids := generateKademliaIDs(ic, max, existingSignature)
 		metadata := actionapi.CascadeMetadata{
 			RqIdsIds: ids,
-			RqIdsOti: generateRandomOtiValues(12),
 		}
 
 		metadataBytes, err = json.Marshal(&metadata)
@@ -849,7 +848,7 @@ func generateCascadeMetadataMissingRqIds(action *actionapi.Action) string {
 	// Create invalid metadata with missing RqIdsIds field
 	metadata := actionapi.CascadeMetadata{
 		// RqIdsIds intentionally omitted
-		RqIdsOti: generateRandomOtiValues(12),
+		//RqIdsOti: generateRandomOtiValues(12),
 	}
 
 	metadataBytes, _ := json.Marshal(&metadata)
@@ -873,7 +872,6 @@ func generateCascadeMetadataEmptyRqIds(action *actionapi.Action) string {
 	// Create invalid metadata with empty RqIdsIds array
 	metadata := actionapi.CascadeMetadata{
 		RqIdsIds: ids,
-		RqIdsOti: generateRandomOtiValues(12),
 	}
 
 	metadataBytes, _ := json.Marshal(&metadata)
@@ -895,7 +893,6 @@ func generateCascadeMetadataInvalidRqIc(action *actionapi.Action) string {
 	// Create invalid metadata with mismatched IC count (5) vs actual ID count (3)
 	metadata := actionapi.CascadeMetadata{
 		RqIdsIds: ids,
-		RqIdsOti: generateRandomOtiValues(12),
 	}
 
 	metadataBytes, _ := json.Marshal(&metadata)
@@ -917,7 +914,6 @@ func generateCascadeMetadataMissingIds(action *actionapi.Action) string {
 	// Create invalid metadata with different DataHash than the original action
 	metadata := actionapi.CascadeMetadata{
 		RqIdsIds: ids,
-		RqIdsOti: generateRandomOtiValues(12),
 	}
 
 	metadataBytes, _ := json.Marshal(&metadata)
@@ -938,7 +934,6 @@ func generateCascadeMetadataSignatureMismatch(action *actionapi.Action) string {
 	// Create invalid metadata with different FileName than the original action
 	metadata := actionapi.CascadeMetadata{
 		RqIdsIds: ids,
-		RqIdsOti: generateRandomOtiValues(12),
 	}
 
 	metadataBytes, _ := json.Marshal(&metadata)

@@ -151,10 +151,7 @@ func (suite *ActionIntegrationTestSuite) TestActionLifecycle() {
 		ids, err := generateValidCascadeIDs(sigStr, 1, 50) // pass full sigStr here
 		require.NoError(suite.T(), err)
 
-		// OTI should be a valid 12-byte base64 string
-		oti := base64.StdEncoding.EncodeToString(make([]byte, 12))
-
-		metadata := fmt.Sprintf(`{"rq_ids_ids":%s,"rq_ids_oti":"%s","rq_ids_ic":1,"rq_ids_max":50}`, toJSONStringArray(ids), oti)
+		metadata := fmt.Sprintf(`{"rq_ids_ids":%s}`, toJSONStringArray(ids))
 
 		msg := &types.MsgFinalizeAction{
 			ActionId:   actionID,

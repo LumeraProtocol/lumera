@@ -19,8 +19,7 @@ func TestMsgFinalizeAction_ValidateBasic(t *testing.T) {
 
 	// Create valid metadata for CASCADE action type
 	validCascadeMetadataStr := `{
-		"rq_ids_ids": ["id1", "id2", "id3"],
-		"rq_ids_oti": "b3RpX2RhdGE="
+		"rq_ids_ids": ["id1", "id2", "id3"]
 	}`
 
 	// Create invalid SENSE metadata (missing required fields)
@@ -33,15 +32,8 @@ func TestMsgFinalizeAction_ValidateBasic(t *testing.T) {
 		"dd_and_fingerprints_ids": ["id1", "id2", "id3"]
 	}`
 
-	// Create invalid CASCADE metadata (missing required fields)
-	invalidCascadeMetadataStr := `{
-		"rq_ids_ids": ["id1", "id2", "id3"]
-	}`
-
 	// Create another invalid CASCADE metadata (missing different required field)
-	invalidCascadeMetadataStr2 := `{
-		"rq_ids_oti": "b3RpX2RhdGE="
-	}`
+	invalidCascadeMetadataStr2 := `{}`
 
 	tests := []struct {
 		name string
@@ -168,16 +160,6 @@ func TestMsgFinalizeAction_ValidateBasic(t *testing.T) {
 				ActionId:   validActionId,
 				ActionType: "CASCADE",
 				Metadata:   "",
-			},
-			err: ErrInvalidMetadata,
-		},
-		{
-			name: "invalid metadata - CASCADE missing rq_ids_oti",
-			msg: MsgFinalizeAction{
-				Creator:    validCreator,
-				ActionId:   validActionId,
-				ActionType: "CASCADE",
-				Metadata:   invalidCascadeMetadataStr,
 			},
 			err: ErrInvalidMetadata,
 		},

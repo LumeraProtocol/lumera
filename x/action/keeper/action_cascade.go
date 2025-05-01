@@ -59,9 +59,6 @@ func (h CascadeActionHandler) Process(metadataBytes []byte, msgType common.Messa
 		if len(metadata.RqIdsIds) == 0 {
 			return nil, fmt.Errorf("rq_ids_ids is required for cascade metadata")
 		}
-		if len(metadata.RqIdsOti) == 0 {
-			return nil, fmt.Errorf("rq_ids_oti is required for cascade metadata")
-		}
 	default:
 		return nil, fmt.Errorf("unsupported message type: %s", msgType)
 	}

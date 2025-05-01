@@ -193,7 +193,7 @@ func (suite *KeeperTestSuite) prepareCascadeActionForRegistration(creator string
 	action := &actionapi.Action{
 		Creator:    creator,
 		ActionType: actionapi.ActionType_ACTION_TYPE_CASCADE,
-		Price:      "200ulume",
+		Price:      "10100ulume",
 		Metadata:   metadataBytes,
 	}
 

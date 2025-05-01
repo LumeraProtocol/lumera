@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/LumeraProtocol/lumera/x/action/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -16,8 +17,16 @@ func (k *Keeper) GetActionFee(goCtx context.Context, req *types.QueryGetActionFe
 
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
-	// TODO: Process the query
-	_ = ctx
-	// FOR NOW: Return the data size as the fee
-	return &types.QueryGetActionFeeResponse{Amount: req.DataSize}, nil
+	dataSize, err := strconv.ParseInt(req.DataSize, 10, 64)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid data_size: %v", err)
+	}
+
+	params := k.GetParams(ctx)
+
+	// Calculate: FeePerByte * DataSize + BaseActionFee
+	perByteCost := params.FeePerByte.Amount.MulRaw(dataSize)
+	totalAmount := perByteCost.Add(params.BaseActionFee.Amount)
+
+	return &types.QueryGetActionFeeResponse{Amount: totalAmount.String()}, nil
 }

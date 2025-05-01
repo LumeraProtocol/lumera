@@ -47,7 +47,7 @@ func (suite *ActionIntegrationTestSuite) SetupTest() {
 
 	// Create test accounts
 	//var baseAccounts []*authtypes.BaseAccount
-	initCoins := sdk.NewCoins(sdk.NewInt64Coin("token", 1_000_000))
+	initCoins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 1_000_000))
 
 	suite.testAddrs, suite.privKeys, _ = createTestAddAddrsWithKeys(5)
 	for i, addr := range suite.testAddrs {
@@ -135,7 +135,7 @@ func (suite *ActionIntegrationTestSuite) TestActionLifecycle() {
 			Creator:        txCreator,
 			ActionType:     actionapi.ActionType_ACTION_TYPE_CASCADE.String(),
 			Metadata:       metadata,
-			Price:          "10token",
+			Price:          "100000ulume",
 			ExpirationTime: fmt.Sprintf("%d", time.Now().Add(10*time.Minute).Unix()),
 		}
 		res, err := suite.msgServer.RequestAction(suite.ctx, msg)

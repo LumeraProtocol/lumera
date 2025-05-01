@@ -1,17 +1,30 @@
 package keeper
 
 import (
+	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"golang.org/x/sync/semaphore"
+	"io"
+	"runtime"
+	"time"
 
 	errorsmod "cosmossdk.io/errors"
 	"github.com/LumeraProtocol/lumera/x/action/types"
 	"github.com/cosmos/btcutil/base58"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/klauspost/compress/zstd"
-	"golang.org/x/crypto/sha3"
+	"lukechampine.com/blake3"
 	"math/big"
+)
+
+const (
+	semaphoreWeight              = 1
+	maxParallelHighCompressCalls = 5
+	highCompressionLevel         = 4
+	highCompressTimeout          = 30 * time.Minute
 )
 
 // VerifySignature verifies that a signature is valid for given data and signer.
@@ -69,10 +82,10 @@ func (k *Keeper) VerifySignature(ctx sdk.Context, data string, signature string,
 
 // VerifyKademliaIDs verifies that a Kademlia ID matches the expected format and content.
 //
-// Cascade ID Format is `Base58(SHA3_256(zstd_compressed(Base64(rq_ids).creators_signature.counter)))`
-// Sense Format is `Base58(SHA3_256(zstd_compressed(Base64(rq_ids).sn1_signature.sn2_signature.sn3_signature.counter)))`
+// Cascade ID Format is `Base58(BLAKE3(zstd_compressed(Base64(rq_ids).creators_signature.counter)))`
+// Sense Format is `Base58(BLAKE3(zstd_compressed(Base64(rq_ids).sn1_signature.sn2_signature.sn3_signature.counter)))`
 //
-// ID Format is `Base58(SHA3_256(zstd_compressed(<Metadata.Signatures>.counter)))`
+// ID Format is `Base58(BLAKE3(zstd_compressed(<Metadata.Signatures>.counter)))`
 //
 // Parameters:
 // - id: The Kademlia ID to verify
@@ -126,7 +139,7 @@ func VerifyKademliaIDs(ids []string, signatures string, counterIc uint64, counte
 	randomID := ids[idIndex]
 	counter := counterIc + idIndex
 
-	// Create the expected format: Base58(SHA3_256(zstd_compressed(signatures.counter)))
+	// Create the expected format: Base58(BLAKE3(zstd_compressed(signatures.counter)))
 	expectedID, err := CreateKademliaID(signatures, counter)
 	if err != nil {
 		return fmt.Errorf("failed to create expected ID: %v", err)
@@ -140,7 +153,7 @@ func VerifyKademliaIDs(ids []string, signatures string, counterIc uint64, counte
 	return nil
 }
 
-// CreateKademliaID - Create the expected format: Base58(SHA3_256(zstd_compressed(signatures.counter)))
+// CreateKademliaID - Create the expected format: Base58(BLAKE3(zstd_compressed(signatures.counter)))
 func CreateKademliaID(signatures string, counter uint64) (string, error) {
 	// Concatenate signatures and counter
 	dataToCompress := fmt.Sprintf("%s.%d", signatures, counter)
@@ -151,16 +164,11 @@ func CreateKademliaID(signatures string, counter uint64) (string, error) {
 		return "", fmt.Errorf("failed to zstd compress data: %v", err)
 	}
 
-	// Compute SHA3-256 hash of the compressed data
-	hasher := sha3.New256()
-	_, err = hasher.Write(compressedData)
-	if err != nil {
-		return "", fmt.Errorf("failed to compute SHA3-256 hash: %v", err)
-	}
-	hashedData := hasher.Sum(nil)
+	// Compute BLAKE3 hash of the compressed data
+	hashedData := blake3.Sum256(compressedData)
 
 	// Encode the hashed data using Base58
-	return base58.Encode(hashedData), nil
+	return base58.Encode(hashedData[:]), nil
 }
 
 // Helper function for zstd compression
@@ -172,4 +180,40 @@ func zstdCompress(data []byte) ([]byte, error) {
 	defer encoder.Close()
 
 	return encoder.EncodeAll(data, nil), nil
+}
+
+func HighCompress(data []byte) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), highCompressTimeout)
+	defer cancel()
+
+	sem := semaphore.NewWeighted(maxParallelHighCompressCalls)
+
+	// Acquire the semaphore. This will block if 5 other goroutines are already inside this function.
+	if err := sem.Acquire(ctx, semaphoreWeight); err != nil {
+		return nil, fmt.Errorf("failed to acquire semaphore: %v", err)
+	}
+	defer sem.Release(semaphoreWeight) // Ensure that the semaphore is always released
+
+	numCPU := runtime.NumCPU()
+	// Create a buffer to store compressed data
+	var compressedData bytes.Buffer
+
+	// Create a new Zstd encoder with concurrency set to the number of CPU cores
+	encoder, err := zstd.NewWriter(&compressedData, zstd.WithEncoderConcurrency(numCPU), zstd.WithEncoderLevel(zstd.EncoderLevel(highCompressionLevel)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Zstd encoder: %v", err)
+	}
+
+	// Perform the compression
+	_, err = io.Copy(encoder, bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("failed to compress data: %v", err)
+	}
+
+	// Close the encoder to flush any remaining data
+	if err := encoder.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close encoder: %v", err)
+	}
+
+	return compressedData.Bytes(), nil
 }

@@ -111,7 +111,7 @@ func (suite *ExpirationTestSuite) TestCheckExpiration() {
 		action := &actionapi.Action{
 			Creator:        suite.testAddr.String(),
 			ActionType:     actionapi.ActionType_ACTION_TYPE_CASCADE,
-			Price:          "100ulume",
+			Price:          "10100ulume",
 			BlockHeight:    suite.ctx.BlockHeight(),
 			State:          tc.state,
 			ExpirationTime: tc.expirationTime,
@@ -190,7 +190,7 @@ func (suite *ExpirationTestSuite) TestExpiredActionEvents() {
 	expiredAction := &actionapi.Action{
 		Creator:        suite.testAddr.String(),
 		ActionType:     actionapi.ActionType_ACTION_TYPE_SENSE,
-		Price:          "100ulume",
+		Price:          "10100ulume",
 		BlockHeight:    ctx.BlockHeight(),
 		State:          actionapi.ActionState_ACTION_STATE_PENDING,
 		ExpirationTime: ctx.BlockTime().Unix() - 3600, // 1 hour in the past

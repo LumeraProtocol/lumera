@@ -703,6 +703,61 @@ func (suite *KeeperIntegrationTestSuite) TestQueryActionByMetadata() {
 	}
 }
 
+func (suite *KeeperIntegrationTestSuite) TestGetActionFee() {
+	params := suite.keeper.GetParams(suite.ctx)
+
+	// Override with known values for testing
+	params.BaseActionFee = sdk.NewCoin("ulume", math.NewInt(10000))
+	params.FeePerByte = sdk.NewCoin("ulume", math.NewInt(100))
+	suite.keeper.SetParams(suite.ctx, params)
+
+	testCases := []struct {
+		name        string
+		dataSize    string
+		expectErr   bool
+		expectedFee string
+	}{
+		{
+			name:        "valid request with zero data",
+			dataSize:    "0",
+			expectedFee: "10000", // Only base fee
+		},
+		{
+			name:        "valid request with 200 bytes",
+			dataSize:    "200",
+			expectedFee: "30000", // 200*100 + 10000
+		},
+		{
+			name:      "invalid dataSize string",
+			dataSize:  "invalid",
+			expectErr: true,
+		},
+		{
+			name:      "empty dataSize string",
+			dataSize:  "",
+			expectErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		suite.Run(tc.name, func() {
+			req := &actiontypes.QueryGetActionFeeRequest{
+				DataSize: tc.dataSize,
+			}
+			resp, err := suite.keeper.GetActionFee(suite.ctx, req)
+
+			if tc.expectErr {
+				suite.Require().Error(err)
+				suite.Require().Nil(resp)
+			} else {
+				suite.Require().NoError(err)
+				suite.Require().NotNil(resp)
+				suite.Require().Equal(tc.expectedFee, resp.Amount)
+			}
+		})
+	}
+}
+
 func TestKeeperIntegrationTestSuite(t *testing.T) {
 	suite.Run(t, new(KeeperIntegrationTestSuite))
 }

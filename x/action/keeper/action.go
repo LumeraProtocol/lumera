@@ -1,6 +1,7 @@
 package keeper
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"slices"
@@ -42,6 +43,10 @@ func (k *Keeper) RegisterAction(ctx sdk.Context, action *actionapi.Action) (stri
 			"invalid price %s: %s",
 			action.Price,
 			err.Error())
+	}
+
+	if err := k.validatePrice(ctx, price); err != nil {
+		return "", err
 	}
 
 	creator, err := sdk.AccAddressFromBech32(action.Creator)
@@ -724,4 +729,21 @@ func (k *Keeper) getLastActionID(ctx sdk.Context) (uint64, error) {
 	}
 
 	return binary.BigEndian.Uint64(bz), nil
+}
+
+func (k *Keeper) validatePrice(ctx context.Context, price sdk.Coin) error {
+	params := k.GetParams(ctx)
+
+	minFeeAmount := params.FeePerByte.Amount.Add(params.BaseActionFee.Amount)
+
+	if price.Amount.LT(minFeeAmount) {
+		return errors.Wrapf(
+			sdkerrors.ErrInvalidRequest,
+			"invalid price amount %s: must be at least %s (base + per-byte)",
+			price.Amount.String(),
+			minFeeAmount.String(),
+		)
+	}
+
+	return nil
 }

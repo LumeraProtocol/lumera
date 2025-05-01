@@ -30,9 +30,6 @@ message SenseMetadata {
   // FinalizeAction fields
   repeated string dd_and_fingerprints_ids = 6 [json_name = "dd_and_fingerprints_ids"];
   string signatures = 7 [json_name = "signatures"];
-  
-  // Implementation-specific field to track supernode submissions
-  map<string, string> supernode_fingerprints = 8 [json_name = "supernode_fingerprints"];
 }
   
 // CascadeMetadata contains information for Cascade actions.

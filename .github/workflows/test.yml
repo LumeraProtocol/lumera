@@ -34,7 +34,7 @@ jobs:
         run: go mod download
 
       - name: Run unit tests
-        run: go test ./... -v
+        run: go test -v ./x/...
 
   integration-tests:
     name: integration

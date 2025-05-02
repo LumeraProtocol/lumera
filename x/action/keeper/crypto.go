@@ -159,7 +159,7 @@ func CreateKademliaID(signatures string, counter uint64) (string, error) {
 	dataToCompress := fmt.Sprintf("%s.%d", signatures, counter)
 
 	// Compress the data using zstd
-	compressedData, err := zstdCompress([]byte(dataToCompress))
+	compressedData, err := ZstdCompress([]byte(dataToCompress))
 	if err != nil {
 		return "", fmt.Errorf("failed to zstd compress data: %v", err)
 	}
@@ -171,8 +171,8 @@ func CreateKademliaID(signatures string, counter uint64) (string, error) {
 	return base58.Encode(hashedData[:]), nil
 }
 
-// Helper function for zstd compression
-func zstdCompress(data []byte) ([]byte, error) {
+// ZstdCompress Helper function for zstd compression
+func ZstdCompress(data []byte) ([]byte, error) {
 	encoder, err := zstd.NewWriter(nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create zstd encoder: %v", err)

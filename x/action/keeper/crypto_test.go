@@ -1,15 +1,25 @@
 package keeper_test
 
 import (
+	"bytes"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
+	"github.com/cosmos/btcutil/base58"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+	"lukechampine.com/blake3"
+	"math/rand"
+	"strconv"
 	"testing"
+	"time"
 
 	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
 	"github.com/LumeraProtocol/lumera/x/action/keeper"
 	"github.com/stretchr/testify/require"
 )
+
+const separatorByte = byte('.')
 
 func TestVerifySignature(t *testing.T) {
 	key, address := cryptotestutils.KeyAndAddress()
@@ -179,4 +189,103 @@ func TestVerifyKademliaID(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Mocked Layout/Block types to match actual implementation
+type block struct {
+	BlockID           int      `json:"block_id"`
+	EncoderParameters []int    `json:"encoder_parameters"`
+	OriginalOffset    int64    `json:"original_offset"`
+	Size              int64    `json:"size"`
+	Symbols           []string `json:"symbols"`
+	Hash              string   `json:"hash"`
+}
+
+type layout struct {
+	Blocks []block `json:"blocks"`
+}
+
+func TestGenerateSupernodeRQIDs(t *testing.T) {
+	type testCase struct {
+		name      string
+		layout    layout
+		signature string
+		rqMax     uint32
+	}
+
+	rand.Seed(time.Now().UnixNano())
+	ic := uint32(rand.Intn(100000))
+
+	tests := []testCase{
+		{
+			name: "basic metadata with 1 block and 2 symbols",
+			layout: layout{
+				Blocks: []block{
+					{
+						BlockID:           1,
+						EncoderParameters: []int{10, 20},
+						OriginalOffset:    0,
+						Size:              2048,
+						Symbols:           []string{"S1", "S2"},
+						Hash:              "xyz123",
+					},
+				},
+			},
+			signature: "mock_supernode_signature",
+			rqMax:     5,
+		},
+		{
+			name: "empty blocks",
+			layout: layout{
+				Blocks: []block{},
+			},
+			signature: "sig",
+			rqMax:     3,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ids, encMetadataWithSignature, err := generateSupernodeRQIDs(tc.layout, tc.signature, ic, tc.rqMax)
+			require.NoError(t, err)
+			require.Len(t, ids, int(tc.rqMax))
+
+			// Validate with Lumera logic
+			err = keeper.VerifyKademliaIDs(ids, string(encMetadataWithSignature), uint64(ic), uint64(tc.rqMax))
+			require.NoError(t, err, "expected RQID validation to pass")
+		})
+	}
+}
+
+// Supernode-style generator with BLAKE3
+func generateSupernodeRQIDs(metadata layout, signature string, ic, max uint32) ([]string, []byte, error) {
+	metadataBytes, err := json.Marshal(metadata)
+	if err != nil {
+		return nil, nil, fmt.Errorf("marshal metadata: %w", err)
+	}
+
+	b64encodedMetadata := make([]byte, base64.StdEncoding.EncodedLen(len(metadataBytes)))
+	base64.StdEncoding.Encode(b64encodedMetadata, metadataBytes)
+	var signedBuffer bytes.Buffer
+	signedBuffer.Write(b64encodedMetadata)
+	signedBuffer.WriteByte(separatorByte)
+	signedBuffer.WriteString(signature)
+	encMetadataWithSignature := signedBuffer.Bytes()
+
+	var ids []string
+	for i := uint32(0); i < max; i++ {
+		var b bytes.Buffer
+		b.Write(encMetadataWithSignature)
+		b.WriteByte(separatorByte)
+		b.WriteString(strconv.Itoa(int(ic + i)))
+
+		compressed, err := keeper.ZstdCompress(b.Bytes())
+		if err != nil {
+			return nil, nil, fmt.Errorf("compression error: %w", err)
+		}
+
+		hash := blake3.Sum256(compressed)
+		ids = append(ids, base58.Encode(hash[:]))
+	}
+	return ids, encMetadataWithSignature, nil
 }

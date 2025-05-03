@@ -63,7 +63,7 @@ func SimulateMsgDeregisterSupernode(
 
 		// Execute the message
 		msgServer := keeper.NewMsgServerImpl(k)
-		_, err := msgServer.DeregisterSupernode(sdk.WrapSDKContext(ctx), msg)
+		_, err := msgServer.DeregisterSupernode(ctx, msg)
 		if err != nil {
 			return simtypes.NoOpMsg(types.ModuleName, TypeMsgDeregisterSupernode, err.Error()), nil, err
 		}

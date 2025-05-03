@@ -77,7 +77,7 @@ func SimulateMsgStopSupernode(
 
 		// Execute the message
 		msgServer := keeper.NewMsgServerImpl(k)
-		_, err := msgServer.StopSupernode(sdk.WrapSDKContext(ctx), msg)
+		_, err := msgServer.StopSupernode(ctx, msg)
 		if err != nil {
 			return simtypes.NoOpMsg(types.ModuleName, TypeMsgStopSupernode, err.Error()), nil, err
 		}

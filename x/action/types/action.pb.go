@@ -5,6 +5,9 @@ package types
 
 import (
 	fmt "fmt"
+	_ "github.com/cosmos/cosmos-proto"
+	github_com_cosmos_cosmos_sdk_types "github.com/cosmos/cosmos-sdk/types"
+	_ "github.com/cosmos/gogoproto/gogoproto"
 	proto "github.com/cosmos/gogoproto/proto"
 	io "io"
 	math "math"
@@ -23,13 +26,15 @@ var _ = math.Inf
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
 type Action struct {
-	Creator        string      `protobuf:"bytes,1,opt,name=creator,proto3" json:"creator,omitempty"`
-	ActionID       string      `protobuf:"bytes,2,opt,name=actionID,proto3" json:"actionID,omitempty"`
-	Metadata       *Metadata   `protobuf:"bytes,3,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	Price          string      `protobuf:"bytes,4,opt,name=price,proto3" json:"price,omitempty"`
-	ExpirationTime string      `protobuf:"bytes,5,opt,name=expirationTime,proto3" json:"expirationTime,omitempty"`
-	BlockHeight    int64       `protobuf:"varint,6,opt,name=blockHeight,proto3" json:"blockHeight,omitempty"`
-	State          ActionState `protobuf:"varint,7,opt,name=state,proto3,enum=lumera.action.ActionState" json:"state,omitempty"`
+	Creator        string                                   `protobuf:"bytes,1,opt,name=creator,proto3" json:"creator,omitempty"`
+	ActionID       string                                   `protobuf:"bytes,2,opt,name=actionID,proto3" json:"actionID,omitempty"`
+	ActionType     ActionType                               `protobuf:"varint,3,opt,name=actionType,proto3,enum=lumera.action.ActionType" json:"actionType,omitempty"`
+	Metadata       []byte                                   `protobuf:"bytes,4,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Price          *github_com_cosmos_cosmos_sdk_types.Coin `protobuf:"bytes,5,opt,name=price,proto3,customtype=github.com/cosmos/cosmos-sdk/types.Coin" json:"price,omitempty"`
+	ExpirationTime int64                                    `protobuf:"varint,6,opt,name=expirationTime,proto3" json:"expirationTime,omitempty"`
+	State          ActionState                              `protobuf:"varint,7,opt,name=state,proto3,enum=lumera.action.ActionState" json:"state,omitempty"`
+	BlockHeight    int64                                    `protobuf:"varint,8,opt,name=blockHeight,proto3" json:"blockHeight,omitempty"`
+	SuperNodes     []string                                 `protobuf:"bytes,9,rep,name=superNodes,proto3" json:"superNodes,omitempty"`
 }
 
 func (m *Action) Reset()         { *m = Action{} }
@@ -79,30 +84,23 @@ func (m *Action) GetActionID() string {
 	return ""
 }
 
-func (m *Action) GetMetadata() *Metadata {
+func (m *Action) GetActionType() ActionType {
+	if m != nil {
+		return m.ActionType
+	}
+	return ActionTypeUnspecified
+}
+
+func (m *Action) GetMetadata() []byte {
 	if m != nil {
 		return m.Metadata
 	}
 	return nil
 }
 
-func (m *Action) GetPrice() string {
-	if m != nil {
-		return m.Price
-	}
-	return ""
-}
-
-func (m *Action) GetExpirationTime() string {
+func (m *Action) GetExpirationTime() int64 {
 	if m != nil {
 		return m.ExpirationTime
-	}
-	return ""
-}
-
-func (m *Action) GetBlockHeight() int64 {
-	if m != nil {
-		return m.BlockHeight
 	}
 	return 0
 }
@@ -114,6 +112,20 @@ func (m *Action) GetState() ActionState {
 	return ActionStateUnspecified
 }
 
+func (m *Action) GetBlockHeight() int64 {
+	if m != nil {
+		return m.BlockHeight
+	}
+	return 0
+}
+
+func (m *Action) GetSuperNodes() []string {
+	if m != nil {
+		return m.SuperNodes
+	}
+	return nil
+}
+
 func init() {
 	proto.RegisterType((*Action)(nil), "lumera.action.Action")
 }
@@ -121,26 +133,34 @@ func init() {
 func init() { proto.RegisterFile("lumera/action/action.proto", fileDescriptor_fb97c90726166d4c) }
 
 var fileDescriptor_fb97c90726166d4c = []byte{
-	// 298 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x6c, 0x90, 0x41, 0x4b, 0xc3, 0x30,
-	0x14, 0xc7, 0x9b, 0xcd, 0x76, 0x33, 0xc3, 0x1d, 0x82, 0x60, 0x28, 0x12, 0x82, 0x07, 0xe9, 0xa9,
-	0x95, 0xed, 0x13, 0x28, 0x1e, 0x1c, 0x28, 0x48, 0xf5, 0xe4, 0x45, 0xd2, 0x18, 0xb6, 0x60, 0x6b,
-	0x4a, 0x96, 0xc1, 0xfc, 0x00, 0xde, 0xfd, 0x58, 0x1e, 0x77, 0xf4, 0x28, 0xed, 0x17, 0x91, 0x26,
-	0xed, 0x70, 0xc3, 0x53, 0x78, 0xff, 0xff, 0xef, 0xbd, 0xbc, 0xf7, 0x87, 0x61, 0xbe, 0x2a, 0x84,
-	0x66, 0x09, 0xe3, 0x46, 0xaa, 0xb7, 0xf6, 0x89, 0x4b, 0xad, 0x8c, 0x42, 0x47, 0xce, 0x8b, 0x9d,
-	0x18, 0x9e, 0xee, 0xa2, 0x85, 0x30, 0xec, 0x85, 0x19, 0xe6, 0xe0, 0x90, 0xfe, 0x37, 0xe8, 0x79,
-	0x69, 0x98, 0x11, 0x8e, 0x38, 0xfb, 0xe8, 0xc1, 0xe0, 0xd2, 0xca, 0x08, 0xc3, 0x01, 0xd7, 0x82,
-	0x19, 0xa5, 0x31, 0xa0, 0x20, 0x3a, 0x4c, 0xbb, 0x12, 0x85, 0x70, 0xe8, 0x5a, 0x67, 0xd7, 0xb8,
-	0x67, 0xad, 0x6d, 0x8d, 0xa6, 0x70, 0xd8, 0x7d, 0x8a, 0xfb, 0x14, 0x44, 0xa3, 0xc9, 0x49, 0xbc,
-	0xb3, 0x62, 0x7c, 0xd7, 0xda, 0xe9, 0x16, 0x44, 0xc7, 0xd0, 0x2f, 0xb5, 0xe4, 0x02, 0x1f, 0xd8,
-	0x69, 0xae, 0x40, 0xe7, 0x70, 0x2c, 0xd6, 0xa5, 0xd4, 0xac, 0x69, 0x7b, 0x94, 0x85, 0xc0, 0xbe,
-	0xb5, 0xf7, 0x54, 0x44, 0xe1, 0x28, 0xcb, 0x15, 0x7f, 0xbd, 0x11, 0x72, 0xbe, 0x30, 0x38, 0xa0,
-	0x20, 0xea, 0xa7, 0x7f, 0x25, 0x74, 0x01, 0x7d, 0x7b, 0x24, 0x1e, 0x50, 0x10, 0x8d, 0x27, 0xe1,
-	0xde, 0x46, 0xee, 0xe0, 0x87, 0x86, 0x48, 0x1d, 0x78, 0x35, 0xfb, 0xaa, 0x08, 0xd8, 0x54, 0x04,
-	0xfc, 0x54, 0x04, 0x7c, 0xd6, 0xc4, 0xdb, 0xd4, 0xc4, 0xfb, 0xae, 0x89, 0xf7, 0x94, 0xcc, 0xa5,
-	0x59, 0xac, 0xb2, 0x98, 0xab, 0x22, 0xb9, 0xb5, 0x63, 0xee, 0x9b, 0xe4, 0xb8, 0xca, 0x93, 0x36,
-	0xdd, 0x75, 0x97, 0xaf, 0x79, 0x2f, 0xc5, 0x32, 0x0b, 0x6c, 0xb2, 0xd3, 0xdf, 0x00, 0x00, 0x00,
-	0xff, 0xff, 0x76, 0xd7, 0xd8, 0xc5, 0xc6, 0x01, 0x00, 0x00,
+	// 418 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x6c, 0x52, 0xb1, 0xae, 0xd3, 0x30,
+	0x14, 0xad, 0x09, 0xed, 0x7b, 0x35, 0xf0, 0x06, 0xeb, 0x0d, 0x7e, 0x11, 0xa4, 0x81, 0x01, 0x22,
+	0xa1, 0x26, 0xa8, 0x4c, 0x8c, 0x29, 0x0c, 0x54, 0x42, 0x08, 0xa5, 0x88, 0x81, 0xa5, 0x72, 0x13,
+	0x2b, 0xb5, 0x9a, 0xd4, 0x91, 0xed, 0x4a, 0xed, 0x5f, 0xf0, 0x2b, 0x48, 0xfd, 0x08, 0xc6, 0xaa,
+	0x13, 0x62, 0x40, 0xa8, 0xfd, 0x11, 0x14, 0xdb, 0xad, 0xd2, 0xa7, 0x4e, 0xf6, 0xbd, 0xe7, 0xdc,
+	0xeb, 0x73, 0x8f, 0x2f, 0x74, 0x8b, 0x65, 0x49, 0x05, 0x89, 0x48, 0xaa, 0x18, 0x5f, 0xd8, 0x23,
+	0xac, 0x04, 0x57, 0x1c, 0x3d, 0x31, 0x58, 0x68, 0x92, 0xee, 0x6d, 0xce, 0x73, 0xae, 0x91, 0xa8,
+	0xbe, 0x19, 0x92, 0x7b, 0x97, 0x72, 0x59, 0x72, 0x39, 0x31, 0x80, 0x09, 0x2c, 0xf4, 0xf4, 0xbc,
+	0x77, 0x49, 0x15, 0xc9, 0x88, 0x22, 0x16, 0xf5, 0x2f, 0xbd, 0x3c, 0x91, 0x8a, 0x28, 0x6a, 0x19,
+	0xbd, 0x8b, 0x0c, 0xb5, 0xae, 0x2c, 0xe1, 0xc5, 0x4f, 0x07, 0x76, 0x62, 0x9d, 0x45, 0x03, 0x78,
+	0x95, 0x0a, 0x4a, 0x14, 0x17, 0x18, 0xf8, 0x20, 0xe8, 0x0e, 0xf1, 0x6e, 0xd3, 0xbf, 0xb5, 0x72,
+	0xe2, 0x2c, 0x13, 0x54, 0xca, 0xb1, 0x12, 0x6c, 0x91, 0x27, 0x47, 0x22, 0x72, 0xe1, 0xb5, 0xe9,
+	0x39, 0xfa, 0x80, 0x1f, 0xd4, 0x45, 0xc9, 0x29, 0x46, 0xef, 0x20, 0x34, 0xf7, 0xaf, 0xeb, 0x8a,
+	0x62, 0xc7, 0x07, 0xc1, 0xcd, 0xe0, 0x2e, 0x3c, 0x33, 0x24, 0x8c, 0x4f, 0x84, 0xa4, 0x41, 0xae,
+	0xdb, 0x1e, 0x47, 0xc5, 0x0f, 0x7d, 0x10, 0x3c, 0x4e, 0x4e, 0x31, 0x8a, 0x61, 0xbb, 0x12, 0x2c,
+	0xa5, 0xb8, 0xad, 0x45, 0xbe, 0xfe, 0xf3, 0xb7, 0xf7, 0x2a, 0x67, 0x6a, 0xb6, 0x9c, 0x86, 0x29,
+	0x2f, 0xad, 0x7d, 0xf6, 0xe8, 0xcb, 0x6c, 0x1e, 0xd5, 0xd3, 0xca, 0xf0, 0x3d, 0x67, 0x8b, 0xc4,
+	0x54, 0xa2, 0x97, 0xf0, 0x86, 0xae, 0x2a, 0x26, 0x88, 0x7e, 0x90, 0x95, 0x14, 0x77, 0x7c, 0x10,
+	0x38, 0xc9, 0xbd, 0x2c, 0x7a, 0x03, 0xdb, 0xda, 0x4c, 0x7c, 0xa5, 0xc5, 0xbb, 0x17, 0xc5, 0x8f,
+	0x6b, 0x46, 0x62, 0x88, 0xc8, 0x87, 0x8f, 0xa6, 0x05, 0x4f, 0xe7, 0x1f, 0x29, 0xcb, 0x67, 0x0a,
+	0x5f, 0xeb, 0xb6, 0xcd, 0x14, 0x8a, 0x21, 0x94, 0xcb, 0x8a, 0x8a, 0xcf, 0x3c, 0xa3, 0x12, 0x77,
+	0x7d, 0x27, 0xe8, 0x0e, 0x9f, 0xef, 0x36, 0xfd, 0x67, 0xd6, 0xe8, 0x6f, 0xa4, 0x60, 0x59, 0xed,
+	0xed, 0xb9, 0xe3, 0x8d, 0xa2, 0xe1, 0xe8, 0xd7, 0xde, 0x03, 0xdb, 0xbd, 0x07, 0xfe, 0xed, 0x3d,
+	0xf0, 0xe3, 0xe0, 0xb5, 0xb6, 0x07, 0xaf, 0xf5, 0xfb, 0xe0, 0xb5, 0xbe, 0x47, 0x0d, 0x23, 0x3e,
+	0x69, 0xad, 0x5f, 0xea, 0x5f, 0x4e, 0x79, 0x11, 0xd9, 0x45, 0x58, 0x1d, 0x57, 0x41, 0xbb, 0x32,
+	0xed, 0xe8, 0x2d, 0x78, 0xfb, 0x3f, 0x00, 0x00, 0xff, 0xff, 0x60, 0x2f, 0xcc, 0x74, 0xc4, 0x02,
+	0x00, 0x00,
 }
 
 func (m *Action) Marshal() (dAtA []byte, err error) {
@@ -163,41 +183,53 @@ func (m *Action) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.SuperNodes) > 0 {
+		for iNdEx := len(m.SuperNodes) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.SuperNodes[iNdEx])
+			copy(dAtA[i:], m.SuperNodes[iNdEx])
+			i = encodeVarintAction(dAtA, i, uint64(len(m.SuperNodes[iNdEx])))
+			i--
+			dAtA[i] = 0x4a
+		}
+	}
+	if m.BlockHeight != 0 {
+		i = encodeVarintAction(dAtA, i, uint64(m.BlockHeight))
+		i--
+		dAtA[i] = 0x40
+	}
 	if m.State != 0 {
 		i = encodeVarintAction(dAtA, i, uint64(m.State))
 		i--
 		dAtA[i] = 0x38
 	}
-	if m.BlockHeight != 0 {
-		i = encodeVarintAction(dAtA, i, uint64(m.BlockHeight))
+	if m.ExpirationTime != 0 {
+		i = encodeVarintAction(dAtA, i, uint64(m.ExpirationTime))
 		i--
 		dAtA[i] = 0x30
 	}
-	if len(m.ExpirationTime) > 0 {
-		i -= len(m.ExpirationTime)
-		copy(dAtA[i:], m.ExpirationTime)
-		i = encodeVarintAction(dAtA, i, uint64(len(m.ExpirationTime)))
-		i--
-		dAtA[i] = 0x2a
-	}
-	if len(m.Price) > 0 {
-		i -= len(m.Price)
-		copy(dAtA[i:], m.Price)
-		i = encodeVarintAction(dAtA, i, uint64(len(m.Price)))
-		i--
-		dAtA[i] = 0x22
-	}
-	if m.Metadata != nil {
+	if m.Price != nil {
 		{
-			size, err := m.Metadata.MarshalToSizedBuffer(dAtA[:i])
-			if err != nil {
+			size := m.Price.Size()
+			i -= size
+			if _, err := m.Price.MarshalTo(dAtA[i:]); err != nil {
 				return 0, err
 			}
-			i -= size
 			i = encodeVarintAction(dAtA, i, uint64(size))
 		}
 		i--
-		dAtA[i] = 0x1a
+		dAtA[i] = 0x2a
+	}
+	if len(m.Metadata) > 0 {
+		i -= len(m.Metadata)
+		copy(dAtA[i:], m.Metadata)
+		i = encodeVarintAction(dAtA, i, uint64(len(m.Metadata)))
+		i--
+		dAtA[i] = 0x22
+	}
+	if m.ActionType != 0 {
+		i = encodeVarintAction(dAtA, i, uint64(m.ActionType))
+		i--
+		dAtA[i] = 0x18
 	}
 	if len(m.ActionID) > 0 {
 		i -= len(m.ActionID)
@@ -241,23 +273,31 @@ func (m *Action) Size() (n int) {
 	if l > 0 {
 		n += 1 + l + sovAction(uint64(l))
 	}
-	if m.Metadata != nil {
-		l = m.Metadata.Size()
-		n += 1 + l + sovAction(uint64(l))
+	if m.ActionType != 0 {
+		n += 1 + sovAction(uint64(m.ActionType))
 	}
-	l = len(m.Price)
+	l = len(m.Metadata)
 	if l > 0 {
 		n += 1 + l + sovAction(uint64(l))
 	}
-	l = len(m.ExpirationTime)
-	if l > 0 {
+	if m.Price != nil {
+		l = m.Price.Size()
 		n += 1 + l + sovAction(uint64(l))
+	}
+	if m.ExpirationTime != 0 {
+		n += 1 + sovAction(uint64(m.ExpirationTime))
+	}
+	if m.State != 0 {
+		n += 1 + sovAction(uint64(m.State))
 	}
 	if m.BlockHeight != 0 {
 		n += 1 + sovAction(uint64(m.BlockHeight))
 	}
-	if m.State != 0 {
-		n += 1 + sovAction(uint64(m.State))
+	if len(m.SuperNodes) > 0 {
+		for _, s := range m.SuperNodes {
+			l = len(s)
+			n += 1 + l + sovAction(uint64(l))
+		}
 	}
 	return n
 }
@@ -362,10 +402,10 @@ func (m *Action) Unmarshal(dAtA []byte) error {
 			m.ActionID = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 3:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Metadata", wireType)
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ActionType", wireType)
 			}
-			var msglen int
+			m.ActionType = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowAction
@@ -375,29 +415,46 @@ func (m *Action) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				msglen |= int(b&0x7F) << shift
+				m.ActionType |= ActionType(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-			if msglen < 0 {
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Metadata", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAction
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
 				return ErrInvalidLengthAction
 			}
-			postIndex := iNdEx + msglen
+			postIndex := iNdEx + byteLen
 			if postIndex < 0 {
 				return ErrInvalidLengthAction
 			}
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
+			m.Metadata = append(m.Metadata[:0], dAtA[iNdEx:postIndex]...)
 			if m.Metadata == nil {
-				m.Metadata = &Metadata{}
-			}
-			if err := m.Metadata.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
+				m.Metadata = []byte{}
 			}
 			iNdEx = postIndex
-		case 4:
+		case 5:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Price", wireType)
 			}
@@ -427,11 +484,72 @@ func (m *Action) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Price = string(dAtA[iNdEx:postIndex])
+			var v github_com_cosmos_cosmos_sdk_types.Coin
+			m.Price = &v
+			if err := m.Price.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
 			iNdEx = postIndex
-		case 5:
-			if wireType != 2 {
+		case 6:
+			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ExpirationTime", wireType)
+			}
+			m.ExpirationTime = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAction
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ExpirationTime |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 7:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field State", wireType)
+			}
+			m.State = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAction
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.State |= ActionState(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 8:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field BlockHeight", wireType)
+			}
+			m.BlockHeight = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAction
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.BlockHeight |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 9:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SuperNodes", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -459,46 +577,8 @@ func (m *Action) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.ExpirationTime = string(dAtA[iNdEx:postIndex])
+			m.SuperNodes = append(m.SuperNodes, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
-		case 6:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field BlockHeight", wireType)
-			}
-			m.BlockHeight = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowAction
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.BlockHeight |= int64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-		case 7:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field State", wireType)
-			}
-			m.State = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowAction
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.State |= ActionState(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipAction(dAtA[iNdEx:])

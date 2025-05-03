@@ -17,7 +17,7 @@ import (
 func TestKeeper_ListSuperNodes(t *testing.T) {
 	valAddr := sdk.ValAddress([]byte("validator"))
 	creatorAddr := sdk.AccAddress(valAddr)
-	// Create sample supernodes
+	// Create action supernodes
 	sn1 := types.SuperNode{
 		ValidatorAddress: valAddr.String(),
 		SupernodeAccount: creatorAddr.String(),

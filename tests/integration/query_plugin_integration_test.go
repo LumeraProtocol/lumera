@@ -11,7 +11,7 @@ import (
 	"time"
 
 	wasmvmtypes "github.com/CosmWasm/wasmvm/v2/types"
-	"github.com/cometbft/cometbft/crypto/ed25519"
+	"github.com/cometbft/cometbft/crypto/secp256k1"
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	"github.com/cosmos/gogoproto/proto"
 	"github.com/stretchr/testify/assert"
@@ -789,7 +789,7 @@ func TestAcceptListStargateQuerier(t *testing.T) {
 		"in accept list - error result": {
 			req: &wasmvmtypes.StargateQuery{
 				Path: "/cosmos.auth.v1beta1.Query/Account",
-				Data: marshal(&authtypes.QueryAccountRequest{Address: sdk.AccAddress(ed25519.GenPrivKey().PubKey().Address()).String()}),
+				Data: marshal(&authtypes.QueryAccountRequest{Address: sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address()).String()}),
 			},
 			expErr: true,
 		},

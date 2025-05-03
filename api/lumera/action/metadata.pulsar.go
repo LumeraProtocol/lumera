@@ -4,6 +4,7 @@ package action
 import (
 	fmt "fmt"
 	runtime "github.com/cosmos/cosmos-proto/runtime"
+	_ "github.com/cosmos/gogoproto/gogoproto"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoiface "google.golang.org/protobuf/runtime/protoiface"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -12,49 +13,49 @@ import (
 	sync "sync"
 )
 
-var _ protoreflect.List = (*_SenseMetadata_4_list)(nil)
+var _ protoreflect.List = (*_SenseMetadata_6_list)(nil)
 
-type _SenseMetadata_4_list struct {
+type _SenseMetadata_6_list struct {
 	list *[]string
 }
 
-func (x *_SenseMetadata_4_list) Len() int {
+func (x *_SenseMetadata_6_list) Len() int {
 	if x.list == nil {
 		return 0
 	}
 	return len(*x.list)
 }
 
-func (x *_SenseMetadata_4_list) Get(i int) protoreflect.Value {
+func (x *_SenseMetadata_6_list) Get(i int) protoreflect.Value {
 	return protoreflect.ValueOfString((*x.list)[i])
 }
 
-func (x *_SenseMetadata_4_list) Set(i int, value protoreflect.Value) {
+func (x *_SenseMetadata_6_list) Set(i int, value protoreflect.Value) {
 	valueUnwrapped := value.String()
 	concreteValue := valueUnwrapped
 	(*x.list)[i] = concreteValue
 }
 
-func (x *_SenseMetadata_4_list) Append(value protoreflect.Value) {
+func (x *_SenseMetadata_6_list) Append(value protoreflect.Value) {
 	valueUnwrapped := value.String()
 	concreteValue := valueUnwrapped
 	*x.list = append(*x.list, concreteValue)
 }
 
-func (x *_SenseMetadata_4_list) AppendMutable() protoreflect.Value {
+func (x *_SenseMetadata_6_list) AppendMutable() protoreflect.Value {
 	panic(fmt.Errorf("AppendMutable can not be called on message SenseMetadata at list field DdAndFingerprintsIds as it is not of Message kind"))
 }
 
-func (x *_SenseMetadata_4_list) Truncate(n int) {
+func (x *_SenseMetadata_6_list) Truncate(n int) {
 	*x.list = (*x.list)[:n]
 }
 
-func (x *_SenseMetadata_4_list) NewElement() protoreflect.Value {
+func (x *_SenseMetadata_6_list) NewElement() protoreflect.Value {
 	v := ""
 	return protoreflect.ValueOfString(v)
 }
 
-func (x *_SenseMetadata_4_list) IsValid() bool {
+func (x *_SenseMetadata_6_list) IsValid() bool {
 	return x.list != nil
 }
 
@@ -62,8 +63,11 @@ var (
 	md_SenseMetadata                         protoreflect.MessageDescriptor
 	fd_SenseMetadata_data_hash               protoreflect.FieldDescriptor
 	fd_SenseMetadata_dd_and_fingerprints_ic  protoreflect.FieldDescriptor
+	fd_SenseMetadata_collection_id           protoreflect.FieldDescriptor
+	fd_SenseMetadata_group_id                protoreflect.FieldDescriptor
 	fd_SenseMetadata_dd_and_fingerprints_max protoreflect.FieldDescriptor
 	fd_SenseMetadata_dd_and_fingerprints_ids protoreflect.FieldDescriptor
+	fd_SenseMetadata_signatures              protoreflect.FieldDescriptor
 )
 
 func init() {
@@ -71,8 +75,11 @@ func init() {
 	md_SenseMetadata = File_lumera_action_metadata_proto.Messages().ByName("SenseMetadata")
 	fd_SenseMetadata_data_hash = md_SenseMetadata.Fields().ByName("data_hash")
 	fd_SenseMetadata_dd_and_fingerprints_ic = md_SenseMetadata.Fields().ByName("dd_and_fingerprints_ic")
+	fd_SenseMetadata_collection_id = md_SenseMetadata.Fields().ByName("collection_id")
+	fd_SenseMetadata_group_id = md_SenseMetadata.Fields().ByName("group_id")
 	fd_SenseMetadata_dd_and_fingerprints_max = md_SenseMetadata.Fields().ByName("dd_and_fingerprints_max")
 	fd_SenseMetadata_dd_and_fingerprints_ids = md_SenseMetadata.Fields().ByName("dd_and_fingerprints_ids")
+	fd_SenseMetadata_signatures = md_SenseMetadata.Fields().ByName("signatures")
 }
 
 var _ protoreflect.Message = (*fastReflection_SenseMetadata)(nil)
@@ -146,21 +153,39 @@ func (x *fastReflection_SenseMetadata) Range(f func(protoreflect.FieldDescriptor
 			return
 		}
 	}
-	if x.DdAndFingerprintsIc != int32(0) {
-		value := protoreflect.ValueOfInt32(x.DdAndFingerprintsIc)
+	if x.DdAndFingerprintsIc != uint64(0) {
+		value := protoreflect.ValueOfUint64(x.DdAndFingerprintsIc)
 		if !f(fd_SenseMetadata_dd_and_fingerprints_ic, value) {
 			return
 		}
 	}
-	if x.DdAndFingerprintsMax != int32(0) {
-		value := protoreflect.ValueOfInt32(x.DdAndFingerprintsMax)
+	if x.CollectionId != "" {
+		value := protoreflect.ValueOfString(x.CollectionId)
+		if !f(fd_SenseMetadata_collection_id, value) {
+			return
+		}
+	}
+	if x.GroupId != "" {
+		value := protoreflect.ValueOfString(x.GroupId)
+		if !f(fd_SenseMetadata_group_id, value) {
+			return
+		}
+	}
+	if x.DdAndFingerprintsMax != uint64(0) {
+		value := protoreflect.ValueOfUint64(x.DdAndFingerprintsMax)
 		if !f(fd_SenseMetadata_dd_and_fingerprints_max, value) {
 			return
 		}
 	}
 	if len(x.DdAndFingerprintsIds) != 0 {
-		value := protoreflect.ValueOfList(&_SenseMetadata_4_list{list: &x.DdAndFingerprintsIds})
+		value := protoreflect.ValueOfList(&_SenseMetadata_6_list{list: &x.DdAndFingerprintsIds})
 		if !f(fd_SenseMetadata_dd_and_fingerprints_ids, value) {
+			return
+		}
+	}
+	if x.Signatures != "" {
+		value := protoreflect.ValueOfString(x.Signatures)
+		if !f(fd_SenseMetadata_signatures, value) {
 			return
 		}
 	}
@@ -182,11 +207,17 @@ func (x *fastReflection_SenseMetadata) Has(fd protoreflect.FieldDescriptor) bool
 	case "lumera.action.SenseMetadata.data_hash":
 		return x.DataHash != ""
 	case "lumera.action.SenseMetadata.dd_and_fingerprints_ic":
-		return x.DdAndFingerprintsIc != int32(0)
+		return x.DdAndFingerprintsIc != uint64(0)
+	case "lumera.action.SenseMetadata.collection_id":
+		return x.CollectionId != ""
+	case "lumera.action.SenseMetadata.group_id":
+		return x.GroupId != ""
 	case "lumera.action.SenseMetadata.dd_and_fingerprints_max":
-		return x.DdAndFingerprintsMax != int32(0)
+		return x.DdAndFingerprintsMax != uint64(0)
 	case "lumera.action.SenseMetadata.dd_and_fingerprints_ids":
 		return len(x.DdAndFingerprintsIds) != 0
+	case "lumera.action.SenseMetadata.signatures":
+		return x.Signatures != ""
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: lumera.action.SenseMetadata"))
@@ -206,11 +237,17 @@ func (x *fastReflection_SenseMetadata) Clear(fd protoreflect.FieldDescriptor) {
 	case "lumera.action.SenseMetadata.data_hash":
 		x.DataHash = ""
 	case "lumera.action.SenseMetadata.dd_and_fingerprints_ic":
-		x.DdAndFingerprintsIc = int32(0)
+		x.DdAndFingerprintsIc = uint64(0)
+	case "lumera.action.SenseMetadata.collection_id":
+		x.CollectionId = ""
+	case "lumera.action.SenseMetadata.group_id":
+		x.GroupId = ""
 	case "lumera.action.SenseMetadata.dd_and_fingerprints_max":
-		x.DdAndFingerprintsMax = int32(0)
+		x.DdAndFingerprintsMax = uint64(0)
 	case "lumera.action.SenseMetadata.dd_and_fingerprints_ids":
 		x.DdAndFingerprintsIds = nil
+	case "lumera.action.SenseMetadata.signatures":
+		x.Signatures = ""
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: lumera.action.SenseMetadata"))
@@ -232,16 +269,25 @@ func (x *fastReflection_SenseMetadata) Get(descriptor protoreflect.FieldDescript
 		return protoreflect.ValueOfString(value)
 	case "lumera.action.SenseMetadata.dd_and_fingerprints_ic":
 		value := x.DdAndFingerprintsIc
-		return protoreflect.ValueOfInt32(value)
+		return protoreflect.ValueOfUint64(value)
+	case "lumera.action.SenseMetadata.collection_id":
+		value := x.CollectionId
+		return protoreflect.ValueOfString(value)
+	case "lumera.action.SenseMetadata.group_id":
+		value := x.GroupId
+		return protoreflect.ValueOfString(value)
 	case "lumera.action.SenseMetadata.dd_and_fingerprints_max":
 		value := x.DdAndFingerprintsMax
-		return protoreflect.ValueOfInt32(value)
+		return protoreflect.ValueOfUint64(value)
 	case "lumera.action.SenseMetadata.dd_and_fingerprints_ids":
 		if len(x.DdAndFingerprintsIds) == 0 {
-			return protoreflect.ValueOfList(&_SenseMetadata_4_list{})
+			return protoreflect.ValueOfList(&_SenseMetadata_6_list{})
 		}
-		listValue := &_SenseMetadata_4_list{list: &x.DdAndFingerprintsIds}
+		listValue := &_SenseMetadata_6_list{list: &x.DdAndFingerprintsIds}
 		return protoreflect.ValueOfList(listValue)
+	case "lumera.action.SenseMetadata.signatures":
+		value := x.Signatures
+		return protoreflect.ValueOfString(value)
 	default:
 		if descriptor.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: lumera.action.SenseMetadata"))
@@ -265,13 +311,19 @@ func (x *fastReflection_SenseMetadata) Set(fd protoreflect.FieldDescriptor, valu
 	case "lumera.action.SenseMetadata.data_hash":
 		x.DataHash = value.Interface().(string)
 	case "lumera.action.SenseMetadata.dd_and_fingerprints_ic":
-		x.DdAndFingerprintsIc = int32(value.Int())
+		x.DdAndFingerprintsIc = value.Uint()
+	case "lumera.action.SenseMetadata.collection_id":
+		x.CollectionId = value.Interface().(string)
+	case "lumera.action.SenseMetadata.group_id":
+		x.GroupId = value.Interface().(string)
 	case "lumera.action.SenseMetadata.dd_and_fingerprints_max":
-		x.DdAndFingerprintsMax = int32(value.Int())
+		x.DdAndFingerprintsMax = value.Uint()
 	case "lumera.action.SenseMetadata.dd_and_fingerprints_ids":
 		lv := value.List()
-		clv := lv.(*_SenseMetadata_4_list)
+		clv := lv.(*_SenseMetadata_6_list)
 		x.DdAndFingerprintsIds = *clv.list
+	case "lumera.action.SenseMetadata.signatures":
+		x.Signatures = value.Interface().(string)
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: lumera.action.SenseMetadata"))
@@ -296,14 +348,20 @@ func (x *fastReflection_SenseMetadata) Mutable(fd protoreflect.FieldDescriptor) 
 		if x.DdAndFingerprintsIds == nil {
 			x.DdAndFingerprintsIds = []string{}
 		}
-		value := &_SenseMetadata_4_list{list: &x.DdAndFingerprintsIds}
+		value := &_SenseMetadata_6_list{list: &x.DdAndFingerprintsIds}
 		return protoreflect.ValueOfList(value)
 	case "lumera.action.SenseMetadata.data_hash":
 		panic(fmt.Errorf("field data_hash of message lumera.action.SenseMetadata is not mutable"))
 	case "lumera.action.SenseMetadata.dd_and_fingerprints_ic":
 		panic(fmt.Errorf("field dd_and_fingerprints_ic of message lumera.action.SenseMetadata is not mutable"))
+	case "lumera.action.SenseMetadata.collection_id":
+		panic(fmt.Errorf("field collection_id of message lumera.action.SenseMetadata is not mutable"))
+	case "lumera.action.SenseMetadata.group_id":
+		panic(fmt.Errorf("field group_id of message lumera.action.SenseMetadata is not mutable"))
 	case "lumera.action.SenseMetadata.dd_and_fingerprints_max":
 		panic(fmt.Errorf("field dd_and_fingerprints_max of message lumera.action.SenseMetadata is not mutable"))
+	case "lumera.action.SenseMetadata.signatures":
+		panic(fmt.Errorf("field signatures of message lumera.action.SenseMetadata is not mutable"))
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: lumera.action.SenseMetadata"))
@@ -320,12 +378,18 @@ func (x *fastReflection_SenseMetadata) NewField(fd protoreflect.FieldDescriptor)
 	case "lumera.action.SenseMetadata.data_hash":
 		return protoreflect.ValueOfString("")
 	case "lumera.action.SenseMetadata.dd_and_fingerprints_ic":
-		return protoreflect.ValueOfInt32(int32(0))
+		return protoreflect.ValueOfUint64(uint64(0))
+	case "lumera.action.SenseMetadata.collection_id":
+		return protoreflect.ValueOfString("")
+	case "lumera.action.SenseMetadata.group_id":
+		return protoreflect.ValueOfString("")
 	case "lumera.action.SenseMetadata.dd_and_fingerprints_max":
-		return protoreflect.ValueOfInt32(int32(0))
+		return protoreflect.ValueOfUint64(uint64(0))
 	case "lumera.action.SenseMetadata.dd_and_fingerprints_ids":
 		list := []string{}
-		return protoreflect.ValueOfList(&_SenseMetadata_4_list{list: &list})
+		return protoreflect.ValueOfList(&_SenseMetadata_6_list{list: &list})
+	case "lumera.action.SenseMetadata.signatures":
+		return protoreflect.ValueOfString("")
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: lumera.action.SenseMetadata"))
@@ -402,6 +466,14 @@ func (x *fastReflection_SenseMetadata) ProtoMethods() *protoiface.Methods {
 		if x.DdAndFingerprintsIc != 0 {
 			n += 1 + runtime.Sov(uint64(x.DdAndFingerprintsIc))
 		}
+		l = len(x.CollectionId)
+		if l > 0 {
+			n += 1 + l + runtime.Sov(uint64(l))
+		}
+		l = len(x.GroupId)
+		if l > 0 {
+			n += 1 + l + runtime.Sov(uint64(l))
+		}
 		if x.DdAndFingerprintsMax != 0 {
 			n += 1 + runtime.Sov(uint64(x.DdAndFingerprintsMax))
 		}
@@ -410,6 +482,10 @@ func (x *fastReflection_SenseMetadata) ProtoMethods() *protoiface.Methods {
 				l = len(s)
 				n += 1 + l + runtime.Sov(uint64(l))
 			}
+		}
+		l = len(x.Signatures)
+		if l > 0 {
+			n += 1 + l + runtime.Sov(uint64(l))
 		}
 		if x.unknownFields != nil {
 			n += len(x.unknownFields)
@@ -440,19 +516,40 @@ func (x *fastReflection_SenseMetadata) ProtoMethods() *protoiface.Methods {
 			i -= len(x.unknownFields)
 			copy(dAtA[i:], x.unknownFields)
 		}
+		if len(x.Signatures) > 0 {
+			i -= len(x.Signatures)
+			copy(dAtA[i:], x.Signatures)
+			i = runtime.EncodeVarint(dAtA, i, uint64(len(x.Signatures)))
+			i--
+			dAtA[i] = 0x3a
+		}
 		if len(x.DdAndFingerprintsIds) > 0 {
 			for iNdEx := len(x.DdAndFingerprintsIds) - 1; iNdEx >= 0; iNdEx-- {
 				i -= len(x.DdAndFingerprintsIds[iNdEx])
 				copy(dAtA[i:], x.DdAndFingerprintsIds[iNdEx])
 				i = runtime.EncodeVarint(dAtA, i, uint64(len(x.DdAndFingerprintsIds[iNdEx])))
 				i--
-				dAtA[i] = 0x22
+				dAtA[i] = 0x32
 			}
 		}
 		if x.DdAndFingerprintsMax != 0 {
 			i = runtime.EncodeVarint(dAtA, i, uint64(x.DdAndFingerprintsMax))
 			i--
-			dAtA[i] = 0x18
+			dAtA[i] = 0x28
+		}
+		if len(x.GroupId) > 0 {
+			i -= len(x.GroupId)
+			copy(dAtA[i:], x.GroupId)
+			i = runtime.EncodeVarint(dAtA, i, uint64(len(x.GroupId)))
+			i--
+			dAtA[i] = 0x22
+		}
+		if len(x.CollectionId) > 0 {
+			i -= len(x.CollectionId)
+			copy(dAtA[i:], x.CollectionId)
+			i = runtime.EncodeVarint(dAtA, i, uint64(len(x.CollectionId)))
+			i--
+			dAtA[i] = 0x1a
 		}
 		if x.DdAndFingerprintsIc != 0 {
 			i = runtime.EncodeVarint(dAtA, i, uint64(x.DdAndFingerprintsIc))
@@ -561,12 +658,76 @@ func (x *fastReflection_SenseMetadata) ProtoMethods() *protoiface.Methods {
 					}
 					b := dAtA[iNdEx]
 					iNdEx++
-					x.DdAndFingerprintsIc |= int32(b&0x7F) << shift
+					x.DdAndFingerprintsIc |= uint64(b&0x7F) << shift
 					if b < 0x80 {
 						break
 					}
 				}
 			case 3:
+				if wireType != 2 {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: wrong wireType = %d for field CollectionId", wireType)
+				}
+				var stringLen uint64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrIntOverflow
+					}
+					if iNdEx >= l {
+						return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					stringLen |= uint64(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				intStringLen := int(stringLen)
+				if intStringLen < 0 {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
+				}
+				postIndex := iNdEx + intStringLen
+				if postIndex < 0 {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
+				}
+				if postIndex > l {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
+				}
+				x.CollectionId = string(dAtA[iNdEx:postIndex])
+				iNdEx = postIndex
+			case 4:
+				if wireType != 2 {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: wrong wireType = %d for field GroupId", wireType)
+				}
+				var stringLen uint64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrIntOverflow
+					}
+					if iNdEx >= l {
+						return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					stringLen |= uint64(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				intStringLen := int(stringLen)
+				if intStringLen < 0 {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
+				}
+				postIndex := iNdEx + intStringLen
+				if postIndex < 0 {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
+				}
+				if postIndex > l {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
+				}
+				x.GroupId = string(dAtA[iNdEx:postIndex])
+				iNdEx = postIndex
+			case 5:
 				if wireType != 0 {
 					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: wrong wireType = %d for field DdAndFingerprintsMax", wireType)
 				}
@@ -580,12 +741,12 @@ func (x *fastReflection_SenseMetadata) ProtoMethods() *protoiface.Methods {
 					}
 					b := dAtA[iNdEx]
 					iNdEx++
-					x.DdAndFingerprintsMax |= int32(b&0x7F) << shift
+					x.DdAndFingerprintsMax |= uint64(b&0x7F) << shift
 					if b < 0x80 {
 						break
 					}
 				}
-			case 4:
+			case 6:
 				if wireType != 2 {
 					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: wrong wireType = %d for field DdAndFingerprintsIds", wireType)
 				}
@@ -616,6 +777,38 @@ func (x *fastReflection_SenseMetadata) ProtoMethods() *protoiface.Methods {
 					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
 				}
 				x.DdAndFingerprintsIds = append(x.DdAndFingerprintsIds, string(dAtA[iNdEx:postIndex]))
+				iNdEx = postIndex
+			case 7:
+				if wireType != 2 {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: wrong wireType = %d for field Signatures", wireType)
+				}
+				var stringLen uint64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrIntOverflow
+					}
+					if iNdEx >= l {
+						return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					stringLen |= uint64(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				intStringLen := int(stringLen)
+				if intStringLen < 0 {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
+				}
+				postIndex := iNdEx + intStringLen
+				if postIndex < 0 {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
+				}
+				if postIndex > l {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
+				}
+				x.Signatures = string(dAtA[iNdEx:postIndex])
 				iNdEx = postIndex
 			default:
 				iNdEx = preIndex
@@ -652,60 +845,60 @@ func (x *fastReflection_SenseMetadata) ProtoMethods() *protoiface.Methods {
 	}
 }
 
-var _ protoreflect.List = (*_CascadeMetadata_3_list)(nil)
+var _ protoreflect.List = (*_CascadeMetadata_5_list)(nil)
 
-type _CascadeMetadata_3_list struct {
+type _CascadeMetadata_5_list struct {
 	list *[]string
 }
 
-func (x *_CascadeMetadata_3_list) Len() int {
+func (x *_CascadeMetadata_5_list) Len() int {
 	if x.list == nil {
 		return 0
 	}
 	return len(*x.list)
 }
 
-func (x *_CascadeMetadata_3_list) Get(i int) protoreflect.Value {
+func (x *_CascadeMetadata_5_list) Get(i int) protoreflect.Value {
 	return protoreflect.ValueOfString((*x.list)[i])
 }
 
-func (x *_CascadeMetadata_3_list) Set(i int, value protoreflect.Value) {
+func (x *_CascadeMetadata_5_list) Set(i int, value protoreflect.Value) {
 	valueUnwrapped := value.String()
 	concreteValue := valueUnwrapped
 	(*x.list)[i] = concreteValue
 }
 
-func (x *_CascadeMetadata_3_list) Append(value protoreflect.Value) {
+func (x *_CascadeMetadata_5_list) Append(value protoreflect.Value) {
 	valueUnwrapped := value.String()
 	concreteValue := valueUnwrapped
 	*x.list = append(*x.list, concreteValue)
 }
 
-func (x *_CascadeMetadata_3_list) AppendMutable() protoreflect.Value {
-	panic(fmt.Errorf("AppendMutable can not be called on message CascadeMetadata at list field RqIds as it is not of Message kind"))
+func (x *_CascadeMetadata_5_list) AppendMutable() protoreflect.Value {
+	panic(fmt.Errorf("AppendMutable can not be called on message CascadeMetadata at list field RqIdsIds as it is not of Message kind"))
 }
 
-func (x *_CascadeMetadata_3_list) Truncate(n int) {
+func (x *_CascadeMetadata_5_list) Truncate(n int) {
 	*x.list = (*x.list)[:n]
 }
 
-func (x *_CascadeMetadata_3_list) NewElement() protoreflect.Value {
+func (x *_CascadeMetadata_5_list) NewElement() protoreflect.Value {
 	v := ""
 	return protoreflect.ValueOfString(v)
 }
 
-func (x *_CascadeMetadata_3_list) IsValid() bool {
+func (x *_CascadeMetadata_5_list) IsValid() bool {
 	return x.list != nil
 }
 
 var (
-	md_CascadeMetadata           protoreflect.MessageDescriptor
-	fd_CascadeMetadata_data_hash protoreflect.FieldDescriptor
-	fd_CascadeMetadata_file_name protoreflect.FieldDescriptor
-	fd_CascadeMetadata_rq_ids    protoreflect.FieldDescriptor
-	fd_CascadeMetadata_rq_max    protoreflect.FieldDescriptor
-	fd_CascadeMetadata_rq_ic     protoreflect.FieldDescriptor
-	fd_CascadeMetadata_rq_oti    protoreflect.FieldDescriptor
+	md_CascadeMetadata            protoreflect.MessageDescriptor
+	fd_CascadeMetadata_data_hash  protoreflect.FieldDescriptor
+	fd_CascadeMetadata_file_name  protoreflect.FieldDescriptor
+	fd_CascadeMetadata_rq_ids_ic  protoreflect.FieldDescriptor
+	fd_CascadeMetadata_rq_ids_max protoreflect.FieldDescriptor
+	fd_CascadeMetadata_rq_ids_ids protoreflect.FieldDescriptor
+	fd_CascadeMetadata_signatures protoreflect.FieldDescriptor
 )
 
 func init() {
@@ -713,10 +906,10 @@ func init() {
 	md_CascadeMetadata = File_lumera_action_metadata_proto.Messages().ByName("CascadeMetadata")
 	fd_CascadeMetadata_data_hash = md_CascadeMetadata.Fields().ByName("data_hash")
 	fd_CascadeMetadata_file_name = md_CascadeMetadata.Fields().ByName("file_name")
-	fd_CascadeMetadata_rq_ids = md_CascadeMetadata.Fields().ByName("rq_ids")
-	fd_CascadeMetadata_rq_max = md_CascadeMetadata.Fields().ByName("rq_max")
-	fd_CascadeMetadata_rq_ic = md_CascadeMetadata.Fields().ByName("rq_ic")
-	fd_CascadeMetadata_rq_oti = md_CascadeMetadata.Fields().ByName("rq_oti")
+	fd_CascadeMetadata_rq_ids_ic = md_CascadeMetadata.Fields().ByName("rq_ids_ic")
+	fd_CascadeMetadata_rq_ids_max = md_CascadeMetadata.Fields().ByName("rq_ids_max")
+	fd_CascadeMetadata_rq_ids_ids = md_CascadeMetadata.Fields().ByName("rq_ids_ids")
+	fd_CascadeMetadata_signatures = md_CascadeMetadata.Fields().ByName("signatures")
 }
 
 var _ protoreflect.Message = (*fastReflection_CascadeMetadata)(nil)
@@ -796,27 +989,27 @@ func (x *fastReflection_CascadeMetadata) Range(f func(protoreflect.FieldDescript
 			return
 		}
 	}
-	if len(x.RqIds) != 0 {
-		value := protoreflect.ValueOfList(&_CascadeMetadata_3_list{list: &x.RqIds})
-		if !f(fd_CascadeMetadata_rq_ids, value) {
+	if x.RqIdsIc != uint64(0) {
+		value := protoreflect.ValueOfUint64(x.RqIdsIc)
+		if !f(fd_CascadeMetadata_rq_ids_ic, value) {
 			return
 		}
 	}
-	if x.RqMax != int32(0) {
-		value := protoreflect.ValueOfInt32(x.RqMax)
-		if !f(fd_CascadeMetadata_rq_max, value) {
+	if x.RqIdsMax != uint64(0) {
+		value := protoreflect.ValueOfUint64(x.RqIdsMax)
+		if !f(fd_CascadeMetadata_rq_ids_max, value) {
 			return
 		}
 	}
-	if x.RqIc != int32(0) {
-		value := protoreflect.ValueOfInt32(x.RqIc)
-		if !f(fd_CascadeMetadata_rq_ic, value) {
+	if len(x.RqIdsIds) != 0 {
+		value := protoreflect.ValueOfList(&_CascadeMetadata_5_list{list: &x.RqIdsIds})
+		if !f(fd_CascadeMetadata_rq_ids_ids, value) {
 			return
 		}
 	}
-	if len(x.RqOti) != 0 {
-		value := protoreflect.ValueOfBytes(x.RqOti)
-		if !f(fd_CascadeMetadata_rq_oti, value) {
+	if x.Signatures != "" {
+		value := protoreflect.ValueOfString(x.Signatures)
+		if !f(fd_CascadeMetadata_signatures, value) {
 			return
 		}
 	}
@@ -839,14 +1032,14 @@ func (x *fastReflection_CascadeMetadata) Has(fd protoreflect.FieldDescriptor) bo
 		return x.DataHash != ""
 	case "lumera.action.CascadeMetadata.file_name":
 		return x.FileName != ""
-	case "lumera.action.CascadeMetadata.rq_ids":
-		return len(x.RqIds) != 0
-	case "lumera.action.CascadeMetadata.rq_max":
-		return x.RqMax != int32(0)
-	case "lumera.action.CascadeMetadata.rq_ic":
-		return x.RqIc != int32(0)
-	case "lumera.action.CascadeMetadata.rq_oti":
-		return len(x.RqOti) != 0
+	case "lumera.action.CascadeMetadata.rq_ids_ic":
+		return x.RqIdsIc != uint64(0)
+	case "lumera.action.CascadeMetadata.rq_ids_max":
+		return x.RqIdsMax != uint64(0)
+	case "lumera.action.CascadeMetadata.rq_ids_ids":
+		return len(x.RqIdsIds) != 0
+	case "lumera.action.CascadeMetadata.signatures":
+		return x.Signatures != ""
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: lumera.action.CascadeMetadata"))
@@ -867,14 +1060,14 @@ func (x *fastReflection_CascadeMetadata) Clear(fd protoreflect.FieldDescriptor) 
 		x.DataHash = ""
 	case "lumera.action.CascadeMetadata.file_name":
 		x.FileName = ""
-	case "lumera.action.CascadeMetadata.rq_ids":
-		x.RqIds = nil
-	case "lumera.action.CascadeMetadata.rq_max":
-		x.RqMax = int32(0)
-	case "lumera.action.CascadeMetadata.rq_ic":
-		x.RqIc = int32(0)
-	case "lumera.action.CascadeMetadata.rq_oti":
-		x.RqOti = nil
+	case "lumera.action.CascadeMetadata.rq_ids_ic":
+		x.RqIdsIc = uint64(0)
+	case "lumera.action.CascadeMetadata.rq_ids_max":
+		x.RqIdsMax = uint64(0)
+	case "lumera.action.CascadeMetadata.rq_ids_ids":
+		x.RqIdsIds = nil
+	case "lumera.action.CascadeMetadata.signatures":
+		x.Signatures = ""
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: lumera.action.CascadeMetadata"))
@@ -897,21 +1090,21 @@ func (x *fastReflection_CascadeMetadata) Get(descriptor protoreflect.FieldDescri
 	case "lumera.action.CascadeMetadata.file_name":
 		value := x.FileName
 		return protoreflect.ValueOfString(value)
-	case "lumera.action.CascadeMetadata.rq_ids":
-		if len(x.RqIds) == 0 {
-			return protoreflect.ValueOfList(&_CascadeMetadata_3_list{})
+	case "lumera.action.CascadeMetadata.rq_ids_ic":
+		value := x.RqIdsIc
+		return protoreflect.ValueOfUint64(value)
+	case "lumera.action.CascadeMetadata.rq_ids_max":
+		value := x.RqIdsMax
+		return protoreflect.ValueOfUint64(value)
+	case "lumera.action.CascadeMetadata.rq_ids_ids":
+		if len(x.RqIdsIds) == 0 {
+			return protoreflect.ValueOfList(&_CascadeMetadata_5_list{})
 		}
-		listValue := &_CascadeMetadata_3_list{list: &x.RqIds}
+		listValue := &_CascadeMetadata_5_list{list: &x.RqIdsIds}
 		return protoreflect.ValueOfList(listValue)
-	case "lumera.action.CascadeMetadata.rq_max":
-		value := x.RqMax
-		return protoreflect.ValueOfInt32(value)
-	case "lumera.action.CascadeMetadata.rq_ic":
-		value := x.RqIc
-		return protoreflect.ValueOfInt32(value)
-	case "lumera.action.CascadeMetadata.rq_oti":
-		value := x.RqOti
-		return protoreflect.ValueOfBytes(value)
+	case "lumera.action.CascadeMetadata.signatures":
+		value := x.Signatures
+		return protoreflect.ValueOfString(value)
 	default:
 		if descriptor.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: lumera.action.CascadeMetadata"))
@@ -936,16 +1129,16 @@ func (x *fastReflection_CascadeMetadata) Set(fd protoreflect.FieldDescriptor, va
 		x.DataHash = value.Interface().(string)
 	case "lumera.action.CascadeMetadata.file_name":
 		x.FileName = value.Interface().(string)
-	case "lumera.action.CascadeMetadata.rq_ids":
+	case "lumera.action.CascadeMetadata.rq_ids_ic":
+		x.RqIdsIc = value.Uint()
+	case "lumera.action.CascadeMetadata.rq_ids_max":
+		x.RqIdsMax = value.Uint()
+	case "lumera.action.CascadeMetadata.rq_ids_ids":
 		lv := value.List()
-		clv := lv.(*_CascadeMetadata_3_list)
-		x.RqIds = *clv.list
-	case "lumera.action.CascadeMetadata.rq_max":
-		x.RqMax = int32(value.Int())
-	case "lumera.action.CascadeMetadata.rq_ic":
-		x.RqIc = int32(value.Int())
-	case "lumera.action.CascadeMetadata.rq_oti":
-		x.RqOti = value.Bytes()
+		clv := lv.(*_CascadeMetadata_5_list)
+		x.RqIdsIds = *clv.list
+	case "lumera.action.CascadeMetadata.signatures":
+		x.Signatures = value.Interface().(string)
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: lumera.action.CascadeMetadata"))
@@ -966,22 +1159,22 @@ func (x *fastReflection_CascadeMetadata) Set(fd protoreflect.FieldDescriptor, va
 // Mutable is a mutating operation and unsafe for concurrent use.
 func (x *fastReflection_CascadeMetadata) Mutable(fd protoreflect.FieldDescriptor) protoreflect.Value {
 	switch fd.FullName() {
-	case "lumera.action.CascadeMetadata.rq_ids":
-		if x.RqIds == nil {
-			x.RqIds = []string{}
+	case "lumera.action.CascadeMetadata.rq_ids_ids":
+		if x.RqIdsIds == nil {
+			x.RqIdsIds = []string{}
 		}
-		value := &_CascadeMetadata_3_list{list: &x.RqIds}
+		value := &_CascadeMetadata_5_list{list: &x.RqIdsIds}
 		return protoreflect.ValueOfList(value)
 	case "lumera.action.CascadeMetadata.data_hash":
 		panic(fmt.Errorf("field data_hash of message lumera.action.CascadeMetadata is not mutable"))
 	case "lumera.action.CascadeMetadata.file_name":
 		panic(fmt.Errorf("field file_name of message lumera.action.CascadeMetadata is not mutable"))
-	case "lumera.action.CascadeMetadata.rq_max":
-		panic(fmt.Errorf("field rq_max of message lumera.action.CascadeMetadata is not mutable"))
-	case "lumera.action.CascadeMetadata.rq_ic":
-		panic(fmt.Errorf("field rq_ic of message lumera.action.CascadeMetadata is not mutable"))
-	case "lumera.action.CascadeMetadata.rq_oti":
-		panic(fmt.Errorf("field rq_oti of message lumera.action.CascadeMetadata is not mutable"))
+	case "lumera.action.CascadeMetadata.rq_ids_ic":
+		panic(fmt.Errorf("field rq_ids_ic of message lumera.action.CascadeMetadata is not mutable"))
+	case "lumera.action.CascadeMetadata.rq_ids_max":
+		panic(fmt.Errorf("field rq_ids_max of message lumera.action.CascadeMetadata is not mutable"))
+	case "lumera.action.CascadeMetadata.signatures":
+		panic(fmt.Errorf("field signatures of message lumera.action.CascadeMetadata is not mutable"))
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: lumera.action.CascadeMetadata"))
@@ -999,15 +1192,15 @@ func (x *fastReflection_CascadeMetadata) NewField(fd protoreflect.FieldDescripto
 		return protoreflect.ValueOfString("")
 	case "lumera.action.CascadeMetadata.file_name":
 		return protoreflect.ValueOfString("")
-	case "lumera.action.CascadeMetadata.rq_ids":
+	case "lumera.action.CascadeMetadata.rq_ids_ic":
+		return protoreflect.ValueOfUint64(uint64(0))
+	case "lumera.action.CascadeMetadata.rq_ids_max":
+		return protoreflect.ValueOfUint64(uint64(0))
+	case "lumera.action.CascadeMetadata.rq_ids_ids":
 		list := []string{}
-		return protoreflect.ValueOfList(&_CascadeMetadata_3_list{list: &list})
-	case "lumera.action.CascadeMetadata.rq_max":
-		return protoreflect.ValueOfInt32(int32(0))
-	case "lumera.action.CascadeMetadata.rq_ic":
-		return protoreflect.ValueOfInt32(int32(0))
-	case "lumera.action.CascadeMetadata.rq_oti":
-		return protoreflect.ValueOfBytes(nil)
+		return protoreflect.ValueOfList(&_CascadeMetadata_5_list{list: &list})
+	case "lumera.action.CascadeMetadata.signatures":
+		return protoreflect.ValueOfString("")
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: lumera.action.CascadeMetadata"))
@@ -1085,19 +1278,19 @@ func (x *fastReflection_CascadeMetadata) ProtoMethods() *protoiface.Methods {
 		if l > 0 {
 			n += 1 + l + runtime.Sov(uint64(l))
 		}
-		if len(x.RqIds) > 0 {
-			for _, s := range x.RqIds {
+		if x.RqIdsIc != 0 {
+			n += 1 + runtime.Sov(uint64(x.RqIdsIc))
+		}
+		if x.RqIdsMax != 0 {
+			n += 1 + runtime.Sov(uint64(x.RqIdsMax))
+		}
+		if len(x.RqIdsIds) > 0 {
+			for _, s := range x.RqIdsIds {
 				l = len(s)
 				n += 1 + l + runtime.Sov(uint64(l))
 			}
 		}
-		if x.RqMax != 0 {
-			n += 1 + runtime.Sov(uint64(x.RqMax))
-		}
-		if x.RqIc != 0 {
-			n += 1 + runtime.Sov(uint64(x.RqIc))
-		}
-		l = len(x.RqOti)
+		l = len(x.Signatures)
 		if l > 0 {
 			n += 1 + l + runtime.Sov(uint64(l))
 		}
@@ -1130,31 +1323,31 @@ func (x *fastReflection_CascadeMetadata) ProtoMethods() *protoiface.Methods {
 			i -= len(x.unknownFields)
 			copy(dAtA[i:], x.unknownFields)
 		}
-		if len(x.RqOti) > 0 {
-			i -= len(x.RqOti)
-			copy(dAtA[i:], x.RqOti)
-			i = runtime.EncodeVarint(dAtA, i, uint64(len(x.RqOti)))
+		if len(x.Signatures) > 0 {
+			i -= len(x.Signatures)
+			copy(dAtA[i:], x.Signatures)
+			i = runtime.EncodeVarint(dAtA, i, uint64(len(x.Signatures)))
 			i--
 			dAtA[i] = 0x32
 		}
-		if x.RqIc != 0 {
-			i = runtime.EncodeVarint(dAtA, i, uint64(x.RqIc))
-			i--
-			dAtA[i] = 0x28
+		if len(x.RqIdsIds) > 0 {
+			for iNdEx := len(x.RqIdsIds) - 1; iNdEx >= 0; iNdEx-- {
+				i -= len(x.RqIdsIds[iNdEx])
+				copy(dAtA[i:], x.RqIdsIds[iNdEx])
+				i = runtime.EncodeVarint(dAtA, i, uint64(len(x.RqIdsIds[iNdEx])))
+				i--
+				dAtA[i] = 0x2a
+			}
 		}
-		if x.RqMax != 0 {
-			i = runtime.EncodeVarint(dAtA, i, uint64(x.RqMax))
+		if x.RqIdsMax != 0 {
+			i = runtime.EncodeVarint(dAtA, i, uint64(x.RqIdsMax))
 			i--
 			dAtA[i] = 0x20
 		}
-		if len(x.RqIds) > 0 {
-			for iNdEx := len(x.RqIds) - 1; iNdEx >= 0; iNdEx-- {
-				i -= len(x.RqIds[iNdEx])
-				copy(dAtA[i:], x.RqIds[iNdEx])
-				i = runtime.EncodeVarint(dAtA, i, uint64(len(x.RqIds[iNdEx])))
-				i--
-				dAtA[i] = 0x1a
-			}
+		if x.RqIdsIc != 0 {
+			i = runtime.EncodeVarint(dAtA, i, uint64(x.RqIdsIc))
+			i--
+			dAtA[i] = 0x18
 		}
 		if len(x.FileName) > 0 {
 			i -= len(x.FileName)
@@ -1284,8 +1477,46 @@ func (x *fastReflection_CascadeMetadata) ProtoMethods() *protoiface.Methods {
 				x.FileName = string(dAtA[iNdEx:postIndex])
 				iNdEx = postIndex
 			case 3:
+				if wireType != 0 {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: wrong wireType = %d for field RqIdsIc", wireType)
+				}
+				x.RqIdsIc = 0
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrIntOverflow
+					}
+					if iNdEx >= l {
+						return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					x.RqIdsIc |= uint64(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+			case 4:
+				if wireType != 0 {
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: wrong wireType = %d for field RqIdsMax", wireType)
+				}
+				x.RqIdsMax = 0
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrIntOverflow
+					}
+					if iNdEx >= l {
+						return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					x.RqIdsMax |= uint64(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+			case 5:
 				if wireType != 2 {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: wrong wireType = %d for field RqIds", wireType)
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: wrong wireType = %d for field RqIdsIds", wireType)
 				}
 				var stringLen uint64
 				for shift := uint(0); ; shift += 7 {
@@ -1313,51 +1544,13 @@ func (x *fastReflection_CascadeMetadata) ProtoMethods() *protoiface.Methods {
 				if postIndex > l {
 					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
 				}
-				x.RqIds = append(x.RqIds, string(dAtA[iNdEx:postIndex]))
+				x.RqIdsIds = append(x.RqIdsIds, string(dAtA[iNdEx:postIndex]))
 				iNdEx = postIndex
-			case 4:
-				if wireType != 0 {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: wrong wireType = %d for field RqMax", wireType)
-				}
-				x.RqMax = 0
-				for shift := uint(0); ; shift += 7 {
-					if shift >= 64 {
-						return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrIntOverflow
-					}
-					if iNdEx >= l {
-						return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
-					}
-					b := dAtA[iNdEx]
-					iNdEx++
-					x.RqMax |= int32(b&0x7F) << shift
-					if b < 0x80 {
-						break
-					}
-				}
-			case 5:
-				if wireType != 0 {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: wrong wireType = %d for field RqIc", wireType)
-				}
-				x.RqIc = 0
-				for shift := uint(0); ; shift += 7 {
-					if shift >= 64 {
-						return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrIntOverflow
-					}
-					if iNdEx >= l {
-						return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
-					}
-					b := dAtA[iNdEx]
-					iNdEx++
-					x.RqIc |= int32(b&0x7F) << shift
-					if b < 0x80 {
-						break
-					}
-				}
 			case 6:
 				if wireType != 2 {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: wrong wireType = %d for field RqOti", wireType)
+					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: wrong wireType = %d for field Signatures", wireType)
 				}
-				var byteLen int
+				var stringLen uint64
 				for shift := uint(0); ; shift += 7 {
 					if shift >= 64 {
 						return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrIntOverflow
@@ -1367,603 +1560,23 @@ func (x *fastReflection_CascadeMetadata) ProtoMethods() *protoiface.Methods {
 					}
 					b := dAtA[iNdEx]
 					iNdEx++
-					byteLen |= int(b&0x7F) << shift
+					stringLen |= uint64(b&0x7F) << shift
 					if b < 0x80 {
 						break
 					}
 				}
-				if byteLen < 0 {
+				intStringLen := int(stringLen)
+				if intStringLen < 0 {
 					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
 				}
-				postIndex := iNdEx + byteLen
+				postIndex := iNdEx + intStringLen
 				if postIndex < 0 {
 					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
 				}
 				if postIndex > l {
 					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
 				}
-				x.RqOti = append(x.RqOti[:0], dAtA[iNdEx:postIndex]...)
-				if x.RqOti == nil {
-					x.RqOti = []byte{}
-				}
-				iNdEx = postIndex
-			default:
-				iNdEx = preIndex
-				skippy, err := runtime.Skip(dAtA[iNdEx:])
-				if err != nil {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, err
-				}
-				if (skippy < 0) || (iNdEx+skippy) < 0 {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
-				}
-				if (iNdEx + skippy) > l {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
-				}
-				if !options.DiscardUnknown {
-					x.unknownFields = append(x.unknownFields, dAtA[iNdEx:iNdEx+skippy]...)
-				}
-				iNdEx += skippy
-			}
-		}
-
-		if iNdEx > l {
-			return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
-		}
-		return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, nil
-	}
-	return &protoiface.Methods{
-		NoUnkeyedLiterals: struct{}{},
-		Flags:             protoiface.SupportMarshalDeterministic | protoiface.SupportUnmarshalDiscardUnknown,
-		Size:              size,
-		Marshal:           marshal,
-		Unmarshal:         unmarshal,
-		Merge:             nil,
-		CheckInitialized:  nil,
-	}
-}
-
-var (
-	md_Metadata                  protoreflect.MessageDescriptor
-	fd_Metadata_sense_metadata   protoreflect.FieldDescriptor
-	fd_Metadata_cascade_metadata protoreflect.FieldDescriptor
-)
-
-func init() {
-	file_lumera_action_metadata_proto_init()
-	md_Metadata = File_lumera_action_metadata_proto.Messages().ByName("Metadata")
-	fd_Metadata_sense_metadata = md_Metadata.Fields().ByName("sense_metadata")
-	fd_Metadata_cascade_metadata = md_Metadata.Fields().ByName("cascade_metadata")
-}
-
-var _ protoreflect.Message = (*fastReflection_Metadata)(nil)
-
-type fastReflection_Metadata Metadata
-
-func (x *Metadata) ProtoReflect() protoreflect.Message {
-	return (*fastReflection_Metadata)(x)
-}
-
-func (x *Metadata) slowProtoReflect() protoreflect.Message {
-	mi := &file_lumera_action_metadata_proto_msgTypes[2]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-var _fastReflection_Metadata_messageType fastReflection_Metadata_messageType
-var _ protoreflect.MessageType = fastReflection_Metadata_messageType{}
-
-type fastReflection_Metadata_messageType struct{}
-
-func (x fastReflection_Metadata_messageType) Zero() protoreflect.Message {
-	return (*fastReflection_Metadata)(nil)
-}
-func (x fastReflection_Metadata_messageType) New() protoreflect.Message {
-	return new(fastReflection_Metadata)
-}
-func (x fastReflection_Metadata_messageType) Descriptor() protoreflect.MessageDescriptor {
-	return md_Metadata
-}
-
-// Descriptor returns message descriptor, which contains only the protobuf
-// type information for the message.
-func (x *fastReflection_Metadata) Descriptor() protoreflect.MessageDescriptor {
-	return md_Metadata
-}
-
-// Type returns the message type, which encapsulates both Go and protobuf
-// type information. If the Go type information is not needed,
-// it is recommended that the message descriptor be used instead.
-func (x *fastReflection_Metadata) Type() protoreflect.MessageType {
-	return _fastReflection_Metadata_messageType
-}
-
-// New returns a newly allocated and mutable empty message.
-func (x *fastReflection_Metadata) New() protoreflect.Message {
-	return new(fastReflection_Metadata)
-}
-
-// Interface unwraps the message reflection interface and
-// returns the underlying ProtoMessage interface.
-func (x *fastReflection_Metadata) Interface() protoreflect.ProtoMessage {
-	return (*Metadata)(x)
-}
-
-// Range iterates over every populated field in an undefined order,
-// calling f for each field descriptor and value encountered.
-// Range returns immediately if f returns false.
-// While iterating, mutating operations may only be performed
-// on the current field descriptor.
-func (x *fastReflection_Metadata) Range(f func(protoreflect.FieldDescriptor, protoreflect.Value) bool) {
-	if x.MetadataType != nil {
-		switch o := x.MetadataType.(type) {
-		case *Metadata_SenseMetadata:
-			v := o.SenseMetadata
-			value := protoreflect.ValueOfMessage(v.ProtoReflect())
-			if !f(fd_Metadata_sense_metadata, value) {
-				return
-			}
-		case *Metadata_CascadeMetadata:
-			v := o.CascadeMetadata
-			value := protoreflect.ValueOfMessage(v.ProtoReflect())
-			if !f(fd_Metadata_cascade_metadata, value) {
-				return
-			}
-		}
-	}
-}
-
-// Has reports whether a field is populated.
-//
-// Some fields have the property of nullability where it is possible to
-// distinguish between the default value of a field and whether the field
-// was explicitly populated with the default value. Singular message fields,
-// member fields of a oneof, and proto2 scalar fields are nullable. Such
-// fields are populated only if explicitly set.
-//
-// In other cases (aside from the nullable cases above),
-// a proto3 scalar field is populated if it contains a non-zero value, and
-// a repeated field is populated if it is non-empty.
-func (x *fastReflection_Metadata) Has(fd protoreflect.FieldDescriptor) bool {
-	switch fd.FullName() {
-	case "lumera.action.Metadata.sense_metadata":
-		if x.MetadataType == nil {
-			return false
-		} else if _, ok := x.MetadataType.(*Metadata_SenseMetadata); ok {
-			return true
-		} else {
-			return false
-		}
-	case "lumera.action.Metadata.cascade_metadata":
-		if x.MetadataType == nil {
-			return false
-		} else if _, ok := x.MetadataType.(*Metadata_CascadeMetadata); ok {
-			return true
-		} else {
-			return false
-		}
-	default:
-		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: lumera.action.Metadata"))
-		}
-		panic(fmt.Errorf("message lumera.action.Metadata does not contain field %s", fd.FullName()))
-	}
-}
-
-// Clear clears the field such that a subsequent Has call reports false.
-//
-// Clearing an extension field clears both the extension type and value
-// associated with the given field number.
-//
-// Clear is a mutating operation and unsafe for concurrent use.
-func (x *fastReflection_Metadata) Clear(fd protoreflect.FieldDescriptor) {
-	switch fd.FullName() {
-	case "lumera.action.Metadata.sense_metadata":
-		x.MetadataType = nil
-	case "lumera.action.Metadata.cascade_metadata":
-		x.MetadataType = nil
-	default:
-		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: lumera.action.Metadata"))
-		}
-		panic(fmt.Errorf("message lumera.action.Metadata does not contain field %s", fd.FullName()))
-	}
-}
-
-// Get retrieves the value for a field.
-//
-// For unpopulated scalars, it returns the default value, where
-// the default value of a bytes scalar is guaranteed to be a copy.
-// For unpopulated composite types, it returns an empty, read-only view
-// of the value; to obtain a mutable reference, use Mutable.
-func (x *fastReflection_Metadata) Get(descriptor protoreflect.FieldDescriptor) protoreflect.Value {
-	switch descriptor.FullName() {
-	case "lumera.action.Metadata.sense_metadata":
-		if x.MetadataType == nil {
-			return protoreflect.ValueOfMessage((*SenseMetadata)(nil).ProtoReflect())
-		} else if v, ok := x.MetadataType.(*Metadata_SenseMetadata); ok {
-			return protoreflect.ValueOfMessage(v.SenseMetadata.ProtoReflect())
-		} else {
-			return protoreflect.ValueOfMessage((*SenseMetadata)(nil).ProtoReflect())
-		}
-	case "lumera.action.Metadata.cascade_metadata":
-		if x.MetadataType == nil {
-			return protoreflect.ValueOfMessage((*CascadeMetadata)(nil).ProtoReflect())
-		} else if v, ok := x.MetadataType.(*Metadata_CascadeMetadata); ok {
-			return protoreflect.ValueOfMessage(v.CascadeMetadata.ProtoReflect())
-		} else {
-			return protoreflect.ValueOfMessage((*CascadeMetadata)(nil).ProtoReflect())
-		}
-	default:
-		if descriptor.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: lumera.action.Metadata"))
-		}
-		panic(fmt.Errorf("message lumera.action.Metadata does not contain field %s", descriptor.FullName()))
-	}
-}
-
-// Set stores the value for a field.
-//
-// For a field belonging to a oneof, it implicitly clears any other field
-// that may be currently set within the same oneof.
-// For extension fields, it implicitly stores the provided ExtensionType.
-// When setting a composite type, it is unspecified whether the stored value
-// aliases the source's memory in any way. If the composite value is an
-// empty, read-only value, then it panics.
-//
-// Set is a mutating operation and unsafe for concurrent use.
-func (x *fastReflection_Metadata) Set(fd protoreflect.FieldDescriptor, value protoreflect.Value) {
-	switch fd.FullName() {
-	case "lumera.action.Metadata.sense_metadata":
-		cv := value.Message().Interface().(*SenseMetadata)
-		x.MetadataType = &Metadata_SenseMetadata{SenseMetadata: cv}
-	case "lumera.action.Metadata.cascade_metadata":
-		cv := value.Message().Interface().(*CascadeMetadata)
-		x.MetadataType = &Metadata_CascadeMetadata{CascadeMetadata: cv}
-	default:
-		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: lumera.action.Metadata"))
-		}
-		panic(fmt.Errorf("message lumera.action.Metadata does not contain field %s", fd.FullName()))
-	}
-}
-
-// Mutable returns a mutable reference to a composite type.
-//
-// If the field is unpopulated, it may allocate a composite value.
-// For a field belonging to a oneof, it implicitly clears any other field
-// that may be currently set within the same oneof.
-// For extension fields, it implicitly stores the provided ExtensionType
-// if not already stored.
-// It panics if the field does not contain a composite type.
-//
-// Mutable is a mutating operation and unsafe for concurrent use.
-func (x *fastReflection_Metadata) Mutable(fd protoreflect.FieldDescriptor) protoreflect.Value {
-	switch fd.FullName() {
-	case "lumera.action.Metadata.sense_metadata":
-		if x.MetadataType == nil {
-			value := &SenseMetadata{}
-			oneofValue := &Metadata_SenseMetadata{SenseMetadata: value}
-			x.MetadataType = oneofValue
-			return protoreflect.ValueOfMessage(value.ProtoReflect())
-		}
-		switch m := x.MetadataType.(type) {
-		case *Metadata_SenseMetadata:
-			return protoreflect.ValueOfMessage(m.SenseMetadata.ProtoReflect())
-		default:
-			value := &SenseMetadata{}
-			oneofValue := &Metadata_SenseMetadata{SenseMetadata: value}
-			x.MetadataType = oneofValue
-			return protoreflect.ValueOfMessage(value.ProtoReflect())
-		}
-	case "lumera.action.Metadata.cascade_metadata":
-		if x.MetadataType == nil {
-			value := &CascadeMetadata{}
-			oneofValue := &Metadata_CascadeMetadata{CascadeMetadata: value}
-			x.MetadataType = oneofValue
-			return protoreflect.ValueOfMessage(value.ProtoReflect())
-		}
-		switch m := x.MetadataType.(type) {
-		case *Metadata_CascadeMetadata:
-			return protoreflect.ValueOfMessage(m.CascadeMetadata.ProtoReflect())
-		default:
-			value := &CascadeMetadata{}
-			oneofValue := &Metadata_CascadeMetadata{CascadeMetadata: value}
-			x.MetadataType = oneofValue
-			return protoreflect.ValueOfMessage(value.ProtoReflect())
-		}
-	default:
-		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: lumera.action.Metadata"))
-		}
-		panic(fmt.Errorf("message lumera.action.Metadata does not contain field %s", fd.FullName()))
-	}
-}
-
-// NewField returns a new value that is assignable to the field
-// for the given descriptor. For scalars, this returns the default value.
-// For lists, maps, and messages, this returns a new, empty, mutable value.
-func (x *fastReflection_Metadata) NewField(fd protoreflect.FieldDescriptor) protoreflect.Value {
-	switch fd.FullName() {
-	case "lumera.action.Metadata.sense_metadata":
-		value := &SenseMetadata{}
-		return protoreflect.ValueOfMessage(value.ProtoReflect())
-	case "lumera.action.Metadata.cascade_metadata":
-		value := &CascadeMetadata{}
-		return protoreflect.ValueOfMessage(value.ProtoReflect())
-	default:
-		if fd.IsExtension() {
-			panic(fmt.Errorf("proto3 declared messages do not support extensions: lumera.action.Metadata"))
-		}
-		panic(fmt.Errorf("message lumera.action.Metadata does not contain field %s", fd.FullName()))
-	}
-}
-
-// WhichOneof reports which field within the oneof is populated,
-// returning nil if none are populated.
-// It panics if the oneof descriptor does not belong to this message.
-func (x *fastReflection_Metadata) WhichOneof(d protoreflect.OneofDescriptor) protoreflect.FieldDescriptor {
-	switch d.FullName() {
-	case "lumera.action.Metadata.metadata_type":
-		if x.MetadataType == nil {
-			return nil
-		}
-		switch x.MetadataType.(type) {
-		case *Metadata_SenseMetadata:
-			return x.Descriptor().Fields().ByName("sense_metadata")
-		case *Metadata_CascadeMetadata:
-			return x.Descriptor().Fields().ByName("cascade_metadata")
-		}
-	default:
-		panic(fmt.Errorf("%s is not a oneof field in lumera.action.Metadata", d.FullName()))
-	}
-	panic("unreachable")
-}
-
-// GetUnknown retrieves the entire list of unknown fields.
-// The caller may only mutate the contents of the RawFields
-// if the mutated bytes are stored back into the message with SetUnknown.
-func (x *fastReflection_Metadata) GetUnknown() protoreflect.RawFields {
-	return x.unknownFields
-}
-
-// SetUnknown stores an entire list of unknown fields.
-// The raw fields must be syntactically valid according to the wire format.
-// An implementation may panic if this is not the case.
-// Once stored, the caller must not mutate the content of the RawFields.
-// An empty RawFields may be passed to clear the fields.
-//
-// SetUnknown is a mutating operation and unsafe for concurrent use.
-func (x *fastReflection_Metadata) SetUnknown(fields protoreflect.RawFields) {
-	x.unknownFields = fields
-}
-
-// IsValid reports whether the message is valid.
-//
-// An invalid message is an empty, read-only value.
-//
-// An invalid message often corresponds to a nil pointer of the concrete
-// message type, but the details are implementation dependent.
-// Validity is not part of the protobuf data model, and may not
-// be preserved in marshaling or other operations.
-func (x *fastReflection_Metadata) IsValid() bool {
-	return x != nil
-}
-
-// ProtoMethods returns optional fastReflectionFeature-path implementations of various operations.
-// This method may return nil.
-//
-// The returned methods type is identical to
-// "google.golang.org/protobuf/runtime/protoiface".Methods.
-// Consult the protoiface package documentation for details.
-func (x *fastReflection_Metadata) ProtoMethods() *protoiface.Methods {
-	size := func(input protoiface.SizeInput) protoiface.SizeOutput {
-		x := input.Message.Interface().(*Metadata)
-		if x == nil {
-			return protoiface.SizeOutput{
-				NoUnkeyedLiterals: input.NoUnkeyedLiterals,
-				Size:              0,
-			}
-		}
-		options := runtime.SizeInputToOptions(input)
-		_ = options
-		var n int
-		var l int
-		_ = l
-		switch x := x.MetadataType.(type) {
-		case *Metadata_SenseMetadata:
-			if x == nil {
-				break
-			}
-			l = options.Size(x.SenseMetadata)
-			n += 1 + l + runtime.Sov(uint64(l))
-		case *Metadata_CascadeMetadata:
-			if x == nil {
-				break
-			}
-			l = options.Size(x.CascadeMetadata)
-			n += 1 + l + runtime.Sov(uint64(l))
-		}
-		if x.unknownFields != nil {
-			n += len(x.unknownFields)
-		}
-		return protoiface.SizeOutput{
-			NoUnkeyedLiterals: input.NoUnkeyedLiterals,
-			Size:              n,
-		}
-	}
-
-	marshal := func(input protoiface.MarshalInput) (protoiface.MarshalOutput, error) {
-		x := input.Message.Interface().(*Metadata)
-		if x == nil {
-			return protoiface.MarshalOutput{
-				NoUnkeyedLiterals: input.NoUnkeyedLiterals,
-				Buf:               input.Buf,
-			}, nil
-		}
-		options := runtime.MarshalInputToOptions(input)
-		_ = options
-		size := options.Size(x)
-		dAtA := make([]byte, size)
-		i := len(dAtA)
-		_ = i
-		var l int
-		_ = l
-		if x.unknownFields != nil {
-			i -= len(x.unknownFields)
-			copy(dAtA[i:], x.unknownFields)
-		}
-		switch x := x.MetadataType.(type) {
-		case *Metadata_SenseMetadata:
-			encoded, err := options.Marshal(x.SenseMetadata)
-			if err != nil {
-				return protoiface.MarshalOutput{
-					NoUnkeyedLiterals: input.NoUnkeyedLiterals,
-					Buf:               input.Buf,
-				}, err
-			}
-			i -= len(encoded)
-			copy(dAtA[i:], encoded)
-			i = runtime.EncodeVarint(dAtA, i, uint64(len(encoded)))
-			i--
-			dAtA[i] = 0xa
-		case *Metadata_CascadeMetadata:
-			encoded, err := options.Marshal(x.CascadeMetadata)
-			if err != nil {
-				return protoiface.MarshalOutput{
-					NoUnkeyedLiterals: input.NoUnkeyedLiterals,
-					Buf:               input.Buf,
-				}, err
-			}
-			i -= len(encoded)
-			copy(dAtA[i:], encoded)
-			i = runtime.EncodeVarint(dAtA, i, uint64(len(encoded)))
-			i--
-			dAtA[i] = 0x12
-		}
-		if input.Buf != nil {
-			input.Buf = append(input.Buf, dAtA...)
-		} else {
-			input.Buf = dAtA
-		}
-		return protoiface.MarshalOutput{
-			NoUnkeyedLiterals: input.NoUnkeyedLiterals,
-			Buf:               input.Buf,
-		}, nil
-	}
-	unmarshal := func(input protoiface.UnmarshalInput) (protoiface.UnmarshalOutput, error) {
-		x := input.Message.Interface().(*Metadata)
-		if x == nil {
-			return protoiface.UnmarshalOutput{
-				NoUnkeyedLiterals: input.NoUnkeyedLiterals,
-				Flags:             input.Flags,
-			}, nil
-		}
-		options := runtime.UnmarshalInputToOptions(input)
-		_ = options
-		dAtA := input.Buf
-		l := len(dAtA)
-		iNdEx := 0
-		for iNdEx < l {
-			preIndex := iNdEx
-			var wire uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrIntOverflow
-				}
-				if iNdEx >= l {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				wire |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			fieldNum := int32(wire >> 3)
-			wireType := int(wire & 0x7)
-			if wireType == 4 {
-				return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: Metadata: wiretype end group for non-group")
-			}
-			if fieldNum <= 0 {
-				return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: Metadata: illegal tag %d (wire type %d)", fieldNum, wire)
-			}
-			switch fieldNum {
-			case 1:
-				if wireType != 2 {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: wrong wireType = %d for field SenseMetadata", wireType)
-				}
-				var msglen int
-				for shift := uint(0); ; shift += 7 {
-					if shift >= 64 {
-						return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrIntOverflow
-					}
-					if iNdEx >= l {
-						return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
-					}
-					b := dAtA[iNdEx]
-					iNdEx++
-					msglen |= int(b&0x7F) << shift
-					if b < 0x80 {
-						break
-					}
-				}
-				if msglen < 0 {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
-				}
-				postIndex := iNdEx + msglen
-				if postIndex < 0 {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
-				}
-				if postIndex > l {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
-				}
-				v := &SenseMetadata{}
-				if err := options.Unmarshal(dAtA[iNdEx:postIndex], v); err != nil {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, err
-				}
-				x.MetadataType = &Metadata_SenseMetadata{v}
-				iNdEx = postIndex
-			case 2:
-				if wireType != 2 {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, fmt.Errorf("proto: wrong wireType = %d for field CascadeMetadata", wireType)
-				}
-				var msglen int
-				for shift := uint(0); ; shift += 7 {
-					if shift >= 64 {
-						return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrIntOverflow
-					}
-					if iNdEx >= l {
-						return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
-					}
-					b := dAtA[iNdEx]
-					iNdEx++
-					msglen |= int(b&0x7F) << shift
-					if b < 0x80 {
-						break
-					}
-				}
-				if msglen < 0 {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
-				}
-				postIndex := iNdEx + msglen
-				if postIndex < 0 {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, runtime.ErrInvalidLength
-				}
-				if postIndex > l {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, io.ErrUnexpectedEOF
-				}
-				v := &CascadeMetadata{}
-				if err := options.Unmarshal(dAtA[iNdEx:postIndex], v); err != nil {
-					return protoiface.UnmarshalOutput{NoUnkeyedLiterals: input.NoUnkeyedLiterals, Flags: input.Flags}, err
-				}
-				x.MetadataType = &Metadata_CascadeMetadata{v}
+				x.Signatures = string(dAtA[iNdEx:postIndex])
 				iNdEx = postIndex
 			default:
 				iNdEx = preIndex
@@ -2013,15 +1626,33 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// SenseMetadata contains information for Sense actions.
+// This metadata is directly embedded in the Action.metadata field.
+// For RequestAction:
+//   - Required: data_hash, dd_and_fingerprints_ic
+//   - Optional: collection_id, group_id
+//
+// Keeper will add:
+//   - dd_and_fingerprints_max (from module params)
+//
+// For FinalizeAction:
+//   - Required: dd_and_fingerprints_ids, signatures
 type SenseMetadata struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	DataHash             string   `protobuf:"bytes,1,opt,name=data_hash,json=dataHash,proto3" json:"data_hash,omitempty"`
-	DdAndFingerprintsIc  int32    `protobuf:"varint,2,opt,name=dd_and_fingerprints_ic,json=ddAndFingerprintsIc,proto3" json:"dd_and_fingerprints_ic,omitempty"`
-	DdAndFingerprintsMax int32    `protobuf:"varint,3,opt,name=dd_and_fingerprints_max,json=ddAndFingerprintsMax,proto3" json:"dd_and_fingerprints_max,omitempty"`
-	DdAndFingerprintsIds []string `protobuf:"bytes,4,rep,name=dd_and_fingerprints_ids,json=ddAndFingerprintsIds,proto3" json:"dd_and_fingerprints_ids,omitempty"`
+	// RequestAction required fields
+	DataHash            string `protobuf:"bytes,1,opt,name=data_hash,proto3" json:"data_hash,omitempty"`
+	DdAndFingerprintsIc uint64 `protobuf:"varint,2,opt,name=dd_and_fingerprints_ic,proto3" json:"dd_and_fingerprints_ic,omitempty"`
+	// RequestAction optional fields
+	CollectionId string `protobuf:"bytes,3,opt,name=collection_id,proto3" json:"collection_id,omitempty"`
+	GroupId      string `protobuf:"bytes,4,opt,name=group_id,proto3" json:"group_id,omitempty"`
+	// Added by Keeper
+	DdAndFingerprintsMax uint64 `protobuf:"varint,5,opt,name=dd_and_fingerprints_max,proto3" json:"dd_and_fingerprints_max,omitempty"`
+	// FinalizeAction fields
+	DdAndFingerprintsIds []string `protobuf:"bytes,6,rep,name=dd_and_fingerprints_ids,proto3" json:"dd_and_fingerprints_ids,omitempty"`
+	Signatures           string   `protobuf:"bytes,7,opt,name=signatures,proto3" json:"signatures,omitempty"`
 }
 
 func (x *SenseMetadata) Reset() {
@@ -2051,14 +1682,28 @@ func (x *SenseMetadata) GetDataHash() string {
 	return ""
 }
 
-func (x *SenseMetadata) GetDdAndFingerprintsIc() int32 {
+func (x *SenseMetadata) GetDdAndFingerprintsIc() uint64 {
 	if x != nil {
 		return x.DdAndFingerprintsIc
 	}
 	return 0
 }
 
-func (x *SenseMetadata) GetDdAndFingerprintsMax() int32 {
+func (x *SenseMetadata) GetCollectionId() string {
+	if x != nil {
+		return x.CollectionId
+	}
+	return ""
+}
+
+func (x *SenseMetadata) GetGroupId() string {
+	if x != nil {
+		return x.GroupId
+	}
+	return ""
+}
+
+func (x *SenseMetadata) GetDdAndFingerprintsMax() uint64 {
 	if x != nil {
 		return x.DdAndFingerprintsMax
 	}
@@ -2072,17 +1717,38 @@ func (x *SenseMetadata) GetDdAndFingerprintsIds() []string {
 	return nil
 }
 
+func (x *SenseMetadata) GetSignatures() string {
+	if x != nil {
+		return x.Signatures
+	}
+	return ""
+}
+
+// CascadeMetadata contains information for Cascade actions.
+// This metadata is directly embedded in the Action.metadata field.
+// For RequestAction:
+//   - Required: data_hash, file_name, rq_ids_ic, signatures
+//
+// Keeper will add:
+//   - rq_ids_max (from module params)
+//
+// For FinalizeAction:
+//   - Required: rq_ids_ids
 type CascadeMetadata struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	DataHash string   `protobuf:"bytes,1,opt,name=data_hash,json=dataHash,proto3" json:"data_hash,omitempty"`
-	FileName string   `protobuf:"bytes,2,opt,name=file_name,json=fileName,proto3" json:"file_name,omitempty"`
-	RqIds    []string `protobuf:"bytes,3,rep,name=rq_ids,json=rqIds,proto3" json:"rq_ids,omitempty"`
-	RqMax    int32    `protobuf:"varint,4,opt,name=rq_max,json=rqMax,proto3" json:"rq_max,omitempty"`
-	RqIc     int32    `protobuf:"varint,5,opt,name=rq_ic,json=rqIc,proto3" json:"rq_ic,omitempty"`
-	RqOti    []byte   `protobuf:"bytes,6,opt,name=rq_oti,json=rqOti,proto3" json:"rq_oti,omitempty"`
+	// RequestAction required fields
+	DataHash string `protobuf:"bytes,1,opt,name=data_hash,proto3" json:"data_hash,omitempty"`
+	FileName string `protobuf:"bytes,2,opt,name=file_name,proto3" json:"file_name,omitempty"`
+	RqIdsIc  uint64 `protobuf:"varint,3,opt,name=rq_ids_ic,proto3" json:"rq_ids_ic,omitempty"`
+	// Added by Keeper
+	RqIdsMax uint64 `protobuf:"varint,4,opt,name=rq_ids_max,proto3" json:"rq_ids_max,omitempty"`
+	// FinalizeAction fields
+	RqIdsIds []string `protobuf:"bytes,5,rep,name=rq_ids_ids,proto3" json:"rq_ids_ids,omitempty"`
+	// RequestAction required field
+	Signatures string `protobuf:"bytes,6,opt,name=signatures,proto3" json:"signatures,omitempty"`
 }
 
 func (x *CascadeMetadata) Reset() {
@@ -2119,155 +1785,88 @@ func (x *CascadeMetadata) GetFileName() string {
 	return ""
 }
 
-func (x *CascadeMetadata) GetRqIds() []string {
+func (x *CascadeMetadata) GetRqIdsIc() uint64 {
 	if x != nil {
-		return x.RqIds
-	}
-	return nil
-}
-
-func (x *CascadeMetadata) GetRqMax() int32 {
-	if x != nil {
-		return x.RqMax
+		return x.RqIdsIc
 	}
 	return 0
 }
 
-func (x *CascadeMetadata) GetRqIc() int32 {
+func (x *CascadeMetadata) GetRqIdsMax() uint64 {
 	if x != nil {
-		return x.RqIc
+		return x.RqIdsMax
 	}
 	return 0
 }
 
-func (x *CascadeMetadata) GetRqOti() []byte {
+func (x *CascadeMetadata) GetRqIdsIds() []string {
 	if x != nil {
-		return x.RqOti
+		return x.RqIdsIds
 	}
 	return nil
 }
 
-type Metadata struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	// Types that are assignable to MetadataType:
-	//
-	//	*Metadata_SenseMetadata
-	//	*Metadata_CascadeMetadata
-	MetadataType isMetadata_MetadataType `protobuf_oneof:"metadata_type"`
-}
-
-func (x *Metadata) Reset() {
-	*x = Metadata{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_lumera_action_metadata_proto_msgTypes[2]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *Metadata) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Metadata) ProtoMessage() {}
-
-// Deprecated: Use Metadata.ProtoReflect.Descriptor instead.
-func (*Metadata) Descriptor() ([]byte, []int) {
-	return file_lumera_action_metadata_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *Metadata) GetMetadataType() isMetadata_MetadataType {
+func (x *CascadeMetadata) GetSignatures() string {
 	if x != nil {
-		return x.MetadataType
+		return x.Signatures
 	}
-	return nil
+	return ""
 }
-
-func (x *Metadata) GetSenseMetadata() *SenseMetadata {
-	if x, ok := x.GetMetadataType().(*Metadata_SenseMetadata); ok {
-		return x.SenseMetadata
-	}
-	return nil
-}
-
-func (x *Metadata) GetCascadeMetadata() *CascadeMetadata {
-	if x, ok := x.GetMetadataType().(*Metadata_CascadeMetadata); ok {
-		return x.CascadeMetadata
-	}
-	return nil
-}
-
-type isMetadata_MetadataType interface {
-	isMetadata_MetadataType()
-}
-
-type Metadata_SenseMetadata struct {
-	SenseMetadata *SenseMetadata `protobuf:"bytes,1,opt,name=sense_metadata,json=senseMetadata,proto3,oneof"`
-}
-
-type Metadata_CascadeMetadata struct {
-	CascadeMetadata *CascadeMetadata `protobuf:"bytes,2,opt,name=cascade_metadata,json=cascadeMetadata,proto3,oneof"`
-}
-
-func (*Metadata_SenseMetadata) isMetadata_MetadataType() {}
-
-func (*Metadata_CascadeMetadata) isMetadata_MetadataType() {}
 
 var File_lumera_action_metadata_proto protoreflect.FileDescriptor
 
 var file_lumera_action_metadata_proto_rawDesc = []byte{
 	0x0a, 0x1c, 0x6c, 0x75, 0x6d, 0x65, 0x72, 0x61, 0x2f, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x2f,
 	0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x0d,
-	0x6c, 0x75, 0x6d, 0x65, 0x72, 0x61, 0x2e, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x22, 0xcf, 0x01,
-	0x0a, 0x0d, 0x53, 0x65, 0x6e, 0x73, 0x65, 0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x12,
-	0x1b, 0x0a, 0x09, 0x64, 0x61, 0x74, 0x61, 0x5f, 0x68, 0x61, 0x73, 0x68, 0x18, 0x01, 0x20, 0x01,
-	0x28, 0x09, 0x52, 0x08, 0x64, 0x61, 0x74, 0x61, 0x48, 0x61, 0x73, 0x68, 0x12, 0x33, 0x0a, 0x16,
-	0x64, 0x64, 0x5f, 0x61, 0x6e, 0x64, 0x5f, 0x66, 0x69, 0x6e, 0x67, 0x65, 0x72, 0x70, 0x72, 0x69,
-	0x6e, 0x74, 0x73, 0x5f, 0x69, 0x63, 0x18, 0x02, 0x20, 0x01, 0x28, 0x05, 0x52, 0x13, 0x64, 0x64,
-	0x41, 0x6e, 0x64, 0x46, 0x69, 0x6e, 0x67, 0x65, 0x72, 0x70, 0x72, 0x69, 0x6e, 0x74, 0x73, 0x49,
-	0x63, 0x12, 0x35, 0x0a, 0x17, 0x64, 0x64, 0x5f, 0x61, 0x6e, 0x64, 0x5f, 0x66, 0x69, 0x6e, 0x67,
-	0x65, 0x72, 0x70, 0x72, 0x69, 0x6e, 0x74, 0x73, 0x5f, 0x6d, 0x61, 0x78, 0x18, 0x03, 0x20, 0x01,
-	0x28, 0x05, 0x52, 0x14, 0x64, 0x64, 0x41, 0x6e, 0x64, 0x46, 0x69, 0x6e, 0x67, 0x65, 0x72, 0x70,
-	0x72, 0x69, 0x6e, 0x74, 0x73, 0x4d, 0x61, 0x78, 0x12, 0x35, 0x0a, 0x17, 0x64, 0x64, 0x5f, 0x61,
+	0x6c, 0x75, 0x6d, 0x65, 0x72, 0x61, 0x2e, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x1a, 0x14, 0x67,
+	0x6f, 0x67, 0x6f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2f, 0x67, 0x6f, 0x67, 0x6f, 0x2e, 0x70, 0x72,
+	0x6f, 0x74, 0x6f, 0x1a, 0x1f, 0x6c, 0x75, 0x6d, 0x65, 0x72, 0x61, 0x2f, 0x61, 0x63, 0x74, 0x69,
+	0x6f, 0x6e, 0x2f, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x74, 0x79, 0x70, 0x65, 0x2e, 0x70,
+	0x72, 0x6f, 0x74, 0x6f, 0x22, 0xbb, 0x02, 0x0a, 0x0d, 0x53, 0x65, 0x6e, 0x73, 0x65, 0x4d, 0x65,
+	0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x12, 0x1c, 0x0a, 0x09, 0x64, 0x61, 0x74, 0x61, 0x5f, 0x68,
+	0x61, 0x73, 0x68, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09, 0x64, 0x61, 0x74, 0x61, 0x5f,
+	0x68, 0x61, 0x73, 0x68, 0x12, 0x36, 0x0a, 0x16, 0x64, 0x64, 0x5f, 0x61, 0x6e, 0x64, 0x5f, 0x66,
+	0x69, 0x6e, 0x67, 0x65, 0x72, 0x70, 0x72, 0x69, 0x6e, 0x74, 0x73, 0x5f, 0x69, 0x63, 0x18, 0x02,
+	0x20, 0x01, 0x28, 0x04, 0x52, 0x16, 0x64, 0x64, 0x5f, 0x61, 0x6e, 0x64, 0x5f, 0x66, 0x69, 0x6e,
+	0x67, 0x65, 0x72, 0x70, 0x72, 0x69, 0x6e, 0x74, 0x73, 0x5f, 0x69, 0x63, 0x12, 0x24, 0x0a, 0x0d,
+	0x63, 0x6f, 0x6c, 0x6c, 0x65, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x69, 0x64, 0x18, 0x03, 0x20,
+	0x01, 0x28, 0x09, 0x52, 0x0d, 0x63, 0x6f, 0x6c, 0x6c, 0x65, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x5f,
+	0x69, 0x64, 0x12, 0x1a, 0x0a, 0x08, 0x67, 0x72, 0x6f, 0x75, 0x70, 0x5f, 0x69, 0x64, 0x18, 0x04,
+	0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x67, 0x72, 0x6f, 0x75, 0x70, 0x5f, 0x69, 0x64, 0x12, 0x38,
+	0x0a, 0x17, 0x64, 0x64, 0x5f, 0x61, 0x6e, 0x64, 0x5f, 0x66, 0x69, 0x6e, 0x67, 0x65, 0x72, 0x70,
+	0x72, 0x69, 0x6e, 0x74, 0x73, 0x5f, 0x6d, 0x61, 0x78, 0x18, 0x05, 0x20, 0x01, 0x28, 0x04, 0x52,
+	0x17, 0x64, 0x64, 0x5f, 0x61, 0x6e, 0x64, 0x5f, 0x66, 0x69, 0x6e, 0x67, 0x65, 0x72, 0x70, 0x72,
+	0x69, 0x6e, 0x74, 0x73, 0x5f, 0x6d, 0x61, 0x78, 0x12, 0x38, 0x0a, 0x17, 0x64, 0x64, 0x5f, 0x61,
 	0x6e, 0x64, 0x5f, 0x66, 0x69, 0x6e, 0x67, 0x65, 0x72, 0x70, 0x72, 0x69, 0x6e, 0x74, 0x73, 0x5f,
-	0x69, 0x64, 0x73, 0x18, 0x04, 0x20, 0x03, 0x28, 0x09, 0x52, 0x14, 0x64, 0x64, 0x41, 0x6e, 0x64,
-	0x46, 0x69, 0x6e, 0x67, 0x65, 0x72, 0x70, 0x72, 0x69, 0x6e, 0x74, 0x73, 0x49, 0x64, 0x73, 0x22,
-	0xa5, 0x01, 0x0a, 0x0f, 0x43, 0x61, 0x73, 0x63, 0x61, 0x64, 0x65, 0x4d, 0x65, 0x74, 0x61, 0x64,
-	0x61, 0x74, 0x61, 0x12, 0x1b, 0x0a, 0x09, 0x64, 0x61, 0x74, 0x61, 0x5f, 0x68, 0x61, 0x73, 0x68,
-	0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x64, 0x61, 0x74, 0x61, 0x48, 0x61, 0x73, 0x68,
-	0x12, 0x1b, 0x0a, 0x09, 0x66, 0x69, 0x6c, 0x65, 0x5f, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x02, 0x20,
-	0x01, 0x28, 0x09, 0x52, 0x08, 0x66, 0x69, 0x6c, 0x65, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x15, 0x0a,
-	0x06, 0x72, 0x71, 0x5f, 0x69, 0x64, 0x73, 0x18, 0x03, 0x20, 0x03, 0x28, 0x09, 0x52, 0x05, 0x72,
-	0x71, 0x49, 0x64, 0x73, 0x12, 0x15, 0x0a, 0x06, 0x72, 0x71, 0x5f, 0x6d, 0x61, 0x78, 0x18, 0x04,
-	0x20, 0x01, 0x28, 0x05, 0x52, 0x05, 0x72, 0x71, 0x4d, 0x61, 0x78, 0x12, 0x13, 0x0a, 0x05, 0x72,
-	0x71, 0x5f, 0x69, 0x63, 0x18, 0x05, 0x20, 0x01, 0x28, 0x05, 0x52, 0x04, 0x72, 0x71, 0x49, 0x63,
-	0x12, 0x15, 0x0a, 0x06, 0x72, 0x71, 0x5f, 0x6f, 0x74, 0x69, 0x18, 0x06, 0x20, 0x01, 0x28, 0x0c,
-	0x52, 0x05, 0x72, 0x71, 0x4f, 0x74, 0x69, 0x22, 0xaf, 0x01, 0x0a, 0x08, 0x4d, 0x65, 0x74, 0x61,
-	0x64, 0x61, 0x74, 0x61, 0x12, 0x45, 0x0a, 0x0e, 0x73, 0x65, 0x6e, 0x73, 0x65, 0x5f, 0x6d, 0x65,
-	0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1c, 0x2e, 0x6c,
-	0x75, 0x6d, 0x65, 0x72, 0x61, 0x2e, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x2e, 0x53, 0x65, 0x6e,
-	0x73, 0x65, 0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x48, 0x00, 0x52, 0x0d, 0x73, 0x65,
-	0x6e, 0x73, 0x65, 0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x12, 0x4b, 0x0a, 0x10, 0x63,
-	0x61, 0x73, 0x63, 0x61, 0x64, 0x65, 0x5f, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x18,
-	0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1e, 0x2e, 0x6c, 0x75, 0x6d, 0x65, 0x72, 0x61, 0x2e, 0x61,
-	0x63, 0x74, 0x69, 0x6f, 0x6e, 0x2e, 0x43, 0x61, 0x73, 0x63, 0x61, 0x64, 0x65, 0x4d, 0x65, 0x74,
-	0x61, 0x64, 0x61, 0x74, 0x61, 0x48, 0x00, 0x52, 0x0f, 0x63, 0x61, 0x73, 0x63, 0x61, 0x64, 0x65,
-	0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x42, 0x0f, 0x0a, 0x0d, 0x6d, 0x65, 0x74, 0x61,
-	0x64, 0x61, 0x74, 0x61, 0x5f, 0x74, 0x79, 0x70, 0x65, 0x42, 0xab, 0x01, 0x0a, 0x11, 0x63, 0x6f,
-	0x6d, 0x2e, 0x6c, 0x75, 0x6d, 0x65, 0x72, 0x61, 0x2e, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x42,
-	0x0d, 0x4d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x50, 0x01,
-	0x5a, 0x32, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x4c, 0x75, 0x6d,
-	0x65, 0x72, 0x61, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x2f, 0x6c, 0x75, 0x6d, 0x65,
-	0x72, 0x61, 0x2f, 0x61, 0x70, 0x69, 0x2f, 0x6c, 0x75, 0x6d, 0x65, 0x72, 0x61, 0x2f, 0x61, 0x63,
-	0x74, 0x69, 0x6f, 0x6e, 0xa2, 0x02, 0x03, 0x4c, 0x41, 0x58, 0xaa, 0x02, 0x0d, 0x4c, 0x75, 0x6d,
-	0x65, 0x72, 0x61, 0x2e, 0x41, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0xca, 0x02, 0x0d, 0x4c, 0x75, 0x6d,
-	0x65, 0x72, 0x61, 0x5c, 0x41, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0xe2, 0x02, 0x19, 0x4c, 0x75, 0x6d,
-	0x65, 0x72, 0x61, 0x5c, 0x41, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x5c, 0x47, 0x50, 0x42, 0x4d, 0x65,
-	0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0xea, 0x02, 0x0e, 0x4c, 0x75, 0x6d, 0x65, 0x72, 0x61, 0x3a,
-	0x3a, 0x41, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x69, 0x64, 0x73, 0x18, 0x06, 0x20, 0x03, 0x28, 0x09, 0x52, 0x17, 0x64, 0x64, 0x5f, 0x61, 0x6e,
+	0x64, 0x5f, 0x66, 0x69, 0x6e, 0x67, 0x65, 0x72, 0x70, 0x72, 0x69, 0x6e, 0x74, 0x73, 0x5f, 0x69,
+	0x64, 0x73, 0x12, 0x1e, 0x0a, 0x0a, 0x73, 0x69, 0x67, 0x6e, 0x61, 0x74, 0x75, 0x72, 0x65, 0x73,
+	0x18, 0x07, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0a, 0x73, 0x69, 0x67, 0x6e, 0x61, 0x74, 0x75, 0x72,
+	0x65, 0x73, 0x22, 0xd1, 0x01, 0x0a, 0x0f, 0x43, 0x61, 0x73, 0x63, 0x61, 0x64, 0x65, 0x4d, 0x65,
+	0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x12, 0x1c, 0x0a, 0x09, 0x64, 0x61, 0x74, 0x61, 0x5f, 0x68,
+	0x61, 0x73, 0x68, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09, 0x64, 0x61, 0x74, 0x61, 0x5f,
+	0x68, 0x61, 0x73, 0x68, 0x12, 0x1c, 0x0a, 0x09, 0x66, 0x69, 0x6c, 0x65, 0x5f, 0x6e, 0x61, 0x6d,
+	0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09, 0x66, 0x69, 0x6c, 0x65, 0x5f, 0x6e, 0x61,
+	0x6d, 0x65, 0x12, 0x1c, 0x0a, 0x09, 0x72, 0x71, 0x5f, 0x69, 0x64, 0x73, 0x5f, 0x69, 0x63, 0x18,
+	0x03, 0x20, 0x01, 0x28, 0x04, 0x52, 0x09, 0x72, 0x71, 0x5f, 0x69, 0x64, 0x73, 0x5f, 0x69, 0x63,
+	0x12, 0x1e, 0x0a, 0x0a, 0x72, 0x71, 0x5f, 0x69, 0x64, 0x73, 0x5f, 0x6d, 0x61, 0x78, 0x18, 0x04,
+	0x20, 0x01, 0x28, 0x04, 0x52, 0x0a, 0x72, 0x71, 0x5f, 0x69, 0x64, 0x73, 0x5f, 0x6d, 0x61, 0x78,
+	0x12, 0x24, 0x0a, 0x0a, 0x72, 0x71, 0x5f, 0x69, 0x64, 0x73, 0x5f, 0x69, 0x64, 0x73, 0x18, 0x05,
+	0x20, 0x03, 0x28, 0x09, 0x42, 0x04, 0xc8, 0xde, 0x1f, 0x01, 0x52, 0x0a, 0x72, 0x71, 0x5f, 0x69,
+	0x64, 0x73, 0x5f, 0x69, 0x64, 0x73, 0x12, 0x1e, 0x0a, 0x0a, 0x73, 0x69, 0x67, 0x6e, 0x61, 0x74,
+	0x75, 0x72, 0x65, 0x73, 0x18, 0x06, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0a, 0x73, 0x69, 0x67, 0x6e,
+	0x61, 0x74, 0x75, 0x72, 0x65, 0x73, 0x42, 0xab, 0x01, 0x0a, 0x11, 0x63, 0x6f, 0x6d, 0x2e, 0x6c,
+	0x75, 0x6d, 0x65, 0x72, 0x61, 0x2e, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x42, 0x0d, 0x4d, 0x65,
+	0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x50, 0x01, 0x5a, 0x32, 0x67,
+	0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x4c, 0x75, 0x6d, 0x65, 0x72, 0x61,
+	0x50, 0x72, 0x6f, 0x74, 0x6f, 0x63, 0x6f, 0x6c, 0x2f, 0x6c, 0x75, 0x6d, 0x65, 0x72, 0x61, 0x2f,
+	0x61, 0x70, 0x69, 0x2f, 0x6c, 0x75, 0x6d, 0x65, 0x72, 0x61, 0x2f, 0x61, 0x63, 0x74, 0x69, 0x6f,
+	0x6e, 0xa2, 0x02, 0x03, 0x4c, 0x41, 0x58, 0xaa, 0x02, 0x0d, 0x4c, 0x75, 0x6d, 0x65, 0x72, 0x61,
+	0x2e, 0x41, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0xca, 0x02, 0x0d, 0x4c, 0x75, 0x6d, 0x65, 0x72, 0x61,
+	0x5c, 0x41, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0xe2, 0x02, 0x19, 0x4c, 0x75, 0x6d, 0x65, 0x72, 0x61,
+	0x5c, 0x41, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x5c, 0x47, 0x50, 0x42, 0x4d, 0x65, 0x74, 0x61, 0x64,
+	0x61, 0x74, 0x61, 0xea, 0x02, 0x0e, 0x4c, 0x75, 0x6d, 0x65, 0x72, 0x61, 0x3a, 0x3a, 0x41, 0x63,
+	0x74, 0x69, 0x6f, 0x6e, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -2282,20 +1881,17 @@ func file_lumera_action_metadata_proto_rawDescGZIP() []byte {
 	return file_lumera_action_metadata_proto_rawDescData
 }
 
-var file_lumera_action_metadata_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_lumera_action_metadata_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_lumera_action_metadata_proto_goTypes = []interface{}{
 	(*SenseMetadata)(nil),   // 0: lumera.action.SenseMetadata
 	(*CascadeMetadata)(nil), // 1: lumera.action.CascadeMetadata
-	(*Metadata)(nil),        // 2: lumera.action.Metadata
 }
 var file_lumera_action_metadata_proto_depIdxs = []int32{
-	0, // 0: lumera.action.Metadata.sense_metadata:type_name -> lumera.action.SenseMetadata
-	1, // 1: lumera.action.Metadata.cascade_metadata:type_name -> lumera.action.CascadeMetadata
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	0, // [0:0] is the sub-list for method output_type
+	0, // [0:0] is the sub-list for method input_type
+	0, // [0:0] is the sub-list for extension type_name
+	0, // [0:0] is the sub-list for extension extendee
+	0, // [0:0] is the sub-list for field type_name
 }
 
 func init() { file_lumera_action_metadata_proto_init() }
@@ -2303,6 +1899,7 @@ func file_lumera_action_metadata_proto_init() {
 	if File_lumera_action_metadata_proto != nil {
 		return
 	}
+	file_lumera_action_action_type_proto_init()
 	if !protoimpl.UnsafeEnabled {
 		file_lumera_action_metadata_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*SenseMetadata); i {
@@ -2328,22 +1925,6 @@ func file_lumera_action_metadata_proto_init() {
 				return nil
 			}
 		}
-		file_lumera_action_metadata_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Metadata); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-	}
-	file_lumera_action_metadata_proto_msgTypes[2].OneofWrappers = []interface{}{
-		(*Metadata_SenseMetadata)(nil),
-		(*Metadata_CascadeMetadata)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -2351,7 +1932,7 @@ func file_lumera_action_metadata_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_lumera_action_metadata_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   2,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -191,7 +191,7 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 			}
 
 			msgServer := keeper.NewMsgServerImpl(k)
-			_, err := msgServer.UpdateSupernode(sdk.WrapSDKContext(ctx), tc.msg)
+			_, err := msgServer.UpdateSupernode(ctx, tc.msg)
 
 			if tc.expectedError != nil {
 				require.ErrorIs(t, err, tc.expectedError)

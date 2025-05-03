@@ -5,6 +5,7 @@ package types
 
 import (
 	fmt "fmt"
+	_ "github.com/cosmos/gogoproto/gogoproto"
 	proto "github.com/cosmos/gogoproto/proto"
 	io "io"
 	math "math"
@@ -22,11 +23,29 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
+// SenseMetadata contains information for Sense actions.
+// This metadata is directly embedded in the Action.metadata field.
+// For RequestAction:
+//   - Required: data_hash, dd_and_fingerprints_ic
+//   - Optional: collection_id, group_id
+//
+// Keeper will add:
+//   - dd_and_fingerprints_max (from module params)
+//
+// For FinalizeAction:
+//   - Required: dd_and_fingerprints_ids, signatures
 type SenseMetadata struct {
-	DataHash             string   `protobuf:"bytes,1,opt,name=data_hash,json=dataHash,proto3" json:"data_hash,omitempty"`
-	DdAndFingerprintsIc  int32    `protobuf:"varint,2,opt,name=dd_and_fingerprints_ic,json=ddAndFingerprintsIc,proto3" json:"dd_and_fingerprints_ic,omitempty"`
-	DdAndFingerprintsMax int32    `protobuf:"varint,3,opt,name=dd_and_fingerprints_max,json=ddAndFingerprintsMax,proto3" json:"dd_and_fingerprints_max,omitempty"`
-	DdAndFingerprintsIds []string `protobuf:"bytes,4,rep,name=dd_and_fingerprints_ids,json=ddAndFingerprintsIds,proto3" json:"dd_and_fingerprints_ids,omitempty"`
+	// RequestAction required fields
+	DataHash            string `protobuf:"bytes,1,opt,name=data_hash,proto3" json:"data_hash,omitempty"`
+	DdAndFingerprintsIc uint64 `protobuf:"varint,2,opt,name=dd_and_fingerprints_ic,proto3" json:"dd_and_fingerprints_ic,omitempty"`
+	// RequestAction optional fields
+	CollectionId string `protobuf:"bytes,3,opt,name=collection_id,proto3" json:"collection_id,omitempty"`
+	GroupId      string `protobuf:"bytes,4,opt,name=group_id,proto3" json:"group_id,omitempty"`
+	// Added by Keeper
+	DdAndFingerprintsMax uint64 `protobuf:"varint,5,opt,name=dd_and_fingerprints_max,proto3" json:"dd_and_fingerprints_max,omitempty"`
+	// FinalizeAction fields
+	DdAndFingerprintsIds []string `protobuf:"bytes,6,rep,name=dd_and_fingerprints_ids,proto3" json:"dd_and_fingerprints_ids,omitempty"`
+	Signatures           string   `protobuf:"bytes,7,opt,name=signatures,proto3" json:"signatures,omitempty"`
 }
 
 func (m *SenseMetadata) Reset()         { *m = SenseMetadata{} }
@@ -69,14 +88,28 @@ func (m *SenseMetadata) GetDataHash() string {
 	return ""
 }
 
-func (m *SenseMetadata) GetDdAndFingerprintsIc() int32 {
+func (m *SenseMetadata) GetDdAndFingerprintsIc() uint64 {
 	if m != nil {
 		return m.DdAndFingerprintsIc
 	}
 	return 0
 }
 
-func (m *SenseMetadata) GetDdAndFingerprintsMax() int32 {
+func (m *SenseMetadata) GetCollectionId() string {
+	if m != nil {
+		return m.CollectionId
+	}
+	return ""
+}
+
+func (m *SenseMetadata) GetGroupId() string {
+	if m != nil {
+		return m.GroupId
+	}
+	return ""
+}
+
+func (m *SenseMetadata) GetDdAndFingerprintsMax() uint64 {
 	if m != nil {
 		return m.DdAndFingerprintsMax
 	}
@@ -90,13 +123,34 @@ func (m *SenseMetadata) GetDdAndFingerprintsIds() []string {
 	return nil
 }
 
+func (m *SenseMetadata) GetSignatures() string {
+	if m != nil {
+		return m.Signatures
+	}
+	return ""
+}
+
+// CascadeMetadata contains information for Cascade actions.
+// This metadata is directly embedded in the Action.metadata field.
+// For RequestAction:
+//   - Required: data_hash, file_name, rq_ids_ic, signatures
+//
+// Keeper will add:
+//   - rq_ids_max (from module params)
+//
+// For FinalizeAction:
+//   - Required: rq_ids_ids
 type CascadeMetadata struct {
-	DataHash string   `protobuf:"bytes,1,opt,name=data_hash,json=dataHash,proto3" json:"data_hash,omitempty"`
-	FileName string   `protobuf:"bytes,2,opt,name=file_name,json=fileName,proto3" json:"file_name,omitempty"`
-	RqIds    []string `protobuf:"bytes,3,rep,name=rq_ids,json=rqIds,proto3" json:"rq_ids,omitempty"`
-	RqMax    int32    `protobuf:"varint,4,opt,name=rq_max,json=rqMax,proto3" json:"rq_max,omitempty"`
-	RqIc     int32    `protobuf:"varint,5,opt,name=rq_ic,json=rqIc,proto3" json:"rq_ic,omitempty"`
-	RqOti    []byte   `protobuf:"bytes,6,opt,name=rq_oti,json=rqOti,proto3" json:"rq_oti,omitempty"`
+	// RequestAction required fields
+	DataHash string `protobuf:"bytes,1,opt,name=data_hash,proto3" json:"data_hash,omitempty"`
+	FileName string `protobuf:"bytes,2,opt,name=file_name,proto3" json:"file_name,omitempty"`
+	RqIdsIc  uint64 `protobuf:"varint,3,opt,name=rq_ids_ic,proto3" json:"rq_ids_ic,omitempty"`
+	// Added by Keeper
+	RqIdsMax uint64 `protobuf:"varint,4,opt,name=rq_ids_max,proto3" json:"rq_ids_max,omitempty"`
+	// FinalizeAction fields
+	RqIdsIds []string `protobuf:"bytes,5,rep,name=rq_ids_ids,proto3" json:"rq_ids_ids,omitempty"`
+	// RequestAction required field
+	Signatures string `protobuf:"bytes,6,opt,name=signatures,proto3" json:"signatures,omitempty"`
 }
 
 func (m *CascadeMetadata) Reset()         { *m = CascadeMetadata{} }
@@ -146,156 +200,67 @@ func (m *CascadeMetadata) GetFileName() string {
 	return ""
 }
 
-func (m *CascadeMetadata) GetRqIds() []string {
+func (m *CascadeMetadata) GetRqIdsIc() uint64 {
 	if m != nil {
-		return m.RqIds
-	}
-	return nil
-}
-
-func (m *CascadeMetadata) GetRqMax() int32 {
-	if m != nil {
-		return m.RqMax
+		return m.RqIdsIc
 	}
 	return 0
 }
 
-func (m *CascadeMetadata) GetRqIc() int32 {
+func (m *CascadeMetadata) GetRqIdsMax() uint64 {
 	if m != nil {
-		return m.RqIc
+		return m.RqIdsMax
 	}
 	return 0
 }
 
-func (m *CascadeMetadata) GetRqOti() []byte {
+func (m *CascadeMetadata) GetRqIdsIds() []string {
 	if m != nil {
-		return m.RqOti
+		return m.RqIdsIds
 	}
 	return nil
 }
 
-type Metadata struct {
-	// Types that are valid to be assigned to MetadataType:
-	//
-	//	*Metadata_SenseMetadata
-	//	*Metadata_CascadeMetadata
-	MetadataType isMetadata_MetadataType `protobuf_oneof:"metadata_type"`
-}
-
-func (m *Metadata) Reset()         { *m = Metadata{} }
-func (m *Metadata) String() string { return proto.CompactTextString(m) }
-func (*Metadata) ProtoMessage()    {}
-func (*Metadata) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81df3bd9a8bf3d73, []int{2}
-}
-func (m *Metadata) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *Metadata) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	if deterministic {
-		return xxx_messageInfo_Metadata.Marshal(b, m, deterministic)
-	} else {
-		b = b[:cap(b)]
-		n, err := m.MarshalToSizedBuffer(b)
-		if err != nil {
-			return nil, err
-		}
-		return b[:n], nil
-	}
-}
-func (m *Metadata) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Metadata.Merge(m, src)
-}
-func (m *Metadata) XXX_Size() int {
-	return m.Size()
-}
-func (m *Metadata) XXX_DiscardUnknown() {
-	xxx_messageInfo_Metadata.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_Metadata proto.InternalMessageInfo
-
-type isMetadata_MetadataType interface {
-	isMetadata_MetadataType()
-	MarshalTo([]byte) (int, error)
-	Size() int
-}
-
-type Metadata_SenseMetadata struct {
-	SenseMetadata *SenseMetadata `protobuf:"bytes,1,opt,name=sense_metadata,json=senseMetadata,proto3,oneof" json:"sense_metadata,omitempty"`
-}
-type Metadata_CascadeMetadata struct {
-	CascadeMetadata *CascadeMetadata `protobuf:"bytes,2,opt,name=cascade_metadata,json=cascadeMetadata,proto3,oneof" json:"cascade_metadata,omitempty"`
-}
-
-func (*Metadata_SenseMetadata) isMetadata_MetadataType()   {}
-func (*Metadata_CascadeMetadata) isMetadata_MetadataType() {}
-
-func (m *Metadata) GetMetadataType() isMetadata_MetadataType {
+func (m *CascadeMetadata) GetSignatures() string {
 	if m != nil {
-		return m.MetadataType
+		return m.Signatures
 	}
-	return nil
-}
-
-func (m *Metadata) GetSenseMetadata() *SenseMetadata {
-	if x, ok := m.GetMetadataType().(*Metadata_SenseMetadata); ok {
-		return x.SenseMetadata
-	}
-	return nil
-}
-
-func (m *Metadata) GetCascadeMetadata() *CascadeMetadata {
-	if x, ok := m.GetMetadataType().(*Metadata_CascadeMetadata); ok {
-		return x.CascadeMetadata
-	}
-	return nil
-}
-
-// XXX_OneofWrappers is for the internal use of the proto package.
-func (*Metadata) XXX_OneofWrappers() []interface{} {
-	return []interface{}{
-		(*Metadata_SenseMetadata)(nil),
-		(*Metadata_CascadeMetadata)(nil),
-	}
+	return ""
 }
 
 func init() {
 	proto.RegisterType((*SenseMetadata)(nil), "lumera.action.SenseMetadata")
 	proto.RegisterType((*CascadeMetadata)(nil), "lumera.action.CascadeMetadata")
-	proto.RegisterType((*Metadata)(nil), "lumera.action.Metadata")
 }
 
 func init() { proto.RegisterFile("lumera/action/metadata.proto", fileDescriptor_81df3bd9a8bf3d73) }
 
 var fileDescriptor_81df3bd9a8bf3d73 = []byte{
-	// 402 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x8c, 0x52, 0xcd, 0xce, 0xd2, 0x40,
-	0x14, 0xed, 0x00, 0x25, 0x74, 0xb4, 0x62, 0x8a, 0x3f, 0x4d, 0x20, 0x4d, 0xc3, 0xaa, 0xab, 0x36,
-	0x91, 0xf8, 0x00, 0x62, 0x34, 0x34, 0x8a, 0x9a, 0xba, 0x73, 0xd3, 0x0c, 0x33, 0x03, 0x9d, 0x84,
-	0xb6, 0x74, 0x66, 0x48, 0xf0, 0x2d, 0x7c, 0x09, 0xd7, 0xbe, 0x86, 0x3b, 0x59, 0xba, 0x34, 0xf0,
-	0x22, 0x66, 0x86, 0xa2, 0x5f, 0xf9, 0xf8, 0x92, 0x6f, 0x35, 0xc9, 0xb9, 0xf7, 0x9c, 0x7b, 0xcf,
-	0x9c, 0x0b, 0x47, 0xeb, 0x6d, 0x4e, 0x39, 0x8a, 0x10, 0x96, 0xac, 0x2c, 0xa2, 0x9c, 0x4a, 0x44,
-	0x90, 0x44, 0xe1, 0x86, 0x97, 0xb2, 0x74, 0xec, 0x53, 0x35, 0x3c, 0x55, 0xc7, 0xbf, 0x00, 0xb4,
-	0x3f, 0xd3, 0x42, 0xd0, 0x79, 0xdd, 0xe6, 0x0c, 0xa1, 0xa5, 0xde, 0x34, 0x43, 0x22, 0x73, 0x81,
-	0x0f, 0x02, 0x2b, 0xe9, 0x29, 0x60, 0x86, 0x44, 0xe6, 0x4c, 0xe0, 0x33, 0x42, 0x52, 0x54, 0x90,
-	0x74, 0xc9, 0x8a, 0x15, 0xe5, 0x1b, 0xce, 0x0a, 0x29, 0x52, 0x86, 0xdd, 0x96, 0x0f, 0x02, 0x33,
-	0x19, 0x10, 0xf2, 0xaa, 0x20, 0x6f, 0x6f, 0xd4, 0x62, 0xec, 0xbc, 0x84, 0xcf, 0xaf, 0x91, 0x72,
-	0xb4, 0x73, 0xdb, 0x9a, 0xf5, 0xe4, 0x16, 0x6b, 0x8e, 0x76, 0x77, 0xd1, 0x18, 0x11, 0x6e, 0xc7,
-	0x6f, 0x07, 0xd6, 0x15, 0x5a, 0x4c, 0xc4, 0xf8, 0x3b, 0x80, 0xfd, 0xd7, 0x48, 0x60, 0x44, 0xee,
-	0xe9, 0x69, 0x08, 0xad, 0x25, 0x5b, 0xd3, 0xb4, 0x40, 0x39, 0xd5, 0x36, 0xac, 0xa4, 0xa7, 0x80,
-	0x0f, 0x28, 0xa7, 0xce, 0x53, 0xd8, 0xe5, 0x95, 0x9e, 0xd9, 0xd6, 0x33, 0x4d, 0x5e, 0xc5, 0x44,
-	0xd4, 0xb0, 0x72, 0xd0, 0xd1, 0x0e, 0x4c, 0x5e, 0xa9, 0x95, 0x07, 0xd0, 0x54, 0xdd, 0xd8, 0x35,
-	0x35, 0xda, 0xe1, 0x55, 0x8c, 0xeb, 0xde, 0x52, 0x32, 0xb7, 0xeb, 0x83, 0xe0, 0xa1, 0xea, 0xfd,
-	0x28, 0xd9, 0xf8, 0x07, 0x80, 0xbd, 0x7f, 0x0b, 0xbe, 0x81, 0x8f, 0x84, 0x4a, 0x21, 0x3d, 0xa7,
-	0xa5, 0xb7, 0x7c, 0xf0, 0x62, 0x14, 0x36, 0xe2, 0x0a, 0x1b, 0x51, 0xcd, 0x8c, 0xc4, 0x16, 0x8d,
-	0xec, 0xde, 0xc1, 0xc7, 0xf8, 0x64, 0xfd, 0xbf, 0x50, 0x4b, 0x0b, 0x79, 0x17, 0x42, 0x17, 0x3f,
-	0x34, 0x33, 0x92, 0x3e, 0x6e, 0x42, 0xd3, 0x3e, 0xb4, 0xcf, 0x22, 0xa9, 0xfc, 0xba, 0xa1, 0xd3,
-	0xf8, 0xe7, 0xc1, 0x03, 0xfb, 0x83, 0x07, 0xfe, 0x1c, 0x3c, 0xf0, 0xed, 0xe8, 0x19, 0xfb, 0xa3,
-	0x67, 0xfc, 0x3e, 0x7a, 0xc6, 0x97, 0x68, 0xc5, 0x64, 0xb6, 0x5d, 0x84, 0xb8, 0xcc, 0xa3, 0xf7,
-	0x7a, 0xce, 0x27, 0x75, 0x6c, 0xb8, 0x5c, 0x47, 0xf5, 0x31, 0xee, 0xce, 0xe7, 0xa8, 0x94, 0xc4,
-	0xa2, 0xab, 0x8f, 0x71, 0xf2, 0x37, 0x00, 0x00, 0xff, 0xff, 0xb0, 0xa9, 0xd4, 0xcb, 0xac, 0x02,
-	0x00, 0x00,
+	// 377 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x8c, 0x92, 0xbf, 0x6a, 0xeb, 0x30,
+	0x14, 0xc6, 0xa3, 0xc4, 0xc9, 0xbd, 0x16, 0x84, 0x0b, 0xe2, 0xd2, 0x9a, 0x10, 0x9c, 0x10, 0x32,
+	0x64, 0x8a, 0x87, 0x42, 0xe9, 0x9c, 0x4e, 0x85, 0x16, 0x8a, 0xbb, 0x75, 0x31, 0x8a, 0xa5, 0x38,
+	0x02, 0x5b, 0x72, 0x25, 0x19, 0xd2, 0xb7, 0xe8, 0xfb, 0xf4, 0x05, 0x32, 0xa6, 0x5b, 0xa7, 0x52,
+	0x92, 0x17, 0x29, 0x92, 0xd3, 0xfc, 0xa3, 0x86, 0x4e, 0xb2, 0xbe, 0xdf, 0xf1, 0xd1, 0xf9, 0x0e,
+	0x1f, 0xec, 0xa6, 0x45, 0x46, 0x25, 0x0e, 0x70, 0xac, 0x99, 0xe0, 0x41, 0x46, 0x35, 0x26, 0x58,
+	0xe3, 0x71, 0x2e, 0x85, 0x16, 0xa8, 0x5d, 0xd2, 0x71, 0x49, 0x3b, 0xff, 0x13, 0x91, 0x08, 0x4b,
+	0x02, 0xf3, 0x55, 0x16, 0x75, 0x7a, 0xc7, 0x2d, 0xca, 0x23, 0xd2, 0xcf, 0x39, 0x2d, 0x0b, 0x06,
+	0xaf, 0x75, 0xd8, 0x7e, 0xa0, 0x5c, 0xd1, 0xbb, 0x6d, 0x77, 0xd4, 0x85, 0xae, 0x39, 0xa3, 0x39,
+	0x56, 0x73, 0x0f, 0xf4, 0xc1, 0xc8, 0x0d, 0xf7, 0x02, 0xba, 0x84, 0x67, 0x84, 0x44, 0x98, 0x93,
+	0x68, 0xc6, 0x78, 0x42, 0x65, 0x2e, 0x19, 0xd7, 0x2a, 0x62, 0xb1, 0x57, 0xef, 0x83, 0x91, 0x13,
+	0x56, 0x50, 0x34, 0x84, 0xed, 0x58, 0xa4, 0x29, 0x2d, 0x07, 0x60, 0xc4, 0x6b, 0xd8, 0xce, 0xc7,
+	0x22, 0xea, 0xc0, 0xbf, 0x89, 0x14, 0x45, 0x6e, 0x0a, 0x1c, 0x5b, 0xb0, 0xbb, 0xa3, 0x2b, 0x78,
+	0xfe, 0x53, 0xef, 0x0c, 0x2f, 0xbc, 0xa6, 0x7d, 0xba, 0x0a, 0x57, 0xfd, 0xc9, 0x88, 0xf2, 0x5a,
+	0xfd, 0xc6, 0xc8, 0x0d, 0xab, 0x30, 0xf2, 0x21, 0x54, 0x2c, 0xe1, 0x58, 0x17, 0x92, 0x2a, 0xef,
+	0x8f, 0x9d, 0xe8, 0x40, 0x19, 0xbc, 0x01, 0xf8, 0xef, 0x1a, 0xab, 0x18, 0x93, 0xdf, 0xee, 0xaf,
+	0x0b, 0xdd, 0x19, 0x4b, 0x69, 0xc4, 0x71, 0x46, 0xed, 0xca, 0xdc, 0x70, 0x2f, 0x18, 0x2a, 0x9f,
+	0xcc, 0xcb, 0x66, 0xa1, 0x0d, 0xeb, 0x6a, 0x2f, 0x98, 0x69, 0xb6, 0x17, 0x63, 0xda, 0xb1, 0xf8,
+	0x40, 0x41, 0xc3, 0x1d, 0x37, 0xd6, 0x9a, 0xc6, 0xda, 0xc4, 0x59, 0x7e, 0xf4, 0x40, 0x78, 0xa0,
+	0x9f, 0x78, 0x6a, 0x9d, 0x7a, 0x9a, 0xdc, 0x2c, 0xd7, 0x3e, 0x58, 0xad, 0x7d, 0xf0, 0xb9, 0xf6,
+	0xc1, 0xcb, 0xc6, 0xaf, 0xad, 0x36, 0x7e, 0xed, 0x7d, 0xe3, 0xd7, 0x1e, 0x83, 0x84, 0xe9, 0x79,
+	0x31, 0x1d, 0xc7, 0x22, 0x0b, 0x6e, 0x6d, 0xae, 0xee, 0x4d, 0x86, 0x62, 0x91, 0x06, 0xdb, 0x98,
+	0x2d, 0xbe, 0x83, 0x66, 0x12, 0xa6, 0xa6, 0x2d, 0x9b, 0xb1, 0x8b, 0xaf, 0x00, 0x00, 0x00, 0xff,
+	0xff, 0xcb, 0x39, 0x74, 0xfd, 0xc9, 0x02, 0x00, 0x00,
 }
 
 func (m *SenseMetadata) Marshal() (dAtA []byte, err error) {
@@ -318,19 +283,40 @@ func (m *SenseMetadata) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.Signatures) > 0 {
+		i -= len(m.Signatures)
+		copy(dAtA[i:], m.Signatures)
+		i = encodeVarintMetadata(dAtA, i, uint64(len(m.Signatures)))
+		i--
+		dAtA[i] = 0x3a
+	}
 	if len(m.DdAndFingerprintsIds) > 0 {
 		for iNdEx := len(m.DdAndFingerprintsIds) - 1; iNdEx >= 0; iNdEx-- {
 			i -= len(m.DdAndFingerprintsIds[iNdEx])
 			copy(dAtA[i:], m.DdAndFingerprintsIds[iNdEx])
 			i = encodeVarintMetadata(dAtA, i, uint64(len(m.DdAndFingerprintsIds[iNdEx])))
 			i--
-			dAtA[i] = 0x22
+			dAtA[i] = 0x32
 		}
 	}
 	if m.DdAndFingerprintsMax != 0 {
 		i = encodeVarintMetadata(dAtA, i, uint64(m.DdAndFingerprintsMax))
 		i--
-		dAtA[i] = 0x18
+		dAtA[i] = 0x28
+	}
+	if len(m.GroupId) > 0 {
+		i -= len(m.GroupId)
+		copy(dAtA[i:], m.GroupId)
+		i = encodeVarintMetadata(dAtA, i, uint64(len(m.GroupId)))
+		i--
+		dAtA[i] = 0x22
+	}
+	if len(m.CollectionId) > 0 {
+		i -= len(m.CollectionId)
+		copy(dAtA[i:], m.CollectionId)
+		i = encodeVarintMetadata(dAtA, i, uint64(len(m.CollectionId)))
+		i--
+		dAtA[i] = 0x1a
 	}
 	if m.DdAndFingerprintsIc != 0 {
 		i = encodeVarintMetadata(dAtA, i, uint64(m.DdAndFingerprintsIc))
@@ -367,31 +353,31 @@ func (m *CascadeMetadata) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if len(m.RqOti) > 0 {
-		i -= len(m.RqOti)
-		copy(dAtA[i:], m.RqOti)
-		i = encodeVarintMetadata(dAtA, i, uint64(len(m.RqOti)))
+	if len(m.Signatures) > 0 {
+		i -= len(m.Signatures)
+		copy(dAtA[i:], m.Signatures)
+		i = encodeVarintMetadata(dAtA, i, uint64(len(m.Signatures)))
 		i--
 		dAtA[i] = 0x32
 	}
-	if m.RqIc != 0 {
-		i = encodeVarintMetadata(dAtA, i, uint64(m.RqIc))
-		i--
-		dAtA[i] = 0x28
+	if len(m.RqIdsIds) > 0 {
+		for iNdEx := len(m.RqIdsIds) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.RqIdsIds[iNdEx])
+			copy(dAtA[i:], m.RqIdsIds[iNdEx])
+			i = encodeVarintMetadata(dAtA, i, uint64(len(m.RqIdsIds[iNdEx])))
+			i--
+			dAtA[i] = 0x2a
+		}
 	}
-	if m.RqMax != 0 {
-		i = encodeVarintMetadata(dAtA, i, uint64(m.RqMax))
+	if m.RqIdsMax != 0 {
+		i = encodeVarintMetadata(dAtA, i, uint64(m.RqIdsMax))
 		i--
 		dAtA[i] = 0x20
 	}
-	if len(m.RqIds) > 0 {
-		for iNdEx := len(m.RqIds) - 1; iNdEx >= 0; iNdEx-- {
-			i -= len(m.RqIds[iNdEx])
-			copy(dAtA[i:], m.RqIds[iNdEx])
-			i = encodeVarintMetadata(dAtA, i, uint64(len(m.RqIds[iNdEx])))
-			i--
-			dAtA[i] = 0x1a
-		}
+	if m.RqIdsIc != 0 {
+		i = encodeVarintMetadata(dAtA, i, uint64(m.RqIdsIc))
+		i--
+		dAtA[i] = 0x18
 	}
 	if len(m.FileName) > 0 {
 		i -= len(m.FileName)
@@ -410,80 +396,6 @@ func (m *CascadeMetadata) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
-func (m *Metadata) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalToSizedBuffer(dAtA[:size])
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *Metadata) MarshalTo(dAtA []byte) (int, error) {
-	size := m.Size()
-	return m.MarshalToSizedBuffer(dAtA[:size])
-}
-
-func (m *Metadata) MarshalToSizedBuffer(dAtA []byte) (int, error) {
-	i := len(dAtA)
-	_ = i
-	var l int
-	_ = l
-	if m.MetadataType != nil {
-		{
-			size := m.MetadataType.Size()
-			i -= size
-			if _, err := m.MetadataType.MarshalTo(dAtA[i:]); err != nil {
-				return 0, err
-			}
-		}
-	}
-	return len(dAtA) - i, nil
-}
-
-func (m *Metadata_SenseMetadata) MarshalTo(dAtA []byte) (int, error) {
-	size := m.Size()
-	return m.MarshalToSizedBuffer(dAtA[:size])
-}
-
-func (m *Metadata_SenseMetadata) MarshalToSizedBuffer(dAtA []byte) (int, error) {
-	i := len(dAtA)
-	if m.SenseMetadata != nil {
-		{
-			size, err := m.SenseMetadata.MarshalToSizedBuffer(dAtA[:i])
-			if err != nil {
-				return 0, err
-			}
-			i -= size
-			i = encodeVarintMetadata(dAtA, i, uint64(size))
-		}
-		i--
-		dAtA[i] = 0xa
-	}
-	return len(dAtA) - i, nil
-}
-func (m *Metadata_CascadeMetadata) MarshalTo(dAtA []byte) (int, error) {
-	size := m.Size()
-	return m.MarshalToSizedBuffer(dAtA[:size])
-}
-
-func (m *Metadata_CascadeMetadata) MarshalToSizedBuffer(dAtA []byte) (int, error) {
-	i := len(dAtA)
-	if m.CascadeMetadata != nil {
-		{
-			size, err := m.CascadeMetadata.MarshalToSizedBuffer(dAtA[:i])
-			if err != nil {
-				return 0, err
-			}
-			i -= size
-			i = encodeVarintMetadata(dAtA, i, uint64(size))
-		}
-		i--
-		dAtA[i] = 0x12
-	}
-	return len(dAtA) - i, nil
-}
 func encodeVarintMetadata(dAtA []byte, offset int, v uint64) int {
 	offset -= sovMetadata(v)
 	base := offset
@@ -508,6 +420,14 @@ func (m *SenseMetadata) Size() (n int) {
 	if m.DdAndFingerprintsIc != 0 {
 		n += 1 + sovMetadata(uint64(m.DdAndFingerprintsIc))
 	}
+	l = len(m.CollectionId)
+	if l > 0 {
+		n += 1 + l + sovMetadata(uint64(l))
+	}
+	l = len(m.GroupId)
+	if l > 0 {
+		n += 1 + l + sovMetadata(uint64(l))
+	}
 	if m.DdAndFingerprintsMax != 0 {
 		n += 1 + sovMetadata(uint64(m.DdAndFingerprintsMax))
 	}
@@ -516,6 +436,10 @@ func (m *SenseMetadata) Size() (n int) {
 			l = len(s)
 			n += 1 + l + sovMetadata(uint64(l))
 		}
+	}
+	l = len(m.Signatures)
+	if l > 0 {
+		n += 1 + l + sovMetadata(uint64(l))
 	}
 	return n
 }
@@ -534,57 +458,20 @@ func (m *CascadeMetadata) Size() (n int) {
 	if l > 0 {
 		n += 1 + l + sovMetadata(uint64(l))
 	}
-	if len(m.RqIds) > 0 {
-		for _, s := range m.RqIds {
+	if m.RqIdsIc != 0 {
+		n += 1 + sovMetadata(uint64(m.RqIdsIc))
+	}
+	if m.RqIdsMax != 0 {
+		n += 1 + sovMetadata(uint64(m.RqIdsMax))
+	}
+	if len(m.RqIdsIds) > 0 {
+		for _, s := range m.RqIdsIds {
 			l = len(s)
 			n += 1 + l + sovMetadata(uint64(l))
 		}
 	}
-	if m.RqMax != 0 {
-		n += 1 + sovMetadata(uint64(m.RqMax))
-	}
-	if m.RqIc != 0 {
-		n += 1 + sovMetadata(uint64(m.RqIc))
-	}
-	l = len(m.RqOti)
+	l = len(m.Signatures)
 	if l > 0 {
-		n += 1 + l + sovMetadata(uint64(l))
-	}
-	return n
-}
-
-func (m *Metadata) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	if m.MetadataType != nil {
-		n += m.MetadataType.Size()
-	}
-	return n
-}
-
-func (m *Metadata_SenseMetadata) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	if m.SenseMetadata != nil {
-		l = m.SenseMetadata.Size()
-		n += 1 + l + sovMetadata(uint64(l))
-	}
-	return n
-}
-func (m *Metadata_CascadeMetadata) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	if m.CascadeMetadata != nil {
-		l = m.CascadeMetadata.Size()
 		n += 1 + l + sovMetadata(uint64(l))
 	}
 	return n
@@ -671,12 +558,76 @@ func (m *SenseMetadata) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.DdAndFingerprintsIc |= int32(b&0x7F) << shift
+				m.DdAndFingerprintsIc |= uint64(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
 		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CollectionId", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMetadata
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMetadata
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthMetadata
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.CollectionId = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field GroupId", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMetadata
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMetadata
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthMetadata
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.GroupId = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 5:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field DdAndFingerprintsMax", wireType)
 			}
@@ -690,12 +641,12 @@ func (m *SenseMetadata) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.DdAndFingerprintsMax |= int32(b&0x7F) << shift
+				m.DdAndFingerprintsMax |= uint64(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-		case 4:
+		case 6:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field DdAndFingerprintsIds", wireType)
 			}
@@ -726,6 +677,38 @@ func (m *SenseMetadata) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.DdAndFingerprintsIds = append(m.DdAndFingerprintsIds, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
+		case 7:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Signatures", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMetadata
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMetadata
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthMetadata
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Signatures = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -842,8 +825,46 @@ func (m *CascadeMetadata) Unmarshal(dAtA []byte) error {
 			m.FileName = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RqIdsIc", wireType)
+			}
+			m.RqIdsIc = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMetadata
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.RqIdsIc |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RqIdsMax", wireType)
+			}
+			m.RqIdsMax = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMetadata
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.RqIdsMax |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 5:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field RqIds", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field RqIdsIds", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -871,51 +892,13 @@ func (m *CascadeMetadata) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.RqIds = append(m.RqIds, string(dAtA[iNdEx:postIndex]))
+			m.RqIdsIds = append(m.RqIdsIds, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
-		case 4:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field RqMax", wireType)
-			}
-			m.RqMax = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowMetadata
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.RqMax |= int32(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-		case 5:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field RqIc", wireType)
-			}
-			m.RqIc = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowMetadata
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.RqIc |= int32(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
 		case 6:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field RqOti", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Signatures", wireType)
 			}
-			var byteLen int
+			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowMetadata
@@ -925,145 +908,23 @@ func (m *CascadeMetadata) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				byteLen |= int(b&0x7F) << shift
+				stringLen |= uint64(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-			if byteLen < 0 {
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
 				return ErrInvalidLengthMetadata
 			}
-			postIndex := iNdEx + byteLen
+			postIndex := iNdEx + intStringLen
 			if postIndex < 0 {
 				return ErrInvalidLengthMetadata
 			}
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.RqOti = append(m.RqOti[:0], dAtA[iNdEx:postIndex]...)
-			if m.RqOti == nil {
-				m.RqOti = []byte{}
-			}
-			iNdEx = postIndex
-		default:
-			iNdEx = preIndex
-			skippy, err := skipMetadata(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if (skippy < 0) || (iNdEx+skippy) < 0 {
-				return ErrInvalidLengthMetadata
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *Metadata) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowMetadata
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= uint64(b&0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: Metadata: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: Metadata: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field SenseMetadata", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowMetadata
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthMetadata
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthMetadata
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			v := &SenseMetadata{}
-			if err := v.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			m.MetadataType = &Metadata_SenseMetadata{v}
-			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field CascadeMetadata", wireType)
-			}
-			var msglen int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowMetadata
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				msglen |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			if msglen < 0 {
-				return ErrInvalidLengthMetadata
-			}
-			postIndex := iNdEx + msglen
-			if postIndex < 0 {
-				return ErrInvalidLengthMetadata
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			v := &CascadeMetadata{}
-			if err := v.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
-				return err
-			}
-			m.MetadataType = &Metadata_CascadeMetadata{v}
+			m.Signatures = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

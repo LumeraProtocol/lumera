@@ -8,7 +8,7 @@ import (
 	simtypes "github.com/cosmos/cosmos-sdk/types/simulation"
 	"github.com/cosmos/cosmos-sdk/x/simulation"
 
-	"github.com/LumeraProtocol/lumera/testutil/sample"
+	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
 	lumeraidsimulation "github.com/LumeraProtocol/lumera/x/lumeraid/simulation"
 	"github.com/LumeraProtocol/lumera/x/lumeraid/types"
 )
@@ -17,7 +17,7 @@ import (
 var (
 	_ = lumeraidsimulation.FindAccount
 	_ = rand.Rand{}
-	_ = sample.AccAddress
+	_ = cryptotestutils.AccAddress
 	_ = sdk.AccAddress{}
 	_ = simulation.MsgEntryKind
 )

@@ -3,15 +3,20 @@ package lumera.action;
 
 option go_package = "github.com/LumeraProtocol/lumera/x/action/types";
 
+import "gogoproto/gogo.proto";
+import "cosmos_proto/cosmos.proto";
 import "lumera/action/metadata.proto";
 import "lumera/action/action_state.proto";
+import "lumera/action/action_type.proto";
 
 message Action {
-  string creator = 1;
+  string creator = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
   string actionID = 2;
-  Metadata metadata = 3;
-  string price = 4;
-  string expirationTime = 5;
-  int64 blockHeight = 6;
+  ActionType actionType = 3;
+  bytes metadata = 4;
+  string price = 5 [(gogoproto.customtype) = "github.com/cosmos/cosmos-sdk/types.Coin"];
+  int64 expirationTime = 6;
   ActionState state = 7;
+  int64 blockHeight = 8;
+  repeated string superNodes = 9 [(cosmos_proto.scalar) = "cosmos.ValidatorAddressString"];
 }

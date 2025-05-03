@@ -11,9 +11,11 @@ enum ActionState {
 
   ACTION_STATE_UNSPECIFIED = 0 [(gogoproto.enumvalue_customname) = "ActionStateUnspecified"];
   ACTION_STATE_PENDING = 1 [(gogoproto.enumvalue_customname) = "ActionStatePending"];
-  ACTION_STATE_DONE = 2 [(gogoproto.enumvalue_customname) = "ActionStateDone"];
-  ACTION_STATE_APPROVED = 3 [(gogoproto.enumvalue_customname) = "ActionStateApproved"];
-  ACTION_STATE_REJECTED = 4 [(gogoproto.enumvalue_customname) = "ActionStateRejected"];
-  ACTION_STATE_FAILED = 5 [(gogoproto.enumvalue_customname) = "ActionStateFailed"];
+  ACTION_STATE_PROCESSING = 2 [(gogoproto.enumvalue_customname) = "ActionStateProcessing"];
+  ACTION_STATE_DONE = 3 [(gogoproto.enumvalue_customname) = "ActionStateDone"];
+  ACTION_STATE_APPROVED = 4 [(gogoproto.enumvalue_customname) = "ActionStateApproved"];
+  ACTION_STATE_REJECTED = 5 [(gogoproto.enumvalue_customname) = "ActionStateRejected"];
+  ACTION_STATE_FAILED = 6 [(gogoproto.enumvalue_customname) = "ActionStateFailed"];
+  ACTION_STATE_EXPIRED = 7 [(gogoproto.enumvalue_customname) = "ActionStateExpired"];
 }
 

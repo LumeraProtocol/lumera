@@ -7,7 +7,7 @@ import (
 	"errors"
 	"testing"
 
-//	"github.com/cometbft/cometbft/abci/server"
+	//	"github.com/cometbft/cometbft/abci/server"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	proto "github.com/cosmos/gogoproto/proto"
@@ -26,7 +26,7 @@ func TestCreateRequest(t *testing.T) {
 	defer ctrl.Finish()
 
 	kr := accounts.CreateTestKeyring()
-	
+
 	// Create test accounts
 	testAccounts := accounts.SetupTestAccounts(t, kr, []string{"test-client", "test-server"})
 	localAddress := testAccounts[0].Address
@@ -37,7 +37,7 @@ func TestCreateRequest(t *testing.T) {
 
 	ske, err := NewSecureKeyExchange(kr, localAddress, peerType, curve)
 	require.NoError(t, err)
-	
+
 	handshakeBytes, signature, err := ske.CreateRequest(remoteAddress)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, handshakeBytes)
@@ -74,7 +74,7 @@ func TestCreateRequest_SignWithKeyringFails(t *testing.T) {
 	mockKeyring.EXPECT().
 		SignByAddress(gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(nil, nil, errors.New("simulated sign failure"))
-	
+
 	ske, err := NewSecureKeyExchange(mockKeyring, clientAccount.Address, Simplenode, nil)
 	require.NoError(t, err)
 
@@ -233,21 +233,21 @@ func createTestHandshake(t *testing.T, ske *SecureKeyExchange, remoteAddress str
 
 	var accountPubKey []byte
 	switch hsType {
-		case hsValid, hsMissingEphemeralKey, hsOtherAccountPublicKey:
-			accountPubKey, err = ske.codec.MarshalInterface(remoteAccount.PubKey)
-			require.NoError(t, err)
-		case hsNilAccountPublicKey:
-			accountPubKey = nil
-		case hsInvalidAccountPublicKey:
-			accountPubKey = []byte("invalid-account-public-key")
+	case hsValid, hsMissingEphemeralKey, hsOtherAccountPublicKey:
+		accountPubKey, err = ske.codec.MarshalInterface(remoteAccount.PubKey)
+		require.NoError(t, err)
+	case hsNilAccountPublicKey:
+		accountPubKey = nil
+	case hsInvalidAccountPublicKey:
+		accountPubKey = []byte("invalid-account-public-key")
 	}
 
 	handshakeInfo := &lumeraidtypes.HandshakeInfo{
-		Address:   remoteAddress,
-		PeerType:  int32(Supernode),
-		PublicKey: privKey.PublicKey().Bytes(),
+		Address:          remoteAddress,
+		PeerType:         int32(Supernode),
+		PublicKey:        privKey.PublicKey().Bytes(),
 		AccountPublicKey: accountPubKey,
-		Curve:     ske.getCurveName(),
+		Curve:            ske.getCurveName(),
 	}
 	handshakeBytes, err := proto.Marshal(handshakeInfo)
 	require.NoError(t, err)
@@ -319,5 +319,5 @@ func TestComputeSharedSecret(t *testing.T) {
 	sharedSecret, err := skeLocal.ComputeSharedSecret(handshakeRemoteBytes, signatureRemote)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, sharedSecret)
-	assert.Len(t, sharedSecret, 32)	
+	assert.Len(t, sharedSecret, 32)
 }

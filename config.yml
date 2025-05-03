@@ -34,12 +34,28 @@ validators:
   - name: genesis_validator1
     bonded: '100000000000ulume'
 
-
 genesis:
   chain_id: lumera-devnet-1
   app_state:
+    action:
+      params:
+        base_action_fee:
+          amount: "10000"
+          denom: ulume
+        fee_per_byte:
+          amount: "100"
+          denom: ulume
+        super_node_fee_share: '1.000000000000000000'
+        foundation_fee_share: '0.000000000000000000'
+        min_super_nodes: "3"
+        max_actions_per_block: "10"
+        max_dd_and_fingerprints: "50"
+        max_raptor_q_symbols: "50"
+        min_processing_time: 1m0s
+        max_processing_time: 1h0m0s
+        expiration_duration: 24h0m0s
     claim:
-      total_claimable_amount: '12383801540459' # 12,500,000,000,000 ulume --> 12,500,000 lume
+      total_claimable_amount: '18749999981413'
       params:
         claim_end_time: '1746071999' # April 30 2025, 23:59:59
     distribution:

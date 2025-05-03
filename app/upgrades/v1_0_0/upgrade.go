@@ -73,7 +73,6 @@ func CreateUpgradeHandler(
 		logger.Info("Successfully set initial x/action parameters.")
 
 		// 3. Add the New Module to the Version Map
-		// This logic remains the same. 'newVM' was correctly populated by RunMigrations.
 		newVM[actiontypes.ModuleName] = actiontypes.ConsensusVersion
 
 		logger.Info(fmt.Sprintf("Successfully completed upgrade %s", UpgradeName))

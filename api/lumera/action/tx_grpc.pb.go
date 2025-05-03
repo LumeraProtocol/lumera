@@ -19,7 +19,10 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Msg_UpdateParams_FullMethodName = "/lumera.action.Msg/UpdateParams"
+	Msg_UpdateParams_FullMethodName   = "/lumera.action.Msg/UpdateParams"
+	Msg_RequestAction_FullMethodName  = "/lumera.action.Msg/RequestAction"
+	Msg_FinalizeAction_FullMethodName = "/lumera.action.Msg/FinalizeAction"
+	Msg_ApproveAction_FullMethodName  = "/lumera.action.Msg/ApproveAction"
 )
 
 // MsgClient is the client API for Msg service.
@@ -31,6 +34,9 @@ type MsgClient interface {
 	// UpdateParams defines a (governance) operation for updating the module
 	// parameters. The authority defaults to the x/gov module account.
 	UpdateParams(ctx context.Context, in *MsgUpdateParams, opts ...grpc.CallOption) (*MsgUpdateParamsResponse, error)
+	RequestAction(ctx context.Context, in *MsgRequestAction, opts ...grpc.CallOption) (*MsgRequestActionResponse, error)
+	FinalizeAction(ctx context.Context, in *MsgFinalizeAction, opts ...grpc.CallOption) (*MsgFinalizeActionResponse, error)
+	ApproveAction(ctx context.Context, in *MsgApproveAction, opts ...grpc.CallOption) (*MsgApproveActionResponse, error)
 }
 
 type msgClient struct {
@@ -51,6 +57,36 @@ func (c *msgClient) UpdateParams(ctx context.Context, in *MsgUpdateParams, opts 
 	return out, nil
 }
 
+func (c *msgClient) RequestAction(ctx context.Context, in *MsgRequestAction, opts ...grpc.CallOption) (*MsgRequestActionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MsgRequestActionResponse)
+	err := c.cc.Invoke(ctx, Msg_RequestAction_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *msgClient) FinalizeAction(ctx context.Context, in *MsgFinalizeAction, opts ...grpc.CallOption) (*MsgFinalizeActionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MsgFinalizeActionResponse)
+	err := c.cc.Invoke(ctx, Msg_FinalizeAction_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *msgClient) ApproveAction(ctx context.Context, in *MsgApproveAction, opts ...grpc.CallOption) (*MsgApproveActionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MsgApproveActionResponse)
+	err := c.cc.Invoke(ctx, Msg_ApproveAction_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MsgServer is the server API for Msg service.
 // All implementations must embed UnimplementedMsgServer
 // for forward compatibility.
@@ -60,6 +96,9 @@ type MsgServer interface {
 	// UpdateParams defines a (governance) operation for updating the module
 	// parameters. The authority defaults to the x/gov module account.
 	UpdateParams(context.Context, *MsgUpdateParams) (*MsgUpdateParamsResponse, error)
+	RequestAction(context.Context, *MsgRequestAction) (*MsgRequestActionResponse, error)
+	FinalizeAction(context.Context, *MsgFinalizeAction) (*MsgFinalizeActionResponse, error)
+	ApproveAction(context.Context, *MsgApproveAction) (*MsgApproveActionResponse, error)
 	mustEmbedUnimplementedMsgServer()
 }
 
@@ -72,6 +111,15 @@ type UnimplementedMsgServer struct{}
 
 func (UnimplementedMsgServer) UpdateParams(context.Context, *MsgUpdateParams) (*MsgUpdateParamsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateParams not implemented")
+}
+func (UnimplementedMsgServer) RequestAction(context.Context, *MsgRequestAction) (*MsgRequestActionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RequestAction not implemented")
+}
+func (UnimplementedMsgServer) FinalizeAction(context.Context, *MsgFinalizeAction) (*MsgFinalizeActionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FinalizeAction not implemented")
+}
+func (UnimplementedMsgServer) ApproveAction(context.Context, *MsgApproveAction) (*MsgApproveActionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ApproveAction not implemented")
 }
 func (UnimplementedMsgServer) mustEmbedUnimplementedMsgServer() {}
 func (UnimplementedMsgServer) testEmbeddedByValue()             {}
@@ -112,6 +160,60 @@ func _Msg_UpdateParams_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Msg_RequestAction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MsgRequestAction)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServer).RequestAction(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Msg_RequestAction_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServer).RequestAction(ctx, req.(*MsgRequestAction))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Msg_FinalizeAction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MsgFinalizeAction)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServer).FinalizeAction(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Msg_FinalizeAction_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServer).FinalizeAction(ctx, req.(*MsgFinalizeAction))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Msg_ApproveAction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MsgApproveAction)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServer).ApproveAction(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Msg_ApproveAction_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServer).ApproveAction(ctx, req.(*MsgApproveAction))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Msg_ServiceDesc is the grpc.ServiceDesc for Msg service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -122,6 +224,18 @@ var Msg_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateParams",
 			Handler:    _Msg_UpdateParams_Handler,
+		},
+		{
+			MethodName: "RequestAction",
+			Handler:    _Msg_RequestAction_Handler,
+		},
+		{
+			MethodName: "FinalizeAction",
+			Handler:    _Msg_FinalizeAction_Handler,
+		},
+		{
+			MethodName: "ApproveAction",
+			Handler:    _Msg_ApproveAction_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

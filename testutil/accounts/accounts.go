@@ -4,15 +4,16 @@ package accounts
 
 import (
 	"testing"
+
 	"github.com/stretchr/testify/require"
 
-	"github.com/cosmos/go-bip39"
 	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
+	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
-	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
+	"github.com/cosmos/go-bip39"
 )
 
 const (
@@ -26,7 +27,7 @@ type TestAccount struct {
 	Address string
 	PubKey  cryptotypes.PubKey
 }
-	
+
 func generateMnemonic() (string, error) {
 	entropy, err := bip39.NewEntropy(128) // 128 bits for a 12-word mnemonic
 	if err != nil {

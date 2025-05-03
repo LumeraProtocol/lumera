@@ -65,7 +65,7 @@ func SimulateMsgStartSupernode(
 
 		// Execute the message
 		msgServer := keeper.NewMsgServerImpl(k)
-		_, err := msgServer.StartSupernode(sdk.WrapSDKContext(ctx), msg)
+		_, err := msgServer.StartSupernode(ctx, msg)
 		if err != nil {
 			return simtypes.NoOpMsg(types.ModuleName, TypeMsgStartSupernode, err.Error()), nil, err
 		}

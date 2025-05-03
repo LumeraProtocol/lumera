@@ -19,9 +19,14 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Query_Params_FullMethodName       = "/lumera.action.Query/Params"
-	Query_GetAction_FullMethodName    = "/lumera.action.Query/GetAction"
-	Query_GetActionFee_FullMethodName = "/lumera.action.Query/GetActionFee"
+	Query_Params_FullMethodName                   = "/lumera.action.Query/Params"
+	Query_GetAction_FullMethodName                = "/lumera.action.Query/GetAction"
+	Query_GetActionFee_FullMethodName             = "/lumera.action.Query/GetActionFee"
+	Query_ListActions_FullMethodName              = "/lumera.action.Query/ListActions"
+	Query_ListActionsBySuperNode_FullMethodName   = "/lumera.action.Query/ListActionsBySuperNode"
+	Query_ListActionsByBlockHeight_FullMethodName = "/lumera.action.Query/ListActionsByBlockHeight"
+	Query_ListExpiredActions_FullMethodName       = "/lumera.action.Query/ListExpiredActions"
+	Query_QueryActionByMetadata_FullMethodName    = "/lumera.action.Query/QueryActionByMetadata"
 )
 
 // QueryClient is the client API for Query service.
@@ -36,6 +41,16 @@ type QueryClient interface {
 	GetAction(ctx context.Context, in *QueryGetActionRequest, opts ...grpc.CallOption) (*QueryGetActionResponse, error)
 	// Queries a list of GetActionFee items.
 	GetActionFee(ctx context.Context, in *QueryGetActionFeeRequest, opts ...grpc.CallOption) (*QueryGetActionFeeResponse, error)
+	// List actions with optional type and state filters.
+	ListActions(ctx context.Context, in *QueryListActionsRequest, opts ...grpc.CallOption) (*QueryListActionsResponse, error)
+	// List actions for a specific supernode.
+	ListActionsBySuperNode(ctx context.Context, in *QueryListActionsBySuperNodeRequest, opts ...grpc.CallOption) (*QueryListActionsResponse, error)
+	// List actions created at a specific block height.
+	ListActionsByBlockHeight(ctx context.Context, in *QueryListActionsByBlockHeightRequest, opts ...grpc.CallOption) (*QueryListActionsResponse, error)
+	// List expired actions.
+	ListExpiredActions(ctx context.Context, in *QueryListExpiredActionsRequest, opts ...grpc.CallOption) (*QueryListActionsResponse, error)
+	// Query actions based on metadata.
+	QueryActionByMetadata(ctx context.Context, in *QueryActionByMetadataRequest, opts ...grpc.CallOption) (*QueryListActionsResponse, error)
 }
 
 type queryClient struct {
@@ -76,6 +91,56 @@ func (c *queryClient) GetActionFee(ctx context.Context, in *QueryGetActionFeeReq
 	return out, nil
 }
 
+func (c *queryClient) ListActions(ctx context.Context, in *QueryListActionsRequest, opts ...grpc.CallOption) (*QueryListActionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryListActionsResponse)
+	err := c.cc.Invoke(ctx, Query_ListActions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *queryClient) ListActionsBySuperNode(ctx context.Context, in *QueryListActionsBySuperNodeRequest, opts ...grpc.CallOption) (*QueryListActionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryListActionsResponse)
+	err := c.cc.Invoke(ctx, Query_ListActionsBySuperNode_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *queryClient) ListActionsByBlockHeight(ctx context.Context, in *QueryListActionsByBlockHeightRequest, opts ...grpc.CallOption) (*QueryListActionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryListActionsResponse)
+	err := c.cc.Invoke(ctx, Query_ListActionsByBlockHeight_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *queryClient) ListExpiredActions(ctx context.Context, in *QueryListExpiredActionsRequest, opts ...grpc.CallOption) (*QueryListActionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryListActionsResponse)
+	err := c.cc.Invoke(ctx, Query_ListExpiredActions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *queryClient) QueryActionByMetadata(ctx context.Context, in *QueryActionByMetadataRequest, opts ...grpc.CallOption) (*QueryListActionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryListActionsResponse)
+	err := c.cc.Invoke(ctx, Query_QueryActionByMetadata_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // QueryServer is the server API for Query service.
 // All implementations must embed UnimplementedQueryServer
 // for forward compatibility.
@@ -88,6 +153,16 @@ type QueryServer interface {
 	GetAction(context.Context, *QueryGetActionRequest) (*QueryGetActionResponse, error)
 	// Queries a list of GetActionFee items.
 	GetActionFee(context.Context, *QueryGetActionFeeRequest) (*QueryGetActionFeeResponse, error)
+	// List actions with optional type and state filters.
+	ListActions(context.Context, *QueryListActionsRequest) (*QueryListActionsResponse, error)
+	// List actions for a specific supernode.
+	ListActionsBySuperNode(context.Context, *QueryListActionsBySuperNodeRequest) (*QueryListActionsResponse, error)
+	// List actions created at a specific block height.
+	ListActionsByBlockHeight(context.Context, *QueryListActionsByBlockHeightRequest) (*QueryListActionsResponse, error)
+	// List expired actions.
+	ListExpiredActions(context.Context, *QueryListExpiredActionsRequest) (*QueryListActionsResponse, error)
+	// Query actions based on metadata.
+	QueryActionByMetadata(context.Context, *QueryActionByMetadataRequest) (*QueryListActionsResponse, error)
 	mustEmbedUnimplementedQueryServer()
 }
 
@@ -106,6 +181,21 @@ func (UnimplementedQueryServer) GetAction(context.Context, *QueryGetActionReques
 }
 func (UnimplementedQueryServer) GetActionFee(context.Context, *QueryGetActionFeeRequest) (*QueryGetActionFeeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetActionFee not implemented")
+}
+func (UnimplementedQueryServer) ListActions(context.Context, *QueryListActionsRequest) (*QueryListActionsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListActions not implemented")
+}
+func (UnimplementedQueryServer) ListActionsBySuperNode(context.Context, *QueryListActionsBySuperNodeRequest) (*QueryListActionsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListActionsBySuperNode not implemented")
+}
+func (UnimplementedQueryServer) ListActionsByBlockHeight(context.Context, *QueryListActionsByBlockHeightRequest) (*QueryListActionsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListActionsByBlockHeight not implemented")
+}
+func (UnimplementedQueryServer) ListExpiredActions(context.Context, *QueryListExpiredActionsRequest) (*QueryListActionsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListExpiredActions not implemented")
+}
+func (UnimplementedQueryServer) QueryActionByMetadata(context.Context, *QueryActionByMetadataRequest) (*QueryListActionsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryActionByMetadata not implemented")
 }
 func (UnimplementedQueryServer) mustEmbedUnimplementedQueryServer() {}
 func (UnimplementedQueryServer) testEmbeddedByValue()               {}
@@ -182,6 +272,96 @@ func _Query_GetActionFee_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Query_ListActions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryListActionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(QueryServer).ListActions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Query_ListActions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(QueryServer).ListActions(ctx, req.(*QueryListActionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Query_ListActionsBySuperNode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryListActionsBySuperNodeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(QueryServer).ListActionsBySuperNode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Query_ListActionsBySuperNode_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(QueryServer).ListActionsBySuperNode(ctx, req.(*QueryListActionsBySuperNodeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Query_ListActionsByBlockHeight_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryListActionsByBlockHeightRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(QueryServer).ListActionsByBlockHeight(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Query_ListActionsByBlockHeight_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(QueryServer).ListActionsByBlockHeight(ctx, req.(*QueryListActionsByBlockHeightRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Query_ListExpiredActions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryListExpiredActionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(QueryServer).ListExpiredActions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Query_ListExpiredActions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(QueryServer).ListExpiredActions(ctx, req.(*QueryListExpiredActionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Query_QueryActionByMetadata_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryActionByMetadataRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(QueryServer).QueryActionByMetadata(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Query_QueryActionByMetadata_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(QueryServer).QueryActionByMetadata(ctx, req.(*QueryActionByMetadataRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Query_ServiceDesc is the grpc.ServiceDesc for Query service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -200,6 +380,26 @@ var Query_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetActionFee",
 			Handler:    _Query_GetActionFee_Handler,
+		},
+		{
+			MethodName: "ListActions",
+			Handler:    _Query_ListActions_Handler,
+		},
+		{
+			MethodName: "ListActionsBySuperNode",
+			Handler:    _Query_ListActionsBySuperNode_Handler,
+		},
+		{
+			MethodName: "ListActionsByBlockHeight",
+			Handler:    _Query_ListActionsByBlockHeight_Handler,
+		},
+		{
+			MethodName: "ListExpiredActions",
+			Handler:    _Query_ListExpiredActions_Handler,
+		},
+		{
+			MethodName: "QueryActionByMetadata",
+			Handler:    _Query_QueryActionByMetadata_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -36,7 +36,6 @@ func (k Keeper) SetSuperNode(ctx sdk.Context, supernode types.SuperNode) error {
 	valOperAddr, err := sdk.ValAddressFromBech32(supernode.ValidatorAddress)
 	if err != nil {
 		return errorsmod.Wrapf(err, "invalid validator address: %s", err)
-		return errorsmod.Wrapf(err, "invalid validator address: %s", err)
 	}
 
 	// Set the supernode record under [SuperNodeKeyPrefix + valOperAddr]

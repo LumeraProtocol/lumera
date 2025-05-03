@@ -9,7 +9,7 @@ import (
 // x/lumeraid module sentinel errors
 var (
 	ErrInvalidSigner = sdkerrors.Register(ModuleName, 1100, "expected gov account as only signer for proposal message")
-	ErrSample        = sdkerrors.Register(ModuleName, 1101, "sample error")
+	ErrSample        = sdkerrors.Register(ModuleName, 1101, "action error")
 
 	ErrLumeraIDExists        = sdkerrors.Register(ModuleName, 1, "address already has a LumeraID")
 	ErrInvalidSignature      = sdkerrors.Register(ModuleName, 2, "invalid signature")

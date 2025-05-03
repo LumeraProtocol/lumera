@@ -8,9 +8,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 
-	lumeraidmocks "github.com/LumeraProtocol/lumera/x/lumeraid/mocks"
 	"github.com/LumeraProtocol/lumera/testutil/accounts"
 	. "github.com/LumeraProtocol/lumera/x/lumeraid/legroast"
+	lumeraidmocks "github.com/LumeraProtocol/lumera/x/lumeraid/mocks"
 )
 
 // TestGenerateLegRoastKeySeed tests the GenerateLegRoastKeySeed function

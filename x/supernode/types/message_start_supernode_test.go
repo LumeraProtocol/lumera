@@ -3,7 +3,7 @@ package types
 import (
 	"testing"
 
-	"github.com/LumeraProtocol/lumera/testutil/sample"
+	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/stretchr/testify/require"
 )
@@ -23,7 +23,7 @@ func TestMsgStartSupernode_ValidateBasic(t *testing.T) {
 		}, {
 			name: "valid address",
 			msg: MsgStartSupernode{
-				Creator: sample.AccAddress(),
+				Creator: cryptotestutils.AccAddress(),
 			},
 		},
 	}

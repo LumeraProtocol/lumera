@@ -1,19 +1,14 @@
 package keeper_test
 
 import (
-	"testing"
-
-	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/stretchr/testify/require"
-
 	"github.com/LumeraProtocol/lumera/x/action/types"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
-func TestMsgUpdateParams(t *testing.T) {
-	k, ms, ctx := setupMsgServer(t)
+func (suite *MsgServerTestSuite) TestMsgUpdateParams() {
 	params := types.DefaultParams()
-	require.NoError(t, k.SetParams(ctx, params))
-	wctx := sdk.UnwrapSDKContext(ctx)
+	suite.NoError(suite.keeper.SetParams(suite.ctx, params))
+	wctx := sdk.UnwrapSDKContext(suite.ctx)
 
 	// default params
 	testCases := []struct {
@@ -34,7 +29,7 @@ func TestMsgUpdateParams(t *testing.T) {
 		{
 			name: "send enabled param",
 			input: &types.MsgUpdateParams{
-				Authority: k.GetAuthority(),
+				Authority: suite.keeper.GetAuthority(),
 				Params:    types.Params{},
 			},
 			expErr: false,
@@ -42,7 +37,7 @@ func TestMsgUpdateParams(t *testing.T) {
 		{
 			name: "all good",
 			input: &types.MsgUpdateParams{
-				Authority: k.GetAuthority(),
+				Authority: suite.keeper.GetAuthority(),
 				Params:    params,
 			},
 			expErr: false,
@@ -50,14 +45,14 @@ func TestMsgUpdateParams(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			_, err := ms.UpdateParams(wctx, tc.input)
+		suite.Run(tc.name, func() {
+			_, err := suite.msgServer.UpdateParams(wctx, tc.input)
 
 			if tc.expErr {
-				require.Error(t, err)
-				require.Contains(t, err.Error(), tc.expErrMsg)
+				suite.Error(err)
+				suite.Contains(err.Error(), tc.expErrMsg)
 			} else {
-				require.NoError(t, err)
+				suite.NoError(err)
 			}
 		})
 	}

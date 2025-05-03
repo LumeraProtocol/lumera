@@ -95,9 +95,12 @@ func (AppModuleBasic) RegisterGRPCGatewayRoutes(clientCtx client.Context, mux *r
 type AppModule struct {
 	AppModuleBasic
 
-	keeper        keeper.Keeper
-	accountKeeper types.AccountKeeper
-	bankKeeper    types.BankKeeper
+	keeper             keeper.Keeper
+	accountKeeper      types.AccountKeeper
+	bankKeeper         types.BankKeeper
+	stakingKeeper      types.StakingKeeper
+	distributionKeeper types.DistributionKeeper
+	supernodeKeeper    types.SupernodeKeeper
 }
 
 func NewAppModule(
@@ -105,19 +108,25 @@ func NewAppModule(
 	keeper keeper.Keeper,
 	accountKeeper types.AccountKeeper,
 	bankKeeper types.BankKeeper,
+	stakingKeeper types.StakingKeeper,
+	distributionKeeper types.DistributionKeeper,
+	supernodeKeeper types.SupernodeKeeper,
 ) AppModule {
 	return AppModule{
-		AppModuleBasic: NewAppModuleBasic(cdc),
-		keeper:         keeper,
-		accountKeeper:  accountKeeper,
-		bankKeeper:     bankKeeper,
+		AppModuleBasic:     NewAppModuleBasic(cdc),
+		keeper:             keeper,
+		accountKeeper:      accountKeeper,
+		bankKeeper:         bankKeeper,
+		stakingKeeper:      stakingKeeper,
+		distributionKeeper: distributionKeeper,
+		supernodeKeeper:    supernodeKeeper,
 	}
 }
 
 // RegisterServices registers a gRPC query service to respond to the module-specific gRPC queries
 func (am AppModule) RegisterServices(cfg module.Configurator) {
 	types.RegisterMsgServer(cfg.MsgServer(), keeper.NewMsgServerImpl(am.keeper))
-	types.RegisterQueryServer(cfg.QueryServer(), am.keeper)
+	types.RegisterQueryServer(cfg.QueryServer(), &am.keeper)
 }
 
 // RegisterInvariants registers the invariants of the module. If an invariant deviates from its predicted value, the InvariantRegistry triggers appropriate logic (most often the chain will be halted)
@@ -142,6 +151,13 @@ func (am AppModule) ExportGenesis(ctx sdk.Context, cdc codec.JSONCodec) json.Raw
 // It should be incremented on each consensus-breaking change introduced by the module.
 // To avoid wrong/empty versions, the initial version should be set to 1.
 func (AppModule) ConsensusVersion() uint64 { return 1 }
+
+// RegisterForInitGenesis registers the module for genesis initialization
+func (AppModule) RegisterForInitGenesis() map[string]struct{} {
+	return map[string]struct{}{
+		authtypes.ModuleName: {},
+	}
+}
 
 // BeginBlock contains the logic that is automatically triggered at the beginning of each block.
 // The begin block implementation is optional.
@@ -180,8 +196,11 @@ type ModuleInputs struct {
 	Config       *modulev1.Module
 	Logger       log.Logger
 
-	AccountKeeper types.AccountKeeper
-	BankKeeper    types.BankKeeper
+	AccountKeeper      types.AccountKeeper
+	BankKeeper         types.BankKeeper
+	StakingKeeper      types.StakingKeeper
+	distributionKeeper types.DistributionKeeper
+	SupernodeKeeper    types.SupernodeKeeper
 }
 
 type ModuleOutputs struct {
@@ -202,12 +221,20 @@ func ProvideModule(in ModuleInputs) ModuleOutputs {
 		in.StoreService,
 		in.Logger,
 		authority.String(),
+		in.BankKeeper,
+		in.AccountKeeper,
+		in.StakingKeeper,
+		in.distributionKeeper,
+		in.SupernodeKeeper,
 	)
 	m := NewAppModule(
 		in.Cdc,
 		k,
 		in.AccountKeeper,
 		in.BankKeeper,
+		in.StakingKeeper,
+		in.distributionKeeper,
+		in.SupernodeKeeper,
 	)
 
 	return ModuleOutputs{ActionKeeper: k, Module: m}

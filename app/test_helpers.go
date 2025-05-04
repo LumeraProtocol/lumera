@@ -20,7 +20,6 @@ import (
 	abci "github.com/cometbft/cometbft/abci/types"
 	cmttypes "github.com/cometbft/cometbft/types"
 	dbm "github.com/cosmos/cosmos-db"
-	"github.com/cosmos/cosmos-sdk/baseapp"
 	bam "github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/flags"
@@ -52,7 +51,7 @@ func NewTestApp(
 	traceStore io.Writer,
 	loadLatest bool,
 	appOpts servertypes.AppOptions,
-	baseAppOptions ...func(*baseapp.BaseApp),
+	baseAppOptions ...func(*bam.BaseApp),
 ) (*App, error) {
 	var (
 		app        = &App{ScopedKeepers: make(map[string]capabilitykeeper.ScopedKeeper)}

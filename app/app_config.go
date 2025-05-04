@@ -65,9 +65,14 @@ import (
 	ibctransfertypes "github.com/cosmos/ibc-go/v8/modules/apps/transfer/types"
 	ibcexported "github.com/cosmos/ibc-go/v8/modules/core/exported"
 	"google.golang.org/protobuf/types/known/durationpb"
+
 	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
 	feemarkettypes "github.com/evmos/evmos/v20/x/feemarket/types"
 	erc20types "github.com/evmos/evmos/v20/x/erc20/types"
+	evmmodulev1 "github.com/LumeraProtocol/lumera/api/lumera/evm/v1/module"
+	erc20modulev1 "github.com/LumeraProtocol/lumera/api/lumera/erc20/v1/module"
+	feemarketmodulev1 "github.com/LumeraProtocol/lumera/api/lumera/feemarket/v1/module"
+
 	// this line is used by starport scaffolding # stargate/app/moduleImport
 )
 
@@ -338,6 +343,18 @@ var (
 			{
 				Name:   circuittypes.ModuleName,
 				Config: appconfig.WrapAny(&circuitmodulev1.Module{}),
+			},
+			{
+				Name: evmtypes.ModuleName,
+				Config: appconfig.WrapAny(&evmmodulev1.Module{}),
+			},
+			{
+				Name: feemarkettypes.ModuleName,
+				Config: appconfig.WrapAny(&feemarketmodulev1.Module{}),
+			},
+			{
+				Name: erc20types.ModuleName,
+				Config: appconfig.WrapAny(&erc20modulev1.Module{}),
 			},
 			{
 				Name:   lumeraidmoduletypes.ModuleName,

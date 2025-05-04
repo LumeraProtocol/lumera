@@ -36,8 +36,41 @@ validators:
 
 
 genesis:
-  chain_id: lumera-devnet-1
+  chain_id: lumera-devnet_6834-1
   app_state:
+    evm:
+      params:
+        evm_denom: "ulume"
+        chain_config:
+          homestead_block: "0"
+          dao_fork_block: "0"
+          dao_fork_support: true
+          eip150_block: "0"
+          eip150_hash: "0x0000000000000000000000000000000000000000000000000000000000000000"
+          eip155_block: "0"
+          eip158_block: "0"
+          byzantium_block: "0"
+          constantinople_block: "0"
+          petersburg_block: "0"
+          istanbul_block: "0"
+          muir_glacier_block: "0"
+          berlin_block: "0"
+          london_block: "0"
+          arrow_glacier_block: "0"
+          gray_glacier_block: "0"
+          merge_netsplit_block: "0"
+    feemarket:
+      params:
+        no_base_fee: false
+        base_fee_change_denominator: 8
+        elasticity_multiplier: 2
+        enable_height: "0"
+        base_fee: "1000000000"       # initial base fee in wei
+        min_gas_price: "1000000000"
+        min_gas_multiplier: "0.875"
+    erc20:
+      params:
+        enable_erc20: true
     claim:
       total_claimable_amount: '12383801540459' # 12,500,000,000,000 ulume --> 12,500,000 lume
       params:

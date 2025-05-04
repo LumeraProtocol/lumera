@@ -7,6 +7,8 @@ import (
 	"cosmossdk.io/client/v2/autocli"
 	"cosmossdk.io/depinject"
 	"cosmossdk.io/log"
+	evmwiring "github.com/LumeraProtocol/lumera/x/evm/module"
+	lumstakingkeeper "github.com/LumeraProtocol/lumera/x/staking/keeper"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/config"
 	"github.com/cosmos/cosmos-sdk/client/flags"
@@ -17,24 +19,37 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/auth/tx"
 	authtxconfig "github.com/cosmos/cosmos-sdk/x/auth/tx/config"
 	"github.com/cosmos/cosmos-sdk/x/auth/types"
+	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
+	erc20keeper "github.com/evmos/evmos/v20/x/erc20/keeper"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
 	"github.com/LumeraProtocol/lumera/app"
 )
 
+var Erc20KeeperCLI *erc20keeper.Keeper
+
+var GetErc20Keeper evmwiring.Erc20KeeperGetter = func() *erc20keeper.Keeper {
+	return Erc20KeeperCLI
+}
+
 // NewRootCmd creates a new root command for lumera. It is called once in the main function.
 func NewRootCmd() *cobra.Command {
 	var (
-		autoCliOpts        autocli.AppOptions
-		moduleBasicManager module.BasicManager
-		clientCtx          client.Context
+		autoCliOpts         autocli.AppOptions
+		moduleBasicManager  module.BasicManager
+		clientCtx           client.Context
+		StakingKeeperCLI    *stakingkeeper.Keeper
+		LumStakingKeeperCLI *lumstakingkeeper.Keeper
 	)
 
 	if err := depinject.Inject(
+		// Provide the AppConfig to the CLI
 		depinject.Configs(app.AppConfig(),
 			depinject.Supply(
 				log.NewNopLogger(),
+				GetErc20Keeper,
+				LumStakingKeeperCLI,
 			),
 			depinject.Provide(
 				ProvideClientContext,
@@ -46,6 +61,7 @@ func NewRootCmd() *cobra.Command {
 	); err != nil {
 		panic(err)
 	}
+	LumStakingKeeperCLI = lumstakingkeeper.NewKeeper(StakingKeeperCLI)
 
 	rootCmd := &cobra.Command{
 		Use:           app.Name + "d",

@@ -3,9 +3,13 @@ module github.com/LumeraProtocol/lumera
 go 1.24.0
 
 replace (
+	// need this replace to pick up the store changes (Copy func) in our cosmos-sdk fork
+	cosmossdk.io/store => ../cosmos-sdk/store
+	github.com/CosmWasm/wasmd => ../wasmd
 	github.com/btcsuite/btcd => github.com/btcsuite/btcd v0.23.4
 	github.com/btcsuite/btcd/chaincfg/chainhash => github.com/btcsuite/btcd/chaincfg/chainhash v1.0.1
-        github.com/cosmos/cosmos-sdk => github.com/LumeraProtocol/cosmos-sdk v0.50.13-lumera
+	// github.com/cosmos/cosmos-sdk => github.com/LumeraProtocol/cosmos-sdk v0.50.13-lumera.1
+	github.com/cosmos/cosmos-sdk => ../cosmos-sdk
 	//github.com/ethereum/go-ethereum => ../ethereum/go-ethereum
 	// use Evmos geth fork
 	github.com/ethereum/go-ethereum => github.com/evmos/go-ethereum v1.10.26-evmos-rc4
@@ -31,6 +35,7 @@ require (
 	cosmossdk.io/x/evidence v0.1.1
 	cosmossdk.io/x/feegrant v0.1.1
 	cosmossdk.io/x/nft v0.1.1
+	cosmossdk.io/x/tx v0.13.7
 	cosmossdk.io/x/upgrade v0.1.4
 	github.com/CosmWasm/wasmd v0.53.0
 	github.com/CosmWasm/wasmvm/v2 v2.1.2
@@ -39,11 +44,12 @@ require (
 	github.com/cometbft/cometbft v0.38.15
 	github.com/cosmos/cosmos-db v1.1.1
 	github.com/cosmos/cosmos-proto v1.0.0-beta.5
-	github.com/LumeraProtocol/cosmos-sdk v0.50.13-lumera
+	github.com/cosmos/cosmos-sdk v0.50.13
 	github.com/cosmos/go-bip39 v1.0.0
 	github.com/cosmos/gogoproto v1.7.0
 	github.com/cosmos/ibc-go/modules/capability v1.0.1
-	github.com/cosmos/ibc-go/v8 v8.5.2
+	github.com/cosmos/ibc-go/v8 v8.7.0
+	github.com/evmos/evmos/v20 v20.0.0
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.4
 	github.com/gorilla/mux v1.8.1
@@ -78,7 +84,6 @@ require (
 	connectrpc.com/connect v1.16.2 // indirect
 	connectrpc.com/otelconnect v0.7.0 // indirect
 	cosmossdk.io/collections v0.4.0 // indirect
-	cosmossdk.io/x/tx v0.13.7 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/99designs/go-keychain v0.0.0-20191008050251-8e49817e8af4 // indirect
 	github.com/99designs/keyring v1.2.2 // indirect
@@ -150,7 +155,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/dvsekhvalnov/jose2go v1.6.0 // indirect
 	github.com/emicklei/dot v1.6.2 // indirect
-	github.com/evmos/go-ethereum v1.10.26-evmos-rc4 // indirect
+	github.com/ethereum/go-ethereum v1.11.5 // indirect
 	github.com/fatih/color v1.16.0 // indirect
 	github.com/felixge/fgprof v0.9.4 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect

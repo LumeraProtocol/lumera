@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package lumera.erc20.v1.module;
+
+import "cosmos/app/v1alpha1/module.proto";
+
+// Module is the config object for the erc20 module.
+message Module {
+  option (cosmos.app.v1alpha1.module) = {
+    go_import: "github.com/LumeraProtocol/lumera/x/erc20/modulev1"
+  };
+
+  // authority defines the custom module authority. If not set, defaults to the governance module.
+  string authority = 1;
+}

@@ -18,6 +18,7 @@ import (
 	_ "cosmossdk.io/x/nft/module" // import for side-effects
 	_ "cosmossdk.io/x/upgrade"    // import for side-effects
 	upgradekeeper "cosmossdk.io/x/upgrade/keeper"
+	lumstakingkeeper "github.com/LumeraProtocol/lumera/x/staking/keeper"
 	abci "github.com/cometbft/cometbft/abci/types"
 	dbm "github.com/cosmos/cosmos-db"
 	"github.com/cosmos/cosmos-sdk/baseapp"
@@ -75,15 +76,12 @@ import (
 	ibctransferkeeper "github.com/cosmos/ibc-go/v8/modules/apps/transfer/keeper"
 	ibckeeper "github.com/cosmos/ibc-go/v8/modules/core/keeper"
 
-	"github.com/evmos/evmos/v20/x/feemarket"
-	feemarketkeeper "github.com/evmos/evmos/v20/x/feemarket/keeper"
-	feemarkettypes "github.com/evmos/evmos/v20/x/feemarket/types"
-	"github.com/evmos/evmos/v20/x/evm"
-	evmkeeper "github.com/evmos/evmos/v20/x/evm/keeper"
-	evmtypes "github.com/evmos/evmos/v20/x/evm/types"
-	"github.com/evmos/evmos/v20/x/erc20"
+	_ "github.com/LumeraProtocol/lumera/x/erc20/module"     // import for side-effects
+	_ "github.com/LumeraProtocol/lumera/x/evm/module"       // import for side-effects
+	_ "github.com/LumeraProtocol/lumera/x/feemarket/module" // import for side-effects
 	erc20keeper "github.com/evmos/evmos/v20/x/erc20/keeper"
-	erc20types "github.com/evmos/evmos/v20/x/erc20/types"
+	evmkeeper "github.com/evmos/evmos/v20/x/evm/keeper"
+	feemarketkeeper "github.com/evmos/evmos/v20/x/feemarket/keeper"
 
 	claimmodulekeeper "github.com/LumeraProtocol/lumera/x/claim/keeper"
 	lumeraidmodulekeeper "github.com/LumeraProtocol/lumera/x/lumeraid/keeper"
@@ -126,6 +124,7 @@ type App struct {
 	AccountKeeper         authkeeper.AccountKeeper
 	BankKeeper            bankkeeper.Keeper
 	StakingKeeper         *stakingkeeper.Keeper
+	LumStakingKeeper      *lumstakingkeeper.Keeper // wrapped staking keeper for EVM
 	DistrKeeper           distrkeeper.Keeper
 	ConsensusParamsKeeper consensuskeeper.Keeper
 
@@ -143,9 +142,9 @@ type App struct {
 	CircuitBreakerKeeper circuitkeeper.Keeper
 
 	// EVM
-	EVMKeeper 			*evmkeeper.Keeper
-	FeeMarketKeeper		feemarketkeeper.Keeper
-	Erc20Keeper			erc20keeper.Keeper
+	EvmKeeper       evmkeeper.Keeper
+	FeeMarketKeeper feemarketkeeper.Keeper
+	Erc20Keeper     *erc20keeper.Keeper
 
 	// IBC
 	IBCKeeper           *ibckeeper.Keeper // IBC Keeper must be a pointer in the app, so we can SetRouter on it correctly
@@ -210,10 +209,10 @@ func AppConfig() depinject.Config {
 			map[string]module.AppModuleBasic{
 				genutiltypes.ModuleName: genutil.NewAppModuleBasic(genutiltypes.DefaultMessageValidator),
 				govtypes.ModuleName:     gov.NewAppModuleBasic(getGovProposalHandlers()),
-				evmtypes.ModuleName:     evm.AppModuleBasic{},
 				// this line is used by starport scaffolding # stargate/appConfig/moduleBasic
 			},
 		),
+		depinject.Provide(ProvideSigningOptions),
 	)
 }
 
@@ -230,6 +229,10 @@ func New(
 		app        = &App{ScopedKeepers: make(map[string]capabilitykeeper.ScopedKeeper)}
 		appBuilder *runtime.AppBuilder
 
+		getErc20Keeper = func() *erc20keeper.Keeper {
+			return app.Erc20Keeper
+		}
+
 		// merge the AppConfig and other configuration in one config
 		appConfig = depinject.Configs(
 			AppConfig(),
@@ -242,6 +245,7 @@ func New(
 				// This needs to be removed after IBC supports App Wiring.
 				app.GetIBCKeeper,
 				app.GetCapabilityScopedKeeper,
+				getErc20Keeper,
 
 				// here alternative options can be supplied to the DI container.
 				// those options can be used f.e to override the default behavior of some modules.
@@ -251,6 +255,8 @@ func New(
 			),
 		)
 	)
+
+	app.LumStakingKeeper = lumstakingkeeper.NewKeeper(app.StakingKeeper)
 
 	if err := depinject.Inject(appConfig,
 		&appBuilder,
@@ -279,6 +285,9 @@ func New(
 		&app.ClaimKeeper,
 		&app.SupernodeKeeper,
 		&app.ActionKeeper,
+		&app.FeeMarketKeeper,
+		&app.EvmKeeper,
+		&app.Erc20Keeper,
 		// this line is used by starport scaffolding # stargate/app/keeperDefinition
 	); err != nil {
 		panic(err)
@@ -295,9 +304,6 @@ func New(
 	if err := app.registerIBCModules(appOpts); err != nil {
 		return nil, err
 	}
-
-    // register EVM-related modules
-    app.registerEvmModules()
 
 	// register streaming services
 	if err := app.RegisterStreamingServices(appOpts, app.kvStoreKeys()); err != nil {
@@ -332,125 +338,6 @@ func New(
 
 	return app, app.WasmKeeper.InitializePinnedCodes(app.NewUncachedContext(true, tmproto.Header{}))
 
-}
-
-// registerEvmModules registers and initializes all EVM-related modules
-func (app *App) registerEvmModules() {
-    // 1. Initialize FeeMarket module first
-    app.initFeeMarketKeeper()
-    
-    // 2. Initialize EVM module (depends on FeeMarket)
-    app.initEvmKeeper()
-    
-    // 3. Initialize ERC20 module (depends on EVM)
-    app.initErc20Keeper()
-    
-    // Register the modules with the module manager
-    feeMarketModule := feemarket.NewAppModule(
-		app.FeeMarketKeeper,
-		app.GetSubspace(feemarkettypes.ModuleName),
-	)
-    evmModule := evm.NewAppModule(
-		app.EVMKeeper,
-		app.AccountKeeper,
-		app.GetSubspace(evmtypes.ModuleName),
-	)
-    erc20Module := erc20.NewAppModule(
-		app.Erc20Keeper,
-		app.AccountKeeper,
-		app.GetSubspace(erc20types.ModuleName),
-	)
-    
-    // Add modules to the module manager
-    app.ModuleManager.Modules[feemarkettypes.ModuleName] = feeMarketModule
-    app.ModuleManager.Modules[evmtypes.ModuleName] = evmModule
-    app.ModuleManager.Modules[erc20types.ModuleName] = erc20Module
-}
-
-// initFeeMarketKeeper initializes the FeeMarket keeper
-func (app *App) initFeeMarketKeeper() {
-    // Create and mount store keys
-    feeMarketKey := storetypes.NewKVStoreKey(feemarkettypes.StoreKey)
-    feeMarketTransientKey := storetypes.NewTransientStoreKey(feemarkettypes.TransientKey)
-    
-    app.MountStore(feeMarketKey, storetypes.StoreTypeIAVL)
-    app.MountStore(feeMarketTransientKey, storetypes.StoreTypeTransient)
-
-	feeMarketSubspace := app.ParamsKeeper.Subspace(feemarkettypes.ModuleName)
-	if !feeMarketSubspace.HasKeyTable() {
-		feeMarketSubspace = feeMarketSubspace.WithKeyTable(feemarkettypes.ParamKeyTable())
-	}	
-    // Initialize the FeeMarket keeper
-    app.FeeMarketKeeper = feemarketkeeper.NewKeeper(
-        app.appCodec,
-        authtypes.NewModuleAddress(govtypes.ModuleName), // authority
-        feeMarketKey,
-        feeMarketTransientKey,
-        feeMarketSubspace,
-    )
-}
-
-// initEvmKeeper initializes the EVM keeper
-func (app *App) initEvmKeeper() {
-	// Create and mount store keys
-	evmKey := storetypes.NewKVStoreKey(evmtypes.StoreKey)
-	evmTransientKey := storetypes.NewTransientStoreKey(evmtypes.TransientKey)
-
-	 // Mount both stores
-	app.MountStore(evmKey, storetypes.StoreTypeIAVL)
-	app.MountStore(evmTransientKey, storetypes.StoreTypeTransient)
-
-	// Create parameter subspace for EVM module if it doesn't exist
-	evmSubspace := app.ParamsKeeper.Subspace(evmtypes.ModuleName)
-	if !evmSubspace.HasKeyTable() {
-		evmSubspace = evmSubspace.WithKeyTable(evmtypes.ParamKeyTable())
-	}
-
-    // Define the authority
-    authority := authtypes.NewModuleAddress(govtypes.ModuleName)
-
-    // Initialize the EVM Keeper
-    app.EVMKeeper = evmkeeper.NewKeeper(
-        app.appCodec,                // codec
-        evmKey,                      // store key
-        evmTransientKey,                // transient store key
-        authority,                   // authority (typically governance module)
-        app.AccountKeeper,           // account keeper
-        app.BankKeeper,              // bank keeper
-        app.StakingKeeper,           // staking keeper
-        app.FeeMarketKeeper,         // fee market keeper
-        &app.Erc20Keeper,   		 // erc20 keeper
-        "",                          // tracer (empty string if not using)
-        evmSubspace,                 // params subspace
-    )
-}
-
-// initErc20Keeper initializes the ERC20 keeper
-func (app *App) initErc20Keeper() {
-    // Create and mount store key
-    erc20Key := storetypes.NewKVStoreKey(erc20types.StoreKey)
-    app.MountStore(erc20Key, storetypes.StoreTypeIAVL)
-
-	erc20Subspace := app.ParamsKeeper.Subspace(erc20types.ModuleName)
-	if !erc20Subspace.HasKeyTable() {
-    	erc20Subspace = erc20Subspace.WithKeyTable(erc20types.ParamKeyTable())
-	}
-	
-	// Define the authority
-	authority := authtypes.NewModuleAddress(govtypes.ModuleName)
-
-    // Initialize the ERC20 keeper
-    app.Erc20Keeper = erc20keeper.NewKeeper(
-        erc20Key,
-        app.appCodec,
-        authority, // authority
-        app.AccountKeeper,
-        app.BankKeeper,
-        app.EVMKeeper,
-        app.StakingKeeper,
-        app.AuthzKeeper,
-        nil, // IBC Transfer keeper if needed
-    )
 }
 
 // LegacyAmino returns App's amino codec.
@@ -519,6 +406,10 @@ func (app *App) GetSubspace(moduleName string) paramstypes.Subspace {
 // GetIBCKeeper returns the IBC keeper.
 func (app *App) GetIBCKeeper() *ibckeeper.Keeper {
 	return app.IBCKeeper
+}
+
+func (app *App) GetErc20Keeper() *erc20keeper.Keeper {
+	return app.Erc20Keeper
 }
 
 // GetCapabilityScopedKeeper returns the capability scoped keeper.

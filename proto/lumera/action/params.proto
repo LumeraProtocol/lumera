@@ -7,7 +7,7 @@ import "gogoproto/gogo.proto";
 import "google/protobuf/duration.proto";
 import "amino/amino.proto";
 
-option go_package = "github.com/LumeraProtocol/lumera/x/action/types";
+option go_package = "github.com/LumeraProtocol/lumera/x/action/v1/types";
 
 // Params defines the parameters for the module.
 message Params {

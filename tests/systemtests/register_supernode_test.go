@@ -11,7 +11,7 @@ import (
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 
-	"github.com/LumeraProtocol/lumera/x/supernode/types"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 func TestSupernodeRegistrationSuccess(t *testing.T) {

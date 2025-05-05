@@ -1,6 +1,8 @@
 package keeper
 
 import (
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"testing"
 
 	"cosmossdk.io/log"
@@ -16,13 +18,10 @@ import (
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	"github.com/stretchr/testify/require"
-
-	"github.com/LumeraProtocol/lumera/x/supernode/keeper"
-	"github.com/LumeraProtocol/lumera/x/supernode/types"
 )
 
 func SupernodeKeeper(t testing.TB) (keeper.Keeper, sdk.Context) {
-	storeKey := storetypes.NewKVStoreKey(types.StoreKey)
+	storeKey := storetypes.NewKVStoreKey(types2.StoreKey)
 
 	db := dbm.NewMemDB()
 	stateStore := store.NewCommitMultiStore(db, log.NewNopLogger(), metrics.NewNoOpMetrics())
@@ -46,7 +45,7 @@ func SupernodeKeeper(t testing.TB) (keeper.Keeper, sdk.Context) {
 	ctx := sdk.NewContext(stateStore, cmtproto.Header{}, false, log.NewNopLogger())
 
 	// Initialize params
-	if err := k.SetParams(ctx, types.DefaultParams()); err != nil {
+	if err := k.SetParams(ctx, types2.DefaultParams()); err != nil {
 		panic(err)
 	}
 

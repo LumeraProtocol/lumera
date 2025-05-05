@@ -2,14 +2,14 @@ package system_test
 
 import (
 	"context"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"os"
 	"testing"
 
 	sdkmath "cosmossdk.io/math"
 	"github.com/LumeraProtocol/lumera/app"
 	"github.com/LumeraProtocol/lumera/tests/ibctesting"
-	"github.com/LumeraProtocol/lumera/x/supernode/keeper"
-	"github.com/LumeraProtocol/lumera/x/supernode/types"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
@@ -58,7 +58,7 @@ func setupSupernodeSystemSuite(t *testing.T) *SystemTestSuite {
 	suite.ctx = context.WithValue(suite.ctx, "validator_address", valAddr.Bytes())
 
 	// Set up default parameters
-	err = suite.app.SupernodeKeeper.SetParams(chain.GetContext(), types.DefaultParams())
+	err = suite.app.SupernodeKeeper.SetParams(chain.GetContext(), types2.DefaultParams())
 	require.NoError(t, err)
 
 	return suite
@@ -79,34 +79,34 @@ func TestDeregisterSupernode(t *testing.T) {
 
 	testCases := []struct {
 		name   string
-		msg    *types.MsgDeregisterSupernode
+		msg    *types2.MsgDeregisterSupernode
 		setup  func(suite *SystemTestSuite)
-		verify func(t *testing.T, suite *SystemTestSuite, response *types.MsgDeregisterSupernodeResponse, err error)
+		verify func(t *testing.T, suite *SystemTestSuite, response *types2.MsgDeregisterSupernodeResponse, err error)
 	}{
 		{
 			name: "Successful deregistration",
-			msg: &types.MsgDeregisterSupernode{
+			msg: &types2.MsgDeregisterSupernode{
 				Creator:          walletAddr.String(),
 				ValidatorAddress: valAddrStr,
 			},
 			setup: func(suite *SystemTestSuite) {
 				// Register a supernode first
-				supernode := types.SuperNode{
+				supernode := types2.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
-					States: []*types.SuperNodeStateRecord{
+					States: []*types2.SuperNodeStateRecord{
 						{
-							State:  types.SuperNodeStateActive,
+							State:  types2.SuperNodeStateActive,
 							Height: suite.sdkCtx.BlockHeight(),
 						},
 					},
 					Version: "1.0.0",
-					Metrics: &types.MetricsAggregate{
+					Metrics: &types2.MetricsAggregate{
 						Metrics:     make(map[string]float64),
 						ReportCount: 0,
 					},
-					Evidence: []*types.Evidence{},
-					PrevIpAddresses: []*types.IPAddressHistory{
+					Evidence: []*types2.Evidence{},
+					PrevIpAddresses: []*types2.IPAddressHistory{
 						{
 							Address: "127.0.0.1",
 							Height:  suite.sdkCtx.BlockHeight(),
@@ -116,7 +116,7 @@ func TestDeregisterSupernode(t *testing.T) {
 				err := suite.app.SupernodeKeeper.SetSuperNode(suite.sdkCtx, supernode)
 				require.NoError(t, err)
 			},
-			verify: func(t *testing.T, suite *SystemTestSuite, response *types.MsgDeregisterSupernodeResponse, err error) {
+			verify: func(t *testing.T, suite *SystemTestSuite, response *types2.MsgDeregisterSupernodeResponse, err error) {
 				require.NoError(t, err)
 				require.NotNil(t, response)
 
@@ -126,7 +126,7 @@ func TestDeregisterSupernode(t *testing.T) {
 				supernode, found := suite.app.SupernodeKeeper.QuerySuperNode(suite.sdkCtx, val)
 				require.True(t, found)
 				require.NotEmpty(t, supernode.States)
-				require.Equal(t, types.SuperNodeStateDisabled, supernode.States[len(supernode.States)-1].State)
+				require.Equal(t, types2.SuperNodeStateDisabled, supernode.States[len(supernode.States)-1].State)
 
 				// Verify event emission
 				events := suite.sdkCtx.EventManager().Events()
@@ -134,10 +134,10 @@ func TestDeregisterSupernode(t *testing.T) {
 
 				var foundDeregisterEvent bool
 				for _, evt := range events {
-					if evt.Type == types.EventTypeSupernodeDeRegistered {
+					if evt.Type == types2.EventTypeSupernodeDeRegistered {
 						foundDeregisterEvent = true
 						for _, attr := range evt.Attributes {
-							if string(attr.Key) == types.AttributeKeyValidatorAddress {
+							if string(attr.Key) == types2.AttributeKeyValidatorAddress {
 								require.Equal(t, valAddrStr, string(attr.Value))
 							}
 						}
@@ -148,14 +148,14 @@ func TestDeregisterSupernode(t *testing.T) {
 		},
 		{
 			name: "Supernode not found",
-			msg: &types.MsgDeregisterSupernode{
+			msg: &types2.MsgDeregisterSupernode{
 				Creator:          walletAddr.String(),
 				ValidatorAddress: valAddrStr,
 			},
 			setup: func(suite *SystemTestSuite) {
 				// Don't set up any supernode
 			},
-			verify: func(t *testing.T, suite *SystemTestSuite, response *types.MsgDeregisterSupernodeResponse, err error) {
+			verify: func(t *testing.T, suite *SystemTestSuite, response *types2.MsgDeregisterSupernodeResponse, err error) {
 				require.Error(t, err)
 				require.ErrorIs(t, err, sdkerrors.ErrNotFound)
 				require.Nil(t, response)
@@ -163,28 +163,28 @@ func TestDeregisterSupernode(t *testing.T) {
 		},
 		{
 			name: "Unauthorized deregistration attempt",
-			msg: &types.MsgDeregisterSupernode{
+			msg: &types2.MsgDeregisterSupernode{
 				Creator:          unauthorizedAddr.String(),
 				ValidatorAddress: valAddrStr,
 			},
 			setup: func(suite *SystemTestSuite) {
 				// Register a supernode with the authorized (walletAddr) account
-				supernode := types.SuperNode{
+				supernode := types2.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
-					States: []*types.SuperNodeStateRecord{
+					States: []*types2.SuperNodeStateRecord{
 						{
-							State:  types.SuperNodeStateActive,
+							State:  types2.SuperNodeStateActive,
 							Height: suite.sdkCtx.BlockHeight(),
 						},
 					},
 					Version: "1.0.0",
-					Metrics: &types.MetricsAggregate{
+					Metrics: &types2.MetricsAggregate{
 						Metrics:     make(map[string]float64),
 						ReportCount: 0,
 					},
-					Evidence: []*types.Evidence{},
-					PrevIpAddresses: []*types.IPAddressHistory{
+					Evidence: []*types2.Evidence{},
+					PrevIpAddresses: []*types2.IPAddressHistory{
 						{
 							Address: "127.0.0.1",
 							Height:  suite.sdkCtx.BlockHeight(),
@@ -194,7 +194,7 @@ func TestDeregisterSupernode(t *testing.T) {
 				err := suite.app.SupernodeKeeper.SetSuperNode(suite.sdkCtx, supernode)
 				require.NoError(t, err)
 			},
-			verify: func(t *testing.T, suite *SystemTestSuite, response *types.MsgDeregisterSupernodeResponse, err error) {
+			verify: func(t *testing.T, suite *SystemTestSuite, response *types2.MsgDeregisterSupernodeResponse, err error) {
 				require.Error(t, err)
 				require.ErrorIs(t, err, sdkerrors.ErrUnauthorized)
 				require.Nil(t, response)
@@ -202,28 +202,28 @@ func TestDeregisterSupernode(t *testing.T) {
 		},
 		{
 			name: "Already disabled supernode",
-			msg: &types.MsgDeregisterSupernode{
+			msg: &types2.MsgDeregisterSupernode{
 				Creator:          walletAddr.String(),
 				ValidatorAddress: valAddrStr,
 			},
 			setup: func(suite *SystemTestSuite) {
 				// Create a disabled supernode
-				supernode := types.SuperNode{
+				supernode := types2.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
-					States: []*types.SuperNodeStateRecord{
+					States: []*types2.SuperNodeStateRecord{
 						{
-							State:  types.SuperNodeStateDisabled,
+							State:  types2.SuperNodeStateDisabled,
 							Height: suite.sdkCtx.BlockHeight(),
 						},
 					},
 					Version: "1.0.0",
-					Metrics: &types.MetricsAggregate{
+					Metrics: &types2.MetricsAggregate{
 						Metrics:     make(map[string]float64),
 						ReportCount: 0,
 					},
-					Evidence: []*types.Evidence{},
-					PrevIpAddresses: []*types.IPAddressHistory{
+					Evidence: []*types2.Evidence{},
+					PrevIpAddresses: []*types2.IPAddressHistory{
 						{
 							Address: "127.0.0.1",
 							Height:  suite.sdkCtx.BlockHeight(),
@@ -233,7 +233,7 @@ func TestDeregisterSupernode(t *testing.T) {
 				err := suite.app.SupernodeKeeper.SetSuperNode(suite.sdkCtx, supernode)
 				require.NoError(t, err)
 			},
-			verify: func(t *testing.T, suite *SystemTestSuite, response *types.MsgDeregisterSupernodeResponse, err error) {
+			verify: func(t *testing.T, suite *SystemTestSuite, response *types2.MsgDeregisterSupernodeResponse, err error) {
 				// Deregistration on an already disabled supernode is allowed (no error).
 				require.NoError(t, err)
 				require.NotNil(t, response)
@@ -244,16 +244,16 @@ func TestDeregisterSupernode(t *testing.T) {
 				require.True(t, found)
 				require.NotEmpty(t, supernode.States)
 				// Ensure it remains disabled
-				require.Equal(t, types.SuperNodeStateDisabled, supernode.States[len(supernode.States)-1].State)
+				require.Equal(t, types2.SuperNodeStateDisabled, supernode.States[len(supernode.States)-1].State)
 
 				// Verify event emission
 				events := suite.sdkCtx.EventManager().Events()
 				var foundDeregisterEvent bool
 				for _, evt := range events {
-					if evt.Type == types.EventTypeSupernodeDeRegistered {
+					if evt.Type == types2.EventTypeSupernodeDeRegistered {
 						foundDeregisterEvent = true
 						for _, attr := range evt.Attributes {
-							if string(attr.Key) == types.AttributeKeyValidatorAddress {
+							if string(attr.Key) == types2.AttributeKeyValidatorAddress {
 								require.Equal(t, valAddrStr, string(attr.Value))
 							}
 						}
@@ -264,14 +264,14 @@ func TestDeregisterSupernode(t *testing.T) {
 		},
 		{
 			name: "Invalid validator address",
-			msg: &types.MsgDeregisterSupernode{
+			msg: &types2.MsgDeregisterSupernode{
 				Creator:          walletAddr.String(),
 				ValidatorAddress: "invalid-address",
 			},
 			setup: func(suite *SystemTestSuite) {
 				// No setup needed
 			},
-			verify: func(t *testing.T, suite *SystemTestSuite, response *types.MsgDeregisterSupernodeResponse, err error) {
+			verify: func(t *testing.T, suite *SystemTestSuite, response *types2.MsgDeregisterSupernodeResponse, err error) {
 				require.Error(t, err)
 				require.ErrorIs(t, err, sdkerrors.ErrInvalidAddress)
 				require.Nil(t, response)

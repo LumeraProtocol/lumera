@@ -3,15 +3,15 @@ package action_test
 import (
 	"encoding/base64"
 	"fmt"
+	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
+	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"strings"
 	"testing"
 	"time"
 
 	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
 	lumeraapp "github.com/LumeraProtocol/lumera/app"
-	actionkeeper "github.com/LumeraProtocol/lumera/x/action/keeper"
-	"github.com/LumeraProtocol/lumera/x/action/types"
-	supernodetypes "github.com/LumeraProtocol/lumera/x/supernode/types"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
@@ -24,8 +24,8 @@ type ActionIntegrationTestSuite struct {
 	suite.Suite
 
 	ctx       sdk.Context
-	keeper    actionkeeper.Keeper
-	msgServer types.MsgServer
+	keeper    keeper.Keeper
+	msgServer types2.MsgServer
 
 	// Test accounts for simulation
 	testAddrs    []sdk.AccAddress
@@ -43,7 +43,7 @@ func (suite *ActionIntegrationTestSuite) SetupTest() {
 
 	suite.ctx = ctx
 	suite.keeper = app.ActionKeeper
-	suite.msgServer = actionkeeper.NewMsgServerImpl(suite.keeper)
+	suite.msgServer = keeper.NewMsgServerImpl(suite.keeper)
 
 	// Create test accounts
 	//var baseAccounts []*authtypes.BaseAccount
@@ -58,22 +58,22 @@ func (suite *ActionIntegrationTestSuite) SetupTest() {
 			baseAcc.SetPubKey(suite.privKeys[i].PubKey())
 			app.AccountKeeper.SetAccount(suite.ctx, baseAcc)
 		}
-		require.NoError(suite.T(), app.BankKeeper.MintCoins(suite.ctx, types.ModuleName, initCoins))
-		require.NoError(suite.T(), app.BankKeeper.SendCoinsFromModuleToAccount(suite.ctx, types.ModuleName, addr, initCoins))
+		require.NoError(suite.T(), app.BankKeeper.MintCoins(suite.ctx, types2.ModuleName, initCoins))
+		require.NoError(suite.T(), app.BankKeeper.SendCoinsFromModuleToAccount(suite.ctx, types2.ModuleName, addr, initCoins))
 	}
 
 	valAddr := sdk.ValAddress(suite.privKeys[1].PubKey().Address())
-	sn := supernodetypes.SuperNode{
+	sn := types.SuperNode{
 		ValidatorAddress: valAddr.String(),
 		SupernodeAccount: suite.testAddrs[1].String(),
 		Version:          "1.0.0",
-		States:           []*supernodetypes.SuperNodeStateRecord{{State: supernodetypes.SuperNodeStateActive}},
-		PrevIpAddresses:  []*supernodetypes.IPAddressHistory{{Address: "192.168.1.1"}},
+		States:           []*types.SuperNodeStateRecord{{State: types.SuperNodeStateActive}},
+		PrevIpAddresses:  []*types.IPAddressHistory{{Address: "192.168.1.1"}},
 	}
 	require.NoError(suite.T(), app.SupernodeKeeper.SetSuperNode(suite.ctx, sn))
 
 	// Set default params
-	err := suite.keeper.SetParams(ctx, types.DefaultParams())
+	err := suite.keeper.SetParams(ctx, types2.DefaultParams())
 	require.NoError(suite.T(), err)
 }
 
@@ -131,7 +131,7 @@ func (suite *ActionIntegrationTestSuite) TestActionLifecycle() {
 		//signatureDataPart = strings.Split(sigStr, ".")[0] // <-- Add this
 
 		metadata := fmt.Sprintf(`{"data_hash":"abc123","file_name":"file.txt","rq_ids_ic":1,"signatures":"%s"}`, sigStr)
-		msg := &types.MsgRequestAction{
+		msg := &types2.MsgRequestAction{
 			Creator:        txCreator,
 			ActionType:     actionapi.ActionType_ACTION_TYPE_CASCADE.String(),
 			Metadata:       metadata,
@@ -153,7 +153,7 @@ func (suite *ActionIntegrationTestSuite) TestActionLifecycle() {
 
 		metadata := fmt.Sprintf(`{"rq_ids_ids":%s}`, toJSONStringArray(ids))
 
-		msg := &types.MsgFinalizeAction{
+		msg := &types2.MsgFinalizeAction{
 			ActionId:   actionID,
 			Creator:    sn,
 			ActionType: actionapi.ActionType_ACTION_TYPE_CASCADE.String(),
@@ -167,7 +167,7 @@ func (suite *ActionIntegrationTestSuite) TestActionLifecycle() {
 	})
 
 	suite.Run("Approve Cascade Action", func() {
-		msg := &types.MsgApproveAction{
+		msg := &types2.MsgApproveAction{
 			ActionId: actionID,
 			Creator:  txCreator,
 		}
@@ -181,7 +181,7 @@ func (suite *ActionIntegrationTestSuite) TestActionLifecycle() {
 
 func (suite *ActionIntegrationTestSuite) TestInvalidActionLifecycle() {
 	suite.Run("Missing Metadata", func() {
-		msg := &types.MsgRequestAction{
+		msg := &types2.MsgRequestAction{
 			Creator:    suite.testAddrs[0].String(),
 			ActionType: actionapi.ActionType_ACTION_TYPE_SENSE.String(),
 			Metadata:   "",
@@ -237,7 +237,7 @@ func toJSONStringArray(values []string) string {
 func generateValidCascadeIDs(signature string, ic, count int) ([]string, error) {
 	var ids []string
 	for i := 0; i < count; i++ {
-		id, err := actionkeeper.CreateKademliaID(signature, uint64(ic+i))
+		id, err := keeper.CreateKademliaID(signature, uint64(ic+i))
 		if err != nil {
 			return nil, err
 		}

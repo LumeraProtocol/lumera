@@ -1,0 +1,20 @@
+package keeper_test
+
+import (
+	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
+)
+
+func TestParamsQuery(t *testing.T) {
+	keeper, ctx := keepertest.SupernodeKeeper(t)
+	params := types2.DefaultParams()
+	require.NoError(t, keeper.SetParams(ctx, params))
+
+	response, err := keeper.Params(ctx, &types2.QueryParamsRequest{})
+	require.NoError(t, err)
+	require.Equal(t, &types2.QueryParamsResponse{Params: params}, response)
+}

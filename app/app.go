@@ -1,7 +1,10 @@
 package app
 
 import (
+	upgradetypes "cosmossdk.io/x/upgrade/types"
+	"fmt"
 	"io"
+	"os"
 
 	_ "cosmossdk.io/api/cosmos/tx/config/v1" // import for side-effects
 	clienthelpers "cosmossdk.io/client/v2/helpers"
@@ -85,6 +88,8 @@ import (
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	"github.com/LumeraProtocol/lumera/docs"
 	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
+
+	upgrade_v1_0_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_0_0"
 )
 
 const (
@@ -285,8 +290,15 @@ func New(
 		return nil, err
 	}
 
-	/****  Module Options ****/
+	// **** SETUP UPGRADE HANDLER ****
+	// This needs to be done after keepers are initialized but before loading state.
+	app.setupUpgradeHandlers()
 
+	// **** SETUP STORE LOADER ****
+	// This must be done BEFORE LoadLatestVersion/LoadVersion
+	app.setupUpgradeStoreLoaders()
+
+	/****  Module Options ****/
 	app.ModuleManager.RegisterInvariants(app.CrisisKeeper)
 
 	// create the simulation manager and define the order of the modules for deterministic simulations
@@ -313,6 +325,47 @@ func New(
 
 	return app, app.WasmKeeper.InitializePinnedCodes(app.NewUncachedContext(true, tmproto.Header{}))
 
+}
+
+// setupUpgradeHandlers registers the upgrade handlers for specific upgrade names.
+func (app *App) setupUpgradeHandlers() {
+	// Register the v1_0_0 upgrade handler
+	app.UpgradeKeeper.SetUpgradeHandler(
+		upgrade_v1_0_0.UpgradeName,
+		upgrade_v1_0_0.CreateUpgradeHandler(
+			app.Logger(),
+			app.ModuleManager,  // Pass ModuleManager
+			app.Configurator(), // Pass Configurator
+			app.ActionKeeper,   // Pass the ActionKeeper
+		),
+	)
+
+	// Add other future upgrade handlers here...
+	// app.UpgradeKeeper.SetUpgradeHandler(...)
+}
+
+// setupUpgradeStoreLoaders configures the store loader for upcoming upgrades.
+// This needs to be called BEFORE app.Load()
+func (app *App) setupUpgradeStoreLoaders() {
+	upgradeInfo, err := app.UpgradeKeeper.ReadUpgradeInfoFromDisk()
+	// No upgrade scheduled, skip
+	if err != nil {
+		// Only panic if the error is unexpected, not if the file simply doesn't exist
+		if !os.IsNotExist(err) {
+			panic(fmt.Sprintf("failed to read upgrade info from disk: %v", err))
+		}
+		return // No upgrade info file, normal startup
+	}
+
+	// Check if the planned upgrade is our v1_0_0 upgrade
+	if upgradeInfo.Name == upgrade_v1_0_0.UpgradeName && !app.UpgradeKeeper.IsSkipHeight(upgradeInfo.Height) {
+		// Configure the store loader with the StoreUpgrades defined in the v1_0_0 package
+		app.SetStoreLoader(upgradetypes.UpgradeStoreLoader(upgradeInfo.Height, &upgrade_v1_0_0.StoreUpgrades))
+		app.Logger().Info("Configured store loader for upgrade", "name", upgrade_v1_0_0.UpgradeName, "height", upgradeInfo.Height)
+	}
+
+	// Add conditions for future upgrades' store loaders here...
+	// else if upgradeInfo.Name == "v1.1.0" && !app.UpgradeKeeper.IsSkipHeight(upgradeInfo.Height) { ... }
 }
 
 // LegacyAmino returns App's amino codec.

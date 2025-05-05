@@ -10,7 +10,7 @@ import "lumera/supernode/params.proto";
 import "lumera/supernode/super_node.proto";
 import "lumera/supernode/supernode_state.proto";
 
-option go_package = "github.com/LumeraProtocol/lumera/x/supernode/types";
+option go_package = "github.com/LumeraProtocol/lumera/x/supernode/v1/types";
 
 // Query defines the gRPC querier service.
 service Query {

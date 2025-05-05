@@ -1,6 +1,8 @@
 package app
 
 import (
+	actionmoduletypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	supernodemoduletypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"time"
 
 	runtimev1alpha1 "cosmossdk.io/api/cosmos/app/runtime/v1alpha1"
@@ -36,14 +38,12 @@ import (
 	claimmodulev1 "github.com/LumeraProtocol/lumera/api/lumera/claim/module"
 	lumeraidmodulev1 "github.com/LumeraProtocol/lumera/api/lumera/lumeraid/module"
 	supernodemodulev1 "github.com/LumeraProtocol/lumera/api/lumera/supernode/module"
-	_ "github.com/LumeraProtocol/lumera/x/action/module" // import for side-effects
-	actionmoduletypes "github.com/LumeraProtocol/lumera/x/action/types"
-	_ "github.com/LumeraProtocol/lumera/x/claim/module" // import for side-effects
+	_ "github.com/LumeraProtocol/lumera/x/action/v1/module" // import for side-effects
+	_ "github.com/LumeraProtocol/lumera/x/claim/module"     // import for side-effects
 	claimmoduletypes "github.com/LumeraProtocol/lumera/x/claim/types"
 	_ "github.com/LumeraProtocol/lumera/x/lumeraid/module" // import for side-effects
 	lumeraidmoduletypes "github.com/LumeraProtocol/lumera/x/lumeraid/types"
-	_ "github.com/LumeraProtocol/lumera/x/supernode/module" // import for side-effects
-	supernodemoduletypes "github.com/LumeraProtocol/lumera/x/supernode/types"
+	_ "github.com/LumeraProtocol/lumera/x/supernode/v1/module" // import for side-effects
 	"github.com/cosmos/cosmos-sdk/runtime"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	vestingtypes "github.com/cosmos/cosmos-sdk/x/auth/vesting/types"

@@ -4,11 +4,11 @@ package lumera.supernode;
 import "amino/amino.proto";
 import "gogoproto/gogo.proto";
 
-option go_package = "github.com/LumeraProtocol/lumera/x/supernode/types";
+option go_package = "github.com/LumeraProtocol/lumera/x/supernode/v1/types";
 
 // Params defines the parameters for the module.
 message Params {
-  option (amino.name) = "lumera/x/supernode/Params";
+  option (amino.name) = "lumera/x/supernode/v1/Params";
   option (gogoproto.equal) = true;
   
   uint64 minimum_stake_for_sn = 1 [(gogoproto.moretags) = "yaml:\"minimum_stake_for_sn\""];

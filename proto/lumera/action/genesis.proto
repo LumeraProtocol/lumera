@@ -5,7 +5,7 @@ import "amino/amino.proto";
 import "gogoproto/gogo.proto";
 import "lumera/action/params.proto";
 
-option go_package = "github.com/LumeraProtocol/lumera/x/action/types";
+option go_package = "github.com/LumeraProtocol/lumera/x/action/v1/types";
 
 // GenesisState defines the action module's genesis state.
 message GenesisState {

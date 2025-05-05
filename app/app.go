@@ -3,6 +3,8 @@ package app
 import (
 	upgradetypes "cosmossdk.io/x/upgrade/types"
 	"fmt"
+	actionmodulekeeper "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
+	supernodemodulekeeper "github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
 	"io"
 	"os"
 
@@ -80,9 +82,6 @@ import (
 
 	claimmodulekeeper "github.com/LumeraProtocol/lumera/x/claim/keeper"
 	lumeraidmodulekeeper "github.com/LumeraProtocol/lumera/x/lumeraid/keeper"
-	supernodemodulekeeper "github.com/LumeraProtocol/lumera/x/supernode/keeper"
-
-	actionmodulekeeper "github.com/LumeraProtocol/lumera/x/action/keeper"
 	// this line is used by starport scaffolding # stargate/app/moduleImport
 
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"

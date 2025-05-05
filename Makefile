@@ -157,3 +157,5 @@ system-tests:
 simulation-tests:
 	@echo "Running simulation tests..."
 	ignite chain simulate
+
+all-tests: unit-tests integration-tests system-tests simulation-tests

@@ -2,6 +2,9 @@ package keeper
 
 import (
 	"context"
+	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
+	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"testing"
 
 	"cosmossdk.io/math"
@@ -22,10 +25,6 @@ import (
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-
-	"github.com/LumeraProtocol/lumera/x/action/keeper"
-	"github.com/LumeraProtocol/lumera/x/action/types"
-	sntypes "github.com/LumeraProtocol/lumera/x/supernode/types"
 )
 
 // Mock implementation for SupernodeKeeper
@@ -34,9 +33,9 @@ type ActionMockSupernodeKeeper struct {
 }
 
 // Implement SupernodeKeeper interface
-func (m *ActionMockSupernodeKeeper) GetTopSuperNodesForBlock(ctx context.Context, req *sntypes.QueryGetTopSuperNodesForBlockRequest) (*sntypes.QueryGetTopSuperNodesForBlockResponse, error) {
+func (m *ActionMockSupernodeKeeper) GetTopSuperNodesForBlock(ctx context.Context, req *types.QueryGetTopSuperNodesForBlockRequest) (*types.QueryGetTopSuperNodesForBlockResponse, error) {
 	args := m.Called(ctx, req)
-	return args.Get(0).(*sntypes.QueryGetTopSuperNodesForBlockResponse), args.Error(1)
+	return args.Get(0).(*types.QueryGetTopSuperNodesForBlockResponse), args.Error(1)
 }
 
 func (m *ActionMockSupernodeKeeper) IsSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress) bool {
@@ -44,12 +43,12 @@ func (m *ActionMockSupernodeKeeper) IsSuperNodeActive(ctx sdk.Context, valAddr s
 	return args.Bool(0)
 }
 
-func (m *ActionMockSupernodeKeeper) QuerySuperNode(ctx sdk.Context, valOperAddr sdk.ValAddress) (sntypes.SuperNode, bool) {
+func (m *ActionMockSupernodeKeeper) QuerySuperNode(ctx sdk.Context, valOperAddr sdk.ValAddress) (types.SuperNode, bool) {
 	args := m.Called(ctx, valOperAddr)
-	return args.Get(0).(sntypes.SuperNode), args.Bool(1)
+	return args.Get(0).(types.SuperNode), args.Bool(1)
 }
 
-func (m *ActionMockSupernodeKeeper) SetSuperNode(ctx sdk.Context, supernode sntypes.SuperNode) error {
+func (m *ActionMockSupernodeKeeper) SetSuperNode(ctx sdk.Context, supernode types.SuperNode) error {
 	args := m.Called(ctx, supernode)
 	return args.Error(0)
 }
@@ -145,7 +144,7 @@ func ActionKeeper(t testing.TB) (keeper.Keeper, sdk.Context) {
 }
 
 func ActionKeeperWithAddress(t testing.TB, accounts []AccountPair) (keeper.Keeper, sdk.Context) {
-	storeKey := storetypes.NewKVStoreKey(types.StoreKey)
+	storeKey := storetypes.NewKVStoreKey(types2.StoreKey)
 
 	db := dbm.NewMemDB()
 	stateStore := store.NewCommitMultiStore(db, log.NewNopLogger(), metrics.NewNoOpMetrics())
@@ -169,8 +168,8 @@ func ActionKeeperWithAddress(t testing.TB, accounts []AccountPair) (keeper.Keepe
 
 	// Setup supernode mock for GetTopSuperNodesForBlock (used in validateSupernodeAuthorization)
 	supernodeKeeper.On("GetTopSuperNodesForBlock", mock.Anything, mock.Anything).Return(
-		&sntypes.QueryGetTopSuperNodesForBlockResponse{
-			Supernodes: []*sntypes.SuperNode{
+		&types.QueryGetTopSuperNodesForBlockResponse{
+			Supernodes: []*types.SuperNode{
 				{ValidatorAddress: "cosmosvaloper1example"}, // Example supernode for tests
 			},
 		}, nil)
@@ -199,7 +198,7 @@ func ActionKeeperWithAddress(t testing.TB, accounts []AccountPair) (keeper.Keepe
 	)
 
 	// Initialize params
-	params := types.DefaultParams()
+	params := types2.DefaultParams()
 	params.FoundationFeeShare = "0.1"
 	params.SuperNodeFeeShare = "0.9"
 	if err := k.SetParams(ctx, params); err != nil {

@@ -1,7 +1,7 @@
 syntax = "proto3";
 package lumera.action;
 
-option go_package = "github.com/LumeraProtocol/lumera/x/action/types";
+option go_package = "github.com/LumeraProtocol/lumera/x/action/v1/types";
 
 import "gogoproto/gogo.proto";
 import "lumera/action/action_type.proto";

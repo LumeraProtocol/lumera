@@ -3,15 +3,14 @@ package action_test
 import (
 	"encoding/base64"
 	"fmt"
+	actionkeeper "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
+	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 	"testing"
 	"time"
 
+	"cosmossdk.io/math"
 	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
 	testkeeper "github.com/LumeraProtocol/lumera/testutil/keeper"
-	actionkeeper "github.com/LumeraProtocol/lumera/x/action/keeper"
-	actiontypes "github.com/LumeraProtocol/lumera/x/action/types"
-
-	"cosmossdk.io/math"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -91,25 +90,25 @@ func (suite *KeeperIntegrationTestSuite) TestGetAction() {
 		name          string
 		actionId      string
 		expectError   bool
-		expectedState actiontypes.ActionState
+		expectedState types.ActionState
 	}{
 		{
 			name:          "Get existing action",
 			actionId:      actionID,
 			expectError:   false,
-			expectedState: actiontypes.ActionState(actionapi.ActionState_ACTION_STATE_PENDING),
+			expectedState: types.ActionState(actionapi.ActionState_ACTION_STATE_PENDING),
 		},
 		{
 			name:          "Get non-existent action",
 			actionId:      "non-existent",
 			expectError:   true,
-			expectedState: actiontypes.ActionState(actionapi.ActionState_ACTION_STATE_UNSPECIFIED),
+			expectedState: types.ActionState(actionapi.ActionState_ACTION_STATE_UNSPECIFIED),
 		},
 	}
 
 	for _, tc := range testCases {
 		suite.Run(tc.name, func() {
-			req := &actiontypes.QueryGetActionRequest{
+			req := &types.QueryGetActionRequest{
 				ActionID: tc.actionId,
 			}
 			response, err := suite.keeper.GetAction(suite.ctx, req)
@@ -119,7 +118,7 @@ func (suite *KeeperIntegrationTestSuite) TestGetAction() {
 			} else {
 				suite.Require().NoError(err)
 				suite.Require().NotNil(response)
-				suite.Require().Equal(tc.expectedState, actiontypes.ActionState(response.Action.State))
+				suite.Require().Equal(tc.expectedState, types.ActionState(response.Action.State))
 			}
 		})
 	}
@@ -222,9 +221,9 @@ func (suite *KeeperIntegrationTestSuite) TestListActions() {
 
 	for _, tc := range testCases {
 		suite.Run(tc.name, func() {
-			req := &actiontypes.QueryListActionsRequest{
-				ActionType:  actiontypes.ActionType(tc.actionType),
-				ActionState: actiontypes.ActionState(tc.actionState),
+			req := &types.QueryListActionsRequest{
+				ActionType:  types.ActionType(tc.actionType),
+				ActionState: types.ActionState(tc.actionState),
 				Pagination:  tc.pagination,
 			}
 			response, err := suite.keeper.ListActions(suite.ctx, req)
@@ -333,7 +332,7 @@ func (suite *KeeperIntegrationTestSuite) TestListActionsBySuperNode() {
 
 	for _, tc := range testCases {
 		suite.Run(tc.name, func() {
-			req := &actiontypes.QueryListActionsBySuperNodeRequest{
+			req := &types.QueryListActionsBySuperNodeRequest{
 				SuperNodeAddress: tc.supernodeAddr,
 				Pagination:       tc.pagination,
 			}
@@ -458,7 +457,7 @@ func (suite *KeeperIntegrationTestSuite) TestListActionsByBlockHeight() {
 
 	for _, tc := range testCases {
 		suite.Run(tc.name, func() {
-			req := &actiontypes.QueryListActionsByBlockHeightRequest{
+			req := &types.QueryListActionsByBlockHeightRequest{
 				BlockHeight: tc.blockHeight,
 				Pagination:  tc.pagination,
 			}
@@ -559,7 +558,7 @@ func (suite *KeeperIntegrationTestSuite) TestListExpiredActions() {
 
 	for _, tc := range testCases {
 		suite.Run(tc.name, func() {
-			req := &actiontypes.QueryListExpiredActionsRequest{
+			req := &types.QueryListExpiredActionsRequest{
 				Pagination: tc.pagination,
 			}
 			response, err := suite.keeper.ListExpiredActions(suite.ctx, req)
@@ -668,8 +667,8 @@ func (suite *KeeperIntegrationTestSuite) TestQueryActionByMetadata() {
 
 	for _, tc := range testCases {
 		suite.Run(tc.name, func() {
-			req := &actiontypes.QueryActionByMetadataRequest{
-				ActionType:    actiontypes.ActionType(tc.actionType),
+			req := &types.QueryActionByMetadataRequest{
+				ActionType:    types.ActionType(tc.actionType),
 				MetadataQuery: fmt.Sprintf("%s=%s", tc.key, tc.value),
 				Pagination:    tc.pagination,
 			}
@@ -741,7 +740,7 @@ func (suite *KeeperIntegrationTestSuite) TestGetActionFee() {
 
 	for _, tc := range testCases {
 		suite.Run(tc.name, func() {
-			req := &actiontypes.QueryGetActionFeeRequest{
+			req := &types.QueryGetActionFeeRequest{
 				DataSize: tc.dataSize,
 			}
 			resp, err := suite.keeper.GetActionFee(suite.ctx, req)

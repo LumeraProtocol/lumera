@@ -4,6 +4,8 @@ import (
 	"context"
 	storetypes "cosmossdk.io/store/types"
 	"fmt"
+	actionkeeper "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
+	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 	"time"
 
 	"cosmossdk.io/log"
@@ -11,9 +13,6 @@ import (
 	upgradetypes "cosmossdk.io/x/upgrade/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
-
-	actionkeeper "github.com/LumeraProtocol/lumera/x/action/keeper"
-	actiontypes "github.com/LumeraProtocol/lumera/x/action/types"
 )
 
 const UpgradeName = "v1.0.0"
@@ -44,7 +43,7 @@ func CreateUpgradeHandler(
 		logger.Info("Initializing genesis parameters for x/action module...")
 
 		// Set the Action module parameters
-		initialParams := actiontypes.Params{
+		initialParams := types.Params{
 			BaseActionFee:        sdk.NewCoin("ulume", math.NewInt(10000)),
 			FeePerByte:           sdk.NewCoin("ulume", math.NewInt(100)),
 			MaxActionsPerBlock:   10,
@@ -73,7 +72,7 @@ func CreateUpgradeHandler(
 		logger.Info("Successfully set initial x/action parameters.")
 
 		// 3. Add the New Module to the Version Map
-		newVM[actiontypes.ModuleName] = actiontypes.ConsensusVersion
+		newVM[types.ModuleName] = types.ConsensusVersion
 
 		logger.Info(fmt.Sprintf("Successfully completed upgrade %s", UpgradeName))
 
@@ -84,8 +83,8 @@ func CreateUpgradeHandler(
 
 var StoreUpgrades = storetypes.StoreUpgrades{
 	Added: []string{
-		actiontypes.StoreKey,
-		actiontypes.MemStoreKey,
+		types.StoreKey,
+		types.MemStoreKey,
 	},
 	// Deleted: []string{...},
 }

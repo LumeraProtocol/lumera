@@ -11,7 +11,7 @@ import "lumera/action/action_type.proto";
 import "lumera/action/action_state.proto";
 import "lumera/action/action.proto";
 
-option go_package = "github.com/LumeraProtocol/lumera/x/action/types";
+option go_package = "github.com/LumeraProtocol/lumera/x/action/v1/types";
 
 // Query defines the gRPC querier service.
 service Query {

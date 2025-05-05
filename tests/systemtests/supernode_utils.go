@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/LumeraProtocol/lumera/x/supernode/types"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 // GetSuperNodeResponse queries and returns a supernode response

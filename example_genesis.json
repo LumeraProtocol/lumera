@@ -8,6 +8,27 @@
   "app_state": {
     "06-solomachine": null,
     "07-tendermint": null,
+    "action": {
+      "params": {
+        "base_action_fee": {
+          "amount": "10000",
+          "denom": "ulume"
+        },
+        "expiration_duration": "24h0m0s",
+        "fee_per_byte": {
+          "amount": "100",
+          "denom": "ulume"
+        },
+        "foundation_fee_share": "0.000000000000000000",
+        "max_actions_per_block": "10",
+        "max_dd_and_fingerprints": "50",
+        "max_processing_time": "1h0m0s",
+        "max_raptor_q_symbols": "50",
+        "min_processing_time": "1m0s",
+        "min_super_nodes": "3",
+        "super_node_fee_share": "1.000000000000000000"
+      }
+    },
     "auth": {
       "params": {
         "max_memo_characters": "256",
@@ -406,7 +427,7 @@
         "evidence_retention_period": "",
         "inactivity_penalty_period": "",
         "metrics_thresholds": "",
-        "minimum_stake_for_sn": "0",
+        "minimum_stake_for_sn": "10000000000ulume",
         "reporting_threshold": "0",
         "slashing_fraction": "",
         "slashing_threshold": "0"

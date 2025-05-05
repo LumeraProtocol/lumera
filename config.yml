@@ -58,16 +58,32 @@ genesis:
       total_claimable_amount: '18749999981413'
       params:
         claim_end_time: '1746071999' # April 30 2025, 23:59:59
+    crisis:
+      constant_fee:
+        denom: "ulume"
+        amount: "500000000"  # 500,000 ulume --> 500 lume
     distribution:
       params:
         community_tax:         '0.020000000000000000'
         base_proposer_reward:  '0.000000000000000000'
         bonus_proposer_reward: '0.000000000000000000'
-    staking:
+    gov:
       params:
-        bond_denom: "ulume"
-        max_validators: '100'
-        unbonding_time: '1814400s'
+        burn_vote_quorum: false
+        burn_vote_veto: true
+        burn_proposal_deposit_prevote: false
+        min_deposit:                            # min deposit for proposal to enter voting period
+          - denom: "ulume"
+            amount: '1000000000'                # 1,000 lume (1,000,000,000 ulume) for devnet; 10,000 lume (10,000,000,000 ulume) for testnet; 100,000 lume (100,000,000,000 ulume) for mainnet
+        expedited_min_deposit:
+          - amount: '5000000000'                # 5,000 lume (5,000,000,000 ulume) for devnet; 50,000 lume (50,000,000,000 ulume) for testnet; 500,000 lume (500,000,000,000 ulume) for mainnet
+            denom: "ulume"
+        max_deposit_period: '172800s'           # 2 days (172800s) for devnet; 7 days (604800s) for testnet; 14 days (1209600) for mainnet
+        voting_period: '172800s'                # 2 days (172800s) for devnet; 7 days (604800s) for testnet; 14 days (1209600) for mainnet
+        expedited_voting_period: '86400s'       # 1 day (86400s) for devnet;   3 days (259200s) for testnet; 7 days (604800s) for mainnet
+        quorum:         '0.334000000000000000'  # 33.4%
+        threshold:      '0.500000000000000000'  # 50%
+        veto_threshold: '0.334000000000000000'  # 33.4%
     mint:
       params:
         mint_denom: "ulume"
@@ -82,26 +98,21 @@ genesis:
         min_signed_per_window:      '0.500000000000000000'
         slash_fraction_double_sign: '0.050000000000000000'
         slash_fraction_downtime:    '0.010000000000000000'
-    crisis:
-      constant_fee:
-        denom: "ulume"
-        amount: "500000000"  # 500,000 ulume --> 500 lume
-    gov:
+    staking:
       params:
-        burn_vote_quorum: false
-        burn_vote_veto: true
-        burn_proposal_deposit_prevote: false
-        min_deposit:                    # min deposit for proposal to enter voting period
-          - denom: "ulume"
-            amount: '1000000000'  # 1,000 lume (1,000,000,000 ulume) for devnet; 10,000 lume (10,000,000,000 ulume) for testnet; 100,000 lume (100,000,000,000 ulume) for mainnet
-        expedited_min_deposit:
-          - amount: '5000000000'  # 5,000 lume (5,000,000,000 ulume) for devnet; 50,000 lume (50,000,000,000 ulume) for testnet; 500,000 lume (500,000,000,000 ulume) for mainnet
-            denom: "ulume"
-        max_deposit_period: '172800s'   # 2 days (172800s) for devnet; 7 days (604800s) for testnet; 14 days (1209600) for mainnet
-        voting_period: '172800s'        # 2 days (172800s) for devnet; 7 days (604800s) for testnet; 14 days (1209600) for mainnet
-        quorum:         '0.334000000000000000'          # 33.4%
-        threshold:      '0.500000000000000000'       # 50%
-        veto_threshold: '0.334000000000000000'  # 33.4%
+        bond_denom: "ulume"
+        max_validators: '100'
+        unbonding_time: '1814400s'
+    supernode:
+        params:
+            minimum_stake_for_sn: '10000000000'         # Minimum stake required for ANY non-active Validator to run a SuperNode - (10,000,000,000 ulume --> 10,000 lume)
+            inactivity_penalty_period: '86400s'         # Duration of inactivity before penalties are applied - 1 day (86400s)
+            evidence_retention_period: '180days'        # Duration evidence is retained on chain - 180 days
+            reporting_threshold: '10'                   # Number of reports needed before action is taken - 10
+            slashing_threshold: '5'                     # Number of approved reports before slashing occurs - 5
+            slashing_fraction: '0.010000000000000000'   # Fraction of stake slashed for SuperNode as penalties - 1%
+            metrics_thresholds: ''                      # Thresholds for various metrics
+
 
 client:
   openapi:

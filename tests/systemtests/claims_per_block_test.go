@@ -78,9 +78,12 @@ func TestMaxClaimsPerBlockReset(t *testing.T) {
 
 	// WaitGroup to wait for all goroutines to complete
 	var wg sync.WaitGroup
-	// mutex to safely append to the responses slice
-	var mu sync.Mutex
-	firstBlockResponses := make([]string, numTxToSubmit)
+	// Channel to collect responses from goroutines
+	type responseItem struct {
+		index int
+		resp  string
+	}
+	responseChannel := make(chan responseItem, numTxToSubmit)
 
 	for i := 0; i < numTxToSubmit; i++ {
 		wg.Add(1)
@@ -108,17 +111,25 @@ func TestMaxClaimsPerBlockReset(t *testing.T) {
 
 			resp, ok := cli.run(args)
 
-			// Thread-safe logging and response storage
-			mu.Lock()
 			t.Logf("Claim %d submission output: %s", index+1, resp)
 			require.True(t, ok)
-			firstBlockResponses[index] = resp
-			mu.Unlock()
+
+			// Send result to channel
+			responseChannel <- responseItem{index: index, resp: resp}
 		}(i)
 	}
 
-	// Wait for all goroutines to complete
-	wg.Wait()
+	// Close channel in a separate goroutine after all workers are done
+	go func() {
+		wg.Wait()
+		close(responseChannel)
+	}()
+
+	// Collect all responses from the channel
+	firstBlockResponses := make([]string, numTxToSubmit)
+	for item := range responseChannel {
+		firstBlockResponses[item.index] = item.resp
+	}
 
 	// Allow time for block completion and transaction processing
 	t.Log("Waiting for first block to complete...")
@@ -158,13 +169,15 @@ func TestMaxClaimsPerBlockReset(t *testing.T) {
 	// Second Block: Verify limit reset with concurrent submissions
 	t.Log("Submitting second batch of claims concurrently in new block...")
 
+	// Channel for second block responses
+	secondResponseChannel := make(chan responseItem, numTxToSubmit)
 	// Reset WaitGroup for second block
-	secondBlockResponses := make([]string, numTxToSubmit)
+	var wg2 sync.WaitGroup
 
 	for i := 0; i < numTxToSubmit; i++ {
-		wg.Add(1)
+		wg2.Add(1)
 		go func(index int) {
-			defer wg.Done()
+			defer wg2.Done()
 
 			testData := testDataSet[index+numTxToSubmit] // Use next set of test data
 			args := []string{
@@ -186,17 +199,25 @@ func TestMaxClaimsPerBlockReset(t *testing.T) {
 
 			resp, ok := cli.run(args)
 
-			// Thread-safe logging and response storage
-			mu.Lock()
 			t.Logf("Second block claim %d submission output: %s", index+1, resp)
 			require.True(t, ok)
-			secondBlockResponses[index] = resp
-			mu.Unlock()
+
+			// Send result to channel
+			secondResponseChannel <- responseItem{index: index, resp: resp}
 		}(i)
 	}
 
-	// Wait for all goroutines to complete
-	wg.Wait()
+	// Close channel after all workers are done
+	go func() {
+		wg2.Wait()
+		close(secondResponseChannel)
+	}()
+
+	// Collect responses from the channel
+	secondBlockResponses := make([]string, numTxToSubmit)
+	for item := range secondResponseChannel {
+		secondBlockResponses[item.index] = item.resp
+	}
 
 	// Allow time for second block processing
 	t.Log("Waiting for second block to complete...")

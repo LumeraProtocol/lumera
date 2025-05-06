@@ -5,6 +5,7 @@ package system
 import (
 	"fmt"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -39,12 +40,12 @@ const (
 //
 // Test Flow:
 // Block N:
-//   - Submit maxClaimsPerBlock + 1 transactions
+//   - Submit maxClaimsPerBlock + 1 transactions concurrently
 //   - Verify exactly maxClaimsPerBlock succeed
 //   - Verify the excess transaction fails with correct error
 //
 // Block N+1:
-//   - Submit another batch of maxClaimsPerBlock + 1 transactions
+//   - Submit another batch of maxClaimsPerBlock + 1 transactions concurrently
 //   - Verify the limit has reset and exactly maxClaimsPerBlock new claims succeed
 //   - Verify the excess transaction fails appropriately
 func TestMaxClaimsPerBlockReset(t *testing.T) {
@@ -72,34 +73,52 @@ func TestMaxClaimsPerBlockReset(t *testing.T) {
 	startingHeight := gjson.Get(status, "sync_info.latest_block_height").Int()
 	t.Logf("Starting block height: %d", startingHeight)
 
-	// First Block: Test claim limiting
-	t.Logf("Block %d: Submitting %d claims (max allowed is %d)...", startingHeight+1, numTxToSubmit, maxClaimsPerBlock)
-	var firstBlockResponses []string
-	for i := 0; i < numTxToSubmit; i++ {
-		testData := testDataSet[i]
-		// Construct claim transaction with necessary parameters
-		args := []string{
-			"tx", "claim", "claim",
-			testData.OldAddress,
-			testData.NewAddress,
-			testData.PubKey,
-			testData.Signature,
-			"--from", fmt.Sprintf("node%d", i),
-			"--broadcast-mode", "async",
-			"--chain-id", cli.chainID,
-			"--home", cli.homeDir,
-			"--keyring-backend", "test",
-			"--node", cli.nodeAddress,
-			"--output", "json",
-			"--yes",
-			"--fees", cli.fees,
-		}
+	// First Block: Test claim limiting with concurrent submissions
+	t.Logf("Block %d: Submitting %d claims concurrently (max allowed is %d)...", startingHeight+1, numTxToSubmit, maxClaimsPerBlock)
 
-		resp, ok := cli.run(args)
-		t.Logf("Claim %d submission output: %s", i+1, resp)
-		require.True(t, ok)
-		firstBlockResponses = append(firstBlockResponses, resp)
+	// WaitGroup to wait for all goroutines to complete
+	var wg sync.WaitGroup
+	// mutex to safely append to the responses slice
+	var mu sync.Mutex
+	firstBlockResponses := make([]string, numTxToSubmit)
+
+	for i := 0; i < numTxToSubmit; i++ {
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+
+			testData := testDataSet[index]
+			// Construct claim transaction with necessary parameters
+			args := []string{
+				"tx", "claim", "claim",
+				testData.OldAddress,
+				testData.NewAddress,
+				testData.PubKey,
+				testData.Signature,
+				"--from", fmt.Sprintf("node%d", index),
+				"--broadcast-mode", "sync",
+				"--chain-id", cli.chainID,
+				"--home", cli.homeDir,
+				"--keyring-backend", "test",
+				"--node", cli.nodeAddress,
+				"--output", "json",
+				"--yes",
+				"--fees", cli.fees,
+			}
+
+			resp, ok := cli.run(args)
+
+			// Thread-safe logging and response storage
+			mu.Lock()
+			t.Logf("Claim %d submission output: %s", index+1, resp)
+			require.True(t, ok)
+			firstBlockResponses[index] = resp
+			mu.Unlock()
+		}(i)
 	}
+
+	// Wait for all goroutines to complete
+	wg.Wait()
 
 	// Allow time for block completion and transaction processing
 	t.Log("Waiting for first block to complete...")
@@ -136,33 +155,48 @@ func TestMaxClaimsPerBlockReset(t *testing.T) {
 	require.Equal(t, maxClaimsPerBlock, firstBlockSuccess, "Expected exactly maxClaimsPerBlock successful claims in first block")
 	require.Equal(t, 1, firstBlockErrors, "Expected exactly one failed claim in first block")
 
-	// Second Block: Verify limit reset
-	t.Log("Submitting second batch of claims in new block...")
-	var secondBlockResponses []string
-	for i := 0; i < numTxToSubmit; i++ {
-		testData := testDataSet[i+numTxToSubmit] // Use next set of test data
-		args := []string{
-			"tx", "claim", "claim",
-			testData.OldAddress,
-			testData.NewAddress,
-			testData.PubKey,
-			testData.Signature,
-			"--from", fmt.Sprintf("node%d", i),
-			"--broadcast-mode", "async",
-			"--chain-id", cli.chainID,
-			"--home", cli.homeDir,
-			"--keyring-backend", "test",
-			"--node", cli.nodeAddress,
-			"--output", "json",
-			"--yes",
-			"--fees", cli.fees,
-		}
+	// Second Block: Verify limit reset with concurrent submissions
+	t.Log("Submitting second batch of claims concurrently in new block...")
 
-		resp, ok := cli.run(args)
-		t.Logf("Second block claim %d submission output: %s", i+1, resp)
-		require.True(t, ok)
-		secondBlockResponses = append(secondBlockResponses, resp)
+	// Reset WaitGroup for second block
+	secondBlockResponses := make([]string, numTxToSubmit)
+
+	for i := 0; i < numTxToSubmit; i++ {
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+
+			testData := testDataSet[index+numTxToSubmit] // Use next set of test data
+			args := []string{
+				"tx", "claim", "claim",
+				testData.OldAddress,
+				testData.NewAddress,
+				testData.PubKey,
+				testData.Signature,
+				"--from", fmt.Sprintf("node%d", index),
+				"--broadcast-mode", "sync",
+				"--chain-id", cli.chainID,
+				"--home", cli.homeDir,
+				"--keyring-backend", "test",
+				"--node", cli.nodeAddress,
+				"--output", "json",
+				"--yes",
+				"--fees", cli.fees,
+			}
+
+			resp, ok := cli.run(args)
+
+			// Thread-safe logging and response storage
+			mu.Lock()
+			t.Logf("Second block claim %d submission output: %s", index+1, resp)
+			require.True(t, ok)
+			secondBlockResponses[index] = resp
+			mu.Unlock()
+		}(i)
 	}
+
+	// Wait for all goroutines to complete
+	wg.Wait()
 
 	// Allow time for second block processing
 	t.Log("Waiting for second block to complete...")

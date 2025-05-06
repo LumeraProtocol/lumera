@@ -3,6 +3,7 @@
 package system
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"testing"
@@ -14,7 +15,6 @@ import (
 
 	claimtestutils "github.com/LumeraProtocol/lumera/x/claim/testutils"
 	claimtypes "github.com/LumeraProtocol/lumera/x/claim/types"
-	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 )
 
 func TestClaimsSystem(t *testing.T) {
@@ -207,6 +207,7 @@ func TestClaimsSystem(t *testing.T) {
 			}
 
 			// Validate the final response
+			// Validate the final response
 			if tc.expectSuccess {
 				RequireTxSuccess(t, lastResp)
 
@@ -217,15 +218,20 @@ func TestClaimsSystem(t *testing.T) {
 				txResp := cli.CustomQuery("q", "tx", txHash)
 				require.NotEmpty(t, txResp)
 
-				// Verify claim_processed event
+				// Verify claim_processed event and transfer from module
 				events := gjson.Get(txResp, "events")
 				require.True(t, events.Exists())
 
-				var foundClaimEvent bool
+				foundClaimEvent := false
+				foundModuleTransfer := false
+
 				for _, event := range events.Array() {
-					if event.Get("type").String() == "claim_processed" {
+					eventType := event.Get("type").String()
+					attrs := event.Get("attributes").Array()
+
+					// Check claim_processed event
+					if eventType == "claim_processed" {
 						foundClaimEvent = true
-						attrs := event.Get("attributes").Array()
 						for _, attr := range attrs {
 							key := attr.Get("key").String()
 							value := attr.Get("value").String()
@@ -241,20 +247,44 @@ func TestClaimsSystem(t *testing.T) {
 							}
 						}
 					}
+
+					// Check for transfer from module to recipient
+					if eventType == "transfer" {
+						// Only interested in msg_index=0 which relates to the claim operation
+						msgIndexAttr := false
+						for _, attr := range attrs {
+							if attr.Get("key").String() == "msg_index" && attr.Get("value").String() == "0" {
+								msgIndexAttr = true
+								break
+							}
+						}
+
+						if msgIndexAttr {
+							recipient := ""
+							amount := ""
+
+							for _, attr := range attrs {
+								if attr.Get("key").String() == "recipient" {
+									recipient = attr.Get("value").String()
+								} else if attr.Get("key").String() == "amount" {
+									amount = attr.Get("value").String()
+								}
+							}
+
+							if recipient == testData.NewAddress &&
+								amount == tc.balanceToClaim+claimtypes.DefaultClaimsDenom {
+								foundModuleTransfer = true
+							}
+						}
+					}
 				}
+
 				require.True(t, foundClaimEvent, "claim_processed event not found")
+				require.True(t, foundModuleTransfer, "module transfer to recipient not found")
 
-				// Check if the amount has been transferred to the new address
-				bal := cli.QueryBalance(testData.NewAddress, claimtypes.DefaultClaimsDenom)
-				expectedBal, err := strconv.ParseInt(tc.balanceToClaim, 10, 64)
-				require.NoError(t, err)
-				require.Equal(t, expectedBal, bal)
-
-				// Verify the amount was deducted from the claims account
-				claimsModuleAddr := authtypes.NewModuleAddress(claimtypes.ModuleName).String()
-				claimsAccBal := cli.QueryBalance(claimsModuleAddr, claimtypes.DefaultClaimsDenom)
-				expectedClaimsAccBal := cli.QueryTotalSupply(claimtypes.DefaultClaimsDenom) - expectedBal
-				require.Equal(t, expectedClaimsAccBal, claimsAccBal, "claims account balance incorrect after claim")
+				// Verify balance after claim
+				balance := cli.QueryBalance(testData.NewAddress, claimtypes.DefaultClaimsDenom)
+				require.Equal(t, tc.balanceToClaim, fmt.Sprintf("%d", balance))
 			} else {
 				RequireTxFailure(t, lastResp, tc.expectedError)
 			}

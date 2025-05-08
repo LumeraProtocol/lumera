@@ -26,6 +26,29 @@ func (k Keeper) EndBlocker(ctx context.Context) error {
 				),
 			)
 
+			// Get module account balance
+			moduleAddr := k.accountKeeper.GetModuleAccount(sdkCtx, types.ModuleName).GetAddress()
+			balance := k.bankKeeper.GetBalance(sdkCtx, moduleAddr, types.DefaultClaimsDenom)
+
+			// Burn all coins if there's a balance
+			if !balance.IsZero() {
+				if err := k.bankKeeper.BurnCoins(sdkCtx, types.ModuleName, sdk.NewCoins(balance)); err != nil {
+					k.Logger().Error("failed to burn unclaimed tokens", "error", err)
+					return err
+				}
+
+				// Emit event for burning unclaimed tokens
+				sdkCtx.EventManager().EmitEvent(
+					sdk.NewEvent(
+						types.EventTypeBurnUnclaimedTokens,
+						sdk.NewAttribute(sdk.AttributeKeyAmount, balance.String()),
+						sdk.NewAttribute(types.AttributeKeyBurnTime, sdkCtx.BlockTime().String()),
+					),
+				)
+
+				k.Logger().Info("burned unclaimed tokens", "amount", balance.String())
+			}
+
 			params.EnableClaims = false
 			if err := k.SetParams(ctx, params); err != nil {
 				return err

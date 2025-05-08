@@ -8,8 +8,10 @@ const (
 	AttributeKeyOldAddress = "old_address"
 	AttributeKeyNewAddress = "new_address"
 	AttributeKeyClaimTime  = "claim_time"
+	AttributeKeyEndTime    = "end_time"
+	AttributeKeyBurnTime   = "burn_time"
 
 	// Module events
-	EventTypeClaimPeriodEnd = "claim_period_end"
-	AttributeKeyEndTime     = "end_time"
+	EventTypeClaimPeriodEnd      = "claim_period_end"
+	EventTypeBurnUnclaimedTokens = "burn_unclaimed_tokens"
 )

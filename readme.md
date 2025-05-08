@@ -21,6 +21,23 @@ ignite chain build
 
 > **Note:** You can still build directly with go: `go build cmd`, but it won't build protobuf files.
 
+**Note2:** You might get error during build:
+```
+Cosmos SDK's version is: v0.50.12
+
+✘ Cannot build app:                                                          
+                                                                           
+error while running command go mod tidy: go: cannot find "go1.24.1" in PATH
+: exit status 1
+```
+Lumera project doesn't specify toolchain, but it seems `Ignite` sometime might still require it. Do this:
+```cmd
+go install golang.org/dl/go1.24.1@latest
+go1.24.1 download
+export GOTOOLCHAIN=auto
+```
+
+
 ### Initialize
 
 You only need to run this command once.
@@ -31,13 +48,13 @@ lumerad init my-node
 ### Get latest `genesis.json`
 
 ```bash
-COMMING SOON
+https://github.com/LumeraProtocol/lumera-networks
 ```
 
 ### Get seeds
 
 ```bash
-COMMING SOON
+https://github.com/LumeraProtocol/lumera-networks
 ```
 
 ### Start

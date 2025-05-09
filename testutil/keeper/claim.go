@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"cosmossdk.io/log"
+	"cosmossdk.io/math"
 	"cosmossdk.io/store"
 	"cosmossdk.io/store/metrics"
 	storetypes "cosmossdk.io/store/types"
@@ -106,7 +107,10 @@ func (k *MockAccountKeeper) GetModuleAccount(ctx context.Context, moduleName str
 func (k *MockAccountKeeper) SetModuleAccount(ctx context.Context, macc sdk.ModuleAccountI) {
 	k.moduleAccounts[macc.GetName()] = macc
 }
-
+func (k *MockBankKeeper) GetBalance(ctx context.Context, addr sdk.AccAddress, denom string) sdk.Coin {
+	// Empty mock implementation
+	return sdk.NewCoin(denom, math.NewInt(0))
+}
 func (k *MockAccountKeeper) NewAccountWithAddress(ctx context.Context, addr sdk.AccAddress) sdk.AccountI {
 	return authtypes.NewBaseAccountWithAddress(addr)
 }

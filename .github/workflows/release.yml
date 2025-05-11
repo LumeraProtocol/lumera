@@ -228,6 +228,8 @@ jobs:
           tar_file=$(ls *.tar.gz)
           path_depth=$(tar -tzf "$tar_file" | head -n 1)
           component_count=$(echo "$path_depth" | awk -F'/' '{print NF}')
+          echo "Path depth: $path_depth"
+          echo "Component count: $component_count"
 
           mkdir -p temp
           tar xzf "$tar_file" -C temp/ --strip-components="$component_count"
@@ -254,6 +256,7 @@ jobs:
           
           # Create new tar file with all contents
           cd temp
+          ls -l *
           tar czf "../$tar_file" ./*
           cd ..
           

@@ -138,15 +138,12 @@ func (p Params) Validate() error {
 
 // validateMinimumStakeForSn validates the MinimumStakeForSn param
 func validateMinimumStakeForSn(v interface{}) error {
-	minimumStakeForSn, ok := v.(uint64)
+	coin, ok := v.(sdk.Coin)
 	if !ok {
 		return fmt.Errorf("invalid parameter type: %T", v)
 	}
-
-	// TODO implement validation
-	_ = minimumStakeForSn
-
-	return nil
+	// Perform validation on the coin
+	return coin.Validate()
 }
 
 // validateReportingThreshold validates the ReportingThreshold param

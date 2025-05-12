@@ -3,6 +3,7 @@ package types
 import (
 	"fmt"
 
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	paramtypes "github.com/cosmos/cosmos-sdk/x/params/types"
 )
 
@@ -11,7 +12,7 @@ var _ paramtypes.ParamSet = (*Params)(nil)
 var (
 	KeyMinimumStakeForSn = []byte("MinimumStakeForSn")
 	// TODO: Determine the default value
-	DefaultMinimumStakeForSn uint64 = 0
+	DefaultMinimumStakeForSn = sdk.NewInt64Coin("ulume", 0)
 )
 
 var (
@@ -57,7 +58,7 @@ func ParamKeyTable() paramtypes.KeyTable {
 
 // NewParams creates a new Params instance
 func NewParams(
-	minimumStakeForSn uint64,
+	minimumStakeForSn sdk.Coin,
 	reportingThreshold uint64,
 	slashingThreshold uint64,
 	metricsThresholds string,

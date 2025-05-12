@@ -3,11 +3,12 @@ package keeper_test
 import (
 	"context"
 	"fmt"
-	keeper2 "github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"testing"
 	"time"
+
+	keeper2 "github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
+	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
 	"cosmossdk.io/log"
 	"cosmossdk.io/math"
@@ -307,7 +308,7 @@ func setupKeeperForTest(
 
 	// Set default params => min self-stake = 1,000,000
 	params := types2.DefaultParams()
-	params.MinimumStakeForSn = 1_000_000
+	params.MinimumStakeForSn = sdk.NewInt64Coin("ulume", 1_000_000)
 	err := k.SetParams(sdkCtx, params)
 	require.NoError(t, err)
 

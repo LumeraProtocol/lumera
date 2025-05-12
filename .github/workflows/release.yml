@@ -228,14 +228,14 @@ jobs:
           tar_file=$(ls *.tar.gz)
 
           file_path=$(tar -tzf "$tar_file" | head -n 2 | grep -v '/$' | grep lumerad | sed 's|^/||')
-          echo "Binary: file_path"
+          echo "Binary: $file_path"
           tar xzf "$tar_file" -C .
-          ll -s "$file_path"
+          ls -l "$file_path"
 
           # move extracted file
           mkdir -p temp
           mv "$file_path" temp/
-          ll -s temp/
+          ls -l temp/
 
           # Remove the original tar file and the extracted files
           rm "$tar_file"

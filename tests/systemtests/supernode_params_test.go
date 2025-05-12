@@ -23,7 +23,7 @@ func TestSupernodeUpdateParamsProposal(t *testing.T) {
 		// Set initial supernode parameters
 		func(genesis []byte) []byte {
 			state, err := sjson.SetRawBytes(genesis, "app_state.supernode.params", []byte(`{
-				"minimum_stake_for_sn": "1000000",
+				"minimum_stake_for_sn": {"denom":"ulume","amount":"1000000"},
 				"reporting_threshold": "95",
 				"slashing_threshold": "80",
 				"metrics_thresholds": "cpu:80,memory:80,storage:80",
@@ -46,7 +46,10 @@ func TestSupernodeUpdateParamsProposal(t *testing.T) {
 	initialParams := cli.CustomQuery("q", "supernode", "params")
 	t.Logf("Initial params: %s", initialParams)
 
-	require.Equal(t, "1000000", gjson.Get(initialParams, "params.minimum_stake_for_sn").String(), "initial minimum_stake_for_sn should be 1000000")
+	// Verify the coin structure for minimum_stake_for_sn
+	require.Equal(t, "ulume", gjson.Get(initialParams, "params.minimum_stake_for_sn.denom").String(), "initial minimum_stake_for_sn denom should be ulume")
+	require.Equal(t, "1000000", gjson.Get(initialParams, "params.minimum_stake_for_sn.amount").String(), "initial minimum_stake_for_sn amount should be 1000000")
+
 	require.Equal(t, "95", gjson.Get(initialParams, "params.reporting_threshold").String(), "initial reporting_threshold should be 95")
 	require.Equal(t, "80", gjson.Get(initialParams, "params.slashing_threshold").String(), "initial slashing_threshold should be 80")
 	require.Equal(t, "cpu:80,memory:80,storage:80", gjson.Get(initialParams, "params.metrics_thresholds").String(), "initial metrics_thresholds should match")
@@ -66,7 +69,7 @@ func TestSupernodeUpdateParamsProposal(t *testing.T) {
 			"@type": "/lumera.supernode.MsgUpdateParams",
 			"authority": "%s",
 			"params": {
-				"minimum_stake_for_sn": "2000000",
+				"minimum_stake_for_sn": {"denom":"ulume","amount":"2000000"},
 				"reporting_threshold": "90",
 				"slashing_threshold": "75",
 				"metrics_thresholds": "cpu:85,memory:85,storage:85",
@@ -101,7 +104,10 @@ func TestSupernodeUpdateParamsProposal(t *testing.T) {
 	updatedParams := cli.CustomQuery("q", "supernode", "params")
 	t.Logf("Updated params: %s", updatedParams)
 
-	require.Equal(t, "2000000", gjson.Get(updatedParams, "params.minimum_stake_for_sn").String(), "minimum_stake_for_sn should be 2000000")
+	// Verify the updated coin structure for minimum_stake_for_sn
+	require.Equal(t, "ulume", gjson.Get(updatedParams, "params.minimum_stake_for_sn.denom").String(), "minimum_stake_for_sn denom should be ulume")
+	require.Equal(t, "2000000", gjson.Get(updatedParams, "params.minimum_stake_for_sn.amount").String(), "minimum_stake_for_sn amount should be 2000000")
+
 	require.Equal(t, "90", gjson.Get(updatedParams, "params.reporting_threshold").String(), "reporting_threshold should be 90")
 	require.Equal(t, "75", gjson.Get(updatedParams, "params.slashing_threshold").String(), "slashing_threshold should be 75")
 	require.Equal(t, "cpu:85,memory:85,storage:85", gjson.Get(updatedParams, "params.metrics_thresholds").String(), "metrics_thresholds should match new values")

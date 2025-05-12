@@ -226,8 +226,18 @@ jobs:
           
           # Extract the existing tar file
           tar_file=$(ls *.tar.gz)
+
+          file_path=$(tar -tzf "$tar_file" | head -n 2 | grep -v '/$' | grep lumerad | sed 's|^/||')
+          echo "Binary: $file_path"
+          tar xzf "$tar_file" -C .
+          ls -l "$file_path"
+
+          # move extracted file
           mkdir -p temp
-          tar xzf "$tar_file" -C temp/
+          mv "$file_path" temp/
+          ls -l temp/
+
+          # Remove the original tar file and the extracted files
           rm "$tar_file"
           
           # Copy libwasmvm and create install script

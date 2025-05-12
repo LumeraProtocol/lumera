@@ -227,18 +227,17 @@ jobs:
           # Extract the existing tar file
           tar_file=$(ls *.tar.gz)
 
-          echo `tar -tzf $tar_file`
-          echo `tar -tzf $tar_file | head -n 1`
-          echo `tar -tzf $tar_file | head -n 1 | awk -F'/' '{print NF}'`
+          file_path=$(tar -tzf "$tar_file" | head -n 2 | grep -v '/$' | grep lumerad | sed 's|^/||')
+          echo "Binary: file_path"
+          tar xzf "$tar_file" -C .
+          ll -s "$file_path"
 
-          path_depth=$(tar -tzf "$tar_file" | head -n 1)
-          component_count=$(echo "$path_depth" | awk -F'/' '{print NF}')
-          echo "Path depth: $path_depth"
-          echo "Component count: $component_count"
-
+          # move extracted file
           mkdir -p temp
-          echo `tar xzf "$tar_file" -C temp/ --strip-components="$component_count"`
-          ls -l temp/
+          mv "$file_path" temp/
+          ll -s temp/
+
+          # Remove the original tar file and the extracted files
           rm "$tar_file"
           
           # Copy libwasmvm and create install script

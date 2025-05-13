@@ -25,7 +25,7 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorBondedHook() {
 			name: "when validator is bonded and meet supernode requirements, it should be active",
 			setup: func() {
 				params := sntypes.Params{
-					MinimumStakeForSn: 1000000,
+					MinimumStakeForSn: &minimumStakePrice,
 				}
 				suite.keeper.SetParams(suite.ctx, params)
 
@@ -72,7 +72,7 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorBondedHook() {
 			name: "when the validator is bonded but jailed, it should disabled",
 			setup: func() {
 				params := sntypes.Params{
-					MinimumStakeForSn: 1000000,
+					MinimumStakeForSn: &minimumStakePrice,
 				}
 				suite.keeper.SetParams(suite.ctx, params)
 
@@ -135,6 +135,7 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorBondedHook() {
 }
 
 func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
+        minimumStakePrice := sdk.NewInt64Coin("ulume", 1_000_000)
 	tests := []struct {
 		name          string
 		setup         func()
@@ -147,7 +148,7 @@ func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
 			name: "when the validator begins un-bonding and the stake falls below minimum but is not jailed, it should be disabled",
 			setup: func() {
 				params := sntypes.Params{
-					MinimumStakeForSn: 1000000,
+					MinimumStakeForSn: &minimumStakePrice,
 				}
 				suite.keeper.SetParams(suite.ctx, params)
 
@@ -185,7 +186,7 @@ func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
 			name: "when the validator begins un-bonding and stake does not fall below minimum but is jailed, it should be disabled",
 			setup: func() {
 				params := sntypes.Params{
-					MinimumStakeForSn: 1000000,
+					MinimumStakeForSn: &minimumStakePrice,
 				}
 				suite.keeper.SetParams(suite.ctx, params)
 
@@ -233,7 +234,7 @@ func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
 			name: "when the validator begins un-bonding but stake does not fall below minimum and is not jailed, it should not be disabled",
 			setup: func() {
 				params := sntypes.Params{
-					MinimumStakeForSn: 1000000,
+					MinimumStakeForSn: sdk.NewInt64Coin("ulume", 1_000_000),
 				}
 				suite.keeper.SetParams(suite.ctx, params)
 
@@ -367,7 +368,7 @@ func (suite *KeeperIntegrationSuite) TestBeforeDelegationSharesModifiedHook() {
 				}
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
 				params := sntypes.Params{
-					MinimumStakeForSn: 1000000,
+					MinimumStakeForSn: &minimumStakePrice,
 				}
 				suite.keeper.SetParams(suite.ctx, params)
 

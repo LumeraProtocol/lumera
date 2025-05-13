@@ -1,9 +1,5 @@
 package types
 
-import (
-	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
-)
-
 // DefaultIndex is the default global index
 const DefaultIndex uint64 = 1
 
@@ -12,19 +8,11 @@ const DefaultClaimableAmountConst = 18749999981413
 // DefaultGenesis returns the default genesis state
 func DefaultGenesis() *GenesisState {
 
-	// Create module account
-	moduleAcc := authtypes.NewEmptyModuleAccount(
-		ModuleName,
-		authtypes.Minter,
-		authtypes.Burner,
-	)
-
 	// The claim records are directly loaded from the CSV file into the genesis state,
 	// at no point in time, they become part of the genesis file
 	return &GenesisState{
 		Params:               DefaultParams(),
 		ClaimRecords:         []ClaimRecord{}, //representation only
-		ModuleAccount:        moduleAcc.String(),
 		TotalClaimableAmount: DefaultClaimableAmountConst,
 		ClaimsDenom:          DefaultClaimsDenom,
 	}
@@ -40,11 +28,10 @@ func (gs GenesisState) Validate() error {
 }
 
 // NewGenesisState creates a new genesis state with provided values
-func NewGenesisState(params Params, records []ClaimRecord, moduleAcc *authtypes.ModuleAccount, amount uint64, claimDenom string) *GenesisState {
+func NewGenesisState(params Params, records []ClaimRecord, amount uint64, claimDenom string) *GenesisState {
 	return &GenesisState{
 		Params:               params,
 		ClaimRecords:         records,
-		ModuleAccount:        moduleAcc.String(),
 		TotalClaimableAmount: amount,
 		ClaimsDenom:          claimDenom,
 	}

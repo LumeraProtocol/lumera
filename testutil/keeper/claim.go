@@ -115,6 +115,11 @@ func (k *MockAccountKeeper) SetModuleAccount(ctx context.Context, macc sdk.Modul
 	k.moduleAccounts[macc.GetName()] = macc
 }
 
+func (k *MockBankKeeper) GetBalance(ctx context.Context, addr sdk.AccAddress, denom string) sdk.Coin {
+	// Empty mock implementation
+	return sdk.NewInt64Coin(denom, 0)
+}
+
 func (k *MockAccountKeeper) NewAccountWithAddress(ctx context.Context, addr sdk.AccAddress) sdk.AccountI {
 	return authtypes.NewBaseAccountWithAddress(addr)
 }

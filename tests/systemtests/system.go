@@ -743,13 +743,25 @@ func locateExecutable(file string) string {
 	if strings.TrimSpace(file) == "" {
 		panic("executable binary name must not be empty")
 	}
-	path, err := exec.LookPath(file)
+
+	// Get user's home directory dynamically
+	homeDir, err := os.UserHomeDir()
 	if err != nil {
+		panic(fmt.Sprintf("failed to get home directory: %s", err.Error()))
+	}
+
+	// Construct path to home/go/bin
+	path := filepath.Join(homeDir, "go", "bin", file)
+
+	// Check if the file exists
+	_, err = os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			panic(fmt.Sprintf("%q not found", file))
+		}
 		panic(fmt.Sprintf("unexpected error %s", err.Error()))
 	}
-	if path == "" {
-		panic(fmt.Sprintf("%q not founc", file))
-	}
+
 	return path
 }
 

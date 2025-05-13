@@ -42,8 +42,9 @@ func TestSupernodeRegistrationSuccess(t *testing.T) {
 
 			// 1. Set minimum supernode stake in genesis
 			sut.ModifyGenesisJSON(t, func(genesis []byte) []byte {
-				// Update the supernode module params to set minimum stake
-				state, err := sjson.SetRawBytes(genesis, "app_state.supernode.params.minimum_stake_for_sn", []byte(`"`+minimumStake+`"`))
+				// Update the supernode module params to set minimum stake as a Coin
+				coinJSON := `{"denom":"ulume","amount":"` + minimumStake + `"}`
+				state, err := sjson.SetRawBytes(genesis, "app_state.supernode.params.minimum_stake_for_sn", []byte(coinJSON))
 				require.NoError(t, err)
 				return state
 			})
@@ -156,7 +157,9 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 			t.Logf("Setting minimum stake to %s", tc.minimumStake)
 
 			sut.ModifyGenesisJSON(t, func(genesis []byte) []byte {
-				state, err := sjson.SetRawBytes(genesis, "app_state.supernode.params.minimum_stake_for_sn", []byte(`"`+tc.minimumStake+`"`))
+				// Create proper Coin JSON structure
+				coinJSON := `{"denom":"ulume","amount":"` + tc.minimumStake + `"}`
+				state, err := sjson.SetRawBytes(genesis, "app_state.supernode.params.minimum_stake_for_sn", []byte(coinJSON))
 				require.NoError(t, err)
 
 				minStakeSet := gjson.GetBytes(state, "app_state.supernode.params.minimum_stake_for_sn")

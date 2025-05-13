@@ -211,6 +211,7 @@ func (suite *KeeperIntegrationSuite) TestDisableSuperNode() {
 }
 
 func (suite *KeeperIntegrationSuite) TestMeetSupernodeRequirements() {
+        minimumStakePrice := sdk.NewInt64Coin("stake", 1_000_000)
 	tests := []struct {
 		name          string
 		setup         func()
@@ -222,7 +223,7 @@ func (suite *KeeperIntegrationSuite) TestMeetSupernodeRequirements() {
 			name: "when supernode meets requirements, it should return true",
 			setup: func() {
 				params := sntypes.Params{
-					MinimumStakeForSn: 1000000,
+					MinimumStakeForSn: &minimumStakePrice,
 				}
 				suite.keeper.SetParams(suite.ctx, params)
 
@@ -255,7 +256,7 @@ func (suite *KeeperIntegrationSuite) TestMeetSupernodeRequirements() {
 			name: "when the stake is below minimum, should return false",
 			setup: func() {
 				params := sntypes.Params{
-					MinimumStakeForSn: 1000000,
+					MinimumStakeForSn: &minimumStakePrice,
 				}
 				suite.keeper.SetParams(suite.ctx, params)
 

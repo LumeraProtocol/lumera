@@ -308,7 +308,7 @@ func setupKeeperForTest(
 
 	// Set default params => min self-stake = 1,000,000
 	params := types.DefaultParams()
-	params.MinimumStakeForSn = 1_000_000
+	params.MinimumStakeForSn = sdk.NewInt64Coin("ulume", 1_000_000)
 	err := k.SetParams(sdkCtx, params)
 	require.NoError(t, err)
 

@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"fmt"
+
 	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
 	errorsmod "cosmossdk.io/errors"
@@ -129,7 +130,7 @@ func (k Keeper) GetSuperNodesPaginated(ctx sdk.Context, pagination *query.PageRe
 
 func (k Keeper) GetMinStake(ctx sdk.Context) sdkmath.Int {
 	minStake := k.GetParams(ctx).MinimumStakeForSn
-	minStakeInt := sdkmath.NewIntFromUint64(minStake)
+	minStakeInt := minStake.Amount
 	return minStakeInt
 }
 
@@ -234,7 +235,7 @@ func (k Keeper) CheckValidatorSupernodeEligibility(ctx sdk.Context, validator st
 
 	// 1. Get chain's configured minimum self-stake
 	minStake := k.GetParams(ctx).MinimumStakeForSn
-	minStakeInt := sdkmath.NewIntFromUint64(minStake)
+	minStakeInt := minStake
 
 	// 2. Convert operator address (valAddr) into types
 	valOperatorAddr, err := sdk.ValAddressFromBech32(valAddr)
@@ -269,12 +270,12 @@ func (k Keeper) CheckValidatorSupernodeEligibility(ctx sdk.Context, validator st
 	selfDelegatedTokensInt := selfDelegatedTokens.TruncateInt()
 
 	// 7. Compare two Ints: selfDelegatedTokensInt vs. minStakeInt
-	if selfDelegatedTokensInt.LT(minStakeInt) {
+	if selfDelegatedTokensInt.LT(minStakeInt.Amount) {
 		return errorsmod.Wrapf(
 			sdkerrors.ErrInvalidRequest,
-			"validator %s does not meet minimum self stake requirement. Required: %d, got: %s",
+			"validator %s does not meet minimum self stake requirement. Required: %s, got: %s",
 			valAddr,
-			minStake,
+			minStake.Amount.String(),
 			selfDelegatedTokensInt.String(),
 		)
 	}

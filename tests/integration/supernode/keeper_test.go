@@ -221,7 +221,7 @@ func (suite *KeeperIntegrationSuite) TestMeetSupernodeRequirements() {
 			name: "when supernode meets requirements, it should return true",
 			setup: func() {
 				params := types2.Params{
-					MinimumStakeForSn: 1000000,
+					MinimumStakeForSn: sdk.NewCoin("stake", sdkmath.NewInt(1000000)),
 				}
 				suite.keeper.SetParams(suite.ctx, params)
 
@@ -254,7 +254,7 @@ func (suite *KeeperIntegrationSuite) TestMeetSupernodeRequirements() {
 			name: "when the stake is below minimum, should return false",
 			setup: func() {
 				params := types2.Params{
-					MinimumStakeForSn: 1000000,
+					MinimumStakeForSn: sdk.NewCoin("stake", sdkmath.NewInt(1000000)),
 				}
 				suite.keeper.SetParams(suite.ctx, params)
 

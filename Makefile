@@ -160,7 +160,6 @@ system-tests:
 simulation-tests:
 	@echo "Running simulation tests..."
 	ignite chain simulate
-
 clean-proto:
 	@echo "Cleaning up protobuf generated files..."
 	find x/ -type f \( -name "*.pb.go" -o -name "*.pb.gw.go" -o -name "*.pulsar.go" \) -print -exec rm -f {} +

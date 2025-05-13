@@ -87,7 +87,7 @@ Action specific code for Metadata Hadnler must be implemented in the `keeper` pa
 This is intended to be called from the keeper's methods and it does have access to the context and keeper.
 
 ```go
-// x/action/keeper/metadata_handler.go
+// x/action/v1/keeper/metadata_handler.go
 package common
 
 import (...)
@@ -117,7 +117,7 @@ Below is an examples of a Cascade type validator and metadata handler:
 #### 2.4.1 Type validation
 
 ```go
-// x/action/types/action_type_cascade.go
+// x/action/v1/types/action_type_cascade.go
 package types
 
 import (...)
@@ -162,7 +162,7 @@ When an Action of type CASCADE is submitted, the system retrieves the correspond
 #### 2.4.2 Metdata Handler
 
 ```go
-// x/action/keeper/action_handlers.go
+// x/action/v1/keeper/action_handlers.go
 package keeper  
   
 import (...)  
@@ -180,7 +180,7 @@ func (k *Keeper) InitializeActionRegistry() *ActionRegistry {
 ```
 
 ```go
-// x/action/keeper/action_cascade.go
+// x/action/v1/keeper/action_cascade.go
 package keeper  
   
 import (...)  
@@ -228,7 +228,7 @@ In your `.proto` file (or equivalent), define a new enum value (e.g., `ACTION_TY
    ```
 #### 2. Create a Type Validator
 
-Create new file `x/action/types/action_type_my_action.go`
+Create new file `x/action/v1/types/action_type_my_action.go`
 
    ```go
    type MyActionValidator struct{}
@@ -255,10 +255,10 @@ Create new file `x/action/types/action_type_my_action.go`
 * Create unit tests ensuring your new action type’s metadata is correctly validated. Test edge cases (missing fields, invalid data, etc.) to confirm that your validator or handler returns appropriate errors
 #### 3. Create Metadata handler
 
-Create new file `x/action/keeper/action_my_action.go`
+Create new file `x/action/v1/keeper/action_my_action.go`
 
 ```go
-// x/action/keeper/action_cascade.go
+// x/action/v1/keeper/action_cascade.go
 package keeper  
   
 import (...)  
@@ -284,7 +284,7 @@ func (h MyActionHandler) Validate(data []byte, msgType common.MessageType) error
 #### 4. Register new metadata handler
 
 ```go
-// x/action/keeper/action_handlers.go
+// x/action/v1/keeper/action_handlers.go
 package keeper  
   
 import (...)  

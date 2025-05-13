@@ -40,10 +40,16 @@ import (
 	authsims "github.com/cosmos/cosmos-sdk/x/auth/simulation"
 	_ "github.com/cosmos/cosmos-sdk/x/auth/tx/config" // import for side-effects
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	_ "github.com/cosmos/cosmos-sdk/x/auth/vesting" // import for side-effects
+	_ "github.com/cosmos/cosmos-sdk/x/authz/module" // import for side-effects
 	authzkeeper "github.com/cosmos/cosmos-sdk/x/authz/keeper"
+	_ "github.com/cosmos/cosmos-sdk/x/bank"         // import for side-effects
 	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
+	_ "github.com/cosmos/cosmos-sdk/x/consensus" // import for side-effects
 	consensuskeeper "github.com/cosmos/cosmos-sdk/x/consensus/keeper"
+	_ "github.com/cosmos/cosmos-sdk/x/crisis" // import for side-effects
 	crisiskeeper "github.com/cosmos/cosmos-sdk/x/crisis/keeper"
+	_ "github.com/cosmos/cosmos-sdk/x/distribution" // import for side-effects
 	distrkeeper "github.com/cosmos/cosmos-sdk/x/distribution/keeper"
 	"github.com/cosmos/cosmos-sdk/x/genutil"
 	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
@@ -51,12 +57,17 @@ import (
 	govclient "github.com/cosmos/cosmos-sdk/x/gov/client"
 	govkeeper "github.com/cosmos/cosmos-sdk/x/gov/keeper"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
+	_ "github.com/cosmos/cosmos-sdk/x/group/module" // import for side-effects
 	groupkeeper "github.com/cosmos/cosmos-sdk/x/group/keeper"
+	_ "github.com/cosmos/cosmos-sdk/x/mint"         // import for side-effects
 	mintkeeper "github.com/cosmos/cosmos-sdk/x/mint/keeper"
+	_ "github.com/cosmos/cosmos-sdk/x/params" // import for side-effects
 	paramsclient "github.com/cosmos/cosmos-sdk/x/params/client"
 	paramskeeper "github.com/cosmos/cosmos-sdk/x/params/keeper"
 	paramstypes "github.com/cosmos/cosmos-sdk/x/params/types"
+	_ "github.com/cosmos/cosmos-sdk/x/slashing" // import for side-effects
 	slashingkeeper "github.com/cosmos/cosmos-sdk/x/slashing/keeper"
+	_ "github.com/cosmos/cosmos-sdk/x/staking" // import for side-effects
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
 	icacontrollerkeeper "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/controller/keeper"
 	icahostkeeper "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/host/keeper"
@@ -309,23 +320,6 @@ func (app *App) GetSubspace(moduleName string) paramstypes.Subspace {
 	return subspace
 }
 
-// setupUpgradeHandlers registers the upgrade handlers for specific upgrade names.
-func (app *App) setupUpgradeHandlers() {
-	// Register the v1_0_0 upgrade handler
-	app.UpgradeKeeper.SetUpgradeHandler(
-		upgrade_v1_0_0.UpgradeName,
-		upgrade_v1_0_0.CreateUpgradeHandler(
-			app.Logger(),
-			app.ModuleManager,  // Pass ModuleManager
-			app.Configurator(), // Pass Configurator
-			app.ActionKeeper,   // Pass the ActionKeeper
-		),
-	)
-
-	// Add other future upgrade handlers here...
-	// app.UpgradeKeeper.SetUpgradeHandler(...)
-}
-
 // setupUpgradeStoreLoaders configures the store loader for upcoming upgrades.
 // This needs to be called BEFORE app.Load()
 func (app *App) setupUpgradeStoreLoaders() {
@@ -348,6 +342,23 @@ func (app *App) setupUpgradeStoreLoaders() {
 
 	// Add conditions for future upgrades' store loaders here...
 	// else if upgradeInfo.Name == "v1.1.0" && !app.UpgradeKeeper.IsSkipHeight(upgradeInfo.Height) { ... }
+}
+
+// setupUpgradeHandlers registers the upgrade handlers for specific upgrade names.
+func (app *App) setupUpgradeHandlers() {
+	// Register the v1_0_0 upgrade handler
+	app.UpgradeKeeper.SetUpgradeHandler(
+		upgrade_v1_0_0.UpgradeName,
+		upgrade_v1_0_0.CreateUpgradeHandler(
+			app.Logger(),
+			app.ModuleManager,  // Pass ModuleManager
+			app.Configurator(), // Pass Configurator
+			app.ActionKeeper,   // Pass the ActionKeeper
+		),
+	)
+
+	// Add other future upgrade handlers here...
+	// app.UpgradeKeeper.SetUpgradeHandler(...)
 }
 
 // LegacyAmino returns App's amino codec.

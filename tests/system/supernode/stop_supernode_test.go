@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	sdkmath "cosmossdk.io/math"
-	"github.com/LumeraProtocol/lumera/x/supernode/keeper"
-	"github.com/LumeraProtocol/lumera/x/supernode/types"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
@@ -26,30 +26,30 @@ func TestStopSupernode(t *testing.T) {
 
 	testCases := []struct {
 		name   string
-		msg    *types.MsgStopSupernode
+		msg    *sntypes.MsgStopSupernode
 		setup  func(*SystemTestSuite)
-		verify func(t *testing.T, suite *SystemTestSuite, resp *types.MsgStopSupernodeResponse, err error)
+		verify func(t *testing.T, suite *SystemTestSuite, resp *sntypes.MsgStopSupernodeResponse, err error)
 	}{
 		{
 			name: "successful stop",
-			msg: &types.MsgStopSupernode{
+			msg: &sntypes.MsgStopSupernode{
 				Creator:          walletAddr.String(),
 				ValidatorAddress: valAddrStr,
 				Reason:           "maintenance",
 			},
 			setup: func(suite *SystemTestSuite) {
 				// Create a supernode in active state
-				sn := types.SuperNode{
+				sn := sntypes.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
 					Version:          "1.0.0",
-					States: []*types.SuperNodeStateRecord{
+					States: []*sntypes.SuperNodeStateRecord{
 						{
-							State:  types.SuperNodeStateActive,
+							State:  sntypes.SuperNodeStateActive,
 							Height: suite.sdkCtx.BlockHeight(),
 						},
 					},
-					PrevIpAddresses: []*types.IPAddressHistory{
+					PrevIpAddresses: []*sntypes.IPAddressHistory{
 						{
 							Address: "192.168.0.2",
 							Height:  suite.sdkCtx.BlockHeight(),
@@ -59,7 +59,7 @@ func TestStopSupernode(t *testing.T) {
 				err := suite.app.SupernodeKeeper.SetSuperNode(suite.sdkCtx, sn)
 				require.NoError(t, err)
 			},
-			verify: func(t *testing.T, suite *SystemTestSuite, resp *types.MsgStopSupernodeResponse, err error) {
+			verify: func(t *testing.T, suite *SystemTestSuite, resp *sntypes.MsgStopSupernodeResponse, err error) {
 				require.NoError(t, err)
 				require.NotNil(t, resp)
 
@@ -69,16 +69,16 @@ func TestStopSupernode(t *testing.T) {
 				sn, found := suite.app.SupernodeKeeper.QuerySuperNode(suite.sdkCtx, val)
 				require.True(t, found)
 				require.NotEmpty(t, sn.States)
-				require.Equal(t, types.SuperNodeStateStopped, sn.States[len(sn.States)-1].State)
+				require.Equal(t, sntypes.SuperNodeStateStopped, sn.States[len(sn.States)-1].State)
 
 				// Verify event was emitted
 				events := suite.sdkCtx.EventManager().Events()
 				var foundStopEvent bool
 				for _, e := range events {
-					if e.Type == types.EventTypeSupernodeStopped {
+					if e.Type == sntypes.EventTypeSupernodeStopped {
 						foundStopEvent = true
 						for _, attr := range e.Attributes {
-							if string(attr.Key) == types.AttributeKeyValidatorAddress {
+							if string(attr.Key) == sntypes.AttributeKeyValidatorAddress {
 								require.Equal(t, valAddrStr, string(attr.Value))
 							}
 						}
@@ -89,13 +89,13 @@ func TestStopSupernode(t *testing.T) {
 		},
 		{
 			name: "invalid validator address",
-			msg: &types.MsgStopSupernode{
+			msg: &sntypes.MsgStopSupernode{
 				Creator:          walletAddr.String(),
 				ValidatorAddress: "invalid",
 				Reason:           "maintenance",
 			},
 			setup: nil,
-			verify: func(t *testing.T, suite *SystemTestSuite, resp *types.MsgStopSupernodeResponse, err error) {
+			verify: func(t *testing.T, suite *SystemTestSuite, resp *sntypes.MsgStopSupernodeResponse, err error) {
 				require.Error(t, err)
 				require.ErrorIs(t, err, sdkerrors.ErrInvalidAddress)
 				require.Nil(t, resp)
@@ -103,13 +103,13 @@ func TestStopSupernode(t *testing.T) {
 		},
 		{
 			name: "supernode not found",
-			msg: &types.MsgStopSupernode{
+			msg: &sntypes.MsgStopSupernode{
 				Creator:          walletAddr.String(),
 				ValidatorAddress: valAddrStr,
 				Reason:           "node down",
 			},
 			setup: nil,
-			verify: func(t *testing.T, suite *SystemTestSuite, resp *types.MsgStopSupernodeResponse, err error) {
+			verify: func(t *testing.T, suite *SystemTestSuite, resp *sntypes.MsgStopSupernodeResponse, err error) {
 				require.Error(t, err)
 				require.ErrorIs(t, err, sdkerrors.ErrNotFound)
 				require.Nil(t, resp)
@@ -117,24 +117,24 @@ func TestStopSupernode(t *testing.T) {
 		},
 		{
 			name: "unauthorized attempt",
-			msg: &types.MsgStopSupernode{
+			msg: &sntypes.MsgStopSupernode{
 				Creator:          unauthAddr.String(),
 				ValidatorAddress: valAddrStr,
 				Reason:           "not your node",
 			},
 			setup: func(suite *SystemTestSuite) {
 				// Create supernode belonging to walletAddr
-				sn := types.SuperNode{
+				sn := sntypes.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
 					Version:          "1.0.0",
-					States: []*types.SuperNodeStateRecord{
+					States: []*sntypes.SuperNodeStateRecord{
 						{
-							State:  types.SuperNodeStateActive,
+							State:  sntypes.SuperNodeStateActive,
 							Height: suite.sdkCtx.BlockHeight(),
 						},
 					},
-					PrevIpAddresses: []*types.IPAddressHistory{
+					PrevIpAddresses: []*sntypes.IPAddressHistory{
 						{
 							Address: "192.168.0.3",
 							Height:  suite.sdkCtx.BlockHeight(),
@@ -144,7 +144,7 @@ func TestStopSupernode(t *testing.T) {
 				err := suite.app.SupernodeKeeper.SetSuperNode(suite.sdkCtx, sn)
 				require.NoError(t, err)
 			},
-			verify: func(t *testing.T, suite *SystemTestSuite, resp *types.MsgStopSupernodeResponse, err error) {
+			verify: func(t *testing.T, suite *SystemTestSuite, resp *sntypes.MsgStopSupernodeResponse, err error) {
 				require.Error(t, err)
 				require.ErrorIs(t, err, sdkerrors.ErrUnauthorized)
 				require.Nil(t, resp)
@@ -152,27 +152,27 @@ func TestStopSupernode(t *testing.T) {
 		},
 		{
 			name: "already stopped supernode",
-			msg: &types.MsgStopSupernode{
+			msg: &sntypes.MsgStopSupernode{
 				Creator:          walletAddr.String(),
 				ValidatorAddress: valAddrStr,
 				Reason:           "maintenance",
 			},
 			setup: func(suite *SystemTestSuite) {
-				sn := types.SuperNode{
+				sn := sntypes.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
 					Version:          "1.0.0",
-					States: []*types.SuperNodeStateRecord{
+					States: []*sntypes.SuperNodeStateRecord{
 						{
-							State:  types.SuperNodeStateActive,
+							State:  sntypes.SuperNodeStateActive,
 							Height: suite.sdkCtx.BlockHeight(),
 						},
 						{
-							State:  types.SuperNodeStateStopped,
+							State:  sntypes.SuperNodeStateStopped,
 							Height: suite.sdkCtx.BlockHeight() + 1,
 						},
 					},
-					PrevIpAddresses: []*types.IPAddressHistory{
+					PrevIpAddresses: []*sntypes.IPAddressHistory{
 						{
 							Address: "192.168.0.4",
 							Height:  suite.sdkCtx.BlockHeight(),
@@ -182,7 +182,7 @@ func TestStopSupernode(t *testing.T) {
 				err := suite.app.SupernodeKeeper.SetSuperNode(suite.sdkCtx, sn)
 				require.NoError(t, err)
 			},
-			verify: func(t *testing.T, suite *SystemTestSuite, resp *types.MsgStopSupernodeResponse, err error) {
+			verify: func(t *testing.T, suite *SystemTestSuite, resp *sntypes.MsgStopSupernodeResponse, err error) {
 				// Per your logic, you might disallow another stop if it's already stopped
 				// So we expect an error
 				require.Error(t, err)
@@ -192,27 +192,27 @@ func TestStopSupernode(t *testing.T) {
 		},
 		{
 			name: "disabled supernode",
-			msg: &types.MsgStopSupernode{
+			msg: &sntypes.MsgStopSupernode{
 				Creator:          walletAddr.String(),
 				ValidatorAddress: valAddrStr,
 				Reason:           "maintenance",
 			},
 			setup: func(suite *SystemTestSuite) {
-				sn := types.SuperNode{
+				sn := sntypes.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
 					Version:          "1.0.0",
-					States: []*types.SuperNodeStateRecord{
+					States: []*sntypes.SuperNodeStateRecord{
 						{
-							State:  types.SuperNodeStateActive,
+							State:  sntypes.SuperNodeStateActive,
 							Height: suite.sdkCtx.BlockHeight(),
 						},
 						{
-							State:  types.SuperNodeStateDisabled,
+							State:  sntypes.SuperNodeStateDisabled,
 							Height: suite.sdkCtx.BlockHeight() + 1,
 						},
 					},
-					PrevIpAddresses: []*types.IPAddressHistory{
+					PrevIpAddresses: []*sntypes.IPAddressHistory{
 						{
 							Address: "192.168.0.5",
 							Height:  suite.sdkCtx.BlockHeight(),
@@ -222,7 +222,7 @@ func TestStopSupernode(t *testing.T) {
 				err := suite.app.SupernodeKeeper.SetSuperNode(suite.sdkCtx, sn)
 				require.NoError(t, err)
 			},
-			verify: func(t *testing.T, suite *SystemTestSuite, resp *types.MsgStopSupernodeResponse, err error) {
+			verify: func(t *testing.T, suite *SystemTestSuite, resp *sntypes.MsgStopSupernodeResponse, err error) {
 				// If your logic doesn't allow stopping a disabled SN, expect an error
 				require.Error(t, err)
 				require.ErrorIs(t, err, sdkerrors.ErrInvalidRequest)

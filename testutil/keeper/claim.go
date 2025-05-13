@@ -8,10 +8,12 @@ import (
 	"cosmossdk.io/log"
 	"cosmossdk.io/store"
 	"cosmossdk.io/store/metrics"
+	"cosmossdk.io/core/address"
 	storetypes "cosmossdk.io/store/types"
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	dbm "github.com/cosmos/cosmos-db"
 	"github.com/cosmos/cosmos-sdk/codec"
+	addresscodec "github.com/cosmos/cosmos-sdk/codec/address"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	"github.com/cosmos/cosmos-sdk/runtime"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -78,13 +80,19 @@ func (k *MockBankKeeper) SendCoinsFromModuleToAccount(ctx context.Context, sende
 type MockAccountKeeper struct {
 	accounts       map[string]sdk.AccountI
 	moduleAccounts map[string]sdk.ModuleAccountI
+	addrCodec      address.Codec
 }
 
 func NewMockAccountKeeper() *MockAccountKeeper {
 	return &MockAccountKeeper{
 		accounts:       make(map[string]sdk.AccountI),
 		moduleAccounts: make(map[string]sdk.ModuleAccountI),
+		addrCodec:      addresscodec.NewBech32Codec("lumera"),
 	}
+}
+
+func (k *MockAccountKeeper) AddressCodec() address.Codec {
+	return k.addrCodec
 }
 
 func (k *MockAccountKeeper) GetAccount(ctx context.Context, addr sdk.AccAddress) sdk.AccountI {

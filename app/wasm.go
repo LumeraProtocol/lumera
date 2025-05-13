@@ -8,6 +8,7 @@ import (
 	"github.com/CosmWasm/wasmd/x/wasm"
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
+	wasmvmtypes "github.com/CosmWasm/wasmvm/v2/types"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/runtime"
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
@@ -18,15 +19,18 @@ import (
 	distrkeeper "github.com/cosmos/cosmos-sdk/x/distribution/keeper"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	"github.com/cosmos/gogoproto/proto"
-	ibcfee "github.com/cosmos/ibc-go/v8/modules/apps/29-fee"
-	porttypes "github.com/cosmos/ibc-go/v8/modules/core/05-port/types"
+	ibcporttypes "github.com/cosmos/ibc-go/v10/modules/core/05-port/types"
 )
+
+func uint32Ptr(v uint32) *uint32 {
+	return &v
+}
 
 // registerWasmModules register CosmWasm keepers and non dependency inject modules.
 func (app *App) registerWasmModules(
 	appOpts servertypes.AppOptions,
 	wasmOpts ...wasmkeeper.Option,
-) (porttypes.IBCModule, error) {
+) (ibcporttypes.IBCModule, error) {
 	// set up non depinject support modules store keys
 	if err := app.RegisterStores(
 		storetypes.NewKVStoreKey(wasmtypes.StoreKey),
@@ -34,36 +38,49 @@ func (app *App) registerWasmModules(
 		panic(err)
 	}
 
-	scopedWasmKeeper := app.CapabilityKeeper.ScopeToModule(wasmtypes.ModuleName)
-
-	wasmConfig, err := wasm.ReadWasmConfig(appOpts)
+	wasmNodeConfig, err := wasm.ReadNodeConfig(appOpts)
 	if err != nil {
 		return nil, fmt.Errorf("error while reading wasm config: %s", err)
+	}
+
+	vmConfig := wasmtypes.VMConfig{
+		WasmLimits: wasmvmtypes.WasmLimits{
+			InitialMemoryLimitPages: uint32Ptr(16), // 16 * 64KiB = 1MiB
+			TableSizeLimitElements:  uint32Ptr(1024),
+			MaxImports:              uint32Ptr(256),
+			MaxFunctions:            uint32Ptr(1024),
+			MaxFunctionParams:       uint32Ptr(16),
+			MaxTotalFunctionParams:  uint32Ptr(256),
+			MaxFunctionResults:      uint32Ptr(8),
+		},
 	}
 
 	if os.Getenv("SYSTEM_TESTS") == "true" {
 		DefaultNodeHome = setupEnv()
 	}
+
+	capabilities := append(wasmkeeper.BuiltInCapabilities(), app.Name())
+	authority := authtypes.NewModuleAddress(govtypes.ModuleName).String()
+
 	// The last arguments can contain custom message handlers, and custom query handlers,
 	// if we want to allow any custom callbacks
 	app.WasmKeeper = wasmkeeper.NewKeeper(
 		app.AppCodec(),
 		runtime.NewKVStoreService(app.GetKey(wasmtypes.StoreKey)),
-		app.AccountKeeper,
+		app.AuthKeeper,
 		app.BankKeeper,
 		app.StakingKeeper,
 		distrkeeper.NewQuerier(app.DistrKeeper),
-		app.IBCFeeKeeper, // ISC4 Wrapper: fee IBC middleware
 		app.IBCKeeper.ChannelKeeper,
-		app.IBCKeeper.PortKeeper,
-		scopedWasmKeeper,
+		app.IBCKeeper.ChannelKeeper,
 		app.TransferKeeper,
 		app.MsgServiceRouter(),
 		app.GRPCQueryRouter(),
 		DefaultNodeHome,
-		wasmConfig,
-		wasmkeeper.BuiltInCapabilities(),
-		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
+		wasmNodeConfig,
+		vmConfig,
+		capabilities,
+		authority,
 		wasmOpts...,
 	)
 
@@ -73,7 +90,7 @@ func (app *App) registerWasmModules(
 			app.AppCodec(),
 			&app.WasmKeeper,
 			app.StakingKeeper,
-			app.AccountKeeper,
+			app.AuthKeeper,
 			app.BankKeeper,
 			app.MsgServiceRouter(),
 			app.GetSubspace(wasmtypes.ModuleName),
@@ -81,7 +98,7 @@ func (app *App) registerWasmModules(
 		return nil, err
 	}
 
-	if err := app.setAnteHandler(app.txConfig, wasmConfig, app.GetKey(wasmtypes.StoreKey)); err != nil {
+	if err := app.setAnteHandler(app.txConfig, wasmNodeConfig, app.GetKey(wasmtypes.StoreKey)); err != nil {
 		return nil, err
 	}
 
@@ -93,7 +110,6 @@ func (app *App) registerWasmModules(
 			return nil, fmt.Errorf("failed to register snapshot extension: %s", err)
 		}
 	}
-	app.ScopedWasmKeeper = scopedWasmKeeper
 
 	if err := app.setPostHandler(); err != nil {
 		return nil, err
@@ -110,10 +126,9 @@ func (app *App) registerWasmModules(
 		return nil, err
 	}
 
-	// Create fee enabled wasm ibc Stack
-	var wasmStack porttypes.IBCModule
-	wasmStack = wasm.NewIBCHandler(app.WasmKeeper, app.IBCKeeper.ChannelKeeper, app.IBCFeeKeeper)
-	wasmStack = ibcfee.NewIBCMiddleware(wasmStack, app.IBCFeeKeeper)
+	// Create wasm ibc Stack
+	var wasmStack ibcporttypes.IBCModule
+	wasmStack = wasm.NewIBCHandler(app.WasmKeeper, app.IBCKeeper.ChannelKeeper, app.IBCKeeper.ChannelKeeper)
 
 	return wasmStack, nil
 }
@@ -129,11 +144,11 @@ func (app *App) setPostHandler() error {
 	return nil
 }
 
-func (app *App) setAnteHandler(txConfig client.TxConfig, wasmConfig wasmtypes.WasmConfig, txCounterStoreKey *storetypes.KVStoreKey) error {
+func (app *App) setAnteHandler(txConfig client.TxConfig, wasmConfig wasmtypes.NodeConfig, txCounterStoreKey *storetypes.KVStoreKey) error {
 	anteHandler, err := NewAnteHandler(
 		HandlerOptions{
 			HandlerOptions: ante.HandlerOptions{
-				AccountKeeper:   app.AccountKeeper,
+				AuthKeeper:      app.AuthKeeper,
 				BankKeeper:      app.BankKeeper,
 				SignModeHandler: txConfig.SignModeHandler(),
 				FeegrantKeeper:  app.FeeGrantKeeper,

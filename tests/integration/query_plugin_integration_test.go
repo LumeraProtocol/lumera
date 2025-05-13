@@ -13,7 +13,7 @@ import (
 	wasmvmtypes "github.com/CosmWasm/wasmvm/v2/types"
 	"github.com/cometbft/cometbft/crypto/secp256k1"
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
-	"github.com/cosmos/gogoproto/proto"
+	gogoproto "github.com/cosmos/gogoproto/proto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -39,7 +39,7 @@ func TestMaskReflectCustomQuery(t *testing.T) {
 	ctx, keepers := CreateTestInput(t, false, ReflectCapabilities, wasmKeeper.WithMessageEncoders(reflectEncoders(cdc)), wasmKeeper.WithQueryPlugins(reflectPlugins()))
 	keeper := keepers.WasmKeeper
 
-	deposit := sdk.NewCoins(sdk.NewInt64Coin("denom", 100000))
+	deposit := sdk.NewCoins(sdk.NewInt64Coin("denom", 100_000))
 	creator := keepers.Faucet.NewFundedRandomAccount(ctx, deposit...)
 
 	// upload code
@@ -48,7 +48,7 @@ func TestMaskReflectCustomQuery(t *testing.T) {
 	require.Equal(t, uint64(1), codeID)
 
 	// creator instantiates a contract and gives it tokens
-	contractStart := sdk.NewCoins(sdk.NewInt64Coin("denom", 40000))
+	contractStart := sdk.NewCoins(sdk.NewInt64Coin("denom", 40_000))
 	contractAddr, _, err := keepers.ContractKeeper.Instantiate(ctx, codeID, creator, nil, []byte("{}"), "reflect contract 1", contractStart)
 	require.NoError(t, err)
 	require.NotEmpty(t, contractAddr)
@@ -87,8 +87,8 @@ func TestReflectStargateQuery(t *testing.T) {
 	ctx, keepers := CreateTestInput(t, false, ReflectCapabilities, wasmKeeper.WithMessageEncoders(reflectEncoders(cdc)), wasmKeeper.WithQueryPlugins(reflectPlugins()))
 	keeper := keepers.WasmKeeper
 
-	funds := sdk.NewCoins(sdk.NewInt64Coin("denom", 320000))
-	contractStart := sdk.NewCoins(sdk.NewInt64Coin("denom", 40000))
+	funds := sdk.NewCoins(sdk.NewInt64Coin("denom", 320_000))
+	contractStart := sdk.NewCoins(sdk.NewInt64Coin("denom", 40_000))
 	expectedBalance := funds.Sub(contractStart...)
 	creator := keepers.Faucet.NewFundedRandomAccount(ctx, funds...)
 
@@ -127,7 +127,7 @@ func TestReflectStargateQuery(t *testing.T) {
 
 func TestReflectGrpcQuery(t *testing.T) {
 	queryPlugins := (*reflectPlugins()).Merge(&wasmKeeper.QueryPlugins{
-		Grpc: func(ctx sdk.Context, request *wasmvmtypes.GrpcQuery) (proto.Message, error) {
+		Grpc: func(ctx sdk.Context, request *wasmvmtypes.GrpcQuery) (gogoproto.Message, error) {
 			if request.Path == "cosmos.bank.v1beta1.Query/AllBalances" {
 				return &banktypes.QueryAllBalancesResponse{
 					Balances: sdk.NewCoins(),
@@ -154,7 +154,7 @@ func TestReflectGrpcQuery(t *testing.T) {
 
 	// now grpc query for the bank balance
 	cosmosBankQuery := banktypes.NewQueryAllBalancesRequest(creator, nil, false)
-	cosmosBankQueryBz, err := proto.Marshal(cosmosBankQuery)
+	cosmosBankQueryBz, err := gogoproto.Marshal(cosmosBankQuery)
 	require.NoError(t, err)
 	reflectQuery := wasmvmtypes.QueryRequest{
 		Grpc: &wasmvmtypes.GrpcQuery{
@@ -173,7 +173,7 @@ func TestReflectGrpcQuery(t *testing.T) {
 	mustUnmarshal(t, reflectRespBz, &reflectResp)
 	// now unmarshal the protobuf response
 	var grpcBalance banktypes.QueryAllBalancesResponse
-	err = proto.Unmarshal(reflectResp.Data, &grpcBalance)
+	err = gogoproto.Unmarshal(reflectResp.Data, &grpcBalance)
 	require.NoError(t, err)
 }
 
@@ -233,8 +233,8 @@ func TestReflectInvalidStargateQuery(t *testing.T) {
 	ctx, keepers := CreateTestInput(t, false, ReflectCapabilities, wasmKeeper.WithMessageEncoders(reflectEncoders(cdc)), wasmKeeper.WithQueryPlugins(reflectPlugins()))
 	keeper := keepers.WasmKeeper
 
-	funds := sdk.NewCoins(sdk.NewInt64Coin("denom", 320000))
-	contractStart := sdk.NewCoins(sdk.NewInt64Coin("denom", 40000))
+	funds := sdk.NewCoins(sdk.NewInt64Coin("denom", 320_000))
+	contractStart := sdk.NewCoins(sdk.NewInt64Coin("denom", 40_000))
 	creator := keepers.Faucet.NewFundedRandomAccount(ctx, funds...)
 
 	// upload code
@@ -251,7 +251,7 @@ func TestReflectInvalidStargateQuery(t *testing.T) {
 	protoQuery := banktypes.QueryAllBalancesRequest{
 		Address: creator.String(),
 	}
-	protoQueryBin, err := proto.Marshal(&protoQuery)
+	protoQueryBin, err := gogoproto.Marshal(&protoQuery)
 	require.NoError(t, err)
 
 	protoRequest := wasmvmtypes.QueryRequest{
@@ -314,7 +314,7 @@ func TestMaskReflectWasmQueries(t *testing.T) {
 	ctx, keepers := CreateTestInput(t, false, ReflectCapabilities, wasmKeeper.WithMessageEncoders(reflectEncoders(cdc)), wasmKeeper.WithQueryPlugins(reflectPlugins()))
 	keeper := keepers.WasmKeeper
 
-	deposit := sdk.NewCoins(sdk.NewInt64Coin("denom", 100000))
+	deposit := sdk.NewCoins(sdk.NewInt64Coin("denom", 100_000))
 	creator := keepers.Faucet.NewFundedRandomAccount(ctx, deposit...)
 
 	// upload reflect code
@@ -323,7 +323,7 @@ func TestMaskReflectWasmQueries(t *testing.T) {
 	require.Equal(t, uint64(1), reflectID)
 
 	// creator instantiates a contract and gives it tokens
-	reflectStart := sdk.NewCoins(sdk.NewInt64Coin("denom", 40000))
+	reflectStart := sdk.NewCoins(sdk.NewInt64Coin("denom", 40_000))
 	reflectAddr, _, err := keepers.ContractKeeper.Instantiate(ctx, reflectID, creator, nil, []byte("{}"), "reflect contract 2", reflectStart)
 	require.NoError(t, err)
 	require.NotEmpty(t, reflectAddr)
@@ -384,7 +384,7 @@ func TestWasmRawQueryWithNil(t *testing.T) {
 	ctx, keepers := CreateTestInput(t, false, ReflectCapabilities, wasmKeeper.WithMessageEncoders(reflectEncoders(cdc)), wasmKeeper.WithQueryPlugins(reflectPlugins()))
 	keeper := keepers.WasmKeeper
 
-	deposit := sdk.NewCoins(sdk.NewInt64Coin("denom", 100000))
+	deposit := sdk.NewCoins(sdk.NewInt64Coin("denom", 100_000))
 	creator := keepers.Faucet.NewFundedRandomAccount(ctx, deposit...)
 
 	// upload reflect code
@@ -393,7 +393,7 @@ func TestWasmRawQueryWithNil(t *testing.T) {
 	require.Equal(t, uint64(1), reflectID)
 
 	// creator instantiates a contract and gives it tokens
-	reflectStart := sdk.NewCoins(sdk.NewInt64Coin("denom", 40000))
+	reflectStart := sdk.NewCoins(sdk.NewInt64Coin("denom", 40_000))
 	reflectAddr, _, err := keepers.ContractKeeper.Instantiate(ctx, reflectID, creator, nil, []byte("{}"), "reflect contract 2", reflectStart)
 	require.NoError(t, err)
 	require.NotEmpty(t, reflectAddr)
@@ -426,7 +426,7 @@ func TestWasmRawQueryWithNil(t *testing.T) {
 func TestQueryDenomsIntegration(t *testing.T) {
 	ctx, keepers := CreateTestInput(t, false, CyberpunkCapabilities)
 	ck, k := keepers.ContractKeeper, keepers.WasmKeeper
-	creator := keepers.Faucet.NewFundedRandomAccount(ctx, sdk.NewCoins(sdk.NewInt64Coin("denom", 100000))...)
+	creator := keepers.Faucet.NewFundedRandomAccount(ctx, sdk.NewCoins(sdk.NewInt64Coin("denom", 100_000))...)
 
 	// upload code
 	codeID, _, err := ck.Create(ctx, creator, testdata.CyberpunkContractWasm(), nil)
@@ -764,12 +764,16 @@ func TestAcceptListStargateQuerier(t *testing.T) {
 
 	addrs := app.AddTestAddrsIncremental(wasmApp, ctx, 2, sdkmath.NewInt(1_000_000))
 	accepted := wasmKeeper.AcceptedQueries{
-		"/cosmos.auth.v1beta1.Query/Account": &authtypes.QueryAccountResponse{},
-		"/no/route/to/this":                  &authtypes.QueryAccountResponse{},
+		"/cosmos.auth.v1beta1.Query/Account": func() gogoproto.Message {
+			return &authtypes.QueryAccountResponse{}
+		},
+		"/no/route/to/this": func() gogoproto.Message {
+			return &authtypes.QueryAccountResponse{}
+		},
 	}
 
-	marshal := func(pb proto.Message) []byte {
-		b, err := proto.Marshal(pb)
+	marshal := func(pb gogoproto.Message) []byte {
+		b, err := gogoproto.Marshal(pb)
 		require.NoError(t, err)
 		return b
 	}
@@ -855,8 +859,8 @@ func TestDeterministicJsonMarshal(t *testing.T) {
 		originalResponse    string
 		updatedResponse     string
 		queryPath           string
-		responseProtoStruct proto.Message
-		expectedProto       func() proto.Message
+		responseProtoStruct gogoproto.Message
+		expectedProto       func() gogoproto.Message
 	}{
 		/**
 		   *
@@ -884,7 +888,7 @@ func TestDeterministicJsonMarshal(t *testing.T) {
 			"0a530a202f636f736d6f732e617574682e763162657461312e426173654163636f756e74122f0a2d636f736d6f733166387578756c746e3873717a687a6e72737a3371373778776171756867727367366a79766679122d636f736d6f733166387578756c746e3873717a687a6e72737a3371373778776171756867727367366a79766679",
 			"/cosmos.auth.v1beta1.Query/Account",
 			&authtypes.QueryAccountResponse{},
-			func() proto.Message {
+			func() gogoproto.Message {
 				account := authtypes.BaseAccount{
 					Address: "cosmos1f8uxultn8sqzhznrsz3q77xwaquhgrsg6jyvfy",
 				}
@@ -926,9 +930,9 @@ func TestConvertProtoToJSONMarshal(t *testing.T) {
 	testCases := []struct {
 		name                  string
 		queryPath             string
-		protoResponseStruct   proto.Message
+		protoResponseStruct   gogoproto.Message
 		originalResponse      string
-		expectedProtoResponse proto.Message
+		expectedProtoResponse gogoproto.Message
 		expectedError         bool
 	}{
 		{

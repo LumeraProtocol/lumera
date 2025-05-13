@@ -11,8 +11,8 @@ import (
 	"cosmossdk.io/x/feegrant"
 	"cosmossdk.io/x/upgrade"
 
-	"github.com/CosmWasm/wasmd/x/wasm/keeper/wasmtesting"
-	"github.com/CosmWasm/wasmd/x/wasm/types"
+	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
+	wasmvmtypes "github.com/CosmWasm/wasmvm/v2/types"
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/codec"
 	secp256k1 "github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
@@ -30,7 +30,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/slashing"
 	"github.com/cosmos/cosmos-sdk/x/staking"
 	"github.com/cosmos/ibc-go/modules/capability"
-	"github.com/cosmos/ibc-go/v8/modules/apps/transfer"
+	"github.com/cosmos/ibc-go/v10/modules/apps/transfer"
 	"github.com/stretchr/testify/require"
 
 	errorsmod "cosmossdk.io/errors"
@@ -67,33 +67,36 @@ import (
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	capabilitykeeper "github.com/cosmos/ibc-go/modules/capability/keeper"
-	capabilitytypes "github.com/cosmos/ibc-go/modules/capability/types"
-	ibctransfertypes "github.com/cosmos/ibc-go/v8/modules/apps/transfer/types"
-	ibc "github.com/cosmos/ibc-go/v8/modules/core"
-	ibcexported "github.com/cosmos/ibc-go/v8/modules/core/exported"
-	ibckeeper "github.com/cosmos/ibc-go/v8/modules/core/keeper"
+	ibctransfertypes "github.com/cosmos/ibc-go/v10/modules/apps/transfer/types"
+	ibctransferkeeper "github.com/cosmos/ibc-go/v10/modules/apps/transfer/keeper"
+	ibc "github.com/cosmos/ibc-go/v10/modules/core"
+	ibcexported "github.com/cosmos/ibc-go/v10/modules/core/exported"
+	ibckeeper "github.com/cosmos/ibc-go/v10/modules/core/keeper"
 )
 
 const lumeraBech32MainPrefix = "lumera"
 
+func uint32Ptr(v uint32) *uint32 {
+	return &v
+}
+
 // ensure store code returns the expected response
 func assertStoreCodeResponse(t *testing.T, data []byte, expected uint64) {
-	var pStoreResp types.MsgStoreCodeResponse
+	var pStoreResp wasmtypes.MsgStoreCodeResponse
 	require.NoError(t, pStoreResp.Unmarshal(data))
 	require.Equal(t, pStoreResp.CodeID, expected)
 }
 
 // ensure execution returns the expected data
 func assertExecuteResponse(t *testing.T, data, expected []byte) {
-	var pExecResp types.MsgExecuteContractResponse
+	var pExecResp wasmtypes.MsgExecuteContractResponse
 	require.NoError(t, pExecResp.Unmarshal(data))
 	require.Equal(t, pExecResp.Data, expected)
 }
 
 // ensures this returns a valid bech32 address and returns it
 func parseInitResponse(t *testing.T, data []byte) string {
-	var pInstResp types.MsgInstantiateContractResponse
+	var pInstResp wasmtypes.MsgInstantiateContractResponse
 	require.NoError(t, pInstResp.Unmarshal(data))
 	require.NotEmpty(t, pInstResp.Address)
 	addr := pInstResp.Address
@@ -216,9 +219,9 @@ func fromReflectRawMsg(cdc codec.Codec) wasmKeeper.CustomEncoder {
 			return []sdk.Msg{msg}, nil
 		}
 		if custom.Debug != "" {
-			return nil, errorsmod.Wrapf(types.ErrInvalidMsg, "Custom Debug: %s", custom.Debug)
+			return nil, errorsmod.Wrapf(wasmtypes.ErrInvalidMsg, "Custom Debug: %s", custom.Debug)
 		}
-		return nil, errorsmod.Wrap(types.ErrInvalidMsg, "Unknown Custom message variant")
+		return nil, errorsmod.Wrap(wasmtypes.ErrInvalidMsg, "Unknown Custom message variant")
 	}
 }
 
@@ -262,8 +265,8 @@ func MakeEncodingConfig(_ testing.TB) moduletestutil.TestEncodingConfig {
 
 	moduleBasics.RegisterInterfaces(interfaceRegistry)
 	// add wasmd types
-	types.RegisterInterfaces(interfaceRegistry)
-	types.RegisterLegacyAminoCodec(amino)
+	wasmtypes.RegisterInterfaces(interfaceRegistry)
+	wasmtypes.RegisterLegacyAminoCodec(amino)
 
 	return encodingConfig
 }
@@ -276,7 +279,7 @@ func CreateDefaultTestInput(t testing.TB) (sdk.Context, wasmKeeper.TestKeepers) 
 // CreateTestInput encoders can be nil to accept the defaults, or set it to override some of the message handlers (like default)
 func CreateTestInput(t testing.TB, isCheckTx bool, availableCapabilities []string, opts ...wasmKeeper.Option) (sdk.Context, wasmKeeper.TestKeepers) {
 	// Load default wasm config
-	return createTestInput(t, isCheckTx, availableCapabilities, types.DefaultWasmConfig(), dbm.NewMemDB(), opts...)
+	return createTestInput(t, isCheckTx, availableCapabilities, wasmtypes.DefaultNodeConfig(), dbm.NewMemDB(), opts...)
 }
 
 // encoders can be nil to accept the defaults, or set it to override some of the message handlers (like default)
@@ -284,7 +287,7 @@ func createTestInput(
 	t testing.TB,
 	isCheckTx bool,
 	availableCapabilities []string,
-	wasmConfig types.WasmConfig,
+	wasmConfig wasmtypes.NodeConfig,
 	db dbm.DB,
 	opts ...wasmKeeper.Option,
 ) (sdk.Context, wasmKeeper.TestKeepers) {
@@ -295,8 +298,8 @@ func createTestInput(
 		minttypes.StoreKey, distributiontypes.StoreKey, slashingtypes.StoreKey,
 		govtypes.StoreKey, paramstypes.StoreKey, ibcexported.StoreKey, upgradetypes.StoreKey,
 		evidencetypes.StoreKey, ibctransfertypes.StoreKey,
-		capabilitytypes.StoreKey, feegrant.StoreKey, authzkeeper.StoreKey,
-		types.StoreKey,
+		feegrant.StoreKey, authzkeeper.StoreKey,
+		wasmtypes.StoreKey,
 	)
 	logger := log.NewTestLogger(t)
 	ms := store.NewCommitMultiStore(db, logger, storemetrics.NewNoOpMetrics())
@@ -308,18 +311,13 @@ func createTestInput(
 		ms.MountStoreWithDB(v, storetypes.StoreTypeTransient, db)
 	}
 
-	memKeys := storetypes.NewMemoryStoreKeys(capabilitytypes.MemStoreKey)
-	for _, v := range memKeys {
-		ms.MountStoreWithDB(v, storetypes.StoreTypeMemory, db)
-	}
-
 	require.NoError(t, ms.LoadLatestVersion())
 
 	ctx := sdk.NewContext(ms, tmproto.Header{
 		Height: 1234567,
 		Time:   time.Date(2020, time.April, 22, 12, 0, 0, 0, time.UTC),
 	}, isCheckTx, log.NewNopLogger())
-	ctx = types.WithTXCounter(ctx, 0)
+	ctx = wasmtypes.WithTXCounter(ctx, 0)
 
 	encodingConfig := wasmKeeper.MakeEncodingConfig(t)
 	appCodec, legacyAmino := encodingConfig.Codec, encodingConfig.Amino
@@ -339,10 +337,9 @@ func createTestInput(
 		slashingtypes.ModuleName,
 		crisistypes.ModuleName,
 		ibctransfertypes.ModuleName,
-		capabilitytypes.ModuleName,
 		ibcexported.ModuleName,
 		govtypes.ModuleName,
-		types.ModuleName,
+		wasmtypes.ModuleName,
 	} {
 		paramsKeeper.Subspace(m)
 	}
@@ -359,7 +356,7 @@ func createTestInput(
 		stakingtypes.NotBondedPoolName: {authtypes.Burner, authtypes.Staking},
 		govtypes.ModuleName:            {authtypes.Burner},
 		ibctransfertypes.ModuleName:    {authtypes.Minter, authtypes.Burner},
-		types.ModuleName:               {authtypes.Burner},
+		wasmtypes.ModuleName:               {authtypes.Burner},
 	}
 
 	accountKeeper := authkeeper.NewAccountKeeper(
@@ -421,29 +418,19 @@ func createTestInput(
 		authtypes.NewModuleAddress(upgradetypes.ModuleName).String(),
 	)
 
-	faucet := wasmKeeper.NewTestFaucet(t, ctx, bankKeeper, minttypes.ModuleName, sdk.NewCoin("stake", sdkmath.NewInt(100_000_000_000)))
+	faucet := wasmKeeper.NewTestFaucet(t, ctx, bankKeeper, minttypes.ModuleName, sdk.NewInt64Coin("stake", 100_000_000_000))
 
 	// set some funds ot pay out validatores, based on code from:
 	// https://github.com/cosmos/cosmos-sdk/blob/fea231556aee4d549d7551a6190389c4328194eb/x/distribution/keeper/keeper_test.go#L50-L57
 	distrAcc := distKeeper.GetDistributionAccount(ctx)
-	faucet.Fund(ctx, distrAcc.GetAddress(), sdk.NewCoin("stake", sdkmath.NewInt(2000000)))
+	faucet.Fund(ctx, distrAcc.GetAddress(), sdk.NewInt64Coin("stake", 2000000))
 	accountKeeper.SetModuleAccount(ctx, distrAcc)
-
-	capabilityKeeper := capabilitykeeper.NewKeeper(
-		appCodec,
-		keys[capabilitytypes.StoreKey],
-		memKeys[capabilitytypes.MemStoreKey],
-	)
-	scopedIBCKeeper := capabilityKeeper.ScopeToModule(ibcexported.ModuleName)
-	scopedWasmKeeper := capabilityKeeper.ScopeToModule(types.ModuleName)
 
 	ibcKeeper := ibckeeper.NewKeeper(
 		appCodec,
-		keys[ibcexported.StoreKey],
+		runtime.NewKVStoreService(keys[ibcexported.StoreKey]),
 		subspace(ibcexported.ModuleName),
-		stakingKeeper,
 		upgradeKeeper,
-		scopedIBCKeeper,
 		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
 	)
 	querier := baseapp.NewGRPCQueryRouter()
@@ -454,27 +441,53 @@ func createTestInput(
 	//cfg := sdk.GetConfig()
 	//cfg.SetAddressVerifier(types.VerifyAddressLen())
 
+	vmConfig := wasmtypes.VMConfig{
+		WasmLimits: wasmvmtypes.WasmLimits{
+			InitialMemoryLimitPages: uint32Ptr(16), // 16 * 64KiB = 1MiB
+			TableSizeLimitElements:  uint32Ptr(1024),
+			MaxImports:              uint32Ptr(256),
+			MaxFunctions:            uint32Ptr(1024),
+			MaxFunctionParams:       uint32Ptr(16),
+			MaxTotalFunctionParams:  uint32Ptr(256),
+			MaxFunctionResults:      uint32Ptr(8),
+		},
+	}
+
+	authority, err := accountKeeper.AddressCodec().BytesToString(authtypes.NewModuleAddress(govtypes.ModuleName))
+	require.NoError(t, err)
+
+	transferKeeper := ibctransferkeeper.NewKeeper(
+		appCodec,
+		runtime.NewKVStoreService(keys[ibctransfertypes.StoreKey]),	
+		subspace(ibctransfertypes.ModuleName),
+		ibcKeeper.ChannelKeeper, // ICS4Wrapper
+		ibcKeeper.ChannelKeeper,
+		msgRouter,
+		accountKeeper,
+		bankKeeper,
+		authority,
+	)
+
 	keeper := wasmKeeper.NewKeeper(
 		appCodec,
-		runtime.NewKVStoreService(keys[types.StoreKey]),
+		runtime.NewKVStoreService(keys[wasmtypes.StoreKey]),
 		accountKeeper,
 		bankKeeper,
 		stakingKeeper,
 		distributionkeeper.NewQuerier(distKeeper),
 		ibcKeeper.ChannelKeeper, // ICS4Wrapper
 		ibcKeeper.ChannelKeeper,
-		ibcKeeper.PortKeeper,
-		scopedWasmKeeper,
-		wasmtesting.MockIBCTransferKeeper{},
+		transferKeeper,
 		msgRouter,
 		querier,
 		tempDir,
 		wasmConfig,
+		vmConfig,
 		availableCapabilities,
-		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
+		authority,
 		opts...,
 	)
-	require.NoError(t, keeper.SetParams(ctx, types.DefaultParams()))
+	require.NoError(t, keeper.SetParams(ctx, wasmtypes.DefaultParams()))
 
 	// add wasm handler so we can loop-back (contracts calling contracts)
 	contractKeeper := wasmKeeper.NewDefaultPermissionKeeper(&keeper)
@@ -499,8 +512,8 @@ func createTestInput(
 		gov.NewAppModule(appCodec, govKeeper, accountKeeper, bankKeeper, subspace(govtypes.ModuleName)),
 	)
 	am.RegisterServices(module.NewConfigurator(appCodec, msgRouter, querier)) //nolint:errcheck
-	types.RegisterMsgServer(msgRouter, wasmKeeper.NewMsgServerImpl(&keeper))
-	types.RegisterQueryServer(querier, wasmKeeper.NewGrpcQuerier(appCodec, runtime.NewKVStoreService(keys[types.ModuleName]), keeper, keeper.QueryGasLimit()))
+	wasmtypes.RegisterMsgServer(msgRouter, wasmKeeper.NewMsgServerImpl(&keeper))
+	wasmtypes.RegisterQueryServer(querier, wasmKeeper.NewGrpcQuerier(appCodec, runtime.NewKVStoreService(keys[wasmtypes.ModuleName]), keeper, keeper.QueryGasLimit()))
 
 	keepers := wasmKeeper.TestKeepers{
 		AccountKeeper:    accountKeeper,
@@ -515,8 +528,7 @@ func createTestInput(
 		EncodingConfig:   encodingConfig,
 		Faucet:           faucet,
 		MultiStore:       ms,
-		ScopedWasmKeeper: scopedWasmKeeper,
-		WasmStoreKey:     keys[types.StoreKey],
+		WasmStoreKey:     keys[wasmtypes.StoreKey],
 	}
 	return ctx, keepers
 }

@@ -41,7 +41,7 @@ func (suite *KeeperIntegrationSuite) SetupSuite() {
 		suite.app.Logger(),
 		suite.authority.String(),
 		suite.app.BankKeeper,
-		suite.app.AccountKeeper,
+		suite.app.AuthKeeper,
 	)
 }
 
@@ -75,7 +75,7 @@ func (suite *KeeperIntegrationSuite) TestLoggerIntegration() {
 				tc.logger,
 				suite.authority.String(),
 				suite.app.BankKeeper,
-				suite.app.AccountKeeper,
+				suite.app.AuthKeeper,
 			)
 
 			logger := suite.keeper.Logger()

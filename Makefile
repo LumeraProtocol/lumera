@@ -1,4 +1,4 @@
-.PHONY: all up up-detach down
+.PHONY: all up up-detach down buf-proto gen-proto unit-tests integration-tests system-tests simulation-tests all-tests
 
 ### Devnet
 # To use external genesis - provide path to it via EXTERNAL_GENESIS_FILE
@@ -141,6 +141,9 @@ gen-proto:
 	ignite generate proto-go --yes
 	ignite generate openapi --yes
 
+buf-proto:
+	buf generate --template proto/buf.gen.gogo.yaml --debug --verbose
+
 ### Testing
 unit-tests:
 	@echo "Running unit tests in x/..."
@@ -157,3 +160,9 @@ system-tests:
 simulation-tests:
 	@echo "Running simulation tests..."
 	ignite chain simulate
+
+clean-proto:
+	@echo "Cleaning up protobuf generated files..."
+	find x/ -type f \( -name "*.pb.go" -o -name "*.pb.gw.go" -o -name "*.pulsar.go" \) -print -exec rm -f {} +
+
+all-tests: unit-tests integration-tests system-tests simulation-tests

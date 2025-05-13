@@ -1,6 +1,8 @@
 syntax = "proto3";
 package lumera.claim.module;
 
+option go_package = "x/claim/module;claim";
+
 import "cosmos/app/v1alpha1/module.proto";
 
 // Module is the config object for the module.

@@ -3,6 +3,10 @@ package app
 import (
 	"time"
 
+	"github.com/cosmos/cosmos-sdk/runtime"
+	"cosmossdk.io/depinject/appconfig"
+	"google.golang.org/protobuf/types/known/durationpb"
+
 	runtimev1alpha1 "cosmossdk.io/api/cosmos/app/runtime/v1alpha1"
 	appv1alpha1 "cosmossdk.io/api/cosmos/app/v1alpha1"
 	authmodulev1 "cosmossdk.io/api/cosmos/auth/module/v1"
@@ -25,46 +29,55 @@ import (
 	txconfigv1 "cosmossdk.io/api/cosmos/tx/config/v1"
 	upgrademodulev1 "cosmossdk.io/api/cosmos/upgrade/module/v1"
 	vestingmodulev1 "cosmossdk.io/api/cosmos/vesting/module/v1"
-	"cosmossdk.io/core/appconfig"
+	_ "cosmossdk.io/x/circuit" // import for side-effects
 	circuittypes "cosmossdk.io/x/circuit/types"
+	_ "cosmossdk.io/x/evidence" // import for side-effects
 	evidencetypes "cosmossdk.io/x/evidence/types"
 	"cosmossdk.io/x/feegrant"
+	_ "cosmossdk.io/x/feegrant/module" // import for side-effects
 	"cosmossdk.io/x/nft"
+	_ "cosmossdk.io/x/nft/module" // import for side-effects
+	_ "cosmossdk.io/x/upgrade"    // import for side-effects
 	upgradetypes "cosmossdk.io/x/upgrade/types"
-	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
-	actionmodulev1 "github.com/LumeraProtocol/lumera/api/lumera/action/module"
-	claimmodulev1 "github.com/LumeraProtocol/lumera/api/lumera/claim/module"
-	lumeraidmodulev1 "github.com/LumeraProtocol/lumera/api/lumera/lumeraid/module"
-	supernodemodulev1 "github.com/LumeraProtocol/lumera/api/lumera/supernode/module"
-	_ "github.com/LumeraProtocol/lumera/x/action/module" // import for side-effects
-	actionmoduletypes "github.com/LumeraProtocol/lumera/x/action/types"
-	_ "github.com/LumeraProtocol/lumera/x/claim/module" // import for side-effects
+	actionmodulev1 "github.com/LumeraProtocol/lumera/x/action/v1/module"
+	actionmoduletypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	claimmodulev1 "github.com/LumeraProtocol/lumera/x/claim/module"
 	claimmoduletypes "github.com/LumeraProtocol/lumera/x/claim/types"
-	_ "github.com/LumeraProtocol/lumera/x/lumeraid/module" // import for side-effects
+	lumeraidmodulev1 "github.com/LumeraProtocol/lumera/x/lumeraid/module"
 	lumeraidmoduletypes "github.com/LumeraProtocol/lumera/x/lumeraid/types"
-	_ "github.com/LumeraProtocol/lumera/x/supernode/module" // import for side-effects
-	supernodemoduletypes "github.com/LumeraProtocol/lumera/x/supernode/types"
-	"github.com/cosmos/cosmos-sdk/runtime"
+	supernodemodulev1 "github.com/LumeraProtocol/lumera/x/supernode/v1/module"
+	supernodemoduletypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+	_ "github.com/cosmos/cosmos-sdk/x/auth/tx/config" // import for side-effects
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	_ "github.com/cosmos/cosmos-sdk/x/auth/vesting" // import for side-effects
 	vestingtypes "github.com/cosmos/cosmos-sdk/x/auth/vesting/types"
+	_ "github.com/cosmos/cosmos-sdk/x/authz/module" // import for side-effects
 	"github.com/cosmos/cosmos-sdk/x/authz"
+	_ "github.com/cosmos/cosmos-sdk/x/bank"         // import for side-effects
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	_ "github.com/cosmos/cosmos-sdk/x/consensus" // import for side-effects
 	consensustypes "github.com/cosmos/cosmos-sdk/x/consensus/types"
+	_ "github.com/cosmos/cosmos-sdk/x/crisis" // import for side-effects
 	crisistypes "github.com/cosmos/cosmos-sdk/x/crisis/types"
+	_ "github.com/cosmos/cosmos-sdk/x/distribution" // import for side-effects
 	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
+	_ "github.com/cosmos/cosmos-sdk/x/gov" // import for side-effects
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
+	_ "github.com/cosmos/cosmos-sdk/x/group/module" // import for side-effects
 	"github.com/cosmos/cosmos-sdk/x/group"
+	_ "github.com/cosmos/cosmos-sdk/x/mint"         // import for side-effects
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
+	_ "github.com/cosmos/cosmos-sdk/x/params" // import for side-effects
 	paramstypes "github.com/cosmos/cosmos-sdk/x/params/types"
+	_ "github.com/cosmos/cosmos-sdk/x/slashing" // import for side-effects
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
+	_ "github.com/cosmos/cosmos-sdk/x/staking" // import for side-effects
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	capabilitytypes "github.com/cosmos/ibc-go/modules/capability/types"
-	icatypes "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/types"
-	ibcfeetypes "github.com/cosmos/ibc-go/v8/modules/apps/29-fee/types"
-	ibctransfertypes "github.com/cosmos/ibc-go/v8/modules/apps/transfer/types"
-	ibcexported "github.com/cosmos/ibc-go/v8/modules/core/exported"
-	"google.golang.org/protobuf/types/known/durationpb"
+	icatypes "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/types"
+	ibctransfertypes "github.com/cosmos/ibc-go/v10/modules/apps/transfer/types"
+	ibcexported "github.com/cosmos/ibc-go/v10/modules/core/exported"
+	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 	// this line is used by starport scaffolding # stargate/app/moduleImport
 )
 
@@ -76,8 +89,7 @@ var (
 	// so that other modules that want to create or claim capabilities afterwards in InitChain
 	// can do so safely.
 	genesisModuleOrder = []string{
-		// cosmos-sdk/ibc modules
-		capabilitytypes.ModuleName,
+		consensustypes.ModuleName,
 		authtypes.ModuleName,
 		banktypes.ModuleName,
 		distrtypes.ModuleName,
@@ -86,21 +98,20 @@ var (
 		govtypes.ModuleName,
 		minttypes.ModuleName,
 		crisistypes.ModuleName,
-		ibcexported.ModuleName,
 		genutiltypes.ModuleName,
 		evidencetypes.ModuleName,
 		authz.ModuleName,
-		ibctransfertypes.ModuleName,
-		icatypes.ModuleName,
-		ibcfeetypes.ModuleName,
 		feegrant.ModuleName,
 		paramstypes.ModuleName,
 		upgradetypes.ModuleName,
 		vestingtypes.ModuleName,
 		nft.ModuleName,
 		group.ModuleName,
-		consensustypes.ModuleName,
 		circuittypes.ModuleName,
+		// ibc modules
+		ibcexported.ModuleName,
+		ibctransfertypes.ModuleName,
+		icatypes.ModuleName,
 		// chain modules
 		lumeraidmoduletypes.ModuleName,
 		wasmtypes.ModuleName,
@@ -125,11 +136,7 @@ var (
 		authz.ModuleName,
 		genutiltypes.ModuleName,
 		// ibc modules
-		capabilitytypes.ModuleName,
 		ibcexported.ModuleName,
-		ibctransfertypes.ModuleName,
-		icatypes.ModuleName,
-		ibcfeetypes.ModuleName,
 		// chain modules
 		lumeraidmoduletypes.ModuleName,
 		wasmtypes.ModuleName,
@@ -149,10 +156,7 @@ var (
 		genutiltypes.ModuleName,
 		// ibc modules
 		ibcexported.ModuleName,
-		ibctransfertypes.ModuleName,
-		capabilitytypes.ModuleName,
 		icatypes.ModuleName,
-		ibcfeetypes.ModuleName,
 		// chain modules
 		lumeraidmoduletypes.ModuleName,
 		wasmtypes.ModuleName,
@@ -162,6 +166,7 @@ var (
 		// this line is used by starport scaffolding # stargate/app/endBlockers
 	}
 
+	// NOTE: upgrade module is required to be prioritized
 	preBlockers = []string{
 		upgradetypes.ModuleName,
 		// this line is used by starport scaffolding # stargate/app/preBlockers
@@ -177,7 +182,6 @@ var (
 		{Account: govtypes.ModuleName, Permissions: []string{authtypes.Burner}},
 		{Account: nft.ModuleName},
 		{Account: ibctransfertypes.ModuleName, Permissions: []string{authtypes.Minter, authtypes.Burner}},
-		{Account: ibcfeetypes.ModuleName},
 		{Account: icatypes.ModuleName},
 		{Account: lumeraidmoduletypes.ModuleName, Permissions: []string{authtypes.Minter, authtypes.Burner, authtypes.Staking}},
 		{Account: wasmtypes.ModuleName, Permissions: []string{authtypes.Burner}},
@@ -248,12 +252,12 @@ var (
 				}),
 			},
 			{
-				Name: stakingtypes.ModuleName,
+				Name:   stakingtypes.ModuleName,
 				Config: appconfig.WrapAny(&stakingmodulev1.Module{
 					// NOTE: specifying a prefix is only necessary when using bech32 addresses
 					// If not specfied, the auth Bech32Prefix appended with "valoper" and "valcons" is used by default
-					Bech32PrefixValidator: AccountAddressPrefix + "valoper",
-					Bech32PrefixConsensus: AccountAddressPrefix + "valcons",
+					Bech32PrefixValidator: ValidatorAddressPrefix,
+					Bech32PrefixConsensus: ConsNodeAddressPrefix,
 				}),
 			},
 			{

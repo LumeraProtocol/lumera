@@ -1,0 +1,22 @@
+syntax = "proto3";
+package lumera.action.v1;
+
+option go_package = "x/action/v1/types";
+
+import "gogoproto/gogo.proto";
+import "cosmos_proto/cosmos.proto";
+import "lumera/action/v1/action_state.proto";
+import "lumera/action/v1/action_type.proto";
+
+// Action represents a specific action within the Lumera protocol.
+message Action {
+  string creator = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  string actionID = 2;
+  ActionType actionType = 3;
+  bytes metadata = 4;
+  string price = 5 [(gogoproto.customtype) = "github.com/cosmos/cosmos-sdk/types.Coin"];
+  int64 expirationTime = 6;
+  ActionState state = 7;
+  int64 blockHeight = 8;
+  repeated string superNodes = 9 [(cosmos_proto.scalar) = "cosmos.ValidatorAddressString"];
+}

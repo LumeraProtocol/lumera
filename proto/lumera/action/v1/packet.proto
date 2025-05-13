@@ -1,0 +1,14 @@
+syntax = "proto3";
+package lumera.action.v1;
+
+option go_package = "x/action/v1/types";
+
+import "lumera/action/v1/action.proto";
+
+// ActionPacketData defines the Action data packet.
+message ActionPacketData {
+  // The action data.
+  oneof packet {
+    lumera.action.v1.Action action = 1;
+  }
+}

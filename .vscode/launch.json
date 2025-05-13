@@ -40,6 +40,15 @@
         "request": "launch",
         "mode": "auto",
         "program": "${fileDirname}"
+      },
+      {
+        "name": "Debug lumerad",
+        "type": "go",
+        "request": "launch",
+        "mode": "exec",
+        "program": "${workspaceFolder}/build/lumerad",
+        "args": ["start"],
+        "preLaunchTask": "Ignite Debug Build"
       }
     ]
   }

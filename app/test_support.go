@@ -6,12 +6,7 @@ import (
 	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
 	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
-	capabilitykeeper "github.com/cosmos/ibc-go/modules/capability/keeper"
 )
-
-func (app *App) GetScopedIBCKeeper() capabilitykeeper.ScopedKeeper {
-	return app.ScopedIBCKeeper
-}
 
 func (app *App) GetBaseApp() *baseapp.BaseApp {
 	return app.BaseApp
@@ -25,8 +20,8 @@ func (app *App) GetStakingKeeper() *stakingkeeper.Keeper {
 	return app.StakingKeeper
 }
 
-func (app *App) GetAccountKeeper() authkeeper.AccountKeeper {
-	return app.AccountKeeper
+func (app *App) GetAuthKeeper() authkeeper.AccountKeeper {
+	return app.AuthKeeper
 }
 
 func (app *App) GetWasmKeeper() wasmkeeper.Keeper {

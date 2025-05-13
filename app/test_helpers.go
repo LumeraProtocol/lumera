@@ -42,7 +42,6 @@ import (
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	capabilitykeeper "github.com/cosmos/ibc-go/modules/capability/keeper"
 	"github.com/stretchr/testify/require"
 )
 
@@ -55,12 +54,16 @@ func NewTestApp(
 	baseAppOptions ...func(*baseapp.BaseApp),
 ) (*App, error) {
 	var (
-		app        = &App{ScopedKeepers: make(map[string]capabilitykeeper.ScopedKeeper)}
+		app        = &App{}
 		appBuilder *runtime.AppBuilder
 
 		appConfig = depinject.Configs(
 			AppConfig(),
-			depinject.Supply(appOpts, logger, app.GetIBCKeeper, app.GetCapabilityScopedKeeper),
+			depinject.Supply(
+				appOpts,
+				logger,
+				app.GetIBCKeeper,
+			),
 		)
 	)
 
@@ -70,7 +73,7 @@ func NewTestApp(
 		&app.legacyAmino,
 		&app.txConfig,
 		&app.interfaceRegistry,
-		&app.AccountKeeper,
+		&app.AuthKeeper,
 		&app.BankKeeper,
 		&app.StakingKeeper,
 		&app.DistrKeeper,
@@ -178,7 +181,7 @@ func setup(t testing.TB, chainID string, withGenesis bool, invCheckPeriod uint, 
 	appOptions := make(simtestutil.AppOptionsMap, 0)
 	appOptions[flags.FlagHome] = nodeHome // ensure unique folder
 	appOptions[server.FlagInvCheckPeriod] = invCheckPeriod
-	app, err := New(log.NewNopLogger(), db, nil, true, appOptions, bam.SetChainID(chainID))
+	app := New(log.NewNopLogger(), db, nil, true, appOptions, bam.SetChainID(chainID))
 	if withGenesis {
 		return app, app.DefaultGenesis()
 	}
@@ -242,7 +245,7 @@ func Setup(t *testing.T, opts ...wasmkeeper.Option) *App {
 	acc := authtypes.NewBaseAccount(senderPrivKey.PubKey().Address().Bytes(), senderPrivKey.PubKey(), 0, 0)
 	balance := banktypes.Balance{
 		Address: acc.GetAddress().String(),
-		Coins:   sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.NewInt(100000000000000))),
+		Coins:   sdk.NewCoins(sdk.NewInt64Coin(sdk.DefaultBondDenom, 100_000_000_000_000)),
 	}
 	chainID := "testing"
 	app := SetupWithGenesisValSet(t, valSet, []authtypes.GenesisAccount{acc}, chainID, opts, balance)
@@ -344,7 +347,7 @@ func NewTestNetworkFixture() network.TestFixture {
 	defer os.RemoveAll(dir)
 
 	// Create initial app instance
-	app, err := New(
+	app := New(
 		log.NewNopLogger(),
 		dbm.NewMemDB(),
 		nil,
@@ -357,7 +360,7 @@ func NewTestNetworkFixture() network.TestFixture {
 
 	// App constructor function for validators
 	appCtr := func(val network.ValidatorI) servertypes.Application {
-		app, err := New(
+		app := New(
 			val.GetCtx().Logger,
 			dbm.NewMemDB(),
 			nil,

@@ -66,12 +66,15 @@ func SimulateMsgRegisterSupernode(
 		// Generate a random version
 		version := fmt.Sprintf("v%d.%d.%d", r.Intn(10), r.Intn(10), r.Intn(10))
 
+		p2pPort := fmt.Sprintf("%d", r.Intn(65535))
+
 		msg := &types2.MsgRegisterSupernode{
 			Creator:          simAccount.Address.String(),
 			ValidatorAddress: validatorAddress,
 			SupernodeAccount: simAccount.Address.String(),
 			IpAddress:        ipAddress,
 			Version:          version,
+			P2PPort:          p2pPort,
 		}
 
 		// Execute the message

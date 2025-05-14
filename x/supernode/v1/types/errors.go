@@ -20,4 +20,6 @@ var (
 	ErrEmptyDescription            = sdkerrors.Register(ModuleName, 1107, "evidence description cannot be empty")
 	ErrSupernodeAccountUnspecified = sdkerrors.Register(ModuleName, 1108, "supernode account unspecified")
 	ErrInvalidSupernodeAddress     = sdkerrors.Register(ModuleName, 1109, "invalid supernode address")
+
+	ErrEmptyP2PPort = sdkerrors.Register(ModuleName, 1110, "p2p port cannot be empty")
 )

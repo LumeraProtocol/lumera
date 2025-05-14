@@ -34,6 +34,7 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorBondedHook() {
 					Version:          "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					P2PPort:          "26657",
 				}
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
 
@@ -81,6 +82,7 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorBondedHook() {
 					Version:          "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					P2PPort:          "26657",
 				}
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
 
@@ -156,6 +158,7 @@ func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
 					Version:          "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					P2PPort:          "26657",
 				}
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
 
@@ -194,6 +197,7 @@ func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
 					Version:          "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					P2PPort:          "26657",
 				}
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
 
@@ -242,6 +246,7 @@ func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
 					Version:          "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					P2PPort:          "26657",
 				}
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
 
@@ -310,6 +315,7 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorRemovedHook() {
 					Version:          "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					P2PPort:          "26657",
 				}
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
 			},
@@ -363,6 +369,7 @@ func (suite *KeeperIntegrationSuite) TestBeforeDelegationSharesModifiedHook() {
 					Version:          "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					P2PPort:          "26657",
 				}
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
 				params := types2.Params{

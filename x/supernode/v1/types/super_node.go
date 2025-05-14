@@ -4,6 +4,10 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
+const (
+	DefaultP2PPort = "16656"
+)
+
 // ValidatorAddr converts the validator address string to sdk.ValAddress
 func (s *SuperNode) ValidatorAddr() (sdk.ValAddress, error) {
 	return sdk.ValAddressFromBech32(s.ValidatorAddress)
@@ -43,6 +47,10 @@ func (s *SuperNode) Validate() error {
 	// Check if IP address is not empty
 	if len(s.PrevIpAddresses) == 0 || s.PrevIpAddresses[0].Address == "" {
 		return ErrEmptyIPAddress
+	}
+
+	if s.P2PPort == "" {
+		s.P2PPort = DefaultP2PPort
 	}
 
 	// Note: timestamps are validated by protobuf (non-nullable)

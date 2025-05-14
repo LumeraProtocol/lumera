@@ -33,6 +33,7 @@ func TestKeeper_GetSuperNodeBySuperNodeAddress(t *testing.T) {
 				Height: 1,
 			},
 		},
+		P2PPort: "26657",
 	}
 
 	testCases := []struct {

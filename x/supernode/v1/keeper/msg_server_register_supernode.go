@@ -68,6 +68,7 @@ func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types2.MsgRegis
 				Height:  ctx.BlockHeight(),
 			},
 		},
+		P2PPort: msg.P2PPort,
 	}
 
 	// Validate the SuperNode struct

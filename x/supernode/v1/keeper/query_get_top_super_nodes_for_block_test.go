@@ -216,6 +216,7 @@ func TestKeeper_GetTopSuperNodesForBlock(t *testing.T) {
 							Height:  1,
 						},
 					},
+					P2PPort: "26657",
 				}
 
 				sn2 := types2.SuperNode{
@@ -231,6 +232,7 @@ func TestKeeper_GetTopSuperNodesForBlock(t *testing.T) {
 							Height:  1,
 						},
 					},
+					P2PPort: "26657",
 				}
 
 				sn3 := types2.SuperNode{
@@ -247,6 +249,7 @@ func TestKeeper_GetTopSuperNodesForBlock(t *testing.T) {
 							Height:  1,
 						},
 					},
+					P2PPort: "26657",
 				}
 				storeSuperNodes([]types2.SuperNode{sn1, sn2, sn3})
 			},
@@ -282,6 +285,7 @@ func TestKeeper_GetTopSuperNodesForBlock(t *testing.T) {
 							Height:  1,
 						},
 					},
+					P2PPort: "26657",
 				}
 				storeSuperNodes([]types2.SuperNode{sn1})
 			},

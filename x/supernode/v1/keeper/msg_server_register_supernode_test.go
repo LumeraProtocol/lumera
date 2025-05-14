@@ -54,6 +54,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "192.168.1.1",
 				Version:          "1.0.0",
+				P2PPort:          "26657",
 			},
 			mockSetup: func(sk *supernodemocks.MockStakingKeeper, slk *supernodemocks.MockSlashingKeeper, bk *supernodemocks.MockBankKeeper) {
 				// Return a bonded validator => no min-stake check needed
@@ -210,6 +211,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "192.168.1.1",
 				Version:          "1.0.0",
+				P2PPort:          "26657",
 			},
 			mockSetup: func(sk *supernodemocks.MockStakingKeeper, slk *supernodemocks.MockSlashingKeeper, bk *supernodemocks.MockBankKeeper) {
 				sk.EXPECT().

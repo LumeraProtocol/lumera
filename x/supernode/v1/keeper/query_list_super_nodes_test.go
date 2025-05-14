@@ -34,6 +34,7 @@ func TestKeeper_ListSuperNodes(t *testing.T) {
 				Height: 1,
 			},
 		},
+		P2PPort: "26657",
 	}
 	sn2 := types2.SuperNode{
 		ValidatorAddress: sdk.ValAddress([]byte("val2")).String(),
@@ -51,6 +52,7 @@ func TestKeeper_ListSuperNodes(t *testing.T) {
 				Height: 1,
 			},
 		},
+		P2PPort: "26657",
 	}
 
 	testCases := []struct {

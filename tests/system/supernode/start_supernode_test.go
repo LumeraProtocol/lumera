@@ -59,6 +59,7 @@ func TestStartSupernode(t *testing.T) {
 							Height:  suite.sdkCtx.BlockHeight(),
 						},
 					},
+					P2PPort: "26657",
 				}
 				err := suite.app.SupernodeKeeper.SetSuperNode(suite.sdkCtx, disabledSN)
 				require.NoError(t, err)
@@ -124,6 +125,7 @@ func TestStartSupernode(t *testing.T) {
 							Height:  suite.sdkCtx.BlockHeight(),
 						},
 					},
+					P2PPort: "26657",
 				}
 				err := suite.app.SupernodeKeeper.SetSuperNode(suite.sdkCtx, disabledSN)
 				require.NoError(t, err)
@@ -155,6 +157,7 @@ func TestStartSupernode(t *testing.T) {
 							Height:  suite.sdkCtx.BlockHeight(),
 						},
 					},
+					P2PPort: "26657",
 				}
 				err := suite.app.SupernodeKeeper.SetSuperNode(suite.sdkCtx, activeSN)
 				require.NoError(t, err)

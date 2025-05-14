@@ -1030,6 +1030,8 @@ func registerSupernode(r *rand.Rand, ctx sdk.Context, k keeper2.Keeper, accs []s
 	// Generate a random version
 	version := fmt.Sprintf("v%d.%d.%d", r.Intn(10), r.Intn(10), r.Intn(10))
 
+	p2pPort := fmt.Sprintf("%d", r.Intn(65535))
+
 	supernode := types.SuperNode{
 		ValidatorAddress: validatorAddress,
 		SupernodeAccount: simAccount.Address.String(),
@@ -1051,6 +1053,7 @@ func registerSupernode(r *rand.Rand, ctx sdk.Context, k keeper2.Keeper, accs []s
 				Height:  ctx.BlockHeight(),
 			},
 		},
+		P2PPort: p2pPort,
 	}
 
 	sk := k.GetSupernodeKeeper()

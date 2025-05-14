@@ -35,6 +35,7 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 				Height: 1,
 			},
 		},
+		P2PPort: "26657",
 	}
 
 	testCases := []struct {
@@ -88,6 +89,7 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 							Height: 1,
 						},
 					},
+					P2PPort: "26657",
 				}
 				require.NoError(t, k.SetSuperNode(ctx, newSupernode))
 			},
@@ -127,6 +129,7 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 							Height: 1,
 						},
 					},
+					P2PPort: "26657",
 				}
 				require.NoError(t, k.SetSuperNode(ctx, newSupernode))
 			},

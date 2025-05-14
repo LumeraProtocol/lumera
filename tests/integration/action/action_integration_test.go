@@ -3,15 +3,15 @@ package action_test
 import (
 	"encoding/base64"
 	"fmt"
-	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
-	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"strings"
 	"testing"
 	"time"
 
 	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
 	lumeraapp "github.com/LumeraProtocol/lumera/app"
+	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
+	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
@@ -69,6 +69,7 @@ func (suite *ActionIntegrationTestSuite) SetupTest() {
 		Version:          "1.0.0",
 		States:           []*types.SuperNodeStateRecord{{State: types.SuperNodeStateActive}},
 		PrevIpAddresses:  []*types.IPAddressHistory{{Address: "192.168.1.1"}},
+		P2PPort:          "2134",
 	}
 	require.NoError(suite.T(), app.SupernodeKeeper.SetSuperNode(suite.ctx, sn))
 

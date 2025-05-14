@@ -28,6 +28,7 @@ func TestMsgServer_StopSupernode(t *testing.T) {
 				Address: "192.145.1.1",
 			},
 		},
+		P2PPort: "26657",
 	}
 
 	testCases := []struct {

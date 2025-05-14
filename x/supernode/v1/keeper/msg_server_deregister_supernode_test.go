@@ -109,6 +109,7 @@ func TestMsgServer_DeRegisterSupernode(t *testing.T) {
 							Height:  1,
 						},
 					},
+					P2PPort: "26657",
 				})
 			}
 

@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	DefaultP2PPort = "16656"
+	DefaultP2PPort = "4445"
 )
 
 // ValidatorAddr converts the validator address string to sdk.ValAddress

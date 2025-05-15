@@ -42,7 +42,7 @@ genesis:
         base_action_fee:
           amount: "10000"
           denom: ulume
-        fee_per_byte:
+        fee_per_kbyte:
           amount: "100"
           denom: ulume
         super_node_fee_share: '1.000000000000000000'

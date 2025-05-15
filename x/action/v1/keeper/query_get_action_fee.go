@@ -24,8 +24,8 @@ func (k *Keeper) GetActionFee(goCtx context.Context, req *types.QueryGetActionFe
 
 	params := k.GetParams(ctx)
 
-	// Calculate: FeePerByte * DataSize + BaseActionFee
-	perByteCost := params.FeePerByte.Amount.MulRaw(dataSize)
+	// Calculate: FeePerKbyte * DataSize + BaseActionFee
+	perByteCost := params.FeePerKbyte.Amount.MulRaw(dataSize)
 	totalAmount := perByteCost.Add(params.BaseActionFee.Amount)
 
 	return &types.QueryGetActionFeeResponse{Amount: totalAmount.String()}, nil

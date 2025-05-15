@@ -14,7 +14,7 @@ var _ paramtypes.ParamSet = (*Params)(nil)
 // Parameter keys
 var (
 	KeyBaseActionFee        = []byte("BaseActionFee")
-	KeyFeePerByte           = []byte("FeePerByte")
+	KeyFeePerKbyte          = []byte("FeePerKbyte")
 	KeyMaxActionsPerBlock   = []byte("MaxActionsPerBlock")
 	KeyMinSuperNodes        = []byte("MinSuperNodes")
 	KeyMaxDdAndFingerprints = []byte("MaxDdAndFingerprints")
@@ -29,7 +29,7 @@ var (
 // Default parameter values
 var (
 	DefaultBaseActionFee        = sdk.NewCoin("ulume", math.NewInt(10000)) // 0.01 LUME
-	DefaultFeePerByte           = sdk.NewCoin("ulume", math.NewInt(100))   // 0.0001 LUME per byte
+	DefaultFeePerKbyte          = sdk.NewCoin("ulume", math.NewInt(10))    // 0.00001 LUME per kbyte
 	DefaultMaxActionsPerBlock   = uint64(10)                               // 100 actions per block
 	DefaultMinSuperNodes        = uint64(3)                                // Minimum 3 super nodes
 	DefaultMaxDdAndFingerprints = uint64(50)                               // Maximum 1000 DDs and fingerprints
@@ -49,7 +49,7 @@ func ParamKeyTable() paramtypes.KeyTable {
 // NewParams creates a new Params instance
 func NewParams(
 	baseActionFee sdk.Coin,
-	feePerByte sdk.Coin,
+	feePerKbyte sdk.Coin,
 	maxActionsPerBlock uint64,
 	minSuperNodes uint64,
 	maxDdAndFingerprints uint64,
@@ -62,7 +62,7 @@ func NewParams(
 ) Params {
 	return Params{
 		BaseActionFee:        baseActionFee,
-		FeePerByte:           feePerByte,
+		FeePerKbyte:          feePerKbyte,
 		MaxActionsPerBlock:   maxActionsPerBlock,
 		MinSuperNodes:        minSuperNodes,
 		MaxDdAndFingerprints: maxDdAndFingerprints,
@@ -79,7 +79,7 @@ func NewParams(
 func DefaultParams() Params {
 	return NewParams(
 		DefaultBaseActionFee,
-		DefaultFeePerByte,
+		DefaultFeePerKbyte,
 		DefaultMaxActionsPerBlock,
 		DefaultMinSuperNodes,
 		DefaultMaxDdAndFingerprints,
@@ -96,7 +96,7 @@ func DefaultParams() Params {
 func (p *Params) ParamSetPairs() paramtypes.ParamSetPairs {
 	return paramtypes.ParamSetPairs{
 		paramtypes.NewParamSetPair(KeyBaseActionFee, &p.BaseActionFee, validateCoin),
-		paramtypes.NewParamSetPair(KeyFeePerByte, &p.FeePerByte, validateCoin),
+		paramtypes.NewParamSetPair(KeyFeePerKbyte, &p.FeePerKbyte, validateCoin),
 		paramtypes.NewParamSetPair(KeyMaxActionsPerBlock, &p.MaxActionsPerBlock, validateUint64),
 		paramtypes.NewParamSetPair(KeyMinSuperNodes, &p.MinSuperNodes, validateUint64),
 		paramtypes.NewParamSetPair(KeyMaxDdAndFingerprints, &p.MaxDdAndFingerprints, validateUint64),
@@ -115,7 +115,7 @@ func (p Params) Validate() error {
 		return err
 	}
 
-	if err := validateCoin(p.FeePerByte); err != nil {
+	if err := validateCoin(p.FeePerKbyte); err != nil {
 		return err
 	}
 

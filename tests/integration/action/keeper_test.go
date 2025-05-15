@@ -707,7 +707,7 @@ func (suite *KeeperIntegrationTestSuite) TestGetActionFee() {
 
 	// Override with known values for testing
 	params.BaseActionFee = sdk.NewCoin("ulume", math.NewInt(10000))
-	params.FeePerByte = sdk.NewCoin("ulume", math.NewInt(100))
+	params.FeePerKbyte = sdk.NewCoin("ulume", math.NewInt(100))
 	suite.keeper.SetParams(suite.ctx, params)
 
 	testCases := []struct {

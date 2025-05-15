@@ -35,7 +35,7 @@ func registerSenseAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account,
 	senseMetadata := generateRequestActionSenseMetadata(dataHash)
 
 	// 3. Determine fee amount (within valid range)
-	feeAmount := generateRandomFee(r, ctx, params.BaseActionFee.Add(params.FeePerByte))
+	feeAmount := generateRandomFee(r, ctx, params.BaseActionFee.Add(params.FeePerKbyte))
 
 	// 4. Generate an expiration time (current time + random duration >= expiration_duration)
 	expirationTime := getRandomExpirationTime(ctx, r, params)
@@ -80,7 +80,7 @@ func registerCascadeAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Accoun
 	cascadeMetadata := generateRequestActionCascadeMetadata(dataHash, fileName, simAccount)
 
 	// 3. Determine fee amount (within valid range)
-	feeAmount := generateRandomFee(r, ctx, params.BaseActionFee.Add(params.FeePerByte))
+	feeAmount := generateRandomFee(r, ctx, params.BaseActionFee.Add(params.FeePerKbyte))
 
 	// 4. Generate an expiration time (current time + random duration)
 	expirationTime := getRandomExpirationTime(ctx, r, params)

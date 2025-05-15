@@ -45,7 +45,7 @@ func CreateUpgradeHandler(
 		// Set the Action module parameters
 		initialParams := types.Params{
 			BaseActionFee:        sdk.NewCoin("ulume", math.NewInt(10000)),
-			FeePerByte:           sdk.NewCoin("ulume", math.NewInt(100)),
+			FeePerKbyte:          sdk.NewCoin("ulume", math.NewInt(10)),
 			MaxActionsPerBlock:   10,
 			MinSuperNodes:        1,
 			MaxDdAndFingerprints: 50,

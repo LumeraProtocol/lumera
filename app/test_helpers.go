@@ -168,6 +168,13 @@ func SignAndDeliverWithoutCommit(t *testing.T, txCfg client.TxConfig, app *bam.B
 	})
 }
 
+func GetDefaultWasmOptions() []wasmkeeper.Option {
+	return []wasmkeeper.Option{
+		wasmkeeper.WithMessageHandlerDecorator(nil),
+		wasmkeeper.WithQueryPlugins(nil),
+	}
+}
+
 func setup(t testing.TB, chainID string, withGenesis bool, invCheckPeriod uint, opts ...wasmkeeper.Option) (*App, GenesisState) {
 	db := dbm.NewMemDB()
 	nodeHome := t.TempDir()
@@ -181,7 +188,8 @@ func setup(t testing.TB, chainID string, withGenesis bool, invCheckPeriod uint, 
 	appOptions := make(simtestutil.AppOptionsMap, 0)
 	appOptions[flags.FlagHome] = nodeHome // ensure unique folder
 	appOptions[server.FlagInvCheckPeriod] = invCheckPeriod
-	app := New(log.NewNopLogger(), db, nil, true, appOptions, bam.SetChainID(chainID))
+
+	app := New(log.NewNopLogger(), db, nil, true, appOptions, GetDefaultWasmOptions(), bam.SetChainID(chainID))
 	if withGenesis {
 		return app, app.DefaultGenesis()
 	}
@@ -353,6 +361,7 @@ func NewTestNetworkFixture() network.TestFixture {
 		nil,
 		true,
 		simtestutil.NewAppOptionsWithFlagHome(dir),
+		GetDefaultWasmOptions(),
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed creating app: %v", err))
@@ -366,6 +375,7 @@ func NewTestNetworkFixture() network.TestFixture {
 			nil,
 			true,
 			simtestutil.NewAppOptionsWithFlagHome(val.GetCtx().Config.RootDir),
+			GetDefaultWasmOptions(),
 			bam.SetPruning(pruningtypes.NewPruningOptionsFromString(val.GetAppConfig().Pruning)),
 			bam.SetMinGasPrices(val.GetAppConfig().MinGasPrices),
 			bam.SetChainID(val.GetCtx().Viper.GetString(flags.FlagChainID)),

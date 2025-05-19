@@ -34,10 +34,14 @@ import (
 	actionmodule "github.com/LumeraProtocol/lumera/x/action/v1/module"
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
+	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 )
 
 // registerIBCModules register IBC keepers and non dependency inject modules.
-func (app *App) registerIBCModules(appOpts servertypes.AppOptions) error {
+func (app *App) registerIBCModules(
+	appOpts servertypes.AppOptions,
+	wasmOpts ...wasmkeeper.Option,
+) error {
 	// set up non depinject support modules store keys
 	if err := app.RegisterStores(
 		storetypes.NewKVStoreKey(ibcexported.StoreKey),
@@ -122,14 +126,14 @@ func (app *App) registerIBCModules(appOpts servertypes.AppOptions) error {
 	ibcRouter.AddRoute(actiontypes.ModuleName, actionIBCModule)
 
 	// Wasm module
-	wasmStack, err := app.registerWasmModules(appOpts)
+	wasmStack, err := app.registerWasmModules(appOpts, wasmOpts...)
 	if err != nil {
 		return err
 	}
 	ibcRouter.AddRoute(wasmtypes.ModuleName, wasmStack)
-	// this line is used by starport scaffolding # ibc/app/module
 
 	app.IBCKeeper.SetRouter(ibcRouter)
+	app.ibcRouter = ibcRouter
 
 	clientKeeper := app.IBCKeeper.ClientKeeper
 	storeProvider := clientKeeper.GetStoreProvider()

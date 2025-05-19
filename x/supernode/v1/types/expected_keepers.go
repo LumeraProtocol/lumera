@@ -22,6 +22,7 @@ type SupernodeKeeper interface {
 	SetSuperNode(ctx sdk.Context, supernode SuperNode) error
 	EnableSuperNode(ctx sdk.Context, valAddr sdk.ValAddress) error
 	DisableSuperNode(ctx sdk.Context, valAddr sdk.ValAddress) error
+	SetParams(ctx sdk.Context, params Params) error
 
 	GetParams(ctx sdk.Context) (params Params)
 	GetAllSuperNodes(ctx sdk.Context, stateFilters ...SuperNodeState) ([]SuperNode, error)

@@ -73,6 +73,7 @@ import (
 	icahostkeeper "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/host/keeper"
 	ibctransferkeeper "github.com/cosmos/ibc-go/v10/modules/apps/transfer/keeper"
 	ibckeeper "github.com/cosmos/ibc-go/v10/modules/core/keeper"
+	ibcporttypes "github.com/cosmos/ibc-go/v10/modules/core/05-port/types"
 	upgradetypes "cosmossdk.io/x/upgrade/types"
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 
@@ -113,6 +114,7 @@ type App struct {
 	appCodec          codec.Codec
 	txConfig          client.TxConfig
 	interfaceRegistry codectypes.InterfaceRegistry
+	ibcRouter	   	  *ibcporttypes.Router
 
 	// keepers
 	// only keepers required by the app are exposed
@@ -142,7 +144,7 @@ type App struct {
 	TransferKeeper        ibctransferkeeper.Keeper
 
 	// CosmWasm
-	WasmKeeper            wasmkeeper.Keeper
+	WasmKeeper            *wasmkeeper.Keeper
 
 	LumeraidKeeper        lumeraidmodulekeeper.Keeper
 	ClaimKeeper           claimmodulekeeper.Keeper
@@ -200,6 +202,7 @@ func New(
 	traceStore io.Writer,
 	loadLatest bool,
 	appOpts servertypes.AppOptions,
+	wasmOpts []wasmkeeper.Option,
 	baseAppOptions ...func(*baseapp.BaseApp),
 ) *App {
 	var (
@@ -263,7 +266,7 @@ func New(
 	app.App = appBuilder.Build(db, traceStore, baseAppOptions...)
 
 	// register legacy modules
-	if err := app.registerIBCModules(appOpts); err != nil {
+	if err := app.registerIBCModules(appOpts, wasmOpts...); err != nil {
 		panic(err)
 	}
 

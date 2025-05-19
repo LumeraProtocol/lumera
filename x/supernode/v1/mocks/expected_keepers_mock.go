@@ -199,6 +199,20 @@ func (mr *MockSupernodeKeeperMockRecorder) RankSuperNodesByDistance(blockHash, s
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RankSuperNodesByDistance", reflect.TypeOf((*MockSupernodeKeeper)(nil).RankSuperNodesByDistance), blockHash, supernodes, topN)
 }
 
+// SetParams mocks base method.
+func (m *MockSupernodeKeeper) SetParams(ctx types0.Context, params types.Params) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetParams", ctx, params)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetParams indicates an expected call of SetParams.
+func (mr *MockSupernodeKeeperMockRecorder) SetParams(ctx, params interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetParams", reflect.TypeOf((*MockSupernodeKeeper)(nil).SetParams), ctx, params)
+}
+
 // SetSuperNode mocks base method.
 func (m *MockSupernodeKeeper) SetSuperNode(ctx types0.Context, supernode types.SuperNode) error {
 	m.ctrl.T.Helper()

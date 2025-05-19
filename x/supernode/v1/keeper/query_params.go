@@ -2,7 +2,6 @@ package keeper
 
 import (
 	"context"
-	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"google.golang.org/grpc/codes"

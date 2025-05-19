@@ -2,7 +2,6 @@ package app
 
 import (
 	"fmt"
-	"os"
 
 	storetypes "cosmossdk.io/store/types"
 	"github.com/CosmWasm/wasmd/x/wasm"
@@ -21,6 +20,8 @@ import (
 	"github.com/cosmos/gogoproto/proto"
 	ibcporttypes "github.com/cosmos/ibc-go/v10/modules/core/05-port/types"
 )
+
+const WasmHomeDirOption = "wasm-homedir"
 
 func uint32Ptr(v uint32) *uint32 {
 	return &v
@@ -55,8 +56,9 @@ func (app *App) registerWasmModules(
 		},
 	}
 
-	if os.Getenv("SYSTEM_TESTS") == "true" {
-		DefaultNodeHome = setupEnv()
+	homeDir, ok := appOpts.Get(WasmHomeDirOption).(string)
+	if !ok || homeDir == "" {
+		homeDir = DefaultNodeHome
 	}
 
 	capabilities := append(wasmkeeper.BuiltInCapabilities(), app.Name())
@@ -64,7 +66,7 @@ func (app *App) registerWasmModules(
 
 	// The last arguments can contain custom message handlers, and custom query handlers,
 	// if we want to allow any custom callbacks
-	app.WasmKeeper = wasmkeeper.NewKeeper(
+	wasmKeeper := wasmkeeper.NewKeeper(
 		app.AppCodec(),
 		runtime.NewKVStoreService(app.GetKey(wasmtypes.StoreKey)),
 		app.AuthKeeper,
@@ -76,19 +78,20 @@ func (app *App) registerWasmModules(
 		app.TransferKeeper,
 		app.MsgServiceRouter(),
 		app.GRPCQueryRouter(),
-		DefaultNodeHome,
+		homeDir,
 		wasmNodeConfig,
 		vmConfig,
 		capabilities,
 		authority,
 		wasmOpts...,
 	)
+	app.WasmKeeper = &wasmKeeper
 
 	// register IBC modules
 	if err := app.RegisterModules(
 		wasm.NewAppModule(
 			app.AppCodec(),
-			&app.WasmKeeper,
+			app.WasmKeeper,
 			app.StakingKeeper,
 			app.AuthKeeper,
 			app.BankKeeper,
@@ -104,7 +107,7 @@ func (app *App) registerWasmModules(
 
 	if manager := app.SnapshotManager(); manager != nil {
 		err := manager.RegisterExtensions(
-			wasmkeeper.NewWasmSnapshotter(app.CommitMultiStore(), &app.WasmKeeper),
+			wasmkeeper.NewWasmSnapshotter(app.CommitMultiStore(), app.WasmKeeper),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to register snapshot extension: %s", err)
@@ -156,7 +159,7 @@ func (app *App) setAnteHandler(txConfig client.TxConfig, wasmConfig wasmtypes.No
 			},
 			IBCKeeper:             app.IBCKeeper,
 			WasmConfig:            &wasmConfig,
-			WasmKeeper:            &app.WasmKeeper,
+			WasmKeeper:            app.WasmKeeper,
 			TXCounterStoreService: runtime.NewKVStoreService(txCounterStoreKey),
 			CircuitKeeper:         &app.CircuitBreakerKeeper,
 		},
@@ -168,13 +171,4 @@ func (app *App) setAnteHandler(txConfig client.TxConfig, wasmConfig wasmtypes.No
 	// Set the AnteHandler for the app
 	app.SetAnteHandler(anteHandler)
 	return nil
-}
-
-func setupEnv() string {
-	tempDir, err := os.MkdirTemp("", "test-env-*")
-	if err != nil {
-		return ""
-	}
-	os.RemoveAll(tempDir)
-	return tempDir
 }

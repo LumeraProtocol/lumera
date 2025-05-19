@@ -229,7 +229,7 @@ func TestClaimProcess(t *testing.T) {
 			msgServer := keeper.NewMsgServerImpl(suite.app.ClaimKeeper)
 
 			// Record initial balances for validation
-			moduleAddr := suite.app.AccountKeeper.GetModuleAddress(types.ModuleName)
+			moduleAddr := suite.app.AuthKeeper.GetModuleAddress(types.ModuleName)
 			initialModuleBalance := suite.app.BankKeeper.GetAllBalances(suite.sdkCtx, moduleAddr)
 
 			// Get destination address and its initial balance
@@ -258,7 +258,7 @@ func TestClaimProcess(t *testing.T) {
 				require.NotZero(t, record.ClaimTime)
 
 				// Verify destination account exists (should be created if it didn't exist)
-				acc := suite.app.AccountKeeper.GetAccount(suite.sdkCtx, destAddr)
+				acc := suite.app.AuthKeeper.GetAccount(suite.sdkCtx, destAddr)
 				require.NotNil(t, acc)
 
 				// Verify token balances after transfer

@@ -3,10 +3,12 @@
 package securekeyx
 
 import (
+	"context"
 	"crypto/ecdh"
 	"crypto/rand"
 	"fmt"
 	"sync"
+	"time"
 
 	sdkcodec "github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
@@ -15,14 +17,19 @@ import (
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	signingtypes "github.com/cosmos/cosmos-sdk/types/tx/signing"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	proto "github.com/cosmos/gogoproto/proto"
 
 	lumeraidtypes "github.com/LumeraProtocol/lumera/x/lumeraid/types"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 type PeerType int
 
 const (
+	accountValidationTimeout = 5 * time.Second
+
+	// PeerType represents the type of peer in the network.
 	Simplenode PeerType = iota
 	Supernode
 )
@@ -39,11 +46,19 @@ type KeyExchanger interface {
 	LocalAddress() string
 }
 
+type KeyExchangerValidator interface {
+	// AccountInfoByAddress gets the account info by address
+	AccountInfoByAddress(ctx context.Context, addr string) (*authtypes.QueryAccountInfoResponse, error)
+	// GetSupernodeBySupernodeAddress gets the supernode info by supernode address
+	GetSupernodeBySupernodeAddress(ctx context.Context, address string) (*sntypes.SuperNode, error)
+}
+
 type SecureKeyExchange struct {
-	keyring    keyring.Keyring // keyring to access Cosmos accounts
-	accAddress sdk.AccAddress  // local Cosmos address
-	peerType   PeerType        // local peer type (Simplenode or Supernode)
-	curve      ecdh.Curve      // curve used for ECDH key exchange
+	keyring    keyring.Keyring       // keyring to access Cosmos accounts
+	accAddress sdk.AccAddress        // local Cosmos address
+	peerType   PeerType              // local peer type (Simplenode or Supernode)
+	curve      ecdh.Curve            // curve used for ECDH key exchange
+	validator  KeyExchangerValidator // validator to check if the account is a valid
 
 	mutex         sync.Mutex                  // mutex to protect ephemeralKeys
 	ephemeralKeys map[string]*ecdh.PrivateKey // map of [remote_address -> ephemeral private keys]
@@ -63,7 +78,7 @@ Performance and Security Comparison of the curves supported in ECDH Go package
 */
 
 // Helper to get curve name
-func (s *SecureKeyExchange) getCurveName() string {
+func (s *SecureKeyExchange) GetCurveName() string {
 	switch s.curve {
 	case ecdh.P256():
 		return "P256"
@@ -76,10 +91,47 @@ func (s *SecureKeyExchange) getCurveName() string {
 	}
 }
 
-// Helper to validate if address is a validator address of a supernode
-func validateSupernode(address string, isLocal bool) (bool, error) {
-	// to do: implement this
-	return true, nil
+// validateSupernode checks if the given account belongs to a valid supernode.
+func (s *SecureKeyExchange) validateSupernode(accAddress sdk.AccAddress) error {
+	// Create context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), accountValidationTimeout)
+	defer cancel()
+
+	supernode, err := s.validator.GetSupernodeBySupernodeAddress(ctx, accAddress.String())
+	if err != nil || supernode == nil {
+		return fmt.Errorf("supernode peer cannot be verified: %w", err)
+	}
+
+	// GetSupernodeAccount returns string
+	// Check if the account address matches the expected address
+	if !accAddress.Equals(sdk.AccAddress(supernode.GetSupernodeAccount())) {
+		return fmt.Errorf("supernode account address mismatch: expected %s, got %s", accAddress.String(),
+			supernode.GetSupernodeAccount())
+	}
+
+	return nil
+}
+
+// checkAcountExistsGRPC checks if the given account exists in the local chain's auth keeper using gRPC.
+func (s *SecureKeyExchange) checkAccountExists(accAddress sdk.AccAddress) error {
+	// Create context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), accountValidationTimeout)
+	defer cancel()
+
+	resp, err := s.validator.AccountInfoByAddress(ctx, accAddress.String())
+	if err != nil {
+		return fmt.Errorf("account cannot be verified: %w", err)
+	}
+	if resp == nil || resp.Info == nil || resp.Info.GetAddress() == nil {
+		return fmt.Errorf("account info is nil")
+	}
+
+	// Check if the account address matches the expected address
+	if !accAddress.Equals(resp.Info.GetAddress()) {
+		return fmt.Errorf("account address mismatch: expected %s, got %s", accAddress.String(),
+			resp.Info.GetAddress().String())
+	}
+	return nil
 }
 
 // NewSecureKeyExchange creates a new instance of SecureCommManager.
@@ -93,38 +145,47 @@ func validateSupernode(address string, isLocal bool) (bool, error) {
 // Returns:
 //   - SecureKeyExchange: the instance of SecureKeyExchange
 //   - error: if any error occurs
-func NewSecureKeyExchange(kr keyring.Keyring, localAddress string, localPeerType PeerType, curve ecdh.Curve) (*SecureKeyExchange, error) {
+func NewSecureKeyExchange(
+	kr keyring.Keyring,
+	localAddress string,
+	localPeerType PeerType,
+	curve ecdh.Curve,
+	validator KeyExchangerValidator,
+) (*SecureKeyExchange, error) {
 	accAddress, err := sdk.AccAddressFromBech32(localAddress)
 	if err != nil {
 		return nil, fmt.Errorf("invalid address: %w", err)
 	}
-
 	if _, err := kr.KeyByAddress(accAddress); err != nil {
 		return nil, fmt.Errorf("address not found in keyring: %w", err)
 	}
 	if curve == nil {
 		curve = ecdh.P256()
 	}
-	// check if valid supernode
-	if localPeerType == Supernode {
-		isValidSupernode, err := validateSupernode(localAddress, true)
-		if err != nil || !isValidSupernode {
-			return nil, fmt.Errorf("address does not belong to a valid supernode: %w", err)
-		}
+	if validator == nil {
+		return nil, fmt.Errorf("KeyExchanger validator is required")
 	}
 
 	interfaceRegistry := codectypes.NewInterfaceRegistry()
 	cryptocodec.RegisterInterfaces(interfaceRegistry)
 	protoCodec := sdkcodec.NewProtoCodec(interfaceRegistry)
 
-	return &SecureKeyExchange{
+	ske := &SecureKeyExchange{
 		keyring:       kr,
 		accAddress:    accAddress,
 		peerType:      localPeerType,
 		curve:         curve,
 		ephemeralKeys: make(map[string]*ecdh.PrivateKey),
 		codec:         protoCodec,
-	}, nil
+		validator:     validator,
+	}
+
+	// validate local peer
+	if err := ske.checkAccount(accAddress, localPeerType); err != nil {
+		return nil, fmt.Errorf("invalid local peer: %w", err)
+	}
+
+	return ske, nil
 }
 
 // Helper to sign data with keyring.
@@ -135,6 +196,15 @@ func (s *SecureKeyExchange) signWithKeyring(data []byte) ([]byte, error) {
 	}
 
 	return signature, nil
+}
+
+func (s *SecureKeyExchange) checkAccount(accAddress sdk.AccAddress, peerType PeerType) error {
+	if peerType == Supernode {
+		return s.validateSupernode(accAddress)
+	} else if peerType == Simplenode {
+		return s.checkAccountExists(accAddress)
+	}
+	return fmt.Errorf("invalid peer type: %d", peerType)
 }
 
 // Helper to validate signature received from remote peer.
@@ -226,7 +296,7 @@ func (s *SecureKeyExchange) CreateRequest(remoteAddress string) ([]byte, []byte,
 		PeerType:         int32(s.peerType),
 		PublicKey:        privKey.PublicKey().Bytes(),
 		AccountPublicKey: accountPubKeyBytes,
-		Curve:            s.getCurveName(),
+		Curve:            s.GetCurveName(),
 	}
 
 	// Serialize HandshakeInfo
@@ -297,12 +367,18 @@ func (s *SecureKeyExchange) ComputeSharedSecret(handshakeBytes, signature []byte
 		return nil, fmt.Errorf("signature validation failed: %w", err)
 	}
 
-	// If supernode, validate it
-	if handshake.PeerType == int32(Supernode) {
-		isValidSupernode, err := validateSupernode(handshake.Address, false)
-		if err != nil || !isValidSupernode {
-			return nil, fmt.Errorf("address does not belong to a valid supernode: %w", err)
+	// Validate remote peer
+	switch remotePeerType := PeerType(handshake.PeerType); remotePeerType {
+	case Simplenode, Supernode:
+		remoteAccAddress, err := sdk.AccAddressFromBech32(handshake.Address)
+		if err != nil {
+			return nil, fmt.Errorf("invalid remote address: %w", err)
 		}
+		if err := s.checkAccount(remoteAccAddress, remotePeerType); err != nil {
+			return nil, fmt.Errorf("invalid remote peer: %w", err)
+		}
+	default:
+		return nil, fmt.Errorf("invalid remote peer type: %d", handshake.PeerType)
 	}
 
 	// Compute shared secret

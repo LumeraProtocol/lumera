@@ -17,6 +17,10 @@ type TestData struct {
 }
 
 func GenerateClaimingTestData() (TestData, error) {
+	return GenerateClaimingTestData2("")
+}
+
+func GenerateClaimingTestData2(existingNewAddr string) (TestData, error) {
 	// Generate a new key pair
 	privKeyObj, pubKeyObj := cryptoutils.GenerateKeyPair()
 
@@ -29,8 +33,11 @@ func GenerateClaimingTestData() (TestData, error) {
 		return TestData{}, fmt.Errorf("failed to generate old address: %w", err)
 	}
 
-	// Generate a new cosmos address
-	newAddr := sdk.AccAddress(privKeyObj.PubKey().Address()).String()
+	// If an existing new address is provided, use it; otherwise, generate a new one
+	newAddr := existingNewAddr
+	if newAddr == "" {
+		newAddr = sdk.AccAddress(privKeyObj.PubKey().Address()).String()
+	}
 
 	// Construct message for signature (without hashing)
 	message := oldAddr + "." + pubKey + "." + newAddr

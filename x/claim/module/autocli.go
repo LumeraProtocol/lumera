@@ -41,6 +41,12 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					Short:          "Send a claim tx",
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "oldAddress"}, {ProtoField: "newAddress"}, {ProtoField: "pubKey"}, {ProtoField: "signature"}},
 				},
+				{
+					RpcMethod:      "DelayedClaim",
+					Use:            "delayed-claim [old-address] [new-address] [pub-key] [signature] [tier]",
+					Short:          "Send a delayed-claim tx",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "oldAddress"}, {ProtoField: "newAddress"}, {ProtoField: "pubKey"}, {ProtoField: "signature"}, {ProtoField: "tier"}},
+				},
 				// this line is used by ignite scaffolding # autocli/tx
 			},
 		},

@@ -106,6 +106,7 @@ func (k msgServer) processClaim(goCtx context.Context,
 	// Mark the claim as processed
 	claimRecord.Claimed = true
 	claimRecord.ClaimTime = ctx.BlockTime().Unix()
+	claimRecord.DestAddress = msg.NewAddress
 	claimTimeString := strconv.FormatInt(claimRecord.ClaimTime, 10)
 	endTimeStr := strconv.FormatInt(endTime, 10)
 

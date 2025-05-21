@@ -21,18 +21,19 @@ func TestDelayedClaimsSystem(t *testing.T) {
 	testCases := []struct {
 		name            string
 		balanceToClaim  string
-		setupFn         func(t *testing.T) (claimtestutils.TestData, string)
+		setupFn         func(t *testing.T, cli *LumeradCli) (claimtestutils.TestData, string)
 		modifyGenesis   func(genesis []byte) []byte
 		expectSuccess   bool
 		expectedError   string
 		waitBeforeClaim bool
 		claimAttempts   int // number of times to attempt the claim in the same block
 		tier            string
+		from            string
 	}{
 		{
 			name:           "successful_claim",
 			balanceToClaim: "1000000",
-			setupFn: func(t *testing.T) (claimtestutils.TestData, string) {
+			setupFn: func(t *testing.T, cli *LumeradCli) (claimtestutils.TestData, string) {
 				testData, err := claimtestutils.GenerateClaimingTestData()
 				require.NoError(t, err)
 				return testData, testData.OldAddress
@@ -46,12 +47,30 @@ func TestDelayedClaimsSystem(t *testing.T) {
 			waitBeforeClaim: false,
 			claimAttempts:   1,
 			tier:            "1",
+			from:            "node0",
+		},
+		{
+			name:           "successful_claim_from_same_address",
+			balanceToClaim: "1000000",
+			setupFn: func(t *testing.T, cli *LumeradCli) (claimtestutils.TestData, string) {
+				return claimtestutils.TestData{}, ""
+			},
+			modifyGenesis: func(genesis []byte) []byte {
+				state, err := sjson.SetRawBytes(genesis, "app_state.claim.total_claimable_amount", []byte("1000000"))
+				require.NoError(t, err)
+				return state
+			},
+			expectSuccess:   true,
+			waitBeforeClaim: false,
+			claimAttempts:   1,
+			tier:            "1",
+			from:            "test_1",
 		},
 		{
 			// we remove zero balances from csv file by default
 			name:           "claim_with_zero_balance",
 			balanceToClaim: "0",
-			setupFn: func(t *testing.T) (claimtestutils.TestData, string) {
+			setupFn: func(t *testing.T, cli *LumeradCli) (claimtestutils.TestData, string) {
 				testData, err := claimtestutils.GenerateClaimingTestData()
 				require.NoError(t, err)
 				return testData, testData.OldAddress
@@ -66,11 +85,12 @@ func TestDelayedClaimsSystem(t *testing.T) {
 			waitBeforeClaim: false,
 			claimAttempts:   1,
 			tier:            "1",
+			from:            "node0",
 		},
 		{
 			name:           "claims_disabled",
 			balanceToClaim: "500000",
-			setupFn: func(t *testing.T) (claimtestutils.TestData, string) {
+			setupFn: func(t *testing.T, cli *LumeradCli) (claimtestutils.TestData, string) {
 				testData, err := claimtestutils.GenerateClaimingTestData()
 				require.NoError(t, err)
 				return testData, testData.OldAddress
@@ -91,11 +111,12 @@ func TestDelayedClaimsSystem(t *testing.T) {
 			expectedError: "claim is disabled",
 			claimAttempts: 1,
 			tier:          "1",
+			from:          "node0",
 		},
 		{
 			name:           "claim_period_expired",
 			balanceToClaim: "500000",
-			setupFn: func(t *testing.T) (claimtestutils.TestData, string) {
+			setupFn: func(t *testing.T, cli *LumeradCli) (claimtestutils.TestData, string) {
 				testData, err := claimtestutils.GenerateClaimingTestData()
 				require.NoError(t, err)
 				return testData, testData.OldAddress
@@ -121,11 +142,12 @@ func TestDelayedClaimsSystem(t *testing.T) {
 			waitBeforeClaim: true,
 			claimAttempts:   1,
 			tier:            "1",
+			from:            "node0",
 		},
 		{
 			name:           "duplicate_claim",
 			balanceToClaim: "500000",
-			setupFn: func(t *testing.T) (claimtestutils.TestData, string) {
+			setupFn: func(t *testing.T, cli *LumeradCli) (claimtestutils.TestData, string) {
 				testData, err := claimtestutils.GenerateClaimingTestData()
 				require.NoError(t, err)
 				return testData, testData.OldAddress
@@ -158,6 +180,7 @@ func TestDelayedClaimsSystem(t *testing.T) {
 			waitBeforeClaim: false,
 			claimAttempts:   2, // Try to claim 2 times
 			tier:            "1",
+			from:            "node0",
 		},
 	}
 
@@ -168,10 +191,18 @@ func TestDelayedClaimsSystem(t *testing.T) {
 			cli := NewLumeradCLI(t, sut, true)
 
 			// Get test data and CSV address
-			testData, csvAddress := tc.setupFn(t)
+			testData, csvAddress := tc.setupFn(t, cli)
 
 			// Apply custom genesis modifications
 			sut.ModifyGenesisJSON(t, tc.modifyGenesis)
+
+			var pastelAccount claimtestutils.PastelAccount
+			if tc.name == "successful_claim_from_same_address" {
+				var err error
+				pastelAccount, err = claimtestutils.GeneratePastelAddress()
+				require.NoError(t, err)
+				csvAddress = pastelAccount.Address
+			}
 
 			// Create the CSV file in homedir
 			homedir, err := os.UserHomeDir()
@@ -192,6 +223,19 @@ func TestDelayedClaimsSystem(t *testing.T) {
 				time.Sleep(11 * time.Second)
 			}
 
+			if tc.name == "successful_claim_from_same_address" {
+				address := cli.AddKey("test_1")
+				cli.FundAddress(address, "1stake")
+				testData, err = claimtestutils.GenerateClaimingTestData2(pastelAccount, address)
+				require.NoError(t, err)
+
+				// Verify account exist and it is Base account
+				baseAccount := cli.GetAccount(testData.NewAddress)
+				require.NotNil(t, baseAccount, "account not found")
+				baseAccountType := gjson.Get(baseAccount, "account.type").String()
+				require.Equal(t, "/cosmos.auth.v1beta1.BaseAccount", baseAccountType, "account type mismatch")
+			}
+
 			var lastResp string
 			// Register claim multiple times if specified
 			for i := 0; i < tc.claimAttempts; i++ {
@@ -202,7 +246,7 @@ func TestDelayedClaimsSystem(t *testing.T) {
 					testData.PubKey,     // PubKey
 					testData.Signature,  // Signature
 					tc.tier,             // Tier
-					"--from", "node0",
+					"--from", tc.from,   // From address
 				}
 
 				lastResp = cli.CustomCommand(registerCmd...)

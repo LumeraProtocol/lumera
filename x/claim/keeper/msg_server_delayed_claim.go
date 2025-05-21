@@ -30,23 +30,42 @@ func (k msgServer) DelayedClaim(goCtx context.Context, msg *types.MsgDelayedClai
 	return &types.MsgDelayedClaimResponse{}, nil
 }
 
-func (k msgServer) CreateDelayedAccount(ctx context.Context, blockTime time.Time, destAddr sdk.AccAddress, balance sdk.Coins, delayMonth int) (int64, error) {
+func (k msgServer) CreateDelayedAccount(ctx sdk.Context, blockTime time.Time, destAddr sdk.AccAddress, balance sdk.Coins, delayMonth int) (int64, error) {
+
+	// 1. Determine the account that will become the vesting account --------------------------------
 	acc := k.accountKeeper.GetAccount(ctx, destAddr)
-	if acc != nil {
-		return -1, errorsmod.Wrap(sdkerrors.ErrInvalidRequest, "can't create delayed account - account already exists")
+
+	// If it already exists it **must** be a plain BaseAccount (e.g. the stub created in ante).
+	var baseAccount *authtypes.BaseAccount
+	switch a := acc.(type) {
+	case nil:
+		// No account yet – create a new BaseAccount
+		baseAccount = authtypes.NewBaseAccountWithAddress(destAddr)
+		baseAccount = k.accountKeeper.NewAccount(ctx, baseAccount).(*authtypes.BaseAccount)
+
+	case *authtypes.BaseAccount:
+		// Stub (or manually created) account – we can safely convert it
+		baseAccount = a
+
+	default:
+		// Any other concrete type (vesting, module, contract, …) is disallowed
+		return -1, errorsmod.Wrap(sdkerrors.ErrInvalidRequest,
+			"destination address already has a non-base account")
 	}
 
+	// 2. Build the vesting account -----------------------------------------------------------------
 	// endTime is the current time plus X months
 	endTime := blockTime.AddDate(0, delayMonth, 0).Unix()
 
-	baseAccount := authtypes.NewBaseAccountWithAddress(destAddr)
-	baseAccount = k.accountKeeper.NewAccount(ctx, baseAccount).(*authtypes.BaseAccount)
 	baseVestingAccount, err := vestingypes.NewBaseVestingAccount(baseAccount, balance, endTime)
 	if err != nil {
 		return -1, errorsmod.Wrap(sdkerrors.ErrInvalidRequest, err.Error())
 	}
 
 	vestingAccount := vestingypes.NewDelayedVestingAccountRaw(baseVestingAccount)
+
+	// 3. Store (overwriting the stub if it existed) ------------------------------------------------
 	k.accountKeeper.SetAccount(ctx, vestingAccount)
+
 	return endTime, nil
 }

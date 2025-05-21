@@ -12,7 +12,7 @@ import (
 )
 
 // Define a type for account creation functions
-type AccountCreatorFunc func(context.Context, time.Time, sdk.AccAddress, sdk.Coins, int) (int64, error)
+type AccountCreatorFunc func(sdk.Context, time.Time, sdk.AccAddress, sdk.Coins, int) (int64, error)
 
 func (k msgServer) Claim(goCtx context.Context, msg *types.MsgClaim) (*types.MsgClaimResponse, error) {
 	return k.processClaim(goCtx, msg, k.CreateBaseAccount, types.EventTypeClaimProcessed, 0)
@@ -82,7 +82,10 @@ func (k msgServer) processClaim(goCtx context.Context,
 	}
 
 	// Increment block claims counter before processing
-	k.IncrementBlockClaimCount(ctx)
+	err = k.IncrementBlockClaimCount(ctx)
+	if err != nil {
+		// nothing to see here - just continue
+	}
 
 	destAddr, err := sdk.AccAddressFromBech32(msg.NewAddress)
 	if err != nil {
@@ -90,7 +93,7 @@ func (k msgServer) processClaim(goCtx context.Context,
 	}
 
 	// Use the passed function to create the account if needed
-	endTime, err := createAccount(goCtx, ctx.BlockTime(), destAddr, claimRecord.Balance, delayMonth)
+	endTime, err := createAccount(ctx, ctx.BlockTime(), destAddr, claimRecord.Balance, delayMonth)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +130,7 @@ func (k msgServer) processClaim(goCtx context.Context,
 	return &types.MsgClaimResponse{}, nil
 }
 
-func (k msgServer) CreateBaseAccount(ctx context.Context, _ time.Time, destAddr sdk.AccAddress, _ sdk.Coins, _ int) (int64, error) {
+func (k msgServer) CreateBaseAccount(ctx sdk.Context, _ time.Time, destAddr sdk.AccAddress, _ sdk.Coins, _ int) (int64, error) {
 	acc := k.accountKeeper.GetAccount(ctx, destAddr)
 	if acc == nil {
 		acc = k.accountKeeper.NewAccountWithAddress(ctx, destAddr)

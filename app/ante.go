@@ -50,8 +50,13 @@ func NewAnteHandler(options HandlerOptions) (sdk.AnteHandler, error) {
 	}
 
 	anteDecorators := []sdk.AnteDecorator{
+
 		lumante.DelayedClaimFeeDecorator{},
-		ante.NewSetUpContextDecorator(),                                                  // outermost AnteDecorator. SetUpContext must be called first
+		//lumante.EnsureDelayedClaimAccountDecorator{
+		//	AccountKeeper: options.AccountKeeper,
+		//},
+
+		ante.NewSetUpContextDecorator(), // outermost AnteDecorator. SetUpContext must be called first
 		wasmkeeper.NewLimitSimulationGasDecorator(options.WasmConfig.SimulationGasLimit), // after setup context to enforce limits early
 		wasmkeeper.NewCountTXDecorator(options.TXCounterStoreService),
 		wasmkeeper.NewGasRegisterDecorator(options.WasmKeeper.GetGasRegister()),

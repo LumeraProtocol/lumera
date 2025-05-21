@@ -3,6 +3,7 @@ package testutils
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 
 	cryptoutils "github.com/LumeraProtocol/lumera/x/claim/keeper/crypto"
 
@@ -16,11 +17,60 @@ type TestData struct {
 	Signature  string
 }
 
-func GenerateClaimingTestData() (TestData, error) {
-	return GenerateClaimingTestData2("")
+type PastelAccount struct {
+	Address string
+	PubKey  string
+	PrivKey *secp256k1.PrivKey
 }
 
-func GenerateClaimingTestData2(existingNewAddr string) (TestData, error) {
+func GeneratePastelAddress() (PastelAccount, error) {
+	// Generate a new key pair
+	privKeyObj, pubKeyObj := cryptoutils.GenerateKeyPair()
+
+	// Get hex encoded public key
+	pubKey := hex.EncodeToString(pubKeyObj.Key)
+
+	// Generate old address from public key
+	oldAddr, err := cryptoutils.GetAddressFromPubKey(pubKey)
+	if err != nil {
+		return PastelAccount{}, fmt.Errorf("failed to generate pastel address: %w", err)
+	}
+
+	return PastelAccount{
+		Address: oldAddr,
+		PubKey:  pubKey,
+		PrivKey: privKeyObj,
+	}, nil
+}
+
+func GenerateClaimingTestData2(pastelAccount PastelAccount, lumeraAddr string) (TestData, error) {
+	// Construct message for signature (without hashing)
+	message := pastelAccount.Address + "." + pastelAccount.PubKey + "." + lumeraAddr
+
+	// Sign the message directly without hashing
+	signature, err := cryptoutils.SignMessage(pastelAccount.PrivKey, message)
+	if err != nil {
+		return TestData{}, fmt.Errorf("failed to sign message: %w", err)
+	}
+
+	// Verify the signature to ensure it's valid
+	valid, err := cryptoutils.VerifySignature(pastelAccount.PubKey, message, signature)
+	if err != nil {
+		return TestData{}, fmt.Errorf("failed to verify generated signature: %w", err)
+	}
+	if !valid {
+		return TestData{}, fmt.Errorf("generated signature verification failed")
+	}
+
+	return TestData{
+		OldAddress: pastelAccount.Address,
+		PubKey:     pastelAccount.PubKey,
+		NewAddress: lumeraAddr,
+		Signature:  signature,
+	}, nil
+}
+
+func GenerateClaimingTestData() (TestData, error) {
 	// Generate a new key pair
 	privKeyObj, pubKeyObj := cryptoutils.GenerateKeyPair()
 
@@ -33,11 +83,7 @@ func GenerateClaimingTestData2(existingNewAddr string) (TestData, error) {
 		return TestData{}, fmt.Errorf("failed to generate old address: %w", err)
 	}
 
-	// If an existing new address is provided, use it; otherwise, generate a new one
-	newAddr := existingNewAddr
-	if newAddr == "" {
-		newAddr = sdk.AccAddress(privKeyObj.PubKey().Address()).String()
-	}
+	newAddr := sdk.AccAddress(privKeyObj.PubKey().Address()).String()
 
 	// Construct message for signature (without hashing)
 	message := oldAddr + "." + pubKey + "." + newAddr

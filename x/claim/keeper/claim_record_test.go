@@ -159,11 +159,13 @@ func TestListClaimRecords(t *testing.T) {
 					OldAddress: "address1",
 					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(100))),
 					Claimed:    false,
+					VestedTier: 0,
 				},
 				{
 					OldAddress: "address2",
 					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(200))),
 					Claimed:    true,
+					VestedTier: 0,
 				},
 			},
 			expectErr:   false,
@@ -193,7 +195,12 @@ func TestListClaimRecords(t *testing.T) {
 			require.Len(t, records, tc.expectCount)
 
 			if tc.setupRecords != nil {
-				require.ElementsMatch(t, tc.setupRecords, records)
+				// Convert []*types.ClaimRecord → []types.ClaimRecord for comparison
+				values := make([]types.ClaimRecord, len(records))
+				for i, r := range records {
+					values[i] = *r
+				}
+				require.ElementsMatch(t, tc.setupRecords, values)
 			}
 		})
 	}

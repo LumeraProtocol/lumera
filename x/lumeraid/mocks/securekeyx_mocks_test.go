@@ -61,36 +61,65 @@ func (suite *SecureKeyExchangeTestSuite) GetServerAccount() accounts.TestAccount
 	return suite.testAccounts[1]
 }
 
-func (suite *SecureKeyExchangeTestSuite) mockAccountCheck(peerType PeerType, times int) {
+func (suite *SecureKeyExchangeTestSuite) mockAccountCheck(peerType PeerType, accNo int, times int) {
+	require.Less(suite.T(), accNo, len(suite.testAccounts), "Not enough test accounts")
+	var accAddr string
+	if accNo == 0 {
+		accAddr = suite.GetClientAddress()
+	} else {
+		accAddr = suite.GetServerAddress()
+	}
 	if peerType == Supernode {
 		suite.mockValidator.EXPECT().
-			GetSupernodeBySupernodeAddress(gomock.Any(), suite.GetClientAddress()).
+			GetSupernodeBySupernodeAddress(gomock.Any(), accAddr).
 			Return(&sntypes.SuperNode{
-				SupernodeAccount: suite.GetClientAddress(),
+				SupernodeAccount: accAddr,
 			}, nil).
 			Times(times)
 	} else {
 		suite.mockValidator.EXPECT().
-			AccountInfoByAddress(gomock.Any(), suite.GetClientAddress()).
+			AccountInfoByAddress(gomock.Any(), accAddr).
 			Return(&authtypes.QueryAccountInfoResponse{
-				Info: &authtypes.BaseAccount{Address: suite.testAccounts[0].Address},
+				Info: &authtypes.BaseAccount{Address: accAddr},
 			}, nil).
 			Times(times)
 	}
 }
 
-func (suite *SecureKeyExchangeTestSuite) mockClientKeyByAddress(times int) {
-	clientAccount := suite.GetClientAccount()
-	accAddr, err := sdk.AccAddressFromBech32(clientAccount.Address)
+func (suite *SecureKeyExchangeTestSuite) mockAccountClientCheck(peerType PeerType, times int) {
+	suite.mockAccountCheck(peerType, 0, times)
+}
+
+func (suite *SecureKeyExchangeTestSuite) mockAccountServerCheck(peerType PeerType, times int) {
+	suite.mockAccountCheck(peerType, 1, times)
+}
+
+func (suite *SecureKeyExchangeTestSuite) mockKeyByAddress(addrNo int, times int) {
+	require.Less(suite.T(), addrNo, len(suite.testAccounts), "Not enough test accounts")
+	var account accounts.TestAccount
+	if addrNo == 0 {
+		account = suite.GetClientAccount()
+	} else {
+		account = suite.GetServerAccount()
+	}
+	accAddress, err := sdk.AccAddressFromBech32(account.Address)
 	require.NoError(suite.T(), err)
 
-	keyInfo, err := suite.kr.Key(clientAccount.Name)
+	keyInfo, err := suite.kr.Key(account.Name)
 	require.NoError(suite.T(), err)
 
 	suite.mockKeyring.EXPECT().
-		KeyByAddress(accAddr).
+		KeyByAddress(accAddress).
 		Return(keyInfo, nil).
 		Times(times)
+}
+
+func (suite *SecureKeyExchangeTestSuite) mockClientKeyByAddress(times int) {
+	suite.mockKeyByAddress(0, times)
+}
+
+func (suite *SecureKeyExchangeTestSuite) mockServerKeyByAddress(times int) {
+	suite.mockKeyByAddress(1, times)
 }
 
 func (suite *SecureKeyExchangeTestSuite) SetupTest() {
@@ -110,7 +139,7 @@ func (suite *SecureKeyExchangeTestSuite) TestCreateRequest() {
 	peerType := Simplenode
 	curve := ecdh.P256()
 
-	suite.mockAccountCheck(peerType, 1)
+	suite.mockAccountClientCheck(peerType, 1)
 	ske, err := NewSecureKeyExchange(suite.kr, suite.GetClientAddress(), peerType, curve, suite.mockValidator)
 	require.NoError(suite.T(), err)
 
@@ -127,7 +156,7 @@ func (suite *SecureKeyExchangeTestSuite) TestCreateRequest_SignWithKeyringFails(
 	suite.mockKeyring.EXPECT().
 		SignByAddress(gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(nil, nil, errors.New("simulated sign failure"))
-	suite.mockAccountCheck(Supernode, 1)
+	suite.mockAccountClientCheck(Supernode, 1)
 
 	ske, err := NewSecureKeyExchange(suite.mockKeyring, suite.GetClientAddress(), Supernode, nil, suite.mockValidator)
 	require.NoError(suite.T(), err)
@@ -145,10 +174,10 @@ func (suite *SecureKeyExchangeTestSuite) TestGetCurveName() {
 		{ecdh.P256(), "P256"},
 		{ecdh.P384(), "P384"},
 		{ecdh.P521(), "P521"},
-		{nil, "Unknown"},
+		{nil, "P256"}, // Default curve
 	}
 	suite.mockClientKeyByAddress(len(tests))
-	suite.mockAccountCheck(Supernode, len(tests))
+	suite.mockAccountClientCheck(Supernode, len(tests))
 
 	for _, tt := range tests {
 		ske, err := NewSecureKeyExchange(suite.mockKeyring, suite.GetClientAddress(), Supernode, tt.curve, suite.mockValidator)
@@ -159,7 +188,7 @@ func (suite *SecureKeyExchangeTestSuite) TestGetCurveName() {
 
 func (suite *SecureKeyExchangeTestSuite) TestNewSecureKeyExchange() {
 	curve := ecdh.P256()
-	suite.mockAccountCheck(Simplenode, 1)
+	suite.mockAccountClientCheck(Simplenode, 1)
 
 	ske, err := NewSecureKeyExchange(suite.kr, suite.GetClientAddress(), Simplenode, curve, suite.mockValidator)
 	require.NoError(suite.T(), err)
@@ -210,15 +239,15 @@ func (suite *SecureKeyExchangeTestSuite) TestNewSecureKeyExchange_MissingKeyInKe
 }
 
 func (suite *SecureKeyExchangeTestSuite) TestNewSecureKeyExchange_DefaultCurve() {
+	suite.mockAccountClientCheck(Simplenode, 1)
 	ske, err := NewSecureKeyExchange(suite.kr, suite.GetClientAddress(), Simplenode, nil, suite.mockValidator)
 	require.NoError(suite.T(), err)
 	assert.Equal(suite.T(), "P256", ske.GetCurveName())
 }
 
 func (suite *SecureKeyExchangeTestSuite) TestComputeSharedSecret() {
-	suite.mockClientKeyByAddress(2)
-	suite.mockAccountCheck(Simplenode, 1)
-	suite.mockAccountCheck(Supernode, 1)
+	suite.mockAccountClientCheck(Simplenode, 1)
+	suite.mockAccountServerCheck(Supernode, 2)
 	clientAddress := suite.GetClientAddress()
 	serverAddress := suite.GetServerAddress()
 

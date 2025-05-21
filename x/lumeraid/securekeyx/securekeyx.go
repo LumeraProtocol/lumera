@@ -102,9 +102,15 @@ func (s *SecureKeyExchange) validateSupernode(accAddress sdk.AccAddress) error {
 		return fmt.Errorf("supernode peer cannot be verified: %w", err)
 	}
 
+	// convert supernode account address to sdk.AccAddress
+	supernodeAccAddress, err := sdk.AccAddressFromBech32(supernode.GetSupernodeAccount())
+	if err != nil {
+		return fmt.Errorf("invalid supernode account address: %w", err)
+	}
+
 	// GetSupernodeAccount returns string
 	// Check if the account address matches the expected address
-	if !accAddress.Equals(sdk.AccAddress(supernode.GetSupernodeAccount())) {
+	if !accAddress.Equals(supernodeAccAddress) {
 		return fmt.Errorf("supernode account address mismatch: expected %s, got %s", accAddress.String(),
 			supernode.GetSupernodeAccount())
 	}

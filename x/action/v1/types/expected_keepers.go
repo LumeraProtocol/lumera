@@ -4,6 +4,7 @@ package types
 
 import (
 	"context"
+
 	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"

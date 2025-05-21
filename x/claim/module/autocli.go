@@ -24,6 +24,13 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "address"}},
 				},
 
+				{
+					RpcMethod:      "ListClaimed",
+					Use:            "list-claimed [vested-term - 0 if not vested]",
+					Short:          "Query listClaimed",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "vestedTerm"}},
+				},
+
 				// this line is used by ignite scaffolding # autocli/query
 			},
 		},

@@ -2,11 +2,12 @@ package v1_0_0
 
 import (
 	"context"
-	storetypes "cosmossdk.io/store/types"
 	"fmt"
+	"time"
+
+	storetypes "cosmossdk.io/store/types"
 	actionkeeper "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	"github.com/LumeraProtocol/lumera/x/action/v1/types"
-	"time"
 
 	"cosmossdk.io/log"
 	"cosmossdk.io/math"

@@ -183,8 +183,8 @@ func TestListClaimRecords(t *testing.T) {
 				}
 			}
 
-			// Test
-			records, err := keeper.ListClaimRecords(ctx)
+			// Test without filter (should return all records)
+			records, err := keeper.ListClaimRecords(ctx, nil)
 			if tc.expectErr {
 				require.Error(t, err)
 				return
@@ -194,6 +194,123 @@ func TestListClaimRecords(t *testing.T) {
 
 			if tc.setupRecords != nil {
 				require.ElementsMatch(t, tc.setupRecords, records)
+			}
+		})
+	}
+}
+
+func TestListClaimRecordsWithFilter(t *testing.T) {
+	testCases := []struct {
+		name         string
+		setupRecords []types.ClaimRecord
+		filter       func(*types.ClaimRecord) bool
+		expectErr    bool
+		expectCount  int
+	}{
+		{
+			name: "filter by claimed = true",
+			setupRecords: []types.ClaimRecord{
+				{
+					OldAddress: "address1",
+					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(100))),
+					Claimed:    true,
+				},
+				{
+					OldAddress: "address2",
+					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(200))),
+					Claimed:    false,
+				},
+				{
+					OldAddress: "address3",
+					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(300))),
+					Claimed:    true,
+				},
+			},
+			filter: func(record *types.ClaimRecord) bool {
+				return record.Claimed
+			},
+			expectErr:   false,
+			expectCount: 2, // Only the records with Claimed = true
+		},
+		{
+			name: "filter by claimed = false",
+			setupRecords: []types.ClaimRecord{
+				{
+					OldAddress: "address1",
+					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(100))),
+					Claimed:    true,
+				},
+				{
+					OldAddress: "address2",
+					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(200))),
+					Claimed:    false,
+				},
+				{
+					OldAddress: "address3",
+					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(300))),
+					Claimed:    true,
+				},
+			},
+			filter: func(record *types.ClaimRecord) bool {
+				return !record.Claimed
+			},
+			expectErr:   false,
+			expectCount: 1, // Only the record with Claimed = false
+		},
+		{
+			name: "complex filter with multiple conditions",
+			setupRecords: []types.ClaimRecord{
+				{
+					OldAddress: "address1",
+					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(100))),
+					Claimed:    true,
+					ClaimTime:  1000,
+				},
+				{
+					OldAddress: "address2",
+					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(200))),
+					Claimed:    true,
+					ClaimTime:  2000,
+				},
+				{
+					OldAddress: "address3",
+					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(300))),
+					Claimed:    false,
+					ClaimTime:  0,
+				},
+			},
+			filter: func(record *types.ClaimRecord) bool {
+				return record.Claimed && record.ClaimTime > 1500
+			},
+			expectErr:   false,
+			expectCount: 1, // Only the record with Claimed = true and ClaimTime > 1500
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			keeper, ctx := keepertest.ClaimKeeper(t)
+
+			// Setup
+			if tc.setupRecords != nil {
+				for _, record := range tc.setupRecords {
+					err := keeper.SetClaimRecord(ctx, record)
+					require.NoError(t, err)
+				}
+			}
+
+			// Test with filter
+			records, err := keeper.ListClaimRecords(ctx, tc.filter)
+			if tc.expectErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Len(t, records, tc.expectCount)
+
+			// Verify that all returned records satisfy the filter
+			for _, record := range records {
+				require.True(t, tc.filter(record))
 			}
 		})
 	}

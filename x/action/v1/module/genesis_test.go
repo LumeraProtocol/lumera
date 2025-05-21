@@ -1,9 +1,10 @@
 package action_test
 
 import (
-	"github.com/LumeraProtocol/lumera/x/action/v1/module"
-	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	"testing"
+
+	action "github.com/LumeraProtocol/lumera/x/action/v1/module"
+	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
 
 	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
 	"github.com/LumeraProtocol/lumera/testutil/nullify"

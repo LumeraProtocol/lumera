@@ -3,6 +3,7 @@ package testutils
 import (
 	"encoding/hex"
 	"fmt"
+
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 
 	cryptoutils "github.com/LumeraProtocol/lumera/x/claim/keeper/crypto"

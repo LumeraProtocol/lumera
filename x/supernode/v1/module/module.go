@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	keeper2 "github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
 	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 

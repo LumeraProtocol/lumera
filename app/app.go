@@ -1,12 +1,13 @@
 package app
 
 import (
-	upgradetypes "cosmossdk.io/x/upgrade/types"
 	"fmt"
-	actionmodulekeeper "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
-	supernodemodulekeeper "github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
 	"io"
 	"os"
+
+	upgradetypes "cosmossdk.io/x/upgrade/types"
+	actionmodulekeeper "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
+	supernodemodulekeeper "github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
 
 	_ "cosmossdk.io/api/cosmos/tx/config/v1" // import for side-effects
 	clienthelpers "cosmossdk.io/client/v2/helpers"
@@ -82,6 +83,7 @@ import (
 
 	claimmodulekeeper "github.com/LumeraProtocol/lumera/x/claim/keeper"
 	lumeraidmodulekeeper "github.com/LumeraProtocol/lumera/x/lumeraid/keeper"
+
 	// this line is used by starport scaffolding # stargate/app/moduleImport
 
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"

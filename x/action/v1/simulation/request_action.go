@@ -1,14 +1,15 @@
 package simulation
 
 import (
+	"math/rand"
+	"strconv"
+
 	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
 	keeper2 "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	simtypes "github.com/cosmos/cosmos-sdk/types/simulation"
-	"math/rand"
-	"strconv"
 )
 
 // SimulateMsgRequestActionSuccessSense simulates a successful request for a SENSE action

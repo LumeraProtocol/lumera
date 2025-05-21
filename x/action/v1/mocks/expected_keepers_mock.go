@@ -6,8 +6,9 @@ package actionmocks
 
 import (
 	context "context"
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	reflect "reflect"
+
+	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
 	types0 "github.com/cosmos/cosmos-sdk/types"
 	types1 "github.com/cosmos/cosmos-sdk/x/staking/types"

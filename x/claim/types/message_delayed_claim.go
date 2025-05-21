@@ -8,7 +8,7 @@ import (
 
 var _ sdk.Msg = &MsgDelayedClaim{}
 
-func NewMsgDelayedClaim(creator string, oldAddress string, newAddress string, pubKey string, signature string, tier int32) *MsgDelayedClaim {
+func NewMsgDelayedClaim(creator string, oldAddress string, newAddress string, pubKey string, signature string, tier uint32) *MsgDelayedClaim {
 	return &MsgDelayedClaim{
 		Creator:    creator,
 		OldAddress: oldAddress,

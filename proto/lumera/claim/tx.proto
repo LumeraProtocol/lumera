@@ -55,7 +55,7 @@ message MsgDelayedClaim {
   string newAddress = 3 [(cosmos_proto.scalar) = "cosmos.AddressString"];
   string pubKey     = 4;
   string signature  = 5;
-  int32  tier       = 6;
+  uint32 tier       = 6;
 }
 
 message MsgDelayedClaimResponse {}

@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
-	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"slices"
 	"strings"
+
+	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
 	"cosmossdk.io/errors"
 	"cosmossdk.io/math"

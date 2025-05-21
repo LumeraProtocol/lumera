@@ -1,10 +1,11 @@
 package keeper_test
 
 import (
+	"testing"
+
 	"cosmossdk.io/math"
 	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
-	"testing"
 
 	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
 	sdk "github.com/cosmos/cosmos-sdk/types"

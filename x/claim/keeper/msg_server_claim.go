@@ -12,7 +12,7 @@ import (
 )
 
 // Define a type for account creation functions
-type AccountCreatorFunc func(sdk.Context, time.Time, sdk.AccAddress, sdk.Coins, int) (int64, error)
+type AccountCreatorFunc func(sdk.Context, time.Time, sdk.AccAddress, sdk.Coins, uint32) (int64, error)
 
 func (k msgServer) Claim(goCtx context.Context, msg *types.MsgClaim) (*types.MsgClaimResponse, error) {
 	return k.processClaim(goCtx, msg, k.CreateBaseAccount, types.EventTypeClaimProcessed, 0)
@@ -22,7 +22,7 @@ func (k msgServer) processClaim(goCtx context.Context,
 	msg *types.MsgClaim,
 	createAccount AccountCreatorFunc,
 	eventName string,
-	delayMonth int,
+	vestedTier uint32,
 ) (*types.MsgClaimResponse, error) {
 	ctx := sdk.UnwrapSDKContext(goCtx)
 	params := k.GetParams(ctx)
@@ -93,7 +93,7 @@ func (k msgServer) processClaim(goCtx context.Context,
 	}
 
 	// Use the passed function to create the account if needed
-	endTime, err := createAccount(ctx, ctx.BlockTime(), destAddr, claimRecord.Balance, delayMonth)
+	endTime, err := createAccount(ctx, ctx.BlockTime(), destAddr, claimRecord.Balance, vestedTier)
 	if err != nil {
 		return nil, err
 	}
@@ -107,6 +107,7 @@ func (k msgServer) processClaim(goCtx context.Context,
 	claimRecord.Claimed = true
 	claimRecord.ClaimTime = ctx.BlockTime().Unix()
 	claimRecord.DestAddress = msg.NewAddress
+	claimRecord.VestedTier = vestedTier
 	claimTimeString := strconv.FormatInt(claimRecord.ClaimTime, 10)
 	endTimeStr := strconv.FormatInt(endTime, 10)
 
@@ -131,7 +132,7 @@ func (k msgServer) processClaim(goCtx context.Context,
 	return &types.MsgClaimResponse{}, nil
 }
 
-func (k msgServer) CreateBaseAccount(ctx sdk.Context, _ time.Time, destAddr sdk.AccAddress, _ sdk.Coins, _ int) (int64, error) {
+func (k msgServer) CreateBaseAccount(ctx sdk.Context, _ time.Time, destAddr sdk.AccAddress, _ sdk.Coins, _ uint32) (int64, error) {
 	acc := k.accountKeeper.GetAccount(ctx, destAddr)
 	if acc == nil {
 		acc = k.accountKeeper.NewAccountWithAddress(ctx, destAddr)

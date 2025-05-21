@@ -1,10 +1,11 @@
 package keeper_test
 
 import (
+	"strings"
+
 	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
 	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"strings"
 )
 
 func (suite *MsgServerTestSuite) TestMsgFinalizeActionCascade() {

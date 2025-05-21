@@ -2019,8 +2019,8 @@ func (x *fastReflection_MsgDelayedClaim) Range(f func(protoreflect.FieldDescript
 			return
 		}
 	}
-	if x.Tier != int32(0) {
-		value := protoreflect.ValueOfInt32(x.Tier)
+	if x.Tier != uint32(0) {
+		value := protoreflect.ValueOfUint32(x.Tier)
 		if !f(fd_MsgDelayedClaim_tier, value) {
 			return
 		}
@@ -2051,7 +2051,7 @@ func (x *fastReflection_MsgDelayedClaim) Has(fd protoreflect.FieldDescriptor) bo
 	case "lumera.claim.MsgDelayedClaim.signature":
 		return x.Signature != ""
 	case "lumera.claim.MsgDelayedClaim.tier":
-		return x.Tier != int32(0)
+		return x.Tier != uint32(0)
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: lumera.claim.MsgDelayedClaim"))
@@ -2079,7 +2079,7 @@ func (x *fastReflection_MsgDelayedClaim) Clear(fd protoreflect.FieldDescriptor) 
 	case "lumera.claim.MsgDelayedClaim.signature":
 		x.Signature = ""
 	case "lumera.claim.MsgDelayedClaim.tier":
-		x.Tier = int32(0)
+		x.Tier = uint32(0)
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: lumera.claim.MsgDelayedClaim"))
@@ -2113,7 +2113,7 @@ func (x *fastReflection_MsgDelayedClaim) Get(descriptor protoreflect.FieldDescri
 		return protoreflect.ValueOfString(value)
 	case "lumera.claim.MsgDelayedClaim.tier":
 		value := x.Tier
-		return protoreflect.ValueOfInt32(value)
+		return protoreflect.ValueOfUint32(value)
 	default:
 		if descriptor.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: lumera.claim.MsgDelayedClaim"))
@@ -2145,7 +2145,7 @@ func (x *fastReflection_MsgDelayedClaim) Set(fd protoreflect.FieldDescriptor, va
 	case "lumera.claim.MsgDelayedClaim.signature":
 		x.Signature = value.Interface().(string)
 	case "lumera.claim.MsgDelayedClaim.tier":
-		x.Tier = int32(value.Int())
+		x.Tier = uint32(value.Uint())
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: lumera.claim.MsgDelayedClaim"))
@@ -2202,7 +2202,7 @@ func (x *fastReflection_MsgDelayedClaim) NewField(fd protoreflect.FieldDescripto
 	case "lumera.claim.MsgDelayedClaim.signature":
 		return protoreflect.ValueOfString("")
 	case "lumera.claim.MsgDelayedClaim.tier":
-		return protoreflect.ValueOfInt32(int32(0))
+		return protoreflect.ValueOfUint32(uint32(0))
 	default:
 		if fd.IsExtension() {
 			panic(fmt.Errorf("proto3 declared messages do not support extensions: lumera.claim.MsgDelayedClaim"))
@@ -2587,7 +2587,7 @@ func (x *fastReflection_MsgDelayedClaim) ProtoMethods() *protoiface.Methods {
 					}
 					b := dAtA[iNdEx]
 					iNdEx++
-					x.Tier |= int32(b&0x7F) << shift
+					x.Tier |= uint32(b&0x7F) << shift
 					if b < 0x80 {
 						break
 					}
@@ -3175,7 +3175,7 @@ type MsgDelayedClaim struct {
 	NewAddress string `protobuf:"bytes,3,opt,name=newAddress,proto3" json:"newAddress,omitempty"`
 	PubKey     string `protobuf:"bytes,4,opt,name=pubKey,proto3" json:"pubKey,omitempty"`
 	Signature  string `protobuf:"bytes,5,opt,name=signature,proto3" json:"signature,omitempty"`
-	Tier       int32  `protobuf:"varint,6,opt,name=tier,proto3" json:"tier,omitempty"`
+	Tier       uint32 `protobuf:"varint,6,opt,name=tier,proto3" json:"tier,omitempty"`
 }
 
 func (x *MsgDelayedClaim) Reset() {
@@ -3233,7 +3233,7 @@ func (x *MsgDelayedClaim) GetSignature() string {
 	return ""
 }
 
-func (x *MsgDelayedClaim) GetTier() int32 {
+func (x *MsgDelayedClaim) GetTier() uint32 {
 	if x != nil {
 		return x.Tier
 	}
@@ -3314,7 +3314,7 @@ var file_lumera_claim_tx_proto_rawDesc = []byte{
 	0x70, 0x75, 0x62, 0x4b, 0x65, 0x79, 0x12, 0x1c, 0x0a, 0x09, 0x73, 0x69, 0x67, 0x6e, 0x61, 0x74,
 	0x75, 0x72, 0x65, 0x18, 0x05, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09, 0x73, 0x69, 0x67, 0x6e, 0x61,
 	0x74, 0x75, 0x72, 0x65, 0x12, 0x12, 0x0a, 0x04, 0x74, 0x69, 0x65, 0x72, 0x18, 0x06, 0x20, 0x01,
-	0x28, 0x05, 0x52, 0x04, 0x74, 0x69, 0x65, 0x72, 0x3a, 0x0c, 0x82, 0xe7, 0xb0, 0x2a, 0x07, 0x63,
+	0x28, 0x0d, 0x52, 0x04, 0x74, 0x69, 0x65, 0x72, 0x3a, 0x0c, 0x82, 0xe7, 0xb0, 0x2a, 0x07, 0x63,
 	0x72, 0x65, 0x61, 0x74, 0x6f, 0x72, 0x22, 0x19, 0x0a, 0x17, 0x4d, 0x73, 0x67, 0x44, 0x65, 0x6c,
 	0x61, 0x79, 0x65, 0x64, 0x43, 0x6c, 0x61, 0x69, 0x6d, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73,
 	0x65, 0x32, 0xf9, 0x01, 0x0a, 0x03, 0x4d, 0x73, 0x67, 0x12, 0x54, 0x0a, 0x0c, 0x55, 0x70, 0x64,

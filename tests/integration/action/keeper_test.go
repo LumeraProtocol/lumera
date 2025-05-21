@@ -3,10 +3,11 @@ package action_test
 import (
 	"encoding/base64"
 	"fmt"
-	actionkeeper "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
-	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 	"testing"
 	"time"
+
+	actionkeeper "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
+	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 
 	"cosmossdk.io/math"
 	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"

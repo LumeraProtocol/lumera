@@ -20,4 +20,5 @@ message ClaimRecord {
   bool claimed = 3 [(gogoproto.jsontag) = "claimed", (amino.dont_omitempty) = true];
   int64 claimTime = 4 ;
   string destAddress = 5 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  uint32 vestedTier = 6 [(gogoproto.jsontag) = "vestedTier"];
 }

@@ -5,12 +5,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	keeper2 "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
-	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"math/rand"
 	"strconv"
 	"time"
+
+	keeper2 "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
+	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
 	"cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"

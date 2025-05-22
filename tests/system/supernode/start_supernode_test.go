@@ -1,9 +1,10 @@
 package system_test
 
 import (
+	"testing"
+
 	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
 	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-	"testing"
 
 	sdkmath "cosmossdk.io/math"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"

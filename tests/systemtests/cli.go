@@ -300,6 +300,15 @@ func (c LumeradCli) FundAddress(destAddr, amount string) string {
 	return rsp
 }
 
+// GetAccount returns account info for the given address
+func (c LumeradCli) GetAccount(addr string) string {
+	require.NotEmpty(c.t, addr)
+	cmd := []string{"q", "auth", "account", addr}
+	out := c.CustomQuery(cmd...)
+	require.NotEmpty(c.t, out, "got %q", out)
+	return out
+}
+
 func (c LumeradCli) QueryBalances(addr string) string {
 	return c.CustomQuery("q", "bank", "balances", addr)
 }

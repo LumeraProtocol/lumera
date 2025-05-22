@@ -2,10 +2,11 @@ package system_test
 
 import (
 	"context"
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"os"
 	"testing"
+
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
 	sdkmath "cosmossdk.io/math"
 	"github.com/LumeraProtocol/lumera/app"

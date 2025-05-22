@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"context"
+
 	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
 
 	"cosmossdk.io/store/prefix"

@@ -55,9 +55,9 @@ genesis:
         max_processing_time: 1h0m0s
         expiration_duration: 24h0m0s
     claim:
-      total_claimable_amount: '18749999981413'
+      total_claimable_amount: '18751634831726'
       params:
-        claim_end_time: '1746071999' # April 30 2025, 23:59:59
+        claim_end_time: '1748577600' # May 30 2025, 00:00:00
     crisis:
       constant_fee:
         denom: "ulume"
@@ -105,7 +105,9 @@ genesis:
         unbonding_time: '1814400s'
     supernode:
         params:
-            minimum_stake_for_sn: '10000000000'         # Minimum stake required for ANY non-active Validator to run a SuperNode - (10,000,000,000 ulume --> 10,000 lume)
+            minimum_stake_for_sn:                       # Minimum stake required for ANY non-active Validator to run a SuperNode - (10,000,000,000 ulume --> 10,000 lume)
+                denom: "ulume"
+                amount: '10000000000'
             inactivity_penalty_period: '86400s'         # Duration of inactivity before penalties are applied - 1 day (86400s)
             evidence_retention_period: '180days'        # Duration evidence is retained on chain - 180 days
             reporting_threshold: '10'                   # Number of reports needed before action is taken - 10

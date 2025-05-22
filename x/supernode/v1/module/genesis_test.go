@@ -1,9 +1,10 @@
 package supernode_test
 
 import (
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/module"
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"testing"
+
+	supernode "github.com/LumeraProtocol/lumera/x/supernode/v1/module"
+	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
 	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
 	"github.com/LumeraProtocol/lumera/testutil/nullify"

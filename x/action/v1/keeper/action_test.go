@@ -2,6 +2,7 @@ package keeper_test
 
 import (
 	"fmt"
+
 	"github.com/LumeraProtocol/lumera/x/action/v1/common"
 	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
 

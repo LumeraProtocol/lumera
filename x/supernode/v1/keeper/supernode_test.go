@@ -2,8 +2,9 @@ package keeper_test
 
 import (
 	"fmt"
+
 	keeper2 "github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
+	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
 	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
 	"context"

@@ -18,15 +18,16 @@ service Msg {
   // parameters. The authority defaults to the x/gov module account.
   rpc UpdateParams (MsgUpdateParams) returns (MsgUpdateParamsResponse);
   rpc Claim        (MsgClaim       ) returns (MsgClaimResponse       );
+  rpc DelayedClaim (MsgDelayedClaim) returns (MsgDelayedClaimResponse);
 }
 // MsgUpdateParams is the Msg/UpdateParams request type.
 // MsgUpdateParams is the Msg/UpdateParams request type.
 message MsgUpdateParams {
   option (cosmos.msg.v1.signer) = "authority";
-
+  
   // authority is the address that controls the module (defaults to x/gov unless overwritten).
   string authority = 1;
-
+  
   // params defines the x/claim parameters to update.
   // NOTE: All parameters must be supplied.
   Params params = 2 [(gogoproto.nullable) = false];
@@ -37,9 +38,8 @@ message MsgUpdateParams {
 message MsgUpdateParamsResponse {}
 
 message MsgClaim {
-  
   option (cosmos.msg.v1.signer) = "creator";
-  string creator = 1;
+  string creator    = 1;
   string oldAddress = 2;
   string newAddress = 3 [(cosmos_proto.scalar) = "cosmos.AddressString"];
   string pubKey     = 4;
@@ -47,4 +47,16 @@ message MsgClaim {
 }
 
 message MsgClaimResponse {}
+
+message MsgDelayedClaim {
+  option (cosmos.msg.v1.signer) = "creator";
+  string creator    = 1;
+  string oldAddress = 2;
+  string newAddress = 3 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  string pubKey     = 4;
+  string signature  = 5;
+  uint32 tier       = 6;
+}
+
+message MsgDelayedClaimResponse {}
 

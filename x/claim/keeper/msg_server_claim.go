@@ -2,7 +2,6 @@ package keeper
 
 import (
 	"context"
-
 	"strconv"
 	"time"
 
@@ -12,7 +11,19 @@ import (
 	crypto "github.com/LumeraProtocol/lumera/x/claim/keeper/crypto"
 )
 
+// Define a type for account creation functions
+type AccountCreatorFunc func(sdk.Context, time.Time, sdk.AccAddress, sdk.Coins, uint32) (int64, error)
+
 func (k msgServer) Claim(goCtx context.Context, msg *types.MsgClaim) (*types.MsgClaimResponse, error) {
+	return k.processClaim(goCtx, msg, k.CreateBaseAccount, types.EventTypeClaimProcessed, 0)
+}
+
+func (k msgServer) processClaim(goCtx context.Context,
+	msg *types.MsgClaim,
+	createAccount AccountCreatorFunc,
+	eventName string,
+	vestedTier uint32,
+) (*types.MsgClaimResponse, error) {
 	ctx := sdk.UnwrapSDKContext(goCtx)
 	params := k.GetParams(ctx)
 
@@ -71,18 +82,20 @@ func (k msgServer) Claim(goCtx context.Context, msg *types.MsgClaim) (*types.Msg
 	}
 
 	// Increment block claims counter before processing
-	k.IncrementBlockClaimCount(ctx)
+	err = k.IncrementBlockClaimCount(ctx)
+	if err != nil {
+		// nothing to see here - just continue
+	}
 
 	destAddr, err := sdk.AccAddressFromBech32(msg.NewAddress)
 	if err != nil {
 		return nil, err
 	}
 
-	// Check if account exists, create if it doesn't
-	acc := k.accountKeeper.GetAccount(ctx, destAddr)
-	if acc == nil {
-		acc = k.accountKeeper.NewAccountWithAddress(ctx, destAddr)
-		k.accountKeeper.SetAccount(ctx, acc)
+	// Use the passed function to create the account if needed
+	endTime, err := createAccount(ctx, ctx.BlockTime(), destAddr, claimRecord.Balance, vestedTier)
+	if err != nil {
+		return nil, err
 	}
 
 	err = k.bankKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, destAddr, claimRecord.Balance)
@@ -93,22 +106,37 @@ func (k msgServer) Claim(goCtx context.Context, msg *types.MsgClaim) (*types.Msg
 	// Mark the claim as processed
 	claimRecord.Claimed = true
 	claimRecord.ClaimTime = ctx.BlockTime().Unix()
-	ClaimTimeString := strconv.FormatInt(claimRecord.ClaimTime, 10)
+	claimRecord.DestAddress = msg.NewAddress
+	claimRecord.VestedTier = vestedTier
+	claimTimeString := strconv.FormatInt(claimRecord.ClaimTime, 10)
+	endTimeStr := strconv.FormatInt(endTime, 10)
+
 	err = k.SetClaimRecord(ctx, claimRecord)
 	if err != nil {
 		return nil, err
 	}
+
 	// Emit claim processed event
 	ctx.EventManager().EmitEvent(
 		sdk.NewEvent(
-			types.EventTypeClaimProcessed,
+			eventName,
 			sdk.NewAttribute(sdk.AttributeKeyModule, types.ModuleName),
 			sdk.NewAttribute(sdk.AttributeKeyAmount, claimRecord.Balance.String()),
 			sdk.NewAttribute(types.AttributeKeyOldAddress, msg.OldAddress),
 			sdk.NewAttribute(types.AttributeKeyNewAddress, msg.NewAddress),
-			sdk.NewAttribute(types.AttributeKeyClaimTime, ClaimTimeString),
+			sdk.NewAttribute(types.AttributeKeyClaimTime, claimTimeString),
+			sdk.NewAttribute(types.AttributeKeyDelayedEndTime, endTimeStr),
 		),
 	)
 
 	return &types.MsgClaimResponse{}, nil
+}
+
+func (k msgServer) CreateBaseAccount(ctx sdk.Context, _ time.Time, destAddr sdk.AccAddress, _ sdk.Coins, _ uint32) (int64, error) {
+	acc := k.accountKeeper.GetAccount(ctx, destAddr)
+	if acc == nil {
+		acc = k.accountKeeper.NewAccountWithAddress(ctx, destAddr)
+		k.accountKeeper.SetAccount(ctx, acc)
+	}
+	return 0, nil
 }

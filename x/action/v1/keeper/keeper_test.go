@@ -2,10 +2,11 @@ package keeper_test
 
 import (
 	"fmt"
+	"testing"
+
 	keeper2 "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
-	"testing"
 
 	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
 

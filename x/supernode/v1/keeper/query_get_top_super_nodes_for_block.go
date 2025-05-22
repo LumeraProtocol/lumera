@@ -4,9 +4,10 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"math/big"
 	"sort"
+
+	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
 	errorsmod "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"

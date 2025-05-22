@@ -1,10 +1,11 @@
 package keeper_test
 
 import (
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"testing"
+
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
+	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/golang/mock/gomock"
@@ -33,6 +34,7 @@ func TestKeeper_GetSuperNodeBySuperNodeAddress(t *testing.T) {
 				Height: 1,
 			},
 		},
+		P2PPort: "26657",
 	}
 
 	testCases := []struct {

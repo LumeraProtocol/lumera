@@ -2,8 +2,9 @@ package types
 
 import (
 	"fmt"
-	"github.com/LumeraProtocol/lumera/x/action/v1/common"
 	"strings"
+
+	"github.com/LumeraProtocol/lumera/x/action/v1/common"
 
 	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
 )

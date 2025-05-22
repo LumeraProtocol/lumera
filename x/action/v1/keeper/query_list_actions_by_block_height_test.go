@@ -1,9 +1,10 @@
 package keeper_test
 
 import (
+	"testing"
+
 	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	"github.com/LumeraProtocol/lumera/x/action/v1/types"
-	"testing"
 
 	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
 	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"

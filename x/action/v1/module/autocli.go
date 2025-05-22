@@ -19,7 +19,7 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 				},
 				{
 					RpcMethod:      "GetActionFee",
-					Use:            "get-action-fee [data-size]",
+					Use:            "get-action-fee [data-size-in-kb]",
 					Short:          "Query get-action-fee",
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "dataSize"}},
 				},

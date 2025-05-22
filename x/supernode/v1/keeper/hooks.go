@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"context"
+
 	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
 	errorsmod "cosmossdk.io/errors"

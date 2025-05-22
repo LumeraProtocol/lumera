@@ -2,8 +2,9 @@ package keeper_test
 
 import (
 	"fmt"
+
 	keeper2 "github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
+	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
 	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
 	"context"
@@ -40,6 +41,7 @@ func TestKeeper_SetAndQuerySuperNode(t *testing.T) {
 				Height: 1,
 			},
 		},
+		P2PPort: "26657",
 	}
 
 	testCases := []struct {
@@ -143,6 +145,7 @@ func TestKeeper_GetAllSuperNodes(t *testing.T) {
 				Height:  1,
 			},
 		},
+		P2PPort: "26657",
 	}
 
 	sn2 := types2.SuperNode{
@@ -161,6 +164,7 @@ func TestKeeper_GetAllSuperNodes(t *testing.T) {
 				Height:  1,
 			},
 		},
+		P2PPort: "26657",
 	}
 
 	testCases := []struct {
@@ -326,6 +330,7 @@ func makeSuperNodeWithOneState(valIndex int, state types2.SuperNodeState) types2
 				Height:  1,
 			},
 		},
+		P2PPort: "26657",
 	}
 	return sn
 }

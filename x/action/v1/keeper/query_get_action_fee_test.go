@@ -1,10 +1,11 @@
 package keeper_test
 
 import (
+	"testing"
+
 	"cosmossdk.io/math"
 	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
-	"testing"
 
 	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -38,7 +39,7 @@ func TestKeeper_GetActionFee(t *testing.T) {
 			setupParams: func(k keeper.Keeper, ctx sdk.Context) {
 				params := types2.DefaultParams()
 				params.BaseActionFee = sdk.NewCoin("ulume", math.NewInt(10000))
-				params.FeePerByte = sdk.NewCoin("ulume", math.NewInt(100))
+				params.FeePerKbyte = sdk.NewCoin("ulume", math.NewInt(100))
 				k.SetParams(ctx, params)
 			},
 			expectedFee: "10000",
@@ -49,7 +50,7 @@ func TestKeeper_GetActionFee(t *testing.T) {
 			setupParams: func(k keeper.Keeper, ctx sdk.Context) {
 				params := types2.DefaultParams()
 				params.BaseActionFee = sdk.NewCoin("ulume", math.NewInt(10000))
-				params.FeePerByte = sdk.NewCoin("ulume", math.NewInt(100))
+				params.FeePerKbyte = sdk.NewCoin("ulume", math.NewInt(100))
 				k.SetParams(ctx, params)
 			},
 			expectedFee: "30000", // 100 * 200 + 10000

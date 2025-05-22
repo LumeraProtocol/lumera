@@ -5,12 +5,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	keeper2 "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
-	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"math/rand"
 	"strconv"
 	"time"
+
+	keeper2 "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
+	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
 	"cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -35,7 +36,7 @@ func registerSenseAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account,
 	senseMetadata := generateRequestActionSenseMetadata(dataHash)
 
 	// 3. Determine fee amount (within valid range)
-	feeAmount := generateRandomFee(r, ctx, params.BaseActionFee.Add(params.FeePerByte))
+	feeAmount := generateRandomFee(r, ctx, params.BaseActionFee.Add(params.FeePerKbyte))
 
 	// 4. Generate an expiration time (current time + random duration >= expiration_duration)
 	expirationTime := getRandomExpirationTime(ctx, r, params)
@@ -80,7 +81,7 @@ func registerCascadeAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Accoun
 	cascadeMetadata := generateRequestActionCascadeMetadata(dataHash, fileName, simAccount)
 
 	// 3. Determine fee amount (within valid range)
-	feeAmount := generateRandomFee(r, ctx, params.BaseActionFee.Add(params.FeePerByte))
+	feeAmount := generateRandomFee(r, ctx, params.BaseActionFee.Add(params.FeePerKbyte))
 
 	// 4. Generate an expiration time (current time + random duration)
 	expirationTime := getRandomExpirationTime(ctx, r, params)
@@ -1030,6 +1031,8 @@ func registerSupernode(r *rand.Rand, ctx sdk.Context, k keeper2.Keeper, accs []s
 	// Generate a random version
 	version := fmt.Sprintf("v%d.%d.%d", r.Intn(10), r.Intn(10), r.Intn(10))
 
+	p2pPort := fmt.Sprintf("%d", r.Intn(65535))
+
 	supernode := types.SuperNode{
 		ValidatorAddress: validatorAddress,
 		SupernodeAccount: simAccount.Address.String(),
@@ -1051,6 +1054,7 @@ func registerSupernode(r *rand.Rand, ctx sdk.Context, k keeper2.Keeper, accs []s
 				Height:  ctx.BlockHeight(),
 			},
 		},
+		P2PPort: p2pPort,
 	}
 
 	sk := k.GetSupernodeKeeper()

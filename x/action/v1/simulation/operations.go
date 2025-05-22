@@ -1,9 +1,10 @@
 package simulation
 
 import (
+	"math/rand"
+
 	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	"github.com/LumeraProtocol/lumera/x/action/v1/types"
-	"math/rand"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	simtypes "github.com/cosmos/cosmos-sdk/types/simulation"

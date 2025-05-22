@@ -1,9 +1,10 @@
 package keeper
 
 import (
+	"reflect"
+
 	"github.com/LumeraProtocol/lumera/x/action/v1/common"
 	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
-	"reflect"
 
 	"cosmossdk.io/errors"
 	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"

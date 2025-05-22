@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+
 	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
 	"github.com/LumeraProtocol/lumera/x/action/v1/common"
 )

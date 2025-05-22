@@ -1,9 +1,10 @@
 package system_test
 
 import (
+	"testing"
+
 	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
 	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-	"testing"
 
 	sdkmath "cosmossdk.io/math"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
@@ -59,6 +60,7 @@ func TestStartSupernode(t *testing.T) {
 							Height:  suite.sdkCtx.BlockHeight(),
 						},
 					},
+					P2PPort: "26657",
 				}
 				err := suite.app.SupernodeKeeper.SetSuperNode(suite.sdkCtx, disabledSN)
 				require.NoError(t, err)
@@ -124,6 +126,7 @@ func TestStartSupernode(t *testing.T) {
 							Height:  suite.sdkCtx.BlockHeight(),
 						},
 					},
+					P2PPort: "26657",
 				}
 				err := suite.app.SupernodeKeeper.SetSuperNode(suite.sdkCtx, disabledSN)
 				require.NoError(t, err)
@@ -155,6 +158,7 @@ func TestStartSupernode(t *testing.T) {
 							Height:  suite.sdkCtx.BlockHeight(),
 						},
 					},
+					P2PPort: "26657",
 				}
 				err := suite.app.SupernodeKeeper.SetSuperNode(suite.sdkCtx, activeSN)
 				require.NoError(t, err)

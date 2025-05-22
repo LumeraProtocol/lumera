@@ -70,9 +70,9 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 				},
 				{
 					RpcMethod:      "RegisterSupernode",
-					Use:            "register-supernode [validator-address] [ip-address] [version] [supernode-account]",
+					Use:            "register-supernode [validator-address] [ip-address] [version] [supernode-account] [p2p-port]",
 					Short:          "Send a register-supernode tx",
-					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validatorAddress"}, {ProtoField: "ipAddress"}, {ProtoField: "version"}, {ProtoField: "supernodeAccount"}},
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validatorAddress"}, {ProtoField: "ipAddress"}, {ProtoField: "version"}, {ProtoField: "supernodeAccount"}, {ProtoField: "p2p_port"}},
 				},
 				{
 					RpcMethod:      "DeregisterSupernode",

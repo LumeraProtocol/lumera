@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"context"
+
 	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
 	errorsmod "cosmossdk.io/errors"
@@ -68,6 +69,7 @@ func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types2.MsgRegis
 				Height:  ctx.BlockHeight(),
 			},
 		},
+		P2PPort: msg.P2PPort,
 	}
 
 	// Validate the SuperNode struct

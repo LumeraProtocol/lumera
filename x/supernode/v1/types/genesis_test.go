@@ -1,8 +1,9 @@
 package types_test
 
 import (
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"testing"
+
+	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
 	"github.com/stretchr/testify/require"
 )
@@ -14,15 +15,9 @@ func TestGenesisState_Validate(t *testing.T) {
 		valid    bool
 	}{
 		{
-			desc:     "default is valid",
-			genState: types2.DefaultGenesis(),
-			valid:    true,
-		},
-		{
-			desc:     "valid genesis state",
+			desc: "valid genesis state",
 			genState: &types2.GenesisState{
-
-				// this line is used by starport scaffolding # types/genesis/validField
+				Params: types2.DefaultParams(), // Use default params
 			},
 			valid: true,
 		},

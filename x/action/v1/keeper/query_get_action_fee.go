@@ -2,8 +2,9 @@ package keeper
 
 import (
 	"context"
-	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 	"strconv"
+
+	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"google.golang.org/grpc/codes"
@@ -24,8 +25,8 @@ func (k *Keeper) GetActionFee(goCtx context.Context, req *types.QueryGetActionFe
 
 	params := k.GetParams(ctx)
 
-	// Calculate: FeePerByte * DataSize + BaseActionFee
-	perByteCost := params.FeePerByte.Amount.MulRaw(dataSize)
+	// Calculate: FeePerKbyte * DataSize + BaseActionFee
+	perByteCost := params.FeePerKbyte.Amount.MulRaw(dataSize)
 	totalAmount := perByteCost.Add(params.BaseActionFee.Amount)
 
 	return &types.QueryGetActionFeeResponse{Amount: totalAmount.String()}, nil

@@ -2,8 +2,9 @@
 package types_test
 
 import (
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"testing"
+
+	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
@@ -43,6 +44,7 @@ func TestSuperNodeValidation(t *testing.T) {
 						Height:  1,
 					},
 				},
+				P2PPort: "26657",
 			},
 			expectError: false,
 		},
@@ -90,6 +92,33 @@ func TestSuperNodeValidation(t *testing.T) {
 			},
 			expectError: true,
 			errorType:   types2.ErrEmptyVersion,
+		},
+		{
+			name: "empty p2p-address",
+			supernode: types2.SuperNode{
+				ValidatorAddress: valAddr.String(),
+				SupernodeAccount: accAddr.String(),
+				Evidence:         []*types2.Evidence{},
+				Version:          "1.0.0",
+				Metrics: &types2.MetricsAggregate{
+					Metrics:     make(map[string]float64),
+					ReportCount: 0,
+				},
+				States: []*types2.SuperNodeStateRecord{
+					{
+						State:  types2.SuperNodeStateActive,
+						Height: 1,
+					},
+				},
+				PrevIpAddresses: []*types2.IPAddressHistory{
+					{
+						Address: "192.168.1.1",
+						Height:  1,
+					},
+				},
+				P2PPort: "",
+			},
+			expectError: false,
 		},
 	}
 

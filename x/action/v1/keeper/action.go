@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
-	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"slices"
 	"strings"
+
+	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
 	"cosmossdk.io/errors"
 	"cosmossdk.io/math"
@@ -734,7 +735,7 @@ func (k *Keeper) getLastActionID(ctx sdk.Context) (uint64, error) {
 func (k *Keeper) validatePrice(ctx context.Context, price sdk.Coin) error {
 	params := k.GetParams(ctx)
 
-	minFeeAmount := params.FeePerByte.Amount.Add(params.BaseActionFee.Amount)
+	minFeeAmount := params.FeePerKbyte.Amount.Add(params.BaseActionFee.Amount)
 
 	if price.Amount.LT(minFeeAmount) {
 		return errors.Wrapf(

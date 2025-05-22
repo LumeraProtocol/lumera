@@ -3,10 +3,11 @@ package action_test
 import (
 	"encoding/base64"
 	"fmt"
-	actionkeeper "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
-	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 	"testing"
 	"time"
+
+	actionkeeper "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
+	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 
 	"cosmossdk.io/math"
 	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
@@ -707,7 +708,7 @@ func (suite *KeeperIntegrationTestSuite) TestGetActionFee() {
 
 	// Override with known values for testing
 	params.BaseActionFee = sdk.NewCoin("ulume", math.NewInt(10000))
-	params.FeePerByte = sdk.NewCoin("ulume", math.NewInt(100))
+	params.FeePerKbyte = sdk.NewCoin("ulume", math.NewInt(100))
 	suite.keeper.SetParams(suite.ctx, params)
 
 	testCases := []struct {

@@ -15,7 +15,7 @@ export const protobufPackage = "lumera.action";
 export interface Params {
   /** Fees */
   baseActionFee: Coin | undefined;
-  feePerByte:
+  feePerKbyte:
     | Coin
     | undefined;
   /** Limits */
@@ -37,7 +37,7 @@ export interface Params {
 function createBaseParams(): Params {
   return {
     baseActionFee: undefined,
-    feePerByte: undefined,
+    feePerKbyte: undefined,
     maxActionsPerBlock: 0,
     minSuperNodes: 0,
     maxDdAndFingerprints: 0,
@@ -55,8 +55,8 @@ export const Params: MessageFns<Params> = {
     if (message.baseActionFee !== undefined) {
       Coin.encode(message.baseActionFee, writer.uint32(10).fork()).join();
     }
-    if (message.feePerByte !== undefined) {
-      Coin.encode(message.feePerByte, writer.uint32(18).fork()).join();
+    if (message.feePerKbyte !== undefined) {
+      Coin.encode(message.feePerKbyte, writer.uint32(18).fork()).join();
     }
     if (message.maxActionsPerBlock !== 0) {
       writer.uint32(24).uint64(message.maxActionsPerBlock);
@@ -108,7 +108,7 @@ export const Params: MessageFns<Params> = {
             break;
           }
 
-          message.feePerByte = Coin.decode(reader, reader.uint32());
+          message.feePerKbyte = Coin.decode(reader, reader.uint32());
           continue;
         }
         case 3: {
@@ -195,7 +195,7 @@ export const Params: MessageFns<Params> = {
   fromJSON(object: any): Params {
     return {
       baseActionFee: isSet(object.baseActionFee) ? Coin.fromJSON(object.baseActionFee) : undefined,
-      feePerByte: isSet(object.feePerByte) ? Coin.fromJSON(object.feePerByte) : undefined,
+      feePerKbyte: isSet(object.feePerKbyte) ? Coin.fromJSON(object.feePerKbyte) : undefined,
       maxActionsPerBlock: isSet(object.maxActionsPerBlock) ? globalThis.Number(object.maxActionsPerBlock) : 0,
       minSuperNodes: isSet(object.minSuperNodes) ? globalThis.Number(object.minSuperNodes) : 0,
       maxDdAndFingerprints: isSet(object.maxDdAndFingerprints) ? globalThis.Number(object.maxDdAndFingerprints) : 0,
@@ -213,8 +213,8 @@ export const Params: MessageFns<Params> = {
     if (message.baseActionFee !== undefined) {
       obj.baseActionFee = Coin.toJSON(message.baseActionFee);
     }
-    if (message.feePerByte !== undefined) {
-      obj.feePerByte = Coin.toJSON(message.feePerByte);
+    if (message.feePerKbyte !== undefined) {
+      obj.feePerKbyte = Coin.toJSON(message.feePerKbyte);
     }
     if (message.maxActionsPerBlock !== 0) {
       obj.maxActionsPerBlock = Math.round(message.maxActionsPerBlock);
@@ -254,8 +254,8 @@ export const Params: MessageFns<Params> = {
     message.baseActionFee = (object.baseActionFee !== undefined && object.baseActionFee !== null)
       ? Coin.fromPartial(object.baseActionFee)
       : undefined;
-    message.feePerByte = (object.feePerByte !== undefined && object.feePerByte !== null)
-      ? Coin.fromPartial(object.feePerByte)
+    message.feePerKbyte = (object.feePerKbyte !== undefined && object.feePerKbyte !== null)
+      ? Coin.fromPartial(object.feePerKbyte)
       : undefined;
     message.maxActionsPerBlock = object.maxActionsPerBlock ?? 0;
     message.minSuperNodes = object.minSuperNodes ?? 0;

@@ -2,10 +2,11 @@ package keeper
 
 import (
 	"context"
+	"testing"
+
 	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-	"testing"
 
 	"cosmossdk.io/math"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"

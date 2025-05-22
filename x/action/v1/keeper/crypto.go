@@ -6,18 +6,20 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"github.com/LumeraProtocol/lumera/x/action/v1/types"
-	"golang.org/x/sync/semaphore"
 	"io"
 	"runtime"
 	"time"
+
+	"github.com/LumeraProtocol/lumera/x/action/v1/types"
+	"golang.org/x/sync/semaphore"
+
+	"math/big"
 
 	errorsmod "cosmossdk.io/errors"
 	"github.com/cosmos/btcutil/base58"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/klauspost/compress/zstd"
 	"lukechampine.com/blake3"
-	"math/big"
 )
 
 const (

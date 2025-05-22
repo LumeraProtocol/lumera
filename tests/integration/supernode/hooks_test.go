@@ -2,6 +2,7 @@ package integration_test
 
 import (
 	"fmt"
+
 	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
 	sdkmath "cosmossdk.io/math"
@@ -24,7 +25,7 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorBondedHook() {
 			name: "when validator is bonded and meet supernode requirements, it should be active",
 			setup: func() {
 				params := types2.Params{
-					MinimumStakeForSn: 1000000,
+					MinimumStakeForSn: sdk.NewCoin("ulume", sdkmath.NewInt(1000000)),
 				}
 				suite.keeper.SetParams(suite.ctx, params)
 
@@ -34,6 +35,7 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorBondedHook() {
 					Version:          "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					P2PPort:          "26657",
 				}
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
 
@@ -71,7 +73,7 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorBondedHook() {
 			name: "when the validator is bonded but jailed, it should disabled",
 			setup: func() {
 				params := types2.Params{
-					MinimumStakeForSn: 1000000,
+					MinimumStakeForSn: sdk.NewCoin("ulume", sdkmath.NewInt(1000000)),
 				}
 				suite.keeper.SetParams(suite.ctx, params)
 
@@ -81,6 +83,7 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorBondedHook() {
 					Version:          "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					P2PPort:          "26657",
 				}
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
 
@@ -146,7 +149,7 @@ func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
 			name: "when the validator begins un-bonding and the stake falls below minimum but is not jailed, it should be disabled",
 			setup: func() {
 				params := types2.Params{
-					MinimumStakeForSn: 1000000,
+					MinimumStakeForSn: sdk.NewCoin("ulume", sdkmath.NewInt(1000000)),
 				}
 				suite.keeper.SetParams(suite.ctx, params)
 
@@ -156,6 +159,7 @@ func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
 					Version:          "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					P2PPort:          "26657",
 				}
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
 
@@ -184,7 +188,7 @@ func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
 			name: "when the validator begins un-bonding and stake does not fall below minimum but is jailed, it should be disabled",
 			setup: func() {
 				params := types2.Params{
-					MinimumStakeForSn: 1000000,
+					MinimumStakeForSn: sdk.NewCoin("ulume", sdkmath.NewInt(1000000)),
 				}
 				suite.keeper.SetParams(suite.ctx, params)
 
@@ -194,6 +198,7 @@ func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
 					Version:          "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					P2PPort:          "26657",
 				}
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
 
@@ -232,7 +237,7 @@ func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
 			name: "when the validator begins un-bonding but stake does not fall below minimum and is not jailed, it should not be disabled",
 			setup: func() {
 				params := types2.Params{
-					MinimumStakeForSn: 1000000,
+					MinimumStakeForSn: sdk.NewCoin("ulume", sdkmath.NewInt(1000000)),
 				}
 				suite.keeper.SetParams(suite.ctx, params)
 
@@ -242,6 +247,7 @@ func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
 					Version:          "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					P2PPort:          "26657",
 				}
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
 
@@ -310,6 +316,7 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorRemovedHook() {
 					Version:          "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					P2PPort:          "26657",
 				}
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
 			},
@@ -363,10 +370,11 @@ func (suite *KeeperIntegrationSuite) TestBeforeDelegationSharesModifiedHook() {
 					Version:          "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					P2PPort:          "26657",
 				}
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
 				params := types2.Params{
-					MinimumStakeForSn: 1000000,
+					MinimumStakeForSn: sdk.NewCoin("ulume", sdkmath.NewInt(1000000)),
 				}
 				suite.keeper.SetParams(suite.ctx, params)
 

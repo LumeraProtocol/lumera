@@ -8,9 +8,12 @@
 package lumeraidmocks
 
 import (
+	context "context"
 	reflect "reflect"
 
 	securekeyx "github.com/LumeraProtocol/lumera/x/lumeraid/securekeyx"
+	types "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+	types0 "github.com/cosmos/cosmos-sdk/x/auth/types"
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -94,4 +97,57 @@ func (m *MockKeyExchanger) PeerType() securekeyx.PeerType {
 func (mr *MockKeyExchangerMockRecorder) PeerType() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PeerType", reflect.TypeOf((*MockKeyExchanger)(nil).PeerType))
+}
+
+// MockKeyExchangerValidator is a mock of KeyExchangerValidator interface.
+type MockKeyExchangerValidator struct {
+	ctrl     *gomock.Controller
+	recorder *MockKeyExchangerValidatorMockRecorder
+}
+
+// MockKeyExchangerValidatorMockRecorder is the mock recorder for MockKeyExchangerValidator.
+type MockKeyExchangerValidatorMockRecorder struct {
+	mock *MockKeyExchangerValidator
+}
+
+// NewMockKeyExchangerValidator creates a new mock instance.
+func NewMockKeyExchangerValidator(ctrl *gomock.Controller) *MockKeyExchangerValidator {
+	mock := &MockKeyExchangerValidator{ctrl: ctrl}
+	mock.recorder = &MockKeyExchangerValidatorMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockKeyExchangerValidator) EXPECT() *MockKeyExchangerValidatorMockRecorder {
+	return m.recorder
+}
+
+// AccountInfoByAddress mocks base method.
+func (m *MockKeyExchangerValidator) AccountInfoByAddress(ctx context.Context, addr string) (*types0.QueryAccountInfoResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AccountInfoByAddress", ctx, addr)
+	ret0, _ := ret[0].(*types0.QueryAccountInfoResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AccountInfoByAddress indicates an expected call of AccountInfoByAddress.
+func (mr *MockKeyExchangerValidatorMockRecorder) AccountInfoByAddress(ctx, addr interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AccountInfoByAddress", reflect.TypeOf((*MockKeyExchangerValidator)(nil).AccountInfoByAddress), ctx, addr)
+}
+
+// GetSupernodeBySupernodeAddress mocks base method.
+func (m *MockKeyExchangerValidator) GetSupernodeBySupernodeAddress(ctx context.Context, address string) (*types.SuperNode, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSupernodeBySupernodeAddress", ctx, address)
+	ret0, _ := ret[0].(*types.SuperNode)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetSupernodeBySupernodeAddress indicates an expected call of GetSupernodeBySupernodeAddress.
+func (mr *MockKeyExchangerValidatorMockRecorder) GetSupernodeBySupernodeAddress(ctx, address interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSupernodeBySupernodeAddress", reflect.TypeOf((*MockKeyExchangerValidator)(nil).GetSupernodeBySupernodeAddress), ctx, address)
 }

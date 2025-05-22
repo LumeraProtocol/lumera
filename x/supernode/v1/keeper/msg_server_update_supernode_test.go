@@ -1,10 +1,11 @@
 package keeper_test
 
 import (
-	keeper2 "github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"testing"
+
+	keeper2 "github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
+	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
@@ -35,6 +36,7 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 				Height: 1,
 			},
 		},
+		P2PPort: "26657",
 	}
 
 	testCases := []struct {
@@ -88,6 +90,7 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 							Height: 1,
 						},
 					},
+					P2PPort: "26657",
 				}
 				require.NoError(t, k.SetSuperNode(ctx, newSupernode))
 			},
@@ -127,6 +130,7 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 							Height: 1,
 						},
 					},
+					P2PPort: "26657",
 				}
 				require.NoError(t, k.SetSuperNode(ctx, newSupernode))
 			},

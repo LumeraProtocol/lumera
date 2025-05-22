@@ -1,8 +1,9 @@
 package keeper_test
 
 import (
-	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
 	"time"
+
+	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
 )
 
 func (suite *KeeperTestSuite) TestEndBlocker_ChecksExpiredActions() {

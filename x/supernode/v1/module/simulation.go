@@ -1,9 +1,10 @@
 package supernode
 
 import (
+	"math/rand"
+
 	simulation2 "github.com/LumeraProtocol/lumera/x/supernode/v1/simulation"
 	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-	"math/rand"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"

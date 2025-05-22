@@ -1,11 +1,12 @@
 package keeper_test
 
 import (
+	"testing"
+	"time"
+
 	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
-	"testing"
-	"time"
 
 	"github.com/stretchr/testify/suite"
 
@@ -18,9 +19,9 @@ import (
 // ExpirationTestSuite tests the expiration functionality
 type ExpirationTestSuite struct {
 	suite.Suite
-	ctx       sdk.Context
-	keeper    keeper.Keeper
-	signature string
+	ctx         sdk.Context
+	keeper      keeper.Keeper
+	signature   string
 	testAddr    sdk.AccAddress
 	testValAddr sdk.ValAddress
 	blockTime   time.Time

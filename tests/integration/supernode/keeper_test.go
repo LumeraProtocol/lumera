@@ -2,10 +2,11 @@ package integration_test
 
 import (
 	"fmt"
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"os"
 	"testing"
+
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
 	sdkmath "cosmossdk.io/math"
 	"github.com/LumeraProtocol/lumera/app"
@@ -71,6 +72,7 @@ func (suite *KeeperIntegrationSuite) TestEnableSuperNode() {
 					Version:          "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					P2PPort:          "26657",
 				}
 				err := suite.keeper.SetSuperNode(suite.ctx, supernode)
 				require.NoError(suite.T(), err)
@@ -125,6 +127,7 @@ func (suite *KeeperIntegrationSuite) TestIsSupernodeActive() {
 					Version:          "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					P2PPort:          "26657",
 				}
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
 			},
@@ -173,6 +176,7 @@ func (suite *KeeperIntegrationSuite) TestDisableSuperNode() {
 					Version:          "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					P2PPort:          "26657",
 				}
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
 			},
@@ -221,7 +225,7 @@ func (suite *KeeperIntegrationSuite) TestMeetSupernodeRequirements() {
 			name: "when supernode meets requirements, it should return true",
 			setup: func() {
 				params := types2.Params{
-					MinimumStakeForSn: 1000000,
+					MinimumStakeForSn: sdk.NewCoin("stake", sdkmath.NewInt(1000000)),
 				}
 				suite.keeper.SetParams(suite.ctx, params)
 
@@ -254,7 +258,7 @@ func (suite *KeeperIntegrationSuite) TestMeetSupernodeRequirements() {
 			name: "when the stake is below minimum, should return false",
 			setup: func() {
 				params := types2.Params{
-					MinimumStakeForSn: 1000000,
+					MinimumStakeForSn: sdk.NewCoin("stake", sdkmath.NewInt(1000000)),
 				}
 				suite.keeper.SetParams(suite.ctx, params)
 
@@ -299,6 +303,7 @@ func (suite *KeeperIntegrationSuite) TestSetSuperNodeAndQuerySupernode() {
 		Version:          "1.0.0",
 		States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 		PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+		P2PPort:          "26657",
 	}
 
 	require.NoError(suite.T(), suite.keeper.SetSuperNode(suite.ctx, supernode))
@@ -327,6 +332,7 @@ func (suite *KeeperIntegrationSuite) TestGetSuperNodeBySuperNodeAddress() {
 					Version:          "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					P2PPort:          "26657",
 				}
 				require.NoError(suite.T(), suite.keeper.SetSuperNode(suite.ctx, supernode))
 			},

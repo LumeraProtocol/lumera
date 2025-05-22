@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"fmt"
+
 	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
 	"cosmossdk.io/core/store"

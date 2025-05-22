@@ -6,20 +6,12 @@ import (
 	"time"
 
 	"github.com/LumeraProtocol/lumera/x/claim/types"
-	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/stretchr/testify/require"
 )
 
 func TestGenesisState_Validate(t *testing.T) {
 	// Setup common test values
 	validEndTime := time.Now().Add(time.Hour * 48).Unix()
-
-	// Create valid module account
-	moduleAcc := authtypes.NewEmptyModuleAccount(
-		types.ModuleName,
-		authtypes.Minter,
-		authtypes.Burner,
-	)
 
 	testCases := []struct {
 		name     string
@@ -40,7 +32,7 @@ func TestGenesisState_Validate(t *testing.T) {
 					MaxClaimsPerBlock: 50,
 				},
 				[]types.ClaimRecord{}, // Should always be empty in genesis
-				moduleAcc,
+
 				types.DefaultClaimableAmountConst, // Fixed claimable amount
 				types.DefaultClaimsDenom,
 			),
@@ -55,7 +47,7 @@ func TestGenesisState_Validate(t *testing.T) {
 					MaxClaimsPerBlock: 50,
 				},
 				[]types.ClaimRecord{},
-				moduleAcc,
+
 				types.DefaultClaimableAmountConst,
 				types.DefaultClaimsDenom,
 			),
@@ -70,7 +62,7 @@ func TestGenesisState_Validate(t *testing.T) {
 					MaxClaimsPerBlock: 0,
 				},
 				[]types.ClaimRecord{},
-				moduleAcc,
+
 				types.DefaultClaimableAmountConst,
 				types.DefaultClaimsDenom,
 			),
@@ -93,28 +85,19 @@ func TestGenesisState_Validate(t *testing.T) {
 
 func TestDefaultGenesis(t *testing.T) {
 	genState := types.DefaultGenesis()
-
 	require.NotNil(t, genState)
 	require.Equal(t, types.DefaultParams(), genState.Params)
 	require.Empty(t, genState.ClaimRecords, "Genesis claim records should be empty")
 	require.Equal(t, uint64(types.DefaultClaimableAmountConst), genState.TotalClaimableAmount, fmt.Sprintf("total claimable amount should be fixed at %d", types.DefaultClaimableAmountConst))
-
 	// Validate default genesis state
 	require.NoError(t, genState.Validate())
 }
 
 func TestNewGenesisState(t *testing.T) {
 	params := types.DefaultParams()
-	moduleAcc := authtypes.NewEmptyModuleAccount(
-		types.ModuleName,
-		authtypes.Minter,
-		authtypes.Burner,
-	)
-
 	genState := types.NewGenesisState(
 		params,
-		[]types.ClaimRecord{}, // Should be empty in genesis
-		moduleAcc,
+		[]types.ClaimRecord{},             // Should be empty in genesis
 		types.DefaultClaimableAmountConst, // Fixed claimable amount
 		types.DefaultClaimsDenom,
 	)
@@ -122,6 +105,5 @@ func TestNewGenesisState(t *testing.T) {
 	require.NotNil(t, genState)
 	require.Equal(t, params, genState.Params)
 	require.Empty(t, genState.ClaimRecords, "Genesis claim records should be empty")
-	require.Equal(t, moduleAcc.String(), genState.ModuleAccount)
 	require.Equal(t, uint64(types.DefaultClaimableAmountConst), genState.TotalClaimableAmount, fmt.Sprintf("Total claimable amount should be fixed at %d", types.DefaultClaimableAmountConst))
 }

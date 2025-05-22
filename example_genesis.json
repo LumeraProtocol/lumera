@@ -15,8 +15,8 @@
           "denom": "ulume"
         },
         "expiration_duration": "24h0m0s",
-        "fee_per_byte": {
-          "amount": "100",
+        "fee_per_kbyte": {
+          "amount": "10",
           "denom": "ulume"
         },
         "foundation_fee_share": "0.000000000000000000",

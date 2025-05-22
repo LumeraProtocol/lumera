@@ -1,9 +1,10 @@
 package app
 
 import (
+	"time"
+
 	actionmoduletypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	supernodemoduletypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-	"time"
 
 	runtimev1alpha1 "cosmossdk.io/api/cosmos/app/runtime/v1alpha1"
 	appv1alpha1 "cosmossdk.io/api/cosmos/app/v1alpha1"

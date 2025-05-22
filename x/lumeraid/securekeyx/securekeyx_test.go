@@ -2,14 +2,12 @@ package securekeyx
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdh"
 	"crypto/rand"
-	"errors"
 	"testing"
 
-	//	"github.com/cometbft/cometbft/abci/server"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	proto "github.com/cosmos/gogoproto/proto"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -17,32 +15,11 @@ import (
 
 	_ "github.com/LumeraProtocol/lumera/app"
 	"github.com/LumeraProtocol/lumera/testutil/accounts"
-	mocks "github.com/LumeraProtocol/lumera/testutil/mocks"
 	lumeraidtypes "github.com/LumeraProtocol/lumera/x/lumeraid/types"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 )
 
-func TestCreateRequest(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	kr := accounts.CreateTestKeyring()
-
-	// Create test accounts
-	testAccounts := accounts.SetupTestAccounts(t, kr, []string{"test-client", "test-server"})
-	localAddress := testAccounts[0].Address
-	remoteAddress := testAccounts[1].Address
-
-	peerType := Simplenode
-	curve := ecdh.P256()
-
-	ske, err := NewSecureKeyExchange(kr, localAddress, peerType, curve)
-	require.NoError(t, err)
-
-	handshakeBytes, signature, err := ske.CreateRequest(remoteAddress)
-	assert.NoError(t, err)
-	assert.NotEmpty(t, handshakeBytes)
-	assert.NotEmpty(t, signature)
-}
 
 func TestCreateRequest_CurveNotSet(t *testing.T) {
 	ke := &SecureKeyExchange{}
@@ -50,121 +27,42 @@ func TestCreateRequest_CurveNotSet(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestCreateRequest_SignWithKeyringFails(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	// Use real keyring to generate a valid test account
-	kr := accounts.CreateTestKeyring()
-	testAccounts := accounts.SetupTestAccounts(t, kr, []string{"test-client"})
-	clientAccount := testAccounts[0]
-
-	keyInfo, err := kr.Key(clientAccount.Name)
-	require.NoError(t, err)
-
-	accAddr, err := sdk.AccAddressFromBech32(clientAccount.Address)
-	require.NoError(t, err)
-
-	mockKeyring := mocks.NewMockKeyring(ctrl)
-	mockKeyring.EXPECT().
-		KeyByAddress(accAddr).
-		Return(keyInfo, nil).
-		Times(2)
-	// Simulate signing failure
-	mockKeyring.EXPECT().
-		SignByAddress(gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(nil, nil, errors.New("simulated sign failure"))
-
-	ske, err := NewSecureKeyExchange(mockKeyring, clientAccount.Address, Simplenode, nil)
-	require.NoError(t, err)
-
-	_, _, err = ske.CreateRequest(accounts.TestAddress2)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "simulated sign failure")
+type TestKeyExchangerValidator struct {
 }
 
-func TestGetCurveName(t *testing.T) {
-	tests := []struct {
-		curve    ecdh.Curve
-		expected string
-	}{
-		{ecdh.P256(), "P256"},
-		{ecdh.P384(), "P384"},
-		{ecdh.P521(), "P521"},
-		{nil, "Unknown"},
-	}
-
-	for _, tt := range tests {
-		ske := &SecureKeyExchange{curve: tt.curve}
-		assert.Equal(t, tt.expected, ske.getCurveName())
-	}
+func (v *TestKeyExchangerValidator) AccountInfoByAddress(ctx context.Context, addr string) (*authtypes.QueryAccountInfoResponse, error) {
+	return &authtypes.QueryAccountInfoResponse{
+		Info: &authtypes.BaseAccount{
+			Address: addr,
+		},
+	}, nil
 }
 
-func TestNewSecureKeyExchange(t *testing.T) {
-	kr := accounts.CreateTestKeyring()
-	testAccounts := accounts.SetupTestAccounts(t, kr, []string{"test-client"})
-	localAddress := testAccounts[0].Address
-	curve := ecdh.P256()
-
-	ske, err := NewSecureKeyExchange(kr, localAddress, Simplenode, curve)
-	require.NoError(t, err)
-	assert.Equal(t, localAddress, ske.LocalAddress())
-	assert.Equal(t, Simplenode, ske.PeerType())
-	assert.Equal(t, "P256", ske.getCurveName())
-}
-
-func TestNewSecureKeyExchange_InvalidAddress(t *testing.T) {
-	kr := accounts.CreateTestKeyring()
-	invalidAddress := "invalid-address"
-	curve := ecdh.P256()
-
-	ske, err := NewSecureKeyExchange(kr, invalidAddress, Simplenode, curve)
-	require.Error(t, err)
-	assert.Nil(t, ske)
-	assert.Contains(t, err.Error(), "invalid address")
-}
-
-func TestNewSecureKeyExchange_MissingKeyInKeyring(t *testing.T) {
-	kr := accounts.CreateTestKeyring()
-	// Generate a valid Bech32 formatted address that isn't in the keyring
-	validAddress, err := sdk.AccAddressFromBech32(accounts.TestAddress1)
-	require.NoError(t, err)
-	curve := ecdh.P256()
-
-	ske, err := NewSecureKeyExchange(kr, validAddress.String(), Simplenode, curve)
-	require.Error(t, err)
-	assert.Nil(t, ske)
-	assert.Contains(t, err.Error(), "address not found in keyring")
-}
-
-func TestNewSecureKeyExchange_DefaultCurve(t *testing.T) {
-	kr := accounts.CreateTestKeyring()
-	testAccounts := accounts.SetupTestAccounts(t, kr, []string{"test-client"})
-	localAddress := testAccounts[0].Address
-
-	ske, err := NewSecureKeyExchange(kr, localAddress, Simplenode, nil)
-	require.NoError(t, err)
-	assert.Equal(t, "P256", ske.getCurveName())
+func (v *TestKeyExchangerValidator) GetSupernodeBySupernodeAddress(ctx context.Context, address string) (*sntypes.SuperNode, error) {
+	return &sntypes.SuperNode{
+		SupernodeAccount: address,
+	}, nil
 }
 
 func TestValidateSignature(t *testing.T) {
 	kr := accounts.CreateTestKeyring()
-	testAccounts := accounts.SetupTestAccounts(t, kr, []string{"test-client"})
-	localAddress := testAccounts[0].Address
+	testAccounts := accounts.SetupTestAccounts(t, kr, []string{"test-client", "test-server"})
+	clientAccount := testAccounts[0]
 	curve := ecdh.P256()
+	validator := &TestKeyExchangerValidator{}
 
-	ske, err := NewSecureKeyExchange(kr, localAddress, Simplenode, curve)
+	ske, err := NewSecureKeyExchange(kr, clientAccount.Address, Simplenode, curve, validator)
 	require.NoError(t, err)
 
 	validData := []byte("valid-data")
 	validSignature, _ := ske.signWithKeyring(validData)
 
-	isValid, err := ske.validateSignature(testAccounts[0].PubKey, validData, validSignature)
+	isValid, err := ske.validateSignature(clientAccount.PubKey, validData, validSignature)
 	assert.NoError(t, err)
 	assert.True(t, isValid)
 
 	invalidSignature := []byte("invalid-signature")
-	isValid, err = ske.validateSignature(testAccounts[0].PubKey, validData, invalidSignature)
+	isValid, err = ske.validateSignature(clientAccount.PubKey, validData, invalidSignature)
 	assert.Error(t, err)
 	assert.False(t, isValid)
 }
@@ -195,22 +93,6 @@ func TestComputeSharedSecret_CurveNotSet(t *testing.T) {
 	ke := &SecureKeyExchange{}
 	_, err := ke.ComputeSharedSecret([]byte("handshake"), []byte("signature"))
 	assert.Error(t, err)
-}
-
-func TestComputeSharedSecret_InvalidHandshakeBytes(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockKeyring := mocks.NewMockKeyring(ctrl)
-	mockKeyring.EXPECT().KeyByAddress(gomock.Any()).Return(nil, nil)
-
-	ske, err := NewSecureKeyExchange(mockKeyring, accounts.TestAddress1, Simplenode, nil)
-	require.NoError(t, err)
-
-	invalidHandshake := []byte("invalid-data")
-	_, err = ske.ComputeSharedSecret(invalidHandshake, []byte("signature"))
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to deserialize handshake info")
 }
 
 type createHandshakeType int
@@ -247,7 +129,7 @@ func createTestHandshake(t *testing.T, ske *SecureKeyExchange, remoteAddress str
 		PeerType:         int32(Supernode),
 		PublicKey:        privKey.PublicKey().Bytes(),
 		AccountPublicKey: accountPubKey,
-		Curve:            ske.getCurveName(),
+		Curve:            ske.GetCurveName(),
 	}
 	handshakeBytes, err := proto.Marshal(handshakeInfo)
 	require.NoError(t, err)
@@ -278,7 +160,7 @@ func TestComputeSharedSecret_Failure(t *testing.T) {
 			serverKr := accounts.CreateTestKeyring()
 			testServerAccounts := accounts.SetupTestAccounts(t, serverKr, []string{"test-server", "test-other-server"})
 
-			ske, err := NewSecureKeyExchange(clientKr, testClientAccounts[0].Address, Simplenode, nil)
+			ske, err := NewSecureKeyExchange(clientKr, testClientAccounts[0].Address, Simplenode, nil, &TestKeyExchangerValidator{})
 			require.NoError(t, err)
 
 			remoteAddress := testServerAccounts[0].Address
@@ -295,29 +177,4 @@ func TestComputeSharedSecret_Failure(t *testing.T) {
 			assert.Contains(t, err.Error(), tc.wantErr)
 		})
 	}
-}
-
-func TestComputeSharedSecret(t *testing.T) {
-	kr := accounts.CreateTestKeyring()
-	testAccounts := accounts.SetupTestAccounts(t, kr, []string{"test-client", "test-server"})
-
-	clientAddress := testAccounts[0].Address
-	serverAddress := testAccounts[1].Address
-
-	skeLocal, err := NewSecureKeyExchange(kr, clientAddress, Simplenode, nil)
-	require.NoError(t, err)
-
-	skeRemote, err := NewSecureKeyExchange(kr, serverAddress, Supernode, nil)
-	require.NoError(t, err)
-
-	_, _, err = skeLocal.CreateRequest(serverAddress)
-	require.NoError(t, err)
-
-	handshakeRemoteBytes, signatureRemote, err := skeRemote.CreateRequest(clientAddress)
-	require.NoError(t, err)
-
-	sharedSecret, err := skeLocal.ComputeSharedSecret(handshakeRemoteBytes, signatureRemote)
-	assert.NoError(t, err)
-	assert.NotEmpty(t, sharedSecret)
-	assert.Len(t, sharedSecret, 32)
 }

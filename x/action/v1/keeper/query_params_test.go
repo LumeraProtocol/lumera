@@ -1,8 +1,9 @@
 package keeper_test
 
 import (
-	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	"testing"
+
+	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
 
 	"github.com/stretchr/testify/require"
 

@@ -6,6 +6,7 @@ import "gogoproto/gogo.proto";
 import "cosmos/base/v1beta1/coin.proto";
 import "amino/amino.proto";
 import "google/protobuf/timestamp.proto";
+import "cosmos_proto/cosmos.proto";
 
 
 message ClaimRecord {
@@ -18,4 +19,6 @@ message ClaimRecord {
   ];
   bool claimed = 3 [(gogoproto.jsontag) = "claimed", (amino.dont_omitempty) = true];
   int64 claimTime = 4 ;
+  string destAddress = 5 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  uint32 vestedTier = 6 [(gogoproto.jsontag) = "vestedTier"];
 }

@@ -2,9 +2,10 @@ package simulation
 
 import (
 	"fmt"
+	"math/rand"
+
 	keeper2 "github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
 	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-	"math/rand"
 
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -66,12 +67,15 @@ func SimulateMsgRegisterSupernode(
 		// Generate a random version
 		version := fmt.Sprintf("v%d.%d.%d", r.Intn(10), r.Intn(10), r.Intn(10))
 
+		p2pPort := fmt.Sprintf("%d", r.Intn(65535))
+
 		msg := &types2.MsgRegisterSupernode{
 			Creator:          simAccount.Address.String(),
 			ValidatorAddress: validatorAddress,
 			SupernodeAccount: simAccount.Address.String(),
 			IpAddress:        ipAddress,
 			Version:          version,
+			P2PPort:          p2pPort,
 		}
 
 		// Execute the message

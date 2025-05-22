@@ -1,9 +1,10 @@
 package simulation
 
 import (
+	"math/rand"
+
 	keeper2 "github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
 	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-	"math/rand"
 
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	sdk "github.com/cosmos/cosmos-sdk/types"

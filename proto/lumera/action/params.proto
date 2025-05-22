@@ -15,7 +15,7 @@ message Params {
   
   // Fees
   cosmos.base.v1beta1.Coin base_action_fee = 1 [(gogoproto.nullable) = false, (amino.dont_omitempty) = true];
-  cosmos.base.v1beta1.Coin fee_per_byte = 2 [(gogoproto.nullable) = false, (amino.dont_omitempty) = true];
+  cosmos.base.v1beta1.Coin fee_per_kbyte = 2 [(gogoproto.nullable) = false, (amino.dont_omitempty) = true];
 
   // Limits
   uint64 max_actions_per_block = 3;

@@ -25,6 +25,12 @@ service Query {
     option (google.api.http).get = "/LumeraProtocol/lumera/claim/claim_record/{address}";
   
   }
+  
+  // Queries a list of ListClaimed items.
+  rpc ListClaimed (QueryListClaimedRequest) returns (QueryListClaimedResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/claim/list_claimed/{vestedTerm}";
+  
+  }
 }
 // QueryParamsRequest is request type for the Query/Params RPC method.
 message QueryParamsRequest {}
@@ -42,5 +48,15 @@ message QueryClaimRecordRequest {
 
 message QueryClaimRecordResponse {
   ClaimRecord record = 1;
+}
+
+message QueryListClaimedRequest {
+  uint32                                vestedTerm  = 1;
+  cosmos.base.query.v1beta1.PageRequest pagination  = 2;
+}
+
+message QueryListClaimedResponse {
+  repeated ClaimRecord                   claims     = 1;
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
 }
 

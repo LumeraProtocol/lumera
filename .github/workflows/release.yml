@@ -5,6 +5,8 @@ on:
       - '**.md'
       - 'docs/**'
       - '.gitignore'
+    tags:
+      - 'v*'
   pull_request:
     branches: [ master ]
 

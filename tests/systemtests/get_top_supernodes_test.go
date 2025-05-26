@@ -38,7 +38,6 @@ func TestQueryGetTopSuperNodesForBlock(t *testing.T) {
 			"1.0.0",       // version
 			accountAddr,   // supernode account
 			"--from", nodeName,
-			"26556", // p2p-port
 		)
 		RequireTxSuccess(t, registerResp)
 	}
@@ -116,8 +115,6 @@ func TestQueryGetTopSuperNodesForBlockFlags(t *testing.T) {
 			"1.0.0",       // version
 			accountAddr,   // supernode account
 			"--from", nodeName,
-			"26556", // p2p-port
-
 		)
 		RequireTxSuccess(t, registerResp)
 	}

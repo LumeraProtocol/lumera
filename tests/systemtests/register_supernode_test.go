@@ -91,8 +91,6 @@ func TestSupernodeRegistrationSuccess(t *testing.T) {
 				"1.0.0",          // version
 				supernodeAccount, // supernode account
 				"--from", "node0",
-				"26556", // p2p-port
-
 			}
 
 			resp := cli.CustomCommand(registerCmd...)
@@ -192,7 +190,6 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 				"1.0.0",       // version
 				accountAddr,   // supernode account
 				"--from", keyName,
-				"26556", // p2p-port
 			)
 			t.Logf("Registration response: %s", registerResp)
 

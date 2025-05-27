@@ -88,7 +88,6 @@ func TestSupernodeRegistrationSuccess(t *testing.T) {
 				"tx", "supernode", "register-supernode",
 				valAddr,          // validator address
 				"192.168.1.1",    // IP address
-				"1.0.0",          // version
 				supernodeAccount, // supernode account
 				"--from", "node0",
 			}
@@ -187,7 +186,6 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 				"tx", "supernode", "register-supernode",
 				valAddr,       // validator address
 				"192.168.1.1", // IP address
-				"1.0.0",       // version
 				accountAddr,   // supernode account
 				"--from", keyName,
 			)

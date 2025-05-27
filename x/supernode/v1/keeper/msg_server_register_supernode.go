@@ -52,7 +52,6 @@ func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types2.MsgRegis
 		ValidatorAddress: msg.ValidatorAddress,
 		SupernodeAccount: msg.SupernodeAccount,
 		Evidence:         []*types2.Evidence{},
-		Version:          msg.Version,
 		Metrics: &types2.MetricsAggregate{
 			Metrics:     make(map[string]float64),
 			ReportCount: 0,
@@ -88,7 +87,6 @@ func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types2.MsgRegis
 			types2.EventTypeSupernodeRegistered,
 			sdk.NewAttribute(types2.AttributeKeyValidatorAddress, msg.ValidatorAddress),
 			sdk.NewAttribute(types2.AttributeKeyIPAddress, msg.IpAddress),
-			sdk.NewAttribute(types2.AttributeKeyVersion, msg.Version),
 		),
 	)
 

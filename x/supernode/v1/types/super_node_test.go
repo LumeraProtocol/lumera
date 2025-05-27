@@ -89,9 +89,20 @@ func TestSuperNodeValidation(t *testing.T) {
 				SupernodeAccount: accAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				Version:          "",
+				States: []*types2.SuperNodeStateRecord{
+					{
+						State:  types2.SuperNodeStateActive,
+						Height: 1,
+					},
+				},
+				PrevIpAddresses: []*types2.IPAddressHistory{
+					{
+						Address: "192.168.1.1",
+						Height:  1,
+					},
+				},
 			},
-			expectError: true,
-			errorType:   types2.ErrEmptyVersion,
+			expectError: false,
 		},
 		{
 			name: "empty p2p-address",

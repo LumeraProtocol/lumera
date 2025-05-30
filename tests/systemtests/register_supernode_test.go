@@ -88,11 +88,8 @@ func TestSupernodeRegistrationSuccess(t *testing.T) {
 				"tx", "supernode", "register-supernode",
 				valAddr,          // validator address
 				"192.168.1.1",    // IP address
-				"1.0.0",          // version
 				supernodeAccount, // supernode account
 				"--from", "node0",
-				"26556", // p2p-port
-
 			}
 
 			resp := cli.CustomCommand(registerCmd...)
@@ -189,10 +186,8 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 				"tx", "supernode", "register-supernode",
 				valAddr,       // validator address
 				"192.168.1.1", // IP address
-				"1.0.0",       // version
 				accountAddr,   // supernode account
 				"--from", keyName,
-				"26556", // p2p-port
 			)
 			t.Logf("Registration response: %s", registerResp)
 

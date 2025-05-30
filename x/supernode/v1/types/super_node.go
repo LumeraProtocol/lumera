@@ -6,6 +6,7 @@ import (
 
 const (
 	DefaultP2PPort = "4445"
+	DefaultVersion = "1.0.0"
 )
 
 // ValidatorAddr converts the validator address string to sdk.ValAddress
@@ -31,7 +32,7 @@ func (s *SuperNode) Validate() error {
 
 	// Check if version is not empty
 	if s.Version == "" {
-		return ErrEmptyVersion
+		s.Version = DefaultVersion
 	}
 
 	// Check if state is valid (not unspecified)

@@ -53,7 +53,6 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "192.168.1.1",
-				Version:          "1.0.0",
 				P2PPort:          "26657",
 			},
 			mockSetup: func(sk *supernodemocks.MockStakingKeeper, slk *supernodemocks.MockSlashingKeeper, bk *supernodemocks.MockBankKeeper) {
@@ -77,7 +76,6 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: "invalid", // not bech32 => error
 				IpAddress:        "192.168.1.1",
-				Version:          "1.0.0",
 			},
 			// no mock setup needed => fails earlier
 			expectedError: sdkerrors.ErrInvalidAddress,
@@ -89,7 +87,6 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 				Creator:          otherCreatorAddr.String(), // different from valAddr
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "192.168.1.1",
-				Version:          "1.0.0",
 			},
 			mockSetup: func(sk *supernodemocks.MockStakingKeeper, slk *supernodemocks.MockSlashingKeeper, bk *supernodemocks.MockBankKeeper) {
 				// No expectations here, because the code immediately returns unauthorized
@@ -104,7 +101,6 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "", // triggers types.ErrEmptyIPAddress
-				Version:          "1.0.0",
 			},
 			mockSetup: func(sk *supernodemocks.MockStakingKeeper, slk *supernodemocks.MockSlashingKeeper, bk *supernodemocks.MockBankKeeper) {
 				sk.EXPECT().
@@ -126,7 +122,6 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "192.168.1.1",
-				Version:          "1.0.0",
 			},
 			mockSetup: func(sk *supernodemocks.MockStakingKeeper, slk *supernodemocks.MockSlashingKeeper, bk *supernodemocks.MockBankKeeper) {
 				sk.EXPECT().
@@ -142,7 +137,6 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "192.168.1.1",
-				Version:          "1.0.0",
 			},
 			mockSetup: func(sk *supernodemocks.MockStakingKeeper, slk *supernodemocks.MockSlashingKeeper, bk *supernodemocks.MockBankKeeper) {
 				sk.EXPECT().
@@ -164,7 +158,6 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "192.168.1.1",
-				Version:          "1.0.0",
 			},
 			mockSetup: func(sk *supernodemocks.MockStakingKeeper, slk *supernodemocks.MockSlashingKeeper, bk *supernodemocks.MockBankKeeper) {
 				// We'll set unbonded, delegatorShares=0 => triggers the new check
@@ -188,7 +181,6 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "192.168.1.1",
-				Version:          "1.0.0",
 			},
 			mockSetup: func(sk *supernodemocks.MockStakingKeeper, slk *supernodemocks.MockSlashingKeeper, bk *supernodemocks.MockBankKeeper) {
 				sk.EXPECT().
@@ -210,7 +202,6 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "192.168.1.1",
-				Version:          "1.0.0",
 				P2PPort:          "26657",
 			},
 			mockSetup: func(sk *supernodemocks.MockStakingKeeper, slk *supernodemocks.MockSlashingKeeper, bk *supernodemocks.MockBankKeeper) {

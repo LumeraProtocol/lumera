@@ -13,7 +13,6 @@ func NewMsgRegisterSupernode(creator string, validatorAddress string, ipAddress 
 		Creator:          creator,
 		ValidatorAddress: validatorAddress,
 		IpAddress:        ipAddress,
-		Version:          version,
 	}
 }
 
@@ -34,8 +33,5 @@ func (msg *MsgRegisterSupernode) ValidateBasic() error {
 		return errorsmod.Wrap(ErrEmptyIPAddress, "ip address cannot be empty")
 	}
 
-	if msg.Version == "" {
-		return errorsmod.Wrap(ErrEmptyVersion, "version cannot be empty")
-	}
 	return nil
 }

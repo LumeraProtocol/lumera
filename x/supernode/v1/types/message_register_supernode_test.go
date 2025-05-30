@@ -31,7 +31,6 @@ func TestMsgRegisterSupernode_ValidateBasic(t *testing.T) {
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "192.168.1.1",
-				Version:          "1.0.0",
 			},
 		},
 	}

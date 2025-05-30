@@ -2,6 +2,7 @@ package supernode
 
 import (
 	autocliv1 "cosmossdk.io/api/cosmos/autocli/v1"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
 	modulev1 "github.com/LumeraProtocol/lumera/api/lumera/supernode"
 )
@@ -70,9 +71,16 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 				},
 				{
 					RpcMethod:      "RegisterSupernode",
-					Use:            "register-supernode [validator-address] [ip-address] [version] [supernode-account] [p2p-port]",
+					Use:            "register-supernode [validator-address] [ip-address] [supernode-account]",
 					Short:          "Send a register-supernode tx",
-					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validatorAddress"}, {ProtoField: "ipAddress"}, {ProtoField: "version"}, {ProtoField: "supernodeAccount"}, {ProtoField: "p2p_port"}},
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validatorAddress"}, {ProtoField: "ipAddress"}, {ProtoField: "supernodeAccount"}},
+					FlagOptions: map[string]*autocliv1.FlagOptions{
+						"p2p_port": {
+							Name:         "p2p-port",
+							Usage:        "Optional P2P port for supernode communication",
+							DefaultValue: types.DefaultP2PPort,
+						},
+					},
 				},
 				{
 					RpcMethod:      "DeregisterSupernode",

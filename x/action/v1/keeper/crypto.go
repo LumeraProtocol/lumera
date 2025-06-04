@@ -37,7 +37,7 @@ const (
 // 3. Verifies the signature against the provided data
 //
 // Parameters:
-// - data: The original data that was signed (string format)
+// - data: Base64 encoded data that was signed
 // - signature: Base64-encoded signature
 // - signerAddress: Bech32 address of the signer
 //
@@ -71,10 +71,17 @@ func (k *Keeper) VerifySignature(ctx sdk.Context, data string, signature string,
 			"failed to decode signature: %s", err)
 	}
 
+	// Decode the base64-encoded data
+	dataBytes, err := base64.StdEncoding.DecodeString(data)
+	if err != nil {
+		return errorsmod.Wrapf(types.ErrInvalidSignature,
+			"failed to decode data: %s", err)
+	}
+
 	// 3. Verify the signature
 	// PubKey.VerifySignature uses `ed25519consensus.Verify` from `https://github.com/hdevalence/ed25519consensus`
 	// it uses sha512 internally
-	isValid := pubKey.VerifySignature([]byte(data), sigBytes)
+	isValid := pubKey.VerifySignature(dataBytes, sigBytes)
 	if !isValid {
 		return errorsmod.Wrap(types.ErrInvalidSignature, "signature verification failed")
 	}

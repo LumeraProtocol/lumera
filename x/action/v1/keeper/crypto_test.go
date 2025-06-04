@@ -32,6 +32,9 @@ func TestVerifySignature(t *testing.T) {
 	validSignature, err := cryptotestutils.SignString(key, data)
 	require.NoError(t, err)
 
+	// Base64 encode the data as expected by VerifySignature
+	encodedData := base64.StdEncoding.EncodeToString([]byte(data))
+
 	validAddress := address.String()
 
 	invalidSignature := "invalid"
@@ -48,7 +51,7 @@ func TestVerifySignature(t *testing.T) {
 		{
 			name:      "valid signature verification",
 			signature: validSignature,
-			data:      data,
+			data:      encodedData,
 			address:   validAddress,
 			expectErr: false,
 		},
@@ -56,12 +59,14 @@ func TestVerifySignature(t *testing.T) {
 			name:      "invalid signature format",
 			signature: invalidSignature,
 			address:   validAddress,
+			data:      encodedData,
 			expectErr: true,
 		},
 		{
 			name:      "invalid address",
 			signature: validSignature,
 			address:   invalidAddress,
+			data:      encodedData,
 			expectErr: true,
 		},
 	}

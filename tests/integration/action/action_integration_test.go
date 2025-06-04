@@ -217,7 +217,7 @@ func createValidCascadeSignatureString(priv *secp256k1.PrivKey, ic int) (string,
 	rawData := fmt.Sprintf("rqid-%d", ic)
 	dataBase64 := base64.StdEncoding.EncodeToString([]byte(rawData))
 
-	sig, err := priv.Sign([]byte(dataBase64)) // sign base64 ONCE
+	sig, err := priv.Sign([]byte(rawData))
 	if err != nil {
 		return "", err
 	}

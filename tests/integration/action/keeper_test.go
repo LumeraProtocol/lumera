@@ -70,8 +70,46 @@ func (suite *KeeperIntegrationTestSuite) SetupTest() {
 	}
 }
 
+// createSignedMetadata creates properly signed metadata for testing
+func (suite *KeeperIntegrationTestSuite) createSignedCascadeMetadata(privKey *secp256k1.PrivKey) ([]byte, string) {
+	// Create raw data to be signed (e.g., some RQ IDs data)
+	rawData := []byte("test_rq_ids_data")
+
+	// Base64 encode the raw data (this is what goes in the signatures field)
+	encodedData := base64.StdEncoding.EncodeToString(rawData)
+
+	// Sign the raw data (not the base64-encoded version)
+	signatureBytes, err := privKey.Sign(rawData)
+	suite.Require().NoError(err)
+
+	// Base64 encode the signature
+	signature := base64.StdEncoding.EncodeToString(signatureBytes)
+
+	// Create the signatures field in the expected format: base64(data).base64(signature)
+	signatures := fmt.Sprintf("%s.%s", encodedData, signature)
+
+	cascadeMetadata := &actionapi.CascadeMetadata{
+		DataHash:   "hash456",
+		FileName:   "test.file",
+		RqIdsIc:    5,
+		Signatures: signatures,
+	}
+
+	cascadeMetadataBytes, err := proto.Marshal(cascadeMetadata)
+	suite.Require().NoError(err)
+
+	return cascadeMetadataBytes, signatures
+}
+
 // TestGetAction tests the GetAction function
 func (suite *KeeperIntegrationTestSuite) TestGetAction() {
+	senseMetadata := &actionapi.SenseMetadata{
+		DataHash:            "hash123",
+		DdAndFingerprintsIc: 5,
+	}
+	senseMetadataBytes, err := proto.Marshal(senseMetadata)
+	suite.Require().NoError(err)
+
 	action := &actionapi.Action{
 		ActionID:       "",
 		Creator:        suite.testAddrs[0].String(),
@@ -80,7 +118,7 @@ func (suite *KeeperIntegrationTestSuite) TestGetAction() {
 		Price:          "1000000ulume",
 		BlockHeight:    1,
 		ExpirationTime: time.Now().Unix() + 3600,
-		Metadata:       []byte(`{"key": "value"}`),
+		Metadata:       senseMetadataBytes,
 	}
 
 	actionID, err := suite.keeper.RegisterAction(suite.ctx, action)
@@ -134,18 +172,7 @@ func (suite *KeeperIntegrationTestSuite) TestListActions() {
 	senseMetadataBytes, err := proto.Marshal(senseMetadata)
 	suite.Require().NoError(err)
 
-	signatureData := "base64data"
-	signatureBytes, err := suite.testPrivKeys[1].Sign([]byte(signatureData))
-	suite.Require().NoError(err)
-	signature := base64.StdEncoding.EncodeToString(signatureBytes)
-	cascadeMetadata := &actionapi.CascadeMetadata{
-		DataHash:   "hash456",
-		FileName:   "test.file",
-		RqIdsIc:    5,
-		Signatures: fmt.Sprintf("%s.%s", signatureData, signature),
-	}
-	cascadeMetadataBytes, err := proto.Marshal(cascadeMetadata)
-	suite.Require().NoError(err)
+	cascadeMetadataBytes, _ := suite.createSignedCascadeMetadata(suite.testPrivKeys[1])
 
 	actions := []*actionapi.Action{
 		{
@@ -249,18 +276,7 @@ func (suite *KeeperIntegrationTestSuite) TestListActionsBySuperNode() {
 	senseMetadataBytes, err := proto.Marshal(senseMetadata)
 	suite.Require().NoError(err)
 
-	signatureData := "base64data"
-	signatureBytes, err := suite.testPrivKeys[1].Sign([]byte(signatureData))
-	suite.Require().NoError(err)
-	signature := base64.StdEncoding.EncodeToString(signatureBytes)
-	cascadeMetadata := &actionapi.CascadeMetadata{
-		DataHash:   "hash456",
-		FileName:   "test.file",
-		RqIdsIc:    5,
-		Signatures: fmt.Sprintf("%s.%s", signatureData, signature),
-	}
-	cascadeMetadataBytes, err := proto.Marshal(cascadeMetadata)
-	suite.Require().NoError(err)
+	cascadeMetadataBytes, _ := suite.createSignedCascadeMetadata(suite.testPrivKeys[1])
 
 	actions := []*actionapi.Action{
 		{
@@ -363,18 +379,7 @@ func (suite *KeeperIntegrationTestSuite) TestListActionsByBlockHeight() {
 	senseMetadataBytes, err := proto.Marshal(senseMetadata)
 	suite.Require().NoError(err)
 
-	signatureData := "base64data"
-	signatureBytes, err := suite.testPrivKeys[1].Sign([]byte(signatureData))
-	suite.Require().NoError(err)
-	signature := base64.StdEncoding.EncodeToString(signatureBytes)
-	cascadeMetadata := &actionapi.CascadeMetadata{
-		DataHash:   "hash456",
-		FileName:   "test.file",
-		RqIdsIc:    5,
-		Signatures: fmt.Sprintf("%s.%s", signatureData, signature),
-	}
-	cascadeMetadataBytes, err := proto.Marshal(cascadeMetadata)
-	suite.Require().NoError(err)
+	cascadeMetadataBytes, _ := suite.createSignedCascadeMetadata(suite.testPrivKeys[1])
 
 	actions := []*actionapi.Action{
 		{
@@ -484,18 +489,7 @@ func (suite *KeeperIntegrationTestSuite) TestListExpiredActions() {
 	senseMetadataBytes, err := proto.Marshal(senseMetadata)
 	suite.Require().NoError(err)
 
-	signatureData := "base64data"
-	signatureBytes, err := suite.testPrivKeys[1].Sign([]byte(signatureData))
-	suite.Require().NoError(err)
-	signature := base64.StdEncoding.EncodeToString(signatureBytes)
-	cascadeMetadata := &actionapi.CascadeMetadata{
-		DataHash:   "hash456",
-		FileName:   "test.file",
-		RqIdsIc:    5,
-		Signatures: fmt.Sprintf("%s.%s", signatureData, signature),
-	}
-	cascadeMetadataBytes, err := proto.Marshal(cascadeMetadata)
-	suite.Require().NoError(err)
+	cascadeMetadataBytes, _ := suite.createSignedCascadeMetadata(suite.testPrivKeys[1])
 
 	now := time.Now().Unix()
 	actions := []*actionapi.Action{
@@ -584,18 +578,7 @@ func (suite *KeeperIntegrationTestSuite) TestQueryActionByMetadata() {
 	senseMetadataBytes, err := proto.Marshal(senseMetadata)
 	suite.Require().NoError(err)
 
-	signatureData := "base64data"
-	signatureBytes, err := suite.testPrivKeys[1].Sign([]byte(signatureData))
-	suite.Require().NoError(err)
-	signature := base64.StdEncoding.EncodeToString(signatureBytes)
-	cascadeMetadata := &actionapi.CascadeMetadata{
-		DataHash:   "hash456",
-		FileName:   "test.file",
-		RqIdsIc:    5,
-		Signatures: fmt.Sprintf("%s.%s", signatureData, signature),
-	}
-	cascadeMetadataBytes, err := proto.Marshal(cascadeMetadata)
-	suite.Require().NoError(err)
+	cascadeMetadataBytes, _ := suite.createSignedCascadeMetadata(suite.testPrivKeys[1])
 
 	actions := []*actionapi.Action{
 		{

@@ -61,24 +61,27 @@ func CreateSignatureString(privKeys []secp256k1.PrivKey, dataLen int) (string, e
 
 	// 2. Base64-encode the data
 	dataB64 := base64.StdEncoding.EncodeToString(data)
+
+	// 3. Start with the base64-encoded data
 	result := dataB64
 
+	// 4. Sign with each private key and append signatures
 	for _, privKey := range privKeys {
-		// 3. Sign the original data
-		signatureBytes, err := privKey.Sign([]byte(dataB64))
+		// Sign the original data (not base64-encoded)
+		signatureBytes, err := privKey.Sign(data) // Sign original data, not dataB64
 		if err != nil {
 			return "", fmt.Errorf("failed to sign data: %w", err)
 		}
 
-		// 4. verify the signature
+		// Verify the signature against the original data (not base64)
 		pubKey := privKey.PubKey()
-		if !pubKey.VerifySignature([]byte(dataB64), signatureBytes) {
+		if !pubKey.VerifySignature(data, signatureBytes) { // Verify against original data
 			return "", fmt.Errorf("signature verification failed")
 		}
 
-		// 5. Concatenate: "Base64(data).<signature>..."
+		// Base64-encode the signature and append
 		signatureB64 := base64.StdEncoding.EncodeToString(signatureBytes)
-		result = fmt.Sprintf("%s.%s", result, signatureB64)
+		result = fmt.Sprintf("%s.%s", result, signatureB64) // Append, don't overwrite
 	}
 
 	return result, nil

@@ -178,3 +178,30 @@ func (h CascadeActionHandler) ValidateApproval(ctx sdk.Context, action *actionap
 	// Empty implementation - will be filled in later
 	return nil
 }
+
+func (h CascadeActionHandler) GetUpdatedMetadata(ctx sdk.Context, existingMetadataBytes, newMetadataBytes []byte) ([]byte, error) {
+	var (
+		existingMetadata, newMetadata actionapi.CascadeMetadata
+	)
+
+	err := proto.Unmarshal(existingMetadataBytes, &existingMetadata)
+	if err != nil {
+		return nil, errors.Wrap(types2.ErrInternalError, fmt.Sprintf("failed to unmarshal existing metadata: %v", err))
+	}
+
+	err = proto.Unmarshal(newMetadataBytes, &newMetadata)
+	if err != nil {
+		return nil, errors.Wrap(types2.ErrInternalError, fmt.Sprintf("failed to unmarshal new metadata: %v", err))
+	}
+
+	updatedMetadata := &actionapi.CascadeMetadata{
+		RqIdsIc:    existingMetadata.GetRqIdsIc(),
+		RqIdsMax:   existingMetadata.GetRqIdsMax(),
+		DataHash:   existingMetadata.GetDataHash(),
+		FileName:   existingMetadata.GetFileName(),
+		Signatures: existingMetadata.GetSignatures(),
+		RqIdsIds:   newMetadata.GetRqIdsIds(),
+	}
+
+	return proto.Marshal(updatedMetadata)
+}

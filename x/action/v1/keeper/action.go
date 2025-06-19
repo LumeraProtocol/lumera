@@ -200,6 +200,10 @@ func (k *Keeper) FinalizeAction(ctx sdk.Context, actionID string, superNodeAccou
 	// Apply state changes if a new state is recommended
 	if newState != actionapi.ActionState_ACTION_STATE_UNSPECIFIED {
 		existingAction.State = newState
+		existingAction.Metadata, err = handler.GetUpdatedMetadata(ctx, existingAction.Metadata, newMetadata)
+		if err != nil {
+			return err
+		}
 
 		// Add supernode to the list
 		existingAction.SuperNodes = append(existingAction.SuperNodes, superNodeAccount)

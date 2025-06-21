@@ -92,6 +92,7 @@ type Config struct {
 	Gas            uint64       `json:"gas"`             // Gas limit
 	GasAdjustment  float64      `json:"gas_adjustment"`  // Gas adjustment
 	GasPrice       sdk.DecCoins `json:"gas_price"`       // Gas price
+	ServerPort     string       `json:"server_port"`     // Port for the server to listen on
 }
 
 // FaucetRequest - Request struct for the faucet endpoint
@@ -547,7 +548,7 @@ func main() {
 	r.Use(corsMiddleware)
 
 	// Start server
-	addr := ":8080"
+	addr := server.config.ServerPort
 	server.logger.Printf("Starting faucet server on %s", addr)
 	server.logger.Printf("ChainID: %s", server.config.ChainID)
 	server.logger.Printf("Gas limit: %d", server.config.Gas)

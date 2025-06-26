@@ -40,41 +40,6 @@ func (k Keeper) SetClaimRecord(ctx sdk.Context, claimRecord types.ClaimRecord) e
 	return nil
 }
 
-// ListClaimRecords returns all claim records with optional pagination and filtering
-// If filter is nil, all records are returned
-// Example usage:
-// To filter only claimed records:
-//
-//	records, err := k.ListClaimRecords(ctx, func(record *types.ClaimRecord) bool {
-//		return record.Claimed
-//	})
-//
-// To filter claimed records with a specific condition:
-//
-//	records, err := k.ListClaimRecords(ctx, func(record *types.ClaimRecord) bool {
-//		return record.Claimed && someOtherCondition
-//	})
-func (k Keeper) ListClaimRecords(ctx sdk.Context, filter func(*types.ClaimRecord) bool) ([]*types.ClaimRecord, error) {
-	var claimRecords []*types.ClaimRecord
-
-	storeAdapter := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
-	store := prefix.NewStore(storeAdapter, []byte(types.ClaimRecordKey))
-
-	iterator := store.Iterator(nil, nil)
-	defer iterator.Close()
-
-	for ; iterator.Valid(); iterator.Next() {
-		var claimRecord types.ClaimRecord
-		k.cdc.MustUnmarshal(iterator.Value(), &claimRecord)
-
-		// Apply filter if provided
-		if filter == nil || filter(&claimRecord) {
-			claimRecords = append(claimRecords, &claimRecord)
-		}
-	}
-
-	return claimRecords, nil
-}
 
 func (k Keeper) GetClaimRecordCount(ctx sdk.Context) uint64 {
 	storeAdapter := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))

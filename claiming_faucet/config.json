@@ -7,5 +7,6 @@
   "chain_id": "lumera-devnet-1",
   "gas": 100000,
   "gas_adjustment": 1.5,
-  "gas_price": [{"denom": "ulume", "amount": "0.025"}]
+  "gas_price": [{"denom": "ulume", "amount": "0.025"}],
+  "server_port": ":8011"
 }

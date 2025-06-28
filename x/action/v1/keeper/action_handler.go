@@ -34,6 +34,9 @@ type ActionHandler interface {
 
 	// ValidateApproval validates action-specific approval data
 	ValidateApproval(ctx sdk.Context, action *actionapi.Action) error
+
+	// GetUpdatedMetadata returns the updated metadata on finalize action
+	GetUpdatedMetadata(ctx sdk.Context, existingMetadata, newMetadata []byte) ([]byte, error)
 }
 
 // ActionRegistry maintains a registry of handlers for different action types

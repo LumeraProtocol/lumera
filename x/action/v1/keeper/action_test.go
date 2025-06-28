@@ -3,12 +3,12 @@ package keeper_test
 import (
 	"fmt"
 
+	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
 	"github.com/LumeraProtocol/lumera/x/action/v1/common"
 	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
-
 	sdk "github.com/cosmos/cosmos-sdk/types"
-
-	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
+	"github.com/cosmos/gogoproto/proto"
+	"github.com/stretchr/testify/assert"
 )
 
 func (suite *KeeperTestSuite) TestRegisterAction() {
@@ -248,6 +248,14 @@ func (suite *KeeperTestSuite) TestFinalizeAction() {
 				suite.Equal(tc.state, updated.State)
 				suite.Equal(1, len(updated.SuperNodes))
 				suite.Equal(tc.superNode, updated.SuperNodes[0])
+
+				if updated.ActionType == actionapi.ActionType_ACTION_TYPE_CASCADE {
+					cascadeMetadata := types2.CascadeMetadata{}
+					err = proto.Unmarshal(updated.Metadata, &cascadeMetadata)
+					suite.Equal(err, nil)
+
+					assert.NotZero(suite.T(), len(cascadeMetadata.RqIdsIds))
+				}
 			}
 		})
 	}

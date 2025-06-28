@@ -204,3 +204,8 @@ func (h SenseActionHandler) ValidateApproval(ctx sdk.Context, action *actionapi.
 	// Empty implementation - will be filled in later
 	return nil
 }
+
+func (h SenseActionHandler) GetUpdatedMetadata(ctx sdk.Context, existingMetadata, newMetadata []byte) ([]byte, error) {
+	// Empty implementation - will be filled in later
+	return nil, nil
+}

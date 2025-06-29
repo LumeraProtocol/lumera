@@ -531,6 +531,22 @@ func corsMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// Method responses with single string - "nothing to see here"
+func (s *Server) handlePing(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	response := "nothing to see here"
+	w.Header().Set("Content-Type", "text/plain")
+	if _, err := w.Write([]byte(response)); err != nil {
+		s.logger.Printf("Failed to write response: %v", err)
+		http.Error(w, "Failed to write response", http.StatusInternalServerError)
+		return
+	}
+}
+
 func main() {
 	// Create server
 	server, err := NewServer("config.json")
@@ -541,6 +557,7 @@ func main() {
 	// Create router
 	r := mux.NewRouter()
 	r.HandleFunc("/api/getfeeforclaiming", server.handleGetFeeForClaiming).Methods("POST", "OPTIONS")
+	r.HandleFunc("/api/ping", server.handlePing).Methods("GET")
 
 	// Add middleware
 	r.Use(loggingMiddleware(server.logger))

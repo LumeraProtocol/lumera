@@ -139,37 +139,66 @@ func TestSetClaimRecord(t *testing.T) {
 	}
 }
 
-func TestListClaimRecords(t *testing.T) {
+func TestListClaimed(t *testing.T) {
 	testCases := []struct {
-		name         string
-		setupRecords []types.ClaimRecord
-		expectErr    bool
-		expectCount  int
+		name           string
+		setupRecords   []types.ClaimRecord
+		vestedTerm     uint32
+		expectClaimed  int
+		expectErr      bool
 	}{
 		{
-			name:         "empty list",
-			setupRecords: nil,
-			expectErr:    false,
-			expectCount:  0,
+			name:           "empty state",
+			setupRecords:   nil,
+			vestedTerm:     1,
+			expectClaimed:  0,
+			expectErr:      false,
 		},
 		{
-			name: "multiple records",
+			name: "no claimed records",
 			setupRecords: []types.ClaimRecord{
 				{
 					OldAddress: "address1",
 					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(100))),
 					Claimed:    false,
-					VestedTier: 0,
+					VestedTier: 1,
+				},
+				{
+					OldAddress: "address2",
+					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(200))),
+					Claimed:    false,
+					VestedTier: 2,
+				},
+			},
+			vestedTerm:     1,
+			expectClaimed:  0,
+			expectErr:      false,
+		},
+		{
+			name: "claimed records with different vested tiers",
+			setupRecords: []types.ClaimRecord{
+				{
+					OldAddress: "address1",
+					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(100))),
+					Claimed:    true,
+					VestedTier: 1,
 				},
 				{
 					OldAddress: "address2",
 					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(200))),
 					Claimed:    true,
-					VestedTier: 0,
+					VestedTier: 2,
+				},
+				{
+					OldAddress: "address3",
+					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(300))),
+					Claimed:    true,
+					VestedTier: 1,
 				},
 			},
-			expectErr:   false,
-			expectCount: 2,
+			vestedTerm:     1,
+			expectClaimed:  2,
+			expectErr:      false,
 		},
 	}
 
@@ -185,139 +214,24 @@ func TestListClaimRecords(t *testing.T) {
 				}
 			}
 
-			// Test without filter (should return all records)
-			records, err := keeper.ListClaimRecords(ctx, nil)
+			// Test
+			req := &types.QueryListClaimedRequest{
+				VestedTerm: tc.vestedTerm,
+			}
+			resp, err := keeper.ListClaimed(ctx, req)
+
 			if tc.expectErr {
 				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
-			require.Len(t, records, tc.expectCount)
+			require.NotNil(t, resp)
+			require.Equal(t, tc.expectClaimed, len(resp.Claims))
 
-			if tc.setupRecords != nil {
-				// Convert []*types.ClaimRecord → []types.ClaimRecord for comparison
-				values := make([]types.ClaimRecord, len(records))
-				for i, r := range records {
-					values[i] = *r
-				}
-				require.ElementsMatch(t, tc.setupRecords, values)
-			}
-		})
-	}
-}
-
-func TestListClaimRecordsWithFilter(t *testing.T) {
-	testCases := []struct {
-		name         string
-		setupRecords []types.ClaimRecord
-		filter       func(*types.ClaimRecord) bool
-		expectErr    bool
-		expectCount  int
-	}{
-		{
-			name: "filter by claimed = true",
-			setupRecords: []types.ClaimRecord{
-				{
-					OldAddress: "address1",
-					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(100))),
-					Claimed:    true,
-				},
-				{
-					OldAddress: "address2",
-					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(200))),
-					Claimed:    false,
-				},
-				{
-					OldAddress: "address3",
-					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(300))),
-					Claimed:    true,
-				},
-			},
-			filter: func(record *types.ClaimRecord) bool {
-				return record.Claimed
-			},
-			expectErr:   false,
-			expectCount: 2, // Only the records with Claimed = true
-		},
-		{
-			name: "filter by claimed = false",
-			setupRecords: []types.ClaimRecord{
-				{
-					OldAddress: "address1",
-					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(100))),
-					Claimed:    true,
-				},
-				{
-					OldAddress: "address2",
-					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(200))),
-					Claimed:    false,
-				},
-				{
-					OldAddress: "address3",
-					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(300))),
-					Claimed:    true,
-				},
-			},
-			filter: func(record *types.ClaimRecord) bool {
-				return !record.Claimed
-			},
-			expectErr:   false,
-			expectCount: 1, // Only the record with Claimed = false
-		},
-		{
-			name: "complex filter with multiple conditions",
-			setupRecords: []types.ClaimRecord{
-				{
-					OldAddress: "address1",
-					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(100))),
-					Claimed:    true,
-					ClaimTime:  1000,
-				},
-				{
-					OldAddress: "address2",
-					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(200))),
-					Claimed:    true,
-					ClaimTime:  2000,
-				},
-				{
-					OldAddress: "address3",
-					Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(300))),
-					Claimed:    false,
-					ClaimTime:  0,
-				},
-			},
-			filter: func(record *types.ClaimRecord) bool {
-				return record.Claimed && record.ClaimTime > 1500
-			},
-			expectErr:   false,
-			expectCount: 1, // Only the record with Claimed = true and ClaimTime > 1500
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			keeper, ctx := keepertest.ClaimKeeper(t)
-
-			// Setup
-			if tc.setupRecords != nil {
-				for _, record := range tc.setupRecords {
-					err := keeper.SetClaimRecord(ctx, record)
-					require.NoError(t, err)
-				}
-			}
-
-			// Test with filter
-			records, err := keeper.ListClaimRecords(ctx, tc.filter)
-			if tc.expectErr {
-				require.Error(t, err)
-				return
-			}
-			require.NoError(t, err)
-			require.Len(t, records, tc.expectCount)
-
-			// Verify that all returned records satisfy the filter
-			for _, record := range records {
-				require.True(t, tc.filter(record))
+			// Verify all returned records are claimed and have the correct vested tier
+			for _, claim := range resp.Claims {
+				require.True(t, claim.Claimed)
+				require.Equal(t, tc.vestedTerm, claim.VestedTier)
 			}
 		})
 	}

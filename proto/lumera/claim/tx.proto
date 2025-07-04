@@ -1,14 +1,13 @@
 syntax = "proto3";
-
 package lumera.claim;
+
+option go_package = "x/claim/types";
 
 import "amino/amino.proto";
 import "cosmos/msg/v1/msg.proto";
 import "cosmos_proto/cosmos.proto";
 import "gogoproto/gogo.proto";
 import "lumera/claim/params.proto";
-
-option go_package = "github.com/LumeraProtocol/lumera/x/claim/types";
 
 // Msg defines the Msg service.
 service Msg {
@@ -17,6 +16,7 @@ service Msg {
   // UpdateParams defines a (governance) operation for updating the module
   // parameters. The authority defaults to the x/gov module account.
   rpc UpdateParams (MsgUpdateParams) returns (MsgUpdateParamsResponse);
+  // Claim defines a message for claiming tokens.
   rpc Claim        (MsgClaim       ) returns (MsgClaimResponse       );
   rpc DelayedClaim (MsgDelayedClaim) returns (MsgDelayedClaimResponse);
 }
@@ -37,6 +37,7 @@ message MsgUpdateParams {
 // MsgUpdateParams message.
 message MsgUpdateParamsResponse {}
 
+// MsgClaim is the Msg/Claim request type.
 message MsgClaim {
   option (cosmos.msg.v1.signer) = "creator";
   string creator    = 1;
@@ -46,6 +47,7 @@ message MsgClaim {
   string signature  = 5;
 }
 
+// MsgClaimResponse defines the response structure for executing a
 message MsgClaimResponse {}
 
 message MsgDelayedClaim {

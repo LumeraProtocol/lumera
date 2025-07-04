@@ -3,15 +3,14 @@ package keeper
 import (
 	"context"
 
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
 	errorsmod "cosmossdk.io/errors"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 )
 
 // DeregisterSupernode defines a method to deregister a supernode
-func (k msgServer) DeregisterSupernode(goCtx context.Context, msg *types2.MsgDeregisterSupernode) (*types2.MsgDeregisterSupernodeResponse, error) {
+func (k msgServer) DeregisterSupernode(goCtx context.Context, msg *types.MsgDeregisterSupernode) (*types.MsgDeregisterSupernodeResponse, error) {
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
 	// Convert validator address string to ValAddress
@@ -35,10 +34,10 @@ func (k msgServer) DeregisterSupernode(goCtx context.Context, msg *types2.MsgDer
 		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode is in an invalid state")
 	}
 
-	if supernode.States[len(supernode.States)-1].State != types2.SuperNodeStateDisabled {
+	if supernode.States[len(supernode.States)-1].State != types.SuperNodeStateDisabled {
 		// Update supernode state
-		supernode.States = append(supernode.States, &types2.SuperNodeStateRecord{
-			State:  types2.SuperNodeStateDisabled,
+		supernode.States = append(supernode.States, &types.SuperNodeStateRecord{
+			State:  types.SuperNodeStateDisabled,
 			Height: ctx.BlockHeight(),
 		})
 	}
@@ -51,10 +50,10 @@ func (k msgServer) DeregisterSupernode(goCtx context.Context, msg *types2.MsgDer
 	// Emit event
 	ctx.EventManager().EmitEvent(
 		sdk.NewEvent(
-			types2.EventTypeSupernodeDeRegistered,
-			sdk.NewAttribute(types2.AttributeKeyValidatorAddress, msg.ValidatorAddress),
+			types.EventTypeSupernodeDeRegistered,
+			sdk.NewAttribute(types.AttributeKeyValidatorAddress, msg.ValidatorAddress),
 		),
 	)
 
-	return &types2.MsgDeregisterSupernodeResponse{}, nil
+	return &types.MsgDeregisterSupernodeResponse{}, nil
 }

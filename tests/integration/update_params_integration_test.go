@@ -41,8 +41,8 @@ func (s *IntegrationTestSuite) SetupTest() {
 	s.proposer = sdk.AccAddress([]byte("proposer___________"))
 	s.voter = sdk.AccAddress([]byte("voter_____________"))
 
-	s.app.AccountKeeper.SetAccount(s.ctx, s.app.AccountKeeper.NewAccountWithAddress(s.ctx, s.proposer))
-	s.app.AccountKeeper.SetAccount(s.ctx, s.app.AccountKeeper.NewAccountWithAddress(s.ctx, s.voter))
+	s.app.AuthKeeper.SetAccount(s.ctx, s.app.AuthKeeper.NewAccountWithAddress(s.ctx, s.proposer))
+	s.app.AuthKeeper.SetAccount(s.ctx, s.app.AuthKeeper.NewAccountWithAddress(s.ctx, s.voter))
 
 	proposerCoins := sdk.NewCoins(sdk.NewCoin("stake", math.NewInt(1000000000)))
 	voterCoins := sdk.NewCoins(sdk.NewCoin("stake", math.NewInt(1000000000)))

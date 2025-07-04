@@ -3,20 +3,19 @@ package action
 import (
 	"math/rand"
 
-	simulation2 "github.com/LumeraProtocol/lumera/x/action/v1/simulation"
-	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
-
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	simtypes "github.com/cosmos/cosmos-sdk/types/simulation"
 	"github.com/cosmos/cosmos-sdk/x/simulation"
 
 	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
+	actionsimulation "github.com/LumeraProtocol/lumera/x/action/v1/simulation"
+	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 )
 
 // avoid unused import issue
 var (
-	_ = simulation2.FindAccount
+	_ = actionsimulation.FindAccount
 	_ = rand.Rand{}
 	_ = cryptotestutils.AccAddress
 	_ = sdk.AccAddress{}
@@ -45,11 +44,11 @@ func (AppModule) GenerateGenesisState(simState *module.SimulationState) {
 	for i, acc := range simState.Accounts {
 		accs[i] = acc.Address.String()
 	}
-	actionGenesis := types2.GenesisState{
-		Params: types2.DefaultParams(),
+	actionGenesis := types.GenesisState{
+		Params: types.DefaultParams(),
 		// this line is used by starport scaffolding # simapp/module/genesisState
 	}
-	simState.GenState[types2.ModuleName] = simState.Cdc.MustMarshalJSON(&actionGenesis)
+	simState.GenState[types.ModuleName] = simState.Cdc.MustMarshalJSON(&actionGenesis)
 }
 
 // RegisterStoreDecoder registers a decoder.
@@ -58,10 +57,10 @@ func (am AppModule) RegisterStoreDecoder(_ simtypes.StoreDecoderRegistry) {}
 // WeightedOperations returns the all the gov module operations with their respective weights.
 func (am AppModule) WeightedOperations(simState module.SimulationState) []simtypes.WeightedOperation {
 	// Use the comprehensive weighted operations defined in the action simulation package
-	return simulation2.WeightedOperations(
+	return actionsimulation.WeightedOperations(
 		simState.AppParams,
 		simState.Cdc,
-		am.accountKeeper,
+		am.authKeeper,
 		am.bankKeeper,
 		am.keeper,
 	)

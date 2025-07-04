@@ -11,7 +11,7 @@ import (
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 func TestSupernodeRegistrationSuccess(t *testing.T) {
@@ -104,7 +104,7 @@ func TestSupernodeRegistrationSuccess(t *testing.T) {
 			require.Equal(t, "1.0.0", supernode.Version)
 			require.Equal(t, supernodeAccount, supernode.SupernodeAccount)
 			require.NotEmpty(t, supernode.States)
-			require.Equal(t, types.SuperNodeStateActive, supernode.States[0].State)
+			require.Equal(t, sntypes.SuperNodeStateActive, supernode.States[0].State)
 		})
 	}
 }

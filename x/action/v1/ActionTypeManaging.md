@@ -47,7 +47,7 @@ import (...)
 
 type ActionTypeValidator interface {
     // ActionType corresponds to a particular ActionType enum value.
-    ActionType() actionapi.ActionType
+    ActionType() actiontypes.ActionType
 
     // ValidateBasic performs validation checks specific to this action type.
     ValidateBasic(metadataStr string, msgType common.MessageType) error
@@ -131,12 +131,12 @@ func init() {
     )
 }
 
-func (v *CascadeValidator) ActionType() actionapi.ActionType {
-    return actionapi.ActionType_ACTION_TYPE_CASCADE
+func (v *CascadeValidator) ActionType() actiontypes.ActionType {
+    return actiontypes.ActionTypeCascade
 }
 
 func (v *CascadeValidator) ValidateBasic(metadataStr string, msgType common.MessageType) error {
-    var metadata actionapi.CascadeMetadata
+    var metadata actiontypes.CascadeMetadata
     if err := json.Unmarshal([]byte(metadataStr), &metadata); err != nil {
         return fmt.Errorf("failed to unmarshal cascade metadata: %w", err)
     }
@@ -172,8 +172,8 @@ func (k *Keeper) InitializeActionRegistry() *ActionRegistry {
     registry := NewActionRegistry(k)  
   
     // Register handlers for existing action types  
-    registry.RegisterHandler(actionapi.ActionType_ACTION_TYPE_SENSE, NewSenseActionHandler(k))  
-    registry.RegisterHandler(actionapi.ActionType_ACTION_TYPE_CASCADE, NewCascadeActionHandler(k))  
+    registry.RegisterHandler(actiontypes.ActionTypeSense, NewSenseActionHandler(k))  
+    registry.RegisterHandler(actiontypes.ActionTypeCascade, NewCascadeActionHandler(k))  
   
     return registry  
 }
@@ -237,12 +237,12 @@ Create new file `x/action/v1/types/action_type_my_action.go`
        RegisterValidator(&MyCustomValidator{}, "MY_ACTION", "ACTION_TYPE_MY_ACTION")
    }
 
-   func (v *MyActionValidator) ActionType() actionapi.ActionType {
-       return actionapi.ActionType_ACTION_TYPE_MY_ACTION
+   func (v *MyActionValidator) ActionType() actiontypes.ActionType {
+       return actiontypes.ActionType_ACTION_TYPE_MY_ACTION
    }
 
    func (v *MyActionValidator) ValidateBasic(metadataStr string, msgType common.MessageType) error {
-       var metadata actionapi.MyActionMetadata
+       var metadata actiontypes.MyActionMetadata
        if err := json.Unmarshal([]byte(metadataStr), &metadata); err != nil {
            return fmt.Errorf("failed to unmarshal my action metadata: %w", err)
        }
@@ -294,9 +294,9 @@ func (k *Keeper) InitializeActionRegistry() *ActionRegistry {
     registry := NewActionRegistry(k)  
   
     // Register handlers for existing action types  
-    registry.RegisterHandler(actionapi.ActionType_ACTION_TYPE_SENSE, NewSenseActionHandler(k))  
-    registry.RegisterHandler(actionapi.ActionType_ACTION_TYPE_CASCADE, NewCascadeActionHandler(k))  
-    registry.RegisterHandler(actionapi.ActionType_ACTION_TYPE_MY_ACTION, NewMyActionHandler(k))  // <--- NEW ACTION
+    registry.RegisterHandler(actiontypes.ActionTypeSense, NewSenseActionHandler(k))  
+    registry.RegisterHandler(actiontypes.ActionTypeCascade, NewCascadeActionHandler(k))  
+    registry.RegisterHandler(actiontypes.ActionType_ACTION_TYPE_MY_ACTION, NewMyActionHandler(k))  // <--- NEW ACTION
   
     return registry  
 }

@@ -23,7 +23,6 @@ import (
 
 	// this line is used by starport scaffolding # 1
 
-	modulev1 "github.com/LumeraProtocol/lumera/api/lumera/lumeraid/module"
 	"github.com/LumeraProtocol/lumera/x/lumeraid/client/cli"
 	"github.com/LumeraProtocol/lumera/x/lumeraid/keeper"
 	"github.com/LumeraProtocol/lumera/x/lumeraid/types"
@@ -133,7 +132,7 @@ func NewAppModule(
 // RegisterServices registers a gRPC query service to respond to the module-specific gRPC queries
 func (am AppModule) RegisterServices(cfg module.Configurator) {
 	types.RegisterMsgServer(cfg.MsgServer(), keeper.NewMsgServerImpl(am.keeper))
-	types.RegisterQueryServer(cfg.QueryServer(), am.keeper)
+	types.RegisterQueryServer(cfg.QueryServer(), keeper.NewQueryServerImpl(am.keeper))
 }
 
 // RegisterInvariants registers the invariants of the module. If an invariant deviates from its predicted value, the InvariantRegistry triggers appropriate logic (most often the chain will be halted)
@@ -183,7 +182,7 @@ func (am AppModule) IsAppModule() {}
 
 func init() {
 	appmodule.Register(
-		&modulev1.Module{},
+		&Module{},
 		appmodule.Provide(ProvideModule),
 	)
 }
@@ -193,7 +192,7 @@ type ModuleInputs struct {
 
 	StoreService store.KVStoreService
 	Cdc          codec.Codec
-	Config       *modulev1.Module
+	Config       *Module
 	Logger       log.Logger
 
 	AccountKeeper types.AccountKeeper

@@ -5,7 +5,6 @@ import (
 	"encoding/csv"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -33,7 +32,7 @@ func InitGenesis(ctx sdk.Context, k keeper.Keeper, genState types.GenesisState) 
 
 	// Only attempt to load CSV records if TotalClaimableAmount > 0
 	if genState.TotalClaimableAmount > 0 {
-		records, err := loadClaimRecordsFromCSV(genesisClaimsDenom)
+		records, err := loadClaimRecordsFromCSV(k, genesisClaimsDenom)
 		if err != nil {
 			if !os.IsNotExist(err) {
 				panic(fmt.Sprintf("failed to load CSV: %s", err))
@@ -96,13 +95,8 @@ func ExportGenesis(ctx sdk.Context, k keeper.Keeper) *types.GenesisState {
 	return genesis
 }
 
-func loadClaimRecordsFromCSV(claimsDenom string) ([]types.ClaimRecord, error) {
-	filepath, err := getConfigPath()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get config path: %w", err)
-	}
-
-	file, err := os.Open(filepath)
+func loadClaimRecordsFromCSV(k keeper.Keeper, claimsDenom string) ([]types.ClaimRecord, error) {
+	file, err := os.Open(k.GetClaimsPath())
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file: %w", err)
 	}
@@ -136,29 +130,4 @@ func loadClaimRecordsFromCSV(claimsDenom string) ([]types.ClaimRecord, error) {
 	}
 
 	return records, nil
-}
-
-func getConfigPath() (string, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("failed to get home directory: %w", err)
-	}
-
-	// Define potential paths
-	paths := []string{
-		filepath.Join(homeDir, ".lumera", "config", "claims.csv"),
-		filepath.Join(homeDir, "claims.csv"),
-		"../../claims.csv",
-		"../../../claims.csv",
-	}
-
-	// Check each path in order
-	for _, path := range paths {
-		if _, err := os.Stat(path); err == nil {
-			return path, nil
-		}
-	}
-
-	// Return the default path with an error indicating file not found
-	return paths[0], fmt.Errorf("claims file not found in any location")
 }

@@ -1,17 +1,21 @@
 package types
 
-//go:generate mockgen -destination=../mocks/expected_keepers_mock.go -package=actionmocks -source=expected_keepers.go
+//go:generate mockgen -copyright_file=../../../../testutil/mock_header.txt -destination=../mocks/expected_keepers_mock.go -package=actionmocks -source=expected_keepers.go
 
 import (
 	"context"
 
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+	"cosmossdk.io/core/address"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
+	clienttypes "github.com/cosmos/ibc-go/v10/modules/core/02-client/types"
+	channeltypes "github.com/cosmos/ibc-go/v10/modules/core/04-channel/types"
 )
 
-// AccountKeeper defines the expected interface for the Account module.
-type AccountKeeper interface {
+// AuthKeeper defines the expected interface for the Auth module.
+type AuthKeeper interface {
+	AddressCodec() address.Codec
 	GetAccount(context.Context, sdk.AccAddress) sdk.AccountI // only used for simulation
 	GetModuleAccount(ctx context.Context, moduleName string) sdk.ModuleAccountI
 	SetModuleAccount(ctx context.Context, macc sdk.ModuleAccountI)
@@ -36,11 +40,14 @@ type StakingKeeper interface {
 }
 
 type SupernodeKeeper interface {
-	GetTopSuperNodesForBlock(goCtx context.Context, req *types2.QueryGetTopSuperNodesForBlockRequest) (*types2.QueryGetTopSuperNodesForBlockResponse, error)
 	IsSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress) bool
-	QuerySuperNode(ctx sdk.Context, valOperAddr sdk.ValAddress) (sn types2.SuperNode, exists bool)
+	QuerySuperNode(ctx sdk.Context, valOperAddr sdk.ValAddress) (sn sntypes.SuperNode, exists bool)
 
-	SetSuperNode(ctx sdk.Context, supernode types2.SuperNode) error
+	SetSuperNode(ctx sdk.Context, supernode sntypes.SuperNode) error
+}
+
+type SupernodeQueryServer interface {
+	GetTopSuperNodesForBlock(ctx context.Context, req *sntypes.QueryGetTopSuperNodesForBlockRequest) (*sntypes.QueryGetTopSuperNodesForBlockResponse, error)
 }
 
 type DistributionKeeper interface {
@@ -51,4 +58,19 @@ type DistributionKeeper interface {
 type ParamSubspace interface {
 	Get(context.Context, []byte, interface{})
 	Set(context.Context, []byte, interface{})
+}
+
+// ChannelKeeper defines the expected IBC channel keeper.
+type ChannelKeeper interface {
+	GetChannel(ctx context.Context, portID, channelID string) (channeltypes.Channel, bool)
+	GetNextSequenceSend(ctx context.Context, portID, channelID string) (uint64, bool)
+	SendPacket(
+		ctx context.Context,
+		sourcePort string,
+		sourceChannel string,
+		timeoutHeight clienttypes.Height,
+		timeoutTimestamp uint64,
+		data []byte,
+	) (uint64, error)
+	ChanCloseInit(ctx context.Context, portID, channelID string) error
 }

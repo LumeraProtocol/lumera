@@ -5,6 +5,12 @@
     "go.vetOnSave": "package",
     "go.testOnSave": false,
     "go.coverOnSave": false,
+    "go.toolsEnvVars": {
+        "PATH": "/usr/local/go/bin:${env:HOME}/go/bin:${env:PATH}",
+    },
+    "terminal.integrated.env.linux": {
+        "PATH": "/usr/local/go/bin:${env:HOME}/go/bin:${env:PATH}"
+    },
     "protoc": {
         "path": "protoc",
         "compile_on_save": false,

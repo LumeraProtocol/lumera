@@ -3,18 +3,16 @@ package keeper
 import (
 	"reflect"
 
-	"github.com/LumeraProtocol/lumera/x/action/v1/common"
-	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
-
 	"cosmossdk.io/errors"
-	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
+	"github.com/LumeraProtocol/lumera/x/action/v1/common"
+	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 // ActionHandler defines the interface for processing action-specific operations
 type ActionHandler interface {
 	// Process validates and performs any necessary transformations on the action data
-	Process(metadataBytes []byte, msgType common.MessageType, params *types2.Params) ([]byte, error)
+	Process(metadataBytes []byte, msgType common.MessageType, params *actiontypes.Params) ([]byte, error)
 
 	// GetProtoMessageType returns the reflect.Type of the protobuf message for this action
 	GetProtoMessageType() reflect.Type
@@ -26,40 +24,40 @@ type ActionHandler interface {
 	ConvertProtobufToJSON(protobufData []byte) ([]byte, error)
 
 	// RegisterAction handles action-specific validation during registration
-	RegisterAction(ctx sdk.Context, action *actionapi.Action) error
+	RegisterAction(ctx sdk.Context, action *actiontypes.Action) error
 
 	// FinalizeAction validates action-specific finalization data
-	// Returns action state updates (or ActionState_ACTION_STATE_UNSPECIFIED if no change)
-	FinalizeAction(ctx sdk.Context, existingAction *actionapi.Action, superNodeAccount string, newMetadataBytes []byte) (actionapi.ActionState, error)
+	// Returns action state updates (or ActionStateUnspecified if no change)
+	FinalizeAction(ctx sdk.Context, existingAction *actiontypes.Action, superNodeAccount string, newMetadataBytes []byte) (actiontypes.ActionState, error)
 
 	// ValidateApproval validates action-specific approval data
-	ValidateApproval(ctx sdk.Context, action *actionapi.Action) error
+	ValidateApproval(ctx sdk.Context, action *actiontypes.Action) error
 
 	// GetUpdatedMetadata returns the updated metadata on finalize action
-	GetUpdatedMetadata(ctx sdk.Context, existingMetadata, newMetadata []byte) ([]byte, error)
+	GetUpdatedMetadata(ctx sdk.Context, existingMetadata, newMetadata []byte) ([]byte, error) 
 }
 
 // ActionRegistry maintains a registry of handlers for different action types
 type ActionRegistry struct {
-	handlers map[actionapi.ActionType]ActionHandler
+	handlers map[actiontypes.ActionType]ActionHandler
 	keeper   *Keeper // Reference to the keeper for logger and other services
 }
 
 // NewActionRegistry creates a new action registry
 func NewActionRegistry(k *Keeper) *ActionRegistry {
 	return &ActionRegistry{
-		handlers: make(map[actionapi.ActionType]ActionHandler),
+		handlers: make(map[actiontypes.ActionType]ActionHandler),
 		keeper:   k,
 	}
 }
 
 // RegisterHandler registers a handler for a specific action type
-func (r *ActionRegistry) RegisterHandler(actionType actionapi.ActionType, handler ActionHandler) {
+func (r *ActionRegistry) RegisterHandler(actionType actiontypes.ActionType, handler ActionHandler) {
 	r.handlers[actionType] = handler
 }
 
 // GetHandler retrieves the handler for a specific action type
-func (r *ActionRegistry) GetHandler(actionType actionapi.ActionType) (ActionHandler, error) {
+func (r *ActionRegistry) GetHandler(actionType actiontypes.ActionType) (ActionHandler, error) {
 	handler, ok := r.handlers[actionType]
 	if !ok {
 		return nil, ErrNoHandlerForActionType(actionType)
@@ -69,9 +67,9 @@ func (r *ActionRegistry) GetHandler(actionType actionapi.ActionType) (ActionHand
 }
 
 // ErrNoHandlerForActionType returns a formatted error for missing handlers
-func ErrNoHandlerForActionType(actionType actionapi.ActionType) error {
+func ErrNoHandlerForActionType(actionType actiontypes.ActionType) error {
 	return errors.Wrapf(
-		types2.ErrInvalidActionType,
+		actiontypes.ErrInvalidActionType,
 		"no handler registered for action type %s",
 		actionType.String(),
 	)

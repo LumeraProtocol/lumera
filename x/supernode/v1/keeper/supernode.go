@@ -3,12 +3,11 @@ package keeper
 import (
 	"fmt"
 
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
 	errorsmod "cosmossdk.io/errors"
 	sdkmath "cosmossdk.io/math"
 	"cosmossdk.io/store/prefix"
 
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"github.com/cosmos/cosmos-sdk/runtime"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
@@ -17,7 +16,7 @@ import (
 )
 
 // SetSuperNode sets a supernode record in the store
-func (k Keeper) SetSuperNode(ctx sdk.Context, supernode types2.SuperNode) error {
+func (k Keeper) SetSuperNode(ctx sdk.Context, supernode types.SuperNode) error {
 	if err := supernode.Validate(); err != nil {
 		return err
 	}
@@ -25,7 +24,7 @@ func (k Keeper) SetSuperNode(ctx sdk.Context, supernode types2.SuperNode) error 
 	// Convert context store to a KVStore interface
 	storeAdapter := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
 	// Create a prefix store so that all keys are under SuperNodeKey
-	store := prefix.NewStore(storeAdapter, []byte(types2.SuperNodeKey))
+	store := prefix.NewStore(storeAdapter, []byte(types.SuperNodeKey))
 
 	// Marshal the SuperNode into bytes
 	b, err := k.cdc.Marshal(&supernode)
@@ -47,37 +46,37 @@ func (k Keeper) SetSuperNode(ctx sdk.Context, supernode types2.SuperNode) error 
 }
 
 // QuerySuperNode returns the supernode record for a given validator address
-func (k Keeper) QuerySuperNode(ctx sdk.Context, valOperAddr sdk.ValAddress) (sn types2.SuperNode, exists bool) {
+func (k Keeper) QuerySuperNode(ctx sdk.Context, valOperAddr sdk.ValAddress) (sn types.SuperNode, exists bool) {
 	storeAdapter := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
-	store := prefix.NewStore(storeAdapter, []byte(types2.SuperNodeKey))
+	store := prefix.NewStore(storeAdapter, []byte(types.SuperNodeKey))
 
 	bz := store.Get(valOperAddr)
 	if bz == nil {
-		return types2.SuperNode{}, false
+		return types.SuperNode{}, false
 	}
 
 	if err := k.cdc.Unmarshal(bz, &sn); err != nil {
 		k.logger.Error(fmt.Sprintf("failed to unmarshal supernode: %s", err))
-		return types2.SuperNode{}, false
+		return types.SuperNode{}, false
 	}
 
 	return sn, true
 }
 
 // GetAllSuperNodes returns all supernodes, optionally filtered by state
-func (k Keeper) GetAllSuperNodes(ctx sdk.Context, stateFilters ...types2.SuperNodeState) ([]types2.SuperNode, error) {
+func (k Keeper) GetAllSuperNodes(ctx sdk.Context, stateFilters ...types.SuperNodeState) ([]types.SuperNode, error) {
 	storeAdapter := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
-	store := prefix.NewStore(storeAdapter, []byte(types2.SuperNodeKey))
+	store := prefix.NewStore(storeAdapter, []byte(types.SuperNodeKey))
 
 	iterator := store.Iterator(nil, nil)
 	defer iterator.Close()
 
-	var supernodes []types2.SuperNode
+	var supernodes []types.SuperNode
 	filtering := shouldFilter(stateFilters...)
 
 	for ; iterator.Valid(); iterator.Next() {
 		bz := iterator.Value()
-		var sn types2.SuperNode
+		var sn types.SuperNode
 		if err := k.cdc.Unmarshal(bz, &sn); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal supernode: %w", err)
 		}
@@ -99,15 +98,15 @@ func (k Keeper) GetAllSuperNodes(ctx sdk.Context, stateFilters ...types2.SuperNo
 }
 
 // GetSuperNodesPaginated returns paginated supernodes, optionally filtered by state
-func (k Keeper) GetSuperNodesPaginated(ctx sdk.Context, pagination *query.PageRequest, stateFilters ...types2.SuperNodeState) ([]*types2.SuperNode, *query.PageResponse, error) {
+func (k Keeper) GetSuperNodesPaginated(ctx sdk.Context, pagination *query.PageRequest, stateFilters ...types.SuperNodeState) ([]*types.SuperNode, *query.PageResponse, error) {
 	storeAdapter := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
-	store := prefix.NewStore(storeAdapter, []byte(types2.SuperNodeKey))
+	store := prefix.NewStore(storeAdapter, []byte(types.SuperNodeKey))
 
-	var supernodes []*types2.SuperNode
+	var supernodes []*types.SuperNode
 	filtering := shouldFilter(stateFilters...)
 
 	pageRes, err := query.Paginate(store, pagination, func(key, value []byte) error {
-		var sn types2.SuperNode
+		var sn types.SuperNode
 		if err := k.cdc.Unmarshal(value, &sn); err != nil {
 			return err
 		}
@@ -150,22 +149,22 @@ func (k Keeper) EnableSuperNode(ctx sdk.Context, valAddr sdk.ValAddress) error {
 		return errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode is in an invalid state")
 	}
 
-	if supernode.States[len(supernode.States)-1].State != types2.SuperNodeStateActive {
-		supernode.States = append(supernode.States, &types2.SuperNodeStateRecord{
-			State:  types2.SuperNodeStateActive,
+	if supernode.States[len(supernode.States)-1].State != types.SuperNodeStateActive {
+		supernode.States = append(supernode.States, &types.SuperNodeStateRecord{
+			State:  types.SuperNodeStateActive,
 			Height: ctx.BlockHeight(),
 		})
 	}
 	if err := k.SetSuperNode(ctx, supernode); err != nil {
-		k.logger.With("module", fmt.Sprintf("error updating supernode state: %s", valAddr)).Error(fmt.Sprintf("x/%s", types2.ModuleName))
+		k.logger.With("module", fmt.Sprintf("error updating supernode state: %s", valAddr)).Error(fmt.Sprintf("x/%s", types.ModuleName))
 		return errorsmod.Wrapf(sdkerrors.ErrNotFound, "eror updating supernode state")
 	}
 	// Emit event for watchers
 	ctx.EventManager().EmitEvent(
 		sdk.NewEvent(
-			types2.EventTypeSupernodeStarted,
-			sdk.NewAttribute(types2.AttributeKeyValidatorAddress, supernode.ValidatorAddress),
-			sdk.NewAttribute(types2.AttributeKeyReason, "enable_supernode"),
+			types.EventTypeSupernodeStarted,
+			sdk.NewAttribute(types.AttributeKeyValidatorAddress, supernode.ValidatorAddress),
+			sdk.NewAttribute(types.AttributeKeyReason, "enable_supernode"),
 		),
 	)
 
@@ -188,24 +187,24 @@ func (k Keeper) DisableSuperNode(ctx sdk.Context, valAddr sdk.ValAddress) error 
 		return errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode is in an invalid state")
 	}
 
-	if supernode.States[len(supernode.States)-1].State != types2.SuperNodeStateDisabled {
-		supernode.States = append(supernode.States, &types2.SuperNodeStateRecord{
-			State:  types2.SuperNodeStateDisabled,
+	if supernode.States[len(supernode.States)-1].State != types.SuperNodeStateDisabled {
+		supernode.States = append(supernode.States, &types.SuperNodeStateRecord{
+			State:  types.SuperNodeStateDisabled,
 			Height: ctx.BlockHeight(),
 		})
 	}
 
 	if err := k.SetSuperNode(ctx, supernode); err != nil {
-		k.logger.With("module", fmt.Sprintf("error updating supernode state: %s", valAddr)).Error(fmt.Sprintf("x/%s", types2.ModuleName))
+		k.logger.With("module", fmt.Sprintf("error updating supernode state: %s", valAddr)).Error(fmt.Sprintf("x/%s", types.ModuleName))
 		return errorsmod.Wrapf(sdkerrors.ErrNotFound, "eror updating supernode state")
 	}
 
 	// Emit event
 	ctx.EventManager().EmitEvent(
 		sdk.NewEvent(
-			types2.EventTypeSupernodeStopped,
-			sdk.NewAttribute(types2.AttributeKeyValidatorAddress, supernode.ValidatorAddress),
-			sdk.NewAttribute(types2.AttributeKeyReason, "disable_supernode"),
+			types.EventTypeSupernodeStopped,
+			sdk.NewAttribute(types.AttributeKeyValidatorAddress, supernode.ValidatorAddress),
+			sdk.NewAttribute(types.AttributeKeyReason, "disable_supernode"),
 		),
 	)
 
@@ -227,7 +226,7 @@ func (k Keeper) IsSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress) bool 
 		return false
 	}
 
-	return supernode.States[len(supernode.States)-1].State == types2.SuperNodeStateActive
+	return supernode.States[len(supernode.States)-1].State == types.SuperNodeStateActive
 }
 
 // CheckValidatorSupernodeEligibility ensures the validator has enough self-stake.
@@ -299,7 +298,7 @@ func (k Keeper) IsEligibleAndNotJailedValidator(ctx sdk.Context, valAddr sdk.Val
 	return err == nil
 }
 
-func stateIn(state types2.SuperNodeState, stateFilters ...types2.SuperNodeState) bool {
+func stateIn(state types.SuperNodeState, stateFilters ...types.SuperNodeState) bool {
 	for _, sf := range stateFilters {
 		if sf == state {
 			return true
@@ -308,13 +307,13 @@ func stateIn(state types2.SuperNodeState, stateFilters ...types2.SuperNodeState)
 	return false
 }
 
-func shouldFilter(stateFilters ...types2.SuperNodeState) bool {
+func shouldFilter(stateFilters ...types.SuperNodeState) bool {
 	if len(stateFilters) == 0 {
 		return false
 	}
 	// If SuperNodeStateUnspecified is present, it means no filtering
 	for _, sf := range stateFilters {
-		if sf == types2.SuperNodeStateUnspecified {
+		if sf == types.SuperNodeStateUnspecified {
 			return false
 		}
 	}

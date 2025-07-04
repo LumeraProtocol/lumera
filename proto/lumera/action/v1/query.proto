@@ -1,0 +1,152 @@
+syntax = "proto3";
+package lumera.action.v1;
+
+option go_package = "x/action/v1/types";
+
+import "amino/amino.proto";
+import "cosmos/base/query/v1beta1/pagination.proto";
+import "gogoproto/gogo.proto";
+import "google/api/annotations.proto";
+import "lumera/action/v1/params.proto";
+import "lumera/action/v1/action_type.proto";
+import "lumera/action/v1/action_state.proto";
+import "lumera/action/v1/action.proto";
+
+// Query defines the gRPC querier service.
+service Query {
+  
+  // Parameters queries the parameters of the module.
+  rpc Params (QueryParamsRequest) returns (QueryParamsResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/action/v1/params";
+  }
+  
+  // GetAction queries a single action by ID.
+  rpc GetAction (QueryGetActionRequest) returns (QueryGetActionResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/action/v1/get_action/{actionID}";
+  }
+  
+  // Queries a list of GetActionFee items.
+  rpc GetActionFee (QueryGetActionFeeRequest) returns (QueryGetActionFeeResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/action/v1/get_action_fee/{dataSize}";
+  }
+
+  // List actions with optional type and state filters.
+  rpc ListActions (QueryListActionsRequest) returns (QueryListActionsResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/action/v1/list_actions";
+  }
+
+  // List actions for a specific supernode.
+  rpc ListActionsBySuperNode (QueryListActionsBySuperNodeRequest) returns (QueryListActionsBySuperNodeResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/action/v1/list_actions_by_supernode/{superNodeAddress}";
+  }
+
+  // List actions created at a specific block height.
+  rpc ListActionsByBlockHeight (QueryListActionsByBlockHeightRequest) returns (QueryListActionsByBlockHeightResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/action/v1/list_actions_by_block_height/{blockHeight}";
+  }
+
+  // List expired actions.
+  rpc ListExpiredActions (QueryListExpiredActionsRequest) returns (QueryListExpiredActionsResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/action/v1/list_expired_actions";
+  }
+
+  // Query actions based on metadata.
+  rpc QueryActionByMetadata (QueryActionByMetadataRequest) returns (QueryActionByMetadataResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/action/v1/query_action_by_metadata";
+  }
+}
+// QueryParamsRequest is request type for the Query/Params RPC method.
+message QueryParamsRequest {}
+
+// QueryParamsResponse is response type for the Query/Params RPC method.
+message QueryParamsResponse {
+  
+  // params holds all the parameters of this module.
+  Params params = 1 [(gogoproto.nullable) = false, (amino.dont_omitempty) = true];
+}
+
+// Request type for GetAction
+message QueryGetActionRequest {
+  string actionID = 1; // The ID of the action to query
+}
+
+// Response type for GetAction
+message QueryGetActionResponse {
+  Action action = 1;
+}
+
+// QueryGetActionFeeRequest is a request type to get action fee based on data size
+message QueryGetActionFeeRequest {
+  string dataSize = 1;
+}
+
+// QueryGetActionFeeResponse is a response type to get action fee
+message QueryGetActionFeeResponse {
+  string amount = 1;
+}
+
+// List actions with optional type and state filters
+message QueryListActionsRequest {
+  ActionType actionType = 1;
+  ActionState actionState = 2;
+  cosmos.base.query.v1beta1.PageRequest pagination = 3;
+}
+
+// QueryListActionsResponse is a response type to list actions
+message QueryListActionsResponse {
+  repeated Action actions = 1;
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+  uint64 total = 3;
+}
+
+// QueryListActionsBySuperNodeRequest is a request type to list actions for a specific supernode
+message QueryListActionsBySuperNodeRequest {
+  string superNodeAddress = 1;
+  cosmos.base.query.v1beta1.PageRequest pagination = 2;
+}
+
+// QueryListActionsBySuperNodeResponse is a response type to list actions for a specific supernode
+message QueryListActionsBySuperNodeResponse {
+  repeated Action actions = 1;
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+  uint64 total = 3;
+}
+
+// List actions by block height
+message QueryListActionsByBlockHeightRequest {
+  int64 blockHeight = 1;
+  cosmos.base.query.v1beta1.PageRequest pagination = 2;
+}
+
+// QueryListActionsByBlockHeightResponse is a response type to list actions by block height
+message QueryListActionsByBlockHeightResponse {
+  repeated Action actions = 1;
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+  uint64 total = 3;
+}
+
+// QueryListExpiredActionsRequest is a request type to list expired actions
+message QueryListExpiredActionsRequest {
+  cosmos.base.query.v1beta1.PageRequest pagination = 1;
+}
+
+// QueryListExpiredActionsResponse is a response type to list expired actions
+message QueryListExpiredActionsResponse {
+  repeated Action actions = 1;
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+  uint64 total = 3;
+}
+
+// QueryActionByMetadataRequest is a request type to query actions by metadata
+message QueryActionByMetadataRequest {
+  ActionType actionType = 1;
+  string metadataQuery = 2; // e.g., "field=value"
+  cosmos.base.query.v1beta1.PageRequest pagination = 3;
+}
+
+// QueryActionByMetadataResponse is a response type to query actions by metadata
+message QueryActionByMetadataResponse {
+  repeated Action actions = 1;
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+  uint64 total = 3;
+}

@@ -4,10 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
-	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
+	"github.com/golang/mock/gomock"
 	"cosmossdk.io/math"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
@@ -16,6 +13,7 @@ import (
 	"cosmossdk.io/store"
 	"cosmossdk.io/store/metrics"
 	storetypes "cosmossdk.io/store/types"
+	upgradetypes "cosmossdk.io/x/upgrade/types"
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	dbm "github.com/cosmos/cosmos-db"
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -26,33 +24,18 @@ import (
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	paramtypes "github.com/cosmos/cosmos-sdk/x/params/types"
+	moduletestutil "github.com/cosmos/cosmos-sdk/types/module/testutil"
+	ibcclienttypes "github.com/cosmos/ibc-go/v10/modules/core/02-client/types"
+	ibckeeper "github.com/cosmos/ibc-go/v10/modules/core/keeper"
+	ibctypes "github.com/cosmos/ibc-go/v10/modules/core/types"
+
+	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
+	actionmodulev1 "github.com/LumeraProtocol/lumera/x/action/v1/module"
+	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
-
-// Mock implementation for SupernodeKeeper
-type ActionMockSupernodeKeeper struct {
-	mock.Mock
-}
-
-// Implement SupernodeKeeper interface
-func (m *ActionMockSupernodeKeeper) GetTopSuperNodesForBlock(ctx context.Context, req *types.QueryGetTopSuperNodesForBlockRequest) (*types.QueryGetTopSuperNodesForBlockResponse, error) {
-	args := m.Called(ctx, req)
-	return args.Get(0).(*types.QueryGetTopSuperNodesForBlockResponse), args.Error(1)
-}
-
-func (m *ActionMockSupernodeKeeper) IsSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress) bool {
-	args := m.Called(ctx, valAddr)
-	return args.Bool(0)
-}
-
-func (m *ActionMockSupernodeKeeper) QuerySuperNode(ctx sdk.Context, valOperAddr sdk.ValAddress) (types.SuperNode, bool) {
-	args := m.Called(ctx, valOperAddr)
-	return args.Get(0).(types.SuperNode), args.Bool(1)
-}
-
-func (m *ActionMockSupernodeKeeper) SetSuperNode(ctx sdk.Context, supernode types.SuperNode) error {
-	args := m.Called(ctx, supernode)
-	return args.Error(0)
-}
 
 // ActionBankKeeper extends the existing MockBankKeeper with the SpendableCoins method
 type ActionBankKeeper struct {
@@ -140,14 +123,15 @@ type AccountPair struct {
 	PubKey  cryptotypes.PubKey
 }
 
-func ActionKeeper(t testing.TB) (keeper.Keeper, sdk.Context) {
-	return ActionKeeperWithAddress(t, nil)
+func ActionKeeper(t testing.TB, ctrl *gomock.Controller) (keeper.Keeper, sdk.Context) {
+	return ActionKeeperWithAddress(t, ctrl, nil)
 }
 
-func ActionKeeperWithAddress(t testing.TB, accounts []AccountPair) (keeper.Keeper, sdk.Context) {
-	storeKey := storetypes.NewKVStoreKey(types2.StoreKey)
+func ActionKeeperWithAddress(t testing.TB, ctrl *gomock.Controller, accounts []AccountPair) (keeper.Keeper, sdk.Context) {
+	storeKey := storetypes.NewKVStoreKey(actiontypes.StoreKey)
 
 	db := dbm.NewMemDB()
+	encCfg := moduletestutil.MakeTestEncodingConfig(actionmodulev1.AppModule{})
 	stateStore := store.NewCommitMultiStore(db, log.NewNopLogger(), metrics.NewNoOpMetrics())
 	stateStore.MountStoreWithDB(storeKey, storetypes.StoreTypeIAVL, db)
 	require.NoError(t, stateStore.LoadLatestVersion())
@@ -159,47 +143,51 @@ func ActionKeeperWithAddress(t testing.TB, accounts []AccountPair) (keeper.Keepe
 	// Create mock keepers
 	bankKeeper := NewActionMockBankKeeper()
 
-	accountKeeper := NewMockAccountKeeper()
+	authKeeper := NewMockAccountKeeper()
 
 	stakingKeeper := new(MockStakingKeeper)
 
-	supernodeKeeper := new(ActionMockSupernodeKeeper)
+	supernodeKeeper := supernodemocks.NewMockSupernodeKeeper(ctrl)
+	supernodeQueryServer := supernodemocks.NewMockQueryServer(ctrl)
 
 	distributionKeeper := new(MockDistributionKeeper)
 
-	// Setup supernode mock for GetTopSuperNodesForBlock (used in validateSupernodeAuthorization)
-	supernodeKeeper.On("GetTopSuperNodesForBlock", mock.Anything, mock.Anything).Return(
-		&types.QueryGetTopSuperNodesForBlockResponse{
-			Supernodes: []*types.SuperNode{
-				{ValidatorAddress: "cosmosvaloper1example"}, // Example supernode for tests
-			},
-		}, nil)
-
+	// Set up the context
 	ctx := sdk.NewContext(stateStore, cmtproto.Header{}, false, log.NewNopLogger())
 	if accounts != nil && len(accounts) > 0 {
 		for _, acc := range accounts {
-			account := accountKeeper.NewAccountWithAddress(ctx, acc.Address)
+			account := authKeeper.NewAccountWithAddress(ctx, acc.Address)
 			err := account.SetPubKey(acc.PubKey)
 			require.NoError(t, err)
-			accountKeeper.SetAccount(ctx, account)
+			authKeeper.SetAccount(ctx, account)
 			bankKeeper.sentCoins[acc.Address.String()] = sdk.NewCoins(sdk.NewCoin("ulume", math.NewInt(1000000)))
 		}
 	}
 
+	mockUpgradeKeeper := newMockUpgradeKeeper()
+	
+	storeService := runtime.NewKVStoreService(storeKey)
 	k := keeper.NewKeeper(
 		cdc,
-		runtime.NewKVStoreService(storeKey),
+		authKeeper.AddressCodec(),
+		storeService,
 		log.NewNopLogger(),
-		authority.String(),
+		authority,
 		bankKeeper,
-		accountKeeper,
+		authKeeper,
 		stakingKeeper,
 		distributionKeeper,
 		supernodeKeeper,
+		func() sntypes.QueryServer {
+			return supernodeQueryServer
+		},
+		func() *ibckeeper.Keeper {
+			return ibckeeper.NewKeeper(encCfg.Codec, storeService, newMockIbcParams(), mockUpgradeKeeper, authority.String())
+		},
 	)
 
 	// Initialize params
-	params := types2.DefaultParams()
+	params := actiontypes.DefaultParams()
 	params.FoundationFeeShare = "0.1"
 	params.SuperNodeFeeShare = "0.9"
 	if err := k.SetParams(ctx, params); err != nil {
@@ -207,4 +195,31 @@ func ActionKeeperWithAddress(t testing.TB, accounts []AccountPair) (keeper.Keepe
 	}
 
 	return k, ctx
+}
+
+type MockUpgradeKeeper struct {
+	ibcclienttypes.UpgradeKeeper
+
+	initialized bool
+}
+
+func (m MockUpgradeKeeper) GetUpgradePlan(ctx context.Context) (upgradetypes.Plan, error) {
+	return upgradetypes.Plan{}, nil
+}
+
+func newMockUpgradeKeeper() *MockUpgradeKeeper {
+	return &MockUpgradeKeeper{initialized: true}
+}
+
+type mockIbcParams struct {
+	ibctypes.ParamSubspace
+
+	initialized bool
+}
+
+func newMockIbcParams() *mockIbcParams {
+	return &mockIbcParams{initialized: true}
+}
+
+func (mockIbcParams) GetParamSet(ctx sdk.Context, ps paramtypes.ParamSet) {
 }

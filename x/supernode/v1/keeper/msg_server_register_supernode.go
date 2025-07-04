@@ -3,15 +3,14 @@ package keeper
 import (
 	"context"
 
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
 	errorsmod "cosmossdk.io/errors"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
-func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types2.MsgRegisterSupernode) (*types2.MsgRegisterSupernodeResponse, error) {
+func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types.MsgRegisterSupernode) (*types.MsgRegisterSupernodeResponse, error) {
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
 	// Convert validator address string to ValAddress
@@ -32,7 +31,7 @@ func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types2.MsgRegis
 	}
 
 	// Get validator
-	validator, err := k.stakingKeeper.Validator(ctx, valOperAddr)
+	validator, err := k.GetStakingKeeper().Validator(ctx, valOperAddr)
 	if err != nil {
 		return nil, errorsmod.Wrapf(sdkerrors.ErrNotFound, "validator not found for operator address %s: %s", msg.ValidatorAddress, err)
 	}
@@ -48,21 +47,21 @@ func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types2.MsgRegis
 	}
 
 	// Create new SuperNode
-	supernode := types2.SuperNode{
+	supernode := types.SuperNode{
 		ValidatorAddress: msg.ValidatorAddress,
 		SupernodeAccount: msg.SupernodeAccount,
-		Evidence:         []*types2.Evidence{},
-		Metrics: &types2.MetricsAggregate{
+		Evidence:         []*types.Evidence{},
+		Metrics: &types.MetricsAggregate{
 			Metrics:     make(map[string]float64),
 			ReportCount: 0,
 		},
-		States: []*types2.SuperNodeStateRecord{
+		States: []*types.SuperNodeStateRecord{
 			{
-				State:  types2.SuperNodeStateActive,
+				State:  types.SuperNodeStateActive,
 				Height: ctx.BlockHeight(),
 			},
 		},
-		PrevIpAddresses: []*types2.IPAddressHistory{
+		PrevIpAddresses: []*types.IPAddressHistory{
 			{
 				Address: msg.IpAddress,
 				Height:  ctx.BlockHeight(),
@@ -84,11 +83,11 @@ func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types2.MsgRegis
 	// Emit event
 	ctx.EventManager().EmitEvent(
 		sdk.NewEvent(
-			types2.EventTypeSupernodeRegistered,
-			sdk.NewAttribute(types2.AttributeKeyValidatorAddress, msg.ValidatorAddress),
-			sdk.NewAttribute(types2.AttributeKeyIPAddress, msg.IpAddress),
+			types.EventTypeSupernodeRegistered,
+			sdk.NewAttribute(types.AttributeKeyValidatorAddress, msg.ValidatorAddress),
+			sdk.NewAttribute(types.AttributeKeyIPAddress, msg.IpAddress),
 		),
 	)
 
-	return &types2.MsgRegisterSupernodeResponse{}, nil
+	return &types.MsgRegisterSupernodeResponse{}, nil
 }

@@ -1,22 +1,38 @@
 package types
 
+//go:generate mockgen -copyright_file=../../../../testutil/mock_header.txt -destination=../mocks/expected_keepers_mock.go -package=supernodemocks -source=expected_keepers.go
+//go:generate mockgen -copyright_file=../../../../testutil/mock_header.txt -destination=../mocks/queryserver_mock.go -package=supernodemocks -source=query.pb.go
+
 import (
 	"context"
 	"time"
 
 	math "cosmossdk.io/math"
 	sdkmath "cosmossdk.io/math"
-
 	"cosmossdk.io/core/address"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/types/query"
+
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 )
 
 // SupernodeKeeper defines the expected interface for the Supernode module.
 // For Generating mocks only not used in depinject
 type SupernodeKeeper interface {
+	SetSuperNode(ctx sdk.Context, supernode SuperNode) error
 	EnableSuperNode(ctx sdk.Context, valAddr sdk.ValAddress) error
 	DisableSuperNode(ctx sdk.Context, valAddr sdk.ValAddress) error
+	SetParams(ctx sdk.Context, params Params) error
+	CheckValidatorSupernodeEligibility(ctx sdk.Context, validator stakingtypes.ValidatorI, valAddr string) error
+
+	GetAuthority() string
+	GetStakingKeeper() StakingKeeper
+	GetParams(ctx sdk.Context) (params Params)
+	GetAllSuperNodes(ctx sdk.Context, stateFilters ...SuperNodeState) ([]SuperNode, error)
+	GetBlockHashForHeight(ctx sdk.Context, height int64) ([]byte, error)
+	RankSuperNodesByDistance(blockHash []byte, supernodes []SuperNode, topN int) []SuperNode
+	QuerySuperNode(ctx sdk.Context, valOperAddr sdk.ValAddress) (sn SuperNode, exists bool)
+	GetSuperNodesPaginated(ctx sdk.Context, pagination *query.PageRequest, stateFilters ...SuperNodeState) ([]*SuperNode, *query.PageResponse, error)
 	IsSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress) bool
 	IsEligibleAndNotJailedValidator(ctx sdk.Context, valAddr sdk.ValAddress) bool
 }

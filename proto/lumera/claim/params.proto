@@ -1,11 +1,11 @@
 syntax = "proto3";
 package lumera.claim;
 
+option go_package = "x/claim/types";
+
 import "gogoproto/gogo.proto";
 import "google/protobuf/duration.proto";
 import "cosmos/msg/v1/msg.proto";
-
-option go_package = "github.com/LumeraProtocol/lumera/x/claim/types";
 
 // Params defines the parameters for the module.
 message Params {

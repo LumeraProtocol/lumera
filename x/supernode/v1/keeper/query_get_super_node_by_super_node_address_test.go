@@ -5,8 +5,7 @@ import (
 
 	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
 	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
@@ -18,31 +17,31 @@ func TestKeeper_GetSuperNodeBySuperNodeAddress(t *testing.T) {
 	valAddr := sdk.ValAddress([]byte("validator"))
 	creatorAddr := sdk.AccAddress(valAddr)
 
-	sn := types2.SuperNode{
+	sn := types.SuperNode{
 		SupernodeAccount: string(creatorAddr.String()),
 		ValidatorAddress: valAddr.String(),
 		Version:          "1.0.0",
-		PrevIpAddresses: []*types2.IPAddressHistory{
+		PrevIpAddresses: []*types.IPAddressHistory{
 			{
 				Address: "1022.145.1.1",
 				Height:  1,
 			},
 		},
-		States: []*types2.SuperNodeStateRecord{
+		States: []*types.SuperNodeStateRecord{
 			{
-				State:  types2.SuperNodeStateActive,
+				State:  types.SuperNodeStateActive,
 				Height: 1,
 			},
 		},
-		P2PPort: "26657",
+		P2PPort: "4445",
 	}
 
 	testCases := []struct {
 		name        string
-		req         *types2.QueryGetSuperNodeBySuperNodeAddressRequest
+		req         *types.QueryGetSuperNodeBySuperNodeAddressRequest
 		setupState  func(k keeper.Keeper, ctx sdk.Context)
 		expectedErr error
-		checkResult func(t *testing.T, resp *types2.QueryGetSuperNodeBySuperNodeAddressResponse)
+		checkResult func(t *testing.T, resp *types.QueryGetSuperNodeBySuperNodeAddressResponse)
 	}{
 		{
 			name:        "invalid request (nil)",
@@ -51,21 +50,21 @@ func TestKeeper_GetSuperNodeBySuperNodeAddress(t *testing.T) {
 		},
 		{
 			name: "supernode not found",
-			req: &types2.QueryGetSuperNodeBySuperNodeAddressRequest{
+			req: &types.QueryGetSuperNodeBySuperNodeAddressRequest{
 				SupernodeAddress: "non-existent-address",
 			},
 			expectedErr: status.Error(codes.NotFound, "supernode not found"),
 		},
 		{
 			name: "supernode found",
-			req: &types2.QueryGetSuperNodeBySuperNodeAddressRequest{
+			req: &types.QueryGetSuperNodeBySuperNodeAddressRequest{
 				SupernodeAddress: creatorAddr.String(),
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
 				require.NoError(t, k.SetSuperNode(ctx, sn))
 			},
 			expectedErr: nil,
-			checkResult: func(t *testing.T, resp *types2.QueryGetSuperNodeBySuperNodeAddressResponse) {
+			checkResult: func(t *testing.T, resp *types.QueryGetSuperNodeBySuperNodeAddressResponse) {
 				require.NotNil(t, resp.Supernode)
 				require.Equal(t, sn, *resp.Supernode)
 			},
@@ -83,12 +82,13 @@ func TestKeeper_GetSuperNodeBySuperNodeAddress(t *testing.T) {
 			bankKeeper := supernodemocks.NewMockBankKeeper(ctrl)
 
 			k, ctx := setupKeeperForTest(t, stakingKeeper, slashingKeeper, bankKeeper)
+			q := keeper.NewQueryServerImpl(k)
 
 			if tc.setupState != nil {
 				tc.setupState(k, ctx)
 			}
 
-			resp, err := k.GetSuperNodeBySuperNodeAddress(ctx, tc.req)
+			resp, err := q.GetSuperNodeBySuperNodeAddress(ctx, tc.req)
 
 			if tc.expectedErr != nil {
 				require.Error(t, err)

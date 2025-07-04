@@ -1,12 +1,14 @@
 package keeper_test
 
 import (
-	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
 	"github.com/LumeraProtocol/lumera/x/action/v1/types"
+	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 func (suite *MsgServerTestSuite) TestMsgApproveActionCascade() {
+	suite.setupExpectationsGetAllTopSNs(1)
+
 	suite.ctx = suite.ctx.WithEventManager(sdk.NewEventManager())
 	actionID := suite.registerCascadeAction()
 	suite.finalizeCascadeAction(actionID)
@@ -15,7 +17,7 @@ func (suite *MsgServerTestSuite) TestMsgApproveActionCascade() {
 	// Verify action state has changed to APPROVED
 	updatedAction, found := suite.keeper.GetActionByID(suite.ctx, actionID)
 	suite.True(found)
-	suite.Equal(actionapi.ActionState_ACTION_STATE_APPROVED, updatedAction.State)
+	suite.Equal(actiontypes.ActionStateApproved, updatedAction.State)
 
 	// Verify events were emitted
 	events := suite.ctx.EventManager().Events()
@@ -31,6 +33,8 @@ func (suite *MsgServerTestSuite) TestMsgApproveActionCascade() {
 
 func (suite *MsgServerTestSuite) TestMsgApproveActionErrors() {
 	suite.ctx = suite.ctx.WithEventManager(sdk.NewEventManager())
+
+	suite.setupExpectationsGetAllTopSNs(2)
 
 	actionIDApproved := suite.registerCascadeAction()
 	suite.finalizeCascadeAction(actionIDApproved)
@@ -81,7 +85,7 @@ func (suite *MsgServerTestSuite) TestMsgApproveActionErrors() {
 	}
 
 	for _, tc := range testCases {
-		suite.Run(tc.name, func() {
+		suite.Run(tc.name, func() {		
 			res, err := suite.approveActionNoCheck(tc.actionId, tc.creator)
 
 			if tc.errorContains != "" {

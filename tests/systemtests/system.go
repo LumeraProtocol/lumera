@@ -17,8 +17,9 @@ import (
 	"syscall"
 	"testing"
 	"time"
+	"sync"
 
-	"github.com/cometbft/cometbft/libs/sync"
+	mtxSync "github.com/cometbft/cometbft/libs/sync"
 	client "github.com/cometbft/cometbft/rpc/client/http"
 	ctypes "github.com/cometbft/cometbft/rpc/core/types"
 	tmtypes "github.com/cometbft/cometbft/types"
@@ -66,7 +67,7 @@ type SystemUnderTest struct {
 	projectName       string
 	dirty             bool // requires full reset when marked dirty
 
-	pidsLock sync.RWMutex
+	pidsLock mtxSync.RWMutex
 	pids     map[int]struct{}
 }
 
@@ -360,17 +361,28 @@ func (s *SystemUnderTest) withEachPid(cb func(p *os.Process)) {
 
 // PrintBuffer prints the chain logs to the console
 func (s *SystemUnderTest) PrintBuffer() {
-	s.outBuff.Do(func(v interface{}) {
-		if v != nil {
-			fmt.Fprintf(s.out, "out> %s\n", v)
+	const maxLines = 100
+
+	collect := func(r *ring.Ring) []string {
+		var lines []string
+		r.Do(func(v interface{}) {
+			if v != nil {
+				lines = append(lines, v.(string))
+			}
+		})
+		if len(lines) > maxLines {
+			lines = lines[len(lines)-maxLines:]
 		}
-	})
+		return lines
+	}
+
+	for _, line := range collect(s.outBuff) {
+		fmt.Fprintf(s.out, "out> %s\n", line)
+	}
 	fmt.Fprint(s.out, "8< chain err -----------------------------------------\n")
-	s.errBuff.Do(func(v interface{}) {
-		if v != nil {
-			fmt.Fprintf(s.out, "err> %s\n", v)
-		}
-	})
+	for _, line := range collect(s.errBuff) {
+		fmt.Fprintf(s.out, "err> %s\n", line)
+	}
 }
 
 // BuildNewBinary builds and installs new executable binary
@@ -563,6 +575,11 @@ func (s *SystemUnderTest) ForEachNodeExecAndWait(t *testing.T, cmds ...[]string)
 
 // startNodesAsync runs the given app cli command for all cluster nodes and returns without waiting
 func (s *SystemUnderTest) startNodesAsync(t *testing.T, xargs ...string) {
+	t.Helper()
+
+	errChan := make(chan error, s.nodesCount)
+	var wg sync.WaitGroup
+
 	s.withEachNodeHome(func(i int, home string) {
 		args := append(xargs, "--home", home)
 		s.Logf("Execute `%s %s`\n", s.ExecBinary, strings.Join(args, " "))
@@ -572,7 +589,9 @@ func (s *SystemUnderTest) startNodesAsync(t *testing.T, xargs ...string) {
 		)
 		cmd.Dir = WorkDir
 		s.watchLogs(i, cmd)
-		require.NoError(t, cmd.Start(), "node %d", i)
+
+		err := cmd.Start()
+		require.NoError(t, err, "failed to start node %d", i)
 
 		pid := cmd.Process.Pid
 		s.pidsLock.Lock()
@@ -580,15 +599,36 @@ func (s *SystemUnderTest) startNodesAsync(t *testing.T, xargs ...string) {
 		s.pidsLock.Unlock()
 		s.Logf("Node started: %d\n", pid)
 
+		wg.Add(1)
 		// cleanup when stopped
-		go func(pid int) {
-			_ = cmd.Wait() // blocks until shutdown
+		go func(pid int, cmd *exec.Cmd, nodeIndex int) {
+			defer wg.Done()
+			err := cmd.Wait() // blocks until shutdown
+			if err != nil {
+				s.PrintBuffer()
+				errChan <- fmt.Errorf("node %d exited unexpectedly: %w", nodeIndex, err)
+			} else {
+				errChan <- nil
+			}
+
 			s.pidsLock.Lock()
 			delete(s.pids, pid)
 			s.pidsLock.Unlock()
 			s.Logf("Node stopped: %d\n", pid)
-		}(pid)
+		}(pid, cmd, i)
 	})
+
+	// Wait in background and close the channel when all nodes are done
+	go func() {
+		wg.Wait()
+		close(errChan)
+	}()
+
+	for err := range errChan {
+		if err != nil {
+			t.Errorf("%v", err)
+		}
+	}
 }
 
 func (s *SystemUnderTest) withEachNodeHome(cb func(i int, home string)) {
@@ -646,7 +686,6 @@ func (s *SystemUnderTest) resetBuffers() {
 	s.errBuff = ring.New(100)
 }
 
-// AddFullnode starts a new fullnode that connects to the existing chain but is not a validator.
 // AddFullnode starts a new fullnode that connects to the existing chain but is not a validator.
 func (s *SystemUnderTest) AddFullnode(t *testing.T, beforeStart ...func(nodeNumber int, nodePath string)) Node {
 	t.Helper()
@@ -879,7 +918,7 @@ func CaptureAllEventsConsumer(t *testing.T, optMaxWaitTime ...time.Duration) (c 
 		maxWaitTime = optMaxWaitTime[0]
 	}
 	var (
-		mu             sync.Mutex
+		mu             mtxSync.Mutex
 		capturedEvents []ctypes.ResultEvent
 		exit           bool
 	)

@@ -66,7 +66,7 @@ func TestSupernodeUpdateParamsProposal(t *testing.T) {
 	// Create governance proposal to update parameters
 	proposalJson := fmt.Sprintf(`{
 		"messages": [{
-			"@type": "/lumera.supernode.MsgUpdateParams",
+			"@type": "/lumera.supernode.v1.MsgUpdateParams",
 			"authority": "%s",
 			"params": {
 				"minimum_stake_for_sn": {"denom":"ulume","amount":"2000000"},

@@ -3,17 +3,18 @@ package integration_test
 import (
 	"fmt"
 
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
 	sdkmath "cosmossdk.io/math"
 
 	_ "cosmossdk.io/log"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/stretchr/testify/require"
 )
 
 func (suite *KeeperIntegrationSuite) TestAfterValidatorBondedHook() {
+	minimumStakePrice := sdk.NewInt64Coin("ulume", 1_000_000)
 	tests := []struct {
 		name          string
 		setup         func()
@@ -24,17 +25,17 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorBondedHook() {
 		{
 			name: "when validator is bonded and meet supernode requirements, it should be active",
 			setup: func() {
-				params := types2.Params{
-					MinimumStakeForSn: sdk.NewCoin("ulume", sdkmath.NewInt(1000000)),
+				params := sntypes.Params{
+					MinimumStakeForSn: minimumStakePrice,
 				}
 				suite.keeper.SetParams(suite.ctx, params)
 
-				supernode := types2.SuperNode{
+				supernode := sntypes.SuperNode{
 					ValidatorAddress: sdk.ValAddress([]byte("validator1c")).String(),
 					SupernodeAccount: sdk.AccAddress([]byte("validator1c")).String(),
 					Version:          "1.0.0",
-					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
-					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					States:           []*sntypes.SuperNodeStateRecord{{State: sntypes.SuperNodeStateActive}},
+					PrevIpAddresses:  []*sntypes.IPAddressHistory{{Address: "192.168.1.1"}},
 					P2PPort:          "26657",
 				}
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
@@ -62,7 +63,7 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorBondedHook() {
 				if !found {
 					return fmt.Errorf("SuperNode not found")
 				}
-				if result.States[len(result.States)-1].State != types2.SuperNodeStateActive {
+				if result.States[len(result.States)-1].State != sntypes.SuperNodeStateActive {
 					return fmt.Errorf("expected SuperNode to be active")
 				}
 				return nil
@@ -72,17 +73,17 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorBondedHook() {
 		{
 			name: "when the validator is bonded but jailed, it should disabled",
 			setup: func() {
-				params := types2.Params{
-					MinimumStakeForSn: sdk.NewCoin("ulume", sdkmath.NewInt(1000000)),
+				params := sntypes.Params{
+					MinimumStakeForSn: minimumStakePrice,
 				}
 				suite.keeper.SetParams(suite.ctx, params)
 
-				supernode := types2.SuperNode{
+				supernode := sntypes.SuperNode{
 					ValidatorAddress: sdk.ValAddress([]byte("validator1j")).String(),
 					SupernodeAccount: sdk.AccAddress([]byte("validator1j")).String(),
 					Version:          "1.0.0",
-					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
-					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					States:           []*sntypes.SuperNodeStateRecord{{State: sntypes.SuperNodeStateActive}},
+					PrevIpAddresses:  []*sntypes.IPAddressHistory{{Address: "192.168.1.1"}},
 					P2PPort:          "26657",
 				}
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
@@ -111,7 +112,7 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorBondedHook() {
 				if !found {
 					return fmt.Errorf("SuperNode not found")
 				}
-				if result.States[len(result.States)-1].State != types2.SuperNodeStateDisabled {
+				if result.States[len(result.States)-1].State != sntypes.SuperNodeStateDisabled {
 					return fmt.Errorf("expected SuperNode to be active")
 				}
 				return nil
@@ -137,6 +138,7 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorBondedHook() {
 }
 
 func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
+    minimumStakePrice := sdk.NewInt64Coin("ulume", 1_000_000)
 	tests := []struct {
 		name          string
 		setup         func()
@@ -148,17 +150,17 @@ func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
 		{
 			name: "when the validator begins un-bonding and the stake falls below minimum but is not jailed, it should be disabled",
 			setup: func() {
-				params := types2.Params{
-					MinimumStakeForSn: sdk.NewCoin("ulume", sdkmath.NewInt(1000000)),
+				params := sntypes.Params{
+					MinimumStakeForSn: minimumStakePrice,
 				}
 				suite.keeper.SetParams(suite.ctx, params)
 
-				supernode := types2.SuperNode{
+				supernode := sntypes.SuperNode{
 					ValidatorAddress: sdk.ValAddress([]byte("validator1bu")).String(),
 					SupernodeAccount: sdk.AccAddress([]byte("validator1bu")).String(),
 					Version:          "1.0.0",
-					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
-					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					States:           []*sntypes.SuperNodeStateRecord{{State: sntypes.SuperNodeStateActive}},
+					PrevIpAddresses:  []*sntypes.IPAddressHistory{{Address: "192.168.1.1"}},
 					P2PPort:          "26657",
 				}
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
@@ -177,7 +179,7 @@ func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
 				if !found {
 					return fmt.Errorf("SuperNode not found")
 				}
-				if result.States[len(result.States)-1].State != types2.SuperNodeStateDisabled {
+				if result.States[len(result.States)-1].State != sntypes.SuperNodeStateDisabled {
 					return fmt.Errorf("expected SuperNode to be disabled")
 				}
 				return nil
@@ -187,17 +189,17 @@ func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
 		{
 			name: "when the validator begins un-bonding and stake does not fall below minimum but is jailed, it should be disabled",
 			setup: func() {
-				params := types2.Params{
-					MinimumStakeForSn: sdk.NewCoin("ulume", sdkmath.NewInt(1000000)),
+				params := sntypes.Params{
+					MinimumStakeForSn: minimumStakePrice,
 				}
 				suite.keeper.SetParams(suite.ctx, params)
 
-				supernode := types2.SuperNode{
+				supernode := sntypes.SuperNode{
 					ValidatorAddress: sdk.ValAddress([]byte("validator1ju")).String(),
 					SupernodeAccount: sdk.AccAddress([]byte("validator1ju")).String(),
 					Version:          "1.0.0",
-					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
-					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					States:           []*sntypes.SuperNodeStateRecord{{State: sntypes.SuperNodeStateActive}},
+					PrevIpAddresses:  []*sntypes.IPAddressHistory{{Address: "192.168.1.1"}},
 					P2PPort:          "26657",
 				}
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
@@ -226,7 +228,7 @@ func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
 				if !found {
 					return fmt.Errorf("SuperNode not found")
 				}
-				if result.States[len(result.States)-1].State != types2.SuperNodeStateDisabled {
+				if result.States[len(result.States)-1].State != sntypes.SuperNodeStateDisabled {
 					return fmt.Errorf("expected SuperNode to be disabled")
 				}
 				return nil
@@ -236,17 +238,17 @@ func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
 		{
 			name: "when the validator begins un-bonding but stake does not fall below minimum and is not jailed, it should not be disabled",
 			setup: func() {
-				params := types2.Params{
-					MinimumStakeForSn: sdk.NewCoin("ulume", sdkmath.NewInt(1000000)),
+				params := sntypes.Params{
+					MinimumStakeForSn: sdk.NewInt64Coin("ulume", 1_000_000),
 				}
 				suite.keeper.SetParams(suite.ctx, params)
 
-				supernode := types2.SuperNode{
+				supernode := sntypes.SuperNode{
 					ValidatorAddress: sdk.ValAddress([]byte("validator1jua")).String(),
 					SupernodeAccount: sdk.AccAddress([]byte("validator1jua")).String(),
 					Version:          "1.0.0",
-					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
-					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					States:           []*sntypes.SuperNodeStateRecord{{State: sntypes.SuperNodeStateActive}},
+					PrevIpAddresses:  []*sntypes.IPAddressHistory{{Address: "192.168.1.1"}},
 					P2PPort:          "26657",
 				}
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
@@ -274,7 +276,7 @@ func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
 				if !found {
 					return fmt.Errorf("SuperNode not found")
 				}
-				if result.States[len(result.States)-1].State != types2.SuperNodeStateActive {
+				if result.States[len(result.States)-1].State != sntypes.SuperNodeStateActive {
 					return fmt.Errorf("expected SuperNode to be active")
 				}
 				return nil
@@ -310,12 +312,12 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorRemovedHook() {
 		{
 			name: "when the validator is removed, and is active, it should be disabled",
 			setup: func() {
-				supernode := types2.SuperNode{
+				supernode := types.SuperNode{
 					ValidatorAddress: sdk.ValAddress("validator1r").String(),
 					SupernodeAccount: sdk.AccAddress([]byte("validator1r")).String(),
 					Version:          "1.0.0",
-					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
-					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					States:           []*sntypes.SuperNodeStateRecord{{State: sntypes.SuperNodeStateActive}},
+					PrevIpAddresses:  []*sntypes.IPAddressHistory{{Address: "192.168.1.1"}},
 					P2PPort:          "26657",
 				}
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
@@ -328,7 +330,7 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorRemovedHook() {
 				if !found {
 					return fmt.Errorf("SuperNode not found")
 				}
-				if result.States[len(result.States)-1].State != types2.SuperNodeStateDisabled {
+				if result.States[len(result.States)-1].State != sntypes.SuperNodeStateDisabled {
 					return fmt.Errorf("expected SuperNode to be disabled")
 				}
 				return nil
@@ -354,6 +356,7 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorRemovedHook() {
 }
 
 func (suite *KeeperIntegrationSuite) TestBeforeDelegationSharesModifiedHook() {
+	minimumStakePrice := sdk.NewInt64Coin("ulume", 1_000_000)
 	tests := []struct {
 		name          string
 		setup         func()
@@ -364,17 +367,17 @@ func (suite *KeeperIntegrationSuite) TestBeforeDelegationSharesModifiedHook() {
 		{
 			name: "before the delegation shares are modified, if the validator meet supernode requirements, it should be active",
 			setup: func() {
-				supernode := types2.SuperNode{
+				supernode := sntypes.SuperNode{
 					ValidatorAddress: sdk.ValAddress("validator3").String(),
 					SupernodeAccount: sdk.AccAddress([]byte("validator3")).String(),
 					Version:          "1.0.0",
-					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
-					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					States:           []*sntypes.SuperNodeStateRecord{{State: sntypes.SuperNodeStateActive}},
+					PrevIpAddresses:  []*sntypes.IPAddressHistory{{Address: "192.168.1.1"}},
 					P2PPort:          "26657",
 				}
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
-				params := types2.Params{
-					MinimumStakeForSn: sdk.NewCoin("ulume", sdkmath.NewInt(1000000)),
+				params := sntypes.Params{
+					MinimumStakeForSn: minimumStakePrice,
 				}
 				suite.keeper.SetParams(suite.ctx, params)
 
@@ -401,7 +404,7 @@ func (suite *KeeperIntegrationSuite) TestBeforeDelegationSharesModifiedHook() {
 				if !found {
 					return fmt.Errorf("SuperNode not found")
 				}
-				if result.States[len(result.States)-1].State != types2.SuperNodeStateActive {
+				if result.States[len(result.States)-1].State != sntypes.SuperNodeStateActive {
 					return fmt.Errorf("expected SuperNode to be active")
 				}
 				return nil

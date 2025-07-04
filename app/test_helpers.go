@@ -16,7 +16,6 @@ import (
 	sdkmath "cosmossdk.io/math"
 	pruningtypes "cosmossdk.io/store/pruning/types"
 
-	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	abci "github.com/cometbft/cometbft/abci/types"
 	cmttypes "github.com/cometbft/cometbft/types"
 	dbm "github.com/cosmos/cosmos-db"
@@ -40,10 +39,19 @@ import (
 	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	capabilitykeeper "github.com/cosmos/ibc-go/modules/capability/keeper"
 	"github.com/stretchr/testify/require"
+
+	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
+	ibcporttypes "github.com/cosmos/ibc-go/v10/modules/core/05-port/types"
+
+	ibcmock "github.com/LumeraProtocol/lumera/tests/ibctesting/mock"
+)
+
+const (
+	MockPort = ibcmock.ModuleName
 )
 
 func NewTestApp(
@@ -55,12 +63,16 @@ func NewTestApp(
 	baseAppOptions ...func(*baseapp.BaseApp),
 ) (*App, error) {
 	var (
-		app        = &App{ScopedKeepers: make(map[string]capabilitykeeper.ScopedKeeper)}
+		app        = &App{}
 		appBuilder *runtime.AppBuilder
 
 		appConfig = depinject.Configs(
 			AppConfig(),
-			depinject.Supply(appOpts, logger, app.GetIBCKeeper, app.GetCapabilityScopedKeeper),
+			depinject.Supply(
+				appOpts,
+				logger,
+				app.GetIBCKeeper,
+			),
 		)
 	)
 
@@ -70,7 +82,7 @@ func NewTestApp(
 		&app.legacyAmino,
 		&app.txConfig,
 		&app.interfaceRegistry,
-		&app.AccountKeeper,
+		&app.AuthKeeper,
 		&app.BankKeeper,
 		&app.StakingKeeper,
 		&app.DistrKeeper,
@@ -84,7 +96,6 @@ func NewTestApp(
 		&app.AuthzKeeper,
 		&app.EvidenceKeeper,
 		&app.FeeGrantKeeper,
-		&app.NFTKeeper,
 		&app.GroupKeeper,
 		&app.CircuitBreakerKeeper,
 		&app.LumeraidKeeper,
@@ -165,7 +176,16 @@ func SignAndDeliverWithoutCommit(t *testing.T, txCfg client.TxConfig, app *bam.B
 	})
 }
 
-func setup(t testing.TB, chainID string, withGenesis bool, invCheckPeriod uint, opts ...wasmkeeper.Option) (*App, GenesisState) {
+func GetDefaultWasmOptions() []wasmkeeper.Option {
+	return []wasmkeeper.Option{
+		wasmkeeper.WithMessageHandlerDecorator(func(old wasmkeeper.Messenger) wasmkeeper.Messenger {
+			return old
+		}),
+		wasmkeeper.WithQueryPlugins(nil),
+	}
+}
+
+func setup(t testing.TB, chainID string, withGenesis bool, invCheckPeriod uint, wasmOpts ...wasmkeeper.Option) (*App, GenesisState) {
 	db := dbm.NewMemDB()
 	nodeHome := t.TempDir()
 	snapshotDir := filepath.Join(nodeHome, "data", "snapshots")
@@ -177,30 +197,67 @@ func setup(t testing.TB, chainID string, withGenesis bool, invCheckPeriod uint, 
 
 	appOptions := make(simtestutil.AppOptionsMap, 0)
 	appOptions[flags.FlagHome] = nodeHome // ensure unique folder
+	appOptions[FlagWasmHomeDir] = nodeHome
 	appOptions[server.FlagInvCheckPeriod] = invCheckPeriod
-	app, err := New(log.NewNopLogger(), db, nil, true, appOptions, bam.SetChainID(chainID))
+	appOptions[IBCModuleRegisterFnOption] = func(ibcRouter *ibcporttypes.Router) {
+		// Register the mock IBC module for testing
+		ibcRouter.AddRoute(MockPort, ibcmock.NewMockIBCModule(nil, MockPort))
+	}
+
+	app := New(log.NewNopLogger(), db, nil, true, appOptions, wasmOpts, bam.SetChainID(chainID))
 	if withGenesis {
 		return app, app.DefaultGenesis()
 	}
 	return app, GenesisState{}
 }
 
+// Setup initializes a new WasmApp. A Nop logger is set in WasmApp.
+func Setup(tb testing.TB, wasmOpts ...wasmkeeper.Option) *App {
+	tb.Helper()
+
+	privVal := mock.NewPV()
+	pubKey, err := privVal.GetPubKey()
+	require.NoError(tb, err)
+
+	// create validator set with single validator
+	validator := cmttypes.NewValidator(pubKey, 1)
+	valSet := cmttypes.NewValidatorSet([]*cmttypes.Validator{validator})
+
+	// generate genesis account
+	senderPrivKey := secp256k1.GenPrivKey()
+	acc := authtypes.NewBaseAccount(senderPrivKey.PubKey().Address().Bytes(), senderPrivKey.PubKey(), 0, 0)
+	genBals := []banktypes.Balance{}
+	balance := banktypes.Balance{
+		Address: acc.GetAddress().String(),
+		Coins:   sdk.NewCoins(sdk.NewInt64Coin(sdk.DefaultBondDenom, 100_000_000_000_000)),
+	}
+	genBals = append(genBals, balance)
+	chainID := "testing"
+	app := SetupWithGenesisValSet(tb, valSet, []authtypes.GenesisAccount{acc}, chainID, sdk.DefaultPowerReduction, genBals, wasmOpts...)
+
+	return app
+}
+
+// SetupWithGenesisValSet initializes a new Lumera App with a validator set and genesis accounts
+// that also act as delegators. For simplicity, each validator is bonded with a delegation
+// of one consensus engine unit in the default token of the WasmApp from first genesis
+// account. A Nop logger is set in WasmApp.
 func SetupWithGenesisValSet(
-	t *testing.T,
+	tb testing.TB,
 	valSet *cmttypes.ValidatorSet,
 	genAccs []authtypes.GenesisAccount,
 	chainID string,
-	opts []wasmkeeper.Option,
-	balances ...banktypes.Balance,
+	powerReduction sdkmath.Int,
+	balances []banktypes.Balance,
+	wasmOpts ...wasmkeeper.Option,
 ) *App {
-	t.Helper()
+	tb.Helper()
 
-	app, genesisState := setup(t, chainID, true, 5, opts...)
-	genesisState, err := GenesisStateWithValSet(app.AppCodec(), genesisState, valSet, genAccs, balances...)
-	require.NoError(t, err)
+	app, genesisState := setup(tb, chainID, true, 5, wasmOpts...)
+	genesisState = GenesisStateWithValSet(tb, app.AppCodec(), genesisState, valSet, genAccs, balances...)
 
 	stateBytes, err := json.MarshalIndent(genesisState, "", " ")
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	// init chain will set the validator set and initialize the genesis accounts
 	consensusParams := simtestutil.DefaultConsensusParams
@@ -213,25 +270,32 @@ func SetupWithGenesisValSet(
 		InitialHeight:   app.LastBlockHeight() + 1,
 		AppStateBytes:   stateBytes,
 	})
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	_, err = app.FinalizeBlock(&abci.RequestFinalizeBlock{
 		Height:             app.LastBlockHeight() + 1,
 		Hash:               app.LastCommitID().Hash,
 		NextValidatorsHash: valSet.Hash(),
 	})
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	return app
 }
 
-// Setup initializes a new WasmApp. A Nop logger is set in WasmApp.
-func Setup(t *testing.T, opts ...wasmkeeper.Option) *App {
-	t.Helper()
+// SetupWithEmptyStore set up a wasmd app instance with empty DB
+func SetupWithEmptyStore(tb testing.TB) *App {
+	app, _ := setup(tb, "testing", false, 0)
+	return app
+}
+
+// GenesisStateWithSingleValidator initializes GenesisState with a single validator and genesis accounts
+// that also act as delegators.
+func GenesisStateWithSingleValidator(tb testing.TB, app *App) GenesisState {
+	tb.Helper()
 
 	privVal := mock.NewPV()
 	pubKey, err := privVal.GetPubKey()
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	// create validator set with single validator
 	validator := cmttypes.NewValidator(pubKey, 1)
@@ -240,31 +304,63 @@ func Setup(t *testing.T, opts ...wasmkeeper.Option) *App {
 	// generate genesis account
 	senderPrivKey := secp256k1.GenPrivKey()
 	acc := authtypes.NewBaseAccount(senderPrivKey.PubKey().Address().Bytes(), senderPrivKey.PubKey(), 0, 0)
-	balance := banktypes.Balance{
-		Address: acc.GetAddress().String(),
-		Coins:   sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.NewInt(100000000000000))),
+	balances := []banktypes.Balance{
+		{
+			Address: acc.GetAddress().String(),
+			Coins:   sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.NewInt(100000000000000))),
+		},
 	}
-	chainID := "testing"
-	app := SetupWithGenesisValSet(t, valSet, []authtypes.GenesisAccount{acc}, chainID, opts, balance)
 
-	return app
+	genesisState := app.DefaultGenesis()
+	genesisState = GenesisStateWithValSet(tb, app.AppCodec(), genesisState, valSet, []authtypes.GenesisAccount{acc}, balances...)
+
+	return genesisState
 }
 
-// SetupWithEmptyStore set up a wasmd app instance with empty DB
-func SetupWithEmptyStore(t testing.TB) *App {
-	app, _ := setup(t, "testing", false, 0)
-	return app
+// AddTestAddrsIncremental constructs and returns accNum amount of accounts with an
+// initial balance of accAmt in random order
+func AddTestAddrsIncremental(app *App, ctx sdk.Context, accNum int, accAmt sdkmath.Int) []sdk.AccAddress {
+	return addTestAddrs(app, ctx, accNum, accAmt, simtestutil.CreateIncrementalAccounts)
+}
+
+func addTestAddrs(app *App, ctx sdk.Context, accNum int, accAmt sdkmath.Int, strategy simtestutil.GenerateAccountStrategy) []sdk.AccAddress {
+	testAddrs := strategy(accNum)
+	bondDenom, err := app.StakingKeeper.BondDenom(ctx)
+	if err != nil {
+		panic(err)
+	}
+
+	initCoins := sdk.NewCoins(sdk.NewCoin(bondDenom, accAmt))
+
+	for _, addr := range testAddrs {
+		initAccountWithCoins(app, ctx, addr, initCoins)
+	}
+
+	return testAddrs
+}
+
+func initAccountWithCoins(app *App, ctx sdk.Context, addr sdk.AccAddress, coins sdk.Coins) {
+	err := app.BankKeeper.MintCoins(ctx, minttypes.ModuleName, coins)
+	if err != nil {
+		panic(err)
+	}
+
+	err = app.BankKeeper.SendCoinsFromModuleToAccount(ctx, minttypes.ModuleName, addr, coins)
+	if err != nil {
+		panic(err)
+	}
 }
 
 // GenesisStateWithValSet returns a new genesis state with the validator set
 // copied from simtestutil with delegation not added to supply
 func GenesisStateWithValSet(
+	tb testing.TB,
 	codec codec.Codec,
 	genesisState map[string]json.RawMessage,
 	valSet *cmttypes.ValidatorSet,
 	genAccs []authtypes.GenesisAccount,
 	balances ...banktypes.Balance,
-) (map[string]json.RawMessage, error) {
+) map[string]json.RawMessage {
 	// set genesis accounts
 	authGenesis := authtypes.NewGenesisState(authtypes.DefaultParams(), genAccs)
 	genesisState[authtypes.ModuleName] = codec.MustMarshalJSON(authGenesis)
@@ -276,14 +372,10 @@ func GenesisStateWithValSet(
 
 	for _, val := range valSet.Validators {
 		pk, err := cryptocodec.FromCmtPubKeyInterface(val.PubKey)
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert pubkey: %w", err)
-		}
+		require.NoError(tb, err, "failed to convert pubkey")
 
 		pkAny, err := codectypes.NewAnyWithValue(pk)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create new any: %w", err)
-		}
+		require.NoError(tb, err, "failed to create new any")
 
 		validator := stakingtypes.Validator{
 			OperatorAddress:   sdk.ValAddress(val.Address).String(),
@@ -298,6 +390,7 @@ func GenesisStateWithValSet(
 			Commission:        stakingtypes.NewCommission(sdkmath.LegacyZeroDec(), sdkmath.LegacyZeroDec(), sdkmath.LegacyZeroDec()),
 			MinSelfDelegation: sdkmath.ZeroInt(),
 		}
+
 		validators = append(validators, validator)
 		delegations = append(delegations, stakingtypes.NewDelegation(genAccs[0].GetAddress().String(), sdk.ValAddress(val.Address).String(), sdkmath.LegacyOneDec()))
 
@@ -306,6 +399,8 @@ func GenesisStateWithValSet(
 	// set validators and delegations
 	stakingGenesis := stakingtypes.NewGenesisState(stakingtypes.DefaultParams(), validators, delegations)
 	genesisState[stakingtypes.ModuleName] = codec.MustMarshalJSON(stakingGenesis)
+
+	bondDenom := stakingGenesis.Params.BondDenom
 
 	signingInfos := make([]slashingtypes.SigningInfo, len(valSet.Validators))
 	for i, val := range valSet.Validators {
@@ -320,7 +415,7 @@ func GenesisStateWithValSet(
 	// add bonded amount to bonded pool module account
 	balances = append(balances, banktypes.Balance{
 		Address: authtypes.NewModuleAddress(stakingtypes.BondedPoolName).String(),
-		Coins:   sdk.Coins{sdk.NewCoin(sdk.DefaultBondDenom, bondAmt.MulRaw(int64(len(valSet.Validators))))},
+		Coins:   sdk.Coins{sdk.NewCoin(bondDenom, bondAmt.MulRaw(int64(len(valSet.Validators))))},
 	})
 
 	totalSupply := sdk.NewCoins()
@@ -333,7 +428,8 @@ func GenesisStateWithValSet(
 	bankGenesis := banktypes.NewGenesisState(banktypes.DefaultGenesisState().Params, balances, totalSupply, []banktypes.Metadata{}, []banktypes.SendEnabled{})
 	genesisState[banktypes.ModuleName] = codec.MustMarshalJSON(bankGenesis)
 	println(string(genesisState[banktypes.ModuleName]))
-	return genesisState, nil
+
+	return genesisState
 }
 
 func NewTestNetworkFixture() network.TestFixture {
@@ -344,12 +440,13 @@ func NewTestNetworkFixture() network.TestFixture {
 	defer os.RemoveAll(dir)
 
 	// Create initial app instance
-	app, err := New(
+	app := New(
 		log.NewNopLogger(),
 		dbm.NewMemDB(),
 		nil,
 		true,
 		simtestutil.NewAppOptionsWithFlagHome(dir),
+		GetDefaultWasmOptions(),
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed creating app: %v", err))
@@ -357,12 +454,13 @@ func NewTestNetworkFixture() network.TestFixture {
 
 	// App constructor function for validators
 	appCtr := func(val network.ValidatorI) servertypes.Application {
-		app, err := New(
+		app := New(
 			val.GetCtx().Logger,
 			dbm.NewMemDB(),
 			nil,
 			true,
 			simtestutil.NewAppOptionsWithFlagHome(val.GetCtx().Config.RootDir),
+			GetDefaultWasmOptions(),
 			bam.SetPruning(pruningtypes.NewPruningOptionsFromString(val.GetAppConfig().Pruning)),
 			bam.SetMinGasPrices(val.GetAppConfig().MinGasPrices),
 			bam.SetChainID(val.GetCtx().Viper.GetString(flags.FlagChainID)),

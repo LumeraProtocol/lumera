@@ -10,7 +10,7 @@ import (
 )
 
 func TestGetParams(t *testing.T) {
-	k, ctx := keepertest.ClaimKeeper(t)
+	k, ctx := keepertest.ClaimKeeper(t, "")
 	params := types.DefaultParams()
 
 	require.NoError(t, k.SetParams(ctx, params))

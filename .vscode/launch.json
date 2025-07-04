@@ -35,11 +35,32 @@
         ]
       },
       {
+        "name": "Debug Specific System Test",
+        "type": "go",
+        "request": "launch",
+        "mode": "test",
+        "program": "${fileDirname}",
+        "buildFlags": "-tags=system_test",
+        "args": [
+          "-test.run",
+          "${selectedText}"
+        ]
+      },      
+      {
         "name": "Launch Package",
         "type": "go",
         "request": "launch",
         "mode": "auto",
         "program": "${fileDirname}"
+      },
+      {
+        "name": "Debug lumerad",
+        "type": "go",
+        "request": "launch",
+        "mode": "exec",
+        "program": "${workspaceFolder}/build/lumerad",
+        "args": ["start"],
+        "preLaunchTask": "Ignite Debug Build"
       }
     ]
   }

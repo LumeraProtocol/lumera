@@ -3,14 +3,13 @@ package keeper
 import (
 	"context"
 
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
 	errorsmod "cosmossdk.io/errors"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 )
 
-func (k msgServer) StartSupernode(goCtx context.Context, msg *types2.MsgStartSupernode) (*types2.MsgStartSupernodeResponse, error) {
+func (k msgServer) StartSupernode(goCtx context.Context, msg *types.MsgStartSupernode) (*types.MsgStartSupernodeResponse, error) {
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
 	valOperAddr, err := sdk.ValAddressFromBech32(msg.ValidatorAddress)
@@ -27,9 +26,9 @@ func (k msgServer) StartSupernode(goCtx context.Context, msg *types2.MsgStartSup
 		return nil, err
 	}
 
-	if len(supernode.States) == 0 || supernode.States[len(supernode.States)-1].State != types2.SuperNodeStateActive {
-		supernode.States = append(supernode.States, &types2.SuperNodeStateRecord{
-			State:  types2.SuperNodeStateActive,
+	if len(supernode.States) == 0 || supernode.States[len(supernode.States)-1].State != types.SuperNodeStateActive {
+		supernode.States = append(supernode.States, &types.SuperNodeStateRecord{
+			State:  types.SuperNodeStateActive,
 			Height: ctx.BlockHeight(),
 		})
 	} else {
@@ -42,10 +41,10 @@ func (k msgServer) StartSupernode(goCtx context.Context, msg *types2.MsgStartSup
 
 	ctx.EventManager().EmitEvent(
 		sdk.NewEvent(
-			types2.EventTypeSupernodeStarted,
-			sdk.NewAttribute(types2.AttributeKeyValidatorAddress, msg.ValidatorAddress),
+			types.EventTypeSupernodeStarted,
+			sdk.NewAttribute(types.AttributeKeyValidatorAddress, msg.ValidatorAddress),
 		),
 	)
 
-	return &types2.MsgStartSupernodeResponse{}, nil
+	return &types.MsgStartSupernodeResponse{}, nil
 }

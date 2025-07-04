@@ -5,11 +5,11 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 // GetSuperNodeResponse queries and returns a supernode response
-func GetSuperNodeResponse(t *testing.T, cli *LumeradCli, validatorAddr string) *types.SuperNode {
+func GetSuperNodeResponse(t *testing.T, cli *LumeradCli, validatorAddr string) *sntypes.SuperNode {
 	queryCmd := []string{
 		"q", "supernode", "get-super-node",
 		validatorAddr,
@@ -32,7 +32,7 @@ func GetSuperNodeResponse(t *testing.T, cli *LumeradCli, validatorAddr string) *
 		stateMap := state.(map[string]interface{})
 		// Convert state enum
 		stateStr := stateMap["state"].(string)
-		if enumVal, ok := types.SuperNodeState_value[stateStr]; ok {
+		if enumVal, ok := sntypes.SuperNodeState_value[stateStr]; ok {
 			stateMap["state"] = enumVal
 		}
 		// Convert height to number
@@ -66,7 +66,7 @@ func GetSuperNodeResponse(t *testing.T, cli *LumeradCli, validatorAddr string) *
 	}
 
 	// Finally unmarshal into our response type
-	var response types.QueryGetSuperNodeResponse
+	var response sntypes.QueryGetSuperNodeResponse
 	err = json.Unmarshal(jsonBytes, &response)
 	if err != nil {
 		t.Fatal(err)

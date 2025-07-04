@@ -4,7 +4,6 @@ package system
 
 import (
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
@@ -25,20 +24,19 @@ func TestClaimPeriodEndBurn(t *testing.T) {
 	require.NoError(t, err)
 
 	// Setup test parameters
-	claimAmount := "1000000"
-	totalClaimableAmount := 2000000 // Two potential claims
+	claimAmount := uint64(1_000_000)
+	totalClaimableAmount := 2_000_000 // Two potential claims
 
-	// Create the CSV file with claim data
-	homedir, err := os.UserHomeDir()
+	// Generate a CSV file with the test data
+	claimsPath, err := claimtestutils.GenerateClaimsCSVFile([]claimtestutils.ClaimCSVRecord{
+		{OldAddress: testData.OldAddress, Amount: claimAmount},
+		{OldAddress: "lumc4mple2ddress000000000000000000000000", Amount: claimAmount}, // Second address that won't be claimed
+	})
 	require.NoError(t, err)
-	csvPath := homedir + "/claims.csv"
-	csvContent := fmt.Sprintf("%s,%s\n%s,%s\n",
-		testData.OldAddress, claimAmount,
-		"lumc4mple2ddress000000000000000000000000", claimAmount) // Second address that won't be claimed
-	err = os.WriteFile(csvPath, []byte(csvContent), 0644)
-	require.NoError(t, err)
+
+	// Ensure the file is cleaned up after the test
 	t.Cleanup(func() {
-		_ = os.Remove(csvPath)
+		claimtestutils.CleanupClaimsCSVFile(claimsPath)
 	})
 
 	// Set a short claim period (15 seconds)
@@ -65,7 +63,7 @@ func TestClaimPeriodEndBurn(t *testing.T) {
 	})
 
 	// Start the chain
-	sut.StartChain(t)
+	sut.StartChain(t, fmt.Sprintf("--%s=%s", claimtypes.FlagClaimsPath, claimsPath))
 	cli := NewLumeradCLI(t, sut, true)
 
 	// Get claim module account address
@@ -92,11 +90,11 @@ func TestClaimPeriodEndBurn(t *testing.T) {
 
 	// Verify user received funds
 	userBalance := cli.QueryBalance(testData.NewAddress, claimtypes.DefaultClaimsDenom)
-	require.Equal(t, int64(1000000), userBalance, "User should receive claim amount")
+	require.Equal(t, int64(1_000_000), userBalance, "User should receive claim amount")
 
 	// Verify module balance decreased by claim amount
 	midModuleBalance := cli.QueryBalance(moduleAddr, claimtypes.DefaultClaimsDenom)
-	require.Equal(t, int64(1000000), midModuleBalance,
+	require.Equal(t, int64(1_000_000), midModuleBalance,
 		"Module balance should be reduced by claimed amount")
 
 	// Wait for claim period to end

@@ -4,9 +4,8 @@ import (
 	"math/rand"
 	"strconv"
 
-	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
-	keeper2 "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
-	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
+	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	simtypes "github.com/cosmos/cosmos-sdk/types/simulation"
@@ -14,9 +13,9 @@ import (
 
 // SimulateMsgRequestActionSuccessSense simulates a successful request for a SENSE action
 func SimulateMsgRequestActionSuccessSense(
-	ak types2.AccountKeeper,
-	bk types2.BankKeeper,
-	k keeper2.Keeper,
+	ak types.AuthKeeper,
+	bk types.BankKeeper,
+	k keeper.Keeper,
 ) simtypes.Operation {
 	return func(r *rand.Rand, app *baseapp.BaseApp, ctx sdk.Context, accs []simtypes.Account, chainID string,
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
@@ -27,12 +26,12 @@ func SimulateMsgRequestActionSuccessSense(
 		// 2. Verify results: action created, funds deducted, proper state
 		action, found := k.GetActionByID(ctx, actionId)
 		if !found {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(msg), "action not found"), nil, nil
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), "action not found"), nil, nil
 		}
 
 		// 3. Verify action is in PENDING state
-		if action.State != actionapi.ActionState_ACTION_STATE_PENDING {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(msg), "action not in PENDING state"), nil, nil
+		if action.State != types.ActionStatePending {
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), "action not in PENDING state"), nil, nil
 		}
 
 		// 4. Return successful operation message
@@ -42,9 +41,9 @@ func SimulateMsgRequestActionSuccessSense(
 
 // SimulateMsgRequestActionSuccessCascade simulates a successful request for a CASCADE action
 func SimulateMsgRequestActionSuccessCascade(
-	ak types2.AccountKeeper,
-	bk types2.BankKeeper,
-	k keeper2.Keeper,
+	ak types.AuthKeeper,
+	bk types.BankKeeper,
+	k keeper.Keeper,
 ) simtypes.Operation {
 	return func(r *rand.Rand, app *baseapp.BaseApp, ctx sdk.Context, accs []simtypes.Account, chainID string,
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
@@ -54,12 +53,12 @@ func SimulateMsgRequestActionSuccessCascade(
 		// 8. Verify results: action created, funds deducted, proper state
 		action, found := k.GetActionByID(ctx, actionId)
 		if !found {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(msg), "action not found"), nil, nil
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), "action not found"), nil, nil
 		}
 
 		// 9. Verify action is in PENDING state
-		if action.State != actionapi.ActionState_ACTION_STATE_PENDING {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(msg), "action not in PENDING state"), nil, nil
+		if action.State != types.ActionStatePending {
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), "action not in PENDING state"), nil, nil
 		}
 
 		// 10. Return successful operation message
@@ -69,9 +68,9 @@ func SimulateMsgRequestActionSuccessCascade(
 
 // SimulateMsgRequestActionInvalidMetadata simulates a failed request with invalid metadata
 func SimulateMsgRequestActionInvalidMetadata(
-	ak types2.AccountKeeper,
-	bk types2.BankKeeper,
-	k keeper2.Keeper,
+	ak types.AuthKeeper,
+	bk types.BankKeeper,
+	k keeper.Keeper,
 ) simtypes.Operation {
 	return func(r *rand.Rand, app *baseapp.BaseApp, ctx sdk.Context, accs []simtypes.Account, chainID string,
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
@@ -97,7 +96,7 @@ func SimulateMsgRequestActionInvalidMetadata(
 		expirationTime := getRandomExpirationTime(ctx, r, params)
 
 		// 7. Create message
-		msg := types2.NewMsgRequestAction(
+		msg := types.NewMsgRequestAction(
 			simAccount.Address.String(),
 			actionType,
 			invalidMetadata,
@@ -106,7 +105,7 @@ func SimulateMsgRequestActionInvalidMetadata(
 		)
 
 		// 8. Cache keeper state for simulation
-		msgServSim := keeper2.NewMsgServerImpl(k)
+		msgServSim := keeper.NewMsgServerImpl(k)
 
 		// 9. Deliver transaction, expecting error
 		_, err := msgServSim.RequestAction(ctx, msg)
@@ -116,12 +115,12 @@ func SimulateMsgRequestActionInvalidMetadata(
 
 		// Verify balance remained unchanged
 		if !initialBalance.Equal(finalBalance) {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(msg), "balance changed unexpectedly"), nil, nil
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), "balance changed unexpectedly"), nil, nil
 		}
 
 		// Error should not be nil as we're expecting a validation failure
 		if err == nil {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(msg), "expected error but got none"), nil, nil
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), "expected error but got none"), nil, nil
 		}
 
 		// 11. Return operation message, marking as failed but expected
@@ -131,9 +130,9 @@ func SimulateMsgRequestActionInvalidMetadata(
 
 // SimulateMsgRequestActionInsufficientFunds simulates a failed request due to insufficient funds
 func SimulateMsgRequestActionInsufficientFunds(
-	ak types2.AccountKeeper,
-	bk types2.BankKeeper,
-	k keeper2.Keeper,
+	ak types.AuthKeeper,
+	bk types.BankKeeper,
+	k keeper.Keeper,
 ) simtypes.Operation {
 	return func(r *rand.Rand, app *baseapp.BaseApp, ctx sdk.Context, accs []simtypes.Account, chainID string,
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
@@ -159,7 +158,7 @@ func SimulateMsgRequestActionInsufficientFunds(
 		expirationTime := getRandomExpirationTime(ctx, r, params)
 
 		// 7. Create message
-		msg := types2.NewMsgRequestAction(
+		msg := types.NewMsgRequestAction(
 			simAccount.Address.String(),
 			actionType,
 			validMetadata,
@@ -168,7 +167,7 @@ func SimulateMsgRequestActionInsufficientFunds(
 		)
 
 		// 8. Cache keeper state for simulation
-		msgServSim := keeper2.NewMsgServerImpl(k)
+		msgServSim := keeper.NewMsgServerImpl(k)
 
 		// 9. Deliver transaction, expecting error
 		_, err := msgServSim.RequestAction(ctx, msg)
@@ -178,12 +177,12 @@ func SimulateMsgRequestActionInsufficientFunds(
 
 		// Verify balance remained unchanged
 		if !initialBalance.Equal(finalBalance) {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(msg), "balance changed unexpectedly"), nil, nil
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), "balance changed unexpectedly"), nil, nil
 		}
 
 		// Error should not be nil as we're expecting an insufficient funds error
 		if err == nil {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(msg), "expected error but got none"), nil, nil
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), "expected error but got none"), nil, nil
 		}
 
 		// 11. Return operation message, marking as failed but expected
@@ -193,9 +192,9 @@ func SimulateMsgRequestActionInsufficientFunds(
 
 // SimulateMsgRequestActionPermission simulates a failed request due to insufficient permissions
 func SimulateMsgRequestActionPermission(
-	ak types2.AccountKeeper,
-	bk types2.BankKeeper,
-	k keeper2.Keeper,
+	ak types.AuthKeeper,
+	bk types.BankKeeper,
+	k keeper.Keeper,
 ) simtypes.Operation {
 	return func(r *rand.Rand, app *baseapp.BaseApp, ctx sdk.Context, accs []simtypes.Account, chainID string,
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
@@ -224,7 +223,7 @@ func SimulateMsgRequestActionPermission(
 		expirationTime := getRandomExpirationTime(ctx, r, params)
 
 		// 7. Create the action request message
-		msg := types2.NewMsgRequestAction(
+		msg := types.NewMsgRequestAction(
 			simAccount.Address.String(),
 			actionType,
 			metadata,
@@ -234,7 +233,7 @@ func SimulateMsgRequestActionPermission(
 
 		// 8. Use MsgServer to handle the request in the cache context
 		// In a real implementation, this would check permissions and fail the request
-		msgServSim := keeper2.NewMsgServerImpl(k)
+		msgServSim := keeper.NewMsgServerImpl(k)
 
 		// Since the permission mechanism is hypothetical, we need to simulate the expected error
 		// We're using the cache context so we don't actually create the action or charge fees
@@ -247,7 +246,7 @@ func SimulateMsgRequestActionPermission(
 		// 10. Verify account balance remained unchanged
 		finalBalance := bk.GetBalance(ctx, simAccount.Address, denom)
 		if !initialBalance.Equal(finalBalance) {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(msg),
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg),
 				"balance changed despite expected permission check failure"), nil, nil
 		}
 

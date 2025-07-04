@@ -1,25 +1,27 @@
 package keeper_test
 
 import (
-	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 func (suite *MsgServerTestSuite) TestMsgUpdateParams() {
-	params := types2.DefaultParams()
+	params := types.DefaultParams()
 	suite.NoError(suite.keeper.SetParams(suite.ctx, params))
 	wctx := sdk.UnwrapSDKContext(suite.ctx)
+	authority, err := suite.keeper.GetAddressCodec().BytesToString(suite.keeper.GetAuthority())
+	suite.NoError(err)
 
 	// default params
 	testCases := []struct {
 		name      string
-		input     *types2.MsgUpdateParams
+		input     *types.MsgUpdateParams
 		expErr    bool
 		expErrMsg string
 	}{
 		{
 			name: "invalid authority",
-			input: &types2.MsgUpdateParams{
+			input: &types.MsgUpdateParams{
 				Authority: "invalid",
 				Params:    params,
 			},
@@ -28,16 +30,16 @@ func (suite *MsgServerTestSuite) TestMsgUpdateParams() {
 		},
 		{
 			name: "send enabled param",
-			input: &types2.MsgUpdateParams{
-				Authority: suite.keeper.GetAuthority(),
-				Params:    types2.Params{},
+			input: &types.MsgUpdateParams{
+				Authority: authority,
+				Params:    types.Params{},
 			},
 			expErr: false,
 		},
 		{
 			name: "all good",
-			input: &types2.MsgUpdateParams{
-				Authority: suite.keeper.GetAuthority(),
+			input: &types.MsgUpdateParams{
+				Authority: authority,
 				Params:    params,
 			},
 			expErr: false,

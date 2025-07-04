@@ -7,11 +7,11 @@ import (
 	"math/big"
 	"sort"
 
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
 	errorsmod "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
+
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 const DefaultLimit = 25
@@ -21,22 +21,22 @@ const DefaultLimit = 25
 //   - Optionally limit the result to a certain number of supernodes
 //   - Filter supernodes by original registration, block presence, and optional request state
 //   - Sort by XOR distance
-func (k Keeper) GetTopSuperNodesForBlock(
+func (q queryServer) GetTopSuperNodesForBlock(
 	goCtx context.Context,
-	req *types2.QueryGetTopSuperNodesForBlockRequest,
-) (*types2.QueryGetTopSuperNodesForBlockResponse, error) {
+	req *types.QueryGetTopSuperNodesForBlockRequest,
+) (*types.QueryGetTopSuperNodesForBlockResponse, error) {
 
 	if req == nil {
 		return nil, errorsmod.Wrap(sdkerrors.ErrInvalidRequest, "nil request")
 	}
 
 	// 0) Parse the state filter since auto cli doesn't support enum
-	var superNodeStateFilter types2.SuperNodeState
-	stateValue, ok := types2.SuperNodeState_value[req.State]
+	var superNodeStateFilter types.SuperNodeState
+	stateValue, ok := types.SuperNodeState_value[req.State]
 	if !ok {
-		superNodeStateFilter = types2.SuperNodeStateUnspecified
+		superNodeStateFilter = types.SuperNodeStateUnspecified
 	} else {
-		superNodeStateFilter = types2.SuperNodeState(stateValue)
+		superNodeStateFilter = types.SuperNodeState(stateValue)
 	}
 
 	ctx := sdk.UnwrapSDKContext(goCtx)
@@ -57,7 +57,7 @@ func (k Keeper) GetTopSuperNodesForBlock(
 	}
 
 	// 3) Retrieve all supernodes from the store
-	allSns, err := k.GetAllSuperNodes(ctx)
+	allSns, err := q.k.GetAllSuperNodes(ctx)
 	if err != nil {
 		return nil, errorsmod.Wrapf(
 			sdkerrors.ErrNotFound,
@@ -66,7 +66,7 @@ func (k Keeper) GetTopSuperNodesForBlock(
 	}
 
 	// 4) Filter supernodes
-	validSns := make([]types2.SuperNode, 0)
+	validSns := make([]types.SuperNode, 0)
 	for _, sn := range allSns {
 		// 4.1) Must have at least one state record
 		if len(sn.States) == 0 {
@@ -85,12 +85,12 @@ func (k Keeper) GetTopSuperNodesForBlock(
 		}
 
 		// 4.4) State must not be Unspecified
-		if stateAtBlock == types2.SuperNodeStateUnspecified {
+		if stateAtBlock == types.SuperNodeStateUnspecified {
 			continue
 		}
 
 		// 4.5) Must match requested state if specified
-		if superNodeStateFilter != types2.SuperNodeStateUnspecified && stateAtBlock != superNodeStateFilter {
+		if superNodeStateFilter != types.SuperNodeStateUnspecified && stateAtBlock != superNodeStateFilter {
 			continue
 		}
 
@@ -99,7 +99,7 @@ func (k Keeper) GetTopSuperNodesForBlock(
 	}
 
 	// 5) Compute XOR distances and rank
-	blockHash, err := k.GetBlockHashForHeight(ctx, blockHeight)
+	blockHash, err := q.k.GetBlockHashForHeight(ctx, blockHeight)
 	if err != nil {
 		return nil, errorsmod.Wrapf(
 			sdkerrors.ErrInvalidRequest,
@@ -108,28 +108,28 @@ func (k Keeper) GetTopSuperNodesForBlock(
 	}
 
 	// 6) Rank supernodes by distance
-	topNodes := k.rankSuperNodesByDistance(blockHash, validSns, int(limit))
+	topNodes := q.k.RankSuperNodesByDistance(blockHash, validSns, int(limit))
 
 	// 7) Build the response
-	topPointers := make([]*types2.SuperNode, len(topNodes))
+	topPointers := make([]*types.SuperNode, len(topNodes))
 	for i := range topNodes {
 		topPointers[i] = &topNodes[i]
 	}
-	return &types2.QueryGetTopSuperNodesForBlockResponse{
+	return &types.QueryGetTopSuperNodesForBlockResponse{
 		Supernodes: topPointers,
 	}, nil
 }
 
-// rankSuperNodesByDistance calculates XOR distance for each supernode to the given block hash,
+// RankSuperNodesByDistance calculates XOR distance for each supernode to the given block hash,
 // sorts them in ascending order of distance, and returns up to topN supernodes.
-func (k Keeper) rankSuperNodesByDistance(
+func (k Keeper) RankSuperNodesByDistance(
 	blockHash []byte,
-	supernodes []types2.SuperNode,
+	supernodes []types.SuperNode,
 	topN int,
-) []types2.SuperNode {
+) []types.SuperNode {
 
 	type supernodeDistance struct {
-		sn       *types2.SuperNode
+		sn       *types.SuperNode
 		distance *big.Int
 	}
 
@@ -148,7 +148,7 @@ func (k Keeper) rankSuperNodesByDistance(
 		topN = len(distances)
 	}
 
-	result := make([]types2.SuperNode, topN)
+	result := make([]types.SuperNode, topN)
 	for i := 0; i < topN; i++ {
 		result[i] = *distances[i].sn
 	}
@@ -157,16 +157,16 @@ func (k Keeper) rankSuperNodesByDistance(
 
 // DetermineStateAtBlock sorts the records by ascending height, then picks
 // the last record whose height <= blockHeight, if any.
-func DetermineStateAtBlock(states []*types2.SuperNodeStateRecord, blockHeight int64) (types2.SuperNodeState, bool) {
+func DetermineStateAtBlock(states []*types.SuperNodeStateRecord, blockHeight int64) (types.SuperNodeState, bool) {
 	if len(states) == 0 {
-		return types2.SuperNodeStateUnspecified, false
+		return types.SuperNodeStateUnspecified, false
 	}
 	// Defensive: sort ascending
 	sort.Slice(states, func(i, j int) bool {
 		return states[i].Height < states[j].Height
 	})
 
-	foundState := types2.SuperNodeStateUnspecified
+	foundState := types.SuperNodeStateUnspecified
 	found := false
 	for _, sRecord := range states {
 		if sRecord.Height <= blockHeight {
@@ -179,7 +179,7 @@ func DetermineStateAtBlock(states []*types2.SuperNodeStateRecord, blockHeight in
 	return foundState, found
 }
 
-func (k Keeper) calcDistance(blockHash []byte, sn *types2.SuperNode) *big.Int {
+func (k Keeper) calcDistance(blockHash []byte, sn *types.SuperNode) *big.Int {
 	valHash := hashValidatorAddress(sn.ValidatorAddress)
 	return xorDistance(blockHash, valHash)
 }

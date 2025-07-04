@@ -3,9 +3,8 @@ package simulation
 import (
 	"math/rand"
 
-	keeper2 "github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	simtypes "github.com/cosmos/cosmos-sdk/types/simulation"
@@ -16,9 +15,9 @@ const (
 )
 
 func SimulateMsgStartSupernode(
-	ak types2.AccountKeeper,
-	bk types2.BankKeeper,
-	k keeper2.Keeper,
+	ak types.AccountKeeper,
+	bk types.BankKeeper,
+	k keeper.Keeper,
 ) simtypes.Operation {
 	return func(r *rand.Rand, app *baseapp.BaseApp, ctx sdk.Context, accs []simtypes.Account, chainID string,
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
@@ -45,7 +44,7 @@ func SimulateMsgStartSupernode(
 			}
 
 			// Skip if supernode is already active
-			if len(supernode.States) > 0 && supernode.States[len(supernode.States)-1].State == types2.SuperNodeStateActive {
+			if len(supernode.States) > 0 && supernode.States[len(supernode.States)-1].State == types.SuperNodeStateActive {
 				continue
 			}
 
@@ -56,19 +55,19 @@ func SimulateMsgStartSupernode(
 
 		// If we couldn't find an eligible supernode, skip this operation
 		if !found {
-			return simtypes.NoOpMsg(types2.ModuleName, TypeMsgStartSupernode, "no eligible supernode found"), nil, nil
+			return simtypes.NoOpMsg(types.ModuleName, TypeMsgStartSupernode, "no eligible supernode found"), nil, nil
 		}
 
-		msg := &types2.MsgStartSupernode{
+		msg := &types.MsgStartSupernode{
 			Creator:          simAccount.Address.String(),
 			ValidatorAddress: validatorAddress,
 		}
 
 		// Execute the message
-		msgServer := keeper2.NewMsgServerImpl(k)
+		msgServer := keeper.NewMsgServerImpl(k)
 		_, err := msgServer.StartSupernode(ctx, msg)
 		if err != nil {
-			return simtypes.NoOpMsg(types2.ModuleName, TypeMsgStartSupernode, err.Error()), nil, err
+			return simtypes.NoOpMsg(types.ModuleName, TypeMsgStartSupernode, err.Error()), nil, err
 		}
 
 		return simtypes.NewOperationMsg(msg, true, "success"), nil, nil

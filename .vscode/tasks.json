@@ -18,6 +18,43 @@
           }
         }
       ]
-    }
+    },
+		{
+			"label": "Ignite Debug Build",
+			"type": "shell",
+			"command": "ignite",
+			"args": [
+				"chain",
+				"build",
+				"--debug",
+				"-v",
+				"--output",
+				"${workspaceFolder}/build",
+			],
+			"problemMatcher": [
+        {
+          "owner": "go",
+          "fileLocation": ["relative", "${workspaceFolder}"],
+          "pattern": {
+            "regexp": "^(.*\\.go):(\\d+):\\d+: (.*)$",
+            "file": 1,
+            "line": 2,
+            "message": 3
+          }
+        }
+			],
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			  },
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": false,
+				"panel": "shared",
+				"showReuseMessage": true,
+				"clear": false
+			},
+		}
   ]
 }

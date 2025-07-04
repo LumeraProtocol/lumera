@@ -3,11 +3,10 @@ package keeper_test
 import (
 	"testing"
 
+	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
 	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 
-	"github.com/LumeraProtocol/lumera/api/lumera/action"
-	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/query"
 	"github.com/golang/mock/gomock"
@@ -20,38 +19,38 @@ func TestKeeper_ListExpiredActions(t *testing.T) {
 	actionID1 := "12345"
 	actionID2 := "67890"
 	actionID3 := "67891"
-	price := "100stake"
+	price := sdk.NewInt64Coin("stake", 100)
 
-	action1 := action.Action{
+	action1 := types.Action{
 		Creator:        "creator1",
 		ActionID:       actionID1,
-		ActionType:     action.ActionType_ACTION_TYPE_SENSE,
+		ActionType:     types.ActionTypeSense,
 		Metadata:       []byte("metadata1"),
-		Price:          price,
+		Price:          &price,
 		ExpirationTime: 1234567890,
-		State:          action.ActionState_ACTION_STATE_EXPIRED,
+		State:          types.ActionStateExpired,
 		BlockHeight:    100,
 		SuperNodes:     []string{"supernode-1"},
 	}
-	action2 := action.Action{
+	action2 := types.Action{
 		Creator:        "creator2",
 		ActionID:       actionID2,
-		ActionType:     action.ActionType_ACTION_TYPE_CASCADE,
+		ActionType:     types.ActionTypeSense,
 		Metadata:       []byte("metadata2"),
-		Price:          price,
+		Price:          &price,
 		ExpirationTime: 1234567891,
-		State:          action.ActionState_ACTION_STATE_APPROVED,
+		State:          types.ActionStateApproved,
 		BlockHeight:    100,
 		SuperNodes:     []string{"supernode-2"},
 	}
-	action3 := action.Action{
+	action3 := types.Action{
 		Creator:        "creator3",
 		ActionID:       actionID3,
-		ActionType:     action.ActionType_ACTION_TYPE_SENSE,
+		ActionType:     types.ActionTypeSense,
 		Metadata:       []byte("metadata3"),
-		Price:          price,
+		Price:          &price,
 		ExpirationTime: 1234567892,
-		State:          action.ActionState_ACTION_STATE_EXPIRED,
+		State:          types.ActionStateExpired,
 		BlockHeight:    100,
 		SuperNodes:     []string{"supernode-3"},
 	}
@@ -61,7 +60,7 @@ func TestKeeper_ListExpiredActions(t *testing.T) {
 		req         *types.QueryListExpiredActionsRequest
 		setupState  func(k keeper.Keeper, ctx sdk.Context)
 		expectedErr error
-		checkResult func(t *testing.T, resp *types.QueryListActionsResponse)
+		checkResult func(t *testing.T, resp *types.QueryListExpiredActionsResponse)
 	}{
 		{
 			name:        "invalid request (nil request)",
@@ -77,7 +76,7 @@ func TestKeeper_ListExpiredActions(t *testing.T) {
 				k.SetAction(ctx, &action3)
 			},
 			expectedErr: nil,
-			checkResult: func(t *testing.T, resp *types.QueryListActionsResponse) {
+			checkResult: func(t *testing.T, resp *types.QueryListExpiredActionsResponse) {
 				require.NotNil(t, resp)
 				require.Len(t, resp.Actions, 2)
 				require.Equal(t, actionID1, resp.Actions[0].ActionID)
@@ -91,7 +90,7 @@ func TestKeeper_ListExpiredActions(t *testing.T) {
 				k.SetAction(ctx, &action2)
 			},
 			expectedErr: nil,
-			checkResult: func(t *testing.T, resp *types.QueryListActionsResponse) {
+			checkResult: func(t *testing.T, resp *types.QueryListExpiredActionsResponse) {
 				require.NotNil(t, resp)
 				require.Len(t, resp.Actions, 0)
 			},
@@ -110,7 +109,7 @@ func TestKeeper_ListExpiredActions(t *testing.T) {
 				k.SetAction(ctx, &action3)
 			},
 			expectedErr: nil,
-			checkResult: func(t *testing.T, resp *types.QueryListActionsResponse) {
+			checkResult: func(t *testing.T, resp *types.QueryListExpiredActionsResponse) {
 				require.NotNil(t, resp)
 				require.Len(t, resp.Actions, 1)
 				require.Equal(t, actionID3, resp.Actions[0].ActionID)
@@ -130,32 +129,12 @@ func TestKeeper_ListExpiredActions(t *testing.T) {
 				k.SetAction(ctx, &action3)
 			},
 			expectedErr: nil,
-			checkResult: func(t *testing.T, resp *types.QueryListActionsResponse) {
+			checkResult: func(t *testing.T, resp *types.QueryListExpiredActionsResponse) {
 				require.NotNil(t, resp)
 				require.Len(t, resp.Actions, 2)
 				require.Equal(t, actionID1, resp.Actions[0].ActionID)
 				require.Equal(t, actionID3, resp.Actions[1].ActionID)
 			},
-		},
-		{
-			name: "error parsing price",
-			req:  &types.QueryListExpiredActionsRequest{},
-			setupState: func(k keeper.Keeper, ctx sdk.Context) {
-				actionInvalidPrice := action.Action{
-					Creator:        "creator4",
-					ActionID:       "99999",
-					ActionType:     action.ActionType_ACTION_TYPE_SENSE,
-					Metadata:       []byte("metadata4"),
-					Price:          "invalidcoin",
-					ExpirationTime: 1234567893,
-					State:          action.ActionState_ACTION_STATE_EXPIRED,
-					BlockHeight:    100,
-					SuperNodes:     []string{"supernode-4"},
-				}
-				k.SetAction(ctx, &actionInvalidPrice)
-			},
-			expectedErr: status.Error(codes.Internal, "failed to parse price"),
-			checkResult: nil,
 		},
 	}
 
@@ -164,13 +143,14 @@ func TestKeeper_ListExpiredActions(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			k, ctx := keepertest.ActionKeeper(t)
+			k, ctx := keepertest.ActionKeeper(t, ctrl)
+			q := keeper.NewQueryServerImpl(k)
 
 			if tc.setupState != nil {
 				tc.setupState(k, ctx)
 			}
 
-			resp, err := k.ListExpiredActions(ctx, tc.req)
+			resp, err := q.ListExpiredActions(ctx, tc.req)
 
 			if tc.expectedErr != nil {
 				require.Error(t, err)

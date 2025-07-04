@@ -40,24 +40,6 @@ func (k Keeper) SetClaimRecord(ctx sdk.Context, claimRecord types.ClaimRecord) e
 	return nil
 }
 
-// ListClaimRecords returns all claim records with optional pagination
-func (k Keeper) ListClaimRecords(ctx sdk.Context) ([]types.ClaimRecord, error) {
-	var claimRecords []types.ClaimRecord
-
-	storeAdapter := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
-	store := prefix.NewStore(storeAdapter, []byte(types.ClaimRecordKey))
-
-	iterator := store.Iterator(nil, nil)
-	defer iterator.Close()
-
-	for ; iterator.Valid(); iterator.Next() {
-		var claimRecord types.ClaimRecord
-		k.cdc.MustUnmarshal(iterator.Value(), &claimRecord)
-		claimRecords = append(claimRecords, claimRecord)
-	}
-
-	return claimRecords, nil
-}
 
 func (k Keeper) GetClaimRecordCount(ctx sdk.Context) uint64 {
 	storeAdapter := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))

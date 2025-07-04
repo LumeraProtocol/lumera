@@ -6,15 +6,19 @@ import (
 	"github.com/stretchr/testify/require"
 
 	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
+
+	"github.com/LumeraProtocol/lumera/x/claim/keeper"
 	"github.com/LumeraProtocol/lumera/x/claim/types"
 )
 
 func TestParamsQuery(t *testing.T) {
-	keeper, ctx := keepertest.ClaimKeeper(t)
-	params := types.DefaultParams()
-	require.NoError(t, keeper.SetParams(ctx, params))
+	k, ctx := keepertest.ClaimKeeper(t, "")
+	q := keeper.NewQueryServerImpl(k)
 
-	response, err := keeper.Params(ctx, &types.QueryParamsRequest{})
+	params := types.DefaultParams()
+	require.NoError(t, k.SetParams(ctx, params))
+
+	response, err := q.Params(ctx, &types.QueryParamsRequest{})
 	require.NoError(t, err)
 	require.Equal(t, &types.QueryParamsResponse{Params: params}, response)
 }

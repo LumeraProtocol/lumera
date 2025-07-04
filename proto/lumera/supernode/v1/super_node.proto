@@ -1,0 +1,24 @@
+syntax = "proto3";
+package lumera.supernode.v1;
+
+option go_package = "x/supernode/v1/types";
+
+import "cosmos/base/v1beta1/coin.proto";
+import "cosmos_proto/cosmos.proto";
+import "google/protobuf/timestamp.proto";
+import "gogoproto/gogo.proto";
+import "lumera/supernode/v1/evidence.proto";
+import "lumera/supernode/v1/metrics_aggregate.proto";
+import "lumera/supernode/v1/ip_address_history.proto";
+import "lumera/supernode/v1/supernode_state.proto";
+
+message SuperNode {
+  string validator_address = 1 [(cosmos_proto.scalar) = "cosmos.ValidatorAddressString"];
+  repeated SuperNodeStateRecord states = 2;
+  repeated Evidence evidence = 3;
+  repeated IPAddressHistory prev_ip_addresses = 4;
+  string version = 5;
+  MetricsAggregate metrics = 6;
+  string supernode_account = 7 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  string p2p_port = 8;
+}

@@ -61,16 +61,17 @@ func (sb *SecondaryScriptBuilder) initAndCreateGentx() {
 		"",
 		fmt.Sprintf("    cp /shared/genesis.json /root/%s/config/genesis.json", sb.config.Paths.Directories.Daemon),
 		"",
-		fmt.Sprintf("cp /shared/claims.csv /root/%s/config/claims.csv", sb.config.Paths.Directories.Daemon),
+		fmt.Sprintf("    cp /shared/claims.csv /root/%s/config/claims.csv", sb.config.Paths.Directories.Daemon),
 		"",
 		fmt.Sprintf("	%s keys add $KEY_NAME --keyring-backend %s",
 			sb.config.Daemon.Binary, sb.config.Daemon.KeyringBackend),
 		"",
-		fmt.Sprintf(`    echo "Adding genesis account for $KEY_NAME..."`),
+		`    echo "Adding genesis account for $KEY_NAME..."`,
 		fmt.Sprintf("    ADDR=$(%s keys show $KEY_NAME -a --keyring-backend %s)",
 			sb.config.Daemon.Binary, sb.config.Daemon.KeyringBackend),
 		fmt.Sprintf("    %s genesis add-genesis-account $ADDR $BALANCE",
 			sb.config.Daemon.Binary),
+
 		`    echo "Creating gentx for ${MONIKER}..."`,
 		fmt.Sprintf("    %s genesis gentx $KEY_NAME $STAKE_AMOUNT \\", sb.config.Daemon.Binary),
 		fmt.Sprintf("        --chain-id %s \\", sb.config.Chain.ID),
@@ -78,7 +79,7 @@ func (sb *SecondaryScriptBuilder) initAndCreateGentx() {
 
 		"    # Share gentx and address with primary validator",
 		"    mkdir -p /shared/addresses",
-		fmt.Sprintf("    echo $BALANCE > /shared/addresses/${ADDR}"),
+		"    echo $BALANCE > /shared/addresses/${ADDR}",
 		"    mkdir -p /shared/gentx",
 		fmt.Sprintf("    cp /root/%s/config/gentx/* /shared/gentx/${MONIKER}_gentx.json", sb.config.Paths.Directories.Daemon),
 

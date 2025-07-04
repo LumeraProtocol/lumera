@@ -27,6 +27,10 @@ const (
 	// TODO: Determine the simulation weight value
 	defaultWeightMsgClaim int = 100
 
+	opWeightMsgDelayedClaim = "op_weight_msg_delayed_claim"
+	// TODO: Determine the simulation weight value
+	defaultWeightMsgDelayedClaim int = 100
+
 	// this line is used by starport scaffolding # simapp/module/const
 )
 
@@ -61,6 +65,17 @@ func (am AppModule) WeightedOperations(simState module.SimulationState) []simtyp
 		claimsimulation.SimulateMsgClaim(am.accountKeeper, am.bankKeeper, am.keeper),
 	))
 
+	var weightMsgDelayedClaim int
+	simState.AppParams.GetOrGenerate(opWeightMsgDelayedClaim, &weightMsgDelayedClaim, nil,
+		func(_ *rand.Rand) {
+			weightMsgDelayedClaim = defaultWeightMsgDelayedClaim
+		},
+	)
+	operations = append(operations, simulation.NewWeightedOperation(
+		weightMsgDelayedClaim,
+		claimsimulation.SimulateMsgDelayedClaim(am.accountKeeper, am.bankKeeper, am.keeper),
+	))
+
 	// this line is used by starport scaffolding # simapp/module/operation
 
 	return operations
@@ -75,6 +90,14 @@ func (am AppModule) ProposalMsgs(simState module.SimulationState) []simtypes.Wei
 			defaultWeightMsgClaim,
 			func(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account) sdk.Msg {
 				claimsimulation.SimulateMsgClaim(am.accountKeeper, am.bankKeeper, am.keeper)
+				return nil
+			},
+		),
+		simulation.NewWeightedProposalMsg(
+			opWeightMsgDelayedClaim,
+			defaultWeightMsgDelayedClaim,
+			func(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account) sdk.Msg {
+				claimsimulation.SimulateMsgDelayedClaim(am.accountKeeper, am.bankKeeper, am.keeper)
 				return nil
 			},
 		),

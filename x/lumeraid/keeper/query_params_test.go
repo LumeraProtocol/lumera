@@ -7,14 +7,16 @@ import (
 
 	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
 	"github.com/LumeraProtocol/lumera/x/lumeraid/types"
+	"github.com/LumeraProtocol/lumera/x/lumeraid/keeper"
 )
 
 func TestParamsQuery(t *testing.T) {
-	keeper, ctx := keepertest.LumeraidKeeper(t)
+	k, ctx := keepertest.LumeraidKeeper(t)
+	q := keeper.NewQueryServerImpl(k)
 	params := types.DefaultParams()
-	require.NoError(t, keeper.SetParams(ctx, params))
+	require.NoError(t, k.SetParams(ctx, params))
 
-	response, err := keeper.Params(ctx, &types.QueryParamsRequest{})
+	response, err := q.Params(ctx, &types.QueryParamsRequest{})
 	require.NoError(t, err)
 	require.Equal(t, &types.QueryParamsResponse{Params: params}, response)
 }

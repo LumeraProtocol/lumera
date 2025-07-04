@@ -1,8 +1,7 @@
 syntax = "proto3";
-
 package lumera.lumeraid;
 
-option go_package = "github.com/LumeraProtocol/lumera/x/lumeraid/types";
+option go_package = "x/lumeraid/types";
 
 // HandshakeInfo message
 message HandshakeInfo {

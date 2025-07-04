@@ -11,7 +11,7 @@ import (
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 
-	"github.com/LumeraProtocol/lumera/x/supernode/types"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 func TestSupernodeRegistrationSuccess(t *testing.T) {
@@ -42,8 +42,9 @@ func TestSupernodeRegistrationSuccess(t *testing.T) {
 
 			// 1. Set minimum supernode stake in genesis
 			sut.ModifyGenesisJSON(t, func(genesis []byte) []byte {
-				// Update the supernode module params to set minimum stake
-				state, err := sjson.SetRawBytes(genesis, "app_state.supernode.params.minimum_stake_for_sn", []byte(`"`+minimumStake+`"`))
+				// Update the supernode module params to set minimum stake as a Coin
+				coinJSON := `{"denom":"ulume","amount":"` + minimumStake + `"}`
+				state, err := sjson.SetRawBytes(genesis, "app_state.supernode.params.minimum_stake_for_sn", []byte(coinJSON))
 				require.NoError(t, err)
 				return state
 			})
@@ -87,7 +88,6 @@ func TestSupernodeRegistrationSuccess(t *testing.T) {
 				"tx", "supernode", "register-supernode",
 				valAddr,          // validator address
 				"192.168.1.1",    // IP address
-				"1.0.0",          // version
 				supernodeAccount, // supernode account
 				"--from", "node0",
 			}
@@ -104,7 +104,7 @@ func TestSupernodeRegistrationSuccess(t *testing.T) {
 			require.Equal(t, "1.0.0", supernode.Version)
 			require.Equal(t, supernodeAccount, supernode.SupernodeAccount)
 			require.NotEmpty(t, supernode.States)
-			require.Equal(t, types.SuperNodeStateActive, supernode.States[0].State)
+			require.Equal(t, sntypes.SuperNodeStateActive, supernode.States[0].State)
 		})
 	}
 }
@@ -156,7 +156,9 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 			t.Logf("Setting minimum stake to %s", tc.minimumStake)
 
 			sut.ModifyGenesisJSON(t, func(genesis []byte) []byte {
-				state, err := sjson.SetRawBytes(genesis, "app_state.supernode.params.minimum_stake_for_sn", []byte(`"`+tc.minimumStake+`"`))
+				// Create proper Coin JSON structure
+				coinJSON := `{"denom":"ulume","amount":"` + tc.minimumStake + `"}`
+				state, err := sjson.SetRawBytes(genesis, "app_state.supernode.params.minimum_stake_for_sn", []byte(coinJSON))
 				require.NoError(t, err)
 
 				minStakeSet := gjson.GetBytes(state, "app_state.supernode.params.minimum_stake_for_sn")
@@ -184,7 +186,6 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 				"tx", "supernode", "register-supernode",
 				valAddr,       // validator address
 				"192.168.1.1", // IP address
-				"1.0.0",       // version
 				accountAddr,   // supernode account
 				"--from", keyName,
 			)

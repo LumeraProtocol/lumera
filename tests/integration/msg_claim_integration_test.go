@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"cosmossdk.io/math"
 	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/stretchr/testify/suite"
@@ -25,7 +24,7 @@ type MsgClaimIntegrationTestSuite struct {
 }
 
 func (s *MsgClaimIntegrationTestSuite) SetupTest() {
-	k, ctx := keepertest.ClaimKeeper(s.T())
+	k, ctx := keepertest.ClaimKeeper(s.T(), "")
 	s.keeper = k
 	s.ctx = ctx
 	s.msgServer = keeper.NewMsgServerImpl(k)
@@ -46,7 +45,8 @@ func (s *MsgClaimIntegrationTestSuite) SetupTest() {
 
 func (s *MsgClaimIntegrationTestSuite) TestClaimIntegration() {
 
-	validFee := sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, math.NewInt(1000)))
+	testAmount := int64(1_000_000) // Amount to be claimed in test cases
+	validFee := sdk.NewCoins(sdk.NewInt64Coin(sdk.DefaultBondDenom, int64(1_000)))
 	testCases := []struct {
 		name      string
 		setup     func()
@@ -60,7 +60,7 @@ func (s *MsgClaimIntegrationTestSuite) TestClaimIntegration() {
 				// Create and store claim record
 				claimRecord := types.ClaimRecord{
 					OldAddress: s.oldAddress,
-					Balance:    sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, math.NewInt(1000000))),
+					Balance:    sdk.NewCoins(sdk.NewInt64Coin(sdk.DefaultBondDenom, testAmount)),
 					Claimed:    false,
 				}
 				err := s.keeper.SetClaimRecord(s.ctx, claimRecord)
@@ -84,7 +84,7 @@ func (s *MsgClaimIntegrationTestSuite) TestClaimIntegration() {
 				// Create and store claimed record
 				claimRecord := types.ClaimRecord{
 					OldAddress: s.oldAddress,
-					Balance:    sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, math.NewInt(1000000))),
+					Balance:    sdk.NewCoins(sdk.NewInt64Coin(sdk.DefaultBondDenom, testAmount)),
 					Claimed:    true,
 					ClaimTime:  time.Now().Add(-15).Unix(),
 				}
@@ -122,7 +122,7 @@ func (s *MsgClaimIntegrationTestSuite) TestClaimIntegration() {
 				// Add a claim record to ensure the check happens before record lookup
 				claimRecord := types.ClaimRecord{
 					OldAddress: s.oldAddress,
-					Balance:    sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, math.NewInt(1000000))),
+					Balance:    sdk.NewCoins(sdk.NewInt64Coin(sdk.DefaultBondDenom, testAmount)),
 					Claimed:    false,
 				}
 				err := s.keeper.SetClaimRecord(s.ctx, claimRecord)
@@ -142,7 +142,7 @@ func (s *MsgClaimIntegrationTestSuite) TestClaimIntegration() {
 			setup: func() {
 				claimRecord := types.ClaimRecord{
 					OldAddress: s.oldAddress,
-					Balance:    sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, math.NewInt(1000000))),
+					Balance:    sdk.NewCoins(sdk.NewInt64Coin(sdk.DefaultBondDenom, testAmount)),
 					Claimed:    false,
 				}
 				err := s.keeper.SetClaimRecord(s.ctx, claimRecord)

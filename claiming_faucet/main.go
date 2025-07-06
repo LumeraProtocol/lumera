@@ -254,11 +254,11 @@ func (s *Server) handleGetFeeForClaiming(w http.ResponseWriter, r *http.Request)
 	}(resp.Body)
 
 	// If account exists and response is 200, return error
-	//if resp.StatusCode == http.StatusOK {
-	//	s.logger.Printf("Account already exists")
-	//	http.Error(w, "Account already exists", http.StatusBadRequest)
-	//	return
-	//}
+	if resp.StatusCode == http.StatusOK {
+		s.logger.Printf("Account already exists")
+		http.Error(w, "Account already exists", http.StatusBadRequest)
+		return
+	}
 
 	// 2. Query claim record
 	claimRecordURL := fmt.Sprintf("%s/LumeraProtocol/lumera/claim/claim_record/%s", s.config.NodeURL, req.OldAddress)

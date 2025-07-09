@@ -149,11 +149,11 @@
     "claim": {
       "params": {
         "enable_claims": true,
-        "claim_end_time": "1746071999",
+        "claim_end_time": "1767225600",
         "max_claims_per_block": "100"
       },
       "claim_records": [],
-      "total_claimable_amount": "18749999981413",
+      "total_claimable_amount": "18749999991853",
       "claims_denom": "ulume"
     },
     "consensus": null,

@@ -207,7 +207,6 @@ func TestClaimsSystem(t *testing.T) {
 			}
 
 			// Validate the final response
-			// Validate the final response
 			if tc.expectSuccess {
 				RequireTxSuccess(t, lastResp)
 

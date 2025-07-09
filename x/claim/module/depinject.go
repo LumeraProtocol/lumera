@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"fmt"
+	"strings"
 
 	"cosmossdk.io/core/appmodule"
 	"cosmossdk.io/core/store"
@@ -31,21 +32,23 @@ func searchForClaimsFile(appOpts servertypes.AppOptions) (string, error) {
 	if val := appOpts.Get(types.FlagClaimsPath); val != nil {
 		rawPath := val.(string)
 
-		// Check if it's a directory → append claims.csv
-		fi, err := os.Stat(rawPath)
-		if err == nil {
-			if fi.IsDir() {
-				csvPath := filepath.Join(rawPath, types.DefaultClaimsFileName)
-				if _, err := os.Stat(csvPath); err == nil {
-					return csvPath, nil
+		if strings.TrimSpace(rawPath) != "" {
+			// Check if it's a directory → append claims.csv
+			fi, err := os.Stat(rawPath)
+			if err == nil {
+				if fi.IsDir() {
+					csvPath := filepath.Join(rawPath, types.DefaultClaimsFileName)
+					if _, err := os.Stat(csvPath); err == nil {
+						return csvPath, nil
+					}
+					return "", fmt.Errorf("%s not found in provided directory: %s", types.DefaultClaimsFileName, rawPath)
+				} else {
+					// It's a file → return directly
+					return rawPath, nil
 				}
-				return "", fmt.Errorf("%s not found in provided directory: %s", types.DefaultClaimsFileName, rawPath)
-			} else {
-				// It's a file → return directly
-				return rawPath, nil
 			}
+			return "", fmt.Errorf("%s provided but path not found: %s", types.FlagClaimsPath, rawPath)
 		}
-		return "", fmt.Errorf("%s provided but path not found: %s", types.FlagClaimsPath, rawPath)
 	}
 
 	// Gather candidate fallback paths

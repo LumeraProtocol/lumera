@@ -16,8 +16,10 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/module"
 	"github.com/cosmos/cosmos-sdk/x/auth/tx"
 	authtxconfig "github.com/cosmos/cosmos-sdk/x/auth/tx/config"
+	servertypes "github.com/cosmos/cosmos-sdk/server/types"
 	"github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"github.com/spf13/pflag"
 
 	"github.com/LumeraProtocol/lumera/app"
@@ -29,10 +31,12 @@ func NewRootCmd() *cobra.Command {
 		autoCliOpts        autocli.AppOptions
 		moduleBasicManager module.BasicManager
 		clientCtx          client.Context
+		appOpts            servertypes.AppOptions
 	)
 
+	appOpts = viper.New()
 	if err := depinject.Inject(
-		depinject.Configs(app.AppConfig(),
+		depinject.Configs(app.AppConfig(appOpts),
 			depinject.Supply(log.NewNopLogger()),
 			depinject.Provide(
 				ProvideClientContext,

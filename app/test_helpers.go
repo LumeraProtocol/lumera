@@ -67,7 +67,7 @@ func NewTestApp(
 		appBuilder *runtime.AppBuilder
 
 		appConfig = depinject.Configs(
-			AppConfig(),
+			AppConfig(appOpts),
 			depinject.Supply(
 				appOpts,
 				logger,

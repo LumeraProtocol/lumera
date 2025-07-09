@@ -76,9 +76,8 @@ import (
 
 	claimmodulekeeper "github.com/LumeraProtocol/lumera/x/claim/keeper"
 	lumeraidmodulekeeper "github.com/LumeraProtocol/lumera/x/lumeraid/keeper"
-	supernodemodulekeeper "github.com/LumeraProtocol/lumera/x/supernode/keeper"
-
-	actionmodulekeeper "github.com/LumeraProtocol/lumera/x/action/keeper"
+	actionmodulekeeper "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	// this line is used by starport scaffolding # stargate/app/moduleImport
 
 	"github.com/LumeraProtocol/lumera/docs"
@@ -176,12 +175,13 @@ func getGovProposalHandlers() []govclient.ProposalHandler {
 }
 
 // AppConfig returns the default app config.
-func AppConfig() depinject.Config {
+func AppConfig(appOpts servertypes.AppOptions) depinject.Config {
 	return depinject.Configs(
 		appConfig,
 		// Alternatively, load the app config from a YAML file.
 		// appconfig.LoadYAML(AppConfigYAML),
 		depinject.Supply(
+			appOpts,
 			// supply custom module basics
 			map[string]module.AppModuleBasic{
 				genutiltypes.ModuleName: genutil.NewAppModuleBasic(genutiltypes.DefaultMessageValidator),
@@ -208,9 +208,8 @@ func New(
 
 		// merge the AppConfig and other configuration in one config
 		appConfig = depinject.Configs(
-			AppConfig(),
+			AppConfig(appOpts),
 			depinject.Supply(
-				appOpts, // supply app options
 				logger,  // supply logger
 				// here alternative options can be supplied to the DI container.
 				// those options can be used f.e to override the default behavior of some modules.
@@ -356,47 +355,6 @@ func (app *App) setupUpgradeHandlers() {
 
 	// Add other future upgrade handlers here...
 	// app.UpgradeKeeper.SetUpgradeHandler(...)
-}
-
-// setupUpgradeHandlers registers the upgrade handlers for specific upgrade names.
-func (app *App) setupUpgradeHandlers() {
-	// Register the v1_0_0 upgrade handler
-	app.UpgradeKeeper.SetUpgradeHandler(
-		upgrade_v1_0_0.UpgradeName,
-		upgrade_v1_0_0.CreateUpgradeHandler(
-			app.Logger(),
-			app.ModuleManager,  // Pass ModuleManager
-			app.Configurator(), // Pass Configurator
-			app.ActionKeeper,   // Pass the ActionKeeper
-		),
-	)
-
-	// Add other future upgrade handlers here...
-	// app.UpgradeKeeper.SetUpgradeHandler(...)
-}
-
-// setupUpgradeStoreLoaders configures the store loader for upcoming upgrades.
-// This needs to be called BEFORE app.Load()
-func (app *App) setupUpgradeStoreLoaders() {
-	upgradeInfo, err := app.UpgradeKeeper.ReadUpgradeInfoFromDisk()
-	// No upgrade scheduled, skip
-	if err != nil {
-		// Only panic if the error is unexpected, not if the file simply doesn't exist
-		if !os.IsNotExist(err) {
-			panic(fmt.Sprintf("failed to read upgrade info from disk: %v", err))
-		}
-		return // No upgrade info file, normal startup
-	}
-
-	// Check if the planned upgrade is our v1_0_0 upgrade
-	if upgradeInfo.Name == upgrade_v1_0_0.UpgradeName && !app.UpgradeKeeper.IsSkipHeight(upgradeInfo.Height) {
-		// Configure the store loader with the StoreUpgrades defined in the v1_0_0 package
-		app.SetStoreLoader(upgradetypes.UpgradeStoreLoader(upgradeInfo.Height, &upgrade_v1_0_0.StoreUpgrades))
-		app.Logger().Info("Configured store loader for upgrade", "name", upgrade_v1_0_0.UpgradeName, "height", upgradeInfo.Height)
-	}
-
-	// Add conditions for future upgrades' store loaders here...
-	// else if upgradeInfo.Name == "v1.1.0" && !app.UpgradeKeeper.IsSkipHeight(upgradeInfo.Height) { ... }
 }
 
 // LegacyAmino returns App's amino codec.

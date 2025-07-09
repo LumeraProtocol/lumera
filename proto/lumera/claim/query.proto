@@ -27,12 +27,6 @@ service Query {
   rpc ListClaimed (QueryListClaimedRequest) returns (QueryListClaimedResponse) {
     option (google.api.http).get = "/LumeraProtocol/lumera/claim/list_claimed/{vestedTerm}";
   }
-  
-  // Queries a list of ListClaimed items.
-  rpc ListClaimed (QueryListClaimedRequest) returns (QueryListClaimedResponse) {
-    option (google.api.http).get = "/LumeraProtocol/lumera/claim/list_claimed/{vestedTerm}";
-  
-  }
 }
 // QueryParamsRequest is request type for the Query/Params RPC method.
 message QueryParamsRequest {}

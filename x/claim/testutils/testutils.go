@@ -10,8 +10,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
-	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
-
 	cryptoutils "github.com/LumeraProtocol/lumera/x/claim/keeper/crypto"
 )
 
@@ -88,6 +86,7 @@ func GenerateClaimingTestData() (TestData, error) {
 		return TestData{}, fmt.Errorf("failed to generate old address: %w", err)
 	}
 
+	// Generate a new cosmos address
 	newAddr := sdk.AccAddress(privKeyObj.PubKey().Address()).String()
 
 	// Construct message for signature (without hashing)

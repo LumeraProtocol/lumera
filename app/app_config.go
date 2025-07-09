@@ -74,6 +74,8 @@ import (
 	icatypes "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/types"
 	ibctransfertypes "github.com/cosmos/ibc-go/v10/modules/apps/transfer/types"
 	ibcexported "github.com/cosmos/ibc-go/v10/modules/core/exported"
+	ibctm "github.com/cosmos/ibc-go/v10/modules/light-clients/07-tendermint"
+	solomachine "github.com/cosmos/ibc-go/v10/modules/light-clients/06-solomachine"
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 	// this line is used by starport scaffolding # stargate/app/moduleImport
 )
@@ -105,9 +107,11 @@ var (
 		group.ModuleName,
 		circuittypes.ModuleName,
 		// ibc modules
-		ibcexported.ModuleName,
-		ibctransfertypes.ModuleName,
-		icatypes.ModuleName,
+		ibcexported.ModuleName,			// IBC core module
+		ibctransfertypes.ModuleName,	// IBC transfer module
+		icatypes.ModuleName,			// IBC interchain accounts module (host and controller)
+		ibctm.ModuleName,				// IBC Tendermint light client
+		solomachine.ModuleName,			// IBC Solo Machine light client
 		// chain modules
 		lumeraidmoduletypes.ModuleName,
 		wasmtypes.ModuleName,

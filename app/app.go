@@ -90,7 +90,7 @@ import (
 	"github.com/LumeraProtocol/lumera/docs"
 	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
 
-	upgrade_v1_0_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_0_0"
+	upgrade_v1_6_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_6_0"
 )
 
 const (
@@ -328,23 +328,6 @@ func New(
 
 }
 
-// setupUpgradeHandlers registers the upgrade handlers for specific upgrade names.
-func (app *App) setupUpgradeHandlers() {
-	// Register the v1_0_0 upgrade handler
-	app.UpgradeKeeper.SetUpgradeHandler(
-		upgrade_v1_0_0.UpgradeName,
-		upgrade_v1_0_0.CreateUpgradeHandler(
-			app.Logger(),
-			app.ModuleManager,  // Pass ModuleManager
-			app.Configurator(), // Pass Configurator
-			app.ActionKeeper,   // Pass the ActionKeeper
-		),
-	)
-
-	// Add other future upgrade handlers here...
-	// app.UpgradeKeeper.SetUpgradeHandler(...)
-}
-
 // setupUpgradeStoreLoaders configures the store loader for upcoming upgrades.
 // This needs to be called BEFORE app.Load()
 func (app *App) setupUpgradeStoreLoaders() {
@@ -358,15 +341,32 @@ func (app *App) setupUpgradeStoreLoaders() {
 		return // No upgrade info file, normal startup
 	}
 
-	// Check if the planned upgrade is our v1_0_0 upgrade
-	if upgradeInfo.Name == upgrade_v1_0_0.UpgradeName && !app.UpgradeKeeper.IsSkipHeight(upgradeInfo.Height) {
-		// Configure the store loader with the StoreUpgrades defined in the v1_0_0 package
-		app.SetStoreLoader(upgradetypes.UpgradeStoreLoader(upgradeInfo.Height, &upgrade_v1_0_0.StoreUpgrades))
-		app.Logger().Info("Configured store loader for upgrade", "name", upgrade_v1_0_0.UpgradeName, "height", upgradeInfo.Height)
+	// Check if the planned upgrade is our v1_6_0 upgrade
+	if upgradeInfo.Name == upgrade_v1_6_0.UpgradeName && !app.UpgradeKeeper.IsSkipHeight(upgradeInfo.Height) {
+		// Configure the store loader with the StoreUpgrades defined in the v1_6_0 package
+		app.SetStoreLoader(upgradetypes.UpgradeStoreLoader(upgradeInfo.Height, &upgrade_v1_6_0.StoreUpgrades))
+		app.Logger().Info("Configured store loader for upgrade", "name", upgrade_v1_6_0.UpgradeName, "height", upgradeInfo.Height)
 	}
 
 	// Add conditions for future upgrades' store loaders here...
 	// else if upgradeInfo.Name == "v1.1.0" && !app.UpgradeKeeper.IsSkipHeight(upgradeInfo.Height) { ... }
+}
+
+// setupUpgradeHandlers registers the upgrade handlers for specific upgrade names.
+func (app *App) setupUpgradeHandlers() {
+	// Register the v1_6_0 upgrade handler
+	app.UpgradeKeeper.SetUpgradeHandler(
+		upgrade_v1_6_0.UpgradeName,
+		upgrade_v1_6_0.CreateUpgradeHandler(
+			app.Logger(),
+			app.ModuleManager,  // Pass ModuleManager
+			app.Configurator(), // Pass Configurator
+			app.ActionKeeper,   // Pass the ActionKeeper
+		),
+	)
+
+	// Add other future upgrade handlers here...
+	// app.UpgradeKeeper.SetUpgradeHandler(...)
 }
 
 // LegacyAmino returns App's amino codec.

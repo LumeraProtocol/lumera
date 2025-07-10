@@ -116,6 +116,7 @@ func (sb *PrimaryScriptBuilder) addOwnAccountAndGenesis() {
 
 func (sb *PrimaryScriptBuilder) shareAndCreateGentx() {
 	sb.lines = append(sb.lines, []string{
+		"    mkdir -p /shared",
 		"    # Share keyring and genesis",
 		`    echo "Primary validator sharing genesis..."`,
 		fmt.Sprintf("    cp /root/%s/config/genesis.json /shared/genesis.json", sb.config.Paths.Directories.Daemon),

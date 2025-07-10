@@ -102,7 +102,7 @@ validate_height_param() {
   # Sanity check: warn if upgrade height is in the past
   if [ "$UPGRADE_HEIGHT" -lt "$CURRENT_HEIGHT" ]; then
     echo "❗ UPGRADE_HEIGHT ($UPGRADE_HEIGHT) is less than CURRENT_HEIGHT ($CURRENT_HEIGHT)."
-    echo "⚠️  The upgrade proposal will be ineffective and signored by the chain!"
+    echo "⚠️  The upgrade proposal will be ineffective and ignored by the chain!"
     echo "💡 Consider choosing a future block height."
     exit 1
   fi

@@ -91,15 +91,15 @@ devnet-rebuild:
 
 devnet-reset:
 	@echo "Resetting all validators (gentx and keys)..."
-	@cd devnet && for i in $$(docker compose config --services | grep '^supernova_validator_'); do \
+	@cd devnet && for i in $$(docker compose -f ${COMPOSE_FILE} config --services | grep '^supernova_validator_'); do \
 		echo "Resetting $$i..."; \
-		if docker compose ps $$i | grep -q 'Up'; then \
-			docker compose exec -T $$i bash -c "\
+		if docker compose -f ${COMPOSE_FILE} ps $$i | grep -q 'Up'; then \
+			docker compose -f ${COMPOSE_FILE} exec -T $$i bash -c "\
 			  rm -f /root/.lumera/config/genesis.json /root/.lumera/config/priv_validator_key.json"; \
-			docker compose restart $$i; \
+			docker compose -f ${COMPOSE_FILE} restart $$i; \
 		else \
 			echo "Container $$i is not running. Starting and resetting..."; \
-			docker compose run --rm $$i bash -c "\
+			docker compose -f ${COMPOSE_FILE} run --rm $$i bash -c "\
 			  rm -f /root/.lumera/config/genesis.json /root/.lumera/config/priv_validator_key.json"; \
 		fi \
 	done

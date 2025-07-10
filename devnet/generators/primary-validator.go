@@ -97,13 +97,28 @@ func (sb *PrimaryScriptBuilder) addOwnAccountAndGenesis() {
 		fmt.Sprintf("    %s genesis add-genesis-account $ADDR %s",
 			sb.config.Daemon.Binary, sb.validators[0].InitialDistribution.AccountBalance),
 		"")
+
+	// Add governance key account
+	governanceKeyName := "governance_key"
+	sb.lines = append(sb.lines,
+		fmt.Sprintf(`    echo "Creating governance key: %s"`, governanceKeyName),
+		fmt.Sprintf("    %s keys add %s --keyring-backend %s",
+		sb.config.Daemon.Binary, governanceKeyName, sb.config.Daemon.KeyringBackend),
+		fmt.Sprintf("    GOV_ADDR=$(%s keys show %s -a --keyring-backend %s)",
+			sb.config.Daemon.Binary, governanceKeyName, sb.config.Daemon.KeyringBackend),
+		"    echo $GOV_ADDR > /shared/governance_address",
+		"    echo \"Adding genesis account for governance address...\"",
+		fmt.Sprintf("    %s genesis add-genesis-account $GOV_ADDR 1000000000000%s",
+			sb.config.Daemon.Binary, sb.config.Chain.Denom.Bond),		"",
+    )
+
 }
 
 func (sb *PrimaryScriptBuilder) shareAndCreateGentx() {
 	sb.lines = append(sb.lines, []string{
+		"    mkdir -p /shared",
 		"    # Share keyring and genesis",
 		`    echo "Primary validator sharing genesis..."`,
-		"    mkdir -p /shared",
 		fmt.Sprintf("    cp /root/%s/config/genesis.json /shared/genesis.json", sb.config.Paths.Directories.Daemon),
 		"",
 		"    mkdir -p /shared/gentx",
@@ -171,27 +186,63 @@ func (sb *PrimaryScriptBuilder) setupPeers() {
 		"# Wait for other validators' node IDs and IPs",
 	}...)
 
-	var waitConditions []string
+	var nodeidFiles, ipFiles []string
 	var nodeVars []string
 	var peerParts []string
 
 	for _, validator := range sb.validators[1:] {
-		waitConditions = append(waitConditions,
-			fmt.Sprintf("/shared/%s_nodeid", validator.Name),
-			fmt.Sprintf("/shared/%s_ip", validator.Name))
-		nodeVar := fmt.Sprintf("NODE_%s_ID", strings.ToUpper(validator.Name))
-		nodeVars = append(nodeVars, nodeVar)
+		valName := validator.Name
+
+		nodeidFiles = append(nodeidFiles, fmt.Sprintf("/shared/%s_nodeid", valName))
+		ipFiles = append(ipFiles, fmt.Sprintf("/shared/%s_ip", valName))
+		nodeVars = append(nodeVars, fmt.Sprintf("NODE_%s_ID", strings.ToUpper(valName)))
 	}
 
-	sb.lines = append(sb.lines, fmt.Sprintf(
-		"while [[ ! -f %s ]]; do",
-		strings.Join(waitConditions, " || ! -f "),
-	))
 	sb.lines = append(sb.lines,
-		`    echo "Waiting for other node IDs and IPs..."`,
+	"    echo 'Waiting for other node IDs and IPs:'",
+	"    dots=0",
+	"    declare -A found",
+	"",
+	"    while true; do",
+	)
+
+	for i := range nodeidFiles {
+		validatorIndex := i + 2
+		nodeFile := nodeidFiles[i]
+		ipFile := ipFiles[i]
+
+		sb.lines = append(sb.lines, []string{
+			fmt.Sprintf("    if [[ -f %s && -f %s && -z \"${found[%d]}\" ]]; then", nodeFile, ipFile, validatorIndex),
+			fmt.Sprintf("        echo 'Found new node file: %s'", nodeFile),
+			fmt.Sprintf("        echo 'Found new node file: %s'", ipFile),
+			fmt.Sprintf("        found[%d]=1", validatorIndex),
+			fmt.Sprintf("        current=%d", validatorIndex),
+			"        echo -n \"[$current] \"",
+			"        dots=0",
+			"    fi",
+			"",
+		}...)
+	}
+
+	sb.lines = append(sb.lines, []string{
+		fmt.Sprintf("    if [[ ${#found[@]} -eq %d ]]; then", len(sb.validators)-1),
+		"        echo ''",
+		"        break",
+		"    fi",
+		"",
+		"    if [[ -n \"$current\" ]]; then",
+		"        printf '.'",
+		"        dots=$((dots + 1))",
+		"        if [[ $dots -ge 40 ]]; then",
+		"            echo ''",
+		"            echo -n \"[$current] \"",
+		"            dots=0",
+		"        fi",
+		"    fi",
 		"    sleep 1",
 		"done",
-		"")
+		"",
+	}...)
 
 	for i, validator := range sb.validators[1:] {
 		sb.lines = append(sb.lines,

@@ -83,7 +83,7 @@ import (
 	"github.com/LumeraProtocol/lumera/docs"
 	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
 
-	upgrade_v1_6_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_6_0"
+	upgrade_v1_6_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_6_1"
 	upgrade_v1_7_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_7_0"
 )
 
@@ -333,8 +333,8 @@ func (app *App) setupUpgradeStoreLoaders() {
 	}
 
 	// Map of upgrade names to their corresponding StoreUpgrades
-	var storeUpgradesMap = map[string]*upgradetypes.StoreUpgrades{
-		upgrade_v1_6_0.UpgradeName: &upgrade_v1_6_0.StoreUpgrades,
+	var storeUpgradesMap = map[string]*storetypes.StoreUpgrades{
+		upgrade_v1_6_1.UpgradeName: &upgrade_v1_6_1.StoreUpgrades,
 		upgrade_v1_7_0.UpgradeName: &upgrade_v1_7_0.StoreUpgrades,
 	}
 
@@ -349,29 +349,32 @@ func (app *App) setupUpgradeStoreLoaders() {
 
 // setupUpgradeHandlers registers the upgrade handlers for specific upgrade names.
 func (app *App) setupUpgradeHandlers() {
-	// Register the v1_6_0 upgrade handler
-	app.UpgradeKeeper.SetUpgradeHandler(
-		upgrade_v1_6_0.UpgradeName,
-		upgrade_v1_6_0.CreateUpgradeHandler(
-			app.Logger(),
-			app.ModuleManager,  // Pass ModuleManager
-			app.Configurator(), // Pass Configurator
-			app.ActionKeeper,   // Pass the ActionKeeper
-		),
-	)
+	handlers := []UpgradeHandlerConfig{
+		{
+			Name: upgrade_v1_6_1.UpgradeName,
+			Handler: upgrade_v1_6_1.CreateUpgradeHandler(
+				app.Logger(),
+				app.ModuleManager,
+				app.Configurator(),
+				app.ActionKeeper,
+			),
+		},
+		{
+			Name: upgrade_v1_7_0.UpgradeName,
+			Handler: upgrade_v1_7_0.CreateUpgradeHandler(
+				app.Logger(),
+				app.ModuleManager,
+				app.Configurator(),
+			),
+		},
+		// Add future upgrades here
+	}
 
-	// Register the v1_7_0 upgrade handler
-	app.UpgradeKeeper.SetUpgradeHandler(
-		upgrade_v1_7_0.UpgradeName,
-		upgrade_v1_7_0.CreateUpgradeHandler(
-			app.Logger(),
-			app.ModuleManager,  // Pass ModuleManager
-			app.Configurator(), // Pass Configurator
-		),
-	)
-
-	// Add other future upgrade handlers here...
-	// app.UpgradeKeeper.SetUpgradeHandler(...)
+	// Register the upgrade handlers
+	for _, h := range handlers {
+		app.UpgradeKeeper.SetUpgradeHandler(h.Name, h.Handler)
+		app.Logger().Info("Registered upgrade handler", "name", h.Name)
+	}
 }
 
 // LegacyAmino returns App's amino codec.

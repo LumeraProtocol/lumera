@@ -347,6 +347,11 @@ func (app *App) setupUpgradeStoreLoaders() {
 	}
 }
 
+type UpgradeHandlerConfig struct {
+	Name    string
+	Handler upgradetypes.UpgradeHandler
+}
+
 // setupUpgradeHandlers registers the upgrade handlers for specific upgrade names.
 func (app *App) setupUpgradeHandlers() {
 	handlers := []UpgradeHandlerConfig{

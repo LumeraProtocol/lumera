@@ -4,7 +4,6 @@ package system
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"testing"
 	"time"
@@ -20,7 +19,7 @@ import (
 func TestDelayedClaimsSystem(t *testing.T) {
 	testCases := []struct {
 		name            string
-		balanceToClaim  string
+		balanceToClaim  uint64
 		setupFn         func(t *testing.T, cli *LumeradCli) (claimtestutils.TestData, string)
 		modifyGenesis   func(genesis []byte) []byte
 		expectSuccess   bool
@@ -32,7 +31,7 @@ func TestDelayedClaimsSystem(t *testing.T) {
 	}{
 		{
 			name:           "successful_claim",
-			balanceToClaim: "1000000",
+			balanceToClaim: 1_000_000,
 			setupFn: func(t *testing.T, cli *LumeradCli) (claimtestutils.TestData, string) {
 				testData, err := claimtestutils.GenerateClaimingTestData()
 				require.NoError(t, err)
@@ -51,7 +50,7 @@ func TestDelayedClaimsSystem(t *testing.T) {
 		},
 		{
 			name:           "successful_claim_from_same_address",
-			balanceToClaim: "1000000",
+			balanceToClaim: 1_000_000,
 			setupFn: func(t *testing.T, cli *LumeradCli) (claimtestutils.TestData, string) {
 				return claimtestutils.TestData{}, ""
 			},
@@ -69,7 +68,7 @@ func TestDelayedClaimsSystem(t *testing.T) {
 		{
 			// we remove zero balances from csv file by default
 			name:           "claim_with_zero_balance",
-			balanceToClaim: "0",
+			balanceToClaim: 0,
 			setupFn: func(t *testing.T, cli *LumeradCli) (claimtestutils.TestData, string) {
 				testData, err := claimtestutils.GenerateClaimingTestData()
 				require.NoError(t, err)
@@ -89,7 +88,7 @@ func TestDelayedClaimsSystem(t *testing.T) {
 		},
 		{
 			name:           "claims_disabled",
-			balanceToClaim: "500000",
+			balanceToClaim: 500_000,
 			setupFn: func(t *testing.T, cli *LumeradCli) (claimtestutils.TestData, string) {
 				testData, err := claimtestutils.GenerateClaimingTestData()
 				require.NoError(t, err)
@@ -115,7 +114,7 @@ func TestDelayedClaimsSystem(t *testing.T) {
 		},
 		{
 			name:           "claim_period_expired",
-			balanceToClaim: "500000",
+			balanceToClaim: 500_000,
 			setupFn: func(t *testing.T, cli *LumeradCli) (claimtestutils.TestData, string) {
 				testData, err := claimtestutils.GenerateClaimingTestData()
 				require.NoError(t, err)
@@ -146,7 +145,7 @@ func TestDelayedClaimsSystem(t *testing.T) {
 		},
 		{
 			name:           "duplicate_claim",
-			balanceToClaim: "500000",
+			balanceToClaim: 500_000,
 			setupFn: func(t *testing.T, cli *LumeradCli) (claimtestutils.TestData, string) {
 				testData, err := claimtestutils.GenerateClaimingTestData()
 				require.NoError(t, err)
@@ -204,18 +203,21 @@ func TestDelayedClaimsSystem(t *testing.T) {
 				csvAddress = pastelAccount.Address
 			}
 
-			// Create the CSV file in homedir
-			homedir, err := os.UserHomeDir()
+			// generate CSV file with claim data
+			claimsPath, err := claimtestutils.GenerateClaimsCSVFile([]claimtestutils.ClaimCSVRecord{
+				{
+					OldAddress: csvAddress, 
+					Amount: tc.balanceToClaim,
+				},
+			})
 			require.NoError(t, err)
-			csvPath := homedir + "/claims.csv"
-			err = os.WriteFile(csvPath, []byte(csvAddress+","+tc.balanceToClaim+"\n"), 0644)
-			require.NoError(t, err)
+
 			t.Cleanup(func() {
-				_ = os.Remove(csvPath)
+				claimtestutils.CleanupClaimsCSVFile(claimsPath)
 			})
 
 			// Start the chain with modified genesis
-			sut.StartChain(t)
+			sut.StartChain(t, fmt.Sprintf("--%s=%s", claimtypes.FlagClaimsPath, claimsPath))
 
 			// Wait when needed
 			if tc.waitBeforeClaim {
@@ -290,7 +292,7 @@ func TestDelayedClaimsSystem(t *testing.T) {
 							case "module":
 								require.Equal(t, "claim", value)
 							case "amount":
-								require.Equal(t, tc.balanceToClaim+claimtypes.DefaultClaimsDenom, value)
+								require.Equal(t, strconv.FormatUint(tc.balanceToClaim, 10) + claimtypes.DefaultClaimsDenom, value)
 							case "old_address":
 								require.Equal(t, testData.OldAddress, value)
 							case "new_address":
@@ -332,7 +334,7 @@ func TestDelayedClaimsSystem(t *testing.T) {
 							}
 
 							if recipient == testData.NewAddress &&
-								amount == tc.balanceToClaim+claimtypes.DefaultClaimsDenom {
+								amount == (strconv.FormatUint(tc.balanceToClaim, 10) + claimtypes.DefaultClaimsDenom) {
 								foundModuleTransfer = true
 							}
 						}

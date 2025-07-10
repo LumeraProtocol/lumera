@@ -270,6 +270,9 @@ jobs:
           # Verify the final tar contents
           tar tvf "$tar_file"
 
+          sha256sum "$tar_file" > release_checksum
+
+
       - name: Publish the Release
         uses: softprops/action-gh-release@v0.1.15
         if: success()

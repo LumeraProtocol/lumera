@@ -236,7 +236,7 @@ show_proposal_status() {
   echo "❗ Proposal for version $version already exists with ID: $proposal_id and status: $status"
 
   case "$status" in
-    PROPOSAL_STATUS_REJECTED|PROPOSAL_STATUS_REJECTED_WITH_VETO)
+    PROPOSAL_STATUS_REJECTED)
       echo "✅ Previous proposal was rejected."
       ;;
     PROPOSAL_STATUS_REJECTED_WITH_VETO)

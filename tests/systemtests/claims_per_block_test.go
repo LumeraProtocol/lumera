@@ -4,7 +4,6 @@ package system
 
 import (
 	"fmt"
-	"os"
 	"sync"
 	"testing"
 	"time"
@@ -14,6 +13,7 @@ import (
 	"github.com/tidwall/sjson"
 
 	claimtestutils "github.com/LumeraProtocol/lumera/x/claim/testutils"
+	claimtypes "github.com/LumeraProtocol/lumera/x/claim/types"
 )
 
 // System-wide constants that define test parameters and expected behavior
@@ -57,15 +57,28 @@ func TestMaxClaimsPerBlockReset(t *testing.T) {
 
 	// Create test dataset and calculate total tokens needed
 	testDataSet, totalClaimableAmount := generateClaimTestData(t)
-	csvPath := createClaimsCSV(t, testDataSet)
-	defer cleanupCSV(t, csvPath)
+	var csvData []claimtestutils.ClaimCSVRecord
+	// convert test data to CSV format
+	for _, data := range testDataSet {
+		csvData = append(csvData, claimtestutils.ClaimCSVRecord{
+			OldAddress: data.OldAddress,
+			Amount:     tokensPerClaim,
+		})
+	}
+	claimsPath, err := claimtestutils.GenerateClaimsCSVFile(csvData)
+	require.NoError(t, err)
+	
+	// Ensure the file is cleaned up after the test
+	t.Cleanup(func() {
+		claimtestutils.CleanupClaimsCSVFile(claimsPath)
+	})
 
 	// Configure chain with test parameters
 	claimEndTime := time.Now().Add(1 * time.Hour).Unix()
 	setClaimsGenesis(t, totalClaimableAmount, fmt.Sprintf("%d", maxClaimsPerBlock), true, claimEndTime)
 
 	t.Log("Starting chain...")
-	sut.StartChain(t)
+	sut.StartChain(t, fmt.Sprintf("--%s=%s", claimtypes.FlagClaimsPath, claimsPath))
 	cli := NewLumeradCLI(t, sut, true)
 
 	// Record initial block for comparison
@@ -275,32 +288,6 @@ func generateClaimTestData(t *testing.T) ([]claimtestutils.TestData, int64) {
 	t.Logf("Generated %d test data entries", len(testDataSet))
 
 	return testDataSet, totalClaimableAmount
-}
-
-// createClaimsCSV generates a CSV file containing claim data for testing.
-// The file format is: old_address,token_amount
-// Returns the path to the created CSV file.
-func createClaimsCSV(t *testing.T, testDataSet []claimtestutils.TestData) string {
-	t.Log("Creating CSV file...")
-	csvContent := ""
-	for _, data := range testDataSet {
-		csvContent += fmt.Sprintf("%s,%d\n", data.OldAddress, tokensPerClaim)
-	}
-
-	homedir, err := os.UserHomeDir()
-	require.NoError(t, err)
-	csvPath := homedir + "/claims.csv"
-	err = os.WriteFile(csvPath, []byte(csvContent), 0644)
-	require.NoError(t, err)
-	t.Log("CSV file created successfully")
-
-	return csvPath
-}
-
-// cleanupCSV registers a cleanup function to remove the test CSV file
-// after test completion.
-func cleanupCSV(t *testing.T, csvPath string) {
-	t.Cleanup(func() { _ = os.Remove(csvPath) })
 }
 
 // setClaimsGenesis configures the genesis state for claims testing.

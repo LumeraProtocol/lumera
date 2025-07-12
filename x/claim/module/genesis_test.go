@@ -7,8 +7,8 @@ import (
 
 	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
 	claim "github.com/LumeraProtocol/lumera/x/claim/module"
-	"github.com/LumeraProtocol/lumera/x/claim/types"
 	claimtestutils "github.com/LumeraProtocol/lumera/x/claim/testutils"
+	"github.com/LumeraProtocol/lumera/x/claim/types"
 )
 
 func TestGenesis(t *testing.T) {

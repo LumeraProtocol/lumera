@@ -208,4 +208,8 @@ simulation-tests:
 	@echo "Running simulation tests..."
 	ignite chain simulate
 
+systemex-tests:
+	@echo "Running system tests..."
+	cd ./tests/systemtests/ && go test -tags=system_test -v .
+
 all-tests: unit-tests integration-tests system-tests simulation-tests

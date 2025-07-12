@@ -346,7 +346,7 @@ func TestDelayedClaimsSystem(t *testing.T) {
 
 				// Verify balance after claim
 				balance := cli.QueryBalance(testData.NewAddress, claimtypes.DefaultClaimsDenom)
-				require.Equal(t, tc.balanceToClaim, fmt.Sprintf("%d", balance))
+				require.Equal(t, tc.balanceToClaim, balance)
 
 				// Verify vested account creation
 				vestingAccount := cli.GetAccount(testData.NewAddress)

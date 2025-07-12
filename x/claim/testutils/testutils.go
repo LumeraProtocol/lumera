@@ -1,16 +1,17 @@
 package testutils
 
 import (
-	"encoding/hex"
 	"encoding/csv"
-	"os"
+	"encoding/hex"
 	"fmt"
+	"os"
 	"strconv"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	cryptoutils "github.com/LumeraProtocol/lumera/x/claim/keeper/crypto"
+	claimtypes "github.com/LumeraProtocol/lumera/x/claim/types"
 )
 
 type TestData struct {
@@ -117,7 +118,7 @@ func GenerateClaimingTestData() (TestData, error) {
 
 type ClaimCSVRecord struct {
 	OldAddress string `csv:"old_address"`
-	Amount	 uint64 `csv:"amount"`
+	Amount     uint64 `csv:"amount"`
 }
 
 // GenerateClaimsCSVFile creates a temporary claims file using the provided test data.
@@ -160,4 +161,23 @@ func CleanupClaimsCSVFile(filePath string) error {
 	}
 
 	return nil
+}
+
+// GenerateDefaultClaimingTestFile generates a default set of claiming test data.
+func GenerateDefaultClaimingTestData() (string, error) {
+	// Generate test data for claims
+	testData, err := GenerateClaimingTestData()
+	if err != nil {
+		return "", fmt.Errorf("failed to generate claiming test data: %w", err)
+	}
+
+	// Generate a CSV file with the test data
+	claimsPath, err := GenerateClaimsCSVFile([]ClaimCSVRecord{
+		{OldAddress: testData.OldAddress, Amount: claimtypes.DefaultClaimableAmountConst},
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to generate claims CSV file: %w", err)
+	}
+
+	return claimsPath, nil
 }

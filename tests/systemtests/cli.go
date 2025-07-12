@@ -163,7 +163,7 @@ func (c LumeradCli) CustomCommand(args ...string) string {
 	if !ok {
 		return execOutput
 	}
-	rsp, committed := c.awaitTxCommitted(execOutput, DefaultWaitTime)
+	rsp, committed := c.awaitTxCommitted(execOutput, EventWaitTime)
 	c.t.Logf("tx committed: %v", committed)
 	require.Equal(c.t, c.expTXCommitted, committed, "expected tx committed: %v", c.expTXCommitted)
 	return rsp
@@ -315,18 +315,18 @@ func (c LumeradCli) QueryBalances(addr string) string {
 
 // QueryBalance returns balance amount for given denom.
 // 0 when not found
-func (c LumeradCli) QueryBalance(addr, denom string) int64 {
+func (c LumeradCli) QueryBalance(addr, denom string) uint64 {
 	raw := c.CustomQuery("q", "bank", "balance", addr, denom)
 	require.Contains(c.t, raw, "amount", raw)
-	return gjson.Get(raw, "balance.amount").Int()
+	return gjson.Get(raw, "balance.amount").Uint()
 }
 
 // QueryTotalSupply returns total amount of tokens for a given denom.
 // 0 when not found
-func (c LumeradCli) QueryTotalSupply(denom string) int64 {
+func (c LumeradCli) QueryTotalSupply(denom string) uint64 {
 	raw := c.CustomQuery("q", "bank", "total-supply")
 	require.Contains(c.t, raw, "amount", raw)
-	return gjson.Get(raw, fmt.Sprintf("supply.#(denom==%q).amount", denom)).Int()
+	return gjson.Get(raw, fmt.Sprintf("supply.#(denom==%q).amount", denom)).Uint()
 }
 
 func (c LumeradCli) GetCometBFTValidatorSet() cmtservice.GetLatestValidatorSetResponse {

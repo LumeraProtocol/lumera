@@ -361,7 +361,6 @@ func (app *App) setupUpgradeHandlers() {
 				app.Logger(),
 				app.ModuleManager,
 				app.Configurator(),
-				app.ActionKeeper,
 			),
 		},
 		{

@@ -10,6 +10,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
+
+	claimtestutils "github.com/LumeraProtocol/lumera/x/claim/testutils"
+	claimtypes "github.com/LumeraProtocol/lumera/x/claim/types"
 )
 
 func TestQueryGetTopSuperNodesForBlock(t *testing.T) {
@@ -19,8 +22,17 @@ func TestQueryGetTopSuperNodesForBlock(t *testing.T) {
 	// Create CLI helper
 	cli := NewLumeradCLI(t, sut, true)
 
+	// Generate default CSV test file for claims
+	claimsPath, err := claimtestutils.GenerateDefaultClaimingTestData()
+	require.NoError(t, err)
+
+	// Ensure the file is cleaned up after the test
+	t.Cleanup(func() {
+		claimtestutils.CleanupClaimsCSVFile(claimsPath)
+	})
+
 	// Start the chain
-	sut.StartChain(t)
+	sut.StartChain(t, fmt.Sprintf("--%s=%s", claimtypes.FlagClaimsPath, claimsPath))
 
 	// Register all 4 validator nodes as supernodes
 	var valAddrs []string
@@ -95,8 +107,17 @@ func TestQueryGetTopSuperNodesForBlockFlags(t *testing.T) {
 	// Create CLI helper
 	cli := NewLumeradCLI(t, sut, true)
 
+	// Generate default CSV test file for claims
+	claimsPath, err := claimtestutils.GenerateDefaultClaimingTestData()
+	require.NoError(t, err)
+
+	// Ensure the file is cleaned up after the test
+	t.Cleanup(func() {
+		claimtestutils.CleanupClaimsCSVFile(claimsPath)
+	})
+
 	// Start the chain
-	sut.StartChain(t)
+	sut.StartChain(t, fmt.Sprintf("--%s=%s", claimtypes.FlagClaimsPath, claimsPath))
 
 	// Register all 4 validator nodes as supernodes
 	var valAddrs []string

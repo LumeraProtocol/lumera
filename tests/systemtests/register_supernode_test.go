@@ -6,12 +6,15 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"fmt"
 
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+	claimtestutils "github.com/LumeraProtocol/lumera/x/claim/testutils"
+	claimtypes "github.com/LumeraProtocol/lumera/x/claim/types"
 )
 
 func TestSupernodeRegistrationSuccess(t *testing.T) {
@@ -49,8 +52,17 @@ func TestSupernodeRegistrationSuccess(t *testing.T) {
 				return state
 			})
 
-			// Start the chain with modified genesis
-			sut.StartChain(t)
+			// Generate default CSV test file for claims
+			claimsPath, err := claimtestutils.GenerateDefaultClaimingTestData()
+			require.NoError(t, err)
+
+			// Ensure the file is cleaned up after the test
+			t.Cleanup(func() {
+				claimtestutils.CleanupClaimsCSVFile(claimsPath)
+			})
+
+			// Start the chain
+			sut.StartChain(t, fmt.Sprintf("--%s=%s", claimtypes.FlagClaimsPath, claimsPath))
 
 			// Create CLI helper
 			cli := NewLumeradCLI(t, sut, true)
@@ -167,9 +179,17 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 				return state
 			})
 
+			// Generate default CSV test file for claims
+			claimsPath, err := claimtestutils.GenerateDefaultClaimingTestData()
+			require.NoError(t, err)
+
+			// Ensure the file is cleaned up after the test
+			t.Cleanup(func() {
+				claimtestutils.CleanupClaimsCSVFile(claimsPath)
+			})
+
 			// Start the chain
-			t.Log("Starting chain")
-			sut.StartChain(t)
+			sut.StartChain(t, fmt.Sprintf("--%s=%s", claimtypes.FlagClaimsPath, claimsPath))
 
 			// Create CLI helper
 			cli := NewLumeradCLI(t, sut, true)

@@ -10,9 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
-
-	claimtestutils "github.com/LumeraProtocol/lumera/x/claim/testutils"
-	claimtypes "github.com/LumeraProtocol/lumera/x/claim/types"
 )
 
 func TestSupernodeUpdateParamsProposal(t *testing.T) {
@@ -39,17 +36,8 @@ func TestSupernodeUpdateParamsProposal(t *testing.T) {
 		},
 	)
 
-	// Generate default CSV test file for claims
-	claimsPath, err := claimtestutils.GenerateDefaultClaimingTestData()
-	require.NoError(t, err)
-
-	// Ensure the file is cleaned up after the test
-	t.Cleanup(func() {
-		claimtestutils.CleanupClaimsCSVFile(claimsPath)
-	})
-
 	// Start the chain
-	sut.StartChain(t, fmt.Sprintf("--%s=%s", claimtypes.FlagClaimsPath, claimsPath))
+	sut.StartChain(t)
 
 	// Create CLI helper
 	cli := NewLumeradCLI(t, sut, true)

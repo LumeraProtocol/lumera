@@ -65,7 +65,7 @@ func TestMaxClaimsPerBlockReset(t *testing.T) {
 			Amount:     tokensPerClaim,
 		})
 	}
-	claimsPath, err := claimtestutils.GenerateClaimsCSVFile(csvData)
+	claimsPath, err := claimtestutils.GenerateClaimsCSVFile(csvData, nil)
 	require.NoError(t, err)
 	
 	// Ensure the file is cleaned up after the test

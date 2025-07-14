@@ -32,7 +32,7 @@ func TestClaimPeriodEndBurn(t *testing.T) {
 	claimsPath, err := claimtestutils.GenerateClaimsCSVFile([]claimtestutils.ClaimCSVRecord{
 		{OldAddress: testData.OldAddress, Amount: claimAmount},
 		{OldAddress: "lumc4mple2ddress000000000000000000000000", Amount: claimAmount}, // Second address that won't be claimed
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	// Ensure the file is cleaned up after the test

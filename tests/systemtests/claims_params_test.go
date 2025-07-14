@@ -12,7 +12,6 @@ import (
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 
-	claimtestutils "github.com/LumeraProtocol/lumera/x/claim/testutils"
 	claimtypes "github.com/LumeraProtocol/lumera/x/claim/types"
 )
 
@@ -20,15 +19,6 @@ import (
 func TestClaimsUpdateParamsProposal(t *testing.T) {
 	// Initialize and reset chain
 	sut.ResetChain(t)
-
-	// Generate default CSV test file for claims
-	claimsPath, err := claimtestutils.GenerateDefaultClaimingTestData()
-	require.NoError(t, err)
-
-	// Ensure the file is cleaned up after the test
-	t.Cleanup(func() {
-		claimtestutils.CleanupClaimsCSVFile(claimsPath)
-	})
 
 	// Set initial parameters in genesis
 	initialEndTime := time.Now().Add(48 * time.Hour).Unix()
@@ -57,7 +47,7 @@ func TestClaimsUpdateParamsProposal(t *testing.T) {
 	)
 
 	// Start the chain
-	sut.StartChain(t, fmt.Sprintf("--%s=%s", claimtypes.FlagClaimsPath, claimsPath))
+	sut.StartChain(t)
 
 	// Create CLI helper
 	cli := NewLumeradCLI(t, sut, true)

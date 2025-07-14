@@ -37,6 +37,8 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/genutil"
 	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
+
+	claimtestutils "github.com/LumeraProtocol/lumera/x/claim/testutils"
 )
 
 var (
@@ -240,6 +242,7 @@ func initTestnetFiles(
 		genAccounts []authtypes.GenesisAccount
 		genBalances []banktypes.Balance
 		genFiles    []string
+		isSucceeded bool = false
 	)
 	const (
 		rpcPort  = 26657
@@ -272,20 +275,30 @@ func initTestnetFiles(
 		appConfig.GRPC.Address = fmt.Sprintf("0.0.0.0:%d", grpcPort+portOffset)
 		appConfig.GRPCWeb.Enable = true
 
-		if err := os.MkdirAll(filepath.Join(nodeDir, "config"), nodeDirPerm); err != nil {
-			_ = os.RemoveAll(args.outputDir)
+		// cleanup output directory if node initialization fails
+		defer func() {
+			if !isSucceeded {
+				_ = os.RemoveAll(args.outputDir)
+			}
+		}()
+
+		configDir := filepath.Join(nodeDir, "config")
+		if err := os.MkdirAll(configDir, nodeDirPerm); err != nil {
 			return err
+		}
+
+		claimsPath, err := claimtestutils.GenerateNodeClaimingTestData(configDir)
+		if err != nil {
+			return fmt.Errorf("failed to generate claims CSV file %s: %w", claimsPath, err)
 		}
 
 		ip, err := getIP(i, args.startingIPAddress)
 		if err != nil {
-			_ = os.RemoveAll(args.outputDir)
 			return err
 		}
 
 		nodeIDs[i], valPubKeys[i], err = genutil.InitializeNodeValidatorFiles(nodeConfig)
 		if err != nil {
-			_ = os.RemoveAll(args.outputDir)
 			return err
 		}
 
@@ -305,7 +318,6 @@ func initTestnetFiles(
 
 		addr, secret, err := testutil.GenerateSaveCoinKey(kb, nodeDirName, "", true, algo)
 		if err != nil {
-			_ = os.RemoveAll(args.outputDir)
 			return err
 		}
 
@@ -392,6 +404,7 @@ func initTestnetFiles(
 		return err
 	}
 
+	isSucceeded = true
 	cmd.PrintErrf("Successfully initialized %d node directories\n", args.numValidators)
 	return nil
 }

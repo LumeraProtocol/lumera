@@ -172,7 +172,7 @@ func TestClaimsSystem(t *testing.T) {
 					OldAddress: oldAddress,
 					Amount: tc.balanceToClaim,
 				},
-			})
+			}, nil)
 			require.NoError(t, err)
 			// Ensure the file is cleaned up after the test
 			t.Cleanup(func() {

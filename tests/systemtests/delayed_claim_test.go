@@ -209,7 +209,7 @@ func TestDelayedClaimsSystem(t *testing.T) {
 					OldAddress: csvAddress, 
 					Amount: tc.balanceToClaim,
 				},
-			})
+			}, nil)
 			require.NoError(t, err)
 
 			t.Cleanup(func() {

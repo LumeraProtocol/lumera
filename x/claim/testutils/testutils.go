@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
@@ -121,14 +122,28 @@ type ClaimCSVRecord struct {
 	Amount     uint64 `csv:"amount"`
 }
 
-// GenerateClaimsCSVFile creates a temporary claims file using the provided test data.
-// File is created in a temporary directory and has unique name to avoid conflicts.
-// It returns the file path and an error if anything goes wrong.
-func GenerateClaimsCSVFile(data []ClaimCSVRecord) (string, error) {
-	// Create a uniquely named temporary file
-	file, err := os.CreateTemp("", "claims-*.csv")
-	if err != nil {
-		return "", err
+// GenerateClaimsCSVFile creates a claims.csv file at the specified path 
+// (or in a temporary directory with a unique name if path is empty).
+// Returns the full file path and error if any.
+func GenerateClaimsCSVFile(data []ClaimCSVRecord, filePath *string) (string, error) {
+	var path string
+	var file *os.File
+	var err error
+
+	if filePath != nil && *filePath != "" {
+		// Create file at the given path (overwrite if exists)
+		file, err = os.Create(*filePath)
+		if err != nil {
+			return "", fmt.Errorf("failed to create file at %s: %w", *filePath, err)
+		}
+		path = *filePath
+	} else {
+		// Create a uniquely named temporary file
+		file, err = os.CreateTemp("", "claims-*.csv")
+		if err != nil {
+			return "", fmt.Errorf("failed to create temp file: %w", err)
+		}
+		path = file.Name()
 	}
 	defer file.Close()
 
@@ -146,7 +161,7 @@ func GenerateClaimsCSVFile(data []ClaimCSVRecord) (string, error) {
 		return "", fmt.Errorf("failed to set file permissions: %w", err)
 	}
 
-	return file.Name(), nil
+	return path, nil
 }
 
 // CleanupClaimsCSVFile removes the specified claims CSV file.
@@ -174,10 +189,32 @@ func GenerateDefaultClaimingTestData() (string, error) {
 	// Generate a CSV file with the test data
 	claimsPath, err := GenerateClaimsCSVFile([]ClaimCSVRecord{
 		{OldAddress: testData.OldAddress, Amount: claimtypes.DefaultClaimableAmountConst},
-	})
+	}, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate claims CSV file: %w", err)
 	}
 
 	return claimsPath, nil
+}
+
+func GenerateNodeClaimingTestData(configDir string) (string, error) {
+	var err error
+
+	// Generate test data for claims
+	testData, err := GenerateClaimingTestData()
+	if err != nil {
+		return "", fmt.Errorf("failed to generate claiming test data: %w", err)
+	}
+
+	claimsFilePath := filepath.Join(configDir, claimtypes.DefaultClaimsFileName)
+	// Generate a CSV file with the test data
+	claimsFilePath, err = GenerateClaimsCSVFile([]ClaimCSVRecord{
+		{OldAddress: testData.OldAddress, Amount: claimtypes.DefaultClaimableAmountConst},
+	}, &claimsFilePath)
+	
+	if err != nil {
+		return "", fmt.Errorf("failed to generate claims CSV file: %w", err)
+	}
+
+	return claimsFilePath, nil
 }

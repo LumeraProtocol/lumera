@@ -30,7 +30,7 @@ func TestGenesis(t *testing.T) {
 	// generate a CSV file with the test data
 	claimsPath, err := claimtestutils.GenerateClaimsCSVFile([]claimtestutils.ClaimCSVRecord{
 		{OldAddress: testData.OldAddress, Amount: defaultGenState.TotalClaimableAmount},
-	})
+	}, nil)
 	require.NoError(t, err)
 	// Ensure the file is cleaned up after the test
 	t.Cleanup(func() {

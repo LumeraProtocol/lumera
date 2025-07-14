@@ -39,6 +39,7 @@ import (
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 
 	claimtestutils "github.com/LumeraProtocol/lumera/x/claim/testutils"
+	claimtypes "github.com/LumeraProtocol/lumera/x/claim/types"
 )
 
 var (
@@ -282,14 +283,29 @@ func initTestnetFiles(
 			}
 		}()
 
+		commonConfigDir := filepath.Join(args.outputDir, "config")
+		if err := os.MkdirAll(commonConfigDir, nodeDirPerm); err != nil {
+			return err
+		}
+
 		configDir := filepath.Join(nodeDir, "config")
 		if err := os.MkdirAll(configDir, nodeDirPerm); err != nil {
 			return err
 		}
 
-		claimsPath, err := claimtestutils.GenerateNodeClaimingTestData(configDir)
-		if err != nil {
-			return fmt.Errorf("failed to generate claims CSV file %s: %w", claimsPath, err)
+		// if claims.csv file exists in the common config directory, use it
+		// otherwise generate a new one
+		claimsPath := filepath.Join(commonConfigDir, claimtypes.DefaultClaimsFileName)
+		if _, err := os.Stat(claimsPath); os.IsNotExist(err) {
+			// generate a new claims.csv file
+			claimsPath, err = claimtestutils.GenerateNodeClaimingTestData(commonConfigDir)
+			if err != nil {
+				return fmt.Errorf("failed to generate claims CSV file %s: %w", claimsPath, err)
+			}
+		}
+		// copy existing claims.csv file to the node's config directory
+		if err := os.Link(claimsPath, filepath.Join(configDir, claimtypes.DefaultClaimsFileName)); err != nil {
+			return fmt.Errorf("failed to link claims CSV file %s: %w", claimsPath, err)
 		}
 
 		ip, err := getIP(i, args.startingIPAddress)

@@ -362,8 +362,8 @@ func TestDelayedClaimsSystem(t *testing.T) {
 				// Check if the account has a balance
 				vesting_balance := gjson.Get(vestingAccount, "account.value.base_vesting_account.original_vesting").Array()
 				require.NotEmpty(t, vesting_balance, "account balance not found")
-				// check amount is equal to balanceToClaim
-				amount := gjson.Get(vestingAccount, "account.value.base_vesting_account.original_vesting.0.amount").String()
+				// check amount is equal to balanceToClaim, convert to uint64
+				amount := gjson.Get(vestingAccount, "account.value.base_vesting_account.original_vesting.0.amount").Uint()
 				require.Equal(t, tc.balanceToClaim, amount, "account balance mismatch")
 			} else {
 				RequireTxFailure(t, lastResp, tc.expectedError)

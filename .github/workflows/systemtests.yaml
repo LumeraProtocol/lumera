@@ -65,12 +65,10 @@ jobs:
           GOFLAGS: "-buildvcs=false"
 
       - name: Prepare System Tests
-        run: |
-          cd tests/systemtests
-          go mod tidy
+        run: go mod tidy
+        working-directory: tests/systemtests
 
       - name: Run System Tests
-        run: |
-          cd tests/systemtests
-          go test -tags=system_test -v .
+        run: go test -tags=system_test -v .
+        working-directory: tests/systemtests
 

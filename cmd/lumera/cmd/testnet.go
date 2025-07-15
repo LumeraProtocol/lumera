@@ -47,6 +47,7 @@ var (
 	flagNumValidators     = "v"
 	flagOutputDir         = "output-dir"
 	flagNodeDaemonHome    = "node-daemon-home"
+	flagDisableCleanup    = "disable-cleanup"
 	flagStartingIPAddress = "starting-ip-address"
 	flagEnableLogging     = "enable-logging"
 	flagGRPCAddress       = "grpc.address"
@@ -69,6 +70,7 @@ type initArgs struct {
 	outputDir         string
 	startingIPAddress string
 	singleMachine     bool
+	disableCleanup    bool
 }
 
 type startArgs struct {
@@ -151,6 +153,7 @@ Example:
 			args.minGasPrices, _ = cmd.Flags().GetString(server.FlagMinGasPrices)
 			args.nodeDirPrefix, _ = cmd.Flags().GetString(flagNodeDirPrefix)
 			args.nodeDaemonHome, _ = cmd.Flags().GetString(flagNodeDaemonHome)
+			args.disableCleanup, _ = cmd.Flags().GetBool(flagDisableCleanup)
 			args.startingIPAddress, _ = cmd.Flags().GetString(flagStartingIPAddress)
 			args.numValidators, _ = cmd.Flags().GetInt(flagNumValidators)
 			args.algo, _ = cmd.Flags().GetString(flags.FlagKeyType)
@@ -167,6 +170,7 @@ Example:
 	addTestnetFlagsToCmd(cmd)
 	cmd.Flags().String(flagNodeDirPrefix, "node", "Prefix the directory name for each node with (node results in node0, node1, ...)")
 	cmd.Flags().String(flagNodeDaemonHome, version.AppName, "Home directory of the node's daemon configuration")
+	cmd.Flags().Bool(flagDisableCleanup, false, "Disable cleanup of output directory if initialization fails")
 	cmd.Flags().String(flagStartingIPAddress, "192.168.0.1", "Starting IP address (192.168.0.1 results in persistent peers list ID0@192.168.0.1:46656, ID1@192.168.0.2:46656, ...)")
 	cmd.Flags().String(flags.FlagKeyringBackend, flags.DefaultKeyringBackend, "Select keyring's backend (os|file|test)")
 	cmd.Flags().Duration(flagCommitTimeout, 5*time.Second, "Time to wait after a block commit before starting on the new height")
@@ -253,6 +257,7 @@ func initTestnetFiles(
 	p2pPortStart := 26656
 
 	inBuf := bufio.NewReader(cmd.InOrStdin())
+	cmd.Printf("Initializing %d node directories in %s with chain ID %s\n", args.numValidators, args.outputDir, args.chainID)
 	// generate private keys, node IDs, and initial transactions
 	for i := 0; i < args.numValidators; i++ {
 		var portOffset int
@@ -278,19 +283,29 @@ func initTestnetFiles(
 
 		// cleanup output directory if node initialization fails
 		defer func() {
-			if !isSucceeded {
+			if !isSucceeded && !args.disableCleanup {
+				cmd.Printf("Cleaning up output directory: %s\n", args.outputDir)
+				// remove the output directory
 				_ = os.RemoveAll(args.outputDir)
 			}
 		}()
 
 		commonConfigDir := filepath.Join(args.outputDir, "config")
-		if err := os.MkdirAll(commonConfigDir, nodeDirPerm); err != nil {
-			return err
+		if _, err := os.Stat(commonConfigDir); os.IsNotExist(err) {
+			// create common config directory if it does not exist
+			if err := os.MkdirAll(commonConfigDir, nodeDirPerm); err != nil {
+				return err
+			}
+			cmd.Printf("Created common config directory: %s\n", commonConfigDir)
 		}
 
 		configDir := filepath.Join(nodeDir, "config")
-		if err := os.MkdirAll(configDir, nodeDirPerm); err != nil {
-			return err
+		if _, err := os.Stat(configDir); os.IsNotExist(err) {
+			// create node config directory if it does not exist
+			if err := os.MkdirAll(configDir, nodeDirPerm); err != nil {
+				return err
+			}
+			cmd.Printf("Created node #%d config directory: %s\n", i+1, configDir)
 		}
 
 		// if claims.csv file exists in the common config directory, use it
@@ -302,11 +317,13 @@ func initTestnetFiles(
 			if err != nil {
 				return fmt.Errorf("failed to generate claims CSV file %s: %w", claimsPath, err)
 			}
+			cmd.Printf("Generated claims CSV file: %s\n", claimsPath)
 		}
 		// copy existing claims.csv file to the node's config directory
 		if err := os.Link(claimsPath, filepath.Join(configDir, claimtypes.DefaultClaimsFileName)); err != nil {
 			return fmt.Errorf("failed to link claims CSV file %s: %w", claimsPath, err)
 		}
+		cmd.Printf("Linked claims CSV file to node #%d config directory: %s\n", i+1, filepath.Join(configDir, claimtypes.DefaultClaimsFileName))
 
 		ip, err := getIP(i, args.startingIPAddress)
 		if err != nil {
@@ -383,8 +400,7 @@ func initTestnetFiles(
 
 		txBuilder.SetMemo(memo)
 
-		txFactory := tx.Factory{}
-		txFactory = txFactory.
+		txFactory := tx.Factory{}.
 			WithChainID(args.chainID).
 			WithMemo(memo).
 			WithKeybase(kb).
@@ -405,6 +421,7 @@ func initTestnetFiles(
 
 		srvconfig.SetConfigTemplate(srvconfig.DefaultConfigTemplate)
 		srvconfig.WriteConfigFile(filepath.Join(nodeDir, "config", "app.toml"), appConfig)
+		cmd.Printf("Initialized node #%d with ID %s and public key %s\n", i+1, nodeIDs[i], valPubKeys[i].String())
 	}
 
 	if err := initGenFiles(clientCtx, mbm, args.chainID, genAccounts, genBalances, genFiles, args.numValidators); err != nil {
@@ -421,7 +438,7 @@ func initTestnetFiles(
 	}
 
 	isSucceeded = true
-	cmd.PrintErrf("Successfully initialized %d node directories\n", args.numValidators)
+	cmd.Printf("Successfully initialized %d nodes\n", args.numValidators)
 	return nil
 }
 

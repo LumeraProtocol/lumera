@@ -7,8 +7,10 @@ import (
 	"os"
 
 	"cosmossdk.io/math"
+
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	"github.com/spf13/viper"
 
 	"github.com/LumeraProtocol/lumera/x/claim/keeper"
 	"github.com/LumeraProtocol/lumera/x/claim/types"
@@ -25,12 +27,17 @@ func InitGenesis(ctx sdk.Context, k keeper.Keeper, genState types.GenesisState) 
 		panic(err)
 	}
 
-	genesisClaimsDenom := genState.ClaimsDenom
 	if err := initModuleAccount(ctx, k); err != nil {
 		panic(fmt.Sprintf("failed to initialize module account: %s", err))
 	}
 
+	// Skip claims.csv logic if skip-claims-check mode is active
+	if viper.GetBool(types.FlagSkipClaimsCheck) {
+		return
+	}
+
 	// Only attempt to load CSV records if TotalClaimableAmount > 0
+	genesisClaimsDenom := genState.ClaimsDenom
 	if genState.TotalClaimableAmount > 0 {
 		records, err := loadClaimRecordsFromCSV(k, genesisClaimsDenom)
 		if err != nil {
@@ -96,6 +103,15 @@ func ExportGenesis(ctx sdk.Context, k keeper.Keeper) *types.GenesisState {
 }
 
 func loadClaimRecordsFromCSV(k keeper.Keeper, claimsDenom string) ([]types.ClaimRecord, error) {
+
+	claimsPath := k.GetClaimsPath()
+	if claimsPath == "" {
+		return nil, fmt.Errorf("Path to claims CSV file is not set")
+	}
+	if _, err := os.Stat(claimsPath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("claims CSV file not found at path: %s", claimsPath)
+	}
+	
 	file, err := os.Open(k.GetClaimsPath())
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file: %w", err)

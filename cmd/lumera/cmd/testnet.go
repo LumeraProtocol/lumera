@@ -14,6 +14,7 @@ import (
 	cmttime "github.com/cometbft/cometbft/types/time"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 
 	"cosmossdk.io/math"
 	"cosmossdk.io/math/unsafe"
@@ -145,6 +146,8 @@ Example:
 
 			serverCtx := server.GetServerContextFromCmd(cmd)
 			config := serverCtx.Config
+
+			viper.Set(claimtypes.FlagSkipClaimsCheck, true)
 
 			args := initArgs{}
 			args.outputDir, _ = cmd.Flags().GetString(flagOutputDir)

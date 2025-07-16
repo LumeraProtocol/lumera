@@ -61,6 +61,28 @@
         "program": "${workspaceFolder}/build/lumerad",
         "args": ["start"],
         "preLaunchTask": "Ignite Debug Build"
-      }
+      },
+    {
+      "name": "Run lumerad testnet init-files",
+      "type": "go",
+      "request": "launch",
+      "mode": "exec",
+      "program": "${workspaceFolder}/build/lumerad",
+      "args": [
+        "testnet",
+        "init-files",
+        "--chain-id=testing",
+        "--output-dir=./testnet",
+        "--v=4",
+        "--keyring-backend=test",
+        "--commit-timeout=900ms",
+        "--minimum-gas-prices=0.000001stake",
+        "--starting-ip-address",
+        "--single-host",
+        "--disable-cleanup"
+      ],
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "Ignite Debug Build"
+    }
     ]
   }

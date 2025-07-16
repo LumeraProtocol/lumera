@@ -128,11 +128,8 @@ func ProvideModule(in ModuleInputs) ModuleOutputs {
 		authority = authtypes.NewModuleAddressOrBech32Address(in.Config.Authority)
 	}
 	
-	claimsPath, err := searchForClaimsFile(in.AppOpts)
-	if err != nil {
-		// optionally log or panic if strictly required
-		panic(fmt.Sprintf("claims module requires %s: %v", types.DefaultClaimsFileName, err))
-	}
+	// Search for claims.csv file in expected locations
+	claimsPath, _ := searchForClaimsFile(in.AppOpts)
 
 	k := keeper.NewKeeper(
 		in.Cdc,

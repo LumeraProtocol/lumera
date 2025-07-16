@@ -347,6 +347,27 @@ func (app *App) setupUpgradeStoreLoaders() {
 	}
 }
 
+// setupUpgradeHandlers registers the upgrade handlers for specific upgrade names.
+func (app *App) setupUpgradeHandlers() {
+	// Register the v1_6_1 upgrade handler
+	app.UpgradeKeeper.SetUpgradeHandler(
+		upgrade_v1_6_1.UpgradeName,
+		upgrade_v1_6_1.CreateUpgradeHandler(
+			app.Logger(),
+			app.ModuleManager,  // Pass ModuleManager
+			app.Configurator(), // Pass Configurator
+		),
+	)
+
+	// Check for the planned upgrades
+	if !app.UpgradeKeeper.IsSkipHeight(upgradeInfo.Height) {
+		if upgrades, exists := storeUpgradesMap[upgradeInfo.Name]; exists {
+			app.SetStoreLoader(upgradetypes.UpgradeStoreLoader(upgradeInfo.Height, upgrades))
+			app.Logger().Info("Configured store loader for upgrade", "name", upgradeInfo.Name, "height", upgradeInfo.Height)
+		}
+	}
+}
+
 type UpgradeHandlerConfig struct {
 	Name    string
 	Handler upgradetypes.UpgradeHandler

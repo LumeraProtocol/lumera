@@ -23,6 +23,7 @@ import (
 	icahosttypes "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/host/types"
 	icatypes "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/types"
 	ibccallbacks "github.com/cosmos/ibc-go/v10/modules/apps/callbacks"
+	ibccallbacksv2 "github.com/cosmos/ibc-go/v10/modules/apps/callbacks/v2"
 	ibctransfer "github.com/cosmos/ibc-go/v10/modules/apps/transfer"
 	ibctransferkeeper "github.com/cosmos/ibc-go/v10/modules/apps/transfer/keeper"
 	ibctransfertypes "github.com/cosmos/ibc-go/v10/modules/apps/transfer/types"
@@ -34,6 +35,9 @@ import (
 	ibcapi "github.com/cosmos/ibc-go/v10/modules/core/api"
 	ibcexported "github.com/cosmos/ibc-go/v10/modules/core/exported"
 	ibckeeper "github.com/cosmos/ibc-go/v10/modules/core/keeper"
+	pfm "github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v10/packetforward"
+	pfmkeeper "github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v10/packetforward/keeper"
+	pfmtypes "github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v10/packetforward/types"
 	solomachine "github.com/cosmos/ibc-go/v10/modules/light-clients/06-solomachine"
 	ibctm "github.com/cosmos/ibc-go/v10/modules/light-clients/07-tendermint"
 
@@ -52,6 +56,7 @@ func (app *App) registerIBCModules(
 		storetypes.NewKVStoreKey(ibcexported.StoreKey),
 		storetypes.NewKVStoreKey(ibctransfertypes.StoreKey),
 		storetypes.NewKVStoreKey(icahosttypes.StoreKey),
+		storetypes.NewKVStoreKey(pfmtypes.StoreKey),
 		storetypes.NewKVStoreKey(icacontrollertypes.StoreKey),
 		storetypes.NewTransientStoreKey(paramstypes.TStoreKey),
 	); err != nil {
@@ -62,11 +67,12 @@ func (app *App) registerIBCModules(
 	keyTable := ibcclienttypes.ParamKeyTable()
 	keyTable.RegisterParamSet(&ibcconnectiontypes.Params{})
 	app.ParamsKeeper.Subspace(ibcexported.ModuleName).WithKeyTable(keyTable)
+	app.ParamsKeeper.Subspace(pfmtypes.ModuleName)
 	app.ParamsKeeper.Subspace(ibctransfertypes.ModuleName).WithKeyTable(ibctransfertypes.ParamKeyTable())
 	app.ParamsKeeper.Subspace(icacontrollertypes.SubModuleName).WithKeyTable(icacontrollertypes.ParamKeyTable())
 	app.ParamsKeeper.Subspace(icahosttypes.SubModuleName).WithKeyTable(icahosttypes.ParamKeyTable())
 
-	govModuleAddr, _ := app.AuthKeeper.AddressCodec().BytesToString(authtypes.NewModuleAddress(govtypes.ModuleName))
+	govAuthority, _ := app.AuthKeeper.AddressCodec().BytesToString(authtypes.NewModuleAddress(govtypes.ModuleName))
 
 	// Create IBC keeper
 	app.IBCKeeper = ibckeeper.NewKeeper(
@@ -74,7 +80,19 @@ func (app *App) registerIBCModules(
 		runtime.NewKVStoreService(app.GetKey(ibcexported.StoreKey)),
 		app.GetSubspace(ibcexported.ModuleName),
 		app.UpgradeKeeper,
-		govModuleAddr,
+		govAuthority,
+	)
+
+	// Initialize the packet forward middleware Keeper
+	// It's important to note that the PFM Keeper must be initialized before the Transfer Keeper
+	app.PacketForwardKeeper = pfmkeeper.NewKeeper(
+		app.appCodec,
+		runtime.NewKVStoreService(app.GetKey(pfmtypes.StoreKey)),
+		nil, // will be zero-value here, reference is set later on with SetTransferKeeper.
+		app.IBCKeeper.ChannelKeeper,
+		app.BankKeeper,
+		app.IBCKeeper.ChannelKeeper, // ICS4Wrapper
+		govAuthority,
 	)
 
 	// Create IBC transfer keeper
@@ -87,8 +105,9 @@ func (app *App) registerIBCModules(
 		app.MsgServiceRouter(),
 		app.AuthKeeper,
 		app.BankKeeper,
-		govModuleAddr,
+		govAuthority,
 	)
+	app.PacketForwardKeeper.SetTransferKeeper(app.TransferKeeper)
 
 	// Create interchain account keepers
 	app.ICAHostKeeper = icahostkeeper.NewKeeper(
@@ -100,7 +119,7 @@ func (app *App) registerIBCModules(
 		app.AuthKeeper,
 		app.MsgServiceRouter(),
 		app.GRPCQueryRouter(),
-		govModuleAddr,
+		govAuthority,
 	)
 
 	app.ICAControllerKeeper = icacontrollerkeeper.NewKeeper(
@@ -110,7 +129,7 @@ func (app *App) registerIBCModules(
 		app.IBCKeeper.ChannelKeeper,
 		app.IBCKeeper.ChannelKeeper,
 		app.MsgServiceRouter(),
-		govModuleAddr,
+		govAuthority,
 	)
 
 	ibcRouterV2 := ibcapi.NewRouter()
@@ -126,18 +145,51 @@ func (app *App) registerIBCModules(
 	// This is a placeholder for the IBC module for the action module that should be created
 	// actionIBCModule := actionmodule.NewIBCModule(app.appCodec, app.ActionKeeper)
 
-	// Create Interchain Accounts Stack
+	// Create Transfer Stack
+	var ibcv1transferStack ibcporttypes.IBCModule
+	ibcv1transferStack = ibctransfer.NewIBCModule(app.TransferKeeper)
+    // callbacks wraps the transfer stack as its base app, and uses PacketForwardKeeper as the ICS4Wrapper
+    // i.e. packet-forward-middleware is higher on the stack and sits between callbacks and the ibc channel keeper
+    // Since this is the lowest level middleware of the transfer stack, it should be the first entrypoint for transfer keeper's
+    // WriteAcknowledgement.	
+	ibccbStack := ibccallbacks.NewIBCMiddleware(
+		ibcv1transferStack,
+		app.PacketForwardKeeper,
+		wasmStackIBCHandler,
+		DefaultMaxIBCCallbackGas,
+	)
+	ibcv1transferStack = pfm.NewIBCMiddleware(
+		ibccbStack,
+		app.PacketForwardKeeper,
+		0,
+		pfmkeeper.DefaultForwardTransferPacketTimeoutTimestamp,
+	)
+
+	var ibcv2transferStack ibcapi.IBCModule
+	ibcv2transferStack = ibctransferv2.NewIBCModule(app.TransferKeeper)
+	ibcv2transferStack = ibccallbacksv2.NewIBCMiddleware(
+		ibcv2transferStack,
+		app.IBCKeeper.ChannelKeeperV2,
+		wasmStackIBCHandler,
+		app.IBCKeeper.ChannelKeeperV2,
+		DefaultMaxIBCCallbackGas,
+	)
+	app.TransferKeeper.WithICS4Wrapper(ibccbStack)
+
+	// RecvPacket, message that originates from core IBC and goes down to app, the flow is:
+	// channel.RecvPacket -> icaHost.OnRecvPacket
+	icaHostStack := icahost.NewIBCModule(app.ICAHostKeeper)
+
+	// Create Interchain Accounts Controller Stack
 	// SendPacket, since it is originating from the application to core IBC:
 	// icaAuthModuleKeeper.SendTx -> icaController.SendPacket -> fee.SendPacket -> channel.SendPacket
 	var icaControllerStack ibcporttypes.IBCModule
 	// integration point for custom authentication modules
 	// see https://medium.com/the-interchain-foundation/ibc-go-v6-changes-to-interchain-accounts-and-how-it-impacts-your-chain-806c185300d7
-	var noAuthzModule ibcporttypes.IBCModule
-	icaControllerStack = icacontroller.NewIBCMiddlewareWithAuth(noAuthzModule, app.ICAControllerKeeper)
-	icaControllerStack = icacontroller.NewIBCMiddlewareWithAuth(icaControllerStack, app.ICAControllerKeeper)
+	icaControllerStack = icacontroller.NewIBCMiddleware(app.ICAControllerKeeper)
 	icaControllerStack = ibccallbacks.NewIBCMiddleware(
 		icaControllerStack,
-		app.IBCKeeper.ChannelKeeper,
+		app.IBCKeeper.ChannelKeeper, // ICS4Wrapper
 		wasmStackIBCHandler,
 		DefaultMaxIBCCallbackGas,
 	)
@@ -145,26 +197,9 @@ func (app *App) registerIBCModules(
 	// Since the callbacks middleware itself is an ics4wrapper, it needs to be passed to the ica controller keeper
 	app.ICAControllerKeeper.WithICS4Wrapper(icaICS4Wrapper)
 
-	// RecvPacket, message that originates from core IBC and goes down to app, the flow is:
-	// channel.RecvPacket -> icaHost.OnRecvPacket
-	icaHostStack := icahost.NewIBCModule(app.ICAHostKeeper)
-
-	// Create Transfer Stack
-	var transferStack ibcporttypes.IBCModule
-	transferStack = ibctransfer.NewIBCModule(app.TransferKeeper)
-	transferStack = ibccallbacks.NewIBCMiddleware(
-		transferStack,
-		app.IBCKeeper.ChannelKeeper,
-		wasmStackIBCHandler, 
-		DefaultMaxIBCCallbackGas,
-	)
-	transferICS4Wrapper := transferStack.(ibcporttypes.ICS4Wrapper)
-	// Since the callbacks middleware itself is an ics4wrapper, it needs to be passed to the ica controller keeper
-	app.TransferKeeper.WithICS4Wrapper(transferICS4Wrapper)
-
 	// create static IBC router, add transfer route, then set it on the keeper
 	ibcRouter := ibcporttypes.NewRouter().
-		AddRoute(ibctransfertypes.ModuleName, transferStack).
+		AddRoute(ibctransfertypes.ModuleName, ibcv1transferStack).
 		AddRoute(wasmtypes.ModuleName, wasmStackIBCHandler).
 		AddRoute(icacontrollertypes.SubModuleName, icaControllerStack).
 		AddRoute(icahosttypes.SubModuleName, icaHostStack)
@@ -184,7 +219,7 @@ func (app *App) registerIBCModules(
 	app.ibcRouter = ibcRouter
 
 	ibcRouterV2 = ibcRouterV2.
-		AddRoute(ibctransfertypes.PortID, ibctransferv2.NewIBCModule(app.TransferKeeper))
+		AddRoute(ibctransfertypes.PortID, ibcv2transferStack)
 	app.IBCKeeper.SetRouterV2(ibcRouterV2)
 
 	clientKeeper := app.IBCKeeper.ClientKeeper
@@ -199,6 +234,7 @@ func (app *App) registerIBCModules(
 	// register IBC modules
 	if err := app.RegisterModules(
 		ibc.NewAppModule(app.IBCKeeper),
+		pfm.NewAppModule(app.PacketForwardKeeper, app.GetSubspace(pfmtypes.ModuleName)),
 		ibctransfer.NewAppModule(app.TransferKeeper),
 		icamodule.NewAppModule(&app.ICAControllerKeeper, &app.ICAHostKeeper),
 		ibctm.NewAppModule(tmLightClientModule),

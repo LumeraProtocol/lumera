@@ -16,6 +16,7 @@ import (
 	sdkmath "cosmossdk.io/math"
 	pruningtypes "cosmossdk.io/store/pruning/types"
 
+	"github.com/spf13/viper"
 	abci "github.com/cometbft/cometbft/abci/types"
 	cmttypes "github.com/cometbft/cometbft/types"
 	dbm "github.com/cosmos/cosmos-db"
@@ -48,6 +49,7 @@ import (
 	ibcporttypes "github.com/cosmos/ibc-go/v10/modules/core/05-port/types"
 
 	ibcmock "github.com/LumeraProtocol/lumera/tests/ibctesting/mock"
+	claimtypes "github.com/LumeraProtocol/lumera/x/claim/types"
 )
 
 const (
@@ -233,6 +235,7 @@ func Setup(tb testing.TB, wasmOpts ...wasmkeeper.Option) *App {
 	}
 	genBals = append(genBals, balance)
 	chainID := "testing"
+
 	app := SetupWithGenesisValSet(tb, valSet, []authtypes.GenesisAccount{acc}, chainID, sdk.DefaultPowerReduction, genBals, wasmOpts...)
 
 	return app
@@ -258,6 +261,8 @@ func SetupWithGenesisValSet(
 
 	stateBytes, err := json.MarshalIndent(genesisState, "", " ")
 	require.NoError(tb, err)
+
+	viper.Set(claimtypes.FlagSkipClaimsCheck, true)
 
 	// init chain will set the validator set and initialize the genesis accounts
 	consensusParams := simtestutil.DefaultConsensusParams

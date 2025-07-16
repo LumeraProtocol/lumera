@@ -75,6 +75,7 @@ import (
 	ibctransfertypes "github.com/cosmos/ibc-go/v10/modules/apps/transfer/types"
 	ibcexported "github.com/cosmos/ibc-go/v10/modules/core/exported"
 	ibctm "github.com/cosmos/ibc-go/v10/modules/light-clients/07-tendermint"
+	pfmtypes "github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v10/packetforward/types"
 	solomachine "github.com/cosmos/ibc-go/v10/modules/light-clients/06-solomachine"
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 	// this line is used by starport scaffolding # stargate/app/moduleImport
@@ -110,6 +111,7 @@ var (
 		ibcexported.ModuleName,			// IBC core module
 		ibctransfertypes.ModuleName,	// IBC transfer module
 		icatypes.ModuleName,			// IBC interchain accounts module (host and controller)
+		pfmtypes.ModuleName, 			// IBC packet-forward-middleware
 		ibctm.ModuleName,				// IBC Tendermint light client
 		solomachine.ModuleName,			// IBC Solo Machine light client
 		// chain modules
@@ -137,6 +139,9 @@ var (
 		genutiltypes.ModuleName,
 		// ibc modules
 		ibcexported.ModuleName,
+		ibctransfertypes.ModuleName,
+		icatypes.ModuleName,
+		pfmtypes.ModuleName, // IBC packet-forward-middleware
 		// chain modules
 		lumeraidmoduletypes.ModuleName,
 		wasmtypes.ModuleName,
@@ -156,7 +161,9 @@ var (
 		genutiltypes.ModuleName,
 		// ibc modules
 		ibcexported.ModuleName,
+		ibctransfertypes.ModuleName,
 		icatypes.ModuleName,
+		pfmtypes.ModuleName, // IBC packet-forward-middleware
 		// chain modules
 		lumeraidmoduletypes.ModuleName,
 		wasmtypes.ModuleName,

@@ -187,7 +187,9 @@ GO_SRC := $(shell find app -name "*.go") \
 
 build: build/lumerad
 
-build/lumerad: $(PROTO_SRC) $(GO_SRC)
+build/lumerad: $(PROTO_SRC) $(GO_SRC) go.mod go.sum
+	@echo "Building lumerad binary..."
+	@mkdir -p build
 	ignite chain build --output build/
 
 ### Testing

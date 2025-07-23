@@ -3,10 +3,9 @@ package keeper_test
 import (
 	"testing"
 
-	keeper2 "github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
 	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/golang/mock/gomock"
@@ -20,19 +19,19 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 	otherValAddr := sdk.ValAddress([]byte("other-validator"))
 	otherCreatorAddr := sdk.AccAddress(otherValAddr)
 
-	existingSupernode := types2.SuperNode{
+	existingSupernode := types.SuperNode{
 		SupernodeAccount: otherCreatorAddr.String(),
 		ValidatorAddress: valAddr.String(),
 		Version:          "1.0.0",
-		PrevIpAddresses: []*types2.IPAddressHistory{
+		PrevIpAddresses: []*types.IPAddressHistory{
 			{
 				Address: "1022.145.1.1",
 				Height:  1,
 			},
 		},
-		States: []*types2.SuperNodeStateRecord{
+		States: []*types.SuperNodeStateRecord{
 			{
-				State:  types2.SuperNodeStateActive,
+				State:  types.SuperNodeStateActive,
 				Height: 1,
 			},
 		},
@@ -41,25 +40,25 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 
 	testCases := []struct {
 		name          string
-		msg           *types2.MsgUpdateSupernode
+		msg           *types.MsgUpdateSupernode
 		setupMock     func(sk *supernodemocks.MockStakingKeeper, slk *supernodemocks.MockSlashingKeeper, bk *supernodemocks.MockBankKeeper)
-		setupState    func(k keeper2.Keeper, ctx sdk.Context)
+		setupState    func(k keeper.Keeper, ctx sdk.Context)
 		expectedError error
-		checkResult   func(t *testing.T, k keeper2.Keeper, ctx sdk.Context)
+		checkResult   func(t *testing.T, k keeper.Keeper, ctx sdk.Context)
 	}{
 		{
 			name: "successful update with no changes",
-			msg: &types2.MsgUpdateSupernode{
+			msg: &types.MsgUpdateSupernode{
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "",
 				Version:          "",
 			},
-			setupState: func(k keeper2.Keeper, ctx sdk.Context) {
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
 				require.NoError(t, k.SetSuperNode(ctx, existingSupernode))
 			},
 			expectedError: nil,
-			checkResult: func(t *testing.T, k keeper2.Keeper, ctx sdk.Context) {
+			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context) {
 				sn, found := k.QuerySuperNode(ctx, valAddr)
 				require.True(t, found)
 				require.Equal(t, "1.0.0", sn.Version)
@@ -67,26 +66,26 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 		},
 		{
 			name: "successful update with IP change and version change",
-			msg: &types2.MsgUpdateSupernode{
+			msg: &types.MsgUpdateSupernode{
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "192.168.1.1",
 				Version:          "1.1.0",
 			},
-			setupState: func(k keeper2.Keeper, ctx sdk.Context) {
-				newSupernode := types2.SuperNode{
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
+				newSupernode := types.SuperNode{
 					SupernodeAccount: otherCreatorAddr.String(),
 					ValidatorAddress: valAddr.String(),
 					Version:          "1.0.0",
-					PrevIpAddresses: []*types2.IPAddressHistory{
+					PrevIpAddresses: []*types.IPAddressHistory{
 						{
 							Address: "10.0.1.1",
 							Height:  1,
 						},
 					},
-					States: []*types2.SuperNodeStateRecord{
+					States: []*types.SuperNodeStateRecord{
 						{
-							State:  types2.SuperNodeStateActive,
+							State:  types.SuperNodeStateActive,
 							Height: 1,
 						},
 					},
@@ -95,7 +94,7 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 				require.NoError(t, k.SetSuperNode(ctx, newSupernode))
 			},
 			expectedError: nil,
-			checkResult: func(t *testing.T, k keeper2.Keeper, ctx sdk.Context) {
+			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context) {
 				sn, found := k.QuerySuperNode(ctx, valAddr)
 				require.True(t, found)
 				require.Equal(t, "1.1.0", sn.Version)
@@ -106,27 +105,27 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 		},
 		{
 			name: "successful update with supernode account change",
-			msg: &types2.MsgUpdateSupernode{
+			msg: &types.MsgUpdateSupernode{
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "192.168.1.1",
 				Version:          "1.1.0",
 				SupernodeAccount: creatorAddr.String(),
 			},
-			setupState: func(k keeper2.Keeper, ctx sdk.Context) {
-				newSupernode := types2.SuperNode{
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
+				newSupernode := types.SuperNode{
 					SupernodeAccount: otherCreatorAddr.String(),
 					ValidatorAddress: valAddr.String(),
 					Version:          "1.0.0",
-					PrevIpAddresses: []*types2.IPAddressHistory{
+					PrevIpAddresses: []*types.IPAddressHistory{
 						{
 							Address: "10.0.1.1",
 							Height:  1,
 						},
 					},
-					States: []*types2.SuperNodeStateRecord{
+					States: []*types.SuperNodeStateRecord{
 						{
-							State:  types2.SuperNodeStateActive,
+							State:  types.SuperNodeStateActive,
 							Height: 1,
 						},
 					},
@@ -135,7 +134,7 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 				require.NoError(t, k.SetSuperNode(ctx, newSupernode))
 			},
 			expectedError: nil,
-			checkResult: func(t *testing.T, k keeper2.Keeper, ctx sdk.Context) {
+			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context) {
 				sn, found := k.QuerySuperNode(ctx, valAddr)
 				require.True(t, found)
 				require.Equal(t, "1.1.0", sn.Version)
@@ -148,7 +147,7 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 		},
 		{
 			name: "invalid validator address",
-			msg: &types2.MsgUpdateSupernode{
+			msg: &types.MsgUpdateSupernode{
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: "invalid",
 			},
@@ -156,7 +155,7 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 		},
 		{
 			name: "supernode not found",
-			msg: &types2.MsgUpdateSupernode{
+			msg: &types.MsgUpdateSupernode{
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 			},
@@ -164,11 +163,11 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 		},
 		{
 			name: "unauthorized updater",
-			msg: &types2.MsgUpdateSupernode{
+			msg: &types.MsgUpdateSupernode{
 				Creator:          otherCreatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 			},
-			setupState: func(k keeper2.Keeper, ctx sdk.Context) {
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
 				require.NoError(t, k.SetSuperNode(ctx, existingSupernode))
 			},
 			expectedError: sdkerrors.ErrUnauthorized,
@@ -194,7 +193,7 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 				tc.setupState(k, ctx)
 			}
 
-			msgServer := keeper2.NewMsgServerImpl(k)
+			msgServer := keeper.NewMsgServerImpl(k)
 			_, err := msgServer.UpdateSupernode(ctx, tc.msg)
 
 			if tc.expectedError != nil {

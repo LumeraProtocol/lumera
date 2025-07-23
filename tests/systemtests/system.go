@@ -17,8 +17,9 @@ import (
 	"syscall"
 	"testing"
 	"time"
+	"sync"
 
-	"github.com/cometbft/cometbft/libs/sync"
+	mtxSync "github.com/cometbft/cometbft/libs/sync"
 	client "github.com/cometbft/cometbft/rpc/client/http"
 	ctypes "github.com/cometbft/cometbft/rpc/core/types"
 	tmtypes "github.com/cometbft/cometbft/types"
@@ -57,7 +58,8 @@ type SystemUnderTest struct {
 	initialNodesCount int
 	nodesCount        int
 	minGasPrice       string
-	cleanupFn         []CleanupFn
+	cleanupPreFn      []CleanupFn	// runs before SIGTERM
+	cleanupPostFn     []CleanupFn	// runs after the node process exit
 	outBuff           *ring.Ring
 	errBuff           *ring.Ring
 	out               io.Writer
@@ -66,7 +68,7 @@ type SystemUnderTest struct {
 	projectName       string
 	dirty             bool // requires full reset when marked dirty
 
-	pidsLock sync.RWMutex
+	pidsLock mtxSync.RWMutex
 	pids     map[int]struct{}
 }
 
@@ -162,7 +164,7 @@ func (s *SystemUnderTest) SetupChain() {
 
 func (s *SystemUnderTest) StartChain(t *testing.T, xargs ...string) {
 	t.Helper()
-	s.Log("Start chain\n")
+	s.Logf("Start chain\n")
 	s.ChainStarted = true
 	s.startNodesAsync(t, append([]string{"start", "--trace", "--log_level=info"}, xargs...)...)
 
@@ -170,7 +172,7 @@ func (s *SystemUnderTest) StartChain(t *testing.T, xargs ...string) {
 
 	t.Log("Start new block listener")
 	s.blockListener = NewEventListener(t, s.rpcAddr)
-	s.cleanupFn = append(s.cleanupFn,
+	s.cleanupPreFn = append(s.cleanupPreFn,
 		s.blockListener.Subscribe("tm.event='NewBlock'", func(e ctypes.ResultEvent) (more bool) {
 			newBlock, ok := e.Data.(tmtypes.EventDataNewBlock)
 			require.True(t, ok, "unexpected type %T", e.Data)
@@ -210,7 +212,7 @@ func (s *SystemUnderTest) watchLogs(node int, cmd *exec.Cmd) {
 		panic(fmt.Sprintf("stdout reader error %#+v", err))
 	}
 	go appendToBuf(io.TeeReader(outReader, logfile), s.outBuff, stopRingBuffer)
-	s.cleanupFn = append(s.cleanupFn, func() {
+	s.cleanupPostFn = append(s.cleanupPostFn, func() {
 		close(stopRingBuffer)
 		_ = logfile.Close()
 	})
@@ -277,7 +279,7 @@ func (s *SystemUnderTest) AwaitChainStopped() {
 func (s *SystemUnderTest) AwaitNodeUp(t *testing.T, rpcAddr string) {
 	t.Helper()
 	t.Logf("Await node is up: %s", rpcAddr)
-	timeout := DefaultWaitTime
+	timeout := EventWaitTime
 	ctx, done := context.WithTimeout(context.Background(), timeout)
 	defer done()
 
@@ -311,36 +313,54 @@ func (s *SystemUnderTest) AwaitNodeUp(t *testing.T, rpcAddr string) {
 
 // StopChain stops the system under test and executes all registered cleanup callbacks
 func (s *SystemUnderTest) StopChain() {
-	s.Log("Stop chain\n")
+	s.Logf("Stop chain\n")
 	if !s.ChainStarted {
 		return
 	}
 
-	for _, c := range s.cleanupFn {
+	// Pre-cleanup: unsubscribe from events while nodes are still alive
+	for _, c := range s.cleanupPreFn {
 		c()
 	}
-	s.cleanupFn = nil
-	// send SIGTERM
+	s.cleanupPreFn = nil
+
+	// send SIGTERM to all node processes
+	s.Logf("Sending SIGTERM to all nodes\n")
 	s.withEachPid(func(p *os.Process) {
-		go func() {
+		go func(p *os.Process) {
 			if err := p.Signal(syscall.SIGTERM); err != nil {
 				s.Logf("failed to stop node with pid %d: %s\n", p.Pid, err)
 			}
-		}()
+		}(p)
 	})
-	// give some final time to shut down
-	s.withEachPid(func(p *os.Process) {
-		time.Sleep(200 * time.Millisecond)
-	})
-	// goodbye
-	for ; s.anyNodeRunning(); time.Sleep(100 * time.Millisecond) {
+
+	// Wait up to 5 seconds for graceful shutdown (polling)
+	s.Logf("Waiting for nodes to stop gracefully\n")
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if !s.anyNodeRunning() {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	// Force kill any remaining nodes
+	for s.anyNodeRunning() {
 		s.withEachPid(func(p *os.Process) {
 			s.Logf("killing node %d\n", p.Pid)
 			if err := p.Kill(); err != nil {
 				s.Logf("failed to kill node with pid %d: %s\n", p.Pid, err)
 			}
 		})
+		time.Sleep(500 * time.Millisecond)
 	}
+
+	// Post-cleanup: stop log readers, close pipes, etc.
+	for _, c := range s.cleanupPostFn {
+		c()
+	}
+	s.cleanupPostFn = nil
+
 	s.ChainStarted = false
 }
 
@@ -360,22 +380,33 @@ func (s *SystemUnderTest) withEachPid(cb func(p *os.Process)) {
 
 // PrintBuffer prints the chain logs to the console
 func (s *SystemUnderTest) PrintBuffer() {
-	s.outBuff.Do(func(v interface{}) {
-		if v != nil {
-			fmt.Fprintf(s.out, "out> %s\n", v)
+	const maxLines = 100
+
+	collect := func(r *ring.Ring) []string {
+		var lines []string
+		r.Do(func(v interface{}) {
+			if v != nil {
+				lines = append(lines, v.(string))
+			}
+		})
+		if len(lines) > maxLines {
+			lines = lines[len(lines)-maxLines:]
 		}
-	})
+		return lines
+	}
+
+	for _, line := range collect(s.outBuff) {
+		fmt.Fprintf(s.out, "out> %s\n", line)
+	}
 	fmt.Fprint(s.out, "8< chain err -----------------------------------------\n")
-	s.errBuff.Do(func(v interface{}) {
-		if v != nil {
-			fmt.Fprintf(s.out, "err> %s\n", v)
-		}
-	})
+	for _, line := range collect(s.errBuff) {
+		fmt.Fprintf(s.out, "err> %s\n", line)
+	}
 }
 
 // BuildNewBinary builds and installs new executable binary
 func (s *SystemUnderTest) BuildNewBinary() {
-	s.Log("Install binaries\n")
+	s.Logf("Install binaries\n")
 	makePath := locateExecutable("make")
 	cmd := exec.Command(makePath, "clean", "install")
 	cmd.Dir = WorkDir
@@ -563,6 +594,11 @@ func (s *SystemUnderTest) ForEachNodeExecAndWait(t *testing.T, cmds ...[]string)
 
 // startNodesAsync runs the given app cli command for all cluster nodes and returns without waiting
 func (s *SystemUnderTest) startNodesAsync(t *testing.T, xargs ...string) {
+	t.Helper()
+
+	errChan := make(chan error, s.nodesCount)
+	var wg sync.WaitGroup
+
 	s.withEachNodeHome(func(i int, home string) {
 		args := append(xargs, "--home", home)
 		s.Logf("Execute `%s %s`\n", s.ExecBinary, strings.Join(args, " "))
@@ -572,7 +608,9 @@ func (s *SystemUnderTest) startNodesAsync(t *testing.T, xargs ...string) {
 		)
 		cmd.Dir = WorkDir
 		s.watchLogs(i, cmd)
-		require.NoError(t, cmd.Start(), "node %d", i)
+
+		err := cmd.Start()
+		require.NoError(t, err, "failed to start node %d", i)
 
 		pid := cmd.Process.Pid
 		s.pidsLock.Lock()
@@ -580,15 +618,36 @@ func (s *SystemUnderTest) startNodesAsync(t *testing.T, xargs ...string) {
 		s.pidsLock.Unlock()
 		s.Logf("Node started: %d\n", pid)
 
+		wg.Add(1)
 		// cleanup when stopped
-		go func(pid int) {
-			_ = cmd.Wait() // blocks until shutdown
+		go func(pid int, cmd *exec.Cmd, nodeIndex int) {
+			defer wg.Done()
+			err := cmd.Wait() // blocks until shutdown
+			if err != nil {
+				s.PrintBuffer()
+				errChan <- fmt.Errorf("node %d exited unexpectedly: %w", nodeIndex, err)
+			} else {
+				errChan <- nil
+			}
+
 			s.pidsLock.Lock()
 			delete(s.pids, pid)
 			s.pidsLock.Unlock()
 			s.Logf("Node stopped: %d\n", pid)
-		}(pid)
+		}(pid, cmd, i)
 	})
+
+	// Wait in background and close the channel when all nodes are done
+	go func() {
+		wg.Wait()
+
+		for err := range errChan {
+			if err != nil {
+				t.Errorf("%v", err)
+			}
+		}
+		close(errChan)
+	}()
 }
 
 func (s *SystemUnderTest) withEachNodeHome(cb func(i int, home string)) {
@@ -609,7 +668,8 @@ func (s *SystemUnderTest) Log(msg string) {
 }
 
 func (s *SystemUnderTest) Logf(msg string, args ...interface{}) {
-	s.Log(fmt.Sprintf(msg, args...))
+	timestamp := time.Now().Format("15:04:05.000")
+	s.Log(fmt.Sprintf("[%s] %s", timestamp, fmt.Sprintf(msg, args...)))
 }
 
 func (s *SystemUnderTest) RPCClient(t *testing.T) RPCClient {
@@ -646,7 +706,6 @@ func (s *SystemUnderTest) resetBuffers() {
 	s.errBuff = ring.New(100)
 }
 
-// AddFullnode starts a new fullnode that connects to the existing chain but is not a validator.
 // AddFullnode starts a new fullnode that connects to the existing chain but is not a validator.
 func (s *SystemUnderTest) AddFullnode(t *testing.T, beforeStart ...func(nodeNumber int, nodePath string)) Node {
 	t.Helper()
@@ -779,7 +838,14 @@ func NewEventListener(t *testing.T, rpcAddr string) *EventListener {
 	return &EventListener{client: httpClient, t: t}
 }
 
-var DefaultWaitTime = 30 * time.Second
+const (
+	DefaultEventWaitTime = 30 * time.Second
+	DefaultWSWaitTime = 2 * time.Second
+)
+
+var (
+	EventWaitTime = DefaultEventWaitTime
+)
 
 type (
 	CleanupFn     func()
@@ -794,8 +860,8 @@ func (l *EventListener) Subscribe(query string, cb EventConsumer) func() {
 	eventsChan, err := l.client.WSEvents.Subscribe(ctx, "testing", query)
 	require.NoError(l.t, err)
 	cleanup := func() {
-		ctx, _ := context.WithTimeout(ctx, DefaultWaitTime)     //nolint:govet
-		go l.client.WSEvents.Unsubscribe(ctx, "testing", query) //nolint:errcheck
+		ctx, _ := context.WithTimeout(ctx, DefaultWSWaitTime) //nolint:govet
+		_ = l.client.WSEvents.Unsubscribe(ctx, "testing", query) //nolint:errcheck
 		done()
 	}
 	go func() {
@@ -812,7 +878,7 @@ func (l *EventListener) Subscribe(query string, cb EventConsumer) func() {
 // For query syntax See https://docs.cosmos.network/master/core/events.html#subscribing-to-events
 func (l *EventListener) AwaitQuery(query string, optMaxWaitTime ...time.Duration) *ctypes.ResultEvent {
 	c, result := CaptureSingleEventConsumer()
-	maxWaitTime := DefaultWaitTime
+	maxWaitTime := EventWaitTime
 	if len(optMaxWaitTime) != 0 {
 		maxWaitTime = optMaxWaitTime[0]
 	}
@@ -874,12 +940,12 @@ func CaptureSingleEventConsumer() (EventConsumer, *ctypes.ResultEvent) {
 //
 //		assert.Len(t, done(), 1) // then verify your assumption
 func CaptureAllEventsConsumer(t *testing.T, optMaxWaitTime ...time.Duration) (c EventConsumer, done func() []ctypes.ResultEvent) {
-	maxWaitTime := DefaultWaitTime
+	maxWaitTime := EventWaitTime
 	if len(optMaxWaitTime) != 0 {
 		maxWaitTime = optMaxWaitTime[0]
 	}
 	var (
-		mu             sync.Mutex
+		mu             mtxSync.Mutex
 		capturedEvents []ctypes.ResultEvent
 		exit           bool
 	)

@@ -5,7 +5,6 @@ import (
 	"os"
 	"testing"
 
-	sdkmath "cosmossdk.io/math"
 	"github.com/LumeraProtocol/lumera/app"
 	"github.com/LumeraProtocol/lumera/tests/ibctesting"
 	"github.com/LumeraProtocol/lumera/x/claim/keeper"
@@ -64,7 +63,7 @@ func TestClaimProcess(t *testing.T) {
 		testData.Signature)
 	require.NoError(t, err)
 
-	testAmount := int64(1000000)
+	testAmount := int64(1_000_000)
 
 	testCases := []struct {
 		name          string
@@ -83,7 +82,7 @@ func TestClaimProcess(t *testing.T) {
 
 				claimRecord := types.ClaimRecord{
 					OldAddress: testData.OldAddress,
-					Balance:    sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.NewInt(testAmount))),
+					Balance:    sdk.NewCoins(sdk.NewInt64Coin(sdk.DefaultBondDenom, testAmount)),
 					Claimed:    false,
 				}
 				err = suite.app.ClaimKeeper.SetClaimRecord(suite.sdkCtx, claimRecord)
@@ -110,7 +109,7 @@ func TestClaimProcess(t *testing.T) {
 
 				claimRecord := types.ClaimRecord{
 					OldAddress: testData.OldAddress,
-					Balance:    sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.NewInt(testAmount))),
+					Balance:    sdk.NewCoins(sdk.NewInt64Coin(sdk.DefaultBondDenom, testAmount)),
 					Claimed:    true,
 					ClaimTime:  suite.sdkCtx.BlockTime().Unix(),
 				}
@@ -153,7 +152,7 @@ func TestClaimProcess(t *testing.T) {
 
 				claimRecord := types.ClaimRecord{
 					OldAddress: testData.OldAddress,
-					Balance:    sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.NewInt(testAmount))),
+					Balance:    sdk.NewCoins(sdk.NewInt64Coin(sdk.DefaultBondDenom, testAmount)),
 					Claimed:    false,
 				}
 				err = suite.app.ClaimKeeper.SetClaimRecord(suite.sdkCtx, claimRecord)
@@ -178,7 +177,7 @@ func TestClaimProcess(t *testing.T) {
 
 				claimRecord := types.ClaimRecord{
 					OldAddress: testData.OldAddress,
-					Balance:    sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.NewInt(testAmount))),
+					Balance:    sdk.NewCoins(sdk.NewInt64Coin(sdk.DefaultBondDenom, testAmount)),
 					Claimed:    false,
 				}
 				err = suite.app.ClaimKeeper.SetClaimRecord(suite.sdkCtx, claimRecord)
@@ -204,7 +203,7 @@ func TestClaimProcess(t *testing.T) {
 
 				claimRecord := types.ClaimRecord{
 					OldAddress: testData.OldAddress,
-					Balance:    sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.NewInt(testAmount))),
+					Balance:    sdk.NewCoins(sdk.NewInt64Coin(sdk.DefaultBondDenom, testAmount)),
 					Claimed:    false,
 				}
 				err = suite.app.ClaimKeeper.SetClaimRecord(suite.sdkCtx, claimRecord)
@@ -229,7 +228,7 @@ func TestClaimProcess(t *testing.T) {
 			msgServer := keeper.NewMsgServerImpl(suite.app.ClaimKeeper)
 
 			// Record initial balances for validation
-			moduleAddr := suite.app.AccountKeeper.GetModuleAddress(types.ModuleName)
+			moduleAddr := suite.app.AuthKeeper.GetModuleAddress(types.ModuleName)
 			initialModuleBalance := suite.app.BankKeeper.GetAllBalances(suite.sdkCtx, moduleAddr)
 
 			// Get destination address and its initial balance
@@ -258,7 +257,7 @@ func TestClaimProcess(t *testing.T) {
 				require.NotZero(t, record.ClaimTime)
 
 				// Verify destination account exists (should be created if it didn't exist)
-				acc := suite.app.AccountKeeper.GetAccount(suite.sdkCtx, destAddr)
+				acc := suite.app.AuthKeeper.GetAccount(suite.sdkCtx, destAddr)
 				require.NotNil(t, acc)
 
 				// Verify token balances after transfer

@@ -6,10 +6,6 @@ import (
 	"testing"
 	"time"
 
-	keeper2 "github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
-	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
 	"cosmossdk.io/log"
 	"cosmossdk.io/math"
 	"cosmossdk.io/store"
@@ -28,6 +24,10 @@ import (
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 func TestMsgServer_RegisterSupernode(t *testing.T) {
@@ -42,13 +42,13 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 
 	testCases := []struct {
 		name          string
-		msg           *types2.MsgRegisterSupernode
+		msg           *types.MsgRegisterSupernode
 		mockSetup     func(sk *supernodemocks.MockStakingKeeper, slk *supernodemocks.MockSlashingKeeper, bk *supernodemocks.MockBankKeeper)
 		expectedError error
 	}{
 		{
 			name: "successful registration (bonded validator -> skip checks)",
-			msg: &types2.MsgRegisterSupernode{
+			msg: &types.MsgRegisterSupernode{
 				SupernodeAccount: creatorAddr.String(),
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
@@ -71,7 +71,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 		},
 		{
 			name: "invalid validator address",
-			msg: &types2.MsgRegisterSupernode{
+			msg: &types.MsgRegisterSupernode{
 				SupernodeAccount: creatorAddr.String(),
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: "invalid", // not bech32 => error
@@ -82,7 +82,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 		},
 		{
 			name: "unauthorized => msg.Creator != validator operator address",
-			msg: &types2.MsgRegisterSupernode{
+			msg: &types.MsgRegisterSupernode{
 				SupernodeAccount: creatorAddr.String(),
 				Creator:          otherCreatorAddr.String(), // different from valAddr
 				ValidatorAddress: valAddr.String(),
@@ -96,7 +96,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 		},
 		{
 			name: "empty ip address => error from supernode.Validate()",
-			msg: &types2.MsgRegisterSupernode{
+			msg: &types.MsgRegisterSupernode{
 				SupernodeAccount: creatorAddr.String(),
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
@@ -113,11 +113,11 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 						Jailed:          false,
 					}, nil)
 			},
-			expectedError: types2.ErrEmptyIPAddress,
+			expectedError: types.ErrEmptyIPAddress,
 		},
 		{
 			name: "validator not found",
-			msg: &types2.MsgRegisterSupernode{
+			msg: &types.MsgRegisterSupernode{
 				SupernodeAccount: creatorAddr.String(),
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
@@ -132,7 +132,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 		},
 		{
 			name: "jailed validator => error",
-			msg: &types2.MsgRegisterSupernode{
+			msg: &types.MsgRegisterSupernode{
 				SupernodeAccount: creatorAddr.String(),
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
@@ -153,7 +153,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 		},
 		{
 			name: "validator unbonded, zero delegator shares => immediate error (no self-stake)",
-			msg: &types2.MsgRegisterSupernode{
+			msg: &types.MsgRegisterSupernode{
 				SupernodeAccount: creatorAddr.String(),
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
@@ -176,7 +176,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 		},
 		{
 			name: "validator unbonded and insufficient stake => fails eligibility check",
-			msg: &types2.MsgRegisterSupernode{
+			msg: &types.MsgRegisterSupernode{
 				SupernodeAccount: creatorAddr.String(),
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
@@ -197,7 +197,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 		},
 		{
 			name: "validator unbonded but sufficient stake => no error",
-			msg: &types2.MsgRegisterSupernode{
+			msg: &types.MsgRegisterSupernode{
 				SupernodeAccount: creatorAddr.String(),
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
@@ -248,7 +248,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 			}
 
 			k, sdkCtx := setupKeeperForTest(t, stakingKeeper, slashingKeeper, bankKeeper)
-			msgServer := keeper2.NewMsgServerImpl(k)
+			msgServer := keeper.NewMsgServerImpl(k)
 
 			// Execute
 			_, err := msgServer.RegisterSupernode(sdkCtx, tc.msg)
@@ -271,11 +271,11 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 // setupKeeperForTest is your existing function
 func setupKeeperForTest(
 	t testing.TB,
-	stakingKeeper types2.StakingKeeper,
-	slashingKeeper types2.SlashingKeeper,
-	bankKeeper types2.BankKeeper,
-) (keeper2.Keeper, sdk.Context) {
-	storeKey := storetypes.NewKVStoreKey(types2.StoreKey)
+	stakingKeeper types.StakingKeeper,
+	slashingKeeper types.SlashingKeeper,
+	bankKeeper types.BankKeeper,
+) (keeper.Keeper, sdk.Context) {
+	storeKey := storetypes.NewKVStoreKey(types.StoreKey)
 	db := dbm.NewMemDB()
 	stateStore := store.NewCommitMultiStore(db, log.NewNopLogger(), metrics.NewNoOpMetrics())
 	stateStore.MountStoreWithDB(storeKey, storetypes.StoreTypeIAVL, db)
@@ -286,7 +286,7 @@ func setupKeeperForTest(
 
 	authority := authtypes.NewModuleAddress(govtypes.ModuleName).String()
 
-	k := keeper2.NewKeeper(
+	k := keeper.NewKeeper(
 		cdc,
 		runtime.NewKVStoreService(storeKey),
 		log.NewNopLogger(),
@@ -300,7 +300,7 @@ func setupKeeperForTest(
 	sdkCtx = sdkCtx.WithBlockTime(time.Now())
 
 	// Set default params => min self-stake = 1,000,000
-	params := types2.DefaultParams()
+	params := types.DefaultParams()
 	params.MinimumStakeForSn = sdk.NewInt64Coin("ulume", 1_000_000)
 	err := k.SetParams(sdkCtx, params)
 	require.NoError(t, err)

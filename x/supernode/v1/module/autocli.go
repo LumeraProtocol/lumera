@@ -2,16 +2,15 @@ package supernode
 
 import (
 	autocliv1 "cosmossdk.io/api/cosmos/autocli/v1"
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
-	modulev1 "github.com/LumeraProtocol/lumera/api/lumera/supernode"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 // AutoCLIOptions implements the autocli.HasAutoCLIConfig interface.
 func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 	return &autocliv1.ModuleOptions{
 		Query: &autocliv1.ServiceCommandDescriptor{
-			Service: modulev1.Query_ServiceDesc.ServiceName,
+			Service: types.Query_serviceDesc.ServiceName,
 			RpcCommandOptions: []*autocliv1.RpcCommandOptions{
 				{
 					RpcMethod: "Params",
@@ -62,7 +61,7 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 			},
 		},
 		Tx: &autocliv1.ServiceCommandDescriptor{
-			Service:              modulev1.Msg_ServiceDesc.ServiceName,
+			Service:              types.Msg_serviceDesc.ServiceName,
 			EnhanceCustomCommand: true, // only required if you want to use the custom command
 			RpcCommandOptions: []*autocliv1.RpcCommandOptions{
 				{
@@ -73,11 +72,15 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					RpcMethod:      "RegisterSupernode",
 					Use:            "register-supernode [validator-address] [ip-address] [supernode-account]",
 					Short:          "Send a register-supernode tx",
-					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validatorAddress"}, {ProtoField: "ipAddress"}, {ProtoField: "supernodeAccount"}},
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{
+						{ProtoField: "validatorAddress"},
+						{ProtoField: "ipAddress"},
+						{ProtoField: "supernodeAccount"},
+					},
 					FlagOptions: map[string]*autocliv1.FlagOptions{
-						"p2p_port": {
-							Name:         "p2p-port",
-							Usage:        "Optional P2P port for supernode communication",
+	  					"p2p_port": {
+							Name:		 "p2p-port",
+							Usage:        "Optional P2P port for the supernode communication",
 							DefaultValue: types.DefaultP2PPort,
 						},
 					},

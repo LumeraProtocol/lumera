@@ -3,13 +3,15 @@ package keeper_test
 import (
 	"strings"
 
-	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
 	"github.com/LumeraProtocol/lumera/x/action/v1/types"
+	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 func (suite *MsgServerTestSuite) TestMsgFinalizeActionCascade() {
 	suite.ctx = suite.ctx.WithEventManager(sdk.NewEventManager())
+
+	suite.setupExpectationsGetAllTopSNs(1)
 
 	actionID := suite.registerCascadeAction()
 	suite.finalizeCascadeAction(actionID)
@@ -29,8 +31,10 @@ func (suite *MsgServerTestSuite) TestMsgFinalizeActionCascade() {
 func (suite *MsgServerTestSuite) TestMsgFinalizeActionSense() {
 	suite.ctx = suite.ctx.WithEventManager(sdk.NewEventManager())
 
+	suite.setupExpectationsGetAllTopSNs(1)
+
 	actionID := suite.registerSenseAction()
-	suite.finalizeSenseAction(actionID, suite.supernodes[0].SupernodeAccount, actionapi.ActionState_ACTION_STATE_DONE)
+	suite.finalizeSenseAction(actionID, suite.supernodes[0].SupernodeAccount, actiontypes.ActionStateDone)
 
 	// Verify events were emitted
 	events := suite.ctx.EventManager().Events()
@@ -54,6 +58,7 @@ func (suite *MsgServerTestSuite) TestMsgFinalizeActionSense() {
 }
 
 func (suite *MsgServerTestSuite) TestMsgFinalizeActionCascadeErrors() {
+	suite.setupExpectationsGetAllTopSNs(1)
 	actionID := suite.registerCascadeAction()
 
 	testCases := []struct {
@@ -119,7 +124,7 @@ func (suite *MsgServerTestSuite) TestMsgFinalizeActionCascadeErrors() {
 	}
 
 	for _, tc := range testCases {
-		suite.Run(tc.name, func() {
+		suite.Run(tc.name, func() {		
 			msg := suite.makeFinalizeCascadeActionMessage(tc.actionId, tc.actionType, tc.superNode, tc.badMetadata, tc.badIDsOti, tc.badIDs)
 			_, err := suite.msgServer.FinalizeAction(suite.ctx, &msg)
 			suite.Error(err)

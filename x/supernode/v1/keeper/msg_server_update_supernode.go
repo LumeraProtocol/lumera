@@ -3,14 +3,13 @@ package keeper
 import (
 	"context"
 
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
 	errorsmod "cosmossdk.io/errors"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 )
 
-func (k msgServer) UpdateSupernode(goCtx context.Context, msg *types2.MsgUpdateSupernode) (*types2.MsgUpdateSupernodeResponse, error) {
+func (k msgServer) UpdateSupernode(goCtx context.Context, msg *types.MsgUpdateSupernode) (*types.MsgUpdateSupernodeResponse, error) {
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
 	valOperAddr, err := sdk.ValAddressFromBech32(msg.ValidatorAddress)
@@ -30,7 +29,7 @@ func (k msgServer) UpdateSupernode(goCtx context.Context, msg *types2.MsgUpdateS
 	// Update fields
 	if msg.IpAddress != "" {
 		if len(supernode.PrevIpAddresses) == 0 || supernode.PrevIpAddresses[len(supernode.PrevIpAddresses)-1].Address != msg.IpAddress {
-			supernode.PrevIpAddresses = append(supernode.PrevIpAddresses, &types2.IPAddressHistory{
+			supernode.PrevIpAddresses = append(supernode.PrevIpAddresses, &types.IPAddressHistory{
 				Address: msg.IpAddress,
 				Height:  ctx.BlockHeight(),
 			})
@@ -53,11 +52,11 @@ func (k msgServer) UpdateSupernode(goCtx context.Context, msg *types2.MsgUpdateS
 	// Emit event
 	ctx.EventManager().EmitEvent(
 		sdk.NewEvent(
-			types2.EventTypeSupernodeUpdated,
-			sdk.NewAttribute(types2.AttributeKeyValidatorAddress, msg.ValidatorAddress),
-			sdk.NewAttribute(types2.AttributeKeyVersion, supernode.Version),
+			types.EventTypeSupernodeUpdated,
+			sdk.NewAttribute(types.AttributeKeyValidatorAddress, msg.ValidatorAddress),
+			sdk.NewAttribute(types.AttributeKeyVersion, supernode.Version),
 		),
 	)
 
-	return &types2.MsgUpdateSupernodeResponse{}, nil
+	return &types.MsgUpdateSupernodeResponse{}, nil
 }

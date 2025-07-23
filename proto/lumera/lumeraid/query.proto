@@ -1,13 +1,12 @@
 syntax = "proto3";
-
 package lumera.lumeraid;
+
+option go_package = "x/lumeraid/types";
 
 import "amino/amino.proto";
 import "gogoproto/gogo.proto";
 import "google/api/annotations.proto";
 import "lumera/lumeraid/params.proto";
-
-option go_package = "github.com/LumeraProtocol/lumera/x/lumeraid/types";
 
 // Query defines the gRPC querier service.
 service Query {

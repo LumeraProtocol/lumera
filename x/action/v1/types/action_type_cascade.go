@@ -3,8 +3,6 @@ package types
 import (
 	"encoding/json"
 	"fmt"
-
-	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
 	"github.com/LumeraProtocol/lumera/x/action/v1/common"
 )
 
@@ -18,12 +16,12 @@ func init() {
 	)
 }
 
-func (v *CascadeValidator) ActionType() actionapi.ActionType {
-	return actionapi.ActionType_ACTION_TYPE_CASCADE
+func (v *CascadeValidator) ActionType() ActionType {
+	return ActionTypeCascade
 }
 
 func (v *CascadeValidator) ValidateBasic(metadataStr string, msgType common.MessageType) error {
-	var metadata actionapi.CascadeMetadata
+	var metadata CascadeMetadata
 	if err := json.Unmarshal([]byte(metadataStr), &metadata); err != nil {
 		return fmt.Errorf("failed to unmarshal cascade metadata: %w", err)
 	}

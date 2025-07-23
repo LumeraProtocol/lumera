@@ -25,6 +25,7 @@ memory-bank
 projectBrief.md
 
 tests/systemtests/testnet
+tests/systemtests/__debug_bin*
 devnet/docker-compose.start.yml
 devnet/start.sh
 

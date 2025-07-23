@@ -1,13 +1,12 @@
-// x/supernode/v1/types/super_node_test.go
+// x/supernode/types/super_node_test.go
 package types_test
 
 import (
 	"testing"
 
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -17,28 +16,28 @@ func TestSuperNodeValidation(t *testing.T) {
 
 	testCases := []struct {
 		name        string
-		supernode   types2.SuperNode
+		supernode   types.SuperNode
 		expectError bool
 		errorType   error
 	}{
 		{
 			name: "valid supernode",
-			supernode: types2.SuperNode{
+			supernode: types.SuperNode{
 				ValidatorAddress: valAddr.String(),
 				SupernodeAccount: accAddr.String(),
-				Evidence:         []*types2.Evidence{},
+				Evidence:         []*types.Evidence{},
 				Version:          "1.0.0",
-				Metrics: &types2.MetricsAggregate{
+				Metrics: &types.MetricsAggregate{
 					Metrics:     make(map[string]float64),
 					ReportCount: 0,
 				},
-				States: []*types2.SuperNodeStateRecord{
+				States: []*types.SuperNodeStateRecord{
 					{
-						State:  types2.SuperNodeStateActive,
+						State:  types.SuperNodeStateActive,
 						Height: 1,
 					},
 				},
-				PrevIpAddresses: []*types2.IPAddressHistory{
+				PrevIpAddresses: []*types.IPAddressHistory{
 					{
 						Address: "192.168.1.1",
 						Height:  1,
@@ -50,7 +49,7 @@ func TestSuperNodeValidation(t *testing.T) {
 		},
 		{
 			name: "invalid validator address",
-			supernode: types2.SuperNode{
+			supernode: types.SuperNode{
 				SupernodeAccount: accAddr.String(),
 				ValidatorAddress: "invalid",
 				Version:          "1.0.0",
@@ -59,69 +58,70 @@ func TestSuperNodeValidation(t *testing.T) {
 		},
 		{
 			name: "empty ip address",
-			supernode: types2.SuperNode{
+			supernode: types.SuperNode{
 				ValidatorAddress: valAddr.String(),
 				SupernodeAccount: accAddr.String(),
 				Version:          "1.0.0",
-				States: []*types2.SuperNodeStateRecord{
+				States: []*types.SuperNodeStateRecord{
 					{
-						State:  types2.SuperNodeStateActive,
+						State:  types.SuperNodeStateActive,
 						Height: 1,
 					},
 				},
 			},
 			expectError: true,
-			errorType:   types2.ErrEmptyIPAddress,
+			errorType:   types.ErrEmptyIPAddress,
 		},
 		{
 			name: "unspecified state",
-			supernode: types2.SuperNode{
+			supernode: types.SuperNode{
 				SupernodeAccount: accAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				Version:          "1.0.0",
 			},
 			expectError: true,
-			errorType:   types2.ErrInvalidSuperNodeState,
+			errorType:   types.ErrInvalidSuperNodeState,
 		},
 		{
 			name: "empty version",
-			supernode: types2.SuperNode{
+			supernode: types.SuperNode{
 				SupernodeAccount: accAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				Version:          "",
-				States: []*types2.SuperNodeStateRecord{
+				States: []*types.SuperNodeStateRecord{
 					{
-						State:  types2.SuperNodeStateActive,
+						State:  types.SuperNodeStateActive,
 						Height: 1,
 					},
 				},
-				PrevIpAddresses: []*types2.IPAddressHistory{
+				PrevIpAddresses: []*types.IPAddressHistory{
 					{
 						Address: "192.168.1.1",
 						Height:  1,
 					},
 				},
+
 			},
 			expectError: false,
 		},
 		{
 			name: "empty p2p-address",
-			supernode: types2.SuperNode{
+			supernode: types.SuperNode{
 				ValidatorAddress: valAddr.String(),
 				SupernodeAccount: accAddr.String(),
-				Evidence:         []*types2.Evidence{},
+				Evidence:         []*types.Evidence{},
 				Version:          "1.0.0",
-				Metrics: &types2.MetricsAggregate{
+				Metrics: &types.MetricsAggregate{
 					Metrics:     make(map[string]float64),
 					ReportCount: 0,
 				},
-				States: []*types2.SuperNodeStateRecord{
+				States: []*types.SuperNodeStateRecord{
 					{
-						State:  types2.SuperNodeStateActive,
+						State:  types.SuperNodeStateActive,
 						Height: 1,
 					},
 				},
-				PrevIpAddresses: []*types2.IPAddressHistory{
+				PrevIpAddresses: []*types.IPAddressHistory{
 					{
 						Address: "192.168.1.1",
 						Height:  1,

@@ -6,13 +6,14 @@ import (
 	"time"
 
 	"cosmossdk.io/log"
-	"cosmossdk.io/math"
 	"cosmossdk.io/store"
 	"cosmossdk.io/store/metrics"
+	"cosmossdk.io/core/address"
 	storetypes "cosmossdk.io/store/types"
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	dbm "github.com/cosmos/cosmos-db"
 	"github.com/cosmos/cosmos-sdk/codec"
+	addresscodec "github.com/cosmos/cosmos-sdk/codec/address"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	"github.com/cosmos/cosmos-sdk/runtime"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -79,13 +80,19 @@ func (k *MockBankKeeper) SendCoinsFromModuleToAccount(ctx context.Context, sende
 type MockAccountKeeper struct {
 	accounts       map[string]sdk.AccountI
 	moduleAccounts map[string]sdk.ModuleAccountI
+	addrCodec      address.Codec
 }
 
 func NewMockAccountKeeper() *MockAccountKeeper {
 	return &MockAccountKeeper{
 		accounts:       make(map[string]sdk.AccountI),
 		moduleAccounts: make(map[string]sdk.ModuleAccountI),
+		addrCodec:      addresscodec.NewBech32Codec("lumera"),
 	}
+}
+
+func (k *MockAccountKeeper) AddressCodec() address.Codec {
+	return k.addrCodec
 }
 
 func (k *MockAccountKeeper) GetAccount(ctx context.Context, addr sdk.AccAddress) sdk.AccountI {
@@ -107,10 +114,12 @@ func (k *MockAccountKeeper) GetModuleAccount(ctx context.Context, moduleName str
 func (k *MockAccountKeeper) SetModuleAccount(ctx context.Context, macc sdk.ModuleAccountI) {
 	k.moduleAccounts[macc.GetName()] = macc
 }
+
 func (k *MockBankKeeper) GetBalance(ctx context.Context, addr sdk.AccAddress, denom string) sdk.Coin {
 	// Empty mock implementation
-	return sdk.NewCoin(denom, math.NewInt(0))
+	return sdk.NewInt64Coin(denom, 0)
 }
+
 func (k *MockAccountKeeper) NewAccountWithAddress(ctx context.Context, addr sdk.AccAddress) sdk.AccountI {
 	return authtypes.NewBaseAccountWithAddress(addr)
 }
@@ -119,7 +128,7 @@ func (k *MockBankKeeper) SendCoinsFromAccountToModule(ctx context.Context, sende
 	return nil
 }
 
-func ClaimKeeper(t testing.TB) (keeper.Keeper, sdk.Context) {
+func ClaimKeeper(t testing.TB, claimsPath string) (keeper.Keeper, sdk.Context) {
 	storeKey := storetypes.NewKVStoreKey(types.StoreKey)
 	tstoreKey := storetypes.NewTransientStoreKey("t_" + types.StoreKey)
 
@@ -151,6 +160,7 @@ func ClaimKeeper(t testing.TB) (keeper.Keeper, sdk.Context) {
 		authority.String(),
 		bk,
 		ak,
+		claimsPath, // Path to the claims CSV file for testing
 	)
 
 	ctx := sdk.NewContext(stateStore, cmtproto.Header{

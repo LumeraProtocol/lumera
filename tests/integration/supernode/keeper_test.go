@@ -5,11 +5,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
 	sdkmath "cosmossdk.io/math"
-	"github.com/LumeraProtocol/lumera/app"
+
 	"github.com/cosmos/cosmos-sdk/runtime"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
@@ -17,13 +14,20 @@ import (
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/LumeraProtocol/lumera/app"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 type KeeperIntegrationSuite struct {
 	suite.Suite
+
 	app       *app.App
 	ctx       sdk.Context
 	keeper    keeper.Keeper
+	queryServer sntypes.QueryServer
 	authority sdk.AccAddress
 	validator sdk.ValAddress
 }
@@ -36,7 +40,7 @@ func (suite *KeeperIntegrationSuite) SetupSuite() {
 	suite.ctx = suite.app.BaseApp.NewContext(true)
 
 	suite.authority = authtypes.NewModuleAddress(govtypes.ModuleName)
-	storeService := runtime.NewKVStoreService(suite.app.GetKey(types2.StoreKey))
+	storeService := runtime.NewKVStoreService(suite.app.GetKey(sntypes.StoreKey))
 
 	k := keeper.NewKeeper(
 		suite.app.AppCodec(),
@@ -48,6 +52,7 @@ func (suite *KeeperIntegrationSuite) SetupSuite() {
 		suite.app.SlashingKeeper,
 	)
 	suite.keeper = k
+	suite.queryServer = keeper.NewQueryServerImpl(k)
 }
 
 // TearDownSuite cleans up after the test suite
@@ -66,12 +71,12 @@ func (suite *KeeperIntegrationSuite) TestEnableSuperNode() {
 		{
 			name: "when supernode state is successfully enabled, it should be active",
 			setup: func() {
-				supernode := types2.SuperNode{
+				supernode := sntypes.SuperNode{
 					ValidatorAddress: sdk.ValAddress([]byte("validator1e")).String(),
 					SupernodeAccount: sdk.AccAddress([]byte("validator1e")).String(),
 					Version:          "1.0.0",
-					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
-					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					States:           []*sntypes.SuperNodeStateRecord{{State: sntypes.SuperNodeStateActive}},
+					PrevIpAddresses:  []*sntypes.IPAddressHistory{{Address: "192.168.1.1"}},
 					P2PPort:          "26657",
 				}
 				err := suite.keeper.SetSuperNode(suite.ctx, supernode)
@@ -85,7 +90,7 @@ func (suite *KeeperIntegrationSuite) TestEnableSuperNode() {
 				if !found {
 					return fmt.Errorf("SuperNode not found")
 				}
-				if result.States[len(result.States)-1].State != types2.SuperNodeStateActive {
+				if result.States[len(result.States)-1].State != sntypes.SuperNodeStateActive {
 					return fmt.Errorf("expected SuperNode to be active")
 				}
 				return nil
@@ -121,12 +126,12 @@ func (suite *KeeperIntegrationSuite) TestIsSupernodeActive() {
 		{
 			name: "when supernode is in active state, should return true",
 			setup: func() {
-				supernode := types2.SuperNode{
+				supernode := sntypes.SuperNode{
 					ValidatorAddress: sdk.ValAddress([]byte("validator1a")).String(),
 					SupernodeAccount: sdk.AccAddress([]byte("validator1a")).String(),
 					Version:          "1.0.0",
-					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
-					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					States:           []*sntypes.SuperNodeStateRecord{{State: sntypes.SuperNodeStateActive}},
+					PrevIpAddresses:  []*sntypes.IPAddressHistory{{Address: "192.168.1.1"}},
 					P2PPort:          "26657",
 				}
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
@@ -170,12 +175,12 @@ func (suite *KeeperIntegrationSuite) TestDisableSuperNode() {
 		{
 			name: "when supernode is successfully disabled, it should be disabled",
 			setup: func() {
-				supernode := types2.SuperNode{
+				supernode := types.SuperNode{
 					ValidatorAddress: sdk.ValAddress([]byte("validator1d")).String(),
 					SupernodeAccount: sdk.AccAddress([]byte("validator1d")).String(),
 					Version:          "1.0.0",
-					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
-					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					States:           []*sntypes.SuperNodeStateRecord{{State: sntypes.SuperNodeStateActive}},
+					PrevIpAddresses:  []*sntypes.IPAddressHistory{{Address: "192.168.1.1"}},
 					P2PPort:          "26657",
 				}
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
@@ -188,7 +193,7 @@ func (suite *KeeperIntegrationSuite) TestDisableSuperNode() {
 				if !found {
 					return fmt.Errorf("SuperNode not found")
 				}
-				if result.States[len(result.States)-1].State != types2.SuperNodeStateDisabled {
+				if result.States[len(result.States)-1].State != sntypes.SuperNodeStateDisabled {
 					return fmt.Errorf("expected SuperNode to be disabled")
 				}
 				return nil
@@ -214,6 +219,7 @@ func (suite *KeeperIntegrationSuite) TestDisableSuperNode() {
 }
 
 func (suite *KeeperIntegrationSuite) TestMeetSupernodeRequirements() {
+    minimumStakePrice := sdk.NewInt64Coin("stake", 1_000_000)
 	tests := []struct {
 		name          string
 		setup         func()
@@ -224,8 +230,8 @@ func (suite *KeeperIntegrationSuite) TestMeetSupernodeRequirements() {
 		{
 			name: "when supernode meets requirements, it should return true",
 			setup: func() {
-				params := types2.Params{
-					MinimumStakeForSn: sdk.NewCoin("stake", sdkmath.NewInt(1000000)),
+				params := sntypes.Params{
+					MinimumStakeForSn: minimumStakePrice,
 				}
 				suite.keeper.SetParams(suite.ctx, params)
 
@@ -257,8 +263,8 @@ func (suite *KeeperIntegrationSuite) TestMeetSupernodeRequirements() {
 		{
 			name: "when the stake is below minimum, should return false",
 			setup: func() {
-				params := types2.Params{
-					MinimumStakeForSn: sdk.NewCoin("stake", sdkmath.NewInt(1000000)),
+				params := sntypes.Params{
+					MinimumStakeForSn: minimumStakePrice,
 				}
 				suite.keeper.SetParams(suite.ctx, params)
 
@@ -297,12 +303,12 @@ func (suite *KeeperIntegrationSuite) TestMeetSupernodeRequirements() {
 }
 
 func (suite *KeeperIntegrationSuite) TestSetSuperNodeAndQuerySupernode() {
-	supernode := types2.SuperNode{
+	supernode := sntypes.SuperNode{
 		ValidatorAddress: sdk.ValAddress([]byte("validator1")).String(),
 		SupernodeAccount: sdk.AccAddress([]byte("validator1")).String(),
 		Version:          "1.0.0",
-		States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
-		PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+		States:           []*sntypes.SuperNodeStateRecord{{State: sntypes.SuperNodeStateActive}},
+		PrevIpAddresses:  []*sntypes.IPAddressHistory{{Address: "192.168.1.1"}},
 		P2PPort:          "26657",
 	}
 
@@ -310,15 +316,15 @@ func (suite *KeeperIntegrationSuite) TestSetSuperNodeAndQuerySupernode() {
 
 	result, found := suite.keeper.QuerySuperNode(suite.ctx, sdk.ValAddress("validator1"))
 	require.True(suite.T(), found, "SuperNode should exist after being set")
-	require.Equal(suite.T(), types2.SuperNodeStateActive, result.States[len(result.States)-1].State, "SuperNode state should match")
+	require.Equal(suite.T(), sntypes.SuperNodeStateActive, result.States[len(result.States)-1].State, "SuperNode state should match")
 }
 
 func (suite *KeeperIntegrationSuite) TestGetSuperNodeBySuperNodeAddress() {
 	tests := []struct {
 		name          string
 		setup         func()
-		execute       func() (*types2.QueryGetSuperNodeBySuperNodeAddressResponse, error)
-		validate      func(response *types2.QueryGetSuperNodeBySuperNodeAddressResponse) error
+		execute       func() (*sntypes.QueryGetSuperNodeBySuperNodeAddressResponse, error)
+		validate      func(response *sntypes.QueryGetSuperNodeBySuperNodeAddressResponse) error
 		expectSuccess bool
 	}{
 		{
@@ -326,23 +332,24 @@ func (suite *KeeperIntegrationSuite) TestGetSuperNodeBySuperNodeAddress() {
 			setup: func() {
 				suite.validator = sdk.ValAddress([]byte("validator1f"))
 				suite.authority = sdk.AccAddress(suite.validator)
-				supernode := types2.SuperNode{
+				supernode := sntypes.SuperNode{
 					SupernodeAccount: suite.authority.String(),
 					ValidatorAddress: suite.validator.String(),
 					Version:          "1.0.0",
-					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
-					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					States:           []*sntypes.SuperNodeStateRecord{{State: sntypes.SuperNodeStateActive}},
+					PrevIpAddresses:  []*sntypes.IPAddressHistory{{Address: "192.168.1.1"}},
 					P2PPort:          "26657",
 				}
 				require.NoError(suite.T(), suite.keeper.SetSuperNode(suite.ctx, supernode))
 			},
-			execute: func() (*types2.QueryGetSuperNodeBySuperNodeAddressResponse, error) {
-				req := &types2.QueryGetSuperNodeBySuperNodeAddressRequest{
+			execute: func() (*types.QueryGetSuperNodeBySuperNodeAddressResponse, error) {
+				req := &types.QueryGetSuperNodeBySuperNodeAddressRequest{
 					SupernodeAddress: suite.authority.String(),
 				}
-				return suite.keeper.GetSuperNodeBySuperNodeAddress(suite.ctx, req)
+				// Call the query method to get the supernode by address
+				return suite.queryServer.GetSuperNodeBySuperNodeAddress(suite.ctx, req)
 			},
-			validate: func(response *types2.QueryGetSuperNodeBySuperNodeAddressResponse) error {
+			validate: func(response *sntypes.QueryGetSuperNodeBySuperNodeAddressResponse) error {
 				if response.Supernode == nil {
 					return fmt.Errorf("supernode should not be nil")
 				}
@@ -358,13 +365,13 @@ func (suite *KeeperIntegrationSuite) TestGetSuperNodeBySuperNodeAddress() {
 			setup: func() {
 				// No setup needed, as no supernode will be added for this test.
 			},
-			execute: func() (*types2.QueryGetSuperNodeBySuperNodeAddressResponse, error) {
-				req := &types2.QueryGetSuperNodeBySuperNodeAddressRequest{
+			execute: func() (*sntypes.QueryGetSuperNodeBySuperNodeAddressResponse, error) {
+				req := &sntypes.QueryGetSuperNodeBySuperNodeAddressRequest{
 					SupernodeAddress: "nonexistent-supernode",
 				}
-				return suite.keeper.GetSuperNodeBySuperNodeAddress(suite.ctx, req)
+				return suite.queryServer.GetSuperNodeBySuperNodeAddress(suite.ctx, req)
 			},
-			validate: func(response *types2.QueryGetSuperNodeBySuperNodeAddressResponse) error {
+			validate: func(response *sntypes.QueryGetSuperNodeBySuperNodeAddressResponse) error {
 				if response != nil {
 					return fmt.Errorf("expected nil response, got: %v", response)
 				}

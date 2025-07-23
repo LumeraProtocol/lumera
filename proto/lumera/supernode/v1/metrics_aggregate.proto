@@ -1,0 +1,13 @@
+syntax = "proto3";
+package lumera.supernode.v1;
+
+option go_package = "x/supernode/v1/types";
+
+import "google/protobuf/timestamp.proto";
+import "gogoproto/gogo.proto";
+
+message MetricsAggregate {
+  map<string, double> metrics = 1;
+  uint64 report_count = 2;
+  int64 height = 3; 
+}

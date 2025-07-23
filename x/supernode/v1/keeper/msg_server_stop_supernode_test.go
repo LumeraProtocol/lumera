@@ -3,10 +3,9 @@ package keeper_test
 import (
 	"testing"
 
-	keeper2 "github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
 	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/golang/mock/gomock"
@@ -20,11 +19,11 @@ func TestMsgServer_StopSupernode(t *testing.T) {
 	otherValAddr := sdk.ValAddress([]byte("other-validator"))
 	otherCreatorAddr := sdk.AccAddress(otherValAddr)
 
-	existingSupernode := types2.SuperNode{
+	existingSupernode := types.SuperNode{
 		SupernodeAccount: otherCreatorAddr.String(),
 		ValidatorAddress: valAddr.String(),
 		Version:          "1.0.0",
-		PrevIpAddresses: []*types2.IPAddressHistory{
+		PrevIpAddresses: []*types.IPAddressHistory{
 			{
 				Address: "192.145.1.1",
 			},
@@ -34,23 +33,23 @@ func TestMsgServer_StopSupernode(t *testing.T) {
 
 	testCases := []struct {
 		name          string
-		msg           *types2.MsgStopSupernode
+		msg           *types.MsgStopSupernode
 		setupMock     func(sk *supernodemocks.MockStakingKeeper, slk *supernodemocks.MockSlashingKeeper, bk *supernodemocks.MockBankKeeper)
-		setupState    func(k keeper2.Keeper, ctx sdk.Context)
+		setupState    func(k keeper.Keeper, ctx sdk.Context)
 		expectedError error
-		checkResult   func(t *testing.T, k keeper2.Keeper, ctx sdk.Context)
+		checkResult   func(t *testing.T, k keeper.Keeper, ctx sdk.Context)
 	}{
 		{
 			name: "successful stop",
-			msg: &types2.MsgStopSupernode{
+			msg: &types.MsgStopSupernode{
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				Reason:           "maintenance",
 			},
-			setupState: func(k keeper2.Keeper, ctx sdk.Context) {
-				existingSupernode.States = []*types2.SuperNodeStateRecord{
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
+				existingSupernode.States = []*types.SuperNodeStateRecord{
 					{
-						State:  types2.SuperNodeStateActive,
+						State:  types.SuperNodeStateActive,
 						Height: 1,
 					},
 				}
@@ -58,14 +57,14 @@ func TestMsgServer_StopSupernode(t *testing.T) {
 
 			},
 			expectedError: nil,
-			checkResult: func(t *testing.T, k keeper2.Keeper, ctx sdk.Context) {
+			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context) {
 				_, found := k.QuerySuperNode(ctx, valAddr)
 				require.True(t, found)
 			},
 		},
 		{
 			name: "invalid validator address",
-			msg: &types2.MsgStopSupernode{
+			msg: &types.MsgStopSupernode{
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: "invalid",
 				Reason:           "maintenance",
@@ -74,7 +73,7 @@ func TestMsgServer_StopSupernode(t *testing.T) {
 		},
 		{
 			name: "supernode not found",
-			msg: &types2.MsgStopSupernode{
+			msg: &types.MsgStopSupernode{
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				Reason:           "node down",
@@ -83,31 +82,31 @@ func TestMsgServer_StopSupernode(t *testing.T) {
 		},
 		{
 			name: "unauthorized",
-			msg: &types2.MsgStopSupernode{
+			msg: &types.MsgStopSupernode{
 				Creator:          otherCreatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				Reason:           "other reason",
 			},
-			setupState: func(k keeper2.Keeper, ctx sdk.Context) {
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
 				require.NoError(t, k.SetSuperNode(ctx, existingSupernode))
 			},
 			expectedError: sdkerrors.ErrUnauthorized,
 		},
 		{
 			name: "supernode already stopped",
-			msg: &types2.MsgStopSupernode{
+			msg: &types.MsgStopSupernode{
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				Reason:           "maintenance",
 			},
-			setupState: func(k keeper2.Keeper, ctx sdk.Context) {
-				existingSupernode.States = []*types2.SuperNodeStateRecord{
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
+				existingSupernode.States = []*types.SuperNodeStateRecord{
 					{
-						State:  types2.SuperNodeStateActive,
+						State:  types.SuperNodeStateActive,
 						Height: 1,
 					},
 					{
-						State:  types2.SuperNodeStateStopped,
+						State:  types.SuperNodeStateStopped,
 						Height: 2,
 					},
 				}
@@ -115,26 +114,26 @@ func TestMsgServer_StopSupernode(t *testing.T) {
 
 			},
 			expectedError: sdkerrors.ErrInvalidRequest,
-			checkResult: func(t *testing.T, k keeper2.Keeper, ctx sdk.Context) {
+			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context) {
 				_, found := k.QuerySuperNode(ctx, valAddr)
 				require.True(t, found)
 			},
 		},
 		{
 			name: "supernode disabled",
-			msg: &types2.MsgStopSupernode{
+			msg: &types.MsgStopSupernode{
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				Reason:           "maintenance",
 			},
-			setupState: func(k keeper2.Keeper, ctx sdk.Context) {
-				existingSupernode.States = []*types2.SuperNodeStateRecord{
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
+				existingSupernode.States = []*types.SuperNodeStateRecord{
 					{
-						State:  types2.SuperNodeStateActive,
+						State:  types.SuperNodeStateActive,
 						Height: 1,
 					},
 					{
-						State:  types2.SuperNodeStateDisabled,
+						State:  types.SuperNodeStateDisabled,
 						Height: 2,
 					},
 				}
@@ -142,7 +141,7 @@ func TestMsgServer_StopSupernode(t *testing.T) {
 
 			},
 			expectedError: sdkerrors.ErrInvalidRequest,
-			checkResult: func(t *testing.T, k keeper2.Keeper, ctx sdk.Context) {
+			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context) {
 				_, found := k.QuerySuperNode(ctx, valAddr)
 				require.True(t, found)
 			},
@@ -168,7 +167,7 @@ func TestMsgServer_StopSupernode(t *testing.T) {
 				tc.setupState(k, ctx)
 			}
 
-			msgServer := keeper2.NewMsgServerImpl(k)
+			msgServer := keeper.NewMsgServerImpl(k)
 			_, err := msgServer.StopSupernode(ctx, tc.msg)
 
 			if tc.expectedError != nil {

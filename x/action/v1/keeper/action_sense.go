@@ -1,20 +1,19 @@
 package keeper
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
+	"bytes"
 
 	"github.com/LumeraProtocol/lumera/x/action/v1/common"
-	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
-	"google.golang.org/protobuf/encoding/protojson"
 
 	"cosmossdk.io/errors"
-	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
+	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
-	"google.golang.org/protobuf/proto"
+	gogoproto "github.com/gogo/protobuf/proto"
+	"github.com/cosmos/gogoproto/jsonpb"
 )
 
 // SenseActionHandler implements the ActionHandler interface for Sense actions
@@ -30,12 +29,14 @@ func NewSenseActionHandler(k *Keeper) *SenseActionHandler {
 }
 
 // Process handles any necessary transformations for SenseMetadata
-func (h SenseActionHandler) Process(metadataBytes []byte, msgType common.MessageType, params *types2.Params) ([]byte, error) {
-	var metadata actionapi.SenseMetadata
-	if err := protojson.Unmarshal(metadataBytes, &metadata); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal sense metadata: %w", err)
+func (h SenseActionHandler) Process(metadataBytes []byte, msgType common.MessageType, params *actiontypes.Params) ([]byte, error) {
+	var metadata actiontypes.SenseMetadata
+	// Unmarshal JSON to SenseMetadata struct
+	unmarshaller := &jsonpb.Unmarshaler{}
+	if err := unmarshaller.Unmarshal(strings.NewReader(string(metadataBytes)), &metadata); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal sense metadata from JSON: %w", err)
 	}
-
+	
 	// Validate fields based on message type
 	switch msgType {
 	case common.MsgRequestAction:
@@ -61,88 +62,99 @@ func (h SenseActionHandler) Process(metadataBytes []byte, msgType common.Message
 	}
 
 	// Convert to protobuf binary format for more efficient storage
-	return proto.Marshal(&metadata)
+	return gogoproto.Marshal(&metadata)
 }
 
 // GetProtoMessageType returns the reflect.Type for SenseMetadata
 func (h SenseActionHandler) GetProtoMessageType() reflect.Type {
-	return reflect.TypeOf(actionapi.SenseMetadata{})
+	return reflect.TypeOf(actiontypes.SenseMetadata{})
 }
 
 // ConvertJSONToProtobuf converts JSON metadata to protobuf binary format
 func (h SenseActionHandler) ConvertJSONToProtobuf(jsonData []byte) ([]byte, error) {
-	var metadata actionapi.SenseMetadata
-	if err := protojson.Unmarshal(jsonData, &metadata); err != nil {
+	var metadata actiontypes.SenseMetadata
+	// Unmarshal JSON to SenseMetadata struct
+	unmarshaller := &jsonpb.Unmarshaler{}
+	if err := unmarshaller.Unmarshal(strings.NewReader(string(jsonData)), &metadata); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal sense metadata from JSON: %w", err)
 	}
 
 	// Marshal to protobuf binary format
-	return proto.Marshal(&metadata)
+	return gogoproto.Marshal(&metadata)
 }
 
 // ConvertProtobufToJSON converts protobuf binary metadata to JSON format
 func (h SenseActionHandler) ConvertProtobufToJSON(protobufData []byte) ([]byte, error) {
-	var metadata actionapi.SenseMetadata
-	if err := proto.Unmarshal(protobufData, &metadata); err != nil {
+	var metadata actiontypes.SenseMetadata
+	if err := gogoproto.Unmarshal(protobufData, &metadata); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal sense metadata from protobuf: %w", err)
 	}
 
-	return json.Marshal(&metadata)
+	// Marshal to JSON format
+	marshaler := &jsonpb.Marshaler{
+		EmitDefaults: true,
+		EnumsAsInts: true,
+	}
+	var buf bytes.Buffer
+	if err := marshaler.Marshal(&buf, &metadata); err != nil {
+		return nil, fmt.Errorf("failed to marshal cascade metadata to JSON: %w", err)
+	}
+	return buf.Bytes(), nil
 }
 
 // RegisterAction handles action-specific validation and processing during action registration
-func (h SenseActionHandler) RegisterAction(_ sdk.Context, action *actionapi.Action) error {
+func (h SenseActionHandler) RegisterAction(_ sdk.Context, action *actiontypes.Action) error {
 	if action.Metadata == nil {
-		return errors.Wrap(types2.ErrInvalidMetadata, "metadata is required for cascade actions")
+		return errors.Wrap(actiontypes.ErrInvalidMetadata, "metadata is required for cascade actions")
 	}
 	// There is nothing else to do for Sense actions during registration
-	//var newSenseMeta actionapi.SenseMetadata
+	//var newSenseMeta actiontypes.SenseMetadata
 	//if err := proto.Unmarshal(action.Metadata, &newSenseMeta); err != nil {
-	//	return errors.Wrap(types.ErrInvalidMetadata, fmt.Sprintf("failed to unmarshal sense metadata: %v", err))
+	//	return errors.Wrap(actiontypes.ErrInvalidMetadata, fmt.Sprintf("failed to unmarshal sense metadata: %v", err))
 	//}
 
 	return nil
 }
 
 // FinalizeAction validates finalization data for Sense actions
-// Returns the recommended action state or ActionState_ACTION_STATE_UNSPECIFIED if no change
-func (h SenseActionHandler) FinalizeAction(ctx sdk.Context, action *actionapi.Action, superNodeAccount string, metadataBytes []byte) (actionapi.ActionState, error) {
+// Returns the recommended action state or ActionStateUnspecified if no change
+func (h SenseActionHandler) FinalizeAction(ctx sdk.Context, action *actiontypes.Action, superNodeAccount string, metadataBytes []byte) (actiontypes.ActionState, error) {
 	h.keeper.Logger().Info("Validating Sense action finalization",
 		"action_id", action.ActionID,
 		"supernode", superNodeAccount,
 		"current_state", action.State.String(),
 		"previous supernodes_count", len(action.SuperNodes))
 
-	if action.GetState() == actionapi.ActionState_ACTION_STATE_PENDING {
-		action.State = actionapi.ActionState_ACTION_STATE_PROCESSING
+	if action.GetState() == actiontypes.ActionStatePending {
+		action.State = actiontypes.ActionStateProcessing
 	}
 
 	// Verify Registration Metadata exists
-	var existingSenseMeta actionapi.SenseMetadata
+	var existingSenseMeta actiontypes.SenseMetadata
 	if len(action.Metadata) > 0 {
-		if err := proto.Unmarshal(action.Metadata, &existingSenseMeta); err != nil {
-			return actionapi.ActionState_ACTION_STATE_UNSPECIFIED,
+		if err := gogoproto.Unmarshal(action.Metadata, &existingSenseMeta); err != nil {
+			return actiontypes.ActionStateUnspecified,
 				errors.Wrap(sdkerrors.ErrInvalidRequest, fmt.Sprintf("failed to unmarshal existing sense metadata: %v", err))
 		}
 	}
 	if existingSenseMeta.DataHash == "" {
-		return actionapi.ActionState_ACTION_STATE_UNSPECIFIED,
-			errors.Wrap(types2.ErrInvalidMetadata, "data_hash is required in existing metadata")
+		return actiontypes.ActionStateUnspecified,
+			errors.Wrap(actiontypes.ErrInvalidMetadata, "data_hash is required in existing metadata")
 	}
 	if existingSenseMeta.DdAndFingerprintsIc == 0 {
-		return actionapi.ActionState_ACTION_STATE_UNSPECIFIED,
-			errors.Wrap(types2.ErrInvalidMetadata, "dd_and_fingerprints_ic is required in existing metadata")
+		return actiontypes.ActionStateUnspecified,
+			errors.Wrap(actiontypes.ErrInvalidMetadata, "dd_and_fingerprints_ic is required in existing metadata")
 	}
 	if existingSenseMeta.DdAndFingerprintsMax == 0 {
-		return actionapi.ActionState_ACTION_STATE_UNSPECIFIED,
-			errors.Wrap(types2.ErrInvalidMetadata, "dd_and_fingerprints_max is required in existing metadata")
+		return actiontypes.ActionStateUnspecified,
+			errors.Wrap(actiontypes.ErrInvalidMetadata, "dd_and_fingerprints_max is required in existing metadata")
 	}
 
 	// Parse the incoming metadata
-	var newSenseMeta actionapi.SenseMetadata
-	if err := proto.Unmarshal(metadataBytes, &newSenseMeta); err != nil {
-		return actionapi.ActionState_ACTION_STATE_UNSPECIFIED,
-			errors.Wrap(types2.ErrInvalidMetadata, fmt.Sprintf("failed to unmarshal sense metadata: %v", err))
+	var newSenseMeta actiontypes.SenseMetadata
+	if err := gogoproto.Unmarshal(metadataBytes, &newSenseMeta); err != nil {
+		return actiontypes.ActionStateUnspecified,
+			errors.Wrap(actiontypes.ErrInvalidMetadata, fmt.Sprintf("failed to unmarshal sense metadata: %v", err))
 	}
 
 	// 1. Verify supernode signature is included in the signatures list
@@ -154,8 +166,8 @@ func (h SenseActionHandler) FinalizeAction(ctx sdk.Context, action *actionapi.Ac
 	// Where `creators_signature` is the signature of the creator over `Base64(dd_and_fp__ids)`
 	signatureParts := strings.Split(newSenseMeta.Signatures, ".")
 	if len(signatureParts) != 4 {
-		return actionapi.ActionState_ACTION_STATE_UNSPECIFIED,
-			errors.Wrap(types2.ErrInvalidMetadata, "invalid signature format")
+		return actiontypes.ActionStateUnspecified,
+			errors.Wrap(actiontypes.ErrInvalidMetadata, "invalid signature format")
 	}
 
 	// Use VerifySignature from crypto.go to validate the signature in either
@@ -172,7 +184,7 @@ func (h SenseActionHandler) FinalizeAction(ctx sdk.Context, action *actionapi.Ac
 		}
 	}
 	if verifyErr != nil {
-		return actionapi.ActionState_ACTION_STATE_UNSPECIFIED, verifyErr
+		return actiontypes.ActionStateUnspecified, verifyErr
 	}
 
 	// 2. Verify DdAndFingerprintsIds size
@@ -180,15 +192,15 @@ func (h SenseActionHandler) FinalizeAction(ctx sdk.Context, action *actionapi.Ac
 		newSenseMeta.Signatures,
 		existingSenseMeta.DdAndFingerprintsIc,
 		existingSenseMeta.DdAndFingerprintsMax); err != nil {
-		return actionapi.ActionState_ACTION_STATE_UNSPECIFIED,
-			errors.Wrap(types2.ErrInvalidMetadata, fmt.Sprintf("failed to verify dd_and_pf_ids: %v", err))
+		return actiontypes.ActionStateUnspecified,
+			errors.Wrap(actiontypes.ErrInvalidMetadata, fmt.Sprintf("failed to verify dd_and_pf_ids: %v", err))
 	}
 
 	existingSenseMeta.Signatures = newSenseMeta.Signatures
-	updatedMetadataBytes, err := proto.Marshal(&existingSenseMeta)
+	updatedMetadataBytes, err := gogoproto.Marshal(&existingSenseMeta)
 	if err != nil {
-		return actionapi.ActionState_ACTION_STATE_UNSPECIFIED,
-			errors.Wrap(types2.ErrInvalidMetadata, fmt.Sprintf("failed to marshal updated sense metadata: %v", err))
+		return actiontypes.ActionStateUnspecified,
+			errors.Wrap(actiontypes.ErrInvalidMetadata, fmt.Sprintf("failed to marshal updated sense metadata: %v", err))
 	}
 
 	action.Metadata = updatedMetadataBytes
@@ -196,11 +208,11 @@ func (h SenseActionHandler) FinalizeAction(ctx sdk.Context, action *actionapi.Ac
 		"action_id", action.ActionID,
 		"supernode", superNodeAccount)
 
-	return actionapi.ActionState_ACTION_STATE_DONE, nil
+	return actiontypes.ActionStateDone, nil
 }
 
 // ValidateApproval validates approval data for Sense actions
-func (h SenseActionHandler) ValidateApproval(ctx sdk.Context, action *actionapi.Action) error {
+func (h SenseActionHandler) ValidateApproval(ctx sdk.Context, action *actiontypes.Action) error {
 	// Empty implementation - will be filled in later
 	return nil
 }

@@ -10,23 +10,27 @@ import (
 	"testing"
 	"time"
 
-	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
-	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	"github.com/cosmos/btcutil/base58"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	"lukechampine.com/blake3"
-
-	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
 	"github.com/stretchr/testify/require"
+	"github.com/golang/mock/gomock"
+
+	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
+	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
+	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 )
 
 const separatorByte = byte('.')
 
 func TestVerifySignature(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	key, address := cryptotestutils.KeyAndAddress()
 	pubKey := key.PubKey()
 	pairs := []keepertest.AccountPair{{Address: address, PubKey: pubKey}}
-	k, ctx := keepertest.ActionKeeperWithAddress(t, pairs)
+	k, ctx := keepertest.ActionKeeperWithAddress(t, ctrl, pairs)
 
 	data := "test_data"
 	validSignature, err := cryptotestutils.SignString(key, data)

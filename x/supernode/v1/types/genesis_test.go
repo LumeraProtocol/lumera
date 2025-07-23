@@ -3,21 +3,20 @@ package types_test
 import (
 	"testing"
 
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"github.com/stretchr/testify/require"
 )
 
 func TestGenesisState_Validate(t *testing.T) {
 	tests := []struct {
 		desc     string
-		genState *types2.GenesisState
+		genState *types.GenesisState
 		valid    bool
 	}{
 		{
-			desc: "valid genesis state",
-			genState: &types2.GenesisState{
-				Params: types2.DefaultParams(), // Use default params
+			desc:     "valid genesis state",
+			genState: &types.GenesisState{
+				Params: types.DefaultParams(), // Use default params
 			},
 			valid: true,
 		},

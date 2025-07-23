@@ -82,12 +82,10 @@ func (k Keeper) GetAllSuperNodes(ctx sdk.Context, stateFilters ...types.SuperNod
 		}
 
 		// skip if no states at all
-		// skip if no states at all
 		if len(sn.States) == 0 {
 			continue
 		}
 
-		// if we're not filtering or the current state is in the filter list, add it
 		// if we're not filtering or the current state is in the filter list, add it
 		if !filtering || stateIn(sn.States[len(sn.States)-1].State, stateFilters...) {
 			supernodes = append(supernodes, sn)

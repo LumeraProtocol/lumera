@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strconv"
 	"testing"
+	"errors"
 
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
@@ -24,10 +25,17 @@ func GetSuperNodeResponse(t *testing.T, cli *LumeradCli, validatorAddr string) *
 		t.Fatal(err)
 	}
 
-	supernodeData := rawResponse["supernode"].(map[string]interface{})
+	supernodeData, ok := rawResponse["supernode"].(map[string]interface{})
+	if !ok {
+		t.Fatal(errors.New("couldn't find 'supernode' in get-super-node response data"))
+	}
 
 	// Convert state enum and height in states
-	states := supernodeData["states"].([]interface{})
+	states, ok := supernodeData["states"].([]interface{})
+	if !ok {
+		t.Fatal(errors.New("couldn't find 'supernode/states' in get-super-node response data"))
+	}
+
 	for _, state := range states {
 		stateMap := state.(map[string]interface{})
 		// Convert state enum

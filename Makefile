@@ -192,6 +192,14 @@ build/lumerad: $(PROTO_SRC) $(GO_SRC) go.mod go.sum
 	@mkdir -p build
 	ignite chain build --output build/
 
+build-debug: build-debug/lumerad
+
+build-debug/lumerad: $(PROTO_SRC) $(GO_SRC) go.mod go.sum
+	@echo "Building lumerad debug binary..."
+	@mkdir -p build
+	ignite chain build --debug -v --output build/
+
+
 ### Testing
 unit-tests:
 	@echo "Running unit tests in x/..."

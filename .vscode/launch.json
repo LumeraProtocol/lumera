@@ -83,6 +83,24 @@
       ],
       "cwd": "${workspaceFolder}",
       "preLaunchTask": "Ignite Debug Build"
-    }
+    },
+    {
+      "name": "Attach to lumerad process",
+      "type": "go",
+      "request": "attach",
+      "mode": "local",
+      "processId": "${command:pickProcess}",
+      "showLog": true
+    },
+    {
+      "name": "Attach to Delve",
+      "type": "go",
+      "request": "attach",
+      "mode": "remote",
+      "port": 40000,
+      "host": "127.0.0.1",
+      "apiVersion": 2,
+      "trace": "verbose"
+    }        
     ]
   }

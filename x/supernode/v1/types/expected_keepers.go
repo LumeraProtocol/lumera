@@ -7,6 +7,7 @@ import (
 	"context"
 	"time"
 
+	"cosmossdk.io/log"
 	math "cosmossdk.io/math"
 	sdkmath "cosmossdk.io/math"
 	"cosmossdk.io/core/address"
@@ -25,6 +26,7 @@ type SupernodeKeeper interface {
 	SetParams(ctx sdk.Context, params Params) error
 	CheckValidatorSupernodeEligibility(ctx sdk.Context, validator stakingtypes.ValidatorI, valAddr string) error
 
+	Logger() log.Logger
 	GetAuthority() string
 	GetStakingKeeper() StakingKeeper
 	GetParams(ctx sdk.Context) (params Params)

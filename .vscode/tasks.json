@@ -55,6 +55,22 @@
 				"showReuseMessage": true,
 				"clear": false
 			},
-		}
+		},
+    {
+      "label": "Copy lumerad to ~/go/bin",
+      "type": "shell",
+      "command": "cp",
+      "args": [
+        "-f",  // force overwrite
+        "${workspaceFolder}/build/lumerad",
+        "${env:HOME}/go/bin/lumerad"
+      ],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    }
   ]
 }

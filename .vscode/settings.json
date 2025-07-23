@@ -8,15 +8,10 @@
     "go.toolsEnvVars": {
         "PATH": "/usr/local/go/bin:${env:HOME}/go/bin:${env:PATH}",
     },
+    "go.delveConfig": {
+        "showGlobalVariables": true,
+    },
     "terminal.integrated.env.linux": {
         "PATH": "/usr/local/go/bin:${env:HOME}/go/bin:${env:PATH}"
     },
-    "protoc": {
-        "path": "protoc",
-        "compile_on_save": false,
-        "options": [
-            "--proto_path=${workspaceFolder}/proto",
-            "--proto_path=${env:HOME}/.cache/buf/v1"
-        ]
-    }
 }

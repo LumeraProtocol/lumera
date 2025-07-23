@@ -13,6 +13,7 @@ import (
 	time "time"
 
 	address "cosmossdk.io/core/address"
+	log "cosmossdk.io/log"
 	math "cosmossdk.io/math"
 	types "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	types0 "github.com/cosmos/cosmos-sdk/types"
@@ -210,6 +211,20 @@ func (m *MockSupernodeKeeper) IsSuperNodeActive(ctx types0.Context, valAddr type
 func (mr *MockSupernodeKeeperMockRecorder) IsSuperNodeActive(ctx, valAddr interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsSuperNodeActive", reflect.TypeOf((*MockSupernodeKeeper)(nil).IsSuperNodeActive), ctx, valAddr)
+}
+
+// Logger mocks base method.
+func (m *MockSupernodeKeeper) Logger() log.Logger {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Logger")
+	ret0, _ := ret[0].(log.Logger)
+	return ret0
+}
+
+// Logger indicates an expected call of Logger.
+func (mr *MockSupernodeKeeperMockRecorder) Logger() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Logger", reflect.TypeOf((*MockSupernodeKeeper)(nil).Logger))
 }
 
 // QuerySuperNode mocks base method.

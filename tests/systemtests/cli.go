@@ -207,9 +207,11 @@ func (c LumeradCli) run(args []string) (output string, ok bool) {
 	return c.runWithInput(args, nil)
 }
 
+
 func (c LumeradCli) runWithInput(args []string, input io.Reader) (output string, ok bool) {
 	if c.Debug {
-		c.t.Logf("+++ running `%s %s`", c.execBinary, strings.Join(args, " "))
+		timestamp := time.Now().Format("15:04:05.000")
+		c.t.Logf("[%s] +++ running `%s %s` at ", timestamp, c.execBinary, strings.Join(args, " "))
 	}
 	gotOut, gotErr := func() (out []byte, err error) {
 		defer func() {
@@ -217,6 +219,7 @@ func (c LumeradCli) runWithInput(args []string, input io.Reader) (output string,
 				err = fmt.Errorf("recovered from panic: %v", r)
 			}
 		}()
+
 		cmd := exec.Command(locateExecutable(c.execBinary), args...) //nolint:gosec
 		cmd.Dir = WorkDir
 		cmd.Stdin = input

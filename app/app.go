@@ -91,6 +91,7 @@ import (
 	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
 
 	upgrade_v1_6_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_6_1"
+	upgrade_v1_6_2 "github.com/LumeraProtocol/lumera/app/upgrades/v1_6_2"
 )
 
 const (
@@ -344,6 +345,7 @@ func (app *App) setupUpgradeStoreLoaders() {
 	// Map of upgrade names to their corresponding StoreUpgrades
 	var storeUpgradesMap = map[string]*storetypes.StoreUpgrades{
 		upgrade_v1_6_1.UpgradeName: &upgrade_v1_6_1.StoreUpgrades,
+		upgrade_v1_6_2.UpgradeName: &upgrade_v1_6_2.StoreUpgrades,
 	}
 
 	// Check for the planned upgrades
@@ -361,6 +363,16 @@ func (app *App) setupUpgradeHandlers() {
 	app.UpgradeKeeper.SetUpgradeHandler(
 		upgrade_v1_6_1.UpgradeName,
 		upgrade_v1_6_1.CreateUpgradeHandler(
+			app.Logger(),
+			app.ModuleManager,  // Pass ModuleManager
+			app.Configurator(), // Pass Configurator
+		),
+	)
+
+	// Register the v1_6_2 upgrade handler
+	app.UpgradeKeeper.SetUpgradeHandler(
+		upgrade_v1_6_2.UpgradeName,
+		upgrade_v1_6_2.CreateUpgradeHandler(
 			app.Logger(),
 			app.ModuleManager,  // Pass ModuleManager
 			app.Configurator(), // Pass Configurator

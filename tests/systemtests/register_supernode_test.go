@@ -44,13 +44,13 @@ func TestSupernodeRegistrationSuccess(t *testing.T) {
 			minimumStake: "100000000", // Set high minimum stake that exceeds self-delegation
 			additionalSetupFn: func(t *testing.T, cli *LumeradCli, valAddr string, supernodeAccount string) {
 				// Fund the supernode account
-				cli.FundAddress(supernodeAccount, "200000000ulume")
+				cli.FundAddress(supernodeAccount, "200000000stake")
 
 				// Delegate from supernode account to validator to meet the minimum stake requirement
 				delegateCmd := []string{
 					"tx", "staking", "delegate",
 					valAddr,          // validator address
-					"150000000ulume", // delegation amount (more than minimum - self delegation)
+					"150000000stake", // delegation amount (more than minimum - self delegation)
 					"--from", "supernode_account",
 				}
 				resp := cli.CustomCommand(delegateCmd...)
@@ -88,7 +88,7 @@ func TestSupernodeRegistrationSuccess(t *testing.T) {
 			// 1. Set minimum supernode stake in genesis
 			sut.ModifyGenesisJSON(t, func(genesis []byte) []byte {
 				// Update the supernode module params to set minimum stake as a Coin
-				coinJSON := `{"denom":"ulume","amount":"` + minimumStake + `"}`
+				coinJSON := `{"denom":"stake","amount":"` + minimumStake + `"}`
 				state, err := sjson.SetRawBytes(genesis, "app_state.supernode.params.minimum_stake_for_sn", []byte(coinJSON))
 				require.NoError(t, err)
 				return state
@@ -214,13 +214,13 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 				supernodeAccount := cli.GetKeyAddr("supernode_insufficient")
 
 				// Fund the supernode account with insufficient amount
-				cli.FundAddress(supernodeAccount, "10000000ulume")
+				cli.FundAddress(supernodeAccount, "10000000stake")
 
 				// Delegate from supernode account to validator, but not enough to meet the minimum stake
 				delegateCmd := []string{
 					"tx", "staking", "delegate",
 					valAddr,        // validator address
-					"5000000ulume", // delegation amount (not enough to meet minimum with self-delegation)
+					"5000000stake", // delegation amount (not enough to meet minimum with self-delegation)
 					"--from", "supernode_insufficient",
 				}
 				resp := cli.CustomCommand(delegateCmd...)
@@ -244,7 +244,7 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 
 			sut.ModifyGenesisJSON(t, func(genesis []byte) []byte {
 				// Create proper Coin JSON structure
-				coinJSON := `{"denom":"ulume","amount":"` + tc.minimumStake + `"}`
+				coinJSON := `{"denom":"stake","amount":"` + tc.minimumStake + `"}`
 				state, err := sjson.SetRawBytes(genesis, "app_state.supernode.params.minimum_stake_for_sn", []byte(coinJSON))
 				require.NoError(t, err)
 
@@ -274,11 +274,18 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 
 			// Attempt to register supernode
 			t.Log("Attempting to register supernode")
+			var supernodeAccount string
+			if tc.name == "insufficient_self_stake_and_insufficient_supernode_delegation" {
+				// Use the supernode_insufficient account for this test case
+				supernodeAccount = cli.GetKeyAddr("supernode_insufficient")
+			} else {
+				supernodeAccount = accountAddr
+			}
 			registerResp := cli.CustomCommand(
 				"tx", "supernode", "register-supernode",
-				valAddr,       // validator address
-				"192.168.1.1", // IP address
-				accountAddr,   // supernode account
+				valAddr,          // validator address
+				"192.168.1.1",    // IP address
+				supernodeAccount, // supernode account
 				"--from", keyName,
 			)
 			t.Logf("Registration response: %s", registerResp)

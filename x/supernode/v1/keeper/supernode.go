@@ -230,8 +230,11 @@ func (k Keeper) IsSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress) bool 
 	return supernode.States[len(supernode.States)-1].State == types2.SuperNodeStateActive
 }
 
-// CheckValidatorSupernodeEligibility ensures the validator has enough self-stake.
-func (k Keeper) CheckValidatorSupernodeEligibility(ctx sdk.Context, validator stakingtypes.ValidatorI, valAddr string) error {
+// CheckValidatorSupernodeEligibility ensures the validator has enough stake from either self-delegation
+// or delegation from the supernode account.
+// If supernodeAccount is provided, it will check for delegation from that account.
+// If supernodeAccount is nil, it will try to find the supernode in the state and check for delegation from its account.
+func (k Keeper) CheckValidatorSupernodeEligibility(ctx sdk.Context, validator stakingtypes.ValidatorI, valAddr string, supernodeAccount string) error {
 
 	// 1. Get chain's configured minimum self-stake
 	minStake := k.GetParams(ctx).MinimumStakeForSn
@@ -269,14 +272,54 @@ func (k Keeper) CheckValidatorSupernodeEligibility(ctx sdk.Context, validator st
 	// 6. Convert decimal -> integer
 	selfDelegatedTokensInt := selfDelegatedTokens.TruncateInt()
 
-	// 7. Compare two Ints: selfDelegatedTokensInt vs. minStakeInt
-	if selfDelegatedTokensInt.LT(minStakeInt.Amount) {
+	// 7. Check if there's a supernode account with delegation to this validator
+	// Initialize to zero
+	supernodeDelegatedTokensInt := sdkmath.ZeroInt()
+	
+	// If supernodeAccount is provided, use it directly
+	if supernodeAccount != "" {
+		// Get the supernode account address
+		supernodeAccAddr, err := sdk.AccAddressFromBech32(supernodeAccount)
+		if err == nil {
+			// Check if there's a delegation from the supernode account to this validator
+			supernodeDelegation, err := k.stakingKeeper.Delegation(ctx, supernodeAccAddr, valOperatorAddr)
+			if err == nil && supernodeDelegation != nil {
+				// Convert the supernode delegation shares to tokens
+				supernodeDelegatedTokens := validator.TokensFromShares(supernodeDelegation.GetShares())
+				supernodeDelegatedTokensInt = supernodeDelegatedTokens.TruncateInt()
+			}
+		}
+	} else {
+		// If supernodeAccount is not provided, try to find the supernode in the state
+		supernode, found := k.QuerySuperNode(ctx, valOperatorAddr)
+		if found && supernode.SupernodeAccount != "" {
+			// Get the supernode account address
+			supernodeAccAddr, err := sdk.AccAddressFromBech32(supernode.SupernodeAccount)
+			if err == nil {
+				// Check if there's a delegation from the supernode account to this validator
+				supernodeDelegation, err := k.stakingKeeper.Delegation(ctx, supernodeAccAddr, valOperatorAddr)
+				if err == nil && supernodeDelegation != nil {
+					// Convert the supernode delegation shares to tokens
+					supernodeDelegatedTokens := validator.TokensFromShares(supernodeDelegation.GetShares())
+					supernodeDelegatedTokensInt = supernodeDelegatedTokens.TruncateInt()
+				}
+			}
+		}
+	}
+
+	// 8. Add self-delegation and supernode delegation
+	totalDelegatedTokensInt := selfDelegatedTokensInt.Add(supernodeDelegatedTokensInt)
+
+	// 9. Compare total delegation to minimum stake requirement
+	if totalDelegatedTokensInt.LT(minStakeInt.Amount) {
 		return errorsmod.Wrapf(
 			sdkerrors.ErrInvalidRequest,
-			"validator %s does not meet minimum self stake requirement. Required: %s, got: %s",
+			"validator %s does not meet minimum stake requirement. Required: %s, got: %s (self: %s, supernode: %s)",
 			valAddr,
 			minStake.Amount.String(),
+			totalDelegatedTokensInt.String(),
 			selfDelegatedTokensInt.String(),
+			supernodeDelegatedTokensInt.String(),
 		)
 	}
 
@@ -295,7 +338,7 @@ func (k Keeper) IsEligibleAndNotJailedValidator(ctx sdk.Context, valAddr sdk.Val
 		return false
 	}
 
-	err = k.CheckValidatorSupernodeEligibility(ctx, validator, valAddr.String())
+	err = k.CheckValidatorSupernodeEligibility(ctx, validator, valAddr.String(), "")
 	return err == nil
 }
 

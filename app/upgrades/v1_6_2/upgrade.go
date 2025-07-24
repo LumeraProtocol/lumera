@@ -1,10 +1,9 @@
-package v1_6_1
+package v1_6_2
 
 import (
 	"context"
-	"fmt"
 	storetypes "cosmossdk.io/store/types"
-	"github.com/LumeraProtocol/lumera/x/action/v1/types"
+	"fmt"
 
 	"cosmossdk.io/log"
 	upgradetypes "cosmossdk.io/x/upgrade/types"
@@ -12,9 +11,9 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/module"
 )
 
-const UpgradeName = "v1.6.1"
+const UpgradeName = "v1.6.2"
 
-// CreateUpgradeHandler creates an upgrade handler for v1_6_1
+// CreateUpgradeHandler creates an upgrade handler for v1_6_2
 func CreateUpgradeHandler(
 	logger log.Logger,
 	mm *module.Manager,
@@ -35,8 +34,7 @@ func CreateUpgradeHandler(
 		}
 		logger.Info("Module migrations completed.")
 
-		// 3. Add the New Module to the Version Map
-		newVM[types.ModuleName] = types.ConsensusVersion
+		// No new modules to add to the version map for v1.6.2
 
 		logger.Info(fmt.Sprintf("Successfully completed upgrade %s", UpgradeName))
 

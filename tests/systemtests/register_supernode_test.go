@@ -16,26 +16,71 @@ import (
 
 func TestSupernodeRegistrationSuccess(t *testing.T) {
 	testCases := []struct {
-		name    string
-		setupFn func(t *testing.T, cli *LumeradCli) string
+		name                 string
+		setupFn              func(t *testing.T, cli *LumeradCli) string
+		minimumStake         string
+		additionalSetupFn    func(t *testing.T, cli *LumeradCli, valAddr string, supernodeAccount string)
+		additionalValidateFn func(t *testing.T, cli *LumeradCli, valAddr string, supernodeAccount string, accountAddr string)
 	}{
 		{
 			name: "register_with_validator_account",
 			setupFn: func(t *testing.T, cli *LumeradCli) string {
 				return cli.GetKeyAddr("node0") // return validator account
 			},
+			minimumStake: "1000000",
 		},
 		{
 			name: "register_with_new_account",
 			setupFn: func(t *testing.T, cli *LumeradCli) string {
 				return cli.AddKey("supernode_account") // create and return new account
 			},
+			minimumStake: "1000000",
+		},
+		{
+			name: "register_with_insufficient_self_delegation_but_sufficient_supernode_delegation",
+			setupFn: func(t *testing.T, cli *LumeradCli) string {
+				return cli.AddKey("supernode_account") // create and return new account
+			},
+			minimumStake: "100000000", // Set high minimum stake that exceeds self-delegation
+			additionalSetupFn: func(t *testing.T, cli *LumeradCli, valAddr string, supernodeAccount string) {
+				// Fund the supernode account
+				cli.FundAddress(supernodeAccount, "200000000ulume")
+
+				// Delegate from supernode account to validator to meet the minimum stake requirement
+				delegateCmd := []string{
+					"tx", "staking", "delegate",
+					valAddr,          // validator address
+					"150000000ulume", // delegation amount (more than minimum - self delegation)
+					"--from", "supernode_account",
+				}
+				resp := cli.CustomCommand(delegateCmd...)
+				RequireTxSuccess(t, resp)
+
+				// Wait for delegation to be processed
+				sut.AwaitNextBlock(t)
+			},
+			additionalValidateFn: func(t *testing.T, cli *LumeradCli, valAddr string, supernodeAccount string, accountAddr string) {
+				// Check supernode delegation
+				supernodeDelegation := cli.CustomQuery("query", "staking", "delegation", supernodeAccount, valAddr)
+				t.Logf("Supernode delegation: %s", supernodeDelegation)
+
+				// Parse and verify delegation amount
+				delegationAmountStr := gjson.Get(supernodeDelegation, "delegation_response.balance.amount").String()
+				delegationAmount, err := strconv.ParseInt(delegationAmountStr, 10, 64)
+				require.NoError(t, err, "Failed to parse supernode delegation amount")
+
+				// Verify that supernode delegation exists and has tokens
+				require.Greater(t, delegationAmount, int64(0), "Supernode delegation amount should be greater than 0")
+			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			const minimumStake = "1000000"
+			minimumStake := tc.minimumStake
+			if minimumStake == "" {
+				minimumStake = "1000000"
+			}
 
 			// Initialize and reset chain
 			sut.ResetChain(t)
@@ -71,17 +116,18 @@ func TestSupernodeRegistrationSuccess(t *testing.T) {
 			initialDelegation := cli.CustomQuery("query", "staking", "delegation", accountAddr, valAddr)
 			t.Logf("Initial self-delegation: %s", initialDelegation)
 
-			// Parse and verify delegation amount is greater than minimum stake
+			// Parse and verify delegation amount
 			delegationAmountStr := gjson.Get(initialDelegation, "delegation_response.balance.amount").String()
-			delegationAmount, err := strconv.ParseInt(delegationAmountStr, 10, 64)
+			_, err := strconv.ParseInt(delegationAmountStr, 10, 64)
 			require.NoError(t, err, "Failed to parse delegation amount")
 
-			minStakeRequired, err := strconv.ParseInt(minimumStake, 10, 64)
+			_, err = strconv.ParseInt(minimumStake, 10, 64)
 			require.NoError(t, err, "Failed to parse minimum stake")
 
-			require.Greater(t, delegationAmount, minStakeRequired,
-				"Self-delegation amount (%d) must be greater than minimum stake requirement (%d)",
-				delegationAmount, minStakeRequired)
+			// Run additional setup if provided
+			if tc.additionalSetupFn != nil {
+				tc.additionalSetupFn(t, cli, valAddr, supernodeAccount)
+			}
 
 			// Register supernode
 			registerCmd := []string{
@@ -105,16 +151,22 @@ func TestSupernodeRegistrationSuccess(t *testing.T) {
 			require.Equal(t, supernodeAccount, supernode.SupernodeAccount)
 			require.NotEmpty(t, supernode.States)
 			require.Equal(t, types.SuperNodeStateActive, supernode.States[0].State)
+
+			// Run additional validation if provided
+			if tc.additionalValidateFn != nil {
+				tc.additionalValidateFn(t, cli, valAddr, supernodeAccount, accountAddr)
+			}
 		})
 	}
 }
 
 func TestSupernodeRegistrationFailures(t *testing.T) {
 	testCases := []struct {
-		name          string
-		minimumStake  string
-		setupFn       func(t *testing.T, cli *LumeradCli) (string, string, string) // returns (valAddr, accountAddr, keyName)
-		expectedError string
+		name              string
+		minimumStake      string
+		setupFn           func(t *testing.T, cli *LumeradCli) (string, string, string) // returns (valAddr, accountAddr, keyName)
+		expectedError     string
+		additionalSetupFn func(t *testing.T, cli *LumeradCli, valAddr string, accountAddr string, keyName string)
 	}{
 		{
 			name:         "insufficient_self_stake",
@@ -124,7 +176,7 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 				accountAddr := cli.GetKeyAddr("node0")
 				return valAddr, accountAddr, "node0"
 			},
-			expectedError: "does not meet minimum self stake requirement",
+			expectedError: "does not meet minimum stake requirement",
 		},
 		{
 			name:         "non_validator_registration",
@@ -143,6 +195,41 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 				return nonValAddr, accountAddr, keyName
 			},
 			expectedError: "validator does not exist",
+		},
+		{
+			name:         "insufficient_self_stake_and_insufficient_supernode_delegation",
+			minimumStake: "100000000", // Set high minimum stake requirement
+			setupFn: func(t *testing.T, cli *LumeradCli) (string, string, string) {
+				valAddr := strings.TrimSpace(cli.Keys("keys", "show", "node0", "--bech", "val", "-a"))
+				accountAddr := cli.GetKeyAddr("node0")
+
+				// Create a supernode account
+				supernodeKeyName := "supernode_insufficient"
+				cli.AddKey(supernodeKeyName)
+
+				return valAddr, accountAddr, "node0"
+			},
+			additionalSetupFn: func(t *testing.T, cli *LumeradCli, valAddr string, accountAddr string, keyName string) {
+				// Get supernode account address
+				supernodeAccount := cli.GetKeyAddr("supernode_insufficient")
+
+				// Fund the supernode account with insufficient amount
+				cli.FundAddress(supernodeAccount, "10000000ulume")
+
+				// Delegate from supernode account to validator, but not enough to meet the minimum stake
+				delegateCmd := []string{
+					"tx", "staking", "delegate",
+					valAddr,        // validator address
+					"5000000ulume", // delegation amount (not enough to meet minimum with self-delegation)
+					"--from", "supernode_insufficient",
+				}
+				resp := cli.CustomCommand(delegateCmd...)
+				RequireTxSuccess(t, resp)
+
+				// Wait for delegation to be processed
+				sut.AwaitNextBlock(t)
+			},
+			expectedError: "does not meet minimum stake requirement",
 		},
 	}
 
@@ -179,6 +266,11 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 			t.Logf("Using validator address: %s", valAddr)
 			t.Logf("Using account address: %s", accountAddr)
 			t.Logf("Using key name: %s", keyName)
+
+			// Run additional setup if provided
+			if tc.additionalSetupFn != nil {
+				tc.additionalSetupFn(t, cli, valAddr, accountAddr, keyName)
+			}
 
 			// Attempt to register supernode
 			t.Log("Attempting to register supernode")

@@ -139,123 +139,6 @@ func TestSupernodeRegistrationSuccess(t *testing.T) {
 			},
 		},
 		{
-			name: "register_with_delayed_vesting_supernode_account",
-			setupFn: func(t *testing.T, cli *LumeradCli) string {
-				// Create delayed vesting account for validator operator
-				return createDelayedVestingAccount(t, cli, "vesting_validator", "150000000", 12)
-			},
-			minimumStake: "100000000",
-			additionalSetupFn: func(t *testing.T, cli *LumeradCli, valAddr string, supernodeAccount string) {
-				// Delegate from the vesting account to the validator
-				delegateCmd := []string{
-					"tx", "staking", "delegate",
-					valAddr,          // validator address
-					"120000000stake", // delegation amount
-					"--from", "vesting_validator",
-				}
-				resp := cli.CustomCommand(delegateCmd...)
-				RequireTxSuccess(t, resp)
-				sut.AwaitNextBlock(t)
-			},
-			additionalValidateFn: func(t *testing.T, cli *LumeradCli, valAddr string, supernodeAccount string, accountAddr string) {
-				// Verify the supernode account is a delayed vesting account
-				verifyVestingAccountType(t, cli, supernodeAccount, "/cosmos.vesting.v1beta1.DelayedVestingAccount")
-
-				// Verify delegation exists from the vesting account
-				delegation := cli.CustomQuery("query", "staking", "delegation", supernodeAccount, valAddr)
-				delegationAmount := gjson.Get(delegation, "delegation_response.balance.amount").String()
-				require.NotEmpty(t, delegationAmount, "Delegation should exist")
-
-				// Parse and verify the delegation amount meets minimum requirement
-				delegationAmountInt, err := strconv.ParseInt(delegationAmount, 10, 64)
-				require.NoError(t, err, "Failed to parse delegation amount")
-				require.GreaterOrEqual(t, delegationAmountInt, int64(100000000), "Delegation should meet minimum requirement")
-			},
-		},
-		{
-			name: "register_with_permanently_locked_supernode_account",
-			setupFn: func(t *testing.T, cli *LumeradCli) string {
-				// Create permanently locked account for validator operator
-				return createPermanentlyLockedAccount(t, cli, "locked_validator", "200000000")
-			},
-			minimumStake: "100000000",
-			additionalSetupFn: func(t *testing.T, cli *LumeradCli, valAddr string, supernodeAccount string) {
-				// Delegate from the permanently locked account to the validator
-				delegateCmd := []string{
-					"tx", "staking", "delegate",
-					valAddr,          // validator address
-					"150000000stake", // delegation amount
-					"--from", "locked_validator",
-				}
-				resp := cli.CustomCommand(delegateCmd...)
-				RequireTxSuccess(t, resp)
-				sut.AwaitNextBlock(t)
-			},
-			additionalValidateFn: func(t *testing.T, cli *LumeradCli, valAddr string, supernodeAccount string, accountAddr string) {
-				// Verify the account is a permanently locked vesting account
-				verifyVestingAccountType(t, cli, supernodeAccount, "/cosmos.vesting.v1beta1.PermanentLockedAccount")
-
-				// Verify delegation exists and is sufficient
-				delegation := cli.CustomQuery("query", "staking", "delegation", supernodeAccount, valAddr)
-				delegationAmountStr := gjson.Get(delegation, "delegation_response.balance.amount").String()
-				delegationAmount, err := strconv.ParseInt(delegationAmountStr, 10, 64)
-				require.NoError(t, err, "Failed to parse delegation amount")
-				require.GreaterOrEqual(t, delegationAmount, int64(100000000), "Delegation should meet minimum requirement")
-			},
-		},
-		{
-			name: "register_with_mixed_self_and_supernode_delegations",
-			setupFn: func(t *testing.T, cli *LumeradCli) string {
-				// Create delayed vesting account for supernode registration
-				return createDelayedVestingAccount(t, cli, "mixed_supernode", "100000000", 3)
-			},
-			minimumStake: "150000000", // Neither self nor SN delegation alone will meet this
-			additionalSetupFn: func(t *testing.T, cli *LumeradCli, valAddr string, supernodeAccount string) {
-				// Fund validator operator account (node0) for additional self-delegation
-				validatorAddr := cli.GetKeyAddr("node0")
-				cli.FundAddress(validatorAddr, "100000000stake")
-
-				// Add self-delegation from validator operator account
-				delegateCmd1 := []string{
-					"tx", "staking", "delegate",
-					valAddr,         // validator address
-					"70000000stake", // partial amount - self delegation
-					"--from", "node0",
-				}
-				resp1 := cli.CustomCommand(delegateCmd1...)
-				RequireTxSuccess(t, resp1)
-
-				// Delegate from supernode vesting account
-				delegateCmd2 := []string{
-					"tx", "staking", "delegate",
-					valAddr,         // validator address
-					"90000000stake", // partial amount - together should exceed minimum
-					"--from", "mixed_supernode",
-				}
-				resp2 := cli.CustomCommand(delegateCmd2...)
-				RequireTxSuccess(t, resp2)
-				sut.AwaitNextBlock(t)
-			},
-			additionalValidateFn: func(t *testing.T, cli *LumeradCli, valAddr string, supernodeAccount string, accountAddr string) {
-				// Verify supernode account is vesting account
-				verifyVestingAccountType(t, cli, supernodeAccount, "/cosmos.vesting.v1beta1.DelayedVestingAccount")
-
-				// Verify self-delegation from validator operator account
-				selfDelegation := cli.CustomQuery("query", "staking", "delegation", accountAddr, valAddr)
-				selfAmount, _ := strconv.ParseInt(gjson.Get(selfDelegation, "delegation_response.balance.amount").String(), 10, 64)
-
-				// Verify supernode delegation
-				supernodeDelegation := cli.CustomQuery("query", "staking", "delegation", supernodeAccount, valAddr)
-				supernodeAmount, _ := strconv.ParseInt(gjson.Get(supernodeDelegation, "delegation_response.balance.amount").String(), 10, 64)
-
-				// Verify combined delegations meet the requirement
-				totalDelegation := selfAmount + supernodeAmount
-				require.GreaterOrEqual(t, totalDelegation, int64(150000000), "Combined self and supernode delegations should meet minimum requirement")
-				require.Greater(t, selfAmount, int64(0), "Self delegation should be greater than 0")
-				require.Greater(t, supernodeAmount, int64(0), "Supernode delegation should be greater than 0")
-			},
-		},
-		{
 			name: "register_with_self_delegation_only",
 			setupFn: func(t *testing.T, cli *LumeradCli) string {
 				return cli.GetKeyAddr("node0") // Use validator account as supernode account
@@ -503,6 +386,147 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 						strings.Contains(supernodeResp, "key not found"),
 					"supernode should not be registered, got response: %s", supernodeResp)
 			}
+		})
+	}
+}
+
+func TestSupernodeWithVestingDelegation(t *testing.T) {
+	testCases := []struct {
+		name                 string
+		vestingAccountType   string
+		createVestingAccount func(t *testing.T, cli *LumeradCli, keyName string, amount string) string
+		minimumStake         string
+		selfDelegationAmount string
+		vestingDelegationAmount string
+		delayMonths          int
+	}{
+		{
+			name:               "low_self_stake_with_delayed_vesting_delegation",
+			vestingAccountType: "/cosmos.vesting.v1beta1.DelayedVestingAccount",
+			createVestingAccount: func(t *testing.T, cli *LumeradCli, keyName string, amount string) string {
+				return createDelayedVestingAccount(t, cli, keyName, amount, 6)
+			},
+			minimumStake:            "150000000",
+			selfDelegationAmount:    "30000000",
+			vestingDelegationAmount: "130000000",
+		},
+		{
+			name:               "low_self_stake_with_permanently_locked_delegation",
+			vestingAccountType: "/cosmos.vesting.v1beta1.PermanentLockedAccount",
+			createVestingAccount: func(t *testing.T, cli *LumeradCli, keyName string, amount string) string {
+				return createPermanentlyLockedAccount(t, cli, keyName, amount)
+			},
+			minimumStake:            "140000000",
+			selfDelegationAmount:    "25000000",
+			vestingDelegationAmount: "120000000",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Initialize and reset chain
+			sut.ResetChain(t)
+
+			// Set minimum supernode stake in genesis
+			sut.ModifyGenesisJSON(t, func(genesis []byte) []byte {
+				coinJSON := `{"denom":"stake","amount":"` + tc.minimumStake + `"}`
+				state, err := sjson.SetRawBytes(genesis, "app_state.supernode.params.minimum_stake_for_sn", []byte(coinJSON))
+				require.NoError(t, err)
+				return state
+			})
+
+			// Start the chain with modified genesis
+			sut.StartChain(t)
+
+			// Create CLI helper
+			cli := NewLumeradCLI(t, sut, true)
+
+			// Step 1: Register validator with low self-stake
+			accountAddr := cli.GetKeyAddr("node0")
+			valAddrOutput := cli.Keys("keys", "show", "node0", "--bech", "val", "-a")
+			valAddr := strings.TrimSpace(valAddrOutput)
+
+			t.Logf("Validator Account address: %s", accountAddr)
+			t.Logf("Validator Operator address: %s", valAddr)
+			t.Logf("Minimum stake requirement: %s", tc.minimumStake)
+
+			// Step 2: Create new vesting account address
+			vestingAmount := "200000000" // Ensure enough tokens for delegation
+			supernodeAccount := tc.createVestingAccount(t, cli, "vesting_supernode", vestingAmount)
+			t.Logf("Vesting supernode account: %s", supernodeAccount)
+
+			// Step 3: Add minimal self-delegation to validator (intentionally insufficient)
+			cli.FundAddress(accountAddr, "50000000stake")
+			selfDelegateCmd := []string{
+				"tx", "staking", "delegate",
+				valAddr,                    // validator address
+				tc.selfDelegationAmount + "stake", // small self-delegation (much less than minimum)
+				"--from", "node0",
+			}
+			resp1 := cli.CustomCommand(selfDelegateCmd...)
+			RequireTxSuccess(t, resp1)
+			sut.AwaitNextBlock(t)
+
+			// Step 4: Delegate from vesting account to validator
+			vestingDelegateCmd := []string{
+				"tx", "staking", "delegate",
+				valAddr,                        // validator address
+				tc.vestingDelegationAmount + "stake", // delegation from vesting account to meet minimum
+				"--from", "vesting_supernode",
+			}
+			resp2 := cli.CustomCommand(vestingDelegateCmd...)
+			RequireTxSuccess(t, resp2)
+			sut.AwaitNextBlock(t)
+
+			// Step 5: Register supernode using vesting account address
+			registerCmd := []string{
+				"tx", "supernode", "register-supernode",
+				valAddr,          // validator address
+				"192.168.1.1",    // IP address
+				supernodeAccount, // supernode account (vesting account)
+				"--from", "node0",
+			}
+
+			resp := cli.CustomCommand(registerCmd...)
+			RequireTxSuccess(t, resp)
+
+			// Wait for registration to be processed
+			sut.AwaitNextBlock(t)
+
+			// Verify supernode registration success
+			supernode := GetSuperNodeResponse(t, cli, valAddr)
+			require.Equal(t, valAddr, supernode.ValidatorAddress)
+			require.Equal(t, "1.0.0", supernode.Version)
+			require.Equal(t, supernodeAccount, supernode.SupernodeAccount)
+			require.NotEmpty(t, supernode.States)
+			require.Equal(t, types.SuperNodeStateActive, supernode.States[0].State)
+
+			// Verify the supernode account is the correct vesting account type
+			verifyVestingAccountType(t, cli, supernodeAccount, tc.vestingAccountType)
+
+			// Verify validator has low self-delegation
+			selfDelegation := cli.CustomQuery("query", "staking", "delegation", accountAddr, valAddr)
+			selfDelegationAmountStr := gjson.Get(selfDelegation, "delegation_response.balance.amount").String()
+			selfDelegationAmount, err := strconv.ParseInt(selfDelegationAmountStr, 10, 64)
+			require.NoError(t, err, "Failed to parse self delegation amount")
+			
+			minimumStakeInt, err := strconv.ParseInt(tc.minimumStake, 10, 64)
+			require.NoError(t, err, "Failed to parse minimum stake")
+			require.Less(t, selfDelegationAmount, minimumStakeInt, "Self delegation should be less than minimum requirement")
+
+			// Verify vesting account delegation exists and is sufficient
+			vestingDelegation := cli.CustomQuery("query", "staking", "delegation", supernodeAccount, valAddr)
+			vestingDelegationAmountStr := gjson.Get(vestingDelegation, "delegation_response.balance.amount").String()
+			vestingDelegationAmount, err := strconv.ParseInt(vestingDelegationAmountStr, 10, 64)
+			require.NoError(t, err, "Failed to parse vesting delegation amount")
+			require.Greater(t, vestingDelegationAmount, int64(0), "Vesting delegation should exist")
+
+			// Verify combined delegations meet minimum requirement
+			totalDelegation := selfDelegationAmount + vestingDelegationAmount
+			require.GreaterOrEqual(t, totalDelegation, minimumStakeInt, "Combined self and vesting delegations should meet minimum requirement")
+
+			t.Logf("Self delegation: %d, Vesting delegation: %d, Total: %d, Minimum required: %d", 
+				selfDelegationAmount, vestingDelegationAmount, totalDelegation, minimumStakeInt)
 		})
 	}
 }

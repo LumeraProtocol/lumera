@@ -78,7 +78,7 @@ func TestSupernodeUpdateParamsProposal(t *testing.T) {
 				"inactivity_penalty_period": "48h"
 			}
 		}],
-		"deposit": "100000000stake",
+		"deposit": "100000000ulume",
 		"metadata": "ipfs://CID",
 		"title": "Update Supernode Parameters",
 		"summary": "Update supernode module parameters with new values"
@@ -114,4 +114,12 @@ func TestSupernodeUpdateParamsProposal(t *testing.T) {
 	require.Equal(t, "336h", gjson.Get(updatedParams, "params.evidence_retention_period").String(), "evidence_retention_period should be 336h")
 	require.Equal(t, "0.2", gjson.Get(updatedParams, "params.slashing_fraction").String(), "slashing_fraction should be 0.2")
 	require.Equal(t, "48h", gjson.Get(updatedParams, "params.inactivity_penalty_period").String(), "inactivity_penalty_period should be 48h")
+}
+
+func TestA(t *testing.T) {
+	// Initialize and reset chain
+	sut.ResetChain(t)
+
+	sut.StartChain(t)
+
 }

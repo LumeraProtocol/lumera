@@ -27,7 +27,7 @@ func createDelayedVestingAccount(t *testing.T, cli *LumeradCli, keyName string, 
 	createCmd := []string{
 		"tx", "vesting", "create-vesting-account",
 		address,                        // to_address
-		amount + "stake",               // amount
+		amount + "ulume",               // amount
 		strconv.FormatInt(endTime, 10), // end_time
 		"--delayed",                    // make it delayed vesting
 		"--from", "node0",
@@ -40,7 +40,7 @@ func createDelayedVestingAccount(t *testing.T, cli *LumeradCli, keyName string, 
 	sut.AwaitNextBlock(t)
 
 	// Fund the account with some liquid tokens for transaction fees
-	cli.FundAddress(address, "1000000stake")
+	cli.FundAddress(address, "1000000ulume")
 
 	return address
 }
@@ -54,7 +54,7 @@ func createPermanentlyLockedAccount(t *testing.T, cli *LumeradCli, keyName strin
 	createCmd := []string{
 		"tx", "vesting", "create-permanent-locked-account",
 		address,          // to_address
-		amount + "stake", // amount
+		amount + "ulume", // amount
 		"--from", "node0",
 	}
 
@@ -65,7 +65,7 @@ func createPermanentlyLockedAccount(t *testing.T, cli *LumeradCli, keyName strin
 	sut.AwaitNextBlock(t)
 
 	// Fund the account with some liquid tokens for transaction fees
-	cli.FundAddress(address, "1000000stake")
+	cli.FundAddress(address, "1000000ulume")
 
 	return address
 }
@@ -109,13 +109,13 @@ func TestSupernodeRegistrationSuccess(t *testing.T) {
 			minimumStake: "100000000", // Set high minimum stake that exceeds self-delegation
 			additionalSetupFn: func(t *testing.T, cli *LumeradCli, valAddr string, supernodeAccount string) {
 				// Fund the supernode account
-				cli.FundAddress(supernodeAccount, "200000000stake")
+				cli.FundAddress(supernodeAccount, "200000000ulume")
 
 				// Delegate from supernode account to validator to meet the minimum stake requirement
 				delegateCmd := []string{
 					"tx", "staking", "delegate",
 					valAddr,          // validator address
-					"150000000stake", // delegation amount (more than minimum - self delegation)
+					"150000000ulume", // delegation amount (more than minimum - self delegation)
 					"--from", "supernode_account",
 				}
 				resp := cli.CustomCommand(delegateCmd...)
@@ -147,13 +147,13 @@ func TestSupernodeRegistrationSuccess(t *testing.T) {
 			additionalSetupFn: func(t *testing.T, cli *LumeradCli, valAddr string, supernodeAccount string) {
 				// Fund validator operator account for additional self-delegation
 				validatorAddr := cli.GetKeyAddr("node0")
-				cli.FundAddress(validatorAddr, "100000000stake")
+				cli.FundAddress(validatorAddr, "100000000ulume")
 
 				// Add additional self-delegation to meet minimum requirement
 				delegateCmd := []string{
 					"tx", "staking", "delegate",
 					valAddr,         // validator address
-					"60000000stake", // enough to meet minimum with existing self-delegation
+					"60000000ulume", // enough to meet minimum with existing self-delegation
 					"--from", "node0",
 				}
 				resp := cli.CustomCommand(delegateCmd...)
@@ -187,7 +187,7 @@ func TestSupernodeRegistrationSuccess(t *testing.T) {
 			// 1. Set minimum supernode stake in genesis
 			sut.ModifyGenesisJSON(t, func(genesis []byte) []byte {
 				// Update the supernode module params to set minimum stake as a Coin
-				coinJSON := `{"denom":"stake","amount":"` + minimumStake + `"}`
+				coinJSON := `{"denom":"ulume","amount":"` + minimumStake + `"}`
 				state, err := sjson.SetRawBytes(genesis, "app_state.supernode.params.minimum_stake_for_sn", []byte(coinJSON))
 				require.NoError(t, err)
 				return state
@@ -283,7 +283,7 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 			setupFn: func(t *testing.T, cli *LumeradCli) (string, string, string) {
 				keyName := "non_validator"
 				accountAddr := cli.AddKey(keyName)
-				cli.FundAddress(accountAddr, "1000000stake")
+				cli.FundAddress(accountAddr, "1000000ulume")
 				nonValAddr := strings.TrimSpace(cli.Keys("keys", "show", keyName, "--bech", "val", "-a"))
 				return nonValAddr, accountAddr, keyName
 			},
@@ -325,7 +325,7 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 
 			sut.ModifyGenesisJSON(t, func(genesis []byte) []byte {
 				// Create proper Coin JSON structure
-				coinJSON := `{"denom":"stake","amount":"` + tc.minimumStake + `"}`
+				coinJSON := `{"denom":"ulume","amount":"` + tc.minimumStake + `"}`
 				state, err := sjson.SetRawBytes(genesis, "app_state.supernode.params.minimum_stake_for_sn", []byte(coinJSON))
 				require.NoError(t, err)
 
@@ -355,10 +355,10 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 
 			// Attempt to register supernode
 			t.Log("Attempting to register supernode")
-			
+
 			// Use standard IP address
 			ipAddress := "192.168.1.1"
-			
+
 			registerResp := cli.CustomCommand(
 				"tx", "supernode", "register-supernode",
 				valAddr,     // validator address
@@ -392,13 +392,13 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 
 func TestSupernodeWithVestingDelegation(t *testing.T) {
 	testCases := []struct {
-		name                 string
-		vestingAccountType   string
-		createVestingAccount func(t *testing.T, cli *LumeradCli, keyName string, amount string) string
-		minimumStake         string
-		selfDelegationAmount string
+		name                    string
+		vestingAccountType      string
+		createVestingAccount    func(t *testing.T, cli *LumeradCli, keyName string, amount string) string
+		minimumStake            string
+		selfDelegationAmount    string
 		vestingDelegationAmount string
-		delayMonths          int
+		delayMonths             int
 	}{
 		{
 			name:               "low_self_stake_with_delayed_vesting_delegation",
@@ -429,7 +429,7 @@ func TestSupernodeWithVestingDelegation(t *testing.T) {
 
 			// Set minimum supernode stake in genesis
 			sut.ModifyGenesisJSON(t, func(genesis []byte) []byte {
-				coinJSON := `{"denom":"stake","amount":"` + tc.minimumStake + `"}`
+				coinJSON := `{"denom":"ulume","amount":"` + tc.minimumStake + `"}`
 				state, err := sjson.SetRawBytes(genesis, "app_state.supernode.params.minimum_stake_for_sn", []byte(coinJSON))
 				require.NoError(t, err)
 				return state
@@ -456,11 +456,11 @@ func TestSupernodeWithVestingDelegation(t *testing.T) {
 			t.Logf("Vesting supernode account: %s", supernodeAccount)
 
 			// Step 3: Add minimal self-delegation to validator (intentionally insufficient)
-			cli.FundAddress(accountAddr, "50000000stake")
+			cli.FundAddress(accountAddr, "50000000ulume")
 			selfDelegateCmd := []string{
 				"tx", "staking", "delegate",
-				valAddr,                    // validator address
-				tc.selfDelegationAmount + "stake", // small self-delegation (much less than minimum)
+				valAddr,                           // validator address
+				tc.selfDelegationAmount + "ulume", // small self-delegation (much less than minimum)
 				"--from", "node0",
 			}
 			resp1 := cli.CustomCommand(selfDelegateCmd...)
@@ -470,8 +470,8 @@ func TestSupernodeWithVestingDelegation(t *testing.T) {
 			// Step 4: Delegate from vesting account to validator
 			vestingDelegateCmd := []string{
 				"tx", "staking", "delegate",
-				valAddr,                        // validator address
-				tc.vestingDelegationAmount + "stake", // delegation from vesting account to meet minimum
+				valAddr,                              // validator address
+				tc.vestingDelegationAmount + "ulume", // delegation from vesting account to meet minimum
 				"--from", "vesting_supernode",
 			}
 			resp2 := cli.CustomCommand(vestingDelegateCmd...)
@@ -509,7 +509,7 @@ func TestSupernodeWithVestingDelegation(t *testing.T) {
 			selfDelegationAmountStr := gjson.Get(selfDelegation, "delegation_response.balance.amount").String()
 			selfDelegationAmount, err := strconv.ParseInt(selfDelegationAmountStr, 10, 64)
 			require.NoError(t, err, "Failed to parse self delegation amount")
-			
+
 			minimumStakeInt, err := strconv.ParseInt(tc.minimumStake, 10, 64)
 			require.NoError(t, err, "Failed to parse minimum stake")
 			require.Less(t, selfDelegationAmount, minimumStakeInt, "Self delegation should be less than minimum requirement")
@@ -525,7 +525,7 @@ func TestSupernodeWithVestingDelegation(t *testing.T) {
 			totalDelegation := selfDelegationAmount + vestingDelegationAmount
 			require.GreaterOrEqual(t, totalDelegation, minimumStakeInt, "Combined self and vesting delegations should meet minimum requirement")
 
-			t.Logf("Self delegation: %d, Vesting delegation: %d, Total: %d, Minimum required: %d", 
+			t.Logf("Self delegation: %d, Vesting delegation: %d, Total: %d, Minimum required: %d",
 				selfDelegationAmount, vestingDelegationAmount, totalDelegation, minimumStakeInt)
 		})
 	}

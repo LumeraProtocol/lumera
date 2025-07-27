@@ -1,4 +1,4 @@
-package v1_6_2
+package v1_7_0
 
 import (
 	"context"
@@ -11,9 +11,9 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/module"
 )
 
-const UpgradeName = "v1.6.2"
+const UpgradeName = "v1.7.0"
 
-// CreateUpgradeHandler creates an upgrade handler for v1_6_2
+// CreateUpgradeHandler creates an upgrade handler for v1_7_0
 func CreateUpgradeHandler(
 	logger log.Logger,
 	mm *module.Manager,
@@ -34,7 +34,7 @@ func CreateUpgradeHandler(
 		}
 		logger.Info("Module migrations completed.")
 
-		// No new modules to add to the version map for v1.6.2
+		// No new modules to add to the version map for v1.7.0
 
 		logger.Info(fmt.Sprintf("Successfully completed upgrade %s", UpgradeName))
 

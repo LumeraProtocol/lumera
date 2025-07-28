@@ -106,7 +106,7 @@ func TestMsgServer_DeRegisterSupernode(t *testing.T) {
 					},
 					PrevIpAddresses: []*types.IPAddressHistory{
 						{
-							Address: "1022.145.1.1",
+							Address: "102.145.1.1",
 							Height:  1,
 						},
 					},

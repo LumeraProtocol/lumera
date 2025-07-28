@@ -66,7 +66,7 @@ jobs:
 
       - name: Install Specific Ignite CLI Version
         run: |
-          IGNITE_VERSION="v28.8.1"
+          IGNITE_VERSION="v29.2.0"
           ARCH="linux_amd64"
 
           # Download the checksum file
@@ -173,7 +173,7 @@ jobs:
 
       - name: Install Specific Ignite CLI Version
         run: |
-          IGNITE_VERSION="v28.8.1"
+          IGNITE_VERSION="v29.2.0"
           ARCH="linux_amd64"
 
           # Download the checksum file
@@ -199,7 +199,7 @@ jobs:
       - name: Build Release Version
         run: |
           # Set WASMVM version
-          WASMVM_VERSION="v2.1.2"  # Make sure this matches your go.mod version
+          WASMVM_VERSION="v3.0.0-ibc2.0"  # Make sure this matches your go.mod version
           
           # Download and install libwasmvm
           wget https://github.com/CosmWasm/wasmvm/releases/download/${WASMVM_VERSION}/libwasmvm.x86_64.so

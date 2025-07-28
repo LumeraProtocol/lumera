@@ -1,19 +1,19 @@
-package v1_7_0
+package v1_8_0
 
 import (
 	"context"
-	storetypes "cosmossdk.io/store/types"
 	"fmt"
 
-	"cosmossdk.io/log"
+	storetypes "cosmossdk.io/store/types"
 	upgradetypes "cosmossdk.io/x/upgrade/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
+	"cosmossdk.io/log"
 )
 
-const UpgradeName = "v1.7.0"
+const UpgradeName = "v1.8.0"
 
-// CreateUpgradeHandler creates an upgrade handler for v1_7_0
+// CreateUpgradeHandler creates an upgrade handler for v1_8_0
 func CreateUpgradeHandler(
 	logger log.Logger,
 	mm *module.Manager,
@@ -24,8 +24,7 @@ func CreateUpgradeHandler(
 
 		ctx := sdk.UnwrapSDKContext(goCtx)
 
-		// 1. Run Migrations for Existing Modules (if any needed for this upgrade)
-		// Use the unwrapped sdk.Context (ctx)
+		// Run module migrations
 		logger.Info("Running module migrations...")
 		newVM, err := mm.RunMigrations(ctx, configurator, fromVM)
 		if err != nil {
@@ -34,16 +33,17 @@ func CreateUpgradeHandler(
 		}
 		logger.Info("Module migrations completed.")
 
-		// No new modules to add to the version map for v1.7.0
+		// You may add more custom upgrade logic here (if needed)
 
 		logger.Info(fmt.Sprintf("Successfully completed upgrade %s", UpgradeName))
-
-		// Return the UPDATED version map
 		return newVM, nil
 	}
 }
 
 var StoreUpgrades = storetypes.StoreUpgrades{
-	Added: []string{},
-	// Deleted: []string{...},
+	// No new store keys needed if you are only updating existing modules
+	Added:   []string{},
+	Deleted: []string{
+		"nft",	
+	},
 }

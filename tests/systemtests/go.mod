@@ -1,6 +1,6 @@
 module github.com/LumeraProtocol/lumera/tests/systemtests
 
-go 1.24.1
+go 1.24.4
 
 replace (
 	github.com/LumeraProtocol/lumera => ../../

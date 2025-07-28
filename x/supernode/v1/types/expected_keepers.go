@@ -24,7 +24,7 @@ type SupernodeKeeper interface {
 	EnableSuperNode(ctx sdk.Context, valAddr sdk.ValAddress) error
 	DisableSuperNode(ctx sdk.Context, valAddr sdk.ValAddress) error
 	SetParams(ctx sdk.Context, params Params) error
-	CheckValidatorSupernodeEligibility(ctx sdk.Context, validator stakingtypes.ValidatorI, valAddr string) error
+	CheckValidatorSupernodeEligibility(ctx sdk.Context, validator stakingtypes.ValidatorI, valAddr string, supernodeAccount string) error
 
 	Logger() log.Logger
 	GetAuthority() string

@@ -170,7 +170,6 @@ func (s *SystemUnderTest) StartChain(t *testing.T, xargs ...string) {
 
 	s.AwaitNodeUp(t, s.rpcAddr)
 
-	t.Log("Start new block listener")
 	s.blockListener = NewEventListener(t, s.rpcAddr)
 	s.cleanupPreFn = append(s.cleanupPreFn,
 		s.blockListener.Subscribe("tm.event='NewBlock'", func(e ctypes.ResultEvent) (more bool) {

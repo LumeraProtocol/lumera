@@ -44,8 +44,8 @@ func (s *IntegrationTestSuite) SetupTest() {
 	s.app.AuthKeeper.SetAccount(s.ctx, s.app.AuthKeeper.NewAccountWithAddress(s.ctx, s.proposer))
 	s.app.AuthKeeper.SetAccount(s.ctx, s.app.AuthKeeper.NewAccountWithAddress(s.ctx, s.voter))
 
-	proposerCoins := sdk.NewCoins(sdk.NewCoin("stake", math.NewInt(1000000000)))
-	voterCoins := sdk.NewCoins(sdk.NewCoin("stake", math.NewInt(1000000000)))
+	proposerCoins := sdk.NewCoins(sdk.NewInt64Coin("stake", 1_000_000_000))
+	voterCoins := sdk.NewCoins(sdk.NewInt64Coin("stake", 1_000_000_000))
 
 	err := s.app.BankKeeper.MintCoins(s.ctx, minttypes.ModuleName, proposerCoins.Add(voterCoins...))
 	s.Require().NoError(err, "Failed to mint coins")

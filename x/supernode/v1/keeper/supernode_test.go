@@ -507,6 +507,11 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 	// Example val address
 	valOperatorAddr := sdk.ValAddress([]byte("valoper-test"))
 	valAddrString := valOperatorAddr.String()
+	valAccAddr := sdk.AccAddress(valOperatorAddr)
+
+	// Example supernode account address
+	supernodeAccAddr := sdk.AccAddress([]byte("supernode-acc"))
+	supernodeAccString := supernodeAccAddr.String()
 
 	// Test cases
 	testCases := []struct {
@@ -514,6 +519,9 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 		validator            *stakingtypes.Validator
 		selfDelegationFound  bool
 		selfDelegationShares sdkmath.LegacyDec
+		setupSupernode       bool
+		supernodeDelegationFound bool
+		supernodeDelegationShares sdkmath.LegacyDec
 
 		expectErr bool
 		errSubstr string
@@ -525,6 +533,7 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 				Status:          stakingtypes.Unbonded,
 			},
 			selfDelegationFound: false,
+			setupSupernode: false,
 			expectErr:           true,
 			errSubstr:           "no self-delegation",
 		},
@@ -538,8 +547,9 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 			},
 			selfDelegationFound:  true,
 			selfDelegationShares: sdkmath.LegacyNewDec(500000),
+			setupSupernode: false,
 			expectErr:            true,
-			errSubstr:            "does not meet minimum self stake",
+			errSubstr:            "does not meet minimum stake requirement",
 		},
 		{
 			name: "validator unbonded, self-delegation >= min => no error",
@@ -551,6 +561,7 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 			},
 			selfDelegationFound:  true,
 			selfDelegationShares: sdkmath.LegacyNewDec(1000000),
+			setupSupernode: false,
 			expectErr:            false,
 		},
 		{
@@ -563,39 +574,128 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 			},
 			selfDelegationFound:  true,
 			selfDelegationShares: sdkmath.LegacyNewDec(500000),
+			setupSupernode: false,
 			expectErr:            true,
 			errSubstr:            "no self-stake available",
+		},
+		{
+			name: "validator with insufficient self-delegation but sufficient supernode delegation => no error",
+			validator: &stakingtypes.Validator{
+				OperatorAddress: valAddrString,
+				Status:          stakingtypes.Unbonded,
+				DelegatorShares: sdkmath.LegacyNewDec(1000000),
+				Tokens:          sdkmath.NewInt(1000000),
+			},
+			selfDelegationFound:  true,
+			selfDelegationShares: sdkmath.LegacyNewDec(500000),
+			setupSupernode: true,
+			supernodeDelegationFound: true,
+			supernodeDelegationShares: sdkmath.LegacyNewDec(500000),
+			expectErr:            false,
+		},
+		{
+			name: "validator with insufficient self-delegation and insufficient supernode delegation => error",
+			validator: &stakingtypes.Validator{
+				OperatorAddress: valAddrString,
+				Status:          stakingtypes.Unbonded,
+				DelegatorShares: sdkmath.LegacyNewDec(1000000),
+				Tokens:          sdkmath.NewInt(1000000),
+			},
+			selfDelegationFound:  true,
+			selfDelegationShares: sdkmath.LegacyNewDec(400000),
+			setupSupernode: true,
+			supernodeDelegationFound: true,
+			supernodeDelegationShares: sdkmath.LegacyNewDec(400000),
+			expectErr:            true,
+			errSubstr:            "does not meet minimum stake requirement",
+		},
+		{
+			name: "validator with no self-delegation but sufficient supernode delegation => error",
+			validator: &stakingtypes.Validator{
+				OperatorAddress: valAddrString,
+				Status:          stakingtypes.Unbonded,
+				DelegatorShares: sdkmath.LegacyNewDec(1000000),
+				Tokens:          sdkmath.NewInt(1000000),
+			},
+			selfDelegationFound:  false,
+			setupSupernode: true,
+			supernodeDelegationFound: true,
+			supernodeDelegationShares: sdkmath.LegacyNewDec(1000000),
+			expectErr:            true,
+			errSubstr:            "no self-delegation",
 		},
 	}
 
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			// Mock out the Delegation(...) call
-
 			stakingKeeper := supernodemocks.NewMockStakingKeeper(ctrl)
 			slashingKeeper := supernodemocks.NewMockSlashingKeeper(ctrl)
 			bankKeeper := supernodemocks.NewMockBankKeeper(ctrl)
 
+			// Mock the Delegation call
 			stakingKeeper.EXPECT().
 				Delegation(gomock.Any(), gomock.Any(), gomock.Any()).
 				DoAndReturn(func(_ context.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) (stakingtypes.Delegation, error) {
-					if tc.selfDelegationFound {
+					// Check if this is a call for self-delegation
+					if delAddr.Equals(valAccAddr) {
+						if tc.selfDelegationFound {
+							return stakingtypes.Delegation{
+								DelegatorAddress: delAddr.String(),
+								ValidatorAddress: valAddr.String(),
+								Shares:           tc.selfDelegationShares,
+							}, nil
+						}
+						return stakingtypes.Delegation{}, errors.New("no self-delegation")
+					}
+					
+					// Check if this is a call for supernode delegation
+					if tc.setupSupernode && tc.supernodeDelegationFound && delAddr.String() == supernodeAccString {
 						return stakingtypes.Delegation{
 							DelegatorAddress: delAddr.String(),
 							ValidatorAddress: valAddr.String(),
-							Shares:           tc.selfDelegationShares,
+							Shares:           tc.supernodeDelegationShares,
 						}, nil
 					}
-					return stakingtypes.Delegation{}, errors.New("no self-delegation")
+					
+					return stakingtypes.Delegation{}, errors.New("delegation not found")
 				}).
-				MaxTimes(1)
+				AnyTimes()
 
 			k, ctx := setupKeeperForTest(t, stakingKeeper, slashingKeeper, bankKeeper)
+			
+			// If the test case includes a supernode, set it up in the store
+			if tc.setupSupernode {
+				supernode := types.SuperNode{
+					ValidatorAddress: valAddrString,
+					SupernodeAccount: supernodeAccString,
+					States: []*types.SuperNodeStateRecord{
+						{
+							State:  types.SuperNodeStateActive,
+							Height: 1,
+						},
+					},
+					PrevIpAddresses: []*types.IPAddressHistory{
+						{
+							Address: "192.168.1.1",
+							Height:  1,
+						},
+					},
+					Version: "1.0.0",
+					P2PPort: "4445",
+				}
+				err := k.SetSuperNode(ctx, supernode)
+				require.NoError(t, err)
+			}
+			
 			msgServer := keeper.NewMsgServerImpl(k)
 
-			// Call your function
-			err := msgServer.CheckValidatorSupernodeEligibility(ctx, tc.validator, valAddrString)
+			// Call the function
+			var supernodeAccount string
+			if tc.setupSupernode {
+				supernodeAccount = supernodeAccString
+			}
+			err := msgServer.CheckValidatorSupernodeEligibility(ctx, tc.validator, valAddrString, supernodeAccount)
 			if tc.expectErr {
 				require.Error(t, err)
 				if tc.errSubstr != "" {

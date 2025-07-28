@@ -46,17 +46,17 @@ func (m *MockSupernodeKeeper) EXPECT() *MockSupernodeKeeperMockRecorder {
 }
 
 // CheckValidatorSupernodeEligibility mocks base method.
-func (m *MockSupernodeKeeper) CheckValidatorSupernodeEligibility(ctx types0.Context, validator types1.ValidatorI, valAddr string) error {
+func (m *MockSupernodeKeeper) CheckValidatorSupernodeEligibility(ctx types0.Context, validator types1.ValidatorI, valAddr, supernodeAccount string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CheckValidatorSupernodeEligibility", ctx, validator, valAddr)
+	ret := m.ctrl.Call(m, "CheckValidatorSupernodeEligibility", ctx, validator, valAddr, supernodeAccount)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // CheckValidatorSupernodeEligibility indicates an expected call of CheckValidatorSupernodeEligibility.
-func (mr *MockSupernodeKeeperMockRecorder) CheckValidatorSupernodeEligibility(ctx, validator, valAddr interface{}) *gomock.Call {
+func (mr *MockSupernodeKeeperMockRecorder) CheckValidatorSupernodeEligibility(ctx, validator, valAddr, supernodeAccount interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CheckValidatorSupernodeEligibility", reflect.TypeOf((*MockSupernodeKeeper)(nil).CheckValidatorSupernodeEligibility), ctx, validator, valAddr)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CheckValidatorSupernodeEligibility", reflect.TypeOf((*MockSupernodeKeeper)(nil).CheckValidatorSupernodeEligibility), ctx, validator, valAddr, supernodeAccount)
 }
 
 // DisableSuperNode mocks base method.

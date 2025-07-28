@@ -240,7 +240,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 						Shares: math.LegacyNewDec(2_000_000),
 					}, true
 				}).
-				MaxTimes(1)
+				AnyTimes()
 
 			// If there's a mockSetup, run it
 			if tc.mockSetup != nil {

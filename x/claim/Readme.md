@@ -110,12 +110,20 @@ The claim process involves these steps:
 1. User generates proof materials:
    ```bash
    # Using old chain CLI
-   lumerad signclaim "old-address" "new-address"
+   pasteld signclaim "old-address" "new-address"
    
    # Or using web portal with WASM wallet
    ```
 
-2. Submit claim transaction with:
+2. Choose claim type:
+   - **Immediate claim**: Tokens are transferred directly to a regular account
+   - **Delayed claim**: Tokens are transferred to a vesting account with a specified cliff period
+     - Tier 1: 6-month vesting period
+     - Tier 2: 12-month vesting period
+     - Tier 3: 18-month vesting period
+     - Tier 4: 24-month vesting period
+
+3. Submit claim transaction with:
    - Old address: Base58 format, 34 characters  
      Example: `PtqHAEacynVd3V821NPhgxu9K4Ab6kAguHi`
    - New address: Bech32 format with 'lumera' prefix  
@@ -124,8 +132,9 @@ The claim process involves these steps:
      Example: `0309331fc3d23ca17d91eec40ee7711efcd56facf949d46cbfa6393d43f2747e90`
    - Signature: 65-byte hex format, signs message "{old_address}.{pub_key}.{new_address}"  
      Example: `1f46b3a2129047a0d7a6bf91e2879e940ed3db06a2cafaaaabacc337141146f43e4932d357b435bbf2c48227f5c2f738df23a2ebc221dd11cb14ed4b83bd2a95c7`
+   - For delayed claims, include the tier parameter to specify the vesting period
 
-3. Module validates:
+4. Module validates:
    - Claim record exists
    - Not already claimed
    - Within claim period
@@ -172,7 +181,7 @@ For each block:
 
 ### MsgClaim
 
-Claims tokens by proving ownership:
+Claims tokens by proving ownership and transfers them to a regular account:
 
 ```protobuf
 message MsgClaim {
@@ -197,6 +206,28 @@ Validation:
 - Valid signature
 - Signer matches new address
 
+### MsgDelayedClaim
+
+Claims tokens by proving ownership and transfers them to a vesting account with a specified cliff period:
+
+```protobuf
+message MsgDelayedClaim {
+    string old_address = 1; // Original address (base58)
+    string new_address = 2; // Destination Cosmos address (bech32)
+    string pub_key = 3;    // Public key of old address (hex)
+    string signature = 4;   // Signature proving ownership (hex)
+    uint32 tier = 5;       // Vesting tier (1 = 6 months, 2 = 12 months, etc.)
+}
+```
+
+Required fields:
+- Same fields as MsgClaim, plus:
+- `tier`: Vesting tier that determines the cliff period (tier * 6 months)
+
+Validation:
+- Same validation as MsgClaim
+- Additionally validates that the tier is valid
+
 ### MsgUpdateParams
 
 Updates module parameters through governance:
@@ -217,8 +248,8 @@ Requirements:
 
 ### ClaimProcessed
 
-Emitted on successful claim:
-```go
+Emitted on successful immediate claim:
+```
 EventTypeClaimProcessed = "claim_processed"
 Attributes:
 - old_address: Original address
@@ -227,10 +258,24 @@ Attributes:
 - claim_time: Processing timestamp
 ```
 
+### DelayedClaimProcessed
+
+Emitted on successful delayed claim:
+```
+EventTypeDelayedClaimProcessed = "delayed_claim_processed"
+Attributes:
+- old_address: Original address
+- new_address: Destination address
+- amount: Claimed amount
+- claim_time: Processing timestamp
+- vesting_end_time: When vesting period ends
+- tier: Vesting tier used
+```
+
 ### ClaimPeriodEnd
 
 Emitted when claim period expires:
-```go
+```
 EventTypeClaimPeriodEnd = "claim_period_end"
 Attributes:
 - end_time: When period ended
@@ -285,18 +330,31 @@ lumerad query claim claim-record [address]
 # List all claim records with pagination
 lumerad query claim claim-records
 
+# List all claimed claims with a specific vesting tier
+lumerad query claim list-claimed [vested-term]
+
 # Get module account balance
 lumerad query bank balances $(lumerad keys show -a claim)
 ```
 
 Transaction commands:
 ```bash
-# Submit claim
+# Submit immediate claim
 lumerad tx claim claim \
   [old-address] \
   [new-address] \
   [pub-key] \
   [signature] \
+  --from [key] \
+  --chain-id [chain-id]
+
+# Submit delayed claim with vesting
+lumerad tx claim delayed-claim \
+  [old-address] \
+  [new-address] \
+  [pub-key] \
+  [signature] \
+  [tier] \
   --from [key] \
   --chain-id [chain-id]
 
@@ -307,6 +365,8 @@ lumerad tx gov submit-proposal [proposal-file] \
 ```
 
 ### gRPC
+
+The module exposes the following gRPC services:
 
 ```protobuf
 service Query {
@@ -319,11 +379,19 @@ service Query {
     rpc ClaimRecord(QueryClaimRecordRequest) returns (QueryClaimRecordResponse) {
         option (google.api.http).get = "/lumera/claim/claim_record/{address}";
     }
+    
+    // ListClaimed queries all claimed records with a specific vesting tier.
+    rpc ListClaimed(QueryListClaimedRequest) returns (QueryListClaimedResponse) {
+        option (google.api.http).get = "/lumera/claim/list_claimed/{vested_term}";
+    }
 }
 
 service Msg {
     // Claim submits a claim transaction.
     rpc Claim(MsgClaim) returns (MsgClaimResponse);
+    
+    // DelayedClaim submits a delayed claim transaction with vesting.
+    rpc DelayedClaim(MsgDelayedClaim) returns (MsgDelayedClaimResponse);
 
     // UpdateParams updates the module parameters.
     rpc UpdateParams(MsgUpdateParams) returns (MsgUpdateParamsResponse);
@@ -335,6 +403,7 @@ service Msg {
 Endpoints are mounted on the REST API:
 
 ```
-GET /lumera/claim/params            # Query parameters
-GET /lumera/claim/claim_record/{address} # Get claim record
+GET /lumera/claim/params                   # Query parameters
+GET /lumera/claim/claim_record/{address}   # Get claim record
+GET /lumera/claim/list_claimed/{vested_term} # List claimed claims by vesting tier
 ```

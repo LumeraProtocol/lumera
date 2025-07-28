@@ -42,7 +42,7 @@ func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types.MsgRegist
 			"validator %s is jailed and cannot register a supernode", msg.ValidatorAddress)
 	}
 
-	if err := k.CheckValidatorSupernodeEligibility(ctx, validator, msg.ValidatorAddress); err != nil {
+	if err := k.CheckValidatorSupernodeEligibility(ctx, validator, msg.ValidatorAddress, msg.SupernodeAccount); err != nil {
 		return nil, err
 	}
 

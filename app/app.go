@@ -87,6 +87,7 @@ import (
 
 	upgrade_v1_6_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_6_1"
 	upgrade_v1_7_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_7_0"
+	upgrade_v1_8_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_0"
 )
 
 const (
@@ -341,6 +342,7 @@ func (app *App) setupUpgradeStoreLoaders() {
 	var storeUpgradesMap = map[string]*storetypes.StoreUpgrades{
 		upgrade_v1_6_1.UpgradeName: &upgrade_v1_6_1.StoreUpgrades,
 		upgrade_v1_7_0.UpgradeName: &upgrade_v1_7_0.StoreUpgrades,
+		upgrade_v1_8_0.UpgradeName: &upgrade_v1_8_0.StoreUpgrades,
 	}
 
 	// Check for the planned upgrades
@@ -371,6 +373,14 @@ func (app *App) setupUpgradeHandlers() {
 		{
 			Name: upgrade_v1_7_0.UpgradeName,
 			Handler: upgrade_v1_7_0.CreateUpgradeHandler(
+				app.Logger(),
+				app.ModuleManager,
+				app.Configurator(),
+			),
+		},
+		{
+			Name: upgrade_v1_8_0.UpgradeName,
+			Handler: upgrade_v1_8_0.CreateUpgradeHandler(
 				app.Logger(),
 				app.ModuleManager,
 				app.Configurator(),

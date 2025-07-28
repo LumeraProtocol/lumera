@@ -188,6 +188,7 @@ func TestDelayedClaimsSystem(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 
 			sut.ResetChain(t)
+
 			cli := NewLumeradCLI(t, sut, true)
 
 			// Get test data and CSV address
@@ -225,7 +226,7 @@ func TestDelayedClaimsSystem(t *testing.T) {
 
 			if tc.name == "successful_claim_from_same_address" {
 				address := cli.AddKey("test_1")
-				cli.FundAddress(address, "1stake")
+				cli.FundAddress(address, "1ulume")
 				testData, err = claimtestutils.GenerateClaimingTestData2(pastelAccount, address)
 				require.NoError(t, err)
 

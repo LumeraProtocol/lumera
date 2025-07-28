@@ -1,0 +1,29 @@
+syntax = "proto3";
+package lumera.action.v1;
+
+import "gogoproto/gogo.proto";
+
+option go_package = "x/action/v1/types";
+
+// ActionState enum represents the various states an action can be in.
+enum ActionState {
+  option (gogoproto.goproto_enum_prefix) = false;
+  option (gogoproto.goproto_enum_stringer) = true;
+
+  // The default state, used when the state is not specified.
+  ACTION_STATE_UNSPECIFIED = 0 [(gogoproto.enumvalue_customname) = "ActionStateUnspecified"];
+  // The action is pending and has not yet been processed.
+  ACTION_STATE_PENDING = 1 [(gogoproto.enumvalue_customname) = "ActionStatePending"];
+  // The action is currently being processed.
+  ACTION_STATE_PROCESSING = 2 [(gogoproto.enumvalue_customname) = "ActionStateProcessing"];
+  // The action has been completed successfully.
+  ACTION_STATE_DONE = 3 [(gogoproto.enumvalue_customname) = "ActionStateDone"];
+  // The action has been approved.
+  ACTION_STATE_APPROVED = 4 [(gogoproto.enumvalue_customname) = "ActionStateApproved"];
+  // The action has been rejected.
+  ACTION_STATE_REJECTED = 5 [(gogoproto.enumvalue_customname) = "ActionStateRejected"];
+  // The action has failed.
+  ACTION_STATE_FAILED = 6 [(gogoproto.enumvalue_customname) = "ActionStateFailed"];
+  // The action has expired and is no longer valid.
+  ACTION_STATE_EXPIRED = 7 [(gogoproto.enumvalue_customname) = "ActionStateExpired"];
+}

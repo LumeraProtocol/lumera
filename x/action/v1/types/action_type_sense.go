@@ -3,8 +3,6 @@ package types
 import (
 	"encoding/json"
 	"fmt"
-
-	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
 	"github.com/LumeraProtocol/lumera/x/action/v1/common"
 )
 
@@ -18,12 +16,12 @@ func init() {
 	)
 }
 
-func (v *SenseValidator) ActionType() actionapi.ActionType {
-	return actionapi.ActionType_ACTION_TYPE_SENSE
+func (v *SenseValidator) ActionType() ActionType {
+	return ActionTypeSense
 }
 
 func (v *SenseValidator) ValidateBasic(metadataStr string, msgType common.MessageType) error {
-	var metadata actionapi.SenseMetadata
+	var metadata SenseMetadata
 	if err := json.Unmarshal([]byte(metadataStr), &metadata); err != nil {
 		return fmt.Errorf("failed to unmarshal sense metadata: %w", err)
 	}

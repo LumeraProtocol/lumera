@@ -3,11 +3,11 @@ package keeper_test
 import (
 	"testing"
 
+	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
 	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	"github.com/LumeraProtocol/lumera/x/action/v1/types"
+	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 
-	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
-	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
@@ -22,37 +22,37 @@ func TestKeeper_ListActionsByBlockHeight(t *testing.T) {
 	anotherBlockHeight := int64(200)
 	invalidBlockHeight := int64(-1)
 	creatorAddr := sdk.AccAddress([]byte("creator"))
-	price := "100stake"
-	action1 := actionapi.Action{
+	price := sdk.NewInt64Coin("stake", 100)
+	action1 := actiontypes.Action{
 		Creator:        creatorAddr.String(),
 		ActionID:       actionID1,
-		ActionType:     actionapi.ActionType_ACTION_TYPE_SENSE,
+		ActionType:     actiontypes.ActionTypeSense,
 		Metadata:       []byte("metadata1"),
-		Price:          price,
+		Price:          &price,
 		ExpirationTime: 1234567890,
-		State:          actionapi.ActionState_ACTION_STATE_PROCESSING,
+		State:          actiontypes.ActionStateProcessing,
 		BlockHeight:    blockHeight,
 		SuperNodes:     []string{"node1", "node2"},
 	}
-	action2 := actionapi.Action{
+	action2 := actiontypes.Action{
 		Creator:        creatorAddr.String(),
 		ActionID:       actionID2,
-		ActionType:     actionapi.ActionType_ACTION_TYPE_CASCADE,
+		ActionType:     types.ActionTypeCascade,
 		Metadata:       []byte("metadata2"),
-		Price:          price,
+		Price:          &price,
 		ExpirationTime: 1234567891,
-		State:          actionapi.ActionState_ACTION_STATE_DONE,
+		State:          actiontypes.ActionStateDone,
 		BlockHeight:    blockHeight,
 		SuperNodes:     []string{"node3", "node4"},
 	}
-	action3 := actionapi.Action{
+	action3 := actiontypes.Action{
 		Creator:        creatorAddr.String(),
 		ActionID:       "11111",
-		ActionType:     actionapi.ActionType_ACTION_TYPE_SENSE,
+		ActionType:     actiontypes.ActionTypeSense,
 		Metadata:       []byte("metadata3"),
-		Price:          price,
+		Price:          &price,
 		ExpirationTime: 1234567892,
-		State:          actionapi.ActionState_ACTION_STATE_PENDING,
+		State:          actiontypes.ActionStatePending,
 		BlockHeight:    anotherBlockHeight,
 		SuperNodes:     []string{"node5", "node6"},
 	}
@@ -62,7 +62,7 @@ func TestKeeper_ListActionsByBlockHeight(t *testing.T) {
 		req         *types.QueryListActionsByBlockHeightRequest
 		setupState  func(k keeper.Keeper, ctx sdk.Context)
 		expectedErr error
-		checkResult func(t *testing.T, resp *types.QueryListActionsResponse)
+		checkResult func(t *testing.T, resp *types.QueryListActionsByBlockHeightResponse)
 	}{
 		{
 			name:        "invalid request (nil)",
@@ -82,7 +82,7 @@ func TestKeeper_ListActionsByBlockHeight(t *testing.T) {
 				BlockHeight: 9999,
 			},
 			expectedErr: nil,
-			checkResult: func(t *testing.T, resp *types.QueryListActionsResponse) {
+			checkResult: func(t *testing.T, resp *types.QueryListActionsByBlockHeightResponse) {
 				require.NotNil(t, resp)
 				require.Len(t, resp.Actions, 0)
 			},
@@ -97,7 +97,7 @@ func TestKeeper_ListActionsByBlockHeight(t *testing.T) {
 				k.SetAction(ctx, &action2)
 			},
 			expectedErr: nil,
-			checkResult: func(t *testing.T, resp *types.QueryListActionsResponse) {
+			checkResult: func(t *testing.T, resp *types.QueryListActionsByBlockHeightResponse) {
 				require.NotNil(t, resp)
 				require.Len(t, resp.Actions, 2)
 				require.Equal(t, actionID1, resp.Actions[0].ActionID)
@@ -115,7 +115,7 @@ func TestKeeper_ListActionsByBlockHeight(t *testing.T) {
 				k.SetAction(ctx, &action3)
 			},
 			expectedErr: nil,
-			checkResult: func(t *testing.T, resp *types.QueryListActionsResponse) {
+			checkResult: func(t *testing.T, resp *types.QueryListActionsByBlockHeightResponse) {
 				require.NotNil(t, resp)
 				require.Len(t, resp.Actions, 2)
 				require.Equal(t, actionID1, resp.Actions[0].ActionID)
@@ -134,13 +134,14 @@ func TestKeeper_ListActionsByBlockHeight(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			k, ctx := keepertest.ActionKeeper(t)
+			k, ctx := keepertest.ActionKeeper(t, ctrl)
+			q := keeper.NewQueryServerImpl(k)
 
 			if tc.setupState != nil {
 				tc.setupState(k, ctx)
 			}
 
-			resp, err := k.ListActionsByBlockHeight(ctx, tc.req)
+			resp, err := q.ListActionsByBlockHeight(ctx, tc.req)
 
 			if tc.expectedErr != nil {
 				require.Error(t, err)

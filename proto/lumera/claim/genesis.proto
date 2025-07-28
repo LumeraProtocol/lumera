@@ -1,15 +1,14 @@
 syntax = "proto3";
 package lumera.claim;
 
+option go_package = "x/claim/types";
+
 import "amino/amino.proto";
 import "gogoproto/gogo.proto";
 import "lumera/claim/params.proto";
 import "lumera/claim/claim_record.proto";
 import "cosmos_proto/cosmos.proto";
 import "cosmos/base/v1beta1/coin.proto";
-
-
-option go_package = "github.com/LumeraProtocol/lumera/x/claim/types";
 
 // GenesisState defines the claim module's genesis state.
 message GenesisState {

@@ -10,12 +10,12 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 	"golang.org/x/sync/semaphore"
 
 	"math/big"
 
 	errorsmod "cosmossdk.io/errors"
+	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	"github.com/cosmos/btcutil/base58"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/klauspost/compress/zstd"
@@ -48,26 +48,26 @@ const (
 // - Any other validation error occurs
 func (k *Keeper) VerifySignature(ctx sdk.Context, data string, signature string, signerAddress string) error {
 	// 1. Get account PubKey
-	accAddr, err := sdk.AccAddressFromBech32(signerAddress)
+	accAddr, err := k.addressCodec.StringToBytes(signerAddress)
 	if err != nil {
-		return errorsmod.Wrapf(types.ErrInvalidSignature,
+		return errorsmod.Wrapf(actiontypes.ErrInvalidSignature,
 			"invalid account address: %s", err)
 	}
-	account := k.accountKeeper.GetAccount(ctx, accAddr)
+	account := k.authKeeper.GetAccount(ctx, accAddr)
 	if account == nil {
-		return errorsmod.Wrapf(types.ErrInvalidSignature,
+		return errorsmod.Wrapf(actiontypes.ErrInvalidSignature,
 			"account not found for address: %s", signerAddress)
 	}
 	pubKey := account.GetPubKey()
 	if pubKey == nil {
-		return errorsmod.Wrapf(types.ErrInvalidSignature,
+		return errorsmod.Wrapf(actiontypes.ErrInvalidSignature,
 			"account has no public key: %s", signerAddress)
 	}
 
 	// 2. Decode the base64 signature
 	sigBytes, err := base64.StdEncoding.DecodeString(signature)
 	if err != nil {
-		return errorsmod.Wrapf(types.ErrInvalidSignature,
+		return errorsmod.Wrapf(actiontypes.ErrInvalidSignature,
 			"failed to decode signature: %s", err)
 	}
 
@@ -76,7 +76,7 @@ func (k *Keeper) VerifySignature(ctx sdk.Context, data string, signature string,
 	// it uses sha512 internally
 	isValid := pubKey.VerifySignature([]byte(data), sigBytes)
 	if !isValid {
-		return errorsmod.Wrap(types.ErrInvalidSignature, "signature verification failed")
+		return errorsmod.Wrap(actiontypes.ErrInvalidSignature, "signature verification failed")
 	}
 
 	return nil
@@ -149,7 +149,7 @@ func VerifyKademliaIDs(ids []string, signatures string, counterIc uint64, counte
 
 	// Compare with the provided ID
 	if randomID != expectedID {
-		return errorsmod.Wrap(types.ErrInvalidID, "Kademlia ID doesn't match expected format")
+		return errorsmod.Wrap(actiontypes.ErrInvalidID, "Kademlia ID doesn't match expected format")
 	}
 
 	return nil

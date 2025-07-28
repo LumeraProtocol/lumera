@@ -7,12 +7,10 @@ import (
 	"slices"
 	"strings"
 
-	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
-	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
 	"cosmossdk.io/errors"
 	"cosmossdk.io/math"
-	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
+	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 )
@@ -27,7 +25,7 @@ const (
 
 // RegisterAction creates and configures a new action with default parameters
 // This is the recommended method for creating new actions
-func (k *Keeper) RegisterAction(ctx sdk.Context, action *actionapi.Action) (string, error) {
+func (k *Keeper) RegisterAction(ctx sdk.Context, action *actiontypes.Action) (string, error) {
 	// Validate that the action is for a new registration
 	if action.ActionID != "" {
 		return "", errors.Wrapf(
@@ -37,22 +35,14 @@ func (k *Keeper) RegisterAction(ctx sdk.Context, action *actionapi.Action) (stri
 		)
 	}
 
-	price, err := sdk.ParseCoinNormalized(action.Price)
-	if err != nil {
-		return "", errors.Wrapf(
-			sdkerrors.ErrInvalidRequest,
-			"invalid price %s: %s",
-			action.Price,
-			err.Error())
-	}
-
+	price := action.Price
 	if err := k.validatePrice(ctx, price); err != nil {
 		return "", err
 	}
 
-	creator, err := sdk.AccAddressFromBech32(action.Creator)
+	creator, err := k.addressCodec.StringToBytes(action.Creator)
 	if err != nil {
-		return "", errors.Wrapf(types2.ErrInvalidSignature,
+		return "", errors.Wrapf(actiontypes.ErrInvalidSignature,
 			"invalid account address: %s", err)
 	}
 	coins := k.bankKeeper.SpendableCoins(ctx, creator)
@@ -64,7 +54,7 @@ func (k *Keeper) RegisterAction(ctx sdk.Context, action *actionapi.Action) (stri
 		)
 	}
 
-	if !coins.IsAllGTE(sdk.Coins{price}) {
+	if !coins.IsAllGTE(sdk.Coins{*price}) {
 		return "", errors.Wrapf(
 			sdkerrors.ErrInsufficientFunds,
 			"creator %s needs at least %s but only has %s",
@@ -98,12 +88,12 @@ func (k *Keeper) RegisterAction(ctx sdk.Context, action *actionapi.Action) (stri
 	action.BlockHeight = ctx.BlockHeight()
 
 	// Ensure action state is set to PENDING for new actions
-	if action.State == actionapi.ActionState_ACTION_STATE_UNSPECIFIED {
-		action.State = actionapi.ActionState_ACTION_STATE_PENDING
+	if action.State == actiontypes.ActionStateUnspecified {
+		action.State = actiontypes.ActionStatePending
 	}
-	if action.State != actionapi.ActionState_ACTION_STATE_PENDING {
+	if action.State != actiontypes.ActionStatePending {
 		return "", errors.Wrapf(
-			types2.ErrInvalidActionState,
+			actiontypes.ErrInvalidActionState,
 			"new action cannot have state other than pending, but got %s",
 			action.State.String(),
 		)
@@ -112,13 +102,13 @@ func (k *Keeper) RegisterAction(ctx sdk.Context, action *actionapi.Action) (stri
 	// Get the appropriate handler for this action type to validate and process metadata
 	handler, err := k.actionRegistry.GetHandler(action.ActionType)
 	if err != nil {
-		return "", errors.Wrap(types2.ErrInvalidActionType, err.Error())
+		return "", errors.Wrap(actiontypes.ErrInvalidActionType, err.Error())
 	}
 
 	// Call the handler's RegisterAction method with the metadata
 	err = handler.RegisterAction(ctx, action)
 	if err != nil {
-		return "", errors.Wrap(types2.ErrInvalidMetadata, err.Error())
+		return "", errors.Wrap(actiontypes.ErrInvalidMetadata, err.Error())
 	}
 
 	// Store the action using the low-level SetAction method
@@ -130,23 +120,23 @@ func (k *Keeper) RegisterAction(ctx sdk.Context, action *actionapi.Action) (stri
 	// Transfer Fee from Creator account to Action Module Account
 	err = k.bankKeeper.SendCoinsFromAccountToModule(
 		ctx,
-		creator,             // sender - creator
-		types2.ModuleName,   // Recipient
-		sdk.NewCoins(price), // Amount
+		creator,                // sender - creator
+		actiontypes.ModuleName, // Recipient
+		sdk.NewCoins(*price),    // Amount
 	)
 	if err != nil {
-		return "", errors.Wrap(types2.ErrInternalError, err.Error())
+		return "", errors.Wrap(actiontypes.ErrInternalError, err.Error())
 	}
 
 	// Emit event for pending state
-	if action.State == actionapi.ActionState_ACTION_STATE_PENDING {
+	if action.State == actiontypes.ActionStatePending {
 		ctx.EventManager().EmitEvent(
 			sdk.NewEvent(
-				types2.EventTypeActionRegistered,
-				sdk.NewAttribute(types2.AttributeKeyActionID, action.ActionID),
-				sdk.NewAttribute(types2.AttributeKeyCreator, action.Creator),
-				sdk.NewAttribute(types2.AttributeKeyActionType, action.ActionType.String()),
-				sdk.NewAttribute(types2.AttributeKeyFee, action.Price),
+				actiontypes.EventTypeActionRegistered,
+				sdk.NewAttribute(actiontypes.AttributeKeyActionID, action.ActionID),
+				sdk.NewAttribute(actiontypes.AttributeKeyCreator, action.Creator),
+				sdk.NewAttribute(actiontypes.AttributeKeyActionType, action.ActionType.String()),
+				sdk.NewAttribute(actiontypes.AttributeKeyFee, price.String()),
 			),
 		)
 	}
@@ -169,9 +159,9 @@ func (k *Keeper) FinalizeAction(ctx sdk.Context, actionID string, superNodeAccou
 	}
 
 	// Check if action is in a valid state to be finalized
-	if existingAction.State != actionapi.ActionState_ACTION_STATE_PENDING && existingAction.State != actionapi.ActionState_ACTION_STATE_PROCESSING {
+	if existingAction.State != actiontypes.ActionStatePending && existingAction.State != actiontypes.ActionStateProcessing {
 		return errors.Wrapf(
-			types2.ErrInvalidActionState,
+			actiontypes.ErrInvalidActionState,
 			"action %s cannot be finalized: current state %s is not one of pending or processing",
 			actionID,
 			existingAction.State.String(),
@@ -188,7 +178,7 @@ func (k *Keeper) FinalizeAction(ctx sdk.Context, actionID string, superNodeAccou
 	// Get the appropriate handler for this action type
 	handler, err := k.actionRegistry.GetHandler(existingAction.ActionType)
 	if err != nil {
-		return errors.Wrap(types2.ErrInvalidActionType, err.Error())
+		return errors.Wrap(actiontypes.ErrInvalidActionType, err.Error())
 	}
 
 	// Validate and determine state changes
@@ -198,7 +188,7 @@ func (k *Keeper) FinalizeAction(ctx sdk.Context, actionID string, superNodeAccou
 	}
 
 	// Apply state changes if a new state is recommended
-	if newState != actionapi.ActionState_ACTION_STATE_UNSPECIFIED {
+	if newState != actiontypes.ActionStateUnspecified {
 		existingAction.State = newState
 		existingAction.Metadata, err = handler.GetUpdatedMetadata(ctx, existingAction.Metadata, newMetadata)
 		if err != nil {
@@ -212,33 +202,33 @@ func (k *Keeper) FinalizeAction(ctx sdk.Context, actionID string, superNodeAccou
 	// Save the updated action
 	err = k.SetAction(ctx, existingAction)
 	if err != nil {
-		return errors.Wrap(types2.ErrInternalError, fmt.Sprintf("failed to update action: %v", err))
+		return errors.Wrap(actiontypes.ErrInternalError, fmt.Sprintf("failed to update action: %v", err))
 	}
 
-	if existingAction.State == actionapi.ActionState_ACTION_STATE_FAILED {
+	if existingAction.State == actiontypes.ActionStateFailed {
 		// If the action failed, we should emit an event and return early
 		ctx.EventManager().EmitEvent(
 			sdk.NewEvent(
-				types2.EventTypeActionFailed,
-				sdk.NewAttribute(types2.AttributeKeyActionID, existingAction.ActionID),
-				sdk.NewAttribute(types2.AttributeKeyCreator, existingAction.Creator),
-				sdk.NewAttribute(types2.AttributeKeyActionType, existingAction.ActionType.String()),
-				sdk.NewAttribute(types2.AttributeKeyError, "finalization failed"),
-				sdk.NewAttribute(types2.AttributeKeySuperNodes, strings.Join(existingAction.SuperNodes, ",")),
+				actiontypes.EventTypeActionFailed,
+				sdk.NewAttribute(actiontypes.AttributeKeyActionID, existingAction.ActionID),
+				sdk.NewAttribute(actiontypes.AttributeKeyCreator, existingAction.Creator),
+				sdk.NewAttribute(actiontypes.AttributeKeyActionType, existingAction.ActionType.String()),
+				sdk.NewAttribute(actiontypes.AttributeKeyError, "finalization failed"),
+				sdk.NewAttribute(actiontypes.AttributeKeySuperNodes, strings.Join(existingAction.SuperNodes, ",")),
 			),
 		)
-		return errors.Wrapf(types2.ErrFinalizationError, "action %s failed", actionID)
+		return errors.Wrapf(actiontypes.ErrFinalizationError, "action %s failed", actionID)
 	}
 
 	// If the action is now in DONE state, emit an event and distribute fees
-	if existingAction.State == actionapi.ActionState_ACTION_STATE_DONE {
+	if existingAction.State == actiontypes.ActionStateDone {
 		ctx.EventManager().EmitEvent(
 			sdk.NewEvent(
-				types2.EventTypeActionFinalized,
-				sdk.NewAttribute(types2.AttributeKeyActionID, existingAction.ActionID),
-				sdk.NewAttribute(types2.AttributeKeyCreator, existingAction.Creator),
-				sdk.NewAttribute(types2.AttributeKeyActionType, existingAction.ActionType.String()),
-				sdk.NewAttribute(types2.AttributeKeySuperNodes, strings.Join(existingAction.SuperNodes, ",")),
+				actiontypes.EventTypeActionFinalized,
+				sdk.NewAttribute(actiontypes.AttributeKeyActionID, existingAction.ActionID),
+				sdk.NewAttribute(actiontypes.AttributeKeyCreator, existingAction.Creator),
+				sdk.NewAttribute(actiontypes.AttributeKeyActionType, existingAction.ActionType.String()),
+				sdk.NewAttribute(actiontypes.AttributeKeySuperNodes, strings.Join(existingAction.SuperNodes, ",")),
 			),
 		)
 
@@ -263,9 +253,9 @@ func (k *Keeper) ApproveAction(ctx sdk.Context, actionID string, creator string)
 	}
 
 	// Check if action is in a valid state to be approved
-	if existingAction.State != actionapi.ActionState_ACTION_STATE_DONE {
+	if existingAction.State != actiontypes.ActionStateDone {
 		return errors.Wrapf(
-			types2.ErrInvalidActionState,
+			actiontypes.ErrInvalidActionState,
 			"action %s cannot be approved: current state %s",
 			actionID,
 			existingAction.State.String(),
@@ -275,7 +265,7 @@ func (k *Keeper) ApproveAction(ctx sdk.Context, actionID string, creator string)
 	// Verify creator
 	if existingAction.Creator != creator {
 		return errors.Wrapf(
-			types2.ErrUnauthorizedSN,
+			actiontypes.ErrUnauthorizedSN,
 			"only the creator %s can approve action %s",
 			existingAction.Creator,
 			actionID,
@@ -285,7 +275,7 @@ func (k *Keeper) ApproveAction(ctx sdk.Context, actionID string, creator string)
 	// Get the appropriate handler for this action type
 	handler, err := k.actionRegistry.GetHandler(existingAction.ActionType)
 	if err != nil {
-		return errors.Wrap(types2.ErrInvalidActionType, err.Error())
+		return errors.Wrap(actiontypes.ErrInvalidActionType, err.Error())
 	}
 
 	// Call the handler's ValidateApproval method for action-specific approval logic
@@ -295,7 +285,7 @@ func (k *Keeper) ApproveAction(ctx sdk.Context, actionID string, creator string)
 	}
 
 	// Update action state and store signature
-	existingAction.State = actionapi.ActionState_ACTION_STATE_APPROVED
+	existingAction.State = actiontypes.ActionStateApproved
 
 	// Save updated action
 	err = k.SetAction(ctx, existingAction)
@@ -306,10 +296,10 @@ func (k *Keeper) ApproveAction(ctx sdk.Context, actionID string, creator string)
 	// Emit event
 	ctx.EventManager().EmitEvent(
 		sdk.NewEvent(
-			types2.EventTypeActionApproved,
-			sdk.NewAttribute(types2.AttributeKeyActionID, existingAction.ActionID),
-			sdk.NewAttribute(types2.AttributeKeyCreator, existingAction.Creator),
-			sdk.NewAttribute(types2.AttributeKeyActionType, existingAction.ActionType.String()),
+			actiontypes.EventTypeActionApproved,
+			sdk.NewAttribute(actiontypes.AttributeKeyActionID, existingAction.ActionID),
+			sdk.NewAttribute(actiontypes.AttributeKeyCreator, existingAction.Creator),
+			sdk.NewAttribute(actiontypes.AttributeKeyActionType, existingAction.ActionType.String()),
 		),
 	)
 
@@ -318,7 +308,7 @@ func (k *Keeper) ApproveAction(ctx sdk.Context, actionID string, creator string)
 
 // SetAction handles the low-level storing/updating of an action in the KVStore
 // This is an internal method that should be used by other Keeper methods
-func (k *Keeper) SetAction(ctx sdk.Context, action *actionapi.Action) error {
+func (k *Keeper) SetAction(ctx sdk.Context, action *actiontypes.Action) error {
 	// First check if the action already exists to handle state changes correctly
 	existingAction, found := k.GetActionByID(ctx, action.ActionID)
 
@@ -371,7 +361,7 @@ func (k *Keeper) SetAction(ctx sdk.Context, action *actionapi.Action) error {
 
 // GetActionByID retrieves an action from the store by actionId
 // Note: This is different from the GRPC query handler
-func (k *Keeper) GetActionByID(ctx sdk.Context, actionID string) (*actionapi.Action, bool) {
+func (k *Keeper) GetActionByID(ctx sdk.Context, actionID string) (*actiontypes.Action, bool) {
 	store := k.storeService.OpenKVStore(ctx)
 
 	key := []byte(ActionKeyPrefix + actionID)
@@ -386,7 +376,7 @@ func (k *Keeper) GetActionByID(ctx sdk.Context, actionID string) (*actionapi.Act
 		return nil, false
 	}
 
-	var actionData actionapi.Action
+	var actionData actiontypes.Action
 	err = k.cdc.Unmarshal(bz, &actionData)
 	if err != nil {
 		k.Logger().Error("failed to unmarshal action", "error", err)
@@ -397,7 +387,7 @@ func (k *Keeper) GetActionByID(ctx sdk.Context, actionID string) (*actionapi.Act
 }
 
 // IterateActions iterates over all actions and calls the provided handler function
-func (k *Keeper) IterateActions(ctx sdk.Context, handler func(*actionapi.Action) bool) error {
+func (k *Keeper) IterateActions(ctx sdk.Context, handler func(*actiontypes.Action) bool) error {
 	store := k.storeService.OpenKVStore(ctx)
 
 	// Use prefix iterator to get all actions with the ActionKeyPrefix
@@ -412,7 +402,7 @@ func (k *Keeper) IterateActions(ctx sdk.Context, handler func(*actionapi.Action)
 		bz := iter.Value()
 
 		// Unmarshal the action
-		var action actionapi.Action
+		var action actiontypes.Action
 		err = k.cdc.Unmarshal(bz, &action)
 		if err != nil {
 			k.Logger().Error("failed to unmarshal action", "error", err)
@@ -428,7 +418,7 @@ func (k *Keeper) IterateActions(ctx sdk.Context, handler func(*actionapi.Action)
 }
 
 // IterateActionsByState iterates over actions with a specific state
-func (k *Keeper) IterateActionsByState(ctx sdk.Context, state actionapi.ActionState, handler func(*actionapi.Action) bool) error {
+func (k *Keeper) IterateActionsByState(ctx sdk.Context, state actiontypes.ActionState, handler func(*actiontypes.Action) bool) error {
 	store := k.storeService.OpenKVStore(ctx)
 
 	// Create the state-specific prefix for iteration
@@ -475,13 +465,13 @@ func (k *Keeper) IterateActionsByState(ctx sdk.Context, state actionapi.ActionSt
 // This method validates that the supernode:
 // 1. Is not already in the action's SuperNodes list
 // 2. Is in the top-10 supernodes for the action's block height
-func (k *Keeper) validateSupernode(ctx sdk.Context, action *actionapi.Action, superNodeAccount string) error {
+func (k *Keeper) validateSupernode(ctx sdk.Context, action *actiontypes.Action, superNodeAccount string) error {
 
 	// If SuperNode already in the list, return an error
 	if len(action.SuperNodes) > 0 {
 		if slices.Contains(action.SuperNodes, superNodeAccount) {
 			return errors.Wrapf(
-				types2.ErrUnauthorizedSN,
+				actiontypes.ErrUnauthorizedSN,
 				"supernode %s is already in the SuperNodes list for action %s",
 				superNodeAccount,
 				action.ActionID,
@@ -493,7 +483,7 @@ func (k *Keeper) validateSupernode(ctx sdk.Context, action *actionapi.Action, su
 	topSuperNodesReq := &sntypes.QueryGetTopSuperNodesForBlockRequest{
 		BlockHeight: int32(action.BlockHeight),
 	}
-	topSuperNodesResp, err := k.supernodeKeeper.GetTopSuperNodesForBlock(ctx, topSuperNodesReq)
+	topSuperNodesResp, err := k.supernodeQueryServer.GetTopSuperNodesForBlock(ctx, topSuperNodesReq)
 	if err != nil {
 		return errors.Wrapf(sdkerrors.ErrInvalidRequest, "failed to query top supernodes: %s", err)
 	}
@@ -519,7 +509,7 @@ func (k *Keeper) validateSupernode(ctx sdk.Context, action *actionapi.Action, su
 
 	if !isInTop10 {
 		return errors.Wrapf(
-			types2.ErrUnauthorizedSN,
+			actiontypes.ErrUnauthorizedSN,
 			"supernode %s is not in the top-10 supernodes for block height %d",
 			superNodeAccount,
 			action.BlockHeight,
@@ -537,9 +527,9 @@ func (k *Keeper) DistributeFees(ctx sdk.Context, actionID string) error {
 	}
 
 	// Check if the action is in a valid state for fee distribution
-	if actionData.State != actionapi.ActionState_ACTION_STATE_DONE {
+	if actionData.State != actiontypes.ActionStateDone {
 		return errors.Wrapf(
-			types2.ErrInvalidActionState,
+			actiontypes.ErrInvalidActionState,
 			"cannot distribute fees for action %s: invalid state %s",
 			actionID,
 			actionData.State.String(),
@@ -547,13 +537,10 @@ func (k *Keeper) DistributeFees(ctx sdk.Context, actionID string) error {
 	}
 
 	// Parse the fee amount
-	fee, err := sdk.ParseCoinNormalized(actionData.Price)
-	if err != nil {
-		return errors.Wrap(sdkerrors.ErrInvalidCoins, err.Error())
-	}
+	fee := actionData.Price
 
 	// If no fee or no supernodes, nothing to distribute
-	if fee.IsZero() || len(actionData.SuperNodes) == 0 {
+	if fee == nil || fee.IsZero() || len(actionData.SuperNodes) == 0 {
 		return nil
 	}
 
@@ -597,7 +584,7 @@ func (k *Keeper) DistributeFees(ctx sdk.Context, actionID string) error {
 			err = k.distributionKeeper.FundCommunityPool(
 				ctx,
 				sdk.NewCoins(foundationCoin),
-				types2.ModuleAccountAddress,
+				actiontypes.ModuleAccountAddress,
 			)
 			if err != nil {
 				return errors.Wrapf(sdkerrors.ErrInsufficientFunds, "failed to send foundation fee: %s", err)
@@ -629,16 +616,16 @@ func (k *Keeper) DistributeFees(ctx sdk.Context, actionID string) error {
 		}
 
 		// Get the supernode's account address
-		snAddr, err := sdk.AccAddressFromBech32(sn)
+		snAddr, err := k.addressCodec.StringToBytes(sn)
 		if err != nil {
-			return errors.Wrapf(types2.ErrInvalidSignature,
+			return errors.Wrapf(actiontypes.ErrInvalidSignature,
 				"invalid account address: %s", err)
 		}
 
 		// Actual payment
 		err = k.bankKeeper.SendCoinsFromModuleToAccount(
 			ctx,
-			types2.ModuleName,      // Module account name
+			actiontypes.ModuleName, // Module account name
 			snAddr,                 // Recipient
 			sdk.NewCoins(feePerSN), // Amount
 		)
@@ -665,12 +652,12 @@ func (k *Keeper) CheckExpiration(ctx sdk.Context) {
 	currentTime := ctx.BlockTime().Unix()
 	expiredCount := 0
 
-	pendingErr := k.checkExpiredActionsInState(ctx, actionapi.ActionState_ACTION_STATE_PENDING, currentTime, &expiredCount)
+	pendingErr := k.checkExpiredActionsInState(ctx, actiontypes.ActionStatePending, currentTime, &expiredCount)
 	if pendingErr != nil {
 		k.Logger().Error("Error checking pending actions for expiration", "error", pendingErr.Error())
 	}
 
-	processingErr := k.checkExpiredActionsInState(ctx, actionapi.ActionState_ACTION_STATE_PROCESSING, currentTime, &expiredCount)
+	processingErr := k.checkExpiredActionsInState(ctx, actiontypes.ActionStateProcessing, currentTime, &expiredCount)
 	if processingErr != nil {
 		k.Logger().Error("Error checking processing actions for expiration", "error", processingErr.Error())
 	}
@@ -685,12 +672,12 @@ func (k *Keeper) CheckExpiration(ctx sdk.Context) {
 }
 
 // checkExpiredActionsInState iterates through actions in a specific state and marks expired ones
-func (k *Keeper) checkExpiredActionsInState(ctx sdk.Context, state actionapi.ActionState, now int64, expiredCount *int) error {
-	return k.IterateActionsByState(ctx, state, func(action *actionapi.Action) bool {
+func (k *Keeper) checkExpiredActionsInState(ctx sdk.Context, state actiontypes.ActionState, now int64, expiredCount *int) error {
+	return k.IterateActionsByState(ctx, state, func(action *actiontypes.Action) bool {
 		// Check if action is expired
 		if action.ExpirationTime != 0 && action.ExpirationTime <= now {
 			// Update action state to EXPIRED
-			action.State = actionapi.ActionState_ACTION_STATE_EXPIRED
+			action.State = actiontypes.ActionStateExpired
 
 			// Save updated action
 			err := k.SetAction(ctx, action)
@@ -708,10 +695,10 @@ func (k *Keeper) checkExpiredActionsInState(ctx sdk.Context, state actionapi.Act
 			// Emit event
 			ctx.EventManager().EmitEvent(
 				sdk.NewEvent(
-					types2.EventTypeActionExpired,
-					sdk.NewAttribute(types2.AttributeKeyActionID, action.ActionID),
-					sdk.NewAttribute(types2.AttributeKeyCreator, action.Creator),
-					sdk.NewAttribute(types2.AttributeKeyActionType, action.ActionType.String()),
+					actiontypes.EventTypeActionExpired,
+					sdk.NewAttribute(actiontypes.AttributeKeyActionID, action.ActionID),
+					sdk.NewAttribute(actiontypes.AttributeKeyCreator, action.Creator),
+					sdk.NewAttribute(actiontypes.AttributeKeyActionType, action.ActionType.String()),
 				),
 			)
 		}
@@ -736,10 +723,18 @@ func (k *Keeper) getLastActionID(ctx sdk.Context) (uint64, error) {
 	return binary.BigEndian.Uint64(bz), nil
 }
 
-func (k *Keeper) validatePrice(ctx context.Context, price sdk.Coin) error {
+func (k *Keeper) validatePrice(ctx context.Context, price *sdk.Coin) error {
 	params := k.GetParams(ctx)
 
 	minFeeAmount := params.FeePerKbyte.Amount.Add(params.BaseActionFee.Amount)
+
+	if price == nil {
+		return errors.Wrapf(
+			sdkerrors.ErrInvalidRequest,
+			"price is not specified: must be at least %s (base + per-byte)",
+			minFeeAmount.String(),
+		)
+	}
 
 	if price.Amount.LT(minFeeAmount) {
 		return errors.Wrapf(

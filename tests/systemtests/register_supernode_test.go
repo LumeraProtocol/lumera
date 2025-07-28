@@ -12,7 +12,7 @@ import (
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 // Helper function to create a delayed vesting account
@@ -249,7 +249,7 @@ func TestSupernodeRegistrationSuccess(t *testing.T) {
 			require.Equal(t, "1.0.0", supernode.Version)
 			require.Equal(t, supernodeAccount, supernode.SupernodeAccount)
 			require.NotEmpty(t, supernode.States)
-			require.Equal(t, types.SuperNodeStateActive, supernode.States[0].State)
+			require.Equal(t, sntypes.SuperNodeStateActive, supernode.States[0].State)
 
 			// Run additional validation if provided
 			if tc.additionalValidateFn != nil {
@@ -336,7 +336,6 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 			})
 
 			// Start the chain
-			t.Log("Starting chain")
 			sut.StartChain(t)
 
 			// Create CLI helper
@@ -499,7 +498,7 @@ func TestSupernodeWithVestingDelegation(t *testing.T) {
 			require.Equal(t, "1.0.0", supernode.Version)
 			require.Equal(t, supernodeAccount, supernode.SupernodeAccount)
 			require.NotEmpty(t, supernode.States)
-			require.Equal(t, types.SuperNodeStateActive, supernode.States[0].State)
+			require.Equal(t, sntypes.SuperNodeStateActive, supernode.States[0].State)
 
 			// Verify the supernode account is the correct vesting account type
 			verifyVestingAccountType(t, cli, supernodeAccount, tc.vestingAccountType)

@@ -4,9 +4,9 @@ package system
 
 import (
 	"fmt"
-	"os"
 	"testing"
 	"time"
+	"strconv"
 
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
@@ -25,24 +25,25 @@ func TestClaimPeriodEndBurn(t *testing.T) {
 	require.NoError(t, err)
 
 	// Setup test parameters
-	claimAmount := "1000000"
-	totalClaimableAmount := 2000000 // Two potential claims
+	claimAmount := uint64(1_000_000)
+	totalClaimableAmount := uint64(2_000_000) // Two potential claims
 
-	// Create the CSV file with claim data
-	homedir, err := os.UserHomeDir()
+	// Generate a CSV file with the test data
+	claimsPath, err := claimtestutils.GenerateClaimsCSVFile([]claimtestutils.ClaimCSVRecord{
+		{OldAddress: testData.OldAddress, Amount: claimAmount},
+		{OldAddress: "lumc4mple2ddress000000000000000000000000", Amount: claimAmount}, // Second address that won't be claimed
+	}, nil)
 	require.NoError(t, err)
-	csvPath := homedir + "/claims.csv"
-	csvContent := fmt.Sprintf("%s,%s\n%s,%s\n",
-		testData.OldAddress, claimAmount,
-		"lumc4mple2ddress000000000000000000000000", claimAmount) // Second address that won't be claimed
-	err = os.WriteFile(csvPath, []byte(csvContent), 0644)
-	require.NoError(t, err)
+
+	// Ensure the file is cleaned up after the test
 	t.Cleanup(func() {
-		_ = os.Remove(csvPath)
+		claimtestutils.CleanupClaimsCSVFile(claimsPath)
 	})
 
-	// Set a short claim period (15 seconds)
-	claimEndTime := time.Now().Add(15 * time.Second).Unix()
+	claimPeriodSecs := time.Duration(20) * time.Second // Short claim period for testing
+	// Set a short claim period
+	claimEndTime := time.Now().Add(claimPeriodSecs).Unix()
+	sut.Logf("Claim end time: %s\n", time.Unix(claimEndTime, 0).Format(time.RFC3339))
 
 	// Modify genesis to set up test conditions
 	sut.ModifyGenesisJSON(t, func(genesis []byte) []byte {
@@ -51,7 +52,7 @@ func TestClaimPeriodEndBurn(t *testing.T) {
 
 		// Set total claimable amount
 		state, err = sjson.SetRawBytes(state, "app_state.claim.total_claimable_amount",
-			[]byte(fmt.Sprintf("%d", totalClaimableAmount)))
+			[]byte(strconv.FormatUint(totalClaimableAmount, 10)))
 		require.NoError(t, err)
 
 		// Enable claims and set end time
@@ -65,7 +66,7 @@ func TestClaimPeriodEndBurn(t *testing.T) {
 	})
 
 	// Start the chain
-	sut.StartChain(t)
+	sut.StartChain(t, fmt.Sprintf("--%s=%s", claimtypes.FlagClaimsPath, claimsPath))
 	cli := NewLumeradCLI(t, sut, true)
 
 	// Get claim module account address
@@ -75,7 +76,7 @@ func TestClaimPeriodEndBurn(t *testing.T) {
 
 	// Verify initial module balance
 	initialModuleBalance := cli.QueryBalance(moduleAddr, claimtypes.DefaultClaimsDenom)
-	require.Equal(t, int64(totalClaimableAmount), initialModuleBalance,
+	require.Equal(t, totalClaimableAmount, initialModuleBalance,
 		"Initial module balance should match total claimable amount")
 
 	// Process claim
@@ -87,21 +88,22 @@ func TestClaimPeriodEndBurn(t *testing.T) {
 		testData.Signature,
 		"--from", "node0",
 	}
+	sut.Logf("Registering claim with command: %s\n", registerCmd)
 	resp := cli.CustomCommand(registerCmd...)
 	RequireTxSuccess(t, resp)
 
 	// Verify user received funds
 	userBalance := cli.QueryBalance(testData.NewAddress, claimtypes.DefaultClaimsDenom)
-	require.Equal(t, int64(1000000), userBalance, "User should receive claim amount")
+	require.Equal(t, uint64(1_000_000), userBalance, "User should receive claim amount")
 
 	// Verify module balance decreased by claim amount
 	midModuleBalance := cli.QueryBalance(moduleAddr, claimtypes.DefaultClaimsDenom)
-	require.Equal(t, int64(1000000), midModuleBalance,
+	require.Equal(t, uint64(1_000_000), midModuleBalance,
 		"Module balance should be reduced by claimed amount")
 
 	// Wait for claim period to end
 	t.Log("Waiting for claim period to end...")
-	time.Sleep(time.Until(time.Unix(claimEndTime, 0)) + 10*time.Second)
+	time.Sleep(time.Until(time.Unix(claimEndTime, 0)) + claimPeriodSecs)
 
 	// Wait additional blocks for EndBlocker to process
 	sut.AwaitNextBlock(t)
@@ -115,6 +117,6 @@ func TestClaimPeriodEndBurn(t *testing.T) {
 
 	// KEY ASSERTION: Verify all remaining tokens were burned
 	finalModuleBalance := cli.QueryBalance(moduleAddr, claimtypes.DefaultClaimsDenom)
-	require.Equal(t, int64(0), finalModuleBalance,
+	require.Equal(t, uint64(0), finalModuleBalance,
 		"Module balance should be zero after burn")
 }

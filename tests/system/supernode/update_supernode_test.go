@@ -3,10 +3,9 @@ package system_test
 import (
 	"testing"
 
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
 	sdkmath "cosmossdk.io/math"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
@@ -27,13 +26,13 @@ func TestUpdateSupernode(t *testing.T) {
 
 	testCases := []struct {
 		name   string
-		msg    *types2.MsgUpdateSupernode
+		msg    *sntypes.MsgUpdateSupernode
 		setup  func(*SystemTestSuite)
-		verify func(t *testing.T, suite *SystemTestSuite, resp *types2.MsgUpdateSupernodeResponse, err error)
+		verify func(t *testing.T, suite *SystemTestSuite, resp *sntypes.MsgUpdateSupernodeResponse, err error)
 	}{
 		{
 			name: "basic update - new ip, new version, new supernode account",
-			msg: &types2.MsgUpdateSupernode{
+			msg: &sntypes.MsgUpdateSupernode{
 				Creator:          walletAddr.String(),
 				ValidatorAddress: valAddrStr,
 				IpAddress:        "10.0.0.2",
@@ -42,17 +41,17 @@ func TestUpdateSupernode(t *testing.T) {
 			},
 			setup: func(suite *SystemTestSuite) {
 				// Register a supernode in some initial state
-				sn := types2.SuperNode{
+				sn := sntypes.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
 					Version:          "1.0.0",
-					States: []*types2.SuperNodeStateRecord{
+					States: []*sntypes.SuperNodeStateRecord{
 						{
-							State:  types2.SuperNodeStateActive,
+							State:  sntypes.SuperNodeStateActive,
 							Height: suite.sdkCtx.BlockHeight(),
 						},
 					},
-					PrevIpAddresses: []*types2.IPAddressHistory{
+					PrevIpAddresses: []*sntypes.IPAddressHistory{
 						{
 							Address: "192.168.1.1",
 							Height:  suite.sdkCtx.BlockHeight(),
@@ -63,7 +62,7 @@ func TestUpdateSupernode(t *testing.T) {
 				err := suite.app.SupernodeKeeper.SetSuperNode(suite.sdkCtx, sn)
 				require.NoError(t, err)
 			},
-			verify: func(t *testing.T, suite *SystemTestSuite, resp *types2.MsgUpdateSupernodeResponse, err error) {
+			verify: func(t *testing.T, suite *SystemTestSuite, resp *sntypes.MsgUpdateSupernodeResponse, err error) {
 				require.NoError(t, err)
 				require.NotNil(t, resp)
 
@@ -84,13 +83,13 @@ func TestUpdateSupernode(t *testing.T) {
 				events := suite.sdkCtx.EventManager().Events()
 				var foundUpdateEvent bool
 				for _, e := range events {
-					if e.Type == types2.EventTypeSupernodeUpdated {
+					if e.Type == sntypes.EventTypeSupernodeUpdated {
 						foundUpdateEvent = true
 						for _, attr := range e.Attributes {
-							if string(attr.Key) == types2.AttributeKeyValidatorAddress {
+							if string(attr.Key) == sntypes.AttributeKeyValidatorAddress {
 								require.Equal(t, valAddrStr, string(attr.Value))
 							}
-							if string(attr.Key) == types2.AttributeKeyVersion {
+							if string(attr.Key) == sntypes.AttributeKeyVersion {
 								require.Equal(t, "2.0.0", string(attr.Value))
 							}
 						}
@@ -101,13 +100,13 @@ func TestUpdateSupernode(t *testing.T) {
 		},
 		{
 			name: "supernode not found",
-			msg: &types2.MsgUpdateSupernode{
+			msg: &sntypes.MsgUpdateSupernode{
 				Creator:          walletAddr.String(),
 				ValidatorAddress: valAddrStr,
 				IpAddress:        "10.0.0.3",
 			},
 			setup: func(suite *SystemTestSuite) { /* do nothing */ },
-			verify: func(t *testing.T, suite *SystemTestSuite, resp *types2.MsgUpdateSupernodeResponse, err error) {
+			verify: func(t *testing.T, suite *SystemTestSuite, resp *sntypes.MsgUpdateSupernodeResponse, err error) {
 				require.Error(t, err)
 				require.ErrorIs(t, err, sdkerrors.ErrNotFound)
 				require.Nil(t, resp)
@@ -115,24 +114,24 @@ func TestUpdateSupernode(t *testing.T) {
 		},
 		{
 			name: "unauthorized update attempt",
-			msg: &types2.MsgUpdateSupernode{
+			msg: &sntypes.MsgUpdateSupernode{
 				Creator:          unauthAddr.String(),
 				ValidatorAddress: valAddrStr,
 				IpAddress:        "8.8.8.8",
 			},
 			setup: func(suite *SystemTestSuite) {
 				// Create supernode owned by walletAddr
-				sn := types2.SuperNode{
+				sn := sntypes.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
 					Version:          "1.0.0",
-					States: []*types2.SuperNodeStateRecord{
+					States: []*sntypes.SuperNodeStateRecord{
 						{
-							State:  types2.SuperNodeStateActive,
+							State:  sntypes.SuperNodeStateActive,
 							Height: suite.sdkCtx.BlockHeight(),
 						},
 					},
-					PrevIpAddresses: []*types2.IPAddressHistory{
+					PrevIpAddresses: []*sntypes.IPAddressHistory{
 						{
 							Address: "127.0.0.2",
 							Height:  suite.sdkCtx.BlockHeight(),
@@ -143,7 +142,7 @@ func TestUpdateSupernode(t *testing.T) {
 				err := suite.app.SupernodeKeeper.SetSuperNode(suite.sdkCtx, sn)
 				require.NoError(t, err)
 			},
-			verify: func(t *testing.T, suite *SystemTestSuite, resp *types2.MsgUpdateSupernodeResponse, err error) {
+			verify: func(t *testing.T, suite *SystemTestSuite, resp *sntypes.MsgUpdateSupernodeResponse, err error) {
 				require.Error(t, err)
 				require.ErrorIs(t, err, sdkerrors.ErrUnauthorized)
 				require.Nil(t, resp)
@@ -151,12 +150,12 @@ func TestUpdateSupernode(t *testing.T) {
 		},
 		{
 			name: "invalid validator address",
-			msg: &types2.MsgUpdateSupernode{
+			msg: &sntypes.MsgUpdateSupernode{
 				Creator:          walletAddr.String(),
 				ValidatorAddress: "invalid-addr",
 			},
 			setup: nil,
-			verify: func(t *testing.T, suite *SystemTestSuite, resp *types2.MsgUpdateSupernodeResponse, err error) {
+			verify: func(t *testing.T, suite *SystemTestSuite, resp *sntypes.MsgUpdateSupernodeResponse, err error) {
 				require.Error(t, err)
 				require.ErrorIs(t, err, sdkerrors.ErrInvalidAddress)
 				require.Nil(t, resp)
@@ -164,24 +163,24 @@ func TestUpdateSupernode(t *testing.T) {
 		},
 		{
 			name: "update with no changes",
-			msg: &types2.MsgUpdateSupernode{
+			msg: &sntypes.MsgUpdateSupernode{
 				Creator:          walletAddr.String(),
 				ValidatorAddress: valAddrStr,
 				// no changes to ip, version, or supernode account
 			},
 			setup: func(suite *SystemTestSuite) {
 				// Existing supernode
-				sn := types2.SuperNode{
+				sn := sntypes.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
 					Version:          "1.0.0",
-					States: []*types2.SuperNodeStateRecord{
+					States: []*sntypes.SuperNodeStateRecord{
 						{
-							State:  types2.SuperNodeStateActive,
+							State:  sntypes.SuperNodeStateActive,
 							Height: suite.sdkCtx.BlockHeight(),
 						},
 					},
-					PrevIpAddresses: []*types2.IPAddressHistory{
+					PrevIpAddresses: []*sntypes.IPAddressHistory{
 						{
 							Address: "127.0.0.1",
 							Height:  suite.sdkCtx.BlockHeight(),
@@ -192,7 +191,7 @@ func TestUpdateSupernode(t *testing.T) {
 				err := suite.app.SupernodeKeeper.SetSuperNode(suite.sdkCtx, sn)
 				require.NoError(t, err)
 			},
-			verify: func(t *testing.T, suite *SystemTestSuite, resp *types2.MsgUpdateSupernodeResponse, err error) {
+			verify: func(t *testing.T, suite *SystemTestSuite, resp *sntypes.MsgUpdateSupernodeResponse, err error) {
 				require.NoError(t, err)
 				require.NotNil(t, resp)
 

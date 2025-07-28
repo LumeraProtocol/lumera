@@ -3,20 +3,22 @@ package keeper_test
 import (
 	"fmt"
 
-	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
 	"github.com/LumeraProtocol/lumera/x/action/v1/common"
-	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/gogoproto/proto"
+	gogoproto "github.com/cosmos/gogoproto/proto"
 	"github.com/stretchr/testify/assert"
+
+	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 )
 
 func (suite *KeeperTestSuite) TestRegisterAction() {
+	testPrice := sdk.NewInt64Coin("ulume", 100_000)
+
 	// Test cases for RegisterAction
 	testCases := []struct {
 		name      string
 		creator   string
-		action    *actionapi.Action
+		action    *actiontypes.Action
 		expErr    error
 		setupFunc func()
 	}{
@@ -35,37 +37,37 @@ func (suite *KeeperTestSuite) TestRegisterAction() {
 		{
 			name:    "Register Cascade Action - Missing MetadataID",
 			creator: suite.creatorAddress.String(),
-			action: &actionapi.Action{
+			action: &actiontypes.Action{
 				Creator:    suite.creatorAddress.String(),
-				ActionType: actionapi.ActionType_ACTION_TYPE_CASCADE,
-				Price:      "100000ulume",
+				ActionType: actiontypes.ActionTypeCascade,
+				Price:      &testPrice,
 				Metadata:   nil, // Missing metadata
 			},
-			expErr: types2.ErrInvalidMetadata,
+			expErr: actiontypes.ErrInvalidMetadata,
 		},
 		{
 			name:    "Register Sense Action - Missing MetadataID",
 			creator: suite.creatorAddress.String(),
-			action: &actionapi.Action{
+			action: &actiontypes.Action{
 				Creator:    suite.creatorAddress.String(),
-				ActionType: actionapi.ActionType_ACTION_TYPE_SENSE,
-				Price:      "100000ulume",
+				ActionType: actiontypes.ActionTypeSense,
+				Price:      &testPrice,
 				Metadata:   nil, // Missing metadata
 			},
-			expErr: types2.ErrInvalidMetadata,
+			expErr: actiontypes.ErrInvalidMetadata,
 		},
 		{
 			name:    "Register Cascade Action - Missing Signatures in MetadataID",
 			creator: suite.creatorAddress.String(),
 			action:  suite.prepareCascadeActionForRegistration(suite.creatorAddress.String(), MetadataFieldToMissSignatures),
-			expErr:  types2.ErrInvalidMetadata,
+			expErr:  actiontypes.ErrInvalidMetadata,
 		},
 		{
 			name:    "Register Action - Invalid State",
 			creator: suite.creatorAddress.String(),
-			action: func() *actionapi.Action {
+			action: func() *actiontypes.Action {
 				// Create sense metadata
-				senseMetadata := &actionapi.SenseMetadata{
+				senseMetadata := &actiontypes.SenseMetadata{
 					DataHash:             "hash123",
 					DdAndFingerprintsMax: 10,
 				}
@@ -75,25 +77,25 @@ func (suite *KeeperTestSuite) TestRegisterAction() {
 				var err error
 				metadataBytes, err = suite.keeper.GetCodec().Marshal(senseMetadata)
 				if err != nil {
-					return &actionapi.Action{
+					return &actiontypes.Action{
 						Creator:    suite.creatorAddress.String(),
-						ActionType: actionapi.ActionType_ACTION_TYPE_SENSE,
-						Price:      "100000ulume",
-						State:      actionapi.ActionState_ACTION_STATE_DONE, // Should start as UNSPECIFIED
-						Metadata:   nil,                                     // Empty metadata ID
+						ActionType: actiontypes.ActionTypeSense,
+						Price:      &testPrice,
+						State:      actiontypes.ActionStateDone, // Should start as UNSPECIFIED
+						Metadata:   nil,                         // Empty metadata ID
 					}
 				}
 
 				// Create action with invalid state but with embedded metadata
-				return &actionapi.Action{
+				return &actiontypes.Action{
 					Creator:    suite.creatorAddress.String(),
-					ActionType: actionapi.ActionType_ACTION_TYPE_SENSE,
-					Price:      "100000ulume",
-					State:      actionapi.ActionState_ACTION_STATE_DONE, // Should start as UNSPECIFIED
+					ActionType: actiontypes.ActionTypeSense,
+					Price:      &testPrice,
+					State:      actiontypes.ActionStateDone, // Should start as UNSPECIFIED
 					Metadata:   metadataBytes,
 				}
 			}(),
-			expErr: types2.ErrInvalidActionState,
+			expErr: actiontypes.ErrInvalidActionState,
 		},
 	}
 
@@ -124,7 +126,7 @@ func (suite *KeeperTestSuite) TestRegisterAction() {
 				suite.Equal(tc.action.ActionType, storedAction.ActionType, "ActionType should match")
 				suite.Equal(tc.action.Price, storedAction.Price, "Price should match")
 				suite.Equal(tc.action.BlockHeight, storedAction.BlockHeight, "BlockHeight should match")
-				suite.Equal(actionapi.ActionState_ACTION_STATE_PENDING, storedAction.State, "State should be PENDING")
+				suite.Equal(actiontypes.ActionStatePending, storedAction.State, "State should be PENDING")
 			}
 		})
 	}
@@ -141,7 +143,7 @@ func (suite *KeeperTestSuite) TestIterateActions() {
 	creator := suite.creatorAddress.String()
 
 	// Create several actions
-	actions := []*actionapi.Action{
+	actions := []*actiontypes.Action{
 		suite.prepareSenseActionForRegistration(creator, MetadataFieldToMissNone),
 		suite.prepareCascadeActionForRegistration(creator, MetadataFieldToMissNone),
 		suite.prepareSenseActionForRegistration(creator, MetadataFieldToMissNone),
@@ -157,7 +159,7 @@ func (suite *KeeperTestSuite) TestIterateActions() {
 
 	// Count actions using iterator
 	count := 0
-	err := suite.keeper.IterateActions(suite.ctx, func(action *actionapi.Action) bool {
+	err := suite.keeper.IterateActions(suite.ctx, func(action *actiontypes.Action) bool {
 		count++
 		return false // Continue iteration
 	})
@@ -167,7 +169,7 @@ func (suite *KeeperTestSuite) TestIterateActions() {
 	// Verify individual actions can be found
 	for _, id := range ids {
 		actionFound := false
-		err := suite.keeper.IterateActions(suite.ctx, func(action *actionapi.Action) bool {
+		err := suite.keeper.IterateActions(suite.ctx, func(action *actiontypes.Action) bool {
 			if action.ActionID == id {
 				actionFound = true
 				return true // Stop iteration
@@ -183,10 +185,10 @@ func (suite *KeeperTestSuite) TestFinalizeAction() {
 	testCases := []struct {
 		name             string
 		creator          string
-		action           *actionapi.Action
+		action           *actiontypes.Action
 		finalizeMetadata []byte
 		superNode        string
-		state            actionapi.ActionState
+		state            actiontypes.ActionState
 		expErr           error
 		setupFunc        func()
 	}{
@@ -196,7 +198,7 @@ func (suite *KeeperTestSuite) TestFinalizeAction() {
 			superNode:        suite.supernodes[0].SupernodeAccount,
 			action:           suite.prepareCascadeActionForRegistration(suite.creatorAddress.String(), MetadataFieldToMissNone),
 			finalizeMetadata: suite.generateCascadeFinalizationMetadata(MetadataFieldToMissNone),
-			state:            actionapi.ActionState_ACTION_STATE_DONE,
+			state:            actiontypes.ActionStateDone,
 			expErr:           nil,
 		},
 		{
@@ -205,7 +207,7 @@ func (suite *KeeperTestSuite) TestFinalizeAction() {
 			superNode:        suite.supernodes[0].SupernodeAccount,
 			action:           suite.prepareSenseActionForRegistration(suite.creatorAddress.String(), MetadataFieldToMissNone),
 			finalizeMetadata: suite.generateSenseFinalizationMetadata(suite.signatureSense, MetadataFieldToMissNone),
-			state:            actionapi.ActionState_ACTION_STATE_DONE,
+			state:            actiontypes.ActionStateDone,
 			expErr:           nil,
 		},
 		{
@@ -214,7 +216,7 @@ func (suite *KeeperTestSuite) TestFinalizeAction() {
 			superNode:        suite.badSupernode.SupernodeAccount,
 			action:           suite.prepareCascadeActionForRegistration(suite.creatorAddress.String(), MetadataFieldToMissNone),
 			finalizeMetadata: suite.generateCascadeFinalizationMetadata(MetadataFieldToMissNone),
-			expErr:           types2.ErrUnauthorizedSN,
+			expErr:           actiontypes.ErrUnauthorizedSN,
 		},
 		{
 			name:             "Finalizing Sense Action - Wrong SN",
@@ -222,7 +224,7 @@ func (suite *KeeperTestSuite) TestFinalizeAction() {
 			superNode:        suite.badSupernode.SupernodeAccount,
 			action:           suite.prepareSenseActionForRegistration(suite.creatorAddress.String(), MetadataFieldToMissNone),
 			finalizeMetadata: suite.generateSenseFinalizationMetadata(suite.signatureSense, MetadataFieldToMissNone),
-			expErr:           types2.ErrUnauthorizedSN,
+			expErr:           actiontypes.ErrUnauthorizedSN,
 		},
 	}
 	for _, tc := range testCases {
@@ -231,6 +233,8 @@ func (suite *KeeperTestSuite) TestFinalizeAction() {
 			if tc.setupFunc != nil {
 				tc.setupFunc()
 			}
+
+			suite.setupExpectationsGetAllTopSNs(1)
 
 			_, err := suite.keeper.RegisterAction(suite.ctx, tc.action)
 			suite.NoError(err)
@@ -249,9 +253,9 @@ func (suite *KeeperTestSuite) TestFinalizeAction() {
 				suite.Equal(1, len(updated.SuperNodes))
 				suite.Equal(tc.superNode, updated.SuperNodes[0])
 
-				if updated.ActionType == actionapi.ActionType_ACTION_TYPE_CASCADE {
-					cascadeMetadata := types2.CascadeMetadata{}
-					err = proto.Unmarshal(updated.Metadata, &cascadeMetadata)
+				if updated.ActionType == actiontypes.ActionTypeCascade {
+					cascadeMetadata := actiontypes.CascadeMetadata{}
+					err = gogoproto.Unmarshal(updated.Metadata, &cascadeMetadata)
 					suite.Equal(err, nil)
 
 					assert.NotZero(suite.T(), len(cascadeMetadata.RqIdsIds))
@@ -266,9 +270,9 @@ func (suite *KeeperTestSuite) TestFinalizeAction_Sense_SingleSN() {
 		name             string
 		creator          string
 		superNode        string
-		action           *actionapi.Action
+		action           *actiontypes.Action
 		finalizeMetadata []byte
-		expectedState    actionapi.ActionState
+		expectedState    actiontypes.ActionState
 		expectedError    error
 		verifySuperNodes bool
 	}{
@@ -278,7 +282,7 @@ func (suite *KeeperTestSuite) TestFinalizeAction_Sense_SingleSN() {
 			superNode:        suite.supernodes[0].SupernodeAccount,
 			action:           suite.prepareSenseActionForRegistration(suite.creatorAddress.String(), MetadataFieldToMissNone),
 			finalizeMetadata: suite.generateSenseFinalizationMetadata(suite.signatureSense, MetadataFieldToMissNone),
-			expectedState:    actionapi.ActionState_ACTION_STATE_DONE,
+			expectedState:    actiontypes.ActionStateDone,
 			expectedError:    nil,
 			verifySuperNodes: true,
 		},
@@ -288,8 +292,8 @@ func (suite *KeeperTestSuite) TestFinalizeAction_Sense_SingleSN() {
 			superNode:        suite.supernodes[0].SupernodeAccount,
 			action:           suite.prepareSenseActionForRegistration(suite.creatorAddress.String(), MetadataFieldToMissNone),
 			finalizeMetadata: suite.generateSenseFinalizationMetadata("bad-signature", MetadataFieldToMissNone),
-			expectedState:    actionapi.ActionState_ACTION_STATE_PENDING,
-			expectedError:    types2.ErrInvalidSignature,
+			expectedState:    actiontypes.ActionStatePending,
+			expectedError:    actiontypes.ErrInvalidSignature,
 			verifySuperNodes: false,
 		},
 		{
@@ -298,7 +302,7 @@ func (suite *KeeperTestSuite) TestFinalizeAction_Sense_SingleSN() {
 			superNode:        suite.supernodes[0].SupernodeAccount,
 			action:           suite.prepareSenseActionForRegistration(suite.creatorAddress.String(), MetadataFieldToMissNone),
 			finalizeMetadata: suite.generateSenseFinalizationMetadata(suite.signatureSense, MetadataFieldToMissNone),
-			expectedState:    actionapi.ActionState_ACTION_STATE_DONE,
+			expectedState:    actiontypes.ActionStateDone,
 			expectedError:    nil,
 			verifySuperNodes: true,
 		},
@@ -306,6 +310,8 @@ func (suite *KeeperTestSuite) TestFinalizeAction_Sense_SingleSN() {
 
 	for _, tc := range testCases {
 		suite.Run(tc.name, func() {
+			suite.setupExpectationsGetAllTopSNs(1)
+
 			// Register action
 			_, err := suite.keeper.RegisterAction(suite.ctx, tc.action)
 			suite.NoError(err)
@@ -349,6 +355,8 @@ func (suite *KeeperTestSuite) TestFinalizeAction_Again_Cascade() {
 	creator := suite.creatorAddress.String()
 	superNode := suite.supernodes[0].SupernodeAccount
 
+	suite.setupExpectationsGetAllTopSNs(1)
+
 	// Create an action
 	action := suite.prepareCascadeActionForRegistration(creator, MetadataFieldToMissNone)
 	_, err := suite.keeper.RegisterAction(suite.ctx, action)
@@ -369,6 +377,8 @@ func (suite *KeeperTestSuite) TestFinalizeAction_Again_Cascade() {
 func (suite *KeeperTestSuite) TestFinalizeAction_Again_Sense() {
 	creator := suite.creatorAddress.String()
 	superNode := suite.supernodes[0].SupernodeAccount
+
+	suite.setupExpectationsGetAllTopSNs(1)
 
 	// Create an action
 	action := suite.prepareSenseActionForRegistration(creator, MetadataFieldToMissNone)
@@ -396,6 +406,8 @@ func (suite *KeeperTestSuite) TestApproveAction() {
 	_, err := suite.keeper.RegisterAction(suite.ctx, action)
 	suite.NoError(err)
 
+	suite.setupExpectationsGetAllTopSNs(1)
+
 	// Finalize the action first
 	metadata := suite.generateCascadeFinalizationMetadata(MetadataFieldToMissNone)
 	err = suite.keeper.FinalizeAction(suite.ctx, action.ActionID, superNode, metadata)
@@ -408,7 +420,7 @@ func (suite *KeeperTestSuite) TestApproveAction() {
 	// Verify the action was approved
 	updated, found := suite.keeper.GetActionByID(suite.ctx, action.ActionID)
 	suite.True(found)
-	suite.Equal(actionapi.ActionState_ACTION_STATE_APPROVED, updated.State)
+	suite.Equal(actiontypes.ActionStateApproved, updated.State)
 }
 
 func (suite *KeeperTestSuite) TestApproveAction_NotFound() {
@@ -442,6 +454,8 @@ func (suite *KeeperTestSuite) TestApproveAction_UnauthorizedCreator() {
 	_, err := suite.keeper.RegisterAction(suite.ctx, action)
 	suite.NoError(err)
 
+	suite.setupExpectationsGetAllTopSNs(1)
+
 	// Finalize the action first
 	metadata := suite.generateCascadeFinalizationMetadata(MetadataFieldToMissNone)
 	err = suite.keeper.FinalizeAction(suite.ctx, action.ActionID, superNode, metadata)
@@ -453,10 +467,10 @@ func (suite *KeeperTestSuite) TestApproveAction_UnauthorizedCreator() {
 }
 
 func (suite *KeeperTestSuite) TestValidateMetadata_Cascade() {
-	actionHandler, err := suite.keeper.GetActionRegistry().GetHandler(actionapi.ActionType_ACTION_TYPE_CASCADE)
+	actionHandler, err := suite.keeper.GetActionRegistry().GetHandler(actiontypes.ActionTypeCascade)
 	suite.NoError(err)
 
-	params := types2.DefaultParams()
+	params := actiontypes.DefaultParams()
 
 	invalidCascadeAction := suite.prepareCascadeActionForRegistration(suite.creatorAddress.String(), MetadataFieldToMissDataHash)
 	_, err = actionHandler.Process(invalidCascadeAction.Metadata, common.MsgRequestAction, &params)
@@ -484,10 +498,10 @@ func (suite *KeeperTestSuite) TestValidateMetadata_Cascade() {
 }
 
 func (suite *KeeperTestSuite) TestValidateMetadata_Sense() {
-	actionHandler, err := suite.keeper.GetActionRegistry().GetHandler(actionapi.ActionType_ACTION_TYPE_SENSE)
+	actionHandler, err := suite.keeper.GetActionRegistry().GetHandler(actiontypes.ActionTypeSense)
 	suite.NoError(err)
 
-	params := types2.DefaultParams()
+	params := actiontypes.DefaultParams()
 
 	invalidSenseAction := suite.prepareSenseActionForRegistration(suite.creatorAddress.String(), MetadataFieldToMissDataHash)
 	_, err = actionHandler.Process(invalidSenseAction.Metadata, common.MsgRequestAction, &params)
@@ -509,6 +523,8 @@ func (suite *KeeperTestSuite) TestValidateMetadata_Sense() {
 func (suite *KeeperTestSuite) TestIterateActionsByState_Cascade() {
 	creator := suite.creatorAddress.String()
 	superNode := suite.supernodes[0].SupernodeAccount
+
+	suite.setupExpectationsGetAllTopSNs(2)
 
 	// Create actions in different states
 	pendingAction := suite.prepareCascadeActionForRegistration(creator, MetadataFieldToMissNone)
@@ -533,7 +549,7 @@ func (suite *KeeperTestSuite) TestIterateActionsByState_Cascade() {
 
 	// Test iterating over PENDING actions
 	pendingCount := 0
-	err = suite.keeper.IterateActionsByState(suite.ctx, actionapi.ActionState_ACTION_STATE_PENDING, func(action *actionapi.Action) bool {
+	err = suite.keeper.IterateActionsByState(suite.ctx, actiontypes.ActionStatePending, func(action *actiontypes.Action) bool {
 		pendingCount++
 		return false // Continue iteration
 	})
@@ -542,7 +558,7 @@ func (suite *KeeperTestSuite) TestIterateActionsByState_Cascade() {
 
 	// Test iterating over DONE actions
 	doneCount := 0
-	err = suite.keeper.IterateActionsByState(suite.ctx, actionapi.ActionState_ACTION_STATE_DONE, func(action *actionapi.Action) bool {
+	err = suite.keeper.IterateActionsByState(suite.ctx, actiontypes.ActionStateDone, func(action *actiontypes.Action) bool {
 		doneCount++
 		suite.Equal(finalizingAction.ActionID, action.ActionID, "Should be the finalized action")
 		return false // Continue iteration
@@ -552,7 +568,7 @@ func (suite *KeeperTestSuite) TestIterateActionsByState_Cascade() {
 
 	// Test iterating over APPROVED actions
 	approvedCount := 0
-	err = suite.keeper.IterateActionsByState(suite.ctx, actionapi.ActionState_ACTION_STATE_APPROVED, func(action *actionapi.Action) bool {
+	err = suite.keeper.IterateActionsByState(suite.ctx, actiontypes.ActionStateApproved, func(action *actiontypes.Action) bool {
 		approvedCount++
 		suite.Equal(approvedAction.ActionID, action.ActionID, "Should be the approved action")
 		return false // Continue iteration
@@ -565,6 +581,8 @@ func (suite *KeeperTestSuite) TestIterateActionsByState_Sense() {
 	creator := suite.creatorAddress.String()
 	superNode1 := suite.supernodes[0].SupernodeAccount
 
+	suite.setupExpectationsGetAllTopSNs(2)
+	
 	// Create actions in different states
 	pendingAction := suite.prepareSenseActionForRegistration(creator, MetadataFieldToMissNone)
 	_, err := suite.keeper.RegisterAction(suite.ctx, pendingAction)
@@ -589,7 +607,7 @@ func (suite *KeeperTestSuite) TestIterateActionsByState_Sense() {
 
 	// Test iterating over PENDING actions
 	pendingCount := 0
-	err = suite.keeper.IterateActionsByState(suite.ctx, actionapi.ActionState_ACTION_STATE_PENDING, func(action *actionapi.Action) bool {
+	err = suite.keeper.IterateActionsByState(suite.ctx, actiontypes.ActionStatePending, func(action *actiontypes.Action) bool {
 		pendingCount++
 		return false // Continue iteration
 	})
@@ -598,7 +616,7 @@ func (suite *KeeperTestSuite) TestIterateActionsByState_Sense() {
 
 	// Test iterating over PROCESSING actions
 	processingCount := 0
-	err = suite.keeper.IterateActionsByState(suite.ctx, actionapi.ActionState_ACTION_STATE_PROCESSING, func(action *actionapi.Action) bool {
+	err = suite.keeper.IterateActionsByState(suite.ctx, actiontypes.ActionStateProcessing, func(action *actiontypes.Action) bool {
 		processingCount++
 		return false // Continue iteration
 	})
@@ -607,7 +625,7 @@ func (suite *KeeperTestSuite) TestIterateActionsByState_Sense() {
 
 	// Test iterating over DONE actions
 	doneCount := 0
-	err = suite.keeper.IterateActionsByState(suite.ctx, actionapi.ActionState_ACTION_STATE_DONE, func(action *actionapi.Action) bool {
+	err = suite.keeper.IterateActionsByState(suite.ctx, actiontypes.ActionStateDone, func(action *actiontypes.Action) bool {
 		doneCount++
 		suite.Equal(doneAction.ActionID, action.ActionID, "Should be the finalized action")
 		return false // Continue iteration
@@ -617,7 +635,7 @@ func (suite *KeeperTestSuite) TestIterateActionsByState_Sense() {
 
 	// Test iterating over APPROVED actions
 	approvedCount := 0
-	err = suite.keeper.IterateActionsByState(suite.ctx, actionapi.ActionState_ACTION_STATE_APPROVED, func(action *actionapi.Action) bool {
+	err = suite.keeper.IterateActionsByState(suite.ctx, actiontypes.ActionStateApproved, func(action *actiontypes.Action) bool {
 		approvedCount++
 		suite.Equal(approvedAction.ActionID, action.ActionID, "Should be the approved action")
 		return false // Continue iteration
@@ -634,10 +652,13 @@ func (suite *KeeperTestSuite) TestFeeDistribution() {
 	suite.NoError(err)
 
 	creatorBalanceBefore := suite.keeper.GetBankKeeper().GetBalance(suite.ctx, creatorAcc, "ulume")
+	testPrice := sdk.NewInt64Coin("ulume", 100_000)
+
+	suite.setupExpectationsGetAllTopSNs(1)
 
 	// Create an action with a fee
 	action := suite.prepareCascadeActionForRegistration(creator, MetadataFieldToMissNone)
-	action.Price = "100000ulume"
+	action.Price = &testPrice
 	_, err = suite.keeper.RegisterAction(suite.ctx, action)
 	suite.NoError(err)
 

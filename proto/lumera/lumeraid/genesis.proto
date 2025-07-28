@@ -1,12 +1,11 @@
 syntax = "proto3";
-
 package lumera.lumeraid;
+
+option go_package = "x/lumeraid/types";
 
 import "amino/amino.proto";
 import "gogoproto/gogo.proto";
 import "lumera/lumeraid/params.proto";
-
-option go_package = "github.com/LumeraProtocol/lumera/x/lumeraid/types";
 
 // GenesisState defines the lumeraid module's genesis state.
 message GenesisState {

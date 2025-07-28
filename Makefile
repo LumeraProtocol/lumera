@@ -25,7 +25,7 @@ VALIDATOR_DIRS := $(wildcard ${DEVNET_DIR}/supernova_validator*-data)
 EXTERNAL_GENESIS := $(SHARED_DIR)/external_genesis.json
 CLAIMS_FILE := $(SHARED_DIR)/claims.csv
 COMPOSE_FILE := devnet/docker-compose.yml
-WASMVM_VERSION := v2@v2.1.2
+WASMVM_VERSION := v3@v3.0.0-ibc2.0
 
 # Default paths for configuration files
 DEFAULT_CONFIG_JSON := config/config.json
@@ -172,6 +172,13 @@ gen-proto:
 	ignite generate proto-go --yes
 	ignite generate openapi --yes
 
+buf-proto:
+	buf generate --template proto/buf.gen.gogo.yaml --debug --verbose
+
+clean-proto:
+	@echo "Cleaning up protobuf generated files..."
+	find x/ -type f \( -name "*.pb.go" -o -name "*.pb.gw.go" -o -name "*.pulsar.go" \) -print -exec rm -f {} +
+
 PROTO_SRC := $(shell find proto -name "*.proto")
 GO_SRC := $(shell find app -name "*.go") \
 	$(shell find ante -name "*.go") \
@@ -180,8 +187,18 @@ GO_SRC := $(shell find app -name "*.go") \
 
 build: build/lumerad
 
-build/lumerad: $(PROTO_SRC) $(GO_SRC)
+build/lumerad: $(PROTO_SRC) $(GO_SRC) go.mod go.sum
+	@echo "Building lumerad binary..."
+	@mkdir -p build
 	ignite chain build --output build/
+
+build-debug: build-debug/lumerad
+
+build-debug/lumerad: $(PROTO_SRC) $(GO_SRC) go.mod go.sum
+	@echo "Building lumerad debug binary..."
+	@mkdir -p build
+	ignite chain build --debug -v --output build/
+
 
 ### Testing
 unit-tests:
@@ -199,5 +216,9 @@ system-tests:
 simulation-tests:
 	@echo "Running simulation tests..."
 	ignite chain simulate
+
+systemex-tests:
+	@echo "Running system tests..."
+	cd ./tests/systemtests/ && go test -tags=system_test -v .
 
 all-tests: unit-tests integration-tests system-tests simulation-tests

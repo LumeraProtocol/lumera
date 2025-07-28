@@ -8,7 +8,7 @@ import (
 
 var _ sdk.Msg = &MsgRegisterSupernode{}
 
-func NewMsgRegisterSupernode(creator string, validatorAddress string, ipAddress string, version string) *MsgRegisterSupernode {
+func NewMsgRegisterSupernode(creator string, validatorAddress string, ipAddress string) *MsgRegisterSupernode {
 	return &MsgRegisterSupernode{
 		Creator:          creator,
 		ValidatorAddress: validatorAddress,

@@ -1,0 +1,19 @@
+syntax = "proto3";
+package lumera.action.v1;
+
+option go_package = "x/action/v1/types";
+
+import "gogoproto/gogo.proto";
+
+// ActionType enum represents the various types of actions that can be performed.
+enum ActionType {
+  option (gogoproto.goproto_enum_prefix) = false;
+  option (gogoproto.goproto_enum_stringer) = true;
+
+  // The default action type, used when the type is not specified.
+  ACTION_TYPE_UNSPECIFIED = 0 [(gogoproto.enumvalue_customname) = "ActionTypeUnspecified"];
+  // The action type for sense operations.
+  ACTION_TYPE_SENSE = 1 [(gogoproto.enumvalue_customname) = "ActionTypeSense"];
+  // The action type for cascade operations.
+  ACTION_TYPE_CASCADE = 2 [(gogoproto.enumvalue_customname) = "ActionTypeCascade"];
+}

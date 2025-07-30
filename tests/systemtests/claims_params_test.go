@@ -65,7 +65,7 @@ func TestClaimsUpdateParamsProposal(t *testing.T) {
 				"max_claims_per_block": 50
 			}
 		}],
-		"deposit": "100000000stake",
+		"deposit": "100000000ulume",
 		"metadata": "ipfs://CID",
 		"title": "Update Claim Parameters",
 		"summary": "Update claims module parameters with new values"

@@ -217,6 +217,41 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 			},
 			expectedError: nil,
 		},
+		{
+			name: "re-registration of disabled supernode",
+			msg: &types2.MsgRegisterSupernode{
+				SupernodeAccount: creatorAddr.String(),
+				Creator:          creatorAddr.String(),
+				ValidatorAddress: valAddr.String(),
+				IpAddress:        "192.168.1.2",
+				P2PPort:          "26658",
+			},
+			mockSetup: func(sk *supernodemocks.MockStakingKeeper, slk *supernodemocks.MockSlashingKeeper, bk *supernodemocks.MockBankKeeper) {
+				sk.EXPECT().
+					Validator(gomock.Any(), valAddr).
+					Return(&stakingtypes.Validator{
+						OperatorAddress: valAddr.String(),
+						Status:          stakingtypes.Bonded,
+						Tokens:          math.NewInt(2_000_000),
+						DelegatorShares: math.LegacyNewDec(2_000_000),
+						Jailed:          false,
+					}, nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name: "cannot register already active supernode",
+			msg: &types2.MsgRegisterSupernode{
+				SupernodeAccount: creatorAddr.String(),
+				Creator:          creatorAddr.String(),
+				ValidatorAddress: valAddr.String(),
+				IpAddress:        "192.168.1.2",
+				P2PPort:          "26658",
+			},
+			mockSetup: func(sk *supernodemocks.MockStakingKeeper, slk *supernodemocks.MockSlashingKeeper, bk *supernodemocks.MockBankKeeper) {
+			},
+			expectedError: sdkerrors.ErrInvalidRequest,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -250,6 +285,69 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 			k, sdkCtx := setupKeeperForTest(t, stakingKeeper, slashingKeeper, bankKeeper)
 			msgServer := keeper2.NewMsgServerImpl(k)
 
+			// Pre-setup for specific test cases
+			if tc.name == "re-registration of disabled supernode" {
+				// Create a disabled supernode
+				disabledSupernode := types2.SuperNode{
+					ValidatorAddress: valAddr.String(),
+					SupernodeAccount: creatorAddr.String(),
+					States: []*types2.SuperNodeStateRecord{
+						{
+							State:  types2.SuperNodeStateActive,
+							Height: 100,
+						},
+						{
+							State:  types2.SuperNodeStateDisabled,
+							Height: 200,
+						},
+					},
+					PrevIpAddresses: []*types2.IPAddressHistory{
+						{
+							Address: "192.168.1.1",
+							Height:  100,
+						},
+					},
+					PrevSupernodeAccounts: []*types2.SupernodeAccountHistory{
+						{
+							Account: creatorAddr.String(),
+							Height:  100,
+						},
+					},
+					P2PPort: "26657",
+				}
+				err := k.SetSuperNode(sdkCtx, disabledSupernode)
+				require.NoError(t, err)
+			}
+
+			if tc.name == "cannot register already active supernode" {
+				// Create an active supernode
+				activeSupernode := types2.SuperNode{
+					ValidatorAddress: valAddr.String(),
+					SupernodeAccount: creatorAddr.String(),
+					States: []*types2.SuperNodeStateRecord{
+						{
+							State:  types2.SuperNodeStateActive,
+							Height: 100,
+						},
+					},
+					PrevIpAddresses: []*types2.IPAddressHistory{
+						{
+							Address: "192.168.1.1",
+							Height:  100,
+						},
+					},
+					PrevSupernodeAccounts: []*types2.SupernodeAccountHistory{
+						{
+							Account: creatorAddr.String(),
+							Height:  100,
+						},
+					},
+					P2PPort: "26657",
+				}
+				err := k.SetSuperNode(sdkCtx, activeSupernode)
+				require.NoError(t, err)
+			}
+
 			// Execute
 			_, err := msgServer.RegisterSupernode(sdkCtx, tc.msg)
 
@@ -263,6 +361,21 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 				require.ErrorIs(t, err, tc.expectedError)
 			} else {
 				require.NoError(t, err)
+				
+				// Additional assertions for re-registration test
+				if tc.name == "re-registration of disabled supernode" {
+					// Verify the supernode is now active
+					sn, found := k.QuerySuperNode(sdkCtx, valAddr)
+					require.True(t, found)
+					require.Len(t, sn.States, 3) // Initial active, disabled, then active again
+					require.Equal(t, types2.SuperNodeStateActive, sn.States[2].State)
+					
+					// Verify IP address and account were NOT updated
+					require.Equal(t, "192.168.1.1", sn.PrevIpAddresses[len(sn.PrevIpAddresses)-1].Address)
+					require.Equal(t, creatorAddr.String(), sn.SupernodeAccount)
+					require.Len(t, sn.PrevIpAddresses, 1) // No new IP history
+					require.Len(t, sn.PrevSupernodeAccounts, 1) // No new account history
+				}
 			}
 		})
 	}

@@ -55,7 +55,7 @@ func (suite *KeeperIntegrationSuite) TearDownSuite() {
 	suite.app = nil
 }
 
-func (suite *KeeperIntegrationSuite) TestEnableSuperNode() {
+func (suite *KeeperIntegrationSuite) TestSetSuperNodeActive() {
 	tests := []struct {
 		name          string
 		setup         func()
@@ -72,13 +72,14 @@ func (suite *KeeperIntegrationSuite) TestEnableSuperNode() {
 					Version:          "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					PrevSupernodeAccounts: []*types2.SupernodeAccountHistory{{Account: sdk.AccAddress([]byte("validator1e")).String()}},
 					P2PPort:          "26657",
 				}
 				err := suite.keeper.SetSuperNode(suite.ctx, supernode)
 				require.NoError(suite.T(), err)
 			},
 			execute: func() error {
-				return suite.keeper.EnableSuperNode(suite.ctx, sdk.ValAddress("validator1e"))
+				return suite.keeper.SetSuperNodeActive(suite.ctx, sdk.ValAddress("validator1e"))
 			},
 			validate: func() error {
 				result, found := suite.keeper.QuerySuperNode(suite.ctx, sdk.ValAddress("validator1e"))
@@ -127,6 +128,7 @@ func (suite *KeeperIntegrationSuite) TestIsSupernodeActive() {
 					Version:          "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					PrevSupernodeAccounts: []*types2.SupernodeAccountHistory{{Account: sdk.AccAddress([]byte("validator1a")).String()}},
 					P2PPort:          "26657",
 				}
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
@@ -159,7 +161,7 @@ func (suite *KeeperIntegrationSuite) TestIsSupernodeActive() {
 	}
 }
 
-func (suite *KeeperIntegrationSuite) TestDisableSuperNode() {
+func (suite *KeeperIntegrationSuite) TestSetSuperNodeStopped() {
 	tests := []struct {
 		name          string
 		setup         func()
@@ -168,7 +170,7 @@ func (suite *KeeperIntegrationSuite) TestDisableSuperNode() {
 		expectSuccess bool
 	}{
 		{
-			name: "when supernode is successfully disabled, it should be disabled",
+			name: "when supernode is successfully stopped, it should be stopped",
 			setup: func() {
 				supernode := types2.SuperNode{
 					ValidatorAddress: sdk.ValAddress([]byte("validator1d")).String(),
@@ -176,20 +178,21 @@ func (suite *KeeperIntegrationSuite) TestDisableSuperNode() {
 					Version:          "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					PrevSupernodeAccounts: []*types2.SupernodeAccountHistory{{Account: sdk.AccAddress([]byte("validator1d")).String()}},
 					P2PPort:          "26657",
 				}
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
 			},
 			execute: func() error {
-				return suite.keeper.DisableSuperNode(suite.ctx, sdk.ValAddress("validator1d"))
+				return suite.keeper.SetSuperNodeStopped(suite.ctx, sdk.ValAddress("validator1d"))
 			},
 			validate: func() error {
 				result, found := suite.keeper.QuerySuperNode(suite.ctx, sdk.ValAddress("validator1d"))
 				if !found {
 					return fmt.Errorf("SuperNode not found")
 				}
-				if result.States[len(result.States)-1].State != types2.SuperNodeStateDisabled {
-					return fmt.Errorf("expected SuperNode to be disabled")
+				if result.States[len(result.States)-1].State != types2.SuperNodeStateStopped {
+					return fmt.Errorf("expected SuperNode to be stopped")
 				}
 				return nil
 			},
@@ -332,6 +335,7 @@ func (suite *KeeperIntegrationSuite) TestGetSuperNodeBySuperNodeAddress() {
 					Version:          "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
+					PrevSupernodeAccounts: []*types2.SupernodeAccountHistory{{Account: sdk.AccAddress([]byte("validator1")).String()}},
 					P2PPort:          "26657",
 				}
 				require.NoError(suite.T(), suite.keeper.SetSuperNode(suite.ctx, supernode))

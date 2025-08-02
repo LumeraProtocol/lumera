@@ -30,6 +30,12 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 				Height:  1,
 			},
 		},
+		PrevSupernodeAccounts: []*types2.SupernodeAccountHistory{
+			{
+				Account: otherCreatorAddr.String(),
+				Height:  1,
+			},
+		},
 		States: []*types2.SuperNodeStateRecord{
 			{
 				State:  types2.SuperNodeStateActive,
@@ -143,7 +149,10 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 				require.Equal(t, "10.0.1.1", sn.PrevIpAddresses[0].Address)
 				require.Equal(t, "192.168.1.1", sn.PrevIpAddresses[1].Address)
 				require.Equal(t, sn.SupernodeAccount, creatorAddr.String())
-
+				// Check supernode account history
+				require.Len(t, sn.PrevSupernodeAccounts, 2)
+				require.Equal(t, otherCreatorAddr.String(), sn.PrevSupernodeAccounts[0].Account)
+				require.Equal(t, otherCreatorAddr.String(), sn.PrevSupernodeAccounts[1].Account)
 			},
 		},
 		{

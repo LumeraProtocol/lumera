@@ -45,7 +45,7 @@ func (k msgServer) UpdateSupernode(goCtx context.Context, msg *sntypes.MsgUpdate
 				sdk.NewEvent(
 					sntypes.EventTypeSupernodeUpdated,
 					sdk.NewAttribute(sntypes.AttributeKeyValidatorAddress, msg.ValidatorAddress),
-					sdk.NewAttribute("old_ip_address", currentIP),
+					sdk.NewAttribute(sntypes.AttributeKeyOldIPAddress, currentIP),
 					sdk.NewAttribute(sntypes.AttributeKeyIPAddress, msg.IpAddress),
 				),
 			)
@@ -94,7 +94,7 @@ func (k msgServer) UpdateSupernode(goCtx context.Context, msg *sntypes.MsgUpdate
 			sdk.NewEvent(
 				sntypes.EventTypeSupernodeUpdated,
 				sdk.NewAttribute(sntypes.AttributeKeyValidatorAddress, msg.ValidatorAddress),
-				sdk.NewAttribute("old_version", oldVersion),
+				sdk.NewAttribute(sntypes.AttributeKeyOldVersion, oldVersion),
 				sdk.NewAttribute(sntypes.AttributeKeyVersion, msg.Version),
 			),
 		)

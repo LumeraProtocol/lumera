@@ -10,6 +10,7 @@ import (
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 )
 
+// StopSupernode stops an active supernode (transitions from Active to Stopped state)
 func (k msgServer) StopSupernode(goCtx context.Context, msg *types2.MsgStopSupernode) (*types2.MsgStopSupernodeResponse, error) {
 	ctx := sdk.UnwrapSDKContext(goCtx)
 

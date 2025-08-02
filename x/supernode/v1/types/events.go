@@ -14,4 +14,10 @@ const (
 	AttributeKeyReason           = "reason"
 	AttributeKeyOldAccount       = "old_account"
 	AttributeKeyNewAccount       = "new_account"
+	AttributeKeySupernodeAccount = "supernode_account"
+	AttributeKeyP2PPort          = "p2p_port"
+	AttributeKeyReRegistered     = "re_registered"
+	AttributeKeyPreviousState    = "previous_state"
+	AttributeKeyOldIPAddress     = "old_ip_address"
+	AttributeKeyOldVersion       = "old_version"
 )

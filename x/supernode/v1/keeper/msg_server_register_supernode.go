@@ -26,8 +26,61 @@ func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types2.MsgRegis
 	}
 
 	//  Check if supernode exists
-	_, found := k.QuerySuperNode(ctx, valOperAddr)
+	existingSupernode, found := k.QuerySuperNode(ctx, valOperAddr)
 	if found {
+		// Check if it's disabled (deregistered) - allow re-registration
+		if len(existingSupernode.States) > 0 && existingSupernode.States[len(existingSupernode.States)-1].State == types2.SuperNodeStateDisabled {
+
+			// Get validator and perform eligibility checks for re-registration
+			validator, err := k.stakingKeeper.Validator(ctx, valOperAddr)
+			if err != nil {
+				return nil, errorsmod.Wrapf(sdkerrors.ErrNotFound, "validator not found for operator address %s: %s", msg.ValidatorAddress, err)
+			}
+
+			// Check if validator is jailed
+			if validator.IsJailed() {
+				return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest,
+					"validator %s is jailed and cannot re-register a supernode", msg.ValidatorAddress)
+			}
+
+			// Check eligibility - use existing supernode account for validation
+			if err := k.CheckValidatorSupernodeEligibility(ctx, validator, msg.ValidatorAddress, existingSupernode.SupernodeAccount); err != nil {
+				return nil, err
+			}
+
+			// Re-registration only changes state from Disabled to Active
+			// Use UpdateSupernode for updating other fields
+			existingSupernode.States = append(existingSupernode.States, &types2.SuperNodeStateRecord{
+				State:  types2.SuperNodeStateActive,
+				Height: ctx.BlockHeight(),
+			})
+
+			// Save the updated supernode
+			if err := k.SetSuperNode(ctx, existingSupernode); err != nil {
+				return nil, errorsmod.Wrapf(sdkerrors.ErrIO, "error updating supernode: %s", err)
+			}
+
+			// Emit event with existing supernode details
+			currentIP := ""
+			if len(existingSupernode.PrevIpAddresses) > 0 {
+				currentIP = existingSupernode.PrevIpAddresses[len(existingSupernode.PrevIpAddresses)-1].Address
+			}
+			
+			ctx.EventManager().EmitEvent(
+				sdk.NewEvent(
+					types2.EventTypeSupernodeRegistered,
+					sdk.NewAttribute(types2.AttributeKeyValidatorAddress, msg.ValidatorAddress),
+					sdk.NewAttribute(types2.AttributeKeyIPAddress, currentIP),
+					sdk.NewAttribute(types2.AttributeKeySupernodeAccount, existingSupernode.SupernodeAccount),
+					sdk.NewAttribute(types2.AttributeKeyReRegistered, "true"),
+					sdk.NewAttribute(types2.AttributeKeyPreviousState, "disabled"),
+				),
+			)
+
+			return &types2.MsgRegisterSupernodeResponse{}, nil
+		}
+
+		// If not disabled, cannot register
 		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode already exists for validator %s", msg.ValidatorAddress)
 	}
 
@@ -93,6 +146,8 @@ func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types2.MsgRegis
 			types2.EventTypeSupernodeRegistered,
 			sdk.NewAttribute(types2.AttributeKeyValidatorAddress, msg.ValidatorAddress),
 			sdk.NewAttribute(types2.AttributeKeyIPAddress, msg.IpAddress),
+			sdk.NewAttribute(types2.AttributeKeySupernodeAccount, msg.SupernodeAccount),
+			sdk.NewAttribute(types2.AttributeKeyP2PPort, msg.P2PPort),
 		),
 	)
 

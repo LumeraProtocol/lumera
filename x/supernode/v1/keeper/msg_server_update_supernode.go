@@ -3,14 +3,14 @@ package keeper
 import (
 	"context"
 
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
 	errorsmod "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 )
 
-func (k msgServer) UpdateSupernode(goCtx context.Context, msg *types2.MsgUpdateSupernode) (*types2.MsgUpdateSupernodeResponse, error) {
+func (k msgServer) UpdateSupernode(goCtx context.Context, msg *sntypes.MsgUpdateSupernode) (*sntypes.MsgUpdateSupernodeResponse, error) {
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
 	valOperAddr, err := sdk.ValAddressFromBech32(msg.ValidatorAddress)
@@ -29,20 +29,75 @@ func (k msgServer) UpdateSupernode(goCtx context.Context, msg *types2.MsgUpdateS
 
 	// Update fields
 	if msg.IpAddress != "" {
-		if len(supernode.PrevIpAddresses) == 0 || supernode.PrevIpAddresses[len(supernode.PrevIpAddresses)-1].Address != msg.IpAddress {
-			supernode.PrevIpAddresses = append(supernode.PrevIpAddresses, &types2.IPAddressHistory{
+		currentIP := ""
+		if len(supernode.PrevIpAddresses) > 0 {
+			currentIP = supernode.PrevIpAddresses[len(supernode.PrevIpAddresses)-1].Address
+		}
+
+		if currentIP != msg.IpAddress {
+			supernode.PrevIpAddresses = append(supernode.PrevIpAddresses, &sntypes.IPAddressHistory{
 				Address: msg.IpAddress,
 				Height:  ctx.BlockHeight(),
 			})
+
+			// Emit event for IP address change
+			ctx.EventManager().EmitEvent(
+				sdk.NewEvent(
+					sntypes.EventTypeSupernodeUpdated,
+					sdk.NewAttribute(sntypes.AttributeKeyValidatorAddress, msg.ValidatorAddress),
+					sdk.NewAttribute("old_ip_address", currentIP),
+					sdk.NewAttribute(sntypes.AttributeKeyIPAddress, msg.IpAddress),
+				),
+			)
 		}
 	}
 
 	if msg.SupernodeAccount != "" {
-		supernode.SupernodeAccount = msg.SupernodeAccount
+		// Validate the new supernode account address
+		if _, err := sdk.AccAddressFromBech32(msg.SupernodeAccount); err != nil {
+			return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidAddress, "invalid supernode account address: %s", err)
+		}
+
+		// Track supernode account history
+		if supernode.SupernodeAccount != msg.SupernodeAccount {
+			oldAccount := supernode.SupernodeAccount
+
+			// Store the previous account in history
+			supernode.PrevSupernodeAccounts = append(supernode.PrevSupernodeAccounts, &sntypes.SupernodeAccountHistory{
+				Account: oldAccount,
+				Height:  ctx.BlockHeight(),
+			})
+
+			// Update the account
+			supernode.SupernodeAccount = msg.SupernodeAccount
+
+			// Emit event for account change
+			ctx.EventManager().EmitEvent(
+				sdk.NewEvent(
+					sntypes.EventTypeSupernodeUpdated,
+					sdk.NewAttribute(sntypes.AttributeKeyValidatorAddress, msg.ValidatorAddress),
+					sdk.NewAttribute(sntypes.AttributeKeyOldAccount, oldAccount),
+					sdk.NewAttribute(sntypes.AttributeKeyNewAccount, msg.SupernodeAccount),
+				),
+			)
+		} else {
+			supernode.SupernodeAccount = msg.SupernodeAccount
+		}
 	}
 
-	if msg.Version != "" {
+	if msg.Version != "" && supernode.Version != msg.Version {
+		oldVersion := supernode.Version
 		supernode.Version = msg.Version
+
+		// Emit event for version change
+		ctx.EventManager().EmitEvent(
+			sdk.NewEvent(
+				sntypes.EventTypeSupernodeUpdated,
+				sdk.NewAttribute(sntypes.AttributeKeyValidatorAddress, msg.ValidatorAddress),
+				sdk.NewAttribute("old_version", oldVersion),
+				sdk.NewAttribute(sntypes.AttributeKeyVersion, msg.Version),
+			),
+		)
 	}
 
 	// Re-save
@@ -50,14 +105,5 @@ func (k msgServer) UpdateSupernode(goCtx context.Context, msg *types2.MsgUpdateS
 		return nil, err
 	}
 
-	// Emit event
-	ctx.EventManager().EmitEvent(
-		sdk.NewEvent(
-			types2.EventTypeSupernodeUpdated,
-			sdk.NewAttribute(types2.AttributeKeyValidatorAddress, msg.ValidatorAddress),
-			sdk.NewAttribute(types2.AttributeKeyVersion, supernode.Version),
-		),
-	)
-
-	return &types2.MsgUpdateSupernodeResponse{}, nil
+	return &sntypes.MsgUpdateSupernodeResponse{}, nil
 }

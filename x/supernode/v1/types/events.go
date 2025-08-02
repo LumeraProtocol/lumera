@@ -12,4 +12,6 @@ const (
 	AttributeKeyIPAddress        = "ip_address"
 	AttributeKeyVersion          = "version"
 	AttributeKeyReason           = "reason"
+	AttributeKeyOldAccount       = "old_account"
+	AttributeKeyNewAccount       = "new_account"
 )

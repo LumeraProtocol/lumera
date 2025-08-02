@@ -68,6 +68,12 @@ func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types2.MsgRegis
 				Height:  ctx.BlockHeight(),
 			},
 		},
+		PrevSupernodeAccounts: []*types2.SupernodeAccountHistory{
+			{
+				Account: msg.SupernodeAccount,
+				Height:  ctx.BlockHeight(),
+			},
+		},
 		P2PPort: msg.P2PPort,
 	}
 

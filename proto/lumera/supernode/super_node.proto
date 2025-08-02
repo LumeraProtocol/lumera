@@ -11,6 +11,7 @@ import "lumera/supernode/evidence.proto";
 import "lumera/supernode/metrics_aggregate.proto";
 import "lumera/supernode/ip_address_history.proto";
 import "lumera/supernode/supernode_state.proto";
+import "lumera/supernode/supernode_account_history.proto";
 
 message SuperNode {
   string validator_address = 1 [(cosmos_proto.scalar) = "cosmos.ValidatorAddressString"];
@@ -21,4 +22,5 @@ message SuperNode {
   MetricsAggregate metrics = 6;
   string supernode_account = 7 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
   string p2p_port = 8;
+  repeated SupernodeAccountHistory prev_supernode_accounts = 9;
 }

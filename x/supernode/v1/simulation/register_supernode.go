@@ -42,9 +42,15 @@ func SimulateMsgRegisterSupernode(
 				continue
 			}
 
-			// Check if supernode already exists
-			_, superNodeExists := k.QuerySuperNode(ctx, valAddr)
+			// Check if supernode already exists and is not disabled
+			supernode, superNodeExists := k.QuerySuperNode(ctx, valAddr)
 			if superNodeExists {
+				// Allow re-registration if the supernode is disabled
+				if len(supernode.States) > 0 && supernode.States[len(supernode.States)-1].State == types2.SuperNodeStateDisabled {
+					found = true
+					break
+				}
+				// Skip if supernode exists and is not disabled
 				continue
 			}
 

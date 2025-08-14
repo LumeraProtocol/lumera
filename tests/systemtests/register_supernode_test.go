@@ -312,6 +312,39 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 			},
 			expectedError: "supernode already exists",
 		},
+		{
+			name:         "re_registration_of_disabled_supernode",
+			minimumStake: "1000000",
+			setupFn: func(t *testing.T, cli *LumeradCli) (string, string, string) {
+				valAddr := strings.TrimSpace(cli.Keys("keys", "show", "node0", "--bech", "val", "-a"))
+				accountAddr := cli.GetKeyAddr("node0")
+				return valAddr, accountAddr, "node0"
+			},
+			additionalSetupFn: func(t *testing.T, cli *LumeradCli, valAddr string, accountAddr string, keyName string) {
+				// Register supernode first
+				registerCmd := []string{
+					"tx", "supernode", "register-supernode",
+					valAddr,
+					"192.168.1.1",
+					accountAddr,
+					"--from", keyName,
+				}
+				resp := cli.CustomCommand(registerCmd...)
+				RequireTxSuccess(t, resp)
+				sut.AwaitNextBlock(t)
+				
+				// Deregister the supernode to set it to DISABLED state
+				deregisterCmd := []string{
+					"tx", "supernode", "deregister-supernode",
+					valAddr,
+					"--from", keyName,
+				}
+				resp = cli.CustomCommand(deregisterCmd...)
+				RequireTxSuccess(t, resp)
+				sut.AwaitNextBlock(t)
+			},
+			expectedError: "", // Re-registration should succeed
+		},
 	}
 
 	for _, tc := range testCases {
@@ -368,23 +401,42 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 			)
 			t.Logf("Registration response: %s", registerResp)
 
-			// Verify transaction failed with correct error
-			t.Log("Verifying transaction failure")
-			RequireTxFailure(t, registerResp, tc.expectedError)
+			// Handle re-registration success case
+			if tc.expectedError == "" {
+				t.Log("Verifying transaction success for re-registration")
+				RequireTxSuccess(t, registerResp)
+				
+				// Verify supernode is now active after re-registration
+				sut.AwaitNextBlock(t)
+				supernode := GetSuperNodeResponse(t, cli, valAddr)
+				require.Equal(t, valAddr, supernode.ValidatorAddress)
+				require.NotEmpty(t, supernode.States)
+				lastState := supernode.States[len(supernode.States)-1]
+				require.Equal(t, types.SuperNodeStateActive, lastState.State, "Supernode should be active after re-registration")
+				
+				// Verify that IP address was NOT updated during re-registration
+				require.NotEmpty(t, supernode.PrevIpAddresses)
+				lastIP := supernode.PrevIpAddresses[len(supernode.PrevIpAddresses)-1].Address
+				require.Equal(t, "192.168.1.1", lastIP, "IP address should not change during re-registration")
+			} else {
+				// Verify transaction failed with correct error
+				t.Log("Verifying transaction failure")
+				RequireTxFailure(t, registerResp, tc.expectedError)
 
-			// Verify no supernode was registered (except for duplicate_registration case)
-			if tc.name != "duplicate_registration" {
-				t.Log("Verifying no supernode was registered")
-				supernodeResp := cli.WithRunErrorsIgnored().CustomQuery(
-					"query", "supernode", "get-super-node", valAddr,
-				)
-				t.Logf("Supernode query response: %s", supernodeResp)
+				// Verify no supernode was registered (except for duplicate_registration case)
+				if tc.name != "duplicate_registration" {
+					t.Log("Verifying no supernode was registered")
+					supernodeResp := cli.WithRunErrorsIgnored().CustomQuery(
+						"query", "supernode", "get-super-node", valAddr,
+					)
+					t.Logf("Supernode query response: %s", supernodeResp)
 
-				require.True(t,
-					strings.Contains(supernodeResp, "not found") ||
-						strings.Contains(supernodeResp, "no supernode found") ||
-						strings.Contains(supernodeResp, "key not found"),
-					"supernode should not be registered, got response: %s", supernodeResp)
+					require.True(t,
+						strings.Contains(supernodeResp, "not found") ||
+							strings.Contains(supernodeResp, "no supernode found") ||
+							strings.Contains(supernodeResp, "key not found"),
+						"supernode should not be registered, got response: %s", supernodeResp)
+				}
 			}
 		})
 	}

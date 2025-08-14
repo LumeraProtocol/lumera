@@ -54,14 +54,15 @@ Key implementation aspects:
 
 ```go
 type SuperNode struct {
-    ValidatorAddress string                 // Validator operator address
-    States           []SuperNodeStateRecord // State history records
-    Evidence         []Evidence             // Evidence of behavior/violations
-    PrevIpAddresses  []IPAddressHistory    // History of IP addresses
-    Version          string                 // Software version
-    Metrics          MetricsAggregate      // Performance metrics
-    SupernodeAccount string                 // Associated account for delegations
-    P2pPort          string                 // P2P network port
+    ValidatorAddress      string                      // Validator operator address
+    States                []SuperNodeStateRecord      // State history records
+    Evidence              []Evidence                  // Evidence of behavior/violations
+    PrevIpAddresses       []IPAddressHistory         // History of IP addresses
+    Version               string                      // Software version
+    Metrics               MetricsAggregate           // Performance metrics
+    SupernodeAccount      string                      // Associated account for delegations
+    PrevSupernodeAccounts []SupernodeAccountHistory  // History of supernode accounts
+    P2pPort               string                      // P2P network port
 }
 ```
 
@@ -78,17 +79,19 @@ Key implementation details:
 enum SuperNodeState {
     SUPERNODE_STATE_UNSPECIFIED = 0; // Default, unused state
     SUPERNODE_STATE_ACTIVE = 1;      // Operational and processing actions
-    SUPERNODE_STATE_DISABLED = 2;    // Registered but not operational
+    SUPERNODE_STATE_DISABLED = 2;    // Terminal state - requires re-registration
     SUPERNODE_STATE_STOPPED = 3;     // Temporarily deactivated
     SUPERNODE_STATE_PENALIZED = 4;   // Penalized for violations
 }
 ```
 
 State transitions follow specific rules:
-- New supernodes start in DISABLED state
-- Only DISABLED supernodes can transition to ACTIVE
-- ACTIVE supernodes can be STOPPED by operator or PENALIZED by the system
-- STOPPED supernodes can return to ACTIVE if eligibility requirements are met
+- New supernodes start in ACTIVE state upon registration
+- DISABLED is a terminal state set only by deregistration (permanent removal)
+- STOPPED is a temporary state (can restart with StartSupernode)
+- Re-registration of a DISABLED supernode only changes state to ACTIVE (does not update other fields)
+- ACTIVE supernodes can be STOPPED by operator or hooks
+- All methods except deregistration operate between ACTIVE and STOPPED states
 - PENALIZED supernodes may require governance intervention to return to service
 
 ### 3. Evidence
@@ -118,20 +121,24 @@ Evidence is used to:
 1. **Registration**:
    - Validator operator submits a registration transaction
    - System validates eligibility requirements
-   - Supernode is created in DISABLED state
+   - Supernode is created in ACTIVE state
 
-2. **Activation**:
-   - Operator submits activation request
-   - System verifies current eligibility
-   - State changes to ACTIVE
-   - Supernode joins the active set
+2. **Re-registration** (for disabled supernodes):
+   - Only changes state from DISABLED to ACTIVE
+   - Does not update IP address, account, or other fields
+   - Use UpdateSupernode message to update fields
 
 3. **Deactivation**:
-   - Operator submits deactivation request
+   - Operator submits stop request or triggered by hooks
    - State changes to STOPPED
    - Supernode leaves the active set
 
-4. **Penalization**:
+4. **Deregistration**:
+   - Operator submits deregistration request
+   - State changes to DISABLED (terminal state)
+   - Requires re-registration to become active again
+
+5. **Penalization**:
    - Evidence of violations triggers automatic or governance review
    - If threshold is reached, state changes to PENALIZED
    - Possible slashing of stake occurs
@@ -163,7 +170,7 @@ Validation:
 
 ### MsgDeregisterSupernode
 
-Removes a supernode registration:
+Permanently disables a supernode (terminal state):
 
 ```protobuf
 message MsgDeregisterSupernode {
@@ -174,6 +181,7 @@ message MsgDeregisterSupernode {
 Validation:
 - Sender must be validator operator
 - Supernode must exist
+- Sets state to DISABLED (requires re-registration to reactivate)
 
 ### MsgStartSupernode
 
@@ -188,14 +196,14 @@ message MsgStartSupernode {
 
 Validation:
 - Sender must be validator operator
-- Supernode must be in DISABLED or STOPPED state
+- Supernode must be in STOPPED state (DISABLED requires re-registration)
 - Validator must meet minimum stake requirement
 - Validator must not be jailed
 - Version must be compatible
 
 ### MsgStopSupernode
 
-Deactivates an active supernode:
+Temporarily stops an active supernode:
 
 ```protobuf
 message MsgStopSupernode {
@@ -207,6 +215,7 @@ message MsgStopSupernode {
 Validation:
 - Sender must be validator operator
 - Supernode must be in ACTIVE state
+- Sets state to STOPPED (can be restarted with StartSupernode)
 
 ### MsgUpdateSupernode
 
@@ -227,6 +236,8 @@ Validation:
 - Supernode must exist
 - IP address must be valid if provided
 - Version must be compatible if provided
+- Account address must be valid bech32 if provided
+- Previous values are stored in history (IP addresses and accounts)
 
 ### MsgUpdateParams
 

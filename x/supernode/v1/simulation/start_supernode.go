@@ -44,9 +44,21 @@ func SimulateMsgStartSupernode(
 				continue
 			}
 
-			// Skip if supernode is already active
-			if len(supernode.States) > 0 && supernode.States[len(supernode.States)-1].State == types2.SuperNodeStateActive {
-				continue
+			// Check current state
+			if len(supernode.States) > 0 {
+				currentState := supernode.States[len(supernode.States)-1].State
+				// Skip if supernode is already active
+				if currentState == types2.SuperNodeStateActive {
+					continue
+				}
+				// Skip if supernode is disabled (requires re-registration)
+				if currentState == types2.SuperNodeStateDisabled {
+					continue
+				}
+				// Only proceed if supernode is stopped
+				if currentState != types2.SuperNodeStateStopped {
+					continue
+				}
 			}
 
 			validatorAddress = validator.GetOperator()

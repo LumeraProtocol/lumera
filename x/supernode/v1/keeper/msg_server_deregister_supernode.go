@@ -10,7 +10,8 @@ import (
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 )
 
-// DeregisterSupernode defines a method to deregister a supernode
+// DeregisterSupernode permanently disables a supernode (sets state to Disabled - terminal state)
+// A disabled supernode cannot be reactivated and must be re-registered to participate again
 func (k msgServer) DeregisterSupernode(goCtx context.Context, msg *types2.MsgDeregisterSupernode) (*types2.MsgDeregisterSupernodeResponse, error) {
 	ctx := sdk.UnwrapSDKContext(goCtx)
 

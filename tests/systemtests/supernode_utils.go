@@ -59,6 +59,20 @@ func GetSuperNodeResponse(t *testing.T, cli *LumeradCli, validatorAddr string) *
 		}
 	}
 
+	// Convert height in prev_supernode_accounts
+	if supernodeAccounts, ok := supernodeData["prev_supernode_accounts"].([]interface{}); ok {
+		for _, acc := range supernodeAccounts {
+			accMap := acc.(map[string]interface{})
+			if heightStr, ok := accMap["height"].(string); ok {
+				height, err := strconv.ParseInt(heightStr, 10, 64)
+				if err != nil {
+					t.Fatal(err)
+				}
+				accMap["height"] = height
+			}
+		}
+	}
+
 	// Marshal back to JSON
 	jsonBytes, err := json.Marshal(rawResponse)
 	if err != nil {

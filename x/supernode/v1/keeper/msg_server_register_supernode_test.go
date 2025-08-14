@@ -252,6 +252,111 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 			},
 			expectedError: sdkerrors.ErrInvalidRequest,
 		},
+		{
+			name: "cannot re-register STOPPED supernode",
+			msg: &types2.MsgRegisterSupernode{
+				SupernodeAccount: creatorAddr.String(),
+				Creator:          creatorAddr.String(),
+				ValidatorAddress: valAddr.String(),
+				IpAddress:        "192.168.1.2",
+				P2PPort:          "26658",
+			},
+			mockSetup: func(sk *supernodemocks.MockStakingKeeper, slk *supernodemocks.MockSlashingKeeper, bk *supernodemocks.MockBankKeeper) {
+			},
+			expectedError: sdkerrors.ErrInvalidRequest,
+		},
+		{
+			name: "cannot re-register PENALIZED supernode",
+			msg: &types2.MsgRegisterSupernode{
+				SupernodeAccount: creatorAddr.String(),
+				Creator:          creatorAddr.String(),
+				ValidatorAddress: valAddr.String(),
+				IpAddress:        "192.168.1.2",
+				P2PPort:          "26658",
+			},
+			mockSetup: func(sk *supernodemocks.MockStakingKeeper, slk *supernodemocks.MockSlashingKeeper, bk *supernodemocks.MockBankKeeper) {
+			},
+			expectedError: sdkerrors.ErrInvalidRequest,
+		},
+		{
+			name: "re-registration ignores new parameters (IP, account, port)",
+			msg: &types2.MsgRegisterSupernode{
+				SupernodeAccount: otherCreatorAddr.String(), // Different account - should be ignored
+				Creator:          creatorAddr.String(),
+				ValidatorAddress: valAddr.String(),
+				IpAddress:        "10.0.0.1", // Different IP - should be ignored
+				P2PPort:          "9999",     // Different port - should be ignored
+			},
+			mockSetup: func(sk *supernodemocks.MockStakingKeeper, slk *supernodemocks.MockSlashingKeeper, bk *supernodemocks.MockBankKeeper) {
+				sk.EXPECT().
+					Validator(gomock.Any(), valAddr).
+					Return(&stakingtypes.Validator{
+						OperatorAddress: valAddr.String(),
+						Status:          stakingtypes.Bonded,
+						Tokens:          math.NewInt(2_000_000),
+						DelegatorShares: math.LegacyNewDec(2_000_000),
+						Jailed:          false,
+					}, nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name: "re-registration fails when validator becomes jailed",
+			msg: &types2.MsgRegisterSupernode{
+				SupernodeAccount: creatorAddr.String(),
+				Creator:          creatorAddr.String(),
+				ValidatorAddress: valAddr.String(),
+				IpAddress:        "192.168.1.2",
+				P2PPort:          "26658",
+			},
+			mockSetup: func(sk *supernodemocks.MockStakingKeeper, slk *supernodemocks.MockSlashingKeeper, bk *supernodemocks.MockBankKeeper) {
+				sk.EXPECT().
+					Validator(gomock.Any(), valAddr).
+					Return(&stakingtypes.Validator{
+						OperatorAddress: valAddr.String(),
+						Status:          stakingtypes.Bonded,
+						Tokens:          math.NewInt(2_000_000),
+						DelegatorShares: math.LegacyNewDec(2_000_000),
+						Jailed:          true, // Validator became jailed
+					}, nil)
+			},
+			expectedError: sdkerrors.ErrInvalidRequest,
+		},
+		{
+			name: "re-registration fails when validator loses eligibility",
+			msg: &types2.MsgRegisterSupernode{
+				SupernodeAccount: creatorAddr.String(),
+				Creator:          creatorAddr.String(),
+				ValidatorAddress: valAddr.String(),
+				IpAddress:        "192.168.1.2",
+				P2PPort:          "26658",
+			},
+			mockSetup: func(sk *supernodemocks.MockStakingKeeper, slk *supernodemocks.MockSlashingKeeper, bk *supernodemocks.MockBankKeeper) {
+				sk.EXPECT().
+					Validator(gomock.Any(), valAddr).
+					Return(&stakingtypes.Validator{
+						OperatorAddress: valAddr.String(),
+						Status:          stakingtypes.Unbonded,
+						Tokens:          math.NewInt(500_000), // Below minimum stake
+						DelegatorShares: math.LegacyNewDec(500_000),
+						Jailed:          false,
+					}, nil)
+				
+				// Set up delegation mock to return insufficient stake for the existing account
+				// This will be called for both the validator operator account and the supernode account
+				sk.EXPECT().
+					Delegation(gomock.Any(), gomock.Any(), valAddr).
+					DoAndReturn(func(_ context.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) (stakingtypes.Delegation, bool) {
+						return stakingtypes.Delegation{
+							DelegatorAddress: delAddr.String(),
+							ValidatorAddress: valAddr.String(),
+							Shares:           math.LegacyNewDec(250_000), // Below minimum (1,000,000)
+						}, true
+					}).
+					AnyTimes()
+			},
+			expectedError: sdkerrors.ErrInvalidRequest,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -265,17 +370,20 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 			slashingKeeper := supernodemocks.NewMockSlashingKeeper(ctrl)
 			bankKeeper := supernodemocks.NewMockBankKeeper(ctrl)
 
-			stakingKeeper.EXPECT().
-				Delegation(gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(_ context.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) (stakingtypes.Delegation, bool) {
-					return stakingtypes.Delegation{
-						DelegatorAddress: delAddr.String(),
-						ValidatorAddress: valAddr.String(),
-						// Return 2,000,000 shares so we get 2,000,000 tokens
-						Shares: math.LegacyNewDec(2_000_000),
-					}, true
-				}).
-				AnyTimes()
+			// Set up default delegation mock - can be overridden by specific test setup
+			if tc.name != "re-registration fails when validator loses eligibility" {
+				stakingKeeper.EXPECT().
+					Delegation(gomock.Any(), gomock.Any(), gomock.Any()).
+					DoAndReturn(func(_ context.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) (stakingtypes.Delegation, bool) {
+						return stakingtypes.Delegation{
+							DelegatorAddress: delAddr.String(),
+							ValidatorAddress: valAddr.String(),
+							// Return 2,000,000 shares so we get 2,000,000 tokens
+							Shares: math.LegacyNewDec(2_000_000),
+						}, true
+					}).
+					AnyTimes()
+			}
 
 			// If there's a mockSetup, run it
 			if tc.mockSetup != nil {
@@ -348,6 +456,107 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 				require.NoError(t, err)
 			}
 
+			if tc.name == "cannot re-register STOPPED supernode" {
+				// Create a stopped supernode
+				stoppedSupernode := types2.SuperNode{
+					ValidatorAddress: valAddr.String(),
+					SupernodeAccount: creatorAddr.String(),
+					States: []*types2.SuperNodeStateRecord{
+						{
+							State:  types2.SuperNodeStateActive,
+							Height: 100,
+						},
+						{
+							State:  types2.SuperNodeStateStopped,
+							Height: 200,
+						},
+					},
+					PrevIpAddresses: []*types2.IPAddressHistory{
+						{
+							Address: "192.168.1.1",
+							Height:  100,
+						},
+					},
+					PrevSupernodeAccounts: []*types2.SupernodeAccountHistory{
+						{
+							Account: creatorAddr.String(),
+							Height:  100,
+						},
+					},
+					P2PPort: "26657",
+				}
+				err := k.SetSuperNode(sdkCtx, stoppedSupernode)
+				require.NoError(t, err)
+			}
+
+			if tc.name == "cannot re-register PENALIZED supernode" {
+				// Create a penalized supernode
+				penalizedSupernode := types2.SuperNode{
+					ValidatorAddress: valAddr.String(),
+					SupernodeAccount: creatorAddr.String(),
+					States: []*types2.SuperNodeStateRecord{
+						{
+							State:  types2.SuperNodeStateActive,
+							Height: 100,
+						},
+						{
+							State:  types2.SuperNodeStatePenalized,
+							Height: 200,
+						},
+					},
+					PrevIpAddresses: []*types2.IPAddressHistory{
+						{
+							Address: "192.168.1.1",
+							Height:  100,
+						},
+					},
+					PrevSupernodeAccounts: []*types2.SupernodeAccountHistory{
+						{
+							Account: creatorAddr.String(),
+							Height:  100,
+						},
+					},
+					P2PPort: "26657",
+				}
+				err := k.SetSuperNode(sdkCtx, penalizedSupernode)
+				require.NoError(t, err)
+			}
+
+			if tc.name == "re-registration ignores new parameters (IP, account, port)" || 
+			   tc.name == "re-registration fails when validator becomes jailed" ||
+			   tc.name == "re-registration fails when validator loses eligibility" {
+				// Create a disabled supernode
+				disabledSupernode := types2.SuperNode{
+					ValidatorAddress: valAddr.String(),
+					SupernodeAccount: creatorAddr.String(), // Original account
+					States: []*types2.SuperNodeStateRecord{
+						{
+							State:  types2.SuperNodeStateActive,
+							Height: 100,
+						},
+						{
+							State:  types2.SuperNodeStateDisabled,
+							Height: 200,
+						},
+					},
+					PrevIpAddresses: []*types2.IPAddressHistory{
+						{
+							Address: "192.168.1.1", // Original IP
+							Height:  100,
+						},
+					},
+					PrevSupernodeAccounts: []*types2.SupernodeAccountHistory{
+						{
+							Account: creatorAddr.String(), // Original account
+							Height:  100,
+						},
+					},
+					P2PPort: "26657", // Original port
+				}
+				err := k.SetSuperNode(sdkCtx, disabledSupernode)
+				require.NoError(t, err)
+			}
+
 			// Execute
 			_, err := msgServer.RegisterSupernode(sdkCtx, tc.msg)
 
@@ -362,7 +571,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				
-				// Additional assertions for re-registration test
+				// Additional assertions for re-registration tests
 				if tc.name == "re-registration of disabled supernode" {
 					// Verify the supernode is now active
 					sn, found := k.QuerySuperNode(sdkCtx, valAddr)
@@ -373,6 +582,21 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 					// Verify IP address and account were NOT updated
 					require.Equal(t, "192.168.1.1", sn.PrevIpAddresses[len(sn.PrevIpAddresses)-1].Address)
 					require.Equal(t, creatorAddr.String(), sn.SupernodeAccount)
+					require.Len(t, sn.PrevIpAddresses, 1) // No new IP history
+					require.Len(t, sn.PrevSupernodeAccounts, 1) // No new account history
+				}
+
+				if tc.name == "re-registration ignores new parameters (IP, account, port)" {
+					// Verify the supernode is now active but parameters remain unchanged
+					sn, found := k.QuerySuperNode(sdkCtx, valAddr)
+					require.True(t, found)
+					require.Len(t, sn.States, 3) // Initial active, disabled, then active again
+					require.Equal(t, types2.SuperNodeStateActive, sn.States[2].State)
+					
+					// Verify ALL original parameters were preserved (not updated)
+					require.Equal(t, "192.168.1.1", sn.PrevIpAddresses[len(sn.PrevIpAddresses)-1].Address) // Original IP kept
+					require.Equal(t, creatorAddr.String(), sn.SupernodeAccount) // Original account kept
+					require.Equal(t, "26657", sn.P2PPort) // Original port kept
 					require.Len(t, sn.PrevIpAddresses, 1) // No new IP history
 					require.Len(t, sn.PrevSupernodeAccounts, 1) // No new account history
 				}

@@ -155,6 +155,52 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 			},
 		},
 		{
+			name: "successful P2P port update",
+			msg: &types2.MsgUpdateSupernode{
+				Creator:          creatorAddr.String(),
+				ValidatorAddress: valAddr.String(),
+				P2PPort:          "9999",
+			},
+			setupState: func(k keeper2.Keeper, ctx sdk.Context) {
+				require.NoError(t, k.SetSuperNode(ctx, existingSupernode))
+			},
+			expectedError: nil,
+			checkResult: func(t *testing.T, k keeper2.Keeper, ctx sdk.Context) {
+				sn, found := k.QuerySuperNode(ctx, valAddr)
+				require.True(t, found)
+				require.Equal(t, "9999", sn.P2PPort)
+				// Verify other fields remain unchanged
+				require.Equal(t, "1.0.0", sn.Version)
+				require.Equal(t, otherCreatorAddr.String(), sn.SupernodeAccount)
+			},
+		},
+		{
+			name: "successful complete update including P2P port",
+			msg: &types2.MsgUpdateSupernode{
+				Creator:          creatorAddr.String(),
+				ValidatorAddress: valAddr.String(),
+				IpAddress:        "10.0.0.5",
+				Version:          "2.0.0",
+				SupernodeAccount: creatorAddr.String(),
+				P2PPort:          "8080",
+			},
+			setupState: func(k keeper2.Keeper, ctx sdk.Context) {
+				require.NoError(t, k.SetSuperNode(ctx, existingSupernode))
+			},
+			expectedError: nil,
+			checkResult: func(t *testing.T, k keeper2.Keeper, ctx sdk.Context) {
+				sn, found := k.QuerySuperNode(ctx, valAddr)
+				require.True(t, found)
+				require.Equal(t, "2.0.0", sn.Version)
+				require.Equal(t, creatorAddr.String(), sn.SupernodeAccount)
+				require.Equal(t, "8080", sn.P2PPort)
+				// Check IP address history
+				require.Len(t, sn.PrevIpAddresses, 2)
+				require.Equal(t, "1022.145.1.1", sn.PrevIpAddresses[0].Address)
+				require.Equal(t, "10.0.0.5", sn.PrevIpAddresses[1].Address)
+			},
+		},
+		{
 			name: "invalid validator address",
 			msg: &types2.MsgUpdateSupernode{
 				Creator:          creatorAddr.String(),

@@ -84,6 +84,7 @@ message MsgUpdateSupernode {
   string ipAddress        = 3;
   string version          = 4;
   string supernodeAccount = 5;
+  string p2p_port         = 6;
 }
 
 message MsgUpdateSupernodeResponse {}

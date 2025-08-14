@@ -60,8 +60,9 @@ func SimulateMsgUpdateSupernode(
 		updateIP := r.Float64() < 0.5
 		updateAccount := r.Float64() < 0.3
 		updateVersion := r.Float64() < 0.7
+		updateP2pPort := r.Float64() < 0.5
 
-		var ipAddress, supernodeAccount, version string
+		var ipAddress, supernodeAccount, version, p2pPort string
 
 		if updateIP {
 			ipAddress = fmt.Sprintf("%d.%d.%d.%d",
@@ -77,12 +78,17 @@ func SimulateMsgUpdateSupernode(
 			version = fmt.Sprintf("v%d.%d.%d", r.Intn(10), r.Intn(10), r.Intn(10))
 		}
 
+		if updateP2pPort {
+			p2pPort = fmt.Sprintf("%d", r.Intn(65535))
+		}
+
 		msg := &types2.MsgUpdateSupernode{
 			Creator:          simAccount.Address.String(),
 			ValidatorAddress: validatorAddress,
 			IpAddress:        ipAddress,
 			SupernodeAccount: supernodeAccount,
 			Version:          version,
+			P2PPort:          p2pPort,
 		}
 
 		// Execute the message

@@ -8,12 +8,14 @@ import (
 
 var _ sdk.Msg = &MsgUpdateSupernode{}
 
-func NewMsgUpdateSupernode(creator string, validatorAddress string, ipAddress string, version string) *MsgUpdateSupernode {
+func NewMsgUpdateSupernode(creator string, validatorAddress string, ipAddress string, version string, supernodeAccount string, p2pPort string) *MsgUpdateSupernode {
 	return &MsgUpdateSupernode{
 		Creator:          creator,
 		ValidatorAddress: validatorAddress,
 		IpAddress:        ipAddress,
 		Version:          version,
+		SupernodeAccount: supernodeAccount,
+		P2PPort:          p2pPort,
 	}
 }
 

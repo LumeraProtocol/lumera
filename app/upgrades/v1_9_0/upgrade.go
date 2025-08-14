@@ -2,11 +2,12 @@ package v1_9_0
 
 import (
 	"context"
-	storetypes "cosmossdk.io/store/types"
 	"fmt"
 
 	"cosmossdk.io/log"
+	storetypes "cosmossdk.io/store/types"
 	upgradetypes "cosmossdk.io/x/upgrade/types"
+
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 )
@@ -40,5 +41,4 @@ func CreateUpgradeHandler(
 
 var StoreUpgrades = storetypes.StoreUpgrades{
 	Added: []string{},
-	// Deleted: []string{...},
 }

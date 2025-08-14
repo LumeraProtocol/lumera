@@ -65,7 +65,7 @@ func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types2.MsgRegis
 			if len(existingSupernode.PrevIpAddresses) > 0 {
 				currentIP = existingSupernode.PrevIpAddresses[len(existingSupernode.PrevIpAddresses)-1].Address
 			}
-			
+
 			ctx.EventManager().EmitEvent(
 				sdk.NewEvent(
 					types2.EventTypeSupernodeRegistered,
@@ -73,7 +73,7 @@ func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types2.MsgRegis
 					sdk.NewAttribute(types2.AttributeKeyIPAddress, currentIP),
 					sdk.NewAttribute(types2.AttributeKeySupernodeAccount, existingSupernode.SupernodeAccount),
 					sdk.NewAttribute(types2.AttributeKeyReRegistered, "true"),
-					sdk.NewAttribute(types2.AttributeKeyPreviousState, "disabled"),
+					sdk.NewAttribute(types2.AttributeKeyOldState, "disabled"),
 				),
 			)
 

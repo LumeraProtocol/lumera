@@ -80,8 +80,6 @@ func (k msgServer) UpdateSupernode(goCtx context.Context, msg *sntypes.MsgUpdate
 					sdk.NewAttribute(sntypes.AttributeKeyNewAccount, msg.SupernodeAccount),
 				),
 			)
-		} else {
-			supernode.SupernodeAccount = msg.SupernodeAccount
 		}
 	}
 

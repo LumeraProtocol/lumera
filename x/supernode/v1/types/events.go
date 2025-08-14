@@ -17,7 +17,7 @@ const (
 	AttributeKeySupernodeAccount = "supernode_account"
 	AttributeKeyP2PPort          = "p2p_port"
 	AttributeKeyReRegistered     = "re_registered"
-	AttributeKeyPreviousState    = "previous_state"
+	AttributeKeyOldState         = "old_state"
 	AttributeKeyOldIPAddress     = "old_ip_address"
 	AttributeKeyOldVersion       = "old_version"
 )

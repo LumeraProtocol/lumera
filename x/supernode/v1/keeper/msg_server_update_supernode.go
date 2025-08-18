@@ -98,6 +98,21 @@ func (k msgServer) UpdateSupernode(goCtx context.Context, msg *sntypes.MsgUpdate
 		)
 	}
 
+	if msg.P2PPort != "" && msg.P2PPort != supernode.P2PPort {
+		oldP2pPort := supernode.P2PPort
+		supernode.P2PPort = msg.P2PPort
+
+		// Emit event for version change
+		ctx.EventManager().EmitEvent(
+			sdk.NewEvent(
+				sntypes.EventTypeSupernodeUpdated,
+				sdk.NewAttribute(sntypes.AttributeKeyValidatorAddress, msg.ValidatorAddress),
+				sdk.NewAttribute(sntypes.AttributeKeyOldP2PPort, oldP2pPort),
+				sdk.NewAttribute(sntypes.AttributeKeyP2PPort, msg.P2PPort),
+			),
+		)
+	}
+
 	// Re-save
 	if err := k.SetSuperNode(ctx, supernode); err != nil {
 		return nil, err

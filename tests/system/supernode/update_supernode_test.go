@@ -32,13 +32,14 @@ func TestUpdateSupernode(t *testing.T) {
 		verify func(t *testing.T, suite *SystemTestSuite, resp *types2.MsgUpdateSupernodeResponse, err error)
 	}{
 		{
-			name: "basic update - new ip, new version, new supernode account",
+			name: "basic update - new ip, new version, new supernode account, new p2p port",
 			msg: &types2.MsgUpdateSupernode{
 				Creator:          walletAddr.String(),
 				ValidatorAddress: valAddrStr,
 				IpAddress:        "10.0.0.2",
 				Version:          "2.0.0",
 				SupernodeAccount: sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address()).String(),
+				P2PPort:          "26658",
 			},
 			setup: func(suite *SystemTestSuite) {
 				// Register a supernode in some initial state
@@ -80,6 +81,9 @@ func TestUpdateSupernode(t *testing.T) {
 				// Verify new supernode account
 				require.NotEqual(t, walletAddr.String(), sn.SupernodeAccount)
 
+				// Verify P2P port
+				require.Equal(t, "26658", sn.P2PPort)
+
 				// Verify event
 				events := suite.sdkCtx.EventManager().Events()
 				var foundUpdateEvent bool
@@ -93,10 +97,79 @@ func TestUpdateSupernode(t *testing.T) {
 							if string(attr.Key) == types2.AttributeKeyVersion {
 								require.Equal(t, "2.0.0", string(attr.Value))
 							}
+							if string(attr.Key) == types2.AttributeKeyP2PPort {
+								require.Equal(t, "26658", string(attr.Value))
+							}
 						}
 					}
 				}
 				require.True(t, foundUpdateEvent, "supernode_updated event not found")
+			},
+		},
+		{
+			name: "update the existing p2p port, should not change the p2p port",
+			msg: &types2.MsgUpdateSupernode{
+				Creator:          walletAddr.String(),
+				ValidatorAddress: valAddrStr,
+				P2PPort:          "26658",
+			},
+			setup: func(suite *SystemTestSuite) {
+				// Register a supernode in some initial state
+				sn := types2.SuperNode{
+					ValidatorAddress: valAddrStr,
+					SupernodeAccount: walletAddr.String(),
+					Version:          "1.0.0",
+					States: []*types2.SuperNodeStateRecord{
+						{
+							State:  types2.SuperNodeStateActive,
+							Height: suite.sdkCtx.BlockHeight(),
+						},
+					},
+					PrevIpAddresses: []*types2.IPAddressHistory{
+						{
+							Address: "192.168.1.1",
+							Height:  suite.sdkCtx.BlockHeight(),
+						},
+					},
+					P2PPort: "26658",
+				}
+				err := suite.app.SupernodeKeeper.SetSuperNode(suite.sdkCtx, sn)
+				require.NoError(t, err)
+			},
+			verify: func(t *testing.T, suite *SystemTestSuite, resp *types2.MsgUpdateSupernodeResponse, err error) {
+				require.NoError(t, err)
+				require.NotNil(t, resp)
+
+				// Check updated fields
+				valOp, vErr := sdk.ValAddressFromBech32(valAddrStr)
+				require.NoError(t, vErr)
+				sn, found := suite.app.SupernodeKeeper.QuerySuperNode(suite.sdkCtx, valOp)
+				require.True(t, found)
+				// Verify IP was appended
+				require.NotEmpty(t, sn.PrevIpAddresses)
+				require.Equal(t, "192.168.1.1", sn.PrevIpAddresses[len(sn.PrevIpAddresses)-1].Address)
+				// Verify version
+				require.Equal(t, "1.0.0", sn.Version)
+				// Verify new supernode account
+				require.Equal(t, walletAddr.String(), sn.SupernodeAccount)
+
+				// Verify P2P port
+				require.Equal(t, "26658", sn.P2PPort)
+
+				// Verify event
+				events := suite.sdkCtx.EventManager().Events()
+				var foundUpdateEvent bool
+				for _, e := range events {
+					if e.Type == types2.EventTypeSupernodeUpdated {
+						foundUpdateEvent = true
+						for _, attr := range e.Attributes {
+							if string(attr.Key) == types2.AttributeKeyP2PPort {
+								require.Equal(t, valAddrStr, string(attr.Value))
+							}
+						}
+					}
+				}
+				require.False(t, foundUpdateEvent, "supernode_updated event should not found")
 			},
 		},
 		{

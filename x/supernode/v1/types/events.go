@@ -15,6 +15,7 @@ const (
 	AttributeKeyOldAccount       = "old_account"
 	AttributeKeyNewAccount       = "new_account"
 	AttributeKeySupernodeAccount = "supernode_account"
+	AttributeKeyOldP2PPort       = "old_p2p_port"
 	AttributeKeyP2PPort          = "p2p_port"
 	AttributeKeyReRegistered     = "re_registered"
 	AttributeKeyOldState         = "old_state"

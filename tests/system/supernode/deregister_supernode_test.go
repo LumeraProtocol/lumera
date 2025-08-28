@@ -101,7 +101,7 @@ func TestDeregisterSupernode(t *testing.T) {
 							Height: suite.sdkCtx.BlockHeight(),
 						},
 					},
-					Version: "1.0.0",
+					Note: "1.0.0",
 					Metrics: &types2.MetricsAggregate{
 						Metrics:     make(map[string]float64),
 						ReportCount: 0,
@@ -180,7 +180,7 @@ func TestDeregisterSupernode(t *testing.T) {
 							Height: suite.sdkCtx.BlockHeight(),
 						},
 					},
-					Version: "1.0.0",
+					Note: "1.0.0",
 					Metrics: &types2.MetricsAggregate{
 						Metrics:     make(map[string]float64),
 						ReportCount: 0,
@@ -220,7 +220,7 @@ func TestDeregisterSupernode(t *testing.T) {
 							Height: suite.sdkCtx.BlockHeight(),
 						},
 					},
-					Version: "1.0.0",
+					Note: "1.0.0",
 					Metrics: &types2.MetricsAggregate{
 						Metrics:     make(map[string]float64),
 						ReportCount: 0,

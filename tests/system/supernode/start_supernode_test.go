@@ -53,7 +53,7 @@ func TestStartSupernode(t *testing.T) {
 							Height: suite.sdkCtx.BlockHeight(),
 						},
 					},
-					Version: "1.0.0",
+					Note: "1.0.0",
 					PrevIpAddresses: []*types2.IPAddressHistory{
 						{
 							Address: "127.0.0.1",
@@ -119,7 +119,7 @@ func TestStartSupernode(t *testing.T) {
 							Height: suite.sdkCtx.BlockHeight(),
 						},
 					},
-					Version: "1.0.0",
+					Note: "1.0.0",
 					PrevIpAddresses: []*types2.IPAddressHistory{
 						{
 							Address: "127.0.0.1",
@@ -151,7 +151,7 @@ func TestStartSupernode(t *testing.T) {
 							Height: suite.sdkCtx.BlockHeight(),
 						},
 					},
-					Version: "1.0.0",
+					Note: "1.0.0",
 					PrevIpAddresses: []*types2.IPAddressHistory{
 						{
 							Address: "127.0.0.1",

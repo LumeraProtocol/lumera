@@ -82,7 +82,7 @@ message MsgUpdateSupernode {
   string creator          = 1;
   string validatorAddress = 2;
   string ipAddress        = 3;
-  string version          = 4;
+  string note             = 4;
   string supernodeAccount = 5;
 }
 

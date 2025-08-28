@@ -41,8 +41,8 @@ func (k msgServer) UpdateSupernode(goCtx context.Context, msg *types2.MsgUpdateS
 		supernode.SupernodeAccount = msg.SupernodeAccount
 	}
 
-	if msg.Version != "" {
-		supernode.Version = msg.Version
+	if msg.Note != "" {
+		supernode.Note = msg.Note
 	}
 
 	// Re-save
@@ -55,7 +55,7 @@ func (k msgServer) UpdateSupernode(goCtx context.Context, msg *types2.MsgUpdateS
 		sdk.NewEvent(
 			types2.EventTypeSupernodeUpdated,
 			sdk.NewAttribute(types2.AttributeKeyValidatorAddress, msg.ValidatorAddress),
-			sdk.NewAttribute(types2.AttributeKeyVersion, supernode.Version),
+			sdk.NewAttribute(types2.AttributeKeyVersion, supernode.Note),
 		),
 	)
 

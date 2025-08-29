@@ -31,6 +31,7 @@ func TestClaimsSystem(t *testing.T) {
 			name:           "successful_claim",
 			balanceToClaim: 1_000_000,
 			setupFn: func(t *testing.T) (claimtestutils.TestData, string) {
+			setupFn: func(t *testing.T) (claimtestutils.TestData, string) {TestClaimsSystem
 				testData, err := claimtestutils.GenerateClaimingTestData()
 				require.NoError(t, err)
 				return testData, testData.OldAddress
@@ -158,6 +159,7 @@ func TestClaimsSystem(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 
 			sut.ResetChain(t)
+			
 			cli := NewLumeradCLI(t, sut, true)
 
 			// Get test data and CSV address

@@ -23,6 +23,7 @@ import (
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 
 	_ "github.com/LumeraProtocol/lumera/app"
+	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
 var (
@@ -40,7 +41,7 @@ func TestLoadStoredGovV1Beta1LegacyTypes(t *testing.T) {
 		AddRoute(wasmtypes.ModuleName, wasmKeeper.NewLegacyWasmProposalHandler(k, wasmtypes.EnableAllProposals)),
 	)
 	myAddress := wasmKeeper.RandomAccountAddress(t)
-	keepers.Faucet.Fund(pCtx, myAddress, sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.NewIntFromUint64(100_000_000)))
+	keepers.Faucet.Fund(pCtx, myAddress, sdk.NewCoin(lcfg.ChainDenom, sdkmath.NewIntFromUint64(100_000_000)))
 	keepers.Faucet.Fund(pCtx, myAddress, sdk.NewCoin("denom", sdkmath.NewIntFromUint64(100_000_000)))
 
 	reflectExample := wasmKeeper.InstantiateReflectExampleContract(t, pCtx, keepers)
@@ -221,7 +222,7 @@ func submitLegacyProposal(t *testing.T, ctx sdk.Context, content v1beta1.Content
 
 	proposal, err := v1.NewMsgSubmitProposal(
 		[]sdk.Msg{contentMsg},
-		sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.NewIntFromUint64(1_000_000))),
+		sdk.NewCoins(sdk.NewCoin(lcfg.ChainDenom, sdkmath.NewIntFromUint64(1_000_000))),
 		myActorAddress,
 		"",
 		content.GetTitle(),

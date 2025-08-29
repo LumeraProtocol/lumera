@@ -1,4 +1,4 @@
-package app
+package config
 
 import sdk "github.com/cosmos/cosmos-sdk/types"
 
@@ -31,6 +31,12 @@ const (
 	// but the transaction will be committed.
 	// Pass this to the callbacks middleware or choose a custom value.
 	DefaultMaxIBCCallbackGas = uint64(1_000_000)
+
+	// ChainCoinType is the coin type of the chain.
+	ChainCoinType = 118
+
+	// ChainDenom is the denomination of the chain's native token.
+	ChainDenom = "ulume"
 )
 
 func SetupConfig() {

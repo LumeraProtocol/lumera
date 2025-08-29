@@ -13,6 +13,7 @@ import (
 	"github.com/tidwall/sjson"
 
 	claimtypes "github.com/LumeraProtocol/lumera/x/claim/types"
+	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
 // Voting Period is set to 10 seconds for faster test execution by default
@@ -77,11 +78,11 @@ func TestClaimsUpdateParamsProposal(t *testing.T) {
 				"max_claims_per_block": 50
 			}
 		}],
-		"deposit": "100000000stake",
+		"deposit": "100000000%s",
 		"metadata": "ipfs://CID",
 		"title": "Update Claim Parameters",
 		"summary": "Update claims module parameters with new values"
-	}`, govAddr, time.Now().Add(72*time.Hour).Unix())
+	}`, govAddr, time.Now().Add(72*time.Hour).Unix(), lcfg.ChainDenom)
 
 	// Submit proposal and have all validators vote yes
 	proposalID := cli.SubmitAndVoteGovProposal(proposalJson)

@@ -34,6 +34,7 @@ import (
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 
 	"github.com/LumeraProtocol/lumera/app"
+	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
 func TestMaskReflectCustomQuery(t *testing.T) {
@@ -544,11 +545,11 @@ func TestDistributionQuery(t *testing.T) {
 	keeper := keepers.WasmKeeper
 
 	example := wasmKeeper.InstantiateReflectExampleContract(t, pCtx, keepers)
-	delegator := keepers.Faucet.NewFundedRandomAccount(pCtx, sdk.NewCoins(sdk.NewInt64Coin(sdk.DefaultBondDenom, 100_000_000))...)
-	otherAddr := keepers.Faucet.NewFundedRandomAccount(pCtx, sdk.NewCoins(sdk.NewInt64Coin(sdk.DefaultBondDenom, 100_000_000))...)
+	delegator := keepers.Faucet.NewFundedRandomAccount(pCtx, sdk.NewCoins(sdk.NewInt64Coin(lcfg.ChainDenom, 100_000_000))...)
+	otherAddr := keepers.Faucet.NewFundedRandomAccount(pCtx, sdk.NewCoins(sdk.NewInt64Coin(lcfg.ChainDenom, 100_000_000))...)
 
-	val1Addr := addValidator(t, pCtx, keepers.StakingKeeper, keepers.Faucet, sdk.NewInt64Coin(sdk.DefaultBondDenom, 10_000_000))
-	val2Addr := addValidator(t, pCtx, keepers.StakingKeeper, keepers.Faucet, sdk.NewInt64Coin(sdk.DefaultBondDenom, 20_000_000))
+	val1Addr := addValidator(t, pCtx, keepers.StakingKeeper, keepers.Faucet, sdk.NewInt64Coin(lcfg.ChainDenom, 10_000_000))
+	val2Addr := addValidator(t, pCtx, keepers.StakingKeeper, keepers.Faucet, sdk.NewInt64Coin(lcfg.ChainDenom, 20_000_000))
 	_ = val2Addr
 	pCtx = nextBlock(pCtx, keepers.StakingKeeper)
 

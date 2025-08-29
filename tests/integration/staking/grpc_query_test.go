@@ -14,6 +14,8 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/query"
 	"github.com/cosmos/cosmos-sdk/x/staking/types"
+
+	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
 func createValidatorAccs(t *testing.T, f *fixture) ([]sdk.AccAddress, []types.Validator) {
@@ -334,7 +336,7 @@ func TestGRPCQueryDelegation(t *testing.T) {
 			if tc.expPass {
 				assert.Equal(t, delegation.ValidatorAddress, res.DelegationResponse.Delegation.ValidatorAddress)
 				assert.Equal(t, delegation.DelegatorAddress, res.DelegationResponse.Delegation.DelegatorAddress)
-				assert.DeepEqual(t, sdk.NewCoin(sdk.DefaultBondDenom, delegation.Shares.TruncateInt()), res.DelegationResponse.Balance)
+				assert.DeepEqual(t, sdk.NewCoin(lcfg.ChainDenom, delegation.Shares.TruncateInt()), res.DelegationResponse.Balance)
 			} else {
 				assert.ErrorContains(t, err, tc.expErrMsg)
 				assert.Assert(t, res == nil)
@@ -400,7 +402,7 @@ func TestGRPCQueryDelegatorDelegations(t *testing.T) {
 			func(response *types.QueryDelegatorDelegationsResponse) {
 				assert.Equal(t, uint64(2), response.Pagination.Total)
 				assert.Assert(t, len(response.DelegationResponses) == 1)
-				assert.DeepEqual(t, sdk.NewCoin(sdk.DefaultBondDenom, delegation.Shares.TruncateInt()), response.DelegationResponses[0].Balance)
+				assert.DeepEqual(t, sdk.NewCoin(lcfg.ChainDenom, delegation.Shares.TruncateInt()), response.DelegationResponses[0].Balance)
 			},
 			false,
 			"",
@@ -491,7 +493,7 @@ func TestGRPCQueryValidatorDelegations(t *testing.T) {
 				assert.Assert(t, res.Pagination.NextKey != nil)
 				assert.Equal(t, uint64(2), res.Pagination.Total)
 				assert.Equal(t, addrVal1, res.DelegationResponses[0].Delegation.ValidatorAddress)
-				assert.DeepEqual(t, sdk.NewCoin(sdk.DefaultBondDenom, delegation.Shares.TruncateInt()), res.DelegationResponses[0].Balance)
+				assert.DeepEqual(t, sdk.NewCoin(lcfg.ChainDenom, delegation.Shares.TruncateInt()), res.DelegationResponses[0].Balance)
 			case !tc.expPass && !tc.expErr:
 				assert.NilError(t, err)
 				assert.Assert(t, res.DelegationResponses == nil)
@@ -702,7 +704,7 @@ func TestGRPCQueryPoolParameters(t *testing.T) {
 	qr := f.app.QueryHelper()
 	queryClient := types.NewQueryClient(qr)
 
-	bondDenom := sdk.DefaultBondDenom
+	bondDenom := lcfg.ChainDenom
 
 	// Query pool
 	res, err := queryClient.Pool(gocontext.Background(), &types.QueryPoolRequest{})

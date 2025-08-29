@@ -35,6 +35,7 @@ import (
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 
 	"github.com/LumeraProtocol/lumera/app"
+	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
 var MaxAccounts = 10
@@ -133,7 +134,7 @@ func NewTestChainWithValSet(
 		balance := banktypes.Balance{
 			Address: acc.GetAddress().String(),
 			Coins: sdk.NewCoins(
-				sdk.NewCoin(sdk.DefaultBondDenom, amount),
+				sdk.NewCoin(lcfg.ChainDenom, amount),
 				sdk.NewCoin(SecondaryDenom, amount),
 			),
 		}

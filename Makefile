@@ -1,5 +1,5 @@
 .PHONY: all up up-detach down
-.PHONY: devnet-build devnet-rebuild devnet-up devnet-reset devnet-up-detach devnet-down devnet-clean devnet-deploy-tar devnet-upgrade
+.PHONY: devnet-build devnet-rebuild devnet-up devnet-reset devnet-up-detach devnet-down devnet-clean devnet-deploy-tar devnet-upgrade devnet-new
 .PHONY: unit-tests integration-tests system-tests simulation-tests all-tests
 .PHONY: buf-proto gen-proto clean-proto
 
@@ -19,22 +19,27 @@
 ## 		EXTERNAL_GENESIS_FILE=template_genesis.json
 
 # Find validator directories dynamically
-DEVNET_DIR := /tmp/lumera-devnet
+DEVNET_DIR := /tmp/lumera-devnet-1
 SHARED_DIR := ${DEVNET_DIR}/shared
+SHARED_CONFIG_DIR := ${SHARED_DIR}/config
 VALIDATOR_DIRS := $(wildcard ${DEVNET_DIR}/supernova_validator*-data)
-EXTERNAL_GENESIS := $(SHARED_DIR)/external_genesis.json
-CLAIMS_FILE := $(SHARED_DIR)/claims.csv
+EXTERNAL_GENESIS := $(SHARED_CONFIG_DIR)/external_genesis.json
+CLAIMS_FILE := $(SHARED_CONFIG_DIR)/claims.csv
 COMPOSE_FILE := devnet/docker-compose.yml
 WASMVM_VERSION := v3@v3.0.0-ibc2.0
 
 # Default paths for configuration files
 DEFAULT_CONFIG_JSON := config/config.json
 DEFAULT_VALIDATORS_JSON := config/validators.json
+# Default genesis and claims files for devnet docker
+DEFAULT_GENESIS_FILE := devnet/default-config/devnet-genesis.json
+DEFAULT_CLAIMS_FILE := claims.csv # relative to devnet
 
 devnet-build:
-	mkdir -p $(SHARED_DIR)
-	@if [ -n "$(EXTERNAL_GENESIS_FILE)" ] && [ -f "$(EXTERNAL_GENESIS_FILE)" ]; then \
+	@mkdir -p "$(SHARED_DIR)"; \
+	if [ -n "$(EXTERNAL_GENESIS_FILE)" ] && [ -f "$(EXTERNAL_GENESIS_FILE)" ]; then \
 		echo "Starting devnet with existing genesis from $(EXTERNAL_GENESIS_FILE) ..."; \
+		mkdir -p "$(SHARED_CONFIG_DIR)"; \
 		cp "$(EXTERNAL_GENESIS_FILE)" "$(EXTERNAL_GENESIS)"; \
 		export EXTERNAL_GENESIS_FILE=1; \
 	else \
@@ -47,23 +52,30 @@ devnet-build:
 		go get github.com/CosmWasm/wasmvm/$(WASMVM_VERSION) && \
 		ignite chain build --release -t linux:amd64 && \
 		tar --strip-components=2 -xf release/lumera*.tar.gz -C release && \
-		cp release/lumerad devnet/ && \
-		find $$(go env GOPATH)/pkg/mod/github.com/!cosm!wasm/wasmvm/$(WASMVM_VERSION) -name "libwasmvm.x86_64.so" -exec cp {} devnet/libwasmvm.x86_64.so \; && \
+		mkdir -p devnet/bin && \
+		cp release/lumerad devnet/bin && \
+		find $$(go env GOPATH)/pkg/mod/github.com/!cosm!wasm/wasmvm/$(WASMVM_VERSION) -name "libwasmvm.x86_64.so" -exec cp {} devnet/bin/libwasmvm.x86_64.so \; && \
 		cd devnet && \
 		go mod tidy && \
 		CONFIG_JSON="$${CONFIG_JSON:-$(DEFAULT_CONFIG_JSON)}" \
 		VALIDATORS_JSON="$${VALIDATORS_JSON:-$(DEFAULT_VALIDATORS_JSON)}" \
+		./scripts/configure.sh &&\
 		go run . && \
-		docker compose build && \
-		docker compose up -d && \
-		echo "Waiting for initialization to complete..." && \
-		while [ ! -f "$(SHARED_DIR)/setup_complete" ]; do sleep 1; done && \
-		docker compose down && \
+		START_MODE=bootstrap docker compose build && \
 		echo "Initialization complete. Ready to start nodes."; \
 	else \
 		echo "No external claims file provided or file not found."; \
 		exit 1; \
 	fi
+
+devnet-build-default: _check-devnet-default-cfg
+	@$(MAKE) devnet-build \
+		EXTERNAL_GENESIS_FILE="$$(realpath $(DEFAULT_GENESIS_FILE))" \
+		EXTERNAL_CLAIMS_FILE="$$(realpath $(DEFAULT_CLAIMS_FILE))"
+
+_check-devnet-default-cfg:
+	@[ -f "$$(realpath $(DEFAULT_GENESIS_FILE))" ] || (echo "Missing DEFAULT_GENESIS_FILE: $$(realpath $(DEFAULT_GENESIS_FILE))"; exit 1)
+	@[ -f "$$(realpath $(DEFAULT_CLAIMS_FILE))" ] || (echo "Missing DEFAULT_CLAIMS_FILE: $$(realpath $(DEFAULT_CLAIMS_FILE))"; exit 1)
 
 devnet-rebuild:
 	mkdir -p $(SHARED_DIR)
@@ -105,12 +117,13 @@ devnet-reset:
 	done
 	
 devnet-up:
+	@echo "Starting devnet..."; \
 	cd devnet && \
-	docker compose -f docker-compose.start.yml up
+	START_MODE=auto docker compose up
 
 devnet-up-detach:
 	cd devnet && \
-	docker compose up -d
+	START_MODE=auto docker compose up -d
 
 devnet-down:
 	cd devnet && \
@@ -118,6 +131,8 @@ devnet-down:
 
 devnet-clean:
 	sudo rm -rf $(SHARED_DIR) $(VALIDATOR_DIRS)
+	rm -f devnet/docker-compose.yml
+	@echo "Devnet docker shared & generated files cleaned up."
 
 devnet-upgrade:
 	@ignite chain build --release -t linux:amd64 && \
@@ -131,7 +146,17 @@ devnet-upgrade:
 		echo "Upgrading $$i..."; \
 		docker compose -f ${COMPOSE_FILE} cp devnet/lumerad $$i:/usr/local/bin/lumerad; \
 		docker compose -f ${COMPOSE_FILE} cp devnet/libwasmvm.x86_64.so $$i:/usr/lib/libwasmvm.x86_64.so; \
-	done
+	done; \
+	CONFIG_JSON="$${CONFIG_JSON:-$(DEFAULT_CONFIG_JSON)}" \
+	VALIDATORS_JSON="$${VALIDATORS_JSON:-$(DEFAULT_VALIDATORS_JSON)}" \
+	./scripts/configure.sh
+
+devnet-new:
+	$(MAKE) devnet-down
+	$(MAKE) devnet-clean
+	$(MAKE) devnet-build-default
+	sleep 10
+	$(MAKE) devnet-up
 
 devnet-deploy-tar:
 	# Ensure required files exist from previous build

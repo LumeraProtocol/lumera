@@ -8,6 +8,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/stretchr/testify/suite"
 
+	lcfg "github.com/LumeraProtocol/lumera/config"
 	"github.com/LumeraProtocol/lumera/x/claim/keeper"
 	"github.com/LumeraProtocol/lumera/x/claim/types"
 )
@@ -46,7 +47,7 @@ func (s *MsgClaimIntegrationTestSuite) SetupTest() {
 func (s *MsgClaimIntegrationTestSuite) TestClaimIntegration() {
 
 	testAmount := int64(1_000_000) // Amount to be claimed in test cases
-	validFee := sdk.NewCoins(sdk.NewInt64Coin(sdk.DefaultBondDenom, int64(1_000)))
+	validFee := sdk.NewCoins(sdk.NewInt64Coin(lcfg.ChainDenom, int64(1_000)))
 	testCases := []struct {
 		name      string
 		setup     func()
@@ -60,7 +61,7 @@ func (s *MsgClaimIntegrationTestSuite) TestClaimIntegration() {
 				// Create and store claim record
 				claimRecord := types.ClaimRecord{
 					OldAddress: s.oldAddress,
-					Balance:    sdk.NewCoins(sdk.NewInt64Coin(sdk.DefaultBondDenom, testAmount)),
+					Balance:    sdk.NewCoins(sdk.NewInt64Coin(lcfg.ChainDenom, testAmount)),
 					Claimed:    false,
 				}
 				err := s.keeper.SetClaimRecord(s.ctx, claimRecord)
@@ -84,7 +85,7 @@ func (s *MsgClaimIntegrationTestSuite) TestClaimIntegration() {
 				// Create and store claimed record
 				claimRecord := types.ClaimRecord{
 					OldAddress: s.oldAddress,
-					Balance:    sdk.NewCoins(sdk.NewInt64Coin(sdk.DefaultBondDenom, testAmount)),
+					Balance:    sdk.NewCoins(sdk.NewInt64Coin(lcfg.ChainDenom, testAmount)),
 					Claimed:    true,
 					ClaimTime:  time.Now().Add(-15).Unix(),
 				}
@@ -122,7 +123,7 @@ func (s *MsgClaimIntegrationTestSuite) TestClaimIntegration() {
 				// Add a claim record to ensure the check happens before record lookup
 				claimRecord := types.ClaimRecord{
 					OldAddress: s.oldAddress,
-					Balance:    sdk.NewCoins(sdk.NewInt64Coin(sdk.DefaultBondDenom, testAmount)),
+					Balance:    sdk.NewCoins(sdk.NewInt64Coin(lcfg.ChainDenom, testAmount)),
 					Claimed:    false,
 				}
 				err := s.keeper.SetClaimRecord(s.ctx, claimRecord)
@@ -142,7 +143,7 @@ func (s *MsgClaimIntegrationTestSuite) TestClaimIntegration() {
 			setup: func() {
 				claimRecord := types.ClaimRecord{
 					OldAddress: s.oldAddress,
-					Balance:    sdk.NewCoins(sdk.NewInt64Coin(sdk.DefaultBondDenom, testAmount)),
+					Balance:    sdk.NewCoins(sdk.NewInt64Coin(lcfg.ChainDenom, testAmount)),
 					Claimed:    false,
 				}
 				err := s.keeper.SetClaimRecord(s.ctx, claimRecord)

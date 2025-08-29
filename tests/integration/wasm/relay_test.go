@@ -28,6 +28,7 @@ import (
 
 	"github.com/LumeraProtocol/lumera/tests/ibctesting"
 	ibcmock "github.com/LumeraProtocol/lumera/tests/ibctesting/mock"
+	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
 // GetTransferCoin creates a transfer coin with the port ID and channel ID
@@ -126,9 +127,9 @@ func TestFromIBCTransferToContract(t *testing.T) {
 			path.SetupConnections()
 			path.CreateChannels()
 
-			originalChainABalance := chainA.Balance(chainA.SenderAccount.GetAddress(), sdk.DefaultBondDenom)
+			originalChainABalance := chainA.Balance(chainA.SenderAccount.GetAddress(), lcfg.ChainDenom)
 			// when transfer via sdk transfer from A (module) -> B (contract)
-			coinToSendToB := sdk.NewCoin(sdk.DefaultBondDenom, transferAmount)
+			coinToSendToB := sdk.NewCoin(lcfg.ChainDenom, transferAmount)
 			timeoutHeight := clienttypes.NewHeight(1, 110)
 
 			msg := ibctransfertypes.NewMsgTransfer(path.EndpointA.ChannelConfig.PortID, path.EndpointA.ChannelID, coinToSendToB, chainA.SenderAccount.GetAddress().String(), chainB.SenderAccount.GetAddress().String(), timeoutHeight, 0, "")
@@ -153,7 +154,7 @@ func TestFromIBCTransferToContract(t *testing.T) {
 			require.Equal(t, spec.expChainBPendingSendPackets, len(*chainB.PendingSendPackets))
 
 			// and source chain balance was decreased
-			newChainABalance := chainA.Balance(chainA.SenderAccount.GetAddress(), sdk.DefaultBondDenom)
+			newChainABalance := chainA.Balance(chainA.SenderAccount.GetAddress(), lcfg.ChainDenom)
 			assert.Equal(t, originalChainABalance.Amount.Add(spec.expChainABalanceDiff), newChainABalance.Amount)
 
 			// and dest chain balance contains voucher
@@ -200,7 +201,7 @@ func TestContractCanInitiateIBCTransferMsg(t *testing.T) {
 
 	// when contract is triggered to send IBCTransferMsg
 	receiverAddress := chainB.SenderAccount.GetAddress()
-	coinToSendToB := sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.NewInt(100))
+	coinToSendToB := sdk.NewCoin(lcfg.ChainDenom, sdkmath.NewInt(100))
 
 	// start transfer from chainA to chainB
 	startMsg := &wasmtypes.MsgExecuteContract{
@@ -273,7 +274,7 @@ func TestContractCanEmulateIBCTransferMessage(t *testing.T) {
 	// when contract is triggered to send the ibc package to chain B
 	timeout := uint64(chainB.LatestCommittedHeader.Header.Time.Add(time.Hour).UnixNano()) // enough time to not timeout
 	receiverAddress := chainB.SenderAccount.GetAddress()
-	coinToSendToB := sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.NewInt(100))
+	coinToSendToB := sdk.NewCoin(lcfg.ChainDenom, sdkmath.NewInt(100))
 
 	// start transfer from chainA to chainB
 	startMsg := &wasmtypes.MsgExecuteContract{
@@ -349,9 +350,9 @@ func TestContractCanEmulateIBCTransferMessageWithTimeout(t *testing.T) {
 	// when contract is triggered to send the ibc package to chain B
 	timeout := uint64(chainB.LatestCommittedHeader.Header.Time.Add(time.Nanosecond).UnixNano()) // will timeout
 	receiverAddress := chainB.SenderAccount.GetAddress()
-	coinToSendToB := sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.NewInt(100))
-	initialContractBalance := chainA.Balance(myContractAddr, sdk.DefaultBondDenom)
-	initialSenderBalance := chainA.Balance(chainA.SenderAccount.GetAddress(), sdk.DefaultBondDenom)
+	coinToSendToB := sdk.NewCoin(lcfg.ChainDenom, sdkmath.NewInt(100))
+	initialContractBalance := chainA.Balance(myContractAddr, lcfg.ChainDenom)
+	initialSenderBalance := chainA.Balance(chainA.SenderAccount.GetAddress(), lcfg.ChainDenom)
 
 	// custom payload data to be transferred into a proper ICS20 ibc packet
 	startMsg := &wasmtypes.MsgExecuteContract{
@@ -370,7 +371,7 @@ func TestContractCanEmulateIBCTransferMessageWithTimeout(t *testing.T) {
 	require.NoError(t, err)
 	coordinator.CommitBlock(chainA, chainB)
 	// then
-	newContractBalance := chainA.Balance(myContractAddr, sdk.DefaultBondDenom)
+	newContractBalance := chainA.Balance(myContractAddr, lcfg.ChainDenom)
 	assert.Equal(t, initialContractBalance.Add(coinToSendToB), newContractBalance) // hold in escrow
 
 	// when timeout packet send (by the relayer)
@@ -383,9 +384,9 @@ func TestContractCanEmulateIBCTransferMessageWithTimeout(t *testing.T) {
 	require.Equal(t, 0, len(*chainB.PendingSendPackets))
 
 	// and then verify account balances restored
-	newContractBalance = chainA.Balance(myContractAddr, sdk.DefaultBondDenom)
+	newContractBalance = chainA.Balance(myContractAddr, lcfg.ChainDenom)
 	assert.Equal(t, initialContractBalance.String(), newContractBalance.String())
-	newSenderBalance := chainA.Balance(chainA.SenderAccount.GetAddress(), sdk.DefaultBondDenom)
+	newSenderBalance := chainA.Balance(chainA.SenderAccount.GetAddress(), lcfg.ChainDenom)
 	assert.Equal(t, initialSenderBalance.String(), newSenderBalance.String())
 }
 
@@ -435,7 +436,7 @@ func TestContractEmulateIBCTransferMessageOnDiffContractIBCChannel(t *testing.T)
 	// when contract is triggered to send the ibc package to chain B
 	timeout := uint64(chainB.LatestCommittedHeader.Header.Time.Add(time.Hour).UnixNano()) // enough time to not timeout
 	receiverAddress := chainB.SenderAccount.GetAddress()
-	coinToSendToB := sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.NewInt(100))
+	coinToSendToB := sdk.NewCoin(lcfg.ChainDenom, sdkmath.NewInt(100))
 
 	// start transfer from chainA - A2 to chainB via IBC channel
 	startMsg := &wasmtypes.MsgExecuteContract{
@@ -549,7 +550,7 @@ func TestContractHandlesChannelCloseNotOwned(t *testing.T) {
 		Msg: closeIBCChannel{
 			ChannelID: path.EndpointA.ChannelID,
 		}.GetBytes(),
-		Funds: sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.NewInt(100))),
+		Funds: sdk.NewCoins(sdk.NewCoin(lcfg.ChainDenom, sdkmath.NewInt(100))),
 	}
 
 	_, err := chainA.SendMsgs(closeIBCChannelMsg)

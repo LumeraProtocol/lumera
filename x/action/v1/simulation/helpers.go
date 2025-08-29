@@ -20,6 +20,8 @@ import (
 	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+
+	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
 // registerSenseAction creates a new SENSE action in PENDING state for the simulation
@@ -265,8 +267,7 @@ func selectRandomAccountWithSufficientFunds(r *rand.Rand, ctx sdk.Context, accs 
 	}
 
 	// Check if the account has enough balance
-	denom := sdk.DefaultBondDenom
-	balance := bk.GetBalance(ctx, simAccount.Address, denom)
+	balance := bk.GetBalance(ctx, simAccount.Address, lcfg.ChainDenom)
 
 	// Ensure account has enough funds for gas + fees
 	if balance.IsZero() || balance.Amount.LT(math.NewInt(1000000)) {
@@ -288,7 +289,7 @@ func selectRandomAccountWithInsufficientFunds(r *rand.Rand, ctx sdk.Context, acc
 	simAccount, _ := simtypes.RandomAcc(r, accs)
 
 	// Check if the account has insufficient balance
-	balance := bk.GetBalance(ctx, simAccount.Address, sdk.DefaultBondDenom)
+	balance := bk.GetBalance(ctx, simAccount.Address, lcfg.ChainDenom)
 
 	// We need an account that has some funds (not zero) but less than the minimal fee
 	// This ensures we can see the insufficient funds error rather than something else
@@ -375,7 +376,7 @@ func generateRandomFee(r *rand.Rand, ctx sdk.Context, minFee sdk.Coin) sdk.Coin 
 	randomAddition := r.Int63n(1000000)
 	amount := minAmount + randomAddition
 
-	return sdk.NewCoin(sdk.DefaultBondDenom, math.NewInt(amount))
+	return sdk.NewCoin(lcfg.ChainDenom, math.NewInt(amount))
 }
 
 // selectRandomActionType randomly selects an action type between SENSE and CASCADE

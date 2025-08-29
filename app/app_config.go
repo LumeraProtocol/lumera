@@ -78,6 +78,8 @@ import (
 	pfmtypes "github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v10/packetforward/types"
 	solomachine "github.com/cosmos/ibc-go/v10/modules/light-clients/06-solomachine"
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
+
+	lcfg "github.com/LumeraProtocol/lumera/config"	
 	// this line is used by starport scaffolding # stargate/app/moduleImport
 )
 
@@ -235,7 +237,7 @@ var (
 			{
 				Name: authtypes.ModuleName,
 				Config: appconfig.WrapAny(&authmodulev1.Module{
-					Bech32Prefix:             AccountAddressPrefix,
+					Bech32Prefix:             lcfg.AccountAddressPrefix,
 					ModuleAccountPermissions: moduleAccPerms,
 					// By default modules authority is the governance module. This is configurable with the following:
 					// Authority: "group", // A custom module authority can be set using a module name
@@ -257,8 +259,8 @@ var (
 				Config: appconfig.WrapAny(&stakingmodulev1.Module{
 					// NOTE: specifying a prefix is only necessary when using bech32 addresses
 					// If not specfied, the auth Bech32Prefix appended with "valoper" and "valcons" is used by default
-					Bech32PrefixValidator: ValidatorAddressPrefix,
-					Bech32PrefixConsensus: ConsNodeAddressPrefix,
+					Bech32PrefixValidator: lcfg.ValidatorAddressPrefix,
+					Bech32PrefixConsensus: lcfg.ConsNodeAddressPrefix,
 				}),
 			},
 			{

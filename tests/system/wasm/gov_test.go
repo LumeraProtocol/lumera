@@ -19,6 +19,7 @@ import (
 	"github.com/LumeraProtocol/lumera/app"
 	"github.com/LumeraProtocol/lumera/tests/ibctesting"
 	wasmtest "github.com/LumeraProtocol/lumera/tests/system/wasm"
+	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
 func TestGovVoteByContract(t *testing.T) {
@@ -37,7 +38,7 @@ func TestGovVoteByContract(t *testing.T) {
 			Delegate: &wasmvmtypes.DelegateMsg{
 				Validator: sdk.ValAddress(chain.Vals.Validators[0].Address).String(),
 				Amount: wasmvmtypes.Coin{
-					Denom:  sdk.DefaultBondDenom,
+					Denom:  lcfg.ChainDenom,
 					Amount: "1000000000",
 				},
 			},
@@ -48,7 +49,7 @@ func TestGovVoteByContract(t *testing.T) {
 	app := chain.App.(*app.App)
 
 	// Verify the community pool balance
-	communityPoolBalance := chain.Balance(app.AuthKeeper.GetModuleAccount(chain.GetContext(), distributiontypes.ModuleName).GetAddress(), sdk.DefaultBondDenom)
+	communityPoolBalance := chain.Balance(app.AuthKeeper.GetModuleAccount(chain.GetContext(), distributiontypes.ModuleName).GetAddress(), lcfg.ChainDenom)
 	require.False(t, communityPoolBalance.IsZero())
 
 	// Get governance parameters and setup
@@ -97,7 +98,7 @@ func TestGovVoteByContract(t *testing.T) {
 			payloadMsg := &distributiontypes.MsgCommunityPoolSpend{
 				Authority: govAcctAddr.String(),
 				Recipient: recipientAddr.String(),
-				Amount:    sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.OneInt())),
+				Amount:    sdk.NewCoins(sdk.NewCoin(lcfg.ChainDenom, sdkmath.OneInt())),
 			}
 			msg, err := v1.NewMsgSubmitProposal(
 				[]sdk.Msg{payloadMsg},
@@ -136,12 +137,12 @@ func TestGovVoteByContract(t *testing.T) {
 			coord.CommitBlock(chain)
 
 			// Validate recipient balance updates
-			recipientBalance := chain.Balance(recipientAddr, sdk.DefaultBondDenom)
+			recipientBalance := chain.Balance(recipientAddr, lcfg.ChainDenom)
 			if !spec.expPass {
 				assert.True(t, recipientBalance.IsZero())
 				return
 			}
-			expBalanceAmount := sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.OneInt())
+			expBalanceAmount := sdk.NewCoin(lcfg.ChainDenom, sdkmath.OneInt())
 			assert.Equal(t, expBalanceAmount.String(), recipientBalance.String())
 		})
 	}

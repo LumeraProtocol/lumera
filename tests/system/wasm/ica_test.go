@@ -24,6 +24,7 @@ import (
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 
 	"github.com/LumeraProtocol/lumera/tests/ibctesting"
+	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
 func TestICA(t *testing.T) {
@@ -103,7 +104,7 @@ func TestICA(t *testing.T) {
 
 			// submit a tx
 			targetAddr := sdk.AccAddress(rand.Bytes(address.Len))
-			sendCoin := sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.NewInt(100))
+			sendCoin := sdk.NewCoin(lcfg.ChainDenom, sdkmath.NewInt(100))
 			payloadMsg := banktypes.NewMsgSend(icaAddr, targetAddr, sdk.NewCoins(sendCoin))
 			rawPayloadData, err := icatypes.SerializeCosmosTx(controllerChain.Codec, []proto.Message{payloadMsg}, spec.encoding)
 			require.NoError(t, err)
@@ -120,7 +121,7 @@ func TestICA(t *testing.T) {
 			assert.Equal(t, 1, len(*controllerChain.PendingSendPackets))
 			require.NoError(t, path.RelayAndAckPendingPackets())
 
-			gotBalance := hostChain.Balance(targetAddr, sdk.DefaultBondDenom)
+			gotBalance := hostChain.Balance(targetAddr, lcfg.ChainDenom)
 			assert.Equal(t, sendCoin.String(), gotBalance.String())
 		})
 	}

@@ -11,6 +11,8 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	banktestutil "github.com/cosmos/cosmos-sdk/x/bank/testutil"
 	"github.com/cosmos/cosmos-sdk/x/staking/types"
+
+	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
 func BenchmarkGetValidator(b *testing.B) {
@@ -59,7 +61,7 @@ func BenchmarkGetValidatorDelegations(b *testing.B) {
 		for i := 0; i < delegationsNum; i++ {
 			delegator := sdk.AccAddress(fmt.Sprintf("address%d", i))
 			banktestutil.FundAccount(f.sdkCtx, f.bankKeeper, delegator,
-				sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, math.NewInt(int64(i)))))
+				sdk.NewCoins(sdk.NewCoin(lcfg.ChainDenom, math.NewInt(int64(i)))))
 			NewDel := types.NewDelegation(delegator.String(), val.String(), math.LegacyNewDec(int64(i)))
 
 			if err := f.stakingKeeper.SetDelegation(f.sdkCtx, NewDel); err != nil {
@@ -94,7 +96,7 @@ func BenchmarkGetValidatorDelegationsLegacy(b *testing.B) {
 	for _, val := range valAddrs {
 		for i := 0; i < delegationsNum; i++ {
 			delegator := sdk.AccAddress(fmt.Sprintf("address%d", i))
-			banktestutil.FundAccount(f.sdkCtx, f.bankKeeper, delegator, sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, math.NewInt(int64(i)))))
+			banktestutil.FundAccount(f.sdkCtx, f.bankKeeper, delegator, sdk.NewCoins(sdk.NewCoin(lcfg.ChainDenom, math.NewInt(int64(i)))))
 			NewDel := types.NewDelegation(delegator.String(), val.String(), math.LegacyNewDec(int64(i)))
 			if err := f.stakingKeeper.SetDelegation(f.sdkCtx, NewDel); err != nil {
 				panic(err)

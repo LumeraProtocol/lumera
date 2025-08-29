@@ -14,6 +14,8 @@ import (
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	paramstypes "github.com/cosmos/cosmos-sdk/x/params/types"
 
+	lcfg "github.com/LumeraProtocol/lumera/config"
+
 	icamodule "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts"
 	icacontroller "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/controller"
 	icacontrollerkeeper "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/controller/keeper"
@@ -156,7 +158,7 @@ func (app *App) registerIBCModules(
 		ibcv1transferStack,
 		app.PacketForwardKeeper,
 		wasmStackIBCHandler,
-		DefaultMaxIBCCallbackGas,
+		lcfg.DefaultMaxIBCCallbackGas,
 	)
 	ibcv1transferStack = pfm.NewIBCMiddleware(
 		ibccbStack,
@@ -172,7 +174,7 @@ func (app *App) registerIBCModules(
 		app.IBCKeeper.ChannelKeeperV2,
 		wasmStackIBCHandler,
 		app.IBCKeeper.ChannelKeeperV2,
-		DefaultMaxIBCCallbackGas,
+		lcfg.DefaultMaxIBCCallbackGas,
 	)
 	app.TransferKeeper.WithICS4Wrapper(ibccbStack)
 
@@ -191,7 +193,7 @@ func (app *App) registerIBCModules(
 		icaControllerStack,
 		app.IBCKeeper.ChannelKeeper, // ICS4Wrapper
 		wasmStackIBCHandler,
-		DefaultMaxIBCCallbackGas,
+		lcfg.DefaultMaxIBCCallbackGas,
 	)
 	icaICS4Wrapper := icaControllerStack.(ibcporttypes.ICS4Wrapper)
 	// Since the callbacks middleware itself is an ics4wrapper, it needs to be passed to the ica controller keeper

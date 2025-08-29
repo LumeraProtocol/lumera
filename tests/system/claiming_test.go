@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	claimtestutils "github.com/LumeraProtocol/lumera/x/claim/testutils"
+	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
 type SystemTestSuite struct {
@@ -82,7 +83,7 @@ func TestClaimProcess(t *testing.T) {
 
 				claimRecord := types.ClaimRecord{
 					OldAddress: testData.OldAddress,
-					Balance:    sdk.NewCoins(sdk.NewInt64Coin(sdk.DefaultBondDenom, testAmount)),
+					Balance:    sdk.NewCoins(sdk.NewInt64Coin(lcfg.ChainDenom, testAmount)),
 					Claimed:    false,
 				}
 				err = suite.app.ClaimKeeper.SetClaimRecord(suite.sdkCtx, claimRecord)
@@ -109,7 +110,7 @@ func TestClaimProcess(t *testing.T) {
 
 				claimRecord := types.ClaimRecord{
 					OldAddress: testData.OldAddress,
-					Balance:    sdk.NewCoins(sdk.NewInt64Coin(sdk.DefaultBondDenom, testAmount)),
+					Balance:    sdk.NewCoins(sdk.NewInt64Coin(lcfg.ChainDenom, testAmount)),
 					Claimed:    true,
 					ClaimTime:  suite.sdkCtx.BlockTime().Unix(),
 				}
@@ -152,7 +153,7 @@ func TestClaimProcess(t *testing.T) {
 
 				claimRecord := types.ClaimRecord{
 					OldAddress: testData.OldAddress,
-					Balance:    sdk.NewCoins(sdk.NewInt64Coin(sdk.DefaultBondDenom, testAmount)),
+					Balance:    sdk.NewCoins(sdk.NewInt64Coin(lcfg.ChainDenom, testAmount)),
 					Claimed:    false,
 				}
 				err = suite.app.ClaimKeeper.SetClaimRecord(suite.sdkCtx, claimRecord)
@@ -177,7 +178,7 @@ func TestClaimProcess(t *testing.T) {
 
 				claimRecord := types.ClaimRecord{
 					OldAddress: testData.OldAddress,
-					Balance:    sdk.NewCoins(sdk.NewInt64Coin(sdk.DefaultBondDenom, testAmount)),
+					Balance:    sdk.NewCoins(sdk.NewInt64Coin(lcfg.ChainDenom, testAmount)),
 					Claimed:    false,
 				}
 				err = suite.app.ClaimKeeper.SetClaimRecord(suite.sdkCtx, claimRecord)
@@ -203,7 +204,7 @@ func TestClaimProcess(t *testing.T) {
 
 				claimRecord := types.ClaimRecord{
 					OldAddress: testData.OldAddress,
-					Balance:    sdk.NewCoins(sdk.NewInt64Coin(sdk.DefaultBondDenom, testAmount)),
+					Balance:    sdk.NewCoins(sdk.NewInt64Coin(lcfg.ChainDenom, testAmount)),
 					Claimed:    false,
 				}
 				err = suite.app.ClaimKeeper.SetClaimRecord(suite.sdkCtx, claimRecord)

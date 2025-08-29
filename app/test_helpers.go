@@ -50,6 +50,7 @@ import (
 
 	ibcmock "github.com/LumeraProtocol/lumera/tests/ibctesting/mock"
 	claimtypes "github.com/LumeraProtocol/lumera/x/claim/types"
+	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
 const (
@@ -231,7 +232,7 @@ func Setup(tb testing.TB, wasmOpts ...wasmkeeper.Option) *App {
 	genBals := []banktypes.Balance{}
 	balance := banktypes.Balance{
 		Address: acc.GetAddress().String(),
-		Coins:   sdk.NewCoins(sdk.NewInt64Coin(sdk.DefaultBondDenom, 100_000_000_000_000)),
+		Coins:   sdk.NewCoins(sdk.NewInt64Coin(lcfg.ChainDenom, 100_000_000_000_000)),
 	}
 	genBals = append(genBals, balance)
 	chainID := "testing"
@@ -312,7 +313,7 @@ func GenesisStateWithSingleValidator(tb testing.TB, app *App) GenesisState {
 	balances := []banktypes.Balance{
 		{
 			Address: acc.GetAddress().String(),
-			Coins:   sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.NewInt(100000000000000))),
+			Coins:   sdk.NewCoins(sdk.NewCoin(lcfg.ChainDenom, sdkmath.NewInt(100000000000000))),
 		},
 	}
 

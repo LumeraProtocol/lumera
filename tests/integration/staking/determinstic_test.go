@@ -35,6 +35,8 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/staking"
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
+
+	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
 var (
@@ -238,7 +240,7 @@ func setValidator(f *deterministicFixture, t *testing.T, validator stakingtypes.
 	assert.NilError(t, f.stakingKeeper.Hooks().AfterValidatorCreated(f.ctx, valbz))
 
 	delegatorAddress := sdk.AccAddress(valbz)
-	coins := sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, validator.BondedTokens()))
+	coins := sdk.NewCoins(sdk.NewCoin(lcfg.ChainDenom, validator.BondedTokens()))
 	assert.NilError(t, banktestutil.FundAccount(f.ctx, f.bankKeeper, delegatorAddress, coins))
 
 	_, err = f.stakingKeeper.Delegate(f.ctx, delegatorAddress, validator.BondedTokens(), stakingtypes.Unbonded, validator, true)
@@ -321,7 +323,7 @@ func createDelegationAndDelegate(rt *rapid.T, f *deterministicFixture, t *testin
 
 // fundAccountAndDelegate funds the delegator account with the specified delegation and delegates.
 func fundAccountAndDelegate(f *deterministicFixture, t *testing.T, delegator sdk.AccAddress, validator stakingtypes.Validator, amt math.Int) (newShares math.LegacyDec, err error) {
-	coins := sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, amt))
+	coins := sdk.NewCoins(sdk.NewCoin(lcfg.ChainDenom, amt))
 
 	assert.NilError(t, f.bankKeeper.MintCoins(f.ctx, minttypes.ModuleName, coins))
 	assert.NilError(t, banktestutil.FundAccount(f.ctx, f.bankKeeper, delegator, coins))

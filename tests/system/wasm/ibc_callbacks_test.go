@@ -19,6 +19,7 @@ import (
 
 	wasmtest "github.com/LumeraProtocol/lumera/tests/system/wasm"
 	"github.com/LumeraProtocol/lumera/tests/ibctesting"
+	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
 func TestIBCCallbacks(t *testing.T) {
@@ -36,7 +37,7 @@ func TestIBCCallbacks(t *testing.T) {
 	chainB := coord.GetChain(ibctesting.GetChainID(2))
 
 	actorChainA := sdk.AccAddress(chainA.SenderPrivKey.PubKey().Address())
-	oneToken := sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.NewInt(1)))
+	oneToken := sdk.NewCoins(sdk.NewCoin(lcfg.ChainDenom, sdkmath.NewInt(1)))
 
 	path := ibctesting.NewPath(chainA, chainB)
 	path.EndpointA.ChannelConfig = &ibctesting.ChannelConfig{
@@ -181,7 +182,7 @@ func TestIBCCallbacksWithoutEntrypoints(t *testing.T) {
 	chainA := coord.GetChain(ibctesting.GetChainID(1))
 	chainB := coord.GetChain(ibctesting.GetChainID(2))
 
-	oneToken := sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.NewInt(1))
+	oneToken := sdk.NewCoin(lcfg.ChainDenom, sdkmath.NewInt(1))
 
 	path := ibctesting.NewPath(chainA, chainB)
 	path.EndpointA.ChannelConfig = &ibctesting.ChannelConfig{

@@ -92,8 +92,6 @@ import (
 
 const (
 	Name                 = "lumera"
-	// ChainCoinType is the coin type of the chain.
-	ChainCoinType = 118
 )
 
 var (

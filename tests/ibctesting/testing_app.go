@@ -22,6 +22,7 @@ import (
 
 	ibcporttypes "github.com/cosmos/ibc-go/v10/modules/core/05-port/types"
 	ibckeeper "github.com/cosmos/ibc-go/v10/modules/core/keeper"
+	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
 type TestingApp interface {
@@ -52,7 +53,7 @@ func SignAndDeliver(
 		rand.New(rand.NewSource(time.Now().UnixNano())),
 		txCfg,
 		msgs,
-		sdk.Coins{sdk.NewInt64Coin(sdk.DefaultBondDenom, 0)},
+		sdk.Coins{sdk.NewInt64Coin(lcfg.ChainDenom, 0)},
 		simtestutil.DefaultGenTxGas,
 		chainID,
 		accNums,

@@ -7,8 +7,11 @@
     "rpc_port": 26667,
     "rest_port": 1327,
     "grpc_port": 9091,
+    "supernode_port": 7441,
+    "supernode_p2p_port": 7442,
+    "supernode_gateway_port": 18001,
     "initial_distribution": {
-      "account_balance": "1100000000000ulume",
+      "account_balance": "2000000000000ulume",
       "validator_stake": "1000000000000ulume"
     }
   },
@@ -20,8 +23,11 @@
     "rpc_port": 26677,
     "rest_port": 1337,
     "grpc_port": 9092,
+    "supernode_port": 7443,
+    "supernode_p2p_port": 7444,
+    "supernode_gateway_port": 18002,
     "initial_distribution": {
-      "account_balance": "1100000000000ulume",
+      "account_balance": "2000000000000ulume",
       "validator_stake": "1000000000000ulume"
     }
   },
@@ -33,8 +39,12 @@
     "rpc_port": 26687,
     "rest_port": 1347,
     "grpc_port": 9093,
+    "supernode_port": 7445,
+    "supernode_p2p_port": 7446,
+    "supernode_gateway_port": 18003,
+    "network-maker": true,
     "initial_distribution": {
-      "account_balance": "1100000000000ulume",
+      "account_balance": "2000000000000ulume",
       "validator_stake": "1000000000000ulume"
     }
   },
@@ -46,8 +56,11 @@
     "rpc_port": 26697,
     "rest_port": 1357,
     "grpc_port": 9094,
+    "supernode_port": 7447,
+    "supernode_p2p_port": 7448,
+    "supernode_gateway_port": 18004,
     "initial_distribution": {
-      "account_balance": "1100000000000ulume",
+      "account_balance": "2000000000000ulume",
       "validator_stake": "1000000000000ulume"
     }
   },
@@ -59,8 +72,11 @@
     "rpc_port": 26607,
     "rest_port": 1367,
     "grpc_port": 9095,
+    "supernode_port": 7449,
+    "supernode_p2p_port": 7450,
+    "supernode_gateway_port": 18005,
     "initial_distribution": {
-      "account_balance": "1100000000000ulume",
+      "account_balance": "2000000000000ulume",
       "validator_stake": "1000000000000ulume"
     }
   }

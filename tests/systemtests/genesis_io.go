@@ -44,24 +44,3 @@ func SetGovVotingPeriod(t *testing.T, period time.Duration) GenesisMutator {
 		return state
 	}
 }
-
-func SetDefaultDenoms(t *testing.T, denom string) GenesisMutator {
-	return func(genesis []byte) []byte {
-		t.Helper()
-		state, err := sjson.SetRawBytes(genesis, "app_state.staking.params.bond_denom", []byte(fmt.Sprintf(`"%s"`, denom)))
-		require.NoError(t, err)
-
-		state, err = sjson.SetRawBytes(state, "app_state.gov.params.min_deposit.0.denom", []byte(fmt.Sprintf(`"%s"`, denom)))
-		require.NoError(t, err)
-
-		state, err = sjson.SetRawBytes(state, "app_state.gov.params.expedited_min_deposit.0.denom", []byte(fmt.Sprintf(`"%s"`, denom)))
-		require.NoError(t, err)
-
-		state, err = sjson.SetRawBytes(state, "app_state.mint.params.mint_denom", []byte(fmt.Sprintf(`"%s"`, denom)))
-		require.NoError(t, err)
-
-		state, err = sjson.SetRawBytes(state, "app_state.crisis.constant_fee.denom", []byte(fmt.Sprintf(`"%s"`, denom)))
-		require.NoError(t, err)
-		return state
-	}
-}

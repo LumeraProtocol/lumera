@@ -26,8 +26,8 @@ get_current_height() {
 }
 
 # Usage:
-#   get_proposal_id_by_version_with_retry "v1.7.0"         # default 1 attempt
-#   get_proposal_id_by_version_with_retry "v1.7.0" 5       # 5 retry attempts
+#   get_proposal_id_by_version_with_retry "v1.8.0"         # default 1 attempt
+#   get_proposal_id_by_version_with_retry "v1.8.0" 5       # 5 retry attempts
 get_proposal_id_by_version_with_retry() {
   local version="$1"
   local attempts="${2:-1}"  # Default to 1 attempt if not provided

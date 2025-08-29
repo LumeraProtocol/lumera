@@ -13,6 +13,8 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/staking/keeper"
 	"github.com/cosmos/cosmos-sdk/x/staking/testutil"
 	"github.com/cosmos/cosmos-sdk/x/staking/types"
+
+	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
 func TestUnbondingDelegationsMaxEntries(t *testing.T) {
@@ -22,7 +24,7 @@ func TestUnbondingDelegationsMaxEntries(t *testing.T) {
 	ctx := f.sdkCtx
 
 	initTokens := f.stakingKeeper.TokensFromConsensusPower(ctx, int64(1000))
-	assert.NilError(t, f.bankKeeper.MintCoins(ctx, types.ModuleName, sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, initTokens))))
+	assert.NilError(t, f.bankKeeper.MintCoins(ctx, types.ModuleName, sdk.NewCoins(sdk.NewCoin(lcfg.ChainDenom, initTokens))))
 
 	addrDel := sdk.AccAddress([]byte("addr"))
 	accAmt := math.NewInt(10000)

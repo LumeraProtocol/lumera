@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"gen/config"
 	"gen/generators"
+	"path/filepath"
 	"log"
 	"os"
 )
@@ -23,7 +24,12 @@ func main() {
 	}
 
 	if useExistingGenesis {
-		data, err := os.ReadFile("/tmp/lumera-devnet/shared/external_genesis.json")
+		data, err := os.ReadFile(filepath.Join(
+			"/tmp",
+			cfg.Chain.ID,
+			generators.SubFolderShared,
+			generators.SubFolderConfig,
+			"external_genesis.json"))
 		if err != nil {
 			log.Fatalf("Failed to read existing genesis file: %v", err)
 		}
@@ -54,38 +60,6 @@ func main() {
 		log.Fatalf("Failed to write docker-compose.yml: %v", err)
 	}
 
-	// Generate start docker-compose
-	startCompose, err := generators.GenerateStartDockerCompose(cfg, validators)
-	if err != nil {
-		log.Fatalf("Failed to generate start docker-compose configuration: %v", err)
-	}
-
-	err = generators.WriteDockerCompose(startCompose, "docker-compose.start.yml")
-	if err != nil {
-		log.Fatalf("Failed to write docker-compose.start.yml: %v", err)
-	}
-
-	// Generate validator scripts
-	err = generators.GeneratePrimaryValidatorScript(cfg, validators, useExistingGenesis)
-	if err != nil {
-		log.Fatalf("Failed to generate primary validator script: %v", err)
-	}
-
-	err = generators.GenerateSecondaryValidatorScript(cfg, validators)
-	if err != nil {
-		log.Fatalf("Failed to generate secondary validator script: %v", err)
-	}
-
-	// Generate start script
-	err = generators.GenerateStartScript(cfg)
-	if err != nil {
-		log.Fatalf("Failed to generate start script: %v", err)
-	}
-
-	fmt.Println("Successfully generated all configuration files:")
-	fmt.Println("- docker-compose.yml (for initialization)")
-	fmt.Println("- docker-compose.start.yml (for starting nodes)")
-	fmt.Println("- primary-validator.sh")
-	fmt.Println("- secondary-validator.sh")
-	fmt.Println("- start.sh")
+	fmt.Println("Successfully generated configuration file:")
+	fmt.Println("- docker-compose.yml")
 }

@@ -1,4 +1,3 @@
-.PHONY: all up up-detach down
 .PHONY: devnet-build devnet-rebuild devnet-up devnet-reset devnet-up-detach devnet-down devnet-clean devnet-deploy-tar devnet-upgrade devnet-new
 .PHONY: unit-tests integration-tests system-tests simulation-tests all-tests
 .PHONY: buf-proto gen-proto clean-proto
@@ -160,7 +159,7 @@ devnet-new:
 
 devnet-deploy-tar:
 	# Ensure required files exist from previous build
-	@if [ ! -f "devnet/docker-compose.yml" ] || [ ! -f "devnet/lumerad" ] || [ ! -f "devnet/libwasmvm.x86_64.so" ]; then \
+	@if [ ! -f "devnet/docker-compose.yml" ] || [ ! -f "devnet/bin/lumerad" ] || [ ! -f "devnet/bin/libwasmvm.x86_64.so" ]; then \
 		echo "Please run 'make devnet-build' first to generate required files."; \
 		exit 1; \
 	fi
@@ -208,6 +207,7 @@ PROTO_SRC := $(shell find proto -name "*.proto")
 GO_SRC := $(shell find app -name "*.go") \
 	$(shell find ante -name "*.go") \
 	$(shell find cmd -name "*.go") \
+	$(shell find config -name "*.go") \
 	$(shell find x -name "*.go")
 
 build: build/lumerad

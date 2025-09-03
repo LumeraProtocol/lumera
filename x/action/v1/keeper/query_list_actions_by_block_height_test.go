@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	v1beta1 "cosmossdk.io/api/cosmos/base/v1beta1"
 )
 
 func TestKeeper_ListActionsByBlockHeight(t *testing.T) {
@@ -22,7 +23,7 @@ func TestKeeper_ListActionsByBlockHeight(t *testing.T) {
 	anotherBlockHeight := int64(200)
 	invalidBlockHeight := int64(-1)
 	creatorAddr := sdk.AccAddress([]byte("creator"))
-	price := "100stake"
+	price := &v1beta1.Coin{Denom: "stake", Amount: "100"}
 	action1 := actionapi.Action{
 		Creator:        creatorAddr.String(),
 		ActionID:       actionID1,

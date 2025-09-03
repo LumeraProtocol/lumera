@@ -17,6 +17,7 @@ import (
 
 	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
 	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
+	v1beta1 "cosmossdk.io/api/cosmos/base/v1beta1"
 )
 
 // KeeperTestSuite is a test suite to test keeper functions
@@ -194,7 +195,7 @@ func (suite *KeeperTestSuite) prepareCascadeActionForRegistration(creator string
 	action := &actionapi.Action{
 		Creator:    creator,
 		ActionType: actionapi.ActionType_ACTION_TYPE_CASCADE,
-		Price:      "10100ulume",
+		Price:      &v1beta1.Coin{Denom: "ulume", Amount: "10100"},
 		Metadata:   metadataBytes,
 	}
 
@@ -228,7 +229,7 @@ func (suite *KeeperTestSuite) prepareSenseActionForRegistration(creator string, 
 	action := &actionapi.Action{
 		Creator:    creator,
 		ActionType: actionapi.ActionType_ACTION_TYPE_SENSE,
-		Price:      "100000ulume",
+		Price:      &v1beta1.Coin{Denom: "ulume", Amount: "100000"},
 		Metadata:   metadataBytes,
 	}
 

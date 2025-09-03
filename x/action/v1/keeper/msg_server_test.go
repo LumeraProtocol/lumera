@@ -12,6 +12,7 @@ import (
 
 	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	v1beta1 "cosmossdk.io/api/cosmos/base/v1beta1"
 )
 
 type MsgServerTestSuite struct {
@@ -80,7 +81,7 @@ func (suite *MsgServerTestSuite) TestKeeperEventEmission() {
 	action := &actionapi.Action{
 		Creator:     suite.creatorAddress.String(),
 		ActionType:  actionapi.ActionType_ACTION_TYPE_SENSE,
-		Price:       "100000ulume",
+		Price:       &v1beta1.Coin{Denom: "ulume", Amount: "100000"},
 		BlockHeight: suite.ctx.BlockHeight(),
 		State:       actionapi.ActionState_ACTION_STATE_PENDING,
 		Metadata:    metadataBytes,

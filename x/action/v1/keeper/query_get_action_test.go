@@ -13,13 +13,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	v1beta1 "cosmossdk.io/api/cosmos/base/v1beta1"
 )
 
 func TestKeeper_GetAction(t *testing.T) {
 	actionID := "12345"
 	invalidActionID := "67890"
 	creatorAddr := sdk.AccAddress([]byte("creator"))
-	price := "100stake"
+	price := &v1beta1.Coin{Denom: "stake", Amount: "100"}
 	action := actionapi.Action{
 		Creator:        creatorAddr.String(),
 		ActionID:       actionID,
@@ -57,7 +58,7 @@ func TestKeeper_GetAction(t *testing.T) {
 				ActionID: actionID,
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
-				action.Price = "invalid_price"
+				action.Price = &v1beta1.Coin{Denom: "invalid", Amount: "price"}
 				k.SetAction(ctx, &action)
 			},
 			expectedErr: status.Errorf(codes.Internal, "invalid price"),
@@ -68,7 +69,7 @@ func TestKeeper_GetAction(t *testing.T) {
 				ActionID: actionID,
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
-				action.Price = "100stake"
+				action.Price = &v1beta1.Coin{Denom: "stake", Amount: "100"}
 				k.SetAction(ctx, &action)
 			},
 			expectedErr: nil,
@@ -76,7 +77,8 @@ func TestKeeper_GetAction(t *testing.T) {
 				require.NotNil(t, resp.Action)
 				require.Equal(t, action.ActionID, resp.Action.ActionID)
 				require.Equal(t, action.Creator, resp.Action.Creator)
-				require.Equal(t, action.Price, resp.Action.Price.String())
+				require.Equal(t, action.Price.Denom, resp.Action.Price.Denom)
+				require.Equal(t, action.Price.Amount, resp.Action.Price.Amount.String())
 			},
 		},
 	}

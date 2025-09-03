@@ -13,6 +13,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
+	v1beta1 "cosmossdk.io/api/cosmos/base/v1beta1"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
@@ -22,7 +23,7 @@ func TestQueryActionByMetadata(t *testing.T) {
 	actionID2 := "67890"
 	actionID3 := "67891"
 	actionID4 := "67892"
-	price := "100stake"
+	price := &v1beta1.Coin{Denom: "stake", Amount: "100"}
 
 	senseMetadata1 := &action.SenseMetadata{
 		CollectionId: "collection1",

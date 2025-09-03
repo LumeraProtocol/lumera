@@ -14,13 +14,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	v1beta1 "cosmossdk.io/api/cosmos/base/v1beta1"
 )
 
 func TestKeeper_ListActions(t *testing.T) {
 	actionID1 := "12345"
 	actionID2 := "67890"
 	actionID3 := "67891"
-	price := "100stake"
+	price := &v1beta1.Coin{Denom: "stake", Amount: "100"}
 
 	action1 := action.Action{
 		Creator:        "creator1",

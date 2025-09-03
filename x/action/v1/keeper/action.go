@@ -37,14 +37,14 @@ func (k *Keeper) RegisterAction(ctx sdk.Context, action *actionapi.Action) (stri
 		)
 	}
 
-	price, err := sdk.ParseCoinNormalized(action.Price)
-	if err != nil {
-		return "", errors.Wrapf(
-			sdkerrors.ErrInvalidRequest,
-			"invalid price %s: %s",
-			action.Price,
-			err.Error())
-	}
+    if action.Price == nil {
+        return "", errors.Wrapf(sdkerrors.ErrInvalidRequest, "missing price")
+    }
+    amt, ok := math.NewIntFromString(action.Price.Amount)
+    if !ok {
+        return "", errors.Wrapf(sdkerrors.ErrInvalidRequest, "invalid price amount: %s", action.Price.Amount)
+    }
+    price := sdk.NewCoin(action.Price.Denom, amt)
 
 	if err := k.validatePrice(ctx, price); err != nil {
 		return "", err
@@ -134,9 +134,9 @@ func (k *Keeper) RegisterAction(ctx sdk.Context, action *actionapi.Action) (stri
 		types2.ModuleName,   // Recipient
 		sdk.NewCoins(price), // Amount
 	)
-	if err != nil {
-		return "", errors.Wrap(types2.ErrInternalError, err.Error())
-	}
+    if err != nil {
+        return "", errors.Wrap(types2.ErrInternalError, err.Error())
+    }
 
 	// Emit event for pending state
 	if action.State == actionapi.ActionState_ACTION_STATE_PENDING {
@@ -146,10 +146,10 @@ func (k *Keeper) RegisterAction(ctx sdk.Context, action *actionapi.Action) (stri
 				sdk.NewAttribute(types2.AttributeKeyActionID, action.ActionID),
 				sdk.NewAttribute(types2.AttributeKeyCreator, action.Creator),
 				sdk.NewAttribute(types2.AttributeKeyActionType, action.ActionType.String()),
-				sdk.NewAttribute(types2.AttributeKeyFee, action.Price),
-			),
-		)
-	}
+            sdk.NewAttribute(types2.AttributeKeyFee, price.String()),
+            ),
+        )
+    }
 
 	return action.ActionID, nil
 }
@@ -547,10 +547,14 @@ func (k *Keeper) DistributeFees(ctx sdk.Context, actionID string) error {
 	}
 
 	// Parse the fee amount
-	fee, err := sdk.ParseCoinNormalized(actionData.Price)
-	if err != nil {
-		return errors.Wrap(sdkerrors.ErrInvalidCoins, err.Error())
-	}
+    if actionData.Price == nil {
+        return errors.Wrap(sdkerrors.ErrInvalidCoins, "missing price")
+    }
+    feeAmt, ok := math.NewIntFromString(actionData.Price.Amount)
+    if !ok {
+        return errors.Wrap(sdkerrors.ErrInvalidCoins, "invalid price amount")
+    }
+    fee := sdk.NewCoin(actionData.Price.Denom, feeAmt)
 
 	// If no fee or no supernodes, nothing to distribute
 	if fee.IsZero() || len(actionData.SuperNodes) == 0 {

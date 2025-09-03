@@ -9,6 +9,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/gogoproto/proto"
 	"github.com/stretchr/testify/assert"
+	v1beta1 "cosmossdk.io/api/cosmos/base/v1beta1"
 )
 
 func (suite *KeeperTestSuite) TestRegisterAction() {
@@ -38,7 +39,7 @@ func (suite *KeeperTestSuite) TestRegisterAction() {
 			action: &actionapi.Action{
 				Creator:    suite.creatorAddress.String(),
 				ActionType: actionapi.ActionType_ACTION_TYPE_CASCADE,
-				Price:      "100000ulume",
+				Price:      &v1beta1.Coin{Denom: "ulume", Amount: "100000"},
 				Metadata:   nil, // Missing metadata
 			},
 			expErr: types2.ErrInvalidMetadata,
@@ -49,7 +50,7 @@ func (suite *KeeperTestSuite) TestRegisterAction() {
 			action: &actionapi.Action{
 				Creator:    suite.creatorAddress.String(),
 				ActionType: actionapi.ActionType_ACTION_TYPE_SENSE,
-				Price:      "100000ulume",
+				Price:      &v1beta1.Coin{Denom: "ulume", Amount: "100000"},
 				Metadata:   nil, // Missing metadata
 			},
 			expErr: types2.ErrInvalidMetadata,
@@ -78,7 +79,7 @@ func (suite *KeeperTestSuite) TestRegisterAction() {
 					return &actionapi.Action{
 						Creator:    suite.creatorAddress.String(),
 						ActionType: actionapi.ActionType_ACTION_TYPE_SENSE,
-						Price:      "100000ulume",
+						Price:      &v1beta1.Coin{Denom: "ulume", Amount: "100000"},
 						State:      actionapi.ActionState_ACTION_STATE_DONE, // Should start as UNSPECIFIED
 						Metadata:   nil,                                     // Empty metadata ID
 					}
@@ -88,7 +89,7 @@ func (suite *KeeperTestSuite) TestRegisterAction() {
 				return &actionapi.Action{
 					Creator:    suite.creatorAddress.String(),
 					ActionType: actionapi.ActionType_ACTION_TYPE_SENSE,
-					Price:      "100000ulume",
+					Price:      &v1beta1.Coin{Denom: "ulume", Amount: "100000"},
 					State:      actionapi.ActionState_ACTION_STATE_DONE, // Should start as UNSPECIFIED
 					Metadata:   metadataBytes,
 				}
@@ -122,7 +123,8 @@ func (suite *KeeperTestSuite) TestRegisterAction() {
 				suite.True(found, "Action should be found in store")
 				suite.Equal(tc.action.Creator, storedAction.Creator, "Creator should match")
 				suite.Equal(tc.action.ActionType, storedAction.ActionType, "ActionType should match")
-				suite.Equal(tc.action.Price, storedAction.Price, "Price should match")
+				suite.Equal(tc.action.Price.Denom, storedAction.Price.Denom, "Price denom should match")
+				suite.Equal(tc.action.Price.Amount, storedAction.Price.Amount, "Price amount should match")
 				suite.Equal(tc.action.BlockHeight, storedAction.BlockHeight, "BlockHeight should match")
 				suite.Equal(actionapi.ActionState_ACTION_STATE_PENDING, storedAction.State, "State should be PENDING")
 			}
@@ -637,7 +639,7 @@ func (suite *KeeperTestSuite) TestFeeDistribution() {
 
 	// Create an action with a fee
 	action := suite.prepareCascadeActionForRegistration(creator, MetadataFieldToMissNone)
-	action.Price = "100000ulume"
+	action.Price = &v1beta1.Coin{Denom: "ulume", Amount: "100000"}
 	_, err = suite.keeper.RegisterAction(suite.ctx, action)
 	suite.NoError(err)
 

@@ -14,13 +14,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	v1beta1 "cosmossdk.io/api/cosmos/base/v1beta1"
 )
 
 func TestKeeper_ListExpiredActions(t *testing.T) {
 	actionID1 := "12345"
 	actionID2 := "67890"
 	actionID3 := "67891"
-	price := "100stake"
+	price := &v1beta1.Coin{Denom: "stake", Amount: "100"}
 
 	action1 := action.Action{
 		Creator:        "creator1",
@@ -146,7 +147,7 @@ func TestKeeper_ListExpiredActions(t *testing.T) {
 					ActionID:       "99999",
 					ActionType:     action.ActionType_ACTION_TYPE_SENSE,
 					Metadata:       []byte("metadata4"),
-					Price:          "invalidcoin",
+					Price:          &v1beta1.Coin{Denom: "invalid", Amount: "coin"},
 					ExpirationTime: 1234567893,
 					State:          action.ActionState_ACTION_STATE_EXPIRED,
 					BlockHeight:    100,

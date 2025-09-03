@@ -62,9 +62,9 @@ func (k msgServer) UpdateSupernode(goCtx context.Context, msg *sntypes.MsgUpdate
 		if supernode.SupernodeAccount != msg.SupernodeAccount {
 			oldAccount := supernode.SupernodeAccount
 
-			// Store the previous account in history
+			// Store the new account in history with recorded block height
 			supernode.PrevSupernodeAccounts = append(supernode.PrevSupernodeAccounts, &sntypes.SupernodeAccountHistory{
-				Account: oldAccount,
+				Account: msg.SupernodeAccount,
 				Height:  ctx.BlockHeight(),
 			})
 

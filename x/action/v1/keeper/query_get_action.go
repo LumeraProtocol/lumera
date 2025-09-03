@@ -1,13 +1,14 @@
 package keeper
 
 import (
-	"context"
+    "context"
 
-	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
+    types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+    "cosmossdk.io/math"
+    sdk "github.com/cosmos/cosmos-sdk/types"
+    "google.golang.org/grpc/codes"
+    "google.golang.org/grpc/status"
 )
 
 // GetAction returns the action for the given action-id
@@ -23,18 +24,23 @@ func (k *Keeper) GetAction(goCtx context.Context, req *types2.QueryGetActionRequ
 		return nil, status.Errorf(codes.Internal, "failed to get action by ID")
 	}
 
-	price, err := sdk.ParseCoinNormalized(action.Price)
-	if err != nil {
-		k.Logger().Error("failed to parse price", "action_id", action.ActionID, "price", action.Price, "error", err)
-		return nil, status.Errorf(codes.Internal, "invalid price")
-	}
+    if action.Price == nil {
+        k.Logger().Error("missing price", "action_id", action.ActionID)
+        return nil, status.Errorf(codes.Internal, "invalid price")
+    }
+    amount, ok := math.NewIntFromString(action.Price.Amount)
+    if !ok {
+        k.Logger().Error("failed to parse price amount", "action_id", action.ActionID, "amount", action.Price.Amount)
+        return nil, status.Errorf(codes.Internal, "invalid price")
+    }
+    price := sdk.NewCoin(action.Price.Denom, amount)
 
 	return &types2.QueryGetActionResponse{Action: &types2.Action{
 		Creator:        action.Creator,
 		ActionID:       action.ActionID,
 		ActionType:     types2.ActionType(action.ActionType),
 		Metadata:       action.Metadata,
-		Price:          &price,
+		Price:          price,
 		ExpirationTime: action.ExpirationTime,
 		State:          types2.ActionState(action.State),
 		BlockHeight:    action.BlockHeight,

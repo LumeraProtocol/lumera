@@ -1,15 +1,16 @@
 package keeper
 
 import (
-	"context"
-	"strconv"
+    "context"
+    "strconv"
 
-	"github.com/LumeraProtocol/lumera/x/action/v1/common"
-	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
+    "github.com/LumeraProtocol/lumera/x/action/v1/common"
+    types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
 
-	errorsmod "cosmossdk.io/errors"
-	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
-	sdk "github.com/cosmos/cosmos-sdk/types"
+    errorsmod "cosmossdk.io/errors"
+    actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
+    v1beta1 "cosmossdk.io/api/cosmos/base/v1beta1"
+    sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 func (k msgServer) RequestAction(goCtx context.Context, msg *types2.MsgRequestAction) (*types2.MsgRequestActionResponse, error) {
@@ -61,15 +62,21 @@ func (k msgServer) RequestAction(goCtx context.Context, msg *types2.MsgRequestAc
 		return nil, errorsmod.Wrap(types2.ErrInvalidMetadata, err.Error())
 	}
 
-	// Create a new action with metadata embedded directly
-	action := &actionapi.Action{
-		Creator:        msg.Creator,
-		ActionType:     actionType,
-		Metadata:       processedData,
-		Price:          msg.Price,
-		ExpirationTime: expTime,
-		State:          actionapi.ActionState_ACTION_STATE_PENDING,
-	}
+    // Parse price and construct API Coin for storage
+    coin, err := sdk.ParseCoinNormalized(msg.Price)
+    if err != nil {
+        return nil, errorsmod.Wrapf(types2.ErrInvalidMetadata, "invalid price: %s", err)
+    }
+
+    // Create a new action with metadata embedded directly
+    action := &actionapi.Action{
+        Creator:        msg.Creator,
+        ActionType:     actionType,
+        Metadata:       processedData,
+        Price:          &v1beta1.Coin{Denom: coin.Denom, Amount: coin.Amount.String()},
+        ExpirationTime: expTime,
+        State:          actionapi.ActionState_ACTION_STATE_PENDING,
+    }
 
 	// Save the action (this generates the action ID)
 	actionID, err := k.RegisterAction(ctx, action)

@@ -5,6 +5,7 @@ import (
 
 	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
 
+	"cosmossdk.io/math"
 	"cosmossdk.io/store/prefix"
 	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
 	"github.com/cosmos/cosmos-sdk/runtime"
@@ -28,11 +29,11 @@ func (k Keeper) ListActions(goCtx context.Context, req *types2.QueryListActionsR
 
 	var actions []*types2.Action
 
-	onResult := func(key, value []byte, accumulate bool) (bool, error) {
-		var act actionapi.Action
-		if err := k.cdc.Unmarshal(value, &act); err != nil {
-			return false, err
-		}
+    onResult := func(key, value []byte, accumulate bool) (bool, error) {
+        var act actionapi.Action
+        if err := k.cdc.Unmarshal(value, &act); err != nil {
+            return false, err
+        }
 
 		if req.ActionState != types2.ActionStateUnspecified && act.State != actionapi.ActionState(req.ActionState) {
 			return false, nil
@@ -42,25 +43,30 @@ func (k Keeper) ListActions(goCtx context.Context, req *types2.QueryListActionsR
 			return false, nil
 		}
 
-		if accumulate {
-			price, err := sdk.ParseCoinNormalized(act.Price)
-			if err != nil {
-				k.Logger().Error("failed to parse price", "action_id", act.ActionID, "price", act.Price, "error", err)
-				return false, err
-			}
+        if accumulate {
+            if act.Price == nil {
+                k.Logger().Error("missing price", "action_id", act.ActionID)
+                return false, status.Errorf(codes.Internal, "invalid price")
+            }
+            amt, ok := math.NewIntFromString(act.Price.Amount)
+            if !ok {
+                k.Logger().Error("failed to parse price amount", "action_id", act.ActionID, "amount", act.Price.Amount)
+                return false, status.Errorf(codes.Internal, "invalid price")
+            }
+            price := sdk.NewCoin(act.Price.Denom, amt)
 
-			actions = append(actions, &types2.Action{
-				Creator:        act.Creator,
-				ActionID:       act.ActionID,
-				ActionType:     types2.ActionType(act.ActionType),
-				Metadata:       act.Metadata,
-				Price:          &price,
-				ExpirationTime: act.ExpirationTime,
-				State:          types2.ActionState(act.State),
-				BlockHeight:    act.BlockHeight,
-				SuperNodes:     act.SuperNodes,
-			})
-		}
+            actions = append(actions, &types2.Action{
+                Creator:        act.Creator,
+                ActionID:       act.ActionID,
+                ActionType:     types2.ActionType(act.ActionType),
+                Metadata:       act.Metadata,
+                Price:          price,
+                ExpirationTime: act.ExpirationTime,
+                State:          types2.ActionState(act.State),
+                BlockHeight:    act.BlockHeight,
+                SuperNodes:     act.SuperNodes,
+            })
+        }
 
 		return true, nil
 	}

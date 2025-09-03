@@ -5,6 +5,7 @@ import (
 
 	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
 
+	"cosmossdk.io/math"
 	"cosmossdk.io/store/prefix"
 	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
 	"github.com/cosmos/cosmos-sdk/runtime"
@@ -34,25 +35,30 @@ func (k Keeper) ListExpiredActions(goCtx context.Context, req *types2.QueryListE
 			return false, err
 		}
 
-		if act.State == actionapi.ActionState_ACTION_STATE_EXPIRED {
-			price, err := sdk.ParseCoinNormalized(act.Price)
-			if err != nil {
-				k.Logger().Error("failed to parse price", "action_id", act.ActionID, "price", act.Price, "error", err)
-				return false, err
-			}
+        if act.State == actionapi.ActionState_ACTION_STATE_EXPIRED {
+            if act.Price == nil {
+                k.Logger().Error("missing price", "action_id", act.ActionID)
+                return false, status.Errorf(codes.Internal, "invalid price")
+            }
+            amt, ok := math.NewIntFromString(act.Price.Amount)
+            if !ok {
+                k.Logger().Error("failed to parse price amount", "action_id", act.ActionID, "amount", act.Price.Amount)
+                return false, status.Errorf(codes.Internal, "invalid price")
+            }
+            price := sdk.NewCoin(act.Price.Denom, amt)
 
 			if accumulate {
-				actions = append(actions, &types2.Action{
-					Creator:        act.Creator,
-					ActionID:       act.ActionID,
-					ActionType:     types2.ActionType(act.ActionType),
-					Metadata:       act.Metadata,
-					Price:          &price,
-					ExpirationTime: act.ExpirationTime,
-					State:          types2.ActionState(act.State),
-					BlockHeight:    act.BlockHeight,
-					SuperNodes:     act.SuperNodes,
-				})
+                actions = append(actions, &types2.Action{
+                    Creator:        act.Creator,
+                    ActionID:       act.ActionID,
+                    ActionType:     types2.ActionType(act.ActionType),
+                    Metadata:       act.Metadata,
+                    Price:          price,
+                    ExpirationTime: act.ExpirationTime,
+                    State:          types2.ActionState(act.State),
+                    BlockHeight:    act.BlockHeight,
+                    SuperNodes:     act.SuperNodes,
+                })
 			}
 			return true, nil
 		}

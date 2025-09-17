@@ -124,16 +124,16 @@ launch_supernode_setup() {
 }
 
 wait_for_validator_setup() {
-    echo "[BOOT] ${MONIKER}: Waiting for validator setup to complete..."
-    wait_for_flag "${SETUP_COMPLETE}"
-    echo "[BOOT] ${MONIKER}: validator setup complete."
+  echo "[BOOT] ${MONIKER}: Waiting for validator setup to complete..."
+  wait_for_flag "${SETUP_COMPLETE}"
+  echo "[BOOT] ${MONIKER}: validator setup complete."
 }
 
 launch_validator_setup() {
-    if [ ! -s "${SETUP_COMPLETE}" ] && [ -x "${SCRIPTS_DIR}/validator-setup.sh" ]; then
-      echo "[BOOT] ${MONIKER}: setup_complete missing; launching validator-setup in background..."
-      nohup bash "${SCRIPTS_DIR}/validator-setup.sh" >"${VALIDATOR_SETUP_OUT}" 2>&1 &
-    fi
+  if [ ! -s "${SETUP_COMPLETE}" ] && [ -x "${SCRIPTS_DIR}/validator-setup.sh" ]; then
+    echo "[BOOT] ${MONIKER}: setup_complete missing; launching validator-setup in background..."
+    nohup bash "${SCRIPTS_DIR}/validator-setup.sh" >"${VALIDATOR_SETUP_OUT}" 2>&1 &
+  fi
 }
 
 launch_network_maker_setup() {

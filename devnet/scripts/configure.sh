@@ -44,7 +44,7 @@ SNCLI="sncli"
 SNCLI_CFG="${BIN_DIR}/sncli-config.toml"
 
 install_supernode() {
-  if [ -n "${BIN_DIR}" ] || [ -f "${BIN_DIR}/${SN}" ]; then
+  if [ -n "${BIN_DIR}" ] && [ -f "${BIN_DIR}/${SN}" ]; then
     echo "[CONFIGURE] Copying supernode binary from ${BIN_DIR} to ${RELEASE_DIR}"
     cp -f "${BIN_DIR}/${SN}" "${RELEASE_DIR}/"
     chmod 755 "${RELEASE_DIR}/${SN}"
@@ -52,7 +52,7 @@ install_supernode() {
 }
 
 install_nm() {
-  if [ -n "${BIN_DIR}" ] || [ -f "${BIN_DIR}/${NM}" ]; then
+  if [ -n "${BIN_DIR}" ] && [ -f "${BIN_DIR}/${NM}" ]; then
     # if nm-config.toml is missing - return an error
     if [ ! -f "${NM_CFG}" ]; then
       echo "[CONFIGURE] Missing ${NM_CFG}"
@@ -65,7 +65,7 @@ install_nm() {
 }
 
 install_sncli() {
-  if [ -n "${BIN_DIR}" ] || [ -f "${BIN_DIR}/${SNCLI}" ]; then
+  if [ -n "${BIN_DIR}" ] && [ -f "${BIN_DIR}/${SNCLI}" ]; then
     # if sncli-config.toml is missing - return an error
     if [ -f "${SNCLI_CFG}" ]; then
       echo "[CONFIGURE] Copying sncli config from ${BIN_DIR} to ${RELEASE_DIR}"

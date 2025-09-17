@@ -6,9 +6,10 @@ import (
 
 	storetypes "cosmossdk.io/store/types"
 	upgradetypes "cosmossdk.io/x/upgrade/types"
+	"cosmossdk.io/log"
+
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
-	"cosmossdk.io/log"
 )
 
 const UpgradeName = "v1.8.0"
@@ -32,8 +33,6 @@ func CreateUpgradeHandler(
 			return nil, fmt.Errorf("failed to run migrations: %w", err)
 		}
 		logger.Info("Module migrations completed.")
-
-		// You may add more custom upgrade logic here (if needed)
 
 		logger.Info(fmt.Sprintf("Successfully completed upgrade %s", UpgradeName))
 		return newVM, nil

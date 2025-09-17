@@ -1,6 +1,6 @@
 module github.com/LumeraProtocol/lumera
 
-go 1.24.4
+go 1.24.7
 
 replace (
 	github.com/cosmos/cosmos-sdk => github.com/cosmos/cosmos-sdk v0.50.14

@@ -111,15 +111,15 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorBondedHook() {
 				if !found {
 					return fmt.Errorf("SuperNode not found")
 				}
-				if result.States[len(result.States)-1].State != types2.SuperNodeStateDisabled {
-					return fmt.Errorf("expected SuperNode to be active")
+				if result.States[len(result.States)-1].State != types2.SuperNodeStateStopped {
+					return fmt.Errorf("expected SuperNode to be stopped")
 				}
 				return nil
 			},
 			expectSuccess: true,
 		},
 		{
-			name: "when validator has insufficient self-delegation but sufficient supernode delegation, it should be active",
+			name: "when validator has insufficient self-delegation but sufficient supernode delegation, it remains disabled until re-registration",
 			setup: func() {
 				params := types2.Params{
 					MinimumStakeForSn: sdk.NewCoin("ulume", sdkmath.NewInt(1000000)),
@@ -171,8 +171,8 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorBondedHook() {
 				if !found {
 					return fmt.Errorf("SuperNode not found")
 				}
-				if result.States[len(result.States)-1].State != types2.SuperNodeStateActive {
-					return fmt.Errorf("expected SuperNode to be active, got %s", result.States[len(result.States)-1].State.String())
+				if result.States[len(result.States)-1].State != types2.SuperNodeStateDisabled {
+					return fmt.Errorf("expected SuperNode to remain disabled, got %s", result.States[len(result.States)-1].State.String())
 				}
 				return nil
 			},
@@ -237,8 +237,8 @@ func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
 				if !found {
 					return fmt.Errorf("SuperNode not found")
 				}
-				if result.States[len(result.States)-1].State != types2.SuperNodeStateDisabled {
-					return fmt.Errorf("expected SuperNode to be disabled")
+				if result.States[len(result.States)-1].State != types2.SuperNodeStateStopped {
+					return fmt.Errorf("expected SuperNode to be stopped")
 				}
 				return nil
 			},
@@ -286,8 +286,8 @@ func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
 				if !found {
 					return fmt.Errorf("SuperNode not found")
 				}
-				if result.States[len(result.States)-1].State != types2.SuperNodeStateDisabled {
-					return fmt.Errorf("expected SuperNode to be disabled")
+				if result.States[len(result.States)-1].State != types2.SuperNodeStateStopped {
+					return fmt.Errorf("expected SuperNode to be stopped")
 				}
 				return nil
 			},
@@ -428,7 +428,7 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorRemovedHook() {
 		expectSuccess bool
 	}{
 		{
-			name: "when the validator is removed, and is active, it should be disabled",
+			name: "when the validator is removed, and is active, it should be stopped",
 			setup: func() {
 				supernode := types2.SuperNode{
 					ValidatorAddress: sdk.ValAddress("validator1r").String(),
@@ -448,8 +448,8 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorRemovedHook() {
 				if !found {
 					return fmt.Errorf("SuperNode not found")
 				}
-				if result.States[len(result.States)-1].State != types2.SuperNodeStateDisabled {
-					return fmt.Errorf("expected SuperNode to be disabled")
+				if result.States[len(result.States)-1].State != types2.SuperNodeStateStopped {
+					return fmt.Errorf("expected SuperNode to be stopped")
 				}
 				return nil
 			},
@@ -555,7 +555,7 @@ func (suite *KeeperIntegrationSuite) TestAfterDelegationModifiedHook() {
 		expectSuccess bool
 	}{
 		{
-			name: "when delegation is modified and validator meets supernode requirements, it should be active",
+			name: "when delegation is modified and validator meets supernode requirements, it remains disabled until re-registration",
 			setup: func() {
 				params := types2.Params{
 					MinimumStakeForSn: sdk.NewCoin("ulume", sdkmath.NewInt(1000000)),
@@ -595,15 +595,15 @@ func (suite *KeeperIntegrationSuite) TestAfterDelegationModifiedHook() {
 				if !found {
 					return fmt.Errorf("SuperNode not found")
 				}
-				if result.States[len(result.States)-1].State != types2.SuperNodeStateActive {
-					return fmt.Errorf("expected SuperNode to be active")
+				if result.States[len(result.States)-1].State != types2.SuperNodeStateDisabled {
+					return fmt.Errorf("expected SuperNode to remain disabled")
 				}
 				return nil
 			},
 			expectSuccess: true,
 		},
 		{
-			name: "when validator has insufficient self-delegation but sufficient supernode delegation, it should be active",
+			name: "when validator has insufficient self-delegation but sufficient supernode delegation, it remains disabled until re-registration",
 			setup: func() {
 				params := types2.Params{
 					MinimumStakeForSn: sdk.NewCoin("ulume", sdkmath.NewInt(1000000)),
@@ -660,15 +660,15 @@ func (suite *KeeperIntegrationSuite) TestAfterDelegationModifiedHook() {
 				if !found {
 					return fmt.Errorf("SuperNode not found")
 				}
-				if result.States[len(result.States)-1].State != types2.SuperNodeStateActive {
-					return fmt.Errorf("expected SuperNode to be active, got %s", result.States[len(result.States)-1].State.String())
+				if result.States[len(result.States)-1].State != types2.SuperNodeStateDisabled {
+					return fmt.Errorf("expected SuperNode to remain disabled, got %s", result.States[len(result.States)-1].State.String())
 				}
 				return nil
 			},
 			expectSuccess: true,
 		},
 		{
-			name: "when validator has insufficient total delegation, it should be disabled",
+			name: "when validator has insufficient total delegation, it should be stopped",
 			setup: func() {
 				params := types2.Params{
 					MinimumStakeForSn: sdk.NewCoin("ulume", sdkmath.NewInt(1000000)),
@@ -725,8 +725,8 @@ func (suite *KeeperIntegrationSuite) TestAfterDelegationModifiedHook() {
 				if !found {
 					return fmt.Errorf("SuperNode not found")
 				}
-				if result.States[len(result.States)-1].State != types2.SuperNodeStateDisabled {
-					return fmt.Errorf("expected SuperNode to be disabled, got %s", result.States[len(result.States)-1].State.String())
+				if result.States[len(result.States)-1].State != types2.SuperNodeStateStopped {
+					return fmt.Errorf("expected SuperNode to be stopped, got %s", result.States[len(result.States)-1].State.String())
 				}
 				return nil
 			},

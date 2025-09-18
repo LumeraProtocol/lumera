@@ -32,16 +32,16 @@ func TestReRegisterSupernode(t *testing.T) {
 			msg: &types2.MsgRegisterSupernode{
 				Creator:          walletAddr.String(),
 				ValidatorAddress: valAddrStr,
-				IpAddress:        "10.0.0.99", // Different from original - should be ignored
+				IpAddress:        "10.0.0.99",                                                        // Different from original - should be ignored
 				SupernodeAccount: sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address()).String(), // Different - should be ignored
-				P2PPort:          "9999",  // Different - should be ignored
+				P2PPort:          "9999",                                                             // Different - should be ignored
 			},
 			setup: func(suite *SystemTestSuite) {
 				// Create a disabled supernode with original parameters
 				originalSupernode := types2.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					States: []*types2.SuperNodeStateRecord{
 						{
 							State:  types2.SuperNodeStateActive,
@@ -89,7 +89,7 @@ func TestReRegisterSupernode(t *testing.T) {
 				require.Equal(t, "192.168.1.100", sn.PrevIpAddresses[len(sn.PrevIpAddresses)-1].Address)
 				require.Equal(t, walletAddr.String(), sn.SupernodeAccount)
 				require.Equal(t, "26657", sn.P2PPort)
-				require.Equal(t, "1.0.0", sn.Version)
+				require.Equal(t, "1.0.0", sn.Note)
 
 				// Verify no new history entries were added
 				require.Len(t, sn.PrevIpAddresses, 1)
@@ -128,7 +128,7 @@ func TestReRegisterSupernode(t *testing.T) {
 				stoppedSupernode := types2.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					States: []*types2.SuperNodeStateRecord{
 						{
 							State:  types2.SuperNodeStateActive,
@@ -183,7 +183,7 @@ func TestReRegisterSupernode(t *testing.T) {
 				penalizedSupernode := types2.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					States: []*types2.SuperNodeStateRecord{
 						{
 							State:  types2.SuperNodeStateActive,
@@ -238,7 +238,7 @@ func TestReRegisterSupernode(t *testing.T) {
 				multipleSupernode := types2.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					States: []*types2.SuperNodeStateRecord{
 						{
 							State:  types2.SuperNodeStateActive,

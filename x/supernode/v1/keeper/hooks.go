@@ -36,14 +36,14 @@ func (h Hooks) AfterValidatorBonded(ctx context.Context, consAddr sdk.ConsAddres
 
 	// Check if validator meets supernode requirements
 	if h.k.IsEligibleAndNotJailedValidator(sdkCtx, valAddr) {
-		// If not already active, enable
+		// If not already active, enable (no-op if currently disabled)
 		if !h.k.IsSuperNodeActive(sdkCtx, valAddr) {
 			if err := h.k.SetSuperNodeActive(sdkCtx, valAddr); err != nil {
 				return errorsmod.Wrap(err, "failed to set supernode active after validator bonded")
 			}
 		}
 	} else {
-		// If it doesn't meet requirements but was active, disable, just incase
+		// Not eligible: transition to STOPPED (hooks never set DISABLED)
 		if h.k.IsSuperNodeActive(sdkCtx, valAddr) {
 			if err := h.k.SetSuperNodeStopped(sdkCtx, valAddr); err != nil {
 				return errorsmod.Wrap(err, "failed to stop supernode after validator bonded")
@@ -91,7 +91,7 @@ func (h Hooks) AfterDelegationModified(ctx context.Context, delAddr sdk.AccAddre
 			}
 		}
 	} else {
-		// If it no longer meets requirements, disable if currently active
+		// If it no longer meets requirements, stop if currently active
 		if h.k.IsSuperNodeActive(sdkCtx, valAddr) {
 			if err := h.k.SetSuperNodeStopped(sdkCtx, valAddr); err != nil {
 				return errorsmod.Wrap(err, "failed to stop supernode after delegation modified")
@@ -112,7 +112,7 @@ func (h Hooks) AfterValidatorRemoved(ctx context.Context, consAddr sdk.ConsAddre
 		return nil
 	}
 
-	// Additional Check, though supernode is already disabled before this hooks is called
+	// If still active, stop it; hooks must not set DISABLED
 	if h.k.IsSuperNodeActive(sdkCtx, valAddr) {
 		if err := h.k.SetSuperNodeStopped(sdkCtx, valAddr); err != nil {
 			return errorsmod.Wrap(err, "failed to stop supernode after validator removed")

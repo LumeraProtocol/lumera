@@ -37,39 +37,44 @@ func (k msgServer) UpdateSupernode(goCtx context.Context, msg *types2.MsgUpdateS
 		}
 	}
 
-    if msg.SupernodeAccount != "" {
-        // Validate the new supernode account address
-        if _, err := sdk.AccAddressFromBech32(msg.SupernodeAccount); err != nil {
-            return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidAddress, "invalid supernode account address: %s", err)
-        }
+	if msg.SupernodeAccount != "" {
+		// Validate the new supernode account address
+		if _, err := sdk.AccAddressFromBech32(msg.SupernodeAccount); err != nil {
+			return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidAddress, "invalid supernode account address: %s", err)
+		}
 
-        // Track supernode account history if changed
-        if supernode.SupernodeAccount != msg.SupernodeAccount {
-            oldAccount := supernode.SupernodeAccount
+		// Track supernode account history if changed
+		if supernode.SupernodeAccount != msg.SupernodeAccount {
+			oldAccount := supernode.SupernodeAccount
 
-            // Store the new account in history with recorded block height
-            supernode.PrevSupernodeAccounts = append(supernode.PrevSupernodeAccounts, &types2.SupernodeAccountHistory{
-                Account: msg.SupernodeAccount,
-                Height:  ctx.BlockHeight(),
-            })
+			// Store the new account in history with recorded block height
+			supernode.PrevSupernodeAccounts = append(supernode.PrevSupernodeAccounts, &types2.SupernodeAccountHistory{
+				Account: msg.SupernodeAccount,
+				Height:  ctx.BlockHeight(),
+			})
 
-            // Update the account
-            supernode.SupernodeAccount = msg.SupernodeAccount
+			// Update the account
+			supernode.SupernodeAccount = msg.SupernodeAccount
 
-            // Emit event for account change
-            ctx.EventManager().EmitEvent(
-                sdk.NewEvent(
-                    types2.EventTypeSupernodeUpdated,
-                    sdk.NewAttribute(types2.AttributeKeyValidatorAddress, msg.ValidatorAddress),
-                    sdk.NewAttribute(types2.AttributeKeyOldAccount, oldAccount),
-                    sdk.NewAttribute(types2.AttributeKeyNewAccount, msg.SupernodeAccount),
-                ),
-            )
-        }
-    }
+			// Emit event for account change
+			ctx.EventManager().EmitEvent(
+				sdk.NewEvent(
+					types2.EventTypeSupernodeUpdated,
+					sdk.NewAttribute(types2.AttributeKeyValidatorAddress, msg.ValidatorAddress),
+					sdk.NewAttribute(types2.AttributeKeyOldAccount, oldAccount),
+					sdk.NewAttribute(types2.AttributeKeyNewAccount, msg.SupernodeAccount),
+				),
+			)
+		}
+	}
 
 	if msg.Note != "" {
 		supernode.Note = msg.Note
+	}
+
+	// Update P2P port if provided
+	if msg.P2PPort != "" {
+		supernode.P2PPort = msg.P2PPort
 	}
 
 	// Re-save
@@ -77,12 +82,11 @@ func (k msgServer) UpdateSupernode(goCtx context.Context, msg *types2.MsgUpdateS
 		return nil, err
 	}
 
-	// Emit event
+	// Emit event (without note attribute)
 	ctx.EventManager().EmitEvent(
 		sdk.NewEvent(
 			types2.EventTypeSupernodeUpdated,
 			sdk.NewAttribute(types2.AttributeKeyValidatorAddress, msg.ValidatorAddress),
-			sdk.NewAttribute(types2.AttributeKeyVersion, supernode.Note),
 		),
 	)
 

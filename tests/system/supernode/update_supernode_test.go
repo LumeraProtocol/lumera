@@ -90,9 +90,7 @@ func TestUpdateSupernode(t *testing.T) {
 							if string(attr.Key) == types2.AttributeKeyValidatorAddress {
 								require.Equal(t, valAddrStr, string(attr.Value))
 							}
-							if string(attr.Key) == types2.AttributeKeyVersion {
-								require.Equal(t, "2.0.0", string(attr.Value))
-							}
+							// Note attribute no longer emitted in events; no check here
 						}
 					}
 				}

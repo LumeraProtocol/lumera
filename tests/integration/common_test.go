@@ -298,7 +298,8 @@ func createTestInput(
 		capabilitytypes.StoreKey, feegrant.StoreKey, authzkeeper.StoreKey,
 		types.StoreKey,
 	)
-	logger := log.NewTestLogger(t)
+	// Use a no-op logger to keep integration test output clean (avoid IAVL debug logs)
+	logger := log.NewNopLogger()
 	ms := store.NewCommitMultiStore(db, logger, storemetrics.NewNoOpMetrics())
 	for _, v := range keys {
 		ms.MountStoreWithDB(v, storetypes.StoreTypeIAVL, db)

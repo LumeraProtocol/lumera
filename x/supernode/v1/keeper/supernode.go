@@ -245,6 +245,46 @@ func (k Keeper) IsSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress) bool 
 	return supernode.States[len(supernode.States)-1].State == types2.SuperNodeStateActive
 }
 
+// SetSuperNodeDisabled appends a Disabled state for the supernode if not already disabled.
+// This represents a terminal state that requires re-registration to become active again.
+func (k Keeper) SetSuperNodeDisabled(ctx sdk.Context, valAddr sdk.ValAddress) error {
+	valOperAddr, err := sdk.ValAddressFromBech32(valAddr.String())
+	if err != nil {
+		return errorsmod.Wrapf(sdkerrors.ErrInvalidAddress, "invalid validator address: %s", err)
+	}
+
+	supernode, found := k.QuerySuperNode(ctx, valOperAddr)
+	if !found {
+		return errorsmod.Wrapf(sdkerrors.ErrNotFound, "no supernode found for validator")
+	}
+
+	if len(supernode.States) == 0 {
+		return errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode is in an invalid state")
+	}
+
+	if supernode.States[len(supernode.States)-1].State != types2.SuperNodeStateDisabled {
+		supernode.States = append(supernode.States, &types2.SuperNodeStateRecord{
+			State:  types2.SuperNodeStateDisabled,
+			Height: ctx.BlockHeight(),
+		})
+		if err := k.SetSuperNode(ctx, supernode); err != nil {
+			k.logger.With("module", fmt.Sprintf("error updating supernode state: %s", valAddr)).Error(fmt.Sprintf("x/%s", types2.ModuleName))
+			return errorsmod.Wrapf(sdkerrors.ErrNotFound, "eror updating supernode state")
+		}
+
+		// Emit event for watchers
+		ctx.EventManager().EmitEvent(
+			sdk.NewEvent(
+				types2.EventTypeSupernodeDeRegistered,
+				sdk.NewAttribute(types2.AttributeKeyValidatorAddress, supernode.ValidatorAddress),
+				sdk.NewAttribute(types2.AttributeKeyReason, "disable_supernode_hook"),
+			),
+		)
+	}
+
+	return nil
+}
+
 // CheckValidatorSupernodeEligibility ensures the validator has enough stake from either self-delegation
 // or delegation from the supernode account.
 // If supernodeAccount is provided, it will check for delegation from that account.

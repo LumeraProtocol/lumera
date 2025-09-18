@@ -36,7 +36,6 @@ type GenesisState struct {
     Params               Params       // Module parameters
     Supernodes           []SuperNode  // List of initial supernodes
     Evidence             []Evidence   // Initial evidence records
-    CurrentVersions      []string     // List of compatible software versions
     PerformanceThresholds MetricsThresholds // Performance thresholds for monitoring
 }
 ```
@@ -44,7 +43,6 @@ type GenesisState struct {
 Key implementation aspects:
 - Parameters are initialized with safe defaults
 - No supernodes are active at genesis
-- Compatible versions list can be pre-populated
 - Evidence storage is initially empty
 - Performance thresholds are set to reasonable defaults
 
@@ -58,11 +56,11 @@ type SuperNode struct {
     States                []SuperNodeStateRecord      // State history records
     Evidence              []Evidence                  // Evidence of behavior/violations
     PrevIpAddresses       []IPAddressHistory         // History of IP addresses
-    Version               string                      // Software version
+    Note                  string                      // Optional operator note (free-form)
     Metrics               MetricsAggregate           // Performance metrics
     SupernodeAccount      string                      // Associated account for delegations
     PrevSupernodeAccounts []SupernodeAccountHistory  // History of supernode accounts
-    P2pPort               string                      // P2P network port
+    P2PPort               string                      // P2P network port
 }
 ```
 
@@ -70,7 +68,7 @@ Key implementation details:
 - Each supernode is linked to exactly one validator
 - State changes are recorded with timestamps and block heights
 - Evidence collection helps maintain accountability
-- Version tracking ensures compatible software is running
+- Note is an optional, free-form field for operator comments or release notes
 - Metrics aggregation provides performance insights
 
 ### 2. SuperNodeState
@@ -88,10 +86,10 @@ enum SuperNodeState {
 State transitions follow specific rules:
 - New supernodes start in ACTIVE state upon registration
 - DISABLED is a terminal state set only by deregistration (permanent removal)
-- STOPPED is a temporary state (can restart with StartSupernode)
-- Re-registration of a DISABLED supernode only changes state to ACTIVE (does not update other fields)
+- STOPPED is a temporary state; can restart with StartSupernode (only from STOPPED)
+- Re-registration of a DISABLED supernode changes state to ACTIVE (other fields unchanged); use UpdateSupernode for field changes
 - ACTIVE supernodes can be STOPPED by operator or hooks
-- All methods except deregistration operate between ACTIVE and STOPPED states
+- Hooks only transition between ACTIVE and STOPPED; they never set DISABLED and never re-activate from DISABLED
 - PENALIZED supernodes may require governance intervention to return to service
 
 ### 3. Evidence
@@ -128,15 +126,15 @@ Evidence is used to:
    - Does not update IP address, account, or other fields
    - Use UpdateSupernode message to update fields
 
-3. **Deactivation**:
-   - Operator submits stop request or triggered by hooks
+3. **Deactivation (STOPPED)**:
+   - Operator submits stop request or hooks trigger on ineligibility/unbonding
    - State changes to STOPPED
-   - Supernode leaves the active set
+   - Supernode leaves the active set; can be restarted with StartSupernode
 
-4. **Deregistration**:
+4. **Deregistration (DISABLED)**:
    - Operator submits deregistration request
    - State changes to DISABLED (terminal state)
-   - Requires re-registration to become active again
+   - Requires re-registration to become ACTIVE again; hooks will not re-activate a DISABLED supernode
 
 5. **Penalization**:
    - Evidence of violations triggers automatic or governance review
@@ -185,21 +183,18 @@ Validation:
 
 ### MsgStartSupernode
 
-Activates a registered supernode:
+Activates a registered supernode (no field updates):
 
 ```protobuf
 message MsgStartSupernode {
     string validator_address = 1; // Validator operator address
-    string version = 2;          // Software version
 }
 ```
 
 Validation:
 - Sender must be validator operator
 - Supernode must be in STOPPED state (DISABLED requires re-registration)
-- Validator must meet minimum stake requirement
-- Validator must not be jailed
-- Version must be compatible
+- Validator must meet minimum stake requirement and must not be jailed
 
 ### MsgStopSupernode
 
@@ -219,25 +214,25 @@ Validation:
 
 ### MsgUpdateSupernode
 
-Updates supernode information:
+Updates supernode information (idempotent, append-only history for selected fields):
 
 ```protobuf
 message MsgUpdateSupernode {
-    string validator_address = 1; // Validator operator address
-    string ip_address = 2;       // New IP address
-    string version = 3;          // New software version
-    string account = 4;          // New supernode account
-    string p2p_port = 5;         // New P2P port
+    string validator_address = 1;  // Validator operator address
+    string ip_address = 2;         // Optional new IP address
+    string note = 3;               // Optional operator note 
+    string supernode_account = 4;  // Optional new supernode account
+    string p2p_port = 5;           // Optional new P2P port
 }
 ```
 
-Validation:
+Validation and effects:
 - Sender must be validator operator
 - Supernode must exist
-- IP address must be valid if provided
-- Version must be compatible if provided
-- Account address must be valid bech32 if provided
-- Previous values are stored in history (IP addresses and accounts)
+- If `ip_address` provided: appended to `PrevIpAddresses` with current height (dedup consecutive)
+- If `supernode_account` provided and valid bech32: appended to `PrevSupernodeAccounts` with height; emits old/new account attributes
+- If `note` provided: replaces `Note` (no history kept)
+- If `p2p_port` provided: replaces `P2PPort`
 
 ### MsgUpdateParams
 
@@ -282,7 +277,6 @@ Emitted when a supernode is activated:
 ```
 Attributes:
 - validator_address: Validator operator address
-- version: Software version
 - height: Block height of activation
 ```
 
@@ -379,7 +373,6 @@ lumerad tx supernode deregister \
 
 # Start a supernode
 lumerad tx supernode start \
-  --version=[version] \
   --from=[validator-key] \
   --chain-id=[chain-id]
 
@@ -392,8 +385,8 @@ lumerad tx supernode stop \
 # Update a supernode
 lumerad tx supernode update \
   --ip-address=[ip] \
-  --version=[version] \
-  --account=[account] \
+  --note=[text] \
+  --supernode-account=[account] \
   --p2p-port=[port] \
   --from=[validator-key] \
   --chain-id=[chain-id]

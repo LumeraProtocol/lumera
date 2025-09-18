@@ -170,7 +170,7 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 				require.True(t, found)
 				require.Equal(t, "9999", sn.P2PPort)
 				// Verify other fields remain unchanged
-				require.Equal(t, "1.0.0", sn.Version)
+				require.Equal(t, "1.0.0", sn.Note)
 				require.Equal(t, otherCreatorAddr.String(), sn.SupernodeAccount)
 			},
 		},
@@ -180,7 +180,7 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "10.0.0.5",
-				Version:          "2.0.0",
+				Note:             "2.0.0",
 				SupernodeAccount: creatorAddr.String(),
 				P2PPort:          "8080",
 			},
@@ -191,7 +191,7 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 			checkResult: func(t *testing.T, k keeper2.Keeper, ctx sdk.Context) {
 				sn, found := k.QuerySuperNode(ctx, valAddr)
 				require.True(t, found)
-				require.Equal(t, "2.0.0", sn.Version)
+				require.Equal(t, "2.0.0", sn.Note)
 				require.Equal(t, creatorAddr.String(), sn.SupernodeAccount)
 				require.Equal(t, "8080", sn.P2PPort)
 				// Check IP address history

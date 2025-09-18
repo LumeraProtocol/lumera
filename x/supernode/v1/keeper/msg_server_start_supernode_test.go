@@ -105,7 +105,7 @@ func TestMsgServer_StartSupernode(t *testing.T) {
 				disabledSupernode := types2.SuperNode{
 					SupernodeAccount: creatorAddr.String(),
 					ValidatorAddress: valAddr.String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					States: []*types2.SuperNodeStateRecord{
 						{
 							State:  types2.SuperNodeStateActive,

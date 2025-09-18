@@ -10,7 +10,6 @@ const (
 
 	AttributeKeyValidatorAddress = "validator_address"
 	AttributeKeyIPAddress        = "ip_address"
-	AttributeKeyVersion          = "version"
 	AttributeKeyReason           = "reason"
 	AttributeKeyOldAccount       = "old_account"
 	AttributeKeyNewAccount       = "new_account"
@@ -20,5 +19,4 @@ const (
 	AttributeKeyReRegistered     = "re_registered"
 	AttributeKeyOldState         = "old_state"
 	AttributeKeyOldIPAddress     = "old_ip_address"
-	AttributeKeyOldVersion       = "old_version"
 )

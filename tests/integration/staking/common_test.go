@@ -97,7 +97,8 @@ func initFixture(t testing.TB) *fixture {
 	)
 	cdc := moduletestutil.MakeTestEncodingConfig(auth.AppModuleBasic{}, staking.AppModuleBasic{}).Codec
 
-	logger := log.NewTestLogger(t)
+	// Suppress verbose storage debug logs in integration runs
+	logger := log.NewNopLogger()
 	cms := integration.CreateMultiStore(keys, logger)
 
 	newCtx := sdk.NewContext(cms, cmtprototypes.Header{}, true, logger)

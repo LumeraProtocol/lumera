@@ -37,9 +37,36 @@ func (k msgServer) UpdateSupernode(goCtx context.Context, msg *types2.MsgUpdateS
 		}
 	}
 
-	if msg.SupernodeAccount != "" {
-		supernode.SupernodeAccount = msg.SupernodeAccount
-	}
+    if msg.SupernodeAccount != "" {
+        // Validate the new supernode account address
+        if _, err := sdk.AccAddressFromBech32(msg.SupernodeAccount); err != nil {
+            return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidAddress, "invalid supernode account address: %s", err)
+        }
+
+        // Track supernode account history if changed
+        if supernode.SupernodeAccount != msg.SupernodeAccount {
+            oldAccount := supernode.SupernodeAccount
+
+            // Store the new account in history with recorded block height
+            supernode.PrevSupernodeAccounts = append(supernode.PrevSupernodeAccounts, &types2.SupernodeAccountHistory{
+                Account: msg.SupernodeAccount,
+                Height:  ctx.BlockHeight(),
+            })
+
+            // Update the account
+            supernode.SupernodeAccount = msg.SupernodeAccount
+
+            // Emit event for account change
+            ctx.EventManager().EmitEvent(
+                sdk.NewEvent(
+                    types2.EventTypeSupernodeUpdated,
+                    sdk.NewAttribute(types2.AttributeKeyValidatorAddress, msg.ValidatorAddress),
+                    sdk.NewAttribute(types2.AttributeKeyOldAccount, oldAccount),
+                    sdk.NewAttribute(types2.AttributeKeyNewAccount, msg.SupernodeAccount),
+                ),
+            )
+        }
+    }
 
 	if msg.Note != "" {
 		supernode.Note = msg.Note

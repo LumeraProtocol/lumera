@@ -149,9 +149,9 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 				require.Equal(t, "10.0.1.1", sn.PrevIpAddresses[0].Address)
 				require.Equal(t, "192.168.1.1", sn.PrevIpAddresses[1].Address)
 				require.Equal(t, sn.SupernodeAccount, creatorAddr.String())
-				// Check supernode account history - should have 1 entry (the old account)
+				// Check supernode account history - should have 1 entry (the new account)
 				require.Len(t, sn.PrevSupernodeAccounts, 1)
-				require.Equal(t, otherCreatorAddr.String(), sn.PrevSupernodeAccounts[0].Account)
+				require.Equal(t, creatorAddr.String(), sn.PrevSupernodeAccounts[0].Account)
 			},
 		},
 		{

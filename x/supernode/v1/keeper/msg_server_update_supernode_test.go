@@ -23,7 +23,7 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 	existingSupernode := types2.SuperNode{
 		SupernodeAccount: otherCreatorAddr.String(),
 		ValidatorAddress: valAddr.String(),
-		Version:          "1.0.0",
+		Note:             "1.0.0",
 		PrevIpAddresses: []*types2.IPAddressHistory{
 			{
 				Address: "1022.145.1.1",
@@ -59,7 +59,7 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "",
-				Version:          "",
+				Note:             "",
 			},
 			setupState: func(k keeper2.Keeper, ctx sdk.Context) {
 				require.NoError(t, k.SetSuperNode(ctx, existingSupernode))
@@ -68,22 +68,22 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 			checkResult: func(t *testing.T, k keeper2.Keeper, ctx sdk.Context) {
 				sn, found := k.QuerySuperNode(ctx, valAddr)
 				require.True(t, found)
-				require.Equal(t, "1.0.0", sn.Version)
+				require.Equal(t, "1.0.0", sn.Note)
 			},
 		},
 		{
-			name: "successful update with IP change and version change",
+			name: "successful update with IP change and Note change",
 			msg: &types2.MsgUpdateSupernode{
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "192.168.1.1",
-				Version:          "1.1.0",
+				Note:             "1.1.0",
 			},
 			setupState: func(k keeper2.Keeper, ctx sdk.Context) {
 				newSupernode := types2.SuperNode{
 					SupernodeAccount: otherCreatorAddr.String(),
 					ValidatorAddress: valAddr.String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					PrevIpAddresses: []*types2.IPAddressHistory{
 						{
 							Address: "10.0.1.1",
@@ -104,7 +104,7 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 			checkResult: func(t *testing.T, k keeper2.Keeper, ctx sdk.Context) {
 				sn, found := k.QuerySuperNode(ctx, valAddr)
 				require.True(t, found)
-				require.Equal(t, "1.1.0", sn.Version)
+				require.Equal(t, "1.1.0", sn.Note)
 				require.Len(t, sn.PrevIpAddresses, 2)
 				require.Equal(t, "10.0.1.1", sn.PrevIpAddresses[0].Address)
 				require.Equal(t, "192.168.1.1", sn.PrevIpAddresses[1].Address)
@@ -116,14 +116,14 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "192.168.1.1",
-				Version:          "1.1.0",
+				Note:             "1.1.0",
 				SupernodeAccount: creatorAddr.String(),
 			},
 			setupState: func(k keeper2.Keeper, ctx sdk.Context) {
 				newSupernode := types2.SuperNode{
 					SupernodeAccount: otherCreatorAddr.String(),
 					ValidatorAddress: valAddr.String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					PrevIpAddresses: []*types2.IPAddressHistory{
 						{
 							Address: "10.0.1.1",
@@ -144,7 +144,7 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 			checkResult: func(t *testing.T, k keeper2.Keeper, ctx sdk.Context) {
 				sn, found := k.QuerySuperNode(ctx, valAddr)
 				require.True(t, found)
-				require.Equal(t, "1.1.0", sn.Version)
+				require.Equal(t, "1.1.0", sn.Note)
 				require.Len(t, sn.PrevIpAddresses, 2)
 				require.Equal(t, "10.0.1.1", sn.PrevIpAddresses[0].Address)
 				require.Equal(t, "192.168.1.1", sn.PrevIpAddresses[1].Address)

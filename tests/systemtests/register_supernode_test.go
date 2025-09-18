@@ -246,7 +246,7 @@ func TestSupernodeRegistrationSuccess(t *testing.T) {
 			// Check supernode registration
 			supernode := GetSuperNodeResponse(t, cli, valAddr)
 			require.Equal(t, valAddr, supernode.ValidatorAddress)
-			require.Equal(t, "1.0.0", supernode.Version)
+			require.Equal(t, "1.0.0", supernode.Note)
 			require.Equal(t, supernodeAccount, supernode.SupernodeAccount)
 			require.NotEmpty(t, supernode.States)
 			require.Equal(t, types.SuperNodeStateActive, supernode.States[0].State)
@@ -548,7 +548,7 @@ func TestSupernodeWithVestingDelegation(t *testing.T) {
 			// Verify supernode registration success
 			supernode := GetSuperNodeResponse(t, cli, valAddr)
 			require.Equal(t, valAddr, supernode.ValidatorAddress)
-			require.Equal(t, "1.0.0", supernode.Version)
+			require.Equal(t, "1.0.0", supernode.Note)
 			require.Equal(t, supernodeAccount, supernode.SupernodeAccount)
 			require.NotEmpty(t, supernode.States)
 			require.Equal(t, types.SuperNodeStateActive, supernode.States[0].State)

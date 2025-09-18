@@ -23,7 +23,7 @@ func TestMsgServer_StopSupernode(t *testing.T) {
 	existingSupernode := types2.SuperNode{
 		SupernodeAccount: otherCreatorAddr.String(),
 		ValidatorAddress: valAddr.String(),
-		Version:          "1.0.0",
+		Note:             "1.0.0",
 		PrevIpAddresses: []*types2.IPAddressHistory{
 			{
 				Address: "192.145.1.1",

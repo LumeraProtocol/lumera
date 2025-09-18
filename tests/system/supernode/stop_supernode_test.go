@@ -43,7 +43,7 @@ func TestStopSupernode(t *testing.T) {
 				sn := types2.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					States: []*types2.SuperNodeStateRecord{
 						{
 							State:  types2.SuperNodeStateActive,
@@ -129,7 +129,7 @@ func TestStopSupernode(t *testing.T) {
 				sn := types2.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					States: []*types2.SuperNodeStateRecord{
 						{
 							State:  types2.SuperNodeStateActive,
@@ -164,7 +164,7 @@ func TestStopSupernode(t *testing.T) {
 				sn := types2.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					States: []*types2.SuperNodeStateRecord{
 						{
 							State:  types2.SuperNodeStateActive,
@@ -205,7 +205,7 @@ func TestStopSupernode(t *testing.T) {
 				sn := types2.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					States: []*types2.SuperNodeStateRecord{
 						{
 							State:  types2.SuperNodeStateActive,

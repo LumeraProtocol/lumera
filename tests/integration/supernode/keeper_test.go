@@ -69,7 +69,7 @@ func (suite *KeeperIntegrationSuite) TestSetSuperNodeActive() {
 				supernode := types2.SuperNode{
 					ValidatorAddress: sdk.ValAddress([]byte("validator1e")).String(),
 					SupernodeAccount: sdk.AccAddress([]byte("validator1e")).String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
 					PrevSupernodeAccounts: []*types2.SupernodeAccountHistory{{Account: sdk.AccAddress([]byte("validator1e")).String()}},
@@ -192,7 +192,7 @@ func (suite *KeeperIntegrationSuite) TestIsSupernodeActive() {
 				supernode := types2.SuperNode{
 					ValidatorAddress: sdk.ValAddress([]byte("validator1a")).String(),
 					SupernodeAccount: sdk.AccAddress([]byte("validator1a")).String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
 					PrevSupernodeAccounts: []*types2.SupernodeAccountHistory{{Account: sdk.AccAddress([]byte("validator1a")).String()}},
@@ -242,7 +242,7 @@ func (suite *KeeperIntegrationSuite) TestSetSuperNodeStopped() {
 				supernode := types2.SuperNode{
 					ValidatorAddress: sdk.ValAddress([]byte("validator1d")).String(),
 					SupernodeAccount: sdk.AccAddress([]byte("validator1d")).String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
 					PrevSupernodeAccounts: []*types2.SupernodeAccountHistory{{Account: sdk.AccAddress([]byte("validator1d")).String()}},
@@ -370,7 +370,7 @@ func (suite *KeeperIntegrationSuite) TestSetSuperNodeAndQuerySupernode() {
 	supernode := types2.SuperNode{
 		ValidatorAddress: sdk.ValAddress([]byte("validator1")).String(),
 		SupernodeAccount: sdk.AccAddress([]byte("validator1")).String(),
-		Version:          "1.0.0",
+		Note:             "1.0.0",
 		States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 		PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
 		P2PPort:          "26657",
@@ -399,7 +399,7 @@ func (suite *KeeperIntegrationSuite) TestGetSuperNodeBySuperNodeAddress() {
 				supernode := types2.SuperNode{
 					SupernodeAccount: suite.authority.String(),
 					ValidatorAddress: suite.validator.String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
 					PrevSupernodeAccounts: []*types2.SupernodeAccountHistory{{Account: sdk.AccAddress([]byte("validator1")).String()}},

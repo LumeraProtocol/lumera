@@ -353,7 +353,7 @@ func createTestInput(
 		authzkeeper.StoreKey,
 		wasmtypes.StoreKey,
 	)
-	logger := log.NewTestLogger(t)
+	logger := log.NewTestLoggerInfo(t)
 	ms := store.NewCommitMultiStore(db, logger, storemetrics.NewNoOpMetrics())
 	for _, v := range keys {
 		ms.MountStoreWithDB(v, storetypes.StoreTypeIAVL, db)

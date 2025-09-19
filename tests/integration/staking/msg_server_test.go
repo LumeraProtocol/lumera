@@ -14,6 +14,8 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/bank/testutil"
 	"github.com/cosmos/cosmos-sdk/x/staking/keeper"
 	"github.com/cosmos/cosmos-sdk/x/staking/types"
+
+	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
 func TestCancelUnbondingDelegation(t *testing.T) {
@@ -56,7 +58,8 @@ func TestCancelUnbondingDelegation(t *testing.T) {
 		ctx.BlockTime().Add(time.Minute*10),
 		unbondingAmount.Amount,
 		0,
-		address.NewBech32Codec("cosmosvaloper"), address.NewBech32Codec("cosmos"),
+		address.NewBech32Codec(lcfg.ValidatorAddressPrefix),
+		address.NewBech32Codec(lcfg.AccountAddressPrefix),
 	)
 
 	// set and retrieve a record

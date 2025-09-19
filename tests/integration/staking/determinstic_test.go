@@ -40,13 +40,13 @@ import (
 )
 
 var (
-	validator1        = "cosmosvaloper1qqqryrs09ggeuqszqygqyqd2tgqmsqzewacjj7"
+	validator1        = "lumeravaloper1st395l45490m30w0ja7jghjlht7hug0djt3mw8"
 	validatorAddr1, _ = sdk.ValAddressFromBech32(validator1)
-	validator2        = "cosmosvaloper1gghjut3ccd8ay0zduzj64hwre2fxs9ldmqhffj"
+	validator2        = "lumeravaloper1rpcg5gevj32qgal2zvs56u3zp7ekzckp4au25f"
 	validatorAddr2, _ = sdk.ValAddressFromBech32(validator2)
-	delegator1        = "cosmos1nph3cfzk6trsmfxkeu943nvach5qw4vwstnvkl"
+	delegator1        = "lumera1evlkjnp072q8u0yftk65ualx49j6mdz66p2073"
 	delegatorAddr1    = sdk.MustAccAddressFromBech32(delegator1)
-	delegator2        = "cosmos139f7kncmglres2nf3h4hc4tade85ekfr8sulz5"
+	delegator2        = "lumera1cm3wc6scwzxf0x944rpzwd03z70rs94vq2fhza"
 	delegatorAddr2    = sdk.MustAccAddressFromBech32(delegator2)
 )
 
@@ -72,12 +72,10 @@ func initDeterministicFixture(t *testing.T) *deterministicFixture {
 	)
 	cdc := moduletestutil.MakeTestEncodingConfig(auth.AppModuleBasic{}, distribution.AppModuleBasic{}).Codec
 
-	logger := log.NewTestLogger(t)
+	logger := log.NewTestLoggerInfo(t)
 	cms := integration.CreateMultiStore(keys, logger)
 
 	newCtx := sdk.NewContext(cms, cmtproto.Header{}, true, logger)
-
-	authority := authtypes.NewModuleAddress("gov")
 
 	maccPerms := map[string][]string{
 		minttypes.ModuleName:           {authtypes.Minter},
@@ -86,13 +84,19 @@ func initDeterministicFixture(t *testing.T) *deterministicFixture {
 		stakingtypes.NotBondedPoolName: {authtypes.Burner, authtypes.Staking},
 	}
 
+	accCodec := addresscodec.NewBech32Codec(lcfg.AccountAddressPrefix)
+	valCodec := addresscodec.NewBech32Codec(lcfg.ValidatorAddressPrefix)
+	consCodec := addresscodec.NewBech32Codec(lcfg.ConsNodeAddressPrefix)
+
+	authority := authtypes.NewModuleAddress("gov")
+
 	accountKeeper := authkeeper.NewAccountKeeper(
 		cdc,
 		runtime.NewKVStoreService(keys[authtypes.StoreKey]),
 		authtypes.ProtoBaseAccount,
 		maccPerms,
-		addresscodec.NewBech32Codec(sdk.Bech32MainPrefix),
-		sdk.Bech32MainPrefix,
+		accCodec,
+		lcfg.AccountAddressPrefix,
 		authority.String(),
 	)
 
@@ -108,7 +112,15 @@ func initDeterministicFixture(t *testing.T) *deterministicFixture {
 		log.NewNopLogger(),
 	)
 
-	stakingKeeper := stakingkeeper.NewKeeper(cdc, runtime.NewKVStoreService(keys[stakingtypes.StoreKey]), accountKeeper, bankKeeper, authority.String(), addresscodec.NewBech32Codec(sdk.Bech32PrefixValAddr), addresscodec.NewBech32Codec(sdk.Bech32PrefixConsAddr))
+	stakingKeeper := stakingkeeper.NewKeeper(
+		cdc,
+		runtime.NewKVStoreService(keys[stakingtypes.StoreKey]),
+		accountKeeper,
+		bankKeeper,
+		authority.String(),
+		valCodec,
+		consCodec,
+	)
 
 	authModule := auth.NewAppModule(cdc, accountKeeper, authsims.RandomGenesisAccounts, nil)
 	bankModule := bank.NewAppModule(cdc, bankKeeper, accountKeeper, nil)
@@ -126,8 +138,10 @@ func initDeterministicFixture(t *testing.T) *deterministicFixture {
 	stakingtypes.RegisterMsgServer(integrationApp.MsgServiceRouter(), stakingkeeper.NewMsgServerImpl(stakingKeeper))
 	stakingtypes.RegisterQueryServer(integrationApp.QueryHelper(), stakingkeeper.NewQuerier(stakingKeeper))
 
-	// set default staking params
-	assert.NilError(t, stakingKeeper.SetParams(ctx, stakingtypes.DefaultParams()))
+	// set staking params to match chain denom
+	params := stakingtypes.DefaultParams()
+	params.BondDenom = lcfg.ChainDenom
+	assert.NilError(t, stakingKeeper.SetParams(ctx, params))
 
 	// set pools
 	startTokens := stakingKeeper.TokensFromConsensusPower(ctx, 10)
@@ -186,7 +200,7 @@ func bondTypeGenerator() *rapid.Generator[stakingtypes.BondStatus] {
 }
 
 // createValidator creates a validator with random values.
-func createValidator(rt *rapid.T, f *deterministicFixture, t *testing.T) stakingtypes.Validator {
+func createValidator(rt *rapid.T, _ *deterministicFixture, t *testing.T) stakingtypes.Validator {
 	pubkey := pubKeyGenerator().Draw(rt, "pubkey")
 	pubkeyAny, err := codectypes.NewAnyWithValue(&pubkey)
 	assert.NilError(t, err)
@@ -377,7 +391,7 @@ func TestGRPCValidators(t *testing.T) {
 	getStaticValidator(f, t)
 	getStaticValidator2(f, t)
 
-	testdata.DeterministicIterations(f.ctx, t, &stakingtypes.QueryValidatorsRequest{}, f.queryClient.Validators, 2862, false)
+	testdata.DeterministicIterations(f.ctx, t, &stakingtypes.QueryValidatorsRequest{}, f.queryClient.Validators, 2889, false)
 }
 
 func TestGRPCValidatorDelegations(t *testing.T) {

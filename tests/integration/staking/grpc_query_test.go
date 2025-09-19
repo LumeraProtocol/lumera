@@ -1,7 +1,7 @@
 package staking_test
 
 import (
-	gocontext "context"
+	"context"
 	"fmt"
 	"testing"
 
@@ -100,7 +100,7 @@ func TestGRPCQueryValidators(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("Case %s", tc.msg), func(t *testing.T) {
 			tc.malleate()
-			valsResp, err := queryClient.Validators(gocontext.Background(), req)
+			valsResp, err := queryClient.Validators(context.Background(), req)
 			if tc.expPass {
 				assert.NilError(t, err)
 				assert.Assert(t, valsResp != nil)
@@ -175,7 +175,7 @@ func TestGRPCQueryDelegatorValidators(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("Case %s", tc.msg), func(t *testing.T) {
 			tc.malleate()
-			res, err := queryClient.DelegatorValidators(gocontext.Background(), req)
+			res, err := queryClient.DelegatorValidators(context.Background(), req)
 			if tc.expPass {
 				assert.NilError(t, err)
 				assert.Equal(t, 1, len(res.Validators))
@@ -264,7 +264,7 @@ func TestGRPCQueryDelegatorValidator(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("Case %s", tc.msg), func(t *testing.T) {
 			tc.malleate()
-			res, err := queryClient.DelegatorValidator(gocontext.Background(), req)
+			res, err := queryClient.DelegatorValidator(context.Background(), req)
 			if tc.expPass {
 				assert.NilError(t, err)
 				assert.Equal(t, addrVal1, res.Validator.OperatorAddress)
@@ -332,7 +332,7 @@ func TestGRPCQueryDelegation(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("Case %s", tc.msg), func(t *testing.T) {
 			tc.malleate()
-			res, err := queryClient.Delegation(gocontext.Background(), req)
+			res, err := queryClient.Delegation(context.Background(), req)
 			if tc.expPass {
 				assert.Equal(t, delegation.ValidatorAddress, res.DelegationResponse.Delegation.ValidatorAddress)
 				assert.Equal(t, delegation.DelegatorAddress, res.DelegationResponse.Delegation.DelegatorAddress)
@@ -412,7 +412,7 @@ func TestGRPCQueryDelegatorDelegations(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("Case %s", tc.msg), func(t *testing.T) {
 			tc.malleate()
-			res, err := queryClient.DelegatorDelegations(gocontext.Background(), req)
+			res, err := queryClient.DelegatorDelegations(context.Background(), req)
 			if tc.expErr {
 				assert.ErrorContains(t, err, tc.expErrMsg)
 			} else {
@@ -485,7 +485,7 @@ func TestGRPCQueryValidatorDelegations(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("Case %s", tc.msg), func(t *testing.T) {
 			tc.malleate()
-			res, err := queryClient.ValidatorDelegations(gocontext.Background(), req)
+			res, err := queryClient.ValidatorDelegations(context.Background(), req)
 			switch {
 			case tc.expPass && !tc.expErr:
 				assert.NilError(t, err)
@@ -596,7 +596,7 @@ func TestGRPCQueryUnbondingDelegation(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("Case %s", tc.msg), func(t *testing.T) {
 			tc.malleate()
-			res, err := queryClient.UnbondingDelegation(gocontext.Background(), req)
+			res, err := queryClient.UnbondingDelegation(context.Background(), req)
 			if tc.expPass {
 				assert.Assert(t, res != nil)
 				assert.DeepEqual(t, unbond, res.Unbond)
@@ -676,7 +676,7 @@ func TestGRPCQueryDelegatorUnbondingDelegations(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("Case %s", tc.msg), func(t *testing.T) {
 			tc.malleate()
-			res, err := queryClient.DelegatorUnbondingDelegations(gocontext.Background(), req)
+			res, err := queryClient.DelegatorUnbondingDelegations(context.Background(), req)
 			switch {
 			case tc.expPass && !tc.expErr:
 				assert.NilError(t, err)
@@ -707,7 +707,7 @@ func TestGRPCQueryPoolParameters(t *testing.T) {
 	bondDenom := lcfg.ChainDenom
 
 	// Query pool
-	res, err := queryClient.Pool(gocontext.Background(), &types.QueryPoolRequest{})
+	res, err := queryClient.Pool(context.Background(), &types.QueryPoolRequest{})
 	assert.NilError(t, err)
 	bondedPool := f.stakingKeeper.GetBondedPool(ctx)
 	notBondedPool := f.stakingKeeper.GetNotBondedPool(ctx)
@@ -715,7 +715,7 @@ func TestGRPCQueryPoolParameters(t *testing.T) {
 	assert.DeepEqual(t, f.bankKeeper.GetBalance(ctx, bondedPool.GetAddress(), bondDenom).Amount, res.Pool.BondedTokens)
 
 	// Query Params
-	resp, err := queryClient.Params(gocontext.Background(), &types.QueryParamsRequest{})
+	resp, err := queryClient.Params(context.Background(), &types.QueryParamsRequest{})
 	assert.NilError(t, err)
 	params, err := f.stakingKeeper.GetParams(ctx)
 	assert.NilError(t, err)
@@ -779,7 +779,7 @@ func TestGRPCQueryHistoricalInfo(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("Case %s", tc.msg), func(t *testing.T) {
 			tc.malleate()
-			res, err := queryClient.HistoricalInfo(gocontext.Background(), req)
+			res, err := queryClient.HistoricalInfo(context.Background(), req)
 			if tc.expPass {
 				assert.NilError(t, err)
 				assert.Assert(t, res != nil)
@@ -894,7 +894,7 @@ func TestGRPCQueryRedelegations(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("Case %s", tc.msg), func(t *testing.T) {
 			tc.malleate()
-			res, err := queryClient.Redelegations(gocontext.Background(), req)
+			res, err := queryClient.Redelegations(context.Background(), req)
 			switch {
 			case tc.expPass && !tc.expErr:
 				assert.NilError(t, err)
@@ -977,7 +977,7 @@ func TestGRPCQueryValidatorUnbondingDelegations(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("Case %s", tc.msg), func(t *testing.T) {
 			tc.malleate()
-			res, err := queryClient.ValidatorUnbondingDelegations(gocontext.Background(), req)
+			res, err := queryClient.ValidatorUnbondingDelegations(context.Background(), req)
 			if tc.expPass {
 				assert.NilError(t, err)
 				assert.Equal(t, uint64(1), res.Pagination.Total)

@@ -279,7 +279,7 @@ func (suite *MsgServerTestSuite) finalizeSenseAction(actionID string, superNode 
 	suite.Equal(actionFinal.State, actionState)
 }
 
-func (suite *MsgServerTestSuite) makeFinalizeCascadeActionMessage(actionID string, actionType string, superNode string, badMetadata string, rqIdsOtiBad bool, rqIdsBad bool) types.MsgFinalizeAction {
+func (suite *MsgServerTestSuite) makeFinalizeCascadeActionMessage(actionID string, actionType string, superNode string, badMetadata string, _ bool, rqIdsBad bool) types.MsgFinalizeAction {
 	var validIDs []string
 	if !rqIdsBad {
 		for i := suite.ic; i < suite.ic+50; i++ { // 50 is default value for MaxDdAndFingerprints

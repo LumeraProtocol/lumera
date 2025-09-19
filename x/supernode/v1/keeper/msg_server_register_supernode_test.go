@@ -341,7 +341,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 						DelegatorShares: math.LegacyNewDec(500_000),
 						Jailed:          false,
 					}, nil)
-				
+
 				// Set up delegation mock to return insufficient stake for the existing account
 				// This will be called for both the validator operator account and the supernode account
 				sk.EXPECT().
@@ -522,9 +522,9 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			if tc.name == "re-registration ignores new parameters (IP, account, port)" || 
-			   tc.name == "re-registration fails when validator becomes jailed" ||
-			   tc.name == "re-registration fails when validator loses eligibility" {
+			if tc.name == "re-registration ignores new parameters (IP, account, port)" ||
+				tc.name == "re-registration fails when validator becomes jailed" ||
+				tc.name == "re-registration fails when validator loses eligibility" {
 				// Create a disabled supernode
 				disabledSupernode := types2.SuperNode{
 					ValidatorAddress: valAddr.String(),
@@ -570,7 +570,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 				require.ErrorIs(t, err, tc.expectedError)
 			} else {
 				require.NoError(t, err)
-				
+
 				// Additional assertions for re-registration tests
 				if tc.name == "re-registration of disabled supernode" {
 					// Verify the supernode is now active
@@ -578,12 +578,35 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 					require.True(t, found)
 					require.Len(t, sn.States, 3) // Initial active, disabled, then active again
 					require.Equal(t, types2.SuperNodeStateActive, sn.States[2].State)
-					
+
 					// Verify IP address and account were NOT updated
 					require.Equal(t, "192.168.1.1", sn.PrevIpAddresses[len(sn.PrevIpAddresses)-1].Address)
 					require.Equal(t, creatorAddr.String(), sn.SupernodeAccount)
-					require.Len(t, sn.PrevIpAddresses, 1) // No new IP history
+					require.Len(t, sn.PrevIpAddresses, 1)       // No new IP history
 					require.Len(t, sn.PrevSupernodeAccounts, 1) // No new account history
+
+					// Verify event attributes are present and correct
+					evs := sdkCtx.EventManager().Events()
+					foundEvt := false
+					for _, e := range evs {
+						if e.Type != types2.EventTypeSupernodeRegistered {
+							continue
+						}
+						kv := map[string]string{}
+						for _, a := range e.Attributes {
+							kv[string(a.Key)] = string(a.Value)
+						}
+						if kv[types2.AttributeKeyReRegistered] == "true" &&
+							kv[types2.AttributeKeyOldState] == types2.SuperNodeStateDisabled.String() &&
+							kv[types2.AttributeKeyIPAddress] == "192.168.1.1" &&
+							kv[types2.AttributeKeySupernodeAccount] == creatorAddr.String() &&
+							kv[types2.AttributeKeyP2PPort] == "26657" &&
+							kv[types2.AttributeKeyValidatorAddress] == valAddr.String() {
+							foundEvt = true
+							break
+						}
+					}
+					require.True(t, foundEvt, "re-registration event with expected attributes not found")
 				}
 
 				if tc.name == "re-registration ignores new parameters (IP, account, port)" {
@@ -592,13 +615,36 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 					require.True(t, found)
 					require.Len(t, sn.States, 3) // Initial active, disabled, then active again
 					require.Equal(t, types2.SuperNodeStateActive, sn.States[2].State)
-					
+
 					// Verify ALL original parameters were preserved (not updated)
 					require.Equal(t, "192.168.1.1", sn.PrevIpAddresses[len(sn.PrevIpAddresses)-1].Address) // Original IP kept
-					require.Equal(t, creatorAddr.String(), sn.SupernodeAccount) // Original account kept
-					require.Equal(t, "26657", sn.P2PPort) // Original port kept
-					require.Len(t, sn.PrevIpAddresses, 1) // No new IP history
-					require.Len(t, sn.PrevSupernodeAccounts, 1) // No new account history
+					require.Equal(t, creatorAddr.String(), sn.SupernodeAccount)                            // Original account kept
+					require.Equal(t, "26657", sn.P2PPort)                                                  // Original port kept
+					require.Len(t, sn.PrevIpAddresses, 1)                                                  // No new IP history
+					require.Len(t, sn.PrevSupernodeAccounts, 1)                                            // No new account history
+
+					// Verify event attributes are present and correct
+					evs := sdkCtx.EventManager().Events()
+					foundEvt := false
+					for _, e := range evs {
+						if e.Type != types2.EventTypeSupernodeRegistered {
+							continue
+						}
+						kv := map[string]string{}
+						for _, a := range e.Attributes {
+							kv[string(a.Key)] = string(a.Value)
+						}
+						if kv[types2.AttributeKeyReRegistered] == "true" &&
+							kv[types2.AttributeKeyOldState] == types2.SuperNodeStateDisabled.String() &&
+							kv[types2.AttributeKeyIPAddress] == "192.168.1.1" &&
+							kv[types2.AttributeKeySupernodeAccount] == creatorAddr.String() &&
+							kv[types2.AttributeKeyP2PPort] == "26657" &&
+							kv[types2.AttributeKeyValidatorAddress] == valAddr.String() {
+							foundEvt = true
+							break
+						}
+					}
+					require.True(t, foundEvt, "re-registration event with expected attributes not found")
 				}
 			}
 		})

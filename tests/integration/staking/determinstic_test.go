@@ -70,8 +70,8 @@ func initDeterministicFixture(t *testing.T) *deterministicFixture {
 	)
 	cdc := moduletestutil.MakeTestEncodingConfig(auth.AppModuleBasic{}, distribution.AppModuleBasic{}).Codec
 
-	// Silence storage debug logs during deterministic staking tests
-	logger := log.NewNopLogger()
+	// Keep warnings/errors visible in deterministic staking tests
+	logger := log.NewTestLoggerInfo(t)
 	cms := integration.CreateMultiStore(keys, logger)
 
 	newCtx := sdk.NewContext(cms, cmtproto.Header{}, true, logger)

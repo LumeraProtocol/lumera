@@ -10,6 +10,7 @@ import (
 
 	sdkmath "cosmossdk.io/math"
 	"github.com/LumeraProtocol/lumera/app"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	"github.com/cosmos/cosmos-sdk/runtime"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
@@ -463,8 +464,9 @@ func (suite *KeeperIntegrationSuite) TestGetSuperNodeBySuperNodeAddress() {
 
 func (suite *KeeperIntegrationSuite) TestSupernodeReRegistration() {
 	// Test re-registration of a disabled supernode
-	valAddr := sdk.ValAddress([]byte("validator1h"))
-	accAddr := sdk.AccAddress([]byte("validator1h"))
+	pk := secp256k1.GenPrivKey()
+	accAddr := sdk.AccAddress(pk.PubKey().Address())
+	valAddr := sdk.ValAddress(pk.PubKey().Address())
 
 	// Step 1: Create and register a supernode
 	supernode := types2.SuperNode{

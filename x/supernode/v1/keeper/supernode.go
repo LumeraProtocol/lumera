@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"fmt"
+	"strconv"
 
 	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
@@ -168,7 +169,7 @@ func (k Keeper) SetSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress) erro
 	}
 	if err := k.SetSuperNode(ctx, supernode); err != nil {
 		k.logger.With("module", fmt.Sprintf("error updating supernode state: %s", valAddr)).Error(fmt.Sprintf("x/%s", types2.ModuleName))
-		return errorsmod.Wrapf(sdkerrors.ErrNotFound, "eror updating supernode state")
+		return errorsmod.Wrapf(sdkerrors.ErrNotFound, "error updating supernode state")
 	}
 	// Emit event for watchers
 	ctx.EventManager().EmitEvent(
@@ -212,7 +213,7 @@ func (k Keeper) SetSuperNodeStopped(ctx sdk.Context, valAddr sdk.ValAddress) err
 
 	if err := k.SetSuperNode(ctx, supernode); err != nil {
 		k.logger.With("module", fmt.Sprintf("error updating supernode state: %s", valAddr)).Error(fmt.Sprintf("x/%s", types2.ModuleName))
-		return errorsmod.Wrapf(sdkerrors.ErrNotFound, "eror updating supernode state")
+		return errorsmod.Wrapf(sdkerrors.ErrNotFound, "error updating supernode state")
 	}
 
 	// Emit event
@@ -246,7 +247,8 @@ func (k Keeper) IsSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress) bool 
 }
 
 // SetSuperNodeDisabled appends a Disabled state for the supernode if not already disabled.
-// This represents a terminal state that requires re-registration to become active again.
+// Terminal state: once Disabled, hooks will not auto re-activate it. A manual
+// re-registration flow is required to become Active again.
 func (k Keeper) SetSuperNodeDisabled(ctx sdk.Context, valAddr sdk.ValAddress) error {
 	valOperAddr, err := sdk.ValAddressFromBech32(valAddr.String())
 	if err != nil {
@@ -263,13 +265,18 @@ func (k Keeper) SetSuperNodeDisabled(ctx sdk.Context, valAddr sdk.ValAddress) er
 	}
 
 	if supernode.States[len(supernode.States)-1].State != types2.SuperNodeStateDisabled {
+		last := supernode.States[len(supernode.States)-1].State
 		supernode.States = append(supernode.States, &types2.SuperNodeStateRecord{
 			State:  types2.SuperNodeStateDisabled,
 			Height: ctx.BlockHeight(),
 		})
 		if err := k.SetSuperNode(ctx, supernode); err != nil {
-			k.logger.With("module", fmt.Sprintf("error updating supernode state: %s", valAddr)).Error(fmt.Sprintf("x/%s", types2.ModuleName))
-			return errorsmod.Wrapf(sdkerrors.ErrNotFound, "eror updating supernode state")
+			k.logger.Error("error updating supernode state",
+				"module", fmt.Sprintf("x/%s", types2.ModuleName),
+				"validator", valAddr.String(),
+				"error", err,
+			)
+			return errorsmod.Wrapf(sdkerrors.ErrNotFound, "error updating supernode state")
 		}
 
 		// Emit event for watchers
@@ -278,6 +285,8 @@ func (k Keeper) SetSuperNodeDisabled(ctx sdk.Context, valAddr sdk.ValAddress) er
 				types2.EventTypeSupernodeDeRegistered,
 				sdk.NewAttribute(types2.AttributeKeyValidatorAddress, supernode.ValidatorAddress),
 				sdk.NewAttribute(types2.AttributeKeyReason, "disable_supernode_hook"),
+				sdk.NewAttribute(types2.AttributeKeyOldState, last.String()),
+				sdk.NewAttribute(types2.AttributeKeyHeight, strconv.FormatInt(ctx.BlockHeight(), 10)),
 			),
 		)
 	}

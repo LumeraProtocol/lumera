@@ -1803,7 +1803,10 @@ type CascadeMetadata struct {
 	RqIdsIds []string `protobuf:"bytes,5,rep,name=rq_ids_ids,proto3" json:"rq_ids_ids,omitempty"`
 	// RequestAction required field
 	Signatures string `protobuf:"bytes,6,opt,name=signatures,proto3" json:"signatures,omitempty"`
-	Public     bool   `protobuf:"varint,7,opt,name=public,proto3" json:"public,omitempty"`
+	// Indicates whether the action is publicly visible. Set to true to
+	// mark the action as visible to all users; set to false for private
+	// or restricted actions.
+	Public bool `protobuf:"varint,7,opt,name=public,proto3" json:"public,omitempty"`
 }
 
 func (x *CascadeMetadata) Reset() {

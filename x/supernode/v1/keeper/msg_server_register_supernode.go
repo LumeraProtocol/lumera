@@ -74,6 +74,7 @@ func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types2.MsgRegis
 					sdk.NewAttribute(types2.AttributeKeySupernodeAccount, existingSupernode.SupernodeAccount),
 					sdk.NewAttribute(types2.AttributeKeyReRegistered, "true"),
 					sdk.NewAttribute(types2.AttributeKeyOldState, "disabled"),
+					sdk.NewAttribute(types2.AttributeKeyP2PPort, existingSupernode.P2PPort),
 				),
 			)
 

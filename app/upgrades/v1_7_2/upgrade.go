@@ -43,9 +43,12 @@ func CreateUpgradeHandler(
 }
 
 // StoreUpgrades declares any store additions/deletions for this upgrade.
-// No store changes are required for v1.7.2 at this time.
+// No KV store key changes are required for v1.7.2 at this time.
+// Note: v1.7.2 includes a module migration in x/action that converts
+// legacy Action.price (string) to cosmos.base.v1beta1.Coin and bumps
+// the module consensus version. Supernode protobuf additions are
+// backward compatible and do not require a store upgrade.
 var StoreUpgrades = storetypes.StoreUpgrades{
     Added:   []string{},
     Deleted: []string{},
 }
-

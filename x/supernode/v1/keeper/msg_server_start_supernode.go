@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"context"
+	"strconv"
 
 	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
@@ -31,24 +32,23 @@ func (k msgServer) StartSupernode(goCtx context.Context, msg *types2.MsgStartSup
 	if len(supernode.States) == 0 {
 		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode is in an invalid state")
 	}
-	
+
 	currentState := supernode.States[len(supernode.States)-1].State
-	
-	// Check if supernode is disabled (terminal state)
-	if currentState == types2.SuperNodeStateDisabled {
+
+	// State-specific checks for better UX
+	switch currentState {
+	case types2.SuperNodeStateDisabled:
 		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode is disabled and must be re-registered")
-	}
-	
-	// Check if already active
-	if currentState == types2.SuperNodeStateActive {
+	case types2.SuperNodeStateActive:
 		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode is already started")
+	case types2.SuperNodeStateStopped:
+		// OK to proceed
+	case types2.SuperNodeStatePenalized:
+		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode is penalized and cannot be started")
+	default:
+		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "cannot start supernode from state=%s", currentState.String())
 	}
-	
-	// Can only start from stopped state
-	if currentState != types2.SuperNodeStateStopped {
-		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode must be in stopped state to start")
-	}
-	
+
 	supernode.States = append(supernode.States, &types2.SuperNodeStateRecord{
 		State:  types2.SuperNodeStateActive,
 		Height: ctx.BlockHeight(),
@@ -62,6 +62,8 @@ func (k msgServer) StartSupernode(goCtx context.Context, msg *types2.MsgStartSup
 		sdk.NewEvent(
 			types2.EventTypeSupernodeStarted,
 			sdk.NewAttribute(types2.AttributeKeyValidatorAddress, msg.ValidatorAddress),
+			sdk.NewAttribute(types2.AttributeKeyOldState, currentState.String()),
+			sdk.NewAttribute(types2.AttributeKeyHeight, strconv.FormatInt(ctx.BlockHeight(), 10)),
 		),
 	)
 

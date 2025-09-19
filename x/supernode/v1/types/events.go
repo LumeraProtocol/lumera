@@ -19,4 +19,5 @@ const (
 	AttributeKeyReRegistered     = "re_registered"
 	AttributeKeyOldState         = "old_state"
 	AttributeKeyOldIPAddress     = "old_ip_address"
+	AttributeKeyHeight           = "height"
 )

@@ -332,7 +332,7 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 				resp := cli.CustomCommand(registerCmd...)
 				RequireTxSuccess(t, resp)
 				sut.AwaitNextBlock(t)
-				
+
 				// Deregister the supernode to set it to DISABLED state
 				deregisterCmd := []string{
 					"tx", "supernode", "deregister-supernode",
@@ -405,7 +405,7 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 			if tc.expectedError == "" {
 				t.Log("Verifying transaction success for re-registration")
 				RequireTxSuccess(t, registerResp)
-				
+
 				// Verify supernode is now active after re-registration
 				sut.AwaitNextBlock(t)
 				supernode := GetSuperNodeResponse(t, cli, valAddr)
@@ -413,7 +413,7 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 				require.NotEmpty(t, supernode.States)
 				lastState := supernode.States[len(supernode.States)-1]
 				require.Equal(t, types.SuperNodeStateActive, lastState.State, "Supernode should be active after re-registration")
-				
+
 				// Verify that IP address was NOT updated during re-registration
 				require.NotEmpty(t, supernode.PrevIpAddresses)
 				lastIP := supernode.PrevIpAddresses[len(supernode.PrevIpAddresses)-1].Address
@@ -425,9 +425,11 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 
 				// Verify no supernode was registered (except for duplicate_registration case)
 				if tc.name != "duplicate_registration" {
+					// Give the node a brief moment before querying state
+					time.Sleep(10 * time.Second)
 					t.Log("Verifying no supernode was registered")
 					supernodeResp := cli.WithRunErrorsIgnored().CustomQuery(
-						"query", "supernode", "get-super-node", valAddr,
+						"query", "supernode", "get-supernode", valAddr,
 					)
 					t.Logf("Supernode query response: %s", supernodeResp)
 

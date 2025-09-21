@@ -4,14 +4,18 @@ import (
 	"encoding/json"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 // GetSuperNodeResponse queries and returns a supernode response
 func GetSuperNodeResponse(t *testing.T, cli *LumeradCli, validatorAddr string) *types.SuperNode {
+	// Give the node a brief moment to finalize state before querying
+	time.Sleep(10 * time.Second)
+
 	queryCmd := []string{
-		"q", "supernode", "get-super-node",
+		"q", "supernode", "get-supernode",
 		validatorAddr,
 	}
 	queryResp := cli.CustomQuery(queryCmd...)

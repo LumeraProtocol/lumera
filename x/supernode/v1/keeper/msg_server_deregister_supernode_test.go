@@ -121,6 +121,27 @@ func TestMsgServer_DeRegisterSupernode(t *testing.T) {
 				require.ErrorIs(t, err, tc.expectedError)
 			} else {
 				require.NoError(t, err)
+				if tc.name == "successful deregistration" {
+					// Verify deregister event includes old_state and height
+					evs := ctx.EventManager().Events()
+					foundEvt := false
+					for _, e := range evs {
+						if e.Type != types2.EventTypeSupernodeDeRegistered {
+							continue
+						}
+						kv := map[string]string{}
+						for _, a := range e.Attributes {
+							kv[string(a.Key)] = string(a.Value)
+						}
+						if kv[types2.AttributeKeyValidatorAddress] == valAddr.String() &&
+							kv[types2.AttributeKeyOldState] != "" &&
+							kv[types2.AttributeKeyHeight] != "" {
+							foundEvt = true
+							break
+						}
+					}
+					require.True(t, foundEvt, "deregister event with expected attributes not found")
+				}
 			}
 		})
 	}

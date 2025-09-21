@@ -73,19 +73,30 @@ func TestStopSupernode(t *testing.T) {
 				require.NotEmpty(t, sn.States)
 				require.Equal(t, types2.SuperNodeStateStopped, sn.States[len(sn.States)-1].State)
 
-				// Verify event was emitted
-				events := suite.sdkCtx.EventManager().Events()
-				var foundStopEvent bool
-				for _, e := range events {
-					if e.Type == types2.EventTypeSupernodeStopped {
-						foundStopEvent = true
-						for _, attr := range e.Attributes {
-							if string(attr.Key) == types2.AttributeKeyValidatorAddress {
-								require.Equal(t, valAddrStr, string(attr.Value))
-							}
-						}
-					}
-				}
+            // Verify event was emitted
+            events := suite.sdkCtx.EventManager().Events()
+            var foundStopEvent bool
+            for _, e := range events {
+                if e.Type == types2.EventTypeSupernodeStopped {
+                    foundStopEvent = true
+                    var addrOK, heightOK, oldStateOK bool
+                    for _, attr := range e.Attributes {
+                        if string(attr.Key) == types2.AttributeKeyValidatorAddress {
+                            require.Equal(t, valAddrStr, string(attr.Value))
+                            addrOK = true
+                        }
+                        if string(attr.Key) == types2.AttributeKeyHeight {
+                            require.NotEmpty(t, string(attr.Value))
+                            heightOK = true
+                        }
+                        if string(attr.Key) == types2.AttributeKeyOldState {
+                            require.NotEmpty(t, string(attr.Value))
+                            oldStateOK = true
+                        }
+                    }
+                    require.True(t, addrOK && heightOK && oldStateOK)
+                }
+            }
 				require.True(t, foundStopEvent, "supernode_stopped event not found")
 			},
 		},

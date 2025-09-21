@@ -20,4 +20,5 @@ const (
 	AttributeKeyOldState         = "old_state"
 	AttributeKeyOldIPAddress     = "old_ip_address"
 	AttributeKeyHeight           = "height"
+	AttributeKeyFieldsUpdated    = "fields_updated"
 )

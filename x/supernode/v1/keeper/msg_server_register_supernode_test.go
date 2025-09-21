@@ -588,24 +588,28 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 					// Verify event attributes are present and correct
 					evs := sdkCtx.EventManager().Events()
 					foundEvt := false
-					for _, e := range evs {
-						if e.Type != types2.EventTypeSupernodeRegistered {
-							continue
-						}
-						kv := map[string]string{}
-						for _, a := range e.Attributes {
-							kv[string(a.Key)] = string(a.Value)
-						}
-						if kv[types2.AttributeKeyReRegistered] == "true" &&
-							kv[types2.AttributeKeyOldState] == types2.SuperNodeStateDisabled.String() &&
-							kv[types2.AttributeKeyIPAddress] == "192.168.1.1" &&
-							kv[types2.AttributeKeySupernodeAccount] == creatorAddr.String() &&
-							kv[types2.AttributeKeyP2PPort] == "26657" &&
-							kv[types2.AttributeKeyValidatorAddress] == valAddr.String() {
-							foundEvt = true
-							break
-						}
-					}
+                    for _, e := range evs {
+                        if e.Type != types2.EventTypeSupernodeRegistered {
+                            continue
+                        }
+                        kv := map[string]string{}
+                        for _, a := range e.Attributes {
+                            kv[string(a.Key)] = string(a.Value)
+                        }
+                        
+                        rereg := kv[types2.AttributeKeyReRegistered] == "true"
+                        oldst := kv[types2.AttributeKeyOldState] == types2.SuperNodeStateDisabled.String()
+                        ipok := kv[types2.AttributeKeyIPAddress] == "192.168.1.1"
+                        accok := kv[types2.AttributeKeySupernodeAccount] == creatorAddr.String()
+                        p2pok := kv[types2.AttributeKeyP2PPort] == "26657"
+                        valok := kv[types2.AttributeKeyValidatorAddress] == valAddr.String()
+                        htok := kv[types2.AttributeKeyHeight] == fmt.Sprintf("%d", sdkCtx.BlockHeight())
+                        
+                        if rereg && oldst && ipok && accok && p2pok && valok && htok {
+                            foundEvt = true
+                            break
+                        }
+                    }
 					require.True(t, foundEvt, "re-registration event with expected attributes not found")
 				}
 
@@ -626,24 +630,28 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 					// Verify event attributes are present and correct
 					evs := sdkCtx.EventManager().Events()
 					foundEvt := false
-					for _, e := range evs {
-						if e.Type != types2.EventTypeSupernodeRegistered {
-							continue
-						}
-						kv := map[string]string{}
-						for _, a := range e.Attributes {
-							kv[string(a.Key)] = string(a.Value)
-						}
-						if kv[types2.AttributeKeyReRegistered] == "true" &&
-							kv[types2.AttributeKeyOldState] == types2.SuperNodeStateDisabled.String() &&
-							kv[types2.AttributeKeyIPAddress] == "192.168.1.1" &&
-							kv[types2.AttributeKeySupernodeAccount] == creatorAddr.String() &&
-							kv[types2.AttributeKeyP2PPort] == "26657" &&
-							kv[types2.AttributeKeyValidatorAddress] == valAddr.String() {
-							foundEvt = true
-							break
-						}
-					}
+                    for _, e := range evs {
+                        if e.Type != types2.EventTypeSupernodeRegistered {
+                            continue
+                        }
+                        kv := map[string]string{}
+                        for _, a := range e.Attributes {
+                            kv[string(a.Key)] = string(a.Value)
+                        }
+                        
+                        rereg := kv[types2.AttributeKeyReRegistered] == "true"
+                        oldst := kv[types2.AttributeKeyOldState] == types2.SuperNodeStateDisabled.String()
+                        ipok := kv[types2.AttributeKeyIPAddress] == "192.168.1.1"
+                        accok := kv[types2.AttributeKeySupernodeAccount] == creatorAddr.String()
+                        p2pok := kv[types2.AttributeKeyP2PPort] == "26657"
+                        valok := kv[types2.AttributeKeyValidatorAddress] == valAddr.String()
+                        htok := kv[types2.AttributeKeyHeight] == fmt.Sprintf("%d", sdkCtx.BlockHeight())
+                        
+                        if rereg && oldst && ipok && accok && p2pok && valok && htok {
+                            foundEvt = true
+                            break
+                        }
+                    }
 					require.True(t, foundEvt, "re-registration event with expected attributes not found")
 				}
 			}

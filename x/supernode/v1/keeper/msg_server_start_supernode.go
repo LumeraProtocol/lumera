@@ -64,6 +64,7 @@ func (k msgServer) StartSupernode(goCtx context.Context, msg *types2.MsgStartSup
 			sdk.NewAttribute(types2.AttributeKeyValidatorAddress, msg.ValidatorAddress),
 			sdk.NewAttribute(types2.AttributeKeyOldState, currentState.String()),
 			sdk.NewAttribute(types2.AttributeKeyHeight, strconv.FormatInt(ctx.BlockHeight(), 10)),
+			sdk.NewAttribute(types2.AttributeKeyReason, "tx_start"),
 		),
 	)
 

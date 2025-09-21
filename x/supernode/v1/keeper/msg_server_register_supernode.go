@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"context"
+	"strconv"
 
 	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
@@ -48,35 +49,37 @@ func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types2.MsgRegis
 				return nil, err
 			}
 
-			// Re-registration only changes state from Disabled to Active
-			// Use UpdateSupernode for updating other fields
-			existingSupernode.States = append(existingSupernode.States, &types2.SuperNodeStateRecord{
-				State:  types2.SuperNodeStateActive,
-				Height: ctx.BlockHeight(),
-			})
+            // Re-registration only changes state from Disabled to Active
+            // Capture previous state before appending for event attributes
+            prevState := existingSupernode.States[len(existingSupernode.States)-1].State
+            // Use UpdateSupernode for updating other fields
+            existingSupernode.States = append(existingSupernode.States, &types2.SuperNodeStateRecord{
+                State:  types2.SuperNodeStateActive,
+                Height: ctx.BlockHeight(),
+            })
 
 			// Save the updated supernode
 			if err := k.SetSuperNode(ctx, existingSupernode); err != nil {
 				return nil, errorsmod.Wrapf(sdkerrors.ErrIO, "error updating supernode: %s", err)
 			}
 
-			// Emit event with existing supernode details
-			currentIP := ""
-			if len(existingSupernode.PrevIpAddresses) > 0 {
-				currentIP = existingSupernode.PrevIpAddresses[len(existingSupernode.PrevIpAddresses)-1].Address
-			}
-
-			ctx.EventManager().EmitEvent(
-				sdk.NewEvent(
-					types2.EventTypeSupernodeRegistered,
-					sdk.NewAttribute(types2.AttributeKeyValidatorAddress, msg.ValidatorAddress),
-					sdk.NewAttribute(types2.AttributeKeyIPAddress, currentIP),
-					sdk.NewAttribute(types2.AttributeKeySupernodeAccount, existingSupernode.SupernodeAccount),
-					sdk.NewAttribute(types2.AttributeKeyReRegistered, "true"),
-					sdk.NewAttribute(types2.AttributeKeyOldState, "disabled"),
-					sdk.NewAttribute(types2.AttributeKeyP2PPort, existingSupernode.P2PPort),
-				),
-			)
+            // Emit event with existing supernode details
+            currentIP := ""
+            if len(existingSupernode.PrevIpAddresses) > 0 {
+                currentIP = existingSupernode.PrevIpAddresses[len(existingSupernode.PrevIpAddresses)-1].Address
+            }
+            ctx.EventManager().EmitEvent(
+                sdk.NewEvent(
+                    types2.EventTypeSupernodeRegistered,
+                    sdk.NewAttribute(types2.AttributeKeyValidatorAddress, msg.ValidatorAddress),
+                    sdk.NewAttribute(types2.AttributeKeyIPAddress, currentIP),
+                    sdk.NewAttribute(types2.AttributeKeySupernodeAccount, existingSupernode.SupernodeAccount),
+                    sdk.NewAttribute(types2.AttributeKeyReRegistered, "true"),
+                    sdk.NewAttribute(types2.AttributeKeyOldState, prevState.String()),
+                    sdk.NewAttribute(types2.AttributeKeyP2PPort, existingSupernode.P2PPort),
+                    sdk.NewAttribute(types2.AttributeKeyHeight, strconv.FormatInt(ctx.BlockHeight(), 10)),
+                ),
+            )
 
 			return &types2.MsgRegisterSupernodeResponse{}, nil
 		}
@@ -149,6 +152,7 @@ func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types2.MsgRegis
 			sdk.NewAttribute(types2.AttributeKeyIPAddress, msg.IpAddress),
 			sdk.NewAttribute(types2.AttributeKeySupernodeAccount, msg.SupernodeAccount),
 			sdk.NewAttribute(types2.AttributeKeyP2PPort, msg.P2PPort),
+			sdk.NewAttribute(types2.AttributeKeyHeight, strconv.FormatInt(ctx.BlockHeight(), 10)),
 		),
 	)
 

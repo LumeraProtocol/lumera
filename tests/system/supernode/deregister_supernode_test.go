@@ -135,16 +135,27 @@ func TestDeregisterSupernode(t *testing.T) {
 				require.NotEmpty(t, events)
 
 				var foundDeregisterEvent bool
-				for _, evt := range events {
-					if evt.Type == types2.EventTypeSupernodeDeRegistered {
-						foundDeregisterEvent = true
-						for _, attr := range evt.Attributes {
-							if string(attr.Key) == types2.AttributeKeyValidatorAddress {
-								require.Equal(t, valAddrStr, string(attr.Value))
-							}
-						}
-					}
-				}
+                for _, evt := range events {
+                    if evt.Type == types2.EventTypeSupernodeDeRegistered {
+                        foundDeregisterEvent = true
+                        var addrOK, heightOK, oldStateOK bool
+                        for _, attr := range evt.Attributes {
+                            if string(attr.Key) == types2.AttributeKeyValidatorAddress {
+                                require.Equal(t, valAddrStr, string(attr.Value))
+                                addrOK = true
+                            }
+                            if string(attr.Key) == types2.AttributeKeyHeight {
+                                require.NotEmpty(t, string(attr.Value))
+                                heightOK = true
+                            }
+                            if string(attr.Key) == types2.AttributeKeyOldState {
+                                require.NotEmpty(t, string(attr.Value))
+                                oldStateOK = true
+                            }
+                        }
+                        require.True(t, addrOK && heightOK && oldStateOK)
+                    }
+                }
 				require.True(t, foundDeregisterEvent, "supernode_deregistered event not found")
 			},
 		},
@@ -253,16 +264,27 @@ func TestDeregisterSupernode(t *testing.T) {
 				// Verify event emission
 				events := suite.sdkCtx.EventManager().Events()
 				var foundDeregisterEvent bool
-				for _, evt := range events {
-					if evt.Type == types2.EventTypeSupernodeDeRegistered {
-						foundDeregisterEvent = true
-						for _, attr := range evt.Attributes {
-							if string(attr.Key) == types2.AttributeKeyValidatorAddress {
-								require.Equal(t, valAddrStr, string(attr.Value))
-							}
-						}
-					}
-				}
+                for _, evt := range events {
+                    if evt.Type == types2.EventTypeSupernodeDeRegistered {
+                        foundDeregisterEvent = true
+                        var addrOK, heightOK, oldStateOK bool
+                        for _, attr := range evt.Attributes {
+                            if string(attr.Key) == types2.AttributeKeyValidatorAddress {
+                                require.Equal(t, valAddrStr, string(attr.Value))
+                                addrOK = true
+                            }
+                            if string(attr.Key) == types2.AttributeKeyHeight {
+                                require.NotEmpty(t, string(attr.Value))
+                                heightOK = true
+                            }
+                            if string(attr.Key) == types2.AttributeKeyOldState {
+                                require.NotEmpty(t, string(attr.Value))
+                                oldStateOK = true
+                            }
+                        }
+                        require.True(t, addrOK && heightOK && oldStateOK)
+                    }
+                }
 				require.True(t, foundDeregisterEvent, "supernode_deregistered event not found")
 			},
 		},

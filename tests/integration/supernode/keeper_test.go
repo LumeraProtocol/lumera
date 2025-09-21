@@ -80,7 +80,7 @@ func (suite *KeeperIntegrationSuite) TestSetSuperNodeActive() {
 				require.NoError(suite.T(), err)
 			},
 			execute: func() error {
-				return suite.keeper.SetSuperNodeActive(suite.ctx, sdk.ValAddress("validator1e"))
+                return suite.keeper.SetSuperNodeActive(suite.ctx, sdk.ValAddress("validator1e"), "test")
 			},
 			validate: func() error {
 				result, found := suite.keeper.QuerySuperNode(suite.ctx, sdk.ValAddress("validator1e"))
@@ -110,7 +110,7 @@ func (suite *KeeperIntegrationSuite) TestSetSuperNodeActive() {
 				require.NoError(suite.T(), err)
 			},
 			execute: func() error {
-				return suite.keeper.SetSuperNodeActive(suite.ctx, sdk.ValAddress("validator1f"))
+                return suite.keeper.SetSuperNodeActive(suite.ctx, sdk.ValAddress("validator1f"), "test")
 			},
 			validate: func() error {
 				result, found := suite.keeper.QuerySuperNode(suite.ctx, sdk.ValAddress("validator1f"))
@@ -143,7 +143,7 @@ func (suite *KeeperIntegrationSuite) TestSetSuperNodeActive() {
 				require.NoError(suite.T(), err)
 			},
 			execute: func() error {
-				return suite.keeper.SetSuperNodeActive(suite.ctx, sdk.ValAddress("validator1g"))
+                return suite.keeper.SetSuperNodeActive(suite.ctx, sdk.ValAddress("validator1g"), "test")
 			},
 			validate: func() error {
 				result, found := suite.keeper.QuerySuperNode(suite.ctx, sdk.ValAddress("validator1g"))
@@ -252,7 +252,7 @@ func (suite *KeeperIntegrationSuite) TestSetSuperNodeStopped() {
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
 			},
 			execute: func() error {
-				return suite.keeper.SetSuperNodeStopped(suite.ctx, sdk.ValAddress("validator1d"))
+                return suite.keeper.SetSuperNodeStopped(suite.ctx, sdk.ValAddress("validator1d"), "test")
 			},
 			validate: func() error {
 				result, found := suite.keeper.QuerySuperNode(suite.ctx, sdk.ValAddress("validator1d"))

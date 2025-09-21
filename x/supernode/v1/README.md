@@ -33,18 +33,12 @@ The Genesis State defines the initial state of the Supernode module. Below is a 
 
 ```go
 type GenesisState struct {
-    Params               Params       // Module parameters
-    Supernodes           []SuperNode  // List of initial supernodes
-    Evidence             []Evidence   // Initial evidence records
-    PerformanceThresholds MetricsThresholds // Performance thresholds for monitoring
+    Params Params // Module parameters
 }
 ```
 
 Key implementation aspects:
-- Parameters are initialized with safe defaults
-- No supernodes are active at genesis
-- Evidence storage is initially empty
-- Performance thresholds are set to reasonable defaults
+- Parameters are initialized from genesis
 
 ## Components
 
@@ -149,10 +143,11 @@ Registers a new supernode:
 
 ```protobuf
 message MsgRegisterSupernode {
-    string validator_address = 1; // Validator operator address
-    string ip_address = 2;       // IP address for supernode operations
-    string account = 3;          // Optional supernode account
-    string p2p_port = 4;         // P2P communication port
+    string creator           = 1; // Signer; must be validator operator
+    string validator_address = 2; // Validator operator address
+    string ip_address        = 3; // IP address for supernode operations
+    string supernode_account = 4; // Optional supernode account
+    string p2p_port          = 5; // P2P communication port
 }
 ```
 
@@ -164,7 +159,7 @@ Validation:
 - Sender must be validator operator
 - Validator must meet minimum stake requirement
 - Validator must not be jailed
-- IP address must be valid and not already registered
+- IP address must be valid
 
 ### MsgDeregisterSupernode
 
@@ -172,7 +167,8 @@ Permanently disables a supernode (terminal state):
 
 ```protobuf
 message MsgDeregisterSupernode {
-    string validator_address = 1; // Validator operator address
+    string creator           = 1; // Signer; must be validator operator
+    string validator_address = 2; // Validator operator address
 }
 ```
 
@@ -187,14 +183,14 @@ Activates a registered supernode (no field updates):
 
 ```protobuf
 message MsgStartSupernode {
-    string validator_address = 1; // Validator operator address
+    string creator           = 1; // Signer; must be validator operator
+    string validator_address = 2; // Validator operator address
 }
 ```
 
 Validation:
 - Sender must be validator operator
 - Supernode must be in STOPPED state (DISABLED requires re-registration)
-- Validator must meet minimum stake requirement and must not be jailed
 
 ### MsgStopSupernode
 
@@ -202,8 +198,9 @@ Temporarily stops an active supernode:
 
 ```protobuf
 message MsgStopSupernode {
-    string validator_address = 1; // Validator operator address
-    string reason = 2;           // Reason for stopping
+    string creator           = 1; // Signer; must be validator operator
+    string validator_address = 2; // Validator operator address
+    string reason            = 3; // Reason for stopping
 }
 ```
 
@@ -218,11 +215,12 @@ Updates supernode information (idempotent, append-only history for selected fiel
 
 ```protobuf
 message MsgUpdateSupernode {
-    string validator_address = 1;  // Validator operator address
-    string ip_address = 2;         // Optional new IP address
-    string note = 3;               // Optional operator note 
-    string supernode_account = 4;  // Optional new supernode account
-    string p2p_port = 5;           // Optional new P2P port
+    string creator           = 1;  // Signer; must be validator operator
+    string validator_address = 2;  // Validator operator address
+    string ip_address        = 3;  // Optional new IP address
+    string note              = 4;  // Optional operator note 
+    string supernode_account = 5;  // Optional new supernode account
+    string p2p_port          = 6;  // Optional new P2P port
 }
 ```
 
@@ -260,14 +258,18 @@ Attributes:
 - ip_address: Assigned IP address
 - supernode_account: Associated account if any
 - height: Block height of registration
+ - re_registered: "true" if this is a re-registration
+ - old_state: Previous state when re-registering (e.g. "disabled")
+ - p2p_port: P2P port value
 ```
 
-### EventTypeSupernodeDeregistered
+### EventTypeSupernodeDeRegistered
 
 Emitted when a supernode is deregistered:
 ```
 Attributes:
 - validator_address: Validator operator address
+- old_state: Previous state before disabling
 - height: Block height of deregistration
 ```
 
@@ -277,6 +279,11 @@ Emitted when a supernode is activated:
 ```
 Attributes:
 - validator_address: Validator operator address
+- reason: Optional reason for starting, examples:
+  - tx_start (operator invoked start tx)
+  - validator_bonded_eligible (hook: validator bonded and meets requirements)
+  - delegation_modified_eligible (hook: stake meets requirements after delegation change)
+- old_state: Previous state before activation (e.g. "stopped")
 - height: Block height of activation
 ```
 
@@ -286,7 +293,13 @@ Emitted when a supernode is deactivated:
 ```
 Attributes:
 - validator_address: Validator operator address
-- reason: Reason for stopping
+- reason: Reason for stopping, examples:
+  - operator-provided string (from stop tx)
+  - validator_bonded_not_eligible (hook: bonded but not eligible)
+  - validator_begin_unbonding (hook: began unbonding)
+  - delegation_modified_not_eligible (hook: stake below minimum after delegation change)
+  - validator_removed (hook: validator removed)
+- old_state: Previous state before deactivation (e.g. "active")
 - height: Block height of deactivation
 ```
 
@@ -298,6 +311,12 @@ Attributes:
 - validator_address: Validator operator address
 - fields_updated: List of updated fields
 - height: Block height of update
+ - old_account: Previous supernode account (when supernode_account changes)
+ - new_account: New supernode account (when supernode_account changes)
+ - old_p2p_port: Previous P2P port (when p2p_port changes)
+ - p2p_port: New P2P port (when p2p_port changes)
+ - old_ip_address: Previous IP (when ip_address changes)
+- ip_address: New IP (when ip_address changes)
 ```
 
 ### EventTypeSupernodePenalized
@@ -312,17 +331,19 @@ Attributes:
 - height: Block height of penalty
 ```
 
+Note: This event is documented as planned; emission is not implemented yet in the current codebase.
+
 ## Parameters
 
 ```protobuf
 message Params {
-    uint64 minimum_stake_for_sn = 1;       // Minimum stake required
-    uint64 reporting_threshold = 2;         // Threshold for reporting
-    uint64 slashing_threshold = 3;          // Threshold for slashing
-    MetricsThresholds metrics_thresholds = 4; // Performance thresholds
-    uint64 evidence_retention_period = 5;   // Evidence retention in blocks
-    string slashing_fraction = 6;           // Fraction of stake to slash
-    uint64 inactivity_penalty_period = 7;   // Blocks before inactivity penalty
+    cosmos.base.v1beta1.Coin minimum_stake_for_sn = 1; // Minimum stake required
+    uint64                    reporting_threshold   = 2; // Threshold for reporting
+    uint64                    slashing_threshold    = 3; // Threshold for slashing
+    string                    metrics_thresholds    = 4; // Performance thresholds (encoded)
+    string                    evidence_retention_period = 5; // Retention window
+    string                    slashing_fraction     = 6; // Fraction of stake to slash
+    string                    inactivity_penalty_period = 7; // Penalty window
 }
 ```
 

@@ -80,7 +80,7 @@ func (suite *KeeperIntegrationSuite) TestSetSuperNodeActive() {
 				require.NoError(suite.T(), err)
 			},
 			execute: func() error {
-                return suite.keeper.SetSuperNodeActive(suite.ctx, sdk.ValAddress("validator1e"), "test")
+				return suite.keeper.SetSuperNodeActive(suite.ctx, sdk.ValAddress("validator1e"), "test")
 			},
 			validate: func() error {
 				result, found := suite.keeper.QuerySuperNode(suite.ctx, sdk.ValAddress("validator1e"))
@@ -110,7 +110,7 @@ func (suite *KeeperIntegrationSuite) TestSetSuperNodeActive() {
 				require.NoError(suite.T(), err)
 			},
 			execute: func() error {
-                return suite.keeper.SetSuperNodeActive(suite.ctx, sdk.ValAddress("validator1f"), "test")
+				return suite.keeper.SetSuperNodeActive(suite.ctx, sdk.ValAddress("validator1f"), "test")
 			},
 			validate: func() error {
 				result, found := suite.keeper.QuerySuperNode(suite.ctx, sdk.ValAddress("validator1f"))
@@ -143,7 +143,7 @@ func (suite *KeeperIntegrationSuite) TestSetSuperNodeActive() {
 				require.NoError(suite.T(), err)
 			},
 			execute: func() error {
-                return suite.keeper.SetSuperNodeActive(suite.ctx, sdk.ValAddress("validator1g"), "test")
+				return suite.keeper.SetSuperNodeActive(suite.ctx, sdk.ValAddress("validator1g"), "test")
 			},
 			validate: func() error {
 				result, found := suite.keeper.QuerySuperNode(suite.ctx, sdk.ValAddress("validator1g"))
@@ -252,7 +252,7 @@ func (suite *KeeperIntegrationSuite) TestSetSuperNodeStopped() {
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
 			},
 			execute: func() error {
-                return suite.keeper.SetSuperNodeStopped(suite.ctx, sdk.ValAddress("validator1d"), "test")
+				return suite.keeper.SetSuperNodeStopped(suite.ctx, sdk.ValAddress("validator1d"), "test")
 			},
 			validate: func() error {
 				result, found := suite.keeper.QuerySuperNode(suite.ctx, sdk.ValAddress("validator1d"))
@@ -518,6 +518,8 @@ func (suite *KeeperIntegrationSuite) TestSupernodeReRegistration() {
 	require.Equal(suite.T(), "192.168.1.1", result.PrevIpAddresses[0].Address)
 	require.Len(suite.T(), result.PrevSupernodeAccounts, 1) // No new account history
 	require.Equal(suite.T(), accAddr.String(), result.PrevSupernodeAccounts[0].Account)
+	// Verify P2PPort remains unchanged
+	require.Equal(suite.T(), "26657", result.P2PPort)
 }
 
 func TestKeeperIntegrationSuite(t *testing.T) {

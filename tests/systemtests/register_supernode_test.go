@@ -414,6 +414,12 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 				lastState := supernode.States[len(supernode.States)-1]
 				require.Equal(t, types.SuperNodeStateActive, lastState.State, "Supernode should be active after re-registration")
 
+				// Verify state transition shape: ... Disabled -> Active
+				require.GreaterOrEqual(t, len(supernode.States), 2)
+				prevState := supernode.States[len(supernode.States)-2].State
+				require.Equal(t, types.SuperNodeStateDisabled, prevState)
+				require.Equal(t, types.SuperNodeStateActive, lastState.State)
+
 				// Verify that IP address was NOT updated during re-registration
 				require.NotEmpty(t, supernode.PrevIpAddresses)
 				lastIP := supernode.PrevIpAddresses[len(supernode.PrevIpAddresses)-1].Address

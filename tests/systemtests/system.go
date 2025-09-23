@@ -26,7 +26,6 @@ import (
 	"github.com/tidwall/sjson"
 
 	"github.com/cosmos/cosmos-sdk/server"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 var (
@@ -90,7 +89,7 @@ func NewSystemUnderTest(execBinary string, verbose bool, nodesCount int, blockTi
 		errBuff:           ring.New(100),
 		out:               os.Stdout,
 		verbose:           verbose,
-		minGasPrice:       fmt.Sprintf("0.000001%s", sdk.DefaultBondDenom),
+		minGasPrice:       fmt.Sprintf("0.000001%s", "ulume"),
 		projectName:       nameTokens[0],
 		pids:              make(map[int]struct{}, nodesCount),
 	}
@@ -141,6 +140,33 @@ func (s *SystemUnderTest) SetupChain() {
 	if err != nil {
 		panic(fmt.Sprintf("failed set block max gas: %s", err))
 	}
+	
+	// Apply default denominations (ulume) to genesis
+	genesisBz, err = sjson.SetRawBytes(genesisBz, "app_state.staking.params.bond_denom", []byte(`"ulume"`))
+	if err != nil {
+		panic(fmt.Sprintf("failed to set staking bond_denom: %s", err))
+	}
+	
+	genesisBz, err = sjson.SetRawBytes(genesisBz, "app_state.gov.params.min_deposit.0.denom", []byte(`"ulume"`))
+	if err != nil {
+		panic(fmt.Sprintf("failed to set gov min_deposit denom: %s", err))
+	}
+	
+	genesisBz, err = sjson.SetRawBytes(genesisBz, "app_state.gov.params.expedited_min_deposit.0.denom", []byte(`"ulume"`))
+	if err != nil {
+		panic(fmt.Sprintf("failed to set gov expedited_min_deposit denom: %s", err))
+	}
+	
+	genesisBz, err = sjson.SetRawBytes(genesisBz, "app_state.mint.params.mint_denom", []byte(`"ulume"`))
+	if err != nil {
+		panic(fmt.Sprintf("failed to set mint denom: %s", err))
+	}
+	
+	genesisBz, err = sjson.SetRawBytes(genesisBz, "app_state.crisis.constant_fee.denom", []byte(`"ulume"`))
+	if err != nil {
+		panic(fmt.Sprintf("failed to set crisis constant_fee denom: %s", err))
+	}
+	
 	s.withEachNodeHome(func(i int, home string) {
 		if err := saveGenesis(home, genesisBz); err != nil {
 			panic(err)

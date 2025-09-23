@@ -63,7 +63,7 @@ check_supernode_status() {
   local valop="${VAL_OPERATOR[$i]}"
   
   log "Checking supernode status for validator ${i} (${valop})"
-  run_cmd "docker exec lumera-validator1 lumerad query supernode get-super-node ${valop}"
+  run_cmd "docker exec lumera-validator1 lumerad query supernode get-supernode ${valop}"
 }
 
 #################################################################

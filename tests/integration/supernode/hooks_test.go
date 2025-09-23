@@ -32,7 +32,7 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorBondedHook() {
 				supernode := types2.SuperNode{
 					ValidatorAddress: sdk.ValAddress([]byte("validator1c")).String(),
 					SupernodeAccount: sdk.AccAddress([]byte("validator1c")).String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
 					P2PPort:          "26657",
@@ -80,7 +80,7 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorBondedHook() {
 				supernode := types2.SuperNode{
 					ValidatorAddress: sdk.ValAddress([]byte("validator1j")).String(),
 					SupernodeAccount: sdk.AccAddress([]byte("validator1j")).String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
 					P2PPort:          "26657",
@@ -111,15 +111,15 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorBondedHook() {
 				if !found {
 					return fmt.Errorf("SuperNode not found")
 				}
-				if result.States[len(result.States)-1].State != types2.SuperNodeStateDisabled {
-					return fmt.Errorf("expected SuperNode to be active")
+				if result.States[len(result.States)-1].State != types2.SuperNodeStateStopped {
+					return fmt.Errorf("expected SuperNode to be stopped")
 				}
 				return nil
 			},
 			expectSuccess: true,
 		},
 		{
-			name: "when validator has insufficient self-delegation but sufficient supernode delegation, it should be active",
+			name: "when validator has insufficient self-delegation but sufficient supernode delegation, it remains disabled until re-registration",
 			setup: func() {
 				params := types2.Params{
 					MinimumStakeForSn: sdk.NewCoin("ulume", sdkmath.NewInt(1000000)),
@@ -129,11 +129,11 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorBondedHook() {
 				// Create a validator with insufficient self-delegation
 				validatorAddr := sdk.ValAddress([]byte("validator_sd"))
 				supernodeAccAddr := sdk.AccAddress([]byte("supernode_sd"))
-				
+
 				supernode := types2.SuperNode{
 					ValidatorAddress: validatorAddr.String(),
 					SupernodeAccount: supernodeAccAddr.String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateDisabled}}, // Start disabled
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
 					P2PPort:          "26657",
@@ -154,7 +154,7 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorBondedHook() {
 					Shares:           sdkmath.LegacyNewDec(500000), // Less than minimum stake
 				}
 				suite.app.StakingKeeper.SetDelegation(suite.ctx, selfDelegation)
-				
+
 				// Set supernode delegation (makes total sufficient)
 				supernodeDelegation := stakingtypes.Delegation{
 					DelegatorAddress: supernodeAccAddr.String(),
@@ -171,8 +171,8 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorBondedHook() {
 				if !found {
 					return fmt.Errorf("SuperNode not found")
 				}
-				if result.States[len(result.States)-1].State != types2.SuperNodeStateActive {
-					return fmt.Errorf("expected SuperNode to be active, got %s", result.States[len(result.States)-1].State.String())
+				if result.States[len(result.States)-1].State != types2.SuperNodeStateDisabled {
+					return fmt.Errorf("expected SuperNode to remain disabled, got %s", result.States[len(result.States)-1].State.String())
 				}
 				return nil
 			},
@@ -216,7 +216,7 @@ func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
 				supernode := types2.SuperNode{
 					ValidatorAddress: sdk.ValAddress([]byte("validator1bu")).String(),
 					SupernodeAccount: sdk.AccAddress([]byte("validator1bu")).String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
 					P2PPort:          "26657",
@@ -237,8 +237,8 @@ func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
 				if !found {
 					return fmt.Errorf("SuperNode not found")
 				}
-				if result.States[len(result.States)-1].State != types2.SuperNodeStateDisabled {
-					return fmt.Errorf("expected SuperNode to be disabled")
+				if result.States[len(result.States)-1].State != types2.SuperNodeStateStopped {
+					return fmt.Errorf("expected SuperNode to be stopped")
 				}
 				return nil
 			},
@@ -255,7 +255,7 @@ func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
 				supernode := types2.SuperNode{
 					ValidatorAddress: sdk.ValAddress([]byte("validator1ju")).String(),
 					SupernodeAccount: sdk.AccAddress([]byte("validator1ju")).String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
 					P2PPort:          "26657",
@@ -286,8 +286,8 @@ func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
 				if !found {
 					return fmt.Errorf("SuperNode not found")
 				}
-				if result.States[len(result.States)-1].State != types2.SuperNodeStateDisabled {
-					return fmt.Errorf("expected SuperNode to be disabled")
+				if result.States[len(result.States)-1].State != types2.SuperNodeStateStopped {
+					return fmt.Errorf("expected SuperNode to be stopped")
 				}
 				return nil
 			},
@@ -304,7 +304,7 @@ func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
 				supernode := types2.SuperNode{
 					ValidatorAddress: sdk.ValAddress([]byte("validator1jua")).String(),
 					SupernodeAccount: sdk.AccAddress([]byte("validator1jua")).String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
 					P2PPort:          "26657",
@@ -352,11 +352,11 @@ func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
 				// Create a validator with insufficient self-delegation but sufficient supernode delegation
 				validatorAddr := sdk.ValAddress([]byte("validator_sd_ub"))
 				supernodeAccAddr := sdk.AccAddress([]byte("supernode_sd_ub"))
-				
+
 				supernode := types2.SuperNode{
 					ValidatorAddress: validatorAddr.String(),
 					SupernodeAccount: supernodeAccAddr.String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}}, // Start active
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
 					P2PPort:          "26657",
@@ -377,7 +377,7 @@ func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
 					Shares:           sdkmath.LegacyNewDec(400000), // Less than minimum stake
 				}
 				suite.app.StakingKeeper.SetDelegation(suite.ctx, selfDelegation)
-				
+
 				// Set supernode delegation (makes total sufficient)
 				supernodeDelegation := stakingtypes.Delegation{
 					DelegatorAddress: supernodeAccAddr.String(),
@@ -428,12 +428,12 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorRemovedHook() {
 		expectSuccess bool
 	}{
 		{
-			name: "when the validator is removed, and is active, it should be disabled",
+			name: "when the validator is removed, and is active, it should be stopped",
 			setup: func() {
 				supernode := types2.SuperNode{
 					ValidatorAddress: sdk.ValAddress("validator1r").String(),
 					SupernodeAccount: sdk.AccAddress([]byte("validator1r")).String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
 					P2PPort:          "26657",
@@ -448,8 +448,8 @@ func (suite *KeeperIntegrationSuite) TestAfterValidatorRemovedHook() {
 				if !found {
 					return fmt.Errorf("SuperNode not found")
 				}
-				if result.States[len(result.States)-1].State != types2.SuperNodeStateDisabled {
-					return fmt.Errorf("expected SuperNode to be disabled")
+				if result.States[len(result.States)-1].State != types2.SuperNodeStateStopped {
+					return fmt.Errorf("expected SuperNode to be stopped")
 				}
 				return nil
 			},
@@ -487,7 +487,7 @@ func (suite *KeeperIntegrationSuite) TestBeforeDelegationSharesModifiedHook() {
 				supernode := types2.SuperNode{
 					ValidatorAddress: sdk.ValAddress("validator3").String(),
 					SupernodeAccount: sdk.AccAddress([]byte("validator3")).String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}},
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
 					P2PPort:          "26657",
@@ -555,7 +555,7 @@ func (suite *KeeperIntegrationSuite) TestAfterDelegationModifiedHook() {
 		expectSuccess bool
 	}{
 		{
-			name: "when delegation is modified and validator meets supernode requirements, it should be active",
+			name: "when delegation is modified and validator meets supernode requirements, it remains disabled until re-registration",
 			setup: func() {
 				params := types2.Params{
 					MinimumStakeForSn: sdk.NewCoin("ulume", sdkmath.NewInt(1000000)),
@@ -565,7 +565,7 @@ func (suite *KeeperIntegrationSuite) TestAfterDelegationModifiedHook() {
 				supernode := types2.SuperNode{
 					ValidatorAddress: sdk.ValAddress([]byte("validator_dm")).String(),
 					SupernodeAccount: sdk.AccAddress([]byte("validator_dm")).String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateDisabled}}, // Start disabled
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
 					P2PPort:          "26657",
@@ -595,15 +595,15 @@ func (suite *KeeperIntegrationSuite) TestAfterDelegationModifiedHook() {
 				if !found {
 					return fmt.Errorf("SuperNode not found")
 				}
-				if result.States[len(result.States)-1].State != types2.SuperNodeStateActive {
-					return fmt.Errorf("expected SuperNode to be active")
+				if result.States[len(result.States)-1].State != types2.SuperNodeStateDisabled {
+					return fmt.Errorf("expected SuperNode to remain disabled")
 				}
 				return nil
 			},
 			expectSuccess: true,
 		},
 		{
-			name: "when validator has insufficient self-delegation but sufficient supernode delegation, it should be active",
+			name: "when validator has insufficient self-delegation but sufficient supernode delegation, it remains disabled until re-registration",
 			setup: func() {
 				params := types2.Params{
 					MinimumStakeForSn: sdk.NewCoin("ulume", sdkmath.NewInt(1000000)),
@@ -613,11 +613,11 @@ func (suite *KeeperIntegrationSuite) TestAfterDelegationModifiedHook() {
 				// Create a validator with insufficient self-delegation
 				validatorAddr := sdk.ValAddress([]byte("validator_dm_sd"))
 				supernodeAccAddr := sdk.AccAddress([]byte("supernode_dm_sd"))
-				
+
 				supernode := types2.SuperNode{
 					ValidatorAddress: validatorAddr.String(),
 					SupernodeAccount: supernodeAccAddr.String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateDisabled}}, // Start disabled
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
 					P2PPort:          "26657",
@@ -638,7 +638,7 @@ func (suite *KeeperIntegrationSuite) TestAfterDelegationModifiedHook() {
 					Shares:           sdkmath.LegacyNewDec(400000), // Less than minimum stake
 				}
 				suite.app.StakingKeeper.SetDelegation(suite.ctx, selfDelegation)
-				
+
 				// Set supernode delegation (makes total sufficient)
 				supernodeDelegation := stakingtypes.Delegation{
 					DelegatorAddress: supernodeAccAddr.String(),
@@ -650,8 +650,8 @@ func (suite *KeeperIntegrationSuite) TestAfterDelegationModifiedHook() {
 			execute: func() error {
 				// Trigger the hook with the supernode account as the delegator
 				return suite.keeper.Hooks().AfterDelegationModified(
-					suite.ctx, 
-					sdk.AccAddress([]byte("supernode_dm_sd")), 
+					suite.ctx,
+					sdk.AccAddress([]byte("supernode_dm_sd")),
 					sdk.ValAddress("validator_dm_sd"),
 				)
 			},
@@ -660,15 +660,15 @@ func (suite *KeeperIntegrationSuite) TestAfterDelegationModifiedHook() {
 				if !found {
 					return fmt.Errorf("SuperNode not found")
 				}
-				if result.States[len(result.States)-1].State != types2.SuperNodeStateActive {
-					return fmt.Errorf("expected SuperNode to be active, got %s", result.States[len(result.States)-1].State.String())
+				if result.States[len(result.States)-1].State != types2.SuperNodeStateDisabled {
+					return fmt.Errorf("expected SuperNode to remain disabled, got %s", result.States[len(result.States)-1].State.String())
 				}
 				return nil
 			},
 			expectSuccess: true,
 		},
 		{
-			name: "when validator has insufficient total delegation, it should be disabled",
+			name: "when validator has insufficient total delegation, it should be stopped",
 			setup: func() {
 				params := types2.Params{
 					MinimumStakeForSn: sdk.NewCoin("ulume", sdkmath.NewInt(1000000)),
@@ -678,11 +678,11 @@ func (suite *KeeperIntegrationSuite) TestAfterDelegationModifiedHook() {
 				// Create a validator with insufficient total delegation
 				validatorAddr := sdk.ValAddress([]byte("validator_dm_insuf"))
 				supernodeAccAddr := sdk.AccAddress([]byte("supernode_dm_insuf"))
-				
+
 				supernode := types2.SuperNode{
 					ValidatorAddress: validatorAddr.String(),
 					SupernodeAccount: supernodeAccAddr.String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					States:           []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive}}, // Start active
 					PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "192.168.1.1"}},
 					P2PPort:          "26657",
@@ -703,7 +703,7 @@ func (suite *KeeperIntegrationSuite) TestAfterDelegationModifiedHook() {
 					Shares:           sdkmath.LegacyNewDec(400000), // Less than minimum stake
 				}
 				suite.app.StakingKeeper.SetDelegation(suite.ctx, selfDelegation)
-				
+
 				// Set supernode delegation (also insufficient)
 				supernodeDelegation := stakingtypes.Delegation{
 					DelegatorAddress: supernodeAccAddr.String(),
@@ -715,8 +715,8 @@ func (suite *KeeperIntegrationSuite) TestAfterDelegationModifiedHook() {
 			execute: func() error {
 				// Trigger the hook with the supernode account as the delegator
 				return suite.keeper.Hooks().AfterDelegationModified(
-					suite.ctx, 
-					sdk.AccAddress([]byte("supernode_dm_insuf")), 
+					suite.ctx,
+					sdk.AccAddress([]byte("supernode_dm_insuf")),
 					sdk.ValAddress("validator_dm_insuf"),
 				)
 			},
@@ -725,8 +725,8 @@ func (suite *KeeperIntegrationSuite) TestAfterDelegationModifiedHook() {
 				if !found {
 					return fmt.Errorf("SuperNode not found")
 				}
-				if result.States[len(result.States)-1].State != types2.SuperNodeStateDisabled {
-					return fmt.Errorf("expected SuperNode to be disabled, got %s", result.States[len(result.States)-1].State.String())
+				if result.States[len(result.States)-1].State != types2.SuperNodeStateStopped {
+					return fmt.Errorf("expected SuperNode to be stopped, got %s", result.States[len(result.States)-1].State.String())
 				}
 				return nil
 			},

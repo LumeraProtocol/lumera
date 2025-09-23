@@ -17,6 +17,7 @@ import (
 	pruningtypes "cosmossdk.io/store/pruning/types"
 
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
+	claimtyp "github.com/LumeraProtocol/lumera/x/claim/types"
 	abci "github.com/cometbft/cometbft/abci/types"
 	cmttypes "github.com/cometbft/cometbft/types"
 	dbm "github.com/cosmos/cosmos-db"
@@ -198,6 +199,12 @@ func SetupWithGenesisValSet(
 	app, genesisState := setup(t, chainID, true, 5, opts...)
 	genesisState, err := GenesisStateWithValSet(app.AppCodec(), genesisState, valSet, genAccs, balances...)
 	require.NoError(t, err)
+
+	// Override claim module genesis in tests to avoid external CSV dependency
+	// by setting TotalClaimableAmount to 0.
+	// Force claim module genesis to zero amount to avoid CSV dependency in tests
+	claimGen := claimtyp.NewGenesisState(claimtyp.DefaultParams(), []claimtyp.ClaimRecord{}, 0, claimtyp.DefaultClaimsDenom)
+	genesisState[claimtyp.ModuleName] = app.AppCodec().MustMarshalJSON(claimGen)
 
 	stateBytes, err := json.MarshalIndent(genesisState, "", " ")
 	require.NoError(t, err)

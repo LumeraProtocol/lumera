@@ -31,8 +31,8 @@ func (s *SuperNode) Validate() error {
 	}
 
 	// Check if version is not empty
-	if s.Version == "" {
-		s.Version = DefaultVersion
+	if s.Note == "" {
+		s.Note = DefaultVersion
 	}
 
 	// Check if state is valid (not unspecified)

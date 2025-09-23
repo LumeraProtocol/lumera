@@ -23,7 +23,7 @@ func TestMsgServer_StopSupernode(t *testing.T) {
 	existingSupernode := types2.SuperNode{
 		SupernodeAccount: otherCreatorAddr.String(),
 		ValidatorAddress: valAddr.String(),
-		Version:          "1.0.0",
+		Note:             "1.0.0",
 		PrevIpAddresses: []*types2.IPAddressHistory{
 			{
 				Address: "192.145.1.1",
@@ -58,10 +58,31 @@ func TestMsgServer_StopSupernode(t *testing.T) {
 
 			},
 			expectedError: nil,
-			checkResult: func(t *testing.T, k keeper2.Keeper, ctx sdk.Context) {
-				_, found := k.QuerySuperNode(ctx, valAddr)
-				require.True(t, found)
-			},
+        checkResult: func(t *testing.T, k keeper2.Keeper, ctx sdk.Context) {
+            _, found := k.QuerySuperNode(ctx, valAddr)
+            require.True(t, found)
+
+            // Verify event attributes
+            evs := ctx.EventManager().Events()
+            foundEvt := false
+            for _, e := range evs {
+                if e.Type != types2.EventTypeSupernodeStopped {
+                    continue
+                }
+                kv := map[string]string{}
+                for _, a := range e.Attributes {
+                    kv[string(a.Key)] = string(a.Value)
+                }
+                if kv[types2.AttributeKeyValidatorAddress] == valAddr.String() &&
+                    kv[types2.AttributeKeyReason] == "maintenance" &&
+                    kv[types2.AttributeKeyOldState] == types2.SuperNodeStateActive.String() &&
+                    kv[types2.AttributeKeyHeight] != "" {
+                    foundEvt = true
+                    break
+                }
+            }
+            require.True(t, foundEvt, "stop event with expected attributes not found")
+        },
 		},
 		{
 			name: "invalid validator address",

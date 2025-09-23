@@ -22,7 +22,7 @@ func TestKeeper_ListSuperNodes(t *testing.T) {
 	sn1 := types2.SuperNode{
 		ValidatorAddress: valAddr.String(),
 		SupernodeAccount: creatorAddr.String(),
-		Version:          "1.0.0",
+		Note:             "1.0.0",
 		PrevIpAddresses: []*types2.IPAddressHistory{
 			{
 				Address: "1022.145.1.1",
@@ -40,7 +40,7 @@ func TestKeeper_ListSuperNodes(t *testing.T) {
 	sn2 := types2.SuperNode{
 		ValidatorAddress: sdk.ValAddress([]byte("val2")).String(),
 		SupernodeAccount: creatorAddr.String(),
-		Version:          "2.0.0",
+		Note:             "2.0.0",
 		PrevIpAddresses: []*types2.IPAddressHistory{
 			{
 				Address: "1022.145.1.1",

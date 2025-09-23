@@ -28,7 +28,7 @@ func TestKeeper_SetAndQuerySuperNode(t *testing.T) {
 	supernode := types2.SuperNode{
 		ValidatorAddress: valAddr.String(),
 		SupernodeAccount: sdk.AccAddress(valAddr).String(),
-		Version:          "1.0.0",
+		Note:             "1.0.0",
 		PrevIpAddresses: []*types2.IPAddressHistory{
 			{
 				Address: "1022.145.1.1",
@@ -132,7 +132,7 @@ func TestKeeper_GetAllSuperNodes(t *testing.T) {
 	sn1 := types2.SuperNode{
 		SupernodeAccount: accAddr,
 		ValidatorAddress: valAddr1.String(),
-		Version:          "1.0.0",
+		Note:             "1.0.0",
 		States: []*types2.SuperNodeStateRecord{
 			{
 				State:  types2.SuperNodeStateActive,
@@ -151,7 +151,7 @@ func TestKeeper_GetAllSuperNodes(t *testing.T) {
 	sn2 := types2.SuperNode{
 		SupernodeAccount: accAddr,
 		ValidatorAddress: valAddr2.String(),
-		Version:          "2.0.0",
+		Note:             "2.0.0",
 		States: []*types2.SuperNodeStateRecord{
 			{
 				State:  types2.SuperNodeStateActive,
@@ -312,7 +312,7 @@ func makeSuperNodeWithOneState(valIndex int, state types2.SuperNodeState) types2
 	sn := types2.SuperNode{
 		ValidatorAddress: valAddr.String(),
 		SupernodeAccount: accAddr.String(),
-		Version:          "1.0.0",
+		Note:             "1.0.0",
 		// Must have at least one record so we don't skip it
 		States: []*types2.SuperNodeStateRecord{
 			{
@@ -515,12 +515,12 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 
 	// Test cases
 	testCases := []struct {
-		name                 string
-		validator            *stakingtypes.Validator
-		selfDelegationFound  bool
-		selfDelegationShares sdkmath.LegacyDec
-		setupSupernode       bool
-		supernodeDelegationFound bool
+		name                      string
+		validator                 *stakingtypes.Validator
+		selfDelegationFound       bool
+		selfDelegationShares      sdkmath.LegacyDec
+		setupSupernode            bool
+		supernodeDelegationFound  bool
 		supernodeDelegationShares sdkmath.LegacyDec
 
 		expectErr bool
@@ -533,7 +533,7 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 				Status:          stakingtypes.Unbonded,
 			},
 			selfDelegationFound: false,
-			setupSupernode: false,
+			setupSupernode:      false,
 			expectErr:           true,
 			errSubstr:           "no self-delegation",
 		},
@@ -547,7 +547,7 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 			},
 			selfDelegationFound:  true,
 			selfDelegationShares: sdkmath.LegacyNewDec(500000),
-			setupSupernode: false,
+			setupSupernode:       false,
 			expectErr:            true,
 			errSubstr:            "does not meet minimum stake requirement",
 		},
@@ -561,7 +561,7 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 			},
 			selfDelegationFound:  true,
 			selfDelegationShares: sdkmath.LegacyNewDec(1000000),
-			setupSupernode: false,
+			setupSupernode:       false,
 			expectErr:            false,
 		},
 		{
@@ -574,7 +574,7 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 			},
 			selfDelegationFound:  true,
 			selfDelegationShares: sdkmath.LegacyNewDec(500000),
-			setupSupernode: false,
+			setupSupernode:       false,
 			expectErr:            true,
 			errSubstr:            "no self-stake available",
 		},
@@ -586,12 +586,12 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 				DelegatorShares: sdkmath.LegacyNewDec(1000000),
 				Tokens:          sdkmath.NewInt(1000000),
 			},
-			selfDelegationFound:  true,
-			selfDelegationShares: sdkmath.LegacyNewDec(500000),
-			setupSupernode: true,
-			supernodeDelegationFound: true,
+			selfDelegationFound:       true,
+			selfDelegationShares:      sdkmath.LegacyNewDec(500000),
+			setupSupernode:            true,
+			supernodeDelegationFound:  true,
 			supernodeDelegationShares: sdkmath.LegacyNewDec(500000),
-			expectErr:            false,
+			expectErr:                 false,
 		},
 		{
 			name: "validator with insufficient self-delegation and insufficient supernode delegation => error",
@@ -601,13 +601,13 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 				DelegatorShares: sdkmath.LegacyNewDec(1000000),
 				Tokens:          sdkmath.NewInt(1000000),
 			},
-			selfDelegationFound:  true,
-			selfDelegationShares: sdkmath.LegacyNewDec(400000),
-			setupSupernode: true,
-			supernodeDelegationFound: true,
+			selfDelegationFound:       true,
+			selfDelegationShares:      sdkmath.LegacyNewDec(400000),
+			setupSupernode:            true,
+			supernodeDelegationFound:  true,
 			supernodeDelegationShares: sdkmath.LegacyNewDec(400000),
-			expectErr:            true,
-			errSubstr:            "does not meet minimum stake requirement",
+			expectErr:                 true,
+			errSubstr:                 "does not meet minimum stake requirement",
 		},
 		{
 			name: "validator with no self-delegation but sufficient supernode delegation => error",
@@ -617,12 +617,12 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 				DelegatorShares: sdkmath.LegacyNewDec(1000000),
 				Tokens:          sdkmath.NewInt(1000000),
 			},
-			selfDelegationFound:  false,
-			setupSupernode: true,
-			supernodeDelegationFound: true,
+			selfDelegationFound:       false,
+			setupSupernode:            true,
+			supernodeDelegationFound:  true,
 			supernodeDelegationShares: sdkmath.LegacyNewDec(1000000),
-			expectErr:            true,
-			errSubstr:            "no self-delegation",
+			expectErr:                 true,
+			errSubstr:                 "no self-delegation",
 		},
 	}
 
@@ -648,7 +648,7 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 						}
 						return stakingtypes.Delegation{}, errors.New("no self-delegation")
 					}
-					
+
 					// Check if this is a call for supernode delegation
 					if tc.setupSupernode && tc.supernodeDelegationFound && delAddr.String() == supernodeAccString {
 						return stakingtypes.Delegation{
@@ -657,13 +657,13 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 							Shares:           tc.supernodeDelegationShares,
 						}, nil
 					}
-					
+
 					return stakingtypes.Delegation{}, errors.New("delegation not found")
 				}).
 				AnyTimes()
 
 			k, ctx := setupKeeperForTest(t, stakingKeeper, slashingKeeper, bankKeeper)
-			
+
 			// If the test case includes a supernode, set it up in the store
 			if tc.setupSupernode {
 				supernode := types2.SuperNode{
@@ -681,13 +681,13 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 							Height:  1,
 						},
 					},
-					Version: "1.0.0",
+					Note:    "1.0.0",
 					P2PPort: "4445",
 				}
 				err := k.SetSuperNode(ctx, supernode)
 				require.NoError(t, err)
 			}
-			
+
 			msgServer := keeper2.NewMsgServerImpl(k)
 
 			// Call the function

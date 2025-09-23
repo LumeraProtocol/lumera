@@ -200,7 +200,7 @@ type ModuleInputs struct {
 	AccountKeeper      types2.AccountKeeper
 	BankKeeper         types2.BankKeeper
 	StakingKeeper      types2.StakingKeeper
-	distributionKeeper types2.DistributionKeeper
+	DistributionKeeper types2.DistributionKeeper
 	SupernodeKeeper    types2.SupernodeKeeper
 }
 
@@ -225,7 +225,7 @@ func ProvideModule(in ModuleInputs) ModuleOutputs {
 		in.BankKeeper,
 		in.AccountKeeper,
 		in.StakingKeeper,
-		in.distributionKeeper,
+		in.DistributionKeeper,
 		in.SupernodeKeeper,
 	)
 	m := NewAppModule(
@@ -234,7 +234,7 @@ func ProvideModule(in ModuleInputs) ModuleOutputs {
 		in.AccountKeeper,
 		in.BankKeeper,
 		in.StakingKeeper,
-		in.distributionKeeper,
+		in.DistributionKeeper,
 		in.SupernodeKeeper,
 	)
 

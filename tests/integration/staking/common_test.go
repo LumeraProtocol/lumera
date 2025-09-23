@@ -97,7 +97,8 @@ func initFixture(t testing.TB) *fixture {
 	)
 	cdc := moduletestutil.MakeTestEncodingConfig(auth.AppModuleBasic{}, staking.AppModuleBasic{}).Codec
 
-	logger := log.NewTestLogger(t)
+	// Reduce noise but keep info/warn/error in logs
+	logger := log.NewTestLoggerInfo(t)
 	cms := integration.CreateMultiStore(keys, logger)
 
 	newCtx := sdk.NewContext(cms, cmtprototypes.Header{}, true, logger)

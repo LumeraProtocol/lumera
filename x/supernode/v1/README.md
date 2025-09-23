@@ -33,20 +33,12 @@ The Genesis State defines the initial state of the Supernode module. Below is a 
 
 ```go
 type GenesisState struct {
-    Params               Params       // Module parameters
-    Supernodes           []SuperNode  // List of initial supernodes
-    Evidence             []Evidence   // Initial evidence records
-    CurrentVersions      []string     // List of compatible software versions
-    PerformanceThresholds MetricsThresholds // Performance thresholds for monitoring
+    Params Params // Module parameters
 }
 ```
 
 Key implementation aspects:
-- Parameters are initialized with safe defaults
-- No supernodes are active at genesis
-- Compatible versions list can be pre-populated
-- Evidence storage is initially empty
-- Performance thresholds are set to reasonable defaults
+- Parameters are initialized from genesis
 
 ## Components
 
@@ -54,14 +46,15 @@ Key implementation aspects:
 
 ```go
 type SuperNode struct {
-    ValidatorAddress string                 // Validator operator address
-    States           []SuperNodeStateRecord // State history records
-    Evidence         []Evidence             // Evidence of behavior/violations
-    PrevIpAddresses  []IPAddressHistory    // History of IP addresses
-    Version          string                 // Software version
-    Metrics          MetricsAggregate      // Performance metrics
-    SupernodeAccount string                 // Associated account for delegations
-    P2pPort          string                 // P2P network port
+    ValidatorAddress      string                      // Validator operator address
+    States                []SuperNodeStateRecord      // State history records
+    Evidence              []Evidence                  // Evidence of behavior/violations
+    PrevIpAddresses       []IPAddressHistory         // History of IP addresses
+    Note                  string                      // Optional operator note (free-form)
+    Metrics               MetricsAggregate           // Performance metrics
+    SupernodeAccount      string                      // Associated account for delegations
+    PrevSupernodeAccounts []SupernodeAccountHistory  // History of supernode accounts
+    P2PPort               string                      // P2P network port
 }
 ```
 
@@ -69,7 +62,7 @@ Key implementation details:
 - Each supernode is linked to exactly one validator
 - State changes are recorded with timestamps and block heights
 - Evidence collection helps maintain accountability
-- Version tracking ensures compatible software is running
+- Note is an optional, free-form field for operator comments or release notes
 - Metrics aggregation provides performance insights
 
 ### 2. SuperNodeState
@@ -78,17 +71,19 @@ Key implementation details:
 enum SuperNodeState {
     SUPERNODE_STATE_UNSPECIFIED = 0; // Default, unused state
     SUPERNODE_STATE_ACTIVE = 1;      // Operational and processing actions
-    SUPERNODE_STATE_DISABLED = 2;    // Registered but not operational
+    SUPERNODE_STATE_DISABLED = 2;    // Terminal state - requires re-registration
     SUPERNODE_STATE_STOPPED = 3;     // Temporarily deactivated
     SUPERNODE_STATE_PENALIZED = 4;   // Penalized for violations
 }
 ```
 
 State transitions follow specific rules:
-- New supernodes start in DISABLED state
-- Only DISABLED supernodes can transition to ACTIVE
-- ACTIVE supernodes can be STOPPED by operator or PENALIZED by the system
-- STOPPED supernodes can return to ACTIVE if eligibility requirements are met
+- New supernodes start in ACTIVE state upon registration
+- DISABLED is a terminal state set only by deregistration (permanent removal)
+- STOPPED is a temporary state; can restart with StartSupernode (only from STOPPED)
+- Re-registration of a DISABLED supernode changes state to ACTIVE (other fields unchanged); use UpdateSupernode for field changes
+- ACTIVE supernodes can be STOPPED by operator or hooks
+- Hooks only transition between ACTIVE and STOPPED; they never set DISABLED and never re-activate from DISABLED
 - PENALIZED supernodes may require governance intervention to return to service
 
 ### 3. Evidence
@@ -118,20 +113,24 @@ Evidence is used to:
 1. **Registration**:
    - Validator operator submits a registration transaction
    - System validates eligibility requirements
-   - Supernode is created in DISABLED state
+   - Supernode is created in ACTIVE state
 
-2. **Activation**:
-   - Operator submits activation request
-   - System verifies current eligibility
-   - State changes to ACTIVE
-   - Supernode joins the active set
+2. **Re-registration** (for disabled supernodes):
+   - Only changes state from DISABLED to ACTIVE
+   - Does not update IP address, account, or other fields
+   - Use UpdateSupernode message to update fields
 
-3. **Deactivation**:
-   - Operator submits deactivation request
+3. **Deactivation (STOPPED)**:
+   - Operator submits stop request or hooks trigger on ineligibility/unbonding
    - State changes to STOPPED
-   - Supernode leaves the active set
+   - Supernode leaves the active set; can be restarted with StartSupernode
 
-4. **Penalization**:
+4. **Deregistration (DISABLED)**:
+   - Operator submits deregistration request
+   - State changes to DISABLED (terminal state)
+   - Requires re-registration to become ACTIVE again; hooks will not re-activate a DISABLED supernode
+
+5. **Penalization**:
    - Evidence of violations triggers automatic or governance review
    - If threshold is reached, state changes to PENALIZED
    - Possible slashing of stake occurs
@@ -144,10 +143,11 @@ Registers a new supernode:
 
 ```protobuf
 message MsgRegisterSupernode {
-    string validator_address = 1; // Validator operator address
-    string ip_address = 2;       // IP address for supernode operations
-    string account = 3;          // Optional supernode account
-    string p2p_port = 4;         // P2P communication port
+    string creator           = 1; // Signer; must be validator operator
+    string validator_address = 2; // Validator operator address
+    string ip_address        = 3; // IP address for supernode operations
+    string supernode_account = 4; // Optional supernode account
+    string p2p_port          = 5; // P2P communication port
 }
 ```
 
@@ -159,74 +159,78 @@ Validation:
 - Sender must be validator operator
 - Validator must meet minimum stake requirement
 - Validator must not be jailed
-- IP address must be valid and not already registered
+- IP address must be valid
 
 ### MsgDeregisterSupernode
 
-Removes a supernode registration:
+Permanently disables a supernode (terminal state):
 
 ```protobuf
 message MsgDeregisterSupernode {
-    string validator_address = 1; // Validator operator address
+    string creator           = 1; // Signer; must be validator operator
+    string validator_address = 2; // Validator operator address
 }
 ```
 
 Validation:
 - Sender must be validator operator
 - Supernode must exist
+- Sets state to DISABLED (requires re-registration to reactivate)
 
 ### MsgStartSupernode
 
-Activates a registered supernode:
+Activates a registered supernode (no field updates):
 
 ```protobuf
 message MsgStartSupernode {
-    string validator_address = 1; // Validator operator address
-    string version = 2;          // Software version
+    string creator           = 1; // Signer; must be validator operator
+    string validator_address = 2; // Validator operator address
 }
 ```
 
 Validation:
 - Sender must be validator operator
-- Supernode must be in DISABLED or STOPPED state
-- Validator must meet minimum stake requirement
-- Validator must not be jailed
-- Version must be compatible
+- Supernode must be in STOPPED state (DISABLED requires re-registration)
 
 ### MsgStopSupernode
 
-Deactivates an active supernode:
+Temporarily stops an active supernode:
 
 ```protobuf
 message MsgStopSupernode {
-    string validator_address = 1; // Validator operator address
-    string reason = 2;           // Reason for stopping
+    string creator           = 1; // Signer; must be validator operator
+    string validator_address = 2; // Validator operator address
+    string reason            = 3; // Reason for stopping
 }
 ```
 
 Validation:
 - Sender must be validator operator
 - Supernode must be in ACTIVE state
+- Sets state to STOPPED (can be restarted with StartSupernode)
 
 ### MsgUpdateSupernode
 
-Updates supernode information:
+Updates supernode information (idempotent, append-only history for selected fields):
 
 ```protobuf
 message MsgUpdateSupernode {
-    string validator_address = 1; // Validator operator address
-    string ip_address = 2;       // New IP address
-    string version = 3;          // New software version
-    string account = 4;          // New supernode account
-    string p2p_port = 5;         // New P2P port
+    string creator           = 1;  // Signer; must be validator operator
+    string validator_address = 2;  // Validator operator address
+    string ip_address        = 3;  // Optional new IP address
+    string note              = 4;  // Optional operator note 
+    string supernode_account = 5;  // Optional new supernode account
+    string p2p_port          = 6;  // Optional new P2P port
 }
 ```
 
-Validation:
+Validation and effects:
 - Sender must be validator operator
 - Supernode must exist
-- IP address must be valid if provided
-- Version must be compatible if provided
+- If `ip_address` provided: appended to `PrevIpAddresses` with current height (dedup consecutive)
+- If `supernode_account` provided and valid bech32: appended to `PrevSupernodeAccounts` with height; emits old/new account attributes
+- If `note` provided: replaces `Note` (no history kept)
+- If `p2p_port` provided: replaces `P2PPort`
 
 ### MsgUpdateParams
 
@@ -254,14 +258,18 @@ Attributes:
 - ip_address: Assigned IP address
 - supernode_account: Associated account if any
 - height: Block height of registration
+ - re_registered: "true" if this is a re-registration
+ - old_state: Previous state when re-registering (e.g. "disabled")
+ - p2p_port: P2P port value
 ```
 
-### EventTypeSupernodeDeregistered
+### EventTypeSupernodeDeRegistered
 
 Emitted when a supernode is deregistered:
 ```
 Attributes:
 - validator_address: Validator operator address
+- old_state: Previous state before disabling
 - height: Block height of deregistration
 ```
 
@@ -271,7 +279,11 @@ Emitted when a supernode is activated:
 ```
 Attributes:
 - validator_address: Validator operator address
-- version: Software version
+- reason: Optional reason for starting, examples:
+  - tx_start (operator invoked start tx)
+  - validator_bonded_eligible (hook: validator bonded and meets requirements)
+  - delegation_modified_eligible (hook: stake meets requirements after delegation change)
+- old_state: Previous state before activation (e.g. "stopped")
 - height: Block height of activation
 ```
 
@@ -281,7 +293,13 @@ Emitted when a supernode is deactivated:
 ```
 Attributes:
 - validator_address: Validator operator address
-- reason: Reason for stopping
+- reason: Reason for stopping, examples:
+  - operator-provided string (from stop tx)
+  - validator_bonded_not_eligible (hook: bonded but not eligible)
+  - validator_begin_unbonding (hook: began unbonding)
+  - delegation_modified_not_eligible (hook: stake below minimum after delegation change)
+  - validator_removed (hook: validator removed)
+- old_state: Previous state before deactivation (e.g. "active")
 - height: Block height of deactivation
 ```
 
@@ -293,6 +311,12 @@ Attributes:
 - validator_address: Validator operator address
 - fields_updated: List of updated fields
 - height: Block height of update
+ - old_account: Previous supernode account (when supernode_account changes)
+ - new_account: New supernode account (when supernode_account changes)
+ - old_p2p_port: Previous P2P port (when p2p_port changes)
+ - p2p_port: New P2P port (when p2p_port changes)
+ - old_ip_address: Previous IP (when ip_address changes)
+- ip_address: New IP (when ip_address changes)
 ```
 
 ### EventTypeSupernodePenalized
@@ -307,17 +331,19 @@ Attributes:
 - height: Block height of penalty
 ```
 
+Note: This event is documented as planned; emission is not implemented yet in the current codebase.
+
 ## Parameters
 
 ```protobuf
 message Params {
-    uint64 minimum_stake_for_sn = 1;       // Minimum stake required
-    uint64 reporting_threshold = 2;         // Threshold for reporting
-    uint64 slashing_threshold = 3;          // Threshold for slashing
-    MetricsThresholds metrics_thresholds = 4; // Performance thresholds
-    uint64 evidence_retention_period = 5;   // Evidence retention in blocks
-    string slashing_fraction = 6;           // Fraction of stake to slash
-    uint64 inactivity_penalty_period = 7;   // Blocks before inactivity penalty
+    cosmos.base.v1beta1.Coin minimum_stake_for_sn = 1; // Minimum stake required
+    uint64                    reporting_threshold   = 2; // Threshold for reporting
+    uint64                    slashing_threshold    = 3; // Threshold for slashing
+    string                    metrics_thresholds    = 4; // Performance thresholds (encoded)
+    string                    evidence_retention_period = 5; // Retention window
+    string                    slashing_fraction     = 6; // Fraction of stake to slash
+    string                    inactivity_penalty_period = 7; // Penalty window
 }
 ```
 
@@ -368,7 +394,6 @@ lumerad tx supernode deregister \
 
 # Start a supernode
 lumerad tx supernode start \
-  --version=[version] \
   --from=[validator-key] \
   --chain-id=[chain-id]
 
@@ -381,8 +406,8 @@ lumerad tx supernode stop \
 # Update a supernode
 lumerad tx supernode update \
   --ip-address=[ip] \
-  --version=[version] \
-  --account=[account] \
+  --note=[text] \
+  --supernode-account=[account] \
   --p2p-port=[port] \
   --from=[validator-key] \
   --chain-id=[chain-id]

@@ -1,0 +1,13 @@
+syntax = "proto3";
+package lumera.supernode;
+
+option go_package = "github.com/LumeraProtocol/lumera/x/supernode/v1/types";
+
+import "google/protobuf/timestamp.proto";
+import "gogoproto/gogo.proto";
+import "cosmos_proto/cosmos.proto";
+
+message SupernodeAccountHistory {
+  string account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"]; 
+  int64 height = 2; 
+}

@@ -27,7 +27,7 @@ func TestSuperNodeValidation(t *testing.T) {
 				ValidatorAddress: valAddr.String(),
 				SupernodeAccount: accAddr.String(),
 				Evidence:         []*types2.Evidence{},
-				Version:          "1.0.0",
+				Note:             "1.0.0",
 				Metrics: &types2.MetricsAggregate{
 					Metrics:     make(map[string]float64),
 					ReportCount: 0,
@@ -53,7 +53,7 @@ func TestSuperNodeValidation(t *testing.T) {
 			supernode: types2.SuperNode{
 				SupernodeAccount: accAddr.String(),
 				ValidatorAddress: "invalid",
-				Version:          "1.0.0",
+				Note:             "1.0.0",
 			},
 			expectError: true,
 		},
@@ -62,7 +62,7 @@ func TestSuperNodeValidation(t *testing.T) {
 			supernode: types2.SuperNode{
 				ValidatorAddress: valAddr.String(),
 				SupernodeAccount: accAddr.String(),
-				Version:          "1.0.0",
+				Note:             "1.0.0",
 				States: []*types2.SuperNodeStateRecord{
 					{
 						State:  types2.SuperNodeStateActive,
@@ -78,17 +78,17 @@ func TestSuperNodeValidation(t *testing.T) {
 			supernode: types2.SuperNode{
 				SupernodeAccount: accAddr.String(),
 				ValidatorAddress: valAddr.String(),
-				Version:          "1.0.0",
+				Note:             "1.0.0",
 			},
 			expectError: true,
 			errorType:   types2.ErrInvalidSuperNodeState,
 		},
 		{
-			name: "empty version",
+			name: "empty Note",
 			supernode: types2.SuperNode{
 				SupernodeAccount: accAddr.String(),
 				ValidatorAddress: valAddr.String(),
-				Version:          "",
+				Note:             "",
 				States: []*types2.SuperNodeStateRecord{
 					{
 						State:  types2.SuperNodeStateActive,
@@ -110,7 +110,7 @@ func TestSuperNodeValidation(t *testing.T) {
 				ValidatorAddress: valAddr.String(),
 				SupernodeAccount: accAddr.String(),
 				Evidence:         []*types2.Evidence{},
-				Version:          "1.0.0",
+				Note:             "1.0.0",
 				Metrics: &types2.MetricsAggregate{
 					Metrics:     make(map[string]float64),
 					ReportCount: 0,

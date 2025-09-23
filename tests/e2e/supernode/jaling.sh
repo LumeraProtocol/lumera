@@ -47,7 +47,7 @@ log "Step 4: Checking initial validator status..."
 log_cmd "docker exec lumera-validator1 lumerad query staking validator $VALIDATOR_OPERATOR"
 
 log "Checking initial supernode status..."
-log_cmd "docker exec lumera-validator1 lumerad query supernode get-super-node $VALIDATOR_OPERATOR"
+log_cmd "docker exec lumera-validator1 lumerad query supernode get-supernode $VALIDATOR_OPERATOR"
 
 # Step 5: Stop Validator to Force Jailing
 log "Step 5: Stopping validator container to force jailing..."
@@ -61,7 +61,7 @@ log "Step 6: Checking validator status after jailing..."
 log_cmd "docker exec lumera-validator1 lumerad query staking validator $VALIDATOR_OPERATOR"
 
 log "Checking supernode status after jailing..."
-log_cmd "docker exec lumera-validator1 lumerad query supernode get-super-node $VALIDATOR_OPERATOR"
+log_cmd "docker exec lumera-validator1 lumerad query supernode get-supernode $VALIDATOR_OPERATOR"
 
 # Step 7: Restart Validator
 log "Step 7: Restarting validator container..."
@@ -90,7 +90,7 @@ log "Checking final validator status..."
 log_cmd "docker exec lumera-validator1 lumerad query staking validator $VALIDATOR_OPERATOR"
 
 log "Checking final supernode status..."
-log_cmd "docker exec lumera-validator1 lumerad query supernode get-super-node $VALIDATOR_OPERATOR"
+log_cmd "docker exec lumera-validator1 lumerad query supernode get-supernode $VALIDATOR_OPERATOR"
 
 # Step 10: Complete
 log "Test completed successfully. All output has been saved to $LOG_FILE"

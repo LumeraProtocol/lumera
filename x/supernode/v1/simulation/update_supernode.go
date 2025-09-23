@@ -82,7 +82,7 @@ func SimulateMsgUpdateSupernode(
 			ValidatorAddress: validatorAddress,
 			IpAddress:        ipAddress,
 			SupernodeAccount: supernodeAccount,
-			Version:          version,
+			Note:             version,
 		}
 
 		// Execute the message

@@ -4,14 +4,18 @@ import (
 	"encoding/json"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 // GetSuperNodeResponse queries and returns a supernode response
 func GetSuperNodeResponse(t *testing.T, cli *LumeradCli, validatorAddr string) *types.SuperNode {
+	// Give the node a brief moment to finalize state before querying
+	time.Sleep(10 * time.Second)
+
 	queryCmd := []string{
-		"q", "supernode", "get-super-node",
+		"q", "supernode", "get-supernode",
 		validatorAddr,
 	}
 	queryResp := cli.CustomQuery(queryCmd...)
@@ -55,6 +59,20 @@ func GetSuperNodeResponse(t *testing.T, cli *LumeradCli, validatorAddr string) *
 					t.Fatal(err)
 				}
 				addrMap["height"] = height
+			}
+		}
+	}
+
+	// Convert height in prev_supernode_accounts
+	if supernodeAccounts, ok := supernodeData["prev_supernode_accounts"].([]interface{}); ok {
+		for _, acc := range supernodeAccounts {
+			accMap := acc.(map[string]interface{})
+			if heightStr, ok := accMap["height"].(string); ok {
+				height, err := strconv.ParseInt(heightStr, 10, 64)
+				if err != nil {
+					t.Fatal(err)
+				}
+				accMap["height"] = height
 			}
 		}
 	}

@@ -52,9 +52,8 @@ func TestQueryGetTopSuperNodesForBlock(t *testing.T) {
 	args := []string{
 		"query",
 		"supernode",
-		"get-top-super-nodes-for-block",
+		"get-top-supernodes-for-block",
 		fmt.Sprint(queryHeight),
-		"--output", "json",
 	}
 
 	// Get initial response to compare against
@@ -173,7 +172,7 @@ func TestQueryGetTopSuperNodesForBlockFlags(t *testing.T) {
 			args := []string{
 				"query",
 				"supernode",
-				"get-top-super-nodes-for-block",
+				"get-top-supernodes-for-block",
 				fmt.Sprint(queryHeight),
 				"--output", "json",
 			}

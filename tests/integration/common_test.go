@@ -298,7 +298,8 @@ func createTestInput(
 		capabilitytypes.StoreKey, feegrant.StoreKey, authzkeeper.StoreKey,
 		types.StoreKey,
 	)
-	logger := log.NewTestLogger(t)
+	// Use test logger at info level to keep errors/warnings
+	logger := log.NewTestLoggerInfo(t)
 	ms := store.NewCommitMultiStore(db, logger, storemetrics.NewNoOpMetrics())
 	for _, v := range keys {
 		ms.MountStoreWithDB(v, storetypes.StoreTypeIAVL, db)
@@ -318,7 +319,7 @@ func createTestInput(
 	ctx := sdk.NewContext(ms, tmproto.Header{
 		Height: 1234567,
 		Time:   time.Date(2020, time.April, 22, 12, 0, 0, 0, time.UTC),
-	}, isCheckTx, log.NewNopLogger())
+	}, isCheckTx, logger)
 	ctx = types.WithTXCounter(ctx, 0)
 
 	encodingConfig := wasmKeeper.MakeEncodingConfig(t)

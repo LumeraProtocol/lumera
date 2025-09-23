@@ -20,23 +20,29 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 				},
 				{
 					RpcMethod:      "GetSuperNode",
-					Use:            "get-super-node [validator-address]",
-					Short:          "Query get-super-node",
+					Use:            "get-supernode [validator-address]",
+					Short:          "Query get-supernode",
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validatorAddress"}},
+				},
+				{
+					RpcMethod:      "GetSuperNodeBySuperNodeAddress",
+					Use:            "get-supernode-by-address [supernode-address]",
+					Short:          "Query supernode by supernode address",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "supernodeAddress"}},
 				},
 
 				{
 					RpcMethod:      "ListSuperNodes",
-					Use:            "list-super-nodes",
-					Short:          "Query list-super-nodes",
+					Use:            "list-supernodes",
+					Short:          "Query list-supernodes",
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{},
 				},
 
 				{
 					RpcMethod: "GetTopSuperNodesForBlock",
-					Use:       "get-top-super-nodes-for-block [block-height]",
-					Short:     "Query get-top-super-nodes-for-block",
-					Long: "Query get-top-super-nodes-for-block with the following states:\n" +
+					Use:       "get-top-supernodes-for-block [block-height]",
+					Short:     "Query get-top-supernodes-for-block",
+					Long: "Query get-top-supernodes-for-block with the following states:\n" +
 						"  - SUPERNODE_STATE_ACTIVE\n" +
 						"  - SUPERNODE_STATE_DISABLED\n" +
 						"  - SUPERNODE_STATE_STOPPED\n" +
@@ -102,9 +108,16 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 				},
 				{
 					RpcMethod:      "UpdateSupernode",
-					Use:            "update-supernode [validator-address] [ip-address] [version] [supernode-account]",
+					Use:            "update-supernode [validator-address] [ip-address] [note] [supernode-account]",
 					Short:          "Send an update-supernode tx",
-					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validatorAddress"}, {ProtoField: "ipAddress"}, {ProtoField: "version"}, {ProtoField: "supernodeAccount"}},
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validatorAddress"}, {ProtoField: "ipAddress"}, {ProtoField: "note"}, {ProtoField: "supernodeAccount"}},
+					FlagOptions: map[string]*autocliv1.FlagOptions{
+						"p2p_port": {
+							Name:         "p2p-port",
+							Usage:        "Optional P2P port for supernode communication",
+							DefaultValue: types.DefaultP2PPort,
+						},
+					},
 				},
 				// this line is used by ignite scaffolding # autocli/tx
 			},

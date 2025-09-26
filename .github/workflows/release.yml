@@ -91,7 +91,7 @@ jobs:
 
       - name: Build with Ignite CLI
         run: |
-          ./ignite chain build --release --release.prefix ${{ steps.vars.outputs.tarball_prefix }} -y -t linux:amd64 #-t darwin:amd64 -t darwin:arm64 -y
+          ./ignite chain build --clear-cache --release --release.prefix ${{ steps.vars.outputs.tarball_prefix }} -y -t linux:amd64 #-t darwin:amd64 -t darwin:arm64 -y
         env:
           DO_NOT_TRACK: 1
           GOFLAGS: "-buildvcs=false"
@@ -209,7 +209,7 @@ jobs:
           unset GOMODCACHE
           
           # Build with only /usr/lib in RUNPATH
-          CGO_LDFLAGS="-Wl,-rpath,/usr/lib -Wl,--disable-new-dtags" ./ignite chain build --release --release.prefix ${{ steps.vars.outputs.tarball_prefix }} -y -t linux:amd64
+          CGO_LDFLAGS="-Wl,-rpath,/usr/lib -Wl,--disable-new-dtags" ./ignite chain build --clear-cache --release --release.prefix ${{ steps.vars.outputs.tarball_prefix }} -y -t linux:amd64
         env:
           DO_NOT_TRACK: 1
           GOFLAGS: "-buildvcs=false"

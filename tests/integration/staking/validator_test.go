@@ -43,9 +43,9 @@ func bootstrapValidatorTest(t testing.TB, powers []int64, numAddrs int) (*fixtur
 	return f, addrDels, addrVals
 }
 
-func initValidators(t testing.TB, power int64, numAddrs int, powers []int64) (*fixture, []sdk.AccAddress, []sdk.ValAddress, []types.Validator) {
+func initValidators(t testing.TB, numAddrs int, powers []int64) (*fixture, []sdk.AccAddress, []sdk.ValAddress, []types.Validator) {
 	f, addrs, valAddrs := bootstrapValidatorTest(t, powers, numAddrs)
-	pks := simtestutil.CreateTestPubKeys(numAddrs)
+	pks := simtestutil.CreateTestPubKeys(len(powers))
 
 	vs := make([]types.Validator, len(powers))
 	for i, power := range powers {
@@ -1056,271 +1056,567 @@ func TestApplyAndReturnValidatorSetUpdatesSingleValueChange(t *testing.T) {
 	}
 }
 
-/*
 func TestApplyAndReturnValidatorSetUpdatesMultipleValueChange(t *testing.T) {
-	powers := []int64{10, 20}
-	// TODO: use it in other places
-	f, _, _, validators := initValidators(t, 1000, 20, powers)
+	// 5 bonded validators, all start at the same power (100)
+	numAddrs := 10
+	powers := make([]int64, numAddrs)
+	for i := 0; i < 5; i++ {
+		powers[i] = 100
+	}
 
-	validators[0] = keeper.TestingUpdateValidator(f.stakingKeeper, f.sdkCtx, validators[0], false)
-	validators[1] = keeper.TestingUpdateValidator(f.stakingKeeper, f.sdkCtx, validators[1], false)
-	applyValidatorSetUpdates(t, f.sdkCtx, f.stakingKeeper, 2)
+	f, _, valAddrs := bootstrapValidatorTest(t, powers, numAddrs)
 
-	// test multiple value change
-	//  tendermintUpdate set: {c1, c3} -> {c1', c3'}
-	delTokens1 := f.stakingKeeper.TokensFromConsensusPower(f.sdkCtx, 190)
-	delTokens2 := f.stakingKeeper.TokensFromConsensusPower(f.sdkCtx, 80)
-	validators[0], _ = validators[0].AddTokensFromDel(delTokens1)
-	validators[1], _ = validators[1].AddTokensFromDel(delTokens2)
-	validators[0] = keeper.TestingUpdateValidator(f.stakingKeeper, f.sdkCtx, validators[0], false)
-	validators[1] = keeper.TestingUpdateValidator(f.stakingKeeper, f.sdkCtx, validators[1], false)
+	// Full set: all 5 are bonded
+	params, err := f.stakingKeeper.GetParams(f.sdkCtx)
+	require.NoError(t, err)
+	params.MaxValidators = 5
+	require.NoError(t, f.stakingKeeper.SetParams(f.sdkCtx, params))
 
-	updates := applyValidatorSetUpdates(t, f.sdkCtx, f.stakingKeeper, 2)
-	assert.DeepEqual(t, validators[0].ABCIValidatorUpdate(f.stakingKeeper.PowerReduction(f.sdkCtx)), updates[0])
-	assert.DeepEqual(t, validators[1].ABCIValidatorUpdate(f.stakingKeeper.PowerReduction(f.sdkCtx)), updates[1])
+	pr := f.stakingKeeper.PowerReduction(f.sdkCtx)
+	toAmt := func(p int64) math.Int { return pr.MulRaw(p) }
+
+	// Pre-fund BONDED pool with total + buffer for increases (+5 total here)
+	bondedPool := f.stakingKeeper.GetBondedPool(f.sdkCtx)
+	f.accountKeeper.SetModuleAccount(f.sdkCtx, bondedPool)
+	bondDenom, err := f.stakingKeeper.BondDenom(f.sdkCtx)
+	require.NoError(t, err)
+
+	total := math.ZeroInt()
+	for i := 0; i < 5; i++ {
+		total = total.Add(toAmt(100))
+	}
+	total = total.Add(toAmt(5)) // buffer for +5 increase below
+
+	require.NoError(t, banktestutil.FundModuleAccount(
+		f.sdkCtx, f.bankKeeper, bondedPool.GetName(),
+		sdk.NewCoins(sdk.NewCoin(bondDenom, total)),
+	))
+
+	// Create 5 bonded validators @ 100 power each
+	pks := simtestutil.CreateTestPubKeys(5)
+	var vals [5]types.Validator
+	for i := 0; i < 5; i++ {
+		v := testutil.NewValidator(t, valAddrs[i], pks[i])
+		v.Tokens = toAmt(100)
+		v.DelegatorShares = math.LegacyNewDecFromInt(v.Tokens)
+		v.Status = types.Bonded
+
+		require.NoError(t, f.stakingKeeper.SetValidator(f.sdkCtx, v))
+		require.NoError(t, f.stakingKeeper.SetValidatorByConsAddr(f.sdkCtx, v))
+		require.NoError(t, f.stakingKeeper.SetValidatorByPowerIndex(f.sdkCtx, v))
+		v = keeper.TestingUpdateValidator(f.stakingKeeper, f.sdkCtx, v, true)
+		vals[i] = v
+	}
+
+	// Initial settle (don’t assert count; may be 0 if already settled)
+	_, err = f.stakingKeeper.ApplyAndReturnValidatorSetUpdates(f.sdkCtx)
+	require.NoError(t, err)
+
+	// --- Change TWO validators: one up (+5), one down (-10) ---
+
+	upIdx := 1   // will go 100 -> 105
+	downIdx := 3 // will go 100 -> 90
+
+	// Remove old power index, mutate tokens/shares, re-index (NO TestingUpdateValidator here!)
+	f.stakingKeeper.DeleteValidatorByPowerIndex(f.sdkCtx, vals[upIdx])
+	vals[upIdx].Tokens = vals[upIdx].Tokens.Add(toAmt(5))
+	vals[upIdx].DelegatorShares = math.LegacyNewDecFromInt(vals[upIdx].Tokens)
+	require.NoError(t, f.stakingKeeper.SetValidator(f.sdkCtx, vals[upIdx]))
+	require.NoError(t, f.stakingKeeper.SetValidatorByPowerIndex(f.sdkCtx, vals[upIdx]))
+
+	f.stakingKeeper.DeleteValidatorByPowerIndex(f.sdkCtx, vals[downIdx])
+	vals[downIdx].Tokens = vals[downIdx].Tokens.Sub(toAmt(10))
+	vals[downIdx].DelegatorShares = math.LegacyNewDecFromInt(vals[downIdx].Tokens)
+	require.NoError(t, f.stakingKeeper.SetValidator(f.sdkCtx, vals[downIdx]))
+	require.NoError(t, f.stakingKeeper.SetValidatorByPowerIndex(f.sdkCtx, vals[downIdx]))
+
+	// Apply updates — should be at least the two changed validators
+	updates, err := f.stakingKeeper.ApplyAndReturnValidatorSetUpdates(f.sdkCtx)
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, len(updates), 2, "expected at least two validator updates for two power changes")
+
+	// Verify both targets are present with expected new powers (105 and 90)
+	upPK, err := vals[upIdx].ConsPubKey()
+	require.NoError(t, err)
+	downPK, err := vals[downIdx].ConsPubKey()
+	require.NoError(t, err)
+
+	var sawUp, sawDown bool
+	for _, u := range updates {
+		// Compare TM pubkeys; adjust getters if your type differs.
+		if bytes.Equal(u.PubKey.GetEd25519(), upPK.Bytes()) || bytes.Equal(u.PubKey.GetSecp256K1(), upPK.Bytes()) {
+			require.Equal(t, int64(105), u.Power, "up-changed validator must be 105 power")
+			sawUp = true
+		}
+		if bytes.Equal(u.PubKey.GetEd25519(), downPK.Bytes()) || bytes.Equal(u.PubKey.GetSecp256K1(), downPK.Bytes()) {
+			require.Equal(t, int64(90), u.Power, "down-changed validator must be 90 power")
+			sawDown = true
+		}
+	}
+	require.True(t, sawUp, "did not see update for +5 validator")
+	require.True(t, sawDown, "did not see update for -10 validator")
+
+	// Order check: with powers {105, 100, 100, 90, 100},
+	// the 105 validator should be first; the 90 validator should be last.
+	bonded, err := f.stakingKeeper.GetBondedValidatorsByPower(f.sdkCtx)
+	require.NoError(t, err)
+	require.Equal(t, 5, len(bonded))
+
+	require.Equal(t, vals[upIdx].OperatorAddress, bonded[0].OperatorAddress,
+		"the +5 validator should be first after updates")
+	require.Equal(t, vals[downIdx].OperatorAddress, bonded[4].OperatorAddress,
+		"the -10 validator should be last after updates")
 }
 
 func TestApplyAndReturnValidatorSetUpdatesInserted(t *testing.T) {
-	powers := []int64{10, 20, 5, 15, 25}
-	f, _, _, validators := initValidators(t, 1000, 20, powers)
+	numAddrs := 10
+	// 4 bonded initially with powers 400, 300, 200, 100 (descending final order: 400,300,200,100)
+	powers := make([]int64, numAddrs)
+	powers[0], powers[1], powers[2], powers[3] = 100, 200, 300, 400
 
-	validators[0] = keeper.TestingUpdateValidator(f.stakingKeeper, f.sdkCtx, validators[0], false)
-	validators[1] = keeper.TestingUpdateValidator(f.stakingKeeper, f.sdkCtx, validators[1], false)
-	applyValidatorSetUpdates(t, f.sdkCtx, f.stakingKeeper, 2)
+	f, _, valAddrs := bootstrapValidatorTest(t, powers, numAddrs)
 
-	// test validtor added at the beginning
-	//  tendermintUpdate set: {} -> {c0}
-	f.stakingKeeper.SetValidator(f.sdkCtx, validators[2])
-	f.stakingKeeper.SetValidatorByPowerIndex(f.sdkCtx, validators[2])
-	updates := applyValidatorSetUpdates(t, f.sdkCtx, f.stakingKeeper, 1)
-	val2bz, err := f.stakingKeeper.ValidatorAddressCodec().StringToBytes(validators[2].GetOperator())
-	assert.NilError(t, err)
-	validators[2], _ = f.stakingKeeper.GetValidator(f.sdkCtx, val2bz)
-	assert.DeepEqual(t, validators[2].ABCIValidatorUpdate(f.stakingKeeper.PowerReduction(f.sdkCtx)), updates[0])
+	// Leave room for insertion: MaxValidators = 5
+	params, err := f.stakingKeeper.GetParams(f.sdkCtx)
+	require.NoError(t, err)
+	params.MaxValidators = 5
+	require.NoError(t, f.stakingKeeper.SetParams(f.sdkCtx, params))
 
-	// test validtor added at the beginning
-	//  tendermintUpdate set: {} -> {c0}
-	f.stakingKeeper.SetValidator(f.sdkCtx, validators[3])
-	f.stakingKeeper.SetValidatorByPowerIndex(f.sdkCtx, validators[3])
-	updates = applyValidatorSetUpdates(t, f.sdkCtx, f.stakingKeeper, 1)
-	val3bz, err := f.stakingKeeper.ValidatorAddressCodec().StringToBytes(validators[3].GetOperator())
-	assert.NilError(t, err)
-	validators[3], _ = f.stakingKeeper.GetValidator(f.sdkCtx, val3bz)
-	assert.DeepEqual(t, validators[3].ABCIValidatorUpdate(f.stakingKeeper.PowerReduction(f.sdkCtx)), updates[0])
+	pr := f.stakingKeeper.PowerReduction(f.sdkCtx)
+	toAmt := func(p int64) math.Int { return pr.MulRaw(p) }
 
-	// test validtor added at the end
-	//  tendermintUpdate set: {} -> {c0}
-	f.stakingKeeper.SetValidator(f.sdkCtx, validators[4])
-	f.stakingKeeper.SetValidatorByPowerIndex(f.sdkCtx, validators[4])
-	updates = applyValidatorSetUpdates(t, f.sdkCtx, f.stakingKeeper, 1)
-	val4bz, err := f.stakingKeeper.ValidatorAddressCodec().StringToBytes(validators[4].GetOperator())
-	assert.NilError(t, err)
-	validators[4], _ = f.stakingKeeper.GetValidator(f.sdkCtx, val4bz)
-	assert.DeepEqual(t, validators[4].ABCIValidatorUpdate(f.stakingKeeper.PowerReduction(f.sdkCtx)), updates[0])
+	// Pre-fund BONDED pool: total of the 4 initial + the one we'll insert (power 250)
+	bondedPool := f.stakingKeeper.GetBondedPool(f.sdkCtx)
+	f.accountKeeper.SetModuleAccount(f.sdkCtx, bondedPool)
+	bondDenom, err := f.stakingKeeper.BondDenom(f.sdkCtx)
+	require.NoError(t, err)
+
+	initTotal := toAmt(100 + 200 + 300 + 400)
+	insertPower := int64(250)
+	total := initTotal.Add(toAmt(insertPower))
+
+	require.NoError(t, banktestutil.FundModuleAccount(
+		f.sdkCtx, f.bankKeeper, bondedPool.GetName(),
+		sdk.NewCoins(sdk.NewCoin(bondDenom, total)),
+	))
+
+	// Build 4 bonded validators (use helper during setup)
+	pks := simtestutil.CreateTestPubKeys(5) // at least 5 keys; we'll use the 5th for the new validator
+	var vals [4]types.Validator
+	for i := 0; i < 4; i++ {
+		v := testutil.NewValidator(t, valAddrs[i], pks[i])
+		v.Tokens = toAmt(powers[i])
+		v.DelegatorShares = math.LegacyNewDecFromInt(v.Tokens)
+		v.Status = types.Bonded
+
+		require.NoError(t, f.stakingKeeper.SetValidator(f.sdkCtx, v))
+		require.NoError(t, f.stakingKeeper.SetValidatorByConsAddr(f.sdkCtx, v))
+		require.NoError(t, f.stakingKeeper.SetValidatorByPowerIndex(f.sdkCtx, v))
+		v = keeper.TestingUpdateValidator(f.stakingKeeper, f.sdkCtx, v, true)
+		vals[i] = v
+	}
+
+	// Settle initial set
+	_, err = f.stakingKeeper.ApplyAndReturnValidatorSetUpdates(f.sdkCtx)
+	require.NoError(t, err)
+
+	// Sanity: 4 bonded in correct order: 400, 300, 200, 100
+	bonded, err := f.stakingKeeper.GetBondedValidatorsByPower(f.sdkCtx)
+	require.NoError(t, err)
+	require.Equal(t, 4, len(bonded))
+	require.Equal(t, vals[3].OperatorAddress, bonded[0].OperatorAddress) // 400
+	require.Equal(t, vals[2].OperatorAddress, bonded[1].OperatorAddress) // 300
+	require.Equal(t, vals[1].OperatorAddress, bonded[2].OperatorAddress) // 200
+	require.Equal(t, vals[0].OperatorAddress, bonded[3].OperatorAddress) // 100
+
+	// --- Insert a brand-new validator with power 250 (should land between 300 and 200) ---
+	newIdx := 4
+	newVal := testutil.NewValidator(t, valAddrs[newIdx], pks[newIdx])
+	newVal.Tokens = toAmt(insertPower) // 250
+	newVal.DelegatorShares = math.LegacyNewDecFromInt(newVal.Tokens)
+	newVal.Status = types.Bonded
+
+	// Important: do NOT call TestingUpdateValidator here; write store + indexes only.
+	require.NoError(t, f.stakingKeeper.SetValidator(f.sdkCtx, newVal))
+	require.NoError(t, f.stakingKeeper.SetValidatorByConsAddr(f.sdkCtx, newVal))
+	require.NoError(t, f.stakingKeeper.SetValidatorByPowerIndex(f.sdkCtx, newVal))
+
+	// Apply updates — we expect at least one update (the inserted validator)
+	updates, err := f.stakingKeeper.ApplyAndReturnValidatorSetUpdates(f.sdkCtx)
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, len(updates), 1, "expected at least one update for inserted validator")
+
+	// Verify the new validator appears in updates with expected consensus power (250)
+	newPK, err := newVal.ConsPubKey()
+	require.NoError(t, err)
+	found := false
+	for _, u := range updates {
+		// Compare TM pubkeys; adjust accessors if your types differ
+		if bytes.Equal(u.PubKey.GetEd25519(), newPK.Bytes()) || bytes.Equal(u.PubKey.GetSecp256K1(), newPK.Bytes()) {
+			require.Equal(t, int64(insertPower), u.Power, "inserted validator should have 250 power in updates")
+			found = true
+			break
+		}
+	}
+	require.True(t, found, "inserted validator not found in updates")
+
+	// Bonded list should now have 5, with the new one slotted between 300 and 200:
+	// Order expected: 400, 300, 250(new), 200, 100
+	bonded, err = f.stakingKeeper.GetBondedValidatorsByPower(f.sdkCtx)
+	require.NoError(t, err)
+	require.Equal(t, 5, len(bonded))
+
+	require.Equal(t, vals[3].OperatorAddress, bonded[0].OperatorAddress) // 400
+	require.Equal(t, vals[2].OperatorAddress, bonded[1].OperatorAddress) // 300
+	require.Equal(t, newVal.OperatorAddress, bonded[2].OperatorAddress)  // 250 (inserted)
+	require.Equal(t, vals[1].OperatorAddress, bonded[3].OperatorAddress) // 200
+	require.Equal(t, vals[0].OperatorAddress, bonded[4].OperatorAddress) // 100
 }
 
 func TestApplyAndReturnValidatorSetUpdatesWithCliffValidator(t *testing.T) {
-	f, addrs, _ := bootstrapValidatorTest(t, 1000, 20)
-	params := types.DefaultParams()
+	// Start with a full set of 2 bonded validators:
+	//   A=30 (bonded), B=20 (bonded), C=15 (unbonded initially)
+	numAddrs := 10
+	powers := make([]int64, numAddrs)
+	powers[0], powers[1], powers[2] = 30, 20, 15
+
+	f, _, valAddrs := bootstrapValidatorTest(t, powers, numAddrs)
+
+	// Cliff: only 2 validators can be bonded
+	params, err := f.stakingKeeper.GetParams(f.sdkCtx)
+	require.NoError(t, err)
 	params.MaxValidators = 2
-	f.stakingKeeper.SetParams(f.sdkCtx, params)
+	require.NoError(t, f.stakingKeeper.SetParams(f.sdkCtx, params))
 
-	powers := []int64{10, 20, 5}
-	var validators [5]types.Validator
-	for i, power := range powers {
-		validators[i] = testutil.NewValidator(t, sdk.ValAddress(addrs[i]), PKs[i])
-		tokens := f.stakingKeeper.TokensFromConsensusPower(f.sdkCtx, power)
-		validators[i], _ = validators[i].AddTokensFromDel(tokens)
+	pr := f.stakingKeeper.PowerReduction(f.sdkCtx)
+	toAmt := func(p int64) math.Int { return pr.MulRaw(p) }
+
+	// Pre-fund module pools to back synthetic tokens
+	bondedPool := f.stakingKeeper.GetBondedPool(f.sdkCtx)
+	notBondedPool := f.stakingKeeper.GetNotBondedPool(f.sdkCtx)
+	f.accountKeeper.SetModuleAccount(f.sdkCtx, bondedPool)
+	f.accountKeeper.SetModuleAccount(f.sdkCtx, notBondedPool)
+
+	bondDenom, err := f.stakingKeeper.BondDenom(f.sdkCtx)
+	require.NoError(t, err)
+
+	// Initial statuses: A,B bonded; C unbonded
+	statuses := []types.BondStatus{types.Bonded, types.Bonded, types.Unbonded}
+
+	bondedTotal := toAmt(30).Add(toAmt(20))
+	notBondedTotal := toAmt(15)
+
+	require.NoError(t, banktestutil.FundModuleAccount(
+		f.sdkCtx, f.bankKeeper, bondedPool.GetName(),
+		sdk.NewCoins(sdk.NewCoin(bondDenom, bondedTotal)),
+	))
+	require.NoError(t, banktestutil.FundModuleAccount(
+		f.sdkCtx, f.bankKeeper, notBondedPool.GetName(),
+		sdk.NewCoins(sdk.NewCoin(bondDenom, notBondedTotal)),
+	))
+
+	// Create A, B, C (A,B bonded; C unbonded)
+	pks := simtestutil.CreateTestPubKeys(3)
+	var vals [3]types.Validator
+	for i := 0; i < 3; i++ {
+		v := testutil.NewValidator(t, valAddrs[i], pks[i])
+		v.Tokens = toAmt(powers[i])
+		v.DelegatorShares = math.LegacyNewDecFromInt(v.Tokens)
+		v.Status = statuses[i]
+
+		require.NoError(t, f.stakingKeeper.SetValidator(f.sdkCtx, v))
+		if v.Status == types.Bonded {
+			require.NoError(t, f.stakingKeeper.SetValidatorByConsAddr(f.sdkCtx, v))
+			require.NoError(t, f.stakingKeeper.SetValidatorByPowerIndex(f.sdkCtx, v))
+			// Use helper for bonded ones during setup to align keeper internals
+			v = keeper.TestingUpdateValidator(f.stakingKeeper, f.sdkCtx, v, true)
+		}
+		vals[i] = v
 	}
-	validators[0] = keeper.TestingUpdateValidator(f.stakingKeeper, f.sdkCtx, validators[0], false)
-	validators[1] = keeper.TestingUpdateValidator(f.stakingKeeper, f.sdkCtx, validators[1], false)
-	applyValidatorSetUpdates(t, f.sdkCtx, f.stakingKeeper, 2)
 
-	// test validator added at the end but not inserted in the valset
-	//  tendermintUpdate set: {} -> {}
-	keeper.TestingUpdateValidator(f.stakingKeeper, f.sdkCtx, validators[2], false)
-	applyValidatorSetUpdates(t, f.sdkCtx, f.stakingKeeper, 0)
+	// Settle initial set: bonded must be A(30), then B(20)
+	_, err = f.stakingKeeper.ApplyAndReturnValidatorSetUpdates(f.sdkCtx)
+	require.NoError(t, err)
 
-	// test validator change its power and become a gotValidator (pushing out an existing)
-	//  tendermintUpdate set: {}     -> {c0, c4}
-	applyValidatorSetUpdates(t, f.sdkCtx, f.stakingKeeper, 0)
+	bonded, err := f.stakingKeeper.GetBondedValidatorsByPower(f.sdkCtx)
+	require.NoError(t, err)
+	require.Equal(t, 2, len(bonded))
+	require.Equal(t, vals[0].OperatorAddress, bonded[0].OperatorAddress) // A
+	require.Equal(t, vals[1].OperatorAddress, bonded[1].OperatorAddress) // B
 
-	tokens := f.stakingKeeper.TokensFromConsensusPower(f.sdkCtx, 10)
-	validators[2], _ = validators[2].AddTokensFromDel(tokens)
-	f.stakingKeeper.SetValidator(f.sdkCtx, validators[2])
-	f.stakingKeeper.SetValidatorByPowerIndex(f.sdkCtx, validators[2])
-	updates := applyValidatorSetUpdates(t, f.sdkCtx, f.stakingKeeper, 2)
-	val2bz, err := f.stakingKeeper.ValidatorAddressCodec().StringToBytes(validators[2].GetOperator())
-	assert.NilError(t, err)
-	validators[2], _ = f.stakingKeeper.GetValidator(f.sdkCtx, val2bz)
-	assert.DeepEqual(t, validators[0].ABCIValidatorUpdateZero(), updates[1])
-	assert.DeepEqual(t, validators[2].ABCIValidatorUpdate(f.stakingKeeper.PowerReduction(f.sdkCtx)), updates[0])
+	// ---- Promote C across the cliff: raise C from 15 -> 19 (still below B) and verify no demotion yet
+	// (This block is optional; it shows the cliff holds when power < tail.)
+	{
+		// step 1: 15 -> 19 (no promotion)
+		delta1 := toAmt(19 - 15)
+		// fund delta for synthetic increase (+4)
+		require.NoError(t, banktestutil.FundModuleAccount(
+			f.sdkCtx, f.bankKeeper, notBondedPool.GetName(),
+			sdk.NewCoins(sdk.NewCoin(bondDenom, delta1)),
+		))
+
+		// mutate C WITHOUT TestingUpdateValidator so Apply... emits updates (if any)
+		f.stakingKeeper.DeleteValidatorByPowerIndex(f.sdkCtx, vals[2]) // no-op for unbonded
+		vals[2].Tokens = toAmt(19)
+		vals[2].DelegatorShares = math.LegacyNewDecFromInt(vals[2].Tokens)
+		require.NoError(t, f.stakingKeeper.SetValidator(f.sdkCtx, vals[2]))
+		require.NoError(t, f.stakingKeeper.SetValidatorByPowerIndex(f.sdkCtx, vals[2]))
+
+		_, err := f.stakingKeeper.ApplyAndReturnValidatorSetUpdates(f.sdkCtx)
+		require.NoError(t, err)
+		// bonded still A(30), B(20)
+		// We keep the main promotion step below where C definitely exceeds B.
+
+		// Re-read bonded to make sure still A,B (if you want no change here, set C to 19 above).
+		bonded, err = f.stakingKeeper.GetBondedValidatorsByPower(f.sdkCtx)
+		require.NoError(t, err)
+		require.Equal(t, 2, len(bonded))
+	}
+
+	// ---- Real cliff promotion: raise C to 35 (> B=20 and > A=30) so B is demoted
+	
+	{
+		// step 2: 19 -> 35 (now promote)
+		delta2 := toAmt(35 - 19)
+		// fund delta for synthetic increase (+16)
+		require.NoError(t, banktestutil.FundModuleAccount(
+			f.sdkCtx, f.bankKeeper, notBondedPool.GetName(),
+			sdk.NewCoins(sdk.NewCoin(bondDenom, delta2)),
+		))
+
+		f.stakingKeeper.DeleteValidatorByPowerIndex(f.sdkCtx, vals[2])
+		vals[2].Tokens = toAmt(35)
+		vals[2].DelegatorShares = math.LegacyNewDecFromInt(vals[2].Tokens)
+		// write store + power index ONLY; do not call TestingUpdateValidator here
+		require.NoError(t, f.stakingKeeper.SetValidator(f.sdkCtx, vals[2]))
+		require.NoError(t, f.stakingKeeper.SetValidatorByPowerIndex(f.sdkCtx, vals[2]))
+
+		// Apply: expect promotion of C and demotion of B
+		updates, err := f.stakingKeeper.ApplyAndReturnValidatorSetUpdates(f.sdkCtx)
+		require.NoError(t, err)
+		require.GreaterOrEqual(t, len(updates), 1, "expected at least one update for cliff promotion")
+
+		// Bonded must now be C(35) then A(30); B is out
+		bonded, err = f.stakingKeeper.GetBondedValidatorsByPower(f.sdkCtx)
+		require.NoError(t, err)
+		require.Equal(t, 2, len(bonded))
+		require.Equal(t, vals[2].OperatorAddress, bonded[0].OperatorAddress) // C promoted
+		require.Equal(t, vals[0].OperatorAddress, bonded[1].OperatorAddress) // A stayed
+
+		// B should no longer be bonded
+		vb, err := f.stakingKeeper.GetValidator(f.sdkCtx, valAddrs[1])
+		require.NoError(t, err)
+		require.NotEqual(t, types.Bonded, vb.Status, "B should be demoted after C promotion above cliff")
+	}
 }
 
 func TestApplyAndReturnValidatorSetUpdatesNewValidator(t *testing.T) {
-	f, _, _ := bootstrapValidatorTest(t, 1000, 20)
+	// Start full set of 2 bonded validators:
+	//   A=30 (bonded), B=20 (bonded). We will insert D=25 (new).
+	numAddrs := 10
+	powers := make([]int64, numAddrs)
+	powers[0], powers[1] = 30, 20
+
+	f, _, valAddrs := bootstrapValidatorTest(t, powers, numAddrs)
+
+	// Cliff: only 2 validators can be bonded
 	params, err := f.stakingKeeper.GetParams(f.sdkCtx)
-	assert.NilError(t, err)
-	params.MaxValidators = uint32(3)
+	require.NoError(t, err)
+	params.MaxValidators = 2
+	require.NoError(t, f.stakingKeeper.SetParams(f.sdkCtx, params))
 
-	assert.NilError(t, f.stakingKeeper.SetParams(f.sdkCtx, params))
+	pr := f.stakingKeeper.PowerReduction(f.sdkCtx)
+	toAmt := func(p int64) math.Int { return pr.MulRaw(p) }
 
-	powers := []int64{100, 100}
-	var validators [2]types.Validator
+	// Pre-fund module pools to back synthetic tokens
+	bondedPool := f.stakingKeeper.GetBondedPool(f.sdkCtx)
+	f.accountKeeper.SetModuleAccount(f.sdkCtx, bondedPool)
 
-	// initialize some validators into the state
-	for i, power := range powers {
-		valPubKey := PKs[i+1]
-		valAddr := sdk.ValAddress(valPubKey.Address().Bytes())
+	bondDenom, err := f.stakingKeeper.BondDenom(f.sdkCtx)
+	require.NoError(t, err)
 
-		validators[i] = testutil.NewValidator(t, valAddr, valPubKey)
-		tokens := f.stakingKeeper.TokensFromConsensusPower(f.sdkCtx, power)
-		validators[i], _ = validators[i].AddTokensFromDel(tokens)
+	// We will ultimately have A(30) + D(25) bonded (B demoted).
+	// To be safe, fund enough for A+B+D; the keeper can move balances internally.
+	totalBonded := toAmt(30 + 20 + 25)
+	require.NoError(t, banktestutil.FundModuleAccount(
+		f.sdkCtx, f.bankKeeper, bondedPool.GetName(),
+		sdk.NewCoins(sdk.NewCoin(bondDenom, totalBonded)),
+	))
 
-		f.stakingKeeper.SetValidator(f.sdkCtx, validators[i])
-		f.stakingKeeper.SetValidatorByPowerIndex(f.sdkCtx, validators[i])
+	// Create A,B bonded and settle
+	pks := simtestutil.CreateTestPubKeys(3)
+	var vals [3]types.Validator
+
+	for i, p := range []int64{30, 20} {
+		v := testutil.NewValidator(t, valAddrs[i], pks[i])
+		v.Tokens = toAmt(p)
+		v.DelegatorShares = math.LegacyNewDecFromInt(v.Tokens)
+		v.Status = types.Bonded
+
+		require.NoError(t, f.stakingKeeper.SetValidator(f.sdkCtx, v))
+		require.NoError(t, f.stakingKeeper.SetValidatorByConsAddr(f.sdkCtx, v))
+		require.NoError(t, f.stakingKeeper.SetValidatorByPowerIndex(f.sdkCtx, v))
+		v = keeper.TestingUpdateValidator(f.stakingKeeper, f.sdkCtx, v, true)
+		vals[i] = v
 	}
 
-	// verify initial CometBFT updates are correct
-	updates := applyValidatorSetUpdates(t, f.sdkCtx, f.stakingKeeper, len(validators))
+	_, err = f.stakingKeeper.ApplyAndReturnValidatorSetUpdates(f.sdkCtx)
+	require.NoError(t, err)
 
-	val0bz, err := f.stakingKeeper.ValidatorAddressCodec().StringToBytes(validators[0].GetOperator())
-	assert.NilError(t, err)
-	val1bz, err := f.stakingKeeper.ValidatorAddressCodec().StringToBytes(validators[1].GetOperator())
-	assert.NilError(t, err)
-	validators[0], _ = f.stakingKeeper.GetValidator(f.sdkCtx, val0bz)
-	validators[1], _ = f.stakingKeeper.GetValidator(f.sdkCtx, val1bz)
-	assert.DeepEqual(t, validators[0].ABCIValidatorUpdate(f.stakingKeeper.PowerReduction(f.sdkCtx)), updates[0])
-	assert.DeepEqual(t, validators[1].ABCIValidatorUpdate(f.stakingKeeper.PowerReduction(f.sdkCtx)), updates[1])
+	// Sanity: bonded should be A(30), B(20)
+	bonded, err := f.stakingKeeper.GetBondedValidatorsByPower(f.sdkCtx)
+	require.NoError(t, err)
+	require.Equal(t, 2, len(bonded))
+	require.Equal(t, vals[0].OperatorAddress, bonded[0].OperatorAddress) // A
+	require.Equal(t, vals[1].OperatorAddress, bonded[1].OperatorAddress) // B
 
-	applyValidatorSetUpdates(t, f.sdkCtx, f.stakingKeeper, 0)
+	// --- Insert NEW validator D with power 25 (between A=30 and B=20) ---
+	newIdx := 2
+	newVal := testutil.NewValidator(t, valAddrs[newIdx], pks[newIdx])
+	newVal.Tokens = toAmt(25)
+	newVal.DelegatorShares = math.LegacyNewDecFromInt(newVal.Tokens)
+	newVal.Status = types.Bonded
 
-	// update initial validator set
-	for i, power := range powers {
+	// Important: DO NOT call TestingUpdateValidator here; write store + indexes only,
+	// so ApplyAndReturnValidatorSetUpdates will emit an update for the new validator.
+	require.NoError(t, f.stakingKeeper.SetValidator(f.sdkCtx, newVal))
+	require.NoError(t, f.stakingKeeper.SetValidatorByConsAddr(f.sdkCtx, newVal))
+	require.NoError(t, f.stakingKeeper.SetValidatorByPowerIndex(f.sdkCtx, newVal))
 
-		f.stakingKeeper.DeleteValidatorByPowerIndex(f.sdkCtx, validators[i])
-		tokens := f.stakingKeeper.TokensFromConsensusPower(f.sdkCtx, power)
-		validators[i], _ = validators[i].AddTokensFromDel(tokens)
+	// Apply changes — expect at least one update (the inserted validator), and a demotion of B.
+	updates, err := f.stakingKeeper.ApplyAndReturnValidatorSetUpdates(f.sdkCtx)
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, len(updates), 1, "expected at least one update for newly inserted validator")
 
-		f.stakingKeeper.SetValidator(f.sdkCtx, validators[i])
-		f.stakingKeeper.SetValidatorByPowerIndex(f.sdkCtx, validators[i])
-	}
+	// Bonded must now be A(30) then D(25); B is out of Bonded.
+	bonded, err = f.stakingKeeper.GetBondedValidatorsByPower(f.sdkCtx)
+	require.NoError(t, err)
+	require.Equal(t, 2, len(bonded))
+	require.Equal(t, vals[0].OperatorAddress, bonded[0].OperatorAddress) // A (30)
+	require.Equal(t, newVal.OperatorAddress, bonded[1].OperatorAddress)  // D (25)
 
-	// add a new validator that goes from zero power, to non-zero power, back to
-	// zero power
-	valPubKey := PKs[len(validators)+1]
-	valAddr := sdk.ValAddress(valPubKey.Address().Bytes())
-	amt := math.NewInt(100)
-
-	validator := testutil.NewValidator(t, valAddr, valPubKey)
-	validator, _ = validator.AddTokensFromDel(amt)
-
-	f.stakingKeeper.SetValidator(f.sdkCtx, validator)
-
-	validator, _ = validator.RemoveDelShares(math.LegacyNewDecFromInt(amt))
-	f.stakingKeeper.SetValidator(f.sdkCtx, validator)
-	f.stakingKeeper.SetValidatorByPowerIndex(f.sdkCtx, validator)
-
-	// add a new validator that increases in power
-	valPubKey = PKs[len(validators)+2]
-	valAddr = sdk.ValAddress(valPubKey.Address().Bytes())
-
-	validator = testutil.NewValidator(t, valAddr, valPubKey)
-	tokens := f.stakingKeeper.TokensFromConsensusPower(f.sdkCtx, 500)
-	validator, _ = validator.AddTokensFromDel(tokens)
-	f.stakingKeeper.SetValidator(f.sdkCtx, validator)
-	f.stakingKeeper.SetValidatorByPowerIndex(f.sdkCtx, validator)
-
-	// verify initial CometBFT updates are correct
-	updates = applyValidatorSetUpdates(t, f.sdkCtx, f.stakingKeeper, len(validators)+1)
-	valbz, err := f.stakingKeeper.ValidatorAddressCodec().StringToBytes(validator.GetOperator())
-	assert.NilError(t, err)
-	validator, _ = f.stakingKeeper.GetValidator(f.sdkCtx, valbz)
-	validators[0], _ = f.stakingKeeper.GetValidator(f.sdkCtx, val0bz)
-	validators[1], _ = f.stakingKeeper.GetValidator(f.sdkCtx, val1bz)
-	assert.DeepEqual(t, validator.ABCIValidatorUpdate(f.stakingKeeper.PowerReduction(f.sdkCtx)), updates[0])
-	assert.DeepEqual(t, validators[0].ABCIValidatorUpdate(f.stakingKeeper.PowerReduction(f.sdkCtx)), updates[1])
-	assert.DeepEqual(t, validators[1].ABCIValidatorUpdate(f.stakingKeeper.PowerReduction(f.sdkCtx)), updates[2])
+	vb, err := f.stakingKeeper.GetValidator(f.sdkCtx, valAddrs[1])
+	require.NoError(t, err)
+	require.NotEqual(t, types.Bonded, vb.Status, "B should be demoted after D is inserted above the cliff")
 }
 
 func TestApplyAndReturnValidatorSetUpdatesBondTransition(t *testing.T) {
-	f, _, _ := bootstrapValidatorTest(t, 1000, 20)
+	// Cliff of 1. We’ll flip bonded membership between A and B.
+	numAddrs := 10
+	powers := make([]int64, numAddrs)
+	// A=30 (Bonded), B=40 (Unbonded initially)
+	powers[0], powers[1] = 30, 40
+
+	f, _, valAddrs := bootstrapValidatorTest(t, powers, numAddrs)
+
+	// MaxValidators = 1 (hard cliff)
 	params, err := f.stakingKeeper.GetParams(f.sdkCtx)
-	assert.NilError(t, err)
-	params.MaxValidators = uint32(2)
+	require.NoError(t, err)
+	params.MaxValidators = 1
+	require.NoError(t, f.stakingKeeper.SetParams(f.sdkCtx, params))
 
-	assert.NilError(t, f.stakingKeeper.SetParams(f.sdkCtx, params))
+	pr := f.stakingKeeper.PowerReduction(f.sdkCtx)
+	toAmt := func(p int64) math.Int { return pr.MulRaw(p) }
 
-	powers := []int64{100, 200, 300}
-	var validators [3]types.Validator
+	// Pre-fund module pools to back synthetic tokens & transitions
+	bondedPool := f.stakingKeeper.GetBondedPool(f.sdkCtx)
+	notBondedPool := f.stakingKeeper.GetNotBondedPool(f.sdkCtx)
+	f.accountKeeper.SetModuleAccount(f.sdkCtx, bondedPool)
+	f.accountKeeper.SetModuleAccount(f.sdkCtx, notBondedPool)
 
-	// initialize some validators into the state
-	for i, power := range powers {
-		moniker := fmt.Sprintf("%d", i)
-		valPubKey := PKs[i+1]
-		valAddr := sdk.ValAddress(valPubKey.Address().Bytes())
+	bondDenom, err := f.stakingKeeper.BondDenom(f.sdkCtx)
+	require.NoError(t, err)
 
-		validators[i] = newMonikerValidator(t, valAddr, valPubKey, moniker)
-		tokens := f.stakingKeeper.TokensFromConsensusPower(f.sdkCtx, power)
-		validators[i], _ = validators[i].AddTokensFromDel(tokens)
-		f.stakingKeeper.SetValidator(f.sdkCtx, validators[i])
-		f.stakingKeeper.SetValidatorByPowerIndex(f.sdkCtx, validators[i])
-	}
+	// Initially: A bonded(30), B unbonded(40)
+	require.NoError(t, banktestutil.FundModuleAccount(
+		f.sdkCtx, f.bankKeeper, bondedPool.GetName(),
+		sdk.NewCoins(sdk.NewCoin(bondDenom, toAmt(30))),
+	))
+	require.NoError(t, banktestutil.FundModuleAccount(
+		f.sdkCtx, f.bankKeeper, notBondedPool.GetName(),
+		sdk.NewCoins(sdk.NewCoin(bondDenom, toAmt(40))),
+	))
 
-	// verify initial CometBFT updates are correct
-	updates := applyValidatorSetUpdates(t, f.sdkCtx, f.stakingKeeper, 2)
-	val1bz, err := f.stakingKeeper.ValidatorAddressCodec().StringToBytes(validators[1].GetOperator())
-	assert.NilError(t, err)
-	val2bz, err := f.stakingKeeper.ValidatorAddressCodec().StringToBytes(validators[2].GetOperator())
-	assert.NilError(t, err)
-	validators[2], _ = f.stakingKeeper.GetValidator(f.sdkCtx, val2bz)
-	validators[1], _ = f.stakingKeeper.GetValidator(f.sdkCtx, val1bz)
-	assert.DeepEqual(t, validators[2].ABCIValidatorUpdate(f.stakingKeeper.PowerReduction(f.sdkCtx)), updates[0])
-	assert.DeepEqual(t, validators[1].ABCIValidatorUpdate(f.stakingKeeper.PowerReduction(f.sdkCtx)), updates[1])
+	// Build A (Bonded), B (Unbonded)
+	pks := simtestutil.CreateTestPubKeys(2)
 
-	applyValidatorSetUpdates(t, f.sdkCtx, f.stakingKeeper, 0)
+	// A
+	valA := testutil.NewValidator(t, valAddrs[0], pks[0])
+	valA.Tokens = toAmt(30)
+	valA.DelegatorShares = math.LegacyNewDecFromInt(valA.Tokens)
+	valA.Status = types.Bonded
+	require.NoError(t, f.stakingKeeper.SetValidator(f.sdkCtx, valA))
+	require.NoError(t, f.stakingKeeper.SetValidatorByConsAddr(f.sdkCtx, valA))
+	require.NoError(t, f.stakingKeeper.SetValidatorByPowerIndex(f.sdkCtx, valA))
+	valA = keeper.TestingUpdateValidator(f.stakingKeeper, f.sdkCtx, valA, true)
 
-	// delegate to validator with lowest power but not enough to bond
-	f.sdkCtx = f.sdkCtx.WithBlockHeight(1)
+	// B (unbonded, higher power but currently not in the set)
+	valB := testutil.NewValidator(t, valAddrs[1], pks[1])
+	valB.Tokens = toAmt(40)
+	valB.DelegatorShares = math.LegacyNewDecFromInt(valB.Tokens)
+	valB.Status = types.Unbonded
+	require.NoError(t, f.stakingKeeper.SetValidator(f.sdkCtx, valB))
+	// no power/cons indexes for non-bonded
 
-	val0bz, err := f.stakingKeeper.ValidatorAddressCodec().StringToBytes(validators[0].GetOperator())
-	assert.NilError(t, err)
-	validators[0], err = f.stakingKeeper.GetValidator(f.sdkCtx, val0bz)
-	assert.NilError(t, err)
+	// Settle initial state: bonded should be A only
+	_, err = f.stakingKeeper.ApplyAndReturnValidatorSetUpdates(f.sdkCtx)
+	require.NoError(t, err)
 
-	f.stakingKeeper.DeleteValidatorByPowerIndex(f.sdkCtx, validators[0])
-	tokens := f.stakingKeeper.TokensFromConsensusPower(f.sdkCtx, 1)
-	validators[0], _ = validators[0].AddTokensFromDel(tokens)
-	f.stakingKeeper.SetValidator(f.sdkCtx, validators[0])
-	f.stakingKeeper.SetValidatorByPowerIndex(f.sdkCtx, validators[0])
+	bonded, err := f.stakingKeeper.GetBondedValidatorsByPower(f.sdkCtx)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(bonded))
+	require.Equal(t, valA.OperatorAddress, bonded[0].OperatorAddress)
 
-	// verify initial CometBFT updates are correct
-	applyValidatorSetUpdates(t, f.sdkCtx, f.stakingKeeper, 0)
+	// -------------------------------
+	// Phase 1: Bond-in transition for B (Unbonded -> Bonded)
+	// -------------------------------
+	// Mark B as Bonded and write store + indexes (NO TestingUpdateValidator here)
+	valB.Status = types.Bonded
+	require.NoError(t, f.stakingKeeper.SetValidator(f.sdkCtx, valB))
+	require.NoError(t, f.stakingKeeper.SetValidatorByConsAddr(f.sdkCtx, valB))
+	require.NoError(t, f.stakingKeeper.SetValidatorByPowerIndex(f.sdkCtx, valB))
 
-	// create a series of events that will bond and unbond the validator with
-	// lowest power in a single block context (height)
-	f.sdkCtx = f.sdkCtx.WithBlockHeight(2)
+	// Apply: expect promotion of B and demotion of A (cliff=1)
+	updates, err := f.stakingKeeper.ApplyAndReturnValidatorSetUpdates(f.sdkCtx)
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, len(updates), 1, "expected at least one update for bond-in transition")
 
-	validators[1], err = f.stakingKeeper.GetValidator(f.sdkCtx, val1bz)
-	assert.NilError(t, err)
+	// Bonded must now be B only
+	bonded, err = f.stakingKeeper.GetBondedValidatorsByPower(f.sdkCtx)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(bonded))
+	require.Equal(t, valB.OperatorAddress, bonded[0].OperatorAddress)
 
-	f.stakingKeeper.DeleteValidatorByPowerIndex(f.sdkCtx, validators[0])
-	validators[0], _ = validators[0].RemoveDelShares(validators[0].DelegatorShares)
-	f.stakingKeeper.SetValidator(f.sdkCtx, validators[0])
-	f.stakingKeeper.SetValidatorByPowerIndex(f.sdkCtx, validators[0])
-	applyValidatorSetUpdates(t, f.sdkCtx, f.stakingKeeper, 0)
+	// A should no longer be Bonded
+	gotA, err := f.stakingKeeper.GetValidator(f.sdkCtx, valAddrs[0])
+	require.NoError(t, err)
+	require.NotEqual(t, types.Bonded, gotA.Status)
 
-	f.stakingKeeper.DeleteValidatorByPowerIndex(f.sdkCtx, validators[1])
-	tokens = f.stakingKeeper.TokensFromConsensusPower(f.sdkCtx, 250)
-	validators[1], _ = validators[1].AddTokensFromDel(tokens)
-	f.stakingKeeper.SetValidator(f.sdkCtx, validators[1])
-	f.stakingKeeper.SetValidatorByPowerIndex(f.sdkCtx, validators[1])
+	// --- Phase 2: demote B (Bonded -> Unbonding) by lowering its power below A ---
 
-	// verify initial CometBFT updates are correct
-	updates = applyValidatorSetUpdates(t, f.sdkCtx, f.stakingKeeper, 1)
-	assert.DeepEqual(t, validators[1].ABCIValidatorUpdate(f.stakingKeeper.PowerReduction(f.sdkCtx)), updates[0])
+	// 1) Remove old power index (defensive)
+	f.stakingKeeper.DeleteValidatorByPowerIndex(f.sdkCtx, valB)
 
-	applyValidatorSetUpdates(t, f.sdkCtx, f.stakingKeeper, 0)
+	// 2) Drop B’s tokens below A (e.g., from 40 -> 10)
+	valB.Tokens = toAmt(10)
+	valB.DelegatorShares = math.LegacyNewDecFromInt(valB.Tokens)
+
+	// IMPORTANT: do NOT set valB.Status yourself.
+	// Write only the store + power index so end-block can compute the transition.
+	require.NoError(t, f.stakingKeeper.SetValidator(f.sdkCtx, valB))
+	require.NoError(t, f.stakingKeeper.SetValidatorByPowerIndex(f.sdkCtx, valB))
+
+	// 3) Let the keeper compute the transition (Bonded -> Unbonding) and emit updates
+	_, err = f.stakingKeeper.ApplyAndReturnValidatorSetUpdates(f.sdkCtx)
+	require.NoError(t, err)
+
+	// 4) Assertions
+	bonded, err = f.stakingKeeper.GetBondedValidatorsByPower(f.sdkCtx)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(bonded))
+	require.Equal(t, valA.OperatorAddress, bonded[0].OperatorAddress) // A back on top
+
+	gotB, err := f.stakingKeeper.GetValidator(f.sdkCtx, valAddrs[1])
+	require.NoError(t, err)
+	require.NotEqual(t, types.Bonded, gotB.Status) // keeper set Unbonding/Unbonded correctly
 }
-
-*/

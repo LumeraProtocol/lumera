@@ -204,7 +204,7 @@ func TestKeeper_GetTopSuperNodesForBlock(t *testing.T) {
 			setupState: func() {
 				clearStore()
 				sn1 := types.SuperNode{
-					Version:          "1.0",
+					Note:             "1.0",
 					SupernodeAccount: makeSnAddr("sn1"),
 					ValidatorAddress: makeValAddr("sn1"),
 					States: []*types.SuperNodeStateRecord{
@@ -217,10 +217,11 @@ func TestKeeper_GetTopSuperNodesForBlock(t *testing.T) {
 							Height:  1,
 						},
 					},
+					P2PPort: "26657",
 				}
 
 				sn2 := types.SuperNode{
-					Version:          "1.0",
+					Note:             "1.0",
 					SupernodeAccount: makeSnAddr("sn2"),
 					ValidatorAddress: makeValAddr("sn2"),
 					States: []*types.SuperNodeStateRecord{
@@ -232,10 +233,11 @@ func TestKeeper_GetTopSuperNodesForBlock(t *testing.T) {
 							Height:  1,
 						},
 					},
+					P2PPort: "26657",
 				}
 
 				sn3 := types.SuperNode{
-					Version:          "1.0",
+					Note:             "1.0",
 					SupernodeAccount: makeSnAddr("sn3"),
 					ValidatorAddress: makeValAddr("sn3"),
 					States: []*types.SuperNodeStateRecord{
@@ -248,6 +250,7 @@ func TestKeeper_GetTopSuperNodesForBlock(t *testing.T) {
 							Height:  1,
 						},
 					},
+					P2PPort: "26657",
 				}
 				storeSuperNodes([]types.SuperNode{sn1, sn2, sn3})
 			},
@@ -271,7 +274,7 @@ func TestKeeper_GetTopSuperNodesForBlock(t *testing.T) {
 			setupState: func() {
 				clearStore()
 				sn1 := types.SuperNode{
-					Version:          "1.0",
+					Note:             "1.0",
 					SupernodeAccount: makeSnAddr("sn1"),
 					ValidatorAddress: makeValAddr("sn1"),
 					States: []*types.SuperNodeStateRecord{
@@ -283,6 +286,7 @@ func TestKeeper_GetTopSuperNodesForBlock(t *testing.T) {
 							Height:  1,
 						},
 					},
+					P2PPort: "26657",
 				}
 				storeSuperNodes([]types.SuperNode{sn1})
 			},

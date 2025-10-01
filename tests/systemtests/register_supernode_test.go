@@ -313,6 +313,39 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 			},
 			expectedError: "supernode already exists",
 		},
+		{
+			name:         "re_registration_of_disabled_supernode",
+			minimumStake: "1000000",
+			setupFn: func(t *testing.T, cli *LumeradCli) (string, string, string) {
+				valAddr := strings.TrimSpace(cli.Keys("keys", "show", "node0", "--bech", "val", "-a"))
+				accountAddr := cli.GetKeyAddr("node0")
+				return valAddr, accountAddr, "node0"
+			},
+			additionalSetupFn: func(t *testing.T, cli *LumeradCli, valAddr string, accountAddr string, keyName string) {
+				// Register supernode first
+				registerCmd := []string{
+					"tx", "supernode", "register-supernode",
+					valAddr,
+					"192.168.1.1",
+					accountAddr,
+					"--from", keyName,
+				}
+				resp := cli.CustomCommand(registerCmd...)
+				RequireTxSuccess(t, resp)
+				sut.AwaitNextBlock(t)
+
+				// Deregister the supernode to set it to DISABLED state
+				deregisterCmd := []string{
+					"tx", "supernode", "deregister-supernode",
+					valAddr,
+					"--from", keyName,
+				}
+				resp = cli.CustomCommand(deregisterCmd...)
+				RequireTxSuccess(t, resp)
+				sut.AwaitNextBlock(t)
+			},
+			expectedError: "", // Re-registration should succeed
+		},
 	}
 
 	for _, tc := range testCases {
@@ -355,10 +388,10 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 
 			// Attempt to register supernode
 			t.Log("Attempting to register supernode")
-			
+
 			// Use standard IP address
 			ipAddress := "192.168.1.1"
-			
+
 			registerResp := cli.CustomCommand(
 				"tx", "supernode", "register-supernode",
 				valAddr,     // validator address
@@ -368,23 +401,50 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 			)
 			t.Logf("Registration response: %s", registerResp)
 
-			// Verify transaction failed with correct error
-			t.Log("Verifying transaction failure")
-			RequireTxFailure(t, registerResp, tc.expectedError)
+			// Handle re-registration success case
+			if tc.expectedError == "" {
+				t.Log("Verifying transaction success for re-registration")
+				RequireTxSuccess(t, registerResp)
 
-			// Verify no supernode was registered (except for duplicate_registration case)
-			if tc.name != "duplicate_registration" {
-				t.Log("Verifying no supernode was registered")
-				supernodeResp := cli.WithRunErrorsIgnored().CustomQuery(
-					"query", "supernode", "get-super-node", valAddr,
-				)
-				t.Logf("Supernode query response: %s", supernodeResp)
+				// Verify supernode is now active after re-registration
+				sut.AwaitNextBlock(t)
+				supernode := GetSuperNodeResponse(t, cli, valAddr)
+				require.Equal(t, valAddr, supernode.ValidatorAddress)
+				require.NotEmpty(t, supernode.States)
+				lastState := supernode.States[len(supernode.States)-1]
+				require.Equal(t, types.SuperNodeStateActive, lastState.State, "Supernode should be active after re-registration")
 
-				require.True(t,
-					strings.Contains(supernodeResp, "not found") ||
-						strings.Contains(supernodeResp, "no supernode found") ||
-						strings.Contains(supernodeResp, "key not found"),
-					"supernode should not be registered, got response: %s", supernodeResp)
+				// Verify state transition shape: ... Disabled -> Active
+				require.GreaterOrEqual(t, len(supernode.States), 2)
+				prevState := supernode.States[len(supernode.States)-2].State
+				require.Equal(t, types.SuperNodeStateDisabled, prevState)
+				require.Equal(t, types.SuperNodeStateActive, lastState.State)
+
+				// Verify that IP address was NOT updated during re-registration
+				require.NotEmpty(t, supernode.PrevIpAddresses)
+				lastIP := supernode.PrevIpAddresses[len(supernode.PrevIpAddresses)-1].Address
+				require.Equal(t, "192.168.1.1", lastIP, "IP address should not change during re-registration")
+			} else {
+				// Verify transaction failed with correct error
+				t.Log("Verifying transaction failure")
+				RequireTxFailure(t, registerResp, tc.expectedError)
+
+				// Verify no supernode was registered (except for duplicate_registration case)
+				if tc.name != "duplicate_registration" {
+					// Give the node a brief moment before querying state
+					time.Sleep(10 * time.Second)
+					t.Log("Verifying no supernode was registered")
+					supernodeResp := cli.WithRunErrorsIgnored().CustomQuery(
+						"query", "supernode", "get-supernode", valAddr,
+					)
+					t.Logf("Supernode query response: %s", supernodeResp)
+
+					require.True(t,
+						strings.Contains(supernodeResp, "not found") ||
+							strings.Contains(supernodeResp, "no supernode found") ||
+							strings.Contains(supernodeResp, "key not found"),
+						"supernode should not be registered, got response: %s", supernodeResp)
+				}
 			}
 		})
 	}
@@ -509,7 +569,7 @@ func TestSupernodeWithVestingDelegation(t *testing.T) {
 			selfDelegationAmountStr := gjson.Get(selfDelegation, "delegation_response.balance.amount").String()
 			selfDelegationAmount, err := strconv.ParseInt(selfDelegationAmountStr, 10, 64)
 			require.NoError(t, err, "Failed to parse self delegation amount")
-			
+
 			minimumStakeInt, err := strconv.ParseInt(tc.minimumStake, 10, 64)
 			require.NoError(t, err, "Failed to parse minimum stake")
 			require.Less(t, selfDelegationAmount, minimumStakeInt, "Self delegation should be less than minimum requirement")

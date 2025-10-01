@@ -7,17 +7,15 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-	"github.com/cosmos/cosmos-sdk/types/query"
-
 	sdkmath "cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-
+	"github.com/cosmos/cosmos-sdk/types/query"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
 )
 
@@ -28,7 +26,7 @@ func TestKeeper_SetAndQuerySuperNode(t *testing.T) {
 	supernode := types.SuperNode{
 		ValidatorAddress: valAddr.String(),
 		SupernodeAccount: sdk.AccAddress(valAddr).String(),
-		Version:          "1.0.0",
+		Note:             "1.0.0",
 		PrevIpAddresses: []*types.IPAddressHistory{
 			{
 				Address: "102.145.1.1",
@@ -41,7 +39,7 @@ func TestKeeper_SetAndQuerySuperNode(t *testing.T) {
 				Height: 1,
 			},
 		},
-		P2PPort: "4445",
+		P2PPort: "26657",
 	}
 
 	testCases := []struct {
@@ -132,7 +130,7 @@ func TestKeeper_GetAllSuperNodes(t *testing.T) {
 	sn1 := types.SuperNode{
 		SupernodeAccount: accAddr,
 		ValidatorAddress: valAddr1.String(),
-		Version:          "1.0.0",
+		Note:             "1.0.0",
 		States: []*types.SuperNodeStateRecord{
 			{
 				State:  types.SuperNodeStateActive,
@@ -151,7 +149,7 @@ func TestKeeper_GetAllSuperNodes(t *testing.T) {
 	sn2 := types.SuperNode{
 		SupernodeAccount: accAddr,
 		ValidatorAddress: valAddr2.String(),
-		Version:          "2.0.0",
+		Note:             "2.0.0",
 		States: []*types.SuperNodeStateRecord{
 			{
 				State:  types.SuperNodeStateActive,
@@ -312,7 +310,7 @@ func makeSuperNodeWithOneState(valIndex int, state types.SuperNodeState) types.S
 	sn := types.SuperNode{
 		ValidatorAddress: valAddr.String(),
 		SupernodeAccount: accAddr.String(),
-		Version:          "1.0.0",
+		Note:             "1.0.0",
 		// Must have at least one record so we don't skip it
 		States: []*types.SuperNodeStateRecord{
 			{
@@ -648,7 +646,7 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 						}
 						return stakingtypes.Delegation{}, errors.New("no self-delegation")
 					}
-					
+
 					// Check if this is a call for supernode delegation
 					if tc.setupSupernode && tc.supernodeDelegationFound && delAddr.String() == supernodeAccString {
 						return stakingtypes.Delegation{
@@ -657,13 +655,13 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 							Shares:           tc.supernodeDelegationShares,
 						}, nil
 					}
-					
+
 					return stakingtypes.Delegation{}, errors.New("delegation not found")
 				}).
 				AnyTimes()
 
 			k, ctx := setupKeeperForTest(t, stakingKeeper, slashingKeeper, bankKeeper)
-			
+
 			// If the test case includes a supernode, set it up in the store
 			if tc.setupSupernode {
 				supernode := types.SuperNode{
@@ -681,13 +679,13 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 							Height:  1,
 						},
 					},
-					Version: "1.0.0",
+					Note:    "1.0.0",
 					P2PPort: "4445",
 				}
 				err := k.SetSuperNode(ctx, supernode)
 				require.NoError(t, err)
 			}
-			
+
 			msgServer := keeper.NewMsgServerImpl(k)
 
 			// Call the function

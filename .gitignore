@@ -11,6 +11,7 @@ release/
 
 devnet/docker-compose.yml
 devnet/bin/
+devnet/bin-*/
 __devnet_deploy_test
 devnet-deploy.tar.gz
 

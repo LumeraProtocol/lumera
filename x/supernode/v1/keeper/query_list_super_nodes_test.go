@@ -3,15 +3,16 @@ package keeper_test
 import (
 	"testing"
 
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
-	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/query"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
 )
 
 func TestKeeper_ListSuperNodes(t *testing.T) {
@@ -21,7 +22,7 @@ func TestKeeper_ListSuperNodes(t *testing.T) {
 	sn1 := types.SuperNode{
 		ValidatorAddress: valAddr.String(),
 		SupernodeAccount: creatorAddr.String(),
-		Version:          "1.0.0",
+		Note:             "1.0.0",
 		PrevIpAddresses: []*types.IPAddressHistory{
 			{
 				Address: "1022.145.1.1",
@@ -34,11 +35,12 @@ func TestKeeper_ListSuperNodes(t *testing.T) {
 				Height: 1,
 			},
 		},
+		P2PPort: "26657",
 	}
 	sn2 := types.SuperNode{
 		ValidatorAddress: sdk.ValAddress([]byte("val2")).String(),
 		SupernodeAccount: creatorAddr.String(),
-		Version:          "2.0.0",
+		Note:             "2.0.0",
 		PrevIpAddresses: []*types.IPAddressHistory{
 			{
 				Address: "1022.145.1.1",
@@ -51,6 +53,7 @@ func TestKeeper_ListSuperNodes(t *testing.T) {
 				Height: 1,
 			},
 		},
+		P2PPort: "26657",
 	}
 
 	testCases := []struct {

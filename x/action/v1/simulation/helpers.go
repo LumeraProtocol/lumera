@@ -1036,7 +1036,7 @@ func registerSupernode(r *rand.Rand, ctx sdk.Context, k keeper.Keeper, accs []si
 		ValidatorAddress: validatorAddress,
 		SupernodeAccount: simAccount.Address.String(),
 		Evidence:         []*sntypes.Evidence{},
-		Version:          version,
+		Note:             version,
 		Metrics: &sntypes.MetricsAggregate{
 			Metrics:     make(map[string]float64),
 			ReportCount: 0,

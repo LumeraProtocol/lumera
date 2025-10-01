@@ -3,13 +3,14 @@ package keeper_test
 import (
 	"testing"
 
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
-	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
 )
 
 func TestMsgServer_UpdateSupernode(t *testing.T) {
@@ -22,10 +23,16 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 	existingSupernode := types.SuperNode{
 		SupernodeAccount: otherCreatorAddr.String(),
 		ValidatorAddress: valAddr.String(),
-		Version:          "1.0.0",
+		Note:             "1.0.0",
 		PrevIpAddresses: []*types.IPAddressHistory{
 			{
 				Address: "1022.145.1.1",
+				Height:  1,
+			},
+		},
+		PrevSupernodeAccounts: []*types.SupernodeAccountHistory{
+			{
+				Account: otherCreatorAddr.String(),
 				Height:  1,
 			},
 		},
@@ -52,7 +59,7 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "",
-				Version:          "",
+				Note:             "",
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
 				require.NoError(t, k.SetSuperNode(ctx, existingSupernode))
@@ -61,22 +68,22 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context) {
 				sn, found := k.QuerySuperNode(ctx, valAddr)
 				require.True(t, found)
-				require.Equal(t, "1.0.0", sn.Version)
+				require.Equal(t, "1.0.0", sn.Note)
 			},
 		},
 		{
-			name: "successful update with IP change and version change",
+			name: "successful update with IP change and note change",
 			msg: &types.MsgUpdateSupernode{
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "192.168.1.1",
-				Version:          "1.1.0",
+				Note:             "1.1.0",
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
 				newSupernode := types.SuperNode{
 					SupernodeAccount: otherCreatorAddr.String(),
 					ValidatorAddress: valAddr.String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					PrevIpAddresses: []*types.IPAddressHistory{
 						{
 							Address: "10.0.1.1",
@@ -97,7 +104,7 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context) {
 				sn, found := k.QuerySuperNode(ctx, valAddr)
 				require.True(t, found)
-				require.Equal(t, "1.1.0", sn.Version)
+				require.Equal(t, "1.1.0", sn.Note)
 				require.Len(t, sn.PrevIpAddresses, 2)
 				require.Equal(t, "10.0.1.1", sn.PrevIpAddresses[0].Address)
 				require.Equal(t, "192.168.1.1", sn.PrevIpAddresses[1].Address)
@@ -109,14 +116,14 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 				IpAddress:        "192.168.1.1",
-				Version:          "1.1.0",
+				Note:             "1.1.0",
 				SupernodeAccount: creatorAddr.String(),
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
 				newSupernode := types.SuperNode{
 					SupernodeAccount: otherCreatorAddr.String(),
 					ValidatorAddress: valAddr.String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					PrevIpAddresses: []*types.IPAddressHistory{
 						{
 							Address: "10.0.1.1",
@@ -137,12 +144,60 @@ func TestMsgServer_UpdateSupernode(t *testing.T) {
 			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context) {
 				sn, found := k.QuerySuperNode(ctx, valAddr)
 				require.True(t, found)
-				require.Equal(t, "1.1.0", sn.Version)
+				require.Equal(t, "1.1.0", sn.Note)
 				require.Len(t, sn.PrevIpAddresses, 2)
 				require.Equal(t, "10.0.1.1", sn.PrevIpAddresses[0].Address)
 				require.Equal(t, "192.168.1.1", sn.PrevIpAddresses[1].Address)
 				require.Equal(t, sn.SupernodeAccount, creatorAddr.String())
-
+				// Check supernode account history - should have 1 entry (the new account)
+				require.Len(t, sn.PrevSupernodeAccounts, 1)
+				require.Equal(t, creatorAddr.String(), sn.PrevSupernodeAccounts[0].Account)
+			},
+		},
+		{
+			name: "successful P2P port update",
+			msg: &types.MsgUpdateSupernode{
+				Creator:          creatorAddr.String(),
+				ValidatorAddress: valAddr.String(),
+				P2PPort:          "9999",
+			},
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
+				require.NoError(t, k.SetSuperNode(ctx, existingSupernode))
+			},
+			expectedError: nil,
+			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context) {
+				sn, found := k.QuerySuperNode(ctx, valAddr)
+				require.True(t, found)
+				require.Equal(t, "9999", sn.P2PPort)
+				// Verify other fields remain unchanged
+				require.Equal(t, "1.0.0", sn.Note)
+				require.Equal(t, otherCreatorAddr.String(), sn.SupernodeAccount)
+			},
+		},
+		{
+			name: "successful complete update including P2P port",
+			msg: &types.MsgUpdateSupernode{
+				Creator:          creatorAddr.String(),
+				ValidatorAddress: valAddr.String(),
+				IpAddress:        "10.0.0.5",
+				Note:             "2.0.0",
+				SupernodeAccount: creatorAddr.String(),
+				P2PPort:          "8080",
+			},
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
+				require.NoError(t, k.SetSuperNode(ctx, existingSupernode))
+			},
+			expectedError: nil,
+			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context) {
+				sn, found := k.QuerySuperNode(ctx, valAddr)
+				require.True(t, found)
+				require.Equal(t, "2.0.0", sn.Note)
+				require.Equal(t, creatorAddr.String(), sn.SupernodeAccount)
+				require.Equal(t, "8080", sn.P2PPort)
+				// Check IP address history
+				require.Len(t, sn.PrevIpAddresses, 2)
+				require.Equal(t, "1022.145.1.1", sn.PrevIpAddresses[0].Address)
+				require.Equal(t, "10.0.0.5", sn.PrevIpAddresses[1].Address)
 			},
 		},
 		{

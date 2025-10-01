@@ -4,13 +4,14 @@ import (
 	"testing"
 
 	sdkmath "cosmossdk.io/math"
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
-	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/stretchr/testify/require"
+
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 func TestStopSupernode(t *testing.T) {
@@ -42,7 +43,7 @@ func TestStopSupernode(t *testing.T) {
 				sn := sntypes.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					States: []*sntypes.SuperNodeStateRecord{
 						{
 							State:  sntypes.SuperNodeStateActive,
@@ -78,11 +79,22 @@ func TestStopSupernode(t *testing.T) {
 				for _, e := range events {
 					if e.Type == sntypes.EventTypeSupernodeStopped {
 						foundStopEvent = true
+						var addrOK, heightOK, oldStateOK bool
 						for _, attr := range e.Attributes {
 							if string(attr.Key) == sntypes.AttributeKeyValidatorAddress {
 								require.Equal(t, valAddrStr, string(attr.Value))
+								addrOK = true
+							}
+							if string(attr.Key) == sntypes.AttributeKeyHeight {
+								require.NotEmpty(t, string(attr.Value))
+								heightOK = true
+							}
+							if string(attr.Key) == sntypes.AttributeKeyOldState {
+								require.NotEmpty(t, string(attr.Value))
+								oldStateOK = true
 							}
 						}
+						require.True(t, addrOK && heightOK && oldStateOK)
 					}
 				}
 				require.True(t, foundStopEvent, "supernode_stopped event not found")
@@ -128,7 +140,7 @@ func TestStopSupernode(t *testing.T) {
 				sn := sntypes.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					States: []*sntypes.SuperNodeStateRecord{
 						{
 							State:  sntypes.SuperNodeStateActive,
@@ -163,7 +175,7 @@ func TestStopSupernode(t *testing.T) {
 				sn := sntypes.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					States: []*sntypes.SuperNodeStateRecord{
 						{
 							State:  sntypes.SuperNodeStateActive,
@@ -204,7 +216,7 @@ func TestStopSupernode(t *testing.T) {
 				sn := sntypes.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
-					Version:          "1.0.0",
+					Note:             "1.0.0",
 					States: []*sntypes.SuperNodeStateRecord{
 						{
 							State:  sntypes.SuperNodeStateActive,

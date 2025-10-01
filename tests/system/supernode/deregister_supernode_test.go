@@ -6,15 +6,16 @@ import (
 	"testing"
 
 	sdkmath "cosmossdk.io/math"
-	"github.com/LumeraProtocol/lumera/app"
-	"github.com/LumeraProtocol/lumera/tests/ibctesting"
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
-	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/stretchr/testify/require"
+
+	"github.com/LumeraProtocol/lumera/app"
+	"github.com/LumeraProtocol/lumera/tests/ibctesting"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 type SystemTestSuite struct {
@@ -100,7 +101,7 @@ func TestDeregisterSupernode(t *testing.T) {
 							Height: suite.sdkCtx.BlockHeight(),
 						},
 					},
-					Version: "1.0.0",
+					Note: "1.0.0",
 					Metrics: &sntypes.MetricsAggregate{
 						Metrics:     make(map[string]float64),
 						ReportCount: 0,
@@ -137,11 +138,22 @@ func TestDeregisterSupernode(t *testing.T) {
 				for _, evt := range events {
 					if evt.Type == sntypes.EventTypeSupernodeDeRegistered {
 						foundDeregisterEvent = true
+						var addrOK, heightOK, oldStateOK bool
 						for _, attr := range evt.Attributes {
 							if string(attr.Key) == sntypes.AttributeKeyValidatorAddress {
 								require.Equal(t, valAddrStr, string(attr.Value))
+								addrOK = true
+							}
+							if string(attr.Key) == sntypes.AttributeKeyHeight {
+								require.NotEmpty(t, string(attr.Value))
+								heightOK = true
+							}
+							if string(attr.Key) == sntypes.AttributeKeyOldState {
+								require.NotEmpty(t, string(attr.Value))
+								oldStateOK = true
 							}
 						}
+						require.True(t, addrOK && heightOK && oldStateOK)
 					}
 				}
 				require.True(t, foundDeregisterEvent, "supernode_deregistered event not found")
@@ -179,7 +191,7 @@ func TestDeregisterSupernode(t *testing.T) {
 							Height: suite.sdkCtx.BlockHeight(),
 						},
 					},
-					Version: "1.0.0",
+					Note: "1.0.0",
 					Metrics: &sntypes.MetricsAggregate{
 						Metrics:     make(map[string]float64),
 						ReportCount: 0,
@@ -219,7 +231,7 @@ func TestDeregisterSupernode(t *testing.T) {
 							Height: suite.sdkCtx.BlockHeight(),
 						},
 					},
-					Version: "1.0.0",
+					Note: "1.0.0",
 					Metrics: &sntypes.MetricsAggregate{
 						Metrics:     make(map[string]float64),
 						ReportCount: 0,
@@ -255,11 +267,22 @@ func TestDeregisterSupernode(t *testing.T) {
 				for _, evt := range events {
 					if evt.Type == sntypes.EventTypeSupernodeDeRegistered {
 						foundDeregisterEvent = true
+						var addrOK, heightOK, oldStateOK bool
 						for _, attr := range evt.Attributes {
 							if string(attr.Key) == sntypes.AttributeKeyValidatorAddress {
 								require.Equal(t, valAddrStr, string(attr.Value))
+								addrOK = true
+							}
+							if string(attr.Key) == sntypes.AttributeKeyHeight {
+								require.NotEmpty(t, string(attr.Value))
+								heightOK = true
+							}
+							if string(attr.Key) == sntypes.AttributeKeyOldState {
+								require.NotEmpty(t, string(attr.Value))
+								oldStateOK = true
 							}
 						}
+						require.True(t, addrOK && heightOK && oldStateOK)
 					}
 				}
 				require.True(t, foundDeregisterEvent, "supernode_deregistered event not found")

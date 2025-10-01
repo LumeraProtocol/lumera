@@ -213,6 +213,7 @@ func (h CascadeActionHandler) GetUpdatedMetadata(ctx sdk.Context, existingMetada
 		FileName:   existingMetadata.GetFileName(),
 		Signatures: existingMetadata.GetSignatures(),
 		RqIdsIds:   newMetadata.GetRqIdsIds(),
+		Public:     existingMetadata.GetPublic(),
 	}
 
 	return gogoproto.Marshal(updatedMetadata)

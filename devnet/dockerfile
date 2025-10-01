@@ -20,12 +20,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     crudini \
     net-tools \
     iputils-ping \
+    lnav \
     mc \
     && rm -rf /var/lib/apt/lists/*
-
-# Copy binary and make it executable
-COPY --chmod=0755 bin/lumerad /usr/local/bin/lumerad
-COPY --chmod=0644 bin/libwasmvm.x86_64.so /usr/lib/
 
 # Update libraries cache & create directories
 RUN ldconfig && mkdir -p ${SCRIPTS_DEST_DIR} /root/.lumerad

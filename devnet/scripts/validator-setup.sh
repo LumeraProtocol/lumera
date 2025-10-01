@@ -19,6 +19,7 @@ PEERS_SHARED="${CFG_DIR}/persistent_peers.txt"
 GENTX_DIR="${CFG_DIR}/gentx"
 ADDR_DIR="${SHARED_DIR}/addresses"
 STATUS_DIR="${SHARED_DIR}/status"
+RELEASE_DIR="${SHARED_DIR}/release"
 GENESIS_READY_FLAG="${STATUS_DIR}/genesis_accounts_ready"
 SETUP_COMPLETE_FLAG="${STATUS_DIR}/setup_complete"
 # node specific vars
@@ -91,7 +92,7 @@ run_capture() {
 }
 
 write_node_markers() {
-  local nodeid ip
+  local nodeid
   # write fixed container P2P port
   echo "${DEFAULT_P2P_PORT}" > "${NODE_STATUS_DIR}/port"
 
@@ -99,9 +100,6 @@ write_node_markers() {
     nodeid="$(${DAEMON} tendermint show-node-id || true)"
     [ -n "${nodeid}" ] && echo "${nodeid}" > "${NODE_STATUS_DIR}/nodeid"
   fi
-
-  ip="$(hostname -i | awk '{print $1}')"
-  [ -n "${ip}" ] && echo "${ip}" > "${NODE_STATUS_DIR}/ip"
 
   echo "[SETUP] status files in ${NODE_STATUS_DIR}:"
   ls -l "${NODE_STATUS_DIR}" || true
@@ -113,8 +111,9 @@ build_persistent_peers() {
     [ -z "${other}" ] && continue
     [ "${other}" = "${MONIKER}" ] && continue
     local od="${STATUS_DIR}/${other}"
-    if [ -s "${od}/nodeid" ] && [ -s "${od}/ip" ] && [ -s "${od}/port" ]; then
-      echo "$(cat "${od}/nodeid")@$(cat "${od}/ip"):$(cat "${od}/port")" >> "${PEERS_SHARED}"
+    # Use service DNS name (compose service == moniker) to avoid IP churn.
+    if [ -s "${od}/nodeid" ] && [ -s "${od}/port" ]; then
+      echo "$(cat "${od}/nodeid")@${other}:$(cat "${od}/port")" >> "${PEERS_SHARED}"
     fi
   done < <(jq -r '.[].moniker' "${CFG_VALS}")
   echo "[SETUP] persistent_peers:"
@@ -204,7 +203,7 @@ primary_validator_setup() {
     while IFS= read -r other; do
       [ "${other}" = "${MONIKER}" ] && continue
       od="${STATUS_DIR}/${other}"
-      [[ -s "${od}/nodeid" && -s "${od}/ip" ]] && found=$((found+1))
+      [[ -s "${od}/nodeid" ]] && found=$((found+1))
     done < <(jq -r '.[].moniker' "${CFG_VALS}")
     [ "${found}" -ge $((total-1)) ] && break
     sleep 1

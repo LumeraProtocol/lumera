@@ -50,6 +50,7 @@ func NewCoordinator(t *testing.T, n int, wasmOpts ...[]wasmkeeper.Option) *Coord
 		var x []wasmkeeper.Option
 		if len(wasmOpts) > (i - 1) {
 			x = wasmOpts[i-1]
+			
 		}
 		chains[chainID] = NewTestChain(t, coord, chainID, x...)
 	}

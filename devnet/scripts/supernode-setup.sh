@@ -226,6 +226,8 @@ start_supernode() {
   if pgrep -x ${SN} >/dev/null; then
     echo "[SN] Supernode already running, skipping start."
   else
+    echo "[SN] Waiting for at least one new block before starting supernode..."
+    wait_for_n_blocks 1 || { echo "[SN] Chain not progressing; cannot start supernode."; return 1; }
     echo "[SN] Starting supernode..."
     export P2P_USE_EXTERNAL_IP=false
     run ${SN} start -d "$SN_BASEDIR" >"$SN_LOG" 2>&1 &
@@ -428,7 +430,7 @@ is_sn_registered_active() {
   local info
 
     echo "[SN] Checking if supernode is registered..."
-  info="$(run_capture $DAEMON q supernode get-super-node "$VALOPER_ADDR" --output json)"
+  info="$(run_capture $DAEMON q supernode get-supernode "$VALOPER_ADDR" --output json)"
   echo "[SN] Supernode info output: $info"
 
   # Extract the supernode account (empty string if missing)

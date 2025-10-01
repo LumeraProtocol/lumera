@@ -9,14 +9,16 @@ import "lumera/supernode/v1/evidence.proto";
 import "lumera/supernode/v1/metrics_aggregate.proto";
 import "lumera/supernode/v1/ip_address_history.proto";
 import "lumera/supernode/v1/supernode_state.proto";
+import "lumera/supernode/v1/supernode_account_history.proto";
 
 message SuperNode {
   string validator_address = 1 [(cosmos_proto.scalar) = "cosmos.ValidatorAddressString"];
   repeated SuperNodeStateRecord states = 2;
   repeated Evidence evidence = 3;
   repeated IPAddressHistory prev_ip_addresses = 4;
-  string version = 5;
+  string note = 5;
   MetricsAggregate metrics = 6;
   string supernode_account = 7 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
   string p2p_port = 8;
+  repeated SupernodeAccountHistory prev_supernode_accounts = 9;
 }

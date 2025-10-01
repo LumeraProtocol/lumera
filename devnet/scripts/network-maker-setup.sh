@@ -266,14 +266,14 @@ wait_for_supernode() {
 # ----- optional network-maker install -----
 install_network_maker_binary() {
   if [ ! -f "${NM_DST_BIN}" ]; then
-    echo "[NM] Installing network-maker binary..."
+    echo "[NM] Installing ${NM} binary..."
     run cp -f "${NM_SRC_BIN}" "${NM_DST_BIN}"
     run chmod +x "${NM_DST_BIN}"
   else
     if cmp -s "${NM_SRC_BIN}" "${NM_DST_BIN}"; then
-      echo "[NM] network-maker binary up-to-date; skipping install."
+      echo "[NM] ${NM} binary already up-to-date at ${NM_DST_BIN}; skipping install."
     else
-      echo "[NM] Updating network-maker binary..."
+      echo "[NM] Updating ${NM} binary at ${NM_DST_BIN}..."
       run cp -f "${NM_SRC_BIN}" "${NM_DST_BIN}"
       run chmod +x "${NM_DST_BIN}"
     fi

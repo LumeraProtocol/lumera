@@ -34,6 +34,11 @@ STATUS_DIR="${SHARED_DIR}/status"
 SETUP_COMPLETE="${STATUS_DIR}/setup_complete"
 SN="supernode-linux-amd64"
 NM="network-maker"
+LUMERAD="lumerad"
+LUMERA_SRC_BIN="${RELEASE_DIR}/${LUMERAD}"
+LUMERA_DST_BIN="/usr/local/bin/${LUMERAD}"
+WASMVM_SRC_LIB="${RELEASE_DIR}/libwasmvm.x86_64.so"
+WASMVM_DST_LIB="/usr/lib/libwasmvm.x86_64.so"
 
 DAEMON="${DAEMON:-lumerad}"
 DAEMON_HOME="${DAEMON_HOME:-/root/.lumera}"
@@ -88,17 +93,17 @@ wait_for_height_at_least() {
   local retries="${2:-180}"  # ~180s
   local delay="${3:-1}"
 
-  echo "[SN] Waiting for block height >= ${target} ..."
+  echo "[BOOT] Waiting for block height >= ${target} ..."
   for ((i=0; i<retries; i++)); do
     local h
     h="$(current_height)"
     if (( h >= target )); then
-      echo "[SN] Height is ${h} (>= ${target}) — OK."
+      echo "[BOOT] Height is ${h} (>= ${target}) — OK."
       return 0
     fi
     sleep "$delay"
   done
-  echo "[SN] Timeout waiting for height >= ${target}."
+  echo "[BOOT] Timeout waiting for height >= ${target}."
   return 1
 }
 
@@ -129,7 +134,52 @@ wait_for_validator_setup() {
   echo "[BOOT] ${MONIKER}: validator setup complete."
 }
 
+install_wasm_lib() {
+  if [ -f "${WASMVM_SRC_LIB}" ]; then
+    if [ -f "${WASMVM_DST_LIB}" ] && cmp -s "${WASMVM_SRC_LIB}" "${WASMVM_DST_LIB}"; then
+      echo "[BOOT] libwasmvm.x86_64.so already up to date at ${WASMVM_DST_LIB}"
+      return
+    fi
+    echo "[BOOT] Installing libwasmvm.x86_64.so to ${WASMVM_DST_LIB}"
+    run cp -f "${WASMVM_SRC_LIB}" "${WASMVM_DST_LIB}"
+    run chmod 755 "${WASMVM_DST_LIB}"
+  else
+    echo "[BOOT] ${WASMVM_SRC_LIB} not found, assuming libwasmvm.x86_64.so is already installed"
+  fi
+}
+
+install_lumerad_binary() {
+  run cp -f "${LUMERA_SRC_BIN}" "${LUMERA_DST_BIN}"
+  run chmod +x "${LUMERA_DST_BIN}"
+  install_wasm_lib
+  run lumerad version || true
+}
+
+install_or_update_lumerad() {
+  if [ ! -f "${LUMERA_DST_BIN}" ]; then
+    if [ -f "${LUMERA_SRC_BIN}" ]; then
+      echo "[BOOT] ${LUMERAD} binary not found at ${LUMERA_DST_BIN}, installing..."
+      install_lumerad_binary
+    else
+      echo "[BOOT] ${LUMERA_SRC_BIN} not found, assuming ${LUMERAD} is already installed"
+    fi
+  else
+    run lumerad version || true
+    if [ -f "${LUMERA_SRC_BIN}" ]; then
+      if cmp -s "${LUMERA_SRC_BIN}" "${LUMERA_DST_BIN}"; then
+        echo "[BOOT] ${LUMERAD} binary already up to date at ${LUMERA_DST_BIN}"
+      else
+        echo "[BOOT] Updating ${LUMERAD} binary at ${LUMERA_DST_BIN}"
+        install_lumerad_binary
+      fi
+    else
+      echo "[BOOT] ${LUMERA_SRC_BIN} not found, assuming ${LUMERAD} is already installed"
+    fi
+  fi
+}
+
 launch_validator_setup() {
+  install_or_update_lumerad
   if [ ! -s "${SETUP_COMPLETE}" ] && [ -x "${SCRIPTS_DIR}/validator-setup.sh" ]; then
     echo "[BOOT] ${MONIKER}: setup_complete missing; launching validator-setup in background..."
     nohup bash "${SCRIPTS_DIR}/validator-setup.sh" >"${VALIDATOR_SETUP_OUT}" 2>&1 &

@@ -4,13 +4,14 @@ import (
 	"testing"
 
 	sdkmath "cosmossdk.io/math"
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
-	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/stretchr/testify/require"
+
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 func TestStartSupernode(t *testing.T) {
@@ -39,7 +40,7 @@ func TestStartSupernode(t *testing.T) {
 		verify func(t *testing.T, suite *SystemTestSuite, resp *sntypes.MsgStartSupernodeResponse, err error)
 	}{
 		{
-			name: "successful start from disabled",
+			name: "disabled supernode should not be started",
 			msg:  newStartSupernodeMsg(walletAddr.String(), valAddrStr),
 			setup: func(suite *SystemTestSuite) {
 				// Create a supernode in disabled state
@@ -52,7 +53,7 @@ func TestStartSupernode(t *testing.T) {
 							Height: suite.sdkCtx.BlockHeight(),
 						},
 					},
-					Version: "1.0.0",
+					Note: "1.0.0",
 					PrevIpAddresses: []*sntypes.IPAddressHistory{
 						{
 							Address: "127.0.0.1",
@@ -65,31 +66,9 @@ func TestStartSupernode(t *testing.T) {
 				require.NoError(t, err)
 			},
 			verify: func(t *testing.T, suite *SystemTestSuite, resp *sntypes.MsgStartSupernodeResponse, err error) {
-				require.NoError(t, err)
-				require.NotNil(t, resp)
+				require.NotNil(t, err)
 
-				// Check supernode final state: should be active
-				valOp, err := sdk.ValAddressFromBech32(valAddrStr)
-				require.NoError(t, err)
-				sn, found := suite.app.SupernodeKeeper.QuerySuperNode(suite.sdkCtx, valOp)
-				require.True(t, found)
-				require.NotEmpty(t, sn.States)
-				require.Equal(t, sntypes.SuperNodeStateActive, sn.States[len(sn.States)-1].State)
-
-				// Check for event
-				events := suite.sdkCtx.EventManager().Events()
-				var foundStartEvent bool
-				for _, evt := range events {
-					if evt.Type == sntypes.EventTypeSupernodeStarted {
-						foundStartEvent = true
-						for _, attr := range evt.Attributes {
-							if string(attr.Key) == sntypes.AttributeKeyValidatorAddress {
-								require.Equal(t, valAddrStr, string(attr.Value))
-							}
-						}
-					}
-				}
-				require.True(t, foundStartEvent, "supernode_started event not found")
+				require.Equal(t, "supernode is disabled and must be re-registered: invalid request", err.Error())
 			},
 		},
 		{
@@ -118,7 +97,7 @@ func TestStartSupernode(t *testing.T) {
 							Height: suite.sdkCtx.BlockHeight(),
 						},
 					},
-					Version: "1.0.0",
+					Note: "1.0.0",
 					PrevIpAddresses: []*sntypes.IPAddressHistory{
 						{
 							Address: "127.0.0.1",
@@ -150,7 +129,7 @@ func TestStartSupernode(t *testing.T) {
 							Height: suite.sdkCtx.BlockHeight(),
 						},
 					},
-					Version: "1.0.0",
+					Note: "1.0.0",
 					PrevIpAddresses: []*sntypes.IPAddressHistory{
 						{
 							Address: "127.0.0.1",

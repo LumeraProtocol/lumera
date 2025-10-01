@@ -99,7 +99,7 @@ Below are the commands for interacting with the Supernode module .
     lumerad query supernode params
 
     # Get supernode information
-    lumerad query supernode get-super-node [validator-address]
+    lumerad query supernode get-supernode [validator-address]
 
     # List all supernodes
     lumerad query supernode list-super-nodes

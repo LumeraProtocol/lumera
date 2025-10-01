@@ -72,6 +72,7 @@ func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validat
 		if useExistingGenesis {
 			env["USE_EXISTING_GENESIS"] = "1"
 		}
+		env["INTEGRATION_TEST"] = "true"
 
 		service := DockerComposeService{
 			Build:         ".",

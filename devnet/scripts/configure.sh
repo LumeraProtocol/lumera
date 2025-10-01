@@ -3,12 +3,64 @@ set -euo pipefail
 
 echo "Configuring Lumera for docker compose ..."
 
+# --- parse args -----------------------------------
+BIN_DIR_ARG=""
+show_help() {
+  cat <<'EOF'
+Usage: configure.sh [--bin-dir DIR]
+
+Options:
+  -b, --bin-dir DIR   Directory containing binaries/configs to copy - absolute or relative to the repo root
+                      (supernode-linux-amd64, sncli, network-maker, configs).
+  -h, --help          Show this help and exit.
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -b|--bin-dir)
+      [[ -n "${2:-}" && "${2:0:1}" != "-" ]] || { echo "ERROR: --bin-dir requires DIR" >&2; exit 2; }
+      BIN_DIR_ARG="$2"; shift 2;;
+    --bin-dir=*) BIN_DIR_ARG="${1#*=}"; shift;;
+    -h|--help)   show_help; exit 0;;
+    *)           echo "ERROR: unknown arg: $1" >&2; show_help; exit 2;;
+  esac
+done
+
+# --- resolve script dir & BIN_DIR (CLI > autodetect ../bin > empty) -----------
+
 # Get the absolute path to the directory containing this script
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [ -d "${SCRIPT_DIR}/../bin" ]; then
-    BIN_DIR="$(cd "${SCRIPT_DIR}/../bin" && pwd)"
+# Prefer git to find the real root; fallback to scripts/..
+REPO_ROOT="$(git -C "${SCRIPT_DIR}" rev-parse --show-toplevel 2>/dev/null || true)"
+[[ -n "${REPO_ROOT}" ]] || REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+# --- resolve BIN_DIR (CLI > repo-root/bin > empty) ----------------------------
+if [[ -n "${BIN_DIR_ARG}" ]]; then
+  # Absolute path stays absolute; relative is interpreted from REPO_ROOT
+  if [[ "${BIN_DIR_ARG}" = /* ]]; then
+    CAND="${BIN_DIR_ARG}"
+  else
+    CAND="${REPO_ROOT}/${BIN_DIR_ARG}"
+  fi
+  # Normalize & verify
+  if BIN_DIR="$(cd "${CAND}" 2>/dev/null && pwd)"; then
+    :
+  else
+    echo "[CONFIGURE] ERROR: --bin-dir '${BIN_DIR_ARG}' not found under ${REPO_ROOT}" >&2
+    exit 1
+  fi
+elif [[ -d "${SCRIPT_DIR}/../bin" ]]; then
+  BIN_DIR="$(cd "${SCRIPT_DIR}/../bin" && pwd)"
 else
-    BIN_DIR=""
+  BIN_DIR=""
+fi
+
+if [[ -n "${BIN_DIR}" ]]; then
+  echo "[CONFIGURE] Using BIN_DIR=${BIN_DIR}"
+else
+  echo "[CONFIGURE] ERROR ! BIN_DIR not provided andcould not be resolved"
+  exit 1
 fi
 
 # Require CONFIG_JSON environment variable

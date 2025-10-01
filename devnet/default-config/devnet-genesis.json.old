@@ -316,6 +316,15 @@
         "channels": [],
         "commitments": [],
         "next_channel_sequence": "0",
+        "params": {
+          "upgrade_timeout": {
+            "height": {
+              "revision_height": "0",
+              "revision_number": "0"
+            },
+            "timestamp": "600000000000"
+          }
+        },
         "receipts": [],
         "recv_sequences": [],
         "send_sequences": []
@@ -383,6 +392,7 @@
       "classes": [],
       "entries": []
     },
+    "params": null,
     "runtime": null,
     "slashing": {
       "missed_blocks": [],
@@ -428,7 +438,7 @@
     },
     "transfer": {
       "port_id": "transfer",
-      "denoms": [],
+      "denom_traces": [],
       "params": {
         "send_enabled": true,
         "receive_enabled": true

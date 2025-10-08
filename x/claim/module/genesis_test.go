@@ -17,8 +17,9 @@ func TestGenesis(t *testing.T) {
 
 	// Create test genesis state matching the default values
 	genesisState := types.GenesisState{
-		Params:               types.DefaultParams(),
-		TotalClaimableAmount: defaultGenState.TotalClaimableAmount, // Match the default amount
+		Params: types.DefaultParams(),
+		// Set to 0 in tests to avoid loading external CSV totals
+		TotalClaimableAmount: 0,
 		// Will be populated during initialization
 		ClaimRecords: []types.ClaimRecord{}, // Empty records for test
 		ClaimsDenom:  types.DefaultClaimsDenom,

@@ -5,9 +5,10 @@ import (
 	"strconv"
 
 	errorsmod "cosmossdk.io/errors"
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
+
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 // StartSupernode activates a stopped supernode (transitions from Stopped to Active state)

@@ -188,6 +188,7 @@ func TestDelayedClaimsSystem(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 
 			sut.ResetChain(t)
+
 			cli := NewLumeradCLI(t, sut, true)
 
 			// Get test data and CSV address

@@ -165,7 +165,7 @@ func (s *SystemUnderTest) SetupChain() {
 
 func (s *SystemUnderTest) StartChain(t *testing.T, xargs ...string) {
 	t.Helper()
-	s.Logf("Start chain\n")
+	s.Log("Start chain\n")
 	s.ChainStarted = true
 	s.startNodesAsync(t, append([]string{"start", "--trace", "--log_level=info"}, xargs...)...)
 

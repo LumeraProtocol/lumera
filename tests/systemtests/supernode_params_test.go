@@ -117,3 +117,11 @@ func TestSupernodeUpdateParamsProposal(t *testing.T) {
 	require.Equal(t, "0.2", gjson.Get(updatedParams, "params.slashing_fraction").String(), "slashing_fraction should be 0.2")
 	require.Equal(t, "48h", gjson.Get(updatedParams, "params.inactivity_penalty_period").String(), "inactivity_penalty_period should be 48h")
 }
+
+func TestA(t *testing.T) {
+	// Initialize and reset chain
+	sut.ResetChain(t)
+
+	sut.StartChain(t)
+
+}

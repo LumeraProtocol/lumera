@@ -44,6 +44,10 @@ type Validator struct {
 	RPCPort             int    `json:"rpc_port"`
 	RESTPort            int    `json:"rest_port"`
 	GRPCPort            int    `json:"grpc_port"`
+	SupernodePort       int    `json:"supernode_port"`
+	SupernodeP2PPort    int    `json:"supernode_p2p_port"`
+	SupernodeGatewayPort int    `json:"supernode_gateway_port"`
+
 	InitialDistribution struct {
 		AccountBalance string `json:"account_balance"`
 		ValidatorStake string `json:"validator_stake"`

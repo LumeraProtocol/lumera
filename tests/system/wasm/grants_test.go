@@ -18,9 +18,10 @@ import (
 	"github.com/CosmWasm/wasmd/x/wasm/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
 	wasmtest "github.com/LumeraProtocol/lumera/tests/system/wasm"
 	"github.com/LumeraProtocol/lumera/tests/ibctesting"
+
+	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
 func TestGrants(t *testing.T) {
@@ -44,9 +45,9 @@ func TestGrants(t *testing.T) {
 
 	chain.Fund(granteeAddr, sdkmath.NewInt(1_000_000))
 	chain.Fund(otherAddr, sdkmath.NewInt(1_000_000))
-	assert.Equal(t, sdkmath.NewInt(1_000_000), chain.Balance(granteeAddr, sdk.DefaultBondDenom).Amount)
+	assert.Equal(t, sdkmath.NewInt(1_000_000), chain.Balance(granteeAddr, lcfg.ChainDenom).Amount)
 
-	myAmount := sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.NewInt(2_000_000))
+	myAmount := sdk.NewCoin(lcfg.ChainDenom, sdkmath.NewInt(2_000_000))
 
 	specs := map[string]struct {
 		limit          types.ContractAuthzLimitX
@@ -64,14 +65,14 @@ func TestGrants(t *testing.T) {
 		"exceed limits": {
 			limit:          types.NewMaxFundsLimit(myAmount),
 			filter:         types.NewAllowAllMessagesFilter(),
-			transferAmount: myAmount.Add(sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.OneInt())),
+			transferAmount: myAmount.Add(sdk.NewCoin(lcfg.ChainDenom, sdkmath.OneInt())),
 			senderKey:      granteePrivKey,
 			expErr:         sdkerrors.ErrUnauthorized,
 		},
 		"not match filter": {
 			limit:          types.NewMaxFundsLimit(myAmount),
 			filter:         types.NewAcceptedMessageKeysFilter("foo"),
-			transferAmount: sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.OneInt()),
+			transferAmount: sdk.NewCoin(lcfg.ChainDenom, sdkmath.OneInt()),
 			senderKey:      granteePrivKey,
 			expErr:         sdkerrors.ErrUnauthorized,
 		},
@@ -95,10 +96,10 @@ func TestGrants(t *testing.T) {
 			_, err = chain.SendMsgs(grantMsg)
 			require.NoError(t, err)
 
-			granterStartBalance := chain.Balance(granterAddr, sdk.DefaultBondDenom).Amount
+			granterStartBalance := chain.Balance(granterAddr, lcfg.ChainDenom).Amount
 
 			// when
-			anyValidReflectMsg := []byte(fmt.Sprintf(`{"reflect_msg": {"msgs": [{"bank":{"burn":{"amount":[{"denom":%q, "amount": %q}]}}}]}}`, sdk.DefaultBondDenom, myAmount.Amount.String()))
+			anyValidReflectMsg := []byte(fmt.Sprintf(`{"reflect_msg": {"msgs": [{"bank":{"burn":{"amount":[{"denom":%q, "amount": %q}]}}}]}}`, lcfg.ChainDenom, myAmount.Amount.String()))
 			execMsg := authz.NewMsgExec(spec.senderKey.PubKey().Address().Bytes(), []sdk.Msg{&types.MsgExecuteContract{
 				Sender:   granterAddr.String(),
 				Contract: contractAddr.String(),
@@ -110,13 +111,13 @@ func TestGrants(t *testing.T) {
 			// then
 			if spec.expErr != nil {
 				require.ErrorContains(t, gotErr, fmt.Sprintf("%s/%d:", spec.expErr.Codespace(), spec.expErr.ABCICode()))
-				assert.Equal(t, sdkmath.NewInt(1_000_000), chain.Balance(granteeAddr, sdk.DefaultBondDenom).Amount)
-				assert.Equal(t, granterStartBalance, chain.Balance(granterAddr, sdk.DefaultBondDenom).Amount)
+				assert.Equal(t, sdkmath.NewInt(1_000_000), chain.Balance(granteeAddr, lcfg.ChainDenom).Amount)
+				assert.Equal(t, granterStartBalance, chain.Balance(granterAddr, lcfg.ChainDenom).Amount)
 				return
 			}
 			require.NoError(t, gotErr)
-			assert.Equal(t, sdkmath.NewInt(1_000_000), chain.Balance(granteeAddr, sdk.DefaultBondDenom).Amount)
-			assert.Equal(t, granterStartBalance.Sub(spec.transferAmount.Amount), chain.Balance(granterAddr, sdk.DefaultBondDenom).Amount)
+			assert.Equal(t, sdkmath.NewInt(1_000_000), chain.Balance(granteeAddr, lcfg.ChainDenom).Amount)
+			assert.Equal(t, granterStartBalance.Sub(spec.transferAmount.Amount), chain.Balance(granterAddr, lcfg.ChainDenom).Amount)
 		})
 	}
 }
@@ -139,7 +140,7 @@ func TestStoreCodeGrant(t *testing.T) {
 
 	chain.Fund(granteeAddr, sdkmath.NewInt(1_000_000))
 	chain.Fund(otherAddr, sdkmath.NewInt(1_000_000))
-	assert.Equal(t, sdkmath.NewInt(1_000_000), chain.Balance(granteeAddr, sdk.DefaultBondDenom).Amount)
+	assert.Equal(t, sdkmath.NewInt(1_000_000), chain.Balance(granteeAddr, lcfg.ChainDenom).Amount)
 
 	specs := map[string]struct {
 		codeHash              []byte
@@ -227,7 +228,7 @@ func TestGzipStoreCodeGrant(t *testing.T) {
 
 	chain.Fund(granteeAddr, sdkmath.NewInt(1_000_000))
 	chain.Fund(otherAddr, sdkmath.NewInt(1_000_000))
-	assert.Equal(t, sdkmath.NewInt(1_000_000), chain.Balance(granteeAddr, sdk.DefaultBondDenom).Amount)
+	assert.Equal(t, sdkmath.NewInt(1_000_000), chain.Balance(granteeAddr, lcfg.ChainDenom).Amount)
 
 	specs := map[string]struct {
 		codeHash              []byte
@@ -309,7 +310,7 @@ func TestBrokenGzipStoreCodeGrant(t *testing.T) {
 
 	chain.Fund(granteeAddr, sdkmath.NewInt(1_000_000))
 	chain.Fund(otherAddr, sdkmath.NewInt(1_000_000))
-	assert.Equal(t, sdkmath.NewInt(1_000_000), chain.Balance(granteeAddr, sdk.DefaultBondDenom).Amount)
+	assert.Equal(t, sdkmath.NewInt(1_000_000), chain.Balance(granteeAddr, lcfg.ChainDenom).Amount)
 
 	codeHash := []byte("*")
 	instantiatePermission := types.AllowEverybody

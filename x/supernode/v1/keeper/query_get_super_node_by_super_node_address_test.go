@@ -20,7 +20,7 @@ func TestKeeper_GetSuperNodeBySuperNodeAddress(t *testing.T) {
 	sn := types.SuperNode{
 		SupernodeAccount: string(creatorAddr.String()),
 		ValidatorAddress: valAddr.String(),
-		Version:          "1.0.0",
+		Note:             "1.0.0",
 		PrevIpAddresses: []*types.IPAddressHistory{
 			{
 				Address: "1022.145.1.1",

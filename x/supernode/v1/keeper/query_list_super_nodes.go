@@ -3,10 +3,11 @@ package keeper
 import (
 	"context"
 
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 func (q queryServer) ListSuperNodes(goCtx context.Context, req *types.QueryListSuperNodesRequest) (*types.QueryListSuperNodesResponse, error) {

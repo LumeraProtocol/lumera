@@ -1,5 +1,8 @@
 #!/bin/bash
 
+##################################################################################################
+# Usage: ./submit_upgrade_proposal.sh <version> <upgrade_height>
+#
 # Expected upgrade sequence:
 # - Submit proposal → Goes into DEPOSIT_PERIOD
 # - Fund deposit → Moves to VOTING_PERIOD
@@ -12,7 +15,7 @@ VERSION="$1"
 UPGRADE_HEIGHT="$2"
 CHAIN_ID="lumera-devnet-1"
 SERVICE="supernova_validator_1" # primary validator
-LUMERA_SHARED="/tmp/lumera-devnet/shared"
+LUMERA_SHARED="/tmp/${CHAIN_ID}/shared"
 KEYRING="test"
 DENOM="ulume"
 DEFAULT_DEPOSIT="10000000$DENOM"
@@ -26,8 +29,8 @@ get_current_height() {
 }
 
 # Usage:
-#   get_proposal_id_by_version_with_retry "v1.7.0"         # default 1 attempt
-#   get_proposal_id_by_version_with_retry "v1.7.0" 5       # 5 retry attempts
+#   get_proposal_id_by_version_with_retry "v1.8.0"         # default 1 attempt
+#   get_proposal_id_by_version_with_retry "v1.8.0" 5       # 5 retry attempts
 get_proposal_id_by_version_with_retry() {
   local version="$1"
   local attempts="${2:-1}"  # Default to 1 attempt if not provided
@@ -89,6 +92,14 @@ get_proposal_deposit_by_id() {
   docker compose -f "$COMPOSE_FILE" exec "$SERVICE" \
     lumerad query gov proposal "$proposal_id" --output json 2>/dev/null |
     jq -r '.proposal.total_deposit[0].amount + .proposal.total_deposit[0].denom'
+}
+
+# Returns the planned upgrade height for the given proposal ID (or empty)
+get_proposal_height_by_id() {
+  local proposal_id="$1"
+  docker compose -f "$COMPOSE_FILE" exec "$SERVICE" \
+    lumerad query gov proposal "$proposal_id" --output json 2>/dev/null |
+    jq -r '.proposal.messages[]?.value.plan.height // empty'
 }
 
 validate_height_param() {
@@ -241,11 +252,11 @@ show_proposal_status() {
       ;;
     PROPOSAL_STATUS_REJECTED_WITH_VETO)
       echo "❗ Previous proposal was rejected with veto."
-      exit 1
+      return 1
       ;;
     PROPOSAL_STATUS_FAILED)
       echo "❗ Previous proposal failed."
-      exit 1
+      return 0
       ;;
     PROPOSAL_STATUS_PASSED)
       echo "✅ Proposal already passed. No need to resubmit."
@@ -265,9 +276,6 @@ show_proposal_status() {
       ;;
   esac
 }
-
-##################################################################################################
-# Usage: ./submit_upgrade_proposal.sh <version> <upgrade_height>
 
 CURRENT_HEIGHT=$(get_current_height)
 if [ $# -eq 1 ]; then
@@ -309,9 +317,39 @@ if [[ -n "$EXISTING_PROPOSAL_ID" ]]; then
       submit_proposal_deposit
       exit 0
       ;;
-    PROPOSAL_STATUS_REJECTED|PROPOSAL_STATUS_FAILED|PROPOSAL_STATUS_REJECTED_WITH_VETO)
+    PROPOSAL_STATUS_FAILED)
+      # Only resubmit if the new requested height is greater than the failed one
+      FAILED_HEIGHT=$(get_proposal_height_by_id "$EXISTING_PROPOSAL_ID")
+      CURRENT_HEIGHT=$(get_current_height)
+      if [[ -z "$FAILED_HEIGHT" ]]; then
+        echo "⚠️  Could not read failed proposal height; refusing to auto-resubmit."
+        exit 1
+      fi
+      echo "ℹ️  Failed proposal height: $FAILED_HEIGHT; requested new height: $UPGRADE_HEIGHT"
+      # check that UPGRADE_HEIGHT is greater than CURRENT_HEIGHT
+      if (( UPGRADE_HEIGHT <= CURRENT_HEIGHT )); then
+        echo "🚫 New height ($UPGRADE_HEIGHT) must be greater than current height ($CURRENT_HEIGHT)."
+        exit 1
+      fi
+      if (( UPGRADE_HEIGHT > FAILED_HEIGHT )); then
+        echo "✅ New height is greater than failed one — submitting a new proposal…"
+        submit_proposal
+        exit 0
+      else
+        echo "🚫 New height ($UPGRADE_HEIGHT) must be greater than failed height ($FAILED_HEIGHT)."
+        exit 1
+      fi
+      ;;
+    PROPOSAL_STATUS_REJECTED)
+      # Rejected (no veto): allow re-submit at caller’s chosen height
+      echo "ℹ️  Previous proposal was rejected. Submitting a new proposal…"
       submit_proposal
       exit 0
+      ;;
+    PROPOSAL_STATUS_REJECTED_WITH_VETO)
+      # Keep current safety behavior for veto
+      echo "❗ Previous proposal was rejected with veto. Not resubmitting automatically."
+      exit 1
       ;;
   esac
 else

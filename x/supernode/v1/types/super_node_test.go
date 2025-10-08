@@ -26,7 +26,7 @@ func TestSuperNodeValidation(t *testing.T) {
 				ValidatorAddress: valAddr.String(),
 				SupernodeAccount: accAddr.String(),
 				Evidence:         []*types.Evidence{},
-				Version:          "1.0.0",
+				Note:             "1.0.0",
 				Metrics: &types.MetricsAggregate{
 					Metrics:     make(map[string]float64),
 					ReportCount: 0,
@@ -52,7 +52,7 @@ func TestSuperNodeValidation(t *testing.T) {
 			supernode: types.SuperNode{
 				SupernodeAccount: accAddr.String(),
 				ValidatorAddress: "invalid",
-				Version:          "1.0.0",
+				Note:             "1.0.0",
 			},
 			expectError: true,
 		},
@@ -61,7 +61,7 @@ func TestSuperNodeValidation(t *testing.T) {
 			supernode: types.SuperNode{
 				ValidatorAddress: valAddr.String(),
 				SupernodeAccount: accAddr.String(),
-				Version:          "1.0.0",
+				Note:             "1.0.0",
 				States: []*types.SuperNodeStateRecord{
 					{
 						State:  types.SuperNodeStateActive,
@@ -77,17 +77,17 @@ func TestSuperNodeValidation(t *testing.T) {
 			supernode: types.SuperNode{
 				SupernodeAccount: accAddr.String(),
 				ValidatorAddress: valAddr.String(),
-				Version:          "1.0.0",
+				Note:             "1.0.0",
 			},
 			expectError: true,
 			errorType:   types.ErrInvalidSuperNodeState,
 		},
 		{
-			name: "empty version",
+			name: "empty note",
 			supernode: types.SuperNode{
 				SupernodeAccount: accAddr.String(),
 				ValidatorAddress: valAddr.String(),
-				Version:          "",
+				Note:             "",
 				States: []*types.SuperNodeStateRecord{
 					{
 						State:  types.SuperNodeStateActive,
@@ -100,7 +100,6 @@ func TestSuperNodeValidation(t *testing.T) {
 						Height:  1,
 					},
 				},
-
 			},
 			expectError: false,
 		},
@@ -110,7 +109,7 @@ func TestSuperNodeValidation(t *testing.T) {
 				ValidatorAddress: valAddr.String(),
 				SupernodeAccount: accAddr.String(),
 				Evidence:         []*types.Evidence{},
-				Version:          "1.0.0",
+				Note:             "1.0.0",
 				Metrics: &types.MetricsAggregate{
 					Metrics:     make(map[string]float64),
 					ReportCount: 0,

@@ -46,7 +46,7 @@ type ModuleInputs struct {
 	AuthKeeper         types.AuthKeeper
 	BankKeeper         types.BankKeeper
 	StakingKeeper      types.StakingKeeper
-	distributionKeeper types.DistributionKeeper
+	DistributionKeeper types.DistributionKeeper
 	SupernodeKeeper    sntypes.SupernodeKeeper
 	IBCKeeperFn 	   func() *ibckeeper.Keeper `optional:"true"`
 }
@@ -74,7 +74,7 @@ func ProvideModule(in ModuleInputs) ModuleOutputs {
 		in.BankKeeper,
 		in.AuthKeeper,
 		in.StakingKeeper,
-		in.distributionKeeper,
+		in.DistributionKeeper,
 		in.SupernodeKeeper,
 		func () sntypes.QueryServer {
 			return snkeeper.NewQueryServerImpl(in.SupernodeKeeper)
@@ -88,7 +88,7 @@ func ProvideModule(in ModuleInputs) ModuleOutputs {
 		in.AuthKeeper,
 		in.BankKeeper,
 		in.StakingKeeper,
-		in.distributionKeeper,
+		in.DistributionKeeper,
 		in.SupernodeKeeper,
 	)
 

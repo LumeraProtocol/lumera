@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	simtypes "github.com/cosmos/cosmos-sdk/types/simulation"
+
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 const (
@@ -81,7 +82,7 @@ func SimulateMsgUpdateSupernode(
 			ValidatorAddress: validatorAddress,
 			IpAddress:        ipAddress,
 			SupernodeAccount: supernodeAccount,
-			Version:          version,
+			Note:             version,
 		}
 
 		// Execute the message

@@ -14,6 +14,7 @@ import (
 
 	claimtestutils "github.com/LumeraProtocol/lumera/x/claim/testutils"
 	claimtypes "github.com/LumeraProtocol/lumera/x/claim/types"
+	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
 func TestDelayedClaimsSystem(t *testing.T) {
@@ -227,7 +228,7 @@ func TestDelayedClaimsSystem(t *testing.T) {
 
 			if tc.name == "successful_claim_from_same_address" {
 				address := cli.AddKey("test_1")
-				cli.FundAddress(address, "1stake")
+				cli.FundAddress(address, "1" + lcfg.ChainDenom)
 				testData, err = claimtestutils.GenerateClaimingTestData2(pastelAccount, address)
 				require.NoError(t, err)
 

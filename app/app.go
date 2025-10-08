@@ -17,9 +17,11 @@ import (
 	evidencekeeper "cosmossdk.io/x/evidence/keeper"
 	feegrantkeeper "cosmossdk.io/x/feegrant/keeper"
 	_ "cosmossdk.io/x/feegrant/module" // import for side-effects
-	_ "cosmossdk.io/x/upgrade"    // import for side-effects
+	_ "cosmossdk.io/x/upgrade"         // import for side-effects
 	upgradekeeper "cosmossdk.io/x/upgrade/keeper"
+	upgradetypes "cosmossdk.io/x/upgrade/types"
 	abci "github.com/cometbft/cometbft/abci/types"
+	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	dbm "github.com/cosmos/cosmos-db"
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/client"
@@ -66,34 +68,31 @@ import (
 	slashingkeeper "github.com/cosmos/cosmos-sdk/x/slashing/keeper"
 	_ "github.com/cosmos/cosmos-sdk/x/staking" // import for side-effects
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
+
+	ibcpacketforwardkeeper "github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v10/packetforward/keeper"
 	icacontrollerkeeper "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/controller/keeper"
 	icahostkeeper "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/host/keeper"
 	ibctransferkeeper "github.com/cosmos/ibc-go/v10/modules/apps/transfer/keeper"
-	ibckeeper "github.com/cosmos/ibc-go/v10/modules/core/keeper"
 	ibcporttypes "github.com/cosmos/ibc-go/v10/modules/core/05-port/types"
-    ibcpacketforwardkeeper "github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v10/packetforward/keeper"
-
-	upgradetypes "cosmossdk.io/x/upgrade/types"
+	ibckeeper "github.com/cosmos/ibc-go/v10/modules/core/keeper"
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 
+	actionmodulekeeper "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	claimmodulekeeper "github.com/LumeraProtocol/lumera/x/claim/keeper"
 	lumeraidmodulekeeper "github.com/LumeraProtocol/lumera/x/lumeraid/keeper"
-	actionmodulekeeper "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	// this line is used by starport scaffolding # stargate/app/moduleImport
 
 	"github.com/LumeraProtocol/lumera/docs"
-	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
 
 	upgrade_v1_6_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_6_1"
 	upgrade_v1_7_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_7_0"
+	upgrade_v1_7_2 "github.com/LumeraProtocol/lumera/app/upgrades/v1_7_2"
 	upgrade_v1_8_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_0"
 )
 
 const (
-	Name                 = "lumera"
-	// ChainCoinType is the coin type of the chain.
-	ChainCoinType = 118
+	Name = "lumera"
 )
 
 var (
@@ -115,7 +114,7 @@ type App struct {
 	appCodec          codec.Codec
 	txConfig          client.TxConfig
 	interfaceRegistry codectypes.InterfaceRegistry
-	ibcRouter	   	  *ibcporttypes.Router
+	ibcRouter         *ibcporttypes.Router
 
 	// keepers
 	// only keepers required by the app are exposed
@@ -138,21 +137,21 @@ type App struct {
 	GroupKeeper           groupkeeper.Keeper
 
 	// ibc keepers
-	IBCKeeper             *ibckeeper.Keeper
-	ICAControllerKeeper   icacontrollerkeeper.Keeper
-	ICAHostKeeper         icahostkeeper.Keeper
-	TransferKeeper        ibctransferkeeper.Keeper
+	IBCKeeper           *ibckeeper.Keeper
+	ICAControllerKeeper icacontrollerkeeper.Keeper
+	ICAHostKeeper       icahostkeeper.Keeper
+	TransferKeeper      ibctransferkeeper.Keeper
 
 	// IBC middleware keepers
-	PacketForwardKeeper   *ibcpacketforwardkeeper.Keeper
+	PacketForwardKeeper *ibcpacketforwardkeeper.Keeper
 
 	// CosmWasm
-	WasmKeeper            *wasmkeeper.Keeper
+	WasmKeeper *wasmkeeper.Keeper
 
-	LumeraidKeeper        lumeraidmodulekeeper.Keeper
-	ClaimKeeper           claimmodulekeeper.Keeper
-	SupernodeKeeper       sntypes.SupernodeKeeper
-	ActionKeeper          actionmodulekeeper.Keeper
+	LumeraidKeeper  lumeraidmodulekeeper.Keeper
+	ClaimKeeper     claimmodulekeeper.Keeper
+	SupernodeKeeper sntypes.SupernodeKeeper
+	ActionKeeper    actionmodulekeeper.Keeper
 	// this line is used by starport scaffolding # stargate/app/keeperDeclaration
 
 	// simulation manager
@@ -217,7 +216,7 @@ func New(
 		appConfig = depinject.Configs(
 			AppConfig(appOpts),
 			depinject.Supply(
-				logger,  // supply logger
+				logger, // supply logger
 				// here alternative options can be supplied to the DI container.
 				// those options can be used f.e to override the default behavior of some modules.
 				// for instance supplying a custom address codec for not using bech32 addresses.
@@ -304,6 +303,7 @@ func New(
 		if err := app.UpgradeKeeper.SetModuleVersionMap(ctx, app.ModuleManager.GetVersionMap()); err != nil {
 			panic(err)
 		}
+
 		return app.App.InitChainer(ctx, req)
 	})
 
@@ -342,6 +342,7 @@ func (app *App) setupUpgradeStoreLoaders() {
 	var storeUpgradesMap = map[string]*storetypes.StoreUpgrades{
 		upgrade_v1_6_1.UpgradeName: &upgrade_v1_6_1.StoreUpgrades,
 		upgrade_v1_7_0.UpgradeName: &upgrade_v1_7_0.StoreUpgrades,
+		upgrade_v1_7_2.UpgradeName: &upgrade_v1_7_2.StoreUpgrades,
 		upgrade_v1_8_0.UpgradeName: &upgrade_v1_8_0.StoreUpgrades,
 	}
 
@@ -373,6 +374,14 @@ func (app *App) setupUpgradeHandlers() {
 		{
 			Name: upgrade_v1_7_0.UpgradeName,
 			Handler: upgrade_v1_7_0.CreateUpgradeHandler(
+				app.Logger(),
+				app.ModuleManager,
+				app.Configurator(),
+			),
+		},
+		{
+			Name: upgrade_v1_7_2.UpgradeName,
+			Handler: upgrade_v1_7_2.CreateUpgradeHandler(
 				app.Logger(),
 				app.ModuleManager,
 				app.Configurator(),

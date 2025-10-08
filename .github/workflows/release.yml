@@ -28,26 +28,11 @@ jobs:
           fetch-depth: 0
 
       - name: Configure Git Safe Directory
-        run: git config --global --add safe.directory $GITHUB_WORKSPACE
-
-      - name: Get Go version from toolchain
-        id: go-version
-        run: |
-          TOOLCHAIN_VERSION=$(grep -E '^toolchain go[0-9]+\.[0-9]+(\.[0-9]+)?$' go.mod | cut -d ' ' -f 2 | sed 's/^go//')
-          if [ -n "$TOOLCHAIN_VERSION" ]; then
-            echo "Found toolchain version: $TOOLCHAIN_VERSION"
-            echo "version=$TOOLCHAIN_VERSION" >> $GITHUB_OUTPUT
-          else
-            GO_VERSION=$(grep -E '^go [0-9]+\.[0-9]+(\.[0-9]+)?$' go.mod | cut -d ' ' -f 2)
-            echo "Found go directive version: $GO_VERSION"
-            echo "version=$GO_VERSION" >> $GITHUB_OUTPUT
-          fi
+        uses: ./.github/actions/configure-git
 
       - name: Setup Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ steps.go-version.outputs.version }}
-          cache: true
+        id: setup-go
+        uses: ./.github/actions/setup-go
 
       - name: Prepare Build Variables
         id: vars
@@ -64,37 +49,31 @@ jobs:
           echo "- build_id: $build_id"
           echo "- tarball_prefix: ${repo_name}_${build_id}"
 
-      - name: Install Specific Ignite CLI Version
+      - name: Install Ignite CLI
+        uses: ./.github/actions/install-ignite
+        with:
+          version: v29.4.1
+          arch: linux_amd64
+
+      - name: Install wasmvm library
+        uses: ./.github/actions/install-wasmvm
+
+      - name: Install buf CLI
         run: |
-          IGNITE_VERSION="v29.2.0"
-          ARCH="linux_amd64"
-
-          # Download the checksum file
-          curl -L "https://github.com/ignite/cli/releases/download/${IGNITE_VERSION}/ignite_${IGNITE_VERSION#v}_checksums.txt" -o checksums.txt
-
-          # Extract the expected checksum for the specific architecture from the checksum file
-          EXPECTED_CHECKSUM=$(grep "ignite_${IGNITE_VERSION#v}_${ARCH}.tar.gz" checksums.txt | awk '{print $1}')
-
-          # Download the Ignite CLI release tarball
-          curl -L "https://github.com/ignite/cli/releases/download/${IGNITE_VERSION}/ignite_${IGNITE_VERSION#v}_${ARCH}.tar.gz" -o ignite.tar.gz
-
-          # Verify the checksum
-          ACTUAL_CHECKSUM=$(sha256sum ignite.tar.gz | awk '{print $1}')
-          if [ "$ACTUAL_CHECKSUM" != "$EXPECTED_CHECKSUM" ]; then
-            echo "Error: Checksum mismatch!"
-            exit 1
-          fi
-
-          # Extract and make executable
-          tar -xzf ignite.tar.gz
-          chmod +x ignite
+          set -euo pipefail
+          go install github.com/bufbuild/buf/cmd/buf@latest
 
       - name: Build with Ignite CLI
         run: |
-          ./ignite chain build --release --release.prefix ${{ steps.vars.outputs.tarball_prefix }} -y -t linux:amd64 #-t darwin:amd64 -t darwin:arm64 -y
+          buf --version
+          buf generate --template proto/buf.gen.gogo.yaml --verbose
+          ./ignite version
+          ./ignite generate openapi --yes
+          ./ignite chain build --clear-cache --skip-proto --release --release.prefix ${{ steps.vars.outputs.tarball_prefix }} -y -t linux:amd64 #-t darwin:amd64 -t darwin:arm64 -y
         env:
           DO_NOT_TRACK: 1
           GOFLAGS: "-buildvcs=false"
+          CGO_LDFLAGS: "-Wl,-rpath,/usr/lib -Wl,--disable-new-dtags"
 
       # Fix permissions
       - name: Fix Release Directory Permissions
@@ -102,9 +81,60 @@ jobs:
           sudo chown -R $USER:$USER release/
           sudo chmod -R 755 release/
 
+      - name: Package Release Artifacts
+        run: |
+          cd release
+
+          tar_file=$(ls *.tar.gz)
+
+          file_path=$(tar -tzf "$tar_file" | head -n 2 | grep -v '/$' | grep lumerad | sed 's|^/||')
+          echo "Binary: $file_path"
+          tar xzf "$tar_file" -C .
+          ls -l "$file_path"
+
+          mkdir -p temp
+          mv "$file_path" temp/
+          ls -l temp/
+
+          rm "$tar_file"
+
+          cp /usr/lib/libwasmvm.x86_64.so temp/
+
+          cat > temp/install.sh << 'EOF'
+          #!/bin/bash
+          if [ "$EUID" -ne 0 ]; then 
+            echo "Please run as root or with sudo"
+            exit 1
+          fi
+          cp lumerad /usr/local/bin
+          cp libwasmvm.x86_64.so /usr/lib/
+          ldconfig
+          echo "WASM library installed successfully"
+          EOF
+
+          chmod +x temp/install.sh
+
+          cd temp
+          tar czf "../$tar_file" ./*
+          cd ..
+
+          rm -rf temp
+
+          tar tvf "$tar_file"
+
+          sha256sum "$tar_file" > release_checksum
+
+      - name: Upload Release Artifacts
+        if: ${{ github.actor != 'nektos/act' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: release
+          if-no-files-found: error
+
   release:
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v') && (github.ref_type == 'tag') && (contains(github.ref, '.') && (contains(github.ref, 'v')))
+    if: ${{ (github.actor != 'nektos/act') && startsWith(github.ref, 'refs/tags/v') && (github.ref_type == 'tag') && contains(github.ref, '.') && contains(github.ref, 'v') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -149,129 +179,15 @@ jobs:
           repo_name=${GITHUB_REPOSITORY##*/}
           echo "tarball_prefix=${repo_name}_${{ steps.tag_info.outputs.tag_name }}" >> $GITHUB_OUTPUT
 
-      - name: Configure Git Safe Directory
-        run: git config --global --add safe.directory $GITHUB_WORKSPACE
-
-      - name: Get Go version from toolchain
-        id: go-version
-        run: |
-          TOOLCHAIN_VERSION=$(grep -E '^toolchain go[0-9]+\.[0-9]+(\.[0-9]+)?$' go.mod | cut -d ' ' -f 2 | sed 's/^go//')
-          if [ -n "$TOOLCHAIN_VERSION" ]; then
-            echo "Found toolchain version: $TOOLCHAIN_VERSION"
-            echo "version=$TOOLCHAIN_VERSION" >> $GITHUB_OUTPUT
-          else
-            GO_VERSION=$(grep -E '^go [0-9]+\.[0-9]+(\.[0-9]+)?$' go.mod | cut -d ' ' -f 2)
-            echo "Found go directive version: $GO_VERSION"
-            echo "version=$GO_VERSION" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Setup Go
-        uses: actions/setup-go@v4
+      - name: Download Release Artifacts
+        uses: actions/download-artifact@v4
         with:
-          go-version: ${{ steps.go-version.outputs.version }}
-          cache: true
+          name: release-artifacts
+          path: .
 
-      - name: Install Specific Ignite CLI Version
+      - name: Inspect Release Artifacts
         run: |
-          IGNITE_VERSION="v29.2.0"
-          ARCH="linux_amd64"
-
-          # Download the checksum file
-          curl -L "https://github.com/ignite/cli/releases/download/${IGNITE_VERSION}/ignite_${IGNITE_VERSION#v}_checksums.txt" -o checksums.txt
-
-          # Extract the expected checksum for the specific architecture from the checksum file
-          EXPECTED_CHECKSUM=$(grep "ignite_${IGNITE_VERSION#v}_${ARCH}.tar.gz" checksums.txt | awk '{print $1}')
-
-          # Download the Ignite CLI release tarball
-          curl -L "https://github.com/ignite/cli/releases/download/${IGNITE_VERSION}/ignite_${IGNITE_VERSION#v}_${ARCH}.tar.gz" -o ignite.tar.gz
-
-          # Verify the checksum
-          ACTUAL_CHECKSUM=$(sha256sum ignite.tar.gz | awk '{print $1}')
-          if [ "$ACTUAL_CHECKSUM" != "$EXPECTED_CHECKSUM" ]; then
-            echo "Error: Checksum mismatch!"
-            exit 1
-          fi
-
-          # Extract and make executable
-          tar -xzf ignite.tar.gz
-          chmod +x ignite
-
-      - name: Build Release Version
-        run: |
-          # Set WASMVM version
-          WASMVM_VERSION="v3.0.0-ibc2.0"  # Make sure this matches your go.mod version
-          
-          # Download and install libwasmvm
-          wget https://github.com/CosmWasm/wasmvm/releases/download/${WASMVM_VERSION}/libwasmvm.x86_64.so
-          sudo cp libwasmvm.x86_64.so /usr/lib/
-          
-          # Unset GOMODCACHE to prevent its path from being included in RUNPATH
-          unset GOMODCACHE
-          
-          # Build with only /usr/lib in RUNPATH
-          CGO_LDFLAGS="-Wl,-rpath,/usr/lib -Wl,--disable-new-dtags" ./ignite chain build --release --release.prefix ${{ steps.vars.outputs.tarball_prefix }} -y -t linux:amd64
-        env:
-          DO_NOT_TRACK: 1
-          GOFLAGS: "-buildvcs=false"
-
-      # Fix permissions
-      - name: Fix Release Directory Permissions
-        run: |
-          sudo chown -R $USER:$USER release/
-          sudo chmod -R 755 release/
-
-      - name: Prepare Release
-        run: |
-          cd release
-          
-          # Extract the existing tar file
-          tar_file=$(ls *.tar.gz)
-
-          file_path=$(tar -tzf "$tar_file" | head -n 2 | grep -v '/$' | grep lumerad | sed 's|^/||')
-          echo "Binary: $file_path"
-          tar xzf "$tar_file" -C .
-          ls -l "$file_path"
-
-          # move extracted file
-          mkdir -p temp
-          mv "$file_path" temp/
-          ls -l temp/
-
-          # Remove the original tar file and the extracted files
-          rm "$tar_file"
-          
-          # Copy libwasmvm and create install script
-          cp /usr/lib/libwasmvm.x86_64.so temp/
-          
-          # Create installation script
-          cat > temp/install.sh << 'EOF'
-          #!/bin/bash
-          if [ "$EUID" -ne 0 ]; then 
-            echo "Please run as root or with sudo"
-            exit 1
-          fi
-          cp lumerad /usr/local/bin
-          cp libwasmvm.x86_64.so /usr/lib/
-          ldconfig
-          echo "WASM library installed successfully"
-          EOF
-          
-          # Make script executable
-          chmod +x temp/install.sh
-          
-          # Create new tar file with all contents
-          cd temp
-          tar czf "../$tar_file" ./*
-          cd ..
-          
-          # Clean up
-          rm -rf temp
-          
-          # Verify the final tar contents
-          tar tvf "$tar_file"
-
-          sha256sum "$tar_file" > release_checksum
-
+          ls -R release
 
       - name: Publish the Release
         uses: softprops/action-gh-release@v0.1.15

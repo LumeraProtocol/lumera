@@ -18,6 +18,7 @@ import (
 
 	wasmtest "github.com/LumeraProtocol/lumera/tests/system/wasm"
 	"github.com/LumeraProtocol/lumera/tests/ibctesting"
+	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
 func TestGroupWithContract(t *testing.T) {
@@ -56,7 +57,7 @@ func TestGroupWithContract(t *testing.T) {
 	// and a proposal submitted
 	recipientAddr := sdk.AccAddress(rand.Bytes(address.Len))
 
-	payload := []sdk.Msg{banktypes.NewMsgSend(policyAddr, recipientAddr, sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.OneInt())))}
+	payload := []sdk.Msg{banktypes.NewMsgSend(policyAddr, recipientAddr, sdk.NewCoins(sdk.NewCoin(lcfg.ChainDenom, sdkmath.OneInt())))}
 	propMsg, err := group.NewMsgSubmitProposal(policyAddr.String(), []string{contractAddr.String()}, payload, "my proposal", group.Exec_EXEC_TRY, "my title", "my description")
 	require.NoError(t, err)
 
@@ -69,8 +70,8 @@ func TestGroupWithContract(t *testing.T) {
 	// require.NotEmpty(t, groupRsp.ProposalId)
 
 	// and coins received
-	recipientBalance := chain.Balance(recipientAddr, sdk.DefaultBondDenom)
-	expBalanceAmount := sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.OneInt())
+	recipientBalance := chain.Balance(recipientAddr, lcfg.ChainDenom)
+	expBalanceAmount := sdk.NewCoin(lcfg.ChainDenom, sdkmath.OneInt())
 	assert.Equal(t, expBalanceAmount.String(), recipientBalance.String())
 }
 
@@ -111,7 +112,7 @@ func TestGroupWithNewReflectContract(t *testing.T) {
 	// and a proposal submitted
 	recipientAddr := sdk.AccAddress(rand.Bytes(address.Len))
 
-	payload := []sdk.Msg{banktypes.NewMsgSend(policyAddr, recipientAddr, sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.OneInt())))}
+	payload := []sdk.Msg{banktypes.NewMsgSend(policyAddr, recipientAddr, sdk.NewCoins(sdk.NewCoin(lcfg.ChainDenom, sdkmath.OneInt())))}
 	propMsg, err := group.NewMsgSubmitProposal(policyAddr.String(), []string{contractAddr.String()}, payload, "my proposal", group.Exec_EXEC_TRY, "my title", "my description")
 	require.NoError(t, err)
 
@@ -123,7 +124,7 @@ func TestGroupWithNewReflectContract(t *testing.T) {
 	require.NoError(t, chain.Codec.Unmarshal(execRsp.Data, &groupRsp))
 
 	// and coins received
-	recipientBalance := chain.Balance(recipientAddr, sdk.DefaultBondDenom)
-	expBalanceAmount := sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.OneInt())
+	recipientBalance := chain.Balance(recipientAddr, lcfg.ChainDenom)
+	expBalanceAmount := sdk.NewCoin(lcfg.ChainDenom, sdkmath.OneInt())
 	assert.Equal(t, expBalanceAmount.String(), recipientBalance.String())
 }

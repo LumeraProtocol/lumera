@@ -3,14 +3,15 @@ package keeper_test
 import (
 	"testing"
 
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
-	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
 )
 
 func TestKeeper_GetSuperNode(t *testing.T) {
@@ -21,7 +22,7 @@ func TestKeeper_GetSuperNode(t *testing.T) {
 	sn := types.SuperNode{
 		SupernodeAccount: string(creatorAddr.String()),
 		ValidatorAddress: valAddr.String(),
-		Version:          "1.0.0",
+		Note:             "1.0.0",
 		PrevIpAddresses: []*types.IPAddressHistory{
 			{
 				Address: "102.145.1.1",

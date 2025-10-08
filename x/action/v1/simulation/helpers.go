@@ -255,56 +255,55 @@ func addPubKeyToAccount(ctx sdk.Context, simAccount simtypes.Account, ak types.A
 
 // selectRandomAccountWithSufficientFunds selects a random account that has enough balance to cover the specified fee amount
 func selectRandomAccountWithSufficientFunds(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, bk types.BankKeeper, ak types.AuthKeeper, skipAddresses []string) simtypes.Account {
-	// Get a random account
-	simAccount, _ := simtypes.RandomAcc(r, accs)
+	if len(accs) == 0 {
+		panic("no accounts available to select")
+	}
 
-	for _, skipAddress := range skipAddresses {
-		if simAccount.Address.String() == skipAddress {
-			return selectRandomAccountWithSufficientFunds(r, ctx, accs, bk, ak, skipAddresses)
+	skip := make(map[string]struct{}, len(skipAddresses))
+	for _, addr := range skipAddresses {
+		skip[addr] = struct{}{}
+	}
+
+	perm := r.Perm(len(accs))
+	for _, idx := range perm {
+		simAccount := accs[idx]
+		if _, shouldSkip := skip[simAccount.Address.String()]; shouldSkip {
+			continue
 		}
+
+		balance := bk.GetBalance(ctx, simAccount.Address, sdk.DefaultBondDenom)
+		if balance.IsZero() || balance.Amount.LT(math.NewInt(1_000_000)) {
+			continue
+		}
+
+		if err := addPubKeyToAccount(ctx, simAccount, ak); err != nil {
+			panic(err)
+		}
+
+		return simAccount
 	}
 
-	// Check if the account has enough balance
-	denom := sdk.DefaultBondDenom
-	balance := bk.GetBalance(ctx, simAccount.Address, denom)
-
-	// Ensure account has enough funds for gas + fees
-	if balance.IsZero() || balance.Amount.LT(math.NewInt(1000000)) {
-		// If the account doesn't have enough funds, recursively try another account
-		return selectRandomAccountWithSufficientFunds(r, ctx, accs, bk, ak, skipAddresses)
-	}
-
-	err := addPubKeyToAccount(ctx, simAccount, ak)
-	if err != nil {
-		panic(err)
-	}
-
-	return simAccount
+	panic("no account with sufficient funds found during simulation")
 }
 
 // selectRandomAccountWithInsufficientFunds selects a random account that doesn't have enough balance to cover the specified fee amount
 func selectRandomAccountWithInsufficientFunds(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, bk types.BankKeeper, minFee sdk.Coin) simtypes.Account {
-	// Get a random account
-	simAccount, _ := simtypes.RandomAcc(r, accs)
+	if len(accs) == 0 {
+		panic("no accounts available to select")
+	}
 
-	// Check if the account has insufficient balance
-	balance := bk.GetBalance(ctx, simAccount.Address, sdk.DefaultBondDenom)
-
-	// We need an account that has some funds (not zero) but less than the minimal fee
-	// This ensures we can see the insufficient funds error rather than something else
-	if balance.IsZero() || balance.Amount.GTE(minFee.Amount) {
-		// If the account has zero balance or enough funds, recursively try another account or modify balance
-		if balance.IsZero() {
-			// If balance is zero, randomly select another account
-			return selectRandomAccountWithInsufficientFunds(r, ctx, accs, bk, minFee)
-		} else {
-			// Since all accounts might have sufficient funds in simulation, we can use this account
-			// but need to artificially reduce its effective balance for the test
+	perm := r.Perm(len(accs))
+	for _, idx := range perm {
+		simAccount := accs[idx]
+		balance := bk.GetBalance(ctx, simAccount.Address, sdk.DefaultBondDenom)
+		if balance.IsZero() || balance.Amount.LT(minFee.Amount) {
 			return simAccount
 		}
 	}
 
-	return simAccount
+	// If every account has sufficient funds, fall back to a random account.
+	acc, _ := simtypes.RandomAcc(r, accs)
+	return acc
 }
 
 // generateRandomHash generates a random hash string for use in SENSE metadata
@@ -1035,7 +1034,7 @@ func registerSupernode(r *rand.Rand, ctx sdk.Context, k keeper.Keeper, accs []si
 		ValidatorAddress: validatorAddress,
 		SupernodeAccount: simAccount.Address.String(),
 		Evidence:         []*sntypes.Evidence{},
-		Version:          version,
+		Note:             version,
 		Metrics: &sntypes.MetricsAggregate{
 			Metrics:     make(map[string]float64),
 			ReportCount: 0,

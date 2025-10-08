@@ -28,6 +28,8 @@ import (
 	
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 	gogoproto "github.com/cosmos/gogoproto/proto"
+
+	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
 var wasmIdent       = []byte("\x00\x61\x73\x6D")
@@ -163,7 +165,7 @@ func (chain *TestChain) Fund(addr sdk.AccAddress, amount sdkmath.Int) {
 	_, err := chain.SendMsgs(&banktypes.MsgSend{
 		FromAddress: chain.SenderAccount.GetAddress().String(),
 		ToAddress:   addr.String(),
-		Amount:      sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, amount)),
+		Amount:      sdk.NewCoins(sdk.NewCoin(lcfg.ChainDenom, amount)),
 	})
 	require.NoError(chain.TB, err)
 }

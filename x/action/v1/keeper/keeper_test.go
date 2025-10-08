@@ -250,7 +250,7 @@ func (suite *KeeperTestSuite) generateCascadeFinalizationMetadata(missing Metada
 }
 
 // generateSenseFinalizationMetadata generates test finalization metadata for Sense actions
-func (suite *KeeperTestSuite) generateSenseFinalizationMetadata(signatures string, missing MetadataFieldToMiss) []byte {
+func (suite *KeeperTestSuite) generateSenseFinalizationMetadata(signatures string, _ MetadataFieldToMiss) []byte {
 	// Generate more complete metadata with required fields
 
 	var validIDs []string

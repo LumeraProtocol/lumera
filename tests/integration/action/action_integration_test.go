@@ -64,7 +64,7 @@ func (suite *ActionIntegrationTestSuite) SetupTest() {
 	sn := sntypes.SuperNode{
 		ValidatorAddress: valAddr.String(),
 		SupernodeAccount: suite.testAddrs[1].String(),
-		Version:          "1.0.0",
+		Note:             "1.0.0",
 		States:           []*sntypes.SuperNodeStateRecord{{State: sntypes.SuperNodeStateActive}},
 		PrevIpAddresses:  []*sntypes.IPAddressHistory{{Address: "192.168.1.1"}},
 		P2PPort:          "2134",

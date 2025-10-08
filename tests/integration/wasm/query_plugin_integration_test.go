@@ -34,6 +34,7 @@ import (
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 
 	"github.com/LumeraProtocol/lumera/app"
+	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
 func TestMaskReflectCustomQuery(t *testing.T) {
@@ -190,14 +191,14 @@ func TestReflectTotalSupplyQuery(t *testing.T) {
 	contractAddr, _, err := keepers.ContractKeeper.Instantiate(ctx, codeID, creator, nil, []byte("{}"), "testing", nil)
 	require.NoError(t, err)
 
-	currentStakeSupply := keepers.BankKeeper.GetSupply(ctx, "stake")
+	currentStakeSupply := keepers.BankKeeper.GetSupply(ctx, lcfg.ChainDenom)
 	require.NotEmpty(t, currentStakeSupply.Amount) // ensure we have real data
 	specs := map[string]struct {
 		denom     string
 		expAmount wasmvmtypes.Coin
 	}{
 		"known denom": {
-			denom:     "stake",
+			denom:     lcfg.ChainDenom,
 			expAmount: wasmKeeper.ConvertSdkCoinToWasmCoin(currentStakeSupply),
 		},
 		"unknown denom": {
@@ -544,11 +545,11 @@ func TestDistributionQuery(t *testing.T) {
 	keeper := keepers.WasmKeeper
 
 	example := wasmKeeper.InstantiateReflectExampleContract(t, pCtx, keepers)
-	delegator := keepers.Faucet.NewFundedRandomAccount(pCtx, sdk.NewCoins(sdk.NewInt64Coin(sdk.DefaultBondDenom, 100_000_000))...)
-	otherAddr := keepers.Faucet.NewFundedRandomAccount(pCtx, sdk.NewCoins(sdk.NewInt64Coin(sdk.DefaultBondDenom, 100_000_000))...)
+	delegator := keepers.Faucet.NewFundedRandomAccount(pCtx, sdk.NewCoins(sdk.NewInt64Coin(lcfg.ChainDenom, 100_000_000))...)
+	otherAddr := keepers.Faucet.NewFundedRandomAccount(pCtx, sdk.NewCoins(sdk.NewInt64Coin(lcfg.ChainDenom, 100_000_000))...)
 
-	val1Addr := addValidator(t, pCtx, keepers.StakingKeeper, keepers.Faucet, sdk.NewInt64Coin(sdk.DefaultBondDenom, 10_000_000))
-	val2Addr := addValidator(t, pCtx, keepers.StakingKeeper, keepers.Faucet, sdk.NewInt64Coin(sdk.DefaultBondDenom, 20_000_000))
+	val1Addr := addValidator(t, pCtx, keepers.StakingKeeper, keepers.Faucet, sdk.NewInt64Coin(lcfg.ChainDenom, 10_000_000))
+	val2Addr := addValidator(t, pCtx, keepers.StakingKeeper, keepers.Faucet, sdk.NewInt64Coin(lcfg.ChainDenom, 20_000_000))
 	_ = val2Addr
 	pCtx = nextBlock(pCtx, keepers.StakingKeeper)
 
@@ -605,7 +606,7 @@ func TestDistributionQuery(t *testing.T) {
 			assert: func(t *testing.T, d []byte) {
 				var rsp wasmvmtypes.DelegationRewardsResponse
 				mustUnmarshal(t, d, &rsp)
-				expRewards := []wasmvmtypes.DecCoin{{Amount: "45000000.000000000000000000", Denom: "stake"}}
+				expRewards := []wasmvmtypes.DecCoin{{Amount: "45000000.000000000000000000", Denom: lcfg.ChainDenom}}
 				assert.Equal(t, expRewards, rsp.Rewards)
 			},
 		},
@@ -649,12 +650,12 @@ func TestDistributionQuery(t *testing.T) {
 				mustUnmarshal(t, d, &rsp)
 				expRewards := []wasmvmtypes.DelegatorReward{
 					{
-						Reward:           []wasmvmtypes.DecCoin{{Amount: "45000000.000000000000000000", Denom: "stake"}},
+						Reward:           []wasmvmtypes.DecCoin{{Amount: "45000000.000000000000000000", Denom: lcfg.ChainDenom}},
 						ValidatorAddress: val1Addr.String(),
 					},
 				}
 				assert.Equal(t, expRewards, rsp.Rewards)
-				expTotal := []wasmvmtypes.DecCoin{{Amount: "45000000.000000000000000000", Denom: "stake"}}
+				expTotal := []wasmvmtypes.DecCoin{{Amount: "45000000.000000000000000000", Denom: lcfg.ChainDenom}}
 				assert.Equal(t, expTotal, rsp.Total)
 			},
 		},

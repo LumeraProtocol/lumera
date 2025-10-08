@@ -2,17 +2,19 @@ package keeper
 
 import (
 	"fmt"
+	"strconv"
 
 	errorsmod "cosmossdk.io/errors"
 	sdkmath "cosmossdk.io/math"
 	"cosmossdk.io/store/prefix"
 
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"github.com/cosmos/cosmos-sdk/runtime"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/types/query"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
+
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 // SetSuperNode sets a supernode record in the store
@@ -131,8 +133,9 @@ func (k Keeper) GetMinStake(ctx sdk.Context) sdkmath.Int {
 	return minStakeInt
 }
 
-// EnableSuperNode enables a validator's SuperNode status
-func (k Keeper) EnableSuperNode(ctx sdk.Context, valAddr sdk.ValAddress) error {
+// SetSuperNodeActive sets a validator's SuperNode status to active and emits an event.
+// If reason is non-empty, it is included as an event attribute.
+func (k Keeper) SetSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress, reason string) error {
 	valOperAddr, err := sdk.ValAddressFromBech32(valAddr.String())
 	if err != nil {
 		return errorsmod.Wrapf(sdkerrors.ErrInvalidAddress, "invalid validator address: %s", err)
@@ -147,30 +150,48 @@ func (k Keeper) EnableSuperNode(ctx sdk.Context, valAddr sdk.ValAddress) error {
 		return errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode is in an invalid state")
 	}
 
-	if supernode.States[len(supernode.States)-1].State != types.SuperNodeStateActive {
+	currentState := supernode.States[len(supernode.States)-1].State
+
+	switch currentState {
+	case types.SuperNodeStateDisabled:
+		// Cannot enable if disabled - must be re-registered
+		return nil // Silently ignore - disabled supernodes need re-registration
+	case types.SuperNodeStateStopped:
+		// Only enable if currently stopped
 		supernode.States = append(supernode.States, &types.SuperNodeStateRecord{
 			State:  types.SuperNodeStateActive,
 			Height: ctx.BlockHeight(),
 		})
+	case types.SuperNodeStateActive:
+		// Already active, nothing to do
+		return nil
 	}
 	if err := k.SetSuperNode(ctx, supernode); err != nil {
 		k.logger.With("module", fmt.Sprintf("error updating supernode state: %s", valAddr)).Error(fmt.Sprintf("x/%s", types.ModuleName))
-		return errorsmod.Wrapf(sdkerrors.ErrNotFound, "eror updating supernode state")
+		return errorsmod.Wrapf(sdkerrors.ErrIO, "error updating supernode state")
 	}
 	// Emit event for watchers
+	attrs := []sdk.Attribute{
+		sdk.NewAttribute(types.AttributeKeyValidatorAddress, supernode.ValidatorAddress),
+		sdk.NewAttribute(types.AttributeKeyOldState, currentState.String()),
+		sdk.NewAttribute(types.AttributeKeyHeight, strconv.FormatInt(ctx.BlockHeight(), 10)),
+	}
+	if reason != "" {
+		attrs = append(attrs, sdk.NewAttribute(types.AttributeKeyReason, reason))
+	}
 	ctx.EventManager().EmitEvent(
 		sdk.NewEvent(
 			types.EventTypeSupernodeStarted,
-			sdk.NewAttribute(types.AttributeKeyValidatorAddress, supernode.ValidatorAddress),
-			sdk.NewAttribute(types.AttributeKeyReason, "enable_supernode"),
+			attrs...,
 		),
 	)
 
 	return nil
 }
 
-// DisableSuperNode disables a validator's SuperNode status
-func (k Keeper) DisableSuperNode(ctx sdk.Context, valAddr sdk.ValAddress) error {
+// SetSuperNodeStopped sets a validator's SuperNode status to stopped and emits an event.
+// If reason is non-empty, it is included as an event attribute.
+func (k Keeper) SetSuperNodeStopped(ctx sdk.Context, valAddr sdk.ValAddress, reason string) error {
 	valOperAddr, err := sdk.ValAddressFromBech32(valAddr.String())
 	if err != nil {
 		return errorsmod.Wrapf(sdkerrors.ErrInvalidAddress, "invalid validator address: %s", err)
@@ -185,24 +206,36 @@ func (k Keeper) DisableSuperNode(ctx sdk.Context, valAddr sdk.ValAddress) error 
 		return errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode is in an invalid state")
 	}
 
-	if supernode.States[len(supernode.States)-1].State != types.SuperNodeStateDisabled {
+	currentState := supernode.States[len(supernode.States)-1].State
+	// Only stop if currently active - ignore if already stopped or disabled
+	if currentState == types.SuperNodeStateActive {
 		supernode.States = append(supernode.States, &types.SuperNodeStateRecord{
-			State:  types.SuperNodeStateDisabled,
+			State:  types.SuperNodeStateStopped,
 			Height: ctx.BlockHeight(),
 		})
+	} else {
+		// If already stopped or disabled, return without error
+		return nil
 	}
 
 	if err := k.SetSuperNode(ctx, supernode); err != nil {
 		k.logger.With("module", fmt.Sprintf("error updating supernode state: %s", valAddr)).Error(fmt.Sprintf("x/%s", types.ModuleName))
-		return errorsmod.Wrapf(sdkerrors.ErrNotFound, "eror updating supernode state")
+		return errorsmod.Wrapf(sdkerrors.ErrIO, "error updating supernode state")
 	}
 
 	// Emit event
+	attrs := []sdk.Attribute{
+		sdk.NewAttribute(types.AttributeKeyValidatorAddress, supernode.ValidatorAddress),
+		sdk.NewAttribute(types.AttributeKeyOldState, currentState.String()),
+		sdk.NewAttribute(types.AttributeKeyHeight, strconv.FormatInt(ctx.BlockHeight(), 10)),
+	}
+	if reason != "" {
+		attrs = append(attrs, sdk.NewAttribute(types.AttributeKeyReason, reason))
+	}
 	ctx.EventManager().EmitEvent(
 		sdk.NewEvent(
 			types.EventTypeSupernodeStopped,
-			sdk.NewAttribute(types.AttributeKeyValidatorAddress, supernode.ValidatorAddress),
-			sdk.NewAttribute(types.AttributeKeyReason, "disable_supernode"),
+			attrs...,
 		),
 	)
 
@@ -272,7 +305,7 @@ func (k Keeper) CheckValidatorSupernodeEligibility(ctx sdk.Context, validator st
 	// 7. Check if there's a supernode account with delegation to this validator
 	// Initialize to zero
 	supernodeDelegatedTokensInt := sdkmath.ZeroInt()
-	
+
 	// If supernodeAccount is provided, use it directly
 	if supernodeAccount != "" {
 		// Get the supernode account address

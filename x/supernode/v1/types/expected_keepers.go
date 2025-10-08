@@ -8,9 +8,8 @@ import (
 	"time"
 
 	"cosmossdk.io/log"
-	math "cosmossdk.io/math"
-	sdkmath "cosmossdk.io/math"
 	"cosmossdk.io/core/address"
+	sdkmath "cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/query"
 
@@ -21,11 +20,11 @@ import (
 // For Generating mocks only not used in depinject
 type SupernodeKeeper interface {
 	SetSuperNode(ctx sdk.Context, supernode SuperNode) error
-	EnableSuperNode(ctx sdk.Context, valAddr sdk.ValAddress) error
-	DisableSuperNode(ctx sdk.Context, valAddr sdk.ValAddress) error
 	SetParams(ctx sdk.Context, params Params) error
 	CheckValidatorSupernodeEligibility(ctx sdk.Context, validator stakingtypes.ValidatorI, valAddr string, supernodeAccount string) error
-
+	SetSuperNodeStopped(ctx sdk.Context, valAddr sdk.ValAddress, reason string) error
+	SetSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress, reason string) error
+	
 	Logger() log.Logger
 	GetAuthority() string
 	GetStakingKeeper() StakingKeeper
@@ -79,5 +78,5 @@ type StakingHooks interface {
 	BeforeDelegationSharesModified(ctx context.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) error // Must be called when a delegation's shares are modified
 	BeforeDelegationRemoved(ctx context.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) error        // Must be called when a delegation is removed
 	AfterDelegationModified(ctx context.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) error
-	BeforeValidatorSlashed(ctx context.Context, valAddr sdk.ValAddress, fraction math.LegacyDec) error
+	BeforeValidatorSlashed(ctx context.Context, valAddr sdk.ValAddress, fraction sdkmath.LegacyDec) error
 }

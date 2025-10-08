@@ -18,6 +18,8 @@ import (
 	commitmenttypes "github.com/cosmos/ibc-go/v10/modules/core/23-commitment/types"
 	ibctm "github.com/cosmos/ibc-go/v10/modules/light-clients/07-tendermint"
 	ibcmock "github.com/LumeraProtocol/lumera/tests/ibctesting/mock"
+
+	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
 const (
@@ -59,7 +61,7 @@ var (
 	DefaultCoinAmount            = sdkmath.NewInt(100)
 
 	TestAccAddress    = "cosmos17dtl0mjt3t77kpuhg2edqzjpszulwhgzuj9ljs"
-	TestCoin          = sdk.NewCoin(sdk.DefaultBondDenom, DefaultCoinAmount)
+	TestCoin          = sdk.NewCoin(lcfg.ChainDenom, DefaultCoinAmount)
 	SecondaryDenom    = "ufoo"
 	SecondaryTestCoin = sdk.NewCoin(SecondaryDenom, DefaultCoinAmount)
 	TestCoins         = sdk.NewCoins(TestCoin, SecondaryTestCoin)

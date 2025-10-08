@@ -100,7 +100,7 @@ func (k *Keeper) VerifySignature(ctx sdk.Context, data string, signature string,
 // - Any step in the verification process fails
 func VerifyKademliaIDs(ids []string, signatures string, counterIc uint64, counterMax uint64) error {
 	// Validate input parameters
-	if ids == nil || len(ids) == 0 {
+	if len(ids) == 0 {
 		return fmt.Errorf("empty ID")
 	}
 
@@ -133,7 +133,7 @@ func VerifyKademliaIDs(ids []string, signatures string, counterIc uint64, counte
 	}
 
 	idIndex := randomIndex.Uint64()
-	if idIndex < 0 || idIndex >= counterMax {
+	if idIndex >= counterMax {
 		return fmt.Errorf("invalid random index: %d", idIndex)
 	}
 

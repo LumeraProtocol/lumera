@@ -59,34 +59,6 @@ func (mr *MockSupernodeKeeperMockRecorder) CheckValidatorSupernodeEligibility(ct
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CheckValidatorSupernodeEligibility", reflect.TypeOf((*MockSupernodeKeeper)(nil).CheckValidatorSupernodeEligibility), ctx, validator, valAddr, supernodeAccount)
 }
 
-// DisableSuperNode mocks base method.
-func (m *MockSupernodeKeeper) DisableSuperNode(ctx types0.Context, valAddr types0.ValAddress) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DisableSuperNode", ctx, valAddr)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// DisableSuperNode indicates an expected call of DisableSuperNode.
-func (mr *MockSupernodeKeeperMockRecorder) DisableSuperNode(ctx, valAddr interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DisableSuperNode", reflect.TypeOf((*MockSupernodeKeeper)(nil).DisableSuperNode), ctx, valAddr)
-}
-
-// EnableSuperNode mocks base method.
-func (m *MockSupernodeKeeper) EnableSuperNode(ctx types0.Context, valAddr types0.ValAddress) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "EnableSuperNode", ctx, valAddr)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// EnableSuperNode indicates an expected call of EnableSuperNode.
-func (mr *MockSupernodeKeeperMockRecorder) EnableSuperNode(ctx, valAddr interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnableSuperNode", reflect.TypeOf((*MockSupernodeKeeper)(nil).EnableSuperNode), ctx, valAddr)
-}
-
 // GetAllSuperNodes mocks base method.
 func (m *MockSupernodeKeeper) GetAllSuperNodes(ctx types0.Context, stateFilters ...types.SuperNodeState) ([]types.SuperNode, error) {
 	m.ctrl.T.Helper()
@@ -282,6 +254,34 @@ func (m *MockSupernodeKeeper) SetSuperNode(ctx types0.Context, supernode types.S
 func (mr *MockSupernodeKeeperMockRecorder) SetSuperNode(ctx, supernode interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSuperNode", reflect.TypeOf((*MockSupernodeKeeper)(nil).SetSuperNode), ctx, supernode)
+}
+
+// SetSuperNodeActive mocks base method.
+func (m *MockSupernodeKeeper) SetSuperNodeActive(ctx types0.Context, valAddr types0.ValAddress, reason string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetSuperNodeActive", ctx, valAddr, reason)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetSuperNodeActive indicates an expected call of SetSuperNodeActive.
+func (mr *MockSupernodeKeeperMockRecorder) SetSuperNodeActive(ctx, valAddr, reason interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSuperNodeActive", reflect.TypeOf((*MockSupernodeKeeper)(nil).SetSuperNodeActive), ctx, valAddr, reason)
+}
+
+// SetSuperNodeStopped mocks base method.
+func (m *MockSupernodeKeeper) SetSuperNodeStopped(ctx types0.Context, valAddr types0.ValAddress, reason string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetSuperNodeStopped", ctx, valAddr, reason)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetSuperNodeStopped indicates an expected call of SetSuperNodeStopped.
+func (mr *MockSupernodeKeeperMockRecorder) SetSuperNodeStopped(ctx, valAddr, reason interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSuperNodeStopped", reflect.TypeOf((*MockSupernodeKeeper)(nil).SetSuperNodeStopped), ctx, valAddr, reason)
 }
 
 // MockStakingKeeper is a mock of StakingKeeper interface.

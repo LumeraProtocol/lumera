@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"context"
+	"strconv"
 
 	errorsmod "cosmossdk.io/errors"
 	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
@@ -9,6 +10,7 @@ import (
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 )
 
+// StopSupernode stops an active supernode (transitions from Active to Stopped state)
 func (k msgServer) StopSupernode(goCtx context.Context, msg *types.MsgStopSupernode) (*types.MsgStopSupernodeResponse, error) {
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
@@ -37,10 +39,11 @@ func (k msgServer) StopSupernode(goCtx context.Context, msg *types.MsgStopSupern
 		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode is disabled")
 	}
 
-	supernode.States = append(supernode.States, &types.SuperNodeStateRecord{
-		State:  types.SuperNodeStateStopped,
-		Height: ctx.BlockHeight(),
-	})
+    prevState := supernode.States[len(supernode.States)-1].State
+    supernode.States = append(supernode.States, &types.SuperNodeStateRecord{
+        State:  types.SuperNodeStateStopped,
+        Height: ctx.BlockHeight(),
+    })
 
 	if err := k.SetSuperNode(ctx, supernode); err != nil {
 		return nil, err
@@ -51,6 +54,8 @@ func (k msgServer) StopSupernode(goCtx context.Context, msg *types.MsgStopSupern
 			types.EventTypeSupernodeStopped,
 			sdk.NewAttribute(types.AttributeKeyValidatorAddress, msg.ValidatorAddress),
 			sdk.NewAttribute(types.AttributeKeyReason, msg.Reason),
+			sdk.NewAttribute(types.AttributeKeyOldState, prevState.String()),
+			sdk.NewAttribute(types.AttributeKeyHeight, strconv.FormatInt(ctx.BlockHeight(), 10)),
 		),
 	)
 

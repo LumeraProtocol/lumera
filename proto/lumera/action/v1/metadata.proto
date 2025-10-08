@@ -52,5 +52,8 @@ message CascadeMetadata {
   repeated string rq_ids_ids = 5 [json_name = "rq_ids_ids", (gogoproto.nullable) = true];
   // RequestAction required field
   string signatures = 6 [json_name = "signatures"];
+  // Indicates whether the action is publicly visible. Set to true to
+  // mark the action as visible to all users; set to false for private
+  // or restricted actions.
+  bool public = 7 [json_name = "public"];
 }
-

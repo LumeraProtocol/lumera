@@ -98,9 +98,25 @@ func requireEnoughFileHandlers(nodesCount int) {
 
 func initSDKConfig(bech32Prefix string) {
 	config := sdk.GetConfig()
-	config.SetBech32PrefixForAccount(bech32Prefix, bech32Prefix+sdk.PrefixPublic)
-	config.SetBech32PrefixForValidator(bech32Prefix+sdk.PrefixValidator+sdk.PrefixOperator, bech32Prefix+sdk.PrefixValidator+sdk.PrefixOperator+sdk.PrefixPublic)
-	config.SetBech32PrefixForConsensusNode(bech32Prefix+sdk.PrefixValidator+sdk.PrefixConsensus, bech32Prefix+sdk.PrefixValidator+sdk.PrefixConsensus+sdk.PrefixPublic)
+	accAddrPrefix := bech32Prefix
+	accPubPrefix := bech32Prefix + sdk.PrefixPublic
+	valAddrPrefix := bech32Prefix + sdk.PrefixValidator + sdk.PrefixOperator
+	valPubPrefix := valAddrPrefix + sdk.PrefixPublic
+	consAddrPrefix := bech32Prefix + sdk.PrefixValidator + sdk.PrefixConsensus
+	consPubPrefix := consAddrPrefix + sdk.PrefixPublic
+
+	if config.GetBech32AccountAddrPrefix() == accAddrPrefix &&
+		config.GetBech32AccountPubPrefix() == accPubPrefix &&
+		config.GetBech32ValidatorAddrPrefix() == valAddrPrefix &&
+		config.GetBech32ValidatorPubPrefix() == valPubPrefix &&
+		config.GetBech32ConsensusAddrPrefix() == consAddrPrefix &&
+		config.GetBech32ConsensusPubPrefix() == consPubPrefix {
+		return
+	}
+
+	config.SetBech32PrefixForAccount(accAddrPrefix, accPubPrefix)
+	config.SetBech32PrefixForValidator(valAddrPrefix, valPubPrefix)
+	config.SetBech32PrefixForConsensusNode(consAddrPrefix, consPubPrefix)
 }
 
 const (

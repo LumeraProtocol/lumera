@@ -3,11 +3,12 @@ package simulation
 import (
 	"math/rand"
 
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	simtypes "github.com/cosmos/cosmos-sdk/types/simulation"
+
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 const (
@@ -43,9 +44,21 @@ func SimulateMsgStartSupernode(
 				continue
 			}
 
-			// Skip if supernode is already active
-			if len(supernode.States) > 0 && supernode.States[len(supernode.States)-1].State == types.SuperNodeStateActive {
-				continue
+			// Check current state
+			if len(supernode.States) > 0 {
+				currentState := supernode.States[len(supernode.States)-1].State
+				// Skip if supernode is already active
+				if currentState == types.SuperNodeStateActive {
+					continue
+				}
+				// Skip if supernode is disabled (requires re-registration)
+				if currentState == types.SuperNodeStateDisabled {
+					continue
+				}
+				// Only proceed if supernode is stopped
+				if currentState != types.SuperNodeStateStopped {
+					continue
+				}
 			}
 
 			validatorAddress = validator.GetOperator()

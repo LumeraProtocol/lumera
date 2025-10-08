@@ -8,12 +8,10 @@ release/
 *.ign
 *.test
 *.out
-devnet/docker-compose.yml
-libwasmvm.x86_64.so
-lumerad
-devnet/primary-validator.sh
-devnet/secondary-validator.sh
 
+devnet/docker-compose.yml
+devnet/bin/
+devnet/bin-*/
 __devnet_deploy_test
 devnet-deploy.tar.gz
 
@@ -26,7 +24,4 @@ projectBrief.md
 
 tests/systemtests/testnet
 tests/systemtests/__debug_bin*
-devnet/docker-compose.start.yml
-devnet/start.sh
-
-
+build/

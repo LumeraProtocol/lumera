@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	simtypes "github.com/cosmos/cosmos-sdk/types/simulation"
+
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 const (
@@ -41,9 +42,15 @@ func SimulateMsgRegisterSupernode(
 				continue
 			}
 
-			// Check if supernode already exists
-			_, superNodeExists := k.QuerySuperNode(ctx, valAddr)
+			// Check if supernode already exists and is not disabled
+			supernode, superNodeExists := k.QuerySuperNode(ctx, valAddr)
 			if superNodeExists {
+				// Allow re-registration if the supernode is disabled
+				if len(supernode.States) > 0 && supernode.States[len(supernode.States)-1].State == types.SuperNodeStateDisabled {
+					found = true
+					break
+				}
+				// Skip if supernode exists and is not disabled
 				continue
 			}
 

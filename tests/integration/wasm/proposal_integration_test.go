@@ -10,8 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	sdkmath "cosmossdk.io/math"
-
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	govkeeper "github.com/cosmos/cosmos-sdk/x/gov/keeper"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
@@ -23,6 +21,7 @@ import (
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 
 	_ "github.com/LumeraProtocol/lumera/app"
+	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
 var (
@@ -40,8 +39,8 @@ func TestLoadStoredGovV1Beta1LegacyTypes(t *testing.T) {
 		AddRoute(wasmtypes.ModuleName, wasmKeeper.NewLegacyWasmProposalHandler(k, wasmtypes.EnableAllProposals)),
 	)
 	myAddress := wasmKeeper.RandomAccountAddress(t)
-	keepers.Faucet.Fund(pCtx, myAddress, sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.NewIntFromUint64(100_000_000)))
-	keepers.Faucet.Fund(pCtx, myAddress, sdk.NewCoin("denom", sdkmath.NewIntFromUint64(100_000_000)))
+	keepers.Faucet.Fund(pCtx, myAddress, sdk.NewInt64Coin(lcfg.ChainDenom, 100_000_000))
+	keepers.Faucet.Fund(pCtx, myAddress, sdk.NewInt64Coin("denom", 100_000_000))
 
 	reflectExample := wasmKeeper.InstantiateReflectExampleContract(t, pCtx, keepers)
 	burnerExample := wasmKeeper.StoreBurnerExampleContract(t, pCtx, keepers)
@@ -221,7 +220,7 @@ func submitLegacyProposal(t *testing.T, ctx sdk.Context, content v1beta1.Content
 
 	proposal, err := v1.NewMsgSubmitProposal(
 		[]sdk.Msg{contentMsg},
-		sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.NewIntFromUint64(1_000_000))),
+		sdk.NewCoins(sdk.NewInt64Coin(lcfg.ChainDenom, 1_000_000)),
 		myActorAddress,
 		"",
 		content.GetTitle(),

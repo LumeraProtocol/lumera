@@ -1,0 +1,222 @@
+.PHONY: devnet-build devnet-up devnet-reset devnet-up-detach devnet-down devnet-clean devnet-deploy-tar devnet-upgrade devnet-new
+.PHONY: devnet-build-default _check-devnet-default-cfg
+
+##### Devnet Makefile (Makefile.devnet) ########################################
+#
+# To use external genesis - provide path to it via EXTERNAL_GENESIS_FILE
+# Examples:
+## Using default config files
+## make devnet-build \
+## 		EXTERNAL_CLAIMS_FILE=~/claims.csv \
+## 		EXTERNAL_GENESIS_FILE=~/genesis.json
+##
+## Using custom config files
+## make devnet-build \
+## 		CONFIG_JSON=path/to/custom/config.json \
+## 		VALIDATORS_JSON=path/to/custom/validators.json \
+## 		EXTERNAL_CLAIMS_FILE=claims.csv \
+## 		EXTERNAL_GENESIS_FILE=template_genesis.json
+
+DEVNET_DIR := /tmp/lumera-devnet-1
+SHARED_DIR := ${DEVNET_DIR}/shared
+SHARED_RELEASE_DIR := ${SHARED_DIR}/release
+SHARED_CONFIG_DIR := ${SHARED_DIR}/config
+VALIDATOR_DIRS := $(wildcard ${DEVNET_DIR}/supernova_validator*-data)
+EXTERNAL_GENESIS := $(SHARED_CONFIG_DIR)/external_genesis.json
+CLAIMS_FILE := $(SHARED_CONFIG_DIR)/claims.csv
+COMPOSE_FILE := devnet/docker-compose.yml
+
+DEVNET_BUILD_LUMERA?=1      # 1 = build lumerad for devnet setup, 0 = skip
+DEVNET_BIN_DIR?=devnet/bin
+
+# Default paths for configuration files
+DEFAULT_CONFIG_JSON := config/config.json
+DEFAULT_VALIDATORS_JSON := config/validators.json
+# Default genesis and claims files for devnet docker
+DEFAULT_GENESIS_FILE := devnet/default-config/devnet-genesis.json
+DEFAULT_CLAIMS_FILE := claims.csv # relative to devnet
+
+devnet-build:
+	@mkdir -p "$(SHARED_RELEASE_DIR)"; \
+	if [ -n "$(EXTERNAL_GENESIS_FILE)" ] && [ -f "$(EXTERNAL_GENESIS_FILE)" ]; then \
+		echo "Starting devnet with existing genesis from $(EXTERNAL_GENESIS_FILE) ..."; \
+		mkdir -p "$(SHARED_CONFIG_DIR)"; \
+		cp -f "$(EXTERNAL_GENESIS_FILE)" "$(EXTERNAL_GENESIS)"; \
+		export EXTERNAL_GENESIS_FILE=1; \
+	else \
+		echo "No external genesis file provided or file not found. Using default initialization..."; \
+		export EXTERNAL_GENESIS_FILE=0; \
+	fi; \
+	if [ -n "$(EXTERNAL_CLAIMS_FILE)" ] && [ -f "$(EXTERNAL_CLAIMS_FILE)" ]; then \
+		cp -f "$(EXTERNAL_CLAIMS_FILE)" "$(CLAIMS_FILE)"; \
+		echo "Using claims file $(EXTERNAL_CLAIMS_FILE)"; \
+		EXTERNAL_GENESIS_FILE=$${EXTERNAL_GENESIS_FILE}; \
+		mkdir -p "${DEVNET_BIN_DIR}"; \
+		if [ "$(DEVNET_BUILD_LUMERA)" -eq "1" ]; then \
+			$(MAKE) build; \
+			if [ ! -f "${BUILD_DIR}/lumerad" ]; then \
+				echo "Cannot find lumerad binary [${BUILD_DIR}/lumerad]"; \
+				exit 1; \
+			fi; \
+			echo "Copying [${BUILD_DIR}/lumerad] to [${DEVNET_BIN_DIR}] directory..."; \
+			cp -f ${BUILD_DIR}/lumerad "${DEVNET_BIN_DIR}"; \
+			go get github.com/CosmWasm/wasmvm/$(WASMVM_VERSION); \
+			find $$(go env GOPATH)/pkg/mod/github.com/!cosm!wasm/wasmvm/$(WASMVM_VERSION) -name "libwasmvm.x86_64.so" -exec cp -f {} ${DEVNET_BIN_DIR}/libwasmvm.x86_64.so \; ; \
+		else \
+			echo "Using existing lumera binaries from ${DEVNET_BIN_DIR}..."; \
+		fi; \
+		if [ ! -f "${DEVNET_BIN_DIR}/lumerad" ]; then \
+			echo "${DEVNET_BIN_DIR}/lumerad binary not found..."; \
+			exit 1; \
+		fi; \
+		if [ ! -f "${DEVNET_BIN_DIR}/libwasmvm.x86_64.so" ]; then \
+			echo "${DEVNET_BIN_DIR}/libwasmvm.x86_64.so library not found..."; \
+			exit 1; \
+		fi; \
+        cp -f "${DEVNET_BIN_DIR}/lumerad" "${SHARED_RELEASE_DIR}/"; \
+        cp -f "${DEVNET_BIN_DIR}/libwasmvm.x86_64.so" "${SHARED_RELEASE_DIR}/"; \
+		cd devnet && \
+		${GO} mod tidy && \
+		CONFIG_JSON="$${CONFIG_JSON:-$(DEFAULT_CONFIG_JSON)}" \
+		VALIDATORS_JSON="$${VALIDATORS_JSON:-$(DEFAULT_VALIDATORS_JSON)}" \
+		./scripts/configure.sh --bin-dir "${DEVNET_BIN_DIR}" &&\
+		${GO} run . && \
+		START_MODE=bootstrap docker compose build && \
+		echo "Initialization complete. Ready to start nodes."; \
+	else \
+		echo "No external claims file provided or file not found."; \
+		exit 1; \
+	fi
+
+devnet-build-default: _check-devnet-default-cfg
+	@$(MAKE) devnet-build \
+		DEVNET_BUILD_LUMERA=$(DEVNET_BUILD_LUMERA) \
+		EXTERNAL_GENESIS_FILE="$$(realpath $(DEFAULT_GENESIS_FILE))" \
+		EXTERNAL_CLAIMS_FILE="$$(realpath $(DEFAULT_CLAIMS_FILE))"
+
+_check-devnet-default-cfg:
+	@[ -f "$$(realpath $(DEFAULT_GENESIS_FILE))" ] || (echo "Missing DEFAULT_GENESIS_FILE: $$(realpath $(DEFAULT_GENESIS_FILE))"; exit 1)
+	@[ -f "$$(realpath $(DEFAULT_CLAIMS_FILE))" ] || (echo "Missing DEFAULT_CLAIMS_FILE: $$(realpath $(DEFAULT_CLAIMS_FILE))"; exit 1)
+
+package-devnet:
+	@echo "Packaging devnet artifacts..."
+
+devnet-reset:
+	@echo "Resetting all validators (gentx and keys)..."
+	@cd devnet && for i in $$(docker compose -f ${COMPOSE_FILE} config --services | grep '^supernova_validator_'); do \
+		echo "Resetting $$i..."; \
+		if docker compose -f ${COMPOSE_FILE} ps $$i | grep -q 'Up'; then \
+			docker compose -f ${COMPOSE_FILE} exec -T $$i bash -c "\
+			  rm -f /root/.lumera/config/genesis.json /root/.lumera/config/priv_validator_key.json"; \
+			docker compose -f ${COMPOSE_FILE} restart $$i; \
+		else \
+			echo "Container $$i is not running. Starting and resetting..."; \
+			docker compose -f ${COMPOSE_FILE} run --rm $$i bash -c "\
+			  rm -f /root/.lumera/config/genesis.json /root/.lumera/config/priv_validator_key.json"; \
+		fi \
+	done
+	
+devnet-up:
+	@if [ -f "${COMPOSE_FILE}" ]; then \
+		echo "Starting devnet..."; \
+		cd devnet && \
+		START_MODE=auto docker compose up; \
+	else \
+		echo "Devnet not built yet. Please run 'make devnet-build' first."; \
+		exit 1; \
+	fi
+
+devnet-up-detach:
+	@if [ -f "${COMPOSE_FILE}" ]; then \
+		cd devnet && \
+		START_MODE=auto docker compose up -d; \
+	else \
+		echo "Devnet not built yet. Please run 'make devnet-build' first."; \
+		exit 1; \
+	fi
+
+devnet-down:
+	@if [ -f "${COMPOSE_FILE}" ]; then \
+		echo "Stopping devnet..."; \
+		cd devnet && \
+	    docker compose down --remove-orphans; \
+	else \
+		echo "Devnet not built yet. Nothing to stop."; \
+	fi
+
+devnet-clean:
+	sudo rm -rf $(SHARED_DIR) $(VALIDATOR_DIRS)
+	rm -f devnet/docker-compose.yml
+	@echo "Devnet docker shared & generated files cleaned up."
+
+devnet-upgrade:
+	@mkdir -p "${DEVNET_BIN_DIR}"; \
+	if [ "$(DEVNET_BUILD_LUMERA)" = "1" ]; then \
+		$(MAKE) build; \
+		if [ ! -f "${BUILD_DIR}/lumerad" ]; then \
+			echo "Cannot find lumerad binary [${BUILD_DIR}/lumerad]"; \
+			exit 1; \
+		fi; \
+		cp -f ${BUILD_DIR}/lumerad "${DEVNET_BIN_DIR}" && \
+		go get github.com/CosmWasm/wasmvm/$(WASMVM_VERSION) && \
+		find $$(go env GOPATH)/pkg/mod/github.com/!cosm!wasm/wasmvm/$(WASMVM_VERSION) -name "libwasmvm.x86_64.so" -exec cp -f {} ${DEVNET_BIN_DIR}/libwasmvm.x86_64.so \; \
+	else \
+		echo "Using lumera binaries from ${DEVNET_BIN_DIR}..."; \
+	fi; \
+	echo "Stopping devnet containers..."; \
+	docker compose -f ${COMPOSE_FILE} stop; \
+	if [ ! -f "${DEVNET_BIN_DIR}/lumerad" ]; then \
+		echo "${DEVNET_BIN_DIR}/lumerad binary not found..."; \
+		exit 1; \
+	fi; \
+	if [ ! -f "${DEVNET_BIN_DIR}/libwasmvm.x86_64.so" ]; then \
+		echo "${DEVNET_BIN_DIR}/libwasmvm.x86_64.so library not found..."; \
+		exit 1; \
+	fi; \
+	cp -f "${DEVNET_BIN_DIR}/lumerad" "${SHARED_RELEASE_DIR}/"; \
+	cp -f "${DEVNET_BIN_DIR}/libwasmvm.x86_64.so" "${SHARED_RELEASE_DIR}/"; \
+	cd devnet && \
+	CONFIG_JSON="$${CONFIG_JSON:-$(DEFAULT_CONFIG_JSON)}" \
+	VALIDATORS_JSON="$${VALIDATORS_JSON:-$(DEFAULT_VALIDATORS_JSON)}" \
+	./scripts/configure.sh --bin-dir "${DEVNET_BIN_DIR}"
+
+devnet-new:
+	$(MAKE) devnet-down
+	$(MAKE) devnet-clean
+	$(MAKE) devnet-build-default
+	sleep 10
+	$(MAKE) devnet-up
+
+devnet-deploy-tar:
+	# Ensure required files exist from previous build
+	@if [ ! -f "devnet/docker-compose.yml" ] || [ ! -f "devnet/bin/lumerad" ] || [ ! -f "devnet/bin/libwasmvm.x86_64.so" ]; then \
+		echo "Please run 'make devnet-build' first to generate required files."; \
+		exit 1; \
+	fi
+	# Optionally include external_genesis.json if available
+	@if [ -f "$(EXTERNAL_GENESIS_FILE)" ]; then \
+		cp -f "$(EXTERNAL_GENESIS_FILE)" devnet/external_genesis.json; \
+	fi
+
+	if [ -n "$(EXTERNAL_CLAIMS_FILE)" ] && [ -f "$(EXTERNAL_CLAIMS_FILE)" ]; then \
+		cp -f "${EXTERNAL_CLAIMS_FILE}" devnet/claims.csv; \
+	else \
+		echo "No external claims file provided or file not found."; \
+		exit 1; \
+	fi
+	# Create the tar archive
+	tar -czf devnet-deploy.tar.gz \
+		-C devnet dockerfile \
+		docker-compose.yml \
+		primary-validator.sh \
+		secondary-validator.sh \
+		lumerad \
+		libwasmvm.x86_64.so \
+		devnet-deploy.sh \
+		claims.csv \
+		$(if $(shell [ -f "$(EXTERNAL_GENESIS_FILE)" ] && echo 1),external_genesis.json)
+
+	@if [ -f "devnet/external_genesis.json" ]; then \
+		rm devnet/external_genesis.json; \
+	fi
+	@echo "Created devnet-deploy.tar.gz with the required files."

@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/LumeraProtocol/lumera/app"
@@ -35,10 +36,15 @@ import (
 	"github.com/cosmos/cosmos-sdk/version"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	crisistypes "github.com/cosmos/cosmos-sdk/x/crisis/types"
 	"github.com/cosmos/cosmos-sdk/x/genutil"
 	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
+	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
+	govv1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
+	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 
+	lcfg "github.com/LumeraProtocol/lumera/config"
 	claimtestutils "github.com/LumeraProtocol/lumera/x/claim/testutils"
 	claimtypes "github.com/LumeraProtocol/lumera/x/claim/types"
 )
@@ -92,7 +98,7 @@ func addTestnetFlagsToCmd(cmd *cobra.Command) {
 	cmd.Flags().Int(flagNumValidators, 4, "Number of validators to initialize the testnet with")
 	cmd.Flags().StringP(flagOutputDir, "o", "./.testnets", "Directory to store initialization data for the testnet")
 	cmd.Flags().String(flags.FlagChainID, "", "genesis file chain-id, if left blank will be randomly created")
-	cmd.Flags().String(server.FlagMinGasPrices, fmt.Sprintf("0.000006%s", sdk.DefaultBondDenom), "Minimum gas prices to accept for transactions; All fees in a tx must meet this minimum (e.g. 0.01photino,0.001stake)")
+	cmd.Flags().String(server.FlagMinGasPrices, fmt.Sprintf("0.000006%s", lcfg.ChainDenom), "Minimum gas prices to accept for transactions; All fees in a tx must meet this minimum (e.g. 0.01photino,0.001stake)")
 	cmd.Flags().String(flags.FlagKeyType, string(hd.Secp256k1Type), "Key signing algorithm to generate keys for")
 
 	// support old flags name for backwards compatibility
@@ -370,11 +376,7 @@ func initTestnetFiles(
 		}
 
 		accTokens := sdk.TokensFromConsensusPower(1000, sdk.DefaultPowerReduction)
-		accStakingTokens := sdk.TokensFromConsensusPower(500, sdk.DefaultPowerReduction)
-		coins := sdk.Coins{
-			sdk.NewCoin("ulume", accTokens),
-			sdk.NewCoin(sdk.DefaultBondDenom, accStakingTokens),
-		}
+		coins := sdk.Coins{sdk.NewCoin(lcfg.ChainDenom, accTokens)}
 
 		genBalances = append(genBalances, banktypes.Balance{Address: addr.String(), Coins: coins.Sort()})
 		genAccounts = append(genAccounts, authtypes.NewBaseAccount(addr, nil, 0, 0))
@@ -387,7 +389,7 @@ func initTestnetFiles(
 		createValMsg, err := stakingtypes.NewMsgCreateValidator(
 			valStr,
 			valPubKeys[i],
-			sdk.NewCoin(sdk.DefaultBondDenom, valTokens),
+			sdk.NewCoin(lcfg.ChainDenom, valTokens),
 			stakingtypes.NewDescription(nodeDirName, "", "", "", ""),
 			stakingtypes.NewCommissionRates(math.LegacyOneDec(), math.LegacyOneDec(), math.LegacyOneDec()),
 			math.OneInt(),
@@ -452,6 +454,47 @@ func initGenFiles(
 ) error {
 	appGenState := mbm.DefaultGenesis(clientCtx.Codec)
 
+	// set bond_denom in staking module
+	var stakingGenState stakingtypes.GenesisState
+	clientCtx.Codec.MustUnmarshalJSON(appGenState[stakingtypes.ModuleName], &stakingGenState)
+	stakingGenState.Params.BondDenom = lcfg.ChainDenom
+	appGenState[stakingtypes.ModuleName] = clientCtx.Codec.MustMarshalJSON(&stakingGenState)
+
+	// set mint_denom in mint module
+	var mintGenState minttypes.GenesisState
+	clientCtx.Codec.MustUnmarshalJSON(appGenState[minttypes.ModuleName], &mintGenState)
+	mintGenState.Params.MintDenom = lcfg.ChainDenom
+	appGenState[minttypes.ModuleName] = clientCtx.Codec.MustMarshalJSON(&mintGenState)
+
+	rewriteCoins := func(coins []sdk.Coin) []sdk.Coin {
+		if len(coins) == 0 {
+			return coins
+		}
+		updated := make([]sdk.Coin, len(coins))
+		for i, coin := range coins {
+			updated[i] = sdk.NewCoin(lcfg.ChainDenom, coin.Amount)
+		}
+		return updated
+	}
+
+	// ensure governance deposits reference the chain denom
+	var govGenState govv1.GenesisState
+	clientCtx.Codec.MustUnmarshalJSON(appGenState[govtypes.ModuleName], &govGenState)
+	if params := govGenState.Params; params != nil {
+		params.MinDeposit = rewriteCoins(params.MinDeposit)
+		params.ExpeditedMinDeposit = rewriteCoins(params.ExpeditedMinDeposit)
+		govGenState.Params = params
+	}
+	appGenState[govtypes.ModuleName] = clientCtx.Codec.MustMarshalJSON(&govGenState)
+
+	// set the crisis module constant fee denom
+	var crisisGenState crisistypes.GenesisState
+	clientCtx.Codec.MustUnmarshalJSON(appGenState[crisistypes.ModuleName], &crisisGenState)
+	if crisisGenState.ConstantFee.Amount.IsPositive() || crisisGenState.ConstantFee.Denom != "" {
+		crisisGenState.ConstantFee = sdk.NewCoin(lcfg.ChainDenom, crisisGenState.ConstantFee.Amount)
+	}
+	appGenState[crisistypes.ModuleName] = clientCtx.Codec.MustMarshalJSON(&crisisGenState)
+
 	// set the accounts in the genesis state
 	var authGenState authtypes.GenesisState
 	clientCtx.Codec.MustUnmarshalJSON(appGenState[authtypes.ModuleName], &authGenState)
@@ -471,6 +514,30 @@ func initGenFiles(
 	bankGenState.Balances = banktypes.SanitizeGenesisBalances(genBalances)
 	for _, bal := range bankGenState.Balances {
 		bankGenState.Supply = bankGenState.Supply.Add(bal.Coins...)
+	}
+
+	// ensure denom metadata describes the chain denom for clients
+	displayDenom := strings.TrimPrefix(lcfg.ChainDenom, "u")
+	metadata := banktypes.Metadata{
+		Description: "The native token of the Lumera network.",
+		DenomUnits: []*banktypes.DenomUnit{
+			{Denom: lcfg.ChainDenom, Exponent: 0},
+			{Denom: displayDenom, Exponent: 6},
+		},
+		Base:    lcfg.ChainDenom,
+		Display: displayDenom,
+		Name:    strings.ToUpper(displayDenom),
+		Symbol:  strings.ToUpper(displayDenom),
+	}
+	metadataUpdated := false
+	for i, md := range bankGenState.DenomMetadata {
+		if md.Base == lcfg.ChainDenom || md.Base == sdk.DefaultBondDenom {
+			bankGenState.DenomMetadata[i] = metadata
+			metadataUpdated = true
+		}
+	}
+	if !metadataUpdated {
+		bankGenState.DenomMetadata = append(bankGenState.DenomMetadata, metadata)
 	}
 	appGenState[banktypes.ModuleName] = clientCtx.Codec.MustMarshalJSON(&bankGenState)
 

@@ -82,38 +82,15 @@ import (
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 	wasmKeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 
+	lcfg "github.com/LumeraProtocol/lumera/config"
 	ibcmock "github.com/LumeraProtocol/lumera/tests/ibctesting/mock"
 	"github.com/LumeraProtocol/lumera/tests/testdata"
 )
 
 const (
-	// AccountAddressPrefix is the prefix for accounts addresses.
-	AccountAddressPrefix = "lumera"
-	// PrefixValidator is the prefix for validator keys
-	PrefixValidator = "val"
-	// PrefixConsensus is the prefix for consensus keys
-	PrefixConsensus = "cons"
-	// PrefixPublic is the prefix for public keys
-	PrefixPublic = "pub"
-	// PrefixOperator is the prefix for operator keys
-	PrefixOperator = "oper"
-
-	// AccountPrefixPub defines the Bech32 prefix of an account's public key
-	AccountPrefixPub = AccountAddressPrefix + PrefixPublic
-	// ValidatorAddressPrefix defines the Bech32 prefix of a validator's operator address
-	ValidatorAddressPrefix = AccountAddressPrefix + PrefixValidator + PrefixOperator
-	// ValidatorAddressPrefixPub defines the Bech32 prefix of a validator's operator public key
-	ValidatorAddressPrefixPub = AccountAddressPrefix + PrefixValidator + PrefixOperator + PrefixPublic
-	// ConsNodeAddressPrefix defines the Bech32 prefix of a consensus node address
-	ConsNodeAddressPrefix = AccountAddressPrefix + PrefixValidator + PrefixConsensus
-	// ConsNodeAddressPrefixPub defines the Bech32 prefix of a consensus node public key
-	ConsNodeAddressPrefixPub = AccountAddressPrefix + PrefixValidator + PrefixConsensus + PrefixPublic
-
 	// TestDataDir is the directory where test data files are stored
 	TestDataDir = "../../testdata"
 )
-
-
 
 func GetTestDataFilePath(filename string) string {
 	return filepath.Join(TestDataDir, filename)
@@ -186,7 +163,7 @@ func setValidatorRewards(ctx sdk.Context, stakingKeeper *stakingkeeper.Keeper, d
 	if err != nil {
 		panic(err)
 	}
-	payout := sdk.DecCoins{{Denom: "stake", Amount: amount}}
+	payout := sdk.DecCoins{{Denom: lcfg.ChainDenom, Amount: amount}}
 	err = distKeeper.AllocateTokensToValidator(ctx, vali, payout)
 	if err != nil {
 		panic(err)
@@ -297,8 +274,8 @@ func MakeEncodingConfig(t testing.TB) moduletestutil.TestEncodingConfig {
 		vesting.AppModule{},
 	)
 	signingOpts := signing.Options{
-		AddressCodec: addresscodec.NewBech32Codec(AccountAddressPrefix),
-		ValidatorAddressCodec: addresscodec.NewBech32Codec(ValidatorAddressPrefix),
+		AddressCodec: addresscodec.NewBech32Codec(lcfg.AccountAddressPrefix),
+		ValidatorAddressCodec: addresscodec.NewBech32Codec(lcfg.ValidatorAddressPrefix),
 	}
 
 	protoFiles, err := proto.MergedRegistry()
@@ -353,7 +330,8 @@ func createTestInput(
 		authzkeeper.StoreKey,
 		wasmtypes.StoreKey,
 	)
-	logger := log.NewTestLogger(t)
+	// Use test logger at info level to keep errors/warnings
+	logger := log.NewTestLoggerInfo(t)
 	ms := store.NewCommitMultiStore(db, logger, storemetrics.NewNoOpMetrics())
 	for _, v := range keys {
 		ms.MountStoreWithDB(v, storetypes.StoreTypeIAVL, db)
@@ -368,7 +346,7 @@ func createTestInput(
 	ctx := sdk.NewContext(ms, tmproto.Header{
 		Height: 1234567,
 		Time:   time.Date(2020, time.April, 22, 12, 0, 0, 0, time.UTC),
-	}, isCheckTx, log.NewNopLogger())
+	}, isCheckTx, logger)
 	ctx = wasmtypes.WithTXCounter(ctx, 0)
 
 	encodingConfig := MakeEncodingConfig(t)
@@ -416,8 +394,8 @@ func createTestInput(
 		runtime.NewKVStoreService(keys[authtypes.StoreKey]),
 		authtypes.ProtoBaseAccount,
 		maccPerms,
-		authcodec.NewBech32Codec(AccountAddressPrefix),
-		AccountAddressPrefix,
+		authcodec.NewBech32Codec(lcfg.AccountAddressPrefix),
+		lcfg.AccountAddressPrefix,
 		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
 	)
 	blockedAddrs := make(map[string]bool)
@@ -445,8 +423,9 @@ func createTestInput(
 		authcodec.NewBech32Codec(sdk.GetConfig().GetBech32ValidatorAddrPrefix()),
 		authcodec.NewBech32Codec(sdk.GetConfig().GetBech32ConsensusAddrPrefix()),
 	)
-	stakingtypes.DefaultParams()
-	require.NoError(t, stakingKeeper.SetParams(ctx, wasmKeeper.TestingStakeParams))
+	stakingParams := wasmKeeper.TestingStakeParams
+	stakingParams.BondDenom = lcfg.ChainDenom
+	require.NoError(t, stakingKeeper.SetParams(ctx, stakingParams))
 
 	distKeeper := distributionkeeper.NewKeeper(
 		appCodec,
@@ -470,12 +449,12 @@ func createTestInput(
 		authtypes.NewModuleAddress(upgradetypes.ModuleName).String(),
 	)
 
-	faucet := wasmKeeper.NewTestFaucet(t, ctx, bankKeeper, minttypes.ModuleName, sdk.NewCoin("stake", sdkmath.NewInt(100_000_000_000)))
+	faucet := wasmKeeper.NewTestFaucet(t, ctx, bankKeeper, minttypes.ModuleName, sdk.NewInt64Coin(lcfg.ChainDenom, 100_000_000_000))
 
 	// set some funds to pay out validators, based on code from:
 	// https://github.com/cosmos/cosmos-sdk/blob/fea231556aee4d549d7551a6190389c4328194eb/x/distribution/keeper/keeper_test.go#L50-L57
 	distrAcc := distKeeper.GetDistributionAccount(ctx)
-	faucet.Fund(ctx, distrAcc.GetAddress(), sdk.NewCoin("stake", sdkmath.NewInt(2000000)))
+	faucet.Fund(ctx, distrAcc.GetAddress(), sdk.NewInt64Coin(lcfg.ChainDenom, 2_000_000))
 	accountKeeper.SetModuleAccount(ctx, distrAcc)
 
 	ibcKeeper := ibckeeper.NewKeeper(
@@ -529,7 +508,10 @@ func createTestInput(
 		govtypes.DefaultConfig(),
 		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
 	)
-	require.NoError(t, govKeeper.Params.Set(ctx, govtypesv1.DefaultParams()))
+	govParams := govtypesv1.DefaultParams()
+	govParams.MinDeposit = sdk.NewCoins(sdk.NewCoin(lcfg.ChainDenom, govtypesv1.DefaultMinDepositTokens))
+	govParams.ExpeditedMinDeposit = sdk.NewCoins(sdk.NewCoin(lcfg.ChainDenom, govtypesv1.DefaultMinExpeditedDepositTokens))
+	require.NoError(t, govKeeper.Params.Set(ctx, govParams))
 
 	am := module.NewManager( // minimal module set that we use for message/ query tests
 		bank.NewAppModule(appCodec, bankKeeper, accountKeeper, subspace(banktypes.ModuleName)),

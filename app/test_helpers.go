@@ -16,7 +16,6 @@ import (
 	sdkmath "cosmossdk.io/math"
 	pruningtypes "cosmossdk.io/store/pruning/types"
 
-	"github.com/spf13/viper"
 	abci "github.com/cometbft/cometbft/abci/types"
 	cmttypes "github.com/cometbft/cometbft/types"
 	dbm "github.com/cosmos/cosmos-db"
@@ -40,14 +39,18 @@ import (
 	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
+	govtypesv1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	ibcporttypes "github.com/cosmos/ibc-go/v10/modules/core/05-port/types"
 
+	lcfg "github.com/LumeraProtocol/lumera/config"
 	ibcmock "github.com/LumeraProtocol/lumera/tests/ibctesting/mock"
 	claimtypes "github.com/LumeraProtocol/lumera/x/claim/types"
 )
@@ -231,7 +234,7 @@ func Setup(tb testing.TB, wasmOpts ...wasmkeeper.Option) *App {
 	genBals := []banktypes.Balance{}
 	balance := banktypes.Balance{
 		Address: acc.GetAddress().String(),
-		Coins:   sdk.NewCoins(sdk.NewInt64Coin(sdk.DefaultBondDenom, 100_000_000_000_000)),
+		Coins:   sdk.NewCoins(sdk.NewInt64Coin(lcfg.ChainDenom, 100_000_000_000_000)),
 	}
 	genBals = append(genBals, balance)
 	chainID := "testing"
@@ -312,7 +315,7 @@ func GenesisStateWithSingleValidator(tb testing.TB, app *App) GenesisState {
 	balances := []banktypes.Balance{
 		{
 			Address: acc.GetAddress().String(),
-			Coins:   sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdkmath.NewInt(100000000000000))),
+			Coins:   sdk.NewCoins(sdk.NewCoin(lcfg.ChainDenom, sdkmath.NewInt(100000000000000))),
 		},
 	}
 
@@ -398,14 +401,20 @@ func GenesisStateWithValSet(
 
 		validators = append(validators, validator)
 		delegations = append(delegations, stakingtypes.NewDelegation(genAccs[0].GetAddress().String(), sdk.ValAddress(val.Address).String(), sdkmath.LegacyOneDec()))
-
 	}
 
 	// set validators and delegations
-	stakingGenesis := stakingtypes.NewGenesisState(stakingtypes.DefaultParams(), validators, delegations)
+	stakingParams := stakingtypes.DefaultParams()
+	stakingParams.BondDenom = lcfg.ChainDenom
+	stakingGenesis := stakingtypes.NewGenesisState(stakingParams, validators, delegations)
 	genesisState[stakingtypes.ModuleName] = codec.MustMarshalJSON(stakingGenesis)
 
-	bondDenom := stakingGenesis.Params.BondDenom
+	bondDenom := stakingParams.BondDenom
+
+	// ensure inflation mints the chain denom
+	mintGenesis := minttypes.DefaultGenesisState()
+	mintGenesis.Params.MintDenom = lcfg.ChainDenom
+	genesisState[minttypes.ModuleName] = codec.MustMarshalJSON(mintGenesis)
 
 	signingInfos := make([]slashingtypes.SigningInfo, len(valSet.Validators))
 	for i, val := range valSet.Validators {
@@ -415,6 +424,18 @@ func GenesisStateWithValSet(
 		}
 	}
 	slashingGenesis := slashingtypes.NewGenesisState(slashingtypes.DefaultParams(), signingInfos, nil)
+
+	govParams := govtypesv1.DefaultParams()
+	govParams.MinDeposit = sdk.NewCoins(sdk.NewCoin(lcfg.ChainDenom, govtypesv1.DefaultMinDepositTokens))
+	govParams.ExpeditedMinDeposit = sdk.NewCoins(sdk.NewCoin(lcfg.ChainDenom, govtypesv1.DefaultMinExpeditedDepositTokens))
+
+	govGenesis := govtypesv1.DefaultGenesisState()
+	if bz, ok := genesisState[govtypes.ModuleName]; ok && len(bz) != 0 {
+		require.NoError(tb, codec.UnmarshalJSON(bz, govGenesis))
+	}
+	govGenesis.Params = &govParams
+	genesisState[govtypes.ModuleName] = codec.MustMarshalJSON(govGenesis)
+
 	genesisState[slashingtypes.ModuleName] = codec.MustMarshalJSON(slashingGenesis)
 
 	// add bonded amount to bonded pool module account
@@ -432,7 +453,6 @@ func GenesisStateWithValSet(
 	// update total supply
 	bankGenesis := banktypes.NewGenesisState(banktypes.DefaultGenesisState().Params, balances, totalSupply, []banktypes.Metadata{}, []banktypes.SendEnabled{})
 	genesisState[banktypes.ModuleName] = codec.MustMarshalJSON(bankGenesis)
-	println(string(genesisState[banktypes.ModuleName]))
 
 	return genesisState
 }

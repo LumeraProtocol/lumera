@@ -22,7 +22,7 @@ func TestMsgServer_StartSupernode(t *testing.T) {
 	existingSupernode := types.SuperNode{
 		SupernodeAccount: creatorAddr.String(),
 		ValidatorAddress: valAddr.String(),
-		Version:          "1.0.0",
+		Note:             "1.0.0",
 		States: []*types.SuperNodeStateRecord{
 			{
 				State:  types.SuperNodeStateActive,
@@ -93,6 +93,45 @@ func TestMsgServer_StartSupernode(t *testing.T) {
 				require.NoError(t, k.SetSuperNode(ctx, existingSupernode))
 			},
 			expectedError: sdkerrors.ErrUnauthorized,
+		},
+		{
+			name: "cannot start disabled supernode",
+			msg: &types.MsgStartSupernode{
+				Creator:          creatorAddr.String(),
+				ValidatorAddress: valAddr.String(),
+			},
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
+				disabledSupernode := types.SuperNode{
+					SupernodeAccount: creatorAddr.String(),
+					ValidatorAddress: valAddr.String(),
+					Note:             "1.0.0",
+					States: []*types.SuperNodeStateRecord{
+						{
+							State:  types.SuperNodeStateActive,
+							Height: 1,
+						},
+						{
+							State:  types.SuperNodeStateDisabled,
+							Height: 2,
+						},
+					},
+					PrevIpAddresses: []*types.IPAddressHistory{
+						{
+							Address: "192.168.1.1",
+							Height:  1,
+						},
+					},
+					PrevSupernodeAccounts: []*types.SupernodeAccountHistory{
+						{
+							Account: creatorAddr.String(),
+							Height:  1,
+						},
+					},
+					P2PPort: "26657",
+				}
+				require.NoError(t, k.SetSuperNode(ctx, disabledSupernode))
+			},
+			expectedError: sdkerrors.ErrInvalidRequest,
 		},
 		{
 			name: "supernode already active",

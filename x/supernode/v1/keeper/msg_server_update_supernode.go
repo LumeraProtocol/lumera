@@ -2,17 +2,17 @@ package keeper
 
 import (
 	"context"
-	"strconv"
 	"strings"
-
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+	"strconv"
 
 	errorsmod "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
+
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
-func (k msgServer) UpdateSupernode(goCtx context.Context, msg *types2.MsgUpdateSupernode) (*types2.MsgUpdateSupernodeResponse, error) {
+func (k msgServer) UpdateSupernode(goCtx context.Context, msg *types.MsgUpdateSupernode) (*types.MsgUpdateSupernodeResponse, error) {
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
 	valOperAddr, err := sdk.ValAddressFromBech32(msg.ValidatorAddress)
@@ -51,7 +51,7 @@ func (k msgServer) UpdateSupernode(goCtx context.Context, msg *types2.MsgUpdateS
 			changedIP = true
 			oldIP = currentIP
 			newIP = msg.IpAddress
-			supernode.PrevIpAddresses = append(supernode.PrevIpAddresses, &types2.IPAddressHistory{
+			supernode.PrevIpAddresses = append(supernode.PrevIpAddresses, &types.IPAddressHistory{
 				Address: msg.IpAddress,
 				Height:  ctx.BlockHeight(),
 			})
@@ -73,7 +73,7 @@ func (k msgServer) UpdateSupernode(goCtx context.Context, msg *types2.MsgUpdateS
 			// Store the new account in history with recorded block height
 			historyLen := len(supernode.PrevSupernodeAccounts)
 			if historyLen == 0 || supernode.PrevSupernodeAccounts[historyLen-1].Account != msg.SupernodeAccount {
-				supernode.PrevSupernodeAccounts = append(supernode.PrevSupernodeAccounts, &types2.SupernodeAccountHistory{
+				supernode.PrevSupernodeAccounts = append(supernode.PrevSupernodeAccounts, &types.SupernodeAccountHistory{
 					Account: msg.SupernodeAccount,
 					Height:  ctx.BlockHeight(),
 				})
@@ -106,49 +106,49 @@ func (k msgServer) UpdateSupernode(goCtx context.Context, msg *types2.MsgUpdateS
 
 	// Build fields_updated and emit consolidated event with contextual attributes
 	if changedIP {
-		fieldsUpdated = append(fieldsUpdated, types2.AttributeKeyIPAddress)
+		fieldsUpdated = append(fieldsUpdated, types.AttributeKeyIPAddress)
 	}
 	if changedAccount {
-		fieldsUpdated = append(fieldsUpdated, types2.AttributeKeySupernodeAccount)
+		fieldsUpdated = append(fieldsUpdated, types.AttributeKeySupernodeAccount)
 	}
 	if changedNote {
 		fieldsUpdated = append(fieldsUpdated, "note")
 	}
 	if changedP2P {
-		fieldsUpdated = append(fieldsUpdated, types2.AttributeKeyP2PPort)
+		fieldsUpdated = append(fieldsUpdated, types.AttributeKeyP2PPort)
 	}
 
 	// Always emit an update event, even if no fields changed, for observability
 	attrs := []sdk.Attribute{
-		sdk.NewAttribute(types2.AttributeKeyValidatorAddress, msg.ValidatorAddress),
-		sdk.NewAttribute(types2.AttributeKeyFieldsUpdated, strings.Join(fieldsUpdated, ",")),
-		sdk.NewAttribute(types2.AttributeKeyHeight, strconv.FormatInt(ctx.BlockHeight(), 10)),
+		sdk.NewAttribute(types.AttributeKeyValidatorAddress, msg.ValidatorAddress),
+		sdk.NewAttribute(types.AttributeKeyFieldsUpdated, strings.Join(fieldsUpdated, ",")),
+		sdk.NewAttribute(types.AttributeKeyHeight, strconv.FormatInt(ctx.BlockHeight(), 10)),
 	}
 	if changedAccount {
 		attrs = append(attrs,
-			sdk.NewAttribute(types2.AttributeKeyOldAccount, oldAccount),
-			sdk.NewAttribute(types2.AttributeKeyNewAccount, newAccount),
+			sdk.NewAttribute(types.AttributeKeyOldAccount, oldAccount),
+			sdk.NewAttribute(types.AttributeKeyNewAccount, newAccount),
 		)
 	}
 	if changedP2P {
 		attrs = append(attrs,
-			sdk.NewAttribute(types2.AttributeKeyOldP2PPort, oldP2P),
-			sdk.NewAttribute(types2.AttributeKeyP2PPort, supernode.P2PPort),
+			sdk.NewAttribute(types.AttributeKeyOldP2PPort, oldP2P),
+			sdk.NewAttribute(types.AttributeKeyP2PPort, supernode.P2PPort),
 		)
 	}
 	if changedIP {
 		attrs = append(attrs,
-			sdk.NewAttribute(types2.AttributeKeyOldIPAddress, oldIP),
-			sdk.NewAttribute(types2.AttributeKeyIPAddress, newIP),
+			sdk.NewAttribute(types.AttributeKeyOldIPAddress, oldIP),
+			sdk.NewAttribute(types.AttributeKeyIPAddress, newIP),
 		)
 	}
 
 	ctx.EventManager().EmitEvent(
 		sdk.NewEvent(
-			types2.EventTypeSupernodeUpdated,
+			types.EventTypeSupernodeUpdated,
 			attrs...,
 		),
 	)
 
-	return &types2.MsgUpdateSupernodeResponse{}, nil
+	return &types.MsgUpdateSupernodeResponse{}, nil
 }

@@ -1,0 +1,8 @@
+name: Configure Git Safe Directory
+description: Add the current workspace to Git's safe directory list
+runs:
+  using: composite
+  steps:
+    - name: Mark workspace as safe directory
+      shell: bash
+      run: git config --global --add safe.directory "$GITHUB_WORKSPACE"

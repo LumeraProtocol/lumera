@@ -3,15 +3,15 @@ package keeper
 import (
 	"context"
 
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
 	errorsmod "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
-func (k msgServer) UpdateParams(goCtx context.Context, req *types2.MsgUpdateParams) (*types2.MsgUpdateParamsResponse, error) {
+func (k msgServer) UpdateParams(goCtx context.Context, req *types.MsgUpdateParams) (*types.MsgUpdateParamsResponse, error) {
 	if k.GetAuthority() != req.Authority {
-		return nil, errorsmod.Wrapf(types2.ErrInvalidSigner, "invalid authority; expected %s, got %s", k.GetAuthority(), req.Authority)
+		return nil, errorsmod.Wrapf(types.ErrInvalidSigner, "invalid authority; expected %s, got %s", k.GetAuthority(), req.Authority)
 	}
 
 	ctx := sdk.UnwrapSDKContext(goCtx)
@@ -19,5 +19,5 @@ func (k msgServer) UpdateParams(goCtx context.Context, req *types2.MsgUpdatePara
 		return nil, err
 	}
 
-	return &types2.MsgUpdateParamsResponse{}, nil
+	return &types.MsgUpdateParamsResponse{}, nil
 }

@@ -1,0 +1,64 @@
+name: Install wasmvm library
+description: Download libwasmvm and install it into /usr/lib using the version from the Makefile
+inputs:
+  makefile:
+    description: Path to the Makefile containing WASMVM_VERSION
+    default: Makefile
+  version:
+    description: Override wasmvm version (e.g. v3.0.0-ibc2.0)
+    required: false
+outputs:
+  version:
+    description: Resolved wasmvm version
+    value: ${{ steps.detect.outputs.version }}
+runs:
+  using: composite
+  steps:
+    - id: detect
+      name: Resolve wasmvm version
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        MAKEFILE="${{ inputs.makefile }}"
+        VERSION_OVERRIDE="${{ inputs.version }}"
+
+        if [ -n "$VERSION_OVERRIDE" ]; then
+          VERSION="$VERSION_OVERRIDE"
+        else
+          if [ ! -f "$MAKEFILE" ]; then
+            echo "Makefile not found at $MAKEFILE" >&2
+            exit 1
+          fi
+          LINE=$(grep -E '^WASMVM_VERSION' "$MAKEFILE" | head -n 1 || true)
+          if [ -z "$LINE" ]; then
+            echo "WASMVM_VERSION not defined in $MAKEFILE" >&2
+            exit 1
+          fi
+          RAW=$(echo "$LINE" | sed -E 's/^WASMVM_VERSION[[:space:]]*[:?]?=[[:space:]]*//' | tr -d ' \t')
+          if [ -z "$RAW" ]; then
+            echo "WASMVM_VERSION not defined in $MAKEFILE" >&2
+            exit 1
+          fi
+          VERSION="${RAW#*@}"
+          if [ -z "$VERSION" ]; then
+            VERSION="$RAW"
+          fi
+        fi
+
+        echo "Resolved wasmvm version: $VERSION"
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+    - name: Download and install libwasmvm
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        VERSION="${{ steps.detect.outputs.version }}"
+        LIB_NAME="libwasmvm.x86_64.so"
+        URL="https://github.com/CosmWasm/wasmvm/releases/download/${VERSION}/${LIB_NAME}"
+
+        curl -sSL "$URL" -o "$LIB_NAME"
+        sudo install -m 755 "$LIB_NAME" "/usr/lib/$LIB_NAME"
+        sudo ldconfig
+        rm -f "$LIB_NAME"

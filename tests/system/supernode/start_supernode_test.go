@@ -3,15 +3,15 @@ package system_test
 import (
 	"testing"
 
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
 	sdkmath "cosmossdk.io/math"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/stretchr/testify/require"
+
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 func TestStartSupernode(t *testing.T) {
@@ -26,8 +26,8 @@ func TestStartSupernode(t *testing.T) {
 	unauthAddr := sdk.AccAddress(unauthPrivKey.PubKey().Address())
 
 	// Common message constructor
-	newStartSupernodeMsg := func(creator string, validator string) *types2.MsgStartSupernode {
-		return &types2.MsgStartSupernode{
+	newStartSupernodeMsg := func(creator string, validator string) *sntypes.MsgStartSupernode {
+		return &sntypes.MsgStartSupernode{
 			Creator:          creator,
 			ValidatorAddress: validator,
 		}
@@ -35,26 +35,26 @@ func TestStartSupernode(t *testing.T) {
 
 	testCases := []struct {
 		name   string
-		msg    *types2.MsgStartSupernode
+		msg    *sntypes.MsgStartSupernode
 		setup  func(*SystemTestSuite)
-		verify func(t *testing.T, suite *SystemTestSuite, resp *types2.MsgStartSupernodeResponse, err error)
+		verify func(t *testing.T, suite *SystemTestSuite, resp *sntypes.MsgStartSupernodeResponse, err error)
 	}{
 		{
 			name: "disabled supernode should not be started",
 			msg:  newStartSupernodeMsg(walletAddr.String(), valAddrStr),
 			setup: func(suite *SystemTestSuite) {
 				// Create a supernode in disabled state
-				disabledSN := types2.SuperNode{
+				disabledSN := sntypes.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
-					States: []*types2.SuperNodeStateRecord{
+					States: []*sntypes.SuperNodeStateRecord{
 						{
-							State:  types2.SuperNodeStateDisabled,
+							State:  sntypes.SuperNodeStateDisabled,
 							Height: suite.sdkCtx.BlockHeight(),
 						},
 					},
 					Note: "1.0.0",
-					PrevIpAddresses: []*types2.IPAddressHistory{
+					PrevIpAddresses: []*sntypes.IPAddressHistory{
 						{
 							Address: "127.0.0.1",
 							Height:  suite.sdkCtx.BlockHeight(),
@@ -65,7 +65,7 @@ func TestStartSupernode(t *testing.T) {
 				err := suite.app.SupernodeKeeper.SetSuperNode(suite.sdkCtx, disabledSN)
 				require.NoError(t, err)
 			},
-			verify: func(t *testing.T, suite *SystemTestSuite, resp *types2.MsgStartSupernodeResponse, err error) {
+			verify: func(t *testing.T, suite *SystemTestSuite, resp *sntypes.MsgStartSupernodeResponse, err error) {
 				require.NotNil(t, err)
 
 				require.Equal(t, "supernode is disabled and must be re-registered: invalid request", err.Error())
@@ -77,7 +77,7 @@ func TestStartSupernode(t *testing.T) {
 			setup: func(suite *SystemTestSuite) {
 				// Do not create any supernode
 			},
-			verify: func(t *testing.T, suite *SystemTestSuite, resp *types2.MsgStartSupernodeResponse, err error) {
+			verify: func(t *testing.T, suite *SystemTestSuite, resp *sntypes.MsgStartSupernodeResponse, err error) {
 				require.Error(t, err)
 				require.ErrorIs(t, err, sdkerrors.ErrNotFound)
 				require.Nil(t, resp)
@@ -88,17 +88,17 @@ func TestStartSupernode(t *testing.T) {
 			msg:  newStartSupernodeMsg(unauthAddr.String(), valAddrStr),
 			setup: func(suite *SystemTestSuite) {
 				// Create a disabled supernode that belongs to `walletAddr`
-				disabledSN := types2.SuperNode{
+				disabledSN := sntypes.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
-					States: []*types2.SuperNodeStateRecord{
+					States: []*sntypes.SuperNodeStateRecord{
 						{
-							State:  types2.SuperNodeStateDisabled,
+							State:  sntypes.SuperNodeStateDisabled,
 							Height: suite.sdkCtx.BlockHeight(),
 						},
 					},
 					Note: "1.0.0",
-					PrevIpAddresses: []*types2.IPAddressHistory{
+					PrevIpAddresses: []*sntypes.IPAddressHistory{
 						{
 							Address: "127.0.0.1",
 							Height:  suite.sdkCtx.BlockHeight(),
@@ -109,7 +109,7 @@ func TestStartSupernode(t *testing.T) {
 				err := suite.app.SupernodeKeeper.SetSuperNode(suite.sdkCtx, disabledSN)
 				require.NoError(t, err)
 			},
-			verify: func(t *testing.T, suite *SystemTestSuite, resp *types2.MsgStartSupernodeResponse, err error) {
+			verify: func(t *testing.T, suite *SystemTestSuite, resp *sntypes.MsgStartSupernodeResponse, err error) {
 				require.Error(t, err)
 				require.ErrorIs(t, err, sdkerrors.ErrUnauthorized)
 				require.Nil(t, resp)
@@ -120,17 +120,17 @@ func TestStartSupernode(t *testing.T) {
 			msg:  newStartSupernodeMsg(walletAddr.String(), valAddrStr),
 			setup: func(suite *SystemTestSuite) {
 				// Create a supernode that is already active
-				activeSN := types2.SuperNode{
+				activeSN := sntypes.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
-					States: []*types2.SuperNodeStateRecord{
+					States: []*sntypes.SuperNodeStateRecord{
 						{
-							State:  types2.SuperNodeStateActive,
+							State:  sntypes.SuperNodeStateActive,
 							Height: suite.sdkCtx.BlockHeight(),
 						},
 					},
 					Note: "1.0.0",
-					PrevIpAddresses: []*types2.IPAddressHistory{
+					PrevIpAddresses: []*sntypes.IPAddressHistory{
 						{
 							Address: "127.0.0.1",
 							Height:  suite.sdkCtx.BlockHeight(),
@@ -141,7 +141,7 @@ func TestStartSupernode(t *testing.T) {
 				err := suite.app.SupernodeKeeper.SetSuperNode(suite.sdkCtx, activeSN)
 				require.NoError(t, err)
 			},
-			verify: func(t *testing.T, suite *SystemTestSuite, resp *types2.MsgStartSupernodeResponse, err error) {
+			verify: func(t *testing.T, suite *SystemTestSuite, resp *sntypes.MsgStartSupernodeResponse, err error) {
 				// Depending on your logic, this might be an error or no-op
 				// Below we'll assume it's a no-op with no error
 				require.Error(t, err)
@@ -153,7 +153,7 @@ func TestStartSupernode(t *testing.T) {
 				sn, found := suite.app.SupernodeKeeper.QuerySuperNode(suite.sdkCtx, valOp)
 				require.True(t, found)
 				require.NotEmpty(t, sn.States)
-				require.Equal(t, types2.SuperNodeStateActive, sn.States[len(sn.States)-1].State)
+				require.Equal(t, sntypes.SuperNodeStateActive, sn.States[len(sn.States)-1].State)
 			},
 		},
 		{
@@ -162,7 +162,7 @@ func TestStartSupernode(t *testing.T) {
 			setup: func(suite *SystemTestSuite) {
 				// No setup needed
 			},
-			verify: func(t *testing.T, suite *SystemTestSuite, resp *types2.MsgStartSupernodeResponse, err error) {
+			verify: func(t *testing.T, suite *SystemTestSuite, resp *sntypes.MsgStartSupernodeResponse, err error) {
 				require.Error(t, err)
 				require.ErrorIs(t, err, sdkerrors.ErrInvalidAddress)
 				require.Nil(t, resp)

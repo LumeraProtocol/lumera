@@ -7,12 +7,14 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"fmt"
 
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
 // Helper function to create a delayed vesting account
@@ -27,7 +29,7 @@ func createDelayedVestingAccount(t *testing.T, cli *LumeradCli, keyName string, 
 	createCmd := []string{
 		"tx", "vesting", "create-vesting-account",
 		address,                        // to_address
-		amount + "ulume",               // amount
+		amount + lcfg.ChainDenom,      // amount
 		strconv.FormatInt(endTime, 10), // end_time
 		"--delayed",                    // make it delayed vesting
 		"--from", "node0",
@@ -40,7 +42,7 @@ func createDelayedVestingAccount(t *testing.T, cli *LumeradCli, keyName string, 
 	sut.AwaitNextBlock(t)
 
 	// Fund the account with some liquid tokens for transaction fees
-	cli.FundAddress(address, "1000000ulume")
+	cli.FundAddress(address, "1000000"+lcfg.ChainDenom)
 
 	return address
 }
@@ -54,7 +56,7 @@ func createPermanentlyLockedAccount(t *testing.T, cli *LumeradCli, keyName strin
 	createCmd := []string{
 		"tx", "vesting", "create-permanent-locked-account",
 		address,          // to_address
-		amount + "ulume", // amount
+		amount + lcfg.ChainDenom, // amount
 		"--from", "node0",
 	}
 
@@ -65,7 +67,7 @@ func createPermanentlyLockedAccount(t *testing.T, cli *LumeradCli, keyName strin
 	sut.AwaitNextBlock(t)
 
 	// Fund the account with some liquid tokens for transaction fees
-	cli.FundAddress(address, "1000000ulume")
+	cli.FundAddress(address, "1000000"+lcfg.ChainDenom)
 
 	return address
 }
@@ -109,13 +111,13 @@ func TestSupernodeRegistrationSuccess(t *testing.T) {
 			minimumStake: "100000000", // Set high minimum stake that exceeds self-delegation
 			additionalSetupFn: func(t *testing.T, cli *LumeradCli, valAddr string, supernodeAccount string) {
 				// Fund the supernode account
-				cli.FundAddress(supernodeAccount, "200000000ulume")
+				cli.FundAddress(supernodeAccount, "200000000"+lcfg.ChainDenom)
 
 				// Delegate from supernode account to validator to meet the minimum stake requirement
 				delegateCmd := []string{
 					"tx", "staking", "delegate",
 					valAddr,          // validator address
-					"150000000ulume", // delegation amount (more than minimum - self delegation)
+					"150000000"+lcfg.ChainDenom, // delegation amount (more than minimum - self delegation)
 					"--from", "supernode_account",
 				}
 				resp := cli.CustomCommand(delegateCmd...)
@@ -147,13 +149,13 @@ func TestSupernodeRegistrationSuccess(t *testing.T) {
 			additionalSetupFn: func(t *testing.T, cli *LumeradCli, valAddr string, supernodeAccount string) {
 				// Fund validator operator account for additional self-delegation
 				validatorAddr := cli.GetKeyAddr("node0")
-				cli.FundAddress(validatorAddr, "100000000ulume")
+				cli.FundAddress(validatorAddr, "100000000"+lcfg.ChainDenom)
 
 				// Add additional self-delegation to meet minimum requirement
 				delegateCmd := []string{
 					"tx", "staking", "delegate",
 					valAddr,         // validator address
-					"60000000ulume", // enough to meet minimum with existing self-delegation
+					"60000000"+lcfg.ChainDenom, // enough to meet minimum with existing self-delegation
 					"--from", "node0",
 				}
 				resp := cli.CustomCommand(delegateCmd...)
@@ -187,7 +189,7 @@ func TestSupernodeRegistrationSuccess(t *testing.T) {
 			// 1. Set minimum supernode stake in genesis
 			sut.ModifyGenesisJSON(t, func(genesis []byte) []byte {
 				// Update the supernode module params to set minimum stake as a Coin
-				coinJSON := `{"denom":"ulume","amount":"` + minimumStake + `"}`
+				coinJSON := fmt.Sprintf(`{"denom":"%s","amount":"%s"}`, lcfg.ChainDenom, minimumStake)
 				state, err := sjson.SetRawBytes(genesis, "app_state.supernode.params.minimum_stake_for_sn", []byte(coinJSON))
 				require.NoError(t, err)
 				return state
@@ -249,7 +251,7 @@ func TestSupernodeRegistrationSuccess(t *testing.T) {
 			require.Equal(t, "1.0.0", supernode.Note)
 			require.Equal(t, supernodeAccount, supernode.SupernodeAccount)
 			require.NotEmpty(t, supernode.States)
-			require.Equal(t, types.SuperNodeStateActive, supernode.States[0].State)
+			require.Equal(t, sntypes.SuperNodeStateActive, supernode.States[0].State)
 
 			// Run additional validation if provided
 			if tc.additionalValidateFn != nil {
@@ -283,7 +285,7 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 			setupFn: func(t *testing.T, cli *LumeradCli) (string, string, string) {
 				keyName := "non_validator"
 				accountAddr := cli.AddKey(keyName)
-				cli.FundAddress(accountAddr, "1000000ulume")
+				cli.FundAddress(accountAddr, "1000000"+lcfg.ChainDenom)
 				nonValAddr := strings.TrimSpace(cli.Keys("keys", "show", keyName, "--bech", "val", "-a"))
 				return nonValAddr, accountAddr, keyName
 			},
@@ -358,7 +360,7 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 
 			sut.ModifyGenesisJSON(t, func(genesis []byte) []byte {
 				// Create proper Coin JSON structure
-				coinJSON := `{"denom":"ulume","amount":"` + tc.minimumStake + `"}`
+				coinJSON := fmt.Sprintf(`{"denom":"%s","amount":"%s"}`, lcfg.ChainDenom, tc.minimumStake)
 				state, err := sjson.SetRawBytes(genesis, "app_state.supernode.params.minimum_stake_for_sn", []byte(coinJSON))
 				require.NoError(t, err)
 
@@ -369,7 +371,6 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 			})
 
 			// Start the chain
-			t.Log("Starting chain")
 			sut.StartChain(t)
 
 			// Create CLI helper
@@ -412,13 +413,13 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 				require.Equal(t, valAddr, supernode.ValidatorAddress)
 				require.NotEmpty(t, supernode.States)
 				lastState := supernode.States[len(supernode.States)-1]
-				require.Equal(t, types.SuperNodeStateActive, lastState.State, "Supernode should be active after re-registration")
+				require.Equal(t, sntypes.SuperNodeStateActive, lastState.State, "Supernode should be active after re-registration")
 
 				// Verify state transition shape: ... Disabled -> Active
 				require.GreaterOrEqual(t, len(supernode.States), 2)
 				prevState := supernode.States[len(supernode.States)-2].State
-				require.Equal(t, types.SuperNodeStateDisabled, prevState)
-				require.Equal(t, types.SuperNodeStateActive, lastState.State)
+				require.Equal(t, sntypes.SuperNodeStateDisabled, prevState)
+				require.Equal(t, sntypes.SuperNodeStateActive, lastState.State)
 
 				// Verify that IP address was NOT updated during re-registration
 				require.NotEmpty(t, supernode.PrevIpAddresses)
@@ -452,13 +453,13 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 
 func TestSupernodeWithVestingDelegation(t *testing.T) {
 	testCases := []struct {
-		name                    string
-		vestingAccountType      string
-		createVestingAccount    func(t *testing.T, cli *LumeradCli, keyName string, amount string) string
-		minimumStake            string
-		selfDelegationAmount    string
+		name                  	string
+		vestingAccountType    	string
+		createVestingAccount  	func(t *testing.T, cli *LumeradCli, keyName string, amount string) string
+		minimumStake          	string
+		selfDelegationAmount  	string
 		vestingDelegationAmount string
-		delayMonths             int
+		delayMonths           	int
 	}{
 		{
 			name:               "low_self_stake_with_delayed_vesting_delegation",
@@ -489,7 +490,7 @@ func TestSupernodeWithVestingDelegation(t *testing.T) {
 
 			// Set minimum supernode stake in genesis
 			sut.ModifyGenesisJSON(t, func(genesis []byte) []byte {
-				coinJSON := `{"denom":"ulume","amount":"` + tc.minimumStake + `"}`
+				coinJSON := fmt.Sprintf(`{"denom":"%s","amount":"%s"}`, lcfg.ChainDenom, tc.minimumStake)
 				state, err := sjson.SetRawBytes(genesis, "app_state.supernode.params.minimum_stake_for_sn", []byte(coinJSON))
 				require.NoError(t, err)
 				return state
@@ -516,11 +517,11 @@ func TestSupernodeWithVestingDelegation(t *testing.T) {
 			t.Logf("Vesting supernode account: %s", supernodeAccount)
 
 			// Step 3: Add minimal self-delegation to validator (intentionally insufficient)
-			cli.FundAddress(accountAddr, "50000000ulume")
+			cli.FundAddress(accountAddr, "50000000"+lcfg.ChainDenom)
 			selfDelegateCmd := []string{
 				"tx", "staking", "delegate",
-				valAddr,                           // validator address
-				tc.selfDelegationAmount + "ulume", // small self-delegation (much less than minimum)
+				valAddr,                    // validator address
+				tc.selfDelegationAmount + lcfg.ChainDenom, // small self-delegation (much less than minimum)
 				"--from", "node0",
 			}
 			resp1 := cli.CustomCommand(selfDelegateCmd...)
@@ -530,8 +531,8 @@ func TestSupernodeWithVestingDelegation(t *testing.T) {
 			// Step 4: Delegate from vesting account to validator
 			vestingDelegateCmd := []string{
 				"tx", "staking", "delegate",
-				valAddr,                              // validator address
-				tc.vestingDelegationAmount + "ulume", // delegation from vesting account to meet minimum
+				valAddr,                        // validator address
+				tc.vestingDelegationAmount + lcfg.ChainDenom, // delegation from vesting account to meet minimum
 				"--from", "vesting_supernode",
 			}
 			resp2 := cli.CustomCommand(vestingDelegateCmd...)
@@ -559,7 +560,7 @@ func TestSupernodeWithVestingDelegation(t *testing.T) {
 			require.Equal(t, "1.0.0", supernode.Note)
 			require.Equal(t, supernodeAccount, supernode.SupernodeAccount)
 			require.NotEmpty(t, supernode.States)
-			require.Equal(t, types.SuperNodeStateActive, supernode.States[0].State)
+			require.Equal(t, sntypes.SuperNodeStateActive, supernode.States[0].State)
 
 			// Verify the supernode account is the correct vesting account type
 			verifyVestingAccountType(t, cli, supernodeAccount, tc.vestingAccountType)

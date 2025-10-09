@@ -36,7 +36,7 @@ import (
 var (
 	denomRegex   = sdk.DefaultCoinDenomRegex()
 	addr1        = sdk.MustAccAddressFromBech32("cosmos139f7kncmglres2nf3h4hc4tade85ekfr8sulz5")
-	coin1        = sdk.NewCoin("denom", math.NewInt(10))
+	coin1        = sdk.NewInt64Coin("denom", 10)
 	metadataAtom = banktypes.Metadata{
 		Description: "The native staking token of the Cosmos Hub.",
 		DenomUnits: []*banktypes.DenomUnit{
@@ -180,8 +180,8 @@ func TestGRPCQueryAllBalances(t *testing.T) {
 	})
 
 	coins := sdk.NewCoins(
-		sdk.NewCoin("stake", math.NewInt(10)),
-		sdk.NewCoin("denom", math.NewInt(100)),
+		sdk.NewInt64Coin("stake", 10),
+		sdk.NewInt64Coin("denom", 100),
 	)
 
 	fundAccount(f, addr1, coins...)
@@ -218,8 +218,8 @@ func TestGRPCQuerySpendableBalances(t *testing.T) {
 	})
 
 	coins := sdk.NewCoins(
-		sdk.NewCoin("stake", math.NewInt(10)),
-		sdk.NewCoin("denom", math.NewInt(100)),
+		sdk.NewInt64Coin("stake", 10),
+		sdk.NewInt64Coin("denom", 100),
 	)
 
 	err := banktestutil.FundAccount(f.ctx, f.bankKeeper, addr1, coins)

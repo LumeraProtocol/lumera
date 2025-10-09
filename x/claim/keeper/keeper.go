@@ -13,17 +13,17 @@ import (
 
 const ModuleName = types.ModuleName
 
-type (
-	Keeper struct {
-		cdc           codec.BinaryCodec
-		storeService  store.KVStoreService
-		tstoreService store.TransientStoreService
-		logger        log.Logger
-		authority     string
-		bankKeeper    types.BankKeeper
-		accountKeeper types.AccountKeeper
-	}
-)
+type Keeper struct {
+	cdc           codec.BinaryCodec
+	storeService  store.KVStoreService
+	tstoreService store.TransientStoreService
+	logger        log.Logger
+	authority     string
+	bankKeeper    types.BankKeeper
+	accountKeeper types.AccountKeeper
+
+	claimsPath    string
+}
 
 func NewKeeper(
 	cdc codec.BinaryCodec,
@@ -31,9 +31,9 @@ func NewKeeper(
 	tstoreService store.TransientStoreService,
 	logger log.Logger,
 	authority string,
-
 	bankKeeper types.BankKeeper,
 	accountKeeper types.AccountKeeper,
+	claimsPath string,
 ) Keeper {
 	if _, err := sdk.AccAddressFromBech32(authority); err != nil {
 		panic(fmt.Sprintf("invalid authority address: %s", authority))
@@ -45,9 +45,9 @@ func NewKeeper(
 		tstoreService: tstoreService,
 		authority:     authority,
 		logger:        logger,
-
 		bankKeeper:    bankKeeper,
 		accountKeeper: accountKeeper,
+		claimsPath:    claimsPath,
 	}
 }
 
@@ -67,4 +67,8 @@ func (k Keeper) GetBankKeeper() types.BankKeeper {
 
 func (k Keeper) GetAccountKeeper() types.AccountKeeper {
 	return k.accountKeeper
+}
+
+func (k Keeper) GetClaimsPath() string {
+	return k.claimsPath
 }

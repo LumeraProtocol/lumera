@@ -2,8 +2,9 @@ package types
 
 import (
 	errorsmod "cosmossdk.io/errors"
-	"github.com/LumeraProtocol/lumera/x/action/v1/common"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+
+	"github.com/LumeraProtocol/lumera/x/action/v1/common"
 )
 
 var _ sdk.Msg = &MsgFinalizeAction{}

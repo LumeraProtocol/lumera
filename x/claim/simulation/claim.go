@@ -6,7 +6,6 @@ import (
 
 	"encoding/hex"
 
-	"cosmossdk.io/math"
 	"github.com/LumeraProtocol/lumera/x/claim/keeper"
 	"github.com/LumeraProtocol/lumera/x/claim/types"
 	"github.com/cometbft/cometbft/crypto/secp256k1"
@@ -40,6 +39,8 @@ func SimulateMsgClaim(
 		pubKeyHex := hex.EncodeToString(pubKeyBytes)
 		oldAddress := sdk.AccAddress(privKey.PubKey().Address()).String()
 
+		testAmount := int64(1_000_000) // Amount to be claimed in the test case
+
 		// Create claim record if it doesn't exist
 		_, found, err := k.GetClaimRecord(ctx, oldAddress)
 		if err != nil {
@@ -49,7 +50,7 @@ func SimulateMsgClaim(
 		if !found {
 			claimRecord := types.ClaimRecord{
 				OldAddress: oldAddress,
-				Balance:    sdk.NewCoins(sdk.NewCoin(types.DefaultClaimsDenom, math.NewInt(1000000))),
+				Balance:    sdk.NewCoins(sdk.NewInt64Coin(types.DefaultClaimsDenom, testAmount)),
 				Claimed:    false,
 			}
 			err = k.SetClaimRecord(ctx, claimRecord)

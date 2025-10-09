@@ -4,15 +4,14 @@ import (
 	"context"
 	"strconv"
 
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
 	errorsmod "cosmossdk.io/errors"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
-func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types2.MsgRegisterSupernode) (*types2.MsgRegisterSupernodeResponse, error) {
+func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types.MsgRegisterSupernode) (*types.MsgRegisterSupernodeResponse, error) {
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
 	// Convert validator address string to ValAddress
@@ -30,10 +29,10 @@ func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types2.MsgRegis
 	existingSupernode, found := k.QuerySuperNode(ctx, valOperAddr)
 	if found {
 		// Check if it's disabled (deregistered) - allow re-registration
-		if len(existingSupernode.States) > 0 && existingSupernode.States[len(existingSupernode.States)-1].State == types2.SuperNodeStateDisabled {
+		if len(existingSupernode.States) > 0 && existingSupernode.States[len(existingSupernode.States)-1].State == types.SuperNodeStateDisabled {
 
 			// Get validator and perform eligibility checks for re-registration
-			validator, err := k.stakingKeeper.Validator(ctx, valOperAddr)
+			validator, err := k.GetStakingKeeper().Validator(ctx, valOperAddr)
 			if err != nil {
 				return nil, errorsmod.Wrapf(sdkerrors.ErrNotFound, "validator not found for operator address %s: %s", msg.ValidatorAddress, err)
 			}
@@ -54,8 +53,8 @@ func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types2.MsgRegis
 			prevState := existingSupernode.States[len(existingSupernode.States)-1].State
 			// Registration only flips Disabled->Active; use a separate
 			// UpdateSupernode transaction to modify any other fields
-			existingSupernode.States = append(existingSupernode.States, &types2.SuperNodeStateRecord{
-				State:  types2.SuperNodeStateActive,
+			existingSupernode.States = append(existingSupernode.States, &types.SuperNodeStateRecord{
+				State:  types.SuperNodeStateActive,
 				Height: ctx.BlockHeight(),
 			})
 
@@ -71,25 +70,25 @@ func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types2.MsgRegis
 			}
 			ctx.EventManager().EmitEvent(
 				sdk.NewEvent(
-					types2.EventTypeSupernodeRegistered,
-					sdk.NewAttribute(types2.AttributeKeyValidatorAddress, msg.ValidatorAddress),
-					sdk.NewAttribute(types2.AttributeKeyIPAddress, currentIP),
-					sdk.NewAttribute(types2.AttributeKeySupernodeAccount, existingSupernode.SupernodeAccount),
-					sdk.NewAttribute(types2.AttributeKeyReRegistered, "true"),
-					sdk.NewAttribute(types2.AttributeKeyOldState, prevState.String()),
-					sdk.NewAttribute(types2.AttributeKeyP2PPort, existingSupernode.P2PPort),
-					sdk.NewAttribute(types2.AttributeKeyHeight, strconv.FormatInt(ctx.BlockHeight(), 10)),
+					types.EventTypeSupernodeRegistered,
+					sdk.NewAttribute(types.AttributeKeyValidatorAddress, msg.ValidatorAddress),
+					sdk.NewAttribute(types.AttributeKeyIPAddress, currentIP),
+					sdk.NewAttribute(types.AttributeKeySupernodeAccount, existingSupernode.SupernodeAccount),
+					sdk.NewAttribute(types.AttributeKeyReRegistered, "true"),
+					sdk.NewAttribute(types.AttributeKeyOldState, prevState.String()),
+					sdk.NewAttribute(types.AttributeKeyP2PPort, existingSupernode.P2PPort),
+					sdk.NewAttribute(types.AttributeKeyHeight, strconv.FormatInt(ctx.BlockHeight(), 10)),
 				),
 			)
 
-			return &types2.MsgRegisterSupernodeResponse{}, nil
+			return &types.MsgRegisterSupernodeResponse{}, nil
 		}
 
 		// If not disabled, cannot register — return clearer errors for other states
 		if len(existingSupernode.States) > 0 {
 			last := existingSupernode.States[len(existingSupernode.States)-1].State
 			switch last {
-			case types2.SuperNodeStateStopped, types2.SuperNodeStatePenalized:
+			case types.SuperNodeStateStopped, types.SuperNodeStatePenalized:
 				return nil, errorsmod.Wrapf(
 					sdkerrors.ErrInvalidRequest,
 					"cannot re-register supernode in state %s for validator %s",
@@ -101,7 +100,7 @@ func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types2.MsgRegis
 	}
 
 	// Get validator
-	validator, err := k.stakingKeeper.Validator(ctx, valOperAddr)
+	validator, err := k.GetStakingKeeper().Validator(ctx, valOperAddr)
 	if err != nil {
 		return nil, errorsmod.Wrapf(sdkerrors.ErrNotFound, "validator not found for operator address %s: %s", msg.ValidatorAddress, err)
 	}
@@ -117,27 +116,27 @@ func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types2.MsgRegis
 	}
 
 	// Create new SuperNode
-	supernode := types2.SuperNode{
+	supernode := types.SuperNode{
 		ValidatorAddress: msg.ValidatorAddress,
 		SupernodeAccount: msg.SupernodeAccount,
-		Evidence:         []*types2.Evidence{},
-		Metrics: &types2.MetricsAggregate{
+		Evidence:         []*types.Evidence{},
+		Metrics: &types.MetricsAggregate{
 			Metrics:     make(map[string]float64),
 			ReportCount: 0,
 		},
-		States: []*types2.SuperNodeStateRecord{
+		States: []*types.SuperNodeStateRecord{
 			{
-				State:  types2.SuperNodeStateActive,
+				State:  types.SuperNodeStateActive,
 				Height: ctx.BlockHeight(),
 			},
 		},
-		PrevIpAddresses: []*types2.IPAddressHistory{
+		PrevIpAddresses: []*types.IPAddressHistory{
 			{
 				Address: msg.IpAddress,
 				Height:  ctx.BlockHeight(),
 			},
 		},
-		PrevSupernodeAccounts: []*types2.SupernodeAccountHistory{
+		PrevSupernodeAccounts: []*types.SupernodeAccountHistory{
 			{
 				Account: msg.SupernodeAccount,
 				Height:  ctx.BlockHeight(),
@@ -159,14 +158,14 @@ func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types2.MsgRegis
 	// Emit event
 	ctx.EventManager().EmitEvent(
 		sdk.NewEvent(
-			types2.EventTypeSupernodeRegistered,
-			sdk.NewAttribute(types2.AttributeKeyValidatorAddress, msg.ValidatorAddress),
-			sdk.NewAttribute(types2.AttributeKeyIPAddress, msg.IpAddress),
-			sdk.NewAttribute(types2.AttributeKeySupernodeAccount, msg.SupernodeAccount),
-			sdk.NewAttribute(types2.AttributeKeyP2PPort, msg.P2PPort),
-			sdk.NewAttribute(types2.AttributeKeyHeight, strconv.FormatInt(ctx.BlockHeight(), 10)),
+			types.EventTypeSupernodeRegistered,
+			sdk.NewAttribute(types.AttributeKeyValidatorAddress, msg.ValidatorAddress),
+			sdk.NewAttribute(types.AttributeKeyIPAddress, msg.IpAddress),
+			sdk.NewAttribute(types.AttributeKeySupernodeAccount, msg.SupernodeAccount),
+			sdk.NewAttribute(types.AttributeKeyP2PPort, msg.P2PPort),
+			sdk.NewAttribute(types.AttributeKeyHeight, strconv.FormatInt(ctx.BlockHeight(), 10)),
 		),
 	)
 
-	return &types2.MsgRegisterSupernodeResponse{}, nil
+	return &types.MsgRegisterSupernodeResponse{}, nil
 }

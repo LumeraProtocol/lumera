@@ -4,9 +4,15 @@ import (
 	"fmt"
 	confg "gen/config"
 	"os"
+	"path/filepath"
 
 	"gopkg.in/yaml.v2"
 )
+
+type DockerComposeLogging struct {
+	Driver  string            `yaml:"driver"`
+	Options map[string]string `yaml:"options,omitempty"`
+}
 
 type DockerComposeConfig struct {
 	Services map[string]DockerComposeService `yaml:"services"`
@@ -14,25 +20,33 @@ type DockerComposeConfig struct {
 }
 
 type DockerComposeService struct {
-	Build         string            `yaml:"build"`
-	ContainerName string            `yaml:"container_name"`
-	Ports         []string          `yaml:"ports"`
-	Volumes       []string          `yaml:"volumes"`
-	Environment   map[string]string `yaml:"environment"`
-	Command       string            `yaml:"command,omitempty"`
-	DependsOn     []string          `yaml:"depends_on,omitempty"`
+	Build         string                `yaml:"build"`
+	Image         string                `yaml:"image,omitempty"`
+	ContainerName string                `yaml:"container_name"`
+	Ports         []string              `yaml:"ports"`
+	Volumes       []string              `yaml:"volumes"`
+	Environment   map[string]string     `yaml:"environment,omitempty"`
+	Command       string                `yaml:"command,omitempty"`
+	DependsOn     []string              `yaml:"depends_on,omitempty"`
+	Logging       *DockerComposeLogging `yaml:"logging,omitempty"`
 }
 
 type DockerComposeNetwork struct {
 	Name string `yaml:"name"`
 }
 
-const (
-	DefaultP2PPort  = 26656
-	DefaultRPCPort  = 26657
-	DefaultRESTPort = 1317
-	DefaultGRPCPort = 9090
-)
+func supernodeBinaryHostPath() (string, bool) {
+	candidates := []string{
+		filepath.Join(SubFolderBin, SupernodeBinary),
+		filepath.Join("devnet", SubFolderBin, SupernodeBinary),
+	}
+	for _, p := range candidates {
+		if fi, err := os.Stat(p); err == nil && !fi.IsDir() {
+			return p, true
+		}
+	}
+	return "", false
+}
 
 func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validator, useExistingGenesis bool) (*DockerComposeConfig, error) {
 	compose := &DockerComposeConfig{
@@ -44,6 +58,10 @@ func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validat
 		},
 	}
 
+	_, snPresent := supernodeBinaryHostPath()
+
+	folderMount := fmt.Sprintf("/tmp/%s", config.Chain.ID)
+
 	for index, validator := range validators {
 		serviceName := fmt.Sprintf("%s-%s", config.Docker.ContainerPrefix, validator.Name)
 		env := map[string]string{
@@ -54,6 +72,7 @@ func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validat
 		if useExistingGenesis {
 			env["USE_EXISTING_GENESIS"] = "1"
 		}
+		env["INTEGRATION_TEST"] = "true"
 
 		service := DockerComposeService{
 			Build:         ".",
@@ -65,20 +84,35 @@ func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validat
 				fmt.Sprintf("%d:%d", validator.GRPCPort, DefaultGRPCPort),
 			},
 			Volumes: []string{
-				fmt.Sprintf("/tmp/lumera-devnet/%s-data:/root/%s", validator.Name, config.Paths.Directories.Daemon),
-				"/tmp/lumera-devnet/shared:/shared",
+				fmt.Sprintf("%s/%s-data:/root/%s", folderMount, validator.Name, config.Paths.Directories.Daemon),
+				fmt.Sprintf("%s/shared:/shared", folderMount),
 			},
 			Environment: env,
+			Command: fmt.Sprintf("bash %s/%s", FolderScripts, StartScript),
+			Logging: &DockerComposeLogging{
+				Driver: "json-file",
+				Options: map[string]string{
+					"max-size": "10m",
+					"max-file": "5",
+				},
+			},
 		}
 
-		if index == 0 {
-			service.Command = "bash /root/scripts/primary-validator.sh"
-		} else {
-			service.Command = fmt.Sprintf("bash /root/scripts/secondary-validator.sh %s %s %s %s",
-				validator.KeyName,
-				validator.InitialDistribution.ValidatorStake,
-				validator.Name,
-				validator.InitialDistribution.AccountBalance)
+        if snPresent {
+            // add supernode port mappings, if provided
+            // container ports are fixed by supernode: 4444 (service), 4445 (p2p), 8002 (gateway)
+            if validator.SupernodePort > 0 {
+                service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.SupernodePort, DefaultSupernodePort))
+            }
+            if validator.SupernodeP2PPort > 0 {
+                service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.SupernodeP2PPort, DefaultSupernodeP2PPort))
+            }
+            if validator.SupernodeGatewayPort > 0 {
+                service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.SupernodeGatewayPort, DefaultSupernodeGatewayPort))
+            }
+        }
+
+		if index > 0 {
 			service.DependsOn = []string{validators[0].Name}
 		}
 
@@ -99,39 +133,3 @@ func WriteDockerCompose(compose *DockerComposeConfig, filename string) error {
 	return nil
 }
 
-func GenerateStartDockerCompose(config *confg.ChainConfig, validators []confg.Validator) (*DockerComposeConfig, error) {
-	compose := &DockerComposeConfig{
-		Services: make(map[string]DockerComposeService),
-		Networks: map[string]DockerComposeNetwork{
-			"default": {
-				Name: config.Docker.NetworkName,
-			},
-		},
-	}
-
-	for index, validator := range validators {
-		serviceName := fmt.Sprintf("%s-%s", config.Docker.ContainerPrefix, validator.Name)
-
-		service := DockerComposeService{
-			ContainerName: serviceName,
-			Ports: []string{
-				fmt.Sprintf("%d:%d", validator.Port, DefaultP2PPort),
-				fmt.Sprintf("%d:%d", validator.RPCPort, DefaultRPCPort),
-				fmt.Sprintf("%d:%d", validator.RESTPort, DefaultRESTPort),
-				fmt.Sprintf("%d:%d", validator.GRPCPort, DefaultGRPCPort),
-			},
-			Volumes: []string{
-				fmt.Sprintf("/tmp/lumera-devnet/%s-data:/root/%s", validator.Name, config.Paths.Directories.Daemon),
-				"/tmp/lumera-devnet/shared:/shared",
-			},
-			Command: "bash /root/scripts/start.sh",
-		}
-
-		if index > 0 {
-			service.DependsOn = []string{validators[0].Name}
-		}
-
-		compose.Services[validator.Name] = service
-	}
-	return compose, nil
-}

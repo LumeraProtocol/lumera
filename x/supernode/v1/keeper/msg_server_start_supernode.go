@@ -4,15 +4,15 @@ import (
 	"context"
 	"strconv"
 
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
 	errorsmod "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
+
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 // StartSupernode activates a stopped supernode (transitions from Stopped to Active state)
-func (k msgServer) StartSupernode(goCtx context.Context, msg *types2.MsgStartSupernode) (*types2.MsgStartSupernodeResponse, error) {
+func (k msgServer) StartSupernode(goCtx context.Context, msg *types.MsgStartSupernode) (*types.MsgStartSupernodeResponse, error) {
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
 	valOperAddr, err := sdk.ValAddressFromBech32(msg.ValidatorAddress)
@@ -37,20 +37,20 @@ func (k msgServer) StartSupernode(goCtx context.Context, msg *types2.MsgStartSup
 
 	// State-specific checks for better UX
 	switch currentState {
-	case types2.SuperNodeStateDisabled:
+	case types.SuperNodeStateDisabled:
 		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode is disabled and must be re-registered")
-	case types2.SuperNodeStateActive:
+	case types.SuperNodeStateActive:
 		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode is already started")
-	case types2.SuperNodeStateStopped:
+	case types.SuperNodeStateStopped:
 		// OK to proceed
-	case types2.SuperNodeStatePenalized:
+	case types.SuperNodeStatePenalized:
 		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode is penalized and cannot be started")
 	default:
 		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "cannot start supernode from state=%s", currentState.String())
 	}
 
-	supernode.States = append(supernode.States, &types2.SuperNodeStateRecord{
-		State:  types2.SuperNodeStateActive,
+	supernode.States = append(supernode.States, &types.SuperNodeStateRecord{
+		State:  types.SuperNodeStateActive,
 		Height: ctx.BlockHeight(),
 	})
 
@@ -60,13 +60,13 @@ func (k msgServer) StartSupernode(goCtx context.Context, msg *types2.MsgStartSup
 
 	ctx.EventManager().EmitEvent(
 		sdk.NewEvent(
-			types2.EventTypeSupernodeStarted,
-			sdk.NewAttribute(types2.AttributeKeyValidatorAddress, msg.ValidatorAddress),
-			sdk.NewAttribute(types2.AttributeKeyOldState, currentState.String()),
-			sdk.NewAttribute(types2.AttributeKeyHeight, strconv.FormatInt(ctx.BlockHeight(), 10)),
-			sdk.NewAttribute(types2.AttributeKeyReason, "tx_start"),
+			types.EventTypeSupernodeStarted,
+			sdk.NewAttribute(types.AttributeKeyValidatorAddress, msg.ValidatorAddress),
+			sdk.NewAttribute(types.AttributeKeyOldState, currentState.String()),
+			sdk.NewAttribute(types.AttributeKeyHeight, strconv.FormatInt(ctx.BlockHeight(), 10)),
+			sdk.NewAttribute(types.AttributeKeyReason, "tx_start"),
 		),
 	)
 
-	return &types2.MsgStartSupernodeResponse{}, nil
+	return &types.MsgStartSupernodeResponse{}, nil
 }

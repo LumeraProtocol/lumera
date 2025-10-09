@@ -2,16 +2,27 @@ package supernode
 
 import (
 	autocliv1 "cosmossdk.io/api/cosmos/autocli/v1"
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
-	modulev1 "github.com/LumeraProtocol/lumera/api/lumera/supernode"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
+
+const getTopSuperNodesLong = `Query the top supernodes for a given block height.
+
+States:
+  - SUPERNODE_STATE_ACTIVE
+  - SUPERNODE_STATE_DISABLED
+  - SUPERNODE_STATE_STOPPED
+  - SUPERNODE_STATE_PENALIZED
+
+Flags:
+  --state string   Optional state filter (defaults to SUPERNODE_STATE_ACTIVE)
+  --limit uint     Optional limit for the number of results (defaults to 25)`
 
 // AutoCLIOptions implements the autocli.HasAutoCLIConfig interface.
 func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 	return &autocliv1.ModuleOptions{
 		Query: &autocliv1.ServiceCommandDescriptor{
-			Service: modulev1.Query_ServiceDesc.ServiceName,
+			Service: types.Query_serviceDesc.ServiceName,
 			RpcCommandOptions: []*autocliv1.RpcCommandOptions{
 				{
 					RpcMethod: "Params",
@@ -30,30 +41,24 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					Short:          "Query supernode by supernode address",
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "supernodeAddress"}},
 				},
-
 				{
 					RpcMethod:      "ListSuperNodes",
 					Use:            "list-supernodes",
 					Short:          "Query list-supernodes",
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{},
 				},
-
 				{
 					RpcMethod: "GetTopSuperNodesForBlock",
 					Use:       "get-top-supernodes-for-block [block-height]",
 					Short:     "Query get-top-supernodes-for-block",
-					Long: "Query get-top-supernodes-for-block with the following states:\n" +
-						"  - SUPERNODE_STATE_ACTIVE\n" +
-						"  - SUPERNODE_STATE_DISABLED\n" +
-						"  - SUPERNODE_STATE_STOPPED\n" +
-						"  - SUPERNODE_STATE_PENALIZED",
+					Long:      getTopSuperNodesLong,
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{
 						{ProtoField: "blockHeight"},
 					},
 					FlagOptions: map[string]*autocliv1.FlagOptions{
 						"limit": {
 							Name:         "limit",
-							Usage:        "Optional limit for number of super nodes",
+							Usage:        "Optional limit for number of supernodes to return",
 							DefaultValue: "25",
 						},
 						"state": {
@@ -68,7 +73,7 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 			},
 		},
 		Tx: &autocliv1.ServiceCommandDescriptor{
-			Service:              modulev1.Msg_ServiceDesc.ServiceName,
+			Service:              types.Msg_serviceDesc.ServiceName,
 			EnhanceCustomCommand: true, // only required if you want to use the custom command
 			RpcCommandOptions: []*autocliv1.RpcCommandOptions{
 				{
@@ -76,14 +81,18 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					Skip:      true, // skipped because authority gated
 				},
 				{
-					RpcMethod:      "RegisterSupernode",
-					Use:            "register-supernode [validator-address] [ip-address] [supernode-account]",
-					Short:          "Send a register-supernode tx",
-					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validatorAddress"}, {ProtoField: "ipAddress"}, {ProtoField: "supernodeAccount"}},
+					RpcMethod: "RegisterSupernode",
+					Use:       "register-supernode [validator-address] [ip-address] [supernode-account]",
+					Short:     "Send a register-supernode tx",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{
+						{ProtoField: "validatorAddress"},
+						{ProtoField: "ipAddress"},
+						{ProtoField: "supernodeAccount"},
+					},
 					FlagOptions: map[string]*autocliv1.FlagOptions{
 						"p2p_port": {
 							Name:         "p2p-port",
-							Usage:        "Optional P2P port for supernode communication",
+							Usage:        "Optional P2P port for the supernode communication",
 							DefaultValue: types.DefaultP2PPort,
 						},
 					},

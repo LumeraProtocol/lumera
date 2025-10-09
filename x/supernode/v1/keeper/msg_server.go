@@ -5,13 +5,18 @@ import (
 )
 
 type msgServer struct {
-	Keeper
+	types.UnimplementedMsgServer
+
+	types.SupernodeKeeper
 }
 
 // NewMsgServerImpl returns an implementation of the MsgServer interface
 // for the provided Keeper.
-func NewMsgServerImpl(keeper Keeper) *msgServer {
-	return &msgServer{Keeper: keeper}
+func NewMsgServerImpl(keeper types.SupernodeKeeper) *msgServer {
+	return &msgServer{
+		UnimplementedMsgServer: types.UnimplementedMsgServer{},
+		SupernodeKeeper: keeper,
+	}
 }
 
 var _ types.MsgServer = msgServer{}

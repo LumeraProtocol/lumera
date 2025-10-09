@@ -1,35 +1,44 @@
 FROM debian:bookworm-slim
 
-RUN apt-get update && apt-get install -y \
+
+ARG APP_VERSION=1.0.0
+ARG APP_NAME=lumera-docker
+ARG SCRIPTS_SRC_DIR=scripts
+ARG SCRIPTS_DEST_DIR=/root/scripts
+
+LABEL Name="${APP_NAME}" \
+      Version="${APP_VERSION}"
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     jq \
     bash \
     sed \
+    libwebp-dev \
     ca-certificates \
+    procps \
+    crudini \
+    net-tools \
+    iputils-ping \
+    lnav \
+    mc \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy binary and make it executable 
-COPY lumerad /usr/local/bin/lumerad
-COPY libwasmvm.x86_64.so /usr/lib/
-RUN chmod +x /usr/local/bin/lumerad && ldconfig
-
-# Create scripts directory and copy scripts
-RUN mkdir -p /root/scripts
+# Update libraries cache & create directories
+RUN ldconfig && mkdir -p ${SCRIPTS_DEST_DIR} /root/.lumerad
 
 # Copy scripts with correct paths
-COPY primary-validator.sh /root/scripts/primary-validator.sh
-COPY secondary-validator.sh /root/scripts/secondary-validator.sh
-COPY start.sh /root/scripts/start.sh
-
-RUN chmod +x /root/scripts/primary-validator.sh && \
-    chmod +x /root/scripts/secondary-validator.sh && \
-    chmod +x /root/scripts/start.sh
+COPY --chmod=0755 \
+    ${SCRIPTS_SRC_DIR}/start.sh \
+    ${SCRIPTS_SRC_DIR}/validator-setup.sh \
+    ${SCRIPTS_SRC_DIR}/supernode-setup.sh \
+    ${SCRIPTS_SRC_DIR}/network-maker-setup.sh \
+    ${SCRIPTS_DEST_DIR}/
 
 # Expose necessary ports
-EXPOSE 26656 26657 1317 9090
+EXPOSE 26656 26657 1317 9090 4444 8002
 
 # Set working directory
 WORKDIR /root
 
-# Create directory for chain data
-RUN mkdir -p /root/.lumerad
+ENTRYPOINT ["/bin/bash", "/root/scripts/start.sh"]

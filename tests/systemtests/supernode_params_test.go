@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
+
+	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
 func TestSupernodeUpdateParamsProposal(t *testing.T) {
@@ -22,15 +24,15 @@ func TestSupernodeUpdateParamsProposal(t *testing.T) {
 		SetGovVotingPeriod(t, 10*time.Second),
 		// Set initial supernode parameters
 		func(genesis []byte) []byte {
-			state, err := sjson.SetRawBytes(genesis, "app_state.supernode.params", []byte(`{
-				"minimum_stake_for_sn": {"denom":"ulume","amount":"1000000"},
+			state, err := sjson.SetRawBytes(genesis, "app_state.supernode.params", []byte(fmt.Sprintf(`{
+				"minimum_stake_for_sn": {"denom":"%s","amount":"1000000"},
 				"reporting_threshold": "95",
 				"slashing_threshold": "80",
 				"metrics_thresholds": "cpu:80,memory:80,storage:80",
 				"evidence_retention_period": "168h",
 				"slashing_fraction": "0.1",
 				"inactivity_penalty_period": "24h"
-			}`))
+			}`, lcfg.ChainDenom)))
 			require.NoError(t, err)
 			return state
 		},
@@ -66,10 +68,10 @@ func TestSupernodeUpdateParamsProposal(t *testing.T) {
 	// Create governance proposal to update parameters
 	proposalJson := fmt.Sprintf(`{
 		"messages": [{
-			"@type": "/lumera.supernode.MsgUpdateParams",
+			"@type": "/lumera.supernode.v1.MsgUpdateParams",
 			"authority": "%s",
 			"params": {
-				"minimum_stake_for_sn": {"denom":"ulume","amount":"2000000"},
+				"minimum_stake_for_sn": {"denom":"%s","amount":"2000000"},
 				"reporting_threshold": "90",
 				"slashing_threshold": "75",
 				"metrics_thresholds": "cpu:85,memory:85,storage:85",
@@ -78,11 +80,11 @@ func TestSupernodeUpdateParamsProposal(t *testing.T) {
 				"inactivity_penalty_period": "48h"
 			}
 		}],
-		"deposit": "100000000ulume",
+		"deposit": "100000000%s",
 		"metadata": "ipfs://CID",
 		"title": "Update Supernode Parameters",
 		"summary": "Update supernode module parameters with new values"
-	}`, govAddr)
+	}`, govAddr, lcfg.ChainDenom, lcfg.ChainDenom)
 
 	// Submit proposal and have all validators vote yes
 	proposalID := cli.SubmitAndVoteGovProposal(proposalJson)
@@ -105,7 +107,7 @@ func TestSupernodeUpdateParamsProposal(t *testing.T) {
 	t.Logf("Updated params: %s", updatedParams)
 
 	// Verify the updated coin structure for minimum_stake_for_sn
-	require.Equal(t, "ulume", gjson.Get(updatedParams, "params.minimum_stake_for_sn.denom").String(), "minimum_stake_for_sn denom should be ulume")
+	require.Equal(t, lcfg.ChainDenom, gjson.Get(updatedParams, "params.minimum_stake_for_sn.denom").String(), "minimum_stake_for_sn denom should be ulume")
 	require.Equal(t, "2000000", gjson.Get(updatedParams, "params.minimum_stake_for_sn.amount").String(), "minimum_stake_for_sn amount should be 2000000")
 
 	require.Equal(t, "90", gjson.Get(updatedParams, "params.reporting_threshold").String(), "reporting_threshold should be 90")

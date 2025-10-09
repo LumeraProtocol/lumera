@@ -11,6 +11,8 @@ RELEASE_DIR ?= release
 module_version = $(strip $(shell EMSDK_QUIET=1 ${GO} list -m -f '{{.Version}}' $1 | tail -n 1))
 IGNITE_INSTALL_SCRIPT ?= https://get.ignite.com/cli!
 
+GOFLAGS = "-trimpath"
+
 WASMVM_VERSION := v3@v3.0.0-ibc2.0
 RELEASE_CGO_LDFLAGS ?= -Wl,-rpath,/usr/lib -Wl,--disable-new-dtags
 COSMOS_PROTO_VERSION := $(call module_version,github.com/cosmos/cosmos-proto)
@@ -58,7 +60,7 @@ build/lumerad: $(GO_SRC) go.mod go.sum  Makefile
 	@mkdir -p ${BUILD_DIR}
 	${BUF} generate --template proto/buf.gen.gogo.yaml --verbose
 	${IGNITE} generate openapi --yes
-	${IGNITE} chain build -t linux:amd64 --skip-proto --output ${BUILD_DIR}/
+	GOFLAGS=${GOFLAGS} ${IGNITE} chain build -t linux:amd64 --skip-proto --output ${BUILD_DIR}/
 	chmod +x $(BUILD_DIR)/lumerad
 
 build-debug: build-debug/lumerad

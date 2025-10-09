@@ -26,8 +26,9 @@ EXTERNAL_GENESIS := $(SHARED_CONFIG_DIR)/external_genesis.json
 CLAIMS_FILE := $(SHARED_CONFIG_DIR)/claims.csv
 COMPOSE_FILE := devnet/docker-compose.yml
 
-DEVNET_BUILD_LUMERA?=1      # 1 = build lumerad for devnet setup, 0 = skip
-DEVNET_BIN_DIR?=devnet/bin
+DEVNET_BUILD_LUMERA ?= 1      # 1 = build lumerad for devnet setup, 0 = skip
+# directory to take lumerad/supernode/network-maker/sncli binaries from
+DEVNET_BIN_DIR ?= devnet/bin
 
 # Default paths for configuration files
 DEFAULT_CONFIG_JSON := config/config.json

@@ -72,7 +72,7 @@ jobs:
           ./ignite chain build --clear-cache --skip-proto --release --release.prefix ${{ steps.vars.outputs.tarball_prefix }} -y -t linux:amd64 #-t darwin:amd64 -t darwin:arm64 -y
         env:
           DO_NOT_TRACK: 1
-          GOFLAGS: "-buildvcs=false"
+          GOFLAGS: "-trimpath -buildvcs=false"
           CGO_LDFLAGS: "-Wl,-rpath,/usr/lib -Wl,--disable-new-dtags"
 
       # Fix permissions

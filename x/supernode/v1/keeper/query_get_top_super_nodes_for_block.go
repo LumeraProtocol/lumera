@@ -2,16 +2,17 @@ package keeper
 
 import (
 	"context"
-	"crypto/sha256"
 	"fmt"
 	"math/big"
 	"sort"
+	"strings"
 
 	errorsmod "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 
 	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+	"lukechampine.com/blake3"
 )
 
 const DefaultLimit = 25
@@ -31,12 +32,27 @@ func (q queryServer) GetTopSuperNodesForBlock(
 	}
 
 	// 0) Parse the state filter since auto cli doesn't support enum
+	// Accept both full enum names (e.g., "SUPERNODE_STATE_ACTIVE") and
+	// short names (e.g., "ACTIVE", case-insensitive).
 	var superNodeStateFilter types.SuperNodeState
-	stateValue, ok := types.SuperNodeState_value[req.State]
-	if !ok {
+	normalized := strings.ToUpper(strings.TrimSpace(req.State))
+	switch normalized {
+	case "", "SUPERNODE_STATE_UNSPECIFIED", "UNSPECIFIED":
 		superNodeStateFilter = types.SuperNodeStateUnspecified
-	} else {
-		superNodeStateFilter = types.SuperNodeState(stateValue)
+	case "SUPERNODE_STATE_ACTIVE", "ACTIVE":
+		superNodeStateFilter = types.SuperNodeStateActive
+	case "SUPERNODE_STATE_DISABLED", "DISABLED":
+		superNodeStateFilter = types.SuperNodeStateDisabled
+	case "SUPERNODE_STATE_STOPPED", "STOPPED":
+		superNodeStateFilter = types.SuperNodeStateStopped
+	case "SUPERNODE_STATE_PENALIZED", "PENALIZED":
+		superNodeStateFilter = types.SuperNodeStatePenalized
+	default:
+		if v, ok := types.SuperNodeState_value[normalized]; ok {
+			superNodeStateFilter = types.SuperNodeState(v)
+		} else {
+			superNodeStateFilter = types.SuperNodeStateUnspecified
+		}
 	}
 
 	ctx := sdk.UnwrapSDKContext(goCtx)
@@ -73,23 +89,18 @@ func (q queryServer) GetTopSuperNodesForBlock(
 			continue
 		}
 
-		// 4.2) Must have a state record at or before the requested block height
-		if sn.States[0].Height > blockHeight {
-			continue
-		}
-
-		// 4.3) Determine supernode's state at blockHeight
+		// 4.2) Determine supernode's state at blockHeight
 		stateAtBlock, ok := DetermineStateAtBlock(sn.States, blockHeight)
 		if !ok {
 			continue
 		}
 
-		// 4.4) State must not be Unspecified
+		// 4.3) State must not be Unspecified
 		if stateAtBlock == types.SuperNodeStateUnspecified {
 			continue
 		}
 
-		// 4.5) Must match requested state if specified
+		// 4.4) Must match requested state if specified
 		if superNodeStateFilter != types.SuperNodeStateUnspecified && stateAtBlock != superNodeStateFilter {
 			continue
 		}
@@ -136,12 +147,18 @@ func (k Keeper) RankSuperNodesByDistance(
 	distances := make([]supernodeDistance, 0, len(supernodes))
 	for i := range supernodes {
 		sn := &supernodes[i]
-		dist := k.calcDistance(blockHash, sn)
-		distances = append(distances, supernodeDistance{sn, dist})
+		if dist, ok := k.calcDistance(blockHash, sn); ok {
+			distances = append(distances, supernodeDistance{sn, dist})
+		}
 	}
 
-	sort.Slice(distances, func(i, j int) bool {
-		return distances[i].distance.Cmp(distances[j].distance) < 0
+	sort.SliceStable(distances, func(i, j int) bool {
+		cmp := distances[i].distance.Cmp(distances[j].distance)
+		if cmp != 0 {
+			return cmp < 0
+		}
+		// Tie-breaker to ensure deterministic order
+		return distances[i].sn.ValidatorAddress < distances[j].sn.ValidatorAddress
 	})
 
 	if len(distances) < topN {
@@ -155,47 +172,64 @@ func (k Keeper) RankSuperNodesByDistance(
 	return result
 }
 
-// DetermineStateAtBlock sorts the records by ascending height, then picks
-// the last record whose height <= blockHeight, if any.
+// DetermineStateAtBlock finds the last state record whose height <= blockHeight
+// without mutating the input slice. It runs in O(n).
 func DetermineStateAtBlock(states []*types.SuperNodeStateRecord, blockHeight int64) (types.SuperNodeState, bool) {
 	if len(states) == 0 {
 		return types.SuperNodeStateUnspecified, false
 	}
-	// Defensive: sort ascending
-	sort.Slice(states, func(i, j int) bool {
-		return states[i].Height < states[j].Height
-	})
-
-	foundState := types.SuperNodeStateUnspecified
 	found := false
+	foundHeight := int64(-1)
+	foundState := types.SuperNodeStateUnspecified
 	for _, sRecord := range states {
-		if sRecord.Height <= blockHeight {
+		if sRecord == nil {
+			continue
+		}
+		if sRecord.Height <= blockHeight && sRecord.Height >= foundHeight {
+			foundHeight = sRecord.Height
 			foundState = sRecord.State
 			found = true
-		} else {
-			break
 		}
 	}
 	return foundState, found
 }
 
-func (k Keeper) calcDistance(blockHash []byte, sn *types.SuperNode) *big.Int {
-	valHash := hashValidatorAddress(sn.ValidatorAddress)
-	return xorDistance(blockHash, valHash)
+func (k Keeper) calcDistance(blockHash []byte, sn *types.SuperNode) (*big.Int, bool) {
+	valHash, ok := hashValidatorAddress(sn.ValidatorAddress)
+	if !ok {
+		return nil, false
+	}
+	return xorDistance(blockHash, valHash), true
 }
 
-// hashValidatorAddress hashes a validator address (in bech32) into a 32-byte sha256 digest.
-func hashValidatorAddress(valAddr string) []byte {
-	addrBytes, _ := sdk.ValAddressFromBech32(valAddr)
-	h := sha256.Sum256(addrBytes)
-	return h[:]
+// hashValidatorAddress hashes a validator address (bech32) into a 32-byte BLAKE3 digest.
+// Returns false if the address cannot be decoded.
+func hashValidatorAddress(valAddr string) ([]byte, bool) {
+	addrBytes, err := sdk.ValAddressFromBech32(valAddr)
+	if err != nil {
+		return nil, false
+	}
+	h := blake3.Sum256(addrBytes)
+	return h[:], true
 }
 
 // xorDistance computes the XOR distance between two byte slices as a big.Int.
 func xorDistance(a, b []byte) *big.Int {
-	xorBytes := make([]byte, len(a))
-	for i := 0; i < len(a) && i < len(b); i++ {
-		xorBytes[i] = a[i] ^ b[i]
+	// XOR over the max length, treating missing bytes as zero
+	n := len(a)
+	if len(b) > n {
+		n = len(b)
+	}
+	xorBytes := make([]byte, n)
+	for i := 0; i < n; i++ {
+		var av, bv byte
+		if i < len(a) {
+			av = a[i]
+		}
+		if i < len(b) {
+			bv = b[i]
+		}
+		xorBytes[i] = av ^ bv
 	}
 	return new(big.Int).SetBytes(xorBytes)
 }
@@ -204,6 +238,6 @@ func (k Keeper) GetBlockHashForHeight(ctx sdk.Context, height int64) ([]byte, er
 	if height <= 0 {
 		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "invalid height %d", height)
 	}
-	h := sha256.Sum256([]byte(fmt.Sprintf("%d", height)))
+	h := blake3.Sum256([]byte(fmt.Sprintf("%d", height)))
 	return h[:], nil
 }

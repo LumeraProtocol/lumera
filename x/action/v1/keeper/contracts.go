@@ -1,14 +1,14 @@
 package keeper
 
 import (
-	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
+	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 // ActionRegistrar defines the required methods for registering actions
 type ActionRegistrar interface {
 	// RegisterAction creates and configures a new action with default parameters
-	RegisterAction(ctx sdk.Context, action *actionapi.Action) (string, error)
+	RegisterAction(ctx sdk.Context, action *actiontypes.Action) (string, error)
 }
 
 // ActionFinalizer defines the required methods for finalizing actions

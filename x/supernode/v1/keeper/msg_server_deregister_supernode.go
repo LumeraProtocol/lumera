@@ -4,16 +4,16 @@ import (
 	"context"
 	"strconv"
 
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
 	errorsmod "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
+
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 // DeregisterSupernode permanently disables a supernode (sets state to Disabled - terminal state)
 // A disabled supernode cannot be reactivated and must be re-registered to participate again
-func (k msgServer) DeregisterSupernode(goCtx context.Context, msg *types2.MsgDeregisterSupernode) (*types2.MsgDeregisterSupernodeResponse, error) {
+func (k msgServer) DeregisterSupernode(goCtx context.Context, msg *types.MsgDeregisterSupernode) (*types.MsgDeregisterSupernodeResponse, error) {
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
 	// Convert validator address string to ValAddress
@@ -39,10 +39,10 @@ func (k msgServer) DeregisterSupernode(goCtx context.Context, msg *types2.MsgDer
 
 	// Capture the previous state to expose as an attribute
 	prevState := supernode.States[len(supernode.States)-1].State
-	if prevState != types2.SuperNodeStateDisabled {
+	if prevState != types.SuperNodeStateDisabled {
 		// Update supernode state
-		supernode.States = append(supernode.States, &types2.SuperNodeStateRecord{
-			State:  types2.SuperNodeStateDisabled,
+		supernode.States = append(supernode.States, &types.SuperNodeStateRecord{
+			State:  types.SuperNodeStateDisabled,
 			Height: ctx.BlockHeight(),
 		})
 	}
@@ -55,12 +55,12 @@ func (k msgServer) DeregisterSupernode(goCtx context.Context, msg *types2.MsgDer
 	// Emit event
 	ctx.EventManager().EmitEvent(
 		sdk.NewEvent(
-			types2.EventTypeSupernodeDeRegistered,
-			sdk.NewAttribute(types2.AttributeKeyValidatorAddress, msg.ValidatorAddress),
-			sdk.NewAttribute(types2.AttributeKeyOldState, prevState.String()),
-			sdk.NewAttribute(types2.AttributeKeyHeight, strconv.FormatInt(ctx.BlockHeight(), 10)),
+			types.EventTypeSupernodeDeRegistered,
+			sdk.NewAttribute(types.AttributeKeyValidatorAddress, msg.ValidatorAddress),
+			sdk.NewAttribute(types.AttributeKeyOldState, prevState.String()),
+			sdk.NewAttribute(types.AttributeKeyHeight, strconv.FormatInt(ctx.BlockHeight(), 10)),
 		),
 	)
 
-	return &types2.MsgDeregisterSupernodeResponse{}, nil
+	return &types.MsgDeregisterSupernodeResponse{}, nil
 }

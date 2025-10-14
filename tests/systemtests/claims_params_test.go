@@ -6,10 +6,14 @@ import (
 	"fmt"
 	"testing"
 	"time"
+	"strconv"
 
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
+
+	claimtypes "github.com/LumeraProtocol/lumera/x/claim/types"
+	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
 // Voting Period is set to 10 seconds for faster test execution by default
@@ -24,12 +28,21 @@ func TestClaimsUpdateParamsProposal(t *testing.T) {
 		SetGovVotingPeriod(t, 10*time.Second),
 		// Set initial claim parameters
 		func(genesis []byte) []byte {
-			state, err := sjson.SetRawBytes(genesis, "app_state.claim.params", []byte(fmt.Sprintf(`{
+			state := genesis
+			var err error
+
+			// Set total claimable amount
+			state, err = sjson.SetRawBytes(state, "app_state.claim.total_claimable_amount",
+				[]byte(strconv.FormatInt(claimtypes.DefaultClaimableAmountConst, 10)))
+			require.NoError(t, err)
+
+			state, err = sjson.SetRawBytes(state, "app_state.claim.params", []byte(fmt.Sprintf(`{
 				"enable_claims": true,
 				"claim_end_time": "%d",
 				"max_claims_per_block": "75"
 			}`, initialEndTime)))
 			require.NoError(t, err)
+
 			return state
 		},
 	)
@@ -65,11 +78,11 @@ func TestClaimsUpdateParamsProposal(t *testing.T) {
 				"max_claims_per_block": 50
 			}
 		}],
-		"deposit": "100000000ulume",
+		"deposit": "100000000%s",
 		"metadata": "ipfs://CID",
 		"title": "Update Claim Parameters",
 		"summary": "Update claims module parameters with new values"
-	}`, govAddr, time.Now().Add(72*time.Hour).Unix())
+	}`, govAddr, time.Now().Add(72*time.Hour).Unix(), lcfg.ChainDenom)
 
 	// Submit proposal and have all validators vote yes
 	proposalID := cli.SubmitAndVoteGovProposal(proposalJson)

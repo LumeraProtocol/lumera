@@ -1,0 +1,40 @@
+name: Install Ignite CLI
+description: Download and install a specific Ignite CLI release with checksum verification
+inputs:
+  version:
+    description: Ignite CLI version (e.g. v29.2.0)
+    required: true
+  arch:
+    description: Target archive suffix (e.g. linux_amd64)
+    default: linux_amd64
+runs:
+  using: composite
+  steps:
+    - name: Download and verify Ignite CLI
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        IGNITE_VERSION="${{ inputs.version }}"
+        ARCH="${{ inputs.arch }}"
+
+        CHECKSUM_URL="https://github.com/ignite/cli/releases/download/${IGNITE_VERSION}/ignite_${IGNITE_VERSION#v}_checksums.txt"
+        TARBALL="ignite_${IGNITE_VERSION#v}_${ARCH}.tar.gz"
+        DOWNLOAD_URL="https://github.com/ignite/cli/releases/download/${IGNITE_VERSION}/${TARBALL}"
+
+        curl -sSL "$CHECKSUM_URL" -o checksums.txt
+        EXPECTED_CHECKSUM=$(grep "${TARBALL}" checksums.txt | awk '{print $1}')
+        if [ -z "$EXPECTED_CHECKSUM" ]; then
+          echo "Failed to locate checksum for ${TARBALL}" >&2
+          exit 1
+        fi
+
+        curl -sSL "$DOWNLOAD_URL" -o ignite.tar.gz
+        ACTUAL_CHECKSUM=$(sha256sum ignite.tar.gz | awk '{print $1}')
+        if [ "$ACTUAL_CHECKSUM" != "$EXPECTED_CHECKSUM" ]; then
+          echo "Checksum mismatch for Ignite CLI archive" >&2
+          exit 1
+        fi
+
+        tar -xzf ignite.tar.gz
+        chmod +x ignite

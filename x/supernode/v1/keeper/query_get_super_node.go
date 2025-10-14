@@ -3,15 +3,15 @@ package keeper
 import (
 	"context"
 
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 // GetSuperNode returns the supernode for the given validator address
-func (k Keeper) GetSuperNode(goCtx context.Context, req *types.QueryGetSuperNodeRequest) (*types.QueryGetSuperNodeResponse, error) {
+func (q queryServer) GetSuperNode(goCtx context.Context, req *types.QueryGetSuperNodeRequest) (*types.QueryGetSuperNodeResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
 	}
@@ -23,7 +23,7 @@ func (k Keeper) GetSuperNode(goCtx context.Context, req *types.QueryGetSuperNode
 		return nil, status.Errorf(codes.InvalidArgument, "invalid validator address: %v", err)
 	}
 
-	sn, found := k.QuerySuperNode(ctx, valOperAddr)
+	sn, found := q.k.QuerySuperNode(ctx, valOperAddr)
 	if !found {
 		return nil, status.Errorf(codes.NotFound, "no supernode found for validator %s", req.ValidatorAddress)
 	}

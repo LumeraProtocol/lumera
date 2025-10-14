@@ -3,11 +3,10 @@ package keeper_test
 import (
 	"testing"
 
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
 	"github.com/stretchr/testify/require"
 
 	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 func TestGetParams(t *testing.T) {

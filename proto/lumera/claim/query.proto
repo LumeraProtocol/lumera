@@ -1,6 +1,7 @@
 syntax = "proto3";
-
 package lumera.claim;
+
+option go_package = "x/claim/types";
 
 import "amino/amino.proto";
 import "gogoproto/gogo.proto";
@@ -9,27 +10,22 @@ import "cosmos/base/query/v1beta1/pagination.proto";
 import "lumera/claim/params.proto";
 import "lumera/claim/claim_record.proto";
 
-option go_package = "github.com/LumeraProtocol/lumera/x/claim/types";
-
 // Query defines the gRPC querier service.
 service Query {
   
   // Parameters queries the parameters of the module.
   rpc Params (QueryParamsRequest) returns (QueryParamsResponse) {
     option (google.api.http).get = "/LumeraProtocol/lumera/claim/params";
-  
   }
   
   // Queries a list of ClaimRecord items.
   rpc ClaimRecord (QueryClaimRecordRequest) returns (QueryClaimRecordResponse) {
     option (google.api.http).get = "/LumeraProtocol/lumera/claim/claim_record/{address}";
-  
   }
   
   // Queries a list of ListClaimed items.
   rpc ListClaimed (QueryListClaimedRequest) returns (QueryListClaimedResponse) {
     option (google.api.http).get = "/LumeraProtocol/lumera/claim/list_claimed/{vestedTerm}";
-  
   }
 }
 // QueryParamsRequest is request type for the Query/Params RPC method.
@@ -42,10 +38,12 @@ message QueryParamsResponse {
   Params params = 1 [(gogoproto.nullable) = false, (amino.dont_omitempty) = true];
 }
 
+// QueryClaimRecordRequest is request type for the Query/ClaimRecord RPC method.
 message QueryClaimRecordRequest {
   string address = 1;
 }
 
+// QueryClaimRecordResponse is response type for the Query/ClaimRecord RPC method.
 message QueryClaimRecordResponse {
   ClaimRecord record = 1;
 }

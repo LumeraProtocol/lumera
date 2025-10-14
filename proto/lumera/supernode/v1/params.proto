@@ -1,0 +1,26 @@
+syntax = "proto3";
+package lumera.supernode.v1;
+
+option go_package = "x/supernode/v1/types";
+
+import "amino/amino.proto";
+import "gogoproto/gogo.proto";
+import "cosmos/base/v1beta1/coin.proto";
+
+// Params defines the parameters for the module.
+message Params {
+  option (amino.name) = "lumera/x/supernode/v1/Params";
+  option (gogoproto.equal) = true;
+  
+  cosmos.base.v1beta1.Coin minimum_stake_for_sn = 1 [
+    (gogoproto.nullable) = false,
+    (amino.dont_omitempty) = true,
+    (gogoproto.moretags) = "yaml:\"minimum_stake_for_sn\""
+  ];
+  uint64 reporting_threshold = 2 [(gogoproto.moretags) = "yaml:\"reporting_threshold\""];
+  uint64 slashing_threshold = 3 [(gogoproto.moretags) = "yaml:\"slashing_threshold\""];
+  string metrics_thresholds = 4 [(gogoproto.moretags) = "yaml:\"metrics_thresholds\""];
+  string evidence_retention_period = 5 [(gogoproto.moretags) = "yaml:\"evidence_retention_period\""];
+  string slashing_fraction = 6 [(gogoproto.moretags) = "yaml:\"slashing_fraction\""];
+  string inactivity_penalty_period = 7 [(gogoproto.moretags) = "yaml:\"inactivity_penalty_period\""];
+}

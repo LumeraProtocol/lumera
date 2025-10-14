@@ -1,8 +1,9 @@
 package ante
 
 import (
-	claimtypes "github.com/LumeraProtocol/lumera/x/claim/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	
+	claimtypes "github.com/LumeraProtocol/lumera/x/claim/types"
 )
 
 // DelayedClaimFeeDecorator must be placed BEFORE authante.NewMempoolFeeDecorator

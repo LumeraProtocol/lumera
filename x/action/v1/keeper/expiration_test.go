@@ -4,15 +4,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
-	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 
 	"github.com/stretchr/testify/suite"
+	"github.com/golang/mock/gomock"
 
-	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
 	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
 	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
+	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
+	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
@@ -28,10 +28,13 @@ type ExpirationTestSuite struct {
 }
 
 func (suite *ExpirationTestSuite) SetupTest() {
+	ctrl := gomock.NewController(suite.T())
+	defer ctrl.Finish()
+	
 	key, address := cryptotestutils.KeyAndAddress()
 	pubKey := key.PubKey()
 	pairs := []keepertest.AccountPair{{Address: address, PubKey: pubKey}}
-	suite.keeper, suite.ctx = keepertest.ActionKeeperWithAddress(suite.T(), pairs)
+	suite.keeper, suite.ctx = keepertest.ActionKeeperWithAddress(suite.T(), ctrl, pairs)
 
 	var err error
 	suite.signature, err = cryptotestutils.CreateSignatureString([]secp256k1.PrivKey{key}, 50)
@@ -52,51 +55,52 @@ func (suite *ExpirationTestSuite) TestCheckExpiration() {
 	testCases := []struct {
 		name           string
 		expirationTime int64
-		state          actionapi.ActionState
+		state          actiontypes.ActionState
 		expectExpired  bool
 	}{
 		{
 			name:           "Pending Action - Not Expired",
 			expirationTime: suite.blockTime.Unix() + 3600, // 1 hour in the future
-			state:          actionapi.ActionState_ACTION_STATE_PENDING,
+			state:          actiontypes.ActionStatePending,
 			expectExpired:  false,
 		},
 		{
 			name:           "Pending Action - Expired",
 			expirationTime: suite.blockTime.Unix() - 3600, // 1 hour in the past
-			state:          actionapi.ActionState_ACTION_STATE_PENDING,
+			state:          actiontypes.ActionStatePending,
 			expectExpired:  true,
 		},
 		{
 			name:           "Action Without Expiration Time",
 			expirationTime: 0, // No expiration time
-			state:          actionapi.ActionState_ACTION_STATE_PENDING,
+			state:          actiontypes.ActionStatePending,
 			expectExpired:  false, // Should not expire
 		},
 		//{
 		//	name:           "Processing Action - Not Expired",
 		//	expirationTime: suite.blockTime.Unix() + 3600, // 1 hour in the future
-		//	state:          actionapi.ActionState_ACTION_STATE_PROCESSING,
+		//	state:          actiontypes.ActionStateProcessing,
 		//	expectExpired:  false,
 		//},
 		//{
 		//	name:           "Processing Action - Expired",
 		//	expirationTime: suite.blockTime.Unix() - 3600, // 1 hour in the past
-		//	state:          actionapi.ActionState_ACTION_STATE_PROCESSING,
+		//	state:          actiontypes.ActionStateProcessing,
 		//	expectExpired:  true,
 		//},
 		//{
 		//	name:           "Done Action - Expired Time But Not Checked",
 		//	expirationTime: suite.blockTime.Unix() - 3600, // 1 hour in the past
-		//	state:          actionapi.ActionState_ACTION_STATE_DONE,
+		//	state:          actiontypes.ActionStateDone,
 		//	expectExpired:  false, // DONE actions shouldn't be checked for expiration
 		//},
 	}
 
+	testPrice := sdk.NewInt64Coin("ulume", 10_100)
 	// Create and store all the test actions
 	for i, tc := range testCases {
 		// Create cascade metadata
-		cascadeMetadata := &actionapi.CascadeMetadata{
+		cascadeMetadata := &actiontypes.CascadeMetadata{
 			DataHash:   "test_hash",
 			FileName:   "test.file",
 			RqIdsIc:    5,
@@ -109,10 +113,10 @@ func (suite *ExpirationTestSuite) TestCheckExpiration() {
 		suite.Require().NoError(err, "Failed to marshal metadata for test case %d: %s", i, tc.name)
 
 		// Create action
-		action := &actionapi.Action{
+		action := &actiontypes.Action{
 			Creator:        suite.testAddr.String(),
-			ActionType:     actionapi.ActionType_ACTION_TYPE_CASCADE,
-			Price:          "10100ulume",
+			ActionType:     actiontypes.ActionTypeCascade,
+			Price:          &testPrice,
 			BlockHeight:    suite.ctx.BlockHeight(),
 			State:          tc.state,
 			ExpirationTime: tc.expirationTime,
@@ -130,19 +134,19 @@ func (suite *ExpirationTestSuite) TestCheckExpiration() {
 	// Verify each action's state after the expiration check
 	var pendingCount, processingCount, expiredCount int
 
-	err := suite.keeper.IterateActionsByState(suite.ctx, actionapi.ActionState_ACTION_STATE_PENDING, func(action *actionapi.Action) bool {
+	err := suite.keeper.IterateActionsByState(suite.ctx, actiontypes.ActionStatePending, func(action *actiontypes.Action) bool {
 		pendingCount++
 		return false // Continue iteration
 	})
 	suite.Require().NoError(err)
 
-	err = suite.keeper.IterateActionsByState(suite.ctx, actionapi.ActionState_ACTION_STATE_PROCESSING, func(action *actionapi.Action) bool {
+	err = suite.keeper.IterateActionsByState(suite.ctx, actiontypes.ActionStateProcessing, func(action *actiontypes.Action) bool {
 		processingCount++
 		return false // Continue iteration
 	})
 	suite.Require().NoError(err)
 
-	err = suite.keeper.IterateActionsByState(suite.ctx, actionapi.ActionState_ACTION_STATE_EXPIRED, func(action *actionapi.Action) bool {
+	err = suite.keeper.IterateActionsByState(suite.ctx, actiontypes.ActionStateExpired, func(action *actiontypes.Action) bool {
 		expiredCount++
 		return false // Continue iteration
 	})
@@ -157,9 +161,9 @@ func (suite *ExpirationTestSuite) TestCheckExpiration() {
 		if tc.expectExpired {
 			expectedExpiredCount++
 		} else {
-			if tc.state == actionapi.ActionState_ACTION_STATE_PENDING {
+			if tc.state == actiontypes.ActionStatePending {
 				expectedPendingCount++
-			} else if tc.state == actionapi.ActionState_ACTION_STATE_PROCESSING {
+			} else if tc.state == actiontypes.ActionStateProcessing {
 				expectedProcessingCount++
 			}
 		}
@@ -177,7 +181,7 @@ func (suite *ExpirationTestSuite) TestExpiredActionEvents() {
 	ctx := suite.ctx.WithEventManager(sdk.NewEventManager())
 
 	// Create sense metadata
-	senseMetadata := &actionapi.SenseMetadata{
+	senseMetadata := &actiontypes.SenseMetadata{
 		DataHash:             "expired_action_hash",
 		DdAndFingerprintsMax: 10,
 		DdAndFingerprintsIc:  5,
@@ -187,13 +191,15 @@ func (suite *ExpirationTestSuite) TestExpiredActionEvents() {
 	metadataBytes, err := suite.keeper.GetCodec().Marshal(senseMetadata)
 	suite.Require().NoError(err)
 
+	testPrice := sdk.NewInt64Coin("ulume", 10_100)
+
 	// Create action
-	expiredAction := &actionapi.Action{
+	expiredAction := &actiontypes.Action{
 		Creator:        suite.testAddr.String(),
-		ActionType:     actionapi.ActionType_ACTION_TYPE_SENSE,
-		Price:          "10100ulume",
+		ActionType:     actiontypes.ActionTypeSense,
+		Price:          &testPrice,
 		BlockHeight:    ctx.BlockHeight(),
-		State:          actionapi.ActionState_ACTION_STATE_PENDING,
+		State:          actiontypes.ActionStatePending,
 		ExpirationTime: ctx.BlockTime().Unix() - 3600, // 1 hour in the past
 		Metadata:       metadataBytes,
 	}
@@ -214,7 +220,7 @@ func (suite *ExpirationTestSuite) TestExpiredActionEvents() {
 	// Verify "action_expired" event was emitted
 	foundExpiredEvent := false
 	for _, event := range events {
-		if event.Type == types.EventTypeActionExpired {
+		if event.Type == actiontypes.EventTypeActionExpired {
 			foundExpiredEvent = true
 
 			// Verify attributes

@@ -5,22 +5,20 @@ import (
 	"math/rand"
 	"strings"
 
-	keeper2 "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
-	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
-
-	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
+	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
+	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	simtypes "github.com/cosmos/cosmos-sdk/types/simulation"
 
-	"google.golang.org/protobuf/proto"
+	gogoproto "github.com/gogo/protobuf/proto"
 )
 
 // SimulateMsgFinalizeActionSuccessSense simulates a successful finalization of a SENSE action
 func SimulateMsgFinalizeActionSuccessSense(
-	ak types2.AccountKeeper,
-	bk types2.BankKeeper,
-	k keeper2.Keeper,
+	ak types.AuthKeeper,
+	bk types.BankKeeper,
+	k keeper.Keeper,
 ) simtypes.Operation {
 	return func(r *rand.Rand, app *baseapp.BaseApp, ctx sdk.Context, accs []simtypes.Account, chainID string,
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
@@ -30,7 +28,7 @@ func SimulateMsgFinalizeActionSuccessSense(
 		// 2. Select three random supernode accounts
 		supernodes, err := getRandomActiveSupernodes(r, ctx, 3, ak, k, accs)
 		if err != nil {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(&types2.MsgFinalizeAction{}), "failed to get random supernodes"), nil, nil
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(&types.MsgFinalizeAction{}), "failed to get random supernodes"), nil, nil
 		}
 
 		// 3. Store initial balances of supernodes to check fee distribution later
@@ -51,7 +49,7 @@ func SimulateMsgFinalizeActionSuccessSense(
 		if !finalBalance1.Amount.GT(initialBalance1.Amount) ||
 			!finalBalance2.Amount.GT(initialBalance2.Amount) ||
 			!finalBalance3.Amount.GT(initialBalance3.Amount) {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(msg), "fee distribution not as expected"), nil, nil
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), "fee distribution not as expected"), nil, nil
 		}
 
 		// 16. Return successful operation message
@@ -61,9 +59,9 @@ func SimulateMsgFinalizeActionSuccessSense(
 
 // SimulateMsgFinalizeActionSuccessCascade simulates a successful finalization of a CASCADE action
 func SimulateMsgFinalizeActionSuccessCascade(
-	ak types2.AccountKeeper,
-	bk types2.BankKeeper,
-	k keeper2.Keeper,
+	ak types.AuthKeeper,
+	bk types.BankKeeper,
+	k keeper.Keeper,
 ) simtypes.Operation {
 	return func(r *rand.Rand, app *baseapp.BaseApp, ctx sdk.Context, accs []simtypes.Account, chainID string,
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
@@ -73,7 +71,7 @@ func SimulateMsgFinalizeActionSuccessCascade(
 		// 2. Select three random supernode accounts
 		supernodes, err := getRandomActiveSupernodes(r, ctx, 1, ak, k, accs)
 		if err != nil {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(&types2.MsgFinalizeAction{}), "failed to get random supernodes"), nil, nil
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(&types.MsgFinalizeAction{}), "failed to get random supernodes"), nil, nil
 		}
 
 		// 3. Store initial balance of supernode to check fee distribution later
@@ -86,7 +84,7 @@ func SimulateMsgFinalizeActionSuccessCascade(
 		// 5. Check supernode balance to confirm fee distribution
 		finalBalance := bk.GetBalance(ctx, supernodes[0].Address, feeDenom)
 		if !finalBalance.Amount.GT(initialBalance.Amount) {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(msg), "fee distribution not as expected"), nil, nil
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), "fee distribution not as expected"), nil, nil
 		}
 
 		// 6. Return successful operation message
@@ -96,9 +94,9 @@ func SimulateMsgFinalizeActionSuccessCascade(
 
 // SimulateMsgFinalizeActionInvalidID simulates attempting to finalize an action with a non-existent ID
 func SimulateMsgFinalizeActionInvalidID(
-	ak types2.AccountKeeper,
-	bk types2.BankKeeper,
-	k keeper2.Keeper,
+	ak types.AuthKeeper,
+	bk types.BankKeeper,
+	k keeper.Keeper,
 ) simtypes.Operation {
 	return func(r *rand.Rand, app *baseapp.BaseApp, ctx sdk.Context, accs []simtypes.Account, chainID string,
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
@@ -108,7 +106,7 @@ func SimulateMsgFinalizeActionInvalidID(
 		// 1. Select random supernode account
 		supernodes, err := getRandomActiveSupernodes(r, ctx, 1, ak, k, accs)
 		if err != nil {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(&types2.MsgFinalizeAction{}), "failed to get random supernodes"), nil, nil
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(&types.MsgFinalizeAction{}), "failed to get random supernodes"), nil, nil
 		}
 
 		// 2. Generate non-existent action ID
@@ -122,7 +120,7 @@ func SimulateMsgFinalizeActionInvalidID(
 		metadata := generateValidFinalizeMetadata(1, 50, actionType, supernodes, "")
 
 		// 5. Create finalization message
-		msg := types2.NewMsgFinalizeAction(
+		msg := types.NewMsgFinalizeAction(
 			supernodes[0].Address.String(),
 			invalidActionID,
 			actionType,
@@ -130,18 +128,18 @@ func SimulateMsgFinalizeActionInvalidID(
 		)
 
 		// 6. Deliver transaction, expecting error
-		msgServSim := keeper2.NewMsgServerImpl(k)
+		msgServSim := keeper.NewMsgServerImpl(k)
 		_, err = msgServSim.FinalizeAction(ctx, msg)
 
 		// 7. Check that an error occurred (should be about invalid action ID)
 		if err == nil {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(msg), "expected error when finalizing with invalid action ID"), nil, nil
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), "expected error when finalizing with invalid action ID"), nil, nil
 		}
 
 		// 8. Verify supernode balance remains unchanged
 		finalBalance := bk.GetBalance(ctx, supernodes[0].Address, feeDenom)
 		if !finalBalance.Equal(initialBalance) {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(msg), "balance changed despite error"), nil, nil
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), "balance changed despite error"), nil, nil
 		}
 
 		// 9. Return operation message, marking as failed but expected
@@ -151,9 +149,9 @@ func SimulateMsgFinalizeActionInvalidID(
 
 // SimulateMsgFinalizeActionInvalidState simulates attempting to finalize an action that is not in PENDING state
 func SimulateMsgFinalizeActionInvalidState(
-	ak types2.AccountKeeper,
-	bk types2.BankKeeper,
-	k keeper2.Keeper,
+	ak types.AuthKeeper,
+	bk types.BankKeeper,
+	k keeper.Keeper,
 ) simtypes.Operation {
 	return func(r *rand.Rand, app *baseapp.BaseApp, ctx sdk.Context, accs []simtypes.Account, chainID string,
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
@@ -161,7 +159,7 @@ func SimulateMsgFinalizeActionInvalidState(
 		actionID, action := registerSenseOrCascadeAction(r, ctx, accs, k, bk, ak)
 		supernodes, err := finalizeAction(r, ctx, k, ak, bk, actionID, action.ActionType, accs)
 		if err != nil {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(&types2.MsgFinalizeAction{}), "failed to get random supernodes"), nil, nil
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(&types.MsgFinalizeAction{}), "failed to get random supernodes"), nil, nil
 		}
 
 		// 2. Get initial supernode balance
@@ -172,7 +170,7 @@ func SimulateMsgFinalizeActionInvalidState(
 		metadata := generateValidFinalizeMetadata(1, 50, action.ActionType.String(), supernodes, "")
 
 		// 4. Create finalization message
-		msg := types2.NewMsgFinalizeAction(
+		msg := types.NewMsgFinalizeAction(
 			supernodes[0].Address.String(),
 			actionID,
 			action.ActionType.String(),
@@ -180,34 +178,34 @@ func SimulateMsgFinalizeActionInvalidState(
 		)
 
 		// 6. Deliver transaction, expecting error
-		msgServSim := keeper2.NewMsgServerImpl(k)
+		msgServSim := keeper.NewMsgServerImpl(k)
 		_, err = msgServSim.FinalizeAction(ctx, msg)
 
 		// 7. Check that an error occurred (should be about invalid action state)
 		if err == nil {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(msg), "expected error when finalizing action in DONE state"), nil, nil
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), "expected error when finalizing action in DONE state"), nil, nil
 		}
 
 		// Check if the error is about invalid action state
 		if !strings.Contains(err.Error(), "invalid state") && !strings.Contains(err.Error(), "not in PENDING state") {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(msg), fmt.Sprintf("unexpected error: %v", err)), nil, nil
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), fmt.Sprintf("unexpected error: %v", err)), nil, nil
 		}
 
 		// 8. Verify supernode balance remains unchanged
 		finalBalance := bk.GetBalance(ctx, supernodes[0].Address, feeDenom)
 		if !finalBalance.Equal(initialBalance) {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(msg), "balance changed despite error"), nil, nil
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), "balance changed despite error"), nil, nil
 		}
 
 		// 9. Verify action state remains unchanged - this will be checked against the actual stored action
 		unchangedAction, found := k.GetActionByID(ctx, actionID)
 		if !found {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(msg), "action not found after finalization attempt"), nil, nil
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), "action not found after finalization attempt"), nil, nil
 		}
 
 		// The state should still be PENDING in the store (not DONE which is only in our simulated version)
-		if unchangedAction.State != actionapi.ActionState_ACTION_STATE_PENDING {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(msg), "action state changed despite error"), nil, nil
+		if unchangedAction.State != types.ActionStatePending {
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), "action state changed despite error"), nil, nil
 		}
 
 		// 10. Return operation message, marking as failed but expected
@@ -217,9 +215,9 @@ func SimulateMsgFinalizeActionInvalidState(
 
 // SimulateMsgFinalizeActionUnauthorized simulates attempting to finalize an action by a non-supernode account
 func SimulateMsgFinalizeActionUnauthorized(
-	ak types2.AccountKeeper,
-	bk types2.BankKeeper,
-	k keeper2.Keeper,
+	ak types.AuthKeeper,
+	bk types.BankKeeper,
+	k keeper.Keeper,
 ) simtypes.Operation {
 	return func(r *rand.Rand, app *baseapp.BaseApp, ctx sdk.Context, accs []simtypes.Account, chainID string,
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
@@ -230,7 +228,7 @@ func SimulateMsgFinalizeActionUnauthorized(
 		metadata := generateValidFinalizeMetadata(1, 50, action.ActionType.String(), accs, "")
 
 		// 4. Create finalization message
-		msg := types2.NewMsgFinalizeAction(
+		msg := types.NewMsgFinalizeAction(
 			accs[0].Address.String(),
 			actionID,
 			action.ActionType.String(),
@@ -238,27 +236,27 @@ func SimulateMsgFinalizeActionUnauthorized(
 		)
 
 		// 5. Deliver transaction, expecting error
-		msgServSim := keeper2.NewMsgServerImpl(k)
+		msgServSim := keeper.NewMsgServerImpl(k)
 		_, err := msgServSim.FinalizeAction(ctx, msg)
 
 		// 6. Check that an error occurred (should be about unauthorized account)
 		if err == nil {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(msg), "expected error when finalizing with unauthorized account"), nil, nil
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), "expected error when finalizing with unauthorized account"), nil, nil
 		}
 
 		// Check if the error is about unauthorized account
 		if !strings.Contains(err.Error(), "unauthorized") && !strings.Contains(err.Error(), "authority") {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(msg), fmt.Sprintf("unexpected error: %v", err)), nil, nil
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), fmt.Sprintf("unexpected error: %v", err)), nil, nil
 		}
 
 		// 7. Verify action state remains unchanged
 		unchangedAction, found := k.GetActionByID(ctx, actionID)
 		if !found {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(msg), "action not found after finalization attempt"), nil, nil
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), "action not found after finalization attempt"), nil, nil
 		}
 
-		if unchangedAction.State != actionapi.ActionState_ACTION_STATE_PENDING {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(msg), "action state changed despite error"), nil, nil
+		if unchangedAction.State != types.ActionStatePending {
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), "action state changed despite error"), nil, nil
 		}
 
 		// 8. Return operation message, marking as failed but expected
@@ -269,9 +267,9 @@ func SimulateMsgFinalizeActionUnauthorized(
 // SimulateMsgFinalizeActionSenseConsensus simulates the consensus requirement for SENSE actions
 // Testing different scenarios of matching and non-matching results from multiple supernodes
 func SimulateMsgFinalizeActionSenseConsensus(
-	ak types2.AccountKeeper,
-	bk types2.BankKeeper,
-	k keeper2.Keeper,
+	ak types.AuthKeeper,
+	bk types.BankKeeper,
+	k keeper.Keeper,
 ) simtypes.Operation {
 	return func(r *rand.Rand, app *baseapp.BaseApp, ctx sdk.Context, accs []simtypes.Account, chainID string,
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
@@ -284,7 +282,7 @@ func SimulateMsgFinalizeActionSenseConsensus(
 		// 2. Select three random supernode accounts
 		supernodes, err := getRandomActiveSupernodes(r, ctx, 3, ak, k, accs)
 		if err != nil {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(&types2.MsgFinalizeAction{}), "failed to get random supernodes"), nil, nil
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(&types.MsgFinalizeAction{}), "failed to get random supernodes"), nil, nil
 		}
 
 		// Store initial balances to verify fee distribution
@@ -294,14 +292,14 @@ func SimulateMsgFinalizeActionSenseConsensus(
 			initialBalances[supernodes[i].Address.String()] = bk.GetBalance(ctx, supernodes[i].Address, feeDenom)
 		}
 
-		var existingMetadata actionapi.SenseMetadata
-		err = proto.Unmarshal([]byte(msg.Metadata), &existingMetadata)
+		var existingMetadata types.SenseMetadata
+		err = gogoproto.Unmarshal([]byte(msg.Metadata), &existingMetadata)
 		if err != nil {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(&types2.MsgFinalizeAction{}),
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(&types.MsgFinalizeAction{}),
 				fmt.Sprintf("failed to unmarshal existing metadata: %v", err)), nil, nil
 		}
 
-		msgServSim := keeper2.NewMsgServerImpl(k)
+		msgServSim := keeper.NewMsgServerImpl(k)
 
 		switch scenario {
 		case 1:
@@ -310,28 +308,28 @@ func SimulateMsgFinalizeActionSenseConsensus(
 			metadata1 := generateValidFinalizeMetadata(
 				existingMetadata.DdAndFingerprintsIc,
 				existingMetadata.DdAndFingerprintsMax,
-				actionapi.ActionType_ACTION_TYPE_SENSE.String(),
+				types.ActionTypeSense.String(),
 				supernodes,
 				"")
 
 			// First two supernodes submit matching results
 			for i := 0; i < 2; i++ {
-				msg := types2.NewMsgFinalizeAction(
+				msg := types.NewMsgFinalizeAction(
 					supernodes[i].Address.String(),
 					actionID,
-					actionapi.ActionType_ACTION_TYPE_SENSE.String(),
+					types.ActionTypeSense.String(),
 					metadata1,
 				)
 
 				_, err := msgServSim.FinalizeAction(ctx, msg)
 				if err != nil {
-					return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(msg), err.Error()), nil, err
+					return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), err.Error()), nil, err
 				}
 
 				// After 1st and 2nd submission, state should be PROCESSING
 				action, _ := k.GetActionByID(ctx, actionID)
-				if action.State != actionapi.ActionState_ACTION_STATE_PROCESSING {
-					return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(msg),
+				if action.State != types.ActionStateProcessing {
+					return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg),
 						"unexpected state after submission"), nil, nil
 				}
 			}
@@ -339,7 +337,7 @@ func SimulateMsgFinalizeActionSenseConsensus(
 			for i := 0; i < 2; i++ {
 				finalBalance := bk.GetBalance(ctx, supernodes[i].Address, feeDenom)
 				if !finalBalance.Equal(initialBalances[supernodes[i].Address.String()]) {
-					return simtypes.NoOpMsg(types2.ModuleName, "FinalizeAction",
+					return simtypes.NoOpMsg(types.ModuleName, "FinalizeAction",
 						"fee distributed before consensus reached"), nil, nil
 				}
 			}
@@ -349,26 +347,26 @@ func SimulateMsgFinalizeActionSenseConsensus(
 			metadata3 := generateValidFinalizeMetadata(
 				existingMetadata.DdAndFingerprintsIc,
 				existingMetadata.DdAndFingerprintsMax,
-				actionapi.ActionType_ACTION_TYPE_SENSE.String(),
+				types.ActionTypeSense.String(),
 				supernodes,
 				"")
 
-			msg3 := types2.NewMsgFinalizeAction(
+			msg3 := types.NewMsgFinalizeAction(
 				supernodes[2].Address.String(),
 				actionID,
-				actionapi.ActionType_ACTION_TYPE_SENSE.String(),
+				types.ActionTypeSense.String(),
 				metadata3,
 			)
 
 			_, err := msgServSim.FinalizeAction(ctx, msg3)
 			if err != nil {
-				return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(msg3), err.Error()), nil, err
+				return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg3), err.Error()), nil, err
 			}
 
 			// After 3rd non-matching submission, state should be FAILED
 			action, _ := k.GetActionByID(ctx, actionID)
-			if action.State != actionapi.ActionState_ACTION_STATE_FAILED {
-				return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(msg3),
+			if action.State != types.ActionStateFailed {
+				return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg3),
 					"unexpected state after non-matching submission"), nil, nil
 			}
 
@@ -376,12 +374,12 @@ func SimulateMsgFinalizeActionSenseConsensus(
 			for i := 0; i < 3; i++ {
 				finalBalance := bk.GetBalance(ctx, supernodes[i].Address, feeDenom)
 				if !finalBalance.Equal(initialBalances[supernodes[i].Address.String()]) {
-					return simtypes.NoOpMsg(types2.ModuleName, "FinalizeAction",
+					return simtypes.NoOpMsg(types.ModuleName, "FinalizeAction",
 						"fee distributed before consensus reached"), nil, nil
 				}
 			}
 
-			return simtypes.NewOperationMsg(&types2.MsgFinalizeAction{}, true, "success - no consensus with conflicting results"), nil, nil
+			return simtypes.NewOperationMsg(&types.MsgFinalizeAction{}, true, "success - no consensus with conflicting results"), nil, nil
 
 		case 2:
 			// Scenario 4: 3 supernodes submit completely different results (should fail/remain in PROCESSING)
@@ -392,27 +390,27 @@ func SimulateMsgFinalizeActionSenseConsensus(
 				metadata := generateValidFinalizeMetadata(
 					existingMetadata.DdAndFingerprintsIc,
 					existingMetadata.DdAndFingerprintsMax,
-					actionapi.ActionType_ACTION_TYPE_SENSE.String(),
+					types.ActionTypeSense.String(),
 					supernodes,
 					"")
 
-				msg := types2.NewMsgFinalizeAction(
+				msg := types.NewMsgFinalizeAction(
 					supernodes[i].Address.String(),
 					actionID,
-					actionapi.ActionType_ACTION_TYPE_SENSE.String(),
+					types.ActionTypeSense.String(),
 					metadata,
 				)
 
 				_, err := msgServSim.FinalizeAction(ctx, msg)
 				if err != nil {
-					return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(msg), err.Error()), nil, err
+					return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg), err.Error()), nil, err
 				}
 			}
 
 			// After 3 different submissions, state should still be FAILED
 			action, _ := k.GetActionByID(ctx, actionID)
-			if action.State != actionapi.ActionState_ACTION_STATE_FAILED {
-				return simtypes.NoOpMsg(types2.ModuleName, "FinalizeAction",
+			if action.State != types.ActionStateFailed {
+				return simtypes.NoOpMsg(types.ModuleName, "FinalizeAction",
 					fmt.Sprintf("unexpected state after 3 different submissions: got %s, expected FAILED",
 						action.State)), nil, nil
 			}
@@ -421,25 +419,25 @@ func SimulateMsgFinalizeActionSenseConsensus(
 			for i := 0; i < 3; i++ {
 				finalBalance := bk.GetBalance(ctx, supernodes[i].Address, feeDenom)
 				if !finalBalance.Equal(initialBalances[supernodes[i].Address.String()]) {
-					return simtypes.NoOpMsg(types2.ModuleName, "FinalizeAction",
+					return simtypes.NoOpMsg(types.ModuleName, "FinalizeAction",
 						"fee distributed before consensus reached"), nil, nil
 				}
 			}
 
-			return simtypes.NewOperationMsg(&types2.MsgFinalizeAction{}, true, "success - no consensus with different results"), nil, nil
+			return simtypes.NewOperationMsg(&types.MsgFinalizeAction{}, true, "success - no consensus with different results"), nil, nil
 		}
 
 		// Should never reach here, but return a generic message if somehow we do
-		return simtypes.NoOpMsg(types2.ModuleName, "FinalizeAction", "unknown scenario"), nil, nil
+		return simtypes.NoOpMsg(types.ModuleName, "FinalizeAction", "unknown scenario"), nil, nil
 	}
 }
 
 // SimulateMsgFinalizeActionMetadataValidation simulates attempting to finalize actions with invalid metadata
 // This tests that invalid or incomplete metadata submitted during MsgFinalizeAction is correctly rejected
 func SimulateMsgFinalizeActionMetadataValidation(
-	ak types2.AccountKeeper,
-	bk types2.BankKeeper,
-	k keeper2.Keeper,
+	ak types.AuthKeeper,
+	bk types.BankKeeper,
+	k keeper.Keeper,
 ) simtypes.Operation {
 	return func(r *rand.Rand, app *baseapp.BaseApp, ctx sdk.Context, accs []simtypes.Account, chainID string,
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
@@ -448,7 +446,7 @@ func SimulateMsgFinalizeActionMetadataValidation(
 		invalidationType := r.Intn(5) // Different types of invalid metadata
 
 		var actionID string
-		var action *actionapi.Action
+		var action *types.Action
 
 		// 1. Create the appropriate type of PENDING action
 		if scenarioType == 0 {
@@ -462,13 +460,13 @@ func SimulateMsgFinalizeActionMetadataValidation(
 		// 2. Get the created action
 		action, found := k.GetActionByID(ctx, actionID)
 		if !found {
-			return simtypes.NoOpMsg(types2.ModuleName, "FinalizeAction", "action not found"), nil, nil
+			return simtypes.NoOpMsg(types.ModuleName, "FinalizeAction", "action not found"), nil, nil
 		}
 
 		// 3. Select a random supernode account
 		supernodes, err := getRandomActiveSupernodes(r, ctx, 3, ak, k, accs)
 		if err != nil {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(&types2.MsgFinalizeAction{}), "failed to get random supernodes"), nil, nil
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(&types.MsgFinalizeAction{}), "failed to get random supernodes"), nil, nil
 		}
 
 		// 4. Get initial supernode balance to verify no fees are distributed
@@ -519,7 +517,7 @@ func SimulateMsgFinalizeActionMetadataValidation(
 		}
 
 		// 6. Create finalization message
-		msg := types2.NewMsgFinalizeAction(
+		msg := types.NewMsgFinalizeAction(
 			supernodes[0].Address.String(),
 			actionID,
 			action.ActionType.String(),
@@ -527,32 +525,32 @@ func SimulateMsgFinalizeActionMetadataValidation(
 		)
 
 		// 8. Deliver transaction, expecting error
-		msgServSim := keeper2.NewMsgServerImpl(k)
+		msgServSim := keeper.NewMsgServerImpl(k)
 		_, err = msgServSim.FinalizeAction(ctx, msg)
 
 		// 9. Check that an error occurred
 		if err == nil {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(msg),
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg),
 				"expected error when finalizing with invalid metadata"), nil, nil
 		}
 
 		// 10. Verify the action state remains unchanged
 		updatedAction, found := k.GetActionByID(ctx, actionID)
 		if !found {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(msg),
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg),
 				"action not found after finalization attempt"), nil, nil
 		}
 
-		expectedState := actionapi.ActionState_ACTION_STATE_PENDING
-		if action.ActionType == actionapi.ActionType_ACTION_TYPE_SENSE &&
-			updatedAction.State == actionapi.ActionState_ACTION_STATE_PROCESSING {
+		expectedState := types.ActionStatePending
+		if action.ActionType == types.ActionTypeSense &&
+			updatedAction.State == types.ActionStateProcessing {
 			// For SENSE actions, it's also valid if the state is PROCESSING
 			// (if a valid message was sent prior to our test)
-			expectedState = actionapi.ActionState_ACTION_STATE_PROCESSING
+			expectedState = types.ActionStateProcessing
 		}
 
 		if updatedAction.State != expectedState {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(msg),
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg),
 				fmt.Sprintf("action state changed despite error: expected %s, got %s",
 					expectedState, updatedAction.State)), nil, nil
 		}
@@ -560,7 +558,7 @@ func SimulateMsgFinalizeActionMetadataValidation(
 		// 11. Verify supernode balance remains unchanged (no fees distributed)
 		finalBalance := bk.GetBalance(ctx, supernodes[0].Address, feeDenom)
 		if !finalBalance.Equal(initialBalance) {
-			return simtypes.NoOpMsg(types2.ModuleName, sdk.MsgTypeURL(msg),
+			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(msg),
 				"balance changed despite error"), nil, nil
 		}
 

@@ -1,0 +1,39 @@
+name: Setup Go from go.mod
+description: Detect the Go toolchain version from go.mod and install it with caching enabled
+outputs:
+  version:
+    description: Detected Go version
+    value: ${{ steps.determine.outputs.version }}
+runs:
+  using: composite
+  steps:
+    - id: determine
+      name: Determine Go version
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        VERSION=""
+        TOOLCHAIN_VERSION=$(grep -E '^toolchain go[0-9]+\.[0-9]+(\.[0-9]+)?$' go.mod | cut -d ' ' -f 2 | sed 's/^go//' || true)
+        if [ -n "$TOOLCHAIN_VERSION" ]; then
+          VERSION="$TOOLCHAIN_VERSION"
+          echo "Detected toolchain directive: go$VERSION"
+        else
+          VERSION=$(grep -E '^go [0-9]+\.[0-9]+(\.[0-9]+)?$' go.mod | cut -d ' ' -f 2 || true)
+          if [ -n "$VERSION" ]; then
+            echo "Detected go directive: $VERSION"
+          fi
+        fi
+
+        if [ -z "$VERSION" ]; then
+          echo "Unable to determine Go version from go.mod" >&2
+          exit 1
+        fi
+
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+    - name: Setup Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ steps.determine.outputs.version }}
+        cache: true

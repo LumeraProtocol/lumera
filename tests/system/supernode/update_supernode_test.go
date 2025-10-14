@@ -3,15 +3,15 @@ package system_test
 import (
 	"testing"
 
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
 	sdkmath "cosmossdk.io/math"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/stretchr/testify/require"
+
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 func TestUpdateSupernode(t *testing.T) {
@@ -27,13 +27,13 @@ func TestUpdateSupernode(t *testing.T) {
 
 	testCases := []struct {
 		name   string
-		msg    *types2.MsgUpdateSupernode
+		msg    *sntypes.MsgUpdateSupernode
 		setup  func(*SystemTestSuite)
-		verify func(t *testing.T, suite *SystemTestSuite, resp *types2.MsgUpdateSupernodeResponse, err error)
+		verify func(t *testing.T, suite *SystemTestSuite, resp *sntypes.MsgUpdateSupernodeResponse, err error)
 	}{
 		{
-			name: "basic update - new ip, new Note, new supernode account",
-			msg: &types2.MsgUpdateSupernode{
+			name: "basic update - new ip, new version, new supernode account",
+			msg: &sntypes.MsgUpdateSupernode{
 				Creator:          walletAddr.String(),
 				ValidatorAddress: valAddrStr,
 				IpAddress:        "10.0.0.2",
@@ -42,17 +42,17 @@ func TestUpdateSupernode(t *testing.T) {
 			},
 			setup: func(suite *SystemTestSuite) {
 				// Register a supernode in some initial state
-				sn := types2.SuperNode{
+				sn := sntypes.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
 					Note:             "1.0.0",
-					States: []*types2.SuperNodeStateRecord{
+					States: []*sntypes.SuperNodeStateRecord{
 						{
-							State:  types2.SuperNodeStateActive,
+							State:  sntypes.SuperNodeStateActive,
 							Height: suite.sdkCtx.BlockHeight(),
 						},
 					},
-					PrevIpAddresses: []*types2.IPAddressHistory{
+					PrevIpAddresses: []*sntypes.IPAddressHistory{
 						{
 							Address: "192.168.1.1",
 							Height:  suite.sdkCtx.BlockHeight(),
@@ -63,7 +63,7 @@ func TestUpdateSupernode(t *testing.T) {
 				err := suite.app.SupernodeKeeper.SetSuperNode(suite.sdkCtx, sn)
 				require.NoError(t, err)
 			},
-			verify: func(t *testing.T, suite *SystemTestSuite, resp *types2.MsgUpdateSupernodeResponse, err error) {
+			verify: func(t *testing.T, suite *SystemTestSuite, resp *sntypes.MsgUpdateSupernodeResponse, err error) {
 				require.NoError(t, err)
 				require.NotNil(t, resp)
 
@@ -80,66 +80,66 @@ func TestUpdateSupernode(t *testing.T) {
 				// Verify new supernode account
 				require.NotEqual(t, walletAddr.String(), sn.SupernodeAccount)
 
-            // Verify event
-            events := suite.sdkCtx.EventManager().Events()
-            var foundUpdateEvent bool
-            for _, e := range events {
-                if e.Type == types2.EventTypeSupernodeUpdated {
-                    foundUpdateEvent = true
-                    var addrOK, fieldsOK, heightOK bool
-                    var oldAccOK, newAccOK, oldIPOK, newIPOK bool
-                    var fieldsUpdated string
-                    kv := map[string]string{}
-                    for _, attr := range e.Attributes {
-                        kv[string(attr.Key)] = string(attr.Value)
-                        if string(attr.Key) == types2.AttributeKeyValidatorAddress {
-                            require.Equal(t, valAddrStr, string(attr.Value))
-                            addrOK = true
-                        }
-                        if string(attr.Key) == types2.AttributeKeyFieldsUpdated {
-                            fieldsUpdated = string(attr.Value)
-                            fieldsOK = true
-                        }
-                        if string(attr.Key) == types2.AttributeKeyHeight {
-                            require.NotEmpty(t, string(attr.Value))
-                            heightOK = true
-                        }
-                        if string(attr.Key) == types2.AttributeKeyOldAccount {
-                            require.Equal(t, walletAddr.String(), string(attr.Value))
-                            oldAccOK = true
-                        }
-                        if string(attr.Key) == types2.AttributeKeyNewAccount {
-                            require.NotEmpty(t, string(attr.Value))
-                            newAccOK = true
-                        }
-                        if string(attr.Key) == types2.AttributeKeyOldIPAddress {
-                            require.Equal(t, "192.168.1.1", string(attr.Value))
-                            oldIPOK = true
-                        }
-                        if string(attr.Key) == types2.AttributeKeyIPAddress {
-                            require.Equal(t, "10.0.0.2", string(attr.Value))
-                            newIPOK = true
-                        }
-                    }
-                    require.True(t, addrOK && fieldsOK && heightOK)
-                    require.Contains(t, fieldsUpdated, types2.AttributeKeyIPAddress)
-                    require.Contains(t, fieldsUpdated, types2.AttributeKeySupernodeAccount)
-                    require.Contains(t, fieldsUpdated, "note")
-                    require.True(t, oldAccOK && newAccOK && oldIPOK && newIPOK)
-                }
-            }
-            require.True(t, foundUpdateEvent, "supernode_updated event not found")
-        },
-        },
+				// Verify event
+				events := suite.sdkCtx.EventManager().Events()
+				var foundUpdateEvent bool
+				for _, e := range events {
+					if e.Type == sntypes.EventTypeSupernodeUpdated {
+						foundUpdateEvent = true
+						var addrOK, fieldsOK, heightOK bool
+						var oldAccOK, newAccOK, oldIPOK, newIPOK bool
+						var fieldsUpdated string
+						kv := map[string]string{}
+						for _, attr := range e.Attributes {
+						    kv[string(attr.Key)] = string(attr.Value)
+						    if string(attr.Key) == sntypes.AttributeKeyValidatorAddress {
+						        require.Equal(t, valAddrStr, string(attr.Value))
+						        addrOK = true
+						    }
+						    if string(attr.Key) == sntypes.AttributeKeyFieldsUpdated {
+						        fieldsUpdated = string(attr.Value)
+						        fieldsOK = true
+						    }
+						    if string(attr.Key) == sntypes.AttributeKeyHeight {
+						        require.NotEmpty(t, string(attr.Value))
+						        heightOK = true
+						    }
+						    if string(attr.Key) == sntypes.AttributeKeyOldAccount {
+						        require.Equal(t, walletAddr.String(), string(attr.Value))
+						        oldAccOK = true
+						    }
+						    if string(attr.Key) == sntypes.AttributeKeyNewAccount {
+						        require.NotEmpty(t, string(attr.Value))
+						        newAccOK = true
+						    }
+						    if string(attr.Key) == sntypes.AttributeKeyOldIPAddress {
+						        require.Equal(t, "192.168.1.1", string(attr.Value))
+						        oldIPOK = true
+						    }
+						    if string(attr.Key) == sntypes.AttributeKeyIPAddress {
+						        require.Equal(t, "10.0.0.2", string(attr.Value))
+						        newIPOK = true
+						    }
+						}
+						require.True(t, addrOK && fieldsOK && heightOK)
+						require.Contains(t, fieldsUpdated, sntypes.AttributeKeyIPAddress)
+						require.Contains(t, fieldsUpdated, sntypes.AttributeKeySupernodeAccount)
+						require.Contains(t, fieldsUpdated, "note")
+						require.True(t, oldAccOK && newAccOK && oldIPOK && newIPOK)
+					}
+				}
+				require.True(t, foundUpdateEvent, "supernode_updated event not found")
+			},
+		},
 		{
 			name: "supernode not found",
-			msg: &types2.MsgUpdateSupernode{
+			msg: &sntypes.MsgUpdateSupernode{
 				Creator:          walletAddr.String(),
 				ValidatorAddress: valAddrStr,
 				IpAddress:        "10.0.0.3",
 			},
 			setup: func(suite *SystemTestSuite) { /* do nothing */ },
-			verify: func(t *testing.T, suite *SystemTestSuite, resp *types2.MsgUpdateSupernodeResponse, err error) {
+			verify: func(t *testing.T, suite *SystemTestSuite, resp *sntypes.MsgUpdateSupernodeResponse, err error) {
 				require.Error(t, err)
 				require.ErrorIs(t, err, sdkerrors.ErrNotFound)
 				require.Nil(t, resp)
@@ -147,24 +147,24 @@ func TestUpdateSupernode(t *testing.T) {
 		},
 		{
 			name: "unauthorized update attempt",
-			msg: &types2.MsgUpdateSupernode{
+			msg: &sntypes.MsgUpdateSupernode{
 				Creator:          unauthAddr.String(),
 				ValidatorAddress: valAddrStr,
 				IpAddress:        "8.8.8.8",
 			},
 			setup: func(suite *SystemTestSuite) {
 				// Create supernode owned by walletAddr
-				sn := types2.SuperNode{
+				sn := sntypes.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
-					Note:             "1.0.0",
-					States: []*types2.SuperNodeStateRecord{
+					Note:          "1.0.0",
+					States: []*sntypes.SuperNodeStateRecord{
 						{
-							State:  types2.SuperNodeStateActive,
+							State:  sntypes.SuperNodeStateActive,
 							Height: suite.sdkCtx.BlockHeight(),
 						},
 					},
-					PrevIpAddresses: []*types2.IPAddressHistory{
+					PrevIpAddresses: []*sntypes.IPAddressHistory{
 						{
 							Address: "127.0.0.2",
 							Height:  suite.sdkCtx.BlockHeight(),
@@ -175,7 +175,7 @@ func TestUpdateSupernode(t *testing.T) {
 				err := suite.app.SupernodeKeeper.SetSuperNode(suite.sdkCtx, sn)
 				require.NoError(t, err)
 			},
-			verify: func(t *testing.T, suite *SystemTestSuite, resp *types2.MsgUpdateSupernodeResponse, err error) {
+			verify: func(t *testing.T, suite *SystemTestSuite, resp *sntypes.MsgUpdateSupernodeResponse, err error) {
 				require.Error(t, err)
 				require.ErrorIs(t, err, sdkerrors.ErrUnauthorized)
 				require.Nil(t, resp)
@@ -183,12 +183,12 @@ func TestUpdateSupernode(t *testing.T) {
 		},
 		{
 			name: "invalid validator address",
-			msg: &types2.MsgUpdateSupernode{
+			msg: &sntypes.MsgUpdateSupernode{
 				Creator:          walletAddr.String(),
 				ValidatorAddress: "invalid-addr",
 			},
 			setup: nil,
-			verify: func(t *testing.T, suite *SystemTestSuite, resp *types2.MsgUpdateSupernodeResponse, err error) {
+			verify: func(t *testing.T, suite *SystemTestSuite, resp *sntypes.MsgUpdateSupernodeResponse, err error) {
 				require.Error(t, err)
 				require.ErrorIs(t, err, sdkerrors.ErrInvalidAddress)
 				require.Nil(t, resp)
@@ -196,24 +196,24 @@ func TestUpdateSupernode(t *testing.T) {
 		},
 		{
 			name: "update with no changes",
-			msg: &types2.MsgUpdateSupernode{
+			msg: &sntypes.MsgUpdateSupernode{
 				Creator:          walletAddr.String(),
 				ValidatorAddress: valAddrStr,
-				// no changes to ip, Note, or supernode account
+				// no changes to ip, version, or supernode account
 			},
 			setup: func(suite *SystemTestSuite) {
 				// Existing supernode
-				sn := types2.SuperNode{
+				sn := sntypes.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
 					Note:             "1.0.0",
-					States: []*types2.SuperNodeStateRecord{
+					States: []*sntypes.SuperNodeStateRecord{
 						{
-							State:  types2.SuperNodeStateActive,
+							State:  sntypes.SuperNodeStateActive,
 							Height: suite.sdkCtx.BlockHeight(),
 						},
 					},
-					PrevIpAddresses: []*types2.IPAddressHistory{
+					PrevIpAddresses: []*sntypes.IPAddressHistory{
 						{
 							Address: "127.0.0.1",
 							Height:  suite.sdkCtx.BlockHeight(),
@@ -224,7 +224,7 @@ func TestUpdateSupernode(t *testing.T) {
 				err := suite.app.SupernodeKeeper.SetSuperNode(suite.sdkCtx, sn)
 				require.NoError(t, err)
 			},
-			verify: func(t *testing.T, suite *SystemTestSuite, resp *types2.MsgUpdateSupernodeResponse, err error) {
+			verify: func(t *testing.T, suite *SystemTestSuite, resp *sntypes.MsgUpdateSupernodeResponse, err error) {
 				require.NoError(t, err)
 				require.NotNil(t, resp)
 
@@ -243,8 +243,8 @@ func TestUpdateSupernode(t *testing.T) {
 		},
 	}
 
-    for _, tc := range testCases {
-        t.Run(tc.name, func(t *testing.T) {
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
 			// Create fresh suite for each test
 			testSuite := setupSupernodeSystemSuite(t)
 
@@ -266,8 +266,8 @@ func TestUpdateSupernode(t *testing.T) {
 
 			// Verification
 			tc.verify(t, testSuite, resp, err)
-        })
-    }
+		})
+	}
 }
 
 // Additional test case for P2P port update
@@ -287,19 +287,19 @@ func TestUpdateSupernode_P2PPort(t *testing.T) {
     testSuite.app.StakingKeeper.SetValidator(testSuite.sdkCtx, validator)
 
     // Set initial SN
-    sn := types2.SuperNode{
+    sn := sntypes.SuperNode{
         ValidatorAddress: valAddrStr,
         SupernodeAccount: walletAddr.String(),
         Note:             "1.0.0",
-        States: []*types2.SuperNodeStateRecord{{State: types2.SuperNodeStateActive, Height: testSuite.sdkCtx.BlockHeight()}},
-        PrevIpAddresses:  []*types2.IPAddressHistory{{Address: "127.0.0.1", Height: testSuite.sdkCtx.BlockHeight()}},
+        States: []*sntypes.SuperNodeStateRecord{{State: sntypes.SuperNodeStateActive, Height: testSuite.sdkCtx.BlockHeight()}},
+        PrevIpAddresses:  []*sntypes.IPAddressHistory{{Address: "127.0.0.1", Height: testSuite.sdkCtx.BlockHeight()}},
         P2PPort:          "26657",
     }
     err = testSuite.app.SupernodeKeeper.SetSuperNode(testSuite.sdkCtx, sn)
     require.NoError(t, err)
 
     // Update P2P port
-    msg := &types2.MsgUpdateSupernode{
+    msg := &sntypes.MsgUpdateSupernode{
         Creator:          walletAddr.String(),
         ValidatorAddress: valAddrStr,
         P2PPort:          "26699",
@@ -313,17 +313,17 @@ func TestUpdateSupernode_P2PPort(t *testing.T) {
     events := testSuite.sdkCtx.EventManager().Events()
     var foundUpdateEvent bool
     for _, e := range events {
-        if e.Type == types2.EventTypeSupernodeUpdated {
+        if e.Type == sntypes.EventTypeSupernodeUpdated {
             foundUpdateEvent = true
             kv := map[string]string{}
             for _, a := range e.Attributes {
                 kv[string(a.Key)] = string(a.Value)
             }
-            require.Equal(t, valAddrStr, kv[types2.AttributeKeyValidatorAddress])
-            require.NotEmpty(t, kv[types2.AttributeKeyHeight])
-            require.Contains(t, kv[types2.AttributeKeyFieldsUpdated], types2.AttributeKeyP2PPort)
-            require.Equal(t, "26657", kv[types2.AttributeKeyOldP2PPort])
-            require.Equal(t, "26699", kv[types2.AttributeKeyP2PPort])
+            require.Equal(t, valAddrStr, kv[sntypes.AttributeKeyValidatorAddress])
+            require.NotEmpty(t, kv[sntypes.AttributeKeyHeight])
+            require.Contains(t, kv[sntypes.AttributeKeyFieldsUpdated], sntypes.AttributeKeyP2PPort)
+            require.Equal(t, "26657", kv[sntypes.AttributeKeyOldP2PPort])
+            require.Equal(t, "26699", kv[sntypes.AttributeKeyP2PPort])
         }
     }
     require.True(t, foundUpdateEvent, "supernode_updated event not found for P2P change")

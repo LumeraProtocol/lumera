@@ -3,24 +3,27 @@ package action_test
 import (
 	"testing"
 
-	action "github.com/LumeraProtocol/lumera/x/action/v1/module"
-	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
-
 	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
 	"github.com/LumeraProtocol/lumera/testutil/nullify"
+	actionmodulev1 "github.com/LumeraProtocol/lumera/x/action/v1/module"
+	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 	"github.com/stretchr/testify/require"
+	"github.com/golang/mock/gomock"
 )
 
 func TestGenesis(t *testing.T) {
-	genesisState := types2.GenesisState{
-		Params: types2.DefaultParams(),
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
+	genesisState := types.GenesisState{
+		Params: types.DefaultParams(),
+	
 		// this line is used by starport scaffolding # genesis/test/state
 	}
 
-	k, ctx := keepertest.ActionKeeper(t)
-	action.InitGenesis(ctx, k, genesisState)
-	got := action.ExportGenesis(ctx, k)
+	k, ctx := keepertest.ActionKeeper(t, ctrl)
+	actionmodulev1.InitGenesis(ctx, k, genesisState)
+	got := actionmodulev1.ExportGenesis(ctx, k)
 	require.NotNil(t, got)
 
 	nullify.Fill(&genesisState)

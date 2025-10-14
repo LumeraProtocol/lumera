@@ -3,16 +3,16 @@ package keeper_test
 import (
 	"time"
 
-	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
+	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 )
 
 func (suite *KeeperTestSuite) TestEndBlocker_ChecksExpiredActions() {
-	expiredAction := &actionapi.Action{
+	expiredAction := &actiontypes.Action{
 		ActionID:       "expired-1",
-		State:          actionapi.ActionState_ACTION_STATE_PENDING,
+		State:          actiontypes.ActionStatePending,
 		ExpirationTime: suite.ctx.BlockTime().Add(-1 * time.Hour).Unix(), // already expired
 		Creator:        suite.creatorAddress.String(),
-		ActionType:     actionapi.ActionType_ACTION_TYPE_SENSE,
+		ActionType:     actiontypes.ActionTypeSense,
 	}
 	err := suite.keeper.SetAction(suite.ctx, expiredAction)
 	suite.NoError(err)
@@ -22,5 +22,5 @@ func (suite *KeeperTestSuite) TestEndBlocker_ChecksExpiredActions() {
 
 	updatedAction, found := suite.keeper.GetActionByID(suite.ctx, expiredAction.ActionID)
 	suite.True(found)
-	suite.Equal(actionapi.ActionState_ACTION_STATE_EXPIRED, updatedAction.State)
+	suite.Equal(actiontypes.ActionStateExpired, updatedAction.State)
 }

@@ -1,13 +1,13 @@
 package keeper_test
 
 import (
+	"cosmossdk.io/math"
 	"testing"
 
-	"cosmossdk.io/math"
-	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
-	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
-
 	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
+	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
+	"github.com/LumeraProtocol/lumera/x/action/v1/types"
+
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
@@ -18,7 +18,7 @@ import (
 func TestKeeper_GetActionFee(t *testing.T) {
 	testCases := []struct {
 		name        string
-		req         *types2.QueryGetActionFeeRequest
+		req         *types.QueryGetActionFeeRequest
 		setupParams func(k keeper.Keeper, ctx sdk.Context)
 		expectedFee string
 		expectedErr error
@@ -30,14 +30,14 @@ func TestKeeper_GetActionFee(t *testing.T) {
 		},
 		{
 			name:        "invalid data size",
-			req:         &types2.QueryGetActionFeeRequest{DataSize: "invalid"},
+			req:         &types.QueryGetActionFeeRequest{DataSize: "invalid"},
 			expectedErr: status.Errorf(codes.InvalidArgument, "invalid data_size: strconv.ParseInt: parsing \"invalid\": invalid syntax"),
 		},
 		{
 			name: "valid request with zero data size",
-			req:  &types2.QueryGetActionFeeRequest{DataSize: "0"},
+			req:  &types.QueryGetActionFeeRequest{DataSize: "0"},
 			setupParams: func(k keeper.Keeper, ctx sdk.Context) {
-				params := types2.DefaultParams()
+				params := types.DefaultParams()
 				params.BaseActionFee = sdk.NewCoin("ulume", math.NewInt(10000))
 				params.FeePerKbyte = sdk.NewCoin("ulume", math.NewInt(100))
 				k.SetParams(ctx, params)
@@ -46,9 +46,9 @@ func TestKeeper_GetActionFee(t *testing.T) {
 		},
 		{
 			name: "valid request with data size 200",
-			req:  &types2.QueryGetActionFeeRequest{DataSize: "200"},
+			req:  &types.QueryGetActionFeeRequest{DataSize: "200"},
 			setupParams: func(k keeper.Keeper, ctx sdk.Context) {
-				params := types2.DefaultParams()
+				params := types.DefaultParams()
 				params.BaseActionFee = sdk.NewCoin("ulume", math.NewInt(10000))
 				params.FeePerKbyte = sdk.NewCoin("ulume", math.NewInt(100))
 				k.SetParams(ctx, params)
@@ -62,14 +62,14 @@ func TestKeeper_GetActionFee(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			k, ctx := keepertest.ActionKeeper(t)
-			goCtx := sdk.WrapSDKContext(ctx)
+			k, ctx := keepertest.ActionKeeper(t, ctrl)
+			q := keeper.NewQueryServerImpl(k)
 
 			if tc.setupParams != nil {
 				tc.setupParams(k, ctx)
 			}
 
-			resp, err := k.GetActionFee(goCtx, tc.req)
+			resp, err := q.GetActionFee(ctx, tc.req)
 
 			if tc.expectedErr != nil {
 				require.Error(t, err)

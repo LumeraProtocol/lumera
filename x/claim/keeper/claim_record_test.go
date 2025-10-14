@@ -4,10 +4,12 @@ import (
 	"testing"
 
 	"cosmossdk.io/math"
-	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
-	"github.com/LumeraProtocol/lumera/x/claim/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/stretchr/testify/require"
+
+	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
+	"github.com/LumeraProtocol/lumera/x/claim/keeper"	
+	"github.com/LumeraProtocol/lumera/x/claim/types"
 )
 
 func TestGetClaimRecord(t *testing.T) {
@@ -54,17 +56,17 @@ func TestGetClaimRecord(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			keeper, ctx := keepertest.ClaimKeeper(t)
+			k, ctx := keepertest.ClaimKeeper(t, "")
 
 			// Setup
 			if tc.setupRecord != nil {
-				err := keeper.SetClaimRecord(ctx, *tc.setupRecord)
+				err := k.SetClaimRecord(ctx, *tc.setupRecord)
 				require.NoError(t, err)
 				tc.expectRecord = *tc.setupRecord
 			}
 
 			// Test
-			record, found, err := keeper.GetClaimRecord(ctx, tc.queryAddress)
+			record, found, err := k.GetClaimRecord(ctx, tc.queryAddress)
 
 			if tc.expectErr {
 				require.Error(t, err)
@@ -114,16 +116,16 @@ func TestSetClaimRecord(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			keeper, ctx := keepertest.ClaimKeeper(t)
+			k, ctx := keepertest.ClaimKeeper(t, "")
 
 			// Setup
 			if tc.initialRecord != nil {
-				err := keeper.SetClaimRecord(ctx, *tc.initialRecord)
+				err := k.SetClaimRecord(ctx, *tc.initialRecord)
 				require.NoError(t, err)
 			}
 
 			// Test
-			err := keeper.SetClaimRecord(ctx, tc.recordToSet)
+			err := k.SetClaimRecord(ctx, tc.recordToSet)
 			if tc.expectErr {
 				require.Error(t, err)
 				return
@@ -131,7 +133,7 @@ func TestSetClaimRecord(t *testing.T) {
 			require.NoError(t, err)
 
 			// Verify
-			record, found, err := keeper.GetClaimRecord(ctx, tc.recordToSet.OldAddress)
+			record, found, err := k.GetClaimRecord(ctx, tc.recordToSet.OldAddress)
 			require.NoError(t, err)
 			require.True(t, found)
 			require.Equal(t, tc.recordToSet, record)
@@ -204,12 +206,13 @@ func TestListClaimed(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			keeper, ctx := keepertest.ClaimKeeper(t)
+			k, ctx := keepertest.ClaimKeeper(t, "")
+			q := keeper.NewQueryServerImpl(k)
 
 			// Setup
 			if tc.setupRecords != nil {
 				for _, record := range tc.setupRecords {
-					err := keeper.SetClaimRecord(ctx, record)
+					err := k.SetClaimRecord(ctx, record)
 					require.NoError(t, err)
 				}
 			}
@@ -218,7 +221,7 @@ func TestListClaimed(t *testing.T) {
 			req := &types.QueryListClaimedRequest{
 				VestedTerm: tc.vestedTerm,
 			}
-			resp, err := keeper.ListClaimed(ctx, req)
+			resp, err := q.ListClaimed(ctx, req)
 
 			if tc.expectErr {
 				require.Error(t, err)
@@ -268,18 +271,18 @@ func TestGetClaimRecordCount(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			keeper, ctx := keepertest.ClaimKeeper(t)
+			k, ctx := keepertest.ClaimKeeper(t, "")
 
 			// Setup
 			if tc.setupRecords != nil {
 				for _, record := range tc.setupRecords {
-					err := keeper.SetClaimRecord(ctx, record)
+					err := k.SetClaimRecord(ctx, record)
 					require.NoError(t, err)
 				}
 			}
 
 			// Test
-			count := keeper.GetClaimRecordCount(ctx)
+			count := k.GetClaimRecordCount(ctx)
 			require.Equal(t, tc.expectCount, count)
 		})
 	}

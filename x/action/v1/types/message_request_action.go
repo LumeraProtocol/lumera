@@ -1,9 +1,8 @@
 package types
 
 import (
-	"strconv"
-
 	"github.com/LumeraProtocol/lumera/x/action/v1/common"
+	"strconv"
 
 	errorsmod "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"

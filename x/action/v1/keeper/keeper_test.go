@@ -4,29 +4,39 @@ import (
 	"fmt"
 	"testing"
 
-	keeper2 "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 
 	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
 
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
+	"github.com/golang/mock/gomock"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
-	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
 	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
+	actionkeeper "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
+	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
 )
+
+type KeeperTestSuite struct {
+	suite.Suite
+	KeeperTestSuiteConfig
+
+	// fields that are reinitialized in SetupTest
+	ctx        sdk.Context
+	ctrl 	   *gomock.Controller
+	keeper     actionkeeper.Keeper
+	mockKeeper *supernodemocks.MockSupernodeKeeper
+	mockQueryServer *supernodemocks.MockQueryServer
+}
 
 // KeeperTestSuite is a test suite to test keeper functions
 type KeeperTestSuiteConfig struct {
-	ctx        sdk.Context
-	keeper     keeper2.Keeper
-	mockKeeper *keepertest.ActionMockSupernodeKeeper
-
-	supernodes   []*types.SuperNode
-	badSupernode types.SuperNode
+	accountPairs []keepertest.AccountPair
+	supernodes   []*sntypes.SuperNode
+	badSupernode sntypes.SuperNode
 
 	creatorAddress  sdk.AccAddress
 	imposterAddress sdk.AccAddress
@@ -40,112 +50,74 @@ type KeeperTestSuiteConfig struct {
 }
 
 // SetupTest sets up the test suite
-func (config *KeeperTestSuiteConfig) SetupTestSuite(suite *suite.Suite) {
+// Creates test data common for all tests
+func (suite *KeeperTestSuite) SetupSuite() {
 	var err error
 
 	// Will add four accounts into Mock Keeper
 	// 5 SNs and one Creator
-	pairs := make([]keepertest.AccountPair, 6)
+	suite.accountPairs = make([]keepertest.AccountPair, 6)
 
 	// Create test supernodes
 	snKeys := make([]secp256k1.PrivKey, 3)
-	config.supernodes = make([]*types.SuperNode, 5)
+	suite.supernodes = make([]*sntypes.SuperNode, 5)
 	for i := 0; i < 5; i++ {
 		key, address, valAddress := cryptotestutils.SupernodeAddresses()
-		config.supernodes[i] = &types.SuperNode{
+		suite.supernodes[i] = &sntypes.SuperNode{
 			ValidatorAddress: valAddress.String(),
 			SupernodeAccount: address.String(),
 		}
 		if i < 3 { // First 3 are active supernodes
 			snKeys[i] = key
 		}
-		pairs[i] = keepertest.AccountPair{Address: address, PubKey: key.PubKey()}
+		suite.accountPairs[i] = keepertest.AccountPair{Address: address, PubKey: key.PubKey()}
 	}
-	config.signatureSense, err = cryptotestutils.CreateSignatureString(snKeys, 50)
+	suite.signatureSense, err = cryptotestutils.CreateSignatureString(snKeys, 50)
 	suite.Require().NoError(err)
-	config.signatureSenseBad1, err = cryptotestutils.CreateSignatureString(snKeys, 50)
+	suite.signatureSenseBad1, err = cryptotestutils.CreateSignatureString(snKeys, 50)
 	suite.Require().NoError(err)
-	config.signatureSenseBad2, err = cryptotestutils.CreateSignatureString(snKeys, 50)
+	suite.signatureSenseBad2, err = cryptotestutils.CreateSignatureString(snKeys, 50)
 	suite.Require().NoError(err)
 
 	_, badSNAddress, badSNValAddress := cryptotestutils.SupernodeAddresses()
-	config.badSupernode = types.SuperNode{
+	suite.badSupernode = sntypes.SuperNode{
 		ValidatorAddress: badSNValAddress.String(),
 		SupernodeAccount: badSNAddress.String(),
 	}
 
 	key, address := cryptotestutils.KeyAndAddress()
 	pubKey := key.PubKey()
-	pairs[3] = keepertest.AccountPair{Address: address, PubKey: pubKey}
-	config.signatureCascade, err = cryptotestutils.CreateSignatureString([]secp256k1.PrivKey{key}, 50)
+	suite.accountPairs[3] = keepertest.AccountPair{Address: address, PubKey: pubKey}
+	suite.signatureCascade, err = cryptotestutils.CreateSignatureString([]secp256k1.PrivKey{key}, 50)
 	suite.Require().NoError(err)
-	config.creatorAddress = address
+	suite.creatorAddress = address
 
-	config.keeper, config.ctx = keepertest.ActionKeeperWithAddress(suite.T(), pairs)
+	suite.ic = 20
+	suite.max = 50
 
-	config.ic = 20
-	config.max = 50
-
-	config.imposterAddress = cryptotestutils.AccAddressAcc()
-
-	// Set context with block height for consistent testing
-	config.ctx = config.ctx.WithBlockHeight(1)
-
-	// Get the mock supernode keeper to configure it
-	config.mockKeeper = getMockSupernodeKeeper(config.keeper)
-
-	// Configure the mock supernode keeper
-	config.configureMockKeeper(suite)
-}
-
-// getMockSupernodeKeeper extracts the mock supernode keeper from the action keeper
-func getMockSupernodeKeeper(k keeper2.Keeper) *keepertest.ActionMockSupernodeKeeper {
-	// Use type assertion to access the underlying mock
-	supernodeKeeper, ok := k.GetSupernodeKeeper().(*keepertest.ActionMockSupernodeKeeper)
-	if !ok {
-		panic("Failed to get ActionMockSupernodeKeeper from Keeper")
-	}
-
-	// Reset existing mocks
-	supernodeKeeper.ExpectedCalls = nil
-
-	return supernodeKeeper
-}
-
-// configureMockKeeper sets up mock expectations for the supernode keeper
-func (config *KeeperTestSuiteConfig) configureMockKeeper(suite *suite.Suite) {
-
-	// Mock GetTopSuperNodesForBlock - return our test validators
-	config.mockKeeper.On("GetTopSuperNodesForBlock", mock.Anything, mock.Anything).Return(
-		&types.QueryGetTopSuperNodesForBlockResponse{
-			Supernodes: config.supernodes,
-		}, nil)
-
-	// Mock IsSuperNodeActive - return true for our test validators
-	for _, sn := range config.supernodes {
-		config.mockKeeper.On("IsSuperNodeActive", mock.Anything, sn.SupernodeAccount).Return(true)
-	}
-
-	// Default fallback for any other value
-	config.mockKeeper.On("IsSuperNodeActive", mock.Anything, mock.Anything).Return(false)
-
-	// Mock QuerySuperNode - return node for test validators
-	for _, sn := range config.supernodes {
-		config.mockKeeper.On("QuerySuperNode", mock.Anything, sn.SupernodeAccount).Return(sn, true)
-	}
-
-	// Default fallback for any other value
-	config.mockKeeper.On("QuerySuperNode", mock.Anything, mock.Anything).Return(
-		types.SuperNode{}, false)
-}
-
-type KeeperTestSuite struct {
-	suite.Suite
-	KeeperTestSuiteConfig
+	suite.imposterAddress = cryptotestutils.AccAddressAcc()
 }
 
 func (suite *KeeperTestSuite) SetupTest() {
-	suite.SetupTestSuite(&suite.Suite)
+	suite.ctrl = gomock.NewController(suite.T())
+	suite.keeper, suite.ctx = keepertest.ActionKeeperWithAddress(suite.T(), suite.ctrl, suite.accountPairs)
+
+	// Set up the mock supernode keeper and query server
+	var ok bool
+	suite.mockKeeper, ok = suite.keeper.GetSupernodeKeeper().(*supernodemocks.MockSupernodeKeeper)
+	suite.Require().True(ok, "Failed to get MockSupernodeKeeper from Keeper")
+
+	suite.mockQueryServer, ok = suite.keeper.GetSupernodeQueryServer().(*supernodemocks.MockQueryServer)
+	suite.Require().True(ok, "Failed to get MockQueryServer from Keeper")
+
+	// Set context with block height for consistent testing
+	suite.ctx = suite.ctx.WithBlockHeight(1)
+}
+
+// TearDownTest cleans up after each test
+func (suite *KeeperTestSuite) TearDownTest() {
+	suite.ctrl.Finish()
+	suite.ctrl = nil
 }
 
 // Helper functions
@@ -162,10 +134,22 @@ const (
 	MetadataFieldToMissRqOti
 )
 
+func (suite *KeeperTestSuite) setupExpectationsGetAllTopSNs(count int) {
+	// Mock GetAllTopSuperNodes - return our test validators
+	suite.mockQueryServer.EXPECT().
+		GetTopSuperNodesForBlock(
+			gomock.AssignableToTypeOf(sdk.Context{}), gomock.AssignableToTypeOf(&sntypes.QueryGetTopSuperNodesForBlockRequest{})).
+		Return(
+			&sntypes.QueryGetTopSuperNodesForBlockResponse{
+				Supernodes: suite.supernodes,
+			}, nil).
+		Times(count)
+}
+
 // prepareCascadeAction creates a test Cascade action
-func (suite *KeeperTestSuite) prepareCascadeActionForRegistration(creator string, missing MetadataFieldToMiss) *actionapi.Action {
+func (suite *KeeperTestSuite) prepareCascadeActionForRegistration(creator string, missing MetadataFieldToMiss) *actiontypes.Action {
 	// Create cascade metadata with all required fields
-	cascadeMetadata := &actionapi.CascadeMetadata{
+	cascadeMetadata := &actiontypes.CascadeMetadata{
 		DataHash:   "hash456",
 		FileName:   "test.file",
 		RqIdsIc:    suite.ic,
@@ -190,11 +174,13 @@ func (suite *KeeperTestSuite) prepareCascadeActionForRegistration(creator string
 		panic(fmt.Sprintf("Failed to marshal cascade metadata: %v", err))
 	}
 
+	testPrice := sdk.NewInt64Coin("ulume", 100_000)
+
 	// Create action with embedded metadata
-	action := &actionapi.Action{
+	action := &actiontypes.Action{
 		Creator:    creator,
-		ActionType: actionapi.ActionType_ACTION_TYPE_CASCADE,
-		Price:      "10100ulume",
+		ActionType: actiontypes.ActionTypeCascade,
+		Price:      &testPrice,
 		Metadata:   metadataBytes,
 	}
 
@@ -202,9 +188,9 @@ func (suite *KeeperTestSuite) prepareCascadeActionForRegistration(creator string
 }
 
 // prepareSenseAction creates a test Sense action
-func (suite *KeeperTestSuite) prepareSenseActionForRegistration(creator string, missing MetadataFieldToMiss) *actionapi.Action {
+func (suite *KeeperTestSuite) prepareSenseActionForRegistration(creator string, missing MetadataFieldToMiss) *actiontypes.Action {
 	// Create sense metadata with all required fields for validation
-	senseMetadata := &actionapi.SenseMetadata{
+	senseMetadata := &actiontypes.SenseMetadata{
 		DataHash:             "hash123",
 		DdAndFingerprintsIc:  suite.ic,
 		DdAndFingerprintsMax: suite.max,
@@ -224,11 +210,13 @@ func (suite *KeeperTestSuite) prepareSenseActionForRegistration(creator string, 
 		panic(fmt.Sprintf("Failed to marshal sense metadata: %v", err))
 	}
 
+	testPrice := sdk.NewInt64Coin("ulume", 100_000)
+
 	// Create action with embedded metadata
-	action := &actionapi.Action{
+	action := &actiontypes.Action{
 		Creator:    creator,
-		ActionType: actionapi.ActionType_ACTION_TYPE_SENSE,
-		Price:      "100000ulume",
+		ActionType: actiontypes.ActionTypeSense,
+		Price:      &testPrice,
 		Metadata:   metadataBytes,
 	}
 
@@ -242,13 +230,13 @@ func (suite *KeeperTestSuite) generateCascadeFinalizationMetadata(missing Metada
 	var validIDs []string
 	if missing != MetadataFieldToMissIds {
 		for i := suite.ic; i < suite.ic+50; i++ { // 50 is default value for MaxDdAndFingerprints
-			id, err := keeper2.CreateKademliaID(suite.signatureCascade, i)
+			id, err := actionkeeper.CreateKademliaID(suite.signatureCascade, i)
 			suite.Require().NoError(err)
 			validIDs = append(validIDs, id)
 		}
 	}
 
-	senseMetadata := &actionapi.CascadeMetadata{
+	senseMetadata := &actiontypes.CascadeMetadata{
 		RqIdsIds: validIDs,
 	}
 
@@ -262,17 +250,17 @@ func (suite *KeeperTestSuite) generateCascadeFinalizationMetadata(missing Metada
 }
 
 // generateSenseFinalizationMetadata generates test finalization metadata for Sense actions
-func (suite *KeeperTestSuite) generateSenseFinalizationMetadata(signatures string, missing MetadataFieldToMiss) []byte {
+func (suite *KeeperTestSuite) generateSenseFinalizationMetadata(signatures string, _ MetadataFieldToMiss) []byte {
 	// Generate more complete metadata with required fields
 
 	var validIDs []string
 	for i := suite.ic; i < suite.ic+50; i++ { // 50 is default value for MaxDdAndFingerprints
-		id, err := keeper2.CreateKademliaID(signatures, i)
+		id, err := actionkeeper.CreateKademliaID(signatures, i)
 		suite.Require().NoError(err)
 		validIDs = append(validIDs, id)
 	}
 
-	senseMetadata := &actionapi.SenseMetadata{
+	senseMetadata := &actiontypes.SenseMetadata{
 		DdAndFingerprintsIds: validIDs,
 		Signatures:           signatures,
 	}

@@ -5,13 +5,12 @@ import (
 	"strconv"
 
 	"github.com/LumeraProtocol/lumera/x/action/v1/types"
-
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func (k *Keeper) GetActionFee(goCtx context.Context, req *types.QueryGetActionFeeRequest) (*types.QueryGetActionFeeResponse, error) {
+func (q queryServer) GetActionFee(goCtx context.Context, req *types.QueryGetActionFeeRequest) (*types.QueryGetActionFeeResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
 	}
@@ -23,7 +22,7 @@ func (k *Keeper) GetActionFee(goCtx context.Context, req *types.QueryGetActionFe
 		return nil, status.Errorf(codes.InvalidArgument, "invalid data_size: %v", err)
 	}
 
-	params := k.GetParams(ctx)
+	params := q.k.GetParams(ctx)
 
 	// Calculate: FeePerKbyte * DataSize + BaseActionFee
 	perByteCost := params.FeePerKbyte.Amount.MulRaw(dataSize)

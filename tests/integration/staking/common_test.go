@@ -26,11 +26,15 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/bank"
 	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	banktestutil "github.com/cosmos/cosmos-sdk/x/bank/testutil"
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	"github.com/cosmos/cosmos-sdk/x/staking"
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
+	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/cosmos/cosmos-sdk/x/staking/testutil"
 	"github.com/cosmos/cosmos-sdk/x/staking/types"
+
+	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
 var PKs = simtestutil.CreateTestPubKeys(500)
@@ -103,6 +107,10 @@ func initFixture(t testing.TB) *fixture {
 
 	newCtx := sdk.NewContext(cms, cmtprototypes.Header{}, true, logger)
 
+	accCodec  := addresscodec.NewBech32Codec(lcfg.AccountAddressPrefix)
+	valCodec  := addresscodec.NewBech32Codec(lcfg.ValidatorAddressPrefix)
+	consCodec := addresscodec.NewBech32Codec(lcfg.ConsNodeAddressPrefix)	
+
 	authority := authtypes.NewModuleAddress("gov")
 
 	maccPerms := map[string][]string{
@@ -117,8 +125,8 @@ func initFixture(t testing.TB) *fixture {
 		runtime.NewKVStoreService(keys[authtypes.StoreKey]),
 		authtypes.ProtoBaseAccount,
 		maccPerms,
-		addresscodec.NewBech32Codec(sdk.Bech32MainPrefix),
-		sdk.Bech32MainPrefix,
+		accCodec,
+		lcfg.AccountAddressPrefix,
 		authority.String(),
 	)
 
@@ -134,7 +142,15 @@ func initFixture(t testing.TB) *fixture {
 		log.NewNopLogger(),
 	)
 
-	stakingKeeper := stakingkeeper.NewKeeper(cdc, runtime.NewKVStoreService(keys[types.StoreKey]), accountKeeper, bankKeeper, authority.String(), addresscodec.NewBech32Codec(sdk.Bech32PrefixValAddr), addresscodec.NewBech32Codec(sdk.Bech32PrefixConsAddr))
+	stakingKeeper := stakingkeeper.NewKeeper(
+		cdc,
+		runtime.NewKVStoreService(keys[types.StoreKey]),
+		accountKeeper,
+		bankKeeper,
+		authority.String(),
+		valCodec,
+		consCodec,
+	)
 
 	authModule := auth.NewAppModule(cdc, accountKeeper, authsims.RandomGenesisAccounts, nil)
 	bankModule := bank.NewAppModule(cdc, bankKeeper, accountKeeper, nil)
@@ -152,8 +168,10 @@ func initFixture(t testing.TB) *fixture {
 	types.RegisterMsgServer(integrationApp.MsgServiceRouter(), stakingkeeper.NewMsgServerImpl(stakingKeeper))
 	types.RegisterQueryServer(integrationApp.QueryHelper(), stakingkeeper.NewQuerier(stakingKeeper))
 
-	// set default staking params
-	assert.NilError(t, stakingKeeper.SetParams(sdkCtx, types.DefaultParams()))
+	// set staking params to match chain denom
+	params := stakingtypes.DefaultParams()
+	params.BondDenom = lcfg.ChainDenom
+	assert.NilError(t, stakingKeeper.SetParams(sdkCtx, params))
 
 	f := fixture{
 		app:           integrationApp,
@@ -166,4 +184,55 @@ func initFixture(t testing.TB) *fixture {
 	}
 
 	return &f
+}
+
+func mustDelegatePower(
+    t testing.TB,
+    f *fixture,
+    delegator sdk.AccAddress,
+    val types.Validator,
+    power int64,
+) types.Validator {
+    t.Helper()
+
+    // ensure validator is in state (TestingUpdateValidator will also touch state, but
+    // we want a consistent path)
+    assert.NilError(t, f.stakingKeeper.SetValidator(f.sdkCtx, val))
+	assert.NilError(t, f.stakingKeeper.SetValidatorByConsAddr(f.sdkCtx, val))
+    assert.NilError(t, f.stakingKeeper.SetValidatorByPowerIndex(f.sdkCtx, val))
+
+	// Delegate in keeper's denom
+    amt := f.stakingKeeper.TokensFromConsensusPower(f.sdkCtx, power)
+    _, err := f.stakingKeeper.Delegate(f.sdkCtx, delegator, amt, types.Unbonded, val, true)
+    assert.NilError(t, err)
+
+    // reload from keeper so future assertions match store
+    valbz, err := f.stakingKeeper.ValidatorAddressCodec().StringToBytes(val.GetOperator())
+    assert.NilError(t, err)
+    newVal, found := f.stakingKeeper.GetValidator(f.sdkCtx, valbz)
+    assert.Assert(t, found)
+
+    return newVal
+}
+
+// only needed if a given test still calls TestingUpdateValidator and you see 0stake errors
+func ensureHelperStakeIfNeeded(
+    ctx sdk.Context,
+    bk bankkeeper.Keeper,
+    sk *stakingkeeper.Keeper,
+    addr sdk.AccAddress,
+    want math.Int,
+) error {
+    bd, err := sk.BondDenom(ctx)
+    if err != nil {
+		return err
+	}
+    if bd == "stake" {
+		return nil
+	}
+    coins := sdk.NewCoins(sdk.NewCoin("stake", want))
+    if err := bk.MintCoins(ctx, minttypes.ModuleName, coins); err != nil {
+		return err
+	}
+    return banktestutil.FundAccount(ctx, bk, addr, coins)
 }

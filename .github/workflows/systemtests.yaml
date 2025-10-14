@@ -39,7 +39,7 @@ jobs:
 
       - name: Install Specific Ignite CLI Version
         run: |
-          IGNITE_VERSION="v28.8.1"
+          IGNITE_VERSION="v29.2.0"
           ARCH="linux_amd64"
 
           curl -L "https://github.com/ignite/cli/releases/download/${IGNITE_VERSION}/ignite_${IGNITE_VERSION#v}_checksums.txt" -o checksums.txt
@@ -65,12 +65,10 @@ jobs:
           GOFLAGS: "-buildvcs=false"
 
       - name: Prepare System Tests
-        run: |
-          cd tests/systemtests
-          go mod tidy
+        run: go mod tidy
+        working-directory: tests/systemtests
 
       - name: Run System Tests
-        run: |
-          cd tests/systemtests
-          go test -tags=system_test -v .
+        run: go test -tags=system_test -v .
+        working-directory: tests/systemtests
 

@@ -3,6 +3,10 @@ package cmd
 import (
 	"errors"
 	"io"
+	"fmt"
+
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"cosmossdk.io/log"
 	confixcmd "cosmossdk.io/tools/confix/cmd"
@@ -21,12 +25,12 @@ import (
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/cosmos/cosmos-sdk/x/crisis"
 	genutilcli "github.com/cosmos/cosmos-sdk/x/genutil/client/cli"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/CosmWasm/wasmd/x/wasm"
 	wasmcli "github.com/CosmWasm/wasmd/x/wasm/client/cli"
+	wasmKeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	"github.com/LumeraProtocol/lumera/app"
+	claimtypes "github.com/LumeraProtocol/lumera/x/claim/types"
 )
 
 func initRootCmd(
@@ -42,6 +46,12 @@ func initRootCmd(
 		pruning.Cmd(newApp, app.DefaultNodeHome),
 		snapshot.Cmd(newApp),
 	)
+    // Register --claims-path persistent flag
+    rootCmd.PersistentFlags().String(claimtypes.FlagClaimsPath, "", 
+		fmt.Sprintf("Path to %s file or directory containing it", claimtypes.DefaultClaimsFileName))
+    // Bind to viper
+    _ = viper.BindPFlag(claimtypes.FlagClaimsPath, rootCmd.PersistentFlags().Lookup(claimtypes.FlagClaimsPath))
+
 
 	server.AddCommands(rootCmd, app.DefaultNodeHome, newApp, appExport, addModuleInitFlags)
 
@@ -54,13 +64,11 @@ func initRootCmd(
 		keys.Commands(),
 	)
 	wasmcli.ExtendUnsafeResetAllCmd(rootCmd)
-
 }
 
 func addModuleInitFlags(startCmd *cobra.Command) {
 	crisis.AddModuleInitFlags(startCmd)
 	wasm.AddModuleInitFlags(startCmd)
-
 }
 
 // genesisCommand builds genesis-related `lumerad genesis` command. Users may provide application specific commands as a parameter
@@ -84,7 +92,7 @@ func queryCommand() *cobra.Command {
 	}
 
 	cmd.AddCommand(
-		rpc.QueryEventForTxCmd(),
+		rpc.WaitTxCmd(),
 		rpc.ValidatorCommand(),
 		server.QueryBlockCmd(),
 		authcmd.QueryTxsByEventsCmd(),
@@ -131,16 +139,14 @@ func newApp(
 	appOpts servertypes.AppOptions,
 ) servertypes.Application {
 	baseappOptions := server.DefaultBaseappOptions(appOpts)
+	wasmOpts := []wasmKeeper.Option{}
 
-	app, err := app.New(
+	return app.New(
 		logger, db, traceStore, true,
 		appOpts,
+		wasmOpts,
 		baseappOptions...,
 	)
-	if err != nil {
-		panic(err)
-	}
-	return app
 }
 
 // appExport creates a new app (optionally at a given height) and exports state.
@@ -154,10 +160,7 @@ func appExport(
 	appOpts servertypes.AppOptions,
 	modulesToExport []string,
 ) (servertypes.ExportedApp, error) {
-	var (
-		bApp *app.App
-		err  error
-	)
+	var bApp *app.App
 
 	// this check is necessary as we use the flag in x/upgrade.
 	// we can exit more gracefully by checking the flag here.
@@ -171,24 +174,15 @@ func appExport(
 		return servertypes.ExportedApp{}, errors.New("appOpts is not viper.Viper")
 	}
 
-	// overwrite the FlagInvCheckPeriod
-	viperAppOpts.Set(server.FlagInvCheckPeriod, 1)
 	appOpts = viperAppOpts
-
+	wasmOpts := []wasmKeeper.Option{}
 	if height != -1 {
-		bApp, err = app.New(logger, db, traceStore, false, appOpts)
-		if err != nil {
-			return servertypes.ExportedApp{}, err
-		}
-
+		bApp = app.New(logger, db, traceStore, false, appOpts, wasmOpts)
 		if err := bApp.LoadHeight(height); err != nil {
 			return servertypes.ExportedApp{}, err
 		}
 	} else {
-		bApp, err = app.New(logger, db, traceStore, true, appOpts)
-		if err != nil {
-			return servertypes.ExportedApp{}, err
-		}
+		bApp = app.New(logger, db, traceStore, true, appOpts, wasmOpts)
 	}
 
 	return bApp.ExportAppStateAndValidators(forZeroHeight, jailAllowedAddrs, modulesToExport)

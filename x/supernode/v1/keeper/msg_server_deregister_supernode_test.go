@@ -3,15 +3,15 @@ package keeper_test
 import (
 	"testing"
 
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
-	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 func TestMsgServer_DeRegisterSupernode(t *testing.T) {
@@ -23,31 +23,31 @@ func TestMsgServer_DeRegisterSupernode(t *testing.T) {
 
 	testCases := []struct {
 		name          string
-		msg           *types2.MsgDeregisterSupernode
-		currentState  types2.SuperNodeState
+		msg           *types.MsgDeregisterSupernode
+		currentState  types.SuperNodeState
 		expectedError error
 	}{
 		{
 			name: "successful deregistration",
-			msg: &types2.MsgDeregisterSupernode{
+			msg: &types.MsgDeregisterSupernode{
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 			},
-			currentState:  types2.SuperNodeStateActive,
+			currentState:  types.SuperNodeStateActive,
 			expectedError: nil,
 		},
 		{
 			name: "invalid validator address",
-			msg: &types2.MsgDeregisterSupernode{
+			msg: &types.MsgDeregisterSupernode{
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: "invalid",
 			},
-			currentState:  types2.SuperNodeStateActive,
+			currentState:  types.SuperNodeStateActive,
 			expectedError: sdkerrors.ErrInvalidAddress,
 		},
 		{
 			name: "validator not found",
-			msg: &types2.MsgDeregisterSupernode{
+			msg: &types.MsgDeregisterSupernode{
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 			},
@@ -56,21 +56,21 @@ func TestMsgServer_DeRegisterSupernode(t *testing.T) {
 		},
 		{
 			name: "unauthorized",
-			msg: &types2.MsgDeregisterSupernode{
+			msg: &types.MsgDeregisterSupernode{
 				Creator:          otherCreatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 			},
-			currentState: types2.SuperNodeStateActive,
+			currentState: types.SuperNodeStateActive,
 
 			expectedError: sdkerrors.ErrUnauthorized,
 		},
 		{
 			name: "supernode already deregistered",
-			msg: &types2.MsgDeregisterSupernode{
+			msg: &types.MsgDeregisterSupernode{
 				Creator:          otherCreatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 			},
-			currentState: types2.SuperNodeStateDisabled,
+			currentState: types.SuperNodeStateDisabled,
 
 			expectedError: sdkerrors.ErrUnauthorized,
 		},
@@ -89,13 +89,13 @@ func TestMsgServer_DeRegisterSupernode(t *testing.T) {
 			k, ctx := setupKeeperForTest(t, stakingKeeper, slashingKeeper, bankKeeper)
 			if tc.expectedError != sdkerrors.ErrNotFound {
 
-				k.SetSuperNode(ctx, types2.SuperNode{
+				k.SetSuperNode(ctx, types.SuperNode{
 					SupernodeAccount: creatorAddr.String(),
 					ValidatorAddress: valAddr.String(),
 					Note:             "1.0.0",
-					States: []*types2.SuperNodeStateRecord{
+					States: []*types.SuperNodeStateRecord{
 						{
-							State:  types2.SuperNodeStateActive,
+							State:  types.SuperNodeStateActive,
 							Height: ctx.BlockHeight(),
 						},
 
@@ -104,9 +104,9 @@ func TestMsgServer_DeRegisterSupernode(t *testing.T) {
 							Height: ctx.BlockHeight(),
 						},
 					},
-					PrevIpAddresses: []*types2.IPAddressHistory{
+					PrevIpAddresses: []*types.IPAddressHistory{
 						{
-							Address: "1022.145.1.1",
+							Address: "102.145.1.1",
 							Height:  1,
 						},
 					},
@@ -126,16 +126,16 @@ func TestMsgServer_DeRegisterSupernode(t *testing.T) {
 					evs := ctx.EventManager().Events()
 					foundEvt := false
 					for _, e := range evs {
-						if e.Type != types2.EventTypeSupernodeDeRegistered {
+						if e.Type != types.EventTypeSupernodeDeRegistered {
 							continue
 						}
 						kv := map[string]string{}
 						for _, a := range e.Attributes {
 							kv[string(a.Key)] = string(a.Value)
 						}
-						if kv[types2.AttributeKeyValidatorAddress] == valAddr.String() &&
-							kv[types2.AttributeKeyOldState] != "" &&
-							kv[types2.AttributeKeyHeight] != "" {
+						if kv[types.AttributeKeyValidatorAddress] == valAddr.String() &&
+							kv[types.AttributeKeyOldState] != "" &&
+							kv[types.AttributeKeyHeight] != "" {
 							foundEvt = true
 							break
 						}

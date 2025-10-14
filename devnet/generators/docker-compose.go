@@ -88,7 +88,7 @@ func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validat
 				fmt.Sprintf("%s/shared:/shared", folderMount),
 			},
 			Environment: env,
-			Command: fmt.Sprintf("bash %s/%s", FolderScripts, StartScript),
+			Command:     fmt.Sprintf("bash %s/%s", FolderScripts, StartScript),
 			Logging: &DockerComposeLogging{
 				Driver: "json-file",
 				Options: map[string]string{
@@ -98,25 +98,60 @@ func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validat
 			},
 		}
 
-        if snPresent {
-            // add supernode port mappings, if provided
-            // container ports are fixed by supernode: 4444 (service), 4445 (p2p), 8002 (gateway)
-            if validator.SupernodePort > 0 {
-                service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.SupernodePort, DefaultSupernodePort))
-            }
-            if validator.SupernodeP2PPort > 0 {
-                service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.SupernodeP2PPort, DefaultSupernodeP2PPort))
-            }
-            if validator.SupernodeGatewayPort > 0 {
-                service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.SupernodeGatewayPort, DefaultSupernodeGatewayPort))
-            }
-        }
+		if snPresent {
+			// add supernode port mappings, if provided
+			// container ports are fixed by supernode: 4444 (service), 4445 (p2p), 8002 (gateway)
+			if validator.SupernodePort > 0 {
+				service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.SupernodePort, DefaultSupernodePort))
+			}
+			if validator.SupernodeP2PPort > 0 {
+				service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.SupernodeP2PPort, DefaultSupernodeP2PPort))
+			}
+			if validator.SupernodeGatewayPort > 0 {
+				service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.SupernodeGatewayPort, DefaultSupernodeGatewayPort))
+			}
+		}
 
 		if index > 0 {
 			service.DependsOn = []string{validators[0].Name}
 		}
 
 		compose.Services[validator.Name] = service
+	}
+
+	if config.Hermes.Enabled {
+		hermesService := DockerComposeService{
+			Build:         "./hermes",
+			ContainerName: fmt.Sprintf("%s-hermes", config.Docker.ContainerPrefix),
+			Ports: []string{
+				fmt.Sprintf("%d:%d", DefaultHermesSimdHostP2PPort, DefaultP2PPort),
+				fmt.Sprintf("%d:%d", DefaultHermesSimdHostRPCPort, DefaultRPCPort),
+				fmt.Sprintf("%d:%d", DefaultHermesSimdHostAPIPort, DefaultRESTPort),
+				fmt.Sprintf("%d:%d", DefaultHermesSimdHostGRPCPort, DefaultGRPCPort),
+				fmt.Sprintf("%d:%d", DefaultHermesSimdHostGRPCWebPort, DefaultGRPCWebPort),
+			},
+			Volumes: []string{
+				fmt.Sprintf("%s/hermes-simd-data:%s", folderMount, HermesSimdHome),
+				fmt.Sprintf("%s/hermes-router:%s", folderMount, HermesStateHome),
+				fmt.Sprintf("%s/shared:/shared", folderMount),
+			},
+			Environment: map[string]string{
+				"HERMES_CONFIG": "/root/.hermes/config.toml",
+			},
+			Logging: &DockerComposeLogging{
+				Driver: "json-file",
+				Options: map[string]string{
+					"max-size": "10m",
+					"max-file": "5",
+				},
+			},
+		}
+
+		if len(validators) > 0 {
+			hermesService.DependsOn = []string{validators[0].Name}
+		}
+
+		compose.Services["hermes"] = hermesService
 	}
 	return compose, nil
 }
@@ -132,4 +167,3 @@ func WriteDockerCompose(compose *DockerComposeConfig, filename string) error {
 	}
 	return nil
 }
-

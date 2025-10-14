@@ -52,6 +52,7 @@ SUPERNODE_SETUP_OUT="${LOGS_DIR}/supernode-setup.out"
 NETWORK_MAKER_SETUP_OUT="${LOGS_DIR}/network-maker-setup.out"
 
 LUMERA_RPC_PORT="${LUMERA_RPC_PORT:-26657}"
+LUMERA_GRPC_PORT="${LUMERA_GRPC_PORT:-9090}"
 LUMERA_RPC_ADDR="http://localhost:${LUMERA_RPC_PORT}"
 
 mkdir -p "${LOGS_DIR}" "${DAEMON_HOME}/config" "${STATUS_DIR}"
@@ -195,7 +196,11 @@ launch_network_maker_setup() {
 
 start_lumera() {
     echo "[BOOT] ${MONIKER}: Starting lumerad..."
-    run "${DAEMON}" start --home "${DAEMON_HOME}" --minimum-gas-prices "${MIN_GAS_PRICE}" >"${VALIDATOR_LOG}" 2>&1 &
+    run "${DAEMON}" start \
+        --home "${DAEMON_HOME}" \
+        --minimum-gas-prices "${MIN_GAS_PRICE}" \
+        --rpc.laddr "tcp://0.0.0.0:${LUMERA_RPC_PORT}" \
+        --grpc.address "0.0.0.0:${LUMERA_GRPC_PORT}" >"${VALIDATOR_LOG}" 2>&1 &
 }
 
 tail_logs() {
@@ -233,4 +238,3 @@ case "${START_MODE}" in
     exit 0
     ;;
 esac
-

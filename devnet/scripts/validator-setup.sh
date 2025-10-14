@@ -25,6 +25,14 @@ SETUP_COMPLETE_FLAG="${STATUS_DIR}/setup_complete"
 # node specific vars
 NODE_STATUS_DIR="${STATUS_DIR}/${MONIKER}"
 NODE_SETUP_COMPLETE_FLAG="${NODE_STATUS_DIR}/setup_complete"
+LOCKS_DIR="${STATUS_DIR}/locks"
+
+HERMES_SHARED_DIR="${SHARED_DIR}/hermes"
+HERMES_STATUS_DIR="${STATUS_DIR}/hermes"
+HERMES_RELAYER_KEY="${HERMES_RELAYER_KEY:-hermes-relayer}"
+HERMES_RELAYER_MNEMONIC_FILE="${HERMES_SHARED_DIR}/hermes-relayer.mnemonic"
+HERMES_RELAYER_ADDR_FILE="${HERMES_SHARED_DIR}/hermes-relayer.address"
+HERMES_RELAYER_GENESIS_AMOUNT="${HERMES_RELAYER_GENESIS_AMOUNT:-10000000}" # in bond denom units
 
 # ----- read config from config.json -----
 if [ ! command -v jq >/dev/null 2>&1 ]; then
@@ -58,6 +66,7 @@ CLAIMS_LOCAL="${DAEMON_HOME}/config/claims.csv"
 GENTX_LOCAL_DIR="${DAEMON_HOME}/config/gentx"
 
 mkdir -p "${NODE_STATUS_DIR}" "${STATUS_DIR}"
+mkdir -p "${LOCKS_DIR}"
 
 # ----- load this validator record -----
 VAL_REC_JSON="$(jq -c --arg m "$MONIKER" '[.[] | select(.moniker==$m)][0]' "${CFG_VALS}")"
@@ -89,6 +98,43 @@ run() {
 run_capture() {
   echo "+ $*" >&2   # goes to stderr, not captured
   "$@"
+}
+
+with_lock() {
+  local name="$1"
+  shift
+  local lock_file="${LOCKS_DIR}/${name}.lock"
+  mkdir -p "${LOCKS_DIR}"
+  if ! command -v flock >/dev/null 2>&1; then
+    "$@"
+    return
+  fi
+  {
+    flock -x 200
+    "$@"
+  } 200>"${lock_file}"
+}
+
+write_with_lock() {
+  local lock_name="$1"
+  local dest="$2"
+  local value="$3"
+  with_lock "${lock_name}" bash -c 'printf "%s\n" "$1" > "$2"' _ "${value}" "${dest}"
+}
+
+copy_with_lock() {
+  local lock_name="$1"
+  shift
+  with_lock "${lock_name}" "$@"
+}
+
+verify_gentx_file() {
+  local file="$1"
+  if [ ! -f "${file}" ]; then
+    echo "[SETUP] ERROR: gentx file ${file} not found"
+    return 1
+  fi
+  return 0
 }
 
 write_node_markers() {
@@ -127,6 +173,60 @@ apply_persistent_peers() {
       sed -i -E "s|^persistent_peers *=.*$|persistent_peers = \"${peers}\"|g" "${CONFIG_TOML}"
       echo "[SETUP] Applied persistent_peers to ${CONFIG_TOML}"
     fi
+  fi
+}
+
+ensure_hermes_relayer_account() {
+  echo "[SETUP] Ensuring Hermes relayer account..."
+  mkdir -p "${HERMES_SHARED_DIR}" "${HERMES_STATUS_DIR}"
+
+  local mnemonic=""
+  if [ -s "${HERMES_RELAYER_MNEMONIC_FILE}" ]; then
+    mnemonic="$(cat "${HERMES_RELAYER_MNEMONIC_FILE}")"
+  fi
+
+  if ! ${DAEMON} keys show "${HERMES_RELAYER_KEY}" --keyring-backend "${KEYRING_BACKEND}" >/dev/null 2>&1; then
+    if [ -n "${mnemonic}" ]; then
+      printf '%s\n' "${mnemonic}" | run ${DAEMON} keys add "${HERMES_RELAYER_KEY}" --recover --keyring-backend "${KEYRING_BACKEND}" >/dev/null
+    else
+      local key_json
+      key_json="$(run_capture ${DAEMON} keys add "${HERMES_RELAYER_KEY}" --keyring-backend "${KEYRING_BACKEND}" --output json)"
+      mnemonic="$(printf '%s' "${key_json}" | jq -r '.mnemonic // empty' 2>/dev/null || true)"
+    fi
+  fi
+
+  if [ -n "${mnemonic}" ]; then
+    write_with_lock "hermes-mnemonic" "${HERMES_RELAYER_MNEMONIC_FILE}" "${mnemonic}"
+  fi
+
+  local relayer_addr
+  relayer_addr="$(run_capture ${DAEMON} keys show "${HERMES_RELAYER_KEY}" -a --keyring-backend "${KEYRING_BACKEND}")"
+  relayer_addr="$(printf '%s' "${relayer_addr}" | tr -d '\r\n')"
+  if [ -z "${relayer_addr}" ]; then
+    echo "[SETUP] ERROR: Unable to obtain Hermes relayer address"
+    exit 1
+  fi
+  write_with_lock "hermes-addr" "${HERMES_RELAYER_ADDR_FILE}" "${relayer_addr}"
+
+  local need_add=1
+  if command -v jq >/dev/null 2>&1 && [ -f "${GENESIS_LOCAL}" ]; then
+    if jq -e --arg addr "${relayer_addr}" '.app_state.bank.balances[]? | select(.address==$addr)' "${GENESIS_LOCAL}" >/dev/null 2>&1; then
+      need_add=0
+    fi
+  fi
+
+  if [ "${need_add}" -eq 1 ]; then
+    echo "[SETUP] Adding Hermes relayer genesis balance: ${HERMES_RELAYER_GENESIS_AMOUNT}${DENOM}"
+    set +e
+    run ${DAEMON} genesis add-genesis-account "${relayer_addr}" "${HERMES_RELAYER_GENESIS_AMOUNT}${DENOM}"
+    local status=$?
+    set -e
+    if [ ${status} -ne 0 ]; then
+      echo "[SETUP] Failed to add Hermes relayer genesis account."
+      exit ${status}
+    fi
+  else
+    echo "[SETUP] Hermes relayer genesis account already present."
   fi
 }
 
@@ -176,16 +276,28 @@ primary_validator_setup() {
   # primary’s own account
   echo "[SETUP] Creating key/account for ${KEY_NAME}..."
   ADDR="$(run_capture ${DAEMON} keys show "${KEY_NAME}" -a --keyring-backend "${KEYRING_BACKEND}")"
+  ADDR="$(printf '%s' "${ADDR}" | tr -d '\r\n')"
+  if [ -z "${ADDR}" ]; then
+    echo "[SETUP] ERROR: Unable to obtain address for ${KEY_NAME}"
+    exit 1
+  fi
   run ${DAEMON} genesis add-genesis-account "${ADDR}" "${ACCOUNT_BAL}"
-  echo "${ADDR}" > "${NODE_STATUS_DIR}/genesis-address"
+  printf '%s\n' "${ADDR}" > "${NODE_STATUS_DIR}/genesis-address"
 
   # governance account
   if ! run ${DAEMON} keys show governance_key --keyring-backend "${KEYRING_BACKEND}" >/dev/null 2>&1; then
     run ${DAEMON} keys add governance_key --keyring-backend "${KEYRING_BACKEND}" >/dev/null
   fi
   GOV_ADDR="$(run_capture ${DAEMON} keys show governance_key -a --keyring-backend "${KEYRING_BACKEND}")"
-  echo "${GOV_ADDR}" > ${SHARED_DIR}/governance_address
+  GOV_ADDR="$(printf '%s' "${GOV_ADDR}" | tr -d '\r\n')"
+  if [ -z "${GOV_ADDR}" ]; then
+    echo "[SETUP] ERROR: Unable to obtain governance key address"
+    exit 1
+  fi
+  printf '%s\n' "${GOV_ADDR}" > ${SHARED_DIR}/governance_address
   run ${DAEMON} genesis add-genesis-account "${GOV_ADDR}" "1000000000000${DENOM}"
+
+  ensure_hermes_relayer_account
 
   # share initial genesis to secondaries & flag
   cp "${GENESIS_LOCAL}" "${GENESIS_SHARED}"
@@ -224,10 +336,19 @@ primary_validator_setup() {
     --chain-id "${CHAIN_ID}" \
     --keyring-backend "${KEYRING_BACKEND}"
 
+  for file in "${GENTX_LOCAL_DIR}"/gentx-*.json; do
+    [ -f "${file}" ] || continue
+    verify_gentx_file "${file}" || exit 1
+  done
+
   # collect others' gentx
   mkdir -p "${GENTX_LOCAL_DIR}"
   if compgen -G "${GENTX_DIR}/*.json" > /dev/null; then
-    cp "${GENTX_DIR}"/*.json "${GENTX_LOCAL_DIR}/" || true
+    copy_with_lock "gentx" bash -c 'cp "$1"/*.json "$2"/' _ "${GENTX_DIR}" "${GENTX_LOCAL_DIR}" || true
+    for file in "${GENTX_LOCAL_DIR}"/gentx-*.json; do
+      [ -f "${file}" ] || continue
+      verify_gentx_file "${file}" || exit 1
+    done
   fi
   run ${DAEMON} genesis collect-gentxs
 
@@ -262,7 +383,14 @@ secondary_validator_setup() {
     run ${DAEMON} keys add "${KEY_NAME}" --keyring-backend "${KEYRING_BACKEND}" >/dev/null
   fi
   ADDR="$(run_capture ${DAEMON} keys show "${KEY_NAME}" -a --keyring-backend "${KEYRING_BACKEND}")"
+  ADDR="$(printf '%s' "${ADDR}" | tr -d '\r\n')"
+  if [ -z "${ADDR}" ]; then
+    echo "[SETUP] ERROR: Unable to obtain address for ${KEY_NAME}"
+    exit 1
+  fi
   run ${DAEMON} genesis add-genesis-account "${ADDR}" "${ACCOUNT_BAL}"
+
+  ensure_hermes_relayer_account
 
   mkdir -p "${GENTX_LOCAL_DIR}" "${GENTX_DIR}" "${ADDR_DIR}"
 
@@ -273,10 +401,18 @@ secondary_validator_setup() {
       --chain-id "${CHAIN_ID}" --keyring-backend "${KEYRING_BACKEND}"
   fi
 
+  local gentx_file
+  gentx_file="$(find "${GENTX_LOCAL_DIR}" -maxdepth 1 -type f -name 'gentx-*.json' -print | head -n1)"
+  if [ -z "${gentx_file}" ]; then
+    echo "[SETUP] ERROR: gentx generation failed for ${KEY_NAME} (no file produced)"
+    exit 1
+  fi
+  verify_gentx_file "${gentx_file}" || exit 1
+
   # share gentx & address
-  cp "${GENTX_LOCAL_DIR}"/gentx-*.json "${GENTX_DIR}"/${MONIKER}_gentx.json
-  echo "${ACCOUNT_BAL}" > "${ADDR_DIR}/${ADDR}"
-  echo "${ADDR}" > "${NODE_STATUS_DIR}/genesis-address"
+  copy_with_lock "gentx" cp "${gentx_file}" "${GENTX_DIR}/${MONIKER}_gentx.json"
+  write_with_lock "addresses" "${ADDR_DIR}/${ADDR}" "${ACCOUNT_BAL}"
+  printf '%s\n' "${ADDR}" > "${NODE_STATUS_DIR}/genesis-address"
 
   # write own markers for peer discovery
   write_node_markers

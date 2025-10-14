@@ -1,5 +1,6 @@
-.PHONY: unit-tests integration-tests system-tests simulation-tests all-tests
-.PHONY: build build-debug release buf-proto gen-proto clean-proto install-tools
+###################################################
+###  Lumera Makefile
+###################################################
 
 # tools/paths
 GO ?= go
@@ -37,6 +38,20 @@ TOOLS := \
 
 -include Makefile.devnet
 
+###################################################
+###                   Build                     ###
+###################################################
+.PHONY: build build-debug release build-proto clean-proto install-tools
+
+install-tools:
+	@echo "Installing Go tooling..."
+	@for tool in $(TOOLS); do \
+		echo "  $$tool"; \
+		EMSDK_QUIET=1 ${GO} install $$tool; \
+	done
+	@echo "Installing Ignite CLI (latest)..."
+	@curl -sSfL ${IGNITE_INSTALL_SCRIPT} | bash
+
 clean-proto:
 	@echo "Cleaning up protobuf generated files..."
 	find x/ -type f \( -name "*.pb.go" -o -name "*.pb.gw.go" -o -name "*.pulsar.go" -o -name "swagger.yaml" \) -print -exec rm -f {} +
@@ -55,7 +70,12 @@ build-proto: clean-proto $(PROTO_SRC)
 
 build: build/lumerad
 
-build/lumerad: $(GO_SRC) go.mod go.sum  Makefile
+go.sum: go.mod
+	@echo "Verifying and tidying go modules..."
+	${GO} mod verify
+	${GO} mod tidy
+
+build/lumerad: $(GO_SRC) go.sum Makefile
 	@echo "Building lumerad binary..."
 	@mkdir -p ${BUILD_DIR}
 	${BUF} generate --template proto/buf.gen.gogo.yaml --verbose
@@ -65,7 +85,7 @@ build/lumerad: $(GO_SRC) go.mod go.sum  Makefile
 
 build-debug: build-debug/lumerad
 
-build-debug/lumerad: $(GO_SRC) go.mod go.sum Makefile
+build-debug/lumerad: $(GO_SRC) go.sum Makefile
 	@echo "Building lumerad debug binary..."
 	@mkdir -p ${BUILD_DIR}
 	${IGNITE} chain build -t linux:amd64 --skip-proto --debug -v --output ${BUILD_DIR}/
@@ -79,7 +99,13 @@ release:
 	CGO_LDFLAGS="${RELEASE_CGO_LDFLAGS}" ${IGNITE} chain build -t linux:amd64 --clear-cache --skip-proto --release -v --output ${RELEASE_DIR}/
 	@echo "Release created in [${RELEASE_DIR}/] directory."
 
-### Testing
+###################################################
+###              Tests and Simulation           ###
+###################################################
+.PHONY: unit-tests integration-tests system-tests simulation-tests all-tests
+
+all-tests: unit-tests integration-tests system-tests simulation-tests
+
 unit-tests:
 	@echo "Running unit tests in x/..."
 	${GO} test ./x/... -v -coverprofile=coverage.out
@@ -101,13 +127,3 @@ systemex-tests:
 	@echo "Running system tests..."
 	cd ./tests/systemtests/ && go test -tags=system_test -v .
 
-all-tests: unit-tests integration-tests system-tests simulation-tests
-
-install-tools:
-	@echo "Installing Go tooling..."
-	@for tool in $(TOOLS); do \
-		echo "  $$tool"; \
-		EMSDK_QUIET=1 ${GO} install $$tool; \
-	done
-	@echo "Installing Ignite CLI (latest)..."
-	@curl -sSfL ${IGNITE_INSTALL_SCRIPT} | bash

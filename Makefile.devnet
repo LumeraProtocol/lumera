@@ -1,27 +1,29 @@
 .PHONY: devnet-build devnet-up devnet-reset devnet-up-detach devnet-down devnet-clean devnet-deploy-tar devnet-upgrade devnet-new
 .PHONY: devnet-build-default _check-devnet-default-cfg
 
-##### Devnet Makefile (Makefile.devnet) ########################################
+##### Devnet Makefile ########################################
 #
 # To use external genesis - provide path to it via EXTERNAL_GENESIS_FILE
 # Examples:
-## Using default config files
-## make devnet-build \
-## 		EXTERNAL_CLAIMS_FILE=~/claims.csv \
-## 		EXTERNAL_GENESIS_FILE=~/genesis.json
-##
-## Using custom config files
-## make devnet-build \
-## 		CONFIG_JSON=path/to/custom/config.json \
-## 		VALIDATORS_JSON=path/to/custom/validators.json \
-## 		EXTERNAL_CLAIMS_FILE=claims.csv \
-## 		EXTERNAL_GENESIS_FILE=template_genesis.json
+#   Using default config files:
+#   make devnet-build \
+#  		EXTERNAL_CLAIMS_FILE=~/claims.csv \
+# 		EXTERNAL_GENESIS_FILE=~/genesis.json
+#
+#   Using custom config files:
+#   make devnet-build \
+# 		CONFIG_JSON=path/to/custom/config.json \
+# 		VALIDATORS_JSON=path/to/custom/validators.json \
+# 		EXTERNAL_CLAIMS_FILE=claims.csv \
+# 		EXTERNAL_GENESIS_FILE=template_genesis.json
 
 DEVNET_DIR := /tmp/lumera-devnet-1
 SHARED_DIR := ${DEVNET_DIR}/shared
 SHARED_RELEASE_DIR := ${SHARED_DIR}/release
 SHARED_CONFIG_DIR := ${SHARED_DIR}/config
 VALIDATOR_DIRS := $(wildcard ${DEVNET_DIR}/supernova_validator*-data)
+HERMES_SIMD_DIR := ${DEVNET_DIR}/hermes-simd-data
+HERMES_ROUTER_DIR := ${DEVNET_DIR}/hermes-router
 EXTERNAL_GENESIS := $(SHARED_CONFIG_DIR)/external_genesis.json
 CLAIMS_FILE := $(SHARED_CONFIG_DIR)/claims.csv
 COMPOSE_FILE := devnet/docker-compose.yml
@@ -33,6 +35,7 @@ DEVNET_BIN_DIR ?= devnet/bin
 # Default paths for configuration files
 DEFAULT_CONFIG_JSON := config/config.json
 DEFAULT_VALIDATORS_JSON := config/validators.json
+
 # Default genesis and claims files for devnet docker
 DEFAULT_GENESIS_FILE := devnet/default-config/devnet-genesis.json
 DEFAULT_CLAIMS_FILE := claims.csv # relative to devnet
@@ -146,7 +149,7 @@ devnet-down:
 	fi
 
 devnet-clean:
-	sudo rm -rf $(SHARED_DIR) $(VALIDATOR_DIRS)
+	sudo rm -rf $(SHARED_DIR) $(VALIDATOR_DIRS) $(HERMES_SIMD_DIR) $(HERMES_ROUTER_DIR)
 	rm -f devnet/docker-compose.yml
 	@echo "Devnet docker shared & generated files cleaned up."
 

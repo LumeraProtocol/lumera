@@ -11,9 +11,10 @@ plugins:
         "tool",
         "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2",
       ]
-    out: .
+    out: proto
     opt:
       - logtostderr=true
       - openapi_naming_strategy=fqn
       - json_names_for_fields=false
       - generate_unbound_methods=true
+      - Mcosmos/app/v1alpha1/module.proto=cosmossdk.io/api/cosmos/app/v1alpha1

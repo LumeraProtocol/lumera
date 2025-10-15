@@ -67,6 +67,7 @@ jobs:
         run: |
           buf --version
           buf generate --template proto/buf.gen.gogo.yaml --verbose
+          buf generate --template proto/buf.gen.swagger.yaml --verbose
           ./ignite version
           ./ignite generate openapi --yes
           ./ignite chain build --clear-cache --skip-proto --release --release.prefix ${{ steps.vars.outputs.tarball_prefix }} -y -t linux:amd64 #-t darwin:amd64 -t darwin:arm64 -y

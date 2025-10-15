@@ -55,6 +55,8 @@ install-tools:
 clean-proto:
 	@echo "Cleaning up protobuf generated files..."
 	find x/ -type f \( -name "*.pb.go" -o -name "*.pb.gw.go" -o -name "*.pulsar.go" -o -name "swagger.yaml" \) -print -exec rm -f {} +
+	find proto/ -type f \( -name "swagger.yaml"  -o -name "*.swagger.json" \) -print -exec rm -f {} +
+	rm -f docs/static/openapi.yml
 
 PROTO_SRC := $(shell find proto -name "*.proto")
 GO_SRC := $(shell find app -name "*.go") \
@@ -66,7 +68,9 @@ GO_SRC := $(shell find app -name "*.go") \
 build-proto: clean-proto $(PROTO_SRC)
 	@echo "Processing proto files..."
 	${BUF} generate --template proto/buf.gen.gogo.yaml --verbose
+	${BUF} generate --template proto/buf.gen.swagger.yaml --verbose
 	${IGNITE} generate openapi --yes
+	${IGNITE} generate proto-go --yes
 
 build: build/lumerad
 

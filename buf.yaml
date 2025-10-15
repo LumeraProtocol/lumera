@@ -28,4 +28,6 @@ lint:
         - FILE_LOWER_SNAKE_CASE
 modules:
     - path: proto
+      name: buf.build/lumera-protocol/lumera
+
 version: v2

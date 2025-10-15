@@ -70,7 +70,6 @@ build-proto: clean-proto $(PROTO_SRC)
 	${BUF} generate --template proto/buf.gen.gogo.yaml --verbose
 	${BUF} generate --template proto/buf.gen.swagger.yaml --verbose
 	${IGNITE} generate openapi --yes
-	${IGNITE} generate proto-go --yes
 
 build: build/lumerad
 
@@ -83,6 +82,7 @@ build/lumerad: $(GO_SRC) go.sum Makefile
 	@echo "Building lumerad binary..."
 	@mkdir -p ${BUILD_DIR}
 	${BUF} generate --template proto/buf.gen.gogo.yaml --verbose
+	${BUF} generate --template proto/buf.gen.swagger.yaml --verbose
 	${IGNITE} generate openapi --yes
 	GOFLAGS=${GOFLAGS} ${IGNITE} chain build -t linux:amd64 --skip-proto --output ${BUILD_DIR}/
 	chmod +x $(BUILD_DIR)/lumerad
@@ -99,6 +99,7 @@ release:
 	@echo "Creating release with ignite..."
 	@mkdir -p ${RELEASE_DIR}
 	${BUF} generate --template proto/buf.gen.gogo.yaml --verbose
+	${BUF} generate --template proto/buf.gen.swagger.yaml --verbose
 	${IGNITE} generate openapi --yes
 	CGO_LDFLAGS="${RELEASE_CGO_LDFLAGS}" ${IGNITE} chain build -t linux:amd64 --clear-cache --skip-proto --release -v --output ${RELEASE_DIR}/
 	@echo "Release created in [${RELEASE_DIR}/] directory."

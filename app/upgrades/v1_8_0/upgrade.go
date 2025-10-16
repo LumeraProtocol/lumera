@@ -43,7 +43,7 @@ func CreateUpgradeHandler(
 }
 
 var StoreUpgrades = storetypes.StoreUpgrades{
-	// No new store keys needed if you are only updating existing modules
+	// Store upgrades for v1.8.0: add PFM store key
 	Added:   []string{
 		pfmtypes.StoreKey,
 	},

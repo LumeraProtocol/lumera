@@ -10,6 +10,9 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
+
+	pfmtypes "github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v10/packetforward/types"
+
 )
 
 const UpgradeName = "v1.8.0"
@@ -41,7 +44,9 @@ func CreateUpgradeHandler(
 
 var StoreUpgrades = storetypes.StoreUpgrades{
 	// No new store keys needed if you are only updating existing modules
-	Added:   []string{},
+	Added:   []string{
+		pfmtypes.StoreKey,
+	},
 	Deleted: []string{
 		"nft",	
 	},

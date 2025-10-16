@@ -4,10 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/golang/mock/gomock"
-	"cosmossdk.io/math"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
+	"github.com/golang/mock/gomock"
 
 	"cosmossdk.io/log"
 	"cosmossdk.io/store"
@@ -20,15 +19,15 @@ import (
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	"github.com/cosmos/cosmos-sdk/runtime"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	moduletestutil "github.com/cosmos/cosmos-sdk/types/module/testutil"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	paramtypes "github.com/cosmos/cosmos-sdk/x/params/types"
-	moduletestutil "github.com/cosmos/cosmos-sdk/types/module/testutil"
 	ibcclienttypes "github.com/cosmos/ibc-go/v10/modules/core/02-client/types"
 	ibckeeper "github.com/cosmos/ibc-go/v10/modules/core/keeper"
 	ibctypes "github.com/cosmos/ibc-go/v10/modules/core/types"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	actionmodulev1 "github.com/LumeraProtocol/lumera/x/action/v1/module"
@@ -37,10 +36,17 @@ import (
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
+const (
+	// test account amounts
+	TestAccountAmount int64 = 1_000_000
+)
+
 // ActionBankKeeper extends the existing MockBankKeeper with the SpendableCoins method
 type ActionBankKeeper struct {
 	mock.Mock
+	// sentCoins tracks the coins sent from accounts
 	sentCoins      map[string]sdk.Coins
+	// moduleBalances tracks the balances of modules
 	moduleBalances map[string]sdk.Coins
 }
 
@@ -94,6 +100,20 @@ func (m *ActionBankKeeper) GetBalance(ctx context.Context, addr sdk.AccAddress, 
 		}
 	}
 	return sdk.Coin{}
+}
+
+func (m *ActionBankKeeper) GetModuleBalance(module string) sdk.Coins {
+	if coins, ok := m.moduleBalances[module]; ok {
+		return coins
+	}
+	return sdk.NewCoins()
+}
+
+func (m *ActionBankKeeper) GetAccountCoins(addr sdk.AccAddress) sdk.Coins {
+	if coins, ok := m.sentCoins[addr.String()]; ok {
+		return coins
+	}
+	return sdk.NewCoins()
 }
 
 type MockDistributionKeeper struct {
@@ -160,12 +180,12 @@ func ActionKeeperWithAddress(t testing.TB, ctrl *gomock.Controller, accounts []A
 			err := account.SetPubKey(acc.PubKey)
 			require.NoError(t, err)
 			authKeeper.SetAccount(ctx, account)
-			bankKeeper.sentCoins[acc.Address.String()] = sdk.NewCoins(sdk.NewCoin("ulume", math.NewInt(1000000)))
+			bankKeeper.sentCoins[acc.Address.String()] = sdk.NewCoins(sdk.NewInt64Coin("ulume", TestAccountAmount))
 		}
 	}
 
 	mockUpgradeKeeper := newMockUpgradeKeeper()
-	
+
 	storeService := runtime.NewKVStoreService(storeKey)
 	k := keeper.NewKeeper(
 		cdc,

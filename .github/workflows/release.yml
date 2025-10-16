@@ -184,7 +184,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: release-artifacts
-          path: .
+          path: release
 
       - name: Inspect Release Artifacts
         run: |

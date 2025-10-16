@@ -12,7 +12,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
-//	porttypes "github.com/cosmos/ibc-go/v10/modules/core/05-port/types"
+	// porttypes "github.com/cosmos/ibc-go/v10/modules/core/05-port/types"
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
 
 	// this line is used by starport scaffolding # 1
@@ -31,8 +31,9 @@ var (
 	_ appmodule.AppModule       = (*AppModule)(nil)
 	_ appmodule.HasBeginBlocker = (*AppModule)(nil)
 	_ appmodule.HasEndBlocker   = (*AppModule)(nil)
-// TODO: Uncomment the following line when the IBC module is implemented
-//	_ porttypes.IBCModule       = (*IBCModule)(nil)
+
+	// TODO: Uncomment the following line when the IBC module is implemented
+	// _ porttypes.IBCModule       = (*IBCModule)(nil)
 )
 
 // ----------------------------------------------------------------------------
@@ -165,8 +166,8 @@ func (am AppModule) BeginBlock(_ context.Context) error {
 
 // EndBlock contains the logic that is automatically triggered at the end of each block.
 // The end block implementation is optional.
-func (am AppModule) EndBlock(_ context.Context) error {
-	return nil
+func (am AppModule) EndBlock(ctx context.Context) error {
+	return am.keeper.EndBlocker(ctx)
 }
 
 // IsAppModule implements the appmodule.AppModule interface.

@@ -1,8 +1,9 @@
 package keeper_test
 
 import (
-	"cosmossdk.io/math"
 	"testing"
+
+	"cosmossdk.io/math"
 
 	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
 	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
@@ -52,8 +53,31 @@ func TestKeeper_GetActionFee(t *testing.T) {
 				params.BaseActionFee = sdk.NewCoin("ulume", math.NewInt(10000))
 				params.FeePerKbyte = sdk.NewCoin("ulume", math.NewInt(100))
 				k.SetParams(ctx, params)
+
 			},
 			expectedFee: "30000", // 100 * 200 + 10000
+		},
+		{
+			name: "fee per kbyte zero returns base only",
+			req:  &types.QueryGetActionFeeRequest{DataSize: "1024"},
+			setupParams: func(k keeper.Keeper, ctx sdk.Context) {
+				params := types.DefaultParams()
+				params.BaseActionFee = sdk.NewCoin("ulume", math.NewInt(12345))
+				params.FeePerKbyte = sdk.NewCoin("ulume", math.NewInt(0))
+				k.SetParams(ctx, params)
+			},
+			expectedFee: "12345",
+		},
+		{
+			name: "large data size determinism",
+			req:  &types.QueryGetActionFeeRequest{DataSize: "10000000"}, // 10M KB
+			setupParams: func(k keeper.Keeper, ctx sdk.Context) {
+				params := types.DefaultParams()
+				params.BaseActionFee = sdk.NewCoin("ulume", math.NewInt(10000))
+				params.FeePerKbyte = sdk.NewCoin("ulume", math.NewInt(1))
+				k.SetParams(ctx, params)
+			},
+			expectedFee: "10010000", // 1 * 10_000_000 + 10_000
 		},
 	}
 
@@ -64,12 +88,13 @@ func TestKeeper_GetActionFee(t *testing.T) {
 
 			k, ctx := keepertest.ActionKeeper(t, ctrl)
 			q := keeper.NewQueryServerImpl(k)
+			goCtx := sdk.WrapSDKContext(ctx)
 
 			if tc.setupParams != nil {
 				tc.setupParams(k, ctx)
 			}
 
-			resp, err := q.GetActionFee(ctx, tc.req)
+			resp, err := q.GetActionFee(goCtx, tc.req)
 
 			if tc.expectedErr != nil {
 				require.Error(t, err)
@@ -79,6 +104,10 @@ func TestKeeper_GetActionFee(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, tc.expectedFee, resp.Amount)
+				// Determinism: same input yields same output
+				resp2, err := q.GetActionFee(goCtx, tc.req)
+				require.NoError(t, err)
+				require.Equal(t, resp.Amount, resp2.Amount)
 			}
 		})
 	}

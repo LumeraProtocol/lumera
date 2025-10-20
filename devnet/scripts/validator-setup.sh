@@ -173,6 +173,14 @@ apply_persistent_peers() {
       sed -i -E "s|^persistent_peers *=.*$|persistent_peers = \"${peers}\"|g" "${CONFIG_TOML}"
       echo "[SETUP] Applied persistent_peers to ${CONFIG_TOML}"
     fi
+
+    # Treat all validators as private peers so CometBFT accepts their non-routable addresses.
+    local peer_ids
+    peer_ids="$(cut -d@ -f1 "${PEERS_SHARED}" | paste -sd, || true)"
+    if [ -n "${peer_ids}" ]; then
+      sed -i -E "s|^private_peer_ids *=.*$|private_peer_ids = \"${peer_ids}\"|g" "${CONFIG_TOML}"
+      echo "[SETUP] Applied private_peer_ids to ${CONFIG_TOML}"
+    fi
   fi
 }
 
@@ -185,7 +193,10 @@ ensure_hermes_relayer_account() {
     mnemonic="$(cat "${HERMES_RELAYER_MNEMONIC_FILE}")"
   fi
 
-  if ! ${DAEMON} keys show "${HERMES_RELAYER_KEY}" --keyring-backend "${KEYRING_BACKEND}" >/dev/null 2>&1; then
+  local relayer_addr
+  relayer_addr="$(run_capture ${DAEMON} keys show "${HERMES_RELAYER_KEY}" -a --keyring-backend "${KEYRING_BACKEND}" 2>/dev/null || true)"
+  relayer_addr="$(printf '%s' "${relayer_addr}" | tr -d '\r\n')"
+  if [ -z "${relayer_addr}" ]; then
     if [ -n "${mnemonic}" ]; then
       printf '%s\n' "${mnemonic}" | run ${DAEMON} keys add "${HERMES_RELAYER_KEY}" --recover --keyring-backend "${KEYRING_BACKEND}" >/dev/null
     else
@@ -199,8 +210,7 @@ ensure_hermes_relayer_account() {
     write_with_lock "hermes-mnemonic" "${HERMES_RELAYER_MNEMONIC_FILE}" "${mnemonic}"
   fi
 
-  local relayer_addr
-  relayer_addr="$(run_capture ${DAEMON} keys show "${HERMES_RELAYER_KEY}" -a --keyring-backend "${KEYRING_BACKEND}")"
+  relayer_addr="$(run_capture ${DAEMON} keys show "${HERMES_RELAYER_KEY}" -a --keyring-backend "${KEYRING_BACKEND}" 2>/dev/null || true)"
   relayer_addr="$(printf '%s' "${relayer_addr}" | tr -d '\r\n')"
   if [ -z "${relayer_addr}" ]; then
     echo "[SETUP] ERROR: Unable to obtain Hermes relayer address"
@@ -209,7 +219,7 @@ ensure_hermes_relayer_account() {
   write_with_lock "hermes-addr" "${HERMES_RELAYER_ADDR_FILE}" "${relayer_addr}"
 
   local need_add=1
-  if command -v jq >/dev/null 2>&1 && [ -f "${GENESIS_LOCAL}" ]; then
+  if [ -f "${GENESIS_LOCAL}" ]; then
     if jq -e --arg addr "${relayer_addr}" '.app_state.bank.balances[]? | select(.address==$addr)' "${GENESIS_LOCAL}" >/dev/null 2>&1; then
       need_add=0
     fi
@@ -238,15 +248,20 @@ wait_for_file() {
 
 init_if_needed() {
   if [ -f "${GENESIS_LOCAL}" ]; then
-    echo "[SETUP] ${MONIKER} already initialized."
-    return 0
+    echo "[SETUP] ${MONIKER} already initialized (genesis exists)."
+  else
+    echo "[SETUP] Initializing ${MONIKER}..."
+    run ${DAEMON} init "${MONIKER}" --chain-id "${CHAIN_ID}" --overwrite
   fi
-  echo "[SETUP] Initializing ${MONIKER}..."
-  ${DAEMON} init "${MONIKER}" --chain-id "${CHAIN_ID}" --overwrite
 
-  # key (idempotent)
-  if ! ${DAEMON} keys show "${KEY_NAME}" --keyring-backend "${KEYRING_BACKEND}" >/dev/null 2>&1; then
-    ${DAEMON} keys add "${KEY_NAME}" --keyring-backend "${KEYRING_BACKEND}" >/dev/null
+  # ensure validator key exists
+  local addr
+  addr="$(run_capture ${DAEMON} keys show "${KEY_NAME}" -a --keyring-backend "${KEYRING_BACKEND}" 2>/dev/null || true)"
+  addr="$(printf '%s' "${addr}" | tr -d '\r\n')"
+  if [ -z "${addr}" ]; then
+    run ${DAEMON} keys add "${KEY_NAME}" --keyring-backend "${KEYRING_BACKEND}"
+  else
+    echo "[SETUP] Key ${KEY_NAME} already exists with address ${addr}"
   fi
 }
 
@@ -275,27 +290,30 @@ primary_validator_setup() {
 
   # primary’s own account
   echo "[SETUP] Creating key/account for ${KEY_NAME}..."
-  ADDR="$(run_capture ${DAEMON} keys show "${KEY_NAME}" -a --keyring-backend "${KEYRING_BACKEND}")"
-  ADDR="$(printf '%s' "${ADDR}" | tr -d '\r\n')"
-  if [ -z "${ADDR}" ]; then
+  addr="$(run_capture ${DAEMON} keys show "${KEY_NAME}" -a --keyring-backend "${KEYRING_BACKEND}")"
+  addr="$(printf '%s' "${addr}" | tr -d '\r\n')"
+  if [ -z "${addr}" ]; then
     echo "[SETUP] ERROR: Unable to obtain address for ${KEY_NAME}"
     exit 1
   fi
-  run ${DAEMON} genesis add-genesis-account "${ADDR}" "${ACCOUNT_BAL}"
-  printf '%s\n' "${ADDR}" > "${NODE_STATUS_DIR}/genesis-address"
+  run ${DAEMON} genesis add-genesis-account "${addr}" "${ACCOUNT_BAL}"
+  printf '%s\n' "${addr}" > "${NODE_STATUS_DIR}/genesis-address"
 
   # governance account
-  if ! run ${DAEMON} keys show governance_key --keyring-backend "${KEYRING_BACKEND}" >/dev/null 2>&1; then
+  local gov_addr
+  gov_addr="$(run_capture ${DAEMON} keys show governance_key -a --keyring-backend "${KEYRING_BACKEND}" 2>/dev/null || true)"
+  gov_addr="$(printf '%s' "${gov_addr}" | tr -d '\r\n')"
+  if [ -z "${gov_addr}" ]; then
     run ${DAEMON} keys add governance_key --keyring-backend "${KEYRING_BACKEND}" >/dev/null
+    gov_addr="$(run_capture ${DAEMON} keys show governance_key -a --keyring-backend "${KEYRING_BACKEND}")"
+    gov_addr="$(printf '%s' "${gov_addr}" | tr -d '\r\n')"
   fi
-  GOV_ADDR="$(run_capture ${DAEMON} keys show governance_key -a --keyring-backend "${KEYRING_BACKEND}")"
-  GOV_ADDR="$(printf '%s' "${GOV_ADDR}" | tr -d '\r\n')"
-  if [ -z "${GOV_ADDR}" ]; then
+  if [ -z "${gov_addr}" ]; then
     echo "[SETUP] ERROR: Unable to obtain governance key address"
     exit 1
   fi
-  printf '%s\n' "${GOV_ADDR}" > ${SHARED_DIR}/governance_address
-  run ${DAEMON} genesis add-genesis-account "${GOV_ADDR}" "1000000000000${DENOM}"
+  printf '%s\n' "${gov_addr}" > ${SHARED_DIR}/governance_address
+  run ${DAEMON} genesis add-genesis-account "${gov_addr}" "1000000000000${DENOM}"
 
   ensure_hermes_relayer_account
 
@@ -379,17 +397,18 @@ secondary_validator_setup() {
   [ -f "${CLAIMS_SHARED}" ] && cp "${CLAIMS_SHARED}" "${CLAIMS_LOCAL}"
 
   # create key, add account, create gentx
-  if ! run ${DAEMON} keys show "${KEY_NAME}" --keyring-backend "${KEYRING_BACKEND}" >/dev/null 2>&1; then
+  addr="$(run_capture ${DAEMON} keys show "${KEY_NAME}" -a --keyring-backend "${KEYRING_BACKEND}")"
+  addr="$(printf '%s' "${addr}" | tr -d '\r\n')"
+  if [ -z "${addr}" ]; then
     run ${DAEMON} keys add "${KEY_NAME}" --keyring-backend "${KEYRING_BACKEND}" >/dev/null
   fi
-  ADDR="$(run_capture ${DAEMON} keys show "${KEY_NAME}" -a --keyring-backend "${KEYRING_BACKEND}")"
-  ADDR="$(printf '%s' "${ADDR}" | tr -d '\r\n')"
-  if [ -z "${ADDR}" ]; then
+  addr="$(run_capture ${DAEMON} keys show "${KEY_NAME}" -a --keyring-backend "${KEYRING_BACKEND}")"
+  addr="$(printf '%s' "${addr}" | tr -d '\r\n')"
+  if [ -z "${addr}" ]; then
     echo "[SETUP] ERROR: Unable to obtain address for ${KEY_NAME}"
     exit 1
   fi
-  run ${DAEMON} genesis add-genesis-account "${ADDR}" "${ACCOUNT_BAL}"
-
+  run ${DAEMON} genesis add-genesis-account "${addr}" "${ACCOUNT_BAL}"
   ensure_hermes_relayer_account
 
   mkdir -p "${GENTX_LOCAL_DIR}" "${GENTX_DIR}" "${ADDR_DIR}"
@@ -411,8 +430,8 @@ secondary_validator_setup() {
 
   # share gentx & address
   copy_with_lock "gentx" cp "${gentx_file}" "${GENTX_DIR}/${MONIKER}_gentx.json"
-  write_with_lock "addresses" "${ADDR_DIR}/${ADDR}" "${ACCOUNT_BAL}"
-  printf '%s\n' "${ADDR}" > "${NODE_STATUS_DIR}/genesis-address"
+  write_with_lock "addresses" "${ADDR_DIR}/${addr}" "${ACCOUNT_BAL}"
+  printf '%s\n' "${addr}" > "${NODE_STATUS_DIR}/genesis-address"
 
   # write own markers for peer discovery
   write_node_markers

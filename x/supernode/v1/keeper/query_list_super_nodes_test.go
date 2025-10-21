@@ -3,53 +3,53 @@ package keeper_test
 import (
 	"testing"
 
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
-	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/query"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
 )
 
 func TestKeeper_ListSuperNodes(t *testing.T) {
 	valAddr := sdk.ValAddress([]byte("validator"))
 	creatorAddr := sdk.AccAddress(valAddr)
 	// Create action supernodes
-	sn1 := types2.SuperNode{
+	sn1 := types.SuperNode{
 		ValidatorAddress: valAddr.String(),
 		SupernodeAccount: creatorAddr.String(),
 		Note:             "1.0.0",
-		PrevIpAddresses: []*types2.IPAddressHistory{
+		PrevIpAddresses: []*types.IPAddressHistory{
 			{
 				Address: "1022.145.1.1",
 				Height:  1,
 			},
 		},
-		States: []*types2.SuperNodeStateRecord{
+		States: []*types.SuperNodeStateRecord{
 			{
-				State:  types2.SuperNodeStateActive,
+				State:  types.SuperNodeStateActive,
 				Height: 1,
 			},
 		},
 		P2PPort: "26657",
 	}
-	sn2 := types2.SuperNode{
+	sn2 := types.SuperNode{
 		ValidatorAddress: sdk.ValAddress([]byte("val2")).String(),
 		SupernodeAccount: creatorAddr.String(),
 		Note:             "2.0.0",
-		PrevIpAddresses: []*types2.IPAddressHistory{
+		PrevIpAddresses: []*types.IPAddressHistory{
 			{
 				Address: "1022.145.1.1",
 				Height:  1,
 			},
 		},
-		States: []*types2.SuperNodeStateRecord{
+		States: []*types.SuperNodeStateRecord{
 			{
-				State:  types2.SuperNodeStateActive,
+				State:  types.SuperNodeStateActive,
 				Height: 1,
 			},
 		},
@@ -58,10 +58,10 @@ func TestKeeper_ListSuperNodes(t *testing.T) {
 
 	testCases := []struct {
 		name        string
-		req         *types2.QueryListSuperNodesRequest
+		req         *types.QueryListSuperNodesRequest
 		setupState  func(k keeper.Keeper, ctx sdk.Context)
 		expectedErr error
-		checkResult func(t *testing.T, resp *types2.QueryListSuperNodesResponse)
+		checkResult func(t *testing.T, resp *types.QueryListSuperNodesResponse)
 	}{
 		{
 			name:        "invalid request (nil)",
@@ -70,41 +70,41 @@ func TestKeeper_ListSuperNodes(t *testing.T) {
 		},
 		{
 			name: "no supernodes in store",
-			req: &types2.QueryListSuperNodesRequest{
+			req: &types.QueryListSuperNodesRequest{
 				Pagination: &query.PageRequest{Limit: 10},
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
 				// no state set, empty store
 			},
 			expectedErr: nil,
-			checkResult: func(t *testing.T, resp *types2.QueryListSuperNodesResponse) {
+			checkResult: func(t *testing.T, resp *types.QueryListSuperNodesResponse) {
 				require.Empty(t, resp.Supernodes)
 				require.Nil(t, resp.Pagination.NextKey)
 			},
 		},
 		{
 			name: "multiple supernodes, no pagination",
-			req: &types2.QueryListSuperNodesRequest{
+			req: &types.QueryListSuperNodesRequest{
 				Pagination: &query.PageRequest{Limit: 10},
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
-				sn1.States = []*types2.SuperNodeStateRecord{
+				sn1.States = []*types.SuperNodeStateRecord{
 					{
-						State:  types2.SuperNodeStateActive,
+						State:  types.SuperNodeStateActive,
 						Height: 1,
 					},
 					{
-						State:  types2.SuperNodeStateDisabled,
+						State:  types.SuperNodeStateDisabled,
 						Height: 2,
 					},
 				}
-				sn2.States = []*types2.SuperNodeStateRecord{
+				sn2.States = []*types.SuperNodeStateRecord{
 					{
-						State:  types2.SuperNodeStateActive,
+						State:  types.SuperNodeStateActive,
 						Height: 1,
 					},
 					{
-						State:  types2.SuperNodeStatePenalized,
+						State:  types.SuperNodeStatePenalized,
 						Height: 2,
 					},
 				}
@@ -112,7 +112,7 @@ func TestKeeper_ListSuperNodes(t *testing.T) {
 				require.NoError(t, k.SetSuperNode(ctx, sn2))
 			},
 			expectedErr: nil,
-			checkResult: func(t *testing.T, resp *types2.QueryListSuperNodesResponse) {
+			checkResult: func(t *testing.T, resp *types.QueryListSuperNodesResponse) {
 				require.Len(t, resp.Supernodes, 2)
 				// Just check that both were returned
 				addrSet := make(map[string]bool)
@@ -125,7 +125,7 @@ func TestKeeper_ListSuperNodes(t *testing.T) {
 		},
 		{
 			name: "pagination with fewer results",
-			req: &types2.QueryListSuperNodesRequest{
+			req: &types.QueryListSuperNodesRequest{
 				Pagination: &query.PageRequest{Limit: 1},
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
@@ -133,7 +133,7 @@ func TestKeeper_ListSuperNodes(t *testing.T) {
 				require.NoError(t, k.SetSuperNode(ctx, sn2))
 			},
 			expectedErr: nil,
-			checkResult: func(t *testing.T, resp *types2.QueryListSuperNodesResponse) {
+			checkResult: func(t *testing.T, resp *types.QueryListSuperNodesResponse) {
 				require.Len(t, resp.Supernodes, 1)
 				require.NotNil(t, resp.Pagination.NextKey)
 				// The test only checks first page. Additional pages would be tested similarly in other tests.
@@ -152,12 +152,13 @@ func TestKeeper_ListSuperNodes(t *testing.T) {
 			bankKeeper := supernodemocks.NewMockBankKeeper(ctrl)
 
 			k, ctx := setupKeeperForTest(t, stakingKeeper, slashingKeeper, bankKeeper)
+			q := keeper.NewQueryServerImpl(k)
 
 			if tc.setupState != nil {
 				tc.setupState(k, ctx)
 			}
 
-			resp, err := k.ListSuperNodes(ctx, tc.req)
+			resp, err := q.ListSuperNodes(ctx, tc.req)
 
 			if tc.expectedErr != nil {
 				require.Error(t, err)

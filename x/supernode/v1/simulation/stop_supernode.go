@@ -3,12 +3,12 @@ package simulation
 import (
 	"math/rand"
 
-	keeper2 "github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	simtypes "github.com/cosmos/cosmos-sdk/types/simulation"
+
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 const (
@@ -16,9 +16,9 @@ const (
 )
 
 func SimulateMsgStopSupernode(
-	ak types2.AccountKeeper,
-	bk types2.BankKeeper,
-	k keeper2.Keeper,
+	ak types.AccountKeeper,
+	bk types.BankKeeper,
+	k keeper.Keeper,
 ) simtypes.Operation {
 	return func(r *rand.Rand, app *baseapp.BaseApp, ctx sdk.Context, accs []simtypes.Account, chainID string,
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
@@ -46,7 +46,7 @@ func SimulateMsgStopSupernode(
 
 			// Check current state
 			currentState := supernode.States[len(supernode.States)-1].State
-			if currentState == types2.SuperNodeStateStopped || currentState == types2.SuperNodeStateDisabled {
+			if currentState == types.SuperNodeStateStopped || currentState == types.SuperNodeStateDisabled {
 				continue
 			}
 
@@ -57,7 +57,7 @@ func SimulateMsgStopSupernode(
 
 		// If we couldn't find an eligible supernode, skip this operation
 		if !found {
-			return simtypes.NoOpMsg(types2.ModuleName, TypeMsgStopSupernode, "no eligible supernode found"), nil, nil
+			return simtypes.NoOpMsg(types.ModuleName, TypeMsgStopSupernode, "no eligible supernode found"), nil, nil
 		}
 
 		// Generate random reason for stopping
@@ -70,17 +70,17 @@ func SimulateMsgStopSupernode(
 		}
 		randomReason := reasons[r.Intn(len(reasons))]
 
-		msg := &types2.MsgStopSupernode{
+		msg := &types.MsgStopSupernode{
 			Creator:          simAccount.Address.String(),
 			ValidatorAddress: validatorAddress,
 			Reason:           randomReason,
 		}
 
 		// Execute the message
-		msgServer := keeper2.NewMsgServerImpl(k)
+		msgServer := keeper.NewMsgServerImpl(k)
 		_, err := msgServer.StopSupernode(ctx, msg)
 		if err != nil {
-			return simtypes.NoOpMsg(types2.ModuleName, TypeMsgStopSupernode, err.Error()), nil, err
+			return simtypes.NoOpMsg(types.ModuleName, TypeMsgStopSupernode, err.Error()), nil, err
 		}
 
 		return simtypes.NewOperationMsg(msg, true, "success"), nil, nil

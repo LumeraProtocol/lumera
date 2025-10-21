@@ -3,15 +3,14 @@ package keeper_test
 import (
 	"testing"
 
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/stretchr/testify/require"
 )
 
 func TestMsgUpdateParams(t *testing.T) {
 	k, ms, ctx := setupMsgServer(t)
-	params := types2.DefaultParams()
+	params := types.DefaultParams()
 	wctx := sdk.UnwrapSDKContext(ctx)
 
 	// Use wctx instead of sdk.Context{}
@@ -20,13 +19,13 @@ func TestMsgUpdateParams(t *testing.T) {
 	// default params
 	testCases := []struct {
 		name      string
-		input     *types2.MsgUpdateParams
+		input     *types.MsgUpdateParams
 		expErr    bool
 		expErrMsg string
 	}{
 		{
 			name: "invalid authority",
-			input: &types2.MsgUpdateParams{
+			input: &types.MsgUpdateParams{
 				Authority: "invalid",
 				Params:    params,
 			},
@@ -35,15 +34,15 @@ func TestMsgUpdateParams(t *testing.T) {
 		},
 		{
 			name: "empty params but valid authority",
-			input: &types2.MsgUpdateParams{
+			input: &types.MsgUpdateParams{
 				Authority: k.GetAuthority(),
-				Params:    types2.Params{},
+				Params:    types.Params{},
 			},
 			expErr: false,
 		},
 		{
 			name: "all good",
-			input: &types2.MsgUpdateParams{
+			input: &types.MsgUpdateParams{
 				Authority: k.GetAuthority(),
 				Params:    params,
 			},

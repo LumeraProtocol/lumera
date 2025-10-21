@@ -3,20 +3,19 @@ package supernode
 import (
 	"math/rand"
 
-	simulation2 "github.com/LumeraProtocol/lumera/x/supernode/v1/simulation"
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	simtypes "github.com/cosmos/cosmos-sdk/types/simulation"
 	"github.com/cosmos/cosmos-sdk/x/simulation"
 
 	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
+	supernodesimulation "github.com/LumeraProtocol/lumera/x/supernode/v1/simulation"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 // avoid unused import issue
 var (
-	_ = simulation2.FindAccount
+	_ = supernodesimulation.FindAccount
 	_ = rand.Rand{}
 	_ = cryptotestutils.AccAddress
 	_ = sdk.AccAddress{}
@@ -53,11 +52,11 @@ func (AppModule) GenerateGenesisState(simState *module.SimulationState) {
 	for i, acc := range simState.Accounts {
 		accs[i] = acc.Address.String()
 	}
-	supernodeGenesis := types2.GenesisState{
-		Params: types2.DefaultParams(),
+	supernodeGenesis := types.GenesisState{
+		Params: types.DefaultParams(),
 		// this line is used by starport scaffolding # simapp/module/genesisState
 	}
-	simState.GenState[types2.ModuleName] = simState.Cdc.MustMarshalJSON(&supernodeGenesis)
+	simState.GenState[types.ModuleName] = simState.Cdc.MustMarshalJSON(&supernodeGenesis)
 }
 
 // RegisterStoreDecoder registers a decoder.
@@ -75,7 +74,7 @@ func (am AppModule) WeightedOperations(simState module.SimulationState) []simtyp
 	)
 	operations = append(operations, simulation.NewWeightedOperation(
 		weightMsgRegisterSupernode,
-		simulation2.SimulateMsgRegisterSupernode(am.accountKeeper, am.bankKeeper, am.keeper),
+		supernodesimulation.SimulateMsgRegisterSupernode(am.accountKeeper, am.bankKeeper, am.keeper),
 	))
 
 	var weightMsgDeregisterSupernode int
@@ -86,7 +85,7 @@ func (am AppModule) WeightedOperations(simState module.SimulationState) []simtyp
 	)
 	operations = append(operations, simulation.NewWeightedOperation(
 		weightMsgDeregisterSupernode,
-		simulation2.SimulateMsgDeregisterSupernode(am.accountKeeper, am.bankKeeper, am.keeper),
+		supernodesimulation.SimulateMsgDeregisterSupernode(am.accountKeeper, am.bankKeeper, am.keeper),
 	))
 
 	var weightMsgStartSupernode int
@@ -97,7 +96,7 @@ func (am AppModule) WeightedOperations(simState module.SimulationState) []simtyp
 	)
 	operations = append(operations, simulation.NewWeightedOperation(
 		weightMsgStartSupernode,
-		simulation2.SimulateMsgStartSupernode(am.accountKeeper, am.bankKeeper, am.keeper),
+		supernodesimulation.SimulateMsgStartSupernode(am.accountKeeper, am.bankKeeper, am.keeper),
 	))
 
 	var weightMsgStopSupernode int
@@ -108,7 +107,7 @@ func (am AppModule) WeightedOperations(simState module.SimulationState) []simtyp
 	)
 	operations = append(operations, simulation.NewWeightedOperation(
 		weightMsgStopSupernode,
-		simulation2.SimulateMsgStopSupernode(am.accountKeeper, am.bankKeeper, am.keeper),
+		supernodesimulation.SimulateMsgStopSupernode(am.accountKeeper, am.bankKeeper, am.keeper),
 	))
 
 	var weightMsgUpdateSupernode int
@@ -119,7 +118,7 @@ func (am AppModule) WeightedOperations(simState module.SimulationState) []simtyp
 	)
 	operations = append(operations, simulation.NewWeightedOperation(
 		weightMsgUpdateSupernode,
-		simulation2.SimulateMsgUpdateSupernode(am.accountKeeper, am.bankKeeper, am.keeper),
+		supernodesimulation.SimulateMsgUpdateSupernode(am.accountKeeper, am.bankKeeper, am.keeper),
 	))
 
 	// this line is used by starport scaffolding # simapp/module/operation
@@ -134,7 +133,7 @@ func (am AppModule) ProposalMsgs(simState module.SimulationState) []simtypes.Wei
 			opWeightMsgRegisterSupernode,
 			defaultWeightMsgRegisterSupernode,
 			func(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account) sdk.Msg {
-				simulation2.SimulateMsgRegisterSupernode(am.accountKeeper, am.bankKeeper, am.keeper)
+				supernodesimulation.SimulateMsgRegisterSupernode(am.accountKeeper, am.bankKeeper, am.keeper)
 				return nil
 			},
 		),
@@ -142,7 +141,7 @@ func (am AppModule) ProposalMsgs(simState module.SimulationState) []simtypes.Wei
 			opWeightMsgDeregisterSupernode,
 			defaultWeightMsgDeregisterSupernode,
 			func(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account) sdk.Msg {
-				simulation2.SimulateMsgDeregisterSupernode(am.accountKeeper, am.bankKeeper, am.keeper)
+				supernodesimulation.SimulateMsgDeregisterSupernode(am.accountKeeper, am.bankKeeper, am.keeper)
 				return nil
 			},
 		),
@@ -150,7 +149,7 @@ func (am AppModule) ProposalMsgs(simState module.SimulationState) []simtypes.Wei
 			opWeightMsgStartSupernode,
 			defaultWeightMsgStartSupernode,
 			func(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account) sdk.Msg {
-				simulation2.SimulateMsgStartSupernode(am.accountKeeper, am.bankKeeper, am.keeper)
+				supernodesimulation.SimulateMsgStartSupernode(am.accountKeeper, am.bankKeeper, am.keeper)
 				return nil
 			},
 		),
@@ -158,7 +157,7 @@ func (am AppModule) ProposalMsgs(simState module.SimulationState) []simtypes.Wei
 			opWeightMsgStopSupernode,
 			defaultWeightMsgStopSupernode,
 			func(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account) sdk.Msg {
-				simulation2.SimulateMsgStopSupernode(am.accountKeeper, am.bankKeeper, am.keeper)
+				supernodesimulation.SimulateMsgStopSupernode(am.accountKeeper, am.bankKeeper, am.keeper)
 				return nil
 			},
 		),
@@ -166,7 +165,7 @@ func (am AppModule) ProposalMsgs(simState module.SimulationState) []simtypes.Wei
 			opWeightMsgUpdateSupernode,
 			defaultWeightMsgUpdateSupernode,
 			func(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account) sdk.Msg {
-				simulation2.SimulateMsgUpdateSupernode(am.accountKeeper, am.bankKeeper, am.keeper)
+				supernodesimulation.SimulateMsgUpdateSupernode(am.accountKeeper, am.bankKeeper, am.keeper)
 				return nil
 			},
 		),

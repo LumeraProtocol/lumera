@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/LumeraProtocol/lumera/app"
@@ -14,6 +15,7 @@ import (
 	cmttime "github.com/cometbft/cometbft/types/time"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 
 	"cosmossdk.io/math"
 	"cosmossdk.io/math/unsafe"
@@ -34,9 +36,17 @@ import (
 	"github.com/cosmos/cosmos-sdk/version"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	crisistypes "github.com/cosmos/cosmos-sdk/x/crisis/types"
 	"github.com/cosmos/cosmos-sdk/x/genutil"
 	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
+	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
+	govv1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
+	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
+
+	lcfg "github.com/LumeraProtocol/lumera/config"
+	claimtestutils "github.com/LumeraProtocol/lumera/x/claim/testutils"
+	claimtypes "github.com/LumeraProtocol/lumera/x/claim/types"
 )
 
 var (
@@ -44,6 +54,7 @@ var (
 	flagNumValidators     = "v"
 	flagOutputDir         = "output-dir"
 	flagNodeDaemonHome    = "node-daemon-home"
+	flagDisableCleanup    = "disable-cleanup"
 	flagStartingIPAddress = "starting-ip-address"
 	flagEnableLogging     = "enable-logging"
 	flagGRPCAddress       = "grpc.address"
@@ -66,6 +77,7 @@ type initArgs struct {
 	outputDir         string
 	startingIPAddress string
 	singleMachine     bool
+	disableCleanup    bool
 }
 
 type startArgs struct {
@@ -86,7 +98,7 @@ func addTestnetFlagsToCmd(cmd *cobra.Command) {
 	cmd.Flags().Int(flagNumValidators, 4, "Number of validators to initialize the testnet with")
 	cmd.Flags().StringP(flagOutputDir, "o", "./.testnets", "Directory to store initialization data for the testnet")
 	cmd.Flags().String(flags.FlagChainID, "", "genesis file chain-id, if left blank will be randomly created")
-	cmd.Flags().String(server.FlagMinGasPrices, fmt.Sprintf("0.000006%s", "ulume"), "Minimum gas prices to accept for transactions; All fees in a tx must meet this minimum (e.g. 0.01photino,0.001stake)")
+	cmd.Flags().String(server.FlagMinGasPrices, fmt.Sprintf("0.000006%s", lcfg.ChainDenom), "Minimum gas prices to accept for transactions; All fees in a tx must meet this minimum (e.g. 0.01photino,0.001stake)")
 	cmd.Flags().String(flags.FlagKeyType, string(hd.Secp256k1Type), "Key signing algorithm to generate keys for")
 
 	// support old flags name for backwards compatibility
@@ -141,6 +153,8 @@ Example:
 			serverCtx := server.GetServerContextFromCmd(cmd)
 			config := serverCtx.Config
 
+			viper.Set(claimtypes.FlagSkipClaimsCheck, true)
+
 			args := initArgs{}
 			args.outputDir, _ = cmd.Flags().GetString(flagOutputDir)
 			args.keyringBackend, _ = cmd.Flags().GetString(flags.FlagKeyringBackend)
@@ -148,6 +162,7 @@ Example:
 			args.minGasPrices, _ = cmd.Flags().GetString(server.FlagMinGasPrices)
 			args.nodeDirPrefix, _ = cmd.Flags().GetString(flagNodeDirPrefix)
 			args.nodeDaemonHome, _ = cmd.Flags().GetString(flagNodeDaemonHome)
+			args.disableCleanup, _ = cmd.Flags().GetBool(flagDisableCleanup)
 			args.startingIPAddress, _ = cmd.Flags().GetString(flagStartingIPAddress)
 			args.numValidators, _ = cmd.Flags().GetInt(flagNumValidators)
 			args.algo, _ = cmd.Flags().GetString(flags.FlagKeyType)
@@ -164,6 +179,7 @@ Example:
 	addTestnetFlagsToCmd(cmd)
 	cmd.Flags().String(flagNodeDirPrefix, "node", "Prefix the directory name for each node with (node results in node0, node1, ...)")
 	cmd.Flags().String(flagNodeDaemonHome, version.AppName, "Home directory of the node's daemon configuration")
+	cmd.Flags().Bool(flagDisableCleanup, false, "Disable cleanup of output directory if initialization fails")
 	cmd.Flags().String(flagStartingIPAddress, "192.168.0.1", "Starting IP address (192.168.0.1 results in persistent peers list ID0@192.168.0.1:46656, ID1@192.168.0.2:46656, ...)")
 	cmd.Flags().String(flags.FlagKeyringBackend, flags.DefaultKeyringBackend, "Select keyring's backend (os|file|test)")
 	cmd.Flags().Duration(flagCommitTimeout, 5*time.Second, "Time to wait after a block commit before starting on the new height")
@@ -240,6 +256,7 @@ func initTestnetFiles(
 		genAccounts []authtypes.GenesisAccount
 		genBalances []banktypes.Balance
 		genFiles    []string
+		isSucceeded bool = false
 	)
 	const (
 		rpcPort  = 26657
@@ -249,6 +266,7 @@ func initTestnetFiles(
 	p2pPortStart := 26656
 
 	inBuf := bufio.NewReader(cmd.InOrStdin())
+	cmd.Printf("Initializing %d node directories in %s with chain ID %s\n", args.numValidators, args.outputDir, args.chainID)
 	// generate private keys, node IDs, and initial transactions
 	for i := 0; i < args.numValidators; i++ {
 		var portOffset int
@@ -272,20 +290,57 @@ func initTestnetFiles(
 		appConfig.GRPC.Address = fmt.Sprintf("0.0.0.0:%d", grpcPort+portOffset)
 		appConfig.GRPCWeb.Enable = true
 
-		if err := os.MkdirAll(filepath.Join(nodeDir, "config"), nodeDirPerm); err != nil {
-			_ = os.RemoveAll(args.outputDir)
-			return err
+		// cleanup output directory if node initialization fails
+		defer func() {
+			if !isSucceeded && !args.disableCleanup {
+				cmd.Printf("Cleaning up output directory: %s\n", args.outputDir)
+				// remove the output directory
+				_ = os.RemoveAll(args.outputDir)
+			}
+		}()
+
+		commonConfigDir := filepath.Join(args.outputDir, "config")
+		if _, err := os.Stat(commonConfigDir); os.IsNotExist(err) {
+			// create common config directory if it does not exist
+			if err := os.MkdirAll(commonConfigDir, nodeDirPerm); err != nil {
+				return err
+			}
+			cmd.Printf("Created common config directory: %s\n", commonConfigDir)
 		}
+
+		configDir := filepath.Join(nodeDir, "config")
+		if _, err := os.Stat(configDir); os.IsNotExist(err) {
+			// create node config directory if it does not exist
+			if err := os.MkdirAll(configDir, nodeDirPerm); err != nil {
+				return err
+			}
+			cmd.Printf("Created node #%d config directory: %s\n", i+1, configDir)
+		}
+
+		// if claims.csv file exists in the common config directory, use it
+		// otherwise generate a new one
+		claimsPath := filepath.Join(commonConfigDir, claimtypes.DefaultClaimsFileName)
+		if _, err := os.Stat(claimsPath); os.IsNotExist(err) {
+			// generate a new claims.csv file
+			claimsPath, err = claimtestutils.GenerateNodeClaimingTestData(commonConfigDir)
+			if err != nil {
+				return fmt.Errorf("failed to generate claims CSV file %s: %w", claimsPath, err)
+			}
+			cmd.Printf("Generated claims CSV file: %s\n", claimsPath)
+		}
+		// copy existing claims.csv file to the node's config directory
+		if err := os.Link(claimsPath, filepath.Join(configDir, claimtypes.DefaultClaimsFileName)); err != nil {
+			return fmt.Errorf("failed to link claims CSV file %s: %w", claimsPath, err)
+		}
+		cmd.Printf("Linked claims CSV file to node #%d config directory: %s\n", i+1, filepath.Join(configDir, claimtypes.DefaultClaimsFileName))
 
 		ip, err := getIP(i, args.startingIPAddress)
 		if err != nil {
-			_ = os.RemoveAll(args.outputDir)
 			return err
 		}
 
 		nodeIDs[i], valPubKeys[i], err = genutil.InitializeNodeValidatorFiles(nodeConfig)
 		if err != nil {
-			_ = os.RemoveAll(args.outputDir)
 			return err
 		}
 
@@ -305,7 +360,6 @@ func initTestnetFiles(
 
 		addr, secret, err := testutil.GenerateSaveCoinKey(kb, nodeDirName, "", true, algo)
 		if err != nil {
-			_ = os.RemoveAll(args.outputDir)
 			return err
 		}
 
@@ -322,8 +376,7 @@ func initTestnetFiles(
 		}
 
 		accTokens := sdk.TokensFromConsensusPower(1000, sdk.DefaultPowerReduction)
-		coins := sdk.Coins{
-			sdk.NewCoin("ulume", accTokens)}
+		coins := sdk.Coins{sdk.NewCoin(lcfg.ChainDenom, accTokens)}
 
 		genBalances = append(genBalances, banktypes.Balance{Address: addr.String(), Coins: coins.Sort()})
 		genAccounts = append(genAccounts, authtypes.NewBaseAccount(addr, nil, 0, 0))
@@ -336,7 +389,7 @@ func initTestnetFiles(
 		createValMsg, err := stakingtypes.NewMsgCreateValidator(
 			valStr,
 			valPubKeys[i],
-			sdk.NewCoin("ulume", valTokens),
+			sdk.NewCoin(lcfg.ChainDenom, valTokens),
 			stakingtypes.NewDescription(nodeDirName, "", "", "", ""),
 			stakingtypes.NewCommissionRates(math.LegacyOneDec(), math.LegacyOneDec(), math.LegacyOneDec()),
 			math.OneInt(),
@@ -352,8 +405,7 @@ func initTestnetFiles(
 
 		txBuilder.SetMemo(memo)
 
-		txFactory := tx.Factory{}
-		txFactory = txFactory.
+		txFactory := tx.Factory{}.
 			WithChainID(args.chainID).
 			WithMemo(memo).
 			WithKeybase(kb).
@@ -374,6 +426,7 @@ func initTestnetFiles(
 
 		srvconfig.SetConfigTemplate(srvconfig.DefaultConfigTemplate)
 		srvconfig.WriteConfigFile(filepath.Join(nodeDir, "config", "app.toml"), appConfig)
+		cmd.Printf("Initialized node #%d with ID %s and public key %s\n", i+1, nodeIDs[i], valPubKeys[i].String())
 	}
 
 	if err := initGenFiles(clientCtx, mbm, args.chainID, genAccounts, genBalances, genFiles, args.numValidators); err != nil {
@@ -389,7 +442,8 @@ func initTestnetFiles(
 		return err
 	}
 
-	cmd.PrintErrf("Successfully initialized %d node directories\n", args.numValidators)
+	isSucceeded = true
+	cmd.Printf("Successfully initialized %d nodes\n", args.numValidators)
 	return nil
 }
 
@@ -399,6 +453,47 @@ func initGenFiles(
 	genFiles []string, numValidators int,
 ) error {
 	appGenState := mbm.DefaultGenesis(clientCtx.Codec)
+
+	// set bond_denom in staking module
+	var stakingGenState stakingtypes.GenesisState
+	clientCtx.Codec.MustUnmarshalJSON(appGenState[stakingtypes.ModuleName], &stakingGenState)
+	stakingGenState.Params.BondDenom = lcfg.ChainDenom
+	appGenState[stakingtypes.ModuleName] = clientCtx.Codec.MustMarshalJSON(&stakingGenState)
+
+	// set mint_denom in mint module
+	var mintGenState minttypes.GenesisState
+	clientCtx.Codec.MustUnmarshalJSON(appGenState[minttypes.ModuleName], &mintGenState)
+	mintGenState.Params.MintDenom = lcfg.ChainDenom
+	appGenState[minttypes.ModuleName] = clientCtx.Codec.MustMarshalJSON(&mintGenState)
+
+	rewriteCoins := func(coins []sdk.Coin) []sdk.Coin {
+		if len(coins) == 0 {
+			return coins
+		}
+		updated := make([]sdk.Coin, len(coins))
+		for i, coin := range coins {
+			updated[i] = sdk.NewCoin(lcfg.ChainDenom, coin.Amount)
+		}
+		return updated
+	}
+
+	// ensure governance deposits reference the chain denom
+	var govGenState govv1.GenesisState
+	clientCtx.Codec.MustUnmarshalJSON(appGenState[govtypes.ModuleName], &govGenState)
+	if params := govGenState.Params; params != nil {
+		params.MinDeposit = rewriteCoins(params.MinDeposit)
+		params.ExpeditedMinDeposit = rewriteCoins(params.ExpeditedMinDeposit)
+		govGenState.Params = params
+	}
+	appGenState[govtypes.ModuleName] = clientCtx.Codec.MustMarshalJSON(&govGenState)
+
+	// set the crisis module constant fee denom
+	var crisisGenState crisistypes.GenesisState
+	clientCtx.Codec.MustUnmarshalJSON(appGenState[crisistypes.ModuleName], &crisisGenState)
+	if crisisGenState.ConstantFee.Amount.IsPositive() || crisisGenState.ConstantFee.Denom != "" {
+		crisisGenState.ConstantFee = sdk.NewCoin(lcfg.ChainDenom, crisisGenState.ConstantFee.Amount)
+	}
+	appGenState[crisistypes.ModuleName] = clientCtx.Codec.MustMarshalJSON(&crisisGenState)
 
 	// set the accounts in the genesis state
 	var authGenState authtypes.GenesisState
@@ -419,6 +514,30 @@ func initGenFiles(
 	bankGenState.Balances = banktypes.SanitizeGenesisBalances(genBalances)
 	for _, bal := range bankGenState.Balances {
 		bankGenState.Supply = bankGenState.Supply.Add(bal.Coins...)
+	}
+
+	// ensure denom metadata describes the chain denom for clients
+	displayDenom := strings.TrimPrefix(lcfg.ChainDenom, "u")
+	metadata := banktypes.Metadata{
+		Description: "The native token of the Lumera network.",
+		DenomUnits: []*banktypes.DenomUnit{
+			{Denom: lcfg.ChainDenom, Exponent: 0},
+			{Denom: displayDenom, Exponent: 6},
+		},
+		Base:    lcfg.ChainDenom,
+		Display: displayDenom,
+		Name:    strings.ToUpper(displayDenom),
+		Symbol:  strings.ToUpper(displayDenom),
+	}
+	metadataUpdated := false
+	for i, md := range bankGenState.DenomMetadata {
+		if md.Base == lcfg.ChainDenom || md.Base == sdk.DefaultBondDenom {
+			bankGenState.DenomMetadata[i] = metadata
+			metadataUpdated = true
+		}
+	}
+	if !metadataUpdated {
+		bankGenState.DenomMetadata = append(bankGenState.DenomMetadata, metadata)
 	}
 	appGenState[banktypes.ModuleName] = clientCtx.Codec.MustMarshalJSON(&bankGenState)
 

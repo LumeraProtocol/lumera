@@ -1,0 +1,100 @@
+syntax = "proto3";
+package lumera.supernode.v1;
+
+option go_package = "x/supernode/v1/types";
+
+import "amino/amino.proto";
+import "gogoproto/gogo.proto";
+import "google/api/annotations.proto";
+import "cosmos/base/query/v1beta1/pagination.proto";
+import "lumera/supernode/v1/params.proto";
+import "lumera/supernode/v1/super_node.proto";
+import "lumera/supernode/v1/supernode_state.proto";
+
+// Query defines the gRPC querier service.
+service Query {
+  
+  // Parameters queries the parameters of the module.
+  rpc Params (QueryParamsRequest) returns (QueryParamsResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/supernode/v1/params";
+  
+  }
+  
+  // Queries a SuperNode by validatorAddress.
+  rpc GetSuperNode (QueryGetSuperNodeRequest) returns (QueryGetSuperNodeResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/supernode/v1/get_super_node/{validatorAddress}";
+  
+  }
+
+  // Queries a SuperNode by supernodeAddress.
+  rpc GetSuperNodeBySuperNodeAddress (QueryGetSuperNodeBySuperNodeAddressRequest) returns (QueryGetSuperNodeBySuperNodeAddressResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/supernode/v1/get_super_node_by_address/{supernodeAddress}";
+  
+  }
+  
+  // Queries a list of SuperNodes.
+  rpc ListSuperNodes (QueryListSuperNodesRequest) returns (QueryListSuperNodesResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/supernode/v1/list_super_nodes";
+  
+  }
+  
+  // Queries a list of GetTopSuperNodesForBlock items.
+  rpc GetTopSuperNodesForBlock (QueryGetTopSuperNodesForBlockRequest) returns (QueryGetTopSuperNodesForBlockResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/supernode/v1/get_top_super_nodes_for_block/{blockHeight}";
+  
+  }
+}
+
+// QueryParamsRequest is request type for the Query/Params RPC method.
+message QueryParamsRequest {}
+
+// QueryParamsResponse is response type for the Query/Params RPC method.
+message QueryParamsResponse {
+  
+  // params holds all the parameters of this module.
+  Params params = 1 [(gogoproto.nullable) = false, (amino.dont_omitempty) = true];
+}
+
+// QueryGetSuperNodeRequest is request type for the Query/GetSuperNode RPC method.
+message QueryGetSuperNodeRequest {
+  string validatorAddress = 1;
+}
+
+// QueryGetSuperNodeResponse is response type for the Query/GetSuperNode RPC method.
+message QueryGetSuperNodeResponse {
+  SuperNode supernode = 1;
+}
+
+// QueryGetSuperNodeBySuperNodeAddressRequest is request type for the Query/GetSuperNodeBySuperNodeAddress RPC method.
+message QueryGetSuperNodeBySuperNodeAddressRequest {
+  string supernodeAddress = 1;
+}
+
+// QueryGetSuperNodeBySuperNodeAddressResponse is response type for the Query/GetSuperNodeBySuperNodeAddress RPC method.
+message QueryGetSuperNodeBySuperNodeAddressResponse {
+  SuperNode supernode = 1;
+}
+
+// QueryListSuperNodesRequest is request type for the Query/ListSuperNodes RPC method.
+message QueryListSuperNodesRequest {
+  cosmos.base.query.v1beta1.PageRequest pagination = 1;
+}
+
+// QueryListSuperNodesResponse is response type for the Query/ListSuperNodes RPC method.
+message QueryListSuperNodesResponse {
+  repeated SuperNode supernodes = 1;
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+// QueryGetTopSuperNodesForBlockRequest is request type for the Query/GetTopSuperNodesForBlock RPC method.
+message QueryGetTopSuperNodesForBlockRequest {
+  int32 blockHeight = 1;
+  int32 limit = 2;
+  string state = 3 [(gogoproto.moretags) = "yaml:\"state\""];
+}
+
+// QueryGetTopSuperNodesForBlockResponse is response type for the Query/GetTopSuperNodesForBlock RPC method.
+message QueryGetTopSuperNodesForBlockResponse {
+  repeated SuperNode supernodes = 1;
+}
+

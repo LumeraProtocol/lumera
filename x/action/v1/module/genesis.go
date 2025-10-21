@@ -4,15 +4,15 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
-	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
-
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+
+	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
+	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 )
 
 // InitGenesis initializes the module's state from a provided genesis state.
-func InitGenesis(ctx sdk.Context, k keeper.Keeper, genState types2.GenesisState) {
+func InitGenesis(ctx sdk.Context, k keeper.Keeper, genState types.GenesisState) {
 	err := genState.Validate()
 	if err != nil {
 		panic(fmt.Sprintf("failed to validate genesis state: %s", err))
@@ -29,25 +29,26 @@ func InitGenesis(ctx sdk.Context, k keeper.Keeper, genState types2.GenesisState)
 }
 
 func initModuleAccount(ctx context.Context, k keeper.Keeper) error {
-	accountKeeper := k.GetAccountKeeper()
-	acc := accountKeeper.GetModuleAccount(ctx, types2.ModuleName)
+	authKeeper := k.GetAuthKeeper()
+	acc := authKeeper.GetModuleAccount(ctx, types.ModuleName)
 	if acc != nil {
 		return nil // Module account already exists
 	}
 
 	moduleAcc := authtypes.NewEmptyModuleAccount(
-		types2.ModuleName,
+		types.ModuleName,
 		authtypes.Minter,
 		authtypes.Burner,
 	)
 
-	accountKeeper.SetModuleAccount(ctx, moduleAcc)
+	authKeeper.SetModuleAccount(ctx, moduleAcc)
 	return nil
 }
 
 // ExportGenesis returns the module's exported genesis.
-func ExportGenesis(ctx sdk.Context, k keeper.Keeper) *types2.GenesisState {
-	genesis := types2.DefaultGenesis()
+func ExportGenesis(ctx sdk.Context, k keeper.Keeper) (*types.GenesisState) {
+
+	genesis := types.DefaultGenesis()
 	genesis.Params = k.GetParams(ctx)
 
 	// this line is used by starport scaffolding # genesis/module/export

@@ -1,7 +1,8 @@
 syntax = "proto3";
 package lumera.claim;
 
-option go_package = "github.com/LumeraProtocol/lumera/x/claim/types";
+option go_package = "x/claim/types";
+
 import "gogoproto/gogo.proto";
 import "cosmos/base/v1beta1/coin.proto";
 import "amino/amino.proto";
@@ -9,6 +10,7 @@ import "google/protobuf/timestamp.proto";
 import "cosmos_proto/cosmos.proto";
 
 
+// ClaimRecord represents a record of a claim made by a user.
 message ClaimRecord {
   string oldAddress = 1;
   repeated cosmos.base.v1beta1.Coin balance = 2 [
@@ -17,8 +19,11 @@ message ClaimRecord {
     (gogoproto.castrepeated) = "github.com/cosmos/cosmos-sdk/types.Coins",
     (amino.encoding) = "legacy_coins"
   ];
-  bool claimed = 3 [(gogoproto.jsontag) = "claimed", (amino.dont_omitempty) = true];
-  int64 claimTime = 4 ;
+  bool claimed = 3 [
+    (gogoproto.jsontag) = "claimed",
+    (amino.dont_omitempty) = true
+  ];
+  int64 claimTime = 4;
   string destAddress = 5 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
   uint32 vestedTier = 6 [(gogoproto.jsontag) = "vestedTier"];
 }

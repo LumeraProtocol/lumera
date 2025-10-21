@@ -2,22 +2,20 @@ package keeper_test
 
 import (
 	"testing"
-
-	keeper2 "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
-	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	"bytes"
 
 	"github.com/stretchr/testify/suite"
 
-	"google.golang.org/protobuf/encoding/protojson"
-
-	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
+	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
+	"github.com/LumeraProtocol/lumera/x/action/v1/types"
+	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/gogoproto/jsonpb"
 )
 
 type MsgServerTestSuite struct {
-	suite.Suite
-	KeeperTestSuiteConfig
-	msgServer types2.MsgServer
+	KeeperTestSuite
+	msgServer types.MsgServer
 }
 
 func TestMsgServerTestSuite(t *testing.T) {
@@ -25,8 +23,8 @@ func TestMsgServerTestSuite(t *testing.T) {
 }
 
 func (suite *MsgServerTestSuite) SetupTest() {
-	suite.SetupTestSuite(&suite.Suite)
-	suite.msgServer = keeper2.NewMsgServerImpl(suite.keeper)
+	suite.KeeperTestSuite.SetupTest()
+	suite.msgServer = keeper.NewMsgServerImpl(suite.keeper)
 }
 
 func (suite *MsgServerTestSuite) TestMsgServer() {
@@ -38,7 +36,7 @@ func (suite *MsgServerTestSuite) TestMsgServer() {
 // TestMsgServerDirectly tests basic keeper functionality
 func (suite *MsgServerTestSuite) TestMsgServerDirectly() {
 	// Test setting params
-	params := types2.DefaultParams()
+	params := types.DefaultParams()
 	err := suite.keeper.SetParams(suite.ctx, params)
 	suite.NoError(err)
 
@@ -50,13 +48,13 @@ func (suite *MsgServerTestSuite) TestMsgServerDirectly() {
 // TestValidateContractsImplementation verifies the keeper implements required interfaces
 func (suite *MsgServerTestSuite) TestValidateContractsImplementation() {
 	// Verify the keeper implements the ActionRegistrar interface
-	var _ keeper2.ActionRegistrar = &suite.keeper
+	var _ keeper.ActionRegistrar = &suite.keeper
 
 	// Verify the keeper implements the ActionFinalizer interface
-	var _ keeper2.ActionFinalizer = &suite.keeper
+	var _ keeper.ActionFinalizer = &suite.keeper
 
 	// Verify the keeper implements the ActionApprover interface
-	var _ keeper2.ActionApprover = &suite.keeper
+	var _ keeper.ActionApprover = &suite.keeper
 }
 
 // TestKeeperEventEmission tests event emission by the keeper
@@ -66,7 +64,7 @@ func (suite *MsgServerTestSuite) TestKeeperEventEmission() {
 	suite.ctx = suite.ctx.WithEventManager(sdk.NewEventManager())
 
 	// Create sense metadata
-	senseMetadata := &actionapi.SenseMetadata{
+	senseMetadata := &actiontypes.SenseMetadata{
 		DataHash:             "test_hash",
 		DdAndFingerprintsMax: 10,
 		DdAndFingerprintsIc:  5,
@@ -76,13 +74,14 @@ func (suite *MsgServerTestSuite) TestKeeperEventEmission() {
 	metadataBytes, err := suite.keeper.GetCodec().Marshal(senseMetadata)
 	suite.NoError(err)
 
+	testPrice := sdk.NewInt64Coin("ulume", 100000)
 	// Create a test action with embedded metadata
-	action := &actionapi.Action{
+	action := &actiontypes.Action{
 		Creator:     suite.creatorAddress.String(),
-		ActionType:  actionapi.ActionType_ACTION_TYPE_SENSE,
-		Price:       "100000ulume",
+		ActionType:  types.ActionTypeSense,
+		Price:       &testPrice,
 		BlockHeight: suite.ctx.BlockHeight(),
-		State:       actionapi.ActionState_ACTION_STATE_PENDING,
+		State:       actiontypes.ActionStatePending,
 		Metadata:    metadataBytes,
 	}
 
@@ -96,7 +95,7 @@ func (suite *MsgServerTestSuite) TestKeeperEventEmission() {
 	// Verify event was emitted
 	found := false
 	for _, event := range events {
-		if event.Type == types2.EventTypeActionRegistered {
+		if event.Type == types.EventTypeActionRegistered {
 			found = true
 			break
 		}
@@ -110,23 +109,25 @@ func (suite *MsgServerTestSuite) TestMsgRequestAction() {
 }
 
 func (suite *MsgServerTestSuite) registerCascadeAction() string {
-	cascadeMetadata := actionapi.CascadeMetadata{
+	cascadeMetadata := types.CascadeMetadata{
 		DataHash:   "test_hash",
 		FileName:   "test_file",
 		RqIdsIc:    20,
 		Signatures: suite.signatureCascade,
 	}
 
-	// Convert to JSON using encoding/json
-	cascadeMetadataBytes, err := protojson.Marshal(&cascadeMetadata)
+	// Convert to JSON using jsonpb	
+	var cascadeMetadataBytes bytes.Buffer
+	marshaler := &jsonpb.Marshaler{}
+	err := marshaler.Marshal(&cascadeMetadataBytes, &cascadeMetadata)
 	suite.NoError(err)
 
 	// Create a RequestAction message
-	msg := types2.MsgRequestAction{
+	msg := types.MsgRequestAction{
 		Creator:    suite.creatorAddress.String(),
 		ActionType: "CASCADE",
 		Price:      "100000ulume",
-		Metadata:   string(cascadeMetadataBytes),
+		Metadata:   cascadeMetadataBytes.String(),
 	}
 
 	// Execute the message
@@ -140,33 +141,36 @@ func (suite *MsgServerTestSuite) registerCascadeAction() string {
 	// Verify the response
 	suite.Equal(res.ActionId, action.ActionID, "Action ID in response does not match the registered action")
 	// Check the status of the action
-	suite.Equal(actionapi.ActionState_ACTION_STATE_PENDING.String(), res.Status,
+	suite.Equal(actiontypes.ActionStatePending.String(), res.Status,
 		"Expected action status to be PENDING, got %s", res.Status)
 	// Verify the action's creator
 	suite.Equal(suite.creatorAddress.String(), action.Creator,
 		"Expected action creator to be %s, got %s", suite.creatorAddress.String(), action.Creator)
 	// Verify the action type
-	suite.Equal(actionapi.ActionType_ACTION_TYPE_CASCADE, action.ActionType,
-		"Expected action type to be %s, got %s", actionapi.ActionType_ACTION_TYPE_CASCADE, action.ActionType)
+	suite.Equal(types.ActionTypeCascade, action.ActionType,
+		"Expected action type to be %s, got %s", types.ActionTypeCascade, action.ActionType)
 
 	return res.ActionId
 }
+
 func (suite *MsgServerTestSuite) registerSenseAction() string {
-	senseMetadata := actionapi.SenseMetadata{
+	senseMetadata := types.SenseMetadata{
 		DataHash:            "test_hash",
 		DdAndFingerprintsIc: suite.ic,
 	}
 
-	// Convert to JSON using encoding/json
-	senseMetadataBytes, err := protojson.Marshal(&senseMetadata)
+	// Convert to JSON using jsonpb
+	marshaller := &jsonpb.Marshaler{}
+	var senseMetadataBytes bytes.Buffer
+	err := marshaller.Marshal(&senseMetadataBytes, &senseMetadata)
 	suite.NoError(err)
 
 	// Create a RequestAction message
-	msg := types2.MsgRequestAction{
+	msg := types.MsgRequestAction{
 		Creator:    suite.creatorAddress.String(),
 		ActionType: "SENSE",
 		Price:      "100000ulume",
-		Metadata:   string(senseMetadataBytes),
+		Metadata:   senseMetadataBytes.String(),
 	}
 
 	// Execute the message
@@ -180,20 +184,22 @@ func (suite *MsgServerTestSuite) registerSenseAction() string {
 	// Verify the response
 	suite.Equal(res.ActionId, action.ActionID, "Action ID in response does not match the registered action")
 	// Check the status of the action
-	suite.Equal(actionapi.ActionState_ACTION_STATE_PENDING.String(), res.Status,
+	suite.Equal(actiontypes.ActionStatePending.String(), res.Status,
 		"Expected action status to be PENDING, got %s", res.Status)
 	// Verify the action's creator
 	suite.Equal(suite.creatorAddress.String(), action.Creator,
 		"Expected action creator to be %s, got %s", suite.creatorAddress.String(), action.Creator)
 	// Verify the action type
-	suite.Equal(actionapi.ActionType_ACTION_TYPE_SENSE, action.ActionType,
-		"Expected action type to be %s, got %s", actionapi.ActionType_ACTION_TYPE_SENSE, action.ActionType)
+	suite.Equal(actiontypes.ActionTypeSense, action.ActionType,
+		"Expected action type to be %s, got %s", actiontypes.ActionTypeSense, action.ActionType)
 
 	return res.ActionId
 }
 
 // TestMsgFinalizeAction tests the FinalizeAction message handler
 func (suite *MsgServerTestSuite) TestMsgFinalizeAction() {
+	suite.setupExpectationsGetAllTopSNs(1)
+	
 	actionID := suite.registerCascadeAction()
 	suite.finalizeCascadeAction(actionID)
 }
@@ -201,24 +207,27 @@ func (suite *MsgServerTestSuite) TestMsgFinalizeAction() {
 func (suite *MsgServerTestSuite) finalizeCascadeAction(actionID string) {
 	var validIDs []string
 	for i := suite.ic; i < suite.ic+50; i++ { // 50 is default value for MaxDdAndFingerprints
-		id, err := keeper2.CreateKademliaID(suite.signatureCascade, i)
+		id, err := keeper.CreateKademliaID(suite.signatureCascade, i)
 		suite.Require().NoError(err)
 		validIDs = append(validIDs, id)
 	}
 
-	finalizeMetadata := actionapi.CascadeMetadata{
+	finalizeMetadata := actiontypes.CascadeMetadata{
 		RqIdsIds: validIDs,
 	}
 
-	finalizeMetadataBytes, err := protojson.Marshal(&finalizeMetadata)
+	// Convert to JSON using jsonpb
+	marshaller := &jsonpb.Marshaler{}
+	var finalizeMetadataBytes bytes.Buffer
+	err := marshaller.Marshal(&finalizeMetadataBytes, &finalizeMetadata)
 	suite.NoError(err)
 
 	// Create FinalizeAction message
-	msgFinal := types2.MsgFinalizeAction{
+	msgFinal := types.MsgFinalizeAction{
 		Creator:    suite.supernodes[0].SupernodeAccount,
 		ActionId:   actionID,
 		ActionType: "CASCADE",
-		Metadata:   string(finalizeMetadataBytes),
+		Metadata:   finalizeMetadataBytes.String(),
 	}
 
 	resFinal, err := suite.msgServer.FinalizeAction(suite.ctx, &msgFinal)
@@ -229,30 +238,34 @@ func (suite *MsgServerTestSuite) finalizeCascadeAction(actionID string) {
 	suite.True(foundFinal, "action not found")
 
 	suite.Equal(actionFinal.ActionID, actionID)
-	suite.Equal(actionFinal.State, actionapi.ActionState_ACTION_STATE_DONE)
+	suite.Equal(actionFinal.State, actiontypes.ActionStateDone)
 }
-func (suite *MsgServerTestSuite) finalizeSenseAction(actionID string, superNode string, actionState actionapi.ActionState) {
+
+func (suite *MsgServerTestSuite) finalizeSenseAction(actionID string, superNode string, actionState actiontypes.ActionState) {
 	var validIDs []string
 	for i := suite.ic; i < suite.ic+50; i++ { // 50 is default value for MaxDdAndFingerprints
-		id, err := keeper2.CreateKademliaID(suite.signatureSense, i)
+		id, err := keeper.CreateKademliaID(suite.signatureSense, i)
 		suite.Require().NoError(err)
 		validIDs = append(validIDs, id)
 	}
 
-	finalizeMetadata := actionapi.SenseMetadata{
+	finalizeMetadata := actiontypes.SenseMetadata{
 		DdAndFingerprintsIds: validIDs,
 		Signatures:           suite.signatureSense,
 	}
 
-	finalizeMetadataBytes, err := protojson.Marshal(&finalizeMetadata)
+	// Convert to JSON using jsonpb
+	marshaller := &jsonpb.Marshaler{}
+	var finalizeMetadataBytes bytes.Buffer
+	err := marshaller.Marshal(&finalizeMetadataBytes, &finalizeMetadata)
 	suite.NoError(err)
 
 	// Create FinalizeAction message
-	msgFinal := types2.MsgFinalizeAction{
+	msgFinal := types.MsgFinalizeAction{
 		Creator:    superNode,
 		ActionId:   actionID,
 		ActionType: "SENSE",
-		Metadata:   string(finalizeMetadataBytes),
+		Metadata:   finalizeMetadataBytes.String(),
 	}
 
 	resFinal, err := suite.msgServer.FinalizeAction(suite.ctx, &msgFinal)
@@ -266,31 +279,34 @@ func (suite *MsgServerTestSuite) finalizeSenseAction(actionID string, superNode 
 	suite.Equal(actionFinal.State, actionState)
 }
 
-func (suite *MsgServerTestSuite) makeFinalizeCascadeActionMessage(actionID string, actionType string, superNode string, badMetadata string, rqIdsOtiBad bool, rqIdsBad bool) types2.MsgFinalizeAction {
+func (suite *MsgServerTestSuite) makeFinalizeCascadeActionMessage(actionID string, actionType string, superNode string, badMetadata string, _ bool, rqIdsBad bool) types.MsgFinalizeAction {
 	var validIDs []string
 	if !rqIdsBad {
 		for i := suite.ic; i < suite.ic+50; i++ { // 50 is default value for MaxDdAndFingerprints
-			id, err := keeper2.CreateKademliaID(suite.signatureCascade, i)
+			id, err := keeper.CreateKademliaID(suite.signatureCascade, i)
 			suite.Require().NoError(err)
 			validIDs = append(validIDs, id)
 		}
 	}
 
-	finalizeMetadata := actionapi.CascadeMetadata{
+	finalizeMetadata := actiontypes.CascadeMetadata{
 		RqIdsIds: validIDs,
 	}
 
-	finalizeMetadataBytes, err := protojson.Marshal(&finalizeMetadata)
+	// Convert to JSON using jsonpb
+	marshaller := &jsonpb.Marshaler{}
+	var finalizeMetadataBytes bytes.Buffer
+	err := marshaller.Marshal(&finalizeMetadataBytes, &finalizeMetadata)
 	suite.NoError(err)
 
 	var metadata string
 	if badMetadata != "" {
 		metadata = badMetadata
 	} else {
-		metadata = string(finalizeMetadataBytes)
+		metadata = finalizeMetadataBytes.String()
 	}
 
-	return types2.MsgFinalizeAction{
+	return types.MsgFinalizeAction{
 		Creator:    superNode,
 		ActionId:   actionID,
 		ActionType: actionType,
@@ -301,13 +317,14 @@ func (suite *MsgServerTestSuite) makeFinalizeCascadeActionMessage(actionID strin
 
 // TestMsgApproveAction tests the ApproveAction message handler
 func (suite *MsgServerTestSuite) TestMsgApproveAction() {
+	suite.setupExpectationsGetAllTopSNs(1)
 	actionID := suite.registerCascadeAction()
 	suite.finalizeCascadeAction(actionID)
 	suite.approveAction(actionID, suite.creatorAddress.String())
 }
 
-func (suite *MsgServerTestSuite) approveActionNoCheck(actionID string, creator string) (*types2.MsgApproveActionResponse, error) {
-	msg := types2.MsgApproveAction{
+func (suite *MsgServerTestSuite) approveActionNoCheck(actionID string, creator string) (*types.MsgApproveActionResponse, error) {
+	msg := types.MsgApproveAction{
 		Creator:  creator,
 		ActionId: actionID,
 	}
@@ -328,5 +345,5 @@ func (suite *MsgServerTestSuite) approveAction(actionID string, creator string) 
 	// Verify the action is now in APPROVED state
 	updatedAction, found := suite.keeper.GetActionByID(suite.ctx, actionID)
 	suite.True(found)
-	suite.Equal(actionapi.ActionState_ACTION_STATE_APPROVED, updatedAction.State)
+	suite.Equal(actiontypes.ActionStateApproved, updatedAction.State)
 }

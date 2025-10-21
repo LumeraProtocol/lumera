@@ -1,7 +1,7 @@
 package keeper
 
 import (
-	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
+	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 )
 
 // InitializeActionRegistry sets up the action registry with default handlers
@@ -9,8 +9,8 @@ func (k *Keeper) InitializeActionRegistry() *ActionRegistry {
 	registry := NewActionRegistry(k)
 
 	// Register handlers for existing action types
-	registry.RegisterHandler(actionapi.ActionType_ACTION_TYPE_SENSE, NewSenseActionHandler(k))
-	registry.RegisterHandler(actionapi.ActionType_ACTION_TYPE_CASCADE, NewCascadeActionHandler(k))
+	registry.RegisterHandler(actiontypes.ActionTypeSense, NewSenseActionHandler(k))
+	registry.RegisterHandler(actiontypes.ActionTypeCascade, NewCascadeActionHandler(k))
 
 	return registry
 }

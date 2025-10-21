@@ -3,41 +3,39 @@ package keeper_test
 import (
 	"fmt"
 
-	keeper2 "github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
-	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
 	"context"
 	"errors"
 	"testing"
 
-	"github.com/cosmos/cosmos-sdk/types/query"
-
 	sdkmath "cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-
+	"github.com/cosmos/cosmos-sdk/types/query"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
 )
 
 func TestKeeper_SetAndQuerySuperNode(t *testing.T) {
 	valAddr := sdk.ValAddress([]byte("validator"))
 	anotherValAddr := sdk.ValAddress([]byte("another-validator"))
 
-	supernode := types2.SuperNode{
+	supernode := types.SuperNode{
 		ValidatorAddress: valAddr.String(),
 		SupernodeAccount: sdk.AccAddress(valAddr).String(),
 		Note:             "1.0.0",
-		PrevIpAddresses: []*types2.IPAddressHistory{
+		PrevIpAddresses: []*types.IPAddressHistory{
 			{
-				Address: "1022.145.1.1",
+				Address: "102.145.1.1",
 				Height:  1,
 			},
 		},
-		States: []*types2.SuperNodeStateRecord{
+		States: []*types.SuperNodeStateRecord{
 			{
-				State:  types2.SuperNodeStateActive,
+				State:  types.SuperNodeStateActive,
 				Height: 1,
 			},
 		},
@@ -46,17 +44,17 @@ func TestKeeper_SetAndQuerySuperNode(t *testing.T) {
 
 	testCases := []struct {
 		name        string
-		setupState  func(k keeper2.Keeper, ctx sdk.Context)
-		run         func(k keeper2.Keeper, ctx sdk.Context) (interface{}, error)
+		setupState  func(k keeper.Keeper, ctx sdk.Context)
+		run         func(k keeper.Keeper, ctx sdk.Context) (interface{}, error)
 		expectedErr error
-		checkResult func(t *testing.T, k keeper2.Keeper, ctx sdk.Context, result interface{})
+		checkResult func(t *testing.T, k keeper.Keeper, ctx sdk.Context, result interface{})
 	}{
 		{
 			name: "set and query existing supernode",
-			setupState: func(k keeper2.Keeper, ctx sdk.Context) {
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
 				// No pre-state needed
 			},
-			run: func(k keeper2.Keeper, ctx sdk.Context) (interface{}, error) {
+			run: func(k keeper.Keeper, ctx sdk.Context) (interface{}, error) {
 				if err := k.SetSuperNode(ctx, supernode); err != nil {
 					return nil, err
 				}
@@ -67,17 +65,17 @@ func TestKeeper_SetAndQuerySuperNode(t *testing.T) {
 				return got, nil
 			},
 			expectedErr: nil,
-			checkResult: func(t *testing.T, k keeper2.Keeper, ctx sdk.Context, result interface{}) {
-				got := result.(types2.SuperNode)
+			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context, result interface{}) {
+				got := result.(types.SuperNode)
 				require.Equal(t, supernode, got)
 			},
 		},
 		{
 			name: "query non-existent supernode",
-			setupState: func(k keeper2.Keeper, ctx sdk.Context) {
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
 				// No supernode set
 			},
-			run: func(k keeper2.Keeper, ctx sdk.Context) (interface{}, error) {
+			run: func(k keeper.Keeper, ctx sdk.Context) (interface{}, error) {
 				got, found := k.QuerySuperNode(ctx, anotherValAddr)
 				if found {
 					return got, fmt.Errorf("found supernode that should not exist")
@@ -85,7 +83,7 @@ func TestKeeper_SetAndQuerySuperNode(t *testing.T) {
 				return nil, nil
 			},
 			expectedErr: nil,
-			checkResult: func(t *testing.T, k keeper2.Keeper, ctx sdk.Context, result interface{}) {
+			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context, result interface{}) {
 				// No result expected, just ensure no error and no supernode found
 			},
 		},
@@ -129,17 +127,17 @@ func TestKeeper_GetAllSuperNodes(t *testing.T) {
 	valAddr2 := sdk.ValAddress([]byte("val2"))
 	accAddr := sdk.AccAddress([]byte("acc1")).String()
 
-	sn1 := types2.SuperNode{
+	sn1 := types.SuperNode{
 		SupernodeAccount: accAddr,
 		ValidatorAddress: valAddr1.String(),
 		Note:             "1.0.0",
-		States: []*types2.SuperNodeStateRecord{
+		States: []*types.SuperNodeStateRecord{
 			{
-				State:  types2.SuperNodeStateActive,
+				State:  types.SuperNodeStateActive,
 				Height: 1, // or any block height, e.g. 1
 			},
 		},
-		PrevIpAddresses: []*types2.IPAddressHistory{
+		PrevIpAddresses: []*types.IPAddressHistory{
 			{
 				Address: "1022.145.1.1",
 				Height:  1,
@@ -148,17 +146,17 @@ func TestKeeper_GetAllSuperNodes(t *testing.T) {
 		P2PPort: "26657",
 	}
 
-	sn2 := types2.SuperNode{
+	sn2 := types.SuperNode{
 		SupernodeAccount: accAddr,
 		ValidatorAddress: valAddr2.String(),
 		Note:             "2.0.0",
-		States: []*types2.SuperNodeStateRecord{
+		States: []*types.SuperNodeStateRecord{
 			{
-				State:  types2.SuperNodeStateActive,
+				State:  types.SuperNodeStateActive,
 				Height: 1,
 			},
 		},
-		PrevIpAddresses: []*types2.IPAddressHistory{
+		PrevIpAddresses: []*types.IPAddressHistory{
 			{
 				Address: "1022.145.1.1",
 				Height:  1,
@@ -169,37 +167,37 @@ func TestKeeper_GetAllSuperNodes(t *testing.T) {
 
 	testCases := []struct {
 		name        string
-		setupState  func(k keeper2.Keeper, ctx sdk.Context)
-		run         func(k keeper2.Keeper, ctx sdk.Context) (interface{}, error)
+		setupState  func(k keeper.Keeper, ctx sdk.Context)
+		run         func(k keeper.Keeper, ctx sdk.Context) (interface{}, error)
 		expectedErr error
-		checkResult func(t *testing.T, k keeper2.Keeper, ctx sdk.Context, result interface{})
+		checkResult func(t *testing.T, k keeper.Keeper, ctx sdk.Context, result interface{})
 	}{
 		{
 			name: "no supernodes",
-			setupState: func(k keeper2.Keeper, ctx sdk.Context) {
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
 				// no setup => store is empty
 			},
-			run: func(k keeper2.Keeper, ctx sdk.Context) (interface{}, error) {
+			run: func(k keeper.Keeper, ctx sdk.Context) (interface{}, error) {
 				return k.GetAllSuperNodes(ctx)
 			},
 			expectedErr: nil,
-			checkResult: func(t *testing.T, k keeper2.Keeper, ctx sdk.Context, result interface{}) {
-				snList := result.([]types2.SuperNode)
+			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context, result interface{}) {
+				snList := result.([]types.SuperNode)
 				require.Empty(t, snList)
 			},
 		},
 		{
 			name: "multiple supernodes",
-			setupState: func(k keeper2.Keeper, ctx sdk.Context) {
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
 				require.NoError(t, k.SetSuperNode(ctx, sn1))
 				require.NoError(t, k.SetSuperNode(ctx, sn2))
 			},
-			run: func(k keeper2.Keeper, ctx sdk.Context) (interface{}, error) {
+			run: func(k keeper.Keeper, ctx sdk.Context) (interface{}, error) {
 				return k.GetAllSuperNodes(ctx)
 			},
 			expectedErr: nil,
-			checkResult: func(t *testing.T, k keeper2.Keeper, ctx sdk.Context, result interface{}) {
-				snList := result.([]types2.SuperNode)
+			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context, result interface{}) {
+				snList := result.([]types.SuperNode)
 				require.Len(t, snList, 2)
 				// Check both present
 				foundVal1, foundVal2 := false, false
@@ -217,59 +215,59 @@ func TestKeeper_GetAllSuperNodes(t *testing.T) {
 		},
 		{
 			name: "filter by state - only active",
-			setupState: func(k keeper2.Keeper, ctx sdk.Context) {
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
 				sn2Updated := sn2
-				sn2Updated.States = append(sn2Updated.States, &types2.SuperNodeStateRecord{
-					State:  types2.SuperNodeStateDisabled,
+				sn2Updated.States = append(sn2Updated.States, &types.SuperNodeStateRecord{
+					State:  types.SuperNodeStateDisabled,
 					Height: 2, // so the last state is Disabled
 				})
 
 				require.NoError(t, k.SetSuperNode(ctx, sn1))
 				require.NoError(t, k.SetSuperNode(ctx, sn2Updated))
 			},
-			run: func(k keeper2.Keeper, ctx sdk.Context) (interface{}, error) {
+			run: func(k keeper.Keeper, ctx sdk.Context) (interface{}, error) {
 				// Only return active supernodes
-				return k.GetAllSuperNodes(ctx, types2.SuperNodeStateActive)
+				return k.GetAllSuperNodes(ctx, types.SuperNodeStateActive)
 			},
 			expectedErr: nil,
-			checkResult: func(t *testing.T, k keeper2.Keeper, ctx sdk.Context, result interface{}) {
-				snList := result.([]types2.SuperNode)
+			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context, result interface{}) {
+				snList := result.([]types.SuperNode)
 				require.Len(t, snList, 1)
 				require.Equal(t, sn1.ValidatorAddress, snList[0].ValidatorAddress)
 			},
 		},
 		{
 			name: "filter by state - unspecified (no filter)",
-			setupState: func(k keeper2.Keeper, ctx sdk.Context) {
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
 				require.NoError(t, k.SetSuperNode(ctx, sn1))
 				require.NoError(t, k.SetSuperNode(ctx, sn2))
 			},
-			run: func(k keeper2.Keeper, ctx sdk.Context) (interface{}, error) {
+			run: func(k keeper.Keeper, ctx sdk.Context) (interface{}, error) {
 				// Unspecified means no filtering
-				return k.GetAllSuperNodes(ctx, types2.SuperNodeStateUnspecified)
+				return k.GetAllSuperNodes(ctx, types.SuperNodeStateUnspecified)
 			},
 			expectedErr: nil,
-			checkResult: func(t *testing.T, k keeper2.Keeper, ctx sdk.Context, result interface{}) {
-				snList := result.([]types2.SuperNode)
+			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context, result interface{}) {
+				snList := result.([]types.SuperNode)
 				require.Len(t, snList, 2)
 			},
 		},
 		{
 			name: "filter by state - skip non-active",
-			setupState: func(k keeper2.Keeper, ctx sdk.Context) {
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
 				sn2Updated := sn2
-				sn2Updated.States = append(sn2Updated.States, &types2.SuperNodeStateRecord{
-					State:  types2.SuperNodeStateDisabled,
+				sn2Updated.States = append(sn2Updated.States, &types.SuperNodeStateRecord{
+					State:  types.SuperNodeStateDisabled,
 					Height: 2, // so the last state is Disabled
 				})
 				require.NoError(t, k.SetSuperNode(ctx, sn2Updated))
 			},
-			run: func(k keeper2.Keeper, ctx sdk.Context) (interface{}, error) {
-				return k.GetAllSuperNodes(ctx, types2.SuperNodeStateActive)
+			run: func(k keeper.Keeper, ctx sdk.Context) (interface{}, error) {
+				return k.GetAllSuperNodes(ctx, types.SuperNodeStateActive)
 			},
 			expectedErr: nil,
-			checkResult: func(t *testing.T, k keeper2.Keeper, ctx sdk.Context, result interface{}) {
-				snList := result.([]types2.SuperNode)
+			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context, result interface{}) {
+				snList := result.([]types.SuperNode)
 				require.Len(t, snList, 0)
 			},
 		},
@@ -305,26 +303,26 @@ func TestKeeper_GetAllSuperNodes(t *testing.T) {
 }
 
 // We define a helper to create a supernode with an initial state record.
-func makeSuperNodeWithOneState(valIndex int, state types2.SuperNodeState) types2.SuperNode {
+func makeSuperNodeWithOneState(valIndex int, state types.SuperNodeState) types.SuperNode {
 	// Use valIndex to produce a stable unique address
 	valAddr := sdk.ValAddress([]byte(fmt.Sprintf("val%d", valIndex)))
 	accAddr := sdk.AccAddress([]byte(fmt.Sprintf("acc%d", valIndex)))
-	sn := types2.SuperNode{
+	sn := types.SuperNode{
 		ValidatorAddress: valAddr.String(),
 		SupernodeAccount: accAddr.String(),
 		Note:             "1.0.0",
 		// Must have at least one record so we don't skip it
-		States: []*types2.SuperNodeStateRecord{
+		States: []*types.SuperNodeStateRecord{
 			{
-				State:  types2.SuperNodeStateActive, // e.g. Active, Stopped, etc.
-				Height: 1,                           // arbitrary block for the "registration"
+				State:  types.SuperNodeStateActive, // e.g. Active, Stopped, etc.
+				Height: 1,                          // arbitrary block for the "registration"
 			},
 			{
 				State:  state, // e.g. Active, Stopped, etc.
 				Height: 1,     // arbitrary block for the "registration"
 			},
 		},
-		PrevIpAddresses: []*types2.IPAddressHistory{
+		PrevIpAddresses: []*types.IPAddressHistory{
 			{
 				Address: "1022.145.1.1",
 				Height:  1,
@@ -338,74 +336,74 @@ func makeSuperNodeWithOneState(valIndex int, state types2.SuperNodeState) types2
 func TestKeeper_GetSuperNodesPaginated(t *testing.T) {
 	// We'll build a set of 5 supernodes. By default, let's make them all "Active" at Height=1.
 	supernodeCount := 5
-	supernodes := make([]types2.SuperNode, supernodeCount)
+	supernodes := make([]types.SuperNode, supernodeCount)
 	for i := 0; i < supernodeCount; i++ {
-		sn := makeSuperNodeWithOneState(i, types2.SuperNodeStateActive)
+		sn := makeSuperNodeWithOneState(i, types.SuperNodeStateActive)
 		supernodes[i] = sn
 	}
 
 	testCases := []struct {
 		name         string
-		setupState   func(k keeper2.Keeper, ctx sdk.Context)
+		setupState   func(k keeper.Keeper, ctx sdk.Context)
 		pagination   *query.PageRequest
-		stateFilters []types2.SuperNodeState
+		stateFilters []types.SuperNodeState
 		expectedErr  error
-		checkResult  func(t *testing.T, k keeper2.Keeper, ctx sdk.Context, snRes []*types2.SuperNode, pageRes *query.PageResponse)
+		checkResult  func(t *testing.T, k keeper.Keeper, ctx sdk.Context, snRes []*types.SuperNode, pageRes *query.PageResponse)
 	}{
 		{
 			name: "empty store, no results",
-			setupState: func(k keeper2.Keeper, ctx sdk.Context) {
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
 				// no supernodes set => store is empty
 			},
 			pagination:   &query.PageRequest{Limit: 10},
-			stateFilters: []types2.SuperNodeState{}, // no filter
+			stateFilters: []types.SuperNodeState{}, // no filter
 			expectedErr:  nil,
-			checkResult: func(t *testing.T, k keeper2.Keeper, ctx sdk.Context, snRes []*types2.SuperNode, pageRes *query.PageResponse) {
+			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context, snRes []*types.SuperNode, pageRes *query.PageResponse) {
 				require.Empty(t, snRes)
 				require.Nil(t, pageRes.NextKey)
 			},
 		},
 		{
 			name: "less results than limit",
-			setupState: func(k keeper2.Keeper, ctx sdk.Context) {
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
 				// Set fewer supernodes than limit => only 2
 				require.NoError(t, k.SetSuperNode(ctx, supernodes[0]))
 				require.NoError(t, k.SetSuperNode(ctx, supernodes[1]))
 			},
 			pagination:   &query.PageRequest{Limit: 10}, // limit > total supernodes = 2
-			stateFilters: []types2.SuperNodeState{},
+			stateFilters: []types.SuperNodeState{},
 			expectedErr:  nil,
-			checkResult: func(t *testing.T, k keeper2.Keeper, ctx sdk.Context, snRes []*types2.SuperNode, pageRes *query.PageResponse) {
+			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context, snRes []*types.SuperNode, pageRes *query.PageResponse) {
 				require.Len(t, snRes, 2)
 				require.Nil(t, pageRes.NextKey)
 			},
 		},
 		{
 			name: "exact match: limit equals number of supernodes",
-			setupState: func(k keeper2.Keeper, ctx sdk.Context) {
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
 				for _, sn := range supernodes {
 					require.NoError(t, k.SetSuperNode(ctx, sn))
 				}
 			},
 			pagination:   &query.PageRequest{Limit: uint64(supernodeCount)}, // exactly 5
-			stateFilters: []types2.SuperNodeState{},
+			stateFilters: []types.SuperNodeState{},
 			expectedErr:  nil,
-			checkResult: func(t *testing.T, k keeper2.Keeper, ctx sdk.Context, snRes []*types2.SuperNode, pageRes *query.PageResponse) {
+			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context, snRes []*types.SuperNode, pageRes *query.PageResponse) {
 				require.Len(t, snRes, supernodeCount)
 				require.Nil(t, pageRes.NextKey)
 			},
 		},
 		{
 			name: "pagination with multiple pages",
-			setupState: func(k keeper2.Keeper, ctx sdk.Context) {
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
 				for _, sn := range supernodes {
 					require.NoError(t, k.SetSuperNode(ctx, sn))
 				}
 			},
 			pagination:   &query.PageRequest{Limit: 2},
-			stateFilters: []types2.SuperNodeState{},
+			stateFilters: []types.SuperNodeState{},
 			expectedErr:  nil,
-			checkResult: func(t *testing.T, k keeper2.Keeper, ctx sdk.Context, snRes []*types2.SuperNode, pageRes *query.PageResponse) {
+			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context, snRes []*types.SuperNode, pageRes *query.PageResponse) {
 				// first call => 2 results
 				require.Len(t, snRes, 2)
 				require.NotNil(t, pageRes.NextKey)
@@ -431,40 +429,40 @@ func TestKeeper_GetSuperNodesPaginated(t *testing.T) {
 		},
 		{
 			name: "filter by state (only active)",
-			setupState: func(k keeper2.Keeper, ctx sdk.Context) {
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
 				// We'll set 3 as active, 2 as stopped
 				// The first 3 are active, the last 2 become stopped
 				for i := 0; i < supernodeCount; i++ {
 					sn := supernodes[i]
 					if i >= 3 {
 						// override last state to be Stopped
-						sn.States[len(sn.States)-1].State = types2.SuperNodeStateStopped
+						sn.States[len(sn.States)-1].State = types.SuperNodeStateStopped
 					} else {
 						// keep them active
-						sn.States[len(sn.States)-1].State = types2.SuperNodeStateActive
+						sn.States[len(sn.States)-1].State = types.SuperNodeStateActive
 					}
 					require.NoError(t, k.SetSuperNode(ctx, sn))
 				}
 			},
 			pagination:   &query.PageRequest{Limit: 10},
-			stateFilters: []types2.SuperNodeState{types2.SuperNodeStateActive},
+			stateFilters: []types.SuperNodeState{types.SuperNodeStateActive},
 			expectedErr:  nil,
-			checkResult: func(t *testing.T, k keeper2.Keeper, ctx sdk.Context, snRes []*types2.SuperNode, pageRes *query.PageResponse) {
+			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context, snRes []*types.SuperNode, pageRes *query.PageResponse) {
 				// The first 3 are active, the last 2 are stopped => we expect 3
 				require.Len(t, snRes, 3)
 			},
 		},
 		{
 			name: "unspecified in filter (no filtering)",
-			setupState: func(k keeper2.Keeper, ctx sdk.Context) {
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
 				for _, sn := range supernodes {
 					require.NoError(t, k.SetSuperNode(ctx, sn))
 				}
 			},
 			pagination:   &query.PageRequest{Limit: 10},
-			stateFilters: []types2.SuperNodeState{types2.SuperNodeStateUnspecified},
+			stateFilters: []types.SuperNodeState{types.SuperNodeStateUnspecified},
 			expectedErr:  nil,
-			checkResult: func(t *testing.T, k keeper2.Keeper, ctx sdk.Context, snRes []*types2.SuperNode, pageRes *query.PageResponse) {
+			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context, snRes []*types.SuperNode, pageRes *query.PageResponse) {
 				require.Len(t, snRes, supernodeCount) // no filtering, so all 5
 			},
 		},
@@ -515,12 +513,12 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 
 	// Test cases
 	testCases := []struct {
-		name                      string
-		validator                 *stakingtypes.Validator
-		selfDelegationFound       bool
-		selfDelegationShares      sdkmath.LegacyDec
-		setupSupernode            bool
-		supernodeDelegationFound  bool
+		name                 string
+		validator            *stakingtypes.Validator
+		selfDelegationFound  bool
+		selfDelegationShares sdkmath.LegacyDec
+		setupSupernode       bool
+		supernodeDelegationFound bool
 		supernodeDelegationShares sdkmath.LegacyDec
 
 		expectErr bool
@@ -533,7 +531,7 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 				Status:          stakingtypes.Unbonded,
 			},
 			selfDelegationFound: false,
-			setupSupernode:      false,
+			setupSupernode: false,
 			expectErr:           true,
 			errSubstr:           "no self-delegation",
 		},
@@ -547,7 +545,7 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 			},
 			selfDelegationFound:  true,
 			selfDelegationShares: sdkmath.LegacyNewDec(500000),
-			setupSupernode:       false,
+			setupSupernode: false,
 			expectErr:            true,
 			errSubstr:            "does not meet minimum stake requirement",
 		},
@@ -561,7 +559,7 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 			},
 			selfDelegationFound:  true,
 			selfDelegationShares: sdkmath.LegacyNewDec(1000000),
-			setupSupernode:       false,
+			setupSupernode: false,
 			expectErr:            false,
 		},
 		{
@@ -574,7 +572,7 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 			},
 			selfDelegationFound:  true,
 			selfDelegationShares: sdkmath.LegacyNewDec(500000),
-			setupSupernode:       false,
+			setupSupernode: false,
 			expectErr:            true,
 			errSubstr:            "no self-stake available",
 		},
@@ -586,12 +584,12 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 				DelegatorShares: sdkmath.LegacyNewDec(1000000),
 				Tokens:          sdkmath.NewInt(1000000),
 			},
-			selfDelegationFound:       true,
-			selfDelegationShares:      sdkmath.LegacyNewDec(500000),
-			setupSupernode:            true,
-			supernodeDelegationFound:  true,
+			selfDelegationFound:  true,
+			selfDelegationShares: sdkmath.LegacyNewDec(500000),
+			setupSupernode: true,
+			supernodeDelegationFound: true,
 			supernodeDelegationShares: sdkmath.LegacyNewDec(500000),
-			expectErr:                 false,
+			expectErr:            false,
 		},
 		{
 			name: "validator with insufficient self-delegation and insufficient supernode delegation => error",
@@ -601,13 +599,13 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 				DelegatorShares: sdkmath.LegacyNewDec(1000000),
 				Tokens:          sdkmath.NewInt(1000000),
 			},
-			selfDelegationFound:       true,
-			selfDelegationShares:      sdkmath.LegacyNewDec(400000),
-			setupSupernode:            true,
-			supernodeDelegationFound:  true,
+			selfDelegationFound:  true,
+			selfDelegationShares: sdkmath.LegacyNewDec(400000),
+			setupSupernode: true,
+			supernodeDelegationFound: true,
 			supernodeDelegationShares: sdkmath.LegacyNewDec(400000),
-			expectErr:                 true,
-			errSubstr:                 "does not meet minimum stake requirement",
+			expectErr:            true,
+			errSubstr:            "does not meet minimum stake requirement",
 		},
 		{
 			name: "validator with no self-delegation but sufficient supernode delegation => error",
@@ -617,12 +615,12 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 				DelegatorShares: sdkmath.LegacyNewDec(1000000),
 				Tokens:          sdkmath.NewInt(1000000),
 			},
-			selfDelegationFound:       false,
-			setupSupernode:            true,
-			supernodeDelegationFound:  true,
+			selfDelegationFound:  false,
+			setupSupernode: true,
+			supernodeDelegationFound: true,
 			supernodeDelegationShares: sdkmath.LegacyNewDec(1000000),
-			expectErr:                 true,
-			errSubstr:                 "no self-delegation",
+			expectErr:            true,
+			errSubstr:            "no self-delegation",
 		},
 	}
 
@@ -666,16 +664,16 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 
 			// If the test case includes a supernode, set it up in the store
 			if tc.setupSupernode {
-				supernode := types2.SuperNode{
+				supernode := types.SuperNode{
 					ValidatorAddress: valAddrString,
 					SupernodeAccount: supernodeAccString,
-					States: []*types2.SuperNodeStateRecord{
+					States: []*types.SuperNodeStateRecord{
 						{
-							State:  types2.SuperNodeStateActive,
+							State:  types.SuperNodeStateActive,
 							Height: 1,
 						},
 					},
-					PrevIpAddresses: []*types2.IPAddressHistory{
+					PrevIpAddresses: []*types.IPAddressHistory{
 						{
 							Address: "192.168.1.1",
 							Height:  1,
@@ -688,7 +686,7 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			msgServer := keeper2.NewMsgServerImpl(k)
+			msgServer := keeper.NewMsgServerImpl(k)
 
 			// Call the function
 			var supernodeAccount string

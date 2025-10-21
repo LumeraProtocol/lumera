@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func (k Keeper) ListClaimed(goCtx context.Context, req *types.QueryListClaimedRequest) (*types.QueryListClaimedResponse, error) {
+func (q queryServer) ListClaimed(goCtx context.Context, req *types.QueryListClaimedRequest) (*types.QueryListClaimedResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
 	}
@@ -27,13 +27,13 @@ func (k Keeper) ListClaimed(goCtx context.Context, req *types.QueryListClaimedRe
 		req.Pagination.Limit = 20_000
 	}
 
-	storeAdapter := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
+	storeAdapter := runtime.KVStoreAdapter(q.k.storeService.OpenKVStore(ctx))
 	store := prefix.NewStore(storeAdapter, []byte(types.ClaimRecordKey))
 
 	var claims []*types.ClaimRecord
 	pageRes, err := query.Paginate(store, req.Pagination, func(key, value []byte) error {
 		var claimRecord types.ClaimRecord
-		if err := k.cdc.Unmarshal(value, &claimRecord); err != nil {
+		if err := q.k.cdc.Unmarshal(value, &claimRecord); err != nil {
 			return err
 		}
 

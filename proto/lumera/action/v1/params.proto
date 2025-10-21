@@ -1,0 +1,46 @@
+syntax = "proto3";
+package lumera.action.v1;
+
+option go_package = "x/action/v1/types";
+
+import "cosmos_proto/cosmos.proto";
+import "cosmos/base/v1beta1/coin.proto";
+import "gogoproto/gogo.proto";
+import "google/protobuf/duration.proto";
+import "amino/amino.proto";
+
+// Params defines the parameters for the module.
+message Params {
+  option (gogoproto.equal) = true;
+  
+  // Fees
+  cosmos.base.v1beta1.Coin base_action_fee = 1 [(gogoproto.nullable) = false, (amino.dont_omitempty) = true];
+  cosmos.base.v1beta1.Coin fee_per_kbyte = 2 [(gogoproto.nullable) = false, (amino.dont_omitempty) = true];
+
+  // Limits
+  uint64 max_actions_per_block = 3;
+  uint64 min_super_nodes = 4;
+  uint64 max_dd_and_fingerprints = 5;
+  uint64 max_raptor_q_symbols = 6;
+  
+  // Time Constraints
+  google.protobuf.Duration expiration_duration = 7 [
+    (gogoproto.stdduration) = true,
+    (gogoproto.nullable) = false
+  ];
+  
+  google.protobuf.Duration min_processing_time = 8 [
+    (gogoproto.stdduration) = true,
+    (gogoproto.nullable) = false
+  ];
+  
+  google.protobuf.Duration max_processing_time = 9 [
+    (gogoproto.stdduration) = true,
+    (gogoproto.jsontag) = "max_processing_time",
+    (gogoproto.nullable) = false
+  ];
+  
+  // Reward Distribution
+  string super_node_fee_share = 10 [(cosmos_proto.scalar) = "cosmos.Dec"];
+  string foundation_fee_share = 11 [(cosmos_proto.scalar) = "cosmos.Dec"];
+}

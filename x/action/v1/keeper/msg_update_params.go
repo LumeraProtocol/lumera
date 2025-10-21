@@ -2,16 +2,28 @@ package keeper
 
 import (
 	"context"
-
-	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	"bytes"
 
 	errorsmod "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+
+	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 )
 
-func (k msgServer) UpdateParams(goCtx context.Context, req *types2.MsgUpdateParams) (*types2.MsgUpdateParamsResponse, error) {
-	if k.GetAuthority() != req.Authority {
-		return nil, errorsmod.Wrapf(types2.ErrInvalidSigner, "invalid authority; expected %s, got %s", k.GetAuthority(), req.Authority)
+func (k msgServer) UpdateParams(goCtx context.Context, req *types.MsgUpdateParams) (*types.MsgUpdateParamsResponse, error) {
+	authorityBytes, err := k.addressCodec.StringToBytes(req.Authority)
+	if err != nil {
+		return nil, errorsmod.Wrapf(types.ErrInvalidSigner, "invalid authority address; %s", req.Authority)
+	}
+
+	if !bytes.Equal(authorityBytes, k.GetAuthority()) {
+		expectedAuthority, err := k.addressCodec.BytesToString(k.GetAuthority())
+		if err != nil {
+			return nil, errorsmod.Wrapf(types.ErrInvalidSigner, "unable to decode expected authority")
+		}
+
+		return nil, errorsmod.Wrapf(types.ErrInvalidSigner, "invalid authority; expected %s, got %s", 
+			expectedAuthority, req.Authority)
 	}
 
 	ctx := sdk.UnwrapSDKContext(goCtx)
@@ -19,5 +31,5 @@ func (k msgServer) UpdateParams(goCtx context.Context, req *types2.MsgUpdatePara
 		return nil, err
 	}
 
-	return &types2.MsgUpdateParamsResponse{}, nil
+	return &types.MsgUpdateParamsResponse{}, nil
 }

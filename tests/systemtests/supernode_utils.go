@@ -4,13 +4,14 @@ import (
 	"encoding/json"
 	"strconv"
 	"testing"
+	"errors"
 	"time"
 
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 // GetSuperNodeResponse queries and returns a supernode response
-func GetSuperNodeResponse(t *testing.T, cli *LumeradCli, validatorAddr string) *types.SuperNode {
+func GetSuperNodeResponse(t *testing.T, cli *LumeradCli, validatorAddr string) *sntypes.SuperNode {
 	// Give the node a brief moment to finalize state before querying
 	time.Sleep(10 * time.Second)
 
@@ -28,15 +29,22 @@ func GetSuperNodeResponse(t *testing.T, cli *LumeradCli, validatorAddr string) *
 		t.Fatal(err)
 	}
 
-	supernodeData := rawResponse["supernode"].(map[string]interface{})
+	supernodeData, ok := rawResponse["supernode"].(map[string]interface{})
+	if !ok {
+		t.Fatal(errors.New("couldn't find 'supernode' in get-supernode response data"))
+	}
 
 	// Convert state enum and height in states
-	states := supernodeData["states"].([]interface{})
+	states, ok := supernodeData["states"].([]interface{})
+	if !ok {
+		t.Fatal(errors.New("couldn't find 'supernode/states' in get-supernode response data"))
+	}
+
 	for _, state := range states {
 		stateMap := state.(map[string]interface{})
 		// Convert state enum
 		stateStr := stateMap["state"].(string)
-		if enumVal, ok := types.SuperNodeState_value[stateStr]; ok {
+		if enumVal, ok := sntypes.SuperNodeState_value[stateStr]; ok {
 			stateMap["state"] = enumVal
 		}
 		// Convert height to number
@@ -84,7 +92,7 @@ func GetSuperNodeResponse(t *testing.T, cli *LumeradCli, validatorAddr string) *
 	}
 
 	// Finally unmarshal into our response type
-	var response types.QueryGetSuperNodeResponse
+	var response sntypes.QueryGetSuperNodeResponse
 	err = json.Unmarshal(jsonBytes, &response)
 	if err != nil {
 		t.Fatal(err)

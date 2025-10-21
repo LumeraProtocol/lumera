@@ -2,16 +2,13 @@ package types
 
 import (
 	"fmt"
-	"strings"
-
 	"github.com/LumeraProtocol/lumera/x/action/v1/common"
-
-	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
+	"strings"
 )
 
 type ActionTypeValidator interface {
 	// ActionType returns the enum constant this validator corresponds to.
-	ActionType() actionapi.ActionType
+	ActionType() ActionType
 
 	// ValidateBasic handles any checks specific to this action type.
 	// Return an error if validation fails; otherwise nil.
@@ -46,17 +43,17 @@ func DoActionValidation(metadata string, actionTypeStr string, msgType common.Me
 }
 
 // ParseActionType converts a string action type to ActionType enum in a case-insensitive way
-func ParseActionType(actionTypeStr string) (actionapi.ActionType, error) {
+func ParseActionType(actionTypeStr string) (ActionType, error) {
 	if actionTypeStr == "" {
-		return actionapi.ActionType_ACTION_TYPE_UNSPECIFIED, fmt.Errorf("action type cannot be empty")
+		return ActionTypeUnspecified, fmt.Errorf("action type cannot be empty")
 	}
 
 	v := validatorRegistry[strings.ToUpper(actionTypeStr)]
 	if v == nil {
-		return actionapi.ActionType_ACTION_TYPE_UNSPECIFIED, fmt.Errorf("unknown action type: %s", actionTypeStr)
+		return ActionTypeUnspecified, fmt.Errorf("unknown action type: %s", actionTypeStr)
 	}
 	// If the validator’s ActionType is UNSPECIFIED, treat it as an error
-	if v.ActionType() == actionapi.ActionType_ACTION_TYPE_UNSPECIFIED {
+	if v.ActionType() == ActionTypeUnspecified {
 		return v.ActionType(), fmt.Errorf("action type cannot be unspecified")
 	}
 	return v.ActionType(), nil

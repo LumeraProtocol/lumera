@@ -24,5 +24,8 @@
     "daemon": {
         "binary": "lumerad",
         "keyring_backend": "test"
+    },
+    "hermes": {
+        "enabled": true
     }
 }

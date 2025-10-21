@@ -26,7 +26,7 @@ var (
 
 func TestMain(m *testing.M) {
 	rebuild := flag.Bool("rebuild", false, "rebuild artifacts")
-	waitTime := flag.Duration("wait-time", DefaultWaitTime, "time to wait for chain events")
+	waitTime := flag.Duration("wait-time", DefaultEventWaitTime, "time to wait for chain events")
 	nodesCount := flag.Int("v", 4, "number of nodes in the cluster")
 	blockTime := flag.Duration("block-time", 1000*time.Millisecond, "block creation time")
 	execBinary := flag.String("binary", "lumerad", "executable binary for server/ client side")
@@ -47,7 +47,7 @@ func TestMain(m *testing.M) {
 	}
 	initSDKConfig(*bech32Prefix)
 
-	DefaultWaitTime = *waitTime
+	EventWaitTime = *waitTime
 	if *execBinary == "" {
 		panic("executable binary name must not be empty")
 	}
@@ -98,9 +98,25 @@ func requireEnoughFileHandlers(nodesCount int) {
 
 func initSDKConfig(bech32Prefix string) {
 	config := sdk.GetConfig()
-	config.SetBech32PrefixForAccount(bech32Prefix, bech32Prefix+sdk.PrefixPublic)
-	config.SetBech32PrefixForValidator(bech32Prefix+sdk.PrefixValidator+sdk.PrefixOperator, bech32Prefix+sdk.PrefixValidator+sdk.PrefixOperator+sdk.PrefixPublic)
-	config.SetBech32PrefixForConsensusNode(bech32Prefix+sdk.PrefixValidator+sdk.PrefixConsensus, bech32Prefix+sdk.PrefixValidator+sdk.PrefixConsensus+sdk.PrefixPublic)
+	accAddrPrefix := bech32Prefix
+	accPubPrefix := bech32Prefix + sdk.PrefixPublic
+	valAddrPrefix := bech32Prefix + sdk.PrefixValidator + sdk.PrefixOperator
+	valPubPrefix := valAddrPrefix + sdk.PrefixPublic
+	consAddrPrefix := bech32Prefix + sdk.PrefixValidator + sdk.PrefixConsensus
+	consPubPrefix := consAddrPrefix + sdk.PrefixPublic
+
+	if config.GetBech32AccountAddrPrefix() == accAddrPrefix &&
+		config.GetBech32AccountPubPrefix() == accPubPrefix &&
+		config.GetBech32ValidatorAddrPrefix() == valAddrPrefix &&
+		config.GetBech32ValidatorPubPrefix() == valPubPrefix &&
+		config.GetBech32ConsensusAddrPrefix() == consAddrPrefix &&
+		config.GetBech32ConsensusPubPrefix() == consPubPrefix {
+		return
+	}
+
+	config.SetBech32PrefixForAccount(accAddrPrefix, accPubPrefix)
+	config.SetBech32PrefixForValidator(valAddrPrefix, valPubPrefix)
+	config.SetBech32PrefixForConsensusNode(consAddrPrefix, consPubPrefix)
 }
 
 const (

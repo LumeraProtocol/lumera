@@ -3,17 +3,17 @@ package keeper
 import (
 	"context"
 
-	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
-
 	"github.com/cosmos/cosmos-sdk/runtime"
+
+	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 )
 
 // GetParams get all parameters as types.Params
-func (k *Keeper) GetParams(ctx context.Context) (params types2.Params) {
+func (k *Keeper) GetParams(ctx context.Context) (params types.Params) {
 	store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
-	bz := store.Get(types2.ParamsKey)
+	bz := store.Get(types.ParamsKey)
 	if bz == nil {
-		return params
+		return types.DefaultParams()
 	}
 
 	k.cdc.MustUnmarshal(bz, &params)
@@ -21,13 +21,13 @@ func (k *Keeper) GetParams(ctx context.Context) (params types2.Params) {
 }
 
 // SetParams set the params
-func (k *Keeper) SetParams(ctx context.Context, params types2.Params) error {
+func (k *Keeper) SetParams(ctx context.Context, params types.Params) error {
 	store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
 	bz, err := k.cdc.Marshal(&params)
 	if err != nil {
 		return err
 	}
-	store.Set(types2.ParamsKey, bz)
+	store.Set(types.ParamsKey, bz)
 
 	return nil
 }

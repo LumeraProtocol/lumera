@@ -1,18 +1,18 @@
 package keeper
 
 import (
-    "context"
-    "strconv"
+	"context"
+	"strconv"
 
-    types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+	errorsmod "cosmossdk.io/errors"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 
-    errorsmod "cosmossdk.io/errors"
-    sdk "github.com/cosmos/cosmos-sdk/types"
-    sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 // StopSupernode stops an active supernode (transitions from Active to Stopped state)
-func (k msgServer) StopSupernode(goCtx context.Context, msg *types2.MsgStopSupernode) (*types2.MsgStopSupernodeResponse, error) {
+func (k msgServer) StopSupernode(goCtx context.Context, msg *types.MsgStopSupernode) (*types.MsgStopSupernodeResponse, error) {
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
 	valOperAddr, err := sdk.ValAddressFromBech32(msg.ValidatorAddress)
@@ -33,16 +33,16 @@ func (k msgServer) StopSupernode(goCtx context.Context, msg *types2.MsgStopSuper
 		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode is in an invalid state")
 	}
 
-    switch supernode.States[len(supernode.States)-1].State {
-	case types2.SuperNodeStateStopped:
+	switch supernode.States[len(supernode.States)-1].State {
+	case types.SuperNodeStateStopped:
 		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode is already stopped")
-	case types2.SuperNodeStateDisabled:
+	case types.SuperNodeStateDisabled:
 		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode is disabled")
 	}
 
     prevState := supernode.States[len(supernode.States)-1].State
-    supernode.States = append(supernode.States, &types2.SuperNodeStateRecord{
-        State:  types2.SuperNodeStateStopped,
+    supernode.States = append(supernode.States, &types.SuperNodeStateRecord{
+        State:  types.SuperNodeStateStopped,
         Height: ctx.BlockHeight(),
     })
 
@@ -50,15 +50,15 @@ func (k msgServer) StopSupernode(goCtx context.Context, msg *types2.MsgStopSuper
 		return nil, err
 	}
 
-    ctx.EventManager().EmitEvent(
-        sdk.NewEvent(
-            types2.EventTypeSupernodeStopped,
-            sdk.NewAttribute(types2.AttributeKeyValidatorAddress, msg.ValidatorAddress),
-            sdk.NewAttribute(types2.AttributeKeyReason, msg.Reason),
-            sdk.NewAttribute(types2.AttributeKeyOldState, prevState.String()),
-            sdk.NewAttribute(types2.AttributeKeyHeight, strconv.FormatInt(ctx.BlockHeight(), 10)),
-        ),
-    )
+	ctx.EventManager().EmitEvent(
+		sdk.NewEvent(
+			types.EventTypeSupernodeStopped,
+			sdk.NewAttribute(types.AttributeKeyValidatorAddress, msg.ValidatorAddress),
+			sdk.NewAttribute(types.AttributeKeyReason, msg.Reason),
+			sdk.NewAttribute(types.AttributeKeyOldState, prevState.String()),
+			sdk.NewAttribute(types.AttributeKeyHeight, strconv.FormatInt(ctx.BlockHeight(), 10)),
+		),
+	)
 
-	return &types2.MsgStopSupernodeResponse{}, nil
+	return &types.MsgStopSupernodeResponse{}, nil
 }

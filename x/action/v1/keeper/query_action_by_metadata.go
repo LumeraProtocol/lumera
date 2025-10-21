@@ -4,25 +4,25 @@ import (
 	"context"
 	"strings"
 
-	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	"github.com/LumeraProtocol/lumera/x/action/v1/types"
+	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 
 	"cosmossdk.io/store/prefix"
-	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
 	"github.com/cosmos/cosmos-sdk/runtime"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/query"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/proto"
+	gogoproto "github.com/gogo/protobuf/proto"
 )
 
 // QueryActionByMetadata returns actions filtered by metadata field and value
-func (k Keeper) QueryActionByMetadata(goCtx context.Context, req *types2.QueryActionByMetadataRequest) (*types2.QueryListActionsResponse, error) {
+func (q queryServer) QueryActionByMetadata(goCtx context.Context, req *types.QueryActionByMetadataRequest) (*types.QueryActionByMetadataResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
 	}
 
-	if req.ActionType == types2.ActionTypeUnspecified || req.MetadataQuery == "" {
+	if req.ActionType == types.ActionTypeUnspecified || req.MetadataQuery == "" {
 		return nil, status.Error(codes.InvalidArgument, "action type and metadata query required")
 	}
 
@@ -35,48 +35,44 @@ func (k Keeper) QueryActionByMetadata(goCtx context.Context, req *types2.QueryAc
 
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
-	store := k.storeService.OpenKVStore(ctx)
+	store := q.k.storeService.OpenKVStore(ctx)
 	storeAdapter := runtime.KVStoreAdapter(store)
 	actionStore := prefix.NewStore(storeAdapter, []byte(ActionKeyPrefix))
 
-	var actions []*types2.Action
+	var actions []*types.Action
 
-	appendAction := func(act *actionapi.Action, price sdk.Coin) {
-		actions = append(actions, &types2.Action{
+	appendAction := func(act *actiontypes.Action, price *sdk.Coin) {
+		actions = append(actions, &types.Action{
 			Creator:        act.Creator,
 			ActionID:       act.ActionID,
-			ActionType:     types2.ActionType(act.ActionType),
+			ActionType:     types.ActionType(act.ActionType),
 			Metadata:       act.Metadata,
-			Price:          &price,
+			Price:          price,
 			ExpirationTime: act.ExpirationTime,
-			State:          types2.ActionState(act.State),
+			State:          types.ActionState(act.State),
 			BlockHeight:    act.BlockHeight,
 			SuperNodes:     act.SuperNodes,
 		})
 	}
 
 	onResult := func(key, value []byte, accumulate bool) (bool, error) {
-		var act actionapi.Action
-		if err := k.cdc.Unmarshal(value, &act); err != nil {
+		var act actiontypes.Action
+		if err := q.k.cdc.Unmarshal(value, &act); err != nil {
 			return false, err
 		}
 
-		if act.ActionType != actionapi.ActionType(req.ActionType) {
+		if act.ActionType != actiontypes.ActionType(req.ActionType) {
 			return false, nil
 		}
 
-		price, err := sdk.ParseCoinNormalized(act.Price)
-		if err != nil {
-			k.Logger().Error("failed to parse price", "action_id", act.ActionID, "price", act.Price, "error", err)
-			return false, err
-		}
+		price := act.Price
 
 		switch req.ActionType {
-		case types2.ActionTypeSense:
-			var senseMetadata actionapi.SenseMetadata
-			err := proto.Unmarshal(act.Metadata, &senseMetadata)
+		case types.ActionTypeSense:
+			var senseMetadata actiontypes.SenseMetadata
+			err := gogoproto.Unmarshal(act.Metadata, &senseMetadata)
 			if err != nil {
-				k.Logger().Error("failed to unmarshal sense metadata", "action_id", act.ActionID, "error", err)
+				q.k.Logger().Error("failed to unmarshal sense metadata", "action_id", act.ActionID, "error", err)
 				return false, err
 			}
 
@@ -104,11 +100,11 @@ func (k Keeper) QueryActionByMetadata(goCtx context.Context, req *types2.QueryAc
 				}
 			}
 
-		case types2.ActionTypeCascade:
-			var cascadeMetadata actionapi.CascadeMetadata
-			err := proto.Unmarshal(act.Metadata, &cascadeMetadata)
+		case types.ActionTypeCascade:
+			var cascadeMetadata actiontypes.CascadeMetadata
+			err := gogoproto.Unmarshal(act.Metadata, &cascadeMetadata)
 			if err != nil {
-				k.Logger().Error("failed to unmarshal cascade metadata", "action_id", act.ActionID, "error", err)
+				q.k.Logger().Error("failed to unmarshal cascade metadata", "action_id", act.ActionID, "error", err)
 				return false, err
 			}
 
@@ -138,7 +134,7 @@ func (k Keeper) QueryActionByMetadata(goCtx context.Context, req *types2.QueryAc
 		return nil, status.Errorf(codes.Internal, "failed to paginate actions: %v", err)
 	}
 
-	return &types2.QueryListActionsResponse{
+	return &types.QueryActionByMetadataResponse{
 		Actions:    actions,
 		Pagination: pageRes,
 	}, nil

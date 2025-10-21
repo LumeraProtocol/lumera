@@ -3,15 +3,15 @@ package system_test
 import (
 	"testing"
 
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
 	sdkmath "cosmossdk.io/math"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/stretchr/testify/require"
+
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 func TestReRegisterSupernode(t *testing.T) {
@@ -23,13 +23,13 @@ func TestReRegisterSupernode(t *testing.T) {
 
 	testCases := []struct {
 		name   string
-		msg    *types2.MsgRegisterSupernode
+		msg    *sntypes.MsgRegisterSupernode
 		setup  func(*SystemTestSuite)
-		verify func(t *testing.T, suite *SystemTestSuite, resp *types2.MsgRegisterSupernodeResponse, err error)
+		verify func(t *testing.T, suite *SystemTestSuite, resp *sntypes.MsgRegisterSupernodeResponse, err error)
 	}{
 		{
 			name: "successful re-registration of disabled supernode",
-			msg: &types2.MsgRegisterSupernode{
+			msg: &sntypes.MsgRegisterSupernode{
 				Creator:          walletAddr.String(),
 				ValidatorAddress: valAddrStr,
 				IpAddress:        "10.0.0.99",                                                        // Different from original - should be ignored
@@ -38,27 +38,27 @@ func TestReRegisterSupernode(t *testing.T) {
 			},
 			setup: func(suite *SystemTestSuite) {
 				// Create a disabled supernode with original parameters
-				originalSupernode := types2.SuperNode{
+				originalSupernode := sntypes.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
 					Note:             "1.0.0",
-					States: []*types2.SuperNodeStateRecord{
+					States: []*sntypes.SuperNodeStateRecord{
 						{
-							State:  types2.SuperNodeStateActive,
+							State:  sntypes.SuperNodeStateActive,
 							Height: suite.sdkCtx.BlockHeight(),
 						},
 						{
-							State:  types2.SuperNodeStateDisabled,
+							State:  sntypes.SuperNodeStateDisabled,
 							Height: suite.sdkCtx.BlockHeight() + 1,
 						},
 					},
-					PrevIpAddresses: []*types2.IPAddressHistory{
+					PrevIpAddresses: []*sntypes.IPAddressHistory{
 						{
 							Address: "192.168.1.100",
 							Height:  suite.sdkCtx.BlockHeight(),
 						},
 					},
-					PrevSupernodeAccounts: []*types2.SupernodeAccountHistory{
+					PrevSupernodeAccounts: []*sntypes.SupernodeAccountHistory{
 						{
 							Account: walletAddr.String(),
 							Height:  suite.sdkCtx.BlockHeight(),
@@ -69,7 +69,7 @@ func TestReRegisterSupernode(t *testing.T) {
 				err := suite.app.SupernodeKeeper.SetSuperNode(suite.sdkCtx, originalSupernode)
 				require.NoError(t, err)
 			},
-			verify: func(t *testing.T, suite *SystemTestSuite, resp *types2.MsgRegisterSupernodeResponse, err error) {
+			verify: func(t *testing.T, suite *SystemTestSuite, resp *sntypes.MsgRegisterSupernodeResponse, err error) {
 				require.NoError(t, err)
 				require.NotNil(t, resp)
 
@@ -81,9 +81,9 @@ func TestReRegisterSupernode(t *testing.T) {
 
 				// Verify state progression: Active → Disabled → Active
 				require.Len(t, sn.States, 3)
-				require.Equal(t, types2.SuperNodeStateActive, sn.States[0].State)
-				require.Equal(t, types2.SuperNodeStateDisabled, sn.States[1].State)
-				require.Equal(t, types2.SuperNodeStateActive, sn.States[2].State)
+				require.Equal(t, sntypes.SuperNodeStateActive, sn.States[0].State)
+				require.Equal(t, sntypes.SuperNodeStateDisabled, sn.States[1].State)
+				require.Equal(t, sntypes.SuperNodeStateActive, sn.States[2].State)
 
 				// Verify ALL original parameters were preserved during re-registration
 				require.Equal(t, "192.168.1.100", sn.PrevIpAddresses[len(sn.PrevIpAddresses)-1].Address)
@@ -99,14 +99,14 @@ func TestReRegisterSupernode(t *testing.T) {
 				events := suite.sdkCtx.EventManager().Events()
 				var foundEvent bool
 				for _, e := range events {
-					if e.Type == types2.EventTypeSupernodeRegistered {
+					if e.Type == sntypes.EventTypeSupernodeRegistered {
 						foundEvent = true
 						for _, attr := range e.Attributes {
-							if string(attr.Key) == types2.AttributeKeyReRegistered {
+							if string(attr.Key) == sntypes.AttributeKeyReRegistered {
 								require.Equal(t, "true", string(attr.Value))
 							}
-							if string(attr.Key) == types2.AttributeKeyOldState {
-								require.Equal(t, "disabled", string(attr.Value))
+							if string(attr.Key) == sntypes.AttributeKeyOldState {
+								require.Equal(t, sntypes.SuperNodeStateDisabled.String(), string(attr.Value))
 							}
 						}
 					}
@@ -116,7 +116,7 @@ func TestReRegisterSupernode(t *testing.T) {
 		},
 		{
 			name: "cannot re-register STOPPED supernode",
-			msg: &types2.MsgRegisterSupernode{
+			msg: &sntypes.MsgRegisterSupernode{
 				Creator:          walletAddr.String(),
 				ValidatorAddress: valAddrStr,
 				IpAddress:        "192.168.1.1",
@@ -125,27 +125,27 @@ func TestReRegisterSupernode(t *testing.T) {
 			},
 			setup: func(suite *SystemTestSuite) {
 				// Create a stopped supernode
-				stoppedSupernode := types2.SuperNode{
+				stoppedSupernode := sntypes.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
 					Note:             "1.0.0",
-					States: []*types2.SuperNodeStateRecord{
+					States: []*sntypes.SuperNodeStateRecord{
 						{
-							State:  types2.SuperNodeStateActive,
+							State:  sntypes.SuperNodeStateActive,
 							Height: suite.sdkCtx.BlockHeight(),
 						},
 						{
-							State:  types2.SuperNodeStateStopped,
+							State:  sntypes.SuperNodeStateStopped,
 							Height: suite.sdkCtx.BlockHeight() + 1,
 						},
 					},
-					PrevIpAddresses: []*types2.IPAddressHistory{
+					PrevIpAddresses: []*sntypes.IPAddressHistory{
 						{
 							Address: "192.168.1.1",
 							Height:  suite.sdkCtx.BlockHeight(),
 						},
 					},
-					PrevSupernodeAccounts: []*types2.SupernodeAccountHistory{
+					PrevSupernodeAccounts: []*sntypes.SupernodeAccountHistory{
 						{
 							Account: walletAddr.String(),
 							Height:  suite.sdkCtx.BlockHeight(),
@@ -156,7 +156,7 @@ func TestReRegisterSupernode(t *testing.T) {
 				err := suite.app.SupernodeKeeper.SetSuperNode(suite.sdkCtx, stoppedSupernode)
 				require.NoError(t, err)
 			},
-			verify: func(t *testing.T, suite *SystemTestSuite, resp *types2.MsgRegisterSupernodeResponse, err error) {
+			verify: func(t *testing.T, suite *SystemTestSuite, resp *sntypes.MsgRegisterSupernodeResponse, err error) {
 				require.Error(t, err)
 				require.ErrorIs(t, err, sdkerrors.ErrInvalidRequest)
 				require.Nil(t, resp)
@@ -166,12 +166,12 @@ func TestReRegisterSupernode(t *testing.T) {
 				require.NoError(t, vErr)
 				sn, found := suite.app.SupernodeKeeper.QuerySuperNode(suite.sdkCtx, valOp)
 				require.True(t, found)
-				require.Equal(t, types2.SuperNodeStateStopped, sn.States[len(sn.States)-1].State)
+				require.Equal(t, sntypes.SuperNodeStateStopped, sn.States[len(sn.States)-1].State)
 			},
 		},
 		{
 			name: "cannot re-register PENALIZED supernode",
-			msg: &types2.MsgRegisterSupernode{
+			msg: &sntypes.MsgRegisterSupernode{
 				Creator:          walletAddr.String(),
 				ValidatorAddress: valAddrStr,
 				IpAddress:        "192.168.1.1",
@@ -180,27 +180,27 @@ func TestReRegisterSupernode(t *testing.T) {
 			},
 			setup: func(suite *SystemTestSuite) {
 				// Create a penalized supernode
-				penalizedSupernode := types2.SuperNode{
+				penalizedSupernode := sntypes.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
 					Note:             "1.0.0",
-					States: []*types2.SuperNodeStateRecord{
+					States: []*sntypes.SuperNodeStateRecord{
 						{
-							State:  types2.SuperNodeStateActive,
+							State:  sntypes.SuperNodeStateActive,
 							Height: suite.sdkCtx.BlockHeight(),
 						},
 						{
-							State:  types2.SuperNodeStatePenalized,
+							State:  sntypes.SuperNodeStatePenalized,
 							Height: suite.sdkCtx.BlockHeight() + 1,
 						},
 					},
-					PrevIpAddresses: []*types2.IPAddressHistory{
+					PrevIpAddresses: []*sntypes.IPAddressHistory{
 						{
 							Address: "192.168.1.1",
 							Height:  suite.sdkCtx.BlockHeight(),
 						},
 					},
-					PrevSupernodeAccounts: []*types2.SupernodeAccountHistory{
+					PrevSupernodeAccounts: []*sntypes.SupernodeAccountHistory{
 						{
 							Account: walletAddr.String(),
 							Height:  suite.sdkCtx.BlockHeight(),
@@ -211,7 +211,7 @@ func TestReRegisterSupernode(t *testing.T) {
 				err := suite.app.SupernodeKeeper.SetSuperNode(suite.sdkCtx, penalizedSupernode)
 				require.NoError(t, err)
 			},
-			verify: func(t *testing.T, suite *SystemTestSuite, resp *types2.MsgRegisterSupernodeResponse, err error) {
+			verify: func(t *testing.T, suite *SystemTestSuite, resp *sntypes.MsgRegisterSupernodeResponse, err error) {
 				require.Error(t, err)
 				require.ErrorIs(t, err, sdkerrors.ErrInvalidRequest)
 				require.Nil(t, resp)
@@ -221,12 +221,12 @@ func TestReRegisterSupernode(t *testing.T) {
 				require.NoError(t, vErr)
 				sn, found := suite.app.SupernodeKeeper.QuerySuperNode(suite.sdkCtx, valOp)
 				require.True(t, found)
-				require.Equal(t, types2.SuperNodeStatePenalized, sn.States[len(sn.States)-1].State)
+				require.Equal(t, sntypes.SuperNodeStatePenalized, sn.States[len(sn.States)-1].State)
 			},
 		},
 		{
 			name: "multiple consecutive re-registrations",
-			msg: &types2.MsgRegisterSupernode{
+			msg: &sntypes.MsgRegisterSupernode{
 				Creator:          walletAddr.String(),
 				ValidatorAddress: valAddrStr,
 				IpAddress:        "192.168.1.1",
@@ -235,35 +235,35 @@ func TestReRegisterSupernode(t *testing.T) {
 			},
 			setup: func(suite *SystemTestSuite) {
 				// Create a supernode that has been re-registered multiple times
-				multipleSupernode := types2.SuperNode{
+				multipleSupernode := sntypes.SuperNode{
 					ValidatorAddress: valAddrStr,
 					SupernodeAccount: walletAddr.String(),
 					Note:             "1.0.0",
-					States: []*types2.SuperNodeStateRecord{
+					States: []*sntypes.SuperNodeStateRecord{
 						{
-							State:  types2.SuperNodeStateActive,
+							State:  sntypes.SuperNodeStateActive,
 							Height: 100,
 						},
 						{
-							State:  types2.SuperNodeStateDisabled,
+							State:  sntypes.SuperNodeStateDisabled,
 							Height: 200,
 						},
 						{
-							State:  types2.SuperNodeStateActive,
+							State:  sntypes.SuperNodeStateActive,
 							Height: 300,
 						},
 						{
-							State:  types2.SuperNodeStateDisabled,
+							State:  sntypes.SuperNodeStateDisabled,
 							Height: 400,
 						},
 					},
-					PrevIpAddresses: []*types2.IPAddressHistory{
+					PrevIpAddresses: []*sntypes.IPAddressHistory{
 						{
 							Address: "192.168.1.1",
 							Height:  100,
 						},
 					},
-					PrevSupernodeAccounts: []*types2.SupernodeAccountHistory{
+					PrevSupernodeAccounts: []*sntypes.SupernodeAccountHistory{
 						{
 							Account: walletAddr.String(),
 							Height:  100,
@@ -274,7 +274,7 @@ func TestReRegisterSupernode(t *testing.T) {
 				err := suite.app.SupernodeKeeper.SetSuperNode(suite.sdkCtx, multipleSupernode)
 				require.NoError(t, err)
 			},
-			verify: func(t *testing.T, suite *SystemTestSuite, resp *types2.MsgRegisterSupernodeResponse, err error) {
+			verify: func(t *testing.T, suite *SystemTestSuite, resp *sntypes.MsgRegisterSupernodeResponse, err error) {
 				require.NoError(t, err)
 				require.NotNil(t, resp)
 
@@ -286,7 +286,7 @@ func TestReRegisterSupernode(t *testing.T) {
 
 				// Verify state progression: Active → Disabled → Active → Disabled → Active
 				require.Len(t, sn.States, 5)
-				require.Equal(t, types2.SuperNodeStateActive, sn.States[4].State) // Latest state should be active
+				require.Equal(t, sntypes.SuperNodeStateActive, sn.States[4].State) // Latest state should be active
 			},
 		},
 	}

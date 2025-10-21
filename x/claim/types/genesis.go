@@ -3,7 +3,7 @@ package types
 // DefaultIndex is the default global index
 const DefaultIndex uint64 = 1
 
-const DefaultClaimableAmountConst = 18749999981413
+const DefaultClaimableAmountConst = 18_749_999_991_853
 
 // DefaultGenesis returns the default genesis state
 func DefaultGenesis() *GenesisState {

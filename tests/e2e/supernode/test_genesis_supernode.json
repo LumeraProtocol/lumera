@@ -99,11 +99,11 @@
       "claims_denom": "ulume",
       "module_account": "base_account:\u003caddress:\"lumera1m5dncvfv7lvpvycr23zja93fecun2kcv6wfr8q\" \u003e name:\"claim\" permissions:\"minter\" permissions:\"burner\" ",
       "params": {
-        "claim_end_time": "1746071999",
+        "claim_end_time": "1767225600",
         "enable_claims": true,
         "max_claims_per_block": "100"
       },
-      "total_claimable_amount": "18749999981413"
+      "total_claimable_amount": "18749999991853"
     },
     "consensus": null,
     "crisis": {

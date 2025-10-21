@@ -1,9 +1,12 @@
 package types
 
-const ConsensusVersion = 1
+const (
+	// ConsensusVersion is a sequence number for state-breaking change of the module.
+	ConsensusVersion = 1
 
-// DefaultIndex is the default global index
-const DefaultIndex uint64 = 1
+	// DefaultIndex is the default global index
+	DefaultIndex uint64 = 1
+)
 
 // DefaultGenesis returns the default genesis state
 func DefaultGenesis() *GenesisState {

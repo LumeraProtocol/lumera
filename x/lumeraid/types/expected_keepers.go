@@ -1,6 +1,6 @@
 package types
 
-//go:generate mockgen -destination=../mocks/expected_keepers_mock.go -package=lumeraidmocks -source=expected_keepers.go
+//go:generate mockgen -copyright_file=../../../testutil/mock_header.txt -destination=../mocks/expected_keepers_mock.go -package=lumeraidmocks -source=expected_keepers.go
 
 import (
 	"context"

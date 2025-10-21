@@ -3,10 +3,9 @@ package keeper_test
 import (
 	"testing"
 
-	keeper2 "github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
 	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/golang/mock/gomock"
@@ -20,17 +19,17 @@ func TestMsgServer_StartSupernode(t *testing.T) {
 	otherValAddr := sdk.ValAddress([]byte("other-validator"))
 	otherCreatorAddr := sdk.AccAddress(otherValAddr)
 
-	existingSupernode := types2.SuperNode{
+	existingSupernode := types.SuperNode{
 		SupernodeAccount: creatorAddr.String(),
 		ValidatorAddress: valAddr.String(),
 		Note:             "1.0.0",
-		States: []*types2.SuperNodeStateRecord{
+		States: []*types.SuperNodeStateRecord{
 			{
-				State:  types2.SuperNodeStateActive,
+				State:  types.SuperNodeStateActive,
 				Height: 1,
 			},
 			{
-				State:  types2.SuperNodeStateStopped,
+				State:  types.SuperNodeStateStopped,
 				Height: 1,
 			},
 		},
@@ -39,21 +38,21 @@ func TestMsgServer_StartSupernode(t *testing.T) {
 
 	testCases := []struct {
 		name          string
-		msg           *types2.MsgStartSupernode
+		msg           *types.MsgStartSupernode
 		setupMock     func(sk *supernodemocks.MockStakingKeeper, slk *supernodemocks.MockSlashingKeeper, bk *supernodemocks.MockBankKeeper)
-		setupState    func(k keeper2.Keeper, ctx sdk.Context)
+		setupState    func(k keeper.Keeper, ctx sdk.Context)
 		expectedError error
-		checkResult   func(t *testing.T, k keeper2.Keeper, ctx sdk.Context)
+		checkResult   func(t *testing.T, k keeper.Keeper, ctx sdk.Context)
 	}{
 		{
 			name: "successful start",
-			msg: &types2.MsgStartSupernode{
+			msg: &types.MsgStartSupernode{
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 			},
 			setupMock: nil,
-			setupState: func(k keeper2.Keeper, ctx sdk.Context) {
-				existingSupernode.PrevIpAddresses = []*types2.IPAddressHistory{
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
+				existingSupernode.PrevIpAddresses = []*types.IPAddressHistory{
 					{
 						Address: "192.168.1.1",
 					},
@@ -61,7 +60,7 @@ func TestMsgServer_StartSupernode(t *testing.T) {
 				require.NoError(t, k.SetSuperNode(ctx, existingSupernode))
 			},
 			expectedError: nil,
-			checkResult: func(t *testing.T, k keeper2.Keeper, ctx sdk.Context) {
+			checkResult: func(t *testing.T, k keeper.Keeper, ctx sdk.Context) {
 				sn, found := k.QuerySuperNode(ctx, valAddr)
 				require.True(t, found)
 				require.Len(t, sn.PrevIpAddresses, 1)
@@ -70,7 +69,7 @@ func TestMsgServer_StartSupernode(t *testing.T) {
 		},
 		{
 			name: "invalid validator address",
-			msg: &types2.MsgStartSupernode{
+			msg: &types.MsgStartSupernode{
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: "invalid",
 			},
@@ -78,7 +77,7 @@ func TestMsgServer_StartSupernode(t *testing.T) {
 		},
 		{
 			name: "supernode not found",
-			msg: &types2.MsgStartSupernode{
+			msg: &types.MsgStartSupernode{
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 			},
@@ -86,43 +85,43 @@ func TestMsgServer_StartSupernode(t *testing.T) {
 		},
 		{
 			name: "unauthorized",
-			msg: &types2.MsgStartSupernode{
+			msg: &types.MsgStartSupernode{
 				Creator:          otherCreatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 			},
-			setupState: func(k keeper2.Keeper, ctx sdk.Context) {
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
 				require.NoError(t, k.SetSuperNode(ctx, existingSupernode))
 			},
 			expectedError: sdkerrors.ErrUnauthorized,
 		},
 		{
 			name: "cannot start disabled supernode",
-			msg: &types2.MsgStartSupernode{
+			msg: &types.MsgStartSupernode{
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 			},
-			setupState: func(k keeper2.Keeper, ctx sdk.Context) {
-				disabledSupernode := types2.SuperNode{
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
+				disabledSupernode := types.SuperNode{
 					SupernodeAccount: creatorAddr.String(),
 					ValidatorAddress: valAddr.String(),
 					Note:             "1.0.0",
-					States: []*types2.SuperNodeStateRecord{
+					States: []*types.SuperNodeStateRecord{
 						{
-							State:  types2.SuperNodeStateActive,
+							State:  types.SuperNodeStateActive,
 							Height: 1,
 						},
 						{
-							State:  types2.SuperNodeStateDisabled,
+							State:  types.SuperNodeStateDisabled,
 							Height: 2,
 						},
 					},
-					PrevIpAddresses: []*types2.IPAddressHistory{
+					PrevIpAddresses: []*types.IPAddressHistory{
 						{
 							Address: "192.168.1.1",
 							Height:  1,
 						},
 					},
-					PrevSupernodeAccounts: []*types2.SupernodeAccountHistory{
+					PrevSupernodeAccounts: []*types.SupernodeAccountHistory{
 						{
 							Account: creatorAddr.String(),
 							Height:  1,
@@ -136,20 +135,20 @@ func TestMsgServer_StartSupernode(t *testing.T) {
 		},
 		{
 			name: "supernode already active",
-			msg: &types2.MsgStartSupernode{
+			msg: &types.MsgStartSupernode{
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
 			},
 			setupMock: nil,
-			setupState: func(k keeper2.Keeper, ctx sdk.Context) {
-				existingSupernode.PrevIpAddresses = []*types2.IPAddressHistory{
+			setupState: func(k keeper.Keeper, ctx sdk.Context) {
+				existingSupernode.PrevIpAddresses = []*types.IPAddressHistory{
 					{
 						Address: "192.168.1.1",
 					},
 				}
-				existingSupernode.States = []*types2.SuperNodeStateRecord{
+				existingSupernode.States = []*types.SuperNodeStateRecord{
 					{
-						State:  types2.SuperNodeStateActive,
+						State:  types.SuperNodeStateActive,
 						Height: 1,
 					},
 				}
@@ -178,7 +177,7 @@ func TestMsgServer_StartSupernode(t *testing.T) {
 				tc.setupState(k, ctx)
 			}
 
-			msgServer := keeper2.NewMsgServerImpl(k)
+			msgServer := keeper.NewMsgServerImpl(k)
 			_, err := msgServer.StartSupernode(ctx, tc.msg)
 
 			if tc.expectedError != nil {

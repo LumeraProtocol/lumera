@@ -3,29 +3,38 @@ package keeper
 import (
 	"fmt"
 
-	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
-
-	"cosmossdk.io/core/store"
+	"cosmossdk.io/collections"
+	"cosmossdk.io/core/address"
+	corestore "cosmossdk.io/core/store"
 	"cosmossdk.io/log"
+	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	snkeeper "github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"github.com/cosmos/cosmos-sdk/codec"
-	sdk "github.com/cosmos/cosmos-sdk/types"
+	ibckeeper "github.com/cosmos/ibc-go/v10/modules/core/keeper"
 )
 
 type (
 	Keeper struct {
 		cdc          codec.BinaryCodec
-		storeService store.KVStoreService
+		addressCodec address.Codec
+		storeService corestore.KVStoreService
 		logger       log.Logger
 
 		// the address capable of executing a MsgUpdateParams message. Typically, this
 		// should be the x/gov module account.
-		authority string
+		authority []byte
 
-		bankKeeper         types2.BankKeeper
-		accountKeeper      types2.AccountKeeper
-		stakingKeeper      types2.StakingKeeper
-		distributionKeeper types2.DistributionKeeper
-		supernodeKeeper    types2.SupernodeKeeper
+		Schema collections.Schema
+		Port   collections.Item[string]
+
+		bankKeeper           actiontypes.BankKeeper
+		authKeeper           actiontypes.AuthKeeper
+		stakingKeeper        actiontypes.StakingKeeper
+		distributionKeeper   actiontypes.DistributionKeeper
+		supernodeKeeper      actiontypes.SupernodeKeeper
+		supernodeQueryServer actiontypes.SupernodeQueryServer
+		ibcKeeperFn          func() *ibckeeper.Keeper
 
 		// Action handling
 		actionRegistry *ActionRegistry
@@ -34,47 +43,69 @@ type (
 
 func NewKeeper(
 	cdc codec.BinaryCodec,
-	storeService store.KVStoreService,
+	addressCodec address.Codec,
+	storeService corestore.KVStoreService,
 	logger log.Logger,
-	authority string,
+	authority []byte,
 
-	bankKeeper types2.BankKeeper,
-	accountKeeper types2.AccountKeeper,
-	stakingKeeper types2.StakingKeeper,
-	distributionKeeper types2.DistributionKeeper,
-	supernodeKeeper types2.SupernodeKeeper,
+	bankKeeper actiontypes.BankKeeper,
+	accountKeeper actiontypes.AuthKeeper,
+	stakingKeeper actiontypes.StakingKeeper,
+	distributionKeeper actiontypes.DistributionKeeper,
+	supernodeKeeper sntypes.SupernodeKeeper,
+	supernodeQueryServer func() sntypes.QueryServer,
+	ibcKeeperFn func() *ibckeeper.Keeper,
 ) Keeper {
-	if _, err := sdk.AccAddressFromBech32(authority); err != nil {
+	if _, err := addressCodec.BytesToString(authority); err != nil {
 		panic(fmt.Sprintf("invalid authority address: %s", authority))
 	}
 
-	// Create the keeper instance
-	keeper := Keeper{
-		cdc:                cdc,
-		storeService:       storeService,
-		logger:             logger,
-		authority:          authority,
-		bankKeeper:         bankKeeper,
-		accountKeeper:      accountKeeper,
-		stakingKeeper:      stakingKeeper,
-		distributionKeeper: distributionKeeper,
-		supernodeKeeper:    supernodeKeeper,
+	sb := collections.NewSchemaBuilder(storeService)
+	var snQueryServer sntypes.QueryServer
+	if supernodeQueryServer == nil {
+		snQueryServer = snkeeper.NewQueryServerImpl(supernodeKeeper)
+	} else {
+		snQueryServer = supernodeQueryServer()
 	}
 
-	// Initialize action registry (requires keeper to be initialized first)
-	keeper.actionRegistry = keeper.InitializeActionRegistry()
+	// Create the k instance
+	k := Keeper{
+		cdc:                  cdc,
+		addressCodec:         addressCodec,
+		storeService:         storeService,
+		logger:               logger,
+		authority:            authority,
+		bankKeeper:           bankKeeper,
+		authKeeper:           accountKeeper,
+		stakingKeeper:        stakingKeeper,
+		distributionKeeper:   distributionKeeper,
+		supernodeKeeper:      supernodeKeeper,
+		supernodeQueryServer: snQueryServer,
+		ibcKeeperFn:          ibcKeeperFn,
 
-	return keeper
+		Port: collections.NewItem(sb, actiontypes.PortKey, "port", collections.StringValue),
+	}
+
+	schema, err := sb.Build()
+	if err != nil {
+		panic(fmt.Sprintf("failed to build schema: %s", err))
+	}
+	k.Schema = schema
+
+	// Initialize action registry (requires keeper to be initialized first)
+	k.actionRegistry = k.InitializeActionRegistry()
+
+	return k
 }
 
 // GetAuthority returns the module's authority.
-func (k *Keeper) GetAuthority() string {
+func (k *Keeper) GetAuthority() []byte {
 	return k.authority
 }
 
 // Logger returns a module-specific logger.
 func (k *Keeper) Logger() log.Logger {
-	return k.logger.With("module", fmt.Sprintf("x/%s", types2.ModuleName))
+	return k.logger.With("module", fmt.Sprintf("x/%s", actiontypes.ModuleName))
 }
 
 // GetCodec returns the codec
@@ -82,16 +113,25 @@ func (k *Keeper) GetCodec() codec.BinaryCodec {
 	return k.cdc
 }
 
-func (k *Keeper) GetSupernodeKeeper() types2.SupernodeKeeper {
+// GetAddressCodec returns the address codec
+func (k *Keeper) GetAddressCodec() address.Codec {
+	return k.addressCodec
+}
+
+func (k *Keeper) GetSupernodeKeeper() actiontypes.SupernodeKeeper {
 	return k.supernodeKeeper
 }
 
-func (k *Keeper) GetBankKeeper() types2.BankKeeper {
+func (k *Keeper) GetSupernodeQueryServer() actiontypes.SupernodeQueryServer {
+	return k.supernodeQueryServer
+}
+
+func (k *Keeper) GetBankKeeper() actiontypes.BankKeeper {
 	return k.bankKeeper
 }
 
-func (k *Keeper) GetAccountKeeper() types2.AccountKeeper {
-	return k.accountKeeper
+func (k *Keeper) GetAuthKeeper() actiontypes.AuthKeeper {
+	return k.authKeeper
 }
 
 // GetActionRegistry returns the action registry
@@ -99,6 +139,6 @@ func (k *Keeper) GetActionRegistry() *ActionRegistry {
 	return k.actionRegistry
 }
 
-func (k *Keeper) GetStakingKeeper() types2.StakingKeeper {
+func (k *Keeper) GetStakingKeeper() actiontypes.StakingKeeper {
 	return k.stakingKeeper
 }

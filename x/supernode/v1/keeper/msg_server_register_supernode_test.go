@@ -6,10 +6,6 @@ import (
 	"testing"
 	"time"
 
-	keeper2 "github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
-	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
 	"cosmossdk.io/log"
 	"cosmossdk.io/math"
 	"cosmossdk.io/store"
@@ -28,6 +24,10 @@ import (
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 func TestMsgServer_RegisterSupernode(t *testing.T) {
@@ -42,13 +42,13 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 
 	testCases := []struct {
 		name          string
-		msg           *types2.MsgRegisterSupernode
+		msg           *types.MsgRegisterSupernode
 		mockSetup     func(sk *supernodemocks.MockStakingKeeper, slk *supernodemocks.MockSlashingKeeper, bk *supernodemocks.MockBankKeeper)
 		expectedError error
 	}{
 		{
 			name: "successful registration (bonded validator -> skip checks)",
-			msg: &types2.MsgRegisterSupernode{
+			msg: &types.MsgRegisterSupernode{
 				SupernodeAccount: creatorAddr.String(),
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
@@ -71,7 +71,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 		},
 		{
 			name: "invalid validator address",
-			msg: &types2.MsgRegisterSupernode{
+			msg: &types.MsgRegisterSupernode{
 				SupernodeAccount: creatorAddr.String(),
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: "invalid", // not bech32 => error
@@ -82,7 +82,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 		},
 		{
 			name: "unauthorized => msg.Creator != validator operator address",
-			msg: &types2.MsgRegisterSupernode{
+			msg: &types.MsgRegisterSupernode{
 				SupernodeAccount: creatorAddr.String(),
 				Creator:          otherCreatorAddr.String(), // different from valAddr
 				ValidatorAddress: valAddr.String(),
@@ -96,7 +96,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 		},
 		{
 			name: "empty ip address => error from supernode.Validate()",
-			msg: &types2.MsgRegisterSupernode{
+			msg: &types.MsgRegisterSupernode{
 				SupernodeAccount: creatorAddr.String(),
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
@@ -113,11 +113,11 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 						Jailed:          false,
 					}, nil)
 			},
-			expectedError: types2.ErrEmptyIPAddress,
+			expectedError: types.ErrEmptyIPAddress,
 		},
 		{
 			name: "validator not found",
-			msg: &types2.MsgRegisterSupernode{
+			msg: &types.MsgRegisterSupernode{
 				SupernodeAccount: creatorAddr.String(),
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
@@ -132,7 +132,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 		},
 		{
 			name: "jailed validator => error",
-			msg: &types2.MsgRegisterSupernode{
+			msg: &types.MsgRegisterSupernode{
 				SupernodeAccount: creatorAddr.String(),
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
@@ -153,7 +153,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 		},
 		{
 			name: "validator unbonded, zero delegator shares => immediate error (no self-stake)",
-			msg: &types2.MsgRegisterSupernode{
+			msg: &types.MsgRegisterSupernode{
 				SupernodeAccount: creatorAddr.String(),
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
@@ -176,7 +176,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 		},
 		{
 			name: "validator unbonded and insufficient stake => fails eligibility check",
-			msg: &types2.MsgRegisterSupernode{
+			msg: &types.MsgRegisterSupernode{
 				SupernodeAccount: creatorAddr.String(),
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
@@ -197,7 +197,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 		},
 		{
 			name: "validator unbonded but sufficient stake => no error",
-			msg: &types2.MsgRegisterSupernode{
+			msg: &types.MsgRegisterSupernode{
 				SupernodeAccount: creatorAddr.String(),
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
@@ -219,7 +219,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 		},
 		{
 			name: "re-registration of disabled supernode",
-			msg: &types2.MsgRegisterSupernode{
+			msg: &types.MsgRegisterSupernode{
 				SupernodeAccount: creatorAddr.String(),
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
@@ -241,7 +241,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 		},
 		{
 			name: "cannot register already active supernode",
-			msg: &types2.MsgRegisterSupernode{
+			msg: &types.MsgRegisterSupernode{
 				SupernodeAccount: creatorAddr.String(),
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
@@ -254,7 +254,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 		},
 		{
 			name: "cannot re-register STOPPED supernode",
-			msg: &types2.MsgRegisterSupernode{
+			msg: &types.MsgRegisterSupernode{
 				SupernodeAccount: creatorAddr.String(),
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
@@ -267,7 +267,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 		},
 		{
 			name: "cannot re-register PENALIZED supernode",
-			msg: &types2.MsgRegisterSupernode{
+			msg: &types.MsgRegisterSupernode{
 				SupernodeAccount: creatorAddr.String(),
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
@@ -280,7 +280,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 		},
 		{
 			name: "re-registration ignores new parameters (IP, account, port)",
-			msg: &types2.MsgRegisterSupernode{
+			msg: &types.MsgRegisterSupernode{
 				SupernodeAccount: otherCreatorAddr.String(), // Different account - should be ignored
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
@@ -302,7 +302,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 		},
 		{
 			name: "re-registration fails when validator becomes jailed",
-			msg: &types2.MsgRegisterSupernode{
+			msg: &types.MsgRegisterSupernode{
 				SupernodeAccount: creatorAddr.String(),
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
@@ -324,7 +324,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 		},
 		{
 			name: "re-registration fails when validator loses eligibility",
-			msg: &types2.MsgRegisterSupernode{
+			msg: &types.MsgRegisterSupernode{
 				SupernodeAccount: creatorAddr.String(),
 				Creator:          creatorAddr.String(),
 				ValidatorAddress: valAddr.String(),
@@ -391,31 +391,31 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 			}
 
 			k, sdkCtx := setupKeeperForTest(t, stakingKeeper, slashingKeeper, bankKeeper)
-			msgServer := keeper2.NewMsgServerImpl(k)
+			msgServer := keeper.NewMsgServerImpl(k)
 
 			// Pre-setup for specific test cases
 			if tc.name == "re-registration of disabled supernode" {
 				// Create a disabled supernode
-				disabledSupernode := types2.SuperNode{
+				disabledSupernode := types.SuperNode{
 					ValidatorAddress: valAddr.String(),
 					SupernodeAccount: creatorAddr.String(),
-					States: []*types2.SuperNodeStateRecord{
+					States: []*types.SuperNodeStateRecord{
 						{
-							State:  types2.SuperNodeStateActive,
+							State:  types.SuperNodeStateActive,
 							Height: 100,
 						},
 						{
-							State:  types2.SuperNodeStateDisabled,
+							State:  types.SuperNodeStateDisabled,
 							Height: 200,
 						},
 					},
-					PrevIpAddresses: []*types2.IPAddressHistory{
+					PrevIpAddresses: []*types.IPAddressHistory{
 						{
 							Address: "192.168.1.1",
 							Height:  100,
 						},
 					},
-					PrevSupernodeAccounts: []*types2.SupernodeAccountHistory{
+					PrevSupernodeAccounts: []*types.SupernodeAccountHistory{
 						{
 							Account: creatorAddr.String(),
 							Height:  100,
@@ -429,22 +429,22 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 
 			if tc.name == "cannot register already active supernode" {
 				// Create an active supernode
-				activeSupernode := types2.SuperNode{
+				activeSupernode := types.SuperNode{
 					ValidatorAddress: valAddr.String(),
 					SupernodeAccount: creatorAddr.String(),
-					States: []*types2.SuperNodeStateRecord{
+					States: []*types.SuperNodeStateRecord{
 						{
-							State:  types2.SuperNodeStateActive,
+							State:  types.SuperNodeStateActive,
 							Height: 100,
 						},
 					},
-					PrevIpAddresses: []*types2.IPAddressHistory{
+					PrevIpAddresses: []*types.IPAddressHistory{
 						{
 							Address: "192.168.1.1",
 							Height:  100,
 						},
 					},
-					PrevSupernodeAccounts: []*types2.SupernodeAccountHistory{
+					PrevSupernodeAccounts: []*types.SupernodeAccountHistory{
 						{
 							Account: creatorAddr.String(),
 							Height:  100,
@@ -458,26 +458,26 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 
 			if tc.name == "cannot re-register STOPPED supernode" {
 				// Create a stopped supernode
-				stoppedSupernode := types2.SuperNode{
+				stoppedSupernode := types.SuperNode{
 					ValidatorAddress: valAddr.String(),
 					SupernodeAccount: creatorAddr.String(),
-					States: []*types2.SuperNodeStateRecord{
+					States: []*types.SuperNodeStateRecord{
 						{
-							State:  types2.SuperNodeStateActive,
+							State:  types.SuperNodeStateActive,
 							Height: 100,
 						},
 						{
-							State:  types2.SuperNodeStateStopped,
+							State:  types.SuperNodeStateStopped,
 							Height: 200,
 						},
 					},
-					PrevIpAddresses: []*types2.IPAddressHistory{
+					PrevIpAddresses: []*types.IPAddressHistory{
 						{
 							Address: "192.168.1.1",
 							Height:  100,
 						},
 					},
-					PrevSupernodeAccounts: []*types2.SupernodeAccountHistory{
+					PrevSupernodeAccounts: []*types.SupernodeAccountHistory{
 						{
 							Account: creatorAddr.String(),
 							Height:  100,
@@ -491,26 +491,26 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 
 			if tc.name == "cannot re-register PENALIZED supernode" {
 				// Create a penalized supernode
-				penalizedSupernode := types2.SuperNode{
+				penalizedSupernode := types.SuperNode{
 					ValidatorAddress: valAddr.String(),
 					SupernodeAccount: creatorAddr.String(),
-					States: []*types2.SuperNodeStateRecord{
+					States: []*types.SuperNodeStateRecord{
 						{
-							State:  types2.SuperNodeStateActive,
+							State:  types.SuperNodeStateActive,
 							Height: 100,
 						},
 						{
-							State:  types2.SuperNodeStatePenalized,
+							State:  types.SuperNodeStatePenalized,
 							Height: 200,
 						},
 					},
-					PrevIpAddresses: []*types2.IPAddressHistory{
+					PrevIpAddresses: []*types.IPAddressHistory{
 						{
 							Address: "192.168.1.1",
 							Height:  100,
 						},
 					},
-					PrevSupernodeAccounts: []*types2.SupernodeAccountHistory{
+					PrevSupernodeAccounts: []*types.SupernodeAccountHistory{
 						{
 							Account: creatorAddr.String(),
 							Height:  100,
@@ -526,26 +526,26 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 				tc.name == "re-registration fails when validator becomes jailed" ||
 				tc.name == "re-registration fails when validator loses eligibility" {
 				// Create a disabled supernode
-				disabledSupernode := types2.SuperNode{
+				disabledSupernode := types.SuperNode{
 					ValidatorAddress: valAddr.String(),
 					SupernodeAccount: creatorAddr.String(), // Original account
-					States: []*types2.SuperNodeStateRecord{
+					States: []*types.SuperNodeStateRecord{
 						{
-							State:  types2.SuperNodeStateActive,
+							State:  types.SuperNodeStateActive,
 							Height: 100,
 						},
 						{
-							State:  types2.SuperNodeStateDisabled,
+							State:  types.SuperNodeStateDisabled,
 							Height: 200,
 						},
 					},
-					PrevIpAddresses: []*types2.IPAddressHistory{
+					PrevIpAddresses: []*types.IPAddressHistory{
 						{
 							Address: "192.168.1.1", // Original IP
 							Height:  100,
 						},
 					},
-					PrevSupernodeAccounts: []*types2.SupernodeAccountHistory{
+					PrevSupernodeAccounts: []*types.SupernodeAccountHistory{
 						{
 							Account: creatorAddr.String(), // Original account
 							Height:  100,
@@ -577,7 +577,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 					sn, found := k.QuerySuperNode(sdkCtx, valAddr)
 					require.True(t, found)
 					require.Len(t, sn.States, 3) // Initial active, disabled, then active again
-					require.Equal(t, types2.SuperNodeStateActive, sn.States[2].State)
+					require.Equal(t, types.SuperNodeStateActive, sn.States[2].State)
 
 					// Verify IP address and account were NOT updated
 					require.Equal(t, "192.168.1.1", sn.PrevIpAddresses[len(sn.PrevIpAddresses)-1].Address)
@@ -589,7 +589,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 					evs := sdkCtx.EventManager().Events()
 					foundEvt := false
                     for _, e := range evs {
-                        if e.Type != types2.EventTypeSupernodeRegistered {
+                        if e.Type != types.EventTypeSupernodeRegistered {
                             continue
                         }
                         kv := map[string]string{}
@@ -597,13 +597,13 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
                             kv[string(a.Key)] = string(a.Value)
                         }
                         
-                        rereg := kv[types2.AttributeKeyReRegistered] == "true"
-                        oldst := kv[types2.AttributeKeyOldState] == types2.SuperNodeStateDisabled.String()
-                        ipok := kv[types2.AttributeKeyIPAddress] == "192.168.1.1"
-                        accok := kv[types2.AttributeKeySupernodeAccount] == creatorAddr.String()
-                        p2pok := kv[types2.AttributeKeyP2PPort] == "26657"
-                        valok := kv[types2.AttributeKeyValidatorAddress] == valAddr.String()
-                        htok := kv[types2.AttributeKeyHeight] == fmt.Sprintf("%d", sdkCtx.BlockHeight())
+                        rereg := kv[types.AttributeKeyReRegistered] == "true"
+                        oldst := kv[types.AttributeKeyOldState] == types.SuperNodeStateDisabled.String()
+                        ipok := kv[types.AttributeKeyIPAddress] == "192.168.1.1"
+                        accok := kv[types.AttributeKeySupernodeAccount] == creatorAddr.String()
+                        p2pok := kv[types.AttributeKeyP2PPort] == "26657"
+                        valok := kv[types.AttributeKeyValidatorAddress] == valAddr.String()
+                        htok := kv[types.AttributeKeyHeight] == fmt.Sprintf("%d", sdkCtx.BlockHeight())
                         
                         if rereg && oldst && ipok && accok && p2pok && valok && htok {
                             foundEvt = true
@@ -618,7 +618,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 					sn, found := k.QuerySuperNode(sdkCtx, valAddr)
 					require.True(t, found)
 					require.Len(t, sn.States, 3) // Initial active, disabled, then active again
-					require.Equal(t, types2.SuperNodeStateActive, sn.States[2].State)
+					require.Equal(t, types.SuperNodeStateActive, sn.States[2].State)
 
 					// Verify ALL original parameters were preserved (not updated)
 					require.Equal(t, "192.168.1.1", sn.PrevIpAddresses[len(sn.PrevIpAddresses)-1].Address) // Original IP kept
@@ -631,7 +631,7 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 					evs := sdkCtx.EventManager().Events()
 					foundEvt := false
                     for _, e := range evs {
-                        if e.Type != types2.EventTypeSupernodeRegistered {
+                        if e.Type != types.EventTypeSupernodeRegistered {
                             continue
                         }
                         kv := map[string]string{}
@@ -639,13 +639,13 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
                             kv[string(a.Key)] = string(a.Value)
                         }
                         
-                        rereg := kv[types2.AttributeKeyReRegistered] == "true"
-                        oldst := kv[types2.AttributeKeyOldState] == types2.SuperNodeStateDisabled.String()
-                        ipok := kv[types2.AttributeKeyIPAddress] == "192.168.1.1"
-                        accok := kv[types2.AttributeKeySupernodeAccount] == creatorAddr.String()
-                        p2pok := kv[types2.AttributeKeyP2PPort] == "26657"
-                        valok := kv[types2.AttributeKeyValidatorAddress] == valAddr.String()
-                        htok := kv[types2.AttributeKeyHeight] == fmt.Sprintf("%d", sdkCtx.BlockHeight())
+                        rereg := kv[types.AttributeKeyReRegistered] == "true"
+                        oldst := kv[types.AttributeKeyOldState] == types.SuperNodeStateDisabled.String()
+                        ipok := kv[types.AttributeKeyIPAddress] == "192.168.1.1"
+                        accok := kv[types.AttributeKeySupernodeAccount] == creatorAddr.String()
+                        p2pok := kv[types.AttributeKeyP2PPort] == "26657"
+                        valok := kv[types.AttributeKeyValidatorAddress] == valAddr.String()
+                        htok := kv[types.AttributeKeyHeight] == fmt.Sprintf("%d", sdkCtx.BlockHeight())
                         
                         if rereg && oldst && ipok && accok && p2pok && valok && htok {
                             foundEvt = true
@@ -662,11 +662,11 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 // setupKeeperForTest is your existing function
 func setupKeeperForTest(
 	t testing.TB,
-	stakingKeeper types2.StakingKeeper,
-	slashingKeeper types2.SlashingKeeper,
-	bankKeeper types2.BankKeeper,
-) (keeper2.Keeper, sdk.Context) {
-	storeKey := storetypes.NewKVStoreKey(types2.StoreKey)
+	stakingKeeper types.StakingKeeper,
+	slashingKeeper types.SlashingKeeper,
+	bankKeeper types.BankKeeper,
+) (keeper.Keeper, sdk.Context) {
+	storeKey := storetypes.NewKVStoreKey(types.StoreKey)
 	db := dbm.NewMemDB()
 	stateStore := store.NewCommitMultiStore(db, log.NewNopLogger(), metrics.NewNoOpMetrics())
 	stateStore.MountStoreWithDB(storeKey, storetypes.StoreTypeIAVL, db)
@@ -677,7 +677,7 @@ func setupKeeperForTest(
 
 	authority := authtypes.NewModuleAddress(govtypes.ModuleName).String()
 
-	k := keeper2.NewKeeper(
+	k := keeper.NewKeeper(
 		cdc,
 		runtime.NewKVStoreService(storeKey),
 		log.NewNopLogger(),
@@ -691,7 +691,7 @@ func setupKeeperForTest(
 	sdkCtx = sdkCtx.WithBlockTime(time.Now())
 
 	// Set default params => min self-stake = 1,000,000
-	params := types2.DefaultParams()
+	params := types.DefaultParams()
 	params.MinimumStakeForSn = sdk.NewInt64Coin("ulume", 1_000_000)
 	err := k.SetParams(sdkCtx, params)
 	require.NoError(t, err)

@@ -9,23 +9,21 @@ import (
 	"strconv"
 	"time"
 
-	keeper2 "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
-	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
 	"cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	simtypes "github.com/cosmos/cosmos-sdk/types/simulation"
 
-	"google.golang.org/protobuf/proto"
+	gogoproto "github.com/gogo/protobuf/proto"
 
-	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
 	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
+	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
+	"github.com/LumeraProtocol/lumera/x/action/v1/types"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 )
 
 // registerSenseAction creates a new SENSE action in PENDING state for the simulation
-func registerSenseAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, bk types2.BankKeeper, k keeper2.Keeper, ak types2.AccountKeeper) (string, *types2.MsgRequestAction) {
+func registerSenseAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, bk types.BankKeeper, k keeper.Keeper, ak types.AuthKeeper) (string, *types.MsgRequestAction) {
 	params := k.GetParams(ctx)
 
 	// 1. Select random account with enough balance
@@ -42,16 +40,16 @@ func registerSenseAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account,
 	expirationTime := getRandomExpirationTime(ctx, r, params)
 
 	// 5. Create message
-	msg := types2.NewMsgRequestAction(
+	msg := types.NewMsgRequestAction(
 		simAccount.Address.String(),
-		actionapi.ActionType_ACTION_TYPE_SENSE.String(),
+		types.ActionTypeSense.String(),
 		senseMetadata,
 		feeAmount.String(),
 		strconv.FormatInt(expirationTime, 10),
 	)
 
 	// 6. Cache keeper state for simulation
-	msgServSim := keeper2.NewMsgServerImpl(k)
+	msgServSim := keeper.NewMsgServerImpl(k)
 
 	// 7. Deliver transaction
 	result, err := msgServSim.RequestAction(ctx, msg)
@@ -63,7 +61,7 @@ func registerSenseAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account,
 }
 
 // registerCascadeAction creates a new CASCADE action in PENDING state for the simulation
-func registerCascadeAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, bk types2.BankKeeper, k keeper2.Keeper, ak types2.AccountKeeper) (string, *types2.MsgRequestAction) {
+func registerCascadeAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, bk types.BankKeeper, k keeper.Keeper, ak types.AuthKeeper) (string, *types.MsgRequestAction) {
 	params := k.GetParams(ctx)
 
 	// 1. Select random account with enough balance
@@ -87,16 +85,16 @@ func registerCascadeAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Accoun
 	expirationTime := getRandomExpirationTime(ctx, r, params)
 
 	// 5. Create message
-	msg := types2.NewMsgRequestAction(
+	msg := types.NewMsgRequestAction(
 		simAccount.Address.String(),
-		actionapi.ActionType_ACTION_TYPE_CASCADE.String(),
+		types.ActionTypeCascade.String(),
 		cascadeMetadata,
 		feeAmount.String(),
 		strconv.FormatInt(expirationTime, 10),
 	)
 
 	// 6. Cache keeper state for simulation
-	msgServSim := keeper2.NewMsgServerImpl(k)
+	msgServSim := keeper.NewMsgServerImpl(k)
 
 	// 7. Deliver transaction
 	result, err := msgServSim.RequestAction(ctx, msg)
@@ -108,7 +106,7 @@ func registerCascadeAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Accoun
 }
 
 // finalizeSenseAction finalizes a SENSE action by submitting 3 matching metadata entries
-func finalizeSenseAction(ctx sdk.Context, k keeper2.Keeper, bk types2.BankKeeper, actionID string, supernodes []simtypes.Account) *types2.MsgFinalizeAction {
+func finalizeSenseAction(ctx sdk.Context, k keeper.Keeper, bk types.BankKeeper, actionID string, supernodes []simtypes.Account) *types.MsgFinalizeAction {
 	// 1. Get the action to verify it exists
 	_, found := k.GetActionByID(ctx, actionID)
 	if !found {
@@ -116,9 +114,9 @@ func finalizeSenseAction(ctx sdk.Context, k keeper2.Keeper, bk types2.BankKeeper
 	}
 
 	// 3. Submit from all three supernodes
-	msgServSim := keeper2.NewMsgServerImpl(k)
+	msgServSim := keeper.NewMsgServerImpl(k)
 
-	var finalMsg *types2.MsgFinalizeAction
+	var finalMsg *types.MsgFinalizeAction
 
 	// Create finalization metadata with signature
 	metadata := generateFinalizeMetadataForSense(ctx, k, actionID, supernodes)
@@ -128,10 +126,10 @@ func finalizeSenseAction(ctx sdk.Context, k keeper2.Keeper, bk types2.BankKeeper
 	initialBalance := bk.GetBalance(ctx, supernodes[0].Address, feeDenom)
 
 	// Create and submit finalization message
-	msg := types2.NewMsgFinalizeAction(
+	msg := types.NewMsgFinalizeAction(
 		supernodes[0].Address.String(),
 		actionID,
-		actionapi.ActionType_ACTION_TYPE_SENSE.String(),
+		types.ActionTypeSense.String(),
 		metadata,
 	)
 
@@ -146,7 +144,7 @@ func finalizeSenseAction(ctx sdk.Context, k keeper2.Keeper, bk types2.BankKeeper
 		panic(fmt.Sprintf("action with ID %s not found after finalization", actionID))
 	}
 
-	if finalAction.State != actionapi.ActionState_ACTION_STATE_DONE {
+	if finalAction.State != types.ActionStateDone {
 		panic(fmt.Sprintf("action %s not in DONE state after finalization: %s", actionID, finalAction.State))
 	}
 
@@ -159,7 +157,7 @@ func finalizeSenseAction(ctx sdk.Context, k keeper2.Keeper, bk types2.BankKeeper
 }
 
 // finalizeCascadeAction finalizes a CASCADE action with a single supernode
-func finalizeCascadeAction(ctx sdk.Context, k keeper2.Keeper, actionID string, supernodes []simtypes.Account) *types2.MsgFinalizeAction {
+func finalizeCascadeAction(ctx sdk.Context, k keeper.Keeper, actionID string, supernodes []simtypes.Account) *types.MsgFinalizeAction {
 	// 1. Get the action
 	_, found := k.GetActionByID(ctx, actionID)
 	if !found {
@@ -170,15 +168,15 @@ func finalizeCascadeAction(ctx sdk.Context, k keeper2.Keeper, actionID string, s
 	metadata := generateFinalizeMetadataForCascade(ctx, k, actionID, supernodes)
 
 	// 3. Create and submit finalization message
-	msg := types2.NewMsgFinalizeAction(
+	msg := types.NewMsgFinalizeAction(
 		supernodes[0].Address.String(),
 		actionID,
-		actionapi.ActionType_ACTION_TYPE_CASCADE.String(),
+		types.ActionTypeCascade.String(),
 		metadata,
 	)
 
 	// 4. Deliver transaction
-	msgServSim := keeper2.NewMsgServerImpl(k)
+	msgServSim := keeper.NewMsgServerImpl(k)
 	_, err := msgServSim.FinalizeAction(ctx, msg)
 	if err != nil {
 		panic(fmt.Sprintf("failed to finalize CASCADE action %s: %v", actionID, err))
@@ -190,7 +188,7 @@ func finalizeCascadeAction(ctx sdk.Context, k keeper2.Keeper, actionID string, s
 		panic(fmt.Sprintf("action with ID %s not found after finalization", actionID))
 	}
 
-	if finalAction.State != actionapi.ActionState_ACTION_STATE_DONE {
+	if finalAction.State != types.ActionStateDone {
 		panic(fmt.Sprintf("action %s not in DONE state after finalization: %s", actionID, finalAction.State))
 	}
 
@@ -198,7 +196,7 @@ func finalizeCascadeAction(ctx sdk.Context, k keeper2.Keeper, actionID string, s
 }
 
 // registerSenseOrCascadeAction finds an existing action in PENDING state or creates a new one
-func registerSenseOrCascadeAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, k keeper2.Keeper, bk types2.BankKeeper, ak types2.AccountKeeper) (string, *actionapi.Action) {
+func registerSenseOrCascadeAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, k keeper.Keeper, bk types.BankKeeper, ak types.AuthKeeper) (string, *types.Action) {
 	// Randomly choose between SENSE and CASCADE
 	var actionID string
 	if r.Intn(2) == 0 {
@@ -214,15 +212,15 @@ func registerSenseOrCascadeAction(r *rand.Rand, ctx sdk.Context, accs []simtypes
 	return actionID, action
 }
 
-func finalizeAction(r *rand.Rand, ctx sdk.Context, k keeper2.Keeper, ak types2.AccountKeeper, bk types2.BankKeeper, actionID string, actionType actionapi.ActionType, accs []simtypes.Account) ([]simtypes.Account, error) {
-	if actionType == actionapi.ActionType_ACTION_TYPE_SENSE {
+func finalizeAction(r *rand.Rand, ctx sdk.Context, k keeper.Keeper, ak types.AuthKeeper, bk types.BankKeeper, actionID string, actionType types.ActionType, accs []simtypes.Account) ([]simtypes.Account, error) {
+	if actionType == types.ActionTypeSense {
 		supernodes, err := getRandomActiveSupernodes(r, ctx, 3, ak, k, accs)
 		if err != nil {
 			return nil, err
 		}
 		finalizeSenseAction(ctx, k, bk, actionID, supernodes)
 		return supernodes, nil
-	} else if actionType == actionapi.ActionType_ACTION_TYPE_CASCADE {
+	} else if actionType == types.ActionTypeCascade {
 		supernodes, err := getRandomActiveSupernodes(r, ctx, 1, ak, k, accs)
 		if err != nil {
 			return nil, err
@@ -242,7 +240,7 @@ func FindAccount(accs []simtypes.Account, address string) (simtypes.Account, boo
 	return simtypes.FindAccount(accs, creator)
 }
 
-func addPubKeyToAccount(ctx sdk.Context, simAccount simtypes.Account, ak types2.AccountKeeper) error {
+func addPubKeyToAccount(ctx sdk.Context, simAccount simtypes.Account, ak types.AuthKeeper) error {
 	acc := ak.GetAccount(ctx, simAccount.Address)
 	if acc != nil {
 		err := acc.SetPubKey(simAccount.PubKey)
@@ -256,57 +254,56 @@ func addPubKeyToAccount(ctx sdk.Context, simAccount simtypes.Account, ak types2.
 }
 
 // selectRandomAccountWithSufficientFunds selects a random account that has enough balance to cover the specified fee amount
-func selectRandomAccountWithSufficientFunds(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, bk types2.BankKeeper, ak types2.AccountKeeper, skipAddresses []string) simtypes.Account {
-	// Get a random account
-	simAccount, _ := simtypes.RandomAcc(r, accs)
+func selectRandomAccountWithSufficientFunds(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, bk types.BankKeeper, ak types.AuthKeeper, skipAddresses []string) simtypes.Account {
+	if len(accs) == 0 {
+		panic("no accounts available to select")
+	}
 
-	for _, skipAddress := range skipAddresses {
-		if simAccount.Address.String() == skipAddress {
-			return selectRandomAccountWithSufficientFunds(r, ctx, accs, bk, ak, skipAddresses)
+	skip := make(map[string]struct{}, len(skipAddresses))
+	for _, addr := range skipAddresses {
+		skip[addr] = struct{}{}
+	}
+
+	perm := r.Perm(len(accs))
+	for _, idx := range perm {
+		simAccount := accs[idx]
+		if _, shouldSkip := skip[simAccount.Address.String()]; shouldSkip {
+			continue
 		}
+
+		balance := bk.GetBalance(ctx, simAccount.Address, sdk.DefaultBondDenom)
+		if balance.IsZero() || balance.Amount.LT(math.NewInt(1_000_000)) {
+			continue
+		}
+
+		if err := addPubKeyToAccount(ctx, simAccount, ak); err != nil {
+			panic(err)
+		}
+
+		return simAccount
 	}
 
-	// Check if the account has enough balance
-	denom := sdk.DefaultBondDenom
-	balance := bk.GetBalance(ctx, simAccount.Address, denom)
-
-	// Ensure account has enough funds for gas + fees
-	if balance.IsZero() || balance.Amount.LT(math.NewInt(1000000)) {
-		// If the account doesn't have enough funds, recursively try another account
-		return selectRandomAccountWithSufficientFunds(r, ctx, accs, bk, ak, skipAddresses)
-	}
-
-	err := addPubKeyToAccount(ctx, simAccount, ak)
-	if err != nil {
-		panic(err)
-	}
-
-	return simAccount
+	panic("no account with sufficient funds found during simulation")
 }
 
 // selectRandomAccountWithInsufficientFunds selects a random account that doesn't have enough balance to cover the specified fee amount
-func selectRandomAccountWithInsufficientFunds(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, bk types2.BankKeeper, minFee sdk.Coin) simtypes.Account {
-	// Get a random account
-	simAccount, _ := simtypes.RandomAcc(r, accs)
+func selectRandomAccountWithInsufficientFunds(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, bk types.BankKeeper, minFee sdk.Coin) simtypes.Account {
+	if len(accs) == 0 {
+		panic("no accounts available to select")
+	}
 
-	// Check if the account has insufficient balance
-	balance := bk.GetBalance(ctx, simAccount.Address, sdk.DefaultBondDenom)
-
-	// We need an account that has some funds (not zero) but less than the minimal fee
-	// This ensures we can see the insufficient funds error rather than something else
-	if balance.IsZero() || balance.Amount.GTE(minFee.Amount) {
-		// If the account has zero balance or enough funds, recursively try another account or modify balance
-		if balance.IsZero() {
-			// If balance is zero, randomly select another account
-			return selectRandomAccountWithInsufficientFunds(r, ctx, accs, bk, minFee)
-		} else {
-			// Since all accounts might have sufficient funds in simulation, we can use this account
-			// but need to artificially reduce its effective balance for the test
+	perm := r.Perm(len(accs))
+	for _, idx := range perm {
+		simAccount := accs[idx]
+		balance := bk.GetBalance(ctx, simAccount.Address, sdk.DefaultBondDenom)
+		if balance.IsZero() || balance.Amount.LT(minFee.Amount) {
 			return simAccount
 		}
 	}
 
-	return simAccount
+	// If every account has sufficient funds, fall back to a random account.
+	acc, _ := simtypes.RandomAcc(r, accs)
+	return acc
 }
 
 // generateRandomHash generates a random hash string for use in SENSE metadata
@@ -365,7 +362,7 @@ func generateSenseSignature(simAccounts []simtypes.Account) string {
 	return signatureSense
 }
 
-func getRandomExpirationTime(ctx sdk.Context, r *rand.Rand, params types2.Params) int64 {
+func getRandomExpirationTime(ctx sdk.Context, r *rand.Rand, params types.Params) int64 {
 	expirationDuration := time.Duration(r.Int63n(int64(params.ExpirationDuration)) + int64(params.ExpirationDuration))
 	return ctx.BlockTime().Add(expirationDuration).Unix()
 }
@@ -384,8 +381,8 @@ func generateRandomFee(r *rand.Rand, ctx sdk.Context, minFee sdk.Coin) sdk.Coin 
 func selectRandomActionType(r *rand.Rand) string {
 	// Define available action types
 	actionTypes := []string{
-		actionapi.ActionType_ACTION_TYPE_SENSE.String(),
-		actionapi.ActionType_ACTION_TYPE_CASCADE.String(),
+		types.ActionTypeSense.String(),
+		types.ActionTypeCascade.String(),
 	}
 
 	// Return random selection
@@ -398,7 +395,7 @@ func generateRandomOtiValues(n int) []byte {
 }
 
 // getRandomActiveSupernodes simulates getting a list of active supernodes from the system
-func getRandomActiveSupernodes(r *rand.Rand, ctx sdk.Context, numSupernodes int, ak types2.AccountKeeper, k keeper2.Keeper, accs []simtypes.Account) ([]simtypes.Account, error) {
+func getRandomActiveSupernodes(r *rand.Rand, ctx sdk.Context, numSupernodes int, ak types.AuthKeeper, k keeper.Keeper, accs []simtypes.Account) ([]simtypes.Account, error) {
 	top10 := getTop10Supernodes(ctx, k)
 	if len(top10) < 10 {
 		for i := 0; i < 10-len(top10); i++ {
@@ -436,7 +433,7 @@ func getRandomActiveSupernodes(r *rand.Rand, ctx sdk.Context, numSupernodes int,
 func generateKademliaIDs(ic uint64, max uint64, signature string) []string {
 	var ids []string
 	for i := ic; i < ic+max; i++ {
-		id, err := keeper2.CreateKademliaID(signature, i)
+		id, err := keeper.CreateKademliaID(signature, i)
 		if err != nil {
 			panic(fmt.Sprintf("failed to create Kademlia ID: %v", err))
 		}
@@ -447,7 +444,7 @@ func generateKademliaIDs(ic uint64, max uint64, signature string) []string {
 
 // generateRequestActionSenseMetadata creates valid SENSE metadata for simulation
 func generateRequestActionSenseMetadata(dataHash string) string {
-	metadata := actionapi.SenseMetadata{
+	metadata := types.SenseMetadata{
 		DataHash:            dataHash,
 		DdAndFingerprintsIc: rand.Uint64(),
 	}
@@ -463,7 +460,7 @@ func generateRequestActionSenseMetadata(dataHash string) string {
 
 // generateCascadeMetadata creates valid CASCADE metadata for simulation
 func generateRequestActionCascadeMetadata(dataHash string, fileName string, simAccount simtypes.Account) string {
-	metadata := actionapi.CascadeMetadata{
+	metadata := types.CascadeMetadata{
 		DataHash:   dataHash,
 		FileName:   fileName,
 		RqIdsIc:    rand.Uint64(),
@@ -482,10 +479,10 @@ func generateRequestActionCascadeMetadata(dataHash string, fileName string, simA
 // generateRequestActionValidMetadata generates valid metadata based on the action type
 func generateRequestActionValidMetadata(r *rand.Rand, actionType string, simAccount simtypes.Account) string {
 	switch actionType {
-	case actionapi.ActionType_ACTION_TYPE_SENSE.String():
+	case types.ActionTypeSense.String():
 		dataHash := generateRandomHash(r)
 		return generateRequestActionSenseMetadata(dataHash)
-	case actionapi.ActionType_ACTION_TYPE_CASCADE.String():
+	case types.ActionTypeCascade.String():
 		dataHash := generateRandomHash(r)
 		fileName := generateRandomFileName(r)
 		return generateRequestActionCascadeMetadata(dataHash, fileName, simAccount)
@@ -497,7 +494,7 @@ func generateRequestActionValidMetadata(r *rand.Rand, actionType string, simAcco
 // generateInvalidSenseMetadata creates invalid SENSE metadata for simulation
 func generateInvalidRequestActionSenseMetadata(r *rand.Rand) string {
 	// Create an invalid metadata missing required fields
-	metadata := actionapi.SenseMetadata{
+	metadata := types.SenseMetadata{
 		// Missing DataHash which is required
 		// Missing DdAndFingerprintsIc which is required
 	}
@@ -520,7 +517,7 @@ func generateInvalidRequestActionSenseMetadata(r *rand.Rand) string {
 // generateInvalidCascadeMetadata creates invalid CASCADE metadata for simulation
 func generateInvalidRequestActionCascadeMetadata(r *rand.Rand, simAccount simtypes.Account) string {
 	// Create an invalid metadata missing required fields
-	metadata := actionapi.CascadeMetadata{
+	metadata := types.CascadeMetadata{
 		// Missing DataHash which is required
 		// Missing FileName which is required
 		// Missing RqIdsIc which is required
@@ -552,9 +549,9 @@ func generateInvalidRequestActionCascadeMetadata(r *rand.Rand, simAccount simtyp
 // generateRequestActionInvalidMetadata generates invalid metadata based on the action type
 func generateRequestActionInvalidMetadata(r *rand.Rand, actionType string, simAccount simtypes.Account) string {
 	switch actionType {
-	case actionapi.ActionType_ACTION_TYPE_SENSE.String():
+	case types.ActionTypeSense.String():
 		return generateInvalidRequestActionSenseMetadata(r)
-	case actionapi.ActionType_ACTION_TYPE_CASCADE.String():
+	case types.ActionTypeCascade.String():
 		return generateInvalidRequestActionCascadeMetadata(r, simAccount)
 	default:
 		panic(fmt.Sprintf("unsupported action type: %s", actionType))
@@ -562,7 +559,7 @@ func generateRequestActionInvalidMetadata(r *rand.Rand, actionType string, simAc
 }
 
 // generateFinalizeMetadataForSense creates finalization metadata for a SENSE action
-func generateFinalizeMetadataForSense(ctx sdk.Context, k keeper2.Keeper, actionID string, supernodes []simtypes.Account) string {
+func generateFinalizeMetadataForSense(ctx sdk.Context, k keeper.Keeper, actionID string, supernodes []simtypes.Account) string {
 	// 1. Get the action using its ID
 	action, found := k.GetActionByID(ctx, actionID)
 	if !found {
@@ -570,8 +567,8 @@ func generateFinalizeMetadataForSense(ctx sdk.Context, k keeper2.Keeper, actionI
 	}
 
 	// 2. Parse existing metadata
-	var existingMetadata actionapi.SenseMetadata
-	err := proto.Unmarshal(action.Metadata, &existingMetadata)
+	var existingMetadata types.SenseMetadata
+	err := gogoproto.Unmarshal(action.Metadata, &existingMetadata)
 	if err != nil {
 		panic(fmt.Sprintf("failed to unmarshal existing SENSE metadata: %v", err))
 	}
@@ -579,13 +576,13 @@ func generateFinalizeMetadataForSense(ctx sdk.Context, k keeper2.Keeper, actionI
 	return generateValidFinalizeMetadata(
 		existingMetadata.DdAndFingerprintsIc,
 		existingMetadata.DdAndFingerprintsMax,
-		actionapi.ActionType_ACTION_TYPE_SENSE.String(),
+		types.ActionTypeSense.String(),
 		supernodes,
 		"")
 }
 
 // generateFinalizeMetadataForCascade creates finalization metadata for a CASCADE action
-func generateFinalizeMetadataForCascade(ctx sdk.Context, k keeper2.Keeper, actionID string, supernodes []simtypes.Account) string {
+func generateFinalizeMetadataForCascade(ctx sdk.Context, k keeper.Keeper, actionID string, supernodes []simtypes.Account) string {
 	// 1. Get the action using its ID
 	action, found := k.GetActionByID(ctx, actionID)
 	if !found {
@@ -593,8 +590,8 @@ func generateFinalizeMetadataForCascade(ctx sdk.Context, k keeper2.Keeper, actio
 	}
 
 	// 2. Parse existing metadata
-	var existingMetadata actionapi.CascadeMetadata
-	err := proto.Unmarshal(action.Metadata, &existingMetadata)
+	var existingMetadata types.CascadeMetadata
+	err := gogoproto.Unmarshal(action.Metadata, &existingMetadata)
 	if err != nil {
 		panic(fmt.Sprintf("failed to unmarshal existing CASCADE metadata: %v", err))
 	}
@@ -602,7 +599,7 @@ func generateFinalizeMetadataForCascade(ctx sdk.Context, k keeper2.Keeper, actio
 	return generateValidFinalizeMetadata(
 		existingMetadata.RqIdsIc,
 		existingMetadata.RqIdsMax,
-		actionapi.ActionType_ACTION_TYPE_CASCADE.String(),
+		types.ActionTypeCascade.String(),
 		supernodes,
 		existingMetadata.Signatures)
 }
@@ -612,20 +609,20 @@ func generateValidFinalizeMetadata(ic uint64, max uint64, actionType string, sup
 	var metadataBytes []byte
 	var err error
 	switch actionType {
-	case actionapi.ActionType_ACTION_TYPE_SENSE.String():
+	case types.ActionTypeSense.String():
 		// Create SENSE finalization metadata
 		signature := generateSenseSignature(supernodes)
 		ids := generateKademliaIDs(ic, max, signature)
-		metadata := actionapi.SenseMetadata{
+		metadata := types.SenseMetadata{
 			DdAndFingerprintsIds: ids,
 			Signatures:           signature,
 		}
 		metadataBytes, err = json.Marshal(&metadata)
 
-	case actionapi.ActionType_ACTION_TYPE_CASCADE.String():
+	case types.ActionTypeCascade.String():
 		// Create CASCADE finalization metadata
 		ids := generateKademliaIDs(ic, max, existingSignature)
-		metadata := actionapi.CascadeMetadata{
+		metadata := types.CascadeMetadata{
 			RqIdsIds: ids,
 		}
 
@@ -643,7 +640,7 @@ func generateValidFinalizeMetadata(ic uint64, max uint64, actionType string, sup
 }
 
 // generateNonExistentActionID generates an action ID that doesn't exist in the state
-func generateNonExistentActionID(r *rand.Rand, ctx sdk.Context, k keeper2.Keeper) string {
+func generateNonExistentActionID(r *rand.Rand, ctx sdk.Context, k keeper.Keeper) string {
 	for {
 		// Generate a random action ID
 		possibleID := generateRandomHash(r)
@@ -658,7 +655,7 @@ func generateNonExistentActionID(r *rand.Rand, ctx sdk.Context, k keeper2.Keeper
 	}
 }
 
-func findOrCreateDoneActionWithCreator(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, k keeper2.Keeper, bk types2.BankKeeper, ak types2.AccountKeeper) (string, *actionapi.Action, simtypes.Account, error) {
+func findOrCreateDoneActionWithCreator(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, k keeper.Keeper, bk types.BankKeeper, ak types.AuthKeeper) (string, *types.Action, simtypes.Account, error) {
 	// Create a PENDING action
 	actionID, _ := registerCascadeAction(r, ctx, accs, bk, k, ak)
 
@@ -684,7 +681,7 @@ func findOrCreateDoneActionWithCreator(r *rand.Rand, ctx sdk.Context, accs []sim
 	}
 
 	// Verify the action is in a DONE state
-	if action.State != actionapi.ActionState_ACTION_STATE_DONE {
+	if action.State != types.ActionStateDone {
 		panic("Expected DONE action state, but action is in DONE state")
 	}
 
@@ -693,7 +690,7 @@ func findOrCreateDoneActionWithCreator(r *rand.Rand, ctx sdk.Context, accs []sim
 
 // findOrCreateActionNotInDoneState finds an action that is NOT in DONE state or creates one
 // Returns the action ID, the action object, and the creator account
-func findOrCreateActionNotInDoneState(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, k keeper2.Keeper, bk types2.BankKeeper, ak types2.AccountKeeper) (string, *actionapi.Action, simtypes.Account) {
+func findOrCreateActionNotInDoneState(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, k keeper.Keeper, bk types.BankKeeper, ak types.AuthKeeper) (string, *types.Action, simtypes.Account) {
 	// Create a PENDING action
 	actionID, _ := registerSenseAction(r, ctx, accs, bk, k, ak)
 
@@ -710,7 +707,7 @@ func findOrCreateActionNotInDoneState(r *rand.Rand, ctx sdk.Context, accs []simt
 	}
 
 	// Verify the action is in a non-DONE state (should be PENDING from registerSenseAction)
-	if action.State == actionapi.ActionState_ACTION_STATE_DONE {
+	if action.State == types.ActionStateDone {
 		panic("Expected non-DONE action state, but action is in DONE state")
 	}
 
@@ -720,10 +717,10 @@ func findOrCreateActionNotInDoneState(r *rand.Rand, ctx sdk.Context, accs []simt
 // Helper functions for generating various types of invalid metadata for SENSE actions
 
 // generateFinalizeSenseMetadataMissingDdIds creates SENSE metadata without the required DdAndFingerprintsIds field
-func generateFinalizeSenseMetadataMissingDdIds(action *actionapi.Action, supernodes []simtypes.Account) string {
+func generateFinalizeSenseMetadataMissingDdIds(action *types.Action, supernodes []simtypes.Account) string {
 	// Parse existing metadata
-	var existingMetadata actionapi.SenseMetadata
-	err := proto.Unmarshal([]byte(action.Metadata), &existingMetadata)
+	var existingMetadata types.SenseMetadata
+	err := gogoproto.Unmarshal([]byte(action.Metadata), &existingMetadata)
 	if err != nil {
 		panic(fmt.Sprintf("failed to unmarshal existing SENSE metadata: %v", err))
 	}
@@ -732,7 +729,7 @@ func generateFinalizeSenseMetadataMissingDdIds(action *actionapi.Action, superno
 	//ids := generateKademliaIDs(ic, max, signature)
 
 	// Create invalid metadata with missing DdAndFingerprintsIds field
-	metadata := actionapi.SenseMetadata{
+	metadata := types.SenseMetadata{
 		// DdAndFingerprintsIds intentionally omitted
 		Signatures: signature,
 	}
@@ -742,10 +739,10 @@ func generateFinalizeSenseMetadataMissingDdIds(action *actionapi.Action, superno
 }
 
 // generateSenseMetadataEmptyDdIds creates SENSE metadata with empty DdAndFingerprintsIds
-func generateSenseMetadataEmptyDdIds(action *actionapi.Action, supernodes []simtypes.Account) string {
+func generateSenseMetadataEmptyDdIds(action *types.Action, supernodes []simtypes.Account) string {
 	// Parse existing metadata
-	var existingMetadata actionapi.SenseMetadata
-	err := proto.Unmarshal([]byte(action.Metadata), &existingMetadata)
+	var existingMetadata types.SenseMetadata
+	err := gogoproto.Unmarshal([]byte(action.Metadata), &existingMetadata)
 	if err != nil {
 		panic(fmt.Sprintf("failed to unmarshal existing SENSE metadata: %v", err))
 	}
@@ -757,7 +754,7 @@ func generateSenseMetadataEmptyDdIds(action *actionapi.Action, supernodes []simt
 	}
 
 	// Create invalid metadata with empty DdAndFingerprintsIds array
-	metadata := actionapi.SenseMetadata{
+	metadata := types.SenseMetadata{
 		DdAndFingerprintsIds: ids,
 		Signatures:           signature,
 	}
@@ -767,10 +764,10 @@ func generateSenseMetadataEmptyDdIds(action *actionapi.Action, supernodes []simt
 }
 
 // generateSenseMetadataInvalidDdIc creates SENSE metadata with invalid DdAndFingerprintsIc count
-func generateSenseMetadataInvalidDdIc(action *actionapi.Action, supernodes []simtypes.Account) string {
+func generateSenseMetadataInvalidDdIc(action *types.Action, supernodes []simtypes.Account) string {
 	// Parse existing metadata
-	var existingMetadata actionapi.SenseMetadata
-	err := proto.Unmarshal([]byte(action.Metadata), &existingMetadata)
+	var existingMetadata types.SenseMetadata
+	err := gogoproto.Unmarshal([]byte(action.Metadata), &existingMetadata)
 	if err != nil {
 		panic(fmt.Sprintf("failed to unmarshal existing SENSE metadata: %v", err))
 	}
@@ -779,7 +776,7 @@ func generateSenseMetadataInvalidDdIc(action *actionapi.Action, supernodes []sim
 	signature := generateSenseSignature(supernodes)
 	ids := generateKademliaIDs(existingMetadata.DdAndFingerprintsIc*2, existingMetadata.DdAndFingerprintsMax, signature)
 
-	metadata := actionapi.SenseMetadata{
+	metadata := types.SenseMetadata{
 		DdAndFingerprintsIds: ids,
 		Signatures:           signature,
 	}
@@ -789,10 +786,10 @@ func generateSenseMetadataInvalidDdIc(action *actionapi.Action, supernodes []sim
 }
 
 // generateSenseMetadataMissingIds creates SENSE metadata without the required SupernodeFingerprints field
-func generateSenseMetadataMissingIds(action *actionapi.Action, supernodes []simtypes.Account) string {
+func generateSenseMetadataMissingIds(action *types.Action, supernodes []simtypes.Account) string {
 	// Parse existing metadata
-	var existingMetadata actionapi.SenseMetadata
-	err := proto.Unmarshal([]byte(action.Metadata), &existingMetadata)
+	var existingMetadata types.SenseMetadata
+	err := gogoproto.Unmarshal([]byte(action.Metadata), &existingMetadata)
 	if err != nil {
 		panic(fmt.Sprintf("failed to unmarshal existing SENSE metadata: %v", err))
 	}
@@ -802,7 +799,7 @@ func generateSenseMetadataMissingIds(action *actionapi.Action, supernodes []simt
 	ids := generateKademliaIDs(existingMetadata.DdAndFingerprintsIc, existingMetadata.DdAndFingerprintsMax/2, signature)
 
 	// Create invalid metadata with missing SupernodeFingerprints
-	metadata := actionapi.SenseMetadata{
+	metadata := types.SenseMetadata{
 		DdAndFingerprintsIds: ids,
 		Signatures:           signature,
 	}
@@ -812,10 +809,10 @@ func generateSenseMetadataMissingIds(action *actionapi.Action, supernodes []simt
 }
 
 // generateSenseMetadataSignatureMismatch creates SENSE metadata with incorrect DataHash
-func generateSenseMetadataSignatureMismatch(action *actionapi.Action, supernodes []simtypes.Account) string {
+func generateSenseMetadataSignatureMismatch(action *types.Action, supernodes []simtypes.Account) string {
 	// Parse existing metadata
-	var existingMetadata actionapi.SenseMetadata
-	err := proto.Unmarshal([]byte(action.Metadata), &existingMetadata)
+	var existingMetadata types.SenseMetadata
+	err := gogoproto.Unmarshal([]byte(action.Metadata), &existingMetadata)
 	if err != nil {
 		panic(fmt.Sprintf("failed to unmarshal existing SENSE metadata: %v", err))
 	}
@@ -824,7 +821,7 @@ func generateSenseMetadataSignatureMismatch(action *actionapi.Action, supernodes
 	ids := generateKademliaIDs(existingMetadata.DdAndFingerprintsIc, existingMetadata.DdAndFingerprintsMax, "wrong signature")
 
 	// Create invalid metadata with different DataHash than the original action
-	metadata := actionapi.SenseMetadata{
+	metadata := types.SenseMetadata{
 		DdAndFingerprintsIds: ids,
 		Signatures:           signature,
 	}
@@ -836,10 +833,10 @@ func generateSenseMetadataSignatureMismatch(action *actionapi.Action, supernodes
 // Helper functions for generating various types of invalid metadata for CASCADE actions
 
 // generateCascadeMetadataMissingRqIds creates CASCADE metadata without the required RqIdsIds field
-func generateCascadeMetadataMissingRqIds(action *actionapi.Action) string {
+func generateCascadeMetadataMissingRqIds(action *types.Action) string {
 	// Parse existing metadata
-	var existingMetadata actionapi.CascadeMetadata
-	err := proto.Unmarshal([]byte(action.Metadata), &existingMetadata)
+	var existingMetadata types.CascadeMetadata
+	err := gogoproto.Unmarshal([]byte(action.Metadata), &existingMetadata)
 	if err != nil {
 		panic(fmt.Sprintf("failed to unmarshal existing CASCADE metadata: %v", err))
 	}
@@ -847,7 +844,7 @@ func generateCascadeMetadataMissingRqIds(action *actionapi.Action) string {
 	//ids := generateKademliaIDs(ic, max, existingMetadata.Signatures)
 
 	// Create invalid metadata with missing RqIdsIds field
-	metadata := actionapi.CascadeMetadata{
+	metadata := types.CascadeMetadata{
 		// RqIdsIds intentionally omitted
 		//RqIdsOti: generateRandomOtiValues(12),
 	}
@@ -857,10 +854,10 @@ func generateCascadeMetadataMissingRqIds(action *actionapi.Action) string {
 }
 
 // generateCascadeMetadataEmptyRqIds creates CASCADE metadata with empty RqIdsIds
-func generateCascadeMetadataEmptyRqIds(action *actionapi.Action) string {
+func generateCascadeMetadataEmptyRqIds(action *types.Action) string {
 	// Parse existing metadata
-	var existingMetadata actionapi.CascadeMetadata
-	err := proto.Unmarshal([]byte(action.Metadata), &existingMetadata)
+	var existingMetadata types.CascadeMetadata
+	err := gogoproto.Unmarshal([]byte(action.Metadata), &existingMetadata)
 	if err != nil {
 		panic(fmt.Sprintf("failed to unmarshal existing CASCADE metadata: %v", err))
 	}
@@ -871,7 +868,7 @@ func generateCascadeMetadataEmptyRqIds(action *actionapi.Action) string {
 	}
 
 	// Create invalid metadata with empty RqIdsIds array
-	metadata := actionapi.CascadeMetadata{
+	metadata := types.CascadeMetadata{
 		RqIdsIds: ids,
 	}
 
@@ -880,10 +877,10 @@ func generateCascadeMetadataEmptyRqIds(action *actionapi.Action) string {
 }
 
 // generateCascadeMetadataInvalidRqIc creates CASCADE metadata with invalid RqIdsIc count
-func generateCascadeMetadataInvalidRqIc(action *actionapi.Action) string {
+func generateCascadeMetadataInvalidRqIc(action *types.Action) string {
 	// Parse existing metadata
-	var existingMetadata actionapi.CascadeMetadata
-	err := proto.Unmarshal([]byte(action.Metadata), &existingMetadata)
+	var existingMetadata types.CascadeMetadata
+	err := gogoproto.Unmarshal([]byte(action.Metadata), &existingMetadata)
 	if err != nil {
 		panic(fmt.Sprintf("failed to unmarshal existing CASCADE metadata: %v", err))
 	}
@@ -892,7 +889,7 @@ func generateCascadeMetadataInvalidRqIc(action *actionapi.Action) string {
 	ids := generateKademliaIDs(existingMetadata.RqIdsIc*2, existingMetadata.RqIdsMax, existingMetadata.Signatures)
 
 	// Create invalid metadata with mismatched IC count (5) vs actual ID count (3)
-	metadata := actionapi.CascadeMetadata{
+	metadata := types.CascadeMetadata{
 		RqIdsIds: ids,
 	}
 
@@ -901,10 +898,10 @@ func generateCascadeMetadataInvalidRqIc(action *actionapi.Action) string {
 }
 
 // generateCascadeMetadataMissingIds creates CASCADE metadata with incorrect DataHash
-func generateCascadeMetadataMissingIds(action *actionapi.Action) string {
+func generateCascadeMetadataMissingIds(action *types.Action) string {
 	// Parse existing metadata
-	var existingMetadata actionapi.CascadeMetadata
-	err := proto.Unmarshal([]byte(action.Metadata), &existingMetadata)
+	var existingMetadata types.CascadeMetadata
+	err := gogoproto.Unmarshal([]byte(action.Metadata), &existingMetadata)
 	if err != nil {
 		panic(fmt.Sprintf("failed to unmarshal existing CASCADE metadata: %v", err))
 	}
@@ -913,7 +910,7 @@ func generateCascadeMetadataMissingIds(action *actionapi.Action) string {
 	ids := generateKademliaIDs(existingMetadata.RqIdsIc, existingMetadata.RqIdsMax/2, existingMetadata.Signatures)
 
 	// Create invalid metadata with different DataHash than the original action
-	metadata := actionapi.CascadeMetadata{
+	metadata := types.CascadeMetadata{
 		RqIdsIds: ids,
 	}
 
@@ -922,10 +919,10 @@ func generateCascadeMetadataMissingIds(action *actionapi.Action) string {
 }
 
 // generateCascadeMetadataSignatureMismatch creates CASCADE metadata with incorrect FileName
-func generateCascadeMetadataSignatureMismatch(action *actionapi.Action) string {
+func generateCascadeMetadataSignatureMismatch(action *types.Action) string {
 	// Parse existing metadata
-	var existingMetadata actionapi.CascadeMetadata
-	err := proto.Unmarshal([]byte(action.Metadata), &existingMetadata)
+	var existingMetadata types.CascadeMetadata
+	err := gogoproto.Unmarshal([]byte(action.Metadata), &existingMetadata)
 	if err != nil {
 		panic(fmt.Sprintf("failed to unmarshal existing CASCADE metadata: %v", err))
 	}
@@ -933,7 +930,7 @@ func generateCascadeMetadataSignatureMismatch(action *actionapi.Action) string {
 	ids := generateKademliaIDs(existingMetadata.RqIdsIc, existingMetadata.RqIdsMax, "wrong signature")
 
 	// Create invalid metadata with different FileName than the original action
-	metadata := actionapi.CascadeMetadata{
+	metadata := types.CascadeMetadata{
 		RqIdsIds: ids,
 	}
 
@@ -969,13 +966,13 @@ func selectAccountWithoutPermission(r *rand.Rand, ctx sdk.Context, accs []simtyp
 	return simAccount
 }
 
-func getTop10Supernodes(ctx sdk.Context, k keeper2.Keeper) []sdk.Address {
+func getTop10Supernodes(ctx sdk.Context, k keeper.Keeper) []sdk.Address {
 	// Query top-10 SuperNodes for action's block height
-	topSuperNodesReq := &types.QueryGetTopSuperNodesForBlockRequest{
+	topSuperNodesReq := &sntypes.QueryGetTopSuperNodesForBlockRequest{
 		BlockHeight: int32(ctx.BlockHeight()),
 		Limit:       10,
 	}
-	topSuperNodesResp, err := k.GetSupernodeKeeper().GetTopSuperNodesForBlock(ctx, topSuperNodesReq)
+	topSuperNodesResp, err := k.GetSupernodeQueryServer().GetTopSuperNodesForBlock(ctx, topSuperNodesReq)
 	if err != nil {
 		panic(err)
 	}
@@ -988,7 +985,7 @@ func getTop10Supernodes(ctx sdk.Context, k keeper2.Keeper) []sdk.Address {
 	return supernodes
 }
 
-func registerSupernode(r *rand.Rand, ctx sdk.Context, k keeper2.Keeper, accs []simtypes.Account) (simtypes.Account, error) {
+func registerSupernode(r *rand.Rand, ctx sdk.Context, k keeper.Keeper, accs []simtypes.Account) (simtypes.Account, error) {
 	var simAccount simtypes.Account
 	var found bool
 	stakingKeeper := k.GetStakingKeeper()
@@ -1033,22 +1030,22 @@ func registerSupernode(r *rand.Rand, ctx sdk.Context, k keeper2.Keeper, accs []s
 
 	p2pPort := fmt.Sprintf("%d", r.Intn(65535))
 
-	supernode := types.SuperNode{
+	supernode := sntypes.SuperNode{
 		ValidatorAddress: validatorAddress,
 		SupernodeAccount: simAccount.Address.String(),
-		Evidence:         []*types.Evidence{},
+		Evidence:         []*sntypes.Evidence{},
 		Note:             version,
-		Metrics: &types.MetricsAggregate{
+		Metrics: &sntypes.MetricsAggregate{
 			Metrics:     make(map[string]float64),
 			ReportCount: 0,
 		},
-		States: []*types.SuperNodeStateRecord{
+		States: []*sntypes.SuperNodeStateRecord{
 			{
-				State:  types.SuperNodeStateActive,
+				State:  sntypes.SuperNodeStateActive,
 				Height: ctx.BlockHeight(),
 			},
 		},
-		PrevIpAddresses: []*types.IPAddressHistory{
+		PrevIpAddresses: []*sntypes.IPAddressHistory{
 			{
 				Address: ipAddress,
 				Height:  ctx.BlockHeight(),

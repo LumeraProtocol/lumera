@@ -1,14 +1,13 @@
 syntax = "proto3";
-
 package lumera.lumeraid;
+
+option go_package = "x/lumeraid/types";
 
 import "amino/amino.proto";
 import "cosmos/msg/v1/msg.proto";
 import "cosmos_proto/cosmos.proto";
 import "gogoproto/gogo.proto";
 import "lumera/lumeraid/params.proto";
-
-option go_package = "github.com/LumeraProtocol/lumera/x/lumeraid/types";
 
 // Msg defines the Msg service.
 service Msg {
@@ -36,6 +35,3 @@ message MsgUpdateParams {
 // MsgUpdateParamsResponse defines the response structure for executing a
 // MsgUpdateParams message.
 message MsgUpdateParamsResponse {}
-
-
-

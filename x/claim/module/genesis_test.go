@@ -3,10 +3,12 @@ package claim_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
 	claim "github.com/LumeraProtocol/lumera/x/claim/module"
+	claimtestutils "github.com/LumeraProtocol/lumera/x/claim/testutils"
 	"github.com/LumeraProtocol/lumera/x/claim/types"
-	"github.com/stretchr/testify/require"
 )
 
 func TestGenesis(t *testing.T) {
@@ -23,7 +25,20 @@ func TestGenesis(t *testing.T) {
 		ClaimsDenom:  types.DefaultClaimsDenom,
 	}
 
-	k, ctx := keepertest.ClaimKeeper(t)
+	testData, err := claimtestutils.GenerateClaimingTestData()
+	require.NoError(t, err)
+
+	// generate a CSV file with the test data
+	claimsPath, err := claimtestutils.GenerateClaimsCSVFile([]claimtestutils.ClaimCSVRecord{
+		{OldAddress: testData.OldAddress, Amount: defaultGenState.TotalClaimableAmount},
+	}, nil)
+	require.NoError(t, err)
+	// Ensure the file is cleaned up after the test
+	t.Cleanup(func() {
+		claimtestutils.CleanupClaimsCSVFile(claimsPath)
+	})
+
+	k, ctx := keepertest.ClaimKeeper(t, claimsPath)
 	claim.InitGenesis(ctx, k, genesisState)
 	got := claim.ExportGenesis(ctx, k)
 	require.NotNil(t, got)

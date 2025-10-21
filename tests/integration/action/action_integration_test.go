@@ -7,11 +7,10 @@ import (
 	"testing"
 	"time"
 
-	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
 	lumeraapp "github.com/LumeraProtocol/lumera/app"
 	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
-	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
@@ -23,9 +22,10 @@ import (
 type ActionIntegrationTestSuite struct {
 	suite.Suite
 
+	app       *lumeraapp.App
 	ctx       sdk.Context
 	keeper    keeper.Keeper
-	msgServer types2.MsgServer
+	msgServer actiontypes.MsgServer
 
 	// Test accounts for simulation
 	testAddrs    []sdk.AccAddress
@@ -34,13 +34,13 @@ type ActionIntegrationTestSuite struct {
 }
 
 // SetupTest sets up a test suite
-
 func (suite *ActionIntegrationTestSuite) SetupTest() {
 	// Setup would normally create a test keeper and context
 	// For now we just create empty structs since we're only setting up the test structure
 	app := lumeraapp.Setup(suite.T()) // Proper app initialization
-	ctx := app.BaseApp.NewContext(false).WithBlockHeight(1)
+	ctx := app.BaseApp.NewContext(false).WithBlockHeight(1).WithBlockTime(time.Now())
 
+	suite.app = app
 	suite.ctx = ctx
 	suite.keeper = app.ActionKeeper
 	suite.msgServer = keeper.NewMsgServerImpl(suite.keeper)
@@ -51,30 +51,32 @@ func (suite *ActionIntegrationTestSuite) SetupTest() {
 
 	suite.testAddrs, suite.privKeys, _ = createTestAddAddrsWithKeys(5)
 	for i, addr := range suite.testAddrs {
-		acc := app.AccountKeeper.GetAccount(suite.ctx, addr)
+		acc := app.AuthKeeper.GetAccount(suite.ctx, addr)
 		if acc == nil {
-			account := app.AccountKeeper.NewAccountWithAddress(suite.ctx, addr)
+			account := app.AuthKeeper.NewAccountWithAddress(suite.ctx, addr)
 			baseAcc := account.(*authtypes.BaseAccount)
 			baseAcc.SetPubKey(suite.privKeys[i].PubKey())
-			app.AccountKeeper.SetAccount(suite.ctx, baseAcc)
+			app.AuthKeeper.SetAccount(suite.ctx, baseAcc)
 		}
-		require.NoError(suite.T(), app.BankKeeper.MintCoins(suite.ctx, types2.ModuleName, initCoins))
-		require.NoError(suite.T(), app.BankKeeper.SendCoinsFromModuleToAccount(suite.ctx, types2.ModuleName, addr, initCoins))
+		require.NoError(suite.T(), app.BankKeeper.MintCoins(suite.ctx, actiontypes.ModuleName, initCoins))
+		require.NoError(suite.T(), app.BankKeeper.SendCoinsFromModuleToAccount(suite.ctx, actiontypes.ModuleName, addr, initCoins))
 	}
 
 	valAddr := sdk.ValAddress(suite.privKeys[1].PubKey().Address())
-	sn := types.SuperNode{
+	sn := sntypes.SuperNode{
 		ValidatorAddress: valAddr.String(),
 		SupernodeAccount: suite.testAddrs[1].String(),
 		Note:             "1.0.0",
-		States:           []*types.SuperNodeStateRecord{{State: types.SuperNodeStateActive}},
-		PrevIpAddresses:  []*types.IPAddressHistory{{Address: "192.168.1.1"}},
+		States:           []*sntypes.SuperNodeStateRecord{{State: sntypes.SuperNodeStateActive}},
+		PrevIpAddresses:  []*sntypes.IPAddressHistory{{Address: "192.168.1.1"}},
 		P2PPort:          "2134",
 	}
 	require.NoError(suite.T(), app.SupernodeKeeper.SetSuperNode(suite.ctx, sn))
 
 	// Set default params
-	err := suite.keeper.SetParams(ctx, types2.DefaultParams())
+	params := actiontypes.DefaultParams()
+	params.ExpirationDuration = time.Minute
+	err := suite.keeper.SetParams(suite.ctx, params)
 	require.NoError(suite.T(), err)
 }
 
@@ -132,9 +134,9 @@ func (suite *ActionIntegrationTestSuite) TestActionLifecycle() {
 		//signatureDataPart = strings.Split(sigStr, ".")[0] // <-- Add this
 
 		metadata := fmt.Sprintf(`{"data_hash":"abc123","file_name":"file.txt","rq_ids_ic":1,"signatures":"%s"}`, sigStr)
-		msg := &types2.MsgRequestAction{
+		msg := &actiontypes.MsgRequestAction{
 			Creator:        txCreator,
-			ActionType:     actionapi.ActionType_ACTION_TYPE_CASCADE.String(),
+			ActionType:     actiontypes.ActionTypeCascade.String(),
 			Metadata:       metadata,
 			Price:          "100000ulume",
 			ExpirationTime: fmt.Sprintf("%d", time.Now().Add(10*time.Minute).Unix()),
@@ -154,21 +156,21 @@ func (suite *ActionIntegrationTestSuite) TestActionLifecycle() {
 
 		metadata := fmt.Sprintf(`{"rq_ids_ids":%s}`, toJSONStringArray(ids))
 
-		msg := &types2.MsgFinalizeAction{
+		msg := &actiontypes.MsgFinalizeAction{
 			ActionId:   actionID,
 			Creator:    sn,
-			ActionType: actionapi.ActionType_ACTION_TYPE_CASCADE.String(),
+			ActionType: actiontypes.ActionTypeCascade.String(),
 			Metadata:   metadata,
 		}
 		_, err = suite.msgServer.FinalizeAction(suite.ctx, msg)
 		require.NoError(suite.T(), err)
 		action, found := suite.keeper.GetActionByID(suite.ctx, actionID)
 		require.True(suite.T(), found)
-		require.Equal(suite.T(), actionapi.ActionState_ACTION_STATE_DONE, action.State)
+		require.Equal(suite.T(), actiontypes.ActionStateDone, action.State)
 	})
 
 	suite.Run("Approve Cascade Action", func() {
-		msg := &types2.MsgApproveAction{
+		msg := &actiontypes.MsgApproveAction{
 			ActionId: actionID,
 			Creator:  txCreator,
 		}
@@ -176,15 +178,85 @@ func (suite *ActionIntegrationTestSuite) TestActionLifecycle() {
 		require.NoError(suite.T(), err)
 		action, found := suite.keeper.GetActionByID(suite.ctx, actionID)
 		require.True(suite.T(), found)
-		require.Equal(suite.T(), actionapi.ActionState_ACTION_STATE_APPROVED, action.State)
+		require.Equal(suite.T(), actiontypes.ActionStateApproved, action.State)
 	})
+}
+
+// TestActionExpiration verifies that pending/processing actions expire, emit events, and refund fees.
+func (suite *ActionIntegrationTestSuite) TestActionExpiration() {
+	params := suite.keeper.GetParams(suite.ctx)
+	minPrice := params.BaseActionFee.Amount.Add(params.FeePerKbyte.Amount)
+	price := sdk.NewCoin(params.BaseActionFee.Denom, minPrice.AddRaw(1_000))
+
+	initialAccountBalance := suite.app.BankKeeper.GetBalance(suite.ctx, suite.testAddrs[0], price.Denom)
+	initialModuleBalance := suite.app.BankKeeper.GetBalance(suite.ctx, actiontypes.ModuleAccountAddress, price.Denom)
+	suite.True(initialModuleBalance.IsZero())
+
+	sigStr, err := createValidCascadeSignatureString(suite.privKeys[0], 1)
+	require.NoError(suite.T(), err)
+
+	metadata := fmt.Sprintf(`{"data_hash":"expire_hash","file_name":"expire.dat","rq_ids_ic":1,"signatures":"%s"}`, sigStr)
+	expiration := suite.ctx.BlockTime().Add(params.ExpirationDuration)
+
+	msg := &actiontypes.MsgRequestAction{
+		Creator:        suite.testAddrs[0].String(),
+		ActionType:     actiontypes.ActionTypeCascade.String(),
+		Metadata:       metadata,
+		Price:          price.String(),
+		ExpirationTime: fmt.Sprintf("%d", expiration.Unix()),
+	}
+
+	res, err := suite.msgServer.RequestAction(suite.ctx, msg)
+	require.NoError(suite.T(), err)
+	require.NotEmpty(suite.T(), res.ActionId)
+
+	moduleBalanceAfterRequest := suite.app.BankKeeper.GetBalance(suite.ctx, actiontypes.ModuleAccountAddress, price.Denom)
+	require.Equal(suite.T(), price, moduleBalanceAfterRequest)
+
+	accountBalanceAfterRequest := suite.app.BankKeeper.GetBalance(suite.ctx, suite.testAddrs[0], price.Denom)
+	require.True(suite.T(), accountBalanceAfterRequest.Amount.Equal(initialAccountBalance.Amount.Sub(price.Amount)))
+
+	// advance block time beyond expiration and clear events before running end blocker
+	suite.ctx = suite.ctx.WithBlockTime(expiration.Add(2 * time.Minute))
+	suite.ctx = suite.ctx.WithEventManager(sdk.NewEventManager())
+
+	require.NoError(suite.T(), suite.keeper.EndBlocker(suite.ctx))
+
+	action, found := suite.keeper.GetActionByID(suite.ctx, res.ActionId)
+	require.True(suite.T(), found)
+	require.Equal(suite.T(), actiontypes.ActionStateExpired, action.State)
+
+	moduleBalanceAfterExpiration := suite.app.BankKeeper.GetBalance(suite.ctx, actiontypes.ModuleAccountAddress, price.Denom)
+	require.True(suite.T(), moduleBalanceAfterExpiration.IsZero())
+
+	accountBalanceAfterExpiration := suite.app.BankKeeper.GetBalance(suite.ctx, suite.testAddrs[0], price.Denom)
+	require.True(suite.T(), accountBalanceAfterExpiration.IsEqual(initialAccountBalance))
+
+	events := suite.ctx.EventManager().Events()
+	foundExpiredEvent := false
+	for _, event := range events {
+		if event.Type != actiontypes.EventTypeActionExpired {
+			continue
+		}
+		foundExpiredEvent = true
+
+		attrMap := make(map[string]string, len(event.Attributes))
+		for _, attr := range event.Attributes {
+			attrMap[string(attr.Key)] = string(attr.Value)
+		}
+
+		require.Equal(suite.T(), res.ActionId, attrMap[actiontypes.AttributeKeyActionID])
+		require.Equal(suite.T(), suite.testAddrs[0].String(), attrMap[actiontypes.AttributeKeyCreator])
+		require.Equal(suite.T(), actiontypes.ActionTypeCascade.String(), attrMap[actiontypes.AttributeKeyActionType])
+	}
+	require.True(suite.T(), foundExpiredEvent, "action_expired event not emitted")
 }
 
 func (suite *ActionIntegrationTestSuite) TestInvalidActionLifecycle() {
 	suite.Run("Missing Metadata", func() {
-		msg := &types2.MsgRequestAction{
+		msg := &actiontypes.MsgRequestAction{
 			Creator:    suite.testAddrs[0].String(),
-			ActionType: actionapi.ActionType_ACTION_TYPE_SENSE.String(),
+			ActionType: actiontypes.ActionTypeSense.String(),
 			Metadata:   "",
 			Price:      "10token",
 		}
@@ -198,10 +270,10 @@ func (suite *ActionIntegrationTestSuite) TestInvalidActionLifecycle() {
 	})
 
 	suite.Run("Invalid State Transition", func() {
-		action := &actionapi.Action{
+		action := &actiontypes.Action{
 			ActionID: "8888",
 			Creator:  suite.testAddrs[0].String(),
-			State:    actionapi.ActionState_ACTION_STATE_APPROVED,
+			State:    actiontypes.ActionStateApproved,
 		}
 		suite.keeper.SetAction(suite.ctx, action)
 		err := suite.keeper.ApproveAction(suite.ctx, action.ActionID, action.Creator)

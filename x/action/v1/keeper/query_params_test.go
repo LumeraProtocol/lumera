@@ -3,19 +3,29 @@ package keeper_test
 import (
 	"testing"
 
-	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
-
 	"github.com/stretchr/testify/require"
+	"github.com/golang/mock/gomock"
 
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
+	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 )
 
 func TestParamsQuery(t *testing.T) {
-	keeper, ctx := keepertest.ActionKeeper(t)
-	params := types2.DefaultParams()
-	require.NoError(t, keeper.SetParams(ctx, params))
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	response, err := keeper.Params(ctx, &types2.QueryParamsRequest{})
+	k, ctx := keepertest.ActionKeeper(t, ctrl)
+
+	params := types.DefaultParams()
+	params.BaseActionFee = sdk.NewInt64Coin("stake", 100)
+	err := k.SetParams(ctx, params)
 	require.NoError(t, err)
-	require.Equal(t, &types2.QueryParamsResponse{Params: params}, response)
+	
+	q := keeper.NewQueryServerImpl(k)
+
+	response, err := q.Params(ctx, &types.QueryParamsRequest{})
+	require.NoError(t, err)
+	require.Equal(t, &types.QueryParamsResponse{Params: params}, response)
 }

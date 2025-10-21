@@ -6,6 +6,7 @@ import (
 	"cosmossdk.io/math"
 	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
 	"github.com/LumeraProtocol/lumera/x/claim/types"
+	"github.com/LumeraProtocol/lumera/x/claim/keeper"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
@@ -13,7 +14,8 @@ import (
 )
 
 func TestClaimRecordQuery(t *testing.T) {
-	keeper, ctx := keepertest.ClaimKeeper(t)
+	k, ctx := keepertest.ClaimKeeper(t, "")
+	q := keeper.NewQueryServerImpl(k)
 
 	// Define a valid claim record using real Pastel network values
 	validRecord := types.ClaimRecord{
@@ -54,7 +56,7 @@ func TestClaimRecordQuery(t *testing.T) {
 				Address: validRecord.OldAddress,
 			},
 			setup: func() {
-				err := keeper.SetClaimRecord(ctx, validRecord)
+				err := k.SetClaimRecord(ctx, validRecord)
 				require.NoError(t, err)
 			},
 			expErr:    false,
@@ -68,7 +70,7 @@ func TestClaimRecordQuery(t *testing.T) {
 			setup: func() {
 				claimedRecord := validRecord
 				claimedRecord.Claimed = true
-				err := keeper.SetClaimRecord(ctx, claimedRecord)
+				err := k.SetClaimRecord(ctx, claimedRecord)
 				require.NoError(t, err)
 			},
 			expErr: false,
@@ -86,7 +88,7 @@ func TestClaimRecordQuery(t *testing.T) {
 			tc.setup()
 
 			// Execute query
-			response, err := keeper.ClaimRecord(ctx, tc.request)
+			response, err := q.ClaimRecord(ctx, tc.request)
 
 			// Verify results
 			if tc.expErr {

@@ -5,14 +5,13 @@ import (
 	"strconv"
 
 	"github.com/LumeraProtocol/lumera/x/action/v1/common"
-	types2 "github.com/LumeraProtocol/lumera/x/action/v1/types"
 
 	errorsmod "cosmossdk.io/errors"
-	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
+	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
-func (k msgServer) RequestAction(goCtx context.Context, msg *types2.MsgRequestAction) (*types2.MsgRequestActionResponse, error) {
+func (k msgServer) RequestAction(goCtx context.Context, msg *types.MsgRequestAction) (*types.MsgRequestActionResponse, error) {
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
 	// Get module parameters to access expiration_duration
@@ -31,10 +30,10 @@ func (k msgServer) RequestAction(goCtx context.Context, msg *types2.MsgRequestAc
 
 		// Context-dependent validation: Validate that expiration time is in the future and further than block time + expiration_duration
 		if expTime <= currentTime {
-			return nil, errorsmod.Wrap(types2.ErrActionExpired, "expiration time must be in the future")
+			return nil, errorsmod.Wrap(types.ErrActionExpired, "expiration time must be in the future")
 		}
 		if expTime < minExpTime {
-			return nil, errorsmod.Wrapf(types2.ErrActionExpired,
+			return nil, errorsmod.Wrapf(types.ErrActionExpired,
 				"expiration time must be at least %f seconds from current block time",
 				params.ExpirationDuration.Seconds(),
 			)
@@ -45,12 +44,12 @@ func (k msgServer) RequestAction(goCtx context.Context, msg *types2.MsgRequestAc
 	}
 
 	// Parse and validate action type - Already validated in ValidateBasic
-	actionType, _ := types2.ParseActionType(msg.ActionType)
+	actionType, _ := types.ParseActionType(msg.ActionType)
 
 	// Validate the metadata
 	actionHandler, err := k.actionRegistry.GetHandler(actionType)
 	if err != nil {
-		return nil, errorsmod.Wrap(types2.ErrInvalidActionType, err.Error())
+		return nil, errorsmod.Wrap(types.ErrInvalidActionType, err.Error())
 	}
 
 	// Process the metadata with the handler:
@@ -58,17 +57,22 @@ func (k msgServer) RequestAction(goCtx context.Context, msg *types2.MsgRequestAc
 	// processedData is the protobuf binary format as []byte
 	processedData, err := actionHandler.Process([]byte(msg.Metadata), common.MsgRequestAction, &params)
 	if err != nil {
-		return nil, errorsmod.Wrap(types2.ErrInvalidMetadata, err.Error())
+		return nil, errorsmod.Wrap(types.ErrInvalidMetadata, err.Error())
+	}
+
+	price, err := sdk.ParseCoinNormalized(msg.Price)
+	if err != nil {
+		return nil, errorsmod.Wrapf(types.ErrInvalidPrice, "invalid price format: %s", err)
 	}
 
 	// Create a new action with metadata embedded directly
-	action := &actionapi.Action{
+	action := &types.Action{
 		Creator:        msg.Creator,
 		ActionType:     actionType,
 		Metadata:       processedData,
-		Price:          msg.Price,
+		Price:          &price,
 		ExpirationTime: expTime,
-		State:          actionapi.ActionState_ACTION_STATE_PENDING,
+		State:          types.ActionStatePending,
 	}
 
 	// Save the action (this generates the action ID)
@@ -80,11 +84,11 @@ func (k msgServer) RequestAction(goCtx context.Context, msg *types2.MsgRequestAc
 	actionNew, ok := k.GetActionByID(ctx, actionID)
 	if !ok {
 		// This should not happen as we just registered the action
-		return &types2.MsgRequestActionResponse{}, errorsmod.Wrap(types2.ErrActionNotFound,
+		return &types.MsgRequestActionResponse{}, errorsmod.Wrap(types.ErrActionNotFound,
 			"failed to retrieve action by ID after registration")
 	}
 
-	return &types2.MsgRequestActionResponse{
+	return &types.MsgRequestActionResponse{
 		ActionId: actionID,
 		Status:   actionNew.State.String(),
 	}, nil

@@ -20,6 +20,8 @@ import (
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/cosmos/cosmos-sdk/std"
+
+	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
 type (
@@ -39,7 +41,7 @@ func NewLumeradCLI(t *testing.T, sut *SystemUnderTest, verbose bool) *LumeradCli
 		sut.AwaitNextBlock,
 		sut.nodesCount,
 		filepath.Join(WorkDir, sut.outputDir),
-		"1ulume",
+		"1"+lcfg.ChainDenom,
 		verbose,
 		assert.NoError,
 		true,
@@ -162,7 +164,7 @@ func (c LumeradCli) CustomCommand(args ...string) string {
 	if !ok {
 		return execOutput
 	}
-	rsp, committed := c.awaitTxCommitted(execOutput, DefaultWaitTime)
+	rsp, committed := c.awaitTxCommitted(execOutput, EventWaitTime)
 	c.t.Logf("tx committed: %v", committed)
 	require.Equal(c.t, c.expTXCommitted, committed, "expected tx committed: %v", c.expTXCommitted)
 	return rsp
@@ -206,9 +208,11 @@ func (c LumeradCli) run(args []string) (output string, ok bool) {
 	return c.runWithInput(args, nil)
 }
 
+
 func (c LumeradCli) runWithInput(args []string, input io.Reader) (output string, ok bool) {
 	if c.Debug {
-		c.t.Logf("+++ running `%s %s`", c.execBinary, strings.Join(args, " "))
+		timestamp := time.Now().Format("15:04:05.000")
+		c.t.Logf("[%s] +++ running `%s %s` at ", timestamp, c.execBinary, strings.Join(args, " "))
 	}
 	gotOut, gotErr := func() (out []byte, err error) {
 		defer func() {
@@ -216,6 +220,7 @@ func (c LumeradCli) runWithInput(args []string, input io.Reader) (output string,
 				err = fmt.Errorf("recovered from panic: %v", r)
 			}
 		}()
+
 		cmd := exec.Command(locateExecutable(c.execBinary), args...) //nolint:gosec
 		cmd.Dir = WorkDir
 		cmd.Stdin = input
@@ -314,18 +319,18 @@ func (c LumeradCli) QueryBalances(addr string) string {
 
 // QueryBalance returns balance amount for given denom.
 // 0 when not found
-func (c LumeradCli) QueryBalance(addr, denom string) int64 {
+func (c LumeradCli) QueryBalance(addr, denom string) uint64 {
 	raw := c.CustomQuery("q", "bank", "balance", addr, denom)
 	require.Contains(c.t, raw, "amount", raw)
-	return gjson.Get(raw, "balance.amount").Int()
+	return gjson.Get(raw, "balance.amount").Uint()
 }
 
 // QueryTotalSupply returns total amount of tokens for a given denom.
 // 0 when not found
-func (c LumeradCli) QueryTotalSupply(denom string) int64 {
+func (c LumeradCli) QueryTotalSupply(denom string) uint64 {
 	raw := c.CustomQuery("q", "bank", "total-supply")
 	require.Contains(c.t, raw, "amount", raw)
-	return gjson.Get(raw, fmt.Sprintf("supply.#(denom==%q).amount", denom)).Int()
+	return gjson.Get(raw, fmt.Sprintf("supply.#(denom==%q).amount", denom)).Uint()
 }
 
 func (c LumeradCli) GetCometBFTValidatorSet() cmtservice.GetLatestValidatorSetResponse {

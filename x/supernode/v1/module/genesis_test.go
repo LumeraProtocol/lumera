@@ -3,17 +3,16 @@ package supernode_test
 import (
 	"testing"
 
-	supernode "github.com/LumeraProtocol/lumera/x/supernode/v1/module"
-	types2 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-
 	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
 	"github.com/LumeraProtocol/lumera/testutil/nullify"
+	supernode "github.com/LumeraProtocol/lumera/x/supernode/v1/module"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"github.com/stretchr/testify/require"
 )
 
 func TestGenesis(t *testing.T) {
-	genesisState := types2.GenesisState{
-		Params: types2.DefaultParams(),
+	genesisState := types.GenesisState{
+		Params: types.DefaultParams(),
 
 		// this line is used by starport scaffolding # genesis/test/state
 	}

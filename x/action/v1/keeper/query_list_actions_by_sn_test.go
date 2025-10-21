@@ -3,11 +3,9 @@ package keeper_test
 import (
 	"testing"
 
+	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
 	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	"github.com/LumeraProtocol/lumera/x/action/v1/types"
-
-	"github.com/LumeraProtocol/lumera/api/lumera/action"
-	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/query"
 	"github.com/golang/mock/gomock"
@@ -21,38 +19,38 @@ func TestKeeper_ListActionsBySuperNode(t *testing.T) {
 	actionID1 := "12345"
 	actionID2 := "67890"
 	actionID3 := "67891"
-	price := "100stake"
+	price := sdk.NewInt64Coin("stake", 100)
 
-	action1 := action.Action{
+	action1 := types.Action{
 		Creator:        "creator1",
 		ActionID:       actionID1,
-		ActionType:     action.ActionType_ACTION_TYPE_SENSE,
+		ActionType:     types.ActionTypeSense,
 		Metadata:       []byte("metadata1"),
-		Price:          price,
+		Price:          &price,
 		ExpirationTime: 1234567890,
-		State:          action.ActionState_ACTION_STATE_PROCESSING,
+		State:          types.ActionStateProcessing,
 		BlockHeight:    100,
 		SuperNodes:     []string{superNodeAddr, "supernode-2"},
 	}
-	action2 := action.Action{
+	action2 := types.Action{
 		Creator:        "creator2",
 		ActionID:       actionID2,
-		ActionType:     action.ActionType_ACTION_TYPE_CASCADE,
+		ActionType:     types.ActionTypeCascade,
 		Metadata:       []byte("metadata2"),
-		Price:          price,
+		Price:          &price,
 		ExpirationTime: 1234567891,
-		State:          action.ActionState_ACTION_STATE_APPROVED,
+		State:          types.ActionStateApproved,
 		BlockHeight:    100,
 		SuperNodes:     []string{superNodeAddr, "supernode-2"},
 	}
-	action3 := action.Action{
+	action3 := types.Action{
 		Creator:        "creator3",
 		ActionID:       actionID3,
-		ActionType:     action.ActionType_ACTION_TYPE_CASCADE,
+		ActionType:     types.ActionTypeCascade,
 		Metadata:       []byte("metadata3"),
-		Price:          price,
+		Price:          &price,
 		ExpirationTime: 1234567892,
-		State:          action.ActionState_ACTION_STATE_APPROVED,
+		State:          types.ActionStateApproved,
 		BlockHeight:    100,
 		SuperNodes:     []string{"supernode-3"},
 	}
@@ -62,7 +60,7 @@ func TestKeeper_ListActionsBySuperNode(t *testing.T) {
 		req         *types.QueryListActionsBySuperNodeRequest
 		setupState  func(k keeper.Keeper, ctx sdk.Context)
 		expectedErr error
-		checkResult func(t *testing.T, resp *types.QueryListActionsResponse)
+		checkResult func(t *testing.T, resp *types.QueryListActionsBySuperNodeResponse)
 	}{
 		{
 			name:        "invalid request (nil or empty SuperNodeAddress)",
@@ -82,7 +80,7 @@ func TestKeeper_ListActionsBySuperNode(t *testing.T) {
 				SuperNodeAddress: "supernode-999",
 			},
 			expectedErr: nil,
-			checkResult: func(t *testing.T, resp *types.QueryListActionsResponse) {
+			checkResult: func(t *testing.T, resp *types.QueryListActionsBySuperNodeResponse) {
 				require.NotNil(t, resp)
 				require.Len(t, resp.Actions, 0)
 			},
@@ -97,7 +95,7 @@ func TestKeeper_ListActionsBySuperNode(t *testing.T) {
 				k.SetAction(ctx, &action2)
 			},
 			expectedErr: nil,
-			checkResult: func(t *testing.T, resp *types.QueryListActionsResponse) {
+			checkResult: func(t *testing.T, resp *types.QueryListActionsBySuperNodeResponse) {
 				require.NotNil(t, resp)
 				require.Len(t, resp.Actions, 2)
 				require.Equal(t, actionID1, resp.Actions[0].ActionID)
@@ -115,7 +113,7 @@ func TestKeeper_ListActionsBySuperNode(t *testing.T) {
 				k.SetAction(ctx, &action3)
 			},
 			expectedErr: nil,
-			checkResult: func(t *testing.T, resp *types.QueryListActionsResponse) {
+			checkResult: func(t *testing.T, resp *types.QueryListActionsBySuperNodeResponse) {
 				require.NotNil(t, resp)
 				require.Len(t, resp.Actions, 2)
 				require.Equal(t, actionID1, resp.Actions[0].ActionID)
@@ -135,7 +133,7 @@ func TestKeeper_ListActionsBySuperNode(t *testing.T) {
 				k.SetAction(ctx, &action2)
 			},
 			expectedErr: nil,
-			checkResult: func(t *testing.T, resp *types.QueryListActionsResponse) {
+			checkResult: func(t *testing.T, resp *types.QueryListActionsBySuperNodeResponse) {
 				require.NotNil(t, resp)
 				require.Len(t, resp.Actions, 1)
 				require.Equal(t, actionID2, resp.Actions[0].ActionID)
@@ -149,13 +147,14 @@ func TestKeeper_ListActionsBySuperNode(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			k, ctx := keepertest.ActionKeeper(t)
+			k, ctx := keepertest.ActionKeeper(t, ctrl)
+			q := keeper.NewQueryServerImpl(k)
 
 			if tc.setupState != nil {
 				tc.setupState(k, ctx)
 			}
 
-			resp, err := k.ListActionsBySuperNode(ctx, tc.req)
+			resp, err := q.ListActionsBySuperNode(ctx, tc.req)
 
 			if tc.expectedErr != nil {
 				require.Error(t, err)

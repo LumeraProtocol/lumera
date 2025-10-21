@@ -9,14 +9,14 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func (k Keeper) ClaimRecord(goCtx context.Context, req *types.QueryClaimRecordRequest) (*types.QueryClaimRecordResponse, error) {
+func (q queryServer) ClaimRecord(goCtx context.Context, req *types.QueryClaimRecordRequest) (*types.QueryClaimRecordResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
 	}
 
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
-	record, found, err := k.GetClaimRecord(ctx, req.Address)
+	record, found, err := q.k.GetClaimRecord(ctx, req.Address)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

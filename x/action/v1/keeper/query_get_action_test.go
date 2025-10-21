@@ -3,11 +3,11 @@ package keeper_test
 import (
 	"testing"
 
+	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
 	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	"github.com/LumeraProtocol/lumera/x/action/v1/types"
+	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 
-	actionapi "github.com/LumeraProtocol/lumera/api/lumera/action"
-	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
@@ -19,15 +19,15 @@ func TestKeeper_GetAction(t *testing.T) {
 	actionID := "12345"
 	invalidActionID := "67890"
 	creatorAddr := sdk.AccAddress([]byte("creator"))
-	price := "100stake"
-	action := actionapi.Action{
+	price := sdk.NewInt64Coin("stake", 100)
+	action := actiontypes.Action{
 		Creator:        creatorAddr.String(),
 		ActionID:       actionID,
-		ActionType:     actionapi.ActionType_ACTION_TYPE_SENSE,
+		ActionType:     actiontypes.ActionTypeSense,
 		Metadata:       []byte("metadata"),
-		Price:          price,
+		Price:          &price,
 		ExpirationTime: 1234567890,
-		State:          actionapi.ActionState_ACTION_STATE_PROCESSING,
+		State:          actiontypes.ActionStateProcessing,
 		BlockHeight:    1,
 		SuperNodes:     []string{"node1", "node2"},
 	}
@@ -52,23 +52,12 @@ func TestKeeper_GetAction(t *testing.T) {
 			expectedErr: status.Errorf(codes.Internal, "failed to get action by ID"),
 		},
 		{
-			name: "invalid price format",
-			req: &types.QueryGetActionRequest{
-				ActionID: actionID,
-			},
-			setupState: func(k keeper.Keeper, ctx sdk.Context) {
-				action.Price = "invalid_price"
-				k.SetAction(ctx, &action)
-			},
-			expectedErr: status.Errorf(codes.Internal, "invalid price"),
-		},
-		{
 			name: "action found",
 			req: &types.QueryGetActionRequest{
 				ActionID: actionID,
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
-				action.Price = "100stake"
+				action.Price = &price
 				k.SetAction(ctx, &action)
 			},
 			expectedErr: nil,
@@ -76,7 +65,7 @@ func TestKeeper_GetAction(t *testing.T) {
 				require.NotNil(t, resp.Action)
 				require.Equal(t, action.ActionID, resp.Action.ActionID)
 				require.Equal(t, action.Creator, resp.Action.Creator)
-				require.Equal(t, action.Price, resp.Action.Price.String())
+				require.Equal(t, action.Price, resp.Action.Price)
 			},
 		},
 	}
@@ -87,13 +76,14 @@ func TestKeeper_GetAction(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			k, ctx := keepertest.ActionKeeper(t)
+			k, ctx := keepertest.ActionKeeper(t, ctrl)
+			q := keeper.NewQueryServerImpl(k)
 
 			if tc.setupState != nil {
 				tc.setupState(k, ctx)
 			}
 
-			resp, err := k.GetAction(ctx, tc.req)
+			resp, err := q.GetAction(ctx, tc.req)
 
 			if tc.expectedErr != nil {
 				require.Error(t, err)

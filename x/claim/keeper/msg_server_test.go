@@ -12,7 +12,7 @@ import (
 )
 
 func setupMsgServer(t testing.TB) (keeper.Keeper, types.MsgServer, sdk.Context) {
-	k, ctx := keepertest.ClaimKeeper(t)
+	k, ctx := keepertest.ClaimKeeper(t, "")
 	return k, keeper.NewMsgServerImpl(k), ctx
 }
 

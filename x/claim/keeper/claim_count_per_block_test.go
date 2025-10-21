@@ -32,7 +32,7 @@ func TestBlockClaimCount(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			keeper, ctx := keepertest.ClaimKeeper(t)
+			keeper, ctx := keepertest.ClaimKeeper(t, "")
 
 			// Initial count should be zero.
 			count, err := keeper.GetBlockClaimCount(ctx)

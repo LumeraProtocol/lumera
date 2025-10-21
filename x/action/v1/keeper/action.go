@@ -9,10 +9,11 @@ import (
 
 	"cosmossdk.io/errors"
 	"cosmossdk.io/math"
-	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
-	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
+	
+	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 // Key prefixes for store
@@ -122,7 +123,7 @@ func (k *Keeper) RegisterAction(ctx sdk.Context, action *actiontypes.Action) (st
 		ctx,
 		creator,                // sender - creator
 		actiontypes.ModuleName, // Recipient
-		sdk.NewCoins(*price),    // Amount
+		sdk.NewCoins(*price),   // Amount
 	)
 	if err != nil {
 		return "", errors.Wrap(actiontypes.ErrInternalError, err.Error())
@@ -652,12 +653,12 @@ func (k *Keeper) CheckExpiration(ctx sdk.Context) {
 	currentTime := ctx.BlockTime().Unix()
 	expiredCount := 0
 
-	pendingErr := k.checkExpiredActionsInState(ctx, actiontypes.ActionStatePending, currentTime, &expiredCount)
+	pendingErr := k.processExpiredActionsInState(ctx, actiontypes.ActionStatePending, currentTime, &expiredCount)
 	if pendingErr != nil {
 		k.Logger().Error("Error checking pending actions for expiration", "error", pendingErr.Error())
 	}
 
-	processingErr := k.checkExpiredActionsInState(ctx, actiontypes.ActionStateProcessing, currentTime, &expiredCount)
+	processingErr := k.processExpiredActionsInState(ctx, actiontypes.ActionStateProcessing, currentTime, &expiredCount)
 	if processingErr != nil {
 		k.Logger().Error("Error checking processing actions for expiration", "error", processingErr.Error())
 	}
@@ -671,11 +672,40 @@ func (k *Keeper) CheckExpiration(ctx sdk.Context) {
 	}
 }
 
-// checkExpiredActionsInState iterates through actions in a specific state and marks expired ones
-func (k *Keeper) checkExpiredActionsInState(ctx sdk.Context, state actiontypes.ActionState, now int64, expiredCount *int) error {
+// processExpiredActionsInState iterates through actions in a specific state and marks expired ones
+func (k *Keeper) processExpiredActionsInState(ctx sdk.Context, state actiontypes.ActionState, now int64, expiredCount *int) error {
 	return k.IterateActionsByState(ctx, state, func(action *actiontypes.Action) bool {
 		// Check if action is expired
 		if action.ExpirationTime != 0 && action.ExpirationTime <= now {
+			// refund action fee to creator before updating state
+			if action.Price != nil && action.Price.IsValid() && !action.Price.IsZero() {
+				creatorAddr, err := k.addressCodec.StringToBytes(action.Creator)
+				if err != nil {
+					k.Logger().Error("Failed to decode action creator address for refund",
+						"action_id", action.ActionID,
+						"creator", action.Creator,
+						"error", err.Error(),
+					)
+					return false // continue iteration, retry next block
+				}
+
+				// Refund the action fee to the creator
+				if err := k.bankKeeper.SendCoinsFromModuleToAccount(
+					ctx,
+					actiontypes.ModuleName,
+					creatorAddr,
+					sdk.NewCoins(*action.Price),
+				); err != nil {
+					k.Logger().Error("Failed to refund action fee",
+						"action_id", action.ActionID,
+						"creator", action.Creator,
+						"fee", action.Price.String(),
+						"error", err.Error(),
+					)
+					return false // continue iteration, retry next block
+				}
+			}
+
 			// Update action state to EXPIRED
 			action.State = actiontypes.ActionStateExpired
 

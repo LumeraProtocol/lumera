@@ -39,6 +39,7 @@ DEFAULT_VALIDATORS_JSON := config/validators.json
 # Default genesis and claims files for devnet docker
 DEFAULT_GENESIS_FILE := devnet/default-config/devnet-genesis.json
 DEFAULT_CLAIMS_FILE := claims.csv # relative to devnet
+ORIG_GENESIS_FILE := devnet/default-config/devnet-genesis-orig.json
 
 devnet-build:
 	@mkdir -p "$(SHARED_RELEASE_DIR)"; \
@@ -98,12 +99,21 @@ devnet-build-default: _check-devnet-default-cfg
 		EXTERNAL_GENESIS_FILE="$$(realpath $(DEFAULT_GENESIS_FILE))" \
 		EXTERNAL_CLAIMS_FILE="$$(realpath $(DEFAULT_CLAIMS_FILE))"
 
+.PHONY: devnet-build-172 _check-devnet-172-cfg
+devnet-build-172:
+	@$(MAKE) devnet-build \
+		DEVNET_BUILD_LUMERA=0 \
+		DEVNET_BIN_DIR=devnet/bin-v1.7.2 \
+		EXTERNAL_GENESIS_FILE="$$(realpath $(ORIG_GENESIS_FILE))" \
+		EXTERNAL_CLAIMS_FILE="$$(realpath $(DEFAULT_CLAIMS_FILE))"
+
+_check-devnet-172-cfg:
+	@[ -f "$$(realpath $(ORIG_GENESIS_FILE))" ] || (echo "Missing ORIG_GENESIS_FILE: $$(realpath $(ORIG_GENESIS_FILE))"; exit 1)
+	@[ -f "$$(realpath $(DEFAULT_CLAIMS_FILE))" ] || (echo "Missing DEFAULT_CLAIMS_FILE: $$(realpath $(DEFAULT_CLAIMS_FILE))"; exit 1)
+
 _check-devnet-default-cfg:
 	@[ -f "$$(realpath $(DEFAULT_GENESIS_FILE))" ] || (echo "Missing DEFAULT_GENESIS_FILE: $$(realpath $(DEFAULT_GENESIS_FILE))"; exit 1)
 	@[ -f "$$(realpath $(DEFAULT_CLAIMS_FILE))" ] || (echo "Missing DEFAULT_CLAIMS_FILE: $$(realpath $(DEFAULT_CLAIMS_FILE))"; exit 1)
-
-package-devnet:
-	@echo "Packaging devnet artifacts..."
 
 devnet-reset:
 	@echo "Resetting all validators (gentx and keys)..."
@@ -188,6 +198,14 @@ devnet-new:
 	$(MAKE) devnet-down
 	$(MAKE) devnet-clean
 	$(MAKE) devnet-build-default
+
+upgrade_180:
+	@cd devnet/scripts && ./upgrade.sh v1.8.0 120 ../bin-v1.8.0
+
+devnet-new-172:
+	$(MAKE) devnet-down
+	$(MAKE) devnet-clean
+	$(MAKE) devnet-build-172
 	sleep 10
 	$(MAKE) devnet-up
 

@@ -1,13 +1,14 @@
 package keeper_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 
-	"github.com/stretchr/testify/suite"
 	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/suite"
 
 	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
 	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
@@ -30,7 +31,7 @@ type ExpirationTestSuite struct {
 func (suite *ExpirationTestSuite) SetupTest() {
 	ctrl := gomock.NewController(suite.T())
 	defer ctrl.Finish()
-	
+
 	key, address := cryptotestutils.KeyAndAddress()
 	pubKey := key.PubKey()
 	pairs := []keepertest.AccountPair{{Address: address, PubKey: pubKey}}
@@ -175,67 +176,166 @@ func (suite *ExpirationTestSuite) TestCheckExpiration() {
 	suite.Require().Equal(expectedProcessingCount, processingCount, "Number of processing actions doesn't match expected")
 }
 
+// TestActionFeeRefundOnExpiration ensures that action fees are refunded when actions expire
+func (suite *ExpirationTestSuite) TestActionFeeRefundOnExpiration() {
+	bankKeeper, ok := suite.keeper.GetBankKeeper().(*keepertest.ActionBankKeeper)
+	suite.Require().True(ok)
+
+	initialBalance := bankKeeper.GetAccountCoins(suite.testAddr)
+	expectedInitial := sdk.NewCoins(sdk.NewInt64Coin("ulume", keepertest.TestAccountAmount))
+	suite.Require().Equal(expectedInitial, initialBalance)
+	suite.Require().True(bankKeeper.GetModuleBalance(actiontypes.ModuleName).IsZero())
+
+	params := suite.keeper.GetParams(suite.ctx)
+	minPriceAmount := params.BaseActionFee.Amount.Add(params.FeePerKbyte.Amount)
+	priceDenom := params.BaseActionFee.Denom
+
+	scenarios := []struct {
+		name  string
+		state actiontypes.ActionState
+	}{
+		{name: "pending", state: actiontypes.ActionStatePending},
+		{name: "processing", state: actiontypes.ActionStateProcessing},
+	}
+
+	for i, scenario := range scenarios {
+		// ensure module balance clean before starting scenario
+		suite.Require().True(bankKeeper.GetModuleBalance(actiontypes.ModuleName).IsZero())
+
+		price := sdk.NewCoin(priceDenom, minPriceAmount.AddRaw(int64(i*1_000)))
+
+		cascadeMetadata := &actiontypes.CascadeMetadata{
+			DataHash:   fmt.Sprintf("refund-hash-%d", i),
+			FileName:   fmt.Sprintf("refund-file-%d", i),
+			RqIdsIc:    1,
+			RqIdsMax:   2,
+			Signatures: suite.signature,
+		}
+
+		metadataBytes, err := suite.keeper.GetCodec().Marshal(cascadeMetadata)
+		suite.Require().NoError(err)
+
+		action := &actiontypes.Action{
+			Creator:        suite.testAddr.String(),
+			ActionType:     actiontypes.ActionTypeCascade,
+			Price:          &price,
+			ExpirationTime: suite.blockTime.Unix() - 10,
+			Metadata:       metadataBytes,
+		}
+
+		_, err = suite.keeper.RegisterAction(suite.ctx, action)
+		suite.Require().NoError(err, "scenario %s failed to register action", scenario.name)
+
+		suite.Equal(sdk.NewCoins(price), bankKeeper.GetModuleBalance(actiontypes.ModuleName))
+
+		expectedAfterFee := initialBalance.Sub(sdk.NewCoins(price)...)
+		suite.Equal(expectedAfterFee, bankKeeper.GetAccountCoins(suite.testAddr))
+
+		stored, found := suite.keeper.GetActionByID(suite.ctx, action.ActionID)
+		suite.Require().True(found)
+
+		if scenario.state == actiontypes.ActionStateProcessing {
+			stored.State = actiontypes.ActionStateProcessing
+			err = suite.keeper.SetAction(suite.ctx, stored)
+			suite.Require().NoError(err)
+		}
+
+		suite.keeper.CheckExpiration(suite.ctx)
+
+		updated, found := suite.keeper.GetActionByID(suite.ctx, action.ActionID)
+		suite.Require().True(found)
+		suite.Equal(actiontypes.ActionStateExpired, updated.State)
+
+		suite.True(bankKeeper.GetModuleBalance(actiontypes.ModuleName).IsZero())
+		suite.Equal(initialBalance, bankKeeper.GetAccountCoins(suite.testAddr))
+	}
+}
+
 // TestExpiredActionEvents tests that events are emitted for expired actions
 func (suite *ExpirationTestSuite) TestExpiredActionEvents() {
-	// Create a context with event manager to capture events
-	ctx := suite.ctx.WithEventManager(sdk.NewEventManager())
+	params := suite.keeper.GetParams(suite.ctx)
+	minPriceAmount := params.BaseActionFee.Amount.Add(params.FeePerKbyte.Amount)
+	priceDenom := params.BaseActionFee.Denom
 
-	// Create sense metadata
-	senseMetadata := &actiontypes.SenseMetadata{
-		DataHash:             "expired_action_hash",
-		DdAndFingerprintsMax: 10,
-		DdAndFingerprintsIc:  5,
+	scenarios := []struct {
+		name      string
+		state     actiontypes.ActionState
+		actionTyp actiontypes.ActionType
+	}{
+		{name: "pending", state: actiontypes.ActionStatePending, actionTyp: actiontypes.ActionTypeSense},
+		{name: "processing", state: actiontypes.ActionStateProcessing, actionTyp: actiontypes.ActionTypeCascade},
 	}
 
-	// Marshal metadata to bytes
-	metadataBytes, err := suite.keeper.GetCodec().Marshal(senseMetadata)
-	suite.Require().NoError(err)
+	for i, scenario := range scenarios {
+		ctx := suite.ctx.WithEventManager(sdk.NewEventManager())
 
-	testPrice := sdk.NewInt64Coin("ulume", 10_100)
+		var metadataBytes []byte
+		var err error
+		if scenario.actionTyp == actiontypes.ActionTypeCascade {
+			metadata := &actiontypes.CascadeMetadata{
+				DataHash:   fmt.Sprintf("event-cascade-hash-%d", i),
+				FileName:   fmt.Sprintf("event-cascade-file-%d", i),
+				RqIdsIc:    1,
+				RqIdsMax:   2,
+				Signatures: suite.signature,
+			}
+			metadataBytes, err = suite.keeper.GetCodec().Marshal(metadata)
+		} else {
+			metadata := &actiontypes.SenseMetadata{
+				DataHash:             fmt.Sprintf("event-sense-hash-%d", i),
+				DdAndFingerprintsIc:  1,
+				DdAndFingerprintsMax: 2,
+			}
+			metadataBytes, err = suite.keeper.GetCodec().Marshal(metadata)
+		}
+		suite.Require().NoError(err)
 
-	// Create action
-	expiredAction := &actiontypes.Action{
-		Creator:        suite.testAddr.String(),
-		ActionType:     actiontypes.ActionTypeSense,
-		Price:          &testPrice,
-		BlockHeight:    ctx.BlockHeight(),
-		State:          actiontypes.ActionStatePending,
-		ExpirationTime: ctx.BlockTime().Unix() - 3600, // 1 hour in the past
-		Metadata:       metadataBytes,
-	}
+		price := sdk.NewCoin(priceDenom, minPriceAmount.AddRaw(int64(i*500)))
 
-	// Register the action
-	_, err = suite.keeper.RegisterAction(ctx, expiredAction)
-	suite.Require().NoError(err)
+		action := &actiontypes.Action{
+			Creator:        suite.testAddr.String(),
+			ActionType:     scenario.actionTyp,
+			Price:          &price,
+			ExpirationTime: ctx.BlockTime().Unix() - 60,
+			Metadata:       metadataBytes,
+		}
 
-	// Clear events from registration
-	ctx = ctx.WithEventManager(sdk.NewEventManager())
+		actionID, err := suite.keeper.RegisterAction(ctx, action)
+		suite.Require().NoError(err, "scenario %s failed to register action", scenario.name)
 
-	// Run expiration check
-	suite.keeper.CheckExpiration(ctx)
+		stored, found := suite.keeper.GetActionByID(ctx, actionID)
+		suite.Require().True(found)
+		if scenario.state == actiontypes.ActionStateProcessing {
+			stored.State = actiontypes.ActionStateProcessing
+			err = suite.keeper.SetAction(ctx, stored)
+			suite.Require().NoError(err)
+		}
 
-	// Get events
-	events := ctx.EventManager().Events()
+		ctx = ctx.WithEventManager(sdk.NewEventManager())
 
-	// Verify "action_expired" event was emitted
-	foundExpiredEvent := false
-	for _, event := range events {
-		if event.Type == actiontypes.EventTypeActionExpired {
+		suite.keeper.CheckExpiration(ctx)
+
+		events := ctx.EventManager().Events()
+		foundExpiredEvent := false
+
+		for _, event := range events {
+			if event.Type != actiontypes.EventTypeActionExpired {
+				continue
+			}
 			foundExpiredEvent = true
 
-			// Verify attributes
+			attrs := make(map[string]string)
 			for _, attr := range event.Attributes {
-				if string(attr.Key) == "action_id" {
-					suite.Require().Equal(expiredAction.ActionID, string(attr.Value))
-				}
-				if string(attr.Key) == "previous_state" {
-					suite.Require().Equal("ACTION_STATE_PENDING", string(attr.Value))
-				}
+				attrs[string(attr.Key)] = string(attr.Value)
 			}
-		}
-	}
 
-	suite.Require().True(foundExpiredEvent, "action_expired event not found")
+			suite.Equal(actionID, attrs[actiontypes.AttributeKeyActionID])
+			suite.Equal(suite.testAddr.String(), attrs[actiontypes.AttributeKeyCreator])
+			suite.Equal(scenario.actionTyp.String(), attrs[actiontypes.AttributeKeyActionType])
+		}
+
+		suite.Require().True(foundExpiredEvent, "scenario %s did not emit action_expired event", scenario.name)
+	}
 }
 
 // Run the test suite

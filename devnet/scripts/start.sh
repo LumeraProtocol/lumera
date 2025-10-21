@@ -29,6 +29,7 @@ START_MODE="${START_MODE:-auto}"
 SHARED_DIR="/shared"
 CFG_DIR="${SHARED_DIR}/config"
 CFG_CHAIN="${CFG_DIR}/config.json"
+CFG_VALS="${CFG_DIR}/validators.json"
 RELEASE_DIR="${SHARED_DIR}/release"
 STATUS_DIR="${SHARED_DIR}/status"
 SETUP_COMPLETE="${STATUS_DIR}/setup_complete"
@@ -70,6 +71,22 @@ if [ ! -f "${CFG_CHAIN}" ]; then
 fi
 
 MIN_GAS_PRICE="$(jq -r '.chain.denom.minimum_gas_price' "${CFG_CHAIN}")"
+
+if [ ! -f "${CFG_VALS}" ]; then
+  echo "[BOOT] Missing ${CFG_VALS}"; exit 1
+fi
+
+PRIMARY_MONIKER="$(jq -r '
+  (map(select(.primary==true)) | if length>0 then .[0].moniker else empty end)
+  // (.[0].moniker)
+' "${CFG_VALS}")"
+
+if [ -z "${PRIMARY_MONIKER}" ] || [ "${PRIMARY_MONIKER}" = "null" ]; then
+  echo "[BOOT] Unable to determine primary validator from ${CFG_VALS}"
+  exit 1
+fi
+
+PRIMARY_STARTED_FLAG="${STATUS_DIR}/${PRIMARY_MONIKER}/lumerad_started"
 
 wait_for_flag() {
   local f="$1"
@@ -195,12 +212,23 @@ launch_network_maker_setup() {
 }
 
 start_lumera() {
+    if [ "${MONIKER}" != "${PRIMARY_MONIKER}" ]; then
+        echo "[BOOT] ${MONIKER}: Waiting for primary (${PRIMARY_MONIKER}) to start lumerad..."
+        wait_for_flag "${PRIMARY_STARTED_FLAG}"
+    fi
+
     echo "[BOOT] ${MONIKER}: Starting lumerad..."
     run "${DAEMON}" start \
         --home "${DAEMON_HOME}" \
         --minimum-gas-prices "${MIN_GAS_PRICE}" \
         --rpc.laddr "tcp://0.0.0.0:${LUMERA_RPC_PORT}" \
         --grpc.address "0.0.0.0:${LUMERA_GRPC_PORT}" >"${VALIDATOR_LOG}" 2>&1 &
+
+    if [ "${MONIKER}" = "${PRIMARY_MONIKER}" ]; then
+        mkdir -p "$(dirname "${PRIMARY_STARTED_FLAG}")"
+        printf 'started\n' > "${PRIMARY_STARTED_FLAG}"
+        echo "[BOOT] ${MONIKER}: Marked primary lumerad as started."
+    fi
 }
 
 tail_logs() {

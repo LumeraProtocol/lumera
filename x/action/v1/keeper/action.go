@@ -11,7 +11,7 @@ import (
 	"cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
-	
+
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
@@ -480,19 +480,21 @@ func (k *Keeper) validateSupernode(ctx sdk.Context, action *actiontypes.Action, 
 		}
 	}
 
-	// Query top-10 SuperNodes for action's block height
+	// Query top-10 ACTIVE SuperNodes for action's block height
 	topSuperNodesReq := &sntypes.QueryGetTopSuperNodesForBlockRequest{
 		BlockHeight: int32(action.BlockHeight),
+		Limit:       10,
+		State:       sntypes.SuperNodeStateActive.String(),
 	}
 	topSuperNodesResp, err := k.supernodeQueryServer.GetTopSuperNodesForBlock(ctx, topSuperNodesReq)
 	if err != nil {
 		return errors.Wrapf(sdkerrors.ErrInvalidRequest, "failed to query top supernodes: %s", err)
 	}
 
-	// Check if superNode is in the top-10 list
+	// Check if superNode is in the top-10 ACTIVE list
 	isInTop10 := false
 
-	k.Logger().Info("Checking if supernode is in top-10 list",
+	k.Logger().Info("Checking if supernode is in top-10 ACTIVE list",
 		"supernode", superNodeAccount,
 		"block_height", action.BlockHeight,
 		"top_supernodes_count", len(topSuperNodesResp.Supernodes))
@@ -511,7 +513,7 @@ func (k *Keeper) validateSupernode(ctx sdk.Context, action *actiontypes.Action, 
 	if !isInTop10 {
 		return errors.Wrapf(
 			actiontypes.ErrUnauthorizedSN,
-			"supernode %s is not in the top-10 supernodes for block height %d",
+			"supernode %s is not in the top-10 ACTIVE supernodes for block height %d",
 			superNodeAccount,
 			action.BlockHeight,
 		)

@@ -8,16 +8,16 @@ import (
 
 	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
 
-	"github.com/stretchr/testify/suite"
 	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/suite"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
 	actionkeeper "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
-	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 type KeeperTestSuite struct {
@@ -25,10 +25,10 @@ type KeeperTestSuite struct {
 	KeeperTestSuiteConfig
 
 	// fields that are reinitialized in SetupTest
-	ctx        sdk.Context
-	ctrl 	   *gomock.Controller
-	keeper     actionkeeper.Keeper
-	mockKeeper *supernodemocks.MockSupernodeKeeper
+	ctx             sdk.Context
+	ctrl            *gomock.Controller
+	keeper          actionkeeper.Keeper
+	mockKeeper      *supernodemocks.MockSupernodeKeeper
 	mockQueryServer *supernodemocks.MockQueryServer
 }
 
@@ -180,7 +180,7 @@ func (suite *KeeperTestSuite) prepareCascadeActionForRegistration(creator string
 	action := &actiontypes.Action{
 		Creator:    creator,
 		ActionType: actiontypes.ActionTypeCascade,
-		Price:      &testPrice,
+		Price:      testPrice.String(),
 		Metadata:   metadataBytes,
 	}
 
@@ -216,7 +216,7 @@ func (suite *KeeperTestSuite) prepareSenseActionForRegistration(creator string, 
 	action := &actiontypes.Action{
 		Creator:    creator,
 		ActionType: actiontypes.ActionTypeSense,
-		Price:      &testPrice,
+		Price:      testPrice.String(),
 		Metadata:   metadataBytes,
 	}
 

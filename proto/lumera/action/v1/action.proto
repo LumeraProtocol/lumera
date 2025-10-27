@@ -14,7 +14,7 @@ message Action {
   string actionID = 2;
   ActionType actionType = 3;
   bytes metadata = 4;
-  string price = 5 [(gogoproto.customtype) = "github.com/cosmos/cosmos-sdk/types.Coin"];
+  string price = 5;
   int64 expirationTime = 6;
   ActionState state = 7;
   int64 blockHeight = 8;

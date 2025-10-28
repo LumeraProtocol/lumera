@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"encoding/asn1"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"runtime"
 	"time"
 
+	"github.com/cosmos/cosmos-sdk/x/auth/migrations/legacytx"
 	"golang.org/x/sync/semaphore"
 
 	"math/big"
@@ -46,7 +49,7 @@ const (
 // - The signature cannot be decoded
 // - The signature verification fails
 // - Any other validation error occurs
-func (k *Keeper) VerifySignature(ctx sdk.Context, data string, signature string, signerAddress string) error {
+func (k *Keeper) VerifySignature(ctx sdk.Context, dataB64 string, signature string, signerAddress string) error {
 	// 1. Get account PubKey
 	accAddr, err := k.addressCodec.StringToBytes(signerAddress)
 	if err != nil {
@@ -65,21 +68,28 @@ func (k *Keeper) VerifySignature(ctx sdk.Context, data string, signature string,
 	}
 
 	// 2. Decode the base64 signature
-	sigBytes, err := base64.StdEncoding.DecodeString(signature)
+	sigRaw, err := base64.StdEncoding.DecodeString(signature)
 	if err != nil {
 		return errorsmod.Wrapf(actiontypes.ErrInvalidSignature,
 			"failed to decode signature: %s", err)
 	}
-
-	// 3. Verify the signature
-	// PubKey.VerifySignature uses `ed25519consensus.Verify` from `https://github.com/hdevalence/ed25519consensus`
-	// it uses sha512 internally
-	isValid := pubKey.VerifySignature([]byte(data), sigBytes)
-	if !isValid {
-		return errorsmod.Wrap(actiontypes.ErrInvalidSignature, "signature verification failed")
+	sigRS, err := CoerceToRS64(sigRaw)
+	if err != nil {
+		return errorsmod.Wrapf(actiontypes.ErrInvalidSignature, "sig format: %s", err)
 	}
 
-	return nil
+	// 3. Verify the signature
+	if pubKey.VerifySignature([]byte(dataB64), sigRS) {
+		return nil
+	}
+
+	// 4) ADR-36 (Keplr/browser)
+	signBytes, err := MakeADR36AminoSignBytes(signerAddress, dataB64)
+	if err == nil && pubKey.VerifySignature(signBytes, sigRS) {
+		return nil
+	}
+
+	return errorsmod.Wrap(actiontypes.ErrInvalidSignature, "signature verification failed")
 }
 
 // VerifyKademliaIDs verifies that a Kademlia ID matches the expected format and content.
@@ -218,4 +228,66 @@ func HighCompress(data []byte) ([]byte, error) {
 	}
 
 	return compressedData.Bytes(), nil
+}
+
+// --- DER → 64-byte r||s ---
+type ecdsaSig struct{ R, S *big.Int }
+
+// CoerceToRS64 returns r||s (64 bytes) from either 64-byte input or DER.
+func CoerceToRS64(sig []byte) ([]byte, error) {
+	if len(sig) == 64 {
+		return sig, nil
+	}
+	var es ecdsaSig
+	if _, err := asn1.Unmarshal(sig, &es); err != nil {
+		return nil, fmt.Errorf("parse DER: %w", err)
+	}
+	r := es.R.Bytes()
+	s := es.S.Bytes()
+	if len(r) > 32 || len(s) > 32 {
+		return nil, fmt.Errorf("r/s too large")
+	}
+	out := make([]byte, 64)
+	copy(out[32-len(r):32], r)
+	copy(out[64-len(s):], s)
+	return out, nil
+}
+
+// --- ADR-36 sign-bytes (Amino JSON) ---
+
+// MakeADR36AminoSignBytes builds the exact bytes Keplr signs for ADR-36.
+// dataB64 MUST be the base64 string you passed to signArbitrary.
+func MakeADR36AminoSignBytes(signerBech32, dataB64 string) ([]byte, error) {
+	// Msg: { type: "sign/MsgSignData", value: { signer, data } }
+	msg := map[string]any{
+		"type": "sign/MsgSignData",
+		"value": map[string]any{
+			"signer": signerBech32,
+			"data":   dataB64,
+		},
+	}
+	msgBz, err := json.Marshal(msg)
+	if err != nil {
+		return nil, fmt.Errorf("marshal adr36 msg: %w", err)
+	}
+
+	// Fee: { gas: "0", amount: [] }
+	fee := map[string]any{"gas": "0", "amount": []any{}}
+	feeBz, err := json.Marshal(fee)
+	if err != nil {
+		return nil, fmt.Errorf("marshal fee: %w", err)
+	}
+
+	// StdSignDoc with empty chain_id/account_number/sequence and timeout=0
+	doc := legacytx.StdSignDoc{
+		AccountNumber: 0,
+		Sequence:      0,
+		TimeoutHeight: 0,
+		ChainID:       "",
+		Memo:          "",
+		Fee:           json.RawMessage(feeBz),
+		Msgs:          []json.RawMessage{json.RawMessage(msgBz)},
+	}
+
+	return json.Marshal(doc)
 }

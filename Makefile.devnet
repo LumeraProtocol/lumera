@@ -1,4 +1,4 @@
-.PHONY: devnet-build devnet-up devnet-reset devnet-up-detach devnet-down devnet-clean devnet-deploy-tar devnet-upgrade devnet-new
+.PHONY: devnet-build devnet-up devnet-reset devnet-up-detach devnet-down devnet-stop devnet-clean devnet-deploy-tar devnet-upgrade devnet-new
 .PHONY: devnet-build-default _check-devnet-default-cfg
 
 ##### Devnet Makefile ########################################
@@ -154,6 +154,15 @@ devnet-down:
 		echo "Stopping devnet..."; \
 		cd devnet && \
 	    docker compose down --remove-orphans; \
+	else \
+		echo "Devnet not built yet. Nothing to stop."; \
+	fi
+
+devnet-stop:
+	@if [ -f "${COMPOSE_FILE}" ]; then \
+		echo "Stopping devnet containers..."; \
+		cd devnet && \
+		docker compose stop; \
 	else \
 		echo "Devnet not built yet. Nothing to stop."; \
 	fi

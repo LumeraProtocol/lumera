@@ -11,9 +11,9 @@ import (
 	"github.com/cosmos/cosmos-sdk/runtime"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/query"
+	gogoproto "github.com/gogo/protobuf/proto"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	gogoproto "github.com/gogo/protobuf/proto"
 )
 
 // QueryActionByMetadata returns actions filtered by metadata field and value
@@ -41,7 +41,7 @@ func (q queryServer) QueryActionByMetadata(goCtx context.Context, req *types.Que
 
 	var actions []*types.Action
 
-	appendAction := func(act *actiontypes.Action, price *sdk.Coin) {
+	appendAction := func(act *actiontypes.Action, price string) {
 		actions = append(actions, &types.Action{
 			Creator:        act.Creator,
 			ActionID:       act.ActionID,

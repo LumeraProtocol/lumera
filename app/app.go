@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	_ "cosmossdk.io/api/cosmos/tx/config/v1" // import for side-effects
 	clienthelpers "cosmossdk.io/client/v2/helpers"
@@ -160,7 +161,7 @@ type App struct {
 
 func init() {
 	var err error
-	clienthelpers.EnvPrefix = Name
+	clienthelpers.EnvPrefix = strings.ToUpper(Name)
 	DefaultNodeHome, err = clienthelpers.GetNodeHomeDirectory("." + Name)
 	if err != nil {
 		panic(err)

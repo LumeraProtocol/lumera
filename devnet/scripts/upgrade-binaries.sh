@@ -26,7 +26,7 @@ DEVNET_RUNTIME_DIR="${DEVNET_DIR:-/tmp/lumera-devnet-1}"
 RELEASE_DIR="${DEVNET_RUNTIME_DIR}/shared/release"
 
 echo "Stopping devnet containers..."
-docker compose -f "${COMPOSE_FILE}" down --remove-orphans
+docker compose -f "${COMPOSE_FILE}" stop --remove-orphans
 
 echo "Copying binaries from ${BINARIES_DIR} to ${RELEASE_DIR}..."
 mkdir -p "${RELEASE_DIR}"

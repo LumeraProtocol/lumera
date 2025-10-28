@@ -70,7 +70,7 @@ func (k msgServer) RequestAction(goCtx context.Context, msg *types.MsgRequestAct
 		Creator:        msg.Creator,
 		ActionType:     actionType,
 		Metadata:       processedData,
-		Price:          &price,
+		Price:          price.String(),
 		ExpirationTime: expTime,
 		State:          types.ActionStatePending,
 	}

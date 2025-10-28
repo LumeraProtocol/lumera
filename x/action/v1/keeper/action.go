@@ -36,8 +36,12 @@ func (k *Keeper) RegisterAction(ctx sdk.Context, action *actiontypes.Action) (st
 		)
 	}
 
-	price := action.Price
-	if err := k.validatePrice(ctx, price); err != nil {
+	// Parse price from stored string and validate against params
+	parsedPrice, err := sdk.ParseCoinNormalized(action.Price)
+	if err != nil {
+		return "", errors.Wrapf(sdkerrors.ErrInvalidRequest, "invalid price %s: %s", action.Price, err)
+	}
+	if err := k.validatePrice(ctx, &parsedPrice); err != nil {
 		return "", err
 	}
 
@@ -55,12 +59,12 @@ func (k *Keeper) RegisterAction(ctx sdk.Context, action *actiontypes.Action) (st
 		)
 	}
 
-	if !coins.IsAllGTE(sdk.Coins{*price}) {
+	if !coins.IsAllGTE(sdk.Coins{parsedPrice}) {
 		return "", errors.Wrapf(
 			sdkerrors.ErrInsufficientFunds,
 			"creator %s needs at least %s but only has %s",
 			action.Creator,
-			price.String(),
+			parsedPrice.String(),
 			coins.String(),
 		)
 	}
@@ -121,9 +125,9 @@ func (k *Keeper) RegisterAction(ctx sdk.Context, action *actiontypes.Action) (st
 	// Transfer Fee from Creator account to Action Module Account
 	err = k.bankKeeper.SendCoinsFromAccountToModule(
 		ctx,
-		creator,                // sender - creator
-		actiontypes.ModuleName, // Recipient
-		sdk.NewCoins(*price),   // Amount
+		creator,                   // sender - creator
+		actiontypes.ModuleName,    // Recipient
+		sdk.NewCoins(parsedPrice), // Amount
 	)
 	if err != nil {
 		return "", errors.Wrap(actiontypes.ErrInternalError, err.Error())
@@ -137,7 +141,7 @@ func (k *Keeper) RegisterAction(ctx sdk.Context, action *actiontypes.Action) (st
 				sdk.NewAttribute(actiontypes.AttributeKeyActionID, action.ActionID),
 				sdk.NewAttribute(actiontypes.AttributeKeyCreator, action.Creator),
 				sdk.NewAttribute(actiontypes.AttributeKeyActionType, action.ActionType.String()),
-				sdk.NewAttribute(actiontypes.AttributeKeyFee, price.String()),
+				sdk.NewAttribute(actiontypes.AttributeKeyFee, parsedPrice.String()),
 			),
 		)
 	}
@@ -539,11 +543,9 @@ func (k *Keeper) DistributeFees(ctx sdk.Context, actionID string) error {
 		)
 	}
 
-	// Parse the fee amount
-	fee := actionData.Price
-
-	// If no fee or no supernodes, nothing to distribute
-	if fee == nil || fee.IsZero() || len(actionData.SuperNodes) == 0 {
+	// Parse the fee amount from stored string
+	fee, err := sdk.ParseCoinNormalized(actionData.Price)
+	if err != nil || fee.IsZero() || len(actionData.SuperNodes) == 0 {
 		return nil
 	}
 
@@ -680,7 +682,7 @@ func (k *Keeper) processExpiredActionsInState(ctx sdk.Context, state actiontypes
 		// Check if action is expired
 		if action.ExpirationTime != 0 && action.ExpirationTime <= now {
 			// refund action fee to creator before updating state
-			if action.Price != nil && action.Price.IsValid() && !action.Price.IsZero() {
+			if fee, err := sdk.ParseCoinNormalized(action.Price); err == nil && !fee.IsZero() {
 				creatorAddr, err := k.addressCodec.StringToBytes(action.Creator)
 				if err != nil {
 					k.Logger().Error("Failed to decode action creator address for refund",
@@ -696,12 +698,12 @@ func (k *Keeper) processExpiredActionsInState(ctx sdk.Context, state actiontypes
 					ctx,
 					actiontypes.ModuleName,
 					creatorAddr,
-					sdk.NewCoins(*action.Price),
+					sdk.NewCoins(fee),
 				); err != nil {
 					k.Logger().Error("Failed to refund action fee",
 						"action_id", action.ActionID,
 						"creator", action.Creator,
-						"fee", action.Price.String(),
+						"fee", fee.String(),
 						"error", err.Error(),
 					)
 					return false // continue iteration, retry next block

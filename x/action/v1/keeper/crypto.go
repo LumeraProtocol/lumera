@@ -10,9 +10,9 @@ import (
 	"fmt"
 	"io"
 	"runtime"
+	"sort"
 	"time"
 
-	"github.com/cosmos/cosmos-sdk/x/auth/migrations/legacytx"
 	"golang.org/x/sync/semaphore"
 
 	"math/big"
@@ -255,39 +255,57 @@ func CoerceToRS64(sig []byte) ([]byte, error) {
 
 // --- ADR-36 sign-bytes (Amino JSON) ---
 
-// MakeADR36AminoSignBytes builds the exact bytes Keplr signs for ADR-36.
-// dataB64 MUST be the base64 string you passed to signArbitrary.
+// MakeADR36AminoSignBytes returns the exact JSON bytes Keplr signs.
+// signerBech32: bech32 address; dataB64: base64 STRING that was given to Keplr signArbitrary().
 func MakeADR36AminoSignBytes(signerBech32, dataB64 string) ([]byte, error) {
-	// Msg: { type: "sign/MsgSignData", value: { signer, data } }
-	msg := map[string]any{
-		"type": "sign/MsgSignData",
-		"value": map[string]any{
-			"signer": signerBech32,
-			"data":   dataB64,
+	doc := map[string]any{
+		"account_number": "0",
+		"chain_id":       "",
+		"fee": map[string]any{
+			"amount": []any{},
+			"gas":    "0",
 		},
+		"memo": "",
+		"msgs": []any{
+			map[string]any{
+				"type": "sign/MsgSignData",
+				"value": map[string]any{
+					"data":   dataB64,      // IMPORTANT: base64 STRING (do not decode)
+					"signer": signerBech32, // bech32 account address
+				},
+			},
+		},
+		"sequence": "0",
 	}
-	msgBz, err := json.Marshal(msg)
+
+	canon := sortObjectByKey(doc)
+	bz, err := json.Marshal(canon)
 	if err != nil {
-		return nil, fmt.Errorf("marshal adr36 msg: %w", err)
+		return nil, fmt.Errorf("marshal adr36 doc: %w", err)
 	}
+	return bz, nil
+}
 
-	// Fee: { gas: "0", amount: [] }
-	fee := map[string]any{"gas": "0", "amount": []any{}}
-	feeBz, err := json.Marshal(fee)
-	if err != nil {
-		return nil, fmt.Errorf("marshal fee: %w", err)
+func sortObjectByKey(v any) any {
+	switch x := v.(type) {
+	case map[string]any:
+		keys := make([]string, 0, len(x))
+		for k := range x {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		out := make(map[string]any, len(x))
+		for _, k := range keys {
+			out[k] = sortObjectByKey(x[k])
+		}
+		return out
+	case []any:
+		out := make([]any, len(x))
+		for i := range x {
+			out[i] = sortObjectByKey(x[i])
+		}
+		return out
+	default:
+		return v
 	}
-
-	// StdSignDoc with empty chain_id/account_number/sequence and timeout=0
-	doc := legacytx.StdSignDoc{
-		AccountNumber: 0,
-		Sequence:      0,
-		TimeoutHeight: 0,
-		ChainID:       "",
-		Memo:          "",
-		Fee:           json.RawMessage(feeBz),
-		Msgs:          []json.RawMessage{json.RawMessage(msgBz)},
-	}
-
-	return json.Marshal(doc)
 }

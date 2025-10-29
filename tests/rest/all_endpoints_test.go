@@ -22,23 +22,23 @@ type Endpoint struct {
 // All Query-tagged endpoints from OpenAPI spec
 var queryEndpoints = []Endpoint{
 	{"/LumeraProtocol/lumera/action/v1/get_action/1", "GetAction queries a single action by ID."},
-	{"/LumeraProtocol/lumera/action/v1/get_action_fee/test-value", "Queries a list of GetActionFee items."},
+	{"/LumeraProtocol/lumera/action/v1/get_action_fee/100", "Queries a list of GetActionFee items."},
 	{"/LumeraProtocol/lumera/action/v1/list_actions", "List actions with optional type and state filters."},
 	{"/LumeraProtocol/lumera/action/v1/list_actions_by_block_height/100", "List actions created at a specific block height."},
 	{"/LumeraProtocol/lumera/action/v1/list_actions_by_supernode/lumera17mku7r3ljspatx3c86kg2qw4mmlzrpnsg9jrel", "List actions for a specific supernode."},
 	{"/LumeraProtocol/lumera/action/v1/list_expired_actions", "List expired actions."},
 	{"/LumeraProtocol/lumera/action/v1/params", "Parameters queries the parameters of the module."},
-	{"/LumeraProtocol/lumera/action/v1/query_action_by_metadata", "Query actions based on metadata."},
-	{"/LumeraProtocol/lumera/claim/claim_record/lumera17mku7r3ljspatx3c86kg2qw4mmlzrpnsg9jrel", "Queries a list of ClaimRecord items."},
+	{"/LumeraProtocol/lumera/action/v1/query_action_by_metadata?actionType=1&metadataQuery=field%3Dvalue", "Query actions based on metadata."},
+	{"/LumeraProtocol/lumera/claim/claim_record/PtguxBoV5apR1Jwjizh8NLm9sAQauFZ49aM", "Queries a list of ClaimRecord items."},
 	{"/LumeraProtocol/lumera/claim/list_claimed/1", "Queries a list of ListClaimed items."},
 	{"/LumeraProtocol/lumera/claim/params", "Parameters queries the parameters of the module."},
 	{"/LumeraProtocol/lumera/lumeraid/params", "Parameters queries the parameters of the module."},
-	{"/LumeraProtocol/lumera/supernode/v1/get_super_node/lumeravaloper1x6e45rudg37fxeaq58a9h883xcrxs4alnn3vwq", "Queries a SuperNode by validatorAddress."},
+	{"/LumeraProtocol/lumera/supernode/v1/get_super_node/lumeravaloper1yl39t9djgh4gnjw77h9k354eus305n7pu70acc", "Queries a SuperNode by validatorAddress."},
 	{"/LumeraProtocol/lumera/supernode/v1/get_super_node_by_address/lumera17mku7r3ljspatx3c86kg2qw4mmlzrpnsg9jrel", "Queries a SuperNode by supernodeAddress."},
 	{"/LumeraProtocol/lumera/supernode/v1/get_top_super_nodes_for_block/100", "Queries a list of GetTopSuperNodesForBlock items."},
 	{"/LumeraProtocol/lumera/supernode/v1/list_super_nodes", "Queries a list of SuperNodes."},
 	{"/LumeraProtocol/lumera/supernode/v1/params", "Parameters queries the parameters of the module."},
-	{"/cosmos/auth/v1beta1/account_info/lumera17mku7r3ljspatx3c86kg2qw4mmlzrpnsg9jrel", "AccountInfo queries account info which is common to all account types."},
+	{"/cosmos/auth/v1beta1/account_info/lumera1yl39t9djgh4gnjw77h9k354eus305n7pnyup7m", "AccountInfo queries account info which is common to all account types."},
 	{"/cosmos/auth/v1beta1/accounts", "Accounts returns all the existing accounts."},
 	{"/cosmos/auth/v1beta1/accounts/lumera17mku7r3ljspatx3c86kg2qw4mmlzrpnsg9jrel", "Account returns account details based on address."},
 	{"/cosmos/auth/v1beta1/address_by_id/1", "AccountAddressByID returns account address based on account number."},
@@ -51,40 +51,40 @@ var queryEndpoints = []Endpoint{
 	{"/cosmos/authz/v1beta1/grants", "Returns list of `Authorization`, granted to the grantee by the granter"},
 	{"/cosmos/authz/v1beta1/grants/grantee/test-value", "GranteeGrants returns a list of `GrantAuthorization` by grantee."},
 	{"/cosmos/authz/v1beta1/grants/granter/test-value", "GranterGrants returns list of `GrantAuthorization`, granted by granter"},
-	{"/cosmos/bank/v1beta1/balances/lumera17mku7r3ljspatx3c86kg2qw4mmlzrpnsg9jrel", "AllBalances queries the balance of all coins for a single account."},
-	{"/cosmos/bank/v1beta1/balances/lumera17mku7r3ljspatx3c86kg2qw4mmlzrpnsg9jrel/by_denom", "Balance queries the balance of a single coin for a single account."},
+	{"/cosmos/bank/v1beta1/balances/lumera1mf7amw0gdaf5epk2fq6w03yvfy9nlnxz82zua9", "AllBalances queries the balance of all coins for a single account."},
+	{"/cosmos/bank/v1beta1/balances/lumera1mf7amw0gdaf5epk2fq6w03yvfy9nlnxz82zua9/by_denom?denom=ulume", "Balance queries the balance of a single coin for a single account."},
 	{"/cosmos/bank/v1beta1/denom_owners/ulume", "DenomOwners queries for all account addresses that own a particular to"},
-	{"/cosmos/bank/v1beta1/denom_owners_by_query", "DenomOwnersByQuery queries for all account addresses that own a partic"},
+	{"/cosmos/bank/v1beta1/denom_owners_by_query?denom=ulume", "DenomOwnersByQuery queries for all account addresses that own a partic"},
 	{"/cosmos/bank/v1beta1/denoms_metadata", "DenomsMetadata queries the client metadata for all registered coin den"},
 	{"/cosmos/bank/v1beta1/denoms_metadata/ulume", "DenomMetadata queries the client metadata of a given coin denomination"},
-	{"/cosmos/bank/v1beta1/denoms_metadata_by_query_string", "DenomMetadataByQueryString queries the client metadata of a given coin"},
+	{"/cosmos/bank/v1beta1/denoms_metadata_by_query_string?denom=ulume", "DenomMetadataByQueryString queries the client metadata of a given coin"},
 	{"/cosmos/bank/v1beta1/params", "Params queries the parameters of x/bank module."},
 	{"/cosmos/bank/v1beta1/send_enabled", "SendEnabled queries for SendEnabled entries."},
-	{"/cosmos/bank/v1beta1/spendable_balances/lumera17mku7r3ljspatx3c86kg2qw4mmlzrpnsg9jrel", "SpendableBalances queries the spendable balance of all coins for a sin"},
-	{"/cosmos/bank/v1beta1/spendable_balances/lumera17mku7r3ljspatx3c86kg2qw4mmlzrpnsg9jrel/by_denom", "SpendableBalanceByDenom queries the spendable balance of a single deno"},
+	{"/cosmos/bank/v1beta1/spendable_balances/lumera1yl39t9djgh4gnjw77h9k354eus305n7pnyup7m", "SpendableBalances queries the spendable balance of all coins for a sin"},
+	{"/cosmos/bank/v1beta1/spendable_balances/lumera1yl39t9djgh4gnjw77h9k354eus305n7pnyup7m/by_denom?denom=ulume", "SpendableBalanceByDenom queries the spendable balance of a single deno"},
 	{"/cosmos/bank/v1beta1/supply", "TotalSupply queries the total supply of all coins."},
-	{"/cosmos/bank/v1beta1/supply/by_denom", "SupplyOf queries the supply of a single coin."},
+	{"/cosmos/bank/v1beta1/supply/by_denom?denom=ulume", "SupplyOf queries the supply of a single coin."},
 	{"/cosmos/circuit/v1/accounts", "Account returns account permissions."},
 	{"/cosmos/circuit/v1/accounts/lumera17mku7r3ljspatx3c86kg2qw4mmlzrpnsg9jrel", "Account returns account permissions."},
 	{"/cosmos/circuit/v1/disable_list", "DisabledList returns a list of disabled message urls"},
 	{"/cosmos/consensus/v1/params", "Params queries the parameters of x/consensus module."},
 	{"/cosmos/distribution/v1beta1/community_pool", "CommunityPool queries the community pool coins."},
-	{"/cosmos/distribution/v1beta1/delegators/lumera17mku7r3ljspatx3c86kg2qw4mmlzrpnsg9jrel/rewards", "DelegationTotalRewards queries the total rewards accrued by each valid"},
-	{"/cosmos/distribution/v1beta1/delegators/lumera17mku7r3ljspatx3c86kg2qw4mmlzrpnsg9jrel/rewards/lumeravaloper1x6e45rudg37fxeaq58a9h883xcrxs4alnn3vwq", "DelegationRewards queries the total rewards accrued by a delegation."},
-	{"/cosmos/distribution/v1beta1/delegators/lumera17mku7r3ljspatx3c86kg2qw4mmlzrpnsg9jrel/validators", "DelegatorValidators queries the validators of a delegator."},
-	{"/cosmos/distribution/v1beta1/delegators/lumera17mku7r3ljspatx3c86kg2qw4mmlzrpnsg9jrel/withdraw_address", "DelegatorWithdrawAddress queries withdraw address of a delegator."},
+	{"/cosmos/distribution/v1beta1/delegators/lumera1yl39t9djgh4gnjw77h9k354eus305n7pnyup7m/rewards", "DelegationTotalRewards queries the total rewards accrued by each valid"},
+	{"/cosmos/distribution/v1beta1/delegators/lumera1yl39t9djgh4gnjw77h9k354eus305n7pnyup7m/rewards/lumeravaloper1yl39t9djgh4gnjw77h9k354eus305n7pu70acc", "DelegationRewards queries the total rewards accrued by a delegation."},
+	{"/cosmos/distribution/v1beta1/delegators/lumera1yl39t9djgh4gnjw77h9k354eus305n7pnyup7m/validators", "DelegatorValidators queries the validators of a delegator."},
+	{"/cosmos/distribution/v1beta1/delegators/lumera1yl39t9djgh4gnjw77h9k354eus305n7pnyup7m/withdraw_address", "DelegatorWithdrawAddress queries withdraw address of a delegator."},
 	{"/cosmos/distribution/v1beta1/params", "Params queries params of the distribution module."},
-	{"/cosmos/distribution/v1beta1/validators/lumeravaloper1x6e45rudg37fxeaq58a9h883xcrxs4alnn3vwq", "ValidatorDistributionInfo queries validator commission and self-delega"},
-	{"/cosmos/distribution/v1beta1/validators/lumeravaloper1x6e45rudg37fxeaq58a9h883xcrxs4alnn3vwq/commission", "ValidatorCommission queries accumulated commission for a validator."},
-	{"/cosmos/distribution/v1beta1/validators/lumeravaloper1x6e45rudg37fxeaq58a9h883xcrxs4alnn3vwq/outstanding_rewards", "ValidatorOutstandingRewards queries rewards of a validator address."},
-	{"/cosmos/distribution/v1beta1/validators/lumeravaloper1x6e45rudg37fxeaq58a9h883xcrxs4alnn3vwq/slashes", "ValidatorSlashes queries slash events of a validator."},
+	{"/cosmos/distribution/v1beta1/validators/lumeravaloper1yl39t9djgh4gnjw77h9k354eus305n7pu70acc", "ValidatorDistributionInfo queries validator commission and self-delega"},
+	{"/cosmos/distribution/v1beta1/validators/lumeravaloper1yl39t9djgh4gnjw77h9k354eus305n7pu70acc/commission", "ValidatorCommission queries accumulated commission for a validator."},
+	{"/cosmos/distribution/v1beta1/validators/lumeravaloper1yl39t9djgh4gnjw77h9k354eus305n7pu70acc/outstanding_rewards", "ValidatorOutstandingRewards queries rewards of a validator address."},
+	{"/cosmos/distribution/v1beta1/validators/lumeravaloper1yl39t9djgh4gnjw77h9k354eus305n7pu70acc/slashes", "ValidatorSlashes queries slash events of a validator."},
 	{"/cosmos/evidence/v1beta1/evidence", "AllEvidence queries all evidence."},
 	{"/cosmos/evidence/v1beta1/evidence/ABCD1234", "Evidence queries evidence based on evidence hash."},
 	{"/cosmos/feegrant/v1beta1/allowance/test-value/test-value", "Allowance returns granted allwance to the grantee by the granter."},
 	{"/cosmos/feegrant/v1beta1/allowances/test-value", "Allowances returns all the grants for the given grantee address."},
 	{"/cosmos/feegrant/v1beta1/issued/test-value", "AllowancesByGranter returns all the grants given by an address"},
 	{"/cosmos/gov/v1/constitution", "Constitution queries the chain's constitution."},
-	{"/cosmos/gov/v1/params/test-value", "Params queries all parameters of the gov module."},
+	{"/cosmos/gov/v1/params/voting", "Params queries all parameters of the gov module."},
 	{"/cosmos/gov/v1/proposals", "Proposals queries all proposals based on given status."},
 	{"/cosmos/gov/v1/proposals/1", "Proposal queries proposal details based on ProposalID."},
 	{"/cosmos/gov/v1/proposals/1/deposits", "Deposits queries all deposits of a single proposal."},
@@ -92,7 +92,7 @@ var queryEndpoints = []Endpoint{
 	{"/cosmos/gov/v1/proposals/1/tally", "TallyResult queries the tally of a proposal vote."},
 	{"/cosmos/gov/v1/proposals/1/votes", "Votes queries votes of a given proposal."},
 	{"/cosmos/gov/v1/proposals/1/votes/test-value", "Vote queries voted information based on proposalID, voterAddr."},
-	{"/cosmos/gov/v1beta1/params/test-value", "Params queries all parameters of the gov module."},
+	{"/cosmos/gov/v1beta1/params/voting", "Params queries all parameters of the gov module."},
 	{"/cosmos/gov/v1beta1/proposals", "Proposals queries all proposals based on given status."},
 	{"/cosmos/gov/v1beta1/proposals/1", "Proposal queries proposal details based on ProposalID."},
 	{"/cosmos/gov/v1beta1/proposals/1/deposits", "Deposits queries all deposits of a single proposal."},
@@ -128,7 +128,7 @@ var queryEndpoints = []Endpoint{
 	{"/cosmos/params/v1beta1/subspaces", "Subspaces queries for all registered subspaces and all keys for a subs"},
 	{"/cosmos/slashing/v1beta1/params", "Params queries the parameters of slashing module"},
 	{"/cosmos/slashing/v1beta1/signing_infos", "SigningInfos queries signing info of all validators"},
-	{"/cosmos/slashing/v1beta1/signing_infos/lumera17mku7r3ljspatx3c86kg2qw4mmlzrpnsg9jrel", "SigningInfo queries the signing info of given cons address"},
+	{"/cosmos/slashing/v1beta1/signing_infos/lumeravalcons145dp86027tfykxj7vu03qhualzwgeymx84nhsc", "SigningInfo queries the signing info of given cons address"},
 	{"/cosmos/staking/v1beta1/delegations/test-value", "DelegatorDelegations queries all delegations of a given delegator addr"},
 	{"/cosmos/staking/v1beta1/delegators/test-value/redelegations", "Redelegations queries redelegations of given address."},
 	{"/cosmos/staking/v1beta1/delegators/test-value/unbonding_delegations", "DelegatorUnbondingDelegations queries all unbonding delegations of a g"},
@@ -138,11 +138,11 @@ var queryEndpoints = []Endpoint{
 	{"/cosmos/staking/v1beta1/params", "Parameters queries the staking parameters."},
 	{"/cosmos/staking/v1beta1/pool", "Pool queries the pool info."},
 	{"/cosmos/staking/v1beta1/validators", "Validators queries all validators that match the given status."},
-	{"/cosmos/staking/v1beta1/validators/1", "Validator queries validator info for given validator address."},
-	{"/cosmos/staking/v1beta1/validators/1/delegations", "ValidatorDelegations queries delegate info for given validator."},
+	{"/cosmos/staking/v1beta1/validators/lumeravaloper1yl39t9djgh4gnjw77h9k354eus305n7pu70acc", "Validator queries validator info for given validator address."},
+	{"/cosmos/staking/v1beta1/validators/lumeravaloper1yl39t9djgh4gnjw77h9k354eus305n7pu70acc/delegations", "ValidatorDelegations queries delegate info for given validator."},
 	{"/cosmos/staking/v1beta1/validators/1/delegations/test-value", "Delegation queries delegate info for given validator delegator pair."},
 	{"/cosmos/staking/v1beta1/validators/1/delegations/test-value/unbonding_delegation", "UnbondingDelegation queries unbonding info for given validator delegat"},
-	{"/cosmos/staking/v1beta1/validators/1/unbonding_delegations", "ValidatorUnbondingDelegations queries unbonding delegations of a valid"},
+	{"/cosmos/staking/v1beta1/validators/lumeravaloper1yl39t9djgh4gnjw77h9k354eus305n7pu70acc/unbonding_delegations", "ValidatorUnbondingDelegations queries unbonding delegations of a valid"},
 	{"/cosmos/upgrade/v1beta1/applied_plan/test-value", "AppliedPlan queries a previously applied upgrade plan by its name."},
 	{"/cosmos/upgrade/v1beta1/authority", "Returns the account with authority to conduct upgrades"},
 	{"/cosmos/upgrade/v1beta1/current_plan", "CurrentPlan queries the current upgrade plan."},
@@ -166,9 +166,9 @@ var queryEndpoints = []Endpoint{
 	{"/ibc/apps/interchain_accounts/controller/v1/params", "Params queries all parameters of the ICA controller submodule."},
 	{"/ibc/apps/interchain_accounts/host/v1/params", "Params queries all parameters of the ICA host submodule."},
 	{"/ibc/apps/transfer/v1/channels/1/ports/1/escrow_address", "EscrowAddress returns the escrow address for a particular port and cha"},
-	{"/ibc/apps/transfer/v1/denom_hashes/test-value", "DenomHash queries a denomination hash information."},
+	{"/ibc/apps/transfer/v1/denom_hashes/transfer/channel-0/uosmo", "DenomHash queries a denomination hash information."},
 	{"/ibc/apps/transfer/v1/denoms", "Denoms queries all denominations"},
-	{"/ibc/apps/transfer/v1/denoms/ABCD1234", "Denom queries a denomination"},
+	{"/ibc/apps/transfer/v1/denoms/ED07A3391A112B175915CD8FAF43A2DA8E4790EDE12566649D0C2F97716B8518", "Denom queries a denomination"},
 	{"/ibc/apps/transfer/v1/params", "Params queries all parameters of the ibc-transfer module."},
 	{"/ibc/apps/transfer/v1/total_escrow/ulume", "TotalEscrowForDenom returns the total amount of tokens in escrow based"},
 	{"/ibc/core/channel/v1/channels", "Channels queries all the IBC channels of a chain."},
@@ -224,44 +224,99 @@ func TestAllQueryEndpoints(t *testing.T) {
 	failed := 0
 	skipped := 0
 
-	fmt.Printf("\n=== Testing %d Query Endpoints ===\n\n", len(queryEndpoints))
+	// Map to group endpoints by error: "StatusCode: ErrorMessage" -> []endpoints
+	errorGroups := make(map[string][]string)
 
-	for i, endpoint := range queryEndpoints {
+	fmt.Printf("\n=== Testing %d Query Endpoints ===\n", len(queryEndpoints))
+
+	for _, endpoint := range queryEndpoints {
 		url := *baseURL + endpoint.Path
 
 		resp, err := client.Get(url)
 		if err != nil {
-			if *verbose {
-				t.Logf("[%d/%d] ⚠️  SKIP: %s - Error: %v", i+1, len(queryEndpoints), endpoint.Description, err)
-			}
 			skipped++
+			errorGroups["Connection Error"] = append(errorGroups["Connection Error"], endpoint.Path)
 			continue
 		}
 		defer resp.Body.Close()
 
 		if resp.StatusCode == http.StatusOK {
-			if *verbose {
-				t.Logf("[%d/%d] ✅ PASS: %s", i+1, len(queryEndpoints), endpoint.Description)
-			}
 			passed++
 		} else {
-			if *verbose {
-				t.Logf("[%d/%d] ❌ FAIL: %s - Status: %d", i+1, len(queryEndpoints), endpoint.Description, resp.StatusCode)
-			}
 			failed++
+
+			// Read error response body
+			var errorMsg string
+			body := make([]byte, 500) // Read first 500 bytes
+			n, _ := resp.Body.Read(body)
+			if n > 0 {
+				errorMsg = string(body[:n])
+				// Extract just the message field if it's JSON
+				if idx := findJSONMessage(errorMsg); idx != "" {
+					errorMsg = idx
+				}
+			}
+
+			// Group by status code and error message
+			errorKey := fmt.Sprintf("%d: %s", resp.StatusCode, errorMsg)
+			errorGroups[errorKey] = append(errorGroups[errorKey], endpoint.Path)
 		}
 	}
 
-	fmt.Printf("\n=== Results ===\n")
-	fmt.Printf("Total Query endpoints: %d\n", len(queryEndpoints))
-	fmt.Printf("✅ Passed (200 OK): %d\n", passed)
-	fmt.Printf("❌ Failed (non-200): %d\n", failed)
-	fmt.Printf("⚠️  Skipped (errors): %d\n", skipped)
-	fmt.Printf("Success rate: %.1f%%\n", float64(passed)/float64(len(queryEndpoints))*100)
+	// Print summary
+	fmt.Printf("\n=== Summary ===\n")
+	fmt.Printf("Total: %d | ✅ Passed: %d (%.1f%%) | ❌ Failed: %d | ⚠️ Skipped: %d\n\n",
+		len(queryEndpoints), passed, float64(passed)/float64(len(queryEndpoints))*100, failed, skipped)
+
+	// Print grouped failures
+	if len(errorGroups) > 0 {
+		fmt.Printf("=== Failed Endpoints Grouped by Error ===\n\n")
+		for errorKey, endpoints := range errorGroups {
+			fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+			fmt.Printf("Error: %s\n", errorKey)
+			fmt.Printf("Count: %d endpoints\n", len(endpoints))
+			fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+			for _, ep := range endpoints {
+				fmt.Printf("  %s\n", ep)
+			}
+			fmt.Printf("\n")
+		}
+	}
 
 	// Don't fail if some endpoints return non-200 (expected for missing data)
 	// Only fail if ALL endpoints are unreachable
 	if passed == 0 {
 		t.Fatal("No endpoints returned 200 OK - API might be down")
 	}
+}
+
+// Helper to extract message from JSON error response
+func findJSONMessage(jsonStr string) string {
+	// Simple extraction of "message" field
+	start := findString(jsonStr, `"message":"`)
+	if start == -1 {
+		start = findString(jsonStr, `"message": "`)
+	}
+	if start == -1 {
+		return jsonStr
+	}
+
+	start += len(`"message":"`)
+	end := start
+	for end < len(jsonStr) && jsonStr[end] != '"' {
+		end++
+	}
+	if end > start && end <= len(jsonStr) {
+		return jsonStr[start:end]
+	}
+	return jsonStr
+}
+
+func findString(s, substr string) int {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return i
+		}
+	}
+	return -1
 }

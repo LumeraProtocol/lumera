@@ -41,7 +41,7 @@ TOOLS := \
 ###################################################
 ###                   Build                     ###
 ###################################################
-.PHONY: build build-debug release build-proto clean-proto install-tools
+.PHONY: build build-debug release build-proto clean-proto clean-cache install-tools
 
 install-tools:
 	@echo "Installing Go tooling..."
@@ -54,9 +54,18 @@ install-tools:
 
 clean-proto:
 	@echo "Cleaning up protobuf generated files..."
-	find x/ -type f \( -name "*.pb.go" -o -name "*.pb.gw.go" -o -name "*.pulsar.go" -o -name "swagger.yaml" \) -print -exec rm -f {} +
-	find proto/ -type f \( -name "swagger.yaml"  -o -name "*.swagger.json" \) -print -exec rm -f {} +
+	find x/ -type f \( -name "*.pb.go" -o -name "*.pb.gw.go" -o -name "*.pulsar.go" -o -name "swagger.yaml" -o -name "swagger.swagger.yaml" \) -print -exec rm -f {} +
+	find proto/ -type f \( -name "swagger.yaml" -o -name "swagger.swagger.yaml" -o -name "*.swagger.json" \) -print -exec rm -f {} +
 	rm -f docs/static/openapi.yml
+
+clean-cache:
+	@echo "Cleaning Ignite cache..."
+	rm -rf ~/.ignite/cache
+	@echo "Cleaning Buf cache..."
+	${BUF} clean || true
+	rm -rf ~/.cache/buf || true
+	@echo "Cleaning Go build cache..."
+	${GO} clean -cache -modcache -i -r
 
 PROTO_SRC := $(shell find proto -name "*.proto")
 GO_SRC := $(shell find app -name "*.go") \
@@ -65,11 +74,11 @@ GO_SRC := $(shell find app -name "*.go") \
 	$(shell find config -name "*.go") \
 	$(shell find x -name "*.go")
 
-build-proto: clean-proto $(PROTO_SRC)
+build-proto: clean-proto clean-cache $(PROTO_SRC)
 	@echo "Processing proto files..."
 	${BUF} generate --template proto/buf.gen.gogo.yaml --verbose
 	${BUF} generate --template proto/buf.gen.swagger.yaml --verbose
-	${IGNITE} generate openapi --yes
+	${IGNITE} generate openapi --yes --enable-proto-vendor --clear-cache
 
 build: build/lumerad
 
@@ -82,8 +91,6 @@ build/lumerad: $(GO_SRC) go.sum Makefile
 	@echo "Building lumerad binary..."
 	@mkdir -p ${BUILD_DIR}
 	${BUF} generate --template proto/buf.gen.gogo.yaml --verbose
-	${BUF} generate --template proto/buf.gen.swagger.yaml --verbose
-	${IGNITE} generate openapi --yes
 	GOFLAGS=${GOFLAGS} ${IGNITE} chain build -t linux:amd64 --skip-proto --output ${BUILD_DIR}/
 	chmod +x $(BUILD_DIR)/lumerad
 
@@ -100,8 +107,8 @@ release:
 	@mkdir -p ${RELEASE_DIR}
 	${BUF} generate --template proto/buf.gen.gogo.yaml --verbose
 	${BUF} generate --template proto/buf.gen.swagger.yaml --verbose
-	${IGNITE} generate openapi --yes
-	CGO_LDFLAGS="${RELEASE_CGO_LDFLAGS}" ${IGNITE} chain build -t linux:amd64 --clear-cache --skip-proto --release -v --output ${RELEASE_DIR}/
+	${IGNITE} generate openapi --yes --enable-proto-vendor --clear-cache
+	CGO_LDFLAGS="${RELEASE_CGO_LDFLAGS}" ${IGNITE} chain build -t linux:amd64 --skip-proto --release -v --output ${RELEASE_DIR}/
 	@echo "Release created in [${RELEASE_DIR}/] directory."
 
 ###################################################

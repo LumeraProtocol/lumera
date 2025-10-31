@@ -44,8 +44,7 @@ func RegisterInterfaces(registry cdctypes.InterfaceRegistry) {
 func registerLegacyTypeURLAliases(registry cdctypes.InterfaceRegistry) {
 	registrar, ok := registry.(customTypeURLRegistry)
 	if !ok {
-		fmt.Printf("supernode module: interface registry %T does not support RegisterCustomTypeURL; skipping legacy type URL aliases\n", registry)
-		return
+		panic(fmt.Sprintf("supernode module: interface registry %T does not support RegisterCustomTypeURL; skipping legacy type URL aliases\n", registry))
 	}
 
 	for _, alias := range legacySupernodeAliases {

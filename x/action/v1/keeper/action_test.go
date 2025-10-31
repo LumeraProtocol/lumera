@@ -40,7 +40,7 @@ func (suite *KeeperTestSuite) TestRegisterAction() {
 			action: &actiontypes.Action{
 				Creator:    suite.creatorAddress.String(),
 				ActionType: actiontypes.ActionTypeCascade,
-				Price:      &testPrice,
+				Price:      testPrice.String(),
 				Metadata:   nil, // Missing metadata
 			},
 			expErr: actiontypes.ErrInvalidMetadata,
@@ -51,7 +51,7 @@ func (suite *KeeperTestSuite) TestRegisterAction() {
 			action: &actiontypes.Action{
 				Creator:    suite.creatorAddress.String(),
 				ActionType: actiontypes.ActionTypeSense,
-				Price:      &testPrice,
+				Price:      testPrice.String(),
 				Metadata:   nil, // Missing metadata
 			},
 			expErr: actiontypes.ErrInvalidMetadata,
@@ -80,7 +80,7 @@ func (suite *KeeperTestSuite) TestRegisterAction() {
 					return &actiontypes.Action{
 						Creator:    suite.creatorAddress.String(),
 						ActionType: actiontypes.ActionTypeSense,
-						Price:      &testPrice,
+						Price:      testPrice.String(),
 						State:      actiontypes.ActionStateDone, // Should start as UNSPECIFIED
 						Metadata:   nil,                         // Empty metadata ID
 					}
@@ -90,7 +90,7 @@ func (suite *KeeperTestSuite) TestRegisterAction() {
 				return &actiontypes.Action{
 					Creator:    suite.creatorAddress.String(),
 					ActionType: actiontypes.ActionTypeSense,
-					Price:      &testPrice,
+					Price:      testPrice.String(),
 					State:      actiontypes.ActionStateDone, // Should start as UNSPECIFIED
 					Metadata:   metadataBytes,
 				}
@@ -582,7 +582,7 @@ func (suite *KeeperTestSuite) TestIterateActionsByState_Sense() {
 	superNode1 := suite.supernodes[0].SupernodeAccount
 
 	suite.setupExpectationsGetAllTopSNs(2)
-	
+
 	// Create actions in different states
 	pendingAction := suite.prepareSenseActionForRegistration(creator, MetadataFieldToMissNone)
 	_, err := suite.keeper.RegisterAction(suite.ctx, pendingAction)
@@ -658,7 +658,7 @@ func (suite *KeeperTestSuite) TestFeeDistribution() {
 
 	// Create an action with a fee
 	action := suite.prepareCascadeActionForRegistration(creator, MetadataFieldToMissNone)
-	action.Price = &testPrice
+	action.Price = testPrice.String()
 	_, err = suite.keeper.RegisterAction(suite.ctx, action)
 	suite.NoError(err)
 

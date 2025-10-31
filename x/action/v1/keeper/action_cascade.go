@@ -13,7 +13,7 @@ import (
 	"cosmossdk.io/errors"
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	gogoproto "github.com/gogo/protobuf/proto"
+	gogoproto "github.com/cosmos/gogoproto/proto"
 	"github.com/cosmos/gogoproto/jsonpb"
 )
 

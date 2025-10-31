@@ -1,0 +1,4 @@
+{
+  "args": ["--headless=true", "--listen=127.0.0.1:0", "--api-version=2", "--check-go-version=false", "--log"],
+  "substitutePath": []
+}

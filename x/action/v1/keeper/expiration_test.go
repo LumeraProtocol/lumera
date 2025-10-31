@@ -117,7 +117,7 @@ func (suite *ExpirationTestSuite) TestCheckExpiration() {
 		action := &actiontypes.Action{
 			Creator:        suite.testAddr.String(),
 			ActionType:     actiontypes.ActionTypeCascade,
-			Price:          &testPrice,
+			Price:          testPrice.String(),
 			BlockHeight:    suite.ctx.BlockHeight(),
 			State:          tc.state,
 			ExpirationTime: tc.expirationTime,
@@ -218,7 +218,7 @@ func (suite *ExpirationTestSuite) TestActionFeeRefundOnExpiration() {
 		action := &actiontypes.Action{
 			Creator:        suite.testAddr.String(),
 			ActionType:     actiontypes.ActionTypeCascade,
-			Price:          &price,
+			Price:          price.String(),
 			ExpirationTime: suite.blockTime.Unix() - 10,
 			Metadata:       metadataBytes,
 		}
@@ -295,7 +295,7 @@ func (suite *ExpirationTestSuite) TestExpiredActionEvents() {
 		action := &actiontypes.Action{
 			Creator:        suite.testAddr.String(),
 			ActionType:     scenario.actionTyp,
-			Price:          &price,
+			Price:          price.String(),
 			ExpirationTime: ctx.BlockTime().Unix() - 60,
 			Metadata:       metadataBytes,
 		}

@@ -12,9 +12,9 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	queryv1beta1 "github.com/cosmos/cosmos-sdk/types/query"
 
-	"github.com/stretchr/testify/suite"
+	gogoproto "github.com/cosmos/gogoproto/proto"
 	"github.com/golang/mock/gomock"
-	gogoproto "github.com/gogo/protobuf/proto"
+	"github.com/stretchr/testify/suite"
 
 	testkeeper "github.com/LumeraProtocol/lumera/testutil/keeper"
 	actionkeeper "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
@@ -25,8 +25,8 @@ import (
 type KeeperIntegrationTestSuite struct {
 	suite.Suite
 
-	ctx    sdk.Context
-	keeper actionkeeper.Keeper
+	ctx         sdk.Context
+	keeper      actionkeeper.Keeper
 	queryServer actiontypes.QueryServer
 
 	testAddrs    []sdk.AccAddress
@@ -85,7 +85,7 @@ func (suite *KeeperIntegrationTestSuite) TestGetAction() {
 		Creator:        suite.testAddrs[0].String(),
 		ActionType:     actiontypes.ActionTypeSense,
 		State:          actiontypes.ActionStatePending,
-		Price:          &price,
+		Price:          price.String(),
 		BlockHeight:    1,
 		ExpirationTime: time.Now().Unix() + 3600,
 		Metadata:       []byte(`{"key": "value"}`),
@@ -164,7 +164,7 @@ func (suite *KeeperIntegrationTestSuite) TestListActions() {
 			Creator:        suite.testAddrs[0].String(),
 			ActionType:     actiontypes.ActionTypeSense,
 			State:          actiontypes.ActionStatePending,
-			Price:          &testPrice1,
+			Price:          testPrice1.String(),
 			BlockHeight:    1,
 			ExpirationTime: time.Now().Unix() + 3600,
 			Metadata:       senseMetadataBytes,
@@ -174,7 +174,7 @@ func (suite *KeeperIntegrationTestSuite) TestListActions() {
 			Creator:        suite.testAddrs[1].String(),
 			ActionType:     actiontypes.ActionTypeCascade,
 			State:          actiontypes.ActionStatePending,
-			Price:          &testPrice2,
+			Price:          testPrice2.String(),
 			BlockHeight:    2,
 			ExpirationTime: time.Now().Unix() + 3600,
 			Metadata:       cascadeMetadataBytes,
@@ -282,7 +282,7 @@ func (suite *KeeperIntegrationTestSuite) TestListActionsBySuperNode() {
 			Creator:        suite.testAddrs[0].String(),
 			ActionType:     actiontypes.ActionTypeSense,
 			State:          actiontypes.ActionStatePending,
-			Price:          &testPrice1,
+			Price:          testPrice1.String(),
 			BlockHeight:    1,
 			ExpirationTime: time.Now().Unix() + 3600,
 			Metadata:       senseMetadataBytes,
@@ -293,7 +293,7 @@ func (suite *KeeperIntegrationTestSuite) TestListActionsBySuperNode() {
 			Creator:        suite.testAddrs[1].String(),
 			ActionType:     actiontypes.ActionTypeCascade,
 			State:          actiontypes.ActionStatePending,
-			Price:          &testPrice2,
+			Price:          testPrice2.String(),
 			BlockHeight:    2,
 			ExpirationTime: time.Now().Unix() + 3600,
 			Metadata:       cascadeMetadataBytes,
@@ -399,7 +399,7 @@ func (suite *KeeperIntegrationTestSuite) TestListActionsByBlockHeight() {
 			Creator:        suite.testAddrs[0].String(),
 			ActionType:     actiontypes.ActionTypeSense,
 			State:          actiontypes.ActionStatePending,
-			Price:          &testPrice1,
+			Price:          testPrice1.String(),
 			BlockHeight:    1,
 			ExpirationTime: time.Now().Unix() + 3600,
 			Metadata:       senseMetadataBytes,
@@ -410,7 +410,7 @@ func (suite *KeeperIntegrationTestSuite) TestListActionsByBlockHeight() {
 			Creator:        suite.testAddrs[1].String(),
 			ActionType:     actiontypes.ActionTypeCascade,
 			State:          actiontypes.ActionStatePending,
-			Price:          &testPrice2,
+			Price:          testPrice2.String(),
 			BlockHeight:    2,
 			ExpirationTime: time.Now().Unix() + 3600,
 			Metadata:       cascadeMetadataBytes,
@@ -524,7 +524,7 @@ func (suite *KeeperIntegrationTestSuite) TestListExpiredActions() {
 			Creator:        suite.testAddrs[0].String(),
 			ActionType:     actiontypes.ActionTypeSense,
 			State:          actiontypes.ActionStatePending,
-			Price:          &testPrice1,
+			Price:          testPrice1.String(),
 			BlockHeight:    1,
 			ExpirationTime: now - 3600,
 			Metadata:       senseMetadataBytes,
@@ -535,7 +535,7 @@ func (suite *KeeperIntegrationTestSuite) TestListExpiredActions() {
 			Creator:        suite.testAddrs[1].String(),
 			ActionType:     actiontypes.ActionTypeCascade,
 			State:          actiontypes.ActionStatePending,
-			Price:          &testPrice2,
+			Price:          testPrice2.String(),
 			BlockHeight:    2,
 			ExpirationTime: now - 7200,
 			Metadata:       cascadeMetadataBytes,
@@ -626,7 +626,7 @@ func (suite *KeeperIntegrationTestSuite) TestQueryActionByMetadata() {
 			Creator:        suite.testAddrs[0].String(),
 			ActionType:     actiontypes.ActionTypeSense,
 			State:          actiontypes.ActionStatePending,
-			Price:          &testPrice1,
+			Price:          testPrice1.String(),
 			BlockHeight:    1,
 			ExpirationTime: time.Now().Unix() + 3600,
 			Metadata:       senseMetadataBytes,
@@ -636,7 +636,7 @@ func (suite *KeeperIntegrationTestSuite) TestQueryActionByMetadata() {
 			Creator:        suite.testAddrs[1].String(),
 			ActionType:     actiontypes.ActionTypeCascade,
 			State:          actiontypes.ActionStatePending,
-			Price:          &testPrice2,
+			Price:          testPrice2.String(),
 			BlockHeight:    2,
 			ExpirationTime: time.Now().Unix() + 3600,
 			Metadata:       cascadeMetadataBytes,

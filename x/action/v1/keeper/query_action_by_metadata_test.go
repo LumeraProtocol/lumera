@@ -9,11 +9,11 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/query"
+	gogoproto "github.com/cosmos/gogoproto/proto"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	gogoproto "github.com/gogo/protobuf/proto"
 )
 
 func TestQueryActionByMetadata(t *testing.T) {
@@ -59,7 +59,7 @@ func TestQueryActionByMetadata(t *testing.T) {
 		ActionID:       actionID1,
 		ActionType:     types.ActionTypeSense,
 		Metadata:       senseMetadataBytes1,
-		Price:          &price,
+		Price:          price.String(),
 		ExpirationTime: 1234567890,
 		State:          types.ActionStateProcessing,
 		BlockHeight:    100,
@@ -70,7 +70,7 @@ func TestQueryActionByMetadata(t *testing.T) {
 		ActionID:       actionID2,
 		ActionType:     types.ActionTypeSense,
 		Metadata:       senseMetadataBytes2,
-		Price:          &price,
+		Price:          price.String(),
 		ExpirationTime: 1234567891,
 		State:          types.ActionStateApproved,
 		BlockHeight:    100,
@@ -81,7 +81,7 @@ func TestQueryActionByMetadata(t *testing.T) {
 		ActionID:       actionID3,
 		ActionType:     types.ActionTypeCascade,
 		Metadata:       cascadeMetadataBytes3,
-		Price:          &price,
+		Price:          price.String(),
 		ExpirationTime: 1234567892,
 		State:          types.ActionStateApproved,
 		BlockHeight:    100,
@@ -92,7 +92,7 @@ func TestQueryActionByMetadata(t *testing.T) {
 		ActionID:       actionID4,
 		ActionType:     types.ActionTypeSense,
 		Metadata:       senseMetadataBytes4,
-		Price:          &price,
+		Price:          price.String(),
 		ExpirationTime: 1234567890,
 		State:          types.ActionStateProcessing,
 		BlockHeight:    100,

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	_ "cosmossdk.io/api/cosmos/tx/config/v1" // import for side-effects
 	clienthelpers "cosmossdk.io/client/v2/helpers"
@@ -69,13 +70,13 @@ import (
 	_ "github.com/cosmos/cosmos-sdk/x/staking" // import for side-effects
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
 
+	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	ibcpacketforwardkeeper "github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v10/packetforward/keeper"
 	icacontrollerkeeper "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/controller/keeper"
 	icahostkeeper "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/host/keeper"
 	ibctransferkeeper "github.com/cosmos/ibc-go/v10/modules/apps/transfer/keeper"
 	ibcporttypes "github.com/cosmos/ibc-go/v10/modules/core/05-port/types"
 	ibckeeper "github.com/cosmos/ibc-go/v10/modules/core/keeper"
-	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 
 	actionmodulekeeper "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	claimmodulekeeper "github.com/LumeraProtocol/lumera/x/claim/keeper"
@@ -160,7 +161,7 @@ type App struct {
 
 func init() {
 	var err error
-	clienthelpers.EnvPrefix = Name
+	clienthelpers.EnvPrefix = strings.ToUpper(Name)
 	DefaultNodeHome, err = clienthelpers.GetNodeHomeDirectory("." + Name)
 	if err != nil {
 		panic(err)
@@ -339,7 +340,7 @@ func (app *App) setupUpgradeStoreLoaders() {
 	}
 
 	// Map of upgrade names to their corresponding StoreUpgrades
-	var storeUpgradesMap = map[string]*storetypes.StoreUpgrades{
+	storeUpgradesMap := map[string]*storetypes.StoreUpgrades{
 		upgrade_v1_6_1.UpgradeName: &upgrade_v1_6_1.StoreUpgrades,
 		upgrade_v1_7_0.UpgradeName: &upgrade_v1_7_0.StoreUpgrades,
 		upgrade_v1_7_2.UpgradeName: &upgrade_v1_7_2.StoreUpgrades,
@@ -351,6 +352,8 @@ func (app *App) setupUpgradeStoreLoaders() {
 		if upgrades, exists := storeUpgradesMap[upgradeInfo.Name]; exists {
 			app.SetStoreLoader(upgradetypes.UpgradeStoreLoader(upgradeInfo.Height, upgrades))
 			app.Logger().Info("Configured store loader for upgrade", "name", upgradeInfo.Name, "height", upgradeInfo.Height)
+		} else {
+			app.Logger().Info("No store upgrades registered for pending plan", "name", upgradeInfo.Name)
 		}
 	}
 }

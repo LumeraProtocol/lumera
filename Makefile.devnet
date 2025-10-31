@@ -1,5 +1,5 @@
-.PHONY: devnet-build devnet-up devnet-reset devnet-up-detach devnet-down devnet-clean devnet-deploy-tar devnet-upgrade devnet-new
-.PHONY: devnet-build-default _check-devnet-default-cfg
+.PHONY: devnet-build devnet-up devnet-reset devnet-up-detach devnet-down devnet-stop devnet-clean devnet-deploy-tar devnet-upgrade devnet-new devnet-start
+.PHONY: devnet-build-default _check-devnet-default-cfg devnet-upgrade-binaries devnet-update-scripts
 
 ##### Devnet Makefile ########################################
 #
@@ -158,6 +158,24 @@ devnet-down:
 		echo "Devnet not built yet. Nothing to stop."; \
 	fi
 
+devnet-stop:
+	@if [ -f "${COMPOSE_FILE}" ]; then \
+		echo "Stopping devnet containers..."; \
+		cd devnet && \
+		docker compose stop; \
+	else \
+		echo "Devnet not built yet. Nothing to stop."; \
+	fi
+
+devnet-start:
+	@if [ -f "${COMPOSE_FILE}" ]; then \
+		echo "Starting devnet containers..."; \
+		cd devnet && \
+		START_MODE=run docker compose up; \
+	else \
+		echo "Devnet not built yet. Nothing to start."; \
+	fi
+
 devnet-clean:
 	sudo rm -rf $(SHARED_DIR) $(VALIDATOR_DIRS) $(HERMES_SIMD_DIR) $(HERMES_ROUTER_DIR)
 	rm -f devnet/docker-compose.yml
@@ -199,7 +217,65 @@ devnet-new:
 	$(MAKE) devnet-clean
 	$(MAKE) devnet-build-default
 
-upgrade_180:
+devnet-upgrade-binaries:
+	@if [ ! -f "${BUILD_DIR}/lumerad" ]; then \
+		echo "Cannot find lumerad binary [${BUILD_DIR}/lumerad]"; \
+		exit 1; \
+	fi; \
+	if [ ! -f "${BUILD_DIR}/libwasmvm.x86_64.so" ]; then \
+		go get github.com/CosmWasm/wasmvm/$(WASMVM_VERSION) && \
+		WASMVM_SO="$$(find $$(go env GOPATH)/pkg/mod/github.com/!cosm!wasm/wasmvm/$(WASMVM_VERSION) -name "libwasmvm.x86_64.so" -print -quit)" && \
+		if [ -z "$$WASMVM_SO" ]; then \
+			echo "Unable to locate libwasmvm.x86_64.so in GOPATH"; \
+			exit 1; \
+		fi; \
+		cp -f "$$WASMVM_SO" ${BUILD_DIR}/libwasmvm.x86_64.so; \
+	fi; \
+	./devnet/scripts/upgrade-binaries.sh "${BUILD_DIR}"
+
+devnet-update-scripts:
+	@if [ ! -f "$(COMPOSE_FILE)" ]; then \
+		echo "Missing $(COMPOSE_FILE); run 'make devnet-build' first."; \
+		exit 1; \
+	fi
+	@services="$$(docker compose -f $(COMPOSE_FILE) ps --services)"; \
+	common_scripts="start.sh validator-setup.sh supernode-setup.sh network-maker-setup.sh"; \
+	updated=0; \
+	for svc in $$services; do \
+		container="$$(docker compose -f $(COMPOSE_FILE) ps -q $$svc)"; \
+		if [ -z "$$container" ]; then \
+			echo "Skipping service $$svc (not running)"; \
+			continue; \
+		fi; \
+		if [ "$$svc" = "hermes" ]; then \
+			for script_path in devnet/hermes/scripts/*.sh; do \
+				[ -f "$$script_path" ] || continue; \
+				script="$$(basename "$$script_path")"; \
+				echo "Updating $$script in container $$container (service $$svc)"; \
+				docker cp "$$script_path" "$$container:/root/scripts/$${script}"; \
+				docker exec "$$container" chmod 0755 "/root/scripts/$${script}"; \
+				updated=1; \
+			done; \
+		else \
+			for script in $$common_scripts; do \
+				host_script="devnet/scripts/$${script}"; \
+				if [ ! -f "$$host_script" ]; then \
+					echo "Warning: $$host_script not found; skipping."; \
+					continue; \
+				fi; \
+				echo "Updating $$script in container $$container (service $$svc)"; \
+				docker cp "$$host_script" "$$container:/root/scripts/$${script}"; \
+				docker exec "$$container" chmod 0755 "/root/scripts/$${script}"; \
+				updated=1; \
+			done; \
+		fi; \
+	done; \
+	if [ "$$updated" -eq 0 ]; then \
+		echo "No containers were updated. Ensure the devnet is running."; \
+	fi
+
+.PHONY: devnet-new-172 devnet-upgrade_180
+devnet-upgrade_180:
 	@cd devnet/scripts && ./upgrade.sh v1.8.0 120 ../bin-v1.8.0
 
 devnet-new-172:

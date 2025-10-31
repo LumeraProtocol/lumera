@@ -5,14 +5,14 @@ breaking:
     use:
         - FILE
 deps:
-    - buf.build/cosmos/cosmos-proto
     - buf.build/cosmos/cosmos-sdk
-    - buf.build/cosmos/gogo-proto
+    - buf.build/cosmos/cosmos-proto
     - buf.build/cosmos/ics23
-    - buf.build/googleapis/googleapis
-    - buf.build/protocolbuffers/wellknowntypes
     - buf.build/cosmos/ibc
     - buf.build/cosmwasm/wasmd
+    - buf.build/cosmos/gogo-proto
+    - buf.build/googleapis/googleapis
+    - buf.build/protocolbuffers/wellknowntypes
 lint:
     disallow_comment_ignores: true
     except:
@@ -27,7 +27,6 @@ lint:
         - DEFAULT
         - FILE_LOWER_SNAKE_CASE
 modules:
-    - path: proto
-      name: buf.build/lumera-protocol/lumera
-
+    - name: buf.build/lumera-protocol/lumera
+      path: proto
 version: v2

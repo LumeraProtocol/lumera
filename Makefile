@@ -97,6 +97,15 @@ clean-proto:
 	find proto/ -type f \( -name "swagger.yaml"  -o -name "*.swagger.json" \) -print -exec rm -f {} +; \
 	rm -f docs/static/openapi.yml
 
+clean-cache:
+	@echo "Cleaning Ignite cache..."
+	rm -rf ~/.ignite/cache
+	@echo "Cleaning Buf cache..."
+	${BUF} clean || true
+	rm -rf ~/.cache/buf || true
+	@echo "Cleaning Go build cache..."
+	${GO} clean -cache -modcache -i -r
+
 PROTO_SRC := $(shell find proto -name "*.proto")
 GO_SRC := $(shell find app -name "*.go") \
 	$(shell find ante -name "*.go") \
@@ -108,7 +117,7 @@ build-proto: check-tools clean-proto $(PROTO_SRC)
 	@echo "Processing proto files..."
 	${BUF} generate --template proto/buf.gen.gogo.yaml --verbose
 	${BUF} generate --template proto/buf.gen.swagger.yaml --verbose
-	${IGNITE} generate openapi --yes
+	${IGNITE} generate openapi --yes --enable-proto-vendor --clear-cache
 
 build: build/lumerad
 

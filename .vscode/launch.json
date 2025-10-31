@@ -93,6 +93,31 @@
       "showLog": true
     },
     {
+      "name": "Debug q gov proposals (container)",
+      "type": "go",
+      "request": "launch",
+      "mode": "exec",
+      "program": "${workspaceFolder}/build/lumerad",
+      "args": [
+        "q",
+        "gov",
+        "proposals",
+        "--node",
+        "tcp://localhost:26687",
+        "--grpc-addr",
+        "localhost:9093",
+        "--grpc-insecure",
+        "--output",
+        "json",
+        "--trace"
+      ],
+      "env": {
+        "LUMERA_HOME": "${workspaceFolder}/debug-home"
+      },
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "Ignite Debug Build"
+    },
+    {
       "name": "Attach to Delve",
       "type": "go",
       "request": "attach",

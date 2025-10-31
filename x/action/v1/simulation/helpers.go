@@ -13,7 +13,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	simtypes "github.com/cosmos/cosmos-sdk/types/simulation"
 
-	gogoproto "github.com/gogo/protobuf/proto"
+	gogoproto "github.com/cosmos/gogoproto/proto"
 
 	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
 	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"

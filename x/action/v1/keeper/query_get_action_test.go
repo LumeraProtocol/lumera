@@ -49,7 +49,7 @@ func TestKeeper_GetAction(t *testing.T) {
 			req: &types.QueryGetActionRequest{
 				ActionID: invalidActionID,
 			},
-			expectedErr: status.Errorf(codes.Internal, "failed to get action by ID"),
+			expectedErr: status.Errorf(codes.NotFound, "failed to get action by ID"),
 		},
 		{
 			name: "action found",

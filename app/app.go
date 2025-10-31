@@ -57,7 +57,6 @@ import (
 	govclient "github.com/cosmos/cosmos-sdk/x/gov/client"
 	govkeeper "github.com/cosmos/cosmos-sdk/x/gov/keeper"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
-	v1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
 	groupkeeper "github.com/cosmos/cosmos-sdk/x/group/keeper"
 	_ "github.com/cosmos/cosmos-sdk/x/group/module" // import for side-effects
 	_ "github.com/cosmos/cosmos-sdk/x/mint"         // import for side-effects
@@ -314,7 +313,6 @@ func New(
 	}
 
 	ctx := app.NewUncachedContext(true, tmproto.Header{})
-	app.logGovernanceDiagnostics(ctx)
 	if err := app.WasmKeeper.InitializePinnedCodes(ctx); err != nil {
 		panic(fmt.Errorf("failed to initialize pinned wasm codes: %w", err))
 	}
@@ -357,24 +355,6 @@ func (app *App) setupUpgradeStoreLoaders() {
 		} else {
 			app.Logger().Info("No store upgrades registered for pending plan", "name", upgradeInfo.Name)
 		}
-	}
-}
-
-func (app *App) logGovernanceDiagnostics(ctx sdk.Context) {
-	err := app.GovKeeper.Proposals.Walk(ctx, nil, func(id uint64, proposal v1.Proposal) (bool, error) {
-		app.Logger().Info("gov proposal snapshot", "proposal_id", id, "status", proposal.Status.String(), "messages", len(proposal.Messages))
-		for i, anyMsg := range proposal.Messages {
-			typeURL := anyMsg.GetTypeUrl()
-			if _, err := app.interfaceRegistry.Resolve(typeURL); err != nil {
-				app.Logger().Error("gov proposal message unresolved", "proposal_id", id, "message_index", i, "type_url", typeURL, "err", err)
-			} else {
-				app.Logger().Info("gov proposal message resolved", "proposal_id", id, "message_index", i, "type_url", typeURL)
-			}
-		}
-		return false, nil
-	})
-	if err != nil {
-		app.Logger().Error("gov proposal diagnostic walk failed", "err", err)
 	}
 }
 

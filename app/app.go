@@ -82,6 +82,7 @@ import (
 	claimmodulekeeper "github.com/LumeraProtocol/lumera/x/claim/keeper"
 	lumeraidmodulekeeper "github.com/LumeraProtocol/lumera/x/lumeraid/keeper"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+
 	// this line is used by starport scaffolding # stargate/app/moduleImport
 
 	"github.com/LumeraProtocol/lumera/docs"
@@ -90,6 +91,7 @@ import (
 	upgrade_v1_7_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_7_0"
 	upgrade_v1_7_2 "github.com/LumeraProtocol/lumera/app/upgrades/v1_7_2"
 	upgrade_v1_8_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_0"
+	upgrade_v1_8_2 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_2"
 )
 
 const (
@@ -345,6 +347,7 @@ func (app *App) setupUpgradeStoreLoaders() {
 		upgrade_v1_7_0.UpgradeName: &upgrade_v1_7_0.StoreUpgrades,
 		upgrade_v1_7_2.UpgradeName: &upgrade_v1_7_2.StoreUpgrades,
 		upgrade_v1_8_0.UpgradeName: &upgrade_v1_8_0.StoreUpgrades,
+		upgrade_v1_8_2.UpgradeName: &upgrade_v1_8_2.StoreUpgrades,
 	}
 
 	// Check for the planned upgrades
@@ -393,6 +396,14 @@ func (app *App) setupUpgradeHandlers() {
 		{
 			Name: upgrade_v1_8_0.UpgradeName,
 			Handler: upgrade_v1_8_0.CreateUpgradeHandler(
+				app.Logger(),
+				app.ModuleManager,
+				app.Configurator(),
+			),
+		},
+		{
+			Name: upgrade_v1_8_2.UpgradeName,
+			Handler: upgrade_v1_8_2.CreateUpgradeHandler(
 				app.Logger(),
 				app.ModuleManager,
 				app.Configurator(),

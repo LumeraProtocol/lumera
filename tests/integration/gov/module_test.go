@@ -23,7 +23,7 @@ func TestItCreatesModuleAccountOnInitBlock(t *testing.T) {
 		depinject.Configs(
 			configurator.NewAppConfig(
 				configurator.ParamsModule(),
-				configurator.AuthModule(),
+				lumeraAuthModule(),
 				configurator.StakingModule(),
 				configurator.BankModule(),
 				configurator.GovModule(),

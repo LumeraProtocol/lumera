@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"errors"
-	"io"
 	"fmt"
+	"io"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -41,17 +41,16 @@ func initRootCmd(
 	rootCmd.AddCommand(
 		genutilcli.InitCmd(basicManager, app.DefaultNodeHome),
 		NewTestnetCmd(basicManager, banktypes.GenesisBalancesIterator{}),
-		debug.Cmd(),
+		debugCommand(),
 		confixcmd.ConfigCommand(),
 		pruning.Cmd(newApp, app.DefaultNodeHome),
 		snapshot.Cmd(newApp),
 	)
-    // Register --claims-path persistent flag
-    rootCmd.PersistentFlags().String(claimtypes.FlagClaimsPath, "", 
+	// Register --claims-path persistent flag
+	rootCmd.PersistentFlags().String(claimtypes.FlagClaimsPath, "",
 		fmt.Sprintf("Path to %s file or directory containing it", claimtypes.DefaultClaimsFileName))
-    // Bind to viper
-    _ = viper.BindPFlag(claimtypes.FlagClaimsPath, rootCmd.PersistentFlags().Lookup(claimtypes.FlagClaimsPath))
-
+	// Bind to viper
+	_ = viper.BindPFlag(claimtypes.FlagClaimsPath, rootCmd.PersistentFlags().Lookup(claimtypes.FlagClaimsPath))
 
 	server.AddCommands(rootCmd, app.DefaultNodeHome, newApp, appExport, addModuleInitFlags)
 
@@ -129,6 +128,13 @@ func txCommand() *cobra.Command {
 	cmd.PersistentFlags().String(flags.FlagChainID, "", "The network chain ID")
 
 	return cmd
+}
+
+func debugCommand() *cobra.Command {
+	debugCmd := debug.Cmd()
+	debugCmd.AddCommand(debugResolveTypeURLCmd())
+
+	return debugCmd
 }
 
 // newApp creates the application

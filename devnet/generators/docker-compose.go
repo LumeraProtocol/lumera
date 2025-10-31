@@ -28,6 +28,8 @@ type DockerComposeService struct {
 	Environment   map[string]string     `yaml:"environment,omitempty"`
 	Command       string                `yaml:"command,omitempty"`
 	DependsOn     []string              `yaml:"depends_on,omitempty"`
+	CapAdd        []string              `yaml:"cap_add,omitempty"`
+	SecurityOpt   []string              `yaml:"security_opt,omitempty"`
 	Logging       *DockerComposeLogging `yaml:"logging,omitempty"`
 }
 
@@ -82,6 +84,7 @@ func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validat
 				fmt.Sprintf("%d:%d", validator.RPCPort, DefaultRPCPort),
 				fmt.Sprintf("%d:%d", validator.RESTPort, DefaultRESTPort),
 				fmt.Sprintf("%d:%d", validator.GRPCPort, DefaultGRPCPort),
+				fmt.Sprintf("%d:%d", DefaultDebugPort+index, DefaultDebugPort),
 			},
 			Volumes: []string{
 				fmt.Sprintf("%s/%s-data:/root/%s", folderMount, validator.Name, config.Paths.Directories.Daemon),
@@ -89,6 +92,12 @@ func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validat
 			},
 			Environment: env,
 			Command:     fmt.Sprintf("bash %s/%s", FolderScripts, StartScript),
+			CapAdd: []string{
+				"SYS_PTRACE",
+			},
+			SecurityOpt: []string{
+				"seccomp=unconfined",
+			},
 			Logging: &DockerComposeLogging{
 				Driver: "json-file",
 				Options: map[string]string{

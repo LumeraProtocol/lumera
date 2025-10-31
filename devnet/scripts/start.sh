@@ -62,6 +62,10 @@ mkdir -p "${LOGS_DIR}" "${DAEMON_HOME}/config" "${STATUS_DIR}"
 : "${MONIKER:?MONIKER environment variable must be set}"
 echo "[BOOT] ${MONIKER}: start.sh (mode=${START_MODE})"
 
+NODE_STATUS_DIR="${STATUS_DIR}/${MONIKER}"
+NODE_SETUP_COMPLETE="${NODE_STATUS_DIR}/setup_complete"
+mkdir -p "${NODE_STATUS_DIR}"
+
 if [ ! command -v jq >/dev/null 2>&1 ]; then
     echo "[BOOT] jq is missing"
 fi
@@ -69,8 +73,6 @@ fi
 if [ ! -f "${CFG_CHAIN}" ]; then
   echo "[BOOT] Missing ${CFG_CHAIN}"; exit 1
 fi
-
-MIN_GAS_PRICE="$(jq -r '.chain.denom.minimum_gas_price' "${CFG_CHAIN}")"
 
 if [ ! -f "${CFG_VALS}" ]; then
   echo "[BOOT] Missing ${CFG_VALS}"; exit 1
@@ -149,6 +151,7 @@ launch_supernode_setup() {
 wait_for_validator_setup() {
   echo "[BOOT] ${MONIKER}: Waiting for validator setup to complete..."
   wait_for_flag "${SETUP_COMPLETE}"
+  wait_for_flag "${NODE_SETUP_COMPLETE}"
   echo "[BOOT] ${MONIKER}: validator setup complete."
 }
 
@@ -169,8 +172,6 @@ install_wasm_lib() {
 install_lumerad_binary() {
   run cp -f "${LUMERA_SRC_BIN}" "${LUMERA_DST_BIN}"
   run chmod +x "${LUMERA_DST_BIN}"
-  install_wasm_lib
-  run lumerad version || true
 }
 
 install_or_update_lumerad() {
@@ -194,12 +195,14 @@ install_or_update_lumerad() {
       echo "[BOOT] ${LUMERA_SRC_BIN} not found, assuming ${LUMERAD} is already installed"
     fi
   fi
+  install_wasm_lib
+  run lumerad version || true
 }
 
 launch_validator_setup() {
   install_or_update_lumerad
-  if [ ! -s "${SETUP_COMPLETE}" ] && [ -x "${SCRIPTS_DIR}/validator-setup.sh" ]; then
-    echo "[BOOT] ${MONIKER}: setup_complete missing; launching validator-setup in background..."
+  if [ ! -s "${NODE_SETUP_COMPLETE}" ] && [ -x "${SCRIPTS_DIR}/validator-setup.sh" ]; then
+    echo "[BOOT] ${MONIKER}: launching validator-setup in background..."
     nohup bash "${SCRIPTS_DIR}/validator-setup.sh" >"${VALIDATOR_SETUP_OUT}" 2>&1 &
   fi
 }
@@ -218,11 +221,7 @@ start_lumera() {
     fi
 
     echo "[BOOT] ${MONIKER}: Starting lumerad..."
-    run "${DAEMON}" start \
-        --home "${DAEMON_HOME}" \
-        --minimum-gas-prices "${MIN_GAS_PRICE}" \
-        --rpc.laddr "tcp://0.0.0.0:${LUMERA_RPC_PORT}" \
-        --grpc.address "0.0.0.0:${LUMERA_GRPC_PORT}" >"${VALIDATOR_LOG}" 2>&1 &
+    run "${DAEMON}" start --home "${DAEMON_HOME}" >"${VALIDATOR_LOG}" 2>&1 &
 
     if [ "${MONIKER}" = "${PRIMARY_MONIKER}" ]; then
         mkdir -p "$(dirname "${PRIMARY_STARTED_FLAG}")"

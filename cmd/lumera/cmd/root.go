@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"cosmossdk.io/client/v2/autocli"
+	autocliflag "cosmossdk.io/client/v2/autocli/flag"
 	"cosmossdk.io/depinject"
 	"cosmossdk.io/log"
 	"github.com/cosmos/cosmos-sdk/client"
@@ -13,16 +14,20 @@ import (
 	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	"github.com/cosmos/cosmos-sdk/server"
+	servertypes "github.com/cosmos/cosmos-sdk/server/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	"github.com/cosmos/cosmos-sdk/x/auth/tx"
 	authtxconfig "github.com/cosmos/cosmos-sdk/x/auth/tx/config"
-	servertypes "github.com/cosmos/cosmos-sdk/server/types"
 	"github.com/cosmos/cosmos-sdk/x/auth/types"
+	proto "github.com/cosmos/gogoproto/proto"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
+	"google.golang.org/grpc"
+	"google.golang.org/protobuf/reflect/protoregistry"
 
 	"github.com/LumeraProtocol/lumera/app"
+	"github.com/LumeraProtocol/lumera/internal/legacyalias"
 )
 
 // NewRootCmd creates a new root command for lumera. It is called once in the main function.
@@ -96,7 +101,7 @@ func NewRootCmd() *cobra.Command {
 		flags.FlagKeyringBackend: "test",
 	})
 
-	if err := autoCliOpts.EnhanceRootCommand(rootCmd); err != nil {
+	if err := enhanceRootCommandWithLegacyAliases(rootCmd, autoCliOpts); err != nil {
 		panic(err)
 	}
 
@@ -117,6 +122,43 @@ func overwriteFlagDefaults(c *cobra.Command, defaults map[string]string) {
 	for _, c := range c.Commands() {
 		overwriteFlagDefaults(c, defaults)
 	}
+}
+
+// enhanceRootCommandWithLegacyAliases configures the auto-generated CLI to fall
+// back to dynamic descriptors and legacy type URLs when decoding Any values,
+// while preserving the default behaviour for canonical proto v2 registrations.
+func enhanceRootCommandWithLegacyAliases(rootCmd *cobra.Command, autoCliOpts autocli.AppOptions) error {
+	mergedFiles, err := proto.MergedRegistry()
+	if err != nil {
+		return err
+	}
+
+	builder := &autocli.Builder{
+		Builder: autocliflag.Builder{
+			// Wrap the default resolver so AutoCLI can decode legacy Any URLs that
+			// still appear in on-chain data while keeping the canonical proto v2 behavior.
+			TypeResolver: legacyalias.WrapResolver(
+				protoregistry.GlobalTypes,
+				mergedFiles,
+			),
+			// Merged proto descriptors allow the resolver to synthesize dynamicpb
+			// message types when the canonical name is absent from the registry.
+			FileResolver:          mergedFiles,
+			AddressCodec:          autoCliOpts.AddressCodec,
+			ValidatorAddressCodec: autoCliOpts.ValidatorAddressCodec,
+			ConsensusAddressCodec: autoCliOpts.ConsensusAddressCodec,
+		},
+		GetClientConn: func(cmd *cobra.Command) (grpc.ClientConnInterface, error) {
+			return client.GetClientQueryContext(cmd)
+		},
+		AddQueryConnFlags: func(c *cobra.Command) {
+			flags.AddQueryFlagsToCmd(c)
+			flags.AddKeyringFlags(c.Flags())
+		},
+		AddTxConnFlags: flags.AddTxFlagsToCmd,
+	}
+
+	return autoCliOpts.EnhanceRootCommandWithBuilder(rootCmd, builder)
 }
 
 // ProvideClientContext creates and provides a fully initialized client.Context,

@@ -13,11 +13,11 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
-	"sync"
 
 	mtxSync "github.com/cometbft/cometbft/libs/sync"
 	client "github.com/cometbft/cometbft/rpc/client/http"
@@ -59,8 +59,8 @@ type SystemUnderTest struct {
 	initialNodesCount int
 	nodesCount        int
 	minGasPrice       string
-	cleanupPreFn      []CleanupFn	// runs before SIGTERM
-	cleanupPostFn     []CleanupFn	// runs after the node process exit
+	cleanupPreFn      []CleanupFn // runs before SIGTERM
+	cleanupPostFn     []CleanupFn // runs after the node process exit
 	outBuff           *ring.Ring
 	errBuff           *ring.Ring
 	out               io.Writer
@@ -120,9 +120,10 @@ func (s *SystemUnderTest) SetupChain() {
 		"--starting-ip-address", "", // empty to use host systems
 		"--single-host",
 	}
-	fmt.Printf("+++ %s %s\n", s.ExecBinary, strings.Join(args, " "))
+	binaryPath := locateExecutable(s.ExecBinary)
+	fmt.Printf("+++ %s %s\n", binaryPath, strings.Join(args, " "))
 	cmd := exec.Command( //nolint:gosec
-		locateExecutable(s.ExecBinary),
+		binaryPath,
 		args...,
 	)
 	cmd.Dir = WorkDir
@@ -803,25 +804,40 @@ func locateExecutable(file string) string {
 		panic("executable binary name must not be empty")
 	}
 
-	// Get user's home directory dynamically
+	var candidates []string
+	if WorkDir != "" {
+		rootDir := filepath.Clean(filepath.Join(WorkDir, "..", ".."))
+		candidates = append(candidates, filepath.Join(rootDir, "build", file))
+	}
+
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		panic(fmt.Sprintf("failed to get home directory: %s", err.Error()))
 	}
+	candidates = append(candidates, filepath.Join(homeDir, "go", "bin", file))
 
-	// Construct path to home/go/bin
-	path := filepath.Join(homeDir, "go", "bin", file)
-
-	// Check if the file exists
-	_, err = os.Stat(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			panic(fmt.Sprintf("%q not found", file))
+	for _, path := range candidates {
+		if path == "" {
+			continue
 		}
-		panic(fmt.Sprintf("unexpected error %s", err.Error()))
+		info, statErr := os.Stat(path)
+		if statErr != nil {
+			if !os.IsNotExist(statErr) {
+				panic(fmt.Sprintf("unexpected error %s", statErr.Error()))
+			}
+			continue
+		}
+		if info.IsDir() {
+			continue
+		}
+		return path
 	}
 
-	return path
+	if path, lookErr := exec.LookPath(file); lookErr == nil {
+		return path
+	}
+
+	panic(fmt.Sprintf("%q not found", file))
 }
 
 // EventListener watches for events on the chain
@@ -840,7 +856,7 @@ func NewEventListener(t *testing.T, rpcAddr string) *EventListener {
 
 const (
 	DefaultEventWaitTime = 30 * time.Second
-	DefaultWSWaitTime = 2 * time.Second
+	DefaultWSWaitTime    = 2 * time.Second
 )
 
 var (
@@ -860,7 +876,7 @@ func (l *EventListener) Subscribe(query string, cb EventConsumer) func() {
 	eventsChan, err := l.client.WSEvents.Subscribe(ctx, "testing", query)
 	require.NoError(l.t, err)
 	cleanup := func() {
-		ctx, _ := context.WithTimeout(ctx, DefaultWSWaitTime) //nolint:govet
+		ctx, _ := context.WithTimeout(ctx, DefaultWSWaitTime)    //nolint:govet
 		_ = l.client.WSEvents.Unsubscribe(ctx, "testing", query) //nolint:errcheck
 		done()
 	}

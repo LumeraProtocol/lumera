@@ -8,9 +8,13 @@ import (
 	dbm "github.com/cosmos/cosmos-db"
 	"gotest.tools/v3/assert"
 
+	appv1alpha1 "cosmossdk.io/api/cosmos/app/v1alpha1"
+	authmodulev1 "cosmossdk.io/api/cosmos/auth/module/v1"
+	"cosmossdk.io/core/appconfig"
 	"cosmossdk.io/depinject"
 	"cosmossdk.io/log"
 
+	lcfg "github.com/LumeraProtocol/lumera/config"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/runtime"
 	"github.com/cosmos/cosmos-sdk/testutil/configurator"
@@ -30,6 +34,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/gov/keeper"
 	"github.com/cosmos/cosmos-sdk/x/gov/types"
 	v1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
+	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	_ "github.com/cosmos/cosmos-sdk/x/params"
 	_ "github.com/cosmos/cosmos-sdk/x/staking"
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
@@ -49,7 +54,7 @@ type suite struct {
 
 var appConfig = configurator.NewAppConfig(
 	configurator.ParamsModule(),
-	configurator.AuthModule(),
+	lumeraAuthModule(),
 	configurator.StakingModule(),
 	configurator.BankModule(),
 	configurator.GovModule(),
@@ -57,6 +62,25 @@ var appConfig = configurator.NewAppConfig(
 	configurator.MintModule(),
 	configurator.ConsensusModule(),
 )
+
+func lumeraAuthModule() configurator.ModuleOption {
+	return func(cfg *configurator.Config) {
+		cfg.ModuleConfigs[authtypes.ModuleName] = &appv1alpha1.ModuleConfig{
+			Name: authtypes.ModuleName,
+			Config: appconfig.WrapAny(&authmodulev1.Module{
+				Bech32Prefix: lcfg.AccountAddressPrefix,
+				ModuleAccountPermissions: []*authmodulev1.ModuleAccountPermission{
+					{Account: authtypes.FeeCollectorName},
+					{Account: disttypes.ModuleName},
+					{Account: minttypes.ModuleName, Permissions: []string{authtypes.Minter}},
+					{Account: stakingtypes.BondedPoolName, Permissions: []string{authtypes.Burner, stakingtypes.ModuleName}},
+					{Account: stakingtypes.NotBondedPoolName, Permissions: []string{authtypes.Burner, stakingtypes.ModuleName}},
+					{Account: types.ModuleName, Permissions: []string{authtypes.Burner}},
+				},
+			}),
+		}
+	}
+}
 
 func TestImportExportQueues(t *testing.T) {
 	var err error

@@ -34,8 +34,8 @@ func (k msgServer) RequestAction(goCtx context.Context, msg *types.MsgRequestAct
 		}
 		if expTime < minExpTime {
 			return nil, errorsmod.Wrapf(types.ErrActionExpired,
-				"expiration time must be at least %f seconds from current block time",
-				params.ExpirationDuration.Seconds(),
+				"expiration time must be at least %f seconds from current block time, but is %d and the minimum is %d",
+				params.ExpirationDuration.Seconds(), expTime, minExpTime,
 			)
 		}
 	} else {

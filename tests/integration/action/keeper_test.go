@@ -1,10 +1,10 @@
 package action_test
 
 import (
-	"encoding/base64"
-	"fmt"
-	"testing"
-	"time"
+    "encoding/base64"
+    "fmt"
+    "testing"
+    "time"
 
 	"cosmossdk.io/math"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
@@ -12,9 +12,9 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	queryv1beta1 "github.com/cosmos/cosmos-sdk/types/query"
 
-	gogoproto "github.com/cosmos/gogoproto/proto"
-	"github.com/golang/mock/gomock"
-	"github.com/stretchr/testify/suite"
+    gogoproto "github.com/cosmos/gogoproto/proto"
+    "github.com/golang/mock/gomock"
+    "github.com/stretchr/testify/suite"
 
 	testkeeper "github.com/LumeraProtocol/lumera/testutil/keeper"
 	actionkeeper "github.com/LumeraProtocol/lumera/x/action/v1/keeper"

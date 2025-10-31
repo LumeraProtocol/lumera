@@ -1,19 +1,19 @@
 package keeper_test
 
 import (
-	"testing"
+    "testing"
 
-	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
-	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
-	"github.com/LumeraProtocol/lumera/x/action/v1/types"
+    keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
+    "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
+    "github.com/LumeraProtocol/lumera/x/action/v1/types"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/types/query"
-	gogoproto "github.com/cosmos/gogoproto/proto"
-	"github.com/golang/mock/gomock"
-	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+    sdk "github.com/cosmos/cosmos-sdk/types"
+    "github.com/cosmos/cosmos-sdk/types/query"
+    gogoproto "github.com/cosmos/gogoproto/proto"
+    "github.com/golang/mock/gomock"
+    "github.com/stretchr/testify/require"
+    "google.golang.org/grpc/codes"
+    "google.golang.org/grpc/status"
 )
 
 func TestQueryActionByMetadata(t *testing.T) {

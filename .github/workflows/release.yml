@@ -47,7 +47,7 @@ jobs:
 
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             # Tagged release: switch identifier to the tag itself (e.g. v1.8.0)
-            build_id=${GITHUB_REF#refs/tags/}
+            build_id="${GITHUB_REF#refs/tags/}"
             is_tag=true
           fi
 
@@ -163,7 +163,7 @@ jobs:
         id: tag_info
         run: |
           # Get the tag name
-          TAG_NAME=${GITHUB_REF#refs/tags/}
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
           echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
           
           # Get the tag message

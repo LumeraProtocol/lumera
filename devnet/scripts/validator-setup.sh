@@ -61,6 +61,7 @@ DAEMON_HOME="${DAEMON_HOME_BASE}/${DAEMON_DIR}"
 echo "[SETUP] DAEMON_HOME is $DAEMON_HOME"
 
 CONFIG_TOML="${DAEMON_HOME}/config/config.toml"
+APP_TOML="${DAEMON_HOME}/config/app.toml"
 GENESIS_LOCAL="${DAEMON_HOME}/config/genesis.json"
 CLAIMS_LOCAL="${DAEMON_HOME}/config/claims.csv"
 GENTX_LOCAL_DIR="${DAEMON_HOME}/config/gentx"
@@ -184,6 +185,37 @@ apply_persistent_peers() {
   fi
 }
 
+configure_node_config() {
+  local api_port="${LUMERA_API_PORT:-1317}"
+  local grpc_port="${LUMERA_GRPC_PORT:-9090}"
+  local rpc_port="${LUMERA_RPC_PORT:-26657}"
+
+  if ! command -v crudini >/dev/null 2>&1; then
+    echo "[SETUP] ERROR: crudini not found; cannot update configs"
+    exit 1
+  fi
+
+  if [ -f "${APP_TOML}" ]; then
+    run crudini --set "${APP_TOML}" '' minimum-gas-prices "\"0.0025ulume\""
+    run crudini --set "${APP_TOML}" api enable "true"
+    run crudini --set "${APP_TOML}" api swagger "true"
+    run crudini --set "${APP_TOML}" api address "\"tcp://0.0.0.0:${api_port}\""
+    run crudini --set "${APP_TOML}" grpc enable "true"
+    run crudini --set "${APP_TOML}" grpc address "\"0.0.0.0:${grpc_port}\""
+    run crudini --set "${APP_TOML}" grpc-web enable "true"
+    echo "[SETUP] Updated ${APP_TOML} with API/GRPC configuration."
+  else
+    echo "[SETUP] WARNING: ${APP_TOML} not found; skipping app.toml update"
+  fi
+
+  if [ -f "${CONFIG_TOML}" ]; then
+    run crudini --set "${CONFIG_TOML}" rpc laddr "\"tcp://0.0.0.0:${rpc_port}\""
+    echo "[SETUP] Updated ${CONFIG_TOML} RPC configuration."
+  else
+    echo "[SETUP] WARNING: ${CONFIG_TOML} not found; skipping config.toml update"
+  fi
+}
+
 ensure_hermes_relayer_account() {
   echo "[SETUP] Ensuring Hermes relayer account..."
   mkdir -p "${HERMES_SHARED_DIR}" "${HERMES_STATUS_DIR}"
@@ -268,6 +300,7 @@ init_if_needed() {
 # ----- primary validator -----
 primary_validator_setup() {
   init_if_needed
+  configure_node_config
 
   # must have external genesis + claims ready
   if [ ! -f "${EXTERNAL_GENESIS}" ]; then
@@ -391,6 +424,7 @@ secondary_validator_setup() {
   wait_for_file "${GENESIS_SHARED}"
   
   init_if_needed
+  configure_node_config
 
   # copy initial genesis/claims
   cp "${GENESIS_SHARED}" "${GENESIS_LOCAL}"

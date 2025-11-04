@@ -5,6 +5,7 @@ const (
 	DefaultRPCPort                   = 26657
 	DefaultRESTPort                  = 1317
 	DefaultGRPCPort                  = 9090
+	DefaultDebugPort                 = 40000
 	DefaultSupernodePort             = 4444
 	DefaultSupernodeP2PPort          = 4445
 	DefaultSupernodeGatewayPort      = 8002

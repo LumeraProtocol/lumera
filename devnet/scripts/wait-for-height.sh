@@ -16,8 +16,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEVNET_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 COMPOSE_FILE="${DEVNET_ROOT}/docker-compose.yml"
 SERVICE="${SERVICE_NAME:-supernova_validator_1}"
-INTERVAL="${INTERVAL:-2}"
-TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-30}"
+INTERVAL="${INTERVAL:-5}"
+TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-600}"
 
 deadline=$((SECONDS + TIMEOUT_SECONDS))
 
@@ -32,6 +32,7 @@ while (( SECONDS < deadline )); do
     exit 0
   fi
 
+  echo "Current height ${height}."
   sleep "${INTERVAL}"
 done
 

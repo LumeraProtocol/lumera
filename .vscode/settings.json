@@ -13,5 +13,5 @@
     },
     "terminal.integrated.env.linux": {
         "PATH": "/usr/local/go/bin:${env:HOME}/go/bin:${env:PATH}"
-    },
+    }
 }

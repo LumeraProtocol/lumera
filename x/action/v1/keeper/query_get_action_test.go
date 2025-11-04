@@ -25,7 +25,7 @@ func TestKeeper_GetAction(t *testing.T) {
 		ActionID:       actionID,
 		ActionType:     actiontypes.ActionTypeSense,
 		Metadata:       []byte("metadata"),
-		Price:          &price,
+		Price:          price.String(),
 		ExpirationTime: 1234567890,
 		State:          actiontypes.ActionStateProcessing,
 		BlockHeight:    1,
@@ -49,7 +49,7 @@ func TestKeeper_GetAction(t *testing.T) {
 			req: &types.QueryGetActionRequest{
 				ActionID: invalidActionID,
 			},
-			expectedErr: status.Errorf(codes.Internal, "failed to get action by ID"),
+			expectedErr: status.Errorf(codes.NotFound, "failed to get action by ID"),
 		},
 		{
 			name: "action found",
@@ -57,7 +57,7 @@ func TestKeeper_GetAction(t *testing.T) {
 				ActionID: actionID,
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
-				action.Price = &price
+				action.Price = price.String()
 				k.SetAction(ctx, &action)
 			},
 			expectedErr: nil,

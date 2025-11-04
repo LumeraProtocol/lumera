@@ -59,6 +59,7 @@ ID="$(echo "$LATEST" | jq -r '.id')"
 TITLE="$(echo "$LATEST" | jq -r '.title // .summary // ""')"
 STATUS="$(echo "$LATEST" | jq -r '.status')"
 PROPOSER="$(echo "$LATEST" | jq -r '.proposer // ""')"
+UPGRADE_HEIGHT="$(echo "$LATEST" | jq -r '.messages[] | select(.["@type"] == "/cosmos.upgrade.v1beta1.MsgSoftwareUpgrade") | .plan.height // ""')"
 
 printf "Latest proposal: ID=%s, Status=%s" "$ID" "$STATUS"
 if [[ -n "$TITLE" && "$TITLE" != "" ]]; then
@@ -66,5 +67,8 @@ if [[ -n "$TITLE" && "$TITLE" != "" ]]; then
 fi
 if [[ -n "$PROPOSER" && "$PROPOSER" != "" ]]; then
   printf ", Proposer=%s" "$PROPOSER"
+fi
+if [[ -n "$UPGRADE_HEIGHT" && "$UPGRADE_HEIGHT" != "" ]]; then
+  printf ", Upgrade Height=%s" "$UPGRADE_HEIGHT"
 fi
 printf '\n'

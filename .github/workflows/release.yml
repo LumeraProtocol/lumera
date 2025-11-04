@@ -102,6 +102,13 @@ jobs:
 
           tar_file=$(ls *.tar.gz)
 
+          if [[ "${IS_TAG}" == "true" ]]; then
+            # Rename tarball to include the tag for official releases
+            desired_name="${TARBALL_PREFIX}_linux-amd64.tar.gz"
+            mv "$tar_file" "$desired_name"
+            tar_file="$desired_name"
+          fi
+
           file_path=$(tar -tzf "$tar_file" | head -n 2 | grep -v '/$' | grep lumerad | sed 's|^/||')
           echo "Binary: $file_path"
           tar xzf "$tar_file" -C .
@@ -138,6 +145,9 @@ jobs:
           tar tvf "$tar_file"
 
           sha256sum "$tar_file" > release_checksum
+        env:
+          IS_TAG: ${{ steps.vars.outputs.is_tag }}
+          TARBALL_PREFIX: ${{ steps.vars.outputs.tarball_prefix }}
 
       - name: Upload Release Artifacts
         if: ${{ github.actor != 'nektos/act' }}

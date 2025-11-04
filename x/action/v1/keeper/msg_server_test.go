@@ -1,8 +1,8 @@
 package keeper_test
 
 import (
-	"testing"
 	"bytes"
+	"testing"
 
 	"github.com/stretchr/testify/suite"
 
@@ -79,7 +79,7 @@ func (suite *MsgServerTestSuite) TestKeeperEventEmission() {
 	action := &actiontypes.Action{
 		Creator:     suite.creatorAddress.String(),
 		ActionType:  types.ActionTypeSense,
-		Price:       &testPrice,
+		Price:       testPrice.String(),
 		BlockHeight: suite.ctx.BlockHeight(),
 		State:       actiontypes.ActionStatePending,
 		Metadata:    metadataBytes,
@@ -116,7 +116,7 @@ func (suite *MsgServerTestSuite) registerCascadeAction() string {
 		Signatures: suite.signatureCascade,
 	}
 
-	// Convert to JSON using jsonpb	
+	// Convert to JSON using jsonpb
 	var cascadeMetadataBytes bytes.Buffer
 	marshaler := &jsonpb.Marshaler{}
 	err := marshaler.Marshal(&cascadeMetadataBytes, &cascadeMetadata)
@@ -199,7 +199,7 @@ func (suite *MsgServerTestSuite) registerSenseAction() string {
 // TestMsgFinalizeAction tests the FinalizeAction message handler
 func (suite *MsgServerTestSuite) TestMsgFinalizeAction() {
 	suite.setupExpectationsGetAllTopSNs(1)
-	
+
 	actionID := suite.registerCascadeAction()
 	suite.finalizeCascadeAction(actionID)
 }

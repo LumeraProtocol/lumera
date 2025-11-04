@@ -13,7 +13,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	simtypes "github.com/cosmos/cosmos-sdk/types/simulation"
 
-	gogoproto "github.com/gogo/protobuf/proto"
+	gogoproto "github.com/cosmos/gogoproto/proto"
 
 	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
 	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
@@ -967,10 +967,11 @@ func selectAccountWithoutPermission(r *rand.Rand, ctx sdk.Context, accs []simtyp
 }
 
 func getTop10Supernodes(ctx sdk.Context, k keeper.Keeper) []sdk.Address {
-	// Query top-10 SuperNodes for action's block height
+	// Query top-10 ACTIVE SuperNodes for current block height
 	topSuperNodesReq := &sntypes.QueryGetTopSuperNodesForBlockRequest{
 		BlockHeight: int32(ctx.BlockHeight()),
 		Limit:       10,
+		State:       sntypes.SuperNodeStateActive.String(),
 	}
 	topSuperNodesResp, err := k.GetSupernodeQueryServer().GetTopSuperNodesForBlock(ctx, topSuperNodesReq)
 	if err != nil {

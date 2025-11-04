@@ -1,19 +1,19 @@
 package keeper
 
 import (
-	"context"
-	"strings"
+    "context"
+    "strings"
 
-	"github.com/LumeraProtocol/lumera/x/action/v1/types"
-	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
+    "github.com/LumeraProtocol/lumera/x/action/v1/types"
+    actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 
-	"cosmossdk.io/store/prefix"
-	"github.com/cosmos/cosmos-sdk/runtime"
-	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/types/query"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-	gogoproto "github.com/gogo/protobuf/proto"
+    "cosmossdk.io/store/prefix"
+    "github.com/cosmos/cosmos-sdk/runtime"
+    sdk "github.com/cosmos/cosmos-sdk/types"
+    "github.com/cosmos/cosmos-sdk/types/query"
+    gogoproto "github.com/cosmos/gogoproto/proto"
+    "google.golang.org/grpc/codes"
+    "google.golang.org/grpc/status"
 )
 
 // QueryActionByMetadata returns actions filtered by metadata field and value
@@ -41,7 +41,7 @@ func (q queryServer) QueryActionByMetadata(goCtx context.Context, req *types.Que
 
 	var actions []*types.Action
 
-	appendAction := func(act *actiontypes.Action, price *sdk.Coin) {
+	appendAction := func(act *actiontypes.Action, price string) {
 		actions = append(actions, &types.Action{
 			Creator:        act.Creator,
 			ActionID:       act.ActionID,

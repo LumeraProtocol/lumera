@@ -3,10 +3,9 @@ package lumera.claim;
 
 option go_package = "x/claim/types";
 
-import "amino/amino.proto";
+import "gogoproto/gogo.proto";
 import "cosmos/msg/v1/msg.proto";
 import "cosmos_proto/cosmos.proto";
-import "gogoproto/gogo.proto";
 import "lumera/claim/params.proto";
 
 // Msg defines the Msg service.
@@ -61,4 +60,3 @@ message MsgDelayedClaim {
 }
 
 message MsgDelayedClaimResponse {}
-

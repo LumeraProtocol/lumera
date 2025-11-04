@@ -48,12 +48,21 @@ get_proposal_id_by_version_with_retry() {
     echo "Proposals JSON:" >&2
     echo "$proposals_json" | jq >&2
 
-    if echo "$proposals_json" | jq -e '.proposals | type == "array"' > /dev/null; then
-      proposal_id=$(echo "$proposals_json" | jq -r --arg version "$version" --arg height "$height_filter" '
-        .proposals
+  if echo "$proposals_json" | jq -e '.proposals | type == "array"' > /dev/null; then
+    proposal_id=$(echo "$proposals_json" | jq -r --arg version "$version" --arg height "$height_filter" '
+      .proposals
         | map(select(
-            .messages[]?.value.plan.name == $version 
-            and ($height == "" or (.messages[]?.value.plan.height | tonumber) >= ($height | tonumber))
+            [
+              .messages[]?
+              | select(
+                  ((.type // .["@type"]) == "/cosmos.upgrade.v1beta1.MsgSoftwareUpgrade")
+                  and (.value.plan.name == $version)
+                  and (
+                    ($height == "")
+                    or ((.value.plan.height // "0") | tonumber) >= ($height | tonumber)
+                  )
+                )
+            ] | length > 0
           ))
         | sort_by(.id | tonumber)
         | last
@@ -61,22 +70,21 @@ get_proposal_id_by_version_with_retry() {
       ')
     fi
 
-    if [[ -n "$proposal_id" ]]; then
-      echo "✅ Found proposal ID for version $version: $proposal_id" >&2
-      echo "$proposal_id"
-      return 0
-    fi
+  if [[ -n "$proposal_id" ]]; then
+    echo "✅ Found proposal ID for version $version: $proposal_id" >&2
+    echo "$proposal_id"
+    return 0
+  fi
 
-    [[ $i -lt $attempts ]] && sleep "$sleep_interval"
-  done
+  [[ $i -lt $attempts ]] && sleep "$sleep_interval"
+done
 
 
   if [[ -z "$proposals_json" ]] || [[ "$proposals_json" != *"proposals"* ]]; then
-    echo ""
-    return
+    return 1
   fi
 
-  echo "❌ Could not find proposal for version $version after $attempts attempt(s)."
+  echo "❌ Could not find proposal for version $version after $attempts attempt(s)." >&2
   return 1
 }
 
@@ -243,6 +251,12 @@ submit_proposal_deposit() {
 show_proposal_status() {
   local version="$1"
   local proposal_id="$2"
+
+  if [[ -z "$proposal_id" ]]; then
+    echo "ℹ️  No upgrade proposal found for version $version."
+    return 1
+  fi
+
   local status=$(get_proposal_status_by_id "$proposal_id")
   echo "❗ Proposal for version $version already exists with ID: $proposal_id and status: $status"
 

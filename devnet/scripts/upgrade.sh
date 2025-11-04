@@ -31,8 +31,8 @@ if [[ ! -f "${COMPOSE_FILE}" ]]; then
 fi
 
 echo "Submitting software upgrade proposal for ${RELEASE_NAME} at height ${UPGRADE_HEIGHT}..."
-"${SCRIPT_DIR}/submit_upgrade_proposal.sh" "${RELEASE_NAME}" "${UPGRADE_HEIGHT}"
-"${SCRIPT_DIR}/submit_upgrade_proposal.sh" "${RELEASE_NAME}"
+"${SCRIPT_DIR}/submit-upgrade-proposal.sh" "${RELEASE_NAME}" "${UPGRADE_HEIGHT}"
+"${SCRIPT_DIR}/submit-upgrade-proposal.sh" "${RELEASE_NAME}"
 
 echo "Retrieving proposal ID..."
 PROPOSAL_ID="$(docker compose -f "${COMPOSE_FILE}" exec -T supernova_validator_1 \
@@ -52,12 +52,12 @@ fi
 echo "Found proposal ID: ${PROPOSAL_ID}"
 
 echo "Casting votes for all validators..."
-"${SCRIPT_DIR}/vote_all.sh" "${PROPOSAL_ID}"
+"${SCRIPT_DIR}/vote-all.sh" "${PROPOSAL_ID}"
 
 echo "Waiting for chain to reach height ${UPGRADE_HEIGHT}..."
-"${SCRIPT_DIR}/wait_for_height.sh" "${UPGRADE_HEIGHT}"
+"${SCRIPT_DIR}/wait-for-height.sh" "${UPGRADE_HEIGHT}"
 
 echo "Upgrading binaries from ${BINARIES_DIR}..."
-"${SCRIPT_DIR}/upgrade_binaries.sh" "${BINARIES_DIR}"
+"${SCRIPT_DIR}/upgrade-binaries.sh" "${BINARIES_DIR}"
 
 echo "Upgrade to ${RELEASE_NAME} initiated successfully."

@@ -4,9 +4,9 @@ package lumera.action.v1;
 option go_package = "x/action/v1/types";
 
 import "amino/amino.proto";
+import "gogoproto/gogo.proto";
 import "cosmos/msg/v1/msg.proto";
 import "cosmos_proto/cosmos.proto";
-import "gogoproto/gogo.proto";
 import "lumera/action/v1/params.proto";
 
 // Msg defines the Msg service.
@@ -78,4 +78,3 @@ message MsgApproveAction {
 
 // MsgApproveActionResponse defines the response structure for executing a MsgApproveAction
 message MsgApproveActionResponse {}
-

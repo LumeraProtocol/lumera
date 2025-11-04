@@ -20,7 +20,7 @@ func (q queryServer) GetAction(goCtx context.Context, req *types.QueryGetActionR
 
 	action, ok := q.k.GetActionByID(ctx, req.ActionID)
 	if !ok {
-		return nil, status.Errorf(codes.Internal, "failed to get action by ID")
+		return nil, status.Errorf(codes.NotFound, "failed to get action by ID")
 	}
 
 	return &types.QueryGetActionResponse{Action: &types.Action{

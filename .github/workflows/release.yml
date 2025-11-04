@@ -41,7 +41,7 @@ jobs:
 
           repo_name=${GITHUB_REPOSITORY##*/}
 
-          # Default behaviour for branch / PR runs: use short commit SHA
+          # Default behavior for branch / PR runs: use short commit SHA
           build_id=${GITHUB_SHA::7}
           is_tag=false
 

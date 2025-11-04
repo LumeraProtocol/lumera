@@ -37,17 +37,31 @@ jobs:
       - name: Prepare Build Variables
         id: vars
         run: |
+          set -euo pipefail
+
           repo_name=${GITHUB_REPOSITORY##*/}
-          
-          # For non-tag builds, use commit SHA as identifier
+
+          # Default behaviour for branch / PR runs: use short commit SHA
           build_id=${GITHUB_SHA::7}
+          is_tag=false
+
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            # Tagged release: switch identifier to the tag itself (e.g. v1.8.0)
+            build_id=${GITHUB_REF#refs/tags/}
+            is_tag=true
+          fi
+
+          tarball_prefix="${repo_name}_${build_id}"
+
           echo "build_id=$build_id" >> $GITHUB_OUTPUT
-          echo "tarball_prefix=${repo_name}_${build_id}" >> $GITHUB_OUTPUT
-          
+          echo "tarball_prefix=${tarball_prefix}" >> $GITHUB_OUTPUT
+          echo "is_tag=${is_tag}" >> $GITHUB_OUTPUT
+
           # Debug output
           echo "Output variables:"
           echo "- build_id: $build_id"
-          echo "- tarball_prefix: ${repo_name}_${build_id}"
+          echo "- tarball_prefix: ${tarball_prefix}"
+          echo "- is_tag: ${is_tag}"
 
       - name: Install Ignite CLI
         uses: ./.github/actions/install-ignite
@@ -88,6 +102,13 @@ jobs:
 
           tar_file=$(ls *.tar.gz)
 
+          if [[ "${IS_TAG}" == "true" ]]; then
+            # Rename tarball to include the tag for official releases
+            desired_name="${TARBALL_PREFIX}_linux-amd64.tar.gz"
+            mv "$tar_file" "$desired_name"
+            tar_file="$desired_name"
+          fi
+
           file_path=$(tar -tzf "$tar_file" | head -n 2 | grep -v '/$' | grep lumerad | sed 's|^/||')
           echo "Binary: $file_path"
           tar xzf "$tar_file" -C .
@@ -124,6 +145,9 @@ jobs:
           tar tvf "$tar_file"
 
           sha256sum "$tar_file" > release_checksum
+        env:
+          IS_TAG: ${{ steps.vars.outputs.is_tag }}
+          TARBALL_PREFIX: ${{ steps.vars.outputs.tarball_prefix }}
 
       - name: Upload Release Artifacts
         if: ${{ github.actor != 'nektos/act' }}

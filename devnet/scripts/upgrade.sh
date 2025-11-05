@@ -2,13 +2,40 @@
 set -euo pipefail
 
 if [[ $# -ne 3 ]]; then
-  echo "Usage: $0 <release-name> <upgrade-height> <binaries-dir>"
+  echo "Usage: $0 <release-name> <upgrade-height|auto-height> <binaries-dir>"
   exit 1
 fi
 
 RELEASE_NAME="$1"
-UPGRADE_HEIGHT="$2"
+REQUESTED_HEIGHT="$2"
 BINARIES_DIR="$3"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEVNET_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+COMPOSE_FILE="${DEVNET_ROOT}/docker-compose.yml"
+SERVICE="${SERVICE_NAME:-supernova_validator_1}"
+AUTO_HEIGHT_OFFSET=100
+
+if [[ ! -f "${COMPOSE_FILE}" ]]; then
+  echo "docker-compose.yml not found at ${COMPOSE_FILE}" >&2
+  exit 1
+fi
+
+if [[ "${REQUESTED_HEIGHT}" == "auto-height" ]]; then
+  echo "Auto height requested. Determining current chain height from ${SERVICE}..."
+  CURRENT_HEIGHT="$(docker compose -f "${COMPOSE_FILE}" exec -T "${SERVICE}" \
+    lumerad status 2>/dev/null | jq -r '.sync_info.latest_block_height // empty' 2>/dev/null || true)"
+
+  if ! [[ "${CURRENT_HEIGHT}" =~ ^[0-9]+$ ]]; then
+    echo "Failed to determine current block height for service ${SERVICE}." >&2
+    exit 1
+  fi
+
+  UPGRADE_HEIGHT=$((CURRENT_HEIGHT + AUTO_HEIGHT_OFFSET))
+  echo "Current height is ${CURRENT_HEIGHT}. Scheduling upgrade at height ${UPGRADE_HEIGHT}."
+else
+  UPGRADE_HEIGHT="${REQUESTED_HEIGHT}"
+fi
 
 if ! [[ "${UPGRADE_HEIGHT}" =~ ^[0-9]+$ ]]; then
   echo "Upgrade height must be a positive integer. Got: ${UPGRADE_HEIGHT}" >&2
@@ -20,15 +47,6 @@ if [[ ! -d "${BINARIES_DIR}" ]]; then
   exit 1
 fi
 BINARIES_DIR="$(cd "${BINARIES_DIR}" && pwd)"
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DEVNET_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-COMPOSE_FILE="${DEVNET_ROOT}/docker-compose.yml"
-
-if [[ ! -f "${COMPOSE_FILE}" ]]; then
-  echo "docker-compose.yml not found at ${COMPOSE_FILE}" >&2
-  exit 1
-fi
 
 echo "Submitting software upgrade proposal for ${RELEASE_NAME} at height ${UPGRADE_HEIGHT}..."
 "${SCRIPT_DIR}/submit-upgrade-proposal.sh" "${RELEASE_NAME}" "${UPGRADE_HEIGHT}"

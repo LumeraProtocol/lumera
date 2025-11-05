@@ -78,6 +78,8 @@ import (
 	ibcporttypes "github.com/cosmos/ibc-go/v10/modules/core/05-port/types"
 	ibckeeper "github.com/cosmos/ibc-go/v10/modules/core/keeper"
 
+	upgrades "github.com/LumeraProtocol/lumera/app/upgrades"
+	appParams "github.com/LumeraProtocol/lumera/app/upgrades/params"
 	actionmodulekeeper "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	claimmodulekeeper "github.com/LumeraProtocol/lumera/x/claim/keeper"
 	lumeraidmodulekeeper "github.com/LumeraProtocol/lumera/x/lumeraid/keeper"
@@ -86,12 +88,6 @@ import (
 	// this line is used by starport scaffolding # stargate/app/moduleImport
 
 	"github.com/LumeraProtocol/lumera/docs"
-
-	upgrade_v1_6_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_6_1"
-	upgrade_v1_7_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_7_0"
-	upgrade_v1_7_2 "github.com/LumeraProtocol/lumera/app/upgrades/v1_7_2"
-	upgrade_v1_8_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_0"
-	upgrade_v1_8_2 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_2"
 )
 
 const (
@@ -279,13 +275,9 @@ func New(
 		panic(err)
 	}
 
-	// **** SETUP UPGRADE HANDLER ****
+	// **** SETUP UPGRADES (upgrade handlers and store loaders) ****
 	// This needs to be done after keepers are initialized but before loading state.
-	app.setupUpgradeHandlers()
-
-	// **** SETUP STORE LOADER ****
-	// This must be done BEFORE LoadLatestVersion/LoadVersion
-	app.setupUpgradeStoreLoaders()
+	app.setupUpgrades()
 
 	/****  Module Options ****/
 	app.ModuleManager.RegisterInvariants(app.CrisisKeeper)
@@ -328,9 +320,9 @@ func (app *App) GetSubspace(moduleName string) paramstypes.Subspace {
 	return subspace
 }
 
-// setupUpgradeStoreLoaders configures the store loader for upcoming upgrades.
+// setupUpgrades configures the store loader for upcoming upgrades and registers upgrade handlers.
 // This needs to be called BEFORE app.Load()
-func (app *App) setupUpgradeStoreLoaders() {
+func (app *App) setupUpgrades() {
 	upgradeInfo, err := app.UpgradeKeeper.ReadUpgradeInfoFromDisk()
 	// No upgrade scheduled, skip
 	if err != nil {
@@ -341,82 +333,41 @@ func (app *App) setupUpgradeStoreLoaders() {
 		return // No upgrade info file, normal startup
 	}
 
-	// Map of upgrade names to their corresponding StoreUpgrades
-	storeUpgradesMap := map[string]*storetypes.StoreUpgrades{
-		upgrade_v1_6_1.UpgradeName: &upgrade_v1_6_1.StoreUpgrades,
-		upgrade_v1_7_0.UpgradeName: &upgrade_v1_7_0.StoreUpgrades,
-		upgrade_v1_7_2.UpgradeName: &upgrade_v1_7_2.StoreUpgrades,
-		upgrade_v1_8_0.UpgradeName: &upgrade_v1_8_0.StoreUpgrades,
-		upgrade_v1_8_2.UpgradeName: &upgrade_v1_8_2.StoreUpgrades,
+	if upgradeInfo.Name == "" {
+		app.Logger().Info("No pending upgrade plan found on disk")
+		return
 	}
 
-	// Check for the planned upgrades
-	if !app.UpgradeKeeper.IsSkipHeight(upgradeInfo.Height) {
-		if upgrades, exists := storeUpgradesMap[upgradeInfo.Name]; exists {
-			app.SetStoreLoader(upgradetypes.UpgradeStoreLoader(upgradeInfo.Height, upgrades))
-			app.Logger().Info("Configured store loader for upgrade", "name", upgradeInfo.Name, "height", upgradeInfo.Height)
-		} else {
-			app.Logger().Info("No store upgrades registered for pending plan", "name", upgradeInfo.Name)
-		}
-	}
-}
+	upgradeConfig, found := upgrades.SetupUpgrades(upgradeInfo.Name, appParams.AppUpgradeParams{
+		ChainID:       app.ChainID(),
+		Logger:        app.Logger(),
+		ModuleManager: app.ModuleManager,
+		Configurator:  app.Configurator(),
+	})
 
-type UpgradeHandlerConfig struct {
-	Name    string
-	Handler upgradetypes.UpgradeHandler
-}
-
-// setupUpgradeHandlers registers the upgrade handlers for specific upgrade names.
-func (app *App) setupUpgradeHandlers() {
-	handlers := []UpgradeHandlerConfig{
-		{
-			Name: upgrade_v1_6_1.UpgradeName,
-			Handler: upgrade_v1_6_1.CreateUpgradeHandler(
-				app.Logger(),
-				app.ModuleManager,
-				app.Configurator(),
-			),
-		},
-		{
-			Name: upgrade_v1_7_0.UpgradeName,
-			Handler: upgrade_v1_7_0.CreateUpgradeHandler(
-				app.Logger(),
-				app.ModuleManager,
-				app.Configurator(),
-			),
-		},
-		{
-			Name: upgrade_v1_7_2.UpgradeName,
-			Handler: upgrade_v1_7_2.CreateUpgradeHandler(
-				app.Logger(),
-				app.ModuleManager,
-				app.Configurator(),
-			),
-		},
-		{
-			Name: upgrade_v1_8_0.UpgradeName,
-			Handler: upgrade_v1_8_0.CreateUpgradeHandler(
-				app.Logger(),
-				app.ModuleManager,
-				app.Configurator(),
-			),
-		},
-		{
-			Name: upgrade_v1_8_2.UpgradeName,
-			Handler: upgrade_v1_8_2.CreateUpgradeHandler(
-				app.Logger(),
-				app.ModuleManager,
-				app.Configurator(),
-			),
-		},
-		// Add future upgrades here
+	if !found {
+		panic(fmt.Sprintf("upgrade plan %q is scheduled at height %d but not registered in this binary", upgradeInfo.Name, upgradeInfo.Height))
 	}
 
-	// Register the upgrade handlers
-	for _, h := range handlers {
-		app.UpgradeKeeper.SetUpgradeHandler(h.Name, h.Handler)
-		app.Logger().Info("Registered upgrade handler", "name", h.Name)
+	if upgradeConfig.Handler != nil {
+		app.UpgradeKeeper.SetUpgradeHandler(upgradeInfo.Name, upgradeConfig.Handler)
+		app.Logger().Info("Registered upgrade handler", "name", upgradeInfo.Name)
+	} else {
+		app.Logger().Info("Skipping upgrade handler registration", "name", upgradeInfo.Name)
 	}
+
+	if upgradeConfig.StoreUpgrade == nil {
+		app.Logger().Info("No store upgrades registered for pending plan", "name", upgradeInfo.Name)
+		return
+	}
+
+	if app.UpgradeKeeper.IsSkipHeight(upgradeInfo.Height) {
+		app.Logger().Info("Skipping store loader because height is flagged to skip", "name", upgradeInfo.Name, "height", upgradeInfo.Height)
+		return
+	}
+
+	app.SetStoreLoader(upgradetypes.UpgradeStoreLoader(upgradeInfo.Height, upgradeConfig.StoreUpgrade))
+	app.Logger().Info("Configured store loader for upgrade", "name", upgradeInfo.Name, "height", upgradeInfo.Height)
 }
 
 // LegacyAmino returns App's amino codec.

@@ -274,9 +274,12 @@ devnet-update-scripts:
 		echo "No containers were updated. Ensure the devnet is running."; \
 	fi
 
-.PHONY: devnet-new-172 devnet-upgrade_180
-devnet-upgrade_180:
-	@cd devnet/scripts && ./upgrade.sh v1.8.0 120 ../bin-v1.8.0
+.PHONY: devnet-new-172 devnet-upgrade-180 devnet-upgrade-184
+devnet-upgrade-180:
+	@cd devnet/scripts && ./upgrade.sh v1.8.0 auto-height ../bin-v1.8.0
+
+devnet-upgrade-184:
+	@cd devnet/scripts && ./upgrade.sh v1.8.4 auto-height ../bin-v1.8.4
 
 devnet-new-172:
 	$(MAKE) devnet-down

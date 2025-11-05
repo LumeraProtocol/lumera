@@ -1,27 +1,30 @@
-package v1_7_0
+package v1_8_4
 
 import (
 	"context"
 	"fmt"
 
+	storetypes "cosmossdk.io/store/types"
 	upgradetypes "cosmossdk.io/x/upgrade/types"
+
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 
 	appParams "github.com/LumeraProtocol/lumera/app/upgrades/params"
+	pfmtypes "github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v10/packetforward/types"
 )
 
-const UpgradeName = "v1.7.0"
+// UpgradeName is the on-chain name used for this upgrade.
+const UpgradeName = "v1.8.4"
 
-// CreateUpgradeHandler creates an upgrade handler for v1_7_0
+// CreateUpgradeHandler creates an upgrade handler for v1_8_4.
 func CreateUpgradeHandler(p appParams.AppUpgradeParams) upgradetypes.UpgradeHandler {
 	return func(goCtx context.Context, _ upgradetypes.Plan, fromVM module.VersionMap) (module.VersionMap, error) {
 		p.Logger.Info(fmt.Sprintf("Starting upgrade %s...", UpgradeName))
 
 		ctx := sdk.UnwrapSDKContext(goCtx)
 
-		// 1. Run Migrations for Existing Modules (if any needed for this upgrade)
-		// Use the unwrapped sdk.Context (ctx)
+		// Run module migrations
 		p.Logger.Info("Running module migrations...")
 		newVM, err := p.ModuleManager.RunMigrations(ctx, p.Configurator, fromVM)
 		if err != nil {
@@ -30,10 +33,17 @@ func CreateUpgradeHandler(p appParams.AppUpgradeParams) upgradetypes.UpgradeHand
 		}
 		p.Logger.Info("Module migrations completed.")
 
-		// No new modules to add to the version map for v1.7.0
-
 		p.Logger.Info(fmt.Sprintf("Successfully completed upgrade %s", UpgradeName))
-		// Return the UPDATED version map
 		return newVM, nil
 	}
+}
+
+// StoreUpgrades declares any store additions/deletions for this upgrade.
+var StoreUpgrades = storetypes.StoreUpgrades{
+	Added: []string{
+		pfmtypes.StoreKey, // added Packet Forwarding Middleware (PFM) store key
+	},
+	Deleted: []string{
+		"nft", // deleted NFT module store key
+	},
 }

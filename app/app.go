@@ -333,6 +333,11 @@ func (app *App) setupUpgrades() {
 		return // No upgrade info file, normal startup
 	}
 
+	if upgradeInfo.Name == "" {
+		app.Logger().Info("No pending upgrade plan found on disk")
+		return
+	}
+
 	upgradeConfig, found := upgrades.SetupUpgrades(upgradeInfo.Name, appParams.AppUpgradeParams{
 		ChainID:       app.ChainID(),
 		Logger:        app.Logger(),

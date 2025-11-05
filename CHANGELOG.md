@@ -15,6 +15,7 @@ Changes included since `v1.8.0` (range: `v1.8.0..HEAD`).
   - Recorded explicit network-specific rules: v1.8.0 handlers run only on devnet/testnet; v1.8.4 registers the handler everywhere but only loads the store changes (PFM store addition, legacy NFT removal) on mainnet.
   - Added a dedicated `app/upgrades/v1_8_4` package for the new upgrade flow.
 - Tweaked devnet tooling (`Makefile.devnet`, query helpers) to support the upgraded workflow and verified the new upgrade sequence via dockerised devnet tests (1.7.2 -> 1.8.0 -> 1.8.4).
+- Signatures: added ADR-36/Keplr arbitrary-signing support and DER→RS64 coercion in signature verification; strengthened Cascade/Sense flows with Kademlia ID checks based on `Signatures` and counters.
 
 ---
 

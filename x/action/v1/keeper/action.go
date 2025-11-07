@@ -760,20 +760,31 @@ func (k *Keeper) getLastActionID(ctx sdk.Context) (uint64, error) {
 func (k *Keeper) validatePrice(ctx context.Context, price *sdk.Coin) error {
 	params := k.GetParams(ctx)
 
-	minFeeAmount := params.FeePerKbyte.Amount.Add(params.BaseActionFee.Amount)
+	minFeeAmount := params.BaseActionFee.Amount
 
 	if price == nil {
 		return errors.Wrapf(
 			sdkerrors.ErrInvalidRequest,
-			"price is not specified: must be at least %s (base + per-byte)",
+			"price is not specified: must be at least %s (base fee)",
 			minFeeAmount.String(),
 		)
 	}
 
+	// Validate denom
+	if price.Denom != params.BaseActionFee.Denom {
+		return errors.Wrapf(
+			sdkerrors.ErrInvalidRequest,
+			"invalid price denom %s: must be %s",
+			price.Denom,
+			params.BaseActionFee.Denom,
+		)
+	}
+
+	// Validate amount is at least the base fee
 	if price.Amount.LT(minFeeAmount) {
 		return errors.Wrapf(
 			sdkerrors.ErrInvalidRequest,
-			"invalid price amount %s: must be at least %s (base + per-byte)",
+			"invalid price amount %s: must be at least %s (base fee)",
 			price.Amount.String(),
 			minFeeAmount.String(),
 		)

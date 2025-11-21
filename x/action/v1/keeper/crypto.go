@@ -1,27 +1,23 @@
 package keeper
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/asn1"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
-	"runtime"
+	"math/big"
 	"sort"
 	"time"
 
 	"golang.org/x/sync/semaphore"
 
-	"math/big"
-
 	errorsmod "cosmossdk.io/errors"
+	"github.com/DataDog/zstd"
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	"github.com/cosmos/btcutil/base58"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/klauspost/compress/zstd"
 	"lukechampine.com/blake3"
 )
 
@@ -183,15 +179,13 @@ func CreateKademliaID(signatures string, counter uint64) (string, error) {
 	return base58.Encode(hashedData[:]), nil
 }
 
-// ZstdCompress Helper function for zstd compression
+// ZstdCompress Helper function for zstd compression using official C library at level 3
 func ZstdCompress(data []byte) ([]byte, error) {
-	encoder, err := zstd.NewWriter(nil)
+	compressed, err := zstd.CompressLevel(nil, data, 3)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create zstd encoder: %v", err)
+		return nil, fmt.Errorf("failed to compress with zstd: %v", err)
 	}
-	defer encoder.Close()
-
-	return encoder.EncodeAll(data, nil), nil
+	return compressed, nil
 }
 
 func HighCompress(data []byte) ([]byte, error) {
@@ -206,28 +200,12 @@ func HighCompress(data []byte) ([]byte, error) {
 	}
 	defer sem.Release(semaphoreWeight) // Ensure that the semaphore is always released
 
-	numCPU := runtime.NumCPU()
-	// Create a buffer to store compressed data
-	var compressedData bytes.Buffer
-
-	// Create a new Zstd encoder with concurrency set to the number of CPU cores
-	encoder, err := zstd.NewWriter(&compressedData, zstd.WithEncoderConcurrency(numCPU), zstd.WithEncoderLevel(zstd.EncoderLevel(highCompressionLevel)))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Zstd encoder: %v", err)
-	}
-
-	// Perform the compression
-	_, err = io.Copy(encoder, bytes.NewReader(data))
+	compressed, err := zstd.CompressLevel(nil, data, highCompressionLevel)
 	if err != nil {
 		return nil, fmt.Errorf("failed to compress data: %v", err)
 	}
 
-	// Close the encoder to flush any remaining data
-	if err := encoder.Close(); err != nil {
-		return nil, fmt.Errorf("failed to close encoder: %v", err)
-	}
-
-	return compressedData.Bytes(), nil
+	return compressed, nil
 }
 
 // --- DER → 64-byte r||s ---

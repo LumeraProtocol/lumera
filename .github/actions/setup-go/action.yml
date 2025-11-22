@@ -33,7 +33,7 @@ runs:
         echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
     - name: Setup Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v6
       with:
         go-version: ${{ steps.determine.outputs.version }}
         cache: true

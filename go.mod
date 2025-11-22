@@ -54,7 +54,7 @@ require (
 	google.golang.org/grpc v1.76.0
 	google.golang.org/protobuf v1.36.9
 	gotest.tools/v3 v3.5.2
-	lukechampine.com/blake3 v1.4.0
+	lukechampine.com/blake3 v1.4.1
 	lukechampine.com/uint128 v1.3.0
 	pgregory.net/rapid v1.2.0
 )

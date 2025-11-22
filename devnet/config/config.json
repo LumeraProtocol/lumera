@@ -25,6 +25,10 @@
         "binary": "lumerad",
         "keyring_backend": "test"
     },
+    "network-maker": {
+        "max_accounts": 5,
+        "account_balance": "10000000ulume"
+    },
     "hermes": {
         "enabled": true
     }

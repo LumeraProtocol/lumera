@@ -45,17 +45,21 @@ NM_LOG="${NM_LOG:-/root/logs/network-maker.log}"
 NM_TEMPLATE="${RELEASE_DIR}/nm-config.toml"   # Your template in /shared/release (you said it's attached as config.toml)
 NM_CONFIG="${NM_HOME}/config.toml"
 
-NM_KEY_NAME="nm-account"
-MNEMONIC_FILE="${NODE_STATUS_DIR}/nm_mnemonic"
+NM_KEY_PREFIX="nm-account"
+NM_MNEMONIC_FILE_BASE="${NODE_STATUS_DIR}/nm_mnemonic"
 NM_ADDR_FILE="${NODE_STATUS_DIR}/nm-address"
 GENESIS_ADDR_FILE="${NODE_STATUS_DIR}/genesis-address"
 SN_ADDR_FILE="${NODE_STATUS_DIR}/supernode-address"
+
+declare -a NM_ACCOUNT_KEY_NAMES=()
+declare -a NM_ACCOUNT_ADDRESSES=()
+declare -a NM_FUND_TX_HASHES=()
 
 mkdir -p "${NODE_STATUS_DIR}" "$(dirname "${NM_LOG}")" "${NM_HOME}"
 
 # ----- tiny helpers -----
 run() {
-  echo "+ $*"
+  echo "+ $*" >&2
   "$@"
 }
 
@@ -69,6 +73,55 @@ wait_for_file() { while [ ! -s "$1" ]; do sleep 1; done; }
 
 fail_soft() { echo "[NM] $*"; exit 0; }   # exit 0 so container keeps running
 
+# Fetch the latest block height from lumerad.
+latest_block_height() {
+  local status
+  status="$(curl -sf "${LUMERA_RPC_ADDR}/status" 2>/dev/null || true)"
+  local height
+  height="$(jq -r 'try .result.sync_info.latest_block_height // "0"' <<<"${status}")"
+  printf "%s" "${height:-0}"
+}
+
+wait_for_block_height_increase() {
+  local prev_height="$1"
+  local timeout="${SUPERNODE_INSTALL_WAIT_TIMEOUT:-300}"
+  local elapsed=0
+
+  while (( elapsed < timeout )); do
+    local height
+    height="$(latest_block_height)"
+    if (( height > prev_height )); then
+      return 0
+    fi
+    sleep 1
+    ((elapsed++))
+  done
+  echo "[NM] Timeout waiting for new block after height ${prev_height}." >&2
+  exit 1
+}
+
+wait_for_tx_confirmation() {
+  local txhash="$1"
+  if ! ${DAEMON} q wait-tx "${txhash}" --timeout 90s >/dev/null 2>&1; then
+    local deadline ok out code height
+    deadline=$((SECONDS+120))
+    ok=0
+    while (( SECONDS < deadline )); do
+      out="$(${DAEMON} q tx "${txhash}" --output json 2>/dev/null || true)"
+      if jq -e . >/dev/null 2>&1 <<<"${out}"; then
+        code="$(jq -r 'try .code // "0"' <<<"${out}")"
+        height="$(jq -r 'try .height // "0"' <<<"${out}")"
+        if [ "${height}" != "0" ] && [ "${code}" = "0" ]; then
+          ok=1
+          break
+        fi
+      fi
+      sleep 5
+    done
+    [ "${ok}" = "1" ] || { echo "[NM] Funding tx ${txhash} failed or not found."; exit 1; }
+  fi
+}
+
 # ----- prerequisites / config reads -----
 have jq || echo "[NM] WARNING: jq is missing; attempting to proceed."
 
@@ -79,6 +132,22 @@ have jq || echo "[NM] WARNING: jq is missing; attempting to proceed."
 CHAIN_ID="$(jq -r '.chain.id' "${CFG_CHAIN}")"
 DENOM="$(jq -r '.chain.denom.bond' "${CFG_CHAIN}")"
 KEYRING_BACKEND="$(jq -r '.daemon.keyring_backend' "${CFG_CHAIN}")"
+DEFAULT_NM_MAX_ACCOUNTS=5
+NM_MAX_ACCOUNTS="${DEFAULT_NM_MAX_ACCOUNTS}"
+NM_CFG_MAX_ACCOUNTS="$(jq -r 'try .["network-maker"].max_accounts // ""' "${CFG_CHAIN}")"
+if [[ "${NM_CFG_MAX_ACCOUNTS}" =~ ^[0-9]+$ ]]; then
+  if [ "${NM_CFG_MAX_ACCOUNTS}" -gt 0 ]; then
+    NM_MAX_ACCOUNTS="${NM_CFG_MAX_ACCOUNTS}"
+  fi
+fi
+DEFAULT_NM_ACCOUNT_BALANCE="10000000${DENOM}"
+NM_ACCOUNT_BALANCE="$(jq -r 'try .["network-maker"].account_balance // ""' "${CFG_CHAIN}")"
+if [ -z "${NM_ACCOUNT_BALANCE}" ] || [ "${NM_ACCOUNT_BALANCE}" = "null" ]; then
+  NM_ACCOUNT_BALANCE="${DEFAULT_NM_ACCOUNT_BALANCE}"
+fi
+if [[ "${NM_ACCOUNT_BALANCE}" =~ ^[0-9]+$ ]]; then
+  NM_ACCOUNT_BALANCE="${NM_ACCOUNT_BALANCE}${DENOM}"
+fi
 
 # Pull this validator record + node ports + optional NM flag
 VAL_REC_JSON="$(jq -c --arg m "$MONIKER" '[.[] | select(.moniker==$m)][0]' "${CFG_VALS}")"
@@ -196,21 +265,57 @@ configure_nm() {
 
   echo "[NM] Configuring network-maker: $cfg"
 
-  nm_address=""
-  # read addresses from status dir
-  if [ -f "${NM_ADDR_FILE}" ]; then
-    nm_address=$(cat ${NM_ADDR_FILE})
-  fi
-
   # lumera section
-  crudini --set "$cfg" lumera grpc_addr     "\"localhost:${LUMERA_GRPC_PORT}\""
-  crudini --set "$cfg" lumera rpchttp_addr  "\"$LUMERA_RPC_ADDR\""
+  crudini --set "$cfg" lumera grpc_endpoint "\"localhost:${LUMERA_GRPC_PORT}\""
+  crudini --set "$cfg" lumera rpc_endpoint  "\"$LUMERA_RPC_ADDR\""
   crudini --set "$cfg" lumera chain_id      "\"$CHAIN_ID\""
   crudini --set "$cfg" lumera denom         "\"$DENOM\""
 
   # keyring section
-  crudini --set "$cfg" keyring backend      "\"$KEYRING_BACKEND\""
-  [ -n "$nm_address" ] && crudini --set "$cfg" keyring local_address "\"$nm_address\""
+  crudini --set "$cfg" keyring backend "\"$KEYRING_BACKEND\""
+  crudini --set "$cfg" keyring dir     "\"${DAEMON_HOME}\""
+
+  update_nm_keyring_accounts "$cfg"
+}
+
+update_nm_keyring_accounts() {
+  local cfg="$1"
+  local total_accounts="${#NM_ACCOUNT_KEY_NAMES[@]}"
+  if [ "${total_accounts}" -eq 0 ]; then
+    echo "[NM] WARNING: No network-maker accounts available to write into ${cfg}"
+    return
+  fi
+
+  local tmp_cfg
+  tmp_cfg="$(mktemp)"
+  awk '
+    /^\[\[keyring\.accounts\]\]/ { skip=1; next }
+    {
+      if (skip) {
+        if ($0 ~ /^\[/) {
+          if ($0 ~ /^\[\[keyring\.accounts\]\]/) {
+            next
+          }
+          skip=0
+        } else {
+          next
+        }
+      }
+      print
+    }
+  ' "${cfg}" > "${tmp_cfg}"
+  mv "${tmp_cfg}" "${cfg}"
+
+  local idx
+  {
+    echo ""
+    for idx in "${!NM_ACCOUNT_KEY_NAMES[@]}"; do
+      printf '[[keyring.accounts]]\nkey_name = "%s"\naddress  = "%s"\n\n' \
+        "${NM_ACCOUNT_KEY_NAMES[$idx]}" "${NM_ACCOUNT_ADDRESSES[$idx]}"
+    done
+  } >> "${cfg}"
+
+  echo "[NM] Configured ${total_accounts} network-maker account(s) in ${cfg}"
 }
 
 # Wait for lumerad RPC to become available
@@ -280,76 +385,134 @@ install_network_maker_binary() {
   fi
 }
 
-configure_nm_account() {
-  # ----- create/fund nm-account if needed -----
+ensure_nm_key() {
+  local key_name="$1"
+  local mnemonic_file="$2"
+
+  if run ${DAEMON} keys show "${key_name}" --keyring-backend "${KEYRING_BACKEND}" >/dev/null 2>&1; then
+    echo "[NM] Key ${key_name} already exists." >&2
+  else
+    if [ -s "${mnemonic_file}" ]; then
+      echo "[NM] Recovering ${key_name} from saved mnemonic." >&2
+      (cat "${mnemonic_file}") | run ${DAEMON} keys add "${key_name}" --recover --keyring-backend "${KEYRING_BACKEND}" >/dev/null
+    else
+      echo "[NM] Creating new key ${key_name}…" >&2
+      local mnemonic_json
+      mnemonic_json="$(run_capture ${DAEMON} keys add "${key_name}" --keyring-backend "${KEYRING_BACKEND}" --output json)"
+      echo "${mnemonic_json}" | jq -r .mnemonic > "${mnemonic_file}"
+    fi
+    sleep 5
+  fi
+
+  local addr
+  addr="$(run_capture ${DAEMON} keys show "${key_name}" -a --keyring-backend "${KEYRING_BACKEND}")"
+  printf "%s" "${addr}"
+}
+
+fund_nm_account_if_needed() {
+  local key_name="$1"
+  local account_addr="$2"
+  local genesis_addr="$3"
+
+  local bal_json bal
+  bal_json="$(run_capture ${DAEMON} q bank balances "${account_addr}" --output json)"
+  bal="$(echo "${bal_json}" | jq -r --arg d "${DENOM}" '([.balances[]? | select(.denom==$d) | .amount] | first) // "0"')"
+  [[ -z "${bal}" ]] && bal="0"
+  echo "[NM] Current ${key_name} balance: ${bal}${DENOM}" >&2
+
+  if (( bal == 0 )); then
+    sleep 5
+    echo "[NM] Funding ${key_name} with ${NM_ACCOUNT_BALANCE} from genesis address ${genesis_addr}…" >&2
+    local send_json txhash
+    send_json="$(run_capture ${DAEMON} tx bank send "${genesis_addr}" "${account_addr}" "${NM_ACCOUNT_BALANCE}" \
+        --chain-id "${CHAIN_ID}" --keyring-backend "${KEYRING_BACKEND}" \
+        --gas auto --gas-adjustment 1.3 --fees "3000${DENOM}" \
+        --yes --output json)"
+    txhash="$(echo "${send_json}" | jq -r .txhash)"
+
+    if [ -n "${txhash}" ] && [ "${txhash}" != "null" ]; then
+      printf "%s" "${txhash}"
+    else
+      echo "[NM] Could not obtain txhash for funding transaction" >&2
+      exit 1
+    fi
+  else
+    echo "[NM] ${key_name} already funded; skipping." >&2
+    printf ""
+  fi
+}
+
+fund_nm_accounts() {
+  local genesis_addr="$1"
+  local prev_height="$2"
+  local total="${#NM_ACCOUNT_KEY_NAMES[@]}"
+  local idx key_name account_addr fund_tx
+
+  if [ "${total}" -eq 0 ]; then
+    return
+  fi
+
+  for idx in $(seq 0 $((total-1))); do
+    key_name="${NM_ACCOUNT_KEY_NAMES[$idx]}"
+    account_addr="${NM_ACCOUNT_ADDRESSES[$idx]}"
+    fund_tx="$(fund_nm_account_if_needed "${key_name}" "${account_addr}" "${genesis_addr}")"
+    if [ -n "${fund_tx}" ]; then
+      NM_FUND_TX_HASHES+=("${fund_tx}")
+      wait_for_block_height_increase "${prev_height}"
+      prev_height="$(latest_block_height)"
+    fi
+  done
+
+  if [ "${#NM_FUND_TX_HASHES[@]}" -gt 0 ]; then
+    wait_for_all_funding_txs
+  fi
+}
+
+wait_for_all_funding_txs() {
+  local txhash
+  for txhash in "${NM_FUND_TX_HASHES[@]}"; do
+    echo "[NM] Waiting for funding tx ${txhash} to confirm…" >&2
+    wait_for_tx_confirmation "${txhash}"
+  done
+}
+
+configure_nm_accounts() {
   if [ ! -f "${GENESIS_ADDR_FILE}" ]; then
     echo "[NM] ERROR: Missing ${GENESIS_ADDR_FILE} (created by validator-setup)."
     exit 1
   fi
-  GENESIS_ADDR="$(cat "${GENESIS_ADDR_FILE}")"
 
-  # Ensure key exists; prefer recovering from stored mnemonic
-  if run ${DAEMON} keys show "${NM_KEY_NAME}" --keyring-backend "${KEYRING_BACKEND}" >/dev/null 2>&1; then
-    echo "[NM] Key ${NM_KEY_NAME} already exists."
-  else
-    if [ -s "${MNEMONIC_FILE}" ]; then
-      echo "[NM] Recovering ${NM_KEY_NAME} from saved mnemonic."
-      (cat "${MNEMONIC_FILE}") | run ${DAEMON} keys add "${NM_KEY_NAME}" --recover --keyring-backend "${KEYRING_BACKEND}" >/dev/null
+  local genesis_addr
+  genesis_addr="$(cat "${GENESIS_ADDR_FILE}")"
+
+  NM_ACCOUNT_KEY_NAMES=()
+  NM_ACCOUNT_ADDRESSES=()
+  NM_FUND_TX_HASHES=()
+  : > "${NM_ADDR_FILE}"
+
+  local idx key_name mnemonic_file account_addr
+  for idx in $(seq 1 "${NM_MAX_ACCOUNTS}"); do
+    if [ "${idx}" -eq 1 ]; then
+      key_name="${NM_KEY_PREFIX}"
+      mnemonic_file="${NM_MNEMONIC_FILE_BASE}"
     else
-      echo "[NM] Creating new key ${NM_KEY_NAME}…"
-      MNEMONIC_JSON="$(run_capture ${DAEMON} keys add "${NM_KEY_NAME}" --keyring-backend "${KEYRING_BACKEND}" --output json)"
-      echo "${MNEMONIC_JSON}" | jq -r .mnemonic > "${MNEMONIC_FILE}"
+      key_name="${NM_KEY_PREFIX}-${idx}"
+      mnemonic_file="${NM_MNEMONIC_FILE_BASE}-${idx}"
     fi
-    sleep 5
-  fi
 
-  NM_ADDR="$(run_capture ${DAEMON} keys show "${NM_KEY_NAME}" -a --keyring-backend "${KEYRING_BACKEND}")"
-  echo "${NM_ADDR}" > "${NM_ADDR_FILE}"
-  echo "[NM] nm-account address: ${NM_ADDR}"
+    account_addr="$(ensure_nm_key "${key_name}" "${mnemonic_file}")"
+    echo "[NM] ${key_name} address: ${account_addr}"
 
-  # Check balance; if 0, fund from genesis
-  BAL_JSON="$(run_capture ${DAEMON} q bank balances "${NM_ADDR}" --output json)"
-  BAL="$(echo "${BAL_JSON}" | jq -r --arg d "${DENOM}" '([.balances[]? | select(.denom==$d) | .amount] | first) // "0"')"
-  [[ -z "${BAL}" ]] && BAL="0"
-  echo "[NM] Current nm-account balance: ${BAL}${DENOM}"
+    NM_ACCOUNT_KEY_NAMES+=("${key_name}")
+    NM_ACCOUNT_ADDRESSES+=("${account_addr}")
+    printf "%s,%s\n" "${key_name}" "${account_addr}" >> "${NM_ADDR_FILE}"
+  done
 
-  if (( BAL == 0 )); then
-    # need this sleep to avoid "account sequence mismatch" error
-    sleep 5
+  local starting_height
+  starting_height="$(latest_block_height)"
+  fund_nm_accounts "${genesis_addr}" "${starting_height}"
 
-    echo "[NM] Funding nm-account from genesis address ${GENESIS_ADDR}…"
-    SEND_JSON="$(run_capture ${DAEMON} tx bank send "${GENESIS_ADDR}" "${NM_ADDR}" "10000000${DENOM}" \
-        --chain-id "${CHAIN_ID}" --keyring-backend "${KEYRING_BACKEND}" \
-        --gas auto --gas-adjustment 1.3 --fees "3000${DENOM}" \
-        --yes --output json)"
-    TXHASH="$(echo "${SEND_JSON}" | jq -r .txhash)"
-
-    if [ -n "${TXHASH}" ] && [ "${TXHASH}" != "null" ]; then
-      echo "[NM] Waiting for funding tx ${TXHASH} to confirm…"
-
-      sleep 51
-      # Prefer WebSocket wait if available in your CLI; fallback to polling q tx
-      if ! ${DAEMON} q wait-tx "${TXHASH}" --timeout 90s >/dev/null 2>&1; then
-        # Poll fallback
-        deadline=$((SECONDS+120))
-        ok=0
-        while (( SECONDS < deadline )); do
-          out="$(${DAEMON} q tx "${TXHASH}" --output json 2>/dev/null || true)"
-          if jq -e . >/dev/null 2>&1 <<<"$out"; then
-            code="$(jq -r 'try .code // "0"' <<<"$out")"
-            height="$(jq -r 'try .height // "0"' <<<"$out")"
-            if [ "${height}" != "0" ] && [ "${code}" = "0" ]; then ok=1; break; fi
-          fi
-          sleep 5
-        done
-        [ "${ok}" = "1" ] || { echo "[NM] Funding tx failed or not found."; exit 1; }
-      fi
-    else
-      echo "[NM] Could not obtain txhash for funding transaction"; exit 1
-    fi
-  else
-    echo "[NM] nm-account already funded; skipping."
-  fi
+  echo "[NM] Prepared ${#NM_ACCOUNT_KEY_NAMES[@]} network-maker account(s)."
 }
 
 
@@ -366,7 +529,7 @@ install_network_maker_binary
 wait_for_lumera || fail_soft "Chain not ready; skipping NM."
 wait_for_supernode || fail_soft "Supernode not ready; skipping NM."
 
-configure_nm_account
+configure_nm_accounts
 configure_nm
 
 start_network_maker

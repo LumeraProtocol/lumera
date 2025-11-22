@@ -23,10 +23,12 @@ import (
 
 const (
 	semaphoreWeight              = 1
-	maxParallelHighCompressCalls = 5
+	maxParallelHighCompressCalls = 10
 	highCompressionLevel         = 4
 	highCompressTimeout          = 30 * time.Minute
 )
+
+var highCompressSem = semaphore.NewWeighted(maxParallelHighCompressCalls)
 
 // VerifySignature verifies that a signature is valid for given data and signer.
 //
@@ -192,13 +194,11 @@ func HighCompress(data []byte) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), highCompressTimeout)
 	defer cancel()
 
-	sem := semaphore.NewWeighted(maxParallelHighCompressCalls)
-
-	// Acquire the semaphore. This will block if 5 other goroutines are already inside this function.
-	if err := sem.Acquire(ctx, semaphoreWeight); err != nil {
+	// limit total concurrent high-compress calls across the process
+	if err := highCompressSem.Acquire(ctx, semaphoreWeight); err != nil {
 		return nil, fmt.Errorf("failed to acquire semaphore: %v", err)
 	}
-	defer sem.Release(semaphoreWeight) // Ensure that the semaphore is always released
+	defer highCompressSem.Release(semaphoreWeight)
 
 	compressed, err := zstd.CompressLevel(nil, data, highCompressionLevel)
 	if err != nil {

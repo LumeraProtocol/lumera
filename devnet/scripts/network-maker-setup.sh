@@ -132,12 +132,15 @@ have jq || echo "[NM] WARNING: jq is missing; attempting to proceed."
 CHAIN_ID="$(jq -r '.chain.id' "${CFG_CHAIN}")"
 DENOM="$(jq -r '.chain.denom.bond' "${CFG_CHAIN}")"
 KEYRING_BACKEND="$(jq -r '.daemon.keyring_backend' "${CFG_CHAIN}")"
-DEFAULT_NM_MAX_ACCOUNTS=5
+# Default number of network-maker accounts
+DEFAULT_NM_MAX_ACCOUNTS=1
 NM_MAX_ACCOUNTS="${DEFAULT_NM_MAX_ACCOUNTS}"
 NM_CFG_MAX_ACCOUNTS="$(jq -r 'try .["network-maker"].max_accounts // ""' "${CFG_CHAIN}")"
 if [[ "${NM_CFG_MAX_ACCOUNTS}" =~ ^[0-9]+$ ]]; then
-  if [ "${NM_CFG_MAX_ACCOUNTS}" -gt 0 ]; then
+  if [ "${NM_CFG_MAX_ACCOUNTS}" -ge 1 ]; then
     NM_MAX_ACCOUNTS="${NM_CFG_MAX_ACCOUNTS}"
+  else
+    echo "[NM] max_accounts must be >=1; using default ${DEFAULT_NM_MAX_ACCOUNTS}"
   fi
 fi
 DEFAULT_NM_ACCOUNT_BALANCE="10000000${DENOM}"
@@ -289,7 +292,7 @@ update_nm_keyring_accounts() {
   local tmp_cfg
   tmp_cfg="$(mktemp)"
   awk '
-    /^\[\[keyring\.accounts\]\]/ { skip=1; next }
+    /^[[:space:]]*\[\[keyring\.accounts\]\]/ { skip=1; next }
     {
       if (skip) {
         if ($0 ~ /^\[/) {

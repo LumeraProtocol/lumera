@@ -32,6 +32,13 @@ type UpgradeConfig struct {
 	Handler      upgradetypes.UpgradeHandler
 }
 
+// Migration-only upgrades that use the standard handler.
+const (
+	upgradeNameV170 = "v1.7.0"
+	upgradeNameV172 = "v1.7.2"
+	upgradeNameV185 = "v1.8.5"
+)
+
 var upgradeNames = []string{
 	upgrade_v1_6_1.UpgradeName,
 	upgradeNameV170,
@@ -45,15 +52,6 @@ var NoUpgradeConfig = UpgradeConfig{
 	StoreUpgrade: nil,
 	Handler:      nil,
 }
-
-const (
-	// upgradeNameV185 is a migration-only upgrade that uses the standard handler.
-	upgradeNameV170 = "v1.7.0"
-	// upgradeNameV172 is a migration-only upgrade that uses the standard handler.
-	upgradeNameV172 = "v1.7.2"
-	// upgradeNameV185 is a migration-only upgrade that uses the standard handler.
-	upgradeNameV185 = "v1.8.5"
-)
 
 // SetupUpgrades returns the configuration for the requested upgrade (if any).
 // Do not define StoreUpgrades if there are no store changes for that upgrade.

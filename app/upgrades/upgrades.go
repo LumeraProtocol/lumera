@@ -19,6 +19,14 @@ type UpgradeConfig struct {
 	Handler      upgradetypes.UpgradeHandler
 }
 
+var upgradeNames = []string{
+	upgrade_v1_6_1.UpgradeName,
+	upgrade_v1_7_0.UpgradeName,
+	upgrade_v1_7_2.UpgradeName,
+	upgrade_v1_8_0.UpgradeName,
+	upgrade_v1_8_4.UpgradeName,
+}
+
 var NoUpgradeConfig = UpgradeConfig{
 	StoreUpgrade: nil,
 	Handler:      nil,
@@ -62,4 +70,15 @@ func SetupUpgrades(upgradeName string, params appParams.AppUpgradeParams) (Upgra
 	default:
 		return UpgradeConfig{}, false
 	}
+}
+
+// AllUpgrades returns the upgrade configuration for every known upgrade name.
+func AllUpgrades(params appParams.AppUpgradeParams) map[string]UpgradeConfig {
+	configs := make(map[string]UpgradeConfig, len(upgradeNames))
+	for _, upgradeName := range upgradeNames {
+		if config, found := SetupUpgrades(upgradeName, params); found {
+			configs[upgradeName] = config
+		}
+	}
+	return configs
 }

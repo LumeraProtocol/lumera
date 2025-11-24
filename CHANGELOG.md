@@ -2,6 +2,15 @@
 
 ---
 
+## 1.8.5
+
+Changes included since `v1.8.4` (range: `v1.8.4..HEAD`).
+
+- Compression: Action/Sense ID generation now uses the DataDog zstd binding with bounded high-compression helpers and clearer error handling.
+- Standardised migration-only upgrades with `standardUpgradeHandler`.
+- Devnet Docker tests: `network-maker-setup.sh` now provisions **multiple** network-maker accounts per validator (configurable in `config/config.json`), funds them, and writes them into generated configs for automated Network-Maker scenarios.
+---
+
 ## 1.8.4
 
 Changes included since `v1.8.0` (range: `v1.8.0..HEAD`).

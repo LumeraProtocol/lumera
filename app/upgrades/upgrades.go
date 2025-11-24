@@ -15,6 +15,17 @@ import (
 	upgrade_v1_8_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_0"
 	upgrade_v1_8_4 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_4"
 )
+// ======================================================================================================================
+// Upgrade overview:
+// ======================================================================================================================
+// | Name   | Handler  | Store changes                     | Notes
+// | v1.6.1 | custom   | none                              | Adds action module consensus version after migrations
+// | v1.7.0 | standard | none                              | Migrations only
+// | v1.7.2 | standard | none                              | Migrations only
+// | v1.8.0 | standard | testnet/devnet: add PFM, drop NFT | Store upgrade gated to non-mainnet; handler is migrations only
+// | v1.8.4 | standard | mainnet: add PFM, drop NFT        | Store upgrade gated to mainnet; handler is migrations only
+// | v1.8.5 | standard | none                              | Migrations only
+// ======================================================================================================================
 
 type UpgradeConfig struct {
 	StoreUpgrade *storetypes.StoreUpgrades

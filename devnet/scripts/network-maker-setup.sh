@@ -295,8 +295,8 @@ update_nm_keyring_accounts() {
     /^[[:space:]]*\[\[keyring\.accounts\]\]/ { skip=1; next }
     {
       if (skip) {
-        if ($0 ~ /^\[/) {
-          if ($0 ~ /^\[\[keyring\.accounts\]\]/) {
+        if ($0 ~ /^[[:space:]]*\[/) {
+          if ($0 ~ /^[[:space:]]*\[\[keyring\.accounts\]\]/) {
             next
           }
           skip=0

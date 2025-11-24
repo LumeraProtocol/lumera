@@ -144,7 +144,9 @@ Produces initialization and startup scripts:
 
 Each generator uses the config package structures to ensure consistent network setup across all components.
 
-## 5. Docker Components
+## 5. Devnet Docker Test System
+
+The Devnet Docker test system is assembled by `Makefile.devnet`, `docker-compose.yml`, and the helper scripts under `devnet/scripts`. During `make devnet-build`, `devnet/scripts/configure.sh` copies configuration files and every binary from `devnet/bin` into `/tmp/<chain-id>/shared`. Each validator container subsequently runs `start.sh`, `validator-setup.sh`, `supernode-setup.sh`, and `network-maker-setup.sh` so that validators, Supernode, network-maker, and optional Hermes relayer tasks all bootstrap in a consistent order.
 
 ### 5.1 Dockerfile Structure
 From [dockerfile](dockerfile):
@@ -201,6 +203,54 @@ services:
     command: bash /root/scripts/secondary-validator.sh bob 900000000000000ulume validator2
 ```
 
+### 5.3 Devnet Binary Bundle (`devnet/bin`)
+
+`make devnet-build` (or `./devnet/scripts/configure.sh --bin-dir devnet/bin`) expects the following assets inside `devnet/bin`. Required files must always be present; optional files only need to exist when the related service is enabled.
+
+| File | Required? | Purpose |
+| --- | --- | --- |
+| `lumerad` | Yes | Primary Lumera daemon executed by every validator container. |
+| `libwasmvm.x86_64.so` | Yes | CosmWasm runtime shared library mounted into every validator so contracts can execute. |
+| `supernode-linux-amd64` | Optional (required when Supernode service is used) | Binary started by `supernode-setup.sh` to aggregate price feeds and update `/shared/status`. |
+| `sncli` | Optional | CLI utility that interacts with Supernode. Copied for convenience when present. |
+| `sncli-config.toml` | Optional (used only if `sncli` exists) | Configuration consumed by `sncli`; copied next to the binary when provided. |
+| `network-maker` | Optional (required for validators with `"network-maker": true`) | Service that mints and rotates accounts used for Supernode/NFT operations. |
+| `nm-config.toml` | Required whenever `network-maker` is bundled | Template applied by `network-maker-setup.sh` to produce `/root/.network-maker/config.toml`. |
+
+> Tip: Keep versioned folders such as `devnet/bin-v1.8.4` in sync with the required binaries so you can point `DEVNET_BIN_DIR` at a tested bundle when reproducing historical upgrades.
+
+### 5.4 Network Maker Multi-Account Support
+
+`devnet/scripts/network-maker-setup.sh` now provisions **multiple** network-maker accounts per validator. The defaults come from `config/config.json`:
+
+```json
+"network-maker": {
+    "max_accounts": 5,
+    "account_balance": "10000000ulume"
+}
+```
+
+Enable the service on specific validators by setting the flag inside `validators.json`:
+
+```json
+{
+    "name": "validator1",
+    "moniker": "validator1",
+    "network-maker": true,
+    "port": 26656,
+    "rpc_port": 26657
+}
+```
+
+When the flag is true and the `network-maker` binary/template exist in `devnet/bin`, the setup script:
+
+- Waits for `lumerad` RPC and the Supernode endpoint to become healthy before executing.
+- Produces keys named `nm-account`, `nm-account-2`, … up to `max_accounts`, storing mnemonics under `/shared/status/<moniker>/nm_mnemonic[-N]` and addresses inside `/shared/status/<moniker>/nm-address`.
+- Funds any empty account from the validator’s genesis key (`/shared/status/<moniker>/genesis-address`) with the configured `account_balance` and confirms the transactions on-chain.
+- Writes the final addresses into `/root/.network-maker/config.toml` via repeated `[[keyring.accounts]]` blocks and records scanner directories `/root/nm-files` plus `/shared/nm-files` for convenient document drop zones.
+
+Adjust `max_accounts` when you need additional faucet-style wallets and update `account_balance` with a denom-suffixed amount (or a raw number that automatically adds the staking denom). This allows automated funding for Supernode scenarios or any devnet tests that require multiple funded signers per validator container.
+
 ## 6. Usage Guide
 
 ### 6.1 Build and Setup
@@ -251,8 +301,8 @@ make devnet-up
 # Start network in background
 make devnet-up-detach
 
-# Clean start (removes old data and regenerates configs)
-make devnet-up-clean
+# Clean start (stops network, cleans, rebuilds defaults)
+make devnet-new
 
 # Stop network and cleanup containers
 make devnet-down
@@ -371,5 +421,27 @@ docker exec -it lumera-validator1 watch 'lumerad status | jq .SyncInfo'
 
 *Note: The keyring-backend is set to 'test' in the dev environment, so no password prompts appear. For production, use 'file' or 'os' backend.*
 
+### 6.7 Devnet Makefile Commands
 
+Targets declared in `Makefile.devnet` (and exposed through the root `Makefile`) control the Docker test system end-to-end.
 
+| Command | Description |
+| --- | --- |
+| `make devnet-build` | Build Lumera, copy `lumerad`/`libwasmvm.x86_64.so` into `/tmp/<chain-id>/shared/release`, and rerun the generators with the active `config.json`/`validators.json`. |
+| `make devnet-build-default` | Run `devnet-build` with the repository default config, validators, genesis template, and claims CSV. |
+| `make devnet-build-172` | Use the legacy `devnet/bin-v1.7.2` bundle and default configs to reproduce the v1.7.2 network. |
+| `make devnet-up` | Start Docker Compose in the foreground with `START_MODE=auto` so logs stream to the terminal. |
+| `make devnet-up-detach` | Start Docker Compose in the background (`docker compose up -d`). |
+| `make devnet-down` | Stop the stack and remove containers (`docker compose down --remove-orphans`). |
+| `make devnet-stop` | Gracefully stop containers without removing them. |
+| `make devnet-start` | Start previously stopped containers with `START_MODE=run`. |
+| `make devnet-reset` | Clear each validator’s `genesis.json` and `priv_validator_key.json`, then restart to rebuild `gentx`. |
+| `make devnet-clean` | Remove `/tmp/<chain-id>/shared`, validator data folders, Hermes volumes, and the generated `docker-compose.yml`. |
+| `make devnet-new` | Convenience target: `devnet-down` + `devnet-clean` + `devnet-build-default`. |
+| `make devnet-new-172` | Clean and rebuild the network using the v1.7.2 binary bundle, then start it. |
+| `make devnet-upgrade` | Rebuild binaries (if requested), stop containers, refresh `/shared/release`, and rerun `configure.sh`. |
+| `make devnet-upgrade-binaries` | Copy freshly built `lumerad` and `libwasmvm` into running containers through `devnet/scripts/upgrade-binaries.sh`. |
+| `make devnet-upgrade-180` | Execute `devnet/scripts/upgrade.sh` for the v1.8.0 release bundle. |
+| `make devnet-upgrade-184` | Execute `devnet/scripts/upgrade.sh` for the v1.8.4 release bundle. |
+| `make devnet-update-scripts` | Copy updated `start.sh`, `validator-setup.sh`, `supernode-setup.sh`, and `network-maker-setup.sh` (plus Hermes scripts) into running containers. |
+| `make devnet-deploy-tar` | Package dockerfile, compose file, binaries, configs, claims, and optional genesis into `devnet-deploy.tar.gz` for distribution. |

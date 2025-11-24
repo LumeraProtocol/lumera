@@ -1,36 +1,34 @@
 package keeper
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/asn1"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
-	"runtime"
+	"math/big"
 	"sort"
 	"time"
 
 	"golang.org/x/sync/semaphore"
 
-	"math/big"
-
 	errorsmod "cosmossdk.io/errors"
+	"github.com/DataDog/zstd"
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	"github.com/cosmos/btcutil/base58"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/klauspost/compress/zstd"
 	"lukechampine.com/blake3"
 )
 
 const (
 	semaphoreWeight              = 1
-	maxParallelHighCompressCalls = 5
+	maxParallelHighCompressCalls = 10
 	highCompressionLevel         = 4
 	highCompressTimeout          = 30 * time.Minute
 )
+
+var highCompressSem = semaphore.NewWeighted(maxParallelHighCompressCalls)
 
 // VerifySignature verifies that a signature is valid for given data and signer.
 //
@@ -183,51 +181,31 @@ func CreateKademliaID(signatures string, counter uint64) (string, error) {
 	return base58.Encode(hashedData[:]), nil
 }
 
-// ZstdCompress Helper function for zstd compression
+// ZstdCompress Helper function for zstd compression using official C library at level 3
 func ZstdCompress(data []byte) ([]byte, error) {
-	encoder, err := zstd.NewWriter(nil)
+	compressed, err := zstd.CompressLevel(nil, data, 3)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create zstd encoder: %v", err)
+		return nil, fmt.Errorf("failed to compress with zstd: %v", err)
 	}
-	defer encoder.Close()
-
-	return encoder.EncodeAll(data, nil), nil
+	return compressed, nil
 }
 
 func HighCompress(data []byte) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), highCompressTimeout)
 	defer cancel()
 
-	sem := semaphore.NewWeighted(maxParallelHighCompressCalls)
-
-	// Acquire the semaphore. This will block if 5 other goroutines are already inside this function.
-	if err := sem.Acquire(ctx, semaphoreWeight); err != nil {
+	// limit total concurrent high-compress calls across the process
+	if err := highCompressSem.Acquire(ctx, semaphoreWeight); err != nil {
 		return nil, fmt.Errorf("failed to acquire semaphore: %v", err)
 	}
-	defer sem.Release(semaphoreWeight) // Ensure that the semaphore is always released
+	defer highCompressSem.Release(semaphoreWeight)
 
-	numCPU := runtime.NumCPU()
-	// Create a buffer to store compressed data
-	var compressedData bytes.Buffer
-
-	// Create a new Zstd encoder with concurrency set to the number of CPU cores
-	encoder, err := zstd.NewWriter(&compressedData, zstd.WithEncoderConcurrency(numCPU), zstd.WithEncoderLevel(zstd.EncoderLevel(highCompressionLevel)))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Zstd encoder: %v", err)
-	}
-
-	// Perform the compression
-	_, err = io.Copy(encoder, bytes.NewReader(data))
+	compressed, err := zstd.CompressLevel(nil, data, highCompressionLevel)
 	if err != nil {
 		return nil, fmt.Errorf("failed to compress data: %v", err)
 	}
 
-	// Close the encoder to flush any remaining data
-	if err := encoder.Close(); err != nil {
-		return nil, fmt.Errorf("failed to close encoder: %v", err)
-	}
-
-	return compressedData.Bytes(), nil
+	return compressed, nil
 }
 
 // --- DER → 64-byte r||s ---

@@ -2,6 +2,35 @@
 
 ---
 
+## 1.8.5
+
+Changes included since `v1.8.4` (range: `v1.8.4..HEAD`).
+
+- Register every upgrade handler at startup (before Load) so state-sync nodes always have handlers available, even without an on-disk plan.
+- Fixed x/upgrade downgrade verification panics on state-synced nodes that already applied v1.8.4 but lacked a registered handler.
+- Standardised migration-only upgrades with `standardUpgradeHandler`.
+- Devnet Docker tests: `network-maker-setup.sh` now provisions **multiple** network-maker accounts per validator (configurable in `config/config.json`), funds them, and writes them into generated configs for automated Network-Maker scenarios.
+- Compression: Action/Sense ID generation now uses the DataDog zstd binding with bounded high-compression helpers and clearer error handling.
+
+---
+
+## 1.8.4
+
+Changes included since `v1.8.0` (range: `v1.8.0..HEAD`).
+
+- Added a legacy type URL aliasing framework (`internal/legacyalias`) and wired it into module registration so pre-versioned Action/Supernode messages stored on-chain continue to decode after the versioned protobuf migration. AutoCLI now wraps the codec resolvers with the legacy-aware resolver to keep CLI and REST queries seamless.
+- Introduced a protobuf enum bridge (`internal/protobridge`) that double-registers enum descriptors with both gogoproto and the standard protobuf runtime, eliminating REST/GRPC mismatches when the gateway still consults the legacy registry.
+- Normalised `Action.price` to a plain string in the proto definition and regenerated bindings (`x/action/v1/types`), improving protobuf compatibility with external tooling while keeping existing data accessible through the legacy alias layer.
+- Reworked upgrade handling:
+  - Added a shared `AppUpgradeParams` bundle and refactored every versioned upgrade handler to consume it.
+  - Consolidated handler/store-loader registration into a single path (`app.setupUpgrades`) that selects the appropriate configuration per plan and panics early when the binary is missing a scheduled plan.
+  - Recorded explicit network-specific rules: v1.8.0 handlers run only on devnet/testnet; v1.8.4 registers the handler everywhere but only loads the store changes (PFM store addition, legacy NFT removal) on mainnet.
+  - Added a dedicated `app/upgrades/v1_8_4` package for the new upgrade flow.
+- Tweaked devnet tooling (`Makefile.devnet`, query helpers) to support the upgraded workflow and verified the new upgrade sequence via dockerised devnet tests (1.7.2 -> 1.8.0 -> 1.8.4).
+- Signatures: added ADR-36/Keplr arbitrary-signing support and DER→RS64 coercion in signature verification; strengthened Cascade/Sense flows with Kademlia ID checks based on `Signatures` and counters.
+
+---
+
 ## 1.8.0
 
 Changes included since `v1.7.2` (range: `v1.7.2..HEAD`).
@@ -134,8 +163,6 @@ IBC v2.0 brings improved cross‑chain routing and middleware support, laying th
 | Ignite      | v28.x           | v29.x          |
 | Proto Build | Pulsar + Buf v1 | Buf v2 only    |
 | NFT Module  | Present         | Removed        |
-
----
 
 ---
 

@@ -34,6 +34,10 @@ type ChainConfig struct {
 		Binary         string `json:"binary"`
 		KeyringBackend string `json:"keyring_backend"`
 	} `json:"daemon"`
+	NetworkMaker struct {
+		MaxAccounts    int    `json:"max_accounts"`
+		AccountBalance string `json:"account_balance"`
+	} `json:"network-maker"`
 	Hermes struct {
 		Enabled bool `json:"enabled"`
 	} `json:"hermes"`

@@ -1,15 +1,17 @@
 package upgrades
 
 import (
-	"strings"
+	"context"
+	"fmt"
 
 	storetypes "cosmossdk.io/store/types"
 	upgradetypes "cosmossdk.io/x/upgrade/types"
 
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/types/module"
+
 	appParams "github.com/LumeraProtocol/lumera/app/upgrades/params"
 	upgrade_v1_6_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_6_1"
-	upgrade_v1_7_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_7_0"
-	upgrade_v1_7_2 "github.com/LumeraProtocol/lumera/app/upgrades/v1_7_2"
 	upgrade_v1_8_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_0"
 	upgrade_v1_8_4 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_4"
 )
@@ -21,10 +23,11 @@ type UpgradeConfig struct {
 
 var upgradeNames = []string{
 	upgrade_v1_6_1.UpgradeName,
-	upgrade_v1_7_0.UpgradeName,
-	upgrade_v1_7_2.UpgradeName,
+	upgradeNameV170,
+	upgradeNameV172,
 	upgrade_v1_8_0.UpgradeName,
 	upgrade_v1_8_4.UpgradeName,
+	upgradeNameV185,
 }
 
 var NoUpgradeConfig = UpgradeConfig{
@@ -32,39 +35,54 @@ var NoUpgradeConfig = UpgradeConfig{
 	Handler:      nil,
 }
 
+const (
+	// upgradeNameV185 is a migration-only upgrade that uses the standard handler.
+	upgradeNameV170 = "v1.7.0"
+	// upgradeNameV172 is a migration-only upgrade that uses the standard handler.
+	upgradeNameV172 = "v1.7.2"
+	// upgradeNameV185 is a migration-only upgrade that uses the standard handler.
+	upgradeNameV185 = "v1.8.5"
+)
+
 // SetupUpgrades returns the configuration for the requested upgrade (if any).
 // Do not define StoreUpgrades if there are no store changes for that upgrade.
 // Do not define an UpgradeHandler if no custom logic is needed beyond module migrations.
+// Prefer standardUpgradeHandler for migration-only upgrades; only create a custom
+// handler when bespoke state changes are required beyond RunMigrations.
 func SetupUpgrades(upgradeName string, params appParams.AppUpgradeParams) (UpgradeConfig, bool) {
 	switch upgradeName {
 	case upgrade_v1_6_1.UpgradeName:
 		return UpgradeConfig{
 			Handler: upgrade_v1_6_1.CreateUpgradeHandler(params),
 		}, true
-	case upgrade_v1_7_0.UpgradeName:
+	case upgradeNameV170:
 		return UpgradeConfig{
-			Handler: upgrade_v1_7_0.CreateUpgradeHandler(params),
+			Handler: standardUpgradeHandler(upgradeNameV170, params),
 		}, true
-	case upgrade_v1_7_2.UpgradeName:
+	case upgradeNameV172:
 		return UpgradeConfig{
-			Handler: upgrade_v1_7_2.CreateUpgradeHandler(params),
+			Handler: standardUpgradeHandler(upgradeNameV172, params),
 		}, true
 	case upgrade_v1_8_0.UpgradeName:
-		if strings.HasPrefix(params.ChainID, "lumera-testnet") || strings.HasPrefix(params.ChainID, "lumera-devnet") {
+		if IsTestnet(params.ChainID) || IsDevnet(params.ChainID) {
 			return UpgradeConfig{
 				StoreUpgrade: &upgrade_v1_8_0.StoreUpgrades,
-				Handler:      upgrade_v1_8_0.CreateUpgradeHandler(params),
+				Handler:      standardUpgradeHandler(upgrade_v1_8_0.UpgradeName, params),
 			}, true
 		}
 		return NoUpgradeConfig, true
 	case upgrade_v1_8_4.UpgradeName:
 		config := UpgradeConfig{
-			Handler: upgrade_v1_8_4.CreateUpgradeHandler(params),
+			Handler: standardUpgradeHandler(upgrade_v1_8_4.UpgradeName, params),
 		}
-		if strings.HasPrefix(params.ChainID, "lumera-mainnet") {
+		if IsMainnet(params.ChainID) {
 			config.StoreUpgrade = &upgrade_v1_8_4.StoreUpgrades
 		}
 		return config, true
+	case upgradeNameV185:
+		return UpgradeConfig{
+			Handler: standardUpgradeHandler(upgradeNameV185, params),
+		}, true
 
 	// add future upgrades here
 	default:
@@ -81,4 +99,28 @@ func AllUpgrades(params appParams.AppUpgradeParams) map[string]UpgradeConfig {
 		}
 	}
 	return configs
+}
+
+// standardUpgradeHandler returns a migration-only upgrade handler for simple upgrades.
+// Use this helper when an upgrade needs only RunMigrations (no custom logic) and does
+// not modify store keys; it keeps minimal upgrades boilerplate-free. When an upgrade
+// requires bespoke state changes or store additions/removals, define a dedicated
+// handler (and StoreUpgrades when applicable).
+func standardUpgradeHandler(upgradeName string, p appParams.AppUpgradeParams) upgradetypes.UpgradeHandler {
+	return func(goCtx context.Context, _ upgradetypes.Plan, fromVM module.VersionMap) (module.VersionMap, error) {
+		p.Logger.Info(fmt.Sprintf("Starting upgrade %s...", upgradeName))
+
+		ctx := sdk.UnwrapSDKContext(goCtx)
+
+		p.Logger.Info("Running module migrations...")
+		newVM, err := p.ModuleManager.RunMigrations(ctx, p.Configurator, fromVM)
+		if err != nil {
+			p.Logger.Error("Failed to run migrations", "error", err)
+			return nil, fmt.Errorf("failed to run migrations: %w", err)
+		}
+		p.Logger.Info("Module migrations completed.")
+
+		p.Logger.Info(fmt.Sprintf("Successfully completed upgrade %s", upgradeName))
+		return newVM, nil
+	}
 }

@@ -323,6 +323,22 @@ func (app *App) GetSubspace(moduleName string) paramstypes.Subspace {
 // setupUpgrades configures the store loader for upcoming upgrades and registers upgrade handlers.
 // This needs to be called BEFORE app.Load()
 func (app *App) setupUpgrades() {
+	params := appParams.AppUpgradeParams{
+		ChainID:       app.ChainID(),
+		Logger:        app.Logger(),
+		ModuleManager: app.ModuleManager,
+		Configurator:  app.Configurator(),
+	}
+
+	allUpgrades := upgrades.AllUpgrades(params)
+	for upgradeName, upgradeConfig := range allUpgrades {
+		if upgradeConfig.Handler == nil {
+			continue
+		}
+		app.UpgradeKeeper.SetUpgradeHandler(upgradeName, upgradeConfig.Handler)
+		app.Logger().Info("Registered upgrade handler", "name", upgradeName)
+	}
+
 	upgradeInfo, err := app.UpgradeKeeper.ReadUpgradeInfoFromDisk()
 	// No upgrade scheduled, skip
 	if err != nil {
@@ -338,22 +354,9 @@ func (app *App) setupUpgrades() {
 		return
 	}
 
-	upgradeConfig, found := upgrades.SetupUpgrades(upgradeInfo.Name, appParams.AppUpgradeParams{
-		ChainID:       app.ChainID(),
-		Logger:        app.Logger(),
-		ModuleManager: app.ModuleManager,
-		Configurator:  app.Configurator(),
-	})
-
+	upgradeConfig, found := allUpgrades[upgradeInfo.Name]
 	if !found {
 		panic(fmt.Sprintf("upgrade plan %q is scheduled at height %d but not registered in this binary", upgradeInfo.Name, upgradeInfo.Height))
-	}
-
-	if upgradeConfig.Handler != nil {
-		app.UpgradeKeeper.SetUpgradeHandler(upgradeInfo.Name, upgradeConfig.Handler)
-		app.Logger().Info("Registered upgrade handler", "name", upgradeInfo.Name)
-	} else {
-		app.Logger().Info("Skipping upgrade handler registration", "name", upgradeInfo.Name)
 	}
 
 	if upgradeConfig.StoreUpgrade == nil {

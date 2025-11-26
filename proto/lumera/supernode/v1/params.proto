@@ -23,4 +23,19 @@ message Params {
   string evidence_retention_period = 5 [(gogoproto.moretags) = "yaml:\"evidence_retention_period\""];
   string slashing_fraction = 6 [(gogoproto.moretags) = "yaml:\"slashing_fraction\""];
   string inactivity_penalty_period = 7 [(gogoproto.moretags) = "yaml:\"inactivity_penalty_period\""];
+
+  uint64 metrics_update_interval = 8 [(gogoproto.moretags) = "yaml:\"metrics_update_interval\""];
+  uint64 metrics_grace_period_blocks = 9 [(gogoproto.moretags) = "yaml:\"metrics_grace_period_blocks\""];
+  uint64 metrics_freshness_max_blocks = 10 [(gogoproto.moretags) = "yaml:\"metrics_freshness_max_blocks\""];
+
+  string min_supernode_version = 11 [(gogoproto.moretags) = "yaml:\"min_supernode_version\""];
+
+  double min_cpu_cores = 12 [(gogoproto.moretags) = "yaml:\"min_cpu_cores\""];
+  double max_cpu_usage_percent = 13 [(gogoproto.moretags) = "yaml:\"max_cpu_usage_percent\""];
+  double min_mem_gb = 14 [(gogoproto.moretags) = "yaml:\"min_mem_gb\""];
+  double max_mem_usage_percent = 15 [(gogoproto.moretags) = "yaml:\"max_mem_usage_percent\""];
+  double min_storage_gb = 16 [(gogoproto.moretags) = "yaml:\"min_storage_gb\""];
+  double max_storage_usage_percent = 17 [(gogoproto.moretags) = "yaml:\"max_storage_usage_percent\""];
+
+  repeated uint32 required_open_ports = 18 [(gogoproto.moretags) = "yaml:\"required_open_ports\""];
 }

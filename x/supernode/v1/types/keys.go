@@ -11,6 +11,9 @@ const (
 
 	// MemStoreKey defines the in-memory store key
 	MemStoreKey = "mem_supernode"
+
+	// RouterKey is the message route for supernode messages.
+	RouterKey = ModuleName
 )
 
 var (

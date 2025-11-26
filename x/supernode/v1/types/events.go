@@ -7,6 +7,7 @@ const (
 	EventTypeSupernodeStarted      = "supernode_started"
 	EventTypeSupernodeStopped      = "supernode_stopped"
 	EventTypeSupernodeUpdated      = "supernode_updated"
+	EventTypeSupernodeMetrics      = "supernode_metrics_reported"
 
 	AttributeKeyValidatorAddress = "validator_address"
 	AttributeKeyIPAddress        = "ip_address"
@@ -21,4 +22,6 @@ const (
 	AttributeKeyOldIPAddress     = "old_ip_address"
 	AttributeKeyHeight           = "height"
 	AttributeKeyFieldsUpdated    = "fields_updated"
+	AttributeKeyIssuesCount      = "issues_count"
+	AttributeKeyStateTransition  = "state_transition"
 )

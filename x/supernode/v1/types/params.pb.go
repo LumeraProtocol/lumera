@@ -12,6 +12,7 @@ import (
 	io "io"
 	math "math"
 	math_bits "math/bits"
+	reflect "reflect"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -34,6 +35,12 @@ type Params struct {
 	EvidenceRetentionPeriod string     `protobuf:"bytes,5,opt,name=evidence_retention_period,json=evidenceRetentionPeriod,proto3" json:"evidence_retention_period,omitempty" yaml:"evidence_retention_period"`
 	SlashingFraction        string     `protobuf:"bytes,6,opt,name=slashing_fraction,json=slashingFraction,proto3" json:"slashing_fraction,omitempty" yaml:"slashing_fraction"`
 	InactivityPenaltyPeriod string     `protobuf:"bytes,7,opt,name=inactivity_penalty_period,json=inactivityPenaltyPeriod,proto3" json:"inactivity_penalty_period,omitempty" yaml:"inactivity_penalty_period"`
+	MetricsTiming           uint64     `protobuf:"varint,8,opt,name=metrics_timing,json=metricsTiming,proto3" json:"metrics_timing,omitempty" yaml:"metrics_timing"`
+	MetricsVersion          string     `protobuf:"bytes,9,opt,name=metrics_version,json=metricsVersion,proto3" json:"metrics_version,omitempty" yaml:"metrics_version"`
+	CPUThreshold            uint64     `protobuf:"varint,10,opt,name=cpu_threshold,json=cpuThreshold,proto3" json:"cpu_threshold,omitempty" yaml:"cpu_threshold"`
+	MemoryThreshold         uint64     `protobuf:"varint,11,opt,name=memory_threshold,json=memoryThreshold,proto3" json:"memory_threshold,omitempty" yaml:"memory_threshold"`
+	StorageThreshold        uint64     `protobuf:"varint,12,opt,name=storage_threshold,json=storageThreshold,proto3" json:"storage_threshold,omitempty" yaml:"storage_threshold"`
+	RequiredPorts           []uint32   `protobuf:"varint,13,rep,packed,name=required_ports,json=requiredPorts,proto3" json:"required_ports,omitempty" yaml:"required_ports"`
 }
 
 func (m *Params) Reset()         { *m = Params{} }
@@ -118,6 +125,48 @@ func (m *Params) GetInactivityPenaltyPeriod() string {
 	return ""
 }
 
+func (m *Params) GetMetricsTiming() uint64 {
+	if m != nil {
+		return m.MetricsTiming
+	}
+	return 0
+}
+
+func (m *Params) GetMetricsVersion() string {
+	if m != nil {
+		return m.MetricsVersion
+	}
+	return ""
+}
+
+func (m *Params) GetCPUThreshold() uint64 {
+	if m != nil {
+		return m.CPUThreshold
+	}
+	return 0
+}
+
+func (m *Params) GetMemoryThreshold() uint64 {
+	if m != nil {
+		return m.MemoryThreshold
+	}
+	return 0
+}
+
+func (m *Params) GetStorageThreshold() uint64 {
+	if m != nil {
+		return m.StorageThreshold
+	}
+	return 0
+}
+
+func (m *Params) GetRequiredPorts() []uint32 {
+	if m != nil {
+		return m.RequiredPorts
+	}
+	return nil
+}
+
 func init() {
 	proto.RegisterType((*Params)(nil), "lumera.supernode.v1.Params")
 }
@@ -198,6 +247,24 @@ func (this *Params) Equal(that interface{}) bool {
 	if this.InactivityPenaltyPeriod != that1.InactivityPenaltyPeriod {
 		return false
 	}
+	if this.MetricsTiming != that1.MetricsTiming {
+		return false
+	}
+	if this.MetricsVersion != that1.MetricsVersion {
+		return false
+	}
+	if this.CPUThreshold != that1.CPUThreshold {
+		return false
+	}
+	if this.MemoryThreshold != that1.MemoryThreshold {
+		return false
+	}
+	if this.StorageThreshold != that1.StorageThreshold {
+		return false
+	}
+	if !reflect.DeepEqual(this.RequiredPorts, that1.RequiredPorts) {
+		return false
+	}
 	return true
 }
 func (m *Params) Marshal() (dAtA []byte, err error) {
@@ -220,6 +287,46 @@ func (m *Params) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.RequiredPorts) > 0 {
+		totalLen := 0
+		for _, num := range m.RequiredPorts {
+			totalLen += sovParams(uint64(num))
+		}
+		i -= totalLen
+		for idx := len(m.RequiredPorts) - 1; idx >= 0; idx-- {
+			i = encodeVarintParams(dAtA, i, uint64(m.RequiredPorts[idx]))
+		}
+		i = encodeVarintParams(dAtA, i, uint64(totalLen))
+		i--
+		dAtA[i] = 0x6a
+	}
+	if m.StorageThreshold != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.StorageThreshold))
+		i--
+		dAtA[i] = 0x60
+	}
+	if m.MemoryThreshold != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.MemoryThreshold))
+		i--
+		dAtA[i] = 0x58
+	}
+	if m.CPUThreshold != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.CPUThreshold))
+		i--
+		dAtA[i] = 0x50
+	}
+	if len(m.MetricsVersion) > 0 {
+		i -= len(m.MetricsVersion)
+		copy(dAtA[i:], m.MetricsVersion)
+		i = encodeVarintParams(dAtA, i, uint64(len(m.MetricsVersion)))
+		i--
+		dAtA[i] = 0x4a
+	}
+	if m.MetricsTiming != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.MetricsTiming))
+		i--
+		dAtA[i] = 0x40
+	}
 	if len(m.InactivityPenaltyPeriod) > 0 {
 		i -= len(m.InactivityPenaltyPeriod)
 		copy(dAtA[i:], m.InactivityPenaltyPeriod)
@@ -311,6 +418,29 @@ func (m *Params) Size() (n int) {
 	l = len(m.InactivityPenaltyPeriod)
 	if l > 0 {
 		n += 1 + l + sovParams(uint64(l))
+	}
+	if m.MetricsTiming != 0 {
+		n += 1 + sovParams(uint64(m.MetricsTiming))
+	}
+	l = len(m.MetricsVersion)
+	if l > 0 {
+		n += 1 + l + sovParams(uint64(l))
+	}
+	if m.CPUThreshold != 0 {
+		n += 1 + sovParams(uint64(m.CPUThreshold))
+	}
+	if m.MemoryThreshold != 0 {
+		n += 1 + sovParams(uint64(m.MemoryThreshold))
+	}
+	if m.StorageThreshold != 0 {
+		n += 1 + sovParams(uint64(m.StorageThreshold))
+	}
+	if len(m.RequiredPorts) > 0 {
+		l = 0
+		for _, e := range m.RequiredPorts {
+			l += sovParams(uint64(e))
+		}
+		n += 1 + sovParams(uint64(l)) + l
 	}
 	return n
 }
@@ -549,6 +679,179 @@ func (m *Params) Unmarshal(dAtA []byte) error {
 			}
 			m.InactivityPenaltyPeriod = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
+		case 8:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field MetricsTiming", wireType)
+			}
+			m.MetricsTiming = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.MetricsTiming |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 9:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field MetricsVersion", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthParams
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthParams
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.MetricsVersion = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 10:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CPUThreshold", wireType)
+			}
+			m.CPUThreshold = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.CPUThreshold |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 11:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field MemoryThreshold", wireType)
+			}
+			m.MemoryThreshold = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.MemoryThreshold |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 12:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageThreshold", wireType)
+			}
+			m.StorageThreshold = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StorageThreshold |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 13:
+			if wireType == 0 {
+				var v uint32
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowParams
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					v |= uint32(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				m.RequiredPorts = append(m.RequiredPorts, v)
+			} else if wireType == 2 {
+				var packedLen int
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowParams
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					packedLen |= int(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				if packedLen < 0 {
+					return ErrInvalidLengthParams
+				}
+				postIndex := iNdEx + packedLen
+				if postIndex < 0 {
+					return ErrInvalidLengthParams
+				}
+				if postIndex > l {
+					return io.ErrUnexpectedEOF
+				}
+				for iNdEx < postIndex {
+					var v uint32
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowParams
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						v |= uint32(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					m.RequiredPorts = append(m.RequiredPorts, v)
+				}
+			} else {
+				return fmt.Errorf("proto: wrong wireType = %d for field RequiredPorts", wireType)
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipParams(dAtA[iNdEx:])

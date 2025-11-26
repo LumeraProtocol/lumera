@@ -3,6 +3,7 @@ package types
 import (
 	"fmt"
 
+	semver "github.com/Masterminds/semver/v3"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	paramtypes "github.com/cosmos/cosmos-sdk/x/params/types"
 )
@@ -51,6 +52,36 @@ var (
 	DefaultInactivityPenaltyPeriod string = ""
 )
 
+var (
+	KeyMetricsTiming            = []byte("MetricsTiming")
+	DefaultMetricsTiming uint64 = 300
+)
+
+var (
+	KeyMetricsVersion            = []byte("MetricsVersion")
+	DefaultMetricsVersion string = "1.0.0"
+)
+
+var (
+	KeyCPUThreshold            = []byte("CPUThreshold")
+	DefaultCPUThreshold uint64 = 80
+)
+
+var (
+	KeyMemoryThreshold            = []byte("MemoryThreshold")
+	DefaultMemoryThreshold uint64 = 80
+)
+
+var (
+	KeyStorageThreshold            = []byte("StorageThreshold")
+	DefaultStorageThreshold uint64 = 80
+)
+
+var (
+	KeyRequiredPorts     = []byte("RequiredPorts")
+	DefaultRequiredPorts = []uint32{22, 26656, 26657, 9090, 1317}
+)
+
 // ParamKeyTable the param key table for launch module
 func ParamKeyTable() paramtypes.KeyTable {
 	return paramtypes.NewKeyTable().RegisterParamSet(&Params{})
@@ -65,6 +96,12 @@ func NewParams(
 	evidenceRetentionPeriod string,
 	slashingFraction string,
 	inactivityPenaltyPeriod string,
+	metricsTiming uint64,
+	metricsVersion string,
+	cpuThreshold uint64,
+	memoryThreshold uint64,
+	storageThreshold uint64,
+	requiredPorts []uint32,
 ) Params {
 	return Params{
 		MinimumStakeForSn:       minimumStakeForSn,
@@ -74,6 +111,12 @@ func NewParams(
 		EvidenceRetentionPeriod: evidenceRetentionPeriod,
 		SlashingFraction:        slashingFraction,
 		InactivityPenaltyPeriod: inactivityPenaltyPeriod,
+		MetricsTiming:           metricsTiming,
+		MetricsVersion:          metricsVersion,
+		CPUThreshold:            cpuThreshold,
+		MemoryThreshold:         memoryThreshold,
+		StorageThreshold:        storageThreshold,
+		RequiredPorts:           requiredPorts,
 	}
 }
 
@@ -87,6 +130,12 @@ func DefaultParams() Params {
 		DefaultEvidenceRetentionPeriod,
 		DefaultSlashingFraction,
 		DefaultInactivityPenaltyPeriod,
+		DefaultMetricsTiming,
+		DefaultMetricsVersion,
+		DefaultCPUThreshold,
+		DefaultMemoryThreshold,
+		DefaultStorageThreshold,
+		DefaultRequiredPorts,
 	)
 }
 
@@ -100,6 +149,12 @@ func (p *Params) ParamSetPairs() paramtypes.ParamSetPairs {
 		paramtypes.NewParamSetPair(KeyEvidenceRetentionPeriod, &p.EvidenceRetentionPeriod, validateEvidenceRetentionPeriod),
 		paramtypes.NewParamSetPair(KeySlashingFraction, &p.SlashingFraction, validateSlashingFraction),
 		paramtypes.NewParamSetPair(KeyInactivityPenaltyPeriod, &p.InactivityPenaltyPeriod, validateInactivityPenaltyPeriod),
+		paramtypes.NewParamSetPair(KeyMetricsTiming, &p.MetricsTiming, validateMetricsTiming),
+		paramtypes.NewParamSetPair(KeyMetricsVersion, &p.MetricsVersion, validateMetricsVersion),
+		paramtypes.NewParamSetPair(KeyCPUThreshold, &p.CPUThreshold, validateCPUThreshold),
+		paramtypes.NewParamSetPair(KeyMemoryThreshold, &p.MemoryThreshold, validateMemoryThreshold),
+		paramtypes.NewParamSetPair(KeyStorageThreshold, &p.StorageThreshold, validateStorageThreshold),
+		paramtypes.NewParamSetPair(KeyRequiredPorts, &p.RequiredPorts, validateRequiredPorts),
 	}
 }
 
@@ -133,6 +188,30 @@ func (p Params) Validate() error {
 		return err
 	}
 
+	if err := validateMetricsTiming(p.MetricsTiming); err != nil {
+		return err
+	}
+
+	if err := validateMetricsVersion(p.MetricsVersion); err != nil {
+		return err
+	}
+
+	if err := validateCPUThreshold(p.CPUThreshold); err != nil {
+		return err
+	}
+
+	if err := validateMemoryThreshold(p.MemoryThreshold); err != nil {
+		return err
+	}
+
+	if err := validateStorageThreshold(p.StorageThreshold); err != nil {
+		return err
+	}
+
+	if err := validateRequiredPorts(p.RequiredPorts); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -153,8 +232,9 @@ func validateReportingThreshold(v interface{}) error {
 		return fmt.Errorf("invalid parameter type: %T", v)
 	}
 
-	// TODO implement validation
-	_ = reportingThreshold
+	if reportingThreshold == 0 {
+		return fmt.Errorf("reporting threshold must be positive")
+	}
 
 	return nil
 }
@@ -166,8 +246,9 @@ func validateSlashingThreshold(v interface{}) error {
 		return fmt.Errorf("invalid parameter type: %T", v)
 	}
 
-	// TODO implement validation
-	_ = slashingThreshold
+	if slashingThreshold == 0 {
+		return fmt.Errorf("slashing threshold must be positive")
+	}
 
 	return nil
 }
@@ -179,8 +260,9 @@ func validateMetricsThresholds(v interface{}) error {
 		return fmt.Errorf("invalid parameter type: %T", v)
 	}
 
-	// TODO implement validation
-	_ = metricsThresholds
+	if metricsThresholds == "" {
+		return fmt.Errorf("metrics thresholds cannot be empty")
+	}
 
 	return nil
 }
@@ -192,8 +274,9 @@ func validateEvidenceRetentionPeriod(v interface{}) error {
 		return fmt.Errorf("invalid parameter type: %T", v)
 	}
 
-	// TODO implement validation
-	_ = evidenceRetentionPeriod
+	if evidenceRetentionPeriod == "" {
+		return fmt.Errorf("evidence retention period cannot be empty")
+	}
 
 	return nil
 }
@@ -205,8 +288,9 @@ func validateSlashingFraction(v interface{}) error {
 		return fmt.Errorf("invalid parameter type: %T", v)
 	}
 
-	// TODO implement validation
-	_ = slashingFraction
+	if slashingFraction == "" {
+		return fmt.Errorf("slashing fraction cannot be empty")
+	}
 
 	return nil
 }
@@ -218,8 +302,98 @@ func validateInactivityPenaltyPeriod(v interface{}) error {
 		return fmt.Errorf("invalid parameter type: %T", v)
 	}
 
-	// TODO implement validation
-	_ = inactivityPenaltyPeriod
+	if inactivityPenaltyPeriod == "" {
+		return fmt.Errorf("inactivity penalty period cannot be empty")
+	}
+
+	return nil
+}
+
+func validateMetricsTiming(v interface{}) error {
+	metricsTiming, ok := v.(uint64)
+	if !ok {
+		return fmt.Errorf("invalid parameter type: %T", v)
+	}
+
+	if metricsTiming == 0 {
+		return fmt.Errorf("metrics timing must be positive")
+	}
+
+	return nil
+}
+
+func validateMetricsVersion(v interface{}) error {
+	metricsVersion, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("invalid parameter type: %T", v)
+	}
+
+	if metricsVersion == "" {
+		return fmt.Errorf("metrics version cannot be empty")
+	}
+
+	if _, err := semver.NewVersion(metricsVersion); err != nil {
+		return fmt.Errorf("invalid metrics version: %w", err)
+	}
+
+	return nil
+}
+
+func validateCPUThreshold(v interface{}) error {
+	cpuThreshold, ok := v.(uint64)
+	if !ok {
+		return fmt.Errorf("invalid parameter type: %T", v)
+	}
+
+	if cpuThreshold > 100 {
+		return fmt.Errorf("cpu threshold must be between 0 and 100")
+	}
+
+	return nil
+}
+
+func validateMemoryThreshold(v interface{}) error {
+	memoryThreshold, ok := v.(uint64)
+	if !ok {
+		return fmt.Errorf("invalid parameter type: %T", v)
+	}
+
+	if memoryThreshold > 100 {
+		return fmt.Errorf("memory threshold must be between 0 and 100")
+	}
+
+	return nil
+}
+
+func validateStorageThreshold(v interface{}) error {
+	storageThreshold, ok := v.(uint64)
+	if !ok {
+		return fmt.Errorf("invalid parameter type: %T", v)
+	}
+
+	if storageThreshold > 100 {
+		return fmt.Errorf("storage threshold must be between 0 and 100")
+	}
+
+	return nil
+}
+
+func validateRequiredPorts(v interface{}) error {
+	requiredPorts, ok := v.([]uint32)
+	if !ok {
+		return fmt.Errorf("invalid parameter type: %T", v)
+	}
+
+	seen := make(map[uint32]struct{})
+	for _, port := range requiredPorts {
+		if port == 0 || port > 65535 {
+			return fmt.Errorf("required ports must be within valid TCP/UDP range")
+		}
+		if _, exists := seen[port]; exists {
+			return fmt.Errorf("duplicate port %d in required ports", port)
+		}
+		seen[port] = struct{}{}
+	}
 
 	return nil
 }

@@ -23,4 +23,10 @@ message Params {
   string evidence_retention_period = 5 [(gogoproto.moretags) = "yaml:\"evidence_retention_period\""];
   string slashing_fraction = 6 [(gogoproto.moretags) = "yaml:\"slashing_fraction\""];
   string inactivity_penalty_period = 7 [(gogoproto.moretags) = "yaml:\"inactivity_penalty_period\""];
+  uint64 metrics_timing = 8 [(gogoproto.moretags) = "yaml:\"metrics_timing\""];
+  string metrics_version = 9 [(gogoproto.moretags) = "yaml:\"metrics_version\""];
+  uint64 cpu_threshold = 10 [(gogoproto.moretags) = "yaml:\"cpu_threshold\""];
+  uint64 memory_threshold = 11 [(gogoproto.moretags) = "yaml:\"memory_threshold\""];
+  uint64 storage_threshold = 12 [(gogoproto.moretags) = "yaml:\"storage_threshold\""];
+  repeated uint32 required_ports = 13 [(gogoproto.moretags) = "yaml:\"required_ports\""];
 }

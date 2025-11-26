@@ -47,6 +47,8 @@ func (q queryServer) GetTopSuperNodesForBlock(
 		superNodeStateFilter = types.SuperNodeStateStopped
 	case "SUPERNODE_STATE_PENALIZED", "PENALIZED":
 		superNodeStateFilter = types.SuperNodeStatePenalized
+	case "SUPERNODE_STATE_POSTPONED", "POSTPONED":
+		superNodeStateFilter = types.SuperNodeStatePostponed
 	default:
 		if v, ok := types.SuperNodeState_value[normalized]; ok {
 			superNodeStateFilter = types.SuperNodeState(v)
@@ -90,7 +92,7 @@ func (q queryServer) GetTopSuperNodesForBlock(
 		}
 
 		// 4.2) Determine supernode's state at blockHeight
-		stateAtBlock, ok := DetermineStateAtBlock(sn.States, blockHeight)
+		stateAtBlock, stateHeight, ok := DetermineStateAtBlock(sn.States, blockHeight)
 		if !ok {
 			continue
 		}
@@ -100,9 +102,23 @@ func (q queryServer) GetTopSuperNodesForBlock(
 			continue
 		}
 
+		// 4.3.a) Skip postponed entries entirely
+		if stateAtBlock == types.SuperNodeStatePostponed {
+			continue
+		}
+
 		// 4.4) Must match requested state if specified
 		if superNodeStateFilter != types.SuperNodeStateUnspecified && stateAtBlock != superNodeStateFilter {
 			continue
+		}
+
+		// 4.5) Apply compliance + freshness for disabled listings
+		if stateAtBlock == types.SuperNodeStateDisabled {
+			processedSN, ok := applyComplianceHelper(sn)
+			if !ok || !isStateFresh(processedSN, stateHeight, blockHeight) {
+				continue
+			}
+			sn = processedSN
 		}
 
 		// This node qualifies for distance calc
@@ -174,9 +190,9 @@ func (k Keeper) RankSuperNodesByDistance(
 
 // DetermineStateAtBlock finds the last state record whose height <= blockHeight
 // without mutating the input slice. It runs in O(n).
-func DetermineStateAtBlock(states []*types.SuperNodeStateRecord, blockHeight int64) (types.SuperNodeState, bool) {
+func DetermineStateAtBlock(states []*types.SuperNodeStateRecord, blockHeight int64) (types.SuperNodeState, int64, bool) {
 	if len(states) == 0 {
-		return types.SuperNodeStateUnspecified, false
+		return types.SuperNodeStateUnspecified, 0, false
 	}
 	found := false
 	foundHeight := int64(-1)
@@ -191,7 +207,34 @@ func DetermineStateAtBlock(states []*types.SuperNodeStateRecord, blockHeight int
 			found = true
 		}
 	}
-	return foundState, found
+	return foundState, foundHeight, found
+}
+
+// applyComplianceHelper reuses the SuperNode validation logic to ensure
+// required fields (addresses, ports, etc.) are present before ranking.
+// It returns a potentially updated copy (Validate may set defaults) and
+// a boolean indicating whether the record passed validation.
+func applyComplianceHelper(sn types.SuperNode) (types.SuperNode, bool) {
+	if err := sn.Validate(); err != nil {
+		return types.SuperNode{}, false
+	}
+	return sn, true
+}
+
+// isStateFresh ensures the supernode data is usable for the requested
+// block. A state record must exist at or before the block height, and the
+// latest recorded IP address must also not be from the future relative to
+// the requested height.
+func isStateFresh(sn types.SuperNode, stateHeight int64, blockHeight int64) bool {
+	if stateHeight > blockHeight {
+		return false
+	}
+
+	if len(sn.PrevIpAddresses) == 0 || sn.PrevIpAddresses[0] == nil {
+		return false
+	}
+
+	return sn.PrevIpAddresses[0].Height <= blockHeight
 }
 
 func (k Keeper) calcDistance(blockHash []byte, sn *types.SuperNode) (*big.Int, bool) {

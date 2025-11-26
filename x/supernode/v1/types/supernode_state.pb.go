@@ -31,6 +31,7 @@ const (
 	SuperNodeStateDisabled    SuperNodeState = 2
 	SuperNodeStateStopped     SuperNodeState = 3
 	SuperNodeStatePenalized   SuperNodeState = 4
+	SuperNodeStatePostponed   SuperNodeState = 5
 )
 
 var SuperNodeState_name = map[int32]string{
@@ -39,6 +40,7 @@ var SuperNodeState_name = map[int32]string{
 	2: "SUPERNODE_STATE_DISABLED",
 	3: "SUPERNODE_STATE_STOPPED",
 	4: "SUPERNODE_STATE_PENALIZED",
+	5: "SUPERNODE_STATE_POSTPONED",
 }
 
 var SuperNodeState_value = map[string]int32{
@@ -47,6 +49,7 @@ var SuperNodeState_value = map[string]int32{
 	"SUPERNODE_STATE_DISABLED":    2,
 	"SUPERNODE_STATE_STOPPED":     3,
 	"SUPERNODE_STATE_PENALIZED":   4,
+	"SUPERNODE_STATE_POSTPONED":   5,
 }
 
 func (x SuperNodeState) String() string {

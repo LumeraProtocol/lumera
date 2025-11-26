@@ -113,14 +113,16 @@ func TestDetermineStateAtBlock(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			gotState, gotFound := keeper.DetermineStateAtBlock(tc.states, tc.blockHeight)
+			gotState, gotHeight, gotFound := keeper.DetermineStateAtBlock(tc.states, tc.blockHeight)
 			require.Equal(t, tc.wantFound, gotFound, tc.note)
 
 			// If we didn't find a record, wantState should be Unspecified
 			if !gotFound {
 				require.Equal(t, types.SuperNodeStateUnspecified, gotState)
+				require.Equal(t, int64(0), gotHeight)
 			} else {
 				require.Equal(t, tc.wantState, gotState, tc.note)
+				require.LessOrEqual(t, gotHeight, tc.blockHeight)
 			}
 		})
 	}
@@ -293,6 +295,90 @@ func TestKeeper_GetTopSuperNodesForBlock(t *testing.T) {
 			expectedErr: nil,
 			checkResult: func(t *testing.T, resp *types.QueryGetTopSuperNodesForBlockResponse) {
 				require.Len(t, resp.Supernodes, 1)
+			},
+		},
+		{
+			name: "postponed supernodes are skipped",
+			req: &types.QueryGetTopSuperNodesForBlockRequest{
+				BlockHeight: 100,
+				Limit:       10,
+			},
+			setupState: func() {
+				clearStore()
+				postponed := types.SuperNode{
+					Note:             "1.0",
+					SupernodeAccount: makeSnAddr("postponed"),
+					ValidatorAddress: makeValAddr("postponed"),
+					States: []*types.SuperNodeStateRecord{
+						{State: types.SuperNodeStatePostponed, Height: 50},
+					},
+					PrevIpAddresses: []*types.IPAddressHistory{
+						{
+							Address: "10.0.0.1",
+							Height:  25,
+						},
+					},
+					P2PPort: "26657",
+				}
+				storeSuperNodes([]types.SuperNode{postponed})
+			},
+			expectedErr: nil,
+			checkResult: func(t *testing.T, resp *types.QueryGetTopSuperNodesForBlockResponse) {
+				require.Empty(t, resp.Supernodes)
+			},
+		},
+		{
+			name: "disabled nodes require compliance and freshness",
+			req: &types.QueryGetTopSuperNodesForBlockRequest{
+				BlockHeight: 120,
+				Limit:       10,
+				State:       types.SuperNodeStateDisabled.String(),
+			},
+			setupState: func() {
+				clearStore()
+				compliant := types.SuperNode{
+					Note:             "1.0",
+					SupernodeAccount: makeSnAddr("good"),
+					ValidatorAddress: makeValAddr("good"),
+					States: []*types.SuperNodeStateRecord{
+						{State: types.SuperNodeStateDisabled, Height: 100},
+					},
+					PrevIpAddresses: []*types.IPAddressHistory{
+						{Address: "10.0.0.2", Height: 90},
+					},
+					P2PPort: "26657",
+				}
+
+				noIP := types.SuperNode{
+					Note:             "1.0",
+					SupernodeAccount: makeSnAddr("noip"),
+					ValidatorAddress: makeValAddr("noip"),
+					States: []*types.SuperNodeStateRecord{
+						{State: types.SuperNodeStateDisabled, Height: 100},
+					},
+					PrevIpAddresses: nil,
+					P2PPort:         "26657",
+				}
+
+				futureIP := types.SuperNode{
+					Note:             "1.0",
+					SupernodeAccount: makeSnAddr("future"),
+					ValidatorAddress: makeValAddr("future"),
+					States: []*types.SuperNodeStateRecord{
+						{State: types.SuperNodeStateDisabled, Height: 110},
+					},
+					PrevIpAddresses: []*types.IPAddressHistory{
+						{Address: "10.0.0.3", Height: 200},
+					},
+					P2PPort: "26657",
+				}
+
+				storeSuperNodes([]types.SuperNode{compliant, noIP, futureIP})
+			},
+			expectedErr: nil,
+			checkResult: func(t *testing.T, resp *types.QueryGetTopSuperNodesForBlockResponse) {
+				require.Len(t, resp.Supernodes, 1)
+				require.Equal(t, makeSnAddr("good"), resp.Supernodes[0].SupernodeAccount)
 			},
 		},
 	}

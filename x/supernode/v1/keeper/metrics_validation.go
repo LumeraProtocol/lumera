@@ -3,6 +3,7 @@ package keeper
 import (
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -32,7 +33,14 @@ var canonicalMetricKeys = map[string]struct{}{
 
 func validateMetricKeys(metrics map[string]float64) []string {
 	issues := make([]string, 0)
-	for key, value := range metrics {
+	keys := make([]string, 0, len(metrics))
+	for key := range metrics {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		value := metrics[key]
 		if _, ok := canonicalMetricKeys[key]; !ok {
 			if !strings.HasPrefix(key, "port.") || !strings.HasSuffix(key, "_open") {
 				issues = append(issues, fmt.Sprintf("unknown metric key: %s", key))

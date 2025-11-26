@@ -16,7 +16,7 @@ func (k msgServer) UpdateParams(goCtx context.Context, req *types.MsgUpdateParam
 
 	ctx := sdk.UnwrapSDKContext(goCtx)
 	current := k.GetParams(ctx)
-	merged := mergeParams(current, req.Params)
+	merged := mergeParams(current, req.Params).WithDefaults()
 
 	if err := merged.Validate(); err != nil {
 		return nil, err

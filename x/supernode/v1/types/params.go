@@ -81,6 +81,49 @@ const (
 
 var DefaultRequiredOpenPorts = []uint32{4444, 4445, 8002}
 
+// WithDefaults returns a copy of the params with any zero-value LEP-4 fields
+// populated from the module defaults. This is used to keep older genesis files
+// and proposals (that omit the new metrics fields) backwards compatible.
+func (p Params) WithDefaults() Params {
+	out := p
+
+	if out.MetricsUpdateInterval == 0 {
+		out.MetricsUpdateInterval = DefaultMetricsUpdateInterval
+	}
+	if out.MetricsGracePeriodBlocks == 0 {
+		out.MetricsGracePeriodBlocks = DefaultMetricsGracePeriodBlocks
+	}
+	if out.MetricsFreshnessMaxBlocks == 0 {
+		out.MetricsFreshnessMaxBlocks = DefaultMetricsFreshnessMaxBlocks
+	}
+	if out.MinSupernodeVersion == "" {
+		out.MinSupernodeVersion = DefaultMinSupernodeVersion
+	}
+	if out.MinCpuCores == 0 {
+		out.MinCpuCores = DefaultMinCPUCores
+	}
+	if out.MaxCpuUsagePercent == 0 {
+		out.MaxCpuUsagePercent = DefaultMaxCPUUsagePercent
+	}
+	if out.MinMemGb == 0 {
+		out.MinMemGb = DefaultMinMemGB
+	}
+	if out.MaxMemUsagePercent == 0 {
+		out.MaxMemUsagePercent = DefaultMaxMemUsagePercent
+	}
+	if out.MinStorageGb == 0 {
+		out.MinStorageGb = DefaultMinStorageGB
+	}
+	if out.MaxStorageUsagePercent == 0 {
+		out.MaxStorageUsagePercent = DefaultMaxStorageUsagePercent
+	}
+	if out.RequiredOpenPorts == nil {
+		out.RequiredOpenPorts = append([]uint32(nil), DefaultRequiredOpenPorts...)
+	}
+
+	return out
+}
+
 // ParamKeyTable the param key table for launch module
 func ParamKeyTable() paramtypes.KeyTable {
 	return paramtypes.NewKeyTable().RegisterParamSet(&Params{})

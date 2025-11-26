@@ -71,6 +71,8 @@ func (AppModuleBasic) ValidateGenesis(cdc codec.JSONCodec, config client.TxEncod
 	if err := cdc.UnmarshalJSON(bz, &genState); err != nil {
 		return fmt.Errorf("failed to unmarshal %s genesis state: %w", types.ModuleName, err)
 	}
+
+	genState.Params = genState.Params.WithDefaults()
 	return genState.Validate()
 }
 
@@ -123,6 +125,7 @@ func (am AppModule) InitGenesis(ctx sdk.Context, cdc codec.JSONCodec, gs json.Ra
 	// Initialize global index to index in genesis state
 	cdc.MustUnmarshalJSON(gs, &genState)
 
+	genState.Params = genState.Params.WithDefaults()
 	InitGenesis(ctx, am.keeper, genState)
 }
 

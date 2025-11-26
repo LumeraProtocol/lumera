@@ -23,4 +23,10 @@ message Params {
   string evidence_retention_period = 5 [(gogoproto.moretags) = "yaml:\"evidence_retention_period\""];
   string slashing_fraction = 6 [(gogoproto.moretags) = "yaml:\"slashing_fraction\""];
   string inactivity_penalty_period = 7 [(gogoproto.moretags) = "yaml:\"inactivity_penalty_period\""];
+  string reporting_interval = 8 [(gogoproto.moretags) = "yaml:\"reporting_interval\""];
+  string reporting_grace_period = 9 [(gogoproto.moretags) = "yaml:\"reporting_grace_period\""];
+  string metrics_freshness = 10 [(gogoproto.moretags) = "yaml:\"metrics_freshness\""];
+  string minimum_supported_version = 11 [(gogoproto.moretags) = "yaml:\"minimum_supported_version\""];
+  string resource_thresholds = 12 [(gogoproto.moretags) = "yaml:\"resource_thresholds\""];
+  repeated string required_open_ports = 13 [(gogoproto.moretags) = "yaml:\"required_open_ports\""];
 }

@@ -31,12 +31,12 @@ func (k Keeper) HandleMetricsStaleness(ctx sdk.Context) error {
 		}
 		if lastHeight == 0 {
 			if ctx.BlockHeight() > overdueThreshold {
-				_ = k.markPostponed(ctx, &sn, "no metrics reported")
+				_ = markPostponed(ctx, k, &sn, "no metrics reported")
 			}
 			continue
 		}
 		if ctx.BlockHeight()-lastHeight > overdueThreshold {
-			_ = k.markPostponed(ctx, &sn, "metrics overdue")
+			_ = markPostponed(ctx, k, &sn, "metrics overdue")
 		}
 	}
 

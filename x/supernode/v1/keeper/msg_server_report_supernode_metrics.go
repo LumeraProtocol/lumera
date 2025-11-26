@@ -31,8 +31,8 @@ func (m msgServer) ReportSupernodeMetrics(goCtx context.Context, msg *types.MsgR
 	}
 
 	params := m.GetParams(ctx)
-	issues := m.validateMetricKeys(msg.Metrics)
-	issues = append(issues, m.evaluateCompliance(ctx, params, sn, msg.Metrics)...)
+	issues := validateMetricKeys(msg.Metrics)
+	issues = append(issues, evaluateCompliance(ctx, params, sn, msg.Metrics)...)
 	compliant := len(issues) == 0
 
 	if sn.Metrics == nil {
@@ -48,13 +48,13 @@ func (m msgServer) ReportSupernodeMetrics(goCtx context.Context, msg *types.MsgR
 		if compliant {
 			if lastState == types.SuperNodeStatePostponed {
 				target := lastNonPostponedState(sn.States)
-				if err := m.recoverFromPostponed(ctx, &sn, target); err != nil {
+				if err := recoverFromPostponed(ctx, m.SupernodeKeeper, &sn, target); err != nil {
 					return nil, err
 				}
 			}
 		} else {
 			if lastState != types.SuperNodeStatePostponed {
-				if err := m.markPostponed(ctx, &sn, strings.Join(issues, ";")); err != nil {
+				if err := markPostponed(ctx, m.SupernodeKeeper, &sn, strings.Join(issues, ";")); err != nil {
 					return nil, err
 				}
 			}

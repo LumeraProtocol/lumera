@@ -1,7 +1,7 @@
 package keeper
 
 import (
-	"strings"
+	"strconv"
 
 	errorsmod "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -10,7 +10,7 @@ import (
 	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
-func (k Keeper) markPostponed(ctx sdk.Context, sn *types.SuperNode, reason string) error {
+func markPostponed(ctx sdk.Context, keeper types.SupernodeKeeper, sn *types.SuperNode, reason string) error {
 	if len(sn.States) == 0 {
 		return errorsmod.Wrap(sdkerrors.ErrInvalidRequest, "supernode state missing")
 	}
@@ -19,7 +19,7 @@ func (k Keeper) markPostponed(ctx sdk.Context, sn *types.SuperNode, reason strin
 		return nil
 	}
 	sn.States = append(sn.States, &types.SuperNodeStateRecord{State: types.SuperNodeStatePostponed, Height: ctx.BlockHeight()})
-	if err := k.SetSuperNode(ctx, *sn); err != nil {
+	if err := keeper.SetSuperNode(ctx, *sn); err != nil {
 		return err
 	}
 	ctx.EventManager().EmitEvent(
@@ -34,12 +34,12 @@ func (k Keeper) markPostponed(ctx sdk.Context, sn *types.SuperNode, reason strin
 	return nil
 }
 
-func (k Keeper) recoverFromPostponed(ctx sdk.Context, sn *types.SuperNode, target types.SuperNodeState) error {
+func recoverFromPostponed(ctx sdk.Context, keeper types.SupernodeKeeper, sn *types.SuperNode, target types.SuperNodeState) error {
 	if target == types.SuperNodeStateUnspecified {
 		target = types.SuperNodeStateActive
 	}
 	sn.States = append(sn.States, &types.SuperNodeStateRecord{State: target, Height: ctx.BlockHeight()})
-	if err := k.SetSuperNode(ctx, *sn); err != nil {
+	if err := keeper.SetSuperNode(ctx, *sn); err != nil {
 		return err
 	}
 	ctx.EventManager().EmitEvent(
@@ -54,5 +54,5 @@ func (k Keeper) recoverFromPostponed(ctx sdk.Context, sn *types.SuperNode, targe
 }
 
 func stringHeight(height int64) string {
-	return strings.TrimSpace(sdk.NewInt(height).String())
+	return strconv.FormatInt(height, 10)
 }

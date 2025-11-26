@@ -30,7 +30,7 @@ var canonicalMetricKeys = map[string]struct{}{
 	"port.8002_open":     {},
 }
 
-func (k Keeper) validateMetricKeys(metrics map[string]float64) []string {
+func validateMetricKeys(metrics map[string]float64) []string {
 	issues := make([]string, 0)
 	for key, value := range metrics {
 		if _, ok := canonicalMetricKeys[key]; !ok {
@@ -67,8 +67,8 @@ func buildVersion(metrics map[string]float64) (*semver.Version, error) {
 	return semver.NewVersion(versionStr)
 }
 
-func (k Keeper) evaluateCompliance(ctx sdk.Context, params types.Params, sn types.SuperNode, metrics map[string]float64) []string {
-	issues := k.validateMetricKeys(metrics)
+func evaluateCompliance(ctx sdk.Context, params types.Params, sn types.SuperNode, metrics map[string]float64) []string {
+	issues := validateMetricKeys(metrics)
 
 	// Version check
 	if minVersion, err := semver.NewVersion(params.MinSupernodeVersion); err == nil {

@@ -47,6 +47,8 @@ func (q queryServer) GetTopSuperNodesForBlock(
 		superNodeStateFilter = types.SuperNodeStateStopped
 	case "SUPERNODE_STATE_PENALIZED", "PENALIZED":
 		superNodeStateFilter = types.SuperNodeStatePenalized
+	case "SUPERNODE_STATE_POSTPONED", "POSTPONED":
+		superNodeStateFilter = types.SuperNodeStatePostponed
 	default:
 		if v, ok := types.SuperNodeState_value[normalized]; ok {
 			superNodeStateFilter = types.SuperNodeState(v)
@@ -95,8 +97,11 @@ func (q queryServer) GetTopSuperNodesForBlock(
 			continue
 		}
 
-		// 4.3) State must not be Unspecified
+		// 4.3) State must not be Unspecified or POSTPONED unless explicitly requested
 		if stateAtBlock == types.SuperNodeStateUnspecified {
+			continue
+		}
+		if superNodeStateFilter == types.SuperNodeStateUnspecified && stateAtBlock == types.SuperNodeStatePostponed {
 			continue
 		}
 

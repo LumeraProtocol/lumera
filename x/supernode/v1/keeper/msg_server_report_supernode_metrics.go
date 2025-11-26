@@ -31,8 +31,7 @@ func (m msgServer) ReportSupernodeMetrics(goCtx context.Context, msg *types.MsgR
 	}
 
 	params := m.GetParams(ctx)
-	issues := validateMetricKeys(msg.Metrics)
-	issues = append(issues, evaluateCompliance(ctx, params, sn, msg.Metrics)...)
+	issues := evaluateCompliance(ctx, params, sn, msg.Metrics)
 	compliant := len(issues) == 0
 
 	if sn.Metrics == nil {

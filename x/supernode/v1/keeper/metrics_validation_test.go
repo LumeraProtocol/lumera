@@ -3,6 +3,7 @@ package keeper
 import (
 	"fmt"
 	"math"
+	"strings"
 	"testing"
 
 	"cosmossdk.io/log"
@@ -58,8 +59,8 @@ func TestEvaluateCompliancePassesWithValidMetrics(t *testing.T) {
 }
 
 func TestEvaluateComplianceDetectsStaleMetrics(t *testing.T) {
-	ctx := sdk.NewContext(nil, tmproto.Header{Height: 10}, false, log.NewNopLogger())
 	params := types.DefaultParams()
+	ctx := sdk.NewContext(nil, tmproto.Header{Height: int64(params.MetricsFreshnessMaxBlocks) + 10}, false, log.NewNopLogger())
 
 	metrics := map[string]float64{
 		"version.major":      2,
@@ -113,9 +114,18 @@ func TestEvaluateComplianceRequiresOpenPorts(t *testing.T) {
 	sn := types.SuperNode{Metrics: &types.MetricsAggregate{Height: ctx.BlockHeight()}}
 	issues := evaluateCompliance(ctx, params, sn, metrics)
 
-	require.Contains(t, issues, "required port")
+	require.True(t, containsSubstring(issues, "required port"))
 }
 
 func portKey(port uint32) string {
 	return fmt.Sprintf("port.%d_open", port)
+}
+
+func containsSubstring(items []string, substr string) bool {
+	for _, item := range items {
+		if strings.Contains(item, substr) {
+			return true
+		}
+	}
+	return false
 }

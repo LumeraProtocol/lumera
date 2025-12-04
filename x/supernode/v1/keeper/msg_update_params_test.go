@@ -60,6 +60,10 @@ func TestMsgUpdateParams(t *testing.T) {
 				require.Contains(t, err.Error(), tc.expErrMsg)
 			} else {
 				require.NoError(t, err)
+				stored := k.GetParams(wctx)
+				// Ensure non-zero defaults are preserved when omitted in the message.
+				require.Equal(t, types.DefaultMetricsUpdateInterval, stored.MetricsUpdateInterval)
+				require.Equal(t, types.DefaultMetricsGracePeriodBlocks, stored.MetricsGracePeriodBlocks)
 			}
 		})
 	}

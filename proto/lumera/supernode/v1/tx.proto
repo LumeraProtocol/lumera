@@ -21,6 +21,7 @@ service Msg {
   rpc StartSupernode      (MsgStartSupernode     ) returns (MsgStartSupernodeResponse     );
   rpc StopSupernode       (MsgStopSupernode      ) returns (MsgStopSupernodeResponse      );
   rpc UpdateSupernode     (MsgUpdateSupernode    ) returns (MsgUpdateSupernodeResponse    );
+  rpc ReportSupernodeMetrics(MsgReportSupernodeMetrics) returns (MsgReportSupernodeMetricsResponse);
 }
 // MsgUpdateParams is the Msg/UpdateParams request type.
 message MsgUpdateParams {
@@ -87,4 +88,17 @@ message MsgUpdateSupernode {
 }
 
 message MsgUpdateSupernodeResponse {}
+
+message MsgReportSupernodeMetrics {
+  option (cosmos.msg.v1.signer) = "validator_address";
+
+  string validator_address = 1 [(cosmos_proto.scalar) = "cosmos.ValidatorAddressString"];
+  string supernode_account = 2 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  map<string, double> metrics = 3;
+}
+
+message MsgReportSupernodeMetricsResponse {
+  bool compliant = 1;
+  repeated string issues = 2;
+}
 

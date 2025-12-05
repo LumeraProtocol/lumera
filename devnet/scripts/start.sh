@@ -31,6 +31,7 @@ CFG_DIR="${SHARED_DIR}/config"
 CFG_CHAIN="${CFG_DIR}/config.json"
 CFG_VALS="${CFG_DIR}/validators.json"
 RELEASE_DIR="${SHARED_DIR}/release"
+NM_UI_DIR="${RELEASE_DIR}/nm-ui"
 STATUS_DIR="${SHARED_DIR}/status"
 SETUP_COMPLETE="${STATUS_DIR}/setup_complete"
 SN="supernode-linux-amd64"
@@ -51,6 +52,7 @@ SUPERNODE_LOG="${LOGS_DIR}/supernode.log"
 VALIDATOR_SETUP_OUT="${LOGS_DIR}/validator-setup.out"
 SUPERNODE_SETUP_OUT="${LOGS_DIR}/supernode-setup.out"
 NETWORK_MAKER_SETUP_OUT="${LOGS_DIR}/network-maker-setup.out"
+NM_UI_PORT="${NM_UI_PORT:-8088}"
 
 LUMERA_RPC_PORT="${LUMERA_RPC_PORT:-26657}"
 LUMERA_GRPC_PORT="${LUMERA_GRPC_PORT:-9090}"
@@ -93,6 +95,33 @@ PRIMARY_STARTED_FLAG="${STATUS_DIR}/${PRIMARY_MONIKER}/lumerad_started"
 wait_for_flag() {
   local f="$1"
   until [ -s "${f}" ]; do sleep 1; done
+}
+
+start_nm_ui_if_present() {
+  if [ ! -d "${NM_UI_DIR}" ] || [ ! -f "${NM_UI_DIR}/index.html" ]; then
+    echo "[BOOT] network-maker UI not found at ${NM_UI_DIR}; skipping nginx"
+    return
+  fi
+
+  cat >/etc/nginx/conf.d/network-maker-ui.conf <<EOF
+server {
+    listen ${NM_UI_PORT};
+    server_name _;
+    root ${NM_UI_DIR};
+    index index.html;
+    location / {
+        try_files \$uri \$uri/ /index.html;
+    }
+}
+EOF
+
+  if pgrep -x nginx >/dev/null 2>&1; then
+    echo "[BOOT] nginx already running; skipping start for network-maker UI."
+    return
+  fi
+
+  echo "[BOOT] Starting nginx to serve network-maker UI on port ${NM_UI_PORT}"
+  nginx
 }
 
 run() {
@@ -242,6 +271,7 @@ case "${START_MODE}" in
     launch_validator_setup
     wait_for_validator_setup
     start_lumera
+    start_nm_ui_if_present
     tail_logs
     ;;
 
@@ -257,6 +287,7 @@ case "${START_MODE}" in
     wait_for_validator_setup
     wait_for_n_blocks 3 || { echo "[SN] Lumera chain not producing blocks in time; exiting."; exit 1; }
     start_lumera
+    start_nm_ui_if_present
     tail_logs
     ;;
 

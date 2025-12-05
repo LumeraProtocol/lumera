@@ -97,11 +97,34 @@ wait_for_flag() {
   until [ -s "${f}" ]; do sleep 1; done
 }
 
+inject_nm_ui_env() {
+  local api_base="${VITE_API_BASE:-}"
+  [ -z "${api_base}" ] && return 0
+  [ -d "${NM_UI_DIR}" ] || return 0
+
+  local files
+  files="$(grep -rl "http://127.0.0.1:8080" "${NM_UI_DIR}" || true)"
+  if [ -z "${files}" ]; then
+    echo "[BOOT] network-maker UI: no API base placeholder found to inject."
+    return 0
+  fi
+
+  local escaped_base="${api_base//\//\\/}"
+  escaped_base="${escaped_base//&/\\&}"
+  echo "[BOOT] network-maker UI: injecting API base ${api_base}"
+  # Replace default API base baked into the static bundle with runtime value
+  while IFS= read -r f; do
+    sed -i "s|http://127.0.0.1:8080|${escaped_base}|g" "$f"
+  done <<<"${files}"
+}
+
 start_nm_ui_if_present() {
   if [ ! -d "${NM_UI_DIR}" ] || [ ! -f "${NM_UI_DIR}/index.html" ]; then
     echo "[BOOT] network-maker UI not found at ${NM_UI_DIR}; skipping nginx"
     return
   fi
+
+  inject_nm_ui_env
 
   cat >/etc/nginx/conf.d/network-maker-ui.conf <<EOF
 server {
@@ -264,8 +287,7 @@ tail_logs() {
     exec tail -F "${VALIDATOR_LOG}" "${SUPERNODE_LOG}" "${SUPERNODE_SETUP_OUT}" "${VALIDATOR_SETUP_OUT}" "${NETWORK_MAKER_SETUP_OUT}"
 }
 
-case "${START_MODE}" in
-  auto|*)
+run_auto_flow() {
     launch_network_maker_setup
     launch_supernode_setup
     launch_validator_setup
@@ -273,6 +295,11 @@ case "${START_MODE}" in
     start_lumera
     start_nm_ui_if_present
     tail_logs
+}
+
+case "${START_MODE}" in
+  auto|"")
+    run_auto_flow
     ;;
 
   bootstrap)
@@ -294,5 +321,10 @@ case "${START_MODE}" in
   wait)
     wait_for_validator_setup
     exit 0
+    ;;
+
+  *)
+    echo "[BOOT] Unknown START_MODE='${START_MODE}', defaulting to auto."
+    run_auto_flow
     ;;
 esac

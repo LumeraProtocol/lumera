@@ -6,6 +6,7 @@
 GO ?= go
 IGNITE ?= ignite
 BUF ?= buf
+GOLANGCI_LINT ?= golangci-lint
 BUILD_DIR ?= build
 RELEASE_DIR ?= release
 
@@ -114,9 +115,13 @@ release:
 ###################################################
 ###              Tests and Simulation           ###
 ###################################################
-.PHONY: unit-tests integration-tests system-tests simulation-tests all-tests
+.PHONY: unit-tests integration-tests system-tests simulation-tests all-tests lint
 
 all-tests: unit-tests integration-tests system-tests simulation-tests
+
+lint:
+	@echo "Running linters..."
+	@${GOLANGCI_LINT} run ./... --timeout=5m
 
 unit-tests:
 	@echo "Running unit tests in x/..."
@@ -138,4 +143,3 @@ simulation-tests:
 systemex-tests:
 	@echo "Running system tests..."
 	cd ./tests/systemtests/ && go test -tags=system_test -v .
-

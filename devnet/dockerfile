@@ -22,7 +22,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     iputils-ping \
     lnav \
     mc \
+    nginx-light \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js (for network-maker UI tooling) using NodeSource 25.x
+RUN curl -fsSL https://deb.nodesource.com/setup_25.x | bash - && \
+    apt-get update && apt-get install -y --no-install-recommends nodejs && \
+    rm -rf /var/lib/apt/lists/*
 
 # Update libraries cache & create directories
 RUN ldconfig && mkdir -p ${SCRIPTS_DEST_DIR} /root/.lumerad
@@ -30,13 +36,15 @@ RUN ldconfig && mkdir -p ${SCRIPTS_DEST_DIR} /root/.lumerad
 # Copy scripts with correct paths
 COPY --chmod=0755 \
     ${SCRIPTS_SRC_DIR}/start.sh \
+    ${SCRIPTS_SRC_DIR}/stop.sh \
+    ${SCRIPTS_SRC_DIR}/restart.sh \
     ${SCRIPTS_SRC_DIR}/validator-setup.sh \
     ${SCRIPTS_SRC_DIR}/supernode-setup.sh \
     ${SCRIPTS_SRC_DIR}/network-maker-setup.sh \
     ${SCRIPTS_DEST_DIR}/
 
 # Expose necessary ports
-EXPOSE 26656 26657 1317 9090 4444 8002
+EXPOSE 26656 26657 1317 9090 4444 8002 50051 8080 8088
 
 # Set working directory
 WORKDIR /root

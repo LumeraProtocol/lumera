@@ -94,6 +94,8 @@ NM="network-maker"
 NM_CFG="${BIN_DIR}/nm-config.toml"
 SNCLI="sncli"
 SNCLI_CFG="${BIN_DIR}/sncli-config.toml"
+NM_UI_SRC="${BIN_DIR}/nm-ui"
+NM_UI_DST="${RELEASE_DIR}/nm-ui"
 
 install_supernode() {
   if [ -n "${BIN_DIR}" ] && [ -f "${BIN_DIR}/${SN}" ]; then
@@ -113,6 +115,14 @@ install_nm() {
     echo "[CONFIGURE] Copying network-maker file from ${BIN_DIR} to ${RELEASE_DIR}"
     cp -f "${BIN_DIR}/${NM}" "${NM_CFG}" "${RELEASE_DIR}/"
     chmod 755 "${RELEASE_DIR}/${NM}"
+
+    if [ -d "${NM_UI_SRC}" ]; then
+      echo "[CONFIGURE] Copying network-maker UI from ${NM_UI_SRC} to ${NM_UI_DST}"
+      rm -rf "${NM_UI_DST}"
+      cp -r "${NM_UI_SRC}" "${NM_UI_DST}"
+    else
+      echo "[CONFIGURE] network-maker UI not found at ${NM_UI_SRC}; skipping UI copy"
+    fi
   fi
 }
 

@@ -9,6 +9,13 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+const (
+	defaultNetworkDriver  = "bridge"
+	defaultNetworkSubnet  = "172.28.0.0/24"
+	defaultNetworkPrefix  = "172.28.0."
+	defaultServiceIPStart = 10
+)
+
 type DockerComposeLogging struct {
 	Driver  string            `yaml:"driver"`
 	Options map[string]string `yaml:"options,omitempty"`
@@ -20,21 +27,36 @@ type DockerComposeConfig struct {
 }
 
 type DockerComposeService struct {
-	Build         string                `yaml:"build"`
-	Image         string                `yaml:"image,omitempty"`
-	ContainerName string                `yaml:"container_name"`
-	Ports         []string              `yaml:"ports"`
-	Volumes       []string              `yaml:"volumes"`
-	Environment   map[string]string     `yaml:"environment,omitempty"`
-	Command       string                `yaml:"command,omitempty"`
-	DependsOn     []string              `yaml:"depends_on,omitempty"`
-	CapAdd        []string              `yaml:"cap_add,omitempty"`
-	SecurityOpt   []string              `yaml:"security_opt,omitempty"`
-	Logging       *DockerComposeLogging `yaml:"logging,omitempty"`
+	Build         string                                 `yaml:"build"`
+	Image         string                                 `yaml:"image,omitempty"`
+	ContainerName string                                 `yaml:"container_name"`
+	Ports         []string                               `yaml:"ports"`
+	Volumes       []string                               `yaml:"volumes"`
+	Environment   map[string]string                      `yaml:"environment,omitempty"`
+	Command       string                                 `yaml:"command,omitempty"`
+	DependsOn     []string                               `yaml:"depends_on,omitempty"`
+	Networks      map[string]DockerComposeServiceNetwork `yaml:"networks,omitempty"`
+	CapAdd        []string                               `yaml:"cap_add,omitempty"`
+	SecurityOpt   []string                               `yaml:"security_opt,omitempty"`
+	Logging       *DockerComposeLogging                  `yaml:"logging,omitempty"`
 }
 
 type DockerComposeNetwork struct {
-	Name string `yaml:"name"`
+	Name   string             `yaml:"name"`
+	Driver string             `yaml:"driver,omitempty"`
+	IPAM   *DockerComposeIPAM `yaml:"ipam,omitempty"`
+}
+
+type DockerComposeIPAM struct {
+	Config []DockerComposeIPAMConfig `yaml:"config,omitempty"`
+}
+
+type DockerComposeIPAMConfig struct {
+	Subnet string `yaml:"subnet,omitempty"`
+}
+
+type DockerComposeServiceNetwork struct {
+	IPv4Address string `yaml:"ipv4_address,omitempty"`
 }
 
 func supernodeBinaryHostPath() (string, bool) {
@@ -55,7 +77,15 @@ func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validat
 		Services: make(map[string]DockerComposeService),
 		Networks: map[string]DockerComposeNetwork{
 			"default": {
-				Name: config.Docker.NetworkName,
+				Name:   config.Docker.NetworkName,
+				Driver: defaultNetworkDriver,
+				IPAM: &DockerComposeIPAM{
+					Config: []DockerComposeIPAMConfig{
+						{
+							Subnet: defaultNetworkSubnet,
+						},
+					},
+				},
 			},
 		},
 	}
@@ -63,6 +93,7 @@ func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validat
 	_, snPresent := supernodeBinaryHostPath()
 
 	folderMount := fmt.Sprintf("/tmp/%s", config.Chain.ID)
+	validatorBaseIP := defaultServiceIPStart + 1
 
 	for index, validator := range validators {
 		serviceName := fmt.Sprintf("%s-%s", config.Docker.ContainerPrefix, validator.Name)
@@ -95,6 +126,11 @@ func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validat
 			CapAdd: []string{
 				"SYS_PTRACE",
 			},
+			Networks: map[string]DockerComposeServiceNetwork{
+				"default": {
+					IPv4Address: fmt.Sprintf("%s%d", defaultNetworkPrefix, validatorBaseIP+index),
+				},
+			},
 			SecurityOpt: []string{
 				"seccomp=unconfined",
 			},
@@ -125,6 +161,29 @@ func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validat
 			service.DependsOn = []string{validators[0].Name}
 		}
 
+		if validator.NetworkMaker.Enabled {
+			nmGrpc := validator.NetworkMaker.GRPCPort
+			if nmGrpc == 0 {
+				nmGrpc = DefaultNetworkMakerGRPCPort
+			}
+			nmHTTP := validator.NetworkMaker.HTTPPort
+			if nmHTTP == 0 {
+				nmHTTP = DefaultNetworkMakerHTTPPort
+			}
+			service.Ports = append(service.Ports,
+				fmt.Sprintf("%d:%d", nmGrpc, DefaultNetworkMakerGRPCPort),
+				fmt.Sprintf("%d:%d", nmHTTP, DefaultNetworkMakerHTTPPort),
+				fmt.Sprintf("%d:%d", DefaultNetworkMakerUIPort, DefaultNetworkMakerUIPort),
+			)
+
+			if config.NetworkMaker.GRPCPort > 0 {
+				env[EnvNMAPIBase] = fmt.Sprintf("http://localhost:%d", nmHTTP)
+			}
+			if config.NetworkMaker.AccountBalance != "" {
+				// reserve env slot for key if provided in config (optional)
+			}
+		}
+
 		compose.Services[validator.Name] = service
 	}
 
@@ -143,6 +202,11 @@ func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validat
 				fmt.Sprintf("%s/hermes-simd-data:%s", folderMount, HermesSimdHome),
 				fmt.Sprintf("%s/hermes-router:%s", folderMount, HermesStateHome),
 				fmt.Sprintf("%s/shared:/shared", folderMount),
+			},
+			Networks: map[string]DockerComposeServiceNetwork{
+				"default": {
+					IPv4Address: fmt.Sprintf("%s%d", defaultNetworkPrefix, defaultServiceIPStart),
+				},
 			},
 			Environment: map[string]string{
 				"HERMES_CONFIG": "/root/.hermes/config.toml",

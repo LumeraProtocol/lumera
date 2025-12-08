@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
+	"github.com/LumeraProtocol/lumera/testutil/sample"
 	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -15,8 +16,8 @@ import (
 )
 
 func TestKeeper_ListActionsByCreator(t *testing.T) {
-	creator := "lumera1creatoraddress00000000000000000000000"
-	otherCreator := "lumera1othercreator000000000000000000000"
+	creator := sample.AccAddress()
+	otherCreator := sample.AccAddress()
 	price := sdk.NewInt64Coin("ulume", 100)
 
 	action1 := types.Action{
@@ -153,4 +154,3 @@ func TestKeeper_ListActionsByCreator(t *testing.T) {
 		})
 	}
 }
-

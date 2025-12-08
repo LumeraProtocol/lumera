@@ -12,6 +12,7 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 		Query: &autocliv1.ServiceCommandDescriptor{
 			Service: types.Query_serviceDesc.ServiceName,
 			RpcCommandOptions: []*autocliv1.RpcCommandOptions{
+				// simple, non-paginated queries
 				{
 					RpcMethod: "Params",
 					Use:       "params",
@@ -29,11 +30,57 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					Short:          "Query get-action-fee",
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "dataSize"}},
 				},
+				// paginated list queries
+				{
+					RpcMethod: "ListActions",
+					Use:       "list-actions",
+					Short:     "List actions with optional type and state filters",
+					FlagOptions: map[string]*autocliv1.FlagOptions{
+						"actionType": {
+							Name:  "action-type",
+							Usage: "Optional action type filter (ACTION_TYPE_SENSE, ACTION_TYPE_CASCADE, ...)",
+						},
+						"actionState": {
+							Name:  "action-state",
+							Usage: "Optional action state filter (ACTION_STATE_PENDING, ACTION_STATE_DONE, ...)",
+						},
+					},
+				},
 				{
 					RpcMethod:      "ListActionsByCreator",
 					Use:            "list-actions-by-creator [creator]",
 					Short:          "List actions created by a specific address",
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "creator"}},
+				},
+				{
+					RpcMethod: "ListActionsBySuperNode",
+					Use:       "list-actions-by-supernode [supernode-address]",
+					Short:     "List actions for a specific supernode",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{
+						{ProtoField: "superNodeAddress"},
+					},
+				},
+				{
+					RpcMethod: "ListActionsByBlockHeight",
+					Use:       "list-actions-by-block-height [block-height]",
+					Short:     "List actions created at a specific block height",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{
+						{ProtoField: "blockHeight"},
+					},
+				},
+				{
+					RpcMethod: "ListExpiredActions",
+					Use:       "list-expired-actions",
+					Short:     "List actions that are in EXPIRED state",
+				},
+				{
+					RpcMethod: "QueryActionByMetadata",
+					Use:       "query-action-by-metadata [action-type] [metadata-query]",
+					Short:     "Query actions by type and metadata (e.g. \"collection_id=123\")",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{
+						{ProtoField: "actionType"},
+						{ProtoField: "metadataQuery"},
+					},
 				},
 
 				// this line is used by ignite scaffolding # autocli/query

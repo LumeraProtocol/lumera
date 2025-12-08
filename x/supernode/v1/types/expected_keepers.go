@@ -7,8 +7,8 @@ import (
 	"context"
 	"time"
 
-	"cosmossdk.io/log"
 	"cosmossdk.io/core/address"
+	"cosmossdk.io/log"
 	sdkmath "cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/query"
@@ -24,12 +24,13 @@ type SupernodeKeeper interface {
 	CheckValidatorSupernodeEligibility(ctx sdk.Context, validator stakingtypes.ValidatorI, valAddr string, supernodeAccount string) error
 	SetSuperNodeStopped(ctx sdk.Context, valAddr sdk.ValAddress, reason string) error
 	SetSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress, reason string) error
-	
+
 	Logger() log.Logger
 	GetAuthority() string
 	GetStakingKeeper() StakingKeeper
 	GetParams(ctx sdk.Context) (params Params)
 	GetAllSuperNodes(ctx sdk.Context, stateFilters ...SuperNodeState) ([]SuperNode, error)
+	GetSuperNodeByAccount(ctx sdk.Context, supernodeAccount string) (SuperNode, bool, error)
 	GetBlockHashForHeight(ctx sdk.Context, height int64) ([]byte, error)
 	RankSuperNodesByDistance(blockHash []byte, supernodes []SuperNode, topN int) []SuperNode
 	QuerySuperNode(ctx sdk.Context, valOperAddr sdk.ValAddress) (sn SuperNode, exists bool)

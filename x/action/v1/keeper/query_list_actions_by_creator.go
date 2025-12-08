@@ -22,6 +22,11 @@ func (q queryServer) ListActionsByCreator(
 		return nil, status.Error(codes.InvalidArgument, "creator address must be provided")
 	}
 
+	// Validate creator address format early to provide clear feedback
+	if _, err := q.k.addressCodec.StringToBytes(req.Creator); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid creator address: %s", err)
+	}
+
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
 	store := q.k.storeService.OpenKVStore(ctx)
@@ -38,21 +43,12 @@ func (q queryServer) ListActionsByCreator(
 
 		act, found := q.k.GetActionByID(ctx, actionID)
 		if !found {
+			// If index is stale or corrupted, skip this entry but continue scanning
 			return false, nil
 		}
 
 		if accumulate {
-			actions = append(actions, &types.Action{
-				Creator:        act.Creator,
-				ActionID:       act.ActionID,
-				ActionType:     types.ActionType(act.ActionType),
-				Metadata:       act.Metadata,
-				Price:          act.Price,
-				ExpirationTime: act.ExpirationTime,
-				State:          types.ActionState(act.State),
-				BlockHeight:    act.BlockHeight,
-				SuperNodes:     act.SuperNodes,
-			})
+			actions = append(actions, act)
 		}
 
 		return true, nil
@@ -66,5 +62,6 @@ func (q queryServer) ListActionsByCreator(
 	return &types.QueryListActionsByCreatorResponse{
 		Actions:    actions,
 		Pagination: pageRes,
+		Total:      pageRes.GetTotal(),
 	}, nil
 }

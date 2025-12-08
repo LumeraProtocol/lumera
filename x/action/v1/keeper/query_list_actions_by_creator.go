@@ -41,18 +41,18 @@ func (q queryServer) ListActionsByCreator(
 	onResult := func(key, _ []byte, accumulate bool) (bool, error) {
 		actionID := string(key)
 
-		act, found := q.k.GetActionByID(ctx, actionID)
-		if !found {
-			// If index is stale or corrupted, skip this entry but continue scanning
-			return false, nil
-		}
-
-		if accumulate {
-			actions = append(actions, act)
-		}
-
-		return true, nil
+	act, found := q.k.GetActionByID(ctx, actionID)
+	if !found {
+		// If index is stale or corrupted, skip this entry but continue scanning
+		return false, nil
 	}
+
+	if accumulate {
+		actions = append(actions, act)
+	}
+
+	return true, nil
+}
 
 	pageRes, err := query.FilteredPaginate(indexStore, req.Pagination, onResult)
 	if err != nil {

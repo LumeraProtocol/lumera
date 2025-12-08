@@ -24,16 +24,16 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					Short:          "Get a single action by ID",
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "actionID"}},
 				},
-					{
-						RpcMethod:      "GetActionFee",
-						Use:            "get-action-fee [data-size-in-kb]",
-						Short:          "Query get-action-fee",
-						PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "dataSize"}},
-					},
-					// paginated list queries
-					{
-						RpcMethod: "ListActions",
-						Use:       "list-actions",
+				{
+					RpcMethod:      "GetActionFee",
+					Use:            "get-action-fee [data-size-in-kb]",
+					Short:          "Query get-action-fee",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "dataSize"}},
+				},
+				// paginated list queries
+				{
+					RpcMethod: "ListActions",
+					Use:       "list-actions",
 					Short:     "List actions with optional type and state filters",
 					FlagOptions: map[string]*autocliv1.FlagOptions{
 						"actionType": {
@@ -43,19 +43,19 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 						"actionState": {
 							Name:  "action-state",
 							Usage: "Optional action state filter (ACTION_STATE_PENDING, ACTION_STATE_DONE, ...)",
-							},
 						},
 					},
-					{
-						RpcMethod:      "ListActionsByCreator",
-						Use:            "list-actions-by-creator [creator]",
-						Short:          "List actions created by a specific address",
-						PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "creator"}},
-					},
-					{
-						RpcMethod: "ListActionsBySuperNode",
-						Use:       "list-actions-by-supernode [supernode-address]",
-						Short:     "List actions for a specific supernode",
+				},
+				{
+					RpcMethod:      "ListActionsByCreator",
+					Use:            "list-actions-by-creator [creator]",
+					Short:          "List actions created by a specific address",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "creator"}},
+				},
+				{
+					RpcMethod: "ListActionsBySuperNode",
+					Use:       "list-actions-by-supernode [supernode-address]",
+					Short:     "List actions for a specific supernode",
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{
 						{ProtoField: "superNodeAddress"},
 					},
@@ -79,13 +79,13 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					Short:     "Query actions by type and metadata (e.g. \"collection_id=123\")",
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{
 						{ProtoField: "actionType"},
-							{ProtoField: "metadataQuery"},
-						},
+						{ProtoField: "metadataQuery"},
 					},
-
-					// this line is used by ignite scaffolding # autocli/query
 				},
+
+				// this line is used by ignite scaffolding # autocli/query
 			},
+		},
 		Tx: &autocliv1.ServiceCommandDescriptor{
 			Service:              types.Msg_serviceDesc.ServiceName,
 			EnhanceCustomCommand: true, // only required if you want to use the custom command

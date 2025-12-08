@@ -27,6 +27,7 @@ func (q queryServer) ListActions(goCtx context.Context, req *types.QueryListActi
 
 	var actions []*types.Action
 	useStateIndex := req.ActionState != types.ActionStateUnspecified
+	useTypeIndex := !useStateIndex && req.ActionType != types.ActionTypeUnspecified
 
 	var pageRes *query.PageResponse
 	var err error
@@ -56,6 +57,27 @@ func (q queryServer) ListActions(goCtx context.Context, req *types.QueryListActi
 		}
 
 		pageRes, err = query.FilteredPaginate(indexStore, req.Pagination, onResult)
+	} else if useTypeIndex {
+		// When filtering only by type, use the type index
+		typePrefix := []byte(ActionByTypePrefix + types.ActionType(req.ActionType).String() + "/")
+		indexStore := prefix.NewStore(storeAdapter, typePrefix)
+
+		onResult := func(key, _ []byte, accumulate bool) (bool, error) {
+			actionID := string(key)
+			act, found := q.k.GetActionByID(ctx, actionID)
+			if !found {
+				// Stale index entry; skip
+				return false, nil
+			}
+
+			if accumulate {
+				actions = append(actions, act)
+			}
+
+			return true, nil
+		}
+
+		pageRes, err = query.FilteredPaginate(indexStore, req.Pagination, onResult)
 	} else {
 		actionStore := prefix.NewStore(storeAdapter, []byte(ActionKeyPrefix))
 
@@ -63,10 +85,6 @@ func (q queryServer) ListActions(goCtx context.Context, req *types.QueryListActi
 			var act actiontypes.Action
 			if err := q.k.cdc.Unmarshal(value, &act); err != nil {
 				return false, err
-			}
-
-			if req.ActionType != types.ActionTypeUnspecified && act.ActionType != actiontypes.ActionType(req.ActionType) {
-				return false, nil
 			}
 
 			if accumulate {

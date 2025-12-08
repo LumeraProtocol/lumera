@@ -2,9 +2,9 @@ package keeper
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/LumeraProtocol/lumera/x/action/v1/types"
-	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 
 	"cosmossdk.io/store/prefix"
 	"github.com/cosmos/cosmos-sdk/runtime"
@@ -28,34 +28,35 @@ func (q queryServer) ListActionsByBlockHeight(goCtx context.Context, req *types.
 
 	store := q.k.storeService.OpenKVStore(ctx)
 	storeAdapter := runtime.KVStoreAdapter(store)
-	var (
-		actions []*types.Action
-		pageRes *query.PageResponse
-		err     error
-	)
+	var actions []*types.Action
+	var pageRes *query.PageResponse
+	var err error
 
-	actionStore := prefix.NewStore(storeAdapter, []byte(ActionKeyPrefix))
+	// Use block height index for efficient lookup
+	heightPrefix := []byte(ActionByBlockHeightPrefix + strconv.FormatInt(req.BlockHeight, 10) + "/")
+	indexStore := prefix.NewStore(storeAdapter, heightPrefix)
 
-	onResult := func(key, value []byte, accumulate bool) (bool, error) {
-		var act actiontypes.Action
-		if err := q.k.cdc.Unmarshal(value, &act); err != nil {
-			return false, err
+	onResult := func(key, _ []byte, accumulate bool) (bool, error) {
+		actionID := string(key)
+		act, found := q.k.GetActionByID(ctx, actionID)
+		if !found {
+			// Stale index entry; skip
+			return false, nil
 		}
 
+		// Sanity check to guard against any malformed index entries
 		if act.BlockHeight != req.BlockHeight {
-			// Skip non-matching heights without counting toward pagination/total
 			return false, nil
 		}
 
 		if accumulate {
-			actCopy := act
-			actions = append(actions, &actCopy)
+			actions = append(actions, act)
 		}
 
 		return true, nil
 	}
 
-	pageRes, err = query.FilteredPaginate(actionStore, req.Pagination, onResult)
+	pageRes, err = query.FilteredPaginate(indexStore, req.Pagination, onResult)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to paginate actions: %v", err)
 	}

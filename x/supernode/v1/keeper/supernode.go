@@ -25,14 +25,18 @@ func (k Keeper) SetSuperNode(ctx sdk.Context, supernode types.SuperNode) error {
 
 	// Convert context store to a KVStore interface
 	storeAdapter := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
-	// Create a prefix store so that all keys are under SuperNodeKey
-	store := prefix.NewStore(storeAdapter, []byte(types.SuperNodeKey))
 
-	// Use the validator address as the key (since it's unique).
+	// Use the validator address as the primary key (since it's unique).
 	valOperAddr, err := sdk.ValAddressFromBech32(supernode.ValidatorAddress)
 	if err != nil {
 		return errorsmod.Wrapf(err, "invalid validator address: %s", err)
 	}
+
+	// Load any existing record so we can maintain secondary indices safely.
+	existing, exists := k.QuerySuperNode(ctx, valOperAddr)
+
+	// Create a prefix store so that all keys are under SuperNodeKey
+	store := prefix.NewStore(storeAdapter, []byte(types.SuperNodeKey))
 
 	// Marshal the SuperNode into bytes
 	b, err := k.cdc.Marshal(&supernode)
@@ -43,6 +47,19 @@ func (k Keeper) SetSuperNode(ctx sdk.Context, supernode types.SuperNode) error {
 	// Set the supernode record under [SuperNodeKeyPrefix + valOperAddr]
 	// Note: prefix.NewStore automatically prepends the prefix we defined above.
 	store.Set(valOperAddr, b)
+
+	// Maintain secondary index by supernode account (if set).
+	accountIndexStore := prefix.NewStore(storeAdapter, types.SuperNodeByAccountKey)
+
+	// Remove old index entry if the account has changed.
+	if exists && existing.SupernodeAccount != "" && existing.SupernodeAccount != supernode.SupernodeAccount {
+		accountIndexStore.Delete([]byte(existing.SupernodeAccount))
+	}
+
+	// Set or update the index entry for the current supernode account.
+	if supernode.SupernodeAccount != "" {
+		accountIndexStore.Set([]byte(supernode.SupernodeAccount), valOperAddr)
+	}
 
 	return nil
 }
@@ -100,24 +117,25 @@ func (k Keeper) GetAllSuperNodes(ctx sdk.Context, stateFilters ...types.SuperNod
 // GetSuperNodeByAccount returns the supernode record for a given supernode account address, if present.
 func (k Keeper) GetSuperNodeByAccount(ctx sdk.Context, supernodeAccount string) (types.SuperNode, bool, error) {
 	storeAdapter := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
-	store := prefix.NewStore(storeAdapter, []byte(types.SuperNodeKey))
+	indexStore := prefix.NewStore(storeAdapter, types.SuperNodeByAccountKey)
 
-	iterator := store.Iterator(nil, nil)
-	defer iterator.Close()
-
-	for ; iterator.Valid(); iterator.Next() {
-		bz := iterator.Value()
-		var sn types.SuperNode
-		if err := k.cdc.Unmarshal(bz, &sn); err != nil {
-			return types.SuperNode{}, false, fmt.Errorf("failed to unmarshal supernode: %w", err)
-		}
-
-		if sn.GetSupernodeAccount() == supernodeAccount {
-			return sn, true, nil
-		}
+	// Look up the validator operator address from the secondary index.
+	valBz := indexStore.Get([]byte(supernodeAccount))
+	if valBz == nil {
+		// Index entry not found; no supernode for this account.
+		return types.SuperNode{}, false, nil
 	}
 
-	return types.SuperNode{}, false, nil
+	valOperAddr := sdk.ValAddress(valBz)
+
+	// Use the primary query path to load the full SuperNode record.
+	sn, exists := k.QuerySuperNode(ctx, valOperAddr)
+	if !exists {
+		// Stale index entry; treat as not found.
+		return types.SuperNode{}, false, nil
+	}
+
+	return sn, true, nil
 }
 
 // GetSuperNodesPaginated returns paginated supernodes, optionally filtered by state

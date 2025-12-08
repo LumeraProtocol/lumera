@@ -18,6 +18,10 @@ var (
 
 	// SuperNodeKey prefix for storing SuperNode entities
 	SuperNodeKey = []byte("sn_") // prefix 'sn_' for supernode storage
+
+	// SuperNodeByAccountKey is a secondary index mapping supernode account address
+	// to the corresponding validator operator address.
+	SuperNodeByAccountKey = []byte("sn_by_account_")
 )
 
 func KeyPrefix(p string) []byte {

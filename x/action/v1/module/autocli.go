@@ -29,6 +29,12 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					Short:          "Query get-action-fee",
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "dataSize"}},
 				},
+				{
+					RpcMethod:      "ListActionsByCreator",
+					Use:            "list-actions-by-creator [creator]",
+					Short:          "List actions created by a specific address",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "creator"}},
+				},
 
 				// this line is used by ignite scaffolding # autocli/query
 			},

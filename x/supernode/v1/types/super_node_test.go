@@ -27,7 +27,7 @@ func TestSuperNodeValidation(t *testing.T) {
 				SupernodeAccount: accAddr.String(),
 				Evidence:         []*types.Evidence{},
 				Note:             "1.0.0",
-				LegacyMetrics: &types.MetricsAggregate{
+				Metrics: &types.MetricsAggregate{
 					Metrics:     make(map[string]float64),
 					ReportCount: 0,
 				},
@@ -110,7 +110,7 @@ func TestSuperNodeValidation(t *testing.T) {
 				SupernodeAccount: accAddr.String(),
 				Evidence:         []*types.Evidence{},
 				Note:             "1.0.0",
-				LegacyMetrics: &types.MetricsAggregate{
+				Metrics: &types.MetricsAggregate{
 					Metrics:     make(map[string]float64),
 					ReportCount: 0,
 				},

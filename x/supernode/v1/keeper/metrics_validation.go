@@ -55,11 +55,11 @@ func evaluateCompliance(ctx sdk.Context, params types.Params, m types.SupernodeM
 	if m.CpuCoresTotal <= 0 {
 		issues = append(issues, "cpu.cores_total must be > 0")
 	}
-	if m.CpuCoresTotal < params.MinCpuCores {
-		issues = append(issues, fmt.Sprintf("cpu cores %.2f below minimum %.2f", m.CpuCoresTotal, params.MinCpuCores))
+	if m.CpuCoresTotal < float64(params.MinCpuCores) {
+		issues = append(issues, fmt.Sprintf("cpu cores %.2f below minimum %d", m.CpuCoresTotal, params.MinCpuCores))
 	}
-	if m.CpuUsagePercent > params.MaxCpuUsagePercent {
-		issues = append(issues, fmt.Sprintf("cpu usage %.2f above max %.2f", m.CpuUsagePercent, params.MaxCpuUsagePercent))
+	if m.CpuUsagePercent > float64(params.MaxCpuUsagePercent) {
+		issues = append(issues, fmt.Sprintf("cpu usage %.2f above max %d", m.CpuUsagePercent, params.MaxCpuUsagePercent))
 	}
 	if m.CpuUsagePercent < 0 || m.CpuUsagePercent > 100 {
 		issues = append(issues, "cpu.usage_percent outside 0-100 range")
@@ -72,11 +72,17 @@ func evaluateCompliance(ctx sdk.Context, params types.Params, m types.SupernodeM
 	if m.MemTotalGb <= 0 {
 		issues = append(issues, "mem.total_gb must be > 0")
 	}
-	if m.MemTotalGb < params.MinMemGb {
-		issues = append(issues, fmt.Sprintf("mem total %.2f below minimum %.2f", m.MemTotalGb, params.MinMemGb))
+	if m.MemFreeGb < 0 {
+		issues = append(issues, "mem.free_gb must be >= 0")
 	}
-	if m.MemUsagePercent > params.MaxMemUsagePercent {
-		issues = append(issues, fmt.Sprintf("mem usage %.2f above max %.2f", m.MemUsagePercent, params.MaxMemUsagePercent))
+	if m.MemFreeGb > m.MemTotalGb {
+		issues = append(issues, "mem.free_gb cannot exceed mem.total_gb")
+	}
+	if m.MemTotalGb < float64(params.MinMemGb) {
+		issues = append(issues, fmt.Sprintf("mem total %.2f below minimum %d", m.MemTotalGb, params.MinMemGb))
+	}
+	if m.MemUsagePercent > float64(params.MaxMemUsagePercent) {
+		issues = append(issues, fmt.Sprintf("mem usage %.2f above max %d", m.MemUsagePercent, params.MaxMemUsagePercent))
 	}
 	if m.MemUsagePercent < 0 || m.MemUsagePercent > 100 {
 		issues = append(issues, "mem.usage_percent outside 0-100 range")
@@ -89,11 +95,17 @@ func evaluateCompliance(ctx sdk.Context, params types.Params, m types.SupernodeM
 	if m.DiskTotalGb <= 0 {
 		issues = append(issues, "disk.total_gb must be > 0")
 	}
-	if m.DiskTotalGb < params.MinStorageGb {
-		issues = append(issues, fmt.Sprintf("disk total %.2f below minimum %.2f", m.DiskTotalGb, params.MinStorageGb))
+	if m.DiskFreeGb < 0 {
+		issues = append(issues, "disk.free_gb must be >= 0")
 	}
-	if m.DiskUsagePercent > params.MaxStorageUsagePercent {
-		issues = append(issues, fmt.Sprintf("disk usage %.2f above max %.2f", m.DiskUsagePercent, params.MaxStorageUsagePercent))
+	if m.DiskFreeGb > m.DiskTotalGb {
+		issues = append(issues, "disk.free_gb cannot exceed disk.total_gb")
+	}
+	if m.DiskTotalGb < float64(params.MinStorageGb) {
+		issues = append(issues, fmt.Sprintf("disk total %.2f below minimum %d", m.DiskTotalGb, params.MinStorageGb))
+	}
+	if m.DiskUsagePercent > float64(params.MaxStorageUsagePercent) {
+		issues = append(issues, fmt.Sprintf("disk usage %.2f above max %d", m.DiskUsagePercent, params.MaxStorageUsagePercent))
 	}
 	if m.DiskUsagePercent < 0 || m.DiskUsagePercent > 100 {
 		issues = append(issues, "disk.usage_percent outside 0-100 range")
@@ -108,6 +120,15 @@ func evaluateCompliance(ctx sdk.Context, params types.Params, m types.SupernodeM
 		if _, ok := openPorts[port]; !ok {
 			issues = append(issues, fmt.Sprintf("required port %d not open", port))
 		}
+	}
+
+	// 6) Liveness/connectivity sanity checks.
+	checkFinite("uptime_seconds", m.UptimeSeconds)
+	if m.UptimeSeconds < 0 {
+		issues = append(issues, "uptime_seconds must be >= 0")
+	}
+	if m.PeersCount == 0 {
+		issues = append(issues, "peers_count must be > 0")
 	}
 
 	return issues

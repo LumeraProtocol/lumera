@@ -18,7 +18,7 @@ func TestSetParamsAppliesDefaults(t *testing.T) {
 	require.NoError(t, k.SetParams(wctx, empty))
 
 	stored := k.GetParams(wctx)
-	require.Equal(t, types.DefaultMetricsUpdateInterval, stored.MetricsUpdateInterval)
+	require.Equal(t, types.DefaultMetricsUpdateIntervalBlocks, stored.MetricsUpdateIntervalBlocks)
 	require.Equal(t, types.DefaultMetricsGracePeriodBlocks, stored.MetricsGracePeriodBlocks)
 	require.Equal(t, types.DefaultMetricsFreshnessMaxBlocks, stored.MetricsFreshnessMaxBlocks)
 	require.Equal(t, types.DefaultMinSupernodeVersion, stored.MinSupernodeVersion)

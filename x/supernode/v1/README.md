@@ -51,7 +51,7 @@ type SuperNode struct {
     Evidence              []Evidence                 // Evidence of behavior/violations
     PrevIpAddresses       []IPAddressHistory         // History of IP addresses
     Note                  string                     // Optional operator note (free-form)
-    LegacyMetrics         MetricsAggregate           // Legacy aggregate metrics (deprecated)
+    Metrics         MetricsAggregate           // Legacy aggregate metrics (deprecated)
     SupernodeAccount      string                     // Associated account for this supernode
     P2PPort               string                     // P2P network port
     PrevSupernodeAccounts []SupernodeAccountHistory  // History of supernode accounts
@@ -63,7 +63,7 @@ Key implementation details:
 - State changes are recorded with timestamps and block heights
 - Evidence collection helps maintain accountability
 - Note is an optional, free-form field for operator comments or release notes
-- `LegacyMetrics` is kept only for backwards compatibility with older aggregate metrics
+- `Metrics` is kept only for backwards compatibility with older aggregate metrics
 - Current performance and compliance are driven by typed `SupernodeMetrics` reports stored in `SupernodeMetricsState`
 
 ### Metrics Storage and Reporting
@@ -383,6 +383,17 @@ message Params {
     string                    evidence_retention_period = 5; // Retention window
     string                    slashing_fraction     = 6; // Fraction of stake to slash
     string                    inactivity_penalty_period = 7; // Penalty window
+    uint64                    metrics_update_interval_blocks = 8; // Expected metrics cadence (blocks)
+    uint64                    metrics_grace_period_blocks    = 9; // Extra grace (blocks) before overdue
+    uint64                    metrics_freshness_max_blocks   = 10; // Reserved freshness cap (blocks)
+    string                    min_supernode_version = 11; // Min semver for reporting supernode
+    uint64                    min_cpu_cores = 12; // Min CPU cores
+    uint64                    max_cpu_usage_percent = 13; // Max CPU usage percent
+    uint64                    min_mem_gb = 14; // Min memory GB
+    uint64                    max_mem_usage_percent = 15; // Max memory usage percent
+    uint64                    min_storage_gb = 16; // Min storage GB
+    uint64                    max_storage_usage_percent = 17; // Max storage usage percent
+    repeated uint32           required_open_ports = 18; // Ports that must be open
 }
 ```
 
@@ -393,6 +404,25 @@ Default values:
 - `evidence_retention_period`: 100800 (~ 7 days)
 - `slashing_fraction`: "0.01"
 - `inactivity_penalty_period`: 600 (~ 1 hour)
+
+### Metrics-specific parameters (new)
+- `metrics_update_interval_blocks`: expected metrics cadence in blocks (default 400).
+- `metrics_grace_period_blocks`: extra blocks allowed before metrics are overdue (default 100).
+- `metrics_freshness_max_blocks`: reserved max staleness gate; currently not enforced (default 5000).
+- `min_supernode_version`: minimum semver for reporting supernode (default 2.0.0).
+- Resource thresholds used during metrics compliance:
+  - `min_cpu_cores` (8), `max_cpu_usage_percent` (90)
+  - `min_mem_gb` (16), `max_mem_usage_percent` (90)
+  - `min_storage_gb` (1000), `max_storage_usage_percent` (90)
+  - `required_open_ports` ([4444, 4445, 8002])
+
+Metrics compliance/staleness behavior:
+- Only the registered `supernode_account` may submit metrics for a validator.
+- Compliance requires finite values, version >= min, CPU/mem/disk totals above mins, usage within 0–100 and below maxes, free mem/disk ≥ 0 and ≤ total, peers_count > 0, uptime_seconds ≥ 0, and all required ports present. Any issue marks the report non-compliant and POSTPONES the node if not already postponed.
+- Staleness (EndBlock) uses `metrics_update_interval_blocks + metrics_grace_period_blocks`:
+  - If never reported and current height exceeds registration height + threshold → POSTPONED (“no metrics reported”).
+  - If last report height lags current height by more than the threshold → POSTPONED (“metrics overdue”).
+- `metrics_freshness_max_blocks` is not currently applied separately.
 
 ## Client
 
@@ -440,6 +470,14 @@ lumerad tx supernode start \
 lumerad tx supernode stop \
   --reason=[reason] \
   --from=[validator-key] \
+  --chain-id=[chain-id]
+
+# Report metrics (structured)
+lumerad tx supernode report-metrics \
+  --validator-address=[valoper] \
+  --supernode-account=[account] \
+  --metrics-json='{"version_major":2,"version_minor":0,"version_patch":0,"cpu_cores_total":8,"cpu_usage_percent":50,"mem_total_gb":16,"mem_usage_percent":50,"mem_free_gb":8,"disk_total_gb":1000,"disk_usage_percent":50,"disk_free_gb":500,"uptime_seconds":3600,"peers_count":10,"open_ports":[4444,4445,8002]}' \
+  --from=[supernode-key] \
   --chain-id=[chain-id]
 
 # Update a supernode
@@ -504,6 +542,9 @@ service Msg {
 
   // UpdateSupernode updates supernode information
   rpc UpdateSupernode(MsgUpdateSupernode) returns (MsgUpdateSupernodeResponse);
+
+  // ReportSupernodeMetrics submits structured metrics for a supernode
+  rpc ReportSupernodeMetrics(MsgReportSupernodeMetrics) returns (MsgReportSupernodeMetricsResponse);
 
   // UpdateParams updates the module parameters
   rpc UpdateParams(MsgUpdateParams) returns (MsgUpdateParamsResponse);

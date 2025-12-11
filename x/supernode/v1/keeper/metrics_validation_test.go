@@ -41,6 +41,7 @@ func TestEvaluateCompliancePassesWithValidMetrics(t *testing.T) {
 func TestEvaluateComplianceDetectsStaleMetrics(t *testing.T) {
 	params := types.DefaultParams()
 	ctx := sdk.NewContext(nil, tmproto.Header{Height: 10}, false, log.NewNopLogger())
+	t.Logf("min supernode version: %s", params.MinSupernodeVersion)
 
 	metrics := types.SupernodeMetrics{
 		VersionMajor:     1,
@@ -59,7 +60,8 @@ func TestEvaluateComplianceDetectsStaleMetrics(t *testing.T) {
 
 	issues := evaluateCompliance(ctx, params, metrics)
 
-	require.True(t, containsSubstring(issues, "version"))
+	require.NotEmpty(t, issues)
+	require.True(t, containsSubstring(issues, "version"), "expected version-related issue, got: %v", issues)
 }
 
 func TestEvaluateComplianceRequiresOpenPorts(t *testing.T) {

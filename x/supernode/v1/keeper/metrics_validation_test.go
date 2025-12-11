@@ -17,19 +17,19 @@ func TestEvaluateCompliancePassesWithValidMetrics(t *testing.T) {
 	params := types.DefaultParams()
 
 	metrics := types.SupernodeMetrics{
-		VersionMajor:    2,
-		VersionMinor:    0,
-		VersionPatch:    0,
-		CpuCoresTotal:   params.MinCpuCores,
-		CpuUsagePercent: params.MaxCpuUsagePercent - 10,
-		MemTotalGb:      params.MinMemGb,
-		MemUsagePercent: params.MaxMemUsagePercent - 10,
-		MemFreeGb:       params.MinMemGb / 2,
-		DiskTotalGb:     params.MinStorageGb,
-		DiskUsagePercent: params.MaxStorageUsagePercent - 10,
-		DiskFreeGb:      params.MinStorageGb / 2,
-		UptimeSeconds:   100,
-		PeersCount:      10,
+		VersionMajor:     2,
+		VersionMinor:     0,
+		VersionPatch:     0,
+		CpuCoresTotal:    float64(params.MinCpuCores),
+		CpuUsagePercent:  float64(params.MaxCpuUsagePercent - 10),
+		MemTotalGb:       float64(params.MinMemGb),
+		MemUsagePercent:  float64(params.MaxMemUsagePercent - 10),
+		MemFreeGb:        float64(params.MinMemGb) / 2,
+		DiskTotalGb:      float64(params.MinStorageGb),
+		DiskUsagePercent: float64(params.MaxStorageUsagePercent - 10),
+		DiskFreeGb:       float64(params.MinStorageGb) / 2,
+		UptimeSeconds:    100,
+		PeersCount:       10,
 	}
 	metrics.OpenPorts = append([]uint32(nil), params.RequiredOpenPorts...)
 
@@ -43,17 +43,17 @@ func TestEvaluateComplianceDetectsStaleMetrics(t *testing.T) {
 	ctx := sdk.NewContext(nil, tmproto.Header{Height: 10}, false, log.NewNopLogger())
 
 	metrics := types.SupernodeMetrics{
-		VersionMajor:    1,
-		VersionMinor:    0,
-		VersionPatch:    0,
-		CpuCoresTotal:   params.MinCpuCores,
-		CpuUsagePercent: params.MaxCpuUsagePercent - 10,
-		MemTotalGb:      params.MinMemGb,
-		MemUsagePercent: params.MaxMemUsagePercent - 10,
-		DiskTotalGb:     params.MinStorageGb,
-		DiskUsagePercent: params.MaxStorageUsagePercent - 10,
-		UptimeSeconds:   100,
-		PeersCount:      5,
+		VersionMajor:     1,
+		VersionMinor:     0,
+		VersionPatch:     0,
+		CpuCoresTotal:    float64(params.MinCpuCores),
+		CpuUsagePercent:  float64(params.MaxCpuUsagePercent - 10),
+		MemTotalGb:       float64(params.MinMemGb),
+		MemUsagePercent:  float64(params.MaxMemUsagePercent - 10),
+		DiskTotalGb:      float64(params.MinStorageGb),
+		DiskUsagePercent: float64(params.MaxStorageUsagePercent - 10),
+		UptimeSeconds:    100,
+		PeersCount:       5,
 	}
 	metrics.OpenPorts = append([]uint32(nil), params.RequiredOpenPorts...)
 
@@ -67,17 +67,17 @@ func TestEvaluateComplianceRequiresOpenPorts(t *testing.T) {
 	params := types.DefaultParams()
 
 	metrics := types.SupernodeMetrics{
-		VersionMajor:    2,
-		VersionMinor:    0,
-		VersionPatch:    0,
-		CpuCoresTotal:   params.MinCpuCores,
-		CpuUsagePercent: params.MaxCpuUsagePercent - 10,
-		MemTotalGb:      params.MinMemGb,
-		MemUsagePercent: params.MaxMemUsagePercent - 10,
-		DiskTotalGb:     params.MinStorageGb,
-		DiskUsagePercent: params.MaxStorageUsagePercent - 10,
-		UptimeSeconds:   100,
-		PeersCount:      5,
+		VersionMajor:     2,
+		VersionMinor:     0,
+		VersionPatch:     0,
+		CpuCoresTotal:    float64(params.MinCpuCores),
+		CpuUsagePercent:  float64(params.MaxCpuUsagePercent - 10),
+		MemTotalGb:       float64(params.MinMemGb),
+		MemUsagePercent:  float64(params.MaxMemUsagePercent - 10),
+		DiskTotalGb:      float64(params.MinStorageGb),
+		DiskUsagePercent: float64(params.MaxStorageUsagePercent - 10),
+		UptimeSeconds:    100,
+		PeersCount:       5,
 	}
 	// Deliberately omit one required port
 	if len(params.RequiredOpenPorts) > 1 {

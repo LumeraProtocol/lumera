@@ -48,7 +48,7 @@ func TestReportSupernodeMetrics_SingleReportRecoversPostponed(t *testing.T) {
 				Height: 50,
 			},
 		},
-		LegacyMetrics: &types.MetricsAggregate{
+		Metrics: &types.MetricsAggregate{
 			Metrics:     make(map[string]float64),
 			ReportCount: 1,
 			Height:      1, // Very old height to simulate staleness
@@ -70,19 +70,19 @@ func TestReportSupernodeMetrics_SingleReportRecoversPostponed(t *testing.T) {
 	// Build a fully compliant metrics payload.
 	params := types.DefaultParams()
 	metrics := types.SupernodeMetrics{
-		VersionMajor:    2,
-		VersionMinor:    0,
-		VersionPatch:    0,
-		CpuCoresTotal:   params.MinCpuCores,
-		CpuUsagePercent: params.MaxCpuUsagePercent - 10,
-		MemTotalGb:      params.MinMemGb,
-		MemUsagePercent: params.MaxMemUsagePercent - 10,
-		MemFreeGb:       params.MinMemGb / 2,
-		DiskTotalGb:     params.MinStorageGb,
-		DiskUsagePercent: params.MaxStorageUsagePercent - 10,
-		DiskFreeGb:      params.MinStorageGb / 2,
-		UptimeSeconds:   100,
-		PeersCount:      10,
+		VersionMajor:     2,
+		VersionMinor:     0,
+		VersionPatch:     0,
+		CpuCoresTotal:    float64(params.MinCpuCores),
+		CpuUsagePercent:  float64(params.MaxCpuUsagePercent - 10),
+		MemTotalGb:       float64(params.MinMemGb),
+		MemUsagePercent:  float64(params.MaxMemUsagePercent - 10),
+		MemFreeGb:        float64(params.MinMemGb) / 2,
+		DiskTotalGb:      float64(params.MinStorageGb),
+		DiskUsagePercent: float64(params.MaxStorageUsagePercent - 10),
+		DiskFreeGb:       float64(params.MinStorageGb) / 2,
+		UptimeSeconds:    100,
+		PeersCount:       10,
 	}
 	for _, port := range params.RequiredOpenPorts {
 		metrics.OpenPorts = append(metrics.OpenPorts, port)

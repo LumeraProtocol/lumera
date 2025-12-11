@@ -102,7 +102,7 @@ func TestDeregisterSupernode(t *testing.T) {
 						},
 					},
 					Note: "1.0.0",
-					LegacyMetrics: &sntypes.MetricsAggregate{
+					Metrics: &sntypes.MetricsAggregate{
 						Metrics:     make(map[string]float64),
 						ReportCount: 0,
 					},
@@ -192,7 +192,7 @@ func TestDeregisterSupernode(t *testing.T) {
 						},
 					},
 					Note: "1.0.0",
-					LegacyMetrics: &sntypes.MetricsAggregate{
+					Metrics: &sntypes.MetricsAggregate{
 						Metrics:     make(map[string]float64),
 						ReportCount: 0,
 					},
@@ -232,7 +232,7 @@ func TestDeregisterSupernode(t *testing.T) {
 						},
 					},
 					Note: "1.0.0",
-					LegacyMetrics: &sntypes.MetricsAggregate{
+					Metrics: &sntypes.MetricsAggregate{
 						Metrics:     make(map[string]float64),
 						ReportCount: 0,
 					},

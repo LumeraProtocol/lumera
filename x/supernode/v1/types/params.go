@@ -53,30 +53,30 @@ var (
 )
 
 var (
-	KeyMetricsUpdateInterval     = []byte("MetricsUpdateInterval")
-	KeyMetricsGracePeriodBlocks  = []byte("MetricsGracePeriodBlocks")
-	KeyMetricsFreshnessMaxBlocks = []byte("MetricsFreshnessMaxBlocks")
-	KeyMinSupernodeVersion       = []byte("MinSupernodeVersion")
-	KeyMinCPUCores               = []byte("MinCPUCores")
-	KeyMaxCPUUsagePercent        = []byte("MaxCPUUsagePercent")
-	KeyMinMemGB                  = []byte("MinMemGB")
-	KeyMaxMemUsagePercent        = []byte("MaxMemUsagePercent")
-	KeyMinStorageGB              = []byte("MinStorageGB")
-	KeyMaxStorageUsagePercent    = []byte("MaxStorageUsagePercent")
-	KeyRequiredOpenPorts         = []byte("RequiredOpenPorts")
+	KeyMetricsUpdateIntervalBlocks = []byte("MetricsUpdateIntervalBlocks")
+	KeyMetricsGracePeriodBlocks    = []byte("MetricsGracePeriodBlocks")
+	KeyMetricsFreshnessMaxBlocks   = []byte("MetricsFreshnessMaxBlocks")
+	KeyMinSupernodeVersion         = []byte("MinSupernodeVersion")
+	KeyMinCPUCores                 = []byte("MinCPUCores")
+	KeyMaxCPUUsagePercent          = []byte("MaxCPUUsagePercent")
+	KeyMinMemGB                    = []byte("MinMemGB")
+	KeyMaxMemUsagePercent          = []byte("MaxMemUsagePercent")
+	KeyMinStorageGB                = []byte("MinStorageGB")
+	KeyMaxStorageUsagePercent      = []byte("MaxStorageUsagePercent")
+	KeyRequiredOpenPorts           = []byte("RequiredOpenPorts")
 )
 
 const (
-	DefaultMetricsUpdateInterval     uint64  = 1000
-	DefaultMetricsGracePeriodBlocks  uint64  = 100
-	DefaultMetricsFreshnessMaxBlocks uint64  = 5000
-	DefaultMinSupernodeVersion               = "2.0.0"
-	DefaultMinCPUCores               float64 = 8
-	DefaultMaxCPUUsagePercent        float64 = 90.0
-	DefaultMinMemGB                  float64 = 16
-	DefaultMaxMemUsagePercent        float64 = 90.0
-	DefaultMinStorageGB              float64 = 1000
-	DefaultMaxStorageUsagePercent    float64 = 90.0
+	DefaultMetricsUpdateIntervalBlocks uint64 = 400
+	DefaultMetricsGracePeriodBlocks    uint64 = 100
+	DefaultMetricsFreshnessMaxBlocks   uint64 = 5000
+	DefaultMinSupernodeVersion                = "1.0.0"
+	DefaultMinCPUCores                 uint64 = 8
+	DefaultMaxCPUUsagePercent          uint64 = 90
+	DefaultMinMemGB                    uint64 = 16
+	DefaultMaxMemUsagePercent          uint64 = 90
+	DefaultMinStorageGB                uint64 = 1000
+	DefaultMaxStorageUsagePercent      uint64 = 90
 )
 
 var DefaultRequiredOpenPorts = []uint32{4444, 4445, 8002}
@@ -87,8 +87,8 @@ var DefaultRequiredOpenPorts = []uint32{4444, 4445, 8002}
 func (p Params) WithDefaults() Params {
 	out := p
 
-	if out.MetricsUpdateInterval == 0 {
-		out.MetricsUpdateInterval = DefaultMetricsUpdateInterval
+	if out.MetricsUpdateIntervalBlocks == 0 {
+		out.MetricsUpdateIntervalBlocks = DefaultMetricsUpdateIntervalBlocks
 	}
 	if out.MetricsGracePeriodBlocks == 0 {
 		out.MetricsGracePeriodBlocks = DefaultMetricsGracePeriodBlocks
@@ -138,37 +138,37 @@ func NewParams(
 	evidenceRetentionPeriod string,
 	slashingFraction string,
 	inactivityPenaltyPeriod string,
-	metricsUpdateInterval uint64,
+	metricsUpdateIntervalBlocks uint64,
 	metricsGracePeriodBlocks uint64,
 	metricsFreshnessMaxBlocks uint64,
 	minSupernodeVersion string,
-	minCPUCores float64,
-	maxCPUUsagePercent float64,
-	minMemGB float64,
-	maxMemUsagePercent float64,
-	minStorageGB float64,
-	maxStorageUsagePercent float64,
+	minCPUCores uint64,
+	maxCPUUsagePercent uint64,
+	minMemGB uint64,
+	maxMemUsagePercent uint64,
+	minStorageGB uint64,
+	maxStorageUsagePercent uint64,
 	requiredOpenPorts []uint32,
 ) Params {
 	return Params{
-		MinimumStakeForSn:         minimumStakeForSn,
-		ReportingThreshold:        reportingThreshold,
-		SlashingThreshold:         slashingThreshold,
-		MetricsThresholds:         metricsThresholds,
-		EvidenceRetentionPeriod:   evidenceRetentionPeriod,
-		SlashingFraction:          slashingFraction,
-		InactivityPenaltyPeriod:   inactivityPenaltyPeriod,
-		MetricsUpdateInterval:     metricsUpdateInterval,
-		MetricsGracePeriodBlocks:  metricsGracePeriodBlocks,
-		MetricsFreshnessMaxBlocks: metricsFreshnessMaxBlocks,
-		MinSupernodeVersion:       minSupernodeVersion,
-		MinCpuCores:               minCPUCores,
-		MaxCpuUsagePercent:        maxCPUUsagePercent,
-		MinMemGb:                  minMemGB,
-		MaxMemUsagePercent:        maxMemUsagePercent,
-		MinStorageGb:              minStorageGB,
-		MaxStorageUsagePercent:    maxStorageUsagePercent,
-		RequiredOpenPorts:         requiredOpenPorts,
+		MinimumStakeForSn:           minimumStakeForSn,
+		ReportingThreshold:          reportingThreshold,
+		SlashingThreshold:           slashingThreshold,
+		MetricsThresholds:           metricsThresholds,
+		EvidenceRetentionPeriod:     evidenceRetentionPeriod,
+		SlashingFraction:            slashingFraction,
+		InactivityPenaltyPeriod:     inactivityPenaltyPeriod,
+		MetricsUpdateIntervalBlocks: metricsUpdateIntervalBlocks,
+		MetricsGracePeriodBlocks:    metricsGracePeriodBlocks,
+		MetricsFreshnessMaxBlocks:   metricsFreshnessMaxBlocks,
+		MinSupernodeVersion:         minSupernodeVersion,
+		MinCpuCores:                 minCPUCores,
+		MaxCpuUsagePercent:          maxCPUUsagePercent,
+		MinMemGb:                    minMemGB,
+		MaxMemUsagePercent:          maxMemUsagePercent,
+		MinStorageGb:                minStorageGB,
+		MaxStorageUsagePercent:      maxStorageUsagePercent,
+		RequiredOpenPorts:           requiredOpenPorts,
 	}
 }
 
@@ -182,7 +182,7 @@ func DefaultParams() Params {
 		DefaultEvidenceRetentionPeriod,
 		DefaultSlashingFraction,
 		DefaultInactivityPenaltyPeriod,
-		DefaultMetricsUpdateInterval,
+		DefaultMetricsUpdateIntervalBlocks,
 		DefaultMetricsGracePeriodBlocks,
 		DefaultMetricsFreshnessMaxBlocks,
 		DefaultMinSupernodeVersion,
@@ -206,16 +206,16 @@ func (p *Params) ParamSetPairs() paramtypes.ParamSetPairs {
 		paramtypes.NewParamSetPair(KeyEvidenceRetentionPeriod, &p.EvidenceRetentionPeriod, validateEvidenceRetentionPeriod),
 		paramtypes.NewParamSetPair(KeySlashingFraction, &p.SlashingFraction, validateSlashingFraction),
 		paramtypes.NewParamSetPair(KeyInactivityPenaltyPeriod, &p.InactivityPenaltyPeriod, validateInactivityPenaltyPeriod),
-		paramtypes.NewParamSetPair(KeyMetricsUpdateInterval, &p.MetricsUpdateInterval, validatePositiveUint64("metrics update interval")),
+		paramtypes.NewParamSetPair(KeyMetricsUpdateIntervalBlocks, &p.MetricsUpdateIntervalBlocks, validatePositiveUint64("metrics update interval (blocks)")),
 		paramtypes.NewParamSetPair(KeyMetricsGracePeriodBlocks, &p.MetricsGracePeriodBlocks, validatePositiveUint64("metrics grace period")),
 		paramtypes.NewParamSetPair(KeyMetricsFreshnessMaxBlocks, &p.MetricsFreshnessMaxBlocks, validatePositiveUint64("metrics freshness max blocks")),
 		paramtypes.NewParamSetPair(KeyMinSupernodeVersion, &p.MinSupernodeVersion, validateVersionString),
-		paramtypes.NewParamSetPair(KeyMinCPUCores, &p.MinCpuCores, validateNonNegative("min cpu cores")),
-		paramtypes.NewParamSetPair(KeyMaxCPUUsagePercent, &p.MaxCpuUsagePercent, validatePercent("max cpu usage percent")),
-		paramtypes.NewParamSetPair(KeyMinMemGB, &p.MinMemGb, validateNonNegative("min mem gb")),
-		paramtypes.NewParamSetPair(KeyMaxMemUsagePercent, &p.MaxMemUsagePercent, validatePercent("max mem usage percent")),
-		paramtypes.NewParamSetPair(KeyMinStorageGB, &p.MinStorageGb, validateNonNegative("min storage gb")),
-		paramtypes.NewParamSetPair(KeyMaxStorageUsagePercent, &p.MaxStorageUsagePercent, validatePercent("max storage usage percent")),
+		paramtypes.NewParamSetPair(KeyMinCPUCores, &p.MinCpuCores, validateNonNegativeUint64("min cpu cores")),
+		paramtypes.NewParamSetPair(KeyMaxCPUUsagePercent, &p.MaxCpuUsagePercent, validatePercentUint64("max cpu usage percent")),
+		paramtypes.NewParamSetPair(KeyMinMemGB, &p.MinMemGb, validateNonNegativeUint64("min mem gb")),
+		paramtypes.NewParamSetPair(KeyMaxMemUsagePercent, &p.MaxMemUsagePercent, validatePercentUint64("max mem usage percent")),
+		paramtypes.NewParamSetPair(KeyMinStorageGB, &p.MinStorageGb, validateNonNegativeUint64("min storage gb")),
+		paramtypes.NewParamSetPair(KeyMaxStorageUsagePercent, &p.MaxStorageUsagePercent, validatePercentUint64("max storage usage percent")),
 		paramtypes.NewParamSetPair(KeyRequiredOpenPorts, &p.RequiredOpenPorts, validateRequiredPorts),
 	}
 }
@@ -250,7 +250,7 @@ func (p Params) Validate() error {
 		return err
 	}
 
-	if err := validatePositiveUint64("metrics update interval")(p.MetricsUpdateInterval); err != nil {
+	if err := validatePositiveUint64("metrics update interval (blocks)")(p.MetricsUpdateIntervalBlocks); err != nil {
 		return err
 	}
 	if err := validatePositiveUint64("metrics grace period")(p.MetricsGracePeriodBlocks); err != nil {
@@ -262,22 +262,22 @@ func (p Params) Validate() error {
 	if err := validateVersionString(p.MinSupernodeVersion); err != nil {
 		return err
 	}
-	if err := validateNonNegative("min cpu cores")(p.MinCpuCores); err != nil {
+	if err := validateNonNegativeUint64("min cpu cores")(p.MinCpuCores); err != nil {
 		return err
 	}
-	if err := validatePercent("max cpu usage percent")(p.MaxCpuUsagePercent); err != nil {
+	if err := validatePercentUint64("max cpu usage percent")(p.MaxCpuUsagePercent); err != nil {
 		return err
 	}
-	if err := validateNonNegative("min mem gb")(p.MinMemGb); err != nil {
+	if err := validateNonNegativeUint64("min mem gb")(p.MinMemGb); err != nil {
 		return err
 	}
-	if err := validatePercent("max mem usage percent")(p.MaxMemUsagePercent); err != nil {
+	if err := validatePercentUint64("max mem usage percent")(p.MaxMemUsagePercent); err != nil {
 		return err
 	}
-	if err := validateNonNegative("min storage gb")(p.MinStorageGb); err != nil {
+	if err := validateNonNegativeUint64("min storage gb")(p.MinStorageGb); err != nil {
 		return err
 	}
-	if err := validatePercent("max storage usage percent")(p.MaxStorageUsagePercent); err != nil {
+	if err := validatePercentUint64("max storage usage percent")(p.MaxStorageUsagePercent); err != nil {
 		return err
 	}
 	if err := validateRequiredPorts(p.RequiredOpenPorts); err != nil {
@@ -388,26 +388,26 @@ func validatePositiveUint64(field string) func(interface{}) error {
 	}
 }
 
-func validateNonNegative(field string) func(interface{}) error {
+func validateNonNegativeUint64(field string) func(interface{}) error {
 	return func(v interface{}) error {
-		value, ok := v.(float64)
+		value, ok := v.(uint64)
 		if !ok {
 			return fmt.Errorf("invalid parameter type for %s: %T", field, v)
 		}
-		if value < 0 {
+		if value < 0 { // uint check for completeness; always false for uint64
 			return fmt.Errorf("%s must be non-negative", field)
 		}
 		return nil
 	}
 }
 
-func validatePercent(field string) func(interface{}) error {
+func validatePercentUint64(field string) func(interface{}) error {
 	return func(v interface{}) error {
-		value, ok := v.(float64)
+		value, ok := v.(uint64)
 		if !ok {
 			return fmt.Errorf("invalid parameter type for %s: %T", field, v)
 		}
-		if value < 0 || value > 100 {
+		if value > 100 {
 			return fmt.Errorf("%s must be between 0 and 100", field)
 		}
 		return nil

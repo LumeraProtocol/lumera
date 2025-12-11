@@ -60,8 +60,8 @@ func mergeParams(base, incoming types.Params) types.Params {
 		merged.InactivityPenaltyPeriod = incoming.InactivityPenaltyPeriod
 	}
 
-	if incoming.MetricsUpdateInterval != 0 {
-		merged.MetricsUpdateInterval = incoming.MetricsUpdateInterval
+	if incoming.MetricsUpdateIntervalBlocks != 0 {
+		merged.MetricsUpdateIntervalBlocks = incoming.MetricsUpdateIntervalBlocks
 	}
 
 	if incoming.MetricsGracePeriodBlocks != 0 {

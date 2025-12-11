@@ -8,7 +8,7 @@ import (
 
 // HandleMetricsStaleness is called from EndBlock and applies
 // metrics staleness rules:
-//   - compute an "overdue" threshold from MetricsUpdateInterval + MetricsGracePeriodBlocks
+//   - compute an "overdue" threshold from MetricsUpdateIntervalBlocks + MetricsGracePeriodBlocks
 //   - only consider supernodes whose latest state is ACTIVE
 //   - if no metrics have ever been reported and the chain height passes the threshold,
 //     mark the supernode as POSTPONED with reason "no metrics reported"
@@ -16,7 +16,7 @@ import (
 //     reason "metrics overdue"
 func (k Keeper) HandleMetricsStaleness(ctx sdk.Context) error {
 	params := k.GetParams(ctx)
-	overdueThreshold := int64(params.MetricsUpdateInterval + params.MetricsGracePeriodBlocks)
+	overdueThreshold := int64(params.MetricsUpdateIntervalBlocks + params.MetricsGracePeriodBlocks)
 
 	supernodes, err := k.GetAllSuperNodes(ctx)
 	if err != nil {

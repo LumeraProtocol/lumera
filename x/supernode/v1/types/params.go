@@ -70,7 +70,7 @@ const (
 	DefaultMetricsUpdateIntervalBlocks uint64 = 400
 	DefaultMetricsGracePeriodBlocks    uint64 = 100
 	DefaultMetricsFreshnessMaxBlocks   uint64 = 5000
-	DefaultMinSupernodeVersion                = "1.0.0"
+	DefaultMinSupernodeVersion                = "2.0.0"
 	DefaultMinCPUCores                 uint64 = 8
 	DefaultMaxCPUUsagePercent          uint64 = 90
 	DefaultMinMemGB                    uint64 = 16

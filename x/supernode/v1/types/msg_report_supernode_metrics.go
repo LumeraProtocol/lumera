@@ -20,18 +20,14 @@ func (m MsgReportSupernodeMetrics) ValidateBasic() error {
 	if _, err := sdk.AccAddressFromBech32(m.SupernodeAccount); err != nil {
 		return fmt.Errorf("invalid supernode account: %w", err)
 	}
-	if len(m.Metrics) == 0 {
-		return fmt.Errorf("metrics cannot be empty")
-	}
+	// Structural validation only; semantic metrics checks (including
+	// completeness and threshold enforcement) are performed in the
+	// keeper's evaluateCompliance function.
 	return nil
 }
 
-// GetSigners allows either the validator operator or supernode account to submit the report.
+// GetSigners requires the supernode account to submit the report.
 func (m MsgReportSupernodeMetrics) GetSigners() []sdk.AccAddress {
-	// Prefer validator operator as signer when valid; fall back to supernode account.
-	if valAddr, err := sdk.ValAddressFromBech32(m.ValidatorAddress); err == nil {
-		return []sdk.AccAddress{sdk.AccAddress(valAddr)}
-	}
 	addr, _ := sdk.AccAddressFromBech32(m.SupernodeAccount)
 	return []sdk.AccAddress{addr}
 }

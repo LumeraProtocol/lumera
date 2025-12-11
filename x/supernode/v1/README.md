@@ -46,15 +46,15 @@ Key implementation aspects:
 
 ```go
 type SuperNode struct {
-    ValidatorAddress      string                      // Validator operator address
-    States                []SuperNodeStateRecord      // State history records
-    Evidence              []Evidence                  // Evidence of behavior/violations
+    ValidatorAddress      string                     // Validator operator address
+    States                []SuperNodeStateRecord     // State history records
+    Evidence              []Evidence                 // Evidence of behavior/violations
     PrevIpAddresses       []IPAddressHistory         // History of IP addresses
-    Note                  string                      // Optional operator note (free-form)
-    Metrics               MetricsAggregate           // Performance metrics
-    SupernodeAccount      string                      // Associated account for delegations
+    Note                  string                     // Optional operator note (free-form)
+    LegacyMetrics         MetricsAggregate           // Legacy aggregate metrics (deprecated)
+    SupernodeAccount      string                     // Associated account for this supernode
+    P2PPort               string                     // P2P network port
     PrevSupernodeAccounts []SupernodeAccountHistory  // History of supernode accounts
-    P2PPort               string                      // P2P network port
 }
 ```
 
@@ -63,7 +63,46 @@ Key implementation details:
 - State changes are recorded with timestamps and block heights
 - Evidence collection helps maintain accountability
 - Note is an optional, free-form field for operator comments or release notes
-- Metrics aggregation provides performance insights
+- `LegacyMetrics` is kept only for backwards compatibility with older aggregate metrics
+- Current performance and compliance are driven by typed `SupernodeMetrics` reports stored in `SupernodeMetricsState`
+
+### Metrics Storage and Reporting
+
+Structured metrics are reported via `MsgReportSupernodeMetrics`:
+
+- The signer and `supernode_account` field must match the current `SuperNode.SupernodeAccount` for that validator.
+- Only the registered supernode account is authorized to report metrics.
+
+Typed metrics are defined in `SupernodeMetrics` and persisted per validator in `SupernodeMetricsState`:
+
+```go
+type SupernodeMetrics struct {
+    VersionMajor     uint32
+    VersionMinor     uint32
+    VersionPatch     uint32
+    CpuCoresTotal    float64
+    CpuUsagePercent  float64
+    MemTotalGb       float64
+    MemUsagePercent  float64
+    MemFreeGb        float64
+    DiskTotalGb      float64
+    DiskUsagePercent float64
+    DiskFreeGb       float64
+    UptimeSeconds    float64
+    PeersCount       uint32
+    OpenPorts        []uint32
+}
+
+type SupernodeMetricsState struct {
+    ValidatorAddress string
+    Metrics          *SupernodeMetrics
+    ReportCount      uint64
+    Height           int64
+}
+```
+
+- Compliance is evaluated per report using only `SupernodeMetrics` and module `Params`.
+- Staleness is enforced in `EndBlocker` based on `SupernodeMetricsState.Height` for ACTIVE supernodes (with a grace period from registration for nodes that have never reported).+
 
 ### 2. SuperNodeState
 

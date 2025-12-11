@@ -3,8 +3,6 @@ package keeper
 import (
 	"fmt"
 	"math"
-	"sort"
-	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -12,151 +10,103 @@ import (
 	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
-var canonicalMetricKeys = map[string]struct{}{
-	"version.major":      {},
-	"version.minor":      {},
-	"version.patch":      {},
-	"cpu.cores_total":    {},
-	"cpu.usage_percent":  {},
-	"mem.total_gb":       {},
-	"mem.free_gb":        {},
-	"mem.usage_percent":  {},
-	"disk.total_gb":      {},
-	"disk.free_gb":       {},
-	"disk.usage_percent": {},
-	"uptime_seconds":     {},
-	"peers.count":        {},
-	"port.4444_open":     {},
-	"port.4445_open":     {},
-	"port.8002_open":     {},
-}
-
-func validateMetricKeys(metrics map[string]float64) []string {
-	issues := make([]string, 0)
-	keys := make([]string, 0, len(metrics))
-	for key := range metrics {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
-	for _, key := range keys {
-		value := metrics[key]
-		if _, ok := canonicalMetricKeys[key]; !ok {
-			if !strings.HasPrefix(key, "port.") || !strings.HasSuffix(key, "_open") {
-				issues = append(issues, fmt.Sprintf("unknown metric key: %s", key))
-			}
-		}
-		if math.IsNaN(value) || math.IsInf(value, 0) {
-			issues = append(issues, fmt.Sprintf("invalid numeric value for %s", key))
-		}
-	}
-	return issues
-}
-
-func metricValue(metrics map[string]float64, key string) (float64, bool) {
-	v, ok := metrics[key]
-	return v, ok
-}
-
-func buildVersion(metrics map[string]float64) (*semver.Version, error) {
-	major, ok := metricValue(metrics, "version.major")
-	if !ok {
-		return nil, fmt.Errorf("missing version.major")
-	}
-	minor, ok := metricValue(metrics, "version.minor")
-	if !ok {
-		return nil, fmt.Errorf("missing version.minor")
-	}
-	patch, ok := metricValue(metrics, "version.patch")
-	if !ok {
-		return nil, fmt.Errorf("missing version.patch")
-	}
-	versionStr := fmt.Sprintf("%.0f.%.0f.%.0f", major, minor, patch)
+// buildVersion reconstructs a semver from the individual
+// version fields in SupernodeMetrics.
+func buildVersion(m types.SupernodeMetrics) (*semver.Version, error) {
+	versionStr := fmt.Sprintf("%d.%d.%d", m.VersionMajor, m.VersionMinor, m.VersionPatch)
 	return semver.NewVersion(versionStr)
 }
 
-func evaluateCompliance(ctx sdk.Context, params types.Params, sn types.SuperNode, metrics map[string]float64) []string {
-	issues := validateMetricKeys(metrics)
+// evaluateCompliance validates the reported metrics against the configured
+// parameter thresholds. It returns a list of human-readable issues; an empty
+// list means the metrics are compliant. Freshness and staleness are handled
+// separately in the end-block staleness handler.
+func evaluateCompliance(ctx sdk.Context, params types.Params, m types.SupernodeMetrics) []string {
+	_ = ctx // ctx reserved for future use (e.g. logging), currently unused.
 
-	// Version check
+	issues := make([]string, 0)
+
+	checkFinite := func(name string, v float64) {
+		if math.IsNaN(v) || math.IsInf(v, 0) {
+			issues = append(issues, fmt.Sprintf("invalid numeric value for %s", name))
+		}
+	}
+
+	// 1) Version check: enforce minimum supernode binary version.
 	if minVersion, err := semver.NewVersion(params.MinSupernodeVersion); err == nil {
-		version, err := buildVersion(metrics)
+		version, err := buildVersion(m)
 		if err != nil {
-			issues = append(issues, err.Error())
+			issues = append(issues, fmt.Sprintf("invalid reported version: %v", err))
 		} else if version.LessThan(minVersion) {
 			issues = append(issues, fmt.Sprintf("version %s below minimum %s", version, minVersion))
 		}
 	} else {
 		issues = append(issues, fmt.Sprintf("invalid minimum version parameter: %v", err))
+		ctx.Logger().Error(
+			"invalid MinSupernodeVersion parameter; all reports will be marked non-compliant",
+			"value", params.MinSupernodeVersion,
+			"err", err,
+		)
 	}
 
-	// CPU
-	if cores, ok := metricValue(metrics, "cpu.cores_total"); ok {
-		if cores < params.MinCpuCores {
-			issues = append(issues, fmt.Sprintf("cpu cores %.2f below minimum %.2f", cores, params.MinCpuCores))
-		}
-	} else {
-		issues = append(issues, "cpu.cores_total missing")
+	// 2) CPU checks: minimum cores and usage within configured bounds.
+	checkFinite("cpu.cores_total", m.CpuCoresTotal)
+	checkFinite("cpu.usage_percent", m.CpuUsagePercent)
+	if m.CpuCoresTotal <= 0 {
+		issues = append(issues, "cpu.cores_total must be > 0")
 	}
-	if usage, ok := metricValue(metrics, "cpu.usage_percent"); ok {
-		if usage > params.MaxCpuUsagePercent {
-			issues = append(issues, fmt.Sprintf("cpu usage %.2f above max %.2f", usage, params.MaxCpuUsagePercent))
-		}
-		if usage < 0 || usage > 100 {
-			issues = append(issues, "cpu.usage_percent outside 0-100 range")
-		}
-	} else {
-		issues = append(issues, "cpu.usage_percent missing")
+	if m.CpuCoresTotal < params.MinCpuCores {
+		issues = append(issues, fmt.Sprintf("cpu cores %.2f below minimum %.2f", m.CpuCoresTotal, params.MinCpuCores))
+	}
+	if m.CpuUsagePercent > params.MaxCpuUsagePercent {
+		issues = append(issues, fmt.Sprintf("cpu usage %.2f above max %.2f", m.CpuUsagePercent, params.MaxCpuUsagePercent))
+	}
+	if m.CpuUsagePercent < 0 || m.CpuUsagePercent > 100 {
+		issues = append(issues, "cpu.usage_percent outside 0-100 range")
 	}
 
-	// Memory
-	if total, ok := metricValue(metrics, "mem.total_gb"); ok {
-		if total < params.MinMemGb {
-			issues = append(issues, fmt.Sprintf("mem total %.2f below minimum %.2f", total, params.MinMemGb))
-		}
-	} else {
-		issues = append(issues, "mem.total_gb missing")
+	// 3) Memory checks: minimum total GB and usage within configured bounds.
+	checkFinite("mem.total_gb", m.MemTotalGb)
+	checkFinite("mem.usage_percent", m.MemUsagePercent)
+	checkFinite("mem.free_gb", m.MemFreeGb)
+	if m.MemTotalGb <= 0 {
+		issues = append(issues, "mem.total_gb must be > 0")
 	}
-	if usage, ok := metricValue(metrics, "mem.usage_percent"); ok {
-		if usage > params.MaxMemUsagePercent {
-			issues = append(issues, fmt.Sprintf("mem usage %.2f above max %.2f", usage, params.MaxMemUsagePercent))
-		}
-		if usage < 0 || usage > 100 {
-			issues = append(issues, "mem.usage_percent outside 0-100 range")
-		}
-	} else {
-		issues = append(issues, "mem.usage_percent missing")
+	if m.MemTotalGb < params.MinMemGb {
+		issues = append(issues, fmt.Sprintf("mem total %.2f below minimum %.2f", m.MemTotalGb, params.MinMemGb))
+	}
+	if m.MemUsagePercent > params.MaxMemUsagePercent {
+		issues = append(issues, fmt.Sprintf("mem usage %.2f above max %.2f", m.MemUsagePercent, params.MaxMemUsagePercent))
+	}
+	if m.MemUsagePercent < 0 || m.MemUsagePercent > 100 {
+		issues = append(issues, "mem.usage_percent outside 0-100 range")
 	}
 
-	// Storage
-	if total, ok := metricValue(metrics, "disk.total_gb"); ok {
-		if total < params.MinStorageGb {
-			issues = append(issues, fmt.Sprintf("disk total %.2f below minimum %.2f", total, params.MinStorageGb))
-		}
-	} else {
-		issues = append(issues, "disk.total_gb missing")
+	// 4) Storage checks: minimum total GB and usage within configured bounds.
+	checkFinite("disk.total_gb", m.DiskTotalGb)
+	checkFinite("disk.usage_percent", m.DiskUsagePercent)
+	checkFinite("disk.free_gb", m.DiskFreeGb)
+	if m.DiskTotalGb <= 0 {
+		issues = append(issues, "disk.total_gb must be > 0")
 	}
-	if usage, ok := metricValue(metrics, "disk.usage_percent"); ok {
-		if usage > params.MaxStorageUsagePercent {
-			issues = append(issues, fmt.Sprintf("disk usage %.2f above max %.2f", usage, params.MaxStorageUsagePercent))
-		}
-		if usage < 0 || usage > 100 {
-			issues = append(issues, "disk.usage_percent outside 0-100 range")
-		}
-	} else {
-		issues = append(issues, "disk.usage_percent missing")
+	if m.DiskTotalGb < params.MinStorageGb {
+		issues = append(issues, fmt.Sprintf("disk total %.2f below minimum %.2f", m.DiskTotalGb, params.MinStorageGb))
+	}
+	if m.DiskUsagePercent > params.MaxStorageUsagePercent {
+		issues = append(issues, fmt.Sprintf("disk usage %.2f above max %.2f", m.DiskUsagePercent, params.MaxStorageUsagePercent))
+	}
+	if m.DiskUsagePercent < 0 || m.DiskUsagePercent > 100 {
+		issues = append(issues, "disk.usage_percent outside 0-100 range")
 	}
 
+	// 5) Network checks: all required ports must be explicitly reported as open.
+	openPorts := make(map[uint32]struct{}, len(m.OpenPorts))
+	for _, port := range m.OpenPorts {
+		openPorts[port] = struct{}{}
+	}
 	for _, port := range params.RequiredOpenPorts {
-		key := fmt.Sprintf("port.%d_open", port)
-		if val, ok := metricValue(metrics, key); !ok || val != 1 {
+		if _, ok := openPorts[port]; !ok {
 			issues = append(issues, fmt.Sprintf("required port %d not open", port))
-		}
-	}
-
-	if sn.Metrics != nil && sn.Metrics.Height > 0 {
-		if ctx.BlockHeight()-sn.Metrics.Height > int64(params.MetricsFreshnessMaxBlocks) {
-			issues = append(issues, "metrics report is stale")
 		}
 	}
 

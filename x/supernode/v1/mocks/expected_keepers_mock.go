@@ -79,6 +79,21 @@ func (mr *MockSupernodeKeeperMockRecorder) GetAllSuperNodes(ctx interface{}, sta
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAllSuperNodes", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetAllSuperNodes), varargs...)
 }
 
+// GetMetricsState mocks base method.
+func (m *MockSupernodeKeeper) GetMetricsState(ctx types0.Context, valAddr types0.ValAddress) (types.SupernodeMetricsState, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMetricsState", ctx, valAddr)
+	ret0, _ := ret[0].(types.SupernodeMetricsState)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetMetricsState indicates an expected call of GetMetricsState.
+func (mr *MockSupernodeKeeperMockRecorder) GetMetricsState(ctx, valAddr interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMetricsState", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetMetricsState), ctx, valAddr)
+}
+
 // GetAuthority mocks base method.
 func (m *MockSupernodeKeeper) GetAuthority() string {
 	m.ctrl.T.Helper()
@@ -155,6 +170,20 @@ func (mr *MockSupernodeKeeperMockRecorder) GetSuperNodesPaginated(ctx, paginatio
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{ctx, pagination}, stateFilters...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSuperNodesPaginated", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetSuperNodesPaginated), varargs...)
+}
+
+// SetMetricsState mocks base method.
+func (m *MockSupernodeKeeper) SetMetricsState(ctx types0.Context, state types.SupernodeMetricsState) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetMetricsState", ctx, state)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetMetricsState indicates an expected call of SetMetricsState.
+func (mr *MockSupernodeKeeperMockRecorder) SetMetricsState(ctx, state interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetMetricsState", reflect.TypeOf((*MockSupernodeKeeper)(nil).SetMetricsState), ctx, state)
 }
 
 // IsEligibleAndNotJailedValidator mocks base method.

@@ -30,18 +30,49 @@ func (m msgServer) ReportSupernodeMetrics(goCtx context.Context, msg *types.MsgR
 		return nil, errorsmod.Wrapf(sdkerrors.ErrNotFound, "supernode for validator %s not found", msg.ValidatorAddress)
 	}
 
+	// Enforce that metrics are reported only by the currently configured
+	// supernode account for this validator. If no supernode account is set on-chain,
+	// metrics reporting is not permitted.
+	if sn.SupernodeAccount == "" {
+		return nil, errorsmod.Wrapf(
+			sdkerrors.ErrUnauthorized,
+			"supernode account not set for validator %s",
+			msg.ValidatorAddress,
+		)
+	}
+	if msg.SupernodeAccount != sn.SupernodeAccount {
+		return nil, errorsmod.Wrapf(
+			sdkerrors.ErrUnauthorized,
+			"reported supernode account %s does not match registered account %s",
+			msg.SupernodeAccount,
+			sn.SupernodeAccount,
+		)
+	}
+
 	params := m.GetParams(ctx)
-	issues := evaluateCompliance(ctx, params, sn, msg.Metrics)
+	// Compliance evaluation operates only on the structured metrics payload.
+	issues := evaluateCompliance(ctx, params, msg.Metrics)
 	compliant := len(issues) == 0
 
-	if sn.Metrics == nil {
-		sn.Metrics = &types.MetricsAggregate{}
+	// Persist the latest structured metrics in the dedicated metrics state table.
+	var reportCount uint64
+	if existing, ok := m.GetMetricsState(ctx, valAddr); ok {
+		reportCount = existing.ReportCount
 	}
-	sn.Metrics.Metrics = msg.Metrics
-	sn.Metrics.ReportCount++
-	sn.Metrics.Height = ctx.BlockHeight()
+	reportCount++
+
+	metricsState := types.SupernodeMetricsState{
+		ValidatorAddress: sn.ValidatorAddress,
+		Metrics:          &msg.Metrics,
+		ReportCount:      reportCount,
+		Height:           ctx.BlockHeight(),
+	}
+	if err := m.SetMetricsState(ctx, metricsState); err != nil {
+		return nil, err
+	}
 
 	// State transition handling
+	stateChanged := false
 	if len(sn.States) > 0 {
 		lastState := sn.States[len(sn.States)-1].State
 		if compliant {
@@ -50,18 +81,22 @@ func (m msgServer) ReportSupernodeMetrics(goCtx context.Context, msg *types.MsgR
 				if err := recoverFromPostponed(ctx, m.SupernodeKeeper, &sn, target); err != nil {
 					return nil, err
 				}
+				stateChanged = true
 			}
 		} else {
 			if lastState != types.SuperNodeStatePostponed {
 				if err := markPostponed(ctx, m.SupernodeKeeper, &sn, strings.Join(issues, ";")); err != nil {
 					return nil, err
 				}
+				stateChanged = true
 			}
 		}
 	}
 
-	if err := m.SetSuperNode(ctx, sn); err != nil {
-		return nil, err
+	if !stateChanged {
+		if err := m.SetSuperNode(ctx, sn); err != nil {
+			return nil, err
+		}
 	}
 
 	ctx.EventManager().EmitEvent(

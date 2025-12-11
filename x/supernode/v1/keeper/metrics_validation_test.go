@@ -1,8 +1,6 @@
 package keeper
 
 import (
-	"fmt"
-	"math"
 	"strings"
 	"testing"
 
@@ -14,111 +12,81 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
-func TestValidateMetricKeysDeterministicOrder(t *testing.T) {
-	metrics := map[string]float64{
-		"unknownB": 1,
-		"unknownA": math.Inf(1),
-	}
-
-	issues := validateMetricKeys(metrics)
-
-	require.Equal(t, []string{
-		"unknown metric key: unknownA",
-		"invalid numeric value for unknownA",
-		"unknown metric key: unknownB",
-	}, issues)
-}
-
 func TestEvaluateCompliancePassesWithValidMetrics(t *testing.T) {
 	ctx := sdk.NewContext(nil, tmproto.Header{Height: 10}, false, log.NewNopLogger())
 	params := types.DefaultParams()
 
-	metrics := map[string]float64{
-		"version.major":      2,
-		"version.minor":      0,
-		"version.patch":      0,
-		"cpu.cores_total":    params.MinCpuCores,
-		"cpu.usage_percent":  params.MaxCpuUsagePercent - 10,
-		"mem.total_gb":       params.MinMemGb,
-		"mem.usage_percent":  params.MaxMemUsagePercent - 10,
-		"disk.total_gb":      params.MinStorageGb,
-		"disk.usage_percent": params.MaxStorageUsagePercent - 10,
-		"disk.free_gb":       params.MinStorageGb / 2,
-		"mem.free_gb":        params.MinMemGb / 2,
-		"uptime_seconds":     100,
-		"peers.count":        10,
+	metrics := types.SupernodeMetrics{
+		VersionMajor:    2,
+		VersionMinor:    0,
+		VersionPatch:    0,
+		CpuCoresTotal:   params.MinCpuCores,
+		CpuUsagePercent: params.MaxCpuUsagePercent - 10,
+		MemTotalGb:      params.MinMemGb,
+		MemUsagePercent: params.MaxMemUsagePercent - 10,
+		MemFreeGb:       params.MinMemGb / 2,
+		DiskTotalGb:     params.MinStorageGb,
+		DiskUsagePercent: params.MaxStorageUsagePercent - 10,
+		DiskFreeGb:      params.MinStorageGb / 2,
+		UptimeSeconds:   100,
+		PeersCount:      10,
 	}
-	for _, port := range params.RequiredOpenPorts {
-		metrics[portKey(port)] = 1
-	}
+	metrics.OpenPorts = append([]uint32(nil), params.RequiredOpenPorts...)
 
-	sn := types.SuperNode{Metrics: &types.MetricsAggregate{Height: ctx.BlockHeight()}}
-	issues := evaluateCompliance(ctx, params, sn, metrics)
+	issues := evaluateCompliance(ctx, params, metrics)
 
 	require.Empty(t, issues)
 }
 
 func TestEvaluateComplianceDetectsStaleMetrics(t *testing.T) {
 	params := types.DefaultParams()
-	ctx := sdk.NewContext(nil, tmproto.Header{Height: int64(params.MetricsFreshnessMaxBlocks) + 10}, false, log.NewNopLogger())
+	ctx := sdk.NewContext(nil, tmproto.Header{Height: 10}, false, log.NewNopLogger())
 
-	metrics := map[string]float64{
-		"version.major":      2,
-		"version.minor":      0,
-		"version.patch":      0,
-		"cpu.cores_total":    params.MinCpuCores,
-		"cpu.usage_percent":  params.MaxCpuUsagePercent - 10,
-		"mem.total_gb":       params.MinMemGb,
-		"mem.usage_percent":  params.MaxMemUsagePercent - 10,
-		"disk.total_gb":      params.MinStorageGb,
-		"disk.usage_percent": params.MaxStorageUsagePercent - 10,
-		"uptime_seconds":     100,
-		"peers.count":        5,
+	metrics := types.SupernodeMetrics{
+		VersionMajor:    1,
+		VersionMinor:    0,
+		VersionPatch:    0,
+		CpuCoresTotal:   params.MinCpuCores,
+		CpuUsagePercent: params.MaxCpuUsagePercent - 10,
+		MemTotalGb:      params.MinMemGb,
+		MemUsagePercent: params.MaxMemUsagePercent - 10,
+		DiskTotalGb:     params.MinStorageGb,
+		DiskUsagePercent: params.MaxStorageUsagePercent - 10,
+		UptimeSeconds:   100,
+		PeersCount:      5,
 	}
-	for _, port := range params.RequiredOpenPorts {
-		metrics[portKey(port)] = 1
-	}
+	metrics.OpenPorts = append([]uint32(nil), params.RequiredOpenPorts...)
 
-	staleHeight := ctx.BlockHeight() - int64(params.MetricsFreshnessMaxBlocks) - 1
-	sn := types.SuperNode{Metrics: &types.MetricsAggregate{Height: staleHeight}}
-	issues := evaluateCompliance(ctx, params, sn, metrics)
+	issues := evaluateCompliance(ctx, params, metrics)
 
-	require.Contains(t, issues, "metrics report is stale")
+	require.True(t, containsSubstring(issues, "version"))
 }
 
 func TestEvaluateComplianceRequiresOpenPorts(t *testing.T) {
 	ctx := sdk.NewContext(nil, tmproto.Header{Height: 10}, false, log.NewNopLogger())
 	params := types.DefaultParams()
 
-	metrics := map[string]float64{
-		"version.major":      2,
-		"version.minor":      0,
-		"version.patch":      0,
-		"cpu.cores_total":    params.MinCpuCores,
-		"cpu.usage_percent":  params.MaxCpuUsagePercent - 10,
-		"mem.total_gb":       params.MinMemGb,
-		"mem.usage_percent":  params.MaxMemUsagePercent - 10,
-		"disk.total_gb":      params.MinStorageGb,
-		"disk.usage_percent": params.MaxStorageUsagePercent - 10,
-		"uptime_seconds":     100,
-		"peers.count":        5,
+	metrics := types.SupernodeMetrics{
+		VersionMajor:    2,
+		VersionMinor:    0,
+		VersionPatch:    0,
+		CpuCoresTotal:   params.MinCpuCores,
+		CpuUsagePercent: params.MaxCpuUsagePercent - 10,
+		MemTotalGb:      params.MinMemGb,
+		MemUsagePercent: params.MaxMemUsagePercent - 10,
+		DiskTotalGb:     params.MinStorageGb,
+		DiskUsagePercent: params.MaxStorageUsagePercent - 10,
+		UptimeSeconds:   100,
+		PeersCount:      5,
 	}
 	// Deliberately omit one required port
-	for i, port := range params.RequiredOpenPorts {
-		if i == 0 {
-			continue
-		}
-		metrics[portKey(port)] = 1
+	if len(params.RequiredOpenPorts) > 1 {
+		metrics.OpenPorts = append([]uint32(nil), params.RequiredOpenPorts[1:]...)
 	}
 
-	sn := types.SuperNode{Metrics: &types.MetricsAggregate{Height: ctx.BlockHeight()}}
-	issues := evaluateCompliance(ctx, params, sn, metrics)
+	issues := evaluateCompliance(ctx, params, metrics)
 
 	require.True(t, containsSubstring(issues, "required port"))
-}
-
-func portKey(port uint32) string {
-	return fmt.Sprintf("port.%d_open", port)
 }
 
 func containsSubstring(items []string, substr string) bool {

@@ -140,17 +140,14 @@ func (am AppModule) ExportGenesis(ctx sdk.Context, cdc codec.JSONCodec) json.Raw
 // To avoid wrong/empty versions, the initial version should be set to 1.
 func (AppModule) ConsensusVersion() uint64 { return 1 }
 
-// BeginBlock contains the logic that is automatically triggered at the beginning of each block.
-// The begin block implementation is optional.
-func (am AppModule) BeginBlock(_ context.Context) error {
-	return nil
+// BeginBlock delegates begin-block logic to the keeper's BeginBlocker.
+func (am AppModule) BeginBlock(ctx context.Context) error {
+	return am.keeper.BeginBlocker(ctx)
 }
 
-// EndBlock contains the logic that is automatically triggered at the end of each block.
-// The end block implementation is optional.
+// EndBlock delegates end-block logic to the keeper's EndBlocker.
 func (am AppModule) EndBlock(ctx context.Context) error {
-	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	return am.keeper.HandleMetricsStaleness(sdkCtx)
+	return am.keeper.EndBlocker(ctx)
 }
 
 // IsAppModule implements the appmodule.AppModule interface.

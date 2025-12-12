@@ -1,0 +1,44 @@
+syntax = "proto3";
+package lumera.supernode.v1;
+
+option go_package = "x/supernode/v1/types";
+
+import "gogoproto/gogo.proto";
+
+// SupernodeMetrics defines the structured metrics reported by a supernode.
+message SupernodeMetrics {
+  // Semantic version of the supernode software.
+  uint32 version_major = 1;
+  uint32 version_minor = 2;
+  uint32 version_patch = 3;
+
+  // CPU metrics.
+  double cpu_cores_total   = 4;
+  double cpu_usage_percent = 5;
+
+  // Memory metrics (GB).
+  double mem_total_gb      = 6;
+  double mem_usage_percent = 7;
+  double mem_free_gb       = 8;
+
+  // Storage metrics (GB).
+  double disk_total_gb      = 9;
+  double disk_usage_percent = 10;
+  double disk_free_gb       = 11;
+
+  // Uptime and connectivity.
+  double uptime_seconds = 12;
+  uint32 peers_count    = 13;
+
+  // List of TCP ports that the supernode reports as open.
+  repeated uint32 open_ports = 14;
+}
+
+// SupernodeMetricsState stores the latest metrics state for a validator.
+message SupernodeMetricsState {
+  string validator_address = 1 [(gogoproto.moretags) = "yaml:\"validator_address\""];
+  SupernodeMetrics metrics = 2;
+  uint64 report_count      = 3;
+  int64 height             = 4;
+}
+

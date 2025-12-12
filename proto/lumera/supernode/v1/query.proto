@@ -10,6 +10,7 @@ import "cosmos/base/query/v1beta1/pagination.proto";
 import "lumera/supernode/v1/params.proto";
 import "lumera/supernode/v1/super_node.proto";
 import "lumera/supernode/v1/supernode_state.proto";
+import "lumera/supernode/v1/metrics.proto";
 
 // Query defines the gRPC querier service.
 service Query {
@@ -41,6 +42,12 @@ service Query {
   // Queries a list of GetTopSuperNodesForBlock items.
   rpc GetTopSuperNodesForBlock (QueryGetTopSuperNodesForBlockRequest) returns (QueryGetTopSuperNodesForBlockResponse) {
     option (google.api.http).get = "/LumeraProtocol/lumera/supernode/v1/get_top_super_nodes_for_block/{blockHeight}";
+  
+  }
+
+  // Queries the latest metrics state for a validator.
+  rpc GetMetrics (QueryGetMetricsRequest) returns (QueryGetMetricsResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/supernode/v1/metrics/{validatorAddress}";
   
   }
 }
@@ -98,3 +105,12 @@ message QueryGetTopSuperNodesForBlockResponse {
   repeated SuperNode supernodes = 1;
 }
 
+// QueryGetMetricsRequest is request type for the Query/GetMetrics RPC method.
+message QueryGetMetricsRequest {
+  string validatorAddress = 1;
+}
+
+// QueryGetMetricsResponse is response type for the Query/GetMetrics RPC method.
+message QueryGetMetricsResponse {
+  SupernodeMetricsState metrics_state = 1;
+}

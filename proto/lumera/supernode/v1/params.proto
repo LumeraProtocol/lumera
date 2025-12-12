@@ -23,4 +23,25 @@ message Params {
   string evidence_retention_period = 5 [(gogoproto.moretags) = "yaml:\"evidence_retention_period\""];
   string slashing_fraction = 6 [(gogoproto.moretags) = "yaml:\"slashing_fraction\""];
   string inactivity_penalty_period = 7 [(gogoproto.moretags) = "yaml:\"inactivity_penalty_period\""];
+
+  // Expected cadence (in blocks) between supernode metrics reports. The daemon
+  // can run on a timer using expected block time, but the chain enforces
+  // height-based staleness strictly in blocks.
+  uint64 metrics_update_interval_blocks = 8 [(gogoproto.moretags) = "yaml:\"metrics_update_interval_blocks\""];
+  // Additional grace (in blocks) before marking metrics overdue/stale.
+  uint64 metrics_grace_period_blocks = 9 [(gogoproto.moretags) = "yaml:\"metrics_grace_period_blocks\""];
+  // Maximum acceptable staleness (in blocks) for a metrics report when
+  // validating freshness.
+  uint64 metrics_freshness_max_blocks = 10 [(gogoproto.moretags) = "yaml:\"metrics_freshness_max_blocks\""];
+
+  string min_supernode_version = 11 [(gogoproto.moretags) = "yaml:\"min_supernode_version\""];
+
+  uint64 min_cpu_cores = 12 [(gogoproto.moretags) = "yaml:\"min_cpu_cores\""];
+  uint64 max_cpu_usage_percent = 13 [(gogoproto.moretags) = "yaml:\"max_cpu_usage_percent\""];
+  uint64 min_mem_gb = 14 [(gogoproto.moretags) = "yaml:\"min_mem_gb\""];
+  uint64 max_mem_usage_percent = 15 [(gogoproto.moretags) = "yaml:\"max_mem_usage_percent\""];
+  uint64 min_storage_gb = 16 [(gogoproto.moretags) = "yaml:\"min_storage_gb\""];
+  uint64 max_storage_usage_percent = 17 [(gogoproto.moretags) = "yaml:\"max_storage_usage_percent\""];
+
+  repeated uint32 required_open_ports = 18 [(gogoproto.moretags) = "yaml:\"required_open_ports\""];
 }

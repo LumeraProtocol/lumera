@@ -24,6 +24,8 @@ type SupernodeKeeper interface {
 	CheckValidatorSupernodeEligibility(ctx sdk.Context, validator stakingtypes.ValidatorI, valAddr string, supernodeAccount string) error
 	SetSuperNodeStopped(ctx sdk.Context, valAddr sdk.ValAddress, reason string) error
 	SetSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress, reason string) error
+	SetMetricsState(ctx sdk.Context, state SupernodeMetricsState) error
+	GetMetricsState(ctx sdk.Context, valAddr sdk.ValAddress) (SupernodeMetricsState, bool)
 	
 	Logger() log.Logger
 	GetAuthority() string

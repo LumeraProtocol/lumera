@@ -12,10 +12,8 @@ func (m *MsgUpdateParams) ValidateBasic() error {
 	if _, err := sdk.AccAddressFromBech32(m.Authority); err != nil {
 		return errorsmod.Wrap(err, "invalid authority address")
 	}
-
-	if err := m.Params.Validate(); err != nil {
-		return err
-	}
-
+	// Params validation is performed server-side after merging with existing
+	// values. This keeps the message backward-compatible with callers that omit
+	// newly added fields, ensuring proposals remain valid across upgrades.
 	return nil
 }

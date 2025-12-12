@@ -4,7 +4,7 @@ go 1.25.1
 
 replace (
 	github.com/LumeraProtocol/lumera => ../../
-	github.com/LumeraProtocol/supernode/v2 => ../../../supernode
+
 	github.com/cosmos/cosmos-sdk => github.com/cosmos/cosmos-sdk v0.50.14
 )
 
@@ -30,8 +30,8 @@ require (
 
 require (
 	cosmossdk.io/math v1.5.3
-	github.com/LumeraProtocol/lumera v0.0.0-00010101000000-000000000000
-	github.com/LumeraProtocol/supernode/v2 v2.0.0-00010101000000-000000000000
+	github.com/LumeraProtocol/lumera v1.8.5
+	github.com/LumeraProtocol/supernode/v2 v2.4.10
 	github.com/cometbft/cometbft v0.38.18
 	github.com/cosmos/cosmos-sdk v0.53.0
 	github.com/tidwall/gjson v1.14.2

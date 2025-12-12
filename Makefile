@@ -146,4 +146,4 @@ systemex-tests:
 
 system-metrics-test:
 	@echo "Running supernode metrics system tests (E2E + staleness)..."
-	cd ./tests/systemtests/ && go test -tags=system_test -v . -run 'TestSupernodeMetrics(E2E|StalenessAndRecovery)'
+	cd ./tests/systemtests/ && go test -tags=system_test -timeout 20m -v . -run 'TestSupernodeMetrics(E2E|StalenessAndRecovery)'

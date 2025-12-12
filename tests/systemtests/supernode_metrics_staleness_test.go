@@ -3,16 +3,11 @@
 package system
 
 import (
-	"context"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
 
-	"github.com/LumeraProtocol/supernode/v2/pkg/keyring"
-	"github.com/LumeraProtocol/supernode/v2/pkg/lumera"
-	"github.com/LumeraProtocol/supernode/v2/supernode/config"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/sjson"
 
@@ -26,6 +21,7 @@ func TestSupernodeMetricsStalenessAndRecovery(t *testing.T) {
 
 	sut.ModifyGenesisJSON(t, SetStakingBondDenomUlume(t), SetSupernodeStalenessParams(t))
 	sut.StartChain(t)
+	defer sut.StopChain()
 
 	cli := NewLumeradCLI(t, sut, true)
 
@@ -64,30 +60,6 @@ func TestSupernodeMetricsStalenessAndRecovery(t *testing.T) {
 	cli.FundAddressWithNode(sn2.account, "100000ulume", "node1")
 	sut.AwaitNextBlock(t)
 
-	ctx := context.Background()
-
-	clientFor := func(keyName string, home string) lumera.Client {
-		kr, err := keyring.InitKeyring(config.KeyringConfig{
-			Backend: "test",
-			Dir:     home,
-		})
-		require.NoError(t, err)
-
-		cfg, cfgErr := lumera.NewConfig("localhost:9090", sut.chainID, keyName, kr)
-		require.NoError(t, cfgErr)
-
-		client, cliErr := lumera.NewClient(ctx, cfg)
-		require.NoError(t, cliErr)
-		return client
-	}
-
-	queryClient := clientFor("node0", filepath.Join(WorkDir, sut.nodePath(0)))
-	defer queryClient.Close()
-	client1 := clientFor("node0", filepath.Join(WorkDir, sut.nodePath(0)))
-	defer client1.Close()
-	client2 := clientFor("node1", filepath.Join(WorkDir, sut.nodePath(1)))
-	defer client2.Close()
-
 	baseMetrics := sntypes.SupernodeMetrics{
 		VersionMajor:     2,
 		VersionMinor:     0,
@@ -106,11 +78,11 @@ func TestSupernodeMetricsStalenessAndRecovery(t *testing.T) {
 	}
 
 	getState := func(accountAddr string) sntypes.SuperNodeState {
-		sn, err := queryClient.SuperNode().GetSupernodeBySupernodeAddress(ctx, accountAddr)
-		require.NoError(t, err)
+		sn := querySupernodeByAddress(t, cli, accountAddr)
 		require.NotNil(t, sn)
-		require.NotEmpty(t, sn.States)
-		return sn.States[len(sn.States)-1].State
+		require.NotNil(t, sn.Supernode)
+		require.NotEmpty(t, sn.Supernode.States)
+		return sn.Supernode.States[len(sn.Supernode.States)-1].State
 	}
 
 	waitForState := func(accountAddr string, expected sntypes.SuperNodeState, maxBlocks int) {
@@ -124,11 +96,9 @@ func TestSupernodeMetricsStalenessAndRecovery(t *testing.T) {
 	}
 
 	// SN1 reports compliant metrics once.
-	txResp, err := client1.SuperNodeMsg().ReportMetrics(ctx, sn1.account, baseMetrics)
-	require.NoError(t, err, "failed to broadcast metrics tx for SN1")
-	require.NotNil(t, txResp)
-	require.NotNil(t, txResp.TxResponse)
-	require.Zero(t, txResp.TxResponse.Code, "metrics tx failed: %v", txResp.TxResponse.RawLog)
+	txHash := reportSupernodeMetrics(t, cli, "node0", sn1.valAddr, sn1.account, baseMetrics)
+	txResp := decodeTxResponse(t, waitForTx(t, cli, txHash))
+	require.Zero(t, txResp.Code, "metrics tx failed: %v", txResp.RawLog)
 	metricsHeight := sut.AwaitNextBlock(t)
 
 	// SN1 should become ACTIVE after reporting; SN2 eventually gets POSTPONED due to missing metrics.
@@ -145,11 +115,9 @@ func TestSupernodeMetricsStalenessAndRecovery(t *testing.T) {
 	waitForState(sn1.account, sntypes.SuperNodeStatePostponed, 3)
 
 	// SN1 recovers with fresh metrics; SN2 stays POSTPONED because it never reports.
-	txRespFresh, err := client1.SuperNodeMsg().ReportMetrics(ctx, sn1.account, baseMetrics)
-	require.NoError(t, err, "failed to broadcast recovery metrics tx for SN1")
-	require.NotNil(t, txRespFresh)
-	require.NotNil(t, txRespFresh.TxResponse)
-	require.Zero(t, txRespFresh.TxResponse.Code, "recovery metrics tx failed: %v", txRespFresh.TxResponse.RawLog)
+	txHashFresh := reportSupernodeMetrics(t, cli, "node0", sn1.valAddr, sn1.account, baseMetrics)
+	txRespFresh := decodeTxResponse(t, waitForTx(t, cli, txHashFresh))
+	require.Zero(t, txRespFresh.Code, "recovery metrics tx failed: %v", txRespFresh.RawLog)
 	sut.AwaitNextBlock(t)
 
 	waitForState(sn1.account, sntypes.SuperNodeStateActive, 4)
@@ -193,30 +161,12 @@ func TestSupernodeMetricsNoReportsAllPostponed(t *testing.T) {
 	cli.FundAddressWithNode(sn2.account, "100000ulume", "node1")
 	sut.AwaitNextBlock(t)
 
-	ctx := context.Background()
-	clientFor := func(keyName string, home string) lumera.Client {
-		kr, err := keyring.InitKeyring(config.KeyringConfig{
-			Backend: "test",
-			Dir:     home,
-		})
-		require.NoError(t, err)
-
-		cfg, cfgErr := lumera.NewConfig("localhost:9090", sut.chainID, keyName, kr)
-		require.NoError(t, cfgErr)
-
-		client, cliErr := lumera.NewClient(ctx, cfg)
-		require.NoError(t, cliErr)
-		return client
-	}
-	queryClient := clientFor("node0", filepath.Join(WorkDir, sut.nodePath(0)))
-	defer queryClient.Close()
-
 	getState := func(accountAddr string) sntypes.SuperNodeState {
-		sn, err := queryClient.SuperNode().GetSupernodeBySupernodeAddress(ctx, accountAddr)
-		require.NoError(t, err)
+		sn := querySupernodeByAddress(t, cli, accountAddr)
 		require.NotNil(t, sn)
-		require.NotEmpty(t, sn.States)
-		return sn.States[len(sn.States)-1].State
+		require.NotNil(t, sn.Supernode)
+		require.NotEmpty(t, sn.Supernode.States)
+		return sn.Supernode.States[len(sn.Supernode.States)-1].State
 	}
 
 	waitForState := func(accountAddr string, expected sntypes.SuperNodeState, maxBlocks int) {

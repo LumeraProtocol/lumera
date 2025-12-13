@@ -28,16 +28,16 @@ func (k Keeper) SetSuperNode(ctx sdk.Context, supernode types.SuperNode) error {
 	// Create a prefix store so that all keys are under SuperNodeKey
 	store := prefix.NewStore(storeAdapter, []byte(types.SuperNodeKey))
 
-	// Marshal the SuperNode into bytes
-	b, err := k.cdc.Marshal(&supernode)
-	if err != nil {
-		return err
-	}
-
 	// Use the validator address as the key (since it's unique).
 	valOperAddr, err := sdk.ValAddressFromBech32(supernode.ValidatorAddress)
 	if err != nil {
 		return errorsmod.Wrapf(err, "invalid validator address: %s", err)
+	}
+
+	// Marshal the SuperNode into bytes
+	b, err := k.cdc.Marshal(&supernode)
+	if err != nil {
+		return err
 	}
 
 	// Set the supernode record under [SuperNodeKeyPrefix + valOperAddr]
@@ -83,7 +83,7 @@ func (k Keeper) GetAllSuperNodes(ctx sdk.Context, stateFilters ...types.SuperNod
 			return nil, fmt.Errorf("failed to unmarshal supernode: %w", err)
 		}
 
-		// skip if no states at all
+		// skip if no states at all to avoid panics on corrupted/legacy records
 		if len(sn.States) == 0 {
 			continue
 		}
@@ -97,6 +97,29 @@ func (k Keeper) GetAllSuperNodes(ctx sdk.Context, stateFilters ...types.SuperNod
 	return supernodes, nil
 }
 
+// GetSuperNodeByAccount returns the supernode record for a given supernode account address, if present.
+func (k Keeper) GetSuperNodeByAccount(ctx sdk.Context, supernodeAccount string) (types.SuperNode, bool, error) {
+	storeAdapter := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
+	store := prefix.NewStore(storeAdapter, []byte(types.SuperNodeKey))
+
+	iterator := store.Iterator(nil, nil)
+	defer iterator.Close()
+
+	for ; iterator.Valid(); iterator.Next() {
+		bz := iterator.Value()
+		var sn types.SuperNode
+		if err := k.cdc.Unmarshal(bz, &sn); err != nil {
+			return types.SuperNode{}, false, fmt.Errorf("failed to unmarshal supernode: %w", err)
+		}
+
+		if sn.GetSupernodeAccount() == supernodeAccount {
+			return sn, true, nil
+		}
+	}
+
+	return types.SuperNode{}, false, nil
+}
+
 // GetSuperNodesPaginated returns paginated supernodes, optionally filtered by state
 func (k Keeper) GetSuperNodesPaginated(ctx sdk.Context, pagination *query.PageRequest, stateFilters ...types.SuperNodeState) ([]*types.SuperNode, *query.PageResponse, error) {
 	storeAdapter := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
@@ -105,20 +128,27 @@ func (k Keeper) GetSuperNodesPaginated(ctx sdk.Context, pagination *query.PageRe
 	var supernodes []*types.SuperNode
 	filtering := shouldFilter(stateFilters...)
 
-	pageRes, err := query.Paginate(store, pagination, func(key, value []byte) error {
+	pageRes, err := query.FilteredPaginate(store, pagination, func(key, value []byte, accumulate bool) (bool, error) {
 		var sn types.SuperNode
 		if err := k.cdc.Unmarshal(value, &sn); err != nil {
-			return err
+			return false, err
 		}
 
+		// Skip records with no states to avoid panics on corrupted/legacy data
 		if len(sn.States) == 0 {
-			return nil
+			return false, nil
 		}
 
-		if !filtering || stateIn(sn.States[len(sn.States)-1].State, stateFilters...) {
+		// If filtering by state, skip non-matching states
+		if filtering && !stateIn(sn.States[len(sn.States)-1].State, stateFilters...) {
+			return false, nil
+		}
+
+		if accumulate {
 			supernodes = append(supernodes, &sn)
 		}
-		return nil
+
+		return true, nil
 	})
 	if err != nil {
 		return nil, nil, err
@@ -164,6 +194,9 @@ func (k Keeper) SetSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress, reas
 		})
 	case types.SuperNodeStateActive:
 		// Already active, nothing to do
+		return nil
+	default:
+		// For penalized or any other state, do nothing and return without emitting events
 		return nil
 	}
 	if err := k.SetSuperNode(ctx, supernode); err != nil {

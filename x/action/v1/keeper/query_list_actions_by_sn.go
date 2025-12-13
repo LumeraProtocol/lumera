@@ -25,9 +25,13 @@ func (q queryServer) ListActionsBySuperNode(goCtx context.Context, req *types.Qu
 
 	store := q.k.storeService.OpenKVStore(ctx)
 	storeAdapter := runtime.KVStoreAdapter(store)
-	actionStore := prefix.NewStore(storeAdapter, []byte(ActionKeyPrefix))
+	var (
+		actions []*types.Action
+		pageRes *query.PageResponse
+		err     error
+	)
 
-	var actions []*types.Action
+	actionStore := prefix.NewStore(storeAdapter, []byte(ActionKeyPrefix))
 
 	onResult := func(key, value []byte, accumulate bool) (bool, error) {
 		var act actiontypes.Action
@@ -35,24 +39,20 @@ func (q queryServer) ListActionsBySuperNode(goCtx context.Context, req *types.Qu
 			return false, err
 		}
 
-		if slices.Contains(act.SuperNodes, req.SuperNodeAddress) && accumulate {
-			actions = append(actions, &types.Action{
-				Creator:        act.Creator,
-				ActionID:       act.ActionID,
-				ActionType:     types.ActionType(act.ActionType),
-				Metadata:       act.Metadata,
-				Price:          act.Price,
-				ExpirationTime: act.ExpirationTime,
-				State:          types.ActionState(act.State),
-				BlockHeight:    act.BlockHeight,
-				SuperNodes:     act.SuperNodes,
-			})
+		if !slices.Contains(act.SuperNodes, req.SuperNodeAddress) {
+			// Skip actions not associated with the requested supernode
+			return false, nil
+		}
+
+		if accumulate {
+			actCopy := act
+			actions = append(actions, &actCopy)
 		}
 
 		return true, nil
 	}
 
-	pageRes, err := query.FilteredPaginate(actionStore, req.Pagination, onResult)
+	pageRes, err = query.FilteredPaginate(actionStore, req.Pagination, onResult)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to paginate actions: %v", err)
 	}
@@ -60,5 +60,6 @@ func (q queryServer) ListActionsBySuperNode(goCtx context.Context, req *types.Qu
 	return &types.QueryListActionsBySuperNodeResponse{
 		Actions:    actions,
 		Pagination: pageRes,
+		Total:      pageRes.GetTotal(),
 	}, nil
 }

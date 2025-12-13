@@ -74,6 +74,13 @@ func TestKeeper_ListActionsByCreator(t *testing.T) {
 			expectedErr: status.Error(codes.InvalidArgument, "creator address must be provided"),
 		},
 		{
+			name: "invalid creator address format",
+			req: &types.QueryListActionsByCreatorRequest{
+				Creator: "invalid-address",
+			},
+			expectedErr: status.Error(codes.InvalidArgument, "invalid creator address"),
+		},
+		{
 			name: "no actions for creator",
 			req: &types.QueryListActionsByCreatorRequest{
 				Creator: creator,

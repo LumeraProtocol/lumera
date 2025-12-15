@@ -45,6 +45,7 @@ func (q queryServer) ListExpiredActions(goCtx context.Context, req *types.QueryL
 					State:          types.ActionState(act.State),
 					BlockHeight:    act.BlockHeight,
 					SuperNodes:     act.SuperNodes,
+					FileSizeKbs:    act.FileSizeKbs,
 				})
 			}
 			return true, nil

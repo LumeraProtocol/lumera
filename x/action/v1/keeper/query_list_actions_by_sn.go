@@ -46,6 +46,7 @@ func (q queryServer) ListActionsBySuperNode(goCtx context.Context, req *types.Qu
 				State:          types.ActionState(act.State),
 				BlockHeight:    act.BlockHeight,
 				SuperNodes:     act.SuperNodes,
+				FileSizeKbs:    act.FileSizeKbs,
 			})
 		}
 

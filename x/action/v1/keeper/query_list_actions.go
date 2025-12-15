@@ -53,6 +53,7 @@ func (q queryServer) ListActions(goCtx context.Context, req *types.QueryListActi
 				State:          types.ActionState(act.State),
 				BlockHeight:    act.BlockHeight,
 				SuperNodes:     act.SuperNodes,
+				FileSizeKbs:    act.FileSizeKbs,
 			})
 		}
 

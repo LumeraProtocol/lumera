@@ -49,6 +49,7 @@ func (q queryServer) ListActionsByBlockHeight(goCtx context.Context, req *types.
 				State:          types.ActionState(act.State),
 				BlockHeight:    act.BlockHeight,
 				SuperNodes:     act.SuperNodes,
+				FileSizeKbs:    act.FileSizeKbs,
 			})
 		}
 

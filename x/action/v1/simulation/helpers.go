@@ -46,6 +46,7 @@ func registerSenseAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account,
 		senseMetadata,
 		feeAmount.String(),
 		strconv.FormatInt(expirationTime, 10),
+		"",
 	)
 
 	// 6. Cache keeper state for simulation
@@ -91,6 +92,7 @@ func registerCascadeAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Accoun
 		cascadeMetadata,
 		feeAmount.String(),
 		strconv.FormatInt(expirationTime, 10),
+		"",
 	)
 
 	// 6. Cache keeper state for simulation

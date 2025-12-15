@@ -11,13 +11,14 @@ import (
 
 var _ sdk.Msg = &MsgRequestAction{}
 
-func NewMsgRequestAction(creator string, actionType string, metadata string, price string, expirationTime string) *MsgRequestAction {
+func NewMsgRequestAction(creator string, actionType string, metadata string, price string, expirationTime string, fileSizeKbs string) *MsgRequestAction {
 	return &MsgRequestAction{
 		Creator:        creator,
 		ActionType:     actionType,
 		Metadata:       metadata,
 		Price:          price,
 		ExpirationTime: expirationTime,
+		FileSizeKbs:    fileSizeKbs,
 	}
 }
 
@@ -76,6 +77,17 @@ func (msg *MsgRequestAction) ValidateBasic() error {
 
 	if err = DoActionValidation(msg.Metadata, msg.ActionType, common.MsgRequestAction); err != nil {
 		return errorsmod.Wrapf(ErrInvalidMetadata, "metadata validation failed, %s", err)
+	}
+
+	// Validate fileSizeKbs: allow empty, otherwise must be int64 >= 0
+	if msg.FileSizeKbs != "" {
+		fileSizeKbs, err := strconv.ParseInt(msg.FileSizeKbs, 10, 64)
+		if err != nil {
+			return errorsmod.Wrapf(ErrInvalidFileSize, "invalid fileSizeKbs format, %s", err)
+		}
+		if fileSizeKbs < 0 {
+			return errorsmod.Wrap(ErrInvalidFileSize, "fileSizeKbs must be >= 0")
+		}
 	}
 
 	return nil

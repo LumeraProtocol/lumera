@@ -335,11 +335,9 @@ func (k *Keeper) SetAction(ctx sdk.Context, action *actiontypes.Action) error {
 	}
 
 	// Handle state indexing
-	// If the action already existed and its state has changed, we need to remove it from the old state index
 	if found && existingAction.State != action.State {
 		oldStateKey := []byte(ActionByStatePrefix + existingAction.State.String() + "/" + action.ActionID)
-		err = store.Delete(oldStateKey)
-		if err != nil {
+		if err := store.Delete(oldStateKey); err != nil {
 			return err
 		}
 		k.Logger().Debug("Removed action from previous state index",
@@ -348,17 +346,14 @@ func (k *Keeper) SetAction(ctx sdk.Context, action *actiontypes.Action) error {
 			"new_state", action.State.String())
 	}
 
-	// Add to current state index
 	stateKey := []byte(ActionByStatePrefix + action.State.String() + "/" + action.ActionID)
-	err = store.Set(stateKey, []byte{1}) // Just a marker
-	if err != nil {
+	if err := store.Set(stateKey, []byte{1}); err != nil { // Just a marker
 		return err
 	}
 
 	// Index by creator
 	creatorKey := []byte(ActionByCreatorPrefix + action.Creator + "/" + action.ActionID)
-	err = store.Set(creatorKey, []byte{1}) // Just a marker
-	if err != nil {
+	if err := store.Set(creatorKey, []byte{1}); err != nil { // Just a marker
 		return err
 	}
 	return nil

@@ -79,6 +79,22 @@ func (mr *MockSupernodeKeeperMockRecorder) GetAllSuperNodes(ctx interface{}, sta
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAllSuperNodes", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetAllSuperNodes), varargs...)
 }
 
+// GetSuperNodeByAccount mocks base method.
+func (m *MockSupernodeKeeper) GetSuperNodeByAccount(ctx types0.Context, supernodeAccount string) (types.SuperNode, bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSuperNodeByAccount", ctx, supernodeAccount)
+	ret0, _ := ret[0].(types.SuperNode)
+	ret1, _ := ret[1].(bool)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// GetSuperNodeByAccount indicates an expected call of GetSuperNodeByAccount.
+func (mr *MockSupernodeKeeperMockRecorder) GetSuperNodeByAccount(ctx, supernodeAccount interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSuperNodeByAccount", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetSuperNodeByAccount), ctx, supernodeAccount)
+}
+
 // GetAuthority mocks base method.
 func (m *MockSupernodeKeeper) GetAuthority() string {
 	m.ctrl.T.Helper()

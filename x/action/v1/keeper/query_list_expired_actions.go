@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/LumeraProtocol/lumera/x/action/v1/types"
+	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 
 	"cosmossdk.io/store/prefix"
 	"github.com/cosmos/cosmos-sdk/runtime"
@@ -28,29 +29,22 @@ func (q queryServer) ListExpiredActions(goCtx context.Context, req *types.QueryL
 	var actions []*types.Action
 
 	onResult := func(key, value []byte, accumulate bool) (bool, error) {
-		var act types.Action
+		var act actiontypes.Action
 		if err := q.k.cdc.Unmarshal(value, &act); err != nil {
 			return false, err
 		}
 
-		if act.State == types.ActionStateExpired {
-			if accumulate {
-				actions = append(actions, &types.Action{
-					Creator:        act.Creator,
-					ActionID:       act.ActionID,
-					ActionType:     types.ActionType(act.ActionType),
-					Metadata:       act.Metadata,
-					Price:          act.Price,
-					ExpirationTime: act.ExpirationTime,
-					State:          types.ActionState(act.State),
-					BlockHeight:    act.BlockHeight,
-					SuperNodes:     act.SuperNodes,
-				})
-			}
-			return true, nil
+		if act.State != types.ActionStateExpired {
+			// Skip non-expired actions but continue iterating
+			return false, nil
 		}
 
-		return false, nil
+		if accumulate {
+			actCopy := act
+			actions = append(actions, &actCopy)
+		}
+
+		return true, nil
 	}
 
 	pageRes, err := query.FilteredPaginate(actionStore, req.Pagination, onResult)
@@ -61,5 +55,6 @@ func (q queryServer) ListExpiredActions(goCtx context.Context, req *types.QueryL
 	return &types.QueryListExpiredActionsResponse{
 		Actions:    actions,
 		Pagination: pageRes,
+		Total:      pageRes.GetTotal(),
 	}, nil
 }

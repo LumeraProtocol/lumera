@@ -10,6 +10,7 @@ import (
 
 	"cosmossdk.io/errors"
 	"cosmossdk.io/math"
+	storetypes "cosmossdk.io/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 
@@ -455,7 +456,8 @@ func (k *Keeper) IterateActions(ctx sdk.Context, handler func(*actiontypes.Actio
 	store := k.storeService.OpenKVStore(ctx)
 
 	// Use prefix iterator to get all actions with the ActionKeyPrefix
-	iter, err := store.Iterator([]byte(ActionKeyPrefix), nil)
+	actionPrefix := []byte(ActionKeyPrefix)
+	iter, err := store.Iterator(actionPrefix, storetypes.PrefixEndBytes(actionPrefix))
 	if err != nil {
 		return errors.Wrap(err, "failed to create iterator for actions")
 	}
@@ -488,27 +490,18 @@ func (k *Keeper) IterateActionsByState(ctx sdk.Context, state actiontypes.Action
 	// Create the state-specific prefix for iteration
 	// The key format is ActionByStatePrefix + state + "/" + actionID
 	prefixStr := ActionByStatePrefix + state.String() + "/"
-	prefixLen := len(prefixStr)
 	statePrefix := []byte(prefixStr)
 
 	// Use prefix iterator to get all actions with this state
-	iter, err := store.Iterator(statePrefix, nil)
+	iter, err := store.Iterator(statePrefix, storetypes.PrefixEndBytes(statePrefix))
 	if err != nil {
 		return errors.Wrap(err, "failed to create iterator for actions by state")
 	}
 	defer iter.Close()
 
 	for ; iter.Valid(); iter.Next() {
-		key := iter.Key()
-		keyStr := string(key)
-
-		// Validate the key has the correct prefix to prevent panics
-		if len(keyStr) <= prefixLen || !strings.HasPrefix(keyStr, prefixStr) {
-			continue
-		}
-
 		// Extract the action ID from the key
-		actionID := keyStr[prefixLen:]
+		actionID := string(iter.Key()[len(statePrefix):])
 
 		// Get the full action using the actionID
 		action, found := k.GetActionByID(ctx, actionID)

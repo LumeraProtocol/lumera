@@ -1,6 +1,7 @@
 package keeper
 
 import (
+	"bytes"
 	"fmt"
 	"strconv"
 
@@ -29,7 +30,7 @@ func (k Keeper) SetSuperNode(ctx sdk.Context, supernode types.SuperNode) error {
 	// Use the validator address as the primary key (since it's unique).
 	valOperAddr, err := sdk.ValAddressFromBech32(supernode.ValidatorAddress)
 	if err != nil {
-		return errorsmod.Wrapf(err, "invalid validator address: %s", err)
+		return errorsmod.Wrapf(err, "invalid validator address: %s", supernode.ValidatorAddress)
 	}
 
 	// Load any existing record so we can maintain secondary indices safely.
@@ -58,6 +59,15 @@ func (k Keeper) SetSuperNode(ctx sdk.Context, supernode types.SuperNode) error {
 
 	// Set or update the index entry for the current supernode account.
 	if supernode.SupernodeAccount != "" {
+		// Enforce 1:1 mapping: a SupernodeAccount can only be associated with one validator.
+		existingVal := accountIndexStore.Get([]byte(supernode.SupernodeAccount))
+		if existingVal != nil && !bytes.Equal(existingVal, valOperAddr) {
+			return errorsmod.Wrapf(
+				sdkerrors.ErrInvalidRequest,
+				"supernode account %s already associated with another validator",
+				supernode.SupernodeAccount,
+			)
+		}
 		accountIndexStore.Set([]byte(supernode.SupernodeAccount), valOperAddr)
 	}
 
@@ -135,6 +145,11 @@ func (k Keeper) GetSuperNodeByAccount(ctx sdk.Context, supernodeAccount string) 
 		return types.SuperNode{}, false, nil
 	}
 
+	// Guard against stale/corrupted index entries.
+	if sn.SupernodeAccount != supernodeAccount {
+		return types.SuperNode{}, false, nil
+	}
+
 	return sn, true, nil
 }
 
@@ -184,10 +199,7 @@ func (k Keeper) GetMinStake(ctx sdk.Context) sdkmath.Int {
 // SetSuperNodeActive sets a validator's SuperNode status to active and emits an event.
 // If reason is non-empty, it is included as an event attribute.
 func (k Keeper) SetSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress, reason string) error {
-	valOperAddr, err := sdk.ValAddressFromBech32(valAddr.String())
-	if err != nil {
-		return errorsmod.Wrapf(sdkerrors.ErrInvalidAddress, "invalid validator address: %s", err)
-	}
+	valOperAddr := valAddr
 
 	supernode, found := k.QuerySuperNode(ctx, valOperAddr)
 	if !found {
@@ -243,10 +255,7 @@ func (k Keeper) SetSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress, reas
 // SetSuperNodeStopped sets a validator's SuperNode status to stopped and emits an event.
 // If reason is non-empty, it is included as an event attribute.
 func (k Keeper) SetSuperNodeStopped(ctx sdk.Context, valAddr sdk.ValAddress, reason string) error {
-	valOperAddr, err := sdk.ValAddressFromBech32(valAddr.String())
-	if err != nil {
-		return errorsmod.Wrapf(sdkerrors.ErrInvalidAddress, "invalid validator address: %s", err)
-	}
+	valOperAddr := valAddr
 
 	supernode, found := k.QuerySuperNode(ctx, valOperAddr)
 	if !found {
@@ -294,10 +303,7 @@ func (k Keeper) SetSuperNodeStopped(ctx sdk.Context, valAddr sdk.ValAddress, rea
 }
 
 func (k Keeper) IsSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress) bool {
-	valOperAddr, err := sdk.ValAddressFromBech32(valAddr.String())
-	if err != nil {
-		return false
-	}
+	valOperAddr := valAddr
 
 	supernode, found := k.QuerySuperNode(ctx, valOperAddr)
 	if !found {

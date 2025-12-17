@@ -56,7 +56,12 @@ func (q queryServer) ListActionsByBlockHeight(goCtx context.Context, req *types.
 		return true, nil
 	}
 
-	pageRes, err = query.FilteredPaginate(indexStore, req.Pagination, onResult)
+	pagination := req.Pagination
+	if pagination == nil {
+		pagination = &query.PageRequest{}
+	}
+
+	pageRes, err = query.FilteredPaginate(indexStore, pagination, onResult)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to paginate actions: %v", err)
 	}

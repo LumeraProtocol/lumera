@@ -80,9 +80,40 @@ func decodeMetricsMsg(t *testing.T, txJSON string) sntypes.MsgReportSupernodeMet
 		return msg
 	}
 
-	msgRaw := gjson.Get(txJSON, "tx.body.messages.0").Raw
-	require.NotEmpty(t, msgRaw, "message not found in tx: %s", txJSON)
-	require.NoError(t, json.Unmarshal([]byte(msgRaw), &msg))
+	msgRaw := gjson.Get(txJSON, "tx.body.messages.0")
+	require.True(t, msgRaw.Exists(), "message not found in tx: %s", txJSON)
+
+	msg.ValidatorAddress = msgRaw.Get("validator_address").String()
+	msg.SupernodeAccount = msgRaw.Get("supernode_account").String()
+
+	metrics := msgRaw.Get("metrics")
+	msg.Metrics.VersionMajor = uint32(metrics.Get("version_major").Uint())
+	msg.Metrics.VersionMinor = uint32(metrics.Get("version_minor").Uint())
+	msg.Metrics.VersionPatch = uint32(metrics.Get("version_patch").Uint())
+	msg.Metrics.UptimeSeconds = metrics.Get("uptime_seconds").Float()
+
+	rawPorts := metrics.Get("open_ports").Array()
+	msg.Metrics.OpenPorts = make([]sntypes.PortStatus, 0, len(rawPorts))
+	for _, p := range rawPorts {
+		stateField := p.Get("state")
+		var stateVal sntypes.PortState
+		switch stateField.Type {
+		case gjson.String:
+			if v, ok := sntypes.PortState_value[stateField.String()]; ok {
+				stateVal = sntypes.PortState(v)
+			} else {
+				require.FailNow(t, "unknown port state", "state=%s tx=%s", stateField.String(), txJSON)
+			}
+		default:
+			stateVal = sntypes.PortState(stateField.Int())
+		}
+
+		msg.Metrics.OpenPorts = append(msg.Metrics.OpenPorts, sntypes.PortStatus{
+			Port:  uint32(p.Get("port").Uint()),
+			State: stateVal,
+		})
+	}
+
 	return msg
 }
 

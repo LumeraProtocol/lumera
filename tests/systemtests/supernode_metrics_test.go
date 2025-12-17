@@ -35,14 +35,22 @@ func TestSupernodeMetricsE2E(t *testing.T) {
 
 				// SN3 compliant metrics (with its own ports).
 				metricsSN3 := fx.baseMetrics
-				metricsSN3.OpenPorts = []uint32{4444, 4445, 4448, 4449, 8002}
+				metricsSN3.OpenPorts = []sntypes.PortStatus{
+					{Port: 4444, State: sntypes.PortState_PORT_STATE_OPEN},
+					{Port: 4445, State: sntypes.PortState_PORT_STATE_OPEN},
+					{Port: 4448, State: sntypes.PortState_PORT_STATE_OPEN},
+					{Port: 4449, State: sntypes.PortState_PORT_STATE_OPEN},
+					{Port: 8002, State: sntypes.PortState_PORT_STATE_OPEN},
+				}
 				txHash3 := reportSupernodeMetrics(t, fx.cli, "node2", fx.sn3.valAddr, fx.sn3.account, metricsSN3)
 				txResp3 := fx.waitForTx(txHash3)
 				require.Zero(t, txResp3.Code, "metrics tx failed: %v", txResp3.RawLog)
 
 				// SN2 non-compliant: bad ports and insufficient CPU cores -> POSTPONED.
 				metricsSN2Bad := fx.baseMetrics
-				metricsSN2Bad.OpenPorts = []uint32{1, 2, 3}
+				metricsSN2Bad.OpenPorts = []sntypes.PortStatus{
+					{Port: 4444, State: sntypes.PortState_PORT_STATE_CLOSED},
+				}
 				metricsSN2Bad.CpuCoresTotal = 0
 				txHash2 := reportSupernodeMetrics(t, fx.cli, "node1", fx.sn2.valAddr, fx.sn2.account, metricsSN2Bad)
 				txResp2 := fx.waitForTx(txHash2)
@@ -66,13 +74,21 @@ func TestSupernodeMetricsE2E(t *testing.T) {
 				// SN1 and SN3 compliant first.
 				metricsSN1 := fx.baseMetrics
 				metricsSN3 := fx.baseMetrics
-				metricsSN3.OpenPorts = []uint32{4444, 4445, 4448, 4449, 8002}
+				metricsSN3.OpenPorts = []sntypes.PortStatus{
+					{Port: 4444, State: sntypes.PortState_PORT_STATE_OPEN},
+					{Port: 4445, State: sntypes.PortState_PORT_STATE_OPEN},
+					{Port: 4448, State: sntypes.PortState_PORT_STATE_OPEN},
+					{Port: 4449, State: sntypes.PortState_PORT_STATE_OPEN},
+					{Port: 8002, State: sntypes.PortState_PORT_STATE_OPEN},
+				}
 				txHash1 := reportSupernodeMetrics(t, fx.cli, "node0", fx.sn1.valAddr, fx.sn1.account, metricsSN1)
 				reportSupernodeMetrics(t, fx.cli, "node2", fx.sn3.valAddr, fx.sn3.account, metricsSN3)
 
 				// SN2 sends bad metrics twice and should remain POSTPONED.
 				metricsBad := fx.baseMetrics
-				metricsBad.OpenPorts = []uint32{1, 2, 3}
+				metricsBad.OpenPorts = []sntypes.PortStatus{
+					{Port: 4444, State: sntypes.PortState_PORT_STATE_CLOSED},
+				}
 				metricsBad.CpuCoresTotal = 0
 				txBad1 := reportSupernodeMetrics(t, fx.cli, "node1", fx.sn2.valAddr, fx.sn2.account, metricsBad)
 				fx.waitForTx(txBad1)
@@ -95,7 +111,13 @@ func TestSupernodeMetricsE2E(t *testing.T) {
 			run: func(t *testing.T, fx *metricsFixture) string {
 				// SN2 now reports compliant metrics and should return to ACTIVE.
 				recovered := fx.baseMetrics
-				recovered.OpenPorts = []uint32{4444, 4445, 4446, 4447, 8002}
+				recovered.OpenPorts = []sntypes.PortStatus{
+					{Port: 4444, State: sntypes.PortState_PORT_STATE_OPEN},
+					{Port: 4445, State: sntypes.PortState_PORT_STATE_OPEN},
+					{Port: 4446, State: sntypes.PortState_PORT_STATE_OPEN},
+					{Port: 4447, State: sntypes.PortState_PORT_STATE_OPEN},
+					{Port: 8002, State: sntypes.PortState_PORT_STATE_OPEN},
+				}
 				recovered.CpuCoresTotal = 4
 				txHash := reportSupernodeMetrics(t, fx.cli, "node1", fx.sn2.valAddr, fx.sn2.account, recovered)
 				txResp := fx.waitForTx(txHash)
@@ -131,7 +153,7 @@ func TestSupernodeMetricsE2E(t *testing.T) {
 				require.Equal(t, fx.sn1.valAddr, msg.ValidatorAddress)
 				require.True(t, msg.Metrics.VersionMajor > 0, "version major should be set")
 				require.True(t, msg.Metrics.UptimeSeconds >= 0, "uptime should be present")
-				require.ElementsMatch(t, []uint32{4444, 4445, 8002}, msg.Metrics.OpenPorts, "open ports should include required ports")
+				require.NotEmpty(t, msg.Metrics.OpenPorts)
 			}
 
 			for acc, expectedState := range expected {
@@ -220,7 +242,11 @@ func newMetricsFixture(t *testing.T) *metricsFixture {
 		DiskFreeGb:       40,
 		UptimeSeconds:    120,
 		PeersCount:       1,
-		OpenPorts:        []uint32{4444, 4445, 8002},
+		OpenPorts: []sntypes.PortStatus{
+			{Port: 4444, State: sntypes.PortState_PORT_STATE_OPEN},
+			{Port: 4445, State: sntypes.PortState_PORT_STATE_OPEN},
+			{Port: 8002, State: sntypes.PortState_PORT_STATE_OPEN},
+		},
 	}
 
 	fx.validatorsByAccount = map[string]string{

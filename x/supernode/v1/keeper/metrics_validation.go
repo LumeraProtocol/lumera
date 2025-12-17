@@ -58,11 +58,14 @@ func evaluateCompliance(ctx sdk.Context, params types.Params, m types.SupernodeM
 	if m.CpuCoresTotal < float64(params.MinCpuCores) {
 		issues = append(issues, fmt.Sprintf("cpu cores %.2f below minimum %d", m.CpuCoresTotal, params.MinCpuCores))
 	}
-	if m.CpuUsagePercent > float64(params.MaxCpuUsagePercent) {
-		issues = append(issues, fmt.Sprintf("cpu usage %.2f above max %d", m.CpuUsagePercent, params.MaxCpuUsagePercent))
-	}
+	// A usage value of 0 is treated as "unknown/not reported" to avoid false
+	// non-compliance due to proto3 defaults. Only non-zero values are enforced.
 	if m.CpuUsagePercent < 0 || m.CpuUsagePercent > 100 {
 		issues = append(issues, "cpu.usage_percent outside 0-100 range")
+	} else if m.CpuUsagePercent > 0 {
+		if m.CpuUsagePercent > float64(params.MaxCpuUsagePercent) {
+			issues = append(issues, fmt.Sprintf("cpu usage %.2f above max %d", m.CpuUsagePercent, params.MaxCpuUsagePercent))
+		}
 	}
 
 	// 3) Memory checks: minimum total GB and usage within configured bounds.
@@ -81,11 +84,14 @@ func evaluateCompliance(ctx sdk.Context, params types.Params, m types.SupernodeM
 	if m.MemTotalGb < float64(params.MinMemGb) {
 		issues = append(issues, fmt.Sprintf("mem total %.2f below minimum %d", m.MemTotalGb, params.MinMemGb))
 	}
-	if m.MemUsagePercent > float64(params.MaxMemUsagePercent) {
-		issues = append(issues, fmt.Sprintf("mem usage %.2f above max %d", m.MemUsagePercent, params.MaxMemUsagePercent))
-	}
+	// A usage value of 0 is treated as "unknown/not reported" to avoid false
+	// non-compliance due to proto3 defaults. Only non-zero values are enforced.
 	if m.MemUsagePercent < 0 || m.MemUsagePercent > 100 {
 		issues = append(issues, "mem.usage_percent outside 0-100 range")
+	} else if m.MemUsagePercent > 0 {
+		if m.MemUsagePercent > float64(params.MaxMemUsagePercent) {
+			issues = append(issues, fmt.Sprintf("mem usage %.2f above max %d", m.MemUsagePercent, params.MaxMemUsagePercent))
+		}
 	}
 
 	// 4) Storage checks: minimum total GB and usage within configured bounds.
@@ -111,14 +117,43 @@ func evaluateCompliance(ctx sdk.Context, params types.Params, m types.SupernodeM
 		issues = append(issues, "disk.usage_percent outside 0-100 range")
 	}
 
-	// 5) Network checks: all required ports must be explicitly reported as open.
-	openPorts := make(map[uint32]struct{}, len(m.OpenPorts))
-	for _, port := range m.OpenPorts {
-		openPorts[port] = struct{}{}
+	// 5) Network checks: explicit CLOSED required ports cause immediate non-compliance.
+	//
+	// Port state defaults to UNKNOWN in proto3; UNKNOWN is ignored to avoid false
+	// non-compliance from omitted/unmeasured port data.
+	portStates := make(map[uint32]types.PortState, len(m.OpenPorts))
+	for _, st := range m.OpenPorts {
+		port := st.Port
+		if port == 0 || port > 65535 {
+			issues = append(issues, fmt.Sprintf("invalid port value %d", port))
+			continue
+		}
+		// Resolve duplicates by taking the most specific/strict state.
+		prev, ok := portStates[port]
+		if !ok {
+			portStates[port] = st.State
+			continue
+		}
+		if prev == types.PortState_PORT_STATE_CLOSED {
+			continue
+		}
+		if st.State == types.PortState_PORT_STATE_CLOSED {
+			portStates[port] = st.State
+			continue
+		}
+		if prev == types.PortState_PORT_STATE_OPEN {
+			continue
+		}
+		portStates[port] = st.State
 	}
-	for _, port := range params.RequiredOpenPorts {
-		if _, ok := openPorts[port]; !ok {
-			issues = append(issues, fmt.Sprintf("required port %d not open", port))
+
+	for _, required := range params.RequiredOpenPorts {
+		if required == 0 || required > 65535 {
+			issues = append(issues, fmt.Sprintf("invalid required port value %d", required))
+			continue
+		}
+		if state, ok := portStates[required]; ok && state == types.PortState_PORT_STATE_CLOSED {
+			issues = append(issues, fmt.Sprintf("required port %d closed", required))
 		}
 	}
 

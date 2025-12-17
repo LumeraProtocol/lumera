@@ -90,7 +90,14 @@ type SupernodeMetrics struct {
     DiskFreeGb       float64
     UptimeSeconds    float64
     PeersCount       uint32
-    OpenPorts        []uint32
+
+    // Tri-state port reporting. UNKNOWN values are ignored for compliance.
+    OpenPorts        []PortStatus
+}
+
+type PortStatus struct {
+    Port  uint32
+    State int32 // UNKNOWN(0), OPEN(1), CLOSED(2)
 }
 
 type SupernodeMetricsState struct {
@@ -102,7 +109,8 @@ type SupernodeMetricsState struct {
 ```
 
 - Compliance is evaluated per report using only `SupernodeMetrics` and module `Params`.
-- Staleness is enforced in `EndBlocker` based on `SupernodeMetricsState.Height` for ACTIVE supernodes (with a grace period from registration for nodes that have never reported).+
+- Staleness is enforced in `EndBlocker` based on `SupernodeMetricsState.Height` for ACTIVE supernodes (with a grace period from registration for nodes that have never reported).
+  - Any metrics report updates `SupernodeMetricsState`.
 
 ### 2. SuperNodeState
 
@@ -418,7 +426,10 @@ Default values:
 
 Metrics compliance/staleness behavior:
 - Only the registered `supernode_account` may submit metrics for a validator.
-- Compliance requires finite values, version >= min, CPU/mem/disk totals above mins, usage within 0–100 and below maxes, free mem/disk ≥ 0 and ≤ total, peers_count > 0, uptime_seconds ≥ 0, and all required ports present. Any issue marks the report non-compliant and POSTPONES the node if not already postponed.
+- Compliance requires finite values, version >= min, CPU/mem/disk totals above mins, free mem/disk ≥ 0 and ≤ total, peers_count > 0, uptime_seconds ≥ 0, and no required port explicitly reported as CLOSED.
+  - `cpu_usage_percent == 0` and `mem_usage_percent == 0` are treated as "unknown" and ignored for compliance.
+  - Port states default to UNKNOWN (0) and are ignored; only explicit CLOSED triggers non-compliance.
+  - Non-compliant reports POSTPONE the node if not already postponed; compliant reports recover a POSTPONED node.
 - Staleness (EndBlock) uses `metrics_update_interval_blocks + metrics_grace_period_blocks`:
   - If never reported and current height exceeds registration height + threshold → POSTPONED (“no metrics reported”).
   - If last report height lags current height by more than the threshold → POSTPONED (“metrics overdue”).
@@ -473,10 +484,11 @@ lumerad tx supernode stop \
   --chain-id=[chain-id]
 
 # Report metrics (structured)
+# Port status state: 0=unknown, 1=open, 2=closed
 lumerad tx supernode report-metrics \
   --validator-address=[valoper] \
   --supernode-account=[account] \
-  --metrics-json='{"version_major":2,"version_minor":0,"version_patch":0,"cpu_cores_total":8,"cpu_usage_percent":50,"mem_total_gb":16,"mem_usage_percent":50,"mem_free_gb":8,"disk_total_gb":1000,"disk_usage_percent":50,"disk_free_gb":500,"uptime_seconds":3600,"peers_count":10,"open_ports":[4444,4445,8002]}' \
+  --metrics-json='{"version_major":2,"version_minor":0,"version_patch":0,"cpu_cores_total":8,"cpu_usage_percent":50,"mem_total_gb":16,"mem_usage_percent":50,"mem_free_gb":8,"disk_total_gb":1000,"disk_usage_percent":50,"disk_free_gb":500,"uptime_seconds":3600,"peers_count":10,"open_ports":[{"port":4444,"state":1},{"port":4445,"state":1},{"port":8002,"state":1}]}' \
   --from=[supernode-key] \
   --chain-id=[chain-id]
 

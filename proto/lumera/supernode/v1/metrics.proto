@@ -5,6 +5,20 @@ option go_package = "x/supernode/v1/types";
 
 import "gogoproto/gogo.proto";
 
+// PortState defines tri-state port reporting. UNKNOWN is the default for proto3
+// and is treated as "not reported / not measured".
+enum PortState {
+  PORT_STATE_UNKNOWN = 0;
+  PORT_STATE_OPEN    = 1;
+  PORT_STATE_CLOSED  = 2;
+}
+
+// PortStatus reports the state of a specific TCP port.
+message PortStatus {
+  uint32 port = 1;
+  PortState state = 2;
+}
+
 // SupernodeMetrics defines the structured metrics reported by a supernode.
 message SupernodeMetrics {
   // Semantic version of the supernode software.
@@ -30,8 +44,8 @@ message SupernodeMetrics {
   double uptime_seconds = 12;
   uint32 peers_count    = 13;
 
-  // List of TCP ports that the supernode reports as open.
-  repeated uint32 open_ports = 14;
+  // Tri-state port reporting for required ports.
+  repeated PortStatus open_ports = 14 [(gogoproto.nullable) = false];
 }
 
 // SupernodeMetricsState stores the latest metrics state for a validator.
@@ -41,4 +55,3 @@ message SupernodeMetricsState {
   uint64 report_count      = 3;
   int64 height             = 4;
 }
-

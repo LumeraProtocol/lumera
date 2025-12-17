@@ -55,6 +55,8 @@ func (m msgServer) ReportSupernodeMetrics(goCtx context.Context, msg *types.MsgR
 	compliant := len(issues) == 0
 
 	// Persist the latest structured metrics in the dedicated metrics state table.
+	// Any report updates the metrics height/report count; UNKNOWN values are
+	// handled by compliance rules (e.g. ports UNKNOWN do not trigger issues).
 	var reportCount uint64
 	if existing, ok := m.GetMetricsState(ctx, valAddr); ok {
 		reportCount = existing.ReportCount

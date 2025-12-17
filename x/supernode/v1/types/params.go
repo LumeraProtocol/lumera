@@ -390,12 +390,8 @@ func validatePositiveUint64(field string) func(interface{}) error {
 
 func validateNonNegativeUint64(field string) func(interface{}) error {
 	return func(v interface{}) error {
-		value, ok := v.(uint64)
-		if !ok {
+		if _, ok := v.(uint64); !ok {
 			return fmt.Errorf("invalid parameter type for %s: %T", field, v)
-		}
-		if value < 0 { // uint check for completeness; always false for uint64
-			return fmt.Errorf("%s must be non-negative", field)
 		}
 		return nil
 	}

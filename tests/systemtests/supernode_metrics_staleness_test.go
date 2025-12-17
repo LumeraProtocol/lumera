@@ -74,7 +74,11 @@ func TestSupernodeMetricsStalenessAndRecovery(t *testing.T) {
 		DiskFreeGb:       40,
 		UptimeSeconds:    120,
 		PeersCount:       1,
-		OpenPorts:        []uint32{4444, 4445, 8002},
+		OpenPorts: []sntypes.PortStatus{
+			{Port: 4444, State: sntypes.PortState_PORT_STATE_OPEN},
+			{Port: 4445, State: sntypes.PortState_PORT_STATE_OPEN},
+			{Port: 8002, State: sntypes.PortState_PORT_STATE_OPEN},
+		},
 	}
 
 	getState := func(accountAddr string) sntypes.SuperNodeState {

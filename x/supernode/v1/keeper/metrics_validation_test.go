@@ -31,11 +31,42 @@ func TestEvaluateCompliancePassesWithValidMetrics(t *testing.T) {
 		UptimeSeconds:    100,
 		PeersCount:       10,
 	}
-	metrics.OpenPorts = append([]uint32(nil), params.RequiredOpenPorts...)
+	for _, port := range params.RequiredOpenPorts {
+		metrics.OpenPorts = append(metrics.OpenPorts, types.PortStatus{
+			Port:  port,
+			State: types.PortState_PORT_STATE_OPEN,
+		})
+	}
 
 	issues := evaluateCompliance(ctx, params, metrics)
 
 	require.Empty(t, issues)
+}
+
+func TestEvaluateComplianceIgnoresZeroCpuAndMemUsage(t *testing.T) {
+	ctx := sdk.NewContext(nil, tmproto.Header{Height: 10}, false, log.NewNopLogger())
+	params := types.DefaultParams()
+
+	metrics := types.SupernodeMetrics{
+		VersionMajor:     2,
+		VersionMinor:     0,
+		VersionPatch:     0,
+		CpuCoresTotal:    float64(params.MinCpuCores),
+		CpuUsagePercent:  0, // treated as unknown
+		MemTotalGb:       float64(params.MinMemGb),
+		MemUsagePercent:  0, // treated as unknown
+		MemFreeGb:        float64(params.MinMemGb) / 2,
+		DiskTotalGb:      float64(params.MinStorageGb),
+		DiskUsagePercent: float64(params.MaxStorageUsagePercent - 10),
+		DiskFreeGb:       float64(params.MinStorageGb) / 2,
+		UptimeSeconds:    100,
+		PeersCount:       10,
+	}
+
+	issues := evaluateCompliance(ctx, params, metrics)
+
+	require.False(t, containsSubstring(issues, "cpu usage"), "cpu usage should be ignored when 0, issues=%v", issues)
+	require.False(t, containsSubstring(issues, "mem usage"), "mem usage should be ignored when 0, issues=%v", issues)
 }
 
 func TestEvaluateComplianceDetectsStaleMetrics(t *testing.T) {
@@ -56,7 +87,12 @@ func TestEvaluateComplianceDetectsStaleMetrics(t *testing.T) {
 		UptimeSeconds:    100,
 		PeersCount:       5,
 	}
-	metrics.OpenPorts = append([]uint32(nil), params.RequiredOpenPorts...)
+	for _, port := range params.RequiredOpenPorts {
+		metrics.OpenPorts = append(metrics.OpenPorts, types.PortStatus{
+			Port:  port,
+			State: types.PortState_PORT_STATE_OPEN,
+		})
+	}
 
 	issues := evaluateCompliance(ctx, params, metrics)
 
@@ -81,10 +117,12 @@ func TestEvaluateComplianceRequiresOpenPorts(t *testing.T) {
 		UptimeSeconds:    100,
 		PeersCount:       5,
 	}
-	// Deliberately omit one required port
-	if len(params.RequiredOpenPorts) > 1 {
-		metrics.OpenPorts = append([]uint32(nil), params.RequiredOpenPorts[1:]...)
-	}
+	// Explicitly report a required port as CLOSED. This should cause non-compliance.
+	require.NotEmpty(t, params.RequiredOpenPorts)
+	metrics.OpenPorts = append(metrics.OpenPorts, types.PortStatus{
+		Port:  params.RequiredOpenPorts[0],
+		State: types.PortState_PORT_STATE_CLOSED,
+	})
 
 	issues := evaluateCompliance(ctx, params, metrics)
 

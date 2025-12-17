@@ -14,7 +14,9 @@ import (
 	upgrade_v1_6_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_6_1"
 	upgrade_v1_8_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_0"
 	upgrade_v1_8_4 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_4"
+	upgrade_v1_8_8 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_8"
 )
+
 // ======================================================================================================================
 // Upgrade overview:
 // ======================================================================================================================
@@ -25,6 +27,7 @@ import (
 // | v1.8.0 | standard | testnet/devnet: add PFM, drop NFT | Store upgrade gated to non-mainnet; handler is migrations only
 // | v1.8.4 | standard | mainnet: add PFM, drop NFT        | Store upgrade gated to mainnet; handler is migrations only
 // | v1.8.5 | standard | none                              | Migrations only
+// | v1.8.8 | custom   | none                              | Backfills action/supernode secondary indices
 // ======================================================================================================================
 
 type UpgradeConfig struct {
@@ -46,6 +49,7 @@ var upgradeNames = []string{
 	upgrade_v1_8_0.UpgradeName,
 	upgrade_v1_8_4.UpgradeName,
 	upgradeNameV185,
+	upgrade_v1_8_8.UpgradeName,
 }
 
 var NoUpgradeConfig = UpgradeConfig{
@@ -91,6 +95,10 @@ func SetupUpgrades(upgradeName string, params appParams.AppUpgradeParams) (Upgra
 	case upgradeNameV185:
 		return UpgradeConfig{
 			Handler: standardUpgradeHandler(upgradeNameV185, params),
+		}, true
+	case upgrade_v1_8_8.UpgradeName:
+		return UpgradeConfig{
+			Handler: upgrade_v1_8_8.CreateUpgradeHandler(params),
 		}, true
 
 	// add future upgrades here

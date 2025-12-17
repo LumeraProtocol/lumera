@@ -75,7 +75,6 @@ func (q queryServer) ListActions(goCtx context.Context, req *types.QueryListActi
 
 			return true, nil
 		}
-
 		pageRes, err = query.FilteredPaginate(actionStore, req.Pagination, onResult)
 	}
 	if err != nil {

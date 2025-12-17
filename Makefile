@@ -115,7 +115,7 @@ release:
 ###################################################
 ###              Tests and Simulation           ###
 ###################################################
-.PHONY: unit-tests integration-tests system-tests simulation-tests all-tests lint
+.PHONY: unit-tests integration-tests system-tests simulation-tests all-tests lint system-metrics-test
 
 all-tests: unit-tests integration-tests system-tests simulation-tests
 
@@ -143,3 +143,7 @@ simulation-tests:
 systemex-tests:
 	@echo "Running system tests..."
 	cd ./tests/systemtests/ && go test -tags=system_test -v .
+
+system-metrics-test:
+	@echo "Running supernode metrics system tests (E2E + staleness)..."
+	cd ./tests/systemtests/ && go test -tags=system_test -timeout 20m -v . -run 'TestSupernodeMetrics(E2E|StalenessAndRecovery)'

@@ -90,9 +90,10 @@ func TestSupernodeUpdateParamsProposal(t *testing.T) {
 	proposalID := cli.SubmitAndVoteGovProposal(proposalJson)
 	require.NotEmpty(t, proposalID)
 
-	// Wait for proposal to be executed
+	// Wait for proposal to be executed (allowing ample time for the shortened voting period)
 	var proposalPassed bool
-	for i := 0; i < 10; i++ {
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
 		sut.AwaitNextBlock(t)
 		status := cli.CustomQuery("q", "gov", "proposal", proposalID)
 		if gjson.Get(status, "proposal.status").String() == "PROPOSAL_STATUS_PASSED" {

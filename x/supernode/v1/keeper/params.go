@@ -17,12 +17,13 @@ func (k Keeper) GetParams(ctx sdk.Context) (params types.Params) {
 	}
 
 	k.cdc.MustUnmarshal(bz, &params)
-	return params
+	return params.WithDefaults()
 }
 
 // SetParams set the params
 func (k Keeper) SetParams(ctx sdk.Context, params types.Params) error {
 	store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
+	params = params.WithDefaults()
 	bz, err := k.cdc.Marshal(&params)
 	if err != nil {
 		return err

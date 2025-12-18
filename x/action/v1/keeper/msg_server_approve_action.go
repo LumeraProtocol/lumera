@@ -27,5 +27,8 @@ func (k msgServer) ApproveAction(goCtx context.Context, msg *types.MsgApproveAct
 		return nil, err
 	}
 
-	return &types.MsgApproveActionResponse{}, nil
+	return &types.MsgApproveActionResponse{
+		ActionId: msg.ActionId,
+		Status:   types.ActionStateApproved.String(),
+	}, nil
 }

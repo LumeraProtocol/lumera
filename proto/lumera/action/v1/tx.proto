@@ -49,6 +49,7 @@ message MsgRequestAction {
   string metadata      = 3;
   string price         = 4;
   string expirationTime = 5;
+  bytes app_pubkey     = 6;
 }
 
 // MsgRequestActionResponse defines the response structure for executing a MsgRequestAction
@@ -77,4 +78,7 @@ message MsgApproveAction {
 }
 
 // MsgApproveActionResponse defines the response structure for executing a MsgApproveAction
-message MsgApproveActionResponse {}
+message MsgApproveActionResponse {
+  string actionId = 1;
+  string status = 2;
+}

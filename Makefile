@@ -8,6 +8,7 @@ IGNITE ?= ignite
 BUF ?= buf
 BUILD_DIR ?= build
 RELEASE_DIR ?= release
+GOPROXY ?= https://proxy.golang.org,direct
 
 module_version = $(strip $(shell EMSDK_QUIET=1 ${GO} list -m -f '{{.Version}}' $1 | tail -n 1))
 IGNITE_INSTALL_SCRIPT ?= https://get.ignite.com/cli!
@@ -24,6 +25,8 @@ GRPC_GATEWAY_V2_VERSION := $(call module_version,github.com/grpc-ecosystem/grpc-
 GO_TOOLS_VERSION := $(call module_version,golang.org/x/tools)
 GRPC_VERSION := $(call module_version,google.golang.org/grpc)
 PROTOBUF_VERSION := $(call module_version,google.golang.org/protobuf)
+GOCACHE := $(shell ${GO} env GOCACHE)
+GOMODCACHE := $(shell ${GO} env GOMODCACHE)
 
 TOOLS := \
 	github.com/bufbuild/buf/cmd/buf@latest \
@@ -65,7 +68,8 @@ clean-cache:
 	${BUF} clean || true
 	rm -rf ~/.cache/buf || true
 	@echo "Cleaning Go build cache..."
-	${GO} clean -cache -modcache -i -r
+	${GO} clean -cache -modcache -i -r || true
+	rm -rf ${GOCACHE} ${GOMODCACHE} || true
 
 PROTO_SRC := $(shell find proto -name "*.proto")
 GO_SRC := $(shell find app -name "*.go") \
@@ -74,7 +78,7 @@ GO_SRC := $(shell find app -name "*.go") \
 	$(shell find config -name "*.go") \
 	$(shell find x -name "*.go")
 
-build-proto: clean-proto clean-cache $(PROTO_SRC)
+build-proto: clean-proto $(PROTO_SRC)
 	@echo "Processing proto files..."
 	${BUF} generate --template proto/buf.gen.gogo.yaml --verbose
 	${BUF} generate --template proto/buf.gen.swagger.yaml --verbose
@@ -84,8 +88,8 @@ build: build/lumerad
 
 go.sum: go.mod
 	@echo "Verifying and tidying go modules..."
-	${GO} mod verify
-	${GO} mod tidy
+	GOPROXY=${GOPROXY} ${GO} mod verify
+	GOPROXY=${GOPROXY} ${GO} mod tidy
 
 build/lumerad: $(GO_SRC) go.sum Makefile
 	@echo "Building lumerad binary..."
@@ -138,4 +142,3 @@ simulation-tests:
 systemex-tests:
 	@echo "Running system tests..."
 	cd ./tests/systemtests/ && go test -tags=system_test -v .
-

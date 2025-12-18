@@ -24,7 +24,7 @@ const (
 	ActionByCreatorPrefix = "Action/creator/"
 )
 
-// RegisterAction creates and configures a new action with default parameters
+// RegisterAction creates and configures a new action with default parameters 
 // This is the recommended method for creating new actions
 func (k *Keeper) RegisterAction(ctx sdk.Context, action *actiontypes.Action) (string, error) {
 	// Validate that the action is for a new registration
@@ -47,7 +47,7 @@ func (k *Keeper) RegisterAction(ctx sdk.Context, action *actiontypes.Action) (st
 
 	creator, err := k.addressCodec.StringToBytes(action.Creator)
 	if err != nil {
-		return "", errors.Wrapf(actiontypes.ErrInvalidSignature,
+		return "", errors.Wrapf(actiontypes.ErrInvalidAddress,
 			"invalid account address: %s", err)
 	}
 	coins := k.bankKeeper.SpendableCoins(ctx, creator)

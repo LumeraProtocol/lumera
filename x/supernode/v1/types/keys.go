@@ -19,6 +19,12 @@ var (
 	// SuperNodeKey prefix for storing SuperNode entities
 	SuperNodeKey = []byte("sn_") // prefix 'sn_' for supernode storage
 
+	// SuperNodeByAccountKey is a secondary index mapping supernode account address
+	// to the corresponding validator operator address.
+	// NOTE: this prefix must not share the "sn_" prefix used by SuperNodeKey,
+	// otherwise SuperNodeKey-prefixed iterators will see index entries.
+	SuperNodeByAccountKey = []byte("sna_")
+
 	// MetricsStateKey prefix for storing latest SupernodeMetricsState
 	// entries keyed by validator address.
 	MetricsStateKey = []byte("snm_")

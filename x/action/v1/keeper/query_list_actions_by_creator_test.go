@@ -72,18 +72,18 @@ func TestKeeper_ListActionsByCreator(t *testing.T) {
 				Creator: "",
 			},
 			expectedErr: status.Error(codes.InvalidArgument, "creator address must be provided"),
-		},
-		{
-			name: "invalid creator address format",
-			req: &types.QueryListActionsByCreatorRequest{
-				Creator: "invalid-address",
 			},
-			expectedErr: status.Error(codes.InvalidArgument, "invalid creator address"),
-		},
-		{
-			name: "no actions for creator",
-			req: &types.QueryListActionsByCreatorRequest{
-				Creator: creator,
+			{
+				name: "invalid creator address format",
+				req: &types.QueryListActionsByCreatorRequest{
+					Creator: "invalid-address",
+				},
+				expectedErr: status.Error(codes.InvalidArgument, "invalid creator address"),
+			},
+			{
+				name: "no actions for creator",
+				req: &types.QueryListActionsByCreatorRequest{
+					Creator: creator,
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
 				// store only actions for other creator

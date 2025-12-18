@@ -5,10 +5,12 @@ import (
 	"encoding/binary"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	"cosmossdk.io/errors"
 	"cosmossdk.io/math"
+	storetypes "cosmossdk.io/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 
@@ -18,10 +20,13 @@ import (
 
 // Key prefixes for store
 const (
-	ActionKeyPrefix       = "Action/value/"
-	ActionCountKey        = "Action/count/"
-	ActionByStatePrefix   = "Action/state/"
-	ActionByCreatorPrefix = "Action/creator/"
+	ActionKeyPrefix           = "Action/value/"
+	ActionCountKey            = "Action/count/"
+	ActionByStatePrefix       = "Action/state/"
+	ActionByCreatorPrefix     = "Action/creator/"
+	ActionByTypePrefix        = "Action/type/"
+	ActionByBlockHeightPrefix = "Action/block/"
+	ActionBySuperNodePrefix   = "Action/supernode/"
 )
 
 // RegisterAction creates and configures a new action with default parameters
@@ -334,7 +339,7 @@ func (k *Keeper) SetAction(ctx sdk.Context, action *actiontypes.Action) error {
 		return err
 	}
 
-	// Handle state indexing
+	// Handle state index
 	if found && existingAction.State != action.State {
 		oldStateKey := []byte(ActionByStatePrefix + existingAction.State.String() + "/" + action.ActionID)
 		if err := store.Delete(oldStateKey); err != nil {
@@ -345,16 +350,76 @@ func (k *Keeper) SetAction(ctx sdk.Context, action *actiontypes.Action) error {
 			"old_state", existingAction.State.String(),
 			"new_state", action.State.String())
 	}
-
 	stateKey := []byte(ActionByStatePrefix + action.State.String() + "/" + action.ActionID)
 	if err := store.Set(stateKey, []byte{1}); err != nil { // Just a marker
 		return err
 	}
 
-	// Index by creator
+	// Index by creator (assumed immutable in practice)
+	if found && existingAction.Creator != action.Creator {
+		oldCreatorKey := []byte(ActionByCreatorPrefix + existingAction.Creator + "/" + action.ActionID)
+		if err := store.Delete(oldCreatorKey); err != nil {
+			return err
+		}
+	}
 	creatorKey := []byte(ActionByCreatorPrefix + action.Creator + "/" + action.ActionID)
 	if err := store.Set(creatorKey, []byte{1}); err != nil { // Just a marker
 		return err
+	}
+
+	// Index by type
+	if found && existingAction.ActionType != action.ActionType {
+		oldTypeKey := []byte(ActionByTypePrefix + existingAction.ActionType.String() + "/" + action.ActionID)
+		if err := store.Delete(oldTypeKey); err != nil {
+			return err
+		}
+	}
+	typeKey := []byte(ActionByTypePrefix + action.ActionType.String() + "/" + action.ActionID)
+	if err := store.Set(typeKey, []byte{1}); err != nil { // Just a marker
+		return err
+	}
+
+	// Index by block height
+	if found && existingAction.BlockHeight != action.BlockHeight {
+		oldBlockKey := []byte(ActionByBlockHeightPrefix + strconv.FormatInt(existingAction.BlockHeight, 10) + "/" + action.ActionID)
+		if err := store.Delete(oldBlockKey); err != nil {
+			return err
+		}
+	}
+	blockKey := []byte(ActionByBlockHeightPrefix + strconv.FormatInt(action.BlockHeight, 10) + "/" + action.ActionID)
+	if err := store.Set(blockKey, []byte{1}); err != nil { // Just a marker
+		return err
+	}
+
+	// Index by supernodes
+	existingSN := make(map[string]struct{})
+	if found {
+		for _, sn := range existingAction.SuperNodes {
+			existingSN[sn] = struct{}{}
+		}
+	}
+	currentSN := make(map[string]struct{})
+	for _, sn := range action.SuperNodes {
+		currentSN[sn] = struct{}{}
+	}
+
+	// Remove stale supernode index entries
+	if found {
+		for sn := range existingSN {
+			if _, stillPresent := currentSN[sn]; !stillPresent {
+				oldSNKey := []byte(ActionBySuperNodePrefix + sn + "/" + action.ActionID)
+				if err := store.Delete(oldSNKey); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	// Add/update current supernode index entries
+	for sn := range currentSN {
+		snKey := []byte(ActionBySuperNodePrefix + sn + "/" + action.ActionID)
+		if err := store.Set(snKey, []byte{1}); err != nil { // Just a marker
+			return err
+		}
 	}
 	return nil
 }
@@ -391,7 +456,8 @@ func (k *Keeper) IterateActions(ctx sdk.Context, handler func(*actiontypes.Actio
 	store := k.storeService.OpenKVStore(ctx)
 
 	// Use prefix iterator to get all actions with the ActionKeyPrefix
-	iter, err := store.Iterator([]byte(ActionKeyPrefix), nil)
+	actionPrefix := []byte(ActionKeyPrefix)
+	iter, err := store.Iterator(actionPrefix, storetypes.PrefixEndBytes(actionPrefix))
 	if err != nil {
 		return errors.Wrap(err, "failed to create iterator for actions")
 	}
@@ -424,27 +490,18 @@ func (k *Keeper) IterateActionsByState(ctx sdk.Context, state actiontypes.Action
 	// Create the state-specific prefix for iteration
 	// The key format is ActionByStatePrefix + state + "/" + actionID
 	prefixStr := ActionByStatePrefix + state.String() + "/"
-	prefixLen := len(prefixStr)
 	statePrefix := []byte(prefixStr)
 
 	// Use prefix iterator to get all actions with this state
-	iter, err := store.Iterator(statePrefix, nil)
+	iter, err := store.Iterator(statePrefix, storetypes.PrefixEndBytes(statePrefix))
 	if err != nil {
 		return errors.Wrap(err, "failed to create iterator for actions by state")
 	}
 	defer iter.Close()
 
 	for ; iter.Valid(); iter.Next() {
-		key := iter.Key()
-		keyStr := string(key)
-
-		// Validate the key has the correct prefix to prevent panics
-		if len(keyStr) <= prefixLen || !strings.HasPrefix(keyStr, prefixStr) {
-			continue
-		}
-
 		// Extract the action ID from the key
-		actionID := keyStr[prefixLen:]
+		actionID := string(iter.Key()[len(statePrefix):])
 
 		// Get the full action using the actionID
 		action, found := k.GetActionByID(ctx, actionID)

@@ -324,10 +324,12 @@ func (app *App) GetSubspace(moduleName string) paramstypes.Subspace {
 // This needs to be called BEFORE app.Load()
 func (app *App) setupUpgrades() {
 	params := appParams.AppUpgradeParams{
-		ChainID:       app.ChainID(),
-		Logger:        app.Logger(),
-		ModuleManager: app.ModuleManager,
-		Configurator:  app.Configurator(),
+		ChainID:         app.ChainID(),
+		Logger:          app.Logger(),
+		ModuleManager:   app.ModuleManager,
+		Configurator:    app.Configurator(),
+		ActionKeeper:    &app.ActionKeeper,
+		SupernodeKeeper: app.SupernodeKeeper,
 	}
 
 	allUpgrades := upgrades.AllUpgrades(params)

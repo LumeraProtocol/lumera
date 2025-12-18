@@ -2,10 +2,8 @@ package keeper
 
 import (
 	"context"
-	"slices"
 
 	"github.com/LumeraProtocol/lumera/x/action/v1/types"
-	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 
 	"cosmossdk.io/store/prefix"
 	"github.com/cosmos/cosmos-sdk/runtime"
@@ -25,34 +23,30 @@ func (q queryServer) ListActionsBySuperNode(goCtx context.Context, req *types.Qu
 
 	store := q.k.storeService.OpenKVStore(ctx)
 	storeAdapter := runtime.KVStoreAdapter(store)
-	var (
-		actions []*types.Action
-		pageRes *query.PageResponse
-		err     error
-	)
+	var actions []*types.Action
+	var pageRes *query.PageResponse
+	var err error
 
-	actionStore := prefix.NewStore(storeAdapter, []byte(ActionKeyPrefix))
+	// Use supernode index for efficient lookup
+	indexPrefix := []byte(ActionBySuperNodePrefix + req.SuperNodeAddress + "/")
+	indexStore := prefix.NewStore(storeAdapter, indexPrefix)
 
-	onResult := func(key, value []byte, accumulate bool) (bool, error) {
-		var act actiontypes.Action
-		if err := q.k.cdc.Unmarshal(value, &act); err != nil {
-			return false, err
-		}
-
-		if !slices.Contains(act.SuperNodes, req.SuperNodeAddress) {
-			// Skip actions not associated with the requested supernode
+	onResult := func(key, _ []byte, accumulate bool) (bool, error) {
+		actionID := string(key)
+		act, found := q.k.GetActionByID(ctx, actionID)
+		if !found {
+			// Stale index entry; skip without counting
 			return false, nil
 		}
 
 		if accumulate {
-			actCopy := act
-			actions = append(actions, &actCopy)
+			actions = append(actions, act)
 		}
 
 		return true, nil
 	}
 
-	pageRes, err = query.FilteredPaginate(actionStore, req.Pagination, onResult)
+	pageRes, err = query.FilteredPaginate(indexStore, req.Pagination, onResult)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to paginate actions: %v", err)
 	}

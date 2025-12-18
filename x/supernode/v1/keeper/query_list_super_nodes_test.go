@@ -11,13 +11,14 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 func TestKeeper_ListSuperNodes(t *testing.T) {
 	valAddr := sdk.ValAddress([]byte("validator"))
 	creatorAddr := sdk.AccAddress(valAddr)
+	creatorAddr2 := sdk.AccAddress(sdk.ValAddress([]byte("val2")))
 	// Create action supernodes
 	sn1 := types.SuperNode{
 		ValidatorAddress: valAddr.String(),
@@ -39,7 +40,7 @@ func TestKeeper_ListSuperNodes(t *testing.T) {
 	}
 	sn2 := types.SuperNode{
 		ValidatorAddress: sdk.ValAddress([]byte("val2")).String(),
-		SupernodeAccount: creatorAddr.String(),
+		SupernodeAccount: creatorAddr2.String(),
 		Note:             "2.0.0",
 		PrevIpAddresses: []*types.IPAddressHistory{
 			{

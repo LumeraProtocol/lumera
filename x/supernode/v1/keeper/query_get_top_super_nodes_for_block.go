@@ -177,26 +177,28 @@ func (k Keeper) RankSuperNodesByDistance(
 	return result
 }
 
-// DetermineStateAtBlock finds the last state record whose height <= blockHeight
-// without mutating the input slice. It runs in O(n).
+// DetermineStateAtBlock returns the supernode state at the given block height.
+//
+// Invariant: the state history is append-only and therefore sorted by Height
+// (non-decreasing). This function relies on that invariant and uses binary
+// search to find the last record with Height <= blockHeight.
+//
+// If multiple records share the same Height, the last record at that height
+// wins ("last write wins") because we search for the first Height > blockHeight
+// and step back one slot.
 func DetermineStateAtBlock(states []*types.SuperNodeStateRecord, blockHeight int64) (types.SuperNodeState, bool) {
 	if len(states) == 0 {
 		return types.SuperNodeStateUnspecified, false
 	}
-	found := false
-	foundHeight := int64(-1)
-	foundState := types.SuperNodeStateUnspecified
-	for _, sRecord := range states {
-		if sRecord == nil {
-			continue
-		}
-		if sRecord.Height <= blockHeight && sRecord.Height >= foundHeight {
-			foundHeight = sRecord.Height
-			foundState = sRecord.State
-			found = true
-		}
+
+	pos := sort.Search(len(states), func(i int) bool {
+		return states[i].Height > blockHeight
+	})
+	idx := pos - 1
+	if idx < 0 {
+		return types.SuperNodeStateUnspecified, false
 	}
-	return foundState, found
+	return states[idx].State, true
 }
 
 func (k Keeper) calcDistance(blockHash []byte, sn *types.SuperNode) (*big.Int, bool) {

@@ -6,6 +6,7 @@
 GO ?= go
 IGNITE ?= ignite
 BUF ?= buf
+GOLANGCI_LINT ?= golangci-lint
 BUILD_DIR ?= build
 RELEASE_DIR ?= release
 GOPROXY ?= https://proxy.golang.org,direct
@@ -118,9 +119,13 @@ release:
 ###################################################
 ###              Tests and Simulation           ###
 ###################################################
-.PHONY: unit-tests integration-tests system-tests simulation-tests all-tests
+.PHONY: unit-tests integration-tests system-tests simulation-tests all-tests lint system-metrics-test
 
 all-tests: unit-tests integration-tests system-tests simulation-tests
+
+lint:
+	@echo "Running linters..."
+	@${GOLANGCI_LINT} run ./... --timeout=5m
 
 unit-tests:
 	@echo "Running unit tests in x/..."
@@ -142,3 +147,7 @@ simulation-tests:
 systemex-tests:
 	@echo "Running system tests..."
 	cd ./tests/systemtests/ && go test -tags=system_test -v .
+
+system-metrics-test:
+	@echo "Running supernode metrics system tests (E2E + staleness)..."
+	cd ./tests/systemtests/ && go test -tags=system_test -timeout 20m -v . -run 'TestSupernodeMetrics(E2E|StalenessAndRecovery)'

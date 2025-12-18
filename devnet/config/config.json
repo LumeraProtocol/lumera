@@ -26,7 +26,10 @@
         "keyring_backend": "test"
     },
     "network-maker": {
-        "max_accounts": 5,
+        "enabled": true,
+        "grpc_port": 50051,
+        "http_port": 8080,
+        "max_accounts": 3,
         "account_balance": "10000000ulume"
     },
     "hermes": {

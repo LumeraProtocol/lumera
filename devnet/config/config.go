@@ -37,6 +37,9 @@ type ChainConfig struct {
 	NetworkMaker struct {
 		MaxAccounts    int    `json:"max_accounts"`
 		AccountBalance string `json:"account_balance"`
+		Enabled        bool   `json:"enabled"`
+		GRPCPort       int    `json:"grpc_port"`
+		HTTPPort       int    `json:"http_port"`
 	} `json:"network-maker"`
 	Hermes struct {
 		Enabled bool `json:"enabled"`
@@ -59,6 +62,12 @@ type Validator struct {
 		AccountBalance string `json:"account_balance"`
 		ValidatorStake string `json:"validator_stake"`
 	} `json:"initial_distribution"`
+
+	NetworkMaker struct {
+		Enabled  bool `json:"enabled,omitempty"`
+		GRPCPort int  `json:"grpc_port,omitempty"`
+		HTTPPort int  `json:"http_port,omitempty"`
+	} `json:"network-maker,omitempty"`
 }
 
 func LoadConfigs(configPath, validatorsPath string) (*ChainConfig, []Validator, error) {

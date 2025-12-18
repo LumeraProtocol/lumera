@@ -128,6 +128,7 @@ func (suite *MsgServerTestSuite) registerCascadeAction() string {
 		ActionType: "CASCADE",
 		Price:      "100000ulume",
 		Metadata:   cascadeMetadataBytes.String(),
+		FileSizeKbs: "123",
 	}
 
 	// Execute the message
@@ -149,6 +150,8 @@ func (suite *MsgServerTestSuite) registerCascadeAction() string {
 	// Verify the action type
 	suite.Equal(types.ActionTypeCascade, action.ActionType,
 		"Expected action type to be %s, got %s", types.ActionTypeCascade, action.ActionType)
+	// Verify file size
+	suite.Equal(int64(123), action.FileSizeKbs)
 
 	return res.ActionId
 }
@@ -171,6 +174,7 @@ func (suite *MsgServerTestSuite) registerSenseAction() string {
 		ActionType: "SENSE",
 		Price:      "100000ulume",
 		Metadata:   senseMetadataBytes.String(),
+		FileSizeKbs: "456",
 	}
 
 	// Execute the message
@@ -192,6 +196,8 @@ func (suite *MsgServerTestSuite) registerSenseAction() string {
 	// Verify the action type
 	suite.Equal(actiontypes.ActionTypeSense, action.ActionType,
 		"Expected action type to be %s, got %s", actiontypes.ActionTypeSense, action.ActionType)
+	// Verify file size
+	suite.Equal(int64(456), action.FileSizeKbs)
 
 	return res.ActionId
 }

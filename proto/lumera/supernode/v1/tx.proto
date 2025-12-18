@@ -8,6 +8,7 @@ import "cosmos/msg/v1/msg.proto";
 import "cosmos_proto/cosmos.proto";
 import "gogoproto/gogo.proto";
 import "lumera/supernode/v1/params.proto";
+import "lumera/supernode/v1/metrics.proto";
 
 // Msg defines the Msg service.
 service Msg {
@@ -21,6 +22,7 @@ service Msg {
   rpc StartSupernode      (MsgStartSupernode     ) returns (MsgStartSupernodeResponse     );
   rpc StopSupernode       (MsgStopSupernode      ) returns (MsgStopSupernodeResponse      );
   rpc UpdateSupernode     (MsgUpdateSupernode    ) returns (MsgUpdateSupernodeResponse    );
+  rpc ReportSupernodeMetrics(MsgReportSupernodeMetrics) returns (MsgReportSupernodeMetricsResponse);
 }
 // MsgUpdateParams is the Msg/UpdateParams request type.
 message MsgUpdateParams {
@@ -88,3 +90,15 @@ message MsgUpdateSupernode {
 
 message MsgUpdateSupernodeResponse {}
 
+message MsgReportSupernodeMetrics {
+  option (cosmos.msg.v1.signer) = "supernode_account";
+
+  string validator_address = 1 [(cosmos_proto.scalar) = "cosmos.ValidatorAddressString"];
+  string supernode_account = 2 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  SupernodeMetrics metrics = 3 [(gogoproto.nullable) = false];
+}
+
+message MsgReportSupernodeMetricsResponse {
+  bool compliant = 1;
+  repeated string issues = 2;
+}

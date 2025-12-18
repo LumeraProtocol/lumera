@@ -40,11 +40,11 @@ func (k msgServer) StopSupernode(goCtx context.Context, msg *types.MsgStopSupern
 		return nil, errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode is disabled")
 	}
 
-    prevState := supernode.States[len(supernode.States)-1].State
-    supernode.States = append(supernode.States, &types.SuperNodeStateRecord{
-        State:  types.SuperNodeStateStopped,
-        Height: ctx.BlockHeight(),
-    })
+	prevState := supernode.States[len(supernode.States)-1].State
+	supernode.States = append(supernode.States, &types.SuperNodeStateRecord{
+		State:  types.SuperNodeStateStopped,
+		Height: ctx.BlockHeight(),
+	})
 
 	if err := k.SetSuperNode(ctx, supernode); err != nil {
 		return nil, err

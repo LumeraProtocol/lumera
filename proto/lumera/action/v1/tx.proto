@@ -49,7 +49,8 @@ message MsgRequestAction {
   string metadata      = 3;
   string price         = 4;
   string expirationTime = 5;
-  bytes app_pubkey     = 6;
+  string fileSizeKbs   = 6;
+  bytes app_pubkey     = 7;
 }
 
 // MsgRequestActionResponse defines the response structure for executing a MsgRequestAction

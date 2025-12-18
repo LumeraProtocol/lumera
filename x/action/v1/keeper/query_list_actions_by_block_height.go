@@ -2,9 +2,9 @@ package keeper
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/LumeraProtocol/lumera/x/action/v1/types"
-	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 
 	"cosmossdk.io/store/prefix"
 	"github.com/cosmos/cosmos-sdk/runtime"
@@ -28,34 +28,40 @@ func (q queryServer) ListActionsByBlockHeight(goCtx context.Context, req *types.
 
 	store := q.k.storeService.OpenKVStore(ctx)
 	storeAdapter := runtime.KVStoreAdapter(store)
-	actionStore := prefix.NewStore(storeAdapter, []byte(ActionKeyPrefix))
-
 	var actions []*types.Action
+	var pageRes *query.PageResponse
+	var err error
 
-	onResult := func(key, value []byte, accumulate bool) (bool, error) {
-		var act actiontypes.Action
-		if err := q.k.cdc.Unmarshal(value, &act); err != nil {
-			return false, err
+	// Use block height index for efficient lookup
+	heightPrefix := []byte(ActionByBlockHeightPrefix + strconv.FormatInt(req.BlockHeight, 10) + "/")
+	indexStore := prefix.NewStore(storeAdapter, heightPrefix)
+
+	onResult := func(key, _ []byte, accumulate bool) (bool, error) {
+		actionID := string(key)
+		act, found := q.k.GetActionByID(ctx, actionID)
+		if !found {
+			// Stale index entry; skip
+			return false, nil
 		}
 
-		if act.BlockHeight == req.BlockHeight && accumulate {
-			actions = append(actions, &types.Action{
-				Creator:        act.Creator,
-				ActionID:       act.ActionID,
-				ActionType:     types.ActionType(act.ActionType),
-				Metadata:       act.Metadata,
-				Price:          act.Price,
-				ExpirationTime: act.ExpirationTime,
-				State:          types.ActionState(act.State),
-				BlockHeight:    act.BlockHeight,
-				SuperNodes:     act.SuperNodes,
-			})
+		// Sanity check to guard against any malformed index entries
+		if act.BlockHeight != req.BlockHeight {
+			return false, nil
+		}
+
+		if accumulate {
+			actions = append(actions, act)
 		}
 
 		return true, nil
 	}
 
-	pageRes, err := query.FilteredPaginate(actionStore, req.Pagination, onResult)
+	pagination := req.Pagination
+	if pagination == nil {
+		pagination = &query.PageRequest{}
+	}
+
+	pageRes, err = query.FilteredPaginate(indexStore, pagination, onResult)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to paginate actions: %v", err)
 	}
@@ -63,5 +69,6 @@ func (q queryServer) ListActionsByBlockHeight(goCtx context.Context, req *types.
 	return &types.QueryListActionsByBlockHeightResponse{
 		Actions:    actions,
 		Pagination: pageRes,
+		Total:      pageRes.GetTotal(),
 	}, nil
 }

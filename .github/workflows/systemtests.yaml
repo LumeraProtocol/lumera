@@ -54,5 +54,5 @@ jobs:
         working-directory: tests/systemtests
 
       - name: Run System Tests
-        run: go test -tags=system_test -v .
+        run: go test -tags=system_test -timeout 20m -v .
         working-directory: tests/systemtests

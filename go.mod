@@ -31,6 +31,7 @@ require (
 	github.com/CosmWasm/wasmd v0.55.0-ibc2.0
 	github.com/CosmWasm/wasmvm/v3 v3.0.0-ibc2.0
 	github.com/DataDog/zstd v1.5.7
+	github.com/Masterminds/semver/v3 v3.3.1
 	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce
 	github.com/cometbft/cometbft v0.38.18
 	github.com/cosmos/btcutil v1.0.5
@@ -104,7 +105,6 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.30.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.50.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.50.0 // indirect
-	github.com/Masterminds/semver/v3 v3.3.1 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/OpenPeeDeeP/depguard/v2 v2.2.1 // indirect
 	github.com/alecthomas/go-check-sumtype v0.3.1 // indirect

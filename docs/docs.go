@@ -13,10 +13,10 @@ const (
 	indexFile = "template/index.tpl"
 )
 
-//go:embed static
+//go:embed static/*
 var Static embed.FS
 
-//go:embed template
+//go:embed template/*
 var template embed.FS
 
 func RegisterOpenAPIService(appName string, rtr *mux.Router) {

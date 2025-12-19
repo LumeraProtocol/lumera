@@ -155,7 +155,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.1
         with:
           fetch-depth: 0
 
@@ -195,7 +195,7 @@ jobs:
           echo "tarball_prefix=${repo_name}_${{ steps.tag_info.outputs.tag_name }}" >> $GITHUB_OUTPUT
 
       - name: Download Release Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: release-artifacts
           path: release
@@ -205,7 +205,7 @@ jobs:
           ls -R release
 
       - name: Publish the Release
-        uses: softprops/action-gh-release@v0.1.15
+        uses: softprops/action-gh-release@v2
         if: success()
         with:
           tag_name: ${{ steps.tag_info.outputs.tag_name }}

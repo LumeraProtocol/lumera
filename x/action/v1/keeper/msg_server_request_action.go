@@ -14,6 +14,18 @@ import (
 func (k msgServer) RequestAction(goCtx context.Context, msg *types.MsgRequestAction) (*types.MsgRequestActionResponse, error) {
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
+	creatorInfo, err := k.getCreatorAccountInfo(ctx, msg)
+	if err != nil {
+		return nil, err
+	}
+
+	// Cache creator info on context for downstream consumers (e.g., signature verification).
+	ctx = ctx.WithValue(creatorAccountCtxKey, creatorInfo)
+
+	if err := creatorInfo.validateAppPubKey(); err != nil {
+		return nil, err
+	}
+
 	// Get module parameters to access expiration_duration
 	params := k.GetParams(goCtx)
 

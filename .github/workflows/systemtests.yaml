@@ -13,29 +13,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.1
         with:
           fetch-depth: 0
 
       - name: Configure Git Safe Directory
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-      - name: Get Go version from toolchain
-        id: go-version
-        run: |
-          TOOLCHAIN_VERSION=$(grep -E '^toolchain go[0-9]+\.[0-9]+(\.[0-9]+)?$' go.mod | cut -d ' ' -f 2 | sed 's/^go//')
-          if [ -n "$TOOLCHAIN_VERSION" ]; then
-            echo "version=$TOOLCHAIN_VERSION" >> "$GITHUB_OUTPUT"
-          else
-            GO_VERSION=$(grep -E '^go [0-9]+\.[0-9]+(\.[0-9]+)?$' go.mod | cut -d ' ' -f 2)
-            echo "version=$GO_VERSION" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ steps.go-version.outputs.version }}
-          cache: true
+        uses: ./.github/actions/setup-go
 
       - name: Install Specific Ignite CLI Version
         run: |
@@ -56,8 +42,7 @@ jobs:
           chmod +x ignite
           # Ignite CLI is now available at ./ignite
 
-      - name: Build Chain 
-        
+      - name: Build Chain
         run: |
           ./ignite chain build -y -t linux:amd64
         env:

@@ -23,19 +23,19 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/address"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 
-	"github.com/LumeraProtocol/lumera/tests/ibctesting"
 	lcfg "github.com/LumeraProtocol/lumera/config"
+	"github.com/LumeraProtocol/lumera/tests/ibctesting"
 )
 
 func TestICA(t *testing.T) {
-	// scenario:
-	// given a host and controller chain
-	// when an ica is registered on the controller chain
-	// and the channel is established to the host chain
-	// then the ICA owner can submit a message via IBC
-	//      to control their account on the host chain
+	// High-level scenario:
+	// - We spin up two in-process chains (controller + host) using ibc-go's testing harness.
+	// - The controller registers an interchain account (ICA) on the host via ICS-27 handshake.
+	// - The controller then sends an "execute tx" packet containing a normal Cosmos SDK Msg (bank send).
+	// - The host executes that Msg as if it was signed by the ICA address, and we assert host state changes.
 	os.Setenv("SYSTEM_TESTS", "true")
 
+	// Set up two chains and configure the host ICA allowlist to only accept bank sends.
 	coord := ibctesting.NewCoordinator(t, 2)
 	hostChain := coord.GetChain(ibctesting.GetChainID(1))
 	hostParams := hosttypes.NewParams(true, []string{sdk.MsgTypeURL(&banktypes.MsgSend{})})
@@ -44,9 +44,11 @@ func TestICA(t *testing.T) {
 
 	controllerChain := coord.GetChain(ibctesting.GetChainID(2))
 
+	// Create an IBC path and set up clients + connections between controller and host.
 	path := ibctesting.NewPath(controllerChain, hostChain)
 	path.SetupConnections()
 
+	// Run the same scenario twice, once with protobuf tx encoding and once with proto3json encoding.
 	specs := map[string]struct {
 		icaVersion string
 		encoding   string
@@ -68,16 +70,18 @@ func TestICA(t *testing.T) {
 	}
 	for name, spec := range specs {
 		t.Run(name, func(t *testing.T) {
+			// Controller-side owner account: signs MsgRegisterInterchainAccount and MsgSendTx on the controller chain.
 			icaControllerKey := secp256k1.GenPrivKey()
 			icaControllerAddr := sdk.AccAddress(icaControllerKey.PubKey().Address().Bytes())
 			controllerChain.Fund(icaControllerAddr, sdkmath.NewInt(1_000))
 
+			// 1) Register an ICA on the host chain (this is an IBC handshake flow).
 			msg := icacontrollertypes.NewMsgRegisterInterchainAccount(path.EndpointA.ConnectionID, icaControllerAddr.String(), spec.icaVersion, channeltypes.UNORDERED)
 			res, err := controllerChain.SendNonDefaultSenderMsgs(icaControllerKey, msg)
 			require.NoError(t, err)
 			chanID, portID, version := parseIBCChannelEvents(t, res)
 
-			// next open channels on both sides
+			// 2) Open the ICA channel on both sides with the negotiated port/version.
 			path.EndpointA.ChannelID = chanID
 			path.EndpointA.ChannelConfig = &ibctesting.ChannelConfig{
 				PortID:  portID,
@@ -92,7 +96,7 @@ func TestICA(t *testing.T) {
 			}
 			path.CreateChannels()
 
-			// assert ICA exists on controller
+			// 3) Query the controller-side ICA address (on the host chain) and fund it on the host.
 			contApp := controllerChain.GetLumeraApp()
 			icaRsp, err := contApp.ICAControllerKeeper.InterchainAccount(controllerChain.GetContext(), &icacontrollertypes.QueryInterchainAccountRequest{
 				Owner:        icaControllerAddr.String(),
@@ -102,7 +106,7 @@ func TestICA(t *testing.T) {
 			icaAddr := sdk.MustAccAddressFromBech32(icaRsp.GetAddress())
 			hostChain.Fund(icaAddr, sdkmath.NewInt(1_000))
 
-			// submit a tx
+			// 4) Build an "execute tx" ICA packet that contains a normal MsgSend signed by the ICA address.
 			targetAddr := sdk.AccAddress(rand.Bytes(address.Len))
 			sendCoin := sdk.NewCoin(lcfg.ChainDenom, sdkmath.NewInt(100))
 			payloadMsg := banktypes.NewMsgSend(icaAddr, targetAddr, sdk.NewCoins(sendCoin))
@@ -114,6 +118,8 @@ func TestICA(t *testing.T) {
 				Memo: "testing",
 			}
 			relativeTimeout := uint64(time.Minute.Nanoseconds()) // note this is in nanoseconds
+
+			// 5) Send MsgSendTx on the controller chain and relay the packet + acknowledgement.
 			msgSendTx := icacontrollertypes.NewMsgSendTx(icaControllerAddr.String(), path.EndpointA.ConnectionID, relativeTimeout, payloadPacket)
 			_, err = controllerChain.SendNonDefaultSenderMsgs(icaControllerKey, msgSendTx)
 			require.NoError(t, err)
@@ -121,6 +127,7 @@ func TestICA(t *testing.T) {
 			assert.Equal(t, 1, len(*controllerChain.PendingSendPackets))
 			require.NoError(t, path.RelayAndAckPendingPackets())
 
+			// 6) Assert the host chain state changed: the target address received funds.
 			gotBalance := hostChain.Balance(targetAddr, lcfg.ChainDenom)
 			assert.Equal(t, sendCoin.String(), gotBalance.String())
 		})

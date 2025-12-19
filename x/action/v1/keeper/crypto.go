@@ -17,6 +17,8 @@ import (
 	"github.com/DataDog/zstd"
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	"github.com/cosmos/btcutil/base58"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"lukechampine.com/blake3"
 )
@@ -32,10 +34,13 @@ var highCompressSem = semaphore.NewWeighted(maxParallelHighCompressCalls)
 
 // VerifySignature verifies that a signature is valid for given data and signer.
 //
-// The function performs these validation steps:
-// 1. Validates that the signer address is valid
-// 2. Decodes the base64-encoded signature
-// 3. Verifies the signature against the provided data
+// Flow:
+// 1) Try to get a pubkey from the context cache (creatorAccountCtxKey). For ICA creators
+//    this uses the app-level pubkey provided on the message; for non-ICA creators it uses
+//    the cached account pubkey when present.
+// 2) If no cached key is found, resolve the account and pubkey from auth keeper + address codec.
+// 3) Decode the base64 signature, coerce to r||s format, and verify.
+// 4) If direct verification fails, retry using ADR-36 amino sign bytes (Keplr/browser flow).
 //
 // Parameters:
 // - data: The original data that was signed (string format)
@@ -48,18 +53,35 @@ var highCompressSem = semaphore.NewWeighted(maxParallelHighCompressCalls)
 // - The signature verification fails
 // - Any other validation error occurs
 func (k *Keeper) VerifySignature(ctx sdk.Context, dataB64 string, signature string, signerAddress string) error {
-	// 1. Get account PubKey
-	accAddr, err := k.addressCodec.StringToBytes(signerAddress)
-	if err != nil {
-		return errorsmod.Wrapf(actiontypes.ErrInvalidSignature,
-			"invalid account address: %s", err)
+	var pubKey cryptotypes.PubKey
+
+	if info, ok := ctx.Value(creatorAccountCtxKey).(*creatorAccountInfo); ok {
+		if info.isICA {
+			if len(info.appPubkey) == 0 {
+				return errorsmod.Wrap(actiontypes.ErrInvalidSignature, "app pubkey required for interchain account signature")
+			}
+			// Assume secp256k1-formatted pubkey bytes for app-level signatures.
+			appPk := secp256k1.PubKey{Key: info.appPubkey}
+			pubKey = &appPk
+		} else if info.account != nil {
+			pubKey = info.account.GetPubKey()
+		}
 	}
-	account := k.authKeeper.GetAccount(ctx, accAddr)
-	if account == nil {
-		return errorsmod.Wrapf(actiontypes.ErrInvalidSignature,
-			"account not found for address: %s", signerAddress)
+
+	// 1. Get account PubKey (fallback if not provided via context)
+	if pubKey == nil {
+		accAddr, err := k.addressCodec.StringToBytes(signerAddress)
+		if err != nil {
+			return errorsmod.Wrapf(actiontypes.ErrInvalidSignature,
+				"invalid account address: %s", err)
+		}
+		account := k.authKeeper.GetAccount(ctx, accAddr)
+		if account == nil {
+			return errorsmod.Wrapf(actiontypes.ErrInvalidSignature,
+				"account not found for address: %s", signerAddress)
+		}
+		pubKey = account.GetPubKey()
 	}
-	pubKey := account.GetPubKey()
 	if pubKey == nil {
 		return errorsmod.Wrapf(actiontypes.ErrInvalidSignature,
 			"account has no public key: %s", signerAddress)

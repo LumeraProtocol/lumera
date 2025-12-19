@@ -21,6 +21,7 @@ var (
 	ErrInvalidAddress     = errorsmod.Register(ModuleName, 13, "invalid address")
 	ErrFinalizationError  = errorsmod.Register(ModuleName, 14, "finalization error")
 	ErrInvalidFileSize    = errorsmod.Register(ModuleName, 15, "invalid file size")
+	ErrInvalidAppPubKey   = errorsmod.Register(ModuleName, 16, "invalid app pubkey")
 	ErrInvalidSigner      = errorsmod.Register(ModuleName, 1100, "expected gov account as only signer for proposal message")
 	ErrInvalidPacketTimeout = errorsmod.Register(ModuleName, 1500, "invalid packet timeout")
 	ErrInvalidVersion       = errorsmod.Register(ModuleName, 1501, "invalid version")

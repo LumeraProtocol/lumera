@@ -1007,6 +1007,15 @@ func registerSupernode(r *rand.Rand, ctx sdk.Context, k keeper.Keeper, accs []si
 			continue
 		}
 
+		// Ensure the supernode account is not already associated with another validator.
+		_, exists, err := k.GetSupernodeKeeper().GetSuperNodeByAccount(ctx, simAccount.Address.String())
+		if err != nil {
+			continue
+		}
+		if exists {
+			continue
+		}
+
 		// Check if supernode already exists
 		_, superNodeExists := k.GetSupernodeKeeper().QuerySuperNode(ctx, valAddr)
 		if superNodeExists {

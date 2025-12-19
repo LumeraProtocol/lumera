@@ -69,8 +69,22 @@ func SimulateMsgUpdateSupernode(
 		}
 
 		if updateAccount {
-			newAcc, _ := simtypes.RandomAcc(r, accs)
-			supernodeAccount = newAcc.Address.String()
+			// Pick an account that is not already associated with another validator.
+			for i := 0; i < len(accs); i++ {
+				newAcc, _ := simtypes.RandomAcc(r, accs)
+				_, exists, err := k.GetSuperNodeByAccount(ctx, newAcc.Address.String())
+				if err != nil {
+					return simtypes.NoOpMsg(types.ModuleName, TypeMsgUpdateSupernode, err.Error()), nil, err
+				}
+				if !exists {
+					supernodeAccount = newAcc.Address.String()
+					break
+				}
+			}
+			// If no free account found, skip updating the supernode account.
+			if supernodeAccount == "" {
+				updateAccount = false
+			}
 		}
 
 		if updateVersion {

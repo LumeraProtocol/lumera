@@ -43,6 +43,10 @@ const (
 	// TODO: Determine the simulation weight value
 	defaultWeightMsgUpdateSupernode int = 100
 
+	opWeightMsgUpdateSupernodeInvalidAccount = "op_weight_msg_update_supernode_invalid_account"
+	// TODO: Determine the simulation weight value
+	defaultWeightMsgUpdateSupernodeInvalidAccount int = 20
+
 	// this line is used by starport scaffolding # simapp/module/const
 )
 
@@ -119,6 +123,17 @@ func (am AppModule) WeightedOperations(simState module.SimulationState) []simtyp
 	operations = append(operations, simulation.NewWeightedOperation(
 		weightMsgUpdateSupernode,
 		supernodesimulation.SimulateMsgUpdateSupernode(am.accountKeeper, am.bankKeeper, am.keeper),
+	))
+
+	var weightMsgUpdateSupernodeInvalidAccount int
+	simState.AppParams.GetOrGenerate(opWeightMsgUpdateSupernodeInvalidAccount, &weightMsgUpdateSupernodeInvalidAccount, nil,
+		func(_ *rand.Rand) {
+			weightMsgUpdateSupernodeInvalidAccount = defaultWeightMsgUpdateSupernodeInvalidAccount
+		},
+	)
+	operations = append(operations, simulation.NewWeightedOperation(
+		weightMsgUpdateSupernodeInvalidAccount,
+		supernodesimulation.SimulateMsgUpdateSupernodeInvalidAccount(am.accountKeeper, am.bankKeeper, am.keeper),
 	))
 
 	// this line is used by starport scaffolding # simapp/module/operation

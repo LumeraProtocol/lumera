@@ -27,7 +27,7 @@ import (
 // | v1.8.0 | standard | testnet/devnet: add PFM, drop NFT | Store upgrade gated to non-mainnet; handler is migrations only
 // | v1.8.4 | standard | mainnet: add PFM, drop NFT        | Store upgrade gated to mainnet; handler is migrations only
 // | v1.8.5 | standard | none                              | Migrations only
-// | v1.8.8 | custom   | none                              | Backfills action/supernode secondary indices
+// | v1.9.0 | custom   | none                              | Backfills action/supernode secondary indices
 // ======================================================================================================================
 
 type UpgradeConfig struct {

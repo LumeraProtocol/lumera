@@ -66,7 +66,7 @@ func TestSetupUpgradesAndHandlers(t *testing.T) {
 					continue
 				}
 
-				// v1.8.8 requires full keeper wiring; exercising it here would require
+				// v1.9.0 requires full keeper wiring; exercising it here would require
 				// a full app harness. This test only verifies registration and gating.
 				if upgradeName == upgrade_v1_9_0.UpgradeName {
 					continue

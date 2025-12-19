@@ -1,4 +1,4 @@
-package v1_8_8
+package v1_9_0
 
 import (
 	"context"
@@ -14,9 +14,9 @@ import (
 )
 
 // UpgradeName is the on-chain name used for this upgrade.
-const UpgradeName = "v1.8.8"
+const UpgradeName = "v1.9.0"
 
-// CreateUpgradeHandler creates an upgrade handler for v1.8.8.
+// CreateUpgradeHandler creates an upgrade handler for v1.9.0.
 //
 // This upgrade backfills secondary indices introduced in prior releases:
 // - action module: state/creator/type/block/supernode indices

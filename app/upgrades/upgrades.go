@@ -14,7 +14,7 @@ import (
 	upgrade_v1_6_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_6_1"
 	upgrade_v1_8_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_0"
 	upgrade_v1_8_4 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_4"
-	upgrade_v1_8_8 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_8"
+	upgrade_v1_9_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_9_0"
 )
 
 // ======================================================================================================================
@@ -49,7 +49,7 @@ var upgradeNames = []string{
 	upgrade_v1_8_0.UpgradeName,
 	upgrade_v1_8_4.UpgradeName,
 	upgradeNameV185,
-	upgrade_v1_8_8.UpgradeName,
+	upgrade_v1_9_0.UpgradeName,
 }
 
 var NoUpgradeConfig = UpgradeConfig{
@@ -96,9 +96,9 @@ func SetupUpgrades(upgradeName string, params appParams.AppUpgradeParams) (Upgra
 		return UpgradeConfig{
 			Handler: standardUpgradeHandler(upgradeNameV185, params),
 		}, true
-	case upgrade_v1_8_8.UpgradeName:
+	case upgrade_v1_9_0.UpgradeName:
 		return UpgradeConfig{
-			Handler: upgrade_v1_8_8.CreateUpgradeHandler(params),
+			Handler: upgrade_v1_9_0.CreateUpgradeHandler(params),
 		}, true
 
 	// add future upgrades here

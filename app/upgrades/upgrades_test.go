@@ -14,7 +14,7 @@ import (
 	upgrade_v1_6_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_6_1"
 	upgrade_v1_8_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_0"
 	upgrade_v1_8_4 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_4"
-	upgrade_v1_8_8 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_8"
+	upgrade_v1_9_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_9_0"
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 )
 
@@ -26,7 +26,7 @@ func TestUpgradeNamesOrder(t *testing.T) {
 		upgrade_v1_8_0.UpgradeName,
 		upgrade_v1_8_4.UpgradeName,
 		upgradeNameV185,
-		upgrade_v1_8_8.UpgradeName,
+		upgrade_v1_9_0.UpgradeName,
 	}
 	require.Equal(t, expected, upgradeNames, "upgradeNames should stay in ascending order")
 }
@@ -68,7 +68,7 @@ func TestSetupUpgradesAndHandlers(t *testing.T) {
 
 				// v1.8.8 requires full keeper wiring; exercising it here would require
 				// a full app harness. This test only verifies registration and gating.
-				if upgradeName == upgrade_v1_8_8.UpgradeName {
+				if upgradeName == upgrade_v1_9_0.UpgradeName {
 					continue
 				}
 

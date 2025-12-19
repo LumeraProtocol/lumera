@@ -42,6 +42,7 @@ type StakingKeeper interface {
 type SupernodeKeeper interface {
 	IsSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress) bool
 	QuerySuperNode(ctx sdk.Context, valOperAddr sdk.ValAddress) (sn sntypes.SuperNode, exists bool)
+	GetSuperNodeByAccount(ctx sdk.Context, supernodeAccount string) (sntypes.SuperNode, bool, error)
 
 	SetSuperNode(ctx sdk.Context, supernode sntypes.SuperNode) error
 }

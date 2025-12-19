@@ -139,6 +139,26 @@ func (mr *MockQueryClientMockRecorder) Params(ctx, in interface{}, opts ...inter
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Params", reflect.TypeOf((*MockQueryClient)(nil).Params), varargs...)
 }
 
+// GetMetrics mocks base method.
+func (m *MockQueryClient) GetMetrics(ctx context.Context, in *types.QueryGetMetricsRequest, opts ...grpc.CallOption) (*types.QueryGetMetricsResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []interface{}{ctx, in}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetMetrics", varargs...)
+	ret0, _ := ret[0].(*types.QueryGetMetricsResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetMetrics indicates an expected call of GetMetrics.
+func (mr *MockQueryClientMockRecorder) GetMetrics(ctx, in interface{}, opts ...interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]interface{}{ctx, in}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMetrics", reflect.TypeOf((*MockQueryClient)(nil).GetMetrics), varargs...)
+}
+
 // MockQueryServer is a mock of QueryServer interface.
 type MockQueryServer struct {
 	ctrl     *gomock.Controller
@@ -235,4 +255,19 @@ func (m *MockQueryServer) Params(arg0 context.Context, arg1 *types.QueryParamsRe
 func (mr *MockQueryServerMockRecorder) Params(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Params", reflect.TypeOf((*MockQueryServer)(nil).Params), arg0, arg1)
+}
+
+// GetMetrics mocks base method.
+func (m *MockQueryServer) GetMetrics(arg0 context.Context, arg1 *types.QueryGetMetricsRequest) (*types.QueryGetMetricsResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMetrics", arg0, arg1)
+	ret0, _ := ret[0].(*types.QueryGetMetricsResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetMetrics indicates an expected call of GetMetrics.
+func (mr *MockQueryServerMockRecorder) GetMetrics(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMetrics", reflect.TypeOf((*MockQueryServer)(nil).GetMetrics), arg0, arg1)
 }

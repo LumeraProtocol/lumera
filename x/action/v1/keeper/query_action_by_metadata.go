@@ -1,19 +1,19 @@
 package keeper
 
 import (
-    "context"
-    "strings"
+	"context"
+	"strings"
 
-    "github.com/LumeraProtocol/lumera/x/action/v1/types"
-    actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	"github.com/LumeraProtocol/lumera/x/action/v1/types"
+	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 
-    "cosmossdk.io/store/prefix"
-    "github.com/cosmos/cosmos-sdk/runtime"
-    sdk "github.com/cosmos/cosmos-sdk/types"
-    "github.com/cosmos/cosmos-sdk/types/query"
-    gogoproto "github.com/cosmos/gogoproto/proto"
-    "google.golang.org/grpc/codes"
-    "google.golang.org/grpc/status"
+	"cosmossdk.io/store/prefix"
+	"github.com/cosmos/cosmos-sdk/runtime"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/types/query"
+	gogoproto "github.com/cosmos/gogoproto/proto"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // QueryActionByMetadata returns actions filtered by metadata field and value
@@ -37,7 +37,11 @@ func (q queryServer) QueryActionByMetadata(goCtx context.Context, req *types.Que
 
 	store := q.k.storeService.OpenKVStore(ctx)
 	storeAdapter := runtime.KVStoreAdapter(store)
-	actionStore := prefix.NewStore(storeAdapter, []byte(ActionKeyPrefix))
+
+	// Use the type index to avoid scanning all actions; we still filter by
+	// the requested metadata field/value.
+	typePrefix := []byte(ActionByTypePrefix + req.ActionType.String() + "/")
+	actionStore := prefix.NewStore(storeAdapter, typePrefix)
 
 	var actions []*types.Action
 
@@ -52,16 +56,15 @@ func (q queryServer) QueryActionByMetadata(goCtx context.Context, req *types.Que
 			State:          types.ActionState(act.State),
 			BlockHeight:    act.BlockHeight,
 			SuperNodes:     act.SuperNodes,
+			FileSizeKbs:    act.FileSizeKbs,
 		})
 	}
 
 	onResult := func(key, value []byte, accumulate bool) (bool, error) {
-		var act actiontypes.Action
-		if err := q.k.cdc.Unmarshal(value, &act); err != nil {
-			return false, err
-		}
-
-		if act.ActionType != actiontypes.ActionType(req.ActionType) {
+		actionID := string(key)
+		act, found := q.k.GetActionByID(ctx, actionID)
+		if !found {
+			// Stale index entry; skip
 			return false, nil
 		}
 
@@ -80,21 +83,21 @@ func (q queryServer) QueryActionByMetadata(goCtx context.Context, req *types.Que
 			case "collection_id":
 				if senseMetadata.CollectionId == metadataValue {
 					if accumulate {
-						appendAction(&act, price)
+						appendAction(act, price)
 					}
 					return true, nil
 				}
 			case "group_id":
 				if senseMetadata.GroupId == metadataValue {
 					if accumulate {
-						appendAction(&act, price)
+						appendAction(act, price)
 					}
 					return true, nil
 				}
 			case "data_hash":
 				if senseMetadata.DataHash == metadataValue {
 					if accumulate {
-						appendAction(&act, price)
+						appendAction(act, price)
 					}
 					return true, nil
 				}
@@ -112,14 +115,14 @@ func (q queryServer) QueryActionByMetadata(goCtx context.Context, req *types.Que
 			case "file_name":
 				if cascadeMetadata.FileName == metadataValue {
 					if accumulate {
-						appendAction(&act, price)
+						appendAction(act, price)
 					}
 					return true, nil
 				}
 			case "data_hash":
 				if cascadeMetadata.DataHash == metadataValue {
 					if accumulate {
-						appendAction(&act, price)
+						appendAction(act, price)
 					}
 					return true, nil
 				}

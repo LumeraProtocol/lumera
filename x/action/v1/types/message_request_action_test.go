@@ -67,6 +67,66 @@ func TestMsgRequestAction_ValidateBasic(t *testing.T) {
 			},
 			err: nil,
 		},
+		{
+			name: "valid fileSizeKbs empty",
+			msg: MsgRequestAction{
+				Creator:        validAddress,
+				ActionType:     "CASCADE",
+				Metadata:       validCascadeMetadataStr,
+				Price:          validPrice,
+				ExpirationTime: validExpTime,
+				FileSizeKbs:    "",
+			},
+			err: nil,
+		},
+		{
+			name: "valid fileSizeKbs zero",
+			msg: MsgRequestAction{
+				Creator:        validAddress,
+				ActionType:     "CASCADE",
+				Metadata:       validCascadeMetadataStr,
+				Price:          validPrice,
+				ExpirationTime: validExpTime,
+				FileSizeKbs:    "0",
+			},
+			err: nil,
+		},
+		{
+			name: "valid fileSizeKbs positive",
+			msg: MsgRequestAction{
+				Creator:        validAddress,
+				ActionType:     "CASCADE",
+				Metadata:       validCascadeMetadataStr,
+				Price:          validPrice,
+				ExpirationTime: validExpTime,
+				FileSizeKbs:    "123",
+			},
+			err: nil,
+		},
+		{
+			name: "invalid fileSizeKbs non-integer",
+			msg: MsgRequestAction{
+				Creator:        validAddress,
+				ActionType:     "CASCADE",
+				Metadata:       validCascadeMetadataStr,
+				Price:          validPrice,
+				ExpirationTime: validExpTime,
+				FileSizeKbs:    "not-a-number",
+			},
+			err: ErrInvalidFileSize,
+		},
+		{
+			name: "invalid fileSizeKbs negative",
+			msg: MsgRequestAction{
+				Creator:        validAddress,
+				ActionType:     "CASCADE",
+				Metadata:       validCascadeMetadataStr,
+				Price:          validPrice,
+				ExpirationTime: validExpTime,
+				FileSizeKbs:    "-1",
+			},
+			err: ErrInvalidFileSize,
+		},
 
 		// Test cases for creator address validation
 		{

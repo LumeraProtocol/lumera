@@ -42,7 +42,11 @@
     "supernode_port": 7445,
     "supernode_p2p_port": 7446,
     "supernode_gateway_port": 18003,
-    "network-maker": true,
+    "network-maker": {
+      "enabled": true,
+      "grpc_port": 50051,
+      "http_port": 8080
+    },
     "initial_distribution": {
       "account_balance": "2000000000000ulume",
       "validator_stake": "1000000000000ulume"

@@ -31,6 +31,7 @@ CFG_DIR="${SHARED_DIR}/config"
 CFG_CHAIN="${CFG_DIR}/config.json"
 CFG_VALS="${CFG_DIR}/validators.json"
 RELEASE_DIR="${SHARED_DIR}/release"
+NM_UI_DIR="${RELEASE_DIR}/nm-ui"
 STATUS_DIR="${SHARED_DIR}/status"
 SETUP_COMPLETE="${STATUS_DIR}/setup_complete"
 SN="supernode-linux-amd64"
@@ -51,6 +52,7 @@ SUPERNODE_LOG="${LOGS_DIR}/supernode.log"
 VALIDATOR_SETUP_OUT="${LOGS_DIR}/validator-setup.out"
 SUPERNODE_SETUP_OUT="${LOGS_DIR}/supernode-setup.out"
 NETWORK_MAKER_SETUP_OUT="${LOGS_DIR}/network-maker-setup.out"
+NM_UI_PORT="${NM_UI_PORT:-8088}"
 
 LUMERA_RPC_PORT="${LUMERA_RPC_PORT:-26657}"
 LUMERA_GRPC_PORT="${LUMERA_GRPC_PORT:-9090}"
@@ -93,6 +95,56 @@ PRIMARY_STARTED_FLAG="${STATUS_DIR}/${PRIMARY_MONIKER}/lumerad_started"
 wait_for_flag() {
   local f="$1"
   until [ -s "${f}" ]; do sleep 1; done
+}
+
+inject_nm_ui_env() {
+  local api_base="${VITE_API_BASE:-}"
+  [ -z "${api_base}" ] && return 0
+  [ -d "${NM_UI_DIR}" ] || return 0
+
+  local files
+  files="$(grep -rl "http://127.0.0.1:8080" "${NM_UI_DIR}" || true)"
+  if [ -z "${files}" ]; then
+    echo "[BOOT] network-maker UI: no API base placeholder found to inject."
+    return 0
+  fi
+
+  local escaped_base="${api_base//\//\\/}"
+  escaped_base="${escaped_base//&/\\&}"
+  echo "[BOOT] network-maker UI: injecting API base ${api_base}"
+  # Replace default API base baked into the static bundle with runtime value
+  while IFS= read -r f; do
+    sed -i "s|http://127.0.0.1:8080|${escaped_base}|g" "$f"
+  done <<<"${files}"
+}
+
+start_nm_ui_if_present() {
+  if [ ! -d "${NM_UI_DIR}" ] || [ ! -f "${NM_UI_DIR}/index.html" ]; then
+    echo "[BOOT] network-maker UI not found at ${NM_UI_DIR}; skipping nginx"
+    return
+  fi
+
+  inject_nm_ui_env
+
+  cat >/etc/nginx/conf.d/network-maker-ui.conf <<EOF
+server {
+    listen ${NM_UI_PORT};
+    server_name _;
+    root ${NM_UI_DIR};
+    index index.html;
+    location / {
+        try_files \$uri \$uri/ /index.html;
+    }
+}
+EOF
+
+  if pgrep -x nginx >/dev/null 2>&1; then
+    echo "[BOOT] nginx already running; skipping start for network-maker UI."
+    return
+  fi
+
+  echo "[BOOT] Starting nginx to serve network-maker UI on port ${NM_UI_PORT}"
+  nginx
 }
 
 run() {
@@ -235,14 +287,19 @@ tail_logs() {
     exec tail -F "${VALIDATOR_LOG}" "${SUPERNODE_LOG}" "${SUPERNODE_SETUP_OUT}" "${VALIDATOR_SETUP_OUT}" "${NETWORK_MAKER_SETUP_OUT}"
 }
 
-case "${START_MODE}" in
-  auto|*)
+run_auto_flow() {
     launch_network_maker_setup
     launch_supernode_setup
     launch_validator_setup
     wait_for_validator_setup
     start_lumera
+    start_nm_ui_if_present
     tail_logs
+}
+
+case "${START_MODE}" in
+  auto|"")
+    run_auto_flow
     ;;
 
   bootstrap)
@@ -257,11 +314,17 @@ case "${START_MODE}" in
     wait_for_validator_setup
     wait_for_n_blocks 3 || { echo "[SN] Lumera chain not producing blocks in time; exiting."; exit 1; }
     start_lumera
+    start_nm_ui_if_present
     tail_logs
     ;;
 
   wait)
     wait_for_validator_setup
     exit 0
+    ;;
+
+  *)
+    echo "[BOOT] Unknown START_MODE='${START_MODE}', defaulting to auto."
+    run_auto_flow
     ;;
 esac

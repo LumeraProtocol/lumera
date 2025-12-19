@@ -1,10 +1,10 @@
 package keeper
 
 import (
+	"bytes"
 	"fmt"
 	"reflect"
 	"strings"
-	"bytes"
 
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 
@@ -13,8 +13,8 @@ import (
 	"cosmossdk.io/errors"
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	gogoproto "github.com/cosmos/gogoproto/proto"
 	"github.com/cosmos/gogoproto/jsonpb"
+	gogoproto "github.com/cosmos/gogoproto/proto"
 )
 
 // CascadeActionHandler implements the ActionHandler interface for Cascade actions
@@ -96,7 +96,7 @@ func (h CascadeActionHandler) ConvertProtobufToJSON(protobufData []byte) ([]byte
 	// Marshal to JSON format
 	marshaler := &jsonpb.Marshaler{
 		EmitDefaults: true,
-		EnumsAsInts: true,
+		EnumsAsInts:  true,
 	}
 	var buf bytes.Buffer
 	if err := marshaler.Marshal(&buf, &metadata); err != nil {
@@ -126,6 +126,7 @@ func (h CascadeActionHandler) RegisterAction(ctx sdk.Context, action *actiontype
 	dataToVerify := signatureParts[0]
 	creatorSignature := signatureParts[1] // the signature is Base64 encoded, VerifySignature will decode it
 
+	// Reuse already-fetched creator account when possible to avoid duplicate lookups.
 	if err := h.keeper.VerifySignature(ctx, dataToVerify, creatorSignature, action.Creator); err != nil {
 		return errors.Wrap(actiontypes.ErrInvalidMetadata, fmt.Sprintf("failed to verify creator's signature: %v", err))
 	}

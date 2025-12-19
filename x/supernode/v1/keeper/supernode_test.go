@@ -9,14 +9,14 @@ import (
 
 	sdkmath "cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/cosmos/cosmos-sdk/types/query"
+	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 func TestKeeper_SetAndQuerySuperNode(t *testing.T) {
@@ -125,10 +125,11 @@ func TestKeeper_GetAllSuperNodes(t *testing.T) {
 	// We'll add at least one state record so the SuperNode won't be skipped.
 	valAddr1 := sdk.ValAddress([]byte("val1"))
 	valAddr2 := sdk.ValAddress([]byte("val2"))
-	accAddr := sdk.AccAddress([]byte("acc1")).String()
+	accAddr1 := sdk.AccAddress([]byte("acc1")).String()
+	accAddr2 := sdk.AccAddress([]byte("acc2")).String()
 
 	sn1 := types.SuperNode{
-		SupernodeAccount: accAddr,
+		SupernodeAccount: accAddr1,
 		ValidatorAddress: valAddr1.String(),
 		Note:             "1.0.0",
 		States: []*types.SuperNodeStateRecord{
@@ -147,7 +148,7 @@ func TestKeeper_GetAllSuperNodes(t *testing.T) {
 	}
 
 	sn2 := types.SuperNode{
-		SupernodeAccount: accAddr,
+		SupernodeAccount: accAddr2,
 		ValidatorAddress: valAddr2.String(),
 		Note:             "2.0.0",
 		States: []*types.SuperNodeStateRecord{
@@ -513,12 +514,12 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 
 	// Test cases
 	testCases := []struct {
-		name                 string
-		validator            *stakingtypes.Validator
-		selfDelegationFound  bool
-		selfDelegationShares sdkmath.LegacyDec
-		setupSupernode       bool
-		supernodeDelegationFound bool
+		name                      string
+		validator                 *stakingtypes.Validator
+		selfDelegationFound       bool
+		selfDelegationShares      sdkmath.LegacyDec
+		setupSupernode            bool
+		supernodeDelegationFound  bool
 		supernodeDelegationShares sdkmath.LegacyDec
 
 		expectErr bool
@@ -531,7 +532,7 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 				Status:          stakingtypes.Unbonded,
 			},
 			selfDelegationFound: false,
-			setupSupernode: false,
+			setupSupernode:      false,
 			expectErr:           true,
 			errSubstr:           "no self-delegation",
 		},
@@ -545,7 +546,7 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 			},
 			selfDelegationFound:  true,
 			selfDelegationShares: sdkmath.LegacyNewDec(500000),
-			setupSupernode: false,
+			setupSupernode:       false,
 			expectErr:            true,
 			errSubstr:            "does not meet minimum stake requirement",
 		},
@@ -559,7 +560,7 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 			},
 			selfDelegationFound:  true,
 			selfDelegationShares: sdkmath.LegacyNewDec(1000000),
-			setupSupernode: false,
+			setupSupernode:       false,
 			expectErr:            false,
 		},
 		{
@@ -572,7 +573,7 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 			},
 			selfDelegationFound:  true,
 			selfDelegationShares: sdkmath.LegacyNewDec(500000),
-			setupSupernode: false,
+			setupSupernode:       false,
 			expectErr:            true,
 			errSubstr:            "no self-stake available",
 		},
@@ -584,12 +585,12 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 				DelegatorShares: sdkmath.LegacyNewDec(1000000),
 				Tokens:          sdkmath.NewInt(1000000),
 			},
-			selfDelegationFound:  true,
-			selfDelegationShares: sdkmath.LegacyNewDec(500000),
-			setupSupernode: true,
-			supernodeDelegationFound: true,
+			selfDelegationFound:       true,
+			selfDelegationShares:      sdkmath.LegacyNewDec(500000),
+			setupSupernode:            true,
+			supernodeDelegationFound:  true,
 			supernodeDelegationShares: sdkmath.LegacyNewDec(500000),
-			expectErr:            false,
+			expectErr:                 false,
 		},
 		{
 			name: "validator with insufficient self-delegation and insufficient supernode delegation => error",
@@ -599,13 +600,13 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 				DelegatorShares: sdkmath.LegacyNewDec(1000000),
 				Tokens:          sdkmath.NewInt(1000000),
 			},
-			selfDelegationFound:  true,
-			selfDelegationShares: sdkmath.LegacyNewDec(400000),
-			setupSupernode: true,
-			supernodeDelegationFound: true,
+			selfDelegationFound:       true,
+			selfDelegationShares:      sdkmath.LegacyNewDec(400000),
+			setupSupernode:            true,
+			supernodeDelegationFound:  true,
 			supernodeDelegationShares: sdkmath.LegacyNewDec(400000),
-			expectErr:            true,
-			errSubstr:            "does not meet minimum stake requirement",
+			expectErr:                 true,
+			errSubstr:                 "does not meet minimum stake requirement",
 		},
 		{
 			name: "validator with no self-delegation but sufficient supernode delegation => error",
@@ -615,12 +616,12 @@ func TestCheckValidatorSupernodeEligibility(t *testing.T) {
 				DelegatorShares: sdkmath.LegacyNewDec(1000000),
 				Tokens:          sdkmath.NewInt(1000000),
 			},
-			selfDelegationFound:  false,
-			setupSupernode: true,
-			supernodeDelegationFound: true,
+			selfDelegationFound:       false,
+			setupSupernode:            true,
+			supernodeDelegationFound:  true,
 			supernodeDelegationShares: sdkmath.LegacyNewDec(1000000),
-			expectErr:            true,
-			errSubstr:            "no self-delegation",
+			expectErr:                 true,
+			errSubstr:                 "no self-delegation",
 		},
 	}
 

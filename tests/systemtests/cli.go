@@ -208,7 +208,6 @@ func (c LumeradCli) run(args []string) (output string, ok bool) {
 	return c.runWithInput(args, nil)
 }
 
-
 func (c LumeradCli) runWithInput(args []string, input io.Reader) (output string, ok bool) {
 	if c.Debug {
 		timestamp := time.Now().Format("15:04:05.000")
@@ -294,14 +293,19 @@ func (c LumeradCli) GetKeyAddr(name string) string {
 
 const defaultSrcAddr = "node0"
 
-// FundAddress sends the token amount to the destination address
-func (c LumeradCli) FundAddress(destAddr, amount string) string {
+// FundAddressWithNode sends the token amount to the destination address from the given source node key.
+func (c LumeradCli) FundAddressWithNode(destAddr, amount string, nodeAddr string) string {
 	require.NotEmpty(c.t, destAddr)
 	require.NotEmpty(c.t, amount)
-	cmd := []string{"tx", "bank", "send", defaultSrcAddr, destAddr, amount}
+	cmd := []string{"tx", "bank", "send", nodeAddr, destAddr, amount}
 	rsp := c.CustomCommand(cmd...)
 	RequireTxSuccess(c.t, rsp)
 	return rsp
+}
+
+// FundAddress sends the token amount to the destination address
+func (c LumeradCli) FundAddress(destAddr, amount string) string {
+	return c.FundAddressWithNode(destAddr, amount, defaultSrcAddr)
 }
 
 // GetAccount returns account info for the given address

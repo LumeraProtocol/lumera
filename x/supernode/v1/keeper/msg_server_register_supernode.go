@@ -120,10 +120,6 @@ func (k msgServer) RegisterSupernode(goCtx context.Context, msg *types.MsgRegist
 		ValidatorAddress: msg.ValidatorAddress,
 		SupernodeAccount: msg.SupernodeAccount,
 		Evidence:         []*types.Evidence{},
-		Metrics: &types.MetricsAggregate{
-			Metrics:     make(map[string]float64),
-			ReportCount: 0,
-		},
 		States: []*types.SuperNodeStateRecord{
 			{
 				State:  types.SuperNodeStateActive,

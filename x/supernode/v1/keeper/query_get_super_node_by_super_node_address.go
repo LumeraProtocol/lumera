@@ -18,16 +18,14 @@ func (q queryServer) GetSuperNodeBySuperNodeAddress(goCtx context.Context, req *
 
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
-	superNodes, err := q.k.GetAllSuperNodes(ctx)
+	sn, found, err := q.k.GetSuperNodeByAccount(ctx, req.SupernodeAddress)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get all supernodes: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to get supernode: %v", err)
 	}
 
-	for _, sn := range superNodes {
-		if sn.GetSupernodeAccount() == req.SupernodeAddress {
-			return &types.QueryGetSuperNodeBySuperNodeAddressResponse{Supernode: &sn}, nil
-		}
+	if !found {
+		return nil, status.Errorf(codes.NotFound, "supernode not found")
 	}
 
-	return nil, status.Errorf(codes.NotFound, "supernode not found: %v", err)
+	return &types.QueryGetSuperNodeBySuperNodeAddressResponse{Supernode: &sn}, nil
 }

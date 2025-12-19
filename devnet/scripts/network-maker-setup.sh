@@ -44,6 +44,8 @@ NM_FILES_DIR_SHARED="/shared/nm-files"
 NM_LOG="${NM_LOG:-/root/logs/network-maker.log}"
 NM_TEMPLATE="${RELEASE_DIR}/nm-config.toml"   # Your template in /shared/release (you said it's attached as config.toml)
 NM_CONFIG="${NM_HOME}/config.toml"
+NM_GRPC_PORT="${NM_GRPC_PORT:-50051}"
+NM_HTTP_PORT="${NM_HTTP_PORT:-8080}"
 
 NM_KEY_PREFIX="nm-account"
 NM_MNEMONIC_FILE_BASE="${NODE_STATUS_DIR}/nm_mnemonic"
@@ -72,6 +74,10 @@ have() { command -v "$1" >/dev/null 2>&1; }
 wait_for_file() { while [ ! -s "$1" ]; do sleep 1; done; }
 
 fail_soft() { echo "[NM] $*"; exit 0; }   # exit 0 so container keeps running
+
+version_ge() {
+  printf '%s\n' "$2" "$1" | sort -V | head -n1 | grep -q "^$2$"
+}
 
 # Fetch the latest block height from lumerad.
 latest_block_height() {
@@ -156,7 +162,11 @@ fi
 VAL_REC_JSON="$(jq -c --arg m "$MONIKER" '[.[] | select(.moniker==$m)][0]' "${CFG_VALS}")"
 [ -n "${VAL_REC_JSON}" ] && [ "${VAL_REC_JSON}" != "null" ] || { echo "[NM] Validator moniker ${MONIKER} not found in validators.json"; exit 1; }
 
-NM_ENABLED="$(echo "${VAL_REC_JSON}" | jq -r 'try .["network-maker"] // "false"')"
+NM_ENABLED="$(echo "${VAL_REC_JSON}" | jq -r 'try .["network-maker"].enabled // .["network-maker"] // "false"')"
+NM_GRPC_PORT="$(echo "${VAL_REC_JSON}" | jq -r 'try .["network-maker"].grpc_port // empty')"
+NM_HTTP_PORT="$(echo "${VAL_REC_JSON}" | jq -r 'try .["network-maker"].http_port // empty')"
+if [ -z "${NM_GRPC_PORT}" ] || [ "${NM_GRPC_PORT}" = "null" ]; then NM_GRPC_PORT="${NM_GRPC_PORT:-50051}"; fi
+if [ -z "${NM_HTTP_PORT}" ] || [ "${NM_HTTP_PORT}" = "null" ]; then NM_HTTP_PORT="${NM_HTTP_PORT:-8080}"; fi
 
 # ----- short-circuits -----
 if [ "${START_MODE}" = "wait" ]; then
@@ -273,6 +283,10 @@ configure_nm() {
   crudini --set "$cfg" lumera rpc_endpoint  "\"$LUMERA_RPC_ADDR\""
   crudini --set "$cfg" lumera chain_id      "\"$CHAIN_ID\""
   crudini --set "$cfg" lumera denom         "\"$DENOM\""
+
+  # monitor (grpc/http) listeners
+  crudini --set "$cfg" network-maker grpc_listen "\"0.0.0.0:${NM_GRPC_PORT}\""
+  crudini --set "$cfg" network-maker http_gateway_listen "\"0.0.0.0:${NM_HTTP_PORT}\""
 
   # keyring section
   crudini --set "$cfg" keyring backend "\"$KEYRING_BACKEND\""

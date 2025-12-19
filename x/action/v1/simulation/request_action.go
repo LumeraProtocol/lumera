@@ -102,6 +102,7 @@ func SimulateMsgRequestActionInvalidMetadata(
 			invalidMetadata,
 			feeAmount.String(),
 			strconv.FormatInt(expirationTime, 10),
+			"",
 		)
 
 		// 8. Cache keeper state for simulation
@@ -164,6 +165,7 @@ func SimulateMsgRequestActionInsufficientFunds(
 			validMetadata,
 			feeAmount.String(),
 			strconv.FormatInt(expirationTime, 10),
+			"",
 		)
 
 		// 8. Cache keeper state for simulation
@@ -229,6 +231,7 @@ func SimulateMsgRequestActionPermission(
 			metadata,
 			feeAmount.String(),
 			strconv.FormatInt(expirationTime, 10),
+			"",
 		)
 
 		// 8. Use MsgServer to handle the request in the cache context

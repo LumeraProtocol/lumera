@@ -35,6 +35,11 @@ service Query {
     option (google.api.http).get = "/LumeraProtocol/lumera/action/v1/list_actions";
   }
 
+  // List actions created by a specific address.
+  rpc ListActionsByCreator (QueryListActionsByCreatorRequest) returns (QueryListActionsByCreatorResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/action/v1/list_actions_by_creator/{creator}";
+  }
+
   // List actions for a specific supernode.
   rpc ListActionsBySuperNode (QueryListActionsBySuperNodeRequest) returns (QueryListActionsBySuperNodeResponse) {
     option (google.api.http).get = "/LumeraProtocol/lumera/action/v1/list_actions_by_supernode/{superNodeAddress}";
@@ -94,6 +99,19 @@ message QueryListActionsRequest {
 
 // QueryListActionsResponse is a response type to list actions
 message QueryListActionsResponse {
+  repeated Action actions = 1;
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+  uint64 total = 3;
+}
+
+// QueryListActionsByCreatorRequest is a request type to list actions for a specific creator
+message QueryListActionsByCreatorRequest {
+  string creator = 1;
+  cosmos.base.query.v1beta1.PageRequest pagination = 2;
+}
+
+// QueryListActionsByCreatorResponse is a response type to list actions for a specific creator
+message QueryListActionsByCreatorResponse {
   repeated Action actions = 1;
   cosmos.base.query.v1beta1.PageResponse pagination = 2;
   uint64 total = 3;

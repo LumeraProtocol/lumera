@@ -46,6 +46,7 @@ func registerSenseAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account,
 		senseMetadata,
 		feeAmount.String(),
 		strconv.FormatInt(expirationTime, 10),
+		"",
 	)
 
 	// 6. Cache keeper state for simulation
@@ -91,6 +92,7 @@ func registerCascadeAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Accoun
 		cascadeMetadata,
 		feeAmount.String(),
 		strconv.FormatInt(expirationTime, 10),
+		"",
 	)
 
 	// 6. Cache keeper state for simulation
@@ -1002,6 +1004,15 @@ func registerSupernode(r *rand.Rand, ctx sdk.Context, k keeper.Keeper, accs []si
 		}
 
 		if validator.IsJailed() {
+			continue
+		}
+
+		// Ensure the supernode account is not already associated with another validator.
+		_, exists, err := k.GetSupernodeKeeper().GetSuperNodeByAccount(ctx, simAccount.Address.String())
+		if err != nil {
+			continue
+		}
+		if exists {
 			continue
 		}
 

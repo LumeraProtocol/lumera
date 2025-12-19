@@ -24,42 +24,77 @@ func (q queryServer) ListActions(goCtx context.Context, req *types.QueryListActi
 
 	store := q.k.storeService.OpenKVStore(ctx)
 	storeAdapter := runtime.KVStoreAdapter(store)
-	actionStore := prefix.NewStore(storeAdapter, []byte(ActionKeyPrefix))
 
 	var actions []*types.Action
+	useStateIndex := req.ActionState != types.ActionStateUnspecified
+	useTypeIndex := !useStateIndex && req.ActionType != types.ActionTypeUnspecified
 
-	onResult := func(key, value []byte, accumulate bool) (bool, error) {
-		var act actiontypes.Action
-		if err := q.k.cdc.Unmarshal(value, &act); err != nil {
-			return false, err
+	var pageRes *query.PageResponse
+	var err error
+
+	if useStateIndex {
+		// When filtering by state, use the state index to avoid full scans
+		statePrefix := []byte(ActionByStatePrefix + types.ActionState(req.ActionState).String() + "/")
+		indexStore := prefix.NewStore(storeAdapter, statePrefix)
+
+		onResult := func(key, _ []byte, accumulate bool) (bool, error) {
+			actionID := string(key)
+			act, found := q.k.GetActionByID(ctx, actionID)
+			if !found {
+				// Stale index entry; skip without counting
+				return false, nil
+			}
+
+			if req.ActionType != types.ActionTypeUnspecified && act.ActionType != actiontypes.ActionType(req.ActionType) {
+				return false, nil
+			}
+
+			if accumulate {
+				actions = append(actions, act)
+			}
+
+			return true, nil
 		}
 
-		if req.ActionState != types.ActionStateUnspecified && act.State != actiontypes.ActionState(req.ActionState) {
-			return false, nil
+		pageRes, err = query.FilteredPaginate(indexStore, req.Pagination, onResult)
+	} else if useTypeIndex {
+		// When filtering only by type, use the type index
+		typePrefix := []byte(ActionByTypePrefix + types.ActionType(req.ActionType).String() + "/")
+		indexStore := prefix.NewStore(storeAdapter, typePrefix)
+
+		onResult := func(key, _ []byte, accumulate bool) (bool, error) {
+			actionID := string(key)
+			act, found := q.k.GetActionByID(ctx, actionID)
+			if !found {
+				// Stale index entry; skip
+				return false, nil
+			}
+
+			if accumulate {
+				actions = append(actions, act)
+			}
+
+			return true, nil
 		}
 
-		if req.ActionType != types.ActionTypeUnspecified && act.ActionType != actiontypes.ActionType(req.ActionType) {
-			return false, nil
-		}
+		pageRes, err = query.FilteredPaginate(indexStore, req.Pagination, onResult)
+	} else {
+		actionStore := prefix.NewStore(storeAdapter, []byte(ActionKeyPrefix))
 
-		if accumulate {
-			actions = append(actions, &types.Action{
-				Creator:        act.Creator,
-				ActionID:       act.ActionID,
-				ActionType:     types.ActionType(act.ActionType),
-				Metadata:       act.Metadata,
-				Price:          act.Price,
-				ExpirationTime: act.ExpirationTime,
-				State:          types.ActionState(act.State),
-				BlockHeight:    act.BlockHeight,
-				SuperNodes:     act.SuperNodes,
-			})
-		}
+		onResult := func(key, value []byte, accumulate bool) (bool, error) {
+			var act actiontypes.Action
+			if err := q.k.cdc.Unmarshal(value, &act); err != nil {
+				return false, err
+			}
 
-		return true, nil
+			if accumulate {
+				actions = append(actions, &act)
+			}
+
+			return true, nil
+		}
+		pageRes, err = query.FilteredPaginate(actionStore, req.Pagination, onResult)
 	}
-
-	pageRes, err := query.FilteredPaginate(actionStore, req.Pagination, onResult)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to paginate actions: %v", err)
 	}
@@ -67,5 +102,6 @@ func (q queryServer) ListActions(goCtx context.Context, req *types.QueryListActi
 	return &types.QueryListActionsResponse{
 		Actions:    actions,
 		Pagination: pageRes,
+		Total:      pageRes.GetTotal(),
 	}, nil
 }

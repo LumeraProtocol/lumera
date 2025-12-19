@@ -14,6 +14,18 @@ import (
 func (k msgServer) RequestAction(goCtx context.Context, msg *types.MsgRequestAction) (*types.MsgRequestActionResponse, error) {
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
+	creatorInfo, err := k.getCreatorAccountInfo(ctx, msg)
+	if err != nil {
+		return nil, err
+	}
+
+	// Cache creator info on context for downstream consumers (e.g., signature verification).
+	ctx = ctx.WithValue(creatorAccountCtxKey, creatorInfo)
+
+	if err := creatorInfo.validateAppPubKey(); err != nil {
+		return nil, err
+	}
+
 	// Get module parameters to access expiration_duration
 	params := k.GetParams(goCtx)
 
@@ -46,6 +58,12 @@ func (k msgServer) RequestAction(goCtx context.Context, msg *types.MsgRequestAct
 	// Parse and validate action type - Already validated in ValidateBasic
 	actionType, _ := types.ParseActionType(msg.ActionType)
 
+	var fileSizeKbs int64
+	if msg.FileSizeKbs != "" {
+		// Already validated in ValidateBasic
+		fileSizeKbs, _ = strconv.ParseInt(msg.FileSizeKbs, 10, 64)
+	}
+
 	// Validate the metadata
 	actionHandler, err := k.actionRegistry.GetHandler(actionType)
 	if err != nil {
@@ -73,6 +91,7 @@ func (k msgServer) RequestAction(goCtx context.Context, msg *types.MsgRequestAct
 		Price:          price.String(),
 		ExpirationTime: expTime,
 		State:          types.ActionStatePending,
+		FileSizeKbs:    fileSizeKbs,
 	}
 
 	// Save the action (this generates the action ID)

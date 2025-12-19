@@ -9,12 +9,18 @@ const (
 	DefaultSupernodePort             = 4444
 	DefaultSupernodeP2PPort          = 4445
 	DefaultSupernodeGatewayPort      = 8002
+	DefaultNetworkMakerGRPCPort      = 50051
+	DefaultNetworkMakerHTTPPort      = 8080
+	DefaultNetworkMakerUIPort        = 8088
 	DefaultGRPCWebPort               = 9091
 	DefaultHermesSimdHostP2PPort     = 36656
 	DefaultHermesSimdHostRPCPort     = 36657
 	DefaultHermesSimdHostAPIPort     = 31317
 	DefaultHermesSimdHostGRPCPort    = 39090
 	DefaultHermesSimdHostGRPCWebPort = 39091
+
+	EnvNMAPIBase                     = "VITE_API_BASE"
+	EnvNMAPIToken                    = "VITE_API_KEY"
 
 	FolderScripts   = "/root/scripts"
 	SubFolderShared = "shared"

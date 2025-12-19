@@ -1,21 +1,27 @@
 package app
 
 import (
+	"context"
 	"errors"
 
-	"cosmossdk.io/core/appmodule"	
+	"cosmossdk.io/core/appmodule"
 	storetypes "cosmossdk.io/store/types"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/runtime"
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
+	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	paramstypes "github.com/cosmos/cosmos-sdk/x/params/types"
 
 	lcfg "github.com/LumeraProtocol/lumera/config"
 
+	pfm "github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v10/packetforward"
+	pfmkeeper "github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v10/packetforward/keeper"
+	pfmtypes "github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v10/packetforward/types"
 	icamodule "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts"
 	icacontroller "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/controller"
 	icacontrollerkeeper "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/controller/keeper"
@@ -37,15 +43,12 @@ import (
 	ibcapi "github.com/cosmos/ibc-go/v10/modules/core/api"
 	ibcexported "github.com/cosmos/ibc-go/v10/modules/core/exported"
 	ibckeeper "github.com/cosmos/ibc-go/v10/modules/core/keeper"
-	pfm "github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v10/packetforward"
-	pfmkeeper "github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v10/packetforward/keeper"
-	pfmtypes "github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v10/packetforward/types"
 	solomachine "github.com/cosmos/ibc-go/v10/modules/light-clients/06-solomachine"
 	ibctm "github.com/cosmos/ibc-go/v10/modules/light-clients/07-tendermint"
 
 	// this line is used by starport scaffolding # ibc/app/import
-	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
+	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 )
 
 // registerIBCModules register IBC keepers and non dependency inject modules.
@@ -150,10 +153,10 @@ func (app *App) registerIBCModules(
 	// Create Transfer Stack
 	var ibcv1transferStack ibcporttypes.IBCModule
 	ibcv1transferStack = ibctransfer.NewIBCModule(app.TransferKeeper)
-    // callbacks wraps the transfer stack as its base app, and uses PacketForwardKeeper as the ICS4Wrapper
-    // i.e. packet-forward-middleware is higher on the stack and sits between callbacks and the ibc channel keeper
-    // Since this is the lowest level middleware of the transfer stack, it should be the first entrypoint for transfer keeper's
-    // WriteAcknowledgement.	
+	// callbacks wraps the transfer stack as its base app, and uses PacketForwardKeeper as the ICS4Wrapper
+	// i.e. packet-forward-middleware is higher on the stack and sits between callbacks and the ibc channel keeper
+	// Since this is the lowest level middleware of the transfer stack, it should be the first entrypoint for transfer keeper's
+	// WriteAcknowledgement.
 	ibccbStack := ibccallbacks.NewIBCMiddleware(
 		ibcv1transferStack,
 		app.PacketForwardKeeper,
@@ -205,8 +208,8 @@ func (app *App) registerIBCModules(
 		AddRoute(wasmtypes.ModuleName, wasmStackIBCHandler).
 		AddRoute(icacontrollertypes.SubModuleName, icaControllerStack).
 		AddRoute(icahosttypes.SubModuleName, icaHostStack)
-// TODO: Uncomment the following line when the IBC module for the action module is implemented
-//		AddRoute(actiontypes.ModuleName, actionIBCModule)
+		// TODO: Uncomment the following line when the IBC module for the action module is implemented
+		//		AddRoute(actiontypes.ModuleName, actionIBCModule)
 
 	// Additional IBC modules can be registered here
 	if v := appOpts.Get(IBCModuleRegisterFnOption); v != nil {
@@ -267,4 +270,20 @@ func RegisterIBC(cdc codec.Codec) map[string]appmodule.AppModule {
 	}
 
 	return modules
+}
+
+// isInterchainAccount reports whether the provided account is an ICA account.
+// Useful for modules that need to branch behavior for ICS-27-controlled accounts.
+func isInterchainAccount(account sdk.AccountI) bool {
+	_, ok := account.(*icatypes.InterchainAccount)
+	return ok
+}
+
+// isInterchainAccountAddr reports whether the address resolves to an ICA account.
+func isInterchainAccountAddr(ctx context.Context, ak authkeeper.AccountKeeper, addr sdk.AccAddress) bool {
+	acct := ak.GetAccount(ctx, addr)
+	if acct == nil {
+		return false
+	}
+	return isInterchainAccount(acct)
 }

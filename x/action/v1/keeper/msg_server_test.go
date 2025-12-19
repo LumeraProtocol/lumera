@@ -128,6 +128,7 @@ func (suite *MsgServerTestSuite) registerCascadeAction() string {
 		ActionType: "CASCADE",
 		Price:      "100000ulume",
 		Metadata:   cascadeMetadataBytes.String(),
+		FileSizeKbs: "123",
 	}
 
 	// Execute the message
@@ -149,6 +150,8 @@ func (suite *MsgServerTestSuite) registerCascadeAction() string {
 	// Verify the action type
 	suite.Equal(types.ActionTypeCascade, action.ActionType,
 		"Expected action type to be %s, got %s", types.ActionTypeCascade, action.ActionType)
+	// Verify file size
+	suite.Equal(int64(123), action.FileSizeKbs)
 
 	return res.ActionId
 }
@@ -171,6 +174,7 @@ func (suite *MsgServerTestSuite) registerSenseAction() string {
 		ActionType: "SENSE",
 		Price:      "100000ulume",
 		Metadata:   senseMetadataBytes.String(),
+		FileSizeKbs: "456",
 	}
 
 	// Execute the message
@@ -192,6 +196,8 @@ func (suite *MsgServerTestSuite) registerSenseAction() string {
 	// Verify the action type
 	suite.Equal(actiontypes.ActionTypeSense, action.ActionType,
 		"Expected action type to be %s, got %s", actiontypes.ActionTypeSense, action.ActionType)
+	// Verify file size
+	suite.Equal(int64(456), action.FileSizeKbs)
 
 	return res.ActionId
 }
@@ -323,6 +329,41 @@ func (suite *MsgServerTestSuite) TestMsgApproveAction() {
 	suite.approveAction(actionID, suite.creatorAddress.String())
 }
 
+func (suite *MsgServerTestSuite) TestMsgApproveActionTxMsgDataContainsResponseFields() {
+	suite.setupExpectationsGetAllTopSNs(1)
+	actionID := suite.registerCascadeAction()
+	suite.finalizeCascadeAction(actionID)
+
+	suite.ctx = suite.ctx.WithEventManager(sdk.NewEventManager())
+
+	msg := types.MsgApproveAction{
+		Creator:  suite.creatorAddress.String(),
+		ActionId: actionID,
+	}
+
+	res, err := suite.msgServer.ApproveAction(suite.ctx, &msg)
+	suite.Require().NoError(err)
+	suite.Require().NotNil(res)
+
+	result, err := sdk.WrapServiceResult(suite.ctx, res, nil)
+	suite.Require().NoError(err)
+
+	txMsgData := sdk.TxMsgData{MsgResponses: result.MsgResponses}
+	bz, err := suite.keeper.GetCodec().Marshal(&txMsgData)
+	suite.Require().NoError(err)
+
+	var decoded sdk.TxMsgData
+	err = suite.keeper.GetCodec().Unmarshal(bz, &decoded)
+	suite.Require().NoError(err)
+	suite.Require().Len(decoded.MsgResponses, 1)
+
+	var approveRes types.MsgApproveActionResponse
+	err = suite.keeper.GetCodec().Unmarshal(decoded.MsgResponses[0].Value, &approveRes)
+	suite.Require().NoError(err)
+	suite.Require().Equal(actionID, approveRes.ActionId)
+	suite.Require().Equal(actiontypes.ActionStateApproved.String(), approveRes.Status)
+}
+
 func (suite *MsgServerTestSuite) approveActionNoCheck(actionID string, creator string) (*types.MsgApproveActionResponse, error) {
 	msg := types.MsgApproveAction{
 		Creator:  creator,
@@ -341,6 +382,8 @@ func (suite *MsgServerTestSuite) approveAction(actionID string, creator string) 
 	res, err := suite.approveActionNoCheck(actionID, creator)
 	suite.NoError(err)
 	suite.NotNil(res)
+	suite.Equal(actionID, res.ActionId, "Expected response to return action ID")
+	suite.Equal(actiontypes.ActionStateApproved.String(), res.Status, "Expected response to return approved status")
 
 	// Verify the action is now in APPROVED state
 	updatedAction, found := suite.keeper.GetActionByID(suite.ctx, actionID)

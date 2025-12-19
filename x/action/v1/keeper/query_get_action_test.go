@@ -30,6 +30,7 @@ func TestKeeper_GetAction(t *testing.T) {
 		State:          actiontypes.ActionStateProcessing,
 		BlockHeight:    1,
 		SuperNodes:     []string{"node1", "node2"},
+		FileSizeKbs:    123,
 	}
 
 	testCases := []struct {
@@ -66,6 +67,7 @@ func TestKeeper_GetAction(t *testing.T) {
 				require.Equal(t, action.ActionID, resp.Action.ActionID)
 				require.Equal(t, action.Creator, resp.Action.Creator)
 				require.Equal(t, action.Price, resp.Action.Price)
+				require.Equal(t, action.FileSizeKbs, resp.Action.FileSizeKbs)
 			},
 		},
 	}

@@ -73,11 +73,42 @@ func (m *MockSupernodeKeeper) GetAllSuperNodes(ctx types0.Context, stateFilters 
 }
 
 // GetAllSuperNodes indicates an expected call of GetAllSuperNodes.
-func (mr *MockSupernodeKeeperMockRecorder) GetAllSuperNodes(ctx interface{}, stateFilters ...interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{ctx}, stateFilters...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAllSuperNodes", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetAllSuperNodes), varargs...)
+	func (mr *MockSupernodeKeeperMockRecorder) GetAllSuperNodes(ctx interface{}, stateFilters ...interface{}) *gomock.Call {
+		mr.mock.ctrl.T.Helper()
+		varargs := append([]interface{}{ctx}, stateFilters...)
+		return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAllSuperNodes", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetAllSuperNodes), varargs...)
+	}
+
+	// GetMetricsState mocks base method.
+	func (m *MockSupernodeKeeper) GetMetricsState(ctx types0.Context, valAddr types0.ValAddress) (types.SupernodeMetricsState, bool) {
+		m.ctrl.T.Helper()
+		ret := m.ctrl.Call(m, "GetMetricsState", ctx, valAddr)
+	ret0, _ := ret[0].(types.SupernodeMetricsState)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
 }
+
+	// GetMetricsState indicates an expected call of GetMetricsState.
+	func (mr *MockSupernodeKeeperMockRecorder) GetMetricsState(ctx, valAddr interface{}) *gomock.Call {
+		mr.mock.ctrl.T.Helper()
+		return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMetricsState", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetMetricsState), ctx, valAddr)
+	}
+
+	// GetSuperNodeByAccount mocks base method.
+	func (m *MockSupernodeKeeper) GetSuperNodeByAccount(ctx types0.Context, supernodeAccount string) (types.SuperNode, bool, error) {
+		m.ctrl.T.Helper()
+		ret := m.ctrl.Call(m, "GetSuperNodeByAccount", ctx, supernodeAccount)
+		ret0, _ := ret[0].(types.SuperNode)
+		ret1, _ := ret[1].(bool)
+		ret2, _ := ret[2].(error)
+		return ret0, ret1, ret2
+	}
+
+	// GetSuperNodeByAccount indicates an expected call of GetSuperNodeByAccount.
+	func (mr *MockSupernodeKeeperMockRecorder) GetSuperNodeByAccount(ctx, supernodeAccount interface{}) *gomock.Call {
+		mr.mock.ctrl.T.Helper()
+		return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSuperNodeByAccount", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetSuperNodeByAccount), ctx, supernodeAccount)
+	}
 
 // GetAuthority mocks base method.
 func (m *MockSupernodeKeeper) GetAuthority() string {
@@ -155,6 +186,20 @@ func (mr *MockSupernodeKeeperMockRecorder) GetSuperNodesPaginated(ctx, paginatio
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{ctx, pagination}, stateFilters...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSuperNodesPaginated", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetSuperNodesPaginated), varargs...)
+}
+
+// SetMetricsState mocks base method.
+func (m *MockSupernodeKeeper) SetMetricsState(ctx types0.Context, state types.SupernodeMetricsState) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetMetricsState", ctx, state)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetMetricsState indicates an expected call of SetMetricsState.
+func (mr *MockSupernodeKeeperMockRecorder) SetMetricsState(ctx, state interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetMetricsState", reflect.TypeOf((*MockSupernodeKeeper)(nil).SetMetricsState), ctx, state)
 }
 
 // IsEligibleAndNotJailedValidator mocks base method.

@@ -174,8 +174,10 @@ func (suite *ActionIntegrationTestSuite) TestActionLifecycle() {
 			ActionId: actionID,
 			Creator:  txCreator,
 		}
-		_, err := suite.msgServer.ApproveAction(suite.ctx, msg)
+		res, err := suite.msgServer.ApproveAction(suite.ctx, msg)
 		require.NoError(suite.T(), err)
+		require.Equal(suite.T(), actionID, res.ActionId)
+		require.Equal(suite.T(), actiontypes.ActionStateApproved.String(), res.Status)
 		action, found := suite.keeper.GetActionByID(suite.ctx, actionID)
 		require.True(suite.T(), found)
 		require.Equal(suite.T(), actiontypes.ActionStateApproved, action.State)

@@ -1,6 +1,7 @@
 package keeper
 
 import (
+	"bytes"
 	"fmt"
 	"strconv"
 
@@ -25,6 +26,16 @@ func (k Keeper) SetSuperNode(ctx sdk.Context, supernode types.SuperNode) error {
 
 	// Convert context store to a KVStore interface
 	storeAdapter := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
+
+	// Use the validator address as the primary key (since it's unique).
+	valOperAddr, err := sdk.ValAddressFromBech32(supernode.ValidatorAddress)
+	if err != nil {
+		return errorsmod.Wrapf(err, "invalid validator address: %s", supernode.ValidatorAddress)
+	}
+
+	// Load any existing record so we can maintain secondary indices safely.
+	existing, exists := k.QuerySuperNode(ctx, valOperAddr)
+
 	// Create a prefix store so that all keys are under SuperNodeKey
 	store := prefix.NewStore(storeAdapter, []byte(types.SuperNodeKey))
 
@@ -34,15 +45,31 @@ func (k Keeper) SetSuperNode(ctx sdk.Context, supernode types.SuperNode) error {
 		return err
 	}
 
-	// Use the validator address as the key (since it's unique).
-	valOperAddr, err := sdk.ValAddressFromBech32(supernode.ValidatorAddress)
-	if err != nil {
-		return errorsmod.Wrapf(err, "invalid validator address: %s", err)
-	}
-
 	// Set the supernode record under [SuperNodeKeyPrefix + valOperAddr]
 	// Note: prefix.NewStore automatically prepends the prefix we defined above.
 	store.Set(valOperAddr, b)
+
+	// Maintain secondary index by supernode account (if set).
+	accountIndexStore := prefix.NewStore(storeAdapter, types.SuperNodeByAccountKey)
+
+	// Remove old index entry if the account has changed.
+	if exists && existing.SupernodeAccount != "" && existing.SupernodeAccount != supernode.SupernodeAccount {
+		accountIndexStore.Delete([]byte(existing.SupernodeAccount))
+	}
+
+	// Set or update the index entry for the current supernode account.
+	if supernode.SupernodeAccount != "" {
+		// Enforce 1:1 mapping: a SupernodeAccount can only be associated with one validator.
+		existingVal := accountIndexStore.Get([]byte(supernode.SupernodeAccount))
+		if existingVal != nil && !bytes.Equal(existingVal, valOperAddr) {
+			return errorsmod.Wrapf(
+				sdkerrors.ErrInvalidRequest,
+				"supernode account %s already associated with another validator",
+				supernode.SupernodeAccount,
+			)
+		}
+		accountIndexStore.Set([]byte(supernode.SupernodeAccount), valOperAddr)
+	}
 
 	return nil
 }
@@ -83,7 +110,7 @@ func (k Keeper) GetAllSuperNodes(ctx sdk.Context, stateFilters ...types.SuperNod
 			return nil, fmt.Errorf("failed to unmarshal supernode: %w", err)
 		}
 
-		// skip if no states at all
+		// skip if no states at all to avoid panics on corrupted/legacy records
 		if len(sn.States) == 0 {
 			continue
 		}
@@ -97,6 +124,35 @@ func (k Keeper) GetAllSuperNodes(ctx sdk.Context, stateFilters ...types.SuperNod
 	return supernodes, nil
 }
 
+// GetSuperNodeByAccount returns the supernode record for a given supernode account address, if present.
+func (k Keeper) GetSuperNodeByAccount(ctx sdk.Context, supernodeAccount string) (types.SuperNode, bool, error) {
+	storeAdapter := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
+	indexStore := prefix.NewStore(storeAdapter, types.SuperNodeByAccountKey)
+
+	// Look up the validator operator address from the secondary index.
+	valBz := indexStore.Get([]byte(supernodeAccount))
+	if valBz == nil {
+		// Index entry not found; no supernode for this account.
+		return types.SuperNode{}, false, nil
+	}
+
+	valOperAddr := sdk.ValAddress(valBz)
+
+	// Use the primary query path to load the full SuperNode record.
+	sn, exists := k.QuerySuperNode(ctx, valOperAddr)
+	if !exists {
+		// Stale index entry; treat as not found.
+		return types.SuperNode{}, false, nil
+	}
+
+	// Guard against stale/corrupted index entries.
+	if sn.SupernodeAccount != supernodeAccount {
+		return types.SuperNode{}, false, nil
+	}
+
+	return sn, true, nil
+}
+
 // GetSuperNodesPaginated returns paginated supernodes, optionally filtered by state
 func (k Keeper) GetSuperNodesPaginated(ctx sdk.Context, pagination *query.PageRequest, stateFilters ...types.SuperNodeState) ([]*types.SuperNode, *query.PageResponse, error) {
 	storeAdapter := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
@@ -105,20 +161,27 @@ func (k Keeper) GetSuperNodesPaginated(ctx sdk.Context, pagination *query.PageRe
 	var supernodes []*types.SuperNode
 	filtering := shouldFilter(stateFilters...)
 
-	pageRes, err := query.Paginate(store, pagination, func(key, value []byte) error {
+	pageRes, err := query.FilteredPaginate(store, pagination, func(key, value []byte, accumulate bool) (bool, error) {
 		var sn types.SuperNode
 		if err := k.cdc.Unmarshal(value, &sn); err != nil {
-			return err
+			return false, err
 		}
 
+		// Skip records with no states to avoid panics on corrupted/legacy data
 		if len(sn.States) == 0 {
-			return nil
+			return false, nil
 		}
 
-		if !filtering || stateIn(sn.States[len(sn.States)-1].State, stateFilters...) {
+		// If filtering by state, skip non-matching states
+		if filtering && !stateIn(sn.States[len(sn.States)-1].State, stateFilters...) {
+			return false, nil
+		}
+
+		if accumulate {
 			supernodes = append(supernodes, &sn)
 		}
-		return nil
+
+		return true, nil
 	})
 	if err != nil {
 		return nil, nil, err
@@ -136,10 +199,7 @@ func (k Keeper) GetMinStake(ctx sdk.Context) sdkmath.Int {
 // SetSuperNodeActive sets a validator's SuperNode status to active and emits an event.
 // If reason is non-empty, it is included as an event attribute.
 func (k Keeper) SetSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress, reason string) error {
-	valOperAddr, err := sdk.ValAddressFromBech32(valAddr.String())
-	if err != nil {
-		return errorsmod.Wrapf(sdkerrors.ErrInvalidAddress, "invalid validator address: %s", err)
-	}
+	valOperAddr := valAddr
 
 	supernode, found := k.QuerySuperNode(ctx, valOperAddr)
 	if !found {
@@ -164,6 +224,9 @@ func (k Keeper) SetSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress, reas
 		})
 	case types.SuperNodeStateActive:
 		// Already active, nothing to do
+		return nil
+	default:
+		// For penalized or any other state, do nothing and return without emitting events
 		return nil
 	}
 	if err := k.SetSuperNode(ctx, supernode); err != nil {
@@ -192,10 +255,7 @@ func (k Keeper) SetSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress, reas
 // SetSuperNodeStopped sets a validator's SuperNode status to stopped and emits an event.
 // If reason is non-empty, it is included as an event attribute.
 func (k Keeper) SetSuperNodeStopped(ctx sdk.Context, valAddr sdk.ValAddress, reason string) error {
-	valOperAddr, err := sdk.ValAddressFromBech32(valAddr.String())
-	if err != nil {
-		return errorsmod.Wrapf(sdkerrors.ErrInvalidAddress, "invalid validator address: %s", err)
-	}
+	valOperAddr := valAddr
 
 	supernode, found := k.QuerySuperNode(ctx, valOperAddr)
 	if !found {
@@ -243,10 +303,7 @@ func (k Keeper) SetSuperNodeStopped(ctx sdk.Context, valAddr sdk.ValAddress, rea
 }
 
 func (k Keeper) IsSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress) bool {
-	valOperAddr, err := sdk.ValAddressFromBech32(valAddr.String())
-	if err != nil {
-		return false
-	}
+	valOperAddr := valAddr
 
 	supernode, found := k.QuerySuperNode(ctx, valOperAddr)
 	if !found {

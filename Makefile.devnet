@@ -1,5 +1,5 @@
 .PHONY: devnet-build devnet-up devnet-reset devnet-up-detach devnet-down devnet-stop devnet-clean devnet-deploy-tar devnet-upgrade devnet-new devnet-start
-.PHONY: devnet-build-default _check-devnet-default-cfg devnet-upgrade-binaries devnet-update-scripts
+.PHONY: devnet-build-default _check-devnet-default-cfg devnet-upgrade-binaries devnet-upgrade-binaries-default devnet-update-scripts
 
 ##### Devnet Makefile ########################################
 #
@@ -233,13 +233,16 @@ devnet-upgrade-binaries:
 	fi; \
 	./devnet/scripts/upgrade-binaries.sh "${BUILD_DIR}"
 
+devnet-upgrade-binaries-default:
+	./devnet/scripts/upgrade-binaries.sh "${DEVNET_BIN_DIR}"
+
 devnet-update-scripts:
 	@if [ ! -f "$(COMPOSE_FILE)" ]; then \
 		echo "Missing $(COMPOSE_FILE); run 'make devnet-build' first."; \
 		exit 1; \
 	fi
 	@services="$$(docker compose -f $(COMPOSE_FILE) ps --services)"; \
-	common_scripts="start.sh validator-setup.sh supernode-setup.sh network-maker-setup.sh"; \
+	common_scripts="start.sh stop.sh restart.sh validator-setup.sh supernode-setup.sh network-maker-setup.sh"; \
 	updated=0; \
 	for svc in $$services; do \
 		container="$$(docker compose -f $(COMPOSE_FILE) ps -q $$svc)"; \

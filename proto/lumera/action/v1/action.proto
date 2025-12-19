@@ -19,4 +19,5 @@ message Action {
   ActionState state = 7;
   int64 blockHeight = 8;
   repeated string superNodes = 9 [(cosmos_proto.scalar) = "cosmos.ValidatorAddressString"];
+  int64 fileSizeKbs = 10;
 }

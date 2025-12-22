@@ -2,6 +2,19 @@
 
 ---
 
+## 1.9.0
+
+Changes included since `v1.8.5` (range: `v1.8.5..v1.9.0`).
+
+- Supernode: added self-reported metrics with validation, staleness handling, new query endpoints, and expanded system tests/docs.
+- Action: added `ListActionsByCreator` query and refined action/supernode query behavior.
+- Storage/perf: added query indices and backfills, enforced unique supernode account index, bounded prefix iterators, and improved supernode state lookups.
+- IBC/ICA: `MsgRequestAction` now supports `app_pubkey` validation/signature verification and returns `actionId`/`status` (plus new tests).
+- Action tickets: added `fileSizeKbs` to action requests and keeper/simulation handling.
+- Devnet: added Network-Maker UI support and improved lifecycle scripts (`restart.sh`, `stop.sh`) and compose generation.
+
+---
+
 ## 1.8.5
 
 Changes included since `v1.8.4` (range: `v1.8.4..HEAD`).

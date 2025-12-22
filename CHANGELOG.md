@@ -2,6 +2,20 @@
 
 ---
 
+## 1.9.0
+
+Changes included since `v1.8.5` (range: `v1.8.5..v1.9.0`).
+
+- Supernode: added self-reported metrics with validation `MsgReportSupernodeMetrics`, enforcing staleness/compliance in EndBlock, storing typed metrics (version/cpu/mem/disk/peers, tri-state open_ports), exposing a `GetMetrics` query with refreshed parameter defaults, and expanded system tests/docs.
+- Revamped action queries with secondary indices (state/creator/type/block height/supernode), bounded prefix iterators, and a new `ListActionsByCreator` endpoint for paginated lookups.
+- Enforced a unique supernodeAccount→validator index with lookup helpers; on-chain upgrade `v1.9.0` backfills the new action and supernode indices without store key changes.
+- Testing tightened with supernode metrics system tests and simulation coverage for the validator↔supernode 1:1 invariant.
+- Hardened actions for interchain-account use: `MsgRequestAction` now requires `app_pubkey` when the creator is an ICA, verifies app-level signatures (ADR-36 fallback), `MsgApproveAction` now returns `actionId`/`status`.
+- Action tickets: added `fileSizeKbs` to action requests and keeper/simulation handling.
+- Devnet tooling: added Network-Maker UI support (enhanced compose generator, multi-account provisioning, start/stop/restart scripts) to streamline automation.
+
+---
+
 ## 1.8.5
 
 Changes included since `v1.8.4` (range: `v1.8.4..HEAD`).

@@ -161,5 +161,13 @@ func TestKeeper_GetSuperNodeByAccount(t *testing.T) {
 		err := k.SetSuperNode(ctx, baseSN(val2Bech32, accABech32))
 		require.Error(t, err)
 		require.ErrorIs(t, err, sdkerrors.ErrInvalidRequest)
+
+		// Ensure the failing write did not mutate state.
+		_, found := k.QuerySuperNode(ctx, val2)
+		require.False(t, found)
+
+		storeAdapter := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
+		indexStore := prefix.NewStore(storeAdapter, types.SuperNodeByAccountKey)
+		require.True(t, bytes.Equal(indexStore.Get([]byte(accABech32)), val1))
 	})
 }

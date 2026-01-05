@@ -14,9 +14,9 @@ func (k Keeper) BeginBlocker(ctx context.Context) error {
 
 // EndBlocker contains logic that runs at the end of each block.
 // It delegates to HandleMetricsStaleness, which may transition ACTIVE
-// supernodes into POSTPONED when they fail to report metrics on time.
+// supernodes into POSTPONED when they fail to report metrics on time, or
+// when their supernode account balance is below 1 LUME.
 func (k Keeper) EndBlocker(ctx context.Context) error {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
 	return k.HandleMetricsStaleness(sdkCtx)
 }
-

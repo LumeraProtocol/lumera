@@ -45,7 +45,14 @@ func (k Keeper) HandleMetricsStaleness(ctx sdk.Context) error {
 		// postpone immediately (regardless of metrics freshness).
 		if k.bankKeeper != nil {
 			supernodeAccAddr, err := sdk.AccAddressFromBech32(sn.SupernodeAccount)
-			if err == nil {
+			if err != nil {
+				k.Logger().Warn(
+					"invalid supernode account address; skipping balance check",
+					"validator", sn.ValidatorAddress,
+					"supernode_account", sn.SupernodeAccount,
+					"err", err,
+				)
+			} else {
 				spendable := k.bankKeeper.SpendableCoins(ctx, supernodeAccAddr).AmountOf(lumeBaseDenom)
 				if spendable.LT(minSupernodeBalance.Amount) {
 					if err := markPostponed(ctx, k, &sn, "insufficient balance"); err != nil {

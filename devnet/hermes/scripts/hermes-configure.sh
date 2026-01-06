@@ -93,6 +93,7 @@ ran_capture() {
 : "${SIMD_RPC_PORT:=26657}"
 : "${SIMD_GRPC_PORT:=9090}"
 : "${HERMES_KEY_NAME:=relayer}"
+: "${HERMES_MAX_GAS:=1000000}"
 
 CONFIG_DIR="$(dirname "${HERMES_CONFIG_PATH}")"
 ran mkdir -p "${CONFIG_DIR}"
@@ -100,6 +101,52 @@ ran mkdir -p "${CONFIG_DIR}"
 if [ ! -f "${HERMES_CONFIG_PATH}" ]; then
   ran cp "${HERMES_TEMPLATE_PATH}" "${HERMES_CONFIG_PATH}"
 fi
+
+ensure_mode_enabled() {
+  local section="$1"
+  local value="$2"
+  if ! ran python3 - "$HERMES_CONFIG_PATH" "$section" "$value" <<'PY'
+import pathlib
+import re
+import sys
+
+path = pathlib.Path(sys.argv[1])
+section = sys.argv[2]
+value = sys.argv[3]
+
+lines = path.read_text().splitlines()
+out = []
+in_section = False
+replaced = False
+
+for line in lines:
+    if re.match(r'^\s*\[', line):
+        if in_section and not replaced:
+            out.append(f'enabled = {value}')
+            replaced = True
+        in_section = line.strip() == f'[{section}]'
+        out.append(line)
+        continue
+    if in_section and re.match(r'^\s*enabled\s*=', line):
+        out.append(f'enabled = {value}')
+        replaced = True
+        continue
+    out.append(line)
+
+if in_section and not replaced:
+    out.append(f'enabled = {value}')
+
+path.write_text('\n'.join(out) + '\n')
+PY
+  then
+    log_info "Failed to enforce ${section}.enabled=${value}"
+    return 1
+  fi
+  log_info "Ensured ${section}.enabled=${value}"
+}
+
+ensure_mode_enabled "mode.channels" "true"
+ensure_mode_enabled "mode.connections" "true"
 
 append_chain() {
   local chain_id="$1"
@@ -144,6 +191,7 @@ key_name = '${HERMES_KEY_NAME}'
 store_prefix = 'ibc'
 memo_prefix = ''
 gas_price = { price = 0.025, denom = '${LUMERA_BOND_DENOM}' }
+max_gas = ${HERMES_MAX_GAS}
 clock_drift = '5s'
 trusting_period = '14days'
 trust_threshold = '1/3'
@@ -163,6 +211,7 @@ key_name = '${HERMES_KEY_NAME}'
 store_prefix = 'ibc'
 memo_prefix = ''
 gas_price = { price = 0.025, denom = '${SIMD_DENOM}' }
+max_gas = ${HERMES_MAX_GAS}
 clock_drift = '5s'
 trusting_period = '14days'
 trust_threshold = '1/3'

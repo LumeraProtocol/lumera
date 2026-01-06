@@ -35,12 +35,12 @@ var highCompressSem = semaphore.NewWeighted(maxParallelHighCompressCalls)
 // VerifySignature verifies that a signature is valid for given data and signer.
 //
 // Flow:
-// 1) Try to get a pubkey from the context cache (creatorAccountCtxKey). For ICA creators
+// - Try to get a pubkey from the context cache (creatorAccountCtxKey). For ICA creators
 //    this uses the app-level pubkey provided on the message; for non-ICA creators it uses
 //    the cached account pubkey when present.
-// 2) If no cached key is found, resolve the account and pubkey from auth keeper + address codec.
-// 3) Decode the base64 signature, coerce to r||s format, and verify.
-// 4) If direct verification fails, retry using ADR-36 amino sign bytes (Keplr/browser flow).
+// - If no cached key is found, resolve the account and pubkey from auth keeper + address codec.
+// - Decode the base64 signature, coerce to r||s format, and verify.
+// - If direct verification fails, retry using ADR-36 amino sign bytes (Keplr/browser flow).
 //
 // Parameters:
 // - data: The original data that was signed (string format)
@@ -55,6 +55,7 @@ var highCompressSem = semaphore.NewWeighted(maxParallelHighCompressCalls)
 func (k *Keeper) VerifySignature(ctx sdk.Context, dataB64 string, signature string, signerAddress string) error {
 	var pubKey cryptotypes.PubKey
 
+	// 1. Try to get pubkey from context cache (creatorAccountCtxKey)
 	if info, ok := ctx.Value(creatorAccountCtxKey).(*creatorAccountInfo); ok {
 		if info.isICA {
 			if len(info.appPubkey) == 0 {
@@ -68,7 +69,7 @@ func (k *Keeper) VerifySignature(ctx sdk.Context, dataB64 string, signature stri
 		}
 	}
 
-	// 1. Get account PubKey (fallback if not provided via context)
+	// 2. Get account PubKey (fallback if not provided via context)
 	if pubKey == nil {
 		accAddr, err := k.addressCodec.StringToBytes(signerAddress)
 		if err != nil {
@@ -87,23 +88,24 @@ func (k *Keeper) VerifySignature(ctx sdk.Context, dataB64 string, signature stri
 			"account has no public key: %s", signerAddress)
 	}
 
-	// 2. Decode the base64 signature
+	// 3. Decode the base64 signature
 	sigRaw, err := base64.StdEncoding.DecodeString(signature)
 	if err != nil {
 		return errorsmod.Wrapf(actiontypes.ErrInvalidSignature,
 			"failed to decode signature: %s", err)
 	}
+	// 4. Coerce to r||s format
 	sigRS, err := CoerceToRS64(sigRaw)
 	if err != nil {
 		return errorsmod.Wrapf(actiontypes.ErrInvalidSignature, "sig format: %s", err)
 	}
 
-	// 3. Verify the signature
+	// 5. Verify the signature
 	if pubKey.VerifySignature([]byte(dataB64), sigRS) {
 		return nil
 	}
 
-	// 4) ADR-36 (Keplr/browser)
+	// 6. ADR-36 (Keplr/browser)
 	signBytes, err := MakeADR36AminoSignBytes(signerAddress, dataB64)
 	if err == nil && pubKey.VerifySignature(signBytes, sigRS) {
 		return nil

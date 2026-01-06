@@ -92,6 +92,7 @@ func (k msgServer) RequestAction(goCtx context.Context, msg *types.MsgRequestAct
 		ExpirationTime: expTime,
 		State:          types.ActionStatePending,
 		FileSizeKbs:    fileSizeKbs,
+		AppPubkey:      msg.AppPubkey,
 	}
 
 	// Save the action (this generates the action ID)

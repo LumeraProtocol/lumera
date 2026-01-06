@@ -1,19 +1,19 @@
 package keeper_test
 
 import (
-    "testing"
+	"testing"
 
-    keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
-    "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
-    "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
+	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
+	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 
-    sdk "github.com/cosmos/cosmos-sdk/types"
-    "github.com/cosmos/cosmos-sdk/types/query"
-    gogoproto "github.com/cosmos/gogoproto/proto"
-    "github.com/golang/mock/gomock"
-    "github.com/stretchr/testify/require"
-    "google.golang.org/grpc/codes"
-    "google.golang.org/grpc/status"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/types/query"
+	gogoproto "github.com/cosmos/gogoproto/proto"
+	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func TestQueryActionByMetadata(t *testing.T) {
@@ -64,6 +64,7 @@ func TestQueryActionByMetadata(t *testing.T) {
 		State:          types.ActionStateProcessing,
 		BlockHeight:    100,
 		SuperNodes:     []string{"supernode-1", "supernode-2"},
+		AppPubkey:      []byte{1, 2, 3},
 	}
 	action2 := types.Action{
 		Creator:        "creator2",
@@ -141,6 +142,7 @@ func TestQueryActionByMetadata(t *testing.T) {
 				require.NotNil(t, resp)
 				require.Len(t, resp.Actions, 2)
 				require.Equal(t, actionID1, resp.Actions[0].ActionID)
+				require.Equal(t, action1.AppPubkey, resp.Actions[0].AppPubkey)
 			},
 		},
 		{

@@ -1,15 +1,15 @@
 package keeper
 
 import (
-	"encoding/base64"
 	"context"
+	"encoding/base64"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/cosmos/cosmos-sdk/codec/address"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 )
 
@@ -62,4 +62,24 @@ func TestVerifySignatureUsesCachedAccountPubKey(t *testing.T) {
 	})
 
 	require.NoError(t, k.VerifySignature(ctx, data, sigB64, signer))
+}
+
+func TestVerifySignatureCachedICARequiresAppPubkey(t *testing.T) {
+	priv := secp256k1.GenPrivKey()
+	signerBz := sdk.AccAddress(priv.PubKey().Address())
+
+	addrCodec := address.NewBech32Codec("lumera")
+	signer, err := addrCodec.BytesToString(signerBz)
+	require.NoError(t, err)
+
+	k := Keeper{addressCodec: addrCodec}
+
+	ctx := sdk.Context{}.WithContext(context.Background())
+	ctx = ctx.WithValue(creatorAccountCtxKey, &creatorAccountInfo{
+		isICA: true,
+	})
+
+	err = k.VerifySignature(ctx, "payload", "invalid", signer)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "app pubkey required")
 }

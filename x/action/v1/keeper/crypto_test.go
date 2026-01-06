@@ -2,9 +2,11 @@ package keeper_test
 
 import (
 	"bytes"
+	"encoding/asn1"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"math/rand"
 	"strconv"
 	"testing"
@@ -12,12 +14,12 @@ import (
 
 	"github.com/cosmos/btcutil/base58"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
-	"lukechampine.com/blake3"
-	"github.com/stretchr/testify/require"
 	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/require"
+	"lukechampine.com/blake3"
 
-	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
 	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
+	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
 	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 )
 
@@ -81,6 +83,53 @@ func TestVerifySignature(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestVerifySignatureADR36Fallback(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	key, address := cryptotestutils.KeyAndAddress()
+	pubKey := key.PubKey()
+	pairs := []keepertest.AccountPair{{Address: address, PubKey: pubKey}}
+	k, ctx := keepertest.ActionKeeperWithAddress(t, ctrl, pairs)
+
+	data := base64.StdEncoding.EncodeToString([]byte("payload"))
+	signBytes, err := keeper.MakeADR36AminoSignBytes(address.String(), data)
+	require.NoError(t, err)
+
+	signature, err := key.Sign(signBytes)
+	require.NoError(t, err)
+
+	sigB64 := base64.StdEncoding.EncodeToString(signature)
+	require.NoError(t, k.VerifySignature(ctx, data, sigB64, address.String()))
+}
+
+func TestVerifySignatureAcceptsDERSignature(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	key, address := cryptotestutils.KeyAndAddress()
+	pubKey := key.PubKey()
+	pairs := []keepertest.AccountPair{{Address: address, PubKey: pubKey}}
+	k, ctx := keepertest.ActionKeeperWithAddress(t, ctrl, pairs)
+
+	data := "test_data"
+	sigRS, err := key.Sign([]byte(data))
+	require.NoError(t, err)
+
+	es := struct {
+		R *big.Int
+		S *big.Int
+	}{
+		R: new(big.Int).SetBytes(sigRS[:32]),
+		S: new(big.Int).SetBytes(sigRS[32:]),
+	}
+	der, err := asn1.Marshal(es)
+	require.NoError(t, err)
+
+	sigB64 := base64.StdEncoding.EncodeToString(der)
+	require.NoError(t, k.VerifySignature(ctx, data, sigB64, address.String()))
 }
 
 func TestVerifyKademliaID(t *testing.T) {

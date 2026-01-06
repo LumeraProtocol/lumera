@@ -10,7 +10,9 @@ import (
 	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/cosmos/gogoproto/jsonpb"
+	icatypes "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/types"
 )
 
 type MsgServerTestSuite struct {
@@ -108,6 +110,101 @@ func (suite *MsgServerTestSuite) TestMsgRequestAction() {
 	suite.registerCascadeAction()
 }
 
+func (suite *MsgServerTestSuite) TestMsgRequestActionStoresAppPubkey() {
+	base := authtypes.NewBaseAccountWithAddress(suite.creatorAddress)
+	ica := icatypes.NewInterchainAccount(base, "owner")
+	suite.keeper.GetAuthKeeper().SetAccount(suite.ctx, ica)
+
+	cascadeMetadata := types.CascadeMetadata{
+		DataHash:   "test_hash",
+		FileName:   "test_file",
+		RqIdsIc:    20,
+		Signatures: suite.signatureCascade,
+	}
+
+	var cascadeMetadataBytes bytes.Buffer
+	marshaler := &jsonpb.Marshaler{}
+	err := marshaler.Marshal(&cascadeMetadataBytes, &cascadeMetadata)
+	suite.NoError(err)
+
+	appPubkey := []byte{1, 2, 3}
+	msg := types.MsgRequestAction{
+		Creator:     suite.creatorAddress.String(),
+		ActionType:  "CASCADE",
+		Price:       "100000ulume",
+		Metadata:    cascadeMetadataBytes.String(),
+		FileSizeKbs: "123",
+		AppPubkey:   appPubkey,
+	}
+
+	res, err := suite.msgServer.RequestAction(suite.ctx, &msg)
+	suite.NoError(err)
+	suite.NotNil(res)
+
+	action, found := suite.keeper.GetActionByID(suite.ctx, res.ActionId)
+	suite.True(found, "action not found")
+	suite.Equal(appPubkey, action.AppPubkey)
+}
+
+func (suite *MsgServerTestSuite) TestMsgRequestActionRejectsAppPubkeyForNonICA() {
+	cascadeMetadata := types.CascadeMetadata{
+		DataHash:   "test_hash",
+		FileName:   "test_file",
+		RqIdsIc:    20,
+		Signatures: suite.signatureCascade,
+	}
+
+	var cascadeMetadataBytes bytes.Buffer
+	marshaler := &jsonpb.Marshaler{}
+	err := marshaler.Marshal(&cascadeMetadataBytes, &cascadeMetadata)
+	suite.NoError(err)
+
+	msg := types.MsgRequestAction{
+		Creator:     suite.creatorAddress.String(),
+		ActionType:  "CASCADE",
+		Price:       "100000ulume",
+		Metadata:    cascadeMetadataBytes.String(),
+		FileSizeKbs: "123",
+		AppPubkey:   []byte{1, 2, 3},
+	}
+
+	res, err := suite.msgServer.RequestAction(suite.ctx, &msg)
+	suite.Error(err)
+	suite.Nil(res)
+	suite.ErrorIs(err, types.ErrInvalidAppPubKey)
+}
+
+func (suite *MsgServerTestSuite) TestMsgRequestActionICARequiresAppPubkey() {
+	base := authtypes.NewBaseAccountWithAddress(suite.creatorAddress)
+	ica := icatypes.NewInterchainAccount(base, "owner")
+	suite.keeper.GetAuthKeeper().SetAccount(suite.ctx, ica)
+
+	cascadeMetadata := types.CascadeMetadata{
+		DataHash:   "test_hash",
+		FileName:   "test_file",
+		RqIdsIc:    20,
+		Signatures: suite.signatureCascade,
+	}
+
+	var cascadeMetadataBytes bytes.Buffer
+	marshaler := &jsonpb.Marshaler{}
+	err := marshaler.Marshal(&cascadeMetadataBytes, &cascadeMetadata)
+	suite.NoError(err)
+
+	msg := types.MsgRequestAction{
+		Creator:     suite.creatorAddress.String(),
+		ActionType:  "CASCADE",
+		Price:       "100000ulume",
+		Metadata:    cascadeMetadataBytes.String(),
+		FileSizeKbs: "123",
+	}
+
+	res, err := suite.msgServer.RequestAction(suite.ctx, &msg)
+	suite.Error(err)
+	suite.Nil(res)
+	suite.ErrorIs(err, types.ErrInvalidAppPubKey)
+}
+
 func (suite *MsgServerTestSuite) registerCascadeAction() string {
 	cascadeMetadata := types.CascadeMetadata{
 		DataHash:   "test_hash",
@@ -124,10 +221,10 @@ func (suite *MsgServerTestSuite) registerCascadeAction() string {
 
 	// Create a RequestAction message
 	msg := types.MsgRequestAction{
-		Creator:    suite.creatorAddress.String(),
-		ActionType: "CASCADE",
-		Price:      "100000ulume",
-		Metadata:   cascadeMetadataBytes.String(),
+		Creator:     suite.creatorAddress.String(),
+		ActionType:  "CASCADE",
+		Price:       "100000ulume",
+		Metadata:    cascadeMetadataBytes.String(),
 		FileSizeKbs: "123",
 	}
 
@@ -170,10 +267,10 @@ func (suite *MsgServerTestSuite) registerSenseAction() string {
 
 	// Create a RequestAction message
 	msg := types.MsgRequestAction{
-		Creator:    suite.creatorAddress.String(),
-		ActionType: "SENSE",
-		Price:      "100000ulume",
-		Metadata:   senseMetadataBytes.String(),
+		Creator:     suite.creatorAddress.String(),
+		ActionType:  "SENSE",
+		Price:       "100000ulume",
+		Metadata:    senseMetadataBytes.String(),
 		FileSizeKbs: "456",
 	}
 

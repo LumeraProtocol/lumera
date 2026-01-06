@@ -31,6 +31,7 @@ func TestKeeper_GetAction(t *testing.T) {
 		BlockHeight:    1,
 		SuperNodes:     []string{"node1", "node2"},
 		FileSizeKbs:    123,
+		AppPubkey:      []byte{1, 2, 3},
 	}
 
 	testCases := []struct {
@@ -68,6 +69,7 @@ func TestKeeper_GetAction(t *testing.T) {
 				require.Equal(t, action.Creator, resp.Action.Creator)
 				require.Equal(t, action.Price, resp.Action.Price)
 				require.Equal(t, action.FileSizeKbs, resp.Action.FileSizeKbs)
+				require.Equal(t, action.AppPubkey, resp.Action.AppPubkey)
 			},
 		},
 	}

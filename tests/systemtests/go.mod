@@ -6,6 +6,9 @@ replace (
 	github.com/LumeraProtocol/lumera => ../../
 
 	github.com/cosmos/cosmos-sdk => github.com/cosmos/cosmos-sdk v0.50.14
+	github.com/envoyproxy/protoc-gen-validate => github.com/bufbuild/protoc-gen-validate v1.3.0
+	github.com/lyft/protoc-gen-validate => github.com/envoyproxy/protoc-gen-validate v1.3.0
+	nhooyr.io/websocket => github.com/coder/websocket v1.8.7
 )
 
 require (
@@ -89,7 +92,6 @@ require (
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/getsentry/sentry-go v0.32.0 // indirect
-	github.com/go-errors/errors v1.5.1 // indirect
 	github.com/go-kit/kit v0.13.0 // indirect
 	github.com/go-kit/log v0.2.1 // indirect
 	github.com/go-logfmt/logfmt v0.6.0 // indirect

@@ -30,7 +30,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/runtime"
 	"github.com/cosmos/cosmos-sdk/server"
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
-	"github.com/cosmos/cosmos-sdk/testutil/mock"
 	"github.com/cosmos/cosmos-sdk/testutil/network"
 	simtestutil "github.com/cosmos/cosmos-sdk/testutil/sims"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -219,7 +218,7 @@ func setup(t testing.TB, chainID string, withGenesis bool, invCheckPeriod uint, 
 func Setup(tb testing.TB, wasmOpts ...wasmkeeper.Option) *App {
 	tb.Helper()
 
-	privVal := mock.NewPV()
+	privVal := cmttypes.NewMockPV()
 	pubKey, err := privVal.GetPubKey()
 	require.NoError(tb, err)
 
@@ -300,7 +299,7 @@ func SetupWithEmptyStore(tb testing.TB) *App {
 func GenesisStateWithSingleValidator(tb testing.TB, app *App) GenesisState {
 	tb.Helper()
 
-	privVal := mock.NewPV()
+	privVal := cmttypes.NewMockPV()
 	pubKey, err := privVal.GetPubKey()
 	require.NoError(tb, err)
 

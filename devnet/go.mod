@@ -2,6 +2,17 @@ module gen
 
 go 1.25.5
 
+replace (
+	github.com/LumeraProtocol/lumera => ..
+	github.com/LumeraProtocol/sdk-go => ../../sdk-go
+	github.com/LumeraProtocol/supernode/v2 => ../../supernode
+	github.com/cosmos/cosmos-sdk => github.com/cosmos/cosmos-sdk v0.50.14
+	github.com/envoyproxy/protoc-gen-validate => github.com/bufbuild/protoc-gen-validate v1.3.0
+	github.com/lyft/protoc-gen-validate => github.com/envoyproxy/protoc-gen-validate v1.3.0
+	github.com/syndtr/goleveldb => github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
+	nhooyr.io/websocket => github.com/coder/websocket v1.8.7
+)
+
 require (
 	cosmossdk.io/api v0.9.2
 	cosmossdk.io/math v1.5.3
@@ -12,17 +23,6 @@ require (
 	github.com/cosmos/ibc-go/v10 v10.3.0
 	github.com/stretchr/testify v1.11.1
 	gopkg.in/yaml.v2 v2.4.0
-)
-
-replace (
-	github.com/LumeraProtocol/lumera => ..
-	github.com/LumeraProtocol/sdk-go => ../../sdk-go
-	github.com/LumeraProtocol/supernode/v2 => ../../supernode
-	github.com/cosmos/cosmos-sdk => github.com/cosmos/cosmos-sdk v0.50.14
-	github.com/envoyproxy/protoc-gen-validate => github.com/bufbuild/protoc-gen-validate v1.3.0
-	github.com/lyft/protoc-gen-validate => github.com/envoyproxy/protoc-gen-validate v1.3.0
-	github.com/syndtr/goleveldb => github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
-	nhooyr.io/websocket => github.com/coder/websocket v1.8.7
 )
 
 require (
@@ -93,7 +93,6 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/glog v1.2.5 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
-	github.com/golang/mock v1.6.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v0.0.5-0.20231225225746-43d5d4cd4e0e // indirect
 	github.com/google/btree v1.1.3 // indirect

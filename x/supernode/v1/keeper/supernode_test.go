@@ -11,7 +11,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/query"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	"github.com/golang/mock/gomock"
+	"go.uber.org/mock/gomock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"

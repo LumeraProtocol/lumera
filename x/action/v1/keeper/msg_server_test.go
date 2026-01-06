@@ -127,7 +127,7 @@ func (suite *MsgServerTestSuite) TestMsgRequestActionStoresAppPubkey() {
 	err := marshaler.Marshal(&cascadeMetadataBytes, &cascadeMetadata)
 	suite.NoError(err)
 
-	appPubkey := []byte{1, 2, 3}
+	appPubkey := suite.accountPairs[3].PubKey.Bytes()
 	msg := types.MsgRequestAction{
 		Creator:     suite.creatorAddress.String(),
 		ActionType:  "CASCADE",
@@ -138,8 +138,8 @@ func (suite *MsgServerTestSuite) TestMsgRequestActionStoresAppPubkey() {
 	}
 
 	res, err := suite.msgServer.RequestAction(suite.ctx, &msg)
-	suite.NoError(err)
-	suite.NotNil(res)
+	suite.Require().NoError(err)
+	suite.Require().NotNil(res)
 
 	action, found := suite.keeper.GetActionByID(suite.ctx, res.ActionId)
 	suite.True(found, "action not found")

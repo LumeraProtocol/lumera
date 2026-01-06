@@ -14,7 +14,7 @@ import (
 
 	"github.com/cosmos/btcutil/base58"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
-	"github.com/golang/mock/gomock"
+	"go.uber.org/mock/gomock"
 	"github.com/stretchr/testify/require"
 	"lukechampine.com/blake3"
 

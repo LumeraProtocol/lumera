@@ -8,7 +8,7 @@ import (
 	actionmodulev1 "github.com/LumeraProtocol/lumera/x/action/v1/module"
 	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 	"github.com/stretchr/testify/require"
-	"github.com/golang/mock/gomock"
+	"go.uber.org/mock/gomock"
 )
 
 func TestGenesis(t *testing.T) {

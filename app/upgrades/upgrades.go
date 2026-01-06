@@ -28,6 +28,7 @@ import (
 // | v1.8.4 | standard | mainnet: add PFM, drop NFT        | Store upgrade gated to mainnet; handler is migrations only
 // | v1.8.5 | standard | none                              | Migrations only
 // | v1.9.0 | custom   | none                              | Backfills action/supernode secondary indices
+// | v1.9.1 | standard | none                              | Migrations only
 // ======================================================================================================================
 
 type UpgradeConfig struct {
@@ -40,6 +41,7 @@ const (
 	upgradeNameV170 = "v1.7.0"
 	upgradeNameV172 = "v1.7.2"
 	upgradeNameV185 = "v1.8.5"
+	upgradeNameV191 = "v1.9.1"
 )
 
 var upgradeNames = []string{
@@ -50,6 +52,7 @@ var upgradeNames = []string{
 	upgrade_v1_8_4.UpgradeName,
 	upgradeNameV185,
 	upgrade_v1_9_0.UpgradeName,
+	upgradeNameV191,
 }
 
 var NoUpgradeConfig = UpgradeConfig{
@@ -99,6 +102,10 @@ func SetupUpgrades(upgradeName string, params appParams.AppUpgradeParams) (Upgra
 	case upgrade_v1_9_0.UpgradeName:
 		return UpgradeConfig{
 			Handler: upgrade_v1_9_0.CreateUpgradeHandler(params),
+		}, true
+	case upgradeNameV191:
+		return UpgradeConfig{
+			Handler: standardUpgradeHandler(upgradeNameV191, params),
 		}, true
 
 	// add future upgrades here

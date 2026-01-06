@@ -36,6 +36,21 @@ func (k Keeper) SetSuperNode(ctx sdk.Context, supernode types.SuperNode) error {
 	// Load any existing record so we can maintain secondary indices safely.
 	existing, exists := k.QuerySuperNode(ctx, valOperAddr)
 
+	// Maintain secondary index by supernode account (if set).
+	accountIndexStore := prefix.NewStore(storeAdapter, types.SuperNodeByAccountKey)
+
+	if supernode.SupernodeAccount != "" {
+		// Avoid partial writes if the account is already linked to another validator.
+		existingVal := accountIndexStore.Get([]byte(supernode.SupernodeAccount))
+		if existingVal != nil && !bytes.Equal(existingVal, valOperAddr) {
+			return errorsmod.Wrapf(
+				sdkerrors.ErrInvalidRequest,
+				"supernode account %s already associated with another validator",
+				supernode.SupernodeAccount,
+			)
+		}
+	}
+
 	// Create a prefix store so that all keys are under SuperNodeKey
 	store := prefix.NewStore(storeAdapter, []byte(types.SuperNodeKey))
 
@@ -49,9 +64,6 @@ func (k Keeper) SetSuperNode(ctx sdk.Context, supernode types.SuperNode) error {
 	// Note: prefix.NewStore automatically prepends the prefix we defined above.
 	store.Set(valOperAddr, b)
 
-	// Maintain secondary index by supernode account (if set).
-	accountIndexStore := prefix.NewStore(storeAdapter, types.SuperNodeByAccountKey)
-
 	// Remove old index entry if the account has changed.
 	if exists && existing.SupernodeAccount != "" && existing.SupernodeAccount != supernode.SupernodeAccount {
 		accountIndexStore.Delete([]byte(existing.SupernodeAccount))
@@ -59,15 +71,6 @@ func (k Keeper) SetSuperNode(ctx sdk.Context, supernode types.SuperNode) error {
 
 	// Set or update the index entry for the current supernode account.
 	if supernode.SupernodeAccount != "" {
-		// Enforce 1:1 mapping: a SupernodeAccount can only be associated with one validator.
-		existingVal := accountIndexStore.Get([]byte(supernode.SupernodeAccount))
-		if existingVal != nil && !bytes.Equal(existingVal, valOperAddr) {
-			return errorsmod.Wrapf(
-				sdkerrors.ErrInvalidRequest,
-				"supernode account %s already associated with another validator",
-				supernode.SupernodeAccount,
-			)
-		}
 		accountIndexStore.Set([]byte(supernode.SupernodeAccount), valOperAddr)
 	}
 

@@ -15,8 +15,12 @@ SIMD_KEYRING="${SIMD_KEYRING:-test}"
 SIMD_DENOM="${SIMD_DENOM:-stake}"
 SIMD_GENESIS_BALANCE="${SIMD_GENESIS_BALANCE:-100000000000${SIMD_DENOM}}"
 SIMD_STAKE_AMOUNT="${SIMD_STAKE_AMOUNT:-50000000000${SIMD_DENOM}}"
+SIMD_TEST_KEY_NAME="${SIMD_TEST_KEY_NAME:-simd-test}"
+SIMD_TEST_ACCOUNT_BALANCE="${SIMD_TEST_ACCOUNT_BALANCE:-100000000${SIMD_DENOM}}"
+SIMD_RELAYER_ACCOUNT_BALANCE="${SIMD_RELAYER_ACCOUNT_BALANCE:-100000000${SIMD_DENOM}}"
 RELAYER_KEY_NAME="${RELAYER_KEY_NAME:-relayer}"
 DEFAULT_SIMD_RELAYER_MNEMONIC=""
+MINIMUM_GAS_PRICES="${MINIMUM_GAS_PRICES:-${SIMD_MINIMUM_GAS_PRICES:-0.0025${SIMD_DENOM}}}"
 
 SIMAPP_KEY_RELAYER_MNEMONIC="${SIMAPP_KEY_RELAYER_MNEMONIC:-${DEFAULT_SIMD_RELAYER_MNEMONIC}}"
 export SIMAPP_KEY_RELAYER_MNEMONIC
@@ -122,10 +126,24 @@ CONFIG_JSON="${SHARED_DIR}/config/config.json"
 VALIDATORS_JSON="${SHARED_DIR}/config/validators.json"
 mkdir -p "${HERMES_SHARED_DIR}"
 
-HERMES_RELAYER_MNEMONIC_FILE="${HERMES_SHARED_DIR}/hermes-relayer.mnemonic"
+HERMES_RELAYER_MNEMONIC_FILE="${HERMES_SHARED_DIR}/lumera-hermes-relayer.mnemonic"
+LEGACY_RELAYER_MNEMONIC_FILE="${HERMES_SHARED_DIR}/hermes-relayer.mnemonic"
 
-if [ -z "${SIMAPP_KEY_RELAYER_MNEMONIC:-}" ] && [ -s "${HERMES_RELAYER_MNEMONIC_FILE}" ]; then
-  SIMAPP_KEY_RELAYER_MNEMONIC="$(cat "${HERMES_RELAYER_MNEMONIC_FILE}")"
+if [ ! -s "${HERMES_RELAYER_MNEMONIC_FILE}" ] && [ -s "${LEGACY_RELAYER_MNEMONIC_FILE}" ]; then
+  log_info "Legacy relayer mnemonic file detected; copying to ${HERMES_RELAYER_MNEMONIC_FILE}"
+  cp "${LEGACY_RELAYER_MNEMONIC_FILE}" "${HERMES_RELAYER_MNEMONIC_FILE}"
+fi
+
+if [ -s "${HERMES_RELAYER_MNEMONIC_FILE}" ]; then
+  if [ -z "${SIMAPP_KEY_RELAYER_MNEMONIC:-}" ]; then
+    SIMAPP_KEY_RELAYER_MNEMONIC="$(cat "${HERMES_RELAYER_MNEMONIC_FILE}")"
+  else
+    existing_relayer_mnemonic="$(cat "${HERMES_RELAYER_MNEMONIC_FILE}")"
+    if [ "${SIMAPP_KEY_RELAYER_MNEMONIC}" != "${existing_relayer_mnemonic}" ]; then
+      log_info "Relayer mnemonic file ${HERMES_RELAYER_MNEMONIC_FILE} differs from SIMAPP_KEY_RELAYER_MNEMONIC; using file to keep Hermes/simd aligned"
+      SIMAPP_KEY_RELAYER_MNEMONIC="${existing_relayer_mnemonic}"
+    fi
+  fi
 fi
 
 if command -v jq >/dev/null 2>&1 && [ -f "${CONFIG_JSON}" ]; then
@@ -155,10 +173,13 @@ fi
 # Inside the compose network every validator exposes the default container ports.
 LUMERA_RPC_PORT="${LUMERA_RPC_PORT:-26657}"
 LUMERA_GRPC_PORT="${LUMERA_GRPC_PORT:-9090}"
+LUMERA_API_PORT="${LUMERA_API_PORT:-1317}"
 
 LUMERA_RPC_ADDR="http://${FIRST_VALIDATOR_SERVICE}:${LUMERA_RPC_PORT}"
 LUMERA_GRPC_ADDR="http://${FIRST_VALIDATOR_SERVICE}:${LUMERA_GRPC_PORT}"
 LUMERA_WS_ADDR="ws://${FIRST_VALIDATOR_SERVICE}:${LUMERA_RPC_PORT}/websocket"
+LUMERA_REST_ADDR="http://${FIRST_VALIDATOR_SERVICE}:${LUMERA_API_PORT}"
+SIMD_REST_ADDR="http://127.0.0.1:${SIMD_API_PORT}"
 LUMERA_ACCOUNT_PREFIX="${LUMERA_ACCOUNT_PREFIX:-lumera}"
 HERMES_KEY_NAME="${HERMES_KEY_NAME:-${RELAYER_KEY_NAME}}"
 
@@ -169,7 +190,8 @@ HERMES_TEMPLATE_PATH="${HERMES_TEMPLATE_PATH:-/root/scripts/hermes-config-templa
 
 export HERMES_CONFIG_PATH
 export HERMES_TEMPLATE_PATH
-export LUMERA_CHAIN_ID LUMERA_BOND_DENOM LUMERA_RPC_ADDR LUMERA_GRPC_ADDR LUMERA_WS_ADDR LUMERA_ACCOUNT_PREFIX
+export LUMERA_CHAIN_ID LUMERA_BOND_DENOM LUMERA_RPC_ADDR LUMERA_GRPC_ADDR LUMERA_WS_ADDR LUMERA_REST_ADDR LUMERA_ACCOUNT_PREFIX
+export SIMD_REST_ADDR
 export SIMD_CHAIN_ID SIMD_DENOM SIMD_RPC_PORT SIMD_GRPC_PORT
 export HERMES_KEY_NAME LUMERA_MNEMONIC_FILE SIMD_MNEMONIC_FILE
 
@@ -193,6 +215,8 @@ init_simd_home() {
   export SIMD_DENOM DENOM="${SIMD_DENOM}" STAKE_DENOM="${SIMD_DENOM}"
   export SIMD_GENESIS_BALANCE ACCOUNT_BALANCE="${SIMD_GENESIS_BALANCE}"
   export SIMD_STAKE_AMOUNT STAKING_AMOUNT="${SIMD_STAKE_AMOUNT}"
+  export SIMD_TEST_KEY_NAME SIMD_TEST_ACCOUNT_BALANCE
+  export MINIMUM_GAS_PRICES
   export SIMAPP_KEY_RELAYER_MNEMONIC
   export SIMAPP_SHARED_DIR="${SHARED_DIR}"
 
@@ -220,11 +244,36 @@ wait_for_lumera_rpc() {
   return 1
 }
 
-current_lumera_height() {
-  local url="${LUMERA_RPC_ADDR}/status"
+current_height() {
+  local url="$1"
   curl -sf "${url}" 2>/dev/null \
     | jq -r '.result.sync_info.latest_block_height // "0"' 2>/dev/null \
     | awk '($1 ~ /^[0-9]+$/) { print $1; next } { print 0 }'
+}
+
+wait_for_height() {
+  local label="$1"
+  local url="$2"
+  local target="$3"
+  local retries="${4:-180}"
+  local delay="${5:-2}"
+
+  log_info "Waiting for ${label} height to reach at least ${target}..."
+  for _ in $(seq 1 "${retries}"); do
+    local height
+    height="$(current_height "${url}")"
+    if (( height >= target )); then
+      log_info "${label} height is ${height} (>= ${target})."
+      return 0
+    fi
+    sleep "${delay}"
+  done
+  log_info "Timed out waiting for ${label} height ${target}; continuing anyway."
+  return 1
+}
+
+current_lumera_height() {
+  current_height "${LUMERA_RPC_ADDR}/status"
 }
 
 wait_for_lumera_height() {
@@ -232,18 +281,7 @@ wait_for_lumera_height() {
   local retries="${2:-180}"
   local delay="${3:-2}"
 
-  log_info "Waiting for Lumera height to reach at least ${target}..."
-  for _ in $(seq 1 "${retries}"); do
-    local height
-    height="$(current_lumera_height)"
-    if (( height >= target )); then
-      log_info "Lumera height is ${height} (>= ${target})."
-      return 0
-    fi
-    sleep "${delay}"
-  done
-  log_info "Timed out waiting for Lumera height ${target}; continuing anyway."
-  return 1
+  wait_for_height "Lumera" "${LUMERA_RPC_ADDR}/status" "${target}" "${retries}" "${delay}"
 }
 
 wait_for_lumera_blocks() {
@@ -288,6 +326,129 @@ wait_for_simd() {
   return 1
 }
 
+current_simd_height() {
+  current_height "http://127.0.0.1:${SIMD_RPC_PORT}/status"
+}
+
+wait_for_simd_height() {
+  local target="$1"
+  local retries="${2:-180}"
+  local delay="${3:-1}"
+
+  wait_for_height "simd" "http://127.0.0.1:${SIMD_RPC_PORT}/status" "${target}" "${retries}" "${delay}"
+}
+
+fund_simd_test_account() {
+  local key_name="${SIMD_TEST_KEY_NAME}"
+  if [ -z "${key_name}" ]; then
+    log_info "SIMD test key name is empty; skipping funding"
+    return 0
+  fi
+
+  local addr
+  addr="$(simd --home "${SIMD_HOME}" keys show "${key_name}" -a --keyring-backend "${SIMD_KEYRING}" 2>/dev/null || true)"
+  addr="$(printf '%s' "${addr}" | tr -d '\r\n')"
+  if [ -z "${addr}" ]; then
+    log_info "SIMD test key ${key_name} not found; skipping funding"
+    return 0
+  fi
+
+  local target amount current
+  target="${SIMD_TEST_ACCOUNT_BALANCE}"
+  amount="${target%${SIMD_DENOM}}"
+  if [ "${amount}" = "${target}" ]; then
+    log_info "SIMD test account balance ${target} missing denom ${SIMD_DENOM}; skipping funding"
+    return 0
+  fi
+
+  current="$(simd --home "${SIMD_HOME}" query bank balances "${addr}" --node "http://127.0.0.1:${SIMD_RPC_PORT}" --output json 2>/dev/null \
+    | jq -r --arg denom "${SIMD_DENOM}" '.balances[]? | select(.denom==$denom) | .amount' 2>/dev/null || echo 0)"
+  if ! [[ "${current}" =~ ^[0-9]+$ ]]; then
+    current=0
+  fi
+
+  if (( current >= amount )); then
+    log_info "SIMD test account already funded (${current}${SIMD_DENOM} >= ${target})"
+    return 0
+  fi
+
+  local topup
+  topup=$(( amount - current ))
+  log_info "Funding SIMD test account ${addr} with ${topup}${SIMD_DENOM}"
+  local tx_output
+  if tx_output=$(simd --home "${SIMD_HOME}" tx bank send "${SIMD_KEY_NAME}" "${addr}" "${topup}${SIMD_DENOM}" \
+    --keyring-backend "${SIMD_KEYRING}" \
+    --chain-id "${SIMD_CHAIN_ID}" \
+    --node "http://127.0.0.1:${SIMD_RPC_PORT}" \
+    --gas auto \
+    --gas-adjustment 1.3 \
+    --gas-prices "${MINIMUM_GAS_PRICES}" \
+    -y 2>&1); then
+    log_info "Funding transaction for SIMD test account succeeded"
+  else
+    log_info "Funding transaction for SIMD test account failed: ${tx_output}"
+  fi
+}
+
+fund_simd_relayer_account() {
+  local key_name="${RELAYER_KEY_NAME}"
+  if [ -z "${key_name}" ]; then
+    log_info "SIMD relayer key name is empty; skipping funding"
+    return 0
+  fi
+  if [ "${key_name}" = "${SIMD_KEY_NAME}" ]; then
+    log_info "SIMD relayer key matches validator key; skipping funding"
+    return 0
+  fi
+
+  log_info "Resolving SIMD relayer key ${key_name} for funding"
+  local addr
+  addr="$(simd --home "${SIMD_HOME}" keys show "${key_name}" -a --keyring-backend "${SIMD_KEYRING}" 2>/dev/null || true)"
+  addr="$(printf '%s' "${addr}" | tr -d '\r\n')"
+  if [ -z "${addr}" ]; then
+    log_info "SIMD relayer key ${key_name} not found; skipping funding"
+    return 0
+  fi
+  log_info "SIMD relayer address: ${addr}"
+
+  local target amount current
+  target="${SIMD_RELAYER_ACCOUNT_BALANCE}"
+  amount="${target%${SIMD_DENOM}}"
+  if [ "${amount}" = "${target}" ]; then
+    log_info "SIMD relayer balance ${target} missing denom ${SIMD_DENOM}; skipping funding"
+    return 0
+  fi
+
+  current="$(simd --home "${SIMD_HOME}" query bank balances "${addr}" --node "http://127.0.0.1:${SIMD_RPC_PORT}" --output json 2>/dev/null \
+    | jq -r --arg denom "${SIMD_DENOM}" '.balances[]? | select(.denom==$denom) | .amount' 2>/dev/null || echo 0)"
+  if ! [[ "${current}" =~ ^[0-9]+$ ]]; then
+    current=0
+  fi
+  log_info "SIMD relayer current balance: ${current}${SIMD_DENOM}"
+
+  if (( current >= amount )); then
+    log_info "SIMD relayer account already funded (${current}${SIMD_DENOM} >= ${target})"
+    return 0
+  fi
+
+  local topup
+  topup=$(( amount - current ))
+  log_info "Funding SIMD relayer account ${addr} with ${topup}${SIMD_DENOM}"
+  local tx_output
+  if tx_output=$(simd --home "${SIMD_HOME}" tx bank send "${SIMD_KEY_NAME}" "${addr}" "${topup}${SIMD_DENOM}" \
+    --keyring-backend "${SIMD_KEYRING}" \
+    --chain-id "${SIMD_CHAIN_ID}" \
+    --node "http://127.0.0.1:${SIMD_RPC_PORT}" \
+    --gas auto \
+    --gas-adjustment 1.3 \
+    --gas-prices "${MINIMUM_GAS_PRICES}" \
+    -y 2>&1); then
+    log_info "Funding transaction for SIMD relayer account succeeded"
+  else
+    log_info "Funding transaction for SIMD relayer account failed: ${tx_output}"
+  fi
+}
+
 start_hermes() {
   log_info "Starting Hermes relayer..."
   hermes --config "${HERMES_CONFIG_PATH}" start >"${HERMES_LOG_FILE}" 2>&1 &
@@ -313,7 +474,9 @@ else
 fi
 if start_simd; then
   if wait_for_simd; then
-    :
+    wait_for_simd_height 1 || true
+    fund_simd_relayer_account || true
+    fund_simd_test_account || true
   else
     log_info "wait_for_simd timed out; continuing to keep container alive"
   fi

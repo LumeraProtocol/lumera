@@ -1,4 +1,4 @@
-.PHONY: devnet-build devnet-up devnet-reset devnet-up-detach devnet-down devnet-stop devnet-clean devnet-deploy-tar devnet-upgrade devnet-new devnet-start
+.PHONY: devnet-build devnet-tests-build devnet-up devnet-reset devnet-up-detach devnet-down devnet-stop devnet-clean devnet-deploy-tar devnet-upgrade devnet-new devnet-start
 .PHONY: devnet-build-default _check-devnet-default-cfg devnet-upgrade-binaries devnet-upgrade-binaries-default devnet-update-scripts
 
 ##### Devnet Makefile ########################################
@@ -31,6 +31,7 @@ COMPOSE_FILE := devnet/docker-compose.yml
 DEVNET_BUILD_LUMERA ?= 1      # 1 = build lumerad for devnet setup, 0 = skip
 # directory to take lumerad/supernode/network-maker/sncli binaries from
 DEVNET_BIN_DIR ?= devnet/bin
+DEVNET_BIN_DIR_ABS := $(abspath $(DEVNET_BIN_DIR))
 
 # Default paths for configuration files
 DEFAULT_CONFIG_JSON := config/config.json
@@ -40,6 +41,14 @@ DEFAULT_VALIDATORS_JSON := config/validators.json
 DEFAULT_GENESIS_FILE := devnet/default-config/devnet-genesis.json
 DEFAULT_CLAIMS_FILE := claims.csv # relative to devnet
 ORIG_GENESIS_FILE := devnet/default-config/devnet-genesis-orig.json
+
+devnet-tests-build:
+	@mkdir -p "${DEVNET_BIN_DIR_ABS}"
+	@echo "Building devnet test binaries..."
+	@cd devnet && \
+		$(GO) test -c -o "${DEVNET_BIN_DIR_ABS}/ibc_validator" ./tests/validator && \
+		$(GO) test -c -o "${DEVNET_BIN_DIR_ABS}/ibc_hermes" ./tests/hermes
+	@echo "Devnet test binaries built successfully"
 
 devnet-build:
 	@mkdir -p "$(SHARED_RELEASE_DIR)"; \
@@ -78,6 +87,7 @@ devnet-build:
 			echo "${DEVNET_BIN_DIR}/libwasmvm.x86_64.so library not found..."; \
 			exit 1; \
 		fi; \
+		$(MAKE) devnet-tests-build DEVNET_BIN_DIR="${DEVNET_BIN_DIR}"; \
         cp -f "${DEVNET_BIN_DIR}/lumerad" "${SHARED_RELEASE_DIR}/"; \
         cp -f "${DEVNET_BIN_DIR}/libwasmvm.x86_64.so" "${SHARED_RELEASE_DIR}/"; \
 		cd devnet && \
@@ -205,6 +215,7 @@ devnet-upgrade:
 		echo "${DEVNET_BIN_DIR}/libwasmvm.x86_64.so library not found..."; \
 		exit 1; \
 	fi; \
+	$(MAKE) devnet-tests-build DEVNET_BIN_DIR="${DEVNET_BIN_DIR}"; \
 	cp -f "${DEVNET_BIN_DIR}/lumerad" "${SHARED_RELEASE_DIR}/"; \
 	cp -f "${DEVNET_BIN_DIR}/libwasmvm.x86_64.so" "${SHARED_RELEASE_DIR}/"; \
 	cd devnet && \

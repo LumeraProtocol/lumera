@@ -34,5 +34,6 @@ func (q queryServer) GetAction(goCtx context.Context, req *types.QueryGetActionR
 		BlockHeight:    action.BlockHeight,
 		SuperNodes:     action.SuperNodes,
 		FileSizeKbs:    action.FileSizeKbs,
+		AppPubkey:      action.AppPubkey,
 	}}, nil
 }

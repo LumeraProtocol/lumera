@@ -2,9 +2,34 @@
 
 ---
 
+## 1.9.1
+
+Changes included since `v1.9.0` (range: `v1.9.0..v1.9.1`).
+
+.- Action/ICA: persist `app_pubkey` on new actions, expose `app_pubkey` in action query responses, and regenerate action protobufs.
+- Action/crypto: refreshed signature verification paths (ADR-36 fallback, DER→RS64) and added coverage for app_pubkey validation/caching + query output.
+- Devnet/Hermes: added ICA cascade flow tests and IBC helpers; updated Hermes configs/scripts and devnet setup scripts; removed legacy `devnet/tests/test-channel.sh`.
+- Dependencies/docs: updated devnet and root Go module files and refreshed `readme.md`.
+
+---
+
+## 1.9.0
+
+Changes included since `v1.8.5` (range: `v1.8.5..v1.9.0`).
+
+- Supernode: added self-reported metrics with validation `MsgReportSupernodeMetrics`, enforcing staleness/compliance in EndBlock, storing typed metrics (version/cpu/mem/disk/peers, tri-state open_ports), exposing a `GetMetrics` query with refreshed parameter defaults, and expanded system tests/docs.
+- Revamped action queries with secondary indices (state/creator/type/block height/supernode), bounded prefix iterators, and a new `ListActionsByCreator` endpoint for paginated lookups.
+- Enforced a unique supernodeAccount→validator index with lookup helpers; on-chain upgrade `v1.9.0` backfills the new action and supernode indices without store key changes.
+- Testing tightened with supernode metrics system tests and simulation coverage for the validator↔supernode 1:1 invariant.
+- Hardened actions for interchain-account use: `MsgRequestAction` now requires `app_pubkey` when the creator is an ICA, verifies app-level signatures (ADR-36 fallback), `MsgApproveAction` now returns `actionId`/`status`.
+- Action tickets: added `fileSizeKbs` to action requests and keeper/simulation handling.
+- Devnet tooling: added Network-Maker UI support (enhanced compose generator, multi-account provisioning, start/stop/restart scripts) to streamline automation.
+
+---
+
 ## 1.8.5
 
-Changes included since `v1.8.4` (range: `v1.8.4..HEAD`).
+Changes included since `v1.8.4` (range: `v1.8.4..v1.8.5`).
 
 - Register every upgrade handler at startup (before Load) so state-sync nodes always have handlers available, even without an on-disk plan.
 - Fixed x/upgrade downgrade verification panics on state-synced nodes that already applied v1.8.4 but lacked a registered handler.
@@ -16,7 +41,7 @@ Changes included since `v1.8.4` (range: `v1.8.4..HEAD`).
 
 ## 1.8.4
 
-Changes included since `v1.8.0` (range: `v1.8.0..HEAD`).
+Changes included since `v1.8.0` (range: `v1.8.0..v1.8.4`).
 
 - Added a legacy type URL aliasing framework (`internal/legacyalias`) and wired it into module registration so pre-versioned Action/Supernode messages stored on-chain continue to decode after the versioned protobuf migration. AutoCLI now wraps the codec resolvers with the legacy-aware resolver to keep CLI and REST queries seamless.
 - Introduced a protobuf enum bridge (`internal/protobridge`) that double-registers enum descriptors with both gogoproto and the standard protobuf runtime, eliminating REST/GRPC mismatches when the gateway still consults the legacy registry.
@@ -33,7 +58,7 @@ Changes included since `v1.8.0` (range: `v1.8.0..HEAD`).
 
 ## 1.8.0
 
-Changes included since `v1.7.2` (range: `v1.7.2..HEAD`).
+Changes included since `v1.7.2` (range: `v1.7.2..v1.8.0`).
 
 🚀 This release delivers major upgrades across Lumera’s blockchain core, IBC, CosmWasm, Ignite CLI, governance automation, and devnet infrastructure — improving performance, reliability, and developer experience.
 
@@ -134,12 +159,12 @@ IBC v2.0 brings improved cross‑chain routing and middleware support, laying th
 - `start.sh` supports`auto`,`bootstrap`,`run`, and`wait` modes.
 - Auto-installs binaries, monitors height, coordinates services.
 
-* Enable/disable each component via flags or environment variables when bringing up the devnet (kept generic here to avoid locking to specific flag names).
-* **Optional service installers**: add-on installation toggles for**Supernode**,**Network‑Maker**, and**SN Client** (enable via flags/env when bringing up the devnet). Network‑Maker installation on a selected validator is driven by the`network-maker` flag in`validators.json`.
+- Enable/disable each component via flags or environment variables when bringing up the devnet (kept generic here to avoid locking to specific flag names).
+- **Optional service installers**: add-on installation toggles for**Supernode**,**Network‑Maker**, and**SN Client** (enable via flags/env when bringing up the devnet). Network‑Maker installation on a selected validator is driven by the`network-maker` flag in`validators.json`.
 
 #### 📋 Devnet Architecture Overview
 
-```
+```go
 ┌─────────────────────────────────────────────────────────────┐
 │                    Lumera Devnet Architecture               │
 ├─────────────────────────────────────────────────────────────┤
@@ -168,7 +193,7 @@ IBC v2.0 brings improved cross‑chain routing and middleware support, laying th
 
 ## 1.7.2
 
-Changes included since `v1.7.0` (range: `v1.7.0..HEAD`).
+Changes included since `v1.7.0` (range: `v1.7.0..v1.7.2`).
 
 Added
 

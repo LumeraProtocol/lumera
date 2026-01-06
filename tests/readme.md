@@ -67,7 +67,7 @@ We use `gomock` and `mockgen` to generate mock implementations of interfaces. Th
 
 ```bash
 # Install mockgen if not already installed
-go install github.com/golang/mock/mockgen@v1.6.0
+go install go.uber.org/mock/mockgen@v0.6.0
 
 # Generate mocks for interfaces
 mockgen -destination=./x/lumeraid/mocks/keeper.go -package=mocks github.com/LumeraProtocol/lumera/x/lumeraid/types BankKeeper,AccountKeeper

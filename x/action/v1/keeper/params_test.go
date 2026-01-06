@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/golang/mock/gomock"
+	"go.uber.org/mock/gomock"
 
 	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
 	"github.com/LumeraProtocol/lumera/x/action/v1/types"

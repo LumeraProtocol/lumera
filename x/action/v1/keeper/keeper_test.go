@@ -8,7 +8,7 @@ import (
 
 	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
 
-	"github.com/golang/mock/gomock"
+	"go.uber.org/mock/gomock"
 	"github.com/stretchr/testify/suite"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"

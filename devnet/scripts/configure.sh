@@ -140,6 +140,18 @@ install_sncli() {
   fi
 }
 
+install_ibc_tests() {
+  local test_bins=("ibc_validator" "ibc_hermes")
+  local bin
+  for bin in "${test_bins[@]}"; do
+    if [ -n "${BIN_DIR}" ] && [ -f "${BIN_DIR}/${bin}" ]; then
+      echo "[CONFIGURE] Copying ${bin} binary from ${BIN_DIR} to ${RELEASE_DIR}"
+      cp -f "${BIN_DIR}/${bin}" "${RELEASE_DIR}/"
+      chmod 755 "${RELEASE_DIR}/${bin}"
+    fi
+  done
+}
+
 mkdir -p "${CFG_DIR}" "${RELEASE_DIR}"
 cp -f "${CONFIG_JSON}" "${VALIDATORS_JSON}" "${CFG_DIR}/"
 echo "[CONFIGURE] Configuration files copied to ${CFG_DIR}"
@@ -147,4 +159,5 @@ echo "[CONFIGURE] Configuration files copied to ${CFG_DIR}"
 install_supernode
 install_sncli
 install_nm
+install_ibc_tests
 echo "[CONFIGURE] Lumera configuration completed successfully."

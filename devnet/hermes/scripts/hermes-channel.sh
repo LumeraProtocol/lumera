@@ -5,9 +5,11 @@ set -euo pipefail
 : "${LUMERA_CHAIN_ID:=lumera-devnet-1}"
 : "${SIMD_CHAIN_ID:=hermes-simd-1}"
 : "${HERMES_KEY_NAME:=hermes-relayer}"
-: "${RELAYER_MNEMONIC_FILE:=/shared/hermes/hermes-relayer.mnemonic}"
+: "${RELAYER_MNEMONIC_FILE:=/shared/hermes/lumera-hermes-relayer.mnemonic}"
 : "${LUMERA_MNEMONIC_FILE:=${RELAYER_MNEMONIC_FILE}}"
 : "${SIMD_MNEMONIC_FILE:=${RELAYER_MNEMONIC_FILE}}"
+: "${LUMERA_REST_ADDR:=}"
+: "${SIMD_REST_ADDR:=}"
 : "${HERMES_STATUS_DIR:=/shared/status/hermes}"
 
 ENTRY_LOG_FILE="${ENTRY_LOG_FILE:-/root/logs/entrypoint.log}"
@@ -180,6 +182,88 @@ require_jq() {
   fi
 }
 
+parse_key_address() {
+  local key_name="$1"
+  local json_payload="$2"
+  printf '%s\n' "${json_payload}" \
+    | extract_json \
+    | jq -r --arg name "${key_name}" '
+      .result as $r |
+      if ($r|type)=="array" then
+        ($r | map(select(.name==$name)) | .[0].address // empty)
+      elif ($r|type)=="object" then
+        ($r[$name].account // $r[$name].address // empty)
+      else
+        empty
+      end
+    ' 2>/dev/null || true
+}
+
+check_account_rest() {
+  local rest_addr="$1"
+  local addr="$2"
+  local url
+
+  if [ -z "${rest_addr}" ]; then
+    return 2
+  fi
+
+  url="${rest_addr%/}/cosmos/auth/v1beta1/accounts/${addr}"
+  local out
+  out="$(run_capture curl -s "${url}" || true)"
+  if [ -z "${out}" ]; then
+    return 2
+  fi
+  if printf '%s\n' "${out}" | jq -e '.account' >/dev/null 2>&1; then
+    return 0
+  fi
+  if printf '%s\n' "${out}" | jq -e '.code' >/dev/null 2>&1; then
+    printf '%s\n' "${out}" >&2
+    return 1
+  fi
+  return 2
+}
+
+ensure_chain_account() {
+  local chain_id="$1"
+  local addr="$2"
+  local label="$3"
+
+  if [ -z "${addr}" ] || [ "${addr}" = "null" ]; then
+    log "Missing ${label} address; cannot verify account on ${chain_id}"
+    exit 1
+  fi
+
+  log "Checking ${label} account on ${chain_id} (${addr})"
+  local rest_addr=""
+  if [ "${chain_id}" = "${LUMERA_CHAIN_ID}" ] && [ -n "${LUMERA_REST_ADDR}" ]; then
+    rest_addr="${LUMERA_REST_ADDR}"
+  elif [ "${chain_id}" = "${SIMD_CHAIN_ID}" ] && [ -n "${SIMD_REST_ADDR}" ]; then
+    rest_addr="${SIMD_REST_ADDR}"
+  fi
+
+  if [ -z "${rest_addr}" ]; then
+    log "No REST address configured for ${chain_id}; skipping ${label} account check"
+    return 0
+  fi
+
+  log "Checking ${label} account via REST (${rest_addr})"
+  if check_account_rest "${rest_addr}" "${addr}"; then
+    return 0
+  fi
+
+  case $? in
+    1)
+      log "${label} account ${addr} not found on ${chain_id}"
+      log "Ensure the relayer account is funded in genesis or re-run devnet build."
+      exit 1
+      ;;
+    *)
+      log "REST account check unavailable for ${chain_id}; skipping ${label} account check"
+      ;;
+  esac
+}
+
 ensure_client() {
   local host_chain="$1"
   local reference_chain="$2"
@@ -243,18 +327,23 @@ ensure_connection() {
       --a-chain "${a_chain}" \
       --b-chain "${b_chain}" \
       --delay 0)"
-  local conn_result_line
-  conn_result_line="$(printf '%s\n' "${create_conn_json}")"
-  connection_id="$(printf '%s' "${conn_result_line}" \
-    | first_result_object \
-    | jq -r --arg a_client "${a_client}" --arg b_client "${b_client}" \
-       'select(.result.a_side.client_id==$a_client and .result.b_side.client_id==$b_client)
-       | (.result.a_side.connection_id // .result.b_side.connection_id // empty)' \
-       2>/dev/null || true)"
+  connection_id="$(printf '%s\n' "${create_conn_json}" \
+    | result_items \
+    | jq -r '.[0].a_side.connection_id // .[0].b_side.connection_id // .[0].connection_id // empty' \
+      2>/dev/null || true)"
+
+  if [ -z "${connection_id}" ] || [ "${connection_id}" = "null" ]; then
+    log "Connection id not found in create-connection output; re-querying existing connections"
+    connections_json="$(run_capture hermes --json query connections --chain "${a_chain}" --counterparty-chain "${b_chain}" || true)"
+    log_query_empty "connections (${a_chain})" "${connections_json}"
+    connection_id="$(printf '%s\n' "${connections_json}" \
+      | result_items \
+      | jq -r '.[0] // empty' || true)"
+  fi
 
   if [ -z "${connection_id}" ] || [ "${connection_id}" = "null" ]; then
     local conn_err
-    conn_err="$(printf '%s\n' "${conn_result_line}" \
+    conn_err="$(printf '%s\n' "${create_conn_json}" \
       | first_result_object \
       | jq -r '.result // empty' || true)"
     log "Failed to create connection between ${a_chain} and ${b_chain}"
@@ -300,11 +389,11 @@ if ! OUT="$(run_capture hermes keys add \
   exit 1
 fi
 log "Imported Lumera key ${HERMES_KEY_NAME}"
-lumera_relayer_addr="$(run_capture hermes --json keys list --chain "${LUMERA_CHAIN_ID}" \
-  | jq -r ".result[]? | select(.name==\"${HERMES_KEY_NAME}\") | .address" || true)"
+lumera_relayer_addr="$(parse_key_address "${HERMES_KEY_NAME}" "$(run_capture hermes --json keys list --chain "${LUMERA_CHAIN_ID}")")"
 if [ -n "${lumera_relayer_addr}" ] && [ "${lumera_relayer_addr}" != "null" ]; then
   log "Lumera relayer address: ${lumera_relayer_addr}"
 fi
+ensure_chain_account "${LUMERA_CHAIN_ID}" "${lumera_relayer_addr}" "Lumera relayer"
 
 if ! OUT="$(run_capture hermes keys add \
      --chain "${SIMD_CHAIN_ID}" \
@@ -315,11 +404,11 @@ if ! OUT="$(run_capture hermes keys add \
   exit 1
 fi
 log "Imported SIMD key ${HERMES_KEY_NAME}"
-simd_relayer_addr="$(run_capture hermes --json keys list --chain "${SIMD_CHAIN_ID}" \
-  | jq -r ".result[]? | select(.name==\"${HERMES_KEY_NAME}\") | .address" || true)"
+simd_relayer_addr="$(parse_key_address "${HERMES_KEY_NAME}" "$(run_capture hermes --json keys list --chain "${SIMD_CHAIN_ID}")")"
 if [ -n "${simd_relayer_addr}" ] && [ "${simd_relayer_addr}" != "null" ]; then
   log "SIMD relayer address: ${simd_relayer_addr}"
 fi
+ensure_chain_account "${SIMD_CHAIN_ID}" "${simd_relayer_addr}" "SIMD relayer"
 
 existing=""
 log "Querying existing transfer channels on ${LUMERA_CHAIN_ID}"
@@ -418,6 +507,7 @@ cat <<EOF >"${CHANNEL_INFO_FILE}"
   "b_client_id": "${b_client_id}",
   "channel_id": "${new_channel_id}",
   "port_id": "transfer",
+  "counterparty_chain_id": "${SIMD_CHAIN_ID}",
   "last_updated": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 }
 EOF

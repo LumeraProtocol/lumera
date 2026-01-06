@@ -13,7 +13,7 @@ import (
 	queryv1beta1 "github.com/cosmos/cosmos-sdk/types/query"
 
     gogoproto "github.com/cosmos/gogoproto/proto"
-    "github.com/golang/mock/gomock"
+    "go.uber.org/mock/gomock"
     "github.com/stretchr/testify/suite"
 
 	testkeeper "github.com/LumeraProtocol/lumera/testutil/keeper"

@@ -7,7 +7,7 @@ import (
 	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
 	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/golang/mock/gomock"
+	"go.uber.org/mock/gomock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

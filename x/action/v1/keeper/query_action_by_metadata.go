@@ -57,6 +57,7 @@ func (q queryServer) QueryActionByMetadata(goCtx context.Context, req *types.Que
 			BlockHeight:    act.BlockHeight,
 			SuperNodes:     act.SuperNodes,
 			FileSizeKbs:    act.FileSizeKbs,
+			AppPubkey:      act.AppPubkey,
 		})
 	}
 

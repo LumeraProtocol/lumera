@@ -27,6 +27,7 @@ func TestUpgradeNamesOrder(t *testing.T) {
 		upgrade_v1_8_4.UpgradeName,
 		upgradeNameV185,
 		upgrade_v1_9_0.UpgradeName,
+		upgradeNameV191,
 	}
 	require.Equal(t, expected, upgradeNames, "upgradeNames should stay in ascending order")
 }

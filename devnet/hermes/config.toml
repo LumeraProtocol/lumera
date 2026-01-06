@@ -21,11 +21,11 @@ misbehaviour = true
 
 [mode.connections]
 # Whether or not to enable the connection workers for handshake completion. [Required]
-enabled = false
+enabled = true
 
 [mode.channels]
 # Whether or not to enable the channel workers for handshake completion. [Required]
-enabled = false
+enabled = true
 
 [mode.packets]
 # Whether or not to enable the packet workers. [Required]

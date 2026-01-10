@@ -3,9 +3,10 @@ module gen
 go 1.25.5
 
 replace (
-	github.com/LumeraProtocol/lumera => ..
-	github.com/LumeraProtocol/sdk-go => ../../sdk-go
-	github.com/LumeraProtocol/supernode/v2 => ../../supernode
+	// Local development - uncomment these for local testing
+	// Comment lines with github.com/LumeraProtocol/ before releasing
+	//	github.com/LumeraProtocol/lumera => ..
+	//github.com/LumeraProtocol/sdk-go => ../../sdk-go
 	github.com/cosmos/cosmos-sdk => github.com/cosmos/cosmos-sdk v0.50.14
 	github.com/envoyproxy/protoc-gen-validate => github.com/bufbuild/protoc-gen-validate v1.3.0
 	github.com/lyft/protoc-gen-validate => github.com/envoyproxy/protoc-gen-validate v1.3.0
@@ -16,8 +17,8 @@ replace (
 require (
 	cosmossdk.io/api v0.9.2
 	cosmossdk.io/math v1.5.3
-	github.com/LumeraProtocol/lumera v1.9.0
-	github.com/LumeraProtocol/sdk-go v1.0.3
+	github.com/LumeraProtocol/lumera v1.9.1
+	github.com/LumeraProtocol/sdk-go v1.0.5
 	github.com/cosmos/cosmos-sdk v0.53.0
 	github.com/cosmos/gogoproto v1.7.0
 	github.com/cosmos/ibc-go/v10 v10.3.0
@@ -41,7 +42,7 @@ require (
 	github.com/DataDog/datadog-go v4.8.3+incompatible // indirect
 	github.com/DataDog/zstd v1.5.7 // indirect
 	github.com/LumeraProtocol/rq-go v0.2.1 // indirect
-	github.com/LumeraProtocol/supernode/v2 v2.4.10 // indirect
+	github.com/LumeraProtocol/supernode/v2 v2.4.19 // indirect
 	github.com/Masterminds/semver/v3 v3.3.1 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect

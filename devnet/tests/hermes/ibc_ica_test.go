@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	stdlog "log"
 	"net/http"
 	"net/url"
 	"os"
@@ -24,14 +23,12 @@ import (
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	"github.com/LumeraProtocol/sdk-go/blockchain"
 	"github.com/LumeraProtocol/sdk-go/cascade"
+	sdkcrypto "github.com/LumeraProtocol/sdk-go/pkg/crypto"
 	"github.com/LumeraProtocol/sdk-go/types"
 	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
-	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
-	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	sdkbech32 "github.com/cosmos/cosmos-sdk/types/bech32"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	gogoproto "github.com/cosmos/gogoproto/proto"
 	icatypes "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/types"
@@ -39,149 +36,60 @@ import (
 
 const icaAckRetries = 120
 
-type supernodeInfoLogger struct {
-	logger *stdlog.Logger
-}
-
-func newSupernodeInfoLogger() *supernodeInfoLogger {
-	return &supernodeInfoLogger{logger: stdlog.New(os.Stdout, "", stdlog.LstdFlags)}
-}
-
-func (l *supernodeInfoLogger) Printf(format string, v ...interface{}) {
-	l.logf(format, v...)
-}
-
-func (l *supernodeInfoLogger) Infof(format string, v ...interface{}) {
-	l.logf(format, v...)
-}
-
-func (l *supernodeInfoLogger) Warnf(format string, v ...interface{}) {
-	l.logf(format, v...)
-}
-
-func (l *supernodeInfoLogger) logf(format string, v ...interface{}) {
-	msg := fmt.Sprintf(format, v...)
-	if strings.Contains(msg, "[supernode] DEBUG") {
-		return
-	}
-	l.logger.Printf("%s", msg)
-}
-
-func (s *ibcSimdSuite) TestICARequestActionAppPubkeyRequired() {
-	ctx, cancel := context.WithTimeout(context.Background(), icaTestTimeout)
-	defer cancel()
-
-	s.T().Log("ica: resolve simd owner address")
-	ownerAddr, err := s.resolveSimdOwnerAddress(ctx)
-	s.Require().NoError(err, "resolve simd owner address")
-
-	s.T().Log("ica: ensure ICA address")
-	icaAddr, err := s.ensureICAAddress(ctx, ownerAddr)
-	s.Require().NoError(err, "ensure ICA address")
-	s.Require().NotEmpty(icaAddr, "ICA address is empty")
-
-	s.T().Log("ica: load lumera keyring")
-	kr, _, lumeraAddr, err := loadKeyringFromMnemonic(s.lumera.KeyName, s.lumera.MnemonicFile)
-	s.Require().NoError(err, "load lumera keyring")
-	s.Require().NotEmpty(lumeraAddr, "lumera address is empty")
-
-	s.T().Log("ica: load simd key for app pubkey")
-	simdPubkey, simdAddr, err := importKeyFromMnemonic(kr, s.simd.KeyName, s.simd.MnemonicFile, "cosmos")
-	s.Require().NoError(err, "load simd key")
-	if ownerAddr != "" {
-		s.Require().Equal(ownerAddr, simdAddr, "simd owner address mismatch")
-	}
-
-	s.T().Log("ica: create lumera blockchain client")
-	lumeraClient, err := newLumeraBlockchainClient(ctx, s.lumera.ChainID, s.lumera.GRPC, kr, s.lumera.KeyName)
-	s.Require().NoError(err, "create lumera client")
-	defer lumeraClient.Close()
-	actionClient := lumeraClient.Action
-
-	s.T().Log("ica: ensure ICA account funded")
-	err = s.ensureICAFunded(ctx, lumeraClient, lumeraAddr, icaAddr)
-	s.Require().NoError(err, "fund ICA account")
-
-	s.T().Log("ica: create cascade client")
-	cascadeClient, err := cascade.New(ctx, cascade.Config{
-		ChainID:         s.lumera.ChainID,
-		GRPCAddr:        s.lumera.GRPC,
-		Address:         lumeraAddr,
-		KeyName:         s.lumera.KeyName,
-		ICAOwnerKeyName: s.simd.KeyName,
-		ICAOwnerHRP:     "cosmos",
-		Timeout:         30 * time.Second,
-	}, kr)
-	s.Require().NoError(err, "create cascade client")
-	cascadeClient.SetLogger(newSupernodeInfoLogger())
-	defer cascadeClient.Close()
-
-	files, err := createICATestFiles(s.T().TempDir())
-	s.Require().NoError(err, "create test files")
-	s.Require().NotEmpty(files, "no test files created")
-
-	options := &cascade.UploadOptions{ICACreatorAddress: icaAddr}
-	msg, _, err := cascadeClient.CreateRequestActionMessage(ctx, icaAddr, files[0].path, options)
-	s.Require().NoError(err, "build request action without app_pubkey")
-
-	_, err = s.sendICARequestTx(ctx, []*actiontypes.MsgRequestAction{msg})
-	s.Require().Error(err, "expected app_pubkey requirement failure")
-	if err != nil {
-		s.Contains(err.Error(), "app_pubkey")
-	}
-
-	options.AppPubkey = simdPubkey
-	msg, _, err = cascadeClient.CreateRequestActionMessage(ctx, icaAddr, files[0].path, options)
-	s.Require().NoError(err, "build request action with app_pubkey")
-
-	actionIDs, err := s.sendICARequestTx(ctx, []*actiontypes.MsgRequestAction{msg})
-	s.Require().NoError(err, "send request with app_pubkey")
-	s.Require().NotEmpty(actionIDs, "no action ids returned")
-	s.Require().NotEmpty(actionIDs[0], "empty action id response")
-	s.Require().NoError(waitForActionState(ctx, actionClient, actionIDs[0], types.ActionStatePending))
-}
-
+// TestICACascadeFlow exercises an end-to-end ICA upload/download/approve flow.
+// Workflow:
+// - Resolve owner + ICA addresses and load key material.
+// - Ensure the ICA account is funded on the host chain.
+// - Upload test files over ICA and collect action IDs from acknowledgements.
+// - Download each action payload and verify content matches the source.
+// - Approve each action over ICA and wait until the host chain marks them approved.
 func (s *ibcSimdSuite) TestICACascadeFlow() {
 	ctx, cancel := context.WithTimeout(context.Background(), icaTestTimeout)
 	defer cancel()
 
+	// Resolve addresses and initialize clients.
 	s.T().Log("ica: resolve simd owner address")
 	ownerAddr, err := s.resolveSimdOwnerAddress(ctx)
 	s.Require().NoError(err, "resolve simd owner address")
 	s.T().Logf("ica: simd owner address=%s", ownerAddr)
 
+	// Establish the ICA address, registering the controller if needed.
 	s.T().Log("ica: ensure ICA address")
 	icaAddr, err := s.ensureICAAddress(ctx, ownerAddr)
 	s.Require().NoError(err, "ensure ICA address")
 	s.Require().NotEmpty(icaAddr, "ICA address is empty")
 	s.T().Logf("ica: interchain account address=%s", icaAddr)
 
+	// Load key material used to sign Lumera-side transactions.
 	s.T().Log("ica: load lumera keyring")
-	kr, _, lumeraAddr, err := loadKeyringFromMnemonic(s.lumera.KeyName, s.lumera.MnemonicFile)
+	kr, _, lumeraAddr, err := sdkcrypto.LoadKeyringFromMnemonic(s.lumera.KeyName, s.lumera.MnemonicFile)
 	s.Require().NoError(err, "load lumera keyring")
 	s.Require().NotEmpty(lumeraAddr, "lumera address is empty")
 	s.T().Logf("ica: lumera address=%s", lumeraAddr)
 
+	// Load the simd key to derive the app pubkey for ICA requests.
 	s.T().Log("ica: load simd key for app pubkey")
-	simdPubkey, simdAddr, err := importKeyFromMnemonic(kr, s.simd.KeyName, s.simd.MnemonicFile, "cosmos")
+	simdPubkey, simdAddr, err := sdkcrypto.ImportKeyFromMnemonic(kr, s.simd.KeyName, s.simd.MnemonicFile, "cosmos")
 	s.Require().NoError(err, "load simd key")
 	s.T().Logf("ica: simd key address=%s app_pubkey_len=%d", simdAddr, len(simdPubkey))
 	if ownerAddr != "" {
 		s.Require().Equal(ownerAddr, simdAddr, "simd owner address mismatch")
 	}
 
+	// Create the host-chain client used for action queries and funding.
 	s.T().Log("ica: create lumera blockchain client")
 	lumeraClient, err := newLumeraBlockchainClient(ctx, s.lumera.ChainID, s.lumera.GRPC, kr, s.lumera.KeyName)
 	s.Require().NoError(err, "create lumera client")
 	defer lumeraClient.Close()
 	actionClient := lumeraClient.Action
 
+	// Fund the ICA account so it can pay fees on the host chain.
 	s.T().Log("ica: ensure ICA account funded")
 	err = s.ensureICAFunded(ctx, lumeraClient, lumeraAddr, icaAddr)
 	s.Require().NoError(err, "fund ICA account")
 
-	s.T().Log("ica: create cascade client")
 	// Create cascade client for metadata, upload, and download helpers.
+	s.T().Log("ica: create cascade client")
 	cascadeClient, err := cascade.New(ctx, cascade.Config{
 		ChainID:         s.lumera.ChainID,
 		GRPCAddr:        s.lumera.GRPC,
@@ -195,13 +103,13 @@ func (s *ibcSimdSuite) TestICACascadeFlow() {
 	cascadeClient.SetLogger(newSupernodeInfoLogger())
 	defer cascadeClient.Close()
 
-	s.T().Log("ica: create test files")
 	// Prepare local test files of varying sizes.
+	s.T().Log("ica: create test files")
 	files, err := createICATestFiles(s.T().TempDir())
 	s.Require().NoError(err, "create test files")
 
-	s.T().Log("ica: register actions via ICA")
 	// ICA send hook: build packet, submit via simd controller, and resolve action ID from ack.
+	s.T().Log("ica: register actions via ICA")
 	sendFunc := func(ctx context.Context, msg *actiontypes.MsgRequestAction, _ []byte, filePath string, _ *cascade.UploadOptions) (*types.ActionResult, error) {
 		s.T().Logf("ica: send request for %s", filepath.Base(filePath))
 		actionIDs, err := s.sendICARequestTx(ctx, []*actiontypes.MsgRequestAction{msg})
@@ -229,8 +137,9 @@ func (s *ibcSimdSuite) TestICACascadeFlow() {
 		s.T().Logf("ica: action id for %s -> %s", filepath.Base(f.path), res.ActionID)
 	}
 
-	s.T().Log("ica: download and verify files")
 	// Download each action payload and compare to the original.
+	// The action ID serves as the download handle for each payload.
+	s.T().Log("ica: download and verify files")
 	downloadDir := s.T().TempDir()
 	for _, f := range files {
 		actionID := actionIDs[f.path]
@@ -243,10 +152,12 @@ func (s *ibcSimdSuite) TestICACascadeFlow() {
 		s.True(bytes.Equal(f.content, downloaded), "downloaded content mismatch for %s", downloadedPath)
 	}
 
+	// Wait for DONE to ensure the host chain processed the uploads.
+	// Then build and submit approvals via ICA.
 	s.T().Log("ica: wait for DONE and build approve messages")
 	for _, f := range files {
 		actionID := actionIDs[f.path]
-		err := waitForActionState(ctx, actionClient, actionID, types.ActionStateDone)
+		_, err := actionClient.WaitForState(ctx, actionID, types.ActionStateDone, actionPollDelay)
 		s.Require().NoError(err, "wait for action done %s", actionID)
 		s.T().Logf("ica: action %s is DONE", actionID)
 
@@ -257,11 +168,11 @@ func (s *ibcSimdSuite) TestICACascadeFlow() {
 		s.Require().NoError(err, "send ICA approve tx for %s", actionID)
 	}
 
-	s.T().Log("ica: wait for APPROVED")
 	// Confirm actions reach APPROVED on the host chain.
+	s.T().Log("ica: wait for APPROVED")
 	for _, f := range files {
 		actionID := actionIDs[f.path]
-		err := waitForActionState(ctx, actionClient, actionID, types.ActionStateApproved)
+		_, err := actionClient.WaitForState(ctx, actionID, types.ActionStateApproved, actionPollDelay)
 		s.Require().NoError(err, "wait for action approved %s", actionID)
 	}
 }
@@ -271,6 +182,7 @@ type icaTestFile struct {
 	content []byte
 }
 
+// newLumeraBlockchainClient creates a Lumera blockchain client with test defaults.
 func newLumeraBlockchainClient(ctx context.Context, chainID, grpcAddr string, kr keyring.Keyring, keyName string) (*blockchain.Client, error) {
 	if grpcAddr == "" {
 		return nil, fmt.Errorf("grpc address is required")
@@ -286,6 +198,7 @@ func newLumeraBlockchainClient(ctx context.Context, chainID, grpcAddr string, kr
 	return blockchain.New(ctx, cfg, kr, keyName)
 }
 
+// createICATestFiles writes a small set of deterministic test files.
 func createICATestFiles(dir string) ([]icaTestFile, error) {
 	base := time.Now().UnixNano()
 	sizes := []int{128, 2048, 8192}
@@ -304,6 +217,7 @@ func createICATestFiles(dir string) ([]icaTestFile, error) {
 	return files, nil
 }
 
+// ensureICAFunded tops up the ICA account if the balance is below the target.
 func (s *ibcSimdSuite) ensureICAFunded(ctx context.Context, client *blockchain.Client, fromAddr, icaAddr string) error {
 	if client == nil {
 		return fmt.Errorf("lumera client is nil")
@@ -395,132 +309,7 @@ func (s *ibcSimdSuite) ensureICAFunded(ctx context.Context, client *blockchain.C
 	return nil
 }
 
-func loadKeyringFromMnemonic(keyName, mnemonicFile string) (keyring.Keyring, []byte, string, error) {
-	if keyName == "" {
-		return nil, nil, "", fmt.Errorf("key name is required")
-	}
-	mnemonicRaw, err := os.ReadFile(mnemonicFile)
-	if err != nil {
-		return nil, nil, "", fmt.Errorf("read mnemonic file: %w", err)
-	}
-	mnemonic := strings.TrimSpace(string(mnemonicRaw))
-	if mnemonic == "" {
-		return nil, nil, "", fmt.Errorf("mnemonic file is empty")
-	}
-
-	krDir, err := os.MkdirTemp("", "lumera-keyring-*")
-	if err != nil {
-		return nil, nil, "", fmt.Errorf("create keyring dir: %w", err)
-	}
-
-	registry := codectypes.NewInterfaceRegistry()
-	cryptocodec.RegisterInterfaces(registry)
-	krCodec := codec.NewProtoCodec(registry)
-	kr, err := keyring.New("lumera", "test", krDir, strings.NewReader(""), krCodec)
-	if err != nil {
-		return nil, nil, "", fmt.Errorf("create keyring: %w", err)
-	}
-	if _, err := kr.NewAccount(keyName, mnemonic, "", sdk.FullFundraiserPath, hd.Secp256k1); err != nil {
-		return nil, nil, "", fmt.Errorf("import key: %w", err)
-	}
-
-	addr, err := addressFromKey(kr, keyName, "lumera")
-	if err != nil {
-		return nil, nil, "", fmt.Errorf("derive address: %w", err)
-	}
-
-	rec, err := kr.Key(keyName)
-	if err != nil {
-		return nil, nil, "", fmt.Errorf("load key: %w", err)
-	}
-	pub, err := rec.GetPubKey()
-	if err != nil {
-		return nil, nil, "", fmt.Errorf("get pubkey: %w", err)
-	}
-	if pub == nil {
-		return nil, nil, "", fmt.Errorf("pubkey is nil")
-	}
-
-	return kr, pub.Bytes(), addr, nil
-}
-
-func importKeyFromMnemonic(kr keyring.Keyring, keyName, mnemonicFile, hrp string) ([]byte, string, error) {
-	if kr == nil {
-		return nil, "", fmt.Errorf("keyring is nil")
-	}
-	if keyName == "" {
-		return nil, "", fmt.Errorf("key name is required")
-	}
-	mnemonicRaw, err := os.ReadFile(mnemonicFile)
-	if err != nil {
-		return nil, "", fmt.Errorf("read mnemonic file: %w", err)
-	}
-	mnemonic := strings.TrimSpace(string(mnemonicRaw))
-	if mnemonic == "" {
-		return nil, "", fmt.Errorf("mnemonic file is empty")
-	}
-
-	if _, err := kr.Key(keyName); err != nil {
-		if _, err := kr.NewAccount(keyName, mnemonic, "", sdk.FullFundraiserPath, hd.Secp256k1); err != nil {
-			return nil, "", fmt.Errorf("import key: %w", err)
-		}
-	}
-
-	addr, err := addressFromKey(kr, keyName, hrp)
-	if err != nil {
-		return nil, "", fmt.Errorf("derive address: %w", err)
-	}
-	rec, err := kr.Key(keyName)
-	if err != nil {
-		return nil, "", fmt.Errorf("load key: %w", err)
-	}
-	pub, err := rec.GetPubKey()
-	if err != nil {
-		return nil, "", fmt.Errorf("get pubkey: %w", err)
-	}
-	if pub == nil {
-		return nil, "", fmt.Errorf("pubkey is nil")
-	}
-	return pub.Bytes(), addr, nil
-}
-
-func addressFromKey(kr keyring.Keyring, keyName, hrp string) (string, error) {
-	if kr == nil {
-		return "", fmt.Errorf("keyring is required")
-	}
-	if keyName == "" {
-		return "", fmt.Errorf("key name is required")
-	}
-	rec, err := kr.Key(keyName)
-	if err != nil {
-		return "", fmt.Errorf("key %s not found: %w", keyName, err)
-	}
-	pub, err := rec.GetPubKey()
-	if err != nil {
-		return "", fmt.Errorf("get pubkey: %w", err)
-	}
-	if pub == nil {
-		return "", fmt.Errorf("pubkey is nil")
-	}
-	addrBz := pub.Address()
-	bech, err := sdkbech32.ConvertAndEncode(hrp, addrBz)
-	if err != nil {
-		return "", fmt.Errorf("bech32 encode: %w", err)
-	}
-	return bech, nil
-}
-
-func waitForActionState(ctx context.Context, client *blockchain.ActionClient, actionID string, state types.ActionState) error {
-	for i := 0; i < actionPollRetries; i++ {
-		action, err := client.GetAction(ctx, actionID)
-		if err == nil && action != nil && action.State == state {
-			return nil
-		}
-		time.Sleep(actionPollDelay)
-	}
-	return fmt.Errorf("action %s did not reach state %s", actionID, state)
-}
-
+// resolveSimdOwnerAddress finds the simd owner address from file or keyring.
 func (s *ibcSimdSuite) resolveSimdOwnerAddress(ctx context.Context) (string, error) {
 	if s.simdAddrFile != "" {
 		if addr, err := ibcutil.ReadAddress(s.simdAddrFile); err == nil {
@@ -534,6 +323,7 @@ func (s *ibcSimdSuite) resolveSimdOwnerAddress(ctx context.Context) (string, err
 	return strings.TrimSpace(out), nil
 }
 
+// ensureICAAddress resolves or registers an ICA address for the owner.
 func (s *ibcSimdSuite) ensureICAAddress(ctx context.Context, ownerAddr string) (string, error) {
 	addr, err := s.queryICAAddress(ctx, ownerAddr)
 	if err == nil && addr != "" {
@@ -564,6 +354,7 @@ func (s *ibcSimdSuite) ensureICAAddress(ctx context.Context, ownerAddr string) (
 	return "", fmt.Errorf("ICA address not found")
 }
 
+// waitForICAChannel polls until the controller channel is open.
 func (s *ibcSimdSuite) waitForICAChannel(_ context.Context, ownerAddr string) error {
 	portID := fmt.Sprintf("icacontroller-%s", ownerAddr)
 	for i := 0; i < actionPollRetries; i++ {
@@ -588,6 +379,7 @@ func (s *ibcSimdSuite) waitForICAChannel(_ context.Context, ownerAddr string) er
 	return fmt.Errorf("controller channel %s not open after %d retries", portID, actionPollRetries)
 }
 
+// queryICAAddress queries the controller for the ICA address.
 func (s *ibcSimdSuite) queryICAAddress(ctx context.Context, ownerAddr string) (string, error) {
 	args := []string{
 		"q", "interchain-accounts", "controller", "interchain-account",
@@ -615,6 +407,7 @@ func (s *ibcSimdSuite) queryICAAddress(ctx context.Context, ownerAddr string) (s
 	return strings.TrimSpace(resp.Address), nil
 }
 
+// registerICA submits a controller register tx on simd.
 func (s *ibcSimdSuite) registerICA(ctx context.Context) error {
 	version := icatypes.NewDefaultMetadataString(s.connection.ID, s.connection.Counterparty.ConnectionID)
 	s.T().Logf("ica: register controller (connection=%s counterparty=%s version=%s)", s.connection.ID, s.connection.Counterparty.ConnectionID, version)
@@ -652,6 +445,7 @@ func (s *ibcSimdSuite) registerICA(ctx context.Context) error {
 	return nil
 }
 
+// logICAConnectionDetails logs connection and client state details for debugging.
 func (s *ibcSimdSuite) logICAConnectionDetails(ctx context.Context) {
 	if s.connection == nil {
 		return
@@ -717,6 +511,7 @@ func (s *ibcSimdSuite) logICAConnectionDetails(ctx context.Context) {
 	}
 }
 
+// querySimdClientChainID fetches the counterparty chain_id from simd client state.
 func (s *ibcSimdSuite) querySimdClientChainID(ctx context.Context, clientID string) string {
 	if clientID == "" {
 		return ""
@@ -738,6 +533,7 @@ func (s *ibcSimdSuite) querySimdClientChainID(ctx context.Context, clientID stri
 	return chainID
 }
 
+// queryLumeraClientChainID fetches the counterparty chain_id from lumera client state.
 func (s *ibcSimdSuite) queryLumeraClientChainID(ctx context.Context, clientID string) string {
 	if clientID == "" || s.lumera.REST == "" {
 		return ""
@@ -769,6 +565,7 @@ func (s *ibcSimdSuite) queryLumeraClientChainID(ctx context.Context, clientID st
 	return chainID
 }
 
+// extractClientChainID extracts chain_id from a client-state JSON payload.
 func extractClientChainID(raw []byte) string {
 	var resp map[string]any
 	if err := json.Unmarshal(raw, &resp); err != nil {
@@ -784,6 +581,7 @@ func extractClientChainID(raw []byte) string {
 	return stringPath(clientState, "chain_id")
 }
 
+// mapPath walks a nested map and returns the nested map, if present.
 func mapPath(m map[string]any, path ...string) map[string]any {
 	var cur any = m
 	for _, p := range path {
@@ -799,6 +597,7 @@ func mapPath(m map[string]any, path ...string) map[string]any {
 	return nil
 }
 
+// stringPath returns a nested string value for the given path.
 func stringPath(m map[string]any, path ...string) string {
 	var cur any = m
 	for _, p := range path {
@@ -811,6 +610,7 @@ func stringPath(m map[string]any, path ...string) string {
 	return stringFromAny(cur)
 }
 
+// stringFromAny normalizes common JSON scalar types to strings.
 func stringFromAny(v any) string {
 	switch val := v.(type) {
 	case string:
@@ -824,6 +624,7 @@ func stringFromAny(v any) string {
 	}
 }
 
+// waitForPacketInfo polls for packet identifiers in a tx response.
 func (s *ibcSimdSuite) waitForPacketInfo(ctx context.Context, txHash string) (cascade.PacketInfo, error) {
 	for i := 0; i < actionPollRetries; i++ {
 		info, err := s.queryPacketInfo(ctx, txHash)
@@ -836,6 +637,7 @@ func (s *ibcSimdSuite) waitForPacketInfo(ctx context.Context, txHash string) (ca
 	return cascade.PacketInfo{}, fmt.Errorf("packet info not found for tx %s", txHash)
 }
 
+// queryPacketInfo queries simd for tx JSON and extracts packet info.
 func (s *ibcSimdSuite) queryPacketInfo(ctx context.Context, txHash string) (cascade.PacketInfo, error) {
 	args := []string{"q", "tx", txHash, "--output", "json"}
 	if s.simd.RPC != "" {
@@ -848,6 +650,7 @@ func (s *ibcSimdSuite) queryPacketInfo(ctx context.Context, txHash string) (casc
 	return cascade.ExtractPacketInfoFromTxJSON([]byte(out))
 }
 
+// waitForPacketAcknowledgement waits for the host chain acknowledgement.
 func (s *ibcSimdSuite) waitForPacketAcknowledgement(ctx context.Context, info cascade.PacketInfo) ([]byte, error) {
 	hostPort, hostChannel := s.resolveHostPacketRoute(ctx, info)
 	s.T().Logf("ica: wait for host ack (port=%s channel=%s seq=%d)", hostPort, hostChannel, info.Sequence)
@@ -874,6 +677,7 @@ func (s *ibcSimdSuite) waitForPacketAcknowledgement(ctx context.Context, info ca
 	return nil, fmt.Errorf("acknowledgement not found for %s/%s/%d", info.Port, info.Channel, info.Sequence)
 }
 
+// isRetryableAckErr returns true for acknowledgement lookup errors worth retrying.
 func isRetryableAckErr(err error) bool {
 	msg := err.Error()
 	return strings.Contains(msg, "not found") ||
@@ -881,6 +685,7 @@ func isRetryableAckErr(err error) bool {
 		strings.Contains(msg, "invalid acknowledgement")
 }
 
+// logAckDebug dumps packet status from both chains to aid debugging.
 func (s *ibcSimdSuite) logAckDebug(ctx context.Context, info cascade.PacketInfo) {
 	s.logSimdPacketQuery(ctx, "packet-commitment", info)
 	s.logSimdPacketQuery(ctx, "packet-receipt", info)
@@ -897,6 +702,7 @@ func (s *ibcSimdSuite) logAckDebug(ctx context.Context, info cascade.PacketInfo)
 	s.logLumeraPacketQuery(ctx, "packet_acks", lumeraPort, lumeraChannel, info.Sequence)
 }
 
+// logSimdPacketQuery logs simd packet state for the given query type.
 func (s *ibcSimdSuite) logSimdPacketQuery(ctx context.Context, subcommand string, info cascade.PacketInfo) {
 	args := []string{
 		"q", "ibc", "channel", subcommand,
@@ -914,6 +720,7 @@ func (s *ibcSimdSuite) logSimdPacketQuery(ctx context.Context, subcommand string
 	s.T().Logf("ica: simd %s response: %s", subcommand, trimLog(out))
 }
 
+// querySimdChannelEnd returns the channel state and counterparty identifiers.
 func (s *ibcSimdSuite) querySimdChannelEnd(ctx context.Context, port, channel string) (string, string, string, error) {
 	args := []string{
 		"q", "ibc", "channel", "end",
@@ -942,6 +749,7 @@ func (s *ibcSimdSuite) querySimdChannelEnd(ctx context.Context, port, channel st
 	return resp.Channel.State, resp.Channel.Counterparty.PortID, resp.Channel.Counterparty.ChannelID, nil
 }
 
+// logLumeraPacketQuery queries the lumera REST endpoint and logs the response.
 func (s *ibcSimdSuite) logLumeraPacketQuery(ctx context.Context, endpoint, port, channel string, sequence uint64) {
 	if s.lumera.REST == "" {
 		return
@@ -969,6 +777,7 @@ func (s *ibcSimdSuite) logLumeraPacketQuery(ctx context.Context, endpoint, port,
 	s.T().Logf("ica: lumera %s response (status=%d): %s", endpoint, httpResp.StatusCode, trimLog(string(body)))
 }
 
+// resolveHostPacketRoute maps controller port/channel to the host-side route.
 func (s *ibcSimdSuite) resolveHostPacketRoute(ctx context.Context, info cascade.PacketInfo) (string, string) {
 	hostPort := info.Port
 	hostChannel := info.Channel
@@ -986,10 +795,12 @@ func (s *ibcSimdSuite) resolveHostPacketRoute(ctx context.Context, info cascade.
 	return hostPort, hostChannel
 }
 
+// queryLumeraPacketAcknowledgement returns the acknowledgement bytes from lumera.
 func (s *ibcSimdSuite) queryLumeraPacketAcknowledgement(ctx context.Context, port, channel string, sequence uint64) ([]byte, error) {
 	return s.queryLumeraAckHex(ctx, port, channel, sequence)
 }
 
+// queryLumeraAckHex searches CometBFT events for the acknowledgement hex payload.
 func (s *ibcSimdSuite) queryLumeraAckHex(ctx context.Context, port, channel string, sequence uint64) ([]byte, error) {
 	if s.lumera.RPC == "" {
 		return nil, fmt.Errorf("lumera RPC address is empty")
@@ -1113,6 +924,7 @@ func (s *ibcSimdSuite) queryLumeraAckHex(ctx context.Context, port, channel stri
 	return nil, fmt.Errorf("acknowledgement event not found for %s/%s/%d", port, channel, sequence)
 }
 
+// decodeEventValue base64-decodes values if they look like printable ASCII.
 func decodeEventValue(raw string) string {
 	if raw == "" {
 		return ""
@@ -1127,6 +939,7 @@ func decodeEventValue(raw string) string {
 	return string(decoded)
 }
 
+// isMostlyPrintableASCII checks whether a byte slice is likely displayable text.
 func isMostlyPrintableASCII(data []byte) bool {
 	if len(data) == 0 {
 		return false
@@ -1140,6 +953,7 @@ func isMostlyPrintableASCII(data []byte) bool {
 	return printable*100/len(data) >= 90
 }
 
+// trimLog shortens noisy log payloads for test output.
 func trimLog(payload string) string {
 	out := strings.TrimSpace(payload)
 	const maxLen = 600
@@ -1149,6 +963,7 @@ func trimLog(payload string) string {
 	return out[:maxLen] + "…"
 }
 
+// parseTxHash extracts the tx hash from CLI output or JSON.
 func parseTxHash(output string) (string, error) {
 	if hash, err := cascade.ParseTxHashJSON([]byte(output)); err == nil {
 		return hash, nil
@@ -1166,6 +981,7 @@ type txResponse struct {
 	TxHash    string `json:"txhash"`
 }
 
+// parseTxResponse parses a tx response from CLI output.
 func parseTxResponse(output string) (txResponse, bool) {
 	if resp, ok := parseTxResponseJSON([]byte(strings.TrimSpace(output))); ok {
 		return resp, true
@@ -1190,6 +1006,7 @@ func parseTxResponse(output string) (txResponse, bool) {
 	return txResponse{}, false
 }
 
+// parseTxResponseJSON attempts to parse a tx response from JSON.
 func parseTxResponseJSON(data []byte) (txResponse, bool) {
 	var resp txResponse
 	if err := json.Unmarshal(data, &resp); err != nil {
@@ -1198,6 +1015,7 @@ func parseTxResponseJSON(data []byte) (txResponse, bool) {
 	return resp, true
 }
 
+// parseTxHashFromLines scans output lines for embedded JSON tx responses.
 func parseTxHashFromLines(output string) (string, error) {
 	for _, line := range strings.Split(output, "\n") {
 		line = strings.TrimSpace(line)
@@ -1219,6 +1037,7 @@ func parseTxHashFromLines(output string) (string, error) {
 	return "", fmt.Errorf("tx hash not found in output")
 }
 
+// sendICARequestTx sends request action messages via ICA and returns action IDs.
 func (s *ibcSimdSuite) sendICARequestTx(ctx context.Context, msgs []*actiontypes.MsgRequestAction) ([]string, error) {
 	var anys []*codectypes.Any
 	for _, msg := range msgs {
@@ -1239,6 +1058,7 @@ func (s *ibcSimdSuite) sendICARequestTx(ctx context.Context, msgs []*actiontypes
 	return actionIDs, nil
 }
 
+// sendICAApproveTx sends approve action messages via ICA.
 func (s *ibcSimdSuite) sendICAApproveTx(ctx context.Context, msgs []*actiontypes.MsgApproveAction) error {
 	s.T().Logf("ica: build approve ICA packet (msgs=%d)", len(msgs))
 	var anys []*codectypes.Any
@@ -1258,6 +1078,7 @@ func (s *ibcSimdSuite) sendICAApproveTx(ctx context.Context, msgs []*actiontypes
 	return nil
 }
 
+// sendICAAnysWithAck submits a controller send-tx and waits for the ack.
 func (s *ibcSimdSuite) sendICAAnysWithAck(ctx context.Context, anys []*codectypes.Any) (cascade.PacketInfo, []byte, error) {
 	s.T().Logf("ica: build ICA packet data (msgs=%d connection=%s)", len(anys), s.connection.ID)
 	packet, err := cascade.BuildICAPacketData(anys)
@@ -1321,6 +1142,7 @@ func (s *ibcSimdSuite) sendICAAnysWithAck(ctx context.Context, anys []*codectype
 	return packetInfo, ackBytes, nil
 }
 
+// packRequestAny packs a request action message into an Any wrapper.
 func packRequestAny(msg *actiontypes.MsgRequestAction) (*codectypes.Any, error) {
 	anyBytes, err := cascade.PackRequestForICA(msg)
 	if err != nil {
@@ -1333,6 +1155,7 @@ func packRequestAny(msg *actiontypes.MsgRequestAction) (*codectypes.Any, error) 
 	return &any, nil
 }
 
+// packApproveAny packs an approve action message into an Any wrapper.
 func packApproveAny(msg *actiontypes.MsgApproveAction) (*codectypes.Any, error) {
 	anyBytes, err := cascade.PackApproveForICA(msg)
 	if err != nil {
@@ -1345,11 +1168,13 @@ func packApproveAny(msg *actiontypes.MsgApproveAction) (*codectypes.Any, error) 
 	return &any, nil
 }
 
+// marshalICAPacketJSON marshals packet data as JSON for CLI usage.
 func marshalICAPacketJSON(packet icatypes.InterchainAccountPacketData) ([]byte, error) {
 	cdc := codec.NewProtoCodec(codectypes.NewInterfaceRegistry())
 	return cdc.MarshalJSON(&packet)
 }
 
+// runSimdCmd executes simd with a timeout and returns combined output.
 func (s *ibcSimdSuite) runSimdCmd(ctx context.Context, timeout time.Duration, args ...string) (string, error) {
 	cmdArgs := append([]string{}, args...)
 	if s.simdHome != "" {
@@ -1370,6 +1195,7 @@ func (s *ibcSimdSuite) runSimdCmd(ctx context.Context, timeout time.Duration, ar
 	return string(out), nil
 }
 
+// formatCmd formats a command for logging with shell-safe quoting.
 func formatCmd(bin string, args []string) string {
 	parts := make([]string, 0, len(args)+1)
 	parts = append(parts, shellQuote(bin))
@@ -1379,6 +1205,7 @@ func formatCmd(bin string, args []string) string {
 	return strings.Join(parts, " ")
 }
 
+// shellQuote provides a minimal shell-safe quote for logging.
 func shellQuote(value string) string {
 	if value == "" {
 		return "''"

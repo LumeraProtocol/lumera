@@ -38,6 +38,8 @@ import (
 	upgradetypes "cosmossdk.io/x/upgrade/types"
 	actionmodulev1 "github.com/LumeraProtocol/lumera/x/action/v1/module"
 	actionmoduletypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	auditmodulev1 "github.com/LumeraProtocol/lumera/x/audit/v1/module"
+	auditmoduletypes "github.com/LumeraProtocol/lumera/x/audit/v1/types"
 	claimmodulev1 "github.com/LumeraProtocol/lumera/x/claim/module"
 	claimmoduletypes "github.com/LumeraProtocol/lumera/x/claim/types"
 	lumeraidmodulev1 "github.com/LumeraProtocol/lumera/x/lumeraid/module"
@@ -121,6 +123,7 @@ var (
 		wasmtypes.ModuleName,
 		claimmoduletypes.ModuleName,
 		supernodemoduletypes.ModuleName,
+		auditmoduletypes.ModuleName,
 		actionmoduletypes.ModuleName,
 		// this line is used by starport scaffolding # stargate/app/initGenesis
 	}
@@ -149,6 +152,7 @@ var (
 		wasmtypes.ModuleName,
 		claimmoduletypes.ModuleName,
 		supernodemoduletypes.ModuleName,
+		auditmoduletypes.ModuleName,
 		actionmoduletypes.ModuleName,
 		// this line is used by starport scaffolding # stargate/app/beginBlockers
 	}
@@ -171,6 +175,7 @@ var (
 		wasmtypes.ModuleName,
 		claimmoduletypes.ModuleName,
 		supernodemoduletypes.ModuleName,
+		auditmoduletypes.ModuleName,
 		actionmoduletypes.ModuleName,
 		// this line is used by starport scaffolding # stargate/app/endBlockers
 	}
@@ -337,6 +342,10 @@ var (
 			{
 				Name:   supernodemoduletypes.ModuleName,
 				Config: appconfig.WrapAny(&supernodemodulev1.Module{}),
+			},
+			{
+				Name:   auditmoduletypes.ModuleName,
+				Config: appconfig.WrapAny(&auditmodulev1.Module{}),
 			},
 			{
 				Name:   actionmoduletypes.ModuleName,

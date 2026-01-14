@@ -81,6 +81,7 @@ import (
 	upgrades "github.com/LumeraProtocol/lumera/app/upgrades"
 	appParams "github.com/LumeraProtocol/lumera/app/upgrades/params"
 	actionmodulekeeper "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
+	auditmodulekeeper "github.com/LumeraProtocol/lumera/x/audit/v1/keeper"
 	claimmodulekeeper "github.com/LumeraProtocol/lumera/x/claim/keeper"
 	lumeraidmodulekeeper "github.com/LumeraProtocol/lumera/x/lumeraid/keeper"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
@@ -150,6 +151,7 @@ type App struct {
 	LumeraidKeeper  lumeraidmodulekeeper.Keeper
 	ClaimKeeper     claimmodulekeeper.Keeper
 	SupernodeKeeper sntypes.SupernodeKeeper
+	AuditKeeper     auditmodulekeeper.Keeper
 	ActionKeeper    actionmodulekeeper.Keeper
 	// this line is used by starport scaffolding # stargate/app/keeperDeclaration
 
@@ -252,6 +254,7 @@ func New(
 		&app.LumeraidKeeper,
 		&app.ClaimKeeper,
 		&app.SupernodeKeeper,
+		&app.AuditKeeper,
 		&app.ActionKeeper,
 		// this line is used by starport scaffolding # stargate/app/keeperDefinition
 	); err != nil {

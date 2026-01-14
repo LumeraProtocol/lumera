@@ -1,0 +1,73 @@
+syntax = "proto3";
+package lumera.audit.v1;
+
+option go_package = "x/audit/v1/types";
+
+import "amino/amino.proto";
+import "cosmos_proto/cosmos.proto";
+import "gogoproto/gogo.proto";
+
+enum PortState {
+  PORT_STATE_UNKNOWN = 0;
+  PORT_STATE_OPEN    = 1;
+  PORT_STATE_CLOSED  = 2;
+}
+
+message AuditSelfReport {
+  double cpu_usage_percent  = 1;
+  double mem_usage_percent  = 2;
+  double disk_usage_percent = 3;
+
+  // Ordered like Params.required_open_ports.
+  repeated PortState inbound_port_states = 4;
+
+  uint32 failed_actions_count = 5;
+}
+
+message AuditPeerObservation {
+  string target_validator_address = 1 [(cosmos_proto.scalar) = "cosmos.ValidatorAddressString"];
+
+  // Ordered like Params.required_open_ports.
+  repeated PortState port_states = 2;
+}
+
+message AuditReport {
+  string reporter_validator_address = 1 [(cosmos_proto.scalar) = "cosmos.ValidatorAddressString"];
+  string supernode_account          = 2 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  uint64 window_id                  = 3;
+  int64 report_height               = 4;
+
+  AuditSelfReport self_report = 5 [(gogoproto.nullable) = false];
+  repeated AuditPeerObservation peer_observations = 6;
+}
+
+message AuditStatus {
+  string validator_address = 1 [(cosmos_proto.scalar) = "cosmos.ValidatorAddressString"];
+
+  uint64 last_reported_window_id = 2;
+  int64  last_report_height      = 3;
+
+  bool compliant          = 4;
+  repeated string reasons = 5;
+
+  // Summary reachability states (last evaluated window).
+  repeated PortState required_ports_state = 6;
+}
+
+message PortEvidenceAggregate {
+  uint32 count      = 1;
+  PortState first_state = 2;
+  bool conflict     = 3;
+}
+
+message WindowSnapshot {
+  uint64 window_id          = 1;
+  int64  window_start_height = 2;
+
+  bytes seed_bytes = 3;
+
+  repeated string senders   = 4 [(cosmos_proto.scalar) = "cosmos.ValidatorAddressString"];
+  repeated string receivers = 5 [(cosmos_proto.scalar) = "cosmos.ValidatorAddressString"];
+
+  uint32 k_window = 6;
+}

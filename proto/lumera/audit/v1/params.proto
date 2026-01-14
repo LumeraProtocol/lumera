@@ -1,0 +1,21 @@
+syntax = "proto3";
+package lumera.audit.v1;
+
+option go_package = "x/audit/v1/types";
+
+import "amino/amino.proto";
+import "gogoproto/gogo.proto";
+
+// Params defines the parameters for the audit module.
+message Params {
+  option (gogoproto.equal) = true;
+
+  uint64 reporting_window_blocks      = 1;
+  uint64 missing_report_grace_blocks  = 2;
+
+  uint32 peer_quorum_reports          = 3;
+  uint32 min_probe_targets_per_window = 4;
+  uint32 max_probe_targets_per_window = 5;
+
+  repeated uint32 required_open_ports = 6;
+}

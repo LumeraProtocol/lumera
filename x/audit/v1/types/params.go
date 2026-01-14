@@ -1,0 +1,145 @@
+package types
+
+import (
+	"fmt"
+	"sort"
+
+	paramtypes "github.com/cosmos/cosmos-sdk/x/params/types"
+)
+
+var _ paramtypes.ParamSet = (*Params)(nil)
+
+var (
+	KeyReportingWindowBlocks      = []byte("ReportingWindowBlocks")
+	KeyMissingReportGraceBlocks   = []byte("MissingReportGraceBlocks")
+	KeyPeerQuorumReports          = []byte("PeerQuorumReports")
+	KeyMinProbeTargetsPerWindow   = []byte("MinProbeTargetsPerWindow")
+	KeyMaxProbeTargetsPerWindow   = []byte("MaxProbeTargetsPerWindow")
+	KeyRequiredOpenPorts          = []byte("RequiredOpenPorts")
+)
+
+var (
+	DefaultReportingWindowBlocks      = uint64(400)
+	DefaultMissingReportGraceBlocks   = uint64(100)
+	DefaultPeerQuorumReports          = uint32(3)
+	DefaultMinProbeTargetsPerWindow   = uint32(3)
+	DefaultMaxProbeTargetsPerWindow   = uint32(5)
+	DefaultRequiredOpenPorts          = []uint32{4444, 4445, 8002}
+)
+
+func ParamKeyTable() paramtypes.KeyTable {
+	return paramtypes.NewKeyTable().RegisterParamSet(&Params{})
+}
+
+func NewParams(
+	reportingWindowBlocks uint64,
+	missingReportGraceBlocks uint64,
+	peerQuorumReports uint32,
+	minProbeTargetsPerWindow uint32,
+	maxProbeTargetsPerWindow uint32,
+	requiredOpenPorts []uint32,
+) Params {
+	return Params{
+		ReportingWindowBlocks:      reportingWindowBlocks,
+		MissingReportGraceBlocks:   missingReportGraceBlocks,
+		PeerQuorumReports:          peerQuorumReports,
+		MinProbeTargetsPerWindow:   minProbeTargetsPerWindow,
+		MaxProbeTargetsPerWindow:   maxProbeTargetsPerWindow,
+		RequiredOpenPorts:          requiredOpenPorts,
+	}
+}
+
+func DefaultParams() Params {
+	return NewParams(
+		DefaultReportingWindowBlocks,
+		DefaultMissingReportGraceBlocks,
+		DefaultPeerQuorumReports,
+		DefaultMinProbeTargetsPerWindow,
+		DefaultMaxProbeTargetsPerWindow,
+		append([]uint32(nil), DefaultRequiredOpenPorts...),
+	)
+}
+
+func (p Params) WithDefaults() Params {
+	if p.ReportingWindowBlocks == 0 {
+		p.ReportingWindowBlocks = DefaultReportingWindowBlocks
+	}
+	if p.MissingReportGraceBlocks == 0 {
+		p.MissingReportGraceBlocks = DefaultMissingReportGraceBlocks
+	}
+	if p.PeerQuorumReports == 0 {
+		p.PeerQuorumReports = DefaultPeerQuorumReports
+	}
+	if p.MinProbeTargetsPerWindow == 0 {
+		p.MinProbeTargetsPerWindow = DefaultMinProbeTargetsPerWindow
+	}
+	if p.MaxProbeTargetsPerWindow == 0 {
+		p.MaxProbeTargetsPerWindow = DefaultMaxProbeTargetsPerWindow
+	}
+	if len(p.RequiredOpenPorts) == 0 {
+		p.RequiredOpenPorts = append([]uint32(nil), DefaultRequiredOpenPorts...)
+	}
+	return p
+}
+
+func (p *Params) ParamSetPairs() paramtypes.ParamSetPairs {
+	return paramtypes.ParamSetPairs{
+		paramtypes.NewParamSetPair(KeyReportingWindowBlocks, &p.ReportingWindowBlocks, validateUint64),
+		paramtypes.NewParamSetPair(KeyMissingReportGraceBlocks, &p.MissingReportGraceBlocks, validateUint64),
+		paramtypes.NewParamSetPair(KeyPeerQuorumReports, &p.PeerQuorumReports, validateUint32),
+		paramtypes.NewParamSetPair(KeyMinProbeTargetsPerWindow, &p.MinProbeTargetsPerWindow, validateUint32),
+		paramtypes.NewParamSetPair(KeyMaxProbeTargetsPerWindow, &p.MaxProbeTargetsPerWindow, validateUint32),
+		paramtypes.NewParamSetPair(KeyRequiredOpenPorts, &p.RequiredOpenPorts, validateUint32Slice),
+	}
+}
+
+func (p Params) Validate() error {
+	p = p.WithDefaults()
+
+	if p.ReportingWindowBlocks == 0 {
+		return fmt.Errorf("reporting_window_blocks must be > 0")
+	}
+	if p.PeerQuorumReports == 0 {
+		return fmt.Errorf("peer_quorum_reports must be > 0")
+	}
+	if p.MinProbeTargetsPerWindow > p.MaxProbeTargetsPerWindow {
+		return fmt.Errorf("min_probe_targets_per_window must be <= max_probe_targets_per_window")
+	}
+	if len(p.RequiredOpenPorts) == 0 {
+		return fmt.Errorf("required_open_ports must not be empty")
+	}
+
+	ports := append([]uint32(nil), p.RequiredOpenPorts...)
+	sort.Slice(ports, func(i, j int) bool { return ports[i] < ports[j] })
+	for i := 1; i < len(ports); i++ {
+		if ports[i] == ports[i-1] {
+			return fmt.Errorf("required_open_ports must be unique")
+		}
+	}
+
+	return nil
+}
+
+func validateUint64(v interface{}) error {
+	_, ok := v.(uint64)
+	if !ok {
+		return fmt.Errorf("invalid parameter type: %T", v)
+	}
+	return nil
+}
+
+func validateUint32(v interface{}) error {
+	_, ok := v.(uint32)
+	if !ok {
+		return fmt.Errorf("invalid parameter type: %T", v)
+	}
+	return nil
+}
+
+func validateUint32Slice(v interface{}) error {
+	_, ok := v.([]uint32)
+	if !ok {
+		return fmt.Errorf("invalid parameter type: %T", v)
+	}
+	return nil
+}

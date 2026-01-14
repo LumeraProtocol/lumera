@@ -1,0 +1,38 @@
+syntax = "proto3";
+package lumera.audit.v1;
+
+option go_package = "x/audit/v1/types";
+
+import "amino/amino.proto";
+import "gogoproto/gogo.proto";
+import "google/api/annotations.proto";
+import "cosmos_proto/cosmos.proto";
+
+import "lumera/audit/v1/params.proto";
+import "lumera/audit/v1/audit.proto";
+
+// Query defines the gRPC querier service.
+service Query {
+  // Parameters queries the parameters of the module.
+  rpc Params(QueryParamsRequest) returns (QueryParamsResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/params";
+  }
+
+  rpc AuditStatus(QueryAuditStatusRequest) returns (QueryAuditStatusResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/audit_status/{validator_address}";
+  }
+}
+
+message QueryParamsRequest {}
+
+message QueryParamsResponse {
+  Params params = 1 [(gogoproto.nullable) = false, (amino.dont_omitempty) = true];
+}
+
+message QueryAuditStatusRequest {
+  string validator_address = 1 [(cosmos_proto.scalar) = "cosmos.ValidatorAddressString"];
+}
+
+message QueryAuditStatusResponse {
+  AuditStatus status = 1 [(gogoproto.nullable) = false];
+}

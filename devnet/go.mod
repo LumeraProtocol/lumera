@@ -18,11 +18,11 @@ require (
 	cosmossdk.io/api v0.9.2
 	cosmossdk.io/math v1.5.3
 	github.com/LumeraProtocol/lumera v1.9.1
-	github.com/LumeraProtocol/sdk-go v1.0.5
+	github.com/LumeraProtocol/sdk-go v1.0.6
 	github.com/cosmos/cosmos-sdk v0.53.0
-	github.com/cosmos/gogoproto v1.7.0
 	github.com/cosmos/ibc-go/v10 v10.3.0
 	github.com/stretchr/testify v1.11.1
+	go.uber.org/zap v1.27.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 
@@ -42,7 +42,7 @@ require (
 	github.com/DataDog/datadog-go v4.8.3+incompatible // indirect
 	github.com/DataDog/zstd v1.5.7 // indirect
 	github.com/LumeraProtocol/rq-go v0.2.1 // indirect
-	github.com/LumeraProtocol/supernode/v2 v2.4.19 // indirect
+	github.com/LumeraProtocol/supernode/v2 v2.4.23 // indirect
 	github.com/Masterminds/semver/v3 v3.3.1 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -66,6 +66,7 @@ require (
 	github.com/cosmos/cosmos-proto v1.0.0-beta.5 // indirect
 	github.com/cosmos/go-bip39 v1.0.0 // indirect
 	github.com/cosmos/gogogateway v1.2.0 // indirect
+	github.com/cosmos/gogoproto v1.7.0 // indirect
 	github.com/cosmos/iavl v1.2.4 // indirect
 	github.com/cosmos/ics23/go v0.11.0 // indirect
 	github.com/cosmos/ledger-cosmos-go v0.14.0 // indirect
@@ -166,7 +167,6 @@ require (
 	go.opencensus.io v0.24.0 // indirect
 	go.uber.org/mock v0.6.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.uber.org/zap v1.27.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/arch v0.15.0 // indirect
 	golang.org/x/crypto v0.43.0 // indirect

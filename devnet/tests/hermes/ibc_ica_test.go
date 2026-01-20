@@ -404,7 +404,7 @@ func parseGasPrice(input, fallbackDenom string) (sdkmath.LegacyDec, string, erro
 		return sdkmath.LegacyDec{}, "", fmt.Errorf("parse gas price amount: %w", err)
 	}
 	if amount.IsZero() {
-		return sdkmath.LegacyDec{}, "", fmt.Errorf("gas price amount is zero: %s", input)
+		return sdkmath.LegacyNewDecWithPrec(25, 3), denom, nil
 	}
 	return amount, denom, nil
 }

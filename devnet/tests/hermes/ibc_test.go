@@ -1,6 +1,7 @@
 package hermes
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -15,6 +16,7 @@ const (
 	defaultChannelInfoPath = "/shared/status/hermes/channel_transfer.json"
 	defaultSimdBin         = "simd"
 	defaultSimdRPC         = "http://127.0.0.1:26657"
+	defaultSimdGRPCAddr    = "http://127.0.0.1:9090"
 	defaultSimdChainID     = "hermes-simd-1"
 	defaultSimdHome        = "/root/.simd"
 	defaultSimdKeyName     = "simd-test"
@@ -78,6 +80,19 @@ type ChainInfo struct {
 	MnemonicFile string
 }
 
+func (s *ibcSimdSuite) logInfo(msg string) {
+	s.T().Log(formatTestLog("INFO", msg))
+}
+
+func (s *ibcSimdSuite) logInfof(format string, args ...any) {
+	s.T().Log(formatTestLog("INFO", fmt.Sprintf(format, args...)))
+}
+
+func formatTestLog(level, msg string) string {
+	ts := time.Now().Format("01/02/2006 15:04:05.000")
+	return fmt.Sprintf("%s %s %s", level, ts, msg)
+}
+
 func (s *ibcSimdSuite) SetupSuite() {
 	// Load environment-driven configuration and shared chain metadata.
 	s.channelInfoPath = getenv("CHANNEL_INFO_FILE", defaultChannelInfoPath)
@@ -85,6 +100,7 @@ func (s *ibcSimdSuite) SetupSuite() {
 	s.simd = ChainInfo{
 		ChainID:      getenv("SIMD_CHAIN_ID", defaultSimdChainID),
 		RPC:          getenv("SIMD_RPC_ADDR", defaultSimdRPC),
+		GRPC:         normalizeGRPCAddr(getenv("SIMD_GRPC_ADDR", defaultSimdGRPCAddr)),
 		Denom:        getenv("SIMD_DENOM", defaultSimdDenom),
 		KeyName:      getenv("SIMD_KEY_NAME", defaultSimdKeyName),
 		MnemonicFile: getenv("SIMD_KEY_MNEMONIC_FILE", defaultSimdMnemonic),

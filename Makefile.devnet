@@ -46,8 +46,8 @@ devnet-tests-build:
 	@mkdir -p "${DEVNET_BIN_DIR_ABS}"
 	@echo "Building devnet test binaries..."
 	@cd devnet && \
-		$(GO) test -c -o "${DEVNET_BIN_DIR_ABS}/ibc_validator" ./tests/validator && \
-		$(GO) test -c -o "${DEVNET_BIN_DIR_ABS}/ibc_hermes" ./tests/hermes
+		$(GO) test -c -o "${DEVNET_BIN_DIR_ABS}/tests_validator" ./tests/validator && \
+		$(GO) test -c -o "${DEVNET_BIN_DIR_ABS}/tests_hermes" ./tests/hermes
 	@echo "Devnet test binaries built successfully"
 
 devnet-build:

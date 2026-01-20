@@ -3,92 +3,138 @@ package hermes
 import (
 	"context"
 	"fmt"
-	stdlog "log"
 	"os"
-	"strings"
+	"sort"
 	"time"
 
-	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	"github.com/LumeraProtocol/sdk-go/cascade"
 	sdkcrypto "github.com/LumeraProtocol/sdk-go/pkg/crypto"
 	"github.com/LumeraProtocol/sdk-go/types"
+	"go.uber.org/zap"
+	"go.uber.org/zap/buffer"
+	"go.uber.org/zap/zapcore"
 )
 
-type supernodeInfoLogger struct {
-	logger *stdlog.Logger
+var plainEncoderPool = buffer.NewPool()
+
+type plainEncoder struct {
+	zapcore.Encoder
+	cfg zapcore.EncoderConfig
 }
 
-func newSupernodeInfoLogger() *supernodeInfoLogger {
-	return &supernodeInfoLogger{logger: stdlog.New(os.Stdout, "", stdlog.LstdFlags)}
-}
-
-func (l *supernodeInfoLogger) Printf(format string, v ...interface{}) {
-	l.logf(format, v...)
-}
-
-func (l *supernodeInfoLogger) Infof(format string, v ...interface{}) {
-	l.logf(format, v...)
-}
-
-func (l *supernodeInfoLogger) Warnf(format string, v ...interface{}) {
-	l.logf(format, v...)
-}
-
-func (l *supernodeInfoLogger) logf(format string, v ...interface{}) {
-	msg := fmt.Sprintf(format, v...)
-	if strings.Contains(msg, "[supernode] DEBUG") {
-		return
+func (e *plainEncoder) Clone() zapcore.Encoder {
+	return &plainEncoder{
+		Encoder: e.Encoder.Clone(),
+		cfg:     e.cfg,
 	}
-	l.logger.Printf("%s", msg)
+}
+
+func (e *plainEncoder) EncodeEntry(entry zapcore.Entry, fields []zapcore.Field) (*buffer.Buffer, error) {
+	buf := plainEncoderPool.Get()
+	level := entry.Level.CapitalString()
+	ts := entry.Time.Format("01/02/2006 15:04:05.000")
+
+	buf.AppendString(level)
+	buf.AppendByte(' ')
+	buf.AppendString(ts)
+	if entry.Message != "" {
+		buf.AppendByte(' ')
+		buf.AppendString(entry.Message)
+	}
+	if len(fields) > 0 {
+		buf.AppendByte(' ')
+		appendZapFields(buf, fields)
+	}
+	if e.cfg.LineEnding != "" {
+		buf.AppendString(e.cfg.LineEnding)
+	}
+	return buf, nil
+}
+
+func appendZapFields(buf *buffer.Buffer, fields []zapcore.Field) {
+	enc := zapcore.NewMapObjectEncoder()
+	for _, field := range fields {
+		field.AddTo(enc)
+	}
+	keys := make([]string, 0, len(enc.Fields))
+	for k := range enc.Fields {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for i, k := range keys {
+		if i > 0 {
+			buf.AppendByte(' ')
+		}
+		buf.AppendString(k)
+		buf.AppendByte('=')
+		buf.AppendString(fmt.Sprint(enc.Fields[k]))
+	}
+}
+
+func newSupernodeLogger() *zap.Logger {
+	cfg := zapcore.EncoderConfig{
+		LineEnding: zapcore.DefaultLineEnding,
+	}
+	baseEnc := zapcore.NewConsoleEncoder(cfg)
+	enc := &plainEncoder{
+		Encoder: baseEnc,
+		cfg:     cfg,
+	}
+	core := zapcore.NewCore(enc, zapcore.AddSync(os.Stdout), zap.NewAtomicLevelAt(zap.InfoLevel))
+	return zap.New(core)
 }
 
 func (s *ibcSimdSuite) TestICARequestActionAppPubkeyRequired() {
 	ctx, cancel := context.WithTimeout(context.Background(), icaTestTimeout)
 	defer cancel()
 
-	s.T().Log("ica: resolve simd owner address")
-	ownerAddr, err := s.resolveSimdOwnerAddress(ctx)
-	s.Require().NoError(err, "resolve simd owner address")
-
-	s.T().Log("ica: ensure ICA address")
-	icaAddr, err := s.ensureICAAddress(ctx, ownerAddr)
-	s.Require().NoError(err, "ensure ICA address")
-	s.Require().NotEmpty(icaAddr, "ICA address is empty")
-
-	s.T().Log("ica: load lumera keyring")
+	s.logInfo("ica: load lumera keyring")
 	kr, _, lumeraAddr, err := sdkcrypto.LoadKeyringFromMnemonic(s.lumera.KeyName, s.lumera.MnemonicFile)
 	s.Require().NoError(err, "load lumera keyring")
 	s.Require().NotEmpty(lumeraAddr, "lumera address is empty")
 
-	s.T().Log("ica: load simd key for app pubkey")
-	simdPubkey, simdAddr, err := sdkcrypto.ImportKeyFromMnemonic(kr, s.simd.KeyName, s.simd.MnemonicFile, "cosmos")
+	s.logInfo("ica: load simd key for app pubkey")
+	simdPubkey, simdAddr, err := sdkcrypto.ImportKeyFromMnemonic(kr, s.simd.KeyName, s.simd.MnemonicFile, simdOwnerHRP)
 	s.Require().NoError(err, "load simd key")
-	if ownerAddr != "" {
+
+	s.logInfo("ica: create ICA controller (grpc)")
+	icaController, err := s.newICAController(ctx, kr, s.simd.KeyName)
+	s.Require().NoError(err, "create ICA controller")
+	defer icaController.Close()
+
+	ownerAddr := icaController.OwnerAddress()
+	s.Require().NotEmpty(ownerAddr, "simd owner address is empty")
+	if simdAddr != "" {
 		s.Require().Equal(ownerAddr, simdAddr, "simd owner address mismatch")
 	}
 
-	s.T().Log("ica: create lumera blockchain client")
+	s.logInfo("ica: ensure ICA address")
+	icaAddr, err := icaController.EnsureICAAddress(ctx)
+	s.Require().NoError(err, "ensure ICA address")
+	s.Require().NotEmpty(icaAddr, "ICA address is empty")
+
+	s.logInfo("ica: create lumera blockchain client")
 	lumeraClient, err := newLumeraBlockchainClient(ctx, s.lumera.ChainID, s.lumera.GRPC, kr, s.lumera.KeyName)
 	s.Require().NoError(err, "create lumera client")
 	defer lumeraClient.Close()
 	actionClient := lumeraClient.Action
 
-	s.T().Log("ica: ensure ICA account funded")
+	s.logInfo("ica: ensure ICA account funded")
 	err = s.ensureICAFunded(ctx, lumeraClient, lumeraAddr, icaAddr)
 	s.Require().NoError(err, "fund ICA account")
 
-	s.T().Log("ica: create cascade client")
+	s.logInfo("ica: create cascade client")
 	cascadeClient, err := cascade.New(ctx, cascade.Config{
 		ChainID:         s.lumera.ChainID,
 		GRPCAddr:        s.lumera.GRPC,
 		Address:         lumeraAddr,
 		KeyName:         s.lumera.KeyName,
 		ICAOwnerKeyName: s.simd.KeyName,
-		ICAOwnerHRP:     "cosmos",
+		ICAOwnerHRP:     simdOwnerHRP,
 		Timeout:         30 * time.Second,
 	}, kr)
 	s.Require().NoError(err, "create cascade client")
-	cascadeClient.SetLogger(newSupernodeInfoLogger())
+	cascadeClient.SetLogger(newSupernodeLogger())
 	defer cascadeClient.Close()
 
 	files, err := createICATestFiles(s.T().TempDir())
@@ -99,7 +145,7 @@ func (s *ibcSimdSuite) TestICARequestActionAppPubkeyRequired() {
 	msg, _, err := cascadeClient.CreateRequestActionMessage(ctx, icaAddr, files[0].path, options)
 	s.Require().NoError(err, "build request action without app_pubkey")
 
-	_, err = s.sendICARequestTx(ctx, []*actiontypes.MsgRequestAction{msg})
+	_, err = icaController.SendRequestAction(ctx, msg)
 	s.Require().Error(err, "expected app_pubkey requirement failure")
 	if err != nil {
 		s.Contains(err.Error(), "app_pubkey")
@@ -109,10 +155,10 @@ func (s *ibcSimdSuite) TestICARequestActionAppPubkeyRequired() {
 	msg, _, err = cascadeClient.CreateRequestActionMessage(ctx, icaAddr, files[0].path, options)
 	s.Require().NoError(err, "build request action with app_pubkey")
 
-	actionIDs, err := s.sendICARequestTx(ctx, []*actiontypes.MsgRequestAction{msg})
+	actionRes, err := icaController.SendRequestAction(ctx, msg)
 	s.Require().NoError(err, "send request with app_pubkey")
-	s.Require().NotEmpty(actionIDs, "no action ids returned")
-	s.Require().NotEmpty(actionIDs[0], "empty action id response")
-	_, err = actionClient.WaitForState(ctx, actionIDs[0], types.ActionStatePending, actionPollDelay)
+	s.Require().NotNil(actionRes, "action result missing")
+	s.Require().NotEmpty(actionRes.ActionID, "empty action id response")
+	_, err = actionClient.WaitForState(ctx, actionRes.ActionID, types.ActionStatePending, actionPollDelay)
 	s.Require().NoError(err)
 }

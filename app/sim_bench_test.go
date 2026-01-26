@@ -1,11 +1,9 @@
 package app_test
 
 import (
-	"fmt"
 	"os"
 	"testing"
 
-	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/cosmos/cosmos-sdk/server"
 	simtestutil "github.com/cosmos/cosmos-sdk/testutil/sims"
@@ -128,21 +126,6 @@ func BenchmarkInvariants(b *testing.B) {
 		simtestutil.PrintStats(db)
 	}
 
-	ctx := bApp.NewContextLegacy(true, cmtproto.Header{Height: bApp.LastBlockHeight() + 1})
-
-	// 3. Benchmark each invariant separately
-	//
-	// NOTE: We use the crisis keeper as it has all the invariants registered with
-	// their respective metadata which makes it useful for testing/benchmarking.
-	for _, cr := range bApp.CrisisKeeper.Routes() {
-		cr := cr
-		b.Run(fmt.Sprintf("%s/%s", cr.ModuleName, cr.Route), func(b *testing.B) {
-			if res, stop := cr.Invar(ctx); stop {
-				b.Fatalf(
-					"broken invariant at block %d of %d\n%s",
-					ctx.BlockHeight()-1, config.NumBlocks, res,
-				)
-			}
-		})
-	}
+	// NOTE: x/crisis is removed, so invariant benchmarks are not available.
+	b.Skip("x/crisis disabled; invariants benchmark not available")
 }

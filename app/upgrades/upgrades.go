@@ -15,21 +15,23 @@ import (
 	upgrade_v1_8_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_0"
 	upgrade_v1_8_4 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_4"
 	upgrade_v1_9_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_9_0"
+	upgrade_v1_10_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_10_0"
 )
 
-// ======================================================================================================================
+// =================================================================================================================================
 // Upgrade overview:
-// ======================================================================================================================
-// | Name   | Handler  | Store changes                     | Notes
-// | v1.6.1 | custom   | none                              | Adds action module consensus version after migrations
-// | v1.7.0 | standard | none                              | Migrations only
-// | v1.7.2 | standard | none                              | Migrations only
-// | v1.8.0 | standard | testnet/devnet: add PFM, drop NFT | Store upgrade gated to non-mainnet; handler is migrations only
-// | v1.8.4 | standard | mainnet: add PFM, drop NFT        | Store upgrade gated to mainnet; handler is migrations only
-// | v1.8.5 | standard | none                              | Migrations only
-// | v1.9.0 | custom   | none                              | Backfills action/supernode secondary indices
-// | v1.9.1 | standard | none                              | Migrations only
-// ======================================================================================================================
+// =================================================================================================================================
+// | Name    | Handler  | Store changes                     | Notes
+// | v1.6.1  | custom   | none                              | Adds action module consensus version after migrations
+// | v1.7.0  | standard | none                              | Migrations only
+// | v1.7.2  | standard | none                              | Migrations only
+// | v1.8.0  | standard | testnet/devnet: add PFM, drop NFT | Store upgrade gated to non-mainnet; handler is migrations only
+// | v1.8.4  | standard | mainnet: add PFM, drop NFT        | Store upgrade gated to mainnet; handler is migrations only
+// | v1.8.5  | standard | none                              | Migrations only
+// | v1.9.0  | custom   | none                              | Backfills action/supernode secondary indices
+// | v1.9.1  | standard | none                              | Migrations only
+// | v1.10.0 | custom   | drop crisis                       | Migrate consensus params from x/params to x/consensus; remove x/crisis
+// =================================================================================================================================
 
 type UpgradeConfig struct {
 	StoreUpgrade *storetypes.StoreUpgrades
@@ -53,6 +55,7 @@ var upgradeNames = []string{
 	upgradeNameV185,
 	upgrade_v1_9_0.UpgradeName,
 	upgradeNameV191,
+	upgrade_v1_10_0.UpgradeName,
 }
 
 var NoUpgradeConfig = UpgradeConfig{
@@ -106,6 +109,11 @@ func SetupUpgrades(upgradeName string, params appParams.AppUpgradeParams) (Upgra
 	case upgradeNameV191:
 		return UpgradeConfig{
 			Handler: standardUpgradeHandler(upgradeNameV191, params),
+		}, true
+	case upgrade_v1_10_0.UpgradeName:
+		return UpgradeConfig{
+			StoreUpgrade: &upgrade_v1_10_0.StoreUpgrades,
+			Handler: upgrade_v1_10_0.CreateUpgradeHandler(params),
 		}, true
 
 	// add future upgrades here

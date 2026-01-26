@@ -31,6 +31,8 @@ func TestMain(m *testing.M) {
 	blockTime := flag.Duration("block-time", 1000*time.Millisecond, "block creation time")
 	execBinary := flag.String("binary", "lumerad", "executable binary for server/ client side")
 	bech32Prefix := flag.String("bech32", "lumera", "bech32 prefix to be used with addresses")
+	claimsPath := flag.String("claims-path", "", "path to claims.csv file or directory")
+	skipClaimsCheck := flag.Bool("skip-claims-check", false, "skip claims.csv validation")
 	flag.BoolVar(&verbose, "verbose", true, "verbose output")
 	flag.Parse()
 
@@ -53,6 +55,8 @@ func TestMain(m *testing.M) {
 	}
 	execBinaryName = *execBinary
 	sut = NewSystemUnderTest(*execBinary, verbose, *nodesCount, *blockTime)
+	sut.SetClaimsPath(*claimsPath)
+	sut.SetSkipClaimsCheck(*skipClaimsCheck)
 	if *rebuild {
 		sut.BuildNewBinary()
 	}

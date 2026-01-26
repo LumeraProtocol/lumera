@@ -47,11 +47,13 @@ var (
 
 // SystemUnderTest blockchain provisioning
 type SystemUnderTest struct {
-	ExecBinary    string
-	blockListener *EventListener
-	currentHeight int64
-	chainID       string
-	outputDir     string
+	ExecBinary      string
+	blockListener   *EventListener
+	currentHeight   int64
+	chainID         string
+	outputDir       string
+	claimsPath      string
+	skipClaimsCheck bool
 	// blockTime is the expected/desired block time. This is not going to be very precise
 	// since Tendermint consensus does not allow specifying it directly.
 	blockTime         time.Duration
@@ -168,7 +170,14 @@ func (s *SystemUnderTest) StartChain(t *testing.T, xargs ...string) {
 	t.Helper()
 	s.Log("Start chain\n")
 	s.ChainStarted = true
-	s.startNodesAsync(t, append([]string{"start", "--trace", "--log_level=info"}, xargs...)...)
+	args := []string{"start", "--trace", "--log_level=info"}
+	if s.claimsPath != "" {
+		args = append(args, "--claims-path="+s.claimsPath)
+	}
+	if s.skipClaimsCheck {
+		args = append(args, "--skip-claims-check")
+	}
+	s.startNodesAsync(t, append(args, xargs...)...)
 
 	s.AwaitNodeUp(t, s.rpcAddr)
 
@@ -182,6 +191,14 @@ func (s *SystemUnderTest) StartChain(t *testing.T, xargs ...string) {
 		}),
 	)
 	s.AwaitNextBlock(t, 4e9)
+}
+
+func (s *SystemUnderTest) SetClaimsPath(path string) {
+	s.claimsPath = path
+}
+
+func (s *SystemUnderTest) SetSkipClaimsCheck(skip bool) {
+	s.skipClaimsCheck = skip
 }
 
 // MarkDirty whole chain will be reset when marked dirty

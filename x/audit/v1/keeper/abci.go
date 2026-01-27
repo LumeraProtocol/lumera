@@ -10,9 +10,12 @@ func (k Keeper) BeginBlocker(ctx context.Context) error {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
 	params := k.GetParams(ctx).WithDefaults()
 
-	origin := k.getOrInitWindowOriginHeight(sdkCtx)
-	currentWindowID := k.windowIDAtHeight(origin, params, sdkCtx.BlockHeight())
-	windowStart := k.windowStartHeight(origin, params, currentWindowID)
+	ws, err := k.getCurrentWindowState(sdkCtx, params)
+	if err != nil {
+		return err
+	}
+	currentWindowID := ws.WindowID
+	windowStart := ws.StartHeight
 
 	// Only create the snapshot exactly at the window start height.
 	if sdkCtx.BlockHeight() != windowStart {

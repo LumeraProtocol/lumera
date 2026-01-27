@@ -51,12 +51,23 @@ Key fields:
 - `max_probe_targets_per_window`
 - `required_open_ports`
 
-### 2. Window Origin and Window IDs
+### 2. Window State and Window IDs
 
-On first use, the module stores an `origin_height` and uses it to derive:
+The module maintains a persisted **current window state** in KV-store and advances it deterministically as the chain height increases.
+
+The current window state includes:
 - `window_id`
 - `window_start_height`
 - `window_end_height`
+- `window_blocks` (effective window size for the current window)
+
+#### Window size changes (`reporting_window_blocks`)
+
+`reporting_window_blocks` may be updated by governance. To keep historical window boundaries stable, any change is applied **at the next window boundary**:
+- the current window’s start/end heights do not change mid-window
+- the new window size takes effect starting at `window_end_height + 1`
+
+Implementation note: the module persists a pending “next window size” value and consumes it when advancing into the next window.
 
 ### 3. Window Snapshots
 
@@ -82,7 +93,7 @@ Uniqueness is guaranteed (one report per reporter per window).
 
 On `MsgSubmitAuditReport`:
 1. Resolve reporter supernode from `supernode_account` via `x/supernode`.
-2. Validate window acceptance (from `window_start_height` through `window_end_height`).
+2. Validate window acceptance (only the current `window_id` at the current height is accepted).
 3. Ensure per-window uniqueness for the reporter.
 4. Persist the report.
 

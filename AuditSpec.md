@@ -32,45 +32,58 @@ Assumption:
 - `supernode_account` is treated as the stable identifier for audit storage and queries.
 
 ### 2.2 High-level flow (per window)
-1) The chain derives `window_id` from block height and a stored `origin_height`.
+1) The module maintains a persisted “current window” state derived from block height.
 2) At `window_start_height`, the module stores a `WindowSnapshot` containing the per-window prober → targets mapping (`assignments`).
 3) Each reporter submits `MsgSubmitAuditReport` for a specific `window_id` during the acceptance period.
 4) The module stores the report.
 
 ### Summary
-- Time is divided into fixed-size **reporting windows** (a set number of blocks). Window IDs/boundaries are derived deterministically from block height and a one-time **origin height** stored on first use.
+- Time is divided into **reporting windows**. The module persists the current window boundaries and advances them deterministically as height increases.
 - At the **first block of each window**, the chain writes a **window snapshot** that freezes, for that window:
   - the **prober → targets mapping** (`assignments`)
 - Each supernode can submit **at most one report per window**. A report is signed by the supernode account and stored under `supernode_account`.
 - A report contains self metrics plus optional peer observations. Peer observations include port states aligned by index to `required_open_ports` (position `i` refers to the `i`th configured port).
 - A report is **accepted** only if:
-  - the chain is within the window’s acceptance period (window start through window end)
+  - the report targets the **current window_id** at the current height (window start through window end)
   - the reporter has not already submitted a report for that window
 - When accepted, the chain stores the report as-is.
 - Penalties and aggregation are intentionally out-of-scope for the current implementation.
 
 ## 3. Reporting Windows
-Window sizing is block-based and deterministic. The module stores an `origin_height` once and uses it to derive window boundaries.
+Window sizing is block-based and deterministic. The module persists the current window boundaries and advances them as the chain height increases.
 
-### 3.1 Window origin
-`origin_height` is stored in module state on first use and remains fixed for the lifetime of the chain.
+### 3.1 Window state
+The module persists a “current window” record containing:
+- `window_id`
+- `window_start_height`
+- `window_end_height`
+- `window_blocks` (effective window size for the current window)
 
-### 3.2 Window derivation
-Let:
-- `origin = origin_height`
-- `W = reporting_window_blocks`
-- `H = current block height`
+Initialization:
+- On first run (e.g., at the first `BeginBlock` after module activation), the module writes the initial window:
+  - `window_id = 0`
+  - `window_start_height = H_init` (the current block height at initialization)
+  - `window_blocks = reporting_window_blocks` (from params at initialization)
+  - `window_end_height = window_start_height + window_blocks - 1`
 
-Then:
-- `window_id = floor((H - origin) / W)` for `H >= origin` (else `0`)
-- `window_start_height(window_id) = origin + window_id * W`
-- `window_end_height(window_id) = window_start_height(window_id) + W - 1`
+Advancement:
+- If `H > window_end_height`, the module advances windows until `H` is within the current window.
+- Each advance increments `window_id` by 1 and sets:
+  - `next_start = previous_end + 1`
+  - `window_start_height = next_start`
+  - `window_end_height = next_start + window_blocks - 1` (using the effective window size for that new window)
 
-### 3.3 Report acceptance period
-A report for `window_id` is accepted only when the current height is within:
-- `[window_start_height(window_id), window_end_height(window_id)]`
+### 3.2 Report acceptance period
+A report is accepted only when:
+- `window_id` equals the module’s current `window_id` at the current height, and
+- the current height is within `[window_start_height, window_end_height]` of that current window.
 
-Outside this range, `MsgSubmitAuditReport` is rejected.
+Otherwise, `MsgSubmitAuditReport` is rejected.
+
+### 3.3 Window size changes (`reporting_window_blocks`)
+`reporting_window_blocks` may be updated by governance. To preserve stable window boundaries, the change is applied **at the next window boundary**:
+- the current window’s `start_height`/`end_height` do not change mid-window
+- the new `reporting_window_blocks` value takes effect starting at `previous_end_height + 1`
 
 ## 4. Parameters
 Parameters are represented by the `Params` message.
@@ -260,12 +273,13 @@ message QuerySelfReportsResponse { repeated SelfReport reports = 1; }
 
 ## 8. On-Chain State
 This section describes the minimum state persisted by the module:
-- `origin_height` (int64) stored once.
+- Current window state (window_id, start/end, effective window size).
+- Pending next window size (optional; applied at the next boundary when present).
 - `WindowSnapshot` stored per `window_id`.
 - `AuditReport` stored per `(window_id, supernode_account)`.
 
 State growth considerations:
-- State must remain bounded. The module MAY prune per-window state (`WindowSnapshot`, `AuditReport`) for any `window_id` once the acceptance period for that window has ended (section 3.3).
+- State must remain bounded. The module MAY prune per-window state (`WindowSnapshot`, `AuditReport`) for any `window_id` once the acceptance period for that window has ended (section 3.2).
 - Current implementation note: pruning is not yet implemented; per-window state accumulates over time.
 
 ## 11. Out of Scope

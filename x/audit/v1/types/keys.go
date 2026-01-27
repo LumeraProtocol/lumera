@@ -24,9 +24,17 @@ var (
 	// - The snapshot is intended to be an immutable per-window source-of-truth for:
 	//   - prober -> targets mapping (assignments)
 	//
+	// Window state:
+	// - Window math is derived from persisted "current window" state:
+	//   - current window_id, start_height, end_height, window_blocks
+	// - When reporting_window_blocks is changed via governance, the new size is scheduled to take effect
+	//   at the next window boundary (end(current)+1) by persisting a pending next_window_blocks value.
+	//
 	// Formats:
 	// - WindowOriginHeightKey: "origin_height" -> 8 bytes (u64be(height))
 	// - WindowSnapshotKey:     "ws/" + u64be(window_id)
+	// - CurrentWindowStateKey: "win/current" -> 32 bytes: u64be(window_id) + u64be(start_height) + u64be(end_height) + u64be(window_blocks)
+	// - NextWindowBlocksKey:   "win/next_blocks" -> 8 bytes (u64be(window_blocks))
 	// - ReportKey:             "r/"  + u64be(window_id) + reporter_supernode_account
 	// - ReportIndexKey:        "ri/" + reporter_supernode_account + "/" + u64be(window_id)
 	// - SupernodeReportIndexKey: "sr/" + supernode_account + "/" + u64be(window_id) + "/" + reporter_supernode_account
@@ -38,6 +46,8 @@ var (
 	// - EvidenceKey(1, "<target>")    => "e/"  + u64be(1) + "<target>"
 
 	windowOriginHeightKey = []byte("origin_height")
+	currentWindowStateKey = []byte("win/current")
+	nextWindowBlocksKey   = []byte("win/next_blocks")
 
 	windowSnapshotPrefix = []byte("ws/")
 	reportPrefix         = []byte("r/")
@@ -65,6 +75,16 @@ func WindowSnapshotKey(windowID uint64) []byte {
 	key = append(key, windowSnapshotPrefix...)          // "ws/"
 	key = binary.BigEndian.AppendUint64(key, windowID)  // u64be(window_id)
 	return key
+}
+
+// CurrentWindowStateKey returns the store key for the persisted current-window state.
+func CurrentWindowStateKey() []byte {
+	return currentWindowStateKey
+}
+
+// NextWindowBlocksKey returns the store key for the persisted pending next-window size.
+func NextWindowBlocksKey() []byte {
+	return nextWindowBlocksKey
 }
 
 // ReportKey returns the store key for the AuditReport identified by (windowID, reporterSupernodeAccount).

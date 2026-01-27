@@ -10,22 +10,27 @@ import (
 var _ paramtypes.ParamSet = (*Params)(nil)
 
 var (
-	KeyReportingWindowBlocks      = []byte("ReportingWindowBlocks")
-	KeyMissingReportGraceBlocks   = []byte("MissingReportGraceBlocks")
-	KeyPeerQuorumReports          = []byte("PeerQuorumReports")
-	KeyMinProbeTargetsPerWindow   = []byte("MinProbeTargetsPerWindow")
-	KeyMaxProbeTargetsPerWindow   = []byte("MaxProbeTargetsPerWindow")
-	KeyRequiredOpenPorts          = []byte("RequiredOpenPorts")
+	KeyReportingWindowBlocks    = []byte("ReportingWindowBlocks")
+	KeyPeerQuorumReports        = []byte("PeerQuorumReports")
+	KeyMinProbeTargetsPerWindow = []byte("MinProbeTargetsPerWindow")
+	KeyMaxProbeTargetsPerWindow = []byte("MaxProbeTargetsPerWindow")
+	KeyRequiredOpenPorts        = []byte("RequiredOpenPorts")
 )
 
 var (
-	DefaultReportingWindowBlocks      = uint64(400)
-	DefaultMissingReportGraceBlocks   = uint64(100)
-	DefaultPeerQuorumReports          = uint32(3)
-	DefaultMinProbeTargetsPerWindow   = uint32(3)
-	DefaultMaxProbeTargetsPerWindow   = uint32(5)
-	DefaultRequiredOpenPorts          = []uint32{4444, 4445, 8002}
+	DefaultReportingWindowBlocks    = uint64(400)
+	DefaultPeerQuorumReports        = uint32(3)
+	DefaultMinProbeTargetsPerWindow = uint32(3)
+	DefaultMaxProbeTargetsPerWindow = uint32(5)
+	DefaultRequiredOpenPorts        = []uint32{4444, 4445, 8002}
 )
+
+// Params notes
+//
+// - reporting_window_blocks: defines the fixed-length reporting window size in blocks.
+// - peer_quorum_reports: desired number of peer observations per receiver (drives k_window calculation).
+// - min/max_probe_targets_per_window: clamps k_window to a safe range.
+// - required_open_ports: ports every report must cover.
 
 func ParamKeyTable() paramtypes.KeyTable {
 	return paramtypes.NewKeyTable().RegisterParamSet(&Params{})
@@ -33,26 +38,23 @@ func ParamKeyTable() paramtypes.KeyTable {
 
 func NewParams(
 	reportingWindowBlocks uint64,
-	missingReportGraceBlocks uint64,
 	peerQuorumReports uint32,
 	minProbeTargetsPerWindow uint32,
 	maxProbeTargetsPerWindow uint32,
 	requiredOpenPorts []uint32,
 ) Params {
 	return Params{
-		ReportingWindowBlocks:      reportingWindowBlocks,
-		MissingReportGraceBlocks:   missingReportGraceBlocks,
-		PeerQuorumReports:          peerQuorumReports,
-		MinProbeTargetsPerWindow:   minProbeTargetsPerWindow,
-		MaxProbeTargetsPerWindow:   maxProbeTargetsPerWindow,
-		RequiredOpenPorts:          requiredOpenPorts,
+		ReportingWindowBlocks:    reportingWindowBlocks,
+		PeerQuorumReports:        peerQuorumReports,
+		MinProbeTargetsPerWindow: minProbeTargetsPerWindow,
+		MaxProbeTargetsPerWindow: maxProbeTargetsPerWindow,
+		RequiredOpenPorts:        requiredOpenPorts,
 	}
 }
 
 func DefaultParams() Params {
 	return NewParams(
 		DefaultReportingWindowBlocks,
-		DefaultMissingReportGraceBlocks,
 		DefaultPeerQuorumReports,
 		DefaultMinProbeTargetsPerWindow,
 		DefaultMaxProbeTargetsPerWindow,
@@ -63,9 +65,6 @@ func DefaultParams() Params {
 func (p Params) WithDefaults() Params {
 	if p.ReportingWindowBlocks == 0 {
 		p.ReportingWindowBlocks = DefaultReportingWindowBlocks
-	}
-	if p.MissingReportGraceBlocks == 0 {
-		p.MissingReportGraceBlocks = DefaultMissingReportGraceBlocks
 	}
 	if p.PeerQuorumReports == 0 {
 		p.PeerQuorumReports = DefaultPeerQuorumReports
@@ -85,7 +84,6 @@ func (p Params) WithDefaults() Params {
 func (p *Params) ParamSetPairs() paramtypes.ParamSetPairs {
 	return paramtypes.ParamSetPairs{
 		paramtypes.NewParamSetPair(KeyReportingWindowBlocks, &p.ReportingWindowBlocks, validateUint64),
-		paramtypes.NewParamSetPair(KeyMissingReportGraceBlocks, &p.MissingReportGraceBlocks, validateUint64),
 		paramtypes.NewParamSetPair(KeyPeerQuorumReports, &p.PeerQuorumReports, validateUint32),
 		paramtypes.NewParamSetPair(KeyMinProbeTargetsPerWindow, &p.MinProbeTargetsPerWindow, validateUint32),
 		paramtypes.NewParamSetPair(KeyMaxProbeTargetsPerWindow, &p.MaxProbeTargetsPerWindow, validateUint32),

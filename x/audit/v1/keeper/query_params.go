@@ -10,4 +10,3 @@ func (q queryServer) Params(ctx context.Context, _ *types.QueryParamsRequest) (*
 	params := q.k.GetParams(ctx).WithDefaults()
 	return &types.QueryParamsResponse{Params: params}, nil
 }
-

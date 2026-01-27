@@ -37,11 +37,11 @@ func NewKeeper(
 	}
 
 	return Keeper{
-		cdc:            cdc,
-		addressCodec:   addressCodec,
-		storeService:   storeService,
-		logger:         logger,
-		authority:      authority,
+		cdc:             cdc,
+		addressCodec:    addressCodec,
+		storeService:    storeService,
+		logger:          logger,
+		authority:       authority,
 		supernodeKeeper: supernodeKeeper,
 	}
 }
@@ -53,4 +53,3 @@ func (k Keeper) GetAuthority() []byte {
 func (k Keeper) Logger() log.Logger {
 	return k.logger.With("module", "x/audit")
 }
-

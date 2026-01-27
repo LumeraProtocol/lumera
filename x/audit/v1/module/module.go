@@ -107,4 +107,3 @@ func (am AppModule) EndBlock(ctx context.Context) error {
 }
 
 func (am AppModule) IsAppModule() {}
-

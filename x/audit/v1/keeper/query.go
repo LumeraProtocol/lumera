@@ -16,4 +16,3 @@ func NewQueryServerImpl(k Keeper) types.QueryServer {
 		k:                        k,
 	}
 }
-

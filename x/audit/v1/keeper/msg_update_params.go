@@ -32,4 +32,3 @@ func (m msgServer) UpdateParams(ctx context.Context, req *types.MsgUpdateParams)
 
 	return &types.MsgUpdateParamsResponse{}, nil
 }
-

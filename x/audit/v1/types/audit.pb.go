@@ -55,10 +55,9 @@ func (PortState) EnumDescriptor() ([]byte, []int) {
 }
 
 type AuditSelfReport struct {
-	CpuUsagePercent  float64 `protobuf:"fixed64,1,opt,name=cpu_usage_percent,json=cpuUsagePercent,proto3" json:"cpu_usage_percent,omitempty"`
-	MemUsagePercent  float64 `protobuf:"fixed64,2,opt,name=mem_usage_percent,json=memUsagePercent,proto3" json:"mem_usage_percent,omitempty"`
-	DiskUsagePercent float64 `protobuf:"fixed64,3,opt,name=disk_usage_percent,json=diskUsagePercent,proto3" json:"disk_usage_percent,omitempty"`
-	// Ordered like Params.required_open_ports.
+	CpuUsagePercent    float64     `protobuf:"fixed64,1,opt,name=cpu_usage_percent,json=cpuUsagePercent,proto3" json:"cpu_usage_percent,omitempty"`
+	MemUsagePercent    float64     `protobuf:"fixed64,2,opt,name=mem_usage_percent,json=memUsagePercent,proto3" json:"mem_usage_percent,omitempty"`
+	DiskUsagePercent   float64     `protobuf:"fixed64,3,opt,name=disk_usage_percent,json=diskUsagePercent,proto3" json:"disk_usage_percent,omitempty"`
 	InboundPortStates  []PortState `protobuf:"varint,4,rep,packed,name=inbound_port_states,json=inboundPortStates,proto3,enum=lumera.audit.v1.PortState" json:"inbound_port_states,omitempty"`
 	FailedActionsCount uint32      `protobuf:"varint,5,opt,name=failed_actions_count,json=failedActionsCount,proto3" json:"failed_actions_count,omitempty"`
 }
@@ -132,8 +131,8 @@ func (m *AuditSelfReport) GetFailedActionsCount() uint32 {
 }
 
 type AuditPeerObservation struct {
-	TargetValidatorAddress string `protobuf:"bytes,1,opt,name=target_validator_address,json=targetValidatorAddress,proto3" json:"target_validator_address,omitempty"`
-	// Ordered like Params.required_open_ports.
+	TargetSupernodeAccount string `protobuf:"bytes,1,opt,name=target_supernode_account,json=targetSupernodeAccount,proto3" json:"target_supernode_account,omitempty"`
+	// port_states[i] refers to required_open_ports[i] for the window.
 	PortStates []PortState `protobuf:"varint,2,rep,packed,name=port_states,json=portStates,proto3,enum=lumera.audit.v1.PortState" json:"port_states,omitempty"`
 }
 
@@ -170,9 +169,9 @@ func (m *AuditPeerObservation) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_AuditPeerObservation proto.InternalMessageInfo
 
-func (m *AuditPeerObservation) GetTargetValidatorAddress() string {
+func (m *AuditPeerObservation) GetTargetSupernodeAccount() string {
 	if m != nil {
-		return m.TargetValidatorAddress
+		return m.TargetSupernodeAccount
 	}
 	return ""
 }
@@ -185,12 +184,11 @@ func (m *AuditPeerObservation) GetPortStates() []PortState {
 }
 
 type AuditReport struct {
-	ReporterValidatorAddress string                  `protobuf:"bytes,1,opt,name=reporter_validator_address,json=reporterValidatorAddress,proto3" json:"reporter_validator_address,omitempty"`
-	SupernodeAccount         string                  `protobuf:"bytes,2,opt,name=supernode_account,json=supernodeAccount,proto3" json:"supernode_account,omitempty"`
-	WindowId                 uint64                  `protobuf:"varint,3,opt,name=window_id,json=windowId,proto3" json:"window_id,omitempty"`
-	ReportHeight             int64                   `protobuf:"varint,4,opt,name=report_height,json=reportHeight,proto3" json:"report_height,omitempty"`
-	SelfReport               AuditSelfReport         `protobuf:"bytes,5,opt,name=self_report,json=selfReport,proto3" json:"self_report"`
-	PeerObservations         []*AuditPeerObservation `protobuf:"bytes,6,rep,name=peer_observations,json=peerObservations,proto3" json:"peer_observations,omitempty"`
+	SupernodeAccount string                  `protobuf:"bytes,1,opt,name=supernode_account,json=supernodeAccount,proto3" json:"supernode_account,omitempty"`
+	WindowId         uint64                  `protobuf:"varint,2,opt,name=window_id,json=windowId,proto3" json:"window_id,omitempty"`
+	ReportHeight     int64                   `protobuf:"varint,3,opt,name=report_height,json=reportHeight,proto3" json:"report_height,omitempty"`
+	SelfReport       AuditSelfReport         `protobuf:"bytes,4,opt,name=self_report,json=selfReport,proto3" json:"self_report"`
+	PeerObservations []*AuditPeerObservation `protobuf:"bytes,5,rep,name=peer_observations,json=peerObservations,proto3" json:"peer_observations,omitempty"`
 }
 
 func (m *AuditReport) Reset()         { *m = AuditReport{} }
@@ -225,13 +223,6 @@ func (m *AuditReport) XXX_DiscardUnknown() {
 }
 
 var xxx_messageInfo_AuditReport proto.InternalMessageInfo
-
-func (m *AuditReport) GetReporterValidatorAddress() string {
-	if m != nil {
-		return m.ReporterValidatorAddress
-	}
-	return ""
-}
 
 func (m *AuditReport) GetSupernodeAccount() string {
 	if m != nil {
@@ -268,28 +259,24 @@ func (m *AuditReport) GetPeerObservations() []*AuditPeerObservation {
 	return nil
 }
 
-type AuditStatus struct {
-	ValidatorAddress     string   `protobuf:"bytes,1,opt,name=validator_address,json=validatorAddress,proto3" json:"validator_address,omitempty"`
-	LastReportedWindowId uint64   `protobuf:"varint,2,opt,name=last_reported_window_id,json=lastReportedWindowId,proto3" json:"last_reported_window_id,omitempty"`
-	LastReportHeight     int64    `protobuf:"varint,3,opt,name=last_report_height,json=lastReportHeight,proto3" json:"last_report_height,omitempty"`
-	Compliant            bool     `protobuf:"varint,4,opt,name=compliant,proto3" json:"compliant,omitempty"`
-	Reasons              []string `protobuf:"bytes,5,rep,name=reasons,proto3" json:"reasons,omitempty"`
-	// Summary reachability states (last evaluated window).
-	RequiredPortsState []PortState `protobuf:"varint,6,rep,packed,name=required_ports_state,json=requiredPortsState,proto3,enum=lumera.audit.v1.PortState" json:"required_ports_state,omitempty"`
+// ProberTargets captures the deterministic prober -> targets mapping for a window.
+type ProberTargets struct {
+	ProberSupernodeAccount  string   `protobuf:"bytes,1,opt,name=prober_supernode_account,json=proberSupernodeAccount,proto3" json:"prober_supernode_account,omitempty"`
+	TargetSupernodeAccounts []string `protobuf:"bytes,2,rep,name=target_supernode_accounts,json=targetSupernodeAccounts,proto3" json:"target_supernode_accounts,omitempty"`
 }
 
-func (m *AuditStatus) Reset()         { *m = AuditStatus{} }
-func (m *AuditStatus) String() string { return proto.CompactTextString(m) }
-func (*AuditStatus) ProtoMessage()    {}
-func (*AuditStatus) Descriptor() ([]byte, []int) {
+func (m *ProberTargets) Reset()         { *m = ProberTargets{} }
+func (m *ProberTargets) String() string { return proto.CompactTextString(m) }
+func (*ProberTargets) ProtoMessage()    {}
+func (*ProberTargets) Descriptor() ([]byte, []int) {
 	return fileDescriptor_0613fff850c07858, []int{3}
 }
-func (m *AuditStatus) XXX_Unmarshal(b []byte) error {
+func (m *ProberTargets) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
-func (m *AuditStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+func (m *ProberTargets) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
-		return xxx_messageInfo_AuditStatus.Marshal(b, m, deterministic)
+		return xxx_messageInfo_ProberTargets.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
 		n, err := m.MarshalToSizedBuffer(b)
@@ -299,134 +286,44 @@ func (m *AuditStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) 
 		return b[:n], nil
 	}
 }
-func (m *AuditStatus) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_AuditStatus.Merge(m, src)
+func (m *ProberTargets) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ProberTargets.Merge(m, src)
 }
-func (m *AuditStatus) XXX_Size() int {
+func (m *ProberTargets) XXX_Size() int {
 	return m.Size()
 }
-func (m *AuditStatus) XXX_DiscardUnknown() {
-	xxx_messageInfo_AuditStatus.DiscardUnknown(m)
+func (m *ProberTargets) XXX_DiscardUnknown() {
+	xxx_messageInfo_ProberTargets.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_AuditStatus proto.InternalMessageInfo
+var xxx_messageInfo_ProberTargets proto.InternalMessageInfo
 
-func (m *AuditStatus) GetValidatorAddress() string {
+func (m *ProberTargets) GetProberSupernodeAccount() string {
 	if m != nil {
-		return m.ValidatorAddress
+		return m.ProberSupernodeAccount
 	}
 	return ""
 }
 
-func (m *AuditStatus) GetLastReportedWindowId() uint64 {
+func (m *ProberTargets) GetTargetSupernodeAccounts() []string {
 	if m != nil {
-		return m.LastReportedWindowId
-	}
-	return 0
-}
-
-func (m *AuditStatus) GetLastReportHeight() int64 {
-	if m != nil {
-		return m.LastReportHeight
-	}
-	return 0
-}
-
-func (m *AuditStatus) GetCompliant() bool {
-	if m != nil {
-		return m.Compliant
-	}
-	return false
-}
-
-func (m *AuditStatus) GetReasons() []string {
-	if m != nil {
-		return m.Reasons
+		return m.TargetSupernodeAccounts
 	}
 	return nil
-}
-
-func (m *AuditStatus) GetRequiredPortsState() []PortState {
-	if m != nil {
-		return m.RequiredPortsState
-	}
-	return nil
-}
-
-type PortEvidenceAggregate struct {
-	Count      uint32    `protobuf:"varint,1,opt,name=count,proto3" json:"count,omitempty"`
-	FirstState PortState `protobuf:"varint,2,opt,name=first_state,json=firstState,proto3,enum=lumera.audit.v1.PortState" json:"first_state,omitempty"`
-	Conflict   bool      `protobuf:"varint,3,opt,name=conflict,proto3" json:"conflict,omitempty"`
-}
-
-func (m *PortEvidenceAggregate) Reset()         { *m = PortEvidenceAggregate{} }
-func (m *PortEvidenceAggregate) String() string { return proto.CompactTextString(m) }
-func (*PortEvidenceAggregate) ProtoMessage()    {}
-func (*PortEvidenceAggregate) Descriptor() ([]byte, []int) {
-	return fileDescriptor_0613fff850c07858, []int{4}
-}
-func (m *PortEvidenceAggregate) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *PortEvidenceAggregate) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	if deterministic {
-		return xxx_messageInfo_PortEvidenceAggregate.Marshal(b, m, deterministic)
-	} else {
-		b = b[:cap(b)]
-		n, err := m.MarshalToSizedBuffer(b)
-		if err != nil {
-			return nil, err
-		}
-		return b[:n], nil
-	}
-}
-func (m *PortEvidenceAggregate) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_PortEvidenceAggregate.Merge(m, src)
-}
-func (m *PortEvidenceAggregate) XXX_Size() int {
-	return m.Size()
-}
-func (m *PortEvidenceAggregate) XXX_DiscardUnknown() {
-	xxx_messageInfo_PortEvidenceAggregate.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_PortEvidenceAggregate proto.InternalMessageInfo
-
-func (m *PortEvidenceAggregate) GetCount() uint32 {
-	if m != nil {
-		return m.Count
-	}
-	return 0
-}
-
-func (m *PortEvidenceAggregate) GetFirstState() PortState {
-	if m != nil {
-		return m.FirstState
-	}
-	return PortState_PORT_STATE_UNKNOWN
-}
-
-func (m *PortEvidenceAggregate) GetConflict() bool {
-	if m != nil {
-		return m.Conflict
-	}
-	return false
 }
 
 type WindowSnapshot struct {
-	WindowId          uint64   `protobuf:"varint,1,opt,name=window_id,json=windowId,proto3" json:"window_id,omitempty"`
-	WindowStartHeight int64    `protobuf:"varint,2,opt,name=window_start_height,json=windowStartHeight,proto3" json:"window_start_height,omitempty"`
-	SeedBytes         []byte   `protobuf:"bytes,3,opt,name=seed_bytes,json=seedBytes,proto3" json:"seed_bytes,omitempty"`
-	Senders           []string `protobuf:"bytes,4,rep,name=senders,proto3" json:"senders,omitempty"`
-	Receivers         []string `protobuf:"bytes,5,rep,name=receivers,proto3" json:"receivers,omitempty"`
-	KWindow           uint32   `protobuf:"varint,6,opt,name=k_window,json=kWindow,proto3" json:"k_window,omitempty"`
+	WindowId          uint64 `protobuf:"varint,1,opt,name=window_id,json=windowId,proto3" json:"window_id,omitempty"`
+	WindowStartHeight int64  `protobuf:"varint,2,opt,name=window_start_height,json=windowStartHeight,proto3" json:"window_start_height,omitempty"`
+	// assignments is the minimal per-window source-of-truth for prober -> targets mapping.
+	Assignments []ProberTargets `protobuf:"bytes,3,rep,name=assignments,proto3" json:"assignments"`
 }
 
 func (m *WindowSnapshot) Reset()         { *m = WindowSnapshot{} }
 func (m *WindowSnapshot) String() string { return proto.CompactTextString(m) }
 func (*WindowSnapshot) ProtoMessage()    {}
 func (*WindowSnapshot) Descriptor() ([]byte, []int) {
-	return fileDescriptor_0613fff850c07858, []int{5}
+	return fileDescriptor_0613fff850c07858, []int{4}
 }
 func (m *WindowSnapshot) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -469,32 +366,11 @@ func (m *WindowSnapshot) GetWindowStartHeight() int64 {
 	return 0
 }
 
-func (m *WindowSnapshot) GetSeedBytes() []byte {
+func (m *WindowSnapshot) GetAssignments() []ProberTargets {
 	if m != nil {
-		return m.SeedBytes
+		return m.Assignments
 	}
 	return nil
-}
-
-func (m *WindowSnapshot) GetSenders() []string {
-	if m != nil {
-		return m.Senders
-	}
-	return nil
-}
-
-func (m *WindowSnapshot) GetReceivers() []string {
-	if m != nil {
-		return m.Receivers
-	}
-	return nil
-}
-
-func (m *WindowSnapshot) GetKWindow() uint32 {
-	if m != nil {
-		return m.KWindow
-	}
-	return 0
 }
 
 func init() {
@@ -502,70 +378,56 @@ func init() {
 	proto.RegisterType((*AuditSelfReport)(nil), "lumera.audit.v1.AuditSelfReport")
 	proto.RegisterType((*AuditPeerObservation)(nil), "lumera.audit.v1.AuditPeerObservation")
 	proto.RegisterType((*AuditReport)(nil), "lumera.audit.v1.AuditReport")
-	proto.RegisterType((*AuditStatus)(nil), "lumera.audit.v1.AuditStatus")
-	proto.RegisterType((*PortEvidenceAggregate)(nil), "lumera.audit.v1.PortEvidenceAggregate")
+	proto.RegisterType((*ProberTargets)(nil), "lumera.audit.v1.ProberTargets")
 	proto.RegisterType((*WindowSnapshot)(nil), "lumera.audit.v1.WindowSnapshot")
 }
 
 func init() { proto.RegisterFile("lumera/audit/v1/audit.proto", fileDescriptor_0613fff850c07858) }
 
 var fileDescriptor_0613fff850c07858 = []byte{
-	// 871 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x55, 0xcd, 0x6e, 0x1b, 0x37,
-	0x10, 0xd6, 0x4a, 0xfe, 0x91, 0x46, 0x49, 0x2c, 0xd1, 0x4a, 0xb2, 0x91, 0x1b, 0x55, 0x55, 0x51,
-	0x40, 0x30, 0x12, 0xb9, 0x71, 0xd1, 0x53, 0x0e, 0x85, 0x9c, 0x1a, 0x4d, 0xdb, 0x40, 0x12, 0x56,
-	0x4e, 0x03, 0xb4, 0x07, 0x82, 0xde, 0x1d, 0xad, 0x17, 0x96, 0x96, 0x5b, 0x92, 0xab, 0x34, 0x2f,
-	0xd0, 0x73, 0x2f, 0x45, 0x5f, 0xa3, 0x87, 0x3c, 0x84, 0x8f, 0x41, 0x4e, 0x3d, 0x15, 0x85, 0xfd,
-	0x22, 0x05, 0xc9, 0x95, 0x64, 0x6f, 0x8a, 0x26, 0x80, 0x2f, 0x02, 0xe7, 0xfb, 0xbe, 0x19, 0x91,
-	0xdf, 0x0c, 0xb9, 0xb0, 0x33, 0x4d, 0x67, 0x28, 0xd8, 0x1e, 0x4b, 0x83, 0x48, 0xed, 0xcd, 0x1f,
-	0xd9, 0x45, 0x2f, 0x11, 0x5c, 0x71, 0xb2, 0x65, 0xc9, 0x9e, 0xc5, 0xe6, 0x8f, 0x9a, 0x75, 0x36,
-	0x8b, 0x62, 0xbe, 0x67, 0x7e, 0xad, 0xa6, 0x79, 0xcf, 0xe7, 0x72, 0xc6, 0x25, 0x35, 0xd1, 0x9e,
-	0x0d, 0x32, 0xaa, 0x11, 0xf2, 0x90, 0x5b, 0x5c, 0xaf, 0x2c, 0xda, 0xf9, 0xbd, 0x08, 0x5b, 0x7d,
-	0x5d, 0x70, 0x8c, 0xd3, 0x89, 0x87, 0x09, 0x17, 0x8a, 0xec, 0x42, 0xdd, 0x4f, 0x52, 0x9a, 0x4a,
-	0x16, 0x22, 0x4d, 0x50, 0xf8, 0x18, 0x2b, 0xd7, 0x69, 0x3b, 0x5d, 0xc7, 0xdb, 0xf2, 0x93, 0xf4,
-	0xb9, 0xc6, 0x47, 0x16, 0xd6, 0xda, 0x19, 0xce, 0x72, 0xda, 0xa2, 0xd5, 0xce, 0x70, 0x76, 0x45,
-	0xfb, 0x00, 0x48, 0x10, 0xc9, 0xd3, 0x9c, 0xb8, 0x64, 0xc4, 0x35, 0xcd, 0x5c, 0x51, 0x7f, 0x07,
-	0xdb, 0x51, 0x7c, 0xcc, 0xd3, 0x38, 0xa0, 0x7a, 0x57, 0x54, 0x2a, 0xa6, 0x50, 0xba, 0x6b, 0xed,
-	0x52, 0xf7, 0xd6, 0x7e, 0xb3, 0x97, 0x33, 0xa3, 0x37, 0xe2, 0x42, 0x8d, 0xb5, 0xc4, 0xab, 0x67,
-	0x69, 0x4b, 0x44, 0x92, 0xcf, 0xa1, 0x31, 0x61, 0xd1, 0x14, 0x03, 0xca, 0x7c, 0x15, 0xf1, 0x58,
-	0x52, 0x9f, 0xa7, 0xb1, 0x72, 0xd7, 0xdb, 0x4e, 0xf7, 0xa6, 0x47, 0x2c, 0xd7, 0xb7, 0xd4, 0x13,
-	0xcd, 0x74, 0xfe, 0x74, 0xa0, 0x61, 0x7c, 0x19, 0x21, 0x8a, 0xe1, 0xb1, 0x44, 0x31, 0x67, 0x9a,
-	0x26, 0x3f, 0x81, 0xab, 0x98, 0x08, 0x51, 0xd1, 0x39, 0x9b, 0x46, 0x01, 0x53, 0x5c, 0x50, 0x16,
-	0x04, 0x02, 0xa5, 0x34, 0x1e, 0x55, 0x0e, 0x3e, 0x79, 0xfb, 0xfa, 0xe1, 0xfd, 0xcc, 0xfa, 0x1f,
-	0x16, 0x9a, 0xbe, 0x95, 0x8c, 0x95, 0x88, 0xe2, 0xd0, 0xbb, 0x63, 0x4b, 0xe4, 0x59, 0xf2, 0x18,
-	0xaa, 0x97, 0xcf, 0x5a, 0x7c, 0xef, 0x59, 0x21, 0x59, 0x1e, 0xb2, 0xf3, 0x47, 0x09, 0xaa, 0x66,
-	0xcb, 0x59, 0x1b, 0x29, 0x34, 0x85, 0x59, 0xa1, 0xb8, 0xce, 0x5e, 0xdd, 0x45, 0x91, 0x77, 0x76,
-	0xfb, 0x14, 0xea, 0x32, 0x4d, 0x50, 0xc4, 0x3c, 0x40, 0xca, 0x7c, 0x6b, 0x69, 0xd1, 0xd4, 0xdd,
-	0x79, 0xfb, 0xfa, 0xe1, 0xdd, 0xac, 0x6e, 0xdf, 0xf7, 0xaf, 0x56, 0xac, 0x2d, 0xb3, 0xfa, 0x36,
-	0x89, 0xec, 0x40, 0xe5, 0x65, 0x14, 0x07, 0xfc, 0x25, 0x8d, 0x02, 0x33, 0x10, 0x6b, 0x5e, 0xd9,
-	0x02, 0xdf, 0x06, 0xe4, 0x53, 0xb8, 0x69, 0xb7, 0x40, 0x4f, 0x30, 0x0a, 0x4f, 0x94, 0xbb, 0xd6,
-	0x76, 0xba, 0x25, 0xef, 0x86, 0x05, 0x9f, 0x1a, 0x8c, 0x7c, 0x03, 0x55, 0x89, 0xd3, 0x09, 0xb5,
-	0xa0, 0x69, 0x6c, 0x75, 0xbf, 0xfd, 0x8e, 0x73, 0xb9, 0x51, 0x3f, 0x58, 0x3b, 0xfb, 0xfb, 0xe3,
-	0x82, 0x07, 0x72, 0x35, 0xfc, 0x1e, 0xd4, 0x13, 0x44, 0x41, 0xf9, 0xaa, 0xe7, 0xd2, 0xdd, 0x68,
-	0x97, 0xba, 0xd5, 0xfd, 0xcf, 0xfe, 0xbb, 0x5c, 0x6e, 0x42, 0xbc, 0x5a, 0x72, 0x15, 0x90, 0x9d,
-	0xb3, 0x62, 0xd6, 0x19, 0xdd, 0xa9, 0x54, 0x92, 0x01, 0xd4, 0xaf, 0xd1, 0x90, 0xda, 0x3c, 0xdf,
-	0x88, 0x2f, 0xe1, 0xee, 0x94, 0x49, 0x95, 0x1d, 0x1e, 0x03, 0xba, 0x32, 0xb3, 0x68, 0xcc, 0x6c,
-	0x68, 0xda, 0xcb, 0xd8, 0x17, 0x0b, 0x63, 0x1f, 0x00, 0xb9, 0x94, 0xb6, 0x70, 0xb7, 0x64, 0xdc,
-	0xad, 0xad, 0x32, 0x32, 0x87, 0x3f, 0x82, 0x8a, 0xcf, 0x67, 0xc9, 0x34, 0x62, 0xb1, 0x6d, 0x41,
-	0xd9, 0x5b, 0x01, 0xc4, 0x85, 0x4d, 0x81, 0x4c, 0x6a, 0xb3, 0xd6, 0xdb, 0xa5, 0x6e, 0xc5, 0x5b,
-	0x84, 0xe4, 0x19, 0x34, 0x04, 0xfe, 0x9c, 0x46, 0x02, 0xed, 0x45, 0x96, 0x76, 0xba, 0x8d, 0xa7,
-	0xff, 0x3f, 0xdc, 0x64, 0x91, 0xa7, 0x21, 0x69, 0xb0, 0xce, 0xaf, 0x0e, 0xdc, 0xd6, 0xe1, 0xe1,
-	0x3c, 0x0a, 0x30, 0xf6, 0xb1, 0x1f, 0x86, 0x02, 0x43, 0xa6, 0x90, 0x34, 0x60, 0xdd, 0x4e, 0xa0,
-	0x63, 0x2e, 0xb5, 0x0d, 0xf4, 0x8d, 0x9a, 0x44, 0x42, 0x66, 0x57, 0xca, 0xd8, 0xf1, 0x9e, 0x1b,
-	0x65, 0xe4, 0x66, 0x4d, 0x9a, 0x50, 0xf6, 0x79, 0x3c, 0x99, 0x46, 0xbe, 0xb5, 0xa5, 0xec, 0x2d,
-	0x63, 0xfd, 0x70, 0xde, 0xb2, 0x4e, 0x8e, 0x63, 0x96, 0xc8, 0x13, 0x9e, 0x9b, 0x62, 0x27, 0x37,
-	0xc5, 0x3d, 0xd8, 0xce, 0x48, 0xa9, 0xd8, 0xca, 0xed, 0xa2, 0x71, 0xbb, 0x6e, 0xa9, 0xb1, 0x66,
-	0x32, 0xbb, 0xef, 0x03, 0x48, 0xc4, 0x80, 0x1e, 0xbf, 0xd2, 0x2f, 0x81, 0xfe, 0xf7, 0x1b, 0x5e,
-	0x45, 0x23, 0x07, 0x1a, 0x20, 0x8f, 0x61, 0x53, 0x62, 0x1c, 0xa0, 0xb0, 0x2f, 0xe2, 0x07, 0x0d,
-	0xce, 0x22, 0x83, 0x7c, 0x05, 0x15, 0x81, 0x3e, 0x46, 0x73, 0x9d, 0xbe, 0xfe, 0xa1, 0xe9, 0xab,
-	0x1c, 0x72, 0x0f, 0xca, 0xa7, 0xd9, 0x90, 0xb9, 0x1b, 0xc6, 0xee, 0xcd, 0x53, 0x6b, 0xc6, 0xee,
-	0x10, 0x2a, 0x4b, 0x33, 0xc9, 0x1d, 0x20, 0xa3, 0xa1, 0x77, 0x44, 0xc7, 0x47, 0xfd, 0xa3, 0x43,
-	0xfa, 0x7c, 0xf0, 0xfd, 0x60, 0xf8, 0x62, 0x50, 0x2b, 0x90, 0x6d, 0xd8, 0xba, 0x84, 0x0f, 0x47,
-	0x87, 0x83, 0x9a, 0x43, 0x6e, 0x43, 0xfd, 0x12, 0xf8, 0xe4, 0xd9, 0x70, 0x7c, 0xf8, 0x75, 0xad,
-	0x78, 0xb0, 0x7b, 0x76, 0xde, 0x72, 0xde, 0x9c, 0xb7, 0x9c, 0x7f, 0xce, 0x5b, 0xce, 0x6f, 0x17,
-	0xad, 0xc2, 0x9b, 0x8b, 0x56, 0xe1, 0xaf, 0x8b, 0x56, 0xe1, 0xc7, 0xda, 0x2f, 0xab, 0x0f, 0xa5,
-	0x7a, 0x95, 0xa0, 0x3c, 0xde, 0x30, 0x1f, 0xb5, 0x2f, 0xfe, 0x0d, 0x00, 0x00, 0xff, 0xff, 0x15,
-	0x00, 0xd5, 0x42, 0x48, 0x07, 0x00, 0x00,
+	// 666 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x94, 0xcf, 0x4e, 0xdb, 0x4c,
+	0x14, 0xc5, 0xe3, 0x24, 0x7c, 0xfa, 0xb8, 0x29, 0x24, 0x36, 0x14, 0x02, 0x48, 0x6e, 0x94, 0xaa,
+	0x52, 0x84, 0xda, 0xa4, 0xd0, 0x65, 0x57, 0x81, 0xd2, 0xd2, 0x3f, 0x4a, 0x22, 0x3b, 0x08, 0xa9,
+	0x9b, 0xd1, 0xc4, 0x1e, 0x8c, 0xd5, 0xd8, 0x63, 0xcd, 0x8c, 0xa1, 0x7d, 0x8b, 0x6e, 0xfa, 0x08,
+	0xdd, 0x74, 0x5d, 0x75, 0xdb, 0x2d, 0x4b, 0xd4, 0x55, 0x57, 0x55, 0x05, 0x2f, 0x52, 0xcd, 0x8c,
+	0x4b, 0x82, 0xa1, 0x42, 0x62, 0x13, 0xd9, 0xe7, 0x9c, 0x3b, 0xb9, 0x73, 0x7f, 0x57, 0x86, 0xb5,
+	0x71, 0x1a, 0x11, 0x86, 0x3b, 0x38, 0xf5, 0x43, 0xd1, 0x39, 0xda, 0xd0, 0x0f, 0xed, 0x84, 0x51,
+	0x41, 0xad, 0xaa, 0x36, 0xdb, 0x5a, 0x3b, 0xda, 0x58, 0x35, 0x71, 0x14, 0xc6, 0xb4, 0xa3, 0x7e,
+	0x75, 0x66, 0x75, 0xc5, 0xa3, 0x3c, 0xa2, 0x1c, 0xa9, 0xb7, 0x8e, 0x7e, 0xc9, 0xac, 0xc5, 0x80,
+	0x06, 0x54, 0xeb, 0xf2, 0x49, 0xab, 0xcd, 0x4f, 0x45, 0xa8, 0x76, 0xe5, 0x81, 0x2e, 0x19, 0x1f,
+	0x38, 0x24, 0xa1, 0x4c, 0x58, 0xeb, 0x60, 0x7a, 0x49, 0x8a, 0x52, 0x8e, 0x03, 0x82, 0x12, 0xc2,
+	0x3c, 0x12, 0x8b, 0xba, 0xd1, 0x30, 0x5a, 0x86, 0x53, 0xf5, 0x92, 0x74, 0x4f, 0xea, 0x03, 0x2d,
+	0xcb, 0x6c, 0x44, 0xa2, 0x5c, 0xb6, 0xa8, 0xb3, 0x11, 0x89, 0x2e, 0x65, 0x1f, 0x82, 0xe5, 0x87,
+	0xfc, 0x5d, 0x2e, 0x5c, 0x52, 0xe1, 0x9a, 0x74, 0x2e, 0xa5, 0x5f, 0xc1, 0x42, 0x18, 0x8f, 0x68,
+	0x1a, 0xfb, 0x48, 0x76, 0x85, 0xb8, 0xc0, 0x82, 0xf0, 0x7a, 0xb9, 0x51, 0x6a, 0xcd, 0x6f, 0xae,
+	0xb6, 0x73, 0xc3, 0x68, 0x0f, 0x28, 0x13, 0xae, 0x8c, 0x38, 0x66, 0x56, 0x76, 0xa1, 0x70, 0xeb,
+	0x31, 0x2c, 0x1e, 0xe0, 0x70, 0x4c, 0x7c, 0x84, 0x3d, 0x11, 0xd2, 0x98, 0x23, 0x8f, 0xa6, 0xb1,
+	0xa8, 0xcf, 0x34, 0x8c, 0xd6, 0x9c, 0x63, 0x69, 0xaf, 0xab, 0xad, 0x6d, 0xe9, 0x34, 0xbf, 0x18,
+	0xb0, 0xa8, 0xe6, 0x32, 0x20, 0x84, 0xf5, 0x47, 0x9c, 0xb0, 0x23, 0x2c, 0x6d, 0x6b, 0x0f, 0xea,
+	0x02, 0xb3, 0x80, 0x08, 0xc4, 0xd3, 0x84, 0xb0, 0x98, 0xfa, 0x04, 0x61, 0x4f, 0x1f, 0x27, 0x67,
+	0x34, 0xbb, 0xb5, 0xf6, 0xe3, 0xeb, 0xa3, 0xe5, 0x6c, 0xf4, 0x5d, 0xcf, 0xeb, 0xfa, 0x3e, 0x23,
+	0x9c, 0xbb, 0x82, 0x85, 0x71, 0xe0, 0x2c, 0xe9, 0x62, 0xf7, 0x6f, 0x6d, 0x57, 0x97, 0x5a, 0x4f,
+	0xa1, 0x32, 0x7d, 0xcb, 0xe2, 0x8d, 0xb7, 0x84, 0xe4, 0xe2, 0x7a, 0xcd, 0x6f, 0x45, 0xa8, 0xa8,
+	0x66, 0x33, 0x80, 0xbb, 0x60, 0xde, 0xaa, 0xb9, 0x1a, 0xcf, 0xb7, 0xb5, 0x06, 0xb3, 0xc7, 0x61,
+	0xec, 0xd3, 0x63, 0x14, 0xfa, 0x0a, 0x6b, 0xd9, 0xf9, 0x5f, 0x0b, 0x2f, 0x7d, 0xeb, 0x3e, 0xcc,
+	0x31, 0xf5, 0x87, 0xe8, 0x90, 0x84, 0xc1, 0xa1, 0x46, 0x59, 0x72, 0xee, 0x68, 0x71, 0x57, 0x69,
+	0xd6, 0x0b, 0xa8, 0x70, 0x32, 0x3e, 0x40, 0x5a, 0xac, 0x97, 0x1b, 0x46, 0xab, 0xb2, 0xd9, 0xb8,
+	0x72, 0xb1, 0xdc, 0x0e, 0x6e, 0x95, 0x4f, 0x7e, 0xdd, 0x2b, 0x38, 0xc0, 0x27, 0x5b, 0xe9, 0x80,
+	0x99, 0x10, 0xc2, 0x10, 0x9d, 0xc0, 0xe0, 0xf5, 0x99, 0x46, 0xa9, 0x55, 0xd9, 0x7c, 0x70, 0xfd,
+	0x71, 0x39, 0x74, 0x4e, 0x2d, 0xb9, 0x2c, 0xf0, 0xe6, 0x77, 0x03, 0xe6, 0x06, 0x8c, 0x8e, 0x08,
+	0x1b, 0x2a, 0x2c, 0x5c, 0xe2, 0x4d, 0x94, 0x70, 0x4b, 0xbc, 0xba, 0xf8, 0x0a, 0xde, 0x7d, 0x58,
+	0xf9, 0xd7, 0xd6, 0x68, 0xd8, 0x37, 0x9c, 0xbb, 0x7c, 0xfd, 0xda, 0xf0, 0xe6, 0x67, 0x03, 0xe6,
+	0xf7, 0x15, 0x10, 0x37, 0xc6, 0x09, 0x3f, 0xa4, 0x39, 0x66, 0x46, 0x8e, 0x59, 0x1b, 0x16, 0x32,
+	0x93, 0x0b, 0x3c, 0x21, 0x57, 0x54, 0xe4, 0x4c, 0x6d, 0xb9, 0xd2, 0xc9, 0xf0, 0x3d, 0x87, 0x0a,
+	0xe6, 0x3c, 0x0c, 0xe2, 0x88, 0xc8, 0x56, 0x4b, 0x6a, 0xde, 0xf6, 0xd5, 0xbd, 0x9c, 0x1e, 0x62,
+	0x06, 0x6f, 0xba, 0x70, 0xbd, 0x0f, 0xb3, 0x17, 0xbb, 0x6b, 0x2d, 0x81, 0x35, 0xe8, 0x3b, 0x43,
+	0xe4, 0x0e, 0xbb, 0xc3, 0x1d, 0xb4, 0xd7, 0x7b, 0xdd, 0xeb, 0xef, 0xf7, 0x6a, 0x05, 0x6b, 0x01,
+	0xaa, 0x53, 0x7a, 0x7f, 0xb0, 0xd3, 0xab, 0x19, 0xd6, 0x5d, 0x30, 0xa7, 0xc4, 0xed, 0x37, 0x7d,
+	0x77, 0xe7, 0x59, 0xad, 0xb8, 0xb5, 0x7e, 0x72, 0x66, 0x1b, 0xa7, 0x67, 0xb6, 0xf1, 0xfb, 0xcc,
+	0x36, 0x3e, 0x9e, 0xdb, 0x85, 0xd3, 0x73, 0xbb, 0xf0, 0xf3, 0xdc, 0x2e, 0xbc, 0xad, 0xbd, 0x9f,
+	0x7c, 0x3f, 0xc5, 0x87, 0x84, 0xf0, 0xd1, 0x7f, 0xea, 0x5b, 0xf7, 0xe4, 0x4f, 0x00, 0x00, 0x00,
+	0xff, 0xff, 0x83, 0x4b, 0x2e, 0xcc, 0x5f, 0x05, 0x00, 0x00,
 }
 
 func (m *AuditSelfReport) Marshal() (dAtA []byte, err error) {
@@ -670,10 +532,10 @@ func (m *AuditPeerObservation) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i--
 		dAtA[i] = 0x12
 	}
-	if len(m.TargetValidatorAddress) > 0 {
-		i -= len(m.TargetValidatorAddress)
-		copy(dAtA[i:], m.TargetValidatorAddress)
-		i = encodeVarintAudit(dAtA, i, uint64(len(m.TargetValidatorAddress)))
+	if len(m.TargetSupernodeAccount) > 0 {
+		i -= len(m.TargetSupernodeAccount)
+		copy(dAtA[i:], m.TargetSupernodeAccount)
+		i = encodeVarintAudit(dAtA, i, uint64(len(m.TargetSupernodeAccount)))
 		i--
 		dAtA[i] = 0xa
 	}
@@ -711,7 +573,7 @@ func (m *AuditReport) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 				i = encodeVarintAudit(dAtA, i, uint64(size))
 			}
 			i--
-			dAtA[i] = 0x32
+			dAtA[i] = 0x2a
 		}
 	}
 	{
@@ -723,35 +585,28 @@ func (m *AuditReport) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i = encodeVarintAudit(dAtA, i, uint64(size))
 	}
 	i--
-	dAtA[i] = 0x2a
+	dAtA[i] = 0x22
 	if m.ReportHeight != 0 {
 		i = encodeVarintAudit(dAtA, i, uint64(m.ReportHeight))
 		i--
-		dAtA[i] = 0x20
+		dAtA[i] = 0x18
 	}
 	if m.WindowId != 0 {
 		i = encodeVarintAudit(dAtA, i, uint64(m.WindowId))
 		i--
-		dAtA[i] = 0x18
+		dAtA[i] = 0x10
 	}
 	if len(m.SupernodeAccount) > 0 {
 		i -= len(m.SupernodeAccount)
 		copy(dAtA[i:], m.SupernodeAccount)
 		i = encodeVarintAudit(dAtA, i, uint64(len(m.SupernodeAccount)))
 		i--
-		dAtA[i] = 0x12
-	}
-	if len(m.ReporterValidatorAddress) > 0 {
-		i -= len(m.ReporterValidatorAddress)
-		copy(dAtA[i:], m.ReporterValidatorAddress)
-		i = encodeVarintAudit(dAtA, i, uint64(len(m.ReporterValidatorAddress)))
-		i--
 		dAtA[i] = 0xa
 	}
 	return len(dAtA) - i, nil
 }
 
-func (m *AuditStatus) Marshal() (dAtA []byte, err error) {
+func (m *ProberTargets) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -761,112 +616,31 @@ func (m *AuditStatus) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *AuditStatus) MarshalTo(dAtA []byte) (int, error) {
+func (m *ProberTargets) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *AuditStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *ProberTargets) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if len(m.RequiredPortsState) > 0 {
-		dAtA7 := make([]byte, len(m.RequiredPortsState)*10)
-		var j6 int
-		for _, num := range m.RequiredPortsState {
-			for num >= 1<<7 {
-				dAtA7[j6] = uint8(uint64(num)&0x7f | 0x80)
-				num >>= 7
-				j6++
-			}
-			dAtA7[j6] = uint8(num)
-			j6++
-		}
-		i -= j6
-		copy(dAtA[i:], dAtA7[:j6])
-		i = encodeVarintAudit(dAtA, i, uint64(j6))
-		i--
-		dAtA[i] = 0x32
-	}
-	if len(m.Reasons) > 0 {
-		for iNdEx := len(m.Reasons) - 1; iNdEx >= 0; iNdEx-- {
-			i -= len(m.Reasons[iNdEx])
-			copy(dAtA[i:], m.Reasons[iNdEx])
-			i = encodeVarintAudit(dAtA, i, uint64(len(m.Reasons[iNdEx])))
+	if len(m.TargetSupernodeAccounts) > 0 {
+		for iNdEx := len(m.TargetSupernodeAccounts) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.TargetSupernodeAccounts[iNdEx])
+			copy(dAtA[i:], m.TargetSupernodeAccounts[iNdEx])
+			i = encodeVarintAudit(dAtA, i, uint64(len(m.TargetSupernodeAccounts[iNdEx])))
 			i--
-			dAtA[i] = 0x2a
+			dAtA[i] = 0x12
 		}
 	}
-	if m.Compliant {
-		i--
-		if m.Compliant {
-			dAtA[i] = 1
-		} else {
-			dAtA[i] = 0
-		}
-		i--
-		dAtA[i] = 0x20
-	}
-	if m.LastReportHeight != 0 {
-		i = encodeVarintAudit(dAtA, i, uint64(m.LastReportHeight))
-		i--
-		dAtA[i] = 0x18
-	}
-	if m.LastReportedWindowId != 0 {
-		i = encodeVarintAudit(dAtA, i, uint64(m.LastReportedWindowId))
-		i--
-		dAtA[i] = 0x10
-	}
-	if len(m.ValidatorAddress) > 0 {
-		i -= len(m.ValidatorAddress)
-		copy(dAtA[i:], m.ValidatorAddress)
-		i = encodeVarintAudit(dAtA, i, uint64(len(m.ValidatorAddress)))
+	if len(m.ProberSupernodeAccount) > 0 {
+		i -= len(m.ProberSupernodeAccount)
+		copy(dAtA[i:], m.ProberSupernodeAccount)
+		i = encodeVarintAudit(dAtA, i, uint64(len(m.ProberSupernodeAccount)))
 		i--
 		dAtA[i] = 0xa
-	}
-	return len(dAtA) - i, nil
-}
-
-func (m *PortEvidenceAggregate) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalToSizedBuffer(dAtA[:size])
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *PortEvidenceAggregate) MarshalTo(dAtA []byte) (int, error) {
-	size := m.Size()
-	return m.MarshalToSizedBuffer(dAtA[:size])
-}
-
-func (m *PortEvidenceAggregate) MarshalToSizedBuffer(dAtA []byte) (int, error) {
-	i := len(dAtA)
-	_ = i
-	var l int
-	_ = l
-	if m.Conflict {
-		i--
-		if m.Conflict {
-			dAtA[i] = 1
-		} else {
-			dAtA[i] = 0
-		}
-		i--
-		dAtA[i] = 0x18
-	}
-	if m.FirstState != 0 {
-		i = encodeVarintAudit(dAtA, i, uint64(m.FirstState))
-		i--
-		dAtA[i] = 0x10
-	}
-	if m.Count != 0 {
-		i = encodeVarintAudit(dAtA, i, uint64(m.Count))
-		i--
-		dAtA[i] = 0x8
 	}
 	return len(dAtA) - i, nil
 }
@@ -891,35 +665,19 @@ func (m *WindowSnapshot) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if m.KWindow != 0 {
-		i = encodeVarintAudit(dAtA, i, uint64(m.KWindow))
-		i--
-		dAtA[i] = 0x30
-	}
-	if len(m.Receivers) > 0 {
-		for iNdEx := len(m.Receivers) - 1; iNdEx >= 0; iNdEx-- {
-			i -= len(m.Receivers[iNdEx])
-			copy(dAtA[i:], m.Receivers[iNdEx])
-			i = encodeVarintAudit(dAtA, i, uint64(len(m.Receivers[iNdEx])))
+	if len(m.Assignments) > 0 {
+		for iNdEx := len(m.Assignments) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Assignments[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintAudit(dAtA, i, uint64(size))
+			}
 			i--
-			dAtA[i] = 0x2a
+			dAtA[i] = 0x1a
 		}
-	}
-	if len(m.Senders) > 0 {
-		for iNdEx := len(m.Senders) - 1; iNdEx >= 0; iNdEx-- {
-			i -= len(m.Senders[iNdEx])
-			copy(dAtA[i:], m.Senders[iNdEx])
-			i = encodeVarintAudit(dAtA, i, uint64(len(m.Senders[iNdEx])))
-			i--
-			dAtA[i] = 0x22
-		}
-	}
-	if len(m.SeedBytes) > 0 {
-		i -= len(m.SeedBytes)
-		copy(dAtA[i:], m.SeedBytes)
-		i = encodeVarintAudit(dAtA, i, uint64(len(m.SeedBytes)))
-		i--
-		dAtA[i] = 0x1a
 	}
 	if m.WindowStartHeight != 0 {
 		i = encodeVarintAudit(dAtA, i, uint64(m.WindowStartHeight))
@@ -979,7 +737,7 @@ func (m *AuditPeerObservation) Size() (n int) {
 	}
 	var l int
 	_ = l
-	l = len(m.TargetValidatorAddress)
+	l = len(m.TargetSupernodeAccount)
 	if l > 0 {
 		n += 1 + l + sovAudit(uint64(l))
 	}
@@ -999,10 +757,6 @@ func (m *AuditReport) Size() (n int) {
 	}
 	var l int
 	_ = l
-	l = len(m.ReporterValidatorAddress)
-	if l > 0 {
-		n += 1 + l + sovAudit(uint64(l))
-	}
 	l = len(m.SupernodeAccount)
 	if l > 0 {
 		n += 1 + l + sovAudit(uint64(l))
@@ -1024,55 +778,21 @@ func (m *AuditReport) Size() (n int) {
 	return n
 }
 
-func (m *AuditStatus) Size() (n int) {
+func (m *ProberTargets) Size() (n int) {
 	if m == nil {
 		return 0
 	}
 	var l int
 	_ = l
-	l = len(m.ValidatorAddress)
+	l = len(m.ProberSupernodeAccount)
 	if l > 0 {
 		n += 1 + l + sovAudit(uint64(l))
 	}
-	if m.LastReportedWindowId != 0 {
-		n += 1 + sovAudit(uint64(m.LastReportedWindowId))
-	}
-	if m.LastReportHeight != 0 {
-		n += 1 + sovAudit(uint64(m.LastReportHeight))
-	}
-	if m.Compliant {
-		n += 2
-	}
-	if len(m.Reasons) > 0 {
-		for _, s := range m.Reasons {
+	if len(m.TargetSupernodeAccounts) > 0 {
+		for _, s := range m.TargetSupernodeAccounts {
 			l = len(s)
 			n += 1 + l + sovAudit(uint64(l))
 		}
-	}
-	if len(m.RequiredPortsState) > 0 {
-		l = 0
-		for _, e := range m.RequiredPortsState {
-			l += sovAudit(uint64(e))
-		}
-		n += 1 + sovAudit(uint64(l)) + l
-	}
-	return n
-}
-
-func (m *PortEvidenceAggregate) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	if m.Count != 0 {
-		n += 1 + sovAudit(uint64(m.Count))
-	}
-	if m.FirstState != 0 {
-		n += 1 + sovAudit(uint64(m.FirstState))
-	}
-	if m.Conflict {
-		n += 2
 	}
 	return n
 }
@@ -1089,24 +809,11 @@ func (m *WindowSnapshot) Size() (n int) {
 	if m.WindowStartHeight != 0 {
 		n += 1 + sovAudit(uint64(m.WindowStartHeight))
 	}
-	l = len(m.SeedBytes)
-	if l > 0 {
-		n += 1 + l + sovAudit(uint64(l))
-	}
-	if len(m.Senders) > 0 {
-		for _, s := range m.Senders {
-			l = len(s)
+	if len(m.Assignments) > 0 {
+		for _, e := range m.Assignments {
+			l = e.Size()
 			n += 1 + l + sovAudit(uint64(l))
 		}
-	}
-	if len(m.Receivers) > 0 {
-		for _, s := range m.Receivers {
-			l = len(s)
-			n += 1 + l + sovAudit(uint64(l))
-		}
-	}
-	if m.KWindow != 0 {
-		n += 1 + sovAudit(uint64(m.KWindow))
 	}
 	return n
 }
@@ -1319,7 +1026,7 @@ func (m *AuditPeerObservation) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field TargetValidatorAddress", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field TargetSupernodeAccount", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -1347,7 +1054,7 @@ func (m *AuditPeerObservation) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.TargetValidatorAddress = string(dAtA[iNdEx:postIndex])
+			m.TargetSupernodeAccount = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
 			if wireType == 0 {
@@ -1470,38 +1177,6 @@ func (m *AuditReport) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ReporterValidatorAddress", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowAudit
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthAudit
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return ErrInvalidLengthAudit
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.ReporterValidatorAddress = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field SupernodeAccount", wireType)
 			}
 			var stringLen uint64
@@ -1532,7 +1207,7 @@ func (m *AuditReport) Unmarshal(dAtA []byte) error {
 			}
 			m.SupernodeAccount = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
-		case 3:
+		case 2:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field WindowId", wireType)
 			}
@@ -1551,7 +1226,7 @@ func (m *AuditReport) Unmarshal(dAtA []byte) error {
 					break
 				}
 			}
-		case 4:
+		case 3:
 			if wireType != 0 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ReportHeight", wireType)
 			}
@@ -1570,7 +1245,7 @@ func (m *AuditReport) Unmarshal(dAtA []byte) error {
 					break
 				}
 			}
-		case 5:
+		case 4:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field SelfReport", wireType)
 			}
@@ -1603,7 +1278,7 @@ func (m *AuditReport) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
-		case 6:
+		case 5:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field PeerObservations", wireType)
 			}
@@ -1658,7 +1333,7 @@ func (m *AuditReport) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *AuditStatus) Unmarshal(dAtA []byte) error {
+func (m *ProberTargets) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -1681,15 +1356,15 @@ func (m *AuditStatus) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: AuditStatus: wiretype end group for non-group")
+			return fmt.Errorf("proto: ProberTargets: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: AuditStatus: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: ProberTargets: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ValidatorAddress", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field ProberSupernodeAccount", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -1717,69 +1392,11 @@ func (m *AuditStatus) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.ValidatorAddress = string(dAtA[iNdEx:postIndex])
+			m.ProberSupernodeAccount = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field LastReportedWindowId", wireType)
-			}
-			m.LastReportedWindowId = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowAudit
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.LastReportedWindowId |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-		case 3:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field LastReportHeight", wireType)
-			}
-			m.LastReportHeight = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowAudit
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.LastReportHeight |= int64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-		case 4:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Compliant", wireType)
-			}
-			var v int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowAudit
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				v |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.Compliant = bool(v != 0)
-		case 5:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Reasons", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field TargetSupernodeAccounts", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -1807,185 +1424,8 @@ func (m *AuditStatus) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Reasons = append(m.Reasons, string(dAtA[iNdEx:postIndex]))
+			m.TargetSupernodeAccounts = append(m.TargetSupernodeAccounts, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
-		case 6:
-			if wireType == 0 {
-				var v PortState
-				for shift := uint(0); ; shift += 7 {
-					if shift >= 64 {
-						return ErrIntOverflowAudit
-					}
-					if iNdEx >= l {
-						return io.ErrUnexpectedEOF
-					}
-					b := dAtA[iNdEx]
-					iNdEx++
-					v |= PortState(b&0x7F) << shift
-					if b < 0x80 {
-						break
-					}
-				}
-				m.RequiredPortsState = append(m.RequiredPortsState, v)
-			} else if wireType == 2 {
-				var packedLen int
-				for shift := uint(0); ; shift += 7 {
-					if shift >= 64 {
-						return ErrIntOverflowAudit
-					}
-					if iNdEx >= l {
-						return io.ErrUnexpectedEOF
-					}
-					b := dAtA[iNdEx]
-					iNdEx++
-					packedLen |= int(b&0x7F) << shift
-					if b < 0x80 {
-						break
-					}
-				}
-				if packedLen < 0 {
-					return ErrInvalidLengthAudit
-				}
-				postIndex := iNdEx + packedLen
-				if postIndex < 0 {
-					return ErrInvalidLengthAudit
-				}
-				if postIndex > l {
-					return io.ErrUnexpectedEOF
-				}
-				var elementCount int
-				if elementCount != 0 && len(m.RequiredPortsState) == 0 {
-					m.RequiredPortsState = make([]PortState, 0, elementCount)
-				}
-				for iNdEx < postIndex {
-					var v PortState
-					for shift := uint(0); ; shift += 7 {
-						if shift >= 64 {
-							return ErrIntOverflowAudit
-						}
-						if iNdEx >= l {
-							return io.ErrUnexpectedEOF
-						}
-						b := dAtA[iNdEx]
-						iNdEx++
-						v |= PortState(b&0x7F) << shift
-						if b < 0x80 {
-							break
-						}
-					}
-					m.RequiredPortsState = append(m.RequiredPortsState, v)
-				}
-			} else {
-				return fmt.Errorf("proto: wrong wireType = %d for field RequiredPortsState", wireType)
-			}
-		default:
-			iNdEx = preIndex
-			skippy, err := skipAudit(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if (skippy < 0) || (iNdEx+skippy) < 0 {
-				return ErrInvalidLengthAudit
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *PortEvidenceAggregate) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowAudit
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= uint64(b&0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: PortEvidenceAggregate: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: PortEvidenceAggregate: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Count", wireType)
-			}
-			m.Count = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowAudit
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.Count |= uint32(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-		case 2:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field FirstState", wireType)
-			}
-			m.FirstState = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowAudit
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.FirstState |= PortState(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-		case 3:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Conflict", wireType)
-			}
-			var v int
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowAudit
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				v |= int(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			m.Conflict = bool(v != 0)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipAudit(dAtA[iNdEx:])
@@ -2076,9 +1516,9 @@ func (m *WindowSnapshot) Unmarshal(dAtA []byte) error {
 			}
 		case 3:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field SeedBytes", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Assignments", wireType)
 			}
-			var byteLen int
+			var msglen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowAudit
@@ -2088,109 +1528,26 @@ func (m *WindowSnapshot) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				byteLen |= int(b&0x7F) << shift
+				msglen |= int(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-			if byteLen < 0 {
+			if msglen < 0 {
 				return ErrInvalidLengthAudit
 			}
-			postIndex := iNdEx + byteLen
+			postIndex := iNdEx + msglen
 			if postIndex < 0 {
 				return ErrInvalidLengthAudit
 			}
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.SeedBytes = append(m.SeedBytes[:0], dAtA[iNdEx:postIndex]...)
-			if m.SeedBytes == nil {
-				m.SeedBytes = []byte{}
+			m.Assignments = append(m.Assignments, ProberTargets{})
+			if err := m.Assignments[len(m.Assignments)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
 			}
 			iNdEx = postIndex
-		case 4:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Senders", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowAudit
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthAudit
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return ErrInvalidLengthAudit
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Senders = append(m.Senders, string(dAtA[iNdEx:postIndex]))
-			iNdEx = postIndex
-		case 5:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Receivers", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowAudit
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthAudit
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return ErrInvalidLengthAudit
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Receivers = append(m.Receivers, string(dAtA[iNdEx:postIndex]))
-			iNdEx = postIndex
-		case 6:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field KWindow", wireType)
-			}
-			m.KWindow = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowAudit
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.KWindow |= uint32(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipAudit(dAtA[iNdEx:])

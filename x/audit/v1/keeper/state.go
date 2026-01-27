@@ -6,14 +6,14 @@ import (
 	"github.com/LumeraProtocol/lumera/x/audit/v1/types"
 )
 
-func (k Keeper) HasReport(ctx sdk.Context, windowID uint64, reporterValidatorAddress string) bool {
+func (k Keeper) HasReport(ctx sdk.Context, windowID uint64, reporterSupernodeAccount string) bool {
 	store := k.kvStore(ctx)
-	return store.Has(types.ReportKey(windowID, reporterValidatorAddress))
+	return store.Has(types.ReportKey(windowID, reporterSupernodeAccount))
 }
 
-func (k Keeper) GetReport(ctx sdk.Context, windowID uint64, reporterValidatorAddress string) (types.AuditReport, bool) {
+func (k Keeper) GetReport(ctx sdk.Context, windowID uint64, reporterSupernodeAccount string) (types.AuditReport, bool) {
 	store := k.kvStore(ctx)
-	bz := store.Get(types.ReportKey(windowID, reporterValidatorAddress))
+	bz := store.Get(types.ReportKey(windowID, reporterSupernodeAccount))
 	if bz == nil {
 		return types.AuditReport{}, false
 	}
@@ -28,78 +28,21 @@ func (k Keeper) SetReport(ctx sdk.Context, r types.AuditReport) error {
 	if err != nil {
 		return err
 	}
-	store.Set(types.ReportKey(r.WindowId, r.ReporterValidatorAddress), bz)
+	store.Set(types.ReportKey(r.WindowId, r.SupernodeAccount), bz)
 	return nil
 }
 
-func (k Keeper) GetEvidenceAggregate(ctx sdk.Context, windowID uint64, targetValidatorAddress string, portIndex uint32) (types.PortEvidenceAggregate, bool) {
+func (k Keeper) SetReportIndex(ctx sdk.Context, windowID uint64, reporterSupernodeAccount string) {
 	store := k.kvStore(ctx)
-	bz := store.Get(types.EvidenceKey(windowID, targetValidatorAddress, portIndex))
-	if bz == nil {
-		return types.PortEvidenceAggregate{}, false
-	}
-	var a types.PortEvidenceAggregate
-	k.cdc.MustUnmarshal(bz, &a)
-	return a, true
+	store.Set(types.ReportIndexKey(reporterSupernodeAccount, windowID), []byte{1})
 }
 
-func (k Keeper) SetEvidenceAggregate(ctx sdk.Context, windowID uint64, targetValidatorAddress string, portIndex uint32, a types.PortEvidenceAggregate) error {
+func (k Keeper) SetSupernodeReportIndex(ctx sdk.Context, supernodeAccount string, windowID uint64, reporterSupernodeAccount string) {
 	store := k.kvStore(ctx)
-	bz, err := k.cdc.Marshal(&a)
-	if err != nil {
-		return err
-	}
-	store.Set(types.EvidenceKey(windowID, targetValidatorAddress, portIndex), bz)
-	return nil
+	store.Set(types.SupernodeReportIndexKey(supernodeAccount, windowID, reporterSupernodeAccount), []byte{1})
 }
 
-func (k Keeper) GetAuditStatus(ctx sdk.Context, validatorAddress string) (types.AuditStatus, bool) {
+func (k Keeper) SetSelfReportIndex(ctx sdk.Context, windowID uint64, reporterSupernodeAccount string) {
 	store := k.kvStore(ctx)
-	bz := store.Get(types.AuditStatusKey(validatorAddress))
-	if bz == nil {
-		return types.AuditStatus{}, false
-	}
-	var s types.AuditStatus
-	k.cdc.MustUnmarshal(bz, &s)
-	return s, true
-}
-
-func (k Keeper) SetAuditStatus(ctx sdk.Context, s types.AuditStatus) error {
-	store := k.kvStore(ctx)
-	bz, err := k.cdc.Marshal(&s)
-	if err != nil {
-		return err
-	}
-	store.Set(types.AuditStatusKey(s.ValidatorAddress), bz)
-	return nil
-}
-
-func consensusFromAggregate(a types.PortEvidenceAggregate, quorum uint32) types.PortState {
-	if a.Count < quorum {
-		return types.PortState_PORT_STATE_UNKNOWN
-	}
-	if a.Conflict {
-		return types.PortState_PORT_STATE_UNKNOWN
-	}
-	return a.FirstState
-}
-
-func (k Keeper) setRequiredPortsState(ctx sdk.Context, validatorAddress string, requiredPortsCount int, portIndex uint32, state types.PortState) error {
-	status, found := k.GetAuditStatus(ctx, validatorAddress)
-	if !found {
-		status = types.AuditStatus{
-			ValidatorAddress: validatorAddress,
-			Compliant:        true,
-		}
-	}
-
-	if len(status.RequiredPortsState) != requiredPortsCount {
-		status.RequiredPortsState = make([]types.PortState, requiredPortsCount)
-	}
-
-	if int(portIndex) < len(status.RequiredPortsState) {
-		status.RequiredPortsState[portIndex] = state
-	}
-
-	return k.SetAuditStatus(ctx, status)
+	store.Set(types.SelfReportIndexKey(reporterSupernodeAccount, windowID), []byte{1})
 }

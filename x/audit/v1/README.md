@@ -14,20 +14,19 @@
 
 ## Abstract
 
-The Audit module provides deterministic, window-based reporting and peer reachability observations for supernodes. It aggregates peer evidence per window and enforces minimum participation by postponing ACTIVE supernodes that fail to submit required reports after a grace period.
+The Audit module provides deterministic, window-based reporting for supernodes. It persists audit reports and a per-window `WindowSnapshot` that serves as the minimal source-of-truth for the prober → targets mapping for that window.
 
 ## Overview
 
 High-level behavior:
 - The chain advances in deterministic reporting windows derived from block height.
-- At each window start, the module snapshots the ACTIVE set (senders) and the ACTIVE+POSTPONED set (receivers), plus a window seed.
-- ACTIVE supernodes submit one report per window:
+- At each window start, the module persists a `WindowSnapshot` containing the prober → targets mapping (`assignments`).
+- Supernodes submit one report per window containing:
   - self metrics (self-attested)
-  - peer reachability observations for deterministically assigned targets
-- Peer observations are aggregated per `(window_id, target_validator_address, port_index)` using quorum + unanimity semantics.
-- After the grace period, any ACTIVE sender in the window snapshot that did not submit a report is transitioned to POSTPONED.
+  - peer reachability observations
 
-Note: this implementation currently focuses on windowing, deterministic assignment, evidence aggregation, and missing-report postponement. Resource threshold enforcement and POSTPONED recovery via peer consensus are not yet implemented.
+Notes:
+- This module currently focuses on windowing/snapshotting and report persistence. Penalties and aggregation are intentionally not implemented.
 
 ## Genesis State Implementation
 
@@ -47,7 +46,6 @@ Module parameters are defined in `proto/lumera/audit/v1/params.proto` and persis
 
 Key fields:
 - `reporting_window_blocks`
-- `missing_report_grace_blocks`
 - `peer_quorum_reports`
 - `min_probe_targets_per_window`
 - `max_probe_targets_per_window`
@@ -55,7 +53,7 @@ Key fields:
 
 ### 2. Window Origin and Window IDs
 
-On first use, the module stores a `window_origin_height` and uses it to derive:
+On first use, the module stores an `origin_height` and uses it to derive:
 - `window_id`
 - `window_start_height`
 - `window_end_height`
@@ -63,56 +61,30 @@ On first use, the module stores a `window_origin_height` and uses it to derive:
 ### 3. Window Snapshots
 
 At `window_start_height`, the module stores a `WindowSnapshot`:
-- `seed_bytes` (from the block header hash)
-- ordered `senders` (ACTIVE validator addresses)
-- ordered `receivers` (ACTIVE + POSTPONED validator addresses)
-- `k_window` (targets assigned per sender for the window)
+- `window_id`
+- `window_start_height`
+- `assignments`: the per-window prober → targets mapping
 
-Snapshots make target assignment deterministic for the entire window, even if membership changes mid-window.
+Snapshots freeze the per-window prober → targets mapping at the start of the window so later logic can rely on a deterministic, persisted mapping.
 
 ### 4. Reports
 
-Reports are stored per `(window_id, reporter_validator_address)` and include:
+Reports are stored per `(window_id, supernode_account)` and include:
 - `supernode_account`
 - `self_report`
 - `peer_observations`
 
-Uniqueness is enforced (one report per reporter per window).
-
-### 5. Evidence Aggregates
-
-Evidence is aggregated per `(window_id, target_validator_address, port_index)` as:
-- `count` of distinct probers contributing OPEN/CLOSED
-- `first_state` (OPEN/CLOSED)
-- `conflict` flag (true if any prober disagrees with first_state)
-
-Consensus state derivation:
-- if `count < peer_quorum_reports` => `UNKNOWN`
-- if `conflict == true` => `UNKNOWN`
-- else => `first_state`
-
-### 6. Audit Status
-
-`AuditStatus` provides a compact, queryable view per validator:
-- last reported window + height
-- compliance flag and bounded reasons
-- last-derived `required_ports_state` (ordered like `required_open_ports`)
+Uniqueness is guaranteed (one report per reporter per window).
 
 ## State Transitions
 
 ### Report submission
 
 On `MsgSubmitAuditReport`:
-1. Resolve reporter validator address from `supernode_account` via `x/supernode`.
-2. Validate window acceptance (from `window_start_height` until `window_end_height + grace`).
-3. Enforce per-window uniqueness for the reporter.
-4. If reporter is ACTIVE, validate peer observation targets match deterministic assignment from the window snapshot.
-5. Persist the report and update evidence aggregates and `AuditStatus`.
-
-### Missing report enforcement
-
-After `missing_report_grace_blocks` past `window_end_height`, for the enforced window:
-- For each sender in the window snapshot without a report, transition the corresponding supernode to POSTPONED and record `"missing_report"` in its `AuditStatus`.
+1. Resolve reporter supernode from `supernode_account` via `x/supernode`.
+2. Validate window acceptance (from `window_start_height` through `window_end_height`).
+3. Ensure per-window uniqueness for the reporter.
+4. Persist the report.
 
 ## Messages
 
@@ -148,21 +120,43 @@ Returns current module params:
 - gRPC: `Query/Params`
 - REST: `GET /LumeraProtocol/lumera/audit/v1/params`
 
-### AuditStatus
+### AuditReport
 
-Returns `AuditStatus` for a validator:
-- gRPC: `Query/AuditStatus`
-- REST: `GET /LumeraProtocol/lumera/audit/v1/audit_status/{validator_address}`
+Returns `AuditReport` for a window and reporter:
+- gRPC: `Query/AuditReport`
+
+### AuditReportsByReporter
+
+Lists `AuditReport` submitted by a reporter (paginated):
+- gRPC: `Query/AuditReportsByReporter`
+- REST: `GET /LumeraProtocol/lumera/audit/v1/audit_reports_by_reporter/{supernode_account}`
+
+### CurrentWindow
+
+Returns the current reporting window boundaries:
+- gRPC: `Query/CurrentWindow`
+- REST: `GET /LumeraProtocol/lumera/audit/v1/current_window`
+
+### SupernodeReports
+
+Lists peer-observation chunks about a given supernode (by other reporters):
+- gRPC: `Query/SupernodeReports`
+- REST: `GET /LumeraProtocol/lumera/audit/v1/supernode_reports/{supernode_account}`
+
+### SelfReports
+
+Lists self-report chunks for a supernode across windows:
+- gRPC: `Query/SelfReports`
+- REST: `GET /LumeraProtocol/lumera/audit/v1/self_reports/{supernode_account}`
 
 ## Events
 
-The module currently emits the `x/supernode` postponement event when a sender misses a report window. Audit-specific events are not yet emitted.
+Audit-specific events are not emitted.
 
 ## Parameters
 
 Default values (as implemented in `x/audit/v1/types/params.go`):
 - `reporting_window_blocks`: `400`
-- `missing_report_grace_blocks`: `100`
 - `peer_quorum_reports`: `3`
 - `min_probe_targets_per_window`: `3`
 - `max_probe_targets_per_window`: `5`

@@ -55,7 +55,7 @@ genesis:
         max_processing_time: 1h0m0s
         expiration_duration: 24h0m0s
     claim:
-      total_claimable_amount: '18749999991853'
+      total_claimable_amount: '18749999981413'
       params:
         claim_end_time: '1767225600' # Jan 1 2026, 00:00:00
     crisis:

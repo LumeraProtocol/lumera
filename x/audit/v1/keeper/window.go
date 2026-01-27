@@ -2,13 +2,25 @@ package keeper
 
 import (
 	"encoding/binary"
-	"sort"
+	"fmt"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
+	"github.com/LumeraProtocol/lumera/x/audit/v1/keeper/assignment"
 	"github.com/LumeraProtocol/lumera/x/audit/v1/types"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
+
+func (k Keeper) getWindowOriginHeight(ctx sdk.Context) (int64, bool) {
+	// The origin height is set once (on first use) and then kept stable forever.
+	// All window boundaries are derived from it to avoid drifting schedules.
+	store := k.kvStore(ctx)
+	bz := store.Get(types.WindowOriginHeightKey())
+	if len(bz) != 8 {
+		return 0, false
+	}
+	return int64(binary.BigEndian.Uint64(bz)), true
+}
 
 func (k Keeper) getOrInitWindowOriginHeight(ctx sdk.Context) int64 {
 	store := k.kvStore(ctx)
@@ -37,34 +49,6 @@ func (k Keeper) windowIDAtHeight(origin int64, params types.Params, height int64
 		return 0
 	}
 	return uint64((height - origin) / int64(params.ReportingWindowBlocks))
-}
-
-func computeKWindow(params types.Params, sendersCount, receiversCount int) uint32 {
-	if sendersCount <= 0 || receiversCount <= 1 {
-		return 0
-	}
-
-	a := uint64(sendersCount)
-	n := uint64(receiversCount)
-	q := uint64(params.PeerQuorumReports)
-
-	kNeeded := (q*n + a - 1) / a
-
-	kMin := uint64(params.MinProbeTargetsPerWindow)
-	kMax := uint64(params.MaxProbeTargetsPerWindow)
-	if kNeeded < kMin {
-		kNeeded = kMin
-	}
-	if kNeeded > kMax {
-		kNeeded = kMax
-	}
-
-	// Avoid self + no duplicates.
-	if kNeeded > n-1 {
-		kNeeded = n - 1
-	}
-
-	return uint32(kNeeded)
 }
 
 func (k Keeper) GetWindowSnapshot(ctx sdk.Context, windowID uint64) (types.WindowSnapshot, bool) {
@@ -104,79 +88,30 @@ func (k Keeper) CreateWindowSnapshotIfNeeded(ctx sdk.Context, windowID uint64, p
 
 	senders := make([]string, 0, len(active))
 	for _, sn := range active {
-		senders = append(senders, sn.ValidatorAddress)
+		if sn.SupernodeAccount == "" {
+			return fmt.Errorf("supernode %q has empty supernode_account", sn.ValidatorAddress)
+		}
+		senders = append(senders, sn.SupernodeAccount)
 	}
 	receivers := make([]string, 0, len(receiversSN))
 	for _, sn := range receiversSN {
-		receivers = append(receivers, sn.ValidatorAddress)
+		if sn.SupernodeAccount == "" {
+			return fmt.Errorf("supernode %q has empty supernode_account", sn.ValidatorAddress)
+		}
+		receivers = append(receivers, sn.SupernodeAccount)
 	}
 
-	sort.Strings(senders)
-	sort.Strings(receivers)
+	seedBytes := ctx.HeaderHash()
+	assignments, err := assignment.ComputeSnapshotAssignments(params, senders, receivers, seedBytes)
+	if err != nil {
+		return err
+	}
 
 	snap := types.WindowSnapshot{
-		WindowId:           windowID,
-		WindowStartHeight:  ctx.BlockHeight(),
-		SeedBytes:          ctx.HeaderHash(),
-		Senders:            senders,
-		Receivers:          receivers,
-		KWindow:            computeKWindow(params, len(senders), len(receivers)),
+		WindowId:          windowID,
+		WindowStartHeight: ctx.BlockHeight(),
+		Assignments:       assignments,
 	}
 
 	return k.SetWindowSnapshot(ctx, snap)
 }
-
-func assignedTargets(snapshot types.WindowSnapshot, senderValidatorAddress string) ([]string, bool) {
-	kWindow := int(snapshot.KWindow)
-	if kWindow == 0 || len(snapshot.Receivers) == 0 {
-		return []string{}, true
-	}
-
-	senderIndex := -1
-	for i, s := range snapshot.Senders {
-		if s == senderValidatorAddress {
-			senderIndex = i
-			break
-		}
-	}
-	if senderIndex < 0 {
-		return nil, false
-	}
-
-	seed := snapshot.SeedBytes
-	if len(seed) < 8 {
-		return nil, false
-	}
-	offsetU64 := binary.BigEndian.Uint64(seed[:8])
-	n := len(snapshot.Receivers)
-	offset := int(offsetU64 % uint64(n))
-
-	seen := make(map[int]struct{}, kWindow)
-	out := make([]string, 0, kWindow)
-
-	for j := 0; j < kWindow; j++ {
-		slot := senderIndex*kWindow + j
-		candidate := (offset + slot) % n
-
-		tries := 0
-		for tries < n {
-			if snapshot.Receivers[candidate] != senderValidatorAddress {
-				if _, ok := seen[candidate]; !ok {
-					break
-				}
-			}
-			candidate = (candidate + 1) % n
-			tries++
-		}
-
-		if tries >= n {
-			break
-		}
-
-		seen[candidate] = struct{}{}
-		out = append(out, snapshot.Receivers[candidate])
-	}
-
-	return out, true
-}
-

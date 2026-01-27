@@ -31,4 +31,3 @@ func (k Keeper) SetParams(ctx context.Context, params types.Params) error {
 	store.Set(types.ParamsKey, bz)
 	return nil
 }
-

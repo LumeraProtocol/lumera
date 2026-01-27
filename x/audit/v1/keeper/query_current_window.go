@@ -16,20 +16,17 @@ func (q queryServer) CurrentWindow(ctx context.Context, req *types.QueryCurrentW
 	}
 
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	params := q.k.GetParams(ctx).WithDefaults()
-
-	origin, found := q.k.getWindowOriginHeight(sdkCtx)
+	ws, found, err := q.k.getWindowState(sdkCtx)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
 	if !found {
-		return nil, status.Error(codes.NotFound, "window origin height not initialized")
+		return nil, status.Error(codes.NotFound, "current window not initialized")
 	}
 
-	windowID := q.k.windowIDAtHeight(origin, params, sdkCtx.BlockHeight())
-	windowStart := q.k.windowStartHeight(origin, params, windowID)
-	windowEnd := q.k.windowEndHeight(origin, params, windowID)
-
 	return &types.QueryCurrentWindowResponse{
-		WindowId:          windowID,
-		WindowStartHeight: windowStart,
-		WindowEndHeight:   windowEnd,
+		WindowId:          ws.WindowID,
+		WindowStartHeight: ws.StartHeight,
+		WindowEndHeight:   ws.EndHeight,
 	}, nil
 }

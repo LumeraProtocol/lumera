@@ -16,12 +16,16 @@ func (m msgServer) SubmitAuditReport(ctx context.Context, req *types.MsgSubmitAu
 
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
 	params := m.GetParams(ctx).WithDefaults()
-	origin := m.getOrInitWindowOriginHeight(sdkCtx)
 
-	// Validate window_id acceptance: allow submitting for a window until end.
-	windowStart := m.windowStartHeight(origin, params, req.WindowId)
-	windowEnd := m.windowEndHeight(origin, params, req.WindowId)
-	if sdkCtx.BlockHeight() < windowStart || sdkCtx.BlockHeight() > windowEnd {
+	// Validate window_id acceptance: only the current window_id is accepted at the current height.
+	ws, err := m.getCurrentWindowState(sdkCtx, params)
+	if err != nil {
+		return nil, err
+	}
+	if req.WindowId != ws.WindowID {
+		return nil, errorsmod.Wrapf(types.ErrInvalidWindowID, "window_id %d not accepted at height %d", req.WindowId, sdkCtx.BlockHeight())
+	}
+	if sdkCtx.BlockHeight() < ws.StartHeight || sdkCtx.BlockHeight() > ws.EndHeight {
 		return nil, errorsmod.Wrapf(types.ErrInvalidWindowID, "window_id not accepted at height %d", sdkCtx.BlockHeight())
 	}
 

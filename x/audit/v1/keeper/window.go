@@ -36,21 +36,6 @@ func (k Keeper) getOrInitWindowOriginHeight(ctx sdk.Context) int64 {
 	return origin
 }
 
-func (k Keeper) windowStartHeight(origin int64, params types.Params, windowID uint64) int64 {
-	return origin + int64(windowID)*int64(params.ReportingWindowBlocks)
-}
-
-func (k Keeper) windowEndHeight(origin int64, params types.Params, windowID uint64) int64 {
-	return k.windowStartHeight(origin, params, windowID) + int64(params.ReportingWindowBlocks) - 1
-}
-
-func (k Keeper) windowIDAtHeight(origin int64, params types.Params, height int64) uint64 {
-	if height < origin {
-		return 0
-	}
-	return uint64((height - origin) / int64(params.ReportingWindowBlocks))
-}
-
 func (k Keeper) GetWindowSnapshot(ctx sdk.Context, windowID uint64) (types.WindowSnapshot, bool) {
 	store := k.kvStore(ctx)
 	bz := store.Get(types.WindowSnapshotKey(windowID))
@@ -102,6 +87,12 @@ func (k Keeper) CreateWindowSnapshotIfNeeded(ctx sdk.Context, windowID uint64, p
 	}
 
 	seedBytes := ctx.HeaderHash()
+	// Some test harnesses do not populate HeaderHash(). We only need a deterministic per-window seed,
+	// so fall back to the window start height (which equals ctx.BlockHeight() here).
+	if len(seedBytes) < 8 {
+		seedBytes = make([]byte, 8)
+		binary.BigEndian.PutUint64(seedBytes, uint64(ctx.BlockHeight()))
+	}
 	assignments, err := assignment.ComputeSnapshotAssignments(params, senders, receivers, seedBytes)
 	if err != nil {
 		return err

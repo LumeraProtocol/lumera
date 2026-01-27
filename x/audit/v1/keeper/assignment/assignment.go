@@ -54,10 +54,6 @@ func ComputeKWindowFromParams(params types.Params, sendersCount, receiversCount 
 }
 
 func computeAssignmentsFromInputs(senders []string, receivers []string, kWindow uint32, seedBytes []byte) ([]types.ProberTargets, error) {
-	if len(seedBytes) < 8 {
-		return nil, fmt.Errorf("seed must be at least 8 bytes")
-	}
-
 	assignments := make([]types.ProberTargets, 0, len(senders))
 	if kWindow == 0 || len(receivers) == 0 {
 		for _, sender := range senders {
@@ -67,6 +63,9 @@ func computeAssignmentsFromInputs(senders []string, receivers []string, kWindow 
 			})
 		}
 		return assignments, nil
+	}
+	if len(seedBytes) < 8 {
+		return nil, fmt.Errorf("seed must be at least 8 bytes")
 	}
 
 	offsetU64 := binary.BigEndian.Uint64(seedBytes[:8])

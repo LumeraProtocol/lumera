@@ -56,9 +56,15 @@ func (m msgServer) SubmitAuditReport(ctx context.Context, req *types.MsgSubmitAu
 	}
 
 	requiredPortsLen := len(params.RequiredOpenPorts)
-	if len(req.PeerObservations) > 0 {
-		if len(allowedTargets) == 0 {
+	if len(allowedTargets) == 0 {
+		// Not a prober for this window (e.g. POSTPONED). Peer observations are not accepted.
+		if len(req.PeerObservations) > 0 {
 			return nil, errorsmod.Wrap(types.ErrInvalidReporterState, "reporter not eligible for peer observations in this window")
+		}
+	} else {
+		// Probers must submit peer observations for all assigned targets for the window.
+		if len(req.PeerObservations) != len(allowedTargets) {
+			return nil, errorsmod.Wrapf(types.ErrInvalidPeerObservations, "expected peer observations for %d assigned targets; got %d", len(allowedTargets), len(req.PeerObservations))
 		}
 
 		seenTargets := make(map[string]struct{}, len(req.PeerObservations))
@@ -81,6 +87,9 @@ func (m msgServer) SubmitAuditReport(ctx context.Context, req *types.MsgSubmitAu
 			if requiredPortsLen != 0 && len(obs.PortStates) != requiredPortsLen {
 				return nil, errorsmod.Wrapf(types.ErrInvalidPortStatesLength, "port_states length %d does not match required_open_ports length %d", len(obs.PortStates), requiredPortsLen)
 			}
+		}
+		if len(seenTargets) != len(allowedTargets) {
+			return nil, errorsmod.Wrap(types.ErrInvalidPeerObservations, "peer observations do not cover all assigned targets")
 		}
 	}
 

@@ -24,6 +24,17 @@ service Query {
     option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/current_window";
   }
 
+  // WindowSnapshot returns the persisted window snapshot for the given window_id.
+  rpc WindowSnapshot(QueryWindowSnapshotRequest) returns (QueryWindowSnapshotResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/window_snapshot/{window_id}";
+  }
+
+  // AssignedTargets returns the prober -> targets assignment for a given supernode_account.
+  // If filter_by_window_id is false, it returns the assignments for the current window.
+  rpc AssignedTargets(QueryAssignedTargetsRequest) returns (QueryAssignedTargetsResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/assigned_targets/{supernode_account}";
+  }
+
   rpc AuditReport(QueryAuditReportRequest) returns (QueryAuditReportResponse) {
     option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/audit_report/{window_id}/{supernode_account}";
   }
@@ -57,6 +68,27 @@ message QueryCurrentWindowResponse {
   int64  window_end_height   = 3;
 }
 
+message QueryWindowSnapshotRequest {
+  uint64 window_id = 1;
+}
+
+message QueryWindowSnapshotResponse {
+  WindowSnapshot snapshot = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryAssignedTargetsRequest {
+  string supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  uint64 window_id = 2;
+  bool filter_by_window_id = 3;
+}
+
+message QueryAssignedTargetsResponse {
+  uint64 window_id = 1;
+  int64 window_start_height = 2;
+  repeated uint32 required_open_ports = 3;
+  repeated string target_supernode_accounts = 4 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+}
+
 message QueryAuditReportRequest {
   uint64 window_id = 1;
   string supernode_account = 2 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
@@ -80,6 +112,7 @@ message QuerySupernodeReportsRequest {
   string supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
   uint64 window_id = 2;
   cosmos.base.query.v1beta1.PageRequest pagination = 3;
+  bool filter_by_window_id = 4;
 }
 
 message SupernodeReport {
@@ -98,6 +131,7 @@ message QuerySelfReportsRequest {
   string supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
   uint64 window_id = 2;
   cosmos.base.query.v1beta1.PageRequest pagination = 3;
+  bool filter_by_window_id = 4;
 }
 
 message SelfReport {

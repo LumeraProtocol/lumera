@@ -10,12 +10,6 @@ import (
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
-const (
-	// minPeerReportersPerWindow is the minimum number of distinct peer reporters required in a window
-	// before peer-port unanimity can be considered.
-	minPeerReportersPerWindow = 2
-)
-
 // EnforceWindowEnd evaluates the completed window and updates supernode states accordingly.
 // It does not re-check peer assignment gating; that must be enforced at MsgSubmitAuditReport time.
 func (k Keeper) EnforceWindowEnd(ctx sdk.Context, windowID uint64, params types.Params) error {
@@ -36,7 +30,7 @@ func (k Keeper) EnforceWindowEnd(ctx sdk.Context, windowID uint64, params types.
 			continue
 		}
 
-		shouldPostpone, err := k.shouldPostponeAtWindowEnd(ctx, sn.SupernodeAccount, windowID, params)
+		shouldPostpone, reason, err := k.shouldPostponeAtWindowEnd(ctx, sn.SupernodeAccount, windowID, params)
 		if err != nil {
 			return err
 		}
@@ -44,7 +38,7 @@ func (k Keeper) EnforceWindowEnd(ctx sdk.Context, windowID uint64, params types.
 			continue
 		}
 
-		if err := k.appendSupernodeState(ctx, sn, sntypes.SuperNodeStatePostponed); err != nil {
+		if err := k.setSupernodePostponed(ctx, sn, reason); err != nil {
 			return err
 		}
 	}
@@ -63,7 +57,7 @@ func (k Keeper) EnforceWindowEnd(ctx sdk.Context, windowID uint64, params types.
 			continue
 		}
 
-		if err := k.appendSupernodeState(ctx, sn, sntypes.SuperNodeStateActive); err != nil {
+		if err := k.recoverSupernodeActive(ctx, sn); err != nil {
 			return err
 		}
 	}
@@ -71,27 +65,32 @@ func (k Keeper) EnforceWindowEnd(ctx sdk.Context, windowID uint64, params types.
 	return nil
 }
 
-func (k Keeper) shouldPostponeAtWindowEnd(ctx sdk.Context, supernodeAccount string, windowID uint64, params types.Params) (bool, error) {
+func (k Keeper) shouldPostponeAtWindowEnd(ctx sdk.Context, supernodeAccount string, windowID uint64, params types.Params) (bool, string, error) {
+	// Missing-report based postponement.
+	consecutive := params.ConsecutiveWindowsToPostpone
+	if consecutive == 0 {
+		consecutive = 1
+	}
+	if k.missingReportsForConsecutiveWindows(ctx, supernodeAccount, windowID, consecutive) {
+		return true, "audit_missing_reports", nil
+	}
+
 	// Self host-metrics-based postponement (if a self report exists and violates minimums).
 	if ok, err := k.selfHostViolatesMinimums(ctx, supernodeAccount, windowID, params); err != nil {
-		return false, err
+		return false, "", err
 	} else if ok {
-		return true, nil
+		return true, "audit_host_requirements", nil
 	}
 
 	// Peer ports-based postponement.
 	requiredPortsLen := len(params.RequiredOpenPorts)
 	if requiredPortsLen == 0 {
-		return false, nil
+		return false, "", nil
 	}
 
-	consecutive := params.ConsecutiveWindowsToPostpone
-	if consecutive == 0 {
-		consecutive = 1
-	}
 	if consecutive > uint32(windowID+1) {
 		// Not enough history on-chain to satisfy the consecutive rule.
-		return false, nil
+		return false, "", nil
 	}
 
 	for portIndex := 0; portIndex < requiredPortsLen; portIndex++ {
@@ -100,7 +99,7 @@ func (k Keeper) shouldPostponeAtWindowEnd(ctx sdk.Context, supernodeAccount stri
 			w := windowID - uint64(offset)
 			closed, err := k.peersUnanimousPortState(ctx, supernodeAccount, w, portIndex, types.PortState_PORT_STATE_CLOSED)
 			if err != nil {
-				return false, err
+				return false, "", err
 			}
 			if !closed {
 				break
@@ -108,11 +107,11 @@ func (k Keeper) shouldPostponeAtWindowEnd(ctx sdk.Context, supernodeAccount stri
 			streak++
 		}
 		if streak == consecutive {
-			return true, nil
+			return true, "audit_peer_ports", nil
 		}
 	}
 
-	return false, nil
+	return false, "", nil
 }
 
 func (k Keeper) shouldRecoverAtWindowEnd(ctx sdk.Context, supernodeAccount string, windowID uint64, params types.Params) (bool, error) {
@@ -127,44 +126,49 @@ func (k Keeper) shouldRecoverAtWindowEnd(ctx sdk.Context, supernodeAccount strin
 	if requiredPortsLen == 0 {
 		return true, nil
 	}
+
 	peers, err := k.peerReportersForTargetWindow(ctx, supernodeAccount, windowID)
 	if err != nil {
 		return false, err
 	}
-	if len(peers) < minPeerReportersPerWindow {
+	if len(peers) == 0 {
 		return false, nil
 	}
 
-	for portIndex := 0; portIndex < requiredPortsLen; portIndex++ {
-		open, err := k.peersUnanimousPortStateWithPeers(ctx, supernodeAccount, windowID, portIndex, types.PortState_PORT_STATE_OPEN, peers)
-		if err != nil {
-			return false, err
+	// Recovery requires at least one peer report that shows all required ports OPEN for this supernode in this window.
+	for _, reporter := range peers {
+		r, found := k.GetReport(ctx, windowID, reporter)
+		if !found {
+			continue
 		}
-		if !open {
-			return false, nil
+
+		var obs *types.AuditPeerObservation
+		for i := range r.PeerObservations {
+			if r.PeerObservations[i] != nil && r.PeerObservations[i].TargetSupernodeAccount == supernodeAccount {
+				obs = r.PeerObservations[i]
+				break
+			}
+		}
+		if obs == nil {
+			continue
+		}
+		if len(obs.PortStates) != requiredPortsLen {
+			continue
+		}
+
+		allOpen := true
+		for portIndex := 0; portIndex < requiredPortsLen; portIndex++ {
+			if obs.PortStates[portIndex] != types.PortState_PORT_STATE_OPEN {
+				allOpen = false
+				break
+			}
+		}
+		if allOpen {
+			return true, nil
 		}
 	}
 
-	return true, nil
-}
-
-func (k Keeper) appendSupernodeState(ctx sdk.Context, sn sntypes.SuperNode, state sntypes.SuperNodeState) error {
-	if len(sn.States) > 0 {
-		last := sn.States[len(sn.States)-1]
-		if last != nil && last.State == state {
-			return nil
-		}
-	}
-
-	sn.States = append(sn.States, &sntypes.SuperNodeStateRecord{
-		State:  state,
-		Height: ctx.BlockHeight(),
-	})
-
-	if err := k.supernodeKeeper.SetSuperNode(ctx, sn); err != nil {
-		return err
-	}
-	return nil
+	return false, nil
 }
 
 func (k Keeper) selfHostViolatesMinimums(ctx sdk.Context, supernodeAccount string, windowID uint64, params types.Params) (bool, error) {
@@ -241,14 +245,14 @@ func (k Keeper) peersUnanimousPortState(ctx sdk.Context, target string, windowID
 	if err != nil {
 		return false, err
 	}
-	if len(peers) < minPeerReportersPerWindow {
+	if len(peers) == 0 {
 		return false, nil
 	}
 	return k.peersUnanimousPortStateWithPeers(ctx, target, windowID, portIndex, desired, peers)
 }
 
 func (k Keeper) peersUnanimousPortStateWithPeers(ctx sdk.Context, target string, windowID uint64, portIndex int, desired types.PortState, peers []string) (bool, error) {
-	if len(peers) < minPeerReportersPerWindow {
+	if len(peers) == 0 {
 		return false, nil
 	}
 	for _, reporter := range peers {
@@ -298,4 +302,43 @@ func (k Keeper) peerReportersForTargetWindow(ctx sdk.Context, target string, win
 		reporters = append(reporters, reporter)
 	}
 	return reporters, nil
+}
+
+func (k Keeper) setSupernodePostponed(ctx sdk.Context, sn sntypes.SuperNode, reason string) error {
+	if sn.ValidatorAddress == "" {
+		return fmt.Errorf("missing validator address for supernode %q", sn.SupernodeAccount)
+	}
+	valAddr, err := sdk.ValAddressFromBech32(sn.ValidatorAddress)
+	if err != nil {
+		return err
+	}
+	return k.supernodeKeeper.SetSuperNodePostponed(ctx, valAddr, reason)
+}
+
+func (k Keeper) recoverSupernodeActive(ctx sdk.Context, sn sntypes.SuperNode) error {
+	if sn.ValidatorAddress == "" {
+		return fmt.Errorf("missing validator address for supernode %q", sn.SupernodeAccount)
+	}
+	valAddr, err := sdk.ValAddressFromBech32(sn.ValidatorAddress)
+	if err != nil {
+		return err
+	}
+	return k.supernodeKeeper.RecoverSuperNodeFromPostponed(ctx, valAddr)
+}
+
+func (k Keeper) missingReportsForConsecutiveWindows(ctx sdk.Context, supernodeAccount string, windowID uint64, consecutive uint32) bool {
+	if consecutive == 0 {
+		consecutive = 1
+	}
+	if consecutive > uint32(windowID+1) {
+		// Not enough history on-chain to satisfy the consecutive rule.
+		return false
+	}
+	for offset := uint32(0); offset < consecutive; offset++ {
+		w := windowID - uint64(offset)
+		if k.HasReport(ctx, w, supernodeAccount) {
+			return false
+		}
+	}
+	return true
 }

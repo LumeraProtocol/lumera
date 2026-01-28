@@ -17,8 +17,21 @@ func (q queryServer) AuditReportsByReporter(ctx context.Context, req *types.Quer
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
 	}
+	if req.SupernodeAccount == "" {
+		return nil, status.Error(codes.InvalidArgument, "supernode_account is required")
+	}
 
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
+
+	// Validate the reporter is a registered supernode.
+	_, found, err := q.k.supernodeKeeper.GetSuperNodeByAccount(sdkCtx, req.SupernodeAccount)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if !found {
+		return nil, status.Error(codes.NotFound, "supernode not found")
+	}
+
 	storeAdapter := runtime.KVStoreAdapter(q.k.storeService.OpenKVStore(sdkCtx))
 	store := prefix.NewStore(storeAdapter, types.ReportIndexPrefix(req.SupernodeAccount))
 

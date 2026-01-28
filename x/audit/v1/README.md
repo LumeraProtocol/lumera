@@ -23,7 +23,7 @@ High-level behavior:
 - At each window start, the module persists a `WindowSnapshot` containing the prober → targets mapping (`assignments`).
 - Supernodes submit one report per window containing:
   - self metrics (self-attested)
-  - peer reachability observations
+  - peer reachability observations (only when the reporter is a prober for the window)
 
 Notes:
 - This module currently focuses on windowing/snapshotting and report persistence. Penalties and aggregation are intentionally not implemented.
@@ -100,8 +100,21 @@ Uniqueness is guaranteed (one report per reporter per window).
 On `MsgSubmitAuditReport`:
 1. Resolve reporter supernode from `supernode_account` via `x/supernode`.
 2. Validate window acceptance (only the current `window_id` at the current height is accepted).
-3. Ensure per-window uniqueness for the reporter.
-4. Persist the report.
+3. If the reporter is a **prober** for the window (i.e., appears in `WindowSnapshot.assignments`), require peer observations for **all** assigned targets.
+   - If the reporter is **not** a prober for the window (e.g. `POSTPONED`), peer observations must be empty (self-report only).
+4. Ensure per-window uniqueness for the reporter.
+5. Persist the report.
+
+### Window end enforcement
+
+At `window_end_height`, the module evaluates the completed window and may transition supernodes:
+- `ACTIVE` → `POSTPONED` for:
+  - missing reports for `consecutive_windows_to_postpone` consecutive windows
+  - host requirement failures (self report)
+  - peer port unanimity on `CLOSED` for `consecutive_windows_to_postpone` consecutive windows
+- `POSTPONED` → `ACTIVE` if, in a single window, there is:
+  - one compliant self report, and
+  - at least one peer report about the supernode where all required ports are `OPEN`
 
 ## Messages
 
@@ -159,12 +172,28 @@ Returns the current reporting window boundaries:
 Lists peer-observation chunks about a given supernode (by other reporters):
 - gRPC: `Query/SupernodeReports`
 - REST: `GET /LumeraProtocol/lumera/audit/v1/supernode_reports/{supernode_account}`
+Notes:
+- To filter by a specific window (including `window_id = 0`), use `filter_by_window_id = true`.
 
 ### SelfReports
 
 Lists self-report chunks for a supernode across windows:
 - gRPC: `Query/SelfReports`
 - REST: `GET /LumeraProtocol/lumera/audit/v1/self_reports/{supernode_account}`
+Notes:
+- To filter by a specific window (including `window_id = 0`), use `filter_by_window_id = true`.
+
+### WindowSnapshot
+
+Returns the persisted `WindowSnapshot` for a given window:
+- gRPC: `Query/WindowSnapshot`
+- REST: `GET /LumeraProtocol/lumera/audit/v1/window_snapshot/{window_id}`
+
+### AssignedTargets
+
+Returns the reporter’s assigned targets for a given window (or the current window by default):
+- gRPC: `Query/AssignedTargets`
+- REST: `GET /LumeraProtocol/lumera/audit/v1/assigned_targets/{supernode_account}`
 
 ## Events
 

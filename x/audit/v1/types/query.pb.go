@@ -208,6 +208,222 @@ func (m *QueryCurrentWindowResponse) GetWindowEndHeight() int64 {
 	return 0
 }
 
+type QueryWindowSnapshotRequest struct {
+	WindowId uint64 `protobuf:"varint,1,opt,name=window_id,json=windowId,proto3" json:"window_id,omitempty"`
+}
+
+func (m *QueryWindowSnapshotRequest) Reset()         { *m = QueryWindowSnapshotRequest{} }
+func (m *QueryWindowSnapshotRequest) String() string { return proto.CompactTextString(m) }
+func (*QueryWindowSnapshotRequest) ProtoMessage()    {}
+func (*QueryWindowSnapshotRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_e98945621bbc9485, []int{4}
+}
+func (m *QueryWindowSnapshotRequest) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *QueryWindowSnapshotRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_QueryWindowSnapshotRequest.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *QueryWindowSnapshotRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_QueryWindowSnapshotRequest.Merge(m, src)
+}
+func (m *QueryWindowSnapshotRequest) XXX_Size() int {
+	return m.Size()
+}
+func (m *QueryWindowSnapshotRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_QueryWindowSnapshotRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_QueryWindowSnapshotRequest proto.InternalMessageInfo
+
+func (m *QueryWindowSnapshotRequest) GetWindowId() uint64 {
+	if m != nil {
+		return m.WindowId
+	}
+	return 0
+}
+
+type QueryWindowSnapshotResponse struct {
+	Snapshot WindowSnapshot `protobuf:"bytes,1,opt,name=snapshot,proto3" json:"snapshot"`
+}
+
+func (m *QueryWindowSnapshotResponse) Reset()         { *m = QueryWindowSnapshotResponse{} }
+func (m *QueryWindowSnapshotResponse) String() string { return proto.CompactTextString(m) }
+func (*QueryWindowSnapshotResponse) ProtoMessage()    {}
+func (*QueryWindowSnapshotResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_e98945621bbc9485, []int{5}
+}
+func (m *QueryWindowSnapshotResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *QueryWindowSnapshotResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_QueryWindowSnapshotResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *QueryWindowSnapshotResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_QueryWindowSnapshotResponse.Merge(m, src)
+}
+func (m *QueryWindowSnapshotResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *QueryWindowSnapshotResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_QueryWindowSnapshotResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_QueryWindowSnapshotResponse proto.InternalMessageInfo
+
+func (m *QueryWindowSnapshotResponse) GetSnapshot() WindowSnapshot {
+	if m != nil {
+		return m.Snapshot
+	}
+	return WindowSnapshot{}
+}
+
+type QueryAssignedTargetsRequest struct {
+	SupernodeAccount string `protobuf:"bytes,1,opt,name=supernode_account,json=supernodeAccount,proto3" json:"supernode_account,omitempty"`
+	WindowId         uint64 `protobuf:"varint,2,opt,name=window_id,json=windowId,proto3" json:"window_id,omitempty"`
+	FilterByWindowId bool   `protobuf:"varint,3,opt,name=filter_by_window_id,json=filterByWindowId,proto3" json:"filter_by_window_id,omitempty"`
+}
+
+func (m *QueryAssignedTargetsRequest) Reset()         { *m = QueryAssignedTargetsRequest{} }
+func (m *QueryAssignedTargetsRequest) String() string { return proto.CompactTextString(m) }
+func (*QueryAssignedTargetsRequest) ProtoMessage()    {}
+func (*QueryAssignedTargetsRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_e98945621bbc9485, []int{6}
+}
+func (m *QueryAssignedTargetsRequest) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *QueryAssignedTargetsRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_QueryAssignedTargetsRequest.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *QueryAssignedTargetsRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_QueryAssignedTargetsRequest.Merge(m, src)
+}
+func (m *QueryAssignedTargetsRequest) XXX_Size() int {
+	return m.Size()
+}
+func (m *QueryAssignedTargetsRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_QueryAssignedTargetsRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_QueryAssignedTargetsRequest proto.InternalMessageInfo
+
+func (m *QueryAssignedTargetsRequest) GetSupernodeAccount() string {
+	if m != nil {
+		return m.SupernodeAccount
+	}
+	return ""
+}
+
+func (m *QueryAssignedTargetsRequest) GetWindowId() uint64 {
+	if m != nil {
+		return m.WindowId
+	}
+	return 0
+}
+
+func (m *QueryAssignedTargetsRequest) GetFilterByWindowId() bool {
+	if m != nil {
+		return m.FilterByWindowId
+	}
+	return false
+}
+
+type QueryAssignedTargetsResponse struct {
+	WindowId                uint64   `protobuf:"varint,1,opt,name=window_id,json=windowId,proto3" json:"window_id,omitempty"`
+	WindowStartHeight       int64    `protobuf:"varint,2,opt,name=window_start_height,json=windowStartHeight,proto3" json:"window_start_height,omitempty"`
+	RequiredOpenPorts       []uint32 `protobuf:"varint,3,rep,packed,name=required_open_ports,json=requiredOpenPorts,proto3" json:"required_open_ports,omitempty"`
+	TargetSupernodeAccounts []string `protobuf:"bytes,4,rep,name=target_supernode_accounts,json=targetSupernodeAccounts,proto3" json:"target_supernode_accounts,omitempty"`
+}
+
+func (m *QueryAssignedTargetsResponse) Reset()         { *m = QueryAssignedTargetsResponse{} }
+func (m *QueryAssignedTargetsResponse) String() string { return proto.CompactTextString(m) }
+func (*QueryAssignedTargetsResponse) ProtoMessage()    {}
+func (*QueryAssignedTargetsResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_e98945621bbc9485, []int{7}
+}
+func (m *QueryAssignedTargetsResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *QueryAssignedTargetsResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_QueryAssignedTargetsResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *QueryAssignedTargetsResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_QueryAssignedTargetsResponse.Merge(m, src)
+}
+func (m *QueryAssignedTargetsResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *QueryAssignedTargetsResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_QueryAssignedTargetsResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_QueryAssignedTargetsResponse proto.InternalMessageInfo
+
+func (m *QueryAssignedTargetsResponse) GetWindowId() uint64 {
+	if m != nil {
+		return m.WindowId
+	}
+	return 0
+}
+
+func (m *QueryAssignedTargetsResponse) GetWindowStartHeight() int64 {
+	if m != nil {
+		return m.WindowStartHeight
+	}
+	return 0
+}
+
+func (m *QueryAssignedTargetsResponse) GetRequiredOpenPorts() []uint32 {
+	if m != nil {
+		return m.RequiredOpenPorts
+	}
+	return nil
+}
+
+func (m *QueryAssignedTargetsResponse) GetTargetSupernodeAccounts() []string {
+	if m != nil {
+		return m.TargetSupernodeAccounts
+	}
+	return nil
+}
+
 type QueryAuditReportRequest struct {
 	WindowId         uint64 `protobuf:"varint,1,opt,name=window_id,json=windowId,proto3" json:"window_id,omitempty"`
 	SupernodeAccount string `protobuf:"bytes,2,opt,name=supernode_account,json=supernodeAccount,proto3" json:"supernode_account,omitempty"`
@@ -217,7 +433,7 @@ func (m *QueryAuditReportRequest) Reset()         { *m = QueryAuditReportRequest
 func (m *QueryAuditReportRequest) String() string { return proto.CompactTextString(m) }
 func (*QueryAuditReportRequest) ProtoMessage()    {}
 func (*QueryAuditReportRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e98945621bbc9485, []int{4}
+	return fileDescriptor_e98945621bbc9485, []int{8}
 }
 func (m *QueryAuditReportRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -268,7 +484,7 @@ func (m *QueryAuditReportResponse) Reset()         { *m = QueryAuditReportRespon
 func (m *QueryAuditReportResponse) String() string { return proto.CompactTextString(m) }
 func (*QueryAuditReportResponse) ProtoMessage()    {}
 func (*QueryAuditReportResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e98945621bbc9485, []int{5}
+	return fileDescriptor_e98945621bbc9485, []int{9}
 }
 func (m *QueryAuditReportResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -313,7 +529,7 @@ func (m *QueryAuditReportsByReporterRequest) Reset()         { *m = QueryAuditRe
 func (m *QueryAuditReportsByReporterRequest) String() string { return proto.CompactTextString(m) }
 func (*QueryAuditReportsByReporterRequest) ProtoMessage()    {}
 func (*QueryAuditReportsByReporterRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e98945621bbc9485, []int{6}
+	return fileDescriptor_e98945621bbc9485, []int{10}
 }
 func (m *QueryAuditReportsByReporterRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -365,7 +581,7 @@ func (m *QueryAuditReportsByReporterResponse) Reset()         { *m = QueryAuditR
 func (m *QueryAuditReportsByReporterResponse) String() string { return proto.CompactTextString(m) }
 func (*QueryAuditReportsByReporterResponse) ProtoMessage()    {}
 func (*QueryAuditReportsByReporterResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e98945621bbc9485, []int{7}
+	return fileDescriptor_e98945621bbc9485, []int{11}
 }
 func (m *QueryAuditReportsByReporterResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -412,13 +628,14 @@ type QuerySupernodeReportsRequest struct {
 	SupernodeAccount string             `protobuf:"bytes,1,opt,name=supernode_account,json=supernodeAccount,proto3" json:"supernode_account,omitempty"`
 	WindowId         uint64             `protobuf:"varint,2,opt,name=window_id,json=windowId,proto3" json:"window_id,omitempty"`
 	Pagination       *query.PageRequest `protobuf:"bytes,3,opt,name=pagination,proto3" json:"pagination,omitempty"`
+	FilterByWindowId bool               `protobuf:"varint,4,opt,name=filter_by_window_id,json=filterByWindowId,proto3" json:"filter_by_window_id,omitempty"`
 }
 
 func (m *QuerySupernodeReportsRequest) Reset()         { *m = QuerySupernodeReportsRequest{} }
 func (m *QuerySupernodeReportsRequest) String() string { return proto.CompactTextString(m) }
 func (*QuerySupernodeReportsRequest) ProtoMessage()    {}
 func (*QuerySupernodeReportsRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e98945621bbc9485, []int{8}
+	return fileDescriptor_e98945621bbc9485, []int{12}
 }
 func (m *QuerySupernodeReportsRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -468,6 +685,13 @@ func (m *QuerySupernodeReportsRequest) GetPagination() *query.PageRequest {
 	return nil
 }
 
+func (m *QuerySupernodeReportsRequest) GetFilterByWindowId() bool {
+	if m != nil {
+		return m.FilterByWindowId
+	}
+	return false
+}
+
 type SupernodeReport struct {
 	ReporterSupernodeAccount string      `protobuf:"bytes,1,opt,name=reporter_supernode_account,json=reporterSupernodeAccount,proto3" json:"reporter_supernode_account,omitempty"`
 	WindowId                 uint64      `protobuf:"varint,2,opt,name=window_id,json=windowId,proto3" json:"window_id,omitempty"`
@@ -479,7 +703,7 @@ func (m *SupernodeReport) Reset()         { *m = SupernodeReport{} }
 func (m *SupernodeReport) String() string { return proto.CompactTextString(m) }
 func (*SupernodeReport) ProtoMessage()    {}
 func (*SupernodeReport) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e98945621bbc9485, []int{9}
+	return fileDescriptor_e98945621bbc9485, []int{13}
 }
 func (m *SupernodeReport) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -545,7 +769,7 @@ func (m *QuerySupernodeReportsResponse) Reset()         { *m = QuerySupernodeRep
 func (m *QuerySupernodeReportsResponse) String() string { return proto.CompactTextString(m) }
 func (*QuerySupernodeReportsResponse) ProtoMessage()    {}
 func (*QuerySupernodeReportsResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e98945621bbc9485, []int{10}
+	return fileDescriptor_e98945621bbc9485, []int{14}
 }
 func (m *QuerySupernodeReportsResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -592,13 +816,14 @@ type QuerySelfReportsRequest struct {
 	SupernodeAccount string             `protobuf:"bytes,1,opt,name=supernode_account,json=supernodeAccount,proto3" json:"supernode_account,omitempty"`
 	WindowId         uint64             `protobuf:"varint,2,opt,name=window_id,json=windowId,proto3" json:"window_id,omitempty"`
 	Pagination       *query.PageRequest `protobuf:"bytes,3,opt,name=pagination,proto3" json:"pagination,omitempty"`
+	FilterByWindowId bool               `protobuf:"varint,4,opt,name=filter_by_window_id,json=filterByWindowId,proto3" json:"filter_by_window_id,omitempty"`
 }
 
 func (m *QuerySelfReportsRequest) Reset()         { *m = QuerySelfReportsRequest{} }
 func (m *QuerySelfReportsRequest) String() string { return proto.CompactTextString(m) }
 func (*QuerySelfReportsRequest) ProtoMessage()    {}
 func (*QuerySelfReportsRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e98945621bbc9485, []int{11}
+	return fileDescriptor_e98945621bbc9485, []int{15}
 }
 func (m *QuerySelfReportsRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -648,6 +873,13 @@ func (m *QuerySelfReportsRequest) GetPagination() *query.PageRequest {
 	return nil
 }
 
+func (m *QuerySelfReportsRequest) GetFilterByWindowId() bool {
+	if m != nil {
+		return m.FilterByWindowId
+	}
+	return false
+}
+
 type SelfReport struct {
 	WindowId     uint64          `protobuf:"varint,1,opt,name=window_id,json=windowId,proto3" json:"window_id,omitempty"`
 	ReportHeight int64           `protobuf:"varint,2,opt,name=report_height,json=reportHeight,proto3" json:"report_height,omitempty"`
@@ -658,7 +890,7 @@ func (m *SelfReport) Reset()         { *m = SelfReport{} }
 func (m *SelfReport) String() string { return proto.CompactTextString(m) }
 func (*SelfReport) ProtoMessage()    {}
 func (*SelfReport) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e98945621bbc9485, []int{12}
+	return fileDescriptor_e98945621bbc9485, []int{16}
 }
 func (m *SelfReport) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -717,7 +949,7 @@ func (m *QuerySelfReportsResponse) Reset()         { *m = QuerySelfReportsRespon
 func (m *QuerySelfReportsResponse) String() string { return proto.CompactTextString(m) }
 func (*QuerySelfReportsResponse) ProtoMessage()    {}
 func (*QuerySelfReportsResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_e98945621bbc9485, []int{13}
+	return fileDescriptor_e98945621bbc9485, []int{17}
 }
 func (m *QuerySelfReportsResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -765,6 +997,10 @@ func init() {
 	proto.RegisterType((*QueryParamsResponse)(nil), "lumera.audit.v1.QueryParamsResponse")
 	proto.RegisterType((*QueryCurrentWindowRequest)(nil), "lumera.audit.v1.QueryCurrentWindowRequest")
 	proto.RegisterType((*QueryCurrentWindowResponse)(nil), "lumera.audit.v1.QueryCurrentWindowResponse")
+	proto.RegisterType((*QueryWindowSnapshotRequest)(nil), "lumera.audit.v1.QueryWindowSnapshotRequest")
+	proto.RegisterType((*QueryWindowSnapshotResponse)(nil), "lumera.audit.v1.QueryWindowSnapshotResponse")
+	proto.RegisterType((*QueryAssignedTargetsRequest)(nil), "lumera.audit.v1.QueryAssignedTargetsRequest")
+	proto.RegisterType((*QueryAssignedTargetsResponse)(nil), "lumera.audit.v1.QueryAssignedTargetsResponse")
 	proto.RegisterType((*QueryAuditReportRequest)(nil), "lumera.audit.v1.QueryAuditReportRequest")
 	proto.RegisterType((*QueryAuditReportResponse)(nil), "lumera.audit.v1.QueryAuditReportResponse")
 	proto.RegisterType((*QueryAuditReportsByReporterRequest)(nil), "lumera.audit.v1.QueryAuditReportsByReporterRequest")
@@ -780,68 +1016,82 @@ func init() {
 func init() { proto.RegisterFile("lumera/audit/v1/query.proto", fileDescriptor_e98945621bbc9485) }
 
 var fileDescriptor_e98945621bbc9485 = []byte{
-	// 973 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xd4, 0x57, 0x4d, 0x6f, 0x1b, 0x45,
-	0x18, 0xce, 0xc4, 0x21, 0x34, 0xaf, 0x29, 0x49, 0xa6, 0x15, 0x71, 0xd7, 0xc1, 0x58, 0x1b, 0x54,
-	0x8c, 0x51, 0x77, 0x49, 0x8a, 0x38, 0x50, 0x0e, 0x8d, 0x51, 0x49, 0x90, 0x5a, 0x48, 0xd7, 0x7c,
-	0x08, 0x2e, 0xab, 0xb5, 0x77, 0xba, 0x5d, 0xc9, 0xde, 0xd9, 0xee, 0x8c, 0x53, 0xac, 0xaa, 0x12,
-	0x82, 0x3f, 0x80, 0x84, 0x10, 0xd7, 0x1e, 0x11, 0xea, 0x81, 0x03, 0x42, 0x88, 0x13, 0xc7, 0x5c,
-	0x90, 0x2a, 0xb8, 0x20, 0x0e, 0x08, 0x25, 0x48, 0x1c, 0xf8, 0x13, 0x68, 0x67, 0x66, 0x63, 0x7b,
-	0x77, 0xfd, 0x91, 0xa8, 0x1c, 0xb8, 0x44, 0xe3, 0x79, 0xbf, 0x9e, 0xe7, 0x9d, 0x67, 0xdf, 0x99,
-	0x40, 0xb9, 0xd3, 0xeb, 0x92, 0xc8, 0x31, 0x9d, 0x9e, 0xeb, 0x73, 0x73, 0x7f, 0xd3, 0xbc, 0xd3,
-	0x23, 0x51, 0xdf, 0x08, 0x23, 0xca, 0x29, 0x5e, 0x96, 0x46, 0x43, 0x18, 0x8d, 0xfd, 0x4d, 0x6d,
-	0xd5, 0xe9, 0xfa, 0x01, 0x35, 0xc5, 0x5f, 0xe9, 0xa3, 0x9d, 0xf7, 0xa8, 0x47, 0xc5, 0xd2, 0x8c,
-	0x57, 0x6a, 0x77, 0xdd, 0xa3, 0xd4, 0xeb, 0x10, 0xd3, 0x09, 0x7d, 0xd3, 0x09, 0x02, 0xca, 0x1d,
-	0xee, 0xd3, 0x80, 0x29, 0xeb, 0x85, 0x36, 0x65, 0x5d, 0xca, 0x6c, 0x19, 0x26, 0x7f, 0x28, 0x53,
-	0x5d, 0xfe, 0x32, 0x5b, 0x0e, 0x23, 0x12, 0x8b, 0xb9, 0xbf, 0xd9, 0x22, 0xdc, 0xd9, 0x34, 0x43,
-	0xc7, 0xf3, 0x03, 0x91, 0x27, 0x29, 0x92, 0xc6, 0x1e, 0x3a, 0x91, 0xd3, 0x4d, 0x32, 0x65, 0x98,
-	0x49, 0x16, 0xc2, 0xa8, 0x9f, 0x07, 0x7c, 0x33, 0x4e, 0xbe, 0x27, 0x22, 0x2c, 0x72, 0xa7, 0x47,
-	0x18, 0xd7, 0x6f, 0xc2, 0xb9, 0x91, 0x5d, 0x16, 0xd2, 0x80, 0x11, 0xfc, 0x1a, 0x2c, 0xca, 0xcc,
-	0x25, 0x54, 0x45, 0xb5, 0xe2, 0xd6, 0x9a, 0x91, 0xea, 0x8b, 0x21, 0x03, 0x1a, 0x4b, 0x07, 0x7f,
-	0x3c, 0x37, 0xf7, 0xf5, 0xdf, 0xdf, 0xd6, 0x91, 0xa5, 0x22, 0xf4, 0x32, 0x5c, 0x10, 0x29, 0xdf,
-	0xe8, 0x45, 0x11, 0x09, 0xf8, 0x07, 0x7e, 0xe0, 0xd2, 0xbb, 0x49, 0xbd, 0x2f, 0x11, 0x68, 0x79,
-	0x56, 0x55, 0xb7, 0x0c, 0x4b, 0x77, 0xc5, 0x8e, 0xed, 0xbb, 0xa2, 0xf4, 0x82, 0x75, 0x46, 0x6e,
-	0xbc, 0xe5, 0x62, 0x03, 0xce, 0x29, 0x23, 0xe3, 0x4e, 0xc4, 0xed, 0xdb, 0xc4, 0xf7, 0x6e, 0xf3,
-	0xd2, 0x7c, 0x15, 0xd5, 0x0a, 0xd6, 0xaa, 0x34, 0x35, 0x63, 0xcb, 0xae, 0x30, 0xe0, 0x3a, 0xa8,
-	0x4d, 0x9b, 0x04, 0x6e, 0xe2, 0x5d, 0x10, 0xde, 0xcb, 0xd2, 0x70, 0x2d, 0x70, 0xa5, 0xaf, 0xfe,
-	0x09, 0x82, 0x35, 0x81, 0x6b, 0x3b, 0x26, 0x68, 0x91, 0x90, 0x46, 0x5c, 0x61, 0x9e, 0x0c, 0x6a,
-	0x17, 0x56, 0x59, 0x2f, 0x24, 0x51, 0x40, 0x5d, 0x62, 0x3b, 0xed, 0x36, 0xed, 0x05, 0x12, 0xd2,
-	0x52, 0xa3, 0xfc, 0xcb, 0x77, 0x97, 0xd6, 0xd4, 0x51, 0x6f, 0xb7, 0xdb, 0xdb, 0xae, 0x1b, 0x11,
-	0xc6, 0x9a, 0x3c, 0xf2, 0x03, 0xcf, 0x5a, 0x39, 0x8e, 0xda, 0x96, 0x41, 0xfa, 0xfb, 0x50, 0xca,
-	0x22, 0x18, 0x9c, 0x47, 0x24, 0x76, 0xd4, 0x79, 0xac, 0x67, 0xce, 0x63, 0x28, 0xaa, 0xb1, 0x10,
-	0x1f, 0x8a, 0xa5, 0x22, 0xf4, 0xef, 0x11, 0xe8, 0xe9, 0xc4, 0xac, 0xd1, 0x97, 0x0b, 0x12, 0x25,
-	0x2c, 0x73, 0x89, 0xa0, 0x53, 0x10, 0xc1, 0x6f, 0x02, 0x0c, 0x84, 0x2b, 0x7a, 0x51, 0xdc, 0xba,
-	0x68, 0xa8, 0xf8, 0x58, 0xe5, 0x86, 0xfc, 0xe2, 0x94, 0xca, 0x8d, 0x3d, 0xc7, 0x23, 0x0a, 0x85,
-	0x35, 0x14, 0xa9, 0x3f, 0x44, 0xb0, 0x31, 0x11, 0xb8, 0x6a, 0xce, 0xeb, 0xf0, 0xa4, 0xa4, 0x1a,
-	0xab, 0xb5, 0x30, 0x63, 0x77, 0x92, 0x10, 0xbc, 0x93, 0x83, 0xf6, 0x85, 0xa9, 0x68, 0x65, 0xe9,
-	0x11, 0xb8, 0x3f, 0x23, 0x58, 0x17, 0x70, 0x9b, 0x49, 0x43, 0x14, 0xe4, 0xc7, 0xdf, 0xe1, 0x11,
-	0x45, 0xce, 0xa7, 0x14, 0x39, 0xda, 0xfe, 0xc2, 0xa9, 0xdb, 0xff, 0x0f, 0x82, 0xe5, 0x14, 0x15,
-	0xfc, 0x21, 0x68, 0x91, 0x6a, 0xbf, 0x7d, 0x2a, 0x2e, 0xa5, 0x24, 0xbc, 0x79, 0x22, 0x4e, 0x1b,
-	0x70, 0x56, 0x06, 0x8e, 0x7e, 0xc6, 0x4f, 0xc9, 0x4d, 0xf5, 0xbd, 0x5f, 0x81, 0xa2, 0x70, 0x61,
-	0xdc, 0xe1, 0x84, 0x95, 0x16, 0xaa, 0x85, 0xda, 0xd3, 0x5b, 0x5a, 0x76, 0x72, 0xd1, 0x88, 0x37,
-	0x63, 0x17, 0x0b, 0xc2, 0x64, 0xc9, 0xf4, 0x6f, 0x10, 0x3c, 0x3b, 0xe6, 0xf4, 0x94, 0xcc, 0xae,
-	0xa6, 0x65, 0x56, 0xcd, 0xa4, 0x4e, 0xc5, 0xfe, 0x67, 0x52, 0x3b, 0x48, 0xa6, 0x55, 0x93, 0x74,
-	0x6e, 0xfd, 0xbf, 0x55, 0xf6, 0x15, 0x02, 0x18, 0xb0, 0x98, 0x3c, 0x6b, 0x33, 0x2a, 0x98, 0xcf,
-	0x51, 0xc1, 0x0e, 0x14, 0x19, 0xe9, 0xdc, 0xb2, 0xd5, 0xbc, 0x94, 0xc8, 0xaa, 0xf9, 0x13, 0x61,
-	0x50, 0x58, 0x1d, 0x15, 0xb0, 0xe3, 0x1d, 0xfd, 0x01, 0x52, 0x03, 0x79, 0xa4, 0xc9, 0x4a, 0x0c,
-	0x57, 0xd2, 0x62, 0x28, 0x67, 0xc5, 0x90, 0x4e, 0xfe, 0xd8, 0x75, 0xb0, 0xf5, 0xe3, 0x19, 0x78,
-	0x42, 0x40, 0xc4, 0x9f, 0x21, 0x58, 0x94, 0x57, 0x32, 0xde, 0xc8, 0x20, 0xc9, 0xde, 0xfb, 0xda,
-	0xf3, 0x93, 0x9d, 0x64, 0x2d, 0xdd, 0xf8, 0xf4, 0xd7, 0xbf, 0xbe, 0x98, 0xaf, 0xe1, 0x8b, 0xe6,
-	0x75, 0xe1, 0xbd, 0x17, 0xbf, 0x24, 0xda, 0xb4, 0x63, 0xe6, 0x3f, 0x43, 0xf0, 0x03, 0x04, 0x67,
-	0x47, 0x2e, 0x76, 0x5c, 0xcf, 0xaf, 0x93, 0xf7, 0x36, 0xd0, 0x5e, 0x9a, 0xc9, 0x57, 0x41, 0x7b,
-	0x55, 0x40, 0x7b, 0x19, 0x1b, 0xd3, 0xa0, 0xb5, 0x65, 0xb8, 0x2d, 0x55, 0x84, 0x7f, 0x40, 0x50,
-	0x1c, 0xba, 0x0d, 0x70, 0x2d, 0xbf, 0x68, 0xf6, 0x19, 0xa0, 0xbd, 0x38, 0x83, 0xa7, 0x02, 0xf7,
-	0xae, 0x00, 0xf7, 0x36, 0xbe, 0x3e, 0x0d, 0x9c, 0x58, 0x28, 0xa9, 0x9a, 0xf7, 0x8e, 0x95, 0x7f,
-	0xdf, 0xbc, 0x97, 0xf9, 0x86, 0xef, 0xe3, 0xdf, 0x11, 0x3c, 0x93, 0x7f, 0x15, 0xe2, 0xcb, 0x53,
-	0xb1, 0x65, 0x6f, 0x7c, 0xed, 0x95, 0x93, 0x05, 0x29, 0x6e, 0xef, 0x09, 0x6e, 0xef, 0xe0, 0x1b,
-	0x27, 0xe1, 0xc6, 0xec, 0x56, 0xdf, 0x4e, 0x46, 0x7f, 0x2e, 0xb9, 0x9f, 0x10, 0xac, 0xa4, 0x47,
-	0x2f, 0xbe, 0x94, 0x8f, 0x70, 0xcc, 0x05, 0xab, 0x19, 0xb3, 0xba, 0x2b, 0x2a, 0x37, 0x04, 0x95,
-	0x1d, 0x7c, 0x6d, 0x1a, 0x95, 0x01, 0x5e, 0x45, 0x27, 0x97, 0xc2, 0x43, 0x04, 0xc5, 0xa1, 0x59,
-	0x31, 0x4e, 0x5a, 0xd9, 0x99, 0x3d, 0x4e, 0x5a, 0x39, 0x83, 0x47, 0xdf, 0x15, 0x98, 0x1b, 0xf8,
-	0xea, 0x54, 0xcc, 0x83, 0x21, 0x98, 0x0b, 0xb7, 0x51, 0x3f, 0x38, 0xac, 0xa0, 0x47, 0x87, 0x15,
-	0xf4, 0xe7, 0x61, 0x05, 0x7d, 0x7e, 0x54, 0x99, 0x7b, 0x74, 0x54, 0x99, 0xfb, 0xed, 0xa8, 0x32,
-	0xf7, 0xd1, 0xca, 0xc7, 0x83, 0x34, 0xbc, 0x1f, 0x12, 0xd6, 0x5a, 0x14, 0xff, 0x43, 0x5c, 0xfe,
-	0x37, 0x00, 0x00, 0xff, 0xff, 0xf0, 0x85, 0xcb, 0x6e, 0x3c, 0x0d, 0x00, 0x00,
+	// 1191 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe4, 0x58, 0xc1, 0x6f, 0xdc, 0xc4,
+	0x17, 0xce, 0x64, 0xf3, 0xeb, 0x2f, 0x79, 0x4b, 0x9a, 0x64, 0x52, 0x91, 0x8d, 0x37, 0x6c, 0x57,
+	0x0e, 0x2a, 0x21, 0x10, 0x9b, 0xa4, 0x08, 0x09, 0x02, 0x52, 0xb3, 0xa5, 0x4d, 0x2a, 0xa5, 0x34,
+	0xf5, 0x16, 0x2a, 0xb8, 0x18, 0x67, 0x3d, 0xd9, 0x58, 0xda, 0xd8, 0x8e, 0xc7, 0x9b, 0x12, 0x55,
+	0x95, 0x10, 0xfc, 0x03, 0x48, 0x08, 0x71, 0xed, 0x11, 0xa1, 0x1c, 0x2a, 0x81, 0x10, 0x07, 0x0e,
+	0x1c, 0x7b, 0xac, 0xe0, 0x82, 0x38, 0x20, 0x94, 0x20, 0x71, 0xe0, 0x8a, 0xc4, 0x85, 0x03, 0xf2,
+	0xcc, 0x73, 0x36, 0x6b, 0x7b, 0xb3, 0x9b, 0xa8, 0xe5, 0xc2, 0x25, 0x9a, 0x9d, 0xf7, 0xbe, 0x79,
+	0xdf, 0x7b, 0xf3, 0xf9, 0xcd, 0x53, 0xa0, 0xd8, 0x68, 0x6e, 0xb1, 0xc0, 0xd2, 0xad, 0xa6, 0xed,
+	0x84, 0xfa, 0xce, 0xbc, 0xbe, 0xdd, 0x64, 0xc1, 0xae, 0xe6, 0x07, 0x5e, 0xe8, 0xd1, 0x11, 0x69,
+	0xd4, 0x84, 0x51, 0xdb, 0x99, 0x57, 0xc6, 0xac, 0x2d, 0xc7, 0xf5, 0x74, 0xf1, 0x57, 0xfa, 0x28,
+	0xe7, 0xea, 0x5e, 0xdd, 0x13, 0x4b, 0x3d, 0x5a, 0xe1, 0xee, 0x54, 0xdd, 0xf3, 0xea, 0x0d, 0xa6,
+	0x5b, 0xbe, 0xa3, 0x5b, 0xae, 0xeb, 0x85, 0x56, 0xe8, 0x78, 0x2e, 0x47, 0xeb, 0x64, 0xcd, 0xe3,
+	0x5b, 0x1e, 0x37, 0x25, 0x4c, 0xfe, 0x40, 0xd3, 0xac, 0xfc, 0xa5, 0xaf, 0x5b, 0x9c, 0x49, 0x2e,
+	0xfa, 0xce, 0xfc, 0x3a, 0x0b, 0xad, 0x79, 0xdd, 0xb7, 0xea, 0x8e, 0x2b, 0xce, 0x89, 0x83, 0x24,
+	0xb9, 0xfb, 0x56, 0x60, 0x6d, 0xc5, 0x27, 0xa5, 0x32, 0x93, 0x59, 0x08, 0xa3, 0x7a, 0x0e, 0xe8,
+	0xcd, 0xe8, 0xf0, 0x35, 0x81, 0x30, 0xd8, 0x76, 0x93, 0xf1, 0x50, 0xbd, 0x09, 0xe3, 0x6d, 0xbb,
+	0xdc, 0xf7, 0x5c, 0xce, 0xe8, 0x6b, 0x70, 0x46, 0x9e, 0x5c, 0x20, 0x65, 0x32, 0x93, 0x5f, 0x98,
+	0xd0, 0x12, 0x75, 0xd1, 0x24, 0xa0, 0x32, 0xf4, 0xf0, 0x97, 0xf3, 0x7d, 0x5f, 0xfc, 0xfe, 0x60,
+	0x96, 0x18, 0x88, 0x50, 0x8b, 0x30, 0x29, 0x8e, 0xbc, 0xdc, 0x0c, 0x02, 0xe6, 0x86, 0xb7, 0x1d,
+	0xd7, 0xf6, 0xee, 0xc4, 0xf1, 0x3e, 0x23, 0xa0, 0x64, 0x59, 0x31, 0x6e, 0x11, 0x86, 0xee, 0x88,
+	0x1d, 0xd3, 0xb1, 0x45, 0xe8, 0x01, 0x63, 0x50, 0x6e, 0x5c, 0xb3, 0xa9, 0x06, 0xe3, 0x68, 0xe4,
+	0xa1, 0x15, 0x84, 0xe6, 0x26, 0x73, 0xea, 0x9b, 0x61, 0xa1, 0xbf, 0x4c, 0x66, 0x72, 0xc6, 0x98,
+	0x34, 0x55, 0x23, 0xcb, 0x8a, 0x30, 0xd0, 0x59, 0xc0, 0x4d, 0x93, 0xb9, 0x76, 0xec, 0x9d, 0x13,
+	0xde, 0x23, 0xd2, 0x70, 0xc5, 0xb5, 0xa5, 0xaf, 0xfa, 0x2a, 0xd2, 0x92, 0x7c, 0xaa, 0xae, 0xe5,
+	0xf3, 0x4d, 0x2f, 0x44, 0xd6, 0xc7, 0xd2, 0x52, 0xdf, 0x87, 0x62, 0x26, 0x14, 0x53, 0x5a, 0x82,
+	0x41, 0x8e, 0x7b, 0x58, 0xcc, 0xf3, 0xa9, 0x62, 0xb6, 0x43, 0x2b, 0x03, 0x51, 0x51, 0x8d, 0x43,
+	0x98, 0xfa, 0x15, 0xc1, 0x10, 0x4b, 0x9c, 0x3b, 0x75, 0x97, 0xd9, 0xb7, 0xac, 0xa0, 0xce, 0xc2,
+	0xf8, 0x12, 0xe9, 0x0a, 0x8c, 0xf1, 0xa6, 0xcf, 0x02, 0xd7, 0xb3, 0x99, 0x69, 0xd5, 0x6a, 0x5e,
+	0xd3, 0x95, 0xb1, 0x86, 0x2a, 0xc5, 0x1f, 0xbe, 0x9e, 0x9b, 0x40, 0xb9, 0x2d, 0xd5, 0x6a, 0x4b,
+	0xb6, 0x1d, 0x30, 0xce, 0xab, 0x61, 0xe0, 0xb8, 0x75, 0x63, 0xf4, 0x10, 0xb5, 0x24, 0x41, 0xed,
+	0x89, 0xf6, 0x27, 0xea, 0x3f, 0x07, 0xe3, 0x1b, 0x4e, 0x23, 0x64, 0x81, 0xb9, 0xbe, 0x6b, 0xb6,
+	0xdc, 0xa2, 0x8a, 0x0e, 0x1a, 0xa3, 0xd2, 0x54, 0xc1, 0x32, 0x5c, 0xb3, 0xd5, 0x3f, 0x09, 0x4c,
+	0x65, 0xb3, 0x7e, 0x12, 0x97, 0xad, 0xc1, 0x78, 0xc0, 0xb6, 0x9b, 0x4e, 0xc0, 0x6c, 0xd3, 0xf3,
+	0x99, 0x6b, 0xfa, 0x5e, 0x10, 0xf2, 0x42, 0xae, 0x9c, 0x9b, 0x19, 0x36, 0xc6, 0x62, 0xd3, 0x0d,
+	0x9f, 0xb9, 0x6b, 0x91, 0x81, 0xde, 0x86, 0xc9, 0x50, 0xf0, 0x31, 0x53, 0xa5, 0xe3, 0x85, 0x81,
+	0x72, 0xae, 0x5b, 0xed, 0x26, 0x24, 0xba, 0x9a, 0xa8, 0x20, 0x57, 0x3f, 0x24, 0x30, 0x21, 0xd3,
+	0x8e, 0x6e, 0xd7, 0x60, 0x11, 0x8f, 0x5e, 0x74, 0x94, 0x7d, 0x8b, 0xfd, 0xa7, 0xb8, 0x45, 0xf5,
+	0x1d, 0x28, 0xa4, 0x19, 0xb4, 0xbe, 0xec, 0x40, 0xec, 0xa0, 0x18, 0xa7, 0x52, 0x62, 0x3c, 0x82,
+	0x42, 0x25, 0x22, 0x42, 0xfd, 0x86, 0x80, 0x9a, 0x3c, 0x98, 0x57, 0x76, 0xe5, 0x82, 0x05, 0x8f,
+	0x5f, 0x8e, 0x57, 0x01, 0x5a, 0x2d, 0x50, 0xd4, 0x22, 0xbf, 0x70, 0x41, 0x43, 0x7c, 0xd4, 0x2f,
+	0x35, 0xd9, 0xbb, 0xb1, 0x5f, 0x6a, 0x6b, 0x56, 0x9d, 0x21, 0x0b, 0xe3, 0x08, 0x52, 0xdd, 0x23,
+	0x30, 0x7d, 0x2c, 0x71, 0x2c, 0xce, 0xeb, 0xf0, 0x7f, 0x99, 0x6a, 0xd4, 0xf7, 0x72, 0x3d, 0x56,
+	0x27, 0x86, 0xd0, 0xe5, 0x0c, 0xb6, 0xcf, 0x75, 0x65, 0x2b, 0x43, 0xb7, 0xd1, 0xfd, 0x3b, 0xfe,
+	0x72, 0x0e, 0xd5, 0x85, 0x94, 0xff, 0xe5, 0x0f, 0xbe, 0xbd, 0xfc, 0xb9, 0xd3, 0x96, 0xbf, 0x53,
+	0xe3, 0x18, 0xe8, 0xd0, 0x38, 0xfe, 0x20, 0x30, 0x92, 0xc8, 0x9c, 0xbe, 0x0b, 0x4a, 0x80, 0xb7,
+	0x65, 0x9e, 0x2a, 0xf5, 0x42, 0x0c, 0xaf, 0x9e, 0xa8, 0x04, 0xd3, 0x30, 0x2c, 0x81, 0xed, 0xef,
+	0xc7, 0x53, 0x72, 0x13, 0x7b, 0xcf, 0x22, 0xe4, 0x85, 0x0b, 0x0f, 0xad, 0x90, 0xc9, 0xee, 0x71,
+	0x76, 0x41, 0x49, 0x3f, 0x99, 0x5e, 0x10, 0x56, 0x23, 0x17, 0x03, 0xfc, 0x78, 0xc9, 0xd5, 0x2f,
+	0x09, 0x3c, 0xd3, 0xe1, 0xb2, 0x51, 0x95, 0x97, 0x92, 0xaa, 0x2c, 0xa7, 0x8e, 0x4e, 0x60, 0x9f,
+	0x98, 0x32, 0xff, 0x8a, 0x9b, 0x5b, 0x95, 0x35, 0x36, 0xfe, 0x53, 0xa2, 0xfc, 0x9c, 0x00, 0xb4,
+	0x92, 0x3e, 0xbe, 0x93, 0xa7, 0x44, 0xd3, 0x9f, 0x21, 0x9a, 0x65, 0xc8, 0x73, 0xd6, 0xd8, 0x30,
+	0xb1, 0x1b, 0xcb, 0x44, 0xca, 0xd9, 0xfd, 0xa6, 0x15, 0x18, 0x6f, 0x16, 0xf8, 0xe1, 0x8e, 0x7a,
+	0x9f, 0x60, 0xbb, 0x6f, 0xbb, 0x13, 0xd4, 0xce, 0x62, 0x52, 0x3b, 0xc5, 0xb4, 0x76, 0x92, 0x87,
+	0x3f, 0x76, 0xd9, 0x2c, 0xec, 0xe5, 0xe1, 0x7f, 0x82, 0x22, 0xfd, 0x98, 0xc0, 0x19, 0x39, 0x3a,
+	0xd2, 0xe9, 0x14, 0x93, 0xf4, 0x7c, 0xaa, 0x3c, 0x7b, 0xbc, 0x93, 0x8c, 0xa5, 0x6a, 0x1f, 0xfd,
+	0xf8, 0xdb, 0xa7, 0xfd, 0x33, 0xf4, 0x82, 0xbe, 0x2a, 0xbc, 0xd7, 0xa2, 0x89, 0xb7, 0xe6, 0x35,
+	0xf4, 0xec, 0x71, 0x99, 0xde, 0x27, 0x30, 0xdc, 0x36, 0x80, 0xd2, 0xd9, 0xec, 0x38, 0x59, 0x33,
+	0xac, 0xf2, 0x42, 0x4f, 0xbe, 0x48, 0xed, 0x15, 0x41, 0xed, 0x25, 0xaa, 0x75, 0xa3, 0x56, 0x93,
+	0x70, 0x94, 0x22, 0x7d, 0x40, 0xe0, 0x6c, 0xfb, 0x58, 0x48, 0x3b, 0xc4, 0xcd, 0x1c, 0x59, 0x95,
+	0x17, 0x7b, 0x73, 0x46, 0x96, 0x97, 0x05, 0xcb, 0x37, 0xe8, 0x62, 0x37, 0x96, 0xf1, 0x4c, 0x86,
+	0x07, 0xe8, 0x77, 0x0f, 0xbf, 0x82, 0x7b, 0xf4, 0x3b, 0x02, 0x23, 0x89, 0x59, 0x8f, 0x76, 0xa0,
+	0x91, 0x3d, 0xc8, 0x2a, 0x73, 0x3d, 0x7a, 0x23, 0xeb, 0x55, 0xc1, 0xfa, 0x2a, 0x7d, 0xb3, 0x1b,
+	0x6b, 0x0b, 0x0f, 0x30, 0xe5, 0xd0, 0xc6, 0xf5, 0xbb, 0xa9, 0x4e, 0x75, 0x8f, 0x7e, 0x4b, 0x20,
+	0x7f, 0xe4, 0x75, 0xa7, 0x33, 0x1d, 0xc8, 0xa4, 0xc6, 0x3a, 0xe5, 0xf9, 0x1e, 0x3c, 0x91, 0xf2,
+	0x2d, 0x41, 0xf9, 0x2d, 0xba, 0xda, 0x95, 0x72, 0xb4, 0xc0, 0xe6, 0x70, 0xb4, 0xca, 0x99, 0xd4,
+	0x7f, 0x26, 0xf0, 0x74, 0xf6, 0x68, 0x43, 0x2f, 0x76, 0xe5, 0x96, 0x9e, 0xe0, 0x94, 0x97, 0x4f,
+	0x06, 0xc2, 0xdc, 0xde, 0x16, 0xb9, 0xdd, 0xa0, 0xd7, 0x4f, 0x92, 0x1b, 0x8f, 0xda, 0x6f, 0xfc,
+	0x36, 0x67, 0x26, 0xf7, 0x3d, 0x81, 0xd1, 0xe4, 0xdb, 0x48, 0x3b, 0x28, 0xa5, 0xc3, 0xc0, 0xa4,
+	0x68, 0xbd, 0xba, 0x63, 0x2a, 0xd7, 0x45, 0x2a, 0xcb, 0xf4, 0x4a, 0xb7, 0x54, 0x5a, 0x7c, 0x31,
+	0x9d, 0xcc, 0x14, 0xf6, 0x08, 0xe4, 0x8f, 0x74, 0xe7, 0x4e, 0xd2, 0x4a, 0x3f, 0xaa, 0x9d, 0xa4,
+	0x95, 0xd1, 0xea, 0xd5, 0x15, 0xc1, 0xb9, 0x42, 0x2f, 0x75, 0xe5, 0xdc, 0x7a, 0x76, 0x32, 0xe9,
+	0x56, 0x66, 0x1f, 0xee, 0x97, 0xc8, 0xa3, 0xfd, 0x12, 0xf9, 0x75, 0xbf, 0x44, 0x3e, 0x39, 0x28,
+	0xf5, 0x3d, 0x3a, 0x28, 0xf5, 0xfd, 0x74, 0x50, 0xea, 0x7b, 0x6f, 0xf4, 0x83, 0xd6, 0x31, 0xe1,
+	0xae, 0xcf, 0xf8, 0xfa, 0x19, 0xf1, 0xdf, 0x85, 0x8b, 0xff, 0x04, 0x00, 0x00, 0xff, 0xff, 0x6b,
+	0x7f, 0xcd, 0xb8, 0x56, 0x11, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -860,6 +1110,11 @@ type QueryClient interface {
 	Params(ctx context.Context, in *QueryParamsRequest, opts ...grpc.CallOption) (*QueryParamsResponse, error)
 	// CurrentWindow returns the current derived window boundaries at the current chain height.
 	CurrentWindow(ctx context.Context, in *QueryCurrentWindowRequest, opts ...grpc.CallOption) (*QueryCurrentWindowResponse, error)
+	// WindowSnapshot returns the persisted window snapshot for the given window_id.
+	WindowSnapshot(ctx context.Context, in *QueryWindowSnapshotRequest, opts ...grpc.CallOption) (*QueryWindowSnapshotResponse, error)
+	// AssignedTargets returns the prober -> targets assignment for a given supernode_account.
+	// If filter_by_window_id is false, it returns the assignments for the current window.
+	AssignedTargets(ctx context.Context, in *QueryAssignedTargetsRequest, opts ...grpc.CallOption) (*QueryAssignedTargetsResponse, error)
 	AuditReport(ctx context.Context, in *QueryAuditReportRequest, opts ...grpc.CallOption) (*QueryAuditReportResponse, error)
 	AuditReportsByReporter(ctx context.Context, in *QueryAuditReportsByReporterRequest, opts ...grpc.CallOption) (*QueryAuditReportsByReporterResponse, error)
 	// SupernodeReports returns all reports that include observations about the given supernode_account.
@@ -888,6 +1143,24 @@ func (c *queryClient) Params(ctx context.Context, in *QueryParamsRequest, opts .
 func (c *queryClient) CurrentWindow(ctx context.Context, in *QueryCurrentWindowRequest, opts ...grpc.CallOption) (*QueryCurrentWindowResponse, error) {
 	out := new(QueryCurrentWindowResponse)
 	err := c.cc.Invoke(ctx, "/lumera.audit.v1.Query/CurrentWindow", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *queryClient) WindowSnapshot(ctx context.Context, in *QueryWindowSnapshotRequest, opts ...grpc.CallOption) (*QueryWindowSnapshotResponse, error) {
+	out := new(QueryWindowSnapshotResponse)
+	err := c.cc.Invoke(ctx, "/lumera.audit.v1.Query/WindowSnapshot", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *queryClient) AssignedTargets(ctx context.Context, in *QueryAssignedTargetsRequest, opts ...grpc.CallOption) (*QueryAssignedTargetsResponse, error) {
+	out := new(QueryAssignedTargetsResponse)
+	err := c.cc.Invoke(ctx, "/lumera.audit.v1.Query/AssignedTargets", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -936,6 +1209,11 @@ type QueryServer interface {
 	Params(context.Context, *QueryParamsRequest) (*QueryParamsResponse, error)
 	// CurrentWindow returns the current derived window boundaries at the current chain height.
 	CurrentWindow(context.Context, *QueryCurrentWindowRequest) (*QueryCurrentWindowResponse, error)
+	// WindowSnapshot returns the persisted window snapshot for the given window_id.
+	WindowSnapshot(context.Context, *QueryWindowSnapshotRequest) (*QueryWindowSnapshotResponse, error)
+	// AssignedTargets returns the prober -> targets assignment for a given supernode_account.
+	// If filter_by_window_id is false, it returns the assignments for the current window.
+	AssignedTargets(context.Context, *QueryAssignedTargetsRequest) (*QueryAssignedTargetsResponse, error)
 	AuditReport(context.Context, *QueryAuditReportRequest) (*QueryAuditReportResponse, error)
 	AuditReportsByReporter(context.Context, *QueryAuditReportsByReporterRequest) (*QueryAuditReportsByReporterResponse, error)
 	// SupernodeReports returns all reports that include observations about the given supernode_account.
@@ -953,6 +1231,12 @@ func (*UnimplementedQueryServer) Params(ctx context.Context, req *QueryParamsReq
 }
 func (*UnimplementedQueryServer) CurrentWindow(ctx context.Context, req *QueryCurrentWindowRequest) (*QueryCurrentWindowResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CurrentWindow not implemented")
+}
+func (*UnimplementedQueryServer) WindowSnapshot(ctx context.Context, req *QueryWindowSnapshotRequest) (*QueryWindowSnapshotResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method WindowSnapshot not implemented")
+}
+func (*UnimplementedQueryServer) AssignedTargets(ctx context.Context, req *QueryAssignedTargetsRequest) (*QueryAssignedTargetsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AssignedTargets not implemented")
 }
 func (*UnimplementedQueryServer) AuditReport(ctx context.Context, req *QueryAuditReportRequest) (*QueryAuditReportResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AuditReport not implemented")
@@ -1003,6 +1287,42 @@ func _Query_CurrentWindow_Handler(srv interface{}, ctx context.Context, dec func
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(QueryServer).CurrentWindow(ctx, req.(*QueryCurrentWindowRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Query_WindowSnapshot_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryWindowSnapshotRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(QueryServer).WindowSnapshot(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/lumera.audit.v1.Query/WindowSnapshot",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(QueryServer).WindowSnapshot(ctx, req.(*QueryWindowSnapshotRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Query_AssignedTargets_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryAssignedTargetsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(QueryServer).AssignedTargets(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/lumera.audit.v1.Query/AssignedTargets",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(QueryServer).AssignedTargets(ctx, req.(*QueryAssignedTargetsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1091,6 +1411,14 @@ var _Query_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CurrentWindow",
 			Handler:    _Query_CurrentWindow_Handler,
+		},
+		{
+			MethodName: "WindowSnapshot",
+			Handler:    _Query_WindowSnapshot_Handler,
+		},
+		{
+			MethodName: "AssignedTargets",
+			Handler:    _Query_AssignedTargets_Handler,
 		},
 		{
 			MethodName: "AuditReport",
@@ -1216,6 +1544,172 @@ func (m *QueryCurrentWindowResponse) MarshalToSizedBuffer(dAtA []byte) (int, err
 		i = encodeVarintQuery(dAtA, i, uint64(m.WindowEndHeight))
 		i--
 		dAtA[i] = 0x18
+	}
+	if m.WindowStartHeight != 0 {
+		i = encodeVarintQuery(dAtA, i, uint64(m.WindowStartHeight))
+		i--
+		dAtA[i] = 0x10
+	}
+	if m.WindowId != 0 {
+		i = encodeVarintQuery(dAtA, i, uint64(m.WindowId))
+		i--
+		dAtA[i] = 0x8
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *QueryWindowSnapshotRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *QueryWindowSnapshotRequest) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *QueryWindowSnapshotRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.WindowId != 0 {
+		i = encodeVarintQuery(dAtA, i, uint64(m.WindowId))
+		i--
+		dAtA[i] = 0x8
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *QueryWindowSnapshotResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *QueryWindowSnapshotResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *QueryWindowSnapshotResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	{
+		size, err := m.Snapshot.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintQuery(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *QueryAssignedTargetsRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *QueryAssignedTargetsRequest) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *QueryAssignedTargetsRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.FilterByWindowId {
+		i--
+		if m.FilterByWindowId {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x18
+	}
+	if m.WindowId != 0 {
+		i = encodeVarintQuery(dAtA, i, uint64(m.WindowId))
+		i--
+		dAtA[i] = 0x10
+	}
+	if len(m.SupernodeAccount) > 0 {
+		i -= len(m.SupernodeAccount)
+		copy(dAtA[i:], m.SupernodeAccount)
+		i = encodeVarintQuery(dAtA, i, uint64(len(m.SupernodeAccount)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *QueryAssignedTargetsResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *QueryAssignedTargetsResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *QueryAssignedTargetsResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.TargetSupernodeAccounts) > 0 {
+		for iNdEx := len(m.TargetSupernodeAccounts) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.TargetSupernodeAccounts[iNdEx])
+			copy(dAtA[i:], m.TargetSupernodeAccounts[iNdEx])
+			i = encodeVarintQuery(dAtA, i, uint64(len(m.TargetSupernodeAccounts[iNdEx])))
+			i--
+			dAtA[i] = 0x22
+		}
+	}
+	if len(m.RequiredOpenPorts) > 0 {
+		dAtA4 := make([]byte, len(m.RequiredOpenPorts)*10)
+		var j3 int
+		for _, num := range m.RequiredOpenPorts {
+			for num >= 1<<7 {
+				dAtA4[j3] = uint8(uint64(num)&0x7f | 0x80)
+				num >>= 7
+				j3++
+			}
+			dAtA4[j3] = uint8(num)
+			j3++
+		}
+		i -= j3
+		copy(dAtA[i:], dAtA4[:j3])
+		i = encodeVarintQuery(dAtA, i, uint64(j3))
+		i--
+		dAtA[i] = 0x1a
 	}
 	if m.WindowStartHeight != 0 {
 		i = encodeVarintQuery(dAtA, i, uint64(m.WindowStartHeight))
@@ -1409,6 +1903,16 @@ func (m *QuerySupernodeReportsRequest) MarshalToSizedBuffer(dAtA []byte) (int, e
 	_ = i
 	var l int
 	_ = l
+	if m.FilterByWindowId {
+		i--
+		if m.FilterByWindowId {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x20
+	}
 	if m.Pagination != nil {
 		{
 			size, err := m.Pagination.MarshalToSizedBuffer(dAtA[:i])
@@ -1457,20 +1961,20 @@ func (m *SupernodeReport) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	var l int
 	_ = l
 	if len(m.PortStates) > 0 {
-		dAtA7 := make([]byte, len(m.PortStates)*10)
-		var j6 int
+		dAtA10 := make([]byte, len(m.PortStates)*10)
+		var j9 int
 		for _, num := range m.PortStates {
 			for num >= 1<<7 {
-				dAtA7[j6] = uint8(uint64(num)&0x7f | 0x80)
+				dAtA10[j9] = uint8(uint64(num)&0x7f | 0x80)
 				num >>= 7
-				j6++
+				j9++
 			}
-			dAtA7[j6] = uint8(num)
-			j6++
+			dAtA10[j9] = uint8(num)
+			j9++
 		}
-		i -= j6
-		copy(dAtA[i:], dAtA7[:j6])
-		i = encodeVarintQuery(dAtA, i, uint64(j6))
+		i -= j9
+		copy(dAtA[i:], dAtA10[:j9])
+		i = encodeVarintQuery(dAtA, i, uint64(j9))
 		i--
 		dAtA[i] = 0x22
 	}
@@ -1563,6 +2067,16 @@ func (m *QuerySelfReportsRequest) MarshalToSizedBuffer(dAtA []byte) (int, error)
 	_ = i
 	var l int
 	_ = l
+	if m.FilterByWindowId {
+		i--
+		if m.FilterByWindowId {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x20
+	}
 	if m.Pagination != nil {
 		{
 			size, err := m.Pagination.MarshalToSizedBuffer(dAtA[:i])
@@ -1740,6 +2254,76 @@ func (m *QueryCurrentWindowResponse) Size() (n int) {
 	return n
 }
 
+func (m *QueryWindowSnapshotRequest) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.WindowId != 0 {
+		n += 1 + sovQuery(uint64(m.WindowId))
+	}
+	return n
+}
+
+func (m *QueryWindowSnapshotResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = m.Snapshot.Size()
+	n += 1 + l + sovQuery(uint64(l))
+	return n
+}
+
+func (m *QueryAssignedTargetsRequest) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.SupernodeAccount)
+	if l > 0 {
+		n += 1 + l + sovQuery(uint64(l))
+	}
+	if m.WindowId != 0 {
+		n += 1 + sovQuery(uint64(m.WindowId))
+	}
+	if m.FilterByWindowId {
+		n += 2
+	}
+	return n
+}
+
+func (m *QueryAssignedTargetsResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.WindowId != 0 {
+		n += 1 + sovQuery(uint64(m.WindowId))
+	}
+	if m.WindowStartHeight != 0 {
+		n += 1 + sovQuery(uint64(m.WindowStartHeight))
+	}
+	if len(m.RequiredOpenPorts) > 0 {
+		l = 0
+		for _, e := range m.RequiredOpenPorts {
+			l += sovQuery(uint64(e))
+		}
+		n += 1 + sovQuery(uint64(l)) + l
+	}
+	if len(m.TargetSupernodeAccounts) > 0 {
+		for _, s := range m.TargetSupernodeAccounts {
+			l = len(s)
+			n += 1 + l + sovQuery(uint64(l))
+		}
+	}
+	return n
+}
+
 func (m *QueryAuditReportRequest) Size() (n int) {
 	if m == nil {
 		return 0
@@ -1820,6 +2404,9 @@ func (m *QuerySupernodeReportsRequest) Size() (n int) {
 		l = m.Pagination.Size()
 		n += 1 + l + sovQuery(uint64(l))
 	}
+	if m.FilterByWindowId {
+		n += 2
+	}
 	return n
 }
 
@@ -1884,6 +2471,9 @@ func (m *QuerySelfReportsRequest) Size() (n int) {
 	if m.Pagination != nil {
 		l = m.Pagination.Size()
 		n += 1 + l + sovQuery(uint64(l))
+	}
+	if m.FilterByWindowId {
+		n += 2
 	}
 	return n
 }
@@ -2199,6 +2789,475 @@ func (m *QueryCurrentWindowResponse) Unmarshal(dAtA []byte) error {
 					break
 				}
 			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipQuery(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *QueryWindowSnapshotRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowQuery
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: QueryWindowSnapshotRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: QueryWindowSnapshotRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field WindowId", wireType)
+			}
+			m.WindowId = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.WindowId |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipQuery(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *QueryWindowSnapshotResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowQuery
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: QueryWindowSnapshotResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: QueryWindowSnapshotResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Snapshot", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthQuery
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.Snapshot.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipQuery(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *QueryAssignedTargetsRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowQuery
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: QueryAssignedTargetsRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: QueryAssignedTargetsRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SupernodeAccount", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthQuery
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SupernodeAccount = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field WindowId", wireType)
+			}
+			m.WindowId = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.WindowId |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FilterByWindowId", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.FilterByWindowId = bool(v != 0)
+		default:
+			iNdEx = preIndex
+			skippy, err := skipQuery(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *QueryAssignedTargetsResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowQuery
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: QueryAssignedTargetsResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: QueryAssignedTargetsResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field WindowId", wireType)
+			}
+			m.WindowId = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.WindowId |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field WindowStartHeight", wireType)
+			}
+			m.WindowStartHeight = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.WindowStartHeight |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType == 0 {
+				var v uint32
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowQuery
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					v |= uint32(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				m.RequiredOpenPorts = append(m.RequiredOpenPorts, v)
+			} else if wireType == 2 {
+				var packedLen int
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowQuery
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					packedLen |= int(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				if packedLen < 0 {
+					return ErrInvalidLengthQuery
+				}
+				postIndex := iNdEx + packedLen
+				if postIndex < 0 {
+					return ErrInvalidLengthQuery
+				}
+				if postIndex > l {
+					return io.ErrUnexpectedEOF
+				}
+				var elementCount int
+				var count int
+				for _, integer := range dAtA[iNdEx:postIndex] {
+					if integer < 128 {
+						count++
+					}
+				}
+				elementCount = count
+				if elementCount != 0 && len(m.RequiredOpenPorts) == 0 {
+					m.RequiredOpenPorts = make([]uint32, 0, elementCount)
+				}
+				for iNdEx < postIndex {
+					var v uint32
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowQuery
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						v |= uint32(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					m.RequiredOpenPorts = append(m.RequiredOpenPorts, v)
+				}
+			} else {
+				return fmt.Errorf("proto: wrong wireType = %d for field RequiredOpenPorts", wireType)
+			}
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TargetSupernodeAccounts", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthQuery
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.TargetSupernodeAccounts = append(m.TargetSupernodeAccounts, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipQuery(dAtA[iNdEx:])
@@ -2758,6 +3817,26 @@ func (m *QuerySupernodeReportsRequest) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FilterByWindowId", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.FilterByWindowId = bool(v != 0)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipQuery(dAtA[iNdEx:])
@@ -3204,6 +4283,26 @@ func (m *QuerySelfReportsRequest) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FilterByWindowId", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.FilterByWindowId = bool(v != 0)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipQuery(dAtA[iNdEx:])

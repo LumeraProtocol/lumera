@@ -110,7 +110,7 @@ func SetupUpgrades(upgradeName string, params appParams.AppUpgradeParams) (Upgra
 		return UpgradeConfig{
 			Handler: standardUpgradeHandler(upgradeNameV191, params),
 		}, true
-case upgrade_v1_12_0.UpgradeName:
+	case upgrade_v1_12_0.UpgradeName:
 		return UpgradeConfig{
 			StoreUpgrade: &upgrade_v1_12_0.StoreUpgrades,
 			Handler: upgrade_v1_12_0.CreateUpgradeHandler(params),

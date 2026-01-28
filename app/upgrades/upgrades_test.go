@@ -15,7 +15,7 @@ import (
 	upgrade_v1_8_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_0"
 	upgrade_v1_8_4 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_4"
 	upgrade_v1_9_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_9_0"
-	upgrade_v1_12_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_12_0"
+	upgrade_v1_10_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_10_0"
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	crisistypes "github.com/cosmos/cosmos-sdk/x/crisis/types"
 )
@@ -30,7 +30,7 @@ func TestUpgradeNamesOrder(t *testing.T) {
 		upgradeNameV185,
 		upgrade_v1_9_0.UpgradeName,
 		upgradeNameV191,
-		upgrade_v1_12_0.UpgradeName,
+		upgrade_v1_10_0.UpgradeName,
 	}
 	require.Equal(t, expected, upgradeNames, "upgradeNames should stay in ascending order")
 }
@@ -66,8 +66,8 @@ func TestSetupUpgradesAndHandlers(t *testing.T) {
 					"store upgrade presence mismatch for %s on %s", upgradeName, tt.chainID,
 				)
 
-				if upgradeName == upgrade_v1_12_0.UpgradeName && config.StoreUpgrade != nil {
-					require.Contains(t, config.StoreUpgrade.Deleted, crisistypes.StoreKey, "v1.12.0 should delete crisis store key")
+				if upgradeName == upgrade_v1_10_0.UpgradeName && config.StoreUpgrade != nil {
+					require.Contains(t, config.StoreUpgrade.Deleted, crisistypes.StoreKey, "v1.10.0 should delete crisis store key")
 				}
 
 				if config.Handler == nil {
@@ -76,7 +76,7 @@ func TestSetupUpgradesAndHandlers(t *testing.T) {
 
 				// v1.9.0 requires full keeper wiring; exercising it here would require
 				// a full app harness. This test only verifies registration and gating.
-				if upgradeName == upgrade_v1_9_0.UpgradeName || upgradeName == upgrade_v1_12_0.UpgradeName {
+				if upgradeName == upgrade_v1_9_0.UpgradeName || upgradeName == upgrade_v1_10_0.UpgradeName {
 					continue
 				}
 
@@ -119,7 +119,7 @@ func expectStoreUpgrade(upgradeName, chainID string) bool {
 		return IsTestnet(chainID) || IsDevnet(chainID)
 	case upgrade_v1_8_4.UpgradeName:
 		return IsMainnet(chainID)
-	case upgrade_v1_12_0.UpgradeName:
+	case upgrade_v1_10_0.UpgradeName:
 		return true
 	default:
 		return false

@@ -15,7 +15,7 @@ import (
 	upgrade_v1_8_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_0"
 	upgrade_v1_8_4 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_4"
 	upgrade_v1_9_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_9_0"
-	upgrade_v1_12_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_12_0"
+	upgrade_v1_10_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_10_0"
 )
 
 // =================================================================================================================================
@@ -30,7 +30,7 @@ import (
 // | v1.8.5  | standard | none                              | Migrations only
 // | v1.9.0  | custom   | none                              | Backfills action/supernode secondary indices
 // | v1.9.1  | standard | none                              | Migrations only
-// | v1.12.0 | custom   | drop crisis                       | Migrate consensus params from x/params to x/consensus; remove x/crisis
+// | v1.10.0 | custom   | drop crisis                       | Migrate consensus params from x/params to x/consensus; remove x/crisis
 // =================================================================================================================================
 
 type UpgradeConfig struct {
@@ -46,6 +46,7 @@ const (
 	upgradeNameV191 = "v1.9.1"
 )
 
+// List of all known upgrade names, in chronological order.
 var upgradeNames = []string{
 	upgrade_v1_6_1.UpgradeName,
 	upgradeNameV170,
@@ -55,7 +56,7 @@ var upgradeNames = []string{
 	upgradeNameV185,
 	upgrade_v1_9_0.UpgradeName,
 	upgradeNameV191,
-	upgrade_v1_12_0.UpgradeName,
+	upgrade_v1_10_0.UpgradeName,
 }
 
 var NoUpgradeConfig = UpgradeConfig{
@@ -110,10 +111,10 @@ func SetupUpgrades(upgradeName string, params appParams.AppUpgradeParams) (Upgra
 		return UpgradeConfig{
 			Handler: standardUpgradeHandler(upgradeNameV191, params),
 		}, true
-	case upgrade_v1_12_0.UpgradeName:
+	case upgrade_v1_10_0.UpgradeName:
 		return UpgradeConfig{
-			StoreUpgrade: &upgrade_v1_12_0.StoreUpgrades,
-			Handler: upgrade_v1_12_0.CreateUpgradeHandler(params),
+			StoreUpgrade: &upgrade_v1_10_0.StoreUpgrades,
+			Handler: upgrade_v1_10_0.CreateUpgradeHandler(params),
 		}, true
 
 	// add future upgrades here

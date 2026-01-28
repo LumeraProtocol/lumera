@@ -2,9 +2,9 @@
 
 ---
 
-## 1.12.0
+## 1.10.0
 
-Changes included since `v1.9.1` (range: `v1.9.1..v1.12.0`).
+Changes included since `v1.9.1` (range: `v1.9.1..v1.10.0`).
 
 - Cosmos SDK: upgraded from v0.50.14 to v0.53.5, CometBFT upgraded to v0.38.20
 - enabled unordered 

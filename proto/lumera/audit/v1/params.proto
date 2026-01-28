@@ -17,4 +17,19 @@ message Params {
   uint32 max_probe_targets_per_window = 5;
 
   repeated uint32 required_open_ports = 6;
+
+  // Minimum required host free capacity (self reported).
+  // free% = 100 - usage%
+  // A usage% of 0 is treated as "unknown" (no action).
+  uint32 min_cpu_free_percent = 7;
+  uint32 min_mem_free_percent = 8;
+  uint32 min_disk_free_percent = 9;
+
+  // Number of consecutive windows a required port must be unanimously reported CLOSED
+  // by peers (with at least 2 peer reports per window) before postponing the supernode.
+  uint32 consecutive_windows_to_postpone = 10;
+
+  // How many completed windows to keep in state for window-scoped data like WindowSnapshot,
+  // AuditReport, and related indices. Pruning runs at window end.
+  uint64 keep_last_window_entries = 11;
 }

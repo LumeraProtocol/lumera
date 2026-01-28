@@ -11,8 +11,9 @@ This document specifies the `audit/v1` on-chain contract: protobuf shapes, windo
 6. Messages (tx)
 7. Queries
 8. On-Chain State
-11. Out of Scope
-12. Events
+9. Postponement and Recovery (Draft)
+10. Out of Scope
+11. Events
 
 
 
@@ -47,7 +48,7 @@ Assumption:
   - the report targets the **current window_id** at the current height (window start through window end)
   - the reporter has not already submitted a report for that window
 - When accepted, the chain stores the report as-is.
-- Penalties and aggregation are intentionally out-of-scope for the current implementation.
+- Economic penalties and aggregation are intentionally out-of-scope for the current implementation.
 
 ## 3. Reporting Windows
 Window sizing is block-based and deterministic. The module persists the current window boundaries and advances them as the chain height increases.
@@ -94,6 +95,11 @@ Default values:
 - `min_probe_targets_per_window` (uint32): `3`
 - `max_probe_targets_per_window` (uint32): `5`
 - `required_open_ports` (repeated uint32): `[4444, 4445, 8002]`
+- `min_cpu_free_percent` (uint32): `0` (disabled)
+- `min_mem_free_percent` (uint32): `0` (disabled)
+- `min_disk_free_percent` (uint32): `0` (disabled)
+- `consecutive_windows_to_postpone` (uint32): `1`
+- `keep_last_window_entries` (uint64): `200`
 
 ## 5. Data Types (audit/v1)
 The module defines its reachability types under `audit/v1`.
@@ -204,7 +210,7 @@ message MsgSubmitAuditReport {
 
 ### 6.4 Message validation rules
 On `MsgSubmitAuditReport`:
-1) Reject if current height is outside the acceptance period for `window_id` (section 3.3).
+1) Reject if current height is outside the acceptance period for `window_id` (section 3.2).
 2) Resolve reporter supernode from `supernode_account` via `x/supernode`; reject if not found.
 3) Reject duplicates: at most one report per `(window_id, supernode_account)`.
 
@@ -280,10 +286,66 @@ This section describes the minimum state persisted by the module:
 
 State growth considerations:
 - State must remain bounded. The module MAY prune per-window state (`WindowSnapshot`, `AuditReport`) for any `window_id` once the acceptance period for that window has ended (section 3.2).
-- Current implementation note: pruning is not yet implemented; per-window state accumulates over time.
+- Current implementation note: pruning is implemented at window end and keeps the last `keep_last_window_entries` windows of window-scoped state.
 
-## 11. Out of Scope
-This specification does not define penalties or participation requirements for audit reports in its current scope.
+## 9. Postponement and Recovery (Draft)
 
-## 12. Events
+This section defines draft rules to set a supernode to `POSTPONED` (and recover to `ACTIVE`) based on audit reports.
+
+Important note:
+- Peer-observation assignment/gating is enforced **when `MsgSubmitAuditReport` is accepted**. Enforcement later assumes only gated observations are stored.
+
+### 9.1 Self-report based postponement (host requirements)
+
+Inputs:
+- `AuditSelfReport.cpu_usage_percent`, `mem_usage_percent`, `disk_usage_percent`
+
+Planned params:
+- `min_cpu_free_percent`
+- `min_mem_free_percent`
+- `min_disk_free_percent`
+
+Compute free%:
+- `cpu_free_percent = 100 - cpu_usage_percent`
+- `mem_free_percent = 100 - mem_usage_percent`
+- `disk_free_percent = 100 - disk_usage_percent`
+
+Unknown special case:
+- If a usage% is `0`, treat that metric as unknown and do not postpone based on it.
+
+Rule:
+- If any known free% is below its minimum, set the supernode to `POSTPONED`.
+
+Non-rules (for now):
+- Ignore `failed_actions_count`.
+- Ignore `inbound_port_states` (self inbound traffic is not reachability).
+
+### 9.2 Peer-report based postponement (ports)
+
+Inputs:
+- Peer observations for required ports (index-aligned to `required_open_ports`).
+
+Planned param:
+- `consecutive_windows_to_postpone` (default `1`)
+
+Per window `W` and required port index `i`, “port i is closed for target T in window W” is true only if:
+- there are at least **2** distinct peer reporters about `T` in `W`, and
+- **all** those peer reporters report `PORT_STATE_CLOSED` for port index `i` for `T`.
+
+Rule:
+- If any required port index `i` is closed for `consecutive_windows_to_postpone` consecutive windows, set `T` to `POSTPONED`.
+
+### 9.3 Recovery (POSTPONED -> ACTIVE)
+
+Rule:
+- A `POSTPONED` supernode becomes `ACTIVE` after, in a single window:
+  - one compliant self report (meets host requirements; treating 0 values as unknown), and
+  - one compliant peer report, meaning:
+    - at least **2** distinct peer reporters about the target in that window, and
+    - for each required port index `i`, all those peer reporters report `PORT_STATE_OPEN`.
+
+## 10. Out of Scope
+This specification does not define economic penalties (e.g. slashing, jailing, rewards) for audit reports in its current scope.
+
+## 11. Events
 The current implementation does not emit audit-specific events.

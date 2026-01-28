@@ -32,12 +32,14 @@ func (q queryServer) SelfReports(ctx context.Context, req *types.QuerySelfReport
 		pagination = &query.PageRequest{Limit: 100}
 	}
 
+	useWindowFilter := req.FilterByWindowId || req.WindowId != 0
+
 	pageRes, err := query.Paginate(store, pagination, func(key, _ []byte) error {
 		if len(key) != 8 {
 			return status.Error(codes.Internal, "invalid self report index key")
 		}
 		windowID := binary.BigEndian.Uint64(key)
-		if req.WindowId != 0 && windowID != req.WindowId {
+		if useWindowFilter && windowID != req.WindowId {
 			return nil
 		}
 
@@ -46,9 +48,9 @@ func (q queryServer) SelfReports(ctx context.Context, req *types.QuerySelfReport
 			return nil
 		}
 		reports = append(reports, types.SelfReport{
-			WindowId:      r.WindowId,
-			ReportHeight:  r.ReportHeight,
-			SelfReport:    r.SelfReport,
+			WindowId:     r.WindowId,
+			ReportHeight: r.ReportHeight,
+			SelfReport:   r.SelfReport,
 		})
 		return nil
 	})
@@ -61,4 +63,3 @@ func (q queryServer) SelfReports(ctx context.Context, req *types.QuerySelfReport
 		Pagination: pageRes,
 	}, nil
 }
-

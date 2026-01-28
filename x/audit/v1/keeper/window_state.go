@@ -102,8 +102,7 @@ func (k Keeper) clearNextWindowBlocks(ctx sdk.Context) {
 	store.Delete(types.NextWindowBlocksKey())
 }
 
-// initWindowStateIfNeeded writes initial window state once. It prefers initializing from an existing
-// origin_height (for compatibility), otherwise it uses the current block height as the first window start.
+// initWindowStateIfNeeded writes initial window state once, using the current block height as the first window start.
 func (k Keeper) initWindowStateIfNeeded(ctx sdk.Context, params types.Params) (windowState, error) {
 	if ws, found, err := k.getWindowState(ctx); err != nil {
 		return windowState{}, err
@@ -114,28 +113,6 @@ func (k Keeper) initWindowStateIfNeeded(ctx sdk.Context, params types.Params) (w
 	windowBlocks := params.ReportingWindowBlocks
 	if windowBlocks == 0 {
 		return windowState{}, fmt.Errorf("reporting_window_blocks must be > 0")
-	}
-
-	// Compatibility: if origin_height exists, derive the current window by the legacy math once.
-	if origin, found := k.getWindowOriginHeight(ctx); found {
-		if ctx.BlockHeight() < origin {
-			ws := windowState{
-				WindowID:     0,
-				StartHeight:  origin,
-				EndHeight:    origin + int64(windowBlocks) - 1,
-				WindowBlocks: windowBlocks,
-			}
-			return ws, k.setWindowState(ctx, ws)
-		}
-		windowID := uint64((ctx.BlockHeight() - origin) / int64(windowBlocks))
-		start := origin + int64(windowID)*int64(windowBlocks)
-		ws := windowState{
-			WindowID:     windowID,
-			StartHeight:  start,
-			EndHeight:    start + int64(windowBlocks) - 1,
-			WindowBlocks: windowBlocks,
-		}
-		return ws, k.setWindowState(ctx, ws)
 	}
 
 	start := ctx.BlockHeight()

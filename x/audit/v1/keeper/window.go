@@ -11,31 +11,6 @@ import (
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
-func (k Keeper) getWindowOriginHeight(ctx sdk.Context) (int64, bool) {
-	// The origin height is set once (on first use) and then kept stable forever.
-	// All window boundaries are derived from it to avoid drifting schedules.
-	store := k.kvStore(ctx)
-	bz := store.Get(types.WindowOriginHeightKey())
-	if len(bz) != 8 {
-		return 0, false
-	}
-	return int64(binary.BigEndian.Uint64(bz)), true
-}
-
-func (k Keeper) getOrInitWindowOriginHeight(ctx sdk.Context) int64 {
-	store := k.kvStore(ctx)
-	bz := store.Get(types.WindowOriginHeightKey())
-	if len(bz) == 8 {
-		return int64(binary.BigEndian.Uint64(bz))
-	}
-
-	origin := ctx.BlockHeight()
-	out := make([]byte, 8)
-	binary.BigEndian.PutUint64(out, uint64(origin))
-	store.Set(types.WindowOriginHeightKey(), out)
-	return origin
-}
-
 func (k Keeper) GetWindowSnapshot(ctx sdk.Context, windowID uint64) (types.WindowSnapshot, bool) {
 	store := k.kvStore(ctx)
 	bz := store.Get(types.WindowSnapshotKey(windowID))
@@ -87,11 +62,15 @@ func (k Keeper) CreateWindowSnapshotIfNeeded(ctx sdk.Context, windowID uint64, p
 	}
 
 	seedBytes := ctx.HeaderHash()
-	// Some test harnesses do not populate HeaderHash(). We only need a deterministic per-window seed,
-	// so fall back to the window start height (which equals ctx.BlockHeight() here).
-	if len(seedBytes) < 8 {
+	// In production (CometBFT), ctx.HeaderHash() should always be set and long enough.
+	// In simulation/benchmarks, the SDK often runs blocks with an empty header hash.
+	// Fall back to a deterministic 8-byte seed to keep simulation usable.
+	if len(seedBytes) == 0 {
 		seedBytes = make([]byte, 8)
 		binary.BigEndian.PutUint64(seedBytes, uint64(ctx.BlockHeight()))
+	}
+	if len(seedBytes) < 8 {
+		return fmt.Errorf("header hash must be at least 8 bytes")
 	}
 	assignments, err := assignment.ComputeSnapshotAssignments(params, senders, receivers, seedBytes)
 	if err != nil {

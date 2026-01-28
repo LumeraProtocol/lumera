@@ -3,8 +3,8 @@
 package system
 
 // This test validates missing-report enforcement in EndBlocker:
-// - two ACTIVE supernodes are snapshotted as senders at window start
-// - only one submits a report for the window
+// - two ACTIVE supernodes exist during a window
+// - only one submits a report for that window
 // - after `window_end + 1`, the missing sender is POSTPONED
 
 import (
@@ -15,7 +15,7 @@ import (
 
 func TestAuditMissingReportPostponesSender(t *testing.T) {
 	const (
-		reportingWindowBlocks = uint64(5)
+		reportingWindowBlocks = uint64(10)
 	)
 	const originHeight = int64(1)
 
@@ -33,29 +33,29 @@ func TestAuditMissingReportPostponesSender(t *testing.T) {
 	registerSupernode(t, cli, n1, "192.168.1.2")
 
 	currentHeight := sut.AwaitNextBlock(t)
-	// Use the next window after registration so both supernodes are in the sender snapshot for that window.
-	windowID, windowStartHeight := nextWindowAfterHeight(originHeight, reportingWindowBlocks, currentHeight)
-	enforceHeight := windowStartHeight + int64(reportingWindowBlocks)
+	blocks := int64(reportingWindowBlocks)
 
-	awaitAtLeastHeight(t, windowStartHeight)
-
-	seed := headerHashAtHeight(t, sut.rpcAddr, windowStartHeight)
-	senders := sortedStrings(n0.accAddr, n1.accAddr)
-	receivers := sortedStrings(n0.accAddr, n1.accAddr)
-	kWindow := computeKWindow(1, 1, 1, len(senders), len(receivers))
-	require.Equal(t, uint32(1), kWindow)
-
-	targets0, ok := assignedTargets(seed, senders, receivers, kWindow, n0.accAddr)
-	require.True(t, ok)
-	require.Len(t, targets0, 1)
+	var windowID uint64
+	var windowStartHeight int64
+	var windowEndHeight int64
+	for {
+		windowID = uint64((currentHeight - originHeight) / blocks)
+		windowStartHeight = originHeight + int64(windowID)*blocks
+		windowEndHeight = windowStartHeight + blocks - 1
+		// Ensure there's enough room in the window so the tx is committed before the next window starts.
+		if windowEndHeight-currentHeight >= 3 {
+			break
+		}
+		currentHeight = sut.AwaitNextBlock(t)
+	}
+	enforceHeight := windowEndHeight + 1
 
 	self := auditSelfReportJSON([]string{"PORT_STATE_OPEN"})
-	txResp := submitAuditReport(t, cli, n0.nodeName, windowID, self, []string{
-		auditPeerObservationJSON(targets0[0], []string{"PORT_STATE_OPEN"}),
-	})
+	// node0 submits a report; node1 submits nothing in this window.
+	txResp := submitAuditReport(t, cli, n0.nodeName, windowID, self, nil)
 	RequireTxSuccess(t, txResp)
 
-	// node1 does not submit any report for this window -> should be postponed at enforceHeight.
+	// node1 does not submit any report for this window -> should be postponed after the window ends.
 	awaitAtLeastHeight(t, enforceHeight)
 
 	require.Equal(t, "SUPERNODE_STATE_POSTPONED", querySupernodeLatestState(t, cli, n1.valAddr))

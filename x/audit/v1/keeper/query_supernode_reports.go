@@ -25,7 +25,8 @@ func (q queryServer) SupernodeReports(ctx context.Context, req *types.QuerySuper
 	storeAdapter := runtime.KVStoreAdapter(q.k.storeService.OpenKVStore(sdkCtx))
 
 	var store prefix.Store
-	if req.WindowId != 0 {
+	useWindowFilter := req.FilterByWindowId || req.WindowId != 0
+	if useWindowFilter {
 		store = prefix.NewStore(storeAdapter, types.SupernodeReportIndexWindowPrefix(req.SupernodeAccount, req.WindowId))
 	} else {
 		store = prefix.NewStore(storeAdapter, types.SupernodeReportIndexPrefix(req.SupernodeAccount))
@@ -44,7 +45,7 @@ func (q queryServer) SupernodeReports(ctx context.Context, req *types.QuerySuper
 			reporter string
 		)
 
-		if req.WindowId != 0 {
+		if useWindowFilter {
 			windowID = req.WindowId
 			reporter = string(key)
 		} else {

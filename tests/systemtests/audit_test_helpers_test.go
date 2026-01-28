@@ -355,3 +355,17 @@ func auditQueryReport(t *testing.T, windowID uint64, reporterSupernodeAccount st
 	require.NoError(t, err)
 	return resp.Report
 }
+
+func auditQueryAssignedTargets(t *testing.T, windowID uint64, filterByWindowID bool, proberSupernodeAccount string) audittypes.QueryAssignedTargetsResponse {
+	t.Helper()
+	qc, _ := newAuditQueryClient(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	resp, err := qc.AssignedTargets(ctx, &audittypes.QueryAssignedTargetsRequest{
+		WindowId:         windowID,
+		FilterByWindowId: filterByWindowID,
+		SupernodeAccount: proberSupernodeAccount,
+	})
+	require.NoError(t, err)
+	return *resp
+}

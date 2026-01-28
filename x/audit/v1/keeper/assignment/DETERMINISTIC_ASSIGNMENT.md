@@ -21,7 +21,10 @@ At `window_start_height` for a given `window_id`, the module builds:
   - `peer_quorum_reports`
   - `min_probe_targets_per_window`
   - `max_probe_targets_per_window`
-- `seedBytes`: `ctx.HeaderHash()` at `window_start_height` (only the first 8 bytes are used)
+- `seedBytes`: `ctx.HeaderHash()` at `window_start_height` (the first 8 bytes are used)
+
+Note:
+- Snapshot creation requires `len(ctx.HeaderHash()) >= 8` (otherwise snapshot creation fails).
 
 ## Ordering (determinism invariant)
 

@@ -1,6 +1,6 @@
 # Audit Module Specification (audit/v1)
 
-This document specifies the `audit/v1` on-chain contract: protobuf shapes, windowing, snapshots, and report storage/query surfaces.
+This document specifies the `audit/v1` on-chain contract: protobuf shapes, windowing, snapshots, report storage/query surfaces, and postpone/recovery behavior.
 
 ## Contents
 1. Abstract
@@ -11,7 +11,7 @@ This document specifies the `audit/v1` on-chain contract: protobuf shapes, windo
 6. Messages (tx)
 7. Queries
 8. On-Chain State
-9. Postponement and Recovery (Draft)
+9. Postponement and Recovery
 10. Out of Scope
 11. Events
 
@@ -19,7 +19,7 @@ This document specifies the `audit/v1` on-chain contract: protobuf shapes, windo
 
 ## 1. Abstract
 The Audit module (`x/audit/v1`) provides deterministic, window-based reporting for supernodes:
-- ACTIVE supernodes submit one audit report per window, containing a self report and optional peer reachability observations.
+- ACTIVE supernodes submit one audit report per window, containing a self report and (when they are a prober for the window) peer reachability observations for all assigned targets.
 - At the start of each window, the module persists a `WindowSnapshot` that serves as the minimal source-of-truth for the prober → targets mapping for that window.
 
 ## 2. Overview
@@ -43,7 +43,9 @@ Assumption:
 - At the **first block of each window**, the chain writes a **window snapshot** that freezes, for that window:
   - the **prober → targets mapping** (`assignments`)
 - Each supernode can submit **at most one report per window**. A report is signed by the supernode account and stored under `supernode_account`.
-- A report contains self metrics plus optional peer observations. Peer observations include port states aligned by index to `required_open_ports` (position `i` refers to the `i`th configured port).
+- A report contains self metrics plus peer observations. Peer observations include port states aligned by index to `required_open_ports` (position `i` refers to the `i`th configured port).
+  - If the reporter is a prober for the window (i.e. appears in `WindowSnapshot.assignments`), peer observations must cover **all** assigned targets for that prober.
+  - If the reporter is not a prober for the window (e.g. `POSTPONED`), peer observations must be empty (self-report only).
 - A report is **accepted** only if:
   - the report targets the **current window_id** at the current height (window start through window end)
   - the reporter has not already submitted a report for that window
@@ -212,13 +214,17 @@ message MsgSubmitAuditReport {
 On `MsgSubmitAuditReport`:
 1) Reject if current height is outside the acceptance period for `window_id` (section 3.2).
 2) Resolve reporter supernode from `supernode_account` via `x/supernode`; reject if not found.
-3) Reject duplicates: at most one report per `(window_id, supernode_account)`.
+3) If the reporter is a prober for the window (per `WindowSnapshot.assignments`), require peer observations for **all** assigned targets.
+4) Reject duplicates: at most one report per `(window_id, supernode_account)`.
 
 ## 7. Queries
 ```protobuf
 service Query {
   rpc Params(QueryParamsRequest) returns (QueryParamsResponse);
   rpc CurrentWindow(QueryCurrentWindowRequest) returns (QueryCurrentWindowResponse);
+
+  rpc WindowSnapshot(QueryWindowSnapshotRequest) returns (QueryWindowSnapshotResponse);
+  rpc AssignedTargets(QueryAssignedTargetsRequest) returns (QueryAssignedTargetsResponse);
 
   rpc AuditReport(QueryAuditReportRequest) returns (QueryAuditReportResponse);
   rpc AuditReportsByReporter(QueryAuditReportsByReporterRequest) returns (QueryAuditReportsByReporterResponse);
@@ -237,6 +243,21 @@ message QueryCurrentWindowResponse {
   int64  window_end_height   = 3;
 }
 
+message QueryWindowSnapshotRequest { uint64 window_id = 1; }
+message QueryWindowSnapshotResponse { WindowSnapshot snapshot = 1; }
+
+message QueryAssignedTargetsRequest {
+  string supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  uint64 window_id = 2;
+  bool filter_by_window_id = 3;
+}
+message QueryAssignedTargetsResponse {
+  uint64 window_id = 1;
+  int64 window_start_height = 2;
+  repeated uint32 required_open_ports = 3;
+  repeated string target_supernode_accounts = 4 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+}
+
 message QueryAuditReportRequest {
   uint64 window_id = 1;
   string supernode_account = 2 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
@@ -245,13 +266,18 @@ message QueryAuditReportResponse { AuditReport report = 1 [(gogoproto.nullable) 
 
 message QueryAuditReportsByReporterRequest {
   string supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
-  // pagination omitted in this spec; implementations may add pagination.
+  cosmos.base.query.v1beta1.PageRequest pagination = 2;
 }
-message QueryAuditReportsByReporterResponse { repeated AuditReport reports = 1; }
+message QueryAuditReportsByReporterResponse {
+  repeated AuditReport reports = 1;
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
 
 message QuerySupernodeReportsRequest {
   string supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
-  // pagination omitted in this spec; implementations may add pagination.
+  uint64 window_id = 2;
+  cosmos.base.query.v1beta1.PageRequest pagination = 3;
+  bool filter_by_window_id = 4;
 }
 
 message SupernodeReport {
@@ -261,11 +287,16 @@ message SupernodeReport {
   repeated PortState port_states = 4;
 }
 
-message QuerySupernodeReportsResponse { repeated SupernodeReport reports = 1; }
+message QuerySupernodeReportsResponse {
+  repeated SupernodeReport reports = 1;
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
 
 message QuerySelfReportsRequest {
   string supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
-  // pagination omitted in this spec; implementations may add pagination.
+  uint64 window_id = 2;
+  cosmos.base.query.v1beta1.PageRequest pagination = 3;
+  bool filter_by_window_id = 4;
 }
 
 message SelfReport {
@@ -274,7 +305,10 @@ message SelfReport {
   AuditSelfReport self_report = 3 [(gogoproto.nullable) = false];
 }
 
-message QuerySelfReportsResponse { repeated SelfReport reports = 1; }
+message QuerySelfReportsResponse {
+  repeated SelfReport reports = 1;
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
 ```
 
 ## 8. On-Chain State
@@ -287,10 +321,11 @@ This section describes the minimum state persisted by the module:
 State growth considerations:
 - State must remain bounded. The module MAY prune per-window state (`WindowSnapshot`, `AuditReport`) for any `window_id` once the acceptance period for that window has ended (section 3.2).
 - Current implementation note: pruning is implemented at window end and keeps the last `keep_last_window_entries` windows of window-scoped state.
+  - Operational note: `keep_last_window_entries` should be >= `consecutive_windows_to_postpone` so missing-report and peer-port rules always have enough history available.
 
-## 9. Postponement and Recovery (Draft)
+## 9. Postponement and Recovery
 
-This section defines draft rules to set a supernode to `POSTPONED` (and recover to `ACTIVE`) based on audit reports.
+This section defines the rules used to set a supernode to `POSTPONED` (and recover to `ACTIVE`) based on audit reports.
 
 Important note:
 - Peer-observation assignment/gating is enforced **when `MsgSubmitAuditReport` is accepted**. Enforcement later assumes only gated observations are stored.
@@ -300,7 +335,7 @@ Important note:
 Inputs:
 - `AuditSelfReport.cpu_usage_percent`, `mem_usage_percent`, `disk_usage_percent`
 
-Planned params:
+Params:
 - `min_cpu_free_percent`
 - `min_mem_free_percent`
 - `min_disk_free_percent`
@@ -316,7 +351,7 @@ Unknown special case:
 Rule:
 - If any known free% is below its minimum, set the supernode to `POSTPONED`.
 
-Non-rules (for now):
+Non-rules:
 - Ignore `failed_actions_count`.
 - Ignore `inbound_port_states` (self inbound traffic is not reachability).
 
@@ -325,24 +360,30 @@ Non-rules (for now):
 Inputs:
 - Peer observations for required ports (index-aligned to `required_open_ports`).
 
-Planned param:
+Param:
 - `consecutive_windows_to_postpone` (default `1`)
 
 Per window `W` and required port index `i`, “port i is closed for target T in window W” is true only if:
-- there are at least **2** distinct peer reporters about `T` in `W`, and
+- there is at least **1** peer reporter about `T` in `W`, and
 - **all** those peer reporters report `PORT_STATE_CLOSED` for port index `i` for `T`.
 
 Rule:
 - If any required port index `i` is closed for `consecutive_windows_to_postpone` consecutive windows, set `T` to `POSTPONED`.
 
-### 9.3 Recovery (POSTPONED -> ACTIVE)
+### 9.3 Missing report based postponement
+
+Param:
+- `consecutive_windows_to_postpone` (default `1`)
+
+Rule:
+- If a supernode in state `ACTIVE` fails to submit any `MsgSubmitAuditReport` for `consecutive_windows_to_postpone` consecutive windows, set it to `POSTPONED`.
+
+### 9.4 Recovery (POSTPONED -> ACTIVE)
 
 Rule:
 - A `POSTPONED` supernode becomes `ACTIVE` after, in a single window:
   - one compliant self report (meets host requirements; treating 0 values as unknown), and
-  - one compliant peer report, meaning:
-    - at least **2** distinct peer reporters about the target in that window, and
-    - for each required port index `i`, all those peer reporters report `PORT_STATE_OPEN`.
+  - at least **1** peer report about the target in that window where all required ports are `PORT_STATE_OPEN`.
 
 ## 10. Out of Scope
 This specification does not define economic penalties (e.g. slashing, jailing, rewards) for audit reports in its current scope.

@@ -31,7 +31,6 @@ var (
 	//   at the next window boundary (end(current)+1) by persisting a pending next_window_blocks value.
 	//
 	// Formats:
-	// - WindowOriginHeightKey: "origin_height" -> 8 bytes (u64be(height))
 	// - WindowSnapshotKey:     "ws/" + u64be(window_id)
 	// - CurrentWindowStateKey: "win/current" -> 32 bytes: u64be(window_id) + u64be(start_height) + u64be(end_height) + u64be(window_blocks)
 	// - NextWindowBlocksKey:   "win/next_blocks" -> 8 bytes (u64be(window_blocks))
@@ -43,9 +42,7 @@ var (
 	// Examples (shown as pseudo strings; the u64be bytes will appear as non-printable in raw dumps):
 	// - WindowSnapshotKey(1)          => "ws/" + u64be(1)
 	// - ReportKey(1, "<reporter>")    => "r/"  + u64be(1) + "<reporter>"
-	// - EvidenceKey(1, "<target>")    => "e/"  + u64be(1) + "<target>"
 
-	windowOriginHeightKey = []byte("origin_height")
 	currentWindowStateKey = []byte("win/current")
 	nextWindowBlocksKey   = []byte("win/next_blocks")
 
@@ -62,12 +59,6 @@ var (
 	// Format: "ss/" + reporter_supernode_account + "/" + u64be(window_id)
 	selfReportIndexPrefix = []byte("ss/")
 )
-
-// WindowOriginHeightKey returns the store key for the module's fixed window origin height.
-// The stored value is u64be(height).
-func WindowOriginHeightKey() []byte {
-	return windowOriginHeightKey
-}
 
 // WindowSnapshotKey returns the store key for the WindowSnapshot identified by windowID.
 func WindowSnapshotKey(windowID uint64) []byte {

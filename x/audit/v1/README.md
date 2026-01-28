@@ -27,6 +27,7 @@ High-level behavior:
 
 Notes:
 - This module currently focuses on windowing/snapshotting and report persistence. Penalties and aggregation are intentionally not implemented.
+- Postponement/recovery enforcement is implemented; rules are documented in `x/audit/v1/POSTPONEMENT_RULES.md`.
 
 ## Genesis State Implementation
 
@@ -50,6 +51,11 @@ Key fields:
 - `min_probe_targets_per_window`
 - `max_probe_targets_per_window`
 - `required_open_ports`
+- `min_cpu_free_percent`
+- `min_mem_free_percent`
+- `min_disk_free_percent`
+- `consecutive_windows_to_postpone`
+- `keep_last_window_entries`
 
 ### 2. Window State and Window IDs
 
@@ -172,6 +178,11 @@ Default values (as implemented in `x/audit/v1/types/params.go`):
 - `min_probe_targets_per_window`: `3`
 - `max_probe_targets_per_window`: `5`
 - `required_open_ports`: `[4444, 4445, 8002]`
+- `min_cpu_free_percent`: `0` (disabled)
+- `min_mem_free_percent`: `0` (disabled)
+- `min_disk_free_percent`: `0` (disabled)
+- `consecutive_windows_to_postpone`: `1`
+- `keep_last_window_entries`: `200`
 
 ## Client
 

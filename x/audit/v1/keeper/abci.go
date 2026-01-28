@@ -26,6 +26,22 @@ func (k Keeper) BeginBlocker(ctx context.Context) error {
 }
 
 func (k Keeper) EndBlocker(ctx context.Context) error {
-	// Windowing/snapshotting only: no EndBlock side effects here.
-	return nil
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	params := k.GetParams(ctx).WithDefaults()
+
+	ws, err := k.getCurrentWindowState(sdkCtx, params)
+	if err != nil {
+		return err
+	}
+
+	// Only enforce and prune exactly at the window end height.
+	if sdkCtx.BlockHeight() != ws.EndHeight {
+		return nil
+	}
+
+	if err := k.EnforceWindowEnd(sdkCtx, ws.WindowID, params); err != nil {
+		return err
+	}
+
+	return k.PruneOldWindows(sdkCtx, ws.WindowID, params)
 }

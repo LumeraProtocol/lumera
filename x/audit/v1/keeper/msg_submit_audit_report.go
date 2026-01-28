@@ -37,6 +37,53 @@ func (m msgServer) SubmitAuditReport(ctx context.Context, req *types.MsgSubmitAu
 		return nil, errorsmod.Wrap(types.ErrReporterNotFound, "unknown supernode_account")
 	}
 
+	// Enforce peer-observation gating at submission time using the persisted window snapshot.
+	// Enforcement later assumes all stored peer observations were gated here.
+	snap, found := m.GetWindowSnapshot(sdkCtx, req.WindowId)
+	if !found {
+		return nil, errorsmod.Wrapf(types.ErrWindowSnapshotNotFound, "window snapshot not found for window_id %d", req.WindowId)
+	}
+
+	allowedTargets := make(map[string]struct{})
+	for _, a := range snap.Assignments {
+		if a.ProberSupernodeAccount != req.SupernodeAccount {
+			continue
+		}
+		for _, t := range a.TargetSupernodeAccounts {
+			allowedTargets[t] = struct{}{}
+		}
+		break
+	}
+
+	requiredPortsLen := len(params.RequiredOpenPorts)
+	if len(req.PeerObservations) > 0 {
+		if len(allowedTargets) == 0 {
+			return nil, errorsmod.Wrap(types.ErrInvalidReporterState, "reporter not eligible for peer observations in this window")
+		}
+
+		seenTargets := make(map[string]struct{}, len(req.PeerObservations))
+		for _, obs := range req.PeerObservations {
+			target := obs.TargetSupernodeAccount
+			if target == "" {
+				return nil, errorsmod.Wrap(types.ErrInvalidPeerObservations, "empty target_supernode_account")
+			}
+			if target == req.SupernodeAccount {
+				return nil, errorsmod.Wrap(types.ErrInvalidPeerObservations, "self-targeting is not allowed")
+			}
+			if _, ok := allowedTargets[target]; !ok {
+				return nil, errorsmod.Wrapf(types.ErrInvalidPeerObservations, "target %q is not assigned to reporter in this window", target)
+			}
+			if _, dup := seenTargets[target]; dup {
+				return nil, errorsmod.Wrapf(types.ErrInvalidPeerObservations, "duplicate peer observation for target %q", target)
+			}
+			seenTargets[target] = struct{}{}
+
+			if requiredPortsLen != 0 && len(obs.PortStates) != requiredPortsLen {
+				return nil, errorsmod.Wrapf(types.ErrInvalidPortStatesLength, "port_states length %d does not match required_open_ports length %d", len(obs.PortStates), requiredPortsLen)
+			}
+		}
+	}
+
 	reporterAccount := req.SupernodeAccount
 	if m.HasReport(sdkCtx, req.WindowId, reporterAccount) {
 		return nil, errorsmod.Wrap(types.ErrDuplicateReport, "report already submitted for this window")

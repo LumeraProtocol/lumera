@@ -1,4 +1,4 @@
-package v1_10_0
+package v1_12_0
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 )
 
 // UpgradeName is the on-chain name used for this upgrade.
-const UpgradeName = "v1.10.0"
+const UpgradeName = "v1.12.0"
 
 // CreateUpgradeHandler migrates consensus params from x/params to x/consensus
 // and then runs module migrations.

@@ -2,6 +2,21 @@
 
 ---
 
+## 1.12.0
+
+Changes included since `v1.9.1` (range: `v1.9.1..v1.12.0`).
+
+- Cosmos SDK: upgraded from v0.50.14 to v0.53.5, CometBFT upgraded to v0.38.20
+- enabled unordered 
+- migrated consensus params from `x/params` to `x/consensus` via baseapp.MigrateParams; removed `x/params` usage.
+- IBC: upgraded to IBC-Go from v10.3.0 to v10.5.0 with IBC v2 readiness (Router v2, v2 packet/event handling helpers).
+- Wasm: upgraded wasmd from v0.55.0-ibc2.0 to v0.61.6 and wasmvm from v3.0.0-ibc2.0 to v3.0.2.
+- Module changes: removed `x/crisis`, deleted its store key and disabled crisis invariants by default.
+- Client/indexer impact: legacy tx logs removed in SDK v0.53.
+- Unordered transactions feature (SDK v0.52) is enabled: "fire-and-forget" tx submission model with timeout_timestamp as TTL/replay protection, useful for throughput-focused clients where strict ordering is not required.
+
+---
+
 ## 1.9.1
 
 Changes included since `v1.9.0` (range: `v1.9.0..v1.9.1`).

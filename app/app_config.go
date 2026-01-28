@@ -237,7 +237,7 @@ var (
 					ModuleAccountPermissions: moduleAccPerms,
 					// Cosmos SDK 0.53.x new feature - unordered transactions 
 					// "Fire-and-forget" submission model with timeout_timestamp as TTL/replay protection
-					EnableUnorderedTransactions: false,
+					EnableUnorderedTransactions: true,
 					// By default modules authority is the governance module. This is configurable with the following:
 					// Authority: "group", // A custom module authority can be set using a module name
 					// Authority: "cosmos1cwwv22j5ca08ggdv9c2uky355k908694z577tv", // or a specific address

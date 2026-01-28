@@ -36,7 +36,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/version"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
-	crisistypes "github.com/cosmos/cosmos-sdk/x/crisis/types"
 	"github.com/cosmos/cosmos-sdk/x/genutil"
 	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
@@ -243,6 +242,12 @@ func initTestnetFiles(
 	}
 	nodeIDs := make([]string, args.numValidators)
 	valPubKeys := make([]cryptotypes.PubKey, args.numValidators)
+
+	// Disable state sync for local testnets.
+	nodeConfig.StateSync.Enable = false
+	nodeConfig.StateSync.RPCServers = nil
+	nodeConfig.StateSync.TrustHeight = 0
+	nodeConfig.StateSync.TrustHash = ""
 
 	appConfig := srvconfig.DefaultConfig()
 	appConfig.MinGasPrices = args.minGasPrices
@@ -486,14 +491,6 @@ func initGenFiles(
 		govGenState.Params = params
 	}
 	appGenState[govtypes.ModuleName] = clientCtx.Codec.MustMarshalJSON(&govGenState)
-
-	// set the crisis module constant fee denom
-	var crisisGenState crisistypes.GenesisState
-	clientCtx.Codec.MustUnmarshalJSON(appGenState[crisistypes.ModuleName], &crisisGenState)
-	if crisisGenState.ConstantFee.Amount.IsPositive() || crisisGenState.ConstantFee.Denom != "" {
-		crisisGenState.ConstantFee = sdk.NewCoin(lcfg.ChainDenom, crisisGenState.ConstantFee.Amount)
-	}
-	appGenState[crisistypes.ModuleName] = clientCtx.Codec.MustMarshalJSON(&crisisGenState)
 
 	// set the accounts in the genesis state
 	var authGenState authtypes.GenesisState

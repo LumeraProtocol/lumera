@@ -18,7 +18,6 @@ import (
 	distrkeeper "github.com/cosmos/cosmos-sdk/x/distribution/keeper"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	"github.com/cosmos/gogoproto/proto"
-	ibcapi "github.com/cosmos/ibc-go/v10/modules/core/api"
 )
 
 func uint32Ptr(v uint32) *uint32 {
@@ -28,7 +27,6 @@ func uint32Ptr(v uint32) *uint32 {
 // registerWasmModules register CosmWasm keepers and non dependency inject modules.
 func (app *App) registerWasmModules(
 	appOpts servertypes.AppOptions,
-	ibcRouterV2 *ibcapi.Router,
 	wasmOpts ...wasmkeeper.Option,
 ) (*wasm.IBCHandler, error) {
 	// set up non depinject support modules store keys
@@ -74,6 +72,7 @@ func (app *App) registerWasmModules(
 		distrkeeper.NewQuerier(app.DistrKeeper),
 		app.IBCKeeper.ChannelKeeper,
 		app.IBCKeeper.ChannelKeeper,
+		app.IBCKeeper.ChannelKeeperV2,
 		app.TransferKeeper,
 		app.MsgServiceRouter(),
 		app.GRPCQueryRouter(),
@@ -82,7 +81,6 @@ func (app *App) registerWasmModules(
 		vmConfig,
 		capabilities,
 		authority,
-		ibcRouterV2,
 		wasmOpts...,
 	)
 	app.WasmKeeper = &wasmKeeper
@@ -133,7 +131,9 @@ func (app *App) registerWasmModules(
 	wasmStackIBCHandler := wasm.NewIBCHandler(
 		app.WasmKeeper,
 		app.IBCKeeper.ChannelKeeper,
-		app.IBCKeeper.ChannelKeeper)
+		app.TransferKeeper,
+		app.IBCKeeper.ChannelKeeper,
+	)
 
 	return &wasmStackIBCHandler, nil
 }

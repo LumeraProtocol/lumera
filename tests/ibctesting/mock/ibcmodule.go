@@ -31,6 +31,7 @@ var (
 	MockApplicationCallbackError error = &applicationCallbackError{}
 
 	_ porttypes.IBCModule = &MockIBCModule{}
+	_ porttypes.PacketDataUnmarshaler = &MockIBCModule{}
 	_ ibcexported.Path = KeyPath{}
 	_ ibcexported.Height = Height{}
 )
@@ -63,7 +64,7 @@ func (m *MockIBCModule) OnChanOpenInit(ctx sdk.Context, order channeltypes.Order
 		version = Version
 	}
 
-	if m.IBCApp != nil && m.IBCApp.OnChanOpenInit != nil {
+	if m.IBCApp != nil {
 		return m.IBCApp.OnChanOpenInit(ctx, order, connectionHops, portID, channelID, counterparty, version)
 	}
 	return version, nil
@@ -72,7 +73,7 @@ func (m *MockIBCModule) OnChanOpenInit(ctx sdk.Context, order channeltypes.Order
 func (m *MockIBCModule) OnChanOpenTry(ctx sdk.Context, order channeltypes.Order, connectionHops []string,
 	portID, channelID string,
 	counterparty channeltypes.Counterparty, counterpartyVersion string) (string, error) {
-	if m.IBCApp != nil && m.IBCApp.OnChanOpenTry != nil {
+	if m.IBCApp != nil {
 		return m.IBCApp.OnChanOpenTry(ctx, order, connectionHops, portID, channelID, counterparty, counterpartyVersion)
 	}
 
@@ -80,7 +81,7 @@ func (m *MockIBCModule) OnChanOpenTry(ctx sdk.Context, order channeltypes.Order,
 }
 
 func (m *MockIBCModule) OnChanOpenAck(ctx sdk.Context, portID, channelID, counterpartyChannelID, counterpartyVersion string) error {
-	if m.IBCApp != nil && m.IBCApp.OnChanOpenAck != nil {
+	if m.IBCApp != nil {
 		return m.IBCApp.OnChanOpenAck(ctx, portID, channelID, counterpartyChannelID, counterpartyVersion)
 	}
 
@@ -88,7 +89,7 @@ func (m *MockIBCModule) OnChanOpenAck(ctx sdk.Context, portID, channelID, counte
 }
 
 func (m *MockIBCModule) OnChanOpenConfirm(ctx sdk.Context, portID, channelID string) error {
-	if m.IBCApp != nil && m.IBCApp.OnChanOpenConfirm != nil {
+	if m.IBCApp != nil {
 		return m.IBCApp.OnChanOpenConfirm(ctx, portID, channelID)
 	}
 
@@ -96,11 +97,15 @@ func (m *MockIBCModule) OnChanOpenConfirm(ctx sdk.Context, portID, channelID str
 }
 
 func (m *MockIBCModule) OnChanCloseInit(ctx sdk.Context, portID, channelID string) error {
-	return m.IBCApp.OnChanCloseInit(ctx, portID, channelID)
+	if m.IBCApp != nil {
+		return m.IBCApp.OnChanCloseInit(ctx, portID, channelID)
+	}
+
+	return nil
 }
 
 func (m *MockIBCModule) OnChanCloseConfirm(ctx sdk.Context, portID, channelID string) error {
-	if m.IBCApp != nil && m.IBCApp.OnChanCloseConfirm != nil {
+	if m.IBCApp != nil {
 		return m.IBCApp.OnChanCloseConfirm(ctx, portID, channelID)
 	}
 
@@ -108,7 +113,7 @@ func (m *MockIBCModule) OnChanCloseConfirm(ctx sdk.Context, portID, channelID st
 }
 
 func (m *MockIBCModule) OnRecvPacket(ctx sdk.Context, channelVersion string, packet channeltypes.Packet, relayer sdk.AccAddress) ibcexported.Acknowledgement {
-	if m.IBCApp != nil && m.IBCApp.OnRecvPacket != nil {
+	if m.IBCApp != nil {
 		return m.IBCApp.OnRecvPacket(ctx, channelVersion, packet, relayer)
 	}
 
@@ -124,7 +129,7 @@ func (m *MockIBCModule) OnRecvPacket(ctx sdk.Context, channelVersion string, pac
 }
 
 func (m *MockIBCModule) OnAcknowledgementPacket(ctx sdk.Context, channelVersion string, packet channeltypes.Packet, acknowledgement []byte, relayer sdk.AccAddress) error {
-	if m.IBCApp != nil && m.IBCApp.OnAcknowledgementPacket != nil {
+	if m.IBCApp != nil {
 		return m.IBCApp.OnAcknowledgementPacket(ctx, channelVersion, packet, acknowledgement, relayer)
 	}
 
@@ -133,7 +138,7 @@ func (m *MockIBCModule) OnAcknowledgementPacket(ctx sdk.Context, channelVersion 
 }
 
 func (m *MockIBCModule) OnTimeoutPacket(ctx sdk.Context, channelVersion string, packet channeltypes.Packet, relayer sdk.AccAddress) error {
-	if m.IBCApp != nil && m.IBCApp.OnTimeoutPacket != nil {
+	if m.IBCApp != nil {
 		return m.IBCApp.OnTimeoutPacket(ctx, channelVersion, packet, relayer)
 	}
 
@@ -167,4 +172,3 @@ func (KeyPath) Empty() bool {
 type Height struct {
 	ibcexported.Height
 }
-

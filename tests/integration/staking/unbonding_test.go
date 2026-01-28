@@ -8,7 +8,7 @@ import (
 
 	"cosmossdk.io/math"
 
-	"github.com/golang/mock/gomock"
+	"go.uber.org/mock/gomock"
 
 	simtestutil "github.com/cosmos/cosmos-sdk/testutil/sims"
 	sdk "github.com/cosmos/cosmos-sdk/types"

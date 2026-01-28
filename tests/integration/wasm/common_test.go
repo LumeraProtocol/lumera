@@ -46,8 +46,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/bank"
 	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
-	"github.com/cosmos/cosmos-sdk/x/crisis"
-	crisistypes "github.com/cosmos/cosmos-sdk/x/crisis/types"
 	"github.com/cosmos/cosmos-sdk/x/distribution"
 	distributionkeeper "github.com/cosmos/cosmos-sdk/x/distribution/keeper"
 	distributiontypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
@@ -251,7 +249,6 @@ var moduleBasics = module.NewBasicManager(
 		paramsclient.ProposalHandler,
 	}),
 	params.AppModuleBasic{},
-	crisis.AppModuleBasic{},
 	slashing.AppModuleBasic{},
 	ibc.AppModuleBasic{},
 	upgrade.AppModuleBasic{},
@@ -268,7 +265,6 @@ func MakeEncodingConfig(t testing.TB) moduletestutil.TestEncodingConfig {
 		mint.AppModule{},
 		slashing.AppModule{},
 		gov.AppModule{},
-		crisis.AppModule{},
 		ibc.AppModule{},
 		ibctransfer.AppModule{},
 		vesting.AppModule{},
@@ -365,7 +361,6 @@ func createTestInput(
 		minttypes.ModuleName,
 		distributiontypes.ModuleName,
 		slashingtypes.ModuleName,
-		crisistypes.ModuleName,
 		ibctransfertypes.ModuleName,
 		ibcexported.ModuleName,
 		govtypes.ModuleName,
@@ -481,6 +476,7 @@ func createTestInput(
 		distributionkeeper.NewQuerier(distKeeper),
 		ibcKeeper.ChannelKeeper, // ICS4Wrapper
 		ibcKeeper.ChannelKeeper,
+		ibcKeeper.ChannelKeeperV2,
 		ibcmock.MockIBCTransferKeeper{},
 		msgRouter,
 		querier,
@@ -489,7 +485,6 @@ func createTestInput(
 		vmConfig,
 		availableCapabilities,
 		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
-		nil,
 		opts...,
 	)
 	require.NoError(t, keeper.SetParams(ctx, wasmtypes.DefaultParams()))

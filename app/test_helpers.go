@@ -15,6 +15,8 @@ import (
 	"cosmossdk.io/log"
 	sdkmath "cosmossdk.io/math"
 	pruningtypes "cosmossdk.io/store/pruning/types"
+	"cosmossdk.io/store/snapshots"
+	snapshottypes "cosmossdk.io/store/snapshots/types"
 
 	abci "github.com/cometbft/cometbft/abci/types"
 	cmttypes "github.com/cometbft/cometbft/types"
@@ -47,9 +49,11 @@ import (
 
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	ibcporttypes "github.com/cosmos/ibc-go/v10/modules/core/05-port/types"
+	ibcapi "github.com/cosmos/ibc-go/v10/modules/core/api"
 
 	lcfg "github.com/LumeraProtocol/lumera/config"
 	ibcmock "github.com/LumeraProtocol/lumera/tests/ibctesting/mock"
+	mockv2 "github.com/LumeraProtocol/lumera/tests/ibctesting/mock/v2"
 	claimtypes "github.com/LumeraProtocol/lumera/x/claim/types"
 )
 
@@ -93,7 +97,6 @@ func NewTestApp(
 		&app.SlashingKeeper,
 		&app.MintKeeper,
 		&app.GovKeeper,
-		&app.CrisisKeeper,
 		&app.UpgradeKeeper,
 		&app.ParamsKeeper,
 		&app.AuthzKeeper,
@@ -197,6 +200,8 @@ func setup(t testing.TB, chainID string, withGenesis bool, invCheckPeriod uint, 
 	require.NoError(t, err)
 	t.Cleanup(func() { snapshotDB.Close() })
 	require.NoError(t, err)
+	snapshotStore, err := snapshots.NewStore(snapshotDB, snapshotDir)
+	require.NoError(t, err)
 
 	appOptions := make(simtestutil.AppOptionsMap, 0)
 	appOptions[flags.FlagHome] = nodeHome // ensure unique folder
@@ -206,8 +211,21 @@ func setup(t testing.TB, chainID string, withGenesis bool, invCheckPeriod uint, 
 		// Register the mock IBC module for testing
 		ibcRouter.AddRoute(MockPort, ibcmock.NewMockIBCModule(nil, MockPort))
 	}
+	appOptions[IBCModuleRegisterFnOptionV2] = func(ibcRouter *ibcapi.Router) {
+		ibcRouter.AddRoute(mockv2.PortIDA, mockv2.NewIBCModule())
+		ibcRouter.AddRoute(mockv2.PortIDB, mockv2.NewIBCModule())
+	}
 
-	app := New(log.NewNopLogger(), db, nil, true, appOptions, wasmOpts, bam.SetChainID(chainID))
+	app := New(
+		log.NewNopLogger(),
+		db,
+		nil,
+		true,
+		appOptions,
+		wasmOpts,
+		bam.SetChainID(chainID),
+		bam.SetSnapshot(snapshotStore, snapshottypes.SnapshotOptions{KeepRecent: 2}),
+	)
 	if withGenesis {
 		return app, app.DefaultGenesis()
 	}

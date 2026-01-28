@@ -13,7 +13,7 @@ import (
 	wasmvmtypes "github.com/CosmWasm/wasmvm/v3/types"
 	"github.com/cometbft/cometbft/crypto/secp256k1"
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
-	gogoproto "github.com/cosmos/gogoproto/proto"
+	proto "github.com/cosmos/gogoproto/proto"
 	channeltypes "github.com/cosmos/ibc-go/v10/modules/core/04-channel/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -130,7 +130,7 @@ func TestReflectStargateQuery(t *testing.T) {
 
 func TestReflectGrpcQuery(t *testing.T) {
 	queryPlugins := (*reflectPlugins()).Merge(&wasmKeeper.QueryPlugins{
-		Grpc: func(ctx sdk.Context, request *wasmvmtypes.GrpcQuery) (gogoproto.Message, error) {
+		Grpc: func(ctx sdk.Context, request *wasmvmtypes.GrpcQuery) (proto.Message, error) {
 			if request.Path == "cosmos.bank.v1beta1.Query/AllBalances" {
 				return &banktypes.QueryAllBalancesResponse{
 					Balances: sdk.NewCoins(),
@@ -157,7 +157,7 @@ func TestReflectGrpcQuery(t *testing.T) {
 
 	// now grpc query for the bank balance
 	cosmosBankQuery := banktypes.NewQueryAllBalancesRequest(creator, nil, false)
-	cosmosBankQueryBz, err := gogoproto.Marshal(cosmosBankQuery)
+	cosmosBankQueryBz, err := proto.Marshal(cosmosBankQuery)
 	require.NoError(t, err)
 	reflectQuery := wasmvmtypes.QueryRequest{
 		Grpc: &wasmvmtypes.GrpcQuery{
@@ -176,7 +176,7 @@ func TestReflectGrpcQuery(t *testing.T) {
 	mustUnmarshal(t, reflectRespBz, &reflectResp)
 	// now unmarshal the protobuf response
 	var grpcBalance banktypes.QueryAllBalancesResponse
-	err = gogoproto.Unmarshal(reflectResp.Data, &grpcBalance)
+	err = proto.Unmarshal(reflectResp.Data, &grpcBalance)
 	require.NoError(t, err)
 }
 
@@ -254,7 +254,7 @@ func TestReflectInvalidStargateQuery(t *testing.T) {
 	protoQuery := banktypes.QueryAllBalancesRequest{
 		Address: creator.String(),
 	}
-	protoQueryBin, err := gogoproto.Marshal(&protoQuery)
+	protoQueryBin, err := proto.Marshal(&protoQuery)
 	require.NoError(t, err)
 
 	protoRequest := wasmvmtypes.QueryRequest{
@@ -953,16 +953,16 @@ func TestAcceptListStargateQuerier(t *testing.T) {
 
 	addrs := app.AddTestAddrsIncremental(lumeraApp, ctx, 2, sdkmath.NewInt(1_000_000))
 	accepted := wasmKeeper.AcceptedQueries{
-		"/cosmos.auth.v1beta1.Query/Account": func() gogoproto.Message {
+		"/cosmos.auth.v1beta1.Query/Account": func() proto.Message {
 			return &authtypes.QueryAccountResponse{}
 		},
-		"/no/route/to/this": func() gogoproto.Message {
+		"/no/route/to/this": func() proto.Message {
 			return &authtypes.QueryAccountResponse{}
 		},
 	}
 
-	marshal := func(pb gogoproto.Message) []byte {
-		b, err := gogoproto.Marshal(pb)
+	marshal := func(pb proto.Message) []byte {
+		b, err := proto.Marshal(pb)
 		require.NoError(t, err)
 		return b
 	}
@@ -1048,8 +1048,8 @@ func TestDeterministicJsonMarshal(t *testing.T) {
 		originalResponse    string
 		updatedResponse     string
 		queryPath           string
-		responseProtoStruct gogoproto.Message
-		expectedProto       func() gogoproto.Message
+		responseProtoStruct proto.Message
+		expectedProto       func() proto.Message
 	}{
 		/**
 		   *
@@ -1077,7 +1077,7 @@ func TestDeterministicJsonMarshal(t *testing.T) {
 			"0a530a202f636f736d6f732e617574682e763162657461312e426173654163636f756e74122f0a2d636f736d6f733166387578756c746e3873717a687a6e72737a3371373778776171756867727367366a79766679122d636f736d6f733166387578756c746e3873717a687a6e72737a3371373778776171756867727367366a79766679",
 			"/cosmos.auth.v1beta1.Query/Account",
 			&authtypes.QueryAccountResponse{},
-			func() gogoproto.Message {
+			func() proto.Message {
 				account := authtypes.BaseAccount{
 					Address: "cosmos1f8uxultn8sqzhznrsz3q77xwaquhgrsg6jyvfy",
 				}
@@ -1119,9 +1119,9 @@ func TestConvertProtoToJSONMarshal(t *testing.T) {
 	testCases := []struct {
 		name                  string
 		queryPath             string
-		protoResponseStruct   gogoproto.Message
+		protoResponseStruct   proto.Message
 		originalResponse      string
-		expectedProtoResponse gogoproto.Message
+		expectedProtoResponse proto.Message
 		expectedError         bool
 	}{
 		{

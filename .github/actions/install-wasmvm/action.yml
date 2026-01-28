@@ -5,7 +5,7 @@ inputs:
     description: Path to the Makefile containing WASMVM_VERSION
     default: Makefile
   version:
-    description: Override wasmvm version (e.g. v3.0.0-ibc2.0)
+    description: Override wasmvm version (e.g. v3.0.2)
     required: false
 outputs:
   version:

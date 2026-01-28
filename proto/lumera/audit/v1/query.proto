@@ -1,0 +1,146 @@
+syntax = "proto3";
+package lumera.audit.v1;
+
+option go_package = "x/audit/v1/types";
+
+import "amino/amino.proto";
+import "gogoproto/gogo.proto";
+import "google/api/annotations.proto";
+import "cosmos_proto/cosmos.proto";
+import "cosmos/base/query/v1beta1/pagination.proto";
+
+import "lumera/audit/v1/params.proto";
+import "lumera/audit/v1/audit.proto";
+
+// Query defines the gRPC querier service.
+service Query {
+  // Parameters queries the parameters of the module.
+  rpc Params(QueryParamsRequest) returns (QueryParamsResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/params";
+  }
+
+  // CurrentWindow returns the current derived window boundaries at the current chain height.
+  rpc CurrentWindow(QueryCurrentWindowRequest) returns (QueryCurrentWindowResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/current_window";
+  }
+
+  // WindowSnapshot returns the persisted window snapshot for the given window_id.
+  rpc WindowSnapshot(QueryWindowSnapshotRequest) returns (QueryWindowSnapshotResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/window_snapshot/{window_id}";
+  }
+
+  // AssignedTargets returns the prober -> targets assignment for a given supernode_account.
+  // If filter_by_window_id is false, it returns the assignments for the current window.
+  rpc AssignedTargets(QueryAssignedTargetsRequest) returns (QueryAssignedTargetsResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/assigned_targets/{supernode_account}";
+  }
+
+  rpc AuditReport(QueryAuditReportRequest) returns (QueryAuditReportResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/audit_report/{window_id}/{supernode_account}";
+  }
+
+  rpc AuditReportsByReporter(QueryAuditReportsByReporterRequest) returns (QueryAuditReportsByReporterResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/audit_reports_by_reporter/{supernode_account}";
+  }
+
+  // SupernodeReports returns all reports that include observations about the given supernode_account.
+  rpc SupernodeReports(QuerySupernodeReportsRequest) returns (QuerySupernodeReportsResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/supernode_reports/{supernode_account}";
+  }
+
+  // SelfReports returns self-reports submitted by the given supernode_account across windows.
+  rpc SelfReports(QuerySelfReportsRequest) returns (QuerySelfReportsResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/self_reports/{supernode_account}";
+  }
+}
+
+message QueryParamsRequest {}
+
+message QueryParamsResponse {
+  Params params = 1 [(gogoproto.nullable) = false, (amino.dont_omitempty) = true];
+}
+
+message QueryCurrentWindowRequest {}
+
+message QueryCurrentWindowResponse {
+  uint64 window_id           = 1;
+  int64  window_start_height = 2;
+  int64  window_end_height   = 3;
+}
+
+message QueryWindowSnapshotRequest {
+  uint64 window_id = 1;
+}
+
+message QueryWindowSnapshotResponse {
+  WindowSnapshot snapshot = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryAssignedTargetsRequest {
+  string supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  uint64 window_id = 2;
+  bool filter_by_window_id = 3;
+}
+
+message QueryAssignedTargetsResponse {
+  uint64 window_id = 1;
+  int64 window_start_height = 2;
+  repeated uint32 required_open_ports = 3;
+  repeated string target_supernode_accounts = 4 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+}
+
+message QueryAuditReportRequest {
+  uint64 window_id = 1;
+  string supernode_account = 2 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+}
+
+message QueryAuditReportResponse {
+  AuditReport report = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryAuditReportsByReporterRequest {
+  string supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  cosmos.base.query.v1beta1.PageRequest pagination = 2;
+}
+
+message QueryAuditReportsByReporterResponse {
+  repeated AuditReport reports = 1 [(gogoproto.nullable) = false];
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+message QuerySupernodeReportsRequest {
+  string supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  uint64 window_id = 2;
+  cosmos.base.query.v1beta1.PageRequest pagination = 3;
+  bool filter_by_window_id = 4;
+}
+
+message SupernodeReport {
+  string reporter_supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  uint64 window_id = 2;
+  int64 report_height = 3;
+  repeated PortState port_states = 4;
+}
+
+message QuerySupernodeReportsResponse {
+  repeated SupernodeReport reports = 1 [(gogoproto.nullable) = false];
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+message QuerySelfReportsRequest {
+  string supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  uint64 window_id = 2;
+  cosmos.base.query.v1beta1.PageRequest pagination = 3;
+  bool filter_by_window_id = 4;
+}
+
+message SelfReport {
+  uint64 window_id = 1;
+  int64 report_height = 2;
+  AuditSelfReport self_report = 3 [(gogoproto.nullable) = false];
+}
+
+message QuerySelfReportsResponse {
+  repeated SelfReport reports = 1 [(gogoproto.nullable) = false];
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}

@@ -18,19 +18,21 @@ import (
 
 // SupernodeKeeper defines the expected interface for the Supernode module.
 // For Generating mocks only not used in depinject
-	type SupernodeKeeper interface {
-		SetSuperNode(ctx sdk.Context, supernode SuperNode) error
-		SetParams(ctx sdk.Context, params Params) error
-		CheckValidatorSupernodeEligibility(ctx sdk.Context, validator stakingtypes.ValidatorI, valAddr string, supernodeAccount string) error
-		SetSuperNodeStopped(ctx sdk.Context, valAddr sdk.ValAddress, reason string) error
-		SetSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress, reason string) error
-		SetMetricsState(ctx sdk.Context, state SupernodeMetricsState) error
-		GetMetricsState(ctx sdk.Context, valAddr sdk.ValAddress) (SupernodeMetricsState, bool)
-		Logger() log.Logger
-		GetAuthority() string
-		GetStakingKeeper() StakingKeeper
-		GetParams(ctx sdk.Context) (params Params)
-		GetAllSuperNodes(ctx sdk.Context, stateFilters ...SuperNodeState) ([]SuperNode, error)
+type SupernodeKeeper interface {
+	SetSuperNode(ctx sdk.Context, supernode SuperNode) error
+	SetParams(ctx sdk.Context, params Params) error
+	CheckValidatorSupernodeEligibility(ctx sdk.Context, validator stakingtypes.ValidatorI, valAddr string, supernodeAccount string) error
+	SetSuperNodeStopped(ctx sdk.Context, valAddr sdk.ValAddress, reason string) error
+	SetSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress, reason string) error
+	SetSuperNodePostponed(ctx sdk.Context, valAddr sdk.ValAddress, reason string) error
+	RecoverSuperNodeFromPostponed(ctx sdk.Context, valAddr sdk.ValAddress) error
+	SetMetricsState(ctx sdk.Context, state SupernodeMetricsState) error
+	GetMetricsState(ctx sdk.Context, valAddr sdk.ValAddress) (SupernodeMetricsState, bool)
+	Logger() log.Logger
+	GetAuthority() string
+	GetStakingKeeper() StakingKeeper
+	GetParams(ctx sdk.Context) (params Params)
+	GetAllSuperNodes(ctx sdk.Context, stateFilters ...SuperNodeState) ([]SuperNode, error)
 	GetSuperNodeByAccount(ctx sdk.Context, supernodeAccount string) (SuperNode, bool, error)
 	GetBlockHashForHeight(ctx sdk.Context, height int64) ([]byte, error)
 	RankSuperNodesByDistance(blockHash []byte, supernodes []SuperNode, topN int) []SuperNode

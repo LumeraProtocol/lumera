@@ -28,6 +28,12 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					RpcMethod: "UpdateParams",
 					Skip:      true, // skipped because authority gated
 				},
+				{
+					RpcMethod:      "SubmitEvidence",
+					Use:            "submit-evidence [subject-address] [evidence-type] [action-id] [metadata]",
+					Short:          "Send a submit-evidence tx",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "subject_address"}, {ProtoField: "evidence_type"}, {ProtoField: "action_id"}, {ProtoField: "metadata"}},
+				},
 				// this line is used by ignite scaffolding # autocli/tx
 			},
 		},

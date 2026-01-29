@@ -19,8 +19,12 @@ type Keeper struct {
 	// Typically, this should be the x/gov module account.
 	authority []byte
 
-	Schema collections.Schema
-	Params collections.Item[types.Params]
+	Schema     collections.Schema
+	Params     collections.Item[types.Params]
+	EvidenceID collections.Sequence
+	Evidences  collections.Map[uint64, types.Evidence]
+	BySubject  collections.KeySet[collections.Pair[string, uint64]]
+	ByActionID collections.KeySet[collections.Pair[string, uint64]]
 }
 
 func NewKeeper(
@@ -42,7 +46,23 @@ func NewKeeper(
 		addressCodec: addressCodec,
 		authority:    authority,
 
-		Params: collections.NewItem(sb, types.ParamsKey, "params", codec.CollValue[types.Params](cdc)),
+		Params:     collections.NewItem(sb, types.ParamsKey, "params", codec.CollValue[types.Params](cdc)),
+		EvidenceID: collections.NewSequence(sb, types.EvidenceIDKey, "evidence_id"),
+		Evidences:  collections.NewMap(sb, types.EvidenceKey, "evidences", collections.Uint64Key, codec.CollValue[types.Evidence](cdc)),
+		BySubject: collections.NewKeySet(
+			sb,
+			types.EvidenceBySubjectKey,
+			"evidence_by_subject",
+			collections.PairKeyCodec(collections.StringKey, collections.Uint64Key),
+			collections.WithKeySetSecondaryIndex(),
+		),
+		ByActionID: collections.NewKeySet(
+			sb,
+			types.EvidenceByActionKey,
+			"evidence_by_action",
+			collections.PairKeyCodec(collections.StringKey, collections.Uint64Key),
+			collections.WithKeySetSecondaryIndex(),
+		),
 	}
 
 	schema, err := sb.Build()

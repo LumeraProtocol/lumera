@@ -17,3 +17,15 @@ const (
 
 // ParamsKey is the prefix to retrieve all Params
 var ParamsKey = collections.NewPrefix("p_audit")
+
+// EvidenceIDKey is the prefix for the evidence id sequence.
+var EvidenceIDKey = collections.NewPrefix(1)
+
+// EvidenceKey is the prefix for stored Evidence records.
+var EvidenceKey = collections.NewPrefix(2)
+
+// EvidenceBySubjectKey is the prefix for the secondary index (subject_address, evidence_id).
+var EvidenceBySubjectKey = collections.NewPrefix(3)
+
+// EvidenceByActionKey is the prefix for the secondary index (action_id, evidence_id).
+var EvidenceByActionKey = collections.NewPrefix(4)

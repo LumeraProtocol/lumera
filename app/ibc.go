@@ -140,7 +140,7 @@ func (app *App) registerIBCModules(
 	ibcRouterV2 := ibcapi.NewRouter()
 
 	// Wasm module
-	wasmStackIBCHandler, err := app.registerWasmModules(appOpts, ibcRouterV2, wasmOpts...)
+	wasmStackIBCHandler, err := app.registerWasmModules(appOpts, wasmOpts...)
 	if err != nil {
 		return err
 	}
@@ -224,7 +224,17 @@ func (app *App) registerIBCModules(
 	app.ibcRouter = ibcRouter
 
 	ibcRouterV2 = ibcRouterV2.
-		AddRoute(ibctransfertypes.PortID, ibcv2transferStack)
+		AddRoute(ibctransfertypes.PortID, ibcv2transferStack).
+		AddPrefixRoute(wasmkeeper.PortIDPrefixV2, wasmkeeper.NewIBC2Handler(app.WasmKeeper))
+
+	// Additional IBC v2 modules can be registered here.
+	if v := appOpts.Get(IBCModuleRegisterFnOptionV2); v != nil {
+		if registerFn, ok := v.(func(router *ibcapi.Router)); ok {
+			registerFn(ibcRouterV2)
+		} else {
+			return errors.New("invalid IBC v2 module register function option")
+		}
+	}
 	app.IBCKeeper.SetRouterV2(ibcRouterV2)
 
 	clientKeeper := app.IBCKeeper.ClientKeeper

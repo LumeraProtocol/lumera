@@ -42,6 +42,15 @@ func SimulateMsgRegisterSupernode(
 				continue
 			}
 
+			// Ensure the account isn't already associated with a different validator.
+			if snByAccount, foundByAccount, err := k.GetSuperNodeByAccount(ctx, simAccount.Address.String()); err == nil && foundByAccount {
+				if snByAccount.ValidatorAddress != valAddr.String() {
+					continue
+				}
+			} else if err != nil {
+				continue
+			}
+
 			// Check if supernode already exists and is not disabled
 			supernode, superNodeExists := k.QuerySuperNode(ctx, valAddr)
 			if superNodeExists {

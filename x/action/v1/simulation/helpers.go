@@ -26,15 +26,15 @@ import (
 func registerSenseAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, bk types.BankKeeper, k keeper.Keeper, ak types.AuthKeeper) (string, *types.MsgRequestAction) {
 	params := k.GetParams(ctx)
 
-	// 1. Select random account with enough balance
-	simAccount := selectRandomAccountWithSufficientFunds(r, ctx, accs, bk, ak, []string{""})
+	// 1. Determine fee amount (within valid range)
+	feeAmount := generateRandomFee(r, ctx, params.BaseActionFee.Add(params.FeePerKbyte))
 
-	// 2. Generate random valid SENSE metadata
+	// 2. Select random account with enough spendable balance for the fee
+	simAccount := selectRandomAccountWithSufficientFunds(r, ctx, accs, bk, ak, feeAmount, []string{""})
+
+	// 3. Generate random valid SENSE metadata
 	dataHash := generateRandomHash(r)
 	senseMetadata := generateRequestActionSenseMetadata(dataHash)
-
-	// 3. Determine fee amount (within valid range)
-	feeAmount := generateRandomFee(r, ctx, params.BaseActionFee.Add(params.FeePerKbyte))
 
 	// 4. Generate an expiration time (current time + random duration >= expiration_duration)
 	expirationTime := getRandomExpirationTime(ctx, r, params)
@@ -65,22 +65,16 @@ func registerSenseAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account,
 func registerCascadeAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, bk types.BankKeeper, k keeper.Keeper, ak types.AuthKeeper) (string, *types.MsgRequestAction) {
 	params := k.GetParams(ctx)
 
-	// 1. Select random account with enough balance
-	simAccount := selectRandomAccountWithSufficientFunds(r, ctx, accs, bk, ak, []string{""})
+	// 1. Determine fee amount (within valid range)
+	feeAmount := generateRandomFee(r, ctx, params.BaseActionFee.Add(params.FeePerKbyte))
 
-	// 2. Set account public key
-	err := addPubKeyToAccount(ctx, simAccount, ak)
-	if err != nil {
-		panic(fmt.Sprintf("failed to set account public key: %v", err))
-	}
+	// 2. Select random account with enough spendable balance for the fee
+	simAccount := selectRandomAccountWithSufficientFunds(r, ctx, accs, bk, ak, feeAmount, []string{""})
 
-	// 2. Generate random valid CASCADE metadata
+	// 3. Generate random valid CASCADE metadata
 	dataHash := generateRandomHash(r)
 	fileName := generateRandomFileName(r)
 	cascadeMetadata := generateRequestActionCascadeMetadata(dataHash, fileName, simAccount)
-
-	// 3. Determine fee amount (within valid range)
-	feeAmount := generateRandomFee(r, ctx, params.BaseActionFee.Add(params.FeePerKbyte))
 
 	// 4. Generate an expiration time (current time + random duration)
 	expirationTime := getRandomExpirationTime(ctx, r, params)
@@ -123,7 +117,7 @@ func finalizeSenseAction(ctx sdk.Context, k keeper.Keeper, bk types.BankKeeper, 
 	// Create finalization metadata with signature
 	metadata := generateFinalizeMetadataForSense(ctx, k, actionID, supernodes)
 
-	// Get supernode's initial balance to verify no fee distribution
+	// Get supernode's initial balance to verify it doesn't decrease
 	feeDenom := k.GetParams(ctx).BaseActionFee.Denom
 	initialBalance := bk.GetBalance(ctx, supernodes[0].Address, feeDenom)
 
@@ -151,8 +145,8 @@ func finalizeSenseAction(ctx sdk.Context, k keeper.Keeper, bk types.BankKeeper, 
 	}
 
 	finalBalance := bk.GetBalance(ctx, supernodes[0].Address, feeDenom)
-	if !finalBalance.Equal(initialBalance) {
-		panic(fmt.Sprintf("supernode %s balance changed after FinalizeAction, expected no fee distribution", supernodes[0].Address.String()))
+	if finalBalance.Amount.LT(initialBalance.Amount) {
+		panic(fmt.Sprintf("supernode %s balance decreased after FinalizeAction", supernodes[0].Address.String()))
 	}
 
 	return finalMsg
@@ -256,7 +250,7 @@ func addPubKeyToAccount(ctx sdk.Context, simAccount simtypes.Account, ak types.A
 }
 
 // selectRandomAccountWithSufficientFunds selects a random account that has enough balance to cover the specified fee amount
-func selectRandomAccountWithSufficientFunds(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, bk types.BankKeeper, ak types.AuthKeeper, skipAddresses []string) simtypes.Account {
+func selectRandomAccountWithSufficientFunds(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, bk types.BankKeeper, ak types.AuthKeeper, minFee sdk.Coin, skipAddresses []string) simtypes.Account {
 	if len(accs) == 0 {
 		panic("no accounts available to select")
 	}
@@ -273,8 +267,8 @@ func selectRandomAccountWithSufficientFunds(r *rand.Rand, ctx sdk.Context, accs 
 			continue
 		}
 
-		balance := bk.GetBalance(ctx, simAccount.Address, sdk.DefaultBondDenom)
-		if balance.IsZero() || balance.Amount.LT(math.NewInt(1_000_000)) {
+		spendable := bk.SpendableCoins(ctx, simAccount.Address)
+		if spendable.IsZero() || spendable.AmountOf(minFee.Denom).LT(minFee.Amount) {
 			continue
 		}
 

@@ -16,7 +16,7 @@ IGNITE_INSTALL_SCRIPT ?= https://get.ignite.com/cli!
 
 GOFLAGS = "-trimpath"
 
-WASMVM_VERSION := v3@v3.0.0-ibc2.0
+WASMVM_VERSION := v3@v3.0.2
 RELEASE_CGO_LDFLAGS ?= -Wl,-rpath,/usr/lib -Wl,--disable-new-dtags
 COSMOS_PROTO_VERSION := $(call module_version,github.com/cosmos/cosmos-proto)
 GOGOPROTO_VERSION := $(call module_version,github.com/cosmos/gogoproto)

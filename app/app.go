@@ -35,6 +35,7 @@ import (
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
+	"github.com/cosmos/cosmos-sdk/version"
 	"github.com/cosmos/cosmos-sdk/x/auth"
 	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
 	authsims "github.com/cosmos/cosmos-sdk/x/auth/simulation"
@@ -47,8 +48,6 @@ import (
 	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
 	_ "github.com/cosmos/cosmos-sdk/x/consensus" // import for side-effects
 	consensuskeeper "github.com/cosmos/cosmos-sdk/x/consensus/keeper"
-	_ "github.com/cosmos/cosmos-sdk/x/crisis" // import for side-effects
-	crisiskeeper "github.com/cosmos/cosmos-sdk/x/crisis/keeper"
 	_ "github.com/cosmos/cosmos-sdk/x/distribution" // import for side-effects
 	distrkeeper "github.com/cosmos/cosmos-sdk/x/distribution/keeper"
 	"github.com/cosmos/cosmos-sdk/x/genutil"
@@ -129,7 +128,6 @@ type App struct {
 	AuthzKeeper           authzkeeper.Keeper
 	ConsensusParamsKeeper consensuskeeper.Keeper
 	CircuitBreakerKeeper  circuitkeeper.Keeper
-	CrisisKeeper          *crisiskeeper.Keeper
 	ParamsKeeper          paramskeeper.Keeper
 	EvidenceKeeper        evidencekeeper.Keeper
 	FeeGrantKeeper        feegrantkeeper.Keeper
@@ -240,7 +238,6 @@ func New(
 		&app.MintKeeper,
 		&app.DistrKeeper,
 		&app.GovKeeper,
-		&app.CrisisKeeper,
 		&app.UpgradeKeeper,
 		&app.ParamsKeeper,
 		&app.AuthzKeeper,
@@ -264,6 +261,7 @@ func New(
 
 	// build app
 	app.App = appBuilder.Build(db, traceStore, baseAppOptions...)
+	app.SetVersion(version.Version)
 
 	// register legacy modules
 	if err := app.registerIBCModules(appOpts, wasmOpts...); err != nil {
@@ -280,7 +278,6 @@ func New(
 	app.setupUpgrades()
 
 	/****  Module Options ****/
-	app.ModuleManager.RegisterInvariants(app.CrisisKeeper)
 
 	// create the simulation manager and define the order of the modules for deterministic simulations
 	overrideModules := map[string]module.AppModuleSimulation{
@@ -324,12 +321,14 @@ func (app *App) GetSubspace(moduleName string) paramstypes.Subspace {
 // This needs to be called BEFORE app.Load()
 func (app *App) setupUpgrades() {
 	params := appParams.AppUpgradeParams{
-		ChainID:         app.ChainID(),
-		Logger:          app.Logger(),
-		ModuleManager:   app.ModuleManager,
-		Configurator:    app.Configurator(),
-		ActionKeeper:    &app.ActionKeeper,
-		SupernodeKeeper: app.SupernodeKeeper,
+		ChainID:               app.ChainID(),
+		Logger:                app.Logger(),
+		ModuleManager:         app.ModuleManager,
+		Configurator:          app.Configurator(),
+		ActionKeeper:          &app.ActionKeeper,
+		SupernodeKeeper:       app.SupernodeKeeper,
+		ParamsKeeper:          &app.ParamsKeeper,
+		ConsensusParamsKeeper: &app.ConsensusParamsKeeper,
 	}
 
 	allUpgrades := upgrades.AllUpgrades(params)

@@ -6,9 +6,9 @@ import (
 
 	"encoding/hex"
 
+	claimcrypto "github.com/LumeraProtocol/lumera/x/claim/keeper/crypto"
 	"github.com/LumeraProtocol/lumera/x/claim/keeper"
 	"github.com/LumeraProtocol/lumera/x/claim/types"
-	"github.com/cometbft/cometbft/crypto/secp256k1"
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	simtypes "github.com/cosmos/cosmos-sdk/types/simulation"
@@ -34,10 +34,12 @@ func SimulateMsgClaim(
 		}
 
 		// Generate simulated keys and addresses
-		privKey := secp256k1.GenPrivKey()
-		pubKeyBytes := privKey.PubKey().Bytes()
-		pubKeyHex := hex.EncodeToString(pubKeyBytes)
-		oldAddress := sdk.AccAddress(privKey.PubKey().Address()).String()
+		privKey, pubKey := claimcrypto.GenerateKeyPair()
+		pubKeyHex := hex.EncodeToString(pubKey.Key)
+		oldAddress, err := claimcrypto.GetAddressFromPubKey(pubKeyHex)
+		if err != nil {
+			return simtypes.NoOpMsg(types.ModuleName, TypeMsgClaim, "failed to generate claim address"), nil, err
+		}
 
 		testAmount := int64(1_000_000) // Amount to be claimed in the test case
 
@@ -67,7 +69,7 @@ func SimulateMsgClaim(
 
 		// Generate message signature
 		message := fmt.Sprintf("%s.%s.%s", oldAddress, pubKeyHex, simAccount.Address.String())
-		signature, err := privKey.Sign([]byte(message))
+		signature, err := claimcrypto.SignMessage(privKey, message)
 		if err != nil {
 			return simtypes.NoOpMsg(types.ModuleName, TypeMsgClaim, "failed to sign message"), nil, err
 		}
@@ -76,7 +78,7 @@ func SimulateMsgClaim(
 			OldAddress: oldAddress,
 			NewAddress: simAccount.Address.String(),
 			PubKey:     pubKeyHex,
-			Signature:  hex.EncodeToString(signature),
+			Signature:  signature,
 		}
 
 		// Check if we've hit the claims per block limit

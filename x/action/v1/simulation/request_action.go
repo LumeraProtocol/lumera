@@ -74,23 +74,23 @@ func SimulateMsgRequestActionInvalidMetadata(
 ) simtypes.Operation {
 	return func(r *rand.Rand, app *baseapp.BaseApp, ctx sdk.Context, accs []simtypes.Account, chainID string,
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
-		// 1. Select random account with enough balance
-		simAccount := selectRandomAccountWithSufficientFunds(r, ctx, accs, bk, ak, []string{""})
-
 		params := k.GetParams(ctx)
 
-		// 2. Get initial balance
+		// 1. Determine fee amount
+		feeAmount := generateRandomFee(r, ctx, params.BaseActionFee)
+
+		// 2. Select random account with enough spendable balance
+		simAccount := selectRandomAccountWithSufficientFunds(r, ctx, accs, bk, ak, feeAmount, []string{""})
+
+		// 3. Get initial balance
 		denom := params.BaseActionFee.Denom
 		initialBalance := bk.GetBalance(ctx, simAccount.Address, denom)
 
-		// 3. Randomly select action type
+		// 4. Randomly select action type
 		actionType := selectRandomActionType(r)
 
-		// 4. Generate invalid metadata based on action type
+		// 5. Generate invalid metadata based on action type
 		invalidMetadata := generateRequestActionInvalidMetadata(r, actionType, simAccount)
-
-		// 5. Determine fee amount
-		feeAmount := generateRandomFee(r, ctx, params.BaseActionFee)
 
 		// 6. Generate an expiration time (current time + random duration)
 		expirationTime := getRandomExpirationTime(ctx, r, params)

@@ -16,6 +16,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/server"
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
+	"github.com/cosmos/cosmos-sdk/version"
 	"github.com/cosmos/cosmos-sdk/x/auth/tx"
 	authtxconfig "github.com/cosmos/cosmos-sdk/x/auth/tx/config"
 	"github.com/cosmos/cosmos-sdk/x/auth/types"
@@ -32,6 +33,9 @@ import (
 
 // NewRootCmd creates a new root command for lumera. It is called once in the main function.
 func NewRootCmd() *cobra.Command {
+	// Ensure SDK placeholders use the Lumera daemon name.
+	version.AppName = app.Name + "d"
+
 	var (
 		autoCliOpts        autocli.AppOptions
 		moduleBasicManager module.BasicManager

@@ -141,7 +141,7 @@ install_sncli() {
 }
 
 install_ibc_tests() {
-  local test_bins=("ibc_validator" "ibc_hermes")
+  local test_bins=("tests_validator" "tests_hermes")
   local bin
   for bin in "${test_bins[@]}"; do
     if [ -n "${BIN_DIR}" ] && [ -f "${BIN_DIR}/${bin}" ]; then

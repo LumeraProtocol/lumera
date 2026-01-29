@@ -43,6 +43,9 @@ func SetupConfig() {
 	// Set and seal config
 	config := sdk.GetConfig()
 
+	// Keep SDK fallback in sync with chain denom.
+	sdk.DefaultBondDenom = ChainDenom
+
 	// Set the chain coin type
 	config.SetCoinType(ChainCoinType)
 

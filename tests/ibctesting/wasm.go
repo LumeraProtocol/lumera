@@ -40,10 +40,10 @@ type PendingAckPacketV2 struct {
 }
 
 func (chain *TestChain) CaptureIBCEvents(result *abci.ExecTxResult) {
-	toSend, _ := ibctst.ParsePacketsFromEvents(channeltypes.EventTypeSendPacket, result.Events)
+	toSend, _ := ibctst.ParseIBCV1Packets(channeltypes.EventTypeSendPacket, result.Events)
 
 	// IBCv1 and IBCv2 `EventTypeSendPacket` are the same
-	// and the [`ParsePacketsFromEvents`] parses both of them as they were IBCv1
+	// and ParseIBCV1Packets parses both of them as they were IBCv1
 	// so we have to filter them here.
 	//
 	// While parsing IBC2 events in IBC1 context the only overlapping event is the
@@ -64,8 +64,13 @@ func (chain *TestChain) CaptureIBCEvents(result *abci.ExecTxResult) {
 }
 
 func (chain *TestChain) CaptureIBCEventsV2(result *abci.ExecTxResult) {
-	toSend, err := ParsePacketsFromEventsV2(channeltypesv2.EventTypeSendPacket, result.Events)
-	require.NoError(chain, err)
+	toSend, err := ibctst.ParseIBCV2Packets(channeltypesv2.EventTypeSendPacket, result.Events)
+	if err != nil {
+		if err.Error() == "no IBC v2 packets found in events" {
+			return
+		}
+		require.NoError(chain, err)
+	}
 	if len(toSend) > 0 {
 		// Keep a queue on the chain that we can relay in tests
 		*chain.PendingSendPacketsV2 = append(*chain.PendingSendPacketsV2, toSend...)
@@ -324,4 +329,3 @@ func CloseChannel(coord *Coordinator, path *Path) {
 	_, err = dst.Chain.SendMsgs(msg)
 	require.NoError(coord, err)
 }
-

@@ -3,8 +3,8 @@ package app
 import (
 	"time"
 
-	"github.com/cosmos/cosmos-sdk/runtime"
 	"cosmossdk.io/depinject/appconfig"
+	"github.com/cosmos/cosmos-sdk/runtime"
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	runtimev1alpha1 "cosmossdk.io/api/cosmos/app/runtime/v1alpha1"
@@ -34,10 +34,13 @@ import (
 	evidencetypes "cosmossdk.io/x/evidence/types"
 	"cosmossdk.io/x/feegrant"
 	_ "cosmossdk.io/x/feegrant/module" // import for side-effects
-	_ "cosmossdk.io/x/upgrade"    // import for side-effects
+	_ "cosmossdk.io/x/upgrade"         // import for side-effects
 	upgradetypes "cosmossdk.io/x/upgrade/types"
+	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 	actionmodulev1 "github.com/LumeraProtocol/lumera/x/action/v1/module"
 	actionmoduletypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	auditmodulev1 "github.com/LumeraProtocol/lumera/x/audit/v1/module"
+	auditmoduletypes "github.com/LumeraProtocol/lumera/x/audit/v1/types"
 	claimmodulev1 "github.com/LumeraProtocol/lumera/x/claim/module"
 	claimmoduletypes "github.com/LumeraProtocol/lumera/x/claim/types"
 	lumeraidmodulev1 "github.com/LumeraProtocol/lumera/x/lumeraid/module"
@@ -48,8 +51,8 @@ import (
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	_ "github.com/cosmos/cosmos-sdk/x/auth/vesting" // import for side-effects
 	vestingtypes "github.com/cosmos/cosmos-sdk/x/auth/vesting/types"
-	_ "github.com/cosmos/cosmos-sdk/x/authz/module" // import for side-effects
 	"github.com/cosmos/cosmos-sdk/x/authz"
+	_ "github.com/cosmos/cosmos-sdk/x/authz/module" // import for side-effects
 	_ "github.com/cosmos/cosmos-sdk/x/bank"         // import for side-effects
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	_ "github.com/cosmos/cosmos-sdk/x/consensus" // import for side-effects
@@ -61,8 +64,8 @@ import (
 	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
 	_ "github.com/cosmos/cosmos-sdk/x/gov" // import for side-effects
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
-	_ "github.com/cosmos/cosmos-sdk/x/group/module" // import for side-effects
 	"github.com/cosmos/cosmos-sdk/x/group"
+	_ "github.com/cosmos/cosmos-sdk/x/group/module" // import for side-effects
 	_ "github.com/cosmos/cosmos-sdk/x/mint"         // import for side-effects
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	_ "github.com/cosmos/cosmos-sdk/x/params" // import for side-effects
@@ -71,15 +74,14 @@ import (
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	_ "github.com/cosmos/cosmos-sdk/x/staking" // import for side-effects
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
+	pfmtypes "github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v10/packetforward/types"
 	icatypes "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/types"
 	ibctransfertypes "github.com/cosmos/ibc-go/v10/modules/apps/transfer/types"
 	ibcexported "github.com/cosmos/ibc-go/v10/modules/core/exported"
-	ibctm "github.com/cosmos/ibc-go/v10/modules/light-clients/07-tendermint"
-	pfmtypes "github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v10/packetforward/types"
 	solomachine "github.com/cosmos/ibc-go/v10/modules/light-clients/06-solomachine"
-	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
+	ibctm "github.com/cosmos/ibc-go/v10/modules/light-clients/07-tendermint"
 
-	lcfg "github.com/LumeraProtocol/lumera/config"	
+	lcfg "github.com/LumeraProtocol/lumera/config"
 	// this line is used by starport scaffolding # stargate/app/moduleImport
 )
 
@@ -110,18 +112,19 @@ var (
 		group.ModuleName,
 		circuittypes.ModuleName,
 		// ibc modules
-		ibcexported.ModuleName,			// IBC core module
-		ibctransfertypes.ModuleName,	// IBC transfer module
-		icatypes.ModuleName,			// IBC interchain accounts module (host and controller)
-		pfmtypes.ModuleName, 			// IBC packet-forward-middleware
-		ibctm.ModuleName,				// IBC Tendermint light client
-		solomachine.ModuleName,			// IBC Solo Machine light client
+		ibcexported.ModuleName,      // IBC core module
+		ibctransfertypes.ModuleName, // IBC transfer module
+		icatypes.ModuleName,         // IBC interchain accounts module (host and controller)
+		pfmtypes.ModuleName,         // IBC packet-forward-middleware
+		ibctm.ModuleName,            // IBC Tendermint light client
+		solomachine.ModuleName,      // IBC Solo Machine light client
 		// chain modules
 		lumeraidmoduletypes.ModuleName,
 		wasmtypes.ModuleName,
 		claimmoduletypes.ModuleName,
 		supernodemoduletypes.ModuleName,
 		actionmoduletypes.ModuleName,
+		auditmoduletypes.ModuleName,
 		// this line is used by starport scaffolding # stargate/app/initGenesis
 	}
 
@@ -150,6 +153,7 @@ var (
 		claimmoduletypes.ModuleName,
 		supernodemoduletypes.ModuleName,
 		actionmoduletypes.ModuleName,
+		auditmoduletypes.ModuleName,
 		// this line is used by starport scaffolding # stargate/app/beginBlockers
 	}
 
@@ -172,6 +176,7 @@ var (
 		claimmoduletypes.ModuleName,
 		supernodemoduletypes.ModuleName,
 		actionmoduletypes.ModuleName,
+		auditmoduletypes.ModuleName,
 		// this line is used by starport scaffolding # stargate/app/endBlockers
 	}
 
@@ -255,7 +260,7 @@ var (
 				}),
 			},
 			{
-				Name:   stakingtypes.ModuleName,
+				Name: stakingtypes.ModuleName,
 				Config: appconfig.WrapAny(&stakingmodulev1.Module{
 					// NOTE: specifying a prefix is only necessary when using bech32 addresses
 					// If not specfied, the auth Bech32Prefix appended with "valoper" and "valcons" is used by default
@@ -341,6 +346,10 @@ var (
 			{
 				Name:   actionmoduletypes.ModuleName,
 				Config: appconfig.WrapAny(&actionmodulev1.Module{}),
+			},
+			{
+				Name:   auditmoduletypes.ModuleName,
+				Config: appconfig.WrapAny(&auditmodulev1.Module{}),
 			},
 			// this line is used by starport scaffolding # stargate/app/moduleConfig
 		},

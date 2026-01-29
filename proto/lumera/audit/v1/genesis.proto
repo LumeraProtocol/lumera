@@ -1,0 +1,17 @@
+syntax = "proto3";
+package lumera.audit.v1;
+
+import "amino/amino.proto";
+import "gogoproto/gogo.proto";
+import "lumera/audit/v1/params.proto";
+
+option go_package = "x/audit/v1/types";
+
+// GenesisState defines the audit module's genesis state.
+message GenesisState {
+  // params defines all the parameters of the module.
+  Params params = 1 [
+    (gogoproto.nullable) = false,
+    (amino.dont_omitempty) = true
+  ];
+}

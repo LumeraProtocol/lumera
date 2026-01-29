@@ -1,0 +1,13 @@
+syntax = "proto3";
+package lumera.audit.v1;
+
+import "amino/amino.proto";
+import "gogoproto/gogo.proto";
+
+option go_package = "x/audit/v1/types";
+
+// Params defines the parameters for the module.
+message Params {
+  option (amino.name) = "lumera/x/audit/Params";
+  option (gogoproto.equal) = true;
+}

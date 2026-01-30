@@ -1,0 +1,24 @@
+syntax = "proto3";
+package lumera.audit.v1;
+
+import "amino/amino.proto";
+import "gogoproto/gogo.proto";
+import "lumera/audit/v1/evidence.proto";
+import "lumera/audit/v1/params.proto";
+
+option go_package = "x/audit/v1/types";
+
+// GenesisState defines the audit module's genesis state.
+message GenesisState {
+  // params defines all the parameters of the module.
+  Params params = 1 [
+    (gogoproto.nullable) = false,
+    (amino.dont_omitempty) = true
+  ];
+
+  // evidence defines the initial evidence records (optional).
+  repeated Evidence evidence = 2 [(gogoproto.nullable) = false];
+
+  // next_evidence_id is the next id to use for chain-assigned ids.
+  uint64 next_evidence_id = 3;
+}

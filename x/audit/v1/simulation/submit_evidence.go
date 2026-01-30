@@ -34,7 +34,7 @@ func SimulateMsgSubmitEvidence(
 		msg := &types.MsgSubmitEvidence{
 			Creator:        simAccount.Address.String(),
 			SubjectAddress: subjectAccount.Address.String(),
-			EvidenceType:   types.EvidenceTypeActionExpired,
+			EvidenceType:   types.EvidenceType_EVIDENCE_TYPE_ACTION_EXPIRED,
 			ActionId:       "sim-action-id",
 			Metadata:       string(metadataBz),
 		}

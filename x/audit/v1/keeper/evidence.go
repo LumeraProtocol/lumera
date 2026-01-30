@@ -18,7 +18,7 @@ func (k Keeper) CreateEvidence(
 	reporterAddress string,
 	subjectAddress string,
 	actionID string,
-	evidenceType string,
+	evidenceType types.EvidenceType,
 	metadataJSON string,
 ) (uint64, error) {
 	if _, err := k.addressCodec.StringToBytes(reporterAddress); err != nil {
@@ -29,8 +29,7 @@ func (k Keeper) CreateEvidence(
 		return 0, errors.Wrap(types.ErrInvalidSubject, err.Error())
 	}
 
-	etype := types.CanonicalEvidenceType(evidenceType)
-	if etype == "" {
+	if evidenceType == types.EvidenceType_EVIDENCE_TYPE_UNSPECIFIED {
 		return 0, types.ErrInvalidEvidenceType
 	}
 
@@ -41,13 +40,13 @@ func (k Keeper) CreateEvidence(
 
 	if actionID == "" {
 		// For the initial supported evidence types (action expiration/finalization), action id is required.
-		switch etype {
-		case types.EvidenceTypeActionExpired, types.EvidenceTypeActionWrongFinalizer:
+		switch evidenceType {
+		case types.EvidenceType_EVIDENCE_TYPE_ACTION_EXPIRED, types.EvidenceType_EVIDENCE_TYPE_ACTION_WRONG_FINALIZATION:
 			return 0, types.ErrInvalidActionID
 		}
 	}
 
-	metadataBytes, err := marshalEvidenceMetadataJSON(etype, metadataJSON)
+	metadataBytes, err := marshalEvidenceMetadataJSON(evidenceType, metadataJSON)
 	if err != nil {
 		return 0, errors.Wrap(types.ErrInvalidMetadata, err.Error())
 	}
@@ -61,13 +60,13 @@ func (k Keeper) CreateEvidence(
 	}
 
 	ev := types.Evidence{
-		EvidenceId:     evidenceID,
-		SubjectAddress: subjectAddress,
+		EvidenceId:      evidenceID,
+		SubjectAddress:  subjectAddress,
 		ReporterAddress: reporterAddress,
-		ActionId:       actionID,
-		EvidenceType:   etype,
-		Metadata:       metadataBytes,
-		ReportedHeight: reportedHeight,
+		ActionId:        actionID,
+		EvidenceType:    evidenceType,
+		Metadata:        metadataBytes,
+		ReportedHeight:  reportedHeight,
 	}
 
 	if err := k.Evidences.Set(ctx, evidenceID, ev); err != nil {
@@ -86,18 +85,18 @@ func (k Keeper) CreateEvidence(
 	return evidenceID, nil
 }
 
-func marshalEvidenceMetadataJSON(evidenceType string, metadataJSON string) ([]byte, error) {
+func marshalEvidenceMetadataJSON(evidenceType types.EvidenceType, metadataJSON string) ([]byte, error) {
 	u := &jsonpb.Unmarshaler{}
 
 	switch evidenceType {
-	case types.EvidenceTypeActionExpired:
+	case types.EvidenceType_EVIDENCE_TYPE_ACTION_EXPIRED:
 		var m types.ExpirationEvidenceMetadata
 		if err := u.Unmarshal(strings.NewReader(metadataJSON), &m); err != nil {
 			return nil, fmt.Errorf("unmarshal ExpirationEvidenceMetadata: %w", err)
 		}
 		return gogoproto.Marshal(&m)
 
-	case types.EvidenceTypeActionWrongFinalizer:
+	case types.EvidenceType_EVIDENCE_TYPE_ACTION_WRONG_FINALIZATION:
 		var m types.FinalizationEvidenceMetadata
 		if err := u.Unmarshal(strings.NewReader(metadataJSON), &m); err != nil {
 			return nil, fmt.Errorf("unmarshal FinalizationEvidenceMetadata: %w", err)
@@ -108,6 +107,6 @@ func marshalEvidenceMetadataJSON(evidenceType string, metadataJSON string) ([]by
 		return gogoproto.Marshal(&m)
 
 	default:
-		return nil, fmt.Errorf("unsupported evidence_type: %s", evidenceType)
+		return nil, fmt.Errorf("unsupported evidence_type: %s", evidenceType.String())
 	}
 }

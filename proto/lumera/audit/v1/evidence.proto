@@ -6,6 +6,12 @@ import "cosmos_proto/cosmos.proto";
 
 option go_package = "x/audit/v1/types";
 
+enum EvidenceType {
+  EVIDENCE_TYPE_UNSPECIFIED = 0;
+  EVIDENCE_TYPE_ACTION_WRONG_FINALIZATION = 1;
+  EVIDENCE_TYPE_ACTION_EXPIRED = 2;
+}
+
 // Evidence is a stable outer record that stores evidence about an audited subject.
 // Type-specific fields are encoded into the `metadata` bytes field.
 message Evidence {
@@ -22,7 +28,7 @@ message Evidence {
   string action_id = 4;
 
   // evidence_type is a stable discriminator used to interpret metadata.
-  string evidence_type = 5;
+  EvidenceType evidence_type = 5;
 
   // metadata is protobuf-binary bytes of a type-specific Evidence metadata message.
   bytes metadata = 6;
@@ -30,4 +36,3 @@ message Evidence {
   // reported_height is the block height when the evidence was submitted.
   uint64 reported_height = 7;
 }
-

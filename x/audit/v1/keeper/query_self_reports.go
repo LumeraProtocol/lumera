@@ -23,7 +23,15 @@ func (q queryServer) SelfReports(ctx context.Context, req *types.QuerySelfReport
 
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
 	storeAdapter := runtime.KVStoreAdapter(q.k.storeService.OpenKVStore(sdkCtx))
-	store := prefix.NewStore(storeAdapter, types.SelfReportIndexPrefix(req.SupernodeAccount))
+
+	useWindowFilter := req.FilterByWindowId || req.WindowId != 0
+
+	var store prefix.Store
+	if useWindowFilter {
+		store = prefix.NewStore(storeAdapter, types.SelfReportIndexKey(req.SupernodeAccount, req.WindowId))
+	} else {
+		store = prefix.NewStore(storeAdapter, types.SelfReportIndexPrefix(req.SupernodeAccount))
+	}
 
 	var reports []types.SelfReport
 
@@ -32,15 +40,15 @@ func (q queryServer) SelfReports(ctx context.Context, req *types.QuerySelfReport
 		pagination = &query.PageRequest{Limit: 100}
 	}
 
-	useWindowFilter := req.FilterByWindowId || req.WindowId != 0
-
 	pageRes, err := query.Paginate(store, pagination, func(key, _ []byte) error {
-		if len(key) != 8 {
-			return status.Error(codes.Internal, "invalid self report index key")
-		}
-		windowID := binary.BigEndian.Uint64(key)
-		if useWindowFilter && windowID != req.WindowId {
-			return nil
+		var windowID uint64
+		if useWindowFilter {
+			windowID = req.WindowId
+		} else {
+			if len(key) != 8 {
+				return status.Error(codes.Internal, "invalid self report index key")
+			}
+			windowID = binary.BigEndian.Uint64(key)
 		}
 
 		r, found := q.k.GetReport(sdkCtx, windowID, req.SupernodeAccount)

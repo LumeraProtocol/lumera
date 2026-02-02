@@ -121,7 +121,7 @@ func (k Keeper) shouldRecoverAtWindowEnd(ctx sdk.Context, supernodeAccount strin
 		return false, err
 	}
 
-	// Need one compliant peer report: >=2 peers and all required ports unanimously OPEN.
+	// Need at least one compliant peer report that shows all required ports OPEN.
 	requiredPortsLen := len(params.RequiredOpenPorts)
 	if requiredPortsLen == 0 {
 		return true, nil

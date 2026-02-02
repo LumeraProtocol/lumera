@@ -17,6 +17,24 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					Short:     "Shows the parameters of the module",
 				},
 				{
+					RpcMethod:      "EvidenceById",
+					Use:            "evidence [evidence-id]",
+					Short:          "Query evidence by id",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "evidence_id"}},
+				},
+				{
+					RpcMethod:      "EvidenceBySubject",
+					Use:            "evidence-by-subject [subject-address]",
+					Short:          "List evidence records by subject address",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "subject_address"}},
+				},
+				{
+					RpcMethod:      "EvidenceByAction",
+					Use:            "evidence-by-action [action-id]",
+					Short:          "List evidence records by action id",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "action_id"}},
+				},
+				{
 					RpcMethod: "CurrentWindow",
 					Use:       "current-window",
 					Short:     "Query current audit reporting window boundaries",
@@ -63,6 +81,12 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					Use:            "submit-audit-report [window-id] [self-report-json]",
 					Short:          "Submit an audit report (peer observations encoded in JSON via flags)",
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "window_id"}, {ProtoField: "self_report"}},
+				},
+				{
+					RpcMethod:      "SubmitEvidence",
+					Use:            "submit-evidence [subject-address] [evidence-type] [action-id] [metadata-json]",
+					Short:          "Submit evidence about a subject (metadata is JSON)",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "subject_address"}, {ProtoField: "evidence_type"}, {ProtoField: "action_id"}, {ProtoField: "metadata"}},
 				},
 				// this line is used by ignite scaffolding # autocli/tx
 			},

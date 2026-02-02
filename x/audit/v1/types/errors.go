@@ -14,4 +14,10 @@ var (
 	ErrReporterNotFound        = errorsmod.Register(ModuleName, 7, "reporter supernode not found")
 	ErrInvalidReporterState    = errorsmod.Register(ModuleName, 8, "invalid reporter state")
 	ErrInvalidWindowSnapshot   = errorsmod.Register(ModuleName, 9, "invalid window snapshot")
+
+	ErrInvalidEvidenceType = errorsmod.Register(ModuleName, 1101, "invalid evidence type")
+	ErrInvalidMetadata     = errorsmod.Register(ModuleName, 1102, "invalid evidence metadata")
+	ErrInvalidSubject      = errorsmod.Register(ModuleName, 1103, "invalid subject address")
+	ErrInvalidReporter     = errorsmod.Register(ModuleName, 1104, "invalid reporter address")
+	ErrInvalidActionID     = errorsmod.Register(ModuleName, 1105, "invalid action id")
 )

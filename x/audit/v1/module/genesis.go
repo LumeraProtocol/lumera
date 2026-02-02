@@ -14,13 +14,15 @@ func InitGenesis(ctx sdk.Context, k keeper.Keeper, genState types.GenesisState) 
 		panic(fmt.Sprintf("failed to validate genesis state: %s", err))
 	}
 
-	if err := k.SetParams(ctx, genState.Params); err != nil {
+	if err := k.InitGenesis(ctx, genState); err != nil {
 		panic(err)
 	}
 }
 
 func ExportGenesis(ctx sdk.Context, k keeper.Keeper) *types.GenesisState {
-	genesis := types.DefaultGenesis()
-	genesis.Params = k.GetParams(ctx)
+	genesis, err := k.ExportGenesis(ctx)
+	if err != nil {
+		panic(err)
+	}
 	return genesis
 }

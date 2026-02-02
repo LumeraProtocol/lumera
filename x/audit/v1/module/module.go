@@ -68,13 +68,17 @@ func (AppModuleBasic) RegisterGRPCGatewayRoutes(clientCtx client.Context, mux *r
 type AppModule struct {
 	AppModuleBasic
 
-	keeper keeper.Keeper
+	keeper     keeper.Keeper
+	authKeeper types.AuthKeeper
+	bankKeeper types.BankKeeper
 }
 
-func NewAppModule(cdc codec.Codec, keeper keeper.Keeper) AppModule {
+func NewAppModule(cdc codec.Codec, keeper keeper.Keeper, authKeeper types.AuthKeeper, bankKeeper types.BankKeeper) AppModule {
 	return AppModule{
 		AppModuleBasic: NewAppModuleBasic(cdc),
 		keeper:         keeper,
+		authKeeper:     authKeeper,
+		bankKeeper:     bankKeeper,
 	}
 }
 

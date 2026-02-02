@@ -11,12 +11,28 @@ import "cosmos/base/query/v1beta1/pagination.proto";
 
 import "lumera/audit/v1/params.proto";
 import "lumera/audit/v1/audit.proto";
+import "lumera/audit/v1/evidence.proto";
 
 // Query defines the gRPC querier service.
 service Query {
   // Parameters queries the parameters of the module.
   rpc Params(QueryParamsRequest) returns (QueryParamsResponse) {
     option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/params";
+  }
+
+  // EvidenceById queries a single evidence record by id.
+  rpc EvidenceById(QueryEvidenceByIdRequest) returns (QueryEvidenceByIdResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/evidence/{evidence_id}";
+  }
+
+  // EvidenceBySubject queries evidence records by subject address.
+  rpc EvidenceBySubject(QueryEvidenceBySubjectRequest) returns (QueryEvidenceBySubjectResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/evidence/by_subject/{subject_address}";
+  }
+
+  // EvidenceByAction queries evidence records by action id.
+  rpc EvidenceByAction(QueryEvidenceByActionRequest) returns (QueryEvidenceByActionResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/evidence/by_action/{action_id}";
   }
 
   // CurrentWindow returns the current derived window boundaries at the current chain height.
@@ -58,6 +74,34 @@ message QueryParamsRequest {}
 
 message QueryParamsResponse {
   Params params = 1 [(gogoproto.nullable) = false, (amino.dont_omitempty) = true];
+}
+
+message QueryEvidenceByIdRequest {
+  uint64 evidence_id = 1;
+}
+
+message QueryEvidenceByIdResponse {
+  Evidence evidence = 1 [(gogoproto.nullable) = false, (amino.dont_omitempty) = true];
+}
+
+message QueryEvidenceBySubjectRequest {
+  string subject_address = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  cosmos.base.query.v1beta1.PageRequest pagination = 2;
+}
+
+message QueryEvidenceBySubjectResponse {
+  repeated Evidence evidence = 1 [(gogoproto.nullable) = false];
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+message QueryEvidenceByActionRequest {
+  string action_id = 1;
+  cosmos.base.query.v1beta1.PageRequest pagination = 2;
+}
+
+message QueryEvidenceByActionResponse {
+  repeated Evidence evidence = 1 [(gogoproto.nullable) = false];
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
 }
 
 message QueryCurrentWindowRequest {}

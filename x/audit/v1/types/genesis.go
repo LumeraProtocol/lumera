@@ -6,7 +6,8 @@ const (
 
 func DefaultGenesis() *GenesisState {
 	return &GenesisState{
-		Params: DefaultParams(),
+		Params:         DefaultParams(),
+		NextEvidenceId: 1,
 	}
 }
 

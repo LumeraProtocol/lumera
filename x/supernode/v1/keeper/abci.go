@@ -14,7 +14,6 @@ func (k Keeper) BeginBlocker(ctx context.Context) error {
 // It delegates to HandleMetricsStaleness, which may transition ACTIVE
 // supernodes into POSTPONED when they fail to report metrics on time.
 func (k Keeper) EndBlocker(ctx context.Context) error {
-	// sdkCtx := sdk.UnwrapSDKContext(ctx)
-	// return k.HandleMetricsStaleness(sdkCtx)
+	// Metrics staleness enforcement is handled by the audit module.
 	return nil
 }

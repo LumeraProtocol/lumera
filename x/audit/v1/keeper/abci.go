@@ -27,6 +27,12 @@ func (k Keeper) BeginBlocker(ctx context.Context) error {
 
 func (k Keeper) EndBlocker(ctx context.Context) error {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
+
+	// Enforce supernode metrics staleness each block at end-block.
+	if err := k.HandleSupernodeMetricsStaleness(sdkCtx); err != nil {
+		return err
+	}
+
 	params := k.GetParams(ctx).WithDefaults()
 
 	ws, err := k.getCurrentWindowState(sdkCtx, params)

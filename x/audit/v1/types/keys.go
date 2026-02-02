@@ -58,6 +58,16 @@ var (
 	// selfReportIndexPrefix indexes all submitted reports (for listing self reports across reporters/windows).
 	// Format: "ss/" + reporter_supernode_account + "/" + u64be(window_id)
 	selfReportIndexPrefix = []byte("ss/")
+
+	// Evidence:
+	// - NextEvidenceIDKey: "ev/next_id" -> 8 bytes u64be(next_evidence_id)
+	// - EvidenceKey: "ev/r/" + u64be(evidence_id) -> Evidence bytes
+	// - EvidenceBySubjectIndexKey: "ev/s/" + subject_address + "/" + u64be(evidence_id) -> empty
+	// - EvidenceByActionIndexKey:  "ev/a/" + action_id + 0x00 + u64be(evidence_id) -> empty
+	nextEvidenceIDKey        = []byte("ev/next_id")
+	evidenceRecordPrefix     = []byte("ev/r/")
+	evidenceBySubjectPrefix  = []byte("ev/s/")
+	evidenceByActionIDPrefix = []byte("ev/a/")
 )
 
 // WindowSnapshotKey returns the store key for the WindowSnapshot identified by windowID.
@@ -157,5 +167,54 @@ func SelfReportIndexPrefix(reporterSupernodeAccount string) []byte {
 	key = append(key, selfReportIndexPrefix...)                                        // "ss/"
 	key = append(key, reporterSupernodeAccount...)                                     // reporter (bech32)
 	key = append(key, '/')                                                             // separator
+	return key
+}
+
+func NextEvidenceIDKey() []byte {
+	return nextEvidenceIDKey
+}
+
+func EvidenceKey(evidenceID uint64) []byte {
+	key := make([]byte, 0, len(evidenceRecordPrefix)+8) // "ev/r/" + u64be(evidence_id)
+	key = append(key, evidenceRecordPrefix...)
+	key = binary.BigEndian.AppendUint64(key, evidenceID)
+	return key
+}
+
+func EvidenceRecordPrefix() []byte {
+	return evidenceRecordPrefix
+}
+
+func EvidenceBySubjectIndexKey(subjectAddress string, evidenceID uint64) []byte {
+	key := make([]byte, 0, len(evidenceBySubjectPrefix)+len(subjectAddress)+1+8) // "ev/s/" + subject + "/" + u64be(evidence_id)
+	key = append(key, evidenceBySubjectPrefix...)
+	key = append(key, subjectAddress...)
+	key = append(key, '/')
+	key = binary.BigEndian.AppendUint64(key, evidenceID)
+	return key
+}
+
+func EvidenceBySubjectIndexPrefix(subjectAddress string) []byte {
+	key := make([]byte, 0, len(evidenceBySubjectPrefix)+len(subjectAddress)+1) // "ev/s/" + subject + "/"
+	key = append(key, evidenceBySubjectPrefix...)
+	key = append(key, subjectAddress...)
+	key = append(key, '/')
+	return key
+}
+
+func EvidenceByActionIndexKey(actionID string, evidenceID uint64) []byte {
+	key := make([]byte, 0, len(evidenceByActionIDPrefix)+len(actionID)+1+8) // "ev/a/" + action + 0x00 + u64be(evidence_id)
+	key = append(key, evidenceByActionIDPrefix...)
+	key = append(key, actionID...)
+	key = append(key, 0) // delimiter (allows action_id to contain '/')
+	key = binary.BigEndian.AppendUint64(key, evidenceID)
+	return key
+}
+
+func EvidenceByActionIndexPrefix(actionID string) []byte {
+	key := make([]byte, 0, len(evidenceByActionIDPrefix)+len(actionID)+1) // "ev/a/" + action + 0x00
+	key = append(key, evidenceByActionIDPrefix...)
+	key = append(key, actionID...)
+	key = append(key, 0) // delimiter
 	return key
 }

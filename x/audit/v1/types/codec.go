@@ -10,6 +10,7 @@ func RegisterInterfaces(registry cdctypes.InterfaceRegistry) {
 	registry.RegisterImplementations((*sdk.Msg)(nil),
 		&MsgUpdateParams{},
 		&MsgSubmitAuditReport{},
+		&MsgSubmitEvidence{},
 	)
 
 	msgservice.RegisterMsgServiceDesc(registry, &Msg_serviceDesc)

@@ -12,6 +12,7 @@ import (
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 
 	"github.com/LumeraProtocol/lumera/x/audit/v1/keeper"
+	audittypes "github.com/LumeraProtocol/lumera/x/audit/v1/types"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
@@ -36,6 +37,8 @@ type ModuleInputs struct {
 	Logger       log.Logger
 
 	SupernodeKeeper sntypes.SupernodeKeeper
+	AuthKeeper      audittypes.AuthKeeper
+	BankKeeper      audittypes.BankKeeper
 }
 
 type ModuleOutputs struct {
@@ -60,7 +63,7 @@ func ProvideModule(in ModuleInputs) ModuleOutputs {
 		in.SupernodeKeeper,
 	)
 
-	m := NewAppModule(in.Cdc, k)
+	m := NewAppModule(in.Cdc, k, in.AuthKeeper, in.BankKeeper)
 
 	return ModuleOutputs{AuditKeeper: k, Module: m}
 }

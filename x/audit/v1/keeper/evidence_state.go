@@ -13,10 +13,39 @@ import (
 func (k Keeper) GetNextEvidenceID(ctx sdk.Context) uint64 {
 	store := k.kvStore(ctx)
 	bz := store.Get(types.NextEvidenceIDKey())
-	if bz == nil || len(bz) != 8 {
+	if bz == nil {
 		return 1
 	}
-	return binary.BigEndian.Uint64(bz)
+	if len(bz) != 8 {
+		// Avoid evidence ID reuse if the stored counter is malformed by deriving the next ID from state.
+		return k.deriveNextEvidenceID(ctx)
+	}
+	id := binary.BigEndian.Uint64(bz)
+	if id == 0 {
+		// Evidence IDs start at 1; treat 0 as invalid/corrupt and derive a safe next ID.
+		return k.deriveNextEvidenceID(ctx)
+	}
+	return id
+}
+
+func (k Keeper) deriveNextEvidenceID(ctx sdk.Context) uint64 {
+	store := prefix.NewStore(k.kvStore(ctx), types.EvidenceRecordPrefix())
+
+	iter := store.Iterator(nil, nil)
+	defer iter.Close()
+
+	var maxID uint64
+	for ; iter.Valid(); iter.Next() {
+		key := iter.Key()
+		if len(key) != 8 {
+			continue
+		}
+		id := binary.BigEndian.Uint64(key)
+		if id > maxID {
+			maxID = id
+		}
+	}
+	return maxID + 1
 }
 
 func (k Keeper) SetNextEvidenceID(ctx sdk.Context, nextID uint64) {
@@ -77,4 +106,3 @@ func (k Keeper) GetAllEvidence(ctx sdk.Context) ([]types.Evidence, error) {
 
 	return evidence, nil
 }
-

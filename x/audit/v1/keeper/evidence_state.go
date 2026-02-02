@@ -14,7 +14,8 @@ func (k Keeper) GetNextEvidenceID(ctx sdk.Context) uint64 {
 	store := k.kvStore(ctx)
 	bz := store.Get(types.NextEvidenceIDKey())
 	if bz == nil {
-		return 1
+		// Avoid evidence ID reuse if the stored counter is missing by deriving the next ID from state.
+		return k.deriveNextEvidenceID(ctx)
 	}
 	if len(bz) != 8 {
 		// Avoid evidence ID reuse if the stored counter is malformed by deriving the next ID from state.

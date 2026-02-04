@@ -109,7 +109,7 @@ devnet-build-default: _check-devnet-default-cfg
 		EXTERNAL_GENESIS_FILE="$$(realpath $(DEFAULT_GENESIS_FILE))" \
 		EXTERNAL_CLAIMS_FILE="$$(realpath $(DEFAULT_CLAIMS_FILE))"
 
-.PHONY: devnet-build-172 _check-devnet-172-cfg
+.PHONY: devnet-build-191 _check-devnet-191-cfg
 devnet-build-172:
 	@$(MAKE) devnet-build \
 		DEVNET_BUILD_LUMERA=0 \
@@ -119,6 +119,17 @@ devnet-build-172:
 
 _check-devnet-172-cfg:
 	@[ -f "$$(realpath $(ORIG_GENESIS_FILE))" ] || (echo "Missing ORIG_GENESIS_FILE: $$(realpath $(ORIG_GENESIS_FILE))"; exit 1)
+	@[ -f "$$(realpath $(DEFAULT_CLAIMS_FILE))" ] || (echo "Missing DEFAULT_CLAIMS_FILE: $$(realpath $(DEFAULT_CLAIMS_FILE))"; exit 1)
+
+devnet-build-191:
+	@$(MAKE) devnet-build \
+		DEVNET_BUILD_LUMERA=0 \
+		DEVNET_BIN_DIR=devnet/bin-v1.9.1 \
+		EXTERNAL_GENESIS_FILE="$$(realpath $(DEFAULT_GENESIS_FILE))" \
+		EXTERNAL_CLAIMS_FILE="$$(realpath $(DEFAULT_CLAIMS_FILE))"
+
+_check-devnet-191-cfg:
+	@[ -f "$$(realpath $(DEFAULT_GENESIS_FILE))" ] || (echo "Missing DEFAULT_GENESIS_FILE: $$(realpath $(DEFAULT_GENESIS_FILE))"; exit 1)
 	@[ -f "$$(realpath $(DEFAULT_CLAIMS_FILE))" ] || (echo "Missing DEFAULT_CLAIMS_FILE: $$(realpath $(DEFAULT_CLAIMS_FILE))"; exit 1)
 
 _check-devnet-default-cfg:
@@ -288,17 +299,32 @@ devnet-update-scripts:
 		echo "No containers were updated. Ensure the devnet is running."; \
 	fi
 
-.PHONY: devnet-new-172 devnet-upgrade-180 devnet-upgrade-184
+.PHONY: devnet-new-172 devnet-new-191 devnet-upgrade-180 devnet-upgrade-191 devnet-upgrade-1100 devnet-upgrade-1101
+
 devnet-upgrade-180:
 	@cd devnet/scripts && ./upgrade.sh v1.8.0 auto-height ../bin-v1.8.0
 
-devnet-upgrade-184:
-	@cd devnet/scripts && ./upgrade.sh v1.8.4 auto-height ../bin-v1.8.4
+devnet-upgrade-191:
+	@cd devnet/scripts && ./upgrade.sh v1.9.1 auto-height ../bin-v1.9.1
+
+devnet-upgrade-1100:
+	@cd devnet/scripts && ./upgrade.sh v1.10.0 auto-height ../bin-v1.10.0
+
+devnet-upgrade-1101:
+	@cd devnet/scripts && ./upgrade.sh v1.10.1 auto-height ../bin
 
 devnet-new-172:
 	$(MAKE) devnet-down
 	$(MAKE) devnet-clean
 	$(MAKE) devnet-build-172
+	sleep 10
+	$(MAKE) devnet-up
+
+
+devnet-new-191:
+	$(MAKE) devnet-down
+	$(MAKE) devnet-clean
+	$(MAKE) devnet-build-191
 	sleep 10
 	$(MAKE) devnet-up
 

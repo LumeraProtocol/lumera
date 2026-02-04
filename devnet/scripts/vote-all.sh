@@ -14,6 +14,9 @@ SERVICE_NAME="supernova_validator_1"
 LUMERA_SHARED="/tmp/lumera-devnet/shared"
 COMPOSE_FILE="../docker-compose.yml"
 FEES="5000ulume"
+# Gas configuration
+USE_GAS_AUTO="true"     # "true" to use --gas auto with --gas-adjustment 1.3
+GAS_AMOUNT="120000"     # Used when USE_GAS_AUTO="false"
 
 # Checking the votes with:
 #    lumerad query gov votes <proposal_id> --output json | jq
@@ -66,13 +69,18 @@ vote_all() {
 
     echo "🗳️  Voting YES on behalf of $SERVICE (address: $VOTER_ADDRESS)..."
 
+    if [ "$USE_GAS_AUTO" = "true" ]; then
+      GAS_FLAGS=(--gas auto --gas-adjustment 1.3)
+    else
+      GAS_FLAGS=(--gas "$GAS_AMOUNT")
+    fi
+
     VOTE_JSON=$(docker compose -f "$COMPOSE_FILE" exec "$SERVICE" \
         lumerad tx gov vote "$PROPOSAL_ID" yes \
         --from $VOTER_ADDRESS \
         --chain-id "$CHAIN_ID" \
         --keyring-backend "$KEYRING_BACKEND" \
-        --gas auto \
-        --gas-adjustment 1.3 \
+        "${GAS_FLAGS[@]}" \
         --fees "$FEES" \
         --output json \
         --broadcast-mode sync \

@@ -69,11 +69,37 @@ fi
 
 echo "Found proposal ID: ${PROPOSAL_ID}"
 
-echo "Casting votes for all validators..."
-"${SCRIPT_DIR}/vote-all.sh" "${PROPOSAL_ID}"
+# Determine proposal status and planned height
+PROPOSAL_JSON="$(docker compose -f "${COMPOSE_FILE}" exec -T "${SERVICE}" \
+  lumerad query gov proposal "${PROPOSAL_ID}" --output json 2>/dev/null || true)"
+PROPOSAL_STATUS="$(echo "${PROPOSAL_JSON}" | jq -r '.proposal.status // .status // empty')"
+PROPOSAL_HEIGHT="$(echo "${PROPOSAL_JSON}" | jq -r '.proposal.messages[]?.value.plan.height // empty' | head -n 1)"
+
+if [[ -n "${PROPOSAL_HEIGHT}" && "${PROPOSAL_HEIGHT}" =~ ^[0-9]+$ ]]; then
+  if [[ "${PROPOSAL_HEIGHT}" != "${UPGRADE_HEIGHT}" ]]; then
+    echo "⚠️  Proposal height (${PROPOSAL_HEIGHT}) differs from requested height (${UPGRADE_HEIGHT})."
+    echo "Using proposal height for wait/upgrade."
+    UPGRADE_HEIGHT="${PROPOSAL_HEIGHT}"
+  fi
+else
+  echo "⚠️  Could not determine proposal height; continuing with ${UPGRADE_HEIGHT}."
+fi
+
+if [[ "${PROPOSAL_STATUS}" == "PROPOSAL_STATUS_VOTING_PERIOD" ]]; then
+  echo "Casting votes for all validators..."
+  "${SCRIPT_DIR}/vote-all.sh" "${PROPOSAL_ID}"
+else
+  echo "ℹ️  Skipping voting; proposal status is ${PROPOSAL_STATUS:-unknown}."
+fi
 
 echo "Waiting for chain to reach height ${UPGRADE_HEIGHT}..."
-"${SCRIPT_DIR}/wait-for-height.sh" "${UPGRADE_HEIGHT}"
+CURRENT_HEIGHT_NOW="$(docker compose -f "${COMPOSE_FILE}" exec -T "${SERVICE}" \
+  lumerad status 2>/dev/null | jq -r '.sync_info.latest_block_height // empty' 2>/dev/null || true)"
+if [[ "${CURRENT_HEIGHT_NOW}" =~ ^[0-9]+$ ]] && (( CURRENT_HEIGHT_NOW >= UPGRADE_HEIGHT )); then
+  echo "ℹ️  Current height ${CURRENT_HEIGHT_NOW} is already at or above upgrade height ${UPGRADE_HEIGHT}; skipping wait."
+else
+  "${SCRIPT_DIR}/wait-for-height.sh" "${UPGRADE_HEIGHT}"
+fi
 
 echo "Upgrading binaries from ${BINARIES_DIR}..."
 "${SCRIPT_DIR}/upgrade-binaries.sh" "${BINARIES_DIR}"

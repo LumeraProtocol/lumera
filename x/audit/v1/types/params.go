@@ -10,29 +10,31 @@ import (
 var _ paramtypes.ParamSet = (*Params)(nil)
 
 var (
-	KeyReportingWindowBlocks        = []byte("ReportingWindowBlocks")
-	KeyPeerQuorumReports            = []byte("PeerQuorumReports")
-	KeyMinProbeTargetsPerWindow     = []byte("MinProbeTargetsPerWindow")
-	KeyMaxProbeTargetsPerWindow     = []byte("MaxProbeTargetsPerWindow")
-	KeyRequiredOpenPorts            = []byte("RequiredOpenPorts")
-	KeyMinCpuFreePercent            = []byte("MinCpuFreePercent")
-	KeyMinMemFreePercent            = []byte("MinMemFreePercent")
-	KeyMinDiskFreePercent           = []byte("MinDiskFreePercent")
-	KeyConsecutiveWindowsToPostpone = []byte("ConsecutiveWindowsToPostpone")
-	KeyKeepLastWindowEntries        = []byte("KeepLastWindowEntries")
+	KeyReportingWindowBlocks            = []byte("ReportingWindowBlocks")
+	KeyPeerQuorumReports                = []byte("PeerQuorumReports")
+	KeyMinProbeTargetsPerWindow         = []byte("MinProbeTargetsPerWindow")
+	KeyMaxProbeTargetsPerWindow         = []byte("MaxProbeTargetsPerWindow")
+	KeyRequiredOpenPorts                = []byte("RequiredOpenPorts")
+	KeyMinCpuFreePercent                = []byte("MinCpuFreePercent")
+	KeyMinMemFreePercent                = []byte("MinMemFreePercent")
+	KeyMinDiskFreePercent               = []byte("MinDiskFreePercent")
+	KeyConsecutiveWindowsToPostpone     = []byte("ConsecutiveWindowsToPostpone")
+	KeyKeepLastWindowEntries            = []byte("KeepLastWindowEntries")
+	KeyPeerPortPostponeThresholdPercent = []byte("PeerPortPostponeThresholdPercent")
 )
 
 var (
-	DefaultReportingWindowBlocks        = uint64(400)
-	DefaultPeerQuorumReports            = uint32(3)
-	DefaultMinProbeTargetsPerWindow     = uint32(3)
-	DefaultMaxProbeTargetsPerWindow     = uint32(5)
-	DefaultRequiredOpenPorts            = []uint32{4444, 4445, 8002}
-	DefaultMinCpuFreePercent            = uint32(0)
-	DefaultMinMemFreePercent            = uint32(0)
-	DefaultMinDiskFreePercent           = uint32(0)
-	DefaultConsecutiveWindowsToPostpone = uint32(1)
-	DefaultKeepLastWindowEntries        = uint64(200)
+	DefaultReportingWindowBlocks            = uint64(400)
+	DefaultPeerQuorumReports                = uint32(3)
+	DefaultMinProbeTargetsPerWindow         = uint32(3)
+	DefaultMaxProbeTargetsPerWindow         = uint32(5)
+	DefaultRequiredOpenPorts                = []uint32{4444, 4445, 8002}
+	DefaultMinCpuFreePercent                = uint32(0)
+	DefaultMinMemFreePercent                = uint32(0)
+	DefaultMinDiskFreePercent               = uint32(0)
+	DefaultConsecutiveWindowsToPostpone     = uint32(1)
+	DefaultKeepLastWindowEntries            = uint64(200)
+	DefaultPeerPortPostponeThresholdPercent = uint32(100)
 )
 
 // Params notes
@@ -42,7 +44,8 @@ var (
 // - min/max_probe_targets_per_window: clamps k_window to a safe range.
 // - required_open_ports: ports every report must cover.
 // - min_*_free_percent: minimum required free capacity from self report (0 disables).
-// - consecutive_windows_to_postpone: consecutive windows of unanimous peer port CLOSED needed to postpone.
+// - consecutive_windows_to_postpone: consecutive windows of peer port CLOSED meeting threshold needed to postpone.
+// - peer_port_postpone_threshold_percent: percent of peers that must report CLOSED for port-based postponement (100 = unanimous).
 // - keep_last_window_entries: how many windows of window-scoped state to keep (pruning at window end).
 
 func ParamKeyTable() paramtypes.KeyTable {
@@ -60,18 +63,20 @@ func NewParams(
 	minDiskFreePercent uint32,
 	consecutiveWindowsToPostpone uint32,
 	keepLastWindowEntries uint64,
+	peerPortPostponeThresholdPercent uint32,
 ) Params {
 	return Params{
-		ReportingWindowBlocks:        reportingWindowBlocks,
-		PeerQuorumReports:            peerQuorumReports,
-		MinProbeTargetsPerWindow:     minProbeTargetsPerWindow,
-		MaxProbeTargetsPerWindow:     maxProbeTargetsPerWindow,
-		RequiredOpenPorts:            requiredOpenPorts,
-		MinCpuFreePercent:            minCpuFreePercent,
-		MinMemFreePercent:            minMemFreePercent,
-		MinDiskFreePercent:           minDiskFreePercent,
-		ConsecutiveWindowsToPostpone: consecutiveWindowsToPostpone,
-		KeepLastWindowEntries:        keepLastWindowEntries,
+		ReportingWindowBlocks:            reportingWindowBlocks,
+		PeerQuorumReports:                peerQuorumReports,
+		MinProbeTargetsPerWindow:         minProbeTargetsPerWindow,
+		MaxProbeTargetsPerWindow:         maxProbeTargetsPerWindow,
+		RequiredOpenPorts:                requiredOpenPorts,
+		MinCpuFreePercent:                minCpuFreePercent,
+		MinMemFreePercent:                minMemFreePercent,
+		MinDiskFreePercent:               minDiskFreePercent,
+		ConsecutiveWindowsToPostpone:     consecutiveWindowsToPostpone,
+		KeepLastWindowEntries:            keepLastWindowEntries,
+		PeerPortPostponeThresholdPercent: peerPortPostponeThresholdPercent,
 	}
 }
 
@@ -87,6 +92,7 @@ func DefaultParams() Params {
 		DefaultMinDiskFreePercent,
 		DefaultConsecutiveWindowsToPostpone,
 		DefaultKeepLastWindowEntries,
+		DefaultPeerPortPostponeThresholdPercent,
 	)
 }
 
@@ -112,6 +118,9 @@ func (p Params) WithDefaults() Params {
 	if p.KeepLastWindowEntries == 0 {
 		p.KeepLastWindowEntries = DefaultKeepLastWindowEntries
 	}
+	if p.PeerPortPostponeThresholdPercent == 0 {
+		p.PeerPortPostponeThresholdPercent = DefaultPeerPortPostponeThresholdPercent
+	}
 	return p
 }
 
@@ -127,6 +136,7 @@ func (p *Params) ParamSetPairs() paramtypes.ParamSetPairs {
 		paramtypes.NewParamSetPair(KeyMinDiskFreePercent, &p.MinDiskFreePercent, validateUint32),
 		paramtypes.NewParamSetPair(KeyConsecutiveWindowsToPostpone, &p.ConsecutiveWindowsToPostpone, validateUint32),
 		paramtypes.NewParamSetPair(KeyKeepLastWindowEntries, &p.KeepLastWindowEntries, validateUint64),
+		paramtypes.NewParamSetPair(KeyPeerPortPostponeThresholdPercent, &p.PeerPortPostponeThresholdPercent, validateUint32),
 	}
 }
 
@@ -159,6 +169,9 @@ func (p Params) Validate() error {
 	}
 	if p.KeepLastWindowEntries == 0 {
 		return fmt.Errorf("keep_last_window_entries must be > 0")
+	}
+	if p.PeerPortPostponeThresholdPercent == 0 || p.PeerPortPostponeThresholdPercent > 100 {
+		return fmt.Errorf("peer_port_postpone_threshold_percent must be within 1..100")
 	}
 
 	ports := append([]uint32(nil), p.RequiredOpenPorts...)

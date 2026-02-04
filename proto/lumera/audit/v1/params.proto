@@ -25,11 +25,18 @@ message Params {
   uint32 min_mem_free_percent = 8;
   uint32 min_disk_free_percent = 9;
 
-  // Number of consecutive windows a required port must be unanimously reported CLOSED
-  // by peers (with at least 2 peer reports per window) before postponing the supernode.
+  // Number of consecutive windows a required port must be reported CLOSED by peers
+  // at or above peer_port_postpone_threshold_percent before postponing the supernode.
   uint32 consecutive_windows_to_postpone = 10;
 
   // How many completed windows to keep in state for window-scoped data like WindowSnapshot,
   // AuditReport, and related indices. Pruning runs at window end.
   uint64 keep_last_window_entries = 11;
+
+  // Minimum percent (1-100) of peer reports that must report a required port as CLOSED
+  // for the port to be treated as CLOSED for postponement purposes.
+  //
+  // 100 means unanimous.
+  // Example: to approximate a 2/3 threshold, use 66 (since 2/3 ≈ 66.6%).
+  uint32 peer_port_postpone_threshold_percent = 12;
 }

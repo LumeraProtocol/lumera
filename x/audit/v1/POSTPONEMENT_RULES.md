@@ -44,11 +44,11 @@ The following self-report fields are currently ignored by postponement logic:
 
 ### 3) Peer ports (peer observations)
 
-For any required port index `i`, a target is postponed if peers unanimously report that port as `CLOSED` for `consecutive_windows_to_postpone` consecutive windows.
+For any required port index `i`, a target is postponed if peers report that port as `CLOSED` at or above `peer_port_postpone_threshold_percent` for `consecutive_windows_to_postpone` consecutive windows.
 
 A window counts toward the consecutive requirement only if:
 - there is at least **1** peer reporter about the target in that window, and
-- **all** peer reporters about the target in that window report `PORT_STATE_CLOSED` for port index `i`.
+- the share of peer reporters about the target in that window that report `PORT_STATE_CLOSED` for port index `i` meets or exceeds `peer_port_postpone_threshold_percent`.
 
 ## Recovery rule (POSTPONED → ACTIVE)
 

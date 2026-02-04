@@ -8,8 +8,8 @@ import (
 	errorsmod "cosmossdk.io/errors"
 	"github.com/LumeraProtocol/lumera/x/audit/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	gogoproto "github.com/cosmos/gogoproto/proto"
 	"github.com/cosmos/gogoproto/jsonpb"
+	gogoproto "github.com/cosmos/gogoproto/proto"
 )
 
 func (k Keeper) CreateEvidence(
@@ -39,7 +39,9 @@ func (k Keeper) CreateEvidence(
 	if actionID == "" {
 		// For the initial supported evidence types (action expiration/finalization), action id is required.
 		switch evidenceType {
-		case types.EvidenceType_EVIDENCE_TYPE_ACTION_EXPIRED, types.EvidenceType_EVIDENCE_TYPE_ACTION_WRONG_FINALIZATION:
+		case types.EvidenceType_EVIDENCE_TYPE_ACTION_EXPIRED,
+			types.EvidenceType_EVIDENCE_TYPE_ACTION_FINALIZATION_SIGNATURE_FAILURE,
+			types.EvidenceType_EVIDENCE_TYPE_ACTION_FINALIZATION_NOT_IN_TOP_10:
 			return 0, types.ErrInvalidActionID
 		}
 	}
@@ -89,7 +91,8 @@ func marshalEvidenceMetadataJSON(evidenceType types.EvidenceType, metadataJSON s
 		}
 		return gogoproto.Marshal(&m)
 
-	case types.EvidenceType_EVIDENCE_TYPE_ACTION_WRONG_FINALIZATION:
+	case types.EvidenceType_EVIDENCE_TYPE_ACTION_FINALIZATION_SIGNATURE_FAILURE,
+		types.EvidenceType_EVIDENCE_TYPE_ACTION_FINALIZATION_NOT_IN_TOP_10:
 		var m types.FinalizationEvidenceMetadata
 		if err := u.Unmarshal(strings.NewReader(metadataJSON), &m); err != nil {
 			return nil, fmt.Errorf("unmarshal FinalizationEvidenceMetadata: %w", err)
@@ -100,9 +103,12 @@ func marshalEvidenceMetadataJSON(evidenceType types.EvidenceType, metadataJSON s
 		if _, err := addressCodec.StringToBytes(m.AttemptedFinalizerAddress); err != nil {
 			return nil, fmt.Errorf("attempted_finalizer_address is invalid: %w", err)
 		}
-		if strings.TrimSpace(m.ExpectedFinalizerAddress) != "" {
-			if _, err := addressCodec.StringToBytes(m.ExpectedFinalizerAddress); err != nil {
-				return nil, fmt.Errorf("expected_finalizer_address is invalid: %w", err)
+		for i, addr := range m.ExpectedFinalizerAddresses {
+			if strings.TrimSpace(addr) == "" {
+				return nil, fmt.Errorf("expected_finalizer_addresses[%d] is empty", i)
+			}
+			if _, err := addressCodec.StringToBytes(addr); err != nil {
+				return nil, fmt.Errorf("expected_finalizer_addresses[%d] is invalid: %w", i, err)
 			}
 		}
 		return gogoproto.Marshal(&m)
@@ -111,4 +117,3 @@ func marshalEvidenceMetadataJSON(evidenceType types.EvidenceType, metadataJSON s
 		return nil, fmt.Errorf("unsupported evidence_type: %s", evidenceType.String())
 	}
 }
-

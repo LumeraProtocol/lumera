@@ -90,6 +90,7 @@ func computeConsensusStoreUpgrades(
 			effective.Added = append(effective.Added, consensusStoreKey)
 		}
 	case hasLegacy && hasNew:
+		effective.Deleted = removeStoreName(effective.Deleted, legacyConsensusStoreKey)
 		logger.Info("Both legacy and new consensus stores exist; skipping rename", "old", legacyConsensusStoreKey, "new", consensusStoreKey)
 	}
 

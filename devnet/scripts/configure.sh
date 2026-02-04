@@ -74,7 +74,7 @@ fi
 if [[ -n "${BIN_DIR}" ]]; then
 	echo "[CONFIGURE] Using BIN_DIR=${BIN_DIR}"
 else
-	echo "[CONFIGURE] ERROR ! BIN_DIR not provided andcould not be resolved"
+	echo "[CONFIGURE] ERROR ! BIN_DIR not provided and could not be resolved"
 	exit 1
 fi
 
@@ -96,7 +96,7 @@ if [ ! -f "${VALIDATORS_JSON}" ]; then
 	exit 1
 fi
 
-if [ ! command -v jq ] >/dev/null 2>&1; then
+if ! command -v jq >/dev/null 2>&1; then
 	echo "[CONFIGURE] jq is missing"
 fi
 

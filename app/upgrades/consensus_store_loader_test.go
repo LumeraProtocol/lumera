@@ -51,4 +51,5 @@ func TestComputeConsensusStoreUpgrades_NoRenameWhenBothExist(t *testing.T) {
 	effective := computeConsensusStoreUpgrades(nil, expected, existing, log.NewNopLogger())
 
 	require.Empty(t, effective.Renamed)
+	require.NotContains(t, effective.Deleted, "Consensus")
 }

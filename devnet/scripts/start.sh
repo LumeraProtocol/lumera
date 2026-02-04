@@ -68,7 +68,7 @@ NODE_STATUS_DIR="${STATUS_DIR}/${MONIKER}"
 NODE_SETUP_COMPLETE="${NODE_STATUS_DIR}/setup_complete"
 mkdir -p "${NODE_STATUS_DIR}"
 
-if [ ! command -v jq ] >/dev/null 2>&1; then
+if ! command -v jq >/dev/null 2>&1; then
 	echo "[BOOT] jq is missing"
 fi
 

@@ -23,26 +23,24 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
-// ExpirationEvidenceMetadata is metadata for evidence about an action expiring.
-type ExpirationEvidenceMetadata struct {
-	// expiration_height is the height at which the action expired (if known).
-	ExpirationHeight uint64 `protobuf:"varint,1,opt,name=expiration_height,json=expirationHeight,proto3" json:"expiration_height,omitempty"`
-	// reason is optional human-readable context.
-	Reason string `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+// ActionExpiredEvidenceMetadata is metadata for evidence about an action expiring.
+type ActionExpiredEvidenceMetadata struct {
+	// top_10_validator_addresses is the expected validator set for the action's block height.
+	Top_10ValidatorAddresses []string `protobuf:"bytes,1,rep,name=top_10_validator_addresses,json=top10ValidatorAddresses,proto3" json:"top_10_validator_addresses,omitempty"`
 }
 
-func (m *ExpirationEvidenceMetadata) Reset()         { *m = ExpirationEvidenceMetadata{} }
-func (m *ExpirationEvidenceMetadata) String() string { return proto.CompactTextString(m) }
-func (*ExpirationEvidenceMetadata) ProtoMessage()    {}
-func (*ExpirationEvidenceMetadata) Descriptor() ([]byte, []int) {
+func (m *ActionExpiredEvidenceMetadata) Reset()         { *m = ActionExpiredEvidenceMetadata{} }
+func (m *ActionExpiredEvidenceMetadata) String() string { return proto.CompactTextString(m) }
+func (*ActionExpiredEvidenceMetadata) ProtoMessage()    {}
+func (*ActionExpiredEvidenceMetadata) Descriptor() ([]byte, []int) {
 	return fileDescriptor_09b57e4c2349ab91, []int{0}
 }
-func (m *ExpirationEvidenceMetadata) XXX_Unmarshal(b []byte) error {
+func (m *ActionExpiredEvidenceMetadata) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
-func (m *ExpirationEvidenceMetadata) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+func (m *ActionExpiredEvidenceMetadata) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
-		return xxx_messageInfo_ExpirationEvidenceMetadata.Marshal(b, m, deterministic)
+		return xxx_messageInfo_ActionExpiredEvidenceMetadata.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
 		n, err := m.MarshalToSizedBuffer(b)
@@ -52,99 +50,130 @@ func (m *ExpirationEvidenceMetadata) XXX_Marshal(b []byte, deterministic bool) (
 		return b[:n], nil
 	}
 }
-func (m *ExpirationEvidenceMetadata) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ExpirationEvidenceMetadata.Merge(m, src)
+func (m *ActionExpiredEvidenceMetadata) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ActionExpiredEvidenceMetadata.Merge(m, src)
 }
-func (m *ExpirationEvidenceMetadata) XXX_Size() int {
+func (m *ActionExpiredEvidenceMetadata) XXX_Size() int {
 	return m.Size()
 }
-func (m *ExpirationEvidenceMetadata) XXX_DiscardUnknown() {
-	xxx_messageInfo_ExpirationEvidenceMetadata.DiscardUnknown(m)
+func (m *ActionExpiredEvidenceMetadata) XXX_DiscardUnknown() {
+	xxx_messageInfo_ActionExpiredEvidenceMetadata.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_ExpirationEvidenceMetadata proto.InternalMessageInfo
+var xxx_messageInfo_ActionExpiredEvidenceMetadata proto.InternalMessageInfo
 
-func (m *ExpirationEvidenceMetadata) GetExpirationHeight() uint64 {
+func (m *ActionExpiredEvidenceMetadata) GetTop_10ValidatorAddresses() []string {
 	if m != nil {
-		return m.ExpirationHeight
-	}
-	return 0
-}
-
-func (m *ExpirationEvidenceMetadata) GetReason() string {
-	if m != nil {
-		return m.Reason
-	}
-	return ""
-}
-
-// FinalizationEvidenceMetadata is metadata for evidence about finalization behavior.
-type FinalizationEvidenceMetadata struct {
-	// attempted_finalizer_address is the address that attempted finalization.
-	AttemptedFinalizerAddress string `protobuf:"bytes,1,opt,name=attempted_finalizer_address,json=attemptedFinalizerAddress,proto3" json:"attempted_finalizer_address,omitempty"`
-	// expected_finalizer_addresses is optional (if there is a known set of expected finalizers).
-	ExpectedFinalizerAddresses []string `protobuf:"bytes,2,rep,name=expected_finalizer_addresses,json=expectedFinalizerAddresses,proto3" json:"expected_finalizer_addresses,omitempty"`
-	// reason is optional human-readable context.
-	Reason string `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
-}
-
-func (m *FinalizationEvidenceMetadata) Reset()         { *m = FinalizationEvidenceMetadata{} }
-func (m *FinalizationEvidenceMetadata) String() string { return proto.CompactTextString(m) }
-func (*FinalizationEvidenceMetadata) ProtoMessage()    {}
-func (*FinalizationEvidenceMetadata) Descriptor() ([]byte, []int) {
-	return fileDescriptor_09b57e4c2349ab91, []int{1}
-}
-func (m *FinalizationEvidenceMetadata) XXX_Unmarshal(b []byte) error {
-	return m.Unmarshal(b)
-}
-func (m *FinalizationEvidenceMetadata) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	if deterministic {
-		return xxx_messageInfo_FinalizationEvidenceMetadata.Marshal(b, m, deterministic)
-	} else {
-		b = b[:cap(b)]
-		n, err := m.MarshalToSizedBuffer(b)
-		if err != nil {
-			return nil, err
-		}
-		return b[:n], nil
-	}
-}
-func (m *FinalizationEvidenceMetadata) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_FinalizationEvidenceMetadata.Merge(m, src)
-}
-func (m *FinalizationEvidenceMetadata) XXX_Size() int {
-	return m.Size()
-}
-func (m *FinalizationEvidenceMetadata) XXX_DiscardUnknown() {
-	xxx_messageInfo_FinalizationEvidenceMetadata.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_FinalizationEvidenceMetadata proto.InternalMessageInfo
-
-func (m *FinalizationEvidenceMetadata) GetAttemptedFinalizerAddress() string {
-	if m != nil {
-		return m.AttemptedFinalizerAddress
-	}
-	return ""
-}
-
-func (m *FinalizationEvidenceMetadata) GetExpectedFinalizerAddresses() []string {
-	if m != nil {
-		return m.ExpectedFinalizerAddresses
+		return m.Top_10ValidatorAddresses
 	}
 	return nil
 }
 
-func (m *FinalizationEvidenceMetadata) GetReason() string {
-	if m != nil {
-		return m.Reason
+// ActionFinalizationSignatureFailureEvidenceMetadata is metadata for evidence about an action finalization
+// rejected due to invalid signature / signature-derived data.
+type ActionFinalizationSignatureFailureEvidenceMetadata struct {
+	Top_10ValidatorAddresses []string `protobuf:"bytes,1,rep,name=top_10_validator_addresses,json=top10ValidatorAddresses,proto3" json:"top_10_validator_addresses,omitempty"`
+}
+
+func (m *ActionFinalizationSignatureFailureEvidenceMetadata) Reset() {
+	*m = ActionFinalizationSignatureFailureEvidenceMetadata{}
+}
+func (m *ActionFinalizationSignatureFailureEvidenceMetadata) String() string {
+	return proto.CompactTextString(m)
+}
+func (*ActionFinalizationSignatureFailureEvidenceMetadata) ProtoMessage() {}
+func (*ActionFinalizationSignatureFailureEvidenceMetadata) Descriptor() ([]byte, []int) {
+	return fileDescriptor_09b57e4c2349ab91, []int{1}
+}
+func (m *ActionFinalizationSignatureFailureEvidenceMetadata) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *ActionFinalizationSignatureFailureEvidenceMetadata) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_ActionFinalizationSignatureFailureEvidenceMetadata.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
 	}
-	return ""
+}
+func (m *ActionFinalizationSignatureFailureEvidenceMetadata) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ActionFinalizationSignatureFailureEvidenceMetadata.Merge(m, src)
+}
+func (m *ActionFinalizationSignatureFailureEvidenceMetadata) XXX_Size() int {
+	return m.Size()
+}
+func (m *ActionFinalizationSignatureFailureEvidenceMetadata) XXX_DiscardUnknown() {
+	xxx_messageInfo_ActionFinalizationSignatureFailureEvidenceMetadata.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ActionFinalizationSignatureFailureEvidenceMetadata proto.InternalMessageInfo
+
+func (m *ActionFinalizationSignatureFailureEvidenceMetadata) GetTop_10ValidatorAddresses() []string {
+	if m != nil {
+		return m.Top_10ValidatorAddresses
+	}
+	return nil
+}
+
+// ActionFinalizationNotInTop10EvidenceMetadata is metadata for evidence about an action finalization
+// rejected because the attempted finalizer is not in the top-10 supernodes.
+type ActionFinalizationNotInTop10EvidenceMetadata struct {
+	// top_10_validator_addresses is the expected validator set for the action's block height.
+	Top_10ValidatorAddresses []string `protobuf:"bytes,1,rep,name=top_10_validator_addresses,json=top10ValidatorAddresses,proto3" json:"top_10_validator_addresses,omitempty"`
+}
+
+func (m *ActionFinalizationNotInTop10EvidenceMetadata) Reset() {
+	*m = ActionFinalizationNotInTop10EvidenceMetadata{}
+}
+func (m *ActionFinalizationNotInTop10EvidenceMetadata) String() string {
+	return proto.CompactTextString(m)
+}
+func (*ActionFinalizationNotInTop10EvidenceMetadata) ProtoMessage() {}
+func (*ActionFinalizationNotInTop10EvidenceMetadata) Descriptor() ([]byte, []int) {
+	return fileDescriptor_09b57e4c2349ab91, []int{2}
+}
+func (m *ActionFinalizationNotInTop10EvidenceMetadata) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *ActionFinalizationNotInTop10EvidenceMetadata) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_ActionFinalizationNotInTop10EvidenceMetadata.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *ActionFinalizationNotInTop10EvidenceMetadata) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ActionFinalizationNotInTop10EvidenceMetadata.Merge(m, src)
+}
+func (m *ActionFinalizationNotInTop10EvidenceMetadata) XXX_Size() int {
+	return m.Size()
+}
+func (m *ActionFinalizationNotInTop10EvidenceMetadata) XXX_DiscardUnknown() {
+	xxx_messageInfo_ActionFinalizationNotInTop10EvidenceMetadata.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ActionFinalizationNotInTop10EvidenceMetadata proto.InternalMessageInfo
+
+func (m *ActionFinalizationNotInTop10EvidenceMetadata) GetTop_10ValidatorAddresses() []string {
+	if m != nil {
+		return m.Top_10ValidatorAddresses
+	}
+	return nil
 }
 
 func init() {
-	proto.RegisterType((*ExpirationEvidenceMetadata)(nil), "lumera.audit.v1.ExpirationEvidenceMetadata")
-	proto.RegisterType((*FinalizationEvidenceMetadata)(nil), "lumera.audit.v1.FinalizationEvidenceMetadata")
+	proto.RegisterType((*ActionExpiredEvidenceMetadata)(nil), "lumera.audit.v1.ActionExpiredEvidenceMetadata")
+	proto.RegisterType((*ActionFinalizationSignatureFailureEvidenceMetadata)(nil), "lumera.audit.v1.ActionFinalizationSignatureFailureEvidenceMetadata")
+	proto.RegisterType((*ActionFinalizationNotInTop10EvidenceMetadata)(nil), "lumera.audit.v1.ActionFinalizationNotInTop10EvidenceMetadata")
 }
 
 func init() {
@@ -152,29 +181,28 @@ func init() {
 }
 
 var fileDescriptor_09b57e4c2349ab91 = []byte{
-	// 302 bytes of a gzipped FileDescriptorProto
+	// 278 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0x52, 0xcf, 0x29, 0xcd, 0x4d,
 	0x2d, 0x4a, 0xd4, 0x4f, 0x2c, 0x4d, 0xc9, 0x2c, 0xd1, 0x2f, 0x33, 0xd4, 0x4f, 0x2d, 0xcb, 0x4c,
 	0x49, 0xcd, 0x4b, 0x4e, 0x8d, 0xcf, 0x4d, 0x2d, 0x49, 0x4c, 0x49, 0x2c, 0x49, 0xd4, 0x2b, 0x28,
 	0xca, 0x2f, 0xc9, 0x17, 0xe2, 0x87, 0x28, 0xd4, 0x03, 0x2b, 0xd4, 0x2b, 0x33, 0x94, 0x92, 0x4c,
-	0xce, 0x2f, 0xce, 0xcd, 0x2f, 0x8e, 0x07, 0x4b, 0xeb, 0x43, 0x38, 0x10, 0xb5, 0x4a, 0x89, 0x5c,
-	0x52, 0xae, 0x15, 0x05, 0x99, 0x45, 0x89, 0x25, 0x99, 0xf9, 0x79, 0xae, 0x50, 0x03, 0x7d, 0xa1,
-	0xe6, 0x09, 0x69, 0x73, 0x09, 0xa6, 0xc2, 0x65, 0xe3, 0x33, 0x52, 0x33, 0xd3, 0x33, 0x4a, 0x24,
-	0x18, 0x15, 0x18, 0x35, 0x58, 0x82, 0x04, 0x10, 0x12, 0x1e, 0x60, 0x71, 0x21, 0x31, 0x2e, 0xb6,
-	0xa2, 0xd4, 0xc4, 0xe2, 0xfc, 0x3c, 0x09, 0x26, 0x05, 0x46, 0x0d, 0xce, 0x20, 0x28, 0x4f, 0xe9,
-	0x0d, 0x23, 0x97, 0x8c, 0x5b, 0x66, 0x5e, 0x62, 0x4e, 0x66, 0x15, 0x76, 0x5b, 0x22, 0xb8, 0xa4,
-	0x13, 0x4b, 0x4a, 0x52, 0x73, 0x0b, 0x4a, 0x52, 0x53, 0xe2, 0xd3, 0x20, 0x2a, 0x53, 0x8b, 0xe2,
-	0x13, 0x53, 0x52, 0x8a, 0x52, 0x8b, 0x8b, 0xc1, 0xf6, 0x71, 0x3a, 0x49, 0x5c, 0xda, 0xa2, 0x2b,
-	0x02, 0x75, 0xba, 0x23, 0x44, 0x26, 0xb8, 0xa4, 0x28, 0x33, 0x2f, 0x3d, 0x48, 0x12, 0xae, 0xd9,
-	0x0d, 0xa6, 0x17, 0xaa, 0x40, 0x28, 0x8a, 0x4b, 0x26, 0xb5, 0xa2, 0x20, 0x35, 0x19, 0xab, 0xc1,
-	0xa9, 0xc5, 0x12, 0x4c, 0x0a, 0xcc, 0x78, 0x8d, 0x96, 0x82, 0xe9, 0x46, 0x37, 0x39, 0xb5, 0x18,
-	0xc9, 0xbb, 0xcc, 0xc8, 0xde, 0x75, 0xd2, 0x3a, 0xf1, 0x48, 0x8e, 0xf1, 0xc2, 0x23, 0x39, 0xc6,
-	0x07, 0x8f, 0xe4, 0x18, 0x27, 0x3c, 0x96, 0x63, 0xb8, 0xf0, 0x58, 0x8e, 0xe1, 0xc6, 0x63, 0x39,
-	0x86, 0x28, 0x81, 0x0a, 0x44, 0xdc, 0x95, 0x54, 0x16, 0xa4, 0x16, 0x27, 0xb1, 0x81, 0x23, 0xc1,
-	0x18, 0x10, 0x00, 0x00, 0xff, 0xff, 0xcd, 0xaa, 0x5c, 0xe4, 0xdb, 0x01, 0x00, 0x00,
+	0xce, 0x2f, 0xce, 0xcd, 0x2f, 0x8e, 0x07, 0x4b, 0xeb, 0x43, 0x38, 0x10, 0xb5, 0x4a, 0xf5, 0x5c,
+	0xb2, 0x8e, 0xc9, 0x25, 0x99, 0xf9, 0x79, 0xae, 0x15, 0x05, 0x99, 0x45, 0xa9, 0x29, 0xae, 0x50,
+	0x33, 0x7d, 0xa1, 0x46, 0x0a, 0xc5, 0x71, 0x49, 0x95, 0xe4, 0x17, 0xc4, 0x1b, 0x1a, 0xc4, 0x97,
+	0x25, 0xe6, 0x64, 0xa6, 0x24, 0x96, 0xe4, 0x17, 0xc5, 0x27, 0xa6, 0xa4, 0x14, 0xa5, 0x16, 0x17,
+	0xa7, 0x16, 0x4b, 0x30, 0x2a, 0x30, 0x6b, 0x70, 0x3a, 0x29, 0x5e, 0xda, 0xa2, 0x2b, 0x0b, 0x35,
+	0x36, 0x0c, 0xa6, 0xca, 0x11, 0xa2, 0x28, 0xb8, 0xa4, 0x28, 0x33, 0x2f, 0x3d, 0x48, 0xbc, 0x24,
+	0xbf, 0xc0, 0xd0, 0x00, 0x5d, 0x32, 0xb5, 0x58, 0x69, 0x0a, 0x23, 0x97, 0x11, 0xc4, 0x05, 0x6e,
+	0x99, 0x79, 0x89, 0x39, 0x99, 0x55, 0x89, 0x20, 0x76, 0x70, 0x66, 0x7a, 0x5e, 0x62, 0x49, 0x69,
+	0x51, 0xaa, 0x5b, 0x62, 0x66, 0x4e, 0x69, 0x51, 0x2a, 0xdd, 0x9d, 0xd5, 0xc7, 0xc8, 0xa5, 0x83,
+	0xe9, 0x2c, 0xbf, 0xfc, 0x12, 0xcf, 0xbc, 0x10, 0x90, 0x16, 0x7a, 0x3b, 0xc8, 0x49, 0xeb, 0xc4,
+	0x23, 0x39, 0xc6, 0x0b, 0x8f, 0xe4, 0x18, 0x1f, 0x3c, 0x92, 0x63, 0x9c, 0xf0, 0x58, 0x8e, 0xe1,
+	0xc2, 0x63, 0x39, 0x86, 0x1b, 0x8f, 0xe5, 0x18, 0xa2, 0x04, 0x2a, 0x10, 0x49, 0xa2, 0xa4, 0xb2,
+	0x20, 0xb5, 0x38, 0x89, 0x0d, 0x1c, 0xb7, 0xc6, 0x80, 0x00, 0x00, 0x00, 0xff, 0xff, 0x56, 0x8f,
+	0xc7, 0xad, 0x32, 0x02, 0x00, 0x00,
 }
 
-func (m *ExpirationEvidenceMetadata) Marshal() (dAtA []byte, err error) {
+func (m *ActionExpiredEvidenceMetadata) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -184,32 +212,29 @@ func (m *ExpirationEvidenceMetadata) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *ExpirationEvidenceMetadata) MarshalTo(dAtA []byte) (int, error) {
+func (m *ActionExpiredEvidenceMetadata) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *ExpirationEvidenceMetadata) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *ActionExpiredEvidenceMetadata) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if len(m.Reason) > 0 {
-		i -= len(m.Reason)
-		copy(dAtA[i:], m.Reason)
-		i = encodeVarintEvidenceMetadata(dAtA, i, uint64(len(m.Reason)))
-		i--
-		dAtA[i] = 0x12
-	}
-	if m.ExpirationHeight != 0 {
-		i = encodeVarintEvidenceMetadata(dAtA, i, uint64(m.ExpirationHeight))
-		i--
-		dAtA[i] = 0x8
+	if len(m.Top_10ValidatorAddresses) > 0 {
+		for iNdEx := len(m.Top_10ValidatorAddresses) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.Top_10ValidatorAddresses[iNdEx])
+			copy(dAtA[i:], m.Top_10ValidatorAddresses[iNdEx])
+			i = encodeVarintEvidenceMetadata(dAtA, i, uint64(len(m.Top_10ValidatorAddresses[iNdEx])))
+			i--
+			dAtA[i] = 0xa
+		}
 	}
 	return len(dAtA) - i, nil
 }
 
-func (m *FinalizationEvidenceMetadata) Marshal() (dAtA []byte, err error) {
+func (m *ActionFinalizationSignatureFailureEvidenceMetadata) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -219,38 +244,56 @@ func (m *FinalizationEvidenceMetadata) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *FinalizationEvidenceMetadata) MarshalTo(dAtA []byte) (int, error) {
+func (m *ActionFinalizationSignatureFailureEvidenceMetadata) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *FinalizationEvidenceMetadata) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *ActionFinalizationSignatureFailureEvidenceMetadata) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if len(m.Reason) > 0 {
-		i -= len(m.Reason)
-		copy(dAtA[i:], m.Reason)
-		i = encodeVarintEvidenceMetadata(dAtA, i, uint64(len(m.Reason)))
-		i--
-		dAtA[i] = 0x1a
-	}
-	if len(m.ExpectedFinalizerAddresses) > 0 {
-		for iNdEx := len(m.ExpectedFinalizerAddresses) - 1; iNdEx >= 0; iNdEx-- {
-			i -= len(m.ExpectedFinalizerAddresses[iNdEx])
-			copy(dAtA[i:], m.ExpectedFinalizerAddresses[iNdEx])
-			i = encodeVarintEvidenceMetadata(dAtA, i, uint64(len(m.ExpectedFinalizerAddresses[iNdEx])))
+	if len(m.Top_10ValidatorAddresses) > 0 {
+		for iNdEx := len(m.Top_10ValidatorAddresses) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.Top_10ValidatorAddresses[iNdEx])
+			copy(dAtA[i:], m.Top_10ValidatorAddresses[iNdEx])
+			i = encodeVarintEvidenceMetadata(dAtA, i, uint64(len(m.Top_10ValidatorAddresses[iNdEx])))
 			i--
-			dAtA[i] = 0x12
+			dAtA[i] = 0xa
 		}
 	}
-	if len(m.AttemptedFinalizerAddress) > 0 {
-		i -= len(m.AttemptedFinalizerAddress)
-		copy(dAtA[i:], m.AttemptedFinalizerAddress)
-		i = encodeVarintEvidenceMetadata(dAtA, i, uint64(len(m.AttemptedFinalizerAddress)))
-		i--
-		dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *ActionFinalizationNotInTop10EvidenceMetadata) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ActionFinalizationNotInTop10EvidenceMetadata) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ActionFinalizationNotInTop10EvidenceMetadata) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Top_10ValidatorAddresses) > 0 {
+		for iNdEx := len(m.Top_10ValidatorAddresses) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.Top_10ValidatorAddresses[iNdEx])
+			copy(dAtA[i:], m.Top_10ValidatorAddresses[iNdEx])
+			i = encodeVarintEvidenceMetadata(dAtA, i, uint64(len(m.Top_10ValidatorAddresses[iNdEx])))
+			i--
+			dAtA[i] = 0xa
+		}
 	}
 	return len(dAtA) - i, nil
 }
@@ -266,41 +309,47 @@ func encodeVarintEvidenceMetadata(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
-func (m *ExpirationEvidenceMetadata) Size() (n int) {
+func (m *ActionExpiredEvidenceMetadata) Size() (n int) {
 	if m == nil {
 		return 0
 	}
 	var l int
 	_ = l
-	if m.ExpirationHeight != 0 {
-		n += 1 + sovEvidenceMetadata(uint64(m.ExpirationHeight))
-	}
-	l = len(m.Reason)
-	if l > 0 {
-		n += 1 + l + sovEvidenceMetadata(uint64(l))
-	}
-	return n
-}
-
-func (m *FinalizationEvidenceMetadata) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	l = len(m.AttemptedFinalizerAddress)
-	if l > 0 {
-		n += 1 + l + sovEvidenceMetadata(uint64(l))
-	}
-	if len(m.ExpectedFinalizerAddresses) > 0 {
-		for _, s := range m.ExpectedFinalizerAddresses {
+	if len(m.Top_10ValidatorAddresses) > 0 {
+		for _, s := range m.Top_10ValidatorAddresses {
 			l = len(s)
 			n += 1 + l + sovEvidenceMetadata(uint64(l))
 		}
 	}
-	l = len(m.Reason)
-	if l > 0 {
-		n += 1 + l + sovEvidenceMetadata(uint64(l))
+	return n
+}
+
+func (m *ActionFinalizationSignatureFailureEvidenceMetadata) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if len(m.Top_10ValidatorAddresses) > 0 {
+		for _, s := range m.Top_10ValidatorAddresses {
+			l = len(s)
+			n += 1 + l + sovEvidenceMetadata(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *ActionFinalizationNotInTop10EvidenceMetadata) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if len(m.Top_10ValidatorAddresses) > 0 {
+		for _, s := range m.Top_10ValidatorAddresses {
+			l = len(s)
+			n += 1 + l + sovEvidenceMetadata(uint64(l))
+		}
 	}
 	return n
 }
@@ -311,7 +360,7 @@ func sovEvidenceMetadata(x uint64) (n int) {
 func sozEvidenceMetadata(x uint64) (n int) {
 	return sovEvidenceMetadata(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
-func (m *ExpirationEvidenceMetadata) Unmarshal(dAtA []byte) error {
+func (m *ActionExpiredEvidenceMetadata) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -334,34 +383,15 @@ func (m *ExpirationEvidenceMetadata) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: ExpirationEvidenceMetadata: wiretype end group for non-group")
+			return fmt.Errorf("proto: ActionExpiredEvidenceMetadata: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: ExpirationEvidenceMetadata: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: ActionExpiredEvidenceMetadata: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ExpirationHeight", wireType)
-			}
-			m.ExpirationHeight = 0
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowEvidenceMetadata
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				m.ExpirationHeight |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-		case 2:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Reason", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Top_10ValidatorAddresses", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -389,7 +419,7 @@ func (m *ExpirationEvidenceMetadata) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Reason = string(dAtA[iNdEx:postIndex])
+			m.Top_10ValidatorAddresses = append(m.Top_10ValidatorAddresses, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -412,7 +442,7 @@ func (m *ExpirationEvidenceMetadata) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *FinalizationEvidenceMetadata) Unmarshal(dAtA []byte) error {
+func (m *ActionFinalizationSignatureFailureEvidenceMetadata) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -435,15 +465,15 @@ func (m *FinalizationEvidenceMetadata) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: FinalizationEvidenceMetadata: wiretype end group for non-group")
+			return fmt.Errorf("proto: ActionFinalizationSignatureFailureEvidenceMetadata: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: FinalizationEvidenceMetadata: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: ActionFinalizationSignatureFailureEvidenceMetadata: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field AttemptedFinalizerAddress", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Top_10ValidatorAddresses", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -471,11 +501,61 @@ func (m *FinalizationEvidenceMetadata) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.AttemptedFinalizerAddress = string(dAtA[iNdEx:postIndex])
+			m.Top_10ValidatorAddresses = append(m.Top_10ValidatorAddresses, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
-		case 2:
+		default:
+			iNdEx = preIndex
+			skippy, err := skipEvidenceMetadata(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthEvidenceMetadata
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ActionFinalizationNotInTop10EvidenceMetadata) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowEvidenceMetadata
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ActionFinalizationNotInTop10EvidenceMetadata: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ActionFinalizationNotInTop10EvidenceMetadata: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ExpectedFinalizerAddresses", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Top_10ValidatorAddresses", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -503,39 +583,7 @@ func (m *FinalizationEvidenceMetadata) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.ExpectedFinalizerAddresses = append(m.ExpectedFinalizerAddresses, string(dAtA[iNdEx:postIndex]))
-			iNdEx = postIndex
-		case 3:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Reason", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowEvidenceMetadata
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthEvidenceMetadata
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return ErrInvalidLengthEvidenceMetadata
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Reason = string(dAtA[iNdEx:postIndex])
+			m.Top_10ValidatorAddresses = append(m.Top_10ValidatorAddresses, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

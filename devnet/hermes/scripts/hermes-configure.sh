@@ -8,78 +8,78 @@ ENTRY_LOG_FILE="${ENTRY_LOG_FILE:-/root/logs/entrypoint.log}"
 LOG_PREFIX="[hermes-configure]"
 
 log_info() {
-  local msg="$1"
-  local line
-  line=$(printf '[%s] %s %s\n' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" "${LOG_PREFIX}" "${msg}")
-  printf '%s\n' "${line}"
-  printf '%s\n' "${line}" >> "${ENTRY_LOG_FILE}"
+	local msg="$1"
+	local line
+	line=$(printf '[%s] %s %s\n' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" "${LOG_PREFIX}" "${msg}")
+	printf '%s\n' "${line}"
+	printf '%s\n' "${line}" >>"${ENTRY_LOG_FILE}"
 }
 
 fmt_cmd() {
-  local out="" arg
-  for arg in "$@"; do
-    if [ -z "${out}" ]; then
-      out=$(printf '%q' "${arg}")
-    else
-      out="${out} $(printf '%q' "${arg}")"
-    fi
-  done
-  printf '%s' "${out}"
+	local out="" arg
+	for arg in "$@"; do
+		if [ -z "${out}" ]; then
+			out=$(printf '%q' "${arg}")
+		else
+			out="${out} $(printf '%q' "${arg}")"
+		fi
+	done
+	printf '%s' "${out}"
 }
 
 log_cmd_start() {
-  log_info "CMD start: $(fmt_cmd "$@")"
+	log_info "CMD start: $(fmt_cmd "$@")"
 }
 
 log_cmd_result() {
-  local rc="$1"
-  shift
-  if [ "${rc}" -eq 0 ]; then
-    log_info "CMD success (rc=${rc}): $(fmt_cmd "$@")"
-  else
-    log_info "CMD failure (rc=${rc}): $(fmt_cmd "$@")"
-  fi
+	local rc="$1"
+	shift
+	if [ "${rc}" -eq 0 ]; then
+		log_info "CMD success (rc=${rc}): $(fmt_cmd "$@")"
+	else
+		log_info "CMD failure (rc=${rc}): $(fmt_cmd "$@")"
+	fi
 }
 
 log_cmd_output() {
-  local label="$1"
-  local payload="$2"
-  local count=0
-  if [ -z "${payload}" ]; then
-    return 0
-  fi
-  while IFS= read -r line; do
-    log_info "${label}: ${line}"
-    count=$((count + 1))
-    if [ "${count}" -ge 40 ]; then
-      log_info "${label}: ... (truncated after 40 lines)"
-      break
-    fi
-  done <<< "${payload}"
+	local label="$1"
+	local payload="$2"
+	local count=0
+	if [ -z "${payload}" ]; then
+		return 0
+	fi
+	while IFS= read -r line; do
+		log_info "${label}: ${line}"
+		count=$((count + 1))
+		if [ "${count}" -ge 40 ]; then
+			log_info "${label}: ... (truncated after 40 lines)"
+			break
+		fi
+	done <<<"${payload}"
 }
 
 ran() {
-  local cmd=("$@")
-  log_cmd_start "${cmd[@]}"
-  "${cmd[@]}"
-  local rc=$?
-  log_cmd_result "${rc}" "${cmd[@]}"
-  return "${rc}"
+	local cmd=("$@")
+	log_cmd_start "${cmd[@]}"
+	"${cmd[@]}"
+	local rc=$?
+	log_cmd_result "${rc}" "${cmd[@]}"
+	return "${rc}"
 }
 
 ran_capture() {
-  local cmd=("$@")
-  log_cmd_start "${cmd[@]}"
-  local output rc
-  if output=$("${cmd[@]}" 2>&1); then
-    rc=0
-  else
-    rc=$?
-  fi
-  log_cmd_output "CMD output" "${output}"
-  log_cmd_result "${rc}" "${cmd[@]}"
-  printf '%s' "${output}"
-  return "${rc}"
+	local cmd=("$@")
+	log_cmd_start "${cmd[@]}"
+	local output rc
+	if output=$("${cmd[@]}" 2>&1); then
+		rc=0
+	else
+		rc=$?
+	fi
+	log_cmd_output "CMD output" "${output}"
+	log_cmd_result "${rc}" "${cmd[@]}"
+	printf '%s' "${output}"
+	return "${rc}"
 }
 
 : "${LUMERA_CHAIN_ID:=lumera-devnet-1}"
@@ -99,13 +99,13 @@ CONFIG_DIR="$(dirname "${HERMES_CONFIG_PATH}")"
 ran mkdir -p "${CONFIG_DIR}"
 
 if [ ! -f "${HERMES_CONFIG_PATH}" ]; then
-  ran cp "${HERMES_TEMPLATE_PATH}" "${HERMES_CONFIG_PATH}"
+	ran cp "${HERMES_TEMPLATE_PATH}" "${HERMES_CONFIG_PATH}"
 fi
 
 ensure_mode_enabled() {
-  local section="$1"
-  local value="$2"
-  if ! ran python3 - "$HERMES_CONFIG_PATH" "$section" "$value" <<'PY'
+	local section="$1"
+	local value="$2"
+	if ! ran python3 - "$HERMES_CONFIG_PATH" "$section" "$value" <<'PY'; then
 import pathlib
 import re
 import sys
@@ -138,21 +138,20 @@ if in_section and not replaced:
 
 path.write_text('\n'.join(out) + '\n')
 PY
-  then
-    log_info "Failed to enforce ${section}.enabled=${value}"
-    return 1
-  fi
-  log_info "Ensured ${section}.enabled=${value}"
+		log_info "Failed to enforce ${section}.enabled=${value}"
+		return 1
+	fi
+	log_info "Ensured ${section}.enabled=${value}"
 }
 
 ensure_mode_enabled "mode.channels" "true"
 ensure_mode_enabled "mode.connections" "true"
 
 append_chain() {
-  local chain_id="$1"
-  local block="$2"
-  log_info "Updating Hermes chain entry for ${chain_id}"
-  if ! ran python3 - "$HERMES_CONFIG_PATH" "$chain_id" <<'PY'
+	local chain_id="$1"
+	local block="$2"
+	log_info "Updating Hermes chain entry for ${chain_id}"
+	if ! ran python3 - "$HERMES_CONFIG_PATH" "$chain_id" <<'PY'; then
 import pathlib, re, sys
 config_path = pathlib.Path(sys.argv[1])
 chain_id = sys.argv[2]
@@ -166,19 +165,19 @@ pattern = re.compile(r"^\s*id\s*=\s*['\"]{}['\"]\s*$".format(re.escape(chain_id)
 kept = [blk for blk in blocks if not pattern.search(blk)]
 config_path.write_text(head + ''.join(kept))
 PY
-  then
-    log_info "Failed to normalise configuration for chain ${chain_id}"
-    return 1
-  fi
-  if printf "\n%s\n" "${block}" >> "${HERMES_CONFIG_PATH}"; then
-    log_info "Appended configuration block for ${chain_id}"
-  else
-    log_info "Failed to append configuration block for ${chain_id}"
-    return 1
-  fi
+		log_info "Failed to normalise configuration for chain ${chain_id}"
+		return 1
+	fi
+	if printf "\n%s\n" "${block}" >>"${HERMES_CONFIG_PATH}"; then
+		log_info "Appended configuration block for ${chain_id}"
+	else
+		log_info "Failed to append configuration block for ${chain_id}"
+		return 1
+	fi
 }
 
-lumera_block=$(cat <<EOF
+lumera_block=$(
+	cat <<EOF
 [[chains]]
 id = '${LUMERA_CHAIN_ID}'
 type = 'CosmosSdk'
@@ -198,7 +197,8 @@ trust_threshold = '1/3'
 EOF
 )
 
-simd_block=$(cat <<EOF
+simd_block=$(
+	cat <<EOF
 [[chains]]
 id = '${SIMD_CHAIN_ID}'
 type = 'CosmosSdk'

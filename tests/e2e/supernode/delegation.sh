@@ -19,16 +19,16 @@ touch "$LOG_FILE"
 
 # Step 2: Setup Logging Function
 log() {
-    local msg="[$(date '+%Y-%m-%d %H:%M:%S')] $1"
-    echo "$msg" | tee -a "$LOG_FILE"
+	local msg="[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+	echo "$msg" | tee -a "$LOG_FILE"
 }
 
 log_cmd() {
-    local cmd_output
-    log "Executing: $1"
-    cmd_output=$(eval "$1" 2>&1)
-    echo "$cmd_output" | tee -a "$LOG_FILE"
-    echo "----------------------------------------" | tee -a "$LOG_FILE"
+	local cmd_output
+	log "Executing: $1"
+	cmd_output=$(eval "$1" 2>&1)
+	echo "$cmd_output" | tee -a "$LOG_FILE"
+	echo "----------------------------------------" | tee -a "$LOG_FILE"
 }
 
 log "Starting stake test for validator ${VALIDATOR_NUM}"
@@ -37,11 +37,11 @@ log "Starting stake test for validator ${VALIDATOR_NUM}"
 log "Step 3: Getting validator addresses..."
 
 VALIDATOR_ACCOUNT=$(docker exec "$VALIDATOR_CONTAINER" lumerad keys show validator${VALIDATOR_NUM}_key \
-    --keyring-backend "$KEYRING_BACKEND" -a)
+	--keyring-backend "$KEYRING_BACKEND" -a)
 log "Validator Account: $VALIDATOR_ACCOUNT"
 
 VALIDATOR_OPERATOR=$(docker exec "$VALIDATOR_CONTAINER" lumerad keys show validator${VALIDATOR_NUM}_key \
-    --keyring-backend "$KEYRING_BACKEND" --bech val -a)
+	--keyring-backend "$KEYRING_BACKEND" --bech val -a)
 log "Validator Operator: $VALIDATOR_OPERATOR"
 
 # Step 4: Check Initial Status
@@ -74,7 +74,7 @@ log_cmd "docker exec lumera-validator1 lumerad query staking validator $VALIDATO
 log "Checking supernode status after stake reduction..."
 log_cmd "docker exec lumera-validator1 lumerad query supernode get-supernode $VALIDATOR_OPERATOR"
 
-# Step 7: Restore Stake 
+# Step 7: Restore Stake
 log "Step 7: Restoring stake by delegating ${RESTORE_AMOUNT} back..."
 log_cmd "docker exec $VALIDATOR_CONTAINER lumerad tx staking delegate \
     $VALIDATOR_OPERATOR \

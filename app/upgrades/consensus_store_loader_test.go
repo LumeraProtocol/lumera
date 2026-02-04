@@ -20,6 +20,7 @@ func TestComputeConsensusStoreUpgrades_RenameWhenLegacyOnly(t *testing.T) {
 	require.Len(t, effective.Renamed, 1)
 	require.Equal(t, storetypes.StoreRename{OldKey: "Consensus", NewKey: "consensus"}, effective.Renamed[0])
 	require.NotContains(t, effective.Added, "consensus")
+	require.NotContains(t, effective.Deleted, "Consensus")
 	require.Contains(t, effective.Deleted, "crisis")
 }
 

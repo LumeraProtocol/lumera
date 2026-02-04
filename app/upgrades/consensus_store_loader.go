@@ -80,6 +80,7 @@ func computeConsensusStoreUpgrades(
 	switch {
 	case hasLegacy && !hasNew:
 		effective.Added = removeStoreName(effective.Added, consensusStoreKey)
+		effective.Deleted = removeStoreName(effective.Deleted, legacyConsensusStoreKey)
 		effective.Renamed = append(effective.Renamed, storetypes.StoreRename{
 			OldKey: legacyConsensusStoreKey,
 			NewKey: consensusStoreKey,

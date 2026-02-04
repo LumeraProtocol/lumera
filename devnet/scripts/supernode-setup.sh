@@ -307,8 +307,8 @@ install_supernode_binary() {
 register_supernode() {
 	if is_sn_registered_active; then
 		echo "[SN] Supernode is already registered and in ACTIVE state; no action needed."
-	elif is_sn_postponed; then
-		echo "[SN] Supernode is in POSTPONED state; skipping registration."
+	elif is_sn_blocked_state; then
+		echo "[SN] Supernode is in ${SN_LAST_STATE} state; skipping registration."
 	else
 		echo "[SN] Registering supernode..."
 		REG_TX_JSON="$(run_capture $DAEMON tx supernode register-supernode \
@@ -466,9 +466,10 @@ is_sn_registered_active() {
 	return 1
 }
 
-# Returns 0 if last state is SUPERNODE_STATE_POSTPONED, else 1
-is_sn_postponed() {
+# Returns 0 if last state is a non-registrable state, else 1
+is_sn_blocked_state() {
 	local info
+	SN_LAST_STATE=""
 
 	echo "[SN] Checking if supernode is postponed..."
 	info="$(run_capture $DAEMON q supernode get-supernode "$VALOPER_ADDR" --output json)"
@@ -485,12 +486,16 @@ is_sn_postponed() {
       | .state // ""
     ')"
 
+	SN_LAST_STATE="$last_state"
 	echo "[SN] Supernode: account='${acct}', last_state='${last_state}'"
-	if [[ "$last_state" == "SUPERNODE_STATE_POSTPONED" ]]; then
+	case "$last_state" in
+	SUPERNODE_STATE_POSTPONED | SUPERNODE_STATE_DISABLED | SUPERNODE_STATE_STOPPED | SUPERNODE_STATE_PENALIZED)
 		return 0
-	fi
-
-	return 1
+		;;
+	*)
+		return 1
+		;;
+	esac
 }
 
 install_sncli_binary() {

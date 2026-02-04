@@ -1,39 +1,38 @@
 #!/usr/bin/env bash
 #
 
-
 set -euo pipefail
 
 # Configuration
 CHAIN_ID="lumera-devnet-1"
 KEYRING_BACKEND="test"
 CONTAINER_PREFIX="lumera-validator"
+QUERY_CONTAINER="${QUERY_CONTAINER:-${CONTAINER_PREFIX}1}"
 
-# Test validator number 
+# Test validator number
 TEST_VALIDATOR_NUM=5
-
 
 SLEEP_BETWEEN_OPS=5
 
 # Logging Setup
 LOG_FILE="./test_supernode_state_transitions.log"
-> "$LOG_FILE"
+>"$LOG_FILE"
 
 log() {
-  local timestamp
-  timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
-  echo -e "[$timestamp] [INFO] $*" | tee -a "$LOG_FILE"
+	local timestamp
+	timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
+	echo -e "[$timestamp] [INFO] $*" | tee -a "$LOG_FILE"
 }
 
 error() {
-  local timestamp
-  timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
-  echo -e "[$timestamp] [ERROR] $*" | tee -a "$LOG_FILE" >&2
+	local timestamp
+	timestamp="$(date '+%Y-%m-%d %H:%M:%S')"
+	echo -e "[$timestamp] [ERROR] $*" | tee -a "$LOG_FILE" >&2
 }
 
 run_cmd() {
-  log "Running: $*"
-  eval "$*" 2>&1 | tee -a "$LOG_FILE"
+	log "Running: $*"
+	eval "$*" 2>&1 | tee -a "$LOG_FILE"
 }
 
 #################################################################
@@ -44,26 +43,26 @@ declare -A VAL_ACCOUNT
 declare -A VAL_OPERATOR
 
 query_addresses() {
-  local i="$1"
-  local container="${CONTAINER_PREFIX}${i}"
+	local i="$1"
+	local container="${CONTAINER_PREFIX}${i}"
 
-  VAL_ACCOUNT["$i"]="$(
-    docker exec "$container" lumerad keys show validator${i}_key \
-      --keyring-backend "$KEYRING_BACKEND" -a
-  )"
+	VAL_ACCOUNT["$i"]="$(
+		docker exec "$container" lumerad keys show validator${i}_key \
+			--keyring-backend "$KEYRING_BACKEND" -a
+	)"
 
-  VAL_OPERATOR["$i"]="$(
-    docker exec "$container" lumerad keys show validator${i}_key \
-      --keyring-backend "$KEYRING_BACKEND" --bech val -a
-  )"
+	VAL_OPERATOR["$i"]="$(
+		docker exec "$container" lumerad keys show validator${i}_key \
+			--keyring-backend "$KEYRING_BACKEND" --bech val -a
+	)"
 }
 
 check_supernode_status() {
-  local i="$1"
-  local valop="${VAL_OPERATOR[$i]}"
-  
-  log "Checking supernode status for validator ${i} (${valop})"
-  run_cmd "docker exec lumera-validator1 lumerad query supernode get-supernode ${valop}"
+	local i="$1"
+	local valop="${VAL_OPERATOR[$i]}"
+
+	log "Checking supernode status for validator ${i} (${valop})"
+	run_cmd "docker exec ${QUERY_CONTAINER} lumerad query supernode get-supernode ${valop}"
 }
 
 #################################################################

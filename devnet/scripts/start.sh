@@ -12,7 +12,7 @@
 #
 #   run              Waits for setup_complete, starts lumerad, and tails logs.
 #
-#   wait  (optional) Wait for setup_complete and exit. 
+#   wait  (optional) Wait for setup_complete and exit.
 #
 # DOCKER COMPOSE:
 #   - Image ENTRYPOINT should be: ["/bin/bash", "/root/scripts/start.sh"] (as in Dockerfile).
@@ -68,16 +68,18 @@ NODE_STATUS_DIR="${STATUS_DIR}/${MONIKER}"
 NODE_SETUP_COMPLETE="${NODE_STATUS_DIR}/setup_complete"
 mkdir -p "${NODE_STATUS_DIR}"
 
-if [ ! command -v jq >/dev/null 2>&1 ]; then
-    echo "[BOOT] jq is missing"
+if ! command -v jq >/dev/null 2>&1; then
+	echo "[BOOT] jq is missing"
 fi
 
 if [ ! -f "${CFG_CHAIN}" ]; then
-  echo "[BOOT] Missing ${CFG_CHAIN}"; exit 1
+	echo "[BOOT] Missing ${CFG_CHAIN}"
+	exit 1
 fi
 
 if [ ! -f "${CFG_VALS}" ]; then
-  echo "[BOOT] Missing ${CFG_VALS}"; exit 1
+	echo "[BOOT] Missing ${CFG_VALS}"
+	exit 1
 fi
 
 PRIMARY_MONIKER="$(jq -r '
@@ -86,47 +88,47 @@ PRIMARY_MONIKER="$(jq -r '
 ' "${CFG_VALS}")"
 
 if [ -z "${PRIMARY_MONIKER}" ] || [ "${PRIMARY_MONIKER}" = "null" ]; then
-  echo "[BOOT] Unable to determine primary validator from ${CFG_VALS}"
-  exit 1
+	echo "[BOOT] Unable to determine primary validator from ${CFG_VALS}"
+	exit 1
 fi
 
 PRIMARY_STARTED_FLAG="${STATUS_DIR}/${PRIMARY_MONIKER}/lumerad_started"
 
 wait_for_flag() {
-  local f="$1"
-  until [ -s "${f}" ]; do sleep 1; done
+	local f="$1"
+	until [ -s "${f}" ]; do sleep 1; done
 }
 
 inject_nm_ui_env() {
-  local api_base="${VITE_API_BASE:-}"
-  [ -z "${api_base}" ] && return 0
-  [ -d "${NM_UI_DIR}" ] || return 0
+	local api_base="${VITE_API_BASE:-}"
+	[ -z "${api_base}" ] && return 0
+	[ -d "${NM_UI_DIR}" ] || return 0
 
-  local files
-  files="$(grep -rl "http://127.0.0.1:8080" "${NM_UI_DIR}" || true)"
-  if [ -z "${files}" ]; then
-    echo "[BOOT] network-maker UI: no API base placeholder found to inject."
-    return 0
-  fi
+	local files
+	files="$(grep -rl "http://127.0.0.1:8080" "${NM_UI_DIR}" || true)"
+	if [ -z "${files}" ]; then
+		echo "[BOOT] network-maker UI: no API base placeholder found to inject."
+		return 0
+	fi
 
-  local escaped_base="${api_base//\//\\/}"
-  escaped_base="${escaped_base//&/\\&}"
-  echo "[BOOT] network-maker UI: injecting API base ${api_base}"
-  # Replace default API base baked into the static bundle with runtime value
-  while IFS= read -r f; do
-    sed -i "s|http://127.0.0.1:8080|${escaped_base}|g" "$f"
-  done <<<"${files}"
+	local escaped_base="${api_base//\//\\/}"
+	escaped_base="${escaped_base//&/\\&}"
+	echo "[BOOT] network-maker UI: injecting API base ${api_base}"
+	# Replace default API base baked into the static bundle with runtime value
+	while IFS= read -r f; do
+		sed -i "s|http://127.0.0.1:8080|${escaped_base}|g" "$f"
+	done <<<"${files}"
 }
 
 start_nm_ui_if_present() {
-  if [ ! -d "${NM_UI_DIR}" ] || [ ! -f "${NM_UI_DIR}/index.html" ]; then
-    echo "[BOOT] network-maker UI not found at ${NM_UI_DIR}; skipping nginx"
-    return
-  fi
+	if [ ! -d "${NM_UI_DIR}" ] || [ ! -f "${NM_UI_DIR}/index.html" ]; then
+		echo "[BOOT] network-maker UI not found at ${NM_UI_DIR}; skipping nginx"
+		return
+	fi
 
-  inject_nm_ui_env
+	inject_nm_ui_env
 
-  cat >/etc/nginx/conf.d/network-maker-ui.conf <<EOF
+	cat >/etc/nginx/conf.d/network-maker-ui.conf <<EOF
 server {
     listen ${NM_UI_PORT};
     server_name _;
@@ -138,193 +140,196 @@ server {
 }
 EOF
 
-  if pgrep -x nginx >/dev/null 2>&1; then
-    echo "[BOOT] nginx already running; skipping start for network-maker UI."
-    return
-  fi
+	if pgrep -x nginx >/dev/null 2>&1; then
+		echo "[BOOT] nginx already running; skipping start for network-maker UI."
+		return
+	fi
 
-  echo "[BOOT] Starting nginx to serve network-maker UI on port ${NM_UI_PORT}"
-  nginx
+	echo "[BOOT] Starting nginx to serve network-maker UI on port ${NM_UI_PORT}"
+	nginx
 }
 
 run() {
-  echo "+ $*"
-  "$@"
+	echo "+ $*"
+	"$@"
 }
 
 # Get current block height (integer), 0 if unknown
 current_height() {
-  curl -sf "${LUMERA_RPC_ADDR}/status" \
-    | jq -r '.result.sync_info.latest_block_height // "0"' 2>/dev/null \
-    | awk '{print ($1 ~ /^[0-9]+$/) ? $1 : 0}'
+	curl -sf "${LUMERA_RPC_ADDR}/status" |
+		jq -r '.result.sync_info.latest_block_height // "0"' 2>/dev/null |
+		awk '{print ($1 ~ /^[0-9]+$/) ? $1 : 0}'
 }
 
 # Wait until height >= target (with timeout)
 wait_for_height_at_least() {
-  local target="$1"
-  local retries="${2:-180}"  # ~180s
-  local delay="${3:-1}"
+	local target="$1"
+	local retries="${2:-180}" # ~180s
+	local delay="${3:-1}"
 
-  echo "[BOOT] Waiting for block height >= ${target} ..."
-  for ((i=0; i<retries; i++)); do
-    local h
-    h="$(current_height)"
-    if (( h >= target )); then
-      echo "[BOOT] Height is ${h} (>= ${target}) — OK."
-      return 0
-    fi
-    sleep "$delay"
-  done
-  echo "[BOOT] Timeout waiting for height >= ${target}."
-  return 1
+	echo "[BOOT] Waiting for block height >= ${target} ..."
+	for ((i = 0; i < retries; i++)); do
+		local h
+		h="$(current_height)"
+		if ((h >= target)); then
+			echo "[BOOT] Height is ${h} (>= ${target}) — OK."
+			return 0
+		fi
+		sleep "$delay"
+	done
+	echo "[BOOT] Timeout waiting for height >= ${target}."
+	return 1
 }
 
 # Wait for N new blocks from the current height (default 5)
 wait_for_n_blocks() {
-  local n="${1:-5}"
-  local start
-  start="$(current_height)"
-  local target=$(( start + n ))
-  # If the chain hasn't started yet (start==0), still use +n (so target=n)
-  (( target < n )) && target="$n"
-  wait_for_height_at_least "$target"
+	local n="${1:-5}"
+	local start
+	start="$(current_height)"
+	local target=$((start + n))
+	# If the chain hasn't started yet (start==0), still use +n (so target=n)
+	((target < n)) && target="$n"
+	wait_for_height_at_least "$target"
 }
 
 launch_supernode_setup() {
-  # Start optional supernode setup only in auto/run modes after init is done.
-  if [ -x "${SCRIPTS_DIR}/supernode-setup.sh" ] && [ -f "${RELEASE_DIR}/${SN}" ]; then
-    echo "[BOOT] ${MONIKER}: Launching Supernode setup in background..."
-    export LUMERA_RPC_PORT="${LUMERA_RPC_PORT:-26657}"
-    export LUMERA_GRPC_PORT="${LUMERA_GRPC_PORT:-9090}"
-    nohup bash "${SCRIPTS_DIR}/supernode-setup.sh" >"${SUPERNODE_SETUP_OUT}" 2>&1 &
-  fi
+	# Start optional supernode setup only in auto/run modes after init is done.
+	if [ -x "${SCRIPTS_DIR}/supernode-setup.sh" ] && [ -f "${RELEASE_DIR}/${SN}" ]; then
+		echo "[BOOT] ${MONIKER}: Launching Supernode setup in background..."
+		export LUMERA_RPC_PORT="${LUMERA_RPC_PORT:-26657}"
+		export LUMERA_GRPC_PORT="${LUMERA_GRPC_PORT:-9090}"
+		nohup bash "${SCRIPTS_DIR}/supernode-setup.sh" >"${SUPERNODE_SETUP_OUT}" 2>&1 &
+	fi
 }
 
 wait_for_validator_setup() {
-  echo "[BOOT] ${MONIKER}: Waiting for validator setup to complete..."
-  wait_for_flag "${SETUP_COMPLETE}"
-  wait_for_flag "${NODE_SETUP_COMPLETE}"
-  echo "[BOOT] ${MONIKER}: validator setup complete."
+	echo "[BOOT] ${MONIKER}: Waiting for validator setup to complete..."
+	wait_for_flag "${SETUP_COMPLETE}"
+	wait_for_flag "${NODE_SETUP_COMPLETE}"
+	echo "[BOOT] ${MONIKER}: validator setup complete."
 }
 
 install_wasm_lib() {
-  if [ -f "${WASMVM_SRC_LIB}" ]; then
-    if [ -f "${WASMVM_DST_LIB}" ] && cmp -s "${WASMVM_SRC_LIB}" "${WASMVM_DST_LIB}"; then
-      echo "[BOOT] libwasmvm.x86_64.so already up to date at ${WASMVM_DST_LIB}"
-      return
-    fi
-    echo "[BOOT] Installing libwasmvm.x86_64.so to ${WASMVM_DST_LIB}"
-    run cp -f "${WASMVM_SRC_LIB}" "${WASMVM_DST_LIB}"
-    run chmod 755 "${WASMVM_DST_LIB}"
-  else
-    echo "[BOOT] ${WASMVM_SRC_LIB} not found, assuming libwasmvm.x86_64.so is already installed"
-  fi
+	if [ -f "${WASMVM_SRC_LIB}" ]; then
+		if [ -f "${WASMVM_DST_LIB}" ] && cmp -s "${WASMVM_SRC_LIB}" "${WASMVM_DST_LIB}"; then
+			echo "[BOOT] libwasmvm.x86_64.so already up to date at ${WASMVM_DST_LIB}"
+			return
+		fi
+		echo "[BOOT] Installing libwasmvm.x86_64.so to ${WASMVM_DST_LIB}"
+		run cp -f "${WASMVM_SRC_LIB}" "${WASMVM_DST_LIB}"
+		run chmod 755 "${WASMVM_DST_LIB}"
+	else
+		echo "[BOOT] ${WASMVM_SRC_LIB} not found, assuming libwasmvm.x86_64.so is already installed"
+	fi
 }
 
 install_lumerad_binary() {
-  run cp -f "${LUMERA_SRC_BIN}" "${LUMERA_DST_BIN}"
-  run chmod +x "${LUMERA_DST_BIN}"
+	run cp -f "${LUMERA_SRC_BIN}" "${LUMERA_DST_BIN}"
+	run chmod +x "${LUMERA_DST_BIN}"
 }
 
 install_or_update_lumerad() {
-  if [ ! -f "${LUMERA_DST_BIN}" ]; then
-    if [ -f "${LUMERA_SRC_BIN}" ]; then
-      echo "[BOOT] ${LUMERAD} binary not found at ${LUMERA_DST_BIN}, installing..."
-      install_lumerad_binary
-    else
-      echo "[BOOT] ${LUMERA_SRC_BIN} not found, assuming ${LUMERAD} is already installed"
-    fi
-  else
-    run lumerad version || true
-    if [ -f "${LUMERA_SRC_BIN}" ]; then
-      if cmp -s "${LUMERA_SRC_BIN}" "${LUMERA_DST_BIN}"; then
-        echo "[BOOT] ${LUMERAD} binary already up to date at ${LUMERA_DST_BIN}"
-      else
-        echo "[BOOT] Updating ${LUMERAD} binary at ${LUMERA_DST_BIN}"
-        install_lumerad_binary
-      fi
-    else
-      echo "[BOOT] ${LUMERA_SRC_BIN} not found, assuming ${LUMERAD} is already installed"
-    fi
-  fi
-  install_wasm_lib
-  run lumerad version || true
+	if [ ! -f "${LUMERA_DST_BIN}" ]; then
+		if [ -f "${LUMERA_SRC_BIN}" ]; then
+			echo "[BOOT] ${LUMERAD} binary not found at ${LUMERA_DST_BIN}, installing..."
+			install_lumerad_binary
+		else
+			echo "[BOOT] ${LUMERA_SRC_BIN} not found, assuming ${LUMERAD} is already installed"
+		fi
+	else
+		run lumerad version || true
+		if [ -f "${LUMERA_SRC_BIN}" ]; then
+			if cmp -s "${LUMERA_SRC_BIN}" "${LUMERA_DST_BIN}"; then
+				echo "[BOOT] ${LUMERAD} binary already up to date at ${LUMERA_DST_BIN}"
+			else
+				echo "[BOOT] Updating ${LUMERAD} binary at ${LUMERA_DST_BIN}"
+				install_lumerad_binary
+			fi
+		else
+			echo "[BOOT] ${LUMERA_SRC_BIN} not found, assuming ${LUMERAD} is already installed"
+		fi
+	fi
+	install_wasm_lib
+	run lumerad version || true
 }
 
 launch_validator_setup() {
-  install_or_update_lumerad
-  if [ ! -s "${NODE_SETUP_COMPLETE}" ] && [ -x "${SCRIPTS_DIR}/validator-setup.sh" ]; then
-    echo "[BOOT] ${MONIKER}: launching validator-setup in background..."
-    nohup bash "${SCRIPTS_DIR}/validator-setup.sh" >"${VALIDATOR_SETUP_OUT}" 2>&1 &
-  fi
+	install_or_update_lumerad
+	if [ ! -s "${NODE_SETUP_COMPLETE}" ] && [ -x "${SCRIPTS_DIR}/validator-setup.sh" ]; then
+		echo "[BOOT] ${MONIKER}: launching validator-setup in background..."
+		nohup bash "${SCRIPTS_DIR}/validator-setup.sh" >"${VALIDATOR_SETUP_OUT}" 2>&1 &
+	fi
 }
 
 launch_network_maker_setup() {
-  if [ -x "${SCRIPTS_DIR}/network-maker-setup.sh" ] && [ -f "${RELEASE_DIR}/${NM}" ]; then
-    echo "[BOOT] ${MONIKER}: Launching Network Maker setup in background..."
-    nohup bash "${SCRIPTS_DIR}/network-maker-setup.sh" >"${NETWORK_MAKER_SETUP_OUT}" 2>&1 &
-  fi
+	if [ -x "${SCRIPTS_DIR}/network-maker-setup.sh" ] && [ -f "${RELEASE_DIR}/${NM}" ]; then
+		echo "[BOOT] ${MONIKER}: Launching Network Maker setup in background..."
+		nohup bash "${SCRIPTS_DIR}/network-maker-setup.sh" >"${NETWORK_MAKER_SETUP_OUT}" 2>&1 &
+	fi
 }
 
 start_lumera() {
-    if [ "${MONIKER}" != "${PRIMARY_MONIKER}" ]; then
-        echo "[BOOT] ${MONIKER}: Waiting for primary (${PRIMARY_MONIKER}) to start lumerad..."
-        wait_for_flag "${PRIMARY_STARTED_FLAG}"
-    fi
+	if [ "${MONIKER}" != "${PRIMARY_MONIKER}" ]; then
+		echo "[BOOT] ${MONIKER}: Waiting for primary (${PRIMARY_MONIKER}) to start lumerad..."
+		wait_for_flag "${PRIMARY_STARTED_FLAG}"
+	fi
 
-    echo "[BOOT] ${MONIKER}: Starting lumerad..."
-    run "${DAEMON}" start --home "${DAEMON_HOME}" >"${VALIDATOR_LOG}" 2>&1 &
+	echo "[BOOT] ${MONIKER}: Starting lumerad..."
+	run "${DAEMON}" start --home "${DAEMON_HOME}" >"${VALIDATOR_LOG}" 2>&1 &
 
-    if [ "${MONIKER}" = "${PRIMARY_MONIKER}" ]; then
-        mkdir -p "$(dirname "${PRIMARY_STARTED_FLAG}")"
-        printf 'started\n' > "${PRIMARY_STARTED_FLAG}"
-        echo "[BOOT] ${MONIKER}: Marked primary lumerad as started."
-    fi
+	if [ "${MONIKER}" = "${PRIMARY_MONIKER}" ]; then
+		mkdir -p "$(dirname "${PRIMARY_STARTED_FLAG}")"
+		printf 'started\n' >"${PRIMARY_STARTED_FLAG}"
+		echo "[BOOT] ${MONIKER}: Marked primary lumerad as started."
+	fi
 }
 
 tail_logs() {
-    touch "${VALIDATOR_LOG}" "${SUPERNODE_LOG}" "${SUPERNODE_SETUP_OUT}" "${VALIDATOR_SETUP_OUT}" "${NETWORK_MAKER_SETUP_OUT}"
-    exec tail -F "${VALIDATOR_LOG}" "${SUPERNODE_LOG}" "${SUPERNODE_SETUP_OUT}" "${VALIDATOR_SETUP_OUT}" "${NETWORK_MAKER_SETUP_OUT}"
+	touch "${VALIDATOR_LOG}" "${SUPERNODE_LOG}" "${SUPERNODE_SETUP_OUT}" "${VALIDATOR_SETUP_OUT}" "${NETWORK_MAKER_SETUP_OUT}"
+	exec tail -F "${VALIDATOR_LOG}" "${SUPERNODE_LOG}" "${SUPERNODE_SETUP_OUT}" "${VALIDATOR_SETUP_OUT}" "${NETWORK_MAKER_SETUP_OUT}"
 }
 
 run_auto_flow() {
-    launch_network_maker_setup
-    launch_supernode_setup
-    launch_validator_setup
-    wait_for_validator_setup
-    start_lumera
-    start_nm_ui_if_present
-    tail_logs
+	launch_network_maker_setup
+	launch_supernode_setup
+	launch_validator_setup
+	wait_for_validator_setup
+	start_lumera
+	start_nm_ui_if_present
+	tail_logs
 }
 
 case "${START_MODE}" in
-  auto|"")
-    run_auto_flow
-    ;;
+auto | "")
+	run_auto_flow
+	;;
 
-  bootstrap)
-    launch_network_maker_setup
-    launch_supernode_setup
-    launch_validator_setup
-    wait_for_validator_setup
-    exit 0
-    ;;
+bootstrap)
+	launch_network_maker_setup
+	launch_supernode_setup
+	launch_validator_setup
+	wait_for_validator_setup
+	exit 0
+	;;
 
-  run)
-    wait_for_validator_setup
-    wait_for_n_blocks 3 || { echo "[SN] Lumera chain not producing blocks in time; exiting."; exit 1; }
-    start_lumera
-    start_nm_ui_if_present
-    tail_logs
-    ;;
+run)
+	wait_for_validator_setup
+	wait_for_n_blocks 3 || {
+		echo "[SN] Lumera chain not producing blocks in time; exiting."
+		exit 1
+	}
+	start_lumera
+	start_nm_ui_if_present
+	tail_logs
+	;;
 
-  wait)
-    wait_for_validator_setup
-    exit 0
-    ;;
+wait)
+	wait_for_validator_setup
+	exit 0
+	;;
 
-  *)
-    echo "[BOOT] Unknown START_MODE='${START_MODE}', defaulting to auto."
-    run_auto_flow
-    ;;
+*)
+	echo "[BOOT] Unknown START_MODE='${START_MODE}', defaulting to auto."
+	run_auto_flow
+	;;
 esac

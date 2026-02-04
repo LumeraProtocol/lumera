@@ -2,7 +2,9 @@ package validator
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -37,11 +39,11 @@ type ibcLumeraSuite struct {
 	simdRecipient   string
 	simdREST        string
 
-	info        ibcutil.ChannelInfo
-	channels    []ibcutil.Channel
-	channel     *ibcutil.Channel
-	connections []ibcutil.Connection
-	connection  *ibcutil.Connection
+	info         ibcutil.ChannelInfo
+	channels     []ibcutil.Channel
+	channel      *ibcutil.Channel
+	connections  []ibcutil.Connection
+	connection   *ibcutil.Connection
 	clientStatus string
 	csClientID   string
 	csHeight     int64
@@ -52,15 +54,12 @@ func (s *ibcLumeraSuite) SetupSuite() {
 	// Load environment-driven configuration and shared channel metadata.
 	s.channelInfoPath = getenv("CHANNEL_INFO_FILE", defaultChannelInfoPath)
 	s.lumeraBin = getenv("LUMERA_BIN", defaultLumeraBin)
-	s.lumeraRPC = getenv("LUMERA_RPC_ADDR", defaultLumeraRPC)
+	s.lumeraRPC = resolveLumeraRPC()
 	s.lumeraChainID = getenv("LUMERA_CHAIN_ID", defaultLumeraChainID)
 	if val := os.Getenv("LUMERA_KEY_NAME"); val != "" {
 		s.lumeraKeyName = val
 	} else {
-		s.lumeraKeyName = defaultLumeraKeyName
-		if key := loadPrimaryValidatorKey(getenv("LUMERA_VALIDATORS_FILE", defaultValidatorsFile)); key != "" {
-			s.lumeraKeyName = key
-		}
+		s.lumeraKeyName = resolveLumeraKeyName()
 	}
 	s.lumeraGasPrices = getenv("LUMERA_GAS_PRICES", defaultLumeraGasPrices)
 	s.lumeraDenom = getenv("LUMERA_DENOM", defaultLumeraDenom)
@@ -223,6 +222,84 @@ func loadPrimaryValidatorKey(path string) string {
 	}
 	if len(vals) > 0 {
 		return vals[0].KeyName
+	}
+	return ""
+}
+
+func resolveLumeraRPC() string {
+	if val := os.Getenv("LUMERA_RPC_ADDR"); val != "" {
+		return val
+	}
+
+	if moniker := detectValidatorMoniker(); moniker != "" {
+		return fmt.Sprintf("http://%s:26657", moniker)
+	}
+
+	return defaultLumeraRPC
+}
+
+func resolveLumeraKeyName() string {
+	validatorsPath := getenv("LUMERA_VALIDATORS_FILE", defaultValidatorsFile)
+	if moniker := detectValidatorMoniker(); moniker != "" {
+		if key := loadValidatorKeyByMoniker(validatorsPath, moniker); key != "" {
+			return key
+		}
+	}
+
+	if key := loadPrimaryValidatorKey(validatorsPath); key != "" {
+		return key
+	}
+
+	return defaultLumeraKeyName
+}
+
+func detectValidatorMoniker() string {
+	if val := strings.TrimSpace(os.Getenv("MONIKER")); val != "" {
+		return val
+	}
+
+	if val := strings.TrimSpace(os.Getenv("HOSTNAME")); val != "" {
+		if moniker := normalizeMoniker(val); moniker != "" {
+			return moniker
+		}
+	}
+
+	host, err := os.Hostname()
+	if err != nil {
+		return ""
+	}
+	return normalizeMoniker(host)
+}
+
+func normalizeMoniker(host string) string {
+	host = strings.TrimSpace(host)
+	if host == "" {
+		return ""
+	}
+	host = strings.TrimPrefix(host, "lumera-")
+	if strings.HasPrefix(host, "supernova_validator_") {
+		return host
+	}
+	return ""
+}
+
+func loadValidatorKeyByMoniker(path, moniker string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	var vals []struct {
+		Name    string `json:"name"`
+		Moniker string `json:"moniker"`
+		KeyName string `json:"key_name"`
+	}
+	if err := json.Unmarshal(data, &vals); err != nil {
+		return ""
+	}
+	for _, v := range vals {
+		if v.Moniker == moniker || v.Name == moniker {
+			return v.KeyName
+		}
 	}
 	return ""
 }

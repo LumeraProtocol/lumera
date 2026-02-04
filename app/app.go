@@ -20,7 +20,6 @@ import (
 	_ "cosmossdk.io/x/feegrant/module" // import for side-effects
 	_ "cosmossdk.io/x/upgrade"         // import for side-effects
 	upgradekeeper "cosmossdk.io/x/upgrade/keeper"
-	upgradetypes "cosmossdk.io/x/upgrade/types"
 	abci "github.com/cometbft/cometbft/abci/types"
 	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	dbm "github.com/cosmos/cosmos-db"
@@ -360,7 +359,8 @@ func (app *App) setupUpgrades() {
 		panic(fmt.Sprintf("upgrade plan %q is scheduled at height %d but not registered in this binary", upgradeInfo.Name, upgradeInfo.Height))
 	}
 
-	if upgradeConfig.StoreUpgrade == nil {
+	useAdaptiveStoreUpgrades := upgrades.ShouldEnableStoreUpgradeManager(params.ChainID)
+	if upgradeConfig.StoreUpgrade == nil && !useAdaptiveStoreUpgrades {
 		app.Logger().Info("No store upgrades registered for pending plan", "name", upgradeInfo.Name)
 		return
 	}
@@ -370,8 +370,31 @@ func (app *App) setupUpgrades() {
 		return
 	}
 
-	app.SetStoreLoader(upgradetypes.UpgradeStoreLoader(upgradeInfo.Height, upgradeConfig.StoreUpgrade))
-	app.Logger().Info("Configured store loader for upgrade", "name", upgradeInfo.Name, "height", upgradeInfo.Height)
+	if useAdaptiveStoreUpgrades {
+		expectedStoreNames := upgrades.KVStoreNames(app.GetStoreKeys())
+		selection := upgrades.StoreLoaderForUpgrade(
+			upgradeInfo.Name,
+			upgradeInfo.Height,
+			upgradeConfig.StoreUpgrade,
+			expectedStoreNames,
+			app.Logger(),
+			true,
+		)
+		app.SetStoreLoader(selection.Loader)
+		app.Logger().Info(selection.LogMessage(), "name", upgradeInfo.Name, "height", upgradeInfo.Height)
+		return
+	}
+
+	selection := upgrades.StoreLoaderForUpgrade(
+		upgradeInfo.Name,
+		upgradeInfo.Height,
+		upgradeConfig.StoreUpgrade,
+		nil,
+		app.Logger(),
+		false,
+	)
+	app.SetStoreLoader(selection.Loader)
+	app.Logger().Info(selection.LogMessage(), "name", upgradeInfo.Name, "height", upgradeInfo.Height)
 }
 
 // LegacyAmino returns App's amino codec.

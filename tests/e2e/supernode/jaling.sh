@@ -8,6 +8,7 @@ CHAIN_ID="lumera-devnet-1"
 KEYRING_BACKEND="test"
 VALIDATOR_NUM=5
 VALIDATOR_CONTAINER="lumera-validator${VALIDATOR_NUM}"
+QUERY_CONTAINER="${QUERY_CONTAINER:-lumera-validator1}"
 SLEEP_FOR_JAIL=60
 SLEEP_FOR_UNJAIL=90
 
@@ -17,16 +18,16 @@ touch "$LOG_FILE"
 
 # Step 2: Setup Logging Function
 log() {
-    local msg="[$(date '+%Y-%m-%d %H:%M:%S')] $1"
-    echo "$msg" | tee -a "$LOG_FILE"
+	local msg="[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+	echo "$msg" | tee -a "$LOG_FILE"
 }
 
 log_cmd() {
-    local cmd_output
-    log "Executing: $1"
-    cmd_output=$(eval "$1" 2>&1)
-    echo "$cmd_output" | tee -a "$LOG_FILE"
-    echo "----------------------------------------" | tee -a "$LOG_FILE"
+	local cmd_output
+	log "Executing: $1"
+	cmd_output=$(eval "$1" 2>&1)
+	echo "$cmd_output" | tee -a "$LOG_FILE"
+	echo "----------------------------------------" | tee -a "$LOG_FILE"
 }
 
 log "Starting jail test for validator ${VALIDATOR_NUM}"
@@ -35,19 +36,19 @@ log "Starting jail test for validator ${VALIDATOR_NUM}"
 log "Step 3: Getting validator addresses..."
 
 VALIDATOR_ACCOUNT=$(docker exec "$VALIDATOR_CONTAINER" lumerad keys show validator${VALIDATOR_NUM}_key \
-    --keyring-backend "$KEYRING_BACKEND" -a)
+	--keyring-backend "$KEYRING_BACKEND" -a)
 log "Validator Account: $VALIDATOR_ACCOUNT"
 
 VALIDATOR_OPERATOR=$(docker exec "$VALIDATOR_CONTAINER" lumerad keys show validator${VALIDATOR_NUM}_key \
-    --keyring-backend "$KEYRING_BACKEND" --bech val -a)
+	--keyring-backend "$KEYRING_BACKEND" --bech val -a)
 log "Validator Operator: $VALIDATOR_OPERATOR"
 
 # Step 4: Check Initial Status
 log "Step 4: Checking initial validator status..."
-log_cmd "docker exec lumera-validator1 lumerad query staking validator $VALIDATOR_OPERATOR"
+log_cmd "docker exec ${QUERY_CONTAINER} lumerad query staking validator $VALIDATOR_OPERATOR"
 
 log "Checking initial supernode status..."
-log_cmd "docker exec lumera-validator1 lumerad query supernode get-supernode $VALIDATOR_OPERATOR"
+log_cmd "docker exec ${QUERY_CONTAINER} lumerad query supernode get-supernode $VALIDATOR_OPERATOR"
 
 # Step 5: Stop Validator to Force Jailing
 log "Step 5: Stopping validator container to force jailing..."
@@ -58,10 +59,10 @@ sleep "${SLEEP_FOR_JAIL}"
 
 # Step 6: Check Status After Jailing
 log "Step 6: Checking validator status after jailing..."
-log_cmd "docker exec lumera-validator1 lumerad query staking validator $VALIDATOR_OPERATOR"
+log_cmd "docker exec ${QUERY_CONTAINER} lumerad query staking validator $VALIDATOR_OPERATOR"
 
 log "Checking supernode status after jailing..."
-log_cmd "docker exec lumera-validator1 lumerad query supernode get-supernode $VALIDATOR_OPERATOR"
+log_cmd "docker exec ${QUERY_CONTAINER} lumerad query supernode get-supernode $VALIDATOR_OPERATOR"
 
 # Step 7: Restart Validator
 log "Step 7: Restarting validator container..."
@@ -87,10 +88,10 @@ sleep 10
 # Step 9: Final Status Check
 log "Step 9: Performing final status check..."
 log "Checking final validator status..."
-log_cmd "docker exec lumera-validator1 lumerad query staking validator $VALIDATOR_OPERATOR"
+log_cmd "docker exec ${QUERY_CONTAINER} lumerad query staking validator $VALIDATOR_OPERATOR"
 
 log "Checking final supernode status..."
-log_cmd "docker exec lumera-validator1 lumerad query supernode get-supernode $VALIDATOR_OPERATOR"
+log_cmd "docker exec ${QUERY_CONTAINER} lumerad query supernode get-supernode $VALIDATOR_OPERATOR"
 
 # Step 10: Complete
 log "Test completed successfully. All output has been saved to $LOG_FILE"

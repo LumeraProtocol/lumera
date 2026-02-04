@@ -21,6 +21,13 @@ var (
 	KeyConsecutiveWindowsToPostpone     = []byte("ConsecutiveWindowsToPostpone")
 	KeyKeepLastWindowEntries            = []byte("KeepLastWindowEntries")
 	KeyPeerPortPostponeThresholdPercent = []byte("PeerPortPostponeThresholdPercent")
+
+	KeyActionFinalizationSignatureFailureEvidencesPerWindow = []byte("ActionFinalizationSignatureFailureEvidencesPerWindow")
+	KeyActionFinalizationSignatureFailureConsecutiveWindows = []byte("ActionFinalizationSignatureFailureConsecutiveWindows")
+	KeyActionFinalizationNotInTop10EvidencesPerWindow       = []byte("ActionFinalizationNotInTop10EvidencesPerWindow")
+	KeyActionFinalizationNotInTop10ConsecutiveWindows       = []byte("ActionFinalizationNotInTop10ConsecutiveWindows")
+	KeyActionFinalizationRecoveryWindows                    = []byte("ActionFinalizationRecoveryWindows")
+	KeyActionFinalizationRecoveryMaxTotalBadEvidences       = []byte("ActionFinalizationRecoveryMaxTotalBadEvidences")
 )
 
 var (
@@ -35,6 +42,13 @@ var (
 	DefaultConsecutiveWindowsToPostpone     = uint32(1)
 	DefaultKeepLastWindowEntries            = uint64(200)
 	DefaultPeerPortPostponeThresholdPercent = uint32(100)
+
+	DefaultActionFinalizationSignatureFailureEvidencesPerWindow = uint32(1)
+	DefaultActionFinalizationSignatureFailureConsecutiveWindows = uint32(1)
+	DefaultActionFinalizationNotInTop10EvidencesPerWindow       = uint32(1)
+	DefaultActionFinalizationNotInTop10ConsecutiveWindows       = uint32(1)
+	DefaultActionFinalizationRecoveryWindows                    = uint32(1)
+	DefaultActionFinalizationRecoveryMaxTotalBadEvidences       = uint32(1)
 )
 
 // Params notes
@@ -47,6 +61,7 @@ var (
 // - consecutive_windows_to_postpone: consecutive windows of peer port CLOSED meeting threshold needed to postpone.
 // - peer_port_postpone_threshold_percent: percent of peers that must report CLOSED for port-based postponement (100 = unanimous).
 // - keep_last_window_entries: how many windows of window-scoped state to keep (pruning at window end).
+// - action_finalization_*: windowed postponement + recovery settings for action-finalization evidence types.
 
 func ParamKeyTable() paramtypes.KeyTable {
 	return paramtypes.NewKeyTable().RegisterParamSet(&Params{})
@@ -64,6 +79,12 @@ func NewParams(
 	consecutiveWindowsToPostpone uint32,
 	keepLastWindowEntries uint64,
 	peerPortPostponeThresholdPercent uint32,
+	actionFinalizationSignatureFailureEvidencesPerWindow uint32,
+	actionFinalizationSignatureFailureConsecutiveWindows uint32,
+	actionFinalizationNotInTop10EvidencesPerWindow uint32,
+	actionFinalizationNotInTop10ConsecutiveWindows uint32,
+	actionFinalizationRecoveryWindows uint32,
+	actionFinalizationRecoveryMaxTotalBadEvidences uint32,
 ) Params {
 	return Params{
 		ReportingWindowBlocks:            reportingWindowBlocks,
@@ -77,6 +98,13 @@ func NewParams(
 		ConsecutiveWindowsToPostpone:     consecutiveWindowsToPostpone,
 		KeepLastWindowEntries:            keepLastWindowEntries,
 		PeerPortPostponeThresholdPercent: peerPortPostponeThresholdPercent,
+
+		ActionFinalizationSignatureFailureEvidencesPerWindow: actionFinalizationSignatureFailureEvidencesPerWindow,
+		ActionFinalizationSignatureFailureConsecutiveWindows: actionFinalizationSignatureFailureConsecutiveWindows,
+		ActionFinalizationNotInTop10EvidencesPerWindow:       actionFinalizationNotInTop10EvidencesPerWindow,
+		ActionFinalizationNotInTop10ConsecutiveWindows:       actionFinalizationNotInTop10ConsecutiveWindows,
+		ActionFinalizationRecoveryWindows:                    actionFinalizationRecoveryWindows,
+		ActionFinalizationRecoveryMaxTotalBadEvidences:       actionFinalizationRecoveryMaxTotalBadEvidences,
 	}
 }
 
@@ -93,6 +121,12 @@ func DefaultParams() Params {
 		DefaultConsecutiveWindowsToPostpone,
 		DefaultKeepLastWindowEntries,
 		DefaultPeerPortPostponeThresholdPercent,
+		DefaultActionFinalizationSignatureFailureEvidencesPerWindow,
+		DefaultActionFinalizationSignatureFailureConsecutiveWindows,
+		DefaultActionFinalizationNotInTop10EvidencesPerWindow,
+		DefaultActionFinalizationNotInTop10ConsecutiveWindows,
+		DefaultActionFinalizationRecoveryWindows,
+		DefaultActionFinalizationRecoveryMaxTotalBadEvidences,
 	)
 }
 
@@ -121,6 +155,24 @@ func (p Params) WithDefaults() Params {
 	if p.PeerPortPostponeThresholdPercent == 0 {
 		p.PeerPortPostponeThresholdPercent = DefaultPeerPortPostponeThresholdPercent
 	}
+	if p.ActionFinalizationSignatureFailureEvidencesPerWindow == 0 {
+		p.ActionFinalizationSignatureFailureEvidencesPerWindow = DefaultActionFinalizationSignatureFailureEvidencesPerWindow
+	}
+	if p.ActionFinalizationSignatureFailureConsecutiveWindows == 0 {
+		p.ActionFinalizationSignatureFailureConsecutiveWindows = DefaultActionFinalizationSignatureFailureConsecutiveWindows
+	}
+	if p.ActionFinalizationNotInTop10EvidencesPerWindow == 0 {
+		p.ActionFinalizationNotInTop10EvidencesPerWindow = DefaultActionFinalizationNotInTop10EvidencesPerWindow
+	}
+	if p.ActionFinalizationNotInTop10ConsecutiveWindows == 0 {
+		p.ActionFinalizationNotInTop10ConsecutiveWindows = DefaultActionFinalizationNotInTop10ConsecutiveWindows
+	}
+	if p.ActionFinalizationRecoveryWindows == 0 {
+		p.ActionFinalizationRecoveryWindows = DefaultActionFinalizationRecoveryWindows
+	}
+	if p.ActionFinalizationRecoveryMaxTotalBadEvidences == 0 {
+		p.ActionFinalizationRecoveryMaxTotalBadEvidences = DefaultActionFinalizationRecoveryMaxTotalBadEvidences
+	}
 	return p
 }
 
@@ -137,6 +189,13 @@ func (p *Params) ParamSetPairs() paramtypes.ParamSetPairs {
 		paramtypes.NewParamSetPair(KeyConsecutiveWindowsToPostpone, &p.ConsecutiveWindowsToPostpone, validateUint32),
 		paramtypes.NewParamSetPair(KeyKeepLastWindowEntries, &p.KeepLastWindowEntries, validateUint64),
 		paramtypes.NewParamSetPair(KeyPeerPortPostponeThresholdPercent, &p.PeerPortPostponeThresholdPercent, validateUint32),
+
+		paramtypes.NewParamSetPair(KeyActionFinalizationSignatureFailureEvidencesPerWindow, &p.ActionFinalizationSignatureFailureEvidencesPerWindow, validateUint32),
+		paramtypes.NewParamSetPair(KeyActionFinalizationSignatureFailureConsecutiveWindows, &p.ActionFinalizationSignatureFailureConsecutiveWindows, validateUint32),
+		paramtypes.NewParamSetPair(KeyActionFinalizationNotInTop10EvidencesPerWindow, &p.ActionFinalizationNotInTop10EvidencesPerWindow, validateUint32),
+		paramtypes.NewParamSetPair(KeyActionFinalizationNotInTop10ConsecutiveWindows, &p.ActionFinalizationNotInTop10ConsecutiveWindows, validateUint32),
+		paramtypes.NewParamSetPair(KeyActionFinalizationRecoveryWindows, &p.ActionFinalizationRecoveryWindows, validateUint32),
+		paramtypes.NewParamSetPair(KeyActionFinalizationRecoveryMaxTotalBadEvidences, &p.ActionFinalizationRecoveryMaxTotalBadEvidences, validateUint32),
 	}
 }
 
@@ -172,6 +231,24 @@ func (p Params) Validate() error {
 	}
 	if p.PeerPortPostponeThresholdPercent == 0 || p.PeerPortPostponeThresholdPercent > 100 {
 		return fmt.Errorf("peer_port_postpone_threshold_percent must be within 1..100")
+	}
+	if p.ActionFinalizationSignatureFailureEvidencesPerWindow == 0 {
+		return fmt.Errorf("action_finalization_signature_failure_evidences_per_window must be > 0")
+	}
+	if p.ActionFinalizationSignatureFailureConsecutiveWindows == 0 {
+		return fmt.Errorf("action_finalization_signature_failure_consecutive_windows must be > 0")
+	}
+	if p.ActionFinalizationNotInTop10EvidencesPerWindow == 0 {
+		return fmt.Errorf("action_finalization_not_in_top_10_evidences_per_window must be > 0")
+	}
+	if p.ActionFinalizationNotInTop10ConsecutiveWindows == 0 {
+		return fmt.Errorf("action_finalization_not_in_top_10_consecutive_windows must be > 0")
+	}
+	if p.ActionFinalizationRecoveryWindows == 0 {
+		return fmt.Errorf("action_finalization_recovery_windows must be > 0")
+	}
+	if p.ActionFinalizationRecoveryMaxTotalBadEvidences == 0 {
+		return fmt.Errorf("action_finalization_recovery_max_total_bad_evidences must be > 0")
 	}
 
 	ports := append([]uint32(nil), p.RequiredOpenPorts...)

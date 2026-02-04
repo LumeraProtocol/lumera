@@ -10,6 +10,11 @@ import (
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
+const (
+	postponeReasonActionFinalizationSignatureFailure = "audit_action_finalization_signature_failure"
+	postponeReasonActionFinalizationNotInTop10       = "audit_action_finalization_not_in_top_10"
+)
+
 // EnforceWindowEnd evaluates the completed window and updates supernode states accordingly.
 // It does not re-check peer assignment gating; that must be enforced at MsgSubmitAuditReport time.
 func (k Keeper) EnforceWindowEnd(ctx sdk.Context, windowID uint64, params types.Params) error {
@@ -30,6 +35,9 @@ func (k Keeper) EnforceWindowEnd(ctx sdk.Context, windowID uint64, params types.
 			continue
 		}
 
+		// Avoid stale action-finalization postponement state if the supernode is ACTIVE.
+		k.clearActionFinalizationPostponedAtWindowID(ctx, sn.SupernodeAccount)
+
 		shouldPostpone, reason, err := k.shouldPostponeAtWindowEnd(ctx, sn.SupernodeAccount, windowID, params)
 		if err != nil {
 			return err
@@ -40,6 +48,12 @@ func (k Keeper) EnforceWindowEnd(ctx sdk.Context, windowID uint64, params types.
 
 		if err := k.setSupernodePostponed(ctx, sn, reason); err != nil {
 			return err
+		}
+		switch reason {
+		case postponeReasonActionFinalizationSignatureFailure, postponeReasonActionFinalizationNotInTop10:
+			k.setActionFinalizationPostponedAtWindowID(ctx, sn.SupernodeAccount, windowID)
+		default:
+			k.clearActionFinalizationPostponedAtWindowID(ctx, sn.SupernodeAccount)
 		}
 	}
 
@@ -60,12 +74,18 @@ func (k Keeper) EnforceWindowEnd(ctx sdk.Context, windowID uint64, params types.
 		if err := k.recoverSupernodeActive(ctx, sn); err != nil {
 			return err
 		}
+		k.clearActionFinalizationPostponedAtWindowID(ctx, sn.SupernodeAccount)
 	}
 
 	return nil
 }
 
 func (k Keeper) shouldPostponeAtWindowEnd(ctx sdk.Context, supernodeAccount string, windowID uint64, params types.Params) (bool, string, error) {
+	// Action finalization evidence-based postponement.
+	if shouldPostpone, reason := k.shouldPostponeForActionFinalizationEvidence(ctx, supernodeAccount, windowID, params); shouldPostpone {
+		return true, reason, nil
+	}
+
 	// Missing-report based postponement.
 	consecutive := params.ConsecutiveWindowsToPostpone
 	if consecutive == 0 {
@@ -115,6 +135,12 @@ func (k Keeper) shouldPostponeAtWindowEnd(ctx sdk.Context, supernodeAccount stri
 }
 
 func (k Keeper) shouldRecoverAtWindowEnd(ctx sdk.Context, supernodeAccount string, windowID uint64, params types.Params) (bool, error) {
+	// If the supernode was postponed due to action-finalization evidence, it recovers using the
+	// action-finalization recovery rules (not the host/peer-port recovery rules).
+	if postponedAtWindowID, ok := k.getActionFinalizationPostponedAtWindowID(ctx, supernodeAccount); ok {
+		return k.shouldRecoverFromActionFinalizationPostponement(ctx, supernodeAccount, windowID, postponedAtWindowID, params), nil
+	}
+
 	// Need one compliant self report.
 	selfCompliant, err := k.selfHostCompliant(ctx, supernodeAccount, windowID, params)
 	if err != nil || !selfCompliant {
@@ -169,6 +195,94 @@ func (k Keeper) shouldRecoverAtWindowEnd(ctx sdk.Context, supernodeAccount strin
 	}
 
 	return false, nil
+}
+
+func (k Keeper) shouldPostponeForActionFinalizationEvidence(ctx sdk.Context, supernodeAccount string, windowID uint64, params types.Params) (bool, string) {
+	if k.evidenceMeetsConsecutiveWindowsThreshold(
+		ctx,
+		supernodeAccount,
+		windowID,
+		types.EvidenceType_EVIDENCE_TYPE_ACTION_FINALIZATION_SIGNATURE_FAILURE,
+		params.ActionFinalizationSignatureFailureEvidencesPerWindow,
+		params.ActionFinalizationSignatureFailureConsecutiveWindows,
+	) {
+		return true, postponeReasonActionFinalizationSignatureFailure
+	}
+
+	if k.evidenceMeetsConsecutiveWindowsThreshold(
+		ctx,
+		supernodeAccount,
+		windowID,
+		types.EvidenceType_EVIDENCE_TYPE_ACTION_FINALIZATION_NOT_IN_TOP_10,
+		params.ActionFinalizationNotInTop10EvidencesPerWindow,
+		params.ActionFinalizationNotInTop10ConsecutiveWindows,
+	) {
+		return true, postponeReasonActionFinalizationNotInTop10
+	}
+
+	return false, ""
+}
+
+func (k Keeper) evidenceMeetsConsecutiveWindowsThreshold(
+	ctx sdk.Context,
+	supernodeAccount string,
+	windowID uint64,
+	evidenceType types.EvidenceType,
+	minEvidencesPerWindow uint32,
+	consecutiveWindows uint32,
+) bool {
+	if minEvidencesPerWindow == 0 || consecutiveWindows == 0 {
+		return false
+	}
+	if consecutiveWindows > uint32(windowID+1) {
+		// Not enough history on-chain to satisfy the consecutive rule.
+		return false
+	}
+
+	streak := uint32(0)
+	for offset := uint32(0); offset < consecutiveWindows; offset++ {
+		w := windowID - uint64(offset)
+		if k.getEvidenceWindowCount(ctx, w, supernodeAccount, evidenceType) < uint64(minEvidencesPerWindow) {
+			break
+		}
+		streak++
+	}
+	return streak == consecutiveWindows
+}
+
+func (k Keeper) shouldRecoverFromActionFinalizationPostponement(
+	ctx sdk.Context,
+	supernodeAccount string,
+	windowID uint64,
+	postponedAtWindowID uint64,
+	params types.Params,
+) bool {
+	recoveryWindows := params.ActionFinalizationRecoveryWindows
+	if recoveryWindows == 0 {
+		recoveryWindows = 1
+	}
+	if windowID < postponedAtWindowID+uint64(recoveryWindows) {
+		return false
+	}
+
+	var startWindowID uint64
+	if windowID+1 > uint64(recoveryWindows) {
+		startWindowID = windowID + 1 - uint64(recoveryWindows)
+	} else {
+		startWindowID = 0
+	}
+
+	totalBad := uint64(0)
+	for w := startWindowID; w <= windowID; w++ {
+		totalBad += k.getEvidenceWindowCount(ctx, w, supernodeAccount, types.EvidenceType_EVIDENCE_TYPE_ACTION_FINALIZATION_SIGNATURE_FAILURE)
+		totalBad += k.getEvidenceWindowCount(ctx, w, supernodeAccount, types.EvidenceType_EVIDENCE_TYPE_ACTION_FINALIZATION_NOT_IN_TOP_10)
+	}
+
+	maxTotal := params.ActionFinalizationRecoveryMaxTotalBadEvidences
+	if maxTotal == 0 {
+		maxTotal = 1
+	}
+	return totalBad < uint64(maxTotal)
 }
 
 func (k Keeper) selfHostViolatesMinimums(ctx sdk.Context, supernodeAccount string, windowID uint64, params types.Params) (bool, error) {

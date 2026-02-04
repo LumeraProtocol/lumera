@@ -66,6 +66,16 @@ func (k Keeper) CreateEvidence(
 	}
 
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	if evidenceType == types.EvidenceType_EVIDENCE_TYPE_ACTION_EXPIRED ||
+		evidenceType == types.EvidenceType_EVIDENCE_TYPE_ACTION_FINALIZATION_SIGNATURE_FAILURE ||
+		evidenceType == types.EvidenceType_EVIDENCE_TYPE_ACTION_FINALIZATION_NOT_IN_TOP_10 {
+		params := k.GetParams(ctx)
+		ws, err := k.getCurrentWindowState(sdkCtx, params)
+		if err != nil {
+			return 0, err
+		}
+		k.incrementEvidenceWindowCount(sdkCtx, ws.WindowID, subjectAddress, evidenceType)
+	}
 	reportedHeight := uint64(sdkCtx.BlockHeight())
 
 	evidenceID := k.GetNextEvidenceID(sdkCtx)

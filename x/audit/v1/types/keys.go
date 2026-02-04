@@ -64,10 +64,20 @@ var (
 	// - EvidenceKey: "ev/r/" + u64be(evidence_id) -> Evidence bytes
 	// - EvidenceBySubjectIndexKey: "ev/s/" + subject_address + "/" + u64be(evidence_id) -> empty
 	// - EvidenceByActionIndexKey:  "ev/a/" + action_id + 0x00 + u64be(evidence_id) -> empty
+	//
+	// Evidence window counts (window-scoped aggregates used for postponement/recovery):
+	// - EvidenceWindowCountKey: "evw/" + u64be(window_id) + "/" + subject_address + "/" + u32be(evidence_type) -> 8 bytes u64be(count)
+	//
+	// Action finalization postponement state:
+	// - ActionFinalizationPostponementKey: "ap/af/" + supernode_account -> 8 bytes u64be(postponed_at_window_id)
 	nextEvidenceIDKey        = []byte("ev/next_id")
 	evidenceRecordPrefix     = []byte("ev/r/")
 	evidenceBySubjectPrefix  = []byte("ev/s/")
 	evidenceByActionIDPrefix = []byte("ev/a/")
+
+	evidenceWindowCountPrefix = []byte("evw/")
+
+	actionFinalizationPostponementPrefix = []byte("ap/af/")
 )
 
 // WindowSnapshotKey returns the store key for the WindowSnapshot identified by windowID.
@@ -217,4 +227,30 @@ func EvidenceByActionIndexPrefix(actionID string) []byte {
 	key = append(key, actionID...)
 	key = append(key, 0) // delimiter
 	return key
+}
+
+func EvidenceWindowCountKey(windowID uint64, subjectAddress string, evidenceType EvidenceType) []byte {
+	key := make([]byte, 0, len(evidenceWindowCountPrefix)+8+1+len(subjectAddress)+1+4) // "evw/" + u64be(window_id) + "/" + subject + "/" + u32be(evidence_type)
+	key = append(key, evidenceWindowCountPrefix...)
+	key = binary.BigEndian.AppendUint64(key, windowID)
+	key = append(key, '/')
+	key = append(key, subjectAddress...)
+	key = append(key, '/')
+	key = binary.BigEndian.AppendUint32(key, uint32(evidenceType))
+	return key
+}
+
+func EvidenceWindowCountPrefix() []byte {
+	return evidenceWindowCountPrefix
+}
+
+func ActionFinalizationPostponementKey(supernodeAccount string) []byte {
+	key := make([]byte, 0, len(actionFinalizationPostponementPrefix)+len(supernodeAccount)) // "ap/af/" + supernode
+	key = append(key, actionFinalizationPostponementPrefix...)
+	key = append(key, supernodeAccount...)
+	return key
+}
+
+func ActionFinalizationPostponementPrefix() []byte {
+	return actionFinalizationPostponementPrefix
 }

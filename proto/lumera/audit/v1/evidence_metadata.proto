@@ -6,23 +6,21 @@ import "cosmos_proto/cosmos.proto";
 
 option go_package = "x/audit/v1/types";
 
-// ExpirationEvidenceMetadata is metadata for evidence about an action expiring.
-message ExpirationEvidenceMetadata {
-  // expiration_height is the height at which the action expired (if known).
-  uint64 expiration_height = 1;
-
-  // reason is optional human-readable context.
-  string reason = 2;
+// ActionExpiredEvidenceMetadata is metadata for evidence about an action expiring.
+message ActionExpiredEvidenceMetadata {
+  // top_10_validator_addresses is the expected validator set for the action's block height.
+  repeated string top_10_validator_addresses = 1 [(cosmos_proto.scalar) = "cosmos.ValidatorAddressString"];
 }
 
-// FinalizationEvidenceMetadata is metadata for evidence about finalization behavior.
-message FinalizationEvidenceMetadata {
-  // attempted_finalizer_address is the address that attempted finalization.
-  string attempted_finalizer_address = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+// ActionFinalizationSignatureFailureEvidenceMetadata is metadata for evidence about an action finalization
+// rejected due to invalid signature / signature-derived data.
+message ActionFinalizationSignatureFailureEvidenceMetadata {
+  repeated string top_10_validator_addresses = 1 [(cosmos_proto.scalar) = "cosmos.ValidatorAddressString"];
+}
 
-  // expected_finalizer_addresses is optional (if there is a known set of expected finalizers).
-  repeated string expected_finalizer_addresses = 2 [(cosmos_proto.scalar) = "cosmos.AddressString"];
-
-  // reason is optional human-readable context.
-  string reason = 3;
+// ActionFinalizationNotInTop10EvidenceMetadata is metadata for evidence about an action finalization
+// rejected because the attempted finalizer is not in the top-10 supernodes.
+message ActionFinalizationNotInTop10EvidenceMetadata {
+  // top_10_validator_addresses is the expected validator set for the action's block height.
+  repeated string top_10_validator_addresses = 1 [(cosmos_proto.scalar) = "cosmos.ValidatorAddressString"];
 }

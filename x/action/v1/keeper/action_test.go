@@ -312,10 +312,15 @@ func (suite *KeeperTestSuite) TestFinalizeAction() {
 					call := suite.mockAuditKeeper.CreateCalls[len(suite.mockAuditKeeper.CreateCalls)-1]
 					suite.Equal(tc.evidenceType, call.EvidenceType)
 
-					if tc.evidenceType == audittypes.EvidenceType_EVIDENCE_TYPE_ACTION_FINALIZATION_NOT_IN_TOP_10 {
-						var meta audittypes.FinalizationEvidenceMetadata
+					if tc.evidenceType == audittypes.EvidenceType_EVIDENCE_TYPE_ACTION_FINALIZATION_SIGNATURE_FAILURE {
+						var meta audittypes.ActionFinalizationSignatureFailureEvidenceMetadata
 						suite.Require().NoError(json.Unmarshal([]byte(call.MetadataJSON), &meta))
-						suite.NotEmpty(meta.ExpectedFinalizerAddresses)
+						suite.NotEmpty(meta.Top_10ValidatorAddresses)
+					}
+					if tc.evidenceType == audittypes.EvidenceType_EVIDENCE_TYPE_ACTION_FINALIZATION_NOT_IN_TOP_10 {
+						var meta audittypes.ActionFinalizationNotInTop10EvidenceMetadata
+						suite.Require().NoError(json.Unmarshal([]byte(call.MetadataJSON), &meta))
+						suite.NotEmpty(meta.Top_10ValidatorAddresses)
 					}
 				} else {
 					suite.Equal(startEvidenceCalls, len(suite.mockAuditKeeper.CreateCalls))

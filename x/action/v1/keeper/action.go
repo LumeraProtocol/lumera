@@ -194,6 +194,9 @@ func (k *Keeper) FinalizeAction(ctx sdk.Context, actionID string, superNodeAccou
 		return errors.Wrap(actiontypes.ErrUnauthorizedSN, rejectReason)
 	}
 
+	// Make the top-10 validator addresses available for downstream handler logic (e.g. signature failure evidence metadata).
+	ctx = ctx.WithValue(ctxKeyTop10ValidatorAddresses{}, expectedFinalizerAddresses)
+
 	// Get the appropriate handler for this action type
 	handler, err := k.actionRegistry.GetHandler(existingAction.ActionType)
 	if err != nil {
@@ -557,7 +560,7 @@ func (k *Keeper) checkFinalizerEligibility(ctx sdk.Context, action *actiontypes.
 		return false, "", nil, errors.Wrapf(sdkerrors.ErrInvalidRequest, "failed to query top supernodes: %s", err)
 	}
 
-	expectedFinalizerAddresses := make([]string, 0, len(topSuperNodesResp.Supernodes))
+	top10ValidatorAddresses := make([]string, 0, len(topSuperNodesResp.Supernodes))
 
 	// Check if superNode is in the top-10 ACTIVE list
 	isInTop10 := false
@@ -568,7 +571,7 @@ func (k *Keeper) checkFinalizerEligibility(ctx sdk.Context, action *actiontypes.
 		"top_supernodes_count", len(topSuperNodesResp.Supernodes))
 
 	for _, sn := range topSuperNodesResp.Supernodes {
-		expectedFinalizerAddresses = append(expectedFinalizerAddresses, sn.SupernodeAccount)
+		top10ValidatorAddresses = append(top10ValidatorAddresses, sn.ValidatorAddress)
 
 		k.Logger().Debug("Comparing supernodes",
 			"validator_address", sn.ValidatorAddress,
@@ -576,7 +579,6 @@ func (k *Keeper) checkFinalizerEligibility(ctx sdk.Context, action *actiontypes.
 
 		if sn.SupernodeAccount == superNodeAccount {
 			isInTop10 = true
-			break
 		}
 	}
 
@@ -585,10 +587,10 @@ func (k *Keeper) checkFinalizerEligibility(ctx sdk.Context, action *actiontypes.
 			"supernode %s is not in the top-10 ACTIVE supernodes for block height %d",
 			superNodeAccount,
 			action.BlockHeight,
-		), expectedFinalizerAddresses, nil
+		), top10ValidatorAddresses, nil
 	}
 
-	return true, "", expectedFinalizerAddresses, nil
+	return true, "", top10ValidatorAddresses, nil
 }
 
 // DistributeFees splits fees among SuperNodes and optionally a foundation address
@@ -787,6 +789,8 @@ func (k *Keeper) processExpiredActionsInState(ctx sdk.Context, state actiontypes
 				)
 				return false // Continue iteration
 			}
+
+			k.RecordActionExpired(ctx, action)
 
 			// Increment counter
 			*expiredCount++

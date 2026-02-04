@@ -6,8 +6,23 @@ import (
 
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	audittypes "github.com/LumeraProtocol/lumera/x/audit/v1/types"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
+
+type ctxKeyTop10ValidatorAddresses struct{}
+
+func top10ValidatorAddressesFromContext(ctx sdk.Context) []string {
+	v := ctx.Value(ctxKeyTop10ValidatorAddresses{})
+	if v == nil {
+		return nil
+	}
+	addrs, ok := v.([]string)
+	if !ok {
+		return nil
+	}
+	return addrs
+}
 
 func (k *Keeper) recordFinalizationEvidence(
 	ctx sdk.Context,
@@ -30,13 +45,26 @@ func (k *Keeper) recordFinalizationEvidence(
 		return 0, fmt.Errorf("module reporter address: %w", err)
 	}
 
-	metaJSON, err := json.Marshal(audittypes.FinalizationEvidenceMetadata{
-		AttemptedFinalizerAddress:  attemptedFinalizerAddress,
-		ExpectedFinalizerAddresses: expectedFinalizerAddresses,
-		Reason:                     reason,
-	})
-	if err != nil {
-		return 0, fmt.Errorf("marshal evidence metadata: %w", err)
+	var metadataJSON string
+	switch evidenceType {
+	case audittypes.EvidenceType_EVIDENCE_TYPE_ACTION_FINALIZATION_SIGNATURE_FAILURE:
+		metaJSON, err := json.Marshal(audittypes.ActionFinalizationSignatureFailureEvidenceMetadata{
+			Top_10ValidatorAddresses: expectedFinalizerAddresses,
+		})
+		if err != nil {
+			return 0, fmt.Errorf("marshal evidence metadata: %w", err)
+		}
+		metadataJSON = string(metaJSON)
+	case audittypes.EvidenceType_EVIDENCE_TYPE_ACTION_FINALIZATION_NOT_IN_TOP_10:
+		metaJSON, err := json.Marshal(audittypes.ActionFinalizationNotInTop10EvidenceMetadata{
+			Top_10ValidatorAddresses: expectedFinalizerAddresses,
+		})
+		if err != nil {
+			return 0, fmt.Errorf("marshal evidence metadata: %w", err)
+		}
+		metadataJSON = string(metaJSON)
+	default:
+		return 0, fmt.Errorf("unsupported finalization evidence type: %s", evidenceType.String())
 	}
 
 	return k.auditKeeper.CreateEvidence(
@@ -45,7 +73,7 @@ func (k *Keeper) recordFinalizationEvidence(
 		subjectAddress,
 		actionID,
 		evidenceType,
-		string(metaJSON),
+		metadataJSON,
 	)
 }
 
@@ -108,12 +136,13 @@ func (k *Keeper) RecordFinalizationSignatureFailure(
 	attemptedFinalizerAddress string,
 	reason string,
 ) uint64 {
+	top10ValidatorAddresses := top10ValidatorAddressesFromContext(ctx)
 	return k.recordFinalizationRejection(
 		ctx,
 		action,
 		attemptedFinalizerAddress,
 		reason,
-		nil,
+		top10ValidatorAddresses,
 		audittypes.EvidenceType_EVIDENCE_TYPE_ACTION_FINALIZATION_SIGNATURE_FAILURE,
 	)
 }
@@ -133,4 +162,66 @@ func (k *Keeper) RecordFinalizationNotInTop10(
 		expectedFinalizerAddresses,
 		audittypes.EvidenceType_EVIDENCE_TYPE_ACTION_FINALIZATION_NOT_IN_TOP_10,
 	)
+}
+
+func (k *Keeper) RecordActionExpired(ctx sdk.Context, action *actiontypes.Action) {
+	if k.auditKeeper == nil || action == nil {
+		return
+	}
+	if action.ActionID == "" {
+		k.Logger().Error("failed to record action expiration evidence: action_id is required")
+		return
+	}
+
+	reporterAddress, err := k.addressCodec.BytesToString(actiontypes.ModuleAccountAddress)
+	if err != nil {
+		k.Logger().Error("failed to record action expiration evidence: module reporter address", "err", err)
+		return
+	}
+
+	topSuperNodesReq := &sntypes.QueryGetTopSuperNodesForBlockRequest{
+		BlockHeight: int32(action.BlockHeight),
+		Limit:       10,
+		State:       sntypes.SuperNodeStateActive.String(),
+	}
+	topSuperNodesResp, err := k.supernodeQueryServer.GetTopSuperNodesForBlock(ctx, topSuperNodesReq)
+	if err != nil {
+		k.Logger().Error("failed to record action expiration evidence: query top supernodes", "action_id", action.ActionID, "err", err)
+		return
+	}
+
+	top10ValidatorAddresses := make([]string, 0, len(topSuperNodesResp.Supernodes))
+	for _, sn := range topSuperNodesResp.Supernodes {
+		top10ValidatorAddresses = append(top10ValidatorAddresses, sn.ValidatorAddress)
+	}
+
+	metaJSON, err := json.Marshal(audittypes.ActionExpiredEvidenceMetadata{
+		Top_10ValidatorAddresses: top10ValidatorAddresses,
+	})
+	if err != nil {
+		k.Logger().Error("failed to record action expiration evidence: marshal evidence metadata", "action_id", action.ActionID, "err", err)
+		return
+	}
+
+	metadataJSON := string(metaJSON)
+	for _, sn := range topSuperNodesResp.Supernodes {
+		if sn.SupernodeAccount == "" {
+			continue
+		}
+		if _, err := k.auditKeeper.CreateEvidence(
+			ctx,
+			reporterAddress,
+			sn.SupernodeAccount,
+			action.ActionID,
+			audittypes.EvidenceType_EVIDENCE_TYPE_ACTION_EXPIRED,
+			metadataJSON,
+		); err != nil {
+			k.Logger().Error(
+				"failed to record action expiration evidence",
+				"action_id", action.ActionID,
+				"subject", sn.SupernodeAccount,
+				"err", err,
+			)
+		}
+	}
 }

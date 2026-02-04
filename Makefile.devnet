@@ -109,7 +109,7 @@ devnet-build-default: _check-devnet-default-cfg
 		EXTERNAL_GENESIS_FILE="$$(realpath $(DEFAULT_GENESIS_FILE))" \
 		EXTERNAL_CLAIMS_FILE="$$(realpath $(DEFAULT_CLAIMS_FILE))"
 
-.PHONY: devnet-build-191 _check-devnet-191-cfg
+.PHONY: devnet-build-172 _check-devnet-172-cfg devnet-build-191 _check-devnet-191-cfg
 devnet-build-172:
 	@$(MAKE) devnet-build \
 		DEVNET_BUILD_LUMERA=0 \

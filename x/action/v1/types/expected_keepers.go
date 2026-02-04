@@ -6,6 +6,7 @@ import (
 	"context"
 
 	"cosmossdk.io/core/address"
+	audittypes "github.com/LumeraProtocol/lumera/x/audit/v1/types"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
@@ -53,6 +54,17 @@ type SupernodeQueryServer interface {
 
 type DistributionKeeper interface {
 	FundCommunityPool(ctx context.Context, amount sdk.Coins, sender sdk.AccAddress) error
+}
+
+type AuditKeeper interface {
+	CreateEvidence(
+		ctx context.Context,
+		reporterAddress string,
+		subjectAddress string,
+		actionID string,
+		evidenceType audittypes.EvidenceType,
+		metadataJSON string,
+	) (uint64, error)
 }
 
 // ParamSubspace defines the expected Subspace interface for parameters.

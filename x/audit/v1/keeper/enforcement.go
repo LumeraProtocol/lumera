@@ -97,7 +97,7 @@ func (k Keeper) shouldPostponeAtWindowEnd(ctx sdk.Context, supernodeAccount stri
 		streak := uint32(0)
 		for offset := uint32(0); offset < consecutive; offset++ {
 			w := windowID - uint64(offset)
-			closed, err := k.peersUnanimousPortState(ctx, supernodeAccount, w, portIndex, types.PortState_PORT_STATE_CLOSED)
+			closed, err := k.peersPortStateMeetsThreshold(ctx, supernodeAccount, w, portIndex, types.PortState_PORT_STATE_CLOSED, params.PeerPortPostponeThresholdPercent)
 			if err != nil {
 				return false, "", err
 			}
@@ -240,7 +240,7 @@ func compliesMinFree(usagePercent float64, minFreePercent uint32) bool {
 	return free >= float64(minFreePercent)
 }
 
-func (k Keeper) peersUnanimousPortState(ctx sdk.Context, target string, windowID uint64, portIndex int, desired types.PortState) (bool, error) {
+func (k Keeper) peersPortStateMeetsThreshold(ctx sdk.Context, target string, windowID uint64, portIndex int, desired types.PortState, thresholdPercent uint32) (bool, error) {
 	peers, err := k.peerReportersForTargetWindow(ctx, target, windowID)
 	if err != nil {
 		return false, err
@@ -248,13 +248,15 @@ func (k Keeper) peersUnanimousPortState(ctx sdk.Context, target string, windowID
 	if len(peers) == 0 {
 		return false, nil
 	}
-	return k.peersUnanimousPortStateWithPeers(ctx, target, windowID, portIndex, desired, peers)
+	return k.peersPortStateMeetsThresholdWithPeers(ctx, target, windowID, portIndex, desired, thresholdPercent, peers)
 }
 
-func (k Keeper) peersUnanimousPortStateWithPeers(ctx sdk.Context, target string, windowID uint64, portIndex int, desired types.PortState, peers []string) (bool, error) {
+func (k Keeper) peersPortStateMeetsThresholdWithPeers(ctx sdk.Context, target string, windowID uint64, portIndex int, desired types.PortState, thresholdPercent uint32, peers []string) (bool, error) {
 	if len(peers) == 0 {
 		return false, nil
 	}
+
+	matches := uint64(0)
 	for _, reporter := range peers {
 		r, found := k.GetReport(ctx, windowID, reporter)
 		if !found {
@@ -274,11 +276,14 @@ func (k Keeper) peersUnanimousPortStateWithPeers(ctx sdk.Context, target string,
 		if portIndex < 0 || portIndex >= len(obs.PortStates) {
 			return false, nil
 		}
-		if obs.PortStates[portIndex] != desired {
-			return false, nil
+		if obs.PortStates[portIndex] == desired {
+			matches++
 		}
 	}
-	return true, nil
+
+	// Require a minimum share of matching peer observations.
+	total := uint64(len(peers))
+	return matches*100 >= uint64(thresholdPercent)*total, nil
 }
 
 func (k Keeper) peerReportersForTargetWindow(ctx sdk.Context, target string, windowID uint64) ([]string, error) {

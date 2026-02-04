@@ -8,8 +8,8 @@ import (
 
 	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
 
-	"go.uber.org/mock/gomock"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/mock/gomock"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
@@ -30,6 +30,7 @@ type KeeperTestSuite struct {
 	keeper          actionkeeper.Keeper
 	mockKeeper      *supernodemocks.MockSupernodeKeeper
 	mockQueryServer *supernodemocks.MockQueryServer
+	mockAuditKeeper *keepertest.MockAuditKeeper
 }
 
 // KeeperTestSuite is a test suite to test keeper functions
@@ -109,6 +110,9 @@ func (suite *KeeperTestSuite) SetupTest() {
 
 	suite.mockQueryServer, ok = suite.keeper.GetSupernodeQueryServer().(*supernodemocks.MockQueryServer)
 	suite.Require().True(ok, "Failed to get MockQueryServer from Keeper")
+
+	suite.mockAuditKeeper, ok = suite.keeper.GetAuditKeeper().(*keepertest.MockAuditKeeper)
+	suite.Require().True(ok, "Failed to get MockAuditKeeper from Keeper")
 
 	// Set context with block height for consistent testing
 	suite.ctx = suite.ctx.WithBlockHeight(1)

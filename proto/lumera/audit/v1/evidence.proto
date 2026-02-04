@@ -8,8 +8,13 @@ option go_package = "x/audit/v1/types";
 
 enum EvidenceType {
   EVIDENCE_TYPE_UNSPECIFIED = 0;
-  EVIDENCE_TYPE_ACTION_WRONG_FINALIZATION = 1;
-  EVIDENCE_TYPE_ACTION_EXPIRED = 2;
+  // action finalization rejected due to an invalid signature / signature-derived data.
+  EVIDENCE_TYPE_ACTION_FINALIZATION_SIGNATURE_FAILURE = 1;
+
+  // action finalization rejected because the attempted finalizer is not in the top-10 supernodes.
+  EVIDENCE_TYPE_ACTION_FINALIZATION_NOT_IN_TOP_10 = 2;
+
+  EVIDENCE_TYPE_ACTION_EXPIRED = 3;
 }
 
 // Evidence is a stable outer record that stores evidence about an audited subject.
@@ -36,4 +41,3 @@ message Evidence {
   // reported_height is the block height when the evidence was submitted.
   uint64 reported_height = 7;
 }
-

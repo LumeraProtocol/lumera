@@ -55,6 +55,7 @@ Key fields:
 - `min_mem_free_percent`
 - `min_disk_free_percent`
 - `consecutive_windows_to_postpone`
+- `peer_port_postpone_threshold_percent`
 - `keep_last_window_entries`
 
 ### 2. Window State and Window IDs
@@ -111,7 +112,7 @@ At `window_end_height`, the module evaluates the completed window and may transi
 - `ACTIVE` → `POSTPONED` for:
   - missing reports for `consecutive_windows_to_postpone` consecutive windows
   - host requirement failures (self report)
-  - peer port unanimity on `CLOSED` for `consecutive_windows_to_postpone` consecutive windows
+  - peer port threshold on `CLOSED` (at or above `peer_port_postpone_threshold_percent`) for `consecutive_windows_to_postpone` consecutive windows
 - `POSTPONED` → `ACTIVE` if, in a single window, there is:
   - one compliant self report, and
   - at least one peer report about the supernode where all required ports are `OPEN`
@@ -211,6 +212,7 @@ Default values (as implemented in `x/audit/v1/types/params.go`):
 - `min_mem_free_percent`: `0` (disabled)
 - `min_disk_free_percent`: `0` (disabled)
 - `consecutive_windows_to_postpone`: `1`
+- `peer_port_postpone_threshold_percent`: `100`
 - `keep_last_window_entries`: `200`
 
 ## Client

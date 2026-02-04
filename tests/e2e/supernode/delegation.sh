@@ -8,6 +8,7 @@ CHAIN_ID="lumera-devnet-1"
 KEYRING_BACKEND="test"
 VALIDATOR_NUM=2
 VALIDATOR_CONTAINER="lumera-validator${VALIDATOR_NUM}"
+QUERY_CONTAINER="${QUERY_CONTAINER:-lumera-validator1}"
 
 # Delegation amount constants
 REDUCE_AMOUNT="10ulume"
@@ -46,10 +47,10 @@ log "Validator Operator: $VALIDATOR_OPERATOR"
 
 # Step 4: Check Initial Status
 log "Step 4: Checking initial validator status..."
-log_cmd "docker exec lumera-validator1 lumerad query staking validator $VALIDATOR_OPERATOR"
+log_cmd "docker exec ${QUERY_CONTAINER} lumerad query staking validator $VALIDATOR_OPERATOR"
 
 log "Checking initial supernode status..."
-log_cmd "docker exec lumera-validator1 lumerad query supernode get-supernode $VALIDATOR_OPERATOR"
+log_cmd "docker exec ${QUERY_CONTAINER} lumerad query supernode get-supernode $VALIDATOR_OPERATOR"
 
 # Step 5: Reduce Stake
 log "Step 5: Reducing stake by ${REDUCE_AMOUNT}..."
@@ -69,10 +70,10 @@ sleep 10
 
 # Step 6: Check Status After Reduction
 log "Step 6: Checking validator status after stake reduction..."
-log_cmd "docker exec lumera-validator1 lumerad query staking validator $VALIDATOR_OPERATOR"
+log_cmd "docker exec ${QUERY_CONTAINER} lumerad query staking validator $VALIDATOR_OPERATOR"
 
 log "Checking supernode status after stake reduction..."
-log_cmd "docker exec lumera-validator1 lumerad query supernode get-supernode $VALIDATOR_OPERATOR"
+log_cmd "docker exec ${QUERY_CONTAINER} lumerad query supernode get-supernode $VALIDATOR_OPERATOR"
 
 # Step 7: Restore Stake
 log "Step 7: Restoring stake by delegating ${RESTORE_AMOUNT} back..."
@@ -93,10 +94,10 @@ sleep 10
 # Step 8: Final Status Check
 log "Step 8: Performing final status check..."
 log "Checking final validator status..."
-log_cmd "docker exec lumera-validator1 lumerad query staking validator $VALIDATOR_OPERATOR"
+log_cmd "docker exec ${QUERY_CONTAINER} lumerad query staking validator $VALIDATOR_OPERATOR"
 
 log "Checking final supernode status..."
-log_cmd "docker exec lumera-validator1 lumerad query supernode get-supernode $VALIDATOR_OPERATOR"
+log_cmd "docker exec ${QUERY_CONTAINER} lumerad query supernode get-supernode $VALIDATOR_OPERATOR"
 
 # Step 9: Complete
 log "Test completed successfully. All output has been saved to $LOG_FILE"

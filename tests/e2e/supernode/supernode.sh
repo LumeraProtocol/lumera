@@ -7,6 +7,7 @@ set -euo pipefail
 CHAIN_ID="lumera-devnet-1"
 KEYRING_BACKEND="test"
 CONTAINER_PREFIX="lumera-validator"
+QUERY_CONTAINER="${QUERY_CONTAINER:-${CONTAINER_PREFIX}1}"
 
 # Test validator number
 TEST_VALIDATOR_NUM=5
@@ -61,7 +62,7 @@ check_supernode_status() {
 	local valop="${VAL_OPERATOR[$i]}"
 
 	log "Checking supernode status for validator ${i} (${valop})"
-	run_cmd "docker exec lumera-validator1 lumerad query supernode get-supernode ${valop}"
+	run_cmd "docker exec ${QUERY_CONTAINER} lumerad query supernode get-supernode ${valop}"
 }
 
 #################################################################

@@ -8,11 +8,11 @@ if [ -z "${MONIKER:-}" ]; then
 	exit 0
 fi
 
-if [ ! command -v jq ] >/dev/null 2>&1; then
+if ! command -v jq >/dev/null 2>&1; then
 	echo "[SN] jq is missing"
 fi
 
-if [ ! command -v curl ] >/dev/null 2>&1; then
+if ! command -v curl >/dev/null 2>&1; then
 	echo "[SN] curl is missing"
 fi
 
@@ -307,6 +307,8 @@ install_supernode_binary() {
 register_supernode() {
 	if is_sn_registered_active; then
 		echo "[SN] Supernode is already registered and in ACTIVE state; no action needed."
+	elif is_sn_postponed; then
+		echo "[SN] Supernode is in POSTPONED state; skipping registration."
 	else
 		echo "[SN] Registering supernode..."
 		REG_TX_JSON="$(run_capture $DAEMON tx supernode register-supernode \
@@ -461,6 +463,33 @@ is_sn_registered_active() {
 	fi
 
 	echo "[SN] Status: not active and/or account mismatch"
+	return 1
+}
+
+# Returns 0 if last state is SUPERNODE_STATE_POSTPONED, else 1
+is_sn_postponed() {
+	local info
+
+	echo "[SN] Checking if supernode is postponed..."
+	info="$(run_capture $DAEMON q supernode get-supernode "$VALOPER_ADDR" --output json)"
+	echo "[SN] Supernode info output: $info"
+
+	local acct
+	acct="$(echo "$info" | jq -r '.supernode.supernode_account // ""')"
+
+	local last_state
+	last_state="$(echo "$info" | jq -r '
+      (.supernode.states // [])
+      | sort_by(.height | tonumber)
+      | (last // empty)
+      | .state // ""
+    ')"
+
+	echo "[SN] Supernode: account='${acct}', last_state='${last_state}'"
+	if [[ "$last_state" == "SUPERNODE_STATE_POSTPONED" ]]; then
+		return 0
+	fi
+
 	return 1
 }
 

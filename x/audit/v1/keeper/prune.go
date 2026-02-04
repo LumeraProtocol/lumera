@@ -43,6 +43,11 @@ func (k Keeper) PruneOldWindows(ctx sdk.Context, currentWindowID uint64, params 
 	pruneReporterTrailingWindowID(store, []byte("ss/"), minKeepWindowID)
 	pruneSupernodeWindowReporter(store, []byte("sr/"), minKeepWindowID)
 
+	// Evidence window counts: evw/<u64be(window_id)>/...
+	if err := prunePrefixByWindowIDLeadingU64(store, types.EvidenceWindowCountPrefix(), minKeepWindowID); err != nil {
+		return err
+	}
+
 	return nil
 }
 

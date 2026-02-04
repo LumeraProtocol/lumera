@@ -39,4 +39,43 @@ message Params {
   // 100 means unanimous.
   // Example: to approximate a 2/3 threshold, use 66 (since 2/3 ≈ 66.6%).
   uint32 peer_port_postpone_threshold_percent = 12;
+
+  // Action finalization evidence postponement/recovery settings.
+  //
+  // These apply to evidence types emitted by the action module:
+  // - EVIDENCE_TYPE_ACTION_FINALIZATION_SIGNATURE_FAILURE
+  // - EVIDENCE_TYPE_ACTION_FINALIZATION_NOT_IN_TOP_10
+  //
+  // Postponement triggers when, for a given supernode and evidence type:
+  // - the number of evidences in a window >= <*_evidences_per_window>, and
+  // - this happens for <*_consecutive_windows> windows in a row.
+  //
+  // Recovery (auto-unpostpone) triggers after a supernode has been postponed for at least
+  // action_finalization_recovery_windows windows, and ONLY IF the total number of "bad"
+  // action-finalization evidences across the last action_finalization_recovery_windows windows
+  // is strictly less than action_finalization_recovery_max_total_bad_evidences.
+
+  // action_finalization_signature_failure_evidences_per_window is the per-window count threshold
+  // for EVIDENCE_TYPE_ACTION_FINALIZATION_SIGNATURE_FAILURE.
+  uint32 action_finalization_signature_failure_evidences_per_window = 13;
+
+  // action_finalization_signature_failure_consecutive_windows is the consecutive windows threshold
+  // for EVIDENCE_TYPE_ACTION_FINALIZATION_SIGNATURE_FAILURE.
+  uint32 action_finalization_signature_failure_consecutive_windows = 14;
+
+  // action_finalization_not_in_top10_evidences_per_window is the per-window count threshold
+  // for EVIDENCE_TYPE_ACTION_FINALIZATION_NOT_IN_TOP_10.
+  uint32 action_finalization_not_in_top10_evidences_per_window = 15;
+
+  // action_finalization_not_in_top10_consecutive_windows is the consecutive windows threshold
+  // for EVIDENCE_TYPE_ACTION_FINALIZATION_NOT_IN_TOP_10.
+  uint32 action_finalization_not_in_top10_consecutive_windows = 16;
+
+  // action_finalization_recovery_windows is the number of windows to wait before considering recovery.
+  uint32 action_finalization_recovery_windows = 17;
+
+  // action_finalization_recovery_max_total_bad_evidences is the maximum allowed total count of bad
+  // action-finalization evidences in the recovery window for auto-recovery to occur.
+  // Recovery happens ONLY IF total_bad < this value.
+  uint32 action_finalization_recovery_max_total_bad_evidences = 18;
 }

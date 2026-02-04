@@ -1,4 +1,4 @@
-package v1_10_0
+package v1_10_1
 
 import (
 	"context"
@@ -14,21 +14,21 @@ import (
 )
 
 // UpgradeName is the on-chain name used for this upgrade.
-const UpgradeName = "v1.10.0"
+const UpgradeName = "v1.10.1"
 
-// CreateUpgradeHandler migrates consensus params from x/params to x/consensus
-// and then runs module migrations.
+// CreateUpgradeHandler migrates consensus params from x/params to x/consensus,
+// then repairs consensus params if they are missing or incomplete.
 func CreateUpgradeHandler(p appParams.AppUpgradeParams) upgradetypes.UpgradeHandler {
 	return func(goCtx context.Context, _ upgradetypes.Plan, fromVM module.VersionMap) (module.VersionMap, error) {
 		p.Logger.Info(fmt.Sprintf("Starting upgrade %s...", UpgradeName))
 
 		ctx := sdk.UnwrapSDKContext(goCtx)
 
-		if err := consensusparams.MigrateFromLegacy(ctx, p, UpgradeName); err != nil {
+		if err := consensusparams.EnsurePresent(ctx, p, UpgradeName); err != nil {
 			return nil, err
 		}
 
-		// Run all module migrations after consensus params have been moved.
+		// Run all module migrations after consensus params have been verified.
 		p.Logger.Info("Running module migrations...")
 		newVM, err := p.ModuleManager.RunMigrations(ctx, p.Configurator, fromVM)
 		if err != nil {

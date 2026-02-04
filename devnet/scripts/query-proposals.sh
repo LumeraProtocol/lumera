@@ -10,7 +10,7 @@ COMPOSE_FILE="$SCRIPT_DIR/../docker-compose.yml"
 JSON_OUTPUT="${JSON_OUTPUT:-false}"
 
 print_usage() {
-  cat <<EOF
+	cat <<EOF
 Usage: ${0##*/} [--json]
 
 Options:
@@ -21,38 +21,38 @@ EOF
 }
 
 while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --json)
-      JSON_OUTPUT=true
-      shift
-      ;;
-    -h|--help)
-      print_usage
-      exit 0
-      ;;
-    *)
-      echo "Unknown option: $1" >&2
-      print_usage >&2
-      exit 1
-      ;;
-  esac
+	case "$1" in
+	--json)
+		JSON_OUTPUT=true
+		shift
+		;;
+	-h | --help)
+		print_usage
+		exit 0
+		;;
+	*)
+		echo "Unknown option: $1" >&2
+		print_usage >&2
+		exit 1
+		;;
+	esac
 done
 
 PROPOSALS_JSON="$(docker compose -f "$COMPOSE_FILE" exec "$SERVICE" \
-  lumerad query gov proposals --output json 2>/dev/null)"
+	lumerad query gov proposals --output json 2>/dev/null)"
 
 COUNT="$(echo "$PROPOSALS_JSON" | jq '.proposals | length // 0')"
 
 if [[ "$COUNT" -eq 0 ]]; then
-  echo "No governance proposals found."
-  exit 0
+	echo "No governance proposals found."
+	exit 0
 fi
 
 LATEST="$(echo "$PROPOSALS_JSON" | jq '.proposals | sort_by(.id | tonumber) | last')"
 
 if [[ "$JSON_OUTPUT" == "true" ]]; then
-  echo "$LATEST" | jq
-  exit 0
+	echo "$LATEST" | jq
+	exit 0
 fi
 
 ID="$(echo "$LATEST" | jq -r '.id')"
@@ -63,12 +63,12 @@ UPGRADE_HEIGHT="$(echo "$LATEST" | jq -r '.messages[] | select(.["@type"] == "/c
 
 printf "Latest proposal: ID=%s, Status=%s" "$ID" "$STATUS"
 if [[ -n "$TITLE" && "$TITLE" != "" ]]; then
-  printf ", Title=%s" "$TITLE"
+	printf ", Title=%s" "$TITLE"
 fi
 if [[ -n "$PROPOSER" && "$PROPOSER" != "" ]]; then
-  printf ", Proposer=%s" "$PROPOSER"
+	printf ", Proposer=%s" "$PROPOSER"
 fi
 if [[ -n "$UPGRADE_HEIGHT" && "$UPGRADE_HEIGHT" != "" ]]; then
-  printf ", Upgrade Height=%s" "$UPGRADE_HEIGHT"
+	printf ", Upgrade Height=%s" "$UPGRADE_HEIGHT"
 fi
 printf '\n'

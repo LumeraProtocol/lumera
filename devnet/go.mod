@@ -16,8 +16,8 @@ replace (
 require (
 	cosmossdk.io/api v0.9.2
 	cosmossdk.io/math v1.5.3
-	github.com/LumeraProtocol/lumera v1.9.1
-	github.com/LumeraProtocol/sdk-go v1.0.6
+	github.com/LumeraProtocol/lumera v1.10.0
+	github.com/LumeraProtocol/sdk-go v1.0.8
 	github.com/cosmos/cosmos-sdk v0.53.5
 	github.com/cosmos/ibc-go/v10 v10.5.0
 	github.com/stretchr/testify v1.11.1
@@ -41,7 +41,7 @@ require (
 	github.com/DataDog/datadog-go v4.8.3+incompatible // indirect
 	github.com/DataDog/zstd v1.5.7 // indirect
 	github.com/LumeraProtocol/rq-go v0.2.1 // indirect
-	github.com/LumeraProtocol/supernode/v2 v2.4.23 // indirect
+	github.com/LumeraProtocol/supernode/v2 v2.4.27 // indirect
 	github.com/Masterminds/semver/v3 v3.3.1 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -66,7 +66,7 @@ require (
 	github.com/cosmos/go-bip39 v1.0.0 // indirect
 	github.com/cosmos/gogogateway v1.2.0 // indirect
 	github.com/cosmos/gogoproto v1.7.2 // indirect
-	github.com/cosmos/iavl v1.2.4 // indirect
+	github.com/cosmos/iavl v1.2.6 // indirect
 	github.com/cosmos/ics23/go v0.11.0 // indirect
 	github.com/cosmos/ledger-cosmos-go v0.16.0 // indirect
 	github.com/danieljoos/wincred v1.2.2 // indirect
@@ -138,9 +138,9 @@ require (
 	github.com/petermattis/goid v0.0.0-20240813172612-4fcff4a6cae7 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/prometheus/client_golang v1.23.0 // indirect
+	github.com/prometheus/client_golang v1.23.2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
-	github.com/prometheus/common v0.65.0 // indirect
+	github.com/prometheus/common v0.66.1 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
@@ -169,18 +169,18 @@ require (
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/arch v0.17.0 // indirect
-	golang.org/x/crypto v0.43.0 // indirect
+	golang.org/x/crypto v0.47.0 // indirect
 	golang.org/x/exp v0.0.0-20250819193227-8b4c13bb791b // indirect
-	golang.org/x/net v0.46.1-0.20251013234738-63d1a5100f82 // indirect
-	golang.org/x/sync v0.17.0 // indirect
-	golang.org/x/sys v0.37.0 // indirect
-	golang.org/x/term v0.36.0 // indirect
-	golang.org/x/text v0.30.0 // indirect
+	golang.org/x/net v0.48.0 // indirect
+	golang.org/x/sync v0.19.0 // indirect
+	golang.org/x/sys v0.40.0 // indirect
+	golang.org/x/term v0.39.0 // indirect
+	golang.org/x/text v0.33.0 // indirect
 	google.golang.org/genproto v0.0.0-20250603155806-513f23925822 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20251022142026-3a174f9686a8 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251022142026-3a174f9686a8 // indirect
 	google.golang.org/grpc v1.77.0 // indirect
-	google.golang.org/protobuf v1.36.10 // indirect
+	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gotest.tools/v3 v3.5.2 // indirect
 	lukechampine.com/blake3 v1.4.1 // indirect

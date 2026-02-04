@@ -2,6 +2,18 @@
 
 ---
 
+## 1.10.1
+
+Changes included since `v1.10.0` (range: `v1.10.0..v1.10.1`).
+
+- Upgrade safety: add a conditional store loader for `v1.10.1` that only renames the legacy `Consensus` store when needed and avoids panics when the new `consensus` store already exists.
+- Consensus params: ensure `x/consensus` params are present and repair missing/incomplete values during the upgrade.
+- Devnet tooling: adaptive store loader can be enabled to reconcile on-disk stores against expected modules when skipping intermediate upgrades.
+- Devnet tests: validator IBC tests now auto-detect the validator container (RPC + key) instead of assuming `supernova_validator_1`.
+- Upgrade guidance: do not apply `v1.10.0` on testnet or mainnet.
+
+---
+
 ## 1.10.0
 
 Changes included since `v1.9.1` (range: `v1.9.1..v1.10.0`).

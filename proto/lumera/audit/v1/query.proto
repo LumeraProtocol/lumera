@@ -12,6 +12,7 @@ import "cosmos/base/query/v1beta1/pagination.proto";
 import "lumera/audit/v1/params.proto";
 import "lumera/audit/v1/audit.proto";
 import "lumera/audit/v1/evidence.proto";
+import "lumera/audit/v1/epoch.proto";
 
 // Query defines the gRPC querier service.
 service Query {
@@ -35,24 +36,29 @@ service Query {
     option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/evidence/by_action/{action_id}";
   }
 
-  // CurrentWindow returns the current derived window boundaries at the current chain height.
-  rpc CurrentWindow(QueryCurrentWindowRequest) returns (QueryCurrentWindowResponse) {
-    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/current_window";
+  // CurrentEpoch returns the current derived epoch boundaries at the current chain height.
+  rpc CurrentEpoch(QueryCurrentEpochRequest) returns (QueryCurrentEpochResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/current_epoch";
   }
 
-  // WindowSnapshot returns the persisted window snapshot for the given window_id.
-  rpc WindowSnapshot(QueryWindowSnapshotRequest) returns (QueryWindowSnapshotResponse) {
-    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/window_snapshot/{window_id}";
+  // EpochAnchor returns the persisted epoch anchor for the given epoch_id.
+  rpc EpochAnchor(QueryEpochAnchorRequest) returns (QueryEpochAnchorResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/epoch_anchor/{epoch_id}";
+  }
+
+  // CurrentEpochAnchor returns the persisted epoch anchor for the current epoch.
+  rpc CurrentEpochAnchor(QueryCurrentEpochAnchorRequest) returns (QueryCurrentEpochAnchorResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/current_epoch_anchor";
   }
 
   // AssignedTargets returns the prober -> targets assignment for a given supernode_account.
-  // If filter_by_window_id is false, it returns the assignments for the current window.
+  // If filter_by_epoch_id is false, it returns the assignments for the current epoch.
   rpc AssignedTargets(QueryAssignedTargetsRequest) returns (QueryAssignedTargetsResponse) {
     option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/assigned_targets/{supernode_account}";
   }
 
   rpc AuditReport(QueryAuditReportRequest) returns (QueryAuditReportResponse) {
-    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/audit_report/{window_id}/{supernode_account}";
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/audit_report/{epoch_id}/{supernode_account}";
   }
 
   rpc AuditReportsByReporter(QueryAuditReportsByReporterRequest) returns (QueryAuditReportsByReporterResponse) {
@@ -64,7 +70,7 @@ service Query {
     option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/supernode_reports/{supernode_account}";
   }
 
-  // SelfReports returns self-reports submitted by the given supernode_account across windows.
+  // SelfReports returns self-reports submitted by the given supernode_account across epochs.
   rpc SelfReports(QuerySelfReportsRequest) returns (QuerySelfReportsResponse) {
     option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/self_reports/{supernode_account}";
   }
@@ -104,37 +110,43 @@ message QueryEvidenceByActionResponse {
   cosmos.base.query.v1beta1.PageResponse pagination = 2;
 }
 
-message QueryCurrentWindowRequest {}
+message QueryCurrentEpochRequest {}
 
-message QueryCurrentWindowResponse {
-  uint64 window_id           = 1;
-  int64  window_start_height = 2;
-  int64  window_end_height   = 3;
+message QueryCurrentEpochResponse {
+  uint64 epoch_id           = 1;
+  int64  epoch_start_height = 2;
+  int64  epoch_end_height   = 3;
 }
 
-message QueryWindowSnapshotRequest {
-  uint64 window_id = 1;
+message QueryEpochAnchorRequest {
+  uint64 epoch_id = 1;
 }
 
-message QueryWindowSnapshotResponse {
-  WindowSnapshot snapshot = 1 [(gogoproto.nullable) = false];
+message QueryEpochAnchorResponse {
+  EpochAnchor anchor = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryCurrentEpochAnchorRequest {}
+
+message QueryCurrentEpochAnchorResponse {
+  EpochAnchor anchor = 1 [(gogoproto.nullable) = false];
 }
 
 message QueryAssignedTargetsRequest {
   string supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
-  uint64 window_id = 2;
-  bool filter_by_window_id = 3;
+  uint64 epoch_id = 2;
+  bool filter_by_epoch_id = 3;
 }
 
 message QueryAssignedTargetsResponse {
-  uint64 window_id = 1;
-  int64 window_start_height = 2;
+  uint64 epoch_id = 1;
+  int64 epoch_start_height = 2;
   repeated uint32 required_open_ports = 3;
   repeated string target_supernode_accounts = 4 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
 }
 
 message QueryAuditReportRequest {
-  uint64 window_id = 1;
+  uint64 epoch_id = 1;
   string supernode_account = 2 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
 }
 
@@ -144,7 +156,9 @@ message QueryAuditReportResponse {
 
 message QueryAuditReportsByReporterRequest {
   string supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
-  cosmos.base.query.v1beta1.PageRequest pagination = 2;
+  uint64 epoch_id = 2;
+  cosmos.base.query.v1beta1.PageRequest pagination = 3;
+  bool filter_by_epoch_id = 4;
 }
 
 message QueryAuditReportsByReporterResponse {
@@ -154,14 +168,14 @@ message QueryAuditReportsByReporterResponse {
 
 message QuerySupernodeReportsRequest {
   string supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
-  uint64 window_id = 2;
+  uint64 epoch_id = 2;
   cosmos.base.query.v1beta1.PageRequest pagination = 3;
-  bool filter_by_window_id = 4;
+  bool filter_by_epoch_id = 4;
 }
 
 message SupernodeReport {
   string reporter_supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
-  uint64 window_id = 2;
+  uint64 epoch_id = 2;
   int64 report_height = 3;
   repeated PortState port_states = 4;
 }
@@ -173,13 +187,13 @@ message QuerySupernodeReportsResponse {
 
 message QuerySelfReportsRequest {
   string supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
-  uint64 window_id = 2;
+  uint64 epoch_id = 2;
   cosmos.base.query.v1beta1.PageRequest pagination = 3;
-  bool filter_by_window_id = 4;
+  bool filter_by_epoch_id = 4;
 }
 
 message SelfReport {
-  uint64 window_id = 1;
+  uint64 epoch_id = 1;
   int64 report_height = 2;
   AuditSelfReport self_report = 3 [(gogoproto.nullable) = false];
 }

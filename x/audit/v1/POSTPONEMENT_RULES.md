@@ -4,32 +4,32 @@ This document describes the on-chain rules implemented by `x/audit/v1` for switc
 
 ## Definitions
 
-- **Window**: a contiguous block-height interval `[window_start_height, window_end_height]` derived from `reporting_window_blocks`.
-- **Probers (reporters with assignments)**: supernodes that are `ACTIVE` at `window_start_height`. These appear as keys in `WindowSnapshot.assignments`.
-- **Targets**: supernodes that are `ACTIVE` or `POSTPONED` at `window_start_height`. These may appear in `WindowSnapshot.assignments[*].target_supernode_accounts`.
-- **Report**: `MsgSubmitAuditReport` stored under `(window_id, supernode_account)`.
+- **Epoch**: a contiguous block-height interval `[epoch_start_height, epoch_end_height]` derived from `epoch_zero_height` and `epoch_length_blocks`.
+- **Probers**: supernodes that are `ACTIVE` at epoch start (i.e., present in `EpochAnchor.active_supernode_accounts`).
+- **Targets**: supernodes that are `ACTIVE` or `POSTPONED` at epoch start (i.e., present in `EpochAnchor.target_supernode_accounts`).
+- **Report**: `MsgSubmitAuditReport` stored under `(epoch_id, supernode_account)`.
 
 ## Enforcement timing
 
-All postpone/recovery decisions are evaluated only at **window end** (`window_end_height`) in `EndBlocker`.
+All postpone/recovery decisions are evaluated only at **epoch end** (`epoch_end_height`) in `EndBlocker`.
 
 ## Submission-time gating and completeness
 
 Peer observation gating is enforced only when `MsgSubmitAuditReport` is accepted (enforcement later assumes stored observations already passed these checks):
 
-- If the reporter is a **prober** for the window (it has a non-empty assignment in `WindowSnapshot.assignments`), then:
+- If the reporter is a **prober** for the epoch (it is in `EpochAnchor.active_supernode_accounts`), then:
   - `peer_observations` must include **exactly one entry per assigned target** (no missing targets, no extra targets, no duplicates).
   - For each `peer_observation`, `port_states` length must equal the configured `required_open_ports` length.
-- If the reporter is **not** a prober for the window (e.g. `POSTPONED`), then:
+- If the reporter is **not** a prober for the epoch (e.g. `POSTPONED`), then:
   - `peer_observations` must be empty (self-report only).
 
 ## Postpone rules
 
 ### 1) Missing reports
 
-If an `ACTIVE` supernode fails to submit any report for `consecutive_windows_to_postpone` consecutive windows, it is set to `POSTPONED`.
+If an `ACTIVE` supernode fails to submit any report for `consecutive_epochs_to_postpone` consecutive epochs, it is set to `POSTPONED`.
 
-This is evaluated by checking for a stored report in each of the last `N` windows.
+This is evaluated by checking for a stored report in each of the last `N` epochs.
 
 ### 2) Host requirements (self report)
 
@@ -44,14 +44,14 @@ The following self-report fields are currently ignored by postponement logic:
 
 ### 3) Peer ports (peer observations)
 
-For any required port index `i`, a target is postponed if peers report that port as `CLOSED` at or above `peer_port_postpone_threshold_percent` for `consecutive_windows_to_postpone` consecutive windows.
+For any required port index `i`, a target is postponed if peers report that port as `CLOSED` at or above `peer_port_postpone_threshold_percent` for `consecutive_epochs_to_postpone` consecutive epochs.
 
-A window counts toward the consecutive requirement only if:
-- there is at least **1** peer reporter about the target in that window, and
-- the share of peer reporters about the target in that window that report `PORT_STATE_CLOSED` for port index `i` meets or exceeds `peer_port_postpone_threshold_percent`.
+An epoch counts toward the consecutive requirement only if:
+- there is at least **1** peer reporter about the target in that epoch, and
+- the share of peer reporters about the target in that epoch that report `PORT_STATE_CLOSED` for port index `i` meets or exceeds `peer_port_postpone_threshold_percent`.
 
 ## Recovery rule (POSTPONED → ACTIVE)
 
-In a single window, a `POSTPONED` supernode becomes `ACTIVE` if:
+In a single epoch, a `POSTPONED` supernode becomes `ACTIVE` if:
 - it submits one compliant self report (host requirements), and
-- there exists at least **1** peer report about that supernode in the same window where **all** required ports are `PORT_STATE_OPEN`.
+- there exists at least **1** peer report about that supernode in the same epoch where **all** required ports are `PORT_STATE_OPEN`.

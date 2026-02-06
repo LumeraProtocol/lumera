@@ -8,46 +8,49 @@ import (
 
 func (k Keeper) BeginBlocker(ctx context.Context) error {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	// BeginBlocker is responsible for epoch-start duties only. It derives the current epoch
+	// from immutable epoch-cadence params (length + zero height), and persists an EpochAnchor
+	// exactly at epoch start. The anchor freezes the epoch seed and eligible sets used by
+	// deterministic off-chain selection.
 	params := k.GetParams(ctx).WithDefaults()
 
-	ws, err := k.getCurrentWindowState(sdkCtx, params)
+	epoch, err := deriveEpochAtHeight(sdkCtx.BlockHeight(), params)
 	if err != nil {
 		return err
 	}
-	currentWindowID := ws.WindowID
-	windowStart := ws.StartHeight
 
-	// Only create the snapshot exactly at the window start height.
-	if sdkCtx.BlockHeight() != windowStart {
+	// Only create the anchor exactly at the epoch start height.
+	if sdkCtx.BlockHeight() != epoch.StartHeight {
 		return nil
 	}
 
-	return k.CreateWindowSnapshotIfNeeded(sdkCtx, currentWindowID, params)
+	if err := k.CreateEpochAnchorIfNeeded(sdkCtx, epoch.EpochID, epoch.StartHeight, epoch.EndHeight, params); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (k Keeper) EndBlocker(ctx context.Context) error {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
 
-	// Enforce supernode metrics staleness each block at end-block.
-	if err := k.HandleSupernodeMetricsStaleness(sdkCtx); err != nil {
-		return err
-	}
+	// EndBlocker does two things:
+	// 1) epoch-end audit enforcement + pruning (only at epoch end height).
 
 	params := k.GetParams(ctx).WithDefaults()
 
-	ws, err := k.getCurrentWindowState(sdkCtx, params)
+	epoch, err := deriveEpochAtHeight(sdkCtx.BlockHeight(), params)
 	if err != nil {
 		return err
 	}
 
-	// Only enforce and prune exactly at the window end height.
-	if sdkCtx.BlockHeight() != ws.EndHeight {
+	// Only enforce and prune exactly at the epoch end height.
+	if sdkCtx.BlockHeight() != epoch.EndHeight {
 		return nil
 	}
 
-	if err := k.EnforceWindowEnd(sdkCtx, ws.WindowID, params); err != nil {
+	if err := k.EnforceEpochEnd(sdkCtx, epoch.EpochID, params); err != nil {
 		return err
 	}
 
-	return k.PruneOldWindows(sdkCtx, ws.WindowID, params)
+	return k.PruneOldEpochs(sdkCtx, epoch.EpochID, params)
 }

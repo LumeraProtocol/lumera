@@ -4,7 +4,6 @@ import (
 	"context"
 
 	errorsmod "cosmossdk.io/errors"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/LumeraProtocol/lumera/x/audit/v1/types"
 )
@@ -13,8 +12,6 @@ func (m msgServer) UpdateParams(ctx context.Context, req *types.MsgUpdateParams)
 	if req == nil {
 		return nil, errorsmod.Wrap(types.ErrInvalidSigner, "empty request")
 	}
-
-	sdkCtx := sdk.UnwrapSDKContext(ctx)
 
 	authority, err := m.addressCodec.BytesToString(m.authority)
 	if err != nil {
@@ -29,9 +26,17 @@ func (m msgServer) UpdateParams(ctx context.Context, req *types.MsgUpdateParams)
 		return nil, err
 	}
 
-	// If reporting_window_blocks changes, schedule the new size to take effect at the next boundary.
-	if err := m.scheduleReportingWindowBlocksChangeAtNextBoundary(sdkCtx, m.GetParams(ctx).WithDefaults(), params.ReportingWindowBlocks); err != nil {
-		return nil, err
+	// Params are changed only by genesis or by this governance message. Epoch cadence is an
+	// especially sensitive invariant because it defines height->epoch mapping used throughout
+	// the module (anchoring, gating, enforcement, pruning).
+	// Epoch cadence is a global invariant. Do not allow epoch math changes via governance,
+	// since it would re-map heights->epoch_id and break deterministic off-chain behavior.
+	current := m.GetParams(ctx).WithDefaults()
+	if params.EpochLengthBlocks != current.EpochLengthBlocks {
+		return nil, errorsmod.Wrap(types.ErrInvalidSigner, "epoch_length_blocks is immutable after genesis")
+	}
+	if params.EpochZeroHeight != current.EpochZeroHeight {
+		return nil, errorsmod.Wrap(types.ErrInvalidSigner, "epoch_zero_height is immutable after genesis")
 	}
 
 	if err := m.SetParams(ctx, params); err != nil {

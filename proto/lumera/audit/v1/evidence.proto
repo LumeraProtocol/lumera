@@ -15,6 +15,9 @@ enum EvidenceType {
   EVIDENCE_TYPE_ACTION_FINALIZATION_NOT_IN_TOP_10 = 2;
 
   EVIDENCE_TYPE_ACTION_EXPIRED = 3;
+
+  // storage challenge failure evidence submitted by the deterministic challenger.
+  EVIDENCE_TYPE_STORAGE_CHALLENGE_FAILURE = 4;
 }
 
 // Evidence is a stable outer record that stores evidence about an audited subject.

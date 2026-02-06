@@ -25,9 +25,9 @@ func (q queryServer) SupernodeReports(ctx context.Context, req *types.QuerySuper
 	storeAdapter := runtime.KVStoreAdapter(q.k.storeService.OpenKVStore(sdkCtx))
 
 	var store prefix.Store
-	useWindowFilter := req.FilterByWindowId || req.WindowId != 0
-	if useWindowFilter {
-		store = prefix.NewStore(storeAdapter, types.SupernodeReportIndexWindowPrefix(req.SupernodeAccount, req.WindowId))
+	useEpochFilter := req.FilterByEpochId || req.EpochId != 0
+	if useEpochFilter {
+		store = prefix.NewStore(storeAdapter, types.SupernodeReportIndexEpochPrefix(req.SupernodeAccount, req.EpochId))
 	} else {
 		store = prefix.NewStore(storeAdapter, types.SupernodeReportIndexPrefix(req.SupernodeAccount))
 	}
@@ -41,18 +41,18 @@ func (q queryServer) SupernodeReports(ctx context.Context, req *types.QuerySuper
 
 	pageRes, err := query.Paginate(store, pagination, func(key, _ []byte) error {
 		var (
-			windowID uint64
+			epochID  uint64
 			reporter string
 		)
 
-		if useWindowFilter {
-			windowID = req.WindowId
+		if useEpochFilter {
+			epochID = req.EpochId
 			reporter = string(key)
 		} else {
 			if len(key) < 9 || key[8] != '/' {
 				return status.Error(codes.Internal, "invalid supernode report index key")
 			}
-			windowID = binary.BigEndian.Uint64(key[:8])
+			epochID = binary.BigEndian.Uint64(key[:8])
 			reporter = string(key[9:])
 		}
 
@@ -60,13 +60,16 @@ func (q queryServer) SupernodeReports(ctx context.Context, req *types.QuerySuper
 			return nil
 		}
 
-		r, found := q.k.GetReport(sdkCtx, windowID, reporter)
+		r, found := q.k.GetReport(sdkCtx, epochID, reporter)
 		if !found {
 			return nil
 		}
 
 		var portStates []types.PortState
 		for _, obs := range r.PeerObservations {
+			if obs == nil {
+				continue
+			}
 			if obs.TargetSupernodeAccount != req.SupernodeAccount {
 				continue
 			}
@@ -81,7 +84,7 @@ func (q queryServer) SupernodeReports(ctx context.Context, req *types.QuerySuper
 
 		reports = append(reports, types.SupernodeReport{
 			ReporterSupernodeAccount: reporter,
-			WindowId:                 r.WindowId,
+			EpochId:                  r.EpochId,
 			ReportHeight:             r.ReportHeight,
 			PortStates:               portStates,
 		})

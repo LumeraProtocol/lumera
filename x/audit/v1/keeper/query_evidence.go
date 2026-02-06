@@ -64,7 +64,7 @@ func (q queryServer) EvidenceBySubject(ctx context.Context, req *types.QueryEvid
 	}
 
 	return &types.QueryEvidenceBySubjectResponse{
-		Evidence:    evidence,
+		Evidence:   evidence,
 		Pagination: pageRes,
 	}, nil
 }
@@ -103,8 +103,7 @@ func (q queryServer) EvidenceByAction(ctx context.Context, req *types.QueryEvide
 	}
 
 	return &types.QueryEvidenceByActionResponse{
-		Evidence:    evidence,
+		Evidence:   evidence,
 		Pagination: pageRes,
 	}, nil
 }
-

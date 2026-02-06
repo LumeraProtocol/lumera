@@ -170,10 +170,112 @@ func (m *ActionFinalizationNotInTop10EvidenceMetadata) GetTop_10ValidatorAddress
 	return nil
 }
 
+// StorageChallengeFailureEvidenceMetadata is metadata for a storage challenge failure submitted by a challenger.
+type StorageChallengeFailureEvidenceMetadata struct {
+	EpochId uint64 `protobuf:"varint,1,opt,name=epoch_id,json=epochId,proto3" json:"epoch_id,omitempty"`
+	// challenger_supernode_account must be the tx signer for evidence submission.
+	ChallengerSupernodeAccount string `protobuf:"bytes,2,opt,name=challenger_supernode_account,json=challengerSupernodeAccount,proto3" json:"challenger_supernode_account,omitempty"`
+	// challenged_supernode_account should match Evidence.subject_address.
+	ChallengedSupernodeAccount string `protobuf:"bytes,3,opt,name=challenged_supernode_account,json=challengedSupernodeAccount,proto3" json:"challenged_supernode_account,omitempty"`
+	// challenge_id is the deterministic per-(epoch,challenger) identifier (hex-encoded blake3-256).
+	ChallengeId string `protobuf:"bytes,4,opt,name=challenge_id,json=challengeId,proto3" json:"challenge_id,omitempty"`
+	// file_key is the challenged file key (typically base58).
+	FileKey string `protobuf:"bytes,5,opt,name=file_key,json=fileKey,proto3" json:"file_key,omitempty"`
+	// failure_type is a short discriminator (e.g. TIMEOUT, INVALID_PROOF, MISSING_FILE).
+	FailureType string `protobuf:"bytes,6,opt,name=failure_type,json=failureType,proto3" json:"failure_type,omitempty"`
+	// transcript_hash is a hash commitment to the off-chain transcript (hex-encoded blake3-256).
+	TranscriptHash string `protobuf:"bytes,7,opt,name=transcript_hash,json=transcriptHash,proto3" json:"transcript_hash,omitempty"`
+}
+
+func (m *StorageChallengeFailureEvidenceMetadata) Reset() {
+	*m = StorageChallengeFailureEvidenceMetadata{}
+}
+func (m *StorageChallengeFailureEvidenceMetadata) String() string { return proto.CompactTextString(m) }
+func (*StorageChallengeFailureEvidenceMetadata) ProtoMessage()    {}
+func (*StorageChallengeFailureEvidenceMetadata) Descriptor() ([]byte, []int) {
+	return fileDescriptor_09b57e4c2349ab91, []int{3}
+}
+func (m *StorageChallengeFailureEvidenceMetadata) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *StorageChallengeFailureEvidenceMetadata) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_StorageChallengeFailureEvidenceMetadata.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *StorageChallengeFailureEvidenceMetadata) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_StorageChallengeFailureEvidenceMetadata.Merge(m, src)
+}
+func (m *StorageChallengeFailureEvidenceMetadata) XXX_Size() int {
+	return m.Size()
+}
+func (m *StorageChallengeFailureEvidenceMetadata) XXX_DiscardUnknown() {
+	xxx_messageInfo_StorageChallengeFailureEvidenceMetadata.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_StorageChallengeFailureEvidenceMetadata proto.InternalMessageInfo
+
+func (m *StorageChallengeFailureEvidenceMetadata) GetEpochId() uint64 {
+	if m != nil {
+		return m.EpochId
+	}
+	return 0
+}
+
+func (m *StorageChallengeFailureEvidenceMetadata) GetChallengerSupernodeAccount() string {
+	if m != nil {
+		return m.ChallengerSupernodeAccount
+	}
+	return ""
+}
+
+func (m *StorageChallengeFailureEvidenceMetadata) GetChallengedSupernodeAccount() string {
+	if m != nil {
+		return m.ChallengedSupernodeAccount
+	}
+	return ""
+}
+
+func (m *StorageChallengeFailureEvidenceMetadata) GetChallengeId() string {
+	if m != nil {
+		return m.ChallengeId
+	}
+	return ""
+}
+
+func (m *StorageChallengeFailureEvidenceMetadata) GetFileKey() string {
+	if m != nil {
+		return m.FileKey
+	}
+	return ""
+}
+
+func (m *StorageChallengeFailureEvidenceMetadata) GetFailureType() string {
+	if m != nil {
+		return m.FailureType
+	}
+	return ""
+}
+
+func (m *StorageChallengeFailureEvidenceMetadata) GetTranscriptHash() string {
+	if m != nil {
+		return m.TranscriptHash
+	}
+	return ""
+}
+
 func init() {
 	proto.RegisterType((*ActionExpiredEvidenceMetadata)(nil), "lumera.audit.v1.ActionExpiredEvidenceMetadata")
 	proto.RegisterType((*ActionFinalizationSignatureFailureEvidenceMetadata)(nil), "lumera.audit.v1.ActionFinalizationSignatureFailureEvidenceMetadata")
 	proto.RegisterType((*ActionFinalizationNotInTop10EvidenceMetadata)(nil), "lumera.audit.v1.ActionFinalizationNotInTop10EvidenceMetadata")
+	proto.RegisterType((*StorageChallengeFailureEvidenceMetadata)(nil), "lumera.audit.v1.StorageChallengeFailureEvidenceMetadata")
 }
 
 func init() {
@@ -181,25 +283,36 @@ func init() {
 }
 
 var fileDescriptor_09b57e4c2349ab91 = []byte{
-	// 278 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0x52, 0xcf, 0x29, 0xcd, 0x4d,
-	0x2d, 0x4a, 0xd4, 0x4f, 0x2c, 0x4d, 0xc9, 0x2c, 0xd1, 0x2f, 0x33, 0xd4, 0x4f, 0x2d, 0xcb, 0x4c,
-	0x49, 0xcd, 0x4b, 0x4e, 0x8d, 0xcf, 0x4d, 0x2d, 0x49, 0x4c, 0x49, 0x2c, 0x49, 0xd4, 0x2b, 0x28,
-	0xca, 0x2f, 0xc9, 0x17, 0xe2, 0x87, 0x28, 0xd4, 0x03, 0x2b, 0xd4, 0x2b, 0x33, 0x94, 0x92, 0x4c,
-	0xce, 0x2f, 0xce, 0xcd, 0x2f, 0x8e, 0x07, 0x4b, 0xeb, 0x43, 0x38, 0x10, 0xb5, 0x4a, 0xf5, 0x5c,
-	0xb2, 0x8e, 0xc9, 0x25, 0x99, 0xf9, 0x79, 0xae, 0x15, 0x05, 0x99, 0x45, 0xa9, 0x29, 0xae, 0x50,
-	0x33, 0x7d, 0xa1, 0x46, 0x0a, 0xc5, 0x71, 0x49, 0x95, 0xe4, 0x17, 0xc4, 0x1b, 0x1a, 0xc4, 0x97,
-	0x25, 0xe6, 0x64, 0xa6, 0x24, 0x96, 0xe4, 0x17, 0xc5, 0x27, 0xa6, 0xa4, 0x14, 0xa5, 0x16, 0x17,
-	0xa7, 0x16, 0x4b, 0x30, 0x2a, 0x30, 0x6b, 0x70, 0x3a, 0x29, 0x5e, 0xda, 0xa2, 0x2b, 0x0b, 0x35,
-	0x36, 0x0c, 0xa6, 0xca, 0x11, 0xa2, 0x28, 0xb8, 0xa4, 0x28, 0x33, 0x2f, 0x3d, 0x48, 0xbc, 0x24,
-	0xbf, 0xc0, 0xd0, 0x00, 0x5d, 0x32, 0xb5, 0x58, 0x69, 0x0a, 0x23, 0x97, 0x11, 0xc4, 0x05, 0x6e,
-	0x99, 0x79, 0x89, 0x39, 0x99, 0x55, 0x89, 0x20, 0x76, 0x70, 0x66, 0x7a, 0x5e, 0x62, 0x49, 0x69,
-	0x51, 0xaa, 0x5b, 0x62, 0x66, 0x4e, 0x69, 0x51, 0x2a, 0xdd, 0x9d, 0xd5, 0xc7, 0xc8, 0xa5, 0x83,
-	0xe9, 0x2c, 0xbf, 0xfc, 0x12, 0xcf, 0xbc, 0x10, 0x90, 0x16, 0x7a, 0x3b, 0xc8, 0x49, 0xeb, 0xc4,
-	0x23, 0x39, 0xc6, 0x0b, 0x8f, 0xe4, 0x18, 0x1f, 0x3c, 0x92, 0x63, 0x9c, 0xf0, 0x58, 0x8e, 0xe1,
-	0xc2, 0x63, 0x39, 0x86, 0x1b, 0x8f, 0xe5, 0x18, 0xa2, 0x04, 0x2a, 0x10, 0x49, 0xa2, 0xa4, 0xb2,
-	0x20, 0xb5, 0x38, 0x89, 0x0d, 0x1c, 0xb7, 0xc6, 0x80, 0x00, 0x00, 0x00, 0xff, 0xff, 0x56, 0x8f,
-	0xc7, 0xad, 0x32, 0x02, 0x00, 0x00,
+	// 455 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xbc, 0x93, 0xcd, 0x6e, 0x13, 0x31,
+	0x14, 0x85, 0x63, 0x52, 0x1a, 0x6a, 0x10, 0x45, 0xd9, 0x74, 0x1a, 0xe8, 0x28, 0xed, 0x26, 0x11,
+	0xa2, 0x49, 0x03, 0x4f, 0x90, 0xa0, 0x56, 0x44, 0x08, 0x16, 0x49, 0xc5, 0x02, 0x09, 0xac, 0x8b,
+	0x7d, 0x9b, 0xb1, 0x98, 0xd8, 0x96, 0xed, 0x89, 0x3a, 0x6c, 0x78, 0x01, 0x84, 0x58, 0xf0, 0x28,
+	0x7d, 0x08, 0x96, 0x55, 0x57, 0x2c, 0x51, 0xf2, 0x22, 0x68, 0x7e, 0xd2, 0xa8, 0x14, 0x16, 0x6c,
+	0xba, 0x9b, 0x7b, 0xcf, 0x39, 0xdf, 0x1c, 0x5b, 0x32, 0x6d, 0xc5, 0xc9, 0x14, 0x2d, 0x74, 0x21,
+	0x11, 0xd2, 0x77, 0x67, 0xbd, 0x2e, 0xce, 0xa4, 0x40, 0xc5, 0x91, 0x4d, 0xd1, 0x83, 0x00, 0x0f,
+	0x1d, 0x63, 0xb5, 0xd7, 0xf5, 0xcd, 0xc2, 0xd8, 0xc9, 0x8d, 0x9d, 0x59, 0xaf, 0xb1, 0xcd, 0xb5,
+	0x9b, 0x6a, 0xc7, 0x72, 0xb9, 0x5b, 0x0c, 0x85, 0x77, 0xef, 0x33, 0xdd, 0xe9, 0x73, 0x2f, 0xb5,
+	0x3a, 0x3c, 0x35, 0xd2, 0xa2, 0x38, 0x2c, 0x99, 0xaf, 0x4a, 0x64, 0xfd, 0x3d, 0x6d, 0x78, 0x6d,
+	0x58, 0xef, 0x80, 0xcd, 0x20, 0x96, 0x02, 0xbc, 0xb6, 0x0c, 0x84, 0xb0, 0xe8, 0x1c, 0xba, 0x80,
+	0x34, 0xab, 0xed, 0x8d, 0xc1, 0xee, 0xc5, 0xd9, 0xfe, 0x4e, 0x89, 0x7d, 0xb3, 0x74, 0xf5, 0x0b,
+	0xd3, 0xd8, 0x5b, 0xa9, 0x26, 0xa3, 0x2d, 0xaf, 0x4d, 0xef, 0xe0, 0x4f, 0x11, 0xdd, 0xde, 0x77,
+	0x42, 0x9f, 0x16, 0x0d, 0x8e, 0xa4, 0x82, 0x58, 0x7e, 0x82, 0xec, 0x7b, 0x2c, 0x27, 0x0a, 0x7c,
+	0x62, 0xf1, 0x08, 0x64, 0x9c, 0x58, 0xbc, 0xf1, 0x5a, 0x5f, 0x09, 0x7d, 0x72, 0xbd, 0xd6, 0x6b,
+	0xed, 0x87, 0xea, 0x38, 0x8b, 0xdc, 0x78, 0xa1, 0x2f, 0x55, 0xda, 0x1a, 0x7b, 0x6d, 0x61, 0x82,
+	0xcf, 0x23, 0x88, 0x63, 0x54, 0x93, 0x7f, 0x5e, 0xce, 0x36, 0xbd, 0x83, 0x46, 0xf3, 0x88, 0x49,
+	0x11, 0x90, 0x26, 0x69, 0xaf, 0x8d, 0x6a, 0xf9, 0x3c, 0x14, 0xf5, 0x77, 0xf4, 0x11, 0x5f, 0xc6,
+	0x2d, 0x73, 0x89, 0x41, 0xab, 0xb4, 0x40, 0x06, 0x9c, 0xeb, 0x44, 0xf9, 0xe0, 0x56, 0x93, 0xb4,
+	0x37, 0x06, 0x0f, 0x2f, 0xce, 0xf6, 0xb7, 0xca, 0xa2, 0x7d, 0xce, 0xaf, 0x56, 0x6c, 0xac, 0x00,
+	0xe3, 0x65, 0xbe, 0x5f, 0xc4, 0xaf, 0xe0, 0xc5, 0x5f, 0xf0, 0xd5, 0xff, 0xc1, 0x8b, 0x6b, 0xf8,
+	0x5d, 0x7a, 0xef, 0x52, 0xcd, 0x0e, 0xb7, 0x96, 0xe1, 0x46, 0x77, 0x2f, 0x77, 0x43, 0x91, 0x9d,
+	0xfd, 0x44, 0xc6, 0xc8, 0x3e, 0x62, 0x1a, 0xdc, 0xce, 0xe5, 0x5a, 0x36, 0xbf, 0xc4, 0x34, 0x4b,
+	0x9f, 0x14, 0x37, 0xc6, 0x7c, 0x6a, 0x30, 0x58, 0x2f, 0xd2, 0xe5, 0xee, 0x38, 0x35, 0x58, 0x6f,
+	0xd1, 0x4d, 0x6f, 0x41, 0x39, 0x6e, 0xa5, 0xf1, 0x2c, 0x02, 0x17, 0x05, 0xb5, 0xdc, 0x75, 0x7f,
+	0xb5, 0x7e, 0x01, 0x2e, 0x1a, 0x3c, 0xfe, 0x31, 0x0f, 0xc9, 0xf9, 0x3c, 0x24, 0xbf, 0xe6, 0x21,
+	0xf9, 0xb6, 0x08, 0x2b, 0xe7, 0x8b, 0xb0, 0xf2, 0x73, 0x11, 0x56, 0xde, 0x3e, 0x38, 0x5d, 0xbd,
+	0xd0, 0xec, 0x37, 0xee, 0xc3, 0x7a, 0xfe, 0xd4, 0x9e, 0xfd, 0x0e, 0x00, 0x00, 0xff, 0xff, 0xb3,
+	0x76, 0x69, 0x56, 0xc1, 0x03, 0x00, 0x00,
 }
 
 func (m *ActionExpiredEvidenceMetadata) Marshal() (dAtA []byte, err error) {
@@ -298,6 +411,76 @@ func (m *ActionFinalizationNotInTop10EvidenceMetadata) MarshalToSizedBuffer(dAtA
 	return len(dAtA) - i, nil
 }
 
+func (m *StorageChallengeFailureEvidenceMetadata) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *StorageChallengeFailureEvidenceMetadata) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *StorageChallengeFailureEvidenceMetadata) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.TranscriptHash) > 0 {
+		i -= len(m.TranscriptHash)
+		copy(dAtA[i:], m.TranscriptHash)
+		i = encodeVarintEvidenceMetadata(dAtA, i, uint64(len(m.TranscriptHash)))
+		i--
+		dAtA[i] = 0x3a
+	}
+	if len(m.FailureType) > 0 {
+		i -= len(m.FailureType)
+		copy(dAtA[i:], m.FailureType)
+		i = encodeVarintEvidenceMetadata(dAtA, i, uint64(len(m.FailureType)))
+		i--
+		dAtA[i] = 0x32
+	}
+	if len(m.FileKey) > 0 {
+		i -= len(m.FileKey)
+		copy(dAtA[i:], m.FileKey)
+		i = encodeVarintEvidenceMetadata(dAtA, i, uint64(len(m.FileKey)))
+		i--
+		dAtA[i] = 0x2a
+	}
+	if len(m.ChallengeId) > 0 {
+		i -= len(m.ChallengeId)
+		copy(dAtA[i:], m.ChallengeId)
+		i = encodeVarintEvidenceMetadata(dAtA, i, uint64(len(m.ChallengeId)))
+		i--
+		dAtA[i] = 0x22
+	}
+	if len(m.ChallengedSupernodeAccount) > 0 {
+		i -= len(m.ChallengedSupernodeAccount)
+		copy(dAtA[i:], m.ChallengedSupernodeAccount)
+		i = encodeVarintEvidenceMetadata(dAtA, i, uint64(len(m.ChallengedSupernodeAccount)))
+		i--
+		dAtA[i] = 0x1a
+	}
+	if len(m.ChallengerSupernodeAccount) > 0 {
+		i -= len(m.ChallengerSupernodeAccount)
+		copy(dAtA[i:], m.ChallengerSupernodeAccount)
+		i = encodeVarintEvidenceMetadata(dAtA, i, uint64(len(m.ChallengerSupernodeAccount)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if m.EpochId != 0 {
+		i = encodeVarintEvidenceMetadata(dAtA, i, uint64(m.EpochId))
+		i--
+		dAtA[i] = 0x8
+	}
+	return len(dAtA) - i, nil
+}
+
 func encodeVarintEvidenceMetadata(dAtA []byte, offset int, v uint64) int {
 	offset -= sovEvidenceMetadata(v)
 	base := offset
@@ -350,6 +533,42 @@ func (m *ActionFinalizationNotInTop10EvidenceMetadata) Size() (n int) {
 			l = len(s)
 			n += 1 + l + sovEvidenceMetadata(uint64(l))
 		}
+	}
+	return n
+}
+
+func (m *StorageChallengeFailureEvidenceMetadata) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.EpochId != 0 {
+		n += 1 + sovEvidenceMetadata(uint64(m.EpochId))
+	}
+	l = len(m.ChallengerSupernodeAccount)
+	if l > 0 {
+		n += 1 + l + sovEvidenceMetadata(uint64(l))
+	}
+	l = len(m.ChallengedSupernodeAccount)
+	if l > 0 {
+		n += 1 + l + sovEvidenceMetadata(uint64(l))
+	}
+	l = len(m.ChallengeId)
+	if l > 0 {
+		n += 1 + l + sovEvidenceMetadata(uint64(l))
+	}
+	l = len(m.FileKey)
+	if l > 0 {
+		n += 1 + l + sovEvidenceMetadata(uint64(l))
+	}
+	l = len(m.FailureType)
+	if l > 0 {
+		n += 1 + l + sovEvidenceMetadata(uint64(l))
+	}
+	l = len(m.TranscriptHash)
+	if l > 0 {
+		n += 1 + l + sovEvidenceMetadata(uint64(l))
 	}
 	return n
 }
@@ -584,6 +803,267 @@ func (m *ActionFinalizationNotInTop10EvidenceMetadata) Unmarshal(dAtA []byte) er
 				return io.ErrUnexpectedEOF
 			}
 			m.Top_10ValidatorAddresses = append(m.Top_10ValidatorAddresses, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipEvidenceMetadata(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthEvidenceMetadata
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *StorageChallengeFailureEvidenceMetadata) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowEvidenceMetadata
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: StorageChallengeFailureEvidenceMetadata: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: StorageChallengeFailureEvidenceMetadata: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field EpochId", wireType)
+			}
+			m.EpochId = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowEvidenceMetadata
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.EpochId |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ChallengerSupernodeAccount", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowEvidenceMetadata
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthEvidenceMetadata
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthEvidenceMetadata
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ChallengerSupernodeAccount = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ChallengedSupernodeAccount", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowEvidenceMetadata
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthEvidenceMetadata
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthEvidenceMetadata
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ChallengedSupernodeAccount = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ChallengeId", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowEvidenceMetadata
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthEvidenceMetadata
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthEvidenceMetadata
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ChallengeId = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FileKey", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowEvidenceMetadata
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthEvidenceMetadata
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthEvidenceMetadata
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.FileKey = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FailureType", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowEvidenceMetadata
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthEvidenceMetadata
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthEvidenceMetadata
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.FailureType = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 7:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TranscriptHash", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowEvidenceMetadata
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthEvidenceMetadata
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthEvidenceMetadata
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.TranscriptHash = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

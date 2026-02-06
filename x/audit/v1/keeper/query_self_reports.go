@@ -24,11 +24,11 @@ func (q queryServer) SelfReports(ctx context.Context, req *types.QuerySelfReport
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
 	storeAdapter := runtime.KVStoreAdapter(q.k.storeService.OpenKVStore(sdkCtx))
 
-	useWindowFilter := req.FilterByWindowId || req.WindowId != 0
+	useEpochFilter := req.FilterByEpochId || req.EpochId != 0
 
 	var store prefix.Store
-	if useWindowFilter {
-		store = prefix.NewStore(storeAdapter, types.SelfReportIndexKey(req.SupernodeAccount, req.WindowId))
+	if useEpochFilter {
+		store = prefix.NewStore(storeAdapter, types.SelfReportIndexKey(req.SupernodeAccount, req.EpochId))
 	} else {
 		store = prefix.NewStore(storeAdapter, types.SelfReportIndexPrefix(req.SupernodeAccount))
 	}
@@ -41,22 +41,22 @@ func (q queryServer) SelfReports(ctx context.Context, req *types.QuerySelfReport
 	}
 
 	pageRes, err := query.Paginate(store, pagination, func(key, _ []byte) error {
-		var windowID uint64
-		if useWindowFilter {
-			windowID = req.WindowId
+		var epochID uint64
+		if useEpochFilter {
+			epochID = req.EpochId
 		} else {
 			if len(key) != 8 {
 				return status.Error(codes.Internal, "invalid self report index key")
 			}
-			windowID = binary.BigEndian.Uint64(key)
+			epochID = binary.BigEndian.Uint64(key)
 		}
 
-		r, found := q.k.GetReport(sdkCtx, windowID, req.SupernodeAccount)
+		r, found := q.k.GetReport(sdkCtx, epochID, req.SupernodeAccount)
 		if !found {
 			return nil
 		}
 		reports = append(reports, types.SelfReport{
-			WindowId:     r.WindowId,
+			EpochId:      r.EpochId,
 			ReportHeight: r.ReportHeight,
 			SelfReport:   r.SelfReport,
 		})

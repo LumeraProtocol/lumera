@@ -11,13 +11,13 @@ import (
 )
 
 func TestPeerPortPostponementThresholdPercent(t *testing.T) {
-	makeReports := func(t *testing.T, f *fixture, windowID uint64, target sntypes.SuperNode, peers []sntypes.SuperNode, portStateForPeer []types.PortState) {
+	makeReports := func(t *testing.T, f *fixture, epochID uint64, target sntypes.SuperNode, peers []sntypes.SuperNode, portStateForPeer []types.PortState) {
 		t.Helper()
 
 		// Target must submit a report to avoid missing-report postponement.
 		err := f.keeper.SetReport(f.ctx, types.AuditReport{
 			SupernodeAccount: target.SupernodeAccount,
-			WindowId:         windowID,
+			EpochId:          epochID,
 			ReportHeight:     f.ctx.BlockHeight(),
 			SelfReport:       types.AuditSelfReport{},
 		})
@@ -28,7 +28,7 @@ func TestPeerPortPostponementThresholdPercent(t *testing.T) {
 		for i, peer := range peers {
 			err := f.keeper.SetReport(f.ctx, types.AuditReport{
 				SupernodeAccount: peer.SupernodeAccount,
-				WindowId:         windowID,
+				EpochId:          epochID,
 				ReportHeight:     f.ctx.BlockHeight(),
 				SelfReport:       types.AuditSelfReport{},
 				PeerObservations: []*types.AuditPeerObservation{
@@ -41,11 +41,11 @@ func TestPeerPortPostponementThresholdPercent(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to set peer report: %v", err)
 			}
-			f.keeper.SetSupernodeReportIndex(f.ctx, target.SupernodeAccount, windowID, peer.SupernodeAccount)
+			f.keeper.SetSupernodeReportIndex(f.ctx, target.SupernodeAccount, epochID, peer.SupernodeAccount)
 		}
 	}
 
-	windowID := uint64(0)
+	epochID := uint64(0)
 
 	_, targetAcc, targetVal := cryptotestutils.SupernodeAddresses()
 	target := sntypes.SuperNode{
@@ -74,10 +74,10 @@ func TestPeerPortPostponementThresholdPercent(t *testing.T) {
 
 		params := types.DefaultParams()
 		params.RequiredOpenPorts = []uint32{4444}
-		params.ConsecutiveWindowsToPostpone = 1
+		params.ConsecutiveEpochsToPostpone = 1
 		params.PeerPortPostponeThresholdPercent = 100
 
-		makeReports(t, f, windowID, target, peers, peerStates)
+		makeReports(t, f, epochID, target, peers, peerStates)
 
 		f.supernodeKeeper.EXPECT().
 			GetAllSuperNodes(gomock.AssignableToTypeOf(f.ctx), sntypes.SuperNodeStateActive).
@@ -91,7 +91,7 @@ func TestPeerPortPostponementThresholdPercent(t *testing.T) {
 			SetSuperNodePostponed(gomock.AssignableToTypeOf(f.ctx), sdk.ValAddress(targetVal), gomock.Any()).
 			Times(0)
 
-		if err := f.keeper.EnforceWindowEnd(f.ctx, windowID, params); err != nil {
+		if err := f.keeper.EnforceEpochEnd(f.ctx, epochID, params); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
@@ -101,10 +101,10 @@ func TestPeerPortPostponementThresholdPercent(t *testing.T) {
 
 		params := types.DefaultParams()
 		params.RequiredOpenPorts = []uint32{4444}
-		params.ConsecutiveWindowsToPostpone = 1
+		params.ConsecutiveEpochsToPostpone = 1
 		params.PeerPortPostponeThresholdPercent = 66
 
-		makeReports(t, f, windowID, target, peers, peerStates)
+		makeReports(t, f, epochID, target, peers, peerStates)
 
 		f.supernodeKeeper.EXPECT().
 			GetAllSuperNodes(gomock.AssignableToTypeOf(f.ctx), sntypes.SuperNodeStateActive).
@@ -119,7 +119,7 @@ func TestPeerPortPostponementThresholdPercent(t *testing.T) {
 			Return(nil).
 			Times(1)
 
-		if err := f.keeper.EnforceWindowEnd(f.ctx, windowID, params); err != nil {
+		if err := f.keeper.EnforceEpochEnd(f.ctx, epochID, params); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})

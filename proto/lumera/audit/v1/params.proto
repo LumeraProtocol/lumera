@@ -10,11 +10,15 @@ import "gogoproto/gogo.proto";
 message Params {
   option (gogoproto.equal) = true;
 
-  uint64 reporting_window_blocks      = 1;
+  uint64 epoch_length_blocks          = 1;
+
+  // epoch_zero_height defines the reference chain height at which epoch_id = 0 starts.
+  // This makes epoch boundaries deterministic from genesis without needing to query state.
+  uint64 epoch_zero_height            = 2;
 
   uint32 peer_quorum_reports          = 3;
-  uint32 min_probe_targets_per_window = 4;
-  uint32 max_probe_targets_per_window = 5;
+  uint32 min_probe_targets_per_epoch  = 4;
+  uint32 max_probe_targets_per_epoch  = 5;
 
   repeated uint32 required_open_ports = 6;
 
@@ -25,13 +29,13 @@ message Params {
   uint32 min_mem_free_percent = 8;
   uint32 min_disk_free_percent = 9;
 
-  // Number of consecutive windows a required port must be reported CLOSED by peers
+  // Number of consecutive epochs a required port must be reported CLOSED by peers
   // at or above peer_port_postpone_threshold_percent before postponing the supernode.
-  uint32 consecutive_windows_to_postpone = 10;
+  uint32 consecutive_epochs_to_postpone = 10;
 
-  // How many completed windows to keep in state for window-scoped data like WindowSnapshot,
-  // AuditReport, and related indices. Pruning runs at window end.
-  uint64 keep_last_window_entries = 11;
+  // How many completed epochs to keep in state for epoch-scoped data like AuditReport
+  // and related indices. Pruning runs at epoch end.
+  uint64 keep_last_epoch_entries = 11;
 
   // Minimum percent (1-100) of peer reports that must report a required port as CLOSED
   // for the port to be treated as CLOSED for postponement purposes.
@@ -47,35 +51,50 @@ message Params {
   // - EVIDENCE_TYPE_ACTION_FINALIZATION_NOT_IN_TOP_10
   //
   // Postponement triggers when, for a given supernode and evidence type:
-  // - the number of evidences in a window >= <*_evidences_per_window>, and
-  // - this happens for <*_consecutive_windows> windows in a row.
+  // - the number of evidences in an epoch >= <*_evidences_per_epoch>, and
+  // - this happens for <*_consecutive_epochs> epochs in a row.
   //
   // Recovery (auto-unpostpone) triggers after a supernode has been postponed for at least
-  // action_finalization_recovery_windows windows, and ONLY IF the total number of "bad"
-  // action-finalization evidences across the last action_finalization_recovery_windows windows
+  // action_finalization_recovery_epochs epochs, and ONLY IF the total number of "bad"
+  // action-finalization evidences across the last action_finalization_recovery_epochs epochs
   // is strictly less than action_finalization_recovery_max_total_bad_evidences.
 
-  // action_finalization_signature_failure_evidences_per_window is the per-window count threshold
+  // action_finalization_signature_failure_evidences_per_epoch is the per-epoch count threshold
   // for EVIDENCE_TYPE_ACTION_FINALIZATION_SIGNATURE_FAILURE.
-  uint32 action_finalization_signature_failure_evidences_per_window = 13;
+  uint32 action_finalization_signature_failure_evidences_per_epoch = 13;
 
-  // action_finalization_signature_failure_consecutive_windows is the consecutive windows threshold
+  // action_finalization_signature_failure_consecutive_epochs is the consecutive epochs threshold
   // for EVIDENCE_TYPE_ACTION_FINALIZATION_SIGNATURE_FAILURE.
-  uint32 action_finalization_signature_failure_consecutive_windows = 14;
+  uint32 action_finalization_signature_failure_consecutive_epochs = 14;
 
-  // action_finalization_not_in_top10_evidences_per_window is the per-window count threshold
+  // action_finalization_not_in_top10_evidences_per_epoch is the per-epoch count threshold
   // for EVIDENCE_TYPE_ACTION_FINALIZATION_NOT_IN_TOP_10.
-  uint32 action_finalization_not_in_top10_evidences_per_window = 15;
+  uint32 action_finalization_not_in_top10_evidences_per_epoch = 15;
 
-  // action_finalization_not_in_top10_consecutive_windows is the consecutive windows threshold
+  // action_finalization_not_in_top10_consecutive_epochs is the consecutive epochs threshold
   // for EVIDENCE_TYPE_ACTION_FINALIZATION_NOT_IN_TOP_10.
-  uint32 action_finalization_not_in_top10_consecutive_windows = 16;
+  uint32 action_finalization_not_in_top10_consecutive_epochs = 16;
 
-  // action_finalization_recovery_windows is the number of windows to wait before considering recovery.
-  uint32 action_finalization_recovery_windows = 17;
+  // action_finalization_recovery_epochs is the number of epochs to wait before considering recovery.
+  uint32 action_finalization_recovery_epochs = 17;
 
   // action_finalization_recovery_max_total_bad_evidences is the maximum allowed total count of bad
-  // action-finalization evidences in the recovery window for auto-recovery to occur.
+  // action-finalization evidences in the recovery epoch-span for auto-recovery to occur.
   // Recovery happens ONLY IF total_bad < this value.
   uint32 action_finalization_recovery_max_total_bad_evidences = 18;
+
+  // Storage Challenge (SC) params.
+  bool   sc_enabled = 19;
+  uint32 sc_challengers_per_epoch = 20;
+  uint32 sc_files_per_challenger = 21;
+  uint32 sc_replica_count = 22;
+  uint32 sc_observer_threshold = 23;
+  uint64 sc_min_slice_bytes = 24;
+  uint64 sc_max_slice_bytes = 25;
+  uint64 sc_response_timeout_ms = 26;
+  uint64 sc_affirmation_timeout_ms = 27;
+  uint64 sc_evidence_max_bytes = 28;
+  uint32 sc_candidate_keys_lookback_epochs = 29;
+  uint64 sc_start_jitter_ms = 30;
+  bool   sc_evidence_submitter_must_be_challenger = 31;
 }

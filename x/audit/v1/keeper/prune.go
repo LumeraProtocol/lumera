@@ -9,49 +9,49 @@ import (
 	"github.com/LumeraProtocol/lumera/x/audit/v1/types"
 )
 
-// PruneOldWindows bounds audit storage by window_id, keeping only the last params.keep_last_window_entries windows
-// (including the provided currentWindowID).
-func (k Keeper) PruneOldWindows(ctx sdk.Context, currentWindowID uint64, params types.Params) error {
+// PruneOldEpochs bounds audit storage by epoch_id, keeping only the last params.keep_last_epoch_entries epochs
+// (including the provided currentEpochID).
+func (k Keeper) PruneOldEpochs(ctx sdk.Context, currentEpochID uint64, params types.Params) error {
 	params = params.WithDefaults()
-	keepLastWindowEntries := params.KeepLastWindowEntries
+	keepLastEpochEntries := params.KeepLastEpochEntries
 
-	// Keep [minKeepWindowID .. currentWindowID].
-	var minKeepWindowID uint64
-	if currentWindowID+1 > keepLastWindowEntries {
-		minKeepWindowID = currentWindowID + 1 - keepLastWindowEntries
+	// Keep [minKeepEpochID .. currentEpochID].
+	var minKeepEpochID uint64
+	if currentEpochID+1 > keepLastEpochEntries {
+		minKeepEpochID = currentEpochID + 1 - keepLastEpochEntries
 	} else {
-		minKeepWindowID = 0
+		minKeepEpochID = 0
 	}
 
 	store := k.kvStore(ctx)
 
-	// Snapshots: ws/<u64be(window_id)>
-	if err := prunePrefixByWindowIDLeadingU64(store, []byte("ws/"), minKeepWindowID); err != nil {
+	// Epoch anchors: ea/<u64be(epoch_id)>
+	if err := prunePrefixByWindowIDLeadingU64(store, types.EpochAnchorPrefix(), minKeepEpochID); err != nil {
 		return err
 	}
 
-	// Reports: r/<u64be(window_id)><reporter>
-	if err := prunePrefixByWindowIDLeadingU64(store, []byte("r/"), minKeepWindowID); err != nil {
+	// Reports: r/<u64be(epoch_id)><reporter>
+	if err := prunePrefixByWindowIDLeadingU64(store, []byte("r/"), minKeepEpochID); err != nil {
 		return err
 	}
 
 	// Indices:
-	// - ri/<reporter>/<u64be(window_id)>
-	// - ss/<reporter>/<u64be(window_id)>
-	// - sr/<supernode>/<u64be(window_id)>/<reporter>
-	pruneReporterTrailingWindowID(store, []byte("ri/"), minKeepWindowID)
-	pruneReporterTrailingWindowID(store, []byte("ss/"), minKeepWindowID)
-	pruneSupernodeWindowReporter(store, []byte("sr/"), minKeepWindowID)
+	// - ri/<reporter>/<u64be(epoch_id)>
+	// - ss/<reporter>/<u64be(epoch_id)>
+	// - sr/<supernode>/<u64be(epoch_id)>/<reporter>
+	pruneReporterTrailingWindowID(store, []byte("ri/"), minKeepEpochID)
+	pruneReporterTrailingWindowID(store, []byte("ss/"), minKeepEpochID)
+	pruneSupernodeWindowReporter(store, []byte("sr/"), minKeepEpochID)
 
-	// Evidence window counts: evw/<u64be(window_id)>/...
-	if err := prunePrefixByWindowIDLeadingU64(store, types.EvidenceWindowCountPrefix(), minKeepWindowID); err != nil {
+	// Evidence epoch counts: eve/<u64be(epoch_id)>/...
+	if err := prunePrefixByWindowIDLeadingU64(store, types.EvidenceEpochCountPrefix(), minKeepEpochID); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func prunePrefixByWindowIDLeadingU64(store storetypes.KVStore, prefix []byte, minKeepWindowID uint64) error {
+func prunePrefixByWindowIDLeadingU64(store storetypes.KVStore, prefix []byte, minKeepEpochID uint64) error {
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
 	defer it.Close()
 
@@ -63,9 +63,9 @@ func prunePrefixByWindowIDLeadingU64(store storetypes.KVStore, prefix []byte, mi
 			// Malformed; skip.
 			continue
 		}
-		windowID := binary.BigEndian.Uint64(key[len(prefix) : len(prefix)+8])
-		if windowID >= minKeepWindowID {
-			// Keys are ordered by leading u64be(window_id); we can stop.
+		epochID := binary.BigEndian.Uint64(key[len(prefix) : len(prefix)+8])
+		if epochID >= minKeepEpochID {
+			// Keys are ordered by leading u64be(epoch_id); we can stop.
 			break
 		}
 		// Copy key before iterator advances.
@@ -82,9 +82,9 @@ func prunePrefixByWindowIDLeadingU64(store storetypes.KVStore, prefix []byte, mi
 
 // pruneReporterTrailingWindowID prunes keys shaped like:
 //
-//	<prefix><account>"/"<u64be(window_id)>
+//	<prefix><account>"/"<u64be(epoch_id)>
 //
-// by parsing the final 8 bytes as the window id.
+// by parsing the final 8 bytes as the epoch id.
 func pruneReporterTrailingWindowID(store storetypes.KVStore, prefix []byte, minKeepWindowID uint64) {
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
 	defer it.Close()
@@ -96,8 +96,8 @@ func pruneReporterTrailingWindowID(store storetypes.KVStore, prefix []byte, minK
 		if len(key) < len(prefix)+1+8 {
 			continue
 		}
-		windowID := binary.BigEndian.Uint64(key[len(key)-8:])
-		if windowID >= minKeepWindowID {
+		epochID := binary.BigEndian.Uint64(key[len(key)-8:])
+		if epochID >= minKeepWindowID {
 			continue
 		}
 		kc := make([]byte, len(key))
@@ -112,7 +112,7 @@ func pruneReporterTrailingWindowID(store storetypes.KVStore, prefix []byte, minK
 
 // pruneSupernodeWindowReporter prunes keys shaped like:
 //
-//	sr/<supernode>"/"<u64be(window_id)>"/"<reporter>
+//	sr/<supernode>"/"<u64be(epoch_id)>"/"<reporter>
 func pruneSupernodeWindowReporter(store storetypes.KVStore, prefix []byte, minKeepWindowID uint64) {
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
 	defer it.Close()
@@ -132,10 +132,10 @@ func pruneSupernodeWindowReporter(store storetypes.KVStore, prefix []byte, minKe
 		if len(rest) < sep+1+8+1 {
 			continue
 		}
-		windowIDStart := sep + 1
-		windowIDEnd := windowIDStart + 8
-		windowID := binary.BigEndian.Uint64(rest[windowIDStart:windowIDEnd])
-		if windowID >= minKeepWindowID {
+		epochIDStart := sep + 1
+		epochIDEnd := epochIDStart + 8
+		epochID := binary.BigEndian.Uint64(rest[epochIDStart:epochIDEnd])
+		if epochID >= minKeepWindowID {
 			continue
 		}
 		kc := make([]byte, len(key))

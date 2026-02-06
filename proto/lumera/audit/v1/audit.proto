@@ -26,29 +26,15 @@ message AuditSelfReport {
 message AuditPeerObservation {
   string target_supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
 
-  // port_states[i] refers to required_open_ports[i] for the window.
+  // port_states[i] refers to required_open_ports[i] for the epoch.
   repeated PortState port_states = 2;
 }
 
 message AuditReport {
   string supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
-  uint64 window_id         = 2;
+  uint64 epoch_id          = 2;
   int64 report_height      = 3;
 
   AuditSelfReport self_report = 4 [(gogoproto.nullable) = false];
   repeated AuditPeerObservation peer_observations = 5;
-}
-
-// ProberTargets captures the deterministic prober -> targets mapping for a window.
-message ProberTargets {
-  string prober_supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
-  repeated string target_supernode_accounts = 2 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
-}
-
-message WindowSnapshot {
-  uint64 window_id          = 1;
-  int64  window_start_height = 2;
-
-  // assignments is the minimal per-window source-of-truth for prober -> targets mapping.
-  repeated ProberTargets assignments = 3 [(gogoproto.nullable) = false];
 }

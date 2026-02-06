@@ -40,7 +40,7 @@ message MsgSubmitAuditReport {
   option (cosmos.msg.v1.signer) = "supernode_account";
 
   string supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
-  uint64 window_id         = 2;
+  uint64 epoch_id          = 2;
 
   AuditSelfReport self_report = 3 [(gogoproto.nullable) = false];
   repeated AuditPeerObservation peer_observations = 4;

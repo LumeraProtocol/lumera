@@ -10,16 +10,16 @@ import (
 	"github.com/LumeraProtocol/lumera/x/audit/v1/types"
 )
 
-func (q queryServer) WindowSnapshot(ctx context.Context, req *types.QueryWindowSnapshotRequest) (*types.QueryWindowSnapshotResponse, error) {
+func (q queryServer) EpochAnchor(ctx context.Context, req *types.QueryEpochAnchorRequest) (*types.QueryEpochAnchorResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
 	}
 
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
-	snap, found := q.k.GetWindowSnapshot(sdkCtx, req.WindowId)
+	anchor, found := q.k.GetEpochAnchor(sdkCtx, req.EpochId)
 	if !found {
-		return nil, status.Error(codes.NotFound, "window snapshot not found")
+		return nil, status.Error(codes.NotFound, "epoch anchor not found")
 	}
 
-	return &types.QueryWindowSnapshotResponse{Snapshot: snap}, nil
+	return &types.QueryEpochAnchorResponse{Anchor: anchor}, nil
 }

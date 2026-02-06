@@ -26,47 +26,64 @@ const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
 // Params defines the parameters for the audit module.
 type Params struct {
-	ReportingWindowBlocks    uint64   `protobuf:"varint,1,opt,name=reporting_window_blocks,json=reportingWindowBlocks,proto3" json:"reporting_window_blocks,omitempty"`
-	PeerQuorumReports        uint32   `protobuf:"varint,3,opt,name=peer_quorum_reports,json=peerQuorumReports,proto3" json:"peer_quorum_reports,omitempty"`
-	MinProbeTargetsPerWindow uint32   `protobuf:"varint,4,opt,name=min_probe_targets_per_window,json=minProbeTargetsPerWindow,proto3" json:"min_probe_targets_per_window,omitempty"`
-	MaxProbeTargetsPerWindow uint32   `protobuf:"varint,5,opt,name=max_probe_targets_per_window,json=maxProbeTargetsPerWindow,proto3" json:"max_probe_targets_per_window,omitempty"`
-	RequiredOpenPorts        []uint32 `protobuf:"varint,6,rep,packed,name=required_open_ports,json=requiredOpenPorts,proto3" json:"required_open_ports,omitempty"`
+	EpochLengthBlocks uint64 `protobuf:"varint,1,opt,name=epoch_length_blocks,json=epochLengthBlocks,proto3" json:"epoch_length_blocks,omitempty"`
+	// epoch_zero_height defines the reference chain height at which epoch_id = 0 starts.
+	// This makes epoch boundaries deterministic from genesis without needing to query state.
+	EpochZeroHeight         uint64   `protobuf:"varint,2,opt,name=epoch_zero_height,json=epochZeroHeight,proto3" json:"epoch_zero_height,omitempty"`
+	PeerQuorumReports       uint32   `protobuf:"varint,3,opt,name=peer_quorum_reports,json=peerQuorumReports,proto3" json:"peer_quorum_reports,omitempty"`
+	MinProbeTargetsPerEpoch uint32   `protobuf:"varint,4,opt,name=min_probe_targets_per_epoch,json=minProbeTargetsPerEpoch,proto3" json:"min_probe_targets_per_epoch,omitempty"`
+	MaxProbeTargetsPerEpoch uint32   `protobuf:"varint,5,opt,name=max_probe_targets_per_epoch,json=maxProbeTargetsPerEpoch,proto3" json:"max_probe_targets_per_epoch,omitempty"`
+	RequiredOpenPorts       []uint32 `protobuf:"varint,6,rep,packed,name=required_open_ports,json=requiredOpenPorts,proto3" json:"required_open_ports,omitempty"`
 	// Minimum required host free capacity (self reported).
 	// free% = 100 - usage%
 	// A usage% of 0 is treated as "unknown" (no action).
 	MinCpuFreePercent  uint32 `protobuf:"varint,7,opt,name=min_cpu_free_percent,json=minCpuFreePercent,proto3" json:"min_cpu_free_percent,omitempty"`
 	MinMemFreePercent  uint32 `protobuf:"varint,8,opt,name=min_mem_free_percent,json=minMemFreePercent,proto3" json:"min_mem_free_percent,omitempty"`
 	MinDiskFreePercent uint32 `protobuf:"varint,9,opt,name=min_disk_free_percent,json=minDiskFreePercent,proto3" json:"min_disk_free_percent,omitempty"`
-	// Number of consecutive windows a required port must be reported CLOSED by peers
+	// Number of consecutive epochs a required port must be reported CLOSED by peers
 	// at or above peer_port_postpone_threshold_percent before postponing the supernode.
-	ConsecutiveWindowsToPostpone uint32 `protobuf:"varint,10,opt,name=consecutive_windows_to_postpone,json=consecutiveWindowsToPostpone,proto3" json:"consecutive_windows_to_postpone,omitempty"`
-	// How many completed windows to keep in state for window-scoped data like WindowSnapshot,
-	// AuditReport, and related indices. Pruning runs at window end.
-	KeepLastWindowEntries uint64 `protobuf:"varint,11,opt,name=keep_last_window_entries,json=keepLastWindowEntries,proto3" json:"keep_last_window_entries,omitempty"`
+	ConsecutiveEpochsToPostpone uint32 `protobuf:"varint,10,opt,name=consecutive_epochs_to_postpone,json=consecutiveEpochsToPostpone,proto3" json:"consecutive_epochs_to_postpone,omitempty"`
+	// How many completed epochs to keep in state for epoch-scoped data like AuditReport
+	// and related indices. Pruning runs at epoch end.
+	KeepLastEpochEntries uint64 `protobuf:"varint,11,opt,name=keep_last_epoch_entries,json=keepLastEpochEntries,proto3" json:"keep_last_epoch_entries,omitempty"`
 	// Minimum percent (1-100) of peer reports that must report a required port as CLOSED
 	// for the port to be treated as CLOSED for postponement purposes.
 	//
 	// 100 means unanimous.
 	// Example: to approximate a 2/3 threshold, use 66 (since 2/3 ≈ 66.6%).
 	PeerPortPostponeThresholdPercent uint32 `protobuf:"varint,12,opt,name=peer_port_postpone_threshold_percent,json=peerPortPostponeThresholdPercent,proto3" json:"peer_port_postpone_threshold_percent,omitempty"`
-	// action_finalization_signature_failure_evidences_per_window is the per-window count threshold
+	// action_finalization_signature_failure_evidences_per_epoch is the per-epoch count threshold
 	// for EVIDENCE_TYPE_ACTION_FINALIZATION_SIGNATURE_FAILURE.
-	ActionFinalizationSignatureFailureEvidencesPerWindow uint32 `protobuf:"varint,13,opt,name=action_finalization_signature_failure_evidences_per_window,json=actionFinalizationSignatureFailureEvidencesPerWindow,proto3" json:"action_finalization_signature_failure_evidences_per_window,omitempty"`
-	// action_finalization_signature_failure_consecutive_windows is the consecutive windows threshold
+	ActionFinalizationSignatureFailureEvidencesPerEpoch uint32 `protobuf:"varint,13,opt,name=action_finalization_signature_failure_evidences_per_epoch,json=actionFinalizationSignatureFailureEvidencesPerEpoch,proto3" json:"action_finalization_signature_failure_evidences_per_epoch,omitempty"`
+	// action_finalization_signature_failure_consecutive_epochs is the consecutive epochs threshold
 	// for EVIDENCE_TYPE_ACTION_FINALIZATION_SIGNATURE_FAILURE.
-	ActionFinalizationSignatureFailureConsecutiveWindows uint32 `protobuf:"varint,14,opt,name=action_finalization_signature_failure_consecutive_windows,json=actionFinalizationSignatureFailureConsecutiveWindows,proto3" json:"action_finalization_signature_failure_consecutive_windows,omitempty"`
-	// action_finalization_not_in_top10_evidences_per_window is the per-window count threshold
+	ActionFinalizationSignatureFailureConsecutiveEpochs uint32 `protobuf:"varint,14,opt,name=action_finalization_signature_failure_consecutive_epochs,json=actionFinalizationSignatureFailureConsecutiveEpochs,proto3" json:"action_finalization_signature_failure_consecutive_epochs,omitempty"`
+	// action_finalization_not_in_top10_evidences_per_epoch is the per-epoch count threshold
 	// for EVIDENCE_TYPE_ACTION_FINALIZATION_NOT_IN_TOP_10.
-	ActionFinalizationNotInTop10EvidencesPerWindow uint32 `protobuf:"varint,15,opt,name=action_finalization_not_in_top10_evidences_per_window,json=actionFinalizationNotInTop10EvidencesPerWindow,proto3" json:"action_finalization_not_in_top10_evidences_per_window,omitempty"`
-	// action_finalization_not_in_top10_consecutive_windows is the consecutive windows threshold
+	ActionFinalizationNotInTop10EvidencesPerEpoch uint32 `protobuf:"varint,15,opt,name=action_finalization_not_in_top10_evidences_per_epoch,json=actionFinalizationNotInTop10EvidencesPerEpoch,proto3" json:"action_finalization_not_in_top10_evidences_per_epoch,omitempty"`
+	// action_finalization_not_in_top10_consecutive_epochs is the consecutive epochs threshold
 	// for EVIDENCE_TYPE_ACTION_FINALIZATION_NOT_IN_TOP_10.
-	ActionFinalizationNotInTop10ConsecutiveWindows uint32 `protobuf:"varint,16,opt,name=action_finalization_not_in_top10_consecutive_windows,json=actionFinalizationNotInTop10ConsecutiveWindows,proto3" json:"action_finalization_not_in_top10_consecutive_windows,omitempty"`
-	// action_finalization_recovery_windows is the number of windows to wait before considering recovery.
-	ActionFinalizationRecoveryWindows uint32 `protobuf:"varint,17,opt,name=action_finalization_recovery_windows,json=actionFinalizationRecoveryWindows,proto3" json:"action_finalization_recovery_windows,omitempty"`
+	ActionFinalizationNotInTop10ConsecutiveEpochs uint32 `protobuf:"varint,16,opt,name=action_finalization_not_in_top10_consecutive_epochs,json=actionFinalizationNotInTop10ConsecutiveEpochs,proto3" json:"action_finalization_not_in_top10_consecutive_epochs,omitempty"`
+	// action_finalization_recovery_epochs is the number of epochs to wait before considering recovery.
+	ActionFinalizationRecoveryEpochs uint32 `protobuf:"varint,17,opt,name=action_finalization_recovery_epochs,json=actionFinalizationRecoveryEpochs,proto3" json:"action_finalization_recovery_epochs,omitempty"`
 	// action_finalization_recovery_max_total_bad_evidences is the maximum allowed total count of bad
-	// action-finalization evidences in the recovery window for auto-recovery to occur.
+	// action-finalization evidences in the recovery epoch-span for auto-recovery to occur.
 	// Recovery happens ONLY IF total_bad < this value.
 	ActionFinalizationRecoveryMaxTotalBadEvidences uint32 `protobuf:"varint,18,opt,name=action_finalization_recovery_max_total_bad_evidences,json=actionFinalizationRecoveryMaxTotalBadEvidences,proto3" json:"action_finalization_recovery_max_total_bad_evidences,omitempty"`
+	// Storage Challenge (SC) params.
+	ScEnabled                           bool   `protobuf:"varint,19,opt,name=sc_enabled,json=scEnabled,proto3" json:"sc_enabled,omitempty"`
+	ScChallengersPerEpoch               uint32 `protobuf:"varint,20,opt,name=sc_challengers_per_epoch,json=scChallengersPerEpoch,proto3" json:"sc_challengers_per_epoch,omitempty"`
+	ScFilesPerChallenger                uint32 `protobuf:"varint,21,opt,name=sc_files_per_challenger,json=scFilesPerChallenger,proto3" json:"sc_files_per_challenger,omitempty"`
+	ScReplicaCount                      uint32 `protobuf:"varint,22,opt,name=sc_replica_count,json=scReplicaCount,proto3" json:"sc_replica_count,omitempty"`
+	ScObserverThreshold                 uint32 `protobuf:"varint,23,opt,name=sc_observer_threshold,json=scObserverThreshold,proto3" json:"sc_observer_threshold,omitempty"`
+	ScMinSliceBytes                     uint64 `protobuf:"varint,24,opt,name=sc_min_slice_bytes,json=scMinSliceBytes,proto3" json:"sc_min_slice_bytes,omitempty"`
+	ScMaxSliceBytes                     uint64 `protobuf:"varint,25,opt,name=sc_max_slice_bytes,json=scMaxSliceBytes,proto3" json:"sc_max_slice_bytes,omitempty"`
+	ScResponseTimeoutMs                 uint64 `protobuf:"varint,26,opt,name=sc_response_timeout_ms,json=scResponseTimeoutMs,proto3" json:"sc_response_timeout_ms,omitempty"`
+	ScAffirmationTimeoutMs              uint64 `protobuf:"varint,27,opt,name=sc_affirmation_timeout_ms,json=scAffirmationTimeoutMs,proto3" json:"sc_affirmation_timeout_ms,omitempty"`
+	ScEvidenceMaxBytes                  uint64 `protobuf:"varint,28,opt,name=sc_evidence_max_bytes,json=scEvidenceMaxBytes,proto3" json:"sc_evidence_max_bytes,omitempty"`
+	ScCandidateKeysLookbackEpochs       uint32 `protobuf:"varint,29,opt,name=sc_candidate_keys_lookback_epochs,json=scCandidateKeysLookbackEpochs,proto3" json:"sc_candidate_keys_lookback_epochs,omitempty"`
+	ScStartJitterMs                     uint64 `protobuf:"varint,30,opt,name=sc_start_jitter_ms,json=scStartJitterMs,proto3" json:"sc_start_jitter_ms,omitempty"`
+	ScEvidenceSubmitterMustBeChallenger bool   `protobuf:"varint,31,opt,name=sc_evidence_submitter_must_be_challenger,json=scEvidenceSubmitterMustBeChallenger,proto3" json:"sc_evidence_submitter_must_be_challenger,omitempty"`
 }
 
 func (m *Params) Reset()         { *m = Params{} }
@@ -102,9 +119,16 @@ func (m *Params) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_Params proto.InternalMessageInfo
 
-func (m *Params) GetReportingWindowBlocks() uint64 {
+func (m *Params) GetEpochLengthBlocks() uint64 {
 	if m != nil {
-		return m.ReportingWindowBlocks
+		return m.EpochLengthBlocks
+	}
+	return 0
+}
+
+func (m *Params) GetEpochZeroHeight() uint64 {
+	if m != nil {
+		return m.EpochZeroHeight
 	}
 	return 0
 }
@@ -116,16 +140,16 @@ func (m *Params) GetPeerQuorumReports() uint32 {
 	return 0
 }
 
-func (m *Params) GetMinProbeTargetsPerWindow() uint32 {
+func (m *Params) GetMinProbeTargetsPerEpoch() uint32 {
 	if m != nil {
-		return m.MinProbeTargetsPerWindow
+		return m.MinProbeTargetsPerEpoch
 	}
 	return 0
 }
 
-func (m *Params) GetMaxProbeTargetsPerWindow() uint32 {
+func (m *Params) GetMaxProbeTargetsPerEpoch() uint32 {
 	if m != nil {
-		return m.MaxProbeTargetsPerWindow
+		return m.MaxProbeTargetsPerEpoch
 	}
 	return 0
 }
@@ -158,16 +182,16 @@ func (m *Params) GetMinDiskFreePercent() uint32 {
 	return 0
 }
 
-func (m *Params) GetConsecutiveWindowsToPostpone() uint32 {
+func (m *Params) GetConsecutiveEpochsToPostpone() uint32 {
 	if m != nil {
-		return m.ConsecutiveWindowsToPostpone
+		return m.ConsecutiveEpochsToPostpone
 	}
 	return 0
 }
 
-func (m *Params) GetKeepLastWindowEntries() uint64 {
+func (m *Params) GetKeepLastEpochEntries() uint64 {
 	if m != nil {
-		return m.KeepLastWindowEntries
+		return m.KeepLastEpochEntries
 	}
 	return 0
 }
@@ -179,37 +203,37 @@ func (m *Params) GetPeerPortPostponeThresholdPercent() uint32 {
 	return 0
 }
 
-func (m *Params) GetActionFinalizationSignatureFailureEvidencesPerWindow() uint32 {
+func (m *Params) GetActionFinalizationSignatureFailureEvidencesPerEpoch() uint32 {
 	if m != nil {
-		return m.ActionFinalizationSignatureFailureEvidencesPerWindow
+		return m.ActionFinalizationSignatureFailureEvidencesPerEpoch
 	}
 	return 0
 }
 
-func (m *Params) GetActionFinalizationSignatureFailureConsecutiveWindows() uint32 {
+func (m *Params) GetActionFinalizationSignatureFailureConsecutiveEpochs() uint32 {
 	if m != nil {
-		return m.ActionFinalizationSignatureFailureConsecutiveWindows
+		return m.ActionFinalizationSignatureFailureConsecutiveEpochs
 	}
 	return 0
 }
 
-func (m *Params) GetActionFinalizationNotInTop10EvidencesPerWindow() uint32 {
+func (m *Params) GetActionFinalizationNotInTop10EvidencesPerEpoch() uint32 {
 	if m != nil {
-		return m.ActionFinalizationNotInTop10EvidencesPerWindow
+		return m.ActionFinalizationNotInTop10EvidencesPerEpoch
 	}
 	return 0
 }
 
-func (m *Params) GetActionFinalizationNotInTop10ConsecutiveWindows() uint32 {
+func (m *Params) GetActionFinalizationNotInTop10ConsecutiveEpochs() uint32 {
 	if m != nil {
-		return m.ActionFinalizationNotInTop10ConsecutiveWindows
+		return m.ActionFinalizationNotInTop10ConsecutiveEpochs
 	}
 	return 0
 }
 
-func (m *Params) GetActionFinalizationRecoveryWindows() uint32 {
+func (m *Params) GetActionFinalizationRecoveryEpochs() uint32 {
 	if m != nil {
-		return m.ActionFinalizationRecoveryWindows
+		return m.ActionFinalizationRecoveryEpochs
 	}
 	return 0
 }
@@ -221,6 +245,97 @@ func (m *Params) GetActionFinalizationRecoveryMaxTotalBadEvidences() uint32 {
 	return 0
 }
 
+func (m *Params) GetScEnabled() bool {
+	if m != nil {
+		return m.ScEnabled
+	}
+	return false
+}
+
+func (m *Params) GetScChallengersPerEpoch() uint32 {
+	if m != nil {
+		return m.ScChallengersPerEpoch
+	}
+	return 0
+}
+
+func (m *Params) GetScFilesPerChallenger() uint32 {
+	if m != nil {
+		return m.ScFilesPerChallenger
+	}
+	return 0
+}
+
+func (m *Params) GetScReplicaCount() uint32 {
+	if m != nil {
+		return m.ScReplicaCount
+	}
+	return 0
+}
+
+func (m *Params) GetScObserverThreshold() uint32 {
+	if m != nil {
+		return m.ScObserverThreshold
+	}
+	return 0
+}
+
+func (m *Params) GetScMinSliceBytes() uint64 {
+	if m != nil {
+		return m.ScMinSliceBytes
+	}
+	return 0
+}
+
+func (m *Params) GetScMaxSliceBytes() uint64 {
+	if m != nil {
+		return m.ScMaxSliceBytes
+	}
+	return 0
+}
+
+func (m *Params) GetScResponseTimeoutMs() uint64 {
+	if m != nil {
+		return m.ScResponseTimeoutMs
+	}
+	return 0
+}
+
+func (m *Params) GetScAffirmationTimeoutMs() uint64 {
+	if m != nil {
+		return m.ScAffirmationTimeoutMs
+	}
+	return 0
+}
+
+func (m *Params) GetScEvidenceMaxBytes() uint64 {
+	if m != nil {
+		return m.ScEvidenceMaxBytes
+	}
+	return 0
+}
+
+func (m *Params) GetScCandidateKeysLookbackEpochs() uint32 {
+	if m != nil {
+		return m.ScCandidateKeysLookbackEpochs
+	}
+	return 0
+}
+
+func (m *Params) GetScStartJitterMs() uint64 {
+	if m != nil {
+		return m.ScStartJitterMs
+	}
+	return 0
+}
+
+func (m *Params) GetScEvidenceSubmitterMustBeChallenger() bool {
+	if m != nil {
+		return m.ScEvidenceSubmitterMustBeChallenger
+	}
+	return false
+}
+
 func init() {
 	proto.RegisterType((*Params)(nil), "lumera.audit.v1.Params")
 }
@@ -228,48 +343,70 @@ func init() {
 func init() { proto.RegisterFile("lumera/audit/v1/params.proto", fileDescriptor_3788ca0fc7eb9d86) }
 
 var fileDescriptor_3788ca0fc7eb9d86 = []byte{
-	// 644 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x8c, 0x94, 0x4f, 0x4f, 0x13, 0x41,
-	0x18, 0xc6, 0xd9, 0x80, 0xa8, 0xa3, 0x08, 0x2c, 0x10, 0x37, 0x84, 0x94, 0x6a, 0x38, 0x10, 0x0f,
-	0xad, 0x8d, 0xa8, 0x91, 0x83, 0x07, 0x10, 0x12, 0x13, 0x81, 0xb5, 0x36, 0x31, 0xf1, 0x32, 0x99,
-	0xee, 0xbe, 0x94, 0x49, 0x77, 0xfe, 0x30, 0x33, 0x5b, 0x8a, 0x9f, 0xc2, 0xb3, 0x27, 0x3f, 0x8e,
-	0x47, 0x8e, 0x1e, 0x0d, 0x5c, 0xfc, 0x18, 0x66, 0x66, 0xba, 0x4b, 0x09, 0x4b, 0xe0, 0xd2, 0x6e,
-	0xfb, 0x3c, 0xbf, 0xf7, 0x79, 0xdf, 0x77, 0x36, 0x83, 0x56, 0xb2, 0x9c, 0x81, 0x22, 0x4d, 0x92,
-	0xa7, 0xd4, 0x34, 0x07, 0xad, 0xa6, 0x24, 0x8a, 0x30, 0xdd, 0x90, 0x4a, 0x18, 0x11, 0xce, 0x7a,
-	0xb5, 0xe1, 0xd4, 0xc6, 0xa0, 0xb5, 0x3c, 0x4f, 0x18, 0xe5, 0xa2, 0xe9, 0x3e, 0xbd, 0x67, 0x79,
-	0xb1, 0x27, 0x7a, 0xc2, 0x3d, 0x36, 0xed, 0x93, 0xff, 0xf7, 0xf9, 0x4f, 0x84, 0xa6, 0x63, 0x57,
-	0x2a, 0x7c, 0x83, 0x9e, 0x2a, 0x90, 0x42, 0x19, 0xca, 0x7b, 0xf8, 0x84, 0xf2, 0x54, 0x9c, 0xe0,
-	0x6e, 0x26, 0x92, 0xbe, 0x8e, 0x82, 0x7a, 0xb0, 0x3e, 0xd5, 0x5e, 0x2a, 0xe5, 0xaf, 0x4e, 0xdd,
-	0x72, 0x62, 0xd8, 0x40, 0x0b, 0x12, 0x40, 0xe1, 0xe3, 0x5c, 0xa8, 0x9c, 0x61, 0x6f, 0xd2, 0xd1,
-	0x64, 0x3d, 0x58, 0x9f, 0x69, 0xcf, 0x5b, 0xe9, 0xb3, 0x53, 0xda, 0x5e, 0x08, 0xdf, 0xa3, 0x15,
-	0x46, 0x39, 0x96, 0x4a, 0x74, 0x01, 0x1b, 0xa2, 0x7a, 0x60, 0x34, 0x96, 0xa0, 0x46, 0x99, 0xd1,
-	0x94, 0x03, 0x23, 0x46, 0x79, 0x6c, 0x2d, 0x1d, 0xef, 0x88, 0x41, 0xf9, 0x54, 0xc7, 0x93, 0xe1,
-	0xcd, 0xfc, 0xbd, 0x11, 0x4f, 0x86, 0xd5, 0x7c, 0x03, 0x2d, 0x28, 0x38, 0xce, 0xa9, 0x82, 0x14,
-	0x0b, 0x09, 0x1c, 0xfb, 0x7e, 0xa7, 0xeb, 0x93, 0xb6, 0xdf, 0x42, 0x3a, 0x90, 0xc0, 0x63, 0xd7,
-	0x6f, 0x13, 0x2d, 0xda, 0x7e, 0x13, 0x99, 0xe3, 0x43, 0x05, 0x60, 0xa3, 0x12, 0xe0, 0x26, 0xba,
-	0xef, 0x07, 0x64, 0x94, 0x6f, 0xcb, 0x7c, 0x57, 0x01, 0xc4, 0x5e, 0x28, 0x00, 0x06, 0xec, 0x2a,
-	0xf0, 0xa0, 0x04, 0xf6, 0x80, 0x8d, 0x03, 0x2d, 0xb4, 0x64, 0x81, 0x94, 0xea, 0xfe, 0x55, 0xe2,
-	0xa1, 0x23, 0x42, 0x46, 0xf9, 0x07, 0xaa, 0xfb, 0xe3, 0xc8, 0x0e, 0x5a, 0x4d, 0x04, 0xd7, 0x90,
-	0xe4, 0x86, 0x0e, 0x60, 0x34, 0xba, 0xc6, 0x46, 0x60, 0x29, 0xb4, 0x91, 0x82, 0x43, 0x84, 0x1c,
-	0xbc, 0x32, 0x66, 0xf3, 0x0b, 0xd0, 0x1d, 0x11, 0x8f, 0x3c, 0xe1, 0x5b, 0x14, 0xf5, 0x01, 0x24,
-	0xce, 0x88, 0x36, 0xc5, 0x99, 0x03, 0x37, 0x8a, 0x82, 0x8e, 0x1e, 0xf9, 0x43, 0xb7, 0xfa, 0x27,
-	0xa2, 0x8d, 0x87, 0x77, 0xbc, 0x18, 0xee, 0xa3, 0x35, 0x77, 0xe8, 0x76, 0x77, 0x65, 0x24, 0x36,
-	0x47, 0x0a, 0xf4, 0x91, 0xc8, 0xd2, 0x72, 0x82, 0xc7, 0xae, 0x89, 0xba, 0xf5, 0xda, 0x6d, 0x16,
-	0xc1, 0x9d, 0xc2, 0x58, 0xcc, 0x33, 0x44, 0x9b, 0x24, 0x31, 0x54, 0x70, 0x7c, 0x48, 0x39, 0xc9,
-	0xe8, 0x77, 0xe2, 0x7e, 0x68, 0xda, 0xe3, 0xc4, 0xe4, 0x0a, 0xf0, 0x21, 0xa1, 0x99, 0xfd, 0x86,
-	0x01, 0x4d, 0x81, 0x27, 0x70, 0xe5, 0xc8, 0x67, 0x5c, 0xca, 0x86, 0xaf, 0xb0, 0x3b, 0x56, 0xe0,
-	0x4b, 0xc1, 0xef, 0x7a, 0x7c, 0xa7, 0xa0, 0x2f, 0x5f, 0x87, 0x13, 0xf4, 0xee, 0x6e, 0xc9, 0x15,
-	0xfb, 0x8e, 0x9e, 0xdc, 0x35, 0x78, 0xfb, 0xda, 0x29, 0x84, 0x0c, 0xbd, 0xae, 0x0a, 0xe6, 0xc2,
-	0x60, 0xca, 0xb1, 0x11, 0xb2, 0xf5, 0xb2, 0x7a, 0xda, 0x59, 0x17, 0xda, 0xb8, 0x1e, 0xba, 0x2f,
-	0xcc, 0x47, 0xde, 0xb1, 0x60, 0xc5, 0x9c, 0x19, 0xda, 0xb8, 0x35, 0xae, 0x6a, 0xc4, 0xb9, 0xdb,
-	0xd3, 0x2a, 0x86, 0x3b, 0x40, 0x6b, 0x55, 0x69, 0x0a, 0x12, 0x31, 0x00, 0x75, 0x5a, 0x56, 0x9f,
-	0x77, 0xd5, 0x9f, 0x5d, 0xaf, 0xde, 0x1e, 0x39, 0x8b, 0x82, 0x37, 0xb4, 0x5f, 0x16, 0xb4, 0x57,
-	0x82, 0x11, 0x86, 0x64, 0xb8, 0x4b, 0xd2, 0xcb, 0xbd, 0x45, 0xe1, 0x4d, 0xed, 0x17, 0x01, 0x7b,
-	0x64, 0xd8, 0xb1, 0xdc, 0x16, 0x49, 0xcb, 0xad, 0x6d, 0x4e, 0xfd, 0xfb, 0xb5, 0x1a, 0x6c, 0xbd,
-	0xf8, 0x7d, 0x5e, 0x0b, 0xce, 0xce, 0x6b, 0xc1, 0xdf, 0xf3, 0x5a, 0xf0, 0xe3, 0xa2, 0x36, 0x71,
-	0x76, 0x51, 0x9b, 0xf8, 0x73, 0x51, 0x9b, 0xf8, 0x36, 0x37, 0xbc, 0xbc, 0x89, 0xcd, 0xa9, 0x04,
-	0xdd, 0x9d, 0x76, 0xf7, 0xe9, 0xab, 0xff, 0x01, 0x00, 0x00, 0xff, 0xff, 0x98, 0xb5, 0x04, 0xce,
-	0xa9, 0x05, 0x00, 0x00,
+	// 993 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x8c, 0x56, 0xcd, 0x72, 0x1b, 0x45,
+	0x10, 0xb6, 0x88, 0x31, 0xc9, 0x40, 0x62, 0x7b, 0xfd, 0xb7, 0xb1, 0x63, 0xc5, 0x10, 0x0e, 0xae,
+	0x50, 0x48, 0x18, 0x93, 0x82, 0x50, 0x5c, 0xb0, 0xb0, 0x2b, 0x80, 0x95, 0x08, 0x59, 0x5c, 0x72,
+	0x99, 0x1a, 0x8d, 0x5a, 0xd2, 0x44, 0xbb, 0x33, 0x9b, 0xe9, 0x59, 0x95, 0x9c, 0xa7, 0xe0, 0x11,
+	0x78, 0x1c, 0x8e, 0x39, 0x72, 0xa4, 0x6c, 0x0e, 0x3c, 0x06, 0x35, 0x3d, 0x5a, 0x49, 0x8e, 0x95,
+	0x4a, 0x2e, 0xf6, 0xaa, 0xbf, 0xef, 0xeb, 0xfe, 0xba, 0x7b, 0x76, 0x6a, 0xd9, 0xbd, 0x24, 0x4f,
+	0xc1, 0x8a, 0xaa, 0xc8, 0x3b, 0xca, 0x55, 0x87, 0x07, 0xd5, 0x4c, 0x58, 0x91, 0x62, 0x25, 0xb3,
+	0xc6, 0x99, 0x68, 0x39, 0xa0, 0x15, 0x42, 0x2b, 0xc3, 0x83, 0xed, 0x55, 0x91, 0x2a, 0x6d, 0xaa,
+	0xf4, 0x37, 0x70, 0xb6, 0xd7, 0x7b, 0xa6, 0x67, 0xe8, 0xb1, 0xea, 0x9f, 0x42, 0xf4, 0xb3, 0x7f,
+	0x97, 0xd9, 0x52, 0x83, 0x52, 0x45, 0x15, 0xb6, 0x06, 0x99, 0x91, 0x7d, 0x9e, 0x80, 0xee, 0xb9,
+	0x3e, 0x6f, 0x27, 0x46, 0x0e, 0x30, 0x2e, 0xed, 0x95, 0xf6, 0x17, 0x9b, 0xab, 0x04, 0x9d, 0x12,
+	0x72, 0x44, 0x40, 0xf4, 0x90, 0x85, 0x20, 0x7f, 0x05, 0xd6, 0xf0, 0x3e, 0xa8, 0x5e, 0xdf, 0xc5,
+	0x1f, 0x10, 0x7b, 0x99, 0x80, 0xe7, 0x60, 0xcd, 0x13, 0x0a, 0xfb, 0xdc, 0x19, 0x80, 0xe5, 0x2f,
+	0x73, 0x63, 0xf3, 0x94, 0x5b, 0xc8, 0x8c, 0x75, 0x18, 0xdf, 0xd8, 0x2b, 0xed, 0xdf, 0x6e, 0xae,
+	0x7a, 0xe8, 0x37, 0x42, 0x9a, 0x01, 0x88, 0x7e, 0x60, 0x3b, 0xa9, 0xd2, 0x3c, 0xb3, 0xa6, 0x0d,
+	0xdc, 0x09, 0xdb, 0x03, 0x87, 0x3c, 0x03, 0xcb, 0x29, 0x71, 0xbc, 0x48, 0xba, 0xad, 0x54, 0xe9,
+	0x86, 0x67, 0xb4, 0x02, 0xa1, 0x01, 0xf6, 0xd8, 0xc3, 0xa4, 0x16, 0xa3, 0xb7, 0xaa, 0x3f, 0x1c,
+	0xab, 0xc5, 0x68, 0xae, 0xba, 0xc2, 0xd6, 0x2c, 0xbc, 0xcc, 0x95, 0x85, 0x0e, 0x37, 0x19, 0x68,
+	0x1e, 0xbc, 0x2e, 0xed, 0xdd, 0xf0, 0x5e, 0x0b, 0xe8, 0x59, 0x06, 0xba, 0x41, 0x5e, 0xab, 0x6c,
+	0xdd, 0x7b, 0x95, 0x59, 0xce, 0xbb, 0x16, 0xc0, 0x17, 0x92, 0xa0, 0x5d, 0xfc, 0x51, 0x68, 0x2e,
+	0x55, 0xba, 0x96, 0xe5, 0x27, 0x16, 0xa0, 0x11, 0x80, 0x42, 0x90, 0x42, 0x7a, 0x55, 0x70, 0x73,
+	0x22, 0xa8, 0x43, 0x3a, 0x2b, 0x38, 0x60, 0x1b, 0x5e, 0xd0, 0x51, 0x38, 0xb8, 0xaa, 0xb8, 0x45,
+	0x8a, 0x28, 0x55, 0xfa, 0x27, 0x85, 0x83, 0x59, 0x49, 0x8d, 0x95, 0xa5, 0xd1, 0x08, 0x32, 0x77,
+	0x6a, 0x08, 0xa1, 0x71, 0xe4, 0xce, 0xf0, 0xcc, 0xa0, 0xcb, 0x8c, 0x86, 0x98, 0x91, 0x76, 0x67,
+	0x86, 0x45, 0xed, 0x63, 0xcb, 0x34, 0xc6, 0x94, 0xe8, 0x11, 0xdb, 0x1a, 0x00, 0x64, 0x3c, 0x11,
+	0xe8, 0x42, 0x0a, 0x0e, 0xda, 0x59, 0x05, 0x18, 0x7f, 0x4c, 0x7b, 0x5e, 0xf7, 0xf0, 0xa9, 0x40,
+	0x47, 0xd2, 0xe3, 0x80, 0x45, 0x4f, 0xd9, 0xe7, 0xb4, 0x6c, 0x3f, 0xb7, 0x49, 0x3d, 0xee, 0xfa,
+	0x16, 0xb0, 0x6f, 0x92, 0xce, 0xc4, 0xfd, 0x27, 0xe4, 0x60, 0xcf, 0x73, 0xfd, 0x24, 0x8b, 0xb2,
+	0xad, 0x82, 0x58, 0xf4, 0x32, 0x64, 0x8f, 0x85, 0x74, 0xca, 0x68, 0xde, 0x55, 0x5a, 0x24, 0xea,
+	0x95, 0xa0, 0x1f, 0xa8, 0x7a, 0x5a, 0xb8, 0xdc, 0x02, 0xef, 0x0a, 0x95, 0xf8, 0xff, 0x30, 0x54,
+	0x1d, 0xd0, 0x12, 0x66, 0x97, 0x7d, 0x9b, 0x8a, 0x1c, 0x86, 0x04, 0x27, 0x33, 0xfa, 0xb3, 0x42,
+	0x7e, 0x12, 0xd4, 0xc7, 0x85, 0x78, 0x72, 0x10, 0x72, 0xf6, 0xdd, 0xfb, 0xd5, 0xbd, 0x3e, 0xe9,
+	0xf8, 0xce, 0xfb, 0x96, 0xad, 0xbd, 0x39, 0xff, 0x68, 0xc0, 0xbe, 0x99, 0x57, 0x56, 0x1b, 0xc7,
+	0x95, 0xe6, 0xce, 0x64, 0x07, 0x5f, 0xcd, 0xed, 0x74, 0x99, 0x4a, 0x7e, 0x79, 0xbd, 0xe4, 0x53,
+	0xe3, 0x7e, 0xd6, 0x2d, 0xaf, 0xbb, 0xde, 0xe3, 0x0b, 0x76, 0xf8, 0xce, 0x62, 0x73, 0xda, 0x5b,
+	0x79, 0x77, 0xad, 0xeb, 0x8d, 0xd5, 0xd9, 0x83, 0x79, 0xb5, 0x2c, 0x48, 0x33, 0x04, 0x7b, 0x5e,
+	0xe4, 0x5e, 0x0d, 0xc7, 0xe2, 0x7a, 0xee, 0xe6, 0x98, 0x38, 0x4e, 0x97, 0xcc, 0x9f, 0xd3, 0x24,
+	0x9d, 0xbf, 0x02, 0x9c, 0x71, 0x22, 0xe1, 0x6d, 0xd1, 0x99, 0x4e, 0x2c, 0x8e, 0x28, 0x7f, 0xe5,
+	0xed, 0xf9, 0xeb, 0x62, 0xd4, 0xf2, 0xba, 0x23, 0xd1, 0x99, 0x0c, 0x2c, 0xda, 0x65, 0x0c, 0x25,
+	0x07, 0x2d, 0xda, 0x09, 0x74, 0xe2, 0xb5, 0xbd, 0xd2, 0xfe, 0xcd, 0xe6, 0x2d, 0x94, 0xc7, 0x21,
+	0x10, 0x7d, 0xcb, 0x62, 0x94, 0x5c, 0xf6, 0x45, 0xe2, 0x6f, 0x4f, 0xb0, 0xb3, 0x8b, 0x59, 0xa7,
+	0x82, 0x1b, 0x28, 0x6b, 0x53, 0x78, 0xb2, 0x80, 0x47, 0x6c, 0x0b, 0x25, 0xef, 0xaa, 0x64, 0xbc,
+	0xcb, 0x69, 0x8a, 0x78, 0x83, 0x74, 0xeb, 0x28, 0x4f, 0x3c, 0xda, 0x00, 0x3b, 0xd5, 0x47, 0xfb,
+	0x6c, 0x05, 0xa5, 0xbf, 0x47, 0x13, 0x25, 0x05, 0x97, 0x26, 0xd7, 0x2e, 0xde, 0x24, 0xfe, 0x1d,
+	0x94, 0xcd, 0x10, 0xae, 0xf9, 0x68, 0xf4, 0x35, 0xdb, 0x40, 0xc9, 0x4d, 0x1b, 0xc1, 0x0e, 0xc1,
+	0x4e, 0x5f, 0xc3, 0x78, 0x8b, 0xe8, 0x6b, 0x28, 0x9f, 0x8d, 0xb1, 0xc9, 0x8b, 0x17, 0x7d, 0xc1,
+	0x22, 0x94, 0xdc, 0xdf, 0x39, 0x98, 0x28, 0x09, 0xbc, 0x7d, 0xee, 0x00, 0xe3, 0x38, 0xdc, 0xed,
+	0x28, 0xeb, 0x4a, 0x9f, 0xf9, 0xf8, 0x91, 0x0f, 0x17, 0x64, 0x31, 0xba, 0x42, 0xbe, 0x3b, 0x21,
+	0x8b, 0xd1, 0x0c, 0xf9, 0x90, 0x6d, 0x92, 0x6f, 0xcc, 0xfc, 0xf1, 0xe0, 0x4e, 0xa5, 0x60, 0x72,
+	0xc7, 0x53, 0x8c, 0xb7, 0x49, 0xb0, 0xe6, 0xdd, 0x07, 0xb0, 0x15, 0xb0, 0x3a, 0x46, 0x8f, 0xd9,
+	0x5d, 0x94, 0x5c, 0x74, 0xbb, 0xca, 0xa6, 0x61, 0xc9, 0x33, 0xba, 0x1d, 0xd2, 0x6d, 0xa2, 0xfc,
+	0x71, 0x8a, 0x4f, 0xa5, 0x07, 0xd4, 0x7d, 0xb1, 0x7c, 0x72, 0x19, 0xfc, 0xdd, 0x23, 0x59, 0x84,
+	0xb2, 0x58, 0x71, 0x5d, 0x8c, 0x82, 0xc5, 0x27, 0xec, 0x53, 0xbf, 0x4a, 0xa1, 0x3b, 0xaa, 0x23,
+	0x1c, 0xf0, 0x01, 0x9c, 0x23, 0x4f, 0x8c, 0x19, 0xb4, 0x85, 0x1c, 0x14, 0x87, 0x74, 0x97, 0x86,
+	0xb7, 0x8b, 0xb2, 0x56, 0xf0, 0x7e, 0x85, 0x73, 0x3c, 0x1d, 0xb3, 0xc6, 0x27, 0x34, 0x4c, 0x06,
+	0x9d, 0xb0, 0x8e, 0xbf, 0x50, 0xce, 0x81, 0xf5, 0x86, 0xcb, 0xc5, 0x64, 0xce, 0x3c, 0xf0, 0x0b,
+	0xc5, 0xeb, 0x18, 0xfd, 0xce, 0xf6, 0x67, 0x9d, 0x62, 0xde, 0x4e, 0xc7, 0x92, 0x1c, 0x1d, 0x6f,
+	0xc3, 0xec, 0xc9, 0xb8, 0x4f, 0xc7, 0xef, 0xc1, 0xd4, 0xfc, 0x59, 0xc1, 0xae, 0xe7, 0xe8, 0x8e,
+	0x60, 0x7a, 0x50, 0xbe, 0x5f, 0xfc, 0xef, 0xcf, 0xfb, 0xa5, 0xa3, 0x87, 0x7f, 0x5d, 0x94, 0x4b,
+	0xaf, 0x2f, 0xca, 0xa5, 0x7f, 0x2e, 0xca, 0xa5, 0x3f, 0x2e, 0xcb, 0x0b, 0xaf, 0x2f, 0xcb, 0x0b,
+	0x7f, 0x5f, 0x96, 0x17, 0x9e, 0xaf, 0x8c, 0xa6, 0xdf, 0x14, 0xee, 0x3c, 0x03, 0x6c, 0x2f, 0xd1,
+	0x97, 0xc1, 0xe1, 0xff, 0x01, 0x00, 0x00, 0xff, 0xff, 0x24, 0x0a, 0xa4, 0x48, 0x73, 0x08, 0x00,
+	0x00,
 }
 
 func (this *Params) Equal(that interface{}) bool {
@@ -291,16 +428,19 @@ func (this *Params) Equal(that interface{}) bool {
 	} else if this == nil {
 		return false
 	}
-	if this.ReportingWindowBlocks != that1.ReportingWindowBlocks {
+	if this.EpochLengthBlocks != that1.EpochLengthBlocks {
+		return false
+	}
+	if this.EpochZeroHeight != that1.EpochZeroHeight {
 		return false
 	}
 	if this.PeerQuorumReports != that1.PeerQuorumReports {
 		return false
 	}
-	if this.MinProbeTargetsPerWindow != that1.MinProbeTargetsPerWindow {
+	if this.MinProbeTargetsPerEpoch != that1.MinProbeTargetsPerEpoch {
 		return false
 	}
-	if this.MaxProbeTargetsPerWindow != that1.MaxProbeTargetsPerWindow {
+	if this.MaxProbeTargetsPerEpoch != that1.MaxProbeTargetsPerEpoch {
 		return false
 	}
 	if len(this.RequiredOpenPorts) != len(that1.RequiredOpenPorts) {
@@ -320,31 +460,70 @@ func (this *Params) Equal(that interface{}) bool {
 	if this.MinDiskFreePercent != that1.MinDiskFreePercent {
 		return false
 	}
-	if this.ConsecutiveWindowsToPostpone != that1.ConsecutiveWindowsToPostpone {
+	if this.ConsecutiveEpochsToPostpone != that1.ConsecutiveEpochsToPostpone {
 		return false
 	}
-	if this.KeepLastWindowEntries != that1.KeepLastWindowEntries {
+	if this.KeepLastEpochEntries != that1.KeepLastEpochEntries {
 		return false
 	}
 	if this.PeerPortPostponeThresholdPercent != that1.PeerPortPostponeThresholdPercent {
 		return false
 	}
-	if this.ActionFinalizationSignatureFailureEvidencesPerWindow != that1.ActionFinalizationSignatureFailureEvidencesPerWindow {
+	if this.ActionFinalizationSignatureFailureEvidencesPerEpoch != that1.ActionFinalizationSignatureFailureEvidencesPerEpoch {
 		return false
 	}
-	if this.ActionFinalizationSignatureFailureConsecutiveWindows != that1.ActionFinalizationSignatureFailureConsecutiveWindows {
+	if this.ActionFinalizationSignatureFailureConsecutiveEpochs != that1.ActionFinalizationSignatureFailureConsecutiveEpochs {
 		return false
 	}
-	if this.ActionFinalizationNotInTop10EvidencesPerWindow != that1.ActionFinalizationNotInTop10EvidencesPerWindow {
+	if this.ActionFinalizationNotInTop10EvidencesPerEpoch != that1.ActionFinalizationNotInTop10EvidencesPerEpoch {
 		return false
 	}
-	if this.ActionFinalizationNotInTop10ConsecutiveWindows != that1.ActionFinalizationNotInTop10ConsecutiveWindows {
+	if this.ActionFinalizationNotInTop10ConsecutiveEpochs != that1.ActionFinalizationNotInTop10ConsecutiveEpochs {
 		return false
 	}
-	if this.ActionFinalizationRecoveryWindows != that1.ActionFinalizationRecoveryWindows {
+	if this.ActionFinalizationRecoveryEpochs != that1.ActionFinalizationRecoveryEpochs {
 		return false
 	}
 	if this.ActionFinalizationRecoveryMaxTotalBadEvidences != that1.ActionFinalizationRecoveryMaxTotalBadEvidences {
+		return false
+	}
+	if this.ScEnabled != that1.ScEnabled {
+		return false
+	}
+	if this.ScChallengersPerEpoch != that1.ScChallengersPerEpoch {
+		return false
+	}
+	if this.ScFilesPerChallenger != that1.ScFilesPerChallenger {
+		return false
+	}
+	if this.ScReplicaCount != that1.ScReplicaCount {
+		return false
+	}
+	if this.ScObserverThreshold != that1.ScObserverThreshold {
+		return false
+	}
+	if this.ScMinSliceBytes != that1.ScMinSliceBytes {
+		return false
+	}
+	if this.ScMaxSliceBytes != that1.ScMaxSliceBytes {
+		return false
+	}
+	if this.ScResponseTimeoutMs != that1.ScResponseTimeoutMs {
+		return false
+	}
+	if this.ScAffirmationTimeoutMs != that1.ScAffirmationTimeoutMs {
+		return false
+	}
+	if this.ScEvidenceMaxBytes != that1.ScEvidenceMaxBytes {
+		return false
+	}
+	if this.ScCandidateKeysLookbackEpochs != that1.ScCandidateKeysLookbackEpochs {
+		return false
+	}
+	if this.ScStartJitterMs != that1.ScStartJitterMs {
+		return false
+	}
+	if this.ScEvidenceSubmitterMustBeChallenger != that1.ScEvidenceSubmitterMustBeChallenger {
 		return false
 	}
 	return true
@@ -369,6 +548,107 @@ func (m *Params) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.ScEvidenceSubmitterMustBeChallenger {
+		i--
+		if m.ScEvidenceSubmitterMustBeChallenger {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0xf8
+	}
+	if m.ScStartJitterMs != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.ScStartJitterMs))
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0xf0
+	}
+	if m.ScCandidateKeysLookbackEpochs != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.ScCandidateKeysLookbackEpochs))
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0xe8
+	}
+	if m.ScEvidenceMaxBytes != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.ScEvidenceMaxBytes))
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0xe0
+	}
+	if m.ScAffirmationTimeoutMs != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.ScAffirmationTimeoutMs))
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0xd8
+	}
+	if m.ScResponseTimeoutMs != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.ScResponseTimeoutMs))
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0xd0
+	}
+	if m.ScMaxSliceBytes != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.ScMaxSliceBytes))
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0xc8
+	}
+	if m.ScMinSliceBytes != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.ScMinSliceBytes))
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0xc0
+	}
+	if m.ScObserverThreshold != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.ScObserverThreshold))
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0xb8
+	}
+	if m.ScReplicaCount != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.ScReplicaCount))
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0xb0
+	}
+	if m.ScFilesPerChallenger != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.ScFilesPerChallenger))
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0xa8
+	}
+	if m.ScChallengersPerEpoch != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.ScChallengersPerEpoch))
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0xa0
+	}
+	if m.ScEnabled {
+		i--
+		if m.ScEnabled {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0x98
+	}
 	if m.ActionFinalizationRecoveryMaxTotalBadEvidences != 0 {
 		i = encodeVarintParams(dAtA, i, uint64(m.ActionFinalizationRecoveryMaxTotalBadEvidences))
 		i--
@@ -376,32 +656,32 @@ func (m *Params) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i--
 		dAtA[i] = 0x90
 	}
-	if m.ActionFinalizationRecoveryWindows != 0 {
-		i = encodeVarintParams(dAtA, i, uint64(m.ActionFinalizationRecoveryWindows))
+	if m.ActionFinalizationRecoveryEpochs != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.ActionFinalizationRecoveryEpochs))
 		i--
 		dAtA[i] = 0x1
 		i--
 		dAtA[i] = 0x88
 	}
-	if m.ActionFinalizationNotInTop10ConsecutiveWindows != 0 {
-		i = encodeVarintParams(dAtA, i, uint64(m.ActionFinalizationNotInTop10ConsecutiveWindows))
+	if m.ActionFinalizationNotInTop10ConsecutiveEpochs != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.ActionFinalizationNotInTop10ConsecutiveEpochs))
 		i--
 		dAtA[i] = 0x1
 		i--
 		dAtA[i] = 0x80
 	}
-	if m.ActionFinalizationNotInTop10EvidencesPerWindow != 0 {
-		i = encodeVarintParams(dAtA, i, uint64(m.ActionFinalizationNotInTop10EvidencesPerWindow))
+	if m.ActionFinalizationNotInTop10EvidencesPerEpoch != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.ActionFinalizationNotInTop10EvidencesPerEpoch))
 		i--
 		dAtA[i] = 0x78
 	}
-	if m.ActionFinalizationSignatureFailureConsecutiveWindows != 0 {
-		i = encodeVarintParams(dAtA, i, uint64(m.ActionFinalizationSignatureFailureConsecutiveWindows))
+	if m.ActionFinalizationSignatureFailureConsecutiveEpochs != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.ActionFinalizationSignatureFailureConsecutiveEpochs))
 		i--
 		dAtA[i] = 0x70
 	}
-	if m.ActionFinalizationSignatureFailureEvidencesPerWindow != 0 {
-		i = encodeVarintParams(dAtA, i, uint64(m.ActionFinalizationSignatureFailureEvidencesPerWindow))
+	if m.ActionFinalizationSignatureFailureEvidencesPerEpoch != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.ActionFinalizationSignatureFailureEvidencesPerEpoch))
 		i--
 		dAtA[i] = 0x68
 	}
@@ -410,13 +690,13 @@ func (m *Params) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i--
 		dAtA[i] = 0x60
 	}
-	if m.KeepLastWindowEntries != 0 {
-		i = encodeVarintParams(dAtA, i, uint64(m.KeepLastWindowEntries))
+	if m.KeepLastEpochEntries != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.KeepLastEpochEntries))
 		i--
 		dAtA[i] = 0x58
 	}
-	if m.ConsecutiveWindowsToPostpone != 0 {
-		i = encodeVarintParams(dAtA, i, uint64(m.ConsecutiveWindowsToPostpone))
+	if m.ConsecutiveEpochsToPostpone != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.ConsecutiveEpochsToPostpone))
 		i--
 		dAtA[i] = 0x50
 	}
@@ -453,13 +733,13 @@ func (m *Params) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i--
 		dAtA[i] = 0x32
 	}
-	if m.MaxProbeTargetsPerWindow != 0 {
-		i = encodeVarintParams(dAtA, i, uint64(m.MaxProbeTargetsPerWindow))
+	if m.MaxProbeTargetsPerEpoch != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.MaxProbeTargetsPerEpoch))
 		i--
 		dAtA[i] = 0x28
 	}
-	if m.MinProbeTargetsPerWindow != 0 {
-		i = encodeVarintParams(dAtA, i, uint64(m.MinProbeTargetsPerWindow))
+	if m.MinProbeTargetsPerEpoch != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.MinProbeTargetsPerEpoch))
 		i--
 		dAtA[i] = 0x20
 	}
@@ -468,8 +748,13 @@ func (m *Params) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i--
 		dAtA[i] = 0x18
 	}
-	if m.ReportingWindowBlocks != 0 {
-		i = encodeVarintParams(dAtA, i, uint64(m.ReportingWindowBlocks))
+	if m.EpochZeroHeight != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.EpochZeroHeight))
+		i--
+		dAtA[i] = 0x10
+	}
+	if m.EpochLengthBlocks != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.EpochLengthBlocks))
 		i--
 		dAtA[i] = 0x8
 	}
@@ -493,17 +778,20 @@ func (m *Params) Size() (n int) {
 	}
 	var l int
 	_ = l
-	if m.ReportingWindowBlocks != 0 {
-		n += 1 + sovParams(uint64(m.ReportingWindowBlocks))
+	if m.EpochLengthBlocks != 0 {
+		n += 1 + sovParams(uint64(m.EpochLengthBlocks))
+	}
+	if m.EpochZeroHeight != 0 {
+		n += 1 + sovParams(uint64(m.EpochZeroHeight))
 	}
 	if m.PeerQuorumReports != 0 {
 		n += 1 + sovParams(uint64(m.PeerQuorumReports))
 	}
-	if m.MinProbeTargetsPerWindow != 0 {
-		n += 1 + sovParams(uint64(m.MinProbeTargetsPerWindow))
+	if m.MinProbeTargetsPerEpoch != 0 {
+		n += 1 + sovParams(uint64(m.MinProbeTargetsPerEpoch))
 	}
-	if m.MaxProbeTargetsPerWindow != 0 {
-		n += 1 + sovParams(uint64(m.MaxProbeTargetsPerWindow))
+	if m.MaxProbeTargetsPerEpoch != 0 {
+		n += 1 + sovParams(uint64(m.MaxProbeTargetsPerEpoch))
 	}
 	if len(m.RequiredOpenPorts) > 0 {
 		l = 0
@@ -521,32 +809,71 @@ func (m *Params) Size() (n int) {
 	if m.MinDiskFreePercent != 0 {
 		n += 1 + sovParams(uint64(m.MinDiskFreePercent))
 	}
-	if m.ConsecutiveWindowsToPostpone != 0 {
-		n += 1 + sovParams(uint64(m.ConsecutiveWindowsToPostpone))
+	if m.ConsecutiveEpochsToPostpone != 0 {
+		n += 1 + sovParams(uint64(m.ConsecutiveEpochsToPostpone))
 	}
-	if m.KeepLastWindowEntries != 0 {
-		n += 1 + sovParams(uint64(m.KeepLastWindowEntries))
+	if m.KeepLastEpochEntries != 0 {
+		n += 1 + sovParams(uint64(m.KeepLastEpochEntries))
 	}
 	if m.PeerPortPostponeThresholdPercent != 0 {
 		n += 1 + sovParams(uint64(m.PeerPortPostponeThresholdPercent))
 	}
-	if m.ActionFinalizationSignatureFailureEvidencesPerWindow != 0 {
-		n += 1 + sovParams(uint64(m.ActionFinalizationSignatureFailureEvidencesPerWindow))
+	if m.ActionFinalizationSignatureFailureEvidencesPerEpoch != 0 {
+		n += 1 + sovParams(uint64(m.ActionFinalizationSignatureFailureEvidencesPerEpoch))
 	}
-	if m.ActionFinalizationSignatureFailureConsecutiveWindows != 0 {
-		n += 1 + sovParams(uint64(m.ActionFinalizationSignatureFailureConsecutiveWindows))
+	if m.ActionFinalizationSignatureFailureConsecutiveEpochs != 0 {
+		n += 1 + sovParams(uint64(m.ActionFinalizationSignatureFailureConsecutiveEpochs))
 	}
-	if m.ActionFinalizationNotInTop10EvidencesPerWindow != 0 {
-		n += 1 + sovParams(uint64(m.ActionFinalizationNotInTop10EvidencesPerWindow))
+	if m.ActionFinalizationNotInTop10EvidencesPerEpoch != 0 {
+		n += 1 + sovParams(uint64(m.ActionFinalizationNotInTop10EvidencesPerEpoch))
 	}
-	if m.ActionFinalizationNotInTop10ConsecutiveWindows != 0 {
-		n += 2 + sovParams(uint64(m.ActionFinalizationNotInTop10ConsecutiveWindows))
+	if m.ActionFinalizationNotInTop10ConsecutiveEpochs != 0 {
+		n += 2 + sovParams(uint64(m.ActionFinalizationNotInTop10ConsecutiveEpochs))
 	}
-	if m.ActionFinalizationRecoveryWindows != 0 {
-		n += 2 + sovParams(uint64(m.ActionFinalizationRecoveryWindows))
+	if m.ActionFinalizationRecoveryEpochs != 0 {
+		n += 2 + sovParams(uint64(m.ActionFinalizationRecoveryEpochs))
 	}
 	if m.ActionFinalizationRecoveryMaxTotalBadEvidences != 0 {
 		n += 2 + sovParams(uint64(m.ActionFinalizationRecoveryMaxTotalBadEvidences))
+	}
+	if m.ScEnabled {
+		n += 3
+	}
+	if m.ScChallengersPerEpoch != 0 {
+		n += 2 + sovParams(uint64(m.ScChallengersPerEpoch))
+	}
+	if m.ScFilesPerChallenger != 0 {
+		n += 2 + sovParams(uint64(m.ScFilesPerChallenger))
+	}
+	if m.ScReplicaCount != 0 {
+		n += 2 + sovParams(uint64(m.ScReplicaCount))
+	}
+	if m.ScObserverThreshold != 0 {
+		n += 2 + sovParams(uint64(m.ScObserverThreshold))
+	}
+	if m.ScMinSliceBytes != 0 {
+		n += 2 + sovParams(uint64(m.ScMinSliceBytes))
+	}
+	if m.ScMaxSliceBytes != 0 {
+		n += 2 + sovParams(uint64(m.ScMaxSliceBytes))
+	}
+	if m.ScResponseTimeoutMs != 0 {
+		n += 2 + sovParams(uint64(m.ScResponseTimeoutMs))
+	}
+	if m.ScAffirmationTimeoutMs != 0 {
+		n += 2 + sovParams(uint64(m.ScAffirmationTimeoutMs))
+	}
+	if m.ScEvidenceMaxBytes != 0 {
+		n += 2 + sovParams(uint64(m.ScEvidenceMaxBytes))
+	}
+	if m.ScCandidateKeysLookbackEpochs != 0 {
+		n += 2 + sovParams(uint64(m.ScCandidateKeysLookbackEpochs))
+	}
+	if m.ScStartJitterMs != 0 {
+		n += 2 + sovParams(uint64(m.ScStartJitterMs))
+	}
+	if m.ScEvidenceSubmitterMustBeChallenger {
+		n += 3
 	}
 	return n
 }
@@ -588,9 +915,9 @@ func (m *Params) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ReportingWindowBlocks", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field EpochLengthBlocks", wireType)
 			}
-			m.ReportingWindowBlocks = 0
+			m.EpochLengthBlocks = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowParams
@@ -600,7 +927,26 @@ func (m *Params) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.ReportingWindowBlocks |= uint64(b&0x7F) << shift
+				m.EpochLengthBlocks |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field EpochZeroHeight", wireType)
+			}
+			m.EpochZeroHeight = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.EpochZeroHeight |= uint64(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
@@ -626,9 +972,9 @@ func (m *Params) Unmarshal(dAtA []byte) error {
 			}
 		case 4:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field MinProbeTargetsPerWindow", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field MinProbeTargetsPerEpoch", wireType)
 			}
-			m.MinProbeTargetsPerWindow = 0
+			m.MinProbeTargetsPerEpoch = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowParams
@@ -638,16 +984,16 @@ func (m *Params) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.MinProbeTargetsPerWindow |= uint32(b&0x7F) << shift
+				m.MinProbeTargetsPerEpoch |= uint32(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
 		case 5:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field MaxProbeTargetsPerWindow", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field MaxProbeTargetsPerEpoch", wireType)
 			}
-			m.MaxProbeTargetsPerWindow = 0
+			m.MaxProbeTargetsPerEpoch = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowParams
@@ -657,7 +1003,7 @@ func (m *Params) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.MaxProbeTargetsPerWindow |= uint32(b&0x7F) << shift
+				m.MaxProbeTargetsPerEpoch |= uint32(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
@@ -797,9 +1143,9 @@ func (m *Params) Unmarshal(dAtA []byte) error {
 			}
 		case 10:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ConsecutiveWindowsToPostpone", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field ConsecutiveEpochsToPostpone", wireType)
 			}
-			m.ConsecutiveWindowsToPostpone = 0
+			m.ConsecutiveEpochsToPostpone = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowParams
@@ -809,16 +1155,16 @@ func (m *Params) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.ConsecutiveWindowsToPostpone |= uint32(b&0x7F) << shift
+				m.ConsecutiveEpochsToPostpone |= uint32(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
 		case 11:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field KeepLastWindowEntries", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field KeepLastEpochEntries", wireType)
 			}
-			m.KeepLastWindowEntries = 0
+			m.KeepLastEpochEntries = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowParams
@@ -828,7 +1174,7 @@ func (m *Params) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.KeepLastWindowEntries |= uint64(b&0x7F) << shift
+				m.KeepLastEpochEntries |= uint64(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
@@ -854,9 +1200,9 @@ func (m *Params) Unmarshal(dAtA []byte) error {
 			}
 		case 13:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ActionFinalizationSignatureFailureEvidencesPerWindow", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field ActionFinalizationSignatureFailureEvidencesPerEpoch", wireType)
 			}
-			m.ActionFinalizationSignatureFailureEvidencesPerWindow = 0
+			m.ActionFinalizationSignatureFailureEvidencesPerEpoch = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowParams
@@ -866,16 +1212,16 @@ func (m *Params) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.ActionFinalizationSignatureFailureEvidencesPerWindow |= uint32(b&0x7F) << shift
+				m.ActionFinalizationSignatureFailureEvidencesPerEpoch |= uint32(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
 		case 14:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ActionFinalizationSignatureFailureConsecutiveWindows", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field ActionFinalizationSignatureFailureConsecutiveEpochs", wireType)
 			}
-			m.ActionFinalizationSignatureFailureConsecutiveWindows = 0
+			m.ActionFinalizationSignatureFailureConsecutiveEpochs = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowParams
@@ -885,16 +1231,16 @@ func (m *Params) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.ActionFinalizationSignatureFailureConsecutiveWindows |= uint32(b&0x7F) << shift
+				m.ActionFinalizationSignatureFailureConsecutiveEpochs |= uint32(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
 		case 15:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ActionFinalizationNotInTop10EvidencesPerWindow", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field ActionFinalizationNotInTop10EvidencesPerEpoch", wireType)
 			}
-			m.ActionFinalizationNotInTop10EvidencesPerWindow = 0
+			m.ActionFinalizationNotInTop10EvidencesPerEpoch = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowParams
@@ -904,16 +1250,16 @@ func (m *Params) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.ActionFinalizationNotInTop10EvidencesPerWindow |= uint32(b&0x7F) << shift
+				m.ActionFinalizationNotInTop10EvidencesPerEpoch |= uint32(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
 		case 16:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ActionFinalizationNotInTop10ConsecutiveWindows", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field ActionFinalizationNotInTop10ConsecutiveEpochs", wireType)
 			}
-			m.ActionFinalizationNotInTop10ConsecutiveWindows = 0
+			m.ActionFinalizationNotInTop10ConsecutiveEpochs = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowParams
@@ -923,16 +1269,16 @@ func (m *Params) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.ActionFinalizationNotInTop10ConsecutiveWindows |= uint32(b&0x7F) << shift
+				m.ActionFinalizationNotInTop10ConsecutiveEpochs |= uint32(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
 		case 17:
 			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ActionFinalizationRecoveryWindows", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field ActionFinalizationRecoveryEpochs", wireType)
 			}
-			m.ActionFinalizationRecoveryWindows = 0
+			m.ActionFinalizationRecoveryEpochs = 0
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowParams
@@ -942,7 +1288,7 @@ func (m *Params) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.ActionFinalizationRecoveryWindows |= uint32(b&0x7F) << shift
+				m.ActionFinalizationRecoveryEpochs |= uint32(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
@@ -966,6 +1312,255 @@ func (m *Params) Unmarshal(dAtA []byte) error {
 					break
 				}
 			}
+		case 19:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ScEnabled", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.ScEnabled = bool(v != 0)
+		case 20:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ScChallengersPerEpoch", wireType)
+			}
+			m.ScChallengersPerEpoch = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ScChallengersPerEpoch |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 21:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ScFilesPerChallenger", wireType)
+			}
+			m.ScFilesPerChallenger = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ScFilesPerChallenger |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 22:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ScReplicaCount", wireType)
+			}
+			m.ScReplicaCount = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ScReplicaCount |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 23:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ScObserverThreshold", wireType)
+			}
+			m.ScObserverThreshold = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ScObserverThreshold |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 24:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ScMinSliceBytes", wireType)
+			}
+			m.ScMinSliceBytes = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ScMinSliceBytes |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 25:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ScMaxSliceBytes", wireType)
+			}
+			m.ScMaxSliceBytes = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ScMaxSliceBytes |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 26:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ScResponseTimeoutMs", wireType)
+			}
+			m.ScResponseTimeoutMs = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ScResponseTimeoutMs |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 27:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ScAffirmationTimeoutMs", wireType)
+			}
+			m.ScAffirmationTimeoutMs = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ScAffirmationTimeoutMs |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 28:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ScEvidenceMaxBytes", wireType)
+			}
+			m.ScEvidenceMaxBytes = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ScEvidenceMaxBytes |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 29:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ScCandidateKeysLookbackEpochs", wireType)
+			}
+			m.ScCandidateKeysLookbackEpochs = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ScCandidateKeysLookbackEpochs |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 30:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ScStartJitterMs", wireType)
+			}
+			m.ScStartJitterMs = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ScStartJitterMs |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 31:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ScEvidenceSubmitterMustBeChallenger", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.ScEvidenceSubmitterMustBeChallenger = bool(v != 0)
 		default:
 			iNdEx = preIndex
 			skippy, err := skipParams(dAtA[iNdEx:])

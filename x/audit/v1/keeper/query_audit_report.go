@@ -28,7 +28,7 @@ func (q queryServer) AuditReport(ctx context.Context, req *types.QueryAuditRepor
 		return nil, status.Error(codes.NotFound, "supernode not found")
 	}
 
-	r, found := q.k.GetReport(sdkCtx, req.WindowId, req.SupernodeAccount)
+	r, found := q.k.GetReport(sdkCtx, req.EpochId, req.SupernodeAccount)
 	if !found {
 		return nil, status.Error(codes.NotFound, "audit report not found")
 	}

@@ -15,9 +15,9 @@ const (
 	postponeReasonActionFinalizationNotInTop10       = "audit_action_finalization_not_in_top_10"
 )
 
-// EnforceWindowEnd evaluates the completed window and updates supernode states accordingly.
+// EnforceEpochEnd evaluates the completed epoch and updates supernode states accordingly.
 // It does not re-check peer assignment gating; that must be enforced at MsgSubmitAuditReport time.
-func (k Keeper) EnforceWindowEnd(ctx sdk.Context, windowID uint64, params types.Params) error {
+func (k Keeper) EnforceEpochEnd(ctx sdk.Context, epochID uint64, params types.Params) error {
 	params = params.WithDefaults()
 
 	active, err := k.supernodeKeeper.GetAllSuperNodes(ctx, sntypes.SuperNodeStateActive)
@@ -36,9 +36,9 @@ func (k Keeper) EnforceWindowEnd(ctx sdk.Context, windowID uint64, params types.
 		}
 
 		// Avoid stale action-finalization postponement state if the supernode is ACTIVE.
-		k.clearActionFinalizationPostponedAtWindowID(ctx, sn.SupernodeAccount)
+		k.clearActionFinalizationPostponedAtEpochID(ctx, sn.SupernodeAccount)
 
-		shouldPostpone, reason, err := k.shouldPostponeAtWindowEnd(ctx, sn.SupernodeAccount, windowID, params)
+		shouldPostpone, reason, err := k.shouldPostponeAtEpochEnd(ctx, sn.SupernodeAccount, epochID, params)
 		if err != nil {
 			return err
 		}
@@ -51,9 +51,9 @@ func (k Keeper) EnforceWindowEnd(ctx sdk.Context, windowID uint64, params types.
 		}
 		switch reason {
 		case postponeReasonActionFinalizationSignatureFailure, postponeReasonActionFinalizationNotInTop10:
-			k.setActionFinalizationPostponedAtWindowID(ctx, sn.SupernodeAccount, windowID)
+			k.setActionFinalizationPostponedAtEpochID(ctx, sn.SupernodeAccount, epochID)
 		default:
-			k.clearActionFinalizationPostponedAtWindowID(ctx, sn.SupernodeAccount)
+			k.clearActionFinalizationPostponedAtEpochID(ctx, sn.SupernodeAccount)
 		}
 	}
 
@@ -63,7 +63,7 @@ func (k Keeper) EnforceWindowEnd(ctx sdk.Context, windowID uint64, params types.
 			continue
 		}
 
-		shouldRecover, err := k.shouldRecoverAtWindowEnd(ctx, sn.SupernodeAccount, windowID, params)
+		shouldRecover, err := k.shouldRecoverAtEpochEnd(ctx, sn.SupernodeAccount, epochID, params)
 		if err != nil {
 			return err
 		}
@@ -74,29 +74,29 @@ func (k Keeper) EnforceWindowEnd(ctx sdk.Context, windowID uint64, params types.
 		if err := k.recoverSupernodeActive(ctx, sn); err != nil {
 			return err
 		}
-		k.clearActionFinalizationPostponedAtWindowID(ctx, sn.SupernodeAccount)
+		k.clearActionFinalizationPostponedAtEpochID(ctx, sn.SupernodeAccount)
 	}
 
 	return nil
 }
 
-func (k Keeper) shouldPostponeAtWindowEnd(ctx sdk.Context, supernodeAccount string, windowID uint64, params types.Params) (bool, string, error) {
+func (k Keeper) shouldPostponeAtEpochEnd(ctx sdk.Context, supernodeAccount string, epochID uint64, params types.Params) (bool, string, error) {
 	// Action finalization evidence-based postponement.
-	if shouldPostpone, reason := k.shouldPostponeForActionFinalizationEvidence(ctx, supernodeAccount, windowID, params); shouldPostpone {
+	if shouldPostpone, reason := k.shouldPostponeForActionFinalizationEvidence(ctx, supernodeAccount, epochID, params); shouldPostpone {
 		return true, reason, nil
 	}
 
 	// Missing-report based postponement.
-	consecutive := params.ConsecutiveWindowsToPostpone
+	consecutive := params.ConsecutiveEpochsToPostpone
 	if consecutive == 0 {
 		consecutive = 1
 	}
-	if k.missingReportsForConsecutiveWindows(ctx, supernodeAccount, windowID, consecutive) {
+	if k.missingReportsForConsecutiveEpochs(ctx, supernodeAccount, epochID, consecutive) {
 		return true, "audit_missing_reports", nil
 	}
 
 	// Self host-metrics-based postponement (if a self report exists and violates minimums).
-	if ok, err := k.selfHostViolatesMinimums(ctx, supernodeAccount, windowID, params); err != nil {
+	if ok, err := k.selfHostViolatesMinimums(ctx, supernodeAccount, epochID, params); err != nil {
 		return false, "", err
 	} else if ok {
 		return true, "audit_host_requirements", nil
@@ -108,7 +108,7 @@ func (k Keeper) shouldPostponeAtWindowEnd(ctx sdk.Context, supernodeAccount stri
 		return false, "", nil
 	}
 
-	if consecutive > uint32(windowID+1) {
+	if consecutive > uint32(epochID+1) {
 		// Not enough history on-chain to satisfy the consecutive rule.
 		return false, "", nil
 	}
@@ -116,8 +116,8 @@ func (k Keeper) shouldPostponeAtWindowEnd(ctx sdk.Context, supernodeAccount stri
 	for portIndex := 0; portIndex < requiredPortsLen; portIndex++ {
 		streak := uint32(0)
 		for offset := uint32(0); offset < consecutive; offset++ {
-			w := windowID - uint64(offset)
-			closed, err := k.peersPortStateMeetsThreshold(ctx, supernodeAccount, w, portIndex, types.PortState_PORT_STATE_CLOSED, params.PeerPortPostponeThresholdPercent)
+			e := epochID - uint64(offset)
+			closed, err := k.peersPortStateMeetsThreshold(ctx, supernodeAccount, e, portIndex, types.PortState_PORT_STATE_CLOSED, params.PeerPortPostponeThresholdPercent)
 			if err != nil {
 				return false, "", err
 			}
@@ -134,15 +134,15 @@ func (k Keeper) shouldPostponeAtWindowEnd(ctx sdk.Context, supernodeAccount stri
 	return false, "", nil
 }
 
-func (k Keeper) shouldRecoverAtWindowEnd(ctx sdk.Context, supernodeAccount string, windowID uint64, params types.Params) (bool, error) {
+func (k Keeper) shouldRecoverAtEpochEnd(ctx sdk.Context, supernodeAccount string, epochID uint64, params types.Params) (bool, error) {
 	// If the supernode was postponed due to action-finalization evidence, it recovers using the
 	// action-finalization recovery rules (not the host/peer-port recovery rules).
-	if postponedAtWindowID, ok := k.getActionFinalizationPostponedAtWindowID(ctx, supernodeAccount); ok {
-		return k.shouldRecoverFromActionFinalizationPostponement(ctx, supernodeAccount, windowID, postponedAtWindowID, params), nil
+	if postponedAtEpochID, ok := k.getActionFinalizationPostponedAtEpochID(ctx, supernodeAccount); ok {
+		return k.shouldRecoverFromActionFinalizationPostponement(ctx, supernodeAccount, epochID, postponedAtEpochID, params), nil
 	}
 
 	// Need one compliant self report.
-	selfCompliant, err := k.selfHostCompliant(ctx, supernodeAccount, windowID, params)
+	selfCompliant, err := k.selfHostCompliant(ctx, supernodeAccount, epochID, params)
 	if err != nil || !selfCompliant {
 		return false, err
 	}
@@ -153,7 +153,7 @@ func (k Keeper) shouldRecoverAtWindowEnd(ctx sdk.Context, supernodeAccount strin
 		return true, nil
 	}
 
-	peers, err := k.peerReportersForTargetWindow(ctx, supernodeAccount, windowID)
+	peers, err := k.peerReportersForTargetEpoch(ctx, supernodeAccount, epochID)
 	if err != nil {
 		return false, err
 	}
@@ -161,9 +161,9 @@ func (k Keeper) shouldRecoverAtWindowEnd(ctx sdk.Context, supernodeAccount strin
 		return false, nil
 	}
 
-	// Recovery requires at least one peer report that shows all required ports OPEN for this supernode in this window.
+	// Recovery requires at least one peer report that shows all required ports OPEN for this supernode in this epoch.
 	for _, reporter := range peers {
-		r, found := k.GetReport(ctx, windowID, reporter)
+		r, found := k.GetReport(ctx, epochID, reporter)
 		if !found {
 			continue
 		}
@@ -197,25 +197,25 @@ func (k Keeper) shouldRecoverAtWindowEnd(ctx sdk.Context, supernodeAccount strin
 	return false, nil
 }
 
-func (k Keeper) shouldPostponeForActionFinalizationEvidence(ctx sdk.Context, supernodeAccount string, windowID uint64, params types.Params) (bool, string) {
-	if k.evidenceMeetsConsecutiveWindowsThreshold(
+func (k Keeper) shouldPostponeForActionFinalizationEvidence(ctx sdk.Context, supernodeAccount string, epochID uint64, params types.Params) (bool, string) {
+	if k.evidenceMeetsConsecutiveEpochsThreshold(
 		ctx,
 		supernodeAccount,
-		windowID,
+		epochID,
 		types.EvidenceType_EVIDENCE_TYPE_ACTION_FINALIZATION_SIGNATURE_FAILURE,
-		params.ActionFinalizationSignatureFailureEvidencesPerWindow,
-		params.ActionFinalizationSignatureFailureConsecutiveWindows,
+		params.ActionFinalizationSignatureFailureEvidencesPerEpoch,
+		params.ActionFinalizationSignatureFailureConsecutiveEpochs,
 	) {
 		return true, postponeReasonActionFinalizationSignatureFailure
 	}
 
-	if k.evidenceMeetsConsecutiveWindowsThreshold(
+	if k.evidenceMeetsConsecutiveEpochsThreshold(
 		ctx,
 		supernodeAccount,
-		windowID,
+		epochID,
 		types.EvidenceType_EVIDENCE_TYPE_ACTION_FINALIZATION_NOT_IN_TOP_10,
-		params.ActionFinalizationNotInTop10EvidencesPerWindow,
-		params.ActionFinalizationNotInTop10ConsecutiveWindows,
+		params.ActionFinalizationNotInTop10EvidencesPerEpoch,
+		params.ActionFinalizationNotInTop10ConsecutiveEpochs,
 	) {
 		return true, postponeReasonActionFinalizationNotInTop10
 	}
@@ -223,59 +223,59 @@ func (k Keeper) shouldPostponeForActionFinalizationEvidence(ctx sdk.Context, sup
 	return false, ""
 }
 
-func (k Keeper) evidenceMeetsConsecutiveWindowsThreshold(
+func (k Keeper) evidenceMeetsConsecutiveEpochsThreshold(
 	ctx sdk.Context,
 	supernodeAccount string,
-	windowID uint64,
+	epochID uint64,
 	evidenceType types.EvidenceType,
-	minEvidencesPerWindow uint32,
-	consecutiveWindows uint32,
+	minEvidencesPerEpoch uint32,
+	consecutiveEpochs uint32,
 ) bool {
-	if minEvidencesPerWindow == 0 || consecutiveWindows == 0 {
+	if minEvidencesPerEpoch == 0 || consecutiveEpochs == 0 {
 		return false
 	}
-	if consecutiveWindows > uint32(windowID+1) {
+	if consecutiveEpochs > uint32(epochID+1) {
 		// Not enough history on-chain to satisfy the consecutive rule.
 		return false
 	}
 
 	streak := uint32(0)
-	for offset := uint32(0); offset < consecutiveWindows; offset++ {
-		w := windowID - uint64(offset)
-		if k.getEvidenceWindowCount(ctx, w, supernodeAccount, evidenceType) < uint64(minEvidencesPerWindow) {
+	for offset := uint32(0); offset < consecutiveEpochs; offset++ {
+		e := epochID - uint64(offset)
+		if k.getEvidenceEpochCount(ctx, e, supernodeAccount, evidenceType) < uint64(minEvidencesPerEpoch) {
 			break
 		}
 		streak++
 	}
-	return streak == consecutiveWindows
+	return streak == consecutiveEpochs
 }
 
 func (k Keeper) shouldRecoverFromActionFinalizationPostponement(
 	ctx sdk.Context,
 	supernodeAccount string,
-	windowID uint64,
-	postponedAtWindowID uint64,
+	epochID uint64,
+	postponedAtEpochID uint64,
 	params types.Params,
 ) bool {
-	recoveryWindows := params.ActionFinalizationRecoveryWindows
-	if recoveryWindows == 0 {
-		recoveryWindows = 1
+	recoveryEpochs := params.ActionFinalizationRecoveryEpochs
+	if recoveryEpochs == 0 {
+		recoveryEpochs = 1
 	}
-	if windowID < postponedAtWindowID+uint64(recoveryWindows) {
+	if epochID < postponedAtEpochID+uint64(recoveryEpochs) {
 		return false
 	}
 
-	var startWindowID uint64
-	if windowID+1 > uint64(recoveryWindows) {
-		startWindowID = windowID + 1 - uint64(recoveryWindows)
+	var startEpochID uint64
+	if epochID+1 > uint64(recoveryEpochs) {
+		startEpochID = epochID + 1 - uint64(recoveryEpochs)
 	} else {
-		startWindowID = 0
+		startEpochID = 0
 	}
 
 	totalBad := uint64(0)
-	for w := startWindowID; w <= windowID; w++ {
-		totalBad += k.getEvidenceWindowCount(ctx, w, supernodeAccount, types.EvidenceType_EVIDENCE_TYPE_ACTION_FINALIZATION_SIGNATURE_FAILURE)
-		totalBad += k.getEvidenceWindowCount(ctx, w, supernodeAccount, types.EvidenceType_EVIDENCE_TYPE_ACTION_FINALIZATION_NOT_IN_TOP_10)
+	for e := startEpochID; e <= epochID; e++ {
+		totalBad += k.getEvidenceEpochCount(ctx, e, supernodeAccount, types.EvidenceType_EVIDENCE_TYPE_ACTION_FINALIZATION_SIGNATURE_FAILURE)
+		totalBad += k.getEvidenceEpochCount(ctx, e, supernodeAccount, types.EvidenceType_EVIDENCE_TYPE_ACTION_FINALIZATION_NOT_IN_TOP_10)
 	}
 
 	maxTotal := params.ActionFinalizationRecoveryMaxTotalBadEvidences
@@ -285,8 +285,8 @@ func (k Keeper) shouldRecoverFromActionFinalizationPostponement(
 	return totalBad < uint64(maxTotal)
 }
 
-func (k Keeper) selfHostViolatesMinimums(ctx sdk.Context, supernodeAccount string, windowID uint64, params types.Params) (bool, error) {
-	r, found := k.GetReport(ctx, windowID, supernodeAccount)
+func (k Keeper) selfHostViolatesMinimums(ctx sdk.Context, supernodeAccount string, epochID uint64, params types.Params) (bool, error) {
+	r, found := k.GetReport(ctx, epochID, supernodeAccount)
 	if !found {
 		return false, nil
 	}
@@ -305,8 +305,8 @@ func (k Keeper) selfHostViolatesMinimums(ctx sdk.Context, supernodeAccount strin
 	return false, nil
 }
 
-func (k Keeper) selfHostCompliant(ctx sdk.Context, supernodeAccount string, windowID uint64, params types.Params) (bool, error) {
-	r, found := k.GetReport(ctx, windowID, supernodeAccount)
+func (k Keeper) selfHostCompliant(ctx sdk.Context, supernodeAccount string, epochID uint64, params types.Params) (bool, error) {
+	r, found := k.GetReport(ctx, epochID, supernodeAccount)
 	if !found {
 		return false, nil
 	}
@@ -354,25 +354,25 @@ func compliesMinFree(usagePercent float64, minFreePercent uint32) bool {
 	return free >= float64(minFreePercent)
 }
 
-func (k Keeper) peersPortStateMeetsThreshold(ctx sdk.Context, target string, windowID uint64, portIndex int, desired types.PortState, thresholdPercent uint32) (bool, error) {
-	peers, err := k.peerReportersForTargetWindow(ctx, target, windowID)
+func (k Keeper) peersPortStateMeetsThreshold(ctx sdk.Context, target string, epochID uint64, portIndex int, desired types.PortState, thresholdPercent uint32) (bool, error) {
+	peers, err := k.peerReportersForTargetEpoch(ctx, target, epochID)
 	if err != nil {
 		return false, err
 	}
 	if len(peers) == 0 {
 		return false, nil
 	}
-	return k.peersPortStateMeetsThresholdWithPeers(ctx, target, windowID, portIndex, desired, thresholdPercent, peers)
+	return k.peersPortStateMeetsThresholdWithPeers(ctx, target, epochID, portIndex, desired, thresholdPercent, peers)
 }
 
-func (k Keeper) peersPortStateMeetsThresholdWithPeers(ctx sdk.Context, target string, windowID uint64, portIndex int, desired types.PortState, thresholdPercent uint32, peers []string) (bool, error) {
+func (k Keeper) peersPortStateMeetsThresholdWithPeers(ctx sdk.Context, target string, epochID uint64, portIndex int, desired types.PortState, thresholdPercent uint32, peers []string) (bool, error) {
 	if len(peers) == 0 {
 		return false, nil
 	}
 
 	matches := uint64(0)
 	for _, reporter := range peers {
-		r, found := k.GetReport(ctx, windowID, reporter)
+		r, found := k.GetReport(ctx, epochID, reporter)
 		if !found {
 			return false, nil
 		}
@@ -400,16 +400,16 @@ func (k Keeper) peersPortStateMeetsThresholdWithPeers(ctx sdk.Context, target st
 	return matches*100 >= uint64(thresholdPercent)*total, nil
 }
 
-func (k Keeper) peerReportersForTargetWindow(ctx sdk.Context, target string, windowID uint64) ([]string, error) {
+func (k Keeper) peerReportersForTargetEpoch(ctx sdk.Context, target string, epochID uint64) ([]string, error) {
 	store := k.kvStore(ctx)
-	prefix := types.SupernodeReportIndexWindowPrefix(target, windowID)
+	prefix := types.SupernodeReportIndexEpochPrefix(target, epochID)
 
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
 	defer it.Close()
 
 	reporters := make([]string, 0, 8)
 	for ; it.Valid(); it.Next() {
-		// Key is "<reporter_supernode_account>" under the window-specific prefix.
+		// Key is "<reporter_supernode_account>" under the epoch-specific prefix.
 		key := it.Key()
 		if len(key) < len(prefix) {
 			return nil, fmt.Errorf("invalid supernode report index key")
@@ -445,17 +445,17 @@ func (k Keeper) recoverSupernodeActive(ctx sdk.Context, sn sntypes.SuperNode) er
 	return k.supernodeKeeper.RecoverSuperNodeFromPostponed(ctx, valAddr)
 }
 
-func (k Keeper) missingReportsForConsecutiveWindows(ctx sdk.Context, supernodeAccount string, windowID uint64, consecutive uint32) bool {
+func (k Keeper) missingReportsForConsecutiveEpochs(ctx sdk.Context, supernodeAccount string, epochID uint64, consecutive uint32) bool {
 	if consecutive == 0 {
 		consecutive = 1
 	}
-	if consecutive > uint32(windowID+1) {
+	if consecutive > uint32(epochID+1) {
 		// Not enough history on-chain to satisfy the consecutive rule.
 		return false
 	}
 	for offset := uint32(0); offset < consecutive; offset++ {
-		w := windowID - uint64(offset)
-		if k.HasReport(ctx, w, supernodeAccount) {
+		e := epochID - uint64(offset)
+		if k.HasReport(ctx, e, supernodeAccount) {
 			return false
 		}
 	}

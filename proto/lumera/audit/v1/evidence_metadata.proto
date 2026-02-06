@@ -24,3 +24,26 @@ message ActionFinalizationNotInTop10EvidenceMetadata {
   // top_10_validator_addresses is the expected validator set for the action's block height.
   repeated string top_10_validator_addresses = 1 [(cosmos_proto.scalar) = "cosmos.ValidatorAddressString"];
 }
+
+// StorageChallengeFailureEvidenceMetadata is metadata for a storage challenge failure submitted by a challenger.
+message StorageChallengeFailureEvidenceMetadata {
+  uint64 epoch_id = 1;
+
+  // challenger_supernode_account must be the tx signer for evidence submission.
+  string challenger_supernode_account = 2 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+
+  // challenged_supernode_account should match Evidence.subject_address.
+  string challenged_supernode_account = 3 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+
+  // challenge_id is the deterministic per-(epoch,challenger) identifier (hex-encoded blake3-256).
+  string challenge_id = 4;
+
+  // file_key is the challenged file key (typically base58).
+  string file_key = 5;
+
+  // failure_type is a short discriminator (e.g. TIMEOUT, INVALID_PROOF, MISSING_FILE).
+  string failure_type = 6;
+
+  // transcript_hash is a hash commitment to the off-chain transcript (hex-encoded blake3-256).
+  string transcript_hash = 7;
+}

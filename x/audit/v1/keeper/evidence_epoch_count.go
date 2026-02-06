@@ -7,18 +7,18 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
-func (k Keeper) getEvidenceWindowCount(ctx sdk.Context, windowID uint64, subjectAddress string, evidenceType types.EvidenceType) uint64 {
+func (k Keeper) getEvidenceEpochCount(ctx sdk.Context, epochID uint64, subjectAddress string, evidenceType types.EvidenceType) uint64 {
 	store := k.kvStore(ctx)
-	bz := store.Get(types.EvidenceWindowCountKey(windowID, subjectAddress, evidenceType))
+	bz := store.Get(types.EvidenceEpochCountKey(epochID, subjectAddress, evidenceType))
 	if len(bz) != 8 {
 		return 0
 	}
 	return binary.BigEndian.Uint64(bz)
 }
 
-func (k Keeper) incrementEvidenceWindowCount(ctx sdk.Context, windowID uint64, subjectAddress string, evidenceType types.EvidenceType) {
+func (k Keeper) incrementEvidenceEpochCount(ctx sdk.Context, epochID uint64, subjectAddress string, evidenceType types.EvidenceType) {
 	store := k.kvStore(ctx)
-	key := types.EvidenceWindowCountKey(windowID, subjectAddress, evidenceType)
+	key := types.EvidenceEpochCountKey(epochID, subjectAddress, evidenceType)
 
 	current := uint64(0)
 	if bz := store.Get(key); len(bz) == 8 {

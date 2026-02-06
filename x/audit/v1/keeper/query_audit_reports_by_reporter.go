@@ -42,12 +42,20 @@ func (q queryServer) AuditReportsByReporter(ctx context.Context, req *types.Quer
 		pagination = &query.PageRequest{Limit: 100}
 	}
 
+	if req.FilterByEpochId {
+		r, found := q.k.GetReport(sdkCtx, req.EpochId, req.SupernodeAccount)
+		if !found {
+			return &types.QueryAuditReportsByReporterResponse{Reports: []types.AuditReport{}, Pagination: &query.PageResponse{}}, nil
+		}
+		return &types.QueryAuditReportsByReporterResponse{Reports: []types.AuditReport{r}, Pagination: &query.PageResponse{}}, nil
+	}
+
 	pageRes, err := query.Paginate(store, pagination, func(key, _ []byte) error {
 		if len(key) != 8 {
 			return status.Error(codes.Internal, "invalid report index key")
 		}
-		windowID := binary.BigEndian.Uint64(key)
-		r, found := q.k.GetReport(sdkCtx, windowID, req.SupernodeAccount)
+		epochID := binary.BigEndian.Uint64(key)
+		r, found := q.k.GetReport(sdkCtx, epochID, req.SupernodeAccount)
 		if !found {
 			return nil
 		}

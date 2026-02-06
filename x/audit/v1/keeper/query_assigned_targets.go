@@ -31,32 +31,36 @@ func (q queryServer) AssignedTargets(ctx context.Context, req *types.QueryAssign
 
 	params := q.k.GetParams(ctx).WithDefaults()
 
-	windowID := req.WindowId
-	if !req.FilterByWindowId {
-		ws, err := q.k.getCurrentWindowState(sdkCtx, params)
+	epochID := req.EpochId
+	var epochStart int64
+	if !req.FilterByEpochId {
+		epoch, err := deriveEpochAtHeight(sdkCtx.BlockHeight(), params)
 		if err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
-		windowID = ws.WindowID
-	}
-
-	snap, found := q.k.GetWindowSnapshot(sdkCtx, windowID)
-	if !found {
-		return nil, status.Error(codes.NotFound, "window snapshot not found")
-	}
-
-	var targets []string
-	for _, a := range snap.Assignments {
-		if a.ProberSupernodeAccount != req.SupernodeAccount {
-			continue
+		epochID = epoch.EpochID
+		epochStart = epoch.StartHeight
+	} else {
+		epoch, err := deriveEpochByID(epochID, params)
+		if err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
 		}
-		targets = append([]string(nil), a.TargetSupernodeAccounts...)
-		break
+		epochStart = epoch.StartHeight
+	}
+
+	anchor, found := q.k.GetEpochAnchor(sdkCtx, epochID)
+	if !found {
+		return nil, status.Error(codes.NotFound, "epoch anchor not found")
+	}
+
+	targets, _, err := computeAuditPeerTargetsForReporter(&params, anchor.ActiveSupernodeAccounts, anchor.TargetSupernodeAccounts, anchor.Seed, req.SupernodeAccount)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	return &types.QueryAssignedTargetsResponse{
-		WindowId:                windowID,
-		WindowStartHeight:       snap.WindowStartHeight,
+		EpochId:                 epochID,
+		EpochStartHeight:        epochStart,
 		RequiredOpenPorts:       append([]uint32(nil), params.RequiredOpenPorts...),
 		TargetSupernodeAccounts: targets,
 	}, nil

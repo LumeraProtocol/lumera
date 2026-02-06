@@ -35,15 +35,15 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "action_id"}},
 				},
 				{
-					RpcMethod: "CurrentWindow",
-					Use:       "current-window",
-					Short:     "Query current audit reporting window boundaries",
+					RpcMethod: "CurrentEpoch",
+					Use:       "current-epoch",
+					Short:     "Query current audit epoch boundaries",
 				},
 				{
 					RpcMethod:      "AuditReport",
-					Use:            "audit-report [window-id] [supernode-account]",
-					Short:          "Query an audit report by window and reporter",
-					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "window_id"}, {ProtoField: "supernode_account"}},
+					Use:            "audit-report [epoch-id] [supernode-account]",
+					Short:          "Query an audit report by epoch and reporter",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "epoch_id"}, {ProtoField: "supernode_account"}},
 				},
 				{
 					RpcMethod:      "AuditReportsByReporter",
@@ -60,7 +60,7 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 				{
 					RpcMethod: "SelfReports",
 					Use:       "self-reports [supernode-account]",
-					Short:     "List self-reports submitted by a supernode across windows",
+					Short:     "List self-reports submitted by a supernode across epochs",
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{
 						{ProtoField: "supernode_account"},
 					},
@@ -78,9 +78,9 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 				},
 				{
 					RpcMethod:      "SubmitAuditReport",
-					Use:            "submit-audit-report [window-id] [self-report-json]",
+					Use:            "submit-audit-report [epoch-id] [self-report-json]",
 					Short:          "Submit an audit report (peer observations encoded in JSON via flags)",
-					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "window_id"}, {ProtoField: "self_report"}},
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "epoch_id"}, {ProtoField: "self_report"}},
 				},
 				{
 					RpcMethod:      "SubmitEvidence",

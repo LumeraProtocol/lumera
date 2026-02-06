@@ -21,6 +21,8 @@ type Keeper struct {
 	// should be the x/gov module account.
 	authority []byte
 
+	// supernodeKeeper is used to snapshot eligible supernodes at epoch start (for anchoring)
+	// and to apply postpone/recovery transitions at epoch end.
 	supernodeKeeper sntypes.SupernodeKeeper
 }
 
@@ -32,6 +34,8 @@ func NewKeeper(
 	authority []byte,
 	supernodeKeeper sntypes.SupernodeKeeper,
 ) Keeper {
+	// Keeper construction is consensus-critical: authority address validity is verified once
+	// so later param updates can't panic due to malformed config.
 	if _, err := addressCodec.BytesToString(authority); err != nil {
 		panic(fmt.Sprintf("invalid authority address: %s", err))
 	}

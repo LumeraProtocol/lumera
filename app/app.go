@@ -331,6 +331,7 @@ func (app *App) setupUpgrades() {
 		SupernodeKeeper:       app.SupernodeKeeper,
 		ParamsKeeper:          &app.ParamsKeeper,
 		ConsensusParamsKeeper: &app.ConsensusParamsKeeper,
+		AuditKeeper:     &app.AuditKeeper,
 	}
 
 	allUpgrades := upgrades.AllUpgrades(params)

@@ -10,20 +10,20 @@ import (
 	"github.com/tidwall/sjson"
 )
 
-// This test validates that ACTIVE probers must submit peer observations for all assigned targets.
+// This test validates that ACTIVE probers must submit storage challenge observations for all assigned targets.
 func TestAuditSubmitReport_ProberRequiresAllPeerObservations(t *testing.T) {
 	const (
-		// Keep windows long enough in real time to avoid end-blocker enforcement during the test.
-		reportingWindowBlocks = uint64(20)
+		// Keep epochs long enough in real time to avoid end-blocker enforcement during the test.
+		epochLengthBlocks = uint64(20)
 	)
 	const originHeight = int64(1)
 
 	sut.ModifyGenesisJSON(t,
 		setSupernodeParamsForAuditTests(t),
-		setAuditParamsForFastWindows(t, reportingWindowBlocks, 1, 1, 1, []uint32{4444}),
+		setAuditParamsForFastEpochs(t, epochLengthBlocks, 1, 1, 1, []uint32{4444}),
 		func(genesis []byte) []byte {
-			// Avoid missing-report postponement before the window under test.
-			state, err := sjson.SetRawBytes(genesis, "app_state.audit.params.consecutive_windows_to_postpone", []byte(strconv.FormatUint(2, 10)))
+			// Avoid missing-report postponement before the epoch under test.
+			state, err := sjson.SetRawBytes(genesis, "app_state.audit.params.consecutive_epochs_to_postpone", []byte(strconv.FormatUint(2, 10)))
 			require.NoError(t, err)
 			return state
 		},
@@ -38,10 +38,10 @@ func TestAuditSubmitReport_ProberRequiresAllPeerObservations(t *testing.T) {
 	registerSupernode(t, cli, n1, "192.168.1.2")
 
 	currentHeight := sut.AwaitNextBlock(t)
-	windowID, windowStartHeight := nextWindowAfterHeight(originHeight, reportingWindowBlocks, currentHeight)
-	awaitAtLeastHeight(t, windowStartHeight)
+	epochID, epochStartHeight := nextEpochAfterHeight(originHeight, epochLengthBlocks, currentHeight)
+	awaitAtLeastHeight(t, epochStartHeight)
 
-	self := auditSelfReportJSON([]string{"PORT_STATE_OPEN"})
-	txResp := submitAuditReport(t, cli, n0.nodeName, windowID, self, nil)
-	RequireTxFailure(t, txResp, "expected peer observations")
+	host := auditHostReportJSON([]string{"PORT_STATE_OPEN"})
+	txResp := submitEpochReport(t, cli, n0.nodeName, epochID, host, nil)
+	RequireTxFailure(t, txResp, "expected storage challenge observations")
 }

@@ -33,7 +33,7 @@ message Params {
   // at or above peer_port_postpone_threshold_percent before postponing the supernode.
   uint32 consecutive_epochs_to_postpone = 10;
 
-  // How many completed epochs to keep in state for epoch-scoped data like AuditReport
+  // How many completed epochs to keep in state for epoch-scoped data like EpochReport
   // and related indices. Pruning runs at epoch end.
   uint64 keep_last_epoch_entries = 11;
 
@@ -86,15 +86,4 @@ message Params {
   // Storage Challenge (SC) params.
   bool   sc_enabled = 19;
   uint32 sc_challengers_per_epoch = 20;
-  uint32 sc_files_per_challenger = 21;
-  uint32 sc_replica_count = 22;
-  uint32 sc_observer_threshold = 23;
-  uint64 sc_min_slice_bytes = 24;
-  uint64 sc_max_slice_bytes = 25;
-  uint64 sc_response_timeout_ms = 26;
-  uint64 sc_affirmation_timeout_ms = 27;
-  uint64 sc_evidence_max_bytes = 28;
-  uint32 sc_candidate_keys_lookback_epochs = 29;
-  uint64 sc_start_jitter_ms = 30;
-  bool   sc_evidence_submitter_must_be_challenger = 31;
 }

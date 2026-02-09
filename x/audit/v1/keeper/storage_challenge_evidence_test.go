@@ -14,7 +14,6 @@ func TestCreateEvidence_StorageChallengeFailure_ChallengerPolicy(t *testing.T) {
 
 	params := types.DefaultParams()
 	params.ScEnabled = true
-	params.ScEvidenceSubmitterMustBeChallenger = true
 	params.ScChallengersPerEpoch = 2
 	require.NoError(t, f.keeper.SetParams(f.ctx, params))
 

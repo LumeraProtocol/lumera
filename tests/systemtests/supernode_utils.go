@@ -2,9 +2,9 @@ package system
 
 import (
 	"encoding/json"
+	"errors"
 	"strconv"
 	"testing"
-	"errors"
 	"time"
 
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"

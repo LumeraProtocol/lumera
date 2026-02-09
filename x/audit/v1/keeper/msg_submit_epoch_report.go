@@ -9,9 +9,12 @@ import (
 	"github.com/LumeraProtocol/lumera/x/audit/v1/types"
 )
 
-func (m msgServer) SubmitAuditReport(ctx context.Context, req *types.MsgSubmitAuditReport) (*types.MsgSubmitAuditReportResponse, error) {
+func (m msgServer) SubmitEpochReport(ctx context.Context, req *types.MsgSubmitEpochReport) (*types.MsgSubmitEpochReportResponse, error) {
 	if req == nil {
 		return nil, errorsmod.Wrap(types.ErrInvalidSigner, "empty request")
+	}
+	if req.Creator == "" {
+		return nil, errorsmod.Wrap(types.ErrInvalidSigner, "creator is required")
 	}
 
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
@@ -29,12 +32,12 @@ func (m msgServer) SubmitAuditReport(ctx context.Context, req *types.MsgSubmitAu
 		return nil, errorsmod.Wrapf(types.ErrInvalidEpochID, "epoch_id not accepted at height %d", sdkCtx.BlockHeight())
 	}
 
-	_, found, err := m.supernodeKeeper.GetSuperNodeByAccount(sdkCtx, req.SupernodeAccount)
+	_, found, err := m.supernodeKeeper.GetSuperNodeByAccount(sdkCtx, req.Creator)
 	if err != nil {
 		return nil, err
 	}
 	if !found {
-		return nil, errorsmod.Wrap(types.ErrReporterNotFound, "unknown supernode_account")
+		return nil, errorsmod.Wrap(types.ErrReporterNotFound, "creator is not a registered supernode")
 	}
 
 	anchor, found := m.GetEpochAnchor(sdkCtx, req.EpochId)
@@ -42,7 +45,9 @@ func (m msgServer) SubmitAuditReport(ctx context.Context, req *types.MsgSubmitAu
 		return nil, errorsmod.Wrapf(types.ErrInvalidEpochID, "epoch anchor not found for epoch_id %d", req.EpochId)
 	}
 
-	allowedTargetsList, isProber, err := computeAuditPeerTargetsForReporter(&params, anchor.ActiveSupernodeAccounts, anchor.TargetSupernodeAccounts, anchor.Seed, req.SupernodeAccount)
+	reporterAccount := req.Creator
+
+	allowedTargetsList, isProber, err := computeAuditPeerTargetsForReporter(&params, anchor.ActiveSupernodeAccounts, anchor.TargetSupernodeAccounts, anchor.Seed, reporterAccount)
 	if err != nil {
 		return nil, err
 	}
@@ -52,52 +57,52 @@ func (m msgServer) SubmitAuditReport(ctx context.Context, req *types.MsgSubmitAu
 	}
 
 	requiredPortsLen := len(params.RequiredOpenPorts)
-	// Self report port states are persisted on-chain. To prevent state bloat and keep the
+	// Host report port states are persisted on-chain. To prevent state bloat and keep the
 	// semantics clear, allow either:
 	// - an empty list (unknown/unreported), or
 	// - a full list matching required_open_ports length (same ordering).
-	if len(req.SelfReport.InboundPortStates) > requiredPortsLen {
+	if len(req.HostReport.InboundPortStates) > requiredPortsLen {
 		return nil, errorsmod.Wrapf(
 			types.ErrInvalidPortStatesLength,
 			"inbound_port_states length %d exceeds required_open_ports length %d",
-			len(req.SelfReport.InboundPortStates), requiredPortsLen,
+			len(req.HostReport.InboundPortStates), requiredPortsLen,
 		)
 	}
-	if len(req.SelfReport.InboundPortStates) != 0 && len(req.SelfReport.InboundPortStates) != requiredPortsLen {
+	if len(req.HostReport.InboundPortStates) != 0 && len(req.HostReport.InboundPortStates) != requiredPortsLen {
 		return nil, errorsmod.Wrapf(
 			types.ErrInvalidPortStatesLength,
 			"inbound_port_states length %d must be 0 or %d",
-			len(req.SelfReport.InboundPortStates), requiredPortsLen,
+			len(req.HostReport.InboundPortStates), requiredPortsLen,
 		)
 	}
 	if !isProber {
 		// Not a prober for this epoch (e.g. POSTPONED). Peer observations are not accepted.
-		if len(req.PeerObservations) > 0 {
-			return nil, errorsmod.Wrap(types.ErrInvalidReporterState, "reporter not eligible for peer observations in this epoch")
+		if len(req.StorageChallengeObservations) > 0 {
+			return nil, errorsmod.Wrap(types.ErrInvalidReporterState, "reporter not eligible for storage challenge observations in this epoch")
 		}
 	} else {
 		// Probers must submit peer observations for all assigned targets for the epoch.
-		if len(req.PeerObservations) != len(allowedTargets) {
-			return nil, errorsmod.Wrapf(types.ErrInvalidPeerObservations, "expected peer observations for %d assigned targets; got %d", len(allowedTargets), len(req.PeerObservations))
+		if len(req.StorageChallengeObservations) != len(allowedTargets) {
+			return nil, errorsmod.Wrapf(types.ErrInvalidPeerObservations, "expected storage challenge observations for %d assigned targets; got %d", len(allowedTargets), len(req.StorageChallengeObservations))
 		}
 
-		seenTargets := make(map[string]struct{}, len(req.PeerObservations))
-		for _, obs := range req.PeerObservations {
+		seenTargets := make(map[string]struct{}, len(req.StorageChallengeObservations))
+		for _, obs := range req.StorageChallengeObservations {
 			if obs == nil {
-				return nil, errorsmod.Wrap(types.ErrInvalidPeerObservations, "nil peer observation")
+				return nil, errorsmod.Wrap(types.ErrInvalidPeerObservations, "nil storage challenge observation")
 			}
 			target := obs.TargetSupernodeAccount
 			if target == "" {
 				return nil, errorsmod.Wrap(types.ErrInvalidPeerObservations, "empty target_supernode_account")
 			}
-			if target == req.SupernodeAccount {
+			if target == reporterAccount {
 				return nil, errorsmod.Wrap(types.ErrInvalidPeerObservations, "self-targeting is not allowed")
 			}
 			if _, ok := allowedTargets[target]; !ok {
 				return nil, errorsmod.Wrapf(types.ErrInvalidPeerObservations, "target %q is not assigned to reporter in this epoch", target)
 			}
 			if _, dup := seenTargets[target]; dup {
-				return nil, errorsmod.Wrapf(types.ErrInvalidPeerObservations, "duplicate peer observation for target %q", target)
+				return nil, errorsmod.Wrapf(types.ErrInvalidPeerObservations, "duplicate storage challenge observation for target %q", target)
 			}
 			seenTargets[target] = struct{}{}
 
@@ -110,27 +115,26 @@ func (m msgServer) SubmitAuditReport(ctx context.Context, req *types.MsgSubmitAu
 		}
 	}
 
-	reporterAccount := req.SupernodeAccount
 	if m.HasReport(sdkCtx, req.EpochId, reporterAccount) {
 		return nil, errorsmod.Wrap(types.ErrDuplicateReport, "report already submitted for this epoch")
 	}
 
-	report := types.AuditReport{
-		SupernodeAccount: reporterAccount,
-		EpochId:          req.EpochId,
-		ReportHeight:     sdkCtx.BlockHeight(),
-		SelfReport:       req.SelfReport,
-		PeerObservations: req.PeerObservations,
+	report := types.EpochReport{
+		SupernodeAccount:             reporterAccount,
+		EpochId:                      req.EpochId,
+		ReportHeight:                 sdkCtx.BlockHeight(),
+		HostReport:                   req.HostReport,
+		StorageChallengeObservations: req.StorageChallengeObservations,
 	}
 
 	if err := m.SetReport(sdkCtx, report); err != nil {
 		return nil, err
 	}
 	m.SetReportIndex(sdkCtx, req.EpochId, reporterAccount)
-	m.SetSelfReportIndex(sdkCtx, req.EpochId, reporterAccount)
+	m.SetHostReportIndex(sdkCtx, req.EpochId, reporterAccount)
 
-	seenSupernodes := make(map[string]struct{}, len(req.PeerObservations))
-	for _, obs := range req.PeerObservations {
+	seenSupernodes := make(map[string]struct{}, len(req.StorageChallengeObservations))
+	for _, obs := range req.StorageChallengeObservations {
 		if obs == nil {
 			continue
 		}
@@ -142,8 +146,8 @@ func (m msgServer) SubmitAuditReport(ctx context.Context, req *types.MsgSubmitAu
 			continue
 		}
 		seenSupernodes[supernodeAccount] = struct{}{}
-		m.SetSupernodeReportIndex(sdkCtx, supernodeAccount, req.EpochId, reporterAccount)
+		m.SetStorageChallengeReportIndex(sdkCtx, supernodeAccount, req.EpochId, reporterAccount)
 	}
 
-	return &types.MsgSubmitAuditReportResponse{}, nil
+	return &types.MsgSubmitEpochReportResponse{}, nil
 }

@@ -13,6 +13,7 @@ import (
 	appParams "github.com/LumeraProtocol/lumera/app/upgrades/params"
 	upgrade_v1_10_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_10_0"
 	upgrade_v1_10_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_10_1"
+	upgrade_v1_11_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_11_0"
 	upgrade_v1_6_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_6_1"
 	upgrade_v1_8_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_0"
 	upgrade_v1_8_4 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_4"
@@ -33,6 +34,7 @@ import (
 // | v1.9.1  | standard | none                              | Migrations only
 // | v1.10.0 | custom   | drop crisis                       | Migrate consensus params from x/params to x/consensus; remove x/crisis
 // | v1.10.1 | custom   | drop crisis (if not already)      | Ensure consensus params are present in x/consensus
+// | v1.11.0 | custom   | add audit store                   | Initializes audit params with dynamic epoch_zero_height
 // =================================================================================================================================
 
 type UpgradeConfig struct {
@@ -60,6 +62,7 @@ var upgradeNames = []string{
 	upgradeNameV191,
 	upgrade_v1_10_0.UpgradeName,
 	upgrade_v1_10_1.UpgradeName,
+	upgrade_v1_11_0.UpgradeName,
 }
 
 var NoUpgradeConfig = UpgradeConfig{
@@ -123,6 +126,11 @@ func SetupUpgrades(upgradeName string, params appParams.AppUpgradeParams) (Upgra
 		return UpgradeConfig{
 			StoreUpgrade: &upgrade_v1_10_1.StoreUpgrades,
 			Handler:      upgrade_v1_10_1.CreateUpgradeHandler(params),
+		}, true
+	case upgrade_v1_11_0.UpgradeName:
+		return UpgradeConfig{
+			StoreUpgrade: &upgrade_v1_11_0.StoreUpgrades,
+			Handler:      upgrade_v1_11_0.CreateUpgradeHandler(params),
 		}, true
 
 	// add future upgrades here

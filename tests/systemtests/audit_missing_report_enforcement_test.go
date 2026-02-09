@@ -3,9 +3,9 @@
 package system
 
 // This test validates missing-report enforcement in EndBlocker:
-// - two ACTIVE supernodes exist during a window
-// - only one submits a report for that window
-// - after `window_end + 1`, the missing sender is POSTPONED
+// - two ACTIVE supernodes exist during an epoch
+// - only one submits a report for that epoch
+// - after `epoch_end + 1`, the missing sender is POSTPONED
 
 import (
 	"testing"
@@ -15,13 +15,13 @@ import (
 
 func TestAuditMissingReportPostponesSender(t *testing.T) {
 	const (
-		reportingWindowBlocks = uint64(10)
+		epochLengthBlocks = uint64(10)
 	)
 	const originHeight = int64(1)
 
 	sut.ModifyGenesisJSON(t,
 		setSupernodeParamsForAuditTests(t),
-		setAuditParamsForFastWindows(t, reportingWindowBlocks, 1, 1, 1, []uint32{4444}),
+		setAuditParamsForFastEpochs(t, epochLengthBlocks, 1, 1, 1, []uint32{4444}),
 	)
 	sut.StartChain(t)
 
@@ -33,29 +33,29 @@ func TestAuditMissingReportPostponesSender(t *testing.T) {
 	registerSupernode(t, cli, n1, "192.168.1.2")
 
 	currentHeight := sut.AwaitNextBlock(t)
-	blocks := int64(reportingWindowBlocks)
+	blocks := int64(epochLengthBlocks)
 
-	var windowID uint64
-	var windowStartHeight int64
-	var windowEndHeight int64
+	var epochID uint64
+	var epochStartHeight int64
+	var epochEndHeight int64
 	for {
-		windowID = uint64((currentHeight - originHeight) / blocks)
-		windowStartHeight = originHeight + int64(windowID)*blocks
-		windowEndHeight = windowStartHeight + blocks - 1
-		// Ensure there's enough room in the window so the tx is committed before the next window starts.
-		if windowEndHeight-currentHeight >= 3 {
+		epochID = uint64((currentHeight - originHeight) / blocks)
+		epochStartHeight = originHeight + int64(epochID)*blocks
+		epochEndHeight = epochStartHeight + blocks - 1
+		// Ensure there's enough room in the epoch so the tx is committed before the next epoch starts.
+		if epochEndHeight-currentHeight >= 3 {
 			break
 		}
 		currentHeight = sut.AwaitNextBlock(t)
 	}
-	enforceHeight := windowEndHeight + 1
+	enforceHeight := epochEndHeight + 1
 
-	self := auditSelfReportJSON([]string{"PORT_STATE_OPEN"})
-	// node0 submits a report; node1 submits nothing in this window.
-	txResp := submitAuditReport(t, cli, n0.nodeName, windowID, self, nil)
+	host := auditHostReportJSON([]string{"PORT_STATE_OPEN"})
+	// node0 submits a report; node1 submits nothing in this epoch.
+	txResp := submitEpochReport(t, cli, n0.nodeName, epochID, host, nil)
 	RequireTxSuccess(t, txResp)
 
-	// node1 does not submit any report for this window -> should be postponed after the window ends.
+	// node1 does not submit any report for this epoch -> should be postponed after the epoch ends.
 	awaitAtLeastHeight(t, enforceHeight)
 
 	require.Equal(t, "SUPERNODE_STATE_POSTPONED", querySupernodeLatestState(t, cli, n1.valAddr))

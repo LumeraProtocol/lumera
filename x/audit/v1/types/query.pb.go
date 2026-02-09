@@ -800,23 +800,23 @@ func (m *QueryAssignedTargetsResponse) GetTargetSupernodeAccounts() []string {
 	return nil
 }
 
-type QueryAuditReportRequest struct {
+type QueryEpochReportRequest struct {
 	EpochId          uint64 `protobuf:"varint,1,opt,name=epoch_id,json=epochId,proto3" json:"epoch_id,omitempty"`
 	SupernodeAccount string `protobuf:"bytes,2,opt,name=supernode_account,json=supernodeAccount,proto3" json:"supernode_account,omitempty"`
 }
 
-func (m *QueryAuditReportRequest) Reset()         { *m = QueryAuditReportRequest{} }
-func (m *QueryAuditReportRequest) String() string { return proto.CompactTextString(m) }
-func (*QueryAuditReportRequest) ProtoMessage()    {}
-func (*QueryAuditReportRequest) Descriptor() ([]byte, []int) {
+func (m *QueryEpochReportRequest) Reset()         { *m = QueryEpochReportRequest{} }
+func (m *QueryEpochReportRequest) String() string { return proto.CompactTextString(m) }
+func (*QueryEpochReportRequest) ProtoMessage()    {}
+func (*QueryEpochReportRequest) Descriptor() ([]byte, []int) {
 	return fileDescriptor_e98945621bbc9485, []int{16}
 }
-func (m *QueryAuditReportRequest) XXX_Unmarshal(b []byte) error {
+func (m *QueryEpochReportRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
-func (m *QueryAuditReportRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+func (m *QueryEpochReportRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
-		return xxx_messageInfo_QueryAuditReportRequest.Marshal(b, m, deterministic)
+		return xxx_messageInfo_QueryEpochReportRequest.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
 		n, err := m.MarshalToSizedBuffer(b)
@@ -826,48 +826,48 @@ func (m *QueryAuditReportRequest) XXX_Marshal(b []byte, deterministic bool) ([]b
 		return b[:n], nil
 	}
 }
-func (m *QueryAuditReportRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_QueryAuditReportRequest.Merge(m, src)
+func (m *QueryEpochReportRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_QueryEpochReportRequest.Merge(m, src)
 }
-func (m *QueryAuditReportRequest) XXX_Size() int {
+func (m *QueryEpochReportRequest) XXX_Size() int {
 	return m.Size()
 }
-func (m *QueryAuditReportRequest) XXX_DiscardUnknown() {
-	xxx_messageInfo_QueryAuditReportRequest.DiscardUnknown(m)
+func (m *QueryEpochReportRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_QueryEpochReportRequest.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_QueryAuditReportRequest proto.InternalMessageInfo
+var xxx_messageInfo_QueryEpochReportRequest proto.InternalMessageInfo
 
-func (m *QueryAuditReportRequest) GetEpochId() uint64 {
+func (m *QueryEpochReportRequest) GetEpochId() uint64 {
 	if m != nil {
 		return m.EpochId
 	}
 	return 0
 }
 
-func (m *QueryAuditReportRequest) GetSupernodeAccount() string {
+func (m *QueryEpochReportRequest) GetSupernodeAccount() string {
 	if m != nil {
 		return m.SupernodeAccount
 	}
 	return ""
 }
 
-type QueryAuditReportResponse struct {
-	Report AuditReport `protobuf:"bytes,1,opt,name=report,proto3" json:"report"`
+type QueryEpochReportResponse struct {
+	Report EpochReport `protobuf:"bytes,1,opt,name=report,proto3" json:"report"`
 }
 
-func (m *QueryAuditReportResponse) Reset()         { *m = QueryAuditReportResponse{} }
-func (m *QueryAuditReportResponse) String() string { return proto.CompactTextString(m) }
-func (*QueryAuditReportResponse) ProtoMessage()    {}
-func (*QueryAuditReportResponse) Descriptor() ([]byte, []int) {
+func (m *QueryEpochReportResponse) Reset()         { *m = QueryEpochReportResponse{} }
+func (m *QueryEpochReportResponse) String() string { return proto.CompactTextString(m) }
+func (*QueryEpochReportResponse) ProtoMessage()    {}
+func (*QueryEpochReportResponse) Descriptor() ([]byte, []int) {
 	return fileDescriptor_e98945621bbc9485, []int{17}
 }
-func (m *QueryAuditReportResponse) XXX_Unmarshal(b []byte) error {
+func (m *QueryEpochReportResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
-func (m *QueryAuditReportResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+func (m *QueryEpochReportResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
-		return xxx_messageInfo_QueryAuditReportResponse.Marshal(b, m, deterministic)
+		return xxx_messageInfo_QueryEpochReportResponse.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
 		n, err := m.MarshalToSizedBuffer(b)
@@ -877,44 +877,44 @@ func (m *QueryAuditReportResponse) XXX_Marshal(b []byte, deterministic bool) ([]
 		return b[:n], nil
 	}
 }
-func (m *QueryAuditReportResponse) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_QueryAuditReportResponse.Merge(m, src)
+func (m *QueryEpochReportResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_QueryEpochReportResponse.Merge(m, src)
 }
-func (m *QueryAuditReportResponse) XXX_Size() int {
+func (m *QueryEpochReportResponse) XXX_Size() int {
 	return m.Size()
 }
-func (m *QueryAuditReportResponse) XXX_DiscardUnknown() {
-	xxx_messageInfo_QueryAuditReportResponse.DiscardUnknown(m)
+func (m *QueryEpochReportResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_QueryEpochReportResponse.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_QueryAuditReportResponse proto.InternalMessageInfo
+var xxx_messageInfo_QueryEpochReportResponse proto.InternalMessageInfo
 
-func (m *QueryAuditReportResponse) GetReport() AuditReport {
+func (m *QueryEpochReportResponse) GetReport() EpochReport {
 	if m != nil {
 		return m.Report
 	}
-	return AuditReport{}
+	return EpochReport{}
 }
 
-type QueryAuditReportsByReporterRequest struct {
+type QueryEpochReportsByReporterRequest struct {
 	SupernodeAccount string             `protobuf:"bytes,1,opt,name=supernode_account,json=supernodeAccount,proto3" json:"supernode_account,omitempty"`
 	EpochId          uint64             `protobuf:"varint,2,opt,name=epoch_id,json=epochId,proto3" json:"epoch_id,omitempty"`
 	Pagination       *query.PageRequest `protobuf:"bytes,3,opt,name=pagination,proto3" json:"pagination,omitempty"`
 	FilterByEpochId  bool               `protobuf:"varint,4,opt,name=filter_by_epoch_id,json=filterByEpochId,proto3" json:"filter_by_epoch_id,omitempty"`
 }
 
-func (m *QueryAuditReportsByReporterRequest) Reset()         { *m = QueryAuditReportsByReporterRequest{} }
-func (m *QueryAuditReportsByReporterRequest) String() string { return proto.CompactTextString(m) }
-func (*QueryAuditReportsByReporterRequest) ProtoMessage()    {}
-func (*QueryAuditReportsByReporterRequest) Descriptor() ([]byte, []int) {
+func (m *QueryEpochReportsByReporterRequest) Reset()         { *m = QueryEpochReportsByReporterRequest{} }
+func (m *QueryEpochReportsByReporterRequest) String() string { return proto.CompactTextString(m) }
+func (*QueryEpochReportsByReporterRequest) ProtoMessage()    {}
+func (*QueryEpochReportsByReporterRequest) Descriptor() ([]byte, []int) {
 	return fileDescriptor_e98945621bbc9485, []int{18}
 }
-func (m *QueryAuditReportsByReporterRequest) XXX_Unmarshal(b []byte) error {
+func (m *QueryEpochReportsByReporterRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
-func (m *QueryAuditReportsByReporterRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+func (m *QueryEpochReportsByReporterRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
-		return xxx_messageInfo_QueryAuditReportsByReporterRequest.Marshal(b, m, deterministic)
+		return xxx_messageInfo_QueryEpochReportsByReporterRequest.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
 		n, err := m.MarshalToSizedBuffer(b)
@@ -924,63 +924,63 @@ func (m *QueryAuditReportsByReporterRequest) XXX_Marshal(b []byte, deterministic
 		return b[:n], nil
 	}
 }
-func (m *QueryAuditReportsByReporterRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_QueryAuditReportsByReporterRequest.Merge(m, src)
+func (m *QueryEpochReportsByReporterRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_QueryEpochReportsByReporterRequest.Merge(m, src)
 }
-func (m *QueryAuditReportsByReporterRequest) XXX_Size() int {
+func (m *QueryEpochReportsByReporterRequest) XXX_Size() int {
 	return m.Size()
 }
-func (m *QueryAuditReportsByReporterRequest) XXX_DiscardUnknown() {
-	xxx_messageInfo_QueryAuditReportsByReporterRequest.DiscardUnknown(m)
+func (m *QueryEpochReportsByReporterRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_QueryEpochReportsByReporterRequest.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_QueryAuditReportsByReporterRequest proto.InternalMessageInfo
+var xxx_messageInfo_QueryEpochReportsByReporterRequest proto.InternalMessageInfo
 
-func (m *QueryAuditReportsByReporterRequest) GetSupernodeAccount() string {
+func (m *QueryEpochReportsByReporterRequest) GetSupernodeAccount() string {
 	if m != nil {
 		return m.SupernodeAccount
 	}
 	return ""
 }
 
-func (m *QueryAuditReportsByReporterRequest) GetEpochId() uint64 {
+func (m *QueryEpochReportsByReporterRequest) GetEpochId() uint64 {
 	if m != nil {
 		return m.EpochId
 	}
 	return 0
 }
 
-func (m *QueryAuditReportsByReporterRequest) GetPagination() *query.PageRequest {
+func (m *QueryEpochReportsByReporterRequest) GetPagination() *query.PageRequest {
 	if m != nil {
 		return m.Pagination
 	}
 	return nil
 }
 
-func (m *QueryAuditReportsByReporterRequest) GetFilterByEpochId() bool {
+func (m *QueryEpochReportsByReporterRequest) GetFilterByEpochId() bool {
 	if m != nil {
 		return m.FilterByEpochId
 	}
 	return false
 }
 
-type QueryAuditReportsByReporterResponse struct {
-	Reports    []AuditReport       `protobuf:"bytes,1,rep,name=reports,proto3" json:"reports"`
+type QueryEpochReportsByReporterResponse struct {
+	Reports    []EpochReport       `protobuf:"bytes,1,rep,name=reports,proto3" json:"reports"`
 	Pagination *query.PageResponse `protobuf:"bytes,2,opt,name=pagination,proto3" json:"pagination,omitempty"`
 }
 
-func (m *QueryAuditReportsByReporterResponse) Reset()         { *m = QueryAuditReportsByReporterResponse{} }
-func (m *QueryAuditReportsByReporterResponse) String() string { return proto.CompactTextString(m) }
-func (*QueryAuditReportsByReporterResponse) ProtoMessage()    {}
-func (*QueryAuditReportsByReporterResponse) Descriptor() ([]byte, []int) {
+func (m *QueryEpochReportsByReporterResponse) Reset()         { *m = QueryEpochReportsByReporterResponse{} }
+func (m *QueryEpochReportsByReporterResponse) String() string { return proto.CompactTextString(m) }
+func (*QueryEpochReportsByReporterResponse) ProtoMessage()    {}
+func (*QueryEpochReportsByReporterResponse) Descriptor() ([]byte, []int) {
 	return fileDescriptor_e98945621bbc9485, []int{19}
 }
-func (m *QueryAuditReportsByReporterResponse) XXX_Unmarshal(b []byte) error {
+func (m *QueryEpochReportsByReporterResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
-func (m *QueryAuditReportsByReporterResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+func (m *QueryEpochReportsByReporterResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
-		return xxx_messageInfo_QueryAuditReportsByReporterResponse.Marshal(b, m, deterministic)
+		return xxx_messageInfo_QueryEpochReportsByReporterResponse.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
 		n, err := m.MarshalToSizedBuffer(b)
@@ -990,51 +990,51 @@ func (m *QueryAuditReportsByReporterResponse) XXX_Marshal(b []byte, deterministi
 		return b[:n], nil
 	}
 }
-func (m *QueryAuditReportsByReporterResponse) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_QueryAuditReportsByReporterResponse.Merge(m, src)
+func (m *QueryEpochReportsByReporterResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_QueryEpochReportsByReporterResponse.Merge(m, src)
 }
-func (m *QueryAuditReportsByReporterResponse) XXX_Size() int {
+func (m *QueryEpochReportsByReporterResponse) XXX_Size() int {
 	return m.Size()
 }
-func (m *QueryAuditReportsByReporterResponse) XXX_DiscardUnknown() {
-	xxx_messageInfo_QueryAuditReportsByReporterResponse.DiscardUnknown(m)
+func (m *QueryEpochReportsByReporterResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_QueryEpochReportsByReporterResponse.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_QueryAuditReportsByReporterResponse proto.InternalMessageInfo
+var xxx_messageInfo_QueryEpochReportsByReporterResponse proto.InternalMessageInfo
 
-func (m *QueryAuditReportsByReporterResponse) GetReports() []AuditReport {
+func (m *QueryEpochReportsByReporterResponse) GetReports() []EpochReport {
 	if m != nil {
 		return m.Reports
 	}
 	return nil
 }
 
-func (m *QueryAuditReportsByReporterResponse) GetPagination() *query.PageResponse {
+func (m *QueryEpochReportsByReporterResponse) GetPagination() *query.PageResponse {
 	if m != nil {
 		return m.Pagination
 	}
 	return nil
 }
 
-type QuerySupernodeReportsRequest struct {
+type QueryStorageChallengeReportsRequest struct {
 	SupernodeAccount string             `protobuf:"bytes,1,opt,name=supernode_account,json=supernodeAccount,proto3" json:"supernode_account,omitempty"`
 	EpochId          uint64             `protobuf:"varint,2,opt,name=epoch_id,json=epochId,proto3" json:"epoch_id,omitempty"`
 	Pagination       *query.PageRequest `protobuf:"bytes,3,opt,name=pagination,proto3" json:"pagination,omitempty"`
 	FilterByEpochId  bool               `protobuf:"varint,4,opt,name=filter_by_epoch_id,json=filterByEpochId,proto3" json:"filter_by_epoch_id,omitempty"`
 }
 
-func (m *QuerySupernodeReportsRequest) Reset()         { *m = QuerySupernodeReportsRequest{} }
-func (m *QuerySupernodeReportsRequest) String() string { return proto.CompactTextString(m) }
-func (*QuerySupernodeReportsRequest) ProtoMessage()    {}
-func (*QuerySupernodeReportsRequest) Descriptor() ([]byte, []int) {
+func (m *QueryStorageChallengeReportsRequest) Reset()         { *m = QueryStorageChallengeReportsRequest{} }
+func (m *QueryStorageChallengeReportsRequest) String() string { return proto.CompactTextString(m) }
+func (*QueryStorageChallengeReportsRequest) ProtoMessage()    {}
+func (*QueryStorageChallengeReportsRequest) Descriptor() ([]byte, []int) {
 	return fileDescriptor_e98945621bbc9485, []int{20}
 }
-func (m *QuerySupernodeReportsRequest) XXX_Unmarshal(b []byte) error {
+func (m *QueryStorageChallengeReportsRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
-func (m *QuerySupernodeReportsRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+func (m *QueryStorageChallengeReportsRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
-		return xxx_messageInfo_QuerySupernodeReportsRequest.Marshal(b, m, deterministic)
+		return xxx_messageInfo_QueryStorageChallengeReportsRequest.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
 		n, err := m.MarshalToSizedBuffer(b)
@@ -1044,65 +1044,65 @@ func (m *QuerySupernodeReportsRequest) XXX_Marshal(b []byte, deterministic bool)
 		return b[:n], nil
 	}
 }
-func (m *QuerySupernodeReportsRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_QuerySupernodeReportsRequest.Merge(m, src)
+func (m *QueryStorageChallengeReportsRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_QueryStorageChallengeReportsRequest.Merge(m, src)
 }
-func (m *QuerySupernodeReportsRequest) XXX_Size() int {
+func (m *QueryStorageChallengeReportsRequest) XXX_Size() int {
 	return m.Size()
 }
-func (m *QuerySupernodeReportsRequest) XXX_DiscardUnknown() {
-	xxx_messageInfo_QuerySupernodeReportsRequest.DiscardUnknown(m)
+func (m *QueryStorageChallengeReportsRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_QueryStorageChallengeReportsRequest.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_QuerySupernodeReportsRequest proto.InternalMessageInfo
+var xxx_messageInfo_QueryStorageChallengeReportsRequest proto.InternalMessageInfo
 
-func (m *QuerySupernodeReportsRequest) GetSupernodeAccount() string {
+func (m *QueryStorageChallengeReportsRequest) GetSupernodeAccount() string {
 	if m != nil {
 		return m.SupernodeAccount
 	}
 	return ""
 }
 
-func (m *QuerySupernodeReportsRequest) GetEpochId() uint64 {
+func (m *QueryStorageChallengeReportsRequest) GetEpochId() uint64 {
 	if m != nil {
 		return m.EpochId
 	}
 	return 0
 }
 
-func (m *QuerySupernodeReportsRequest) GetPagination() *query.PageRequest {
+func (m *QueryStorageChallengeReportsRequest) GetPagination() *query.PageRequest {
 	if m != nil {
 		return m.Pagination
 	}
 	return nil
 }
 
-func (m *QuerySupernodeReportsRequest) GetFilterByEpochId() bool {
+func (m *QueryStorageChallengeReportsRequest) GetFilterByEpochId() bool {
 	if m != nil {
 		return m.FilterByEpochId
 	}
 	return false
 }
 
-type SupernodeReport struct {
+type StorageChallengeReport struct {
 	ReporterSupernodeAccount string      `protobuf:"bytes,1,opt,name=reporter_supernode_account,json=reporterSupernodeAccount,proto3" json:"reporter_supernode_account,omitempty"`
 	EpochId                  uint64      `protobuf:"varint,2,opt,name=epoch_id,json=epochId,proto3" json:"epoch_id,omitempty"`
 	ReportHeight             int64       `protobuf:"varint,3,opt,name=report_height,json=reportHeight,proto3" json:"report_height,omitempty"`
 	PortStates               []PortState `protobuf:"varint,4,rep,packed,name=port_states,json=portStates,proto3,enum=lumera.audit.v1.PortState" json:"port_states,omitempty"`
 }
 
-func (m *SupernodeReport) Reset()         { *m = SupernodeReport{} }
-func (m *SupernodeReport) String() string { return proto.CompactTextString(m) }
-func (*SupernodeReport) ProtoMessage()    {}
-func (*SupernodeReport) Descriptor() ([]byte, []int) {
+func (m *StorageChallengeReport) Reset()         { *m = StorageChallengeReport{} }
+func (m *StorageChallengeReport) String() string { return proto.CompactTextString(m) }
+func (*StorageChallengeReport) ProtoMessage()    {}
+func (*StorageChallengeReport) Descriptor() ([]byte, []int) {
 	return fileDescriptor_e98945621bbc9485, []int{21}
 }
-func (m *SupernodeReport) XXX_Unmarshal(b []byte) error {
+func (m *StorageChallengeReport) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
-func (m *SupernodeReport) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+func (m *StorageChallengeReport) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
-		return xxx_messageInfo_SupernodeReport.Marshal(b, m, deterministic)
+		return xxx_messageInfo_StorageChallengeReport.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
 		n, err := m.MarshalToSizedBuffer(b)
@@ -1112,63 +1112,63 @@ func (m *SupernodeReport) XXX_Marshal(b []byte, deterministic bool) ([]byte, err
 		return b[:n], nil
 	}
 }
-func (m *SupernodeReport) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SupernodeReport.Merge(m, src)
+func (m *StorageChallengeReport) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_StorageChallengeReport.Merge(m, src)
 }
-func (m *SupernodeReport) XXX_Size() int {
+func (m *StorageChallengeReport) XXX_Size() int {
 	return m.Size()
 }
-func (m *SupernodeReport) XXX_DiscardUnknown() {
-	xxx_messageInfo_SupernodeReport.DiscardUnknown(m)
+func (m *StorageChallengeReport) XXX_DiscardUnknown() {
+	xxx_messageInfo_StorageChallengeReport.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_SupernodeReport proto.InternalMessageInfo
+var xxx_messageInfo_StorageChallengeReport proto.InternalMessageInfo
 
-func (m *SupernodeReport) GetReporterSupernodeAccount() string {
+func (m *StorageChallengeReport) GetReporterSupernodeAccount() string {
 	if m != nil {
 		return m.ReporterSupernodeAccount
 	}
 	return ""
 }
 
-func (m *SupernodeReport) GetEpochId() uint64 {
+func (m *StorageChallengeReport) GetEpochId() uint64 {
 	if m != nil {
 		return m.EpochId
 	}
 	return 0
 }
 
-func (m *SupernodeReport) GetReportHeight() int64 {
+func (m *StorageChallengeReport) GetReportHeight() int64 {
 	if m != nil {
 		return m.ReportHeight
 	}
 	return 0
 }
 
-func (m *SupernodeReport) GetPortStates() []PortState {
+func (m *StorageChallengeReport) GetPortStates() []PortState {
 	if m != nil {
 		return m.PortStates
 	}
 	return nil
 }
 
-type QuerySupernodeReportsResponse struct {
-	Reports    []SupernodeReport   `protobuf:"bytes,1,rep,name=reports,proto3" json:"reports"`
-	Pagination *query.PageResponse `protobuf:"bytes,2,opt,name=pagination,proto3" json:"pagination,omitempty"`
+type QueryStorageChallengeReportsResponse struct {
+	Reports    []StorageChallengeReport `protobuf:"bytes,1,rep,name=reports,proto3" json:"reports"`
+	Pagination *query.PageResponse      `protobuf:"bytes,2,opt,name=pagination,proto3" json:"pagination,omitempty"`
 }
 
-func (m *QuerySupernodeReportsResponse) Reset()         { *m = QuerySupernodeReportsResponse{} }
-func (m *QuerySupernodeReportsResponse) String() string { return proto.CompactTextString(m) }
-func (*QuerySupernodeReportsResponse) ProtoMessage()    {}
-func (*QuerySupernodeReportsResponse) Descriptor() ([]byte, []int) {
+func (m *QueryStorageChallengeReportsResponse) Reset()         { *m = QueryStorageChallengeReportsResponse{} }
+func (m *QueryStorageChallengeReportsResponse) String() string { return proto.CompactTextString(m) }
+func (*QueryStorageChallengeReportsResponse) ProtoMessage()    {}
+func (*QueryStorageChallengeReportsResponse) Descriptor() ([]byte, []int) {
 	return fileDescriptor_e98945621bbc9485, []int{22}
 }
-func (m *QuerySupernodeReportsResponse) XXX_Unmarshal(b []byte) error {
+func (m *QueryStorageChallengeReportsResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
-func (m *QuerySupernodeReportsResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+func (m *QueryStorageChallengeReportsResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
-		return xxx_messageInfo_QuerySupernodeReportsResponse.Marshal(b, m, deterministic)
+		return xxx_messageInfo_QueryStorageChallengeReportsResponse.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
 		n, err := m.MarshalToSizedBuffer(b)
@@ -1178,51 +1178,51 @@ func (m *QuerySupernodeReportsResponse) XXX_Marshal(b []byte, deterministic bool
 		return b[:n], nil
 	}
 }
-func (m *QuerySupernodeReportsResponse) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_QuerySupernodeReportsResponse.Merge(m, src)
+func (m *QueryStorageChallengeReportsResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_QueryStorageChallengeReportsResponse.Merge(m, src)
 }
-func (m *QuerySupernodeReportsResponse) XXX_Size() int {
+func (m *QueryStorageChallengeReportsResponse) XXX_Size() int {
 	return m.Size()
 }
-func (m *QuerySupernodeReportsResponse) XXX_DiscardUnknown() {
-	xxx_messageInfo_QuerySupernodeReportsResponse.DiscardUnknown(m)
+func (m *QueryStorageChallengeReportsResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_QueryStorageChallengeReportsResponse.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_QuerySupernodeReportsResponse proto.InternalMessageInfo
+var xxx_messageInfo_QueryStorageChallengeReportsResponse proto.InternalMessageInfo
 
-func (m *QuerySupernodeReportsResponse) GetReports() []SupernodeReport {
+func (m *QueryStorageChallengeReportsResponse) GetReports() []StorageChallengeReport {
 	if m != nil {
 		return m.Reports
 	}
 	return nil
 }
 
-func (m *QuerySupernodeReportsResponse) GetPagination() *query.PageResponse {
+func (m *QueryStorageChallengeReportsResponse) GetPagination() *query.PageResponse {
 	if m != nil {
 		return m.Pagination
 	}
 	return nil
 }
 
-type QuerySelfReportsRequest struct {
+type QueryHostReportsRequest struct {
 	SupernodeAccount string             `protobuf:"bytes,1,opt,name=supernode_account,json=supernodeAccount,proto3" json:"supernode_account,omitempty"`
 	EpochId          uint64             `protobuf:"varint,2,opt,name=epoch_id,json=epochId,proto3" json:"epoch_id,omitempty"`
 	Pagination       *query.PageRequest `protobuf:"bytes,3,opt,name=pagination,proto3" json:"pagination,omitempty"`
 	FilterByEpochId  bool               `protobuf:"varint,4,opt,name=filter_by_epoch_id,json=filterByEpochId,proto3" json:"filter_by_epoch_id,omitempty"`
 }
 
-func (m *QuerySelfReportsRequest) Reset()         { *m = QuerySelfReportsRequest{} }
-func (m *QuerySelfReportsRequest) String() string { return proto.CompactTextString(m) }
-func (*QuerySelfReportsRequest) ProtoMessage()    {}
-func (*QuerySelfReportsRequest) Descriptor() ([]byte, []int) {
+func (m *QueryHostReportsRequest) Reset()         { *m = QueryHostReportsRequest{} }
+func (m *QueryHostReportsRequest) String() string { return proto.CompactTextString(m) }
+func (*QueryHostReportsRequest) ProtoMessage()    {}
+func (*QueryHostReportsRequest) Descriptor() ([]byte, []int) {
 	return fileDescriptor_e98945621bbc9485, []int{23}
 }
-func (m *QuerySelfReportsRequest) XXX_Unmarshal(b []byte) error {
+func (m *QueryHostReportsRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
-func (m *QuerySelfReportsRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+func (m *QueryHostReportsRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
-		return xxx_messageInfo_QuerySelfReportsRequest.Marshal(b, m, deterministic)
+		return xxx_messageInfo_QueryHostReportsRequest.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
 		n, err := m.MarshalToSizedBuffer(b)
@@ -1232,64 +1232,64 @@ func (m *QuerySelfReportsRequest) XXX_Marshal(b []byte, deterministic bool) ([]b
 		return b[:n], nil
 	}
 }
-func (m *QuerySelfReportsRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_QuerySelfReportsRequest.Merge(m, src)
+func (m *QueryHostReportsRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_QueryHostReportsRequest.Merge(m, src)
 }
-func (m *QuerySelfReportsRequest) XXX_Size() int {
+func (m *QueryHostReportsRequest) XXX_Size() int {
 	return m.Size()
 }
-func (m *QuerySelfReportsRequest) XXX_DiscardUnknown() {
-	xxx_messageInfo_QuerySelfReportsRequest.DiscardUnknown(m)
+func (m *QueryHostReportsRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_QueryHostReportsRequest.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_QuerySelfReportsRequest proto.InternalMessageInfo
+var xxx_messageInfo_QueryHostReportsRequest proto.InternalMessageInfo
 
-func (m *QuerySelfReportsRequest) GetSupernodeAccount() string {
+func (m *QueryHostReportsRequest) GetSupernodeAccount() string {
 	if m != nil {
 		return m.SupernodeAccount
 	}
 	return ""
 }
 
-func (m *QuerySelfReportsRequest) GetEpochId() uint64 {
+func (m *QueryHostReportsRequest) GetEpochId() uint64 {
 	if m != nil {
 		return m.EpochId
 	}
 	return 0
 }
 
-func (m *QuerySelfReportsRequest) GetPagination() *query.PageRequest {
+func (m *QueryHostReportsRequest) GetPagination() *query.PageRequest {
 	if m != nil {
 		return m.Pagination
 	}
 	return nil
 }
 
-func (m *QuerySelfReportsRequest) GetFilterByEpochId() bool {
+func (m *QueryHostReportsRequest) GetFilterByEpochId() bool {
 	if m != nil {
 		return m.FilterByEpochId
 	}
 	return false
 }
 
-type SelfReport struct {
-	EpochId      uint64          `protobuf:"varint,1,opt,name=epoch_id,json=epochId,proto3" json:"epoch_id,omitempty"`
-	ReportHeight int64           `protobuf:"varint,2,opt,name=report_height,json=reportHeight,proto3" json:"report_height,omitempty"`
-	SelfReport   AuditSelfReport `protobuf:"bytes,3,opt,name=self_report,json=selfReport,proto3" json:"self_report"`
+type HostReportEntry struct {
+	EpochId      uint64     `protobuf:"varint,1,opt,name=epoch_id,json=epochId,proto3" json:"epoch_id,omitempty"`
+	ReportHeight int64      `protobuf:"varint,2,opt,name=report_height,json=reportHeight,proto3" json:"report_height,omitempty"`
+	HostReport   HostReport `protobuf:"bytes,3,opt,name=host_report,json=hostReport,proto3" json:"host_report"`
 }
 
-func (m *SelfReport) Reset()         { *m = SelfReport{} }
-func (m *SelfReport) String() string { return proto.CompactTextString(m) }
-func (*SelfReport) ProtoMessage()    {}
-func (*SelfReport) Descriptor() ([]byte, []int) {
+func (m *HostReportEntry) Reset()         { *m = HostReportEntry{} }
+func (m *HostReportEntry) String() string { return proto.CompactTextString(m) }
+func (*HostReportEntry) ProtoMessage()    {}
+func (*HostReportEntry) Descriptor() ([]byte, []int) {
 	return fileDescriptor_e98945621bbc9485, []int{24}
 }
-func (m *SelfReport) XXX_Unmarshal(b []byte) error {
+func (m *HostReportEntry) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
-func (m *SelfReport) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+func (m *HostReportEntry) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
-		return xxx_messageInfo_SelfReport.Marshal(b, m, deterministic)
+		return xxx_messageInfo_HostReportEntry.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
 		n, err := m.MarshalToSizedBuffer(b)
@@ -1299,56 +1299,56 @@ func (m *SelfReport) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 		return b[:n], nil
 	}
 }
-func (m *SelfReport) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SelfReport.Merge(m, src)
+func (m *HostReportEntry) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_HostReportEntry.Merge(m, src)
 }
-func (m *SelfReport) XXX_Size() int {
+func (m *HostReportEntry) XXX_Size() int {
 	return m.Size()
 }
-func (m *SelfReport) XXX_DiscardUnknown() {
-	xxx_messageInfo_SelfReport.DiscardUnknown(m)
+func (m *HostReportEntry) XXX_DiscardUnknown() {
+	xxx_messageInfo_HostReportEntry.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_SelfReport proto.InternalMessageInfo
+var xxx_messageInfo_HostReportEntry proto.InternalMessageInfo
 
-func (m *SelfReport) GetEpochId() uint64 {
+func (m *HostReportEntry) GetEpochId() uint64 {
 	if m != nil {
 		return m.EpochId
 	}
 	return 0
 }
 
-func (m *SelfReport) GetReportHeight() int64 {
+func (m *HostReportEntry) GetReportHeight() int64 {
 	if m != nil {
 		return m.ReportHeight
 	}
 	return 0
 }
 
-func (m *SelfReport) GetSelfReport() AuditSelfReport {
+func (m *HostReportEntry) GetHostReport() HostReport {
 	if m != nil {
-		return m.SelfReport
+		return m.HostReport
 	}
-	return AuditSelfReport{}
+	return HostReport{}
 }
 
-type QuerySelfReportsResponse struct {
-	Reports    []SelfReport        `protobuf:"bytes,1,rep,name=reports,proto3" json:"reports"`
+type QueryHostReportsResponse struct {
+	Reports    []HostReportEntry   `protobuf:"bytes,1,rep,name=reports,proto3" json:"reports"`
 	Pagination *query.PageResponse `protobuf:"bytes,2,opt,name=pagination,proto3" json:"pagination,omitempty"`
 }
 
-func (m *QuerySelfReportsResponse) Reset()         { *m = QuerySelfReportsResponse{} }
-func (m *QuerySelfReportsResponse) String() string { return proto.CompactTextString(m) }
-func (*QuerySelfReportsResponse) ProtoMessage()    {}
-func (*QuerySelfReportsResponse) Descriptor() ([]byte, []int) {
+func (m *QueryHostReportsResponse) Reset()         { *m = QueryHostReportsResponse{} }
+func (m *QueryHostReportsResponse) String() string { return proto.CompactTextString(m) }
+func (*QueryHostReportsResponse) ProtoMessage()    {}
+func (*QueryHostReportsResponse) Descriptor() ([]byte, []int) {
 	return fileDescriptor_e98945621bbc9485, []int{25}
 }
-func (m *QuerySelfReportsResponse) XXX_Unmarshal(b []byte) error {
+func (m *QueryHostReportsResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
-func (m *QuerySelfReportsResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+func (m *QueryHostReportsResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
-		return xxx_messageInfo_QuerySelfReportsResponse.Marshal(b, m, deterministic)
+		return xxx_messageInfo_QueryHostReportsResponse.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
 		n, err := m.MarshalToSizedBuffer(b)
@@ -1358,26 +1358,26 @@ func (m *QuerySelfReportsResponse) XXX_Marshal(b []byte, deterministic bool) ([]
 		return b[:n], nil
 	}
 }
-func (m *QuerySelfReportsResponse) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_QuerySelfReportsResponse.Merge(m, src)
+func (m *QueryHostReportsResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_QueryHostReportsResponse.Merge(m, src)
 }
-func (m *QuerySelfReportsResponse) XXX_Size() int {
+func (m *QueryHostReportsResponse) XXX_Size() int {
 	return m.Size()
 }
-func (m *QuerySelfReportsResponse) XXX_DiscardUnknown() {
-	xxx_messageInfo_QuerySelfReportsResponse.DiscardUnknown(m)
+func (m *QueryHostReportsResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_QueryHostReportsResponse.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_QuerySelfReportsResponse proto.InternalMessageInfo
+var xxx_messageInfo_QueryHostReportsResponse proto.InternalMessageInfo
 
-func (m *QuerySelfReportsResponse) GetReports() []SelfReport {
+func (m *QueryHostReportsResponse) GetReports() []HostReportEntry {
 	if m != nil {
 		return m.Reports
 	}
 	return nil
 }
 
-func (m *QuerySelfReportsResponse) GetPagination() *query.PageResponse {
+func (m *QueryHostReportsResponse) GetPagination() *query.PageResponse {
 	if m != nil {
 		return m.Pagination
 	}
@@ -1401,116 +1401,116 @@ func init() {
 	proto.RegisterType((*QueryCurrentEpochAnchorResponse)(nil), "lumera.audit.v1.QueryCurrentEpochAnchorResponse")
 	proto.RegisterType((*QueryAssignedTargetsRequest)(nil), "lumera.audit.v1.QueryAssignedTargetsRequest")
 	proto.RegisterType((*QueryAssignedTargetsResponse)(nil), "lumera.audit.v1.QueryAssignedTargetsResponse")
-	proto.RegisterType((*QueryAuditReportRequest)(nil), "lumera.audit.v1.QueryAuditReportRequest")
-	proto.RegisterType((*QueryAuditReportResponse)(nil), "lumera.audit.v1.QueryAuditReportResponse")
-	proto.RegisterType((*QueryAuditReportsByReporterRequest)(nil), "lumera.audit.v1.QueryAuditReportsByReporterRequest")
-	proto.RegisterType((*QueryAuditReportsByReporterResponse)(nil), "lumera.audit.v1.QueryAuditReportsByReporterResponse")
-	proto.RegisterType((*QuerySupernodeReportsRequest)(nil), "lumera.audit.v1.QuerySupernodeReportsRequest")
-	proto.RegisterType((*SupernodeReport)(nil), "lumera.audit.v1.SupernodeReport")
-	proto.RegisterType((*QuerySupernodeReportsResponse)(nil), "lumera.audit.v1.QuerySupernodeReportsResponse")
-	proto.RegisterType((*QuerySelfReportsRequest)(nil), "lumera.audit.v1.QuerySelfReportsRequest")
-	proto.RegisterType((*SelfReport)(nil), "lumera.audit.v1.SelfReport")
-	proto.RegisterType((*QuerySelfReportsResponse)(nil), "lumera.audit.v1.QuerySelfReportsResponse")
+	proto.RegisterType((*QueryEpochReportRequest)(nil), "lumera.audit.v1.QueryEpochReportRequest")
+	proto.RegisterType((*QueryEpochReportResponse)(nil), "lumera.audit.v1.QueryEpochReportResponse")
+	proto.RegisterType((*QueryEpochReportsByReporterRequest)(nil), "lumera.audit.v1.QueryEpochReportsByReporterRequest")
+	proto.RegisterType((*QueryEpochReportsByReporterResponse)(nil), "lumera.audit.v1.QueryEpochReportsByReporterResponse")
+	proto.RegisterType((*QueryStorageChallengeReportsRequest)(nil), "lumera.audit.v1.QueryStorageChallengeReportsRequest")
+	proto.RegisterType((*StorageChallengeReport)(nil), "lumera.audit.v1.StorageChallengeReport")
+	proto.RegisterType((*QueryStorageChallengeReportsResponse)(nil), "lumera.audit.v1.QueryStorageChallengeReportsResponse")
+	proto.RegisterType((*QueryHostReportsRequest)(nil), "lumera.audit.v1.QueryHostReportsRequest")
+	proto.RegisterType((*HostReportEntry)(nil), "lumera.audit.v1.HostReportEntry")
+	proto.RegisterType((*QueryHostReportsResponse)(nil), "lumera.audit.v1.QueryHostReportsResponse")
 }
 
 func init() { proto.RegisterFile("lumera/audit/v1/query.proto", fileDescriptor_e98945621bbc9485) }
 
 var fileDescriptor_e98945621bbc9485 = []byte{
-	// 1489 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe4, 0x58, 0x5d, 0x68, 0x1c, 0xd5,
-	0x17, 0xcf, 0xcd, 0xe6, 0xdf, 0x26, 0x67, 0xdb, 0x26, 0xb9, 0x2d, 0xff, 0x6c, 0x36, 0x75, 0x1b,
-	0xa6, 0x52, 0xd3, 0xd8, 0xec, 0x98, 0xb6, 0xd6, 0x8f, 0x96, 0xda, 0x5d, 0x4d, 0xdb, 0x60, 0x4b,
-	0xd3, 0x5d, 0x3f, 0x50, 0x28, 0xc3, 0x64, 0xe7, 0x76, 0x33, 0x92, 0xcc, 0x4c, 0xe7, 0xce, 0x06,
-	0x43, 0x88, 0x0f, 0xf6, 0x5d, 0x04, 0xf1, 0xcd, 0x07, 0x41, 0x2a, 0x22, 0x05, 0x7d, 0xa8, 0x88,
-	0xe0, 0x83, 0xe0, 0x4b, 0x1f, 0x4b, 0x7d, 0x11, 0x1f, 0x44, 0x5a, 0x41, 0x7c, 0x13, 0x7c, 0xf1,
-	0x41, 0x44, 0xe6, 0x7e, 0xec, 0x7c, 0x67, 0x36, 0x25, 0x8a, 0xe8, 0x4b, 0x98, 0x3d, 0x1f, 0x77,
-	0x7e, 0xe7, 0x9c, 0xdf, 0x3d, 0x73, 0x4e, 0x60, 0x62, 0xb9, 0xb3, 0x42, 0x5c, 0x5d, 0xd5, 0x3b,
-	0x86, 0xe9, 0xa9, 0xab, 0xb3, 0xea, 0xb5, 0x0e, 0x71, 0xd7, 0xaa, 0x8e, 0x6b, 0x7b, 0x36, 0x1e,
-	0xe6, 0xca, 0x2a, 0x53, 0x56, 0x57, 0x67, 0xcb, 0xa3, 0xfa, 0x8a, 0x69, 0xd9, 0x2a, 0xfb, 0xcb,
-	0x6d, 0xca, 0xfb, 0xda, 0x76, 0xdb, 0x66, 0x8f, 0xaa, 0xff, 0x24, 0xa4, 0xfb, 0xdb, 0xb6, 0xdd,
-	0x5e, 0x26, 0xaa, 0xee, 0x98, 0xaa, 0x6e, 0x59, 0xb6, 0xa7, 0x7b, 0xa6, 0x6d, 0x51, 0xa1, 0x1d,
-	0x6f, 0xd9, 0x74, 0xc5, 0xa6, 0x1a, 0x77, 0xe3, 0x3f, 0x84, 0x6a, 0x9a, 0xff, 0x52, 0x17, 0x75,
-	0x4a, 0x38, 0x16, 0x75, 0x75, 0x76, 0x91, 0x78, 0xfa, 0xac, 0xea, 0xe8, 0x6d, 0xd3, 0x62, 0xe7,
-	0xc8, 0x97, 0xc4, 0xb1, 0x3b, 0xba, 0xab, 0xaf, 0xc8, 0x93, 0x12, 0x91, 0xf1, 0x28, 0xb8, 0xb2,
-	0x12, 0x57, 0x92, 0x55, 0xd3, 0x20, 0x56, 0x8b, 0x64, 0x39, 0x13, 0xc7, 0x6e, 0x2d, 0x71, 0xa5,
-	0xb2, 0x0f, 0xf0, 0x65, 0x1f, 0xd9, 0x02, 0x7b, 0x5d, 0x83, 0x5c, 0xeb, 0x10, 0xea, 0x29, 0x97,
-	0x61, 0x6f, 0x44, 0x4a, 0x1d, 0xdb, 0xa2, 0x04, 0x3f, 0x0d, 0x3b, 0x38, 0xac, 0x12, 0x9a, 0x44,
-	0x53, 0xc5, 0xa3, 0x63, 0xd5, 0x58, 0x52, 0xab, 0xdc, 0xa1, 0x3e, 0x74, 0xfb, 0xfb, 0x03, 0x7d,
-	0x1f, 0xfd, 0xf4, 0xe9, 0x34, 0x6a, 0x08, 0x0f, 0xe5, 0x24, 0x94, 0xd8, 0x91, 0x73, 0x02, 0x5c,
-	0x7d, 0x6d, 0xde, 0x10, 0xaf, 0xc3, 0x07, 0xa0, 0x28, 0x31, 0x6b, 0xa6, 0xc1, 0x0e, 0x1f, 0x68,
-	0x80, 0x14, 0xcd, 0x1b, 0xca, 0x15, 0x18, 0x4f, 0x71, 0x16, 0xa8, 0xce, 0xc0, 0xa0, 0x34, 0x15,
-	0xb8, 0xc6, 0x13, 0xb8, 0xba, 0x8e, 0x21, 0x64, 0x5d, 0x2f, 0xe5, 0x63, 0x04, 0x0f, 0xc5, 0xce,
-	0x6f, 0x76, 0x16, 0x5f, 0x23, 0x2d, 0x4f, 0x22, 0xac, 0xc1, 0x30, 0xe5, 0x12, 0x4d, 0x37, 0x0c,
-	0x97, 0x50, 0x9e, 0x82, 0xa1, 0x7a, 0xe9, 0xee, 0xad, 0x99, 0x7d, 0xa2, 0xea, 0x35, 0xae, 0x69,
-	0x7a, 0xae, 0x69, 0xb5, 0x1b, 0x7b, 0x84, 0x83, 0x90, 0xe2, 0xb3, 0x00, 0x41, 0xd5, 0x4b, 0xfd,
-	0x0c, 0xe8, 0xa1, 0xaa, 0x70, 0xf5, 0x29, 0x52, 0xe5, 0x74, 0x15, 0x14, 0xa9, 0x2e, 0xe8, 0x6d,
-	0x22, 0x5e, 0xdf, 0x08, 0x79, 0x2a, 0x1f, 0x22, 0xa8, 0x64, 0x81, 0x15, 0x19, 0x39, 0x19, 0xc9,
-	0x48, 0x61, 0xf3, 0x8c, 0x0c, 0xf8, 0x19, 0x09, 0x92, 0x81, 0xcf, 0xa5, 0xe0, 0x7c, 0x24, 0x17,
-	0x27, 0x7f, 0x73, 0x04, 0xe8, 0x75, 0x04, 0xfb, 0x63, 0x40, 0x6b, 0x2d, 0x5f, 0x23, 0x93, 0x3a,
-	0x01, 0x43, 0x3a, 0x13, 0xc8, 0xa2, 0x0f, 0x35, 0x06, 0xb9, 0x60, 0xde, 0xd8, 0xb6, 0x74, 0xdd,
-	0x48, 0xd6, 0x56, 0xa2, 0xf8, 0x47, 0x65, 0xab, 0x2c, 0xee, 0xc7, 0xb3, 0x1d, 0xd7, 0x25, 0x96,
-	0x37, 0xe7, 0xdf, 0x51, 0x79, 0x1d, 0xdf, 0x42, 0x82, 0xff, 0x51, 0xa5, 0xc0, 0x3f, 0x0e, 0x83,
-	0xec, 0x46, 0x07, 0x57, 0x67, 0x27, 0xfb, 0x3d, 0x6f, 0xe0, 0x23, 0x80, 0xb9, 0x8a, 0x7a, 0xba,
-	0xeb, 0x69, 0x4b, 0xc4, 0x6c, 0x2f, 0x79, 0x0c, 0x65, 0xa1, 0x31, 0xc2, 0x34, 0x4d, 0x5f, 0x71,
-	0x9e, 0xc9, 0xf1, 0x14, 0x70, 0x99, 0x46, 0x2c, 0x43, 0xda, 0x16, 0x98, 0xed, 0x1e, 0x26, 0x9f,
-	0xb3, 0x0c, 0x6e, 0xa9, 0x1c, 0x87, 0x31, 0x9e, 0x53, 0x5f, 0x5c, 0xb3, 0x5a, 0x4b, 0xb6, 0x2b,
-	0x8b, 0x9a, 0x8d, 0x46, 0x79, 0x49, 0xb6, 0x80, 0xb0, 0x57, 0xd0, 0x5a, 0x74, 0x26, 0x11, 0x57,
-	0x78, 0x7f, 0xb2, 0x04, 0x81, 0x97, 0xa8, 0x82, 0xf0, 0x50, 0x26, 0xc5, 0x85, 0x08, 0x67, 0x27,
-	0x02, 0x4a, 0xb9, 0x02, 0x07, 0x32, 0x2d, 0xb6, 0x01, 0xc0, 0x27, 0x08, 0x26, 0xd8, 0xf9, 0x35,
-	0x4a, 0xcd, 0xb6, 0x45, 0x8c, 0x17, 0x74, 0xb7, 0x4d, 0x3c, 0xd9, 0x4e, 0xf1, 0x79, 0x18, 0xa5,
-	0x1d, 0x87, 0xb8, 0x96, 0x6d, 0x10, 0x4d, 0x6f, 0xb5, 0xec, 0x8e, 0xe5, 0x89, 0xfe, 0x31, 0x71,
-	0xf7, 0xd6, 0xcc, 0x98, 0xec, 0x1f, 0xad, 0x56, 0xb4, 0x85, 0x8c, 0x74, 0xbd, 0x6a, 0xdc, 0x29,
-	0x92, 0xdd, 0xfe, 0x68, 0xad, 0x1f, 0x05, 0x7c, 0xd5, 0x5c, 0xf6, 0x88, 0xab, 0x2d, 0xae, 0x69,
-	0x5d, 0x23, 0xbf, 0x7e, 0x83, 0x8d, 0x61, 0xae, 0xa9, 0xf3, 0xd4, 0xcf, 0x1b, 0xca, 0x2f, 0xf2,
-	0x6e, 0x26, 0x10, 0x6f, 0x37, 0xa9, 0xaa, 0xb0, 0xd7, 0x25, 0xd7, 0x3a, 0xa6, 0x4b, 0x0c, 0xcd,
-	0x76, 0x88, 0xa5, 0x39, 0xb6, 0xeb, 0xd1, 0x52, 0x61, 0xb2, 0x30, 0xb5, 0xbb, 0x31, 0x2a, 0x55,
-	0x97, 0x1c, 0x62, 0x2d, 0xf8, 0x0a, 0xfc, 0x32, 0x8c, 0x7b, 0x0c, 0x8b, 0x96, 0x48, 0x19, 0x2d,
-	0x0d, 0x4c, 0x16, 0xf2, 0x72, 0x36, 0xc6, 0xbd, 0x9b, 0xb1, 0xcc, 0x51, 0xe5, 0x0d, 0xc1, 0xd9,
-	0x9a, 0x5f, 0xcf, 0x06, 0xf1, 0x61, 0xe4, 0x73, 0x36, 0xbd, 0x74, 0xfd, 0x0f, 0x50, 0xba, 0x2e,
-	0xfb, 0x23, 0xef, 0x0f, 0xc8, 0xe7, 0x32, 0x49, 0x26, 0xf9, 0x42, 0x5e, 0x92, 0x7c, 0xdc, 0x43,
-	0xf9, 0x03, 0x81, 0x12, 0x3f, 0x98, 0xd6, 0xd7, 0xf8, 0x03, 0x71, 0xff, 0x56, 0x0e, 0x46, 0x9b,
-	0x76, 0xe1, 0x41, 0x9b, 0x76, 0x06, 0x97, 0x07, 0xd2, 0xb9, 0x7c, 0x13, 0xc1, 0xc1, 0x4d, 0x13,
-	0x20, 0x92, 0x7c, 0x0a, 0x76, 0xf2, 0x94, 0x51, 0xd1, 0xe6, 0x7b, 0xc9, 0xb2, 0x74, 0xd9, 0xbe,
-	0x46, 0xff, 0x9b, 0xbc, 0x7a, 0x5d, 0x8a, 0x0a, 0xc8, 0xff, 0xfe, 0x4a, 0xfd, 0x8c, 0x60, 0x38,
-	0x16, 0x35, 0x7e, 0x05, 0xca, 0xae, 0xa8, 0x94, 0xf6, 0x40, 0x61, 0x97, 0xa4, 0x7b, 0x73, 0x0b,
-	0xe1, 0x1f, 0x84, 0xdd, 0xdc, 0x2d, 0xfa, 0x9d, 0xdb, 0xc5, 0x85, 0xa2, 0x75, 0x9d, 0x84, 0x22,
-	0x33, 0xa1, 0x9e, 0xee, 0x11, 0xde, 0x7c, 0xf6, 0x1c, 0x2d, 0x27, 0x67, 0x5e, 0xdb, 0xf5, 0x9a,
-	0xbe, 0x49, 0x03, 0x1c, 0xf9, 0x48, 0x83, 0x99, 0x32, 0x59, 0xe6, 0xee, 0xdc, 0x1a, 0xe3, 0xe3,
-	0x64, 0xe2, 0xe8, 0x98, 0xef, 0x5f, 0xc6, 0xc9, 0x5f, 0x91, 0x68, 0x8e, 0x4d, 0xb2, 0x7c, 0xf5,
-	0x3f, 0x43, 0xc7, 0x77, 0x11, 0x40, 0x10, 0xf0, 0x66, 0x5f, 0x81, 0x04, 0x5d, 0xfa, 0x53, 0xe8,
-	0x72, 0x0e, 0x8a, 0x94, 0x2c, 0x5f, 0xd5, 0x44, 0x27, 0xe7, 0x41, 0x4c, 0xa6, 0xf7, 0x98, 0xe0,
-	0xb5, 0xa2, 0xa6, 0x40, 0xbb, 0x12, 0xe5, 0x7d, 0x24, 0x3e, 0x15, 0x91, 0x6a, 0x74, 0xa7, 0xd5,
-	0x18, 0x6b, 0x26, 0x92, 0xac, 0x89, 0x1f, 0xbe, 0xed, 0x84, 0x39, 0xfa, 0xfb, 0x08, 0xfc, 0x8f,
-	0x41, 0xc4, 0xd7, 0x11, 0xec, 0xe0, 0x5b, 0x1f, 0x3e, 0x98, 0x40, 0x92, 0x5c, 0x2d, 0xcb, 0x0f,
-	0x6f, 0x6e, 0xc4, 0xdf, 0xa5, 0x54, 0xdf, 0xfc, 0xe6, 0xc7, 0x77, 0xfa, 0xa7, 0xf0, 0x21, 0xf5,
-	0x02, 0xb3, 0x5e, 0xf0, 0x97, 0xd5, 0x96, 0xbd, 0xac, 0xa6, 0xaf, 0xc9, 0xf8, 0x06, 0x82, 0x5d,
-	0xe1, 0xe5, 0x10, 0x1f, 0x4e, 0x7f, 0x4d, 0xca, 0xf6, 0x59, 0x9e, 0xee, 0xc5, 0x54, 0xe0, 0x3a,
-	0xcd, 0x70, 0x3d, 0x89, 0x4f, 0xe4, 0xe1, 0x92, 0x0b, 0x82, 0xba, 0x1e, 0xda, 0x6c, 0x37, 0xf0,
-	0xd7, 0x08, 0x46, 0x13, 0x7b, 0x1b, 0xae, 0xe6, 0x21, 0x88, 0x6e, 0xa3, 0x65, 0xb5, 0x67, 0x7b,
-	0x01, 0xfb, 0x22, 0x83, 0x7d, 0x0e, 0xcf, 0xf5, 0x0c, 0x7b, 0x71, 0x4d, 0x13, 0xfb, 0xab, 0xba,
-	0x1e, 0xdb, 0x7c, 0x37, 0xf0, 0x17, 0x08, 0x46, 0xe2, 0xeb, 0x14, 0x9e, 0xc9, 0x03, 0x15, 0x59,
-	0xfe, 0xca, 0xd5, 0x5e, 0xcd, 0x45, 0x08, 0x67, 0x59, 0x08, 0x67, 0xf0, 0xe9, 0xad, 0x84, 0xc0,
-	0xb7, 0x49, 0x75, 0xbd, 0xbb, 0x66, 0x6e, 0xe0, 0xf7, 0x10, 0xec, 0x0a, 0xaf, 0x01, 0x59, 0x4c,
-	0x49, 0xd9, 0xc3, 0xb2, 0x98, 0x92, 0xb6, 0x95, 0x29, 0x8f, 0x33, 0xbc, 0x2a, 0x9e, 0xc9, 0xc3,
-	0xdb, 0xe2, 0xde, 0xbc, 0x5b, 0xe1, 0x0f, 0x10, 0x14, 0x43, 0x8b, 0x06, 0x9e, 0xca, 0x48, 0x53,
-	0x62, 0xc7, 0x29, 0x1f, 0xee, 0xc1, 0x52, 0x60, 0x7b, 0x86, 0x61, 0x7b, 0x0a, 0x3f, 0x91, 0x9b,
-	0x4b, 0xd6, 0x0f, 0xf9, 0x96, 0xa3, 0xae, 0xcb, 0xee, 0xb8, 0x81, 0x3f, 0x43, 0x80, 0x93, 0xbb,
-	0x14, 0x56, 0xf3, 0xf3, 0x13, 0xc5, 0xfc, 0x58, 0xef, 0x0e, 0x02, 0xfa, 0x29, 0x06, 0xfd, 0x04,
-	0x3e, 0xbe, 0xa5, 0xb4, 0x8a, 0x10, 0xf0, 0x97, 0x08, 0x86, 0x63, 0x1b, 0x0f, 0x3e, 0x92, 0x8e,
-	0x21, 0x7d, 0x95, 0x2b, 0xcf, 0xf4, 0x68, 0x2d, 0xe0, 0x5e, 0x60, 0x70, 0xcf, 0xe2, 0xe7, 0xf2,
-	0xe0, 0xea, 0xe2, 0x00, 0x8d, 0xaf, 0x2f, 0xd4, 0xbf, 0x75, 0xb1, 0x8f, 0xee, 0x06, 0xfe, 0x1c,
-	0x41, 0x31, 0x34, 0xa2, 0x66, 0x91, 0x23, 0xb9, 0xe1, 0x64, 0x91, 0x23, 0x65, 0x17, 0x51, 0x9a,
-	0x0c, 0xf2, 0x45, 0xfc, 0x7c, 0x2e, 0x64, 0xff, 0x41, 0x7c, 0xed, 0x42, 0xe4, 0x48, 0x45, 0xfe,
-	0x1d, 0x82, 0xff, 0xa7, 0x8f, 0xe7, 0xf8, 0x58, 0x2e, 0xb4, 0xe4, 0x36, 0x53, 0x3e, 0xbe, 0x35,
-	0x27, 0x11, 0xda, 0x8b, 0x2c, 0xb4, 0x4b, 0xf8, 0xe2, 0x56, 0x42, 0xa3, 0xfe, 0x28, 0x21, 0x67,
-	0xcc, 0xd4, 0xe0, 0xbe, 0x42, 0x30, 0x12, 0x9f, 0xf2, 0xb2, 0xda, 0x61, 0xc6, 0xd0, 0x9f, 0xd5,
-	0x0e, 0xb3, 0x86, 0xc7, 0xde, 0x3b, 0x7a, 0x80, 0x57, 0x84, 0x93, 0x1a, 0xc2, 0x4d, 0x04, 0xc5,
-	0xd0, 0xb4, 0x91, 0xc5, 0xac, 0xe4, 0x78, 0x98, 0xc5, 0xac, 0x94, 0xd1, 0x45, 0x39, 0xcf, 0x30,
-	0xd7, 0xf1, 0x99, 0x5c, 0xcc, 0xc1, 0x18, 0x95, 0x0a, 0xb7, 0x3e, 0x7d, 0xfb, 0x5e, 0x05, 0xdd,
-	0xb9, 0x57, 0x41, 0x3f, 0xdc, 0xab, 0xa0, 0xb7, 0xef, 0x57, 0xfa, 0xee, 0xdc, 0xaf, 0xf4, 0x7d,
-	0x7b, 0xbf, 0xd2, 0xf7, 0xea, 0xc8, 0xeb, 0xc1, 0x31, 0xde, 0x9a, 0x43, 0xe8, 0xe2, 0x0e, 0xf6,
-	0x8f, 0xee, 0x63, 0x7f, 0x06, 0x00, 0x00, 0xff, 0xff, 0x2f, 0x34, 0xd0, 0xc3, 0x1e, 0x18, 0x00,
-	0x00,
+	// 1500 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe4, 0x58, 0x4d, 0x68, 0x5c, 0x55,
+	0x14, 0xce, 0xcd, 0xc4, 0x36, 0x39, 0x69, 0x9b, 0xe4, 0xb6, 0x34, 0x93, 0x97, 0x3a, 0x0d, 0xaf,
+	0xa5, 0x4d, 0x63, 0x33, 0xcf, 0xf4, 0xcf, 0x9f, 0x96, 0xda, 0x4c, 0x4d, 0x9b, 0x60, 0x4b, 0xd3,
+	0x19, 0x7f, 0x50, 0x28, 0x8f, 0x97, 0xf7, 0xae, 0x33, 0x23, 0xc9, 0x7b, 0xd3, 0x77, 0xef, 0x04,
+	0x87, 0x10, 0x17, 0x76, 0x2f, 0x82, 0xb8, 0x10, 0xdc, 0x49, 0x45, 0xa4, 0xa0, 0x8b, 0x8a, 0x0a,
+	0xee, 0xdc, 0x74, 0x59, 0xea, 0x46, 0x04, 0x45, 0x5a, 0xc1, 0x6d, 0xc1, 0xbd, 0xca, 0xbb, 0x3f,
+	0x33, 0xf3, 0x7e, 0xe6, 0xaf, 0xa4, 0x22, 0xba, 0x09, 0x33, 0xf7, 0x9c, 0x73, 0xef, 0x77, 0xce,
+	0xf9, 0xee, 0x99, 0xfb, 0x05, 0x26, 0x57, 0xab, 0x6b, 0xc4, 0xb7, 0x0c, 0xab, 0xea, 0x94, 0x99,
+	0xb1, 0x3e, 0x67, 0x5c, 0xaf, 0x12, 0xbf, 0x96, 0xad, 0xf8, 0x1e, 0xf3, 0xf0, 0x88, 0x30, 0x66,
+	0xb9, 0x31, 0xbb, 0x3e, 0xa7, 0x8d, 0x59, 0x6b, 0x65, 0xd7, 0x33, 0xf8, 0x5f, 0xe1, 0xa3, 0xed,
+	0x29, 0x7a, 0x45, 0x8f, 0x7f, 0x34, 0x82, 0x4f, 0x72, 0x75, 0x5f, 0xd1, 0xf3, 0x8a, 0xab, 0xc4,
+	0xb0, 0x2a, 0x65, 0xc3, 0x72, 0x5d, 0x8f, 0x59, 0xac, 0xec, 0xb9, 0x54, 0x5a, 0x27, 0x6c, 0x8f,
+	0xae, 0x79, 0xd4, 0x14, 0x61, 0xe2, 0x8b, 0x34, 0xcd, 0x88, 0x6f, 0xc6, 0x8a, 0x45, 0x89, 0xc0,
+	0x62, 0xac, 0xcf, 0xad, 0x10, 0x66, 0xcd, 0x19, 0x15, 0xab, 0x58, 0x76, 0xf9, 0x3e, 0xea, 0x90,
+	0x28, 0xf6, 0x8a, 0xe5, 0x5b, 0x6b, 0x6a, 0xa7, 0x58, 0x66, 0x22, 0x0b, 0x61, 0xcc, 0x44, 0x8d,
+	0x64, 0xbd, 0xec, 0x10, 0xd7, 0x26, 0xad, 0x82, 0x49, 0xc5, 0xb3, 0x4b, 0xc2, 0xa8, 0xef, 0x01,
+	0x7c, 0x35, 0x40, 0xb6, 0xcc, 0x8f, 0xcb, 0x93, 0xeb, 0x55, 0x42, 0x99, 0x7e, 0x15, 0x76, 0x87,
+	0x56, 0x69, 0xc5, 0x73, 0x29, 0xc1, 0xcf, 0xc3, 0x36, 0x01, 0x2b, 0x8d, 0xa6, 0xd0, 0xf4, 0xf0,
+	0xb1, 0xf1, 0x6c, 0xa4, 0xa8, 0x59, 0x11, 0x90, 0x1b, 0xba, 0xf3, 0xcb, 0xfe, 0xbe, 0xcf, 0x7e,
+	0xff, 0x72, 0x06, 0xe5, 0x65, 0x84, 0x7e, 0x1a, 0xd2, 0x7c, 0xcb, 0x05, 0x09, 0x2e, 0x57, 0x5b,
+	0x72, 0xe4, 0x71, 0x78, 0x3f, 0x0c, 0x2b, 0xcc, 0x66, 0xd9, 0xe1, 0x9b, 0x0f, 0xe4, 0x41, 0x2d,
+	0x2d, 0x39, 0xfa, 0x35, 0x98, 0x48, 0x08, 0x96, 0xa8, 0xce, 0xc1, 0xa0, 0x72, 0x95, 0xb8, 0x26,
+	0x62, 0xb8, 0xea, 0x81, 0x4d, 0xc8, 0xea, 0x51, 0xfa, 0xe7, 0x08, 0x9e, 0x8c, 0xec, 0x5f, 0xa8,
+	0xae, 0xbc, 0x45, 0x6c, 0xa6, 0x10, 0xce, 0xc3, 0x08, 0x15, 0x2b, 0xa6, 0xe5, 0x38, 0x3e, 0xa1,
+	0xa2, 0x04, 0x43, 0xb9, 0xf4, 0xbd, 0xdb, 0xb3, 0x7b, 0x64, 0xd7, 0xe7, 0x85, 0xa5, 0xc0, 0xfc,
+	0xb2, 0x5b, 0xcc, 0xef, 0x92, 0x01, 0x72, 0x15, 0x5f, 0x00, 0x68, 0x74, 0x3d, 0xdd, 0xcf, 0x81,
+	0x1e, 0xca, 0xca, 0xd0, 0x80, 0x22, 0x59, 0x41, 0x57, 0x49, 0x91, 0xec, 0xb2, 0x55, 0x24, 0xf2,
+	0xf8, 0x7c, 0x53, 0xa4, 0xfe, 0x29, 0x82, 0x4c, 0x2b, 0xb0, 0xb2, 0x22, 0xa7, 0x43, 0x15, 0x49,
+	0xb5, 0xaf, 0xc8, 0x40, 0x50, 0x91, 0x46, 0x31, 0xf0, 0xc5, 0x04, 0x9c, 0x87, 0x3b, 0xe2, 0x14,
+	0x27, 0x87, 0x80, 0xde, 0x40, 0xb0, 0x2f, 0x02, 0x74, 0xde, 0x0e, 0x2c, 0xaa, 0xa8, 0x93, 0x30,
+	0x64, 0xf1, 0x05, 0xd5, 0xf4, 0xa1, 0xfc, 0xa0, 0x58, 0x58, 0x72, 0xb6, 0xac, 0x5c, 0x37, 0xe3,
+	0xbd, 0x55, 0x28, 0xfe, 0x55, 0xd5, 0xd2, 0xe4, 0xfd, 0x38, 0x5f, 0xf5, 0x7d, 0xe2, 0xb2, 0x85,
+	0xe0, 0x8e, 0xaa, 0xeb, 0xf8, 0x1e, 0x92, 0xfc, 0x0f, 0x1b, 0x25, 0xfe, 0x09, 0x18, 0xe4, 0x37,
+	0xba, 0x71, 0x75, 0xb6, 0xf3, 0xef, 0x4b, 0x0e, 0x3e, 0x0a, 0x58, 0x98, 0x28, 0xb3, 0x7c, 0x66,
+	0x96, 0x48, 0xb9, 0x58, 0x62, 0x1c, 0x65, 0x2a, 0x3f, 0xca, 0x2d, 0x85, 0xc0, 0xb0, 0xc8, 0xd7,
+	0xf1, 0x34, 0x88, 0x35, 0x93, 0xb8, 0x8e, 0xf2, 0x4d, 0x71, 0xdf, 0x5d, 0x7c, 0x7d, 0xc1, 0x75,
+	0x84, 0xa7, 0x7e, 0x02, 0xc6, 0x45, 0x4d, 0x83, 0xe5, 0x79, 0xd7, 0x2e, 0x79, 0xbe, 0x6a, 0x6a,
+	0x6b, 0x34, 0xfa, 0xab, 0x6a, 0x04, 0x34, 0x47, 0x35, 0x46, 0x8b, 0xc5, 0x57, 0xe4, 0x15, 0xde,
+	0x17, 0x6f, 0x41, 0x23, 0x4a, 0x76, 0x41, 0x46, 0xe8, 0x53, 0xf2, 0x42, 0x34, 0x57, 0x27, 0x04,
+	0x4a, 0xbf, 0x06, 0xfb, 0x5b, 0x7a, 0x6c, 0x01, 0x80, 0x2f, 0x10, 0x4c, 0xf2, 0xfd, 0xe7, 0x29,
+	0x2d, 0x17, 0x5d, 0xe2, 0xbc, 0x6c, 0xf9, 0x45, 0xc2, 0xd4, 0x38, 0xc5, 0x8b, 0x30, 0x46, 0xab,
+	0x15, 0xe2, 0xbb, 0x9e, 0x43, 0x4c, 0xcb, 0xb6, 0xbd, 0xaa, 0xcb, 0xe4, 0xfc, 0x98, 0xbc, 0x77,
+	0x7b, 0x76, 0x5c, 0xcd, 0x0f, 0xdb, 0x0e, 0x8f, 0x90, 0xd1, 0x7a, 0xd4, 0xbc, 0x08, 0x0a, 0x55,
+	0xb7, 0x3f, 0xdc, 0xeb, 0xa7, 0x00, 0xbf, 0x59, 0x5e, 0x65, 0xc4, 0x37, 0x57, 0x6a, 0x66, 0xdd,
+	0x29, 0xe8, 0xdf, 0x60, 0x7e, 0x44, 0x58, 0x72, 0xa2, 0xf4, 0x4b, 0x8e, 0xfe, 0x50, 0xdd, 0xcd,
+	0x18, 0xe2, 0xad, 0x26, 0x55, 0x16, 0x76, 0xfb, 0xe4, 0x7a, 0xb5, 0xec, 0x13, 0xc7, 0xf4, 0x2a,
+	0xc4, 0x35, 0x2b, 0x9e, 0xcf, 0x68, 0x3a, 0x35, 0x95, 0x9a, 0xde, 0x99, 0x1f, 0x53, 0xa6, 0x2b,
+	0x15, 0xe2, 0x2e, 0x07, 0x06, 0xfc, 0x1a, 0x4c, 0x30, 0x8e, 0xc5, 0x8c, 0x95, 0x8c, 0xa6, 0x07,
+	0xa6, 0x52, 0x9d, 0x6a, 0x36, 0x2e, 0xa2, 0x0b, 0x91, 0xca, 0x51, 0xfd, 0x9d, 0x66, 0xce, 0xe6,
+	0x49, 0x00, 0xa3, 0x33, 0x67, 0x93, 0x5b, 0xd7, 0xff, 0x08, 0xad, 0x0b, 0xb3, 0x5f, 0x9d, 0xdf,
+	0x20, 0x9f, 0xcf, 0x57, 0xda, 0x93, 0x4f, 0x44, 0x29, 0xf2, 0x89, 0x08, 0xfd, 0x4f, 0x04, 0x7a,
+	0x74, 0x63, 0x9a, 0xab, 0x89, 0x0f, 0xc4, 0xff, 0x47, 0x39, 0x18, 0x1e, 0xda, 0xa9, 0x47, 0x1d,
+	0xda, 0x2d, 0xb8, 0x3c, 0x90, 0xcc, 0xe5, 0x5b, 0x08, 0x0e, 0xb4, 0x2d, 0x80, 0x2c, 0xf2, 0x19,
+	0xd8, 0x2e, 0x4a, 0x46, 0xe5, 0x98, 0xef, 0xa6, 0xca, 0x2a, 0x64, 0xeb, 0x06, 0xfd, 0x5f, 0x0a,
+	0x6e, 0x81, 0x79, 0xbe, 0x55, 0x24, 0xe7, 0x4b, 0xd6, 0xea, 0x2a, 0x71, 0x03, 0x6f, 0x7e, 0xd2,
+	0x7f, 0xbf, 0x61, 0x0f, 0x11, 0xec, 0x4d, 0x4e, 0x1e, 0xbf, 0x0e, 0x9a, 0x2f, 0xfb, 0x66, 0x3e,
+	0x52, 0xf6, 0x69, 0x15, 0x5e, 0xe8, 0xa1, 0x0a, 0x07, 0x60, 0xa7, 0x08, 0x0b, 0xff, 0xea, 0xed,
+	0x10, 0x8b, 0x72, 0x90, 0x9d, 0x86, 0x61, 0xee, 0x42, 0x99, 0xc5, 0x88, 0x18, 0x45, 0xbb, 0x8e,
+	0x69, 0xf1, 0x17, 0xb0, 0xe7, 0xb3, 0x42, 0xe0, 0x92, 0x87, 0x8a, 0xfa, 0x48, 0xf5, 0x6f, 0x10,
+	0x1c, 0x6c, 0xdf, 0x74, 0x49, 0xd2, 0x8b, 0x51, 0x92, 0x1e, 0x8e, 0x9d, 0x90, 0xbc, 0xc5, 0x63,
+	0xe3, 0xeb, 0x1f, 0x48, 0x0e, 0xce, 0x45, 0x8f, 0xb2, 0xff, 0x0d, 0x47, 0x3f, 0x44, 0x30, 0xd2,
+	0x48, 0x78, 0xc1, 0x65, 0x7e, 0xad, 0xdd, 0xcf, 0x44, 0x8c, 0x41, 0xfd, 0x09, 0x0c, 0xca, 0xc1,
+	0x70, 0xc9, 0xa3, 0xcc, 0x94, 0xa3, 0x5e, 0x64, 0x32, 0x19, 0xeb, 0x6f, 0xe3, 0x58, 0xd9, 0x53,
+	0x28, 0xd5, 0x57, 0x82, 0xe7, 0x6c, 0x3a, 0xde, 0x8d, 0xba, 0x12, 0x8a, 0x90, 0x67, 0xaa, 0xcd,
+	0xe6, 0x3c, 0xa7, 0xc7, 0xc5, 0x9a, 0x63, 0x1f, 0x8d, 0xc1, 0x13, 0x1c, 0x27, 0xbe, 0x81, 0x60,
+	0x9b, 0x90, 0x85, 0xf8, 0x40, 0x0c, 0x4e, 0x5c, 0x7b, 0x6a, 0x07, 0xdb, 0x3b, 0x89, 0xb3, 0xf4,
+	0xec, 0xbb, 0x3f, 0xfc, 0xf6, 0x41, 0xff, 0x34, 0x3e, 0x64, 0x5c, 0xe2, 0xde, 0xcb, 0x81, 0x9a,
+	0xb5, 0xbd, 0x55, 0x23, 0x59, 0x47, 0xe3, 0x9b, 0x08, 0x76, 0x34, 0xab, 0x47, 0x7c, 0x24, 0xf9,
+	0x98, 0x04, 0x79, 0xaa, 0xcd, 0x74, 0xe3, 0x2a, 0x71, 0x9d, 0xe5, 0xb8, 0x9e, 0xc5, 0xa7, 0x3a,
+	0xe1, 0x52, 0x0a, 0xc2, 0xd8, 0x68, 0x92, 0xbe, 0x9b, 0xf8, 0x7b, 0x04, 0x63, 0x31, 0x61, 0x87,
+	0xb3, 0x9d, 0x10, 0x84, 0xe5, 0xaa, 0x66, 0x74, 0xed, 0x2f, 0x61, 0x5f, 0xe6, 0xb0, 0x2f, 0xe2,
+	0x85, 0xae, 0x61, 0xaf, 0xd4, 0x4c, 0x29, 0x70, 0x8d, 0x8d, 0x88, 0x34, 0xde, 0xc4, 0xdf, 0x22,
+	0x18, 0x8d, 0xea, 0x2d, 0x3c, 0xdb, 0x09, 0x54, 0x48, 0x1d, 0x6a, 0xd9, 0x6e, 0xdd, 0x65, 0x0a,
+	0x17, 0x78, 0x0a, 0xe7, 0xf0, 0xd9, 0x5e, 0x52, 0x10, 0x72, 0xd3, 0xd8, 0xa8, 0xeb, 0xd0, 0x4d,
+	0xfc, 0x31, 0x82, 0x1d, 0xcd, 0x3a, 0xa1, 0x15, 0x53, 0x12, 0x84, 0x5a, 0x2b, 0xa6, 0x24, 0xc9,
+	0x36, 0xfd, 0x24, 0xc7, 0x6b, 0xe0, 0xd9, 0x4e, 0x78, 0x6d, 0x11, 0x2d, 0x46, 0x16, 0xfe, 0x04,
+	0xc1, 0x70, 0x93, 0x12, 0xc1, 0xd3, 0x2d, 0xca, 0x14, 0x13, 0x41, 0xda, 0x91, 0x2e, 0x3c, 0x25,
+	0xb6, 0x17, 0x38, 0xb6, 0xe7, 0xf0, 0x33, 0x1d, 0x6b, 0xc9, 0xe7, 0xa1, 0x90, 0x41, 0xc6, 0x86,
+	0x9a, 0x8e, 0x9b, 0xf8, 0x2b, 0x04, 0x38, 0x2e, 0xb6, 0xb0, 0xd1, 0xb9, 0x3e, 0x61, 0xcc, 0x4f,
+	0x77, 0x1f, 0x20, 0xa1, 0x9f, 0xe1, 0xd0, 0x4f, 0xe1, 0x13, 0x3d, 0x95, 0x55, 0xa6, 0x80, 0xbf,
+	0x43, 0x30, 0x12, 0x91, 0x44, 0xf8, 0x68, 0x32, 0x86, 0x64, 0xad, 0xa7, 0xcd, 0x76, 0xe9, 0x2d,
+	0xe1, 0x5e, 0xe2, 0x70, 0x2f, 0xe0, 0x17, 0x3b, 0xc1, 0xb5, 0xe4, 0x06, 0xa6, 0xd0, 0x37, 0x34,
+	0xb8, 0x75, 0x91, 0x5f, 0xde, 0x4d, 0xfc, 0xb5, 0x22, 0x87, 0x7c, 0x4e, 0xb5, 0x23, 0x47, 0x48,
+	0x02, 0xb5, 0x25, 0x47, 0x58, 0xac, 0xe8, 0x05, 0x0e, 0xf9, 0x32, 0x7e, 0xa9, 0x3b, 0x72, 0x88,
+	0x9f, 0x96, 0x26, 0x72, 0x24, 0x22, 0xff, 0x09, 0xc1, 0xde, 0xe4, 0xf7, 0x3b, 0x3e, 0xde, 0x11,
+	0x5a, 0x5c, 0xee, 0x68, 0x27, 0x7a, 0x0b, 0x92, 0xa9, 0xbd, 0xc2, 0x53, 0xbb, 0x82, 0x2f, 0xf7,
+	0x92, 0x1a, 0x0d, 0xde, 0x13, 0xea, 0xd9, 0x99, 0x98, 0xdc, 0xcf, 0x08, 0xc6, 0x5b, 0x3c, 0xfc,
+	0x70, 0x0b, 0xa0, 0xed, 0xc5, 0x81, 0x76, 0xb2, 0xc7, 0xa8, 0x5e, 0xf3, 0xa3, 0x62, 0x23, 0xd3,
+	0x56, 0x3b, 0xa9, 0x5c, 0x13, 0xf3, 0xbb, 0x85, 0x60, 0xb8, 0xe9, 0x3d, 0xd2, 0x8a, 0x76, 0xf1,
+	0x07, 0x64, 0x2b, 0xda, 0x25, 0x3c, 0x6e, 0xf4, 0x45, 0x8e, 0x3d, 0x87, 0xcf, 0x75, 0xc2, 0xde,
+	0xf4, 0xc6, 0x4a, 0x84, 0x9b, 0x9b, 0xb9, 0x73, 0x3f, 0x83, 0xee, 0xde, 0xcf, 0xa0, 0x5f, 0xef,
+	0x67, 0xd0, 0xfb, 0x0f, 0x32, 0x7d, 0x77, 0x1f, 0x64, 0xfa, 0x7e, 0x7c, 0x90, 0xe9, 0x7b, 0x63,
+	0xf4, 0xed, 0xc6, 0x36, 0xac, 0x56, 0x21, 0x74, 0x65, 0x1b, 0xff, 0x37, 0xf9, 0xf1, 0xbf, 0x03,
+	0x00, 0x00, 0xff, 0xff, 0x07, 0xb6, 0x06, 0x74, 0x5c, 0x18, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -1542,12 +1542,14 @@ type QueryClient interface {
 	// AssignedTargets returns the prober -> targets assignment for a given supernode_account.
 	// If filter_by_epoch_id is false, it returns the assignments for the current epoch.
 	AssignedTargets(ctx context.Context, in *QueryAssignedTargetsRequest, opts ...grpc.CallOption) (*QueryAssignedTargetsResponse, error)
-	AuditReport(ctx context.Context, in *QueryAuditReportRequest, opts ...grpc.CallOption) (*QueryAuditReportResponse, error)
-	AuditReportsByReporter(ctx context.Context, in *QueryAuditReportsByReporterRequest, opts ...grpc.CallOption) (*QueryAuditReportsByReporterResponse, error)
-	// SupernodeReports returns all reports that include observations about the given supernode_account.
-	SupernodeReports(ctx context.Context, in *QuerySupernodeReportsRequest, opts ...grpc.CallOption) (*QuerySupernodeReportsResponse, error)
-	// SelfReports returns self-reports submitted by the given supernode_account across epochs.
-	SelfReports(ctx context.Context, in *QuerySelfReportsRequest, opts ...grpc.CallOption) (*QuerySelfReportsResponse, error)
+	// EpochReport returns the submitted epoch report for (epoch_id, supernode_account).
+	EpochReport(ctx context.Context, in *QueryEpochReportRequest, opts ...grpc.CallOption) (*QueryEpochReportResponse, error)
+	// EpochReportsByReporter returns epoch reports submitted by the given reporter across epochs.
+	EpochReportsByReporter(ctx context.Context, in *QueryEpochReportsByReporterRequest, opts ...grpc.CallOption) (*QueryEpochReportsByReporterResponse, error)
+	// StorageChallengeReports returns all reports that include storage-challenge observations about the given supernode_account.
+	StorageChallengeReports(ctx context.Context, in *QueryStorageChallengeReportsRequest, opts ...grpc.CallOption) (*QueryStorageChallengeReportsResponse, error)
+	// HostReports returns host reports submitted by the given supernode_account across epochs.
+	HostReports(ctx context.Context, in *QueryHostReportsRequest, opts ...grpc.CallOption) (*QueryHostReportsResponse, error)
 }
 
 type queryClient struct {
@@ -1630,36 +1632,36 @@ func (c *queryClient) AssignedTargets(ctx context.Context, in *QueryAssignedTarg
 	return out, nil
 }
 
-func (c *queryClient) AuditReport(ctx context.Context, in *QueryAuditReportRequest, opts ...grpc.CallOption) (*QueryAuditReportResponse, error) {
-	out := new(QueryAuditReportResponse)
-	err := c.cc.Invoke(ctx, "/lumera.audit.v1.Query/AuditReport", in, out, opts...)
+func (c *queryClient) EpochReport(ctx context.Context, in *QueryEpochReportRequest, opts ...grpc.CallOption) (*QueryEpochReportResponse, error) {
+	out := new(QueryEpochReportResponse)
+	err := c.cc.Invoke(ctx, "/lumera.audit.v1.Query/EpochReport", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *queryClient) AuditReportsByReporter(ctx context.Context, in *QueryAuditReportsByReporterRequest, opts ...grpc.CallOption) (*QueryAuditReportsByReporterResponse, error) {
-	out := new(QueryAuditReportsByReporterResponse)
-	err := c.cc.Invoke(ctx, "/lumera.audit.v1.Query/AuditReportsByReporter", in, out, opts...)
+func (c *queryClient) EpochReportsByReporter(ctx context.Context, in *QueryEpochReportsByReporterRequest, opts ...grpc.CallOption) (*QueryEpochReportsByReporterResponse, error) {
+	out := new(QueryEpochReportsByReporterResponse)
+	err := c.cc.Invoke(ctx, "/lumera.audit.v1.Query/EpochReportsByReporter", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *queryClient) SupernodeReports(ctx context.Context, in *QuerySupernodeReportsRequest, opts ...grpc.CallOption) (*QuerySupernodeReportsResponse, error) {
-	out := new(QuerySupernodeReportsResponse)
-	err := c.cc.Invoke(ctx, "/lumera.audit.v1.Query/SupernodeReports", in, out, opts...)
+func (c *queryClient) StorageChallengeReports(ctx context.Context, in *QueryStorageChallengeReportsRequest, opts ...grpc.CallOption) (*QueryStorageChallengeReportsResponse, error) {
+	out := new(QueryStorageChallengeReportsResponse)
+	err := c.cc.Invoke(ctx, "/lumera.audit.v1.Query/StorageChallengeReports", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *queryClient) SelfReports(ctx context.Context, in *QuerySelfReportsRequest, opts ...grpc.CallOption) (*QuerySelfReportsResponse, error) {
-	out := new(QuerySelfReportsResponse)
-	err := c.cc.Invoke(ctx, "/lumera.audit.v1.Query/SelfReports", in, out, opts...)
+func (c *queryClient) HostReports(ctx context.Context, in *QueryHostReportsRequest, opts ...grpc.CallOption) (*QueryHostReportsResponse, error) {
+	out := new(QueryHostReportsResponse)
+	err := c.cc.Invoke(ctx, "/lumera.audit.v1.Query/HostReports", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1685,12 +1687,14 @@ type QueryServer interface {
 	// AssignedTargets returns the prober -> targets assignment for a given supernode_account.
 	// If filter_by_epoch_id is false, it returns the assignments for the current epoch.
 	AssignedTargets(context.Context, *QueryAssignedTargetsRequest) (*QueryAssignedTargetsResponse, error)
-	AuditReport(context.Context, *QueryAuditReportRequest) (*QueryAuditReportResponse, error)
-	AuditReportsByReporter(context.Context, *QueryAuditReportsByReporterRequest) (*QueryAuditReportsByReporterResponse, error)
-	// SupernodeReports returns all reports that include observations about the given supernode_account.
-	SupernodeReports(context.Context, *QuerySupernodeReportsRequest) (*QuerySupernodeReportsResponse, error)
-	// SelfReports returns self-reports submitted by the given supernode_account across epochs.
-	SelfReports(context.Context, *QuerySelfReportsRequest) (*QuerySelfReportsResponse, error)
+	// EpochReport returns the submitted epoch report for (epoch_id, supernode_account).
+	EpochReport(context.Context, *QueryEpochReportRequest) (*QueryEpochReportResponse, error)
+	// EpochReportsByReporter returns epoch reports submitted by the given reporter across epochs.
+	EpochReportsByReporter(context.Context, *QueryEpochReportsByReporterRequest) (*QueryEpochReportsByReporterResponse, error)
+	// StorageChallengeReports returns all reports that include storage-challenge observations about the given supernode_account.
+	StorageChallengeReports(context.Context, *QueryStorageChallengeReportsRequest) (*QueryStorageChallengeReportsResponse, error)
+	// HostReports returns host reports submitted by the given supernode_account across epochs.
+	HostReports(context.Context, *QueryHostReportsRequest) (*QueryHostReportsResponse, error)
 }
 
 // UnimplementedQueryServer can be embedded to have forward compatible implementations.
@@ -1721,17 +1725,17 @@ func (*UnimplementedQueryServer) CurrentEpochAnchor(ctx context.Context, req *Qu
 func (*UnimplementedQueryServer) AssignedTargets(ctx context.Context, req *QueryAssignedTargetsRequest) (*QueryAssignedTargetsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AssignedTargets not implemented")
 }
-func (*UnimplementedQueryServer) AuditReport(ctx context.Context, req *QueryAuditReportRequest) (*QueryAuditReportResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method AuditReport not implemented")
+func (*UnimplementedQueryServer) EpochReport(ctx context.Context, req *QueryEpochReportRequest) (*QueryEpochReportResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method EpochReport not implemented")
 }
-func (*UnimplementedQueryServer) AuditReportsByReporter(ctx context.Context, req *QueryAuditReportsByReporterRequest) (*QueryAuditReportsByReporterResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method AuditReportsByReporter not implemented")
+func (*UnimplementedQueryServer) EpochReportsByReporter(ctx context.Context, req *QueryEpochReportsByReporterRequest) (*QueryEpochReportsByReporterResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method EpochReportsByReporter not implemented")
 }
-func (*UnimplementedQueryServer) SupernodeReports(ctx context.Context, req *QuerySupernodeReportsRequest) (*QuerySupernodeReportsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SupernodeReports not implemented")
+func (*UnimplementedQueryServer) StorageChallengeReports(ctx context.Context, req *QueryStorageChallengeReportsRequest) (*QueryStorageChallengeReportsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StorageChallengeReports not implemented")
 }
-func (*UnimplementedQueryServer) SelfReports(ctx context.Context, req *QuerySelfReportsRequest) (*QuerySelfReportsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SelfReports not implemented")
+func (*UnimplementedQueryServer) HostReports(ctx context.Context, req *QueryHostReportsRequest) (*QueryHostReportsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HostReports not implemented")
 }
 
 func RegisterQueryServer(s grpc1.Server, srv QueryServer) {
@@ -1882,74 +1886,74 @@ func _Query_AssignedTargets_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Query_AuditReport_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(QueryAuditReportRequest)
+func _Query_EpochReport_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryEpochReportRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(QueryServer).AuditReport(ctx, in)
+		return srv.(QueryServer).EpochReport(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/lumera.audit.v1.Query/AuditReport",
+		FullMethod: "/lumera.audit.v1.Query/EpochReport",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(QueryServer).AuditReport(ctx, req.(*QueryAuditReportRequest))
+		return srv.(QueryServer).EpochReport(ctx, req.(*QueryEpochReportRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Query_AuditReportsByReporter_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(QueryAuditReportsByReporterRequest)
+func _Query_EpochReportsByReporter_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryEpochReportsByReporterRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(QueryServer).AuditReportsByReporter(ctx, in)
+		return srv.(QueryServer).EpochReportsByReporter(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/lumera.audit.v1.Query/AuditReportsByReporter",
+		FullMethod: "/lumera.audit.v1.Query/EpochReportsByReporter",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(QueryServer).AuditReportsByReporter(ctx, req.(*QueryAuditReportsByReporterRequest))
+		return srv.(QueryServer).EpochReportsByReporter(ctx, req.(*QueryEpochReportsByReporterRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Query_SupernodeReports_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(QuerySupernodeReportsRequest)
+func _Query_StorageChallengeReports_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryStorageChallengeReportsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(QueryServer).SupernodeReports(ctx, in)
+		return srv.(QueryServer).StorageChallengeReports(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/lumera.audit.v1.Query/SupernodeReports",
+		FullMethod: "/lumera.audit.v1.Query/StorageChallengeReports",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(QueryServer).SupernodeReports(ctx, req.(*QuerySupernodeReportsRequest))
+		return srv.(QueryServer).StorageChallengeReports(ctx, req.(*QueryStorageChallengeReportsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Query_SelfReports_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(QuerySelfReportsRequest)
+func _Query_HostReports_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryHostReportsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(QueryServer).SelfReports(ctx, in)
+		return srv.(QueryServer).HostReports(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/lumera.audit.v1.Query/SelfReports",
+		FullMethod: "/lumera.audit.v1.Query/HostReports",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(QueryServer).SelfReports(ctx, req.(*QuerySelfReportsRequest))
+		return srv.(QueryServer).HostReports(ctx, req.(*QueryHostReportsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1992,20 +1996,20 @@ var _Query_serviceDesc = grpc.ServiceDesc{
 			Handler:    _Query_AssignedTargets_Handler,
 		},
 		{
-			MethodName: "AuditReport",
-			Handler:    _Query_AuditReport_Handler,
+			MethodName: "EpochReport",
+			Handler:    _Query_EpochReport_Handler,
 		},
 		{
-			MethodName: "AuditReportsByReporter",
-			Handler:    _Query_AuditReportsByReporter_Handler,
+			MethodName: "EpochReportsByReporter",
+			Handler:    _Query_EpochReportsByReporter_Handler,
 		},
 		{
-			MethodName: "SupernodeReports",
-			Handler:    _Query_SupernodeReports_Handler,
+			MethodName: "StorageChallengeReports",
+			Handler:    _Query_StorageChallengeReports_Handler,
 		},
 		{
-			MethodName: "SelfReports",
-			Handler:    _Query_SelfReports_Handler,
+			MethodName: "HostReports",
+			Handler:    _Query_HostReports_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -2594,7 +2598,7 @@ func (m *QueryAssignedTargetsResponse) MarshalToSizedBuffer(dAtA []byte) (int, e
 	return len(dAtA) - i, nil
 }
 
-func (m *QueryAuditReportRequest) Marshal() (dAtA []byte, err error) {
+func (m *QueryEpochReportRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -2604,12 +2608,12 @@ func (m *QueryAuditReportRequest) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *QueryAuditReportRequest) MarshalTo(dAtA []byte) (int, error) {
+func (m *QueryEpochReportRequest) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *QueryAuditReportRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *QueryEpochReportRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
@@ -2629,7 +2633,7 @@ func (m *QueryAuditReportRequest) MarshalToSizedBuffer(dAtA []byte) (int, error)
 	return len(dAtA) - i, nil
 }
 
-func (m *QueryAuditReportResponse) Marshal() (dAtA []byte, err error) {
+func (m *QueryEpochReportResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -2639,12 +2643,12 @@ func (m *QueryAuditReportResponse) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *QueryAuditReportResponse) MarshalTo(dAtA []byte) (int, error) {
+func (m *QueryEpochReportResponse) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *QueryAuditReportResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *QueryEpochReportResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
@@ -2662,7 +2666,7 @@ func (m *QueryAuditReportResponse) MarshalToSizedBuffer(dAtA []byte) (int, error
 	return len(dAtA) - i, nil
 }
 
-func (m *QueryAuditReportsByReporterRequest) Marshal() (dAtA []byte, err error) {
+func (m *QueryEpochReportsByReporterRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -2672,12 +2676,12 @@ func (m *QueryAuditReportsByReporterRequest) Marshal() (dAtA []byte, err error) 
 	return dAtA[:n], nil
 }
 
-func (m *QueryAuditReportsByReporterRequest) MarshalTo(dAtA []byte) (int, error) {
+func (m *QueryEpochReportsByReporterRequest) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *QueryAuditReportsByReporterRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *QueryEpochReportsByReporterRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
@@ -2719,7 +2723,7 @@ func (m *QueryAuditReportsByReporterRequest) MarshalToSizedBuffer(dAtA []byte) (
 	return len(dAtA) - i, nil
 }
 
-func (m *QueryAuditReportsByReporterResponse) Marshal() (dAtA []byte, err error) {
+func (m *QueryEpochReportsByReporterResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -2729,12 +2733,12 @@ func (m *QueryAuditReportsByReporterResponse) Marshal() (dAtA []byte, err error)
 	return dAtA[:n], nil
 }
 
-func (m *QueryAuditReportsByReporterResponse) MarshalTo(dAtA []byte) (int, error) {
+func (m *QueryEpochReportsByReporterResponse) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *QueryAuditReportsByReporterResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *QueryEpochReportsByReporterResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
@@ -2768,7 +2772,7 @@ func (m *QueryAuditReportsByReporterResponse) MarshalToSizedBuffer(dAtA []byte) 
 	return len(dAtA) - i, nil
 }
 
-func (m *QuerySupernodeReportsRequest) Marshal() (dAtA []byte, err error) {
+func (m *QueryStorageChallengeReportsRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -2778,12 +2782,12 @@ func (m *QuerySupernodeReportsRequest) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *QuerySupernodeReportsRequest) MarshalTo(dAtA []byte) (int, error) {
+func (m *QueryStorageChallengeReportsRequest) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *QuerySupernodeReportsRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *QueryStorageChallengeReportsRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
@@ -2825,7 +2829,7 @@ func (m *QuerySupernodeReportsRequest) MarshalToSizedBuffer(dAtA []byte) (int, e
 	return len(dAtA) - i, nil
 }
 
-func (m *SupernodeReport) Marshal() (dAtA []byte, err error) {
+func (m *StorageChallengeReport) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -2835,12 +2839,12 @@ func (m *SupernodeReport) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *SupernodeReport) MarshalTo(dAtA []byte) (int, error) {
+func (m *StorageChallengeReport) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *SupernodeReport) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *StorageChallengeReport) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
@@ -2883,7 +2887,7 @@ func (m *SupernodeReport) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
-func (m *QuerySupernodeReportsResponse) Marshal() (dAtA []byte, err error) {
+func (m *QueryStorageChallengeReportsResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -2893,12 +2897,12 @@ func (m *QuerySupernodeReportsResponse) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *QuerySupernodeReportsResponse) MarshalTo(dAtA []byte) (int, error) {
+func (m *QueryStorageChallengeReportsResponse) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *QuerySupernodeReportsResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *QueryStorageChallengeReportsResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
@@ -2932,7 +2936,7 @@ func (m *QuerySupernodeReportsResponse) MarshalToSizedBuffer(dAtA []byte) (int, 
 	return len(dAtA) - i, nil
 }
 
-func (m *QuerySelfReportsRequest) Marshal() (dAtA []byte, err error) {
+func (m *QueryHostReportsRequest) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -2942,12 +2946,12 @@ func (m *QuerySelfReportsRequest) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *QuerySelfReportsRequest) MarshalTo(dAtA []byte) (int, error) {
+func (m *QueryHostReportsRequest) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *QuerySelfReportsRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *QueryHostReportsRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
@@ -2989,7 +2993,7 @@ func (m *QuerySelfReportsRequest) MarshalToSizedBuffer(dAtA []byte) (int, error)
 	return len(dAtA) - i, nil
 }
 
-func (m *SelfReport) Marshal() (dAtA []byte, err error) {
+func (m *HostReportEntry) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -2999,18 +3003,18 @@ func (m *SelfReport) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *SelfReport) MarshalTo(dAtA []byte) (int, error) {
+func (m *HostReportEntry) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *SelfReport) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *HostReportEntry) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
 	{
-		size, err := m.SelfReport.MarshalToSizedBuffer(dAtA[:i])
+		size, err := m.HostReport.MarshalToSizedBuffer(dAtA[:i])
 		if err != nil {
 			return 0, err
 		}
@@ -3032,7 +3036,7 @@ func (m *SelfReport) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
-func (m *QuerySelfReportsResponse) Marshal() (dAtA []byte, err error) {
+func (m *QueryHostReportsResponse) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -3042,12 +3046,12 @@ func (m *QuerySelfReportsResponse) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *QuerySelfReportsResponse) MarshalTo(dAtA []byte) (int, error) {
+func (m *QueryHostReportsResponse) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *QuerySelfReportsResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *QueryHostReportsResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
@@ -3324,7 +3328,7 @@ func (m *QueryAssignedTargetsResponse) Size() (n int) {
 	return n
 }
 
-func (m *QueryAuditReportRequest) Size() (n int) {
+func (m *QueryEpochReportRequest) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -3340,7 +3344,7 @@ func (m *QueryAuditReportRequest) Size() (n int) {
 	return n
 }
 
-func (m *QueryAuditReportResponse) Size() (n int) {
+func (m *QueryEpochReportResponse) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -3351,7 +3355,7 @@ func (m *QueryAuditReportResponse) Size() (n int) {
 	return n
 }
 
-func (m *QueryAuditReportsByReporterRequest) Size() (n int) {
+func (m *QueryEpochReportsByReporterRequest) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -3374,7 +3378,7 @@ func (m *QueryAuditReportsByReporterRequest) Size() (n int) {
 	return n
 }
 
-func (m *QueryAuditReportsByReporterResponse) Size() (n int) {
+func (m *QueryEpochReportsByReporterResponse) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -3393,7 +3397,7 @@ func (m *QueryAuditReportsByReporterResponse) Size() (n int) {
 	return n
 }
 
-func (m *QuerySupernodeReportsRequest) Size() (n int) {
+func (m *QueryStorageChallengeReportsRequest) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -3416,7 +3420,7 @@ func (m *QuerySupernodeReportsRequest) Size() (n int) {
 	return n
 }
 
-func (m *SupernodeReport) Size() (n int) {
+func (m *StorageChallengeReport) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -3442,7 +3446,7 @@ func (m *SupernodeReport) Size() (n int) {
 	return n
 }
 
-func (m *QuerySupernodeReportsResponse) Size() (n int) {
+func (m *QueryStorageChallengeReportsResponse) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -3461,7 +3465,7 @@ func (m *QuerySupernodeReportsResponse) Size() (n int) {
 	return n
 }
 
-func (m *QuerySelfReportsRequest) Size() (n int) {
+func (m *QueryHostReportsRequest) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -3484,7 +3488,7 @@ func (m *QuerySelfReportsRequest) Size() (n int) {
 	return n
 }
 
-func (m *SelfReport) Size() (n int) {
+func (m *HostReportEntry) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -3496,12 +3500,12 @@ func (m *SelfReport) Size() (n int) {
 	if m.ReportHeight != 0 {
 		n += 1 + sovQuery(uint64(m.ReportHeight))
 	}
-	l = m.SelfReport.Size()
+	l = m.HostReport.Size()
 	n += 1 + l + sovQuery(uint64(l))
 	return n
 }
 
-func (m *QuerySelfReportsResponse) Size() (n int) {
+func (m *QueryHostReportsResponse) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -5046,7 +5050,7 @@ func (m *QueryAssignedTargetsResponse) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *QueryAuditReportRequest) Unmarshal(dAtA []byte) error {
+func (m *QueryEpochReportRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -5069,10 +5073,10 @@ func (m *QueryAuditReportRequest) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: QueryAuditReportRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: QueryEpochReportRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: QueryAuditReportRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: QueryEpochReportRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -5147,7 +5151,7 @@ func (m *QueryAuditReportRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *QueryAuditReportResponse) Unmarshal(dAtA []byte) error {
+func (m *QueryEpochReportResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -5170,10 +5174,10 @@ func (m *QueryAuditReportResponse) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: QueryAuditReportResponse: wiretype end group for non-group")
+			return fmt.Errorf("proto: QueryEpochReportResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: QueryAuditReportResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: QueryEpochReportResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -5230,7 +5234,7 @@ func (m *QueryAuditReportResponse) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *QueryAuditReportsByReporterRequest) Unmarshal(dAtA []byte) error {
+func (m *QueryEpochReportsByReporterRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -5253,10 +5257,10 @@ func (m *QueryAuditReportsByReporterRequest) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: QueryAuditReportsByReporterRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: QueryEpochReportsByReporterRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: QueryAuditReportsByReporterRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: QueryEpochReportsByReporterRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -5387,7 +5391,7 @@ func (m *QueryAuditReportsByReporterRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *QueryAuditReportsByReporterResponse) Unmarshal(dAtA []byte) error {
+func (m *QueryEpochReportsByReporterResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -5410,10 +5414,10 @@ func (m *QueryAuditReportsByReporterResponse) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: QueryAuditReportsByReporterResponse: wiretype end group for non-group")
+			return fmt.Errorf("proto: QueryEpochReportsByReporterResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: QueryAuditReportsByReporterResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: QueryEpochReportsByReporterResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -5445,7 +5449,7 @@ func (m *QueryAuditReportsByReporterResponse) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Reports = append(m.Reports, AuditReport{})
+			m.Reports = append(m.Reports, EpochReport{})
 			if err := m.Reports[len(m.Reports)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
@@ -5507,7 +5511,7 @@ func (m *QueryAuditReportsByReporterResponse) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *QuerySupernodeReportsRequest) Unmarshal(dAtA []byte) error {
+func (m *QueryStorageChallengeReportsRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -5530,10 +5534,10 @@ func (m *QuerySupernodeReportsRequest) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: QuerySupernodeReportsRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: QueryStorageChallengeReportsRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: QuerySupernodeReportsRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: QueryStorageChallengeReportsRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -5664,7 +5668,7 @@ func (m *QuerySupernodeReportsRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *SupernodeReport) Unmarshal(dAtA []byte) error {
+func (m *StorageChallengeReport) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -5687,10 +5691,10 @@ func (m *SupernodeReport) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: SupernodeReport: wiretype end group for non-group")
+			return fmt.Errorf("proto: StorageChallengeReport: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: SupernodeReport: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: StorageChallengeReport: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -5853,7 +5857,7 @@ func (m *SupernodeReport) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *QuerySupernodeReportsResponse) Unmarshal(dAtA []byte) error {
+func (m *QueryStorageChallengeReportsResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -5876,10 +5880,10 @@ func (m *QuerySupernodeReportsResponse) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: QuerySupernodeReportsResponse: wiretype end group for non-group")
+			return fmt.Errorf("proto: QueryStorageChallengeReportsResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: QuerySupernodeReportsResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: QueryStorageChallengeReportsResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -5911,7 +5915,7 @@ func (m *QuerySupernodeReportsResponse) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Reports = append(m.Reports, SupernodeReport{})
+			m.Reports = append(m.Reports, StorageChallengeReport{})
 			if err := m.Reports[len(m.Reports)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
@@ -5973,7 +5977,7 @@ func (m *QuerySupernodeReportsResponse) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *QuerySelfReportsRequest) Unmarshal(dAtA []byte) error {
+func (m *QueryHostReportsRequest) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -5996,10 +6000,10 @@ func (m *QuerySelfReportsRequest) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: QuerySelfReportsRequest: wiretype end group for non-group")
+			return fmt.Errorf("proto: QueryHostReportsRequest: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: QuerySelfReportsRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: QueryHostReportsRequest: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -6130,7 +6134,7 @@ func (m *QuerySelfReportsRequest) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *SelfReport) Unmarshal(dAtA []byte) error {
+func (m *HostReportEntry) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -6153,10 +6157,10 @@ func (m *SelfReport) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: SelfReport: wiretype end group for non-group")
+			return fmt.Errorf("proto: HostReportEntry: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: SelfReport: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: HostReportEntry: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -6199,7 +6203,7 @@ func (m *SelfReport) Unmarshal(dAtA []byte) error {
 			}
 		case 3:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field SelfReport", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field HostReport", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -6226,7 +6230,7 @@ func (m *SelfReport) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.SelfReport.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+			if err := m.HostReport.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -6251,7 +6255,7 @@ func (m *SelfReport) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *QuerySelfReportsResponse) Unmarshal(dAtA []byte) error {
+func (m *QueryHostReportsResponse) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -6274,10 +6278,10 @@ func (m *QuerySelfReportsResponse) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: QuerySelfReportsResponse: wiretype end group for non-group")
+			return fmt.Errorf("proto: QueryHostReportsResponse: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: QuerySelfReportsResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: QueryHostReportsResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -6309,7 +6313,7 @@ func (m *QuerySelfReportsResponse) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Reports = append(m.Reports, SelfReport{})
+			m.Reports = append(m.Reports, HostReportEntry{})
 			if err := m.Reports[len(m.Reports)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}

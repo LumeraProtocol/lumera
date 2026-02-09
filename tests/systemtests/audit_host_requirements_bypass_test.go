@@ -12,16 +12,16 @@ import (
 
 func TestAuditHostRequirements_UsageZeroBypassesMinimums(t *testing.T) {
 	const (
-		reportingWindowBlocks = uint64(10)
+		epochLengthBlocks = uint64(10)
 	)
 	const originHeight = int64(1)
 
 	sut.ModifyGenesisJSON(t,
 		setSupernodeParamsForAuditTests(t),
-		setAuditParamsForFastWindows(t, reportingWindowBlocks, 1, 1, 1, []uint32{4444}),
+		setAuditParamsForFastEpochs(t, epochLengthBlocks, 1, 1, 1, []uint32{4444}),
 		func(genesis []byte) []byte {
-			// Avoid missing-report postponement before/around the tested window.
-			state, err := sjson.SetRawBytes(genesis, "app_state.audit.params.consecutive_windows_to_postpone", []byte("10"))
+			// Avoid missing-report postponement before/around the tested epoch.
+			state, err := sjson.SetRawBytes(genesis, "app_state.audit.params.consecutive_epochs_to_postpone", []byte("10"))
 			require.NoError(t, err)
 
 			// Enforce host requirements, but allow "unknown" usage values to bypass (usage_percent==0).
@@ -40,21 +40,21 @@ func TestAuditHostRequirements_UsageZeroBypassesMinimums(t *testing.T) {
 	registerSupernode(t, cli, n1, "192.168.1.2")
 
 	currentHeight := sut.AwaitNextBlock(t)
-	windowID, windowStartHeight := nextWindowAfterHeight(originHeight, reportingWindowBlocks, currentHeight)
-	enforceHeight := windowStartHeight + int64(reportingWindowBlocks)
+	epochID, epochStartHeight := nextEpochAfterHeight(originHeight, epochLengthBlocks, currentHeight)
+	enforceHeight := epochStartHeight + int64(epochLengthBlocks)
 
-	awaitAtLeastHeight(t, windowStartHeight)
+	awaitAtLeastHeight(t, epochStartHeight)
 
-	seed := headerHashAtHeight(t, sut.rpcAddr, windowStartHeight)
+	seed := headerHashAtHeight(t, sut.rpcAddr, epochStartHeight)
 	senders := sortedStrings(n0.accAddr, n1.accAddr)
 	receivers := sortedStrings(n0.accAddr, n1.accAddr)
-	kWindow := computeKWindow(1, 1, 1, len(senders), len(receivers))
-	require.Equal(t, uint32(1), kWindow)
+	kEpoch := computeKEpoch(1, 1, 1, len(senders), len(receivers))
+	require.Equal(t, uint32(1), kEpoch)
 
-	targets0, ok := assignedTargets(seed, senders, receivers, kWindow, n0.accAddr)
+	targets0, ok := assignedTargets(seed, senders, receivers, kEpoch, n0.accAddr)
 	require.True(t, ok)
 	require.Len(t, targets0, 1)
-	targets1, ok := assignedTargets(seed, senders, receivers, kWindow, n1.accAddr)
+	targets1, ok := assignedTargets(seed, senders, receivers, kEpoch, n1.accAddr)
 	require.True(t, ok)
 	require.Len(t, targets1, 1)
 
@@ -68,16 +68,16 @@ func TestAuditHostRequirements_UsageZeroBypassesMinimums(t *testing.T) {
 	require.NoError(t, err)
 	unknownSelf := string(unknownSelfBz)
 
-	okSelf := auditSelfReportJSON([]string{"PORT_STATE_OPEN"})
+	okHost := auditHostReportJSON([]string{"PORT_STATE_OPEN"})
 
 	// node0 reports "unknown" cpu usage (0), which must not trigger host-requirements postponement.
-	tx0 := submitAuditReport(t, cli, n0.nodeName, windowID, unknownSelf, []string{
-		auditPeerObservationJSON(targets0[0], []string{"PORT_STATE_OPEN"}),
+	tx0 := submitEpochReport(t, cli, n0.nodeName, epochID, unknownSelf, []string{
+		storageChallengeObservationJSON(targets0[0], []string{"PORT_STATE_OPEN"}),
 	})
 	RequireTxSuccess(t, tx0)
 
-	tx1 := submitAuditReport(t, cli, n1.nodeName, windowID, okSelf, []string{
-		auditPeerObservationJSON(targets1[0], []string{"PORT_STATE_OPEN"}),
+	tx1 := submitEpochReport(t, cli, n1.nodeName, epochID, okHost, []string{
+		storageChallengeObservationJSON(targets1[0], []string{"PORT_STATE_OPEN"}),
 	})
 	RequireTxSuccess(t, tx1)
 

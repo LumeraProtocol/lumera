@@ -54,7 +54,8 @@ func (PortState) EnumDescriptor() ([]byte, []int) {
 	return fileDescriptor_0613fff850c07858, []int{0}
 }
 
-type AuditSelfReport struct {
+// HostReport is the Supernode's self-reported host metrics and counters for an epoch.
+type HostReport struct {
 	CpuUsagePercent    float64     `protobuf:"fixed64,1,opt,name=cpu_usage_percent,json=cpuUsagePercent,proto3" json:"cpu_usage_percent,omitempty"`
 	MemUsagePercent    float64     `protobuf:"fixed64,2,opt,name=mem_usage_percent,json=memUsagePercent,proto3" json:"mem_usage_percent,omitempty"`
 	DiskUsagePercent   float64     `protobuf:"fixed64,3,opt,name=disk_usage_percent,json=diskUsagePercent,proto3" json:"disk_usage_percent,omitempty"`
@@ -62,18 +63,18 @@ type AuditSelfReport struct {
 	FailedActionsCount uint32      `protobuf:"varint,5,opt,name=failed_actions_count,json=failedActionsCount,proto3" json:"failed_actions_count,omitempty"`
 }
 
-func (m *AuditSelfReport) Reset()         { *m = AuditSelfReport{} }
-func (m *AuditSelfReport) String() string { return proto.CompactTextString(m) }
-func (*AuditSelfReport) ProtoMessage()    {}
-func (*AuditSelfReport) Descriptor() ([]byte, []int) {
+func (m *HostReport) Reset()         { *m = HostReport{} }
+func (m *HostReport) String() string { return proto.CompactTextString(m) }
+func (*HostReport) ProtoMessage()    {}
+func (*HostReport) Descriptor() ([]byte, []int) {
 	return fileDescriptor_0613fff850c07858, []int{0}
 }
-func (m *AuditSelfReport) XXX_Unmarshal(b []byte) error {
+func (m *HostReport) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
-func (m *AuditSelfReport) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+func (m *HostReport) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
-		return xxx_messageInfo_AuditSelfReport.Marshal(b, m, deterministic)
+		return xxx_messageInfo_HostReport.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
 		n, err := m.MarshalToSizedBuffer(b)
@@ -83,71 +84,72 @@ func (m *AuditSelfReport) XXX_Marshal(b []byte, deterministic bool) ([]byte, err
 		return b[:n], nil
 	}
 }
-func (m *AuditSelfReport) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_AuditSelfReport.Merge(m, src)
+func (m *HostReport) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_HostReport.Merge(m, src)
 }
-func (m *AuditSelfReport) XXX_Size() int {
+func (m *HostReport) XXX_Size() int {
 	return m.Size()
 }
-func (m *AuditSelfReport) XXX_DiscardUnknown() {
-	xxx_messageInfo_AuditSelfReport.DiscardUnknown(m)
+func (m *HostReport) XXX_DiscardUnknown() {
+	xxx_messageInfo_HostReport.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_AuditSelfReport proto.InternalMessageInfo
+var xxx_messageInfo_HostReport proto.InternalMessageInfo
 
-func (m *AuditSelfReport) GetCpuUsagePercent() float64 {
+func (m *HostReport) GetCpuUsagePercent() float64 {
 	if m != nil {
 		return m.CpuUsagePercent
 	}
 	return 0
 }
 
-func (m *AuditSelfReport) GetMemUsagePercent() float64 {
+func (m *HostReport) GetMemUsagePercent() float64 {
 	if m != nil {
 		return m.MemUsagePercent
 	}
 	return 0
 }
 
-func (m *AuditSelfReport) GetDiskUsagePercent() float64 {
+func (m *HostReport) GetDiskUsagePercent() float64 {
 	if m != nil {
 		return m.DiskUsagePercent
 	}
 	return 0
 }
 
-func (m *AuditSelfReport) GetInboundPortStates() []PortState {
+func (m *HostReport) GetInboundPortStates() []PortState {
 	if m != nil {
 		return m.InboundPortStates
 	}
 	return nil
 }
 
-func (m *AuditSelfReport) GetFailedActionsCount() uint32 {
+func (m *HostReport) GetFailedActionsCount() uint32 {
 	if m != nil {
 		return m.FailedActionsCount
 	}
 	return 0
 }
 
-type AuditPeerObservation struct {
+// StorageChallengeObservation is a prober's reachability observation about an assigned target.
+type StorageChallengeObservation struct {
 	TargetSupernodeAccount string `protobuf:"bytes,1,opt,name=target_supernode_account,json=targetSupernodeAccount,proto3" json:"target_supernode_account,omitempty"`
 	// port_states[i] refers to required_open_ports[i] for the epoch.
 	PortStates []PortState `protobuf:"varint,2,rep,packed,name=port_states,json=portStates,proto3,enum=lumera.audit.v1.PortState" json:"port_states,omitempty"`
 }
 
-func (m *AuditPeerObservation) Reset()         { *m = AuditPeerObservation{} }
-func (m *AuditPeerObservation) String() string { return proto.CompactTextString(m) }
-func (*AuditPeerObservation) ProtoMessage()    {}
-func (*AuditPeerObservation) Descriptor() ([]byte, []int) {
+func (m *StorageChallengeObservation) Reset()         { *m = StorageChallengeObservation{} }
+func (m *StorageChallengeObservation) String() string { return proto.CompactTextString(m) }
+func (*StorageChallengeObservation) ProtoMessage()    {}
+func (*StorageChallengeObservation) Descriptor() ([]byte, []int) {
 	return fileDescriptor_0613fff850c07858, []int{1}
 }
-func (m *AuditPeerObservation) XXX_Unmarshal(b []byte) error {
+func (m *StorageChallengeObservation) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
-func (m *AuditPeerObservation) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+func (m *StorageChallengeObservation) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
-		return xxx_messageInfo_AuditPeerObservation.Marshal(b, m, deterministic)
+		return xxx_messageInfo_StorageChallengeObservation.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
 		n, err := m.MarshalToSizedBuffer(b)
@@ -157,52 +159,53 @@ func (m *AuditPeerObservation) XXX_Marshal(b []byte, deterministic bool) ([]byte
 		return b[:n], nil
 	}
 }
-func (m *AuditPeerObservation) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_AuditPeerObservation.Merge(m, src)
+func (m *StorageChallengeObservation) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_StorageChallengeObservation.Merge(m, src)
 }
-func (m *AuditPeerObservation) XXX_Size() int {
+func (m *StorageChallengeObservation) XXX_Size() int {
 	return m.Size()
 }
-func (m *AuditPeerObservation) XXX_DiscardUnknown() {
-	xxx_messageInfo_AuditPeerObservation.DiscardUnknown(m)
+func (m *StorageChallengeObservation) XXX_DiscardUnknown() {
+	xxx_messageInfo_StorageChallengeObservation.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_AuditPeerObservation proto.InternalMessageInfo
+var xxx_messageInfo_StorageChallengeObservation proto.InternalMessageInfo
 
-func (m *AuditPeerObservation) GetTargetSupernodeAccount() string {
+func (m *StorageChallengeObservation) GetTargetSupernodeAccount() string {
 	if m != nil {
 		return m.TargetSupernodeAccount
 	}
 	return ""
 }
 
-func (m *AuditPeerObservation) GetPortStates() []PortState {
+func (m *StorageChallengeObservation) GetPortStates() []PortState {
 	if m != nil {
 		return m.PortStates
 	}
 	return nil
 }
 
-type AuditReport struct {
-	SupernodeAccount string                  `protobuf:"bytes,1,opt,name=supernode_account,json=supernodeAccount,proto3" json:"supernode_account,omitempty"`
-	EpochId          uint64                  `protobuf:"varint,2,opt,name=epoch_id,json=epochId,proto3" json:"epoch_id,omitempty"`
-	ReportHeight     int64                   `protobuf:"varint,3,opt,name=report_height,json=reportHeight,proto3" json:"report_height,omitempty"`
-	SelfReport       AuditSelfReport         `protobuf:"bytes,4,opt,name=self_report,json=selfReport,proto3" json:"self_report"`
-	PeerObservations []*AuditPeerObservation `protobuf:"bytes,5,rep,name=peer_observations,json=peerObservations,proto3" json:"peer_observations,omitempty"`
+// EpochReport is a single per-epoch report submitted by a Supernode.
+type EpochReport struct {
+	SupernodeAccount             string                         `protobuf:"bytes,1,opt,name=supernode_account,json=supernodeAccount,proto3" json:"supernode_account,omitempty"`
+	EpochId                      uint64                         `protobuf:"varint,2,opt,name=epoch_id,json=epochId,proto3" json:"epoch_id,omitempty"`
+	ReportHeight                 int64                          `protobuf:"varint,3,opt,name=report_height,json=reportHeight,proto3" json:"report_height,omitempty"`
+	HostReport                   HostReport                     `protobuf:"bytes,4,opt,name=host_report,json=hostReport,proto3" json:"host_report"`
+	StorageChallengeObservations []*StorageChallengeObservation `protobuf:"bytes,5,rep,name=storage_challenge_observations,json=storageChallengeObservations,proto3" json:"storage_challenge_observations,omitempty"`
 }
 
-func (m *AuditReport) Reset()         { *m = AuditReport{} }
-func (m *AuditReport) String() string { return proto.CompactTextString(m) }
-func (*AuditReport) ProtoMessage()    {}
-func (*AuditReport) Descriptor() ([]byte, []int) {
+func (m *EpochReport) Reset()         { *m = EpochReport{} }
+func (m *EpochReport) String() string { return proto.CompactTextString(m) }
+func (*EpochReport) ProtoMessage()    {}
+func (*EpochReport) Descriptor() ([]byte, []int) {
 	return fileDescriptor_0613fff850c07858, []int{2}
 }
-func (m *AuditReport) XXX_Unmarshal(b []byte) error {
+func (m *EpochReport) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
-func (m *AuditReport) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+func (m *EpochReport) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
-		return xxx_messageInfo_AuditReport.Marshal(b, m, deterministic)
+		return xxx_messageInfo_EpochReport.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
 		n, err := m.MarshalToSizedBuffer(b)
@@ -212,103 +215,103 @@ func (m *AuditReport) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) 
 		return b[:n], nil
 	}
 }
-func (m *AuditReport) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_AuditReport.Merge(m, src)
+func (m *EpochReport) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_EpochReport.Merge(m, src)
 }
-func (m *AuditReport) XXX_Size() int {
+func (m *EpochReport) XXX_Size() int {
 	return m.Size()
 }
-func (m *AuditReport) XXX_DiscardUnknown() {
-	xxx_messageInfo_AuditReport.DiscardUnknown(m)
+func (m *EpochReport) XXX_DiscardUnknown() {
+	xxx_messageInfo_EpochReport.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_AuditReport proto.InternalMessageInfo
+var xxx_messageInfo_EpochReport proto.InternalMessageInfo
 
-func (m *AuditReport) GetSupernodeAccount() string {
+func (m *EpochReport) GetSupernodeAccount() string {
 	if m != nil {
 		return m.SupernodeAccount
 	}
 	return ""
 }
 
-func (m *AuditReport) GetEpochId() uint64 {
+func (m *EpochReport) GetEpochId() uint64 {
 	if m != nil {
 		return m.EpochId
 	}
 	return 0
 }
 
-func (m *AuditReport) GetReportHeight() int64 {
+func (m *EpochReport) GetReportHeight() int64 {
 	if m != nil {
 		return m.ReportHeight
 	}
 	return 0
 }
 
-func (m *AuditReport) GetSelfReport() AuditSelfReport {
+func (m *EpochReport) GetHostReport() HostReport {
 	if m != nil {
-		return m.SelfReport
+		return m.HostReport
 	}
-	return AuditSelfReport{}
+	return HostReport{}
 }
 
-func (m *AuditReport) GetPeerObservations() []*AuditPeerObservation {
+func (m *EpochReport) GetStorageChallengeObservations() []*StorageChallengeObservation {
 	if m != nil {
-		return m.PeerObservations
+		return m.StorageChallengeObservations
 	}
 	return nil
 }
 
 func init() {
 	proto.RegisterEnum("lumera.audit.v1.PortState", PortState_name, PortState_value)
-	proto.RegisterType((*AuditSelfReport)(nil), "lumera.audit.v1.AuditSelfReport")
-	proto.RegisterType((*AuditPeerObservation)(nil), "lumera.audit.v1.AuditPeerObservation")
-	proto.RegisterType((*AuditReport)(nil), "lumera.audit.v1.AuditReport")
+	proto.RegisterType((*HostReport)(nil), "lumera.audit.v1.HostReport")
+	proto.RegisterType((*StorageChallengeObservation)(nil), "lumera.audit.v1.StorageChallengeObservation")
+	proto.RegisterType((*EpochReport)(nil), "lumera.audit.v1.EpochReport")
 }
 
 func init() { proto.RegisterFile("lumera/audit/v1/audit.proto", fileDescriptor_0613fff850c07858) }
 
 var fileDescriptor_0613fff850c07858 = []byte{
-	// 563 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x93, 0x4d, 0x8f, 0xd2, 0x4e,
-	0x1c, 0xc7, 0x29, 0xb0, 0xff, 0xbf, 0x3b, 0xb8, 0xd2, 0xce, 0xe2, 0xda, 0x65, 0x93, 0xda, 0x60,
-	0x4c, 0x08, 0x51, 0x70, 0xf1, 0xe8, 0xa9, 0xac, 0xc4, 0xf5, 0x21, 0x94, 0xb4, 0x10, 0x13, 0x2f,
-	0x93, 0xd2, 0x0e, 0xa5, 0x91, 0x76, 0x9a, 0x99, 0x29, 0xd1, 0x77, 0xe1, 0xc5, 0x37, 0xe1, 0x79,
-	0x5f, 0xc4, 0x1e, 0x37, 0x9e, 0x3c, 0x19, 0x03, 0x6f, 0xc4, 0xb4, 0x83, 0x3c, 0x54, 0x13, 0x13,
-	0x2f, 0xcd, 0xcc, 0xe7, 0xfb, 0xfd, 0x4d, 0x7f, 0x0f, 0x33, 0xe0, 0x6c, 0x9e, 0x84, 0x98, 0x3a,
-	0x1d, 0x27, 0xf1, 0x02, 0xde, 0x59, 0x9c, 0x8b, 0x45, 0x3b, 0xa6, 0x84, 0x13, 0x58, 0x15, 0x62,
-	0x5b, 0xb0, 0xc5, 0x79, 0x5d, 0x71, 0xc2, 0x20, 0x22, 0x9d, 0xec, 0x2b, 0x3c, 0xf5, 0x53, 0x97,
-	0xb0, 0x90, 0x30, 0x94, 0xed, 0x3a, 0x62, 0xb3, 0x96, 0x6a, 0x3e, 0xf1, 0x89, 0xe0, 0xe9, 0x4a,
-	0xd0, 0xc6, 0xe7, 0x22, 0xa8, 0x1a, 0xe9, 0x81, 0x36, 0x9e, 0x4f, 0x2d, 0x1c, 0x13, 0xca, 0x61,
-	0x0b, 0x28, 0x6e, 0x9c, 0xa0, 0x84, 0x39, 0x3e, 0x46, 0x31, 0xa6, 0x2e, 0x8e, 0xb8, 0x2a, 0xe9,
-	0x52, 0x53, 0xb2, 0xaa, 0x6e, 0x9c, 0x8c, 0x53, 0x3e, 0x14, 0x38, 0xf5, 0x86, 0x38, 0xcc, 0x79,
-	0x8b, 0xc2, 0x1b, 0xe2, 0x70, 0xcf, 0xfb, 0x08, 0x40, 0x2f, 0x60, 0xef, 0x73, 0xe6, 0x52, 0x66,
-	0x96, 0x53, 0x65, 0xcf, 0xfd, 0x0a, 0x1c, 0x07, 0xd1, 0x84, 0x24, 0x91, 0x87, 0xd2, 0xac, 0x10,
-	0xe3, 0x0e, 0xc7, 0x4c, 0x2d, 0xeb, 0xa5, 0xe6, 0x9d, 0x6e, 0xbd, 0x9d, 0x6b, 0x46, 0x7b, 0x48,
-	0x28, 0xb7, 0x53, 0x8b, 0xa5, 0xac, 0xc3, 0x36, 0x84, 0xc1, 0x27, 0xa0, 0x36, 0x75, 0x82, 0x39,
-	0xf6, 0x90, 0xe3, 0xf2, 0x80, 0x44, 0x0c, 0xb9, 0x24, 0x89, 0xb8, 0x7a, 0xa0, 0x4b, 0xcd, 0x23,
-	0x0b, 0x0a, 0xcd, 0x10, 0xd2, 0x45, 0xaa, 0x34, 0xbe, 0x48, 0xa0, 0x96, 0xf5, 0x65, 0x88, 0x31,
-	0x35, 0x27, 0x0c, 0xd3, 0x85, 0x93, 0xca, 0x70, 0x0c, 0x54, 0xee, 0x50, 0x1f, 0x73, 0xc4, 0x92,
-	0x18, 0xd3, 0x88, 0x78, 0x18, 0x39, 0xae, 0x38, 0x2e, 0xed, 0xd1, 0x61, 0xef, 0xec, 0xeb, 0xd5,
-	0xe3, 0x7b, 0xeb, 0xd6, 0x1b, 0xae, 0x6b, 0x78, 0x1e, 0xc5, 0x8c, 0xd9, 0x9c, 0x06, 0x91, 0x6f,
-	0x9d, 0x88, 0x60, 0xfb, 0x57, 0xac, 0x21, 0x42, 0xe1, 0x33, 0x50, 0xd9, 0xad, 0xb2, 0xf8, 0xd7,
-	0x2a, 0x41, 0xbc, 0x29, 0xaf, 0x71, 0x55, 0x04, 0x95, 0x2c, 0xd9, 0xf5, 0x00, 0x2f, 0x81, 0xf2,
-	0x4f, 0xc9, 0xc9, 0x2c, 0x9f, 0xd6, 0x29, 0xb8, 0x85, 0x63, 0xe2, 0xce, 0x50, 0xe0, 0x65, 0x53,
-	0x2d, 0x5b, 0xff, 0x67, 0xfb, 0x97, 0x1e, 0x7c, 0x00, 0x8e, 0x68, 0xf6, 0x3b, 0x34, 0xc3, 0x81,
-	0x3f, 0x13, 0x83, 0x2c, 0x59, 0xb7, 0x05, 0xbc, 0xcc, 0x18, 0x7c, 0x01, 0x2a, 0x0c, 0xcf, 0xa7,
-	0x48, 0x40, 0xb5, 0xac, 0x4b, 0xcd, 0x4a, 0x57, 0xff, 0xad, 0xac, 0xdc, 0x0d, 0xec, 0x95, 0xaf,
-	0xbf, 0xdf, 0x2f, 0x58, 0x80, 0x6d, 0xef, 0xa4, 0x05, 0x94, 0x18, 0x63, 0x8a, 0xc8, 0x76, 0x14,
-	0x4c, 0x3d, 0xd0, 0x4b, 0xcd, 0x4a, 0xf7, 0xe1, 0x9f, 0x8f, 0xcb, 0x0d, 0xce, 0x92, 0xe3, 0x7d,
-	0xc0, 0x5a, 0x26, 0x38, 0xdc, 0xf4, 0x13, 0x9e, 0x00, 0x38, 0x34, 0xad, 0x11, 0xb2, 0x47, 0xc6,
-	0xa8, 0x8f, 0xc6, 0x83, 0xd7, 0x03, 0xf3, 0xed, 0x40, 0x2e, 0xc0, 0x63, 0x50, 0xdd, 0xe1, 0xe6,
-	0xb0, 0x3f, 0x90, 0x25, 0x78, 0x17, 0x28, 0x3b, 0xf0, 0xe2, 0x8d, 0x69, 0xf7, 0x9f, 0xcb, 0xc5,
-	0x5e, 0xeb, 0x7a, 0xa9, 0x49, 0x37, 0x4b, 0x4d, 0xfa, 0xb1, 0xd4, 0xa4, 0x4f, 0x2b, 0xad, 0x70,
-	0xb3, 0xd2, 0x0a, 0xdf, 0x56, 0x5a, 0xe1, 0x9d, 0xfc, 0x61, 0xfb, 0xa6, 0xf9, 0xc7, 0x18, 0xb3,
-	0xc9, 0x7f, 0xd9, 0xfb, 0x7b, 0xfa, 0x33, 0x00, 0x00, 0xff, 0xff, 0xa2, 0x5b, 0x6a, 0x87, 0xf3,
-	0x03, 0x00, 0x00,
+	// 569 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x53, 0xdd, 0x8e, 0xd2, 0x40,
+	0x14, 0xa6, 0xc0, 0xaa, 0x3b, 0xb8, 0x52, 0x66, 0xd7, 0xb5, 0x0b, 0xa6, 0x12, 0xbc, 0x21, 0x64,
+	0x05, 0x17, 0x2f, 0xbd, 0x02, 0x24, 0xc1, 0x9f, 0x50, 0xd2, 0x42, 0x4c, 0xbc, 0x99, 0x0c, 0xed,
+	0xd8, 0x36, 0xd2, 0x4e, 0x33, 0x33, 0x25, 0xfa, 0x16, 0xfb, 0x2a, 0x26, 0x3e, 0xc4, 0xde, 0xb9,
+	0xf1, 0xca, 0x2b, 0x63, 0xe0, 0x45, 0x4c, 0x3b, 0x2c, 0xb0, 0x6c, 0xd4, 0x64, 0x6f, 0x9a, 0x39,
+	0xdf, 0xf7, 0x9d, 0xd3, 0x73, 0xce, 0x37, 0x03, 0x2a, 0xb3, 0x38, 0x20, 0x0c, 0xb7, 0x70, 0xec,
+	0xf8, 0xa2, 0x35, 0x3f, 0x93, 0x87, 0x66, 0xc4, 0xa8, 0xa0, 0xb0, 0x28, 0xc9, 0xa6, 0xc4, 0xe6,
+	0x67, 0xe5, 0x12, 0x0e, 0xfc, 0x90, 0xb6, 0xd2, 0xaf, 0xd4, 0x94, 0x4f, 0x6c, 0xca, 0x03, 0xca,
+	0x51, 0x1a, 0xb5, 0x64, 0xb0, 0xa2, 0x8e, 0x5c, 0xea, 0x52, 0x89, 0x27, 0x27, 0x89, 0xd6, 0xce,
+	0xb3, 0x00, 0x0c, 0x28, 0x17, 0x26, 0x89, 0x28, 0x13, 0xb0, 0x01, 0x4a, 0x76, 0x14, 0xa3, 0x98,
+	0x63, 0x97, 0xa0, 0x88, 0x30, 0x9b, 0x84, 0x42, 0x53, 0xaa, 0x4a, 0x5d, 0x31, 0x8b, 0x76, 0x14,
+	0x4f, 0x12, 0x7c, 0x24, 0xe1, 0x44, 0x1b, 0x90, 0x60, 0x47, 0x9b, 0x95, 0xda, 0x80, 0x04, 0xd7,
+	0xb4, 0xa7, 0x00, 0x3a, 0x3e, 0xff, 0xb4, 0x23, 0xce, 0xa5, 0x62, 0x35, 0x61, 0xae, 0xa9, 0xdf,
+	0x80, 0x43, 0x3f, 0x9c, 0xd2, 0x38, 0x74, 0x50, 0xd2, 0x15, 0xe2, 0x02, 0x0b, 0xc2, 0xb5, 0x7c,
+	0x35, 0x57, 0x7f, 0xd0, 0x2e, 0x37, 0x77, 0xf6, 0xd0, 0x1c, 0x51, 0x26, 0xac, 0x44, 0x62, 0x96,
+	0x56, 0x69, 0x6b, 0x84, 0xc3, 0xe7, 0xe0, 0xe8, 0x23, 0xf6, 0x67, 0xc4, 0x41, 0xd8, 0x16, 0x3e,
+	0x0d, 0x39, 0xb2, 0x69, 0x1c, 0x0a, 0x6d, 0xaf, 0xaa, 0xd4, 0x0f, 0x4c, 0x28, 0xb9, 0x8e, 0xa4,
+	0x7a, 0x09, 0x53, 0xfb, 0xaa, 0x80, 0x8a, 0x25, 0x28, 0xc3, 0x2e, 0xe9, 0x79, 0x78, 0x36, 0x23,
+	0xa1, 0x4b, 0x8c, 0x29, 0x27, 0x6c, 0x8e, 0x13, 0x15, 0x9c, 0x00, 0x4d, 0x60, 0xe6, 0x12, 0x81,
+	0x78, 0x1c, 0x11, 0x16, 0x52, 0x87, 0x20, 0x6c, 0xcb, 0xaa, 0xc9, 0xaa, 0xf6, 0xbb, 0x95, 0x1f,
+	0xdf, 0x9e, 0x3d, 0x5a, 0x2d, 0xbf, 0x63, 0xdb, 0x1d, 0xc7, 0x61, 0x84, 0x73, 0x4b, 0x30, 0x3f,
+	0x74, 0xcd, 0x63, 0x99, 0x6c, 0x5d, 0xe5, 0x76, 0x64, 0x2a, 0x7c, 0x09, 0x0a, 0xdb, 0xc3, 0x66,
+	0xff, 0x3b, 0x2c, 0x88, 0xd6, 0x53, 0xd6, 0xbe, 0x67, 0x41, 0xa1, 0x1f, 0x51, 0xdb, 0x5b, 0xf9,
+	0x38, 0x00, 0xa5, 0x5b, 0x35, 0xa7, 0xf2, 0xdd, 0xb6, 0x4e, 0xc0, 0x3d, 0x92, 0x14, 0x46, 0xbe,
+	0x93, 0x9a, 0x9b, 0x37, 0xef, 0xa6, 0xf1, 0x6b, 0x07, 0x3e, 0x05, 0x07, 0x2c, 0xfd, 0x1d, 0xf2,
+	0x88, 0xef, 0x7a, 0xd2, 0xcf, 0x9c, 0x79, 0x5f, 0x82, 0x83, 0x14, 0x83, 0x5d, 0x50, 0xf0, 0x28,
+	0x17, 0x48, 0x82, 0x5a, 0xbe, 0xaa, 0xd4, 0x0b, 0xed, 0xca, 0x8d, 0xb1, 0x36, 0x77, 0xb0, 0x9b,
+	0xbf, 0xf8, 0xf5, 0x24, 0x63, 0x02, 0x6f, 0x73, 0x2b, 0x19, 0xd0, 0xb9, 0x34, 0x04, 0xd9, 0x57,
+	0x8e, 0x20, 0xba, 0xb1, 0x84, 0x6b, 0x7b, 0xd5, 0x5c, 0xbd, 0xd0, 0x3e, 0xbd, 0x51, 0xf6, 0x1f,
+	0x3e, 0x9a, 0x8f, 0xf9, 0xdf, 0x49, 0xde, 0x30, 0xc0, 0xfe, 0x7a, 0xd5, 0xf0, 0x18, 0xc0, 0x91,
+	0x61, 0x8e, 0x91, 0x35, 0xee, 0x8c, 0xfb, 0x68, 0x32, 0x7c, 0x3b, 0x34, 0xde, 0x0f, 0xd5, 0x0c,
+	0x3c, 0x04, 0xc5, 0x2d, 0xdc, 0x18, 0xf5, 0x87, 0xaa, 0x02, 0x1f, 0x82, 0xd2, 0x16, 0xd8, 0x7b,
+	0x67, 0x58, 0xfd, 0x57, 0x6a, 0xb6, 0xdb, 0xb8, 0x58, 0xe8, 0xca, 0xe5, 0x42, 0x57, 0x7e, 0x2f,
+	0x74, 0xe5, 0x7c, 0xa9, 0x67, 0x2e, 0x97, 0x7a, 0xe6, 0xe7, 0x52, 0xcf, 0x7c, 0x50, 0x3f, 0x6f,
+	0x1e, 0xbc, 0xf8, 0x12, 0x11, 0x3e, 0xbd, 0x93, 0x3e, 0xce, 0x17, 0x7f, 0x02, 0x00, 0x00, 0xff,
+	0xff, 0x2e, 0xff, 0x1c, 0xe8, 0x10, 0x04, 0x00, 0x00,
 }
 
-func (m *AuditSelfReport) Marshal() (dAtA []byte, err error) {
+func (m *HostReport) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -318,12 +321,12 @@ func (m *AuditSelfReport) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *AuditSelfReport) MarshalTo(dAtA []byte) (int, error) {
+func (m *HostReport) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *AuditSelfReport) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *HostReport) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
@@ -372,7 +375,7 @@ func (m *AuditSelfReport) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
-func (m *AuditPeerObservation) Marshal() (dAtA []byte, err error) {
+func (m *StorageChallengeObservation) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -382,12 +385,12 @@ func (m *AuditPeerObservation) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *AuditPeerObservation) MarshalTo(dAtA []byte) (int, error) {
+func (m *StorageChallengeObservation) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *AuditPeerObservation) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *StorageChallengeObservation) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
@@ -420,7 +423,7 @@ func (m *AuditPeerObservation) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
-func (m *AuditReport) Marshal() (dAtA []byte, err error) {
+func (m *EpochReport) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -430,20 +433,20 @@ func (m *AuditReport) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *AuditReport) MarshalTo(dAtA []byte) (int, error) {
+func (m *EpochReport) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *AuditReport) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *EpochReport) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if len(m.PeerObservations) > 0 {
-		for iNdEx := len(m.PeerObservations) - 1; iNdEx >= 0; iNdEx-- {
+	if len(m.StorageChallengeObservations) > 0 {
+		for iNdEx := len(m.StorageChallengeObservations) - 1; iNdEx >= 0; iNdEx-- {
 			{
-				size, err := m.PeerObservations[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				size, err := m.StorageChallengeObservations[iNdEx].MarshalToSizedBuffer(dAtA[:i])
 				if err != nil {
 					return 0, err
 				}
@@ -455,7 +458,7 @@ func (m *AuditReport) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		}
 	}
 	{
-		size, err := m.SelfReport.MarshalToSizedBuffer(dAtA[:i])
+		size, err := m.HostReport.MarshalToSizedBuffer(dAtA[:i])
 		if err != nil {
 			return 0, err
 		}
@@ -495,7 +498,7 @@ func encodeVarintAudit(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
-func (m *AuditSelfReport) Size() (n int) {
+func (m *HostReport) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -523,7 +526,7 @@ func (m *AuditSelfReport) Size() (n int) {
 	return n
 }
 
-func (m *AuditPeerObservation) Size() (n int) {
+func (m *StorageChallengeObservation) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -543,7 +546,7 @@ func (m *AuditPeerObservation) Size() (n int) {
 	return n
 }
 
-func (m *AuditReport) Size() (n int) {
+func (m *EpochReport) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -559,10 +562,10 @@ func (m *AuditReport) Size() (n int) {
 	if m.ReportHeight != 0 {
 		n += 1 + sovAudit(uint64(m.ReportHeight))
 	}
-	l = m.SelfReport.Size()
+	l = m.HostReport.Size()
 	n += 1 + l + sovAudit(uint64(l))
-	if len(m.PeerObservations) > 0 {
-		for _, e := range m.PeerObservations {
+	if len(m.StorageChallengeObservations) > 0 {
+		for _, e := range m.StorageChallengeObservations {
 			l = e.Size()
 			n += 1 + l + sovAudit(uint64(l))
 		}
@@ -576,7 +579,7 @@ func sovAudit(x uint64) (n int) {
 func sozAudit(x uint64) (n int) {
 	return sovAudit(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
-func (m *AuditSelfReport) Unmarshal(dAtA []byte) error {
+func (m *HostReport) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -599,10 +602,10 @@ func (m *AuditSelfReport) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: AuditSelfReport: wiretype end group for non-group")
+			return fmt.Errorf("proto: HostReport: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: AuditSelfReport: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: HostReport: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -747,7 +750,7 @@ func (m *AuditSelfReport) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *AuditPeerObservation) Unmarshal(dAtA []byte) error {
+func (m *StorageChallengeObservation) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -770,10 +773,10 @@ func (m *AuditPeerObservation) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: AuditPeerObservation: wiretype end group for non-group")
+			return fmt.Errorf("proto: StorageChallengeObservation: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: AuditPeerObservation: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: StorageChallengeObservation: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -898,7 +901,7 @@ func (m *AuditPeerObservation) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
-func (m *AuditReport) Unmarshal(dAtA []byte) error {
+func (m *EpochReport) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -921,10 +924,10 @@ func (m *AuditReport) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: AuditReport: wiretype end group for non-group")
+			return fmt.Errorf("proto: EpochReport: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: AuditReport: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: EpochReport: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -999,7 +1002,7 @@ func (m *AuditReport) Unmarshal(dAtA []byte) error {
 			}
 		case 4:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field SelfReport", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field HostReport", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -1026,13 +1029,13 @@ func (m *AuditReport) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if err := m.SelfReport.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+			if err := m.HostReport.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
 		case 5:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field PeerObservations", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageChallengeObservations", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -1059,8 +1062,8 @@ func (m *AuditReport) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.PeerObservations = append(m.PeerObservations, &AuditPeerObservation{})
-			if err := m.PeerObservations[len(m.PeerObservations)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+			m.StorageChallengeObservations = append(m.StorageChallengeObservations, &StorageChallengeObservation{})
+			if err := m.StorageChallengeObservations[len(m.StorageChallengeObservations)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex

@@ -12,16 +12,16 @@ import (
 
 func TestAuditRecovery_PostponedBecomesActiveWithSelfAndPeerOpen(t *testing.T) {
 	const (
-		reportingWindowBlocks = uint64(10)
+		epochLengthBlocks = uint64(10)
 	)
 	const originHeight = int64(1)
 
 	sut.ModifyGenesisJSON(t,
 		setSupernodeParamsForAuditTests(t),
-		setAuditParamsForFastWindows(t, reportingWindowBlocks, 1, 1, 1, []uint32{4444}),
+		setAuditParamsForFastEpochs(t, epochLengthBlocks, 1, 1, 1, []uint32{4444}),
 		func(genesis []byte) []byte {
 			// Keep missing-report / peer-port streaks from interfering with this recovery test.
-			state, err := sjson.SetRawBytes(genesis, "app_state.audit.params.consecutive_windows_to_postpone", []byte("10"))
+			state, err := sjson.SetRawBytes(genesis, "app_state.audit.params.consecutive_epochs_to_postpone", []byte("10"))
 			require.NoError(t, err)
 
 			// Use host requirements to get into POSTPONED state deterministically.
@@ -40,17 +40,17 @@ func TestAuditRecovery_PostponedBecomesActiveWithSelfAndPeerOpen(t *testing.T) {
 	registerSupernode(t, cli, n1, "192.168.1.2")
 
 	currentHeight := sut.AwaitNextBlock(t)
-	windowID1, window1Start := nextWindowAfterHeight(originHeight, reportingWindowBlocks, currentHeight)
-	windowID2 := windowID1 + 1
-	window2Start := window1Start + int64(reportingWindowBlocks)
-	enforce2 := window2Start + int64(reportingWindowBlocks)
+	epochID1, epoch1Start := nextEpochAfterHeight(originHeight, epochLengthBlocks, currentHeight)
+	epochID2 := epochID1 + 1
+	epoch2Start := epoch1Start + int64(epochLengthBlocks)
+	enforce2 := epoch2Start + int64(epochLengthBlocks)
 
 	senders := sortedStrings(n0.accAddr, n1.accAddr)
 	receivers := sortedStrings(n0.accAddr, n1.accAddr)
-	kWindow := computeKWindow(1, 1, 1, len(senders), len(receivers))
-	require.Equal(t, uint32(1), kWindow)
+	kEpoch := computeKEpoch(1, 1, 1, len(senders), len(receivers))
+	require.Equal(t, uint32(1), kEpoch)
 
-	selfOK := auditSelfReportJSON([]string{"PORT_STATE_OPEN"})
+	hostOK := auditHostReportJSON([]string{"PORT_STATE_OPEN"})
 
 	badSelfBz, err := json.Marshal(map[string]any{
 		"cpu_usage_percent":    99.0,
@@ -60,44 +60,44 @@ func TestAuditRecovery_PostponedBecomesActiveWithSelfAndPeerOpen(t *testing.T) {
 		"failed_actions_count": 0,
 	})
 	require.NoError(t, err)
-	selfBad := string(badSelfBz)
+	hostBad := string(badSelfBz)
 
-	// Window 1: node1 violates host requirements -> becomes POSTPONED.
-	awaitAtLeastHeight(t, window1Start)
-	seed1 := headerHashAtHeight(t, sut.rpcAddr, window1Start)
-	targets0w1, ok := assignedTargets(seed1, senders, receivers, kWindow, n0.accAddr)
+	// Epoch 1: node1 violates host requirements -> becomes POSTPONED.
+	awaitAtLeastHeight(t, epoch1Start)
+	seed1 := headerHashAtHeight(t, sut.rpcAddr, epoch1Start)
+	targets0e1, ok := assignedTargets(seed1, senders, receivers, kEpoch, n0.accAddr)
 	require.True(t, ok)
-	require.Len(t, targets0w1, 1)
-	targets1w1, ok := assignedTargets(seed1, senders, receivers, kWindow, n1.accAddr)
+	require.Len(t, targets0e1, 1)
+	targets1e1, ok := assignedTargets(seed1, senders, receivers, kEpoch, n1.accAddr)
 	require.True(t, ok)
-	require.Len(t, targets1w1, 1)
+	require.Len(t, targets1e1, 1)
 
-	tx0w1 := submitAuditReport(t, cli, n0.nodeName, windowID1, selfOK, []string{
-		auditPeerObservationJSON(targets0w1[0], []string{"PORT_STATE_OPEN"}),
+	tx0e1 := submitEpochReport(t, cli, n0.nodeName, epochID1, hostOK, []string{
+		storageChallengeObservationJSON(targets0e1[0], []string{"PORT_STATE_OPEN"}),
 	})
-	RequireTxSuccess(t, tx0w1)
-	tx1w1 := submitAuditReport(t, cli, n1.nodeName, windowID1, selfBad, []string{
-		auditPeerObservationJSON(targets1w1[0], []string{"PORT_STATE_OPEN"}),
+	RequireTxSuccess(t, tx0e1)
+	tx1e1 := submitEpochReport(t, cli, n1.nodeName, epochID1, hostBad, []string{
+		storageChallengeObservationJSON(targets1e1[0], []string{"PORT_STATE_OPEN"}),
 	})
-	RequireTxSuccess(t, tx1w1)
+	RequireTxSuccess(t, tx1e1)
 
-	awaitAtLeastHeight(t, window2Start)
+	awaitAtLeastHeight(t, epoch2Start)
 	require.Equal(t, "SUPERNODE_STATE_POSTPONED", querySupernodeLatestState(t, cli, n1.valAddr))
 
-	// Window 2: node1 submits compliant self report (no peer observations),
-	// and node0 submits an OPEN peer observation about node1 in the same window -> recovery at window end.
-	seed2 := headerHashAtHeight(t, sut.rpcAddr, window2Start)
-	targets0w2, ok := assignedTargets(seed2, senders, receivers, kWindow, n0.accAddr)
+	// Epoch 2: node1 submits compliant host report (no storage challenge observations),
+	// and node0 submits an OPEN storage challenge observation about node1 in the same epoch -> recovery at epoch end.
+	seed2 := headerHashAtHeight(t, sut.rpcAddr, epoch2Start)
+	targets0e2, ok := assignedTargets(seed2, senders, receivers, kEpoch, n0.accAddr)
 	require.True(t, ok)
-	require.Len(t, targets0w2, 1)
+	require.Len(t, targets0e2, 1)
 
-	tx0w2 := submitAuditReport(t, cli, n0.nodeName, windowID2, selfOK, []string{
-		auditPeerObservationJSON(targets0w2[0], []string{"PORT_STATE_OPEN"}),
+	tx0e2 := submitEpochReport(t, cli, n0.nodeName, epochID2, hostOK, []string{
+		storageChallengeObservationJSON(targets0e2[0], []string{"PORT_STATE_OPEN"}),
 	})
-	RequireTxSuccess(t, tx0w2)
+	RequireTxSuccess(t, tx0e2)
 
-	tx1w2 := submitAuditReport(t, cli, n1.nodeName, windowID2, selfOK, nil)
-	RequireTxSuccess(t, tx1w2)
+	tx1e2 := submitEpochReport(t, cli, n1.nodeName, epochID2, hostOK, nil)
+	RequireTxSuccess(t, tx1e2)
 
 	awaitAtLeastHeight(t, enforce2)
 	require.Equal(t, "SUPERNODE_STATE_ACTIVE", querySupernodeLatestState(t, cli, n1.valAddr))

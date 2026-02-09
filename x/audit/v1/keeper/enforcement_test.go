@@ -15,23 +15,23 @@ func TestPeerPortPostponementThresholdPercent(t *testing.T) {
 		t.Helper()
 
 		// Target must submit a report to avoid missing-report postponement.
-		err := f.keeper.SetReport(f.ctx, types.AuditReport{
+		err := f.keeper.SetReport(f.ctx, types.EpochReport{
 			SupernodeAccount: target.SupernodeAccount,
 			EpochId:          epochID,
 			ReportHeight:     f.ctx.BlockHeight(),
-			SelfReport:       types.AuditSelfReport{},
+			HostReport:       types.HostReport{},
 		})
 		if err != nil {
 			t.Fatalf("failed to set target report: %v", err)
 		}
 
 		for i, peer := range peers {
-			err := f.keeper.SetReport(f.ctx, types.AuditReport{
+			err := f.keeper.SetReport(f.ctx, types.EpochReport{
 				SupernodeAccount: peer.SupernodeAccount,
 				EpochId:          epochID,
 				ReportHeight:     f.ctx.BlockHeight(),
-				SelfReport:       types.AuditSelfReport{},
-				PeerObservations: []*types.AuditPeerObservation{
+				HostReport:       types.HostReport{},
+				StorageChallengeObservations: []*types.StorageChallengeObservation{
 					{
 						TargetSupernodeAccount: target.SupernodeAccount,
 						PortStates:             []types.PortState{portStateForPeer[i]},
@@ -41,7 +41,7 @@ func TestPeerPortPostponementThresholdPercent(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to set peer report: %v", err)
 			}
-			f.keeper.SetSupernodeReportIndex(f.ctx, target.SupernodeAccount, epochID, peer.SupernodeAccount)
+			f.keeper.SetStorageChallengeReportIndex(f.ctx, target.SupernodeAccount, epochID, peer.SupernodeAccount)
 		}
 	}
 

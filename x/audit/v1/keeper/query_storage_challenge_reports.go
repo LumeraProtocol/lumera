@@ -13,7 +13,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func (q queryServer) SupernodeReports(ctx context.Context, req *types.QuerySupernodeReportsRequest) (*types.QuerySupernodeReportsResponse, error) {
+func (q queryServer) StorageChallengeReports(ctx context.Context, req *types.QueryStorageChallengeReportsRequest) (*types.QueryStorageChallengeReportsResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
 	}
@@ -27,12 +27,12 @@ func (q queryServer) SupernodeReports(ctx context.Context, req *types.QuerySuper
 	var store prefix.Store
 	useEpochFilter := req.FilterByEpochId || req.EpochId != 0
 	if useEpochFilter {
-		store = prefix.NewStore(storeAdapter, types.SupernodeReportIndexEpochPrefix(req.SupernodeAccount, req.EpochId))
+		store = prefix.NewStore(storeAdapter, types.StorageChallengeReportIndexEpochPrefix(req.SupernodeAccount, req.EpochId))
 	} else {
-		store = prefix.NewStore(storeAdapter, types.SupernodeReportIndexPrefix(req.SupernodeAccount))
+		store = prefix.NewStore(storeAdapter, types.StorageChallengeReportIndexPrefix(req.SupernodeAccount))
 	}
 
-	var reports []types.SupernodeReport
+	var reports []types.StorageChallengeReport
 
 	pagination := req.Pagination
 	if pagination == nil {
@@ -66,7 +66,7 @@ func (q queryServer) SupernodeReports(ctx context.Context, req *types.QuerySuper
 		}
 
 		var portStates []types.PortState
-		for _, obs := range r.PeerObservations {
+		for _, obs := range r.StorageChallengeObservations {
 			if obs == nil {
 				continue
 			}
@@ -82,7 +82,7 @@ func (q queryServer) SupernodeReports(ctx context.Context, req *types.QuerySuper
 			return nil
 		}
 
-		reports = append(reports, types.SupernodeReport{
+		reports = append(reports, types.StorageChallengeReport{
 			ReporterSupernodeAccount: reporter,
 			EpochId:                  r.EpochId,
 			ReportHeight:             r.ReportHeight,
@@ -94,7 +94,7 @@ func (q queryServer) SupernodeReports(ctx context.Context, req *types.QuerySuper
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	return &types.QuerySupernodeReportsResponse{
+	return &types.QueryStorageChallengeReportsResponse{
 		Reports:    reports,
 		Pagination: pageRes,
 	}, nil

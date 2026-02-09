@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"math"
 	"sort"
 
 	paramtypes "github.com/cosmos/cosmos-sdk/x/params/types"
@@ -30,55 +31,65 @@ var (
 	KeyActionFinalizationRecoveryEpochs                    = []byte("ActionFinalizationRecoveryEpochs")
 	KeyActionFinalizationRecoveryMaxTotalBadEvidences      = []byte("ActionFinalizationRecoveryMaxTotalBadEvidences")
 
-	KeyScEnabled                           = []byte("ScEnabled")
-	KeyScChallengersPerEpoch               = []byte("ScChallengersPerEpoch")
-	KeyScFilesPerChallenger                = []byte("ScFilesPerChallenger")
-	KeyScReplicaCount                      = []byte("ScReplicaCount")
-	KeyScObserverThreshold                 = []byte("ScObserverThreshold")
-	KeyScMinSliceBytes                     = []byte("ScMinSliceBytes")
-	KeyScMaxSliceBytes                     = []byte("ScMaxSliceBytes")
-	KeyScResponseTimeoutMs                 = []byte("ScResponseTimeoutMs")
-	KeyScAffirmationTimeoutMs              = []byte("ScAffirmationTimeoutMs")
-	KeyScEvidenceMaxBytes                  = []byte("ScEvidenceMaxBytes")
-	KeyScCandidateKeysLookbackEpochs       = []byte("ScCandidateKeysLookbackEpochs")
-	KeyScStartJitterMs                     = []byte("ScStartJitterMs")
-	KeyScEvidenceSubmitterMustBeChallenger = []byte("ScEvidenceSubmitterMustBeChallenger")
+	KeyScEnabled             = []byte("ScEnabled")
+	KeyScChallengersPerEpoch = []byte("ScChallengersPerEpoch")
 )
 
 var (
-	DefaultEpochLengthBlocks                = uint64(400)
-	DefaultEpochZeroHeight                  = uint64(1)
-	DefaultPeerQuorumReports                = uint32(3)
-	DefaultMinProbeTargetsPerEpoch          = uint32(3)
-	DefaultMaxProbeTargetsPerEpoch          = uint32(5)
-	DefaultRequiredOpenPorts                = []uint32{4444, 4445, 8002}
-	DefaultMinCpuFreePercent                = uint32(0)
-	DefaultMinMemFreePercent                = uint32(0)
-	DefaultMinDiskFreePercent               = uint32(0)
-	DefaultConsecutiveEpochsToPostpone      = uint32(1)
-	DefaultKeepLastEpochEntries             = uint64(200)
+	DefaultEpochLengthBlocks = uint64(400)
+	// DefaultEpochZeroHeight is a placeholder used for genesis-based initialization.
+	// For module activation on an already-running chain, the upgrade handler must set
+	// epoch_zero_height dynamically to the upgrade block height.
+	DefaultEpochZeroHeight = uint64(1)
+
+	// DefaultPeerQuorumReports is the desired average number of peer observations per target per epoch.
+	// This indirectly drives how many targets each prober must observe in an epoch.
+	DefaultPeerQuorumReports = uint32(3)
+
+	// DefaultMinProbeTargetsPerEpoch clamps the per-prober target assignment to a minimum.
+	DefaultMinProbeTargetsPerEpoch = uint32(3)
+
+	// DefaultMaxProbeTargetsPerEpoch clamps the per-prober target assignment to a maximum.
+	DefaultMaxProbeTargetsPerEpoch = uint32(5)
+
+	// DefaultRequiredOpenPorts is the ordered list of ports that probers must check and report for assigned targets.
+	// The index in peer observations corresponds to the index in this list.
+	DefaultRequiredOpenPorts = []uint32{4444, 4445, 8002}
+
+	// DefaultMin*FreePercent are minimum required free-capacity thresholds derived from self reports.
+	// A value of 0 disables that resource-based postponement.
+	DefaultMinCpuFreePercent  = uint32(0)
+	DefaultMinMemFreePercent  = uint32(0)
+	DefaultMinDiskFreePercent = uint32(0)
+
+	// DefaultConsecutiveEpochsToPostpone is the lookback window for postponement decisions that rely on
+	// consecutive-epoch streaks (missing reports and peer port closures).
+	DefaultConsecutiveEpochsToPostpone = uint32(1)
+
+	// DefaultKeepLastEpochEntries is the retention window for epoch-scoped state (anchors, reports, indices,
+	// evidence epoch counters). It must be >= the maximum configured lookback windows.
+	DefaultKeepLastEpochEntries = uint64(200)
+
+	// DefaultPeerPortPostponeThresholdPercent is the percentage of peer reporters that must report a required
+	// port as CLOSED to treat that port as CLOSED for the epoch. 100 means unanimous.
 	DefaultPeerPortPostponeThresholdPercent = uint32(100)
 
+	// DefaultActionFinalization* are action-finalization evidence-based postponement thresholds.
 	DefaultActionFinalizationSignatureFailureEvidencesPerEpoch = uint32(1)
 	DefaultActionFinalizationSignatureFailureConsecutiveEpochs = uint32(1)
 	DefaultActionFinalizationNotInTop10EvidencesPerEpoch       = uint32(1)
 	DefaultActionFinalizationNotInTop10ConsecutiveEpochs       = uint32(1)
-	DefaultActionFinalizationRecoveryEpochs                    = uint32(1)
-	DefaultActionFinalizationRecoveryMaxTotalBadEvidences      = uint32(1)
 
-	DefaultScEnabled                           = true
-	DefaultScChallengersPerEpoch               = uint32(0) // 0 means auto
-	DefaultScFilesPerChallenger                = uint32(2)
-	DefaultScReplicaCount                      = uint32(5)
-	DefaultScObserverThreshold                 = uint32(2)
-	DefaultScMinSliceBytes                     = uint64(1024)
-	DefaultScMaxSliceBytes                     = uint64(65536)
-	DefaultScResponseTimeoutMs                 = uint64(30000)
-	DefaultScAffirmationTimeoutMs              = uint64(30000)
-	DefaultScEvidenceMaxBytes                  = uint64(65536)
-	DefaultScCandidateKeysLookbackEpochs       = uint32(1)
-	DefaultScStartJitterMs                     = uint64(60000)
-	DefaultScEvidenceSubmitterMustBeChallenger = true
+	// DefaultActionFinalizationRecovery* define the action-finalization recovery window.
+	DefaultActionFinalizationRecoveryEpochs               = uint32(1)
+	DefaultActionFinalizationRecoveryMaxTotalBadEvidences = uint32(1)
+
+	// DefaultScEnabled is the storage challenge feature gate (supernode-side execution and chain-side evidence validation).
+	DefaultScEnabled = true
+
+	// DefaultScChallengersPerEpoch is the number of challengers selected per epoch from the anchored ACTIVE set.
+	// A value of 0 means "auto" (implementation-defined default).
+	DefaultScChallengersPerEpoch = uint32(0) // 0 means auto
 )
 
 // Params notes
@@ -122,17 +133,6 @@ func NewParams(
 	actionFinalizationRecoveryMaxTotalBadEvidences uint32,
 	scEnabled bool,
 	scChallengersPerEpoch uint32,
-	scFilesPerChallenger uint32,
-	scReplicaCount uint32,
-	scObserverThreshold uint32,
-	scMinSliceBytes uint64,
-	scMaxSliceBytes uint64,
-	scResponseTimeoutMs uint64,
-	scAffirmationTimeoutMs uint64,
-	scEvidenceMaxBytes uint64,
-	scCandidateKeysLookbackEpochs uint32,
-	scStartJitterMs uint64,
-	scEvidenceSubmitterMustBeChallenger bool,
 ) Params {
 	return Params{
 		EpochLengthBlocks:                epochLengthBlocks,
@@ -155,19 +155,8 @@ func NewParams(
 		ActionFinalizationRecoveryEpochs:                    actionFinalizationRecoveryEpochs,
 		ActionFinalizationRecoveryMaxTotalBadEvidences:      actionFinalizationRecoveryMaxTotalBadEvidences,
 
-		ScEnabled:                           scEnabled,
-		ScChallengersPerEpoch:               scChallengersPerEpoch,
-		ScFilesPerChallenger:                scFilesPerChallenger,
-		ScReplicaCount:                      scReplicaCount,
-		ScObserverThreshold:                 scObserverThreshold,
-		ScMinSliceBytes:                     scMinSliceBytes,
-		ScMaxSliceBytes:                     scMaxSliceBytes,
-		ScResponseTimeoutMs:                 scResponseTimeoutMs,
-		ScAffirmationTimeoutMs:              scAffirmationTimeoutMs,
-		ScEvidenceMaxBytes:                  scEvidenceMaxBytes,
-		ScCandidateKeysLookbackEpochs:       scCandidateKeysLookbackEpochs,
-		ScStartJitterMs:                     scStartJitterMs,
-		ScEvidenceSubmitterMustBeChallenger: scEvidenceSubmitterMustBeChallenger,
+		ScEnabled:             scEnabled,
+		ScChallengersPerEpoch: scChallengersPerEpoch,
 	}
 }
 
@@ -193,17 +182,6 @@ func DefaultParams() Params {
 		DefaultActionFinalizationRecoveryMaxTotalBadEvidences,
 		DefaultScEnabled,
 		DefaultScChallengersPerEpoch,
-		DefaultScFilesPerChallenger,
-		DefaultScReplicaCount,
-		DefaultScObserverThreshold,
-		DefaultScMinSliceBytes,
-		DefaultScMaxSliceBytes,
-		DefaultScResponseTimeoutMs,
-		DefaultScAffirmationTimeoutMs,
-		DefaultScEvidenceMaxBytes,
-		DefaultScCandidateKeysLookbackEpochs,
-		DefaultScStartJitterMs,
-		DefaultScEvidenceSubmitterMustBeChallenger,
 	)
 }
 
@@ -254,37 +232,6 @@ func (p Params) WithDefaults() Params {
 		p.ActionFinalizationRecoveryMaxTotalBadEvidences = DefaultActionFinalizationRecoveryMaxTotalBadEvidences
 	}
 
-	if p.ScFilesPerChallenger == 0 {
-		p.ScFilesPerChallenger = DefaultScFilesPerChallenger
-	}
-	if p.ScReplicaCount == 0 {
-		p.ScReplicaCount = DefaultScReplicaCount
-	}
-	if p.ScObserverThreshold == 0 {
-		p.ScObserverThreshold = DefaultScObserverThreshold
-	}
-	if p.ScMinSliceBytes == 0 {
-		p.ScMinSliceBytes = DefaultScMinSliceBytes
-	}
-	if p.ScMaxSliceBytes == 0 {
-		p.ScMaxSliceBytes = DefaultScMaxSliceBytes
-	}
-	if p.ScResponseTimeoutMs == 0 {
-		p.ScResponseTimeoutMs = DefaultScResponseTimeoutMs
-	}
-	if p.ScAffirmationTimeoutMs == 0 {
-		p.ScAffirmationTimeoutMs = DefaultScAffirmationTimeoutMs
-	}
-	if p.ScEvidenceMaxBytes == 0 {
-		p.ScEvidenceMaxBytes = DefaultScEvidenceMaxBytes
-	}
-	if p.ScCandidateKeysLookbackEpochs == 0 {
-		p.ScCandidateKeysLookbackEpochs = DefaultScCandidateKeysLookbackEpochs
-	}
-	if p.ScStartJitterMs == 0 {
-		p.ScStartJitterMs = DefaultScStartJitterMs
-	}
-
 	return p
 }
 
@@ -312,17 +259,6 @@ func (p *Params) ParamSetPairs() paramtypes.ParamSetPairs {
 
 		paramtypes.NewParamSetPair(KeyScEnabled, &p.ScEnabled, validateBool),
 		paramtypes.NewParamSetPair(KeyScChallengersPerEpoch, &p.ScChallengersPerEpoch, validateUint32),
-		paramtypes.NewParamSetPair(KeyScFilesPerChallenger, &p.ScFilesPerChallenger, validateUint32),
-		paramtypes.NewParamSetPair(KeyScReplicaCount, &p.ScReplicaCount, validateUint32),
-		paramtypes.NewParamSetPair(KeyScObserverThreshold, &p.ScObserverThreshold, validateUint32),
-		paramtypes.NewParamSetPair(KeyScMinSliceBytes, &p.ScMinSliceBytes, validateUint64),
-		paramtypes.NewParamSetPair(KeyScMaxSliceBytes, &p.ScMaxSliceBytes, validateUint64),
-		paramtypes.NewParamSetPair(KeyScResponseTimeoutMs, &p.ScResponseTimeoutMs, validateUint64),
-		paramtypes.NewParamSetPair(KeyScAffirmationTimeoutMs, &p.ScAffirmationTimeoutMs, validateUint64),
-		paramtypes.NewParamSetPair(KeyScEvidenceMaxBytes, &p.ScEvidenceMaxBytes, validateUint64),
-		paramtypes.NewParamSetPair(KeyScCandidateKeysLookbackEpochs, &p.ScCandidateKeysLookbackEpochs, validateUint32),
-		paramtypes.NewParamSetPair(KeyScStartJitterMs, &p.ScStartJitterMs, validateUint64),
-		paramtypes.NewParamSetPair(KeyScEvidenceSubmitterMustBeChallenger, &p.ScEvidenceSubmitterMustBeChallenger, validateBool),
 	}
 }
 
@@ -334,6 +270,14 @@ func (p Params) Validate() error {
 	}
 	if p.EpochZeroHeight == 0 {
 		return fmt.Errorf("epoch_zero_height must be > 0")
+	}
+	// Epoch math currently operates on int64 heights. Guard against values that would overflow
+	// when converted (epoch_zero_height and epoch_length_blocks are uint64 on-chain).
+	if p.EpochLengthBlocks > uint64(math.MaxInt64) {
+		return fmt.Errorf("epoch_length_blocks must be <= %d", int64(math.MaxInt64))
+	}
+	if p.EpochZeroHeight > uint64(math.MaxInt64) {
+		return fmt.Errorf("epoch_zero_height must be <= %d", int64(math.MaxInt64))
 	}
 	if p.PeerQuorumReports == 0 {
 		return fmt.Errorf("peer_quorum_reports must be > 0")
@@ -397,39 +341,6 @@ func (p Params) Validate() error {
 	}
 	if p.ActionFinalizationRecoveryMaxTotalBadEvidences == 0 {
 		return fmt.Errorf("action_finalization_recovery_max_total_bad_evidences must be > 0")
-	}
-
-	if p.ScEnabled {
-		if p.ScFilesPerChallenger == 0 {
-			return fmt.Errorf("sc_files_per_challenger must be > 0")
-		}
-		if p.ScReplicaCount == 0 {
-			return fmt.Errorf("sc_replica_count must be > 0")
-		}
-		if p.ScObserverThreshold == 0 {
-			return fmt.Errorf("sc_observer_threshold must be > 0")
-		}
-		if p.ScObserverThreshold > p.ScReplicaCount {
-			return fmt.Errorf("sc_observer_threshold must be <= sc_replica_count")
-		}
-		if p.ScMinSliceBytes == 0 || p.ScMaxSliceBytes == 0 {
-			return fmt.Errorf("sc_min_slice_bytes and sc_max_slice_bytes must be > 0")
-		}
-		if p.ScMinSliceBytes > p.ScMaxSliceBytes {
-			return fmt.Errorf("sc_min_slice_bytes must be <= sc_max_slice_bytes")
-		}
-		if p.ScResponseTimeoutMs == 0 {
-			return fmt.Errorf("sc_response_timeout_ms must be > 0")
-		}
-		if p.ScAffirmationTimeoutMs == 0 {
-			return fmt.Errorf("sc_affirmation_timeout_ms must be > 0")
-		}
-		if p.ScEvidenceMaxBytes == 0 {
-			return fmt.Errorf("sc_evidence_max_bytes must be > 0")
-		}
-		if p.ScCandidateKeysLookbackEpochs == 0 {
-			return fmt.Errorf("sc_candidate_keys_lookback_epochs must be > 0")
-		}
 	}
 
 	ports := append([]uint32(nil), p.RequiredOpenPorts...)

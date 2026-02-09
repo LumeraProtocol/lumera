@@ -11,18 +11,18 @@ func (k Keeper) HasReport(ctx sdk.Context, epochID uint64, reporterSupernodeAcco
 	return store.Has(types.ReportKey(epochID, reporterSupernodeAccount))
 }
 
-func (k Keeper) GetReport(ctx sdk.Context, epochID uint64, reporterSupernodeAccount string) (types.AuditReport, bool) {
+func (k Keeper) GetReport(ctx sdk.Context, epochID uint64, reporterSupernodeAccount string) (types.EpochReport, bool) {
 	store := k.kvStore(ctx)
 	bz := store.Get(types.ReportKey(epochID, reporterSupernodeAccount))
 	if bz == nil {
-		return types.AuditReport{}, false
+		return types.EpochReport{}, false
 	}
-	var r types.AuditReport
+	var r types.EpochReport
 	k.cdc.MustUnmarshal(bz, &r)
 	return r, true
 }
 
-func (k Keeper) SetReport(ctx sdk.Context, r types.AuditReport) error {
+func (k Keeper) SetReport(ctx sdk.Context, r types.EpochReport) error {
 	store := k.kvStore(ctx)
 	bz, err := k.cdc.Marshal(&r)
 	if err != nil {
@@ -37,12 +37,12 @@ func (k Keeper) SetReportIndex(ctx sdk.Context, epochID uint64, reporterSupernod
 	store.Set(types.ReportIndexKey(reporterSupernodeAccount, epochID), []byte{1})
 }
 
-func (k Keeper) SetSupernodeReportIndex(ctx sdk.Context, supernodeAccount string, epochID uint64, reporterSupernodeAccount string) {
+func (k Keeper) SetStorageChallengeReportIndex(ctx sdk.Context, supernodeAccount string, epochID uint64, reporterSupernodeAccount string) {
 	store := k.kvStore(ctx)
-	store.Set(types.SupernodeReportIndexKey(supernodeAccount, epochID, reporterSupernodeAccount), []byte{1})
+	store.Set(types.StorageChallengeReportIndexKey(supernodeAccount, epochID, reporterSupernodeAccount), []byte{1})
 }
 
-func (k Keeper) SetSelfReportIndex(ctx sdk.Context, epochID uint64, reporterSupernodeAccount string) {
+func (k Keeper) SetHostReportIndex(ctx sdk.Context, epochID uint64, reporterSupernodeAccount string) {
 	store := k.kvStore(ctx)
-	store.Set(types.SelfReportIndexKey(reporterSupernodeAccount, epochID), []byte{1})
+	store.Set(types.HostReportIndexKey(reporterSupernodeAccount, epochID), []byte{1})
 }

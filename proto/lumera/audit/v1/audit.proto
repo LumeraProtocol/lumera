@@ -13,7 +13,8 @@ enum PortState {
   PORT_STATE_CLOSED  = 2;
 }
 
-message AuditSelfReport {
+// HostReport is the Supernode's self-reported host metrics and counters for an epoch.
+message HostReport {
   double cpu_usage_percent  = 1;
   double mem_usage_percent  = 2;
   double disk_usage_percent = 3;
@@ -23,18 +24,20 @@ message AuditSelfReport {
   uint32 failed_actions_count = 5;
 }
 
-message AuditPeerObservation {
+// StorageChallengeObservation is a prober's reachability observation about an assigned target.
+message StorageChallengeObservation {
   string target_supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
 
   // port_states[i] refers to required_open_ports[i] for the epoch.
   repeated PortState port_states = 2;
 }
 
-message AuditReport {
+// EpochReport is a single per-epoch report submitted by a Supernode.
+message EpochReport {
   string supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
   uint64 epoch_id          = 2;
   int64 report_height      = 3;
 
-  AuditSelfReport self_report = 4 [(gogoproto.nullable) = false];
-  repeated AuditPeerObservation peer_observations = 5;
+  HostReport host_report = 4 [(gogoproto.nullable) = false];
+  repeated StorageChallengeObservation storage_challenge_observations = 5;
 }

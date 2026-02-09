@@ -173,7 +173,8 @@ func (m *ActionFinalizationNotInTop10EvidenceMetadata) GetTop_10ValidatorAddress
 // StorageChallengeFailureEvidenceMetadata is metadata for a storage challenge failure submitted by a challenger.
 type StorageChallengeFailureEvidenceMetadata struct {
 	EpochId uint64 `protobuf:"varint,1,opt,name=epoch_id,json=epochId,proto3" json:"epoch_id,omitempty"`
-	// challenger_supernode_account must be the tx signer for evidence submission.
+	// challenger_supernode_account must match the tx signer (MsgSubmitEvidence.creator).
+	// The keeper validates challenger authorization deterministically from the epoch anchor.
 	ChallengerSupernodeAccount string `protobuf:"bytes,2,opt,name=challenger_supernode_account,json=challengerSupernodeAccount,proto3" json:"challenger_supernode_account,omitempty"`
 	// challenged_supernode_account should match Evidence.subject_address.
 	ChallengedSupernodeAccount string `protobuf:"bytes,3,opt,name=challenged_supernode_account,json=challengedSupernodeAccount,proto3" json:"challenged_supernode_account,omitempty"`

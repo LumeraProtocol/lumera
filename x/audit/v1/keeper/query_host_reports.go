@@ -13,7 +13,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func (q queryServer) SelfReports(ctx context.Context, req *types.QuerySelfReportsRequest) (*types.QuerySelfReportsResponse, error) {
+func (q queryServer) HostReports(ctx context.Context, req *types.QueryHostReportsRequest) (*types.QueryHostReportsResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
 	}
@@ -28,12 +28,12 @@ func (q queryServer) SelfReports(ctx context.Context, req *types.QuerySelfReport
 
 	var store prefix.Store
 	if useEpochFilter {
-		store = prefix.NewStore(storeAdapter, types.SelfReportIndexKey(req.SupernodeAccount, req.EpochId))
+		store = prefix.NewStore(storeAdapter, types.HostReportIndexKey(req.SupernodeAccount, req.EpochId))
 	} else {
-		store = prefix.NewStore(storeAdapter, types.SelfReportIndexPrefix(req.SupernodeAccount))
+		store = prefix.NewStore(storeAdapter, types.HostReportIndexPrefix(req.SupernodeAccount))
 	}
 
-	var reports []types.SelfReport
+	var reports []types.HostReportEntry
 
 	pagination := req.Pagination
 	if pagination == nil {
@@ -46,7 +46,7 @@ func (q queryServer) SelfReports(ctx context.Context, req *types.QuerySelfReport
 			epochID = req.EpochId
 		} else {
 			if len(key) != 8 {
-				return status.Error(codes.Internal, "invalid self report index key")
+				return status.Error(codes.Internal, "invalid host report index key")
 			}
 			epochID = binary.BigEndian.Uint64(key)
 		}
@@ -55,10 +55,10 @@ func (q queryServer) SelfReports(ctx context.Context, req *types.QuerySelfReport
 		if !found {
 			return nil
 		}
-		reports = append(reports, types.SelfReport{
+		reports = append(reports, types.HostReportEntry{
 			EpochId:      r.EpochId,
 			ReportHeight: r.ReportHeight,
-			SelfReport:   r.SelfReport,
+			HostReport:   r.HostReport,
 		})
 		return nil
 	})
@@ -66,7 +66,7 @@ func (q queryServer) SelfReports(ctx context.Context, req *types.QuerySelfReport
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	return &types.QuerySelfReportsResponse{
+	return &types.QueryHostReportsResponse{
 		Reports:    reports,
 		Pagination: pageRes,
 	}, nil

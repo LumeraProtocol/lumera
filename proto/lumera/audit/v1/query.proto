@@ -57,22 +57,24 @@ service Query {
     option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/assigned_targets/{supernode_account}";
   }
 
-  rpc AuditReport(QueryAuditReportRequest) returns (QueryAuditReportResponse) {
-    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/audit_report/{epoch_id}/{supernode_account}";
+  // EpochReport returns the submitted epoch report for (epoch_id, supernode_account).
+  rpc EpochReport(QueryEpochReportRequest) returns (QueryEpochReportResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/epoch_report/{epoch_id}/{supernode_account}";
   }
 
-  rpc AuditReportsByReporter(QueryAuditReportsByReporterRequest) returns (QueryAuditReportsByReporterResponse) {
-    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/audit_reports_by_reporter/{supernode_account}";
+  // EpochReportsByReporter returns epoch reports submitted by the given reporter across epochs.
+  rpc EpochReportsByReporter(QueryEpochReportsByReporterRequest) returns (QueryEpochReportsByReporterResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/epoch_reports_by_reporter/{supernode_account}";
   }
 
-  // SupernodeReports returns all reports that include observations about the given supernode_account.
-  rpc SupernodeReports(QuerySupernodeReportsRequest) returns (QuerySupernodeReportsResponse) {
-    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/supernode_reports/{supernode_account}";
+  // StorageChallengeReports returns all reports that include storage-challenge observations about the given supernode_account.
+  rpc StorageChallengeReports(QueryStorageChallengeReportsRequest) returns (QueryStorageChallengeReportsResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/storage_challenge_reports/{supernode_account}";
   }
 
-  // SelfReports returns self-reports submitted by the given supernode_account across epochs.
-  rpc SelfReports(QuerySelfReportsRequest) returns (QuerySelfReportsResponse) {
-    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/self_reports/{supernode_account}";
+  // HostReports returns host reports submitted by the given supernode_account across epochs.
+  rpc HostReports(QueryHostReportsRequest) returns (QueryHostReportsResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/host_reports/{supernode_account}";
   }
 }
 
@@ -145,60 +147,60 @@ message QueryAssignedTargetsResponse {
   repeated string target_supernode_accounts = 4 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
 }
 
-message QueryAuditReportRequest {
+message QueryEpochReportRequest {
   uint64 epoch_id = 1;
   string supernode_account = 2 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
 }
 
-message QueryAuditReportResponse {
-  AuditReport report = 1 [(gogoproto.nullable) = false];
+message QueryEpochReportResponse {
+  EpochReport report = 1 [(gogoproto.nullable) = false];
 }
 
-message QueryAuditReportsByReporterRequest {
+message QueryEpochReportsByReporterRequest {
   string supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
   uint64 epoch_id = 2;
   cosmos.base.query.v1beta1.PageRequest pagination = 3;
   bool filter_by_epoch_id = 4;
 }
 
-message QueryAuditReportsByReporterResponse {
-  repeated AuditReport reports = 1 [(gogoproto.nullable) = false];
+message QueryEpochReportsByReporterResponse {
+  repeated EpochReport reports = 1 [(gogoproto.nullable) = false];
   cosmos.base.query.v1beta1.PageResponse pagination = 2;
 }
 
-message QuerySupernodeReportsRequest {
+message QueryStorageChallengeReportsRequest {
   string supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
   uint64 epoch_id = 2;
   cosmos.base.query.v1beta1.PageRequest pagination = 3;
   bool filter_by_epoch_id = 4;
 }
 
-message SupernodeReport {
+message StorageChallengeReport {
   string reporter_supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
   uint64 epoch_id = 2;
   int64 report_height = 3;
   repeated PortState port_states = 4;
 }
 
-message QuerySupernodeReportsResponse {
-  repeated SupernodeReport reports = 1 [(gogoproto.nullable) = false];
+message QueryStorageChallengeReportsResponse {
+  repeated StorageChallengeReport reports = 1 [(gogoproto.nullable) = false];
   cosmos.base.query.v1beta1.PageResponse pagination = 2;
 }
 
-message QuerySelfReportsRequest {
+message QueryHostReportsRequest {
   string supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
   uint64 epoch_id = 2;
   cosmos.base.query.v1beta1.PageRequest pagination = 3;
   bool filter_by_epoch_id = 4;
 }
 
-message SelfReport {
+message HostReportEntry {
   uint64 epoch_id = 1;
   int64 report_height = 2;
-  AuditSelfReport self_report = 3 [(gogoproto.nullable) = false];
+  HostReport host_report = 3 [(gogoproto.nullable) = false];
 }
 
-message QuerySelfReportsResponse {
-  repeated SelfReport reports = 1 [(gogoproto.nullable) = false];
+message QueryHostReportsResponse {
+  repeated HostReportEntry reports = 1 [(gogoproto.nullable) = false];
   cosmos.base.query.v1beta1.PageResponse pagination = 2;
 }

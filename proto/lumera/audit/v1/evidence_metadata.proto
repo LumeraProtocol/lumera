@@ -29,7 +29,8 @@ message ActionFinalizationNotInTop10EvidenceMetadata {
 message StorageChallengeFailureEvidenceMetadata {
   uint64 epoch_id = 1;
 
-  // challenger_supernode_account must be the tx signer for evidence submission.
+  // challenger_supernode_account must match the tx signer (MsgSubmitEvidence.creator).
+  // The keeper validates challenger authorization deterministically from the epoch anchor.
   string challenger_supernode_account = 2 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
 
   // challenged_supernode_account should match Evidence.subject_address.

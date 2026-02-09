@@ -5,9 +5,9 @@ package system
 // This file contains helper functions used by the audit module systemtests.
 //
 // Why helpers exist here:
-// - The audit module behavior depends heavily on block height (window boundaries).
+// - The audit module behavior depends heavily on block height (epoch boundaries).
 // - The systemtest harness runs a real multi-node testnet; we need stable ways to:
-//   - pick a safe window to test against (avoid racing enforcement),
+//   - pick a safe epoch to test against (avoid racing enforcement),
 //   - derive deterministic peer targets (same logic as the keeper),
 //   - submit reports via CLI,
 //   - query results reliably (gRPC where CLI JSON marshalling is known to break).
@@ -34,22 +34,25 @@ import (
 	audittypes "github.com/LumeraProtocol/lumera/x/audit/v1/types"
 )
 
-// setAuditParamsForFastWindows overrides audit module params in genesis so tests complete quickly.
-func setAuditParamsForFastWindows(t *testing.T, reportingWindowBlocks uint64, peerQuorumReports, minTargets, maxTargets uint32, requiredOpenPorts []uint32) GenesisMutator {
+// setAuditParamsForFastEpochs overrides audit module params in genesis so tests complete quickly.
+func setAuditParamsForFastEpochs(t *testing.T, epochLengthBlocks uint64, peerQuorumReports, minTargets, maxTargets uint32, requiredOpenPorts []uint32) GenesisMutator {
 	return func(genesis []byte) []byte {
 		t.Helper()
 
 		state := genesis
 		var err error
 
-		state, err = sjson.SetRawBytes(state, "app_state.audit.params.reporting_window_blocks", []byte(fmt.Sprintf("%q", strconv.FormatUint(reportingWindowBlocks, 10))))
+		state, err = sjson.SetRawBytes(state, "app_state.audit.params.epoch_length_blocks", []byte(fmt.Sprintf("%q", strconv.FormatUint(epochLengthBlocks, 10))))
+		require.NoError(t, err)
+		// In system tests, start epoch 0 at height 1 (the first block height on a fresh chain).
+		state, err = sjson.SetRawBytes(state, "app_state.audit.params.epoch_zero_height", []byte(fmt.Sprintf("%q", "1")))
 		require.NoError(t, err)
 
 		state, err = sjson.SetRawBytes(state, "app_state.audit.params.peer_quorum_reports", []byte(strconv.FormatUint(uint64(peerQuorumReports), 10)))
 		require.NoError(t, err)
-		state, err = sjson.SetRawBytes(state, "app_state.audit.params.min_probe_targets_per_window", []byte(strconv.FormatUint(uint64(minTargets), 10)))
+		state, err = sjson.SetRawBytes(state, "app_state.audit.params.min_probe_targets_per_epoch", []byte(strconv.FormatUint(uint64(minTargets), 10)))
 		require.NoError(t, err)
-		state, err = sjson.SetRawBytes(state, "app_state.audit.params.max_probe_targets_per_window", []byte(strconv.FormatUint(uint64(maxTargets), 10)))
+		state, err = sjson.SetRawBytes(state, "app_state.audit.params.max_probe_targets_per_epoch", []byte(strconv.FormatUint(uint64(maxTargets), 10)))
 		require.NoError(t, err)
 
 		portsJSON, err := json.Marshal(requiredOpenPorts)
@@ -88,40 +91,40 @@ func awaitAtLeastHeight(t *testing.T, height int64) {
 	sut.AwaitBlockHeight(t, height)
 }
 
-// pickWindowForStartAtOrAfter returns the first window whose start height is >= minStartHeight.
-// This is a "ceiling" window picker.
-func pickWindowForStartAtOrAfter(originHeight int64, windowBlocks uint64, minStartHeight int64) (windowID uint64, startHeight int64) {
-	if windowBlocks == 0 {
+// pickEpochForStartAtOrAfter returns the first epoch whose start height is >= minStartHeight.
+// This is a "ceiling" epoch picker.
+func pickEpochForStartAtOrAfter(originHeight int64, epochBlocks uint64, minStartHeight int64) (epochID uint64, startHeight int64) {
+	if epochBlocks == 0 {
 		return 0, originHeight
 	}
 	if minStartHeight < originHeight {
 		minStartHeight = originHeight
 	}
 
-	blocks := int64(windowBlocks)
+	blocks := int64(epochBlocks)
 	delta := minStartHeight - originHeight
-	windowID = uint64((delta + blocks - 1) / blocks) // ceil(delta/blocks)
-	startHeight = originHeight + int64(windowID)*blocks
-	return windowID, startHeight
+	epochID = uint64((delta + blocks - 1) / blocks) // ceil(delta/blocks)
+	startHeight = originHeight + int64(epochID)*blocks
+	return epochID, startHeight
 }
 
-// nextWindowAfterHeight returns the next window after the provided height.
+// nextEpochAfterHeight returns the next epoch after the provided height.
 //
 // We use this in tests to:
 // - register supernodes first,
-// - then wait for the *next* window boundary to ensure snapshot inclusion and acceptance.
-func nextWindowAfterHeight(originHeight int64, windowBlocks uint64, height int64) (windowID uint64, startHeight int64) {
-	if windowBlocks == 0 {
+// - then wait for the *next* epoch boundary to ensure snapshot inclusion and acceptance.
+func nextEpochAfterHeight(originHeight int64, epochBlocks uint64, height int64) (epochID uint64, startHeight int64) {
+	if epochBlocks == 0 {
 		return 0, originHeight
 	}
 	if height < originHeight {
 		return 0, originHeight
 	}
-	blocks := int64(windowBlocks)
+	blocks := int64(epochBlocks)
 	currentID := uint64((height - originHeight) / blocks)
-	windowID = currentID + 1
-	startHeight = originHeight + int64(windowID)*blocks
-	return windowID, startHeight
+	epochID = currentID + 1
+	startHeight = originHeight + int64(epochID)*blocks
+	return epochID, startHeight
 }
 
 type testNodeIdentity struct {
@@ -142,7 +145,7 @@ func getNodeIdentity(t *testing.T, cli *LumeradCli, nodeName string) testNodeIde
 
 // registerSupernode registers a supernode using the node's own key as both:
 // - the tx signer (via --from),
-// - the supernode_account (so that later MsgSubmitAuditReport signatures match).
+// - the supernode_account (so that later MsgSubmitEpochReport signatures match).
 func registerSupernode(t *testing.T, cli *LumeradCli, id testNodeIdentity, ip string) {
 	t.Helper()
 	resp := cli.CustomCommand(
@@ -172,9 +175,9 @@ func headerHashAtHeight(t *testing.T, rpcAddr string, height int64) []byte {
 	return []byte(hash)
 }
 
-// computeKWindow replicates x/audit/v1/keeper.computeKWindow to keep tests deterministic and black-box.
-// It computes how many peer targets each sender must probe this window.
-func computeKWindow(peerQuorumReports, minTargets, maxTargets uint32, sendersCount, receiversCount int) uint32 {
+// computeKEpoch replicates x/audit/v1/keeper.computeKWindow to keep tests deterministic and black-box.
+// It computes how many peer targets each sender must probe this epoch.
+func computeKEpoch(peerQuorumReports, minTargets, maxTargets uint32, sendersCount, receiversCount int) uint32 {
 	if sendersCount <= 0 || receiversCount <= 1 {
 		return 0
 	}
@@ -256,9 +259,9 @@ func assignedTargets(seed []byte, senders, receivers []string, kWindow uint32, s
 	return out, true
 }
 
-// auditSelfReportJSON builds the JSON payload for the positional self-report argument.
-// AuditSelfReport contains float fields (cpu/mem/disk), so we keep values simple.
-func auditSelfReportJSON(inboundPortStates []string) string {
+// auditHostReportJSON builds the JSON payload for the positional host-report argument.
+// HostReport contains float fields (cpu/mem/disk), so we keep values simple.
+func auditHostReportJSON(inboundPortStates []string) string {
 	bz, _ := json.Marshal(map[string]any{
 		"cpu_usage_percent":    1.0,
 		"mem_usage_percent":    1.0,
@@ -269,8 +272,8 @@ func auditSelfReportJSON(inboundPortStates []string) string {
 	return string(bz)
 }
 
-// auditPeerObservationJSON builds the JSON payload for --peer-observations flag.
-func auditPeerObservationJSON(targetSupernodeAccount string, portStates []string) string {
+// storageChallengeObservationJSON builds the JSON payload for --storage-challenge-observations flag.
+func storageChallengeObservationJSON(targetSupernodeAccount string, portStates []string) string {
 	bz, _ := json.Marshal(map[string]any{
 		"target_supernode_account": targetSupernodeAccount,
 		"port_states":              portStates,
@@ -278,17 +281,17 @@ func auditPeerObservationJSON(targetSupernodeAccount string, portStates []string
 	return string(bz)
 }
 
-// submitAuditReport submits a report using the AutoCLI command:
+// submitEpochReport submits a report using the AutoCLI command:
 //
-//	tx audit submit-audit-report [window-id] [self-report-json] --peer-observations <json>...
+//	tx audit submit-epoch-report [epoch-id] [host-report-json] --storage-challenge-observations <json>...
 //
 // We keep it as a CLI call to validate the end-to-end integration path (signer handling, encoding).
-func submitAuditReport(t *testing.T, cli *LumeradCli, fromNode string, windowID uint64, selfReportJSON string, peerObservationJSONs []string) string {
+func submitEpochReport(t *testing.T, cli *LumeradCli, fromNode string, epochID uint64, hostReportJSON string, storageChallengeObservationJSONs []string) string {
 	t.Helper()
 
-	args := []string{"tx", "audit", "submit-audit-report", strconv.FormatUint(windowID, 10), selfReportJSON, "--from", fromNode}
-	for _, obs := range peerObservationJSONs {
-		args = append(args, "--peer-observations", obs)
+	args := []string{"tx", "audit", "submit-epoch-report", strconv.FormatUint(epochID, 10), hostReportJSON, "--from", fromNode}
+	for _, obs := range storageChallengeObservationJSONs {
+		args = append(args, "--storage-challenge-observations", obs)
 	}
 
 	return cli.CustomCommand(args...)
@@ -331,7 +334,7 @@ func sortedStrings(in ...string) []string {
 
 // newAuditQueryClient creates a gRPC query client against node0's gRPC endpoint.
 //
-//   - `AuditReport` contains float fields; CLI JSON marshalling for those fields is currently broken
+//   - `EpochReport` contains float fields; CLI JSON marshalling for those fields is currently broken
 //     in this environment and fails with "unknown type float64".
 func newAuditQueryClient(t *testing.T) (audittypes.QueryClient, func()) {
 	t.Helper()
@@ -343,27 +346,27 @@ func newAuditQueryClient(t *testing.T) (audittypes.QueryClient, func()) {
 }
 
 // auditQueryReport queries a stored report via gRPC.
-func auditQueryReport(t *testing.T, windowID uint64, reporterSupernodeAccount string) audittypes.AuditReport {
+func auditQueryReport(t *testing.T, epochID uint64, reporterSupernodeAccount string) audittypes.EpochReport {
 	t.Helper()
 	qc, _ := newAuditQueryClient(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	resp, err := qc.AuditReport(ctx, &audittypes.QueryAuditReportRequest{
-		WindowId:         windowID,
+	resp, err := qc.EpochReport(ctx, &audittypes.QueryEpochReportRequest{
+		EpochId:          epochID,
 		SupernodeAccount: reporterSupernodeAccount,
 	})
 	require.NoError(t, err)
 	return resp.Report
 }
 
-func auditQueryAssignedTargets(t *testing.T, windowID uint64, filterByWindowID bool, proberSupernodeAccount string) audittypes.QueryAssignedTargetsResponse {
+func auditQueryAssignedTargets(t *testing.T, epochID uint64, filterByEpochID bool, proberSupernodeAccount string) audittypes.QueryAssignedTargetsResponse {
 	t.Helper()
 	qc, _ := newAuditQueryClient(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	resp, err := qc.AssignedTargets(ctx, &audittypes.QueryAssignedTargetsRequest{
-		WindowId:         windowID,
-		FilterByWindowId: filterByWindowID,
+		EpochId:          epochID,
+		FilterByEpochId:  filterByEpochID,
 		SupernodeAccount: proberSupernodeAccount,
 	})
 	require.NoError(t, err)

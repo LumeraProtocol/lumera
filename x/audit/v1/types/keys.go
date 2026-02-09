@@ -29,8 +29,8 @@ var (
 	// - EpochAnchorKey:          "ea/" + u64be(epoch_id)
 	// - ReportKey:               "r/"  + u64be(epoch_id) + reporter_supernode_account
 	// - ReportIndexKey:          "ri/" + reporter_supernode_account + "/" + u64be(epoch_id)
-	// - SupernodeReportIndexKey: "sr/" + supernode_account + "/" + u64be(epoch_id) + "/" + reporter_supernode_account
-	// - SelfReportIndexKey:      "ss/" + reporter_supernode_account + "/" + u64be(epoch_id)
+	// - StorageChallengeReportIndexKey: "sc/" + supernode_account + "/" + u64be(epoch_id) + "/" + reporter_supernode_account
+	// - HostReportIndexKey:             "hr/" + reporter_supernode_account + "/" + u64be(epoch_id)
 	//
 	// Examples (shown as pseudo strings; the u64be bytes will appear as non-printable in raw dumps):
 	// - EpochAnchorKey(1)          => "ea/" + u64be(1)
@@ -40,13 +40,13 @@ var (
 
 	reportIndexPrefix = []byte("ri/")
 
-	// supernodeReportIndexPrefix indexes reports that include an observation for a given supernode.
-	// Format: "sr/" + supernode_account + "/" + u64be(epoch_id) + "/" + reporter_supernode_account
-	supernodeReportIndexPrefix = []byte("sr/")
+	// storageChallengeReportIndexPrefix indexes reports that include a storage-challenge observation for a given supernode.
+	// Format: "sc/" + supernode_account + "/" + u64be(epoch_id) + "/" + reporter_supernode_account
+	storageChallengeReportIndexPrefix = []byte("sc/")
 
-	// selfReportIndexPrefix indexes all submitted reports (for listing self reports across reporters/epochs).
-	// Format: "ss/" + reporter_supernode_account + "/" + u64be(epoch_id)
-	selfReportIndexPrefix = []byte("ss/")
+	// hostReportIndexPrefix indexes all submitted reports (for listing host reports across epochs for a reporter).
+	// Format: "hr/" + reporter_supernode_account + "/" + u64be(epoch_id)
+	hostReportIndexPrefix = []byte("hr/")
 
 	// Evidence:
 	// - NextEvidenceIDKey: "ev/next_id" -> 8 bytes u64be(next_evidence_id)
@@ -81,7 +81,35 @@ func EpochAnchorPrefix() []byte {
 	return epochAnchorPrefix
 }
 
-// ReportKey returns the store key for the AuditReport identified by (epochID, reporterSupernodeAccount).
+// ReportPrefix returns the root prefix for epoch report keys.
+//
+// Format: "r/" + u64be(epoch_id) + reporter_supernode_account
+func ReportPrefix() []byte {
+	return reportPrefix
+}
+
+// ReportIndexRootPrefix returns the root prefix for report index keys.
+//
+// Format: "ri/" + reporter_supernode_account + "/" + u64be(epoch_id)
+func ReportIndexRootPrefix() []byte {
+	return reportIndexPrefix
+}
+
+// StorageChallengeReportIndexRootPrefix returns the root prefix for storage-challenge report index keys.
+//
+// Format: "sc/" + supernode_account + "/" + u64be(epoch_id) + "/" + reporter_supernode_account
+func StorageChallengeReportIndexRootPrefix() []byte {
+	return storageChallengeReportIndexPrefix
+}
+
+// HostReportIndexRootPrefix returns the root prefix for host report index keys.
+//
+// Format: "hr/" + reporter_supernode_account + "/" + u64be(epoch_id)
+func HostReportIndexRootPrefix() []byte {
+	return hostReportIndexPrefix
+}
+
+// ReportKey returns the store key for the EpochReport identified by (epochID, reporterSupernodeAccount).
 func ReportKey(epochID uint64, reporterSupernodeAccount string) []byte {
 	key := make([]byte, 0, len(reportPrefix)+8+len(reporterSupernodeAccount)) // "r/" + u64be(epoch_id) + reporter
 	key = append(key, reportPrefix...)                                        // "r/"
@@ -110,54 +138,54 @@ func ReportIndexPrefix(reporterSupernodeAccount string) []byte {
 	return key
 }
 
-// SupernodeReportIndexKey returns the store key for an index entry identified by (supernodeAccount, epochID, reporterSupernodeAccount).
+// StorageChallengeReportIndexKey returns the store key for an index entry identified by (supernodeAccount, epochID, reporterSupernodeAccount).
 // The value is empty; the key exists to allow querying reports about a given supernode without scanning all reports.
-func SupernodeReportIndexKey(supernodeAccount string, epochID uint64, reporterSupernodeAccount string) []byte {
-	key := make([]byte, 0, len(supernodeReportIndexPrefix)+len(supernodeAccount)+1+8+1+len(reporterSupernodeAccount)) // "sr/" + supernode + "/" + u64be(epoch_id) + "/" + reporter
-	key = append(key, supernodeReportIndexPrefix...)                                                                  // "sr/"
-	key = append(key, supernodeAccount...)                                                                            // supernode (bech32)
-	key = append(key, '/')                                                                                            // separator
-	key = binary.BigEndian.AppendUint64(key, epochID)                                                                 // u64be(epoch_id)
-	key = append(key, '/')                                                                                            // separator
-	key = append(key, reporterSupernodeAccount...)                                                                    // reporter (bech32)
+func StorageChallengeReportIndexKey(supernodeAccount string, epochID uint64, reporterSupernodeAccount string) []byte {
+	key := make([]byte, 0, len(storageChallengeReportIndexPrefix)+len(supernodeAccount)+1+8+1+len(reporterSupernodeAccount)) // "sc/" + supernode + "/" + u64be(epoch_id) + "/" + reporter
+	key = append(key, storageChallengeReportIndexPrefix...)                                                                  // "sc/"
+	key = append(key, supernodeAccount...)                                                                                   // supernode (bech32)
+	key = append(key, '/')                                                                                                   // separator
+	key = binary.BigEndian.AppendUint64(key, epochID)                                                                        // u64be(epoch_id)
+	key = append(key, '/')                                                                                                   // separator
+	key = append(key, reporterSupernodeAccount...)                                                                           // reporter (bech32)
 	return key
 }
 
-// SupernodeReportIndexPrefix returns the prefix under which index keys are stored for a given supernode.
-func SupernodeReportIndexPrefix(supernodeAccount string) []byte {
-	key := make([]byte, 0, len(supernodeReportIndexPrefix)+len(supernodeAccount)+1) // "sr/" + supernode + "/"
-	key = append(key, supernodeReportIndexPrefix...)                                // "sr/"
-	key = append(key, supernodeAccount...)                                          // supernode (bech32)
-	key = append(key, '/')                                                          // separator
+// StorageChallengeReportIndexPrefix returns the prefix under which index keys are stored for a given supernode.
+func StorageChallengeReportIndexPrefix(supernodeAccount string) []byte {
+	key := make([]byte, 0, len(storageChallengeReportIndexPrefix)+len(supernodeAccount)+1) // "sc/" + supernode + "/"
+	key = append(key, storageChallengeReportIndexPrefix...)                                // "sc/"
+	key = append(key, supernodeAccount...)                                                 // supernode (bech32)
+	key = append(key, '/')                                                                 // separator
 	return key
 }
 
-// SupernodeReportIndexEpochPrefix returns the prefix under which index keys are stored for a given (supernodeAccount, epochID).
-func SupernodeReportIndexEpochPrefix(supernodeAccount string, epochID uint64) []byte {
-	key := make([]byte, 0, len(supernodeReportIndexPrefix)+len(supernodeAccount)+1+8+1) // "sr/" + supernode + "/" + u64be(epoch_id) + "/"
-	key = append(key, supernodeReportIndexPrefix...)                                    // "sr/"
-	key = append(key, supernodeAccount...)                                              // supernode (bech32)
-	key = append(key, '/')                                                              // separator
-	key = binary.BigEndian.AppendUint64(key, epochID)                                   // u64be(epoch_id)
-	key = append(key, '/')                                                              // separator
+// StorageChallengeReportIndexEpochPrefix returns the prefix under which index keys are stored for a given (supernodeAccount, epochID).
+func StorageChallengeReportIndexEpochPrefix(supernodeAccount string, epochID uint64) []byte {
+	key := make([]byte, 0, len(storageChallengeReportIndexPrefix)+len(supernodeAccount)+1+8+1) // "sc/" + supernode + "/" + u64be(epoch_id) + "/"
+	key = append(key, storageChallengeReportIndexPrefix...)                                    // "sc/"
+	key = append(key, supernodeAccount...)                                                     // supernode (bech32)
+	key = append(key, '/')                                                                     // separator
+	key = binary.BigEndian.AppendUint64(key, epochID)                                          // u64be(epoch_id)
+	key = append(key, '/')                                                                     // separator
 	return key
 }
 
-// SelfReportIndexKey returns the store key for an index entry identified by (reporterSupernodeAccount, epochID).
-// The value is empty; the key exists to allow listing a supernode's self reports across epochs without scanning all report keys.
-func SelfReportIndexKey(reporterSupernodeAccount string, epochID uint64) []byte {
-	key := make([]byte, 0, len(selfReportIndexPrefix)+len(reporterSupernodeAccount)+1+8) // "ss/" + reporter + "/" + u64be(epoch_id)
-	key = append(key, selfReportIndexPrefix...)                                          // "ss/"
+// HostReportIndexKey returns the store key for an index entry identified by (reporterSupernodeAccount, epochID).
+// The value is empty; the key exists to allow listing a reporter's host reports across epochs without scanning all report keys.
+func HostReportIndexKey(reporterSupernodeAccount string, epochID uint64) []byte {
+	key := make([]byte, 0, len(hostReportIndexPrefix)+len(reporterSupernodeAccount)+1+8) // "hr/" + reporter + "/" + u64be(epoch_id)
+	key = append(key, hostReportIndexPrefix...)                                          // "hr/"
 	key = append(key, reporterSupernodeAccount...)                                       // reporter (bech32)
 	key = append(key, '/')                                                               // separator
 	key = binary.BigEndian.AppendUint64(key, epochID)                                    // u64be(epoch_id)
 	return key
 }
 
-// SelfReportIndexPrefix returns the prefix under which self report index keys are stored for a given reporter.
-func SelfReportIndexPrefix(reporterSupernodeAccount string) []byte {
-	key := make([]byte, 0, len(selfReportIndexPrefix)+len(reporterSupernodeAccount)+1) // "ss/" + reporter + "/"
-	key = append(key, selfReportIndexPrefix...)                                        // "ss/"
+// HostReportIndexPrefix returns the prefix under which host report index keys are stored for a given reporter.
+func HostReportIndexPrefix(reporterSupernodeAccount string) []byte {
+	key := make([]byte, 0, len(hostReportIndexPrefix)+len(reporterSupernodeAccount)+1) // "hr/" + reporter + "/"
+	key = append(key, hostReportIndexPrefix...)                                        // "hr/"
 	key = append(key, reporterSupernodeAccount...)                                     // reporter (bech32)
 	key = append(key, '/')                                                             // separator
 	return key

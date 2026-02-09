@@ -16,7 +16,7 @@ const (
 )
 
 // EnforceEpochEnd evaluates the completed epoch and updates supernode states accordingly.
-// It does not re-check peer assignment gating; that must be enforced at MsgSubmitAuditReport time.
+// It does not re-check storage-challenge assignment gating; that must be enforced at MsgSubmitEpochReport time.
 func (k Keeper) EnforceEpochEnd(ctx sdk.Context, epochID uint64, params types.Params) error {
 	params = params.WithDefaults()
 
@@ -141,7 +141,7 @@ func (k Keeper) shouldRecoverAtEpochEnd(ctx sdk.Context, supernodeAccount string
 		return k.shouldRecoverFromActionFinalizationPostponement(ctx, supernodeAccount, epochID, postponedAtEpochID, params), nil
 	}
 
-	// Need one compliant self report.
+	// Need one compliant host report.
 	selfCompliant, err := k.selfHostCompliant(ctx, supernodeAccount, epochID, params)
 	if err != nil || !selfCompliant {
 		return false, err
@@ -168,10 +168,10 @@ func (k Keeper) shouldRecoverAtEpochEnd(ctx sdk.Context, supernodeAccount string
 			continue
 		}
 
-		var obs *types.AuditPeerObservation
-		for i := range r.PeerObservations {
-			if r.PeerObservations[i] != nil && r.PeerObservations[i].TargetSupernodeAccount == supernodeAccount {
-				obs = r.PeerObservations[i]
+		var obs *types.StorageChallengeObservation
+		for i := range r.StorageChallengeObservations {
+			if r.StorageChallengeObservations[i] != nil && r.StorageChallengeObservations[i].TargetSupernodeAccount == supernodeAccount {
+				obs = r.StorageChallengeObservations[i]
 				break
 			}
 		}
@@ -292,13 +292,13 @@ func (k Keeper) selfHostViolatesMinimums(ctx sdk.Context, supernodeAccount strin
 	}
 
 	// If any known metric is below minimum free%, postpone.
-	if violatesMinFree(r.SelfReport.CpuUsagePercent, params.MinCpuFreePercent) {
+	if violatesMinFree(r.HostReport.CpuUsagePercent, params.MinCpuFreePercent) {
 		return true, nil
 	}
-	if violatesMinFree(r.SelfReport.MemUsagePercent, params.MinMemFreePercent) {
+	if violatesMinFree(r.HostReport.MemUsagePercent, params.MinMemFreePercent) {
 		return true, nil
 	}
-	if violatesMinFree(r.SelfReport.DiskUsagePercent, params.MinDiskFreePercent) {
+	if violatesMinFree(r.HostReport.DiskUsagePercent, params.MinDiskFreePercent) {
 		return true, nil
 	}
 
@@ -311,13 +311,13 @@ func (k Keeper) selfHostCompliant(ctx sdk.Context, supernodeAccount string, epoc
 		return false, nil
 	}
 
-	if !compliesMinFree(r.SelfReport.CpuUsagePercent, params.MinCpuFreePercent) {
+	if !compliesMinFree(r.HostReport.CpuUsagePercent, params.MinCpuFreePercent) {
 		return false, nil
 	}
-	if !compliesMinFree(r.SelfReport.MemUsagePercent, params.MinMemFreePercent) {
+	if !compliesMinFree(r.HostReport.MemUsagePercent, params.MinMemFreePercent) {
 		return false, nil
 	}
-	if !compliesMinFree(r.SelfReport.DiskUsagePercent, params.MinDiskFreePercent) {
+	if !compliesMinFree(r.HostReport.DiskUsagePercent, params.MinDiskFreePercent) {
 		return false, nil
 	}
 
@@ -377,10 +377,10 @@ func (k Keeper) peersPortStateMeetsThresholdWithPeers(ctx sdk.Context, target st
 			return false, nil
 		}
 
-		var obs *types.AuditPeerObservation
-		for i := range r.PeerObservations {
-			if r.PeerObservations[i] != nil && r.PeerObservations[i].TargetSupernodeAccount == target {
-				obs = r.PeerObservations[i]
+		var obs *types.StorageChallengeObservation
+		for i := range r.StorageChallengeObservations {
+			if r.StorageChallengeObservations[i] != nil && r.StorageChallengeObservations[i].TargetSupernodeAccount == target {
+				obs = r.StorageChallengeObservations[i]
 				break
 			}
 		}
@@ -402,7 +402,7 @@ func (k Keeper) peersPortStateMeetsThresholdWithPeers(ctx sdk.Context, target st
 
 func (k Keeper) peerReportersForTargetEpoch(ctx sdk.Context, target string, epochID uint64) ([]string, error) {
 	store := k.kvStore(ctx)
-	prefix := types.SupernodeReportIndexEpochPrefix(target, epochID)
+	prefix := types.StorageChallengeReportIndexEpochPrefix(target, epochID)
 
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
 	defer it.Close()

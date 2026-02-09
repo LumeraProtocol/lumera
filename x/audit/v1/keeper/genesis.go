@@ -10,20 +10,20 @@ import (
 
 // InitGenesis initializes the module's state from a provided genesis state.
 func (k Keeper) InitGenesis(ctx context.Context, genState types.GenesisState) error {
+	params := genState.Params.WithDefaults()
+	if err := params.Validate(); err != nil {
+		return err
+	}
+
 	// Genesis is the initial source of truth for module params. After genesis, params can
 	// only be updated via governance (MsgUpdateParams).
-	if err := k.SetParams(ctx, genState.Params); err != nil {
+	if err := k.SetParams(ctx, params); err != nil {
 		return err
 	}
 
 	sdkCtx, ok := ctx.(sdk.Context)
 	if !ok {
 		sdkCtx = sdk.UnwrapSDKContext(ctx)
-	}
-
-	params := genState.Params.WithDefaults()
-	if err := params.Validate(); err != nil {
-		return err
 	}
 
 	var nextEvidenceID uint64

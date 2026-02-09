@@ -13,7 +13,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func (q queryServer) AuditReportsByReporter(ctx context.Context, req *types.QueryAuditReportsByReporterRequest) (*types.QueryAuditReportsByReporterResponse, error) {
+func (q queryServer) EpochReportsByReporter(ctx context.Context, req *types.QueryEpochReportsByReporterRequest) (*types.QueryEpochReportsByReporterResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
 	}
@@ -35,7 +35,7 @@ func (q queryServer) AuditReportsByReporter(ctx context.Context, req *types.Quer
 	storeAdapter := runtime.KVStoreAdapter(q.k.storeService.OpenKVStore(sdkCtx))
 	store := prefix.NewStore(storeAdapter, types.ReportIndexPrefix(req.SupernodeAccount))
 
-	var reports []types.AuditReport
+	var reports []types.EpochReport
 
 	pagination := req.Pagination
 	if pagination == nil {
@@ -45,9 +45,9 @@ func (q queryServer) AuditReportsByReporter(ctx context.Context, req *types.Quer
 	if req.FilterByEpochId {
 		r, found := q.k.GetReport(sdkCtx, req.EpochId, req.SupernodeAccount)
 		if !found {
-			return &types.QueryAuditReportsByReporterResponse{Reports: []types.AuditReport{}, Pagination: &query.PageResponse{}}, nil
+			return &types.QueryEpochReportsByReporterResponse{Reports: []types.EpochReport{}, Pagination: &query.PageResponse{}}, nil
 		}
-		return &types.QueryAuditReportsByReporterResponse{Reports: []types.AuditReport{r}, Pagination: &query.PageResponse{}}, nil
+		return &types.QueryEpochReportsByReporterResponse{Reports: []types.EpochReport{r}, Pagination: &query.PageResponse{}}, nil
 	}
 
 	pageRes, err := query.Paginate(store, pagination, func(key, _ []byte) error {
@@ -66,7 +66,7 @@ func (q queryServer) AuditReportsByReporter(ctx context.Context, req *types.Quer
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	return &types.QueryAuditReportsByReporterResponse{
+	return &types.QueryEpochReportsByReporterResponse{
 		Reports:    reports,
 		Pagination: pageRes,
 	}, nil

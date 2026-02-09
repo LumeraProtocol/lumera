@@ -11,7 +11,7 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-func TestSubmitAuditReport_ValidatesInboundPortStatesLength(t *testing.T) {
+func TestSubmitEpochReport_ValidatesInboundPortStatesLength(t *testing.T) {
 	f := initFixture(t)
 	f.ctx = f.ctx.WithBlockHeight(1)
 
@@ -45,35 +45,34 @@ func TestSubmitAuditReport_ValidatesInboundPortStatesLength(t *testing.T) {
 	require.Greater(t, requiredPortsLen, 0)
 
 	// Empty inbound_port_states is allowed (unknown/unreported).
-	_, err = ms.SubmitAuditReport(f.ctx, &types.MsgSubmitAuditReport{
-		SupernodeAccount: reporter,
-		EpochId:          0,
-		SelfReport:       types.AuditSelfReport{},
-		PeerObservations: nil,
+	_, err = ms.SubmitEpochReport(f.ctx, &types.MsgSubmitEpochReport{
+		Creator:                      reporter,
+		EpochId:                      0,
+		HostReport:                   types.HostReport{},
+		StorageChallengeObservations: nil,
 	})
 	require.NoError(t, err)
 
 	// Partial inbound_port_states is rejected.
-	_, err = ms.SubmitAuditReport(f.ctx, &types.MsgSubmitAuditReport{
-		SupernodeAccount: reporter,
-		EpochId:          0,
-		SelfReport: types.AuditSelfReport{
+	_, err = ms.SubmitEpochReport(f.ctx, &types.MsgSubmitEpochReport{
+		Creator: reporter,
+		EpochId: 0,
+		HostReport: types.HostReport{
 			InboundPortStates: []types.PortState{types.PortState_PORT_STATE_OPEN},
 		},
-		PeerObservations: nil,
+		StorageChallengeObservations: nil,
 	})
 	require.Error(t, err)
 
 	// Oversized inbound_port_states is rejected.
 	oversized := make([]types.PortState, requiredPortsLen+1)
-	_, err = ms.SubmitAuditReport(f.ctx, &types.MsgSubmitAuditReport{
-		SupernodeAccount: reporter,
-		EpochId:          0,
-		SelfReport: types.AuditSelfReport{
+	_, err = ms.SubmitEpochReport(f.ctx, &types.MsgSubmitEpochReport{
+		Creator: reporter,
+		EpochId: 0,
+		HostReport: types.HostReport{
 			InboundPortStates: oversized,
 		},
-		PeerObservations: nil,
+		StorageChallengeObservations: nil,
 	})
 	require.Error(t, err)
 }
-

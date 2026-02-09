@@ -3,7 +3,6 @@ package keeper
 import (
 	"bytes"
 	"encoding/hex"
-	"fmt"
 	"sort"
 	"strconv"
 
@@ -82,11 +81,4 @@ func maxInt(a, b int) int {
 		return a
 	}
 	return b
-}
-
-func mustLowerHex32(b []byte) string {
-	if len(b) != 32 {
-		panic(fmt.Sprintf("expected 32 bytes, got %d", len(b)))
-	}
-	return hex.EncodeToString(b)
 }

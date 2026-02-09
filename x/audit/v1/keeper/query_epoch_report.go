@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func (q queryServer) AuditReport(ctx context.Context, req *types.QueryAuditReportRequest) (*types.QueryAuditReportResponse, error) {
+func (q queryServer) EpochReport(ctx context.Context, req *types.QueryEpochReportRequest) (*types.QueryEpochReportResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
 	}
@@ -30,8 +30,8 @@ func (q queryServer) AuditReport(ctx context.Context, req *types.QueryAuditRepor
 
 	r, found := q.k.GetReport(sdkCtx, req.EpochId, req.SupernodeAccount)
 	if !found {
-		return nil, status.Error(codes.NotFound, "audit report not found")
+		return nil, status.Error(codes.NotFound, "epoch report not found")
 	}
 
-	return &types.QueryAuditReportResponse{Report: r}, nil
+	return &types.QueryEpochReportResponse{Report: r}, nil
 }

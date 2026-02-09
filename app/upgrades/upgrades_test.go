@@ -13,6 +13,7 @@ import (
 	appParams "github.com/LumeraProtocol/lumera/app/upgrades/params"
 	upgrade_v1_10_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_10_0"
 	upgrade_v1_10_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_10_1"
+	upgrade_v1_11_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_11_0"
 	upgrade_v1_6_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_6_1"
 	upgrade_v1_8_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_0"
 	upgrade_v1_8_4 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_4"
@@ -33,6 +34,7 @@ func TestUpgradeNamesOrder(t *testing.T) {
 		upgradeNameV191,
 		upgrade_v1_10_0.UpgradeName,
 		upgrade_v1_10_1.UpgradeName,
+		upgrade_v1_11_0.UpgradeName,
 	}
 	require.Equal(t, expected, upgradeNames, "upgradeNames should stay in ascending order")
 }
@@ -76,9 +78,9 @@ func TestSetupUpgradesAndHandlers(t *testing.T) {
 					continue
 				}
 
-				// v1.9.0 requires full keeper wiring; exercising it here would require
+				// v1.9.0 and v1.11.0 require full keeper wiring; exercising them here would require
 				// a full app harness. This test only verifies registration and gating.
-				if upgradeName == upgrade_v1_9_0.UpgradeName || upgradeName == upgrade_v1_10_0.UpgradeName || upgradeName == upgrade_v1_10_1.UpgradeName {
+				if upgradeName == upgrade_v1_9_0.UpgradeName || upgradeName == upgrade_v1_10_0.UpgradeName || upgradeName == upgrade_v1_10_1.UpgradeName || upgradeName == upgrade_v1_11_0.UpgradeName {
 					continue
 				}
 
@@ -124,6 +126,7 @@ func expectStoreUpgrade(upgradeName, chainID string) bool {
 	case upgrade_v1_10_0.UpgradeName:
 		return true
 	case upgrade_v1_10_1.UpgradeName:
+	case upgrade_v1_11_0.UpgradeName:
 		return true
 	default:
 		return false

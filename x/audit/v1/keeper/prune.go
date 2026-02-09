@@ -31,17 +31,17 @@ func (k Keeper) PruneOldEpochs(ctx sdk.Context, currentEpochID uint64, params ty
 	}
 
 	// Reports: r/<u64be(epoch_id)><reporter>
-	if err := prunePrefixByWindowIDLeadingU64(store, []byte("r/"), minKeepEpochID); err != nil {
+	if err := prunePrefixByWindowIDLeadingU64(store, types.ReportPrefix(), minKeepEpochID); err != nil {
 		return err
 	}
 
 	// Indices:
 	// - ri/<reporter>/<u64be(epoch_id)>
-	// - ss/<reporter>/<u64be(epoch_id)>
-	// - sr/<supernode>/<u64be(epoch_id)>/<reporter>
-	pruneReporterTrailingWindowID(store, []byte("ri/"), minKeepEpochID)
-	pruneReporterTrailingWindowID(store, []byte("ss/"), minKeepEpochID)
-	pruneSupernodeWindowReporter(store, []byte("sr/"), minKeepEpochID)
+	// - hr/<reporter>/<u64be(epoch_id)>
+	// - sc/<supernode>/<u64be(epoch_id)>/<reporter>
+	pruneReporterTrailingWindowID(store, types.ReportIndexRootPrefix(), minKeepEpochID)
+	pruneReporterTrailingWindowID(store, types.HostReportIndexRootPrefix(), minKeepEpochID)
+	pruneSupernodeWindowReporter(store, types.StorageChallengeReportIndexRootPrefix(), minKeepEpochID)
 
 	// Evidence epoch counts: eve/<u64be(epoch_id)>/...
 	if err := prunePrefixByWindowIDLeadingU64(store, types.EvidenceEpochCountPrefix(), minKeepEpochID); err != nil {
@@ -112,7 +112,7 @@ func pruneReporterTrailingWindowID(store storetypes.KVStore, prefix []byte, minK
 
 // pruneSupernodeWindowReporter prunes keys shaped like:
 //
-//	sr/<supernode>"/"<u64be(epoch_id)>"/"<reporter>
+//	sc/<supernode>"/"<u64be(epoch_id)>"/"<reporter>
 func pruneSupernodeWindowReporter(store storetypes.KVStore, prefix []byte, minKeepWindowID uint64) {
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
 	defer it.Close()

@@ -1,6 +1,7 @@
 package keeper_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"testing"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/LumeraProtocol/lumera/x/audit/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	gogoproto "github.com/cosmos/gogoproto/proto"
 	"github.com/stretchr/testify/require"
 )
 
@@ -65,4 +67,83 @@ func TestSubmitEvidenceAndQueries(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, gotByAction.Evidence, 1)
 	require.Equal(t, respID, gotByAction.Evidence[0].EvidenceId)
+}
+
+func TestSubmitEvidenceAndQueries_CascadeClientFailure(t *testing.T) {
+	f := initFixture(t)
+
+	ms := keeper.NewMsgServerImpl(f.keeper)
+	qs := keeper.NewQueryServerImpl(f.keeper)
+
+	reporter, err := f.addressCodec.BytesToString(bytes.Repeat([]byte{0x11}, 20))
+	require.NoError(t, err)
+	subject, err := f.addressCodec.BytesToString(bytes.Repeat([]byte{0x22}, 20))
+	require.NoError(t, err)
+	target, err := f.addressCodec.BytesToString(bytes.Repeat([]byte{0x33}, 20))
+	require.NoError(t, err)
+
+	meta := types.CascadeClientFailureEvidenceMetadata{
+		Flow:                   "UPLOAD",
+		ReporterComponent:      "sn-api-server",
+		TargetSupernodeAccount: target,
+		Details:                "context deadline exceeded while streaming upload; full stack trace here",
+	}
+	metaBz, err := json.Marshal(meta)
+	require.NoError(t, err)
+
+	resp, err := ms.SubmitEvidence(f.ctx, &types.MsgSubmitEvidence{
+		Creator:        reporter,
+		SubjectAddress: subject,
+		EvidenceType:   types.EvidenceType_EVIDENCE_TYPE_CASCADE_CLIENT_FAILURE,
+		ActionId:       "action-cascade-1",
+		Metadata:       string(metaBz),
+	})
+	require.NoError(t, err)
+	require.Equal(t, uint64(1), resp.EvidenceId)
+
+	gotByID, err := qs.EvidenceById(f.ctx, &types.QueryEvidenceByIdRequest{EvidenceId: resp.EvidenceId})
+	require.NoError(t, err)
+	require.Equal(t, resp.EvidenceId, gotByID.Evidence.EvidenceId)
+	require.Equal(t, subject, gotByID.Evidence.SubjectAddress)
+	require.Equal(t, reporter, gotByID.Evidence.ReporterAddress)
+	require.Equal(t, "action-cascade-1", gotByID.Evidence.ActionId)
+	require.Equal(t, types.EvidenceType_EVIDENCE_TYPE_CASCADE_CLIENT_FAILURE, gotByID.Evidence.EvidenceType)
+
+	var gotMeta types.CascadeClientFailureEvidenceMetadata
+	err = gogoproto.Unmarshal(gotByID.Evidence.Metadata, &gotMeta)
+	require.NoError(t, err)
+	require.Equal(t, meta.Flow, gotMeta.Flow)
+	require.Equal(t, meta.ReporterComponent, gotMeta.ReporterComponent)
+	require.Equal(t, meta.TargetSupernodeAccount, gotMeta.TargetSupernodeAccount)
+	require.Equal(t, meta.Details, gotMeta.Details)
+
+	gotBySubject, err := qs.EvidenceBySubject(f.ctx, &types.QueryEvidenceBySubjectRequest{SubjectAddress: subject})
+	require.NoError(t, err)
+	require.Len(t, gotBySubject.Evidence, 1)
+	require.Equal(t, resp.EvidenceId, gotBySubject.Evidence[0].EvidenceId)
+
+	gotByAction, err := qs.EvidenceByAction(f.ctx, &types.QueryEvidenceByActionRequest{ActionId: "action-cascade-1"})
+	require.NoError(t, err)
+	require.Len(t, gotByAction.Evidence, 1)
+	require.Equal(t, resp.EvidenceId, gotByAction.Evidence[0].EvidenceId)
+}
+
+func TestCreateEvidence_CascadeClientFailure_InvalidMetadata(t *testing.T) {
+	f := initFixture(t)
+
+	reporter, err := f.addressCodec.BytesToString(bytes.Repeat([]byte{0x11}, 20))
+	require.NoError(t, err)
+	subject, err := f.addressCodec.BytesToString(bytes.Repeat([]byte{0x22}, 20))
+	require.NoError(t, err)
+
+	_, err = f.keeper.CreateEvidence(
+		f.ctx,
+		reporter,
+		subject,
+		"action-cascade-1",
+		types.EvidenceType_EVIDENCE_TYPE_CASCADE_CLIENT_FAILURE,
+		`{"flow":`,
+	)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), types.ErrInvalidMetadata.Error())
 }

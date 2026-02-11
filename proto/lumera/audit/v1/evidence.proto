@@ -18,6 +18,9 @@ enum EvidenceType {
 
   // storage challenge failure evidence submitted by the deterministic challenger.
   EVIDENCE_TYPE_STORAGE_CHALLENGE_FAILURE = 4;
+
+  // client-observed cascade flow failure (upload/download).
+  EVIDENCE_TYPE_CASCADE_CLIENT_FAILURE = 5;
 }
 
 // Evidence is a stable outer record that stores evidence about an audited subject.

@@ -203,6 +203,13 @@ func marshalEvidenceMetadataJSON(evidenceType types.EvidenceType, metadataJSON s
 		}
 		return gogoproto.Marshal(&m)
 
+	case types.EvidenceType_EVIDENCE_TYPE_CASCADE_CLIENT_FAILURE:
+		var m types.CascadeClientFailureEvidenceMetadata
+		if err := u.Unmarshal(strings.NewReader(metadataJSON), &m); err != nil {
+			return nil, fmt.Errorf("unmarshal CascadeClientFailureEvidenceMetadata: %w", err)
+		}
+		return gogoproto.Marshal(&m)
+
 	default:
 		return nil, fmt.Errorf("unsupported evidence_type: %s", evidenceType.String())
 	}

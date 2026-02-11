@@ -48,3 +48,20 @@ message StorageChallengeFailureEvidenceMetadata {
   // transcript_hash is a hash commitment to the off-chain transcript (hex-encoded blake3-256).
   string transcript_hash = 7;
 }
+
+// CascadeClientFailureEvidenceMetadata is metadata for client-observed failures
+message CascadeClientFailureEvidenceMetadata {
+  // flow is a short discriminator for the failed flow segment.
+  // Example values: UPLOAD, DOWNLOAD.
+  string flow = 1;
+
+  // reporter_component identifies the emitting component.
+  // Example values: sn-api-server, sdk-go, sdk-js.
+  string reporter_component = 2;
+
+  // target_supernode_account is the implicated supernode account, when known.
+  string target_supernode_account = 3 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+
+  // details is free-form diagnostic text (e.g. full error traces).
+  string details = 4;
+}

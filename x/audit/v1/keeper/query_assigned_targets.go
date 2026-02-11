@@ -53,7 +53,14 @@ func (q queryServer) AssignedTargets(ctx context.Context, req *types.QueryAssign
 		return nil, status.Error(codes.NotFound, "epoch anchor not found")
 	}
 
-	targets, _, err := computeAuditPeerTargetsForReporter(&params, anchor.ActiveSupernodeAccounts, anchor.TargetSupernodeAccounts, anchor.Seed, req.SupernodeAccount)
+	// Keep assignment stable within the epoch by using the params snapshot captured at epoch start
+	// (when available). Fallback to current params for backward compatibility.
+	assignParams := params
+	if snap, ok := q.k.GetEpochParamsSnapshot(sdkCtx, epochID); ok {
+		assignParams = snap.WithDefaults()
+	}
+
+	targets, _, err := computeAuditPeerTargetsForReporter(&assignParams, anchor.ActiveSupernodeAccounts, anchor.TargetSupernodeAccounts, anchor.Seed, req.SupernodeAccount)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -61,7 +68,7 @@ func (q queryServer) AssignedTargets(ctx context.Context, req *types.QueryAssign
 	return &types.QueryAssignedTargetsResponse{
 		EpochId:                 epochID,
 		EpochStartHeight:        epochStart,
-		RequiredOpenPorts:       append([]uint32(nil), params.RequiredOpenPorts...),
+		RequiredOpenPorts:       append([]uint32(nil), assignParams.RequiredOpenPorts...),
 		TargetSupernodeAccounts: targets,
 	}, nil
 }

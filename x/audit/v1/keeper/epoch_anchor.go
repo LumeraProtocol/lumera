@@ -95,7 +95,13 @@ func (k Keeper) CreateEpochAnchorIfNeeded(ctx sdk.Context, epochID uint64, epoch
 		TargetsSetCommitment:    targetCommit,
 	}
 
-	return k.SetEpochAnchor(ctx, anchor)
+	if err := k.SetEpochAnchor(ctx, anchor); err != nil {
+		return err
+	}
+
+	// Snapshot assignment/gating-related params at epoch start so queries and report validation
+	// can remain stable within an epoch even if governance updates params mid-epoch.
+	return k.CreateEpochParamsSnapshotIfNeeded(ctx, epochID, params)
 }
 
 func deriveEpochSeed(ctx sdk.Context, epochID uint64, epochStartHeight int64) ([]byte, error) {

@@ -30,6 +30,11 @@ func (k Keeper) PruneOldEpochs(ctx sdk.Context, currentEpochID uint64, params ty
 		return err
 	}
 
+	// Epoch params snapshots: eps/<u64be(epoch_id)>
+	if err := prunePrefixByWindowIDLeadingU64(store, types.EpochParamsSnapshotPrefix(), minKeepEpochID); err != nil {
+		return err
+	}
+
 	// Reports: r/<u64be(epoch_id)><reporter>
 	if err := prunePrefixByWindowIDLeadingU64(store, types.ReportPrefix(), minKeepEpochID); err != nil {
 		return err

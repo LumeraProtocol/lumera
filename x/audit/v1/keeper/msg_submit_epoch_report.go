@@ -47,7 +47,14 @@ func (m msgServer) SubmitEpochReport(ctx context.Context, req *types.MsgSubmitEp
 
 	reporterAccount := req.Creator
 
-	allowedTargetsList, isProber, err := computeAuditPeerTargetsForReporter(&params, anchor.ActiveSupernodeAccounts, anchor.TargetSupernodeAccounts, anchor.Seed, reporterAccount)
+	// Keep assignment/gating stable within the epoch by using the params snapshot captured
+	// at epoch start (when available). Fallback to current params for backward compatibility.
+	assignParams := params
+	if snap, ok := m.GetEpochParamsSnapshot(sdkCtx, req.EpochId); ok {
+		assignParams = snap.WithDefaults()
+	}
+
+	allowedTargetsList, isProber, err := computeAuditPeerTargetsForReporter(&assignParams, anchor.ActiveSupernodeAccounts, anchor.TargetSupernodeAccounts, anchor.Seed, reporterAccount)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +63,7 @@ func (m msgServer) SubmitEpochReport(ctx context.Context, req *types.MsgSubmitEp
 		allowedTargets[t] = struct{}{}
 	}
 
-	requiredPortsLen := len(params.RequiredOpenPorts)
+	requiredPortsLen := len(assignParams.RequiredOpenPorts)
 	// Host report port states are persisted on-chain. To prevent state bloat and keep the
 	// semantics clear, allow either:
 	// - an empty list (unknown/unreported), or

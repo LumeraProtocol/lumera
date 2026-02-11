@@ -27,6 +27,7 @@ var (
 	//
 	// Formats:
 	// - EpochAnchorKey:          "ea/" + u64be(epoch_id)
+	// - EpochParamsSnapshotKey:  "eps/" + u64be(epoch_id)
 	// - ReportKey:               "r/"  + u64be(epoch_id) + reporter_supernode_account
 	// - ReportIndexKey:          "ri/" + reporter_supernode_account + "/" + u64be(epoch_id)
 	// - StorageChallengeReportIndexKey: "sc/" + supernode_account + "/" + u64be(epoch_id) + "/" + reporter_supernode_account
@@ -36,6 +37,9 @@ var (
 	// - EpochAnchorKey(1)          => "ea/" + u64be(1)
 	// - ReportKey(1, "<reporter>") => "r/"  + u64be(1) + "<reporter>"
 	epochAnchorPrefix = []byte("ea/")
+	// epochParamsSnapshotPrefix stores a per-epoch snapshot of assignment/gating-related params.
+	// Format: "eps/" + u64be(epoch_id)
+	epochParamsSnapshotPrefix = []byte("eps/")
 	reportPrefix      = []byte("r/")
 
 	reportIndexPrefix = []byte("ri/")
@@ -79,6 +83,18 @@ func EpochAnchorKey(epochID uint64) []byte {
 
 func EpochAnchorPrefix() []byte {
 	return epochAnchorPrefix
+}
+
+// EpochParamsSnapshotKey returns the store key for the per-epoch params snapshot identified by epochID.
+func EpochParamsSnapshotKey(epochID uint64) []byte {
+	key := make([]byte, 0, len(epochParamsSnapshotPrefix)+8) // "eps/" + u64be(epoch_id)
+	key = append(key, epochParamsSnapshotPrefix...)
+	key = binary.BigEndian.AppendUint64(key, epochID)
+	return key
+}
+
+func EpochParamsSnapshotPrefix() []byte {
+	return epochParamsSnapshotPrefix
 }
 
 // ReportPrefix returns the root prefix for epoch report keys.

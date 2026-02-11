@@ -79,14 +79,21 @@ func TestSubmitEvidenceAndQueries_CascadeClientFailure(t *testing.T) {
 	require.NoError(t, err)
 	subject, err := f.addressCodec.BytesToString(bytes.Repeat([]byte{0x22}, 20))
 	require.NoError(t, err)
-	target, err := f.addressCodec.BytesToString(bytes.Repeat([]byte{0x33}, 20))
+	targetA, err := f.addressCodec.BytesToString(bytes.Repeat([]byte{0x33}, 20))
+	require.NoError(t, err)
+	targetB, err := f.addressCodec.BytesToString(bytes.Repeat([]byte{0x44}, 20))
 	require.NoError(t, err)
 
 	meta := types.CascadeClientFailureEvidenceMetadata{
-		Flow:                   "UPLOAD",
-		ReporterComponent:      "sn-api-server",
-		TargetSupernodeAccount: target,
-		Details:                "context deadline exceeded while streaming upload; full stack trace here",
+		ReporterComponent: types.CascadeClientFailureReporterComponent_CASCADE_CLIENT_FAILURE_REPORTER_COMPONENT_SN_API_SERVER,
+		TargetSupernodeAccounts: []string{
+			targetA,
+			targetB,
+		},
+		Details: map[string]string{
+			"error":    "context deadline exceeded while streaming upload",
+			"trace_id": "trace-1234",
+		},
 	}
 	metaBz, err := json.Marshal(meta)
 	require.NoError(t, err)
@@ -112,9 +119,8 @@ func TestSubmitEvidenceAndQueries_CascadeClientFailure(t *testing.T) {
 	var gotMeta types.CascadeClientFailureEvidenceMetadata
 	err = gogoproto.Unmarshal(gotByID.Evidence.Metadata, &gotMeta)
 	require.NoError(t, err)
-	require.Equal(t, meta.Flow, gotMeta.Flow)
 	require.Equal(t, meta.ReporterComponent, gotMeta.ReporterComponent)
-	require.Equal(t, meta.TargetSupernodeAccount, gotMeta.TargetSupernodeAccount)
+	require.Equal(t, meta.TargetSupernodeAccounts, gotMeta.TargetSupernodeAccounts)
 	require.Equal(t, meta.Details, gotMeta.Details)
 
 	gotBySubject, err := qs.EvidenceBySubject(f.ctx, &types.QueryEvidenceBySubjectRequest{SubjectAddress: subject})
@@ -142,7 +148,7 @@ func TestCreateEvidence_CascadeClientFailure_InvalidMetadata(t *testing.T) {
 		subject,
 		"action-cascade-1",
 		types.EvidenceType_EVIDENCE_TYPE_CASCADE_CLIENT_FAILURE,
-		`{"flow":`,
+		`{"details":`,
 	)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), types.ErrInvalidMetadata.Error())

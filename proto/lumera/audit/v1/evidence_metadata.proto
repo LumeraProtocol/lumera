@@ -49,19 +49,21 @@ message StorageChallengeFailureEvidenceMetadata {
   string transcript_hash = 7;
 }
 
-// CascadeClientFailureEvidenceMetadata is metadata for client-observed failures
+enum CascadeClientFailureReporterComponent {
+  CASCADE_CLIENT_FAILURE_REPORTER_COMPONENT_UNSPECIFIED = 0;
+  CASCADE_CLIENT_FAILURE_REPORTER_COMPONENT_SN_API_SERVER = 1;
+  CASCADE_CLIENT_FAILURE_REPORTER_COMPONENT_SDK_GO = 2;
+  CASCADE_CLIENT_FAILURE_REPORTER_COMPONENT_SDK_JS = 3;
+}
+
+// CascadeClientFailureEvidenceMetadata is metadata for client-observed failures.
 message CascadeClientFailureEvidenceMetadata {
-  // flow is a short discriminator for the failed flow segment.
-  // Example values: UPLOAD, DOWNLOAD.
-  string flow = 1;
-
   // reporter_component identifies the emitting component.
-  // Example values: sn-api-server, sdk-go, sdk-js.
-  string reporter_component = 2;
+  CascadeClientFailureReporterComponent reporter_component = 1;
 
-  // target_supernode_account is the implicated supernode account, when known.
-  string target_supernode_account = 3 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  // target_supernode_accounts are implicated supernode accounts
+  repeated string target_supernode_accounts = 2;
 
-  // details is free-form diagnostic text (e.g. full error traces).
-  string details = 4;
+  // details contains free-form diagnostic attributes (e.g. trace, endpoint, error).
+  map<string, string> details = 3;
 }

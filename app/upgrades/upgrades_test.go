@@ -125,8 +125,7 @@ func expectStoreUpgrade(upgradeName, chainID string) bool {
 		return IsMainnet(chainID)
 	case upgrade_v1_10_0.UpgradeName:
 		return true
-	case upgrade_v1_10_1.UpgradeName:
-	case upgrade_v1_11_0.UpgradeName:
+	case upgrade_v1_10_1.UpgradeName, upgrade_v1_11_0.UpgradeName:
 		return true
 	default:
 		return false

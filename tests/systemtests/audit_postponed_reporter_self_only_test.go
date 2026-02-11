@@ -3,7 +3,6 @@
 package system
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -12,8 +11,8 @@ import (
 
 func TestAuditSubmitReport_PostponedReporterSelfOnly(t *testing.T) {
 	const (
-		// Keep epochs long enough in real time to avoid missing-report postponement before the first tested epoch.
-		epochLengthBlocks = uint64(20)
+		// Keep epochs short so the test stays fast.
+		epochLengthBlocks = uint64(10)
 	)
 	const originHeight = int64(1)
 
@@ -21,12 +20,8 @@ func TestAuditSubmitReport_PostponedReporterSelfOnly(t *testing.T) {
 		setSupernodeParamsForAuditTests(t),
 		setAuditParamsForFastEpochs(t, epochLengthBlocks, 1, 1, 1, []uint32{4444}),
 		func(genesis []byte) []byte {
-			// Avoid missing-report postponement before the first tested epoch.
-			state, err := sjson.SetRawBytes(genesis, "app_state.audit.params.consecutive_epochs_to_postpone", []byte("2"))
-			require.NoError(t, err)
-
-			// Make it easy to postpone node1 via host requirements (independent of consecutive epochs).
-			state, err = sjson.SetRawBytes(state, "app_state.audit.params.min_cpu_free_percent", []byte("90"))
+			// Postpone after one missed epoch so we can drive the state transition quickly.
+			state, err := sjson.SetRawBytes(genesis, "app_state.audit.params.consecutive_epochs_to_postpone", []byte("1"))
 			require.NoError(t, err)
 			return state
 		},
@@ -47,39 +42,16 @@ func TestAuditSubmitReport_PostponedReporterSelfOnly(t *testing.T) {
 
 	awaitAtLeastHeight(t, epoch1Start)
 
-	seed1 := headerHashAtHeight(t, sut.rpcAddr, epoch1Start)
-	senders := sortedStrings(n0.accAddr, n1.accAddr)
-	receivers := sortedStrings(n0.accAddr, n1.accAddr)
-	kEpoch := computeKEpoch(1, 1, 1, len(senders), len(receivers))
-	require.Equal(t, uint32(1), kEpoch)
-
-	targets0, ok := assignedTargets(seed1, senders, receivers, kEpoch, n0.accAddr)
-	require.True(t, ok)
-	require.Len(t, targets0, 1)
-
+	assigned0 := auditQueryAssignedTargets(t, epochID1, true, n0.accAddr)
 	host := auditHostReportJSON([]string{"PORT_STATE_OPEN"})
+	obs0 := make([]string, 0, len(assigned0.TargetSupernodeAccounts))
+	for _, target := range assigned0.TargetSupernodeAccounts {
+		obs0 = append(obs0, storageChallengeObservationJSON(target, []string{"PORT_STATE_OPEN"}))
+	}
 
-	node1BadSelfBz, err := json.Marshal(map[string]any{
-		"cpu_usage_percent":    99.0,
-		"mem_usage_percent":    1.0,
-		"disk_usage_percent":   1.0,
-		"inbound_port_states":  []string{"PORT_STATE_OPEN"},
-		"failed_actions_count": 0,
-	})
-	require.NoError(t, err)
-	node1BadSelf := string(node1BadSelfBz)
-
-	// Both submit in epoch1 so missing-report enforcement doesn't interfere.
-	// node1 violates host minimums and should become POSTPONED at epoch end.
-	txResp0 := submitEpochReport(t, cli, n0.nodeName, epochID1, host, []string{
-		storageChallengeObservationJSON(targets0[0], []string{"PORT_STATE_OPEN"}),
-	})
+	// Submit only node0 in epoch1 so node1 is postponed due to missing report.
+	txResp0 := submitEpochReport(t, cli, n0.nodeName, epochID1, host, obs0)
 	RequireTxSuccess(t, txResp0)
-
-	txResp1 := submitEpochReport(t, cli, n1.nodeName, epochID1, node1BadSelf, []string{
-		storageChallengeObservationJSON(n0.accAddr, []string{"PORT_STATE_OPEN"}),
-	})
-	RequireTxSuccess(t, txResp1)
 
 	awaitAtLeastHeight(t, epoch2Start)
 	require.Equal(t, "SUPERNODE_STATE_POSTPONED", querySupernodeLatestState(t, cli, n1.valAddr))

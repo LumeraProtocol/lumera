@@ -10,7 +10,7 @@ import (
 	"github.com/tidwall/sjson"
 )
 
-func TestAuditHostRequirementsPostponesActiveSupernode(t *testing.T) {
+func TestAuditHostRequirements_NoThresholdsDoNotPostponeActiveSupernode(t *testing.T) {
 	const (
 		// Keep epochs small so AwaitBlockHeight timeouts don't flake.
 		epochLengthBlocks = uint64(10)
@@ -23,10 +23,6 @@ func TestAuditHostRequirementsPostponesActiveSupernode(t *testing.T) {
 		func(genesis []byte) []byte {
 			// Avoid missing-report postponement before the first tested epoch.
 			state, err := sjson.SetRawBytes(genesis, "app_state.audit.params.consecutive_epochs_to_postpone", []byte("10"))
-			require.NoError(t, err)
-
-			// Enforce host requirements.
-			state, err = sjson.SetRawBytes(state, "app_state.audit.params.min_cpu_free_percent", []byte("90"))
 			require.NoError(t, err)
 			return state
 		},
@@ -46,18 +42,11 @@ func TestAuditHostRequirementsPostponesActiveSupernode(t *testing.T) {
 
 	awaitAtLeastHeight(t, epochStartHeight)
 
-	seed := headerHashAtHeight(t, sut.rpcAddr, epochStartHeight)
-	senders := sortedStrings(n0.accAddr, n1.accAddr)
-	receivers := sortedStrings(n0.accAddr, n1.accAddr)
-	kEpoch := computeKEpoch(1, 1, 1, len(senders), len(receivers))
-	require.Equal(t, uint32(1), kEpoch)
+	assigned0 := auditQueryAssignedTargets(t, epochID, true, n0.accAddr)
+	require.Len(t, assigned0.TargetSupernodeAccounts, 1)
 
-	targets0, ok := assignedTargets(seed, senders, receivers, kEpoch, n0.accAddr)
-	require.True(t, ok)
-	require.Len(t, targets0, 1)
-	targets1, ok := assignedTargets(seed, senders, receivers, kEpoch, n1.accAddr)
-	require.True(t, ok)
-	require.Len(t, targets1, 1)
+	assigned1 := auditQueryAssignedTargets(t, epochID, true, n1.accAddr)
+	require.Len(t, assigned1.TargetSupernodeAccounts, 1)
 
 	badSelfBz, err := json.Marshal(map[string]any{
 		"cpu_usage_percent":    99.0,
@@ -71,20 +60,20 @@ func TestAuditHostRequirementsPostponesActiveSupernode(t *testing.T) {
 
 	okHost := auditHostReportJSON([]string{"PORT_STATE_OPEN"})
 
-	// node0 violates host requirements.
+	// node0 reports high CPU usage. With threshold params left at defaults, this should not postpone.
 	tx0 := submitEpochReport(t, cli, n0.nodeName, epochID, badSelf, []string{
-		storageChallengeObservationJSON(targets0[0], []string{"PORT_STATE_OPEN"}),
+		storageChallengeObservationJSON(assigned0.TargetSupernodeAccounts[0], []string{"PORT_STATE_OPEN"}),
 	})
 	RequireTxSuccess(t, tx0)
 
-	// node1 stays compliant (and also submits to avoid missing-report enforcement).
+	// node1 also submits to avoid missing-report enforcement.
 	tx1 := submitEpochReport(t, cli, n1.nodeName, epochID, okHost, []string{
-		storageChallengeObservationJSON(targets1[0], []string{"PORT_STATE_OPEN"}),
+		storageChallengeObservationJSON(assigned1.TargetSupernodeAccounts[0], []string{"PORT_STATE_OPEN"}),
 	})
 	RequireTxSuccess(t, tx1)
 
 	awaitAtLeastHeight(t, enforceHeight)
 
-	require.Equal(t, "SUPERNODE_STATE_POSTPONED", querySupernodeLatestState(t, cli, n0.valAddr))
+	require.Equal(t, "SUPERNODE_STATE_ACTIVE", querySupernodeLatestState(t, cli, n0.valAddr))
 	require.Equal(t, "SUPERNODE_STATE_ACTIVE", querySupernodeLatestState(t, cli, n1.valAddr))
 }

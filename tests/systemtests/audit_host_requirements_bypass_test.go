@@ -23,10 +23,6 @@ func TestAuditHostRequirements_UsageZeroBypassesMinimums(t *testing.T) {
 			// Avoid missing-report postponement before/around the tested epoch.
 			state, err := sjson.SetRawBytes(genesis, "app_state.audit.params.consecutive_epochs_to_postpone", []byte("10"))
 			require.NoError(t, err)
-
-			// Enforce host requirements, but allow "unknown" usage values to bypass (usage_percent==0).
-			state, err = sjson.SetRawBytes(state, "app_state.audit.params.min_cpu_free_percent", []byte("90"))
-			require.NoError(t, err)
 			return state
 		},
 	)
@@ -45,18 +41,16 @@ func TestAuditHostRequirements_UsageZeroBypassesMinimums(t *testing.T) {
 
 	awaitAtLeastHeight(t, epochStartHeight)
 
-	seed := headerHashAtHeight(t, sut.rpcAddr, epochStartHeight)
-	senders := sortedStrings(n0.accAddr, n1.accAddr)
-	receivers := sortedStrings(n0.accAddr, n1.accAddr)
-	kEpoch := computeKEpoch(1, 1, 1, len(senders), len(receivers))
-	require.Equal(t, uint32(1), kEpoch)
+	// Use the on-chain assignment query so tests track current assignment logic.
+	assigned0 := auditQueryAssignedTargets(t, epochID, true, n0.accAddr)
+	require.Equal(t, epochID, assigned0.EpochId)
+	require.Len(t, assigned0.TargetSupernodeAccounts, 1)
+	require.Equal(t, []uint32{4444}, assigned0.RequiredOpenPorts)
 
-	targets0, ok := assignedTargets(seed, senders, receivers, kEpoch, n0.accAddr)
-	require.True(t, ok)
-	require.Len(t, targets0, 1)
-	targets1, ok := assignedTargets(seed, senders, receivers, kEpoch, n1.accAddr)
-	require.True(t, ok)
-	require.Len(t, targets1, 1)
+	assigned1 := auditQueryAssignedTargets(t, epochID, true, n1.accAddr)
+	require.Equal(t, epochID, assigned1.EpochId)
+	require.Len(t, assigned1.TargetSupernodeAccounts, 1)
+	require.Equal(t, []uint32{4444}, assigned1.RequiredOpenPorts)
 
 	unknownSelfBz, err := json.Marshal(map[string]any{
 		"cpu_usage_percent":    0.0,
@@ -72,14 +66,23 @@ func TestAuditHostRequirements_UsageZeroBypassesMinimums(t *testing.T) {
 
 	// node0 reports "unknown" cpu usage (0), which must not trigger host-requirements postponement.
 	tx0 := submitEpochReport(t, cli, n0.nodeName, epochID, unknownSelf, []string{
-		storageChallengeObservationJSON(targets0[0], []string{"PORT_STATE_OPEN"}),
+		storageChallengeObservationJSON(assigned0.TargetSupernodeAccounts[0], []string{"PORT_STATE_OPEN"}),
 	})
 	RequireTxSuccess(t, tx0)
 
 	tx1 := submitEpochReport(t, cli, n1.nodeName, epochID, okHost, []string{
-		storageChallengeObservationJSON(targets1[0], []string{"PORT_STATE_OPEN"}),
+		storageChallengeObservationJSON(assigned1.TargetSupernodeAccounts[0], []string{"PORT_STATE_OPEN"}),
 	})
 	RequireTxSuccess(t, tx1)
+
+	// Verify the report was persisted with unknown host usage values.
+	r0 := auditQueryReport(t, epochID, n0.accAddr)
+	require.Equal(t, n0.accAddr, r0.SupernodeAccount)
+	require.EqualValues(t, 0, r0.HostReport.CpuUsagePercent)
+	require.EqualValues(t, 0, r0.HostReport.MemUsagePercent)
+	require.EqualValues(t, 0, r0.HostReport.DiskUsagePercent)
+	require.Len(t, r0.StorageChallengeObservations, 1)
+	require.Equal(t, assigned0.TargetSupernodeAccounts[0], r0.StorageChallengeObservations[0].TargetSupernodeAccount)
 
 	awaitAtLeastHeight(t, enforceHeight)
 

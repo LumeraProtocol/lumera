@@ -1,9 +1,12 @@
 package keeper_test
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/LumeraProtocol/lumera/x/action/v1/common"
+	actionkeeper "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
+	audittypes "github.com/LumeraProtocol/lumera/x/audit/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	gogoproto "github.com/cosmos/gogoproto/proto"
 	"github.com/stretchr/testify/assert"
@@ -182,13 +185,29 @@ func (suite *KeeperTestSuite) TestIterateActions() {
 }
 
 func (suite *KeeperTestSuite) TestFinalizeAction() {
+	invalidCascadeIDs := func() []byte {
+		badIDs := make([]string, 0, 50)
+		for i := suite.ic; i < suite.ic+50; i++ {
+			id, err := actionkeeper.CreateKademliaID("wrong_signature", i)
+			suite.Require().NoError(err)
+			badIDs = append(badIDs, id)
+		}
+		meta := &actiontypes.CascadeMetadata{RqIdsIds: badIDs}
+		bz, err := suite.keeper.GetCodec().Marshal(meta)
+		suite.Require().NoError(err)
+		return bz
+	}
+
 	testCases := []struct {
 		name             string
 		creator          string
 		action           *actiontypes.Action
 		finalizeMetadata []byte
 		superNode        string
-		state            actiontypes.ActionState
+		expectedState    actiontypes.ActionState
+		expectedSNCount  int
+		expectEvidence   bool
+		evidenceType     audittypes.EvidenceType
 		expErr           error
 		setupFunc        func()
 	}{
@@ -198,7 +217,9 @@ func (suite *KeeperTestSuite) TestFinalizeAction() {
 			superNode:        suite.supernodes[0].SupernodeAccount,
 			action:           suite.prepareCascadeActionForRegistration(suite.creatorAddress.String(), MetadataFieldToMissNone),
 			finalizeMetadata: suite.generateCascadeFinalizationMetadata(MetadataFieldToMissNone),
-			state:            actiontypes.ActionStateDone,
+			expectedState:    actiontypes.ActionStateDone,
+			expectedSNCount:  1,
+			expectEvidence:   false,
 			expErr:           nil,
 		},
 		{
@@ -207,16 +228,34 @@ func (suite *KeeperTestSuite) TestFinalizeAction() {
 			superNode:        suite.supernodes[0].SupernodeAccount,
 			action:           suite.prepareSenseActionForRegistration(suite.creatorAddress.String(), MetadataFieldToMissNone),
 			finalizeMetadata: suite.generateSenseFinalizationMetadata(suite.signatureSense, MetadataFieldToMissNone),
-			state:            actiontypes.ActionStateDone,
+			expectedState:    actiontypes.ActionStateDone,
+			expectedSNCount:  1,
+			expectEvidence:   false,
 			expErr:           nil,
 		},
 		{
-			name:             "Finalizing Cascade Action - Wrong SN",
+			name:             "Finalizing Cascade Action - Invalid IDs (evidence, no error)",
+			creator:          suite.creatorAddress.String(),
+			superNode:        suite.supernodes[0].SupernodeAccount,
+			action:           suite.prepareCascadeActionForRegistration(suite.creatorAddress.String(), MetadataFieldToMissNone),
+			finalizeMetadata: invalidCascadeIDs(),
+			expectedState:    actiontypes.ActionStatePending,
+			expectedSNCount:  0,
+			expectEvidence:   true,
+			evidenceType:     audittypes.EvidenceType_EVIDENCE_TYPE_ACTION_FINALIZATION_SIGNATURE_FAILURE,
+			expErr:           nil,
+		},
+		{
+			name:             "Finalizing Cascade Action - SN not in top (evidence, no error)",
 			creator:          suite.creatorAddress.String(),
 			superNode:        suite.badSupernode.SupernodeAccount,
 			action:           suite.prepareCascadeActionForRegistration(suite.creatorAddress.String(), MetadataFieldToMissNone),
 			finalizeMetadata: suite.generateCascadeFinalizationMetadata(MetadataFieldToMissNone),
-			expErr:           actiontypes.ErrUnauthorizedSN,
+			expectedState:    actiontypes.ActionStatePending,
+			expectedSNCount:  0,
+			expectEvidence:   true,
+			evidenceType:     audittypes.EvidenceType_EVIDENCE_TYPE_ACTION_FINALIZATION_NOT_IN_TOP_10,
+			expErr:           nil,
 		},
 		{
 			name:             "Finalizing Sense Action - Wrong SN",
@@ -224,6 +263,9 @@ func (suite *KeeperTestSuite) TestFinalizeAction() {
 			superNode:        suite.badSupernode.SupernodeAccount,
 			action:           suite.prepareSenseActionForRegistration(suite.creatorAddress.String(), MetadataFieldToMissNone),
 			finalizeMetadata: suite.generateSenseFinalizationMetadata(suite.signatureSense, MetadataFieldToMissNone),
+			expectedState:    actiontypes.ActionStatePending,
+			expectedSNCount:  0,
+			expectEvidence:   false,
 			expErr:           actiontypes.ErrUnauthorizedSN,
 		},
 	}
@@ -239,6 +281,8 @@ func (suite *KeeperTestSuite) TestFinalizeAction() {
 			_, err := suite.keeper.RegisterAction(suite.ctx, tc.action)
 			suite.NoError(err)
 
+			startEvidenceCalls := len(suite.mockAuditKeeper.CreateCalls)
+
 			// Finalize the action
 			err = suite.keeper.FinalizeAction(suite.ctx, tc.action.ActionID, tc.superNode, tc.finalizeMetadata)
 			if tc.expErr != nil {
@@ -249,16 +293,37 @@ func (suite *KeeperTestSuite) TestFinalizeAction() {
 				// Verify the action was finalized
 				updated, found := suite.keeper.GetActionByID(suite.ctx, tc.action.ActionID)
 				suite.True(found)
-				suite.Equal(tc.state, updated.State)
-				suite.Equal(1, len(updated.SuperNodes))
-				suite.Equal(tc.superNode, updated.SuperNodes[0])
+				suite.Equal(tc.expectedState, updated.State)
+				suite.Equal(tc.expectedSNCount, len(updated.SuperNodes))
+				if tc.expectedSNCount > 0 {
+					suite.Equal(tc.superNode, updated.SuperNodes[0])
+				}
 
-				if updated.ActionType == actiontypes.ActionTypeCascade {
+				if updated.ActionType == actiontypes.ActionTypeCascade && updated.State == actiontypes.ActionStateDone {
 					cascadeMetadata := actiontypes.CascadeMetadata{}
 					err = gogoproto.Unmarshal(updated.Metadata, &cascadeMetadata)
 					suite.Equal(err, nil)
 
 					assert.NotZero(suite.T(), len(cascadeMetadata.RqIdsIds))
+				}
+
+				if tc.expectEvidence {
+					suite.Greater(len(suite.mockAuditKeeper.CreateCalls), startEvidenceCalls)
+					call := suite.mockAuditKeeper.CreateCalls[len(suite.mockAuditKeeper.CreateCalls)-1]
+					suite.Equal(tc.evidenceType, call.EvidenceType)
+
+					if tc.evidenceType == audittypes.EvidenceType_EVIDENCE_TYPE_ACTION_FINALIZATION_SIGNATURE_FAILURE {
+						var meta audittypes.ActionFinalizationSignatureFailureEvidenceMetadata
+						suite.Require().NoError(json.Unmarshal([]byte(call.MetadataJSON), &meta))
+						suite.NotEmpty(meta.Top_10ValidatorAddresses)
+					}
+					if tc.evidenceType == audittypes.EvidenceType_EVIDENCE_TYPE_ACTION_FINALIZATION_NOT_IN_TOP_10 {
+						var meta audittypes.ActionFinalizationNotInTop10EvidenceMetadata
+						suite.Require().NoError(json.Unmarshal([]byte(call.MetadataJSON), &meta))
+						suite.NotEmpty(meta.Top_10ValidatorAddresses)
+					}
+				} else {
+					suite.Equal(startEvidenceCalls, len(suite.mockAuditKeeper.CreateCalls))
 				}
 			}
 		})

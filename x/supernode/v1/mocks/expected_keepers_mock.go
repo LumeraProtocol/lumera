@@ -321,6 +321,34 @@ func (mr *MockSupernodeKeeperMockRecorder) SetSuperNodeActive(ctx, valAddr, reas
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSuperNodeActive", reflect.TypeOf((*MockSupernodeKeeper)(nil).SetSuperNodeActive), ctx, valAddr, reason)
 }
 
+// SetSuperNodePostponed mocks base method.
+func (m *MockSupernodeKeeper) SetSuperNodePostponed(ctx types0.Context, valAddr types0.ValAddress, reason string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetSuperNodePostponed", ctx, valAddr, reason)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetSuperNodePostponed indicates an expected call of SetSuperNodePostponed.
+func (mr *MockSupernodeKeeperMockRecorder) SetSuperNodePostponed(ctx, valAddr, reason any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSuperNodePostponed", reflect.TypeOf((*MockSupernodeKeeper)(nil).SetSuperNodePostponed), ctx, valAddr, reason)
+}
+
+// RecoverSuperNodeFromPostponed mocks base method.
+func (m *MockSupernodeKeeper) RecoverSuperNodeFromPostponed(ctx types0.Context, valAddr types0.ValAddress) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RecoverSuperNodeFromPostponed", ctx, valAddr)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RecoverSuperNodeFromPostponed indicates an expected call of RecoverSuperNodeFromPostponed.
+func (mr *MockSupernodeKeeperMockRecorder) RecoverSuperNodeFromPostponed(ctx, valAddr any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecoverSuperNodeFromPostponed", reflect.TypeOf((*MockSupernodeKeeper)(nil).RecoverSuperNodeFromPostponed), ctx, valAddr)
+}
+
 // SetSuperNodeStopped mocks base method.
 func (m *MockSupernodeKeeper) SetSuperNodeStopped(ctx types0.Context, valAddr types0.ValAddress, reason string) error {
 	m.ctrl.T.Helper()

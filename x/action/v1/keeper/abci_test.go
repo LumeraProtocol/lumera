@@ -7,6 +7,8 @@ import (
 )
 
 func (suite *KeeperTestSuite) TestEndBlocker_ChecksExpiredActions() {
+	suite.setupExpectationsGetAllTopSNs(1)
+
 	expiredAction := &actiontypes.Action{
 		ActionID:       "expired-1",
 		State:          actiontypes.ActionStatePending,

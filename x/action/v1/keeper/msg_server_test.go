@@ -382,11 +382,15 @@ func (suite *MsgServerTestSuite) finalizeSenseAction(actionID string, superNode 
 	suite.Equal(actionFinal.State, actionState)
 }
 
-func (suite *MsgServerTestSuite) makeFinalizeCascadeActionMessage(actionID string, actionType string, superNode string, badMetadata string, _ bool, rqIdsBad bool) types.MsgFinalizeAction {
+func (suite *MsgServerTestSuite) makeFinalizeCascadeActionMessage(actionID string, actionType string, superNode string, badMetadata string, rqIdsWrong bool, rqIdsMissing bool) types.MsgFinalizeAction {
 	var validIDs []string
-	if !rqIdsBad {
+	if !rqIdsMissing {
 		for i := suite.ic; i < suite.ic+50; i++ { // 50 is default value for MaxDdAndFingerprints
-			id, err := keeper.CreateKademliaID(suite.signatureCascade, i)
+			signature := suite.signatureCascade
+			if rqIdsWrong {
+				signature = "wrong_signature"
+			}
+			id, err := keeper.CreateKademliaID(signature, i)
 			suite.Require().NoError(err)
 			validIDs = append(validIDs, id)
 		}

@@ -1,0 +1,206 @@
+syntax = "proto3";
+package lumera.audit.v1;
+
+option go_package = "x/audit/v1/types";
+
+import "amino/amino.proto";
+import "gogoproto/gogo.proto";
+import "google/api/annotations.proto";
+import "cosmos_proto/cosmos.proto";
+import "cosmos/base/query/v1beta1/pagination.proto";
+
+import "lumera/audit/v1/params.proto";
+import "lumera/audit/v1/audit.proto";
+import "lumera/audit/v1/evidence.proto";
+import "lumera/audit/v1/epoch.proto";
+
+// Query defines the gRPC querier service.
+service Query {
+  // Parameters queries the parameters of the module.
+  rpc Params(QueryParamsRequest) returns (QueryParamsResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/params";
+  }
+
+  // EvidenceById queries a single evidence record by id.
+  rpc EvidenceById(QueryEvidenceByIdRequest) returns (QueryEvidenceByIdResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/evidence/{evidence_id}";
+  }
+
+  // EvidenceBySubject queries evidence records by subject address.
+  rpc EvidenceBySubject(QueryEvidenceBySubjectRequest) returns (QueryEvidenceBySubjectResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/evidence/by_subject/{subject_address}";
+  }
+
+  // EvidenceByAction queries evidence records by action id.
+  rpc EvidenceByAction(QueryEvidenceByActionRequest) returns (QueryEvidenceByActionResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/evidence/by_action/{action_id}";
+  }
+
+  // CurrentEpoch returns the current derived epoch boundaries at the current chain height.
+  rpc CurrentEpoch(QueryCurrentEpochRequest) returns (QueryCurrentEpochResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/current_epoch";
+  }
+
+  // EpochAnchor returns the persisted epoch anchor for the given epoch_id.
+  rpc EpochAnchor(QueryEpochAnchorRequest) returns (QueryEpochAnchorResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/epoch_anchor/{epoch_id}";
+  }
+
+  // CurrentEpochAnchor returns the persisted epoch anchor for the current epoch.
+  rpc CurrentEpochAnchor(QueryCurrentEpochAnchorRequest) returns (QueryCurrentEpochAnchorResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/current_epoch_anchor";
+  }
+
+  // AssignedTargets returns the prober -> targets assignment for a given supernode_account.
+  // If filter_by_epoch_id is false, it returns the assignments for the current epoch.
+  rpc AssignedTargets(QueryAssignedTargetsRequest) returns (QueryAssignedTargetsResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/assigned_targets/{supernode_account}";
+  }
+
+  // EpochReport returns the submitted epoch report for (epoch_id, supernode_account).
+  rpc EpochReport(QueryEpochReportRequest) returns (QueryEpochReportResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/epoch_report/{epoch_id}/{supernode_account}";
+  }
+
+  // EpochReportsByReporter returns epoch reports submitted by the given reporter across epochs.
+  rpc EpochReportsByReporter(QueryEpochReportsByReporterRequest) returns (QueryEpochReportsByReporterResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/epoch_reports_by_reporter/{supernode_account}";
+  }
+
+  // StorageChallengeReports returns all reports that include storage-challenge observations about the given supernode_account.
+  rpc StorageChallengeReports(QueryStorageChallengeReportsRequest) returns (QueryStorageChallengeReportsResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/storage_challenge_reports/{supernode_account}";
+  }
+
+  // HostReports returns host reports submitted by the given supernode_account across epochs.
+  rpc HostReports(QueryHostReportsRequest) returns (QueryHostReportsResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/host_reports/{supernode_account}";
+  }
+}
+
+message QueryParamsRequest {}
+
+message QueryParamsResponse {
+  Params params = 1 [(gogoproto.nullable) = false, (amino.dont_omitempty) = true];
+}
+
+message QueryEvidenceByIdRequest {
+  uint64 evidence_id = 1;
+}
+
+message QueryEvidenceByIdResponse {
+  Evidence evidence = 1 [(gogoproto.nullable) = false, (amino.dont_omitempty) = true];
+}
+
+message QueryEvidenceBySubjectRequest {
+  string subject_address = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  cosmos.base.query.v1beta1.PageRequest pagination = 2;
+}
+
+message QueryEvidenceBySubjectResponse {
+  repeated Evidence evidence = 1 [(gogoproto.nullable) = false];
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+message QueryEvidenceByActionRequest {
+  string action_id = 1;
+  cosmos.base.query.v1beta1.PageRequest pagination = 2;
+}
+
+message QueryEvidenceByActionResponse {
+  repeated Evidence evidence = 1 [(gogoproto.nullable) = false];
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+message QueryCurrentEpochRequest {}
+
+message QueryCurrentEpochResponse {
+  uint64 epoch_id           = 1;
+  int64  epoch_start_height = 2;
+  int64  epoch_end_height   = 3;
+}
+
+message QueryEpochAnchorRequest {
+  uint64 epoch_id = 1;
+}
+
+message QueryEpochAnchorResponse {
+  EpochAnchor anchor = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryCurrentEpochAnchorRequest {}
+
+message QueryCurrentEpochAnchorResponse {
+  EpochAnchor anchor = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryAssignedTargetsRequest {
+  string supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  uint64 epoch_id = 2;
+  bool filter_by_epoch_id = 3;
+}
+
+message QueryAssignedTargetsResponse {
+  uint64 epoch_id = 1;
+  int64 epoch_start_height = 2;
+  repeated uint32 required_open_ports = 3;
+  repeated string target_supernode_accounts = 4 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+}
+
+message QueryEpochReportRequest {
+  uint64 epoch_id = 1;
+  string supernode_account = 2 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+}
+
+message QueryEpochReportResponse {
+  EpochReport report = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryEpochReportsByReporterRequest {
+  string supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  uint64 epoch_id = 2;
+  cosmos.base.query.v1beta1.PageRequest pagination = 3;
+  bool filter_by_epoch_id = 4;
+}
+
+message QueryEpochReportsByReporterResponse {
+  repeated EpochReport reports = 1 [(gogoproto.nullable) = false];
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+message QueryStorageChallengeReportsRequest {
+  string supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  uint64 epoch_id = 2;
+  cosmos.base.query.v1beta1.PageRequest pagination = 3;
+  bool filter_by_epoch_id = 4;
+}
+
+message StorageChallengeReport {
+  string reporter_supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  uint64 epoch_id = 2;
+  int64 report_height = 3;
+  repeated PortState port_states = 4;
+}
+
+message QueryStorageChallengeReportsResponse {
+  repeated StorageChallengeReport reports = 1 [(gogoproto.nullable) = false];
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+message QueryHostReportsRequest {
+  string supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  uint64 epoch_id = 2;
+  cosmos.base.query.v1beta1.PageRequest pagination = 3;
+  bool filter_by_epoch_id = 4;
+}
+
+message HostReportEntry {
+  uint64 epoch_id = 1;
+  int64 report_height = 2;
+  HostReport host_report = 3 [(gogoproto.nullable) = false];
+}
+
+message QueryHostReportsResponse {
+  repeated HostReportEntry reports = 1 [(gogoproto.nullable) = false];
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}

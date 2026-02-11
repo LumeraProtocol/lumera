@@ -177,8 +177,13 @@ func (h CascadeActionHandler) FinalizeAction(ctx sdk.Context, action *actiontype
 
 	// 1. Verify RqIdsIds
 	if err := VerifyKademliaIDs(newCascadeMeta.RqIdsIds, existingCascadeMeta.Signatures, existingCascadeMeta.RqIdsIc, existingCascadeMeta.RqIdsMax); err != nil {
-		return actiontypes.ActionStateUnspecified,
-			errors.Wrap(actiontypes.ErrInvalidMetadata, fmt.Sprintf("failed to verify rq_ids_ids: %v", err))
+		h.keeper.RecordFinalizationSignatureFailure(
+			ctx,
+			action,
+			superNodeAccount,
+			fmt.Sprintf("cascade finalization rejected: rq_ids_ids verification failed: %v", err),
+		)
+		return actiontypes.ActionStateUnspecified, nil
 	}
 
 	// Cascade actions are finalized with a single supernode

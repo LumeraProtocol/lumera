@@ -2,6 +2,8 @@ package keeper
 
 import (
 	"context"
+	"sort"
+	"strconv"
 
 	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
@@ -13,6 +15,64 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+func shouldUseNumericReverseOrdering(pageReq *query.PageRequest) bool {
+	return pageReq != nil && pageReq.Reverse && len(pageReq.Key) == 0
+}
+
+func parseNumericActionID(actionID string) (uint64, bool) {
+	parsed, err := strconv.ParseUint(actionID, 10, 64)
+	if err != nil {
+		return 0, false
+	}
+	return parsed, true
+}
+
+func sortActionsByNumericID(actions []*types.Action) {
+	sort.SliceStable(actions, func(i, j int) bool {
+		leftNumericID, leftIsNumeric := parseNumericActionID(actions[i].ActionID)
+		rightNumericID, rightIsNumeric := parseNumericActionID(actions[j].ActionID)
+
+		switch {
+		case leftIsNumeric && rightIsNumeric:
+			if leftNumericID == rightNumericID {
+				return actions[i].ActionID < actions[j].ActionID
+			}
+			return leftNumericID < rightNumericID
+		case leftIsNumeric != rightIsNumeric:
+			return leftIsNumeric
+		default:
+			return actions[i].ActionID < actions[j].ActionID
+		}
+	})
+}
+
+func paginateActionSlice(actions []*types.Action, pageReq *query.PageRequest) ([]*types.Action, *query.PageResponse) {
+	if pageReq == nil {
+		return actions, &query.PageResponse{}
+	}
+
+	total := uint64(len(actions))
+	offset := pageReq.Offset
+	if offset > total {
+		offset = total
+	}
+
+	limit := pageReq.Limit
+	if limit == 0 || offset+limit > total {
+		limit = total - offset
+	}
+
+	end := offset + limit
+	page := actions[int(offset):int(end)]
+
+	pageRes := &query.PageResponse{}
+	if pageReq.CountTotal {
+		pageRes.Total = total
+	}
+
+	return page, pageRes
+}
 
 // ListActions returns a list of actions, optionally filtered by type and state
 func (q queryServer) ListActions(goCtx context.Context, req *types.QueryListActionsRequest) (*types.QueryListActionsResponse, error) {
@@ -81,19 +141,39 @@ func (q queryServer) ListActions(goCtx context.Context, req *types.QueryListActi
 	} else {
 		actionStore := prefix.NewStore(storeAdapter, []byte(ActionKeyPrefix))
 
-		onResult := func(key, value []byte, accumulate bool) (bool, error) {
-			var act actiontypes.Action
-			if err := q.k.cdc.Unmarshal(value, &act); err != nil {
-				return false, err
-			}
+		if shouldUseNumericReverseOrdering(req.Pagination) {
+			iter := actionStore.Iterator(nil, nil)
+			defer iter.Close()
 
-			if accumulate {
+			for ; iter.Valid(); iter.Next() {
+				var act actiontypes.Action
+				if unmarshalErr := q.k.cdc.Unmarshal(iter.Value(), &act); unmarshalErr != nil {
+					return nil, status.Errorf(codes.Internal, "failed to unmarshal action: %v", unmarshalErr)
+				}
 				actions = append(actions, &act)
 			}
 
-			return true, nil
+			sortActionsByNumericID(actions)
+			for i, j := 0, len(actions)-1; i < j; i, j = i+1, j-1 {
+				actions[i], actions[j] = actions[j], actions[i]
+			}
+
+			actions, pageRes = paginateActionSlice(actions, req.Pagination)
+		} else {
+			onResult := func(key, value []byte, accumulate bool) (bool, error) {
+				var act actiontypes.Action
+				if err := q.k.cdc.Unmarshal(value, &act); err != nil {
+					return false, err
+				}
+
+				if accumulate {
+					actions = append(actions, &act)
+				}
+
+				return true, nil
+			}
+			pageRes, err = query.FilteredPaginate(actionStore, req.Pagination, onResult)
 		}
-		pageRes, err = query.FilteredPaginate(actionStore, req.Pagination, onResult)
 	}
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to paginate actions: %v", err)

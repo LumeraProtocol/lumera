@@ -9,8 +9,8 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/query"
-	"go.uber.org/mock/gomock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -171,4 +171,50 @@ func TestKeeper_ListActions(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestKeeper_ListActions_ReversePaginationUsesNumericActionIDOrder(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	k, ctx := keepertest.ActionKeeper(t, ctrl)
+	q := keeper.NewQueryServerImpl(k)
+	price := sdk.NewInt64Coin("stake", 100)
+
+	// Reproduces the mainnet boundary where lexical ordering would place 99999 before 123611.
+	actionLowLexical := types.Action{
+		Creator:        "creator-low",
+		ActionID:       "99999",
+		ActionType:     types.ActionTypeCascade,
+		Metadata:       []byte("metadata-low"),
+		Price:          price.String(),
+		ExpirationTime: 1234567891,
+		State:          types.ActionStateApproved,
+		BlockHeight:    100,
+		SuperNodes:     []string{"supernode-1"},
+	}
+	actionHighNumeric := types.Action{
+		Creator:        "creator-high",
+		ActionID:       "123611",
+		ActionType:     types.ActionTypeCascade,
+		Metadata:       []byte("metadata-high"),
+		Price:          price.String(),
+		ExpirationTime: 1234567892,
+		State:          types.ActionStateApproved,
+		BlockHeight:    101,
+		SuperNodes:     []string{"supernode-2"},
+	}
+
+	require.NoError(t, k.SetAction(ctx, &actionLowLexical))
+	require.NoError(t, k.SetAction(ctx, &actionHighNumeric))
+
+	resp, err := q.ListActions(ctx, &types.QueryListActionsRequest{
+		Pagination: &query.PageRequest{
+			Limit:   1,
+			Reverse: true,
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.Actions, 1)
+	require.Equal(t, "123611", resp.Actions[0].ActionID)
 }

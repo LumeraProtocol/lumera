@@ -83,6 +83,9 @@ ran_capture() {
 }
 
 : "${LUMERA_CHAIN_ID:=lumera-devnet-1}"
+: "${LUMERA_VERSION:=}"
+: "${LUMERA_FIRST_EVM_VERSION:=v1.12.0}"
+: "${LUMERA_KEY_STYLE:=}"
 : "${LUMERA_RPC_ADDR:=http://supernova_validator_1:26657}"
 : "${LUMERA_GRPC_ADDR:=http://supernova_validator_1:9090}"
 : "${LUMERA_WS_ADDR:=ws://supernova_validator_1:26657/websocket}"
@@ -94,6 +97,27 @@ ran_capture() {
 : "${SIMD_GRPC_PORT:=9090}"
 : "${HERMES_KEY_NAME:=relayer}"
 : "${HERMES_MAX_GAS:=1000000}"
+
+version_ge() {
+	local current="$1"
+	local floor="$2"
+	[ -n "${current}" ] || return 1
+	[ -n "${floor}" ] || return 0
+	printf '%s\n' "${floor}" "${current}" | sort -V | head -n1 | grep -q "^${floor}$"
+}
+
+if [ -z "${LUMERA_KEY_STYLE}" ]; then
+	if version_ge "${LUMERA_VERSION}" "${LUMERA_FIRST_EVM_VERSION}"; then
+		LUMERA_KEY_STYLE="evm"
+	else
+		LUMERA_KEY_STYLE="cosmos"
+	fi
+fi
+
+LUMERA_ADDRESS_TYPE="address_type = { derivation = 'cosmos' }"
+if [ "${LUMERA_KEY_STYLE}" = "evm" ]; then
+	LUMERA_ADDRESS_TYPE="address_type = { derivation = 'ethermint', proto_type = { pk_type = '/ethermint.crypto.v1.ethsecp256k1.PubKey' } }"
+fi
 
 CONFIG_DIR="$(dirname "${HERMES_CONFIG_PATH}")"
 ran mkdir -p "${CONFIG_DIR}"
@@ -186,6 +210,7 @@ grpc_addr = '${LUMERA_GRPC_ADDR}'
 event_source = { mode = 'push', url = '${LUMERA_WS_ADDR}' }
 rpc_timeout = '10s'
 account_prefix = '${LUMERA_ACCOUNT_PREFIX}'
+${LUMERA_ADDRESS_TYPE}
 key_name = '${HERMES_KEY_NAME}'
 store_prefix = 'ibc'
 memo_prefix = ''

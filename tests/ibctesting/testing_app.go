@@ -20,9 +20,9 @@ import (
 
 	abci "github.com/cometbft/cometbft/abci/types"
 
+	lcfg "github.com/LumeraProtocol/lumera/config"
 	ibcporttypes "github.com/cosmos/ibc-go/v10/modules/core/05-port/types"
 	ibckeeper "github.com/cosmos/ibc-go/v10/modules/core/keeper"
-	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
 type TestingApp interface {

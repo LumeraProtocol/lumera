@@ -6,11 +6,20 @@ import (
 	"os"
 )
 
+const (
+	// DefaultChainVersion is the default Lumera version for devnet.
+	DefaultChainVersion = "v1.12.0"
+	// DefaultEVMFromVersion is the first Lumera version where EVM key style is enabled.
+	DefaultEVMFromVersion = "v1.12.0"
+)
+
 // ChainConfig represents the chain configuration structure
 type ChainConfig struct {
 	Chain struct {
-		ID    string `json:"id"`
-		Denom struct {
+		ID             string `json:"id"`
+		Version        string `json:"version"`
+		EVMFromVersion string `json:"evm_from_version"`
+		Denom          struct {
 			Bond            string `json:"bond"`
 			Mint            string `json:"mint"`
 			MinimumGasPrice string `json:"minimum_gas_price"`
@@ -86,6 +95,12 @@ func LoadConfigs(configPath, validatorsPath string) (*ChainConfig, []Validator, 
 	var config ChainConfig
 	if err := json.Unmarshal(configFile, &config); err != nil {
 		return nil, nil, fmt.Errorf("error parsing config.json: %v", err)
+	}
+	if config.Chain.Version == "" {
+		config.Chain.Version = DefaultChainVersion
+	}
+	if config.Chain.EVMFromVersion == "" {
+		config.Chain.EVMFromVersion = DefaultEVMFromVersion
 	}
 
 	validatorsFile, err := os.ReadFile(validatorsPath)

@@ -43,14 +43,14 @@ func (s *ibcSimdSuite) TestICACascadeFlow() {
 
 	// Load key material used to sign Lumera-side transactions.
 	s.logInfo("ica: load lumera keyring")
-	kr, _, lumeraAddr, err := sdkcrypto.LoadKeyringFromMnemonic(s.lumera.KeyName, s.lumera.MnemonicFile)
+	kr, _, lumeraAddr, err := sdkcrypto.LoadKeyring(s.lumera.KeyName, s.lumera.MnemonicFile, s.lumeraKeyType())
 	s.Require().NoError(err, "load lumera keyring")
 	s.Require().NotEmpty(lumeraAddr, "lumera address is empty")
 	s.logInfof("ica: lumera address=%s", lumeraAddr)
 
 	// Load the simd key to derive the app pubkey for ICA requests.
 	s.logInfo("ica: load simd key for app pubkey")
-	simdPubkey, simdAddr, err := sdkcrypto.ImportKeyFromMnemonic(kr, s.simd.KeyName, s.simd.MnemonicFile, simdOwnerHRP)
+	simdPubkey, simdAddr, err := sdkcrypto.ImportKey(kr, s.simd.KeyName, s.simd.MnemonicFile, simdOwnerHRP, sdkcrypto.KeyTypeCosmos)
 	s.Require().NoError(err, "load simd key")
 	s.logInfof("ica: simd key address=%s app_pubkey_len=%d", simdAddr, len(simdPubkey))
 

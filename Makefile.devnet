@@ -1,5 +1,5 @@
 .PHONY: devnet-build devnet-tests-build devnet-up devnet-reset devnet-up-detach devnet-down devnet-stop devnet-clean devnet-deploy-tar devnet-upgrade devnet-new devnet-start
-.PHONY: devnet-build-default _check-devnet-default-cfg devnet-upgrade-binaries devnet-upgrade-binaries-default devnet-update-scripts
+.PHONY: devnet-build-default _check-devnet-default-cfg _devnet-select-default-genesis devnet-upgrade-binaries devnet-upgrade-binaries-default devnet-update-scripts
 
 ##### Devnet Makefile ########################################
 #
@@ -39,8 +39,10 @@ DEFAULT_VALIDATORS_JSON := config/validators.json
 
 # Default genesis and claims files for devnet docker
 DEFAULT_GENESIS_FILE := devnet/default-config/devnet-genesis.json
+DEFAULT_GENESIS_EVM_FILE := devnet/default-config/devnet-genesis-evm.json
 DEFAULT_CLAIMS_FILE := claims.csv # relative to devnet
 ORIG_GENESIS_FILE := devnet/default-config/devnet-genesis-orig.json
+EVM_CUTOVER_VERSION ?= v1.12.0
 
 devnet-tests-build:
 	@mkdir -p "${DEVNET_BIN_DIR_ABS}"
@@ -95,6 +97,7 @@ devnet-build:
 		CONFIG_JSON="$${CONFIG_JSON:-$(DEFAULT_CONFIG_JSON)}" \
 		VALIDATORS_JSON="$${VALIDATORS_JSON:-$(DEFAULT_VALIDATORS_JSON)}" \
 		./scripts/configure.sh --bin-dir "${DEVNET_BIN_DIR}" &&\
+		DEVNET_BIN_DIR="${DEVNET_BIN_DIR_ABS}" \
 		${GO} run . && \
 		START_MODE=bootstrap docker compose build && \
 		echo "Initialization complete. Ready to start nodes."; \
@@ -104,9 +107,11 @@ devnet-build:
 	fi
 
 devnet-build-default: _check-devnet-default-cfg
-	@$(MAKE) devnet-build \
+	@GENESIS_FILE="$$( $(MAKE) --no-print-directory _devnet-select-default-genesis )"; \
+	echo "Using default genesis template: $$GENESIS_FILE"; \
+	$(MAKE) devnet-build \
 		DEVNET_BUILD_LUMERA=$(DEVNET_BUILD_LUMERA) \
-		EXTERNAL_GENESIS_FILE="$$(realpath $(DEFAULT_GENESIS_FILE))" \
+		EXTERNAL_GENESIS_FILE="$$(realpath "$$GENESIS_FILE")" \
 		EXTERNAL_CLAIMS_FILE="$$(realpath $(DEFAULT_CLAIMS_FILE))"
 
 .PHONY: devnet-build-172 _check-devnet-172-cfg devnet-build-191 _check-devnet-191-cfg
@@ -134,7 +139,23 @@ _check-devnet-191-cfg:
 
 _check-devnet-default-cfg:
 	@[ -f "$$(realpath $(DEFAULT_GENESIS_FILE))" ] || (echo "Missing DEFAULT_GENESIS_FILE: $$(realpath $(DEFAULT_GENESIS_FILE))"; exit 1)
+	@[ -f "$$(realpath $(DEFAULT_GENESIS_EVM_FILE))" ] || (echo "Missing DEFAULT_GENESIS_EVM_FILE: $$(realpath $(DEFAULT_GENESIS_EVM_FILE))"; exit 1)
 	@[ -f "$$(realpath $(DEFAULT_CLAIMS_FILE))" ] || (echo "Missing DEFAULT_CLAIMS_FILE: $$(realpath $(DEFAULT_CLAIMS_FILE))"; exit 1)
+
+_devnet-select-default-genesis:
+	@set -e; \
+	version="$${LUMERA_VERSION:-}"; \
+	if [ -z "$$version" ]; then \
+		bin_path="$(DEVNET_BIN_DIR_ABS)/lumerad"; \
+		if [ -x "$$bin_path" ]; then \
+			version="$$( "$$bin_path" version 2>/dev/null | grep -Eo 'v?[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?' | head -n1 || true )"; \
+		fi; \
+	fi; \
+	if [ -n "$$version" ] && printf '%s\n' "$(EVM_CUTOVER_VERSION)" "$$version" | sort -V | head -n1 | grep -q "^$(EVM_CUTOVER_VERSION)$$"; then \
+		echo "$(DEFAULT_GENESIS_EVM_FILE)"; \
+	else \
+		echo "$(DEFAULT_GENESIS_FILE)"; \
+	fi
 
 devnet-reset:
 	@echo "Resetting all validators (gentx and keys)..."
@@ -319,7 +340,6 @@ devnet-new-172:
 	$(MAKE) devnet-build-172
 	sleep 10
 	$(MAKE) devnet-up
-
 
 devnet-new-191:
 	$(MAKE) devnet-down

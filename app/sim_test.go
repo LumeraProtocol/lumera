@@ -1,3 +1,6 @@
+//go:build test
+// +build test
+
 package app_test
 
 import (
@@ -88,7 +91,7 @@ func BenchmarkSimulation(b *testing.B) {
 	appOptions[flags.FlagHome] = app.DefaultNodeHome
 	appOptions[server.FlagInvCheckPeriod] = simcli.FlagPeriodValue
 
-	bApp := app.New(logger, db, nil, true, appOptions, app.GetDefaultWasmOptions(), 
+	bApp := app.New(logger, db, nil, true, appOptions, app.GetDefaultWasmOptions(),
 		fauxMerkleModeOpt, baseapp.SetChainID(SimAppChainID))
 	require.Equal(b, app.Name, bApp.Name())
 
@@ -174,7 +177,7 @@ func TestAppImportExport(t *testing.T) {
 		require.NoError(t, os.RemoveAll(newDir))
 	}()
 
-	newApp := app.New(log.NewNopLogger(), newDB, nil, true, appOptions, 
+	newApp := app.New(log.NewNopLogger(), newDB, nil, true, appOptions,
 		app.GetDefaultWasmOptions(), fauxMerkleModeOpt, baseapp.SetChainID(SimAppChainID))
 	require.Equal(t, app.Name, newApp.Name())
 
@@ -256,7 +259,7 @@ func TestAppSimulationAfterImport(t *testing.T) {
 	appOptions[flags.FlagHome] = app.DefaultNodeHome
 	appOptions[server.FlagInvCheckPeriod] = simcli.FlagPeriodValue
 
-	bApp := app.New(logger, db, nil, true, appOptions, app.GetDefaultWasmOptions(), 
+	bApp := app.New(logger, db, nil, true, appOptions, app.GetDefaultWasmOptions(),
 		fauxMerkleModeOpt, baseapp.SetChainID(SimAppChainID))
 	require.Equal(t, app.Name, bApp.Name())
 
@@ -302,7 +305,7 @@ func TestAppSimulationAfterImport(t *testing.T) {
 		require.NoError(t, os.RemoveAll(newDir))
 	}()
 
-	newApp := app.New(log.NewNopLogger(), newDB, nil, true, appOptions, 
+	newApp := app.New(log.NewNopLogger(), newDB, nil, true, appOptions,
 		app.GetDefaultWasmOptions(), fauxMerkleModeOpt, baseapp.SetChainID(SimAppChainID))
 	require.Equal(t, app.Name, newApp.Name())
 

@@ -39,6 +39,16 @@ func TestComputeAdaptiveStoreUpgradesFiltersExistingAdds(t *testing.T) {
 	require.Empty(t, effective.Deleted)
 }
 
+func TestComputeAdaptiveStoreUpgradesKeepsMultipleMissingEVMStores(t *testing.T) {
+	expected := setOf("auth", "bank", "feemarket", "precisebank", "evm", "erc20")
+	existing := setOf("auth", "bank")
+
+	effective := computeAdaptiveStoreUpgrades(nil, expected, existing)
+
+	require.ElementsMatch(t, []string{"feemarket", "precisebank", "evm", "erc20"}, effective.Added)
+	require.Empty(t, effective.Deleted)
+}
+
 func setOf(names ...string) map[string]struct{} {
 	out := make(map[string]struct{}, len(names))
 	for _, name := range names {

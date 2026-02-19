@@ -15,12 +15,17 @@ import (
 	upgrade_v1_10_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_10_1"
 	upgrade_v1_11_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_11_0"
 	upgrade_v1_11_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_11_1"
+	upgrade_v1_12_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_12_0"
 	upgrade_v1_6_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_6_1"
 	upgrade_v1_8_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_0"
 	upgrade_v1_8_4 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_4"
 	upgrade_v1_9_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_9_0"
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	crisistypes "github.com/cosmos/cosmos-sdk/x/crisis/types"
+	erc20types "github.com/cosmos/evm/x/erc20/types"
+	feemarkettypes "github.com/cosmos/evm/x/feemarket/types"
+	precisebanktypes "github.com/cosmos/evm/x/precisebank/types"
+	evmtypes "github.com/cosmos/evm/x/vm/types"
 )
 
 func TestUpgradeNamesOrder(t *testing.T) {
@@ -37,6 +42,7 @@ func TestUpgradeNamesOrder(t *testing.T) {
 		upgrade_v1_10_1.UpgradeName,
 		upgrade_v1_11_0.UpgradeName,
 		upgrade_v1_11_1.UpgradeName,
+		upgrade_v1_12_0.UpgradeName,
 	}
 	require.Equal(t, expected, upgradeNames, "upgradeNames should stay in ascending order")
 }
@@ -74,6 +80,12 @@ func TestSetupUpgradesAndHandlers(t *testing.T) {
 
 				if upgradeName == upgrade_v1_10_0.UpgradeName && config.StoreUpgrade != nil {
 					require.Contains(t, config.StoreUpgrade.Deleted, crisistypes.StoreKey, "v1.10.0 should delete crisis store key")
+				}
+				if upgradeName == upgrade_v1_12_0.UpgradeName && config.StoreUpgrade != nil {
+					require.Contains(t, config.StoreUpgrade.Added, feemarkettypes.StoreKey, "v1.12.0 should add feemarket store key")
+					require.Contains(t, config.StoreUpgrade.Added, precisebanktypes.StoreKey, "v1.12.0 should add precisebank store key")
+					require.Contains(t, config.StoreUpgrade.Added, evmtypes.StoreKey, "v1.12.0 should add evm store key")
+					require.Contains(t, config.StoreUpgrade.Added, erc20types.StoreKey, "v1.12.0 should add erc20 store key")
 				}
 
 				if config.Handler == nil {
@@ -128,6 +140,8 @@ func expectStoreUpgrade(upgradeName, chainID string) bool {
 	case upgrade_v1_10_0.UpgradeName:
 		return true
 	case upgrade_v1_10_1.UpgradeName, upgrade_v1_11_0.UpgradeName, upgrade_v1_11_1.UpgradeName:
+		return true
+	case upgrade_v1_12_0.UpgradeName:
 		return true
 	default:
 		return false

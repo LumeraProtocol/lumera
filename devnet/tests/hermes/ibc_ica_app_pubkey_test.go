@@ -89,12 +89,12 @@ func (s *ibcSimdSuite) TestICARequestActionAppPubkeyRequired() {
 	defer cancel()
 
 	s.logInfo("ica: load lumera keyring")
-	kr, _, lumeraAddr, err := sdkcrypto.LoadKeyringFromMnemonic(s.lumera.KeyName, s.lumera.MnemonicFile)
+	kr, _, lumeraAddr, err := sdkcrypto.LoadKeyring(s.lumera.KeyName, s.lumera.MnemonicFile, s.lumeraKeyType())
 	s.Require().NoError(err, "load lumera keyring")
 	s.Require().NotEmpty(lumeraAddr, "lumera address is empty")
 
 	s.logInfo("ica: load simd key for app pubkey")
-	simdPubkey, simdAddr, err := sdkcrypto.ImportKeyFromMnemonic(kr, s.simd.KeyName, s.simd.MnemonicFile, simdOwnerHRP)
+	simdPubkey, simdAddr, err := sdkcrypto.ImportKey(kr, s.simd.KeyName, s.simd.MnemonicFile, simdOwnerHRP, sdkcrypto.KeyTypeCosmos)
 	s.Require().NoError(err, "load simd key")
 
 	s.logInfo("ica: create ICA controller (grpc)")

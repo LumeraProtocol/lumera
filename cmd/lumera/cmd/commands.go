@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 
+	cmttypes "github.com/cometbft/cometbft/types"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -24,12 +26,16 @@ import (
 	authcmd "github.com/cosmos/cosmos-sdk/x/auth/client/cli"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	genutilcli "github.com/cosmos/cosmos-sdk/x/genutil/client/cli"
+	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
+	evmserver "github.com/cosmos/evm/server"
 
 	"github.com/CosmWasm/wasmd/x/wasm"
 	wasmcli "github.com/CosmWasm/wasmd/x/wasm/client/cli"
 	wasmKeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	"github.com/LumeraProtocol/lumera/app"
+	lcfg "github.com/LumeraProtocol/lumera/config"
 	claimtypes "github.com/LumeraProtocol/lumera/x/claim/types"
+	"github.com/cosmos/cosmos-sdk/x/genutil"
 )
 
 func initRootCmd(
@@ -38,7 +44,7 @@ func initRootCmd(
 	basicManager module.BasicManager,
 ) {
 	rootCmd.AddCommand(
-		genutilcli.InitCmd(basicManager, app.DefaultNodeHome),
+		initCmdWithEVMDefaults(basicManager),
 		NewTestnetCmd(basicManager, banktypes.GenesisBalancesIterator{}),
 		debugCommand(),
 		confixcmd.ConfigCommand(),
@@ -51,7 +57,12 @@ func initRootCmd(
 	// Bind to viper
 	_ = viper.BindPFlag(claimtypes.FlagClaimsPath, rootCmd.PersistentFlags().Lookup(claimtypes.FlagClaimsPath))
 
-	server.AddCommands(rootCmd, app.DefaultNodeHome, newApp, appExport, addModuleInitFlags)
+	evmserver.AddCommands(
+		rootCmd,
+		evmserver.NewDefaultStartOptions(newEVMApp, app.DefaultNodeHome),
+		appExport,
+		addModuleInitFlags,
+	)
 
 	// add keybase, auxiliary RPC, query, genesis, and tx child commands
 	rootCmd.AddCommand(
@@ -66,6 +77,60 @@ func initRootCmd(
 
 func addModuleInitFlags(startCmd *cobra.Command) {
 	wasm.AddModuleInitFlags(startCmd)
+}
+
+// initCmdWithEVMDefaults wraps the SDK init command and patches genesis defaults:
+//   - chain bank metadata for EVM denom resolution
+//   - consensus block max gas for EIP-1559 base fee calculations
+func initCmdWithEVMDefaults(basicManager module.BasicManager) *cobra.Command {
+	initCmd := genutilcli.InitCmd(basicManager, app.DefaultNodeHome)
+	originalRunE := initCmd.RunE
+	initCmd.RunE = func(cmd *cobra.Command, args []string) error {
+		if err := originalRunE(cmd, args); err != nil {
+			return err
+		}
+		return patchInitGenesisBankMetadata(cmd)
+	}
+	return initCmd
+}
+
+func patchInitGenesisBankMetadata(cmd *cobra.Command) error {
+	clientCtx := client.GetClientContextFromCmd(cmd)
+	serverCtx := server.GetServerContextFromCmd(cmd)
+	serverCtx.Config.SetRoot(clientCtx.HomeDir)
+	genFile := serverCtx.Config.GenesisFile()
+
+	appGenesis, err := genutiltypes.AppGenesisFromFile(genFile)
+	if err != nil {
+		return err
+	}
+
+	var appState map[string]json.RawMessage
+	if err := json.Unmarshal(appGenesis.AppState, &appState); err != nil {
+		return err
+	}
+
+	var bankGenesis banktypes.GenesisState
+	clientCtx.Codec.MustUnmarshalJSON(appState[banktypes.ModuleName], &bankGenesis)
+	bankGenesis.DenomMetadata = lcfg.UpsertChainBankMetadata(bankGenesis.DenomMetadata)
+	appState[banktypes.ModuleName] = clientCtx.Codec.MustMarshalJSON(&bankGenesis)
+
+	appStateBz, err := json.MarshalIndent(appState, "", " ")
+	if err != nil {
+		return err
+	}
+
+	appGenesis.AppState = appStateBz
+
+	if appGenesis.Consensus == nil {
+		appGenesis.Consensus = &genutiltypes.ConsensusGenesis{}
+	}
+	if appGenesis.Consensus.Params == nil {
+		appGenesis.Consensus.Params = cmttypes.DefaultConsensusParams()
+	}
+	appGenesis.Consensus.Params.Block.MaxGas = lcfg.ChainDefaultConsensusMaxGas
+
+	return genutil.ExportGenesisFile(appGenesis, genFile)
 }
 
 // genesisCommand builds genesis-related `lumerad genesis` command. Users may provide application specific commands as a parameter
@@ -142,6 +207,24 @@ func newApp(
 	traceStore io.Writer,
 	appOpts servertypes.AppOptions,
 ) servertypes.Application {
+	baseappOptions := server.DefaultBaseappOptions(appOpts)
+	wasmOpts := []wasmKeeper.Option{}
+
+	return app.New(
+		logger, db, traceStore, true,
+		appOpts,
+		wasmOpts,
+		baseappOptions...,
+	)
+}
+
+// newEVMApp creates the application with the cosmos/evm server.Application type.
+func newEVMApp(
+	logger log.Logger,
+	db dbm.DB,
+	traceStore io.Writer,
+	appOpts servertypes.AppOptions,
+) evmserver.Application {
 	baseappOptions := server.DefaultBaseappOptions(appOpts)
 	wasmOpts := []wasmKeeper.Option{}
 

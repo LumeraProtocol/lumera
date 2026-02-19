@@ -1,0 +1,36 @@
+syntax = "proto3";
+package lumera.audit.v1;
+
+option go_package = "x/audit/v1/types";
+
+import "amino/amino.proto";
+import "gogoproto/gogo.proto";
+import "cosmos_proto/cosmos.proto";
+
+// EpochAnchor is a minimal per-epoch on-chain anchor that freezes the deterministic seed
+// and the eligible supernode sets used for deterministic selection off-chain.
+message EpochAnchor {
+  option (gogoproto.equal) = true;
+
+  uint64 epoch_id = 1;
+  int64  epoch_start_height = 2;
+  int64  epoch_end_height = 3;
+  uint64 epoch_length_blocks = 4;
+
+  // seed is a fixed 32-byte value derived at epoch start (domain-separated).
+  bytes seed = 5;
+
+  // active_supernode_accounts is the sorted list of ACTIVE supernodes at epoch start.
+  repeated string active_supernode_accounts = 6 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+
+  // target_supernode_accounts is the sorted list of eligible targets at epoch start:
+  // ACTIVE + POSTPONED supernodes.
+  repeated string target_supernode_accounts = 7 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+
+  // params_commitment is a hash commitment to Params (with defaults) at epoch start.
+  bytes params_commitment = 8;
+
+  bytes active_set_commitment = 9;
+  bytes targets_set_commitment = 10;
+}
+

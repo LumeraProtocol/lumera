@@ -20,4 +20,7 @@ enum SuperNodeState {
 message SuperNodeStateRecord { 
   SuperNodeState state = 1 [(gogoproto.moretags) = "yaml:\"state\""];
   int64 height = 2; 
+  // reason is an optional string describing why the state transition occurred.
+  // It is currently set only for transitions into POSTPONED.
+  string reason = 3 [(gogoproto.moretags) = "yaml:\"reason\""];
 }

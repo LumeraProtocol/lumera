@@ -28,9 +28,7 @@ func (k *Keeper) recordFinalizationEvidence(
 	ctx sdk.Context,
 	actionID string,
 	subjectAddress string,
-	attemptedFinalizerAddress string,
-	expectedFinalizerAddresses []string,
-	reason string,
+	top10ValidatorAddresses []string,
 	evidenceType audittypes.EvidenceType,
 ) (uint64, error) {
 	if k.auditKeeper == nil {
@@ -49,7 +47,7 @@ func (k *Keeper) recordFinalizationEvidence(
 	switch evidenceType {
 	case audittypes.EvidenceType_EVIDENCE_TYPE_ACTION_FINALIZATION_SIGNATURE_FAILURE:
 		metaJSON, err := json.Marshal(audittypes.ActionFinalizationSignatureFailureEvidenceMetadata{
-			Top_10ValidatorAddresses: expectedFinalizerAddresses,
+			Top_10ValidatorAddresses: top10ValidatorAddresses,
 		})
 		if err != nil {
 			return 0, fmt.Errorf("marshal evidence metadata: %w", err)
@@ -57,7 +55,7 @@ func (k *Keeper) recordFinalizationEvidence(
 		metadataJSON = string(metaJSON)
 	case audittypes.EvidenceType_EVIDENCE_TYPE_ACTION_FINALIZATION_NOT_IN_TOP_10:
 		metaJSON, err := json.Marshal(audittypes.ActionFinalizationNotInTop10EvidenceMetadata{
-			Top_10ValidatorAddresses: expectedFinalizerAddresses,
+			Top_10ValidatorAddresses: top10ValidatorAddresses,
 		})
 		if err != nil {
 			return 0, fmt.Errorf("marshal evidence metadata: %w", err)
@@ -82,7 +80,7 @@ func (k *Keeper) recordFinalizationRejection(
 	action *actiontypes.Action,
 	attemptedFinalizerAddress string,
 	reason string,
-	expectedFinalizerAddresses []string,
+	top10ValidatorAddresses []string,
 	evidenceType audittypes.EvidenceType,
 ) uint64 {
 	if action == nil {
@@ -97,9 +95,7 @@ func (k *Keeper) recordFinalizationRejection(
 		ctx,
 		action.ActionID,
 		subjectAddress,
-		attemptedFinalizerAddress,
-		expectedFinalizerAddresses,
-		reason,
+		top10ValidatorAddresses,
 		evidenceType,
 	); err != nil {
 		k.Logger().Error(
@@ -151,7 +147,7 @@ func (k *Keeper) RecordFinalizationNotInTop10(
 	ctx sdk.Context,
 	action *actiontypes.Action,
 	attemptedFinalizerAddress string,
-	expectedFinalizerAddresses []string,
+	top10ValidatorAddresses []string,
 	reason string,
 ) uint64 {
 	return k.recordFinalizationRejection(
@@ -159,7 +155,7 @@ func (k *Keeper) RecordFinalizationNotInTop10(
 		action,
 		attemptedFinalizerAddress,
 		reason,
-		expectedFinalizerAddresses,
+		top10ValidatorAddresses,
 		audittypes.EvidenceType_EVIDENCE_TYPE_ACTION_FINALIZATION_NOT_IN_TOP_10,
 	)
 }

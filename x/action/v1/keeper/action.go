@@ -181,21 +181,21 @@ func (k *Keeper) FinalizeAction(ctx sdk.Context, actionID string, superNodeAccou
 	// Verify reporting superNode -
 	// it must be in the top-10 supernodes for the (existing) action's block height
 	// and not already in the (existing) action's SuperNodes list
-	eligible, rejectReason, expectedFinalizerAddresses, err := k.checkFinalizerEligibility(ctx, existingAction, superNodeAccount)
+	eligible, rejectReason, top10ValidatorAddresses, err := k.checkFinalizerEligibility(ctx, existingAction, superNodeAccount)
 	if err != nil {
 		return err
 	}
 	if !eligible {
 		// Only Cascade finalization is in scope for evidence-based rejections at the moment.
 		if existingAction.ActionType == actiontypes.ActionTypeCascade {
-			k.RecordFinalizationNotInTop10(ctx, existingAction, superNodeAccount, expectedFinalizerAddresses, rejectReason)
+			k.RecordFinalizationNotInTop10(ctx, existingAction, superNodeAccount, top10ValidatorAddresses, rejectReason)
 			return nil
 		}
 		return errors.Wrap(actiontypes.ErrUnauthorizedSN, rejectReason)
 	}
 
 	// Make the top-10 validator addresses available for downstream handler logic (e.g. signature failure evidence metadata).
-	ctx = ctx.WithValue(ctxKeyTop10ValidatorAddresses{}, expectedFinalizerAddresses)
+	ctx = ctx.WithValue(ctxKeyTop10ValidatorAddresses{}, top10ValidatorAddresses)
 
 	// Get the appropriate handler for this action type
 	handler, err := k.actionRegistry.GetHandler(existingAction.ActionType)
@@ -533,8 +533,8 @@ func (k *Keeper) IterateActionsByState(ctx sdk.Context, state actiontypes.Action
 // checkFinalizerEligibility checks whether a supernode is authorized to finalize an action.
 //
 // It returns:
-// - (true, "", expectedFinalizers, nil) when eligible
-// - (false, reason, expectedFinalizers, nil) when rejected (non-fatal)
+// - (true, "", top10ValidatorAddresses, nil) when eligible
+// - (false, reason, top10ValidatorAddresses, nil) when rejected (non-fatal)
 // - (false, "", nil, err) for hard failures (e.g. duplicates)
 func (k *Keeper) checkFinalizerEligibility(ctx sdk.Context, action *actiontypes.Action, superNodeAccount string) (bool, string, []string, error) {
 	// If SuperNode already in the list, return an error

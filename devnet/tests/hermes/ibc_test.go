@@ -55,6 +55,7 @@ type ibcSimdSuite struct {
 	lumeraICAFund       string
 	lumeraICAFeeBuffer  string
 	lumeraRecipient     string
+	lumeraKeyStyle      string
 
 	simd   ChainInfo
 	lumera ChainInfo
@@ -120,6 +121,8 @@ func (s *ibcSimdSuite) SetupSuite() {
 	}
 	s.lumeraICAFund = getenv("LUMERA_ICA_FUND_AMOUNT", defaultLumeraICAFund)
 	s.lumeraICAFeeBuffer = getenv("LUMERA_ICA_FUND_FEE_BUFFER", defaultLumeraICAFeeBuf)
+	s.lumeraKeyStyle = resolveLumeraKeyStyle()
+	s.T().Logf("Lumera key style for Hermes tests: %s", s.lumeraKeyStyle)
 
 	ensureLumeraBech32Prefixes()
 

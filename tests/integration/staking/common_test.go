@@ -25,14 +25,14 @@ import (
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/cosmos/cosmos-sdk/x/bank"
 	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
-	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	banktestutil "github.com/cosmos/cosmos-sdk/x/bank/testutil"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	"github.com/cosmos/cosmos-sdk/x/staking"
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
-	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/cosmos/cosmos-sdk/x/staking/testutil"
 	"github.com/cosmos/cosmos-sdk/x/staking/types"
+	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 
 	lcfg "github.com/LumeraProtocol/lumera/config"
 )
@@ -101,15 +101,15 @@ func initFixture(t testing.TB) *fixture {
 	)
 	cdc := moduletestutil.MakeTestEncodingConfig(auth.AppModuleBasic{}, staking.AppModuleBasic{}).Codec
 
-	// Reduce noise but keep info/warn/error in logs
-	logger := log.NewTestLoggerInfo(t)
+	// Keep test output deterministic and quiet unless failures occur.
+	logger := log.NewTestLoggerError(t)
 	cms := integration.CreateMultiStore(keys, logger)
 
 	newCtx := sdk.NewContext(cms, cmtprototypes.Header{}, true, logger)
 
-	accCodec  := addresscodec.NewBech32Codec(lcfg.AccountAddressPrefix)
-	valCodec  := addresscodec.NewBech32Codec(lcfg.ValidatorAddressPrefix)
-	consCodec := addresscodec.NewBech32Codec(lcfg.ConsNodeAddressPrefix)	
+	accCodec := addresscodec.NewBech32Codec(lcfg.Bech32AccountAddressPrefix)
+	valCodec := addresscodec.NewBech32Codec(lcfg.Bech32ValidatorAddressPrefix)
+	consCodec := addresscodec.NewBech32Codec(lcfg.Bech32ConsNodeAddressPrefix)
 
 	authority := authtypes.NewModuleAddress("gov")
 
@@ -126,7 +126,7 @@ func initFixture(t testing.TB) *fixture {
 		authtypes.ProtoBaseAccount,
 		maccPerms,
 		accCodec,
-		lcfg.AccountAddressPrefix,
+		lcfg.Bech32AccountAddressPrefix,
 		authority.String(),
 	)
 
@@ -187,52 +187,52 @@ func initFixture(t testing.TB) *fixture {
 }
 
 func mustDelegatePower(
-    t testing.TB,
-    f *fixture,
-    delegator sdk.AccAddress,
-    val types.Validator,
-    power int64,
+	t testing.TB,
+	f *fixture,
+	delegator sdk.AccAddress,
+	val types.Validator,
+	power int64,
 ) types.Validator {
-    t.Helper()
+	t.Helper()
 
-    // ensure validator is in state (TestingUpdateValidator will also touch state, but
-    // we want a consistent path)
-    assert.NilError(t, f.stakingKeeper.SetValidator(f.sdkCtx, val))
+	// ensure validator is in state (TestingUpdateValidator will also touch state, but
+	// we want a consistent path)
+	assert.NilError(t, f.stakingKeeper.SetValidator(f.sdkCtx, val))
 	assert.NilError(t, f.stakingKeeper.SetValidatorByConsAddr(f.sdkCtx, val))
-    assert.NilError(t, f.stakingKeeper.SetValidatorByPowerIndex(f.sdkCtx, val))
+	assert.NilError(t, f.stakingKeeper.SetValidatorByPowerIndex(f.sdkCtx, val))
 
 	// Delegate in keeper's denom
-    amt := f.stakingKeeper.TokensFromConsensusPower(f.sdkCtx, power)
-    _, err := f.stakingKeeper.Delegate(f.sdkCtx, delegator, amt, types.Unbonded, val, true)
-    assert.NilError(t, err)
+	amt := f.stakingKeeper.TokensFromConsensusPower(f.sdkCtx, power)
+	_, err := f.stakingKeeper.Delegate(f.sdkCtx, delegator, amt, types.Unbonded, val, true)
+	assert.NilError(t, err)
 
-    // reload from keeper so future assertions match store
-    valbz, err := f.stakingKeeper.ValidatorAddressCodec().StringToBytes(val.GetOperator())
-    assert.NilError(t, err)
-    newVal, found := f.stakingKeeper.GetValidator(f.sdkCtx, valbz)
-    assert.Assert(t, found)
+	// reload from keeper so future assertions match store
+	valbz, err := f.stakingKeeper.ValidatorAddressCodec().StringToBytes(val.GetOperator())
+	assert.NilError(t, err)
+	newVal, found := f.stakingKeeper.GetValidator(f.sdkCtx, valbz)
+	assert.Assert(t, found)
 
-    return newVal
+	return newVal
 }
 
 // only needed if a given test still calls TestingUpdateValidator and you see 0stake errors
 func ensureHelperStakeIfNeeded(
-    ctx sdk.Context,
-    bk bankkeeper.Keeper,
-    sk *stakingkeeper.Keeper,
-    addr sdk.AccAddress,
-    want math.Int,
+	ctx sdk.Context,
+	bk bankkeeper.Keeper,
+	sk *stakingkeeper.Keeper,
+	addr sdk.AccAddress,
+	want math.Int,
 ) error {
-    bd, err := sk.BondDenom(ctx)
-    if err != nil {
+	bd, err := sk.BondDenom(ctx)
+	if err != nil {
 		return err
 	}
-    if bd == "stake" {
+	if bd == "stake" {
 		return nil
 	}
-    coins := sdk.NewCoins(sdk.NewCoin("stake", want))
-    if err := bk.MintCoins(ctx, minttypes.ModuleName, coins); err != nil {
+	coins := sdk.NewCoins(sdk.NewCoin("stake", want))
+	if err := bk.MintCoins(ctx, minttypes.ModuleName, coins); err != nil {
 		return err
 	}
-    return banktestutil.FundAccount(ctx, bk, addr, coins)
+	return banktestutil.FundAccount(ctx, bk, addr, coins)
 }

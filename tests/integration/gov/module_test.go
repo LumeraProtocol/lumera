@@ -8,6 +8,7 @@ import (
 	"cosmossdk.io/depinject"
 	"cosmossdk.io/log"
 
+	appevm "github.com/LumeraProtocol/lumera/app/evm"
 	"github.com/cosmos/cosmos-sdk/testutil/configurator"
 	simtestutil "github.com/cosmos/cosmos-sdk/testutil/sims"
 	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
@@ -31,6 +32,7 @@ func TestItCreatesModuleAccountOnInitBlock(t *testing.T) {
 				configurator.ConsensusModule(),
 			),
 			depinject.Supply(log.NewNopLogger()),
+			depinject.Provide(appevm.ProvideCustomGetSigners),
 		),
 		&accountKeeper,
 	)

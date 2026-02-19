@@ -72,8 +72,8 @@ func initDeterministicFixture(t *testing.T) *deterministicFixture {
 	)
 	cdc := moduletestutil.MakeTestEncodingConfig(auth.AppModuleBasic{}, distribution.AppModuleBasic{}).Codec
 
-	// Keep warnings/errors visible in deterministic staking tests
-	logger := log.NewTestLoggerInfo(t)
+	// Keep deterministic test output quiet unless failures occur.
+	logger := log.NewTestLoggerError(t)
 	cms := integration.CreateMultiStore(keys, logger)
 
 	newCtx := sdk.NewContext(cms, cmtproto.Header{}, true, logger)
@@ -85,9 +85,9 @@ func initDeterministicFixture(t *testing.T) *deterministicFixture {
 		stakingtypes.NotBondedPoolName: {authtypes.Burner, authtypes.Staking},
 	}
 
-	accCodec := addresscodec.NewBech32Codec(lcfg.AccountAddressPrefix)
-	valCodec := addresscodec.NewBech32Codec(lcfg.ValidatorAddressPrefix)
-	consCodec := addresscodec.NewBech32Codec(lcfg.ConsNodeAddressPrefix)
+	accCodec := addresscodec.NewBech32Codec(lcfg.Bech32AccountAddressPrefix)
+	valCodec := addresscodec.NewBech32Codec(lcfg.Bech32ValidatorAddressPrefix)
+	consCodec := addresscodec.NewBech32Codec(lcfg.Bech32ConsNodeAddressPrefix)
 
 	authority := authtypes.NewModuleAddress("gov")
 
@@ -97,7 +97,7 @@ func initDeterministicFixture(t *testing.T) *deterministicFixture {
 		authtypes.ProtoBaseAccount,
 		maccPerms,
 		accCodec,
-		lcfg.AccountAddressPrefix,
+		lcfg.Bech32AccountAddressPrefix,
 		authority.String(),
 	)
 

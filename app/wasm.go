@@ -8,12 +8,9 @@ import (
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 	wasmvmtypes "github.com/CosmWasm/wasmvm/v3/types"
-	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/runtime"
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
 	"github.com/cosmos/cosmos-sdk/types/msgservice"
-	"github.com/cosmos/cosmos-sdk/x/auth/ante"
-	"github.com/cosmos/cosmos-sdk/x/auth/posthandler"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	distrkeeper "github.com/cosmos/cosmos-sdk/x/distribution/keeper"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
@@ -99,10 +96,6 @@ func (app *App) registerWasmModules(
 		return nil, err
 	}
 
-	if err := app.setAnteHandler(app.txConfig, wasmNodeConfig, app.GetKey(wasmtypes.StoreKey)); err != nil {
-		return nil, err
-	}
-
 	if manager := app.SnapshotManager(); manager != nil {
 		err := manager.RegisterExtensions(
 			wasmkeeper.NewWasmSnapshotter(app.CommitMultiStore(), app.WasmKeeper),
@@ -110,10 +103,6 @@ func (app *App) registerWasmModules(
 		if err != nil {
 			return nil, fmt.Errorf("failed to register snapshot extension: %s", err)
 		}
-	}
-
-	if err := app.setPostHandler(); err != nil {
-		return nil, err
 	}
 
 	// At startup, after all modules have been registered, check that all proto
@@ -136,41 +125,4 @@ func (app *App) registerWasmModules(
 	)
 
 	return &wasmStackIBCHandler, nil
-}
-
-func (app *App) setPostHandler() error {
-	postHandler, err := posthandler.NewPostHandler(
-		posthandler.HandlerOptions{},
-	)
-	if err != nil {
-		return err
-	}
-	app.SetPostHandler(postHandler)
-	return nil
-}
-
-func (app *App) setAnteHandler(txConfig client.TxConfig, wasmConfig wasmtypes.NodeConfig, txCounterStoreKey *storetypes.KVStoreKey) error {
-	anteHandler, err := NewAnteHandler(
-		HandlerOptions{
-			HandlerOptions: ante.HandlerOptions{
-				AccountKeeper:   app.AuthKeeper,
-				BankKeeper:      app.BankKeeper,
-				SignModeHandler: txConfig.SignModeHandler(),
-				FeegrantKeeper:  app.FeeGrantKeeper,
-				SigGasConsumer:  ante.DefaultSigVerificationGasConsumer,
-			},
-			IBCKeeper:             app.IBCKeeper,
-			WasmConfig:            &wasmConfig,
-			WasmKeeper:            app.WasmKeeper,
-			TXCounterStoreService: runtime.NewKVStoreService(txCounterStoreKey),
-			CircuitKeeper:         &app.CircuitBreakerKeeper,
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create AnteHandler: %s", err)
-	}
-
-	// Set the AnteHandler for the app
-	app.SetAnteHandler(anteHandler)
-	return nil
 }

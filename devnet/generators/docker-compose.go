@@ -4,7 +4,10 @@ import (
 	"fmt"
 	confg "gen/config"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	"gopkg.in/yaml.v2"
 )
@@ -15,6 +18,8 @@ const (
 	defaultNetworkPrefix  = "172.28.0."
 	defaultServiceIPStart = 10
 )
+
+var semverPattern = regexp.MustCompile(`v?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?`)
 
 type DockerComposeLogging struct {
 	Driver  string            `yaml:"driver"`
@@ -72,6 +77,98 @@ func supernodeBinaryHostPath() (string, bool) {
 	return "", false
 }
 
+func normalizeVersion(version string) string {
+	out := strings.TrimSpace(version)
+	if out == "" {
+		return ""
+	}
+	match := semverPattern.FindString(out)
+	if match == "" {
+		return ""
+	}
+	if match[0] >= '0' && match[0] <= '9' {
+		return "v" + match
+	}
+	return match
+}
+
+func detectLumeraVersion(binaryName string) string {
+	binaryName = strings.TrimSpace(binaryName)
+	if binaryName == "" {
+		binaryName = "lumerad"
+	}
+
+	candidates := make([]string, 0, 4)
+	if dir := strings.TrimSpace(os.Getenv("DEVNET_BIN_DIR")); dir != "" {
+		candidates = append(candidates, filepath.Join(dir, binaryName))
+	}
+	candidates = append(candidates, filepath.Join(SubFolderBin, binaryName))
+	if strings.ContainsRune(binaryName, os.PathSeparator) {
+		candidates = append(candidates, binaryName)
+	} else {
+		candidates = append(candidates, binaryName)
+	}
+
+	seen := map[string]struct{}{}
+	for _, candidate := range candidates {
+		if candidate == "" {
+			continue
+		}
+		if _, ok := seen[candidate]; ok {
+			continue
+		}
+		seen[candidate] = struct{}{}
+
+		resolved := candidate
+		if strings.ContainsRune(candidate, os.PathSeparator) {
+			info, err := os.Stat(candidate)
+			if err != nil || info.IsDir() {
+				continue
+			}
+		} else {
+			path, err := exec.LookPath(candidate)
+			if err != nil {
+				continue
+			}
+			resolved = path
+		}
+
+		out, err := exec.Command(resolved, "version").CombinedOutput()
+		if err != nil {
+			continue
+		}
+		if version := normalizeVersion(string(out)); version != "" {
+			return version
+		}
+	}
+
+	return ""
+}
+
+func resolveLumeraChainVersion(config *confg.ChainConfig) (string, error) {
+	if config == nil {
+		return "", fmt.Errorf("nil chain config")
+	}
+	if version := normalizeVersion(config.Chain.Version); version != "" {
+		return version, nil
+	}
+	if strings.TrimSpace(config.Chain.Version) != "" {
+		return "", fmt.Errorf("invalid chain.version %q", config.Chain.Version)
+	}
+	if detected := detectLumeraVersion(config.Daemon.Binary); detected != "" {
+		return detected, nil
+	}
+	binaryName := strings.TrimSpace(config.Daemon.Binary)
+	if binaryName == "" {
+		binaryName = "lumerad"
+	}
+	return "", fmt.Errorf(
+		"failed to resolve Lumera version from binary %q; set chain.version in config.json or ensure DEVNET_BIN_DIR points to a working %s binary",
+		binaryName,
+		binaryName,
+	)
+}
+
 func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validator, useExistingGenesis bool) (*DockerComposeConfig, error) {
 	compose := &DockerComposeConfig{
 		Services: make(map[string]DockerComposeService),
@@ -94,11 +191,21 @@ func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validat
 
 	folderMount := fmt.Sprintf("/tmp/%s", config.Chain.ID)
 	validatorBaseIP := defaultServiceIPStart + 1
+	chainVersion, err := resolveLumeraChainVersion(config)
+	if err != nil {
+		return nil, err
+	}
+	evmFromVersion := strings.TrimSpace(config.Chain.EVMFromVersion)
+	if evmFromVersion == "" {
+		evmFromVersion = confg.DefaultEVMFromVersion
+	}
 
 	for index, validator := range validators {
 		serviceName := fmt.Sprintf("%s-%s", config.Docker.ContainerPrefix, validator.Name)
 		env := map[string]string{
-			"MONIKER": validator.Moniker,
+			"MONIKER":                  validator.Moniker,
+			"LUMERA_VERSION":           chainVersion,
+			"LUMERA_FIRST_EVM_VERSION": evmFromVersion,
 		}
 
 		// Pass useExistingGenesis to containers via ENV
@@ -209,7 +316,9 @@ func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validat
 				},
 			},
 			Environment: map[string]string{
-				"HERMES_CONFIG": "/root/.hermes/config.toml",
+				"HERMES_CONFIG":            "/root/.hermes/config.toml",
+				"LUMERA_VERSION":           chainVersion,
+				"LUMERA_FIRST_EVM_VERSION": evmFromVersion,
 			},
 			Logging: &DockerComposeLogging{
 				Driver: "json-file",

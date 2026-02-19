@@ -21,6 +21,7 @@ SIMD_RELAYER_ACCOUNT_BALANCE="${SIMD_RELAYER_ACCOUNT_BALANCE:-100000000${SIMD_DE
 RELAYER_KEY_NAME="${RELAYER_KEY_NAME:-relayer}"
 DEFAULT_SIMD_RELAYER_MNEMONIC=""
 MINIMUM_GAS_PRICES="${MINIMUM_GAS_PRICES:-${SIMD_MINIMUM_GAS_PRICES:-0.0025${SIMD_DENOM}}}"
+DEFAULT_LUMERA_FIRST_EVM_VERSION="${DEFAULT_LUMERA_FIRST_EVM_VERSION:-v1.12.0}"
 
 SIMAPP_KEY_RELAYER_MNEMONIC="${SIMAPP_KEY_RELAYER_MNEMONIC:-${DEFAULT_SIMD_RELAYER_MNEMONIC}}"
 export SIMAPP_KEY_RELAYER_MNEMONIC
@@ -120,6 +121,14 @@ ran_capture() {
 	return "${rc}"
 }
 
+version_ge() {
+	local current="$1"
+	local floor="$2"
+	[ -n "${current}" ] || return 1
+	[ -n "${floor}" ] || return 0
+	printf '%s\n' "${floor}" "${current}" | sort -V | head -n1 | grep -q "^${floor}$"
+}
+
 SHARED_DIR="/shared"
 HERMES_SHARED_DIR="${SHARED_DIR}/hermes"
 CONFIG_JSON="${SHARED_DIR}/config/config.json"
@@ -149,6 +158,8 @@ fi
 if command -v jq >/dev/null 2>&1 && [ -f "${CONFIG_JSON}" ]; then
 	LUMERA_CHAIN_ID="${LUMERA_CHAIN_ID:-$(jq -r '.chain.id' "${CONFIG_JSON}")}"
 	LUMERA_BOND_DENOM="${LUMERA_BOND_DENOM:-$(jq -r '.chain.denom.bond' "${CONFIG_JSON}")}"
+	LUMERA_VERSION="${LUMERA_VERSION:-$(jq -r '.chain.version // empty' "${CONFIG_JSON}")}"
+	LUMERA_FIRST_EVM_VERSION="${LUMERA_FIRST_EVM_VERSION:-$(jq -r '.chain.evm_from_version // empty' "${CONFIG_JSON}")}"
 fi
 
 if [ -z "${LUMERA_CHAIN_ID:-}" ] || [ "${LUMERA_CHAIN_ID}" = "null" ]; then
@@ -157,6 +168,9 @@ fi
 
 if [ -z "${LUMERA_BOND_DENOM:-}" ] || [ "${LUMERA_BOND_DENOM}" = "null" ]; then
 	LUMERA_BOND_DENOM="ulume"
+fi
+if [ -z "${LUMERA_FIRST_EVM_VERSION:-}" ] || [ "${LUMERA_FIRST_EVM_VERSION}" = "null" ]; then
+	LUMERA_FIRST_EVM_VERSION="${DEFAULT_LUMERA_FIRST_EVM_VERSION}"
 fi
 
 if command -v jq >/dev/null 2>&1 && [ -f "${VALIDATORS_JSON}" ]; then
@@ -183,6 +197,14 @@ SIMD_REST_ADDR="http://127.0.0.1:${SIMD_API_PORT}"
 LUMERA_ACCOUNT_PREFIX="${LUMERA_ACCOUNT_PREFIX:-lumera}"
 HERMES_KEY_NAME="${HERMES_KEY_NAME:-${RELAYER_KEY_NAME}}"
 
+if [ -z "${LUMERA_KEY_STYLE:-}" ]; then
+	if version_ge "${LUMERA_VERSION:-}" "${LUMERA_FIRST_EVM_VERSION}"; then
+		LUMERA_KEY_STYLE="evm"
+	else
+		LUMERA_KEY_STYLE="cosmos"
+	fi
+fi
+
 LUMERA_MNEMONIC_FILE="${HERMES_RELAYER_MNEMONIC_FILE}"
 SIMD_MNEMONIC_FILE="${HERMES_RELAYER_MNEMONIC_FILE}"
 
@@ -191,6 +213,7 @@ HERMES_TEMPLATE_PATH="${HERMES_TEMPLATE_PATH:-/root/scripts/hermes-config-templa
 export HERMES_CONFIG_PATH
 export HERMES_TEMPLATE_PATH
 export LUMERA_CHAIN_ID LUMERA_BOND_DENOM LUMERA_RPC_ADDR LUMERA_GRPC_ADDR LUMERA_WS_ADDR LUMERA_REST_ADDR LUMERA_ACCOUNT_PREFIX
+export LUMERA_VERSION LUMERA_FIRST_EVM_VERSION LUMERA_KEY_STYLE
 export SIMD_REST_ADDR
 export SIMD_CHAIN_ID SIMD_DENOM SIMD_RPC_PORT SIMD_GRPC_PORT
 export HERMES_KEY_NAME LUMERA_MNEMONIC_FILE SIMD_MNEMONIC_FILE

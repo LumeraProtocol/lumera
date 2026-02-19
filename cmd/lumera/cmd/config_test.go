@@ -1,0 +1,40 @@
+package cmd
+
+import (
+	"reflect"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	lcfg "github.com/LumeraProtocol/lumera/config"
+)
+
+// TestInitAppConfigEVMDefaults verifies command-layer app config enables the
+// expected Cosmos EVM defaults used by `lumerad start`.
+func TestInitAppConfigEVMDefaults(t *testing.T) {
+	t.Parallel()
+
+	template, cfg := initAppConfig()
+
+	require.Contains(t, template, "[json-rpc]")
+	require.Contains(t, template, "enable-indexer = {{ .JSONRPC.EnableIndexer }}")
+	require.Contains(t, template, "[evm.mempool]")
+
+	cfgValue := reflect.ValueOf(cfg)
+	require.Equal(t, reflect.Struct, cfgValue.Kind())
+
+	jsonRPCCfg := cfgValue.FieldByName("JSONRPC")
+	require.True(t, jsonRPCCfg.IsValid(), "JSONRPC field not found")
+	require.True(t, jsonRPCCfg.FieldByName("Enable").Bool(), "json-rpc must be enabled by default")
+	require.True(t, jsonRPCCfg.FieldByName("EnableIndexer").Bool(), "json-rpc indexer must be enabled by default")
+
+	evmCfg := cfgValue.FieldByName("EVM")
+	require.True(t, evmCfg.IsValid(), "EVM field not found")
+	require.Equal(t, uint64(lcfg.EVMChainID), evmCfg.FieldByName("EVMChainID").Uint(), "unexpected EVM chain ID")
+
+	sdkCfg := cfgValue.FieldByName("Config")
+	require.True(t, sdkCfg.IsValid(), "Config field not found")
+	mempoolCfg := sdkCfg.FieldByName("Mempool")
+	require.True(t, mempoolCfg.IsValid(), "Mempool field not found")
+	require.EqualValues(t, 5000, mempoolCfg.FieldByName("MaxTxs").Int(), "unexpected app-side mempool max txs")
+}

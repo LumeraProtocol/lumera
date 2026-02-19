@@ -7,11 +7,11 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/LumeraProtocol/lumera/app"
 	cmtconfig "github.com/cometbft/cometbft/config"
+	cmttypes "github.com/cometbft/cometbft/types"
 	cmttime "github.com/cometbft/cometbft/types/time"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -23,7 +23,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/cosmos/cosmos-sdk/client/tx"
-	"github.com/cosmos/cosmos-sdk/crypto/hd"
+	sdkhd "github.com/cosmos/cosmos-sdk/crypto/hd"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/cosmos/cosmos-sdk/runtime"
@@ -42,6 +42,7 @@ import (
 	govv1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
+	evmhd "github.com/cosmos/evm/crypto/hd"
 
 	lcfg "github.com/LumeraProtocol/lumera/config"
 	claimtestutils "github.com/LumeraProtocol/lumera/x/claim/testutils"
@@ -98,7 +99,7 @@ func addTestnetFlagsToCmd(cmd *cobra.Command) {
 	cmd.Flags().StringP(flagOutputDir, "o", "./.testnets", "Directory to store initialization data for the testnet")
 	cmd.Flags().String(flags.FlagChainID, "", "genesis file chain-id, if left blank will be randomly created")
 	cmd.Flags().String(server.FlagMinGasPrices, fmt.Sprintf("0.000006%s", lcfg.ChainDenom), "Minimum gas prices to accept for transactions; All fees in a tx must meet this minimum (e.g. 0.01photino,0.001stake)")
-	cmd.Flags().String(flags.FlagKeyType, string(hd.Secp256k1Type), "Key signing algorithm to generate keys for")
+	cmd.Flags().String(flags.FlagKeyType, string(sdkhd.Secp256k1Type), "Key signing algorithm to generate keys for")
 
 	// support old flags name for backwards compatibility
 	cmd.Flags().SetNormalizeFunc(func(f *pflag.FlagSet, name string) pflag.NormalizedName {
@@ -352,7 +353,7 @@ func initTestnetFiles(
 		memo := fmt.Sprintf("%s@%s:%d", nodeIDs[i], ip, p2pPortStart+portOffset)
 		genFiles = append(genFiles, nodeConfig.GenesisFile())
 
-		kb, err := keyring.New(sdk.KeyringServiceName(), args.keyringBackend, nodeDir, inBuf, clientCtx.Codec)
+		kb, err := keyring.New(sdk.KeyringServiceName(), args.keyringBackend, nodeDir, inBuf, clientCtx.Codec, evmhd.EthSecp256k1Option())
 		if err != nil {
 			return err
 		}
@@ -514,28 +515,7 @@ func initGenFiles(
 	}
 
 	// ensure denom metadata describes the chain denom for clients
-	displayDenom := strings.TrimPrefix(lcfg.ChainDenom, "u")
-	metadata := banktypes.Metadata{
-		Description: "The native token of the Lumera network.",
-		DenomUnits: []*banktypes.DenomUnit{
-			{Denom: lcfg.ChainDenom, Exponent: 0},
-			{Denom: displayDenom, Exponent: 6},
-		},
-		Base:    lcfg.ChainDenom,
-		Display: displayDenom,
-		Name:    strings.ToUpper(displayDenom),
-		Symbol:  strings.ToUpper(displayDenom),
-	}
-	metadataUpdated := false
-	for i, md := range bankGenState.DenomMetadata {
-		if md.Base == lcfg.ChainDenom || md.Base == sdk.DefaultBondDenom {
-			bankGenState.DenomMetadata[i] = metadata
-			metadataUpdated = true
-		}
-	}
-	if !metadataUpdated {
-		bankGenState.DenomMetadata = append(bankGenState.DenomMetadata, metadata)
-	}
+	bankGenState.DenomMetadata = lcfg.UpsertChainBankMetadata(bankGenState.DenomMetadata)
 	appGenState[banktypes.ModuleName] = clientCtx.Codec.MustMarshalJSON(&bankGenState)
 
 	appGenStateJSON, err := json.MarshalIndent(appGenState, "", "  ")
@@ -544,6 +524,14 @@ func initGenFiles(
 	}
 
 	appGenesis := genutiltypes.NewAppGenesisWithVersion(chainID, appGenStateJSON)
+	if appGenesis.Consensus == nil {
+		appGenesis.Consensus = &genutiltypes.ConsensusGenesis{}
+	}
+	if appGenesis.Consensus.Params == nil {
+		appGenesis.Consensus.Params = cmttypes.DefaultConsensusParams()
+	}
+	appGenesis.Consensus.Params.Block.MaxGas = lcfg.ChainDefaultConsensusMaxGas
+
 	// generate empty genesis files for each validator and save
 	for i := 0; i < numValidators; i++ {
 		if err := appGenesis.SaveAs(genFiles[i]); err != nil {
@@ -599,8 +587,21 @@ func collectGenFiles(
 
 		genFile := nodeConfig.GenesisFile()
 
-		// overwrite each validator's genesis file to have a canonical genesis time
-		if err := genutil.ExportGenesisFileWithTime(genFile, chainID, nil, appState, genTime); err != nil {
+		// overwrite each validator's genesis file to have canonical app state and
+		// genesis time while preserving customized consensus params (max_gas).
+		appGenesis.ChainID = chainID
+		appGenesis.AppState = appState
+		appGenesis.GenesisTime = genTime
+		if appGenesis.Consensus == nil {
+			appGenesis.Consensus = &genutiltypes.ConsensusGenesis{}
+		}
+		if appGenesis.Consensus.Params == nil {
+			appGenesis.Consensus.Params = cmttypes.DefaultConsensusParams()
+		}
+		appGenesis.Consensus.Params.Block.MaxGas = lcfg.ChainDefaultConsensusMaxGas
+		appGenesis.Consensus.Validators = nil
+
+		if err := genutil.ExportGenesisFile(appGenesis, genFile); err != nil {
 			return err
 		}
 	}
@@ -656,6 +657,7 @@ func startTestnet(cmd *cobra.Command, args startArgs) error {
 		networkConfig.ChainID = args.chainID
 	}
 	networkConfig.SigningAlgo = args.algo
+	networkConfig.KeyringOptions = []keyring.Option{evmhd.EthSecp256k1Option()}
 	networkConfig.MinGasPrices = args.minGasPrices
 	networkConfig.NumValidators = args.numValidators
 	networkConfig.EnableLogging = args.enableLogging

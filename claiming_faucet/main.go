@@ -16,19 +16,19 @@ import (
 	"github.com/gorilla/mux"
 
 	"cosmossdk.io/math"
+	lumeracfg "github.com/LumeraProtocol/lumera/config"
 	lumeracrypto "github.com/LumeraProtocol/lumera/x/claim/keeper/crypto"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/codec/types"
-	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
-	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	signingtypes "github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authtx "github.com/cosmos/cosmos-sdk/x/auth/tx"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	evmhd "github.com/cosmos/evm/crypto/hd"
 )
 
 type StringInt64 int64
@@ -120,8 +120,8 @@ func makeEncodingConfig() EncodingConfig {
 	amino := codec.NewLegacyAmino()
 	interfaceRegistry := types.NewInterfaceRegistry()
 
-	// Register crypto interfaces
-	cryptocodec.RegisterInterfaces(interfaceRegistry)
+	// Register crypto interfaces (both standard Cosmos and EVM)
+	lumeracfg.RegisterExtraInterfaces(interfaceRegistry)
 
 	// Register auth interfaces
 	authtypes.RegisterInterfaces(interfaceRegistry)
@@ -141,13 +141,6 @@ func makeEncodingConfig() EncodingConfig {
 }
 
 func createClientContext(config Config, encodingConfig EncodingConfig) (client.Context, error) {
-	// Initialize SDK configuration
-	sdkConfig := sdk.GetConfig()
-	sdkConfig.SetBech32PrefixForAccount("lumera", "lumerapub")
-	sdkConfig.SetBech32PrefixForValidator("lumeravaloper", "lumeravaloperpub")
-	sdkConfig.SetBech32PrefixForConsensusNode("lumeravalcons", "lumeravalconspub")
-	sdkConfig.Seal()
-
 	// Create keyring
 	kb, err := keyring.New(
 		"lumera",
@@ -155,18 +148,19 @@ func createClientContext(config Config, encodingConfig EncodingConfig) (client.C
 		"",
 		nil,
 		encodingConfig.Codec,
+		evmhd.EthSecp256k1Option(),
 	)
 	if err != nil {
 		return client.Context{}, fmt.Errorf("failed to create keyring: %w", err)
 	}
 
-	// Import faucet account
+	// Import faucet account using EVM-compatible crypto (eth_secp256k1)
 	_, err = kb.NewAccount(
 		config.FaucetKeyName,
 		config.FaucetMnemonic,
 		keyring.DefaultBIP39Passphrase,
-		sdk.FullFundraiserPath,
-		hd.Secp256k1,
+		evmhd.BIP44HDPath,
+		evmhd.EthSecp256k1,
 	)
 	if err != nil {
 		return client.Context{}, fmt.Errorf("failed to import faucet account: %w", err)

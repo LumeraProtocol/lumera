@@ -69,8 +69,8 @@ func TestSlashUnbondingDelegation(t *testing.T) {
 		time.Unix(5, 0),
 		math.NewInt(10),
 		0,
-		address.NewBech32Codec(lcfg.ValidatorAddressPrefix),
-		address.NewBech32Codec(lcfg.AccountAddressPrefix),
+		address.NewBech32Codec(lcfg.Bech32ValidatorAddressPrefix),
+		address.NewBech32Codec(lcfg.Bech32AccountAddressPrefix),
 	)
 
 	assert.NilError(t, f.stakingKeeper.SetUnbondingDelegation(f.sdkCtx, ubd))
@@ -138,8 +138,8 @@ func TestSlashRedelegation(t *testing.T) {
 		math.NewInt(10),
 		math.LegacyNewDec(10),
 		0,
-		address.NewBech32Codec(lcfg.ValidatorAddressPrefix),
-		address.NewBech32Codec(lcfg.AccountAddressPrefix),
+		address.NewBech32Codec(lcfg.Bech32ValidatorAddressPrefix),
+		address.NewBech32Codec(lcfg.Bech32AccountAddressPrefix),
 	)
 
 	assert.NilError(t, f.stakingKeeper.SetRedelegation(f.sdkCtx, rd))
@@ -285,7 +285,7 @@ func TestSlashWithUnbondingDelegation(t *testing.T) {
 	// unbonding delegation shouldn't be slashed
 	ubdTokens := f.stakingKeeper.TokensFromConsensusPower(f.sdkCtx, 4)
 	ubd := types.NewUnbondingDelegation(addrDels[0], addrVals[0], 11, time.Unix(0, 0), ubdTokens, 0,
-		address.NewBech32Codec(lcfg.ValidatorAddressPrefix), address.NewBech32Codec(lcfg.AccountAddressPrefix))
+		address.NewBech32Codec(lcfg.Bech32ValidatorAddressPrefix), address.NewBech32Codec(lcfg.Bech32AccountAddressPrefix))
 	assert.NilError(t, f.stakingKeeper.SetUnbondingDelegation(f.sdkCtx, ubd))
 
 	// slash validator for the first time
@@ -424,8 +424,8 @@ func TestSlashWithRedelegation(t *testing.T) {
 		rdTokens,
 		math.LegacyNewDecFromInt(rdTokens),
 		0,
-		address.NewBech32Codec(lcfg.ValidatorAddressPrefix),
-		address.NewBech32Codec(lcfg.AccountAddressPrefix),
+		address.NewBech32Codec(lcfg.Bech32ValidatorAddressPrefix),
+		address.NewBech32Codec(lcfg.Bech32AccountAddressPrefix),
 	)
 	assert.NilError(t, f.stakingKeeper.SetRedelegation(f.sdkCtx, rd))
 
@@ -593,8 +593,8 @@ func TestSlashBoth(t *testing.T) {
 		rdATokens,
 		math.LegacyNewDecFromInt(rdATokens),
 		0,
-		address.NewBech32Codec(lcfg.ValidatorAddressPrefix),
-		address.NewBech32Codec(lcfg.AccountAddressPrefix),
+		address.NewBech32Codec(lcfg.Bech32ValidatorAddressPrefix),
+		address.NewBech32Codec(lcfg.Bech32AccountAddressPrefix),
 	)
 	assert.NilError(t, f.stakingKeeper.SetRedelegation(f.sdkCtx, rdA))
 
@@ -606,9 +606,9 @@ func TestSlashBoth(t *testing.T) {
 	// unbonding delegation shouldn't be slashed)
 	ubdATokens := f.stakingKeeper.TokensFromConsensusPower(f.sdkCtx, 4)
 	ubdA := types.NewUnbondingDelegation(addrDels[0], addrVals[0], 11,
-		time.Unix(0, 0), ubdATokens, 0, 
-		address.NewBech32Codec(lcfg.ValidatorAddressPrefix),
-		address.NewBech32Codec(lcfg.AccountAddressPrefix),
+		time.Unix(0, 0), ubdATokens, 0,
+		address.NewBech32Codec(lcfg.Bech32ValidatorAddressPrefix),
+		address.NewBech32Codec(lcfg.Bech32AccountAddressPrefix),
 	)
 	assert.NilError(t, f.stakingKeeper.SetUnbondingDelegation(f.sdkCtx, ubdA))
 

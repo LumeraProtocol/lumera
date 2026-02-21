@@ -37,4 +37,7 @@ func TestFeeMarketSuite(t *testing.T) {
 	t.Run("DynamicFeeType2RejectsFeeCapBelowBaseFee", func(t *testing.T) {
 		testDynamicFeeType2RejectsFeeCapBelowBaseFee(t, node)
 	})
+	t.Run("BaseFeeProgressesAcrossMultiBlockLoadPattern", func(t *testing.T) {
+		testBaseFeeProgressesAcrossMultiBlockLoadPattern(t, node)
+	})
 }

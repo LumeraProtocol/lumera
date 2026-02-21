@@ -4,6 +4,8 @@
 package feemarket_test
 
 import (
+	"bytes"
+	lcfg "github.com/LumeraProtocol/lumera/config"
 	evmtest "github.com/LumeraProtocol/lumera/tests/integration/evmtest"
 	testaccounts "github.com/LumeraProtocol/lumera/testutil/accounts"
 	"math/big"
@@ -329,6 +331,142 @@ func testDynamicFeeType2RejectsFeeCapBelowBaseFee(t *testing.T, node *evmtest.No
 	if !strings.Contains(strings.ToLower(err.Error()), "max fee per gas less than block base fee") {
 		t.Fatalf("unexpected error for below-base-fee tx: %v", err)
 	}
+}
+
+// TestBaseFeeProgressesAcrossMultiBlockLoadPattern validates long-run base-fee
+// behavior under sustained high usage followed by sustained empty blocks.
+func testBaseFeeProgressesAcrossMultiBlockLoadPattern(t *testing.T, node *evmtest.Node) {
+	t.Helper()
+
+	const (
+		highUsageBursts       = 8
+		heavyTxPerBurst       = 26
+		lowEmptyBlocks        = 14
+		minObservedBlocks     = 20
+		heavyPayloadBytes     = 12 * 1024
+		heavyTransferGasLimit = 260_000
+		gasPriceMultiplier    = 6
+	)
+
+	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), 1, 20*time.Second)
+
+	fromAddr := testaccounts.MustAccountAddressFromTestKeyInfo(t, node.KeyInfo())
+	privateKey := evmtest.MustDerivePrivateKey(t, node.KeyInfo().Mnemonic)
+	toAddr := common.HexToAddress(fromAddr.Hex())
+	nextNonce := evmtest.MustGetPendingNonceWithRetry(t, node.RPCURL(), fromAddr.Hex(), 20*time.Second)
+
+	minBaseFeeFloorWei := mustULumeDecToWei(t, lcfg.FeeMarketMinGasPrice)
+	startHeight := evmtest.MustGetBlockNumber(t, node.RPCURL())
+	startBaseFee := mustBaseFeeAtHeight(t, node, startHeight)
+	if startBaseFee.Cmp(minBaseFeeFloorWei) < 0 {
+		t.Fatalf(
+			"start base fee below configured floor: start=%s floor=%s height=%d",
+			startBaseFee.String(),
+			minBaseFeeFloorWei.String(),
+			startHeight,
+		)
+	}
+
+	heavyPayload := bytes.Repeat([]byte{0x01}, heavyPayloadBytes)
+	var lastTxHash string
+
+	for burst := 0; burst < highUsageBursts; burst++ {
+		burstStartHeight := evmtest.MustGetBlockNumber(t, node.RPCURL())
+		gasPrice := evmtest.MustGetGasPriceWithRetry(t, node.RPCURL(), 20*time.Second)
+		burstGasPrice := new(big.Int).Mul(gasPrice, big.NewInt(gasPriceMultiplier))
+
+		for i := 0; i < heavyTxPerBurst; i++ {
+			lastTxHash = evmtest.SendLegacyTxWithParams(t, node.RPCURL(), evmtest.LegacyTxParams{
+				PrivateKey: privateKey,
+				Nonce:      nextNonce,
+				To:         &toAddr,
+				Value:      big.NewInt(1),
+				Gas:        heavyTransferGasLimit,
+				GasPrice:   burstGasPrice,
+				Data:       heavyPayload,
+			})
+			nextNonce++
+		}
+
+		evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), burstStartHeight+1, 45*time.Second)
+	}
+
+	if strings.TrimSpace(lastTxHash) == "" {
+		t.Fatal("failed to submit high-usage burst transactions")
+	}
+
+	finalHighReceipt := evmtest.WaitForReceipt(t, node.RPCURL(), lastTxHash, node.WaitCh(), node.OutputBuffer(), 120*time.Second)
+	highPhaseEndHeight := evmtest.MustUint64HexField(t, finalHighReceipt, "blockNumber")
+	highPhaseEndBaseFee := mustBaseFeeAtHeight(t, node, highPhaseEndHeight)
+	if highPhaseEndBaseFee.Cmp(startBaseFee) <= 0 {
+		t.Fatalf(
+			"expected base fee increase after sustained high usage: start=%s end=%s start_height=%d end_height=%d",
+			startBaseFee.String(),
+			highPhaseEndBaseFee.String(),
+			startHeight,
+			highPhaseEndHeight,
+		)
+	}
+
+	lowPhaseTargetHeight := highPhaseEndHeight + lowEmptyBlocks
+	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), lowPhaseTargetHeight, 120*time.Second)
+	lowPhaseEndHeight := evmtest.MustGetBlockNumber(t, node.RPCURL())
+	lowPhaseEndBaseFee := mustBaseFeeAtHeight(t, node, lowPhaseEndHeight)
+	if lowPhaseEndBaseFee.Cmp(highPhaseEndBaseFee) > 0 {
+		t.Fatalf(
+			"expected base fee to decrease or stay flat after sustained empty period: high_end=%s low_end=%s high_height=%d low_height=%d",
+			highPhaseEndBaseFee.String(),
+			lowPhaseEndBaseFee.String(),
+			highPhaseEndHeight,
+			lowPhaseEndHeight,
+		)
+	}
+
+	observedBlocks := lowPhaseEndHeight - startHeight
+	if observedBlocks < minObservedBlocks {
+		t.Fatalf(
+			"insufficient consecutive blocks observed: got=%d want_at_least=%d start_height=%d end_height=%d",
+			observedBlocks,
+			minObservedBlocks,
+			startHeight,
+			lowPhaseEndHeight,
+		)
+	}
+
+	for height := startHeight; height <= lowPhaseEndHeight; height++ {
+		fee := mustBaseFeeAtHeight(t, node, height)
+		if fee.Cmp(minBaseFeeFloorWei) < 0 {
+			t.Fatalf(
+				"base fee dropped below configured floor: fee=%s floor=%s height=%d",
+				fee.String(),
+				minBaseFeeFloorWei.String(),
+				height,
+			)
+		}
+	}
+}
+
+func mustBaseFeeAtHeight(t *testing.T, node *evmtest.Node, height uint64) *big.Int {
+	t.Helper()
+
+	block := evmtest.MustGetBlock(t, node.RPCURL(), "eth_getBlockByNumber", []any{hexutil.EncodeUint64(height), false})
+	return mustHexBig(t, evmtest.MustStringField(t, block, "baseFeePerGas"))
+}
+
+func mustULumeDecToWei(t *testing.T, decValue string) *big.Int {
+	t.Helper()
+
+	parsed, ok := new(big.Rat).SetString(decValue)
+	if !ok {
+		t.Fatalf("invalid decimal value %q", decValue)
+	}
+
+	scaled := new(big.Rat).Mul(parsed, new(big.Rat).SetInt(big.NewInt(1_000_000_000_000)))
+	if scaled.Denom().Cmp(big.NewInt(1)) != 0 {
+		t.Fatalf("decimal value %q is not convertible to exact wei integer: %s", decValue, scaled.RatString())
+	}
+
+	return new(big.Int).Set(scaled.Num())
 }
 
 func mustHexBig(t *testing.T, hexValue string) *big.Int {

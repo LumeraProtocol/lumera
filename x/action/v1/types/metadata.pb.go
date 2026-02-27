@@ -23,6 +23,36 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
+// HashAlgo enumerates the supported hash algorithms for availability
+// commitments.
+type HashAlgo int32
+
+const (
+	HashAlgo_HASH_ALGO_UNSPECIFIED HashAlgo = 0
+	HashAlgo_HASH_ALGO_BLAKE3      HashAlgo = 1
+	HashAlgo_HASH_ALGO_SHA256      HashAlgo = 2
+)
+
+var HashAlgo_name = map[int32]string{
+	0: "HASH_ALGO_UNSPECIFIED",
+	1: "HASH_ALGO_BLAKE3",
+	2: "HASH_ALGO_SHA256",
+}
+
+var HashAlgo_value = map[string]int32{
+	"HASH_ALGO_UNSPECIFIED": 0,
+	"HASH_ALGO_BLAKE3":      1,
+	"HASH_ALGO_SHA256":      2,
+}
+
+func (x HashAlgo) String() string {
+	return proto.EnumName(HashAlgo_name, int32(x))
+}
+
+func (HashAlgo) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor_05a11a06dcddaaa2, []int{0}
+}
+
 // SenseMetadata contains information for Sense actions.
 // This metadata is directly embedded in the Action.metadata field.
 // For RequestAction:
@@ -130,6 +160,173 @@ func (m *SenseMetadata) GetSignatures() string {
 	return ""
 }
 
+// AvailabilityCommitment is the LEP-5 on-chain file commitment included
+// during Cascade registration.
+type AvailabilityCommitment struct {
+	CommitmentType string   `protobuf:"bytes,1,opt,name=commitment_type,proto3" json:"commitment_type,omitempty"`
+	HashAlgo       HashAlgo `protobuf:"varint,2,opt,name=hash_algo,proto3,enum=lumera.action.v1.HashAlgo" json:"hash_algo,omitempty"`
+	ChunkSize      uint32   `protobuf:"varint,3,opt,name=chunk_size,proto3" json:"chunk_size,omitempty"`
+	TotalSize      uint64   `protobuf:"varint,4,opt,name=total_size,proto3" json:"total_size,omitempty"`
+	NumChunks      uint32   `protobuf:"varint,5,opt,name=num_chunks,proto3" json:"num_chunks,omitempty"`
+	Root           []byte   `protobuf:"bytes,6,opt,name=root,proto3" json:"root,omitempty"`
+	// Challenge indices chosen by the client at registration time.
+	// The SuperNode must provide Merkle proofs for these exact chunk
+	// indices during finalization. The keeper validates proofs match
+	// these stored indices and the committed root.
+	ChallengeIndices []uint32 `protobuf:"varint,7,rep,packed,name=challenge_indices,proto3" json:"challenge_indices,omitempty"`
+}
+
+func (m *AvailabilityCommitment) Reset()         { *m = AvailabilityCommitment{} }
+func (m *AvailabilityCommitment) String() string { return proto.CompactTextString(m) }
+func (*AvailabilityCommitment) ProtoMessage()    {}
+func (*AvailabilityCommitment) Descriptor() ([]byte, []int) {
+	return fileDescriptor_05a11a06dcddaaa2, []int{1}
+}
+func (m *AvailabilityCommitment) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *AvailabilityCommitment) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_AvailabilityCommitment.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *AvailabilityCommitment) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_AvailabilityCommitment.Merge(m, src)
+}
+func (m *AvailabilityCommitment) XXX_Size() int {
+	return m.Size()
+}
+func (m *AvailabilityCommitment) XXX_DiscardUnknown() {
+	xxx_messageInfo_AvailabilityCommitment.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_AvailabilityCommitment proto.InternalMessageInfo
+
+func (m *AvailabilityCommitment) GetCommitmentType() string {
+	if m != nil {
+		return m.CommitmentType
+	}
+	return ""
+}
+
+func (m *AvailabilityCommitment) GetHashAlgo() HashAlgo {
+	if m != nil {
+		return m.HashAlgo
+	}
+	return HashAlgo_HASH_ALGO_UNSPECIFIED
+}
+
+func (m *AvailabilityCommitment) GetChunkSize() uint32 {
+	if m != nil {
+		return m.ChunkSize
+	}
+	return 0
+}
+
+func (m *AvailabilityCommitment) GetTotalSize() uint64 {
+	if m != nil {
+		return m.TotalSize
+	}
+	return 0
+}
+
+func (m *AvailabilityCommitment) GetNumChunks() uint32 {
+	if m != nil {
+		return m.NumChunks
+	}
+	return 0
+}
+
+func (m *AvailabilityCommitment) GetRoot() []byte {
+	if m != nil {
+		return m.Root
+	}
+	return nil
+}
+
+func (m *AvailabilityCommitment) GetChallengeIndices() []uint32 {
+	if m != nil {
+		return m.ChallengeIndices
+	}
+	return nil
+}
+
+// ChunkProof is a Merkle inclusion proof for one challenged chunk.
+type ChunkProof struct {
+	ChunkIndex     uint32   `protobuf:"varint,1,opt,name=chunk_index,proto3" json:"chunk_index,omitempty"`
+	LeafHash       []byte   `protobuf:"bytes,2,opt,name=leaf_hash,proto3" json:"leaf_hash,omitempty"`
+	PathHashes     [][]byte `protobuf:"bytes,3,rep,name=path_hashes,proto3" json:"path_hashes,omitempty"`
+	PathDirections []bool   `protobuf:"varint,4,rep,packed,name=path_directions,proto3" json:"path_directions,omitempty"`
+}
+
+func (m *ChunkProof) Reset()         { *m = ChunkProof{} }
+func (m *ChunkProof) String() string { return proto.CompactTextString(m) }
+func (*ChunkProof) ProtoMessage()    {}
+func (*ChunkProof) Descriptor() ([]byte, []int) {
+	return fileDescriptor_05a11a06dcddaaa2, []int{2}
+}
+func (m *ChunkProof) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *ChunkProof) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_ChunkProof.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *ChunkProof) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ChunkProof.Merge(m, src)
+}
+func (m *ChunkProof) XXX_Size() int {
+	return m.Size()
+}
+func (m *ChunkProof) XXX_DiscardUnknown() {
+	xxx_messageInfo_ChunkProof.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ChunkProof proto.InternalMessageInfo
+
+func (m *ChunkProof) GetChunkIndex() uint32 {
+	if m != nil {
+		return m.ChunkIndex
+	}
+	return 0
+}
+
+func (m *ChunkProof) GetLeafHash() []byte {
+	if m != nil {
+		return m.LeafHash
+	}
+	return nil
+}
+
+func (m *ChunkProof) GetPathHashes() [][]byte {
+	if m != nil {
+		return m.PathHashes
+	}
+	return nil
+}
+
+func (m *ChunkProof) GetPathDirections() []bool {
+	if m != nil {
+		return m.PathDirections
+	}
+	return nil
+}
+
 // CascadeMetadata contains information for Cascade actions.
 // This metadata is directly embedded in the Action.metadata field.
 // For RequestAction:
@@ -155,13 +352,16 @@ type CascadeMetadata struct {
 	// mark the action as visible to all users; set to false for private
 	// or restricted actions.
 	Public bool `protobuf:"varint,7,opt,name=public,proto3" json:"public,omitempty"`
+	// LEP-5 fields
+	AvailabilityCommitment *AvailabilityCommitment `protobuf:"bytes,8,opt,name=availability_commitment,proto3" json:"availability_commitment,omitempty"`
+	ChunkProofs            []*ChunkProof           `protobuf:"bytes,9,rep,name=chunk_proofs,proto3" json:"chunk_proofs,omitempty"`
 }
 
 func (m *CascadeMetadata) Reset()         { *m = CascadeMetadata{} }
 func (m *CascadeMetadata) String() string { return proto.CompactTextString(m) }
 func (*CascadeMetadata) ProtoMessage()    {}
 func (*CascadeMetadata) Descriptor() ([]byte, []int) {
-	return fileDescriptor_05a11a06dcddaaa2, []int{1}
+	return fileDescriptor_05a11a06dcddaaa2, []int{3}
 }
 func (m *CascadeMetadata) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -239,38 +439,75 @@ func (m *CascadeMetadata) GetPublic() bool {
 	return false
 }
 
+func (m *CascadeMetadata) GetAvailabilityCommitment() *AvailabilityCommitment {
+	if m != nil {
+		return m.AvailabilityCommitment
+	}
+	return nil
+}
+
+func (m *CascadeMetadata) GetChunkProofs() []*ChunkProof {
+	if m != nil {
+		return m.ChunkProofs
+	}
+	return nil
+}
+
 func init() {
+	proto.RegisterEnum("lumera.action.v1.HashAlgo", HashAlgo_name, HashAlgo_value)
 	proto.RegisterType((*SenseMetadata)(nil), "lumera.action.v1.SenseMetadata")
+	proto.RegisterType((*AvailabilityCommitment)(nil), "lumera.action.v1.AvailabilityCommitment")
+	proto.RegisterType((*ChunkProof)(nil), "lumera.action.v1.ChunkProof")
 	proto.RegisterType((*CascadeMetadata)(nil), "lumera.action.v1.CascadeMetadata")
 }
 
 func init() { proto.RegisterFile("lumera/action/v1/metadata.proto", fileDescriptor_05a11a06dcddaaa2) }
 
 var fileDescriptor_05a11a06dcddaaa2 = []byte{
-	// 364 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x8c, 0x52, 0x4d, 0x6b, 0xc2, 0x30,
-	0x18, 0x36, 0x5a, 0x3b, 0x1b, 0x90, 0x6d, 0x61, 0xb8, 0x22, 0x52, 0x45, 0x3c, 0x08, 0x03, 0x8b,
-	0x0c, 0xc6, 0xce, 0xee, 0xbc, 0x4b, 0x77, 0xdb, 0xa5, 0xc4, 0x36, 0xd6, 0x40, 0xdb, 0x74, 0x49,
-	0x2a, 0xee, 0x5f, 0xec, 0xff, 0xec, 0x0f, 0x78, 0xf4, 0xb8, 0xd3, 0x18, 0x7a, 0xda, 0xbf, 0x18,
-	0x89, 0xa2, 0x9d, 0xac, 0xb0, 0x53, 0xf2, 0x3e, 0xcf, 0xf3, 0x7e, 0x3c, 0x2f, 0x2f, 0xec, 0xc6,
-	0x79, 0x42, 0x38, 0x76, 0x71, 0x20, 0x29, 0x4b, 0xdd, 0xc5, 0xd8, 0x4d, 0x88, 0xc4, 0x21, 0x96,
-	0x78, 0x94, 0x71, 0x26, 0x19, 0xba, 0xd8, 0x09, 0x46, 0x3b, 0xc1, 0x68, 0x31, 0x6e, 0x5f, 0x45,
-	0x2c, 0x62, 0x9a, 0x74, 0xd5, 0x6f, 0xa7, 0xeb, 0xbf, 0x57, 0x61, 0xf3, 0x89, 0xa4, 0x82, 0x3c,
-	0xee, 0xf3, 0x51, 0x07, 0x5a, 0xea, 0xf5, 0xe7, 0x58, 0xcc, 0x6d, 0xd0, 0x03, 0x43, 0xcb, 0x3b,
-	0x02, 0xe8, 0x0e, 0xb6, 0xc2, 0xd0, 0xc7, 0x69, 0xe8, 0xcf, 0x68, 0x1a, 0x11, 0x9e, 0x71, 0x9a,
-	0x4a, 0xe1, 0xd3, 0xc0, 0xae, 0xf6, 0xc0, 0xd0, 0xf0, 0x4a, 0x58, 0x34, 0x80, 0xcd, 0x80, 0xc5,
-	0x31, 0xd1, 0xe3, 0xf8, 0x34, 0xb4, 0x6b, 0xba, 0xf2, 0x6f, 0x10, 0xb5, 0x61, 0x23, 0xe2, 0x2c,
-	0xcf, 0x94, 0xc0, 0xd0, 0x82, 0x43, 0x8c, 0xee, 0xe1, 0xf5, 0x5f, 0xb5, 0x13, 0xbc, 0xb4, 0xeb,
-	0xba, 0x75, 0x19, 0x5d, 0x96, 0x49, 0x43, 0x61, 0x9b, 0xbd, 0xda, 0xd0, 0xf2, 0xca, 0x68, 0xe4,
-	0x40, 0x28, 0x68, 0x94, 0x62, 0x99, 0x73, 0x22, 0xec, 0x33, 0x3d, 0x51, 0x01, 0xe9, 0x7f, 0x03,
-	0x78, 0xfe, 0x80, 0x45, 0x80, 0xc3, 0xff, 0xee, 0xaf, 0x03, 0xad, 0x19, 0x8d, 0x89, 0x9f, 0xe2,
-	0x84, 0xe8, 0x95, 0x59, 0xde, 0x11, 0x50, 0x2c, 0x7f, 0x51, 0x9d, 0xd5, 0x42, 0x6b, 0xda, 0xd5,
-	0x11, 0x50, 0xd3, 0xec, 0x03, 0x65, 0xda, 0xd0, 0x74, 0x01, 0x41, 0x83, 0x03, 0xaf, 0xac, 0xd5,
-	0x95, 0xb5, 0x89, 0xb1, 0xfa, 0xec, 0x02, 0xaf, 0x80, 0x9f, 0x78, 0x32, 0x4f, 0x3d, 0xa1, 0x16,
-	0x34, 0xb3, 0x7c, 0x1a, 0xd3, 0x40, 0xfb, 0x6d, 0x78, 0xfb, 0x68, 0x72, 0xb3, 0xda, 0x38, 0x60,
-	0xbd, 0x71, 0xc0, 0xd7, 0xc6, 0x01, 0x6f, 0x5b, 0xa7, 0xb2, 0xde, 0x3a, 0x95, 0x8f, 0xad, 0x53,
-	0x79, 0xbe, 0x5c, 0x16, 0xee, 0x50, 0xbe, 0x66, 0x44, 0x4c, 0x4d, 0x7d, 0x5d, 0xb7, 0x3f, 0x01,
-	0x00, 0x00, 0xff, 0xff, 0x90, 0x27, 0xb3, 0x47, 0xa8, 0x02, 0x00, 0x00,
+	// 681 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x8c, 0x54, 0xc1, 0x4e, 0xdb, 0x4c,
+	0x10, 0x8e, 0xe3, 0x90, 0x3f, 0x59, 0xc8, 0x4f, 0x58, 0x51, 0x70, 0x11, 0x0a, 0x56, 0xc4, 0xc1,
+	0x6a, 0xab, 0x44, 0x04, 0x15, 0x71, 0x6c, 0x48, 0x69, 0x83, 0x4a, 0x5b, 0xba, 0x51, 0x2f, 0xbd,
+	0xac, 0x36, 0xf6, 0xc6, 0x59, 0xd5, 0xf6, 0xba, 0xde, 0x0d, 0x82, 0xbe, 0x44, 0x7b, 0xec, 0xa9,
+	0x2f, 0xd2, 0x17, 0xe0, 0xc8, 0xb1, 0xa7, 0xaa, 0x82, 0x17, 0xa9, 0x76, 0x9d, 0x62, 0x13, 0x88,
+	0xd4, 0x93, 0x3d, 0xdf, 0x37, 0x33, 0x3b, 0xfa, 0xe6, 0xdb, 0x05, 0x5b, 0xc1, 0x24, 0xa4, 0x09,
+	0x69, 0x13, 0x57, 0x32, 0x1e, 0xb5, 0x4f, 0x77, 0xda, 0x21, 0x95, 0xc4, 0x23, 0x92, 0xb4, 0xe2,
+	0x84, 0x4b, 0x0e, 0xeb, 0x69, 0x42, 0x2b, 0x4d, 0x68, 0x9d, 0xee, 0x6c, 0xac, 0xfa, 0xdc, 0xe7,
+	0x9a, 0x6c, 0xab, 0xbf, 0x34, 0xaf, 0xf9, 0xa3, 0x08, 0x6a, 0x03, 0x1a, 0x09, 0xfa, 0x7a, 0x5a,
+	0x0f, 0x37, 0x41, 0x55, 0x7d, 0xf1, 0x98, 0x88, 0xb1, 0x65, 0xd8, 0x86, 0x53, 0x45, 0x19, 0x00,
+	0xf7, 0xc0, 0x9a, 0xe7, 0x61, 0x12, 0x79, 0x78, 0xc4, 0x22, 0x9f, 0x26, 0x71, 0xc2, 0x22, 0x29,
+	0x30, 0x73, 0xad, 0xa2, 0x6d, 0x38, 0x25, 0x34, 0x87, 0x85, 0xdb, 0xa0, 0xe6, 0xf2, 0x20, 0xa0,
+	0x7a, 0x1c, 0xcc, 0x3c, 0xcb, 0xd4, 0x9d, 0x6f, 0x83, 0x70, 0x03, 0x54, 0xfc, 0x84, 0x4f, 0x62,
+	0x95, 0x50, 0xd2, 0x09, 0x37, 0x31, 0xdc, 0x07, 0xeb, 0xf7, 0xf5, 0x0e, 0xc9, 0x99, 0xb5, 0xa0,
+	0x8f, 0x9e, 0x47, 0xcf, 0xab, 0x64, 0x9e, 0xb0, 0xca, 0xb6, 0xe9, 0x54, 0xd1, 0x3c, 0x1a, 0x36,
+	0x00, 0x10, 0xcc, 0x8f, 0x88, 0x9c, 0x24, 0x54, 0x58, 0xff, 0xe9, 0x89, 0x72, 0x48, 0xf3, 0x7b,
+	0x11, 0xac, 0x75, 0x4f, 0x09, 0x0b, 0xc8, 0x90, 0x05, 0x4c, 0x9e, 0xf7, 0x78, 0x18, 0x32, 0x19,
+	0xd2, 0x48, 0x42, 0x07, 0x2c, 0xbb, 0x37, 0x11, 0x96, 0xe7, 0x31, 0x9d, 0x8a, 0x39, 0x0b, 0xc3,
+	0x7d, 0x50, 0x55, 0xd2, 0x62, 0x12, 0xf8, 0x5c, 0xab, 0xf8, 0x7f, 0x67, 0xa3, 0x35, 0xbb, 0xbe,
+	0x56, 0x9f, 0x88, 0x71, 0x37, 0xf0, 0x39, 0xca, 0x92, 0xd5, 0x78, 0xee, 0x78, 0x12, 0x7d, 0xc4,
+	0x82, 0x7d, 0xa6, 0x5a, 0xd1, 0x1a, 0xca, 0x21, 0x8a, 0x97, 0x5c, 0x92, 0x20, 0xe5, 0x4b, 0x5a,
+	0xa5, 0x1c, 0xa2, 0xf8, 0x68, 0x12, 0x62, 0x5d, 0x21, 0xb4, 0x8a, 0x35, 0x94, 0x43, 0x20, 0x04,
+	0xa5, 0x84, 0x73, 0x69, 0x95, 0x6d, 0xc3, 0x59, 0x42, 0xfa, 0x1f, 0x3e, 0x01, 0x2b, 0xee, 0x98,
+	0x04, 0x01, 0x8d, 0x7c, 0x8a, 0x59, 0xe4, 0x31, 0x57, 0x2b, 0x63, 0x3a, 0x35, 0x74, 0x97, 0x68,
+	0x7e, 0x33, 0x00, 0xe8, 0xa9, 0x66, 0x27, 0x09, 0xe7, 0x23, 0x68, 0x83, 0xc5, 0x74, 0x3c, 0x16,
+	0x79, 0xf4, 0x4c, 0x0b, 0x52, 0x43, 0x79, 0x48, 0xb9, 0x2f, 0xa0, 0x64, 0x94, 0xba, 0xaf, 0xa8,
+	0xcf, 0xcd, 0x00, 0x55, 0x1f, 0x13, 0x39, 0xd6, 0x01, 0x15, 0x96, 0x69, 0x9b, 0xce, 0x12, 0xca,
+	0x43, 0x4a, 0x76, 0x1d, 0x7a, 0x2c, 0x49, 0x6d, 0x25, 0xac, 0x92, 0x6d, 0x3a, 0x15, 0x34, 0x0b,
+	0x37, 0xbf, 0x98, 0x60, 0xb9, 0x47, 0x84, 0x4b, 0xbc, 0x7f, 0xf5, 0xfe, 0x26, 0xa8, 0x8e, 0x58,
+	0x40, 0x71, 0x44, 0x42, 0xaa, 0x67, 0xab, 0xa2, 0x0c, 0x50, 0x6c, 0xf2, 0x49, 0xb9, 0x46, 0x5d,
+	0x06, 0x53, 0x6b, 0x9d, 0x01, 0x4a, 0xea, 0x69, 0xa0, 0x0c, 0x3b, 0x5d, 0x45, 0x86, 0xc0, 0xed,
+	0x1b, 0x5e, 0xd9, 0x72, 0x41, 0xd9, 0xf2, 0xa0, 0x74, 0xf1, 0x6b, 0xcb, 0x40, 0x39, 0x7c, 0xc6,
+	0x8f, 0xe5, 0x59, 0x3f, 0xc2, 0x35, 0x50, 0x8e, 0x27, 0xc3, 0x80, 0xb9, 0xda, 0xab, 0x15, 0x34,
+	0x8d, 0xe0, 0x10, 0xac, 0x93, 0x9c, 0x4d, 0x71, 0x66, 0x41, 0xab, 0x62, 0x1b, 0xce, 0x62, 0xc7,
+	0xb9, 0x6b, 0xb8, 0xfb, 0x7d, 0x8d, 0xe6, 0x35, 0x82, 0xcf, 0xc0, 0x52, 0xba, 0xc8, 0x58, 0xad,
+	0x5a, 0x58, 0x55, 0xdb, 0x74, 0x16, 0x3b, 0x9b, 0x77, 0x1b, 0x67, 0x7e, 0x40, 0xb7, 0x2a, 0x1e,
+	0xbd, 0x03, 0x95, 0xbf, 0x2e, 0x87, 0x0f, 0xc1, 0x83, 0x7e, 0x77, 0xd0, 0xc7, 0xdd, 0xe3, 0x97,
+	0x6f, 0xf1, 0xfb, 0x37, 0x83, 0x93, 0xc3, 0xde, 0xd1, 0x8b, 0xa3, 0xc3, 0xe7, 0xf5, 0x02, 0x5c,
+	0x05, 0xf5, 0x8c, 0x3a, 0x38, 0xee, 0xbe, 0x3a, 0xdc, 0xad, 0x1b, 0xb7, 0xd1, 0x41, 0xbf, 0xdb,
+	0x79, 0xba, 0x57, 0x2f, 0x1e, 0x3c, 0xbe, 0xb8, 0x6a, 0x18, 0x97, 0x57, 0x0d, 0xe3, 0xf7, 0x55,
+	0xc3, 0xf8, 0x7a, 0xdd, 0x28, 0x5c, 0x5e, 0x37, 0x0a, 0x3f, 0xaf, 0x1b, 0x85, 0x0f, 0x2b, 0x67,
+	0xb9, 0xc7, 0x53, 0xdd, 0x43, 0x31, 0x2c, 0xeb, 0x27, 0x71, 0xf7, 0x4f, 0x00, 0x00, 0x00, 0xff,
+	0xff, 0x28, 0x1a, 0x84, 0x3a, 0x5d, 0x05, 0x00, 0x00,
 }
 
 func (m *SenseMetadata) Marshal() (dAtA []byte, err error) {
@@ -343,6 +580,138 @@ func (m *SenseMetadata) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+func (m *AvailabilityCommitment) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *AvailabilityCommitment) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *AvailabilityCommitment) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.ChallengeIndices) > 0 {
+		dAtA2 := make([]byte, len(m.ChallengeIndices)*10)
+		var j1 int
+		for _, num := range m.ChallengeIndices {
+			for num >= 1<<7 {
+				dAtA2[j1] = uint8(uint64(num)&0x7f | 0x80)
+				num >>= 7
+				j1++
+			}
+			dAtA2[j1] = uint8(num)
+			j1++
+		}
+		i -= j1
+		copy(dAtA[i:], dAtA2[:j1])
+		i = encodeVarintMetadata(dAtA, i, uint64(j1))
+		i--
+		dAtA[i] = 0x3a
+	}
+	if len(m.Root) > 0 {
+		i -= len(m.Root)
+		copy(dAtA[i:], m.Root)
+		i = encodeVarintMetadata(dAtA, i, uint64(len(m.Root)))
+		i--
+		dAtA[i] = 0x32
+	}
+	if m.NumChunks != 0 {
+		i = encodeVarintMetadata(dAtA, i, uint64(m.NumChunks))
+		i--
+		dAtA[i] = 0x28
+	}
+	if m.TotalSize != 0 {
+		i = encodeVarintMetadata(dAtA, i, uint64(m.TotalSize))
+		i--
+		dAtA[i] = 0x20
+	}
+	if m.ChunkSize != 0 {
+		i = encodeVarintMetadata(dAtA, i, uint64(m.ChunkSize))
+		i--
+		dAtA[i] = 0x18
+	}
+	if m.HashAlgo != 0 {
+		i = encodeVarintMetadata(dAtA, i, uint64(m.HashAlgo))
+		i--
+		dAtA[i] = 0x10
+	}
+	if len(m.CommitmentType) > 0 {
+		i -= len(m.CommitmentType)
+		copy(dAtA[i:], m.CommitmentType)
+		i = encodeVarintMetadata(dAtA, i, uint64(len(m.CommitmentType)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *ChunkProof) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ChunkProof) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ChunkProof) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.PathDirections) > 0 {
+		for iNdEx := len(m.PathDirections) - 1; iNdEx >= 0; iNdEx-- {
+			i--
+			if m.PathDirections[iNdEx] {
+				dAtA[i] = 1
+			} else {
+				dAtA[i] = 0
+			}
+		}
+		i = encodeVarintMetadata(dAtA, i, uint64(len(m.PathDirections)))
+		i--
+		dAtA[i] = 0x22
+	}
+	if len(m.PathHashes) > 0 {
+		for iNdEx := len(m.PathHashes) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.PathHashes[iNdEx])
+			copy(dAtA[i:], m.PathHashes[iNdEx])
+			i = encodeVarintMetadata(dAtA, i, uint64(len(m.PathHashes[iNdEx])))
+			i--
+			dAtA[i] = 0x1a
+		}
+	}
+	if len(m.LeafHash) > 0 {
+		i -= len(m.LeafHash)
+		copy(dAtA[i:], m.LeafHash)
+		i = encodeVarintMetadata(dAtA, i, uint64(len(m.LeafHash)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if m.ChunkIndex != 0 {
+		i = encodeVarintMetadata(dAtA, i, uint64(m.ChunkIndex))
+		i--
+		dAtA[i] = 0x8
+	}
+	return len(dAtA) - i, nil
+}
+
 func (m *CascadeMetadata) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -363,6 +732,32 @@ func (m *CascadeMetadata) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.ChunkProofs) > 0 {
+		for iNdEx := len(m.ChunkProofs) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.ChunkProofs[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintMetadata(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x4a
+		}
+	}
+	if m.AvailabilityCommitment != nil {
+		{
+			size, err := m.AvailabilityCommitment.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintMetadata(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x42
+	}
 	if m.Public {
 		i--
 		if m.Public {
@@ -464,6 +859,67 @@ func (m *SenseMetadata) Size() (n int) {
 	return n
 }
 
+func (m *AvailabilityCommitment) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.CommitmentType)
+	if l > 0 {
+		n += 1 + l + sovMetadata(uint64(l))
+	}
+	if m.HashAlgo != 0 {
+		n += 1 + sovMetadata(uint64(m.HashAlgo))
+	}
+	if m.ChunkSize != 0 {
+		n += 1 + sovMetadata(uint64(m.ChunkSize))
+	}
+	if m.TotalSize != 0 {
+		n += 1 + sovMetadata(uint64(m.TotalSize))
+	}
+	if m.NumChunks != 0 {
+		n += 1 + sovMetadata(uint64(m.NumChunks))
+	}
+	l = len(m.Root)
+	if l > 0 {
+		n += 1 + l + sovMetadata(uint64(l))
+	}
+	if len(m.ChallengeIndices) > 0 {
+		l = 0
+		for _, e := range m.ChallengeIndices {
+			l += sovMetadata(uint64(e))
+		}
+		n += 1 + sovMetadata(uint64(l)) + l
+	}
+	return n
+}
+
+func (m *ChunkProof) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.ChunkIndex != 0 {
+		n += 1 + sovMetadata(uint64(m.ChunkIndex))
+	}
+	l = len(m.LeafHash)
+	if l > 0 {
+		n += 1 + l + sovMetadata(uint64(l))
+	}
+	if len(m.PathHashes) > 0 {
+		for _, b := range m.PathHashes {
+			l = len(b)
+			n += 1 + l + sovMetadata(uint64(l))
+		}
+	}
+	if len(m.PathDirections) > 0 {
+		n += 1 + sovMetadata(uint64(len(m.PathDirections))) + len(m.PathDirections)*1
+	}
+	return n
+}
+
 func (m *CascadeMetadata) Size() (n int) {
 	if m == nil {
 		return 0
@@ -496,6 +952,16 @@ func (m *CascadeMetadata) Size() (n int) {
 	}
 	if m.Public {
 		n += 2
+	}
+	if m.AvailabilityCommitment != nil {
+		l = m.AvailabilityCommitment.Size()
+		n += 1 + l + sovMetadata(uint64(l))
+	}
+	if len(m.ChunkProofs) > 0 {
+		for _, e := range m.ChunkProofs {
+			l = e.Size()
+			n += 1 + l + sovMetadata(uint64(l))
+		}
 	}
 	return n
 }
@@ -754,6 +1220,479 @@ func (m *SenseMetadata) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+func (m *AvailabilityCommitment) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMetadata
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: AvailabilityCommitment: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: AvailabilityCommitment: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CommitmentType", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMetadata
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMetadata
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthMetadata
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.CommitmentType = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field HashAlgo", wireType)
+			}
+			m.HashAlgo = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMetadata
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.HashAlgo |= HashAlgo(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ChunkSize", wireType)
+			}
+			m.ChunkSize = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMetadata
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ChunkSize |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TotalSize", wireType)
+			}
+			m.TotalSize = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMetadata
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.TotalSize |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field NumChunks", wireType)
+			}
+			m.NumChunks = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMetadata
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.NumChunks |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Root", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMetadata
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthMetadata
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex < 0 {
+				return ErrInvalidLengthMetadata
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Root = append(m.Root[:0], dAtA[iNdEx:postIndex]...)
+			if m.Root == nil {
+				m.Root = []byte{}
+			}
+			iNdEx = postIndex
+		case 7:
+			if wireType == 0 {
+				var v uint32
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowMetadata
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					v |= uint32(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				m.ChallengeIndices = append(m.ChallengeIndices, v)
+			} else if wireType == 2 {
+				var packedLen int
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowMetadata
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					packedLen |= int(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				if packedLen < 0 {
+					return ErrInvalidLengthMetadata
+				}
+				postIndex := iNdEx + packedLen
+				if postIndex < 0 {
+					return ErrInvalidLengthMetadata
+				}
+				if postIndex > l {
+					return io.ErrUnexpectedEOF
+				}
+				var elementCount int
+				var count int
+				for _, integer := range dAtA[iNdEx:postIndex] {
+					if integer < 128 {
+						count++
+					}
+				}
+				elementCount = count
+				if elementCount != 0 && len(m.ChallengeIndices) == 0 {
+					m.ChallengeIndices = make([]uint32, 0, elementCount)
+				}
+				for iNdEx < postIndex {
+					var v uint32
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowMetadata
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						v |= uint32(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					m.ChallengeIndices = append(m.ChallengeIndices, v)
+				}
+			} else {
+				return fmt.Errorf("proto: wrong wireType = %d for field ChallengeIndices", wireType)
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMetadata(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthMetadata
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ChunkProof) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMetadata
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ChunkProof: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ChunkProof: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ChunkIndex", wireType)
+			}
+			m.ChunkIndex = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMetadata
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ChunkIndex |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LeafHash", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMetadata
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthMetadata
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex < 0 {
+				return ErrInvalidLengthMetadata
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.LeafHash = append(m.LeafHash[:0], dAtA[iNdEx:postIndex]...)
+			if m.LeafHash == nil {
+				m.LeafHash = []byte{}
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PathHashes", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMetadata
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthMetadata
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex < 0 {
+				return ErrInvalidLengthMetadata
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.PathHashes = append(m.PathHashes, make([]byte, postIndex-iNdEx))
+			copy(m.PathHashes[len(m.PathHashes)-1], dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType == 0 {
+				var v int
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowMetadata
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					v |= int(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				m.PathDirections = append(m.PathDirections, bool(v != 0))
+			} else if wireType == 2 {
+				var packedLen int
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowMetadata
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					packedLen |= int(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				if packedLen < 0 {
+					return ErrInvalidLengthMetadata
+				}
+				postIndex := iNdEx + packedLen
+				if postIndex < 0 {
+					return ErrInvalidLengthMetadata
+				}
+				if postIndex > l {
+					return io.ErrUnexpectedEOF
+				}
+				var elementCount int
+				elementCount = packedLen
+				if elementCount != 0 && len(m.PathDirections) == 0 {
+					m.PathDirections = make([]bool, 0, elementCount)
+				}
+				for iNdEx < postIndex {
+					var v int
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowMetadata
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						v |= int(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					m.PathDirections = append(m.PathDirections, bool(v != 0))
+				}
+			} else {
+				return fmt.Errorf("proto: wrong wireType = %d for field PathDirections", wireType)
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMetadata(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthMetadata
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func (m *CascadeMetadata) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -969,6 +1908,76 @@ func (m *CascadeMetadata) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.Public = bool(v != 0)
+		case 8:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AvailabilityCommitment", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMetadata
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMetadata
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthMetadata
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.AvailabilityCommitment == nil {
+				m.AvailabilityCommitment = &AvailabilityCommitment{}
+			}
+			if err := m.AvailabilityCommitment.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 9:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ChunkProofs", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMetadata
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMetadata
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthMetadata
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ChunkProofs = append(m.ChunkProofs, &ChunkProof{})
+			if err := m.ChunkProofs[len(m.ChunkProofs)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipMetadata(dAtA[iNdEx:])

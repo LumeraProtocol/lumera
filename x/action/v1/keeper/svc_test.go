@@ -124,11 +124,6 @@ func setupSVCFixture(t *testing.T, numChunks uint32) (k actionkeeper.Keeper, ctx
 		BlockHeight: 42,
 	}
 
-	params := k.GetParams(baseCtx)
-	params.SvcChallengeCount = 4
-	params.SvcMinChunksForChallenge = 4
-	require.NoError(t, k.SetParams(baseCtx, params))
-
 	ctx = baseCtx.WithBlockHeight(42).WithEventManager(sdk.NewEventManager())
 
 	// Generate proofs matching the stored challenge indices.

@@ -30,11 +30,6 @@ func TestFinalizeCascade_WithValidChunkProofs_SetsDone(t *testing.T) {
 
 	ctx = ctx.WithBlockHeight(42).WithEventManager(sdk.NewEventManager())
 
-	params := k.GetParams(ctx)
-	params.SvcChallengeCount = 4
-	params.SvcMinChunksForChallenge = 4
-	require.NoError(t, k.SetParams(ctx, params))
-
 	signatureCascade, err := cryptotestutils.CreateSignatureString([]secp256k1.PrivKey{creatorKey}, 50)
 	require.NoError(t, err)
 

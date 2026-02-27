@@ -11,10 +11,12 @@ import (
 	gogoproto "github.com/cosmos/gogoproto/proto"
 )
 
-const (
-	defaultSVCChallengeCount        uint32 = 8
-	defaultSVCMinChunksForChallenge uint32 = 4
-)
+// SVCChallengeCount is the number of chunks challenged during SVC verification.
+const SVCChallengeCount uint32 = 8
+
+// SVCMinChunksForChallenge is the minimum number of chunks a file must produce
+// for SVC verification to apply. Files with fewer chunks skip SVC.
+const SVCMinChunksForChallenge uint32 = 4
 
 // VerifyChunkProofs validates LEP-5 chunk proofs for Cascade finalization.
 //
@@ -42,13 +44,12 @@ func (k *Keeper) VerifyChunkProofs(
 		return nil
 	}
 
-	challengeCount, minChunks := getSVCParamsOrDefault(k.GetParams(ctx))
-	if commitment.NumChunks < minChunks {
+	if commitment.NumChunks < SVCMinChunksForChallenge {
 		// Small files are out of challenge scope.
 		return nil
 	}
 
-	expectedCount := challengeCount
+	expectedCount := SVCChallengeCount
 	if expectedCount > commitment.NumChunks {
 		expectedCount = commitment.NumChunks
 	}
@@ -131,19 +132,6 @@ func (k *Keeper) VerifyChunkProofs(
 	return nil
 }
 
-func getSVCParamsOrDefault(params actiontypes.Params) (challengeCount, minChunks uint32) {
-	challengeCount = params.SvcChallengeCount
-	if challengeCount == 0 {
-		challengeCount = defaultSVCChallengeCount
-	}
-
-	minChunks = params.SvcMinChunksForChallenge
-	if minChunks == 0 {
-		minChunks = defaultSVCMinChunksForChallenge
-	}
-
-	return challengeCount, minChunks
-}
 
 func chunkProofToMerkleProof(proof *actiontypes.ChunkProof) (*merkle.Proof, error) {
 	if len(proof.PathHashes) != len(proof.PathDirections) {

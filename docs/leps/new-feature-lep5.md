@@ -612,22 +612,15 @@ func HashInternal(left, right [HashSize]byte) [HashSize]byte {
     return result
 }
 
-func nextPowerOf2(n int) int {
-    v := 1
-    for v < n {
-        v <<= 1
-    }
-    return v
-}
-
 type Tree struct {
     Root      [HashSize]byte
     Leaves    [][HashSize]byte
-    Levels    [][][HashSize]byte // levels[0] = leaves, levels[last] = [root]
+    Levels    [][][HashSize]byte // levels[0] = leaves (possibly padded), levels[last] = [root]
     LeafCount int
 }
 
-// BuildTree constructs a Merkle tree from chunk data
+// BuildTree constructs a Merkle tree from chunk data.
+// If a level has an odd number of nodes, the last node is duplicated.
 func BuildTree(chunks [][]byte) (*Tree, error) {
     n := len(chunks)
     if n == 0 {
@@ -640,18 +633,17 @@ func BuildTree(chunks [][]byte) (*Tree, error) {
         leaves[i] = HashLeaf(uint32(i), chunk)
     }
 
-    // Pad to next power of 2
-    padded := make([][HashSize]byte, nextPowerOf2(n))
-    copy(padded, leaves)
-    for i := n; i < len(padded); i++ {
-        padded[i] = padded[n-1] // duplicate last
-    }
-
-    levels := [][][HashSize]byte{padded}
+    levels := [][][HashSize]byte{leaves}
 
     // Build tree bottom-up
-    current := padded
+    current := leaves
     for len(current) > 1 {
+        // If odd number of nodes, duplicate the last node
+        if len(current)%2 != 0 {
+            current = append(current, current[len(current)-1])
+            levels[len(levels)-1] = current
+        }
+
         next := make([][HashSize]byte, len(current)/2)
         for i := 0; i < len(current); i += 2 {
             next[i/2] = HashInternal(current[i], current[i+1])

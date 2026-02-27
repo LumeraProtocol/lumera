@@ -139,8 +139,7 @@ func (h CascadeActionHandler) Process(metadataBytes []byte, msgType common.Messa
 		if params == nil {
 			return nil, fmt.Errorf("params field is required for cascade metadata")
 		}
-		challengeCount, minChunks := getSVCParamsOrDefault(*params)
-		if err := validateAvailabilityCommitment(metadata.AvailabilityCommitment, challengeCount, minChunks); err != nil {
+		if err := validateAvailabilityCommitment(metadata.AvailabilityCommitment, SVCChallengeCount, SVCMinChunksForChallenge); err != nil {
 			return nil, err
 		}
 		metadata.RqIdsMax = params.MaxRaptorQSymbols
@@ -202,8 +201,7 @@ func (h CascadeActionHandler) RegisterAction(ctx sdk.Context, action *actiontype
 	if err := gogoproto.Unmarshal(action.Metadata, &cascadeMeta); err != nil {
 		return errors.Wrap(actiontypes.ErrInvalidMetadata, fmt.Sprintf("failed to unmarshal cascade metadata: %v", err))
 	}
-	challengeCount, minChunks := getSVCParamsOrDefault(h.keeper.GetParams(ctx))
-	if err := validateAvailabilityCommitment(cascadeMeta.AvailabilityCommitment, challengeCount, minChunks); err != nil {
+	if err := validateAvailabilityCommitment(cascadeMeta.AvailabilityCommitment, SVCChallengeCount, SVCMinChunksForChallenge); err != nil {
 		return errors.Wrap(actiontypes.ErrInvalidMetadata, err.Error())
 	}
 

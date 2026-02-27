@@ -7,6 +7,8 @@ const (
 	EventTypeActionApproved   = "action_approved"
 	EventTypeActionFailed     = "action_failed"
 	EventTypeActionExpired    = "action_expired"
+	EventTypeSVCEvidence      = "svc_verification_failed_evidence"
+	EventTypeSVCVerificationPassed = "svc_verification_passed"
 
 	// Common Attributes
 	AttributeKeyActionID   = "action_id"
@@ -16,4 +18,7 @@ const (
 	AttributeKeyResults    = "results"
 	AttributeKeyFee        = "fee"
 	AttributeKeyError      = "error"
+	AttributeKeyProofIndex = "proof_index"
+	AttributeKeyChunkIndex = "chunk_index"
+	AttributeKeyExpectedChunkIndex = "expected_chunk_index"
 )

@@ -43,4 +43,8 @@ message Params {
   // Reward Distribution
   string super_node_fee_share = 10 [(cosmos_proto.scalar) = "cosmos.Dec"];
   string foundation_fee_share = 11 [(cosmos_proto.scalar) = "cosmos.Dec"];
+
+  // LEP-5 parameters
+  uint32 svc_challenge_count = 12;
+  uint32 svc_min_chunks_for_challenge = 13;
 }

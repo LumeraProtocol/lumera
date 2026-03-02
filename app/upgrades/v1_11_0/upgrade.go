@@ -46,8 +46,13 @@ func CreateUpgradeHandler(p appParams.AppUpgradeParams) upgradetypes.UpgradeHand
 
 		ctx := sdk.UnwrapSDKContext(goCtx)
 
+		// x/module's RunMigrations auto-calls InitGenesis for modules missing from fromVM.
+		// We want custom, upgrade-height-aware audit initialization instead of default genesis,
+		// so pin audit to its consensus version before running migrations.
+		migrationVM := prepareVersionMapForCustomAuditInit(fromVM)
+
 		p.Logger.Info("Running module migrations...")
-		newVM, err := p.ModuleManager.RunMigrations(ctx, p.Configurator, fromVM)
+		newVM, err := p.ModuleManager.RunMigrations(ctx, p.Configurator, migrationVM)
 		if err != nil {
 			p.Logger.Error("Failed to run migrations", "error", err)
 			return nil, fmt.Errorf("failed to run migrations: %w", err)
@@ -89,4 +94,14 @@ func CreateUpgradeHandler(p appParams.AppUpgradeParams) upgradetypes.UpgradeHand
 		p.Logger.Info(fmt.Sprintf("Successfully completed upgrade %s", UpgradeName))
 		return newVM, nil
 	}
+}
+
+func prepareVersionMapForCustomAuditInit(fromVM module.VersionMap) module.VersionMap {
+	migrationVM := make(module.VersionMap, len(fromVM)+1)
+	for moduleName, version := range fromVM {
+		migrationVM[moduleName] = version
+	}
+
+	migrationVM[audittypes.ModuleName] = audittypes.ConsensusVersion
+	return migrationVM
 }

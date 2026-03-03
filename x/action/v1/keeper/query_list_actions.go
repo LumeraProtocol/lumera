@@ -54,6 +54,61 @@ func sortActionsByNumericID(actions []*types.Action) {
 	})
 }
 
+// applyNumericReverseOrderingAndPaginate applies numeric ActionID ordering in
+// descending order and then paginates the resulting slice.
+func applyNumericReverseOrderingAndPaginate(actions []*types.Action, pageReq *query.PageRequest) ([]*types.Action, *query.PageResponse, error) {
+	sortActionsByNumericID(actions)
+	for i, j := 0, len(actions)-1; i < j; i, j = i+1, j-1 {
+		actions[i], actions[j] = actions[j], actions[i]
+	}
+
+	return paginateActionSlice(actions, pageReq)
+}
+
+// collectActionsFromIDIndexStore loads actions by ID from an index store whose keys
+// are action IDs. Stale index entries are ignored.
+func (q queryServer) collectActionsFromIDIndexStore(
+	ctx sdk.Context,
+	indexStore prefix.Store,
+	actionTypeFilter types.ActionType,
+) ([]*types.Action, error) {
+	actions := make([]*types.Action, 0)
+	iter := indexStore.Iterator(nil, nil)
+	defer iter.Close()
+
+	for ; iter.Valid(); iter.Next() {
+		actionID := string(iter.Key())
+		act, found := q.k.GetActionByID(ctx, actionID)
+		if !found {
+			continue
+		}
+		if actionTypeFilter != types.ActionTypeUnspecified && act.ActionType != actiontypes.ActionType(actionTypeFilter) {
+			continue
+		}
+
+		actions = append(actions, act)
+	}
+
+	return actions, nil
+}
+
+// collectActionsFromPrimaryStore loads all actions from the primary action store.
+func (q queryServer) collectActionsFromPrimaryStore(actionStore prefix.Store) ([]*types.Action, error) {
+	actions := make([]*types.Action, 0)
+	iter := actionStore.Iterator(nil, nil)
+	defer iter.Close()
+
+	for ; iter.Valid(); iter.Next() {
+		var act actiontypes.Action
+		if unmarshalErr := q.k.cdc.Unmarshal(iter.Value(), &act); unmarshalErr != nil {
+			return nil, status.Errorf(codes.Internal, "failed to unmarshal action: %v", unmarshalErr)
+		}
+		actions = append(actions, &act)
+	}
+
+	return actions, nil
+}
+
 // decodeActionPaginationOffset decodes an opaque pagination key into an offset.
 func decodeActionPaginationOffset(key []byte) (uint64, error) {
 	if len(key) != 8 {
@@ -141,30 +196,12 @@ func (q queryServer) ListActions(goCtx context.Context, req *types.QueryListActi
 		if shouldUseNumericReverseOrdering(req.Pagination) {
 			// Numeric reverse ordering cannot be derived from lexical KV iteration, so
 			// we materialize the matched set, sort it numerically, then paginate.
-			iter := indexStore.Iterator(nil, nil)
-			defer iter.Close()
-
-			for ; iter.Valid(); iter.Next() {
-				actionID := string(iter.Key())
-				act, found := q.k.GetActionByID(ctx, actionID)
-				if !found {
-					// Stale index entry; skip without counting
-					continue
-				}
-
-				if req.ActionType != types.ActionTypeUnspecified && act.ActionType != actiontypes.ActionType(req.ActionType) {
-					continue
-				}
-
-				actions = append(actions, act)
+			actions, err = q.collectActionsFromIDIndexStore(ctx, indexStore, req.ActionType)
+			if err != nil {
+				return nil, err
 			}
 
-			sortActionsByNumericID(actions)
-			for i, j := 0, len(actions)-1; i < j; i, j = i+1, j-1 {
-				actions[i], actions[j] = actions[j], actions[i]
-			}
-
-			actions, pageRes, err = paginateActionSlice(actions, req.Pagination)
+			actions, pageRes, err = applyNumericReverseOrderingAndPaginate(actions, req.Pagination)
 		} else {
 			onResult := func(key, _ []byte, accumulate bool) (bool, error) {
 				actionID := string(key)
@@ -195,26 +232,12 @@ func (q queryServer) ListActions(goCtx context.Context, req *types.QueryListActi
 		if shouldUseNumericReverseOrdering(req.Pagination) {
 			// Numeric reverse ordering cannot be derived from lexical KV iteration, so
 			// we materialize the matched set, sort it numerically, then paginate.
-			iter := indexStore.Iterator(nil, nil)
-			defer iter.Close()
-
-			for ; iter.Valid(); iter.Next() {
-				actionID := string(iter.Key())
-				act, found := q.k.GetActionByID(ctx, actionID)
-				if !found {
-					// Stale index entry; skip
-					continue
-				}
-
-				actions = append(actions, act)
+			actions, err = q.collectActionsFromIDIndexStore(ctx, indexStore, types.ActionTypeUnspecified)
+			if err != nil {
+				return nil, err
 			}
 
-			sortActionsByNumericID(actions)
-			for i, j := 0, len(actions)-1; i < j; i, j = i+1, j-1 {
-				actions[i], actions[j] = actions[j], actions[i]
-			}
-
-			actions, pageRes, err = paginateActionSlice(actions, req.Pagination)
+			actions, pageRes, err = applyNumericReverseOrderingAndPaginate(actions, req.Pagination)
 		} else {
 			onResult := func(key, _ []byte, accumulate bool) (bool, error) {
 				actionID := string(key)
@@ -239,23 +262,12 @@ func (q queryServer) ListActions(goCtx context.Context, req *types.QueryListActi
 		if shouldUseNumericReverseOrdering(req.Pagination) {
 			// Numeric reverse ordering cannot be derived from lexical KV iteration, so
 			// we materialize the matched set, sort it numerically, then paginate.
-			iter := actionStore.Iterator(nil, nil)
-			defer iter.Close()
-
-			for ; iter.Valid(); iter.Next() {
-				var act actiontypes.Action
-				if unmarshalErr := q.k.cdc.Unmarshal(iter.Value(), &act); unmarshalErr != nil {
-					return nil, status.Errorf(codes.Internal, "failed to unmarshal action: %v", unmarshalErr)
-				}
-				actions = append(actions, &act)
+			actions, err = q.collectActionsFromPrimaryStore(actionStore)
+			if err != nil {
+				return nil, err
 			}
 
-			sortActionsByNumericID(actions)
-			for i, j := 0, len(actions)-1; i < j; i, j = i+1, j-1 {
-				actions[i], actions[j] = actions[j], actions[i]
-			}
-
-			actions, pageRes, err = paginateActionSlice(actions, req.Pagination)
+			actions, pageRes, err = applyNumericReverseOrderingAndPaginate(actions, req.Pagination)
 		} else {
 			onResult := func(key, value []byte, accumulate bool) (bool, error) {
 				var act actiontypes.Action

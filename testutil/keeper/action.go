@@ -32,6 +32,7 @@ import (
 	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	actionmodulev1 "github.com/LumeraProtocol/lumera/x/action/v1/module"
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	audittypes "github.com/LumeraProtocol/lumera/x/audit/v1/types"
 	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
@@ -45,7 +46,7 @@ const (
 type ActionBankKeeper struct {
 	mock.Mock
 	// sentCoins tracks the coins sent from accounts
-	sentCoins      map[string]sdk.Coins
+	sentCoins map[string]sdk.Coins
 	// moduleBalances tracks the balances of modules
 	moduleBalances map[string]sdk.Coins
 }
@@ -138,6 +139,46 @@ func (m *MockStakingKeeper) Validator(ctx context.Context, addr sdk.ValAddress) 
 	return args.Get(0).(stakingtypes.ValidatorI), args.Error(1)
 }
 
+type MockAuditKeeper struct {
+	nextEvidenceID uint64
+	CreateCalls    []MockAuditKeeperCreateEvidenceCall
+}
+
+type MockAuditKeeperCreateEvidenceCall struct {
+	ReporterAddress string
+	SubjectAddress  string
+	ActionID        string
+	EvidenceType    audittypes.EvidenceType
+	MetadataJSON    string
+}
+
+func NewMockAuditKeeper() *MockAuditKeeper {
+	return &MockAuditKeeper{nextEvidenceID: 1}
+}
+
+func (m *MockAuditKeeper) CreateEvidence(
+	ctx context.Context,
+	reporterAddress string,
+	subjectAddress string,
+	actionID string,
+	evidenceType audittypes.EvidenceType,
+	metadataJSON string,
+) (uint64, error) {
+	if m.nextEvidenceID == 0 {
+		m.nextEvidenceID = 1
+	}
+	id := m.nextEvidenceID
+	m.nextEvidenceID++
+	m.CreateCalls = append(m.CreateCalls, MockAuditKeeperCreateEvidenceCall{
+		ReporterAddress: reporterAddress,
+		SubjectAddress:  subjectAddress,
+		ActionID:        actionID,
+		EvidenceType:    evidenceType,
+		MetadataJSON:    metadataJSON,
+	})
+	return id, nil
+}
+
 type AccountPair struct {
 	Address sdk.AccAddress
 	PubKey  cryptotypes.PubKey
@@ -171,6 +212,7 @@ func ActionKeeperWithAddress(t testing.TB, ctrl *gomock.Controller, accounts []A
 	supernodeQueryServer := supernodemocks.NewMockQueryServer(ctrl)
 
 	distributionKeeper := new(MockDistributionKeeper)
+	auditKeeper := NewMockAuditKeeper()
 
 	// Set up the context
 	ctx := sdk.NewContext(stateStore, cmtproto.Header{}, false, log.NewNopLogger())
@@ -201,6 +243,7 @@ func ActionKeeperWithAddress(t testing.TB, ctrl *gomock.Controller, accounts []A
 		func() sntypes.QueryServer {
 			return supernodeQueryServer
 		},
+		auditKeeper,
 		func() *ibckeeper.Keeper {
 			return ibckeeper.NewKeeper(encCfg.Codec, storeService, newMockIbcParams(), mockUpgradeKeeper, authority.String())
 		},

@@ -34,6 +34,7 @@ type (
 		distributionKeeper   actiontypes.DistributionKeeper
 		supernodeKeeper      actiontypes.SupernodeKeeper
 		supernodeQueryServer actiontypes.SupernodeQueryServer
+		auditKeeper          actiontypes.AuditKeeper
 		ibcKeeperFn          func() *ibckeeper.Keeper
 
 		// Action handling
@@ -54,6 +55,7 @@ func NewKeeper(
 	distributionKeeper actiontypes.DistributionKeeper,
 	supernodeKeeper sntypes.SupernodeKeeper,
 	supernodeQueryServer func() sntypes.QueryServer,
+	auditKeeper actiontypes.AuditKeeper,
 	ibcKeeperFn func() *ibckeeper.Keeper,
 ) Keeper {
 	if _, err := addressCodec.BytesToString(authority); err != nil {
@@ -81,6 +83,7 @@ func NewKeeper(
 		distributionKeeper:   distributionKeeper,
 		supernodeKeeper:      supernodeKeeper,
 		supernodeQueryServer: snQueryServer,
+		auditKeeper:          auditKeeper,
 		ibcKeeperFn:          ibcKeeperFn,
 
 		Port: collections.NewItem(sb, actiontypes.PortKey, "port", collections.StringValue),
@@ -132,6 +135,10 @@ func (k *Keeper) GetBankKeeper() actiontypes.BankKeeper {
 
 func (k *Keeper) GetAuthKeeper() actiontypes.AuthKeeper {
 	return k.authKeeper
+}
+
+func (k *Keeper) GetAuditKeeper() actiontypes.AuditKeeper {
+	return k.auditKeeper
 }
 
 // GetActionRegistry returns the action registry

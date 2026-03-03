@@ -1,20 +1,20 @@
-//go:build system_test
+//go:build system_test && supernode_test
 
 package system
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
-	"fmt"
 
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 
-	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	lcfg "github.com/LumeraProtocol/lumera/config"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 // Helper function to create a delayed vesting account
@@ -29,7 +29,7 @@ func createDelayedVestingAccount(t *testing.T, cli *LumeradCli, keyName string, 
 	createCmd := []string{
 		"tx", "vesting", "create-vesting-account",
 		address,                        // to_address
-		amount + lcfg.ChainDenom,      // amount
+		amount + lcfg.ChainDenom,       // amount
 		strconv.FormatInt(endTime, 10), // end_time
 		"--delayed",                    // make it delayed vesting
 		"--from", "node0",
@@ -55,7 +55,7 @@ func createPermanentlyLockedAccount(t *testing.T, cli *LumeradCli, keyName strin
 	// Create permanently locked account
 	createCmd := []string{
 		"tx", "vesting", "create-permanent-locked-account",
-		address,          // to_address
+		address,                  // to_address
 		amount + lcfg.ChainDenom, // amount
 		"--from", "node0",
 	}
@@ -116,8 +116,8 @@ func TestSupernodeRegistrationSuccess(t *testing.T) {
 				// Delegate from supernode account to validator to meet the minimum stake requirement
 				delegateCmd := []string{
 					"tx", "staking", "delegate",
-					valAddr,          // validator address
-					"150000000"+lcfg.ChainDenom, // delegation amount (more than minimum - self delegation)
+					valAddr,                       // validator address
+					"150000000" + lcfg.ChainDenom, // delegation amount (more than minimum - self delegation)
 					"--from", "supernode_account",
 				}
 				resp := cli.CustomCommand(delegateCmd...)
@@ -154,8 +154,8 @@ func TestSupernodeRegistrationSuccess(t *testing.T) {
 				// Add additional self-delegation to meet minimum requirement
 				delegateCmd := []string{
 					"tx", "staking", "delegate",
-					valAddr,         // validator address
-					"60000000"+lcfg.ChainDenom, // enough to meet minimum with existing self-delegation
+					valAddr,                      // validator address
+					"60000000" + lcfg.ChainDenom, // enough to meet minimum with existing self-delegation
 					"--from", "node0",
 				}
 				resp := cli.CustomCommand(delegateCmd...)
@@ -453,13 +453,13 @@ func TestSupernodeRegistrationFailures(t *testing.T) {
 
 func TestSupernodeWithVestingDelegation(t *testing.T) {
 	testCases := []struct {
-		name                  	string
-		vestingAccountType    	string
-		createVestingAccount  	func(t *testing.T, cli *LumeradCli, keyName string, amount string) string
-		minimumStake          	string
-		selfDelegationAmount  	string
+		name                    string
+		vestingAccountType      string
+		createVestingAccount    func(t *testing.T, cli *LumeradCli, keyName string, amount string) string
+		minimumStake            string
+		selfDelegationAmount    string
 		vestingDelegationAmount string
-		delayMonths           	int
+		delayMonths             int
 	}{
 		{
 			name:               "low_self_stake_with_delayed_vesting_delegation",
@@ -520,7 +520,7 @@ func TestSupernodeWithVestingDelegation(t *testing.T) {
 			cli.FundAddress(accountAddr, "50000000"+lcfg.ChainDenom)
 			selfDelegateCmd := []string{
 				"tx", "staking", "delegate",
-				valAddr,                    // validator address
+				valAddr, // validator address
 				tc.selfDelegationAmount + lcfg.ChainDenom, // small self-delegation (much less than minimum)
 				"--from", "node0",
 			}
@@ -531,7 +531,7 @@ func TestSupernodeWithVestingDelegation(t *testing.T) {
 			// Step 4: Delegate from vesting account to validator
 			vestingDelegateCmd := []string{
 				"tx", "staking", "delegate",
-				valAddr,                        // validator address
+				valAddr, // validator address
 				tc.vestingDelegationAmount + lcfg.ChainDenom, // delegation from vesting account to meet minimum
 				"--from", "vesting_supernode",
 			}

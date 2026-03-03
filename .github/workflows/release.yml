@@ -75,7 +75,12 @@ jobs:
       - name: Install buf CLI
         run: |
           set -euo pipefail
-          go install github.com/bufbuild/buf/cmd/buf@latest
+          BUF_VERSION="$(go list -m -f '{{.Version}}' github.com/bufbuild/buf)"
+          if [ -z "${BUF_VERSION}" ]; then
+            echo "Failed to resolve github.com/bufbuild/buf version from go.mod" >&2
+            exit 1
+          fi
+          go install "github.com/bufbuild/buf/cmd/buf@${BUF_VERSION}"
 
       - name: Build with Ignite CLI
         run: |

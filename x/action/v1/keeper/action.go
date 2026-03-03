@@ -29,7 +29,7 @@ const (
 	ActionBySuperNodePrefix   = "Action/supernode/"
 )
 
-// RegisterAction creates and configures a new action with default parameters 
+// RegisterAction creates and configures a new action with default parameters
 // This is the recommended method for creating new actions
 func (k *Keeper) RegisterAction(ctx sdk.Context, action *actiontypes.Action) (string, error) {
 	// Validate that the action is for a new registration
@@ -181,9 +181,21 @@ func (k *Keeper) FinalizeAction(ctx sdk.Context, actionID string, superNodeAccou
 	// Verify reporting superNode -
 	// it must be in the top-10 supernodes for the (existing) action's block height
 	// and not already in the (existing) action's SuperNodes list
-	if err := k.validateSupernode(ctx, existingAction, superNodeAccount); err != nil {
+	eligible, rejectReason, top10ValidatorAddresses, err := k.checkFinalizerEligibility(ctx, existingAction, superNodeAccount)
+	if err != nil {
 		return err
 	}
+	if !eligible {
+		// Only Cascade finalization is in scope for evidence-based rejections at the moment.
+		if existingAction.ActionType == actiontypes.ActionTypeCascade {
+			k.RecordFinalizationNotInTop10(ctx, existingAction, superNodeAccount, top10ValidatorAddresses, rejectReason)
+			return nil
+		}
+		return errors.Wrap(actiontypes.ErrUnauthorizedSN, rejectReason)
+	}
+
+	// Make the top-10 validator addresses available for downstream handler logic (e.g. signature failure evidence metadata).
+	ctx = ctx.WithValue(ctxKeyTop10ValidatorAddresses{}, top10ValidatorAddresses)
 
 	// Get the appropriate handler for this action type
 	handler, err := k.actionRegistry.GetHandler(existingAction.ActionType)
@@ -518,16 +530,17 @@ func (k *Keeper) IterateActionsByState(ctx sdk.Context, state actiontypes.Action
 	return nil
 }
 
-// validateSupernode checks if a supernode is authorized to finalize an action
-// This method validates that the supernode:
-// 1. Is not already in the action's SuperNodes list
-// 2. Is in the top-10 supernodes for the action's block height
-func (k *Keeper) validateSupernode(ctx sdk.Context, action *actiontypes.Action, superNodeAccount string) error {
-
+// checkFinalizerEligibility checks whether a supernode is authorized to finalize an action.
+//
+// It returns:
+// - (true, "", top10ValidatorAddresses, nil) when eligible
+// - (false, reason, top10ValidatorAddresses, nil) when rejected (non-fatal)
+// - (false, "", nil, err) for hard failures (e.g. duplicates)
+func (k *Keeper) checkFinalizerEligibility(ctx sdk.Context, action *actiontypes.Action, superNodeAccount string) (bool, string, []string, error) {
 	// If SuperNode already in the list, return an error
 	if len(action.SuperNodes) > 0 {
 		if slices.Contains(action.SuperNodes, superNodeAccount) {
-			return errors.Wrapf(
+			return false, "", nil, errors.Wrapf(
 				actiontypes.ErrUnauthorizedSN,
 				"supernode %s is already in the SuperNodes list for action %s",
 				superNodeAccount,
@@ -544,8 +557,10 @@ func (k *Keeper) validateSupernode(ctx sdk.Context, action *actiontypes.Action, 
 	}
 	topSuperNodesResp, err := k.supernodeQueryServer.GetTopSuperNodesForBlock(ctx, topSuperNodesReq)
 	if err != nil {
-		return errors.Wrapf(sdkerrors.ErrInvalidRequest, "failed to query top supernodes: %s", err)
+		return false, "", nil, errors.Wrapf(sdkerrors.ErrInvalidRequest, "failed to query top supernodes: %s", err)
 	}
+
+	top10ValidatorAddresses := make([]string, 0, len(topSuperNodesResp.Supernodes))
 
 	// Check if superNode is in the top-10 ACTIVE list
 	isInTop10 := false
@@ -556,26 +571,26 @@ func (k *Keeper) validateSupernode(ctx sdk.Context, action *actiontypes.Action, 
 		"top_supernodes_count", len(topSuperNodesResp.Supernodes))
 
 	for _, sn := range topSuperNodesResp.Supernodes {
+		top10ValidatorAddresses = append(top10ValidatorAddresses, sn.ValidatorAddress)
+
 		k.Logger().Debug("Comparing supernodes",
 			"validator_address", sn.ValidatorAddress,
 			"current_supernode", superNodeAccount)
 
 		if sn.SupernodeAccount == superNodeAccount {
 			isInTop10 = true
-			break
 		}
 	}
 
 	if !isInTop10 {
-		return errors.Wrapf(
-			actiontypes.ErrUnauthorizedSN,
+		return false, fmt.Sprintf(
 			"supernode %s is not in the top-10 ACTIVE supernodes for block height %d",
 			superNodeAccount,
 			action.BlockHeight,
-		)
+		), top10ValidatorAddresses, nil
 	}
 
-	return nil
+	return true, "", top10ValidatorAddresses, nil
 }
 
 // DistributeFees splits fees among SuperNodes and optionally a foundation address
@@ -774,6 +789,8 @@ func (k *Keeper) processExpiredActionsInState(ctx sdk.Context, state actiontypes
 				)
 				return false // Continue iteration
 			}
+
+			k.RecordActionExpired(ctx, action)
 
 			// Increment counter
 			*expiredCount++

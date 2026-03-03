@@ -1,0 +1,89 @@
+syntax = "proto3";
+package lumera.audit.v1;
+
+option go_package = "x/audit/v1/types";
+
+import "amino/amino.proto";
+import "gogoproto/gogo.proto";
+
+// Params defines the parameters for the audit module.
+message Params {
+  option (gogoproto.equal) = true;
+
+  uint64 epoch_length_blocks          = 1;
+
+  // epoch_zero_height defines the reference chain height at which epoch_id = 0 starts.
+  // This makes epoch boundaries deterministic from genesis without needing to query state.
+  uint64 epoch_zero_height            = 2;
+
+  uint32 peer_quorum_reports          = 3;
+  uint32 min_probe_targets_per_epoch  = 4;
+  uint32 max_probe_targets_per_epoch  = 5;
+
+  repeated uint32 required_open_ports = 6;
+
+  // Minimum required host free capacity (self reported).
+  // free% = 100 - usage%
+  // A usage% of 0 is treated as "unknown" (no action).
+  uint32 min_cpu_free_percent = 7;
+  uint32 min_mem_free_percent = 8;
+  uint32 min_disk_free_percent = 9;
+
+  // Number of consecutive epochs a required port must be reported CLOSED by peers
+  // at or above peer_port_postpone_threshold_percent before postponing the supernode.
+  uint32 consecutive_epochs_to_postpone = 10;
+
+  // How many completed epochs to keep in state for epoch-scoped data like EpochReport
+  // and related indices. Pruning runs at epoch end.
+  uint64 keep_last_epoch_entries = 11;
+
+  // Minimum percent (1-100) of peer reports that must report a required port as CLOSED
+  // for the port to be treated as CLOSED for postponement purposes.
+  //
+  // 100 means unanimous.
+  // Example: to approximate a 2/3 threshold, use 66 (since 2/3 ≈ 66.6%).
+  uint32 peer_port_postpone_threshold_percent = 12;
+
+  // Action finalization evidence postponement/recovery settings.
+  //
+  // These apply to evidence types emitted by the action module:
+  // - EVIDENCE_TYPE_ACTION_FINALIZATION_SIGNATURE_FAILURE
+  // - EVIDENCE_TYPE_ACTION_FINALIZATION_NOT_IN_TOP_10
+  //
+  // Postponement triggers when, for a given supernode and evidence type:
+  // - the number of evidences in an epoch >= <*_evidences_per_epoch>, and
+  // - this happens for <*_consecutive_epochs> epochs in a row.
+  //
+  // Recovery (auto-unpostpone) triggers after a supernode has been postponed for at least
+  // action_finalization_recovery_epochs epochs, and ONLY IF the total number of "bad"
+  // action-finalization evidences across the last action_finalization_recovery_epochs epochs
+  // is strictly less than action_finalization_recovery_max_total_bad_evidences.
+
+  // action_finalization_signature_failure_evidences_per_epoch is the per-epoch count threshold
+  // for EVIDENCE_TYPE_ACTION_FINALIZATION_SIGNATURE_FAILURE.
+  uint32 action_finalization_signature_failure_evidences_per_epoch = 13;
+
+  // action_finalization_signature_failure_consecutive_epochs is the consecutive epochs threshold
+  // for EVIDENCE_TYPE_ACTION_FINALIZATION_SIGNATURE_FAILURE.
+  uint32 action_finalization_signature_failure_consecutive_epochs = 14;
+
+  // action_finalization_not_in_top10_evidences_per_epoch is the per-epoch count threshold
+  // for EVIDENCE_TYPE_ACTION_FINALIZATION_NOT_IN_TOP_10.
+  uint32 action_finalization_not_in_top10_evidences_per_epoch = 15;
+
+  // action_finalization_not_in_top10_consecutive_epochs is the consecutive epochs threshold
+  // for EVIDENCE_TYPE_ACTION_FINALIZATION_NOT_IN_TOP_10.
+  uint32 action_finalization_not_in_top10_consecutive_epochs = 16;
+
+  // action_finalization_recovery_epochs is the number of epochs to wait before considering recovery.
+  uint32 action_finalization_recovery_epochs = 17;
+
+  // action_finalization_recovery_max_total_bad_evidences is the maximum allowed total count of bad
+  // action-finalization evidences in the recovery epoch-span for auto-recovery to occur.
+  // Recovery happens ONLY IF total_bad < this value.
+  uint32 action_finalization_recovery_max_total_bad_evidences = 18;
+
+  // Storage Challenge (SC) params.
+  bool   sc_enabled = 19;
+  uint32 sc_challengers_per_epoch = 20;
+}

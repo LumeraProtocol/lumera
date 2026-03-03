@@ -2,6 +2,16 @@
 
 ---
 
+## 1.11.0
+
+Changes included since `v1.10.1` (range: `v1.10.1..v1.11.0`).
+
+- Added `x/audit/v1` from scratch.
+- Added epoch-based audit reporting, evidence handling, and enforcement for supernodes.
+- Added audit gRPC/REST messages and queries (epoch, assignments, reports, evidence, params).
+
+---
+
 ## 1.10.1
 
 Changes included since `v1.10.0` (range: `v1.10.0..v1.10.1`).

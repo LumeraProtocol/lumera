@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package lumera.audit.v1;
+
+import "cosmos_proto/cosmos.proto";
+
+option go_package = "x/audit/v1/types";
+
+enum EvidenceType {
+  EVIDENCE_TYPE_UNSPECIFIED = 0;
+  // action finalization rejected due to an invalid signature / signature-derived data.
+  EVIDENCE_TYPE_ACTION_FINALIZATION_SIGNATURE_FAILURE = 1;
+
+  // action finalization rejected because the attempted finalizer is not in the top-10 supernodes.
+  EVIDENCE_TYPE_ACTION_FINALIZATION_NOT_IN_TOP_10 = 2;
+
+  EVIDENCE_TYPE_ACTION_EXPIRED = 3;
+
+  // storage challenge failure evidence submitted by the deterministic challenger.
+  EVIDENCE_TYPE_STORAGE_CHALLENGE_FAILURE = 4;
+
+  // client-observed cascade flow failure (upload/download).
+  EVIDENCE_TYPE_CASCADE_CLIENT_FAILURE = 5;
+}
+
+// Evidence is a stable outer record that stores evidence about an audited subject.
+// Type-specific fields are encoded into the `metadata` bytes field.
+message Evidence {
+  // evidence_id is a chain-assigned unique identifier.
+  uint64 evidence_id = 1;
+
+  // subject_address is the audited subject (e.g. supernode-related actor).
+  string subject_address = 2 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+
+  // reporter_address is the submitter of the evidence.
+  string reporter_address = 3 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+
+  // action_id optionally links this evidence to a specific action.
+  string action_id = 4;
+
+  // evidence_type is a stable discriminator used to interpret metadata.
+  EvidenceType evidence_type = 5;
+
+  // metadata is protobuf-binary bytes of a type-specific Evidence metadata message.
+  bytes metadata = 6;
+
+  // reported_height is the block height when the evidence was submitted.
+  uint64 reported_height = 7;
+}

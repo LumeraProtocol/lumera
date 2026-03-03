@@ -21,6 +21,7 @@ RELEASE_CGO_LDFLAGS ?= -Wl,-rpath,/usr/lib -Wl,--disable-new-dtags
 COSMOS_PROTO_VERSION := $(call module_version,github.com/cosmos/cosmos-proto)
 GOGOPROTO_VERSION := $(call module_version,github.com/cosmos/gogoproto)
 GOLANGCI_LINT_VERSION := $(call module_version,github.com/golangci/golangci-lint)
+BUF_VERSION := $(call module_version,github.com/bufbuild/buf)
 GRPC_GATEWAY_VERSION := $(call module_version,github.com/grpc-ecosystem/grpc-gateway)
 GRPC_GATEWAY_V2_VERSION := $(call module_version,github.com/grpc-ecosystem/grpc-gateway/v2)
 GO_TOOLS_VERSION := $(call module_version,golang.org/x/tools)
@@ -30,7 +31,7 @@ GOCACHE := $(shell ${GO} env GOCACHE)
 GOMODCACHE := $(shell ${GO} env GOMODCACHE)
 
 TOOLS := \
-	github.com/bufbuild/buf/cmd/buf@latest \
+	github.com/bufbuild/buf/cmd/buf@$(BUF_VERSION) \
 	github.com/cosmos/gogoproto/protoc-gen-gocosmos@$(GOGOPROTO_VERSION) \
 	github.com/cosmos/gogoproto/protoc-gen-gogo@$(GOGOPROTO_VERSION) \
 	github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) \

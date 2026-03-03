@@ -1,4 +1,4 @@
-//go:build system_test
+//go:build system_test && supernode_metrics_tests
 
 package system
 

@@ -7,6 +7,7 @@ import (
 	paramskeeper "github.com/cosmos/cosmos-sdk/x/params/keeper"
 
 	actionmodulekeeper "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
+	auditmodulekeeper "github.com/LumeraProtocol/lumera/x/audit/v1/keeper"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
@@ -24,4 +25,5 @@ type AppUpgradeParams struct {
 	SupernodeKeeper       sntypes.SupernodeKeeper
 	ParamsKeeper          *paramskeeper.Keeper
 	ConsensusParamsKeeper *consensuskeeper.Keeper
+	AuditKeeper           *auditmodulekeeper.Keeper
 }

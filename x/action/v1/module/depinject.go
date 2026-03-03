@@ -7,15 +7,15 @@ import (
 	"cosmossdk.io/depinject"
 	"cosmossdk.io/depinject/appconfig"
 	"cosmossdk.io/log"
+	snkeeper "github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
 	"github.com/cosmos/cosmos-sdk/codec"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
-	snkeeper "github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
 	ibckeeper "github.com/cosmos/ibc-go/v10/modules/core/keeper"
 
-	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	"github.com/LumeraProtocol/lumera/x/action/v1/types"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 var _ depinject.OnePerModuleType = AppModule{}
@@ -48,7 +48,8 @@ type ModuleInputs struct {
 	StakingKeeper      types.StakingKeeper
 	DistributionKeeper types.DistributionKeeper
 	SupernodeKeeper    sntypes.SupernodeKeeper
-	IBCKeeperFn 	   func() *ibckeeper.Keeper `optional:"true"`
+	AuditKeeper        types.AuditKeeper
+	IBCKeeperFn        func() *ibckeeper.Keeper `optional:"true"`
 }
 
 type ModuleOutputs struct {
@@ -76,9 +77,10 @@ func ProvideModule(in ModuleInputs) ModuleOutputs {
 		in.StakingKeeper,
 		in.DistributionKeeper,
 		in.SupernodeKeeper,
-		func () sntypes.QueryServer {
+		func() sntypes.QueryServer {
 			return snkeeper.NewQueryServerImpl(in.SupernodeKeeper)
 		},
+		in.AuditKeeper,
 		in.IBCKeeperFn,
 	)
 

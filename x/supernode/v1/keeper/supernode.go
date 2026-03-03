@@ -305,6 +305,33 @@ func (k Keeper) SetSuperNodeStopped(ctx sdk.Context, valAddr sdk.ValAddress, rea
 	return nil
 }
 
+// SetSuperNodePostponed sets a validator's SuperNode status to postponed and emits an event.
+// If reason is non-empty, it is included as an event attribute.
+func (k Keeper) SetSuperNodePostponed(ctx sdk.Context, valAddr sdk.ValAddress, reason string) error {
+	supernode, found := k.QuerySuperNode(ctx, valAddr)
+	if !found {
+		return errorsmod.Wrapf(sdkerrors.ErrNotFound, "no supernode found for validator")
+	}
+	return markPostponed(ctx, k, &supernode, reason)
+}
+
+// RecoverSuperNodeFromPostponed transitions a validator out of POSTPONED back into ACTIVE
+// and emits a recovery event.
+func (k Keeper) RecoverSuperNodeFromPostponed(ctx sdk.Context, valAddr sdk.ValAddress) error {
+	supernode, found := k.QuerySuperNode(ctx, valAddr)
+	if !found {
+		return errorsmod.Wrapf(sdkerrors.ErrNotFound, "no supernode found for validator")
+	}
+	if len(supernode.States) == 0 {
+		return errorsmod.Wrapf(sdkerrors.ErrInvalidRequest, "supernode is in an invalid state")
+	}
+	last := supernode.States[len(supernode.States)-1]
+	if last.State != types.SuperNodeStatePostponed {
+		return nil
+	}
+	return recoverFromPostponed(ctx, k, &supernode, types.SuperNodeStateActive)
+}
+
 func (k Keeper) IsSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress) bool {
 	valOperAddr := valAddr
 

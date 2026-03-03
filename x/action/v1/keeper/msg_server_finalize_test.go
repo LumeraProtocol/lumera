@@ -58,7 +58,8 @@ func (suite *MsgServerTestSuite) TestMsgFinalizeActionSense() {
 }
 
 func (suite *MsgServerTestSuite) TestMsgFinalizeActionCascadeErrors() {
-	suite.setupExpectationsGetAllTopSNs(1)
+	// Only 2 of the below cases reach keeper.FinalizeAction (and thus query top supernodes).
+	suite.setupExpectationsGetAllTopSNs(2)
 	actionID := suite.registerCascadeAction()
 
 	testCases := []struct {
@@ -69,6 +70,7 @@ func (suite *MsgServerTestSuite) TestMsgFinalizeActionCascadeErrors() {
 		badMetadata   string
 		badIDsOti     bool
 		badIDs        bool
+		expectErr     bool
 		errorContains string
 	}{
 		{
@@ -79,17 +81,30 @@ func (suite *MsgServerTestSuite) TestMsgFinalizeActionCascadeErrors() {
 			badMetadata:   "",
 			badIDsOti:     false,
 			badIDs:        false,
+			expectErr:     true,
 			errorContains: "not found",
 		},
 		{
-			name:          "Wrong supernode",
+			name:          "Wrong supernode (rejected, evidence, no error)",
 			actionId:      actionID,
 			actionType:    "CASCADE",
 			superNode:     suite.badSupernode.SupernodeAccount,
 			badMetadata:   "",
 			badIDsOti:     false,
 			badIDs:        false,
-			errorContains: "unauthorized supernode",
+			expectErr:     false,
+			errorContains: "",
+		},
+		{
+			name:          "Invalid rq_ids_ids values (rejected, evidence, no error)",
+			actionId:      actionID,
+			actionType:    "CASCADE",
+			superNode:     suite.supernodes[0].SupernodeAccount,
+			badMetadata:   "",
+			badIDsOti:     true,
+			badIDs:        false,
+			expectErr:     false,
+			errorContains: "",
 		},
 		{
 			name:          "Invalid metadata JSON",
@@ -99,6 +114,7 @@ func (suite *MsgServerTestSuite) TestMsgFinalizeActionCascadeErrors() {
 			badMetadata:   "{invalid_json",
 			badIDsOti:     false,
 			badIDs:        false,
+			expectErr:     true,
 			errorContains: "invalid metadata",
 		},
 		{
@@ -109,6 +125,7 @@ func (suite *MsgServerTestSuite) TestMsgFinalizeActionCascadeErrors() {
 			badMetadata:   "",
 			badIDsOti:     false,
 			badIDs:        true,
+			expectErr:     true,
 			errorContains: "invalid metadata",
 		},
 		{
@@ -119,16 +136,38 @@ func (suite *MsgServerTestSuite) TestMsgFinalizeActionCascadeErrors() {
 			badMetadata:   "",
 			badIDsOti:     false,
 			badIDs:        false,
+			expectErr:     true,
 			errorContains: "invalid metadata",
 		},
 	}
 
 	for _, tc := range testCases {
-		suite.Run(tc.name, func() {		
+		suite.Run(tc.name, func() {
+			suite.ctx = suite.ctx.WithEventManager(sdk.NewEventManager())
 			msg := suite.makeFinalizeCascadeActionMessage(tc.actionId, tc.actionType, tc.superNode, tc.badMetadata, tc.badIDsOti, tc.badIDs)
 			_, err := suite.msgServer.FinalizeAction(suite.ctx, &msg)
-			suite.Error(err)
-			suite.Contains(err.Error(), tc.errorContains)
+
+			if tc.expectErr {
+				suite.Error(err)
+				suite.Contains(err.Error(), tc.errorContains)
+				return
+			}
+
+			suite.NoError(err)
+
+			action, found := suite.keeper.GetActionByID(suite.ctx, tc.actionId)
+			suite.True(found)
+			suite.Equal(actiontypes.ActionStatePending, action.State)
+
+			events := suite.ctx.EventManager().Events()
+			foundRejected := false
+			for _, event := range events {
+				if event.Type == types.EventTypeActionFinalizationRejected {
+					foundRejected = true
+					break
+				}
+			}
+			suite.True(foundRejected, "action_finalization_rejected event not found")
 		})
 	}
 }

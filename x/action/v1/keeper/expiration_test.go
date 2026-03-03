@@ -7,19 +7,23 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 
-	"go.uber.org/mock/gomock"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/mock/gomock"
 
 	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
 	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
 	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 // ExpirationTestSuite tests the expiration functionality
 type ExpirationTestSuite struct {
 	suite.Suite
+	ctrl        *gomock.Controller
+	queryServer *supernodemocks.MockQueryServer
 	ctx         sdk.Context
 	keeper      keeper.Keeper
 	signature   string
@@ -29,13 +33,16 @@ type ExpirationTestSuite struct {
 }
 
 func (suite *ExpirationTestSuite) SetupTest() {
-	ctrl := gomock.NewController(suite.T())
-	defer ctrl.Finish()
+	suite.ctrl = gomock.NewController(suite.T())
 
 	key, address := cryptotestutils.KeyAndAddress()
 	pubKey := key.PubKey()
 	pairs := []keepertest.AccountPair{{Address: address, PubKey: pubKey}}
-	suite.keeper, suite.ctx = keepertest.ActionKeeperWithAddress(suite.T(), ctrl, pairs)
+	suite.keeper, suite.ctx = keepertest.ActionKeeperWithAddress(suite.T(), suite.ctrl, pairs)
+
+	var ok bool
+	suite.queryServer, ok = suite.keeper.GetSupernodeQueryServer().(*supernodemocks.MockQueryServer)
+	suite.Require().True(ok)
 
 	var err error
 	suite.signature, err = cryptotestutils.CreateSignatureString([]secp256k1.PrivKey{key}, 50)
@@ -48,6 +55,20 @@ func (suite *ExpirationTestSuite) SetupTest() {
 	// Set a fixed block time for testing
 	suite.blockTime = time.Now()
 	suite.ctx = suite.ctx.WithBlockTime(suite.blockTime)
+}
+
+func (suite *ExpirationTestSuite) TearDownTest() {
+	suite.ctrl.Finish()
+}
+
+func (suite *ExpirationTestSuite) setupExpectationsGetTopSuperNodesForExpiration(count int) {
+	suite.queryServer.EXPECT().
+		GetTopSuperNodesForBlock(
+			gomock.AssignableToTypeOf(sdk.Context{}),
+			gomock.AssignableToTypeOf(&sntypes.QueryGetTopSuperNodesForBlockRequest{}),
+		).
+		Return(&sntypes.QueryGetTopSuperNodesForBlockResponse{}, nil).
+		Times(count)
 }
 
 // TestCheckExpiration tests the expiration functionality
@@ -129,7 +150,16 @@ func (suite *ExpirationTestSuite) TestCheckExpiration() {
 		suite.Require().NoError(err, "Failed to register action for test case %d: %s", i, tc.name)
 	}
 
-	// Run the expiration check
+	// Count expected number of expired actions to match supernode query calls.
+	expectedExpiredCount := 0
+	for _, tc := range testCases {
+		if tc.expectExpired {
+			expectedExpiredCount++
+		}
+	}
+
+	// Run the expiration check.
+	suite.setupExpectationsGetTopSuperNodesForExpiration(expectedExpiredCount)
 	suite.keeper.CheckExpiration(suite.ctx)
 
 	// Verify each action's state after the expiration check
@@ -153,15 +183,12 @@ func (suite *ExpirationTestSuite) TestCheckExpiration() {
 	})
 	suite.Require().NoError(err)
 
-	// Count expected number of expired/pending actions
-	expectedExpiredCount := 0
+	// Count expected number of pending/processing actions
 	expectedPendingCount := 0
 	expectedProcessingCount := 0
 
 	for _, tc := range testCases {
-		if tc.expectExpired {
-			expectedExpiredCount++
-		} else {
+		if !tc.expectExpired {
 			if tc.state == actiontypes.ActionStatePending {
 				expectedPendingCount++
 			} else if tc.state == actiontypes.ActionStateProcessing {
@@ -197,6 +224,7 @@ func (suite *ExpirationTestSuite) TestActionFeeRefundOnExpiration() {
 		{name: "pending", state: actiontypes.ActionStatePending},
 		{name: "processing", state: actiontypes.ActionStateProcessing},
 	}
+	suite.setupExpectationsGetTopSuperNodesForExpiration(len(scenarios))
 
 	for i, scenario := range scenarios {
 		// ensure module balance clean before starting scenario
@@ -265,6 +293,7 @@ func (suite *ExpirationTestSuite) TestExpiredActionEvents() {
 		{name: "pending", state: actiontypes.ActionStatePending, actionTyp: actiontypes.ActionTypeSense},
 		{name: "processing", state: actiontypes.ActionStateProcessing, actionTyp: actiontypes.ActionTypeCascade},
 	}
+	suite.setupExpectationsGetTopSuperNodesForExpiration(len(scenarios))
 
 	for i, scenario := range scenarios {
 		ctx := suite.ctx.WithEventManager(sdk.NewEventManager())

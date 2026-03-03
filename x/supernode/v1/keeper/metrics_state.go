@@ -18,7 +18,7 @@ func markPostponed(ctx sdk.Context, keeper types.SupernodeKeeper, sn *types.Supe
 	if last.State == types.SuperNodeStatePostponed {
 		return nil
 	}
-	sn.States = append(sn.States, &types.SuperNodeStateRecord{State: types.SuperNodeStatePostponed, Height: ctx.BlockHeight()})
+	sn.States = append(sn.States, &types.SuperNodeStateRecord{State: types.SuperNodeStatePostponed, Height: ctx.BlockHeight(), Reason: reason})
 	if err := keeper.SetSuperNode(ctx, *sn); err != nil {
 		return err
 	}

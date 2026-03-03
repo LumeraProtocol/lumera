@@ -130,6 +130,9 @@ func paginateActionSlice(actions []*types.Action, pageReq *query.PageRequest) ([
 	if pageReq == nil {
 		return actions, &query.PageResponse{}, nil
 	}
+	if pageReq.Offset > 0 && pageReq.Key != nil {
+		return nil, nil, status.Error(codes.InvalidArgument, "paginate: invalid request, either offset or key is expected, got both")
+	}
 
 	total := uint64(len(actions))
 	offset := pageReq.Offset

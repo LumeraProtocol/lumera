@@ -345,6 +345,28 @@ func TestKeeper_ListActions_ReversePaginationInvalidCursorKey(t *testing.T) {
 	require.Equal(t, codes.InvalidArgument, st.Code())
 }
 
+func TestKeeper_ListActions_ReversePaginationRejectsOffsetAndKey(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	k, ctx := keepertest.ActionKeeper(t, ctrl)
+	q := keeper.NewQueryServerImpl(k)
+
+	resp, err := q.ListActions(ctx, &types.QueryListActionsRequest{
+		Pagination: &query.PageRequest{
+			Key:     []byte{0, 0, 0, 0, 0, 0, 0, 1},
+			Offset:  1,
+			Reverse: true,
+		},
+	})
+	require.Nil(t, resp)
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	require.Equal(t, codes.InvalidArgument, st.Code())
+	require.Contains(t, st.Message(), "either offset or key is expected, got both")
+}
+
 func TestKeeper_ListActions_ReversePaginationZeroLimitUsesDefaultLimit(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

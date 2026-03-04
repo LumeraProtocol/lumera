@@ -40,3 +40,6 @@ docs/new-feature*
 plans/
 CLAUDE.md
 .claude/
+.codex
+.agents
+AGENTS.md

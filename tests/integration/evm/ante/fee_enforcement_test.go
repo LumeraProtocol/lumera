@@ -10,7 +10,7 @@ import (
 
 	lcfg "github.com/LumeraProtocol/lumera/config"
 	evmtest "github.com/LumeraProtocol/lumera/tests/integration/evmtest"
-	testtext "github.com/LumeraProtocol/lumera/testutil/text"
+	testtext "github.com/LumeraProtocol/lumera/pkg/text"
 )
 
 // TestCosmosTxFeeEnforcement validates Cosmos-path fee checks with EVM ante enabled.
@@ -21,7 +21,7 @@ import (
 // 3. Broadcast a sufficiently funded bank tx and assert inclusion on chain.
 func testCosmosTxFeeEnforcement(t *testing.T, node *evmtest.Node) {
 	t.Helper()
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), 1, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
 
 	// Dynamic fee ante checks must reject an underpriced Cosmos tx.
 	lowFeeResp := mustBroadcastBankSend(t, node, node.KeyInfo().Address, "1"+lcfg.ChainDenom, "0"+lcfg.ChainDenom)

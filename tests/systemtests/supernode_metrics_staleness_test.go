@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/sjson"
@@ -115,7 +116,7 @@ func TestSupernodeMetricsStalenessAndRecovery(t *testing.T) {
 	if targetHeight <= currentHeight {
 		targetHeight = currentHeight + 1
 	}
-	sut.AwaitBlockHeight(t, targetHeight)
+	sut.AwaitBlockHeight(t, targetHeight, 60*time.Second)
 	waitForState(sn1.account, sntypes.SuperNodeStatePostponed, 3)
 
 	// SN1 recovers with fresh metrics; SN2 stays POSTPONED because it never reports.
@@ -185,7 +186,7 @@ func TestSupernodeMetricsNoReportsAllPostponed(t *testing.T) {
 
 	// Do not send any metrics. Wait past update+grace to ensure both get postponed.
 	targetHeight := sut.AwaitNextBlock(t) + 12
-	sut.AwaitBlockHeight(t, targetHeight)
+	sut.AwaitBlockHeight(t, targetHeight, 60*time.Second)
 
 	waitForState(sn1.account, sntypes.SuperNodeStatePostponed, 4)
 	waitForState(sn2.account, sntypes.SuperNodeStatePostponed, 4)

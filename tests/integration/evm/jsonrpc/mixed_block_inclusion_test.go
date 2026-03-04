@@ -11,7 +11,6 @@ import (
 	"time"
 
 	testaccounts "github.com/LumeraProtocol/lumera/testutil/accounts"
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // testMixedCosmosAndEVMTransactionsCanShareBlock validates that Cosmos and EVM
@@ -26,15 +25,11 @@ func testMixedCosmosAndEVMTransactionsCanShareBlock(t *testing.T, node *evmtest.
 	// Use a dedicated EVM sender to avoid nonce coupling with validator Cosmos txs.
 	validatorAddr := testaccounts.MustAccountAddressFromTestKeyInfo(t, node.KeyInfo())
 	validatorPriv := evmtest.MustDerivePrivateKey(t, node.KeyInfo().Mnemonic)
-	evmSenderPriv, err := crypto.GenerateKey()
-	if err != nil {
-		t.Fatalf("generate evm sender key: %v", err)
-	}
-	evmSenderAddr := crypto.PubkeyToAddress(evmSenderPriv.PublicKey)
+	evmSenderPriv, evmSenderAddr := testaccounts.MustGenerateEthKey(t)
 
-	fundNonce := evmtest.MustGetPendingNonceWithRetry(t, node.RPCURL(), validatorAddr.Hex(), 20*time.Second)
-	fundGasPrice := evmtest.MustGetGasPriceWithRetry(t, node.RPCURL(), 20*time.Second)
-	fundHash := evmtest.SendLegacyTxWithParams(t, node.RPCURL(), evmtest.LegacyTxParams{
+	fundNonce := node.MustGetPendingNonceWithRetry(t, validatorAddr.Hex(), 20*time.Second)
+	fundGasPrice := node.MustGetGasPriceWithRetry(t, 20*time.Second)
+	fundHash := node.SendLegacyTxWithParams(t, evmtest.LegacyTxParams{
 		PrivateKey: validatorPriv,
 		Nonce:      fundNonce,
 		To:         &evmSenderAddr,
@@ -42,14 +37,14 @@ func testMixedCosmosAndEVMTransactionsCanShareBlock(t *testing.T, node *evmtest.
 		Gas:        21_000,
 		GasPrice:   fundGasPrice,
 	})
-	evmtest.WaitForReceipt(t, node.RPCURL(), fundHash, node.WaitCh(), node.OutputBuffer(), 40*time.Second)
+	node.WaitForReceipt(t, fundHash, 40*time.Second)
 
 	// Try a few rounds to reliably catch both tx types in the same block.
 	for attempt := 0; attempt < 8; attempt++ {
 		cosmosHash := evmtest.SendOneCosmosBankTx(t, node)
-		evmNonce := evmtest.MustGetPendingNonceWithRetry(t, node.RPCURL(), evmSenderAddr.Hex(), 20*time.Second)
-		gasPrice := evmtest.MustGetGasPriceWithRetry(t, node.RPCURL(), 20*time.Second)
-		ethHash := evmtest.SendLegacyTxWithParams(t, node.RPCURL(), evmtest.LegacyTxParams{
+		evmNonce := node.MustGetPendingNonceWithRetry(t, evmSenderAddr.Hex(), 20*time.Second)
+		gasPrice := node.MustGetGasPriceWithRetry(t, 20*time.Second)
+		ethHash := node.SendLegacyTxWithParams(t, evmtest.LegacyTxParams{
 			PrivateKey: evmSenderPriv,
 			Nonce:      evmNonce,
 			To:         &evmSenderAddr,
@@ -58,7 +53,7 @@ func testMixedCosmosAndEVMTransactionsCanShareBlock(t *testing.T, node *evmtest.
 			GasPrice:   gasPrice,
 		})
 
-		receipt := evmtest.WaitForReceipt(t, node.RPCURL(), ethHash, node.WaitCh(), node.OutputBuffer(), 40*time.Second)
+		receipt := node.WaitForReceipt(t, ethHash, 40*time.Second)
 		ethHeight := evmtest.MustUint64HexField(t, receipt, "blockNumber")
 		cosmosHeight := evmtest.WaitForCosmosTxHeight(t, node, cosmosHash, 40*time.Second)
 

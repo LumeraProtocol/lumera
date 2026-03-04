@@ -1,0 +1,540 @@
+{
+  "debug_blockProfile": [
+    {
+      "name": "capture-block-profile",
+      "summary": "Starts block profiling for 5 seconds and writes to a pprof file.",
+      "params": [
+        { "name": "arg1", "value": "/tmp/block.pprof" },
+        { "name": "arg2", "value": 5 }
+      ],
+      "result": { "name": "result", "value": null }
+    }
+  ],
+  "debug_cpuProfile": [
+    {
+      "name": "capture-cpu-profile",
+      "summary": "Captures CPU profile for 10 seconds.",
+      "params": [
+        { "name": "arg1", "value": "/tmp/cpu.pprof" },
+        { "name": "arg2", "value": 10 }
+      ],
+      "result": { "name": "result", "value": null }
+    }
+  ],
+  "debug_freeOSMemory": [
+    {
+      "name": "trigger-gc-memory-release",
+      "summary": "Hints runtime to return memory to the OS.",
+      "result": { "name": "result", "value": null }
+    }
+  ],
+  "debug_gcStats": [
+    {
+      "name": "gc-stats",
+      "summary": "Returns current Go GC statistics.",
+      "result": {
+        "name": "result",
+        "value": {
+          "NumGC": 42,
+          "PauseTotal": 123456789,
+          "PauseQuantiles": [1200, 5400, 21000]
+        }
+      }
+    }
+  ],
+  "debug_getBlockRlp": [
+    {
+      "name": "block-rlp-by-height",
+      "summary": "Returns RLP-encoded Ethereum block bytes.",
+      "params": [
+        { "name": "arg1", "value": 5 }
+      ],
+      "result": { "name": "result", "value": "0xf901e9a078ad2e4f9b10c3f5f4871e56e2f361e01b6a77de4a8931d3df5f0fef8ee8b9010000000000000000000000000000000000000000000000000000000000000000" }
+    }
+  ],
+  "debug_getHeaderRlp": [
+    {
+      "name": "header-rlp-by-height",
+      "summary": "Returns RLP-encoded Ethereum header bytes.",
+      "params": [
+        { "name": "arg1", "value": 5 }
+      ],
+      "result": { "name": "result", "value": "0xf9014ea0ab29f87349d7ca8b175f0a0e05b5a2de65d0d2f8e2b02cbcd711c6c8b8b8a0f9836f5308ff2f4e9c8cbdf635f78c6b2db2a6df4b5722f7fe5b9d5a5f2e8c2" }
+    }
+  ],
+  "debug_getRawBlock": [
+    {
+      "name": "raw-block-latest",
+      "summary": "Returns RLP bytes for the latest block.",
+      "params": [
+        { "name": "arg1", "value": "latest" }
+      ],
+      "result": { "name": "result", "value": "0xf901e9a078ad2e4f9b10c3f5f4871e56e2f361e01b6a77de4a8931d3df5f0fef8ee8b9010000000000000000000000000000000000000000000000000000000000000000" }
+    }
+  ],
+  "debug_goTrace": [
+    {
+      "name": "capture-go-trace",
+      "summary": "Starts Go execution trace and writes to file for 3 seconds.",
+      "params": [
+        { "name": "arg1", "value": "/tmp/trace.out" },
+        { "name": "arg2", "value": 3 }
+      ],
+      "result": { "name": "result", "value": null }
+    }
+  ],
+  "debug_intermediateRoots": [
+    {
+      "name": "intermediate-state-roots",
+      "summary": "Returns intermediate state roots while replaying tx execution.",
+      "params": [
+        { "name": "arg1", "value": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+        { "name": "arg2", "value": { "tracer": "callTracer" } }
+      ],
+      "result": {
+        "name": "result",
+        "value": [
+          "0x1111111111111111111111111111111111111111111111111111111111111111",
+          "0x2222222222222222222222222222222222222222222222222222222222222222"
+        ]
+      }
+    }
+  ],
+  "debug_memStats": [
+    {
+      "name": "memory-stats",
+      "summary": "Returns runtime memory statistics.",
+      "result": {
+        "name": "result",
+        "value": {
+          "Alloc": 15698544,
+          "TotalAlloc": 91328576,
+          "HeapAlloc": 12583936,
+          "NumGC": 42
+        }
+      }
+    }
+  ],
+  "debug_mutexProfile": [
+    {
+      "name": "capture-mutex-profile",
+      "summary": "Captures mutex contention profile.",
+      "params": [
+        { "name": "arg1", "value": "/tmp/mutex.pprof" },
+        { "name": "arg2", "value": 5 }
+      ],
+      "result": { "name": "result", "value": null }
+    }
+  ],
+  "debug_printBlock": [
+    {
+      "name": "print-block",
+      "summary": "Returns pretty-printed block dump by number.",
+      "params": [
+        { "name": "arg1", "value": 5 }
+      ],
+      "result": { "name": "result", "value": "Block #5 [0x4f1c8d5b8cf530f4c01f8ca07825f8f5084f57b9d7b5e0f8031f4bca8e1c83f4]\nMiner: 0x0000000000000000000000000000000000000000\nGas used: 0xa410\nTxs: 2" }
+    }
+  ],
+  "debug_setBlockProfileRate": [
+    {
+      "name": "set-block-rate",
+      "summary": "Enables block profiling with sample rate 1.",
+      "params": [
+        { "name": "arg1", "value": 1 }
+      ],
+      "result": { "name": "result", "value": null }
+    }
+  ],
+  "debug_setGCPercent": [
+    {
+      "name": "set-gc-percent",
+      "summary": "Sets GOGC threshold and returns previous value.",
+      "params": [
+        { "name": "arg1", "value": 100 }
+      ],
+      "result": { "name": "result", "value": 100 }
+    }
+  ],
+  "debug_setMutexProfileFraction": [
+    {
+      "name": "set-mutex-fraction",
+      "summary": "Sets mutex profiling fraction to 1.",
+      "params": [
+        { "name": "arg1", "value": 1 }
+      ],
+      "result": { "name": "result", "value": null }
+    }
+  ],
+  "debug_stacks": [
+    {
+      "name": "goroutine-stacks",
+      "summary": "Returns current goroutine stack dump.",
+      "result": { "name": "result", "value": "goroutine 1 [running]:\nmain.main()\n\t/home/akobrin/p/lumera/cmd/lumera/main.go:14 +0x2a\n" }
+    }
+  ],
+  "debug_startCPUProfile": [
+    {
+      "name": "start-cpu-profile",
+      "summary": "Starts CPU profiling until debug_stopCPUProfile.",
+      "params": [
+        { "name": "arg1", "value": "/tmp/cpu-live.pprof" }
+      ],
+      "result": { "name": "result", "value": null }
+    }
+  ],
+  "debug_startGoTrace": [
+    {
+      "name": "start-go-trace",
+      "summary": "Starts Go tracing until debug_stopGoTrace.",
+      "params": [
+        { "name": "arg1", "value": "/tmp/trace-live.out" }
+      ],
+      "result": { "name": "result", "value": null }
+    }
+  ],
+  "debug_stopCPUProfile": [
+    {
+      "name": "stop-cpu-profile",
+      "summary": "Stops active CPU profile and flushes output.",
+      "result": { "name": "result", "value": null }
+    }
+  ],
+  "debug_stopGoTrace": [
+    {
+      "name": "stop-go-trace",
+      "summary": "Stops active Go trace and flushes output.",
+      "result": { "name": "result", "value": null }
+    }
+  ],
+  "debug_traceBlock": [
+    {
+      "name": "trace-block-rlp",
+      "summary": "Traces all txs in an RLP-encoded block payload.",
+      "params": [
+        { "name": "arg1", "value": "0xf901e9a078ad2e4f9b10c3f5f4871e56e2f361e01b6a77de4a8931d3df5f0fef8ee8b9010000000000000000000000000000000000000000000000000000000000000000" },
+        { "name": "arg2", "value": { "tracer": "callTracer", "timeout": "5s" } }
+      ],
+      "result": {
+        "name": "result",
+        "value": [
+          {
+            "txHash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "result": { "gasUsed": "0x5208", "failed": false, "returnValue": "0x", "structLogs": [] }
+          }
+        ]
+      }
+    }
+  ],
+  "debug_traceBlockByHash": [
+    {
+      "name": "trace-block-by-hash",
+      "summary": "Traces all txs in a block selected by hash.",
+      "params": [
+        { "name": "arg1", "value": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
+        { "name": "arg2", "value": { "tracer": "callTracer" } }
+      ],
+      "result": {
+        "name": "result",
+        "value": [
+          {
+            "txHash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "result": { "gasUsed": "0x5208", "failed": false, "returnValue": "0x", "structLogs": [] }
+          }
+        ]
+      }
+    }
+  ],
+  "debug_traceBlockByNumber": [
+    {
+      "name": "trace-block-by-number",
+      "summary": "Traces all txs in a block selected by number/tag.",
+      "params": [
+        { "name": "arg1", "value": "latest" },
+        { "name": "arg2", "value": { "tracer": "callTracer" } }
+      ],
+      "result": {
+        "name": "result",
+        "value": [
+          {
+            "txHash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "result": { "gasUsed": "0x5208", "failed": false, "returnValue": "0x", "structLogs": [] }
+          }
+        ]
+      }
+    }
+  ],
+  "debug_traceCall": [
+    {
+      "name": "trace-eth-call",
+      "summary": "Traces an eth_call at a selected block.",
+      "params": [
+        {
+          "name": "arg1",
+          "value": {
+            "from": "0x1111111111111111111111111111111111111111",
+            "to": "0x2222222222222222222222222222222222222222",
+            "data": "0x70a082310000000000000000000000001111111111111111111111111111111111111111"
+          }
+        },
+        { "name": "arg2", "value": "latest" },
+        { "name": "arg3", "value": { "tracer": "callTracer", "timeout": "5s" } }
+      ],
+      "result": {
+        "name": "result",
+        "value": { "gasUsed": "0x2dc6c0", "failed": false, "returnValue": "0x", "structLogs": [] }
+      }
+    }
+  ],
+  "debug_traceTransaction": [
+    {
+      "name": "trace-tx",
+      "summary": "Traces a single transaction by hash.",
+      "params": [
+        { "name": "arg1", "value": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+        { "name": "arg2", "value": { "tracer": "callTracer", "timeout": "5s" } }
+      ],
+      "result": {
+        "name": "result",
+        "value": { "gasUsed": "0x5208", "failed": false, "returnValue": "0x", "structLogs": [] }
+      }
+    }
+  ],
+  "debug_writeBlockProfile": [
+    {
+      "name": "write-block-profile",
+      "summary": "Writes current block profile snapshot to disk.",
+      "params": [
+        { "name": "arg1", "value": "/tmp/block-now.pprof" }
+      ],
+      "result": { "name": "result", "value": null }
+    }
+  ],
+  "debug_writeMemProfile": [
+    {
+      "name": "write-memory-profile",
+      "summary": "Writes current heap profile to disk.",
+      "params": [
+        { "name": "arg1", "value": "/tmp/mem.pprof" }
+      ],
+      "result": { "name": "result", "value": null }
+    }
+  ],
+  "debug_writeMutexProfile": [
+    {
+      "name": "write-mutex-profile",
+      "summary": "Writes current mutex profile to disk.",
+      "params": [
+        { "name": "arg1", "value": "/tmp/mutex-now.pprof" }
+      ],
+      "result": { "name": "result", "value": null }
+    }
+  ],
+  "personal_ecRecover": [
+    {
+      "name": "recover-address",
+      "summary": "Recovers signer from personal_sign-style payload/signature.",
+      "params": [
+        { "name": "arg1", "value": "0x48656c6c6f2c204c756d657261" },
+        { "name": "arg2", "value": "0x2c640f4fba7b6d6f665ba4a2f8dc1d56c3dc0f8ad1a47d9fd2d8f6b5c7b2f7f40d8f8b6e7450cd9ec68f2f2bb0f8bc7afbe73f48603f2f53f23d4c2fd0cf0a7f1b" }
+      ],
+      "result": { "name": "result", "value": "0x1111111111111111111111111111111111111111" }
+    }
+  ],
+  "personal_importRawKey": [
+    {
+      "name": "import-private-key",
+      "summary": "Imports a raw secp256k1 private key into local keyring.",
+      "params": [
+        { "name": "arg1", "value": "4c0883a69102937d6231471b5dbb6204fe5129617082795f6f9d9f1996f9f4b2" },
+        { "name": "arg2", "value": "strong-password" }
+      ],
+      "result": { "name": "result", "value": "0x90f8bf6a479f320ead074411a4b0e7944ea8c9c1" }
+    }
+  ],
+  "personal_initializeWallet": [
+    {
+      "name": "initialize-smartcard-wallet",
+      "summary": "Smartcard wallets are currently unsupported; call returns an error.",
+      "params": [
+        { "name": "arg1", "value": "usb://ledger" }
+      ],
+      "result": { "name": "result", "value": "" }
+    }
+  ],
+  "personal_listAccounts": [
+    {
+      "name": "list-local-accounts",
+      "summary": "Returns locally managed accounts in keyring.",
+      "result": {
+        "name": "result",
+        "value": [
+          "0x1111111111111111111111111111111111111111",
+          "0x2222222222222222222222222222222222222222"
+        ]
+      }
+    }
+  ],
+  "personal_listWallets": [
+    {
+      "name": "list-wallets",
+      "summary": "Wallet-level management is not supported; returns null/empty.",
+      "result": { "name": "result", "value": [] }
+    }
+  ],
+  "personal_lockAccount": [
+    {
+      "name": "lock-account",
+      "summary": "Lock/unlock via keyring backend is not supported; returns false.",
+      "params": [
+        { "name": "arg1", "value": "0x1111111111111111111111111111111111111111" }
+      ],
+      "result": { "name": "result", "value": false }
+    }
+  ],
+  "personal_newAccount": [
+    {
+      "name": "create-account",
+      "summary": "Creates a new eth_secp256k1 account from mnemonic path iterator.",
+      "params": [
+        { "name": "arg1", "value": "strong-password" }
+      ],
+      "result": { "name": "result", "value": "0x3333333333333333333333333333333333333333" }
+    }
+  ],
+  "personal_sendTransaction": [
+    {
+      "name": "send-transaction",
+      "summary": "Signs and broadcasts a transaction using personal namespace.",
+      "params": [
+        {
+          "name": "arg1",
+          "value": {
+            "from": "0x1111111111111111111111111111111111111111",
+            "to": "0x2222222222222222222222222222222222222222",
+            "gas": "0x5208",
+            "value": "0x1"
+          }
+        },
+        { "name": "arg2", "value": "strong-password" }
+      ],
+      "result": { "name": "result", "value": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+    }
+  ],
+  "personal_sign": [
+    {
+      "name": "sign-message",
+      "summary": "Signs arbitrary bytes with Ethereum message prefixing.",
+      "params": [
+        { "name": "arg1", "value": "0x48656c6c6f2c204c756d657261" },
+        { "name": "arg2", "value": "0x1111111111111111111111111111111111111111" },
+        { "name": "arg3", "value": "strong-password" }
+      ],
+      "result": { "name": "result", "value": "0x2c640f4fba7b6d6f665ba4a2f8dc1d56c3dc0f8ad1a47d9fd2d8f6b5c7b2f7f40d8f8b6e7450cd9ec68f2f2bb0f8bc7afbe73f48603f2f53f23d4c2fd0cf0a7f1b" }
+    }
+  ],
+  "personal_unlockAccount": [
+    {
+      "name": "unlock-account",
+      "summary": "Lock/unlock via keyring backend is not supported; returns false.",
+      "params": [
+        { "name": "arg1", "value": "0x1111111111111111111111111111111111111111" },
+        { "name": "arg2", "value": "strong-password" },
+        { "name": "arg3", "value": 300 }
+      ],
+      "result": { "name": "result", "value": false }
+    }
+  ],
+  "personal_unpair": [
+    {
+      "name": "unpair-smartcard-wallet",
+      "summary": "Smartcard wallets are currently unsupported; call returns an error.",
+      "params": [
+        { "name": "arg1", "value": "usb://ledger" },
+        { "name": "arg2", "value": "123456" }
+      ],
+      "result": { "name": "result", "value": null }
+    }
+  ],
+  "miner_getHashrate": [
+    {
+      "name": "get-hashrate",
+      "summary": "Mining is unsupported in Cosmos EVM; hashrate is always zero.",
+      "result": { "name": "result", "value": 0 }
+    }
+  ],
+  "miner_setEtherbase": [
+    {
+      "name": "set-etherbase",
+      "summary": "Sets fee recipient address used by miner namespace.",
+      "params": [
+        { "name": "arg1", "value": "0x1111111111111111111111111111111111111111" }
+      ],
+      "result": { "name": "result", "value": true }
+    }
+  ],
+  "miner_setExtra": [
+    {
+      "name": "set-extra-data",
+      "summary": "Unsupported in Cosmos EVM; returns false and error.",
+      "params": [
+        { "name": "arg1", "value": "lumera-devnet" }
+      ],
+      "result": { "name": "result", "value": false }
+    }
+  ],
+  "miner_setGasLimit": [
+    {
+      "name": "set-gas-limit",
+      "summary": "Unsupported in Cosmos EVM; returns false.",
+      "params": [
+        { "name": "arg1", "value": "0x989680" }
+      ],
+      "result": { "name": "result", "value": false }
+    }
+  ],
+  "miner_setGasPrice": [
+    {
+      "name": "set-miner-gas-price",
+      "summary": "Updates miner-side minimum gas price.",
+      "params": [
+        { "name": "arg1", "value": "0x3b9aca00" }
+      ],
+      "result": { "name": "result", "value": true }
+    }
+  ],
+  "miner_start": [
+    {
+      "name": "start-miner",
+      "summary": "Unsupported in Cosmos EVM; call returns an error.",
+      "params": [
+        { "name": "arg1", "value": 1 }
+      ],
+      "result": { "name": "result", "value": null }
+    }
+  ],
+  "miner_stop": [
+    {
+      "name": "stop-miner",
+      "summary": "Unsupported in Cosmos EVM; no-op.",
+      "result": { "name": "result", "value": null }
+    }
+  ],
+  "rpc_discover": [
+    {
+      "name": "openrpc-discovery",
+      "summary": "Returns the embedded OpenRPC document served by the running node.",
+      "result": {
+        "name": "result",
+        "value": {
+          "openrpc": "1.2.6",
+          "info": {
+            "title": "Lumera Cosmos EVM JSON-RPC API",
+            "version": "cosmos/evm v0.5.1"
+          },
+          "methods": []
+        }
+      }
+    }
+  ]
+}

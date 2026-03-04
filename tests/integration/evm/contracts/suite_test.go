@@ -13,14 +13,14 @@ import (
 // TestContractsSuite runs contract integration coverage against one node
 // fixture to avoid repeated startup overhead.
 func TestContractsSuite(t *testing.T) {
-	node := evmtest.NewEVMNode(t, "lumera-contracts-suite", 700)
+	node := evmtest.NewEVMNode(t, "lumera-contracts-suite", 900)
 	node.StartAndWaitRPC()
 	defer node.Stop()
 
 	run := func(name string, fn func(t *testing.T, node *evmtest.Node)) {
 		t.Run(name, func(t *testing.T) {
-			latest := evmtest.MustGetBlockNumber(t, node.RPCURL())
-			evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), latest+1, 20*time.Second)
+			latest := node.MustGetBlockNumber(t)
+			node.WaitForBlockNumberAtLeast(t, latest+1, 20*time.Second)
 			fn(t, node)
 		})
 	}
@@ -30,5 +30,17 @@ func TestContractsSuite(t *testing.T) {
 	})
 	run("ContractRevertTxReceiptAndGasE2E", func(t *testing.T, node *evmtest.Node) {
 		testContractRevertTxReceiptAndGasE2E(t, node)
+	})
+	run("CALLBetweenContracts", func(t *testing.T, node *evmtest.Node) {
+		testCALLBetweenContracts(t, node)
+	})
+	run("DELEGATECALLPreservesContext", func(t *testing.T, node *evmtest.Node) {
+		testDELEGATECALLPreservesContext(t, node)
+	})
+	run("CREATE2DeterministicAddress", func(t *testing.T, node *evmtest.Node) {
+		testCREATE2DeterministicAddress(t, node)
+	})
+	run("STATICCALLCannotModifyState", func(t *testing.T, node *evmtest.Node) {
+		testSTATICCALLCannotModifyState(t, node)
 	})
 }

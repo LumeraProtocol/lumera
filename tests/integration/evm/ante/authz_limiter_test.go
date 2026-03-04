@@ -10,7 +10,7 @@ import (
 
 	lcfg "github.com/LumeraProtocol/lumera/config"
 	evmtest "github.com/LumeraProtocol/lumera/tests/integration/evmtest"
-	testtext "github.com/LumeraProtocol/lumera/testutil/text"
+	testtext "github.com/LumeraProtocol/lumera/pkg/text"
 )
 
 // TestAuthzGenericGrantRejectsBlockedMsgTypes verifies authz grant filtering in
@@ -21,7 +21,7 @@ import (
 // - Generic grant for MsgCreateVestingAccount should be rejected.
 func testAuthzGenericGrantRejectsBlockedMsgTypes(t *testing.T, node *evmtest.Node) {
 	t.Helper()
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), 1, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
 
 	grantee := mustAddKeyAddress(t, node, "grantee-reject")
 
@@ -63,7 +63,7 @@ func testAuthzGenericGrantRejectsBlockedMsgTypes(t *testing.T, node *evmtest.Nod
 // authz limiter: a regular MsgSend authorization must still pass.
 func testAuthzGenericGrantAllowsNonBlockedMsgType(t *testing.T, node *evmtest.Node) {
 	t.Helper()
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), 1, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
 
 	grantee := mustAddKeyAddress(t, node, "grantee-allow")
 	resp := mustBroadcastAuthzGenericGrant(

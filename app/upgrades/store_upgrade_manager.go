@@ -2,15 +2,13 @@ package upgrades
 
 import (
 	"fmt"
-	"os"
 	"sort"
-	"strconv"
-	"strings"
 
 	"cosmossdk.io/log"
 	storetypes "cosmossdk.io/store/types"
 	upgradetypes "cosmossdk.io/x/upgrade/types"
 
+	textutil "github.com/LumeraProtocol/lumera/pkg/text"
 	"github.com/cosmos/cosmos-sdk/baseapp"
 )
 
@@ -24,7 +22,7 @@ func ShouldEnableStoreUpgradeManager(chainID string) bool {
 	if !IsDevnet(chainID) {
 		return false
 	}
-	return envBool(EnvEnableStoreUpgradeManager)
+	return textutil.EnvBool(EnvEnableStoreUpgradeManager)
 }
 
 // KVStoreNames returns the set of persistent KV store names registered in the app.
@@ -193,16 +191,4 @@ func formatStoreRenames(renames []storetypes.StoreRename) []string {
 		out = append(out, fmt.Sprintf("%s->%s", rename.OldKey, rename.NewKey))
 	}
 	return out
-}
-
-func envBool(key string) bool {
-	value := strings.TrimSpace(os.Getenv(key))
-	if value == "" {
-		return false
-	}
-	parsed, err := strconv.ParseBool(value)
-	if err != nil {
-		return false
-	}
-	return parsed
 }

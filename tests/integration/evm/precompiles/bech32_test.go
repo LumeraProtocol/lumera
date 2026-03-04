@@ -24,7 +24,7 @@ import (
 // 3. Assert both directions preserve the same address.
 func testBech32PrecompileRoundTripViaEthCall(t *testing.T, node *evmtest.Node) {
 	t.Helper()
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), 1, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
 
 	accHex := testaccounts.MustAccountAddressFromTestKeyInfo(t, node.KeyInfo())
 	bech32Addr := node.KeyInfo().Address
@@ -39,7 +39,7 @@ func testBech32PrecompileRoundTripViaEthCall(t *testing.T, node *evmtest.Node) {
 		t.Fatalf("pack hexToBech32 input: %v", err)
 	}
 
-	hexToBech32Result := mustEthCallPrecompile(t, node.RPCURL(), evmtypes.Bech32PrecompileAddress, hexToBech32Input)
+	hexToBech32Result := mustEthCallPrecompile(t, node, evmtypes.Bech32PrecompileAddress, hexToBech32Input)
 	out, err := bech32precompile.ABI.Unpack(bech32precompile.HexToBech32Method, hexToBech32Result)
 	if err != nil {
 		t.Fatalf("unpack hexToBech32 output: %v", err)
@@ -57,7 +57,7 @@ func testBech32PrecompileRoundTripViaEthCall(t *testing.T, node *evmtest.Node) {
 		t.Fatalf("pack bech32ToHex input: %v", err)
 	}
 
-	bech32ToHexResult := mustEthCallPrecompile(t, node.RPCURL(), evmtypes.Bech32PrecompileAddress, bech32ToHexInput)
+	bech32ToHexResult := mustEthCallPrecompile(t, node, evmtypes.Bech32PrecompileAddress, bech32ToHexInput)
 	out, err = bech32precompile.ABI.Unpack(bech32precompile.Bech32ToHexMethod, bech32ToHexResult)
 	if err != nil {
 		t.Fatalf("unpack bech32ToHex output: %v", err)

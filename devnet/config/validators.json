@@ -7,9 +7,15 @@
     "rpc_port": 26667,
     "rest_port": 1327,
     "grpc_port": 9091,
-    "supernode_port": 7441,
-    "supernode_p2p_port": 7442,
-    "supernode_gateway_port": 18001,
+    "supernode": {
+      "port": 7441,
+      "p2p_port": 7442,
+      "gateway_port": 18001
+    },
+    "json-rpc": {
+      "port": 8545,
+      "ws_port": 8546
+    },
     "initial_distribution": {
       "account_balance": "2000000000000ulume",
       "validator_stake": "1000000000000ulume"
@@ -23,9 +29,15 @@
     "rpc_port": 26677,
     "rest_port": 1337,
     "grpc_port": 9092,
-    "supernode_port": 7443,
-    "supernode_p2p_port": 7444,
-    "supernode_gateway_port": 18002,
+    "supernode": {
+      "port": 7443,
+      "p2p_port": 7444,
+      "gateway_port": 18002
+    },
+    "json-rpc": {
+      "port": 8555,
+      "ws_port": 8556
+    },
     "initial_distribution": {
       "account_balance": "2000000000000ulume",
       "validator_stake": "1000000000000ulume"
@@ -39,9 +51,15 @@
     "rpc_port": 26687,
     "rest_port": 1347,
     "grpc_port": 9093,
-    "supernode_port": 7445,
-    "supernode_p2p_port": 7446,
-    "supernode_gateway_port": 18003,
+    "supernode": {
+      "port": 7445,
+      "p2p_port": 7446,
+      "gateway_port": 18003
+    },
+    "json-rpc": {
+      "port": 8565,
+      "ws_port": 8566
+    },
     "network-maker": {
       "enabled": true,
       "grpc_port": 50051,
@@ -60,9 +78,15 @@
     "rpc_port": 26697,
     "rest_port": 1357,
     "grpc_port": 9094,
-    "supernode_port": 7447,
-    "supernode_p2p_port": 7448,
-    "supernode_gateway_port": 18004,
+    "supernode": {
+      "port": 7447,
+      "p2p_port": 7448,
+      "gateway_port": 18004
+    },
+    "json-rpc": {
+      "port": 8575,
+      "ws_port": 8576
+    },
     "initial_distribution": {
       "account_balance": "2000000000000ulume",
       "validator_stake": "1000000000000ulume"
@@ -76,9 +100,15 @@
     "rpc_port": 26607,
     "rest_port": 1367,
     "grpc_port": 9095,
-    "supernode_port": 7449,
-    "supernode_p2p_port": 7450,
-    "supernode_gateway_port": 18005,
+    "supernode": {
+      "port": 7449,
+      "p2p_port": 7450,
+      "gateway_port": 18005
+    },
+    "json-rpc": {
+      "port": 8585,
+      "ws_port": 8586
+    },
     "initial_distribution": {
       "account_balance": "2000000000000ulume",
       "validator_stake": "1000000000000ulume"

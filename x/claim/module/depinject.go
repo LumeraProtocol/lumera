@@ -17,6 +17,7 @@ import (
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
 	"github.com/cosmos/cosmos-sdk/client/flags"
+	"github.com/spf13/viper"
 
 	"github.com/LumeraProtocol/lumera/x/claim/keeper"
 	"github.com/LumeraProtocol/lumera/x/claim/types"
@@ -94,6 +95,10 @@ func searchForClaimsFile(appOpts servertypes.AppOptions) (string, error) {
 // ----------------------------------------------------------------------------
 
 func init() {
+	// Claiming period ended 2025-01-01; skip the claims.csv check by default.
+	// Operators who need the check can pass --skip-claims-check=false.
+	viper.SetDefault(types.FlagSkipClaimsCheck, true)
+
 	appconfig.Register(
 		&Module{},
 		appconfig.Provide(ProvideModule),

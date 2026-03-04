@@ -20,10 +20,10 @@ import (
 // deterministic storage write.
 func testVMQueryCodeAndStorageMatchJSONRPC(t *testing.T, node *evmtest.Node) {
 	t.Helper()
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), 1, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
 
 	deployTxHash := sendContractCreationTx(t, node, storageSetterContractCreationCode())
-	deployReceipt := evmtest.WaitForReceipt(t, node.RPCURL(), deployTxHash, node.WaitCh(), node.OutputBuffer(), 45*time.Second)
+	deployReceipt := node.WaitForReceipt(t, deployTxHash, 45*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, deployReceipt, deployTxHash)
 
 	contractAddress := evmtest.MustStringField(t, deployReceipt, "contractAddress")
@@ -32,7 +32,7 @@ func testVMQueryCodeAndStorageMatchJSONRPC(t *testing.T, node *evmtest.Node) {
 	}
 
 	callTxHash := sendContractMethodTx(t, node, contractAddress, "0x")
-	callReceipt := evmtest.WaitForReceipt(t, node.RPCURL(), callTxHash, node.WaitCh(), node.OutputBuffer(), 45*time.Second)
+	callReceipt := node.WaitForReceipt(t, callTxHash, 45*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, callReceipt, callTxHash)
 
 	outCode := mustRunNodeCommand(t, node,
@@ -50,7 +50,7 @@ func testVMQueryCodeAndStorageMatchJSONRPC(t *testing.T, node *evmtest.Node) {
 	codeFromQuery := mustDecodeCodeBytes(t, codeResp.Code)
 
 	var codeFromRPC string
-	evmtest.MustJSONRPC(t, node.RPCURL(), "eth_getCode", []any{contractAddress, "latest"}, &codeFromRPC)
+	node.MustJSONRPC(t, "eth_getCode", []any{contractAddress, "latest"}, &codeFromRPC)
 	rpcCodeBytes, err := hexutil.Decode(codeFromRPC)
 	if err != nil {
 		t.Fatalf("decode eth_getCode %q: %v", codeFromRPC, err)
@@ -74,7 +74,7 @@ func testVMQueryCodeAndStorageMatchJSONRPC(t *testing.T, node *evmtest.Node) {
 	}
 
 	var storageFromRPC string
-	evmtest.MustJSONRPC(t, node.RPCURL(), "eth_getStorageAt", []any{contractAddress, "0x0", "latest"}, &storageFromRPC)
+	node.MustJSONRPC(t, "eth_getStorageAt", []any{contractAddress, "0x0", "latest"}, &storageFromRPC)
 
 	if !strings.EqualFold(strings.TrimSpace(storageResp.Value), strings.TrimSpace(storageFromRPC)) {
 		t.Fatalf("query evm storage mismatch vs eth_getStorageAt: query=%s rpc=%s", storageResp.Value, storageFromRPC)

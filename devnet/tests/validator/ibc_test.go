@@ -9,6 +9,9 @@ import (
 	"time"
 
 	"gen/tests/ibcutil"
+
+	textutil "github.com/LumeraProtocol/lumera/pkg/text"
+	pkgversion "github.com/LumeraProtocol/lumera/pkg/version"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -23,9 +26,11 @@ const (
 	defaultSimdAddrFile    = "/shared/hermes/simd-test.address"
 	defaultSimdREST        = "http://hermes:1317"
 	defaultValidatorsFile  = "/shared/config/validators.json"
+	defaultIBCRetries      = 40
+	defaultIBCRetryDelay   = 3 * time.Second
 )
 
-type ibcLumeraSuite struct {
+type lumeraValidatorSuite struct {
 	suite.Suite
 	channelInfoPath string
 	lumeraBin       string
@@ -50,20 +55,20 @@ type ibcLumeraSuite struct {
 	csType       string
 }
 
-func (s *ibcLumeraSuite) SetupSuite() {
+func (s *lumeraValidatorSuite) SetupSuite() {
 	// Load environment-driven configuration and shared channel metadata.
-	s.channelInfoPath = getenv("CHANNEL_INFO_FILE", defaultChannelInfoPath)
-	s.lumeraBin = getenv("LUMERA_BIN", defaultLumeraBin)
+	s.channelInfoPath = textutil.EnvOrDefault("CHANNEL_INFO_FILE", defaultChannelInfoPath)
+	s.lumeraBin = textutil.EnvOrDefault("LUMERA_BIN", defaultLumeraBin)
 	s.lumeraRPC = resolveLumeraRPC()
-	s.lumeraChainID = getenv("LUMERA_CHAIN_ID", defaultLumeraChainID)
+	s.lumeraChainID = textutil.EnvOrDefault("LUMERA_CHAIN_ID", defaultLumeraChainID)
 	if val := os.Getenv("LUMERA_KEY_NAME"); val != "" {
 		s.lumeraKeyName = val
 	} else {
 		s.lumeraKeyName = resolveLumeraKeyName()
 	}
-	s.lumeraGasPrices = getenv("LUMERA_GAS_PRICES", defaultLumeraGasPrices)
-	s.lumeraDenom = getenv("LUMERA_DENOM", defaultLumeraDenom)
-	s.simdREST = getenv("SIMD_REST_ADDR", defaultSimdREST)
+	s.lumeraGasPrices = textutil.EnvOrDefault("LUMERA_GAS_PRICES", defaultLumeraGasPrices)
+	s.lumeraDenom = textutil.EnvOrDefault("LUMERA_DENOM", defaultLumeraDenom)
+	s.simdREST = textutil.EnvOrDefault("SIMD_REST_ADDR", defaultSimdREST)
 
 	info, err := ibcutil.LoadChannelInfo(s.channelInfoPath)
 	s.Require().NoError(err, "load channel info")
@@ -82,7 +87,7 @@ func (s *ibcLumeraSuite) SetupSuite() {
 	s.T().Logf("Using lumera key name: %s", s.lumeraKeyName)
 
 	// Resolve port/channel IDs from env or the generated channel info file.
-	portID := getenv("PORT_ID", "")
+	portID := textutil.EnvOrDefault("PORT_ID", "")
 	if portID == "" {
 		portID = info.PortID
 	}
@@ -91,11 +96,11 @@ func (s *ibcLumeraSuite) SetupSuite() {
 	}
 	s.portID = portID
 
-	s.channelID = getenv("CHANNEL_ID", info.ChannelID)
+	s.channelID = textutil.EnvOrDefault("CHANNEL_ID", info.ChannelID)
 	s.Require().NotEmpty(s.channelID, "channel_id missing in %s", s.channelInfoPath)
 
 	// Default simd recipient from shared file for transfer tests.
-	simdAddrFile := getenv("SIMD_RECIPIENT_ADDR_FILE", defaultSimdAddrFile)
+	simdAddrFile := textutil.EnvOrDefault("SIMD_RECIPIENT_ADDR_FILE", defaultSimdAddrFile)
 	addr, err := ibcutil.ReadAddress(simdAddrFile)
 	s.Require().NoError(err, "read simd recipient address")
 	s.simdRecipient = addr
@@ -150,21 +155,21 @@ func (s *ibcLumeraSuite) SetupSuite() {
 	s.csType = csType
 }
 
-func (s *ibcLumeraSuite) TestChannelOpen() {
+func (s *lumeraValidatorSuite) TestChannelOpen() {
 	s.Require().NotNil(s.channel, "channel is nil")
 	s.True(ibcutil.IsOpenState(s.channel.State), "channel %s/%s not open: %s", s.channel.PortID, s.channel.ChannelID, s.channel.State)
 }
 
-func (s *ibcLumeraSuite) TestConnectionOpen() {
+func (s *lumeraValidatorSuite) TestConnectionOpen() {
 	s.Require().NotNil(s.connection, "connection is nil")
 	s.True(ibcutil.IsOpenState(s.connection.State), "connection %s not open: %s", s.connection.ID, s.connection.State)
 }
 
-func (s *ibcLumeraSuite) TestClientActive() {
+func (s *lumeraValidatorSuite) TestClientActive() {
 	s.True(ibcutil.IsActiveStatus(s.clientStatus), "client %s not active: %s", s.connection.ClientID, s.clientStatus)
 }
 
-func (s *ibcLumeraSuite) TestChannelClientState() {
+func (s *lumeraValidatorSuite) TestChannelClientState() {
 	if s.csClientID != "" {
 		s.Equal(s.connection.ClientID, s.csClientID, "client-state mismatch")
 	}
@@ -172,10 +177,31 @@ func (s *ibcLumeraSuite) TestChannelClientState() {
 	s.T().Logf("Client status active; client-state height=%d type=%s", s.csHeight, s.csType)
 }
 
-func (s *ibcLumeraSuite) TestTransferToSimd() {
+func (s *lumeraValidatorSuite) TestTransferToSimd() {
 	// Exercise a real packet flow from lumera -> simd and confirm balance change.
-	amount := getenv("LUMERA_IBC_AMOUNT", "100"+s.lumeraDenom)
-	ibcDenom := ibcutil.IBCDenom(s.portID, s.channelID, s.lumeraDenom)
+	amount := textutil.EnvOrDefault("LUMERA_IBC_AMOUNT", "100"+s.lumeraDenom)
+	s.transferFromLumeraToSimdAndAssert(amount)
+}
+
+func (s *lumeraValidatorSuite) TestIBCTransferWithEVMModeStillRelays() {
+	s.requireLumeraEVMModeOrSkip()
+	amount := textutil.EnvOrDefault("LUMERA_IBC_EVM_MODE_AMOUNT", "77"+s.lumeraDenom)
+	s.transferFromLumeraToSimdAndAssert(amount)
+}
+
+func TestIBCLumeraSideSuite(t *testing.T) {
+	suite.Run(t, new(lumeraValidatorSuite))
+}
+
+func (s *lumeraValidatorSuite) transferFromLumeraToSimdAndAssert(amount string) {
+	// On the destination chain (simd), the voucher denom trace uses the
+	// destination-side channel ID (counterparty from lumera's perspective).
+	dstChannelID := s.info.CounterpartyChannel
+	if dstChannelID == "" && s.channel != nil {
+		dstChannelID = s.channel.Counterparty.ChannelID
+	}
+	s.Require().NotEmpty(dstChannelID, "destination channel id is empty")
+	ibcDenom := ibcutil.IBCDenom(s.portID, dstChannelID, s.lumeraDenom)
 
 	before, err := ibcutil.QueryBalanceREST(s.simdREST, s.simdRecipient, ibcDenom)
 	s.Require().NoError(err, "query simd recipient balance before")
@@ -187,20 +213,29 @@ func (s *ibcLumeraSuite) TestTransferToSimd() {
 	)
 	s.Require().NoError(err, "send ibc transfer to simd")
 
-	after, err := ibcutil.WaitForBalanceIncreaseREST(s.simdREST, s.simdRecipient, ibcDenom, before, 20, 3*time.Second)
+	after, err := ibcutil.WaitForBalanceIncreaseREST(s.simdREST, s.simdRecipient, ibcDenom, before, defaultIBCRetries, defaultIBCRetryDelay)
 	s.Require().NoError(err, "wait for simd recipient balance increase")
 	s.T().Logf("simd recipient balance increased: %d -> %d", before, after)
 }
 
-func TestIBCLumeraSideSuite(t *testing.T) {
-	suite.Run(t, new(ibcLumeraSuite))
-}
-
-func getenv(key, fallback string) string {
-	if val := os.Getenv(key); val != "" {
-		return val
+func (s *lumeraValidatorSuite) requireLumeraEVMModeOrSkip() {
+	explicit := strings.ToLower(strings.TrimSpace(os.Getenv("LUMERA_KEY_STYLE")))
+	switch explicit {
+	case "evm":
+		return
+	case "cosmos":
+		s.T().Skip("skip EVM-mode transfer assertion: LUMERA_KEY_STYLE=cosmos")
+		return
 	}
-	return fallback
+
+	ver, err := resolveLumeraBinaryVersion(s.lumeraBin)
+	if err != nil {
+		s.T().Skipf("skip EVM-mode transfer assertion: failed to resolve %s version: %v", s.lumeraBin, err)
+		return
+	}
+	if !pkgversion.GTE(ver, firstEVMVersion) {
+		s.T().Skipf("skip EVM-mode transfer assertion: %s version %s < %s", s.lumeraBin, ver, firstEVMVersion)
+	}
 }
 
 func loadPrimaryValidatorKey(path string) string {
@@ -239,7 +274,7 @@ func resolveLumeraRPC() string {
 }
 
 func resolveLumeraKeyName() string {
-	validatorsPath := getenv("LUMERA_VALIDATORS_FILE", defaultValidatorsFile)
+	validatorsPath := textutil.EnvOrDefault("LUMERA_VALIDATORS_FILE", defaultValidatorsFile)
 	if moniker := detectValidatorMoniker(); moniker != "" {
 		if key := loadValidatorKeyByMoniker(validatorsPath, moniker); key != "" {
 			return key

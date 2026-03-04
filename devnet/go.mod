@@ -28,6 +28,7 @@ require (
 require (
 	github.com/LumeraProtocol/lumera v1.10.0
 	github.com/LumeraProtocol/sdk-go v0.0.0-00010101000000-000000000000
+	github.com/ethereum/go-ethereum v1.15.11
 )
 
 require (
@@ -94,7 +95,6 @@ require (
 	github.com/dvsekhvalnov/jose2go v1.7.0 // indirect
 	github.com/emicklei/dot v1.6.2 // indirect
 	github.com/ethereum/c-kzg-4844/v2 v2.1.0 // indirect
-	github.com/ethereum/go-ethereum v1.15.11 // indirect
 	github.com/ethereum/go-verkle v0.2.2 // indirect
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect

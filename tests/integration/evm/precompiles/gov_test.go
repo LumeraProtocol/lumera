@@ -17,14 +17,14 @@ import (
 // precompile methods for params and constitution.
 func testGovPrecompileQueryPathsViaEthCall(t *testing.T, node *evmtest.Node) {
 	t.Helper()
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), 1, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
 
 	getParamsInput, err := govprecompile.ABI.Pack(govprecompile.GetParamsMethod)
 	if err != nil {
 		t.Fatalf("pack getParams input: %v", err)
 	}
 
-	getParamsResult := mustEthCallPrecompile(t, node.RPCURL(), evmtypes.GovPrecompileAddress, getParamsInput)
+	getParamsResult := mustEthCallPrecompile(t, node, evmtypes.GovPrecompileAddress, getParamsInput)
 	var paramsOut struct {
 		Params govprecompile.ParamsOutput `abi:"params"`
 	}
@@ -43,7 +43,7 @@ func testGovPrecompileQueryPathsViaEthCall(t *testing.T, node *evmtest.Node) {
 		t.Fatalf("pack getConstitution input: %v", err)
 	}
 
-	getConstitutionResult := mustEthCallPrecompile(t, node.RPCURL(), evmtypes.GovPrecompileAddress, getConstitutionInput)
+	getConstitutionResult := mustEthCallPrecompile(t, node, evmtypes.GovPrecompileAddress, getConstitutionInput)
 	out, err := govprecompile.ABI.Unpack(govprecompile.GetConstitutionMethod, getConstitutionResult)
 	if err != nil {
 		t.Fatalf("unpack getConstitution output: %v", err)

@@ -23,7 +23,7 @@ import (
 // behavior for valid and invalid public keys through the static p256 precompile.
 func testP256PrecompileVerifyViaEthCall(t *testing.T, node *evmtest.Node) {
 	t.Helper()
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), 1, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
 
 	msgHash := sha256.Sum256([]byte("lumera-p256-precompile"))
 
@@ -43,7 +43,7 @@ func testP256PrecompileVerifyViaEthCall(t *testing.T, node *evmtest.Node) {
 	priv.X.FillBytes(validInput[96:128])
 	priv.Y.FillBytes(validInput[128:160])
 
-	validResult := mustEthCallPrecompile(t, node.RPCURL(), evmtypes.P256PrecompileAddress, validInput)
+	validResult := mustEthCallPrecompile(t, node, evmtypes.P256PrecompileAddress, validInput)
 	wantTrue := common.LeftPadBytes(big.NewInt(1).Bytes(), 32)
 	if !bytes.Equal(validResult, wantTrue) {
 		t.Fatalf("expected valid p256 verification result %x, got %x", wantTrue, validResult)
@@ -57,7 +57,7 @@ func testP256PrecompileVerifyViaEthCall(t *testing.T, node *evmtest.Node) {
 	otherPriv.X.FillBytes(invalidInput[96:128])
 	otherPriv.Y.FillBytes(invalidInput[128:160])
 
-	invalidResult := mustEthCallPrecompile(t, node.RPCURL(), evmtypes.P256PrecompileAddress, invalidInput)
+	invalidResult := mustEthCallPrecompile(t, node, evmtypes.P256PrecompileAddress, invalidInput)
 	if len(invalidResult) != 0 {
 		t.Fatalf("expected empty result for invalid p256 signature, got %x", invalidResult)
 	}

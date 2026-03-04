@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"strings"
 
@@ -94,6 +95,7 @@ import (
 	corevm "github.com/ethereum/go-ethereum/core/vm"
 
 	appevm "github.com/LumeraProtocol/lumera/app/evm"
+	appopenrpc "github.com/LumeraProtocol/lumera/app/openrpc"
 	upgrades "github.com/LumeraProtocol/lumera/app/upgrades"
 	appParams "github.com/LumeraProtocol/lumera/app/upgrades/params"
 	lcfg "github.com/LumeraProtocol/lumera/config"
@@ -140,6 +142,11 @@ type App struct {
 	ibcRouter          *ibcporttypes.Router
 	pendingTxListeners []evmante.PendingTxListener
 	evmMempool         *evmmempool.ExperimentalEVMMempool
+	// evmTxBroadcaster is used to asynchronously broadcast promoted EVM transactions from the mempool to the network without blocking CheckTx execution.
+	evmTxBroadcaster   *evmTxBroadcastDispatcher
+	// if true, the app will log additional information about mempool transaction broadcasts, which can be noisy but is useful for debugging mempool behavior.
+	evmBroadcastDebug  bool
+	evmBroadcastLogger log.Logger
 
 	// keepers
 	// only keepers required by the app are exposed
@@ -294,6 +301,9 @@ func New(
 	); err != nil {
 		panic(err)
 	}
+	// Keep LegacyAmino aligned with Cosmos EVM so SDK ante code paths that still
+	// marshal StdSignature via legacy.Cdc support eth_secp256k1 pubkeys.
+	registerLumeraLegacyAminoCodec(app.legacyAmino)
 
 	// add to default baseapp options, enable optimistic execution
 	baseAppOptions = append(baseAppOptions, baseapp.SetOptimisticExecution())
@@ -485,12 +495,6 @@ func (app *App) TxConfig() client.TxConfig {
 	return app.txConfig
 }
 
-// SetClientCtx stores the CLI/query client context for services started via
-// cosmos/evm's custom server command.
-func (app *App) SetClientCtx(clientCtx client.Context) {
-	app.clientCtx = clientCtx
-}
-
 // RegisterPendingTxListener registers a callback consumed by JSON-RPC pending
 // transaction streaming.
 func (app *App) RegisterPendingTxListener(listener func(common.Hash)) {
@@ -566,6 +570,7 @@ func (app *App) RegisterAPIRoutes(apiSvr *api.Server, apiConfig config.APIConfig
 	if err := server.RegisterSwaggerAPI(apiSvr.ClientCtx, apiSvr.Router, apiConfig.Swagger); err != nil {
 		panic(err)
 	}
+	apiSvr.Router.HandleFunc(appopenrpc.HTTPPath, appopenrpc.ServeHTTP).Methods(http.MethodGet, http.MethodHead)
 
 	// register app's OpenAPI routes.
 	docs.RegisterOpenAPIService(Name, apiSvr.Router)

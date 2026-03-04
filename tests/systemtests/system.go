@@ -52,8 +52,7 @@ type SystemUnderTest struct {
 	currentHeight   int64
 	chainID         string
 	outputDir       string
-	claimsPath      string
-	skipClaimsCheck bool
+	claimsPath string
 	// blockTime is the expected/desired block time. This is not going to be very precise
 	// since Tendermint consensus does not allow specifying it directly.
 	blockTime         time.Duration
@@ -70,6 +69,7 @@ type SystemUnderTest struct {
 	ChainStarted      bool
 	projectName       string
 	dirty             bool // requires full reset when marked dirty
+	stopping          bool // true while StopChain is running (suppresses exit errors)
 
 	pidsLock mtxSync.RWMutex
 	pids     map[int]struct{}
@@ -174,9 +174,6 @@ func (s *SystemUnderTest) StartChain(t *testing.T, xargs ...string) {
 	if s.claimsPath != "" {
 		args = append(args, "--claims-path="+s.claimsPath)
 	}
-	if s.skipClaimsCheck {
-		args = append(args, "--skip-claims-check")
-	}
 	s.startNodesAsync(t, append(args, xargs...)...)
 
 	s.AwaitNodeUp(t, s.rpcAddr)
@@ -197,9 +194,6 @@ func (s *SystemUnderTest) SetClaimsPath(path string) {
 	s.claimsPath = path
 }
 
-func (s *SystemUnderTest) SetSkipClaimsCheck(skip bool) {
-	s.skipClaimsCheck = skip
-}
 
 // MarkDirty whole chain will be reset when marked dirty
 func (s *SystemUnderTest) MarkDirty() {
@@ -335,6 +329,7 @@ func (s *SystemUnderTest) StopChain() {
 	if !s.ChainStarted {
 		return
 	}
+	s.stopping = true
 
 	// Pre-cleanup: unsubscribe from events while nodes are still alive
 	for _, c := range s.cleanupPreFn {
@@ -380,6 +375,7 @@ func (s *SystemUnderTest) StopChain() {
 	s.cleanupPostFn = nil
 
 	s.ChainStarted = false
+	s.stopping = false
 }
 
 func (s *SystemUnderTest) withEachPid(cb func(p *os.Process)) {
@@ -660,7 +656,7 @@ func (s *SystemUnderTest) startNodesAsync(t *testing.T, xargs ...string) {
 		wg.Wait()
 
 		for err := range errChan {
-			if err != nil {
+			if err != nil && !s.stopping {
 				t.Errorf("%v", err)
 			}
 		}

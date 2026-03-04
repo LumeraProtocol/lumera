@@ -19,7 +19,7 @@ import (
 // consistency.
 func testVMQueryParamsAndConfigBasic(t *testing.T, node *evmtest.Node) {
 	t.Helper()
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), 1, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
 
 	paramsResp := mustQueryEVMParams(t, node)
 	paramsMap, ok := paramsResp["params"].(map[string]any)

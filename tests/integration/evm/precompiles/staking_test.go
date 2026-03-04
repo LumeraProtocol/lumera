@@ -18,7 +18,7 @@ import (
 // validator query returns active validator data for the local test validator.
 func testStakingPrecompileValidatorViaEthCall(t *testing.T, node *evmtest.Node) {
 	t.Helper()
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), 1, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
 
 	validatorHex := testaccounts.MustAccountAddressFromTestKeyInfo(t, node.KeyInfo())
 	input, err := stakingprecompile.ABI.Pack(stakingprecompile.ValidatorMethod, validatorHex)
@@ -26,7 +26,7 @@ func testStakingPrecompileValidatorViaEthCall(t *testing.T, node *evmtest.Node) 
 		t.Fatalf("pack staking validator input: %v", err)
 	}
 
-	result := mustEthCallPrecompile(t, node.RPCURL(), evmtypes.StakingPrecompileAddress, input)
+	result := mustEthCallPrecompile(t, node, evmtypes.StakingPrecompileAddress, input)
 	var out struct {
 		Validator stakingprecompile.ValidatorInfo `abi:"validator"`
 	}

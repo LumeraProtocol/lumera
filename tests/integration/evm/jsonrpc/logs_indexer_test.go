@@ -31,8 +31,8 @@ func testLogsIndexerPathAcrossRestart(t *testing.T, node *evmtest.Node) {
 	t.Helper()
 
 	logTopic := "0x" + strings.Repeat("11", 32)
-	txHash := evmtest.SendLogEmitterCreationTx(t, node.RPCURL(), node.KeyInfo(), logTopic)
-	receipt := evmtest.WaitForReceipt(t, node.RPCURL(), txHash, node.WaitCh(), node.OutputBuffer(), 40*time.Second)
+	txHash := node.SendLogEmitterCreationTx(t, logTopic)
+	receipt := node.WaitForReceipt(t, txHash, 40*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, receipt, txHash)
 
 	blockNumber := evmtest.MustStringField(t, receipt, "blockNumber")
@@ -47,7 +47,7 @@ func testLogsIndexerPathAcrossRestart(t *testing.T, node *evmtest.Node) {
 		"toBlock":   blockNumber,
 		"address":   contractAddress,
 	}
-	logsByAddressBefore := evmtest.MustGetLogs(t, node.RPCURL(), addressFilter)
+	logsByAddressBefore := node.MustGetLogs(t, addressFilter)
 	assertLogsContainTxAndAddress(t, logsByAddressBefore, txHash, contractAddress)
 
 	addressAndTopicFilter := map[string]any{
@@ -56,17 +56,17 @@ func testLogsIndexerPathAcrossRestart(t *testing.T, node *evmtest.Node) {
 		"address":   contractAddress,
 		"topics":    []any{logTopic},
 	}
-	logsByTopicBefore := evmtest.MustGetLogs(t, node.RPCURL(), addressAndTopicFilter)
+	logsByTopicBefore := node.MustGetLogs(t, addressAndTopicFilter)
 	assertLogsContainTxAndAddress(t, logsByTopicBefore, txHash, contractAddress)
 
 	// Restart and verify indexed logs are still queryable.
 	firstStartOutput := node.OutputString()
 	node.RestartAndWaitRPC()
 
-	logsByAddressAfter := evmtest.MustGetLogs(t, node.RPCURL(), addressFilter)
+	logsByAddressAfter := node.MustGetLogs(t, addressFilter)
 	assertLogsContainTxAndAddress(t, logsByAddressAfter, txHash, contractAddress)
 
-	logsByTopicAfter := evmtest.MustGetLogs(t, node.RPCURL(), addressAndTopicFilter)
+	logsByTopicAfter := node.MustGetLogs(t, addressAndTopicFilter)
 	assertLogsContainTxAndAddress(t, logsByTopicAfter, txHash, contractAddress)
 
 	evmtest.AssertContains(t, firstStartOutput, "Starting EVMIndexerService service")

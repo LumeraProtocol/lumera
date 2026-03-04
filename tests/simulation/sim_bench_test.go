@@ -1,7 +1,7 @@
-//go:build test
-// +build test
+//go:build simulation
+// +build simulation
 
-package app_test
+package simulation_test
 
 import (
 	"os"
@@ -52,7 +52,7 @@ func BenchmarkFullAppSimulation(b *testing.B) {
 		b,
 		os.Stdout,
 		bApp.BaseApp,
-		simtestutil.AppStateFn(bApp.AppCodec(), bApp.SimulationManager(), bApp.DefaultGenesis()),
+		simAppStateFn(bApp),
 		simtypes.RandomAccounts, // Replace with own random account function if using keys other than secp256k1
 		simtestutil.BuildSimulationOperations(bApp, bApp.AppCodec(), config, bApp.TxConfig()),
 		app.BlockedAddresses(),
@@ -108,7 +108,7 @@ func BenchmarkInvariants(b *testing.B) {
 		b,
 		os.Stdout,
 		bApp.BaseApp,
-		simtestutil.AppStateFn(bApp.AppCodec(), bApp.SimulationManager(), bApp.DefaultGenesis()),
+		simAppStateFn(bApp),
 		simtypes.RandomAccounts, // Replace with own random account function if using keys other than secp256k1
 		simtestutil.BuildSimulationOperations(bApp, bApp.AppCodec(), config, bApp.TxConfig()),
 		app.BlockedAddresses(),

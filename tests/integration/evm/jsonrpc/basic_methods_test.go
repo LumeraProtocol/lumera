@@ -21,21 +21,21 @@ func testBasicRPCMethods(t *testing.T, node *evmtest.Node) {
 
 	// Validate identity endpoints exposed by the EVM JSON-RPC server.
 	var chainIDHex string
-	evmtest.MustJSONRPC(t, node.RPCURL(), "eth_chainId", []any{}, &chainIDHex)
+	node.MustJSONRPC(t, "eth_chainId", []any{}, &chainIDHex)
 	expectedChainIDHex := "0x" + strconv.FormatUint(evmtest.EVMChainID, 16)
 	if strings.ToLower(chainIDHex) != strings.ToLower(expectedChainIDHex) {
 		t.Fatalf("unexpected eth_chainId: got %q want %q", chainIDHex, expectedChainIDHex)
 	}
 
 	var netVersion string
-	evmtest.MustJSONRPC(t, node.RPCURL(), "net_version", []any{}, &netVersion)
+	node.MustJSONRPC(t, "net_version", []any{}, &netVersion)
 	expectedNetVersion := strconv.FormatUint(evmtest.EVMChainID, 10)
 	if netVersion != expectedNetVersion {
 		t.Fatalf("unexpected net_version: got %q want %q", netVersion, expectedNetVersion)
 	}
 
 	var clientVersion string
-	evmtest.MustJSONRPC(t, node.RPCURL(), "web3_clientVersion", []any{}, &clientVersion)
+	node.MustJSONRPC(t, "web3_clientVersion", []any{}, &clientVersion)
 	if strings.TrimSpace(clientVersion) == "" {
 		t.Fatalf("web3_clientVersion returned empty value")
 	}

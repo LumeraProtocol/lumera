@@ -64,6 +64,7 @@ func NewRootCmd() *cobra.Command {
 		Use:           app.Name + "d",
 		Short:         "Start lumera node",
 		SilenceErrors: true,
+		SilenceUsage:  true,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			// set the default command outputs
 			cmd.SetOut(cmd.OutOrStdout())

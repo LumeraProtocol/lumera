@@ -30,11 +30,10 @@ func testContractCodePersistsAcrossRestart(t *testing.T, node *evmtest.Node) {
 
 	deployTxHash := sendLoggingConstantContractCreationTx(
 		t,
-		node.RPCURL(),
-		node.KeyInfo(),
+		node,
 		"0x"+strings.Repeat("33", 32),
 	)
-	deployReceipt := evmtest.WaitForReceipt(t, node.RPCURL(), deployTxHash, node.WaitCh(), node.OutputBuffer(), 45*time.Second)
+	deployReceipt := node.WaitForReceipt(t, deployTxHash, 45*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, deployReceipt, deployTxHash)
 	assertReceiptBasics(t, deployReceipt)
 
@@ -44,15 +43,14 @@ func testContractCodePersistsAcrossRestart(t *testing.T, node *evmtest.Node) {
 	}
 
 	var codeBefore string
-	evmtest.MustJSONRPC(t, node.RPCURL(), "eth_getCode", []any{contractAddress, "latest"}, &codeBefore)
+	node.MustJSONRPC(t, "eth_getCode", []any{contractAddress, "latest"}, &codeBefore)
 	if strings.EqualFold(strings.TrimSpace(codeBefore), "0x") {
 		t.Fatalf("expected non-empty runtime code, got %q", codeBefore)
 	}
 
 	var codeAtDeployBlock string
-	evmtest.MustJSONRPC(
+	node.MustJSONRPC(
 		t,
-		node.RPCURL(),
 		"eth_getCode",
 		[]any{contractAddress, evmtest.MustStringField(t, deployReceipt, "blockNumber")},
 		&codeAtDeployBlock,
@@ -64,7 +62,7 @@ func testContractCodePersistsAcrossRestart(t *testing.T, node *evmtest.Node) {
 	node.RestartAndWaitRPC()
 
 	var codeAfter string
-	evmtest.MustJSONRPC(t, node.RPCURL(), "eth_getCode", []any{contractAddress, "latest"}, &codeAfter)
+	node.MustJSONRPC(t, "eth_getCode", []any{contractAddress, "latest"}, &codeAfter)
 	if !strings.EqualFold(codeBefore, codeAfter) {
 		t.Fatalf("contract bytecode changed across restart: before=%s after=%s", codeBefore, codeAfter)
 	}
@@ -85,8 +83,8 @@ func TestContractStoragePersistsAcrossRestart(t *testing.T) {
 func testContractStoragePersistsAcrossRestart(t *testing.T, node *evmtest.Node) {
 	t.Helper()
 
-	deployTxHash := sendContractCreationTx(t, node.RPCURL(), node.KeyInfo(), storageSetterContractCreationCode())
-	deployReceipt := evmtest.WaitForReceipt(t, node.RPCURL(), deployTxHash, node.WaitCh(), node.OutputBuffer(), 45*time.Second)
+	deployTxHash := sendContractCreationTx(t, node, storageSetterContractCreationCode())
+	deployReceipt := node.WaitForReceipt(t, deployTxHash, 45*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, deployReceipt, deployTxHash)
 	assertReceiptBasics(t, deployReceipt)
 
@@ -95,19 +93,19 @@ func testContractStoragePersistsAcrossRestart(t *testing.T, node *evmtest.Node) 
 		t.Fatalf("unexpected zero contractAddress in deployment receipt: %#v", deployReceipt)
 	}
 
-	callTxHash := sendContractMethodTx(t, node.RPCURL(), node.KeyInfo(), contractAddress, "0x")
-	callReceipt := evmtest.WaitForReceipt(t, node.RPCURL(), callTxHash, node.WaitCh(), node.OutputBuffer(), 45*time.Second)
+	callTxHash := sendContractMethodTx(t, node, contractAddress, "0x")
+	callReceipt := node.WaitForReceipt(t, callTxHash, 45*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, callReceipt, callTxHash)
 	assertReceiptBasics(t, callReceipt)
 
 	var slotBefore string
-	evmtest.MustJSONRPC(t, node.RPCURL(), "eth_getStorageAt", []any{contractAddress, "0x0", "latest"}, &slotBefore)
+	node.MustJSONRPC(t, "eth_getStorageAt", []any{contractAddress, "0x0", "latest"}, &slotBefore)
 	assertStorageSlot0Equals42(t, slotBefore)
 
 	node.RestartAndWaitRPC()
 
 	var slotAfter string
-	evmtest.MustJSONRPC(t, node.RPCURL(), "eth_getStorageAt", []any{contractAddress, "0x0", "latest"}, &slotAfter)
+	node.MustJSONRPC(t, "eth_getStorageAt", []any{contractAddress, "0x0", "latest"}, &slotAfter)
 	assertStorageSlot0Equals42(t, slotAfter)
 	if !strings.EqualFold(slotBefore, slotAfter) {
 		t.Fatalf("slot0 changed across restart: before=%s after=%s", slotBefore, slotAfter)

@@ -12,3 +12,15 @@ func ContainsAny(value string, needles ...string) bool {
 	}
 	return false
 }
+
+// LastNonEmptyLine returns the last non-empty trimmed line from s.
+func LastNonEmptyLine(s string) string {
+	lines := strings.Split(strings.TrimSpace(s), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := strings.TrimSpace(lines[i])
+		if line != "" {
+			return line
+		}
+	}
+	return ""
+}

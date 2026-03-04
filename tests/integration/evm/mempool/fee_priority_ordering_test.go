@@ -16,7 +16,6 @@ import (
 	testjsonrpc "github.com/LumeraProtocol/lumera/testutil/jsonrpc"
 	addresscodec "github.com/cosmos/cosmos-sdk/codec/address"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // TestEVMFeePriorityOrderingSameBlock verifies higher-fee tx ordering precedence
@@ -27,11 +26,7 @@ func testEVMFeePriorityOrderingSameBlock(t *testing.T, node *evmtest.Node) {
 	senderAddr := testaccounts.MustAccountAddressFromTestKeyInfo(t, node.KeyInfo())
 	senderPriv := evmtest.MustDerivePrivateKey(t, node.KeyInfo().Mnemonic)
 
-	receiverPriv, err := crypto.GenerateKey()
-	if err != nil {
-		t.Fatalf("generate second key: %v", err)
-	}
-	receiverAddr := crypto.PubkeyToAddress(receiverPriv.PublicKey)
+	receiverPriv, receiverAddr := testaccounts.MustGenerateEthKey(t)
 
 	// Wait until gas price is affordable for two 21k txs from the fixed test balance.
 	lowGasPrice := waitForAffordableGasPrice(t, node, big.NewInt(2_200_000_000), 30*time.Second)
@@ -48,10 +43,10 @@ func testEVMFeePriorityOrderingSameBlock(t *testing.T, node *evmtest.Node) {
 	}
 	fundAccountViaBankSend(t, node, receiverBech32, receiverFunding)
 
-	nonce1 := evmtest.MustGetPendingNonceWithRetry(t, node.RPCURL(), senderAddr.Hex(), 20*time.Second)
-	nonce2 := evmtest.MustGetPendingNonceWithRetry(t, node.RPCURL(), receiverAddr.Hex(), 20*time.Second)
+	nonce1 := node.MustGetPendingNonceWithRetry(t, senderAddr.Hex(), 20*time.Second)
+	nonce2 := node.MustGetPendingNonceWithRetry(t, receiverAddr.Hex(), 20*time.Second)
 
-	lowHash := evmtest.SendLegacyTxWithParams(t, node.RPCURL(), evmtest.LegacyTxParams{
+	lowHash := node.SendLegacyTxWithParams(t, evmtest.LegacyTxParams{
 		PrivateKey: senderPriv,
 		Nonce:      nonce1,
 		To:         &senderAddr,
@@ -59,7 +54,7 @@ func testEVMFeePriorityOrderingSameBlock(t *testing.T, node *evmtest.Node) {
 		Gas:        21_000,
 		GasPrice:   lowGasPrice,
 	})
-	highHash := evmtest.SendLegacyTxWithParams(t, node.RPCURL(), evmtest.LegacyTxParams{
+	highHash := node.SendLegacyTxWithParams(t, evmtest.LegacyTxParams{
 		PrivateKey: receiverPriv,
 		Nonce:      nonce2,
 		To:         &receiverAddr,
@@ -68,8 +63,8 @@ func testEVMFeePriorityOrderingSameBlock(t *testing.T, node *evmtest.Node) {
 		GasPrice:   highGasPrice,
 	})
 
-	lowReceipt := evmtest.WaitForReceipt(t, node.RPCURL(), lowHash, node.WaitCh(), node.OutputBuffer(), 40*time.Second)
-	highReceipt := evmtest.WaitForReceipt(t, node.RPCURL(), highHash, node.WaitCh(), node.OutputBuffer(), 40*time.Second)
+	lowReceipt := node.WaitForReceipt(t, lowHash, 40*time.Second)
+	highReceipt := node.WaitForReceipt(t, highHash, 40*time.Second)
 
 	lowBlock := evmtest.MustUint64HexField(t, lowReceipt, "blockNumber")
 	highBlock := evmtest.MustUint64HexField(t, highReceipt, "blockNumber")

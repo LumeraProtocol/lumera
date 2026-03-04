@@ -20,8 +20,8 @@ func TestJSONRPCMixedBlockSuite(t *testing.T) {
 
 	run := func(name string, fn func(t *testing.T, node *evmtest.Node)) {
 		t.Run(name, func(t *testing.T) {
-			latest := evmtest.MustGetBlockNumber(t, node.RPCURL())
-			evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), latest+1, 20*time.Second)
+			latest := node.MustGetBlockNumber(t)
+			node.WaitForBlockNumberAtLeast(t, latest+1, 20*time.Second)
 			fn(t, node)
 		})
 	}

@@ -253,15 +253,24 @@ func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validat
 		if snPresent {
 			// add supernode port mappings, if provided
 			// container ports are fixed by supernode: 4444 (service), 4445 (p2p), 8002 (gateway)
-			if validator.SupernodePort > 0 {
-				service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.SupernodePort, DefaultSupernodePort))
+			if validator.Supernode.Port > 0 {
+				service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.Supernode.Port, DefaultSupernodePort))
 			}
-			if validator.SupernodeP2PPort > 0 {
-				service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.SupernodeP2PPort, DefaultSupernodeP2PPort))
+			if validator.Supernode.P2PPort > 0 {
+				service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.Supernode.P2PPort, DefaultSupernodeP2PPort))
 			}
-			if validator.SupernodeGatewayPort > 0 {
-				service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.SupernodeGatewayPort, DefaultSupernodeGatewayPort))
+			if validator.Supernode.GatewayPort > 0 {
+				service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.Supernode.GatewayPort, DefaultSupernodeGatewayPort))
 			}
+		}
+
+		// Optional JSON-RPC host bindings per validator.
+		// Container ports are fixed by lumerad: 8545 (HTTP) and 8546 (WebSocket).
+		if validator.JSONRPC.Port > 0 {
+			service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.JSONRPC.Port, DefaultJSONRPCPort))
+		}
+		if validator.JSONRPC.WSPort > 0 {
+			service.Ports = append(service.Ports, fmt.Sprintf("%d:%d", validator.JSONRPC.WSPort, DefaultJSONRPCWSPort))
 		}
 
 		if index > 0 {

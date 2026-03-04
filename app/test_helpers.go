@@ -44,7 +44,6 @@ import (
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
@@ -55,7 +54,6 @@ import (
 	lcfg "github.com/LumeraProtocol/lumera/config"
 	ibcmock "github.com/LumeraProtocol/lumera/tests/ibctesting/mock"
 	mockv2 "github.com/LumeraProtocol/lumera/tests/ibctesting/mock/v2"
-	claimtypes "github.com/LumeraProtocol/lumera/x/claim/types"
 )
 
 const (
@@ -306,8 +304,6 @@ func SetupWithGenesisValSet(
 
 	stateBytes, err := json.MarshalIndent(genesisState, "", " ")
 	require.NoError(tb, err)
-
-	viper.Set(claimtypes.FlagSkipClaimsCheck, true)
 
 	// init chain will set the validator set and initialize the genesis accounts
 	consensusParams := simtestutil.DefaultConsensusParams

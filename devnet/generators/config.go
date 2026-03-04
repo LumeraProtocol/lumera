@@ -13,6 +13,8 @@ const (
 	DefaultNetworkMakerHTTPPort      = 8080
 	DefaultNetworkMakerUIPort        = 8088
 	DefaultGRPCWebPort               = 9091
+	DefaultJSONRPCPort               = 8545
+	DefaultJSONRPCWSPort             = 8546
 	DefaultHermesSimdHostP2PPort     = 36656
 	DefaultHermesSimdHostRPCPort     = 36657
 	DefaultHermesSimdHostAPIPort     = 31317

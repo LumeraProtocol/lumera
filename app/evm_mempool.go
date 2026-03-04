@@ -1,8 +1,6 @@
 package app
 
 import (
-	"fmt"
-
 	"cosmossdk.io/log"
 
 	"github.com/cosmos/cosmos-sdk/baseapp"
@@ -11,8 +9,6 @@ import (
 	sdkmempool "github.com/cosmos/cosmos-sdk/types/mempool"
 	evmconfig "github.com/cosmos/evm/config"
 	evmmempool "github.com/cosmos/evm/mempool"
-	evmtypes "github.com/cosmos/evm/x/vm/types"
-	ethtypes "github.com/ethereum/go-ethereum/core/types"
 )
 
 // configureEVMMempool wires the Cosmos EVM mempool into BaseApp after ante is set.
@@ -31,6 +27,10 @@ func (app *App) configureEVMMempool(appOpts servertypes.AppOptions, logger log.L
 		logger.Debug("app-side mempool is disabled, skipping EVM mempool configuration")
 		return nil
 	}
+
+	broadcastLogger := logger.With(log.ModuleKey, evmBroadcastLogModule)
+	app.configureEVMBroadcastOptions(appOpts, broadcastLogger)
+	app.startEVMBroadcastWorker(broadcastLogger)
 
 	// Use cosmos/evm config readers so app.toml/flags values map 1:1
 	// with upstream EVM behavior.
@@ -70,41 +70,6 @@ func (app *App) configureEVMMempool(appOpts servertypes.AppOptions, logger log.L
 		),
 	)
 	app.SetPrepareProposal(abciProposalHandler.PrepareProposalHandler())
-
-	return nil
-}
-
-// broadcastEVMTransactions broadcasts promoted EVM txs using the server-set client context.
-func (app *App) broadcastEVMTransactions(ethTxs []*ethtypes.Transaction) error {
-	clientCtx := app.clientCtx
-	if clientCtx.TxConfig == nil {
-		// Keep tx encoding available even if SetClientCtx has not run yet.
-		clientCtx = clientCtx.WithTxConfig(app.txConfig)
-	}
-
-	for _, ethTx := range ethTxs {
-		// Wrap Ethereum tx as MsgEthereumTx and submit via Comet CheckTx path.
-		msg := &evmtypes.MsgEthereumTx{}
-		msg.FromEthereumTx(ethTx)
-
-		txBuilder := app.txConfig.NewTxBuilder()
-		if err := txBuilder.SetMsgs(msg); err != nil {
-			return fmt.Errorf("failed to set msg in tx builder: %w", err)
-		}
-
-		txBytes, err := app.txConfig.TxEncoder()(txBuilder.GetTx())
-		if err != nil {
-			return fmt.Errorf("failed to encode transaction: %w", err)
-		}
-
-		res, err := clientCtx.BroadcastTxSync(txBytes)
-		if err != nil {
-			return fmt.Errorf("failed to broadcast transaction %s: %w", ethTx.Hash().Hex(), err)
-		}
-		if res.Code != 0 {
-			return fmt.Errorf("transaction %s rejected by mempool: code=%d, log=%s", ethTx.Hash().Hex(), res.Code, res.RawLog)
-		}
-	}
 
 	return nil
 }

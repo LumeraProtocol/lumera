@@ -84,7 +84,7 @@ func newSupernodeLogger() *zap.Logger {
 	return zap.New(core)
 }
 
-func (s *ibcSimdSuite) TestICARequestActionAppPubkeyRequired() {
+func (s *lumeraHermesSuite) TestICARequestActionAppPubkeyRequired() {
 	ctx, cancel := context.WithTimeout(context.Background(), icaTestTimeout)
 	defer cancel()
 

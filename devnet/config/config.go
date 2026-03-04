@@ -43,6 +43,18 @@ type ChainConfig struct {
 		Binary         string `json:"binary"`
 		KeyringBackend string `json:"keyring_backend"`
 	} `json:"daemon"`
+	GenesisAccountMnemonics []string `json:"genesis-account-mnemonics"`
+	SNAccountMnemonics      []string `json:"sn-account-mnemonics"`
+	API struct {
+		EnableUnsafeCORS bool `json:"enable_unsafe_cors"`
+	} `json:"api"`
+	JSONRPC struct {
+		Enable        bool   `json:"enable"`
+		Address       string `json:"address"`
+		WSAddress     string `json:"ws_address"`
+		API           string `json:"api"`
+		EnableIndexer bool   `json:"enable_indexer"`
+	} `json:"json-rpc"`
 	NetworkMaker struct {
 		MaxAccounts    int    `json:"max_accounts"`
 		AccountBalance string `json:"account_balance"`
@@ -63,9 +75,15 @@ type Validator struct {
 	RPCPort              int    `json:"rpc_port"`
 	RESTPort             int    `json:"rest_port"`
 	GRPCPort             int    `json:"grpc_port"`
-	SupernodePort        int    `json:"supernode_port"`
-	SupernodeP2PPort     int    `json:"supernode_p2p_port"`
-	SupernodeGatewayPort int    `json:"supernode_gateway_port"`
+	Supernode            struct {
+		Port        int `json:"port,omitempty"`
+		P2PPort     int `json:"p2p_port,omitempty"`
+		GatewayPort int `json:"gateway_port,omitempty"`
+	} `json:"supernode,omitempty"`
+	JSONRPC struct {
+		Port   int `json:"port,omitempty"`
+		WSPort int `json:"ws_port,omitempty"`
+	} `json:"json-rpc,omitempty"`
 
 	InitialDistribution struct {
 		AccountBalance string `json:"account_balance"`

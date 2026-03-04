@@ -29,13 +29,13 @@ func TestNonceReplacementRequiresPriceBump(t *testing.T) {
 
 	fromAddr := testaccounts.MustAccountAddressFromTestKeyInfo(t, node.KeyInfo())
 	privateKey := evmtest.MustDerivePrivateKey(t, node.KeyInfo().Mnemonic)
-	nonce := evmtest.MustGetPendingNonceWithRetry(t, node.RPCURL(), fromAddr.Hex(), 20*time.Second)
+	nonce := node.MustGetPendingNonceWithRetry(t, fromAddr.Hex(), 20*time.Second)
 	// Use node-reported gas price so tx fee clears the current base fee floor.
-	gasPrice := evmtest.MustGetGasPriceWithRetry(t, node.RPCURL(), 20*time.Second)
+	gasPrice := node.MustGetGasPriceWithRetry(t, 20*time.Second)
 	toAddr := fromAddr
 
 	// First tx enters the pool with nonce N.
-	firstHash := evmtest.SendLegacyTxWithParams(t, node.RPCURL(), evmtest.LegacyTxParams{
+	firstHash := node.SendLegacyTxWithParams(t, evmtest.LegacyTxParams{
 		PrivateKey: privateKey,
 		Nonce:      nonce,
 		To:         &toAddr,
@@ -57,7 +57,7 @@ func TestNonceReplacementRequiresPriceBump(t *testing.T) {
 
 	// Bumped fee replacement with same nonce should be accepted and mined.
 	bumpedGasPrice := new(big.Int).Mul(gasPrice, big.NewInt(100))
-	replacementHash := evmtest.SendLegacyTxWithParams(t, node.RPCURL(), evmtest.LegacyTxParams{
+	replacementHash := node.SendLegacyTxWithParams(t, evmtest.LegacyTxParams{
 		PrivateKey: privateKey,
 		Nonce:      nonce,
 		To:         &toAddr,
@@ -69,7 +69,7 @@ func TestNonceReplacementRequiresPriceBump(t *testing.T) {
 		t.Fatalf("replacement tx hash unexpectedly equals original hash: %s", firstHash)
 	}
 
-	replacementReceipt := evmtest.WaitForReceipt(t, node.RPCURL(), replacementHash, node.WaitCh(), node.OutputBuffer(), 40*time.Second)
+	replacementReceipt := node.WaitForReceipt(t, replacementHash, 40*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, replacementReceipt, replacementHash)
 	assertReceiptStaysUnavailable(t, node.RPCURL(), firstHash, 10*time.Second)
 }

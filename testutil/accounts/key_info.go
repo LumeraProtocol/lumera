@@ -1,6 +1,7 @@
 package accounts
 
 import (
+	"crypto/ecdsa"
 	"fmt"
 	"strings"
 	"testing"
@@ -9,6 +10,7 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 )
 
 // TestKeyInfo mirrors `keys add --output json` fields used in integration tests.
@@ -46,6 +48,16 @@ func AccountAddressFromTestKeyInfo(keyInfo TestKeyInfo) (common.Address, error) 
 	}
 
 	return common.BytesToAddress(accAddr.Bytes()), nil
+}
+
+// MustGenerateEthKey generates a random secp256k1 private key and derives the
+// corresponding Ethereum address. It fails the test on key-generation error.
+func MustGenerateEthKey(t *testing.T) (*ecdsa.PrivateKey, common.Address) {
+	t.Helper()
+
+	privKey, err := ethcrypto.GenerateKey()
+	require.NoError(t, err, "generate ethereum key")
+	return privKey, ethcrypto.PubkeyToAddress(privKey.PublicKey)
 }
 
 func MustAccountAddressFromTestKeyInfo(t *testing.T, keyInfo TestKeyInfo) common.Address {

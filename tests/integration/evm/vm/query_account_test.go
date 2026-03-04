@@ -11,7 +11,7 @@ import (
 
 	evmtest "github.com/LumeraProtocol/lumera/tests/integration/evmtest"
 	testaccounts "github.com/LumeraProtocol/lumera/testutil/accounts"
-	testtext "github.com/LumeraProtocol/lumera/testutil/text"
+	testtext "github.com/LumeraProtocol/lumera/pkg/text"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )
@@ -20,7 +20,7 @@ import (
 // `query evm 0x-to-bech32` conversion parity for the validator key.
 func testVMAddressConversionRoundTrip(t *testing.T, node *evmtest.Node) {
 	t.Helper()
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), 1, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
 
 	bech32Addr := node.KeyInfo().Address
 	hexAddr := testaccounts.MustAccountAddressFromTestKeyInfo(t, node.KeyInfo()).Hex()
@@ -31,7 +31,7 @@ func testVMAddressConversionRoundTrip(t *testing.T, node *evmtest.Node) {
 		"--home", node.HomeDir(),
 		"--log_no_color",
 	)
-	gotHex := lastNonEmptyLine(outHex)
+	gotHex := testtext.LastNonEmptyLine(outHex)
 	if !strings.EqualFold(gotHex, hexAddr) {
 		t.Fatalf("bech32->hex mismatch: got=%q want=%q", gotHex, hexAddr)
 	}
@@ -42,7 +42,7 @@ func testVMAddressConversionRoundTrip(t *testing.T, node *evmtest.Node) {
 		"--home", node.HomeDir(),
 		"--log_no_color",
 	)
-	gotBech32 := lastNonEmptyLine(outBech32)
+	gotBech32 := testtext.LastNonEmptyLine(outBech32)
 	if gotBech32 != bech32Addr {
 		t.Fatalf("hex->bech32 mismatch: got=%q want=%q", gotBech32, bech32Addr)
 	}
@@ -52,10 +52,10 @@ func testVMAddressConversionRoundTrip(t *testing.T, node *evmtest.Node) {
 // with JSON-RPC nonce/balance after a state-changing tx.
 func testVMQueryAccountMatchesEthRPC(t *testing.T, node *evmtest.Node) {
 	t.Helper()
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), 1, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
 
-	txHash := evmtest.SendOneLegacyTx(t, node.RPCURL(), node.KeyInfo())
-	receipt := evmtest.WaitForReceipt(t, node.RPCURL(), txHash, node.WaitCh(), node.OutputBuffer(), 40*time.Second)
+	txHash := node.SendOneLegacyTx(t)
+	receipt := node.WaitForReceipt(t, txHash, 40*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, receipt, txHash)
 
 	bech32Addr := node.KeyInfo().Address
@@ -74,7 +74,7 @@ func testVMQueryAccountMatchesEthRPC(t *testing.T, node *evmtest.Node) {
 		t.Fatalf("decode query evm account response: %v\n%s", err, out)
 	}
 
-	rpcNonce := mustGetEthTxCount(t, node.RPCURL(), hexAddr)
+	rpcNonce := mustGetEthTxCount(t, node, hexAddr)
 	queryNonce, err := strconv.ParseUint(strings.TrimSpace(resp.Nonce), 10, 64)
 	if err != nil {
 		t.Fatalf("parse query nonce %q: %v", resp.Nonce, err)
@@ -83,7 +83,7 @@ func testVMQueryAccountMatchesEthRPC(t *testing.T, node *evmtest.Node) {
 		t.Fatalf("nonce mismatch: query=%d rpc=%d", queryNonce, rpcNonce)
 	}
 
-	rpcBalance := mustGetEthBalance(t, node.RPCURL(), hexAddr)
+	rpcBalance := mustGetEthBalance(t, node, hexAddr)
 	if strings.TrimSpace(resp.Balance) != rpcBalance.String() {
 		t.Fatalf("balance mismatch: query=%s rpc=%s", resp.Balance, rpcBalance.String())
 	}
@@ -98,7 +98,7 @@ func testVMQueryAccountMatchesEthRPC(t *testing.T, node *evmtest.Node) {
 // the CLI query path.
 func testVMQueryAccountRejectsInvalidAddress(t *testing.T, node *evmtest.Node) {
 	t.Helper()
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), 1, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
 
 	out, err := runNodeCommand(t, node,
 		"query", "evm", "account", "0x0000",

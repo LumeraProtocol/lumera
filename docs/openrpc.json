@@ -1,0 +1,5071 @@
+{
+  "openrpc": "1.2.6",
+  "info": {
+    "title": "Lumera Cosmos EVM JSON-RPC API",
+    "version": "cosmos/evm v0.5.1",
+    "description": "Auto-generated method catalog from Cosmos EVM JSON-RPC namespace implementations."
+  },
+  "servers": [
+    {
+      "name": "Default JSON-RPC endpoint",
+      "url": "http://localhost:8545"
+    }
+  ],
+  "methods": [
+    {
+      "name": "debug_blockProfile",
+      "summary": "debug_blockProfile JSON-RPC method",
+      "description": "BlockProfile turns on goroutine profiling for nsec seconds and writes profile data to file. It uses a profile rate of 1 for most accurate information. If a different rate is desired, set the rate and write the profile manually.",
+      "tags": [
+        {
+          "name": "debug"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "file",
+          "description": "Parameter `file`. Go type: string",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "string"
+          }
+        },
+        {
+          "name": "nsec",
+          "description": "Parameter `nsec`. Go type: uint",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "uint"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "No return value",
+        "schema": {
+          "type": "null"
+        }
+      },
+      "examples": [
+        {
+          "name": "capture-block-profile",
+          "summary": "Starts block profiling for 5 seconds and writes to a pprof file.",
+          "params": [
+            {
+              "name": "file",
+              "value": "/tmp/block.pprof"
+            },
+            {
+              "name": "nsec",
+              "value": 5
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "debug_cpuProfile",
+      "summary": "debug_cpuProfile JSON-RPC method",
+      "description": "CpuProfile turns on CPU profiling for nsec seconds and writes profile data to file.",
+      "tags": [
+        {
+          "name": "debug"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "file",
+          "description": "Parameter `file`. Go type: string",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "string"
+          }
+        },
+        {
+          "name": "nsec",
+          "description": "Parameter `nsec`. Go type: uint",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "uint"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "No return value",
+        "schema": {
+          "type": "null"
+        }
+      },
+      "examples": [
+        {
+          "name": "capture-cpu-profile",
+          "summary": "Captures CPU profile for 10 seconds.",
+          "params": [
+            {
+              "name": "file",
+              "value": "/tmp/cpu.pprof"
+            },
+            {
+              "name": "nsec",
+              "value": 10
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "debug_freeOSMemory",
+      "summary": "debug_freeOSMemory JSON-RPC method",
+      "description": "FreeOSMemory forces a garbage collection.",
+      "tags": [
+        {
+          "name": "debug"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [],
+      "result": {
+        "name": "result",
+        "description": "No return value",
+        "schema": {
+          "type": "null"
+        }
+      },
+      "examples": [
+        {
+          "name": "trigger-gc-memory-release",
+          "summary": "Hints runtime to return memory to the OS.",
+          "params": [],
+          "result": {
+            "name": "result",
+            "value": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "debug_gcStats",
+      "summary": "debug_gcStats JSON-RPC method",
+      "description": "GcStats returns GC statistics.",
+      "tags": [
+        {
+          "name": "debug"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [],
+      "result": {
+        "name": "result",
+        "description": "Go type: *debug.GCStats",
+        "schema": {
+          "nullable": true,
+          "type": "object",
+          "x-go-type": "debug.GCStats"
+        }
+      },
+      "examples": [
+        {
+          "name": "gc-stats",
+          "summary": "Returns current Go GC statistics.",
+          "params": [],
+          "result": {
+            "name": "result",
+            "value": {
+              "NumGC": 42,
+              "PauseQuantiles": [
+                1200,
+                5400,
+                21000
+              ],
+              "PauseTotal": 123456789
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "debug_getBlockRlp",
+      "summary": "debug_getBlockRlp JSON-RPC method",
+      "description": "GetBlockRlp retrieves the RLP encoded for of a single block.",
+      "tags": [
+        {
+          "name": "debug"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "number",
+          "description": "Parameter `number`. Go type: uint64",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "uint64"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: hexutil.Bytes",
+        "schema": {
+          "items": {},
+          "type": "array",
+          "x-go-type": "hexutil.Bytes"
+        }
+      },
+      "examples": [
+        {
+          "name": "block-rlp-by-height",
+          "summary": "Returns RLP-encoded Ethereum block bytes.",
+          "params": [
+            {
+              "name": "number",
+              "value": 5
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": "0xf901e9a078ad2e4f9b10c3f5f4871e56e2f361e01b6a77de4a8931d3df5f0fef8ee8b9010000000000000000000000000000000000000000000000000000000000000000"
+          }
+        }
+      ]
+    },
+    {
+      "name": "debug_getHeaderRlp",
+      "summary": "debug_getHeaderRlp JSON-RPC method",
+      "description": "GetHeaderRlp retrieves the RLP encoded for of a single header.",
+      "tags": [
+        {
+          "name": "debug"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "number",
+          "description": "Parameter `number`. Go type: uint64",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "uint64"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: hexutil.Bytes",
+        "schema": {
+          "items": {},
+          "type": "array",
+          "x-go-type": "hexutil.Bytes"
+        }
+      },
+      "examples": [
+        {
+          "name": "header-rlp-by-height",
+          "summary": "Returns RLP-encoded Ethereum header bytes.",
+          "params": [
+            {
+              "name": "number",
+              "value": 5
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": "0xf9014ea0ab29f87349d7ca8b175f0a0e05b5a2de65d0d2f8e2b02cbcd711c6c8b8b8a0f9836f5308ff2f4e9c8cbdf635f78c6b2db2a6df4b5722f7fe5b9d5a5f2e8c2"
+          }
+        }
+      ]
+    },
+    {
+      "name": "debug_getRawBlock",
+      "summary": "debug_getRawBlock JSON-RPC method",
+      "description": "GetRawBlock retrieves the RLP-encoded block by block number or hash.",
+      "tags": [
+        {
+          "name": "debug"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "blockNrOrHash",
+          "description": "Parameter `blockNrOrHash`. Go type: types.BlockNumberOrHash",
+          "required": true,
+          "schema": {
+            "type": "object",
+            "x-go-type": "types.BlockNumberOrHash"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: hexutil.Bytes",
+        "schema": {
+          "items": {},
+          "type": "array",
+          "x-go-type": "hexutil.Bytes"
+        }
+      },
+      "examples": [
+        {
+          "name": "raw-block-latest",
+          "summary": "Returns RLP bytes for the latest block.",
+          "params": [
+            {
+              "name": "blockNrOrHash",
+              "value": "latest"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": "0xf901e9a078ad2e4f9b10c3f5f4871e56e2f361e01b6a77de4a8931d3df5f0fef8ee8b9010000000000000000000000000000000000000000000000000000000000000000"
+          }
+        }
+      ]
+    },
+    {
+      "name": "debug_goTrace",
+      "summary": "debug_goTrace JSON-RPC method",
+      "description": "GoTrace turns on tracing for nsec seconds and writes trace data to file.",
+      "tags": [
+        {
+          "name": "debug"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "file",
+          "description": "Parameter `file`. Go type: string",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "string"
+          }
+        },
+        {
+          "name": "nsec",
+          "description": "Parameter `nsec`. Go type: uint",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "uint"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "No return value",
+        "schema": {
+          "type": "null"
+        }
+      },
+      "examples": [
+        {
+          "name": "capture-go-trace",
+          "summary": "Starts Go execution trace and writes to file for 3 seconds.",
+          "params": [
+            {
+              "name": "file",
+              "value": "/tmp/trace.out"
+            },
+            {
+              "name": "nsec",
+              "value": 3
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "debug_intermediateRoots",
+      "summary": "debug_intermediateRoots JSON-RPC method",
+      "description": "IntermediateRoots executes a block, and returns a list of intermediate roots: the stateroot after each transaction.",
+      "tags": [
+        {
+          "name": "debug"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "hash",
+          "description": "Parameter `hash`. Go type: common.Hash",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array",
+            "x-go-type": "common.Hash"
+          }
+        },
+        {
+          "name": "config",
+          "description": "Parameter `config`. Go type: *types.TraceConfig",
+          "schema": {
+            "nullable": true,
+            "type": "object",
+            "x-go-type": "types.TraceConfig"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: []common.Hash",
+        "schema": {
+          "items": {},
+          "type": "array",
+          "x-go-type": "[]common.Hash"
+        }
+      },
+      "examples": [
+        {
+          "name": "intermediate-state-roots",
+          "summary": "Returns intermediate state roots while replaying tx execution.",
+          "params": [
+            {
+              "name": "hash",
+              "value": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            {
+              "name": "config",
+              "value": {
+                "tracer": "callTracer"
+              }
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": [
+              "0x1111111111111111111111111111111111111111111111111111111111111111",
+              "0x2222222222222222222222222222222222222222222222222222222222222222"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "debug_memStats",
+      "summary": "debug_memStats JSON-RPC method",
+      "description": "MemStats returns detailed runtime memory statistics.",
+      "tags": [
+        {
+          "name": "debug"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [],
+      "result": {
+        "name": "result",
+        "description": "Go type: *runtime.MemStats",
+        "schema": {
+          "nullable": true,
+          "type": "object",
+          "x-go-type": "runtime.MemStats"
+        }
+      },
+      "examples": [
+        {
+          "name": "memory-stats",
+          "summary": "Returns runtime memory statistics.",
+          "params": [],
+          "result": {
+            "name": "result",
+            "value": {
+              "Alloc": 15698544,
+              "HeapAlloc": 12583936,
+              "NumGC": 42,
+              "TotalAlloc": 91328576
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "debug_mutexProfile",
+      "summary": "debug_mutexProfile JSON-RPC method",
+      "description": "MutexProfile turns on mutex profiling for nsec seconds and writes profile data to file. It uses a profile rate of 1 for most accurate information. If a different rate is desired, set the rate and write the profile manually.",
+      "tags": [
+        {
+          "name": "debug"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "file",
+          "description": "Parameter `file`. Go type: string",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "string"
+          }
+        },
+        {
+          "name": "nsec",
+          "description": "Parameter `nsec`. Go type: uint",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "uint"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "No return value",
+        "schema": {
+          "type": "null"
+        }
+      },
+      "examples": [
+        {
+          "name": "capture-mutex-profile",
+          "summary": "Captures mutex contention profile.",
+          "params": [
+            {
+              "name": "file",
+              "value": "/tmp/mutex.pprof"
+            },
+            {
+              "name": "nsec",
+              "value": 5
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "debug_printBlock",
+      "summary": "debug_printBlock JSON-RPC method",
+      "description": "PrintBlock retrieves a block and returns its pretty printed form.",
+      "tags": [
+        {
+          "name": "debug"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "number",
+          "description": "Parameter `number`. Go type: uint64",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "uint64"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: string",
+        "schema": {
+          "type": "string",
+          "x-go-type": "string"
+        }
+      },
+      "examples": [
+        {
+          "name": "print-block",
+          "summary": "Returns pretty-printed block dump by number.",
+          "params": [
+            {
+              "name": "number",
+              "value": 5
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": "Block #5 [0x4f1c8d5b8cf530f4c01f8ca07825f8f5084f57b9d7b5e0f8031f4bca8e1c83f4]\nMiner: 0x0000000000000000000000000000000000000000\nGas used: 0xa410\nTxs: 2"
+          }
+        }
+      ]
+    },
+    {
+      "name": "debug_setBlockProfileRate",
+      "summary": "debug_setBlockProfileRate JSON-RPC method",
+      "description": "SetBlockProfileRate sets the rate of goroutine block profile data collection. rate 0 disables block profiling.",
+      "tags": [
+        {
+          "name": "debug"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "rate",
+          "description": "Parameter `rate`. Go type: int",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "int"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "No return value",
+        "schema": {
+          "type": "null"
+        }
+      },
+      "examples": [
+        {
+          "name": "set-block-rate",
+          "summary": "Enables block profiling with sample rate 1.",
+          "params": [
+            {
+              "name": "rate",
+              "value": 1
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "debug_setGCPercent",
+      "summary": "debug_setGCPercent JSON-RPC method",
+      "description": "SetGCPercent sets the garbage collection target percentage. It returns the previous setting. A negative value disables GC.",
+      "tags": [
+        {
+          "name": "debug"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "v",
+          "description": "Parameter `v`. Go type: int",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "int"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: int",
+        "schema": {
+          "type": "string",
+          "x-go-type": "int"
+        }
+      },
+      "examples": [
+        {
+          "name": "set-gc-percent",
+          "summary": "Sets GOGC threshold and returns previous value.",
+          "params": [
+            {
+              "name": "v",
+              "value": 100
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": 100
+          }
+        }
+      ]
+    },
+    {
+      "name": "debug_setMutexProfileFraction",
+      "summary": "debug_setMutexProfileFraction JSON-RPC method",
+      "description": "SetMutexProfileFraction sets the rate of mutex profiling.",
+      "tags": [
+        {
+          "name": "debug"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "rate",
+          "description": "Parameter `rate`. Go type: int",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "int"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "No return value",
+        "schema": {
+          "type": "null"
+        }
+      },
+      "examples": [
+        {
+          "name": "set-mutex-fraction",
+          "summary": "Sets mutex profiling fraction to 1.",
+          "params": [
+            {
+              "name": "rate",
+              "value": 1
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "debug_stacks",
+      "summary": "debug_stacks JSON-RPC method",
+      "description": "Stacks returns a printed representation of the stacks of all goroutines.",
+      "tags": [
+        {
+          "name": "debug"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [],
+      "result": {
+        "name": "result",
+        "description": "Go type: string",
+        "schema": {
+          "type": "string",
+          "x-go-type": "string"
+        }
+      },
+      "examples": [
+        {
+          "name": "goroutine-stacks",
+          "summary": "Returns current goroutine stack dump.",
+          "params": [],
+          "result": {
+            "name": "result",
+            "value": "goroutine 1 [running]:\nmain.main()\n\t/home/akobrin/p/lumera/cmd/lumera/main.go:14 +0x2a\n"
+          }
+        }
+      ]
+    },
+    {
+      "name": "debug_startCPUProfile",
+      "summary": "debug_startCPUProfile JSON-RPC method",
+      "description": "StartCPUProfile turns on CPU profiling, writing to the given file.",
+      "tags": [
+        {
+          "name": "debug"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "file",
+          "description": "Parameter `file`. Go type: string",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "No return value",
+        "schema": {
+          "type": "null"
+        }
+      },
+      "examples": [
+        {
+          "name": "start-cpu-profile",
+          "summary": "Starts CPU profiling until debug_stopCPUProfile.",
+          "params": [
+            {
+              "name": "file",
+              "value": "/tmp/cpu-live.pprof"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "debug_startGoTrace",
+      "summary": "debug_startGoTrace JSON-RPC method",
+      "description": "StartGoTrace turns on tracing, writing to the given file.",
+      "tags": [
+        {
+          "name": "debug"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "file",
+          "description": "Parameter `file`. Go type: string",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "No return value",
+        "schema": {
+          "type": "null"
+        }
+      },
+      "examples": [
+        {
+          "name": "start-go-trace",
+          "summary": "Starts Go tracing until debug_stopGoTrace.",
+          "params": [
+            {
+              "name": "file",
+              "value": "/tmp/trace-live.out"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "debug_stopCPUProfile",
+      "summary": "debug_stopCPUProfile JSON-RPC method",
+      "description": "StopCPUProfile stops an ongoing CPU profile.",
+      "tags": [
+        {
+          "name": "debug"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [],
+      "result": {
+        "name": "result",
+        "description": "No return value",
+        "schema": {
+          "type": "null"
+        }
+      },
+      "examples": [
+        {
+          "name": "stop-cpu-profile",
+          "summary": "Stops active CPU profile and flushes output.",
+          "params": [],
+          "result": {
+            "name": "result",
+            "value": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "debug_stopGoTrace",
+      "summary": "debug_stopGoTrace JSON-RPC method",
+      "description": "StopGoTrace stops an ongoing trace.",
+      "tags": [
+        {
+          "name": "debug"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [],
+      "result": {
+        "name": "result",
+        "description": "No return value",
+        "schema": {
+          "type": "null"
+        }
+      },
+      "examples": [
+        {
+          "name": "stop-go-trace",
+          "summary": "Stops active Go trace and flushes output.",
+          "params": [],
+          "result": {
+            "name": "result",
+            "value": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "debug_traceBlock",
+      "summary": "debug_traceBlock JSON-RPC method",
+      "description": "TraceBlock returns the structured logs created during the execution of EVM and returns them as a JSON object. It accepts an RLP-encoded block.",
+      "tags": [
+        {
+          "name": "debug"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "tblockRlp",
+          "description": "Parameter `tblockRlp`. Go type: hexutil.Bytes",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array",
+            "x-go-type": "hexutil.Bytes"
+          }
+        },
+        {
+          "name": "config",
+          "description": "Parameter `config`. Go type: *types.TraceConfig",
+          "schema": {
+            "nullable": true,
+            "type": "object",
+            "x-go-type": "types.TraceConfig"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: []*types.TxTraceResult",
+        "schema": {
+          "items": {},
+          "type": "array",
+          "x-go-type": "[]*types.TxTraceResult"
+        }
+      },
+      "examples": [
+        {
+          "name": "trace-block-rlp",
+          "summary": "Traces all txs in an RLP-encoded block payload.",
+          "params": [
+            {
+              "name": "tblockRlp",
+              "value": "0xf901e9a078ad2e4f9b10c3f5f4871e56e2f361e01b6a77de4a8931d3df5f0fef8ee8b9010000000000000000000000000000000000000000000000000000000000000000"
+            },
+            {
+              "name": "config",
+              "value": {
+                "timeout": "5s",
+                "tracer": "callTracer"
+              }
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": [
+              {
+                "result": {
+                  "failed": false,
+                  "gasUsed": "0x5208",
+                  "returnValue": "0x",
+                  "structLogs": []
+                },
+                "txHash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "debug_traceBlockByHash",
+      "summary": "debug_traceBlockByHash JSON-RPC method",
+      "description": "TraceBlockByHash returns the structured logs created during the execution of EVM and returns them as a JSON object.",
+      "tags": [
+        {
+          "name": "debug"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "hash",
+          "description": "Parameter `hash`. Go type: common.Hash",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array",
+            "x-go-type": "common.Hash"
+          }
+        },
+        {
+          "name": "config",
+          "description": "Parameter `config`. Go type: *types.TraceConfig",
+          "schema": {
+            "nullable": true,
+            "type": "object",
+            "x-go-type": "types.TraceConfig"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: []*types.TxTraceResult",
+        "schema": {
+          "items": {},
+          "type": "array",
+          "x-go-type": "[]*types.TxTraceResult"
+        }
+      },
+      "examples": [
+        {
+          "name": "trace-block-by-hash",
+          "summary": "Traces all txs in a block selected by hash.",
+          "params": [
+            {
+              "name": "hash",
+              "value": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            {
+              "name": "config",
+              "value": {
+                "tracer": "callTracer"
+              }
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": [
+              {
+                "result": {
+                  "failed": false,
+                  "gasUsed": "0x5208",
+                  "returnValue": "0x",
+                  "structLogs": []
+                },
+                "txHash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "debug_traceBlockByNumber",
+      "summary": "debug_traceBlockByNumber JSON-RPC method",
+      "description": "TraceBlockByNumber returns the structured logs created during the execution of EVM and returns them as a JSON object.",
+      "tags": [
+        {
+          "name": "debug"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "height",
+          "description": "Parameter `height`. Go type: types.BlockNumber",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "types.BlockNumber"
+          }
+        },
+        {
+          "name": "config",
+          "description": "Parameter `config`. Go type: *types.TraceConfig",
+          "schema": {
+            "nullable": true,
+            "type": "object",
+            "x-go-type": "types.TraceConfig"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: []*types.TxTraceResult",
+        "schema": {
+          "items": {},
+          "type": "array",
+          "x-go-type": "[]*types.TxTraceResult"
+        }
+      },
+      "examples": [
+        {
+          "name": "trace-block-by-number",
+          "summary": "Traces all txs in a block selected by number/tag.",
+          "params": [
+            {
+              "name": "height",
+              "value": "latest"
+            },
+            {
+              "name": "config",
+              "value": {
+                "tracer": "callTracer"
+              }
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": [
+              {
+                "result": {
+                  "failed": false,
+                  "gasUsed": "0x5208",
+                  "returnValue": "0x",
+                  "structLogs": []
+                },
+                "txHash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "debug_traceCall",
+      "summary": "debug_traceCall JSON-RPC method",
+      "description": "TraceCall lets you trace a given eth_call. It collects the structured logs created during the execution of EVM if the given transaction was added on top of the provided block and returns them as a JSON object.",
+      "tags": [
+        {
+          "name": "debug"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "args",
+          "description": "Parameter `args`. Go type: types.TransactionArgs",
+          "required": true,
+          "schema": {
+            "type": "object",
+            "x-go-type": "types.TransactionArgs"
+          }
+        },
+        {
+          "name": "blockNrOrHash",
+          "description": "Parameter `blockNrOrHash`. Go type: types.BlockNumberOrHash",
+          "required": true,
+          "schema": {
+            "type": "object",
+            "x-go-type": "types.BlockNumberOrHash"
+          }
+        },
+        {
+          "name": "config",
+          "description": "Parameter `config`. Go type: *types.TraceConfig",
+          "schema": {
+            "nullable": true,
+            "type": "object",
+            "x-go-type": "types.TraceConfig"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: interface {}",
+        "schema": {
+          "type": "object",
+          "x-go-type": "interface {}"
+        }
+      },
+      "examples": [
+        {
+          "name": "trace-eth-call",
+          "summary": "Traces an eth_call at a selected block.",
+          "params": [
+            {
+              "name": "args",
+              "value": {
+                "data": "0x70a082310000000000000000000000001111111111111111111111111111111111111111",
+                "from": "0x1111111111111111111111111111111111111111",
+                "to": "0x2222222222222222222222222222222222222222"
+              }
+            },
+            {
+              "name": "blockNrOrHash",
+              "value": "latest"
+            },
+            {
+              "name": "config",
+              "value": {
+                "timeout": "5s",
+                "tracer": "callTracer"
+              }
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": {
+              "failed": false,
+              "gasUsed": "0x2dc6c0",
+              "returnValue": "0x",
+              "structLogs": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "debug_traceTransaction",
+      "summary": "debug_traceTransaction JSON-RPC method",
+      "description": "TraceTransaction returns the structured logs created during the execution of EVM and returns them as a JSON object.",
+      "tags": [
+        {
+          "name": "debug"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "hash",
+          "description": "Parameter `hash`. Go type: common.Hash",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array",
+            "x-go-type": "common.Hash"
+          }
+        },
+        {
+          "name": "config",
+          "description": "Parameter `config`. Go type: *types.TraceConfig",
+          "schema": {
+            "nullable": true,
+            "type": "object",
+            "x-go-type": "types.TraceConfig"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: interface {}",
+        "schema": {
+          "type": "object",
+          "x-go-type": "interface {}"
+        }
+      },
+      "examples": [
+        {
+          "name": "trace-tx",
+          "summary": "Traces a single transaction by hash.",
+          "params": [
+            {
+              "name": "hash",
+              "value": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            {
+              "name": "config",
+              "value": {
+                "timeout": "5s",
+                "tracer": "callTracer"
+              }
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": {
+              "failed": false,
+              "gasUsed": "0x5208",
+              "returnValue": "0x",
+              "structLogs": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "debug_writeBlockProfile",
+      "summary": "debug_writeBlockProfile JSON-RPC method",
+      "description": "WriteBlockProfile writes a goroutine blocking profile to the given file.",
+      "tags": [
+        {
+          "name": "debug"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "file",
+          "description": "Parameter `file`. Go type: string",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "No return value",
+        "schema": {
+          "type": "null"
+        }
+      },
+      "examples": [
+        {
+          "name": "write-block-profile",
+          "summary": "Writes current block profile snapshot to disk.",
+          "params": [
+            {
+              "name": "file",
+              "value": "/tmp/block-now.pprof"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "debug_writeMemProfile",
+      "summary": "debug_writeMemProfile JSON-RPC method",
+      "description": "WriteMemProfile writes an allocation profile to the given file. Note that the profiling rate cannot be set through the API, it must be set on the command line.",
+      "tags": [
+        {
+          "name": "debug"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "file",
+          "description": "Parameter `file`. Go type: string",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "No return value",
+        "schema": {
+          "type": "null"
+        }
+      },
+      "examples": [
+        {
+          "name": "write-memory-profile",
+          "summary": "Writes current heap profile to disk.",
+          "params": [
+            {
+              "name": "file",
+              "value": "/tmp/mem.pprof"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "debug_writeMutexProfile",
+      "summary": "debug_writeMutexProfile JSON-RPC method",
+      "description": "WriteMutexProfile writes a goroutine blocking profile to the given file.",
+      "tags": [
+        {
+          "name": "debug"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "file",
+          "description": "Parameter `file`. Go type: string",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "No return value",
+        "schema": {
+          "type": "null"
+        }
+      },
+      "examples": [
+        {
+          "name": "write-mutex-profile",
+          "summary": "Writes current mutex profile to disk.",
+          "params": [
+            {
+              "name": "file",
+              "value": "/tmp/mutex-now.pprof"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_accounts",
+      "summary": "eth_accounts JSON-RPC method",
+      "description": "Accounts returns the list of accounts available to this node.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [],
+      "result": {
+        "name": "result",
+        "description": "Go type: []common.Address",
+        "schema": {
+          "items": {},
+          "type": "array",
+          "x-go-type": "[]common.Address"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [],
+          "result": {
+            "name": "result",
+            "value": "0x1111111111111111111111111111111111111111"
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_blockNumber",
+      "summary": "eth_blockNumber JSON-RPC method",
+      "description": "BlockNumber returns the current block number.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [],
+      "result": {
+        "name": "result",
+        "description": "Go type: hexutil.Uint64",
+        "schema": {
+          "type": "string",
+          "x-go-type": "hexutil.Uint64"
+        }
+      },
+      "examples": [
+        {
+          "name": "latest-height",
+          "summary": "Returns latest block number in hex.",
+          "params": [],
+          "result": {
+            "name": "result",
+            "value": "0x5"
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_call",
+      "summary": "eth_call JSON-RPC method",
+      "description": "Call performs a raw contract call.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "args",
+          "description": "Parameter `args`. Go type: types.TransactionArgs",
+          "required": true,
+          "schema": {
+            "type": "object",
+            "x-go-type": "types.TransactionArgs"
+          }
+        },
+        {
+          "name": "blockNrOrHash",
+          "description": "Parameter `blockNrOrHash`. Go type: types.BlockNumberOrHash",
+          "required": true,
+          "schema": {
+            "type": "object",
+            "x-go-type": "types.BlockNumberOrHash"
+          }
+        },
+        {
+          "name": "overrides",
+          "description": "Parameter `overrides`. Go type: *json.RawMessage",
+          "schema": {
+            "items": {},
+            "nullable": true,
+            "type": "array",
+            "x-go-type": "json.RawMessage"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: hexutil.Bytes",
+        "schema": {
+          "items": {},
+          "type": "array",
+          "x-go-type": "hexutil.Bytes"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [
+            {
+              "name": "args",
+              "value": {
+                "data": "0x",
+                "from": "0x1111111111111111111111111111111111111111",
+                "gas": "0x5208",
+                "to": "0x2222222222222222222222222222222222222222",
+                "value": "0x1"
+              }
+            },
+            {
+              "name": "blockNrOrHash",
+              "value": "latest"
+            },
+            {
+              "name": "overrides",
+              "value": {}
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": "0x"
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_chainId",
+      "summary": "eth_chainId JSON-RPC method",
+      "description": "ChainId is the EIP-155 replay-protection chain id for the current ethereum chain config.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [],
+      "result": {
+        "name": "result",
+        "description": "Go type: *hexutil.Big",
+        "schema": {
+          "nullable": true,
+          "type": "object",
+          "x-go-type": "hexutil.Big"
+        }
+      },
+      "examples": [
+        {
+          "name": "chain-id",
+          "summary": "Returns the configured EVM chain ID in hex.",
+          "params": [],
+          "result": {
+            "name": "result",
+            "value": "0x494c1a9"
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_createAccessList",
+      "summary": "eth_createAccessList JSON-RPC method",
+      "description": "CreateAccessList returns the list of addresses and storage keys used by the transaction (except for the sender account and precompiles), plus the estimated gas if the access list were added to the transaction.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "args",
+          "description": "Parameter `args`. Go type: types.TransactionArgs",
+          "required": true,
+          "schema": {
+            "type": "object",
+            "x-go-type": "types.TransactionArgs"
+          }
+        },
+        {
+          "name": "blockNrOrHash",
+          "description": "Parameter `blockNrOrHash`. Go type: types.BlockNumberOrHash",
+          "required": true,
+          "schema": {
+            "type": "object",
+            "x-go-type": "types.BlockNumberOrHash"
+          }
+        },
+        {
+          "name": "overrides",
+          "description": "Parameter `overrides`. Go type: *json.RawMessage",
+          "schema": {
+            "items": {},
+            "nullable": true,
+            "type": "array",
+            "x-go-type": "json.RawMessage"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: *types.AccessListResult",
+        "schema": {
+          "nullable": true,
+          "type": "object",
+          "x-go-type": "types.AccessListResult"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [
+            {
+              "name": "args",
+              "value": {
+                "data": "0x",
+                "from": "0x1111111111111111111111111111111111111111",
+                "gas": "0x5208",
+                "to": "0x2222222222222222222222222222222222222222",
+                "value": "0x1"
+              }
+            },
+            {
+              "name": "blockNrOrHash",
+              "value": "latest"
+            },
+            {
+              "name": "overrides",
+              "value": {}
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": {}
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_estimateGas",
+      "summary": "eth_estimateGas JSON-RPC method",
+      "description": "EstimateGas returns an estimate of gas usage for the given smart contract call.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "args",
+          "description": "Parameter `args`. Go type: types.TransactionArgs",
+          "required": true,
+          "schema": {
+            "type": "object",
+            "x-go-type": "types.TransactionArgs"
+          }
+        },
+        {
+          "name": "blockNrOptional",
+          "description": "Parameter `blockNrOptional`. Go type: *types.BlockNumber",
+          "schema": {
+            "nullable": true,
+            "type": "string",
+            "x-go-type": "types.BlockNumber"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: hexutil.Uint64",
+        "schema": {
+          "type": "string",
+          "x-go-type": "hexutil.Uint64"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [
+            {
+              "name": "args",
+              "value": {
+                "data": "0x",
+                "from": "0x1111111111111111111111111111111111111111",
+                "gas": "0x5208",
+                "to": "0x2222222222222222222222222222222222222222",
+                "value": "0x1"
+              }
+            },
+            {
+              "name": "blockNrOptional",
+              "value": "latest"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": "0x1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_feeHistory",
+      "summary": "eth_feeHistory JSON-RPC method",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "blockCount",
+          "description": "Parameter `blockCount`. Go type: math.HexOrDecimal64",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "math.HexOrDecimal64"
+          }
+        },
+        {
+          "name": "lastBlock",
+          "description": "Parameter `lastBlock`. Go type: rpc.BlockNumber",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "rpc.BlockNumber"
+          }
+        },
+        {
+          "name": "rewardPercentiles",
+          "description": "Parameter `rewardPercentiles`. Go type: []float64",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array",
+            "x-go-type": "[]float64"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: *types.FeeHistoryResult",
+        "schema": {
+          "nullable": true,
+          "type": "object",
+          "x-go-type": "types.FeeHistoryResult"
+        }
+      },
+      "examples": [
+        {
+          "name": "single-block-fee-history",
+          "summary": "Returns base fee history and optional reward percentiles.",
+          "params": [
+            {
+              "name": "blockCount",
+              "value": "0x1"
+            },
+            {
+              "name": "lastBlock",
+              "value": "latest"
+            },
+            {
+              "name": "rewardPercentiles",
+              "value": [
+                50
+              ]
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": {
+              "baseFeePerGas": [
+                "0x9502f900",
+                "0x8f0d1800"
+              ],
+              "gasUsedRatio": [
+                0.21
+              ],
+              "oldestBlock": "0x4",
+              "reward": [
+                [
+                  "0x3b9aca00"
+                ]
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_fillTransaction",
+      "summary": "eth_fillTransaction JSON-RPC method",
+      "description": "FillTransaction fills the defaults (nonce, gas, gasPrice or 1559 fields) on a given unsigned transaction, and returns it to the caller for further processing (signing + broadcast).",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "args",
+          "description": "Parameter `args`. Go type: types.TransactionArgs",
+          "required": true,
+          "schema": {
+            "type": "object",
+            "x-go-type": "types.TransactionArgs"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: *types.SignTransactionResult",
+        "schema": {
+          "nullable": true,
+          "type": "object",
+          "x-go-type": "types.SignTransactionResult"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [
+            {
+              "name": "args",
+              "value": {
+                "data": "0x",
+                "from": "0x1111111111111111111111111111111111111111",
+                "gas": "0x5208",
+                "to": "0x2222222222222222222222222222222222222222",
+                "value": "0x1"
+              }
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": {
+              "hash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_gasPrice",
+      "summary": "eth_gasPrice JSON-RPC method",
+      "description": "GasPrice returns the current gas price based on Cosmos EVM's gas price oracle.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [],
+      "result": {
+        "name": "result",
+        "description": "Go type: *hexutil.Big",
+        "schema": {
+          "nullable": true,
+          "type": "object",
+          "x-go-type": "hexutil.Big"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [],
+          "result": {
+            "name": "result",
+            "value": "0x1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_getBalance",
+      "summary": "eth_getBalance JSON-RPC method",
+      "description": "GetBalance returns the provided account's balance up to the provided block number.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "address",
+          "description": "Parameter `address`. Go type: common.Address",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array",
+            "x-go-type": "common.Address"
+          }
+        },
+        {
+          "name": "blockNrOrHash",
+          "description": "Parameter `blockNrOrHash`. Go type: types.BlockNumberOrHash",
+          "required": true,
+          "schema": {
+            "type": "object",
+            "x-go-type": "types.BlockNumberOrHash"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: *hexutil.Big",
+        "schema": {
+          "nullable": true,
+          "type": "object",
+          "x-go-type": "hexutil.Big"
+        }
+      },
+      "examples": [
+        {
+          "name": "account-balance-latest",
+          "summary": "Returns 18-decimal EVM view balance in wei.",
+          "params": [
+            {
+              "name": "address",
+              "value": "0x1111111111111111111111111111111111111111"
+            },
+            {
+              "name": "blockNrOrHash",
+              "value": "latest"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": "0xde0b6b3a7640000"
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_getBlockByHash",
+      "summary": "eth_getBlockByHash JSON-RPC method",
+      "description": "GetBlockByHash returns the block identified by hash.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "hash",
+          "description": "Parameter `hash`. Go type: common.Hash",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array",
+            "x-go-type": "common.Hash"
+          }
+        },
+        {
+          "name": "fullTx",
+          "description": "Parameter `fullTx`. Go type: bool",
+          "required": true,
+          "schema": {
+            "type": "boolean",
+            "x-go-type": "bool"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: map[string]interface {}",
+        "schema": {
+          "type": "object",
+          "x-go-type": "map[string]interface {}"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [
+            {
+              "name": "hash",
+              "value": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            {
+              "name": "fullTx",
+              "value": true
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": {
+              "hash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "number": "0x5"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_getBlockByNumber",
+      "summary": "eth_getBlockByNumber JSON-RPC method",
+      "description": "GetBlockByNumber returns the block identified by number.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "ethBlockNum",
+          "description": "Parameter `ethBlockNum`. Go type: types.BlockNumber",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "types.BlockNumber"
+          }
+        },
+        {
+          "name": "fullTx",
+          "description": "Parameter `fullTx`. Go type: bool",
+          "required": true,
+          "schema": {
+            "type": "boolean",
+            "x-go-type": "bool"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: map[string]interface {}",
+        "schema": {
+          "type": "object",
+          "x-go-type": "map[string]interface {}"
+        }
+      },
+      "examples": [
+        {
+          "name": "latest-header-only",
+          "summary": "Returns latest block object without full transactions.",
+          "params": [
+            {
+              "name": "ethBlockNum",
+              "value": "latest"
+            },
+            {
+              "name": "fullTx",
+              "value": false
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": {
+              "baseFeePerGas": "0x9502f900",
+              "hash": "0x4f1c8d5b8cf530f4c01f8ca07825f8f5084f57b9d7b5e0f8031f4bca8e1c83f4",
+              "number": "0x5"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_getBlockReceipts",
+      "summary": "eth_getBlockReceipts JSON-RPC method",
+      "description": "GetBlockReceipts returns the block receipts for the given block hash or number or tag.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "blockNrOrHash",
+          "description": "Parameter `blockNrOrHash`. Go type: types.BlockNumberOrHash",
+          "required": true,
+          "schema": {
+            "type": "object",
+            "x-go-type": "types.BlockNumberOrHash"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: []map[string]interface {}",
+        "schema": {
+          "items": {},
+          "type": "array",
+          "x-go-type": "[]map[string]interface {}"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [
+            {
+              "name": "blockNrOrHash",
+              "value": "latest"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": {
+              "hash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "number": "0x5"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_getBlockTransactionCountByHash",
+      "summary": "eth_getBlockTransactionCountByHash JSON-RPC method",
+      "description": "GetBlockTransactionCountByHash returns the number of transactions in the block identified by hash.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "hash",
+          "description": "Parameter `hash`. Go type: common.Hash",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array",
+            "x-go-type": "common.Hash"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: *hexutil.Uint",
+        "schema": {
+          "nullable": true,
+          "type": "string",
+          "x-go-type": "hexutil.Uint"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [
+            {
+              "name": "hash",
+              "value": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": "0x1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_getBlockTransactionCountByNumber",
+      "summary": "eth_getBlockTransactionCountByNumber JSON-RPC method",
+      "description": "GetBlockTransactionCountByNumber returns the number of transactions in the block identified by number.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "blockNum",
+          "description": "Parameter `blockNum`. Go type: types.BlockNumber",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "types.BlockNumber"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: *hexutil.Uint",
+        "schema": {
+          "nullable": true,
+          "type": "string",
+          "x-go-type": "hexutil.Uint"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [
+            {
+              "name": "blockNum",
+              "value": "latest"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": "0x1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_getCode",
+      "summary": "eth_getCode JSON-RPC method",
+      "description": "GetCode returns the contract code at the given address and block number.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "address",
+          "description": "Parameter `address`. Go type: common.Address",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array",
+            "x-go-type": "common.Address"
+          }
+        },
+        {
+          "name": "blockNrOrHash",
+          "description": "Parameter `blockNrOrHash`. Go type: types.BlockNumberOrHash",
+          "required": true,
+          "schema": {
+            "type": "object",
+            "x-go-type": "types.BlockNumberOrHash"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: hexutil.Bytes",
+        "schema": {
+          "items": {},
+          "type": "array",
+          "x-go-type": "hexutil.Bytes"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [
+            {
+              "name": "address",
+              "value": "0x1111111111111111111111111111111111111111"
+            },
+            {
+              "name": "blockNrOrHash",
+              "value": "latest"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": "0x"
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_getFilterChanges",
+      "summary": "eth_getFilterChanges JSON-RPC method",
+      "description": "GetFilterChanges returns the logs for the filter with the given id since last time it was called. This can be used for polling. For pending transaction and block filters the result is []common.Hash. (pending)Log filters return []Log. https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_getfilterchanges",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "id",
+          "description": "Parameter `id`. Go type: rpc.ID",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "rpc.ID"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: interface {}",
+        "schema": {
+          "type": "object",
+          "x-go-type": "interface {}"
+        }
+      },
+      "examples": [
+        {
+          "name": "poll-filter",
+          "summary": "Returns new entries since last poll for a filter id.",
+          "params": [
+            {
+              "name": "id",
+              "value": "0x1"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_getFilterLogs",
+      "summary": "eth_getFilterLogs JSON-RPC method",
+      "description": "GetFilterLogs returns the logs for the filter with the given id. If the filter could not be found an empty array of logs is returned. https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_getfilterlogs",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "id",
+          "description": "Parameter `id`. Go type: rpc.ID",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "rpc.ID"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: []*types.Log",
+        "schema": {
+          "items": {},
+          "type": "array",
+          "x-go-type": "[]*types.Log"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [
+            {
+              "name": "id",
+              "value": "0x1"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_getHeaderByHash",
+      "summary": "eth_getHeaderByHash JSON-RPC method",
+      "description": "GetHeaderByHash returns the requested header by hash.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "hash",
+          "description": "Parameter `hash`. Go type: common.Hash",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array",
+            "x-go-type": "common.Hash"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: map[string]interface {}",
+        "schema": {
+          "type": "object",
+          "x-go-type": "map[string]interface {}"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [
+            {
+              "name": "hash",
+              "value": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": {}
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_getHeaderByNumber",
+      "summary": "eth_getHeaderByNumber JSON-RPC method",
+      "description": "GetHeaderByNumber returns the requested canonical block header. - When blockNr is -1 the chain pending header is returned. - When blockNr is -2 the chain latest header is returned. - When blockNr is -3 the chain finalized header is returned. - When blockNr is -4 the chain safe header is returned.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "ethBlockNum",
+          "description": "Parameter `ethBlockNum`. Go type: types.BlockNumber",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "types.BlockNumber"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: map[string]interface {}",
+        "schema": {
+          "type": "object",
+          "x-go-type": "map[string]interface {}"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [
+            {
+              "name": "ethBlockNum",
+              "value": "latest"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": {}
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_getLogs",
+      "summary": "eth_getLogs JSON-RPC method",
+      "description": "GetLogs returns logs matching the given argument that are stored within the state. https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_getlogs",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "crit",
+          "description": "Parameter `crit`. Go type: filters.FilterCriteria",
+          "required": true,
+          "schema": {
+            "type": "object",
+            "x-go-type": "filters.FilterCriteria"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: []*types.Log",
+        "schema": {
+          "items": {},
+          "type": "array",
+          "x-go-type": "[]*types.Log"
+        }
+      },
+      "examples": [
+        {
+          "name": "range-query",
+          "summary": "Returns logs in a bounded block range (can be empty).",
+          "params": [
+            {
+              "name": "crit",
+              "value": {
+                "fromBlock": "0x1",
+                "toBlock": "latest",
+                "topics": []
+              }
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_getProof",
+      "summary": "eth_getProof JSON-RPC method",
+      "description": "GetProof returns an account object with proof and any storage proofs",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "address",
+          "description": "Parameter `address`. Go type: common.Address",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array",
+            "x-go-type": "common.Address"
+          }
+        },
+        {
+          "name": "storageKeys",
+          "description": "Parameter `storageKeys`. Go type: []string",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array",
+            "x-go-type": "[]string"
+          }
+        },
+        {
+          "name": "blockNrOrHash",
+          "description": "Parameter `blockNrOrHash`. Go type: types.BlockNumberOrHash",
+          "required": true,
+          "schema": {
+            "type": "object",
+            "x-go-type": "types.BlockNumberOrHash"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: *types.AccountResult",
+        "schema": {
+          "nullable": true,
+          "type": "object",
+          "x-go-type": "types.AccountResult"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [
+            {
+              "name": "address",
+              "value": "0x1111111111111111111111111111111111111111"
+            },
+            {
+              "name": "storageKeys",
+              "value": []
+            },
+            {
+              "name": "blockNrOrHash",
+              "value": "latest"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": {}
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_getStorageAt",
+      "summary": "eth_getStorageAt JSON-RPC method",
+      "description": "GetStorageAt returns the contract storage at the given address, block number, and key.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "address",
+          "description": "Parameter `address`. Go type: common.Address",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array",
+            "x-go-type": "common.Address"
+          }
+        },
+        {
+          "name": "key",
+          "description": "Parameter `key`. Go type: string",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "string"
+          }
+        },
+        {
+          "name": "blockNrOrHash",
+          "description": "Parameter `blockNrOrHash`. Go type: types.BlockNumberOrHash",
+          "required": true,
+          "schema": {
+            "type": "object",
+            "x-go-type": "types.BlockNumberOrHash"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: hexutil.Bytes",
+        "schema": {
+          "items": {},
+          "type": "array",
+          "x-go-type": "hexutil.Bytes"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [
+            {
+              "name": "address",
+              "value": "0x1111111111111111111111111111111111111111"
+            },
+            {
+              "name": "key",
+              "value": "0x1"
+            },
+            {
+              "name": "blockNrOrHash",
+              "value": "latest"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": "0x"
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_getTransactionByBlockHashAndIndex",
+      "summary": "eth_getTransactionByBlockHashAndIndex JSON-RPC method",
+      "description": "GetTransactionByBlockHashAndIndex returns the transaction identified by hash and index.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "hash",
+          "description": "Parameter `hash`. Go type: common.Hash",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array",
+            "x-go-type": "common.Hash"
+          }
+        },
+        {
+          "name": "idx",
+          "description": "Parameter `idx`. Go type: hexutil.Uint",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "hexutil.Uint"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: *types.RPCTransaction",
+        "schema": {
+          "nullable": true,
+          "type": "object",
+          "x-go-type": "types.RPCTransaction"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [
+            {
+              "name": "hash",
+              "value": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            {
+              "name": "idx",
+              "value": "0x1"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": {
+              "hash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_getTransactionByBlockNumberAndIndex",
+      "summary": "eth_getTransactionByBlockNumberAndIndex JSON-RPC method",
+      "description": "GetTransactionByBlockNumberAndIndex returns the transaction identified by number and index.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "blockNum",
+          "description": "Parameter `blockNum`. Go type: types.BlockNumber",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "types.BlockNumber"
+          }
+        },
+        {
+          "name": "idx",
+          "description": "Parameter `idx`. Go type: hexutil.Uint",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "hexutil.Uint"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: *types.RPCTransaction",
+        "schema": {
+          "nullable": true,
+          "type": "object",
+          "x-go-type": "types.RPCTransaction"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [
+            {
+              "name": "blockNum",
+              "value": "latest"
+            },
+            {
+              "name": "idx",
+              "value": "0x1"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": {
+              "hash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_getTransactionByHash",
+      "summary": "eth_getTransactionByHash JSON-RPC method",
+      "description": "GetTransactionByHash returns the transaction identified by hash.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "hash",
+          "description": "Parameter `hash`. Go type: common.Hash",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array",
+            "x-go-type": "common.Hash"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: *types.RPCTransaction",
+        "schema": {
+          "nullable": true,
+          "type": "object",
+          "x-go-type": "types.RPCTransaction"
+        }
+      },
+      "examples": [
+        {
+          "name": "lookup-tx",
+          "summary": "Returns tx object when indexed/persisted.",
+          "params": [
+            {
+              "name": "hash",
+              "value": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": {
+              "blockNumber": "0x5",
+              "hash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "transactionIndex": "0x0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_getTransactionCount",
+      "summary": "eth_getTransactionCount JSON-RPC method",
+      "description": "GetTransactionCount returns the number of transactions at the given address up to the given block number.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "address",
+          "description": "Parameter `address`. Go type: common.Address",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array",
+            "x-go-type": "common.Address"
+          }
+        },
+        {
+          "name": "blockNrOrHash",
+          "description": "Parameter `blockNrOrHash`. Go type: types.BlockNumberOrHash",
+          "required": true,
+          "schema": {
+            "type": "object",
+            "x-go-type": "types.BlockNumberOrHash"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: *hexutil.Uint64",
+        "schema": {
+          "nullable": true,
+          "type": "string",
+          "x-go-type": "hexutil.Uint64"
+        }
+      },
+      "examples": [
+        {
+          "name": "account-nonce",
+          "summary": "Returns account nonce at selected block tag.",
+          "params": [
+            {
+              "name": "address",
+              "value": "0x1111111111111111111111111111111111111111"
+            },
+            {
+              "name": "blockNrOrHash",
+              "value": "pending"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": "0x3"
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_getTransactionLogs",
+      "summary": "eth_getTransactionLogs JSON-RPC method",
+      "description": "GetTransactionLogs returns the logs given a transaction hash.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "txHash",
+          "description": "Parameter `txHash`. Go type: common.Hash",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array",
+            "x-go-type": "common.Hash"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: []*types.Log",
+        "schema": {
+          "items": {},
+          "type": "array",
+          "x-go-type": "[]*types.Log"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [
+            {
+              "name": "txHash",
+              "value": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": {
+              "hash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_getTransactionReceipt",
+      "summary": "eth_getTransactionReceipt JSON-RPC method",
+      "description": "GetTransactionReceipt returns the transaction receipt identified by hash.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "hash",
+          "description": "Parameter `hash`. Go type: common.Hash",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array",
+            "x-go-type": "common.Hash"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: map[string]interface {}",
+        "schema": {
+          "type": "object",
+          "x-go-type": "map[string]interface {}"
+        }
+      },
+      "examples": [
+        {
+          "name": "lookup-receipt",
+          "summary": "Returns receipt for a mined transaction hash.",
+          "params": [
+            {
+              "name": "hash",
+              "value": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": {
+              "gasUsed": "0x5208",
+              "status": "0x1",
+              "transactionHash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_getUncleByBlockHashAndIndex",
+      "summary": "eth_getUncleByBlockHashAndIndex JSON-RPC method",
+      "description": "GetUncleByBlockHashAndIndex returns the uncle identified by hash and index. Always returns nil.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "blockHash",
+          "description": "Parameter `blockHash`. Go type: common.Hash",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array",
+            "x-go-type": "common.Hash"
+          }
+        },
+        {
+          "name": "index",
+          "description": "Parameter `index`. Go type: hexutil.Uint",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "hexutil.Uint"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: map[string]interface {}",
+        "schema": {
+          "type": "object",
+          "x-go-type": "map[string]interface {}"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [
+            {
+              "name": "blockHash",
+              "value": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            },
+            {
+              "name": "index",
+              "value": "0x1"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": {}
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_getUncleByBlockNumberAndIndex",
+      "summary": "eth_getUncleByBlockNumberAndIndex JSON-RPC method",
+      "description": "GetUncleByBlockNumberAndIndex returns the uncle identified by number and index. Always returns nil.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "blockNumber",
+          "description": "Parameter `blockNumber`. Go type: hexutil.Uint",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "hexutil.Uint"
+          }
+        },
+        {
+          "name": "index",
+          "description": "Parameter `index`. Go type: hexutil.Uint",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "hexutil.Uint"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: map[string]interface {}",
+        "schema": {
+          "type": "object",
+          "x-go-type": "map[string]interface {}"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [
+            {
+              "name": "blockNumber",
+              "value": "0x1"
+            },
+            {
+              "name": "index",
+              "value": "0x1"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": {}
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_getUncleCountByBlockHash",
+      "summary": "eth_getUncleCountByBlockHash JSON-RPC method",
+      "description": "GetUncleCountByBlockHash returns the number of uncles in the block identified by hash. Always zero.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "blockHash",
+          "description": "Parameter `blockHash`. Go type: common.Hash",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array",
+            "x-go-type": "common.Hash"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: hexutil.Uint",
+        "schema": {
+          "type": "string",
+          "x-go-type": "hexutil.Uint"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [
+            {
+              "name": "blockHash",
+              "value": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": "0x1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_getUncleCountByBlockNumber",
+      "summary": "eth_getUncleCountByBlockNumber JSON-RPC method",
+      "description": "GetUncleCountByBlockNumber returns the number of uncles in the block identified by number. Always zero.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "blockNumber",
+          "description": "Parameter `blockNumber`. Go type: types.BlockNumber",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "types.BlockNumber"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: hexutil.Uint",
+        "schema": {
+          "type": "string",
+          "x-go-type": "hexutil.Uint"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [
+            {
+              "name": "blockNumber",
+              "value": "latest"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": "0x1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_maxPriorityFeePerGas",
+      "summary": "eth_maxPriorityFeePerGas JSON-RPC method",
+      "description": "MaxPriorityFeePerGas returns a suggestion for a gas tip cap for dynamic fee transactions.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [],
+      "result": {
+        "name": "result",
+        "description": "Go type: *hexutil.Big",
+        "schema": {
+          "nullable": true,
+          "type": "object",
+          "x-go-type": "hexutil.Big"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [],
+          "result": {
+            "name": "result",
+            "value": "0x1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_newBlockFilter",
+      "summary": "eth_newBlockFilter JSON-RPC method",
+      "description": "NewBlockFilter creates a filter that fetches blocks that are imported into the chain. It is part of the filter package since polling goes with eth_getFilterChanges. https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_newblockfilter",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [],
+      "result": {
+        "name": "result",
+        "description": "Go type: rpc.ID",
+        "schema": {
+          "type": "string",
+          "x-go-type": "rpc.ID"
+        }
+      },
+      "examples": [
+        {
+          "name": "create-block-filter",
+          "summary": "Creates a block filter and returns filter id.",
+          "params": [],
+          "result": {
+            "name": "result",
+            "value": "0x1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_newFilter",
+      "summary": "eth_newFilter JSON-RPC method",
+      "description": "NewFilter creates a new filter and returns the filter id. It can be used to retrieve logs when the state changes. This method cannot be used to fetch logs that are already stored in the state. Default criteria for the from and to block are \"latest\". Using \"latest\" as block number will return logs for mined blocks. Using \"pending\" as block number returns logs for not yet mined (pending) blocks. In case logs are removed (chain reorg) previously returned logs are returned again but with the removed property set to true. In case \"fromBlock\" \u003e \"toBlock\" an error is returned. https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_newfilter",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "criteria",
+          "description": "Parameter `criteria`. Go type: filters.FilterCriteria",
+          "required": true,
+          "schema": {
+            "type": "object",
+            "x-go-type": "filters.FilterCriteria"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: rpc.ID",
+        "schema": {
+          "type": "string",
+          "x-go-type": "rpc.ID"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [
+            {
+              "name": "criteria",
+              "value": {}
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": "0x1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_newPendingTransactionFilter",
+      "summary": "eth_newPendingTransactionFilter JSON-RPC method",
+      "description": "NewPendingTransactionFilter creates a filter that fetches pending transaction hashes as transactions enter the pending state. It is part of the filter package because this filter can be used through the `eth_getFilterChanges` polling method that is also used for log filters. https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_newPendingTransactionFilter",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [],
+      "result": {
+        "name": "result",
+        "description": "Go type: rpc.ID",
+        "schema": {
+          "type": "string",
+          "x-go-type": "rpc.ID"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [],
+          "result": {
+            "name": "result",
+            "value": "0x1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_protocolVersion",
+      "summary": "eth_protocolVersion JSON-RPC method",
+      "description": "ProtocolVersion returns the supported Ethereum protocol version.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [],
+      "result": {
+        "name": "result",
+        "description": "Go type: hexutil.Uint",
+        "schema": {
+          "type": "string",
+          "x-go-type": "hexutil.Uint"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [],
+          "result": {
+            "name": "result",
+            "value": "0x1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_resend",
+      "summary": "eth_resend JSON-RPC method",
+      "description": "Resend accepts an existing transaction and a new gas price and limit. It will remove the given transaction from the pool and reinsert it with the new gas price and limit.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "args",
+          "description": "Parameter `args`. Go type: types.TransactionArgs",
+          "required": true,
+          "schema": {
+            "type": "object",
+            "x-go-type": "types.TransactionArgs"
+          }
+        },
+        {
+          "name": "gasPrice",
+          "description": "Parameter `gasPrice`. Go type: *hexutil.Big",
+          "schema": {
+            "nullable": true,
+            "type": "object",
+            "x-go-type": "hexutil.Big"
+          }
+        },
+        {
+          "name": "gasLimit",
+          "description": "Parameter `gasLimit`. Go type: *hexutil.Uint64",
+          "schema": {
+            "nullable": true,
+            "type": "string",
+            "x-go-type": "hexutil.Uint64"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: common.Hash",
+        "schema": {
+          "items": {},
+          "type": "array",
+          "x-go-type": "common.Hash"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [
+            {
+              "name": "args",
+              "value": {
+                "data": "0x",
+                "from": "0x1111111111111111111111111111111111111111",
+                "gas": "0x5208",
+                "to": "0x2222222222222222222222222222222222222222",
+                "value": "0x1"
+              }
+            },
+            {
+              "name": "gasPrice",
+              "value": "0x1"
+            },
+            {
+              "name": "gasLimit",
+              "value": "0x1"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_sendRawTransaction",
+      "summary": "eth_sendRawTransaction JSON-RPC method",
+      "description": "SendRawTransaction send a raw Ethereum transaction.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "data",
+          "description": "Parameter `data`. Go type: hexutil.Bytes",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array",
+            "x-go-type": "hexutil.Bytes"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: common.Hash",
+        "schema": {
+          "items": {},
+          "type": "array",
+          "x-go-type": "common.Hash"
+        }
+      },
+      "examples": [
+        {
+          "name": "broadcast-signed-tx",
+          "summary": "Broadcasts a signed raw Ethereum tx; returns tx hash.",
+          "params": [
+            {
+              "name": "data",
+              "value": "0x02f86a82053901843b9aca00849502f9008252089411111111111111111111111111111111111111110180c001a0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_sendTransaction",
+      "summary": "eth_sendTransaction JSON-RPC method",
+      "description": "SendTransaction sends an Ethereum transaction.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "args",
+          "description": "Parameter `args`. Go type: types.TransactionArgs",
+          "required": true,
+          "schema": {
+            "type": "object",
+            "x-go-type": "types.TransactionArgs"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: common.Hash",
+        "schema": {
+          "items": {},
+          "type": "array",
+          "x-go-type": "common.Hash"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [
+            {
+              "name": "args",
+              "value": {
+                "data": "0x",
+                "from": "0x1111111111111111111111111111111111111111",
+                "gas": "0x5208",
+                "to": "0x2222222222222222222222222222222222222222",
+                "value": "0x1"
+              }
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_sign",
+      "summary": "eth_sign JSON-RPC method",
+      "description": "Sign signs the provided data using the private key of address via Geth's signature standard.",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "address",
+          "description": "Parameter `address`. Go type: common.Address",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array",
+            "x-go-type": "common.Address"
+          }
+        },
+        {
+          "name": "data",
+          "description": "Parameter `data`. Go type: hexutil.Bytes",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array",
+            "x-go-type": "hexutil.Bytes"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: hexutil.Bytes",
+        "schema": {
+          "items": {},
+          "type": "array",
+          "x-go-type": "hexutil.Bytes"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [
+            {
+              "name": "address",
+              "value": "0x1111111111111111111111111111111111111111"
+            },
+            {
+              "name": "data",
+              "value": "0x"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": "0x"
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_signTypedData",
+      "summary": "eth_signTypedData JSON-RPC method",
+      "description": "SignTypedData signs EIP-712 conformant typed data",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "address",
+          "description": "Parameter `address`. Go type: common.Address",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array",
+            "x-go-type": "common.Address"
+          }
+        },
+        {
+          "name": "typedData",
+          "description": "Parameter `typedData`. Go type: apitypes.TypedData",
+          "required": true,
+          "schema": {
+            "type": "object",
+            "x-go-type": "apitypes.TypedData"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: hexutil.Bytes",
+        "schema": {
+          "items": {},
+          "type": "array",
+          "x-go-type": "hexutil.Bytes"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [
+            {
+              "name": "address",
+              "value": "0x1111111111111111111111111111111111111111"
+            },
+            {
+              "name": "typedData",
+              "value": {
+                "domain": {
+                  "name": "Lumera"
+                },
+                "message": {
+                  "name": "Lumera"
+                },
+                "primaryType": "EIP712Domain",
+                "types": {
+                  "EIP712Domain": [
+                    {
+                      "name": "name",
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": "0x"
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_syncing",
+      "summary": "eth_syncing JSON-RPC method",
+      "description": "Syncing returns false in case the node is currently not syncing with the network. It can be up to date or has not yet received the latest block headers from its pears. In case it is synchronizing: - startingBlock: block number this node started to synchronize from - currentBlock: block number this node is currently importing - highestBlock: block number of the highest block header this node has received from peers - pulledStates: number of state entries processed until now - knownStates: number of known state entries that still need to be pulled",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [],
+      "result": {
+        "name": "result",
+        "description": "Go type: interface {}",
+        "schema": {
+          "type": "object",
+          "x-go-type": "interface {}"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [],
+          "result": {
+            "name": "result",
+            "value": {}
+          }
+        }
+      ]
+    },
+    {
+      "name": "eth_uninstallFilter",
+      "summary": "eth_uninstallFilter JSON-RPC method",
+      "description": "UninstallFilter removes the filter with the given filter id. https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_uninstallfilter",
+      "tags": [
+        {
+          "name": "eth"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "id",
+          "description": "Parameter `id`. Go type: rpc.ID",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "rpc.ID"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: bool",
+        "schema": {
+          "type": "boolean",
+          "x-go-type": "bool"
+        }
+      },
+      "examples": [
+        {
+          "name": "remove-filter",
+          "summary": "Uninstalls an existing filter.",
+          "params": [
+            {
+              "name": "id",
+              "value": "0x1"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "miner_getHashrate",
+      "summary": "miner_getHashrate JSON-RPC method",
+      "description": "GetHashrate returns the current hashrate for local CPU miner and remote miner. Unsupported in Cosmos EVM",
+      "tags": [
+        {
+          "name": "miner"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [],
+      "result": {
+        "name": "result",
+        "description": "Go type: uint64",
+        "schema": {
+          "type": "string",
+          "x-go-type": "uint64"
+        }
+      },
+      "examples": [
+        {
+          "name": "get-hashrate",
+          "summary": "Mining is unsupported in Cosmos EVM; hashrate is always zero.",
+          "params": [],
+          "result": {
+            "name": "result",
+            "value": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "miner_setEtherbase",
+      "summary": "miner_setEtherbase JSON-RPC method",
+      "description": "SetEtherbase sets the etherbase of the miner",
+      "tags": [
+        {
+          "name": "miner"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "etherbase",
+          "description": "Parameter `etherbase`. Go type: common.Address",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array",
+            "x-go-type": "common.Address"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: bool",
+        "schema": {
+          "type": "boolean",
+          "x-go-type": "bool"
+        }
+      },
+      "examples": [
+        {
+          "name": "set-etherbase",
+          "summary": "Sets fee recipient address used by miner namespace.",
+          "params": [
+            {
+              "name": "etherbase",
+              "value": "0x1111111111111111111111111111111111111111"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "miner_setExtra",
+      "summary": "miner_setExtra JSON-RPC method",
+      "description": "SetExtra sets the extra data string that is included when this miner mines a block. Unsupported in Cosmos EVM",
+      "tags": [
+        {
+          "name": "miner"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "extra",
+          "description": "Parameter `extra`. Go type: string",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: bool",
+        "schema": {
+          "type": "boolean",
+          "x-go-type": "bool"
+        }
+      },
+      "examples": [
+        {
+          "name": "set-extra-data",
+          "summary": "Unsupported in Cosmos EVM; returns false and error.",
+          "params": [
+            {
+              "name": "extra",
+              "value": "lumera-devnet"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "miner_setGasLimit",
+      "summary": "miner_setGasLimit JSON-RPC method",
+      "description": "SetGasLimit sets the gaslimit to target towards during mining. Unsupported in Cosmos EVM",
+      "tags": [
+        {
+          "name": "miner"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "gasLimit",
+          "description": "Parameter `gasLimit`. Go type: hexutil.Uint64",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "hexutil.Uint64"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: bool",
+        "schema": {
+          "type": "boolean",
+          "x-go-type": "bool"
+        }
+      },
+      "examples": [
+        {
+          "name": "set-gas-limit",
+          "summary": "Unsupported in Cosmos EVM; returns false.",
+          "params": [
+            {
+              "name": "gasLimit",
+              "value": "0x989680"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "miner_setGasPrice",
+      "summary": "miner_setGasPrice JSON-RPC method",
+      "description": "SetGasPrice sets the minimum accepted gas price for the miner.",
+      "tags": [
+        {
+          "name": "miner"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "gasPrice",
+          "description": "Parameter `gasPrice`. Go type: hexutil.Big",
+          "required": true,
+          "schema": {
+            "type": "object",
+            "x-go-type": "hexutil.Big"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: bool",
+        "schema": {
+          "type": "boolean",
+          "x-go-type": "bool"
+        }
+      },
+      "examples": [
+        {
+          "name": "set-miner-gas-price",
+          "summary": "Updates miner-side minimum gas price.",
+          "params": [
+            {
+              "name": "gasPrice",
+              "value": "0x3b9aca00"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "miner_start",
+      "summary": "miner_start JSON-RPC method",
+      "description": "Start starts the miner with the given number of threads. If threads is nil, the number of workers started is equal to the number of logical CPUs that are usable by this process. If mining is already running, this method adjust the number of threads allowed to use and updates the minimum price required by the transaction pool. Unsupported in Cosmos EVM",
+      "tags": [
+        {
+          "name": "miner"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "threads",
+          "description": "Parameter `threads`. Go type: *int",
+          "schema": {
+            "nullable": true,
+            "type": "string",
+            "x-go-type": "int"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "No return value",
+        "schema": {
+          "type": "null"
+        }
+      },
+      "examples": [
+        {
+          "name": "start-miner",
+          "summary": "Unsupported in Cosmos EVM; call returns an error.",
+          "params": [
+            {
+              "name": "threads",
+              "value": 1
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "miner_stop",
+      "summary": "miner_stop JSON-RPC method",
+      "description": "Stop terminates the miner, both at the consensus engine level as well as at the block creation level. Unsupported in Cosmos EVM",
+      "tags": [
+        {
+          "name": "miner"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [],
+      "result": {
+        "name": "result",
+        "description": "No return value",
+        "schema": {
+          "type": "null"
+        }
+      },
+      "examples": [
+        {
+          "name": "stop-miner",
+          "summary": "Unsupported in Cosmos EVM; no-op.",
+          "params": [],
+          "result": {
+            "name": "result",
+            "value": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "net_listening",
+      "summary": "net_listening JSON-RPC method",
+      "description": "Listening returns if client is actively listening for network connections.",
+      "tags": [
+        {
+          "name": "net"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [],
+      "result": {
+        "name": "result",
+        "description": "Go type: bool",
+        "schema": {
+          "type": "boolean",
+          "x-go-type": "bool"
+        }
+      },
+      "examples": [
+        {
+          "name": "listening-status",
+          "summary": "Returns whether the node P2P layer is listening.",
+          "params": [],
+          "result": {
+            "name": "result",
+            "value": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "net_peerCount",
+      "summary": "net_peerCount JSON-RPC method",
+      "description": "PeerCount returns the number of peers currently connected to the client.",
+      "tags": [
+        {
+          "name": "net"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [],
+      "result": {
+        "name": "result",
+        "description": "Go type: int",
+        "schema": {
+          "type": "string",
+          "x-go-type": "int"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [],
+          "result": {
+            "name": "result",
+            "value": "0x1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "net_version",
+      "summary": "net_version JSON-RPC method",
+      "description": "Version returns the current ethereum protocol version.",
+      "tags": [
+        {
+          "name": "net"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [],
+      "result": {
+        "name": "result",
+        "description": "Go type: string",
+        "schema": {
+          "type": "string",
+          "x-go-type": "string"
+        }
+      },
+      "examples": [
+        {
+          "name": "network-id",
+          "summary": "Returns network ID as decimal string.",
+          "params": [],
+          "result": {
+            "name": "result",
+            "value": "76874281"
+          }
+        }
+      ]
+    },
+    {
+      "name": "personal_ecRecover",
+      "summary": "personal_ecRecover JSON-RPC method",
+      "description": "EcRecover returns the address for the account that was used to create the signature. Note, this function is compatible with eth_sign and personal_sign. As such it recovers the address of: hash = keccak256(\"\\x19Ethereum Signed Message:\\n\"${message length}${message}) addr = ecrecover(hash, signature) Note, the signature must conform to the secp256k1 curve R, S and V values, where the V value must be 27 or 28 for legacy reasons. https://github.com/ethereum/go-ethereum/wiki/Management-APIs#personal_ecRecove",
+      "tags": [
+        {
+          "name": "personal"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "data",
+          "description": "Parameter `data`. Go type: hexutil.Bytes",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array",
+            "x-go-type": "hexutil.Bytes"
+          }
+        },
+        {
+          "name": "sig",
+          "description": "Parameter `sig`. Go type: hexutil.Bytes",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array",
+            "x-go-type": "hexutil.Bytes"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: common.Address",
+        "schema": {
+          "items": {},
+          "type": "array",
+          "x-go-type": "common.Address"
+        }
+      },
+      "examples": [
+        {
+          "name": "recover-address",
+          "summary": "Recovers signer from personal_sign-style payload/signature.",
+          "params": [
+            {
+              "name": "data",
+              "value": "0x48656c6c6f2c204c756d657261"
+            },
+            {
+              "name": "sig",
+              "value": "0x2c640f4fba7b6d6f665ba4a2f8dc1d56c3dc0f8ad1a47d9fd2d8f6b5c7b2f7f40d8f8b6e7450cd9ec68f2f2bb0f8bc7afbe73f48603f2f53f23d4c2fd0cf0a7f1b"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": "0x1111111111111111111111111111111111111111"
+          }
+        }
+      ]
+    },
+    {
+      "name": "personal_importRawKey",
+      "summary": "personal_importRawKey JSON-RPC method",
+      "description": "ImportRawKey armors and encrypts a given raw hex encoded ECDSA key and stores it into the key directory. The name of the key will have the format \"personal_\u003clength-keys\u003e\", where \u003clength-keys\u003e is the total number of keys stored on the keyring. NOTE: The key will be both armored and encrypted using the same passphrase.",
+      "tags": [
+        {
+          "name": "personal"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "privkey",
+          "description": "Parameter `privkey`. Go type: string",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "string"
+          }
+        },
+        {
+          "name": "password",
+          "description": "Parameter `password`. Go type: string",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: common.Address",
+        "schema": {
+          "items": {},
+          "type": "array",
+          "x-go-type": "common.Address"
+        }
+      },
+      "examples": [
+        {
+          "name": "import-private-key",
+          "summary": "Imports a raw secp256k1 private key into local keyring.",
+          "params": [
+            {
+              "name": "privkey",
+              "value": "4c0883a69102937d6231471b5dbb6204fe5129617082795f6f9d9f1996f9f4b2"
+            },
+            {
+              "name": "password",
+              "value": "strong-password"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": "0x90f8bf6a479f320ead074411a4b0e7944ea8c9c1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "personal_initializeWallet",
+      "summary": "personal_initializeWallet JSON-RPC method",
+      "description": "InitializeWallet initializes a new wallet at the provided URL, by generating and returning a new private key.",
+      "tags": [
+        {
+          "name": "personal"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "url",
+          "description": "Parameter `url`. Go type: string",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: string",
+        "schema": {
+          "type": "string",
+          "x-go-type": "string"
+        }
+      },
+      "examples": [
+        {
+          "name": "initialize-smartcard-wallet",
+          "summary": "Smartcard wallets are currently unsupported; call returns an error.",
+          "params": [
+            {
+              "name": "url",
+              "value": "usb://ledger"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "personal_listAccounts",
+      "summary": "personal_listAccounts JSON-RPC method",
+      "description": "ListAccounts will return a list of addresses for accounts this node manages.",
+      "tags": [
+        {
+          "name": "personal"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [],
+      "result": {
+        "name": "result",
+        "description": "Go type: []common.Address",
+        "schema": {
+          "items": {},
+          "type": "array",
+          "x-go-type": "[]common.Address"
+        }
+      },
+      "examples": [
+        {
+          "name": "list-local-accounts",
+          "summary": "Returns locally managed accounts in keyring.",
+          "params": [],
+          "result": {
+            "name": "result",
+            "value": [
+              "0x1111111111111111111111111111111111111111",
+              "0x2222222222222222222222222222222222222222"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "personal_listWallets",
+      "summary": "personal_listWallets JSON-RPC method",
+      "description": "ListWallets will return a list of wallets this node manages.",
+      "tags": [
+        {
+          "name": "personal"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [],
+      "result": {
+        "name": "result",
+        "description": "Go type: []personal.RawWallet",
+        "schema": {
+          "items": {},
+          "type": "array",
+          "x-go-type": "[]personal.RawWallet"
+        }
+      },
+      "examples": [
+        {
+          "name": "list-wallets",
+          "summary": "Wallet-level management is not supported; returns null/empty.",
+          "params": [],
+          "result": {
+            "name": "result",
+            "value": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "personal_lockAccount",
+      "summary": "personal_lockAccount JSON-RPC method",
+      "description": "LockAccount will lock the account associated with the given address when it's unlocked. It removes the key corresponding to the given address from the API's local keys.",
+      "tags": [
+        {
+          "name": "personal"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "address",
+          "description": "Parameter `address`. Go type: common.Address",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array",
+            "x-go-type": "common.Address"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: bool",
+        "schema": {
+          "type": "boolean",
+          "x-go-type": "bool"
+        }
+      },
+      "examples": [
+        {
+          "name": "lock-account",
+          "summary": "Lock/unlock via keyring backend is not supported; returns false.",
+          "params": [
+            {
+              "name": "address",
+              "value": "0x1111111111111111111111111111111111111111"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "personal_newAccount",
+      "summary": "personal_newAccount JSON-RPC method",
+      "description": "NewAccount will create a new account and returns the address for the new account.",
+      "tags": [
+        {
+          "name": "personal"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "password",
+          "description": "Parameter `password`. Go type: string",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: common.Address",
+        "schema": {
+          "items": {},
+          "type": "array",
+          "x-go-type": "common.Address"
+        }
+      },
+      "examples": [
+        {
+          "name": "create-account",
+          "summary": "Creates a new eth_secp256k1 account from mnemonic path iterator.",
+          "params": [
+            {
+              "name": "password",
+              "value": "strong-password"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": "0x3333333333333333333333333333333333333333"
+          }
+        }
+      ]
+    },
+    {
+      "name": "personal_sendTransaction",
+      "summary": "personal_sendTransaction JSON-RPC method",
+      "description": "SendTransaction will create a transaction from the given arguments and tries to sign it with the key associated with args.To. If the given password isn't able to decrypt the key it fails.",
+      "tags": [
+        {
+          "name": "personal"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "args",
+          "description": "Parameter `args`. Go type: types.TransactionArgs",
+          "required": true,
+          "schema": {
+            "type": "object",
+            "x-go-type": "types.TransactionArgs"
+          }
+        },
+        {
+          "name": "password",
+          "description": "Parameter `password`. Go type: string",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: common.Hash",
+        "schema": {
+          "items": {},
+          "type": "array",
+          "x-go-type": "common.Hash"
+        }
+      },
+      "examples": [
+        {
+          "name": "send-transaction",
+          "summary": "Signs and broadcasts a transaction using personal namespace.",
+          "params": [
+            {
+              "name": "args",
+              "value": {
+                "from": "0x1111111111111111111111111111111111111111",
+                "gas": "0x5208",
+                "to": "0x2222222222222222222222222222222222222222",
+                "value": "0x1"
+              }
+            },
+            {
+              "name": "password",
+              "value": "strong-password"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        }
+      ]
+    },
+    {
+      "name": "personal_sign",
+      "summary": "personal_sign JSON-RPC method",
+      "description": "Sign calculates an Ethereum ECDSA signature for: keccak256(\"\\x19Ethereum Signed Message:\\n\" + len(message) + message)) Note, the produced signature conforms to the secp256k1 curve R, S and V values, where the V value will be 27 or 28 for legacy reasons. The key used to calculate the signature is decrypted with the given password. https://github.com/ethereum/go-ethereum/wiki/Management-APIs#personal_sign",
+      "tags": [
+        {
+          "name": "personal"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "data",
+          "description": "Parameter `data`. Go type: hexutil.Bytes",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array",
+            "x-go-type": "hexutil.Bytes"
+          }
+        },
+        {
+          "name": "addr",
+          "description": "Parameter `addr`. Go type: common.Address",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array",
+            "x-go-type": "common.Address"
+          }
+        },
+        {
+          "name": "password",
+          "description": "Parameter `password`. Go type: string",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: hexutil.Bytes",
+        "schema": {
+          "items": {},
+          "type": "array",
+          "x-go-type": "hexutil.Bytes"
+        }
+      },
+      "examples": [
+        {
+          "name": "sign-message",
+          "summary": "Signs arbitrary bytes with Ethereum message prefixing.",
+          "params": [
+            {
+              "name": "data",
+              "value": "0x48656c6c6f2c204c756d657261"
+            },
+            {
+              "name": "addr",
+              "value": "0x1111111111111111111111111111111111111111"
+            },
+            {
+              "name": "password",
+              "value": "strong-password"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": "0x2c640f4fba7b6d6f665ba4a2f8dc1d56c3dc0f8ad1a47d9fd2d8f6b5c7b2f7f40d8f8b6e7450cd9ec68f2f2bb0f8bc7afbe73f48603f2f53f23d4c2fd0cf0a7f1b"
+          }
+        }
+      ]
+    },
+    {
+      "name": "personal_unlockAccount",
+      "summary": "personal_unlockAccount JSON-RPC method",
+      "description": "UnlockAccount will unlock the account associated with the given address with the given password for duration seconds. If duration is nil it will use a default of 300 seconds. It returns an indication if the account was unlocked.",
+      "tags": [
+        {
+          "name": "personal"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "addr",
+          "description": "Parameter `addr`. Go type: common.Address",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array",
+            "x-go-type": "common.Address"
+          }
+        },
+        {
+          "name": "password",
+          "description": "Parameter `password`. Go type: string",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "string"
+          }
+        },
+        {
+          "name": "duration",
+          "description": "Parameter `duration`. Go type: *uint64",
+          "schema": {
+            "nullable": true,
+            "type": "string",
+            "x-go-type": "uint64"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: bool",
+        "schema": {
+          "type": "boolean",
+          "x-go-type": "bool"
+        }
+      },
+      "examples": [
+        {
+          "name": "unlock-account",
+          "summary": "Lock/unlock via keyring backend is not supported; returns false.",
+          "params": [
+            {
+              "name": "addr",
+              "value": "0x1111111111111111111111111111111111111111"
+            },
+            {
+              "name": "password",
+              "value": "strong-password"
+            },
+            {
+              "name": "duration",
+              "value": 300
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "personal_unpair",
+      "summary": "personal_unpair JSON-RPC method",
+      "description": "Unpair deletes a pairing between wallet and Cosmos EVM.",
+      "tags": [
+        {
+          "name": "personal"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "url",
+          "description": "Parameter `url`. Go type: string",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "string"
+          }
+        },
+        {
+          "name": "pin",
+          "description": "Parameter `pin`. Go type: string",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "No return value",
+        "schema": {
+          "type": "null"
+        }
+      },
+      "examples": [
+        {
+          "name": "unpair-smartcard-wallet",
+          "summary": "Smartcard wallets are currently unsupported; call returns an error.",
+          "params": [
+            {
+              "name": "url",
+              "value": "usb://ledger"
+            },
+            {
+              "name": "pin",
+              "value": "123456"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "rpc_discover",
+      "summary": "rpc_discover JSON-RPC method",
+      "tags": [
+        {
+          "name": "rpc"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [],
+      "result": {
+        "name": "result",
+        "description": "Go type: json.RawMessage",
+        "schema": {
+          "items": {},
+          "type": "array",
+          "x-go-type": "json.RawMessage"
+        }
+      },
+      "examples": [
+        {
+          "name": "openrpc-discovery",
+          "summary": "Returns the embedded OpenRPC document served by the running node.",
+          "params": [],
+          "result": {
+            "name": "result",
+            "value": {
+              "info": {
+                "title": "Lumera Cosmos EVM JSON-RPC API",
+                "version": "cosmos/evm v0.5.1"
+              },
+              "methods": [],
+              "openrpc": "1.2.6"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "txpool_content",
+      "summary": "txpool_content JSON-RPC method",
+      "description": "Content returns the transactions contained within the transaction pool",
+      "tags": [
+        {
+          "name": "txpool"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [],
+      "result": {
+        "name": "result",
+        "description": "Go type: map[string]map[string]map[string]*types.RPCTransaction",
+        "schema": {
+          "type": "object",
+          "x-go-type": "map[string]map[string]map[string]*types.RPCTransaction"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [],
+          "result": {
+            "name": "result",
+            "value": {}
+          }
+        }
+      ]
+    },
+    {
+      "name": "txpool_contentFrom",
+      "summary": "txpool_contentFrom JSON-RPC method",
+      "description": "ContentFrom returns the transactions contained within the transaction pool",
+      "tags": [
+        {
+          "name": "txpool"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "address",
+          "description": "Parameter `address`. Go type: common.Address",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array",
+            "x-go-type": "common.Address"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: map[string]map[string]*types.RPCTransaction",
+        "schema": {
+          "type": "object",
+          "x-go-type": "map[string]map[string]*types.RPCTransaction"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [
+            {
+              "name": "address",
+              "value": "0x1111111111111111111111111111111111111111"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": {}
+          }
+        }
+      ]
+    },
+    {
+      "name": "txpool_inspect",
+      "summary": "txpool_inspect JSON-RPC method",
+      "description": "Inspect returns the content of the transaction pool and flattens it into an easily inspectable list",
+      "tags": [
+        {
+          "name": "txpool"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [],
+      "result": {
+        "name": "result",
+        "description": "Go type: map[string]map[string]map[string]string",
+        "schema": {
+          "type": "object",
+          "x-go-type": "map[string]map[string]map[string]string"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [],
+          "result": {
+            "name": "result",
+            "value": {}
+          }
+        }
+      ]
+    },
+    {
+      "name": "txpool_status",
+      "summary": "txpool_status JSON-RPC method",
+      "description": "Status returns the number of pending and queued transaction in the pool",
+      "tags": [
+        {
+          "name": "txpool"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [],
+      "result": {
+        "name": "result",
+        "description": "Go type: map[string]hexutil.Uint",
+        "schema": {
+          "type": "object",
+          "x-go-type": "map[string]hexutil.Uint"
+        }
+      },
+      "examples": [
+        {
+          "name": "txpool-counters",
+          "summary": "Returns pending and queued tx counters from mempool.",
+          "params": [],
+          "result": {
+            "name": "result",
+            "value": {
+              "pending": "0x1",
+              "queued": "0x0"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "web3_clientVersion",
+      "summary": "web3_clientVersion JSON-RPC method",
+      "description": "ClientVersion returns the client version in the Web3 user agent format.",
+      "tags": [
+        {
+          "name": "web3"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [],
+      "result": {
+        "name": "result",
+        "description": "Go type: string",
+        "schema": {
+          "type": "string",
+          "x-go-type": "string"
+        }
+      },
+      "examples": [
+        {
+          "name": "client-version",
+          "summary": "Returns Cosmos EVM client version string.",
+          "params": [],
+          "result": {
+            "name": "result",
+            "value": "lumera/v1.12.0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "web3_sha3",
+      "summary": "web3_sha3 JSON-RPC method",
+      "description": "Sha3 returns the keccak-256 hash of the passed-in input.",
+      "tags": [
+        {
+          "name": "web3"
+        }
+      ],
+      "paramStructure": "by-position",
+      "params": [
+        {
+          "name": "input",
+          "description": "Parameter `input`. Go type: string",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "x-go-type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "description": "Go type: hexutil.Bytes",
+        "schema": {
+          "items": {},
+          "type": "array",
+          "x-go-type": "hexutil.Bytes"
+        }
+      },
+      "examples": [
+        {
+          "name": "auto-generated",
+          "summary": "Type-aware example generated from Go method signature.",
+          "params": [
+            {
+              "name": "input",
+              "value": "0x1"
+            }
+          ],
+          "result": {
+            "name": "result",
+            "value": "0x"
+          }
+        }
+      ]
+    }
+  ],
+  "externalDocs": {
+    "description": "Cosmos EVM Ethereum JSON-RPC reference",
+    "url": "https://cosmos-docs.mintlify.app/docs/api-reference/ethereum-json-rpc"
+  }
+}

@@ -14,7 +14,7 @@ import (
 	lcfg "github.com/LumeraProtocol/lumera/config"
 	evmtest "github.com/LumeraProtocol/lumera/tests/integration/evmtest"
 	testaccounts "github.com/LumeraProtocol/lumera/testutil/accounts"
-	testtext "github.com/LumeraProtocol/lumera/testutil/text"
+	testtext "github.com/LumeraProtocol/lumera/pkg/text"
 	precisebanktypes "github.com/cosmos/evm/x/precisebank/types"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )
@@ -29,7 +29,7 @@ import (
 //     b) bank integer balance + precisebank fractional split recomposition.
 func testPreciseBankFractionalBalanceQueryMatrix(t *testing.T, node *evmtest.Node) {
 	t.Helper()
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), 1, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
 
 	untouchedAddr := mustAddKeyAddress(t, node, "precisebank-untouched")
 	untouchedFractional := mustQueryPrecisebankFractionalBalance(t, node, untouchedAddr)
@@ -37,8 +37,8 @@ func testPreciseBankFractionalBalanceQueryMatrix(t *testing.T, node *evmtest.Nod
 		t.Fatalf("untouched key fractional balance should be zero, got %s", untouchedFractional.String())
 	}
 
-	txHash := evmtest.SendOneLegacyTx(t, node.RPCURL(), node.KeyInfo())
-	receipt := evmtest.WaitForReceipt(t, node.RPCURL(), txHash, node.WaitCh(), node.OutputBuffer(), 40*time.Second)
+	txHash := node.SendOneLegacyTx(t)
+	receipt := node.WaitForReceipt(t, txHash, 40*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, receipt, txHash)
 
 	senderBech32 := node.KeyInfo().Address
@@ -46,7 +46,7 @@ func testPreciseBankFractionalBalanceQueryMatrix(t *testing.T, node *evmtest.Nod
 
 	senderInteger := mustQueryBankBalanceDenom(t, node, senderBech32, lcfg.ChainDenom)
 	senderFractional := mustQueryPrecisebankFractionalBalance(t, node, senderBech32)
-	senderExtended := mustGetEthBalance(t, node.RPCURL(), senderHex)
+	senderExtended := mustGetEthBalance(t, node, senderHex)
 
 	cf := conversionFactorBigInt()
 	if senderFractional.Sign() < 0 || senderFractional.Cmp(cf) >= 0 {
@@ -90,11 +90,11 @@ func TestPreciseBankRemainderQueryPersistsAcrossRestart(t *testing.T) {
 
 func testPreciseBankRemainderQueryPersistsAcrossRestart(t *testing.T, node *evmtest.Node) {
 	t.Helper()
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), 1, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
 
 	// Produce at least one EVM fee event before reading remainder.
-	txHash := evmtest.SendOneLegacyTx(t, node.RPCURL(), node.KeyInfo())
-	receipt := evmtest.WaitForReceipt(t, node.RPCURL(), txHash, node.WaitCh(), node.OutputBuffer(), 40*time.Second)
+	txHash := node.SendOneLegacyTx(t)
+	receipt := node.WaitForReceipt(t, txHash, 40*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, receipt, txHash)
 
 	before := mustQueryPrecisebankRemainder(t, node)
@@ -125,7 +125,7 @@ func TestPreciseBankModuleAccountFractionalBalanceIsZero(t *testing.T) {
 
 func testPreciseBankModuleAccountFractionalBalanceIsZero(t *testing.T, node *evmtest.Node) {
 	t.Helper()
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), 1, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
 
 	moduleAddr := mustQueryModuleAccountAddress(t, node, precisebanktypes.ModuleName)
 	before := mustQueryPrecisebankFractionalBalance(t, node, moduleAddr)
@@ -134,8 +134,8 @@ func testPreciseBankModuleAccountFractionalBalanceIsZero(t *testing.T, node *evm
 	}
 
 	// Execute EVM activity, then re-check module fractional visibility.
-	txHash := evmtest.SendOneLegacyTx(t, node.RPCURL(), node.KeyInfo())
-	receipt := evmtest.WaitForReceipt(t, node.RPCURL(), txHash, node.WaitCh(), node.OutputBuffer(), 40*time.Second)
+	txHash := node.SendOneLegacyTx(t)
+	receipt := node.WaitForReceipt(t, txHash, 40*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, receipt, txHash)
 
 	after := mustQueryPrecisebankFractionalBalance(t, node, moduleAddr)
@@ -154,7 +154,7 @@ func testPreciseBankModuleAccountFractionalBalanceIsZero(t *testing.T, node *evm
 // handling for malformed bech32 addresses.
 func testPreciseBankFractionalBalanceRejectsInvalidAddress(t *testing.T, node *evmtest.Node) {
 	t.Helper()
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), 1, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
@@ -343,11 +343,11 @@ func mustQueryModuleAccountAddress(t *testing.T, node *evmtest.Node, moduleName 
 }
 
 // mustGetEthBalance reads `eth_getBalance` at latest block.
-func mustGetEthBalance(t *testing.T, rpcURL, addressHex string) *big.Int {
+func mustGetEthBalance(t *testing.T, node *evmtest.Node, addressHex string) *big.Int {
 	t.Helper()
 
 	var balanceHex string
-	evmtest.MustJSONRPC(t, rpcURL, "eth_getBalance", []any{addressHex, "latest"}, &balanceHex)
+	node.MustJSONRPC(t, "eth_getBalance", []any{addressHex, "latest"}, &balanceHex)
 
 	balance, err := hexutil.DecodeBig(balanceHex)
 	if err != nil {

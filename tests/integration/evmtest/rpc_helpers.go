@@ -227,6 +227,8 @@ func startProcess(t *testing.T, ctx context.Context, workDir, bin string, args .
 
 	cmd := exec.CommandContext(ctx, bin, args...)
 	cmd.Dir = workDir
+	// Prevent depinject from blocking on D-Bus keyring in WSL2/headless.
+	cmd.Env = append(os.Environ(), "LUMERA_KEYRING_BACKEND=test")
 
 	var output bytes.Buffer
 	cmd.Stdout = &output
@@ -507,6 +509,8 @@ func mustRun(t *testing.T, workDir string, timeout time.Duration, bin string, ar
 func run(ctx context.Context, workDir, bin string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, bin, args...)
 	cmd.Dir = workDir
+	// Prevent depinject from blocking on D-Bus keyring in WSL2/headless.
+	cmd.Env = append(os.Environ(), "LUMERA_KEYRING_BACKEND=test")
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

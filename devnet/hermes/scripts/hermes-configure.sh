@@ -101,9 +101,25 @@ ran_capture() {
 version_ge() {
 	local current="$1"
 	local floor="$2"
+
+	current="$(normalize_version "${current}")"
+	floor="$(normalize_version "${floor}")"
+
 	[ -n "${current}" ] || return 1
 	[ -n "${floor}" ] || return 0
 	printf '%s\n' "${floor}" "${current}" | sort -V | head -n1 | grep -q "^${floor}$"
+}
+
+normalize_version() {
+	local raw="$1"
+	local v
+	v="$(printf '%s' "${raw}" | tr -d '[:space:]')"
+	[ -n "${v}" ] || return 0
+	case "${v}" in
+	v*) printf '%s' "${v}" ;;
+	V*) printf 'v%s' "${v#V}" ;;
+	*) printf 'v%s' "${v}" ;;
+	esac
 }
 
 if [ -z "${LUMERA_KEY_STYLE}" ]; then
@@ -116,7 +132,7 @@ fi
 
 LUMERA_ADDRESS_TYPE="address_type = { derivation = 'cosmos' }"
 if [ "${LUMERA_KEY_STYLE}" = "evm" ]; then
-	LUMERA_ADDRESS_TYPE="address_type = { derivation = 'ethermint', proto_type = { pk_type = '/ethermint.crypto.v1.ethsecp256k1.PubKey' } }"
+	LUMERA_ADDRESS_TYPE="address_type = { derivation = 'ethermint', proto_type = { pk_type = '/cosmos.evm.crypto.v1.ethsecp256k1.PubKey' } }"
 fi
 
 CONFIG_DIR="$(dirname "${HERMES_CONFIG_PATH}")"
@@ -216,6 +232,7 @@ store_prefix = 'ibc'
 memo_prefix = ''
 gas_price = { price = 0.025, denom = '${LUMERA_BOND_DENOM}' }
 max_gas = ${HERMES_MAX_GAS}
+sequential_batch_tx = true
 clock_drift = '5s'
 trusting_period = '14days'
 trust_threshold = '1/3'
@@ -237,6 +254,7 @@ store_prefix = 'ibc'
 memo_prefix = ''
 gas_price = { price = 0.025, denom = '${SIMD_DENOM}' }
 max_gas = ${HERMES_MAX_GAS}
+sequential_batch_tx = true
 clock_drift = '5s'
 trusting_period = '14days'
 trust_threshold = '1/3'

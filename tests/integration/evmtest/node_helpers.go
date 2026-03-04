@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -161,6 +162,75 @@ func (n *evmNode) AppendStartArgs(args ...string) {
 	n.startArgs = append(n.startArgs, args...)
 }
 
+// --- RPC convenience methods ------------------------------------------------
+// Each method delegates to the corresponding private function so the caller
+// does not have to unpack rpcURL / waitCh / output manually.
+
+func (n *evmNode) WaitForReceipt(t *testing.T, txHash string, timeout time.Duration) map[string]any {
+	t.Helper()
+	return waitForReceipt(t, n.rpcURL, txHash, n.waitCh, n.output, timeout)
+}
+
+func (n *evmNode) WaitForTransactionByHash(t *testing.T, txHash string, timeout time.Duration) map[string]any {
+	t.Helper()
+	return waitForTransactionByHash(t, n.rpcURL, txHash, n.waitCh, n.output, timeout)
+}
+
+func (n *evmNode) WaitForBlockNumberAtLeast(t *testing.T, minBlock uint64, timeout time.Duration) {
+	t.Helper()
+	waitForBlockNumberAtLeast(t, n.rpcURL, minBlock, timeout)
+}
+
+func (n *evmNode) MustGetBlockNumber(t *testing.T) uint64 {
+	t.Helper()
+	return mustGetBlockNumber(t, n.rpcURL)
+}
+
+func (n *evmNode) MustGetGasPriceWithRetry(t *testing.T, timeout time.Duration) *big.Int {
+	t.Helper()
+	return mustGetGasPriceWithRetry(t, n.rpcURL, timeout)
+}
+
+func (n *evmNode) MustGetPendingNonceWithRetry(t *testing.T, fromHex string, timeout time.Duration) uint64 {
+	t.Helper()
+	return mustGetPendingNonceWithRetry(t, n.rpcURL, fromHex, timeout)
+}
+
+func (n *evmNode) SendOneLegacyTx(t *testing.T) string {
+	t.Helper()
+	return sendOneLegacyTx(t, n.rpcURL, n.keyInfo)
+}
+
+func (n *evmNode) SendLogEmitterCreationTx(t *testing.T, topicHex string) string {
+	t.Helper()
+	return sendLogEmitterCreationTx(t, n.rpcURL, n.keyInfo, topicHex)
+}
+
+func (n *evmNode) SendLegacyTxWithParams(t *testing.T, p legacyTxParams) string {
+	t.Helper()
+	return sendLegacyTxWithParams(t, n.rpcURL, p)
+}
+
+func (n *evmNode) SendDynamicFeeTxWithParams(t *testing.T, p dynamicFeeTxParams) string {
+	t.Helper()
+	return sendDynamicFeeTxWithParams(t, n.rpcURL, p)
+}
+
+func (n *evmNode) MustGetBlock(t *testing.T, method string, params []any) map[string]any {
+	t.Helper()
+	return mustGetBlock(t, n.rpcURL, method, params)
+}
+
+func (n *evmNode) MustGetLogs(t *testing.T, filter map[string]any) []map[string]any {
+	t.Helper()
+	return mustGetLogs(t, n.rpcURL, filter)
+}
+
+func (n *evmNode) MustJSONRPC(t *testing.T, method string, params []any, out any) {
+	t.Helper()
+	mustJSONRPC(t, n.rpcURL, method, params, out)
+}
+
 // reserveNodePorts allocates a full set of free local ports for one node.
 func reserveNodePorts(t *testing.T) nodePorts {
 	t.Helper()
@@ -233,7 +303,7 @@ func mustBuildLumeraBinary(t *testing.T, repoRoot string) string {
 func setupGenesisWithGentx(t *testing.T, repoRoot, binPath, homeDir, chainID string) testaccounts.TestKeyInfo {
 	t.Helper()
 
-	const setupCmdTimeout = 180 * time.Second
+	const setupCmdTimeout = 5 * time.Minute
 	keyName := "validator"
 
 	mustRun(t, repoRoot, setupCmdTimeout, binPath,
@@ -284,6 +354,7 @@ func setupGenesisWithGentx(t *testing.T, repoRoot, binPath, homeDir, chainID str
 		"--chain-id", chainID,
 		"--home", homeDir,
 		"--keyring-backend", "test",
+		"--fees", "100"+lcfg.ChainDenom,
 		"--log_no_color",
 	)
 

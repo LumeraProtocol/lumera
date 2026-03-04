@@ -191,18 +191,6 @@ func decodeCLIJSON(out string, v any) error {
 	return nil
 }
 
-// lastNonEmptyLine returns the last non-empty trimmed output line.
-func lastNonEmptyLine(s string) string {
-	lines := strings.Split(strings.TrimSpace(s), "\n")
-	for i := len(lines) - 1; i >= 0; i-- {
-		line := strings.TrimSpace(lines[i])
-		if line != "" {
-			return line
-		}
-	}
-	return ""
-}
-
 // mustDecodeCodeBytes parses code payload from query output.
 //
 // Depending on output codec, bytes can be rendered as base64 or 0x-hex.
@@ -236,11 +224,11 @@ func mustDecodeCodeBytes(t *testing.T, value string) []byte {
 	return nil
 }
 
-func mustGetEthBalance(t *testing.T, rpcURL, addressHex string) *big.Int {
+func mustGetEthBalance(t *testing.T, node *evmtest.Node, addressHex string) *big.Int {
 	t.Helper()
 
 	var balanceHex string
-	evmtest.MustJSONRPC(t, rpcURL, "eth_getBalance", []any{addressHex, "latest"}, &balanceHex)
+	node.MustJSONRPC(t, "eth_getBalance", []any{addressHex, "latest"}, &balanceHex)
 
 	bal, err := hexutil.DecodeBig(balanceHex)
 	if err != nil {
@@ -249,11 +237,11 @@ func mustGetEthBalance(t *testing.T, rpcURL, addressHex string) *big.Int {
 	return bal
 }
 
-func mustGetEthTxCount(t *testing.T, rpcURL, addressHex string) uint64 {
+func mustGetEthTxCount(t *testing.T, node *evmtest.Node, addressHex string) uint64 {
 	t.Helper()
 
 	var nonceHex string
-	evmtest.MustJSONRPC(t, rpcURL, "eth_getTransactionCount", []any{addressHex, "latest"}, &nonceHex)
+	node.MustJSONRPC(t, "eth_getTransactionCount", []any{addressHex, "latest"}, &nonceHex)
 
 	nonce, err := hexutil.DecodeUint64(nonceHex)
 	if err != nil {
@@ -267,10 +255,10 @@ func sendContractCreationTx(t *testing.T, node *evmtest.Node, creationCode []byt
 
 	fromAddr := testaccounts.MustAccountAddressFromTestKeyInfo(t, node.KeyInfo())
 	privateKey := evmtest.MustDerivePrivateKey(t, node.KeyInfo().Mnemonic)
-	nonce := evmtest.MustGetPendingNonceWithRetry(t, node.RPCURL(), fromAddr.Hex(), 20*time.Second)
-	gasPrice := evmtest.MustGetGasPriceWithRetry(t, node.RPCURL(), 20*time.Second)
+	nonce := node.MustGetPendingNonceWithRetry(t, fromAddr.Hex(), 20*time.Second)
+	gasPrice := node.MustGetGasPriceWithRetry(t, 20*time.Second)
 
-	return evmtest.SendLegacyTxWithParams(t, node.RPCURL(), evmtest.LegacyTxParams{
+	return node.SendLegacyTxWithParams(t, evmtest.LegacyTxParams{
 		PrivateKey: privateKey,
 		Nonce:      nonce,
 		To:         nil,
@@ -286,8 +274,8 @@ func sendContractMethodTx(t *testing.T, node *evmtest.Node, contractHex string, 
 
 	fromAddr := testaccounts.MustAccountAddressFromTestKeyInfo(t, node.KeyInfo())
 	privateKey := evmtest.MustDerivePrivateKey(t, node.KeyInfo().Mnemonic)
-	nonce := evmtest.MustGetPendingNonceWithRetry(t, node.RPCURL(), fromAddr.Hex(), 20*time.Second)
-	gasPrice := evmtest.MustGetGasPriceWithRetry(t, node.RPCURL(), 20*time.Second)
+	nonce := node.MustGetPendingNonceWithRetry(t, fromAddr.Hex(), 20*time.Second)
+	gasPrice := node.MustGetGasPriceWithRetry(t, 20*time.Second)
 
 	inputBz, err := hexutil.Decode(inputHex)
 	if err != nil {
@@ -295,7 +283,7 @@ func sendContractMethodTx(t *testing.T, node *evmtest.Node, contractHex string, 
 	}
 
 	to := common.HexToAddress(contractHex)
-	return evmtest.SendLegacyTxWithParams(t, node.RPCURL(), evmtest.LegacyTxParams{
+	return node.SendLegacyTxWithParams(t, evmtest.LegacyTxParams{
 		PrivateKey: privateKey,
 		Nonce:      nonce,
 		To:         &to,

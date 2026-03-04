@@ -21,10 +21,14 @@ func LumeraEVMGenesisState() *evmtypes.GenesisState {
 }
 
 // LumeraFeemarketGenesisState returns the feemarket genesis state customized for Lumera.
-// EIP-1559 dynamic base fee is enabled with a chain-specific default base fee.
+// EIP-1559 dynamic base fee is enabled with a chain-specific default base fee,
+// a minimum gas price floor to prevent decay to zero, and a gentler change
+// denominator for smoother adjustments.
 func LumeraFeemarketGenesisState() *feemarkettypes.GenesisState {
 	genesis := feemarkettypes.DefaultGenesisState()
 	genesis.Params.NoBaseFee = false
 	genesis.Params.BaseFee = math.LegacyMustNewDecFromStr(lcfg.FeeMarketDefaultBaseFee)
+	genesis.Params.MinGasPrice = math.LegacyMustNewDecFromStr(lcfg.FeeMarketMinGasPrice)
+	genesis.Params.BaseFeeChangeDenominator = lcfg.FeeMarketBaseFeeChangeDenominator
 	return genesis
 }

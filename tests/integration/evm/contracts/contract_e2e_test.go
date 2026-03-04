@@ -30,8 +30,8 @@ func testContractDeployCallAndLogsE2E(t *testing.T, node *evmtest.Node) {
 	logTopic := "0x" + strings.Repeat("22", 32)
 
 	// 1) Deploy contract through eth_sendRawTransaction and verify deployment receipt.
-	deployTxHash := sendLoggingConstantContractCreationTx(t, node.RPCURL(), node.KeyInfo(), logTopic)
-	deployReceipt := evmtest.WaitForReceipt(t, node.RPCURL(), deployTxHash, node.WaitCh(), node.OutputBuffer(), 45*time.Second)
+	deployTxHash := sendLoggingConstantContractCreationTx(t, node, logTopic)
+	deployReceipt := node.WaitForReceipt(t, deployTxHash, 45*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, deployReceipt, deployTxHash)
 	assertReceiptBasics(t, deployReceipt)
 
@@ -42,7 +42,7 @@ func testContractDeployCallAndLogsE2E(t *testing.T, node *evmtest.Node) {
 
 	// 2) Read-only method call via eth_call should return uint256(42).
 	var callResultHex string
-	evmtest.MustJSONRPC(t, node.RPCURL(), "eth_call", []any{
+	node.MustJSONRPC(t, "eth_call", []any{
 		map[string]any{
 			"to":   contractAddress,
 			"data": methodSelectorHex("getValue()"),
@@ -52,8 +52,8 @@ func testContractDeployCallAndLogsE2E(t *testing.T, node *evmtest.Node) {
 	assertEthCallReturnsUint256(t, callResultHex, 42)
 
 	// 3) Stateful method call via transaction should emit a log and produce receipt/gas fields.
-	callTxHash := sendContractMethodTx(t, node.RPCURL(), node.KeyInfo(), contractAddress, methodSelectorHex("emitEvent()"))
-	callReceipt := evmtest.WaitForReceipt(t, node.RPCURL(), callTxHash, node.WaitCh(), node.OutputBuffer(), 45*time.Second)
+	callTxHash := sendContractMethodTx(t, node, contractAddress, methodSelectorHex("emitEvent()"))
+	callReceipt := node.WaitForReceipt(t, callTxHash, 45*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, callReceipt, callTxHash)
 	assertReceiptBasics(t, callReceipt)
 	assertReceiptHasTopic(t, callReceipt, logTopic)
@@ -68,8 +68,8 @@ func testContractRevertTxReceiptAndGasE2E(t *testing.T, node *evmtest.Node) {
 	t.Helper()
 
 	// 1) Deploy a contract whose runtime always REVERTs.
-	deployTxHash := sendContractCreationTx(t, node.RPCURL(), node.KeyInfo(), alwaysRevertContractCreationCode())
-	deployReceipt := evmtest.WaitForReceipt(t, node.RPCURL(), deployTxHash, node.WaitCh(), node.OutputBuffer(), 45*time.Second)
+	deployTxHash := sendContractCreationTx(t, node, alwaysRevertContractCreationCode())
+	deployReceipt := node.WaitForReceipt(t, deployTxHash, 45*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, deployReceipt, deployTxHash)
 	assertReceiptBasics(t, deployReceipt)
 
@@ -79,27 +79,27 @@ func testContractRevertTxReceiptAndGasE2E(t *testing.T, node *evmtest.Node) {
 	}
 
 	// 2) Send a stateful call tx that should fail and verify failed receipt + gas accounting.
-	callTxHash := sendContractMethodTx(t, node.RPCURL(), node.KeyInfo(), contractAddress, methodSelectorHex("revertNow()"))
-	callReceipt := evmtest.WaitForReceipt(t, node.RPCURL(), callTxHash, node.WaitCh(), node.OutputBuffer(), 45*time.Second)
+	callTxHash := sendContractMethodTx(t, node, contractAddress, methodSelectorHex("revertNow()"))
+	callReceipt := node.WaitForReceipt(t, callTxHash, 45*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, callReceipt, callTxHash)
 	assertFailedReceiptBasics(t, callReceipt)
 }
 
 // sendLoggingConstantContractCreationTx deploys a contract that logs and returns 42.
-func sendLoggingConstantContractCreationTx(t *testing.T, rpcURL string, keyInfo testaccounts.TestKeyInfo, topicHex string) string {
+func sendLoggingConstantContractCreationTx(t *testing.T, node *evmtest.Node, topicHex string) string {
 	t.Helper()
-	return sendContractCreationTx(t, rpcURL, keyInfo, loggingConstantContractCreationCode(topicHex))
+	return sendContractCreationTx(t, node, loggingConstantContractCreationCode(topicHex))
 }
 
-func sendContractCreationTx(t *testing.T, rpcURL string, keyInfo testaccounts.TestKeyInfo, creationCode []byte) string {
+func sendContractCreationTx(t *testing.T, node *evmtest.Node, creationCode []byte) string {
 	t.Helper()
 
-	fromAddr := testaccounts.MustAccountAddressFromTestKeyInfo(t, keyInfo)
-	privateKey := evmtest.MustDerivePrivateKey(t, keyInfo.Mnemonic)
-	nonce := evmtest.MustGetPendingNonceWithRetry(t, rpcURL, fromAddr.Hex(), 20*time.Second)
-	gasPrice := evmtest.MustGetGasPriceWithRetry(t, rpcURL, 20*time.Second)
+	fromAddr := testaccounts.MustAccountAddressFromTestKeyInfo(t, node.KeyInfo())
+	privateKey := evmtest.MustDerivePrivateKey(t, node.KeyInfo().Mnemonic)
+	nonce := node.MustGetPendingNonceWithRetry(t, fromAddr.Hex(), 20*time.Second)
+	gasPrice := node.MustGetGasPriceWithRetry(t, 20*time.Second)
 
-	return evmtest.SendLegacyTxWithParams(t, rpcURL, evmtest.LegacyTxParams{
+	return node.SendLegacyTxWithParams(t, evmtest.LegacyTxParams{
 		PrivateKey: privateKey,
 		Nonce:      nonce,
 		To:         nil,
@@ -111,16 +111,16 @@ func sendContractCreationTx(t *testing.T, rpcURL string, keyInfo testaccounts.Te
 }
 
 // sendContractMethodTx sends a transaction that calls contract bytecode with provided calldata.
-func sendContractMethodTx(t *testing.T, rpcURL string, keyInfo testaccounts.TestKeyInfo, toAddressHex, calldataHex string) string {
+func sendContractMethodTx(t *testing.T, node *evmtest.Node, toAddressHex, calldataHex string) string {
 	t.Helper()
 
-	fromAddr := testaccounts.MustAccountAddressFromTestKeyInfo(t, keyInfo)
-	privateKey := evmtest.MustDerivePrivateKey(t, keyInfo.Mnemonic)
-	nonce := evmtest.MustGetPendingNonceWithRetry(t, rpcURL, fromAddr.Hex(), 20*time.Second)
-	gasPrice := evmtest.MustGetGasPriceWithRetry(t, rpcURL, 20*time.Second)
+	fromAddr := testaccounts.MustAccountAddressFromTestKeyInfo(t, node.KeyInfo())
+	privateKey := evmtest.MustDerivePrivateKey(t, node.KeyInfo().Mnemonic)
+	nonce := node.MustGetPendingNonceWithRetry(t, fromAddr.Hex(), 20*time.Second)
+	gasPrice := node.MustGetGasPriceWithRetry(t, 20*time.Second)
 	toAddr := mustHexAddress(t, toAddressHex)
 
-	return evmtest.SendLegacyTxWithParams(t, rpcURL, evmtest.LegacyTxParams{
+	return node.SendLegacyTxWithParams(t, evmtest.LegacyTxParams{
 		PrivateKey: privateKey,
 		Nonce:      nonce,
 		To:         &toAddr,

@@ -124,9 +124,23 @@ ran_capture() {
 version_ge() {
 	local current="$1"
 	local floor="$2"
+	current="$(normalize_version "${current}")"
+	floor="$(normalize_version "${floor}")"
 	[ -n "${current}" ] || return 1
 	[ -n "${floor}" ] || return 0
 	printf '%s\n' "${floor}" "${current}" | sort -V | head -n1 | grep -q "^${floor}$"
+}
+
+normalize_version() {
+	local raw="$1"
+	local v
+	v="$(printf '%s' "${raw}" | tr -d '[:space:]')"
+	[ -n "${v}" ] || return 0
+	case "${v}" in
+	v*) printf '%s' "${v}" ;;
+	V*) printf 'v%s' "${v#V}" ;;
+	*) printf 'v%s' "${v}" ;;
+	esac
 }
 
 SHARED_DIR="/shared"

@@ -15,7 +15,6 @@ import (
 	cmttime "github.com/cometbft/cometbft/types/time"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 
 	"cosmossdk.io/math"
 	"cosmossdk.io/math/unsafe"
@@ -153,8 +152,6 @@ Example:
 			serverCtx := server.GetServerContextFromCmd(cmd)
 			config := serverCtx.Config
 
-			viper.Set(claimtypes.FlagSkipClaimsCheck, true)
-
 			args := initArgs{}
 			args.outputDir, _ = cmd.Flags().GetString(flagOutputDir)
 			args.keyringBackend, _ = cmd.Flags().GetString(flags.FlagKeyringBackend)
@@ -250,7 +247,9 @@ func initTestnetFiles(
 	nodeConfig.StateSync.TrustHeight = 0
 	nodeConfig.StateSync.TrustHash = ""
 
-	appConfig := srvconfig.DefaultConfig()
+	customAppTemplate, customAppConfigIface := initAppConfig()
+	appCfgVal := customAppConfigIface.(CustomAppConfig)
+	appConfig := &appCfgVal
 	appConfig.MinGasPrices = args.minGasPrices
 	appConfig.API.Enable = true
 	appConfig.Telemetry.Enabled = true
@@ -265,9 +264,14 @@ func initTestnetFiles(
 		isSucceeded bool = false
 	)
 	const (
-		rpcPort  = 26657
-		apiPort  = 1317
-		grpcPort = 9090
+		rpcPort         = 26657
+		apiPort         = 1317
+		grpcPort        = 9090
+		pprofPort       = 6060
+		jsonRPCPort     = 8545
+		jsonRPCWsPort   = 8546
+		jsonRPCMetrics  = 6065
+		gethMetricsPort = 8100
 	)
 	p2pPortStart := 26656
 
@@ -291,10 +295,18 @@ func initTestnetFiles(
 		nodeConfig.SetRoot(nodeDir)
 		nodeConfig.Moniker = nodeDirName
 		nodeConfig.RPC.ListenAddress = "tcp://0.0.0.0:26657"
+		nodeConfig.RPC.PprofListenAddress = fmt.Sprintf("localhost:%d", pprofPort+portOffset)
 
 		appConfig.API.Address = fmt.Sprintf("tcp://0.0.0.0:%d", apiPort+portOffset)
 		appConfig.GRPC.Address = fmt.Sprintf("0.0.0.0:%d", grpcPort+portOffset)
 		appConfig.GRPCWeb.Enable = true
+		// EVM ports need a larger stride because JSON-RPC (8545) and WS (8546)
+		// are adjacent; a +1 offset would collide (node1 JSON-RPC = node0 WS).
+		evmPortOffset := portOffset * 100
+		appConfig.JSONRPC.Address = fmt.Sprintf("127.0.0.1:%d", jsonRPCPort+evmPortOffset)
+		appConfig.JSONRPC.WsAddress = fmt.Sprintf("127.0.0.1:%d", jsonRPCWsPort+evmPortOffset)
+		appConfig.JSONRPC.MetricsAddress = fmt.Sprintf("127.0.0.1:%d", jsonRPCMetrics+evmPortOffset)
+		appConfig.EVM.GethMetricsAddress = fmt.Sprintf("127.0.0.1:%d", gethMetricsPort+evmPortOffset)
 
 		// cleanup output directory if node initialization fails
 		defer func() {
@@ -430,7 +442,7 @@ func initTestnetFiles(
 			return err
 		}
 
-		srvconfig.SetConfigTemplate(srvconfig.DefaultConfigTemplate)
+		srvconfig.SetConfigTemplate(customAppTemplate)
 		srvconfig.WriteConfigFile(filepath.Join(nodeDir, "config", "app.toml"), appConfig)
 		cmd.Printf("Initialized node #%d with ID %s and public key %s\n", i+1, nodeIDs[i], valPubKeys[i].String())
 	}

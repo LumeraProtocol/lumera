@@ -17,11 +17,11 @@ import (
 
 // mustEthCallPrecompile executes an eth_call against a precompile address and
 // returns decoded output bytes.
-func mustEthCallPrecompile(t *testing.T, rpcURL, to string, input []byte) []byte {
+func mustEthCallPrecompile(t *testing.T, node *evmtest.Node, to string, input []byte) []byte {
 	t.Helper()
 
 	var resultHex string
-	evmtest.MustJSONRPC(t, rpcURL, "eth_call", []any{
+	node.MustJSONRPC(t, "eth_call", []any{
 		map[string]any{
 			"to":   to,
 			"data": hexutil.Encode(input),
@@ -45,21 +45,21 @@ func mustEthCallPrecompile(t *testing.T, rpcURL, to string, input []byte) []byte
 // precompile contract and returns its tx hash.
 func sendPrecompileLegacyTx(
 	t *testing.T,
-	rpcURL string,
-	keyInfo testaccounts.TestKeyInfo,
+	node *evmtest.Node,
 	to string,
 	input []byte,
 	gasLimit uint64,
 ) string {
 	t.Helper()
 
+	keyInfo := node.KeyInfo()
 	fromAddr := testaccounts.MustAccountAddressFromTestKeyInfo(t, keyInfo)
 	privateKey := evmtest.MustDerivePrivateKey(t, keyInfo.Mnemonic)
-	nonce := evmtest.MustGetPendingNonceWithRetry(t, rpcURL, fromAddr.Hex(), 20*time.Second)
-	gasPrice := evmtest.MustGetGasPriceWithRetry(t, rpcURL, 20*time.Second)
+	nonce := node.MustGetPendingNonceWithRetry(t, fromAddr.Hex(), 20*time.Second)
+	gasPrice := node.MustGetGasPriceWithRetry(t, 20*time.Second)
 	toAddr := common.HexToAddress(to)
 
-	return evmtest.SendLegacyTxWithParams(t, rpcURL, evmtest.LegacyTxParams{
+	return node.SendLegacyTxWithParams(t, evmtest.LegacyTxParams{
 		PrivateKey: privateKey,
 		Nonce:      nonce,
 		To:         &toAddr,

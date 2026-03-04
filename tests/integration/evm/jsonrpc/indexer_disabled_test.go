@@ -25,13 +25,13 @@ func TestIndexerDisabledLookupUnavailable(t *testing.T) {
 	node.StartAndWaitRPC()
 	defer node.Stop()
 
-	startBlock := evmtest.MustGetBlockNumber(t, node.RPCURL())
-	txHash := evmtest.SendOneLegacyTx(t, node.RPCURL(), node.KeyInfo())
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), startBlock+2, 30*time.Second)
+	startBlock := node.MustGetBlockNumber(t)
+	txHash := node.SendOneLegacyTx(t)
+	node.WaitForBlockNumberAtLeast(t, startBlock+2, 30*time.Second)
 
 	// Receipt/tx-by-hash should be unavailable when indexers are disabled.
-	assertLookupNilOrError(t, node.RPCURL(), "eth_getTransactionReceipt", []any{txHash})
-	assertLookupNilOrError(t, node.RPCURL(), "eth_getTransactionByHash", []any{txHash})
+	assertLookupNilOrError(t, node, "eth_getTransactionReceipt", []any{txHash})
+	assertLookupNilOrError(t, node, "eth_getTransactionByHash", []any{txHash})
 
 	if strings.Contains(node.OutputString(), "Starting EVMIndexerService service") {
 		t.Fatalf("EVM indexer service unexpectedly started while disabled:\n%s", node.OutputString())
@@ -40,14 +40,14 @@ func TestIndexerDisabledLookupUnavailable(t *testing.T) {
 
 // assertLookupNilOrError accepts either a transport error or nil result, as
 // upstream behavior varies by version when indexers are off.
-func assertLookupNilOrError(t *testing.T, rpcURL, method string, params []any) {
+func assertLookupNilOrError(t *testing.T, node *evmtest.Node, method string, params []any) {
 	t.Helper()
 
 	// Accept either RPC error or nil result depending on upstream behavior.
 	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
 		var out map[string]any
-		err := testjsonrpc.Call(context.Background(), rpcURL, method, params, &out)
+		err := testjsonrpc.Call(context.Background(), node.RPCURL(), method, params, &out)
 		if err != nil {
 			return
 		}

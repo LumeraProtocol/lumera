@@ -20,4 +20,13 @@ func TestIBCERC20MiddlewareSuite(t *testing.T) {
 	t.Run("DenomCollisionKeepsExistingMap", func(t *testing.T) {
 		testIBCERC20MiddlewareDenomCollisionKeepsExistingMap(t)
 	})
+	t.Run("RoundTripTransfer", func(t *testing.T) {
+		testIBCERC20RoundTripTransfer(t)
+	})
+	t.Run("SecondaryDenomRegistration", func(t *testing.T) {
+		testIBCERC20SecondaryDenomRegistration(t)
+	})
+	t.Run("TransferBackBurnsVoucher", func(t *testing.T) {
+		testIBCERC20TransferBackBurnsVoucher(t)
+	})
 }

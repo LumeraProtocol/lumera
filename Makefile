@@ -51,7 +51,7 @@ TOOLS := \
 ###################################################
 ###                   Build                     ###
 ###################################################
-.PHONY: build build-debug release build-proto clean-proto clean-cache install-tools
+.PHONY: build build-debug release build-proto clean-proto clean-cache install-tools openrpc
 
 install-tools:
 	@echo "Installing Go tooling..."
@@ -91,6 +91,18 @@ build-proto: clean-proto $(PROTO_SRC)
 	${BUF} generate --template proto/buf.gen.swagger.yaml --verbose
 	${IGNITE} generate openapi --yes --enable-proto-vendor --clear-cache
 
+OPENRPC_GENERATOR_INPUTS := \
+	tools/openrpcgen/main.go \
+	docs/openrpc_examples_overrides.json
+
+app/openrpc/openrpc.json docs/openrpc.json: $(OPENRPC_GENERATOR_INPUTS)
+	@echo "Generating OpenRPC spec..."
+	${GO} run ./tools/openrpcgen -out docs/openrpc.json -examples docs/openrpc_examples_overrides.json
+	cp docs/openrpc.json app/openrpc/openrpc.json
+	@echo "OpenRPC spec written to docs/openrpc.json"
+
+openrpc: app/openrpc/openrpc.json
+
 build: ${BUILD_DIR}/lumerad
 
 go.sum: go.mod
@@ -98,7 +110,7 @@ go.sum: go.mod
 	GOPROXY=${GOPROXY} ${GO} mod verify
 	GOPROXY=${GOPROXY} ${GO} mod tidy
 
-${BUILD_DIR}/lumerad: $(GO_SRC) go.sum Makefile
+${BUILD_DIR}/lumerad: $(GO_SRC) app/openrpc/openrpc.json go.sum Makefile
 	@echo "Building lumerad binary..."
 	@mkdir -p ${BUILD_DIR}
 	${BUF} generate --template proto/buf.gen.gogo.yaml --verbose
@@ -107,7 +119,7 @@ ${BUILD_DIR}/lumerad: $(GO_SRC) go.sum Makefile
 
 build-debug: ${BUILD_DIR}/debug/lumerad
 
-${BUILD_DIR}/debug/lumerad: $(GO_SRC) go.sum Makefile
+${BUILD_DIR}/debug/lumerad: $(GO_SRC) app/openrpc/openrpc.json go.sum Makefile
 	@echo "Building lumerad debug binary..."
 	@mkdir -p ${BUILD_DIR}
 	${IGNITE} ${CHAIN_BUILD} -t linux:amd64 --skip-proto --debug -v --output ${BUILD_DIR}/debug/
@@ -116,6 +128,7 @@ ${BUILD_DIR}/debug/lumerad: $(GO_SRC) go.sum Makefile
 release:
 	@echo "Creating release with ignite..."
 	@mkdir -p ${RELEASE_DIR}
+	@$(MAKE) --no-print-directory app/openrpc/openrpc.json
 	${BUF} generate --template proto/buf.gen.gogo.yaml --verbose
 	${BUF} generate --template proto/buf.gen.swagger.yaml --verbose
 	${IGNITE} generate openapi --yes --enable-proto-vendor --clear-cache
@@ -143,12 +156,11 @@ integration-tests:
 
 system-tests:
 	@echo "Running system tests..."
-	${GO} test -tags=system ./tests/system/... -v
+	${GO} test -tags=system,test ./tests/system/... -v
 
 simulation-tests:
 	@echo "Running simulation tests..."
-	${IGNITE} version
-	${IGNITE} chain simulate
+	${GO} test -tags='simulation test' ./tests/simulation/ -v -timeout 30m -args -Enabled=true -NumBlocks=200 -BlockSize=50 -Commit=true
 
 systemex-tests:
 	@echo "Running system tests..."

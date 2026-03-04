@@ -25,6 +25,7 @@ SETUP_COMPLETE_FLAG="${STATUS_DIR}/setup_complete"
 # node specific vars
 NODE_STATUS_DIR="${STATUS_DIR}/${MONIKER}"
 NODE_SETUP_COMPLETE_FLAG="${NODE_STATUS_DIR}/setup_complete"
+GENESIS_MNEMONIC_FILE="${NODE_STATUS_DIR}/genesis-address-mnemonic"
 LOCKS_DIR="${STATUS_DIR}/locks"
 
 HERMES_SHARED_DIR="${SHARED_DIR}/hermes"
@@ -87,6 +88,11 @@ KEY_NAME="$(echo "${VAL_REC_JSON}" | jq -r '.key_name')"
 STAKE_AMOUNT="$(echo "${VAL_REC_JSON}" | jq -r '.initial_distribution.validator_stake')"
 ACCOUNT_BAL="$(echo "${VAL_REC_JSON}" | jq -r '.initial_distribution.account_balance')"
 P2P_HOST_PORT="$(echo "${VAL_REC_JSON}" | jq --arg port "${DEFAULT_P2P_PORT}" -r '.port // $port')"
+VAL_INDEX="$(jq -r --arg m "${MONIKER}" 'map(.moniker) | index($m) // -1' "${CFG_VALS}")"
+GENESIS_ACCOUNT_MNEMONIC=""
+if [ "${VAL_INDEX}" != "-1" ]; then
+	GENESIS_ACCOUNT_MNEMONIC="$(jq -r --argjson idx "${VAL_INDEX}" '.["genesis-account-mnemonics"][$idx] // empty' "${CFG_CHAIN}")"
+fi
 
 # Determine primary (prefer .primary==true, else first element)
 PRIMARY_NAME="$(jq -r '
@@ -108,6 +114,13 @@ run() {
 run_capture() {
 	echo "+ $*" >&2 # goes to stderr, not captured
 	"$@"
+}
+
+recover_key_from_mnemonic() {
+	local key_name="$1"
+	local mnemonic="$2"
+	run ${DAEMON} keys delete "${key_name}" --keyring-backend "${KEYRING_BACKEND}" -y >/dev/null 2>&1 || true
+	printf '%s\n' "${mnemonic}" | run ${DAEMON} keys add "${key_name}" --recover --keyring-backend "${KEYRING_BACKEND}" >/dev/null
 }
 
 with_lock() {
@@ -153,7 +166,9 @@ write_node_markers() {
 	echo "${DEFAULT_P2P_PORT}" >"${NODE_STATUS_DIR}/port"
 
 	if [ -f "${CONFIG_TOML}" ]; then
-		nodeid="$(${DAEMON} tendermint show-node-id || true)"
+		# Cosmos SDK 0.53+ exposes CometBFT commands under "comet";
+		# keep a tendermint fallback for older binaries.
+		nodeid="$(${DAEMON} comet show-node-id 2>/dev/null || ${DAEMON} tendermint show-node-id 2>/dev/null || true)"
 		[ -n "${nodeid}" ] && echo "${nodeid}" >"${NODE_STATUS_DIR}/nodeid"
 	fi
 
@@ -199,6 +214,18 @@ configure_node_config() {
 	local api_port="${LUMERA_API_PORT:-1317}"
 	local grpc_port="${LUMERA_GRPC_PORT:-9090}"
 	local rpc_port="${LUMERA_RPC_PORT:-26657}"
+	local api_enable_unsafe_cors jsonrpc_enable jsonrpc_address jsonrpc_ws_address jsonrpc_api jsonrpc_enable_indexer
+
+	api_enable_unsafe_cors="$(jq -r '.api.enable_unsafe_cors // true' "${CFG_CHAIN}")"
+	jsonrpc_enable="$(jq -r '.["json-rpc"].enable // true' "${CFG_CHAIN}")"
+	jsonrpc_address="$(jq -r '.["json-rpc"].address // "0.0.0.0:8545"' "${CFG_CHAIN}")"
+	jsonrpc_ws_address="$(jq -r '.["json-rpc"].ws_address // "0.0.0.0:8546"' "${CFG_CHAIN}")"
+	jsonrpc_api="$(jq -r '.["json-rpc"].api // "web3,eth,personal,net,txpool,debug,rpc"' "${CFG_CHAIN}")"
+	jsonrpc_enable_indexer="$(jq -r '.["json-rpc"].enable_indexer // true' "${CFG_CHAIN}")"
+	jsonrpc_api="${jsonrpc_api// /}"
+	if [[ ",${jsonrpc_api}," != *",rpc,"* ]]; then
+		jsonrpc_api="${jsonrpc_api},rpc"
+	fi
 
 	if ! command -v crudini >/dev/null 2>&1; then
 		echo "[SETUP] ERROR: crudini not found; cannot update configs"
@@ -210,9 +237,17 @@ configure_node_config() {
 		run crudini --set "${APP_TOML}" api enable "true"
 		run crudini --set "${APP_TOML}" api swagger "true"
 		run crudini --set "${APP_TOML}" api address "\"tcp://0.0.0.0:${api_port}\""
+		# Required for browser-extension clients (MetaMask) that send non-simple
+		# headers like x-metamask-clientid on JSON-RPC requests.
+		run crudini --set "${APP_TOML}" api enabled-unsafe-cors "${api_enable_unsafe_cors}"
 		run crudini --set "${APP_TOML}" grpc enable "true"
 		run crudini --set "${APP_TOML}" grpc address "\"0.0.0.0:${grpc_port}\""
 		run crudini --set "${APP_TOML}" grpc-web enable "true"
+		run crudini --set "${APP_TOML}" json-rpc enable "${jsonrpc_enable}"
+		run crudini --set "${APP_TOML}" json-rpc address "\"${jsonrpc_address}\""
+		run crudini --set "${APP_TOML}" json-rpc ws-address "\"${jsonrpc_ws_address}\""
+		run crudini --set "${APP_TOML}" json-rpc api "\"${jsonrpc_api}\""
+		run crudini --set "${APP_TOML}" json-rpc enable-indexer "${jsonrpc_enable_indexer}"
 		echo "[SETUP] Updated ${APP_TOML} with API/GRPC configuration."
 	else
 		echo "[SETUP] WARNING: ${APP_TOML} not found; skipping app.toml update"
@@ -296,14 +331,40 @@ init_if_needed() {
 		run ${DAEMON} init "${MONIKER}" --chain-id "${CHAIN_ID}" --overwrite
 	fi
 
-	# ensure validator key exists
-	local addr
-	addr="$(run_capture ${DAEMON} keys show "${KEY_NAME}" -a --keyring-backend "${KEYRING_BACKEND}" 2>/dev/null || true)"
-	addr="$(printf '%s' "${addr}" | tr -d '\r\n')"
-	if [ -z "${addr}" ]; then
-		run ${DAEMON} keys add "${KEY_NAME}" --keyring-backend "${KEYRING_BACKEND}"
+	# Ensure validator key exists. If a mnemonic is configured for this validator
+	# index in config.json, always recover from it to keep addresses deterministic.
+	local addr mnemonic key_json
+	if [ -n "${GENESIS_ACCOUNT_MNEMONIC}" ]; then
+		recover_key_from_mnemonic "${KEY_NAME}" "${GENESIS_ACCOUNT_MNEMONIC}"
+		addr="$(run_capture ${DAEMON} keys show "${KEY_NAME}" -a --keyring-backend "${KEYRING_BACKEND}" 2>/dev/null || true)"
+		addr="$(printf '%s' "${addr}" | tr -d '\r\n')"
+		printf '%s\n' "${GENESIS_ACCOUNT_MNEMONIC}" >"${GENESIS_MNEMONIC_FILE}"
+		echo "[SETUP] Recovered ${KEY_NAME} from configured genesis mnemonic (validator index ${VAL_INDEX})"
 	else
-		echo "[SETUP] Key ${KEY_NAME} already exists with address ${addr}"
+		addr="$(run_capture ${DAEMON} keys show "${KEY_NAME}" -a --keyring-backend "${KEYRING_BACKEND}" 2>/dev/null || true)"
+		addr="$(printf '%s' "${addr}" | tr -d '\r\n')"
+		if [ -z "${addr}" ]; then
+			key_json="$(run_capture ${DAEMON} keys add "${KEY_NAME}" --keyring-backend "${KEYRING_BACKEND}" --output json)"
+			addr="$(printf '%s' "${key_json}" | jq -r '.address // empty' 2>/dev/null || true)"
+			addr="$(printf '%s' "${addr}" | tr -d '\r\n')"
+			mnemonic="$(printf '%s' "${key_json}" | jq -r '.mnemonic // empty' 2>/dev/null || true)"
+			if [ -n "${mnemonic}" ]; then
+				printf '%s\n' "${mnemonic}" >"${GENESIS_MNEMONIC_FILE}"
+				echo "[SETUP] Wrote validator mnemonic to ${GENESIS_MNEMONIC_FILE}"
+			else
+				echo "[SETUP] WARNING: mnemonic is empty for ${KEY_NAME}; ${GENESIS_MNEMONIC_FILE} was not written"
+			fi
+		else
+			echo "[SETUP] Key ${KEY_NAME} already exists with address ${addr}"
+			if [ ! -s "${GENESIS_MNEMONIC_FILE}" ]; then
+				echo "[SETUP] WARNING: ${GENESIS_MNEMONIC_FILE} is missing; mnemonic cannot be reconstructed for existing key"
+			fi
+		fi
+	fi
+
+	if [ -z "${addr}" ]; then
+		addr="$(run_capture ${DAEMON} keys show "${KEY_NAME}" -a --keyring-backend "${KEYRING_BACKEND}" 2>/dev/null || true)"
+		addr="$(printf '%s' "${addr}" | tr -d '\r\n')"
 	fi
 }
 
@@ -446,7 +507,11 @@ secondary_validator_setup() {
 	addr="$(run_capture ${DAEMON} keys show "${KEY_NAME}" -a --keyring-backend "${KEYRING_BACKEND}")"
 	addr="$(printf '%s' "${addr}" | tr -d '\r\n')"
 	if [ -z "${addr}" ]; then
-		run ${DAEMON} keys add "${KEY_NAME}" --keyring-backend "${KEYRING_BACKEND}" >/dev/null
+		if [ -n "${GENESIS_ACCOUNT_MNEMONIC}" ]; then
+			recover_key_from_mnemonic "${KEY_NAME}" "${GENESIS_ACCOUNT_MNEMONIC}"
+		else
+			run ${DAEMON} keys add "${KEY_NAME}" --keyring-backend "${KEYRING_BACKEND}" >/dev/null
+		fi
 	fi
 	addr="$(run_capture ${DAEMON} keys show "${KEY_NAME}" -a --keyring-backend "${KEYRING_BACKEND}")"
 	addr="$(printf '%s' "${addr}" | tr -d '\r\n')"

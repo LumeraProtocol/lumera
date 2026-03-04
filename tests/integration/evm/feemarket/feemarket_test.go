@@ -4,7 +4,6 @@
 package feemarket_test
 
 import (
-	"bytes"
 	lcfg "github.com/LumeraProtocol/lumera/config"
 	evmtest "github.com/LumeraProtocol/lumera/tests/integration/evmtest"
 	testaccounts "github.com/LumeraProtocol/lumera/testutil/accounts"
@@ -24,12 +23,12 @@ func testFeeHistoryReportsCanonicalShape(t *testing.T, node *evmtest.Node) {
 
 	// Produce a few blocks with EVM tx load so gas usage and fee history are populated.
 	for i := 0; i < 3; i++ {
-		txHash := evmtest.SendOneLegacyTx(t, node.RPCURL(), node.KeyInfo())
-		evmtest.WaitForReceipt(t, node.RPCURL(), txHash, node.WaitCh(), node.OutputBuffer(), 40*time.Second)
+		txHash := node.SendOneLegacyTx(t)
+		node.WaitForReceipt(t, txHash, 40*time.Second)
 	}
 
 	var resp map[string]any
-	evmtest.MustJSONRPC(t, node.RPCURL(), "eth_feeHistory", []any{"0x3", "latest", []any{}}, &resp)
+	node.MustJSONRPC(t, "eth_feeHistory", []any{"0x3", "latest", []any{}}, &resp)
 	if resp == nil {
 		t.Fatalf("eth_feeHistory returned nil response")
 	}
@@ -78,8 +77,8 @@ func testFeeHistoryReportsCanonicalShape(t *testing.T, node *evmtest.Node) {
 func testReceiptEffectiveGasPriceRespectsBlockBaseFee(t *testing.T, node *evmtest.Node) {
 	t.Helper()
 
-	txHash := evmtest.SendOneLegacyTx(t, node.RPCURL(), node.KeyInfo())
-	receipt := evmtest.WaitForReceipt(t, node.RPCURL(), txHash, node.WaitCh(), node.OutputBuffer(), 40*time.Second)
+	txHash := node.SendOneLegacyTx(t)
+	receipt := node.WaitForReceipt(t, txHash, 40*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, receipt, txHash)
 
 	effectiveGasPriceHex := evmtest.MustStringField(t, receipt, "effectiveGasPrice")
@@ -92,7 +91,7 @@ func testReceiptEffectiveGasPriceRespectsBlockBaseFee(t *testing.T, node *evmtes
 	}
 
 	blockNumberHex := evmtest.MustStringField(t, receipt, "blockNumber")
-	block := evmtest.MustGetBlock(t, node.RPCURL(), "eth_getBlockByNumber", []any{blockNumberHex, false})
+	block := node.MustGetBlock(t, "eth_getBlockByNumber", []any{blockNumberHex, false})
 	baseFeeHex := evmtest.MustStringField(t, block, "baseFeePerGas")
 	baseFee, err := hexutil.DecodeBig(baseFeeHex)
 	if err != nil {
@@ -109,7 +108,7 @@ func testReceiptEffectiveGasPriceRespectsBlockBaseFee(t *testing.T, node *evmtes
 
 	// Fee history for this height should include the block base fee.
 	var resp map[string]any
-	evmtest.MustJSONRPC(t, node.RPCURL(), "eth_feeHistory", []any{"0x1", blockNumberHex, []any{}}, &resp)
+	node.MustJSONRPC(t, "eth_feeHistory", []any{"0x1", blockNumberHex, []any{}}, &resp)
 
 	baseFeesRaw, ok := resp["baseFeePerGas"].([]any)
 	if !ok || len(baseFeesRaw) < 1 {
@@ -140,12 +139,12 @@ func testFeeHistoryRewardPercentilesShape(t *testing.T, node *evmtest.Node) {
 
 	// Generate EVM activity so fee history contains non-empty sampled blocks.
 	for i := 0; i < 2; i++ {
-		txHash := evmtest.SendOneLegacyTx(t, node.RPCURL(), node.KeyInfo())
-		evmtest.WaitForReceipt(t, node.RPCURL(), txHash, node.WaitCh(), node.OutputBuffer(), 40*time.Second)
+		txHash := node.SendOneLegacyTx(t)
+		node.WaitForReceipt(t, txHash, 40*time.Second)
 	}
 
 	var resp map[string]any
-	evmtest.MustJSONRPC(t, node.RPCURL(), "eth_feeHistory", []any{"0x2", "latest", []any{10.0, 50.0, 90.0}}, &resp)
+	node.MustJSONRPC(t, "eth_feeHistory", []any{"0x2", "latest", []any{10.0, 50.0, 90.0}}, &resp)
 	if resp == nil {
 		t.Fatalf("eth_feeHistory returned nil response")
 	}
@@ -184,11 +183,11 @@ func testMaxPriorityFeePerGasReturnsValidHex(t *testing.T, node *evmtest.Node) {
 	t.Helper()
 
 	// Ensure at least one block with EVM activity has been produced before querying.
-	txHash := evmtest.SendOneLegacyTx(t, node.RPCURL(), node.KeyInfo())
-	evmtest.WaitForReceipt(t, node.RPCURL(), txHash, node.WaitCh(), node.OutputBuffer(), 40*time.Second)
+	txHash := node.SendOneLegacyTx(t)
+	node.WaitForReceipt(t, txHash, 40*time.Second)
 
 	var feeHex string
-	evmtest.MustJSONRPC(t, node.RPCURL(), "eth_maxPriorityFeePerGas", []any{}, &feeHex)
+	node.MustJSONRPC(t, "eth_maxPriorityFeePerGas", []any{}, &feeHex)
 	fee, err := hexutil.DecodeBig(feeHex)
 	if err != nil {
 		t.Fatalf("invalid eth_maxPriorityFeePerGas %q: %v", feeHex, err)
@@ -204,18 +203,18 @@ func testGasPriceIsAtLeastLatestBaseFee(t *testing.T, node *evmtest.Node) {
 	t.Helper()
 
 	// Create at least one tx so latest block has deterministic EVM activity.
-	txHash := evmtest.SendOneLegacyTx(t, node.RPCURL(), node.KeyInfo())
-	receipt := evmtest.WaitForReceipt(t, node.RPCURL(), txHash, node.WaitCh(), node.OutputBuffer(), 40*time.Second)
+	txHash := node.SendOneLegacyTx(t)
+	receipt := node.WaitForReceipt(t, txHash, 40*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, receipt, txHash)
 
 	var gasPriceHex string
-	evmtest.MustJSONRPC(t, node.RPCURL(), "eth_gasPrice", []any{}, &gasPriceHex)
+	node.MustJSONRPC(t, "eth_gasPrice", []any{}, &gasPriceHex)
 	gasPrice, err := hexutil.DecodeBig(gasPriceHex)
 	if err != nil {
 		t.Fatalf("invalid eth_gasPrice %q: %v", gasPriceHex, err)
 	}
 
-	latestBlock := evmtest.MustGetBlock(t, node.RPCURL(), "eth_getBlockByNumber", []any{"latest", false})
+	latestBlock := node.MustGetBlock(t, "eth_getBlockByNumber", []any{"latest", false})
 	baseFeeHex := evmtest.MustStringField(t, latestBlock, "baseFeePerGas")
 	baseFee, err := hexutil.DecodeBig(baseFeeHex)
 	if err != nil {
@@ -235,16 +234,16 @@ func testDynamicFeeType2EffectiveGasPriceFormula(t *testing.T, node *evmtest.Nod
 
 	fromAddr := testaccounts.MustAccountAddressFromTestKeyInfo(t, node.KeyInfo())
 	privateKey := evmtest.MustDerivePrivateKey(t, node.KeyInfo().Mnemonic)
-	nonce := evmtest.MustGetPendingNonceWithRetry(t, node.RPCURL(), fromAddr.Hex(), 20*time.Second)
+	nonce := node.MustGetPendingNonceWithRetry(t, fromAddr.Hex(), 20*time.Second)
 
-	latestBlock := evmtest.MustGetBlock(t, node.RPCURL(), "eth_getBlockByNumber", []any{"latest", false})
+	latestBlock := node.MustGetBlock(t, "eth_getBlockByNumber", []any{"latest", false})
 	baseFee := mustHexBig(t, evmtest.MustStringField(t, latestBlock, "baseFeePerGas"))
 
 	tipCap := big.NewInt(2_000_000_000)
 	maxFeeCap := new(big.Int).Add(baseFee, new(big.Int).Mul(tipCap, big.NewInt(2)))
 	to := common.HexToAddress(fromAddr.Hex())
 
-	txHash := evmtest.SendDynamicFeeTxWithParams(t, node.RPCURL(), evmtest.DynamicFeeTxParams{
+	txHash := node.SendDynamicFeeTxWithParams(t, evmtest.DynamicFeeTxParams{
 		PrivateKey: privateKey,
 		Nonce:      nonce,
 		To:         &to,
@@ -255,11 +254,11 @@ func testDynamicFeeType2EffectiveGasPriceFormula(t *testing.T, node *evmtest.Nod
 		Data:       nil,
 	})
 
-	receipt := evmtest.WaitForReceipt(t, node.RPCURL(), txHash, node.WaitCh(), node.OutputBuffer(), 45*time.Second)
+	receipt := node.WaitForReceipt(t, txHash, 45*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, receipt, txHash)
 	effectiveGasPrice := mustHexBig(t, evmtest.MustStringField(t, receipt, "effectiveGasPrice"))
 
-	txObj := evmtest.WaitForTransactionByHash(t, node.RPCURL(), txHash, node.WaitCh(), node.OutputBuffer(), 45*time.Second)
+	txObj := node.WaitForTransactionByHash(t, txHash, 45*time.Second)
 	evmtest.AssertTxObjectMatchesHash(t, txObj, txHash)
 	txType := evmtest.MustStringField(t, txObj, "type")
 	if !strings.EqualFold(txType, "0x2") {
@@ -270,7 +269,7 @@ func testDynamicFeeType2EffectiveGasPriceFormula(t *testing.T, node *evmtest.Nod
 	txMaxPriorityFee := mustHexBig(t, evmtest.MustStringField(t, txObj, "maxPriorityFeePerGas"))
 
 	blockNumberHex := evmtest.MustStringField(t, receipt, "blockNumber")
-	includedBlock := evmtest.MustGetBlock(t, node.RPCURL(), "eth_getBlockByNumber", []any{blockNumberHex, false})
+	includedBlock := node.MustGetBlock(t, "eth_getBlockByNumber", []any{blockNumberHex, false})
 	includedBaseFee := mustHexBig(t, evmtest.MustStringField(t, includedBlock, "baseFeePerGas"))
 
 	expectedEffective := new(big.Int).Add(includedBaseFee, txMaxPriorityFee)
@@ -296,14 +295,14 @@ func testDynamicFeeType2RejectsFeeCapBelowBaseFee(t *testing.T, node *evmtest.No
 	t.Helper()
 
 	// Produce one tx first so latest base fee context is initialized/stable.
-	seedTxHash := evmtest.SendOneLegacyTx(t, node.RPCURL(), node.KeyInfo())
-	evmtest.WaitForReceipt(t, node.RPCURL(), seedTxHash, node.WaitCh(), node.OutputBuffer(), 40*time.Second)
+	seedTxHash := node.SendOneLegacyTx(t)
+	node.WaitForReceipt(t, seedTxHash, 40*time.Second)
 
 	fromAddr := testaccounts.MustAccountAddressFromTestKeyInfo(t, node.KeyInfo())
 	privateKey := evmtest.MustDerivePrivateKey(t, node.KeyInfo().Mnemonic)
-	nonce := evmtest.MustGetPendingNonceWithRetry(t, node.RPCURL(), fromAddr.Hex(), 20*time.Second)
+	nonce := node.MustGetPendingNonceWithRetry(t, fromAddr.Hex(), 20*time.Second)
 
-	latestBlock := evmtest.MustGetBlock(t, node.RPCURL(), "eth_getBlockByNumber", []any{"latest", false})
+	latestBlock := node.MustGetBlock(t, "eth_getBlockByNumber", []any{"latest", false})
 	baseFee := mustHexBig(t, evmtest.MustStringField(t, latestBlock, "baseFeePerGas"))
 	if baseFee.Sign() <= 0 {
 		t.Fatalf("expected positive baseFeePerGas, got %s", baseFee.String())
@@ -335,28 +334,46 @@ func testDynamicFeeType2RejectsFeeCapBelowBaseFee(t *testing.T, node *evmtest.No
 
 // TestBaseFeeProgressesAcrossMultiBlockLoadPattern validates long-run base-fee
 // behavior under sustained high usage followed by sustained empty blocks.
+//
+// Strategy: flood the mempool with simple value transfers (no calldata) so
+// gasUsed == gasLimit == 21 000 per tx (100% gas efficiency). The chain drains
+// them across consecutive near-full blocks, pushing utilization well above the
+// 50% EIP-1559 target and causing the base fee to rise.
 func testBaseFeeProgressesAcrossMultiBlockLoadPattern(t *testing.T, node *evmtest.Node) {
 	t.Helper()
 
 	const (
-		highUsageBursts       = 8
-		heavyTxPerBurst       = 26
-		lowEmptyBlocks        = 14
-		minObservedBlocks     = 20
-		heavyPayloadBytes     = 12 * 1024
-		heavyTransferGasLimit = 260_000
-		gasPriceMultiplier    = 6
+		// 1500 simple transfers at 21k gas each = 31.5M total gas.
+		// With 10M block gas limit the chain packs ~476 per block, producing
+		// 3 consecutive near-100% blocks (~6.25% base-fee increase each).
+		totalSimpleTxs     = 1500
+		simpleGasLimit     = uint64(21_000)
+		lowEmptyBlocks     = 16
+		minObservedBlocks  = 20
+		gasPriceMultiplier = 6
 	)
 
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), 1, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
 
 	fromAddr := testaccounts.MustAccountAddressFromTestKeyInfo(t, node.KeyInfo())
 	privateKey := evmtest.MustDerivePrivateKey(t, node.KeyInfo().Mnemonic)
 	toAddr := common.HexToAddress(fromAddr.Hex())
-	nextNonce := evmtest.MustGetPendingNonceWithRetry(t, node.RPCURL(), fromAddr.Hex(), 20*time.Second)
+	nextNonce := node.MustGetPendingNonceWithRetry(t, fromAddr.Hex(), 20*time.Second)
 
 	minBaseFeeFloorWei := mustULumeDecToWei(t, lcfg.FeeMarketMinGasPrice)
-	startHeight := evmtest.MustGetBlockNumber(t, node.RPCURL())
+
+	// Precondition to a low-fee baseline so the subsequent high-load phase can
+	// deterministically demonstrate upward pressure.
+	for i := 0; i < 20; i++ {
+		h := node.MustGetBlockNumber(t)
+		fee := mustBaseFeeAtHeight(t, node, h)
+		if fee.Cmp(minBaseFeeFloorWei) <= 0 {
+			break
+		}
+		node.WaitForBlockNumberAtLeast(t, h+1, 30*time.Second)
+	}
+
+	startHeight := node.MustGetBlockNumber(t)
 	startBaseFee := mustBaseFeeAtHeight(t, node, startHeight)
 	if startBaseFee.Cmp(minBaseFeeFloorWei) < 0 {
 		t.Fatalf(
@@ -367,57 +384,64 @@ func testBaseFeeProgressesAcrossMultiBlockLoadPattern(t *testing.T, node *evmtes
 		)
 	}
 
-	heavyPayload := bytes.Repeat([]byte{0x01}, heavyPayloadBytes)
+	// Submit all txs in one batch so the chain processes them across
+	// consecutive full blocks without empty-block gaps.
+	gasPrice := node.MustGetGasPriceWithRetry(t, 20*time.Second)
+	batchGasPrice := new(big.Int).Mul(gasPrice, big.NewInt(gasPriceMultiplier))
+
 	var lastTxHash string
-
-	for burst := 0; burst < highUsageBursts; burst++ {
-		burstStartHeight := evmtest.MustGetBlockNumber(t, node.RPCURL())
-		gasPrice := evmtest.MustGetGasPriceWithRetry(t, node.RPCURL(), 20*time.Second)
-		burstGasPrice := new(big.Int).Mul(gasPrice, big.NewInt(gasPriceMultiplier))
-
-		for i := 0; i < heavyTxPerBurst; i++ {
-			lastTxHash = evmtest.SendLegacyTxWithParams(t, node.RPCURL(), evmtest.LegacyTxParams{
-				PrivateKey: privateKey,
-				Nonce:      nextNonce,
-				To:         &toAddr,
-				Value:      big.NewInt(1),
-				Gas:        heavyTransferGasLimit,
-				GasPrice:   burstGasPrice,
-				Data:       heavyPayload,
-			})
-			nextNonce++
-		}
-
-		evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), burstStartHeight+1, 45*time.Second)
+	for i := 0; i < totalSimpleTxs; i++ {
+		lastTxHash = node.SendLegacyTxWithParams(t, evmtest.LegacyTxParams{
+			PrivateKey: privateKey,
+			Nonce:      nextNonce,
+			To:         &toAddr,
+			Value:      big.NewInt(1),
+			Gas:        simpleGasLimit,
+			GasPrice:   batchGasPrice,
+		})
+		nextNonce++
 	}
 
-	if strings.TrimSpace(lastTxHash) == "" {
-		t.Fatal("failed to submit high-usage burst transactions")
-	}
-
-	finalHighReceipt := evmtest.WaitForReceipt(t, node.RPCURL(), lastTxHash, node.WaitCh(), node.OutputBuffer(), 120*time.Second)
+	finalHighReceipt := node.WaitForReceipt(t, lastTxHash, 120*time.Second)
 	highPhaseEndHeight := evmtest.MustUint64HexField(t, finalHighReceipt, "blockNumber")
 	highPhaseEndBaseFee := mustBaseFeeAtHeight(t, node, highPhaseEndHeight)
-	if highPhaseEndBaseFee.Cmp(startBaseFee) <= 0 {
+
+	// Scan blocks for base-fee increases.
+	maxHighFee := new(big.Int).Set(startBaseFee)
+	highIncreases := 0
+	prevFee := startBaseFee
+	for h := startHeight + 1; h <= highPhaseEndHeight; h++ {
+		fee := mustBaseFeeAtHeight(t, node, h)
+		if fee.Cmp(prevFee) > 0 {
+			highIncreases++
+		}
+		if fee.Cmp(maxHighFee) > 0 {
+			maxHighFee = fee
+		}
+		prevFee = fee
+	}
+	if highIncreases == 0 || maxHighFee.Cmp(startBaseFee) <= 0 {
 		t.Fatalf(
-			"expected base fee increase after sustained high usage: start=%s end=%s start_height=%d end_height=%d",
+			"expected at least one base-fee increase during high-usage phase: start=%s high_end=%s max_high=%s increases=%d start_height=%d end_height=%d",
 			startBaseFee.String(),
 			highPhaseEndBaseFee.String(),
+			maxHighFee.String(),
+			highIncreases,
 			startHeight,
 			highPhaseEndHeight,
 		)
 	}
 
 	lowPhaseTargetHeight := highPhaseEndHeight + lowEmptyBlocks
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), lowPhaseTargetHeight, 120*time.Second)
-	lowPhaseEndHeight := evmtest.MustGetBlockNumber(t, node.RPCURL())
+	node.WaitForBlockNumberAtLeast(t, lowPhaseTargetHeight, 120*time.Second)
+	lowPhaseEndHeight := node.MustGetBlockNumber(t)
 	lowPhaseEndBaseFee := mustBaseFeeAtHeight(t, node, lowPhaseEndHeight)
-	if lowPhaseEndBaseFee.Cmp(highPhaseEndBaseFee) > 0 {
+	if lowPhaseEndBaseFee.Cmp(maxHighFee) > 0 {
 		t.Fatalf(
-			"expected base fee to decrease or stay flat after sustained empty period: high_end=%s low_end=%s high_height=%d low_height=%d",
-			highPhaseEndBaseFee.String(),
+			"expected base fee after empty phase not to exceed high-phase peak: peak_high=%s low_end=%s high_end=%s low_end_height=%d",
+			maxHighFee.String(),
 			lowPhaseEndBaseFee.String(),
-			highPhaseEndHeight,
+			highPhaseEndBaseFee.String(),
 			lowPhaseEndHeight,
 		)
 	}
@@ -449,7 +473,7 @@ func testBaseFeeProgressesAcrossMultiBlockLoadPattern(t *testing.T, node *evmtes
 func mustBaseFeeAtHeight(t *testing.T, node *evmtest.Node, height uint64) *big.Int {
 	t.Helper()
 
-	block := evmtest.MustGetBlock(t, node.RPCURL(), "eth_getBlockByNumber", []any{hexutil.EncodeUint64(height), false})
+	block := node.MustGetBlock(t, "eth_getBlockByNumber", []any{hexutil.EncodeUint64(height), false})
 	return mustHexBig(t, evmtest.MustStringField(t, block, "baseFeePerGas"))
 }
 

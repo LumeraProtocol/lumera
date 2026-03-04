@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	appopenrpc "github.com/LumeraProtocol/lumera/app/openrpc"
 	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
@@ -19,6 +20,8 @@ func TestInitAppConfigEVMDefaults(t *testing.T) {
 	require.Contains(t, template, "[json-rpc]")
 	require.Contains(t, template, "enable-indexer = {{ .JSONRPC.EnableIndexer }}")
 	require.Contains(t, template, "[evm.mempool]")
+	require.Contains(t, template, "[lumera.evm-mempool]")
+	require.Contains(t, template, "broadcast-debug = {{ .Lumera.EVMMempool.BroadcastDebug }}")
 
 	cfgValue := reflect.ValueOf(cfg)
 	require.Equal(t, reflect.Struct, cfgValue.Kind())
@@ -27,6 +30,9 @@ func TestInitAppConfigEVMDefaults(t *testing.T) {
 	require.True(t, jsonRPCCfg.IsValid(), "JSONRPC field not found")
 	require.True(t, jsonRPCCfg.FieldByName("Enable").Bool(), "json-rpc must be enabled by default")
 	require.True(t, jsonRPCCfg.FieldByName("EnableIndexer").Bool(), "json-rpc indexer must be enabled by default")
+	apiNamespaces, ok := jsonRPCCfg.FieldByName("API").Interface().([]string)
+	require.True(t, ok, "json-rpc.api must be []string")
+	require.Contains(t, apiNamespaces, appopenrpc.Namespace, "json-rpc.api must include rpc namespace for OpenRPC discovery")
 
 	evmCfg := cfgValue.FieldByName("EVM")
 	require.True(t, evmCfg.IsValid(), "EVM field not found")
@@ -37,4 +43,10 @@ func TestInitAppConfigEVMDefaults(t *testing.T) {
 	mempoolCfg := sdkCfg.FieldByName("Mempool")
 	require.True(t, mempoolCfg.IsValid(), "Mempool field not found")
 	require.EqualValues(t, 5000, mempoolCfg.FieldByName("MaxTxs").Int(), "unexpected app-side mempool max txs")
+
+	lumeraCfg := cfgValue.FieldByName("Lumera")
+	require.True(t, lumeraCfg.IsValid(), "Lumera field not found")
+	evmMempoolCfg := lumeraCfg.FieldByName("EVMMempool")
+	require.True(t, evmMempoolCfg.IsValid(), "Lumera.EVMMempool field not found")
+	require.False(t, evmMempoolCfg.FieldByName("BroadcastDebug").Bool(), "broadcast debug must be disabled by default")
 }

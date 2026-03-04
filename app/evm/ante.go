@@ -23,6 +23,20 @@ import (
 	lumante "github.com/LumeraProtocol/lumera/ante"
 )
 
+// genesisSkipDecorator wraps an inner AnteDecorator and skips it at genesis
+// height (BlockHeight == 0). This matches how the SDK itself skips fee, gas,
+// and signature checks during InitGenesis so that gentxs don't need fees.
+type genesisSkipDecorator struct {
+	inner sdk.AnteDecorator
+}
+
+func (d genesisSkipDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, simulate bool, next sdk.AnteHandler) (sdk.Context, error) {
+	if ctx.BlockHeight() == 0 {
+		return next(ctx, tx, simulate)
+	}
+	return d.inner.AnteHandle(ctx, tx, simulate, next)
+}
+
 // HandlerOptions extend the SDK's AnteHandler options by requiring the IBC
 // channel keeper, wasm keepers, and EVM keepers for dual-routing.
 type HandlerOptions struct {
@@ -154,7 +168,9 @@ func newLumeraCosmosAnteHandler(ctx sdk.Context, options HandlerOptions) sdk.Ant
 		ante.NewTxTimeoutHeightDecorator(),
 		ante.NewValidateMemoDecorator(options.AccountKeeper),
 		// cosmos/evm: min gas price from feemarket params
-		cosmosante.NewMinGasPriceDecorator(&feemarketParams),
+		// Wrapped to skip at genesis height (BlockHeight==0) so gentxs don't
+		// need fees, matching how the SDK skips fee/gas/sig checks at genesis.
+		genesisSkipDecorator{cosmosante.NewMinGasPriceDecorator(&feemarketParams)},
 		ante.NewConsumeGasForTxSizeDecorator(options.AccountKeeper),
 		ante.NewDeductFeeDecorator(options.AccountKeeper, options.BankKeeper, options.FeegrantKeeper, txFeeChecker),
 		ante.NewSetPubKeyDecorator(options.AccountKeeper),

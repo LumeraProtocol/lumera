@@ -1,6 +1,8 @@
 package text
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestContainsAny(t *testing.T) {
 	t.Parallel()

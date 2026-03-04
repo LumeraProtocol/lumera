@@ -24,26 +24,26 @@ import (
 func testBackendBlockCountAndUncleSemantics(t *testing.T, node *evmtest.Node) {
 	t.Helper()
 
-	txHash := evmtest.SendOneLegacyTx(t, node.RPCURL(), node.KeyInfo())
-	receipt := evmtest.WaitForReceipt(t, node.RPCURL(), txHash, node.WaitCh(), node.OutputBuffer(), 40*time.Second)
+	txHash := node.SendOneLegacyTx(t)
+	receipt := node.WaitForReceipt(t, txHash, 40*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, receipt, txHash)
 
 	blockHash := evmtest.MustStringField(t, receipt, "blockHash")
 	blockNumber := evmtest.MustStringField(t, receipt, "blockNumber")
 
 	// Cross-check tx-count methods against block payload transaction array length.
-	blockByHash := evmtest.MustGetBlock(t, node.RPCURL(), "eth_getBlockByHash", []any{blockHash, false})
+	blockByHash := node.MustGetBlock(t, "eth_getBlockByHash", []any{blockHash, false})
 	blockTxs, ok := blockByHash["transactions"].([]any)
 	if !ok {
 		t.Fatalf("unexpected transactions payload in block: %#v", blockByHash["transactions"])
 	}
 
 	var countByHashHex string
-	evmtest.MustJSONRPC(t, node.RPCURL(), "eth_getBlockTransactionCountByHash", []any{blockHash}, &countByHashHex)
+	node.MustJSONRPC(t, "eth_getBlockTransactionCountByHash", []any{blockHash}, &countByHashHex)
 	countByHash := mustDecodeHexUint64(t, countByHashHex, "countByHash")
 
 	var countByNumberHex string
-	evmtest.MustJSONRPC(t, node.RPCURL(), "eth_getBlockTransactionCountByNumber", []any{blockNumber}, &countByNumberHex)
+	node.MustJSONRPC(t, "eth_getBlockTransactionCountByNumber", []any{blockNumber}, &countByNumberHex)
 	countByNumber := mustDecodeHexUint64(t, countByNumberHex, "countByNumber")
 
 	if countByHash != uint64(len(blockTxs)) {
@@ -56,38 +56,38 @@ func testBackendBlockCountAndUncleSemantics(t *testing.T, node *evmtest.Node) {
 	// Unknown blocks should produce `null` (decoded as nil interface).
 	const missingHash = "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
 	var missingCountByHash any
-	evmtest.MustJSONRPC(t, node.RPCURL(), "eth_getBlockTransactionCountByHash", []any{missingHash}, &missingCountByHash)
+	node.MustJSONRPC(t, "eth_getBlockTransactionCountByHash", []any{missingHash}, &missingCountByHash)
 	if missingCountByHash != nil {
 		t.Fatalf("expected nil tx count for missing hash, got %#v", missingCountByHash)
 	}
 
 	var missingCountByNumber any
-	evmtest.MustJSONRPC(t, node.RPCURL(), "eth_getBlockTransactionCountByNumber", []any{"0x7fffffff"}, &missingCountByNumber)
+	node.MustJSONRPC(t, "eth_getBlockTransactionCountByNumber", []any{"0x7fffffff"}, &missingCountByNumber)
 	if missingCountByNumber != nil {
 		t.Fatalf("expected nil tx count for missing number, got %#v", missingCountByNumber)
 	}
 
 	// CometBFT backend never has uncles.
 	var uncleCountByHashHex string
-	evmtest.MustJSONRPC(t, node.RPCURL(), "eth_getUncleCountByBlockHash", []any{blockHash}, &uncleCountByHashHex)
+	node.MustJSONRPC(t, "eth_getUncleCountByBlockHash", []any{blockHash}, &uncleCountByHashHex)
 	if mustDecodeHexUint64(t, uncleCountByHashHex, "uncleCountByHash") != 0 {
 		t.Fatalf("expected zero uncle count by hash, got %s", uncleCountByHashHex)
 	}
 
 	var uncleCountByNumberHex string
-	evmtest.MustJSONRPC(t, node.RPCURL(), "eth_getUncleCountByBlockNumber", []any{blockNumber}, &uncleCountByNumberHex)
+	node.MustJSONRPC(t, "eth_getUncleCountByBlockNumber", []any{blockNumber}, &uncleCountByNumberHex)
 	if mustDecodeHexUint64(t, uncleCountByNumberHex, "uncleCountByNumber") != 0 {
 		t.Fatalf("expected zero uncle count by number, got %s", uncleCountByNumberHex)
 	}
 
 	var uncleByHash any
-	evmtest.MustJSONRPC(t, node.RPCURL(), "eth_getUncleByBlockHashAndIndex", []any{blockHash, "0x0"}, &uncleByHash)
+	node.MustJSONRPC(t, "eth_getUncleByBlockHashAndIndex", []any{blockHash, "0x0"}, &uncleByHash)
 	if uncleByHash != nil {
 		t.Fatalf("expected nil uncle by hash+index, got %#v", uncleByHash)
 	}
 
 	var uncleByNumber any
-	evmtest.MustJSONRPC(t, node.RPCURL(), "eth_getUncleByBlockNumberAndIndex", []any{blockNumber, "0x0"}, &uncleByNumber)
+	node.MustJSONRPC(t, "eth_getUncleByBlockNumberAndIndex", []any{blockNumber, "0x0"}, &uncleByNumber)
 	if uncleByNumber != nil {
 		t.Fatalf("expected nil uncle by number+index, got %#v", uncleByNumber)
 	}
@@ -104,14 +104,14 @@ func testBackendNetAndWeb3UtilityMethods(t *testing.T, node *evmtest.Node) {
 	t.Helper()
 
 	var listening bool
-	evmtest.MustJSONRPC(t, node.RPCURL(), "net_listening", []any{}, &listening)
+	node.MustJSONRPC(t, "net_listening", []any{}, &listening)
 	if !listening {
 		t.Fatalf("expected net_listening=true on started local node")
 	}
 
 	// Keep parsing flexible for backend variations (numeric JSON or quantity hex string).
 	var peerCountRaw any
-	evmtest.MustJSONRPC(t, node.RPCURL(), "net_peerCount", []any{}, &peerCountRaw)
+	node.MustJSONRPC(t, "net_peerCount", []any{}, &peerCountRaw)
 	peerCount := mustParsePeerCount(t, peerCountRaw)
 	if peerCount < 0 {
 		t.Fatalf("peer count must be non-negative, got %d", peerCount)
@@ -121,17 +121,17 @@ func testBackendNetAndWeb3UtilityMethods(t *testing.T, node *evmtest.Node) {
 	payloadB := "lumera-rpc-backend-2"
 
 	var hashA1 string
-	evmtest.MustJSONRPC(t, node.RPCURL(), "web3_sha3", []any{payloadA}, &hashA1)
+	node.MustJSONRPC(t, "web3_sha3", []any{payloadA}, &hashA1)
 	mustAssertHexBytesLen(t, hashA1, 32, "web3_sha3(payloadA)")
 
 	var hashA2 string
-	evmtest.MustJSONRPC(t, node.RPCURL(), "web3_sha3", []any{payloadA}, &hashA2)
+	node.MustJSONRPC(t, "web3_sha3", []any{payloadA}, &hashA2)
 	if !strings.EqualFold(hashA1, hashA2) {
 		t.Fatalf("web3_sha3 must be deterministic: first=%s second=%s", hashA1, hashA2)
 	}
 
 	var hashB string
-	evmtest.MustJSONRPC(t, node.RPCURL(), "web3_sha3", []any{payloadB}, &hashB)
+	node.MustJSONRPC(t, "web3_sha3", []any{payloadB}, &hashB)
 	mustAssertHexBytesLen(t, hashB, 32, "web3_sha3(payloadB)")
 	if strings.EqualFold(hashA1, hashB) {
 		t.Fatalf("web3_sha3 should differ for different payloads: A=%s B=%s", hashA1, hashB)

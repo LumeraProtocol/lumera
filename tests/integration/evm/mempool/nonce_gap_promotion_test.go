@@ -23,12 +23,12 @@ func testNonceGapPromotionAfterGapFilled(t *testing.T, node *evmtest.Node) {
 
 	fromAddr := testaccounts.MustAccountAddressFromTestKeyInfo(t, node.KeyInfo())
 	privateKey := evmtest.MustDerivePrivateKey(t, node.KeyInfo().Mnemonic)
-	baseNonce := evmtest.MustGetPendingNonceWithRetry(t, node.RPCURL(), fromAddr.Hex(), 20*time.Second)
+	baseNonce := node.MustGetPendingNonceWithRetry(t, fromAddr.Hex(), 20*time.Second)
 	toAddr := fromAddr
 	// Use node-reported gas price (already base-fee aware) with headroom.
-	gasPrice := new(big.Int).Mul(evmtest.MustGetGasPriceWithRetry(t, node.RPCURL(), 20*time.Second), big.NewInt(2))
+	gasPrice := new(big.Int).Mul(node.MustGetGasPriceWithRetry(t, 20*time.Second), big.NewInt(2))
 
-	tx0 := evmtest.SendLegacyTxWithParams(t, node.RPCURL(), evmtest.LegacyTxParams{
+	tx0 := node.SendLegacyTxWithParams(t, evmtest.LegacyTxParams{
 		PrivateKey: privateKey,
 		Nonce:      baseNonce,
 		To:         &toAddr,
@@ -36,7 +36,7 @@ func testNonceGapPromotionAfterGapFilled(t *testing.T, node *evmtest.Node) {
 		Gas:        21_000,
 		GasPrice:   gasPrice,
 	})
-	tx2 := evmtest.SendLegacyTxWithParams(t, node.RPCURL(), evmtest.LegacyTxParams{
+	tx2 := node.SendLegacyTxWithParams(t, evmtest.LegacyTxParams{
 		PrivateKey: privateKey,
 		Nonce:      baseNonce + 2,
 		To:         &toAddr,
@@ -45,14 +45,14 @@ func testNonceGapPromotionAfterGapFilled(t *testing.T, node *evmtest.Node) {
 		GasPrice:   gasPrice,
 	})
 
-	receipt0 := evmtest.WaitForReceipt(t, node.RPCURL(), tx0, node.WaitCh(), node.OutputBuffer(), 40*time.Second)
+	receipt0 := node.WaitForReceipt(t, tx0, 40*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, receipt0, tx0)
 
 	block0 := evmtest.MustUint64HexField(t, receipt0, "blockNumber")
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), block0+2, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, block0+2, 20*time.Second)
 	assertReceiptStaysUnavailable(t, node.RPCURL(), tx2, 5*time.Second)
 
-	tx1 := evmtest.SendLegacyTxWithParams(t, node.RPCURL(), evmtest.LegacyTxParams{
+	tx1 := node.SendLegacyTxWithParams(t, evmtest.LegacyTxParams{
 		PrivateKey: privateKey,
 		Nonce:      baseNonce + 1,
 		To:         &toAddr,
@@ -61,8 +61,8 @@ func testNonceGapPromotionAfterGapFilled(t *testing.T, node *evmtest.Node) {
 		GasPrice:   gasPrice,
 	})
 
-	receipt1 := evmtest.WaitForReceipt(t, node.RPCURL(), tx1, node.WaitCh(), node.OutputBuffer(), 40*time.Second)
-	receipt2 := evmtest.WaitForReceipt(t, node.RPCURL(), tx2, node.WaitCh(), node.OutputBuffer(), 40*time.Second)
+	receipt1 := node.WaitForReceipt(t, tx1, 40*time.Second)
+	receipt2 := node.WaitForReceipt(t, tx2, 40*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, receipt1, tx1)
 	evmtest.AssertReceiptMatchesTxHash(t, receipt2, tx2)
 

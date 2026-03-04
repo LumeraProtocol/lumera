@@ -24,7 +24,7 @@ import (
 // response.
 func testBankPrecompileBalancesViaEthCall(t *testing.T, node *evmtest.Node) {
 	t.Helper()
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), 1, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
 
 	fundedAddr := testaccounts.MustAccountAddressFromTestKeyInfo(t, node.KeyInfo())
 	fundedInput, err := bankprecompile.ABI.Pack(bankprecompile.BalancesMethod, fundedAddr)
@@ -32,7 +32,7 @@ func testBankPrecompileBalancesViaEthCall(t *testing.T, node *evmtest.Node) {
 		t.Fatalf("pack balances(address funded): %v", err)
 	}
 
-	fundedResult := mustEthCallPrecompile(t, node.RPCURL(), evmtypes.BankPrecompileAddress, fundedInput)
+	fundedResult := mustEthCallPrecompile(t, node, evmtypes.BankPrecompileAddress, fundedInput)
 	var fundedBalances []bankprecompile.Balance
 	if err := bankprecompile.ABI.UnpackIntoInterface(&fundedBalances, bankprecompile.BalancesMethod, fundedResult); err != nil {
 		t.Fatalf("unpack funded balances: %v", err)
@@ -54,7 +54,7 @@ func testBankPrecompileBalancesViaEthCall(t *testing.T, node *evmtest.Node) {
 		t.Fatalf("pack balances(address empty): %v", err)
 	}
 
-	emptyResult := mustEthCallPrecompile(t, node.RPCURL(), evmtypes.BankPrecompileAddress, emptyInput)
+	emptyResult := mustEthCallPrecompile(t, node, evmtypes.BankPrecompileAddress, emptyInput)
 	var emptyBalances []bankprecompile.Balance
 	if err := bankprecompile.ABI.UnpackIntoInterface(&emptyBalances, bankprecompile.BalancesMethod, emptyResult); err != nil {
 		t.Fatalf("unpack empty balances: %v", err)

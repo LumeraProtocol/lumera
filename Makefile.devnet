@@ -146,12 +146,32 @@ _devnet-select-default-genesis:
 	@set -e; \
 	version="$${LUMERA_VERSION:-}"; \
 	if [ -z "$$version" ]; then \
+		if [ "$(DEVNET_BUILD_LUMERA)" = "1" ]; then \
+			build_bin="$(BUILD_DIR)/lumerad"; \
+			if [ -x "$$build_bin" ]; then \
+				version="$$( "$$build_bin" version 2>/dev/null | grep -Eo 'v?[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?' | head -n1 || true )"; \
+			fi; \
+			if [ -z "$$version" ]; then \
+				version="$$( git describe --tags --dirty 2>/dev/null | grep -Eo 'v?[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?' | head -n1 || true )"; \
+			fi; \
+		fi; \
+	fi; \
+	if [ -z "$$version" ]; then \
 		bin_path="$(DEVNET_BIN_DIR_ABS)/lumerad"; \
 		if [ -x "$$bin_path" ]; then \
 			version="$$( "$$bin_path" version 2>/dev/null | grep -Eo 'v?[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?' | head -n1 || true )"; \
 		fi; \
 	fi; \
-	if [ -n "$$version" ] && printf '%s\n' "$(EVM_CUTOVER_VERSION)" "$$version" | sort -V | head -n1 | grep -q "^$(EVM_CUTOVER_VERSION)$$"; then \
+	case "$$version" in \
+		v*|"") ;; \
+		*) version="v$$version" ;; \
+	esac; \
+	cutover="$(EVM_CUTOVER_VERSION)"; \
+	case "$$cutover" in \
+		v*|"") ;; \
+		*) cutover="v$$cutover" ;; \
+	esac; \
+	if [ -n "$$version" ] && printf '%s\n' "$$cutover" "$$version" | sort -V | head -n1 | grep -q "^$$cutover$$"; then \
 		echo "$(DEFAULT_GENESIS_EVM_FILE)"; \
 	else \
 		echo "$(DEFAULT_GENESIS_FILE)"; \

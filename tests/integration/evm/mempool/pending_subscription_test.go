@@ -35,7 +35,7 @@ func testPendingTxSubscriptionEmitsHash(t *testing.T, node *evmtest.Node) {
 	}
 	defer sub.Unsubscribe()
 
-	txHash := evmtest.SendOneLegacyTx(t, node.RPCURL(), node.KeyInfo())
+	txHash := node.SendOneLegacyTx(t)
 
 	deadline := time.After(20 * time.Second)
 	for {
@@ -44,7 +44,7 @@ func testPendingTxSubscriptionEmitsHash(t *testing.T, node *evmtest.Node) {
 			t.Fatalf("pending subscription failed: %v", err)
 		case hash := <-pendingHashes:
 			if strings.EqualFold(hash.Hex(), txHash) {
-				evmtest.WaitForReceipt(t, node.RPCURL(), txHash, node.WaitCh(), node.OutputBuffer(), 40*time.Second)
+				node.WaitForReceipt(t, txHash, 40*time.Second)
 				return
 			}
 		case <-deadline:

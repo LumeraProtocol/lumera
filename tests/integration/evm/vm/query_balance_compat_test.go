@@ -24,7 +24,7 @@ type bankBalanceQueryResponse struct {
 // address formats and returns the same account snapshot.
 func testVMQueryAccountAcceptsHexAndBech32(t *testing.T, node *evmtest.Node) {
 	t.Helper()
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), 1, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
 
 	bech32Addr := node.KeyInfo().Address
 	hexAddr := testaccounts.MustAccountAddressFromTestKeyInfo(t, node.KeyInfo()).Hex()
@@ -47,7 +47,7 @@ func testVMQueryAccountAcceptsHexAndBech32(t *testing.T, node *evmtest.Node) {
 // the same coin amount as the canonical bank query for the same account/denom.
 func testVMBalanceBankMatchesBankQuery(t *testing.T, node *evmtest.Node) {
 	t.Helper()
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), 1, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
 
 	bech32Addr := node.KeyInfo().Address
 	hexAddr := testaccounts.MustAccountAddressFromTestKeyInfo(t, node.KeyInfo()).Hex()
@@ -91,10 +91,10 @@ func testVMBalanceBankMatchesBankQuery(t *testing.T, node *evmtest.Node) {
 // normalization by querying the same slot using short and full hex keys.
 func testVMStorageQueryKeyFormatEquivalence(t *testing.T, node *evmtest.Node) {
 	t.Helper()
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), 1, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
 
 	deployTxHash := sendContractCreationTx(t, node, storageSetterContractCreationCode())
-	deployReceipt := evmtest.WaitForReceipt(t, node.RPCURL(), deployTxHash, node.WaitCh(), node.OutputBuffer(), 45*time.Second)
+	deployReceipt := node.WaitForReceipt(t, deployTxHash, 45*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, deployReceipt, deployTxHash)
 
 	contractAddress := evmtest.MustStringField(t, deployReceipt, "contractAddress")
@@ -103,7 +103,7 @@ func testVMStorageQueryKeyFormatEquivalence(t *testing.T, node *evmtest.Node) {
 	}
 
 	callTxHash := sendContractMethodTx(t, node, contractAddress, "0x")
-	callReceipt := evmtest.WaitForReceipt(t, node.RPCURL(), callTxHash, node.WaitCh(), node.OutputBuffer(), 45*time.Second)
+	callReceipt := node.WaitForReceipt(t, callTxHash, 45*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, callReceipt, callTxHash)
 
 	gotShort := mustQueryEVMStorage(t, node, contractAddress, "0x0", 0)

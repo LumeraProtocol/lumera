@@ -36,6 +36,9 @@ SN_GATEWAY_PORT="${SUPERNODE_GATEWAY_PORT:-8002}"
 SN_LOG="${SN_LOG:-/root/logs/supernode.log}"
 
 SHARED_DIR="/shared"
+CFG_DIR="${SHARED_DIR}/config"
+CFG_CHAIN="${CFG_DIR}/config.json"
+CFG_VALS="${CFG_DIR}/validators.json"
 STATUS_DIR="${SHARED_DIR}/status"
 RELEASE_DIR="${SHARED_DIR}/release"
 
@@ -63,6 +66,8 @@ SNCLI_ADDR_FILE="${NODE_STATUS_DIR}/sncli_address"
 SNCLI_FUND_AMOUNT="100000" # in ulume
 SNCLI_MIN_AMOUNT=10000
 SNCLI_KEY_NAME="sncli-account"
+SN_CONFIG_MNEMONIC=""
+SNCLI_CONFIG_MNEMONIC=""
 
 if [[ "$KEY_NAME" == *validator* ]]; then
 	SN_KEY_NAME="${KEY_NAME/validator/supernode}"
@@ -78,6 +83,31 @@ run() {
 run_capture() {
 	echo "+ $*" >&2 # goes to stderr, not captured
 	"$@"
+}
+
+recover_key_from_mnemonic() {
+	local key_name="$1"
+	local mnemonic="$2"
+	run ${DAEMON} keys delete "${key_name}" --keyring-backend "${KEYRING_BACKEND}" -y >/dev/null 2>&1 || true
+	printf '%s\n' "${mnemonic}" | run ${DAEMON} keys add "${key_name}" --recover --keyring-backend "${KEYRING_BACKEND}" >/dev/null
+}
+
+load_configured_mnemonics() {
+	if [ ! -f "${CFG_CHAIN}" ] || [ ! -f "${CFG_VALS}" ]; then
+		echo "[SN] Missing ${CFG_CHAIN} or ${CFG_VALS}; will generate local supernode keys."
+		return 0
+	fi
+
+	local val_index val_count
+	val_index="$(jq -r --arg m "${MONIKER}" 'map(.moniker) | index($m) // -1' "${CFG_VALS}")"
+	if [ "${val_index}" = "-1" ]; then
+		echo "[SN] Validator index for ${MONIKER} not found; will generate local supernode keys."
+		return 0
+	fi
+
+	val_count="$(jq -r 'length' "${CFG_VALS}")"
+	SN_CONFIG_MNEMONIC="$(jq -r --argjson idx "${val_index}" '.["sn-account-mnemonics"][$idx] // empty' "${CFG_CHAIN}")"
+	SNCLI_CONFIG_MNEMONIC="$(jq -r --argjson idx "${val_index}" --argjson cnt "${val_count}" '.["sn-account-mnemonics"][$idx + $cnt] // empty' "${CFG_CHAIN}")"
 }
 
 require_crudini() {
@@ -359,7 +389,11 @@ configure_supernode_p2p_listen() {
 configure_supernode() {
 	echo "[SN] Ensuring SN key exists..."
 	mkdir -p "$SN_BASEDIR" "${NODE_STATUS_DIR}"
-	if [ -f "$SN_MNEMONIC_FILE" ]; then
+	if [ -n "${SN_CONFIG_MNEMONIC}" ]; then
+		echo "${SN_CONFIG_MNEMONIC}" >"${SN_MNEMONIC_FILE}"
+		recover_key_from_mnemonic "${SN_KEY_NAME}" "${SN_CONFIG_MNEMONIC}"
+		echo "[SN] Recovered ${SN_KEY_NAME} from configured sn-account-mnemonics entry."
+	elif [ -f "$SN_MNEMONIC_FILE" ]; then
 		if ! run $DAEMON keys show "$SN_KEY_NAME" --keyring-backend "$KEYRING_BACKEND" >/dev/null 2>&1; then
 			(cat "$SN_MNEMONIC_FILE") | run $DAEMON keys add "$SN_KEY_NAME" --recover --keyring-backend "$KEYRING_BACKEND" >/dev/null
 		fi
@@ -538,7 +572,11 @@ configure_sncli() {
 	fi
 
 	# Ensure sncli-account key exists
-	if [ -f "$SNCLI_MNEMONIC_FILE" ]; then
+	if [ -n "${SNCLI_CONFIG_MNEMONIC}" ]; then
+		echo "${SNCLI_CONFIG_MNEMONIC}" >"${SNCLI_MNEMONIC_FILE}"
+		recover_key_from_mnemonic "${SNCLI_KEY_NAME}" "${SNCLI_CONFIG_MNEMONIC}"
+		echo "[SNCLI] Recovered ${SNCLI_KEY_NAME} from configured sn-account-mnemonics entry."
+	elif [ -f "$SNCLI_MNEMONIC_FILE" ]; then
 		if ! run ${DAEMON} keys show "${SNCLI_KEY_NAME}" --keyring-backend "${KEYRING_BACKEND}" >/dev/null 2>&1; then
 			(cat "$SNCLI_MNEMONIC_FILE") | run $DAEMON keys add "$SNCLI_KEY_NAME" --recover --keyring-backend "$KEYRING_BACKEND" >/dev/null
 		fi
@@ -619,6 +657,7 @@ wait_for_height_at_least 5 || {
 	exit 1
 }
 
+load_configured_mnemonics
 configure_supernode
 register_supernode
 configure_sncli

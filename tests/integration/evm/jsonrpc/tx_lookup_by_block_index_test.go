@@ -15,8 +15,8 @@ import (
 func testTransactionLookupByBlockAndIndex(t *testing.T, node *evmtest.Node) {
 	t.Helper()
 
-	txHash := evmtest.SendOneLegacyTx(t, node.RPCURL(), node.KeyInfo())
-	receipt := evmtest.WaitForReceipt(t, node.RPCURL(), txHash, node.WaitCh(), node.OutputBuffer(), 40*time.Second)
+	txHash := node.SendOneLegacyTx(t)
+	receipt := node.WaitForReceipt(t, txHash, 40*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, receipt, txHash)
 
 	blockHash := evmtest.MustStringField(t, receipt, "blockHash")
@@ -24,14 +24,14 @@ func testTransactionLookupByBlockAndIndex(t *testing.T, node *evmtest.Node) {
 	txIndex := evmtest.MustStringField(t, receipt, "transactionIndex")
 
 	var txByBlockHash map[string]any
-	evmtest.MustJSONRPC(t, node.RPCURL(), "eth_getTransactionByBlockHashAndIndex", []any{blockHash, txIndex}, &txByBlockHash)
+	node.MustJSONRPC(t, "eth_getTransactionByBlockHashAndIndex", []any{blockHash, txIndex}, &txByBlockHash)
 	if txByBlockHash == nil {
 		t.Fatalf("eth_getTransactionByBlockHashAndIndex returned nil for block=%s index=%s", blockHash, txIndex)
 	}
 	evmtest.AssertTxObjectMatchesHash(t, txByBlockHash, txHash)
 
 	var txByBlockNumber map[string]any
-	evmtest.MustJSONRPC(t, node.RPCURL(), "eth_getTransactionByBlockNumberAndIndex", []any{blockNumber, txIndex}, &txByBlockNumber)
+	node.MustJSONRPC(t, "eth_getTransactionByBlockNumberAndIndex", []any{blockNumber, txIndex}, &txByBlockNumber)
 	if txByBlockNumber == nil {
 		t.Fatalf("eth_getTransactionByBlockNumberAndIndex returned nil for block=%s index=%s", blockNumber, txIndex)
 	}

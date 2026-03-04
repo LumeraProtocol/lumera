@@ -33,6 +33,7 @@ import (
 	wasmcli "github.com/CosmWasm/wasmd/x/wasm/client/cli"
 	wasmKeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	"github.com/LumeraProtocol/lumera/app"
+	appopenrpc "github.com/LumeraProtocol/lumera/app/openrpc"
 	lcfg "github.com/LumeraProtocol/lumera/config"
 	claimtypes "github.com/LumeraProtocol/lumera/x/claim/types"
 	"github.com/cosmos/cosmos-sdk/x/genutil"
@@ -43,6 +44,10 @@ func initRootCmd(
 	txConfig client.TxConfig,
 	basicManager module.BasicManager,
 ) {
+	if err := appopenrpc.RegisterJSONRPCNamespace(); err != nil {
+		panic(err)
+	}
+
 	rootCmd.AddCommand(
 		initCmdWithEVMDefaults(basicManager),
 		NewTestnetCmd(basicManager, banktypes.GenesisBalancesIterator{}),

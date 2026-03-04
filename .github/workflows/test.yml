@@ -25,9 +25,6 @@ jobs:
       - name: Set up Go
         uses: ./.github/actions/setup-go
 
-      - name: Copy claims.csv to home directory
-        run: cp claims.csv $HOME/
-
       - name: Install Ignite CLI
         run: |
           curl https://get.ignite.com/cli! | bash
@@ -50,9 +47,6 @@ jobs:
 
       - name: Set up Go
         uses: ./.github/actions/setup-go
-
-      - name: Copy claims.csv to home directory
-        run: cp claims.csv $HOME/
 
       - name: Install Ignite CLI
         run: |
@@ -77,9 +71,6 @@ jobs:
 
       - name: Set up Go
         uses: ./.github/actions/setup-go
-
-      - name: Copy claims.csv to home directory
-        run: cp claims.csv $HOME/
 
       - name: Install Ignite CLI
         run: |

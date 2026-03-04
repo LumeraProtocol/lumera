@@ -11,7 +11,7 @@ import (
 
 	evmtest "github.com/LumeraProtocol/lumera/tests/integration/evmtest"
 	testaccounts "github.com/LumeraProtocol/lumera/testutil/accounts"
-	testtext "github.com/LumeraProtocol/lumera/testutil/text"
+	testtext "github.com/LumeraProtocol/lumera/pkg/text"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -28,10 +28,10 @@ import (
 // 3. Query balance via JSON-RPC `eth_call` and compare amounts.
 func testVMBalanceERC20MatchesEthCall(t *testing.T, node *evmtest.Node) {
 	t.Helper()
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), 1, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
 
 	deployTxHash := sendContractCreationTx(t, node, erc20ConstantBalanceCreationCode())
-	deployReceipt := evmtest.WaitForReceipt(t, node.RPCURL(), deployTxHash, node.WaitCh(), node.OutputBuffer(), 45*time.Second)
+	deployReceipt := node.WaitForReceipt(t, deployTxHash, 45*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, deployReceipt, deployTxHash)
 
 	contractAddress := evmtest.MustStringField(t, deployReceipt, "contractAddress")
@@ -53,7 +53,7 @@ func testVMBalanceERC20MatchesEthCall(t *testing.T, node *evmtest.Node) {
 
 	callData := balanceOfCallData(holderHex)
 	var rpcRet string
-	evmtest.MustJSONRPC(t, node.RPCURL(), "eth_call", []any{
+	node.MustJSONRPC(t, "eth_call", []any{
 		map[string]any{
 			"to":   contractAddress,
 			"data": callData,
@@ -75,10 +75,10 @@ func testVMBalanceERC20MatchesEthCall(t *testing.T, node *evmtest.Node) {
 // `balanceOf(address)` ABI return data.
 func testVMBalanceERC20RejectsNonERC20Runtime(t *testing.T, node *evmtest.Node) {
 	t.Helper()
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), 1, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
 
 	deployTxHash := sendContractCreationTx(t, node, storageSetterContractCreationCode())
-	deployReceipt := evmtest.WaitForReceipt(t, node.RPCURL(), deployTxHash, node.WaitCh(), node.OutputBuffer(), 45*time.Second)
+	deployReceipt := node.WaitForReceipt(t, deployTxHash, 45*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, deployReceipt, deployTxHash)
 
 	contractAddress := evmtest.MustStringField(t, deployReceipt, "contractAddress")

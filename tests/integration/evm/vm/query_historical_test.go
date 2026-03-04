@@ -20,7 +20,7 @@ func testVMQueryAccountHistoricalHeightNonceProgression(t *testing.T, node *evmt
 	t.Helper()
 
 	// Ensure height-1 and height-2 queries are always valid snapshot targets.
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), 3, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, 3, 20*time.Second)
 
 	bech32Addr := node.KeyInfo().Address
 	hexAddr := testaccounts.MustAccountAddressFromTestKeyInfo(t, node.KeyInfo()).Hex()
@@ -28,8 +28,8 @@ func testVMQueryAccountHistoricalHeightNonceProgression(t *testing.T, node *evmt
 	before := mustQueryEVMAccount(t, node, bech32Addr, 0)
 	beforeNonce := mustParseUint64Dec(t, before.Nonce, "nonce")
 
-	txHash := evmtest.SendOneLegacyTx(t, node.RPCURL(), node.KeyInfo())
-	receipt := evmtest.WaitForReceipt(t, node.RPCURL(), txHash, node.WaitCh(), node.OutputBuffer(), 45*time.Second)
+	txHash := node.SendOneLegacyTx(t)
+	receipt := node.WaitForReceipt(t, txHash, 45*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, receipt, txHash)
 	txHeight := evmtest.MustUint64HexField(t, receipt, "blockNumber")
 	if txHeight < 2 {
@@ -49,7 +49,7 @@ func testVMQueryAccountHistoricalHeightNonceProgression(t *testing.T, node *evmt
 	}
 
 	// Cross-check latest nonce against JSON-RPC to ensure query/RPC parity.
-	rpcNonce := mustGetEthTxCount(t, node.RPCURL(), hexAddr)
+	rpcNonce := mustGetEthTxCount(t, node, hexAddr)
 	latest := mustQueryEVMAccount(t, node, bech32Addr, 0)
 	latestNonce := mustParseUint64Dec(t, latest.Nonce, "nonce")
 	if latestNonce != rpcNonce {
@@ -63,10 +63,10 @@ func testVMQueryAccountHistoricalHeightNonceProgression(t *testing.T, node *evmt
 func testVMQueryHistoricalCodeAndStorageSnapshots(t *testing.T, node *evmtest.Node) {
 	t.Helper()
 
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), 3, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, 3, 20*time.Second)
 
 	deployTxHash := sendContractCreationTx(t, node, storageSetterContractCreationCode())
-	deployReceipt := evmtest.WaitForReceipt(t, node.RPCURL(), deployTxHash, node.WaitCh(), node.OutputBuffer(), 45*time.Second)
+	deployReceipt := node.WaitForReceipt(t, deployTxHash, 45*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, deployReceipt, deployTxHash)
 
 	contractAddress := evmtest.MustStringField(t, deployReceipt, "contractAddress")
@@ -90,10 +90,10 @@ func testVMQueryHistoricalCodeAndStorageSnapshots(t *testing.T, node *evmtest.No
 	}
 
 	// Wait for the next block so storage write lands strictly after deploy height.
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), deployHeight+1, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, deployHeight+1, 20*time.Second)
 
 	callTxHash := sendContractMethodTx(t, node, contractAddress, "0x")
-	callReceipt := evmtest.WaitForReceipt(t, node.RPCURL(), callTxHash, node.WaitCh(), node.OutputBuffer(), 45*time.Second)
+	callReceipt := node.WaitForReceipt(t, callTxHash, 45*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, callReceipt, callTxHash)
 
 	callHeight := evmtest.MustUint64HexField(t, callReceipt, "blockNumber")

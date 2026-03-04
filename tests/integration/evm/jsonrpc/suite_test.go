@@ -20,14 +20,20 @@ func TestJSONRPCSuite(t *testing.T) {
 
 	run := func(name string, fn func(t *testing.T, node *evmtest.Node)) {
 		t.Run(name, func(t *testing.T) {
-			latest := evmtest.MustGetBlockNumber(t, node.RPCURL())
-			evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), latest+1, 20*time.Second)
+			latest := node.MustGetBlockNumber(t)
+			node.WaitForBlockNumberAtLeast(t, latest+1, 20*time.Second)
 			fn(t, node)
 		})
 	}
 
 	run("BasicRPCMethods", func(t *testing.T, node *evmtest.Node) {
 		testBasicRPCMethods(t, node)
+	})
+	run("OpenRPCDiscoverMethodCatalog", func(t *testing.T, node *evmtest.Node) {
+		testOpenRPCDiscoverMethodCatalog(t, node)
+	})
+	run("OpenRPCDiscoverMatchesEmbeddedSpec", func(t *testing.T, node *evmtest.Node) {
+		testOpenRPCDiscoverMatchesEmbeddedSpec(t, node)
 	})
 	run("BackendBlockCountAndUncleSemantics", func(t *testing.T, node *evmtest.Node) {
 		testBackendBlockCountAndUncleSemantics(t, node)

@@ -28,7 +28,7 @@ import (
 // 3. Assert successful receipt and non-zero delegation shares via follow-up query.
 func testStakingPrecompileDelegateTxPath(t *testing.T, node *evmtest.Node) {
 	t.Helper()
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), 1, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
 
 	delegatorHex := testaccounts.MustAccountAddressFromTestKeyInfo(t, node.KeyInfo())
 	validatorAddr, err := sdk.Bech32ifyAddressBytes(lcfg.Bech32ValidatorAddressPrefix, delegatorHex.Bytes())
@@ -41,8 +41,8 @@ func testStakingPrecompileDelegateTxPath(t *testing.T, node *evmtest.Node) {
 		t.Fatalf("pack staking delegate input: %v", err)
 	}
 
-	txHash := sendPrecompileLegacyTx(t, node.RPCURL(), node.KeyInfo(), evmtypes.StakingPrecompileAddress, delegateInput, 500_000)
-	receipt := evmtest.WaitForReceipt(t, node.RPCURL(), txHash, node.WaitCh(), node.OutputBuffer(), 45*time.Second)
+	txHash := sendPrecompileLegacyTx(t, node, evmtypes.StakingPrecompileAddress, delegateInput, 500_000)
+	receipt := node.WaitForReceipt(t, txHash, 45*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, receipt, txHash)
 	if status := evmtest.MustStringField(t, receipt, "status"); !strings.EqualFold(status, "0x1") {
 		t.Fatalf("expected successful staking delegate tx status, got %q (%#v)", status, receipt)
@@ -53,7 +53,7 @@ func testStakingPrecompileDelegateTxPath(t *testing.T, node *evmtest.Node) {
 		t.Fatalf("pack staking delegation query input: %v", err)
 	}
 
-	delegationQueryResult := mustEthCallPrecompile(t, node.RPCURL(), evmtypes.StakingPrecompileAddress, delegationQueryInput)
+	delegationQueryResult := mustEthCallPrecompile(t, node, evmtypes.StakingPrecompileAddress, delegationQueryInput)
 	out, err := stakingprecompile.ABI.Unpack(stakingprecompile.DelegationMethod, delegationQueryResult)
 	if err != nil {
 		t.Fatalf("unpack staking delegation query output: %v", err)
@@ -71,7 +71,7 @@ func testStakingPrecompileDelegateTxPath(t *testing.T, node *evmtest.Node) {
 // precompile tx method `setWithdrawAddress` via eth_sendRawTransaction.
 func testDistributionPrecompileSetWithdrawAddressTxPath(t *testing.T, node *evmtest.Node) {
 	t.Helper()
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), 1, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
 
 	delegatorHex := testaccounts.MustAccountAddressFromTestKeyInfo(t, node.KeyInfo())
 	withdrawerAddr := node.KeyInfo().Address
@@ -81,8 +81,8 @@ func testDistributionPrecompileSetWithdrawAddressTxPath(t *testing.T, node *evmt
 		t.Fatalf("pack distribution setWithdrawAddress input: %v", err)
 	}
 
-	txHash := sendPrecompileLegacyTx(t, node.RPCURL(), node.KeyInfo(), evmtypes.DistributionPrecompileAddress, setWithdrawerInput, 500_000)
-	receipt := evmtest.WaitForReceipt(t, node.RPCURL(), txHash, node.WaitCh(), node.OutputBuffer(), 45*time.Second)
+	txHash := sendPrecompileLegacyTx(t, node, evmtypes.DistributionPrecompileAddress, setWithdrawerInput, 500_000)
+	receipt := node.WaitForReceipt(t, txHash, 45*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, receipt, txHash)
 	if status := evmtest.MustStringField(t, receipt, "status"); !strings.EqualFold(status, "0x1") {
 		t.Fatalf("expected successful distribution setWithdrawAddress tx status, got %q (%#v)", status, receipt)
@@ -92,7 +92,7 @@ func testDistributionPrecompileSetWithdrawAddressTxPath(t *testing.T, node *evmt
 	if err != nil {
 		t.Fatalf("pack delegatorWithdrawAddress query input: %v", err)
 	}
-	queryResult := mustEthCallPrecompile(t, node.RPCURL(), evmtypes.DistributionPrecompileAddress, queryInput)
+	queryResult := mustEthCallPrecompile(t, node, evmtypes.DistributionPrecompileAddress, queryInput)
 	out, err := distributionprecompile.ABI.Unpack(distributionprecompile.DelegatorWithdrawAddressMethod, queryResult)
 	if err != nil {
 		t.Fatalf("unpack delegatorWithdrawAddress query output: %v", err)
@@ -110,7 +110,7 @@ func testDistributionPrecompileSetWithdrawAddressTxPath(t *testing.T, node *evmt
 // precompile tx-path failure semantics on a non-existent proposal id.
 func testGovPrecompileCancelProposalTxPathFailsForUnknownProposal(t *testing.T, node *evmtest.Node) {
 	t.Helper()
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), 1, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
 
 	proposerHex := testaccounts.MustAccountAddressFromTestKeyInfo(t, node.KeyInfo())
 	cancelInput, err := govprecompile.ABI.Pack(govprecompile.CancelProposalMethod, proposerHex, uint64(9_999_999))
@@ -118,8 +118,8 @@ func testGovPrecompileCancelProposalTxPathFailsForUnknownProposal(t *testing.T, 
 		t.Fatalf("pack gov cancelProposal input: %v", err)
 	}
 
-	txHash := sendPrecompileLegacyTx(t, node.RPCURL(), node.KeyInfo(), evmtypes.GovPrecompileAddress, cancelInput, 500_000)
-	receipt := evmtest.WaitForReceipt(t, node.RPCURL(), txHash, node.WaitCh(), node.OutputBuffer(), 45*time.Second)
+	txHash := sendPrecompileLegacyTx(t, node, evmtypes.GovPrecompileAddress, cancelInput, 500_000)
+	receipt := node.WaitForReceipt(t, txHash, 45*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, receipt, txHash)
 
 	status := evmtest.MustStringField(t, receipt, "status")

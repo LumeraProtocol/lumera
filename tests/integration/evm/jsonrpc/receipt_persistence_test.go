@@ -24,14 +24,14 @@ func TestReceiptPersistsAcrossRestart(t *testing.T) {
 func testReceiptPersistsAcrossRestart(t *testing.T, node *evmtest.Node) {
 	t.Helper()
 
-	txHash := evmtest.SendOneLegacyTx(t, node.RPCURL(), node.KeyInfo())
-	receiptBefore := evmtest.WaitForReceipt(t, node.RPCURL(), txHash, node.WaitCh(), node.OutputBuffer(), 40*time.Second)
+	txHash := node.SendOneLegacyTx(t)
+	receiptBefore := node.WaitForReceipt(t, txHash, 40*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, receiptBefore, txHash)
 	firstStartOutput := node.OutputString()
 
 	node.RestartAndWaitRPC()
 
-	receiptAfter := evmtest.WaitForReceipt(t, node.RPCURL(), txHash, node.WaitCh(), node.OutputBuffer(), 30*time.Second)
+	receiptAfter := node.WaitForReceipt(t, txHash, 30*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, receiptAfter, txHash)
 
 	evmtest.AssertContains(t, firstStartOutput, "Starting EVMIndexerService service")

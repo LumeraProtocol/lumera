@@ -13,7 +13,6 @@ import (
 	testaccounts "github.com/LumeraProtocol/lumera/testutil/accounts"
 	addresscodec "github.com/cosmos/cosmos-sdk/codec/address"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // TestPreciseBankEVMTransferSendSplitMatrix validates tx-level send behavior
@@ -27,7 +26,7 @@ import (
 // precisebank remainder stability.
 func testPreciseBankEVMTransferSendSplitMatrix(t *testing.T, node *evmtest.Node) {
 	t.Helper()
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), 1, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
 
 	senderAddr := testaccounts.MustAccountAddressFromTestKeyInfo(t, node.KeyInfo())
 	senderPriv := evmtest.MustDerivePrivateKey(t, node.KeyInfo().Mnemonic)
@@ -53,20 +52,16 @@ func testPreciseBankEVMTransferSendSplitMatrix(t *testing.T, node *evmtest.Node)
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			recipientPriv, err := crypto.GenerateKey()
-			if err != nil {
-				t.Fatalf("generate recipient key: %v", err)
-			}
-			recipientEthAddr := crypto.PubkeyToAddress(recipientPriv.PublicKey)
+			_, recipientEthAddr := testaccounts.MustGenerateEthKey(t)
 			recipientBech32 := mustAccAddressBech32(t, recipientEthAddr.Bytes())
 
 			senderBefore := mustExtendedBalanceFromSplitQueries(t, node, senderBech32)
 			recipientBefore := mustExtendedBalanceFromSplitQueries(t, node, recipientBech32)
 
-			nonce := evmtest.MustGetPendingNonceWithRetry(t, node.RPCURL(), senderAddr.Hex(), 20*time.Second)
-			gasPrice := evmtest.MustGetGasPriceWithRetry(t, node.RPCURL(), 20*time.Second)
+			nonce := node.MustGetPendingNonceWithRetry(t, senderAddr.Hex(), 20*time.Second)
+			gasPrice := node.MustGetGasPriceWithRetry(t, 20*time.Second)
 
-			txHash := evmtest.SendLegacyTxWithParams(t, node.RPCURL(), evmtest.LegacyTxParams{
+			txHash := node.SendLegacyTxWithParams(t, evmtest.LegacyTxParams{
 				PrivateKey: senderPriv,
 				Nonce:      nonce,
 				To:         &recipientEthAddr,
@@ -74,7 +69,7 @@ func testPreciseBankEVMTransferSendSplitMatrix(t *testing.T, node *evmtest.Node)
 				Gas:        21_000,
 				GasPrice:   gasPrice,
 			})
-			receipt := evmtest.WaitForReceipt(t, node.RPCURL(), txHash, node.WaitCh(), node.OutputBuffer(), 40*time.Second)
+			receipt := node.WaitForReceipt(t, txHash, 40*time.Second)
 			evmtest.AssertReceiptMatchesTxHash(t, receipt, txHash)
 
 			gasUsed := evmtest.MustUint64HexField(t, receipt, "gasUsed")
@@ -141,23 +136,15 @@ func testPreciseBankEVMTransferSendSplitMatrix(t *testing.T, node *evmtest.Node)
 //     - precisebank remainder remains stable.
 func testPreciseBankSecondarySenderBurnMintWorkflow(t *testing.T, node *evmtest.Node) {
 	t.Helper()
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), 1, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
 
 	senderAddr := testaccounts.MustAccountAddressFromTestKeyInfo(t, node.KeyInfo())
 	senderPriv := evmtest.MustDerivePrivateKey(t, node.KeyInfo().Mnemonic)
 
-	secondaryPriv, err := crypto.GenerateKey()
-	if err != nil {
-		t.Fatalf("generate secondary key: %v", err)
-	}
-	secondaryEthAddr := crypto.PubkeyToAddress(secondaryPriv.PublicKey)
+	secondaryPriv, secondaryEthAddr := testaccounts.MustGenerateEthKey(t)
 	secondaryBech32 := mustAccAddressBech32(t, secondaryEthAddr.Bytes())
 
-	recipientPriv, err := crypto.GenerateKey()
-	if err != nil {
-		t.Fatalf("generate recipient key: %v", err)
-	}
-	recipientEthAddr := crypto.PubkeyToAddress(recipientPriv.PublicKey)
+	_, recipientEthAddr := testaccounts.MustGenerateEthKey(t)
 	recipientBech32 := mustAccAddressBech32(t, recipientEthAddr.Bytes())
 
 	cf := conversionFactorBigInt()
@@ -167,10 +154,10 @@ func testPreciseBankSecondarySenderBurnMintWorkflow(t *testing.T, node *evmtest.
 	// Step 1: fund secondary account with enough headroom for transfer value and
 	// dynamic gas fees.
 	fundAmount := new(big.Int).Add(big.NewInt(1_000_000_000_000_000), new(big.Int).Mul(big.NewInt(3), cf))
-	fundNonce := evmtest.MustGetPendingNonceWithRetry(t, node.RPCURL(), senderAddr.Hex(), 20*time.Second)
-	fundGasPrice := evmtest.MustGetGasPriceWithRetry(t, node.RPCURL(), 20*time.Second)
+	fundNonce := node.MustGetPendingNonceWithRetry(t, senderAddr.Hex(), 20*time.Second)
+	fundGasPrice := node.MustGetGasPriceWithRetry(t, 20*time.Second)
 
-	fundHash := evmtest.SendLegacyTxWithParams(t, node.RPCURL(), evmtest.LegacyTxParams{
+	fundHash := node.SendLegacyTxWithParams(t, evmtest.LegacyTxParams{
 		PrivateKey: senderPriv,
 		Nonce:      fundNonce,
 		To:         &secondaryEthAddr,
@@ -178,7 +165,7 @@ func testPreciseBankSecondarySenderBurnMintWorkflow(t *testing.T, node *evmtest.
 		Gas:        21_000,
 		GasPrice:   fundGasPrice,
 	})
-	fundReceipt := evmtest.WaitForReceipt(t, node.RPCURL(), fundHash, node.WaitCh(), node.OutputBuffer(), 40*time.Second)
+	fundReceipt := node.WaitForReceipt(t, fundHash, 40*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, fundReceipt, fundHash)
 
 	secondaryBefore := mustExtendedBalanceFromSplitQueries(t, node, secondaryBech32)
@@ -187,10 +174,10 @@ func testPreciseBankSecondarySenderBurnMintWorkflow(t *testing.T, node *evmtest.
 	// Step 2: secondary account sends to recipient, exercising sender burn +
 	// recipient mint through tx-level state transition.
 	sendAmount := new(big.Int).Add(new(big.Int).Set(cf), big.NewInt(42))
-	sendNonce := evmtest.MustGetPendingNonceWithRetry(t, node.RPCURL(), secondaryEthAddr.Hex(), 20*time.Second)
-	sendGasPrice := evmtest.MustGetGasPriceWithRetry(t, node.RPCURL(), 20*time.Second)
+	sendNonce := node.MustGetPendingNonceWithRetry(t, secondaryEthAddr.Hex(), 20*time.Second)
+	sendGasPrice := node.MustGetGasPriceWithRetry(t, 20*time.Second)
 
-	sendHash := evmtest.SendLegacyTxWithParams(t, node.RPCURL(), evmtest.LegacyTxParams{
+	sendHash := node.SendLegacyTxWithParams(t, evmtest.LegacyTxParams{
 		PrivateKey: secondaryPriv,
 		Nonce:      sendNonce,
 		To:         &recipientEthAddr,
@@ -198,7 +185,7 @@ func testPreciseBankSecondarySenderBurnMintWorkflow(t *testing.T, node *evmtest.
 		Gas:        21_000,
 		GasPrice:   sendGasPrice,
 	})
-	sendReceipt := evmtest.WaitForReceipt(t, node.RPCURL(), sendHash, node.WaitCh(), node.OutputBuffer(), 40*time.Second)
+	sendReceipt := node.WaitForReceipt(t, sendHash, 40*time.Second)
 	evmtest.AssertReceiptMatchesTxHash(t, sendReceipt, sendHash)
 
 	gasUsed := evmtest.MustUint64HexField(t, sendReceipt, "gasUsed")

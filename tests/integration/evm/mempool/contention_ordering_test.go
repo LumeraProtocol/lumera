@@ -20,8 +20,8 @@ func testDeterministicOrderingUnderContention(t *testing.T, node *evmtest.Node) 
 
 	fromAddr := testaccounts.MustAccountAddressFromTestKeyInfo(t, node.KeyInfo())
 	privateKey := evmtest.MustDerivePrivateKey(t, node.KeyInfo().Mnemonic)
-	baseNonce := evmtest.MustGetPendingNonceWithRetry(t, node.RPCURL(), fromAddr.Hex(), 20*time.Second)
-	gasPrice := evmtest.MustGetGasPriceWithRetry(t, node.RPCURL(), 20*time.Second)
+	baseNonce := node.MustGetPendingNonceWithRetry(t, fromAddr.Hex(), 20*time.Second)
+	gasPrice := node.MustGetGasPriceWithRetry(t, 20*time.Second)
 	toAddr := fromAddr
 
 	const totalTx = 6
@@ -79,7 +79,7 @@ func testDeterministicOrderingUnderContention(t *testing.T, node *evmtest.Node) 
 			t.Fatalf("missing tx hash for nonce %d", nonce)
 		}
 
-		receipt := evmtest.WaitForReceipt(t, node.RPCURL(), txHash, node.WaitCh(), node.OutputBuffer(), 40*time.Second)
+		receipt := node.WaitForReceipt(t, txHash, 40*time.Second)
 		evmtest.AssertReceiptMatchesTxHash(t, receipt, txHash)
 
 		blockNum := evmtest.MustUint64HexField(t, receipt, "blockNumber")

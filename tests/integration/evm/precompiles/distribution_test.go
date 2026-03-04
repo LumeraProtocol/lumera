@@ -19,7 +19,7 @@ import (
 // distribution precompile methods (withdraw address + community pool).
 func testDistributionPrecompileQueryPathsViaEthCall(t *testing.T, node *evmtest.Node) {
 	t.Helper()
-	evmtest.WaitForBlockNumberAtLeast(t, node.RPCURL(), 1, 20*time.Second)
+	node.WaitForBlockNumberAtLeast(t, 1, 20*time.Second)
 
 	delegatorHex := testaccounts.MustAccountAddressFromTestKeyInfo(t, node.KeyInfo())
 
@@ -28,7 +28,7 @@ func testDistributionPrecompileQueryPathsViaEthCall(t *testing.T, node *evmtest.
 		t.Fatalf("pack delegatorWithdrawAddress input: %v", err)
 	}
 
-	withdrawAddrResult := mustEthCallPrecompile(t, node.RPCURL(), evmtypes.DistributionPrecompileAddress, withdrawAddrInput)
+	withdrawAddrResult := mustEthCallPrecompile(t, node, evmtypes.DistributionPrecompileAddress, withdrawAddrInput)
 	out, err := distributionprecompile.ABI.Unpack(distributionprecompile.DelegatorWithdrawAddressMethod, withdrawAddrResult)
 	if err != nil {
 		t.Fatalf("unpack delegatorWithdrawAddress output: %v", err)
@@ -46,7 +46,7 @@ func testDistributionPrecompileQueryPathsViaEthCall(t *testing.T, node *evmtest.
 		t.Fatalf("pack communityPool input: %v", err)
 	}
 
-	communityPoolResult := mustEthCallPrecompile(t, node.RPCURL(), evmtypes.DistributionPrecompileAddress, communityPoolInput)
+	communityPoolResult := mustEthCallPrecompile(t, node, evmtypes.DistributionPrecompileAddress, communityPoolInput)
 	var cpOut struct {
 		Coins []cmn.DecCoin `abi:"coins"`
 	}

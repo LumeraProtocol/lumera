@@ -24,14 +24,14 @@ func TestTransactionByHashPersistsAcrossRestart(t *testing.T) {
 func testTransactionByHashPersistsAcrossRestart(t *testing.T, node *evmtest.Node) {
 	t.Helper()
 
-	txHash := evmtest.SendOneLegacyTx(t, node.RPCURL(), node.KeyInfo())
-	evmtest.WaitForReceipt(t, node.RPCURL(), txHash, node.WaitCh(), node.OutputBuffer(), 40*time.Second)
-	txBefore := evmtest.WaitForTransactionByHash(t, node.RPCURL(), txHash, node.WaitCh(), node.OutputBuffer(), 20*time.Second)
+	txHash := node.SendOneLegacyTx(t)
+	node.WaitForReceipt(t, txHash, 40*time.Second)
+	txBefore := node.WaitForTransactionByHash(t, txHash, 20*time.Second)
 	evmtest.AssertTxObjectMatchesHash(t, txBefore, txHash)
 
 	node.RestartAndWaitRPC()
 
-	txAfter := evmtest.WaitForTransactionByHash(t, node.RPCURL(), txHash, node.WaitCh(), node.OutputBuffer(), 20*time.Second)
+	txAfter := node.WaitForTransactionByHash(t, txHash, 20*time.Second)
 	evmtest.AssertTxObjectMatchesHash(t, txAfter, txHash)
 
 	evmtest.AssertTxFieldStable(t, "blockHash", txBefore, txAfter)

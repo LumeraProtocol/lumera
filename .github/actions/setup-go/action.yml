@@ -1,5 +1,10 @@
 name: Setup Go from go.mod
 description: Detect the Go toolchain version from go.mod and install it with caching enabled
+inputs:
+  version:
+    description: "Go version to use (overrides go.mod detection)"
+    required: false
+    default: ""
 outputs:
   version:
     description: Detected Go version
@@ -13,15 +18,20 @@ runs:
       run: |
         set -euo pipefail
 
-        VERSION=""
-        TOOLCHAIN_VERSION=$(grep -E '^toolchain go[0-9]+\.[0-9]+(\.[0-9]+)?$' go.mod | cut -d ' ' -f 2 | sed 's/^go//' || true)
-        if [ -n "$TOOLCHAIN_VERSION" ]; then
-          VERSION="$TOOLCHAIN_VERSION"
-          echo "Detected toolchain directive: go$VERSION"
+        if [ -n "${{ inputs.version }}" ]; then
+          VERSION="${{ inputs.version }}"
+          echo "Using provided version: go$VERSION"
         else
-          VERSION=$(grep -E '^go [0-9]+\.[0-9]+(\.[0-9]+)?$' go.mod | cut -d ' ' -f 2 || true)
-          if [ -n "$VERSION" ]; then
-            echo "Detected go directive: $VERSION"
+          VERSION=""
+          TOOLCHAIN_VERSION=$(grep -E '^toolchain go[0-9]+\.[0-9]+(\.[0-9]+)?$' go.mod | cut -d ' ' -f 2 | sed 's/^go//' || true)
+          if [ -n "$TOOLCHAIN_VERSION" ]; then
+            VERSION="$TOOLCHAIN_VERSION"
+            echo "Detected toolchain directive: go$VERSION"
+          else
+            VERSION=$(grep -E '^go [0-9]+\.[0-9]+(\.[0-9]+)?$' go.mod | cut -d ' ' -f 2 || true)
+            if [ -n "$VERSION" ]; then
+              echo "Detected go directive: $VERSION"
+            fi
           fi
         fi
 

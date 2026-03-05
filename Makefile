@@ -51,7 +51,8 @@ TOOLS := \
 ###################################################
 ###                   Build                     ###
 ###################################################
-.PHONY: build build-debug release build-proto clean-proto clean-cache install-tools openrpc
+.PHONY: build build-debug build-proto  build-claiming-faucet
+.PHONY: clean-proto clean-cache install-tools openrpc release
 
 install-tools:
 	@echo "Installing Go tooling..."
@@ -116,6 +117,12 @@ ${BUILD_DIR}/lumerad: $(GO_SRC) app/openrpc/openrpc.json go.sum Makefile
 	${BUF} generate --template proto/buf.gen.gogo.yaml --verbose
 	GOFLAGS=${GOFLAGS} ${IGNITE} ${CHAIN_BUILD} -t linux:amd64 --skip-proto --output ${BUILD_DIR}/
 	chmod +x $(BUILD_DIR)/lumerad
+
+build-claiming-faucet:
+	@echo "Building Claiming Faucet binary..."
+	@mkdir -p ${BUILD_DIR}
+	${GO} build -o ${BUILD_DIR}/claiming_faucet ./claiming_faucet/
+	chmod +x ${BUILD_DIR}/claiming_faucet
 
 build-debug: ${BUILD_DIR}/debug/lumerad
 

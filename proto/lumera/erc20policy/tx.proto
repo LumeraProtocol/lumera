@@ -1,0 +1,54 @@
+syntax = "proto3";
+package lumera.erc20policy;
+
+import "amino/amino.proto";
+import "cosmos/msg/v1/msg.proto";
+import "cosmos_proto/cosmos.proto";
+
+option go_package = "x/erc20policy/types";
+
+// Msg defines the governance-controlled ERC20 registration policy service.
+service Msg {
+  option (cosmos.msg.v1.service) = true;
+
+  // SetRegistrationPolicy sets the IBC voucher ERC20 auto-registration policy.
+  // Only the governance module account (x/gov authority) may call this.
+  rpc SetRegistrationPolicy(MsgSetRegistrationPolicy)
+      returns (MsgSetRegistrationPolicyResponse);
+}
+
+// MsgSetRegistrationPolicy configures the IBC voucher ERC20 auto-registration
+// policy. It allows governance to control which IBC denoms are automatically
+// registered as ERC20 token pairs on first IBC receive.
+message MsgSetRegistrationPolicy {
+  option (cosmos.msg.v1.signer) = "authority";
+  option (amino.name) = "lumera/erc20policy/MsgSetRegistrationPolicy";
+
+  // authority is the address that controls the policy (defaults to x/gov).
+  string authority = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+
+  // mode is the registration policy mode: "all", "allowlist", or "none".
+  // If empty, the mode is not changed.
+  string mode = 2;
+
+  // add_denoms is a list of exact IBC denoms (e.g. "ibc/HASH...") to add to
+  // the allowlist. Only meaningful when mode is "allowlist".
+  repeated string add_denoms = 3;
+
+  // remove_denoms is a list of exact IBC denoms to remove from the allowlist.
+  repeated string remove_denoms = 4;
+
+  // add_base_denoms is a list of base token denominations (e.g. "uatom",
+  // "uosmo") to add to the base denom allowlist. Base denom matching is
+  // channel-independent: approving "uatom" allows ATOM arriving via any
+  // IBC channel or multi-hop path.
+  repeated string add_base_denoms = 5;
+
+  // remove_base_denoms is a list of base denominations to remove from the
+  // base denom allowlist.
+  repeated string remove_base_denoms = 6;
+}
+
+// MsgSetRegistrationPolicyResponse is the response type for
+// MsgSetRegistrationPolicy.
+message MsgSetRegistrationPolicyResponse {}

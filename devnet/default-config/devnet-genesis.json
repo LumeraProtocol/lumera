@@ -29,6 +29,28 @@
         "foundation_fee_share": "0.000000000000000000"
       }
     },
+    "audit": {
+      "params": {
+        "epoch_length_blocks": "400",
+        "epoch_zero_height": "1",
+        "peer_quorum_reports": 3,
+        "min_probe_targets_per_epoch": 3,
+        "max_probe_targets_per_epoch": 5,
+        "required_open_ports": [4444, 4445, 8002],
+        "consecutive_epochs_to_postpone": 1,
+        "keep_last_epoch_entries": "200",
+        "peer_port_postpone_threshold_percent": 100,
+        "action_finalization_signature_failure_evidences_per_epoch": 1,
+        "action_finalization_signature_failure_consecutive_epochs": 1,
+        "action_finalization_not_in_top10_evidences_per_epoch": 1,
+        "action_finalization_not_in_top10_consecutive_epochs": 1,
+        "action_finalization_recovery_epochs": 1,
+        "action_finalization_recovery_max_total_bad_evidences": 1,
+        "sc_enabled": true
+      },
+      "evidence": [],
+      "next_evidence_id": "1"
+    },
     "auth": {
       "params": {
         "max_memo_characters": "256",
@@ -149,11 +171,11 @@
     "claim": {
       "params": {
         "enable_claims": true,
-        "claim_end_time": "1746071999",
+        "claim_end_time": "1893456000",
         "max_claims_per_block": "100"
       },
       "claim_records": [],
-      "total_claimable_amount": "18749999981413",
+      "total_claimable_amount": "102250000",
       "claims_denom": "ulume"
     },
     "consensus": null,
@@ -184,6 +206,16 @@
     },
     "evidence": {
       "evidence": []
+    },
+    "evmigration": {
+      "params": {
+        "enable_migration": true,
+        "max_migrations_per_block": "50",
+        "max_validator_delegations": "2000"
+      },
+      "migration_records": [],
+      "total_migrated": "0",
+      "total_validators_migrated": "0"
     },
     "feegrant": {
       "allowances": []

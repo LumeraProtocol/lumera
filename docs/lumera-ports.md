@@ -22,6 +22,7 @@ This document lists network ports used by `lumerad`, with:
 | Ethereum JSON-RPC (WS) | `127.0.0.1:8546` | `app.toml` → `[json-rpc] ws-address` | `--json-rpc.ws-address` |
 | CometBFT pprof | disabled unless set | `config.toml` → `[rpc] pprof_laddr` | `--rpc.pprof_laddr` |
 | EVM geth metrics | `127.0.0.1:8100` | `app.toml` → `[evm] geth-metrics-address` | `--evm.geth-metrics-address` |
+| EVM JSON-RPC rate-limit proxy | `0.0.0.0:8547` (disabled by default) | `app.toml` → `[lumera.json-rpc-ratelimit] proxy-address` | — (config only) |
 | EVM JSON-RPC metrics | (app config; testnet commonly `127.0.0.1:6065`) | `app.toml` → `[json-rpc] metrics-address` | `--metrics` (enables metrics server) |
 
 > Notes:
@@ -43,6 +44,7 @@ This document lists network ports used by `lumerad`, with:
 | `9900` | Cosmos gRPC-Web | Browser-compatible gRPC over HTTP/1.1 for web clients. |
 | `8545` | EVM JSON-RPC HTTP | Ethereum-compatible HTTP RPC (`eth_*`, `net_*`, `web3_*`, etc.). |
 | `8546` | EVM JSON-RPC WS | Ethereum WebSocket RPC, subscriptions (`eth_subscribe`, pending tx, logs, heads). |
+| `8547` | EVM JSON-RPC rate-limit proxy | Per-IP rate-limiting reverse proxy forwarding to `:8545`. Disabled by default. |
 | `6060` (example) | CometBFT pprof | Runtime profiling/debug endpoints (`/debug/pprof/*`). Disabled unless configured. |
 | `8100` | EVM geth metrics | EVM/geth metrics endpoint for monitoring pipelines. |
 | `6065` (common testnet) | EVM JSON-RPC metrics | Metrics endpoint for JSON-RPC server (when enabled). |
@@ -153,6 +155,21 @@ printf '{"jsonrpc":"2.0","id":1,"method":"eth_subscribe","params":["newHeads"]}\
   | websocat ws://127.0.0.1:8546
 ```
 
+### 8547 (EVM JSON-RPC rate-limit proxy)
+
+Disabled by default. Enable in `app.toml` → `[lumera.json-rpc-ratelimit]`.
+When enabled, use this port instead of `8545` for external/public-facing traffic.
+
+```bash
+# Same JSON-RPC calls as 8545, routed through the rate-limiting proxy
+curl -s -X POST http://127.0.0.1:8547 \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' | jq
+
+# When rate limit is exceeded, returns HTTP 429:
+# {"jsonrpc":"2.0","error":{"code":-32005,"message":"rate limit exceeded"},"id":null}
+```
+
 ### 6060 (pprof)
 
 ```bash
@@ -249,21 +266,34 @@ curl -s http://127.0.0.1:6065/metrics | head
 - **Config:** `app.toml` → `[json-rpc] ws-address`
 - **CLI:** `--json-rpc.ws-address`, `--json-rpc.ws-origins`
 
-## 9) CometBFT pprof listener
+## 9) EVM JSON-RPC rate-limit proxy
+
+- **Purpose:** Per-IP token bucket rate limiting for the EVM JSON-RPC endpoint. Reverse-proxies requests to the internal JSON-RPC server (`:8545`).
+- **Default:** `0.0.0.0:8547` (disabled by default — must set `enable = true`)
+- **Config:** `app.toml` → `[lumera.json-rpc-ratelimit]`
+  - `enable` — toggle (default: `false`)
+  - `proxy-address` — listen address
+  - `requests-per-second` — sustained rate per IP (default: `50`)
+  - `burst` — max burst per IP (default: `100`)
+  - `entry-ttl` — inactivity TTL for per-IP state (default: `5m`)
+- **CLI:** none (config-only)
+- **Note:** When enabled, external clients should connect to this port; keep `:8545` on loopback for internal/trusted access.
+
+## 10) CometBFT pprof listener
 
 - **Purpose:** Go pprof diagnostics for RPC process.
 - **Default:** disabled unless set.
 - **Config:** `config.toml` → `[rpc] pprof_laddr`
 - **CLI:** `--rpc.pprof_laddr`
 
-## 10) EVM geth metrics listener
+## 11) EVM geth metrics listener
 
 - **Purpose:** EVM/geth metrics endpoint.
 - **Default:** `127.0.0.1:8100`
 - **Config:** `app.toml` → `[evm] geth-metrics-address`
 - **CLI:** `--evm.geth-metrics-address`
 
-## 11) EVM JSON-RPC metrics listener
+## 12) EVM JSON-RPC metrics listener
 
 - **Purpose:** metrics endpoint for JSON-RPC server.
 - **Common testnet port:** `127.0.0.1:6065`
@@ -308,6 +338,7 @@ Given `--home <HOME>` (default `~/.lumera`), config files are typically:
 - Expose P2P publicly only when operating a network node.
 - Avoid `--rpc.unsafe` on public interfaces.
 - If exposing API/gRPC publicly, place behind firewall/reverse proxy/TLS.
+- For public EVM JSON-RPC access, enable the rate-limiting proxy (`[lumera.json-rpc-ratelimit] enable = true`) and expose `:8547` instead of `:8545` directly.
 
 ---
 

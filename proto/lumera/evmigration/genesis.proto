@@ -1,0 +1,27 @@
+syntax = "proto3";
+package lumera.evmigration;
+
+import "amino/amino.proto";
+import "gogoproto/gogo.proto";
+import "lumera/evmigration/params.proto";
+import "lumera/evmigration/migration_record.proto";
+
+option go_package = "x/evmigration/types";
+
+// GenesisState defines the evmigration module's genesis state.
+message GenesisState {
+  // params defines all the parameters of the module.
+  Params params = 1 [
+    (gogoproto.nullable) = false,
+    (amino.dont_omitempty) = true
+  ];
+
+  // migration_records contains all completed migration records.
+  repeated MigrationRecord migration_records = 2 [(gogoproto.nullable) = false];
+
+  // total_migrated is the running counter of completed migrations (O(1) lookup).
+  uint64 total_migrated = 3;
+
+  // total_validators_migrated is the running counter of validator migrations.
+  uint64 total_validators_migrated = 4;
+}

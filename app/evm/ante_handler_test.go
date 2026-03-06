@@ -116,6 +116,14 @@ func TestNewAnteHandlerRequiredDependencies(t *testing.T) {
 // TestNewAnteHandlerRoutesEthereumExtension verifies extension-option based
 // routing reaches the EVM ante path for Ethereum txs.
 func TestNewAnteHandlerRoutesEthereumExtension(t *testing.T) {
+	ensureChainConfigInitialized(t)
+	evmtypes.SetDefaultEvmCoinInfo(evmtypes.EvmCoinInfo{
+		Denom:         lcfg.ChainEVMExtendedDenom,
+		ExtendedDenom: lcfg.ChainEVMExtendedDenom,
+		DisplayDenom:  lcfg.ChainDisplayDenom,
+		Decimals:      evmtypes.EighteenDecimals.Uint32(),
+	})
+
 	opts := newValidAnteHandlerOptions(t)
 	anteHandler, err := appevm.NewAnteHandler(opts)
 	require.NoError(t, err)
@@ -148,6 +156,68 @@ func TestNewAnteHandlerDefaultRouteWithoutExtension(t *testing.T) {
 	require.NoError(t, err)
 
 	tx := newTxWithoutExtensionWithEthereumMsg(t)
+	_, err = anteHandler(sdk.Context{}, tx, true)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "ExtensionOptionsEthereumTx")
+}
+
+// TestNewAnteHandlerUsesFirstExtensionOption_EthereumBeforeDynamic verifies
+// routing is determined by the first extension option when multiple are present.
+func TestNewAnteHandlerUsesFirstExtensionOption_EthereumBeforeDynamic(t *testing.T) {
+	ensureChainConfigInitialized(t)
+	evmtypes.SetDefaultEvmCoinInfo(evmtypes.EvmCoinInfo{
+		Denom:         lcfg.ChainEVMExtendedDenom,
+		ExtendedDenom: lcfg.ChainEVMExtendedDenom,
+		DisplayDenom:  lcfg.ChainDisplayDenom,
+		Decimals:      evmtypes.EighteenDecimals.Uint32(),
+	})
+
+	opts := newValidAnteHandlerOptions(t)
+	anteHandler, err := appevm.NewAnteHandler(opts)
+	require.NoError(t, err)
+
+	ethOption, err := codectypes.NewAnyWithValue(&evmtypes.ExtensionOptionsEthereumTx{})
+	require.NoError(t, err)
+	dynamicFeeOption, err := codectypes.NewAnyWithValue(&evmante.ExtensionOptionDynamicFeeTx{})
+	require.NoError(t, err)
+
+	tx := newExtensionTxWithoutMsgs(t, ethOption, dynamicFeeOption)
+	_, err = anteHandler(sdk.Context{}, tx, true)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "length of ExtensionOptions should be 1")
+}
+
+// TestNewAnteHandlerUsesFirstExtensionOption_DynamicBeforeEthereum verifies
+// the second extension option is ignored for routing.
+func TestNewAnteHandlerUsesFirstExtensionOption_DynamicBeforeEthereum(t *testing.T) {
+	opts := newValidAnteHandlerOptions(t)
+	anteHandler, err := appevm.NewAnteHandler(opts)
+	require.NoError(t, err)
+
+	dynamicFeeOption, err := codectypes.NewAnyWithValue(&evmante.ExtensionOptionDynamicFeeTx{})
+	require.NoError(t, err)
+	ethOption, err := codectypes.NewAnyWithValue(&evmtypes.ExtensionOptionsEthereumTx{})
+	require.NoError(t, err)
+
+	tx := newExtensionTxWithEthereumMsg(t, dynamicFeeOption, ethOption)
+	_, err = anteHandler(sdk.Context{}, tx, true)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "ExtensionOptionsEthereumTx")
+}
+
+// TestNewAnteHandlerUsesFirstExtensionOption_UnknownBeforeEthereum verifies
+// unknown first extension options fall back to Cosmos path even if Ethereum
+// extension appears later.
+func TestNewAnteHandlerUsesFirstExtensionOption_UnknownBeforeEthereum(t *testing.T) {
+	opts := newValidAnteHandlerOptions(t)
+	anteHandler, err := appevm.NewAnteHandler(opts)
+	require.NoError(t, err)
+
+	unknownOption := &codectypes.Any{TypeUrl: "/lumera.test.UnknownExtensionOption"}
+	ethOption, err := codectypes.NewAnyWithValue(&evmtypes.ExtensionOptionsEthereumTx{})
+	require.NoError(t, err)
+
+	tx := newExtensionTxWithEthereumMsg(t, unknownOption, ethOption)
 	_, err = anteHandler(sdk.Context{}, tx, true)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "ExtensionOptionsEthereumTx")
@@ -256,27 +326,39 @@ func newValidAnteHandlerOptions(t *testing.T) appevm.HandlerOptions {
 func newEthereumExtensionTxWithoutMsgs(t *testing.T) sdk.Tx {
 	t.Helper()
 
-	txCfg := evmencoding.MakeConfig(lcfg.EVMChainID).TxConfig
-	txBuilder := txCfg.NewTxBuilder().(authtx.ExtensionOptionsTxBuilder)
 	option, err := codectypes.NewAnyWithValue(&evmtypes.ExtensionOptionsEthereumTx{})
 	require.NoError(t, err)
 
-	txBuilder.SetExtensionOptions(option)
+	return newExtensionTxWithoutMsgs(t, option)
+}
+
+func newDynamicFeeExtensionTxWithEthereumMsg(t *testing.T) sdk.Tx {
+	t.Helper()
+
+	option, err := codectypes.NewAnyWithValue(&evmante.ExtensionOptionDynamicFeeTx{})
+	require.NoError(t, err)
+
+	return newExtensionTxWithEthereumMsg(t, option)
+}
+
+func newExtensionTxWithoutMsgs(t *testing.T, options ...*codectypes.Any) sdk.Tx {
+	t.Helper()
+
+	txCfg := evmencoding.MakeConfig(lcfg.EVMChainID).TxConfig
+	txBuilder := txCfg.NewTxBuilder().(authtx.ExtensionOptionsTxBuilder)
+	txBuilder.SetExtensionOptions(options...)
 	txBuilder.SetGasLimit(1)
 	txBuilder.SetFeeAmount(sdk.NewCoins(sdk.NewCoin(lcfg.ChainEVMExtendedDenom, sdkmath.NewInt(1))))
 
 	return txBuilder.GetTx()
 }
 
-func newDynamicFeeExtensionTxWithEthereumMsg(t *testing.T) sdk.Tx {
+func newExtensionTxWithEthereumMsg(t *testing.T, options ...*codectypes.Any) sdk.Tx {
 	t.Helper()
 
 	txCfg := evmencoding.MakeConfig(lcfg.EVMChainID).TxConfig
 	txBuilder := txCfg.NewTxBuilder().(authtx.ExtensionOptionsTxBuilder)
-
-	option, err := codectypes.NewAnyWithValue(&evmante.ExtensionOptionDynamicFeeTx{})
-	require.NoError(t, err)
-	txBuilder.SetExtensionOptions(option)
+	txBuilder.SetExtensionOptions(options...)
 
 	msg := evmtypes.NewTx(&evmtypes.EvmTxArgs{
 		Nonce:    0,

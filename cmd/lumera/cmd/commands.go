@@ -56,11 +56,6 @@ func initRootCmd(
 		pruning.Cmd(newApp, app.DefaultNodeHome),
 		snapshot.Cmd(newApp),
 	)
-	// Register --claims-path persistent flag
-	rootCmd.PersistentFlags().String(claimtypes.FlagClaimsPath, "",
-		fmt.Sprintf("Path to %s file or directory containing it", claimtypes.DefaultClaimsFileName))
-	// Bind to viper
-	_ = viper.BindPFlag(claimtypes.FlagClaimsPath, rootCmd.PersistentFlags().Lookup(claimtypes.FlagClaimsPath))
 
 	evmserver.AddCommands(
 		rootCmd,
@@ -82,6 +77,16 @@ func initRootCmd(
 
 func addModuleInitFlags(startCmd *cobra.Command) {
 	wasm.AddModuleInitFlags(startCmd)
+
+	// Claim module flags for genesis CSV loading.
+	// Registered on the start command so cobra accepts them, then bound to global
+	// viper so x/claim's InitGenesis (which uses viper.GetBool/GetString) sees them.
+	startCmd.Flags().String(claimtypes.FlagClaimsPath, "",
+		fmt.Sprintf("Path to %s file or directory containing it", claimtypes.DefaultClaimsFileName))
+	startCmd.Flags().Bool(claimtypes.FlagSkipClaimsCheck, true,
+		"Skip claims.csv loading at genesis (default true; set false to load claim records)")
+	_ = viper.BindPFlag(claimtypes.FlagClaimsPath, startCmd.Flags().Lookup(claimtypes.FlagClaimsPath))
+	_ = viper.BindPFlag(claimtypes.FlagSkipClaimsCheck, startCmd.Flags().Lookup(claimtypes.FlagSkipClaimsCheck))
 }
 
 // initCmdWithEVMDefaults wraps the SDK init command and patches genesis defaults:

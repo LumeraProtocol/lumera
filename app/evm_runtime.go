@@ -23,6 +23,7 @@ func (app *App) Close() error {
 	// Stop async EVM broadcaster first so no background goroutine can race with
 	// runtime/app shutdown or attempt late client usage.
 	app.stopEVMBroadcastWorker()
+	app.stopJSONRPCRateLimitProxy()
 	if app.App == nil {
 		return nil
 	}

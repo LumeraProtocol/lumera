@@ -75,7 +75,6 @@ import (
 	"github.com/CosmWasm/wasmd/x/wasm"
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
-	evmibctransferkeeper "github.com/cosmos/evm/x/ibc/transfer/keeper"
 	ibcpacketforwardkeeper "github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v10/packetforward/keeper"
 	icacontrollerkeeper "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/controller/keeper"
 	icahostkeeper "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/host/keeper"
@@ -102,6 +101,7 @@ import (
 	actionmodulekeeper "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	auditmodulekeeper "github.com/LumeraProtocol/lumera/x/audit/v1/keeper"
 	claimmodulekeeper "github.com/LumeraProtocol/lumera/x/claim/keeper"
+	evmigrationmodulekeeper "github.com/LumeraProtocol/lumera/x/evmigration/keeper"
 	lumeraidmodulekeeper "github.com/LumeraProtocol/lumera/x/lumeraid/keeper"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	erc20keeper "github.com/cosmos/evm/x/erc20/keeper"
@@ -143,10 +143,14 @@ type App struct {
 	pendingTxListeners []evmante.PendingTxListener
 	evmMempool         *evmmempool.ExperimentalEVMMempool
 	// evmTxBroadcaster is used to asynchronously broadcast promoted EVM transactions from the mempool to the network without blocking CheckTx execution.
-	evmTxBroadcaster   *evmTxBroadcastDispatcher
+	evmTxBroadcaster *evmTxBroadcastDispatcher
 	// if true, the app will log additional information about mempool transaction broadcasts, which can be noisy but is useful for debugging mempool behavior.
 	evmBroadcastDebug  bool
 	evmBroadcastLogger log.Logger
+
+	// jsonrpcRateLimitProxy is the optional rate-limiting reverse proxy for JSON-RPC.
+	jsonrpcRateLimitProxy       *http.Server
+	jsonrpcRateLimitCleanupStop chan struct{}
 
 	// keepers
 	// only keepers required by the app are exposed
@@ -172,7 +176,6 @@ type App struct {
 	ICAControllerKeeper icacontrollerkeeper.Keeper
 	ICAHostKeeper       icahostkeeper.Keeper
 	TransferKeeper      ibctransferkeeper.Keeper
-	EVMTransferKeeper   evmibctransferkeeper.Keeper
 
 	// IBC middleware keepers
 	PacketForwardKeeper *ibcpacketforwardkeeper.Keeper
@@ -191,6 +194,8 @@ type App struct {
 	PreciseBankKeeper precisebankkeeper.Keeper
 	EVMKeeper         *evmkeeper.Keeper
 	Erc20Keeper       erc20keeper.Keeper
+	EvmigrationKeeper    evmigrationmodulekeeper.Keeper
+	erc20PolicyWrapper   *erc20PolicyKeeperWrapper
 	// this line is used by starport scaffolding # stargate/app/keeperDeclaration
 
 	// simulation manager
@@ -297,6 +302,8 @@ func New(
 		&app.SupernodeKeeper,
 		&app.AuditKeeper,
 		&app.ActionKeeper,
+		&app.EvmigrationKeeper,
+
 		// this line is used by starport scaffolding # stargate/app/keeperDefinition
 	); err != nil {
 		panic(err)
@@ -320,14 +327,25 @@ func New(
 
 	// register EVM modules first — the ante handler (set during IBC/wasm registration)
 	// depends on EVM keepers (FeeMarketKeeper, EVMKeeper).
-	if err := app.registerEVMModules(); err != nil {
+	if err := app.registerEVMModules(appOpts); err != nil {
 		panic(err)
 	}
+
+	// Create the ERC20 registration policy wrapper (governance-controlled IBC voucher
+	// ERC20 auto-registration). Must be created before registerIBCModules, which wires
+	// the wrapper into the IBC transfer middleware stacks.
+	app.registerERC20Policy()
 
 	// register legacy modules (IBC, wasm)
 	if err := app.registerIBCModules(appOpts, wasmOpts...); err != nil {
 		panic(err)
 	}
+	// Inject IBC store keys into the EVM keeper's KV store map so the snapshot
+	// multi-store used by StateDB includes "ibc" and "transfer" stores.
+	// registerEVMModules captured kvStoreKeys() before IBC stores were registered;
+	// adding them here fixes Bug #6 (ICS20 precompile panic).
+	app.syncEVMStoreKeys()
+
 	// Enable Cosmos EVM static precompiles once IBC keepers are available.
 	app.configureEVMStaticPrecompiles()
 
@@ -348,6 +366,9 @@ func New(
 	if err := app.RegisterStreamingServices(appOpts, app.kvStoreKeys()); err != nil {
 		panic(err)
 	}
+
+	// Start optional JSON-RPC rate-limiting reverse proxy.
+	app.startJSONRPCRateLimitProxy(appOpts, logger)
 
 	// **** SETUP UPGRADES (upgrade handlers and store loaders) ****
 	// This needs to be done after keepers are initialized but before loading state.
@@ -371,6 +392,10 @@ func New(
 		if err := app.UpgradeKeeper.SetModuleVersionMap(ctx, app.ModuleManager.GetVersionMap()); err != nil {
 			panic(err)
 		}
+
+		// Pre-populate the ERC20 registration policy with default allowlist
+		// base denoms (uatom, uosmo, uusdc) on first genesis.
+		app.initERC20PolicyDefaults(ctx)
 
 		return app.App.InitChainer(ctx, req)
 	})
@@ -405,7 +430,7 @@ func (app *App) setupUpgrades() {
 		SupernodeKeeper:       app.SupernodeKeeper,
 		ParamsKeeper:          &app.ParamsKeeper,
 		ConsensusParamsKeeper: &app.ConsensusParamsKeeper,
-		AuditKeeper:     &app.AuditKeeper,
+		AuditKeeper:           &app.AuditKeeper,
 	}
 
 	allUpgrades := upgrades.AllUpgrades(params)
@@ -570,7 +595,7 @@ func (app *App) RegisterAPIRoutes(apiSvr *api.Server, apiConfig config.APIConfig
 	if err := server.RegisterSwaggerAPI(apiSvr.ClientCtx, apiSvr.Router, apiConfig.Swagger); err != nil {
 		panic(err)
 	}
-	apiSvr.Router.HandleFunc(appopenrpc.HTTPPath, appopenrpc.ServeHTTP).Methods(http.MethodGet, http.MethodHead)
+	apiSvr.Router.HandleFunc(appopenrpc.HTTPPath, appopenrpc.ServeHTTP).Methods(http.MethodGet, http.MethodHead, http.MethodOptions)
 
 	// register app's OpenAPI routes.
 	docs.RegisterOpenAPIService(Name, apiSvr.Router)

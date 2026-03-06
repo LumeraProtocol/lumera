@@ -19,6 +19,17 @@ func IsTestTagRequiredPanic(v any) bool {
 	return ok
 }
 
+// IsChainConfigAlreadySetPanic reports whether a recovered panic value is
+// the "chainConfig already set" error from cosmos-evm's global chain config.
+// Without '-tags=test', a second App instantiation in the same process
+// triggers this because the prod SetChainConfig is not resettable.
+func IsChainConfigAlreadySetPanic(v any) bool {
+	if err, ok := v.(error); ok {
+		return err.Error() == "chainConfig already set. Cannot set again the chainConfig"
+	}
+	return false
+}
+
 // TestTagRequiredMessage returns the canonical guidance for running EVM tests.
 func TestTagRequiredMessage() string {
 	return testTagRequiredMessage

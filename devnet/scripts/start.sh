@@ -275,7 +275,14 @@ start_lumera() {
 	fi
 
 	echo "[BOOT] ${MONIKER}: Starting lumerad..."
-	run "${DAEMON}" start --home "${DAEMON_HOME}" >"${VALIDATOR_LOG}" 2>&1 &
+	CLAIMS_LOCAL="${DAEMON_HOME}/config/claims.csv"
+	EXTRA_START_FLAGS=""
+	if [ -f "${CLAIMS_LOCAL}" ] && "${DAEMON}" start --help 2>&1 | grep -q 'skip-claims-check'; then
+		EXTRA_START_FLAGS="--skip-claims-check=false --claims-path=${CLAIMS_LOCAL}"
+		echo "[BOOT] ${MONIKER}: Claims CSV found, loading claim records at genesis"
+	fi
+	# shellcheck disable=SC2086
+	run "${DAEMON}" start --home "${DAEMON_HOME}" ${EXTRA_START_FLAGS} >"${VALIDATOR_LOG}" 2>&1 &
 
 	if [ "${MONIKER}" = "${PRIMARY_MONIKER}" ]; then
 		mkdir -p "$(dirname "${PRIMARY_STARTED_FLAG}")"

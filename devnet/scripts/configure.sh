@@ -157,8 +157,8 @@ install_sncli() {
 	fi
 }
 
-install_ibc_tests() {
-	local test_bins=("tests_validator" "tests_hermes")
+install_tests() {
+	local test_bins=("tests_validator" "tests_hermes" "tests_evmigration")
 	local bin
 	for bin in "${test_bins[@]}"; do
 		if [ -n "${BIN_DIR}" ] && [ -f "${BIN_DIR}/${bin}" ]; then
@@ -176,5 +176,5 @@ echo "[CONFIGURE] Configuration files copied to ${CFG_DIR}"
 install_supernode
 install_sncli
 install_nm
-install_ibc_tests
+install_tests
 echo "[CONFIGURE] Lumera configuration completed successfully."

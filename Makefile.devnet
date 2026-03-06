@@ -1,5 +1,6 @@
 .PHONY: devnet-build devnet-tests-build devnet-up devnet-reset devnet-up-detach devnet-down devnet-stop devnet-clean devnet-deploy-tar devnet-upgrade devnet-new devnet-start
 .PHONY: devnet-build-default _check-devnet-default-cfg _devnet-select-default-genesis devnet-upgrade-binaries devnet-upgrade-binaries-default devnet-update-scripts
+.PHONY: devnet-evmigration-sync-bin devnet-evmigration-prepare devnet-evmigration-migrate devnet-evmigration-migrate-validator devnet-evmigration-cleanup
 
 ##### Devnet Makefile ########################################
 #
@@ -40,16 +41,19 @@ DEFAULT_VALIDATORS_JSON := config/validators.json
 # Default genesis and claims files for devnet docker
 DEFAULT_GENESIS_FILE := devnet/default-config/devnet-genesis.json
 DEFAULT_GENESIS_EVM_FILE := devnet/default-config/devnet-genesis-evm.json
-DEFAULT_CLAIMS_FILE := claims.csv # relative to devnet
+DEFAULT_CLAIMS_FILE := devnet/default-config/claims.csv
 ORIG_GENESIS_FILE := devnet/default-config/devnet-genesis-orig.json
 EVM_CUTOVER_VERSION ?= v1.12.0
 
 devnet-tests-build:
 	@mkdir -p "${DEVNET_BIN_DIR_ABS}"
 	@echo "Building devnet test binaries..."
-	@cd devnet && \
-		$(GO) test -c -o "${DEVNET_BIN_DIR_ABS}/tests_validator" ./tests/validator && \
-		$(GO) test -c -o "${DEVNET_BIN_DIR_ABS}/tests_hermes" ./tests/hermes
+	@echo "  -> building tests_validator (${DEVNET_BIN_DIR_ABS}/tests_validator)"
+	@cd devnet && $(GO) test -c -o "${DEVNET_BIN_DIR_ABS}/tests_validator" ./tests/validator
+	@echo "  -> building tests_hermes (${DEVNET_BIN_DIR_ABS}/tests_hermes)"
+	@cd devnet && $(GO) test -c -o "${DEVNET_BIN_DIR_ABS}/tests_hermes" ./tests/hermes
+	@echo "  -> building tests_evmigration (${DEVNET_BIN_DIR_ABS}/tests_evmigration)"
+	@cd devnet && $(GO) build -o "${DEVNET_BIN_DIR_ABS}/tests_evmigration" ./tests/evmigration
 	@echo "Devnet test binaries built successfully"
 
 devnet-build:
@@ -114,7 +118,7 @@ devnet-build-default: _check-devnet-default-cfg
 		EXTERNAL_GENESIS_FILE="$$(realpath "$$GENESIS_FILE")" \
 		EXTERNAL_CLAIMS_FILE="$$(realpath $(DEFAULT_CLAIMS_FILE))"
 
-.PHONY: devnet-build-172 _check-devnet-172-cfg devnet-build-191 _check-devnet-191-cfg
+.PHONY: devnet-build-172 _check-devnet-172-cfg devnet-build-191 _check-devnet-191-cfg devnet-build-1110 _check-devnet-1110-cfg
 devnet-build-172:
 	@$(MAKE) devnet-build \
 		DEVNET_BUILD_LUMERA=0 \
@@ -134,6 +138,17 @@ devnet-build-191:
 		EXTERNAL_CLAIMS_FILE="$$(realpath $(DEFAULT_CLAIMS_FILE))"
 
 _check-devnet-191-cfg:
+	@[ -f "$$(realpath $(DEFAULT_GENESIS_FILE))" ] || (echo "Missing DEFAULT_GENESIS_FILE: $$(realpath $(DEFAULT_GENESIS_FILE))"; exit 1)
+	@[ -f "$$(realpath $(DEFAULT_CLAIMS_FILE))" ] || (echo "Missing DEFAULT_CLAIMS_FILE: $$(realpath $(DEFAULT_CLAIMS_FILE))"; exit 1)
+
+devnet-build-1110:
+	@$(MAKE) devnet-build \
+		DEVNET_BUILD_LUMERA=0 \
+		DEVNET_BIN_DIR=devnet/bin-v1.11.0 \
+		EXTERNAL_GENESIS_FILE="$$(realpath $(DEFAULT_GENESIS_FILE))" \
+		EXTERNAL_CLAIMS_FILE="$$(realpath $(DEFAULT_CLAIMS_FILE))"
+
+_check-devnet-1110-cfg:
 	@[ -f "$$(realpath $(DEFAULT_GENESIS_FILE))" ] || (echo "Missing DEFAULT_GENESIS_FILE: $$(realpath $(DEFAULT_GENESIS_FILE))"; exit 1)
 	@[ -f "$$(realpath $(DEFAULT_CLAIMS_FILE))" ] || (echo "Missing DEFAULT_CLAIMS_FILE: $$(realpath $(DEFAULT_CLAIMS_FILE))"; exit 1)
 
@@ -340,7 +355,8 @@ devnet-update-scripts:
 		echo "No containers were updated. Ensure the devnet is running."; \
 	fi
 
-.PHONY: devnet-new-172 devnet-new-191 devnet-upgrade-180 devnet-upgrade-191 devnet-upgrade-1100 devnet-upgrade-1101
+.PHONY: devnet-new-172 devnet-new-191 devnet-new-1110 devnet-upgrade-180 devnet-upgrade-191 
+.PHONY: devnet-upgrade-1100 devnet-upgrade-1101 devnet-upgrade-1110 devnet-upgrade-1120
 
 devnet-upgrade-180:
 	@cd devnet/scripts && ./upgrade.sh v1.8.0 auto-height ../bin-v1.8.0
@@ -352,7 +368,13 @@ devnet-upgrade-1100:
 	@cd devnet/scripts && ./upgrade.sh v1.10.0 auto-height ../bin-v1.10.0
 
 devnet-upgrade-1101:
-	@cd devnet/scripts && ./upgrade.sh v1.10.1 auto-height ../bin
+	@cd devnet/scripts && ./upgrade.sh v1.10.1 auto-height ../bin-v1.10.1
+
+devnet-upgrade-1110:
+	@cd devnet/scripts && ./upgrade.sh v1.11.0 auto-height ../bin-v1.11.0
+
+devnet-upgrade-1120:
+	@cd devnet/scripts && ./upgrade.sh v1.12.0 auto-height ../bin
 
 devnet-new-172:
 	$(MAKE) devnet-down
@@ -365,6 +387,13 @@ devnet-new-191:
 	$(MAKE) devnet-down
 	$(MAKE) devnet-clean
 	$(MAKE) devnet-build-191
+	sleep 10
+	$(MAKE) devnet-up
+
+devnet-new-1110:
+	$(MAKE) devnet-down
+	$(MAKE) devnet-clean
+	$(MAKE) devnet-build-1110
 	sleep 10
 	$(MAKE) devnet-up
 
@@ -401,3 +430,91 @@ devnet-deploy-tar:
 		rm devnet/external_genesis.json; \
 	fi
 	@echo "Created devnet-deploy.tar.gz with the required files."
+
+##### EVM Migration test targets #############################
+#
+# Run the evmigration test tool inside each devnet validator container
+# via docker compose exec.
+#
+# Inside containers:
+#   binary   = /shared/release/tests_evmigration
+#   lumerad  = /shared/release/lumerad  (symlinked to PATH or used via -bin)
+#   home     = /root/.lumera
+#   RPC      = tcp://localhost:26657    (each container exposes its own node)
+#   accounts = /shared/evmigration-accounts-<validator_service>.json
+#              (unique per validator to avoid cross-validator key/account reuse)
+#   names    = evm_test_<validator_tag>_<idx> / evm_testex_<validator_tag>_<idx>
+#              (validator tag is auto-derived by tests_evmigration from local validator/funder key name)
+
+EVMIGRATION_CHAIN_ID ?= lumera-devnet-1
+EVMIGRATION_NUM_ACCOUNTS ?= 5
+EVMIGRATION_NUM_EXTRA ?= 5
+EVMIGRATION_ACCOUNTS_PREFIX ?= /shared/evmigration-accounts
+
+# Container-internal paths (the /shared volume is mounted from $(DEVNET_DIR)/shared).
+_EVMIGRATION_BIN_CONTAINER  := /shared/release/tests_evmigration
+_EVMIGRATION_LUMERAD_CONTAINER := /shared/release/lumerad
+_EVMIGRATION_ACCOUNTS_CONTAINER_PREFIX := $(EVMIGRATION_ACCOUNTS_PREFIX)
+_EVMIGRATION_BIN_HOST := $(DEVNET_BIN_DIR_ABS)/tests_evmigration
+_EVMIGRATION_BIN_SHARED_HOST := $(SHARED_RELEASE_DIR)/tests_evmigration
+
+# Discover running validator services from the compose file.
+_EVMIGRATION_SERVICES = $(shell docker compose -f $(COMPOSE_FILE) ps --services 2>/dev/null | grep '^supernova_validator_' | sort)
+
+# Common flags passed to the binary inside the container.
+_evmigration_common_container = \
+	-bin="$(_EVMIGRATION_LUMERAD_CONTAINER)" \
+	-chain-id="$(EVMIGRATION_CHAIN_ID)" \
+	-home="/root/.lumera" \
+	-rpc="tcp://localhost:26657"
+
+define _run_evmigration_in_containers
+	@if [ ! -f "$(COMPOSE_FILE)" ]; then \
+		echo "docker-compose.yml not found; run 'make devnet-build' first"; \
+		exit 1; \
+	fi; \
+	services="$(_EVMIGRATION_SERVICES)"; \
+	if [ -z "$$services" ]; then \
+		echo "No running supernova_validator_* services found; is the devnet up?"; \
+		exit 1; \
+	fi; \
+	for svc in $$services; do \
+		accounts_path="$(_EVMIGRATION_ACCOUNTS_CONTAINER_PREFIX)-$${svc}.json"; \
+		echo "=== $(1) on $${svc} ==="; \
+		echo "    accounts file: $${accounts_path}"; \
+		docker compose -f $(COMPOSE_FILE) exec -T "$${svc}" \
+			"$(_EVMIGRATION_BIN_CONTAINER)" \
+			$(_evmigration_common_container) \
+			-accounts="$${accounts_path}" \
+			-mode="$(1)" \
+			$(2) || exit 1; \
+	done
+endef
+
+devnet-evmigration-sync-bin:
+	@src="$(_EVMIGRATION_BIN_HOST)"; \
+	dst="$(_EVMIGRATION_BIN_SHARED_HOST)"; \
+	if [ ! -f "$$src" ]; then \
+		echo "Missing $$src; run 'make devnet-tests-build' first"; \
+		exit 1; \
+	fi; \
+	mkdir -p "$$(dirname "$$dst")"; \
+	if [ -f "$$dst" ] && cmp -s "$$src" "$$dst"; then \
+		echo "tests_evmigration binary is up to date in shared/release"; \
+	else \
+		cp -f "$$src" "$$dst"; \
+		chmod +x "$$dst"; \
+		echo "synced tests_evmigration to $$dst"; \
+	fi
+
+devnet-evmigration-prepare: devnet-evmigration-sync-bin
+	$(call _run_evmigration_in_containers,prepare,-num-accounts=$(EVMIGRATION_NUM_ACCOUNTS) -num-extra=$(EVMIGRATION_NUM_EXTRA))
+
+devnet-evmigration-migrate: devnet-evmigration-sync-bin
+	$(call _run_evmigration_in_containers,migrate)
+
+devnet-evmigration-migrate-validator: devnet-evmigration-sync-bin
+	$(call _run_evmigration_in_containers,migrate-validator)
+
+devnet-evmigration-cleanup: devnet-evmigration-sync-bin
+	$(call _run_evmigration_in_containers,cleanup)

@@ -32,7 +32,7 @@ const (
 	defaultOutputPath   = "docs/openrpc.json"
 	defaultServerURL    = "http://localhost:8545"
 	defaultExamplesPath = "docs/openrpc_examples_overrides.json"
-	docVersion          = "cosmos/evm v0.5.1"
+	docVersion          = "cosmos/evm v0.6.0"
 )
 
 var (

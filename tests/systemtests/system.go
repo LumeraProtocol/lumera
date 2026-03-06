@@ -143,7 +143,7 @@ func (s *SystemUnderTest) SetupChain() {
 		panic(fmt.Sprintf("failed to load genesis: %s", err))
 	}
 
-	genesisBz, err = sjson.SetRawBytes(genesisBz, "consensus.params.block.max_gas", []byte(fmt.Sprintf(`"%d"`, 10_000_000)))
+	genesisBz, err = sjson.SetRawBytes(genesisBz, "consensus.params.block.max_gas", []byte(fmt.Sprintf(`"%d"`, lcfg.ChainDefaultConsensusMaxGas)))
 	if err != nil {
 		panic(fmt.Sprintf("failed set block max gas: %s", err))
 	}

@@ -43,4 +43,30 @@ func TestPrecompilesSuite(t *testing.T) {
 	t.Run("GovPrecompileCancelProposalTxPathFailsForUnknownProposal", func(t *testing.T) {
 		testGovPrecompileCancelProposalTxPathFailsForUnknownProposal(t, node)
 	})
+
+	// Slashing precompile tests
+	t.Run("SlashingPrecompileGetParamsViaEthCall", func(t *testing.T) {
+		testSlashingPrecompileGetParamsViaEthCall(t, node)
+	})
+	t.Run("SlashingPrecompileGetSigningInfosViaEthCall", func(t *testing.T) {
+		testSlashingPrecompileGetSigningInfosViaEthCall(t, node)
+	})
+	t.Run("SlashingPrecompileUnjailTxPathFailsWhenNotJailed", func(t *testing.T) {
+		testSlashingPrecompileUnjailTxPathFailsWhenNotJailed(t, node)
+	})
+
+	// ICS20 precompile tests
+	t.Run("ICS20PrecompileDenomsViaEthCall", func(t *testing.T) {
+		testICS20PrecompileDenomsViaEthCall(t, node)
+	})
+	t.Run("ICS20PrecompileDenomHashViaEthCall", func(t *testing.T) {
+		testICS20PrecompileDenomHashViaEthCall(t, node)
+	})
+	t.Run("ICS20PrecompileDenomViaEthCall", func(t *testing.T) {
+		testICS20PrecompileDenomViaEthCall(t, node)
+	})
+	// NOTE: ICS20 transfer tx test is omitted because the IBC store ordering
+	// bug causes a panic in the node process, which would corrupt subsequent
+	// tests in this suite. The ICS20 query tests above use t.Skip when the
+	// bug is detected, which is safe. See ics20_test.go for details.
 }

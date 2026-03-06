@@ -164,6 +164,77 @@ func TestEVMTxBroadcastDispatcherReleasesPendingAfterProcessError(t *testing.T) 
 	}, 2*time.Second, 10*time.Millisecond)
 }
 
+// TestEVMTxBroadcastDispatcherStopTimeoutSlowProcessing verifies Stop waits for
+// timeout when the worker is still processing a batch (slow/blocking path).
+func TestEVMTxBroadcastDispatcherStopTimeoutSlowProcessing(t *testing.T) {
+	started := make(chan struct{})
+	release := make(chan struct{})
+
+	dispatcher := newEVMTxBroadcastDispatcher(
+		log.NewNopLogger(),
+		2,
+		func(_ []*ethtypes.Transaction) error {
+			close(started)
+			<-release
+			return nil
+		},
+	)
+
+	accepted, deduped, err := dispatcher.enqueue([]*ethtypes.Transaction{makeLegacyTx(33)})
+	require.NoError(t, err)
+	require.Equal(t, 1, accepted)
+	require.Equal(t, 0, deduped)
+
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for worker to start processing")
+	}
+
+	stopTimeout := 75 * time.Millisecond
+	start := time.Now()
+	dispatcher.stop(stopTimeout)
+	elapsed := time.Since(start)
+	require.GreaterOrEqual(t, elapsed, stopTimeout, "stop should wait for timeout when worker is still busy")
+
+	close(release)
+	select {
+	case <-dispatcher.doneCh:
+	case <-time.After(2 * time.Second):
+		t.Fatal("worker did not exit after releasing processing")
+	}
+}
+
+// TestEVMTxBroadcastDispatcherStopFastAfterPanic verifies Stop returns quickly
+// when the worker has already exited due to panic.
+func TestEVMTxBroadcastDispatcherStopFastAfterPanic(t *testing.T) {
+	started := make(chan struct{})
+
+	dispatcher := newEVMTxBroadcastDispatcher(
+		log.NewNopLogger(),
+		2,
+		func(_ []*ethtypes.Transaction) error {
+			close(started)
+			panic("boom")
+		},
+	)
+
+	accepted, deduped, err := dispatcher.enqueue([]*ethtypes.Transaction{makeLegacyTx(44)})
+	require.NoError(t, err)
+	require.Equal(t, 1, accepted)
+	require.Equal(t, 0, deduped)
+
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for panic callback to start")
+	}
+
+	start := time.Now()
+	dispatcher.stop(2 * time.Second)
+	require.Less(t, time.Since(start), 300*time.Millisecond, "stop should return quickly after panic exit")
+}
+
 // TestEVMTxBroadcastDispatcherEnqueueRemainsNonBlocking verifies enqueue stays
 // non-blocking while the single worker is busy, as long as queue capacity
 // remains available.

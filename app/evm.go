@@ -6,6 +6,9 @@ import (
 	storetypes "cosmossdk.io/store/types"
 	precompiletypes "github.com/cosmos/evm/precompiles/types"
 
+	"github.com/spf13/cast"
+
+	servertypes "github.com/cosmos/cosmos-sdk/server/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
@@ -19,6 +22,8 @@ import (
 	evmkeeper "github.com/cosmos/evm/x/vm/keeper"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
 
+	srvflags "github.com/cosmos/evm/server/flags"
+
 	erc20module "github.com/cosmos/evm/x/erc20"
 	feemarket "github.com/cosmos/evm/x/feemarket"
 	precisebank "github.com/cosmos/evm/x/precisebank"
@@ -30,7 +35,7 @@ import (
 
 // registerEVMModules registers EVM-related keepers and non-depinject modules.
 // This follows the same pattern as registerIBCModules for manually wired modules.
-func (app *App) registerEVMModules() error {
+func (app *App) registerEVMModules(appOpts servertypes.AppOptions) error {
 	// Register store keys for EVM modules.
 	if err := app.RegisterStores(
 		// EVM-related module store keys.
@@ -63,6 +68,11 @@ func (app *App) registerEVMModules() error {
 		app.AuthKeeper,
 	)
 
+	// Read the EVM tracer from app.toml [evm] section / --evm.tracer flag.
+	// Valid values: "json", "struct", "access_list", "markdown", or "" (disabled).
+	// When set, enables debug_traceTransaction and related JSON-RPC methods.
+	evmTracer := cast.ToString(appOpts.Get(srvflags.EVMTracer))
+
 	// Create EVM (x/vm) keeper.
 	// Pass &app.Erc20Keeper (pointer to App field) to resolve the circular dependency:
 	// EVMKeeper needs Erc20Keeper for ERC20 precompiles, and Erc20Keeper needs EVMKeeper
@@ -80,7 +90,7 @@ func (app *App) registerEVMModules() error {
 		&app.ConsensusParamsKeeper,
 		&app.Erc20Keeper, // pointer back-ref, populated below
 		lcfg.EVMChainID,  // Lumera EVM chain ID
-		"",               // tracer — none
+		evmTracer,        // tracer from app.toml / --evm.tracer flag
 	)
 
 	// Set default EVM coin info (production only — see evm/defaults_prod.go / defaults_testbuild.go).
@@ -88,7 +98,7 @@ func (app *App) registerEVMModules() error {
 
 	// Create ERC20 keeper and populate app.Erc20Keeper (the EVMKeeper already holds
 	// &app.Erc20Keeper, so this assignment makes precompiles available).
-	// We pass &app.EVMTransferKeeper so ERC20 precompiles and IBC callbacks can use
+	// We pass &app.TransferKeeper so ERC20 precompiles and IBC callbacks can use
 	// transfer functionality once registerIBCModules initializes this keeper.
 	app.Erc20Keeper = erc20keeper.NewKeeper(
 		app.GetKey(erc20types.StoreKey),
@@ -98,7 +108,7 @@ func (app *App) registerEVMModules() error {
 		app.BankKeeper,
 		app.EVMKeeper,
 		app.StakingKeeper,
-		&app.EVMTransferKeeper, // pointer to resolve circular dependency with IBC transfer keeper
+		&app.TransferKeeper, // pointer to resolve circular dependency with IBC transfer keeper
 	)
 
 	// Register EVM modules.
@@ -114,6 +124,23 @@ func (app *App) registerEVMModules() error {
 	return nil
 }
 
+// syncEVMStoreKeys adds any KV store keys that were registered after the EVM
+// keeper was created (e.g. IBC stores from registerIBCModules) into the keeper's
+// store key map. The EVM's snapshot multi-store reads this map lazily when
+// creating a StateDB, so keys added here are visible to precompile execution.
+func (app *App) syncEVMStoreKeys() {
+	evmKeys := app.EVMKeeper.KVStoreKeys()
+	for _, k := range app.GetStoreKeys() {
+		kv, ok := k.(*storetypes.KVStoreKey)
+		if !ok {
+			continue
+		}
+		if _, exists := evmKeys[kv.Name()]; !exists {
+			evmKeys[kv.Name()] = kv
+		}
+	}
+}
+
 // configureEVMStaticPrecompiles wires Cosmos EVM's static precompile registry
 // once all keepers are initialized (including IBC transfer/channel keepers).
 func (app *App) configureEVMStaticPrecompiles() {
@@ -123,7 +150,7 @@ func (app *App) configureEVMStaticPrecompiles() {
 			app.DistrKeeper,
 			app.PreciseBankKeeper,
 			&app.Erc20Keeper,
-			&app.EVMTransferKeeper,
+			&app.TransferKeeper,
 			app.IBCKeeper.ChannelKeeper,
 			*app.GovKeeper,
 			app.SlashingKeeper,

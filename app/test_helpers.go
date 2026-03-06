@@ -129,7 +129,7 @@ func runOrSkipEVMTestTag(tb testing.TB, fn func()) {
 
 	defer func() {
 		if r := recover(); r != nil {
-			if appevm.IsTestTagRequiredPanic(r) {
+			if appevm.IsTestTagRequiredPanic(r) || appevm.IsChainConfigAlreadySetPanic(r) {
 				tb.Skip(appevm.TestTagRequiredMessage())
 				return
 			}

@@ -42,6 +42,8 @@ import (
 	auditmoduletypes "github.com/LumeraProtocol/lumera/x/audit/v1/types"
 	claimmodulev1 "github.com/LumeraProtocol/lumera/x/claim/module"
 	claimmoduletypes "github.com/LumeraProtocol/lumera/x/claim/types"
+	_ "github.com/LumeraProtocol/lumera/x/evmigration/module"
+	evmigrationmoduletypes "github.com/LumeraProtocol/lumera/x/evmigration/types"
 	lumeraidmodulev1 "github.com/LumeraProtocol/lumera/x/lumeraid/module"
 	lumeraidmoduletypes "github.com/LumeraProtocol/lumera/x/lumeraid/types"
 	supernodemodulev1 "github.com/LumeraProtocol/lumera/x/supernode/v1/module"
@@ -127,13 +129,14 @@ var (
 		pfmtypes.ModuleName,         // IBC packet-forward-middleware
 		ibctm.ModuleName,            // IBC Tendermint light client
 		solomachine.ModuleName,      // IBC Solo Machine light client
-		// chain modules
+		// Lumera custom modules
 		lumeraidmoduletypes.ModuleName,
 		wasmtypes.ModuleName,
 		claimmoduletypes.ModuleName,
 		supernodemoduletypes.ModuleName,
 		auditmoduletypes.ModuleName,
 		actionmoduletypes.ModuleName,
+		evmigrationmoduletypes.ModuleName,
 		// this line is used by starport scaffolding # stargate/app/initGenesis
 	}
 
@@ -161,13 +164,14 @@ var (
 		ibctransfertypes.ModuleName,
 		icatypes.ModuleName,
 		pfmtypes.ModuleName, // IBC packet-forward-middleware
-		// Lumera modules
+		// Lumera custom modules
 		lumeraidmoduletypes.ModuleName,
 		wasmtypes.ModuleName,
 		claimmoduletypes.ModuleName,
 		supernodemoduletypes.ModuleName,
 		auditmoduletypes.ModuleName,
 		actionmoduletypes.ModuleName,
+		evmigrationmoduletypes.ModuleName,
 		// this line is used by starport scaffolding # stargate/app/beginBlockers
 	}
 
@@ -194,6 +198,7 @@ var (
 		erc20types.ModuleName,
 		evmtypes.ModuleName,
 		precisebanktypes.ModuleName,
+		evmigrationmoduletypes.ModuleName,
 		// NOTE: feemarket EndBlocker should be last to get the full block gas used
 		feemarkettypes.ModuleName,
 		// this line is used by starport scaffolding # stargate/app/endBlockers
@@ -374,6 +379,10 @@ var (
 			{
 				Name:   actionmoduletypes.ModuleName,
 				Config: appconfig.WrapAny(&actionmodulev1.Module{}),
+			},
+			{
+				Name:   evmigrationmoduletypes.ModuleName,
+				Config: appconfig.WrapAny(&evmigrationmoduletypes.Module{}),
 			},
 			// this line is used by starport scaffolding # stargate/app/moduleConfig
 		},

@@ -2,7 +2,7 @@
   "openrpc": "1.2.6",
   "info": {
     "title": "Lumera Cosmos EVM JSON-RPC API",
-    "version": "cosmos/evm v0.5.1",
+    "version": "cosmos/evm v0.6.0",
     "description": "Auto-generated method catalog from Cosmos EVM JSON-RPC namespace implementations."
   },
   "servers": [

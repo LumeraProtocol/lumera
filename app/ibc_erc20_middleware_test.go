@@ -18,9 +18,8 @@ func TestIBCERC20MiddlewareWiring(t *testing.T) {
 	require.True(t, erc20KeeperField.IsValid())
 	require.False(t, erc20KeeperField.IsNil())
 
-	// Cosmos-EVM transfer keeper should be initialized and wrapped by callbacks stack.
-	require.NotNil(t, app.EVMTransferKeeper.Keeper)
-	require.NotNil(t, app.EVMTransferKeeper.GetICS4Wrapper())
+	// IBC-Go transfer keeper should be initialized and wrapped by callbacks stack.
+	require.NotNil(t, app.TransferKeeper.GetICS4Wrapper())
 
 	// IBC v1 transfer route exists (outermost middleware is PFM).
 	v1TransferModule, ok := app.GetIBCKeeper().PortKeeper.Route(ibctransfertypes.ModuleName)

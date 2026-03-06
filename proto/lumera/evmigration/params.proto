@@ -1,0 +1,23 @@
+syntax = "proto3";
+package lumera.evmigration;
+
+import "amino/amino.proto";
+import "gogoproto/gogo.proto";
+
+option go_package = "x/evmigration/types";
+
+// Params defines the parameters for the module.
+message Params {
+  option (amino.name) = "lumera/x/evmigration/Params";
+  option (gogoproto.equal) = true;
+
+  // enable_migration controls whether migration messages are accepted.
+  bool enable_migration = 1;
+  // migration_end_time is the unix timestamp deadline after which migrations are rejected.
+  int64 migration_end_time = 2;
+  // max_migrations_per_block is the maximum number of migration messages processed per block.
+  uint64 max_migrations_per_block = 3;
+  // max_validator_delegations is the maximum number of delegators a validator can have
+  // to be eligible for MsgMigrateValidator (default 2000).
+  uint64 max_validator_delegations = 4;
+}

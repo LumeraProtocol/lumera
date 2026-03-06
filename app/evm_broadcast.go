@@ -3,7 +3,9 @@ package app
 import (
 	"fmt"
 	"math/big"
+	"runtime/debug"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"cosmossdk.io/log"
@@ -29,6 +31,12 @@ type evmBroadcastBatch struct {
 	txs []*ethtypes.Transaction
 }
 
+type evmBroadcastWorkerExit struct {
+	panicked   bool
+	panicValue interface{}
+	panicStack string
+}
+
 // evmTxBroadcastDispatcher decouples txpool promotion from Comet CheckTx
 // submission so we do not re-enter app mempool Insert() in the same call stack.
 type evmTxBroadcastDispatcher struct {
@@ -39,7 +47,10 @@ type evmTxBroadcastDispatcher struct {
 	queue chan evmBroadcastBatch
 	// stopCh requests worker termination; doneCh signals worker has exited.
 	stopCh chan struct{}
-	doneCh chan struct{}
+	doneCh chan evmBroadcastWorkerExit
+	// processing indicates whether the worker is currently executing process().
+	processing atomic.Bool
+	stopOnce   sync.Once
 
 	// pending tracks tx hashes currently queued or being processed to dedupe
 	// repeated promotion notifications.
@@ -83,7 +94,7 @@ func newEVMTxBroadcastDispatcher(
 		process: process,
 		queue:   make(chan evmBroadcastBatch, queueSize),
 		stopCh:  make(chan struct{}),
-		doneCh:  make(chan struct{}),
+		doneCh:  make(chan evmBroadcastWorkerExit, 1),
 		pending: make(map[common.Hash]struct{}),
 	}
 
@@ -93,11 +104,25 @@ func newEVMTxBroadcastDispatcher(
 
 // stop requests worker shutdown and waits up to timeout for clean exit.
 func (d *evmTxBroadcastDispatcher) stop(timeout time.Duration) {
-	close(d.stopCh)
+	d.stopOnce.Do(func() {
+		close(d.stopCh)
+	})
+
 	select {
-	case <-d.doneCh:
+	case exit := <-d.doneCh:
+		if exit.panicked {
+			d.logger.Error(
+				"evm mempool broadcast worker exited due to panic",
+				"panic", fmt.Sprint(exit.panicValue),
+				"stack", exit.panicStack,
+			)
+		}
 	case <-time.After(timeout):
-		d.logger.Error("timed out waiting for evm mempool broadcast worker to stop")
+		d.logger.Error(
+			"timed out waiting for evm mempool broadcast worker to stop (likely slow or blocked processing)",
+			"processing", d.processing.Load(),
+			"queue_len", len(d.queue),
+		)
 	}
 }
 
@@ -114,7 +139,7 @@ func (d *evmTxBroadcastDispatcher) enqueue(txs []*ethtypes.Transaction) (accepte
 		return 0, 0, nil
 	}
 
-	filtered := make([]*ethtypes.Transaction, 0, len(txs))
+	var filtered []*ethtypes.Transaction
 
 	d.mtx.Lock()
 	for _, tx := range txs {
@@ -130,6 +155,9 @@ func (d *evmTxBroadcastDispatcher) enqueue(txs []*ethtypes.Transaction) (accepte
 		}
 
 		d.pending[hash] = struct{}{}
+		if filtered == nil {
+			filtered = make([]*ethtypes.Transaction, 0, len(txs))
+		}
 		filtered = append(filtered, tx)
 	}
 	d.mtx.Unlock()
@@ -151,7 +179,16 @@ func (d *evmTxBroadcastDispatcher) enqueue(txs []*ethtypes.Transaction) (accepte
 // run processes batches on a single goroutine to keep broadcast order stable
 // and simplify dedupe bookkeeping.
 func (d *evmTxBroadcastDispatcher) run() {
-	defer close(d.doneCh)
+	defer func() {
+		exit := evmBroadcastWorkerExit{}
+		if r := recover(); r != nil {
+			exit.panicked = true
+			exit.panicValue = r
+			exit.panicStack = string(debug.Stack())
+		}
+		d.doneCh <- exit
+		close(d.doneCh)
+	}()
 
 	for {
 		select {
@@ -162,14 +199,19 @@ func (d *evmTxBroadcastDispatcher) run() {
 				continue
 			}
 
-			if err := d.process(batch.txs); err != nil {
-				d.logger.Error(
-					"failed to broadcast promoted evm transactions",
-					"count", len(batch.txs),
-					"err", err,
-				)
-			}
-			d.releasePending(batch.txs)
+			d.processing.Store(true)
+			func() {
+				defer d.processing.Store(false)
+				defer d.releasePending(batch.txs)
+
+				if err := d.process(batch.txs); err != nil {
+					d.logger.Error(
+						"failed to broadcast promoted evm transactions",
+						"count", len(batch.txs),
+						"err", err,
+					)
+				}
+			}()
 		}
 	}
 }
@@ -231,7 +273,7 @@ func (app *App) broadcastEVMTransactions(ethTxs []*ethtypes.Transaction) error {
 		return app.broadcastEVMTransactionsSync(ethTxs)
 	}
 
-	accepted, deduped, err := app.evmTxBroadcaster.enqueue(append([]*ethtypes.Transaction(nil), ethTxs...))
+	accepted, deduped, err := app.evmTxBroadcaster.enqueue(ethTxs)
 	if err != nil {
 		return err
 	}

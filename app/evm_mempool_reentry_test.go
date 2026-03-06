@@ -52,7 +52,8 @@ func TestEVMMempoolReentrantInsertBlocks(t *testing.T) {
 			WithBlockHeader(cmtproto.Header{
 				Height:  blockHeight,
 				AppHash: bytes.Repeat([]byte{0x1}, 32),
-			}), nil
+			}).
+			WithEventManager(sdk.NewEventManager()), nil
 	}
 
 	extMempool := evmmempool.NewExperimentalEVMMempool(
@@ -80,7 +81,9 @@ func TestEVMMempoolReentrantInsertBlocks(t *testing.T) {
 	funded.Balance = uint256.NewInt(1_000_000_000_000_000_000)
 	require.NoError(t, vmKeeper.SetAccount(sdk.Context{}, sender, *funded))
 
-	ctx := sdk.Context{}.WithBlockHeight(1)
+	ctx := sdk.Context{}.
+		WithBlockHeight(1).
+		WithEventManager(sdk.NewEventManager())
 
 	// Prime a nonce gap: nonce=1 is queued, nonce=0 will fill the gap and
 	// trigger promotion → BroadcastTxFn inside runReorg.

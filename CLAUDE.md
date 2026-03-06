@@ -95,7 +95,7 @@ Generated files land in `x/*/types/` as `*.pb.go`, `*_pb.gw.go`, `*.pulsar.go`.
 
 Custom ante handler in `ante/delayed_claim_fee_decorator.go` - a fee decorator specific to claim transactions. Dual-route EVM ante handler in `app/evm/ante.go` routes Ethereum extension txs to the EVM path and all others to the Cosmos path.
 
-### EVM Stack (Cosmos EVM v0.5.1)
+### EVM Stack (Cosmos EVM v0.6.0)
 
 Four EVM modules wired in `app/evm.go`:
 

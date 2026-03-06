@@ -57,8 +57,14 @@ start_lumera() {
 	ensure_logs_dir
 	mkdir -p "$(dirname "${VALIDATOR_LOG}")" "${DAEMON_HOME}/config"
 
+	CLAIMS_LOCAL="${DAEMON_HOME}/config/claims.csv"
+	EXTRA_START_FLAGS=""
+	if [ -f "${CLAIMS_LOCAL}" ] && "${DAEMON}" start --help 2>&1 | grep -q 'skip-claims-check'; then
+		EXTRA_START_FLAGS="--skip-claims-check=false --claims-path=${CLAIMS_LOCAL}"
+	fi
 	log "Starting ${DAEMON}..."
-	"${DAEMON}" start --home "${DAEMON_HOME}" >"${VALIDATOR_LOG}" 2>&1 &
+	# shellcheck disable=SC2086
+	"${DAEMON}" start --home "${DAEMON_HOME}" ${EXTRA_START_FLAGS} >"${VALIDATOR_LOG}" 2>&1 &
 	log "${DAEMON} start requested; logging to ${VALIDATOR_LOG}"
 }
 

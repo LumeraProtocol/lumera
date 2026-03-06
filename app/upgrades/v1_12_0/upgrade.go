@@ -6,6 +6,8 @@ import (
 	feemarkettypes "github.com/cosmos/evm/x/feemarket/types"
 	precisebanktypes "github.com/cosmos/evm/x/precisebank/types"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
+
+	evmigrationtypes "github.com/LumeraProtocol/lumera/x/evmigration/types"
 )
 
 // UpgradeName is the on-chain name used for this upgrade.
@@ -17,6 +19,7 @@ var StoreUpgrades = storetypes.StoreUpgrades{
 		feemarkettypes.StoreKey,   // added EVM fee market store key
 		precisebanktypes.StoreKey, // added EVM precise bank store key
 		evmtypes.StoreKey,         // added EVM state store key
-		erc20types.StoreKey,       // added ERC20 token pairs store key
+		erc20types.StoreKey,           // added ERC20 token pairs store key
+		evmigrationtypes.StoreKey,     // added EVM migration store key
 	},
 }

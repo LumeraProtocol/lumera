@@ -21,5 +21,6 @@ const (
 
 	// ChainDefaultConsensusMaxGas is the default Comet consensus max gas per block.
 	// A finite value is required for meaningful EIP-1559 base fee adjustments.
-	ChainDefaultConsensusMaxGas int64 = 10_000_000
+	// 25M aligns with Kava/Cronos and provides headroom for DeFi workloads.
+	ChainDefaultConsensusMaxGas int64 = 25_000_000
 )

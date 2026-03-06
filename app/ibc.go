@@ -21,8 +21,6 @@ import (
 
 	erc20ibc "github.com/cosmos/evm/x/erc20"
 	erc20ibcv2 "github.com/cosmos/evm/x/erc20/v2"
-	evmibctransfer "github.com/cosmos/evm/x/ibc/transfer"
-	evmibctransferkeeper "github.com/cosmos/evm/x/ibc/transfer/keeper"
 	pfm "github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v10/packetforward"
 	pfmkeeper "github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v10/packetforward/keeper"
 	pfmtypes "github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v10/packetforward/types"
@@ -104,20 +102,18 @@ func (app *App) registerIBCModules(
 		govAuthority,
 	)
 
-	// Create Cosmos-EVM IBC transfer keeper (wraps IBC-go transfer keeper and
-	// adds ERC20-aware transfer handling).
-	app.EVMTransferKeeper = evmibctransferkeeper.NewKeeper(
+	// Create IBC transfer keeper (official IBC-Go).
+	app.TransferKeeper = ibctransferkeeper.NewKeeper(
 		app.appCodec,
 		runtime.NewKVStoreService(app.GetKey(ibctransfertypes.StoreKey)),
+		app.GetSubspace(ibctransfertypes.ModuleName),
 		app.IBCKeeper.ChannelKeeper, // ICS4Wrapper
 		app.IBCKeeper.ChannelKeeper,
 		app.MsgServiceRouter(),
 		app.AuthKeeper,
 		app.BankKeeper,
-		app.Erc20Keeper,
 		govAuthority,
 	)
-	app.TransferKeeper = *app.EVMTransferKeeper.Keeper
 	app.PacketForwardKeeper.SetTransferKeeper(app.TransferKeeper)
 
 	// Create interchain account keepers
@@ -158,8 +154,8 @@ func (app *App) registerIBCModules(
 
 	// Create Transfer Stack
 	var ibcv1transferStack ibcporttypes.IBCModule
-	ibcv1transferStack = evmibctransfer.NewIBCModule(app.EVMTransferKeeper)
-	ibcv1transferStack = erc20ibc.NewIBCMiddleware(app.Erc20Keeper, ibcv1transferStack)
+	ibcv1transferStack = ibctransfer.NewIBCModule(app.TransferKeeper)
+	ibcv1transferStack = erc20ibc.NewIBCMiddleware(app.erc20PolicyWrapper, ibcv1transferStack)
 	// callbacks wraps the transfer stack as its base app, and uses PacketForwardKeeper as the ICS4Wrapper
 	// i.e. packet-forward-middleware is higher on the stack and sits between callbacks and the ibc channel keeper
 	// Since this is the lowest level middleware of the transfer stack, it should be the first entrypoint for transfer keeper's
@@ -188,9 +184,8 @@ func (app *App) registerIBCModules(
 		app.IBCKeeper.ChannelKeeperV2,
 		lcfg.DefaultMaxIBCCallbackGas,
 	)
-	ibcv2transferStack = erc20ibcv2.NewIBCMiddleware(ibcv2transferStack, app.Erc20Keeper)
-	app.EVMTransferKeeper.WithICS4Wrapper(ibccbStack)
-	app.TransferKeeper = *app.EVMTransferKeeper.Keeper
+	ibcv2transferStack = erc20ibcv2.NewIBCMiddleware(ibcv2transferStack, app.erc20PolicyWrapper)
+	app.TransferKeeper.WithICS4Wrapper(ibccbStack)
 
 	// RecvPacket, message that originates from core IBC and goes down to app, the flow is:
 	// channel.RecvPacket -> icaHost.OnRecvPacket
@@ -261,7 +256,7 @@ func (app *App) registerIBCModules(
 	if err := app.RegisterModules(
 		ibc.NewAppModule(app.IBCKeeper),
 		pfm.NewAppModule(app.PacketForwardKeeper, app.GetSubspace(pfmtypes.ModuleName)),
-		evmibctransfer.NewAppModule(app.EVMTransferKeeper),
+		ibctransfer.NewAppModule(app.TransferKeeper),
 		icamodule.NewAppModule(&app.ICAControllerKeeper, &app.ICAHostKeeper),
 		ibctm.NewAppModule(tmLightClientModule),
 		solomachine.NewAppModule(soloLightClientModule),

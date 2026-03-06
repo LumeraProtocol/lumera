@@ -344,8 +344,8 @@ func testBaseFeeProgressesAcrossMultiBlockLoadPattern(t *testing.T, node *evmtes
 
 	const (
 		// 1500 simple transfers at 21k gas each = 31.5M total gas.
-		// With 10M block gas limit the chain packs ~476 per block, producing
-		// 3 consecutive near-100% blocks (~6.25% base-fee increase each).
+		// With 25M block gas limit the chain packs ~1190 per block, producing
+		// 1-2 consecutive above-target blocks that trigger base-fee increases.
 		totalSimpleTxs     = 1500
 		simpleGasLimit     = uint64(21_000)
 		lowEmptyBlocks     = 16

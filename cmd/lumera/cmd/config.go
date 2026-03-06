@@ -13,8 +13,17 @@ type LumeraEVMMempoolConfig struct {
 	BroadcastDebug bool `mapstructure:"broadcast-debug"`
 }
 
+type LumeraJSONRPCRateLimitConfig struct {
+	Enable           bool   `mapstructure:"enable"`
+	ProxyAddress     string `mapstructure:"proxy-address"`
+	RequestsPerSec   int    `mapstructure:"requests-per-second"`
+	Burst            int    `mapstructure:"burst"`
+	EntryTTL         string `mapstructure:"entry-ttl"`
+}
+
 type LumeraConfig struct {
-	EVMMempool LumeraEVMMempoolConfig `mapstructure:"evm-mempool"`
+	EVMMempool       LumeraEVMMempoolConfig        `mapstructure:"evm-mempool"`
+	JSONRPCRateLimit LumeraJSONRPCRateLimitConfig   `mapstructure:"json-rpc-ratelimit"`
 }
 
 const lumeraConfigTemplate = `
@@ -25,6 +34,27 @@ const lumeraConfigTemplate = `
 [lumera.evm-mempool]
 # Enables detailed logs for async EVM mempool broadcast queue processing.
 broadcast-debug = {{ .Lumera.EVMMempool.BroadcastDebug }}
+
+[lumera.json-rpc-ratelimit]
+# Rate-limiting reverse proxy for the EVM JSON-RPC endpoint.
+# When enabled, a proxy server listens on proxy-address and forwards requests
+# to the internal JSON-RPC server with per-IP token bucket rate limiting.
+
+# Enable the rate-limiting proxy (default: false).
+enable = {{ .Lumera.JSONRPCRateLimit.Enable }}
+
+# Address the rate-limiting proxy listens on.
+proxy-address = "{{ .Lumera.JSONRPCRateLimit.ProxyAddress }}"
+
+# Sustained requests per second allowed per IP.
+requests-per-second = {{ .Lumera.JSONRPCRateLimit.RequestsPerSec }}
+
+# Maximum burst size per IP (token bucket capacity).
+burst = {{ .Lumera.JSONRPCRateLimit.Burst }}
+
+# Time-to-live for per-IP rate limiter entries (Go duration, e.g. "5m", "1h").
+# Entries are evicted after this duration of inactivity.
+entry-ttl = "{{ .Lumera.JSONRPCRateLimit.EntryTTL }}"
 `
 
 // initCometBFTConfig helps to override default CometBFT Config values.
@@ -75,6 +105,13 @@ func initAppConfig() (string, interface{}) {
 		Lumera: LumeraConfig{
 			EVMMempool: LumeraEVMMempoolConfig{
 				BroadcastDebug: false,
+			},
+			JSONRPCRateLimit: LumeraJSONRPCRateLimitConfig{
+				Enable:         false,
+				ProxyAddress:   "0.0.0.0:8547",
+				RequestsPerSec: 50,
+				Burst:          100,
+				EntryTTL:       "5m",
 			},
 		},
 	}

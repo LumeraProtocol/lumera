@@ -5,7 +5,7 @@ go 1.25.5
 replace (
 	// Local development - uncomment these for local testing
 	// Comment lines with github.com/LumeraProtocol/ before releasing
-	github.com/LumeraProtocol/lumera => ..
+	// github.com/LumeraProtocol/lumera => ..
 	//github.com/LumeraProtocol/sdk-go => ../../sdk-go
 	github.com/envoyproxy/protoc-gen-validate => github.com/bufbuild/protoc-gen-validate v1.3.0
 	github.com/lyft/protoc-gen-validate => github.com/envoyproxy/protoc-gen-validate v1.3.0

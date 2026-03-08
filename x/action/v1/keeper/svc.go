@@ -11,12 +11,25 @@ import (
 	gogoproto "github.com/cosmos/gogoproto/proto"
 )
 
-// SVCChallengeCount is the number of chunks challenged during SVC verification.
-const SVCChallengeCount uint32 = 8
+// Default SVC constants — used as fallback when params are zero (pre-migration).
+const (
+	SVCChallengeCount        uint32 = 8
+	SVCMinChunksForChallenge uint32 = 4
+)
 
-// SVCMinChunksForChallenge is the minimum number of chunks a file must produce
-// for SVC verification to apply. Files with fewer chunks skip SVC.
-const SVCMinChunksForChallenge uint32 = 4
+// GetSVCParams returns the effective SVC parameters from the given Params.
+// Zero values (from pre-migration state) fall back to the package-level defaults.
+func GetSVCParams(params actiontypes.Params) (challengeCount, minChunks uint32) {
+	challengeCount = params.SvcChallengeCount
+	if challengeCount == 0 {
+		challengeCount = SVCChallengeCount
+	}
+	minChunks = params.SvcMinChunksForChallenge
+	if minChunks == 0 {
+		minChunks = SVCMinChunksForChallenge
+	}
+	return challengeCount, minChunks
+}
 
 // VerifyChunkProofs validates LEP-5 chunk proofs for Cascade finalization.
 //
@@ -44,12 +57,15 @@ func (k *Keeper) VerifyChunkProofs(
 		return nil
 	}
 
-	if commitment.NumChunks < SVCMinChunksForChallenge {
+	params := k.GetParams(ctx)
+	challengeCount, minChunks := GetSVCParams(params)
+
+	if commitment.NumChunks < minChunks {
 		// Small files are out of challenge scope.
 		return nil
 	}
 
-	expectedCount := SVCChallengeCount
+	expectedCount := challengeCount
 	if expectedCount > commitment.NumChunks {
 		expectedCount = commitment.NumChunks
 	}

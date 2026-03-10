@@ -80,6 +80,7 @@ import (
 	appParams "github.com/LumeraProtocol/lumera/app/upgrades/params"
 	actionmodulekeeper "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	claimmodulekeeper "github.com/LumeraProtocol/lumera/x/claim/keeper"
+	everlightkeeper "github.com/LumeraProtocol/lumera/x/everlight/v1/keeper"
 	lumeraidmodulekeeper "github.com/LumeraProtocol/lumera/x/lumeraid/keeper"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
@@ -146,8 +147,9 @@ type App struct {
 
 	LumeraidKeeper  lumeraidmodulekeeper.Keeper
 	ClaimKeeper     claimmodulekeeper.Keeper
-	SupernodeKeeper sntypes.SupernodeKeeper
-	ActionKeeper    actionmodulekeeper.Keeper
+	SupernodeKeeper  sntypes.SupernodeKeeper
+	ActionKeeper     actionmodulekeeper.Keeper
+	EverlightKeeper  everlightkeeper.Keeper
 	// this line is used by starport scaffolding # stargate/app/keeperDeclaration
 
 	// simulation manager
@@ -249,6 +251,7 @@ func New(
 		&app.ClaimKeeper,
 		&app.SupernodeKeeper,
 		&app.ActionKeeper,
+		&app.EverlightKeeper,
 		// this line is used by starport scaffolding # stargate/app/keeperDefinition
 	); err != nil {
 		panic(err)

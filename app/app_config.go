@@ -41,6 +41,8 @@ import (
 	claimmoduletypes "github.com/LumeraProtocol/lumera/x/claim/types"
 	lumeraidmodulev1 "github.com/LumeraProtocol/lumera/x/lumeraid/module"
 	lumeraidmoduletypes "github.com/LumeraProtocol/lumera/x/lumeraid/types"
+	everlightmodulev1 "github.com/LumeraProtocol/lumera/x/everlight/v1/module"
+	everlightmoduletypes "github.com/LumeraProtocol/lumera/x/everlight/v1/types"
 	supernodemodulev1 "github.com/LumeraProtocol/lumera/x/supernode/v1/module"
 	supernodemoduletypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	_ "github.com/cosmos/cosmos-sdk/x/auth/tx/config" // import for side-effects
@@ -118,6 +120,7 @@ var (
 		claimmoduletypes.ModuleName,
 		supernodemoduletypes.ModuleName,
 		actionmoduletypes.ModuleName,
+		everlightmoduletypes.ModuleName,
 		// this line is used by starport scaffolding # stargate/app/initGenesis
 	}
 
@@ -146,6 +149,7 @@ var (
 		claimmoduletypes.ModuleName,
 		supernodemoduletypes.ModuleName,
 		actionmoduletypes.ModuleName,
+		everlightmoduletypes.ModuleName,
 		// this line is used by starport scaffolding # stargate/app/beginBlockers
 	}
 
@@ -167,6 +171,7 @@ var (
 		claimmoduletypes.ModuleName,
 		supernodemoduletypes.ModuleName,
 		actionmoduletypes.ModuleName,
+		everlightmoduletypes.ModuleName,
 		// this line is used by starport scaffolding # stargate/app/endBlockers
 	}
 
@@ -192,6 +197,7 @@ var (
 		{Account: claimmoduletypes.ModuleName, Permissions: []string{authtypes.Minter, authtypes.Burner, authtypes.Staking}},
 		{Account: supernodemoduletypes.ModuleName, Permissions: []string{authtypes.Minter, authtypes.Burner, authtypes.Staking}},
 		{Account: actionmoduletypes.ModuleName, Permissions: []string{authtypes.Minter, authtypes.Burner, authtypes.Staking}},
+		{Account: everlightmoduletypes.ModuleName, Permissions: []string{authtypes.Burner}},
 		// this line is used by starport scaffolding # stargate/app/maccPerms
 	}
 
@@ -336,6 +342,10 @@ var (
 			{
 				Name:   actionmoduletypes.ModuleName,
 				Config: appconfig.WrapAny(&actionmodulev1.Module{}),
+			},
+			{
+				Name:   everlightmoduletypes.ModuleName,
+				Config: appconfig.WrapAny(&everlightmodulev1.Module{}),
 			},
 			// this line is used by starport scaffolding # stargate/app/moduleConfig
 		},

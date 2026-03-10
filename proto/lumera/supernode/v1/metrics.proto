@@ -46,6 +46,9 @@ message SupernodeMetrics {
 
   // Tri-state port reporting for required ports.
   repeated PortStatus open_ports = 14 [(gogoproto.nullable) = false];
+
+  // Cascade Kademlia DB size in bytes (LEP-4 metric for Everlight payouts).
+  double cascade_kademlia_db_bytes = 15;
 }
 
 // SupernodeMetricsState stores the latest metrics state for a validator.

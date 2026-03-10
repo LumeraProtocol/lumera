@@ -1,0 +1,20 @@
+syntax = "proto3";
+package lumera.everlight.v1;
+
+option go_package = "x/everlight/v1/types";
+
+import "amino/amino.proto";
+import "gogoproto/gogo.proto";
+import "lumera/everlight/v1/params.proto";
+
+// GenesisState defines the everlight module's genesis state.
+message GenesisState {
+  // params defines all the parameters of the module.
+  Params params = 1 [
+    (gogoproto.nullable) = false,
+    (amino.dont_omitempty) = true
+  ];
+
+  // last_distribution_height is the block height of the last distribution.
+  int64 last_distribution_height = 2;
+}

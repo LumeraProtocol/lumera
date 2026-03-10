@@ -1,0 +1,34 @@
+syntax = "proto3";
+package lumera.everlight.v1;
+
+option go_package = "x/everlight/v1/types";
+
+import "amino/amino.proto";
+import "gogoproto/gogo.proto";
+
+// Params defines the parameters for the everlight module.
+message Params {
+  option (amino.name) = "lumera/x/everlight/v1/Params";
+  option (gogoproto.equal) = true;
+
+  // Distribution period in blocks. Pool balance distributed every this many blocks.
+  uint64 payment_period_blocks = 1 [(gogoproto.moretags) = "yaml:\"payment_period_blocks\""];
+
+  // Share of block rewards (from Community Pool allocation) routed to Everlight pool, in basis points.
+  uint64 validator_reward_share_bps = 2 [(gogoproto.moretags) = "yaml:\"validator_reward_share_bps\""];
+
+  // Share of action registration fees routed to Everlight pool, in basis points.
+  uint64 registration_fee_share_bps = 3 [(gogoproto.moretags) = "yaml:\"registration_fee_share_bps\""];
+
+  // Minimum cascade_kademlia_db_bytes for a SuperNode to qualify for payouts.
+  uint64 min_cascade_bytes_for_payment = 4 [(gogoproto.moretags) = "yaml:\"min_cascade_bytes_for_payment\""];
+
+  // Number of payment periods for new SuperNode payout ramp-up.
+  uint64 new_sn_ramp_up_periods = 5 [(gogoproto.moretags) = "yaml:\"new_sn_ramp_up_periods\""];
+
+  // Rolling average window (in payment periods) for weight smoothing.
+  uint64 measurement_smoothing_periods = 6 [(gogoproto.moretags) = "yaml:\"measurement_smoothing_periods\""];
+
+  // Maximum rate of reported cascade bytes increase per period, in basis points.
+  uint64 usage_growth_cap_bps_per_period = 7 [(gogoproto.moretags) = "yaml:\"usage_growth_cap_bps_per_period\""];
+}

@@ -44,4 +44,8 @@ message Params {
   uint64 max_storage_usage_percent = 17 [(gogoproto.moretags) = "yaml:\"max_storage_usage_percent\""];
 
   repeated uint32 required_open_ports = 18 [(gogoproto.moretags) = "yaml:\"required_open_ports\""];
+
+  // Cascade Kademlia DB size threshold (bytes) for STORAGE_FULL state.
+  // 0 = disabled (no STORAGE_FULL transitions).
+  uint64 cascade_kademlia_db_max_bytes = 19 [(gogoproto.moretags) = "yaml:\"cascade_kademlia_db_max_bytes\""];
 }

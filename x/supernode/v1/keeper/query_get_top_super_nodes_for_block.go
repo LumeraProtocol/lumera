@@ -97,11 +97,14 @@ func (q queryServer) GetTopSuperNodesForBlock(
 			continue
 		}
 
-		// 4.3) State must not be Unspecified or POSTPONED unless explicitly requested
+		// 4.3) State must not be Unspecified, POSTPONED, or STORAGE_FULL unless explicitly requested.
+		// STORAGE_FULL nodes are excluded from Cascade storage selection by default
+		// but remain eligible for Sense/Agents when explicitly requested.
 		if stateAtBlock == types.SuperNodeStateUnspecified {
 			continue
 		}
-		if superNodeStateFilter == types.SuperNodeStateUnspecified && stateAtBlock == types.SuperNodeStatePostponed {
+		if superNodeStateFilter == types.SuperNodeStateUnspecified &&
+			(stateAtBlock == types.SuperNodeStatePostponed || stateAtBlock == types.SuperNodeStateStorageFull) {
 			continue
 		}
 

@@ -17,14 +17,43 @@ func buildVersion(m types.SupernodeMetrics) (*semver.Version, error) {
 	return semver.NewVersion(versionStr)
 }
 
+// ComplianceResult holds the outcome of a compliance evaluation, separating
+// storage-capacity-only violations (cascade_kademlia_db_bytes >= threshold)
+// from other compliance issues. This enables the STORAGE_FULL state: when the
+// only problem is Cascade storage capacity, the node enters STORAGE_FULL
+// (compute-eligible) instead of POSTPONED (all-services-excluded).
+type ComplianceResult struct {
+	// Issues lists all non-storage compliance violations.
+	Issues []string
+	// StorageFull is true when cascade_kademlia_db_bytes >= cascade_kademlia_db_max_bytes
+	// and the threshold is enabled (> 0).
+	StorageFull bool
+}
+
+// IsCompliant returns true when there are no issues of any kind.
+func (r ComplianceResult) IsCompliant() bool {
+	return len(r.Issues) == 0 && !r.StorageFull
+}
+
+// AllIssues returns a combined human-readable list of all issues (for events/logging).
+func (r ComplianceResult) AllIssues() []string {
+	if !r.StorageFull {
+		return r.Issues
+	}
+	all := make([]string, len(r.Issues), len(r.Issues)+1)
+	copy(all, r.Issues)
+	return append(all, "cascade storage capacity full")
+}
+
 // evaluateCompliance validates the reported metrics against the configured
-// parameter thresholds. It returns a list of human-readable issues; an empty
-// list means the metrics are compliant. Freshness and staleness are handled
-// separately in the end-block staleness handler.
-func evaluateCompliance(ctx sdk.Context, params types.Params, m types.SupernodeMetrics) []string {
+// parameter thresholds. It returns a ComplianceResult that separates
+// storage-capacity violations from other issues. Freshness and staleness are
+// handled separately in the end-block staleness handler.
+func evaluateCompliance(ctx sdk.Context, params types.Params, m types.SupernodeMetrics) ComplianceResult {
 	_ = ctx // ctx reserved for future use (e.g. logging), currently unused.
 
 	issues := make([]string, 0)
+	storageFull := false
 
 	checkFinite := func(name string, v float64) {
 		if math.IsNaN(v) || math.IsInf(v, 0) {
@@ -166,16 +195,26 @@ func evaluateCompliance(ctx sdk.Context, params types.Params, m types.SupernodeM
 		issues = append(issues, "peers_count must be > 0")
 	}
 
-	return issues
+	// 7) Cascade Kademlia DB capacity check (Everlight STORAGE_FULL).
+	// This is evaluated separately: if the only violation is storage capacity,
+	// the node enters STORAGE_FULL instead of POSTPONED.
+	if params.CascadeKademliaDbMaxBytes > 0 && m.CascadeKademliaDbBytes >= float64(params.CascadeKademliaDbMaxBytes) {
+		storageFull = true
+	}
+
+	return ComplianceResult{Issues: issues, StorageFull: storageFull}
 }
 
-func lastNonPostponedState(states []*types.SuperNodeStateRecord) types.SuperNodeState {
+// lastNonDegradedState returns the most recent state that is not POSTPONED
+// or STORAGE_FULL, for use when recovering from a degraded state.
+func lastNonDegradedState(states []*types.SuperNodeStateRecord) types.SuperNodeState {
 	for i := len(states) - 1; i >= 0; i-- {
 		if states[i] == nil {
 			continue
 		}
-		if states[i].State != types.SuperNodeStatePostponed {
-			return states[i].State
+		s := states[i].State
+		if s != types.SuperNodeStatePostponed && s != types.SuperNodeStateStorageFull {
+			return s
 		}
 	}
 	return types.SuperNodeStateUnspecified

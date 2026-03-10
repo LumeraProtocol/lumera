@@ -50,9 +50,10 @@ func (m msgServer) ReportSupernodeMetrics(goCtx context.Context, msg *types.MsgR
 	}
 
 	params := m.GetParams(ctx)
-	// Compliance evaluation operates only on the structured metrics payload.
-	issues := evaluateCompliance(ctx, params, msg.Metrics)
-	compliant := len(issues) == 0
+	// Compliance evaluation separates storage-capacity violations from other issues.
+	result := evaluateCompliance(ctx, params, msg.Metrics)
+	compliant := result.IsCompliant()
+	allIssues := result.AllIssues()
 
 	// Persist the latest structured metrics in the dedicated metrics state table.
 	// Any report updates the metrics height/report count; UNKNOWN values are
@@ -73,21 +74,57 @@ func (m msgServer) ReportSupernodeMetrics(goCtx context.Context, msg *types.MsgR
 		return nil, err
 	}
 
-	// State transition handling
+	// State transition handling with compliance bifurcation:
+	//
+	// - No issues and no storage full → fully compliant → recover from any degraded state
+	// - Has other issues (regardless of storage) → POSTPONED (most restrictive wins)
+	// - Storage full ONLY (no other issues) → STORAGE_FULL (compute-eligible)
+	//
+	// State diagram:
+	//   [ACTIVE] ──storage full only──> [STORAGE_FULL]
+	//   [ACTIVE] ──other issues──> [POSTPONED]
+	//   [STORAGE_FULL] ──storage freed, no issues──> [ACTIVE]
+	//   [STORAGE_FULL] ──other issues added──> [POSTPONED]
+	//   [POSTPONED] ──all clear──> [last non-degraded state]
+	//   [POSTPONED] ──storage only──> [STORAGE_FULL] (improvement from POSTPONED)
 	stateChanged := false
 	if len(sn.States) > 0 {
 		lastState := sn.States[len(sn.States)-1].State
-		if compliant {
+		hasOtherIssues := len(result.Issues) > 0
+
+		if !hasOtherIssues && !result.StorageFull {
+			// Fully compliant: recover from any degraded state.
 			if lastState == types.SuperNodeStatePostponed {
-				target := lastNonPostponedState(sn.States)
+				target := lastNonDegradedState(sn.States)
 				if err := recoverFromPostponed(ctx, m.SupernodeKeeper, &sn, target); err != nil {
+					return nil, err
+				}
+				stateChanged = true
+			} else if lastState == types.SuperNodeStateStorageFull {
+				target := lastNonDegradedState(sn.States)
+				if err := recoverFromStorageFull(ctx, m.SupernodeKeeper, &sn, target); err != nil {
+					return nil, err
+				}
+				stateChanged = true
+			}
+		} else if hasOtherIssues {
+			// Has non-storage issues: POSTPONED always (most restrictive).
+			if lastState != types.SuperNodeStatePostponed {
+				if err := markPostponed(ctx, m.SupernodeKeeper, &sn, strings.Join(allIssues, ";")); err != nil {
 					return nil, err
 				}
 				stateChanged = true
 			}
 		} else {
-			if lastState != types.SuperNodeStatePostponed {
-				if err := markPostponed(ctx, m.SupernodeKeeper, &sn, strings.Join(issues, ";")); err != nil {
+			// Storage full only, no other issues.
+			if lastState == types.SuperNodeStatePostponed {
+				// Improvement: was POSTPONED, now only storage issue → STORAGE_FULL.
+				if err := recoverFromPostponed(ctx, m.SupernodeKeeper, &sn, types.SuperNodeStateStorageFull); err != nil {
+					return nil, err
+				}
+				stateChanged = true
+			} else if lastState != types.SuperNodeStateStorageFull {
+				if err := markStorageFull(ctx, m.SupernodeKeeper, &sn); err != nil {
 					return nil, err
 				}
 				stateChanged = true
@@ -107,12 +144,12 @@ func (m msgServer) ReportSupernodeMetrics(goCtx context.Context, msg *types.MsgR
 			sdk.NewAttribute(types.AttributeKeyValidatorAddress, msg.ValidatorAddress),
 			sdk.NewAttribute(types.AttributeKeySupernodeAccount, msg.SupernodeAccount),
 			sdk.NewAttribute(types.AttributeKeyCompliant, boolToString(compliant)),
-			sdk.NewAttribute(types.AttributeKeyIssues, strings.Join(issues, ";")),
+			sdk.NewAttribute(types.AttributeKeyIssues, strings.Join(allIssues, ";")),
 			sdk.NewAttribute(types.AttributeKeyHeight, stringHeight(ctx.BlockHeight())),
 		),
 	)
 
-	return &types.MsgReportSupernodeMetricsResponse{Compliant: compliant, Issues: issues}, nil
+	return &types.MsgReportSupernodeMetricsResponse{Compliant: compliant, Issues: allIssues}, nil
 }
 
 func boolToString(v bool) string {

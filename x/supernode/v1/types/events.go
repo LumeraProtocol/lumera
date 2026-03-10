@@ -10,6 +10,8 @@ const (
         EventTypeMetricsReported       = "supernode_metrics_reported"
         EventTypeSupernodePostponed    = "supernode_postponed"
         EventTypeSupernodeRecovered    = "supernode_recovered"
+        EventTypeSupernodeStorageFull  = "supernode_storage_full"
+        EventTypeSupernodeStorageRecovered = "supernode_storage_recovered"
 
 	AttributeKeyValidatorAddress = "validator_address"
 	AttributeKeyIPAddress        = "ip_address"

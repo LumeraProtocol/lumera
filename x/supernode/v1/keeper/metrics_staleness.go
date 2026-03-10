@@ -29,8 +29,9 @@ func (k Keeper) HandleMetricsStaleness(ctx sdk.Context) error {
 			continue
 		}
 		lastState := sn.States[len(sn.States)-1].State
-		// Only perform staleness checks for ACTIVE supernodes.
-		if lastState != types.SuperNodeStateActive {
+		// Perform staleness checks for ACTIVE and STORAGE_FULL supernodes.
+		// STORAGE_FULL nodes still hold data and must continue reporting metrics.
+		if lastState != types.SuperNodeStateActive && lastState != types.SuperNodeStateStorageFull {
 			continue
 		}
 

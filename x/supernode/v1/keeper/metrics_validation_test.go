@@ -38,9 +38,11 @@ func TestEvaluateCompliancePassesWithValidMetrics(t *testing.T) {
 		})
 	}
 
-	issues := evaluateCompliance(ctx, params, metrics)
+	result := evaluateCompliance(ctx, params, metrics)
 
-	require.Empty(t, issues)
+	require.True(t, result.IsCompliant())
+	require.Empty(t, result.Issues)
+	require.False(t, result.StorageFull)
 }
 
 func TestEvaluateComplianceIgnoresZeroCpuAndMemUsage(t *testing.T) {
@@ -63,10 +65,10 @@ func TestEvaluateComplianceIgnoresZeroCpuAndMemUsage(t *testing.T) {
 		PeersCount:       10,
 	}
 
-	issues := evaluateCompliance(ctx, params, metrics)
+	result := evaluateCompliance(ctx, params, metrics)
 
-	require.False(t, containsSubstring(issues, "cpu usage"), "cpu usage should be ignored when 0, issues=%v", issues)
-	require.False(t, containsSubstring(issues, "mem usage"), "mem usage should be ignored when 0, issues=%v", issues)
+	require.False(t, containsSubstring(result.Issues, "cpu usage"), "cpu usage should be ignored when 0, issues=%v", result.Issues)
+	require.False(t, containsSubstring(result.Issues, "mem usage"), "mem usage should be ignored when 0, issues=%v", result.Issues)
 }
 
 func TestEvaluateComplianceDetectsStaleMetrics(t *testing.T) {
@@ -94,10 +96,10 @@ func TestEvaluateComplianceDetectsStaleMetrics(t *testing.T) {
 		})
 	}
 
-	issues := evaluateCompliance(ctx, params, metrics)
+	result := evaluateCompliance(ctx, params, metrics)
 
-	require.NotEmpty(t, issues)
-	require.True(t, containsSubstring(issues, "version"), "expected version-related issue, got: %v", issues)
+	require.NotEmpty(t, result.Issues)
+	require.True(t, containsSubstring(result.Issues, "version"), "expected version-related issue, got: %v", result.Issues)
 }
 
 func TestEvaluateComplianceRequiresOpenPorts(t *testing.T) {
@@ -124,9 +126,114 @@ func TestEvaluateComplianceRequiresOpenPorts(t *testing.T) {
 		State: types.PortState_PORT_STATE_CLOSED,
 	})
 
-	issues := evaluateCompliance(ctx, params, metrics)
+	result := evaluateCompliance(ctx, params, metrics)
 
-	require.True(t, containsSubstring(issues, "required port"))
+	require.True(t, containsSubstring(result.Issues, "required port"))
+}
+
+func TestEvaluateComplianceStorageFullOnly(t *testing.T) {
+	ctx := sdk.NewContext(nil, tmproto.Header{Height: 10}, false, log.NewNopLogger())
+	params := types.DefaultParams()
+	params.CascadeKademliaDbMaxBytes = 1_000_000_000 // 1 GB threshold
+
+	metrics := types.SupernodeMetrics{
+		VersionMajor:              2,
+		VersionMinor:              0,
+		VersionPatch:              0,
+		CpuCoresTotal:             float64(params.MinCpuCores),
+		CpuUsagePercent:           float64(params.MaxCpuUsagePercent - 10),
+		MemTotalGb:                float64(params.MinMemGb),
+		MemUsagePercent:           float64(params.MaxMemUsagePercent - 10),
+		MemFreeGb:                 float64(params.MinMemGb) / 2,
+		DiskTotalGb:               float64(params.MinStorageGb),
+		DiskUsagePercent:          float64(params.MaxStorageUsagePercent - 10),
+		DiskFreeGb:                float64(params.MinStorageGb) / 2,
+		UptimeSeconds:             100,
+		PeersCount:                10,
+		CascadeKademliaDbBytes:    1_500_000_000, // exceeds threshold
+	}
+	for _, port := range params.RequiredOpenPorts {
+		metrics.OpenPorts = append(metrics.OpenPorts, types.PortStatus{
+			Port:  port,
+			State: types.PortState_PORT_STATE_OPEN,
+		})
+	}
+
+	result := evaluateCompliance(ctx, params, metrics)
+
+	// Storage full but no other issues.
+	require.Empty(t, result.Issues, "expected no non-storage issues, got: %v", result.Issues)
+	require.True(t, result.StorageFull, "expected StorageFull=true")
+	require.False(t, result.IsCompliant(), "should not be fully compliant when storage full")
+}
+
+func TestEvaluateComplianceStorageFullPlusOtherIssue(t *testing.T) {
+	ctx := sdk.NewContext(nil, tmproto.Header{Height: 10}, false, log.NewNopLogger())
+	params := types.DefaultParams()
+	params.CascadeKademliaDbMaxBytes = 1_000_000_000
+
+	metrics := types.SupernodeMetrics{
+		VersionMajor:              2,
+		VersionMinor:              0,
+		VersionPatch:              0,
+		CpuCoresTotal:             float64(params.MinCpuCores),
+		CpuUsagePercent:           float64(params.MaxCpuUsagePercent - 10),
+		MemTotalGb:                float64(params.MinMemGb),
+		MemUsagePercent:           float64(params.MaxMemUsagePercent - 10),
+		MemFreeGb:                 float64(params.MinMemGb) / 2,
+		DiskTotalGb:               float64(params.MinStorageGb),
+		DiskUsagePercent:          float64(params.MaxStorageUsagePercent - 10),
+		DiskFreeGb:                float64(params.MinStorageGb) / 2,
+		UptimeSeconds:             100,
+		PeersCount:                0, // fails peers check
+		CascadeKademliaDbBytes:    1_500_000_000,
+	}
+	for _, port := range params.RequiredOpenPorts {
+		metrics.OpenPorts = append(metrics.OpenPorts, types.PortStatus{
+			Port:  port,
+			State: types.PortState_PORT_STATE_OPEN,
+		})
+	}
+
+	result := evaluateCompliance(ctx, params, metrics)
+
+	require.NotEmpty(t, result.Issues, "expected non-storage issues")
+	require.True(t, result.StorageFull, "expected StorageFull=true")
+	require.True(t, containsSubstring(result.Issues, "peers_count"))
+}
+
+func TestEvaluateComplianceStorageFullDisabledWhenZeroThreshold(t *testing.T) {
+	ctx := sdk.NewContext(nil, tmproto.Header{Height: 10}, false, log.NewNopLogger())
+	params := types.DefaultParams()
+	// Default: CascadeKademliaDbMaxBytes == 0 (disabled)
+
+	metrics := types.SupernodeMetrics{
+		VersionMajor:              2,
+		VersionMinor:              0,
+		VersionPatch:              0,
+		CpuCoresTotal:             float64(params.MinCpuCores),
+		CpuUsagePercent:           float64(params.MaxCpuUsagePercent - 10),
+		MemTotalGb:                float64(params.MinMemGb),
+		MemUsagePercent:           float64(params.MaxMemUsagePercent - 10),
+		MemFreeGb:                 float64(params.MinMemGb) / 2,
+		DiskTotalGb:               float64(params.MinStorageGb),
+		DiskUsagePercent:          float64(params.MaxStorageUsagePercent - 10),
+		DiskFreeGb:                float64(params.MinStorageGb) / 2,
+		UptimeSeconds:             100,
+		PeersCount:                10,
+		CascadeKademliaDbBytes:    999_999_999_999, // huge, but threshold disabled
+	}
+	for _, port := range params.RequiredOpenPorts {
+		metrics.OpenPorts = append(metrics.OpenPorts, types.PortStatus{
+			Port:  port,
+			State: types.PortState_PORT_STATE_OPEN,
+		})
+	}
+
+	result := evaluateCompliance(ctx, params, metrics)
+
+	require.True(t, result.IsCompliant(), "should be compliant when threshold is disabled")
+	require.False(t, result.StorageFull)
 }
 
 func containsSubstring(items []string, substr string) bool {

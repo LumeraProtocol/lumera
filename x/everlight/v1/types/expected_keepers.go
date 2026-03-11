@@ -4,6 +4,8 @@ import (
 	"context"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
+
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 // BankKeeper defines the expected bank keeper interface.
@@ -20,4 +22,10 @@ type BankKeeper interface {
 type AccountKeeper interface {
 	GetModuleAddress(moduleName string) sdk.AccAddress
 	GetModuleAccount(ctx context.Context, moduleName string) sdk.ModuleAccountI
+}
+
+// SupernodeKeeper defines the expected interface for querying supernode data.
+type SupernodeKeeper interface {
+	GetAllSuperNodes(ctx sdk.Context, stateFilters ...sntypes.SuperNodeState) ([]sntypes.SuperNode, error)
+	GetMetricsState(ctx sdk.Context, valAddr sdk.ValAddress) (sntypes.SupernodeMetricsState, bool)
 }

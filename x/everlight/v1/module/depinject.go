@@ -12,6 +12,7 @@ import (
 
 	"github.com/LumeraProtocol/lumera/x/everlight/v1/keeper"
 	"github.com/LumeraProtocol/lumera/x/everlight/v1/types"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 var _ depinject.OnePerModuleType = AppModule{}
@@ -34,8 +35,9 @@ type ModuleInputs struct {
 	Config       *Module
 	Logger       log.Logger
 
-	AccountKeeper types.AccountKeeper
-	BankKeeper    types.BankKeeper
+	AccountKeeper   types.AccountKeeper
+	BankKeeper      types.BankKeeper
+	SupernodeKeeper sntypes.SupernodeKeeper
 }
 
 type ModuleOutputs struct {
@@ -58,6 +60,7 @@ func ProvideModule(in ModuleInputs) ModuleOutputs {
 		authority.String(),
 		in.BankKeeper,
 		in.AccountKeeper,
+		in.SupernodeKeeper,
 	)
 
 	m := NewAppModule(in.Cdc, k)

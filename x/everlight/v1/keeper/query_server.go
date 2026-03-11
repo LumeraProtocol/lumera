@@ -30,19 +30,72 @@ func (q queryServer) PoolState(goCtx context.Context, _ *types.QueryPoolStateReq
 	ctx := sdk.UnwrapSDKContext(goCtx)
 	balance := q.k.GetPoolBalance(ctx)
 	lastHeight := q.k.GetLastDistributionHeight(ctx)
+	totalDistributed := q.k.GetTotalDistributed(ctx)
+	eligibleCount := q.k.countEligibleSNs(ctx)
 
 	return &types.QueryPoolStateResponse{
 		Balance:                balance,
 		LastDistributionHeight: lastHeight,
-		TotalDistributed:       sdk.Coins{}, // TODO: implement in S13
-		EligibleSnCount:        0,           // TODO: implement in S13
+		TotalDistributed:       totalDistributed,
+		EligibleSnCount:        eligibleCount,
 	}, nil
 }
 
-func (q queryServer) SNEligibility(_ context.Context, _ *types.QuerySNEligibilityRequest) (*types.QuerySNEligibilityResponse, error) {
-	// TODO: implement in S13 when distribution logic is added
+func (q queryServer) SNEligibility(goCtx context.Context, req *types.QuerySNEligibilityRequest) (*types.QuerySNEligibilityResponse, error) {
+	ctx := sdk.UnwrapSDKContext(goCtx)
+
+	if req.ValidatorAddress == "" {
+		return &types.QuerySNEligibilityResponse{
+			Eligible: false,
+			Reason:   "validator_address is required",
+		}, nil
+	}
+
+	valAddr, err := sdk.ValAddressFromBech32(req.ValidatorAddress)
+	if err != nil {
+		return &types.QuerySNEligibilityResponse{
+			Eligible: false,
+			Reason:   "invalid validator address: " + err.Error(),
+		}, nil
+	}
+
+	params := q.k.GetParams(ctx)
+
+	// Check metrics.
+	metricsState, found := q.k.supernodeKeeper.GetMetricsState(ctx, valAddr)
+	if !found {
+		return &types.QuerySNEligibilityResponse{
+			Eligible: false,
+			Reason:   "no metrics reported",
+		}, nil
+	}
+
+	rawBytes := float64(0)
+	if metricsState.Metrics != nil {
+		rawBytes = metricsState.Metrics.CascadeKademliaDbBytes
+	}
+
+	// Load distribution state.
+	distState, exists := q.k.GetSNDistState(ctx, req.ValidatorAddress)
+	smoothedBytes := rawBytes
+	if exists {
+		cappedBytes := applyGrowthCap(rawBytes, distState.PrevRawBytes, params.UsageGrowthCapBpsPerPeriod)
+		smoothedBytes = applyEMA(distState.SmoothedBytes, cappedBytes, params.MeasurementSmoothingPeriods)
+	}
+
+	if floatToUint64(smoothedBytes) < params.MinCascadeBytesForPayment {
+		return &types.QuerySNEligibilityResponse{
+			Eligible:               false,
+			Reason:                 "cascade bytes below minimum threshold",
+			CascadeKademliaDbBytes: rawBytes,
+			SmoothedWeight:         smoothedBytes,
+		}, nil
+	}
+
 	return &types.QuerySNEligibilityResponse{
-		Eligible: false,
-		Reason:   "eligibility check not yet implemented",
+		Eligible:               true,
+		Reason:                 "eligible",
+		CascadeKademliaDbBytes: rawBytes,
+		SmoothedWeight:         smoothedBytes,
 	}, nil
 }

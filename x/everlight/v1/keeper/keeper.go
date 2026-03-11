@@ -20,8 +20,9 @@ type Keeper struct {
 	// Typically, this should be the x/gov module account.
 	authority string
 
-	bankKeeper    types.BankKeeper
-	accountKeeper types.AccountKeeper
+	bankKeeper      types.BankKeeper
+	accountKeeper   types.AccountKeeper
+	supernodeKeeper types.SupernodeKeeper
 }
 
 func NewKeeper(
@@ -31,18 +32,20 @@ func NewKeeper(
 	authority string,
 	bankKeeper types.BankKeeper,
 	accountKeeper types.AccountKeeper,
+	supernodeKeeper types.SupernodeKeeper,
 ) Keeper {
 	if _, err := sdk.AccAddressFromBech32(authority); err != nil {
 		panic(fmt.Sprintf("invalid authority address: %s", authority))
 	}
 
 	return Keeper{
-		cdc:           cdc,
-		storeService:  storeService,
-		logger:        logger,
-		authority:     authority,
-		bankKeeper:    bankKeeper,
-		accountKeeper: accountKeeper,
+		cdc:             cdc,
+		storeService:    storeService,
+		logger:         logger,
+		authority:      authority,
+		bankKeeper:     bankKeeper,
+		accountKeeper:  accountKeeper,
+		supernodeKeeper: supernodeKeeper,
 	}
 }
 

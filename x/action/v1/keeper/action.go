@@ -615,6 +615,22 @@ func (k *Keeper) DistributeFees(ctx sdk.Context, actionID string) error {
 		return nil // No supernodes to pay
 	}
 
+	// Route Everlight share if configured
+	if k.everlightKeeper != nil {
+		everlightBps := k.everlightKeeper.GetRegistrationFeeShareBps(ctx)
+		if everlightBps > 0 && fee.Amount.GT(math.ZeroInt()) {
+			everlightAmount := fee.Amount.MulRaw(int64(everlightBps)).QuoRaw(10000)
+			if everlightAmount.IsPositive() {
+				everlightCoin := sdk.NewCoin(fee.Denom, everlightAmount)
+				err := k.bankKeeper.SendCoinsFromModuleToModule(ctx, actiontypes.ModuleName, "everlight", sdk.NewCoins(everlightCoin))
+				if err != nil {
+					return errors.Wrapf(sdkerrors.ErrInsufficientFunds, "failed to send everlight fee share: %s", err)
+				}
+				fee.Amount = fee.Amount.Sub(everlightAmount)
+			}
+		}
+	}
+
 	params := k.GetParams(ctx)
 	if params.FoundationFeeShare != "" {
 		foundationFeeShareDec, err := math.LegacyNewDecFromStr(params.FoundationFeeShare)

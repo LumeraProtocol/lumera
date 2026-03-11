@@ -35,6 +35,7 @@ type (
 		supernodeKeeper      actiontypes.SupernodeKeeper
 		supernodeQueryServer actiontypes.SupernodeQueryServer
 		ibcKeeperFn          func() *ibckeeper.Keeper
+		everlightKeeper      actiontypes.EverlightKeeper
 
 		// Action handling
 		actionRegistry *ActionRegistry
@@ -55,6 +56,7 @@ func NewKeeper(
 	supernodeKeeper sntypes.SupernodeKeeper,
 	supernodeQueryServer func() sntypes.QueryServer,
 	ibcKeeperFn func() *ibckeeper.Keeper,
+	everlightKeeper actiontypes.EverlightKeeper,
 ) Keeper {
 	if _, err := addressCodec.BytesToString(authority); err != nil {
 		panic(fmt.Sprintf("invalid authority address: %s", authority))
@@ -82,6 +84,7 @@ func NewKeeper(
 		supernodeKeeper:      supernodeKeeper,
 		supernodeQueryServer: snQueryServer,
 		ibcKeeperFn:          ibcKeeperFn,
+		everlightKeeper:      everlightKeeper,
 
 		Port: collections.NewItem(sb, actiontypes.PortKey, "port", collections.StringValue),
 	}
@@ -141,4 +144,8 @@ func (k *Keeper) GetActionRegistry() *ActionRegistry {
 
 func (k *Keeper) GetStakingKeeper() actiontypes.StakingKeeper {
 	return k.stakingKeeper
+}
+
+func (k *Keeper) GetEverlightKeeper() actiontypes.EverlightKeeper {
+	return k.everlightKeeper
 }

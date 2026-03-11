@@ -16,6 +16,7 @@ import (
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	"github.com/LumeraProtocol/lumera/x/action/v1/types"
+	everlightkeeper "github.com/LumeraProtocol/lumera/x/everlight/v1/keeper"
 )
 
 var _ depinject.OnePerModuleType = AppModule{}
@@ -48,6 +49,7 @@ type ModuleInputs struct {
 	StakingKeeper      types.StakingKeeper
 	DistributionKeeper types.DistributionKeeper
 	SupernodeKeeper    sntypes.SupernodeKeeper
+	EverlightKeeper    everlightkeeper.Keeper `optional:"true"`
 	IBCKeeperFn 	   func() *ibckeeper.Keeper `optional:"true"`
 }
 
@@ -65,6 +67,13 @@ func ProvideModule(in ModuleInputs) ModuleOutputs {
 		authority = authtypes.NewModuleAddressOrBech32Address(in.Config.Authority)
 	}
 
+	// Wrap EverlightKeeper: if the module is not available (zero value from optional depinject),
+	// pass nil so the action keeper skips Everlight fee routing.
+	var elKeeper types.EverlightKeeper
+	if in.EverlightKeeper.GetAuthority() != "" {
+		elKeeper = in.EverlightKeeper
+	}
+
 	k := keeper.NewKeeper(
 		in.Cdc,
 		in.AddressCodec,
@@ -80,6 +89,7 @@ func ProvideModule(in ModuleInputs) ModuleOutputs {
 			return snkeeper.NewQueryServerImpl(in.SupernodeKeeper)
 		},
 		in.IBCKeeperFn,
+		elKeeper,
 	)
 
 	m := NewAppModule(

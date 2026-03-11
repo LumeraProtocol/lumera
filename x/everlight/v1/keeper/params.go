@@ -19,6 +19,11 @@ func (k Keeper) GetParams(ctx sdk.Context) (params types.Params) {
 	return params
 }
 
+// GetRegistrationFeeShareBps returns the registration_fee_share_bps parameter.
+func (k Keeper) GetRegistrationFeeShareBps(ctx sdk.Context) uint64 {
+	return k.GetParams(ctx).RegistrationFeeShareBps
+}
+
 // SetParams sets the module parameters.
 func (k Keeper) SetParams(ctx sdk.Context, params types.Params) error {
 	if err := params.Validate(); err != nil {

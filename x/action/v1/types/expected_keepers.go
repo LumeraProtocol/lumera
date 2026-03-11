@@ -30,6 +30,7 @@ type BankKeeper interface {
 	GetBalance(ctx context.Context, addr sdk.AccAddress, denom string) sdk.Coin
 	SendCoinsFromModuleToAccount(ctx context.Context, senderModule string, recipientAddr sdk.AccAddress, amt sdk.Coins) error
 	SendCoinsFromAccountToModule(ctx context.Context, senderAddr sdk.AccAddress, recipientModule string, amt sdk.Coins) error
+	SendCoinsFromModuleToModule(ctx context.Context, senderModule, recipientModule string, amt sdk.Coins) error
 }
 
 // StakingKeeper defines the expected staking keeper
@@ -53,6 +54,11 @@ type SupernodeQueryServer interface {
 
 type DistributionKeeper interface {
 	FundCommunityPool(ctx context.Context, amount sdk.Coins, sender sdk.AccAddress) error
+}
+
+// EverlightKeeper defines the expected interface for the Everlight module.
+type EverlightKeeper interface {
+	GetRegistrationFeeShareBps(ctx sdk.Context) uint64
 }
 
 // ParamSubspace defines the expected Subspace interface for parameters.

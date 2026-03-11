@@ -102,6 +102,18 @@ func (m *ActionBankKeeper) GetBalance(ctx context.Context, addr sdk.AccAddress, 
 	return sdk.Coin{}
 }
 
+func (m *ActionBankKeeper) SendCoinsFromModuleToModule(ctx context.Context, senderModule, recipientModule string, amt sdk.Coins) error {
+	if _, ok := m.moduleBalances[senderModule]; ok {
+		m.moduleBalances[senderModule] = m.moduleBalances[senderModule].Sub(amt...)
+	}
+	if m.moduleBalances[recipientModule].IsZero() {
+		m.moduleBalances[recipientModule] = amt
+	} else {
+		m.moduleBalances[recipientModule] = m.moduleBalances[recipientModule].Add(amt...)
+	}
+	return nil
+}
+
 func (m *ActionBankKeeper) GetModuleBalance(module string) sdk.Coins {
 	if coins, ok := m.moduleBalances[module]; ok {
 		return coins
@@ -204,6 +216,7 @@ func ActionKeeperWithAddress(t testing.TB, ctrl *gomock.Controller, accounts []A
 		func() *ibckeeper.Keeper {
 			return ibckeeper.NewKeeper(encCfg.Codec, storeService, newMockIbcParams(), mockUpgradeKeeper, authority.String())
 		},
+		nil, // everlightKeeper (optional)
 	)
 
 	// Initialize params

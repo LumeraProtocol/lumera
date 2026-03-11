@@ -132,6 +132,7 @@ var (
 	beginBlockers = []string{
 		// cosmos sdk modules
 		minttypes.ModuleName,
+		everlightmoduletypes.ModuleName, // Must run before distrtypes to skim fee collector
 		distrtypes.ModuleName,
 		slashingtypes.ModuleName,
 		evidencetypes.ModuleName,
@@ -149,7 +150,6 @@ var (
 		claimmoduletypes.ModuleName,
 		supernodemoduletypes.ModuleName,
 		actionmoduletypes.ModuleName,
-		everlightmoduletypes.ModuleName,
 		// this line is used by starport scaffolding # stargate/app/beginBlockers
 	}
 

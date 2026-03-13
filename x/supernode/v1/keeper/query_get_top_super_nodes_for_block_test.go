@@ -317,3 +317,129 @@ func TestKeeper_GetTopSuperNodesForBlock(t *testing.T) {
 		})
 	}
 }
+
+// TestAT31_StorageFullExclusionFromCascadeInclusionInSense verifies AT31:
+// "STORAGE_FULL SN excluded from Cascade selection, included in Sense/Agents selection"
+//
+// The default (unspecified) state filter represents Cascade selection — STORAGE_FULL
+// nodes must be excluded. When the state filter explicitly requests STORAGE_FULL
+// (representing Sense/Agents selection), those nodes must be included.
+func TestAT31_StorageFullExclusionFromCascadeInclusionInSense(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	stakingKeeper := supernodemocks.NewMockStakingKeeper(ctrl)
+	slashingKeeper := supernodemocks.NewMockSlashingKeeper(ctrl)
+	bankKeeper := supernodemocks.NewMockBankKeeper(ctrl)
+
+	k, ctx := setupKeeperForTest(t, stakingKeeper, slashingKeeper, bankKeeper)
+	q := keeper.NewQueryServerImpl(k)
+
+	makeValAddr := func(id string) string {
+		valBz := []byte(id + "_unique")
+		valAddr := sdk.ValAddress(valBz)
+		return valAddr.String()
+	}
+	makeSnAddr := func(id string) string {
+		valBz := []byte(id + "_unique")
+		valAddr := sdk.ValAddress(valBz)
+		return sdk.AccAddress(valAddr).String()
+	}
+
+	// Create one Active supernode and one STORAGE_FULL supernode
+	snActive := types.SuperNode{
+		Note:             "1.0",
+		SupernodeAccount: makeSnAddr("active1"),
+		ValidatorAddress: makeValAddr("active1"),
+		States: []*types.SuperNodeStateRecord{
+			{State: types.SuperNodeStateActive, Height: 10},
+		},
+		PrevIpAddresses: []*types.IPAddressHistory{
+			{Address: "192.168.1.1", Height: 1},
+		},
+		P2PPort: "26657",
+	}
+
+	snStorageFull := types.SuperNode{
+		Note:             "1.0",
+		SupernodeAccount: makeSnAddr("sfull1"),
+		ValidatorAddress: makeValAddr("sfull1"),
+		States: []*types.SuperNodeStateRecord{
+			{State: types.SuperNodeStateActive, Height: 10},
+			{State: types.SuperNodeStateStorageFull, Height: 50},
+		},
+		PrevIpAddresses: []*types.IPAddressHistory{
+			{Address: "192.168.1.2", Height: 1},
+		},
+		P2PPort: "26658",
+	}
+
+	require.NoError(t, k.SetSuperNode(ctx, snActive))
+	require.NoError(t, k.SetSuperNode(ctx, snStorageFull))
+
+	var blockHeight int32 = 100
+
+	t.Run("Cascade selection excludes STORAGE_FULL supernode", func(t *testing.T) {
+		// Cascade uses the default (unspecified) state filter.
+		// STORAGE_FULL nodes must be excluded, only Active nodes returned.
+		resp, err := q.GetTopSuperNodesForBlock(ctx, &types.QueryGetTopSuperNodesForBlockRequest{
+			BlockHeight: blockHeight,
+			Limit:       10,
+			State:       "", // unspecified = Cascade default
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.Supernodes, 1, "Cascade selection should return only 1 node (Active)")
+
+		// The returned node must be the Active one, not the STORAGE_FULL one
+		require.Equal(t, snActive.ValidatorAddress, resp.Supernodes[0].ValidatorAddress,
+			"Cascade selection must return the Active node, not the STORAGE_FULL node")
+	})
+
+	t.Run("Sense/Agents selection includes STORAGE_FULL supernode", func(t *testing.T) {
+		// Sense/Agents explicitly request STORAGE_FULL state.
+		// Only STORAGE_FULL nodes should be returned when filtering by that state.
+		resp, err := q.GetTopSuperNodesForBlock(ctx, &types.QueryGetTopSuperNodesForBlockRequest{
+			BlockHeight: blockHeight,
+			Limit:       10,
+			State:       "SUPERNODE_STATE_STORAGE_FULL",
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.Supernodes, 1, "Sense/Agents selection should return exactly the STORAGE_FULL node")
+		require.Equal(t, snStorageFull.ValidatorAddress, resp.Supernodes[0].ValidatorAddress,
+			"Sense/Agents selection must return the STORAGE_FULL node")
+	})
+
+	t.Run("STORAGE_FULL excluded alongside POSTPONED in default selection", func(t *testing.T) {
+		// Add a POSTPONED supernode to confirm both POSTPONED and STORAGE_FULL
+		// are excluded from default (Cascade) selection.
+		k2, ctx2 := setupKeeperForTest(t, stakingKeeper, slashingKeeper, bankKeeper)
+		q2 := keeper.NewQueryServerImpl(k2)
+
+		snPostponed := types.SuperNode{
+			Note:             "1.0",
+			SupernodeAccount: makeSnAddr("postponed1"),
+			ValidatorAddress: makeValAddr("postponed1"),
+			States: []*types.SuperNodeStateRecord{
+				{State: types.SuperNodeStatePostponed, Height: 10},
+			},
+			PrevIpAddresses: []*types.IPAddressHistory{
+				{Address: "192.168.1.3", Height: 1},
+			},
+			P2PPort: "26659",
+		}
+
+		require.NoError(t, k2.SetSuperNode(ctx2, snActive))
+		require.NoError(t, k2.SetSuperNode(ctx2, snStorageFull))
+		require.NoError(t, k2.SetSuperNode(ctx2, snPostponed))
+
+		resp, err := q2.GetTopSuperNodesForBlock(ctx2, &types.QueryGetTopSuperNodesForBlockRequest{
+			BlockHeight: blockHeight,
+			Limit:       10,
+			State:       "", // default/Cascade
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.Supernodes, 1, "Default selection should exclude both STORAGE_FULL and POSTPONED")
+		require.Equal(t, snActive.ValidatorAddress, resp.Supernodes[0].ValidatorAddress,
+			"Only the Active node should survive default selection")
+	})
+}

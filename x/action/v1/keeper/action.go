@@ -29,7 +29,7 @@ const (
 	ActionBySuperNodePrefix   = "Action/supernode/"
 )
 
-// RegisterAction creates and configures a new action with default parameters 
+// RegisterAction creates and configures a new action with default parameters
 // This is the recommended method for creating new actions
 func (k *Keeper) RegisterAction(ctx sdk.Context, action *actiontypes.Action) (string, error) {
 	// Validate that the action is for a new registration
@@ -624,7 +624,7 @@ func (k *Keeper) DistributeFees(ctx sdk.Context, actionID string) error {
 				everlightCoin := sdk.NewCoin(fee.Denom, everlightAmount)
 				err := k.bankKeeper.SendCoinsFromModuleToModule(ctx, actiontypes.ModuleName, "everlight", sdk.NewCoins(everlightCoin))
 				if err != nil {
-					return errors.Wrapf(sdkerrors.ErrInsufficientFunds, "failed to send everlight fee share: %s", err)
+					return errors.Wrap(err, "failed to send everlight fee share")
 				}
 				fee.Amount = fee.Amount.Sub(everlightAmount)
 			}

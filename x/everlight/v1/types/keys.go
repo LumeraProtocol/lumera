@@ -24,5 +24,8 @@ var (
 
 // SNDistStateKey returns the store key for a specific supernode's distribution state.
 func SNDistStateKey(valAddr string) []byte {
-	return append(SNDistStatePrefix, []byte(valAddr)...)
+	key := make([]byte, len(SNDistStatePrefix)+len(valAddr))
+	copy(key, SNDistStatePrefix)
+	copy(key[len(SNDistStatePrefix):], valAddr)
+	return key
 }

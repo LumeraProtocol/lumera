@@ -31,6 +31,10 @@ func (k Keeper) GetLastDistributionHeight(ctx sdk.Context) int64 {
 	if bz == nil {
 		return 0
 	}
+	if len(bz) != 8 {
+		k.Logger().Error("invalid last distribution height encoding", "length", len(bz))
+		return 0
+	}
 	return int64(binary.BigEndian.Uint64(bz))
 }
 
@@ -57,6 +61,7 @@ func (k Keeper) GetTotalDistributed(ctx sdk.Context) sdk.Coins {
 	}
 	var coins sdk.Coins
 	if err := json.Unmarshal(bz, &coins); err != nil {
+		k.Logger().Error("failed to decode total distributed coins", "err", err)
 		return sdk.Coins{}
 	}
 	return coins
@@ -87,6 +92,7 @@ func (k Keeper) GetSNDistState(ctx sdk.Context, valAddr string) (SNDistState, bo
 	}
 	var state SNDistState
 	if err := json.Unmarshal(bz, &state); err != nil {
+		k.Logger().Error("failed to decode supernode distribution state", "validator", valAddr, "err", err)
 		return SNDistState{}, false
 	}
 	return state, true

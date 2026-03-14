@@ -5,8 +5,8 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
-	"go.uber.org/mock/gomock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
 	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
@@ -407,6 +407,18 @@ func TestAT31_StorageFullExclusionFromCascadeInclusionInSense(t *testing.T) {
 		require.Len(t, resp.Supernodes, 1, "Sense/Agents selection should return exactly the STORAGE_FULL node")
 		require.Equal(t, snStorageFull.ValidatorAddress, resp.Supernodes[0].ValidatorAddress,
 			"Sense/Agents selection must return the STORAGE_FULL node")
+	})
+
+	t.Run("Sense/Agents selection accepts STORAGE_FULL short name", func(t *testing.T) {
+		resp, err := q.GetTopSuperNodesForBlock(ctx, &types.QueryGetTopSuperNodesForBlockRequest{
+			BlockHeight: blockHeight,
+			Limit:       10,
+			State:       "STORAGE_FULL",
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.Supernodes, 1, "short-name filter should return exactly the STORAGE_FULL node")
+		require.Equal(t, snStorageFull.ValidatorAddress, resp.Supernodes[0].ValidatorAddress,
+			"short-name filter must return the STORAGE_FULL node")
 	})
 
 	t.Run("STORAGE_FULL excluded alongside POSTPONED in default selection", func(t *testing.T) {

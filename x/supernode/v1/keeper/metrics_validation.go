@@ -50,8 +50,6 @@ func (r ComplianceResult) AllIssues() []string {
 // storage-capacity violations from other issues. Freshness and staleness are
 // handled separately in the end-block staleness handler.
 func evaluateCompliance(ctx sdk.Context, params types.Params, m types.SupernodeMetrics) ComplianceResult {
-	_ = ctx // ctx reserved for future use (e.g. logging), currently unused.
-
 	issues := make([]string, 0)
 	storageFull := false
 
@@ -198,6 +196,10 @@ func evaluateCompliance(ctx sdk.Context, params types.Params, m types.SupernodeM
 	// 7) Cascade Kademlia DB capacity check (Everlight STORAGE_FULL).
 	// This is evaluated separately: if the only violation is storage capacity,
 	// the node enters STORAGE_FULL instead of POSTPONED.
+	checkFinite("cascade_kademlia_db_bytes", m.CascadeKademliaDbBytes)
+	if m.CascadeKademliaDbBytes < 0 {
+		issues = append(issues, "cascade_kademlia_db_bytes must be >= 0")
+	}
 	if params.CascadeKademliaDbMaxBytes > 0 && m.CascadeKademliaDbBytes >= float64(params.CascadeKademliaDbMaxBytes) {
 		storageFull = true
 	}

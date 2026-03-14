@@ -256,3 +256,83 @@ func TestReportSupernodeMetrics_EmptyPortsStillPersistsAndRecovers(t *testing.T)
 	require.True(t, ok, "report should persist metrics state")
 	require.Equal(t, ctx.BlockHeight(), state.Height)
 }
+
+func TestReportSupernodeMetrics_StorageFullFromPostponedEmitsStorageFullEvent(t *testing.T) {
+	k, ctx := keepertest.SupernodeKeeper(t)
+	ctx = ctx.WithBlockHeight(100)
+
+	valAddr := sdk.ValAddress("validator1_______________")
+	supernode := types.SuperNode{
+		ValidatorAddress: valAddr.String(),
+		SupernodeAccount: sdk.AccAddress([]byte("supernode1")).String(),
+		States: []*types.SuperNodeStateRecord{
+			{State: types.SuperNodeStateActive, Height: 10},
+			{State: types.SuperNodeStatePostponed, Height: 50},
+		},
+		PrevIpAddresses: []*types.IPAddressHistory{
+			{Address: "127.0.0.1", Height: 10},
+		},
+		P2PPort: "26657",
+	}
+	require.NoError(t, k.SetSuperNode(ctx, supernode))
+
+	params := types.DefaultParams()
+	params.CascadeKademliaDbMaxBytes = 1_000
+	require.NoError(t, k.SetParams(ctx, params))
+
+	metrics := types.SupernodeMetrics{
+		VersionMajor:           2,
+		VersionMinor:           0,
+		VersionPatch:           0,
+		CpuCoresTotal:          float64(params.MinCpuCores),
+		CpuUsagePercent:        float64(params.MaxCpuUsagePercent - 10),
+		MemTotalGb:             float64(params.MinMemGb),
+		MemUsagePercent:        float64(params.MaxMemUsagePercent - 10),
+		MemFreeGb:              float64(params.MinMemGb) / 2,
+		DiskTotalGb:            float64(params.MinStorageGb),
+		DiskUsagePercent:       float64(params.MaxStorageUsagePercent - 10),
+		DiskFreeGb:             float64(params.MinStorageGb) / 2,
+		UptimeSeconds:          100,
+		PeersCount:             10,
+		CascadeKademliaDbBytes: 2_000,
+	}
+	for _, port := range params.RequiredOpenPorts {
+		metrics.OpenPorts = append(metrics.OpenPorts, types.PortStatus{
+			Port:  port,
+			State: types.PortState_PORT_STATE_OPEN,
+		})
+	}
+
+	ms := keeper.NewMsgServerImpl(k)
+	ctx = ctx.WithBlockHeader(tmproto.Header{Height: ctx.BlockHeight()})
+
+	resp, err := ms.ReportSupernodeMetrics(
+		sdk.WrapSDKContext(ctx),
+		&types.MsgReportSupernodeMetrics{
+			ValidatorAddress: supernode.ValidatorAddress,
+			SupernodeAccount: supernode.SupernodeAccount,
+			Metrics:          metrics,
+		},
+	)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.False(t, resp.Compliant)
+	require.Contains(t, resp.Issues, "cascade storage capacity full")
+
+	stored, found := k.QuerySuperNode(ctx, valAddr)
+	require.True(t, found)
+	require.Equal(t, types.SuperNodeStateStorageFull, stored.States[len(stored.States)-1].State)
+
+	events := ctx.EventManager().Events()
+	require.True(t, hasEventType(events, types.EventTypeSupernodeStorageFull))
+	require.False(t, hasEventType(events, types.EventTypeSupernodeRecovered))
+}
+
+func hasEventType(events sdk.Events, eventType string) bool {
+	for _, event := range events {
+		if event.Type == eventType {
+			return true
+		}
+	}
+	return false
+}

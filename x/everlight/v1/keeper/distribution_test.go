@@ -255,6 +255,24 @@ func TestDistributePoolProportionally(t *testing.T) {
 	require.Equal(t, sdkmath.NewInt(10000), totalDist.AmountOf("ulume"))
 }
 
+func TestGetLastDistributionHeightInvalidEncodingReturnsZero(t *testing.T) {
+	k, ctx, _, _ := setupTestKeeper(t)
+
+	store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
+	store.Set(types.LastDistributionHeightKey, []byte{1, 2, 3})
+
+	require.Equal(t, int64(0), k.GetLastDistributionHeight(ctx))
+}
+
+func TestGetTotalDistributedInvalidEncodingReturnsEmpty(t *testing.T) {
+	k, ctx, _, _ := setupTestKeeper(t)
+
+	store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
+	store.Set(types.TotalDistributedKey, []byte("not-json"))
+
+	require.Empty(t, k.GetTotalDistributed(ctx))
+}
+
 // AT36: SNs below min_cascade_bytes_for_payment excluded from distribution.
 func TestMinCascadeBytesThreshold(t *testing.T) {
 	k, ctx, bankKeeper, snKeeper := setupTestKeeper(t)
@@ -297,7 +315,7 @@ func TestNewSNRampUp(t *testing.T) {
 	params := types.DefaultParams()
 	params.PaymentPeriodBlocks = 10
 	params.MinCascadeBytesForPayment = 1000
-	params.NewSnRampUpPeriods = 4  // 4-period ramp-up
+	params.NewSnRampUpPeriods = 4 // 4-period ramp-up
 	params.MeasurementSmoothingPeriods = 0
 	params.UsageGrowthCapBpsPerPeriod = 10000
 	require.NoError(t, k.SetParams(ctx, params))
@@ -355,7 +373,7 @@ func TestUsageGrowthCap(t *testing.T) {
 	params.PaymentPeriodBlocks = 10
 	params.MinCascadeBytesForPayment = 1000
 	params.NewSnRampUpPeriods = 0
-	params.MeasurementSmoothingPeriods = 0 // No smoothing for clarity.
+	params.MeasurementSmoothingPeriods = 0   // No smoothing for clarity.
 	params.UsageGrowthCapBpsPerPeriod = 1000 // 10% max growth per period.
 	require.NoError(t, k.SetParams(ctx, params))
 

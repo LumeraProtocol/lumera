@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 
 	sdkmath "cosmossdk.io/math"
@@ -196,6 +197,11 @@ func (k Keeper) distributePool(ctx sdk.Context) error {
 	}
 
 	// 5. Distribute pool balance proportionally.
+	poolBalanceDec := sdkmath.LegacyNewDecFromInt(poolUlume)
+	totalWeightDec, err := legacyDecFromFloat64(totalWeight)
+	if err != nil {
+		return fmt.Errorf("invalid total distribution weight: %w", err)
+	}
 	totalDistributed := sdkmath.ZeroInt()
 	payouts := make([]struct {
 		addr   sdk.AccAddress
@@ -204,10 +210,14 @@ func (k Keeper) distributePool(ctx sdk.Context) error {
 	}, 0, len(candidates))
 
 	for _, c := range candidates {
-		share := c.effectiveWeight / totalWeight
+		weightDec, err := legacyDecFromFloat64(c.effectiveWeight)
+		if err != nil {
+			k.Logger().Error("invalid candidate distribution weight", "validator", c.validatorAddr, "err", err)
+			continue
+		}
+		shareDec := weightDec.Quo(totalWeightDec)
 		// Calculate integer amount; truncate fractions (dust stays in pool).
-		shareDec := sdkmath.LegacyNewDecWithPrec(int64(share*1e18), 18)
-		payoutAmount := sdkmath.LegacyNewDecFromInt(poolUlume).MulTruncate(shareDec).TruncateInt()
+		payoutAmount := poolBalanceDec.MulTruncate(shareDec).TruncateInt()
 
 		if payoutAmount.IsPositive() {
 			recipientAddr, err := sdk.AccAddressFromBech32(c.supernodeAccount)
@@ -276,4 +286,11 @@ func (k Keeper) distributePool(ctx sdk.Context) error {
 	)
 
 	return nil
+}
+
+func legacyDecFromFloat64(value float64) (sdkmath.LegacyDec, error) {
+	if math.IsNaN(value) || math.IsInf(value, 0) || value < 0 {
+		return sdkmath.LegacyZeroDec(), fmt.Errorf("invalid float value %v", value)
+	}
+	return sdkmath.LegacyNewDecFromStr(strconv.FormatFloat(value, 'f', -1, 64))
 }

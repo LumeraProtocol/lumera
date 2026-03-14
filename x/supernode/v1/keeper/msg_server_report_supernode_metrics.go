@@ -119,7 +119,7 @@ func (m msgServer) ReportSupernodeMetrics(goCtx context.Context, msg *types.MsgR
 			// Storage full only, no other issues.
 			if lastState == types.SuperNodeStatePostponed {
 				// Improvement: was POSTPONED, now only storage issue → STORAGE_FULL.
-				if err := recoverFromPostponed(ctx, m.SupernodeKeeper, &sn, types.SuperNodeStateStorageFull); err != nil {
+				if err := markStorageFull(ctx, m.SupernodeKeeper, &sn); err != nil {
 					return nil, err
 				}
 				stateChanged = true

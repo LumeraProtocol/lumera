@@ -1,6 +1,7 @@
 package keeper
 
 import (
+	"math"
 	"strings"
 	"testing"
 
@@ -137,20 +138,20 @@ func TestEvaluateComplianceStorageFullOnly(t *testing.T) {
 	params.CascadeKademliaDbMaxBytes = 1_000_000_000 // 1 GB threshold
 
 	metrics := types.SupernodeMetrics{
-		VersionMajor:              2,
-		VersionMinor:              0,
-		VersionPatch:              0,
-		CpuCoresTotal:             float64(params.MinCpuCores),
-		CpuUsagePercent:           float64(params.MaxCpuUsagePercent - 10),
-		MemTotalGb:                float64(params.MinMemGb),
-		MemUsagePercent:           float64(params.MaxMemUsagePercent - 10),
-		MemFreeGb:                 float64(params.MinMemGb) / 2,
-		DiskTotalGb:               float64(params.MinStorageGb),
-		DiskUsagePercent:          float64(params.MaxStorageUsagePercent - 10),
-		DiskFreeGb:                float64(params.MinStorageGb) / 2,
-		UptimeSeconds:             100,
-		PeersCount:                10,
-		CascadeKademliaDbBytes:    1_500_000_000, // exceeds threshold
+		VersionMajor:           2,
+		VersionMinor:           0,
+		VersionPatch:           0,
+		CpuCoresTotal:          float64(params.MinCpuCores),
+		CpuUsagePercent:        float64(params.MaxCpuUsagePercent - 10),
+		MemTotalGb:             float64(params.MinMemGb),
+		MemUsagePercent:        float64(params.MaxMemUsagePercent - 10),
+		MemFreeGb:              float64(params.MinMemGb) / 2,
+		DiskTotalGb:            float64(params.MinStorageGb),
+		DiskUsagePercent:       float64(params.MaxStorageUsagePercent - 10),
+		DiskFreeGb:             float64(params.MinStorageGb) / 2,
+		UptimeSeconds:          100,
+		PeersCount:             10,
+		CascadeKademliaDbBytes: 1_500_000_000, // exceeds threshold
 	}
 	for _, port := range params.RequiredOpenPorts {
 		metrics.OpenPorts = append(metrics.OpenPorts, types.PortStatus{
@@ -173,20 +174,20 @@ func TestEvaluateComplianceStorageFullPlusOtherIssue(t *testing.T) {
 	params.CascadeKademliaDbMaxBytes = 1_000_000_000
 
 	metrics := types.SupernodeMetrics{
-		VersionMajor:              2,
-		VersionMinor:              0,
-		VersionPatch:              0,
-		CpuCoresTotal:             float64(params.MinCpuCores),
-		CpuUsagePercent:           float64(params.MaxCpuUsagePercent - 10),
-		MemTotalGb:                float64(params.MinMemGb),
-		MemUsagePercent:           float64(params.MaxMemUsagePercent - 10),
-		MemFreeGb:                 float64(params.MinMemGb) / 2,
-		DiskTotalGb:               float64(params.MinStorageGb),
-		DiskUsagePercent:          float64(params.MaxStorageUsagePercent - 10),
-		DiskFreeGb:                float64(params.MinStorageGb) / 2,
-		UptimeSeconds:             100,
-		PeersCount:                0, // fails peers check
-		CascadeKademliaDbBytes:    1_500_000_000,
+		VersionMajor:           2,
+		VersionMinor:           0,
+		VersionPatch:           0,
+		CpuCoresTotal:          float64(params.MinCpuCores),
+		CpuUsagePercent:        float64(params.MaxCpuUsagePercent - 10),
+		MemTotalGb:             float64(params.MinMemGb),
+		MemUsagePercent:        float64(params.MaxMemUsagePercent - 10),
+		MemFreeGb:              float64(params.MinMemGb) / 2,
+		DiskTotalGb:            float64(params.MinStorageGb),
+		DiskUsagePercent:       float64(params.MaxStorageUsagePercent - 10),
+		DiskFreeGb:             float64(params.MinStorageGb) / 2,
+		UptimeSeconds:          100,
+		PeersCount:             0, // fails peers check
+		CascadeKademliaDbBytes: 1_500_000_000,
 	}
 	for _, port := range params.RequiredOpenPorts {
 		metrics.OpenPorts = append(metrics.OpenPorts, types.PortStatus{
@@ -208,20 +209,20 @@ func TestEvaluateComplianceStorageFullDisabledWhenZeroThreshold(t *testing.T) {
 	// Default: CascadeKademliaDbMaxBytes == 0 (disabled)
 
 	metrics := types.SupernodeMetrics{
-		VersionMajor:              2,
-		VersionMinor:              0,
-		VersionPatch:              0,
-		CpuCoresTotal:             float64(params.MinCpuCores),
-		CpuUsagePercent:           float64(params.MaxCpuUsagePercent - 10),
-		MemTotalGb:                float64(params.MinMemGb),
-		MemUsagePercent:           float64(params.MaxMemUsagePercent - 10),
-		MemFreeGb:                 float64(params.MinMemGb) / 2,
-		DiskTotalGb:               float64(params.MinStorageGb),
-		DiskUsagePercent:          float64(params.MaxStorageUsagePercent - 10),
-		DiskFreeGb:                float64(params.MinStorageGb) / 2,
-		UptimeSeconds:             100,
-		PeersCount:                10,
-		CascadeKademliaDbBytes:    999_999_999_999, // huge, but threshold disabled
+		VersionMajor:           2,
+		VersionMinor:           0,
+		VersionPatch:           0,
+		CpuCoresTotal:          float64(params.MinCpuCores),
+		CpuUsagePercent:        float64(params.MaxCpuUsagePercent - 10),
+		MemTotalGb:             float64(params.MinMemGb),
+		MemUsagePercent:        float64(params.MaxMemUsagePercent - 10),
+		MemFreeGb:              float64(params.MinMemGb) / 2,
+		DiskTotalGb:            float64(params.MinStorageGb),
+		DiskUsagePercent:       float64(params.MaxStorageUsagePercent - 10),
+		DiskFreeGb:             float64(params.MinStorageGb) / 2,
+		UptimeSeconds:          100,
+		PeersCount:             10,
+		CascadeKademliaDbBytes: 999_999_999_999, // huge, but threshold disabled
 	}
 	for _, port := range params.RequiredOpenPorts {
 		metrics.OpenPorts = append(metrics.OpenPorts, types.PortStatus{
@@ -234,6 +235,55 @@ func TestEvaluateComplianceStorageFullDisabledWhenZeroThreshold(t *testing.T) {
 
 	require.True(t, result.IsCompliant(), "should be compliant when threshold is disabled")
 	require.False(t, result.StorageFull)
+}
+
+func TestEvaluateComplianceRejectsInvalidCascadeKademliaBytes(t *testing.T) {
+	ctx := sdk.NewContext(nil, tmproto.Header{Height: 10}, false, log.NewNopLogger())
+	params := types.DefaultParams()
+	params.CascadeKademliaDbMaxBytes = 1_000_000_000
+
+	baseMetrics := types.SupernodeMetrics{
+		VersionMajor:     2,
+		VersionMinor:     0,
+		VersionPatch:     0,
+		CpuCoresTotal:    float64(params.MinCpuCores),
+		CpuUsagePercent:  float64(params.MaxCpuUsagePercent - 10),
+		MemTotalGb:       float64(params.MinMemGb),
+		MemUsagePercent:  float64(params.MaxMemUsagePercent - 10),
+		MemFreeGb:        float64(params.MinMemGb) / 2,
+		DiskTotalGb:      float64(params.MinStorageGb),
+		DiskUsagePercent: float64(params.MaxStorageUsagePercent - 10),
+		DiskFreeGb:       float64(params.MinStorageGb) / 2,
+		UptimeSeconds:    100,
+		PeersCount:       10,
+	}
+	for _, port := range params.RequiredOpenPorts {
+		baseMetrics.OpenPorts = append(baseMetrics.OpenPorts, types.PortStatus{
+			Port:  port,
+			State: types.PortState_PORT_STATE_OPEN,
+		})
+	}
+
+	t.Run("nan", func(t *testing.T) {
+		metrics := baseMetrics
+		metrics.CascadeKademliaDbBytes = math.NaN()
+
+		result := evaluateCompliance(ctx, params, metrics)
+
+		require.True(t, containsSubstring(result.Issues, "invalid numeric value for cascade_kademlia_db_bytes"))
+		require.False(t, result.IsCompliant())
+	})
+
+	t.Run("negative", func(t *testing.T) {
+		metrics := baseMetrics
+		metrics.CascadeKademliaDbBytes = -1
+
+		result := evaluateCompliance(ctx, params, metrics)
+
+		require.True(t, containsSubstring(result.Issues, "cascade_kademlia_db_bytes must be >= 0"))
+		require.False(t, result.IsCompliant())
+		require.False(t, result.StorageFull)
+	})
 }
 
 func containsSubstring(items []string, substr string) bool {

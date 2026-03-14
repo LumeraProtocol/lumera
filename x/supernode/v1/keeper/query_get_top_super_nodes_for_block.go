@@ -49,6 +49,8 @@ func (q queryServer) GetTopSuperNodesForBlock(
 		superNodeStateFilter = types.SuperNodeStatePenalized
 	case "SUPERNODE_STATE_POSTPONED", "POSTPONED":
 		superNodeStateFilter = types.SuperNodeStatePostponed
+	case "SUPERNODE_STATE_STORAGE_FULL", "STORAGE_FULL":
+		superNodeStateFilter = types.SuperNodeStateStorageFull
 	default:
 		if v, ok := types.SuperNodeState_value[normalized]; ok {
 			superNodeStateFilter = types.SuperNodeState(v)

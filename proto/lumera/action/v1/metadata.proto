@@ -5,6 +5,14 @@ option go_package = "x/action/v1/types";
 
 import "gogoproto/gogo.proto";
 
+// HashAlgo enumerates the supported hash algorithms for availability
+// commitments.
+enum HashAlgo {
+  HASH_ALGO_UNSPECIFIED = 0;
+  HASH_ALGO_BLAKE3      = 1;
+  HASH_ALGO_SHA256      = 2;
+}
+
 // SenseMetadata contains information for Sense actions.
 // This metadata is directly embedded in the Action.metadata field.
 // For RequestAction:
@@ -29,6 +37,30 @@ message SenseMetadata {
   // FinalizeAction fields
   repeated string dd_and_fingerprints_ids = 6 [json_name = "dd_and_fingerprints_ids"];
   string signatures = 7 [json_name = "signatures"];
+}
+
+// AvailabilityCommitment is the LEP-5 on-chain file commitment included
+// during Cascade registration.
+message AvailabilityCommitment {
+  string commitment_type = 1 [json_name = "commitment_type"];
+  HashAlgo hash_algo = 2 [json_name = "hash_algo"];
+  uint32 chunk_size = 3 [json_name = "chunk_size"];
+  uint64 total_size = 4 [json_name = "total_size"];
+  uint32 num_chunks = 5 [json_name = "num_chunks"];
+  bytes root = 6 [json_name = "root"];
+  // Challenge indices chosen by the client at registration time.
+  // The SuperNode must provide Merkle proofs for these exact chunk
+  // indices during finalization. The keeper validates proofs match
+  // these stored indices and the committed root.
+  repeated uint32 challenge_indices = 7 [json_name = "challenge_indices"];
+}
+
+// ChunkProof is a Merkle inclusion proof for one challenged chunk.
+message ChunkProof {
+  uint32 chunk_index = 1 [json_name = "chunk_index"];
+  bytes leaf_hash = 2 [json_name = "leaf_hash"];
+  repeated bytes path_hashes = 3 [json_name = "path_hashes"];
+  repeated bool path_directions = 4 [json_name = "path_directions"];
 }
   
 // CascadeMetadata contains information for Cascade actions.
@@ -56,4 +88,8 @@ message CascadeMetadata {
   // mark the action as visible to all users; set to false for private
   // or restricted actions.
   bool public = 7 [json_name = "public"];
+
+  // LEP-5 fields
+  AvailabilityCommitment availability_commitment = 8 [json_name = "availability_commitment"];
+  repeated ChunkProof chunk_proofs = 9 [json_name = "chunk_proofs"];
 }

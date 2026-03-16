@@ -28,3 +28,18 @@ build/
 
 *.swagger.json
 
+
+
+.roo/
+.roomodes
+docs/context.json
+docs/requirements.json
+docs/decisions.md
+docs/human-playbook.md
+docs/new-feature*
+plans/
+CLAUDE.md
+.claude/
+.codex
+.agents
+AGENTS.md

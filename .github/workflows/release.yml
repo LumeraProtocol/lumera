@@ -33,6 +33,8 @@ jobs:
       - name: Setup Go
         id: setup-go
         uses: ./.github/actions/setup-go
+        with:
+          version: "1.25.6"
 
       - name: Prepare Build Variables
         id: vars

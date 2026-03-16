@@ -36,7 +36,7 @@ import (
 // | v1.10.0 | custom   | drop crisis                       | Migrate consensus params from x/params to x/consensus; remove x/crisis
 // | v1.10.1 | custom   | drop crisis (if not already)      | Ensure consensus params are present in x/consensus
 // | v1.11.0 | custom   | add audit store                   | Initializes audit params with dynamic epoch_zero_height
-// | v1.11.1 | custom   | none                              | Enforces audit min_disk_free_percent floor (>=15)
+// | v1.11.1 | custom   | conditional add audit store       | Supports direct v1.10.1->v1.11.1 and enforces audit min_disk_free_percent floor (>=15)
 // =================================================================================================================================
 
 type UpgradeConfig struct {
@@ -137,7 +137,8 @@ func SetupUpgrades(upgradeName string, params appParams.AppUpgradeParams) (Upgra
 		}, true
 	case upgrade_v1_11_1.UpgradeName:
 		return UpgradeConfig{
-			Handler: upgrade_v1_11_1.CreateUpgradeHandler(params),
+			StoreUpgrade: &upgrade_v1_11_1.StoreUpgrades,
+			Handler:      upgrade_v1_11_1.CreateUpgradeHandler(params),
 		}, true
 
 	// add future upgrades here

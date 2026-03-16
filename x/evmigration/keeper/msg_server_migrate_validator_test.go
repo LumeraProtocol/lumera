@@ -25,9 +25,8 @@ func TestMigrateValidator_NotValidator(t *testing.T) {
 	f := initMsgServerFixture(t)
 
 	privKey := secp256k1.GenPrivKey()
-	pubKey := privKey.PubKey().(*secp256k1.PubKey)
-	legacyAddr := sdk.AccAddress(pubKey.Address())
-	newAddr := testAccAddr()
+	legacyAddr := sdk.AccAddress(privKey.PubKey().Address())
+	newPrivKey, newAddr := testNewMigrationAccount(t)
 
 	baseAcc := authtypes.NewBaseAccountWithAddress(legacyAddr)
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), legacyAddr).Return(baseAcc)
@@ -38,12 +37,7 @@ func TestMigrateValidator_NotValidator(t *testing.T) {
 		stakingtypes.Validator{}, stakingtypes.ErrNoValidatorFound,
 	)
 
-	msg := &types.MsgMigrateValidator{
-		LegacyAddress:   legacyAddr.String(),
-		NewAddress:      newAddr.String(),
-		LegacyPubKey:    pubKey.Key,
-		LegacySignature: signMigrationMessage(t, privKey, legacyAddr, newAddr),
-	}
+	msg := newValidatorMigrationMsg(t, privKey, legacyAddr, newPrivKey, newAddr)
 
 	_, err := f.msgServer.MigrateValidator(f.ctx, msg)
 	require.ErrorIs(t, err, types.ErrNotValidator)
@@ -55,9 +49,8 @@ func TestMigrateValidator_UnbondingValidator(t *testing.T) {
 	f := initMsgServerFixture(t)
 
 	privKey := secp256k1.GenPrivKey()
-	pubKey := privKey.PubKey().(*secp256k1.PubKey)
-	legacyAddr := sdk.AccAddress(pubKey.Address())
-	newAddr := testAccAddr()
+	legacyAddr := sdk.AccAddress(privKey.PubKey().Address())
+	newPrivKey, newAddr := testNewMigrationAccount(t)
 
 	baseAcc := authtypes.NewBaseAccountWithAddress(legacyAddr)
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), legacyAddr).Return(baseAcc)
@@ -70,12 +63,7 @@ func TestMigrateValidator_UnbondingValidator(t *testing.T) {
 		}, nil,
 	)
 
-	msg := &types.MsgMigrateValidator{
-		LegacyAddress:   legacyAddr.String(),
-		NewAddress:      newAddr.String(),
-		LegacyPubKey:    pubKey.Key,
-		LegacySignature: signMigrationMessage(t, privKey, legacyAddr, newAddr),
-	}
+	msg := newValidatorMigrationMsg(t, privKey, legacyAddr, newPrivKey, newAddr)
 
 	_, err := f.msgServer.MigrateValidator(f.ctx, msg)
 	require.ErrorIs(t, err, types.ErrValidatorUnbonding)
@@ -91,9 +79,8 @@ func TestMigrateValidator_TooManyDelegators(t *testing.T) {
 	require.NoError(t, f.keeper.Params.Set(f.ctx, params))
 
 	privKey := secp256k1.GenPrivKey()
-	pubKey := privKey.PubKey().(*secp256k1.PubKey)
-	legacyAddr := sdk.AccAddress(pubKey.Address())
-	newAddr := testAccAddr()
+	legacyAddr := sdk.AccAddress(privKey.PubKey().Address())
+	newPrivKey, newAddr := testNewMigrationAccount(t)
 
 	baseAcc := authtypes.NewBaseAccountWithAddress(legacyAddr)
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), legacyAddr).Return(baseAcc)
@@ -116,12 +103,7 @@ func TestMigrateValidator_TooManyDelegators(t *testing.T) {
 	f.stakingKeeper.EXPECT().GetUnbondingDelegationsFromValidator(gomock.Any(), oldValAddr).Return(nil, nil)
 	f.stakingKeeper.EXPECT().GetRedelegationsFromSrcValidator(gomock.Any(), oldValAddr).Return(nil, nil)
 
-	msg := &types.MsgMigrateValidator{
-		LegacyAddress:   legacyAddr.String(),
-		NewAddress:      newAddr.String(),
-		LegacyPubKey:    pubKey.Key,
-		LegacySignature: signMigrationMessage(t, privKey, legacyAddr, newAddr),
-	}
+	msg := newValidatorMigrationMsg(t, privKey, legacyAddr, newPrivKey, newAddr)
 
 	_, err := f.msgServer.MigrateValidator(f.ctx, msg)
 	require.ErrorIs(t, err, types.ErrTooManyDelegators)
@@ -136,7 +118,7 @@ func TestMigrateValidator_Success(t *testing.T) {
 	privKey := secp256k1.GenPrivKey()
 	pubKey := privKey.PubKey().(*secp256k1.PubKey)
 	legacyAddr := sdk.AccAddress(pubKey.Address())
-	newAddr := testAccAddr()
+	newPrivKey, newAddr := testNewMigrationAccount(t)
 	oldValAddr := sdk.ValAddress(legacyAddr)
 	newValAddr := sdk.ValAddress(newAddr)
 
@@ -194,9 +176,13 @@ func TestMigrateValidator_Success(t *testing.T) {
 	f.distributionKeeper.EXPECT().DeleteValidatorOutstandingRewards(gomock.Any(), oldValAddr).Return(nil)
 	f.distributionKeeper.EXPECT().SetValidatorOutstandingRewards(gomock.Any(), newValAddr, gomock.Any()).Return(nil)
 
-	// HistoricalRewards — none.
-	f.distributionKeeper.EXPECT().IterateValidatorHistoricalRewards(gomock.Any(), gomock.Any())
+	// HistoricalRewards — one entry carried over to the new validator.
+	f.distributionKeeper.EXPECT().IterateValidatorHistoricalRewards(gomock.Any(), gomock.Any()).
+		Do(func(_ any, cb func(sdk.ValAddress, uint64, distrtypes.ValidatorHistoricalRewards) bool) {
+			cb(oldValAddr, 2, distrtypes.ValidatorHistoricalRewards{ReferenceCount: 1})
+		})
 	f.distributionKeeper.EXPECT().DeleteValidatorHistoricalRewards(gomock.Any(), oldValAddr)
+	f.distributionKeeper.EXPECT().SetValidatorHistoricalRewards(gomock.Any(), newValAddr, uint64(2), gomock.Any()).Return(nil)
 
 	// SlashEvents — none.
 	f.distributionKeeper.EXPECT().IterateValidatorSlashEvents(gomock.Any(), gomock.Any())
@@ -206,15 +192,19 @@ func TestMigrateValidator_Success(t *testing.T) {
 	f.stakingKeeper.EXPECT().GetValidatorDelegations(gomock.Any(), oldValAddr).Return(
 		[]stakingtypes.Delegation{del}, nil,
 	)
-	f.distributionKeeper.EXPECT().DeleteDelegatorStartingInfo(gomock.Any(), oldValAddr, legacyAddr).Return(nil)
-	f.stakingKeeper.EXPECT().RemoveDelegation(gomock.Any(), del).Return(nil)
-	f.stakingKeeper.EXPECT().SetDelegation(gomock.Any(), gomock.Any()).Return(nil)
+	// Reset target period refcount before delegation loop.
 	f.distributionKeeper.EXPECT().GetValidatorCurrentRewards(gomock.Any(), newValAddr).Return(
 		distrtypes.ValidatorCurrentRewards{Period: 3}, nil,
 	)
+	expectHistoricalRewardsReset(f.distributionKeeper, newValAddr, 2, 2)
+	// Per-delegation re-keying.
+	f.distributionKeeper.EXPECT().DeleteDelegatorStartingInfo(gomock.Any(), oldValAddr, legacyAddr).Return(nil)
+	f.stakingKeeper.EXPECT().RemoveDelegation(gomock.Any(), del).Return(nil)
+	f.stakingKeeper.EXPECT().SetDelegation(gomock.Any(), gomock.Any()).Return(nil)
 	f.distributionKeeper.EXPECT().GetDelegatorStartingInfo(gomock.Any(), oldValAddr, legacyAddr).Return(
 		distrtypes.DelegatorStartingInfo{}, nil,
 	)
+	expectHistoricalRewardsIncrement(f.distributionKeeper, newValAddr, 2, 1)
 	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), newValAddr, legacyAddr, gomock.Any()).Return(nil)
 	// No unbonding delegations or redelegations.
 	f.stakingKeeper.EXPECT().GetUnbondingDelegationsFromValidator(gomock.Any(), oldValAddr).Return(nil, nil)
@@ -249,12 +239,7 @@ func TestMigrateValidator_Success(t *testing.T) {
 	// MigrateClaim — no claim records targeting this address.
 	f.claimKeeper.EXPECT().IterateClaimRecords(gomock.Any(), gomock.Any()).Return(nil)
 
-	msg := &types.MsgMigrateValidator{
-		LegacyAddress:   legacyAddr.String(),
-		NewAddress:      newAddr.String(),
-		LegacyPubKey:    pubKey.Key,
-		LegacySignature: signMigrationMessage(t, privKey, legacyAddr, newAddr),
-	}
+	msg := newValidatorMigrationMsg(t, privKey, legacyAddr, newPrivKey, newAddr)
 
 	resp, err := f.msgServer.MigrateValidator(f.ctx, msg)
 	require.NoError(t, err)

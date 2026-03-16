@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"cosmossdk.io/math"
+	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/query"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
@@ -130,6 +131,14 @@ func TestQueryMigrationEstimate_NonValidator(t *testing.T) {
 	// No authz or feegrant.
 	f.authzKeeper.EXPECT().IterateGrants(gomock.Any(), gomock.Any())
 	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
+	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ any, cb func(*actiontypes.Action) bool) error {
+			cb(&actiontypes.Action{ActionID: "1", Creator: addr.String()})
+			cb(&actiontypes.Action{ActionID: "2", SuperNodes: []string{addr.String()}})
+			cb(&actiontypes.Action{ActionID: "3", Creator: testAccAddr().String()})
+			return nil
+		},
+	)
 
 	resp, err := qs.MigrationEstimate(f.ctx, &types.QueryMigrationEstimateRequest{
 		LegacyAddress: addr.String(),
@@ -138,7 +147,8 @@ func TestQueryMigrationEstimate_NonValidator(t *testing.T) {
 	require.False(t, resp.IsValidator)
 	require.True(t, resp.WouldSucceed)
 	require.Equal(t, uint64(2), resp.DelegationCount)
-	require.Equal(t, uint64(2), resp.TotalTouched)
+	require.Equal(t, uint64(2), resp.ActionCount)
+	require.Equal(t, uint64(4), resp.TotalTouched)
 }
 
 // TestQueryMigrationEstimate_AlreadyMigrated verifies that already-migrated addresses
@@ -165,6 +175,7 @@ func TestQueryMigrationEstimate_AlreadyMigrated(t *testing.T) {
 	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), addr, ^uint16(0)).Return(nil, nil)
 	f.authzKeeper.EXPECT().IterateGrants(gomock.Any(), gomock.Any())
 	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
+	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
 
 	resp, err := qs.MigrationEstimate(f.ctx, &types.QueryMigrationEstimateRequest{
 		LegacyAddress: addr.String(),

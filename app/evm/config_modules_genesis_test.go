@@ -62,6 +62,31 @@ func TestLumeraGenesisDefaults(t *testing.T) {
 	)
 }
 
+// TestUpstreamDefaultEvmDenomIsNotLumera documents that cosmos/evm v0.6.0
+// DefaultParams().EvmDenom = DefaultEVMExtendedDenom = "aatom", NOT "ulume".
+// This is why the v1.12.0 upgrade handler must skip InitGenesis for EVM modules
+// (via fromVM pre-population) and manually set Lumera params. If this test
+// fails, the upstream default has changed and the upgrade handler may need updating.
+func TestUpstreamDefaultEvmDenomIsNotLumera(t *testing.T) {
+	t.Parallel()
+
+	upstreamParams := evmtypes.DefaultParams()
+
+	// Upstream EvmDenom must NOT be the Lumera chain denom — if it were,
+	// the InitGenesis skip in the upgrade handler would be unnecessary.
+	require.NotEqual(t, lcfg.ChainDenom, upstreamParams.EvmDenom,
+		"upstream DefaultParams().EvmDenom should differ from Lumera ChainDenom")
+	require.Equal(t, evmtypes.DefaultEVMExtendedDenom, upstreamParams.EvmDenom,
+		"upstream DefaultParams().EvmDenom should be DefaultEVMExtendedDenom (aatom)")
+
+	// Lumera's genesis state must use the correct denoms.
+	lumeraGenesis := evm.LumeraEVMGenesisState()
+	require.Equal(t, lcfg.ChainDenom, lumeraGenesis.Params.EvmDenom,
+		"Lumera EVM genesis should use ChainDenom (ulume)")
+	require.Equal(t, lcfg.ChainEVMExtendedDenom, lumeraGenesis.Params.ExtendedDenomOptions.ExtendedDenom,
+		"Lumera EVM genesis should use ChainEVMExtendedDenom (alume)")
+}
+
 // TestRegisterModulesMatrix checks EVM module registration wiring used by CLI
 // module basics / default genesis generation.
 func TestRegisterModulesMatrix(t *testing.T) {

@@ -68,8 +68,11 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 		)
 	}
 
-	// Verify dual signatures.
-	if err := VerifyLegacySignature(legacyAddr, newAddr, msg.LegacyPubKey, msg.LegacySignature); err != nil {
+	// Verify both embedded proofs before touching state.
+	if err := VerifyLegacySignature(migrationPayloadKindValidator, legacyAddr, newAddr, msg.LegacyPubKey, msg.LegacySignature); err != nil {
+		return nil, err
+	}
+	if err := VerifyNewSignature(migrationPayloadKindValidator, legacyAddr, newAddr, msg.NewPubKey, msg.NewSignature); err != nil {
 		return nil, err
 	}
 
@@ -108,7 +111,7 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 	}
 
 	// --- Step V5: Re-key supernode record ---
-	if err := ms.MigrateValidatorSupernode(ctx, oldValAddr, newValAddr, newAddr); err != nil {
+	if err := ms.MigrateValidatorSupernode(ctx, oldValAddr, newValAddr, legacyAddr, newAddr); err != nil {
 		return nil, fmt.Errorf("migrate validator supernode: %w", err)
 	}
 

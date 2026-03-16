@@ -25,6 +25,7 @@ projectBrief.md
 tests/systemtests/testnet
 tests/systemtests/__debug_bin*
 build/
+.claude/settings.json
 
 *.swagger.json
 

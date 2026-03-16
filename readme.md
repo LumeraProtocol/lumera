@@ -23,17 +23,17 @@ ignite chain build
 
 **Note2:** You might get error during build:
 ```
-Cosmos SDK's version is: v0.50.14
+Cosmos SDK's version is: v0.53.6
 
 ✘ Cannot build app:                                                          
                                                                            
-error while running command go mod tidy: go: cannot find "go1.25.5" in PATH
+error while running command go mod tidy: go: cannot find "go1.26.1" in PATH
 : exit status 1
 ```
 Lumera project doesn't specify toolchain, but it seems `Ignite` sometime might still require it. Do this:
 ```cmd
-go install golang.org/dl/go1.25.5@latest
-go1.25.5 download
+go install golang.org/dl/go1.26.1@latest
+go1.26.1 download
 export GOTOOLCHAIN=auto
 ```
 

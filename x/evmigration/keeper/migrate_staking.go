@@ -74,6 +74,9 @@ func (k Keeper) migrateActiveDelegations(ctx sdk.Context, legacyAddr, newAddr sd
 			startingInfo.Stake = del.Shares
 		}
 		startingInfo.PreviousPeriod = currentRewards.Period - 1
+		if err := k.incrementHistoricalRewardsReferenceCount(ctx, valAddr, startingInfo.PreviousPeriod); err != nil {
+			return err
+		}
 		if err := k.distributionKeeper.SetDelegatorStartingInfo(ctx, valAddr, newAddr, startingInfo); err != nil {
 			return err
 		}
@@ -82,35 +85,19 @@ func (k Keeper) migrateActiveDelegations(ctx sdk.Context, legacyAddr, newAddr sd
 	return nil
 }
 
-// migrateUnbondingDelegations re-keys unbonding delegations from legacyAddr to
-// newAddr, including unbonding queue entries and UnbondingID indexes.
+// migrateUnbondingDelegations re-keys all unbonding delegations from legacyAddr
+// to newAddr, including unbonding queue entries and UnbondingID indexes.
 func (k Keeper) migrateUnbondingDelegations(ctx sdk.Context, legacyAddr, newAddr sdk.AccAddress) error {
-	// Get all validators the legacy address has delegations to, then check unbonding.
-	delegations, err := k.stakingKeeper.GetDelegatorDelegations(ctx, legacyAddr, ^uint16(0))
+	unbondings, err := k.stakingKeeper.GetUnbondingDelegations(ctx, legacyAddr, ^uint16(0))
 	if err != nil {
 		return err
 	}
 
-	// Collect validator addresses from active delegations. Also check for unbonding
-	// delegations that may exist without active delegations.
-	valAddrs := make(map[string]bool)
-	for _, del := range delegations {
-		valAddrs[del.ValidatorAddress] = true
-	}
-
-	// Try to get unbonding delegations for each known validator.
-	for valAddrStr := range valAddrs {
-		valAddr, err := sdk.ValAddressFromBech32(valAddrStr)
-		if err != nil {
-			return err
-		}
-
-		ubd, err := k.stakingKeeper.GetUnbondingDelegation(ctx, legacyAddr, valAddr)
-		if err != nil {
-			continue // No unbonding delegation for this validator.
-		}
-
+	for _, ubd := range unbondings {
 		// Remove old unbonding delegation.
+		// The full record is already loaded, so we do not need to rediscover it
+		// through active delegations, which would miss validators that were fully
+		// undelegated before migration.
 		if err := k.stakingKeeper.RemoveUnbondingDelegation(ctx, ubd); err != nil {
 			return err
 		}
@@ -141,58 +128,39 @@ func (k Keeper) migrateUnbondingDelegations(ctx sdk.Context, legacyAddr, newAddr
 	return nil
 }
 
-// migrateRedelegations re-keys redelegations where legacyAddr is the delegator,
-// including redelegation queue entries and UnbondingID indexes.
+// migrateRedelegations re-keys all redelegations where legacyAddr is the
+// delegator, including redelegation queue entries and UnbondingID indexes.
 func (k Keeper) migrateRedelegations(ctx sdk.Context, legacyAddr, newAddr sdk.AccAddress) error {
-	// Redelegations where legacyAddr is the delegator.
-	// We need to iterate all validators to find redelegations from src validators.
-	delegations, err := k.stakingKeeper.GetDelegatorDelegations(ctx, legacyAddr, ^uint16(0))
+	redelegations, err := k.stakingKeeper.GetRedelegations(ctx, legacyAddr, ^uint16(0))
 	if err != nil {
 		return err
 	}
 
-	for _, del := range delegations {
-		srcValAddr, err := sdk.ValAddressFromBech32(del.ValidatorAddress)
-		if err != nil {
+	for _, red := range redelegations {
+		// Remove old redelegation.
+		if err := k.stakingKeeper.RemoveRedelegation(ctx, red); err != nil {
 			return err
 		}
 
-		// Get all redelegations from this source validator.
-		reds, err := k.stakingKeeper.GetRedelegationsFromSrcValidator(ctx, srcValAddr)
-		if err != nil {
+		// Create new with newAddr as delegator.
+		newRed := stakingtypes.Redelegation{
+			DelegatorAddress:    newAddr.String(),
+			ValidatorSrcAddress: red.ValidatorSrcAddress,
+			ValidatorDstAddress: red.ValidatorDstAddress,
+			Entries:             red.Entries,
+		}
+		if err := k.stakingKeeper.SetRedelegation(ctx, newRed); err != nil {
 			return err
 		}
 
-		for _, red := range reds {
-			if red.DelegatorAddress != legacyAddr.String() {
-				continue
-			}
-
-			// Remove old redelegation.
-			if err := k.stakingKeeper.RemoveRedelegation(ctx, red); err != nil {
+		// Re-insert into queue and re-key UnbondingID indexes.
+		for _, entry := range newRed.Entries {
+			if err := k.stakingKeeper.InsertRedelegationQueue(ctx, newRed, entry.CompletionTime); err != nil {
 				return err
 			}
-
-			// Create new with newAddr as delegator.
-			newRed := stakingtypes.Redelegation{
-				DelegatorAddress:    newAddr.String(),
-				ValidatorSrcAddress: red.ValidatorSrcAddress,
-				ValidatorDstAddress: red.ValidatorDstAddress,
-				Entries:             red.Entries,
-			}
-			if err := k.stakingKeeper.SetRedelegation(ctx, newRed); err != nil {
-				return err
-			}
-
-			// Re-insert into queue and re-key UnbondingID indexes.
-			for _, entry := range newRed.Entries {
-				if err := k.stakingKeeper.InsertRedelegationQueue(ctx, newRed, entry.CompletionTime); err != nil {
+			if entry.UnbondingId > 0 {
+				if err := k.stakingKeeper.SetRedelegationByUnbondingID(ctx, newRed, entry.UnbondingId); err != nil {
 					return err
-				}
-				if entry.UnbondingId > 0 {
-					if err := k.stakingKeeper.SetRedelegationByUnbondingID(ctx, newRed, entry.UnbondingId); err != nil {
-						return err
-					}
 				}
 			}
 		}

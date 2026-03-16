@@ -7,17 +7,20 @@ import (
 	"math/rand"
 	"strings"
 	"time"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
+)
+
+type migrateResult int
+
+const (
+	migrateFailed migrateResult = iota
+	migrateNew
+	migrateAlreadyOnChain
 )
 
 func runMigrate() {
 	ensureEVMMigrationRuntime("migrate mode")
-
-	if *flagFunder == "" {
-		if name, err := detectFunder(); err == nil {
-			*flagFunder = name
-			log.Printf("auto-detected funder from keyring: %s", name)
-		}
-	}
 
 	af := loadAccounts(*flagFile)
 	for i := range af.Accounts {
@@ -27,11 +30,21 @@ func runMigrate() {
 
 	// Check migration params.
 	log.Println("--- Checking migration params ---")
-	out, err := run("query", "evmigration", "params")
+	params, err := queryMigrationParams()
 	if err != nil {
-		log.Printf("WARN: query evmigration params: %v\n%s", err, out)
-	} else {
-		log.Printf("  evmigration params: %s", out)
+		log.Fatalf("query evmigration params: %v", err)
+	}
+	log.Printf("  params: enable_migration=%v migration_end_time=%d max_migrations_per_block=%d max_validator_delegations=%d",
+		params.EnableMigration, params.MigrationEndTime, params.MaxMigrationsPerBlock, params.MaxValidatorDelegations)
+	if params.MigrationEndTime > 0 {
+		log.Printf("  migration window end: %s", time.Unix(params.MigrationEndTime, 0).UTC().Format(time.RFC3339))
+	}
+	if !params.EnableMigration {
+		log.Fatal("migration preflight failed: enable_migration=false. Submit/execute governance params update first, then rerun migrate mode")
+	}
+	if params.MigrationEndTime > 0 && time.Now().Unix() > params.MigrationEndTime {
+		log.Fatalf("migration preflight failed: migration window closed at %s",
+			time.Unix(params.MigrationEndTime, 0).UTC().Format(time.RFC3339))
 	}
 
 	// Query initial migration stats.
@@ -73,6 +86,7 @@ func runMigrate() {
 
 	// Process in random batches of 1..5.
 	migrated := 0
+	alreadyMigrated := 0
 	failed := 0
 	pos := 0
 	batchNum := 0
@@ -87,10 +101,12 @@ func runMigrate() {
 
 		for _, idx := range legacyIdx[pos : pos+batchSize] {
 			rec := &af.Accounts[idx]
-			ok := migrateOne(rec)
-			if ok {
+			switch migrateOne(rec) {
+			case migrateNew:
 				migrated++
-			} else {
+			case migrateAlreadyOnChain:
+				alreadyMigrated++
+			default:
 				failed++
 			}
 		}
@@ -102,8 +118,8 @@ func runMigrate() {
 			af.Accounts[i].normalizeActivityTracking()
 		}
 		saveAccounts(*flagFile, af)
-		log.Printf("  batch %d complete, progress saved (%d/%d migrated, %d failed)",
-			batchNum, migrated, len(legacyIdx), failed)
+		log.Printf("  batch %d complete, progress saved (%d newly migrated, %d already on-chain, %d failed, %d total)",
+			batchNum, migrated, alreadyMigrated, failed, len(legacyIdx))
 
 		// Print stats after each batch.
 		printMigrationStats()
@@ -126,20 +142,22 @@ func runMigrate() {
 	if haveInitialStats && haveFinalStats {
 		delta := finalStats.TotalMigrated - initialStats.TotalMigrated
 		if delta < migrated {
-			log.Fatalf("post-check failed: migration-stats delta=%d is lower than successful migrations=%d", delta, migrated)
+			log.Fatalf("post-check failed: migration-stats delta=%d is lower than newly migrated accounts=%d", delta, migrated)
 		}
-		log.Printf("  post-check: migration-stats total_migrated delta=%d (local successful=%d)", delta, migrated)
+		log.Printf("  post-check: migration-stats total_migrated delta=%d (newly migrated=%d, already on-chain=%d)",
+			delta, migrated, alreadyMigrated)
 	}
 
-	log.Printf("=== MIGRATE COMPLETE: %d/%d migrated, %d failed ===",
-		migrated, len(legacyIdx), failed)
+	log.Printf("=== MIGRATE COMPLETE: %d newly migrated, %d already on-chain, %d failed, %d total ===",
+		migrated, alreadyMigrated, failed, len(legacyIdx))
 	if failed > 0 {
 		log.Fatalf("migration completed with %d failures", failed)
 	}
 }
 
-// migrateOne migrates a single legacy account. Returns true on success.
-func migrateOne(rec *AccountRecord) bool {
+// migrateOne migrates a single legacy account and reports whether it was
+// migrated in this run, already migrated on-chain, or failed.
+func migrateOne(rec *AccountRecord) migrateResult {
 	rec.normalizeActivityTracking()
 
 	// Check if already migrated on-chain (handles rerun after partial progress).
@@ -149,9 +167,9 @@ func migrateOne(rec *AccountRecord) bool {
 		rec.NewAddress = recNewAddr
 		if err := validateLegacyPostMigration(rec); err != nil {
 			log.Printf("  FAIL: post-migration checks for already-migrated %s: %v", rec.Name, err)
-			return false
+			return migrateFailed
 		}
-		return true
+		return migrateAlreadyOnChain
 	}
 
 	// Query migration estimate before migrating.
@@ -161,23 +179,18 @@ func migrateOne(rec *AccountRecord) bool {
 	newRec, err := createDestinationAccountFromLegacy(rec)
 	if err != nil {
 		log.Printf("  WARN: create destination key for %s: %v", rec.Name, err)
-		return false
+		return migrateFailed
 	}
 	rec.NewName = newRec.Name
 	rec.NewAddress = newRec.Address
 
-	// Fund the new address minimally so it can pay tx fees.
-	if *flagFunder != "" {
-		_, _ = runTx("tx", "bank", "send", *flagFunder, newRec.Address, "100000ulume", "--from", *flagFunder)
-	}
-
 	// Sign the migration message using the legacy private key.
 	var sigB64, pubB64 string
 	if rec.Mnemonic != "" {
-		sigB64, err = signMigrationMessage(rec.Mnemonic, rec.Address, newRec.Address)
+		sigB64, err = signMigrationMessage("claim", rec.Mnemonic, rec.Address, newRec.Address)
 		if err != nil {
 			log.Printf("  FAIL: sign for %s: %v", rec.Name, err)
-			return false
+			return migrateFailed
 		}
 		pubB64 = rec.PubKeyB64
 	} else {
@@ -185,60 +198,84 @@ func migrateOne(rec *AccountRecord) bool {
 		privHex, expErr := exportPrivateKeyHex(rec.Name)
 		if expErr != nil {
 			log.Printf("  FAIL: export key for %s: %v", rec.Name, expErr)
-			return false
+			return migrateFailed
 		}
-		sigB64, pubB64, err = signMigrationMessageWithPrivHex(privHex, rec.Address, newRec.Address)
+		sigB64, pubB64, err = signMigrationMessageWithPrivHex("claim", privHex, rec.Address, newRec.Address)
 		if err != nil {
 			log.Printf("  FAIL: sign for %s: %v", rec.Name, err)
-			return false
+			return migrateFailed
 		}
 	}
 
 	// Submit the migration transaction.
 	// AutoCLI positional args: [new-address] [legacy-address] [legacy-pub-key] [legacy-signature]
-	_, err = runTx("tx", "evmigration", "claim-legacy-account",
+	_, err = runTx(
+		"tx", "evmigration", "claim-legacy-account",
 		newRec.Address, rec.Address, pubB64, sigB64,
 		"--from", newRec.Name)
 	if err != nil {
 		log.Printf("  FAIL: claim-legacy-account %s -> %s: %v", rec.Name, newRec.Address, err)
-		return false
+		return migrateFailed
 	}
 
 	// Verify migration-record exists and points to the expected new address.
 	hasRecord, recNewAddr := queryMigrationRecord(rec.Address)
 	if !hasRecord {
 		log.Printf("  FAIL: migration-record missing after tx for %s", rec.Name)
-		return false
+		return migrateFailed
 	}
 	if recNewAddr != newRec.Address {
 		log.Printf("  FAIL: migration-record mismatch for %s: expected=%s got=%s", rec.Name, newRec.Address, recNewAddr)
-		return false
+		return migrateFailed
 	}
 
 	rec.Migrated = true
 	if err := validateLegacyPostMigration(rec); err != nil {
 		log.Printf("  FAIL: post-migration checks for %s: %v", rec.Name, err)
-		return false
+		return migrateFailed
 	}
 
 	log.Printf("  OK: %s (%s) -> %s (%s)", rec.Name, rec.Address, newRec.Name, newRec.Address)
-	return true
+	return migrateNew
 }
 
 func createDestinationAccountFromLegacy(rec *AccountRecord) (AccountRecord, error) {
 	if strings.TrimSpace(rec.Mnemonic) == "" {
 		return AccountRecord{}, fmt.Errorf("legacy account %s has no mnemonic; cannot derive coin-type 60 destination from the same mnemonic", rec.Name)
 	}
-	baseName := fmt.Sprintf("new_%s", rec.Name)
 	expectedAddr, err := deriveAddressFromMnemonic(rec.Mnemonic, false)
 	if err != nil {
 		return AccountRecord{}, fmt.Errorf("derive destination address for %s: %w", rec.Name, err)
 	}
 
+	if rec.NewName != "" {
+		addr, err := getAddress(rec.NewName)
+		if err == nil && addr == expectedAddr {
+			return AccountRecord{
+				Name:     rec.NewName,
+				Mnemonic: rec.Mnemonic,
+				Address:  addr,
+				IsLegacy: false,
+			}, nil
+		}
+	}
+	if legacyName := "new_" + rec.Name; legacyName != rec.NewName {
+		addr, err := getAddress(legacyName)
+		if err == nil && addr == expectedAddr {
+			return AccountRecord{
+				Name:     legacyName,
+				Mnemonic: rec.Mnemonic,
+				Address:  addr,
+				IsLegacy: false,
+			}, nil
+		}
+	}
+
+	baseName := migratedAccountBaseName(rec.Name, rec.IsLegacy)
 	for i := 0; i < 50; i++ {
 		name := baseName
 		if i > 0 {
-			name = fmt.Sprintf("%s_%02d", baseName, i)
+			name = fmt.Sprintf("%s-%02d", baseName, i)
 		}
 
 		addr, err := getAddress(name)
@@ -281,6 +318,29 @@ func createDestinationAccountFromLegacy(rec *AccountRecord) (AccountRecord, erro
 	return AccountRecord{}, fmt.Errorf("unable to create unique destination key for %s", rec.Name)
 }
 
+func migratedAccountBaseName(name string, isLegacy bool) string {
+	switch {
+	case strings.HasPrefix(name, legacyPreparedAccountPrefix+"-"):
+		return migratedAccountPrefix + strings.TrimPrefix(name, legacyPreparedAccountPrefix)
+	case strings.HasPrefix(name, extraPreparedAccountPrefix+"-"):
+		return migratedExtraAccountPrefix + strings.TrimPrefix(name, extraPreparedAccountPrefix)
+	case strings.HasPrefix(name, legacyPreparedAccountPrefixV0+"_"):
+		return migratedAccountPrefix + "-" + strings.ReplaceAll(strings.TrimPrefix(name, legacyPreparedAccountPrefixV0+"_"), "_", "-")
+	case strings.HasPrefix(name, extraPreparedAccountPrefixV0+"_"):
+		return migratedExtraAccountPrefix + "-" + strings.ReplaceAll(strings.TrimPrefix(name, extraPreparedAccountPrefixV0+"_"), "_", "-")
+	case strings.HasPrefix(name, "legacy_"):
+		return migratedAccountPrefix + "-" + strings.ReplaceAll(strings.TrimPrefix(name, "legacy_"), "_", "-")
+	case strings.HasPrefix(name, "extra_"):
+		return migratedExtraAccountPrefix + "-" + strings.ReplaceAll(strings.TrimPrefix(name, "extra_"), "_", "-")
+	default:
+		prefix := migratedExtraAccountPrefix
+		if isLegacy {
+			prefix = migratedAccountPrefix
+		}
+		return prefix + "-" + strings.ReplaceAll(strings.Trim(name, "-_ "), "_", "-")
+	}
+}
+
 // verifyMigrationEstimate queries and logs the migration estimate for an account.
 // If expectMigrated is true, it checks for the "already migrated" rejection reason.
 func verifyMigrationEstimate(rec *AccountRecord, expectMigrated bool) {
@@ -290,17 +350,14 @@ func verifyMigrationEstimate(rec *AccountRecord, expectMigrated bool) {
 		return
 	}
 
-	log.Printf("  estimate %s: would_succeed=%v reason=%q dels=%d unbonding=%d redels=%d authz=%d feegrant=%d val_dels=%d is_validator=%v",
-		rec.Name, estimate.WouldSucceed, estimate.RejectionReason,
-		estimate.DelegationCount, estimate.UnbondingCount, estimate.RedelegationCount,
-		estimate.AuthzGrantCount, estimate.FeegrantCount, estimate.ValDelegationCount, estimate.IsValidator)
+	logEstimateReport(rec, estimate)
 
 	isAlreadyMigrated := estimate.RejectionReason == "already migrated"
 	if expectMigrated && !isAlreadyMigrated {
 		log.Printf("  ERROR: expected rejection_reason='already migrated' for %s", rec.Name)
 	}
 	if !expectMigrated && isAlreadyMigrated {
-		log.Printf("  ERROR: unexpected already-migrated rejection for %s", rec.Name)
+		log.Printf("  INFO: %s is already migrated on-chain; local accounts file may be stale", rec.Name)
 	}
 }
 
@@ -354,11 +411,12 @@ func validateLegacyPostMigration(rec *AccountRecord) error {
 				continue
 			}
 			seen[d.Validator] = struct{}{}
-			newN, err := queryDelegationToValidatorCount(rec.NewAddress, d.Validator)
+			currentValidator := resolvePostMigrationValidator(d.Validator)
+			newN, err := queryDelegationToValidatorCount(rec.NewAddress, currentValidator)
 			if err != nil {
-				issues = append(issues, fmt.Sprintf("query new delegation %s failed: %v", d.Validator, err))
+				issues = append(issues, fmt.Sprintf("query new delegation %s failed: %v", currentValidator, err))
 			} else if newN == 0 {
-				issues = append(issues, fmt.Sprintf("expected delegation on new address to %s, got 0", d.Validator))
+				issues = append(issues, fmt.Sprintf("expected delegation on new address to %s, got 0", currentValidator))
 			}
 			oldN, err := queryDelegationToValidatorCount(rec.Address, d.Validator)
 			if err != nil {
@@ -392,11 +450,12 @@ func validateLegacyPostMigration(rec *AccountRecord) error {
 				continue
 			}
 			seen[u.Validator] = struct{}{}
-			newN, err := queryUnbondingFromValidatorCount(rec.NewAddress, u.Validator)
+			currentValidator := resolvePostMigrationValidator(u.Validator)
+			newN, err := queryUnbondingFromValidatorCount(rec.NewAddress, currentValidator)
 			if err != nil {
-				issues = append(issues, fmt.Sprintf("query new unbonding %s failed: %v", u.Validator, err))
+				issues = append(issues, fmt.Sprintf("query new unbonding %s failed: %v", currentValidator, err))
 			} else if newN == 0 {
-				issues = append(issues, fmt.Sprintf("expected unbonding on new address from %s, got 0", u.Validator))
+				issues = append(issues, fmt.Sprintf("expected unbonding on new address from %s, got 0", currentValidator))
 			}
 			oldN, err := queryUnbondingFromValidatorCount(rec.Address, u.Validator)
 			if err != nil {
@@ -431,11 +490,14 @@ func validateLegacyPostMigration(rec *AccountRecord) error {
 				continue
 			}
 			seen[key] = struct{}{}
-			newN, err := queryRedelegationCount(rec.NewAddress, rd.SrcValidator, rd.DstValidator)
+			currentSrc := resolvePostMigrationValidator(rd.SrcValidator)
+			currentDst := resolvePostMigrationValidator(rd.DstValidator)
+			currentKey := currentSrc + "->" + currentDst
+			newN, err := queryRedelegationCount(rec.NewAddress, currentSrc, currentDst)
 			if err != nil {
-				issues = append(issues, fmt.Sprintf("query new redelegation %s failed: %v", key, err))
+				issues = append(issues, fmt.Sprintf("query new redelegation %s failed: %v", currentKey, err))
 			} else if newN == 0 {
-				issues = append(issues, fmt.Sprintf("expected redelegation on new address for %s, got 0", key))
+				issues = append(issues, fmt.Sprintf("expected redelegation on new address for %s, got 0", currentKey))
 			}
 			oldN, err := queryRedelegationCount(rec.Address, rd.SrcValidator, rd.DstValidator)
 			if err != nil {
@@ -482,11 +544,12 @@ func validateLegacyPostMigration(rec *AccountRecord) error {
 				continue
 			}
 			seen[g.Grantee] = struct{}{}
-			ok, err := queryAuthzGrantExists(rec.NewAddress, g.Grantee)
+			currentGrantee := resolvePostMigrationAddress(g.Grantee)
+			ok, err := queryAuthzGrantExists(rec.NewAddress, currentGrantee)
 			if err != nil {
-				issues = append(issues, fmt.Sprintf("query new authz grant -> %s failed: %v", g.Grantee, err))
+				issues = append(issues, fmt.Sprintf("query new authz grant -> %s failed: %v", currentGrantee, err))
 			} else if !ok {
-				issues = append(issues, fmt.Sprintf("expected authz grant on new address -> %s", g.Grantee))
+				issues = append(issues, fmt.Sprintf("expected authz grant on new address -> %s", currentGrantee))
 			}
 			legacyOK, err := queryAuthzGrantExists(rec.Address, g.Grantee)
 			if err != nil {
@@ -496,7 +559,8 @@ func validateLegacyPostMigration(rec *AccountRecord) error {
 			}
 		}
 	} else if rec.HasAuthzGrant && rec.AuthzGrantedTo != "" {
-		ok, err := queryAuthzGrantExists(rec.NewAddress, rec.AuthzGrantedTo)
+		currentGrantee := resolvePostMigrationAddress(rec.AuthzGrantedTo)
+		ok, err := queryAuthzGrantExists(rec.NewAddress, currentGrantee)
 		if err != nil {
 			issues = append(issues, fmt.Sprintf("query new authz grant failed: %v", err))
 		} else if !ok {
@@ -520,11 +584,12 @@ func validateLegacyPostMigration(rec *AccountRecord) error {
 				continue
 			}
 			seen[g.Granter] = struct{}{}
-			ok, err := queryAuthzGrantExists(g.Granter, rec.NewAddress)
+			currentGranter := resolvePostMigrationAddress(g.Granter)
+			ok, err := queryAuthzGrantExists(currentGranter, rec.NewAddress)
 			if err != nil {
-				issues = append(issues, fmt.Sprintf("query authz grant %s -> new failed: %v", g.Granter, err))
+				issues = append(issues, fmt.Sprintf("query authz grant %s -> new failed: %v", currentGranter, err))
 			} else if !ok {
-				issues = append(issues, fmt.Sprintf("expected authz grant %s -> new address", g.Granter))
+				issues = append(issues, fmt.Sprintf("expected authz grant %s -> new address", currentGranter))
 			}
 			legacyOK, err := queryAuthzGrantExists(g.Granter, rec.Address)
 			if err != nil {
@@ -534,7 +599,8 @@ func validateLegacyPostMigration(rec *AccountRecord) error {
 			}
 		}
 	} else if rec.HasAuthzAsGrantee && rec.AuthzReceivedFrom != "" {
-		ok, err := queryAuthzGrantExists(rec.AuthzReceivedFrom, rec.NewAddress)
+		currentGranter := resolvePostMigrationAddress(rec.AuthzReceivedFrom)
+		ok, err := queryAuthzGrantExists(currentGranter, rec.NewAddress)
 		if err != nil {
 			issues = append(issues, fmt.Sprintf("query authz grant to new address failed: %v", err))
 		} else if !ok {
@@ -558,11 +624,12 @@ func validateLegacyPostMigration(rec *AccountRecord) error {
 				continue
 			}
 			seen[g.Grantee] = struct{}{}
-			ok, err := queryFeegrantAllowanceExists(rec.NewAddress, g.Grantee)
+			currentGrantee := resolvePostMigrationAddress(g.Grantee)
+			ok, err := queryFeegrantAllowanceExists(rec.NewAddress, currentGrantee)
 			if err != nil {
-				issues = append(issues, fmt.Sprintf("query new feegrant -> %s failed: %v", g.Grantee, err))
+				issues = append(issues, fmt.Sprintf("query new feegrant -> %s failed: %v", currentGrantee, err))
 			} else if !ok {
-				issues = append(issues, fmt.Sprintf("expected feegrant on new address -> %s", g.Grantee))
+				issues = append(issues, fmt.Sprintf("expected feegrant on new address -> %s", currentGrantee))
 			}
 			legacyOK, err := queryFeegrantAllowanceExists(rec.Address, g.Grantee)
 			if err != nil {
@@ -572,7 +639,8 @@ func validateLegacyPostMigration(rec *AccountRecord) error {
 			}
 		}
 	} else if rec.HasFeegrant && rec.FeegrantGrantedTo != "" {
-		ok, err := queryFeegrantAllowanceExists(rec.NewAddress, rec.FeegrantGrantedTo)
+		currentGrantee := resolvePostMigrationAddress(rec.FeegrantGrantedTo)
+		ok, err := queryFeegrantAllowanceExists(rec.NewAddress, currentGrantee)
 		if err != nil {
 			issues = append(issues, fmt.Sprintf("query new feegrant failed: %v", err))
 		} else if !ok {
@@ -596,11 +664,12 @@ func validateLegacyPostMigration(rec *AccountRecord) error {
 				continue
 			}
 			seen[g.Granter] = struct{}{}
-			ok, err := queryFeegrantAllowanceExists(g.Granter, rec.NewAddress)
+			currentGranter := resolvePostMigrationAddress(g.Granter)
+			ok, err := queryFeegrantAllowanceExists(currentGranter, rec.NewAddress)
 			if err != nil {
-				issues = append(issues, fmt.Sprintf("query feegrant %s -> new failed: %v", g.Granter, err))
+				issues = append(issues, fmt.Sprintf("query feegrant %s -> new failed: %v", currentGranter, err))
 			} else if !ok {
-				issues = append(issues, fmt.Sprintf("expected feegrant %s -> new address", g.Granter))
+				issues = append(issues, fmt.Sprintf("expected feegrant %s -> new address", currentGranter))
 			}
 			legacyOK, err := queryFeegrantAllowanceExists(g.Granter, rec.Address)
 			if err != nil {
@@ -610,7 +679,8 @@ func validateLegacyPostMigration(rec *AccountRecord) error {
 			}
 		}
 	} else if rec.HasFeegrantGrantee && rec.FeegrantFrom != "" {
-		ok, err := queryFeegrantAllowanceExists(rec.FeegrantFrom, rec.NewAddress)
+		currentGranter := resolvePostMigrationAddress(rec.FeegrantFrom)
+		ok, err := queryFeegrantAllowanceExists(currentGranter, rec.NewAddress)
 		if err != nil {
 			issues = append(issues, fmt.Sprintf("query feegrant to new address failed: %v", err))
 		} else if !ok {
@@ -624,8 +694,129 @@ func validateLegacyPostMigration(rec *AccountRecord) error {
 		}
 	}
 
+	// Validate actions: creator field should now point to new address.
+	// For SDK-created actions, also validate state, price, metadata, superNodes.
+	if len(rec.Actions) > 0 {
+		for _, act := range rec.Actions {
+			if act.ActionID == "" {
+				continue
+			}
+			full, err := queryFullAction(act.ActionID)
+			if err != nil {
+				issues = append(issues, fmt.Sprintf("query action %s failed: %v", act.ActionID, err))
+				continue
+			}
+			// Creator should be migrated to new address.
+			if full.Creator != rec.NewAddress {
+				issues = append(issues, fmt.Sprintf("action %s creator mismatch: expected %s got %s", act.ActionID, rec.NewAddress, full.Creator))
+			}
+			// State should survive migration. Allow legitimate forward progression
+			// from background supernode processing between prepare and migrate.
+			if act.State != "" && !isCompatibleActionState(act.State, full.State) {
+				issues = append(issues, fmt.Sprintf("action %s state mismatch: expected %s got %s", act.ActionID, act.State, full.State))
+			}
+			// Price should be preserved.
+			if act.Price != "" && full.Price != act.Price {
+				issues = append(issues, fmt.Sprintf("action %s price mismatch: expected %s got %s", act.ActionID, act.Price, full.Price))
+			}
+			// ActionType should be preserved.
+			if act.ActionType != "" && full.ActionType != act.ActionType && full.ActionType != "ACTION_TYPE_"+act.ActionType {
+				issues = append(issues, fmt.Sprintf("action %s type mismatch: expected %s got %s", act.ActionID, act.ActionType, full.ActionType))
+			}
+			// SuperNodes may be a mix of legacy and EVM addresses while migrations are
+			// still in progress. For each recorded supernode, expect its current
+			// post-migration address: migrated peers should appear under the new EVM
+			// address, and unmigrated peers may still appear under the legacy address.
+			if len(act.SuperNodes) > 0 {
+				if len(full.SuperNodes) == 0 {
+					issues = append(issues, fmt.Sprintf("action %s lost superNodes after migration", act.ActionID))
+				}
+				for _, recorded := range act.SuperNodes {
+					expected := resolvePostMigrationAddress(recorded)
+					if !containsString(full.SuperNodes, expected) {
+						issues = append(issues, fmt.Sprintf("action %s missing migrated supernode %s", act.ActionID, expected))
+					}
+					if expected != recorded && containsString(full.SuperNodes, recorded) {
+						issues = append(issues, fmt.Sprintf("action %s still contains legacy supernode %s", act.ActionID, recorded))
+					}
+				}
+			}
+			// BlockHeight should be preserved.
+			if act.BlockHeight > 0 && full.BlockHeight != "" && full.BlockHeight != "0" {
+				if fmt.Sprintf("%d", act.BlockHeight) != full.BlockHeight {
+					issues = append(issues, fmt.Sprintf("action %s blockHeight mismatch: expected %d got %s", act.ActionID, act.BlockHeight, full.BlockHeight))
+				}
+			}
+		}
+		// Verify legacy address no longer owns any actions.
+		if legacyIDs, err := queryActionsByCreator(rec.Address); err != nil {
+			issues = append(issues, fmt.Sprintf("query legacy actions failed: %v", err))
+		} else if len(legacyIDs) > 0 {
+			issues = append(issues, fmt.Sprintf("expected 0 legacy actions after migration, got %d", len(legacyIDs)))
+		}
+	} else if rec.HasAction {
+		// HasAction flag set but no detailed records — just check by creator.
+		if newIDs, err := queryActionsByCreator(rec.NewAddress); err != nil {
+			issues = append(issues, fmt.Sprintf("query new actions failed: %v", err))
+		} else if len(newIDs) == 0 {
+			issues = append(issues, "expected actions on new address, got 0")
+		}
+		if legacyIDs, err := queryActionsByCreator(rec.Address); err != nil {
+			issues = append(issues, fmt.Sprintf("query legacy actions failed: %v", err))
+		} else if len(legacyIDs) > 0 {
+			issues = append(issues, fmt.Sprintf("expected 0 legacy actions after migration, got %d", len(legacyIDs)))
+		}
+	}
+
 	if len(issues) == 0 {
 		return nil
 	}
 	return errors.New(strings.Join(issues, "; "))
+}
+
+func resolvePostMigrationAddress(addr string) string {
+	if ok, newAddr := queryMigrationRecord(addr); ok && newAddr != "" {
+		return newAddr
+	}
+	return addr
+}
+
+func resolvePostMigrationValidator(valoper string) string {
+	valAddr, err := sdk.ValAddressFromBech32(valoper)
+	if err != nil {
+		return valoper
+	}
+	legacyAcc := sdk.AccAddress(valAddr).String()
+	if ok, newAddr := queryMigrationRecord(legacyAcc); ok && newAddr != "" {
+		if newValoper, err := valoperFromAccAddress(newAddr); err == nil && newValoper != "" {
+			return newValoper
+		}
+	}
+	return valoper
+}
+
+func isCompatibleActionState(expected, actual string) bool {
+	if expected == "" || actual == "" || expected == actual {
+		return true
+	}
+
+	stateRank := func(state string) int {
+		switch state {
+		case "ACTION_STATE_PENDING":
+			return 1
+		case "ACTION_STATE_DONE":
+			return 2
+		case "ACTION_STATE_APPROVED":
+			return 3
+		default:
+			return 0
+		}
+	}
+
+	expectedRank := stateRank(expected)
+	actualRank := stateRank(actual)
+	if expectedRank == 0 || actualRank == 0 {
+		return false
+	}
+	return actualRank >= expectedRank
 }

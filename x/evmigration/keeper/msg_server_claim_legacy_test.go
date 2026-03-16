@@ -17,6 +17,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/authz"
 	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
+	evmcryptotypes "github.com/cosmos/evm/crypto/ethsecp256k1"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
@@ -32,6 +33,44 @@ import (
 type msgServerFixture struct {
 	*mockFixture
 	msgServer types.MsgServer
+}
+
+func newClaimMigrationMsg(
+	t *testing.T,
+	legacyPrivKey *secp256k1.PrivKey,
+	legacyAddr sdk.AccAddress,
+	newPrivKey *evmcryptotypes.PrivKey,
+	newAddr sdk.AccAddress,
+) *types.MsgClaimLegacyAccount {
+	t.Helper()
+
+	return &types.MsgClaimLegacyAccount{
+		LegacyAddress:   legacyAddr.String(),
+		NewAddress:      newAddr.String(),
+		LegacyPubKey:    legacyPrivKey.PubKey().(*secp256k1.PubKey).Key,
+		LegacySignature: signMigrationMessage(t, legacyPrivKey, legacyAddr, newAddr),
+		NewPubKey:       newPrivKey.PubKey().(*evmcryptotypes.PubKey).Key,
+		NewSignature:    signNewMigrationMessage(t, keeperClaimKind, newPrivKey, legacyAddr, newAddr),
+	}
+}
+
+func newValidatorMigrationMsg(
+	t *testing.T,
+	legacyPrivKey *secp256k1.PrivKey,
+	legacyAddr sdk.AccAddress,
+	newPrivKey *evmcryptotypes.PrivKey,
+	newAddr sdk.AccAddress,
+) *types.MsgMigrateValidator {
+	t.Helper()
+
+	return &types.MsgMigrateValidator{
+		LegacyAddress:   legacyAddr.String(),
+		NewAddress:      newAddr.String(),
+		LegacyPubKey:    legacyPrivKey.PubKey().(*secp256k1.PubKey).Key,
+		LegacySignature: signLegacyMigrationMessage(t, keeperValidatorKind, legacyPrivKey, legacyAddr, newAddr),
+		NewPubKey:       newPrivKey.PubKey().(*evmcryptotypes.PubKey).Key,
+		NewSignature:    signNewMigrationMessage(t, keeperValidatorKind, newPrivKey, legacyAddr, newAddr),
+	}
 }
 
 func initMsgServerFixture(t *testing.T) *msgServerFixture {
@@ -111,16 +150,10 @@ func TestPreChecks_MigrationDisabled(t *testing.T) {
 	require.NoError(t, f.keeper.Params.Set(f.ctx, params))
 
 	privKey := secp256k1.GenPrivKey()
-	pubKey := privKey.PubKey().(*secp256k1.PubKey)
-	legacyAddr := sdk.AccAddress(pubKey.Address())
-	newAddr := testAccAddr()
+	legacyAddr := sdk.AccAddress(privKey.PubKey().Address())
+	newPrivKey, newAddr := testNewMigrationAccount(t)
 
-	msg := &types.MsgClaimLegacyAccount{
-		LegacyAddress:   legacyAddr.String(),
-		NewAddress:      newAddr.String(),
-		LegacyPubKey:    pubKey.Key,
-		LegacySignature: signMigrationMessage(t, privKey, legacyAddr, newAddr),
-	}
+	msg := newClaimMigrationMsg(t, privKey, legacyAddr, newPrivKey, newAddr)
 
 	_, err := f.msgServer.ClaimLegacyAccount(f.ctx, msg)
 	require.ErrorIs(t, err, types.ErrMigrationDisabled)
@@ -137,16 +170,10 @@ func TestPreChecks_MigrationWindowClosed(t *testing.T) {
 	require.NoError(t, f.keeper.Params.Set(f.ctx, params))
 
 	privKey := secp256k1.GenPrivKey()
-	pubKey := privKey.PubKey().(*secp256k1.PubKey)
-	legacyAddr := sdk.AccAddress(pubKey.Address())
-	newAddr := testAccAddr()
+	legacyAddr := sdk.AccAddress(privKey.PubKey().Address())
+	newPrivKey, newAddr := testNewMigrationAccount(t)
 
-	msg := &types.MsgClaimLegacyAccount{
-		LegacyAddress:   legacyAddr.String(),
-		NewAddress:      newAddr.String(),
-		LegacyPubKey:    pubKey.Key,
-		LegacySignature: signMigrationMessage(t, privKey, legacyAddr, newAddr),
-	}
+	msg := newClaimMigrationMsg(t, privKey, legacyAddr, newPrivKey, newAddr)
 
 	_, err := f.msgServer.ClaimLegacyAccount(f.ctx, msg)
 	require.ErrorIs(t, err, types.ErrMigrationWindowClosed)
@@ -161,16 +188,10 @@ func TestPreChecks_BlockRateLimitExceeded(t *testing.T) {
 	require.NoError(t, f.keeper.BlockMigrationCounter.Set(f.ctx, f.ctx.BlockHeight(), 50))
 
 	privKey := secp256k1.GenPrivKey()
-	pubKey := privKey.PubKey().(*secp256k1.PubKey)
-	legacyAddr := sdk.AccAddress(pubKey.Address())
-	newAddr := testAccAddr()
+	legacyAddr := sdk.AccAddress(privKey.PubKey().Address())
+	newPrivKey, newAddr := testNewMigrationAccount(t)
 
-	msg := &types.MsgClaimLegacyAccount{
-		LegacyAddress:   legacyAddr.String(),
-		NewAddress:      newAddr.String(),
-		LegacyPubKey:    pubKey.Key,
-		LegacySignature: signMigrationMessage(t, privKey, legacyAddr, newAddr),
-	}
+	msg := newClaimMigrationMsg(t, privKey, legacyAddr, newPrivKey, newAddr)
 
 	_, err := f.msgServer.ClaimLegacyAccount(f.ctx, msg)
 	require.ErrorIs(t, err, types.ErrBlockRateLimitExceeded)
@@ -182,15 +203,10 @@ func TestPreChecks_SameAddress(t *testing.T) {
 	f := initMsgServerFixture(t)
 
 	privKey := secp256k1.GenPrivKey()
-	pubKey := privKey.PubKey().(*secp256k1.PubKey)
-	addr := sdk.AccAddress(pubKey.Address())
+	addr := sdk.AccAddress(privKey.PubKey().Address())
+	newPrivKey, _ := testNewMigrationAccount(t)
 
-	msg := &types.MsgClaimLegacyAccount{
-		LegacyAddress:   addr.String(),
-		NewAddress:      addr.String(),
-		LegacyPubKey:    pubKey.Key,
-		LegacySignature: signMigrationMessage(t, privKey, addr, addr),
-	}
+	msg := newClaimMigrationMsg(t, privKey, addr, newPrivKey, addr)
 
 	_, err := f.msgServer.ClaimLegacyAccount(f.ctx, msg)
 	require.ErrorIs(t, err, types.ErrSameAddress)
@@ -202,9 +218,8 @@ func TestPreChecks_AlreadyMigrated(t *testing.T) {
 	f := initMsgServerFixture(t)
 
 	privKey := secp256k1.GenPrivKey()
-	pubKey := privKey.PubKey().(*secp256k1.PubKey)
-	legacyAddr := sdk.AccAddress(pubKey.Address())
-	newAddr := testAccAddr()
+	legacyAddr := sdk.AccAddress(privKey.PubKey().Address())
+	newPrivKey, newAddr := testNewMigrationAccount(t)
 
 	// Store a migration record for the legacy address.
 	require.NoError(t, f.keeper.MigrationRecords.Set(f.ctx, legacyAddr.String(), types.MigrationRecord{
@@ -212,12 +227,7 @@ func TestPreChecks_AlreadyMigrated(t *testing.T) {
 		NewAddress:    newAddr.String(),
 	}))
 
-	msg := &types.MsgClaimLegacyAccount{
-		LegacyAddress:   legacyAddr.String(),
-		NewAddress:      newAddr.String(),
-		LegacyPubKey:    pubKey.Key,
-		LegacySignature: signMigrationMessage(t, privKey, legacyAddr, newAddr),
-	}
+	msg := newClaimMigrationMsg(t, privKey, legacyAddr, newPrivKey, newAddr)
 
 	_, err := f.msgServer.ClaimLegacyAccount(f.ctx, msg)
 	require.ErrorIs(t, err, types.ErrAlreadyMigrated)
@@ -229,9 +239,8 @@ func TestPreChecks_NewAddressWasMigrated(t *testing.T) {
 	f := initMsgServerFixture(t)
 
 	privKey := secp256k1.GenPrivKey()
-	pubKey := privKey.PubKey().(*secp256k1.PubKey)
-	legacyAddr := sdk.AccAddress(pubKey.Address())
-	newAddr := testAccAddr()
+	legacyAddr := sdk.AccAddress(privKey.PubKey().Address())
+	newPrivKey, newAddr := testNewMigrationAccount(t)
 
 	// Store a migration record where newAddr was a legacy address.
 	require.NoError(t, f.keeper.MigrationRecords.Set(f.ctx, newAddr.String(), types.MigrationRecord{
@@ -242,8 +251,10 @@ func TestPreChecks_NewAddressWasMigrated(t *testing.T) {
 	msg := &types.MsgClaimLegacyAccount{
 		LegacyAddress:   legacyAddr.String(),
 		NewAddress:      newAddr.String(),
-		LegacyPubKey:    pubKey.Key,
+		LegacyPubKey:    privKey.PubKey().(*secp256k1.PubKey).Key,
 		LegacySignature: signMigrationMessage(t, privKey, legacyAddr, newAddr),
+		NewPubKey:       newPrivKey.PubKey().(*evmcryptotypes.PubKey).Key,
+		NewSignature:    signNewMigrationMessage(t, keeperClaimKind, newPrivKey, legacyAddr, newAddr),
 	}
 
 	_, err := f.msgServer.ClaimLegacyAccount(f.ctx, msg)
@@ -255,19 +266,13 @@ func TestPreChecks_ModuleAccount(t *testing.T) {
 	f := initMsgServerFixture(t)
 
 	privKey := secp256k1.GenPrivKey()
-	pubKey := privKey.PubKey().(*secp256k1.PubKey)
-	legacyAddr := sdk.AccAddress(pubKey.Address())
-	newAddr := testAccAddr()
+	legacyAddr := sdk.AccAddress(privKey.PubKey().Address())
+	newPrivKey, newAddr := testNewMigrationAccount(t)
 
 	modAcc := authtypes.NewEmptyModuleAccount("bonded_tokens_pool")
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), legacyAddr).Return(modAcc)
 
-	msg := &types.MsgClaimLegacyAccount{
-		LegacyAddress:   legacyAddr.String(),
-		NewAddress:      newAddr.String(),
-		LegacyPubKey:    pubKey.Key,
-		LegacySignature: signMigrationMessage(t, privKey, legacyAddr, newAddr),
-	}
+	msg := newClaimMigrationMsg(t, privKey, legacyAddr, newPrivKey, newAddr)
 
 	_, err := f.msgServer.ClaimLegacyAccount(f.ctx, msg)
 	require.ErrorIs(t, err, types.ErrCannotMigrateModuleAccount)
@@ -279,18 +284,12 @@ func TestPreChecks_LegacyAccountNotFound(t *testing.T) {
 	f := initMsgServerFixture(t)
 
 	privKey := secp256k1.GenPrivKey()
-	pubKey := privKey.PubKey().(*secp256k1.PubKey)
-	legacyAddr := sdk.AccAddress(pubKey.Address())
-	newAddr := testAccAddr()
+	legacyAddr := sdk.AccAddress(privKey.PubKey().Address())
+	newPrivKey, newAddr := testNewMigrationAccount(t)
 
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), legacyAddr).Return(nil)
 
-	msg := &types.MsgClaimLegacyAccount{
-		LegacyAddress:   legacyAddr.String(),
-		NewAddress:      newAddr.String(),
-		LegacyPubKey:    pubKey.Key,
-		LegacySignature: signMigrationMessage(t, privKey, legacyAddr, newAddr),
-	}
+	msg := newClaimMigrationMsg(t, privKey, legacyAddr, newPrivKey, newAddr)
 
 	_, err := f.msgServer.ClaimLegacyAccount(f.ctx, msg)
 	require.ErrorIs(t, err, types.ErrLegacyAccountNotFound)
@@ -304,9 +303,8 @@ func TestClaimLegacyAccount_ValidatorMustUseMigrateValidator(t *testing.T) {
 	f := initMsgServerFixture(t)
 
 	privKey := secp256k1.GenPrivKey()
-	pubKey := privKey.PubKey().(*secp256k1.PubKey)
-	legacyAddr := sdk.AccAddress(pubKey.Address())
-	newAddr := testAccAddr()
+	legacyAddr := sdk.AccAddress(privKey.PubKey().Address())
+	newPrivKey, newAddr := testNewMigrationAccount(t)
 
 	baseAcc := authtypes.NewBaseAccountWithAddress(legacyAddr)
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), legacyAddr).Return(baseAcc)
@@ -320,8 +318,10 @@ func TestClaimLegacyAccount_ValidatorMustUseMigrateValidator(t *testing.T) {
 	msg := &types.MsgClaimLegacyAccount{
 		LegacyAddress:   legacyAddr.String(),
 		NewAddress:      newAddr.String(),
-		LegacyPubKey:    pubKey.Key,
+		LegacyPubKey:    privKey.PubKey().(*secp256k1.PubKey).Key,
 		LegacySignature: signMigrationMessage(t, privKey, legacyAddr, newAddr),
+		NewPubKey:       newPrivKey.PubKey().(*evmcryptotypes.PubKey).Key,
+		NewSignature:    signNewMigrationMessage(t, keeperClaimKind, newPrivKey, legacyAddr, newAddr),
 	}
 
 	_, err := f.msgServer.ClaimLegacyAccount(f.ctx, msg)
@@ -336,7 +336,7 @@ func TestClaimLegacyAccount_InvalidSignature(t *testing.T) {
 	privKey := secp256k1.GenPrivKey()
 	pubKey := privKey.PubKey().(*secp256k1.PubKey)
 	legacyAddr := sdk.AccAddress(pubKey.Address())
-	newAddr := testAccAddr()
+	newPrivKey, newAddr := testNewMigrationAccount(t)
 
 	baseAcc := authtypes.NewBaseAccountWithAddress(legacyAddr)
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), legacyAddr).Return(baseAcc)
@@ -347,12 +347,8 @@ func TestClaimLegacyAccount_InvalidSignature(t *testing.T) {
 		stakingtypes.Validator{}, stakingtypes.ErrNoValidatorFound,
 	)
 
-	msg := &types.MsgClaimLegacyAccount{
-		LegacyAddress:   legacyAddr.String(),
-		NewAddress:      newAddr.String(),
-		LegacyPubKey:    pubKey.Key,
-		LegacySignature: []byte("bad-signature"),
-	}
+	msg := newClaimMigrationMsg(t, privKey, legacyAddr, newPrivKey, newAddr)
+	msg.LegacySignature = []byte("bad-signature")
 
 	_, err := f.msgServer.ClaimLegacyAccount(f.ctx, msg)
 	require.ErrorIs(t, err, types.ErrInvalidLegacySignature)
@@ -364,9 +360,8 @@ func TestClaimLegacyAccount_Success(t *testing.T) {
 	f := initMsgServerFixture(t)
 
 	privKey := secp256k1.GenPrivKey()
-	pubKey := privKey.PubKey().(*secp256k1.PubKey)
-	legacyAddr := sdk.AccAddress(pubKey.Address())
-	newAddr := testAccAddr()
+	legacyAddr := sdk.AccAddress(privKey.PubKey().Address())
+	newPrivKey, newAddr := testNewMigrationAccount(t)
 
 	baseAcc := authtypes.NewBaseAccountWithAddress(legacyAddr)
 	valAddr := sdk.ValAddress(legacyAddr)
@@ -383,8 +378,10 @@ func TestClaimLegacyAccount_Success(t *testing.T) {
 	// Step 1: MigrateDistribution — no delegations.
 	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
 
-	// Step 2: MigrateStaking — no delegations (called 3 times for active/unbonding/redelegation).
-	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil).Times(3)
+	// Step 2: MigrateStaking — no delegations, unbondings, or redelegations.
+	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetUnbondingDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
 	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacyAddr).Return(legacyAddr, nil)
 	f.distributionKeeper.EXPECT().SetDelegatorWithdrawAddr(gomock.Any(), newAddr, newAddr).Return(nil)
 
@@ -418,12 +415,7 @@ func TestClaimLegacyAccount_Success(t *testing.T) {
 	// Step 8: MigrateClaim — no claim records targeting this address.
 	f.claimKeeper.EXPECT().IterateClaimRecords(gomock.Any(), gomock.Any()).Return(nil)
 
-	msg := &types.MsgClaimLegacyAccount{
-		LegacyAddress:   legacyAddr.String(),
-		NewAddress:      newAddr.String(),
-		LegacyPubKey:    pubKey.Key,
-		LegacySignature: signMigrationMessage(t, privKey, legacyAddr, newAddr),
-	}
+	msg := newClaimMigrationMsg(t, privKey, legacyAddr, newPrivKey, newAddr)
 
 	resp, err := f.msgServer.ClaimLegacyAccount(f.ctx, msg)
 	require.NoError(t, err)
@@ -462,9 +454,8 @@ func setupPassingPreChecks(t *testing.T, f *msgServerFixture) (
 ) {
 	t.Helper()
 	privKey := secp256k1.GenPrivKey()
-	pubKey := privKey.PubKey().(*secp256k1.PubKey)
-	legacyAddr := sdk.AccAddress(pubKey.Address())
-	newAddr := testAccAddr()
+	legacyAddr := sdk.AccAddress(privKey.PubKey().Address())
+	newPrivKey, newAddr := testNewMigrationAccount(t)
 
 	baseAcc := authtypes.NewBaseAccountWithAddress(legacyAddr)
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), legacyAddr).Return(baseAcc)
@@ -472,12 +463,7 @@ func setupPassingPreChecks(t *testing.T, f *msgServerFixture) (
 		stakingtypes.Validator{}, stakingtypes.ErrNoValidatorFound,
 	)
 
-	msg := &types.MsgClaimLegacyAccount{
-		LegacyAddress:   legacyAddr.String(),
-		NewAddress:      newAddr.String(),
-		LegacyPubKey:    pubKey.Key,
-		LegacySignature: signMigrationMessage(t, privKey, legacyAddr, newAddr),
-	}
+	msg := newClaimMigrationMsg(t, privKey, legacyAddr, newPrivKey, newAddr)
 
 	return privKey, legacyAddr, newAddr, msg
 }
@@ -542,8 +528,10 @@ func TestClaimLegacyAccount_FailAtBank(t *testing.T) {
 	// Step 1: MigrateDistribution — no delegations.
 	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
 
-	// Step 2: MigrateStaking — no delegations, no unbonding, no redelegations.
-	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil).Times(3)
+	// Step 2: MigrateStaking — no delegations, unbondings, or redelegations.
+	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetUnbondingDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
 	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacyAddr).Return(legacyAddr, nil)
 	f.distributionKeeper.EXPECT().SetDelegatorWithdrawAddr(gomock.Any(), newAddr, newAddr).Return(nil)
 
@@ -576,7 +564,9 @@ func TestClaimLegacyAccount_FailAtAuthz(t *testing.T) {
 	_, legacyAddr, newAddr, msg := setupPassingPreChecks(t, f)
 
 	// Steps 1-3 succeed (no delegations, base account, zero balance).
-	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil).Times(4)
+	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil).Times(2)
+	f.stakingKeeper.EXPECT().GetUnbondingDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
 	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacyAddr).Return(legacyAddr, nil)
 	f.distributionKeeper.EXPECT().SetDelegatorWithdrawAddr(gomock.Any(), newAddr, newAddr).Return(nil)
 
@@ -615,7 +605,9 @@ func TestClaimLegacyAccount_FailAtFeegrant(t *testing.T) {
 	_, legacyAddr, newAddr, msg := setupPassingPreChecks(t, f)
 
 	// Steps 1-4 succeed.
-	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil).Times(4)
+	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil).Times(2)
+	f.stakingKeeper.EXPECT().GetUnbondingDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
 	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacyAddr).Return(legacyAddr, nil)
 	f.distributionKeeper.EXPECT().SetDelegatorWithdrawAddr(gomock.Any(), newAddr, newAddr).Return(nil)
 
@@ -648,7 +640,9 @@ func TestClaimLegacyAccount_FailAtSupernode(t *testing.T) {
 	_, legacyAddr, newAddr, msg := setupPassingPreChecks(t, f)
 
 	// Steps 1-5 succeed.
-	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil).Times(4)
+	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil).Times(2)
+	f.stakingKeeper.EXPECT().GetUnbondingDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
 	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacyAddr).Return(legacyAddr, nil)
 	f.distributionKeeper.EXPECT().SetDelegatorWithdrawAddr(gomock.Any(), newAddr, newAddr).Return(nil)
 
@@ -682,7 +676,9 @@ func TestClaimLegacyAccount_FailAtActions(t *testing.T) {
 	_, legacyAddr, newAddr, msg := setupPassingPreChecks(t, f)
 
 	// Steps 1-6 succeed.
-	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil).Times(4)
+	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil).Times(2)
+	f.stakingKeeper.EXPECT().GetUnbondingDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
 	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacyAddr).Return(legacyAddr, nil)
 	f.distributionKeeper.EXPECT().SetDelegatorWithdrawAddr(gomock.Any(), newAddr, newAddr).Return(nil)
 
@@ -719,7 +715,9 @@ func TestClaimLegacyAccount_FailAtClaim(t *testing.T) {
 	_, legacyAddr, newAddr, msg := setupPassingPreChecks(t, f)
 
 	// Steps 1-7 succeed.
-	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil).Times(4)
+	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil).Times(2)
+	f.stakingKeeper.EXPECT().GetUnbondingDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
 	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacyAddr).Return(legacyAddr, nil)
 	f.distributionKeeper.EXPECT().SetDelegatorWithdrawAddr(gomock.Any(), newAddr, newAddr).Return(nil)
 
@@ -760,9 +758,8 @@ func setupPassingValPreChecks(t *testing.T, f *msgServerFixture) (
 ) {
 	t.Helper()
 	privKey := secp256k1.GenPrivKey()
-	pubKey := privKey.PubKey().(*secp256k1.PubKey)
-	legacyAddr := sdk.AccAddress(pubKey.Address())
-	newAddr := testAccAddr()
+	legacyAddr := sdk.AccAddress(privKey.PubKey().Address())
+	newPrivKey, newAddr := testNewMigrationAccount(t)
 	oldValAddr := sdk.ValAddress(legacyAddr)
 	newValAddr := sdk.ValAddress(newAddr)
 
@@ -779,12 +776,7 @@ func setupPassingValPreChecks(t *testing.T, f *msgServerFixture) (
 	f.stakingKeeper.EXPECT().GetUnbondingDelegationsFromValidator(gomock.Any(), oldValAddr).Return(nil, nil)
 	f.stakingKeeper.EXPECT().GetRedelegationsFromSrcValidator(gomock.Any(), oldValAddr).Return(nil, nil)
 
-	msg := &types.MsgMigrateValidator{
-		LegacyAddress:   legacyAddr.String(),
-		NewAddress:      newAddr.String(),
-		LegacyPubKey:    pubKey.Key,
-		LegacySignature: signMigrationMessage(t, privKey, legacyAddr, newAddr),
-	}
+	msg := newValidatorMigrationMsg(t, privKey, legacyAddr, newPrivKey, newAddr)
 
 	_ = newValAddr // used by callers
 	return legacyAddr, newAddr, oldValAddr, newValAddr, msg
@@ -1022,7 +1014,7 @@ func TestClaimLegacyAccount_WithDelegations(t *testing.T) {
 	privKey := secp256k1.GenPrivKey()
 	pubKey := privKey.PubKey().(*secp256k1.PubKey)
 	legacyAddr := sdk.AccAddress(pubKey.Address())
-	newAddr := testAccAddr()
+	newPrivKey, newAddr := testNewMigrationAccount(t)
 	valAddr := sdk.ValAddress(testAccAddr())
 
 	baseAcc := authtypes.NewBaseAccountWithAddress(legacyAddr)
@@ -1039,6 +1031,10 @@ func TestClaimLegacyAccount_WithDelegations(t *testing.T) {
 	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(
 		[]stakingtypes.Delegation{del}, nil,
 	)
+	f.distributionKeeper.EXPECT().GetDelegatorStartingInfo(gomock.Any(), valAddr, legacyAddr).Return(
+		distrtypes.DelegatorStartingInfo{PreviousPeriod: 4}, nil,
+	)
+	expectHistoricalRewardsLookup(f.distributionKeeper, valAddr, 4, 1)
 	f.distributionKeeper.EXPECT().WithdrawDelegationRewards(gomock.Any(), legacyAddr, valAddr).Return(sdk.Coins{}, nil)
 
 	// Step 2: MigrateStaking — re-key delegation.
@@ -1055,21 +1051,14 @@ func TestClaimLegacyAccount_WithDelegations(t *testing.T) {
 	f.distributionKeeper.EXPECT().GetDelegatorStartingInfo(gomock.Any(), valAddr, legacyAddr).Return(
 		distrtypes.DelegatorStartingInfo{}, nil,
 	)
+	expectHistoricalRewardsIncrement(f.distributionKeeper, valAddr, 4, 1)
 	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), valAddr, newAddr, gomock.Any()).Return(nil)
 
 	// migrateUnbondingDelegations
-	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(
-		[]stakingtypes.Delegation{del}, nil,
-	)
-	f.stakingKeeper.EXPECT().GetUnbondingDelegation(gomock.Any(), legacyAddr, valAddr).Return(
-		stakingtypes.UnbondingDelegation{}, stakingtypes.ErrNoUnbondingDelegation,
-	)
+	f.stakingKeeper.EXPECT().GetUnbondingDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
 
 	// migrateRedelegations
-	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(
-		[]stakingtypes.Delegation{del}, nil,
-	)
-	f.stakingKeeper.EXPECT().GetRedelegationsFromSrcValidator(gomock.Any(), valAddr).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
 
 	// migrateWithdrawAddress
 	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacyAddr).Return(legacyAddr, nil)
@@ -1100,6 +1089,8 @@ func TestClaimLegacyAccount_WithDelegations(t *testing.T) {
 		NewAddress:      newAddr.String(),
 		LegacyPubKey:    pubKey.Key,
 		LegacySignature: signMigrationMessage(t, privKey, legacyAddr, newAddr),
+		NewPubKey:       newPrivKey.PubKey().(*evmcryptotypes.PubKey).Key,
+		NewSignature:    signNewMigrationMessage(t, keeperClaimKind, newPrivKey, legacyAddr, newAddr),
 	}
 
 	resp, err := f.msgServer.ClaimLegacyAccount(f.ctx, msg)

@@ -146,7 +146,10 @@ func newLumeraCosmosAnteHandler(ctx sdk.Context, options HandlerOptions) sdk.Ant
 		txFeeChecker = evmantedecorators.NewDynamicFeeChecker(&feemarketParams)
 	}
 
-	return sdk.ChainAnteDecorators(
+	minGasDecorator := genesisSkipDecorator{cosmosante.NewMinGasPriceDecorator(&feemarketParams)}
+	deductFeeDecorator := ante.NewDeductFeeDecorator(options.AccountKeeper, options.BankKeeper, options.FeegrantKeeper, txFeeChecker)
+
+	standardCosmosAnte := sdk.ChainAnteDecorators(
 		// Lumera: waive fees for delayed claim txs
 		lumante.DelayedClaimFeeDecorator{},
 		// cosmos/evm: reject MsgEthereumTx in Cosmos path
@@ -164,15 +167,15 @@ func newLumeraCosmosAnteHandler(ctx sdk.Context, options HandlerOptions) sdk.Ant
 		// Lumera: circuit breaker
 		circuitante.NewCircuitBreakerDecorator(options.CircuitKeeper),
 		ante.NewExtensionOptionsDecorator(options.ExtensionOptionChecker),
-		ante.NewValidateBasicDecorator(),
+		lumante.EVMigrationValidateBasicDecorator{},
 		ante.NewTxTimeoutHeightDecorator(),
 		ante.NewValidateMemoDecorator(options.AccountKeeper),
 		// cosmos/evm: min gas price from feemarket params
 		// Wrapped to skip at genesis height (BlockHeight==0) so gentxs don't
 		// need fees, matching how the SDK skips fee/gas/sig checks at genesis.
-		genesisSkipDecorator{cosmosante.NewMinGasPriceDecorator(&feemarketParams)},
+		minGasDecorator,
 		ante.NewConsumeGasForTxSizeDecorator(options.AccountKeeper),
-		ante.NewDeductFeeDecorator(options.AccountKeeper, options.BankKeeper, options.FeegrantKeeper, txFeeChecker),
+		deductFeeDecorator,
 		ante.NewSetPubKeyDecorator(options.AccountKeeper),
 		ante.NewValidateSigCountDecorator(options.AccountKeeper),
 		ante.NewSigGasConsumeDecorator(options.AccountKeeper, options.SigGasConsumer),
@@ -182,4 +185,38 @@ func newLumeraCosmosAnteHandler(ctx sdk.Context, options HandlerOptions) sdk.Ant
 		// cosmos/evm: track gas wanted for feemarket
 		evmantedecorators.NewGasWantedDecorator(options.EvmKeeper, options.FeeMarketKeeper, &feemarketParams),
 	)
+
+	migrationCosmosAnte := sdk.ChainAnteDecorators(
+		// cosmos/evm: reject MsgEthereumTx in Cosmos path
+		cosmosante.NewRejectMessagesDecorator(),
+		// cosmos/evm: block EVM msgs in authz
+		cosmosante.NewAuthzLimiterDecorator(
+			sdk.MsgTypeURL(&evmtypes.MsgEthereumTx{}),
+			sdk.MsgTypeURL(&sdkvesting.MsgCreateVestingAccount{}),
+		),
+		ante.NewSetUpContextDecorator(),
+		// Lumera: wasm decorators
+		wasmkeeper.NewLimitSimulationGasDecorator(options.WasmConfig.SimulationGasLimit),
+		wasmkeeper.NewCountTXDecorator(options.TXCounterStoreService),
+		wasmkeeper.NewGasRegisterDecorator(options.WasmKeeper.GetGasRegister()),
+		// Lumera: circuit breaker
+		circuitante.NewCircuitBreakerDecorator(options.CircuitKeeper),
+		ante.NewExtensionOptionsDecorator(options.ExtensionOptionChecker),
+		// Migration txs authenticate via message payload proofs and intentionally
+		// skip the standard fee/signature/sequence subchain.
+		lumante.EVMigrationValidateBasicDecorator{},
+		ante.NewTxTimeoutHeightDecorator(),
+		ante.NewValidateMemoDecorator(options.AccountKeeper),
+		ante.NewConsumeGasForTxSizeDecorator(options.AccountKeeper),
+		ibcante.NewRedundantRelayDecorator(options.IBCKeeper),
+		// cosmos/evm: track gas wanted for feemarket
+		evmantedecorators.NewGasWantedDecorator(options.EvmKeeper, options.FeeMarketKeeper, &feemarketParams),
+	)
+
+	return func(ctx sdk.Context, tx sdk.Tx, simulate bool) (sdk.Context, error) {
+		if lumante.IsEVMigrationOnlyTx(tx) {
+			return migrationCosmosAnte(ctx, tx, simulate)
+		}
+		return standardCosmosAnte(ctx, tx, simulate)
+	}
 }

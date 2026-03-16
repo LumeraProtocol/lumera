@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"math/rand"
@@ -12,11 +13,17 @@ import (
 )
 
 const (
-	legacyPreparedAccountPrefix = "evm_test"
-	extraPreparedAccountPrefix  = "evm_testex"
+	legacyPreparedAccountPrefix   = "pre-evm"
+	extraPreparedAccountPrefix    = "pre-evmex"
+	migratedAccountPrefix         = "evm"
+	migratedExtraAccountPrefix    = "evmex"
+	legacyPreparedAccountPrefixV0 = "evm_test"
+	extraPreparedAccountPrefixV0  = "evm_testex"
 )
 
 func runPrepare() {
+	ensurePrepareRuntime()
+
 	if *flagFunder == "" {
 		name, err := detectFunder()
 		if err != nil {
@@ -46,9 +53,9 @@ func runPrepare() {
 
 	accountTag := resolvePrepareAccountTag(*flagAccountTag, *flagFunder, funderAddr)
 	if accountTag == "" {
-		log.Printf("account name tag: none (using %s_XXX / %s_XXX)", legacyPreparedAccountPrefix, extraPreparedAccountPrefix)
+		log.Printf("account name tag: none (using %s-XXX / %s-XXX)", legacyPreparedAccountPrefix, extraPreparedAccountPrefix)
 	} else {
-		log.Printf("account name tag: %s (using %s_%s_XXX / %s_%s_XXX)",
+		log.Printf("account name tag: %s (using %s-%s-XXX / %s-%s-XXX)",
 			accountTag, legacyPreparedAccountPrefix, accountTag, extraPreparedAccountPrefix, accountTag)
 	}
 
@@ -83,9 +90,9 @@ func runPrepare() {
 	log.Println("--- Generating legacy accounts ---")
 	for i := 0; i < *flagNumAccounts; i++ {
 		name := buildPreparedAccountName(legacyPreparedAccountPrefix, accountTag, i)
-		if idx, ok := existingByName[name]; ok {
+		if idx, ok := findPreparedAccountIndex(existingByName, legacyPreparedAccountPrefix, accountTag, i); ok {
 			legacyIdx = append(legacyIdx, idx)
-			log.Printf("  reusing existing %s: %s", name, af.Accounts[idx].Address)
+			log.Printf("  reusing existing %s: %s", af.Accounts[idx].Name, af.Accounts[idx].Address)
 			continue
 		}
 		rec, err := ensureAccount(name, true)
@@ -103,9 +110,9 @@ func runPrepare() {
 	log.Println("--- Generating extra accounts ---")
 	for i := 0; i < *flagNumExtra; i++ {
 		name := buildPreparedAccountName(extraPreparedAccountPrefix, accountTag, i)
-		if idx, ok := existingByName[name]; ok {
+		if idx, ok := findPreparedAccountIndex(existingByName, extraPreparedAccountPrefix, accountTag, i); ok {
 			extraIdx = append(extraIdx, idx)
-			log.Printf("  reusing existing %s: %s", name, af.Accounts[idx].Address)
+			log.Printf("  reusing existing %s: %s", af.Accounts[idx].Name, af.Accounts[idx].Address)
 			continue
 		}
 		rec, err := ensureAccount(name, false)
@@ -130,6 +137,13 @@ func runPrepare() {
 	if err := fundAccountsBatched(af, rng); err != nil {
 		log.Printf("  WARN: batched funding failed (%v), falling back to sequential funding", err)
 		fundAccountsSequential(af, rng)
+	}
+
+	log.Println("--- Waiting for supernode upload readiness ---")
+	if waitForEligibleCascadeSupernodes(validators, 90*time.Second) {
+		log.Println("  cascade uploads enabled: at least one registered supernode is ACTIVE")
+	} else {
+		log.Println("  WARN: no ACTIVE cascade supernodes detected within 90s; upload-backed action creation may still fail")
 	}
 
 	// Create activity for legacy accounts in parallel batches.
@@ -264,6 +278,32 @@ func runPrepare() {
 				}
 				rec.addAuthzGrant(grantee, bankSendMsgType)
 				log.Printf("  %s granted authz to %s", rec.Name, grantee)
+			}
+		}
+
+		// 6a) Every 4th legacy account offset by 2: register CASCADE actions
+		// via sdk-go to exercise x/action creator migration and supernode upload.
+		// Actions are left in different states: PENDING, DONE, APPROVED.
+		if ordinal%4 == 2 {
+			if rec.hasDelayedClaim() {
+				log.Printf("  %s already has delayed-claim activity; skipping sdk actions to avoid vesting-account uploads on old supernode", rec.Name)
+			} else if vesting, err := queryAccountIsVesting(rec.Address); err != nil {
+				log.Printf("  WARN: query vesting state for %s: %v", rec.Name, err)
+			} else if vesting {
+				log.Printf("  %s is already a vesting account on-chain; skipping sdk actions to avoid unsupported uploads on old supernode", rec.Name)
+			} else {
+				nPending, nDone, nApproved := 1, 0, 0
+				if ordinal%8 == 2 {
+					// Give some accounts actions in all three states.
+					nPending, nDone, nApproved = 1, 1, 0
+				}
+				if ordinal%16 == 2 {
+					nPending, nDone, nApproved = 0, 1, 1
+				}
+				ctx := context.Background()
+				if err := createActionsWithSDK(ctx, &af.Accounts[idx], nPending, nDone, nApproved); err != nil {
+					log.Printf("  WARN: sdk actions %s: %v", rec.Name, err)
+				}
 			}
 		}
 
@@ -545,6 +585,7 @@ func runPrepare() {
 		log.Printf("  WARN: claim key integrity check failed: %v; skipping claim activity", err)
 	} else {
 		claimKeyIdx := 0
+		skippedClaimKeysOwnedByOther := 0
 		for ordinal, idx := range legacyIdx {
 			rec := &af.Accounts[idx]
 			if !rec.HasBalance || claimKeyIdx >= len(preseededClaimKeysByIndex) {
@@ -566,8 +607,7 @@ func runPrepare() {
 				// Check if already claimed (rerun support).
 				if claimed, destAddr, existingTier, err := queryClaimRecord(entry.OldAddress); err == nil && claimed {
 					if destAddr != "" && destAddr != rec.Address {
-						log.Printf("  WARN: %s: claim key %d (%s) already claimed by %s; skipping key",
-							rec.Name, claimKeyIdx, entry.OldAddress, destAddr)
+						skippedClaimKeysOwnedByOther++
 						claimKeyIdx++
 						c--
 						continue
@@ -587,15 +627,9 @@ func runPrepare() {
 
 				// Decide claim type: ~70% instant, ~10% tier 1, ~10% tier 2, ~10% tier 3.
 				// Keep delayed entries early in the sequence so low-volume runs still exercise delayed claims.
-				var tier uint32
-				delayed := false
-				switch claimKeyIdx % 10 {
-				case 3:
-					tier, delayed = 1, true
-				case 6:
-					tier, delayed = 2, true
-				case 9:
-					tier, delayed = 3, true
+				tier, delayed := selectPrepareClaimForAccount(rec, claimKeyIdx)
+				if plannedTier, plannedDelayed := plannedPrepareClaim(claimKeyIdx); plannedDelayed && (!delayed || tier != plannedTier) {
+					log.Printf("  %s already has action activity; forcing instant claim for key %d to avoid turning an upload account into a vesting account", rec.Name, claimKeyIdx)
 				}
 
 				amountStr := fmt.Sprintf("%dulume", entry.Amount)
@@ -614,7 +648,7 @@ func runPrepare() {
 						existingTier := tier
 						if claimed, destAddr, onChainTier, qErr := queryClaimRecord(entry.OldAddress); qErr == nil && claimed {
 							if destAddr != "" && destAddr != rec.Address {
-								log.Printf("  WARN: claim %s key %d already belongs to %s; skipping key", rec.Name, claimKeyIdx, destAddr)
+								skippedClaimKeysOwnedByOther++
 								claimKeyIdx++
 								c--
 								continue
@@ -638,6 +672,9 @@ func runPrepare() {
 			}
 		}
 		log.Printf("  used %d/%d claim keys", claimKeyIdx, len(preseededClaimKeysByIndex))
+		if skippedClaimKeysOwnedByOther > 0 {
+			log.Printf("  claim keys already claimed by other addresses skipped: %d", skippedClaimKeysOwnedByOther)
+		}
 	}
 
 	// Validate prepared scenarios against chain state and fail if critical coverage is missing.
@@ -658,7 +695,7 @@ func runPrepare() {
 
 	// Print summary.
 	var nLegacy, nExtra, nDelegated, nUnbonding, nRedelegation, nWithdraw, nAuthz, nAuthzRecv, nFeegrant, nFeegrantRecv int
-	var nClaim, nDelayedClaim int
+	var nClaim, nDelayedClaim, nAction int
 	for _, rec := range af.Accounts {
 		if rec.IsLegacy {
 			nLegacy++
@@ -696,16 +733,95 @@ func runPrepare() {
 				nClaim++
 			}
 		}
+		nAction += len(rec.Actions)
 	}
-	log.Printf("  legacy=%d extra=%d delegated=%d unbonding=%d redelegation=%d withdraw_addr=%d authz(granter)=%d authz(grantee)=%d feegrant(granter)=%d feegrant(grantee)=%d claim(instant)=%d claim(delayed)=%d",
-		nLegacy, nExtra, nDelegated, nUnbonding, nRedelegation, nWithdraw, nAuthz, nAuthzRecv, nFeegrant, nFeegrantRecv, nClaim, nDelayedClaim)
+	log.Printf(
+		"  prepare_activity_summary:\n"+
+			"    legacy_accounts: %d\n"+
+			"    extra_accounts: %d\n"+
+			"    delegated_accounts: %d\n"+
+			"    unbonding_accounts: %d\n"+
+			"    redelegation_accounts: %d\n"+
+			"    third_party_withdraw_accounts: %d\n"+
+			"    authz_granter_accounts: %d\n"+
+			"    authz_grantee_accounts: %d\n"+
+			"    feegrant_granter_accounts: %d\n"+
+			"    feegrant_grantee_accounts: %d\n"+
+			"    instant_claims: %d\n"+
+			"    delayed_claims: %d\n"+
+			"    actions: %d",
+		nLegacy, nExtra, nDelegated, nUnbonding, nRedelegation, nWithdraw,
+		nAuthz, nAuthzRecv, nFeegrant, nFeegrantRecv, nClaim, nDelayedClaim, nAction,
+	)
 }
 
 func buildPreparedAccountName(prefix, tag string, idx int) string {
 	if tag == "" {
+		return fmt.Sprintf("%s-%03d", prefix, idx)
+	}
+	return fmt.Sprintf("%s-%s-%03d", prefix, tag, idx)
+}
+
+func batchedFundingWaitTimeout(accountCount int) time.Duration {
+	if accountCount < 1 {
+		accountCount = 1
+	}
+	timeout := 45*time.Second + time.Duration(accountCount)*5*time.Second
+	if timeout > 3*time.Minute {
+		return 3 * time.Minute
+	}
+	return timeout
+}
+
+func plannedPrepareClaim(claimKeyIdx int) (tier uint32, delayed bool) {
+	switch claimKeyIdx % 10 {
+	case 3:
+		return 1, true
+	case 6:
+		return 2, true
+	case 9:
+		return 3, true
+	default:
+		return 0, false
+	}
+}
+
+func selectPrepareClaimForAccount(rec *AccountRecord, claimKeyIdx int) (tier uint32, delayed bool) {
+	tier, delayed = plannedPrepareClaim(claimKeyIdx)
+	if delayed && rec != nil && rec.hasRecordedAction() {
+		return 0, false
+	}
+	return tier, delayed
+}
+
+func buildPreparedAccountNameV0(prefix, tag string, idx int) string {
+	if tag == "" {
 		return fmt.Sprintf("%s_%03d", prefix, idx)
 	}
 	return fmt.Sprintf("%s_%s_%03d", prefix, tag, idx)
+}
+
+func findPreparedAccountIndex(existingByName map[string]int, prefix, tag string, idx int) (int, bool) {
+	candidates := []string{buildPreparedAccountName(prefix, tag, idx)}
+	switch prefix {
+	case legacyPreparedAccountPrefix:
+		candidates = append(candidates,
+			buildPreparedAccountNameV0(legacyPreparedAccountPrefixV0, tag, idx),
+			buildPreparedAccountNameV0("legacy", tag, idx),
+		)
+	case extraPreparedAccountPrefix:
+		candidates = append(candidates,
+			buildPreparedAccountNameV0(extraPreparedAccountPrefixV0, tag, idx),
+			buildPreparedAccountNameV0("extra", tag, idx),
+		)
+	}
+
+	for _, name := range candidates {
+		if recIdx, ok := existingByName[name]; ok {
+			return recIdx, true
+		}
+	}
+	return 0, false
 }
 
 func resolvePrepareAccountTag(explicitTag, funderKeyName, funderAddr string) string {
@@ -995,18 +1111,16 @@ func pickRandomLegacyIndices(legacyIdx []int, selfIdx int, n int, rng *rand.Rand
 }
 
 func fundAccountsBatched(af *AccountsFile, rng *rand.Rand) error {
-	// Auto-gas can re-query account state per tx and break explicit sequence batching.
-	// Force fixed gas for this batched funding phase.
-	origGas := *flagGas
-	if origGas == "auto" {
-		*flagGas = "250000"
-		defer func() { *flagGas = origGas }()
-	}
-
+	ctx := context.Background()
 	funderAddr, err := getAddress(*flagFunder)
 	if err != nil {
 		return fmt.Errorf("get funder address: %w", err)
 	}
+	sdkClient, err := sdkKeyringClient(ctx, *flagFunder, funderAddr)
+	if err != nil {
+		return fmt.Errorf("create SDK client for %s: %w", *flagFunder, err)
+	}
+	defer sdkClient.Close()
 	accountNumber, sequence, err := queryAccountNumberAndSequence(funderAddr)
 	if err != nil {
 		return fmt.Errorf("query funder account number/sequence: %w", err)
@@ -1019,21 +1133,20 @@ func fundAccountsBatched(af *AccountsFile, rng *rand.Rand) error {
 		amount string
 		seq    uint64
 	}
+	waitTimeout := batchedFundingWaitTimeout(len(af.Accounts))
 	var lastTxHash string
 	pending := make([]pendingFund, 0, len(af.Accounts))
 	for i := range af.Accounts {
 		rec := &af.Accounts[i]
 		amount := fmt.Sprintf("%dulume", 1_000_000+rng.Intn(9_000_000))
+		accNum := accountNumber
+		seq := sequence
 
-		_, txHash, err := runTxNoWaitWithAccountSequence(
-			accountNumber,
-			sequence,
-			"tx", "bank", "send", *flagFunder, rec.Address, amount, "--from", *flagFunder,
-		)
+		txHash, err := sdkSendBankTx(ctx, sdkClient.Blockchain, funderAddr, rec.Address, amount, &accNum, &seq)
 		if err != nil {
 			// Settle any accepted txs before the caller falls back to sequential mode.
 			if lastTxHash != "" {
-				_ = waitTx(lastTxHash)
+				_ = waitForSDKTxResult(ctx, sdkClient.Blockchain, lastTxHash, waitTimeout)
 			}
 			return fmt.Errorf("fund %s at sequence %d failed: %w", rec.Name, sequence, err)
 		}
@@ -1050,7 +1163,7 @@ func fundAccountsBatched(af *AccountsFile, rng *rand.Rand) error {
 		return fmt.Errorf("no funding txs accepted")
 	}
 	if lastTxHash != "" {
-		if err := waitTx(lastTxHash); err != nil {
+		if err := waitForSDKTxResult(ctx, sdkClient.Blockchain, lastTxHash, waitTimeout); err != nil {
 			return fmt.Errorf("wait for last funding tx %s: %w", lastTxHash, err)
 		}
 	}
@@ -1076,19 +1189,35 @@ func fundAccountsBatched(af *AccountsFile, rng *rand.Rand) error {
 }
 
 func fundAccountsSequential(af *AccountsFile, rng *rand.Rand) {
+	ctx := context.Background()
+	funderAddr, err := getAddress(*flagFunder)
+	if err != nil {
+		log.Printf("  WARN: get funder address: %v", err)
+		return
+	}
+	sdkClient, err := sdkKeyringClient(ctx, *flagFunder, funderAddr)
+	if err != nil {
+		log.Printf("  WARN: create SDK client for %s: %v", *flagFunder, err)
+		return
+	}
+	defer sdkClient.Close()
+
 	for i := range af.Accounts {
 		rec := &af.Accounts[i]
 		if rec.HasBalance {
 			continue
 		}
 		amount := fmt.Sprintf("%dulume", 1_000_000+rng.Intn(9_000_000))
-		_, err := runTx("tx", "bank", "send", *flagFunder, rec.Address, amount, "--from", *flagFunder)
+		txHash, err := sdkSendBankTx(ctx, sdkClient.Blockchain, funderAddr, rec.Address, amount, nil, nil)
 		if err != nil {
 			low := strings.ToLower(err.Error())
 			if strings.Contains(low, "incorrect account sequence") {
 				_ = waitForNextBlock(20 * time.Second)
-				_, err = runTx("tx", "bank", "send", *flagFunder, rec.Address, amount, "--from", *flagFunder)
+				txHash, err = sdkSendBankTx(ctx, sdkClient.Blockchain, funderAddr, rec.Address, amount, nil, nil)
 			}
+		}
+		if err == nil {
+			err = waitForSDKTxResult(ctx, sdkClient.Blockchain, txHash, 45*time.Second)
 		}
 		if err != nil {
 			log.Printf("  WARN: fund %s: %v", rec.Name, err)
@@ -1103,7 +1232,7 @@ func validatePreparedState(af *AccountsFile) int {
 	var errCount int
 	var legacyWithBalance int
 	var scenarioUnbonding, scenarioRedelegation, scenarioWithdraw, scenarioAuthzAsGrantee, scenarioFeegrantAsGrantee int
-	var scenarioClaim, scenarioDelayedClaim int
+	var scenarioClaim, scenarioDelayedClaim, scenarioAction int
 
 	for i := range af.Accounts {
 		rec := &af.Accounts[i]
@@ -1377,6 +1506,24 @@ func validatePreparedState(af *AccountsFile) int {
 			}
 		}
 
+		// Validate action records.
+		if len(rec.Actions) > 0 {
+			scenarioAction++
+			for _, act := range rec.Actions {
+				if act.ActionID == "" {
+					continue
+				}
+				creator, err := queryActionCreator(act.ActionID)
+				if err != nil {
+					log.Printf("  ERROR: query action %s for %s: %v", act.ActionID, rec.Name, err)
+					errCount++
+				} else if creator != rec.Address {
+					log.Printf("  ERROR: action %s creator mismatch: expected %s got %s", act.ActionID, rec.Address, creator)
+					errCount++
+				}
+			}
+		}
+
 		// Validate claim records.
 		if len(rec.Claims) > 0 {
 			for _, cl := range rec.Claims {
@@ -1421,6 +1568,10 @@ func validatePreparedState(af *AccountsFile) int {
 	}
 	if legacyWithBalance >= 6 && scenarioFeegrantAsGrantee == 0 {
 		log.Printf("  ERROR: no legacy account exercised feegrant-as-grantee scenario")
+		errCount++
+	}
+	if legacyWithBalance >= 4 && scenarioAction == 0 {
+		log.Printf("  ERROR: no legacy account with action scenario created")
 		errCount++
 	}
 	if legacyWithBalance >= 2 && scenarioClaim == 0 {
@@ -1478,10 +1629,14 @@ func runCleanup() {
 
 // isTestKeyName returns true for key names created by the evmigration test tool.
 func isTestKeyName(name string) bool {
-	return strings.HasPrefix(name, legacyPreparedAccountPrefix+"_") ||
-		strings.HasPrefix(name, extraPreparedAccountPrefix+"_") ||
-		strings.HasPrefix(name, "new_"+legacyPreparedAccountPrefix+"_") ||
-		strings.HasPrefix(name, "new_"+extraPreparedAccountPrefix+"_") ||
+	return strings.HasPrefix(name, legacyPreparedAccountPrefix+"-") ||
+		strings.HasPrefix(name, extraPreparedAccountPrefix+"-") ||
+		strings.HasPrefix(name, migratedAccountPrefix+"-") ||
+		strings.HasPrefix(name, migratedExtraAccountPrefix+"-") ||
+		strings.HasPrefix(name, legacyPreparedAccountPrefixV0+"_") ||
+		strings.HasPrefix(name, extraPreparedAccountPrefixV0+"_") ||
+		strings.HasPrefix(name, "new_"+legacyPreparedAccountPrefixV0+"_") ||
+		strings.HasPrefix(name, "new_"+extraPreparedAccountPrefixV0+"_") ||
 		strings.HasPrefix(name, "legacy_") || // backward compatibility with old naming
 		strings.HasPrefix(name, "extra_") || // backward compatibility with old naming
 		strings.HasPrefix(name, "new_legacy_") || // backward compatibility with old naming

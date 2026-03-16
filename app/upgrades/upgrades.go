@@ -38,7 +38,7 @@ import (
 // | v1.10.1 | custom   | drop crisis (if not already)      | Ensure consensus params are present in x/consensus
 // | v1.11.0 | custom   | add audit store                   | Initializes audit params with dynamic epoch_zero_height
 // | v1.11.1 | custom   | conditional add audit store       | Supports direct v1.10.1->v1.11.1 and enforces audit min_disk_free_percent floor (>=15)
-// | v1.12.0 | standard | add feemarket, precisebank, vm, erc20 | Adds EVM module stores (fee market, precisebank, vm, erc20)
+// | v1.12.0 | custom   | add feemarket, precisebank, vm, erc20 | Adds EVM stores and applies Lumera EVM param finalization
 // =================================================================================================================================
 
 type UpgradeConfig struct {
@@ -146,7 +146,7 @@ func SetupUpgrades(upgradeName string, params appParams.AppUpgradeParams) (Upgra
 	case upgrade_v1_12_0.UpgradeName:
 		return UpgradeConfig{
 			StoreUpgrade: &upgrade_v1_12_0.StoreUpgrades,
-			Handler:      standardUpgradeHandler(upgrade_v1_12_0.UpgradeName, params),
+			Handler:      upgrade_v1_12_0.CreateUpgradeHandler(params),
 		}, true
 
 	// add future upgrades here

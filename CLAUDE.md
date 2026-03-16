@@ -120,7 +120,7 @@ Key files:
 
 EVM integration tests live in `tests/integration/evm/` with subpackages: ante, contracts, feemarket, ibc, jsonrpc, mempool, precisebank, precompiles, vm. Most use `//go:build integration` tag; the IBC ERC20 tests use `//go:build test`.
 
-**Rule**: When adding or modifying EVM tests, update `docs/evm-integration.md` — add new tests to the appropriate table (Unit Tests, Integration Tests, or Devnet Tests) and reference them from the related bug entry if applicable.
+**Rule**: When adding or modifying EVM tests, update `docs/evm-integration/tests.md` — add new tests to the appropriate table (Unit Tests, Integration Tests, or Devnet Tests) and reference them from the related bug entry in `docs/evm-integration/bugs.md` if applicable.
 
 ### Test Utilities
 

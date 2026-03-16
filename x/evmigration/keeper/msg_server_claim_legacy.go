@@ -11,9 +11,10 @@ import (
 	"github.com/LumeraProtocol/lumera/x/evmigration/types"
 )
 
-// ClaimLegacyAccount migrates on-chain state from a legacy (coin-type-118) address
-// to a new (coin-type-60) address. The tx is signed by new_address (verified by SDK
-// ante handler). The legacy_signature field proves legacy key ownership.
+// ClaimLegacyAccount migrates on-chain state from a legacy (coin-type-118)
+// address to a new (coin-type-60) address. Authentication is fully embedded in
+// the message: the legacy key authorizes the migration and the destination key
+// authorizes receiving the migrated state.
 func (ms msgServer) ClaimLegacyAccount(goCtx context.Context, msg *types.MsgClaimLegacyAccount) (*types.MsgClaimLegacyAccountResponse, error) {
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
@@ -37,8 +38,11 @@ func (ms msgServer) ClaimLegacyAccount(goCtx context.Context, msg *types.MsgClai
 		return nil, types.ErrUseValidatorMigration
 	}
 
-	// Verify dual signatures.
-	if err := VerifyLegacySignature(legacyAddr, newAddr, msg.LegacyPubKey, msg.LegacySignature); err != nil {
+	// Verify both embedded proofs before touching state.
+	if err := VerifyLegacySignature(migrationPayloadKindClaim, legacyAddr, newAddr, msg.LegacyPubKey, msg.LegacySignature); err != nil {
+		return nil, err
+	}
+	if err := VerifyNewSignature(migrationPayloadKindClaim, legacyAddr, newAddr, msg.NewPubKey, msg.NewSignature); err != nil {
 		return nil, err
 	}
 
@@ -239,4 +243,3 @@ func (ms msgServer) finalizeMigration(ctx sdk.Context, legacyAddr, newAddr sdk.A
 
 	return nil
 }
-

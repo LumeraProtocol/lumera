@@ -26,10 +26,7 @@ jobs:
         uses: ./.github/actions/setup-go
 
       - name: Install Ignite CLI
-        run: |
-          curl https://get.ignite.com/cli! | bash
-        env:
-          IGNITE_CLI_NO_ANALYTICS: 1
+        uses: ./.github/actions/install-ignite
 
       - name: Install dependencies
         run: go mod download
@@ -49,10 +46,7 @@ jobs:
         uses: ./.github/actions/setup-go
 
       - name: Install Ignite CLI
-        run: |
-          curl https://get.ignite.com/cli! | bash
-        env:
-          IGNITE_CLI_NO_ANALYTICS: 1
+        uses: ./.github/actions/install-ignite
 
       - name: Install dependencies
         run: go mod download
@@ -73,10 +67,7 @@ jobs:
         uses: ./.github/actions/setup-go
 
       - name: Install Ignite CLI
-        run: |
-          curl https://get.ignite.com/cli! | bash
-        env:
-          IGNITE_CLI_NO_ANALYTICS: 1
+        uses: ./.github/actions/install-ignite
 
       - name: Install dependencies
         run: go mod download

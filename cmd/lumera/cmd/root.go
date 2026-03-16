@@ -37,6 +37,7 @@ import (
 func NewRootCmd() *cobra.Command {
 	// Ensure SDK placeholders use the Lumera daemon name.
 	version.AppName = app.Name + "d"
+	version.Name = app.Name
 
 	var (
 		autoCliOpts        autocli.AppOptions

@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	upgrade_v1_10_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_10_1"
+	upgrade_v1_11_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_11_1"
 )
 
 func TestStoreLoaderForUpgrade_AdaptiveConsensusRename(t *testing.T) {
@@ -21,6 +22,20 @@ func TestStoreLoaderForUpgrade_AdaptiveConsensusRename(t *testing.T) {
 
 	require.NotNil(t, selection.Loader)
 	require.Equal(t, "Configured store loader for upgrade (consensus rename)", selection.LogMessage())
+}
+
+func TestStoreLoaderForUpgrade_AdaptiveAuditStore(t *testing.T) {
+	selection := StoreLoaderForUpgrade(
+		upgrade_v1_11_1.UpgradeName,
+		100,
+		nil,
+		map[string]struct{}{},
+		log.NewNopLogger(),
+		true,
+	)
+
+	require.NotNil(t, selection.Loader)
+	require.Equal(t, "Configured store loader for upgrade (conditional audit store)", selection.LogMessage())
 }
 
 func TestStoreLoaderForUpgrade_AdaptiveDefault(t *testing.T) {
@@ -49,6 +64,20 @@ func TestStoreLoaderForUpgrade_NonAdaptiveConsensusRename(t *testing.T) {
 
 	require.NotNil(t, selection.Loader)
 	require.Equal(t, "Configured store loader for upgrade (consensus rename)", selection.LogMessage())
+}
+
+func TestStoreLoaderForUpgrade_NonAdaptiveAuditStore(t *testing.T) {
+	selection := StoreLoaderForUpgrade(
+		upgrade_v1_11_1.UpgradeName,
+		100,
+		nil,
+		nil,
+		log.NewNopLogger(),
+		false,
+	)
+
+	require.NotNil(t, selection.Loader)
+	require.Equal(t, "Configured store loader for upgrade (conditional audit store)", selection.LogMessage())
 }
 
 func TestStoreLoaderForUpgrade_NonAdaptiveDefault(t *testing.T) {

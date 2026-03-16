@@ -8,6 +8,7 @@ import (
 	"time"
 
 	sdkmath "cosmossdk.io/math"
+	"cosmossdk.io/x/feegrant"
 
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
@@ -18,6 +19,7 @@ import (
 	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
+	evmcryptotypes "github.com/cosmos/evm/crypto/ethsecp256k1"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -59,11 +61,59 @@ func TestMigrationIntegration(t *testing.T) {
 // signMigration creates a valid legacy signature for the migration message.
 func signMigration(t *testing.T, privKey *secp256k1.PrivKey, legacyAddr, newAddr sdk.AccAddress) []byte {
 	t.Helper()
-	msg := fmt.Sprintf("lumera-evm-migration:%s:%s", legacyAddr.String(), newAddr.String())
+	msg := fmt.Sprintf("lumera-evm-migration:claim:%s:%s", legacyAddr.String(), newAddr.String())
 	hash := sha256.Sum256([]byte(msg))
 	sig, err := privKey.Sign(hash[:])
 	require.NoError(t, err)
 	return sig
+}
+
+func signValidatorMigration(t *testing.T, privKey *secp256k1.PrivKey, legacyAddr, newAddr sdk.AccAddress) []byte {
+	t.Helper()
+	msg := fmt.Sprintf("lumera-evm-migration:validator:%s:%s", legacyAddr.String(), newAddr.String())
+	hash := sha256.Sum256([]byte(msg))
+	sig, err := privKey.Sign(hash[:])
+	require.NoError(t, err)
+	return sig
+}
+
+func signNewMigration(t *testing.T, kind string, privKey *evmcryptotypes.PrivKey, legacyAddr, newAddr sdk.AccAddress) []byte {
+	t.Helper()
+	msg := fmt.Sprintf("lumera-evm-migration:%s:%s:%s", kind, legacyAddr.String(), newAddr.String())
+	sig, err := privKey.Sign([]byte(msg))
+	require.NoError(t, err)
+	return sig
+}
+
+func createNewEVMAddress(t *testing.T) (*evmcryptotypes.PrivKey, sdk.AccAddress) {
+	t.Helper()
+	privKey, err := evmcryptotypes.GenerateKey()
+	require.NoError(t, err)
+	return privKey, sdk.AccAddress(privKey.PubKey().Address())
+}
+
+func newClaimMsg(t *testing.T, legacyPrivKey *secp256k1.PrivKey, legacyAddr sdk.AccAddress, newPrivKey *evmcryptotypes.PrivKey, newAddr sdk.AccAddress) *types.MsgClaimLegacyAccount {
+	t.Helper()
+	return &types.MsgClaimLegacyAccount{
+		LegacyAddress:   legacyAddr.String(),
+		NewAddress:      newAddr.String(),
+		LegacyPubKey:    legacyPrivKey.PubKey().(*secp256k1.PubKey).Key,
+		LegacySignature: signMigration(t, legacyPrivKey, legacyAddr, newAddr),
+		NewPubKey:       newPrivKey.PubKey().(*evmcryptotypes.PubKey).Key,
+		NewSignature:    signNewMigration(t, "claim", newPrivKey, legacyAddr, newAddr),
+	}
+}
+
+func newValidatorMsg(t *testing.T, legacyPrivKey *secp256k1.PrivKey, legacyAddr sdk.AccAddress, newPrivKey *evmcryptotypes.PrivKey, newAddr sdk.AccAddress) *types.MsgMigrateValidator {
+	t.Helper()
+	return &types.MsgMigrateValidator{
+		LegacyAddress:   legacyAddr.String(),
+		NewAddress:      newAddr.String(),
+		LegacyPubKey:    legacyPrivKey.PubKey().(*secp256k1.PubKey).Key,
+		LegacySignature: signValidatorMigration(t, legacyPrivKey, legacyAddr, newAddr),
+		NewPubKey:       newPrivKey.PubKey().(*evmcryptotypes.PubKey).Key,
+		NewSignature:    signNewMigration(t, "validator", newPrivKey, legacyAddr, newAddr),
+	}
 }
 
 // createFundedLegacyAccount creates a secp256k1 account, registers it in auth,
@@ -104,15 +154,9 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_Success() {
 
 	coins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 1_000_000))
 	privKey, legacyAddr := s.createFundedLegacyAccount(coins)
-	pubKey := privKey.PubKey().(*secp256k1.PubKey)
-	_, newAddr := s.createFundedLegacyAccount(sdk.Coins{})
+	newPrivKey, newAddr := createNewEVMAddress(s.T())
 
-	msg := &types.MsgClaimLegacyAccount{
-		LegacyAddress:   legacyAddr.String(),
-		NewAddress:      newAddr.String(),
-		LegacyPubKey:    pubKey.Key,
-		LegacySignature: signMigration(s.T(), privKey, legacyAddr, newAddr),
-	}
+	msg := newClaimMsg(s.T(), privKey, legacyAddr, newPrivKey, newAddr)
 
 	resp, err := s.msgServer.ClaimLegacyAccount(s.ctx, msg)
 	s.Require().NoError(err)
@@ -136,6 +180,52 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_Success() {
 	s.Require().Equal(uint64(1), count, "migration counter should be exactly 1")
 }
 
+// TestClaimLegacyAccount_MigratesAndRevokesFeegrants verifies that feegrant
+// allowances are re-keyed to the migrated address and the legacy entries are
+// removed from the concrete SDK feegrant keeper.
+func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_MigratesAndRevokesFeegrants() {
+	s.enableMigration()
+
+	legacyPrivKey, legacyAddr := s.createFundedLegacyAccount(sdk.NewCoins(sdk.NewInt64Coin("ulume", 1_000_000)))
+	_, outgoingGrantee := s.createFundedLegacyAccount(sdk.NewCoins(sdk.NewInt64Coin("ulume", 100)))
+	_, incomingGranter := s.createFundedLegacyAccount(sdk.NewCoins(sdk.NewInt64Coin("ulume", 100)))
+	newPrivKey, newAddr := createNewEVMAddress(s.T())
+
+	outgoingAllowance := &feegrant.BasicAllowance{
+		SpendLimit: sdk.NewCoins(sdk.NewInt64Coin("ulume", 111)),
+	}
+	incomingAllowance := &feegrant.BasicAllowance{
+		SpendLimit: sdk.NewCoins(sdk.NewInt64Coin("ulume", 222)),
+	}
+
+	s.Require().NoError(s.app.FeeGrantKeeper.GrantAllowance(s.ctx, legacyAddr, outgoingGrantee, outgoingAllowance))
+	s.Require().NoError(s.app.FeeGrantKeeper.GrantAllowance(s.ctx, incomingGranter, legacyAddr, incomingAllowance))
+
+	msg := newClaimMsg(s.T(), legacyPrivKey, legacyAddr, newPrivKey, newAddr)
+	_, err := s.msgServer.ClaimLegacyAccount(s.ctx, msg)
+	s.Require().NoError(err)
+
+	// Legacy feegrant entries must be gone after migration.
+	oldOutgoing, err := s.app.FeeGrantKeeper.GetAllowance(s.ctx, legacyAddr, outgoingGrantee)
+	s.Require().NoError(err)
+	s.Require().Nil(oldOutgoing)
+
+	oldIncoming, err := s.app.FeeGrantKeeper.GetAllowance(s.ctx, incomingGranter, legacyAddr)
+	s.Require().NoError(err)
+	s.Require().Nil(oldIncoming)
+
+	// The same allowances must exist under the migrated address.
+	newOutgoing, err := s.app.FeeGrantKeeper.GetAllowance(s.ctx, newAddr, outgoingGrantee)
+	s.Require().NoError(err)
+	s.Require().NotNil(newOutgoing)
+	s.Require().Equal(outgoingAllowance.SpendLimit, newOutgoing.(*feegrant.BasicAllowance).SpendLimit)
+
+	newIncoming, err := s.app.FeeGrantKeeper.GetAllowance(s.ctx, incomingGranter, newAddr)
+	s.Require().NoError(err)
+	s.Require().NotNil(newIncoming)
+	s.Require().Equal(incomingAllowance.SpendLimit, newIncoming.(*feegrant.BasicAllowance).SpendLimit)
+}
+
 // TestClaimLegacyAccount_MigrationDisabled verifies rejection when migrations are disabled.
 func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_MigrationDisabled() {
 	params := types.NewParams(false, 0, 50, 2000)
@@ -143,15 +233,9 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_MigrationDisabled() {
 
 	coins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 100))
 	privKey, legacyAddr := s.createFundedLegacyAccount(coins)
-	pubKey := privKey.PubKey().(*secp256k1.PubKey)
-	_, newAddr := s.createFundedLegacyAccount(sdk.Coins{})
+	newPrivKey, newAddr := createNewEVMAddress(s.T())
 
-	msg := &types.MsgClaimLegacyAccount{
-		LegacyAddress:   legacyAddr.String(),
-		NewAddress:      newAddr.String(),
-		LegacyPubKey:    pubKey.Key,
-		LegacySignature: signMigration(s.T(), privKey, legacyAddr, newAddr),
-	}
+	msg := newClaimMsg(s.T(), privKey, legacyAddr, newPrivKey, newAddr)
 
 	_, err := s.msgServer.ClaimLegacyAccount(s.ctx, msg)
 	s.Require().ErrorIs(err, types.ErrMigrationDisabled)
@@ -164,15 +248,9 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_AlreadyMigrated() {
 
 	coins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 100))
 	privKey, legacyAddr := s.createFundedLegacyAccount(coins)
-	pubKey := privKey.PubKey().(*secp256k1.PubKey)
-	_, newAddr := s.createFundedLegacyAccount(sdk.Coins{})
+	newPrivKey, newAddr := createNewEVMAddress(s.T())
 
-	msg := &types.MsgClaimLegacyAccount{
-		LegacyAddress:   legacyAddr.String(),
-		NewAddress:      newAddr.String(),
-		LegacyPubKey:    pubKey.Key,
-		LegacySignature: signMigration(s.T(), privKey, legacyAddr, newAddr),
-	}
+	msg := newClaimMsg(s.T(), privKey, legacyAddr, newPrivKey, newAddr)
 
 	// First migration should succeed.
 	_, err := s.msgServer.ClaimLegacyAccount(s.ctx, msg)
@@ -180,26 +258,16 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_AlreadyMigrated() {
 
 	// Create a new account to receive the second attempt.
 	privKey2, legacyAddr2 := s.createFundedLegacyAccount(sdk.NewCoins(sdk.NewInt64Coin("ulume", 50)))
-	pubKey2 := privKey2.PubKey().(*secp256k1.PubKey)
+	newPrivKey2, _ := createNewEVMAddress(s.T())
 
 	// Try to migrate to the same new address (the new address was a previously-migrated legacy).
 	// Actually test the original legacy address being re-migrated.
-	msg2 := &types.MsgClaimLegacyAccount{
-		LegacyAddress:   legacyAddr.String(),
-		NewAddress:      legacyAddr2.String(),
-		LegacyPubKey:    pubKey.Key,
-		LegacySignature: signMigration(s.T(), privKey, legacyAddr, legacyAddr2),
-	}
+	msg2 := newClaimMsg(s.T(), privKey, legacyAddr, newPrivKey2, legacyAddr2)
 	_, err = s.msgServer.ClaimLegacyAccount(s.ctx, msg2)
 	s.Require().ErrorIs(err, types.ErrAlreadyMigrated)
 
 	// Also test: new address that was a previously-migrated legacy address.
-	msg3 := &types.MsgClaimLegacyAccount{
-		LegacyAddress:   legacyAddr2.String(),
-		NewAddress:      legacyAddr.String(),
-		LegacyPubKey:    pubKey2.Key,
-		LegacySignature: signMigration(s.T(), privKey2, legacyAddr2, legacyAddr),
-	}
+	msg3 := newClaimMsg(s.T(), privKey2, legacyAddr2, newPrivKey, legacyAddr)
 	_, err = s.msgServer.ClaimLegacyAccount(s.ctx, msg3)
 	s.Require().ErrorIs(err, types.ErrNewAddressWasMigrated)
 }
@@ -210,14 +278,8 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_SameAddress() {
 
 	coins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 100))
 	privKey, legacyAddr := s.createFundedLegacyAccount(coins)
-	pubKey := privKey.PubKey().(*secp256k1.PubKey)
-
-	msg := &types.MsgClaimLegacyAccount{
-		LegacyAddress:   legacyAddr.String(),
-		NewAddress:      legacyAddr.String(),
-		LegacyPubKey:    pubKey.Key,
-		LegacySignature: signMigration(s.T(), privKey, legacyAddr, legacyAddr),
-	}
+	newPrivKey, _ := createNewEVMAddress(s.T())
+	msg := newClaimMsg(s.T(), privKey, legacyAddr, newPrivKey, legacyAddr)
 
 	_, err := s.msgServer.ClaimLegacyAccount(s.ctx, msg)
 	s.Require().ErrorIs(err, types.ErrSameAddress)
@@ -229,19 +291,14 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_InvalidSignature() {
 
 	coins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 100))
 	privKey, legacyAddr := s.createFundedLegacyAccount(coins)
-	pubKey := privKey.PubKey().(*secp256k1.PubKey)
-	_, newAddr := s.createFundedLegacyAccount(sdk.Coins{})
+	newPrivKey, newAddr := createNewEVMAddress(s.T())
 
 	// Sign with a different private key.
 	otherPrivKey := secp256k1.GenPrivKey()
 	badSig := signMigration(s.T(), otherPrivKey, legacyAddr, newAddr)
 
-	msg := &types.MsgClaimLegacyAccount{
-		LegacyAddress:   legacyAddr.String(),
-		NewAddress:      newAddr.String(),
-		LegacyPubKey:    pubKey.Key,
-		LegacySignature: badSig,
-	}
+	msg := newClaimMsg(s.T(), privKey, legacyAddr, newPrivKey, newAddr)
+	msg.LegacySignature = badSig
 
 	_, err := s.msgServer.ClaimLegacyAccount(s.ctx, msg)
 	s.Require().ErrorIs(err, types.ErrInvalidLegacySignature)
@@ -264,7 +321,6 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_ValidatorMustUseMigra
 
 	legacyAddr := sdk.AccAddress(valOperAddr)
 	privKey := secp256k1.GenPrivKey()
-	pubKey := privKey.PubKey().(*secp256k1.PubKey)
 
 	// Create the account in auth if it doesn't exist.
 	acc := s.app.AuthKeeper.GetAccount(s.ctx, legacyAddr)
@@ -273,14 +329,8 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_ValidatorMustUseMigra
 		s.app.AuthKeeper.SetAccount(s.ctx, acc)
 	}
 
-	_, newAddr := s.createFundedLegacyAccount(sdk.Coins{})
-
-	msg := &types.MsgClaimLegacyAccount{
-		LegacyAddress:   legacyAddr.String(),
-		NewAddress:      newAddr.String(),
-		LegacyPubKey:    pubKey.Key,
-		LegacySignature: signMigration(s.T(), privKey, legacyAddr, newAddr),
-	}
+	newPrivKey, newAddr := createNewEVMAddress(s.T())
+	msg := newClaimMsg(s.T(), privKey, legacyAddr, newPrivKey, newAddr)
 
 	_, err := s.msgServer.ClaimLegacyAccount(s.ctx, msg)
 	// The pubkey won't match legacyAddr (since it's a random key), so we expect
@@ -298,15 +348,8 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_MultiDenom() {
 		sdk.NewInt64Coin("uatom", 200_000),
 	)
 	privKey, legacyAddr := s.createFundedLegacyAccount(coins)
-	pubKey := privKey.PubKey().(*secp256k1.PubKey)
-	_, newAddr := s.createFundedLegacyAccount(sdk.Coins{})
-
-	msg := &types.MsgClaimLegacyAccount{
-		LegacyAddress:   legacyAddr.String(),
-		NewAddress:      newAddr.String(),
-		LegacyPubKey:    pubKey.Key,
-		LegacySignature: signMigration(s.T(), privKey, legacyAddr, newAddr),
-	}
+	newPrivKey, newAddr := createNewEVMAddress(s.T())
+	msg := newClaimMsg(s.T(), privKey, legacyAddr, newPrivKey, newAddr)
 
 	_, err := s.msgServer.ClaimLegacyAccount(s.ctx, msg)
 	s.Require().NoError(err)
@@ -327,8 +370,7 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_DelayedVestingPreserv
 
 	coins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 1_000_000))
 	privKey, legacyAddr := s.createFundedLegacyAccount(coins)
-	pubKey := privKey.PubKey().(*secp256k1.PubKey)
-	_, newAddr := s.createFundedLegacyAccount(sdk.Coins{})
+	newPrivKey, newAddr := createNewEVMAddress(s.T())
 
 	legacyBase, ok := s.app.AuthKeeper.GetAccount(s.ctx, legacyAddr).(*authtypes.BaseAccount)
 	s.Require().True(ok, "legacy account must start as BaseAccount")
@@ -342,12 +384,7 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_DelayedVestingPreserv
 	delayed := vestingtypes.NewDelayedVestingAccountRaw(bva)
 	s.app.AuthKeeper.SetAccount(s.ctx, delayed)
 
-	msg := &types.MsgClaimLegacyAccount{
-		LegacyAddress:   legacyAddr.String(),
-		NewAddress:      newAddr.String(),
-		LegacyPubKey:    pubKey.Key,
-		LegacySignature: signMigration(s.T(), privKey, legacyAddr, newAddr),
-	}
+	msg := newClaimMsg(s.T(), privKey, legacyAddr, newPrivKey, newAddr)
 
 	_, err = s.msgServer.ClaimLegacyAccount(s.ctx, msg)
 	s.Require().NoError(err)
@@ -370,8 +407,7 @@ func (s *MigrationIntegrationSuite) TestQueryMigrationRecord_Integration() {
 
 	coins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 100))
 	privKey, legacyAddr := s.createFundedLegacyAccount(coins)
-	pubKey := privKey.PubKey().(*secp256k1.PubKey)
-	_, newAddr := s.createFundedLegacyAccount(sdk.Coins{})
+	newPrivKey, newAddr := createNewEVMAddress(s.T())
 
 	// Before migration — no record.
 	resp, err := qs.MigrationRecord(s.ctx, &types.QueryMigrationRecordRequest{
@@ -381,12 +417,7 @@ func (s *MigrationIntegrationSuite) TestQueryMigrationRecord_Integration() {
 	s.Require().Nil(resp.Record)
 
 	// Perform migration.
-	msg := &types.MsgClaimLegacyAccount{
-		LegacyAddress:   legacyAddr.String(),
-		NewAddress:      newAddr.String(),
-		LegacyPubKey:    pubKey.Key,
-		LegacySignature: signMigration(s.T(), privKey, legacyAddr, newAddr),
-	}
+	msg := newClaimMsg(s.T(), privKey, legacyAddr, newPrivKey, newAddr)
 	_, err = s.msgServer.ClaimLegacyAccount(s.ctx, msg)
 	s.Require().NoError(err)
 
@@ -502,22 +533,16 @@ func (s *MigrationIntegrationSuite) TestMigrateValidator_Success() {
 	selfBondAmt := sdkmath.NewInt(1_000_000)
 	operatorCoins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 2_000_000))
 	legacyPrivKey, legacyAddr := s.createFundedLegacyAccount(operatorCoins)
-	legacyPubKey := legacyPrivKey.PubKey().(*secp256k1.PubKey)
 
 	// Set up validator with distribution state and an external delegator.
 	oldValAddr, extDelegatorAddr := s.createTestValidator(legacyAddr, selfBondAmt)
 
 	// Create new destination account.
-	_, newAddr := s.createFundedLegacyAccount(sdk.Coins{})
+	newPrivKey, newAddr := createNewEVMAddress(s.T())
 	newValAddr := sdk.ValAddress(newAddr)
 
 	// Submit MigrateValidator.
-	msg := &types.MsgMigrateValidator{
-		LegacyAddress:   legacyAddr.String(),
-		NewAddress:      newAddr.String(),
-		LegacyPubKey:    legacyPubKey.Key,
-		LegacySignature: signMigration(s.T(), legacyPrivKey, legacyAddr, newAddr),
-	}
+	msg := newValidatorMsg(s.T(), legacyPrivKey, legacyAddr, newPrivKey, newAddr)
 
 	resp, err := s.msgServer.MigrateValidator(s.ctx, msg)
 	s.Require().NoError(err)
@@ -581,6 +606,62 @@ func (s *MigrationIntegrationSuite) TestMigrateValidator_Success() {
 		"external delegation should point to new validator")
 }
 
+// TestClaimLegacyAccount_AfterValidatorMigration verifies that legacy account
+// migration still succeeds after the validator it delegates to has already been
+// migrated to a new operator address.
+func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_AfterValidatorMigration() {
+	s.enableMigration()
+
+	selfBondAmt := sdkmath.NewInt(1_000_000)
+	operatorCoins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 2_000_000))
+	validatorPrivKey, validatorLegacyAddr := s.createFundedLegacyAccount(operatorCoins)
+	oldValAddr, _ := s.createTestValidator(validatorLegacyAddr, selfBondAmt)
+
+	// Create a migratable legacy delegator and delegate to the legacy validator
+	// before the validator migration happens.
+	delegatorCoins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 700_000))
+	delegatorPrivKey, delegatorLegacyAddr := s.createFundedLegacyAccount(delegatorCoins)
+	delegatorStake := sdkmath.NewInt(250_000)
+
+	oldVal, err := s.app.StakingKeeper.GetValidator(s.ctx, oldValAddr)
+	s.Require().NoError(err)
+	_, err = s.app.StakingKeeper.Delegate(s.ctx, delegatorLegacyAddr, delegatorStake, stakingtypes.Bonded, oldVal, true)
+	s.Require().NoError(err)
+
+	// Migrate the validator first.
+	validatorNewPrivKey, validatorNewAddr := createNewEVMAddress(s.T())
+	validatorMsg := newValidatorMsg(s.T(), validatorPrivKey, validatorLegacyAddr, validatorNewPrivKey, validatorNewAddr)
+	_, err = s.msgServer.MigrateValidator(s.ctx, validatorMsg)
+	s.Require().NoError(err)
+
+	newValAddr := sdk.ValAddress(validatorNewAddr)
+	delsAfterValidatorMigration, err := s.app.StakingKeeper.GetDelegatorDelegations(s.ctx, delegatorLegacyAddr, 10)
+	s.Require().NoError(err)
+	s.Require().Len(delsAfterValidatorMigration, 1)
+	s.Require().Equal(newValAddr.String(), delsAfterValidatorMigration[0].ValidatorAddress)
+
+	// Then migrate the delegator account. This is the validator-first order that
+	// previously failed when distribution state under the new valoper was
+	// incomplete.
+	delegatorNewPrivKey, delegatorNewAddr := createNewEVMAddress(s.T())
+	delegatorMsg := newClaimMsg(s.T(), delegatorPrivKey, delegatorLegacyAddr, delegatorNewPrivKey, delegatorNewAddr)
+	_, err = s.msgServer.ClaimLegacyAccount(s.ctx, delegatorMsg)
+	s.Require().NoError(err)
+
+	newDelegations, err := s.app.StakingKeeper.GetDelegatorDelegations(s.ctx, delegatorNewAddr, 10)
+	s.Require().NoError(err)
+	s.Require().Len(newDelegations, 1)
+	s.Require().Equal(newValAddr.String(), newDelegations[0].ValidatorAddress)
+
+	oldDelegations, err := s.app.StakingKeeper.GetDelegatorDelegations(s.ctx, delegatorLegacyAddr, 10)
+	s.Require().NoError(err)
+	s.Require().Empty(oldDelegations)
+
+	record, err := s.keeper.MigrationRecords.Get(s.ctx, delegatorLegacyAddr.String())
+	s.Require().NoError(err)
+	s.Require().Equal(delegatorNewAddr.String(), record.NewAddress)
+}
+
 // TestMigrateValidator_NotValidator verifies rejection when the legacy address
 // is not a validator operator.
 func (s *MigrationIntegrationSuite) TestMigrateValidator_NotValidator() {
@@ -588,15 +669,8 @@ func (s *MigrationIntegrationSuite) TestMigrateValidator_NotValidator() {
 
 	coins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 100))
 	privKey, legacyAddr := s.createFundedLegacyAccount(coins)
-	pubKey := privKey.PubKey().(*secp256k1.PubKey)
-	_, newAddr := s.createFundedLegacyAccount(sdk.Coins{})
-
-	msg := &types.MsgMigrateValidator{
-		LegacyAddress:   legacyAddr.String(),
-		NewAddress:      newAddr.String(),
-		LegacyPubKey:    pubKey.Key,
-		LegacySignature: signMigration(s.T(), privKey, legacyAddr, newAddr),
-	}
+	newPrivKey, newAddr := createNewEVMAddress(s.T())
+	msg := newValidatorMsg(s.T(), privKey, legacyAddr, newPrivKey, newAddr)
 
 	_, err := s.msgServer.MigrateValidator(s.ctx, msg)
 	s.Require().ErrorIs(err, types.ErrNotValidator)
@@ -609,15 +683,8 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_LegacyAccountRemoved(
 
 	coins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 100))
 	privKey, legacyAddr := s.createFundedLegacyAccount(coins)
-	pubKey := privKey.PubKey().(*secp256k1.PubKey)
-	_, newAddr := s.createFundedLegacyAccount(sdk.Coins{})
-
-	msg := &types.MsgClaimLegacyAccount{
-		LegacyAddress:   legacyAddr.String(),
-		NewAddress:      newAddr.String(),
-		LegacyPubKey:    pubKey.Key,
-		LegacySignature: signMigration(s.T(), privKey, legacyAddr, newAddr),
-	}
+	newPrivKey, newAddr := createNewEVMAddress(s.T())
+	msg := newClaimMsg(s.T(), privKey, legacyAddr, newPrivKey, newAddr)
 
 	_, err := s.msgServer.ClaimLegacyAccount(s.ctx, msg)
 	s.Require().NoError(err)

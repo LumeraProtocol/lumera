@@ -21,12 +21,56 @@ if [[ ! -f "${COMPOSE_FILE}" ]]; then
 	exit 1
 fi
 
+if [[ ! -d "${BINARIES_DIR}" ]]; then
+	echo "Binaries directory not found: ${BINARIES_DIR}" >&2
+	exit 1
+fi
+BINARIES_DIR="$(cd "${BINARIES_DIR}" && pwd)"
+
+# Detect if chain is already halted for this upgrade (re-run scenario).
+# When the upgrade height is reached, nodes panic and stop serving RPC,
+# so lumerad status fails. Check docker logs for the halt message.
+detect_upgrade_halt() {
+	local logs
+	logs="$(docker compose -f "${COMPOSE_FILE}" logs --tail=100 "${SERVICE}" 2>/dev/null || true)"
+	if echo "${logs}" | grep -qE "UPGRADE.*\"${RELEASE_NAME}\".*NEEDED"; then
+		return 0
+	fi
+	return 1
+}
+
+# Check if the node is already running the target version (upgrade already completed).
+normalize_version() {
+	local v="${1:-}"
+	v="${v#"${v%%[![:space:]]*}"}"
+	v="${v%"${v##*[![:space:]]}"}"
+	v="${v#v}"
+	printf '%s\n' "${v}"
+}
+
+RUNNING_VERSION="$(docker compose -f "${COMPOSE_FILE}" exec -T "${SERVICE}" \
+	lumerad version 2>/dev/null | head -n 1 | tr -d '\r' || true)"
+RUNNING_VERSION="$(normalize_version "${RUNNING_VERSION}")"
+EXPECTED_VERSION="$(normalize_version "${RELEASE_NAME}")"
+
+if [[ -n "${RUNNING_VERSION}" && "${RUNNING_VERSION}" == "${EXPECTED_VERSION}" ]]; then
+	echo "Node is already running version ${RUNNING_VERSION}. Upgrade to ${RELEASE_NAME} already complete."
+	exit 0
+fi
+
 if [[ "${REQUESTED_HEIGHT}" == "auto-height" ]]; then
 	echo "Auto height requested. Determining current chain height from ${SERVICE}..."
 	CURRENT_HEIGHT="$(docker compose -f "${COMPOSE_FILE}" exec -T "${SERVICE}" \
 		lumerad status 2>/dev/null | jq -r '.sync_info.latest_block_height // empty' 2>/dev/null || true)"
 
 	if ! [[ "${CURRENT_HEIGHT}" =~ ^[0-9]+$ ]]; then
+		# Chain is not responding — check if it halted for our upgrade
+		if detect_upgrade_halt; then
+			echo "Chain is already halted for ${RELEASE_NAME} upgrade. Skipping to binary upgrade..."
+			"${SCRIPT_DIR}/upgrade-binaries.sh" "${BINARIES_DIR}" "${RELEASE_NAME}"
+			echo "Upgrade to ${RELEASE_NAME} initiated successfully."
+			exit 0
+		fi
 		echo "Failed to determine current block height for service ${SERVICE}." >&2
 		exit 1
 	fi
@@ -41,12 +85,6 @@ if ! [[ "${UPGRADE_HEIGHT}" =~ ^[0-9]+$ ]]; then
 	echo "Upgrade height must be a positive integer. Got: ${UPGRADE_HEIGHT}" >&2
 	exit 1
 fi
-
-if [[ ! -d "${BINARIES_DIR}" ]]; then
-	echo "Binaries directory not found: ${BINARIES_DIR}" >&2
-	exit 1
-fi
-BINARIES_DIR="$(cd "${BINARIES_DIR}" && pwd)"
 
 echo "Submitting software upgrade proposal for ${RELEASE_NAME} at height ${UPGRADE_HEIGHT}..."
 "${SCRIPT_DIR}/submit-upgrade-proposal.sh" "${RELEASE_NAME}" "${UPGRADE_HEIGHT}"
@@ -101,11 +139,13 @@ CURRENT_HEIGHT_NOW="$(docker compose -f "${COMPOSE_FILE}" exec -T "${SERVICE}" \
 	lumerad status 2>/dev/null | jq -r '.sync_info.latest_block_height // empty' 2>/dev/null || true)"
 if [[ "${CURRENT_HEIGHT_NOW}" =~ ^[0-9]+$ ]] && ((CURRENT_HEIGHT_NOW >= UPGRADE_HEIGHT)); then
 	echo "ℹ️  Current height ${CURRENT_HEIGHT_NOW} is already at or above upgrade height ${UPGRADE_HEIGHT}; skipping wait."
+elif ! [[ "${CURRENT_HEIGHT_NOW}" =~ ^[0-9]+$ ]] && detect_upgrade_halt; then
+	echo "ℹ️  Chain is already halted for ${RELEASE_NAME} upgrade; skipping wait."
 else
 	"${SCRIPT_DIR}/wait-for-height.sh" "${UPGRADE_HEIGHT}"
 fi
 
 echo "Upgrading binaries from ${BINARIES_DIR}..."
-"${SCRIPT_DIR}/upgrade-binaries.sh" "${BINARIES_DIR}"
+"${SCRIPT_DIR}/upgrade-binaries.sh" "${BINARIES_DIR}" "${RELEASE_NAME}"
 
 echo "Upgrade to ${RELEASE_NAME} initiated successfully."

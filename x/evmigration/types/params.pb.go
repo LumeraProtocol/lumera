@@ -24,16 +24,34 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
-// Params defines the parameters for the module.
+// Params defines the governance-controlled parameters for the evmigration module.
+// These knobs determine when migrations are accepted and how much work the
+// chain performs per block during the legacy-to-EVM migration window.
 type Params struct {
-	// enable_migration controls whether migration messages are accepted.
+	// enable_migration is the master switch for the migration window.
+	// When false, all MsgClaimLegacyAccount and MsgMigrateValidator messages
+	// are rejected regardless of other parameter values.
+	// Governance should set this to false once the migration window closes.
+	// Default: true.
 	EnableMigration bool `protobuf:"varint,1,opt,name=enable_migration,json=enableMigration,proto3" json:"enable_migration,omitempty"`
-	// migration_end_time is the unix timestamp deadline after which migrations are rejected.
+	// migration_end_time is an optional hard deadline expressed as a unix
+	// timestamp (seconds). If non-zero, any migration message whose block time
+	// exceeds this value is rejected. A value of 0 disables the deadline,
+	// leaving enable_migration as the sole on/off control.
+	// Default: 0 (no deadline).
 	MigrationEndTime int64 `protobuf:"varint,2,opt,name=migration_end_time,json=migrationEndTime,proto3" json:"migration_end_time,omitempty"`
-	// max_migrations_per_block is the maximum number of migration messages processed per block.
+	// max_migrations_per_block is the maximum number of MsgClaimLegacyAccount
+	// messages processed in a single block. Once this limit is reached,
+	// additional claims in the same block are rejected. This prevents a burst
+	// of migrations from consuming excessive block gas.
+	// Default: 50.
 	MaxMigrationsPerBlock uint64 `protobuf:"varint,3,opt,name=max_migrations_per_block,json=maxMigrationsPerBlock,proto3" json:"max_migrations_per_block,omitempty"`
-	// max_validator_delegations is the maximum number of delegators a validator can have
-	// to be eligible for MsgMigrateValidator (default 2000).
+	// max_validator_delegations is the safety cap for MsgMigrateValidator.
+	// A validator migration must re-key every delegation and unbonding-delegation
+	// record. If the total count exceeds this threshold the message is rejected
+	// because the gas cost of iterating all records would be prohibitive.
+	// Validators that exceed the cap must shed delegations before migrating.
+	// Default: 2000.
 	MaxValidatorDelegations uint64 `protobuf:"varint,4,opt,name=max_validator_delegations,json=maxValidatorDelegations,proto3" json:"max_validator_delegations,omitempty"`
 }
 

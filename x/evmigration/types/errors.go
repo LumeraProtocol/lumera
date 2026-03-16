@@ -22,4 +22,7 @@ var (
 	ErrNotValidator               = errors.Register(ModuleName, 1113, "legacy address is not a validator operator")
 	ErrValidatorUnbonding         = errors.Register(ModuleName, 1114, "validator is unbonding or unbonded; wait for completion")
 	ErrTooManyDelegators          = errors.Register(ModuleName, 1115, "validator has too many delegators; exceeds max_validator_delegations")
+	ErrInvalidNewPubKey           = errors.Register(ModuleName, 1116, "invalid new public key")
+	ErrNewPubKeyAddressMismatch   = errors.Register(ModuleName, 1117, "new public key does not derive to new address")
+	ErrInvalidNewSignature        = errors.Register(ModuleName, 1118, "new signature verification failed")
 )

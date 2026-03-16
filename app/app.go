@@ -102,6 +102,7 @@ import (
 	auditmodulekeeper "github.com/LumeraProtocol/lumera/x/audit/v1/keeper"
 	claimmodulekeeper "github.com/LumeraProtocol/lumera/x/claim/keeper"
 	evmigrationmodulekeeper "github.com/LumeraProtocol/lumera/x/evmigration/keeper"
+	evmigrationmodule "github.com/LumeraProtocol/lumera/x/evmigration/module"
 	lumeraidmodulekeeper "github.com/LumeraProtocol/lumera/x/lumeraid/keeper"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	erc20keeper "github.com/cosmos/evm/x/erc20/keeper"
@@ -190,12 +191,12 @@ type App struct {
 	ActionKeeper    actionmodulekeeper.Keeper
 
 	// EVM keepers
-	FeeMarketKeeper   feemarketkeeper.Keeper
-	PreciseBankKeeper precisebankkeeper.Keeper
-	EVMKeeper         *evmkeeper.Keeper
-	Erc20Keeper       erc20keeper.Keeper
-	EvmigrationKeeper    evmigrationmodulekeeper.Keeper
-	erc20PolicyWrapper   *erc20PolicyKeeperWrapper
+	FeeMarketKeeper    feemarketkeeper.Keeper
+	PreciseBankKeeper  precisebankkeeper.Keeper
+	EVMKeeper          *evmkeeper.Keeper
+	Erc20Keeper        erc20keeper.Keeper
+	EvmigrationKeeper  evmigrationmodulekeeper.Keeper
+	erc20PolicyWrapper *erc20PolicyKeeperWrapper
 	// this line is used by starport scaffolding # stargate/app/keeperDeclaration
 
 	// simulation manager
@@ -242,6 +243,9 @@ func AppConfig(appOpts servertypes.AppOptions) depinject.Config {
 		// EVM custom signers: MsgEthereumTx uses a non-standard signer derivation
 		// that must be registered with the interface registry via depinject.
 		depinject.Provide(appevm.ProvideCustomGetSigners),
+		// EVM migration messages authenticate both parties inside the message
+		// payload, so they intentionally expose zero Cosmos tx signers.
+		depinject.Provide(evmigrationmodule.ProvideCustomGetSigners),
 		depinject.Invoke(lcfg.RegisterExtraInterfaces),
 	)
 }
@@ -431,6 +435,10 @@ func (app *App) setupUpgrades() {
 		ParamsKeeper:          &app.ParamsKeeper,
 		ConsensusParamsKeeper: &app.ConsensusParamsKeeper,
 		AuditKeeper:           &app.AuditKeeper,
+		BankKeeper:            app.BankKeeper,
+		EVMKeeper:             app.EVMKeeper,
+		FeeMarketKeeper:       &app.FeeMarketKeeper,
+		Erc20Keeper:           &app.Erc20Keeper,
 	}
 
 	allUpgrades := upgrades.AllUpgrades(params)

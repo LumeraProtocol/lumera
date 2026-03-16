@@ -25,6 +25,12 @@ func (k Keeper) SetMetricsState(ctx sdk.Context, state types.SupernodeMetricsSta
 	return nil
 }
 
+// DeleteMetricsState removes the SupernodeMetricsState entry for a validator.
+func (k Keeper) DeleteMetricsState(ctx sdk.Context, valAddr sdk.ValAddress) {
+	store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
+	store.Delete(types.GetMetricsStateKey(valAddr))
+}
+
 // GetMetricsState retrieves the latest SupernodeMetricsState for a validator, if any.
 func (k Keeper) GetMetricsState(ctx sdk.Context, valAddr sdk.ValAddress) (types.SupernodeMetricsState, bool) {
 	store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))

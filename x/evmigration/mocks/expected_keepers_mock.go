@@ -1096,6 +1096,18 @@ func (m *MockSupernodeKeeper) EXPECT() *MockSupernodeKeeperMockRecorder {
 	return m.recorder
 }
 
+// DeleteMetricsState mocks base method.
+func (m *MockSupernodeKeeper) DeleteMetricsState(ctx types2.Context, valAddr types2.ValAddress) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "DeleteMetricsState", ctx, valAddr)
+}
+
+// DeleteMetricsState indicates an expected call of DeleteMetricsState.
+func (mr *MockSupernodeKeeperMockRecorder) DeleteMetricsState(ctx, valAddr any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteMetricsState", reflect.TypeOf((*MockSupernodeKeeper)(nil).DeleteMetricsState), ctx, valAddr)
+}
+
 // GetMetricsState mocks base method.
 func (m *MockSupernodeKeeper) GetMetricsState(ctx types2.Context, valAddr types2.ValAddress) (types1.SupernodeMetricsState, bool) {
 	m.ctrl.T.Helper()

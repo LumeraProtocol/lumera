@@ -36,6 +36,12 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validatorAddress"}},
 				},
 				{
+					RpcMethod:      "GetMetrics",
+					Use:            "get-metrics [validator-address]",
+					Short:          "Query get-metrics",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validatorAddress"}},
+				},
+				{
 					RpcMethod:      "GetSuperNodeBySuperNodeAddress",
 					Use:            "get-supernode-by-address [supernode-address]",
 					Short:          "Query supernode by supernode address",

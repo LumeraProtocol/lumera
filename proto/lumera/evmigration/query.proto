@@ -125,6 +125,9 @@ message QueryMigrationEstimateResponse {
   // val_redelegation_count is redelegations referencing this validator as src or dst.
   // Populated only when is_validator is true.
   uint64 val_redelegation_count = 12;
+  // action_count is the number of action records where this address appears
+  // either as creator or in the SuperNodes list.
+  uint64 action_count = 13;
 }
 
 // QueryMigrationStatsRequest is the request type for the Query/MigrationStats RPC method.

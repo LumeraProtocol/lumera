@@ -4,6 +4,8 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
+
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 // MigrateValidatorRecord re-keys the validator record from oldValAddr to newValAddr.
@@ -67,6 +69,21 @@ func (k Keeper) MigrateValidatorDelegations(ctx sdk.Context, oldValAddr, newValA
 		return err
 	}
 
+	// All delegations will reference the same period (currentRewards.Period - 1).
+	// Reset its reference count to 1 (base) since old delegator references are stale
+	// after re-keying distribution state.
+	var targetPeriod uint64
+	if len(delegations) > 0 {
+		currentRewards, err := k.distributionKeeper.GetValidatorCurrentRewards(ctx, newValAddr)
+		if err != nil {
+			return err
+		}
+		targetPeriod = currentRewards.Period - 1
+		if err := k.resetHistoricalRewardsReferenceCount(ctx, newValAddr, targetPeriod); err != nil {
+			return err
+		}
+	}
+
 	for _, del := range delegations {
 		// Delete old distribution starting info.
 		delAddr, err := sdk.AccAddressFromBech32(del.DelegatorAddress)
@@ -89,14 +106,13 @@ func (k Keeper) MigrateValidatorDelegations(ctx sdk.Context, oldValAddr, newValA
 		}
 
 		// Initialize distribution starting info for (newValAddr, delegator).
-		currentRewards, err := k.distributionKeeper.GetValidatorCurrentRewards(ctx, newValAddr)
-		if err != nil {
-			return err
-		}
 		startingInfo, _ := k.distributionKeeper.GetDelegatorStartingInfo(ctx, oldValAddr, delAddr)
-		startingInfo.PreviousPeriod = currentRewards.Period - 1
+		startingInfo.PreviousPeriod = targetPeriod
 		startingInfo.Height = uint64(ctx.BlockHeight())
 		startingInfo.Stake = del.Shares
+		if err := k.incrementHistoricalRewardsReferenceCount(ctx, newValAddr, targetPeriod); err != nil {
+			return err
+		}
 		if err := k.distributionKeeper.SetDelegatorStartingInfo(ctx, newValAddr, delAddr, startingInfo); err != nil {
 			return err
 		}
@@ -247,7 +263,11 @@ func (k Keeper) MigrateValidatorDistribution(ctx sdk.Context, oldValAddr, newVal
 }
 
 // MigrateValidatorSupernode re-keys the supernode record from oldValAddr to newValAddr.
-func (k Keeper) MigrateValidatorSupernode(ctx sdk.Context, oldValAddr, newValAddr sdk.ValAddress, newAddr sdk.AccAddress) error {
+// The supernode's account field is only updated when it matches the validator's
+// legacy address (i.e. the validator was its own supernode account). If the
+// supernode account is a separate entity (possibly already migrated independently),
+// it is left unchanged.
+func (k Keeper) MigrateValidatorSupernode(ctx sdk.Context, oldValAddr, newValAddr sdk.ValAddress, legacyAddr, newAddr sdk.AccAddress) error {
 	sn, found := k.supernodeKeeper.QuerySuperNode(ctx, oldValAddr)
 	if !found {
 		return nil
@@ -255,15 +275,45 @@ func (k Keeper) MigrateValidatorSupernode(ctx sdk.Context, oldValAddr, newValAdd
 
 	// Update validator address to new valoper.
 	sn.ValidatorAddress = sdk.ValAddress(newAddr).String()
-	sn.SupernodeAccount = newAddr.String()
 
-	// Migrate metrics state.
+	// Only update SupernodeAccount if it matches the validator's legacy address.
+	// A supernode account that belongs to a different entity (or was already
+	// migrated independently via ClaimLegacyAccount / supernode-setup) is preserved.
+	legacyAddrStr := legacyAddr.String()
+	if sn.SupernodeAccount == legacyAddrStr {
+		sn.SupernodeAccount = newAddr.String()
+	}
+
+	// Update validator address in embedded evidence records.
+	oldValAddrStr := oldValAddr.String()
+	for i := range sn.Evidence {
+		if sn.Evidence[i].ValidatorAddress == oldValAddrStr {
+			sn.Evidence[i].ValidatorAddress = newValAddr.String()
+		}
+	}
+
+	// Update account address in supernode account history only where it
+	// matches the validator's legacy address.
+	for i := range sn.PrevSupernodeAccounts {
+		if sn.PrevSupernodeAccounts[i].Account == legacyAddrStr {
+			sn.PrevSupernodeAccounts[i].Account = newAddr.String()
+		}
+	}
+
+	// Record the migration as a new account-history entry.
+	sn.PrevSupernodeAccounts = append(sn.PrevSupernodeAccounts, &sntypes.SupernodeAccountHistory{
+		Account: newAddr.String(),
+		Height:  ctx.BlockHeight(),
+	})
+
+	// Migrate metrics state: write under new key, delete old key.
 	metrics, found := k.supernodeKeeper.GetMetricsState(ctx, oldValAddr)
 	if found {
 		metrics.ValidatorAddress = newValAddr.String()
 		if err := k.supernodeKeeper.SetMetricsState(ctx, metrics); err != nil {
 			return err
 		}
+		k.supernodeKeeper.DeleteMetricsState(ctx, oldValAddr)
 	}
 
 	return k.supernodeKeeper.SetSuperNode(ctx, sn)

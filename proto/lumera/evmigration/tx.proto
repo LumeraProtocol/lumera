@@ -50,9 +50,7 @@ message MsgUpdateParamsResponse {}
 
 // MsgClaimLegacyAccount migrates on-chain state from legacy_address to new_address.
 message MsgClaimLegacyAccount {
-  option (cosmos.msg.v1.signer) = "new_address";
-
-  // new_address: destination (coin-type-60). Cosmos tx signer (proves new key).
+  // new_address is the destination coin-type-60 account.
   string new_address = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
 
   // legacy_address: source (coin-type-118) to migrate from.
@@ -62,9 +60,17 @@ message MsgClaimLegacyAccount {
   bytes legacy_pub_key = 3;
 
   // legacy_signature: secp256k1 signature over
-  //   SHA256("lumera-evm-migration:<legacy_address>:<new_address>")
+  //   SHA256("lumera-evm-migration:claim:<legacy_address>:<new_address>")
   // proving legacy key holder consents to the EVM migration.
   bytes legacy_signature = 4;
+
+  // new_pub_key: compressed eth_secp256k1 public key of the destination account.
+  bytes new_pub_key = 5;
+
+  // new_signature: eth_secp256k1 signature over
+  //   Keccak256("lumera-evm-migration:claim:<legacy_address>:<new_address>")
+  // proving the destination key holder consents to receive migrated state.
+  bytes new_signature = 6;
 }
 
 // MsgClaimLegacyAccountResponse is the response type for MsgClaimLegacyAccount.
@@ -76,18 +82,22 @@ message MsgClaimLegacyAccountResponse {}
 // Also performs full account migration (bank, auth, authz, feegrant) like
 // MsgClaimLegacyAccount.
 message MsgMigrateValidator {
-  option (cosmos.msg.v1.signer) = "new_address";
-
-  // new_address is the coin-type-60 destination address (tx signer).
+  // new_address is the coin-type-60 destination address.
   string new_address = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
   // legacy_address is the coin-type-118 validator operator address.
   string legacy_address = 2 [(cosmos_proto.scalar) = "cosmos.AddressString"];
   // legacy_pub_key is the compressed secp256k1 public key of the legacy account.
   bytes legacy_pub_key = 3;
   // legacy_signature: secp256k1 signature over
-  //   SHA256("lumera-evm-migration:<legacy_address>:<new_address>")
+  //   SHA256("lumera-evm-migration:validator:<legacy_address>:<new_address>")
   // proving legacy key holder consents to the EVM migration.
   bytes legacy_signature = 4;
+  // new_pub_key is the compressed eth_secp256k1 public key of the destination account.
+  bytes new_pub_key = 5;
+  // new_signature: eth_secp256k1 signature over
+  //   Keccak256("lumera-evm-migration:validator:<legacy_address>:<new_address>")
+  // proving the destination key holder consents to receive the migrated validator state.
+  bytes new_signature = 6;
 }
 
 // MsgMigrateValidatorResponse is the response type for MsgMigrateValidator.

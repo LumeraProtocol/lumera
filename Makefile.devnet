@@ -1,6 +1,6 @@
 .PHONY: devnet-build devnet-tests-build devnet-up devnet-reset devnet-up-detach devnet-down devnet-stop devnet-clean devnet-deploy-tar devnet-upgrade devnet-new devnet-start
 .PHONY: devnet-build-default _check-devnet-default-cfg _devnet-select-default-genesis devnet-upgrade-binaries devnet-upgrade-binaries-default devnet-update-scripts
-.PHONY: devnet-evmigration-sync-bin devnet-evmigration-prepare devnet-evmigration-migrate devnet-evmigration-migrate-validator devnet-evmigration-cleanup
+.PHONY: devnet-evmigration-sync-bin devnet-evmigration-prepare devnet-evmigration-estimate devnet-evmigration-migrate devnet-evmigration-migrate-validator devnet-evmigration-cleanup
 
 ##### Devnet Makefile ########################################
 #
@@ -44,6 +44,7 @@ DEFAULT_GENESIS_EVM_FILE := devnet/default-config/devnet-genesis-evm.json
 DEFAULT_CLAIMS_FILE := devnet/default-config/claims.csv
 ORIG_GENESIS_FILE := devnet/default-config/devnet-genesis-orig.json
 EVM_CUTOVER_VERSION ?= v1.12.0
+DEVNET_UPGRADE_RELEASE ?= auto
 
 devnet-tests-build:
 	@mkdir -p "${DEVNET_BIN_DIR_ABS}"
@@ -309,10 +310,40 @@ devnet-upgrade-binaries:
 		fi; \
 		cp -f "$$WASMVM_SO" ${BUILD_DIR}/libwasmvm.x86_64.so; \
 	fi; \
-	./devnet/scripts/upgrade-binaries.sh "${BUILD_DIR}"
+	release_name="$(DEVNET_UPGRADE_RELEASE)"; \
+	if [ "$$release_name" = "auto" ]; then \
+		release_name="$$( "${BUILD_DIR}/lumerad" version 2>/dev/null | grep -Eo 'v?[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?' | head -n1 || true )"; \
+		if [ -z "$$release_name" ]; then \
+			echo "Unable to auto-detect lumerad version from ${BUILD_DIR}/lumerad"; \
+			exit 1; \
+		fi; \
+	fi; \
+	case "$$release_name" in \
+		v*) ;; \
+		*) release_name="v$$release_name" ;; \
+	esac; \
+	echo "Using upgrade release $$release_name"; \
+	./devnet/scripts/upgrade-binaries.sh "${BUILD_DIR}" "$$release_name"
 
 devnet-upgrade-binaries-default:
-	./devnet/scripts/upgrade-binaries.sh "${DEVNET_BIN_DIR}"
+	@release_name="$(DEVNET_UPGRADE_RELEASE)"; \
+	if [ "$$release_name" = "auto" ]; then \
+		if [ ! -x "${DEVNET_BIN_DIR}/lumerad" ]; then \
+			echo "Cannot find executable ${DEVNET_BIN_DIR}/lumerad for auto version detection"; \
+			exit 1; \
+		fi; \
+		release_name="$$( "${DEVNET_BIN_DIR}/lumerad" version 2>/dev/null | grep -Eo 'v?[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?' | head -n1 || true )"; \
+		if [ -z "$$release_name" ]; then \
+			echo "Unable to auto-detect lumerad version from ${DEVNET_BIN_DIR}/lumerad"; \
+			exit 1; \
+		fi; \
+	fi; \
+	case "$$release_name" in \
+		v*) ;; \
+		*) release_name="v$$release_name" ;; \
+	esac; \
+	echo "Using upgrade release $$release_name"; \
+	./devnet/scripts/upgrade-binaries.sh "${DEVNET_BIN_DIR}" "$$release_name"
 
 devnet-update-scripts:
 	@if [ ! -f "$(COMPOSE_FILE)" ]; then \
@@ -509,6 +540,9 @@ devnet-evmigration-sync-bin:
 
 devnet-evmigration-prepare: devnet-evmigration-sync-bin
 	$(call _run_evmigration_in_containers,prepare,-num-accounts=$(EVMIGRATION_NUM_ACCOUNTS) -num-extra=$(EVMIGRATION_NUM_EXTRA))
+
+devnet-evmigration-estimate: devnet-evmigration-sync-bin
+	$(call _run_evmigration_in_containers,estimate)
 
 devnet-evmigration-migrate: devnet-evmigration-sync-bin
 	$(call _run_evmigration_in_containers,migrate)

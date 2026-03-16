@@ -6,18 +6,39 @@ import "gogoproto/gogo.proto";
 
 option go_package = "x/evmigration/types";
 
-// Params defines the parameters for the module.
+// Params defines the governance-controlled parameters for the evmigration module.
+// These knobs determine when migrations are accepted and how much work the
+// chain performs per block during the legacy-to-EVM migration window.
 message Params {
   option (amino.name) = "lumera/x/evmigration/Params";
   option (gogoproto.equal) = true;
 
-  // enable_migration controls whether migration messages are accepted.
+  // enable_migration is the master switch for the migration window.
+  // When false, all MsgClaimLegacyAccount and MsgMigrateValidator messages
+  // are rejected regardless of other parameter values.
+  // Governance should set this to false once the migration window closes.
+  // Default: true.
   bool enable_migration = 1;
-  // migration_end_time is the unix timestamp deadline after which migrations are rejected.
+
+  // migration_end_time is an optional hard deadline expressed as a unix
+  // timestamp (seconds). If non-zero, any migration message whose block time
+  // exceeds this value is rejected. A value of 0 disables the deadline,
+  // leaving enable_migration as the sole on/off control.
+  // Default: 0 (no deadline).
   int64 migration_end_time = 2;
-  // max_migrations_per_block is the maximum number of migration messages processed per block.
+
+  // max_migrations_per_block is the maximum number of MsgClaimLegacyAccount
+  // messages processed in a single block. Once this limit is reached,
+  // additional claims in the same block are rejected. This prevents a burst
+  // of migrations from consuming excessive block gas.
+  // Default: 50.
   uint64 max_migrations_per_block = 3;
-  // max_validator_delegations is the maximum number of delegators a validator can have
-  // to be eligible for MsgMigrateValidator (default 2000).
+
+  // max_validator_delegations is the safety cap for MsgMigrateValidator.
+  // A validator migration must re-key every delegation and unbonding-delegation
+  // record. If the total count exceeds this threshold the message is rejected
+  // because the gas cost of iterating all records would be prohibitive.
+  // Validators that exceed the cap must shed delegations before migrating.
+  // Default: 2000.
   uint64 max_validator_delegations = 4;
 }

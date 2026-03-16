@@ -65,9 +65,6 @@ jobs:
 
       - name: Install Ignite CLI
         uses: ./.github/actions/install-ignite
-        with:
-          version: v29.4.1
-          arch: linux_amd64
 
       - name: Install wasmvm library
         uses: ./.github/actions/install-wasmvm

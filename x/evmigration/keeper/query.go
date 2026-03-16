@@ -7,6 +7,7 @@ import (
 
 	"cosmossdk.io/collections"
 	"cosmossdk.io/x/feegrant"
+	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/query"
@@ -134,8 +135,24 @@ func (qs queryServer) MigrationEstimate(goCtx context.Context, req *types.QueryM
 		return false
 	})
 
+	// Count action records touched by this account migration. A single action is
+	// counted once even if the same address appears as both creator and supernode.
+	_ = qs.k.actionKeeper.IterateActions(ctx, func(action *actiontypes.Action) bool {
+		if action.Creator == req.LegacyAddress {
+			resp.ActionCount++
+			return false
+		}
+		for _, sn := range action.SuperNodes {
+			if sn == req.LegacyAddress {
+				resp.ActionCount++
+				break
+			}
+		}
+		return false
+	})
+
 	resp.TotalTouched = resp.DelegationCount + resp.UnbondingCount + resp.RedelegationCount +
-		resp.AuthzGrantCount + resp.FeegrantCount +
+		resp.AuthzGrantCount + resp.FeegrantCount + resp.ActionCount +
 		resp.ValDelegationCount + resp.ValUnbondingCount + resp.ValRedelegationCount
 
 	// Check if already migrated.

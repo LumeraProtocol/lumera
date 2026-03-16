@@ -125,6 +125,7 @@ type SupernodeKeeper interface {
 	SetSuperNode(ctx sdk.Context, supernode sntypes.SuperNode) error
 	GetMetricsState(ctx sdk.Context, valAddr sdk.ValAddress) (sntypes.SupernodeMetricsState, bool)
 	SetMetricsState(ctx sdk.Context, state sntypes.SupernodeMetricsState) error
+	DeleteMetricsState(ctx sdk.Context, valAddr sdk.ValAddress)
 }
 
 // ActionKeeper defines the expected interface for the x/action module.

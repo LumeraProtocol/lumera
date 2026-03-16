@@ -28,6 +28,7 @@ type SupernodeKeeper interface {
 	RecoverSuperNodeFromPostponed(ctx sdk.Context, valAddr sdk.ValAddress) error
 	SetMetricsState(ctx sdk.Context, state SupernodeMetricsState) error
 	GetMetricsState(ctx sdk.Context, valAddr sdk.ValAddress) (SupernodeMetricsState, bool)
+	DeleteMetricsState(ctx sdk.Context, valAddr sdk.ValAddress)
 	Logger() log.Logger
 	GetAuthority() string
 	GetStakingKeeper() StakingKeeper

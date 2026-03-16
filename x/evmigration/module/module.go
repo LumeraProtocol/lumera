@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"cosmossdk.io/client/v2/autocli"
 	"cosmossdk.io/core/appmodule"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -12,8 +13,10 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
+	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
 
+	"github.com/LumeraProtocol/lumera/x/evmigration/client/cli"
 	"github.com/LumeraProtocol/lumera/x/evmigration/keeper"
 	"github.com/LumeraProtocol/lumera/x/evmigration/types"
 )
@@ -23,9 +26,10 @@ var (
 	_ module.AppModule      = (*AppModule)(nil)
 	_ module.HasGenesis     = (*AppModule)(nil)
 
-	_ appmodule.AppModule       = (*AppModule)(nil)
-	_ appmodule.HasBeginBlocker = (*AppModule)(nil)
-	_ appmodule.HasEndBlocker   = (*AppModule)(nil)
+	_ appmodule.AppModule        = (*AppModule)(nil)
+	_ appmodule.HasBeginBlocker  = (*AppModule)(nil)
+	_ appmodule.HasEndBlocker    = (*AppModule)(nil)
+	_ autocli.HasCustomTxCommand = (*AppModule)(nil)
 )
 
 // AppModule implements the AppModule interface that defines the inter-dependent methods that modules need to implement
@@ -54,6 +58,13 @@ func (AppModule) Name() string {
 
 // RegisterLegacyAminoCodec registers the amino codec
 func (AppModule) RegisterLegacyAminoCodec(*codec.LegacyAmino) {}
+
+// GetTxCmd returns the custom tx root command for evmigration.
+// AutoCLI enhances this command with generated metadata while preserving the
+// one-pass unsigned-tx flow used by migration transactions.
+func (AppModule) GetTxCmd() *cobra.Command {
+	return cli.GetTxCmd()
+}
 
 // RegisterGRPCGatewayRoutes registers the gRPC Gateway routes for the module.
 func (AppModule) RegisterGRPCGatewayRoutes(clientCtx client.Context, mux *runtime.ServeMux) {

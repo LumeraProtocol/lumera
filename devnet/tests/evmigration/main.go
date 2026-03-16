@@ -3,6 +3,7 @@
 // Modes:
 //
 //	prepare            — run BEFORE the EVM upgrade to create legacy activity
+//	estimate           — run AFTER the EVM upgrade to query migration estimates only
 //	migrate            — run AFTER the EVM upgrade to migrate accounts in batches
 //	migrate-validator  — run AFTER the EVM upgrade to migrate the local validator operator
 //	cleanup            — remove test keys from the local keyring (based on accounts JSON)
@@ -10,8 +11,9 @@
 // Usage:
 //
 //	tests_evmigration -mode=prepare -bin=lumerad -rpc=tcp://localhost:26657 -chain-id=lumera-devnet-1 -accounts=accounts.json [-funder=validator0]
+//	tests_evmigration -mode=estimate -bin=lumerad -rpc=tcp://localhost:26657 -chain-id=lumera-devnet-1 -accounts=accounts.json
 //	tests_evmigration -mode=migrate -bin=lumerad -rpc=tcp://localhost:26657 -chain-id=lumera-devnet-1 -accounts=accounts.json
-//	tests_evmigration -mode=migrate-validator -bin=lumerad -rpc=tcp://localhost:26657 -chain-id=lumera-devnet-1 [-funder=validator0]
+//	tests_evmigration -mode=migrate-validator -bin=lumerad -rpc=tcp://localhost:26657 -chain-id=lumera-devnet-1
 //	tests_evmigration -mode=cleanup -bin=lumerad -accounts=accounts.json
 package main
 
@@ -19,7 +21,7 @@ import (
 	"flag"
 	"log"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
+	_ "github.com/LumeraProtocol/lumera/config"
 )
 
 type DelegationActivity struct {
@@ -64,11 +66,24 @@ type FeegrantReceiveActivity struct {
 
 // ClaimActivity records a claim or delayed-claim performed for a legacy account.
 type ClaimActivity struct {
-	OldAddress string `json:"old_address"`           // Pastel base58 address
+	OldAddress string `json:"old_address"`            // Pastel base58 address
 	Amount     string `json:"amount,omitempty"`       // e.g. "500000ulume"
 	Tier       uint32 `json:"tier,omitempty"`         // 0 = instant claim, 1/2/3 = delayed (6/12/18 months)
 	Delayed    bool   `json:"delayed,omitempty"`      // true if this was a delayed-claim
 	ClaimKeyID int    `json:"claim_key_id,omitempty"` // index into preseededClaimKeys
+}
+
+// ActionActivity records a request-action submitted by a legacy account.
+type ActionActivity struct {
+	ActionID      string   `json:"action_id"`                 // on-chain action ID returned by request-action tx
+	ActionType    string   `json:"action_type"`               // "SENSE" or "CASCADE"
+	Price         string   `json:"price,omitempty"`           // e.g. "100000ulume"
+	Expiration    string   `json:"expiration,omitempty"`      // unix timestamp string
+	State         string   `json:"state,omitempty"`           // e.g. "ACTION_STATE_PENDING"
+	Metadata      string   `json:"metadata,omitempty"`        // JSON metadata submitted at creation
+	SuperNodes    []string `json:"super_nodes,omitempty"`     // supernode addresses after finalization
+	BlockHeight   int64    `json:"block_height,omitempty"`    // block height when action was created
+	CreatedViaSDK bool     `json:"created_via_sdk,omitempty"` // true if created using sdk-go
 }
 
 // AccountRecord holds a generated test account and its state.
@@ -90,6 +105,7 @@ type AccountRecord struct {
 	HasFeegrantGrantee bool `json:"has_feegrant_as_grantee,omitempty"`
 	HasThirdPartyWD    bool `json:"has_third_party_withdraw,omitempty"`
 	HasClaim           bool `json:"has_claim,omitempty"`
+	HasAction          bool `json:"has_action,omitempty"`
 
 	Delegations       []DelegationActivity      `json:"delegations,omitempty"`
 	Unbondings        []UnbondingActivity       `json:"unbondings,omitempty"`
@@ -100,6 +116,7 @@ type AccountRecord struct {
 	Feegrants         []FeegrantActivity        `json:"feegrants,omitempty"`
 	FeegrantsReceived []FeegrantReceiveActivity `json:"feegrants_received,omitempty"`
 	Claims            []ClaimActivity           `json:"claims,omitempty"`
+	Actions           []ActionActivity          `json:"actions,omitempty"`
 
 	DelegatedTo       string `json:"delegated_to,omitempty"`
 	RedelegatedTo     string `json:"redelegated_to,omitempty"`
@@ -125,13 +142,14 @@ type AccountsFile struct {
 }
 
 var (
-	flagMode          = flag.String("mode", "", "prepare or migrate or migrate-validator")
+	flagMode          = flag.String("mode", "", "prepare or estimate or migrate or migrate-validator or cleanup")
 	flagBin           = flag.String("bin", "lumerad", "lumerad binary path")
 	flagRPC           = flag.String("rpc", "tcp://localhost:26657", "RPC endpoint")
+	flagGRPC          = flag.String("grpc", "", "gRPC endpoint (default: derived from --rpc host + port 9090)")
 	flagChainID       = flag.String("chain-id", "lumera-devnet-1", "chain ID")
 	flagFile          = flag.String("accounts", "accounts.json", "accounts JSON file path")
 	flagHome          = flag.String("home", "", "lumerad home directory (uses default if empty)")
-	flagFunder        = flag.String("funder", "", "funder key name (must exist in keyring)")
+	flagFunder        = flag.String("funder", "", "funder key name for prepare mode (must exist in keyring)")
 	flagGas           = flag.String("gas", "500000", "gas limit for transactions (fixed value avoids simulation sequence races)")
 	flagGasAdj        = flag.String("gas-adjustment", "1.5", "gas adjustment (only used with --gas=auto)")
 	flagGasPrices     = flag.String("gas-prices", "0.025ulume", "gas prices")
@@ -141,7 +159,7 @@ var (
 	flagAccountTag    = flag.String(
 		"account-tag",
 		"",
-		"optional account name tag for prepare mode (e.g. val1 -> evm_test_val1_000); auto-detected from funder key if empty",
+		"optional account name tag for prepare mode (e.g. val1 -> pre-evm-val1-000); auto-detected from funder key if empty",
 	)
 	flagValidatorKeys = flag.String(
 		"validator-keys",
@@ -153,17 +171,13 @@ var (
 func main() {
 	flag.Parse()
 
-	// Set bech32 prefixes so SDK address encoding works.
-	config := sdk.GetConfig()
-	config.SetBech32PrefixForAccount("lumera", "lumerapub")
-	config.SetBech32PrefixForValidator("lumeravaloper", "lumeravaloperpub")
-	config.SetBech32PrefixForConsensusNode("lumeravalcons", "lumeravalconspub")
-
 	initNonLegacyCoinType()
 
 	switch *flagMode {
 	case "prepare":
 		runPrepare()
+	case "estimate":
+		runEstimate()
 	case "migrate":
 		runMigrate()
 	case "migrate-validator":
@@ -171,6 +185,6 @@ func main() {
 	case "cleanup":
 		runCleanup()
 	default:
-		log.Fatalf("usage: -mode=prepare|migrate|migrate-validator|cleanup")
+		log.Fatalf("usage: -mode=prepare|estimate|migrate|migrate-validator|cleanup")
 	}
 }

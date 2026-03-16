@@ -7,6 +7,7 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	evmcryptotypes "github.com/cosmos/evm/crypto/ethsecp256k1"
 	"github.com/stretchr/testify/require"
 
 	"github.com/LumeraProtocol/lumera/x/evmigration/keeper"
@@ -14,15 +15,40 @@ import (
 )
 
 // signMigrationMessage creates a valid legacy signature over the canonical
-// "lumera-evm-migration:<legacy>:<new>" message for testing.
+// migration payload for account-claim messages.
 func signMigrationMessage(t *testing.T, privKey *secp256k1.PrivKey, legacyAddr, newAddr sdk.AccAddress) []byte {
 	t.Helper()
-	msg := fmt.Sprintf("lumera-evm-migration:%s:%s", legacyAddr.String(), newAddr.String())
+	return signLegacyMigrationMessage(t, keeperClaimKind, privKey, legacyAddr, newAddr)
+}
+
+func signLegacyMigrationMessage(t *testing.T, kind string, privKey *secp256k1.PrivKey, legacyAddr, newAddr sdk.AccAddress) []byte {
+	t.Helper()
+	msg := fmt.Sprintf("lumera-evm-migration:%s:%s:%s", kind, legacyAddr.String(), newAddr.String())
 	hash := sha256.Sum256([]byte(msg))
 	sig, err := privKey.Sign(hash[:])
 	require.NoError(t, err)
 	return sig
 }
+
+func signNewMigrationMessage(t *testing.T, kind string, privKey *evmcryptotypes.PrivKey, legacyAddr, newAddr sdk.AccAddress) []byte {
+	t.Helper()
+	msg := fmt.Sprintf("lumera-evm-migration:%s:%s:%s", kind, legacyAddr.String(), newAddr.String())
+	sig, err := privKey.Sign([]byte(msg))
+	require.NoError(t, err)
+	return sig
+}
+
+func testNewMigrationAccount(t *testing.T) (*evmcryptotypes.PrivKey, sdk.AccAddress) {
+	t.Helper()
+	privKey, err := evmcryptotypes.GenerateKey()
+	require.NoError(t, err)
+	return privKey, sdk.AccAddress(privKey.PubKey().Address())
+}
+
+const (
+	keeperClaimKind     = "claim"
+	keeperValidatorKind = "validator"
+)
 
 // TestVerifyLegacySignature_Valid verifies that a correctly signed migration
 // message passes verification.
@@ -30,11 +56,11 @@ func TestVerifyLegacySignature_Valid(t *testing.T) {
 	privKey := secp256k1.GenPrivKey()
 	pubKey := privKey.PubKey().(*secp256k1.PubKey)
 	legacyAddr := sdk.AccAddress(pubKey.Address())
-	newAddr := sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address())
+	_, newAddr := testNewMigrationAccount(t)
 
 	sig := signMigrationMessage(t, privKey, legacyAddr, newAddr)
 
-	err := keeper.VerifyLegacySignature(legacyAddr, newAddr, pubKey.Key, sig)
+	err := keeper.VerifyLegacySignature(keeperClaimKind, legacyAddr, newAddr, pubKey.Key, sig)
 	require.NoError(t, err)
 }
 
@@ -42,14 +68,14 @@ func TestVerifyLegacySignature_Valid(t *testing.T) {
 // not exactly 33 bytes (compressed secp256k1).
 func TestVerifyLegacySignature_InvalidPubKeySize(t *testing.T) {
 	legacyAddr := sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address())
-	newAddr := sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address())
+	_, newAddr := testNewMigrationAccount(t)
 
 	// Too short.
-	err := keeper.VerifyLegacySignature(legacyAddr, newAddr, []byte{0x01, 0x02}, nil)
+	err := keeper.VerifyLegacySignature(keeperClaimKind, legacyAddr, newAddr, []byte{0x01, 0x02}, nil)
 	require.ErrorIs(t, err, types.ErrInvalidLegacyPubKey)
 
 	// Too long.
-	err = keeper.VerifyLegacySignature(legacyAddr, newAddr, make([]byte, 65), nil)
+	err = keeper.VerifyLegacySignature(keeperClaimKind, legacyAddr, newAddr, make([]byte, 65), nil)
 	require.ErrorIs(t, err, types.ErrInvalidLegacyPubKey)
 }
 
@@ -61,9 +87,9 @@ func TestVerifyLegacySignature_PubKeyAddressMismatch(t *testing.T) {
 
 	// Use a different address as legacy (not derived from this pubkey).
 	wrongLegacyAddr := sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address())
-	newAddr := sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address())
+	_, newAddr := testNewMigrationAccount(t)
 
-	err := keeper.VerifyLegacySignature(wrongLegacyAddr, newAddr, pubKey.Key, nil)
+	err := keeper.VerifyLegacySignature(keeperClaimKind, wrongLegacyAddr, newAddr, pubKey.Key, nil)
 	require.ErrorIs(t, err, types.ErrPubKeyAddressMismatch)
 }
 
@@ -73,13 +99,13 @@ func TestVerifyLegacySignature_InvalidSignature(t *testing.T) {
 	privKey := secp256k1.GenPrivKey()
 	pubKey := privKey.PubKey().(*secp256k1.PubKey)
 	legacyAddr := sdk.AccAddress(pubKey.Address())
-	newAddr := sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address())
+	_, newAddr := testNewMigrationAccount(t)
 
 	// Sign with a different key.
 	otherPrivKey := secp256k1.GenPrivKey()
 	badSig := signMigrationMessage(t, otherPrivKey, legacyAddr, newAddr)
 
-	err := keeper.VerifyLegacySignature(legacyAddr, newAddr, pubKey.Key, badSig)
+	err := keeper.VerifyLegacySignature(keeperClaimKind, legacyAddr, newAddr, pubKey.Key, badSig)
 	require.ErrorIs(t, err, types.ErrInvalidLegacySignature)
 }
 
@@ -89,13 +115,13 @@ func TestVerifyLegacySignature_WrongMessage(t *testing.T) {
 	privKey := secp256k1.GenPrivKey()
 	pubKey := privKey.PubKey().(*secp256k1.PubKey)
 	legacyAddr := sdk.AccAddress(pubKey.Address())
-	newAddr := sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address())
+	_, newAddr := testNewMigrationAccount(t)
 
 	// Sign over a different new address.
-	otherNewAddr := sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address())
+	_, otherNewAddr := testNewMigrationAccount(t)
 	sig := signMigrationMessage(t, privKey, legacyAddr, otherNewAddr)
 
-	err := keeper.VerifyLegacySignature(legacyAddr, newAddr, pubKey.Key, sig)
+	err := keeper.VerifyLegacySignature(keeperClaimKind, legacyAddr, newAddr, pubKey.Key, sig)
 	require.ErrorIs(t, err, types.ErrInvalidLegacySignature)
 }
 
@@ -104,8 +130,45 @@ func TestVerifyLegacySignature_EmptySignature(t *testing.T) {
 	privKey := secp256k1.GenPrivKey()
 	pubKey := privKey.PubKey().(*secp256k1.PubKey)
 	legacyAddr := sdk.AccAddress(pubKey.Address())
-	newAddr := sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address())
+	_, newAddr := testNewMigrationAccount(t)
 
-	err := keeper.VerifyLegacySignature(legacyAddr, newAddr, pubKey.Key, nil)
+	err := keeper.VerifyLegacySignature(keeperClaimKind, legacyAddr, newAddr, pubKey.Key, nil)
 	require.ErrorIs(t, err, types.ErrInvalidLegacySignature)
+}
+
+// TestVerifyNewSignature_Valid verifies that a correctly signed destination
+// proof passes verification.
+func TestVerifyNewSignature_Valid(t *testing.T) {
+	legacyAddr := sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address())
+	privKey, newAddr := testNewMigrationAccount(t)
+	pubKey := privKey.PubKey().(*evmcryptotypes.PubKey)
+	sig := signNewMigrationMessage(t, keeperClaimKind, privKey, legacyAddr, newAddr)
+
+	err := keeper.VerifyNewSignature(keeperClaimKind, legacyAddr, newAddr, pubKey.Key, sig)
+	require.NoError(t, err)
+}
+
+// TestVerifyNewSignature_AddressMismatch rejects when the new pubkey does not
+// derive to the claimed destination address.
+func TestVerifyNewSignature_AddressMismatch(t *testing.T) {
+	legacyAddr := sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address())
+	privKey, _ := testNewMigrationAccount(t)
+	_, wrongNewAddr := testNewMigrationAccount(t)
+	pubKey := privKey.PubKey().(*evmcryptotypes.PubKey)
+
+	err := keeper.VerifyNewSignature(keeperClaimKind, legacyAddr, wrongNewAddr, pubKey.Key, nil)
+	require.ErrorIs(t, err, types.ErrNewPubKeyAddressMismatch)
+}
+
+// TestVerifyNewSignature_InvalidSignature rejects signatures produced by a
+// different destination private key.
+func TestVerifyNewSignature_InvalidSignature(t *testing.T) {
+	legacyAddr := sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address())
+	privKey, newAddr := testNewMigrationAccount(t)
+	pubKey := privKey.PubKey().(*evmcryptotypes.PubKey)
+	otherPrivKey, _ := testNewMigrationAccount(t)
+	badSig := signNewMigrationMessage(t, keeperClaimKind, otherPrivKey, legacyAddr, newAddr)
+
+	err := keeper.VerifyNewSignature(keeperClaimKind, legacyAddr, newAddr, pubKey.Key, badSig)
+	require.ErrorIs(t, err, types.ErrInvalidNewSignature)
 }

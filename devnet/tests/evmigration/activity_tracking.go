@@ -168,6 +168,57 @@ func (rec *AccountRecord) addFeegrantAsGrantee(granter, spendLimit string) {
 	rec.refreshLegacyFields()
 }
 
+func (rec *AccountRecord) addAction(actionID, actionType, price string) {
+	if actionID == "" {
+		return
+	}
+	for _, a := range rec.Actions {
+		if a.ActionID == actionID {
+			rec.refreshLegacyFields()
+			return
+		}
+	}
+	rec.Actions = append(rec.Actions, ActionActivity{
+		ActionID:   actionID,
+		ActionType: actionType,
+		Price:      price,
+	})
+	rec.refreshLegacyFields()
+}
+
+func (rec *AccountRecord) addActionFull(actionID, actionType, price, expiration, state, metadata string, superNodes []string, blockHeight int64, createdViaSDK bool) {
+	if actionID == "" {
+		return
+	}
+	for _, a := range rec.Actions {
+		if a.ActionID == actionID {
+			rec.refreshLegacyFields()
+			return
+		}
+	}
+	rec.Actions = append(rec.Actions, ActionActivity{
+		ActionID:      actionID,
+		ActionType:    actionType,
+		Price:         price,
+		Expiration:    expiration,
+		State:         state,
+		Metadata:      metadata,
+		SuperNodes:    superNodes,
+		BlockHeight:   blockHeight,
+		CreatedViaSDK: createdViaSDK,
+	})
+	rec.refreshLegacyFields()
+}
+
+func (rec *AccountRecord) updateActionState(actionID, state string) {
+	for i := range rec.Actions {
+		if rec.Actions[i].ActionID == actionID {
+			rec.Actions[i].State = state
+			return
+		}
+	}
+}
+
 func (rec *AccountRecord) addClaim(oldAddr, amount string, tier uint32, delayed bool, keyID int) {
 	if oldAddr == "" {
 		return
@@ -188,6 +239,19 @@ func (rec *AccountRecord) addClaim(oldAddr, amount string, tier uint32, delayed 
 	rec.refreshLegacyFields()
 }
 
+func (rec *AccountRecord) hasDelayedClaim() bool {
+	for _, claim := range rec.Claims {
+		if claim.Delayed || claim.Tier > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func (rec *AccountRecord) hasRecordedAction() bool {
+	return len(rec.Actions) > 0 || rec.HasAction
+}
+
 func (rec *AccountRecord) refreshLegacyFields() {
 	rec.HasDelegation = len(rec.Delegations) > 0 || rec.HasDelegation
 	rec.HasUnbonding = len(rec.Unbondings) > 0 || rec.HasUnbonding
@@ -198,6 +262,7 @@ func (rec *AccountRecord) refreshLegacyFields() {
 	rec.HasFeegrantGrantee = len(rec.FeegrantsReceived) > 0 || rec.HasFeegrantGrantee
 	rec.HasThirdPartyWD = len(rec.WithdrawAddresses) > 0 || rec.HasThirdPartyWD
 	rec.HasClaim = len(rec.Claims) > 0 || rec.HasClaim
+	rec.HasAction = len(rec.Actions) > 0 || rec.HasAction
 
 	if len(rec.Delegations) > 0 {
 		rec.DelegatedTo = rec.Delegations[0].Validator

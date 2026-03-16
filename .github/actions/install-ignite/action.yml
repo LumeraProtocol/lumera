@@ -2,8 +2,8 @@ name: Install Ignite CLI
 description: Download and install a specific Ignite CLI release with checksum verification
 inputs:
   version:
-    description: Ignite CLI version (e.g. v29.2.0)
-    required: true
+    description: Ignite CLI version (e.g. v29.9.0)
+    default: v29.9.0
   arch:
     description: Target archive suffix (e.g. linux_amd64)
     default: linux_amd64

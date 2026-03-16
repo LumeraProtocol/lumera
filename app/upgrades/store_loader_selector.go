@@ -10,6 +10,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/baseapp"
 
 	upgrade_v1_10_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_10_1"
+	upgrade_v1_11_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_11_1"
 )
 
 type StoreLoaderSelection struct {
@@ -34,6 +35,12 @@ func StoreLoaderForUpgrade(
 				LogLabel: "consensus rename",
 			}
 		}
+		if upgradeName == upgrade_v1_11_1.UpgradeName {
+			return StoreLoaderSelection{
+				Loader:   AuditStoreLoader(upgradeHeight, baseUpgrades, logger),
+				LogLabel: "conditional audit store",
+			}
+		}
 		return StoreLoaderSelection{
 			Loader:   AdaptiveStoreLoader(upgradeHeight, baseUpgrades, expectedStoreNames, logger),
 			LogLabel: "adaptive mode",
@@ -44,6 +51,12 @@ func StoreLoaderForUpgrade(
 		return StoreLoaderSelection{
 			Loader:   ConsensusStoreLoader(upgradeHeight, baseUpgrades, nil, logger),
 			LogLabel: "consensus rename",
+		}
+	}
+	if upgradeName == upgrade_v1_11_1.UpgradeName {
+		return StoreLoaderSelection{
+			Loader:   AuditStoreLoader(upgradeHeight, baseUpgrades, logger),
+			LogLabel: "conditional audit store",
 		}
 	}
 

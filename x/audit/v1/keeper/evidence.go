@@ -145,6 +145,62 @@ func (k Keeper) CreateEvidence(
 			return 0, errorsmod.Wrap(types.ErrInvalidSubject, "subject is not an eligible target for epoch")
 		}
 	}
+
+	if evidenceType == types.EvidenceType_EVIDENCE_TYPE_SELF_HEALING_FAILURE {
+		params := k.GetParams(ctx).WithDefaults()
+
+		var m types.SelfHealingFailureEvidenceMetadata
+		if err := gogoproto.Unmarshal(metadataBytes, &m); err != nil {
+			return 0, errorsmod.Wrap(types.ErrInvalidMetadata, fmt.Sprintf("unmarshal SelfHealingFailureEvidenceMetadata: %v", err))
+		}
+		if strings.TrimSpace(m.ChallengerSupernodeAccount) == "" {
+			return 0, errorsmod.Wrap(types.ErrInvalidMetadata, "challenger_supernode_account is required")
+		}
+		if reporterAddress != m.ChallengerSupernodeAccount {
+			return 0, errorsmod.Wrap(types.ErrInvalidReporter, "reporter must match challenger_supernode_account")
+		}
+		if strings.TrimSpace(m.RecipientSupernodeAccount) == "" {
+			return 0, errorsmod.Wrap(types.ErrInvalidMetadata, "recipient_supernode_account is required")
+		}
+		if subjectAddress != m.RecipientSupernodeAccount {
+			return 0, errorsmod.Wrap(types.ErrInvalidSubject, "subject_address must match recipient_supernode_account")
+		}
+
+		anchor, found := k.GetEpochAnchor(sdkCtx, m.EpochId)
+		if !found {
+			return 0, errorsmod.Wrap(types.ErrInvalidMetadata, fmt.Sprintf("epoch anchor not found for epoch_id %d", m.EpochId))
+		}
+
+		if !params.ScEnabled {
+			return 0, errorsmod.Wrap(types.ErrInvalidEvidenceType, "self-healing evidence is disabled")
+		}
+
+		kc := storageChallengeChallengerCount(len(anchor.ActiveSupernodeAccounts), params.ScChallengersPerEpoch)
+		target := storageChallengeComparisonTarget(anchor.Seed, m.EpochId)
+		challengers := selectTopByXORDistance(anchor.ActiveSupernodeAccounts, target, kc)
+
+		allowed := false
+		for _, c := range challengers {
+			if c == reporterAddress {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return 0, errorsmod.Wrap(types.ErrInvalidReporter, "reporter is not an authorized challenger for epoch")
+		}
+
+		eligible := false
+		for _, t := range anchor.TargetSupernodeAccounts {
+			if t == subjectAddress {
+				eligible = true
+				break
+			}
+		}
+		if !eligible {
+			return 0, errorsmod.Wrap(types.ErrInvalidSubject, "subject is not an eligible target for epoch")
+		}
+	}
 	reportedHeight := uint64(sdkCtx.BlockHeight())
 
 	evidenceID := k.GetNextEvidenceID(sdkCtx)
@@ -207,6 +263,13 @@ func marshalEvidenceMetadataJSON(evidenceType types.EvidenceType, metadataJSON s
 		var m types.CascadeClientFailureEvidenceMetadata
 		if err := u.Unmarshal(strings.NewReader(metadataJSON), &m); err != nil {
 			return nil, fmt.Errorf("unmarshal CascadeClientFailureEvidenceMetadata: %w", err)
+		}
+		return gogoproto.Marshal(&m)
+
+	case types.EvidenceType_EVIDENCE_TYPE_SELF_HEALING_FAILURE:
+		var m types.SelfHealingFailureEvidenceMetadata
+		if err := u.Unmarshal(strings.NewReader(metadataJSON), &m); err != nil {
+			return nil, fmt.Errorf("unmarshal SelfHealingFailureEvidenceMetadata: %w", err)
 		}
 		return gogoproto.Marshal(&m)
 

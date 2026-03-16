@@ -21,6 +21,9 @@ enum EvidenceType {
 
   // client-observed cascade flow failure (upload/download).
   EVIDENCE_TYPE_CASCADE_CLIENT_FAILURE = 5;
+
+  // self-healing challenge failure submitted by a deterministic challenger.
+  EVIDENCE_TYPE_SELF_HEALING_FAILURE = 6;
 }
 
 // Evidence is a stable outer record that stores evidence about an audited subject.

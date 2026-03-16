@@ -49,6 +49,30 @@ message StorageChallengeFailureEvidenceMetadata {
   string transcript_hash = 7;
 }
 
+// SelfHealingFailureEvidenceMetadata is metadata for a self-healing challenge failure
+// submitted by a deterministically authorized challenger.
+message SelfHealingFailureEvidenceMetadata {
+  uint64 epoch_id = 1;
+
+  // challenger_supernode_account must match the tx signer (MsgSubmitEvidence.creator).
+  string challenger_supernode_account = 2 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+
+  // recipient_supernode_account should match Evidence.subject_address.
+  string recipient_supernode_account = 3 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+
+  // challenge_id is the deterministic challenge identifier.
+  string challenge_id = 4;
+
+  // file_key is the target file key (typically base58).
+  string file_key = 5;
+
+  // failure_type is a short discriminator (e.g. TIMEOUT, QUORUM_FAILED, STORE_FAILED).
+  string failure_type = 6;
+
+  // transcript_hash is a hash commitment to off-chain transcript data.
+  string transcript_hash = 7;
+}
+
 enum CascadeClientFailureReporterComponent {
   CASCADE_CLIENT_FAILURE_REPORTER_COMPONENT_UNSPECIFIED = 0;
   CASCADE_CLIENT_FAILURE_REPORTER_COMPONENT_SN_API_SERVER = 1;

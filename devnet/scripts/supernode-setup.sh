@@ -26,19 +26,25 @@ TX_GAS_PRICES="${TX_GAS_PRICES:-0.03ulume}"
 # its own denom (e.g. aatom/alume).  Query the feemarket params at runtime and
 # override TX_GAS_PRICES so bank-send txs satisfy the check.
 update_gas_prices_for_evm() {
-	local params base_fee fee_denom
+	local params evm_config base_fee fee_denom
 	params="$($DAEMON q feemarket params --output json 2>/dev/null || true)"
 	if [[ -z "$params" ]]; then
 		return
 	fi
 	fee_denom="$(echo "$params" | jq -r '.params.fee_denom // empty' 2>/dev/null || true)"
-	base_fee="$(echo "$params" | jq -r '.params.base_fee // empty' 2>/dev/null || true)"
+	base_fee="$(echo "$params" | jq -r '.params.base_fee // .params.min_gas_price // empty' 2>/dev/null || true)"
+	if [[ -z "$fee_denom" ]]; then
+		evm_config="$($DAEMON q evm config --output json 2>/dev/null || true)"
+		fee_denom="$(echo "$evm_config" | jq -r '.config.denom // empty' 2>/dev/null || true)"
+	fi
 	if [[ -n "$fee_denom" && -n "$base_fee" ]]; then
 		# Use 2× base fee as gas price to ensure acceptance under fee fluctuation
 		local price
-		price="$(echo "$base_fee" | awk '{printf "%.0f", $1 * 2}')"
-		# Ensure price is at least 1
-		[[ "$price" == "0" || -z "$price" ]] && price="1"
+		price="$(jq -nr --arg base_fee "$base_fee" '
+			($base_fee | tonumber * 2)
+			| if . < 0.000001 then 0.000001 else . end
+		' 2>/dev/null || true)"
+		[[ -z "$price" || "$price" == "null" ]] && price="0.000001"
 		TX_GAS_PRICES="${price}${fee_denom}"
 		echo "[SN] Feemarket active: using gas price ${TX_GAS_PRICES} (base_fee=${base_fee}${fee_denom})"
 	fi

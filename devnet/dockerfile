@@ -9,6 +9,9 @@ ARG SCRIPTS_DEST_DIR=/root/scripts
 LABEL Name="${APP_NAME}" \
       Version="${APP_VERSION}"
 
+# Use bash as default shell (debian:slim defaults to dash)
+SHELL ["/bin/bash", "-c"]
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     jq \
@@ -23,6 +26,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     lnav \
     mc \
     nginx-light \
+    ripgrep \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js (for network-maker UI tooling) using NodeSource 25.x

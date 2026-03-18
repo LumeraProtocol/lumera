@@ -69,4 +69,12 @@ func TestPrecompilesSuite(t *testing.T) {
 	// bug causes a panic in the node process, which would corrupt subsequent
 	// tests in this suite. The ICS20 query tests above use t.Skip when the
 	// bug is detected, which is safe. See ics20_test.go for details.
+
+	// Gas metering accuracy tests
+	t.Run("PrecompileGasMeteringAccuracy", func(t *testing.T) {
+		testPrecompileGasMeteringAccuracy(t, node)
+	})
+	t.Run("PrecompileGasEstimateMatchesActual", func(t *testing.T) {
+		testPrecompileGasEstimateMatchesActual(t, node)
+	})
 }

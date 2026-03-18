@@ -127,6 +127,7 @@ Extensive post-migration validation:
 - Delegator count matches pre/post migration.
 - All actions referencing the old creator/supernode now reference the new address.
 - Supernode fields verified: `ValidatorAddress`, `SupernodeAccount`, `Evidence` entries, `PrevSupernodeAccounts` history (new entry appended with current block height), `MetricsState` re-keyed.
+- If the validator's supernode account was already migrated independently before validator migration, it must be preserved and reattached under the new valoper without tripping the stale supernode-account index collision.
 
 ### 5. `cleanup` — Remove Test Keys
 
@@ -157,6 +158,10 @@ Loads `accounts.json` and deletes all test keys from the local keyring (`~/.lume
 
 All targets are defined in `Makefile.devnet` and run the tool inside devnet Docker containers via `docker compose exec`.
 
+### Sequential targets
+
+These run the tool on each validator container **one at a time**, in order:
+
 | Target | Description |
 |---|---|
 | `make devnet-evmigration-sync-bin` | Copy the `tests_evmigration` binary into the devnet shared volume |
@@ -165,6 +170,44 @@ All targets are defined in `Makefile.devnet` and run the tool inside devnet Dock
 | `make devnet-evmigration-migrate` | Run migrate mode on all validator containers |
 | `make devnet-evmigration-migrate-validator` | Run migrate-validator mode on all validator containers |
 | `make devnet-evmigration-cleanup` | Run cleanup mode on all validator containers |
+
+### Parallel targets (`devnet-evmigrationp-*`)
+
+These run the tool on **all validator containers simultaneously** using background processes, with per-container output captured and printed after completion. Each container gets its own accounts file, so there are no cross-validator conflicts. If any container fails, the target fails after all containers finish.
+
+| Target | Description |
+|---|---|
+| `make devnet-evmigrationp-prepare` | Run prepare mode on all validators in parallel |
+| `make devnet-evmigrationp-estimate` | Run estimate mode on all validators in parallel |
+| `make devnet-evmigrationp-migrate` | Run migrate mode on all validators in parallel |
+| `make devnet-evmigrationp-migrate-validator` | Run migrate-validator mode on all validators in parallel |
+| `make devnet-evmigrationp-cleanup` | Run cleanup mode on all validators in parallel |
+
+The parallel targets use the `_run_evmigration_in_containers_parallel` macro, which spawns one `docker compose exec` per validator service as a background process, collects exit codes, and prints output prefixed by service name. This is significantly faster for modes like `prepare` and `migrate` where each validator's work is independent.
+
+### Full upgrade pipeline (`devnet-evm-upgrade`)
+
+The `make devnet-evm-upgrade` target runs the **complete end-to-end EVM upgrade cycle** as a single automated pipeline. It orchestrates all stages from a clean v1.11.0 devnet through to a fully migrated v1.12.0 chain, using the parallel targets for speed:
+
+| Stage | What it does |
+|---|---|
+| 1. Install v1.11.0 devnet | `devnet-down` → `devnet-clean` → `devnet-build-1110` → `devnet-up-detach` |
+| 2. Wait for height 40 | Waits for the chain to produce blocks (confirms v1.11.0 is healthy) |
+| 3. Prepare legacy state | `devnet-evmigrationp-prepare` (parallel across all validators) |
+| 4. Wait for +5 blocks | Lets prepared state settle into committed blocks |
+| 5. Upgrade to v1.12.0 | `devnet-upgrade-1120` (governance proposal → vote → halt → binary swap → restart) |
+| 6. Check estimates | `devnet-evmigrationp-estimate` (verify all accounts are `ready_to_migrate`) |
+| 7. Migrate validators | `devnet-evmigrationp-migrate-validator` (validator operators first) |
+| 8. Migrate accounts | `devnet-evmigrationp-migrate` (regular accounts second) |
+
+Each stage has error handling — if any stage fails, the pipeline aborts with a clear error message identifying which stage failed. Validators are migrated before regular accounts because `MsgMigrateValidator` atomically re-keys the validator record and all its delegations, which must happen before delegators attempt their own migration.
+
+Usage:
+
+```bash
+# Run the full upgrade pipeline (takes ~10-15 minutes)
+make devnet-evm-upgrade
+```
 
 ### Configurable variables
 
@@ -186,6 +229,8 @@ make devnet-tests-build
 This builds `tests_evmigration` (along with `tests_validator` and `tests_hermes`) and places it in `devnet/bin/`.
 
 ## Full Upgrade Test Walkthrough
+
+> **Quick path:** `make devnet-evm-upgrade` runs all steps below automatically as a single pipeline. See [Full upgrade pipeline](#full-upgrade-pipeline-devnet-evm-upgrade) above. The manual steps below are useful for debugging or running individual stages.
 
 ### Step 1: Start devnet on v1.11.0
 

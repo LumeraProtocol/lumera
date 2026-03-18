@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -580,12 +581,16 @@ func runPrepare() {
 	// Phase 4: Claim activity — exercise the x/claim module with pre-seeded Pastel keypairs.
 	// Each legacy account with balance gets 1-2 claims from the pool.
 	// ~70% instant (tier 0), ~30% delayed (tiers 1/2/3).
+	// When running in parallel across validators, each validator starts from a
+	// different offset in the key pool so they don't all compete for the same
+	// early indices (which contain the delayed claim slots at 3, 6, 9, ...).
 	log.Println("--- Creating claim activity ---")
 	if err := verifyClaimKeyIntegrity(); err != nil {
 		log.Printf("  WARN: claim key integrity check failed: %v; skipping claim activity", err)
 	} else {
-		claimKeyIdx := 0
+		claimKeyIdx := claimKeyStartOffset(accountTag)
 		skippedClaimKeysOwnedByOther := 0
+		log.Printf("  claim key start offset: %d (tag=%q)", claimKeyIdx, accountTag)
 		for ordinal, idx := range legacyIdx {
 			rec := &af.Accounts[idx]
 			if !rec.HasBalance || claimKeyIdx >= len(preseededClaimKeysByIndex) {
@@ -792,6 +797,28 @@ func selectPrepareClaimForAccount(rec *AccountRecord, claimKeyIdx int) (tier uin
 		return 0, false
 	}
 	return tier, delayed
+}
+
+// claimKeyStartOffset returns a starting index into the pre-seeded claim key
+// pool based on the validator account tag (e.g. "val1" → 0, "val2" → 20, ...).
+// This ensures parallel validators don't all compete for the same early indices
+// and each validator's slice of keys contains delayed claim slots (at offsets
+// 3, 6, 9 within each 10-key block).
+func claimKeyStartOffset(accountTag string) int {
+	const keysPerValidator = 20
+	m := regexp.MustCompile(`(\d+)`).FindString(accountTag)
+	if m == "" {
+		return 0
+	}
+	n, err := strconv.Atoi(m)
+	if err != nil || n < 1 {
+		return 0
+	}
+	offset := (n - 1) * keysPerValidator
+	if offset >= len(preseededClaimKeysByIndex) {
+		return 0
+	}
+	return offset
 }
 
 func buildPreparedAccountNameV0(prefix, tag string, idx int) string {
@@ -1138,7 +1165,7 @@ func fundAccountsBatched(af *AccountsFile, rng *rand.Rand) error {
 	pending := make([]pendingFund, 0, len(af.Accounts))
 	for i := range af.Accounts {
 		rec := &af.Accounts[i]
-		amount := fmt.Sprintf("%dulume", 1_000_000+rng.Intn(9_000_000))
+		amount := fmt.Sprintf("%dulume", 10_000_000+rng.Intn(10_000_000))
 		accNum := accountNumber
 		seq := sequence
 
@@ -1207,7 +1234,7 @@ func fundAccountsSequential(af *AccountsFile, rng *rand.Rand) {
 		if rec.HasBalance {
 			continue
 		}
-		amount := fmt.Sprintf("%dulume", 1_000_000+rng.Intn(9_000_000))
+		amount := fmt.Sprintf("%dulume", 10_000_000+rng.Intn(10_000_000))
 		txHash, err := sdkSendBankTx(ctx, sdkClient.Blockchain, funderAddr, rec.Address, amount, nil, nil)
 		if err != nil {
 			low := strings.ToLower(err.Error())

@@ -833,7 +833,7 @@ func setupV1toV4(f *mockFixture, oldValAddr, newValAddr sdk.ValAddress) {
 	// V4: no delegations.
 	f.stakingKeeper.EXPECT().GetValidatorDelegations(gomock.Any(), oldValAddr).Return(nil, nil)
 	f.stakingKeeper.EXPECT().GetUnbondingDelegationsFromValidator(gomock.Any(), oldValAddr).Return(nil, nil)
-	f.stakingKeeper.EXPECT().GetRedelegationsFromSrcValidator(gomock.Any(), oldValAddr).Return(nil, nil)
+	f.stakingKeeper.EXPECT().IterateRedelegations(gomock.Any(), gomock.Any()).Return(nil)
 }
 
 // TestMigrateValidator_FailAtValidatorRecord verifies that a failure in
@@ -948,6 +948,7 @@ func TestMigrateValidator_FailAtValidatorSupernode(t *testing.T) {
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(
 		sntypes.SuperNode{ValidatorAddress: oldValAddr.String()}, true,
 	)
+	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr)
 	f.supernodeKeeper.EXPECT().GetMetricsState(gomock.Any(), oldValAddr).Return(
 		sntypes.SupernodeMetricsState{}, false,
 	)

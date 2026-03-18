@@ -1048,9 +1048,10 @@ func TestMigrateValidatorDelegations_WithUnbondingAndRedelegation(t *testing.T) 
 	f.stakingKeeper.EXPECT().InsertUBDQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil)
 	f.stakingKeeper.EXPECT().SetUnbondingDelegationByUnbondingID(gomock.Any(), gomock.Any(), uint64(77)).Return(nil)
 
-	// One redelegation with an UnbondingId.
+	// Two redelegations with an UnbondingId: one where the migrated validator is
+	// the source, and one where it is the destination.
 	dstVal := sdk.ValAddress(testAccAddr())
-	red := stakingtypes.Redelegation{
+	srcRed := stakingtypes.Redelegation{
 		DelegatorAddress:    delegator.String(),
 		ValidatorSrcAddress: oldValAddr.String(),
 		ValidatorDstAddress: dstVal.String(),
@@ -1064,18 +1065,48 @@ func TestMigrateValidatorDelegations_WithUnbondingAndRedelegation(t *testing.T) 
 			},
 		},
 	}
-	f.stakingKeeper.EXPECT().GetRedelegationsFromSrcValidator(gomock.Any(), oldValAddr).Return(
-		[]stakingtypes.Redelegation{red}, nil,
+	srcVal := sdk.ValAddress(testAccAddr())
+	dstRed := stakingtypes.Redelegation{
+		DelegatorAddress:    delegator.String(),
+		ValidatorSrcAddress: srcVal.String(),
+		ValidatorDstAddress: oldValAddr.String(),
+		Entries: []stakingtypes.RedelegationEntry{
+			{
+				CreationHeight: 9,
+				CompletionTime: completionTime,
+				InitialBalance: math.NewInt(75),
+				SharesDst:      math.LegacyNewDec(75),
+				UnbondingId:    89,
+			},
+		},
+	}
+	f.stakingKeeper.EXPECT().IterateRedelegations(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ any, fn func(int64, stakingtypes.Redelegation) bool) error {
+			require.False(t, fn(0, srcRed))
+			require.False(t, fn(1, dstRed))
+			return nil
+		},
 	)
-	f.stakingKeeper.EXPECT().RemoveRedelegation(gomock.Any(), red).Return(nil)
+	f.stakingKeeper.EXPECT().RemoveRedelegation(gomock.Any(), srcRed).Return(nil)
 	f.stakingKeeper.EXPECT().SetRedelegation(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ any, newRed stakingtypes.Redelegation) error {
 			require.Equal(t, newValAddr.String(), newRed.ValidatorSrcAddress)
 			require.Equal(t, dstVal.String(), newRed.ValidatorDstAddress)
 			return nil
-		})
+		},
+	)
 	f.stakingKeeper.EXPECT().InsertRedelegationQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil)
 	f.stakingKeeper.EXPECT().SetRedelegationByUnbondingID(gomock.Any(), gomock.Any(), uint64(88)).Return(nil)
+	f.stakingKeeper.EXPECT().RemoveRedelegation(gomock.Any(), dstRed).Return(nil)
+	f.stakingKeeper.EXPECT().SetRedelegation(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ any, newRed stakingtypes.Redelegation) error {
+			require.Equal(t, srcVal.String(), newRed.ValidatorSrcAddress)
+			require.Equal(t, newValAddr.String(), newRed.ValidatorDstAddress)
+			return nil
+		},
+	)
+	f.stakingKeeper.EXPECT().InsertRedelegationQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil)
+	f.stakingKeeper.EXPECT().SetRedelegationByUnbondingID(gomock.Any(), gomock.Any(), uint64(89)).Return(nil)
 
 	err := f.keeper.MigrateValidatorDelegations(f.ctx, oldValAddr, newValAddr)
 	require.NoError(t, err)
@@ -1100,6 +1131,7 @@ func TestMigrateValidatorSupernode_WithMetrics(t *testing.T) {
 	}
 
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
+	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr)
 	f.supernodeKeeper.EXPECT().GetMetricsState(gomock.Any(), oldValAddr).Return(metrics, true)
 	f.supernodeKeeper.EXPECT().SetMetricsState(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ any, updated sntypes.SupernodeMetricsState) error {
@@ -1134,6 +1166,7 @@ func TestMigrateValidatorSupernode_MetricsWriteFails(t *testing.T) {
 	}
 
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
+	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr)
 	f.supernodeKeeper.EXPECT().GetMetricsState(gomock.Any(), oldValAddr).Return(metrics, true)
 	f.supernodeKeeper.EXPECT().SetMetricsState(gomock.Any(), gomock.Any()).Return(
 		fmt.Errorf("metrics store write failed"),
@@ -1176,6 +1209,7 @@ func TestMigrateValidatorSupernode_EvidenceAddressMigrated(t *testing.T) {
 	}
 
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
+	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr)
 	f.supernodeKeeper.EXPECT().GetMetricsState(gomock.Any(), oldValAddr).Return(sntypes.SupernodeMetricsState{}, false)
 	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ any, updated sntypes.SuperNode) error {
@@ -1211,6 +1245,7 @@ func TestMigrateValidatorSupernode_AccountHistoryMigrated(t *testing.T) {
 	}
 
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
+	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr)
 	f.supernodeKeeper.EXPECT().GetMetricsState(gomock.Any(), oldValAddr).Return(sntypes.SupernodeMetricsState{}, false)
 	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ any, updated sntypes.SuperNode) error {
@@ -1250,6 +1285,7 @@ func TestMigrateValidatorSupernode_IndependentAccountPreserved(t *testing.T) {
 	}
 
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sn, true)
+	f.supernodeKeeper.EXPECT().DeleteSuperNode(gomock.Any(), oldValAddr)
 	f.supernodeKeeper.EXPECT().GetMetricsState(gomock.Any(), oldValAddr).Return(sntypes.SupernodeMetricsState{}, false)
 	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ any, updated sntypes.SuperNode) error {

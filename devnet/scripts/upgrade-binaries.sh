@@ -27,6 +27,9 @@ DEVNET_RUNTIME_DIR="${DEVNET_DIR:-/tmp/lumera-devnet-1}"
 RELEASE_DIR="${DEVNET_RUNTIME_DIR}/shared/release"
 SOURCE_LUMERAD="${BINARIES_DIR}/lumerad"
 SHARED_LUMERAD="${RELEASE_DIR}/lumerad"
+COMPOSE_STOP_TIMEOUT="${COMPOSE_STOP_TIMEOUT:-30}"
+COMPOSE_UP_TIMEOUT="${COMPOSE_UP_TIMEOUT:-120}"
+COMPOSE_READY_TIMEOUT="${COMPOSE_READY_TIMEOUT:-90}"
 
 normalize_version() {
 	local version="${1:-}"
@@ -34,6 +37,37 @@ normalize_version() {
 	version="${version%"${version##*[![:space:]]}"}"
 	version="${version#v}"
 	printf '%s\n' "${version}"
+}
+
+release_core_version() {
+	local version
+	version="$(normalize_version "${1:-}")"
+	printf '%s\n' "${version}" | grep -Eo '^[0-9]+\.[0-9]+\.[0-9]+' | head -n 1
+}
+
+versions_match() {
+	local expected actual expected_core actual_core
+	expected="$(normalize_version "${1:-}")"
+	actual="$(normalize_version "${2:-}")"
+
+	if [[ -z "${expected}" || -z "${actual}" ]]; then
+		return 1
+	fi
+
+	if [[ "${expected}" == "${actual}" ]]; then
+		return 0
+	fi
+
+	expected_core="$(release_core_version "${expected}")"
+	actual_core="$(release_core_version "${actual}")"
+
+	# Accept local/dev builds like 1.12.0-<gitsha> when the requested
+	# upgrade target is the stable release 1.12.0.
+	if [[ -n "${expected_core}" && "${expected}" == "${expected_core}" && "${actual_core}" == "${expected_core}" ]]; then
+		return 0
+	fi
+
+	return 1
 }
 
 binary_version() {
@@ -54,6 +88,37 @@ binary_version() {
 	printf '%s\n' "${version}"
 }
 
+compose_services() {
+	docker compose -f "${COMPOSE_FILE}" config --services
+}
+
+running_services() {
+	docker compose -f "${COMPOSE_FILE}" ps --status running --services 2>/dev/null || true
+}
+
+all_services_running() {
+	local expected running
+
+	expected="$(compose_services | sort)"
+	running="$(running_services | sort)"
+
+	[[ -n "${expected}" && "${expected}" == "${running}" ]]
+}
+
+wait_for_all_services_running() {
+	local deadline
+	deadline=$((SECONDS + COMPOSE_READY_TIMEOUT))
+
+	while ((SECONDS < deadline)); do
+		if all_services_running; then
+			return 0
+		fi
+		sleep 2
+	done
+
+	return 1
+}
+
 EXPECTED_VERSION="$(normalize_version "${EXPECTED_RELEASE_NAME}")"
 if [[ -z "${EXPECTED_VERSION}" ]]; then
 	echo "Expected release name is empty or invalid: ${EXPECTED_RELEASE_NAME}" >&2
@@ -66,7 +131,7 @@ if [[ ! -f "${SOURCE_LUMERAD}" ]]; then
 fi
 
 SOURCE_VERSION="$(binary_version "${SOURCE_LUMERAD}")"
-if [[ "${SOURCE_VERSION}" != "${EXPECTED_VERSION}" ]]; then
+if ! versions_match "${EXPECTED_VERSION}" "${SOURCE_VERSION}"; then
 	echo "Source lumerad version mismatch: expected ${EXPECTED_RELEASE_NAME}, got ${SOURCE_VERSION} from ${SOURCE_LUMERAD}" >&2
 	exit 1
 fi
@@ -74,7 +139,7 @@ fi
 echo "Verified source lumerad version ${SOURCE_VERSION} at ${SOURCE_LUMERAD}"
 
 echo "Stopping devnet containers..."
-docker compose -f "${COMPOSE_FILE}" stop
+docker compose -f "${COMPOSE_FILE}" stop -t "${COMPOSE_STOP_TIMEOUT}"
 
 echo "Copying binaries from ${BINARIES_DIR} to ${RELEASE_DIR}..."
 mkdir -p "${RELEASE_DIR}"
@@ -103,7 +168,7 @@ if [[ ! -f "${SHARED_LUMERAD}" ]]; then
 fi
 
 SHARED_VERSION="$(binary_version "${SHARED_LUMERAD}")"
-if [[ "${SHARED_VERSION}" != "${EXPECTED_VERSION}" ]]; then
+if ! versions_match "${EXPECTED_VERSION}" "${SHARED_VERSION}"; then
 	echo "Shared lumerad version mismatch after copy: expected ${EXPECTED_RELEASE_NAME}, got ${SHARED_VERSION} from ${SHARED_LUMERAD}" >&2
 	exit 1
 fi
@@ -111,6 +176,24 @@ fi
 echo "Verified shared lumerad version ${SHARED_VERSION} at ${SHARED_LUMERAD}"
 
 echo "Restarting devnet containers..."
-START_MODE=run docker compose -f "${COMPOSE_FILE}" up -d
+if ! timeout "${COMPOSE_UP_TIMEOUT}" env START_MODE=run docker compose -f "${COMPOSE_FILE}" up -d --no-build; then
+	echo "docker compose up -d did not complete within ${COMPOSE_UP_TIMEOUT}; checking container state..." >&2
+	if all_services_running; then
+		echo "All devnet services are running despite compose timeout; continuing."
+	else
+		echo "Timed out restarting devnet containers and not all services are running." >&2
+		docker compose -f "${COMPOSE_FILE}" ps >&2 || true
+		exit 1
+	fi
+fi
+
+echo "Waiting for all devnet services to report running status..."
+if ! wait_for_all_services_running; then
+	echo "Timed out waiting for all devnet services to reach running state after restart." >&2
+	docker compose -f "${COMPOSE_FILE}" ps >&2 || true
+	exit 1
+fi
+
+docker compose -f "${COMPOSE_FILE}" ps
 
 echo "Binaries upgrade complete using ${BINARIES_DIR}."

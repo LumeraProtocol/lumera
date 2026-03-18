@@ -37,4 +37,16 @@ func TestMempoolSuite(t *testing.T) {
 	run("NonceGapPromotionAfterGapFilled", func(t *testing.T, node *evmtest.Node) {
 		testNonceGapPromotionAfterGapFilled(t, node)
 	})
+	run("RapidReplacementRace", func(t *testing.T, node *evmtest.Node) {
+		testRapidReplacementRace(t, node)
+	})
+	run("NewHeadsSubscriptionEmitsBlocks", func(t *testing.T, node *evmtest.Node) {
+		testNewHeadsSubscriptionEmitsBlocks(t, node)
+	})
+	run("LogsSubscriptionEmitsEvents", func(t *testing.T, node *evmtest.Node) {
+		testLogsSubscriptionEmitsEvents(t, node)
+	})
+	run("NewHeadsSubscriptionMultipleBlocks", func(t *testing.T, node *evmtest.Node) {
+		testNewHeadsSubscriptionMultipleBlocks(t, node)
+	})
 }

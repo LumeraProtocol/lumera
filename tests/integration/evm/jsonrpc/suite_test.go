@@ -53,4 +53,16 @@ func TestJSONRPCSuite(t *testing.T) {
 	run("ReceiptIncludesCanonicalFields", func(t *testing.T, node *evmtest.Node) {
 		testReceiptIncludesCanonicalFields(t, node)
 	})
+	run("BatchJSONRPCReturnsAllResponses", func(t *testing.T, node *evmtest.Node) {
+		testBatchJSONRPCReturnsAllResponses(t, node)
+	})
+	run("BatchJSONRPCMixedErrorsAndResults", func(t *testing.T, node *evmtest.Node) {
+		testBatchJSONRPCMixedErrorsAndResults(t, node)
+	})
+	run("BatchJSONRPCSingleElementBatch", func(t *testing.T, node *evmtest.Node) {
+		testBatchJSONRPCSingleElementBatch(t, node)
+	})
+	run("BatchJSONRPCDuplicateMethods", func(t *testing.T, node *evmtest.Node) {
+		testBatchJSONRPCDuplicateMethods(t, node)
+	})
 }

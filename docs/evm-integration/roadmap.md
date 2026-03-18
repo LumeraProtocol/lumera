@@ -1,6 +1,6 @@
 # Lumera EVM Integration Roadmap
 
-**Last updated**: 2026-03-13
+**Last updated**: 2026-03-17
 **Cosmos EVM version**: v0.6.0
 **Target**: Mainnet-ready EVM integration
 
@@ -86,7 +86,7 @@ EVM-aware app-side mempool with deadlock prevention.
 | 4.5 | `Close()` override for graceful shutdown | DONE | `app/evm_runtime.go` |
 | 4.6 | `broadcast-debug` app.toml toggle | DONE | `cmd/lumera/cmd/config.go` |
 | 4.7 | Default `max_txs=5000` | DONE | App config defaults |
-| 4.8 | Mempool eviction / capacity pressure testing | TODO | Tests for full mempool, rapid replacement races, tiebreaking |
+| 4.8 | Mempool eviction / capacity pressure testing | DONE | `tests/integration/evm/mempool/capacity_pressure_test.go` — `TestMempoolCapacityRejectsOverflow` |
 | 4.9 | Mempool metrics / observability | TODO | Expose mempool size, pending count, rejection rate metrics |
 
 ---
@@ -104,8 +104,8 @@ Ethereum JSON-RPC server and transaction indexing.
 | 5.5 | EVM tracing (debug API) configurable via app.toml | DONE | `app.toml` `[evm] tracer` field |
 | 5.6 | Production CORS origin lockdown | TODO | Currently `Access-Control-Allow-Origin: *` on OpenRPC; need per-environment CORS profiles |
 | 5.7 | JSON-RPC namespace exposure lockdown per env | TODO | Lock `debug`, `personal`, `admin` in production |
-| 5.8 | Batch JSON-RPC request support testing | TODO | No tests for multi-request batching |
-| 5.9 | WebSocket subscription testing | TODO | Only `PendingTxSubscriptionEmitsHash`; need `newHeads`, `logs`, `newPendingTransactions` |
+| 5.8 | Batch JSON-RPC request support testing | DONE | `tests/integration/evm/jsonrpc/batch_rpc_test.go` — 4 batch tests (mixed errors, single-element, duplicates) |
+| 5.9 | WebSocket subscription testing | DONE | `tests/integration/evm/mempool/ws_subscription_test.go` — `newHeads`, `logs`, multi-block subscriptions |
 
 ---
 
@@ -125,7 +125,7 @@ Standard precompile set for EVM-to-Cosmos access.
 | 6.8 | Slashing precompile | DONE | `app/evm/precompiles.go` |
 | 6.9 | Blocked-address protections | DONE | Bank send restriction blocks sends to precompile addresses |
 | 6.10 | Vesting precompile | DEFERRED | Not provided by upstream cosmos/evm v0.6.0 default registry |
-| 6.11 | Precompile gas metering benchmarks | TODO | Validate actual gas consumption vs expected for each precompile |
+| 6.11 | Precompile gas metering benchmarks | DONE | `tests/integration/evm/precompiles/gas_metering_test.go` — accuracy + estimate/actual matching for all static precompiles |
 
 ---
 
@@ -171,7 +171,7 @@ Chain upgrade handling for EVM module stores.
 | 9.2 | Adaptive store upgrade manager | DONE | `app/upgrades/store_upgrade_manager.go` |
 | 9.3 | EVM keeper refs in upgrade params | DONE | `app/upgrades/params/params.go` |
 | 9.4 | ERC20 param finalization after skipped `InitGenesis` | DONE | `app/upgrades/v1_12_0/upgrade.go`, `app/upgrades/v1_12_0/upgrade_test.go` |
-| 9.5 | Chain upgrade EVM state preservation test | TODO | Deploy contract, upgrade chain, verify contract still works |
+| 9.5 | Chain upgrade EVM state preservation test | DONE | `tests/integration/evm/contracts/upgrade_preservation_test.go` — deploy, restart, verify contract code + storage + receipts |
 
 ---
 
@@ -224,18 +224,18 @@ Comprehensive test coverage across all layers.
 | 11.9 | EVMigration types / module / CLI | 8 | DONE |
 | 11.10 | Ante (evmigration fee, validate-basic) | 5 | DONE |
 
-### Integration Tests (97 tests — DONE)
+### Integration Tests (111 tests — DONE)
 
 | # | Area | Tests | Status |
 |---|------|-------|--------|
 | 11.11 | Ante | 3 | DONE |
-| 11.12 | Contracts | 8 | DONE |
+| 11.12 | Contracts (deploy, interact, ERC20 flows, concurrency, upgrade preservation) | 11 | DONE |
 | 11.13 | Fee market | 8 | DONE |
 | 11.14 | IBC ERC20 | 7 | DONE |
-| 11.15 | JSON-RPC / indexer | 19 | DONE |
-| 11.16 | Mempool | 6 | DONE |
+| 11.15 | JSON-RPC / indexer (+ batch RPC) | 23 | DONE |
+| 11.16 | Mempool (+ capacity pressure, WS subscriptions) | 10 | DONE |
 | 11.17 | Precisebank | 6 | DONE |
-| 11.18 | Precompiles | 15 | DONE |
+| 11.18 | Precompiles (+ gas metering) | 17 | DONE |
 | 11.19 | VM queries / state | 12 | DONE |
 | 11.20 | EVMigration | 14 | DONE |
 
@@ -248,18 +248,23 @@ Comprehensive test coverage across all layers.
 | 11.23 | Ports / CORS | 2 | DONE |
 | 11.24 | EVMigration tool (prepare, migrate, migrate-validator, cleanup) | 4 modes | DONE |
 
-### Test Gaps (TODO)
+### Recently Completed Test Gaps
+
+| # | Gap | Status | Implementation |
+|---|-----|--------|----------------|
+| 11.25 | Mempool eviction / capacity stress tests | DONE | `tests/integration/evm/mempool/capacity_pressure_test.go` |
+| 11.26 | Batch JSON-RPC tests | DONE | `tests/integration/evm/jsonrpc/batch_rpc_test.go` |
+| 11.27 | WebSocket subscription tests | DONE | `tests/integration/evm/mempool/ws_subscription_test.go` |
+| 11.28 | Precompile gas metering benchmarks | DONE | `tests/integration/evm/precompiles/gas_metering_test.go` |
+| 11.29 | Chain upgrade EVM state preservation | DONE | `tests/integration/evm/contracts/upgrade_preservation_test.go` |
+| 11.31 | Concurrent operation race detection | DONE | `tests/integration/evm/contracts/concurrent_operations_test.go` |
+| 11.32 | ERC20 allowance/transferFrom/approve flows | DONE | `tests/integration/evm/contracts/erc20_flows_test.go` (contract-based, not precompile) |
+
+### Remaining Test Gaps (TODO)
 
 | # | Gap | Priority | Notes |
 |---|-----|----------|-------|
-| 11.25 | Mempool eviction / capacity stress tests | Medium | Full mempool, rapid replacement, tiebreaking |
-| 11.26 | Batch JSON-RPC tests | Low | Multi-request batching validation |
-| 11.27 | WebSocket subscription tests | Low | `newHeads`, `logs`, `newPendingTransactions` |
-| 11.28 | Precompile gas metering benchmarks | Low | Validate gas consumption vs expected |
-| 11.29 | Chain upgrade EVM state preservation | Medium | Deploy contract -> upgrade -> verify contract |
 | 11.30 | Multi-validator EVM consensus scenarios | Low | Expand devnet tests beyond single-validator assertions |
-| 11.31 | Concurrent operation race detection | Low | Race condition testing under load |
-| 11.32 | ERC20 allowance/transferFrom/approve via precompile | Low | ERC20 write paths through precompile |
 
 ---
 
@@ -346,19 +351,19 @@ External infrastructure for production ecosystem.
 | 1 | Core EVM Runtime | DONE | 17/17 |
 | 2 | Ante Handler & Tx Routing | DONE | 13/13 |
 | 3 | Feemarket Configuration | DONE | 6/8 |
-| 4 | Mempool & Broadcast | DONE | 7/9 |
-| 5 | JSON-RPC & Indexer | DONE | 5/9 |
-| 6 | Static Precompiles | DONE | 9/11 |
+| 4 | Mempool & Broadcast | DONE | 8/9 |
+| 5 | JSON-RPC & Indexer | DONE | 7/9 |
+| 6 | Static Precompiles | DONE | 10/11 |
 | 7 | IBC + ERC20 Middleware | DONE | 7/8 |
 | 8 | OpenRPC Discovery | DONE | 6/6 |
-| 9 | Store Upgrades & Migration | DONE | 3/4 |
+| 9 | Store Upgrades & Migration | DONE | 4/4 |
 | 10 | Legacy Account Migration | DONE | 21/21 |
-| 11 | Testing | IN PROGRESS | 24/32 |
+| 11 | Testing | IN PROGRESS | 31/32 |
 | 12 | Custom Lumera Precompiles | TODO | 0/7 |
 | 13 | CosmWasm + EVM Interaction | TODO | 0/4 |
 | 14 | Production Hardening | TODO | 0/8 |
 | 15 | Ecosystem & Tooling | TODO | 0/6 |
-| | **TOTAL** | | **118/155** |
+| | **TOTAL** | | **130/155** |
 
 ### Before Mainnet (Critical Path)
 
@@ -369,14 +374,12 @@ External infrastructure for production ecosystem.
 
 ### Near-Term Priorities
 
-5. Custom module precompiles — read-only queries first (Phase 12.1-12.3)
-6. Chain upgrade EVM state preservation test (Phase 9.4)
-7. Mempool stress testing (Phase 11.25)
-8. CosmWasm + EVM interaction design (Phase 13.1)
+1. Custom module precompiles — read-only queries first (Phase 12.1-12.3)
+2. CosmWasm + EVM interaction design (Phase 13.1)
+3. Multi-validator EVM consensus testing (Phase 11.30)
 
 ### Can Wait
 
-9. EVM base fee burn mechanism (Phase 3.7)
-10. WebSocket / batch RPC tests (Phase 11.26-11.27)
-11. Write-path precompiles (Phase 12.5-12.6)
-12. External indexer / SDK examples (Phase 15.4-15.5)
+1. EVM base fee burn mechanism (Phase 3.7)
+2. Write-path precompiles (Phase 12.5-12.6)
+3. External indexer / SDK examples (Phase 15.4-15.5)

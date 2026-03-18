@@ -309,6 +309,20 @@ func (mr *MockStakingKeeperMockRecorder) GetRedelegations(ctx, delegator, maxRet
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRedelegations", reflect.TypeOf((*MockStakingKeeper)(nil).GetRedelegations), ctx, delegator, maxRetrieve)
 }
 
+// IterateRedelegations mocks base method.
+func (m *MockStakingKeeper) IterateRedelegations(ctx context.Context, fn func(index int64, red types4.Redelegation) bool) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IterateRedelegations", ctx, fn)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// IterateRedelegations indicates an expected call of IterateRedelegations.
+func (mr *MockStakingKeeperMockRecorder) IterateRedelegations(ctx, fn any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IterateRedelegations", reflect.TypeOf((*MockStakingKeeper)(nil).IterateRedelegations), ctx, fn)
+}
+
 // GetRedelegationsFromSrcValidator mocks base method.
 func (m *MockStakingKeeper) GetRedelegationsFromSrcValidator(ctx context.Context, valAddr types2.ValAddress) ([]types4.Redelegation, error) {
 	m.ctrl.T.Helper()
@@ -1106,6 +1120,18 @@ func (m *MockSupernodeKeeper) DeleteMetricsState(ctx types2.Context, valAddr typ
 func (mr *MockSupernodeKeeperMockRecorder) DeleteMetricsState(ctx, valAddr any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteMetricsState", reflect.TypeOf((*MockSupernodeKeeper)(nil).DeleteMetricsState), ctx, valAddr)
+}
+
+// DeleteSuperNode mocks base method.
+func (m *MockSupernodeKeeper) DeleteSuperNode(ctx types2.Context, valAddr types2.ValAddress) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "DeleteSuperNode", ctx, valAddr)
+}
+
+// DeleteSuperNode indicates an expected call of DeleteSuperNode.
+func (mr *MockSupernodeKeeperMockRecorder) DeleteSuperNode(ctx, valAddr any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSuperNode", reflect.TypeOf((*MockSupernodeKeeper)(nil).DeleteSuperNode), ctx, valAddr)
 }
 
 // GetMetricsState mocks base method.

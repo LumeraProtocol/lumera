@@ -413,6 +413,29 @@ func setEVMMempoolPriceBumpInAppToml(t *testing.T, homeDir string, priceBump uin
 	}
 }
 
+// setMempoolMaxTxsInAppToml sets [mempool].max-txs in app.toml.
+func setMempoolMaxTxsInAppToml(t *testing.T, homeDir string, maxTxs int) {
+	t.Helper()
+
+	appTomlPath := filepath.Join(homeDir, "config", "app.toml")
+	appToml, err := os.ReadFile(appTomlPath)
+	if err != nil {
+		t.Fatalf("read app.toml: %v", err)
+	}
+
+	appTomlStr := string(appToml)
+	target := fmt.Sprintf("max-txs = %d", maxTxs)
+	re := regexp.MustCompile(`(?m)^max-txs = [0-9]+$`)
+	updated := re.ReplaceAllString(appTomlStr, target)
+	if updated == appTomlStr {
+		t.Fatalf("failed to update max-txs in app.toml:\n%s", appTomlStr)
+	}
+
+	if err := os.WriteFile(appTomlPath, []byte(updated), 0o644); err != nil {
+		t.Fatalf("write app.toml: %v", err)
+	}
+}
+
 // setCometTxIndexer sets `[tx_index].indexer` in Comet config.toml.
 func setCometTxIndexer(t *testing.T, homeDir, indexer string) {
 	t.Helper()

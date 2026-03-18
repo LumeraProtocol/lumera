@@ -126,3 +126,39 @@ app.go:
 **Fix** (`app/upgrades/v1_12_0/upgrade.go`, `app/upgrades/params/params.go`, `app/app.go`): Wire the ERC20 keeper into the upgrade params bundle and explicitly call `Erc20Keeper.SetParams(ctx, erc20types.DefaultParams())` after `RunMigrations`. This preserves the `InitGenesis` skip for denom/coin-info safety while restoring the intended default ERC20 behavior.
 
 **Tests**: `TestV1120InitializesERC20ParamsWhenInitGenesisIsSkipped` reproduces the skipped-`InitGenesis` state by clearing the ERC20 param keys, runs the v1.12.0 handler, and verifies the default params are restored.
+
+---
+
+### 9) Validator migration fails when the supernode account was already migrated first
+
+**Symptom**: `tests_evmigration -mode=migrate-validator` fails on a validator that already has a migrated EVM supernode account with:
+
+`migrate validator supernode: supernode account <addr> already associated with another validator`
+
+This shows up even though the supernode account belongs to the same logical validator/supernode pair and was migrated correctly earlier by the supernode process.
+
+**Root cause**: `MigrateValidatorSupernode` preserved the already-migrated independent `SupernodeAccount` correctly, but then wrote the re-keyed supernode record under the new valoper without first removing the old supernode record and its `SuperNodeByAccountKey` secondary index entry. `SetSuperNode` saw the stale old-valoper index for that same account and treated it as a collision with "another validator".
+
+**Fix** (`x/evmigration/keeper/migrate_validator.go`, `x/supernode/v1/keeper/supernode.go`): Added `DeleteSuperNode` to remove both the primary supernode record and the secondary account index, and changed validator supernode migration to delete the old valoper entry before writing the re-keyed record under the new valoper.
+
+**Tests**: `TestMigrateValidatorSupernode_IndependentAccountPreserved` verifies validator migration does not overwrite an already-migrated independent supernode account. `x/supernode/v1/keeper/supernode_by_account_internal_test.go` also adds a regression subtest that verifies deleting the old supernode removes the stale account index and allows the same account to be reattached under the migrated validator.
+
+---
+
+### 10) Validator migration leaves redelegation destination validators on legacy valopers
+
+**Symptom**: `tests_evmigration -mode=migrate-validator` fails post-migration checks for legacy accounts with redelegations after one or more destination validators are migrated later, for example:
+
+`expected redelegation on new address for <new-src-valoper>-><new-dst-valoper>, got 0`
+
+On-chain inspection showed the redelegation had moved to the new delegator address and, when applicable, to the migrated source validator, but its `validator_dst_address` still pointed at the old legacy destination valoper.
+
+**Root cause**: `MigrateValidatorDelegations` only re-keyed redelegations returned by `GetRedelegationsFromSrcValidator(oldValAddr)`. That covers records where the migrating validator is the redelegation source, but misses redelegations where the migrating validator appears only as the destination. As a result, destination-side validator migration left those redelegation records referencing the legacy valoper.
+
+**Fix** (`x/evmigration/keeper/migrate_validator.go`): Changed validator migration to iterate all redelegations and re-key any record where the migrating validator appears as either `ValidatorSrcAddress` or `ValidatorDstAddress`.
+
+**Tests**: `TestMigrateValidatorDelegations_WithUnbondingAndRedelegation` now covers both cases:
+- migrated validator as redelegation source
+- migrated validator as redelegation destination
+
+**Important note**: This fix prevents new bad migrations, but it does not repair redelegation records that were already migrated incorrectly on an existing chain. Those require a fresh devnet run or a dedicated repair path.

@@ -30,6 +30,10 @@ func SetEVMMempoolPriceBumpInAppToml(t *testing.T, homeDir string, priceBump uin
 	setEVMMempoolPriceBumpInAppToml(t, homeDir, priceBump)
 }
 
+func SetMempoolMaxTxsInAppToml(t *testing.T, homeDir string, maxTxs int) {
+	setMempoolMaxTxsInAppToml(t, homeDir, maxTxs)
+}
+
 func SetCometTxIndexer(t *testing.T, homeDir, indexer string) {
 	setCometTxIndexer(t, homeDir, indexer)
 }

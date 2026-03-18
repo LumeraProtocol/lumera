@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 
 	storetypes "cosmossdk.io/store/types"
+	actionprecompile "github.com/LumeraProtocol/lumera/precompiles/action"
+	supernodeprecompile "github.com/LumeraProtocol/lumera/precompiles/supernode"
 	precompiletypes "github.com/cosmos/evm/precompiles/types"
 
 	"github.com/spf13/cast"
@@ -144,19 +146,36 @@ func (app *App) syncEVMStoreKeys() {
 // configureEVMStaticPrecompiles wires Cosmos EVM's static precompile registry
 // once all keepers are initialized (including IBC transfer/channel keepers).
 func (app *App) configureEVMStaticPrecompiles() {
-	app.EVMKeeper.WithStaticPrecompiles(
-		precompiletypes.DefaultStaticPrecompiles(
-			*app.StakingKeeper,
-			app.DistrKeeper,
-			app.PreciseBankKeeper,
-			&app.Erc20Keeper,
-			&app.TransferKeeper,
-			app.IBCKeeper.ChannelKeeper,
-			*app.GovKeeper,
-			app.SlashingKeeper,
-			app.appCodec,
-		),
+	// Get default cosmos-evm precompiles (bank, staking, distribution, etc.)
+	precompiles := precompiletypes.DefaultStaticPrecompiles(
+		*app.StakingKeeper,
+		app.DistrKeeper,
+		app.PreciseBankKeeper,
+		&app.Erc20Keeper,
+		&app.TransferKeeper,
+		app.IBCKeeper.ChannelKeeper,
+		*app.GovKeeper,
+		app.SlashingKeeper,
+		app.appCodec,
 	)
+
+	// Register Lumera custom precompile: Action module
+	actionPC := actionprecompile.NewPrecompile(
+		app.ActionKeeper,
+		app.PreciseBankKeeper,
+		app.AuthKeeper.AddressCodec(),
+	)
+	precompiles[actionPC.Address()] = actionPC
+
+	// Register Lumera custom precompile: Supernode module
+	supernodePC := supernodeprecompile.NewPrecompile(
+		app.SupernodeKeeper,
+		app.PreciseBankKeeper,
+		app.AuthKeeper.AddressCodec(),
+	)
+	precompiles[supernodePC.Address()] = supernodePC
+
+	app.EVMKeeper.WithStaticPrecompiles(precompiles)
 }
 
 // DefaultGenesis overrides the runtime.App default genesis to patch EVM-related

@@ -32,26 +32,32 @@ detect_upgrade_halt() {
 	return 1
 }
 
-echo "Waiting for block height >= ${TARGET_HEIGHT} (service=${SERVICE}, timeout=${TIMEOUT_SECONDS}s)..."
+echo -n "Waiting for height >= ${TARGET_HEIGHT} (service=${SERVICE}, timeout=${TIMEOUT_SECONDS}s): "
 
+LAST_HEIGHT=""
 while ((SECONDS < deadline)); do
 	height="$(docker compose -f "${COMPOSE_FILE}" exec -T "${SERVICE}" \
 		lumerad status 2>/dev/null | jq -r '.sync_info.latest_block_height // "0"' 2>/dev/null || echo "0")"
 
 	if [[ "$height" =~ ^[0-9]+$ ]] && ((height >= TARGET_HEIGHT)); then
-		echo "Reached height ${height}."
+		echo "${height} ✓"
 		exit 0
 	fi
 
 	CONSECUTIVE_PENDING_POLLS=$((CONSECUTIVE_PENDING_POLLS + 1))
 	if ((CONSECUTIVE_PENDING_POLLS >= MAX_FAILURES_BEFORE_LOG_CHECK)) && detect_upgrade_halt; then
+		echo ""
 		echo "Node halted for upgrade at height ${TARGET_HEIGHT} (detected from container logs)."
 		exit 0
 	fi
 
-	echo "Current height ${height}."
+	if [[ "$height" != "$LAST_HEIGHT" && "$height" =~ ^[0-9]+$ && "$height" != "0" ]]; then
+		echo -n "${height}-"
+		LAST_HEIGHT="$height"
+	fi
 	sleep "${INTERVAL}"
 done
 
+echo ""
 echo "Timeout waiting for height ${TARGET_HEIGHT}." >&2
 exit 1

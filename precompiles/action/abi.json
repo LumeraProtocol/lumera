@@ -1,0 +1,627 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "IAction",
+  "sourceName": "solidity/precompiles/action/IAction.sol",
+  "abi": [
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "string",
+          "name": "actionId",
+          "type": "string"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "creator",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "actionType",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "price",
+          "type": "uint256"
+        }
+      ],
+      "name": "ActionRequested",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "string",
+          "name": "actionId",
+          "type": "string"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "superNode",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "newState",
+          "type": "uint8"
+        }
+      ],
+      "name": "ActionFinalized",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "string",
+          "name": "actionId",
+          "type": "string"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "creator",
+          "type": "address"
+        }
+      ],
+      "name": "ActionApproved",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "dataHash",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "fileName",
+          "type": "string"
+        },
+        {
+          "internalType": "uint64",
+          "name": "rqIdsIc",
+          "type": "uint64"
+        },
+        {
+          "internalType": "bytes",
+          "name": "signatures",
+          "type": "bytes"
+        },
+        {
+          "internalType": "uint256",
+          "name": "price",
+          "type": "uint256"
+        },
+        {
+          "internalType": "int64",
+          "name": "expirationTime",
+          "type": "int64"
+        },
+        {
+          "internalType": "uint64",
+          "name": "fileSizeKbs",
+          "type": "uint64"
+        }
+      ],
+      "name": "requestCascade",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "actionId",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "dataHash",
+          "type": "string"
+        },
+        {
+          "internalType": "uint64",
+          "name": "ddAndFingerprintsIc",
+          "type": "uint64"
+        },
+        {
+          "internalType": "uint256",
+          "name": "price",
+          "type": "uint256"
+        },
+        {
+          "internalType": "int64",
+          "name": "expirationTime",
+          "type": "int64"
+        },
+        {
+          "internalType": "uint64",
+          "name": "fileSizeKbs",
+          "type": "uint64"
+        }
+      ],
+      "name": "requestSense",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "actionId",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "actionId",
+          "type": "string"
+        },
+        {
+          "internalType": "string[]",
+          "name": "rqIdsIds",
+          "type": "string[]"
+        }
+      ],
+      "name": "finalizeCascade",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "actionId",
+          "type": "string"
+        },
+        {
+          "internalType": "string[]",
+          "name": "ddAndFingerprintsIds",
+          "type": "string[]"
+        },
+        {
+          "internalType": "string",
+          "name": "signatures",
+          "type": "string"
+        }
+      ],
+      "name": "finalizeSense",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "actionId",
+          "type": "string"
+        }
+      ],
+      "name": "approveAction",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "success",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "actionId",
+          "type": "string"
+        }
+      ],
+      "name": "getAction",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "string",
+              "name": "actionId",
+              "type": "string"
+            },
+            {
+              "internalType": "address",
+              "name": "creator",
+              "type": "address"
+            },
+            {
+              "internalType": "uint8",
+              "name": "actionType",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "state",
+              "type": "uint8"
+            },
+            {
+              "internalType": "string",
+              "name": "metadata",
+              "type": "string"
+            },
+            {
+              "internalType": "uint256",
+              "name": "price",
+              "type": "uint256"
+            },
+            {
+              "internalType": "int64",
+              "name": "expirationTime",
+              "type": "int64"
+            },
+            {
+              "internalType": "int64",
+              "name": "blockHeight",
+              "type": "int64"
+            },
+            {
+              "internalType": "address[]",
+              "name": "superNodes",
+              "type": "address[]"
+            }
+          ],
+          "internalType": "struct IAction.ActionInfo",
+          "name": "action",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint64",
+          "name": "dataSizeKbs",
+          "type": "uint64"
+        }
+      ],
+      "name": "getActionFee",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "baseFee",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "perKbFee",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "totalFee",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "creator",
+          "type": "address"
+        },
+        {
+          "internalType": "uint64",
+          "name": "offset",
+          "type": "uint64"
+        },
+        {
+          "internalType": "uint64",
+          "name": "limit",
+          "type": "uint64"
+        }
+      ],
+      "name": "getActionsByCreator",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "string",
+              "name": "actionId",
+              "type": "string"
+            },
+            {
+              "internalType": "address",
+              "name": "creator",
+              "type": "address"
+            },
+            {
+              "internalType": "uint8",
+              "name": "actionType",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "state",
+              "type": "uint8"
+            },
+            {
+              "internalType": "string",
+              "name": "metadata",
+              "type": "string"
+            },
+            {
+              "internalType": "uint256",
+              "name": "price",
+              "type": "uint256"
+            },
+            {
+              "internalType": "int64",
+              "name": "expirationTime",
+              "type": "int64"
+            },
+            {
+              "internalType": "int64",
+              "name": "blockHeight",
+              "type": "int64"
+            },
+            {
+              "internalType": "address[]",
+              "name": "superNodes",
+              "type": "address[]"
+            }
+          ],
+          "internalType": "struct IAction.ActionInfo[]",
+          "name": "actions",
+          "type": "tuple[]"
+        },
+        {
+          "internalType": "uint64",
+          "name": "total",
+          "type": "uint64"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint8",
+          "name": "state",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint64",
+          "name": "offset",
+          "type": "uint64"
+        },
+        {
+          "internalType": "uint64",
+          "name": "limit",
+          "type": "uint64"
+        }
+      ],
+      "name": "getActionsByState",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "string",
+              "name": "actionId",
+              "type": "string"
+            },
+            {
+              "internalType": "address",
+              "name": "creator",
+              "type": "address"
+            },
+            {
+              "internalType": "uint8",
+              "name": "actionType",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "state",
+              "type": "uint8"
+            },
+            {
+              "internalType": "string",
+              "name": "metadata",
+              "type": "string"
+            },
+            {
+              "internalType": "uint256",
+              "name": "price",
+              "type": "uint256"
+            },
+            {
+              "internalType": "int64",
+              "name": "expirationTime",
+              "type": "int64"
+            },
+            {
+              "internalType": "int64",
+              "name": "blockHeight",
+              "type": "int64"
+            },
+            {
+              "internalType": "address[]",
+              "name": "superNodes",
+              "type": "address[]"
+            }
+          ],
+          "internalType": "struct IAction.ActionInfo[]",
+          "name": "actions",
+          "type": "tuple[]"
+        },
+        {
+          "internalType": "uint64",
+          "name": "total",
+          "type": "uint64"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "superNode",
+          "type": "address"
+        },
+        {
+          "internalType": "uint64",
+          "name": "offset",
+          "type": "uint64"
+        },
+        {
+          "internalType": "uint64",
+          "name": "limit",
+          "type": "uint64"
+        }
+      ],
+      "name": "getActionsBySuperNode",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "string",
+              "name": "actionId",
+              "type": "string"
+            },
+            {
+              "internalType": "address",
+              "name": "creator",
+              "type": "address"
+            },
+            {
+              "internalType": "uint8",
+              "name": "actionType",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "state",
+              "type": "uint8"
+            },
+            {
+              "internalType": "string",
+              "name": "metadata",
+              "type": "string"
+            },
+            {
+              "internalType": "uint256",
+              "name": "price",
+              "type": "uint256"
+            },
+            {
+              "internalType": "int64",
+              "name": "expirationTime",
+              "type": "int64"
+            },
+            {
+              "internalType": "int64",
+              "name": "blockHeight",
+              "type": "int64"
+            },
+            {
+              "internalType": "address[]",
+              "name": "superNodes",
+              "type": "address[]"
+            }
+          ],
+          "internalType": "struct IAction.ActionInfo[]",
+          "name": "actions",
+          "type": "tuple[]"
+        },
+        {
+          "internalType": "uint64",
+          "name": "total",
+          "type": "uint64"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getParams",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "baseActionFee",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "feePerKbyte",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint64",
+          "name": "maxActionsPerBlock",
+          "type": "uint64"
+        },
+        {
+          "internalType": "uint64",
+          "name": "minSuperNodes",
+          "type": "uint64"
+        },
+        {
+          "internalType": "int64",
+          "name": "expirationDuration",
+          "type": "int64"
+        },
+        {
+          "internalType": "string",
+          "name": "superNodeFeeShare",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "foundationFeeShare",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x",
+  "deployedBytecode": "0x",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

@@ -34,6 +34,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/server/api"
 	"github.com/cosmos/cosmos-sdk/server/config"
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
+	"github.com/spf13/cast"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	sdkmempool "github.com/cosmos/cosmos-sdk/types/mempool"
@@ -148,6 +149,10 @@ type App struct {
 	// if true, the app will log additional information about mempool transaction broadcasts, which can be noisy but is useful for debugging mempool behavior.
 	evmBroadcastDebug  bool
 	evmBroadcastLogger log.Logger
+
+	// openRPCAllowedOrigins controls CORS for the /openrpc.json endpoint.
+	// Populated from [json-rpc] ws-origins at startup; empty means allow all.
+	openRPCAllowedOrigins []string
 
 	// jsonrpcRateLimitProxy is the optional rate-limiting reverse proxy for JSON-RPC.
 	jsonrpcRateLimitProxy       *http.Server
@@ -373,6 +378,11 @@ func New(
 
 	// Start optional JSON-RPC rate-limiting reverse proxy.
 	app.startJSONRPCRateLimitProxy(appOpts, logger)
+
+	// Reuse [json-rpc] ws-origins for OpenRPC CORS.
+	if origins, err := cast.ToStringSliceE(appOpts.Get("json-rpc.ws-origins")); err == nil {
+		app.openRPCAllowedOrigins = origins
+	}
 
 	// **** SETUP UPGRADES (upgrade handlers and store loaders) ****
 	// This needs to be done after keepers are initialized but before loading state.
@@ -603,7 +613,7 @@ func (app *App) RegisterAPIRoutes(apiSvr *api.Server, apiConfig config.APIConfig
 	if err := server.RegisterSwaggerAPI(apiSvr.ClientCtx, apiSvr.Router, apiConfig.Swagger); err != nil {
 		panic(err)
 	}
-	apiSvr.Router.HandleFunc(appopenrpc.HTTPPath, appopenrpc.ServeHTTP).Methods(http.MethodGet, http.MethodHead, http.MethodOptions)
+	apiSvr.Router.HandleFunc(appopenrpc.HTTPPath, appopenrpc.NewHTTPHandler(app.openRPCAllowedOrigins)).Methods(http.MethodGet, http.MethodHead, http.MethodOptions)
 
 	// register app's OpenAPI routes.
 	docs.RegisterOpenAPIService(Name, apiSvr.Router)

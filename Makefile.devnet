@@ -499,6 +499,18 @@ devnet-evm-upgrade:
 		echo "ERROR: stage 'devnet-upgrade-1120' failed" >&2; \
 		exit 1; \
 	fi; \
+	current_height="$$(docker compose -f $(COMPOSE_FILE) exec -T supernova_validator_1 \
+		lumerad status 2>/dev/null | jq -r '.sync_info.latest_block_height // empty' 2>/dev/null || true)"; \
+	if ! echo "$$current_height" | grep -Eq '^[0-9]+$$'; then \
+		echo "ERROR: stage 'post-upgrade wait' failed to determine current chain height" >&2; \
+		exit 1; \
+	fi; \
+	target_height=$$((current_height + 10)); \
+	echo "==> Stage: wait for height $${target_height} (post-upgrade settle)"; \
+	if ! ./devnet/scripts/wait-for-height.sh "$$target_height"; then \
+		echo "ERROR: stage 'post-upgrade wait' failed while waiting for height $${target_height}" >&2; \
+		exit 1; \
+	fi; \
 	echo "==> Stage: devnet-evmigrationp-estimate"; \
 	if ! $(MAKE) devnet-evmigrationp-estimate; then \
 		echo "ERROR: stage 'devnet-evmigrationp-estimate' failed" >&2; \
@@ -512,6 +524,11 @@ devnet-evm-upgrade:
 	echo "==> Stage: devnet-evmigrationp-migrate"; \
 	if ! $(MAKE) devnet-evmigrationp-migrate; then \
 		echo "ERROR: stage 'devnet-evmigrationp-migrate' failed" >&2; \
+		exit 1; \
+	fi; \
+	echo "==> Stage: devnet-evmigrationp-verify"; \
+	if ! $(MAKE) devnet-evmigrationp-verify; then \
+		echo "ERROR: stage 'devnet-evmigrationp-verify' failed" >&2; \
 		exit 1; \
 	fi; \
 	echo "devnet-evm-upgrade completed successfully."
@@ -560,7 +577,7 @@ devnet-deploy-tar:
 #   lumerad  = /shared/release/lumerad  (symlinked to PATH or used via -bin)
 #   home     = /root/.lumera
 #   RPC      = tcp://localhost:26657    (each container exposes its own node)
-#   accounts = /shared/evmigration-accounts-<validator_service>.json
+#   accounts = /shared/status/<moniker>/evmigration-accounts.json
 #              (unique per validator to avoid cross-validator key/account reuse)
 #   names    = evm_test_<validator_tag>_<idx> / evm_testex_<validator_tag>_<idx>
 #              (validator tag is auto-derived by tests_evmigration from local validator/funder key name)
@@ -568,12 +585,9 @@ devnet-deploy-tar:
 EVMIGRATION_CHAIN_ID ?= lumera-devnet-1
 EVMIGRATION_NUM_ACCOUNTS ?= 5
 EVMIGRATION_NUM_EXTRA ?= 5
-EVMIGRATION_ACCOUNTS_PREFIX ?= /shared/evmigration-accounts
-
 # Container-internal paths (the /shared volume is mounted from $(DEVNET_DIR)/shared).
 _EVMIGRATION_BIN_CONTAINER  := /shared/release/tests_evmigration
 _EVMIGRATION_LUMERAD_CONTAINER := /shared/release/lumerad
-_EVMIGRATION_ACCOUNTS_CONTAINER_PREFIX := $(EVMIGRATION_ACCOUNTS_PREFIX)
 _EVMIGRATION_BIN_HOST := $(DEVNET_BIN_DIR_ABS)/tests_evmigration
 _EVMIGRATION_BIN_SHARED_HOST := $(SHARED_RELEASE_DIR)/tests_evmigration
 
@@ -598,7 +612,7 @@ define _run_evmigration_in_containers
 		exit 1; \
 	fi; \
 	for svc in $$services; do \
-		accounts_path="$(_EVMIGRATION_ACCOUNTS_CONTAINER_PREFIX)-$${svc}.json"; \
+		accounts_path="/shared/status/$${svc}/evmigration-accounts.json"; \
 		echo "=== $(1) on $${svc} ==="; \
 		echo "    accounts file: $${accounts_path}"; \
 		docker compose -f $(COMPOSE_FILE) exec -T "$${svc}" \
@@ -639,6 +653,9 @@ devnet-evmigration-migrate: devnet-evmigration-sync-bin
 devnet-evmigration-migrate-validator: devnet-evmigration-sync-bin
 	$(call _run_evmigration_in_containers,migrate-validator)
 
+devnet-evmigration-verify: devnet-evmigration-sync-bin
+	$(call _run_evmigration_in_containers,verify)
+
 devnet-evmigration-cleanup: devnet-evmigration-sync-bin
 	$(call _run_evmigration_in_containers,cleanup)
 
@@ -660,7 +677,7 @@ define _run_evmigration_in_containers_parallel
 	tmpdir="$$(mktemp -d)"; \
 	pids=""; \
 	for svc in $$services; do \
-		accounts_path="$(_EVMIGRATION_ACCOUNTS_CONTAINER_PREFIX)-$${svc}.json"; \
+		accounts_path="/shared/status/$${svc}/evmigration-accounts.json"; \
 		echo "=== $(1) on $${svc} (parallel) ==="; \
 		( docker compose -f $(COMPOSE_FILE) exec -T "$${svc}" \
 			"$(_EVMIGRATION_BIN_CONTAINER)" \
@@ -698,6 +715,9 @@ devnet-evmigrationp-migrate: devnet-evmigration-sync-bin
 
 devnet-evmigrationp-migrate-validator: devnet-evmigration-sync-bin
 	$(call _run_evmigration_in_containers_parallel,migrate-validator)
+
+devnet-evmigrationp-verify: devnet-evmigration-sync-bin
+	$(call _run_evmigration_in_containers_parallel,verify)
 
 devnet-evmigrationp-cleanup: devnet-evmigration-sync-bin
 	$(call _run_evmigration_in_containers_parallel,cleanup)

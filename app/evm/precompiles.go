@@ -1,6 +1,10 @@
 package evm
 
-import evmtypes "github.com/cosmos/evm/x/vm/types"
+import (
+	actionprecompile "github.com/LumeraProtocol/lumera/precompiles/action"
+	supernodeprecompile "github.com/LumeraProtocol/lumera/precompiles/supernode"
+	evmtypes "github.com/cosmos/evm/x/vm/types"
+)
 
 // LumeraActiveStaticPrecompiles lists static precompile addresses that are both
 // enabled in genesis params and registered in the keeper precompile map.
@@ -17,4 +21,7 @@ var LumeraActiveStaticPrecompiles = []string{
 	evmtypes.BankPrecompileAddress,
 	evmtypes.GovPrecompileAddress,
 	evmtypes.SlashingPrecompileAddress,
+	// Lumera custom precompiles
+	actionprecompile.ActionPrecompileAddress,
+	supernodeprecompile.SupernodePrecompileAddress,
 }

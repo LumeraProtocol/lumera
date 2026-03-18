@@ -142,7 +142,7 @@ type AccountsFile struct {
 }
 
 var (
-	flagMode          = flag.String("mode", "", "prepare or estimate or migrate or migrate-validator or cleanup")
+	flagMode          = flag.String("mode", "", "prepare|estimate|migrate|migrate-validator|verify|cleanup")
 	flagBin           = flag.String("bin", "lumerad", "lumerad binary path")
 	flagRPC           = flag.String("rpc", "tcp://localhost:26657", "RPC endpoint")
 	flagGRPC          = flag.String("grpc", "", "gRPC endpoint (default: derived from --rpc host + port 9090)")
@@ -182,9 +182,11 @@ func main() {
 		runMigrate()
 	case "migrate-validator":
 		runMigrateValidator()
+	case "verify":
+		runVerify()
 	case "cleanup":
 		runCleanup()
 	default:
-		log.Fatalf("usage: -mode=prepare|estimate|migrate|migrate-validator|cleanup")
+		log.Fatalf("usage: -mode=prepare|estimate|migrate|migrate-validator|verify|cleanup")
 	}
 }

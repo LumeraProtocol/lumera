@@ -861,8 +861,118 @@ restart_supernode_after_evm_migration_if_needed() {
 
 	echo "[SN] Supernode completed in-process EVM migration; restarting to refresh runtime key state."
 	stop_supernode_process || return 1
+
+	# Update status files and configs with the new post-migration addresses.
+	update_addresses_after_evm_migration
+	migrate_sncli_account_if_needed
+
 	start_supernode_process
 	echo "[SN] Supernode restarted after EVM migration."
+}
+
+# After the supernode binary migrates its account on-chain, update the
+# persisted address file and sncli config to reflect the new EVM address.
+update_addresses_after_evm_migration() {
+	local new_sn_addr configured_key_name
+
+	configured_key_name="$(get_supernode_config_value "$SN_CONFIG" "key_name")"
+	new_sn_addr="$(daemon_key_address "$configured_key_name" || true)"
+	if [[ -z "$new_sn_addr" ]]; then
+		echo "[SN] WARN: could not resolve post-migration SN address for ${configured_key_name}"
+		return 0
+	fi
+
+	# Preserve old address file as -pre-evm, write new address.
+	if [[ -f "$SN_ADDR_FILE" ]]; then
+		cp -f "$SN_ADDR_FILE" "${SN_ADDR_FILE}-pre-evm"
+		echo "[SN] Saved pre-EVM supernode address to ${SN_ADDR_FILE}-pre-evm"
+	fi
+	echo "$new_sn_addr" >"$SN_ADDR_FILE"
+	SN_ADDR="$new_sn_addr"
+	echo "[SN] Updated supernode-address: $new_sn_addr"
+
+	# Update sncli config with new supernode address (if sncli is configured).
+	if [[ -f "$SNCLI_CFG" ]] && have crudini; then
+		crudini --set "${SNCLI_CFG}" supernode address "\"${new_sn_addr}\""
+		echo "[SN] Updated sncli config supernode.address: $new_sn_addr"
+	fi
+}
+
+# Migrate the sncli-account key from legacy (secp256k1) to EVM (eth_secp256k1)
+# if the chain supports EVM and the key is still legacy.
+migrate_sncli_account_if_needed() {
+	if [[ ! -f "$SNCLI_CFG" ]] || ! have crudini; then
+		return 0
+	fi
+
+	local sncli_key_type sncli_mnemonic old_addr new_addr
+	sncli_key_type="$(daemon_key_pubkey_type "$SNCLI_KEY_NAME" || true)"
+
+	# Already EVM — nothing to do.
+	if is_evm_pubkey_type "$sncli_key_type"; then
+		return 0
+	fi
+
+	# Not legacy — unknown, skip.
+	if ! is_legacy_pubkey_type "$sncli_key_type"; then
+		echo "[SNCLI] Key ${SNCLI_KEY_NAME} has unknown type ${sncli_key_type:-missing}; skipping migration."
+		return 0
+	fi
+
+	# Need mnemonic to re-derive the key with coin-type 60.
+	if [[ ! -f "$SNCLI_MNEMONIC_FILE" ]]; then
+		echo "[SNCLI] No mnemonic file for ${SNCLI_KEY_NAME}; cannot migrate to EVM key."
+		return 0
+	fi
+	sncli_mnemonic="$(cat "$SNCLI_MNEMONIC_FILE")"
+	if [[ -z "$sncli_mnemonic" ]]; then
+		echo "[SNCLI] Empty mnemonic file for ${SNCLI_KEY_NAME}; cannot migrate."
+		return 0
+	fi
+
+	old_addr="$(daemon_key_address "$SNCLI_KEY_NAME" || true)"
+	echo "[SNCLI] Migrating ${SNCLI_KEY_NAME} from legacy to EVM key type..."
+
+	# Save old address, re-create key as EVM type.
+	if [[ -f "$SNCLI_ADDR_FILE" ]]; then
+		cp -f "$SNCLI_ADDR_FILE" "${SNCLI_ADDR_FILE}-pre-evm"
+	fi
+
+	# Delete and re-add with EVM key type.
+	$DAEMON keys delete "$SNCLI_KEY_NAME" --keyring-backend "$KEYRING_BACKEND" -y >/dev/null 2>&1 || true
+	printf '%s\n' "$sncli_mnemonic" | $DAEMON keys add "$SNCLI_KEY_NAME" \
+		--recover \
+		--keyring-backend "$KEYRING_BACKEND" \
+		--key-type "eth_secp256k1" \
+		--hd-path "$SN_EVM_HD_PATH" >/dev/null
+
+	new_addr="$(daemon_key_address "$SNCLI_KEY_NAME" || true)"
+	echo "[SNCLI] ${SNCLI_KEY_NAME}: ${old_addr} -> ${new_addr}"
+
+	# Update address file and sncli config.
+	echo "$new_addr" >"$SNCLI_ADDR_FILE"
+	crudini --set "${SNCLI_CFG}" keyring local_address "\"$new_addr\""
+	echo "[SNCLI] Updated sncli config keyring.local_address: $new_addr"
+
+	# Fund the new sncli address if needed (balance is on the old address).
+	local bal
+	bal="$($DAEMON q bank balances "$new_addr" --output json 2>/dev/null | \
+		jq -r --arg denom "$DENOM" '([.balances[]? | select(.denom == $denom) | .amount] | first) // "0"')"
+	[[ -z "$bal" ]] && bal="0"
+	if ((bal < SNCLI_MIN_AMOUNT)); then
+		echo "[SNCLI] Funding migrated ${SNCLI_KEY_NAME} ($new_addr)..."
+		local send_json txhash
+		send_json="$($DAEMON tx bank send "$GENESIS_ADDR" "$new_addr" "${SNCLI_FUND_AMOUNT}${DENOM}" \
+			--chain-id "$CHAIN_ID" \
+			--keyring-backend "$KEYRING_BACKEND" \
+			--gas auto --gas-adjustment 1.3 \
+			--gas-prices "${TX_GAS_PRICES}" \
+			--output json --yes 2>/dev/null || true)"
+		txhash="$(echo "$send_json" | jq -r '.txhash // empty')"
+		if [[ -n "$txhash" ]]; then
+			wait_for_tx "$txhash" || echo "[SNCLI] WARN: funding tx may not have confirmed"
+		fi
+	fi
 }
 
 # Extract the numeric suffix from MONIKER (e.g. "supernova_validator_3" → 3)

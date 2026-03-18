@@ -32,7 +32,7 @@ Two custom ante decorators support the migration:
 
 ## Modes
 
-The tool has five operating modes, designed to be run sequentially during a devnet upgrade cycle.
+The tool has six operating modes, designed to be run sequentially during a devnet upgrade cycle.
 
 ### 1. `prepare` — Create Legacy State (Pre-EVM)
 
@@ -129,7 +129,27 @@ Extensive post-migration validation:
 - Supernode fields verified: `ValidatorAddress`, `SupernodeAccount`, `Evidence` entries, `PrevSupernodeAccounts` history (new entry appended with current block height), `MetricsState` re-keyed.
 - If the validator's supernode account was already migrated independently before validator migration, it must be preserved and reattached under the new valoper without tripping the stale supernode-account index collision.
 
-### 5. `cleanup` — Remove Test Keys
+### 5. `verify` — Verify No Leftover Legacy State (Post-Migration)
+
+Run **after** all migrations complete. Queries every chain module (except `x/evmigration` itself) via RPC to confirm that no legacy address references remain in on-chain state.
+
+For each migrated legacy address, the tool checks:
+
+| Module | Check |
+|---|---|
+| **bank** | No remaining balance on legacy address |
+| **staking** | No delegations, unbonding delegations, or redelegations |
+| **distribution** | No pending rewards; withdraw address not pointing to legacy |
+| **authz** | No grants as granter or grantee |
+| **feegrant** | No allowances as granter or grantee |
+| **action** | No actions referencing legacy as creator or supernode |
+| **claim** | No unclaimed records; `dest_address` not pointing to legacy |
+| **supernode** | No `supernode_account` or `evidence.reporter_address` fields referencing legacy (note: `prev_supernode_accounts` entries are excluded — legacy addresses there are legitimate historical records) |
+| **evmigration** | Migration record must exist; estimate must return "already migrated" |
+
+Results are reported as either `PASS` (all addresses clean) or `FAIL` with per-address details grouped by module. The tool exits with a non-zero status on failure, which halts the pipeline.
+
+### 6. `cleanup` — Remove Test Keys
 
 Loads `accounts.json` and deletes all test keys from the local keyring (`~/.lumera/keyring-test/` or the path from `-home`).
 
@@ -137,7 +157,7 @@ Loads `accounts.json` and deletes all test keys from the local keyring (`~/.lume
 
 | Flag | Default | Description |
 |---|---|---|
-| `-mode` | (required) | `prepare`, `estimate`, `migrate`, `migrate-validator`, or `cleanup` |
+| `-mode` | (required) | `prepare`, `estimate`, `migrate`, `migrate-validator`, `verify`, or `cleanup` |
 | `-bin` | `lumerad` | Path to `lumerad` binary |
 | `-rpc` | `tcp://localhost:26657` | Tendermint RPC endpoint |
 | `-grpc` | (derived from RPC) | gRPC endpoint (default: RPC host + port 9090) |
@@ -169,6 +189,7 @@ These run the tool on each validator container **one at a time**, in order:
 | `make devnet-evmigration-estimate` | Run estimate mode on all validator containers |
 | `make devnet-evmigration-migrate` | Run migrate mode on all validator containers |
 | `make devnet-evmigration-migrate-validator` | Run migrate-validator mode on all validator containers |
+| `make devnet-evmigration-verify` | Run verify mode on all validator containers |
 | `make devnet-evmigration-cleanup` | Run cleanup mode on all validator containers |
 
 ### Parallel targets (`devnet-evmigrationp-*`)
@@ -181,6 +202,7 @@ These run the tool on **all validator containers simultaneously** using backgrou
 | `make devnet-evmigrationp-estimate` | Run estimate mode on all validators in parallel |
 | `make devnet-evmigrationp-migrate` | Run migrate mode on all validators in parallel |
 | `make devnet-evmigrationp-migrate-validator` | Run migrate-validator mode on all validators in parallel |
+| `make devnet-evmigrationp-verify` | Run verify mode on all validators in parallel |
 | `make devnet-evmigrationp-cleanup` | Run cleanup mode on all validators in parallel |
 
 The parallel targets use the `_run_evmigration_in_containers_parallel` macro, which spawns one `docker compose exec` per validator service as a background process, collects exit codes, and prints output prefixed by service name. This is significantly faster for modes like `prepare` and `migrate` where each validator's work is independent.
@@ -199,6 +221,7 @@ The `make devnet-evm-upgrade` target runs the **complete end-to-end EVM upgrade 
 | 6. Check estimates | `devnet-evmigrationp-estimate` (verify all accounts are `ready_to_migrate`) |
 | 7. Migrate validators | `devnet-evmigrationp-migrate-validator` (validator operators first) |
 | 8. Migrate accounts | `devnet-evmigrationp-migrate` (regular accounts second) |
+| 9. Verify clean state | `devnet-evmigrationp-verify` (confirms no legacy address leftovers in any module) |
 
 Each stage has error handling — if any stage fails, the pipeline aborts with a clear error message identifying which stage failed. Validators are migrated before regular accounts because `MsgMigrateValidator` atomically re-keys the validator record and all its delegations, which must happen before delegators attempt their own migration.
 
@@ -216,9 +239,8 @@ make devnet-evm-upgrade
 | `EVMIGRATION_CHAIN_ID` | `lumera-devnet-1` | Chain ID passed to the tool |
 | `EVMIGRATION_NUM_ACCOUNTS` | `5` | Number of legacy accounts per validator |
 | `EVMIGRATION_NUM_EXTRA` | `5` | Number of extra accounts per validator |
-| `EVMIGRATION_ACCOUNTS_PREFIX` | `/shared/evmigration-accounts` | Container path prefix for accounts JSON |
 
-Each validator gets its own accounts file (`/shared/evmigration-accounts-<service>.json`) to avoid cross-validator key/account collisions. Account name tags are auto-derived from the local validator/funder key name.
+Each validator gets its own accounts file (`/shared/status/<moniker>/evmigration-accounts.json`) to avoid cross-validator key/account collisions. Account name tags are auto-derived from the local validator/funder key name.
 
 ## Building the Test Binary
 
@@ -260,7 +282,7 @@ Once the devnet is running on v1.11.0:
 make devnet-evmigration-prepare
 ```
 
-This creates legacy accounts and activity on each validator node. Accounts JSON files are written to `/shared/evmigration-accounts-<validator>.json` inside the containers.
+This creates legacy accounts and activity on each validator node. Accounts JSON files are written to `/shared/status/<moniker>/evmigration-accounts.json` inside the containers.
 
 ### Step 3: Upgrade to v1.12.0 (EVM)
 
@@ -302,7 +324,15 @@ make devnet-evmigration-migrate-validator
 
 Migrates the validator operator account on each node with full post-migration validation.
 
-### Step 7: Clean up
+### Step 7: Verify clean state
+
+```bash
+make devnet-evmigration-verify
+```
+
+Queries all modules via RPC to confirm no legacy address references remain (except legitimate `prev_supernode_accounts` entries). Exits non-zero if any leftover state is found.
+
+### Step 8: Clean up
 
 ```bash
 make devnet-evmigration-cleanup
@@ -318,6 +348,7 @@ All modes are **idempotent**:
 - **estimate** — can be run any number of times; purely read-only.
 - **migrate** — checks `migration-record` on-chain before submitting; skips already-migrated accounts and saves progress after each batch.
 - **migrate-validator** — checks migration record before submitting.
+- **verify** — purely read-only; can be run any number of times.
 - **cleanup** — silently skips keys that don't exist.
 
 ## Runtime Version Checks

@@ -150,9 +150,16 @@ func (k Keeper) MigrateValidatorDelegations(ctx sdk.Context, oldValAddr, newValA
 		}
 	}
 
-	// Re-key redelegations where oldValAddr is source.
-	reds, err := k.stakingKeeper.GetRedelegationsFromSrcValidator(ctx, oldValAddr)
-	if err != nil {
+	// Re-key redelegations where oldValAddr appears as either source or
+	// destination validator. Existing in-flight redelegations must continue to
+	// point at the migrated validator record after operator migration.
+	var reds []stakingtypes.Redelegation
+	if err := k.stakingKeeper.IterateRedelegations(ctx, func(_ int64, red stakingtypes.Redelegation) bool {
+		if red.ValidatorSrcAddress == oldValAddr.String() || red.ValidatorDstAddress == oldValAddr.String() {
+			reds = append(reds, red)
+		}
+		return false
+	}); err != nil {
 		return err
 	}
 
@@ -163,9 +170,15 @@ func (k Keeper) MigrateValidatorDelegations(ctx sdk.Context, oldValAddr, newValA
 
 		newRed := stakingtypes.Redelegation{
 			DelegatorAddress:    red.DelegatorAddress,
-			ValidatorSrcAddress: newValAddr.String(),
+			ValidatorSrcAddress: red.ValidatorSrcAddress,
 			ValidatorDstAddress: red.ValidatorDstAddress,
 			Entries:             red.Entries,
+		}
+		if red.ValidatorSrcAddress == oldValAddr.String() {
+			newRed.ValidatorSrcAddress = newValAddr.String()
+		}
+		if red.ValidatorDstAddress == oldValAddr.String() {
+			newRed.ValidatorDstAddress = newValAddr.String()
 		}
 		if err := k.stakingKeeper.SetRedelegation(ctx, newRed); err != nil {
 			return err
@@ -273,8 +286,13 @@ func (k Keeper) MigrateValidatorSupernode(ctx sdk.Context, oldValAddr, newValAdd
 		return nil
 	}
 
+	// Remove the old primary record and secondary account index before writing
+	// the re-keyed record under the new valoper. This avoids a false collision
+	// when the supernode account was already migrated independently.
+	k.supernodeKeeper.DeleteSuperNode(ctx, oldValAddr)
+
 	// Update validator address to new valoper.
-	sn.ValidatorAddress = sdk.ValAddress(newAddr).String()
+	sn.ValidatorAddress = newValAddr.String()
 
 	// Only update SupernodeAccount if it matches the validator's legacy address.
 	// A supernode account that belongs to a different entity (or was already

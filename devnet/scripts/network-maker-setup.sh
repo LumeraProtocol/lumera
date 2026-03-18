@@ -1,19 +1,37 @@
 #!/bin/bash
 # /root/scripts/network-maker-setup.sh
 #
-# Modes (env START_MODE):
-#   run   (default)  Perform optional install, configure, fund nm-account if needed, and start network-maker.
-#   wait              Only wait until lumerad RPC is ready AND supernode is up, then exit 0.
+# Network-maker setup and lifecycle script for Lumera devnet.
 #
-# This script is a no-op if:
-# - /shared/release/network-maker is missing, OR
-# - validators.json has "network-maker": false (or missing) for this MONIKER.
+# Network-maker is a multi-account management service used for NFT/scanner
+# operations. It runs on a single validator (typically validator_3, controlled
+# by validators.json "network-maker" flag). It provides gRPC + HTTP APIs for
+# managing accounts, scanning files, and submitting transactions.
+#
+# Modes (env START_MODE):
+#   run   (default)  Install binary, create/fund accounts, configure, and start.
+#   wait             Only wait until lumerad RPC + supernode are ready, then exit.
+#
+# This script is a no-op (exits 0) if:
+#   - /shared/release/network-maker binary is missing, OR
+#   - validators.json has "network-maker": false (or missing) for this MONIKER
+#
+# Dependencies (must complete before this script runs):
+#   - validator-setup.sh → provides genesis-address file
+#   - supernode-setup.sh → provides running supernode endpoint
+#
+# Environment:
+#   MONIKER            - Validator moniker, set by docker-compose
+#   START_MODE         - "run" (default) or "wait"
+#   NM_GRPC_PORT       - gRPC listen port (default 50051)
+#   NM_HTTP_PORT       - HTTP gateway port (default 8080)
 #
 set -euo pipefail
 
 START_MODE="${START_MODE:-run}"
 
-# ----- env / paths -----
+# ─── Paths & Constants ────────────────────────────────────────────────────────
+
 : "${MONIKER:?MONIKER environment variable must be set}"
 
 SUPERNODE_INSTALL_WAIT_TIMEOUT=300
@@ -25,7 +43,7 @@ RELEASE_DIR="${SHARED_DIR}/release"
 STATUS_DIR="${SHARED_DIR}/status"
 NODE_STATUS_DIR="${STATUS_DIR}/${MONIKER}"
 
-# In-container standard ports (cosmos-sdk)
+# Network ports (inside container)
 LUMERA_GRPC_PORT="${LUMERA_GRPC_PORT:-9090}"
 LUMERA_RPC_PORT="${LUMERA_RPC_PORT:-26657}"
 LUMERA_RPC_ADDR="http://localhost:${LUMERA_RPC_PORT}"
@@ -35,31 +53,38 @@ SN_ENDPOINT="${IP_ADDR}:${SUPERNODE_PORT}"
 DAEMON="${DAEMON:-lumerad}"
 DAEMON_HOME="${DAEMON_HOME:-/root/.lumera}"
 
+# Network-maker binary and config paths
 NM="network-maker"
-NM_SRC_BIN="${RELEASE_DIR}/${NM}"
-NM_DST_BIN="/usr/local/bin/${NM}"
-NM_HOME="/root/.${NM}"
-NM_FILES_DIR="/root/nm-files"
-NM_FILES_DIR_SHARED="/shared/nm-files"
+NM_SRC_BIN="${RELEASE_DIR}/${NM}"       # Source: copied from host by configure.sh
+NM_DST_BIN="/usr/local/bin/${NM}"       # Destination: installed location
+NM_HOME="/root/.${NM}"                  # Runtime home directory
+NM_FILES_DIR="/root/nm-files"           # Local scanner directory
+NM_FILES_DIR_SHARED="/shared/nm-files"  # Shared scanner directory (across containers)
 NM_LOG="${NM_LOG:-/root/logs/network-maker.log}"
-NM_TEMPLATE="${RELEASE_DIR}/nm-config.toml" # Your template in /shared/release (you said it's attached as config.toml)
-NM_CONFIG="${NM_HOME}/config.toml"
+NM_TEMPLATE="${RELEASE_DIR}/nm-config.toml"  # Config template from host
+NM_CONFIG="${NM_HOME}/config.toml"           # Active config (patched from template)
 NM_GRPC_PORT="${NM_GRPC_PORT:-50051}"
 NM_HTTP_PORT="${NM_HTTP_PORT:-8080}"
 
+# Account management — network-maker gets its own funded keyring accounts
+# separate from the validator and supernode accounts.
 NM_KEY_PREFIX="nm-account"
 NM_MNEMONIC_FILE_BASE="${NODE_STATUS_DIR}/nm_mnemonic"
 NM_ADDR_FILE="${NODE_STATUS_DIR}/nm-address"
-GENESIS_ADDR_FILE="${NODE_STATUS_DIR}/genesis-address"
-SN_ADDR_FILE="${NODE_STATUS_DIR}/supernode-address"
+GENESIS_ADDR_FILE="${NODE_STATUS_DIR}/genesis-address"  # Written by validator-setup.sh
+SN_ADDR_FILE="${NODE_STATUS_DIR}/supernode-address"      # Written by supernode-setup.sh
 
+# Arrays populated by configure_nm_accounts()
 declare -a NM_ACCOUNT_KEY_NAMES=()
 declare -a NM_ACCOUNT_ADDRESSES=()
 declare -a NM_FUND_TX_HASHES=()
 
 mkdir -p "${NODE_STATUS_DIR}" "$(dirname "${NM_LOG}")" "${NM_HOME}"
 
-# ----- tiny helpers -----
+# ═════════════════════════════════════════════════════════════════════════════
+# UTILITY FUNCTIONS
+# ═════════════════════════════════════════════════════════════════════════════
+
 run() {
 	echo "+ $*" >&2
 	"$@"
@@ -73,10 +98,11 @@ run_capture() {
 have() { command -v "$1" >/dev/null 2>&1; }
 wait_for_file() { while [ ! -s "$1" ]; do sleep 1; done; }
 
+# Exit with success (0) so the container keeps running even when NM is skipped
 fail_soft() {
 	echo "[NM] $*"
 	exit 0
-} # exit 0 so container keeps running
+}
 
 version_ge() {
 	printf '%s\n' "$2" "$1" | sort -V | head -n1 | grep -q "^$2$"
@@ -109,6 +135,8 @@ wait_for_block_height_increase() {
 	exit 1
 }
 
+# Wait for a tx to be confirmed on-chain. Tries WebSocket-based wait-tx first,
+# then falls back to polling `q tx` by hash.
 wait_for_tx_confirmation() {
 	local txhash="$1"
 	if ! ${DAEMON} q wait-tx "${txhash}" --timeout 90s >/dev/null 2>&1; then
@@ -134,7 +162,7 @@ wait_for_tx_confirmation() {
 	fi
 }
 
-# ----- prerequisites / config reads -----
+# ─── Read Config ──────────────────────────────────────────────────────────────
 have jq || echo "[NM] WARNING: jq is missing; attempting to proceed."
 
 [ -f "${CFG_CHAIN}" ] || {
@@ -146,11 +174,11 @@ have jq || echo "[NM] WARNING: jq is missing; attempting to proceed."
 	exit 1
 }
 
-# Pull global chain settings
+# Global chain settings from config.json
 CHAIN_ID="$(jq -r '.chain.id' "${CFG_CHAIN}")"
 DENOM="$(jq -r '.chain.denom.bond' "${CFG_CHAIN}")"
 KEYRING_BACKEND="$(jq -r '.daemon.keyring_backend' "${CFG_CHAIN}")"
-# Default number of network-maker accounts
+# Number of NM accounts to create (configurable in config.json → network-maker.max_accounts)
 DEFAULT_NM_MAX_ACCOUNTS=1
 NM_MAX_ACCOUNTS="${DEFAULT_NM_MAX_ACCOUNTS}"
 NM_CFG_MAX_ACCOUNTS="$(jq -r 'try .["network-maker"].max_accounts // ""' "${CFG_CHAIN}")"
@@ -170,7 +198,7 @@ if [[ "${NM_ACCOUNT_BALANCE}" =~ ^[0-9]+$ ]]; then
 	NM_ACCOUNT_BALANCE="${NM_ACCOUNT_BALANCE}${DENOM}"
 fi
 
-# Pull this validator record + node ports + optional NM flag
+# Load this validator's record and check if network-maker is enabled for it
 VAL_REC_JSON="$(jq -c --arg m "$MONIKER" '[.[] | select(.moniker==$m)][0]' "${CFG_VALS}")"
 [ -n "${VAL_REC_JSON}" ] && [ "${VAL_REC_JSON}" != "null" ] || {
 	echo "[NM] Validator moniker ${MONIKER} not found in validators.json"
@@ -183,7 +211,8 @@ NM_HTTP_PORT="$(echo "${VAL_REC_JSON}" | jq -r 'try .["network-maker"].http_port
 if [ -z "${NM_GRPC_PORT}" ] || [ "${NM_GRPC_PORT}" = "null" ]; then NM_GRPC_PORT="${NM_GRPC_PORT:-50051}"; fi
 if [ -z "${NM_HTTP_PORT}" ] || [ "${NM_HTTP_PORT}" = "null" ]; then NM_HTTP_PORT="${NM_HTTP_PORT:-8080}"; fi
 
-# ----- short-circuits -----
+# ─── Short-Circuit Checks ─────────────────────────────────────────────────────
+# Exit early if NM is not applicable for this validator.
 if [ "${START_MODE}" = "wait" ]; then
 	# Just wait until both lumerad RPC and supernode are reachable, then exit 0.
 	:
@@ -197,7 +226,11 @@ else
 	fi
 fi
 
-# ----- start network-maker (idempotent) -----
+# ═════════════════════════════════════════════════════════════════════════════
+# PROCESS LIFECYCLE
+# ═════════════════════════════════════════════════════════════════════════════
+
+# Start network-maker as a background process (idempotent)
 start_network_maker() {
 	if pgrep -x ${NM} >/dev/null 2>&1; then
 		echo "[NM] network-maker already running; skipping start."
@@ -219,11 +252,14 @@ stop_network_maker_if_running() {
 	fi
 }
 
-# ----- waiters -----
-# Add one directory to [scanner].directories in a TOML-ish/INI file using crudini.
-# - Creates [scanner] if missing
-# - Creates directories if missing -> ["<dir>"]
-# - If exists: inserts "<dir>" once (no duplicates), preserving existing entries
+# ═════════════════════════════════════════════════════════════════════════════
+# CONFIGURATION
+# Patch the config template with runtime values (endpoints, accounts, paths).
+# The config uses TOML format with INI-style sections edited via crudini.
+# ═════════════════════════════════════════════════════════════════════════════
+
+# Add a directory to [scanner].directories in the TOML config.
+# Handles missing sections, non-list values, and duplicate prevention.
 add_dir_to_scanner() {
 	local dir="$1"
 	local cfg="$2"
@@ -278,7 +314,10 @@ add_dir_to_scanner() {
 	crudini --set "$cfg" scanner directories "[${new_inner}]"
 }
 
-# Configure network-maker options
+# Build the active config from the template, then patch in runtime values:
+# - Chain connection (gRPC, RPC, chain ID, denom)
+# - Network-maker listen addresses (gRPC + HTTP gateway)
+# - Keyring settings and account list
 configure_nm() {
 	local cfg="$NM_CONFIG"
 
@@ -316,6 +355,8 @@ configure_nm() {
 	update_nm_keyring_accounts "$cfg"
 }
 
+# Write [[keyring.accounts]] TOML array entries into the config.
+# First strips any existing [[keyring.accounts]] blocks, then appends fresh ones.
 update_nm_keyring_accounts() {
 	local cfg="$1"
 	local total_accounts="${#NM_ACCOUNT_KEY_NAMES[@]}"
@@ -356,7 +397,12 @@ update_nm_keyring_accounts() {
 	echo "[NM] Configured ${total_accounts} network-maker account(s) in ${cfg}"
 }
 
-# Wait for lumerad RPC to become available
+# ═════════════════════════════════════════════════════════════════════════════
+# CHAIN & SUPERNODE READINESS WAITERS
+# Network-maker depends on both lumerad (for tx submission) and supernode
+# (for task coordination). Both must be up before NM can start.
+# ═════════════════════════════════════════════════════════════════════════════
+
 wait_for_lumera() {
 	echo "[NM] Waiting for lumerad RPC at ${LUMERA_RPC_ADDR}..."
 	for i in $(seq 1 180); do
@@ -370,7 +416,8 @@ wait_for_lumera() {
 	return 1
 }
 
-# Wait for supernode to become available
+# Wait for supernode to become reachable. Checks both process presence
+# (for local endpoints) and TCP port reachability.
 wait_for_supernode() {
 	local ep="${SN_ENDPOINT}"
 	local host="${ep%:*}"
@@ -406,7 +453,11 @@ wait_for_supernode() {
 	return 1
 }
 
-# ----- optional network-maker install -----
+# ═════════════════════════════════════════════════════════════════════════════
+# BINARY INSTALLATION
+# ═════════════════════════════════════════════════════════════════════════════
+
+# Copy NM binary from shared release dir to /usr/local/bin/ (idempotent)
 install_network_maker_binary() {
 	if [ ! -f "${NM_DST_BIN}" ]; then
 		echo "[NM] Installing ${NM} binary..."
@@ -423,6 +474,15 @@ install_network_maker_binary() {
 	fi
 }
 
+# ═════════════════════════════════════════════════════════════════════════════
+# ACCOUNT MANAGEMENT
+# Create NM_MAX_ACCOUNTS keyring keys (nm-account, nm-account-2, etc.),
+# fund each from the validator's genesis account. Keys are persisted via
+# mnemonic files in /shared/status/<moniker>/ for recovery across restarts.
+# ═════════════════════════════════════════════════════════════════════════════
+
+# Ensure a keyring key exists: recover from mnemonic file, or generate new.
+# Returns the bech32 address on stdout.
 ensure_nm_key() {
 	local key_name="$1"
 	local mnemonic_file="$2"
@@ -447,6 +507,8 @@ ensure_nm_key() {
 	printf "%s" "${addr}"
 }
 
+# Fund an NM account if its balance is zero. Returns the txhash on stdout
+# (empty string if already funded).
 fund_nm_account_if_needed() {
 	local key_name="$1"
 	local account_addr="$2"
@@ -480,6 +542,8 @@ fund_nm_account_if_needed() {
 	fi
 }
 
+# Fund all NM accounts sequentially. Waits for each block to avoid sequence
+# number conflicts (each bank send must land in a different block).
 fund_nm_accounts() {
 	local genesis_addr="$1"
 	local prev_height="$2"
@@ -514,6 +578,8 @@ wait_for_all_funding_txs() {
 	done
 }
 
+# Create all NM accounts (keys + funding). Populates NM_ACCOUNT_KEY_NAMES
+# and NM_ACCOUNT_ADDRESSES arrays used by configure_nm() to write config.
 configure_nm_accounts() {
 	if [ ! -f "${GENESIS_ADDR_FILE}" ]; then
 		echo "[NM] ERROR: Missing ${GENESIS_ADDR_FILE} (created by validator-setup)."
@@ -553,7 +619,20 @@ configure_nm_accounts() {
 	echo "[NM] Prepared ${#NM_ACCOUNT_KEY_NAMES[@]} network-maker account(s)."
 }
 
-# If in wait mode, just wait and exit
+# ═════════════════════════════════════════════════════════════════════════════
+# MAIN EXECUTION
+#
+# Execution order:
+#   1. Wait mode: just wait for lumerad + supernode, then exit
+#   2. Run mode:
+#      a. Stop any leftover NM process
+#      b. Install binary from shared release dir
+#      c. Wait for chain + supernode readiness
+#      d. Create/fund NM accounts
+#      e. Build config from template
+#      f. Start NM process
+# ═════════════════════════════════════════════════════════════════════════════
+
 if [ "${START_MODE}" = "wait" ]; then
 	wait_for_lumera || exit 1
 	wait_for_supernode || exit 1
@@ -562,11 +641,11 @@ fi
 
 stop_network_maker_if_running
 install_network_maker_binary
-# ----- wait for chain & supernode readiness before config/funding/start -----
+
+# Both chain and supernode must be ready before we can fund accounts or start NM
 wait_for_lumera || fail_soft "Chain not ready; skipping NM."
 wait_for_supernode || fail_soft "Supernode not ready; skipping NM."
 
-configure_nm_accounts
-configure_nm
-
-start_network_maker
+configure_nm_accounts    # Create keys + fund from genesis account
+configure_nm             # Build config.toml from template + runtime values
+start_network_maker      # Launch NM process in background

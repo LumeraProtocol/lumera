@@ -17,7 +17,7 @@ In short: Lumera is not only "EVM-enabled"; it already includes multiple product
 Related documents:
 
 - [tests.md](tests.md) — Full test inventory (unit, integration, devnet), coverage assessment, gaps, and next steps
-- [bugs.md](bugs.md) — 8 bugs found and fixed during EVM integration
+- [bugs.md](bugs.md) —  bugs found and fixed during EVM integration
 - [roadmap.md](roadmap.md) — EVM integration roadmap and planning
 
 ## App Changes and Features
@@ -596,7 +596,7 @@ Recommended rollout checklist:
 
 ## Tests
 
-Full test inventory (Unit: 236, Integration: 97, Devnet: 12+), coverage assessment, gaps, and recommended next steps are in [tests.md](tests.md).
+Full test inventory (~386 tests across unit, integration, and devnet), coverage assessment, gaps, and recommended next steps are in [tests.md](tests.md).
 
 ## Operational Outcomes
 
@@ -714,7 +714,7 @@ Comparing the requirements in `docs/Lumera_Cosmos_EVM_Integration.pdf` against t
 
 ## Bugs Found and Fixed
 
-8 bugs discovered and fixed during EVM integration — see [bugs.md](bugs.md).
+Bugs discovered and fixed during EVM integration — see [bugs.md](bugs.md).
 
 ## Notes and Intentional Constraints
 
@@ -943,79 +943,4 @@ The EVM core wiring audit found **zero critical issues** across all app-level EV
 
 ### Test coverage summary
 
-#### 3.1 Test Inventory
-
-| Category | Area | Test Count | Quality |
-| --- | --- | --- | --- |
-| Unit | app/evm/ (ante, genesis, config) | 33 | High |
-| Unit | app/ (broadcast, mempool, precompiles) | 14 | High |
-| Unit | app/ (precisebank) | 39 | Excellent |
-| Unit | app/ (feemarket) | 9 | High |
-| Unit | app/ (IBC, ERC20 policy) | 17 | High |
-| Unit | app/ (proto, amino, blocked, pending) | 9 | Medium |
-| Unit | ante/ (evmigration fee, validate-basic) | 5 | High |
-| Unit | x/evmigration/keeper/ | 107 | Excellent |
-| Unit | x/evmigration/types/ | 4 | High |
-| Unit | x/evmigration/module/ | 1 | Medium |
-| Unit | x/evmigration/client/cli/ | 3 | Medium |
-| Integration | evm/jsonrpc | 20 | Very high |
-| Integration | evm/precompiles | 16 | High |
-| Integration | evm/vm | 13 | Medium-high |
-| Integration | evm/feemarket | 9 | Excellent |
-| Integration | evm/contracts | 9 | High |
-| Integration | evm/ibc | 8 | High |
-| Integration | evm/precisebank | 7 | Excellent |
-| Integration | evm/mempool | 7 | High |
-| Integration | evm/ante | 4 | Medium |
-| Integration | evmigration | 14 | High |
-| Devnet | validator/evm | 8 | Medium |
-| Devnet | validator/ibc | 6 | Medium |
-| Devnet | validator/ports | 2 | Medium |
-| Devnet | hermes/ibc | 6 | Medium |
-| Devnet | hermes/ica | 2 | Medium |
-| Devnet | evmigration (5 unit + 4 modes) | 5+4 | Good |
-| | **TOTAL** | **~381** | |
-
-### Identified gaps by priority
-
-**High priority (before mainnet):**
-
-1. Security audit of EVM integration not yet performed
-2. Production CORS + JSON-RPC namespace hardening profile not yet formalized per environment
-
-**Medium priority:**
-
-1. Custom Lumera module precompiles not started
-2. CosmWasm + EVM interaction model not designed
-3. Mempool eviction/capacity stress tests missing
-4. Chain upgrade EVM state preservation test missing
-5. External block explorer not integrated
-
-**Low priority:**
-
-1. Batch JSON-RPC tests
-2. WebSocket subscription tests (`newHeads`, `logs`)
-3. Precompile gas metering benchmarks
-4. EVM governance proposal workflows
-
-### Key architectural strengths
-
-1. **Async broadcast queue** — Novel solution to the cosmos/evm mempool deadlock. No other chain has publicly addressed this. Decouples txpool promotion from CometBFT `CheckTx` via bounded channel + single background worker.
-
-2. **Min gas price floor** — Prevents base fee decay to zero on quiet chains. Evmos experienced spam attacks due to zero base fee; Lumera ships with this protection from day one.
-
-3. **Tracing + rate limiting already implemented** — Runtime-configurable EVM tracing and app-layer JSON-RPC per-IP token bucket rate limiting are integrated now, not deferred.
-
-4. **Governance-controlled IBC voucher ERC20 policy** — Three-mode policy (`all`/`allowlist`/`none`) provides explicit governance control over auto-registration risk at the middleware boundary.
-
-5. **Dual CosmWasm + EVM runtime** — Unique among Cosmos EVM chains. No other chain in the comparison runs both CosmWasm and EVM simultaneously.
-
-6. **IBC v1 + v2 ERC20 middleware** — Both IBC transfer stack versions have ERC20 token registration middleware. Ahead of most peer chains.
-
-7. **OpenRPC discovery** — Machine-readable API spec with build-time synchronization. Unique across all Cosmos EVM chains.
-
-8. **Account migration module** — Purpose-built `x/evmigration` for coin-type-118-to-60 transition with dual-signature verification, atomic state migration across 8 SDK modules, and validator-specific migration path. No comparable mechanism exists in other chains.
-
-### Bottom line
-
-Lumera's EVM integration is **architecturally excellent and feature-complete** for its current scope, and it is already ahead in several operator-facing areas (tracing, rate limiting, governance-controlled ERC20 voucher policy, and mempool hardening). The main remaining gap versus mature production Cosmos EVM chains is **final operational hardening and ecosystem surface**: security audit, CORS/namespace lock-down playbooks, monitoring, and external block explorer.
+Full test inventory (~381 tests), coverage assessment by area, identified gaps by priority, key architectural strengths, and recommended next steps are in [tests.md](tests.md).

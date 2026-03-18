@@ -48,6 +48,35 @@ normalize_version() {
 	printf '%s\n' "${v}"
 }
 
+release_core_version() {
+	local version
+	version="$(normalize_version "${1:-}")"
+	printf '%s\n' "${version}" | grep -Eo '^[0-9]+\.[0-9]+\.[0-9]+' | head -n 1
+}
+
+versions_match() {
+	local expected actual expected_core actual_core
+	expected="$(normalize_version "${1:-}")"
+	actual="$(normalize_version "${2:-}")"
+
+	if [[ -z "${expected}" || -z "${actual}" ]]; then
+		return 1
+	fi
+
+	if [[ "${expected}" == "${actual}" ]]; then
+		return 0
+	fi
+
+	expected_core="$(release_core_version "${expected}")"
+	actual_core="$(release_core_version "${actual}")"
+
+	if [[ -n "${expected_core}" && "${expected}" == "${expected_core}" && "${actual_core}" == "${expected_core}" ]]; then
+		return 0
+	fi
+
+	return 1
+}
+
 RUNNING_VERSION="$(docker compose -f "${COMPOSE_FILE}" exec -T "${SERVICE}" \
 	lumerad version 2>/dev/null | head -n 1 | tr -d '\r' || true)"
 RUNNING_VERSION="$(normalize_version "${RUNNING_VERSION}")"
@@ -55,6 +84,10 @@ EXPECTED_VERSION="$(normalize_version "${RELEASE_NAME}")"
 
 if [[ -n "${RUNNING_VERSION}" && "${RUNNING_VERSION}" == "${EXPECTED_VERSION}" ]]; then
 	echo "Node is already running version ${RUNNING_VERSION}. Upgrade to ${RELEASE_NAME} already complete."
+	exit 0
+fi
+if [[ -n "${RUNNING_VERSION}" ]] && versions_match "${EXPECTED_VERSION}" "${RUNNING_VERSION}"; then
+	echo "Node is already running compatible version ${RUNNING_VERSION}. Upgrade to ${RELEASE_NAME} already complete."
 	exit 0
 fi
 

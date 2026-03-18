@@ -80,6 +80,78 @@ func CallWithClient(ctx context.Context, httpClient *http.Client, rpcURL, method
 	return json.Unmarshal(rpcResp.Result, out)
 }
 
+// BatchRequest represents a single request within a JSON-RPC batch call.
+type BatchRequest struct {
+	Method string
+	Params []any
+}
+
+// BatchResponse holds the parsed response for one request in a batch.
+type BatchResponse struct {
+	ID     int
+	Result json.RawMessage
+	Error  *RPCError
+}
+
+// CallBatch sends a JSON-RPC batch request (array of requests) and returns
+// responses keyed by their integer ID. The caller is responsible for
+// unmarshalling each Result into the appropriate type.
+func CallBatch(ctx context.Context, rpcURL string, requests []BatchRequest) ([]BatchResponse, error) {
+	httpClient := &http.Client{Timeout: DefaultRequestTimeout * time.Duration(len(requests)+1)}
+
+	batch := make([]map[string]any, len(requests))
+	for i, r := range requests {
+		batch[i] = map[string]any{
+			"jsonrpc": "2.0",
+			"id":      i + 1,
+			"method":  r.Method,
+			"params":  r.Params,
+		}
+	}
+
+	bodyBz, err := json.Marshal(batch)
+	if err != nil {
+		return nil, fmt.Errorf("marshal batch request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, rpcURL, bytes.NewReader(bodyBz))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	httpResp, err := httpClient.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer httpResp.Body.Close()
+
+	var rawResps []struct {
+		ID     int             `json:"id"`
+		Result json.RawMessage `json:"result"`
+		Error  *struct {
+			Code    int    `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.NewDecoder(httpResp.Body).Decode(&rawResps); err != nil {
+		return nil, fmt.Errorf("decode batch response: %w", err)
+	}
+
+	results := make([]BatchResponse, len(rawResps))
+	for i, r := range rawResps {
+		results[i] = BatchResponse{
+			ID:     r.ID,
+			Result: r.Result,
+		}
+		if r.Error != nil {
+			results[i].Error = &RPCError{Code: r.Error.Code, Message: r.Error.Message}
+		}
+	}
+
+	return results, nil
+}
+
 // WaitFor repeatedly calls a JSON-RPC method until isReady returns true or ctx expires.
 func WaitFor(
 	ctx context.Context,

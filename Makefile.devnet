@@ -613,9 +613,10 @@ endef
 devnet-evmigration-sync-bin:
 	@src="$(_EVMIGRATION_BIN_HOST)"; \
 	dst="$(_EVMIGRATION_BIN_SHARED_HOST)"; \
-	if [ ! -f "$$src" ]; then \
-		echo "Missing $$src; run 'make devnet-tests-build' first"; \
-		exit 1; \
+	if [ ! -f "$$src" ] || find devnet/tests/evmigration -type f -newer "$$src" | grep -q .; then \
+		echo "building fresh tests_evmigration binary..."; \
+		mkdir -p "$(DEVNET_BIN_DIR_ABS)"; \
+		cd devnet && $(GO) build -o "$$src" ./tests/evmigration; \
 	fi; \
 	mkdir -p "$$(dirname "$$dst")"; \
 	if [ -f "$$dst" ] && cmp -s "$$src" "$$dst"; then \

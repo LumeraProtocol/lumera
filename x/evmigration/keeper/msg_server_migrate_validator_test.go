@@ -208,7 +208,7 @@ func TestMigrateValidator_Success(t *testing.T) {
 	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), newValAddr, legacyAddr, gomock.Any()).Return(nil)
 	// No unbonding delegations or redelegations.
 	f.stakingKeeper.EXPECT().GetUnbondingDelegationsFromValidator(gomock.Any(), oldValAddr).Return(nil, nil)
-	f.stakingKeeper.EXPECT().GetRedelegationsFromSrcValidator(gomock.Any(), oldValAddr).Return(nil, nil)
+	f.stakingKeeper.EXPECT().IterateRedelegations(gomock.Any(), gomock.Any()).Return(nil)
 
 	// Step V5: MigrateValidatorSupernode — not a supernode.
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sntypes.SuperNode{}, false)

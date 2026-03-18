@@ -162,4 +162,25 @@ func TestKeeper_GetSuperNodeByAccount(t *testing.T) {
 		require.Error(t, err)
 		require.ErrorIs(t, err, sdkerrors.ErrInvalidRequest)
 	})
+
+	t.Run("delete removes primary record and account index", func(t *testing.T) {
+		k, ctx := setupKeeperForInternalTest(t)
+		sn := baseSN(val1Bech32, accABech32)
+		require.NoError(t, k.SetSuperNode(ctx, sn))
+
+		k.DeleteSuperNode(ctx, val1)
+
+		_, found := k.QuerySuperNode(ctx, val1)
+		require.False(t, found)
+
+		_, foundByAccount, err := k.GetSuperNodeByAccount(ctx, accABech32)
+		require.NoError(t, err)
+		require.False(t, foundByAccount)
+
+		require.NoError(t, k.SetSuperNode(ctx, baseSN(val2Bech32, accABech32)))
+		got, foundByAccount, err := k.GetSuperNodeByAccount(ctx, accABech32)
+		require.NoError(t, err)
+		require.True(t, foundByAccount)
+		require.Equal(t, val2Bech32, got.ValidatorAddress)
+	})
 }

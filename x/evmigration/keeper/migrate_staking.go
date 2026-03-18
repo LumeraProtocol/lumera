@@ -171,7 +171,9 @@ func (k Keeper) migrateRedelegations(ctx sdk.Context, legacyAddr, newAddr sdk.Ac
 
 // migrateWithdrawAddress updates the delegator withdraw address. If it was set
 // to the legacy address (the default), it is updated to newAddr. If set to a
-// third party, the same third-party address is preserved for the new delegator.
+// third party, the same third-party address is preserved for the new delegator
+// — unless the third party is a previously-migrated legacy address, in which
+// case we follow the migration record to the corresponding new address.
 func (k Keeper) migrateWithdrawAddress(ctx sdk.Context, legacyAddr, newAddr sdk.AccAddress) error {
 	withdrawAddr, err := k.distributionKeeper.GetDelegatorWithdrawAddr(ctx, legacyAddr)
 	if err != nil {
@@ -183,6 +185,16 @@ func (k Keeper) migrateWithdrawAddress(ctx sdk.Context, legacyAddr, newAddr sdk.
 		return k.distributionKeeper.SetDelegatorWithdrawAddr(ctx, newAddr, newAddr)
 	}
 
-	// If set to a third party, preserve the same third-party address for the new delegator.
-	return k.distributionKeeper.SetDelegatorWithdrawAddr(ctx, newAddr, withdrawAddr)
+	// If the third-party withdraw address was migrated, follow the record
+	// to the new address so future rewards reach the right account.
+	resolvedAddr := withdrawAddr
+	record, err := k.MigrationRecords.Get(ctx, withdrawAddr.String())
+	if err == nil && record.NewAddress != "" {
+		resolved, err := sdk.AccAddressFromBech32(record.NewAddress)
+		if err == nil {
+			resolvedAddr = resolved
+		}
+	}
+
+	return k.distributionKeeper.SetDelegatorWithdrawAddr(ctx, newAddr, resolvedAddr)
 }

@@ -42,94 +42,11 @@ interface ISupernode {
         uint32 peersCount;
     }
 
-    // -----------------------------------------------------------------------
-    // Events
-    // -----------------------------------------------------------------------
-
-    event SupernodeRegistered(
-        string indexed validatorAddress,
-        address indexed creator,
-        uint8 newState
-    );
-
-    event SupernodeDeregistered(
-        string indexed validatorAddress,
-        address indexed creator,
-        uint8 oldState
-    );
-
-    event SupernodeStateChanged(
-        string indexed validatorAddress,
-        address indexed creator,
-        uint8 newState
-    );
-
-    // -----------------------------------------------------------------------
-    // Transactions
-    // -----------------------------------------------------------------------
-
-    /// @notice Register a new supernode for a validator.
-    /// @param validatorAddress Bech32 lumeravaloper... address
-    /// @param ipAddress        Node's public IP
-    /// @param supernodeAccount Bech32 lumera... account for the SN operator
-    /// @param p2pPort          P2P port (e.g., "4001")
-    /// @return success         True if registration succeeded
-    function registerSupernode(
-        string calldata validatorAddress,
-        string calldata ipAddress,
-        string calldata supernodeAccount,
-        string calldata p2pPort
-    ) external returns (bool success);
-
-    /// @notice Deregister a supernode (removes it from the active set).
-    /// @param validatorAddress Bech32 lumeravaloper... address
-    /// @return success         True if deregistration succeeded
-    function deregisterSupernode(
-        string calldata validatorAddress
-    ) external returns (bool success);
-
-    /// @notice Start a stopped supernode (transitions Stopped → Active).
-    /// @param validatorAddress Bech32 lumeravaloper... address
-    /// @return success         True if start succeeded
-    function startSupernode(
-        string calldata validatorAddress
-    ) external returns (bool success);
-
-    /// @notice Stop an active supernode (transitions Active → Stopped).
-    /// @param validatorAddress Bech32 lumeravaloper... address
-    /// @param reason           Operator-provided reason for stopping
-    /// @return success         True if stop succeeded
-    function stopSupernode(
-        string calldata validatorAddress,
-        string calldata reason
-    ) external returns (bool success);
-
-    /// @notice Update supernode metadata (IP, port, note, account).
-    /// @param validatorAddress Bech32 lumeravaloper... address
-    /// @param ipAddress        New IP (pass "" to keep current)
-    /// @param note             New operator note (pass "" to keep current)
-    /// @param supernodeAccount New SN account (pass "" to keep current)
-    /// @param p2pPort          New P2P port (pass "" to keep current)
-    /// @return success         True if update succeeded
-    function updateSupernode(
-        string calldata validatorAddress,
-        string calldata ipAddress,
-        string calldata note,
-        string calldata supernodeAccount,
-        string calldata p2pPort
-    ) external returns (bool success);
-
-    /// @notice Report hardware metrics for a supernode.
-    /// @param validatorAddress Bech32 lumeravaloper... address
-    /// @param supernodeAccount Bech32 lumera... account address
-    /// @param metrics          Hardware metrics struct
-    /// @return compliant       True if metrics meet minimum requirements
-    /// @return issues          Array of non-compliance descriptions (empty if compliant)
-    function reportMetrics(
-        string calldata validatorAddress,
-        string calldata supernodeAccount,
-        MetricsReport calldata metrics
-    ) external returns (bool compliant, string[] memory issues);
+    // NOTE: Transaction methods (registerSupernode, deregisterSupernode,
+    // startSupernode, stopSupernode, updateSupernode, reportMetrics) are
+    // omitted from this interface. These are operator-internal operations —
+    // supernodes and validators submit Cosmos SDK transactions directly,
+    // not through the EVM.
 
     // -----------------------------------------------------------------------
     // Queries

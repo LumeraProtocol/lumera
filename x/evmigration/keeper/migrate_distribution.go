@@ -10,6 +10,15 @@ import (
 // MigrateDistribution withdraws all pending delegation rewards for legacyAddr,
 // materializing them into the legacy bank balance before balances are moved.
 func (k Keeper) MigrateDistribution(ctx sdk.Context, legacyAddr sdk.AccAddress) error {
+	// Ensure the withdraw address points to legacyAddr itself so that
+	// WithdrawDelegationRewards deposits rewards into the legacy bank balance
+	// (which MigrateBank will transfer later). Without this, rewards would go
+	// to a third-party withdraw address which, if it was a previously-migrated
+	// legacy address, would deposit coins into a dead account.
+	if err := k.redirectWithdrawAddrIfMigrated(ctx, legacyAddr); err != nil {
+		return err
+	}
+
 	// Get all delegations for the legacy address.
 	delegations, err := k.stakingKeeper.GetDelegatorDelegations(ctx, legacyAddr, ^uint16(0))
 	if err != nil {
@@ -25,14 +34,40 @@ func (k Keeper) MigrateDistribution(ctx sdk.Context, legacyAddr sdk.AccAddress) 
 		if err := k.ensureDelegatorStartingInfoReferenceCount(ctx, valAddr, legacyAddr); err != nil {
 			return err
 		}
-		// WithdrawDelegationRewards sends rewards to the legacy bank balance.
-		// Ignoring the returned coins — they're now in the bank balance.
+		// WithdrawDelegationRewards sends rewards to the delegator's withdraw
+		// address which we ensured points to legacyAddr above.
 		if _, err := k.distributionKeeper.WithdrawDelegationRewards(ctx, legacyAddr, valAddr); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+// redirectWithdrawAddrIfMigrated checks if legacyAddr's distribution withdraw
+// address is a previously-migrated legacy address. If so, it resets the
+// withdraw address to legacyAddr itself so that subsequent reward withdrawals
+// deposit into the account being migrated rather than a dead legacy address.
+func (k Keeper) redirectWithdrawAddrIfMigrated(ctx sdk.Context, legacyAddr sdk.AccAddress) error {
+	withdrawAddr, err := k.distributionKeeper.GetDelegatorWithdrawAddr(ctx, legacyAddr)
+	if err != nil {
+		return nil // No custom withdraw address — default (self) is fine.
+	}
+
+	// If already pointing to self, nothing to do.
+	if withdrawAddr.Equals(legacyAddr) {
+		return nil
+	}
+
+	// Check if the third-party withdraw address was already migrated.
+	has, err := k.MigrationRecords.Has(ctx, withdrawAddr.String())
+	if err != nil || !has {
+		return nil // Not migrated — leave the third-party address as-is.
+	}
+
+	// The withdraw address is a dead legacy address. Temporarily redirect
+	// to self so rewards land in legacyAddr's bank balance for transfer.
+	return k.distributionKeeper.SetDelegatorWithdrawAddr(ctx, legacyAddr, legacyAddr)
 }
 
 func (k Keeper) ensureDelegatorStartingInfoReferenceCount(ctx sdk.Context, valAddr sdk.ValAddress, delAddr sdk.AccAddress) error {

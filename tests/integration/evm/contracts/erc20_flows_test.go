@@ -32,6 +32,9 @@ func TestERC20ApproveAllowanceTransferFrom(t *testing.T) {
 	node.StartAndWaitRPC()
 	defer node.Stop()
 
+	// Wait for the first block before sending any transactions.
+	node.WaitForBlockNumberAtLeast(t, 1, 30*time.Second)
+
 	ownerAddr := testaccounts.MustAccountAddressFromTestKeyInfo(t, node.KeyInfo())
 	ownerKey := evmtest.MustDerivePrivateKey(t, node.KeyInfo().Mnemonic)
 
@@ -133,6 +136,7 @@ var (
 	balanceOfSelector    = crypto.Keccak256([]byte("balanceOf(address)"))[:4]
 	approveSelector      = crypto.Keccak256([]byte("approve(address,uint256)"))[:4]
 	allowanceSelector    = crypto.Keccak256([]byte("allowance(address,address)"))[:4]
+	transferSelector     = crypto.Keccak256([]byte("transfer(address,uint256)"))[:4]
 	transferFromSelector = crypto.Keccak256([]byte("transferFrom(address,address,uint256)"))[:4]
 )
 
@@ -297,48 +301,253 @@ func allowanceSlotKey(owner, spender common.Address) []byte {
 	return crypto.Keccak256(outerData)
 }
 
-// buildERC20RuntimeBytecode creates a minimal ERC20 runtime that dispatches
-// based on function selector. For test purposes, this uses a simplified
-// approach: we build the bytecode as hex and return it.
+// buildERC20RuntimeBytecode creates a minimal ERC20 runtime using evmprogram
+// that dispatches based on function selector. It implements:
+//   - balanceOf(address)                    → 0x70a08231
+//   - approve(address,uint256)              → 0x095ea7b3
+//   - allowance(address,address)            → 0xdd62ed3e
+//   - transfer(address,uint256)             → 0xa9059cbb
+//   - transferFrom(address,address,uint256) → 0x23b872dd
+//
+// Storage layout (Solidity-compatible):
+//   - Slot 0 base: balances mapping  — balances[addr]  = keccak256(addr . 0)
+//   - Slot 1 base: allowances mapping — allowances[owner][spender] = keccak256(spender . keccak256(owner . 1))
+//
+// Memory scratch area: [0:64] is used for keccak256 hashing throughout.
 func buildERC20RuntimeBytecode() []byte {
-	// This is a pre-compiled minimal ERC20 runtime bytecode. It implements:
-	//   balanceOf(address)                    -> 0x70a08231
-	//   approve(address,uint256)              -> 0x095ea7b3
-	//   allowance(address,address)            -> 0xdd62ed3e
-	//   transfer(address,uint256)             -> 0xa9059cbb
-	//   transferFrom(address,address,uint256) -> 0x23b872dd
-	//
-	// Storage: slot 0 = balances mapping, slot 1 = allowances mapping.
-	//
-	// Generated from a minimal Solidity contract compiled with solc 0.8.x.
-	// Using pre-compiled bytecode ensures correctness of the ERC20 logic.
-	bytecodeHex := "608060405234801561001057600080fd5b506004361061005e576000357c0100000000000000000000000000000000000000000000000000000000900480630" +
-		"95ea7b31461006357806323b872dd1461009357806370a08231146100c3578063a9059cbb146100f3578063dd62ed3e14610123575b600080fd5b61007d6004803603" +
-		"81019061007891906104a5565b610153565b60405161008a91906104f4565b60405180910390f35b6100ad60048036038101906100a8919061050f565b610246565b6" +
-		"0405161008a91906104f4565b6100dd60048036038101906100d89190610562565b6103c3565b6040516100ea919061059e565b60405180910390f35b61010d600480" +
-		"36038101906101089190610562565b61040b565b60405161011a91906104f4565b60405180910390f35b61013d600480360381019061013891906105b9565b6103c3" +
-		"565b60405161014a919061059e565b60405180910390f35b600081600160003373ffffffffffffffffffffffffffffffffff" +
-		"ffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060008573ffffffffffffffffffffffffffffffffffff" +
-		"ffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020819055506001905092915050565b6000806001600087" +
-		"73ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020600033" +
-		"73ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020549050828110156102" +
-		"cd57600080fd5b82816102d991906105f9565b6001600088" +
-		"73ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020600033" +
-		"73ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020819055506000808773" +
-		"ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002054838110156103" +
-		"7857600080fd5b838161038491906105f9565b6000808973ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffff" +
-		"ff168152602001908152602001600020819055508360008088" +
-		"73ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020600082825461" +
-		"03d4919061062d565b92505081905550600191505094935050505056" // transferFrom
-	// For balanceOf and allowance read, and transfer:
-	bytecodeHex += "5b60008060008473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffffffff" +
-		"168152602001908152602001600020549050919050565b600080600033" +
-		"73ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002054905081811015610" +
-		"45157600080fd5b818161045d91906105f9565b6000803373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffff" +
-		"ffff1681526020019081526020016000208190555081600080" +
-		"8573ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020600082825461" +
-		"04ad919061062d565b9250508190555060019150509291505056"
+	rt := evmprogram.New()
+	var revertPatches []int // forward-reference positions to the shared revert block
 
-	bz, _ := hex.DecodeString(strings.ReplaceAll(bytecodeHex, "\n", ""))
-	return bz
+	// ── Dispatcher: extract 4-byte selector from calldata ─────────────
+	// calldataload(0) >> 224 isolates the first 4 bytes as a uint256.
+	rt.Push(0).Op(vm.CALLDATALOAD).Push(0xe0).Op(vm.SHR)
+
+	// Branch to each function (forward jumps, patched after bodies are built).
+	balOfPatch := selectorBranch(rt, balanceOfSelector)
+	approvePatch := selectorBranch(rt, approveSelector)
+	allowPatch := selectorBranch(rt, allowanceSelector)
+	xferPatch := selectorBranch(rt, transferSelector)
+	xferFromPatch := selectorBranch(rt, transferFromSelector)
+
+	// Fallback: no matching selector → revert.
+	rt.Op(vm.POP) // discard selector
+	rt.Push(0).Push(0).Op(vm.REVERT)
+
+	// ── balanceOf(address) ────────────────────────────────────────────
+	// Returns balances[addr] where addr = calldata[4:36].
+	patchJumpDest(rt, balOfPatch)
+	rt.Op(vm.POP) // discard selector
+	// Compute balance slot: keccak256(addr . 0).
+	rt.Push(4).Op(vm.CALLDATALOAD) // addr
+	rt.Push(0).Op(vm.MSTORE)       // mem[0:32] = addr
+	rt.Push(0)
+	rt.Push(32).Op(vm.MSTORE) // mem[32:64] = 0
+	rt.Push(64).Push(0).Op(vm.KECCAK256)
+	rt.Op(vm.SLOAD)          // balance
+	rt.Push(0).Op(vm.MSTORE) // mem[0:32] = balance
+	rt.Return(0, 32)
+
+	// ── approve(address spender, uint256 amount) ──────────────────────
+	// Sets allowances[CALLER][spender] = amount, returns true.
+	patchJumpDest(rt, approvePatch)
+	rt.Op(vm.POP) // discard selector
+	// Step 1: innerHash = keccak256(CALLER . 1).
+	rt.Op(vm.CALLER)
+	rt.Push(0).Op(vm.MSTORE)  // mem[0:32] = CALLER (owner)
+	rt.Push(1)
+	rt.Push(32).Op(vm.MSTORE) // mem[32:64] = 1
+	rt.Push(64).Push(0).Op(vm.KECCAK256)
+	// Step 2: slot = keccak256(spender . innerHash).
+	rt.Push(32).Op(vm.MSTORE)      // mem[32:64] = innerHash
+	rt.Push(4).Op(vm.CALLDATALOAD) // spender
+	rt.Push(0).Op(vm.MSTORE)       // mem[0:32] = spender
+	rt.Push(64).Push(0).Op(vm.KECCAK256)
+	// Store amount at slot.                     stack: [slot]
+	rt.Push(36).Op(vm.CALLDATALOAD) //           stack: [slot, amount]
+	rt.Op(vm.SWAP1)                 //           stack: [amount, slot]
+	rt.Op(vm.SSTORE)                // SSTORE(slot, amount)
+	// Return true.
+	rt.Push(1).Push(0).Op(vm.MSTORE)
+	rt.Return(0, 32)
+
+	// ── allowance(address owner, address spender) ─────────────────────
+	// Returns allowances[owner][spender].
+	patchJumpDest(rt, allowPatch)
+	rt.Op(vm.POP) // discard selector
+	// Step 1: innerHash = keccak256(owner . 1).
+	rt.Push(4).Op(vm.CALLDATALOAD) // owner
+	rt.Push(0).Op(vm.MSTORE)       // mem[0:32] = owner
+	rt.Push(1)
+	rt.Push(32).Op(vm.MSTORE) // mem[32:64] = 1
+	rt.Push(64).Push(0).Op(vm.KECCAK256)
+	// Step 2: slot = keccak256(spender . innerHash).
+	rt.Push(32).Op(vm.MSTORE)       // mem[32:64] = innerHash
+	rt.Push(36).Op(vm.CALLDATALOAD) // spender
+	rt.Push(0).Op(vm.MSTORE)        // mem[0:32] = spender
+	rt.Push(64).Push(0).Op(vm.KECCAK256)
+	rt.Op(vm.SLOAD)          // allowance value
+	rt.Push(0).Op(vm.MSTORE) // mem[0:32] = value
+	rt.Return(0, 32)
+
+	// ── transfer(address to, uint256 amount) ──────────────────────────
+	// Debits CALLER, credits to, returns true.
+	patchJumpDest(rt, xferPatch)
+	rt.Op(vm.POP) // discard selector
+
+	rt.Push(36).Op(vm.CALLDATALOAD) // stack: [amount]
+
+	// Compute sender slot: keccak256(CALLER . 0).
+	rt.Op(vm.CALLER)
+	rt.Push(0).Op(vm.MSTORE)  // mem[0:32] = CALLER
+	rt.Push(0)
+	rt.Push(32).Op(vm.MSTORE) // mem[32:64] = 0
+	rt.Push(64).Push(0).Op(vm.KECCAK256)
+	//                                           stack: [amount, senderSlot]
+	rt.Op(vm.DUP1, vm.SLOAD) //                 stack: [amount, senderSlot, senderBal]
+
+	// Underflow check: revert if senderBal < amount.
+	rt.Op(vm.DUP3) //                           stack: [.., senderBal, amount]
+	rt.Op(vm.DUP2) //                           stack: [.., senderBal, amount, senderBal]
+	revertPatches = append(revertPatches, revertIfTopLT(rt))
+	//                                           stack: [amount, senderSlot, senderBal]
+
+	// newSenderBal = senderBal - amount.
+	rt.Op(vm.DUP3)  //                          stack: [.., senderBal, amount]
+	rt.Op(vm.SWAP1)  //                         stack: [.., amount, senderBal]
+	rt.Op(vm.SUB)    //                         stack: [amount, senderSlot, senderBal-amount]
+	rt.Op(vm.SWAP1)  //                         stack: [amount, newBal, senderSlot]
+	rt.Op(vm.SSTORE) //                         stack: [amount]
+
+	// Compute recipient slot: keccak256(to . 0).
+	rt.Push(4).Op(vm.CALLDATALOAD)
+	rt.Push(0).Op(vm.MSTORE)  // mem[0:32] = to
+	rt.Push(0)
+	rt.Push(32).Op(vm.MSTORE) // mem[32:64] = 0
+	rt.Push(64).Push(0).Op(vm.KECCAK256)
+	//                                           stack: [amount, toSlot]
+	rt.Op(vm.DUP1, vm.SLOAD) //                 stack: [amount, toSlot, toBal]
+	rt.Op(vm.DUP3)            //                stack: [amount, toSlot, toBal, amount]
+	rt.Op(vm.ADD)              //               stack: [amount, toSlot, newToBal]
+	rt.Op(vm.SWAP1)            //               stack: [amount, newToBal, toSlot]
+	rt.Op(vm.SSTORE)           //               stack: [amount]
+	rt.Op(vm.POP)              //               stack: []
+
+	// Return true.
+	rt.Push(1).Push(0).Op(vm.MSTORE)
+	rt.Return(0, 32)
+
+	// ── transferFrom(address from, address to, uint256 amount) ────────
+	// Checks allowance, debits from, credits to, returns true.
+	patchJumpDest(rt, xferFromPatch)
+	rt.Op(vm.POP) // discard selector
+
+	rt.Push(68).Op(vm.CALLDATALOAD) // stack: [amount]
+
+	// --- Check & debit allowance ---
+	// Compute allowance slot: keccak256(CALLER . keccak256(from . 1)).
+	// Here CALLER = spender (msg.sender of transferFrom).
+	rt.Push(4).Op(vm.CALLDATALOAD) // from (owner)
+	rt.Push(0).Op(vm.MSTORE)       // mem[0:32] = from
+	rt.Push(1)
+	rt.Push(32).Op(vm.MSTORE) // mem[32:64] = 1
+	rt.Push(64).Push(0).Op(vm.KECCAK256)
+	rt.Push(32).Op(vm.MSTORE) // mem[32:64] = innerHash
+	rt.Op(vm.CALLER)
+	rt.Push(0).Op(vm.MSTORE) // mem[0:32] = CALLER (spender)
+	rt.Push(64).Push(0).Op(vm.KECCAK256)
+	//                                           stack: [amount, allowSlot]
+	rt.Op(vm.DUP1, vm.SLOAD) //                 stack: [amount, allowSlot, allowVal]
+
+	// Revert if allowVal < amount.
+	rt.Op(vm.DUP3)
+	rt.Op(vm.DUP2)
+	revertPatches = append(revertPatches, revertIfTopLT(rt))
+	//                                           stack: [amount, allowSlot, allowVal]
+
+	// newAllowance = allowVal - amount.
+	rt.Op(vm.DUP3, vm.SWAP1, vm.SUB) //         stack: [amount, allowSlot, newAllow]
+	rt.Op(vm.SWAP1)                    //        stack: [amount, newAllow, allowSlot]
+	rt.Op(vm.SSTORE)                   //        stack: [amount]
+
+	// --- Debit from's balance ---
+	// Compute balance slot: keccak256(from . 0).
+	rt.Push(4).Op(vm.CALLDATALOAD)
+	rt.Push(0).Op(vm.MSTORE)  // mem[0:32] = from
+	rt.Push(0)
+	rt.Push(32).Op(vm.MSTORE) // mem[32:64] = 0
+	rt.Push(64).Push(0).Op(vm.KECCAK256)
+	//                                           stack: [amount, fromSlot]
+	rt.Op(vm.DUP1, vm.SLOAD) //                 stack: [amount, fromSlot, fromBal]
+
+	// Revert if fromBal < amount.
+	rt.Op(vm.DUP3, vm.DUP2)
+	revertPatches = append(revertPatches, revertIfTopLT(rt))
+	//                                           stack: [amount, fromSlot, fromBal]
+
+	// newFromBal = fromBal - amount.
+	rt.Op(vm.DUP3, vm.SWAP1, vm.SUB)
+	rt.Op(vm.SWAP1, vm.SSTORE) //               stack: [amount]
+
+	// --- Credit to's balance ---
+	// Compute balance slot: keccak256(to . 0).
+	rt.Push(36).Op(vm.CALLDATALOAD)
+	rt.Push(0).Op(vm.MSTORE)  // mem[0:32] = to
+	rt.Push(0)
+	rt.Push(32).Op(vm.MSTORE) // mem[32:64] = 0
+	rt.Push(64).Push(0).Op(vm.KECCAK256)
+	//                                           stack: [amount, toSlot]
+	rt.Op(vm.DUP1, vm.SLOAD) //                 stack: [amount, toSlot, toBal]
+	rt.Op(vm.DUP3, vm.ADD)    //                stack: [amount, toSlot, newToBal]
+	rt.Op(vm.SWAP1, vm.SSTORE) //               stack: [amount]
+	rt.Op(vm.POP)               //              stack: []
+
+	// Return true.
+	rt.Push(1).Push(0).Op(vm.MSTORE)
+	rt.Return(0, 32)
+
+	// ── Shared revert block ──────────────────────────────────────────
+	_, revertDest := rt.Jumpdest()
+	rt.Push(0).Push(0).Op(vm.REVERT)
+
+	// Patch all forward references to the revert block.
+	code := rt.Bytes()
+	for _, pos := range revertPatches {
+		code[pos] = byte(revertDest >> 8)
+		code[pos+1] = byte(revertDest)
+	}
+
+	return code
+}
+
+// selectorBranch emits a dispatcher branch: DUP1 PUSH4 <sel> EQ PUSH2 <placeholder> JUMPI.
+// Returns the byte offset of the PUSH2 data to be patched with the real jump destination.
+func selectorBranch(p *evmprogram.Program, selector []byte) int {
+	p.Op(vm.DUP1)
+	p.Push(selector)
+	p.Op(vm.EQ)
+	p.Op(vm.PUSH2)
+	pos := p.Size()
+	p.Append([]byte{0, 0}) // placeholder for 2-byte destination
+	p.Op(vm.JUMPI)
+	return pos
+}
+
+// patchJumpDest adds a JUMPDEST and patches the forward-reference at patchPos.
+func patchJumpDest(p *evmprogram.Program, patchPos int) {
+	_, dest := p.Jumpdest()
+	code := p.Bytes()
+	code[patchPos] = byte(dest >> 8)
+	code[patchPos+1] = byte(dest)
+}
+
+// revertIfTopLT emits: LT PUSH2 <placeholder> JUMPI.
+// Expects stack [a (top), b] — jumps to the shared revert block if a < b.
+// Returns the byte offset to be patched with the revert destination.
+func revertIfTopLT(p *evmprogram.Program) int {
+	p.Op(vm.LT)
+	p.Op(vm.PUSH2)
+	pos := p.Size()
+	p.Append([]byte{0, 0})
+	p.Op(vm.JUMPI)
+	return pos
 }

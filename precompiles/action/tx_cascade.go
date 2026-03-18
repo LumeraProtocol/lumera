@@ -37,7 +37,7 @@ func (p Precompile) RequestCascade(
 	dataHash := args[0].(string)
 	fileName := args[1].(string)
 	rqIdsIc := args[2].(uint64)
-	signatures := args[3].([]byte)
+	signatures := args[3].(string) // "Base64(rq_ids).creator_signature" textual format
 	price := args[4].(*big.Int)
 	expirationTime := args[5].(int64)
 	fileSizeKbs := args[6].(uint64)
@@ -53,7 +53,7 @@ func (p Precompile) RequestCascade(
 		"data_hash":  dataHash,
 		"file_name":  fileName,
 		"rq_ids_ic":  rqIdsIc,
-		"signatures": string(signatures),
+		"signatures": signatures,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("marshal cascade metadata: %w", err)
@@ -135,16 +135,17 @@ func (p Precompile) FinalizeCascade(
 		return nil, err
 	}
 
-	// Look up the action to get the new state for the event
+	// Look up the action to determine whether finalization actually completed.
+	// The keeper may return nil (no error) for soft rejections where evidence
+	// is recorded instead of failing the tx. Only emit ActionFinalized and
+	// report success when the action reached the Done state.
 	action, _ := p.actionKeeper.GetActionByID(ctx, actionId)
-	var newState uint8
-	if action != nil {
-		newState = uint8(action.State)
+	finalized := action != nil && action.State == actiontypes.ActionStateDone
+	if finalized {
+		if err := p.EmitActionFinalized(ctx, stateDB, actionId, contract.Caller(), uint8(action.State)); err != nil {
+			return nil, err
+		}
 	}
 
-	if err := p.EmitActionFinalized(ctx, stateDB, actionId, contract.Caller(), newState); err != nil {
-		return nil, err
-	}
-
-	return method.Outputs.Pack(true)
+	return method.Outputs.Pack(finalized)
 }

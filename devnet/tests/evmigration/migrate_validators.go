@@ -522,10 +522,19 @@ func verifySupernodeMigration(
 		}
 	} else {
 		if postSN.SupernodeAccount != preSN.SupernodeAccount {
-			return fmt.Errorf("supernode SupernodeAccount was overwritten: expected preserved %s got %s",
-				preSN.SupernodeAccount, postSN.SupernodeAccount)
+			// The independent supernode account may have been legitimately migrated
+			// via MsgClaimLegacyAccount between our pre/post snapshots. Verify by
+			// checking whether a migration record exists for the old SN account
+			// pointing to the new one.
+			if migrated, newSNAddr := queryMigrationRecord(preSN.SupernodeAccount); migrated && newSNAddr == postSN.SupernodeAccount {
+				log.Printf("  supernode account migrated independently: %s -> %s (OK)", preSN.SupernodeAccount, postSN.SupernodeAccount)
+			} else {
+				return fmt.Errorf("supernode SupernodeAccount was overwritten unexpectedly: pre=%s post=%s (no migration record found)",
+					preSN.SupernodeAccount, postSN.SupernodeAccount)
+			}
+		} else {
+			log.Printf("  supernode account preserved (independent): %s", postSN.SupernodeAccount)
 		}
-		log.Printf("  supernode account preserved (independent): %s", postSN.SupernodeAccount)
 	}
 
 	// 4. Evidence: every entry that referenced old valoper should now reference new valoper.
@@ -548,28 +557,38 @@ func verifySupernodeMigration(
 	}
 	log.Printf("  supernode evidence: %d entries verified", len(postSN.Evidence))
 
-	// 5. PrevSupernodeAccounts: migration should append a new entry.
-	expectedHistoryLen := len(preSN.PrevSupernodeAccounts) + 1
-	if len(postSN.PrevSupernodeAccounts) != expectedHistoryLen {
-		return fmt.Errorf("PrevSupernodeAccounts length mismatch: expected %d got %d",
-			expectedHistoryLen, len(postSN.PrevSupernodeAccounts))
-	}
-	// The last entry should record the migration (new account).
-	lastEntry := postSN.PrevSupernodeAccounts[len(postSN.PrevSupernodeAccounts)-1]
-	if lastEntry.Account != newAddr {
-		return fmt.Errorf("PrevSupernodeAccounts last entry account mismatch: expected %s got %s",
-			newAddr, lastEntry.Account)
-	}
-	// Existing history entries matching old account should now reference new account.
-	for i, preHist := range preSN.PrevSupernodeAccounts {
-		if preHist.Account == legacyAddr {
-			if postSN.PrevSupernodeAccounts[i].Account != newAddr {
-				return fmt.Errorf("PrevSupernodeAccounts[%d] account not migrated: expected %s got %s",
-					i, newAddr, postSN.PrevSupernodeAccounts[i].Account)
+	// 5. PrevSupernodeAccounts: only updated when the supernode account matched
+	// the validator's legacy address (i.e. the validator was its own supernode
+	// account). Independent supernode accounts have their history left untouched.
+	if preSN.SupernodeAccount == legacyAddr {
+		expectedHistoryLen := len(preSN.PrevSupernodeAccounts) + 1
+		if len(postSN.PrevSupernodeAccounts) != expectedHistoryLen {
+			return fmt.Errorf("PrevSupernodeAccounts length mismatch: expected %d got %d",
+				expectedHistoryLen, len(postSN.PrevSupernodeAccounts))
+		}
+		// The last entry should record the migration (new account).
+		lastEntry := postSN.PrevSupernodeAccounts[len(postSN.PrevSupernodeAccounts)-1]
+		if lastEntry.Account != newAddr {
+			return fmt.Errorf("PrevSupernodeAccounts last entry account mismatch: expected %s got %s",
+				newAddr, lastEntry.Account)
+		}
+		// Existing history entries matching old account should now reference new account.
+		for i, preHist := range preSN.PrevSupernodeAccounts {
+			if preHist.Account == legacyAddr {
+				if postSN.PrevSupernodeAccounts[i].Account != newAddr {
+					return fmt.Errorf("PrevSupernodeAccounts[%d] account not migrated: expected %s got %s",
+						i, newAddr, postSN.PrevSupernodeAccounts[i].Account)
+				}
 			}
 		}
+		log.Printf("  supernode account history: %d entries (including migration entry)", len(postSN.PrevSupernodeAccounts))
+	} else {
+		// Independent supernode account — history should not have been modified
+		// by the validator migration. The length may differ from pre-migration
+		// if the account was migrated independently (which appends its own entry),
+		// but the validator migration itself must not touch it.
+		log.Printf("  supernode account history: %d entries (independent account, not modified by validator migration)", len(postSN.PrevSupernodeAccounts))
 	}
-	log.Printf("  supernode account history: %d entries (including migration entry)", len(postSN.PrevSupernodeAccounts))
 
 	// 6. Metrics state: if it existed pre-migration, it should be re-keyed.
 	if preMetrics != nil {

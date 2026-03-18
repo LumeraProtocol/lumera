@@ -294,12 +294,27 @@ func (k Keeper) MigrateValidatorSupernode(ctx sdk.Context, oldValAddr, newValAdd
 	// Update validator address to new valoper.
 	sn.ValidatorAddress = newValAddr.String()
 
-	// Only update SupernodeAccount if it matches the validator's legacy address.
-	// A supernode account that belongs to a different entity (or was already
-	// migrated independently via ClaimLegacyAccount / supernode-setup) is preserved.
+	// Only update SupernodeAccount (and its history) if it matches the
+	// validator's legacy address — i.e. the validator was its own supernode
+	// account. A supernode account that belongs to a different entity (or was
+	// already migrated independently via ClaimLegacyAccount / supernode-setup)
+	// is preserved, and its history is not touched.
 	legacyAddrStr := legacyAddr.String()
 	if sn.SupernodeAccount == legacyAddrStr {
 		sn.SupernodeAccount = newAddr.String()
+
+		// Rewrite existing history entries that reference the legacy address.
+		for i := range sn.PrevSupernodeAccounts {
+			if sn.PrevSupernodeAccounts[i].Account == legacyAddrStr {
+				sn.PrevSupernodeAccounts[i].Account = newAddr.String()
+			}
+		}
+
+		// Record the migration as a new account-history entry.
+		sn.PrevSupernodeAccounts = append(sn.PrevSupernodeAccounts, &sntypes.SupernodeAccountHistory{
+			Account: newAddr.String(),
+			Height:  ctx.BlockHeight(),
+		})
 	}
 
 	// Update validator address in embedded evidence records.
@@ -309,20 +324,6 @@ func (k Keeper) MigrateValidatorSupernode(ctx sdk.Context, oldValAddr, newValAdd
 			sn.Evidence[i].ValidatorAddress = newValAddr.String()
 		}
 	}
-
-	// Update account address in supernode account history only where it
-	// matches the validator's legacy address.
-	for i := range sn.PrevSupernodeAccounts {
-		if sn.PrevSupernodeAccounts[i].Account == legacyAddrStr {
-			sn.PrevSupernodeAccounts[i].Account = newAddr.String()
-		}
-	}
-
-	// Record the migration as a new account-history entry.
-	sn.PrevSupernodeAccounts = append(sn.PrevSupernodeAccounts, &sntypes.SupernodeAccountHistory{
-		Account: newAddr.String(),
-		Height:  ctx.BlockHeight(),
-	})
 
 	// Migrate metrics state: write under new key, delete old key.
 	metrics, found := k.supernodeKeeper.GetMetricsState(ctx, oldValAddr)

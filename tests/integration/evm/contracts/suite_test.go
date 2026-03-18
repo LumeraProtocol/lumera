@@ -43,4 +43,18 @@ func TestContractsSuite(t *testing.T) {
 	run("STATICCALLCannotModifyState", func(t *testing.T, node *evmtest.Node) {
 		testSTATICCALLCannotModifyState(t, node)
 	})
+
+	// Precompile proxy tests — contracts that STATICCALL custom precompiles
+	run("ContractProxiesActionGetParams", func(t *testing.T, node *evmtest.Node) {
+		testContractProxiesActionGetParams(t, node)
+	})
+	run("ContractProxiesSupernodeGetParams", func(t *testing.T, node *evmtest.Node) {
+		testContractProxiesSupernodeGetParams(t, node)
+	})
+	run("ContractProxiesActionGetActionFee", func(t *testing.T, node *evmtest.Node) {
+		testContractProxiesActionGetActionFee(t, node)
+	})
+	run("ContractQueriesBothPrecompiles", func(t *testing.T, node *evmtest.Node) {
+		testContractQueriesBothPrecompiles(t, node)
+	})
 }

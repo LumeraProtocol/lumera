@@ -629,7 +629,7 @@ func TestMigrateFeegrant_NoAllowances(t *testing.T) {
 // --- MigrateSupernode tests ---
 
 // TestMigrateSupernode_Found verifies that the supernode account field is updated
-// from legacy to new address.
+// from legacy to new address and PrevSupernodeAccounts history is maintained.
 func TestMigrateSupernode_Found(t *testing.T) {
 	f := initMockFixture(t)
 	legacy := testAccAddr()
@@ -638,12 +638,21 @@ func TestMigrateSupernode_Found(t *testing.T) {
 	sn := sntypes.SuperNode{
 		SupernodeAccount: legacy.String(),
 		ValidatorAddress: sdk.ValAddress(legacy).String(),
+		PrevSupernodeAccounts: []*sntypes.SupernodeAccountHistory{
+			{Account: legacy.String(), Height: 1},
+		},
 	}
 
 	f.supernodeKeeper.EXPECT().GetSuperNodeByAccount(gomock.Any(), legacy.String()).Return(sn, true, nil)
 	f.supernodeKeeper.EXPECT().SetSuperNode(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(_ any, updated sntypes.SuperNode) error {
 			require.Equal(t, newAddr.String(), updated.SupernodeAccount)
+			// Existing legacy entry should be rewritten to new address.
+			require.Len(t, updated.PrevSupernodeAccounts, 2)
+			require.Equal(t, newAddr.String(), updated.PrevSupernodeAccounts[0].Account)
+			require.Equal(t, int64(1), updated.PrevSupernodeAccounts[0].Height)
+			// New migration entry appended.
+			require.Equal(t, newAddr.String(), updated.PrevSupernodeAccounts[1].Account)
 			return nil
 		})
 
@@ -1293,11 +1302,10 @@ func TestMigrateValidatorSupernode_IndependentAccountPreserved(t *testing.T) {
 			require.Equal(t, sdk.ValAddress(newAddr).String(), updated.ValidatorAddress)
 			// Supernode account should be preserved (not overwritten).
 			require.Equal(t, independentSNAccount, updated.SupernodeAccount)
-			// Existing history entry should NOT be changed (doesn't match legacy addr).
+			// History should be unchanged — no entries added or modified since the
+			// supernode account is independent from the validator.
+			require.Len(t, updated.PrevSupernodeAccounts, 1)
 			require.Equal(t, independentSNAccount, updated.PrevSupernodeAccounts[0].Account)
-			// Migration entry still appended.
-			require.Len(t, updated.PrevSupernodeAccounts, 2)
-			require.Equal(t, newAddr.String(), updated.PrevSupernodeAccounts[1].Account)
 			return nil
 		})
 

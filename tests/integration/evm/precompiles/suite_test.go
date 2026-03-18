@@ -70,6 +70,31 @@ func TestPrecompilesSuite(t *testing.T) {
 	// tests in this suite. The ICS20 query tests above use t.Skip when the
 	// bug is detected, which is safe. See ics20_test.go for details.
 
+	// Action precompile tests
+	t.Run("ActionPrecompileGetParamsViaEthCall", func(t *testing.T) {
+		testActionPrecompileGetParamsViaEthCall(t, node)
+	})
+	t.Run("ActionPrecompileGetActionFeeViaEthCall", func(t *testing.T) {
+		testActionPrecompileGetActionFeeViaEthCall(t, node)
+	})
+	t.Run("ActionPrecompileGetActionsByStateViaEthCall", func(t *testing.T) {
+		testActionPrecompileGetActionsByStateViaEthCall(t, node)
+	})
+	t.Run("ActionPrecompileGetActionsByCreatorViaEthCall", func(t *testing.T) {
+		testActionPrecompileGetActionsByCreatorViaEthCall(t, node)
+	})
+
+	// Supernode precompile tests
+	t.Run("SupernodePrecompileGetParamsViaEthCall", func(t *testing.T) {
+		testSupernodePrecompileGetParamsViaEthCall(t, node)
+	})
+	t.Run("SupernodePrecompileListSuperNodesViaEthCall", func(t *testing.T) {
+		testSupernodePrecompileListSuperNodesViaEthCall(t, node)
+	})
+	t.Run("SupernodePrecompileGetTopSuperNodesForBlockViaEthCall", func(t *testing.T) {
+		testSupernodePrecompileGetTopSuperNodesForBlockViaEthCall(t, node)
+	})
+
 	// Gas metering accuracy tests
 	t.Run("PrecompileGasMeteringAccuracy", func(t *testing.T) {
 		testPrecompileGasMeteringAccuracy(t, node)

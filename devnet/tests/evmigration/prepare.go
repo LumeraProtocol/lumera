@@ -107,7 +107,7 @@ func runPrepare() {
 		log.Printf("  created %s: %s", name, rec.Address)
 	}
 
-	// Generate extra accounts (will NOT be migrated, just add noise).
+	// Generate extra legacy accounts (will also be migrated).
 	log.Println("--- Generating extra accounts ---")
 	for i := 0; i < *flagNumExtra; i++ {
 		name := buildPreparedAccountName(extraPreparedAccountPrefix, accountTag, i)
@@ -116,7 +116,7 @@ func runPrepare() {
 			log.Printf("  reusing existing %s: %s", af.Accounts[idx].Name, af.Accounts[idx].Address)
 			continue
 		}
-		rec, err := ensureAccount(name, false)
+		rec, err := ensureAccount(name, true)
 		if err != nil {
 			log.Fatalf("ensure account %s: %v", name, err)
 		}

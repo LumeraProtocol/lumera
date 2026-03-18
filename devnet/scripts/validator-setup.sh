@@ -443,6 +443,8 @@ init_if_needed() {
 	else
 		echo "[SETUP] Initializing ${MONIKER}..."
 		run ${DAEMON} init "${MONIKER}" --chain-id "${CHAIN_ID}" --overwrite
+		# Set default client output to JSON for scripting-friendly parsing.
+		sed -i 's/^output = .*/output = "json"/' "${DAEMON_HOME}/config/client.toml"
 	fi
 
 	# Ensure validator key exists. If a mnemonic is configured for this validator

@@ -13,9 +13,10 @@ import (
 func TestServeHTTPGet(t *testing.T) {
 	t.Parallel()
 
+	handler := NewHTTPHandler(nil) // nil = allow all origins
 	req := httptest.NewRequest(http.MethodGet, HTTPPath, nil)
 	rec := httptest.NewRecorder()
-	ServeHTTP(rec, req)
+	handler(rec, req)
 
 	resp := rec.Result()
 	defer resp.Body.Close()
@@ -34,9 +35,10 @@ func TestServeHTTPGet(t *testing.T) {
 func TestServeHTTPHead(t *testing.T) {
 	t.Parallel()
 
+	handler := NewHTTPHandler(nil)
 	req := httptest.NewRequest(http.MethodHead, HTTPPath, nil)
 	rec := httptest.NewRecorder()
-	ServeHTTP(rec, req)
+	handler(rec, req)
 
 	resp := rec.Result()
 	defer resp.Body.Close()
@@ -52,9 +54,10 @@ func TestServeHTTPHead(t *testing.T) {
 func TestServeHTTPMethodNotAllowed(t *testing.T) {
 	t.Parallel()
 
+	handler := NewHTTPHandler(nil)
 	req := httptest.NewRequest(http.MethodPost, HTTPPath, nil)
 	rec := httptest.NewRecorder()
-	ServeHTTP(rec, req)
+	handler(rec, req)
 
 	resp := rec.Result()
 	defer resp.Body.Close()
@@ -66,9 +69,10 @@ func TestServeHTTPMethodNotAllowed(t *testing.T) {
 func TestServeHTTPOptions(t *testing.T) {
 	t.Parallel()
 
+	handler := NewHTTPHandler(nil)
 	req := httptest.NewRequest(http.MethodOptions, HTTPPath, nil)
 	rec := httptest.NewRecorder()
-	ServeHTTP(rec, req)
+	handler(rec, req)
 
 	resp := rec.Result()
 	defer resp.Body.Close()
@@ -77,4 +81,73 @@ func TestServeHTTPOptions(t *testing.T) {
 	require.Equal(t, "*", resp.Header.Get("Access-Control-Allow-Origin"))
 	require.Equal(t, "GET, HEAD, OPTIONS", resp.Header.Get("Access-Control-Allow-Methods"))
 	require.Equal(t, "Content-Type", resp.Header.Get("Access-Control-Allow-Headers"))
+}
+
+func TestServeHTTPCORSAllowedOrigin(t *testing.T) {
+	t.Parallel()
+
+	handler := NewHTTPHandler([]string{"https://explorer.lumera.io", "https://docs.lumera.io"})
+
+	// Allowed origin is echoed back.
+	req := httptest.NewRequest(http.MethodGet, HTTPPath, nil)
+	req.Header.Set("Origin", "https://explorer.lumera.io")
+	rec := httptest.NewRecorder()
+	handler(rec, req)
+
+	resp := rec.Result()
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	require.Equal(t, "https://explorer.lumera.io", resp.Header.Get("Access-Control-Allow-Origin"))
+}
+
+func TestServeHTTPCORSBlockedOrigin(t *testing.T) {
+	t.Parallel()
+
+	handler := NewHTTPHandler([]string{"https://explorer.lumera.io"})
+
+	// Unknown origin gets no CORS header.
+	req := httptest.NewRequest(http.MethodGet, HTTPPath, nil)
+	req.Header.Set("Origin", "https://evil.example.com")
+	rec := httptest.NewRecorder()
+	handler(rec, req)
+
+	resp := rec.Result()
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	require.Empty(t, resp.Header.Get("Access-Control-Allow-Origin"))
+}
+
+func TestServeHTTPCORSNoOriginHeader(t *testing.T) {
+	t.Parallel()
+
+	handler := NewHTTPHandler([]string{"https://explorer.lumera.io"})
+
+	// No Origin header (curl, server-to-server) — allow through.
+	req := httptest.NewRequest(http.MethodGet, HTTPPath, nil)
+	rec := httptest.NewRecorder()
+	handler(rec, req)
+
+	resp := rec.Result()
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	require.Equal(t, "*", resp.Header.Get("Access-Control-Allow-Origin"))
+}
+
+func TestServeHTTPCORSWildcardInList(t *testing.T) {
+	t.Parallel()
+
+	handler := NewHTTPHandler([]string{"*"})
+
+	req := httptest.NewRequest(http.MethodGet, HTTPPath, nil)
+	req.Header.Set("Origin", "https://anything.example.com")
+	rec := httptest.NewRecorder()
+	handler(rec, req)
+
+	resp := rec.Result()
+	defer resp.Body.Close()
+
+	require.Equal(t, "*", resp.Header.Get("Access-Control-Allow-Origin"))
 }

@@ -33,6 +33,9 @@ func TestInitAppConfigEVMDefaults(t *testing.T) {
 	apiNamespaces, ok := jsonRPCCfg.FieldByName("API").Interface().([]string)
 	require.True(t, ok, "json-rpc.api must be []string")
 	require.Contains(t, apiNamespaces, appopenrpc.Namespace, "json-rpc.api must include rpc namespace for OpenRPC discovery")
+	require.NotContains(t, apiNamespaces, "admin", "json-rpc.api must not include admin by default")
+	require.NotContains(t, apiNamespaces, "debug", "json-rpc.api must not include debug by default")
+	require.NotContains(t, apiNamespaces, "personal", "json-rpc.api must not include personal by default")
 
 	evmCfg := cfgValue.FieldByName("EVM")
 	require.True(t, evmCfg.IsValid(), "EVM field not found")

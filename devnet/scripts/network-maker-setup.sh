@@ -620,6 +620,166 @@ configure_nm_accounts() {
 }
 
 # ═════════════════════════════════════════════════════════════════════════════
+# EVM ACCOUNT MIGRATION
+# When the chain upgrades to v1.12.0+, NM account keys must switch from
+# secp256k1 (coin 118) to eth_secp256k1 (coin 60). This section detects the
+# upgrade and re-derives all NM keys from the same mnemonics using the EVM
+# key type. Address files and config are updated afterward.
+# ═════════════════════════════════════════════════════════════════════════════
+
+EVM_HD_PATH="m/44'/60'/0'/0/0"
+LUMERA_FIRST_EVM_VERSION="${LUMERA_FIRST_EVM_VERSION:-v1.12.0}"
+
+normalize_version() {
+	local v="${1:-}"
+	v="${v#"${v%%[![:space:]]*}"}"
+	v="${v%"${v##*[![:space:]]}"}"
+	v="${v#v}"
+	printf '%s' "$v"
+}
+
+# Detect the running lumerad version.
+get_lumerad_version() {
+	local version=""
+	version="$($DAEMON version 2>/dev/null | grep -Eo 'v?[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?' | head -n1 || true)"
+	version="$(normalize_version "$version")"
+	if [[ -n "$version" ]]; then
+		printf '%s' "$version"
+		return 0
+	fi
+	# Fallback to config.json.
+	if [[ -f "${CFG_CHAIN}" ]]; then
+		version="$(jq -r '.chain.version // empty' "${CFG_CHAIN}" 2>/dev/null || true)"
+		version="$(normalize_version "$version")"
+	fi
+	printf '%s' "$version"
+}
+
+# Returns 0 if the chain supports EVM (version >= cutover).
+lumera_supports_evm() {
+	local current first_evm
+	current="$(get_lumerad_version)"
+	first_evm="$(normalize_version "$LUMERA_FIRST_EVM_VERSION")"
+	[[ -n "$current" ]] && version_ge "$current" "$first_evm"
+}
+
+# Returns the pubkey @type string for a keyring key.
+key_pubkey_type() {
+	local out
+	if ! out="$($DAEMON keys show "$1" --keyring-backend "$KEYRING_BACKEND" --output json 2>/dev/null)"; then
+		return 1
+	fi
+	jq -r '.pubkey | (if type == "string" then (fromjson? // {}) else . end) | .["@type"] // empty' <<<"$out"
+}
+
+is_legacy_pubkey_type() {
+	[[ -n "${1:-}" && "$1" == *"secp256k1.PubKey"* && "$1" != *"ethsecp256k1"* ]]
+}
+
+is_evm_pubkey_type() {
+	[[ -n "${1:-}" && "$1" == *"ethsecp256k1"* ]]
+}
+
+# Migrate all NM account keys from legacy to EVM key type if the chain has
+# been upgraded. Re-derives each key from its saved mnemonic using coin-type 60.
+# Updates the NM_ACCOUNT_ADDRESSES array, the nm-address status file, and
+# funds any new addresses that have zero balance.
+maybe_migrate_nm_accounts_to_evm() {
+	if ! lumera_supports_evm; then
+		return 0
+	fi
+
+	local total="${#NM_ACCOUNT_KEY_NAMES[@]}"
+	if [ "${total}" -eq 0 ]; then
+		return 0
+	fi
+
+	# Check if first account is already EVM — if so, all should be.
+	local first_type
+	first_type="$(key_pubkey_type "${NM_ACCOUNT_KEY_NAMES[0]}" || true)"
+	if is_evm_pubkey_type "$first_type"; then
+		echo "[NM] NM accounts already use EVM key type; skipping migration."
+		return 0
+	fi
+	if ! is_legacy_pubkey_type "$first_type"; then
+		echo "[NM] NM account ${NM_ACCOUNT_KEY_NAMES[0]} has unknown key type ${first_type:-missing}; skipping migration."
+		return 0
+	fi
+
+	echo "[NM] Chain supports EVM — migrating ${total} NM account(s) from legacy to EVM key type."
+
+	# Save old nm-address file.
+	if [[ -f "$NM_ADDR_FILE" ]]; then
+		cp -f "$NM_ADDR_FILE" "${NM_ADDR_FILE}-pre-evm"
+		echo "[NM] Saved pre-EVM address file to ${NM_ADDR_FILE}-pre-evm"
+	fi
+
+	local genesis_addr=""
+	if [[ -f "$GENESIS_ADDR_FILE" ]]; then
+		genesis_addr="$(cat "$GENESIS_ADDR_FILE")"
+	fi
+
+	: >"${NM_ADDR_FILE}"
+	local idx key_name mnemonic_file old_addr new_addr
+	for idx in $(seq 0 $((total - 1))); do
+		key_name="${NM_ACCOUNT_KEY_NAMES[$idx]}"
+		if [ "$((idx + 1))" -eq 1 ]; then
+			mnemonic_file="${NM_MNEMONIC_FILE_BASE}"
+		else
+			mnemonic_file="${NM_MNEMONIC_FILE_BASE}-$((idx + 1))"
+		fi
+
+		if [[ ! -s "$mnemonic_file" ]]; then
+			echo "[NM] WARN: No mnemonic for ${key_name} at ${mnemonic_file}; cannot migrate."
+			printf "%s,%s\n" "${key_name}" "${NM_ACCOUNT_ADDRESSES[$idx]}" >>"${NM_ADDR_FILE}"
+			continue
+		fi
+
+		old_addr="${NM_ACCOUNT_ADDRESSES[$idx]}"
+		local mnemonic
+		mnemonic="$(cat "$mnemonic_file")"
+
+		# Delete and re-add with EVM key type.
+		$DAEMON keys delete "$key_name" --keyring-backend "$KEYRING_BACKEND" -y >/dev/null 2>&1 || true
+		printf '%s\n' "$mnemonic" | $DAEMON keys add "$key_name" \
+			--recover \
+			--keyring-backend "$KEYRING_BACKEND" \
+			--key-type "eth_secp256k1" \
+			--hd-path "$EVM_HD_PATH" >/dev/null
+
+		new_addr="$(run_capture $DAEMON keys show "$key_name" -a --keyring-backend "$KEYRING_BACKEND")"
+		NM_ACCOUNT_ADDRESSES[$idx]="$new_addr"
+		printf "%s,%s\n" "${key_name}" "${new_addr}" >>"${NM_ADDR_FILE}"
+		echo "[NM] Migrated ${key_name}: ${old_addr} -> ${new_addr}"
+
+		# Fund the new address if needed.
+		if [[ -n "$genesis_addr" ]]; then
+			local bal
+			bal="$($DAEMON q bank balances "$new_addr" --output json 2>/dev/null | \
+				jq -r --arg d "$DENOM" '([.balances[]? | select(.denom==$d) | .amount] | first) // "0"')"
+			[[ -z "$bal" ]] && bal="0"
+			if ((bal == 0)); then
+				echo "[NM] Funding migrated ${key_name} ($new_addr)..."
+				local send_json txhash
+				send_json="$($DAEMON tx bank send "$genesis_addr" "$new_addr" "$NM_ACCOUNT_BALANCE" \
+					--chain-id "$CHAIN_ID" --keyring-backend "$KEYRING_BACKEND" \
+					--gas auto --gas-adjustment 1.3 --fees "3000${DENOM}" \
+					--yes --output json 2>/dev/null || true)"
+				txhash="$(echo "$send_json" | jq -r '.txhash // empty')"
+				if [[ -n "$txhash" ]]; then
+					wait_for_tx_confirmation "$txhash" || echo "[NM] WARN: funding tx may not have confirmed"
+				fi
+				# Wait for a new block to avoid sequence conflicts.
+				local h; h="$(latest_block_height)"
+				wait_for_block_height_increase "$h" || true
+			fi
+		fi
+	done
+
+	echo "[NM] EVM migration complete for ${total} NM account(s)."
+}
+
+# ═════════════════════════════════════════════════════════════════════════════
 # MAIN EXECUTION
 #
 # Execution order:
@@ -629,8 +789,9 @@ configure_nm_accounts() {
 #      b. Install binary from shared release dir
 #      c. Wait for chain + supernode readiness
 #      d. Create/fund NM accounts
-#      e. Build config from template
-#      f. Start NM process
+#      e. Migrate accounts to EVM if chain upgraded
+#      f. Build config from template
+#      g. Start NM process
 # ═════════════════════════════════════════════════════════════════════════════
 
 if [ "${START_MODE}" = "wait" ]; then
@@ -647,5 +808,6 @@ wait_for_lumera || fail_soft "Chain not ready; skipping NM."
 wait_for_supernode || fail_soft "Supernode not ready; skipping NM."
 
 configure_nm_accounts    # Create keys + fund from genesis account
+maybe_migrate_nm_accounts_to_evm  # Re-key to EVM if chain was upgraded
 configure_nm             # Build config.toml from template + runtime values
 start_network_maker      # Launch NM process in background

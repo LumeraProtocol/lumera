@@ -148,6 +148,9 @@ func runMigrate() {
 			delta, migrated, alreadyMigrated)
 	}
 
+	// Clean up spent legacy keys from keyring.
+	cleanupLegacyKeys(af)
+
 	log.Printf("=== MIGRATE COMPLETE: %d newly migrated, %d already on-chain, %d failed, %d total ===",
 		migrated, alreadyMigrated, failed, len(legacyIdx))
 	if failed > 0 {
@@ -772,6 +775,33 @@ func validateLegacyPostMigration(rec *AccountRecord) error {
 		return nil
 	}
 	return errors.New(strings.Join(issues, "; "))
+}
+
+// cleanupLegacyKeys removes spent legacy keys (pre-evm-*, pre-evmex-*) from
+// the keyring for accounts that have been successfully migrated. The new
+// EVM-compatible key (evm-*, evmex-*) remains.
+func cleanupLegacyKeys(af *AccountsFile) {
+	log.Println("--- Cleaning up spent legacy keys ---")
+	deleted := 0
+	for _, rec := range af.Accounts {
+		if !rec.Migrated || !rec.IsLegacy {
+			continue
+		}
+		if rec.Name == "" || rec.NewName == "" {
+			continue
+		}
+		// Only delete if the legacy key name differs from the new key name.
+		if rec.Name == rec.NewName {
+			continue
+		}
+		if err := deleteKey(rec.Name); err != nil {
+			log.Printf("  WARN: failed to delete legacy key %s: %v", rec.Name, err)
+			continue
+		}
+		deleted++
+		log.Printf("  deleted legacy key: %s (migrated to %s)", rec.Name, rec.NewName)
+	}
+	log.Printf("  cleaned up %d legacy keys", deleted)
 }
 
 func resolvePostMigrationAddress(addr string) string {

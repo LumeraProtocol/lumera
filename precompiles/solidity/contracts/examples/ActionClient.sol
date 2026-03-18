@@ -81,7 +81,7 @@ contract ActionClient {
         string calldata dataHash,
         string calldata fileName,
         uint64 rqIdsIc,
-        bytes calldata signatures,
+        string calldata signatures,
         uint256 price,
         int64 expirationTime,
         uint64 fileSizeKbs
@@ -106,7 +106,7 @@ contract ActionClient {
         string calldata dataHash,
         string calldata fileName,
         uint64 rqIdsIc,
-        bytes calldata signatures,
+        string calldata signatures,
         int64 expirationTime,
         uint64 fileSizeKbs
     ) external returns (string memory actionId, uint256 totalFee) {

@@ -95,6 +95,25 @@ func TestPrecompilesSuite(t *testing.T) {
 		testSupernodePrecompileGetTopSuperNodesForBlockViaEthCall(t, node)
 	})
 
+	// Supernode precompile tx-path tests (ordered: register must precede report)
+	t.Run("SupernodeRegisterTxPath", func(t *testing.T) {
+		testSupernodeRegisterTxPath(t, node)
+	})
+	t.Run("SupernodeReportMetricsTxPath", func(t *testing.T) {
+		testSupernodeReportMetricsTxPath(t, node)
+	})
+	t.Run("SupernodeReportMetricsTxPathFailsForWrongCaller", func(t *testing.T) {
+		testSupernodeReportMetricsTxPathFailsForWrongCaller(t, node)
+	})
+
+	// Action precompile tx-path tests
+	t.Run("ActionRequestCascadeTxPathFailsWithBadSignature", func(t *testing.T) {
+		testActionRequestCascadeTxPathFailsWithBadSignature(t, node)
+	})
+	t.Run("ActionApproveActionTxPathFailsForNonExistent", func(t *testing.T) {
+		testActionApproveActionTxPathFailsForNonExistent(t, node)
+	})
+
 	// Gas metering accuracy tests
 	t.Run("PrecompileGasMeteringAccuracy", func(t *testing.T) {
 		testPrecompileGasMeteringAccuracy(t, node)

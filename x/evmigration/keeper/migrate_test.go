@@ -507,6 +507,9 @@ func TestMigrateDistribution_WithDelegations(t *testing.T) {
 		stakingtypes.NewDelegation(legacy.String(), valAddr.String(), math.LegacyNewDec(100)),
 	}
 
+	// redirectWithdrawAddrIfMigrated: withdraw addr returns self — no redirect needed.
+	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacy).Return(legacy, nil)
+
 	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacy, ^uint16(0)).Return(delegations, nil)
 	f.distributionKeeper.EXPECT().GetDelegatorStartingInfo(gomock.Any(), valAddr, legacy).Return(
 		distrtypes.DelegatorStartingInfo{PreviousPeriod: 4}, nil,
@@ -522,6 +525,9 @@ func TestMigrateDistribution_WithDelegations(t *testing.T) {
 func TestMigrateDistribution_NoDelegations(t *testing.T) {
 	f := initMockFixture(t)
 	legacy := testAccAddr()
+
+	// redirectWithdrawAddrIfMigrated: withdraw addr returns self — no redirect needed.
+	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacy).Return(legacy, nil)
 
 	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacy, ^uint16(0)).Return(nil, nil)
 

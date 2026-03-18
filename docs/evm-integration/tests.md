@@ -7,7 +7,7 @@ See [main.md](main.md) for architecture, app changes, and operational details.
 
 ## Executive Summary
 
-Lumera ships **~393 EVM-related tests** spanning unit, integration, and devnet levels — the most comprehensive pre-mainnet EVM test suite in the Cosmos ecosystem. For context:
+Lumera ships **~398 EVM-related tests** spanning unit, integration, and devnet levels — the most comprehensive pre-mainnet EVM test suite in the Cosmos ecosystem. For context:
 
 - **Evmos** — the first Cosmos EVM chain — launched mainnet with primarily unit tests and a handful of end-to-end scripts; their integration test suite was built incrementally*after* mainnet issues surfaced (e.g., the zero-base-fee spam incident).
 - **Kava** — relied heavily on simulation tests and manual QA for their EVM launch; structured integration tests came later.
@@ -24,7 +24,7 @@ Lumera's suite goes beyond any of these baselines **before** mainnet:
 | ERC20/IBC middleware (v1 + v2 stacks)                                            | 7 integration + 14 unit (policy)        | Partial or post-launch                    |
 | Precisebank (6↔18 decimal bridge)                                               | 39 unit + 6 integration                 | Not applicable (novel to Lumera)          |
 | Feemarket (EIP-1559)                                                             | 9 unit + 8 integration                  | Inherited from upstream, rarely augmented |
-| Precompile coverage (9 precompiles + gas metering + action + supernode modules)   | 24 integration                          | Smoke-level                               |
+| Precompile coverage (9 precompiles + gas metering + action + supernode modules)   | 29 integration                          | Smoke-level                               |
 | Account migration (coin-type 118→60)                                            | 102 unit + 14 integration + devnet tool | Not applicable (novel to Lumera)          |
 | OpenRPC discovery + spec sync                                                    | 15 unit + 2 integration                 | No chain has this                         |
 | WebSocket subscriptions (newHeads, logs, pending)                                | 4 integration                           | Untested or manual                        |
@@ -57,7 +57,7 @@ All three previously identified critical test gaps (mempool capacity pressure, b
 | **Integration** | evm/precisebank                      | 6                                                                       | High — transfer/send split matrix, burn/mint workflow, fractional balance queries, remainder persistence, module account invariant                                                                                                                                                 |
 | **Integration** | evm/ante                             | 3                                                                       | Medium — authz generic grant reject/allow, cosmos tx fee enforcement                                                                                                                                                                                                               |
 | **Integration** | evm/jsonrpc                          | 23                                                                      | Very high — basic methods, backend methods, receipts, logs, mixed blocks, tx ordering, block lookup, persistence across restart, OpenRPC endpoint, account state, indexer disabled, batch requests                                                                                 |
-| **Integration** | evm/precompiles                      | 24                                                                      | High — bank, staking, distribution, gov, bech32, p256, slashing (params, signing infos, unjail), ICS20 (denoms, denomHash, denom), action (getParams, getActionFee, getActionsByState, getActionsByCreator), supernode (getParams, listSuperNodes, getTopSuperNodesForBlock), delegate tx, withdraw address tx, gas metering accuracy (6 precompiles), estimate-vs-actual |
+| **Integration** | evm/precompiles                      | 29                                                                      | High — bank, staking, distribution, gov, bech32, p256, slashing (params, signing infos, unjail), ICS20 (denoms, denomHash, denom), action (getParams, getActionFee, getActionsByState, getActionsByCreator, requestCascade bad-sig, approveAction non-existent), supernode (getParams, listSuperNodes, getTopSuperNodesForBlock, register tx, reportMetrics tx, reportMetrics auth), delegate tx, withdraw address tx, gas metering accuracy (6 precompiles), estimate-vs-actual |
 | **Integration** | evm/mempool                          | 12                                                                      | High — fee priority ordering, contention ordering, nonce gap promotion, pending subscription, disabled mode, nonce replacement, capacity overflow, rapid replacement race, newHeads/logs WS subscriptions                                                                          |
 | **Integration** | evm/contracts                        | 15                                                                      | High — deploy/call/revert/persistence, CALL, DELEGATECALL, CREATE2, STATICCALL, code + storage persistence across restart, EVM state preservation across restart, concurrent mixed operations, ERC20 approve/allowance/transferFrom, contract→precompile proxy (action + supernode) |
 | **Integration** | evm/ibc                              | 7                                                                       | High — registration on recv, disabled skip, invalid receiver, denom collision, round-trip transfer, secondary denom, burn-back                                                                                                                                                     |
@@ -70,7 +70,7 @@ All three previously identified critical test gaps (mempool capacity pressure, b
 | **Devnet**      | devnet/ibc                           | 1                                                                       | Low — basic IBC connectivity                                                                                                                                                                                                                                                       |
 | **Devnet**      | devnet/version                       | 1                                                                       | Low — binary version mode check                                                                                                                                                                                                                                                    |
 |                       |                                      |                                                                         |                                                                                                                                                                                                                                                                                     |
-|                       | **Totals**                     | **Unit: ~236 · Integration: ~120 · Devnet: 12+ · Total: ~393** |                                                                                                                                                                                                                                                                                     |
+|                       | **Totals**                     | **Unit: ~236 · Integration: ~125 · Devnet: 12+ · Total: ~398** |                                                                                                                                                                                                                                                                                     |
 
 ### Gaps and next steps
 
@@ -620,6 +620,11 @@ Suite: `tests/integration/evm/precompiles/suite_test.go`
 | `ICS20PrecompileDenomsViaEthCall`                          | Verifies ICS20 `denoms` query returns well-formed response (empty list on fresh chain). |
 | `ICS20PrecompileDenomHashViaEthCall`                       | Verifies ICS20 `denomHash` query for non-existent trace returns empty hash.             |
 | `ICS20PrecompileDenomViaEthCall`                           | Verifies ICS20 `denom` query for non-existent hash returns default struct.              |
+| `SupernodeRegisterTxPath`                                  | Registers supernode via precompile tx, verifies receipt success and listSuperNodes count.  |
+| `SupernodeReportMetricsTxPath`                             | Reports metrics via precompile tx from the registered supernode account, verifies success. |
+| `SupernodeReportMetricsTxPathFailsForWrongCaller`          | Verifies non-supernode account cannot report metrics (auth check on contract.Caller()).    |
+| `ActionRequestCascadeTxPathFailsWithBadSignature`          | Verifies requestCascade rejects invalid signature format via tx path.                     |
+| `ActionApproveActionTxPathFailsForNonExistent`             | Verifies approveAction reverts for non-existent action ID.                                |
 | `PrecompileGasMeteringAccuracy`                            | Verifies each precompile consumes bounded, non-trivial gas (6 precompiles).               |
 | `PrecompileGasEstimateMatchesActual`                       | Verifies eth_estimateGas is within 3x of actual gasUsed for bank precompile.              |
 
@@ -679,4 +684,3 @@ See [devnet-tests.md](devnet-tests.md) for full details on the EVM migration dev
 1. **Precompile gas metering benchmarks** — Validate actual gas consumption vs expected for each precompile and compare against upstream Cosmos EVM defaults.
 2. **Ops monitoring runbook** — Document fee market monitoring (base fee tracking, gas utilization trends), alerting thresholds, and common failure mode diagnosis.
 3. **EVM governance proposals** — Mechanism to toggle precompiles and adjust EVM params via on-chain governance (Evmos has dedicated governance proposals for this).
-

@@ -130,15 +130,17 @@ func (p Precompile) FinalizeSense(
 		return nil, err
 	}
 
+	// Look up the action to determine whether finalization actually completed.
+	// The keeper may return nil (no error) for soft rejections where evidence
+	// is recorded instead of failing the tx. Only emit ActionFinalized and
+	// report success when the action reached the Done state.
 	action, _ := p.actionKeeper.GetActionByID(ctx, actionId)
-	var newState uint8
-	if action != nil {
-		newState = uint8(action.State)
+	finalized := action != nil && action.State == actiontypes.ActionStateDone
+	if finalized {
+		if err := p.EmitActionFinalized(ctx, stateDB, actionId, contract.Caller(), uint8(action.State)); err != nil {
+			return nil, err
+		}
 	}
 
-	if err := p.EmitActionFinalized(ctx, stateDB, actionId, contract.Caller(), newState); err != nil {
-		return nil, err
-	}
-
-	return method.Outputs.Pack(true)
+	return method.Outputs.Pack(finalized)
 }

@@ -162,3 +162,71 @@ On-chain inspection showed the redelegation had moved to the new delegator addre
 - migrated validator as redelegation destination
 
 **Important note**: This fix prevents new bad migrations, but it does not repair redelegation records that were already migrated incorrectly on an existing chain. Those require a fresh devnet run or a dedicated repair path.
+
+---
+
+### 11) Distribution withdraw address sends reward dust to already-migrated legacy address
+
+**Symptom**: `tests_evmigration -mode=verify` reports `[bank] still has balance: 1 ulume` on a legacy address that was fully migrated. The address should have zero balance.
+
+**Root cause**: Cross-account dependency during ordered migration. When Account A's legacy address was set as Account B's distribution **withdraw address** (third-party), and Account A migrated first, the subsequent migration of Account B triggered `WithdrawDelegationRewards` in Step 1 (`MigrateDistribution`). The distribution module sent B's rewards to B's withdraw address — which was A's now-dead legacy address.
+
+Confirmed via on-chain events: at height 208, `MsgClaimLegacyAccount` for a different account emitted `withdraw_rewards: 1ulume` with `coin_received.receiver` pointing to the already-migrated legacy address.
+
+**Fix** (`x/evmigration/keeper/migrate_distribution.go`, `x/evmigration/keeper/migrate_staking.go`):
+
+1. Added `redirectWithdrawAddrIfMigrated()` — called at the start of `MigrateDistribution`, before any reward withdrawal. It checks if the delegator's withdraw address is a previously-migrated legacy address (via `MigrationRecords`). If so, it resets the withdraw address to self, ensuring rewards land in the account being migrated.
+
+2. Updated `migrateWithdrawAddress()` in `MigrateStaking` — when the third-party withdraw address is a migrated legacy address, it now follows the `MigrationRecord` to resolve to the corresponding new address, so future rewards reach the correct destination.
+
+**Tests**: Updated `TestMigrateDistribution_WithDelegations`, `TestMigrateDistribution_NoDelegations`, and all `TestClaimLegacyAccount_*` mock expectations to account for the new `GetDelegatorWithdrawAddr` call in `redirectWithdrawAddrIfMigrated`.
+
+---
+
+### 12) Verify mode redelegation query uses non-existent CLI command
+
+**Symptom**: `tests_evmigration -mode=verify` logs `WARN: redelegation query: exit status 1` for every migrated address, silently skipping redelegation verification.
+
+**Root cause**: `verifyRedelegationCount` called `lumerad query staking redelegations <addr>` (plural). In Cosmos SDK v0.53.6, the autocli registers only `redelegation` (singular) with `src-validator-addr` as a required positional argument. The plural form does not exist.
+
+**Fix** (`devnet/tests/evmigration/verify.go`): Replaced with `getValidators()` + `queryAnyRedelegationCount()` which iterates all validator pairs using the correct `lumerad query staking redelegation <addr> <src> <dst>` command.
+
+---
+
+### 13) Supernode `reportMetrics` precompile bypasses caller authentication
+
+**Severity**: Critical
+
+**Symptom**: Any EVM account can submit metrics for any registered supernode by passing the public supernode account address in calldata.
+
+**Root cause**: `ReportMetrics` in `precompiles/supernode/tx.go` took `supernodeAccount` from `args[1]` (calldata) and passed it to the keeper message without binding it to `contract.Caller()`. Every other tx method in the file derives `creator` from `evmAddrToBech32(contract.Caller())`. The keeper's check (`msg.SupernodeAccount != sn.SupernodeAccount`) only verifies the provided address matches on-chain state — but that value is publicly queryable, so the check is not an auth gate.
+
+**Fix** (`precompiles/supernode/tx.go`): Replaced `args[1]` usage with `evmAddrToBech32(p.addrCdc, contract.Caller())` so the authoritative supernode account is derived from the EVM tx signer. The calldata parameter is accepted for ABI compatibility but ignored.
+
+**Tests added**: `SupernodeReportMetricsTxPath` (success path), `SupernodeReportMetricsTxPathFailsForWrongCaller` (verifies a different EVM account is rejected).
+
+---
+
+### 14) `finalizeCascade`/`finalizeSense` precompiles emit success on soft rejection
+
+**Severity**: High
+
+**Symptom**: When the keeper records evidence instead of failing (e.g., supernode not in top-10, Kademlia ID verification failure), the precompile emits `ActionFinalized` event and returns `true`, misleading EVM callers and indexers.
+
+**Root cause**: The Cosmos keeper intentionally returns `nil` error for evidence-recording rejections to avoid tx reverts (which would discard the evidence). The precompile treated `nil` error as unconditional success, emitting the event and packing `true` regardless of whether the action state actually changed to `Done`.
+
+**Fix** (`precompiles/action/tx_cascade.go`, `tx_sense.go`): After the keeper call, the precompile now checks whether the action reached `ActionStateDone`. The `ActionFinalized` event is only emitted and `true` returned when finalization actually completed. Soft rejections return `false` without an event, preserving the evidence recording.
+
+---
+
+### 15) `requestCascade` ABI declares `bytes` for signature field but keeper expects dot-delimited string
+
+**Severity**: Medium
+
+**Symptom**: Solidity callers following the ABI and passing raw `bytes` for the `signatures` parameter produce data that fails keeper validation.
+
+**Root cause**: The ABI in `precompiles/action/abi.json` declared `signatures` as `type: "bytes"`. The precompile coerced `[]byte` to `string`. But the keeper's `RegisterAction` handler expects `Base64(rq_ids).creator_signature` — a dot-delimited textual format. A Solidity caller passing `abi.encode(someBytes)` would never produce a valid dot-separated string.
+
+**Fix** (`precompiles/action/abi.json`, `tx_cascade.go`, `IAction.sol`): Changed the signature parameter from `bytes` to `string` across ABI, precompile, and Solidity interface. Callers now pass the dot-delimited format directly as a string.
+
+**Tests added**: `ActionRequestCascadeTxPathFailsWithBadSignature` (verifies invalid signature format is rejected via tx path).

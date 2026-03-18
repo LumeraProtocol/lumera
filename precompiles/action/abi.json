@@ -96,9 +96,9 @@
           "type": "uint64"
         },
         {
-          "internalType": "bytes",
+          "internalType": "string",
           "name": "signatures",
-          "type": "bytes"
+          "type": "string"
         },
         {
           "internalType": "uint256",

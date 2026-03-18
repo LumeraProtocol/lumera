@@ -280,7 +280,13 @@ func (p Precompile) ReportMetrics(
 	}
 
 	validatorAddress := args[0].(string)
-	supernodeAccount := args[1].(string)
+	// args[1] (supernodeAccount) from calldata is intentionally ignored.
+	// We derive the authoritative supernode account from the EVM caller to
+	// prevent any account from reporting metrics on behalf of another.
+	supernodeAccount, err := evmAddrToBech32(p.addrCdc, contract.Caller())
+	if err != nil {
+		return nil, fmt.Errorf("invalid caller address: %w", err)
+	}
 	metricsArg := args[2].(struct {
 		VersionMajor     uint32 `abi:"versionMajor"`
 		VersionMinor     uint32 `abi:"versionMinor"`

@@ -35,12 +35,6 @@ interface IAction {
         uint256 price
     );
 
-    event ActionFinalized(
-        string indexed actionId,
-        address indexed superNode,
-        uint8 newState
-    );
-
     event ActionApproved(
         string indexed actionId,
         address indexed creator
@@ -54,7 +48,7 @@ interface IAction {
     /// @param dataHash     Hash of the data to store
     /// @param fileName     Original file name
     /// @param rqIdsIc      Number of redundancy IDs for IC
-    /// @param signatures   Concatenated supernode signatures
+    /// @param signatures   Dot-delimited "Base64(rq_ids).creator_signature" string
     /// @param price        Fee to pay (ulume)
     /// @param expirationTime Unix timestamp for action expiry
     /// @param fileSizeKbs  File size in kilobytes (used for fee calculation)
@@ -63,7 +57,7 @@ interface IAction {
         string calldata dataHash,
         string calldata fileName,
         uint64 rqIdsIc,
-        bytes calldata signatures,
+        string calldata signatures,
         uint256 price,
         int64 expirationTime,
         uint64 fileSizeKbs
@@ -84,25 +78,9 @@ interface IAction {
         uint64 fileSizeKbs
     ) external returns (string memory actionId);
 
-    /// @notice Finalize a Cascade action with result IDs.
-    /// @param actionId  The action to finalize
-    /// @param rqIdsIds  Array of result/redundancy IDs
-    /// @return success  True if finalization succeeded
-    function finalizeCascade(
-        string calldata actionId,
-        string[] calldata rqIdsIds
-    ) external returns (bool success);
-
-    /// @notice Finalize a Sense action with analysis results.
-    /// @param actionId              The action to finalize
-    /// @param ddAndFingerprintsIds  Array of DD & fingerprint result IDs
-    /// @param signatures            Aggregated signatures
-    /// @return success              True if finalization succeeded
-    function finalizeSense(
-        string calldata actionId,
-        string[] calldata ddAndFingerprintsIds,
-        string calldata signatures
-    ) external returns (bool success);
+    // NOTE: finalizeCascade / finalizeSense are omitted from this interface.
+    // Finalization is a supernode-internal operation — supernodes submit
+    // MsgFinalizeAction via Cosmos SDK transactions, not through the EVM.
 
     /// @notice Approve a pending action (governance/creator approval).
     /// @param actionId The action to approve

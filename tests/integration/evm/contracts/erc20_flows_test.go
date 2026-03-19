@@ -353,7 +353,7 @@ func buildERC20RuntimeBytecode() []byte {
 	rt.Op(vm.POP) // discard selector
 	// Step 1: innerHash = keccak256(CALLER . 1).
 	rt.Op(vm.CALLER)
-	rt.Push(0).Op(vm.MSTORE)  // mem[0:32] = CALLER (owner)
+	rt.Push(0).Op(vm.MSTORE) // mem[0:32] = CALLER (owner)
 	rt.Push(1)
 	rt.Push(32).Op(vm.MSTORE) // mem[32:64] = 1
 	rt.Push(64).Push(0).Op(vm.KECCAK256)
@@ -398,7 +398,7 @@ func buildERC20RuntimeBytecode() []byte {
 
 	// Compute sender slot: keccak256(CALLER . 0).
 	rt.Op(vm.CALLER)
-	rt.Push(0).Op(vm.MSTORE)  // mem[0:32] = CALLER
+	rt.Push(0).Op(vm.MSTORE) // mem[0:32] = CALLER
 	rt.Push(0)
 	rt.Push(32).Op(vm.MSTORE) // mem[32:64] = 0
 	rt.Push(64).Push(0).Op(vm.KECCAK256)
@@ -412,7 +412,7 @@ func buildERC20RuntimeBytecode() []byte {
 	//                                           stack: [amount, senderSlot, senderBal]
 
 	// newSenderBal = senderBal - amount.
-	rt.Op(vm.DUP3)  //                          stack: [.., senderBal, amount]
+	rt.Op(vm.DUP3)   //                          stack: [.., senderBal, amount]
 	rt.Op(vm.SWAP1)  //                         stack: [.., amount, senderBal]
 	rt.Op(vm.SUB)    //                         stack: [amount, senderSlot, senderBal-amount]
 	rt.Op(vm.SWAP1)  //                         stack: [amount, newBal, senderSlot]
@@ -420,17 +420,17 @@ func buildERC20RuntimeBytecode() []byte {
 
 	// Compute recipient slot: keccak256(to . 0).
 	rt.Push(4).Op(vm.CALLDATALOAD)
-	rt.Push(0).Op(vm.MSTORE)  // mem[0:32] = to
+	rt.Push(0).Op(vm.MSTORE) // mem[0:32] = to
 	rt.Push(0)
 	rt.Push(32).Op(vm.MSTORE) // mem[32:64] = 0
 	rt.Push(64).Push(0).Op(vm.KECCAK256)
 	//                                           stack: [amount, toSlot]
 	rt.Op(vm.DUP1, vm.SLOAD) //                 stack: [amount, toSlot, toBal]
-	rt.Op(vm.DUP3)            //                stack: [amount, toSlot, toBal, amount]
-	rt.Op(vm.ADD)              //               stack: [amount, toSlot, newToBal]
-	rt.Op(vm.SWAP1)            //               stack: [amount, newToBal, toSlot]
-	rt.Op(vm.SSTORE)           //               stack: [amount]
-	rt.Op(vm.POP)              //               stack: []
+	rt.Op(vm.DUP3)           //                stack: [amount, toSlot, toBal, amount]
+	rt.Op(vm.ADD)            //               stack: [amount, toSlot, newToBal]
+	rt.Op(vm.SWAP1)          //               stack: [amount, newToBal, toSlot]
+	rt.Op(vm.SSTORE)         //               stack: [amount]
+	rt.Op(vm.POP)            //               stack: []
 
 	// Return true.
 	rt.Push(1).Push(0).Op(vm.MSTORE)
@@ -466,13 +466,13 @@ func buildERC20RuntimeBytecode() []byte {
 
 	// newAllowance = allowVal - amount.
 	rt.Op(vm.DUP3, vm.SWAP1, vm.SUB) //         stack: [amount, allowSlot, newAllow]
-	rt.Op(vm.SWAP1)                    //        stack: [amount, newAllow, allowSlot]
-	rt.Op(vm.SSTORE)                   //        stack: [amount]
+	rt.Op(vm.SWAP1)                  //        stack: [amount, newAllow, allowSlot]
+	rt.Op(vm.SSTORE)                 //        stack: [amount]
 
 	// --- Debit from's balance ---
 	// Compute balance slot: keccak256(from . 0).
 	rt.Push(4).Op(vm.CALLDATALOAD)
-	rt.Push(0).Op(vm.MSTORE)  // mem[0:32] = from
+	rt.Push(0).Op(vm.MSTORE) // mem[0:32] = from
 	rt.Push(0)
 	rt.Push(32).Op(vm.MSTORE) // mem[32:64] = 0
 	rt.Push(64).Push(0).Op(vm.KECCAK256)
@@ -491,15 +491,15 @@ func buildERC20RuntimeBytecode() []byte {
 	// --- Credit to's balance ---
 	// Compute balance slot: keccak256(to . 0).
 	rt.Push(36).Op(vm.CALLDATALOAD)
-	rt.Push(0).Op(vm.MSTORE)  // mem[0:32] = to
+	rt.Push(0).Op(vm.MSTORE) // mem[0:32] = to
 	rt.Push(0)
 	rt.Push(32).Op(vm.MSTORE) // mem[32:64] = 0
 	rt.Push(64).Push(0).Op(vm.KECCAK256)
 	//                                           stack: [amount, toSlot]
-	rt.Op(vm.DUP1, vm.SLOAD) //                 stack: [amount, toSlot, toBal]
-	rt.Op(vm.DUP3, vm.ADD)    //                stack: [amount, toSlot, newToBal]
+	rt.Op(vm.DUP1, vm.SLOAD)   //                 stack: [amount, toSlot, toBal]
+	rt.Op(vm.DUP3, vm.ADD)     //                stack: [amount, toSlot, newToBal]
 	rt.Op(vm.SWAP1, vm.SSTORE) //               stack: [amount]
-	rt.Op(vm.POP)               //              stack: []
+	rt.Op(vm.POP)              //              stack: []
 
 	// Return true.
 	rt.Push(1).Push(0).Op(vm.MSTORE)

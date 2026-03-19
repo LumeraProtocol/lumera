@@ -111,12 +111,12 @@ func loadClaimRecordsFromCSV(k keeper.Keeper, claimsDenom string) ([]types.Claim
 	if _, err := os.Stat(claimsPath); os.IsNotExist(err) {
 		return nil, fmt.Errorf("claims CSV file not found at path: %s", claimsPath)
 	}
-	
+
 	file, err := os.Open(k.GetClaimsPath())
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	reader := csv.NewReader(file)
 	rows, err := reader.ReadAll()

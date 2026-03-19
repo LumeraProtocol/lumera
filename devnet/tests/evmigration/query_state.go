@@ -1,3 +1,6 @@
+// query_state.go provides on-chain state query helpers for bank, staking,
+// distribution, authz, feegrant, claim, and EVM modules. These wrap lumerad
+// CLI queries and parse the JSON output into Go types.
 package main
 
 import (
@@ -11,6 +14,7 @@ import (
 
 // --- File I/O ---
 
+// saveAccounts writes the accounts file as indented JSON.
 func saveAccounts(path string, af *AccountsFile) {
 	data, err := json.MarshalIndent(af, "", "  ")
 	if err != nil {
@@ -21,6 +25,7 @@ func saveAccounts(path string, af *AccountsFile) {
 	}
 }
 
+// loadAccounts reads and parses the accounts JSON file.
 func loadAccounts(path string) *AccountsFile {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -33,6 +38,7 @@ func loadAccounts(path string) *AccountsFile {
 	return &af
 }
 
+// truncate returns s capped at maxLen characters with "..." appended if truncated.
 func truncate(s string, maxLen int) string {
 	if len(s) <= maxLen {
 		return s
@@ -42,6 +48,7 @@ func truncate(s string, maxLen int) string {
 
 // --- Staking queries ---
 
+// queryDelegationCount returns the number of staking delegations for addr.
 func queryDelegationCount(addr string) (int, error) {
 	out, err := run("query", "staking", "delegations", addr)
 	if err != nil {
@@ -56,6 +63,7 @@ func queryDelegationCount(addr string) (int, error) {
 	return len(resp.DelegationResponses), nil
 }
 
+// queryDelegationToValidatorCount returns the number of delegations from addr to a specific validator.
 func queryDelegationToValidatorCount(addr string, valoper string) (int, error) {
 	out, err := run("query", "staking", "delegations", addr)
 	if err != nil {
@@ -80,6 +88,7 @@ func queryDelegationToValidatorCount(addr string, valoper string) (int, error) {
 	return n, nil
 }
 
+// queryUnbondingCount returns the number of unbonding delegations for addr.
 func queryUnbondingCount(addr string) (int, error) {
 	out, err := run("query", "staking", "unbonding-delegations", addr)
 	if err != nil {
@@ -94,6 +103,7 @@ func queryUnbondingCount(addr string) (int, error) {
 	return len(resp.UnbondingResponses), nil
 }
 
+// queryUnbondingFromValidatorCount returns the number of unbonding delegations from addr to a specific validator.
 func queryUnbondingFromValidatorCount(addr string, valoper string) (int, error) {
 	out, err := run("query", "staking", "unbonding-delegations", addr)
 	if err != nil {
@@ -116,6 +126,7 @@ func queryUnbondingFromValidatorCount(addr string, valoper string) (int, error) 
 	return n, nil
 }
 
+// queryRedelegationCount returns the number of redelegations from addr between srcVal and dstVal.
 func queryRedelegationCount(addr string, srcVal string, dstVal string) (int, error) {
 	out, err := run("query", "staking", "redelegation", addr, srcVal, dstVal)
 	if err != nil {
@@ -141,6 +152,8 @@ func queryRedelegationCount(addr string, srcVal string, dstVal string) (int, err
 	return 0, nil
 }
 
+// queryAnyRedelegationCount checks all validator pairs and returns the total
+// redelegation count for addr.
 func queryAnyRedelegationCount(addr string, validators []string) (int, error) {
 	total := 0
 	var firstErr error
@@ -168,6 +181,7 @@ func queryAnyRedelegationCount(addr string, validators []string) (int, error) {
 	return 0, nil
 }
 
+// queryValidatorDelegationsToCount returns the number of delegations to a validator.
 func queryValidatorDelegationsToCount(valoper string) (int, error) {
 	out, err := run("query", "staking", "delegations-to", valoper)
 	if err != nil {
@@ -184,6 +198,7 @@ func queryValidatorDelegationsToCount(valoper string) (int, error) {
 
 // --- Distribution queries ---
 
+// queryWithdrawAddress returns the distribution withdraw address for a delegator.
 func queryWithdrawAddress(addr string) (string, error) {
 	out, err := run("query", "distribution", "withdraw-addr", addr)
 	if err != nil {
@@ -206,6 +221,7 @@ func queryWithdrawAddress(addr string) (string, error) {
 
 // --- Authz queries ---
 
+// queryAuthzGrantExists returns true if a MsgSend authz grant exists from granter to grantee.
 func queryAuthzGrantExists(granter, grantee string) (bool, error) {
 	out, err := run("query", "authz", "grants", granter, grantee, "/cosmos.bank.v1beta1.MsgSend")
 	if err != nil {
@@ -226,6 +242,7 @@ func queryAuthzGrantExists(granter, grantee string) (bool, error) {
 
 // --- Bank queries ---
 
+// queryBalance returns the ulume balance for an address.
 func queryBalance(addr string) (int64, error) {
 	out, err := run("query", "bank", "balance", addr, "ulume")
 	if err != nil {
@@ -258,6 +275,63 @@ func queryBalance(addr string) (int64, error) {
 	return amt, nil
 }
 
+// queryBech32ToHex converts a bech32 address to 0x hex via lumerad.
+func queryBech32ToHex(bech32Addr string) (string, error) {
+	out, err := run("query", "evm", "bech32-to-0x", bech32Addr)
+	if err != nil {
+		return "", fmt.Errorf("bech32-to-0x: %s\n%w", truncate(out, 200), err)
+	}
+	hex := strings.TrimSpace(out)
+	// Output may be just the hex, or JSON — handle both.
+	if strings.HasPrefix(hex, "0x") || strings.HasPrefix(hex, "0X") {
+		return hex, nil
+	}
+	// Try JSON parse.
+	var resp struct {
+		Hex string `json:"hex"`
+	}
+	if err := json.Unmarshal([]byte(out), &resp); err == nil && resp.Hex != "" {
+		return resp.Hex, nil
+	}
+	return hex, nil
+}
+
+// queryEVMBalanceBank queries the EVM balance-bank for ulume at a hex address.
+func queryEVMBalanceBank(hexAddr string) (int64, error) {
+	out, err := run("query", "evm", "balance-bank", hexAddr, "ulume")
+	if err != nil {
+		return 0, fmt.Errorf("evm balance-bank: %s\n%w", truncate(out, 200), err)
+	}
+	var resp struct {
+		Balance *struct {
+			Amount string `json:"amount"`
+		} `json:"balance"`
+	}
+	if err := json.Unmarshal([]byte(out), &resp); err != nil {
+		return 0, err
+	}
+	if resp.Balance == nil || resp.Balance.Amount == "" {
+		return 0, nil
+	}
+	return strconv.ParseInt(resp.Balance.Amount, 10, 64)
+}
+
+// queryEVMAccountBalance queries the EVM account balance (18-decimal string).
+func queryEVMAccountBalance(hexAddr string) (string, error) {
+	out, err := run("query", "evm", "account", hexAddr)
+	if err != nil {
+		return "", fmt.Errorf("evm account: %s\n%w", truncate(out, 200), err)
+	}
+	var resp struct {
+		Balance string `json:"balance"`
+	}
+	if err := json.Unmarshal([]byte(out), &resp); err != nil {
+		return "", err
+	}
+	return resp.Balance, nil
+}
+
+// queryHasAnyBalance returns true if the address holds any token balance.
 func queryHasAnyBalance(addr string) (bool, error) {
 	out, err := run("query", "bank", "balances", addr)
 	if err != nil {
@@ -274,6 +348,7 @@ func queryHasAnyBalance(addr string) (bool, error) {
 
 // --- Feegrant queries ---
 
+// queryFeegrantAllowanceExists returns true if a fee grant exists from granter to grantee.
 func queryFeegrantAllowanceExists(granter, grantee string) (bool, error) {
 	out, err := run("query", "feegrant", "grant", granter, grantee)
 	if err != nil {
@@ -373,6 +448,7 @@ func queryClaimedCountByTier(tier uint32) (int, error) {
 	return len(resp.Claims), nil
 }
 
+// queryHasAnyDelayedClaim returns true if any delayed claim records exist for tiers 1-3.
 func queryHasAnyDelayedClaim() (bool, error) {
 	for _, tier := range []uint32{1, 2, 3} {
 		n, err := queryClaimedCountByTier(tier)

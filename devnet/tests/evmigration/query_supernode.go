@@ -1,3 +1,5 @@
+// query_supernode.go provides query helpers for the supernode module: fetching
+// supernode records, metrics state, and waiting for cascade-eligible supernodes.
 package main
 
 import (
@@ -101,10 +103,12 @@ func querySupernodeMetricsByValoper(valoper string) (*SuperNodeMetricsState, err
 	return &resp.MetricsState, nil
 }
 
+// querySupernodeMetricsArgs returns the CLI args for querying supernode metrics.
 func querySupernodeMetricsArgs(valoper string) []string {
 	return []string{"query", "supernode", "get-metrics", valoper}
 }
 
+// latestSupernodeState returns the state string from the highest block height entry.
 func latestSupernodeState(sn *SuperNodeRecord) string {
 	if sn == nil || len(sn.States) == 0 {
 		return ""
@@ -125,6 +129,8 @@ func latestSupernodeState(sn *SuperNodeRecord) string {
 	return bestState
 }
 
+// waitForEligibleCascadeSupernodes polls until at least one active supernode is
+// found or the timeout expires. Returns true if an eligible supernode was found.
 func waitForEligibleCascadeSupernodes(validators []string, timeout time.Duration) bool {
 	if len(validators) == 0 {
 		return false

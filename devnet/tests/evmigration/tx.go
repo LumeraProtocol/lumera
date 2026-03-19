@@ -1,3 +1,6 @@
+// tx.go provides transaction submission, waiting, and block query helpers.
+// It wraps lumerad CLI commands with retry logic for sequence mismatches and
+// uses the sdk-go client for tx inclusion waiting.
 package main
 
 import (
@@ -24,6 +27,8 @@ var (
 
 // --- CLI helpers ---
 
+// run executes a lumerad CLI command with standard flags (node, chain-id, keyring)
+// and retries with variant flag combinations if unknown flags are detected.
 func run(args ...string) (string, error) {
 	out, err := runWithFlags(true, true, args...)
 	if err == nil {
@@ -50,6 +55,7 @@ func run(args ...string) (string, error) {
 	return out, err
 }
 
+// runWithFlags executes a lumerad CLI command with configurable node and keyring flags.
 func runWithFlags(includeNode bool, includeKeyring bool, args ...string) (string, error) {
 	baseArgs := []string{
 		"--chain-id", *flagChainID,
@@ -72,6 +78,8 @@ func runWithFlags(includeNode bool, includeKeyring bool, args ...string) (string
 	return strings.TrimSpace(string(out)), err
 }
 
+// runTx submits a transaction via sync broadcast, waits for inclusion, and
+// retries up to 3 times on account sequence mismatches.
 func runTx(args ...string) (string, error) {
 	var lastOut string
 	var lastErr error
@@ -111,6 +119,8 @@ func runTx(args ...string) (string, error) {
 	return lastOut, lastErr
 }
 
+// runTxWithAccountSequence submits a transaction with explicit account number
+// and sequence (offline signing), then waits for inclusion.
 func runTxWithAccountSequence(accountNumber, sequence uint64, args ...string) (string, error) {
 	out, txHash, err := runTxNoWaitWithAccountSequence(accountNumber, sequence, args...)
 	if err != nil {
@@ -129,6 +139,8 @@ func runTxWithAccountSequence(accountNumber, sequence uint64, args ...string) (s
 	return out, nil
 }
 
+// runMigrationTxWithAdaptiveAccountNumber submits a migration tx and retries
+// with the correct account number if a signature verification mismatch occurs.
 func runMigrationTxWithAdaptiveAccountNumber(accountNumber, sequence uint64, args ...string) (string, error) {
 	curAccNum := accountNumber
 	var lastOut string
@@ -154,6 +166,8 @@ func runMigrationTxWithAdaptiveAccountNumber(accountNumber, sequence uint64, arg
 	return lastOut, lastErr
 }
 
+// runTxNoWaitWithAccountSequence submits a transaction with explicit offline
+// signing parameters but does not wait for inclusion.
 func runTxNoWaitWithAccountSequence(accountNumber, sequence uint64, args ...string) (string, string, error) {
 	txArgs := append([]string{}, args...)
 	txArgs = append(txArgs,
@@ -164,6 +178,8 @@ func runTxNoWaitWithAccountSequence(accountNumber, sequence uint64, args ...stri
 	return runTxWithMode(txArgs, "sync")
 }
 
+// runTxWithMode broadcasts a transaction with the given mode and auto-detects
+// gas for migration txs. Returns the output, tx hash, and any error.
 func runTxWithMode(args []string, broadcastMode string) (string, string, error) {
 	txArgs := append([]string{}, args...)
 	gas := *flagGas
@@ -241,6 +257,7 @@ func waitTx(txHash string) error {
 	return err
 }
 
+// queryTxCode queries a tx by hash and returns its result code and raw log.
 func queryTxCode(txHash string) (uint32, string, error) {
 	resp, err := queryTxResponse(txHash, 10*time.Second)
 	if err != nil {
@@ -249,6 +266,7 @@ func queryTxCode(txHash string) (uint32, string, error) {
 	return txResultCode(resp)
 }
 
+// waitForTxResult waits for a tx to be included in a block and returns its result code.
 func waitForTxResult(txHash string, timeout time.Duration) (uint32, string, error) {
 	resp, err := queryTxResponse(txHash, timeout)
 	if err != nil {
@@ -257,6 +275,7 @@ func waitForTxResult(txHash string, timeout time.Duration) (uint32, string, erro
 	return txResultCode(resp)
 }
 
+// queryTxResponse polls for tx inclusion using the sdk-go client.
 func queryTxResponse(txHash string, timeout time.Duration) (*txtypes.GetTxResponse, error) {
 	client, err := getTxWaitClient()
 	if err != nil {
@@ -276,6 +295,7 @@ func queryTxResponse(txHash string, timeout time.Duration) (*txtypes.GetTxRespon
 	return resp, nil
 }
 
+// txResultCode extracts the result code and raw log from a GetTxResponse.
 func txResultCode(resp *txtypes.GetTxResponse) (uint32, string, error) {
 	if resp == nil || resp.TxResponse == nil {
 		return 0, "", fmt.Errorf("empty tx response")
@@ -283,6 +303,7 @@ func txResultCode(resp *txtypes.GetTxResponse) (uint32, string, error) {
 	return resp.TxResponse.Code, resp.TxResponse.RawLog, nil
 }
 
+// txWaitClientConfig returns the sdk-go client config for tx waiting.
 func txWaitClientConfig() sdkbase.Config {
 	return sdkbase.Config{
 		ChainID:     *flagChainID,
@@ -293,6 +314,7 @@ func txWaitClientConfig() sdkbase.Config {
 	}
 }
 
+// getTxWaitClient returns a lazily-initialized sdk-go client for tx waiting.
 func getTxWaitClient() (*sdkbase.Client, error) {
 	txWaitClientOnce.Do(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -335,6 +357,7 @@ func waitForNextBlock(timeout time.Duration) error {
 	return errors.New("timeout waiting for next block")
 }
 
+// queryLatestHeight returns the current chain height by querying the block or status endpoint.
 func queryLatestHeight() (int64, error) {
 	out, err := run("query", "block")
 	if err != nil {
@@ -379,6 +402,7 @@ func queryLatestHeight() (int64, error) {
 	return h, nil
 }
 
+// getValidators returns the list of all validator operator addresses on the chain.
 func getValidators() ([]string, error) {
 	out, err := run("query", "staking", "validators")
 	if err != nil {

@@ -28,7 +28,7 @@ func TestRegisterLumeraLegacyAminoCodecEnablesEthSecp256k1StdSignature(t *testin
 	// NOTE: legacytx.StdSignature is deprecated, but this is the exact type still
 	// marshaled by SDK ConsumeTxSizeGasDecorator (x/auth/ante/basic.go) when
 	// charging tx size gas. Keep this until the upstream ante path is migrated.
-	sig := legacytx.StdSignature{ //nolint:staticcheck // SA1019: intentional regression guard for current SDK behavior.
+	sig := legacytx.StdSignature{ // SA1019: intentional regression guard for current SDK behavior.
 		PubKey:    ethPrivKey.PubKey(),
 		Signature: make([]byte, 65),
 	}

@@ -54,6 +54,10 @@ Activity generated per account (deterministic pattern based on account index):
 | **Feegrants received** | Every 6th legacy (offset 1) | Receives feegrants from 3 peers |
 | **Actions (CASCADE)** | Every 4th legacy (offset 2) | Submitted via `sdk-go` with supernode involvement |
 | **Claims** | Progressive distribution | Pre-seeded Pastel keys; ~70% instant, ~30% delayed (tiers 1/2/3) |
+| **Withdraw chain** | Every 9th legacy (Phase 2) | A→B→C legacy-to-legacy withdraw address chain |
+| **Authz+feegrant overlap** | Every 9th legacy (offset 1, Phase 2) | Same pair gets both authz AND feegrant |
+| **Redelegation+withdraw** | Every 9th legacy (offset 8, Phase 1) | Redelegation + third-party withdraw on same account |
+| **All-validator delegation** | Every 9th legacy (offset 4, Phase 1) | Delegate to every validator for max MigrateValidatorDelegations coverage |
 
 Execution strategy:
 - **Phase 1** — Own-account operations (delegations, unbonding, redelegations, withdrawal addr, authz grants out, feegrants out) are **parallelized** in 5-worker batches.
@@ -129,7 +133,25 @@ Extensive post-migration validation:
 - Supernode fields verified: `ValidatorAddress`, `SupernodeAccount`, `Evidence` entries, `PrevSupernodeAccounts` history (new entry appended with current block height), `MetricsState` re-keyed.
 - If the validator's supernode account was already migrated independently before validator migration, it must be preserved and reattached under the new valoper without tripping the stale supernode-account index collision.
 
-### 5. `verify` — Verify No Leftover Legacy State (Post-Migration)
+### 5. `migrate-all` — Interleaved Account + Validator Migration (Post-EVM)
+
+Combines `migrate` and `migrate-validator` into a single mode where regular accounts and the local validator candidate are shuffled into one random queue and processed in mixed batches.
+
+**Why:** The separate `migrate-validator` → `migrate` ordering is artificial. Real-world migrations will have validators and accounts completing in unpredictable order. `migrate-all` catches ordering-dependent bugs such as:
+- Accounts delegated to validators that migrate **later** (`MigrateValidatorDelegations` must re-key the already-migrated delegator's records).
+- Validators whose delegators already migrated (delegation records have the new delegator address but old validator address).
+- Cross-account withdraw addresses where the referenced account migrates in a different batch.
+
+**Behavior:**
+1. Collects all unmigrated legacy accounts + the local validator candidate into a unified queue.
+2. Shuffles the queue randomly.
+3. Processes in random batches of 1–5 items.
+4. For each item: calls `migrateOne()` (accounts) or `migrateOneValidator()` (validators) — the same functions used by the standalone modes.
+5. Saves progress after each batch.
+
+This is the default mode used by `make devnet-evm-upgrade`.
+
+### 6. `verify` — Verify No Leftover Legacy State (Post-Migration)
 
 Run **after** all migrations complete. Queries every chain module (except `x/evmigration` itself) via RPC to confirm that no legacy address references remain in on-chain state.
 
@@ -149,7 +171,7 @@ For each migrated legacy address, the tool checks:
 
 Results are reported as either `PASS` (all addresses clean) or `FAIL` with per-address details grouped by module. The tool exits with a non-zero status on failure, which halts the pipeline.
 
-### 6. `cleanup` — Remove Test Keys
+### 7. `cleanup` — Remove Test Keys
 
 Loads `accounts.json` and deletes all test keys from the local keyring (`~/.lumera/keyring-test/` or the path from `-home`).
 
@@ -157,7 +179,7 @@ Loads `accounts.json` and deletes all test keys from the local keyring (`~/.lume
 
 | Flag | Default | Description |
 |---|---|---|
-| `-mode` | (required) | `prepare`, `estimate`, `migrate`, `migrate-validator`, `verify`, or `cleanup` |
+| `-mode` | (required) | `prepare`, `estimate`, `migrate`, `migrate-validator`, `migrate-all`, `verify`, or `cleanup` |
 | `-bin` | `lumerad` | Path to `lumerad` binary |
 | `-rpc` | `tcp://localhost:26657` | Tendermint RPC endpoint |
 | `-grpc` | (derived from RPC) | gRPC endpoint (default: RPC host + port 9090) |

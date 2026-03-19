@@ -3,51 +3,51 @@
 This document lists network ports used by `lumerad`, with:
 
 - **Default bind address/port**
-- **Config file option** (`config.toml` / `app.toml`)
+- **Config file option** (`config.toml` /`app.toml`)
 - **Command-line flag** (when available)
 
 ---
 
 ## Quick reference
 
-| Service | Default | Config key | CLI flag |
-|---|---|---|---|
-| P2P (CometBFT) | `tcp://0.0.0.0:26656` | `config.toml` → `[p2p] laddr` | `--p2p.laddr` |
-| RPC (CometBFT HTTP/WebSocket) | `tcp://127.0.0.1:26657` | `config.toml` → `[rpc] laddr` | `--rpc.laddr` |
-| ABCI app socket | `tcp://0.0.0.0:26658` | `config.toml` / startup (`address` / `proxy_app`) | `--address`, `--proxy_app` |
-| Cosmos API (REST) | `tcp://0.0.0.0:1317` (commonly used) | `app.toml` → `[api] address` | `--api.enable` (enable), address from config |
-| gRPC | `localhost:9090` | `app.toml` → `[grpc] address` | `--grpc.enable`, `--grpc.address` |
-| gRPC-Web | `0.0.0.0:9900` | `app.toml` → `[grpc-web] address` | `--grpc-web.enable`, `--grpc-web.address` |
-| Ethereum JSON-RPC (HTTP) | `127.0.0.1:8545` | `app.toml` → `[json-rpc] address` | `--json-rpc.enable`, `--json-rpc.address` |
-| Ethereum JSON-RPC (WS) | `127.0.0.1:8546` | `app.toml` → `[json-rpc] ws-address` | `--json-rpc.ws-address` |
-| CometBFT pprof | disabled unless set | `config.toml` → `[rpc] pprof_laddr` | `--rpc.pprof_laddr` |
-| EVM geth metrics | `127.0.0.1:8100` | `app.toml` → `[evm] geth-metrics-address` | `--evm.geth-metrics-address` |
-| EVM JSON-RPC rate-limit proxy | `0.0.0.0:8547` (disabled by default) | `app.toml` → `[lumera.json-rpc-ratelimit] proxy-address` | — (config only) |
-| EVM JSON-RPC metrics | (app config; testnet commonly `127.0.0.1:6065`) | `app.toml` → `[json-rpc] metrics-address` | `--metrics` (enables metrics server) |
+| Service                       | Default                                           | Config key                                                    | CLI flag                                       |
+| ----------------------------- | ------------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------- |
+| P2P (CometBFT)                | `tcp://0.0.0.0:26656`                           | `config.toml` → `[p2p] laddr`                            | `--p2p.laddr`                                |
+| RPC (CometBFT HTTP/WebSocket) | `tcp://127.0.0.1:26657`                         | `config.toml` → `[rpc] laddr`                            | `--rpc.laddr`                                |
+| ABCI app socket               | `tcp://0.0.0.0:26658`                           | `config.toml` / startup (`address` / `proxy_app`)       | `--address`, `--proxy_app`                 |
+| Cosmos API (REST)             | `tcp://0.0.0.0:1317` (commonly used)            | `app.toml` → `[api] address`                             | `--api.enable` (enable), address from config |
+| gRPC                          | `localhost:9090`                                | `app.toml` → `[grpc] address`                            | `--grpc.enable`, `--grpc.address`          |
+| gRPC-Web                      | `0.0.0.0:9900`                                  | `app.toml` → `[grpc-web] address`                        | `--grpc-web.enable`, `--grpc-web.address`  |
+| Ethereum JSON-RPC (HTTP)      | `127.0.0.1:8545`                                | `app.toml` → `[json-rpc] address`                        | `--json-rpc.enable`, `--json-rpc.address`  |
+| Ethereum JSON-RPC (WS)        | `127.0.0.1:8546`                                | `app.toml` → `[json-rpc] ws-address`                     | `--json-rpc.ws-address`                      |
+| CometBFT pprof                | disabled unless set                               | `config.toml` → `[rpc] pprof_laddr`                      | `--rpc.pprof_laddr`                          |
+| EVM geth metrics              | `127.0.0.1:8100`                                | `app.toml` → `[evm] geth-metrics-address`                | `--evm.geth-metrics-address`                 |
+| EVM JSON-RPC rate-limit proxy | `0.0.0.0:8547` (disabled by default)            | `app.toml` → `[lumera.json-rpc-ratelimit] proxy-address` | — (config only)                               |
+| EVM JSON-RPC metrics          | (app config; testnet commonly `127.0.0.1:6065`) | `app.toml` → `[json-rpc] metrics-address`                | `--metrics` (enables metrics server)         |
 
 > Notes:
 >
 > - Some services are disabled by default and only bind when enabled (e.g., API, gRPC, gRPC-Web, JSON-RPC depending on config).
-> - Lumera app defaults enable EVM JSON-RPC and indexer in app config initialization; runtime can still override via flags or `app.toml`.
+> - Lumera app defaults enable EVM JSON-RPC and indexer in app config initialization; runtime can still override via flags or`app.toml`.
 
 ---
 
 ## Detailed port table (with descriptions)
 
-| Port / Endpoint | Service | What it is used for |
-|---|---|---|
-| `26656` | CometBFT P2P | Peer discovery, gossip, block/tx propagation between validators/full nodes. |
-| `26657` | CometBFT RPC (HTTP/WS) | Node status, blocks, tx query, broadcast endpoints (`/status`, `/block`, `/broadcast_tx_*`). |
-| `26658` | ABCI app socket | Internal CometBFT ↔ app communication (not for public clients). |
-| `1317` | Cosmos REST API | Cosmos SDK REST + gRPC-gateway routes (module query endpoints). |
-| `9090` | Cosmos gRPC | Native protobuf gRPC for SDK queries/tx workflows. |
-| `9900` | Cosmos gRPC-Web | Browser-compatible gRPC over HTTP/1.1 for web clients. |
-| `8545` | EVM JSON-RPC HTTP | Ethereum-compatible HTTP RPC (`eth_*`, `net_*`, `web3_*`, etc.). |
-| `8546` | EVM JSON-RPC WS | Ethereum WebSocket RPC, subscriptions (`eth_subscribe`, pending tx, logs, heads). |
-| `8547` | EVM JSON-RPC rate-limit proxy | Per-IP rate-limiting reverse proxy forwarding to `:8545`. Disabled by default. |
-| `6060` (example) | CometBFT pprof | Runtime profiling/debug endpoints (`/debug/pprof/*`). Disabled unless configured. |
-| `8100` | EVM geth metrics | EVM/geth metrics endpoint for monitoring pipelines. |
-| `6065` (common testnet) | EVM JSON-RPC metrics | Metrics endpoint for JSON-RPC server (when enabled). |
+| Port / Endpoint           | Service                       | What it is used for                                                                                |
+| ------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------- |
+| `26656`                 | CometBFT P2P                  | Peer discovery, gossip, block/tx propagation between validators/full nodes.                        |
+| `26657`                 | CometBFT RPC (HTTP/WS)        | Node status, blocks, tx query, broadcast endpoints (`/status`, `/block`, `/broadcast_tx_*`). |
+| `26658`                 | ABCI app socket               | Internal CometBFT ↔ app communication (not for public clients).                                   |
+| `1317`                  | Cosmos REST API               | Cosmos SDK REST + gRPC-gateway routes (module query endpoints).                                    |
+| `9090`                  | Cosmos gRPC                   | Native protobuf gRPC for SDK queries/tx workflows.                                                 |
+| `9900`                  | Cosmos gRPC-Web               | Browser-compatible gRPC over HTTP/1.1 for web clients.                                             |
+| `8545`                  | EVM JSON-RPC HTTP             | Ethereum-compatible HTTP RPC (`eth_*`, `net_*`, `web3_*`, etc.).                             |
+| `8546`                  | EVM JSON-RPC WS               | Ethereum WebSocket RPC, subscriptions (`eth_subscribe`, pending tx, logs, heads).                |
+| `8547`                  | EVM JSON-RPC rate-limit proxy | Per-IP rate-limiting reverse proxy forwarding to `:8545`. Disabled by default.                   |
+| `6060` (example)        | CometBFT pprof                | Runtime profiling/debug endpoints (`/debug/pprof/*`). Disabled unless configured.                |
+| `8100`                  | EVM geth metrics              | EVM/geth metrics endpoint for monitoring pipelines.                                                |
+| `6065` (common testnet) | EVM JSON-RPC metrics          | Metrics endpoint for JSON-RPC server (when enabled).                                               |
 
 ---
 
@@ -198,9 +198,9 @@ curl -s http://127.0.0.1:6065/metrics | head
 ## 1) P2P listener (peer gossip)
 
 - **Purpose:** node-to-node networking.
-- **Default:** `tcp://0.0.0.0:26656`
-- **Config:** `config.toml` → `[p2p] laddr`
-- **CLI:** `--p2p.laddr`
+- **Default:**`tcp://0.0.0.0:26656`
+- **Config:**`config.toml` →`[p2p] laddr`
+- **CLI:**`--p2p.laddr`
 - Related:
   - `--p2p.external-address`
   - `--p2p.seeds`
@@ -209,9 +209,9 @@ curl -s http://127.0.0.1:6065/metrics | head
 ## 2) CometBFT RPC listener
 
 - **Purpose:** status, block, tx query endpoints (HTTP + WebSocket).
-- **Default:** `tcp://127.0.0.1:26657`
-- **Config:** `config.toml` → `[rpc] laddr`
-- **CLI:** `--rpc.laddr`
+- **Default:**`tcp://127.0.0.1:26657`
+- **Config:**`config.toml` →`[rpc] laddr`
+- **CLI:**`--rpc.laddr`
 - Related:
   - `--rpc.unsafe`
   - `--rpc.grpc_laddr` (BroadcastTx gRPC endpoint)
@@ -219,39 +219,39 @@ curl -s http://127.0.0.1:6065/metrics | head
 ## 3) ABCI app listener
 
 - **Purpose:** CometBFT ↔ app communication.
-- **Default:** `tcp://0.0.0.0:26658`
+- **Default:**`tcp://0.0.0.0:26658`
 - **Config:** startup transport/proxy settings
-- **CLI:** `--address`, `--proxy_app`, `--transport`, `--abci`
+- **CLI:**`--address`,`--proxy_app`,`--transport`,`--abci`
 
 ## 4) Cosmos SDK REST API
 
 - **Purpose:** REST/HTTP API.
-- **Common default:** `tcp://0.0.0.0:1317` in testnet tooling.
-- **Config:** `app.toml` → `[api] address`
-- **CLI:** `--api.enable` (enable/disable)
+- **Common default:**`tcp://0.0.0.0:1317` in testnet tooling.
+- **Config:**`app.toml` →`[api] address`
+- **CLI:**`--api.enable` (enable/disable)
 - Related:
   - `--api.enabled-unsafe-cors`
 
 ## 5) Cosmos SDK gRPC API
 
 - **Purpose:** gRPC query/tx services.
-- **Default:** `localhost:9090`
-- **Config:** `app.toml` → `[grpc] address`
-- **CLI:** `--grpc.enable`, `--grpc.address`
+- **Default:**`localhost:9090`
+- **Config:**`app.toml` →`[grpc] address`
+- **CLI:**`--grpc.enable`,`--grpc.address`
 
 ## 6) Cosmos SDK gRPC-Web API
 
 - **Purpose:** browser-compatible gRPC over HTTP.
-- **Default:** `0.0.0.0:9900`
-- **Config:** `app.toml` → `[grpc-web] address`
-- **CLI:** `--grpc-web.enable`, `--grpc-web.address`
+- **Default:**`0.0.0.0:9900`
+- **Config:**`app.toml` →`[grpc-web] address`
+- **CLI:**`--grpc-web.enable`,`--grpc-web.address`
 
 ## 7) EVM JSON-RPC HTTP
 
-- **Purpose:** Ethereum-compatible RPC (e.g., `eth_*`, `net_*`, `web3_*`).
-- **Default:** `127.0.0.1:8545`
-- **Config:** `app.toml` → `[json-rpc] address`
-- **CLI:** `--json-rpc.enable`, `--json-rpc.address`
+- **Purpose:** Ethereum-compatible RPC (e.g.,`eth_*`,`net_*`,`web3_*`).
+- **Default:**`127.0.0.1:8545`
+- **Config:**`app.toml` →`[json-rpc] address`
+- **CLI:**`--json-rpc.enable`,`--json-rpc.address`
 - Related namespace/config flags:
   - `--json-rpc.api`
   - `--json-rpc.enable-indexer`
@@ -262,43 +262,43 @@ curl -s http://127.0.0.1:6065/metrics | head
 ## 8) EVM JSON-RPC WebSocket
 
 - **Purpose:** subscriptions (`eth_subscribe`) and WS transport.
-- **Default:** `127.0.0.1:8546`
-- **Config:** `app.toml` → `[json-rpc] ws-address`
-- **CLI:** `--json-rpc.ws-address`, `--json-rpc.ws-origins`
+- **Default:**`127.0.0.1:8546`
+- **Config:**`app.toml` →`[json-rpc] ws-address`
+- **CLI:**`--json-rpc.ws-address`,`--json-rpc.ws-origins`
 
 ## 9) EVM JSON-RPC rate-limit proxy
 
 - **Purpose:** Per-IP token bucket rate limiting for the EVM JSON-RPC endpoint. Reverse-proxies requests to the internal JSON-RPC server (`:8545`).
-- **Default:** `0.0.0.0:8547` (disabled by default — must set `enable = true`)
-- **Config:** `app.toml` → `[lumera.json-rpc-ratelimit]`
-  - `enable` — toggle (default: `false`)
+- **Default:**`0.0.0.0:8547` (disabled by default — must set`enable = true`)
+- **Config:**`app.toml` →`[lumera.json-rpc-ratelimit]`
+  - `enable` — toggle (default:`false`)
   - `proxy-address` — listen address
-  - `requests-per-second` — sustained rate per IP (default: `50`)
-  - `burst` — max burst per IP (default: `100`)
-  - `entry-ttl` — inactivity TTL for per-IP state (default: `5m`)
+  - `requests-per-second` — sustained rate per IP (default:`50`)
+  - `burst` — max burst per IP (default:`100`)
+  - `entry-ttl` — inactivity TTL for per-IP state (default:`5m`)
 - **CLI:** none (config-only)
-- **Note:** When enabled, external clients should connect to this port; keep `:8545` on loopback for internal/trusted access.
+- **Note:** When enabled, external clients should connect to this port; keep`:8545` on loopback for internal/trusted access.
 
 ## 10) CometBFT pprof listener
 
 - **Purpose:** Go pprof diagnostics for RPC process.
 - **Default:** disabled unless set.
-- **Config:** `config.toml` → `[rpc] pprof_laddr`
-- **CLI:** `--rpc.pprof_laddr`
+- **Config:**`config.toml` →`[rpc] pprof_laddr`
+- **CLI:**`--rpc.pprof_laddr`
 
 ## 11) EVM geth metrics listener
 
 - **Purpose:** EVM/geth metrics endpoint.
-- **Default:** `127.0.0.1:8100`
-- **Config:** `app.toml` → `[evm] geth-metrics-address`
-- **CLI:** `--evm.geth-metrics-address`
+- **Default:**`127.0.0.1:8100`
+- **Config:**`app.toml` →`[evm] geth-metrics-address`
+- **CLI:**`--evm.geth-metrics-address`
 
 ## 12) EVM JSON-RPC metrics listener
 
 - **Purpose:** metrics endpoint for JSON-RPC server.
-- **Common testnet port:** `127.0.0.1:6065`
-- **Config:** `app.toml` → `[json-rpc] metrics-address`
-- **CLI:** `--metrics` (enables EVM RPC metrics server)
+- **Common testnet port:**`127.0.0.1:6065`
+- **Config:**`app.toml` →`[json-rpc] metrics-address`
+- **CLI:**`--metrics` (enables EVM RPC metrics server)
 
 ---
 
@@ -315,15 +315,15 @@ Given `--home <HOME>` (default `~/.lumera`), config files are typically:
 
 `lumerad testnet` uses these base ports per node (with offsets):
 
-- P2P: `26656 + i`
-- RPC: `26657 + i`
-- API: `1317 + i`
-- gRPC: `9090 + i`
-- pprof: `6060 + i`
-- JSON-RPC HTTP: `8545 + (i * 100)`
-- JSON-RPC WS: `8546 + (i * 100)`
-- JSON-RPC metrics: `6065 + (i * 100)`
-- geth metrics: `8100 + (i * 100)`
+- P2P:`26656 + i`
+- RPC:`26657 + i`
+- API:`1317 + i`
+- gRPC:`9090 + i`
+- pprof:`6060 + i`
+- JSON-RPC HTTP:`8545 + (i * 100)`
+- JSON-RPC WS:`8546 + (i * 100)`
+- JSON-RPC metrics:`6065 + (i * 100)`
+- geth metrics:`8100 + (i * 100)`
 
 (Using `i*100` for EVM ports avoids JSON-RPC/WS collisions across nodes.)
 
@@ -336,9 +336,9 @@ Given `--home <HOME>` (default `~/.lumera`), config files are typically:
   - `--json-rpc.address 127.0.0.1:8545`
   - `--json-rpc.ws-address 127.0.0.1:8546`
 - Expose P2P publicly only when operating a network node.
-- Avoid `--rpc.unsafe` on public interfaces.
+- Avoid`--rpc.unsafe` on public interfaces.
 - If exposing API/gRPC publicly, place behind firewall/reverse proxy/TLS.
-- For public EVM JSON-RPC access, enable the rate-limiting proxy (`[lumera.json-rpc-ratelimit] enable = true`) and expose `:8547` instead of `:8545` directly.
+- For public EVM JSON-RPC access, enable the rate-limiting proxy (`[lumera.json-rpc-ratelimit] enable = true`) and expose`:8547` instead of`:8545` directly.
 
 ---
 

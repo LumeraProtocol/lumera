@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 
+	tmcmd "github.com/cometbft/cometbft/cmd/cometbft/commands"
 	cmttypes "github.com/cometbft/cometbft/types"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -23,6 +25,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/server"
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
+	"github.com/cosmos/cosmos-sdk/version"
 	authcmd "github.com/cosmos/cosmos-sdk/x/auth/client/cli"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	genutilcli "github.com/cosmos/cosmos-sdk/x/genutil/client/cli"
@@ -57,7 +60,7 @@ func initRootCmd(
 		snapshot.Cmd(newApp),
 	)
 
-	evmserver.AddCommands(
+	addEVMServerCommands(
 		rootCmd,
 		evmserver.NewDefaultStartOptions(newEVMApp, app.DefaultNodeHome),
 		appExport,
@@ -73,6 +76,86 @@ func initRootCmd(
 		keys.Commands(),
 	)
 	wasmcli.ExtendUnsafeResetAllCmd(rootCmd)
+}
+
+func addEVMServerCommands(
+	rootCmd *cobra.Command,
+	opts evmserver.StartOptions,
+	appExport servertypes.AppExporter,
+	addStartFlags servertypes.ModuleInitFlags,
+) {
+	cometbftCmd := &cobra.Command{
+		Use:     "comet",
+		Aliases: []string{"cometbft"},
+		Short:   "CometBFT subcommands",
+	}
+
+	cometbftCmd.AddCommand(
+		server.ShowNodeIDCmd(),
+		server.ShowValidatorCmd(),
+		server.ShowAddressCmd(),
+		server.VersionCmd(),
+		tmcmd.ResetAllCmd,
+		tmcmd.ResetStateCmd,
+		server.BootstrapStateCmd(opts.AppCreator),
+	)
+
+	startCmd := evmserver.StartCmd(opts)
+	wrapJSONRPCAliasStartPreRun(startCmd)
+	addStartFlags(startCmd)
+
+	rootCmd.AddCommand(
+		startCmd,
+		cometbftCmd,
+		server.ExportCmd(appExport, opts.DefaultNodeHome),
+		version.NewVersionCommand(),
+		server.NewRollbackCmd(opts.AppCreator, opts.DefaultNodeHome),
+		evmserver.NewIndexTxCmd(),
+	)
+}
+
+func wrapJSONRPCAliasStartPreRun(startCmd *cobra.Command) {
+	originalPreRunE := startCmd.PreRunE
+	startCmd.PreRunE = func(cmd *cobra.Command, args []string) error {
+		if originalPreRunE != nil {
+			if err := originalPreRunE(cmd, args); err != nil {
+				return err
+			}
+		}
+
+		serverCtx := server.GetServerContextFromCmd(cmd)
+		v := serverCtx.Viper
+		if !v.GetBool("json-rpc.enable") {
+			return nil
+		}
+
+		publicAddr := v.GetString("json-rpc.address")
+		if publicAddr == "" {
+			return nil
+		}
+
+		internalAddr, err := reserveLoopbackAddr()
+		if err != nil {
+			return err
+		}
+
+		v.Set(app.JSONRPCAliasPublicAddrAppOpt, publicAddr)
+		v.Set(app.JSONRPCAliasUpstreamAddrAppOpt, internalAddr)
+		v.Set("json-rpc.address", internalAddr)
+		return nil
+	}
+}
+
+func reserveLoopbackAddr() (string, error) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return "", err
+	}
+	addr := ln.Addr().String()
+	if closeErr := ln.Close(); closeErr != nil {
+		return "", closeErr
+	}
+	return addr, nil
 }
 
 func addModuleInitFlags(startCmd *cobra.Command) {

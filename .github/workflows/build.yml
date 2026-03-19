@@ -1,0 +1,211 @@
+name: build
+
+on:
+  push:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+  pull_request:
+    branches: [master]
+  workflow_call:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  lint:
+    uses: ./.github/workflows/lint.yml
+
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6.0.1
+
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Run unit tests
+        run: go test ./x/... -v
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6.0.1
+
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Run integration tests
+        run: go test -tags=integration,test -p 4 ./tests/integration/... -v
+
+  system-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git Safe Directory
+        uses: ./.github/actions/configure-git
+
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+
+      - name: Install Ignite CLI
+        uses: ./.github/actions/install-ignite
+
+      - name: Build Chain
+        run: ./ignite chain build -y -t linux:amd64
+        env:
+          DO_NOT_TRACK: 1
+          GOFLAGS: "-buildvcs=false"
+
+      - name: Prepare System Tests
+        run: go mod tidy
+        working-directory: tests/systemtests
+
+      - name: Run System Tests
+        run: go test -tags=system_test -timeout 20m -v .
+        working-directory: tests/systemtests
+
+  build:
+    needs: [lint, unit-tests, integration-tests, system-tests]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git Safe Directory
+        uses: ./.github/actions/configure-git
+
+      - name: Setup Go
+        id: setup-go
+        uses: ./.github/actions/setup-go
+
+      - name: Prepare Build Variables
+        id: vars
+        run: |
+          set -euo pipefail
+
+          repo_name=${GITHUB_REPOSITORY##*/}
+
+          build_id=${GITHUB_SHA::7}
+          is_tag=false
+
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            build_id="${GITHUB_REF#refs/tags/}"
+            is_tag=true
+          fi
+
+          tarball_prefix="${repo_name}_${build_id}"
+
+          echo "build_id=$build_id" >> $GITHUB_OUTPUT
+          echo "tarball_prefix=${tarball_prefix}" >> $GITHUB_OUTPUT
+          echo "is_tag=${is_tag}" >> $GITHUB_OUTPUT
+
+      - name: Install Ignite CLI
+        uses: ./.github/actions/install-ignite
+
+      - name: Install wasmvm library
+        uses: ./.github/actions/install-wasmvm
+
+      - name: Install buf CLI
+        run: |
+          set -euo pipefail
+          BUF_VERSION="$(go list -m -f '{{.Version}}' github.com/bufbuild/buf)"
+          if [ -z "${BUF_VERSION}" ]; then
+            echo "Failed to resolve github.com/bufbuild/buf version from go.mod" >&2
+            exit 1
+          fi
+          go install "github.com/bufbuild/buf/cmd/buf@${BUF_VERSION}"
+
+      - name: Build with Ignite CLI
+        run: |
+          buf --version
+          buf generate --template proto/buf.gen.gogo.yaml --verbose
+          buf generate --template proto/buf.gen.swagger.yaml --verbose
+          ./ignite version
+          ./ignite generate openapi --yes
+          ./ignite chain build --clear-cache --skip-proto --release --release.prefix ${{ steps.vars.outputs.tarball_prefix }} -y -t linux:amd64
+        env:
+          DO_NOT_TRACK: 1
+          GOFLAGS: "-trimpath -buildvcs=false"
+          CGO_LDFLAGS: "-Wl,-rpath,/usr/lib -Wl,--disable-new-dtags"
+
+      - name: Fix Release Directory Permissions
+        run: |
+          sudo chown -R $USER:$USER release/
+          sudo chmod -R 755 release/
+
+      - name: Package Release Artifacts
+        run: |
+          cd release
+
+          tar_file=$(ls *.tar.gz)
+
+          file_path=$(tar -tzf "$tar_file" | head -n 2 | grep -v '/$' | grep lumerad | sed 's|^/||')
+          echo "Binary: $file_path"
+          tar xzf "$tar_file" -C .
+          ls -l "$file_path"
+
+          mkdir -p temp
+          mv "$file_path" temp/
+          ls -l temp/
+
+          rm "$tar_file"
+
+          cp /usr/lib/libwasmvm.x86_64.so temp/
+
+          cat > temp/install.sh << 'EOF'
+          #!/bin/bash
+          if [ "$EUID" -ne 0 ]; then
+            echo "Please run as root or with sudo"
+            exit 1
+          fi
+          cp lumerad /usr/local/bin
+          cp libwasmvm.x86_64.so /usr/lib/
+          ldconfig
+          echo "WASM library installed successfully"
+          EOF
+
+          chmod +x temp/install.sh
+
+          cd temp
+          tar czf "../$tar_file" ./*
+          cd ..
+
+          rm -rf temp
+
+          tar tvf "$tar_file"
+
+          sha256sum "$tar_file" > release_checksum
+
+      - name: Upload Release Artifacts
+        if: ${{ github.actor != 'nektos/act' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: release
+          if-no-files-found: error

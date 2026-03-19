@@ -135,8 +135,8 @@ func testActionPrecompileGetActionsByStateViaEthCall(t *testing.T, node *evmtest
 	// Query pending actions (state=1), expect empty on fresh chain
 	input, err := actionprecompile.ABI.Pack(
 		actionprecompile.GetActionsByStateMethod,
-		uint8(1),  // ActionStatePending
-		uint64(0), // offset
+		uint8(1),   // ActionStatePending
+		uint64(0),  // offset
 		uint64(10), // limit
 	)
 	if err != nil {

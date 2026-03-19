@@ -7,12 +7,12 @@ import (
 
 	sdkmath "cosmossdk.io/math"
 
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	"github.com/cosmos/cosmos-sdk/runtime"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -25,12 +25,12 @@ import (
 type KeeperIntegrationSuite struct {
 	suite.Suite
 
-	app       *app.App
-	ctx       sdk.Context
-	keeper    keeper.Keeper
+	app         *app.App
+	ctx         sdk.Context
+	keeper      keeper.Keeper
 	queryServer sntypes.QueryServer
-	authority sdk.AccAddress
-	validator sdk.ValAddress
+	authority   sdk.AccAddress
+	validator   sdk.ValAddress
 }
 
 // SetupSuite initializes the integration test suite
@@ -73,13 +73,13 @@ func (suite *KeeperIntegrationSuite) TestSetSuperNodeActive() {
 			name: "when supernode state is successfully enabled, it should be active",
 			setup: func() {
 				supernode := sntypes.SuperNode{
-					ValidatorAddress: sdk.ValAddress([]byte("validator1e")).String(),
-					SupernodeAccount: sdk.AccAddress([]byte("validator1e")).String(),
-					Note:             "1.0.0",
-					States:           []*sntypes.SuperNodeStateRecord{{State: sntypes.SuperNodeStateActive}},
-					PrevIpAddresses:  []*sntypes.IPAddressHistory{{Address: "192.168.1.1"}},
+					ValidatorAddress:      sdk.ValAddress([]byte("validator1e")).String(),
+					SupernodeAccount:      sdk.AccAddress([]byte("validator1e")).String(),
+					Note:                  "1.0.0",
+					States:                []*sntypes.SuperNodeStateRecord{{State: sntypes.SuperNodeStateActive}},
+					PrevIpAddresses:       []*sntypes.IPAddressHistory{{Address: "192.168.1.1"}},
 					PrevSupernodeAccounts: []*sntypes.SupernodeAccountHistory{{Account: sdk.AccAddress([]byte("validator1e")).String()}},
-					P2PPort:          "26657",
+					P2PPort:               "26657",
 				}
 				err := suite.keeper.SetSuperNode(suite.ctx, supernode)
 				require.NoError(suite.T(), err)
@@ -196,13 +196,13 @@ func (suite *KeeperIntegrationSuite) TestIsSupernodeActive() {
 			name: "when supernode is in active state, should return true",
 			setup: func() {
 				supernode := sntypes.SuperNode{
-					ValidatorAddress: sdk.ValAddress([]byte("validator1a")).String(),
-					SupernodeAccount: sdk.AccAddress([]byte("validator1a")).String(),
-					Note:             "1.0.0",
-					States:           []*sntypes.SuperNodeStateRecord{{State: sntypes.SuperNodeStateActive}},
-					PrevIpAddresses:  []*sntypes.IPAddressHistory{{Address: "192.168.1.1"}},
+					ValidatorAddress:      sdk.ValAddress([]byte("validator1a")).String(),
+					SupernodeAccount:      sdk.AccAddress([]byte("validator1a")).String(),
+					Note:                  "1.0.0",
+					States:                []*sntypes.SuperNodeStateRecord{{State: sntypes.SuperNodeStateActive}},
+					PrevIpAddresses:       []*sntypes.IPAddressHistory{{Address: "192.168.1.1"}},
 					PrevSupernodeAccounts: []*sntypes.SupernodeAccountHistory{{Account: sdk.AccAddress([]byte("validator1a")).String()}},
-					P2PPort:          "26657",
+					P2PPort:               "26657",
 				}
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
 			},
@@ -246,13 +246,13 @@ func (suite *KeeperIntegrationSuite) TestSetSuperNodeStopped() {
 			name: "when supernode is successfully stopped, it should be stopped",
 			setup: func() {
 				supernode := types.SuperNode{
-					ValidatorAddress: sdk.ValAddress([]byte("validator1d")).String(),
-					SupernodeAccount: sdk.AccAddress([]byte("validator1d")).String(),
-					Note:             "1.0.0",
-					States:           []*sntypes.SuperNodeStateRecord{{State: sntypes.SuperNodeStateActive}},
-					PrevIpAddresses:  []*sntypes.IPAddressHistory{{Address: "192.168.1.1"}},
+					ValidatorAddress:      sdk.ValAddress([]byte("validator1d")).String(),
+					SupernodeAccount:      sdk.AccAddress([]byte("validator1d")).String(),
+					Note:                  "1.0.0",
+					States:                []*sntypes.SuperNodeStateRecord{{State: sntypes.SuperNodeStateActive}},
+					PrevIpAddresses:       []*sntypes.IPAddressHistory{{Address: "192.168.1.1"}},
 					PrevSupernodeAccounts: []*sntypes.SupernodeAccountHistory{{Account: sdk.AccAddress([]byte("validator1d")).String()}},
-					P2PPort:          "26657",
+					P2PPort:               "26657",
 				}
 				suite.keeper.SetSuperNode(suite.ctx, supernode)
 			},
@@ -290,7 +290,7 @@ func (suite *KeeperIntegrationSuite) TestSetSuperNodeStopped() {
 }
 
 func (suite *KeeperIntegrationSuite) TestMeetSupernodeRequirements() {
-    minimumStakePrice := sdk.NewInt64Coin("stake", 1_000_000)
+	minimumStakePrice := sdk.NewInt64Coin("stake", 1_000_000)
 	tests := []struct {
 		name          string
 		setup         func()
@@ -404,13 +404,13 @@ func (suite *KeeperIntegrationSuite) TestGetSuperNodeBySuperNodeAddress() {
 				suite.validator = sdk.ValAddress([]byte("validator1f"))
 				suite.authority = sdk.AccAddress(suite.validator)
 				supernode := sntypes.SuperNode{
-					SupernodeAccount: suite.authority.String(),
-					ValidatorAddress: suite.validator.String(),
-					Note:             "1.0.0",
-					States:           []*sntypes.SuperNodeStateRecord{{State: sntypes.SuperNodeStateActive}},
-					PrevIpAddresses:  []*sntypes.IPAddressHistory{{Address: "192.168.1.1"}},
+					SupernodeAccount:      suite.authority.String(),
+					ValidatorAddress:      suite.validator.String(),
+					Note:                  "1.0.0",
+					States:                []*sntypes.SuperNodeStateRecord{{State: sntypes.SuperNodeStateActive}},
+					PrevIpAddresses:       []*sntypes.IPAddressHistory{{Address: "192.168.1.1"}},
 					PrevSupernodeAccounts: []*sntypes.SupernodeAccountHistory{{Account: sdk.AccAddress([]byte("validator1")).String()}},
-					P2PPort:          "26657",
+					P2PPort:               "26657",
 				}
 				require.NoError(suite.T(), suite.keeper.SetSuperNode(suite.ctx, supernode))
 			},

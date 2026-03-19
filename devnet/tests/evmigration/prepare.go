@@ -1,3 +1,8 @@
+// prepare.go implements the "prepare" and "cleanup" modes. Prepare generates
+// legacy and extra test accounts, funds them, and creates on-chain activity
+// (delegations, unbondings, redelegations, authz grants, feegrants, claims,
+// and actions) to exercise all migration paths. Cleanup removes test keys and
+// the accounts JSON file.
 package main
 
 import (
@@ -6,13 +11,20 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"encoding/base64"
+
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
+// Account name prefixes used during prepare and migration phases.
 const (
 	legacyPreparedAccountPrefix   = "pre-evm"
 	extraPreparedAccountPrefix    = "pre-evmex"
@@ -22,6 +34,8 @@ const (
 	extraPreparedAccountPrefixV0  = "evm_testex"
 )
 
+// runPrepare generates test accounts, funds them, and creates on-chain activity
+// for migration testing. Supports rerun on an existing accounts file.
 func runPrepare() {
 	ensurePrepareRuntime()
 
@@ -81,6 +95,65 @@ func runPrepare() {
 	existingByName := make(map[string]int, len(af.Accounts))
 	for i, rec := range af.Accounts {
 		existingByName[rec.Name] = i
+	}
+
+	// Add validator accounts to the accounts file so migrate-all can track
+	// their state (balance, delegations, etc.) alongside regular accounts.
+	log.Println("--- Recording validator accounts ---")
+	keys, _ := listKeys()
+	for _, valoper := range validators {
+		valAddr, err := sdk.ValAddressFromBech32(valoper)
+		if err != nil {
+			continue
+		}
+		accAddr := sdk.AccAddress(valAddr).String()
+		// Check if this validator account is already tracked.
+		if _, ok := existingByName[accAddr]; ok {
+			continue
+		}
+		// Find the matching key in the keyring.
+		var keyName, mnemonic string
+		for _, k := range keys {
+			if k.Address == accAddr {
+				keyName = k.Name
+				break
+			}
+		}
+		if keyName == "" {
+			log.Printf("  SKIP: no local key for validator %s (%s)", valoper, accAddr)
+			continue
+		}
+		// Read mnemonic from status dir.
+		mnemonicFile := filepath.Join(filepath.Dir(*flagFile), "genesis-address-mnemonic")
+		if data, err := os.ReadFile(mnemonicFile); err == nil {
+			mnemonic = strings.TrimSpace(string(data))
+		}
+		// Derive the legacy public key from the mnemonic so it can be used
+		// in the claim-legacy-account tx during migrate-all mode.
+		var pubKeyB64 string
+		if mnemonic != "" {
+			if privKey, err := deriveKey(mnemonic, uint32(118)); err == nil {
+				pubKey := privKey.PubKey().(*secp256k1.PubKey)
+				pubKeyB64 = base64.StdEncoding.EncodeToString(pubKey.Key)
+			} else {
+				log.Printf("  WARN: derive pubkey for %s: %v", keyName, err)
+			}
+		}
+		bal, _ := queryBalance(accAddr)
+		rec := AccountRecord{
+			Name:        keyName,
+			Mnemonic:    mnemonic,
+			Address:     accAddr,
+			PubKeyB64:   pubKeyB64,
+			IsLegacy:    true,
+			HasBalance:  bal > 0,
+			IsValidator: true,
+			Valoper:     valoper,
+		}
+		af.Accounts = append(af.Accounts, rec)
+		existingByName[accAddr] = len(af.Accounts) - 1
+		existingByName[keyName] = len(af.Accounts) - 1
+		log.Printf("  recorded validator %s: %s (%s) balance=%d", keyName, accAddr, valoper, bal)
 	}
 
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -334,6 +407,75 @@ func runPrepare() {
 				log.Printf("  %s granted feegrant to %s", rec.Name, grantee)
 			}
 		}
+
+		// 8) Scenario 3: redelegation + third-party withdraw address on the same account.
+		// Tests interaction between MigrateDistribution (reward redirect) and
+		// migrateRedelegations within the same migration tx.
+		if ordinal%9 == 8 && rec.HasDelegation && len(validators) > 1 && len(extraIdx) > 0 {
+			srcVal := rec.DelegatedTo
+			if len(delegatedVals) > 0 {
+				srcVal = delegatedVals[localRng.Intn(len(delegatedVals))]
+			}
+			dstVal, ok := pickDifferentValidator(validators, srcVal, localRng)
+			if ok {
+				if n, err := queryRedelegationCount(rec.Address, srcVal, dstVal); err == nil && n > 0 {
+					rec.addRedelegation(srcVal, dstVal, "")
+					log.Printf("  s3: %s already has redelegation %s->%s, reusing", rec.Name, srcVal, dstVal)
+				} else {
+					redelAmt := "12000ulume"
+					_, err := runTx("tx", "staking", "redelegate", srcVal, dstVal, redelAmt, "--from", rec.Name)
+					if err != nil {
+						if isPrepareRerunConflict(err) {
+							if n2, qErr := queryRedelegationCount(rec.Address, srcVal, dstVal); qErr == nil && n2 > 0 {
+								rec.addRedelegation(srcVal, dstVal, "")
+							}
+							log.Printf("  s3: %s redelegation already in progress", rec.Name)
+						} else {
+							log.Printf("  WARN: s3 redelegate %s: %v", rec.Name, err)
+						}
+					} else {
+						rec.addRedelegation(srcVal, dstVal, redelAmt)
+						log.Printf("  s3: %s redelegated %s -> %s", rec.Name, srcVal, dstVal)
+					}
+				}
+			}
+			thirdParty := af.Accounts[extraIdx[ordinal%len(extraIdx)]].Address
+			_, err := runTx("tx", "distribution", "set-withdraw-addr", thirdParty, "--from", rec.Name)
+			if err != nil {
+				log.Printf("  WARN: s3 set-withdraw-addr %s: %v", rec.Name, err)
+			} else {
+				rec.addWithdrawAddress(thirdParty)
+				log.Printf("  s3: %s withdraw -> %s (with redelegation)", rec.Name, thirdParty)
+			}
+		}
+
+		// 9) Scenario 4: delegate to ALL validators. Maximizes coverage for
+		// MigrateValidatorDelegations when validators migrate after this account
+		// (especially effective with migrate-all mode).
+		if ordinal%9 == 4 {
+			for _, valAddr := range validators {
+				// Skip validators we already delegated to in step 1.
+				alreadyDelegated := false
+				for _, d := range rec.Delegations {
+					if d.Validator == valAddr {
+						alreadyDelegated = true
+						break
+					}
+				}
+				if alreadyDelegated {
+					continue
+				}
+				delegateAmt := fmt.Sprintf("%dulume", 50_000+localRng.Intn(100_000))
+				_, err := runTx("tx", "staking", "delegate", valAddr, delegateAmt, "--from", rec.Name)
+				if err != nil {
+					log.Printf("  WARN: s4 delegate %s to %s: %v", rec.Name, valAddr, err)
+					continue
+				}
+				rec.addDelegation(valAddr, delegateAmt)
+				delegatedVals = append(delegatedVals, valAddr)
+				log.Printf("  s4: %s delegated %s to %s (all-validator coverage)", rec.Name, delegateAmt, valAddr)
+			}
+		}
 	})
 
 	// Phase 2: cross-account operations (--from is a different account).
@@ -402,6 +544,81 @@ func runPrepare() {
 				}
 				rec.addFeegrantAsGrantee(granter.Address, "350000ulume")
 				log.Printf("  %s received feegrant from %s", rec.Name, granter.Name)
+			}
+		}
+
+		// 10) Scenario 1: withdraw-address chain A → B → C (legacy-to-legacy).
+		// Creates two independent one-hop dependencies: A→B and B→C. Tests that
+		// redirectWithdrawAddrIfMigrated + migrateWithdrawAddress correctly resolve
+		// each hop through MigrationRecords when targets migrate first.
+		if ordinal%9 == 0 && len(legacyIdx) >= 3 {
+			bIdx := legacyIdx[(ordinal+1)%len(legacyIdx)]
+			cIdx := legacyIdx[(ordinal+2)%len(legacyIdx)]
+			if bIdx != idx && cIdx != idx && bIdx != cIdx {
+				B := &af.Accounts[bIdx]
+				C := &af.Accounts[cIdx]
+				// Set B's withdraw addr → C (if B doesn't already have a third-party addr).
+				if B.HasBalance && ensureSenderAccountReady(B) {
+					if wdAddr, err := queryWithdrawAddress(B.Address); err != nil || wdAddr == "" || wdAddr == B.Address {
+						_, err := runTx("tx", "distribution", "set-withdraw-addr", C.Address, "--from", B.Name)
+						if err != nil {
+							log.Printf("  WARN: wd-chain B->C %s->%s: %v", B.Name, C.Name, err)
+						} else {
+							B.addWithdrawAddress(C.Address)
+							log.Printf("  wd-chain: %s withdraw -> %s", B.Name, C.Name)
+						}
+					}
+				}
+				// Set A's withdraw addr → B.
+				if wdAddr, err := queryWithdrawAddress(rec.Address); err != nil || wdAddr == "" || wdAddr == rec.Address {
+					_, err := runTx("tx", "distribution", "set-withdraw-addr", B.Address, "--from", rec.Name)
+					if err != nil {
+						log.Printf("  WARN: wd-chain A->B %s->%s: %v", rec.Name, B.Name, err)
+					} else {
+						rec.addWithdrawAddress(B.Address)
+						log.Printf("  wd-chain: %s withdraw -> %s", rec.Name, B.Name)
+					}
+				}
+			}
+		}
+
+		// 11) Scenario 2: authz + feegrant overlap on the same account pair.
+		// Tests that MigrateAuthz and MigrateFeegrant independently re-key
+		// grants between the same pair without interference.
+		if ordinal%9 == 1 && len(legacyIdx) > 1 {
+			peers := pickRandomLegacyIndices(legacyIdx, idx, 1, localRng)
+			if len(peers) == 1 {
+				B := &af.Accounts[peers[0]]
+				// Authz A → B.
+				if ok, err := queryAuthzGrantExists(rec.Address, B.Address); err != nil || !ok {
+					_, err := runTx("tx", "authz", "grant", B.Address, "generic",
+						"--msg-type", bankSendMsgType, "--from", rec.Name)
+					if err != nil && !isPrepareRerunConflict(err) {
+						log.Printf("  WARN: overlap authz %s->%s: %v", rec.Name, B.Name, err)
+					} else {
+						rec.addAuthzGrant(B.Address, bankSendMsgType)
+						B.addAuthzAsGrantee(rec.Address, bankSendMsgType)
+						log.Printf("  overlap: %s authz -> %s", rec.Name, B.Name)
+					}
+				} else {
+					rec.addAuthzGrant(B.Address, bankSendMsgType)
+					B.addAuthzAsGrantee(rec.Address, bankSendMsgType)
+				}
+				// Feegrant A → B (same pair).
+				if ok, err := queryFeegrantAllowanceExists(rec.Address, B.Address); err != nil || !ok {
+					_, err := runTx("tx", "feegrant", "grant", rec.Address, B.Address,
+						"--spend-limit", "250000ulume", "--from", rec.Name)
+					if err != nil && !isPrepareRerunConflict(err) {
+						log.Printf("  WARN: overlap feegrant %s->%s: %v", rec.Name, B.Name, err)
+					} else {
+						rec.addFeegrant(B.Address, "250000ulume")
+						B.addFeegrantAsGrantee(rec.Address, "250000ulume")
+						log.Printf("  overlap: %s feegrant -> %s", rec.Name, B.Name)
+					}
+				} else {
+					rec.addFeegrant(B.Address, "250000ulume")
+					B.addFeegrantAsGrantee(rec.Address, "250000ulume")
+				}
 			}
 		}
 	}
@@ -494,8 +711,14 @@ func runPrepare() {
 				if err != nil {
 					if isPrepareRerunConflict(err) {
 						if n, qErr := queryAnyRedelegationCount(rec.Address, validators); qErr == nil && n > 0 {
-							rec.addRedelegation(srcVal, dstVal, "")
+							// Only record the marker if the EXACT pair we tried matches;
+							// otherwise the recorded pair would be stale/random.
+							if n2, qErr2 := queryRedelegationCount(rec.Address, srcVal, dstVal); qErr2 == nil && n2 > 0 {
+								rec.addRedelegation(srcVal, dstVal, "")
+							}
 							log.Printf("  %s redelegation already in progress, reusing existing state", rec.Name)
+						} else {
+							log.Printf("  %s redelegation already in progress but no query-visible entry; skipping marker update", rec.Name)
 						}
 					} else {
 						log.Printf("  WARN: extra redelegate %s: %v", rec.Name, err)
@@ -760,6 +983,7 @@ func runPrepare() {
 	)
 }
 
+// buildPreparedAccountName constructs a key name like "pre-evm-val1-003".
 func buildPreparedAccountName(prefix, tag string, idx int) string {
 	if tag == "" {
 		return fmt.Sprintf("%s-%03d", prefix, idx)
@@ -767,6 +991,7 @@ func buildPreparedAccountName(prefix, tag string, idx int) string {
 	return fmt.Sprintf("%s-%s-%03d", prefix, tag, idx)
 }
 
+// batchedFundingWaitTimeout returns a scaling timeout for batched funding based on account count.
 func batchedFundingWaitTimeout(accountCount int) time.Duration {
 	if accountCount < 1 {
 		accountCount = 1
@@ -778,6 +1003,8 @@ func batchedFundingWaitTimeout(accountCount int) time.Duration {
 	return timeout
 }
 
+// plannedPrepareClaim returns the vesting tier and delayed flag for a claim key
+// index. Every 10th block of keys has delayed claims at offsets 3, 6, and 9.
 func plannedPrepareClaim(claimKeyIdx int) (tier uint32, delayed bool) {
 	switch claimKeyIdx % 10 {
 	case 3:
@@ -791,6 +1018,8 @@ func plannedPrepareClaim(claimKeyIdx int) (tier uint32, delayed bool) {
 	}
 }
 
+// selectPrepareClaimForAccount returns the claim tier/delayed flag, but forces
+// instant claim (tier 0) if the account already has recorded actions to avoid conflicts.
 func selectPrepareClaimForAccount(rec *AccountRecord, claimKeyIdx int) (tier uint32, delayed bool) {
 	tier, delayed = plannedPrepareClaim(claimKeyIdx)
 	if delayed && rec != nil && rec.hasRecordedAction() {
@@ -821,6 +1050,7 @@ func claimKeyStartOffset(accountTag string) int {
 	return offset
 }
 
+// buildPreparedAccountNameV0 constructs a V0-style key name using underscores (e.g. "evm_test_val1_003").
 func buildPreparedAccountNameV0(prefix, tag string, idx int) string {
 	if tag == "" {
 		return fmt.Sprintf("%s_%03d", prefix, idx)
@@ -828,6 +1058,8 @@ func buildPreparedAccountNameV0(prefix, tag string, idx int) string {
 	return fmt.Sprintf("%s_%s_%03d", prefix, tag, idx)
 }
 
+// findPreparedAccountIndex looks up an existing account by trying current and
+// legacy naming conventions. Returns the index into af.Accounts and true if found.
 func findPreparedAccountIndex(existingByName map[string]int, prefix, tag string, idx int) (int, bool) {
 	candidates := []string{buildPreparedAccountName(prefix, tag, idx)}
 	switch prefix {
@@ -851,6 +1083,8 @@ func findPreparedAccountIndex(existingByName map[string]int, prefix, tag string,
 	return 0, false
 }
 
+// resolvePrepareAccountTag returns the account tag to use for naming. If no
+// explicit tag is given, it auto-detects from the funder key name or address.
 func resolvePrepareAccountTag(explicitTag, funderKeyName, funderAddr string) string {
 	if tag := sanitizePrepareAccountTag(explicitTag); tag != "" {
 		return tag
@@ -873,6 +1107,8 @@ func resolvePrepareAccountTag(explicitTag, funderKeyName, funderAddr string) str
 	return ""
 }
 
+// sanitizePrepareAccountTag strips non-alphanumeric characters from a tag
+// and lowercases it for use in key names.
 func sanitizePrepareAccountTag(tag string) string {
 	tag = strings.ToLower(strings.TrimSpace(tag))
 	if tag == "" {
@@ -891,6 +1127,8 @@ func sanitizePrepareAccountTag(tag string) string {
 	return b.String()
 }
 
+// ensureSenderAccountReady verifies that the account's key exists in the keyring
+// and has a non-zero balance. Returns false if the account cannot send transactions.
 func ensureSenderAccountReady(rec *AccountRecord) bool {
 	addr, err := getAddress(rec.Name)
 	if err != nil {
@@ -911,6 +1149,9 @@ func ensureSenderAccountReady(rec *AccountRecord) bool {
 	return true
 }
 
+// reconcileAccountsWithKeyring verifies all account keys match the keyring,
+// re-imports missing keys from mnemonics, and propagates address changes to
+// cross-references (withdraw addresses, authz grants, feegrants).
 func reconcileAccountsWithKeyring(af *AccountsFile) {
 	log.Println("--- Reconciling account keys with keyring ---")
 	addressUpdates := make(map[string]string)
@@ -1042,6 +1283,8 @@ func reconcileAccountsWithKeyring(af *AccountsFile) {
 	}
 }
 
+// isPrepareRerunConflict returns true if the error indicates a duplicate state
+// that is expected during a prepare rerun (e.g. grant already exists).
 func isPrepareRerunConflict(err error) bool {
 	if err == nil {
 		return false
@@ -1076,6 +1319,7 @@ func runParallel(indices []int, batchSize int, fn func(ordinal, idx int)) {
 	}
 }
 
+// pickDifferentValidator randomly selects a validator different from current.
 func pickDifferentValidator(validators []string, current string, rng *rand.Rand) (string, bool) {
 	if len(validators) < 2 {
 		return "", false
@@ -1090,6 +1334,7 @@ func pickDifferentValidator(validators []string, current string, rng *rand.Rand)
 	return "", false
 }
 
+// minInt returns the smaller of two integers.
 func minInt(a, b int) int {
 	if a < b {
 		return a
@@ -1097,6 +1342,7 @@ func minInt(a, b int) int {
 	return b
 }
 
+// pickRandomValidators returns up to n randomly selected validators.
 func pickRandomValidators(validators []string, n int, rng *rand.Rand) []string {
 	if n <= 0 || len(validators) == 0 {
 		return nil
@@ -1112,6 +1358,8 @@ func pickRandomValidators(validators []string, n int, rng *rand.Rand) []string {
 	return out
 }
 
+// pickRandomLegacyIndices returns up to n randomly selected legacy account indices,
+// excluding selfIdx to avoid self-referencing grants.
 func pickRandomLegacyIndices(legacyIdx []int, selfIdx int, n int, rng *rand.Rand) []int {
 	if n <= 0 {
 		return nil
@@ -1137,6 +1385,8 @@ func pickRandomLegacyIndices(legacyIdx []int, selfIdx int, n int, rng *rand.Rand
 	return out
 }
 
+// fundAccountsBatched funds all accounts using SDK-built bank send transactions
+// with explicit sequence numbers for pipelining. Falls back on error.
 func fundAccountsBatched(af *AccountsFile, rng *rand.Rand) error {
 	ctx := context.Background()
 	funderAddr, err := getAddress(*flagFunder)
@@ -1215,6 +1465,8 @@ func fundAccountsBatched(af *AccountsFile, rng *rand.Rand) error {
 	return nil
 }
 
+// fundAccountsSequential funds unfunded accounts one at a time, used as a
+// fallback when batched funding fails.
 func fundAccountsSequential(af *AccountsFile, rng *rand.Rand) {
 	ctx := context.Background()
 	funderAddr, err := getAddress(*flagFunder)
@@ -1255,6 +1507,9 @@ func fundAccountsSequential(af *AccountsFile, rng *rand.Rand) {
 	}
 }
 
+// validatePreparedState queries the chain to verify that all expected on-chain
+// activity (delegations, grants, actions, claims) exists for each prepared account.
+// Returns the number of validation errors.
 func validatePreparedState(af *AccountsFile) int {
 	var errCount int
 	var legacyWithBalance int
@@ -1269,311 +1524,52 @@ func validatePreparedState(af *AccountsFile) int {
 		}
 		legacyWithBalance++
 
-		if len(rec.Delegations) > 0 {
-			seen := make(map[string]struct{}, len(rec.Delegations))
-			for _, d := range rec.Delegations {
-				if d.Validator == "" {
-					continue
-				}
-				if _, ok := seen[d.Validator]; ok {
-					continue
-				}
-				seen[d.Validator] = struct{}{}
-				n, err := queryDelegationToValidatorCount(rec.Address, d.Validator)
-				if err != nil {
-					log.Printf("  ERROR: query delegation %s -> %s: %v", rec.Name, d.Validator, err)
-					errCount++
-				} else if n == 0 {
-					log.Printf("  ERROR: expected delegation %s -> %s", rec.Name, d.Validator)
-					errCount++
-				}
-			}
-		} else if rec.HasDelegation {
-			n, err := queryDelegationCount(rec.Address)
-			if err != nil {
-				log.Printf("  ERROR: query delegations %s: %v", rec.Name, err)
-				errCount++
-			} else if n == 0 {
-				log.Printf("  ERROR: expected delegations for %s, got 0", rec.Name)
-				errCount++
-			}
-		}
+		errCount += validatePreparedDelegations(rec)
 
-		if len(rec.Unbondings) > 0 {
+		errs, hit := validatePreparedUnbondings(rec)
+		errCount += errs
+		if hit {
 			scenarioUnbonding++
-			seen := make(map[string]struct{}, len(rec.Unbondings))
-			for _, u := range rec.Unbondings {
-				if u.Validator == "" {
-					continue
-				}
-				if _, ok := seen[u.Validator]; ok {
-					continue
-				}
-				seen[u.Validator] = struct{}{}
-				n, err := queryUnbondingFromValidatorCount(rec.Address, u.Validator)
-				if err != nil {
-					log.Printf("  ERROR: query unbonding %s from %s: %v", rec.Name, u.Validator, err)
-					errCount++
-				} else if n == 0 {
-					// Older reruns could persist synthetic legacy fallback entries with empty amount.
-					// If any unbonding exists for the account, treat this stale per-validator record as reconciled.
-					if u.Amount == "" {
-						if anyN, anyErr := queryUnbondingCount(rec.Address); anyErr == nil && anyN > 0 {
-							log.Printf("  INFO: stale unbonding marker %s from %s; account has %d unbonding entries, keeping run green",
-								rec.Name, u.Validator, anyN)
-							continue
-						}
-					}
-					log.Printf("  ERROR: expected unbonding %s from %s", rec.Name, u.Validator)
-					errCount++
-				}
-			}
-		} else if rec.HasUnbonding {
-			scenarioUnbonding++
-			n, err := queryUnbondingCount(rec.Address)
-			if err != nil {
-				log.Printf("  ERROR: query unbonding %s: %v", rec.Name, err)
-				errCount++
-			} else if n == 0 {
-				log.Printf("  ERROR: expected unbonding entries for %s, got 0", rec.Name)
-				errCount++
-			}
 		}
 
-		if len(rec.Redelegations) > 0 {
+		errs, hit = validatePreparedRedelegations(rec, af.Validators)
+		errCount += errs
+		if hit {
 			scenarioRedelegation++
-			seen := make(map[string]struct{}, len(rec.Redelegations))
-			for _, rd := range rec.Redelegations {
-				if rd.SrcValidator == "" || rd.DstValidator == "" {
-					continue
-				}
-				key := rd.SrcValidator + "->" + rd.DstValidator
-				if _, ok := seen[key]; ok {
-					continue
-				}
-				seen[key] = struct{}{}
-				n, err := queryRedelegationCount(rec.Address, rd.SrcValidator, rd.DstValidator)
-				if err != nil {
-					log.Printf("  ERROR: query redelegation %s %s -> %s: %v", rec.Name, rd.SrcValidator, rd.DstValidator, err)
-					errCount++
-				} else if n == 0 {
-					// Older reruns could persist synthetic legacy fallback entries with empty amount.
-					// If any redelegation exists for the account, treat this stale pair as reconciled.
-					if rd.Amount == "" {
-						if anyN, anyErr := queryAnyRedelegationCount(rec.Address, af.Validators); anyErr == nil && anyN > 0 {
-							log.Printf("  INFO: stale redelegation marker %s %s -> %s; account has %d redelegations, keeping run green",
-								rec.Name, rd.SrcValidator, rd.DstValidator, anyN)
-							continue
-						}
-					}
-					log.Printf("  ERROR: expected redelegation %s %s -> %s", rec.Name, rd.SrcValidator, rd.DstValidator)
-					errCount++
-				}
-			}
-		} else if rec.HasRedelegation {
-			scenarioRedelegation++
-			n, err := queryRedelegationCount(rec.Address, rec.DelegatedTo, rec.RedelegatedTo)
-			if err == nil && n == 0 {
-				n, err = queryAnyRedelegationCount(rec.Address, af.Validators)
-			}
-			if err != nil {
-				log.Printf("  ERROR: query redelegation %s: %v", rec.Name, err)
-				errCount++
-			} else if n == 0 {
-				log.Printf("  ERROR: expected redelegation entries for %s, got 0", rec.Name)
-				errCount++
-			}
 		}
 
-		if len(rec.WithdrawAddresses) > 0 || rec.HasThirdPartyWD {
+		errs, hit = validatePreparedWithdrawAddr(rec)
+		errCount += errs
+		if hit {
 			scenarioWithdraw++
-			addr, err := queryWithdrawAddress(rec.Address)
-			if err != nil {
-				log.Printf("  ERROR: query withdraw addr %s: %v", rec.Name, err)
-				errCount++
-			} else if addr == "" || addr == rec.Address {
-				log.Printf("  ERROR: expected third-party withdraw addr for %s, got %s", rec.Name, addr)
-				errCount++
-			} else {
-				expected := rec.WithdrawAddress
-				if n := len(rec.WithdrawAddresses); n > 0 {
-					expected = rec.WithdrawAddresses[n-1].Address
-				}
-				if expected != "" && addr != expected {
-					// Reruns can legitimately rotate the withdraw address. Reconcile with chain state.
-					log.Printf("  INFO: withdraw addr changed for %s: expected %s got %s; updating record", rec.Name, expected, addr)
-					rec.addWithdrawAddress(addr)
-				} else if expected == "" {
-					rec.addWithdrawAddress(addr)
-				}
-			}
 		}
 
-		if len(rec.AuthzGrants) > 0 {
-			seen := make(map[string]struct{}, len(rec.AuthzGrants))
-			for _, g := range rec.AuthzGrants {
-				if g.Grantee == "" {
-					continue
-				}
-				if _, ok := seen[g.Grantee]; ok {
-					continue
-				}
-				seen[g.Grantee] = struct{}{}
-				ok, err := queryAuthzGrantExists(rec.Address, g.Grantee)
-				if err != nil {
-					log.Printf("  ERROR: query authz grant %s -> %s: %v", rec.Name, g.Grantee, err)
-					errCount++
-				} else if !ok {
-					log.Printf("  ERROR: expected authz grant %s -> %s", rec.Name, g.Grantee)
-					errCount++
-				}
-			}
-		} else if rec.HasAuthzGrant && rec.AuthzGrantedTo != "" {
-			ok, err := queryAuthzGrantExists(rec.Address, rec.AuthzGrantedTo)
-			if err != nil {
-				log.Printf("  ERROR: query authz grant %s -> %s: %v", rec.Name, rec.AuthzGrantedTo, err)
-				errCount++
-			} else if !ok {
-				log.Printf("  ERROR: expected authz grant %s -> %s", rec.Name, rec.AuthzGrantedTo)
-				errCount++
-			}
-		}
+		errCount += validatePreparedAuthzGrants(rec)
 
-		if len(rec.AuthzAsGrantee) > 0 {
+		errs, hit = validatePreparedAuthzAsGrantee(rec)
+		errCount += errs
+		if hit {
 			scenarioAuthzAsGrantee++
-			seen := make(map[string]struct{}, len(rec.AuthzAsGrantee))
-			for _, g := range rec.AuthzAsGrantee {
-				if g.Granter == "" {
-					continue
-				}
-				if _, ok := seen[g.Granter]; ok {
-					continue
-				}
-				seen[g.Granter] = struct{}{}
-				ok, err := queryAuthzGrantExists(g.Granter, rec.Address)
-				if err != nil {
-					log.Printf("  ERROR: query authz grant %s -> %s: %v", g.Granter, rec.Name, err)
-					errCount++
-				} else if !ok {
-					log.Printf("  ERROR: expected authz grant %s -> %s", g.Granter, rec.Name)
-					errCount++
-				}
-			}
-		} else if rec.HasAuthzAsGrantee && rec.AuthzReceivedFrom != "" {
-			scenarioAuthzAsGrantee++
-			ok, err := queryAuthzGrantExists(rec.AuthzReceivedFrom, rec.Address)
-			if err != nil {
-				log.Printf("  ERROR: query authz grant %s -> %s: %v", rec.AuthzReceivedFrom, rec.Name, err)
-				errCount++
-			} else if !ok {
-				log.Printf("  ERROR: expected authz grant %s -> %s", rec.AuthzReceivedFrom, rec.Name)
-				errCount++
-			}
 		}
 
-		if len(rec.Feegrants) > 0 {
-			seen := make(map[string]struct{}, len(rec.Feegrants))
-			for _, g := range rec.Feegrants {
-				if g.Grantee == "" {
-					continue
-				}
-				if _, ok := seen[g.Grantee]; ok {
-					continue
-				}
-				seen[g.Grantee] = struct{}{}
-				ok, err := queryFeegrantAllowanceExists(rec.Address, g.Grantee)
-				if err != nil {
-					log.Printf("  ERROR: query feegrant %s -> %s: %v", rec.Name, g.Grantee, err)
-					errCount++
-				} else if !ok {
-					log.Printf("  ERROR: expected feegrant allowance %s -> %s", rec.Name, g.Grantee)
-					errCount++
-				}
-			}
-		} else if rec.HasFeegrant && rec.FeegrantGrantedTo != "" {
-			ok, err := queryFeegrantAllowanceExists(rec.Address, rec.FeegrantGrantedTo)
-			if err != nil {
-				log.Printf("  ERROR: query feegrant %s -> %s: %v", rec.Name, rec.FeegrantGrantedTo, err)
-				errCount++
-			} else if !ok {
-				log.Printf("  ERROR: expected feegrant allowance %s -> %s", rec.Name, rec.FeegrantGrantedTo)
-				errCount++
-			}
-		}
+		errCount += validatePreparedFeegrants(rec)
 
-		if len(rec.FeegrantsReceived) > 0 {
+		errs, hit = validatePreparedFeegrantsReceived(rec)
+		errCount += errs
+		if hit {
 			scenarioFeegrantAsGrantee++
-			seen := make(map[string]struct{}, len(rec.FeegrantsReceived))
-			for _, g := range rec.FeegrantsReceived {
-				if g.Granter == "" {
-					continue
-				}
-				if _, ok := seen[g.Granter]; ok {
-					continue
-				}
-				seen[g.Granter] = struct{}{}
-				ok, err := queryFeegrantAllowanceExists(g.Granter, rec.Address)
-				if err != nil {
-					log.Printf("  ERROR: query feegrant %s -> %s: %v", g.Granter, rec.Name, err)
-					errCount++
-				} else if !ok {
-					log.Printf("  ERROR: expected feegrant allowance %s -> %s", g.Granter, rec.Name)
-					errCount++
-				}
-			}
-		} else if rec.HasFeegrantGrantee && rec.FeegrantFrom != "" {
-			scenarioFeegrantAsGrantee++
-			ok, err := queryFeegrantAllowanceExists(rec.FeegrantFrom, rec.Address)
-			if err != nil {
-				log.Printf("  ERROR: query feegrant %s -> %s: %v", rec.FeegrantFrom, rec.Name, err)
-				errCount++
-			} else if !ok {
-				log.Printf("  ERROR: expected feegrant allowance %s -> %s", rec.FeegrantFrom, rec.Name)
-				errCount++
-			}
 		}
 
-		// Validate action records.
-		if len(rec.Actions) > 0 {
+		errs, hit = validatePreparedActions(rec)
+		errCount += errs
+		if hit {
 			scenarioAction++
-			for _, act := range rec.Actions {
-				if act.ActionID == "" {
-					continue
-				}
-				creator, err := queryActionCreator(act.ActionID)
-				if err != nil {
-					log.Printf("  ERROR: query action %s for %s: %v", act.ActionID, rec.Name, err)
-					errCount++
-				} else if creator != rec.Address {
-					log.Printf("  ERROR: action %s creator mismatch: expected %s got %s", act.ActionID, rec.Address, creator)
-					errCount++
-				}
-			}
 		}
 
-		// Validate claim records.
-		if len(rec.Claims) > 0 {
-			for _, cl := range rec.Claims {
-				claimed, destAddr, _, err := queryClaimRecord(cl.OldAddress)
-				if err != nil {
-					log.Printf("  ERROR: query claim record %s for %s: %v", cl.OldAddress, rec.Name, err)
-					errCount++
-					continue
-				}
-				if !claimed {
-					log.Printf("  ERROR: claim record %s should be claimed for %s", cl.OldAddress, rec.Name)
-					errCount++
-				} else if destAddr != rec.Address {
-					log.Printf("  ERROR: claim record %s dest=%s, expected %s", cl.OldAddress, destAddr, rec.Address)
-					errCount++
-				}
-				if cl.Delayed {
-					scenarioDelayedClaim++
-				} else {
-					scenarioClaim++
-				}
-			}
-		}
+		instant, delayed, errs := validatePreparedClaims(rec)
+		errCount += errs
+		scenarioClaim += instant
+		scenarioDelayedClaim += delayed
 	}
 
 	// Coverage expectations: with enough legacy accounts, each scenario should exist at least once.
@@ -1623,6 +1619,420 @@ func validatePreparedState(af *AccountsFile) int {
 	return errCount
 }
 
+// validatePreparedDelegations checks that delegations recorded in the account
+// exist on-chain. Uses detailed per-validator records when available, falling
+// back to the legacy scalar HasDelegation flag.
+func validatePreparedDelegations(rec *AccountRecord) int {
+	var errCount int
+
+	// Path 1: detailed slice — iterate each recorded delegation with dedup via seen map.
+	if len(rec.Delegations) > 0 {
+		seen := make(map[string]struct{}, len(rec.Delegations))
+		for _, d := range rec.Delegations {
+			if d.Validator == "" {
+				continue
+			}
+			if _, ok := seen[d.Validator]; ok {
+				continue
+			}
+			seen[d.Validator] = struct{}{}
+			n, err := queryDelegationToValidatorCount(rec.Address, d.Validator)
+			if err != nil {
+				log.Printf("  ERROR: query delegation %s -> %s: %v", rec.Name, d.Validator, err)
+				errCount++
+			} else if n == 0 {
+				log.Printf("  ERROR: expected delegation %s -> %s", rec.Name, d.Validator)
+				errCount++
+			}
+		}
+	} else if rec.HasDelegation {
+		// Path 2: fallback to legacy scalar field — just check total count.
+		n, err := queryDelegationCount(rec.Address)
+		if err != nil {
+			log.Printf("  ERROR: query delegations %s: %v", rec.Name, err)
+			errCount++
+		} else if n == 0 {
+			log.Printf("  ERROR: expected delegations for %s, got 0", rec.Name)
+			errCount++
+		}
+	}
+
+	return errCount
+}
+
+// validatePreparedUnbondings checks that unbonding delegations recorded in the
+// account exist on-chain. Uses detailed per-validator records when available,
+// falling back to the legacy scalar HasUnbonding flag. Returns the error count
+// and whether this account exercises the unbonding scenario.
+func validatePreparedUnbondings(rec *AccountRecord) (int, bool) {
+	var errCount int
+
+	// Path 1: detailed slice — iterate each recorded unbonding with dedup via seen map.
+	if len(rec.Unbondings) > 0 {
+		seen := make(map[string]struct{}, len(rec.Unbondings))
+		for _, u := range rec.Unbondings {
+			if u.Validator == "" {
+				continue
+			}
+			if _, ok := seen[u.Validator]; ok {
+				continue
+			}
+			seen[u.Validator] = struct{}{}
+			n, err := queryUnbondingFromValidatorCount(rec.Address, u.Validator)
+			if err != nil {
+				log.Printf("  ERROR: query unbonding %s from %s: %v", rec.Name, u.Validator, err)
+				errCount++
+			} else if n == 0 {
+				// Older reruns could persist synthetic legacy fallback entries with empty amount.
+				// If any unbonding exists for the account, treat this stale per-validator record as reconciled.
+				if u.Amount == "" {
+					if anyN, anyErr := queryUnbondingCount(rec.Address); anyErr == nil && anyN > 0 {
+						log.Printf("  INFO: stale unbonding marker %s from %s; account has %d unbonding entries, keeping run green",
+							rec.Name, u.Validator, anyN)
+						continue
+					}
+				}
+				log.Printf("  ERROR: expected unbonding %s from %s", rec.Name, u.Validator)
+				errCount++
+			}
+		}
+		return errCount, true
+	} else if rec.HasUnbonding {
+		// Path 2: fallback to legacy scalar field — just check total count.
+		n, err := queryUnbondingCount(rec.Address)
+		if err != nil {
+			log.Printf("  ERROR: query unbonding %s: %v", rec.Name, err)
+			errCount++
+		} else if n == 0 {
+			log.Printf("  ERROR: expected unbonding entries for %s, got 0", rec.Name)
+			errCount++
+		}
+		return errCount, true
+	}
+
+	return errCount, false
+}
+
+// validatePreparedRedelegations checks that redelegations recorded in the account
+// exist on-chain. Uses detailed per-pair records when available, falling back to
+// the legacy scalar HasRedelegation flag. Returns the error count and whether this
+// account exercises the redelegation scenario.
+func validatePreparedRedelegations(rec *AccountRecord, validators []string) (int, bool) {
+	var errCount int
+
+	// Path 1: detailed slice — iterate each recorded redelegation pair with dedup via seen map.
+	if len(rec.Redelegations) > 0 {
+		seen := make(map[string]struct{}, len(rec.Redelegations))
+		for _, rd := range rec.Redelegations {
+			if rd.SrcValidator == "" || rd.DstValidator == "" {
+				continue
+			}
+			key := rd.SrcValidator + "->" + rd.DstValidator
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			n, err := queryRedelegationCount(rec.Address, rd.SrcValidator, rd.DstValidator)
+			if err != nil {
+				log.Printf("  ERROR: query redelegation %s %s -> %s: %v", rec.Name, rd.SrcValidator, rd.DstValidator, err)
+				errCount++
+			} else if n == 0 {
+				// Older reruns could persist synthetic legacy fallback entries with empty amount.
+				// If any redelegation exists for the account, treat this stale pair as reconciled.
+				if rd.Amount == "" {
+					if anyN, anyErr := queryAnyRedelegationCount(rec.Address, validators); anyErr == nil && anyN > 0 {
+						log.Printf("  INFO: stale redelegation marker %s %s -> %s; account has %d redelegations, keeping run green",
+							rec.Name, rd.SrcValidator, rd.DstValidator, anyN)
+						continue
+					}
+				}
+				log.Printf("  ERROR: expected redelegation %s %s -> %s", rec.Name, rd.SrcValidator, rd.DstValidator)
+				errCount++
+			}
+		}
+		return errCount, true
+	} else if rec.HasRedelegation {
+		// Path 2: fallback to legacy scalar field — use DelegatedTo/RedelegatedTo pair.
+		n, err := queryRedelegationCount(rec.Address, rec.DelegatedTo, rec.RedelegatedTo)
+		if err == nil && n == 0 {
+			n, err = queryAnyRedelegationCount(rec.Address, validators)
+		}
+		if err != nil {
+			log.Printf("  ERROR: query redelegation %s: %v", rec.Name, err)
+			errCount++
+		} else if n == 0 {
+			log.Printf("  ERROR: expected redelegation entries for %s, got 0", rec.Name)
+			errCount++
+		}
+		return errCount, true
+	}
+
+	return errCount, false
+}
+
+// validatePreparedWithdrawAddr checks that a third-party withdraw address is set
+// on-chain for this account. Reconciles stale records with the current chain state
+// on reruns. Returns the error count and whether this account exercises the
+// withdraw-address scenario.
+func validatePreparedWithdrawAddr(rec *AccountRecord) (int, bool) {
+	var errCount int
+
+	if len(rec.WithdrawAddresses) > 0 || rec.HasThirdPartyWD {
+		addr, err := queryWithdrawAddress(rec.Address)
+		if err != nil {
+			log.Printf("  ERROR: query withdraw addr %s: %v", rec.Name, err)
+			errCount++
+		} else if addr == "" || addr == rec.Address {
+			log.Printf("  ERROR: expected third-party withdraw addr for %s, got %s", rec.Name, addr)
+			errCount++
+		} else {
+			expected := rec.WithdrawAddress
+			if n := len(rec.WithdrawAddresses); n > 0 {
+				expected = rec.WithdrawAddresses[n-1].Address
+			}
+			if expected != "" && addr != expected {
+				// Reruns can legitimately rotate the withdraw address. Reconcile with chain state.
+				log.Printf("  INFO: withdraw addr changed for %s: expected %s got %s; updating record", rec.Name, expected, addr)
+				rec.addWithdrawAddress(addr)
+			} else if expected == "" {
+				rec.addWithdrawAddress(addr)
+			}
+		}
+		return errCount, true
+	}
+
+	return errCount, false
+}
+
+// validatePreparedAuthzGrants checks that outgoing authz grants (where this account
+// is the granter) exist on-chain. Uses detailed per-grantee records when available,
+// falling back to the legacy scalar HasAuthzGrant flag.
+func validatePreparedAuthzGrants(rec *AccountRecord) int {
+	var errCount int
+
+	// Path 1: detailed slice — iterate each recorded grant with dedup via seen map.
+	if len(rec.AuthzGrants) > 0 {
+		seen := make(map[string]struct{}, len(rec.AuthzGrants))
+		for _, g := range rec.AuthzGrants {
+			if g.Grantee == "" {
+				continue
+			}
+			if _, ok := seen[g.Grantee]; ok {
+				continue
+			}
+			seen[g.Grantee] = struct{}{}
+			ok, err := queryAuthzGrantExists(rec.Address, g.Grantee)
+			if err != nil {
+				log.Printf("  ERROR: query authz grant %s -> %s: %v", rec.Name, g.Grantee, err)
+				errCount++
+			} else if !ok {
+				log.Printf("  ERROR: expected authz grant %s -> %s", rec.Name, g.Grantee)
+				errCount++
+			}
+		}
+	} else if rec.HasAuthzGrant && rec.AuthzGrantedTo != "" {
+		// Path 2: fallback to legacy scalar field — check single granter->grantee pair.
+		ok, err := queryAuthzGrantExists(rec.Address, rec.AuthzGrantedTo)
+		if err != nil {
+			log.Printf("  ERROR: query authz grant %s -> %s: %v", rec.Name, rec.AuthzGrantedTo, err)
+			errCount++
+		} else if !ok {
+			log.Printf("  ERROR: expected authz grant %s -> %s", rec.Name, rec.AuthzGrantedTo)
+			errCount++
+		}
+	}
+
+	return errCount
+}
+
+// validatePreparedAuthzAsGrantee checks that incoming authz grants (where this
+// account is the grantee) exist on-chain. Uses detailed per-granter records when
+// available, falling back to the legacy scalar HasAuthzAsGrantee flag. Returns the
+// error count and whether this account exercises the authz-as-grantee scenario.
+func validatePreparedAuthzAsGrantee(rec *AccountRecord) (int, bool) {
+	var errCount int
+
+	// Path 1: detailed slice — iterate each recorded grant with dedup via seen map.
+	if len(rec.AuthzAsGrantee) > 0 {
+		seen := make(map[string]struct{}, len(rec.AuthzAsGrantee))
+		for _, g := range rec.AuthzAsGrantee {
+			if g.Granter == "" {
+				continue
+			}
+			if _, ok := seen[g.Granter]; ok {
+				continue
+			}
+			seen[g.Granter] = struct{}{}
+			ok, err := queryAuthzGrantExists(g.Granter, rec.Address)
+			if err != nil {
+				log.Printf("  ERROR: query authz grant %s -> %s: %v", g.Granter, rec.Name, err)
+				errCount++
+			} else if !ok {
+				log.Printf("  ERROR: expected authz grant %s -> %s", g.Granter, rec.Name)
+				errCount++
+			}
+		}
+		return errCount, true
+	} else if rec.HasAuthzAsGrantee && rec.AuthzReceivedFrom != "" {
+		// Path 2: fallback to legacy scalar field — check single granter->grantee pair.
+		ok, err := queryAuthzGrantExists(rec.AuthzReceivedFrom, rec.Address)
+		if err != nil {
+			log.Printf("  ERROR: query authz grant %s -> %s: %v", rec.AuthzReceivedFrom, rec.Name, err)
+			errCount++
+		} else if !ok {
+			log.Printf("  ERROR: expected authz grant %s -> %s", rec.AuthzReceivedFrom, rec.Name)
+			errCount++
+		}
+		return errCount, true
+	}
+
+	return errCount, false
+}
+
+// validatePreparedFeegrants checks that outgoing feegrant allowances (where this
+// account is the granter) exist on-chain. Uses detailed per-grantee records when
+// available, falling back to the legacy scalar HasFeegrant flag.
+func validatePreparedFeegrants(rec *AccountRecord) int {
+	var errCount int
+
+	// Path 1: detailed slice — iterate each recorded feegrant with dedup via seen map.
+	if len(rec.Feegrants) > 0 {
+		seen := make(map[string]struct{}, len(rec.Feegrants))
+		for _, g := range rec.Feegrants {
+			if g.Grantee == "" {
+				continue
+			}
+			if _, ok := seen[g.Grantee]; ok {
+				continue
+			}
+			seen[g.Grantee] = struct{}{}
+			ok, err := queryFeegrantAllowanceExists(rec.Address, g.Grantee)
+			if err != nil {
+				log.Printf("  ERROR: query feegrant %s -> %s: %v", rec.Name, g.Grantee, err)
+				errCount++
+			} else if !ok {
+				log.Printf("  ERROR: expected feegrant allowance %s -> %s", rec.Name, g.Grantee)
+				errCount++
+			}
+		}
+	} else if rec.HasFeegrant && rec.FeegrantGrantedTo != "" {
+		// Path 2: fallback to legacy scalar field — check single granter->grantee pair.
+		ok, err := queryFeegrantAllowanceExists(rec.Address, rec.FeegrantGrantedTo)
+		if err != nil {
+			log.Printf("  ERROR: query feegrant %s -> %s: %v", rec.Name, rec.FeegrantGrantedTo, err)
+			errCount++
+		} else if !ok {
+			log.Printf("  ERROR: expected feegrant allowance %s -> %s", rec.Name, rec.FeegrantGrantedTo)
+			errCount++
+		}
+	}
+
+	return errCount
+}
+
+// validatePreparedFeegrantsReceived checks that incoming feegrant allowances (where
+// this account is the grantee) exist on-chain. Uses detailed per-granter records
+// when available, falling back to the legacy scalar HasFeegrantGrantee flag. Returns
+// the error count and whether this account exercises the feegrant-as-grantee scenario.
+func validatePreparedFeegrantsReceived(rec *AccountRecord) (int, bool) {
+	var errCount int
+
+	// Path 1: detailed slice — iterate each recorded feegrant with dedup via seen map.
+	if len(rec.FeegrantsReceived) > 0 {
+		seen := make(map[string]struct{}, len(rec.FeegrantsReceived))
+		for _, g := range rec.FeegrantsReceived {
+			if g.Granter == "" {
+				continue
+			}
+			if _, ok := seen[g.Granter]; ok {
+				continue
+			}
+			seen[g.Granter] = struct{}{}
+			ok, err := queryFeegrantAllowanceExists(g.Granter, rec.Address)
+			if err != nil {
+				log.Printf("  ERROR: query feegrant %s -> %s: %v", g.Granter, rec.Name, err)
+				errCount++
+			} else if !ok {
+				log.Printf("  ERROR: expected feegrant allowance %s -> %s", g.Granter, rec.Name)
+				errCount++
+			}
+		}
+		return errCount, true
+	} else if rec.HasFeegrantGrantee && rec.FeegrantFrom != "" {
+		// Path 2: fallback to legacy scalar field — check single granter->grantee pair.
+		ok, err := queryFeegrantAllowanceExists(rec.FeegrantFrom, rec.Address)
+		if err != nil {
+			log.Printf("  ERROR: query feegrant %s -> %s: %v", rec.FeegrantFrom, rec.Name, err)
+			errCount++
+		} else if !ok {
+			log.Printf("  ERROR: expected feegrant allowance %s -> %s", rec.FeegrantFrom, rec.Name)
+			errCount++
+		}
+		return errCount, true
+	}
+
+	return errCount, false
+}
+
+// validatePreparedActions checks that actions recorded in the account exist on-chain
+// with the correct creator. Returns the error count and whether this account
+// exercises the action scenario.
+func validatePreparedActions(rec *AccountRecord) (int, bool) {
+	var errCount int
+
+	// Validate action records.
+	if len(rec.Actions) > 0 {
+		for _, act := range rec.Actions {
+			if act.ActionID == "" {
+				continue
+			}
+			creator, err := queryActionCreator(act.ActionID)
+			if err != nil {
+				log.Printf("  ERROR: query action %s for %s: %v", act.ActionID, rec.Name, err)
+				errCount++
+			} else if creator != rec.Address {
+				log.Printf("  ERROR: action %s creator mismatch: expected %s got %s", act.ActionID, rec.Address, creator)
+				errCount++
+			}
+		}
+		return errCount, true
+	}
+
+	return errCount, false
+}
+
+// validatePreparedClaims checks that claim records exist on-chain and are correctly
+// attributed to the account. Returns the number of instant claims, delayed claims,
+// and error count.
+func validatePreparedClaims(rec *AccountRecord) (instant int, delayed int, errCount int) {
+	// Validate claim records.
+	if len(rec.Claims) > 0 {
+		for _, cl := range rec.Claims {
+			claimed, destAddr, _, err := queryClaimRecord(cl.OldAddress)
+			if err != nil {
+				log.Printf("  ERROR: query claim record %s for %s: %v", cl.OldAddress, rec.Name, err)
+				errCount++
+				continue
+			}
+			if !claimed {
+				log.Printf("  ERROR: claim record %s should be claimed for %s", cl.OldAddress, rec.Name)
+				errCount++
+			} else if destAddr != rec.Address {
+				log.Printf("  ERROR: claim record %s dest=%s, expected %s", cl.OldAddress, destAddr, rec.Address)
+				errCount++
+			}
+			if cl.Delayed {
+				delayed++
+			} else {
+				instant++
+			}
+		}
+	}
+
+	return instant, delayed, errCount
+}
+
+// runCleanup removes all test keys from the keyring and deletes the accounts file.
 func runCleanup() {
 	log.Println("=== CLEANUP MODE: removing test keys from keyring ===")
 

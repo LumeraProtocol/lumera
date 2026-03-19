@@ -12,6 +12,8 @@ Related documents:
 - [bugs.md](bugs.md) —  bugs found and fixed during EVM integration
 - [roadmap.md](roadmap.md) — EVM integration roadmap and planning
 - [node-evm-config-guide.md](node-evm-config-guide.md) — Node operator EVM configuration guide (app.toml tuning, RPC exposure, tracer config)
+- [openrpc-playground.md](openrpc-playground.md) — OpenRPC discovery and playground guide (access methods, devnet ports, CORS, interactive explorer)
+- [remix-guide.md](remix-guide.md) — Testing smart contracts on Lumera with Remix IDE and MetaMask
 - [action-precompile.md](action-precompile.md) — Action module precompile (`0x0901`) ABI reference, usage examples, and design notes
 - [supernode-precompile.md](supernode-precompile.md) — Supernode module precompile (`0x0902`) ABI reference, usage examples, and design notes
 
@@ -350,18 +352,25 @@ Changes:
 - Added runtime OpenRPC discovery namespace (`rpc`) with JSON-RPC method:
   - `rpc_discover`
 - Added HTTP OpenRPC document endpoint:
-  - `GET /openrpc.json` (and`HEAD`)
+  - `GET /openrpc.json` (and `HEAD`)
+  - `POST /openrpc.json` proxies JSON-RPC calls to the internal JSON-RPC server, enabling OpenRPC Playground "Try It" from the REST API port
+  - Automatic `rpc.discover` → `rpc_discover` method name rewriting for playground compatibility
 - Added browser CORS/preflight support for OpenRPC HTTP endpoint:
-  - CORS origins controlled by`[json-rpc] ws-origins` (empty/`*` = allow all)
-  - `Access-Control-Allow-Methods: GET, HEAD, OPTIONS`
+  - CORS origins controlled by `[json-rpc] ws-origins` (empty/`*` = allow all)
+  - `Access-Control-Allow-Methods: GET, HEAD, POST, OPTIONS`
   - `Access-Control-Allow-Headers: Content-Type`
   - `OPTIONS /openrpc.json -> 204`
+- Dynamic `servers[0].url` rewriting based on the configured JSON-RPC address, so the playground discovers the correct execution endpoint
 - Improved generated example shape for strict OpenRPC tooling compatibility:
   - `examples[*].params` is always present (empty array when no params).
-  - `examples[*].result.value` is always present (including explicit`null`).
+  - `examples[*].result.value` is always present (including explicit `null`).
+- OpenRPC generator now expands struct parameters into JSON Schema `properties` with per-field types, patterns, and descriptions (e.g. `TransactionArgs` shows all 18 fields with correct Ethereum type schemas)
+- Well-known Ethereum types (`common.Address`, `common.Hash`, `hexutil.Big`, `hexutil.Bytes`, etc.) mapped to correct JSON-RPC string representations with validation patterns
+- OpenRPC spec version derived from `go.mod` at build time via `runtime/debug.ReadBuildInfo()` — no hardcoded version string
+- Embedded spec is gzip-compressed in the binary (315 KB → 20 KB, 93% reduction); decompressed once at startup
 - Added OpenRPC generation into build dependency chain:
-  - `build/lumerad` and`build-debug/lumerad` depend on`app/openrpc/openrpc.json`.
-  - `openrpc` target generates`docs/openrpc.json` and copies to`app/openrpc/openrpc.json`.
+  - `build/lumerad` and `build-debug/lumerad` depend on `app/openrpc/openrpc.json.gz`.
+  - `openrpc` target generates `docs/openrpc.json` and compresses to `app/openrpc/openrpc.json.gz`.
 
 Benefits/new features:
 
@@ -676,7 +685,7 @@ The `EVMTransferKeeper` maintains an `ICS4Wrapper` back-reference for callback c
 
 ### OpenRPC build-time synchronization
 
-The OpenRPC spec is regenerated on every `make build` via the `tools/openrpcgen` tool, which uses Go reflection and AST parsing to introspect the actual RPC implementation types. The spec is then `//go:embed`-ded into the binary. This eliminates stale-spec drift: the running node always serves a spec that matches its compiled RPC surface.
+The OpenRPC spec is regenerated on every `make build` via the `tools/openrpcgen` tool, which uses Go reflection and AST parsing to introspect the actual RPC implementation types. The generator expands struct parameters into full JSON Schema `properties` with per-field types and validation patterns for well-known Ethereum types (`common.Address`, `hexutil.Big`, etc.). The spec version is derived from `go.mod` at build time via `runtime/debug.ReadBuildInfo()`. The generated spec is gzip-compressed and `//go:embed`-ded into the binary (315 KB → 20 KB), then decompressed once at startup. This eliminates stale-spec drift: the running node always serves a spec that matches its compiled RPC surface.
 
 ### 18-decimal precision bridge design
 

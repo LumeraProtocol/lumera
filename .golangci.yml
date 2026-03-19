@@ -1,0 +1,99 @@
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - staticcheck
+    - unused
+    - ineffassign
+    - govet
+    - nolintlint
+
+  exclusions:
+    generated: strict
+    rules:
+      # Test files: SDK keeper methods (SetValidator, SetParams, SetDelegation, etc.)
+      # return errors that are safe to ignore in test setup code.
+      - path: _test\.go
+        linters:
+          - errcheck
+
+      # Wasm integration tests adapted from wasmd — not our code to fix.
+      - path: tests/(integration|system)/wasm/
+        linters:
+          - errcheck
+          - unused
+
+      # Action simulation helpers — scaffolded by Ignite, constants may be
+      # used by external repos.
+      - path: x/action/v1/module/simulation\.go
+        linters:
+          - unused
+
+      # Simulation helpers — kept for future use.
+      - path: x/action/v1/simulation/
+        linters:
+          - unused
+          - staticcheck
+
+      # LumeraID mocks — generated/scaffolded test helpers.
+      - path: x/lumeraid/mocks/
+        linters:
+          - unused
+
+      # Staking integration test helpers — kept for future test expansion.
+      - path: tests/integration/staking/
+        linters:
+          - unused
+
+      # SDK deprecated APIs (paramskeeper, WrapSDKContext) — can't remove
+      # until upstream drops them.
+      - linters:
+          - staticcheck
+        text: "SA1019"
+
+      # Cosmetic suggestions (QF1003, QF1007, QF1008) — optional refactors.
+      - linters:
+          - staticcheck
+        text: "QF10(0[378]|11)"
+
+      # S1001 (use copy), S1009 (nil check before len), S1011 (use append),
+      # S1021 (merge var) — cosmetic, not correctness issues.
+      - linters:
+          - staticcheck
+        text: "S100[19]|S101[1]|S1021"
+
+      # ST1005 (error string capitalization), ST1019 (duplicate import),
+      # ST1023 (omit type from declaration) — style, not correctness.
+      - linters:
+          - staticcheck
+        text: "ST10(05|19|23)"
+
+      # SA4031 (nil check on make result), SA9003 (empty branch) —
+      # intentional patterns in existing code.
+      - linters:
+          - staticcheck
+        text: "SA(4031|9003)"
+
+      # SA1029 (built-in type as context key) — existing pattern.
+      - linters:
+          - staticcheck
+        text: "SA1029"
+
+      # SA4010 (unused append result) — false positive in test setup code.
+      - path: _test\.go
+        linters:
+          - staticcheck
+        text: "SA4010"
+
+      # Deprecated proto import — required for compatibility with gogoproto.
+      - path: app/proto_bridge_test\.go
+        linters:
+          - staticcheck
+
+formatters:
+  enable:
+    - gofmt
+  exclusions:
+    generated: strict

@@ -85,7 +85,7 @@ func (suite *MsgServerTestSuite) TestMsgApproveActionErrors() {
 	}
 
 	for _, tc := range testCases {
-		suite.Run(tc.name, func() {		
+		suite.Run(tc.name, func() {
 			res, err := suite.approveActionNoCheck(tc.actionId, tc.creator)
 
 			if tc.errorContains != "" {

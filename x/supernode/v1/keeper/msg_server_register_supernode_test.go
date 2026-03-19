@@ -22,8 +22,8 @@ import (
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	"go.uber.org/mock/gomock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
 	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
@@ -588,28 +588,28 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 					// Verify event attributes are present and correct
 					evs := sdkCtx.EventManager().Events()
 					foundEvt := false
-                    for _, e := range evs {
-                        if e.Type != types.EventTypeSupernodeRegistered {
-                            continue
-                        }
-                        kv := map[string]string{}
-                        for _, a := range e.Attributes {
-                            kv[string(a.Key)] = string(a.Value)
-                        }
-                        
-                        rereg := kv[types.AttributeKeyReRegistered] == "true"
-                        oldst := kv[types.AttributeKeyOldState] == types.SuperNodeStateDisabled.String()
-                        ipok := kv[types.AttributeKeyIPAddress] == "192.168.1.1"
-                        accok := kv[types.AttributeKeySupernodeAccount] == creatorAddr.String()
-                        p2pok := kv[types.AttributeKeyP2PPort] == "26657"
-                        valok := kv[types.AttributeKeyValidatorAddress] == valAddr.String()
-                        htok := kv[types.AttributeKeyHeight] == fmt.Sprintf("%d", sdkCtx.BlockHeight())
-                        
-                        if rereg && oldst && ipok && accok && p2pok && valok && htok {
-                            foundEvt = true
-                            break
-                        }
-                    }
+					for _, e := range evs {
+						if e.Type != types.EventTypeSupernodeRegistered {
+							continue
+						}
+						kv := map[string]string{}
+						for _, a := range e.Attributes {
+							kv[string(a.Key)] = string(a.Value)
+						}
+
+						rereg := kv[types.AttributeKeyReRegistered] == "true"
+						oldst := kv[types.AttributeKeyOldState] == types.SuperNodeStateDisabled.String()
+						ipok := kv[types.AttributeKeyIPAddress] == "192.168.1.1"
+						accok := kv[types.AttributeKeySupernodeAccount] == creatorAddr.String()
+						p2pok := kv[types.AttributeKeyP2PPort] == "26657"
+						valok := kv[types.AttributeKeyValidatorAddress] == valAddr.String()
+						htok := kv[types.AttributeKeyHeight] == fmt.Sprintf("%d", sdkCtx.BlockHeight())
+
+						if rereg && oldst && ipok && accok && p2pok && valok && htok {
+							foundEvt = true
+							break
+						}
+					}
 					require.True(t, foundEvt, "re-registration event with expected attributes not found")
 				}
 
@@ -630,28 +630,28 @@ func TestMsgServer_RegisterSupernode(t *testing.T) {
 					// Verify event attributes are present and correct
 					evs := sdkCtx.EventManager().Events()
 					foundEvt := false
-                    for _, e := range evs {
-                        if e.Type != types.EventTypeSupernodeRegistered {
-                            continue
-                        }
-                        kv := map[string]string{}
-                        for _, a := range e.Attributes {
-                            kv[string(a.Key)] = string(a.Value)
-                        }
-                        
-                        rereg := kv[types.AttributeKeyReRegistered] == "true"
-                        oldst := kv[types.AttributeKeyOldState] == types.SuperNodeStateDisabled.String()
-                        ipok := kv[types.AttributeKeyIPAddress] == "192.168.1.1"
-                        accok := kv[types.AttributeKeySupernodeAccount] == creatorAddr.String()
-                        p2pok := kv[types.AttributeKeyP2PPort] == "26657"
-                        valok := kv[types.AttributeKeyValidatorAddress] == valAddr.String()
-                        htok := kv[types.AttributeKeyHeight] == fmt.Sprintf("%d", sdkCtx.BlockHeight())
-                        
-                        if rereg && oldst && ipok && accok && p2pok && valok && htok {
-                            foundEvt = true
-                            break
-                        }
-                    }
+					for _, e := range evs {
+						if e.Type != types.EventTypeSupernodeRegistered {
+							continue
+						}
+						kv := map[string]string{}
+						for _, a := range e.Attributes {
+							kv[string(a.Key)] = string(a.Value)
+						}
+
+						rereg := kv[types.AttributeKeyReRegistered] == "true"
+						oldst := kv[types.AttributeKeyOldState] == types.SuperNodeStateDisabled.String()
+						ipok := kv[types.AttributeKeyIPAddress] == "192.168.1.1"
+						accok := kv[types.AttributeKeySupernodeAccount] == creatorAddr.String()
+						p2pok := kv[types.AttributeKeyP2PPort] == "26657"
+						valok := kv[types.AttributeKeyValidatorAddress] == valAddr.String()
+						htok := kv[types.AttributeKeyHeight] == fmt.Sprintf("%d", sdkCtx.BlockHeight())
+
+						if rereg && oldst && ipok && accok && p2pok && valok && htok {
+							foundEvt = true
+							break
+						}
+					}
 					require.True(t, foundEvt, "re-registration event with expected attributes not found")
 				}
 			}

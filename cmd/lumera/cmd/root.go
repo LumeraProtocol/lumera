@@ -93,6 +93,13 @@ func NewRootCmd() *cobra.Command {
 				return err
 			}
 
+			// Migrate app.toml for nodes upgrading from pre-EVM binaries.
+			// Adds [evm], [json-rpc], [tls], and [lumera.*] sections with
+			// Lumera defaults while preserving all existing operator settings.
+			if err := migrateAppConfigIfNeeded(cmd); err != nil {
+				return err
+			}
+
 			return validateStartJSONRPCNamespacePolicy(cmd)
 		},
 	}

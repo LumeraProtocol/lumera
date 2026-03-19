@@ -38,4 +38,3 @@ func (k Keeper) CreateEpochParamsSnapshotIfNeeded(ctx sdk.Context, epochID uint6
 	}
 	return k.SetEpochParamsSnapshot(ctx, epochID, params.WithDefaults())
 }
-

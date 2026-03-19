@@ -52,7 +52,7 @@ func (k Keeper) IterateClaimRecords(ctx sdk.Context, cb func(claimRecord types.C
 	store := prefix.NewStore(storeAdapter, types.KeyPrefix(types.ClaimRecordKey))
 
 	iterator := store.Iterator(nil, nil)
-	defer iterator.Close()
+	defer func() { _ = iterator.Close() }()
 
 	for ; iterator.Valid(); iterator.Next() {
 		var record types.ClaimRecord

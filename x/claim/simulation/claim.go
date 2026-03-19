@@ -6,8 +6,8 @@ import (
 
 	"encoding/hex"
 
-	claimcrypto "github.com/LumeraProtocol/lumera/x/claim/keeper/crypto"
 	"github.com/LumeraProtocol/lumera/x/claim/keeper"
+	claimcrypto "github.com/LumeraProtocol/lumera/x/claim/keeper/crypto"
 	"github.com/LumeraProtocol/lumera/x/claim/types"
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	sdk "github.com/cosmos/cosmos-sdk/types"

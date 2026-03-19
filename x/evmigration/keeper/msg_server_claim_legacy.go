@@ -127,13 +127,17 @@ func (ms msgServer) preChecks(ctx sdk.Context, legacyAddr, newAddr sdk.AccAddres
 // migrateAccount performs the account-level migration steps shared by both
 // ClaimLegacyAccount and MigrateValidator (Steps 1-8 from the plan).
 func (ms msgServer) migrateAccount(ctx sdk.Context, legacyAddr, newAddr sdk.AccAddress) error {
+	// Snapshot the original withdraw address before MigrateDistribution
+	// may temporarily redirect it to self (see redirectWithdrawAddrIfMigrated).
+	origWithdrawAddr, _ := ms.distributionKeeper.GetDelegatorWithdrawAddr(ctx, legacyAddr)
+
 	// Step 1: Withdraw distribution rewards.
 	if err := ms.MigrateDistribution(ctx, legacyAddr); err != nil {
 		return fmt.Errorf("migrate distribution: %w", err)
 	}
 
 	// Step 2: Re-key staking (delegations, unbonding, redelegations).
-	if err := ms.MigrateStaking(ctx, legacyAddr, newAddr); err != nil {
+	if err := ms.MigrateStaking(ctx, legacyAddr, newAddr, origWithdrawAddr); err != nil {
 		return fmt.Errorf("migrate staking: %w", err)
 	}
 

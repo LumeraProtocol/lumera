@@ -21,8 +21,8 @@ const (
 	DefaultHermesSimdHostGRPCPort    = 39090
 	DefaultHermesSimdHostGRPCWebPort = 39091
 
-	EnvNMAPIBase                     = "VITE_API_BASE"
-	EnvNMAPIToken                    = "VITE_API_KEY"
+	EnvNMAPIBase  = "VITE_API_BASE"
+	EnvNMAPIToken = "VITE_API_KEY"
 
 	FolderScripts   = "/root/scripts"
 	SubFolderShared = "shared"

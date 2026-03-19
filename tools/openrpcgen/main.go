@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -32,7 +33,9 @@ const (
 	defaultOutputPath   = "docs/openrpc.json"
 	defaultServerURL    = "http://localhost:8545"
 	defaultExamplesPath = "docs/openrpc_examples_overrides.json"
-	docVersion          = "cosmos/evm v0.6.0"
+	evmModulePath       = "github.com/cosmos/evm"
+	openRPCDiscoverName = "rpc.discover"
+	openRPCMetaSchema   = "https://raw.githubusercontent.com/open-rpc/meta-schema/master/schema.json"
 )
 
 var (
@@ -102,12 +105,12 @@ type contentDescriptor struct {
 }
 
 type examplePairing struct {
-	Name        string          `json:"name"`
-	Summary     string          `json:"summary,omitempty"`
-	Description string          `json:"description,omitempty"`
+	Name        string `json:"name"`
+	Summary     string `json:"summary,omitempty"`
+	Description string `json:"description,omitempty"`
 	// Keep `params` always present; OpenRPC tooling expects this field.
-	Params      []exampleObject `json:"params"`
-	Result      *exampleObject  `json:"result,omitempty"`
+	Params []exampleObject `json:"params"`
+	Result *exampleObject  `json:"result,omitempty"`
 }
 
 type exampleObject struct {
@@ -116,7 +119,7 @@ type exampleObject struct {
 	Description string `json:"description,omitempty"`
 	// Keep `value` always present, including explicit null examples.
 	// OpenRPC tooling expects the field to exist on result objects.
-	Value       any    `json:"value"`
+	Value any `json:"value"`
 }
 
 type externalDocs struct {
@@ -163,7 +166,7 @@ func main() {
 		OpenRPC: "1.2.6",
 		Info: infoObject{
 			Title:       "Lumera Cosmos EVM JSON-RPC API",
-			Version:     docVersion,
+			Version:     cosmosEVMVersion(),
 			Description: "Auto-generated method catalog from Cosmos EVM JSON-RPC namespace implementations.",
 		},
 		Servers: []serverObject{
@@ -208,6 +211,9 @@ func collectMethods(services []serviceSpec, exampleOverrides map[string][]exampl
 			}
 
 			methodName := svc.Namespace + "_" + formatRPCName(m.Name)
+			if svc.Namespace == lumeraopenrpc.Namespace && m.Name == "Discover" {
+				methodName = openRPCDiscoverName
+			}
 			if _, exists := methodMap[methodName]; exists {
 				continue
 			}
@@ -300,11 +306,25 @@ func buildMethodDescriptors(methodName string, fntype reflect.Type, sourceMeta m
 			}
 		}
 
+		required := t.Kind() != reflect.Ptr
+		schema := schemaForType(t)
+		if override := paramDescriptorOverride(methodName, paramName, t); override != nil {
+			if override.Description != "" {
+				paramDescription = override.Description
+			}
+			if override.Schema != nil {
+				schema = override.Schema
+			}
+			if override.Required != nil {
+				required = *override.Required
+			}
+		}
+
 		params = append(params, contentDescriptor{
 			Name:        paramName,
 			Description: paramDescription,
-			Required:    t.Kind() != reflect.Ptr,
-			Schema:      schemaForType(t),
+			Required:    required,
+			Schema:      schema,
 		})
 	}
 
@@ -332,40 +352,17 @@ func buildMethodDescriptors(methodName string, fntype reflect.Type, sourceMeta m
 		}
 	}
 
+	if methodName == openRPCDiscoverName {
+		result = contentDescriptor{
+			Name:        "OpenRPC Schema",
+			Description: "OpenRPC schema returned by the service discovery method.",
+			Schema: map[string]any{
+				"$ref": openRPCMetaSchema,
+			},
+		}
+	}
+
 	return params, result
-}
-
-func schemaForType(t reflect.Type) map[string]any {
-	nullable := false
-	for t.Kind() == reflect.Ptr {
-		nullable = true
-		t = t.Elem()
-	}
-
-	schema := map[string]any{
-		"x-go-type": t.String(),
-	}
-
-	switch t.Kind() {
-	case reflect.Bool:
-		schema["type"] = "boolean"
-	case reflect.String:
-		schema["type"] = "string"
-	case reflect.Slice, reflect.Array:
-		schema["type"] = "array"
-		schema["items"] = map[string]any{}
-	case reflect.Map, reflect.Struct, reflect.Interface:
-		schema["type"] = "object"
-	default:
-		// Keep scalar defaults as string; many Ethereum RPC numerics are hex-encoded strings.
-		schema["type"] = "string"
-	}
-
-	if nullable {
-		schema["nullable"] = true
-	}
-
-	return schema
 }
 
 func isErrorType(t reflect.Type) bool {
@@ -403,42 +400,6 @@ func normalizeCommentText(text string) string {
 		return ""
 	}
 	return strings.Join(strings.Fields(text), " ")
-}
-
-func alignExampleParamNames(examples []examplePairing, params []contentDescriptor) []examplePairing {
-	if len(examples) == 0 {
-		return nil
-	}
-
-	out := make([]examplePairing, 0, len(examples))
-	for _, ex := range examples {
-		copied := ex
-		if copied.Params == nil {
-			copied.Params = []exampleObject{}
-		}
-		if len(ex.Params) > 0 {
-			copied.Params = make([]exampleObject, len(ex.Params))
-			copy(copied.Params, ex.Params)
-
-			if len(copied.Params) == len(params) {
-				allIndexedArgs := true
-				for _, p := range copied.Params {
-					if !isIndexedArgName(p.Name) {
-						allIndexedArgs = false
-						break
-					}
-				}
-				if allIndexedArgs {
-					for i := range copied.Params {
-						copied.Params[i].Name = params[i].Name
-					}
-				}
-			}
-		}
-		out = append(out, copied)
-	}
-
-	return out
 }
 
 func isIndexedArgName(name string) bool {
@@ -545,324 +506,17 @@ func receiverMatches(recv *ast.FieldList, expectedName string) bool {
 	}
 }
 
-func loadExampleOverrides(path string) (map[string][]examplePairing, error) {
-	path = strings.TrimSpace(path)
-	if path == "" {
-		return map[string][]examplePairing{}, nil
-	}
-
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return map[string][]examplePairing{}, nil
-		}
-		return nil, err
-	}
-
-	var out map[string][]examplePairing
-	if err := json.Unmarshal(data, &out); err != nil {
-		return nil, err
-	}
-	if out == nil {
-		out = map[string][]examplePairing{}
-	}
-	return out, nil
-}
-
-func methodExamples(method string, params []contentDescriptor, result contentDescriptor) []examplePairing {
-	switch method {
-	case "eth_chainId":
-		return []examplePairing{{
-			Name:    "chain-id",
-			Summary: "Returns the configured EVM chain ID in hex.",
-			Result:  &exampleObject{Name: "result", Value: "0x494c1a9"},
-		}}
-	case "eth_blockNumber":
-		return []examplePairing{{
-			Name:    "latest-height",
-			Summary: "Returns latest block number in hex.",
-			Result:  &exampleObject{Name: "result", Value: "0x5"},
-		}}
-	case "net_version":
-		return []examplePairing{{
-			Name:    "network-id",
-			Summary: "Returns network ID as decimal string.",
-			Result:  &exampleObject{Name: "result", Value: "76874281"},
-		}}
-	case "net_listening":
-		return []examplePairing{{
-			Name:    "listening-status",
-			Summary: "Returns whether the node P2P layer is listening.",
-			Result:  &exampleObject{Name: "result", Value: true},
-		}}
-	case "eth_getBlockByNumber":
-		return []examplePairing{{
-			Name:    "latest-header-only",
-			Summary: "Returns latest block object without full transactions.",
-			Params: []exampleObject{
-				{Name: "arg1", Value: "latest"},
-				{Name: "arg2", Value: false},
-			},
-			Result: &exampleObject{
-				Name: "result",
-				Value: map[string]any{
-					"number":        "0x5",
-					"hash":          "0x4f1c8d5b8cf530f4c01f8ca07825f8f5084f57b9d7b5e0f8031f4bca8e1c83f4",
-					"baseFeePerGas": "0x9502f900",
-				},
-			},
-		}}
-	case "eth_getBalance":
-		return []examplePairing{{
-			Name:    "account-balance-latest",
-			Summary: "Returns 18-decimal EVM view balance in wei.",
-			Params: []exampleObject{
-				{Name: "arg1", Value: "0x1111111111111111111111111111111111111111"},
-				{Name: "arg2", Value: "latest"},
-			},
-			Result: &exampleObject{Name: "result", Value: "0xde0b6b3a7640000"},
-		}}
-	case "eth_getTransactionCount":
-		return []examplePairing{{
-			Name:    "account-nonce",
-			Summary: "Returns account nonce at selected block tag.",
-			Params: []exampleObject{
-				{Name: "arg1", Value: "0x1111111111111111111111111111111111111111"},
-				{Name: "arg2", Value: "pending"},
-			},
-			Result: &exampleObject{Name: "result", Value: "0x3"},
-		}}
-	case "eth_feeHistory":
-		return []examplePairing{{
-			Name:    "single-block-fee-history",
-			Summary: "Returns base fee history and optional reward percentiles.",
-			Params: []exampleObject{
-				{Name: "arg1", Value: "0x1"},
-				{Name: "arg2", Value: "latest"},
-				{Name: "arg3", Value: []any{50}},
-			},
-			Result: &exampleObject{
-				Name: "result",
-				Value: map[string]any{
-					"oldestBlock":   "0x4",
-					"baseFeePerGas": []any{"0x9502f900", "0x8f0d1800"},
-					"gasUsedRatio":  []any{0.21},
-					"reward":        []any{[]any{"0x3b9aca00"}},
-				},
-			},
-		}}
-	case "eth_getLogs":
-		return []examplePairing{{
-			Name:    "range-query",
-			Summary: "Returns logs in a bounded block range (can be empty).",
-			Params: []exampleObject{
-				{Name: "arg1", Value: map[string]any{
-					"fromBlock": "0x1",
-					"toBlock":   "latest",
-					"topics":    []any{},
-				}},
-			},
-			Result: &exampleObject{Name: "result", Value: []any{}},
-		}}
-	case "eth_newBlockFilter":
-		return []examplePairing{{
-			Name:    "create-block-filter",
-			Summary: "Creates a block filter and returns filter id.",
-			Result:  &exampleObject{Name: "result", Value: "0x1"},
-		}}
-	case "eth_getFilterChanges":
-		return []examplePairing{{
-			Name:    "poll-filter",
-			Summary: "Returns new entries since last poll for a filter id.",
-			Params:  []exampleObject{{Name: "arg1", Value: "0x1"}},
-			Result:  &exampleObject{Name: "result", Value: []any{}},
-		}}
-	case "eth_uninstallFilter":
-		return []examplePairing{{
-			Name:    "remove-filter",
-			Summary: "Uninstalls an existing filter.",
-			Params:  []exampleObject{{Name: "arg1", Value: "0x1"}},
-			Result:  &exampleObject{Name: "result", Value: true},
-		}}
-	case "eth_getTransactionByHash":
-		return []examplePairing{{
-			Name:    "lookup-tx",
-			Summary: "Returns tx object when indexed/persisted.",
-			Params: []exampleObject{
-				{Name: "arg1", Value: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
-			},
-			Result: &exampleObject{
-				Name: "result",
-				Value: map[string]any{
-					"hash":             "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-					"transactionIndex": "0x0",
-					"blockNumber":      "0x5",
-				},
-			},
-		}}
-	case "eth_getTransactionReceipt":
-		return []examplePairing{{
-			Name:    "lookup-receipt",
-			Summary: "Returns receipt for a mined transaction hash.",
-			Params: []exampleObject{
-				{Name: "arg1", Value: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
-			},
-			Result: &exampleObject{
-				Name: "result",
-				Value: map[string]any{
-					"transactionHash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-					"status":          "0x1",
-					"gasUsed":         "0x5208",
-				},
-			},
-		}}
-	case "eth_sendRawTransaction":
-		return []examplePairing{{
-			Name:    "broadcast-signed-tx",
-			Summary: "Broadcasts a signed raw Ethereum tx; returns tx hash.",
-			Params: []exampleObject{
-				{
-					Name:  "arg1",
-					Value: "0x02f86a82053901843b9aca00849502f9008252089411111111111111111111111111111111111111110180c001a0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-				},
-			},
-			Result: &exampleObject{Name: "result", Value: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
-		}}
-	case "txpool_status":
-		return []examplePairing{{
-			Name:    "txpool-counters",
-			Summary: "Returns pending and queued tx counters from mempool.",
-			Result: &exampleObject{Name: "result", Value: map[string]any{
-				"pending": "0x1",
-				"queued":  "0x0",
-			}},
-		}}
-	case "web3_clientVersion":
-		return []examplePairing{{
-			Name:    "client-version",
-			Summary: "Returns Cosmos EVM client version string.",
-			Result:  &exampleObject{Name: "result", Value: "lumera/v1.12.0"},
-		}}
-	default:
-		return []examplePairing{autoGeneratedExample(method, params, result)}
-	}
-}
-
-func autoGeneratedExample(method string, params []contentDescriptor, result contentDescriptor) examplePairing {
-	ex := examplePairing{
-		Name:    "auto-generated",
-		Summary: "Type-aware example generated from Go method signature.",
-	}
-
-	for _, p := range params {
-		ex.Params = append(ex.Params, exampleObject{
-			Name:  p.Name,
-			Value: exampleValueForDescriptor(method, p, false),
-		})
-	}
-
-	if resultType, _ := result.Schema["type"].(string); resultType == "null" {
-		ex.Result = &exampleObject{Name: "result", Value: nil}
-	} else {
-		ex.Result = &exampleObject{
-			Name:  "result",
-			Value: exampleValueForDescriptor(method, result, true),
-		}
-	}
-
-	return ex
-}
-
-func exampleValueForDescriptor(method string, d contentDescriptor, isResult bool) any {
-	goType, _ := d.Schema["x-go-type"].(string)
-	schemaType, _ := d.Schema["type"].(string)
-	m := strings.ToLower(method)
-
-	switch {
-	case strings.Contains(goType, "common.Address"):
-		return "0x1111111111111111111111111111111111111111"
-	case strings.Contains(goType, "common.Hash"):
-		return "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-	case strings.Contains(goType, "rpc.ID"):
-		return "0x1"
-	case strings.Contains(goType, "types.BlockNumberOrHash"):
-		return "latest"
-	case strings.Contains(goType, "types.BlockNumber"):
-		if isResult {
-			return "0x5"
-		}
-		return "latest"
-	case strings.Contains(goType, "types.FilterCriteria"):
-		return map[string]any{
-			"fromBlock": "0x1",
-			"toBlock":   "latest",
-			"topics":    []any{},
-		}
-	case strings.Contains(goType, "types.TransactionArgs"):
-		return map[string]any{
-			"from":  "0x1111111111111111111111111111111111111111",
-			"to":    "0x2222222222222222222222222222222222222222",
-			"gas":   "0x5208",
-			"value": "0x1",
-			"data":  "0x",
-		}
-	case strings.Contains(goType, "apitypes.TypedData"):
-		return map[string]any{
-			"types": map[string]any{
-				"EIP712Domain": []any{
-					map[string]any{"name": "name", "type": "string"},
-				},
-			},
-			"domain":      map[string]any{"name": "Lumera"},
-			"primaryType": "EIP712Domain",
-			"message":     map[string]any{"name": "Lumera"},
-		}
-	case strings.Contains(goType, "json.RawMessage"):
-		return map[string]any{}
-	case strings.Contains(goType, "hexutil.Bytes"):
-		return "0x"
-	case strings.Contains(goType, "hexutil.Big"):
-		return "0x1"
-	case strings.Contains(goType, "hexutil.Uint"):
-		return "0x1"
-	case strings.Contains(goType, "[]float64"):
-		return []any{50}
-	}
-
-	// Method-specific defaults for common JSON-RPC response patterns.
-	switch {
-	case strings.HasPrefix(m, "eth_getblock"):
-		if isResult {
-			return map[string]any{
-				"number": "0x5",
-				"hash":   "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-			}
-		}
-	case strings.Contains(m, "receipt"):
-		if isResult {
-			return map[string]any{
-				"status": "0x1",
-			}
-		}
-	case strings.Contains(m, "transaction"):
-		if isResult {
-			return map[string]any{
-				"hash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+// cosmosEVMVersion reads the cosmos/evm module version from the binary's
+// embedded build info (populated by the Go toolchain from go.mod). This
+// avoids hardcoding a version string that drifts on dependency upgrades.
+func cosmosEVMVersion() string {
+	bi, ok := debug.ReadBuildInfo()
+	if ok {
+		for _, dep := range bi.Deps {
+			if dep.Path == evmModulePath {
+				return "cosmos/evm " + dep.Version
 			}
 		}
 	}
-
-	switch schemaType {
-	case "boolean":
-		return true
-	case "array":
-		return []any{}
-	case "object":
-		return map[string]any{}
-	case "null":
-		return nil
-	default:
-		// Most Ethereum JSON-RPC scalar values are hex or decimal strings.
-		return "0x1"
-	}
+	return "cosmos/evm (unknown)"
 }

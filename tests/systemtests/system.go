@@ -47,12 +47,12 @@ var (
 
 // SystemUnderTest blockchain provisioning
 type SystemUnderTest struct {
-	ExecBinary      string
-	blockListener   *EventListener
-	currentHeight   int64
-	chainID         string
-	outputDir       string
-	claimsPath string
+	ExecBinary    string
+	blockListener *EventListener
+	currentHeight int64
+	chainID       string
+	outputDir     string
+	claimsPath    string
 	// blockTime is the expected/desired block time. This is not going to be very precise
 	// since Tendermint consensus does not allow specifying it directly.
 	blockTime         time.Duration
@@ -193,7 +193,6 @@ func (s *SystemUnderTest) StartChain(t *testing.T, xargs ...string) {
 func (s *SystemUnderTest) SetClaimsPath(path string) {
 	s.claimsPath = path
 }
-
 
 // MarkDirty whole chain will be reset when marked dirty
 func (s *SystemUnderTest) MarkDirty() {

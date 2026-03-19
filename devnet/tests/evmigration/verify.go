@@ -1,9 +1,16 @@
+// verify.go implements the "verify" mode, which scans all migrated legacy
+// addresses and checks that no leftover state references remain across bank,
+// staking, distribution, authz, feegrant, action, claim, and supernode modules.
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -135,6 +142,10 @@ func runVerify() {
 	log.Println("  scanning supernode records for legacy address references...")
 	verifySupernodeRecords(targets, &issues)
 
+	// ── JSON-RPC: verify EVM chain ID is correctly configured ──────────
+	log.Println("  verifying JSON-RPC chain ID configuration...")
+	verifyJSONRPCChainID(&issues)
+
 	// Report results.
 	log.Println("--- Verify Results ---")
 
@@ -181,6 +192,7 @@ func verifyRedelegationCount(addr string) (int, error) {
 	return queryAnyRedelegationCount(addr, validators)
 }
 
+// verifyDistributionRewards returns true if the address has pending distribution rewards.
 func verifyDistributionRewards(addr string) (bool, error) {
 	out, err := run("query", "distribution", "rewards", addr)
 	if err != nil {
@@ -200,6 +212,7 @@ func verifyDistributionRewards(addr string) (bool, error) {
 	return len(resp.Rewards) > 0, nil
 }
 
+// verifyAuthzGrantsByGranter returns the number of authz grants where addr is the granter.
 func verifyAuthzGrantsByGranter(addr string) (int, error) {
 	out, err := run("query", "authz", "grants-by-granter", addr)
 	if err != nil {
@@ -218,6 +231,7 @@ func verifyAuthzGrantsByGranter(addr string) (int, error) {
 	return len(resp.Grants), nil
 }
 
+// verifyAuthzGrantsByGrantee returns the number of authz grants where addr is the grantee.
 func verifyAuthzGrantsByGrantee(addr string) (int, error) {
 	out, err := run("query", "authz", "grants-by-grantee", addr)
 	if err != nil {
@@ -236,6 +250,7 @@ func verifyAuthzGrantsByGrantee(addr string) (int, error) {
 	return len(resp.Grants), nil
 }
 
+// verifyFeegrantsByGranter returns the number of fee grants where addr is the granter.
 func verifyFeegrantsByGranter(addr string) (int, error) {
 	out, err := run("query", "feegrant", "grants-by-granter", addr)
 	if err != nil {
@@ -254,6 +269,7 @@ func verifyFeegrantsByGranter(addr string) (int, error) {
 	return len(resp.Allowances), nil
 }
 
+// verifyFeegrantsByGrantee returns the number of fee grants where addr is the grantee.
 func verifyFeegrantsByGrantee(addr string) (int, error) {
 	out, err := run("query", "feegrant", "grants-by-grantee", addr)
 	if err != nil {
@@ -272,6 +288,7 @@ func verifyFeegrantsByGrantee(addr string) (int, error) {
 	return len(resp.Allowances), nil
 }
 
+// issue records a single verification failure for a migrated address.
 type issue struct {
 	name   string
 	addr   string
@@ -340,4 +357,99 @@ type verifyTarget = struct {
 	name       string
 	legacyAddr string
 	newAddr    string
+}
+
+// expectedEVMChainID is the Lumera EVM chain ID (config/evm.go).
+const expectedEVMChainID uint64 = 76857769
+
+// verifyJSONRPCChainID calls eth_chainId and net_version on the local
+// JSON-RPC endpoint and verifies both return the expected Lumera EVM chain ID.
+// A mismatch here means the app.toml config migration did not run or the
+// [evm] section has the wrong evm-chain-id value (bug #19).
+func verifyJSONRPCChainID(issues *[]issue) {
+	const jsonRPCAddr = "http://localhost:8545"
+
+	// eth_chainId — returns hex-encoded EIP-155 chain ID.
+	ethChainID, err := jsonRPCCall(jsonRPCAddr, "eth_chainId")
+	if err != nil {
+		log.Printf("  WARN: eth_chainId query failed: %v", err)
+		*issues = append(*issues, issue{
+			name: "json-rpc", addr: "n/a", module: "evm",
+			detail: fmt.Sprintf("eth_chainId query failed: %v", err),
+		})
+	} else {
+		parsed, parseErr := strconv.ParseUint(strings.TrimPrefix(ethChainID, "0x"), 16, 64)
+		if parseErr != nil {
+			*issues = append(*issues, issue{
+				name: "json-rpc", addr: "n/a", module: "evm",
+				detail: fmt.Sprintf("eth_chainId returned unparseable value: %s", ethChainID),
+			})
+		} else if parsed != expectedEVMChainID {
+			*issues = append(*issues, issue{
+				name: "json-rpc", addr: "n/a", module: "evm",
+				detail: fmt.Sprintf("eth_chainId mismatch: expected %d, got %d (0x%s)", expectedEVMChainID, parsed, ethChainID),
+			})
+		} else {
+			log.Printf("  eth_chainId: %d (0x%x) ✓", parsed, parsed)
+		}
+	}
+
+	// net_version — returns decimal string network ID (should match chain ID).
+	netVersion, err := jsonRPCCall(jsonRPCAddr, "net_version")
+	if err != nil {
+		log.Printf("  WARN: net_version query failed: %v", err)
+		*issues = append(*issues, issue{
+			name: "json-rpc", addr: "n/a", module: "evm",
+			detail: fmt.Sprintf("net_version query failed: %v", err),
+		})
+	} else {
+		parsed, parseErr := strconv.ParseUint(netVersion, 10, 64)
+		if parseErr != nil {
+			*issues = append(*issues, issue{
+				name: "json-rpc", addr: "n/a", module: "evm",
+				detail: fmt.Sprintf("net_version returned unparseable value: %s", netVersion),
+			})
+		} else if parsed != expectedEVMChainID {
+			*issues = append(*issues, issue{
+				name: "json-rpc", addr: "n/a", module: "evm",
+				detail: fmt.Sprintf("net_version mismatch: expected %d, got %d", expectedEVMChainID, parsed),
+			})
+		} else {
+			log.Printf("  net_version: %d ✓", parsed)
+		}
+	}
+}
+
+// jsonRPCCall performs a single JSON-RPC 2.0 call with no params and returns
+// the result as a raw string (stripped of surrounding quotes).
+func jsonRPCCall(addr, method string) (string, error) {
+	payload := fmt.Sprintf(`{"jsonrpc":"2.0","method":"%s","params":[],"id":1}`, method)
+	resp, err := http.Post(addr, "application/json", bytes.NewBufferString(payload)) //nolint:gosec // local devnet only
+	if err != nil {
+		return "", fmt.Errorf("HTTP POST: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("read body: %w", err)
+	}
+
+	var rpcResp struct {
+		Result json.RawMessage `json:"result"`
+		Error  *struct {
+			Code    int    `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(body, &rpcResp); err != nil {
+		return "", fmt.Errorf("unmarshal response: %w (body: %s)", err, truncate(string(body), 200))
+	}
+	if rpcResp.Error != nil {
+		return "", fmt.Errorf("RPC error %d: %s", rpcResp.Error.Code, rpcResp.Error.Message)
+	}
+
+	// Strip surrounding quotes from string results.
+	result := strings.Trim(string(rpcResp.Result), `"`)
+	return result, nil
 }

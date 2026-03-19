@@ -70,7 +70,7 @@ func currentChainID(serverCtx *server.Context) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("open genesis file %q: %w", genesisFile, err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	chainID, err := types.ParseChainIDFromGenesis(reader)
 	if err != nil {

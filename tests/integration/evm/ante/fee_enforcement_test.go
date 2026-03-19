@@ -9,8 +9,8 @@ import (
 	"time"
 
 	lcfg "github.com/LumeraProtocol/lumera/config"
-	evmtest "github.com/LumeraProtocol/lumera/tests/integration/evmtest"
 	testtext "github.com/LumeraProtocol/lumera/pkg/text"
+	evmtest "github.com/LumeraProtocol/lumera/tests/integration/evmtest"
 )
 
 // TestCosmosTxFeeEnforcement validates Cosmos-path fee checks with EVM ante enabled.

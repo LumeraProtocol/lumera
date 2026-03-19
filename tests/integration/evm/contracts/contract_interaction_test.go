@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	testaccounts "github.com/LumeraProtocol/lumera/testutil/accounts"
 	evmtest "github.com/LumeraProtocol/lumera/tests/integration/evmtest"
+	testaccounts "github.com/LumeraProtocol/lumera/testutil/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/vm"
 	evmprogram "github.com/ethereum/go-ethereum/core/vm/program"
@@ -214,7 +214,7 @@ func callerViaCALLCreationCode() []byte {
 		Op(vm.GAS).                  // gas = all remaining
 		Op(vm.CALL).                 // CALL → success flag on stack
 		Op(vm.POP).                  // discard success flag
-		Return(0, 32).              // return memory[0:32] (callee's output)
+		Return(0, 32).               // return memory[0:32] (callee's output)
 		Bytes()
 
 	return evmprogram.New().
@@ -226,9 +226,9 @@ func callerViaCALLCreationCode() []byte {
 // CALLER (msg.sender) into storage slot 0 on any call.
 func callerStorageWriterCreationCode() []byte {
 	runtime := evmprogram.New().
-		Op(vm.CALLER).  // push msg.sender
-		Push(0).        // slot 0
-		Op(vm.SSTORE).  // SSTORE(0, caller)
+		Op(vm.CALLER). // push msg.sender
+		Push(0).       // slot 0
+		Op(vm.SSTORE). // SSTORE(0, caller)
 		Op(vm.STOP).
 		Bytes()
 
@@ -277,7 +277,7 @@ func childReturns42CreationCode() []byte {
 // contract address.
 func create2FactoryCreationCode(childInit []byte) []byte {
 	runtime := evmprogram.New().
-		Create2(childInit, 1).  // CREATE2 → child address on stack
+		Create2(childInit, 1). // CREATE2 → child address on stack
 		Push(0).Op(vm.MSTORE). // store address at memory[0]
 		Return(0, 32).         // return memory[0:32]
 		Bytes()
@@ -314,8 +314,8 @@ func staticCallWrapperCreationCode() []byte {
 		Push(0).Op(vm.CALLDATALOAD). // addr from calldata[0]
 		Op(vm.GAS).                  // gas = all remaining
 		Op(vm.STATICCALL).           // STATICCALL → 0 (fail) or 1 (success)
-		Push(0).Op(vm.MSTORE).      // store result at memory[0]
-		Return(0, 32).              // return memory[0:32]
+		Push(0).Op(vm.MSTORE).       // store result at memory[0]
+		Return(0, 32).               // return memory[0:32]
 		Bytes()
 
 	return evmprogram.New().

@@ -230,3 +230,65 @@ Confirmed via on-chain events: at height 208, `MsgClaimLegacyAccount` for a diff
 **Fix** (`precompiles/action/abi.json`, `tx_cascade.go`, `IAction.sol`): Changed the signature parameter from `bytes` to `string` across ABI, precompile, and Solidity interface. Callers now pass the dot-delimited format directly as a string.
 
 **Tests added**: `ActionRequestCascadeTxPathFailsWithBadSignature` (verifies invalid signature format is rejected via tx path).
+
+---
+
+### 16) Withdraw address lost when third-party target was already migrated
+
+**Symptom**: `tests_evmigration -mode=migrate` reports `withdraw-addr mismatch: expected <B_new> got <A_new>` for accounts whose withdraw address pointed to a previously-migrated legacy address.
+
+**Root cause**: A temporal coupling between `MigrateDistribution` (Step 1) and `MigrateStaking` (Step 2) inside `migrateAccount`. When Account A has a third-party withdraw address pointing to already-migrated Account B:
+
+1. `MigrateDistribution` calls `redirectWithdrawAddrIfMigrated()`, which correctly resets A's withdraw address to **self** (A's legacy address) so that `WithdrawDelegationRewards` deposits into A's legacy balance instead of B's dead address.
+2. `MigrateStaking` then calls `migrateWithdrawAddress()`, which re-reads the withdraw address from state and now sees **self** (due to step 1's temporary redirect). The `withdrawAddr.Equals(legacyAddr)` check returns true, so the function sets the withdraw address to A's new address — the third-party resolution code is never reached.
+
+Net effect: A's post-migration withdraw address becomes A_new (self) instead of B_new (the resolved third-party destination).
+
+**Fix** (`x/evmigration/keeper/msg_server_claim_legacy.go`, `x/evmigration/keeper/migrate_staking.go`): Snapshot the original withdraw address in `migrateAccount` **before** `MigrateDistribution` runs, then pass it to `MigrateStaking` → `migrateWithdrawAddress`. This decouples the permanent withdraw-address migration from the temporary redirect, so the third-party resolution path is reached correctly.
+
+**Tests**: Added `TestClaimLegacyAccount_MigratedThirdPartyWithdrawAddress` — end-to-end message-server test that seeds a migration record for the third-party withdraw address, runs the full `ClaimLegacyAccount` flow, and asserts `SetDelegatorWithdrawAddr` resolves to the migrated destination (pins the cross-step snapshot→redirect→resolve interaction). Added `TestMigrateStaking_MigratedThirdPartyWithdrawAddress` — unit test for the helper in isolation. Updated `TestMigrateStaking_*` and `TestClaimLegacyAccount_FailAtStaking`/`FailAtDistribution` mock expectations to match the new `origWithdrawAddr` parameter. Tightened integration test `TestClaimLegacyAccount_ValidatorMustUseMigrateValidator` to assert `ErrUseValidatorMigration` specifically.
+
+---
+
+### 17) Devnet migrate post-check: stale redelegation pair from prepare rerun-conflict
+
+**Symptom**: `tests_evmigration -mode=migrate` reports `expected redelegation on new address for <src-valoper>-><dst-valoper>, got 0` even though the migration tx succeeded and `redelegations_to_migrate: 1` was confirmed by the estimate query.
+
+**Root cause**: Devnet verifier/data-tracking mismatch, not a keeper bug. When the prepare phase is rerun and encounters a `isPrepareRerunConflict` error for a redelegation attempt, the conflict handler in the extra-activity path (`prepare.go` line 496) called `queryAnyRedelegationCount` to confirm *some* redelegation exists, then recorded the **randomly-chosen** `srcVal`/`dstVal` pair — not the pair that actually exists on-chain.
+
+The migration estimate (which counts all redelegations regardless of pair via `GetRedelegations(ctx, addr, ...)`) correctly reported 1. The keeper-side migration faithfully re-keyed whatever on-chain redelegation existed. But the post-migration validator queried the **recorded** exact pair (`migrate.go` line 499: `queryRedelegationCount(rec.NewAddress, currentSrc, currentDst)`), which didn't match the actual on-chain pair, and returned 0.
+
+**Fix** (`devnet/tests/evmigration/prepare.go`, `devnet/tests/evmigration/migrate.go`, `devnet/tests/evmigration/query_state.go`):
+
+1. **Prepare rerun-conflict handler** (extra-activity path): Added an exact-pair check before recording the marker — only calls `addRedelegation(srcVal, dstVal, "")` if `queryRedelegationCount(rec.Address, srcVal, dstVal) > 0`, matching the pattern already used in the primary prepare path. With this fix, all recorded redelegation entries are exact-pair verified at recording time, so no post-migration fallback is needed.
+2. **Post-migration validator**: No weakening — the exact-pair check remains strict. Every recorded pair must be found on the new address after migration; misses always fail.
+
+Also applied `resolvePostMigrationAddress(expected)` to the withdraw-address post-check to handle the same class of already-migrated third-party issue (bug #16 fix interplay).
+
+---
+
+### 18) Validator migration Step V1 sends reward dust to already-migrated withdraw addresses
+
+**Symptom**: `tests_evmigration -mode=verify` reports `[bank] still has balance: 13 ulume` and `[bank] still has balance: 5 ulume` on legacy addresses that were fully migrated. Traced via `lumerad query txs` to a `MsgMigrateValidator` at height 252 — the dust was deposited *after* the affected accounts had already migrated (at heights 242 and 246).
+
+**Root cause**: Variant of bug #11 specific to `MsgMigrateValidator` Step V1. When a validator migrates, it calls `WithdrawDelegationRewards` for **every delegator** of that validator (line 91 of `msg_server_migrate_validator.go`). If a delegator's withdraw address points to an already-migrated legacy address, the rewards are deposited into the dead address — because `redirectWithdrawAddrIfMigrated` only runs inside `MigrateDistribution` (the regular account migration path), not during the validator migration's bulk reward withdrawal.
+
+The `migrate-all` mode's random interleaving made this bug observable: some delegators migrated before their validator, then the validator migration withdrew rewards to the delegators' third-party withdraw addresses (which were already dead).
+
+**Fix** (`x/evmigration/keeper/msg_server_migrate_validator.go`, `x/evmigration/keeper/migrate_distribution.go`): Added `temporaryRedirectWithdrawAddr(ctx, delAddr)` — a new helper that redirects to self **temporarily** for the withdrawal, then **restores** the original third-party address afterward. This prevents dust on dead addresses while preserving the delegator's intended withdraw target for their own later migration (where `migrateAccount` snapshots it via `origWithdrawAddr` before `MigrateDistribution` runs). Using the permanent `redirectWithdrawAddrIfMigrated` here would have caused the same clobbering bug that #16 fixed for regular account migration.
+
+**Tests**: `TestMigrateValidator_ThirdPartyWithdrawAddrPreserved` — sets up a third-party delegator whose withdraw address points to an already-migrated account, verifies the redirect→withdraw→restore sequence via ordered mock expectations (redirect to self, withdraw rewards, restore original address).
+
+---
+
+### 19) MetaMask/EVM clients see wrong chain ID after upgrade (app.toml missing `[evm]` section)
+
+**Symptom**: After upgrading from a pre-EVM binary (< v1.12.0), MetaMask transactions fail. `eth_chainId` returns `0x494c1a9` (76857769, correct), but the JSON-RPC backend internally uses chain ID `262144` (the cosmos/evm upstream default) for transaction validation. MetaMask sends transactions signed with chain ID `76857769`; the backend's `SendRawTransaction` rejects them with `incorrect chain-id; expected 262144, got 76857769`. `net_version` also returns `262144` instead of `76857769`.
+
+**Root cause**: The JSON-RPC backend reads `evm-chain-id` from `app.toml` (`rpc/backend/backend.go:207`). Nodes that existed before the EVM upgrade keep their old `app.toml`, which has no `[evm]` section. The Cosmos SDK only generates `app.toml` when the file does not exist (`server/util.go:284`), so the new EVM sections are never added. The backend falls back to `cosmosevmserverconfig.DefaultEVMChainID = 262144`.
+
+Meanwhile, the EVM keeper (initialized in `x/vm/keeper/keeper.go:119`) correctly calls `SetChainConfig(DefaultChainConfig(76857769))` using the Lumera constant. This creates a split: on-chain state uses `76857769`, but the JSON-RPC transport layer uses `262144`.
+
+**Fix** (`cmd/lumera/cmd/config_migrate.go`): Added `migrateAppConfigIfNeeded()`, called from the root command's `PersistentPreRunE` after `InterceptConfigsPreRunHandler`. On every startup it checks whether `evm.evm-chain-id` in Viper matches `config.EVMChainID` (76857769). If not, it reads all existing settings from `app.toml` via Viper unmarshal, overwrites `EVM.EVMChainID` with the Lumera constant, ensures `JSONRPC.Enable`/`JSONRPC.EnableIndexer`/`rpc` API namespace are set, and regenerates `app.toml` with the full template (SDK + EVM + Lumera sections), preserving all operator customizations.
+
+**Tests**: `testBasicRPCMethods` (integration, `tests/integration/evm/jsonrpc/basic_methods_test.go`) — validates `eth_chainId` and `net_version` both return `76857769`. `verifyJSONRPCChainID` (devnet, `devnet/tests/evmigration/verify.go`) — runtime check after upgrade that both JSON-RPC methods return the correct chain ID.

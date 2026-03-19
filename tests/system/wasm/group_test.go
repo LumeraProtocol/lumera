@@ -16,9 +16,9 @@ import (
 
 	"github.com/CosmWasm/wasmd/x/wasm/types"
 
-	wasmtest "github.com/LumeraProtocol/lumera/tests/system/wasm"
-	"github.com/LumeraProtocol/lumera/tests/ibctesting"
 	lcfg "github.com/LumeraProtocol/lumera/config"
+	"github.com/LumeraProtocol/lumera/tests/ibctesting"
+	wasmtest "github.com/LumeraProtocol/lumera/tests/system/wasm"
 )
 
 func TestGroupWithContract(t *testing.T) {

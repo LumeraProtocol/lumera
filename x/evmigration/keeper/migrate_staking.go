@@ -6,8 +6,9 @@ import (
 )
 
 // MigrateStaking re-keys all delegations, unbonding delegations, and redelegations
-// from legacyAddr to newAddr. Distribution starting info is also re-keyed.
-func (k Keeper) MigrateStaking(ctx sdk.Context, legacyAddr, newAddr sdk.AccAddress) error {
+// from legacyAddr to newAddr. origWithdrawAddr is the withdraw address that was
+// set *before* MigrateDistribution may have temporarily redirected it to self.
+func (k Keeper) MigrateStaking(ctx sdk.Context, legacyAddr, newAddr, origWithdrawAddr sdk.AccAddress) error {
 	// Active delegations.
 	if err := k.migrateActiveDelegations(ctx, legacyAddr, newAddr); err != nil {
 		return err
@@ -24,8 +25,8 @@ func (k Keeper) MigrateStaking(ctx sdk.Context, legacyAddr, newAddr sdk.AccAddre
 		return err
 	}
 
-	// Migrate withdraw address if set to self (default behavior).
-	return k.migrateWithdrawAddress(ctx, legacyAddr, newAddr)
+	// Migrate withdraw address using the original (pre-redirect) value.
+	return k.migrateWithdrawAddress(ctx, legacyAddr, newAddr, origWithdrawAddr)
 }
 
 // migrateActiveDelegations re-keys all active delegations and their distribution
@@ -171,24 +172,19 @@ func (k Keeper) migrateRedelegations(ctx sdk.Context, legacyAddr, newAddr sdk.Ac
 
 // migrateWithdrawAddress updates the delegator withdraw address. If it was set
 // to the legacy address (the default), it is updated to newAddr. If set to a
-// third party, the same third-party address is preserved for the new delegator
-// — unless the third party is a previously-migrated legacy address, in which
-// case we follow the migration record to the corresponding new address.
-func (k Keeper) migrateWithdrawAddress(ctx sdk.Context, legacyAddr, newAddr sdk.AccAddress) error {
-	withdrawAddr, err := k.distributionKeeper.GetDelegatorWithdrawAddr(ctx, legacyAddr)
-	if err != nil {
-		return nil // No custom withdraw address set.
-	}
-
-	// If withdraw address was set to self (legacy), update to new address.
-	if withdrawAddr.Equals(legacyAddr) {
+// migrateWithdrawAddress updates the delegator withdraw address. origWithdrawAddr
+// is the withdraw address that was set before MigrateDistribution may have
+// temporarily redirected it to self for safe reward withdrawal.
+func (k Keeper) migrateWithdrawAddress(ctx sdk.Context, legacyAddr, newAddr, origWithdrawAddr sdk.AccAddress) error {
+	// If the original withdraw address was self (legacy) or nil, update to new address.
+	if origWithdrawAddr == nil || origWithdrawAddr.Equals(legacyAddr) {
 		return k.distributionKeeper.SetDelegatorWithdrawAddr(ctx, newAddr, newAddr)
 	}
 
-	// If the third-party withdraw address was migrated, follow the record
+	// Third-party withdraw address: if it was migrated, follow the record
 	// to the new address so future rewards reach the right account.
-	resolvedAddr := withdrawAddr
-	record, err := k.MigrationRecords.Get(ctx, withdrawAddr.String())
+	resolvedAddr := origWithdrawAddr
+	record, err := k.MigrationRecords.Get(ctx, origWithdrawAddr.String())
 	if err == nil && record.NewAddress != "" {
 		resolved, err := sdk.AccAddressFromBech32(record.NewAddress)
 		if err == nil {

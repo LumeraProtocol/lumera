@@ -17,7 +17,7 @@ func TestGenesis(t *testing.T) {
 
 	genesisState := types.GenesisState{
 		Params: types.DefaultParams(),
-	
+
 		// this line is used by starport scaffolding # genesis/test/state
 	}
 

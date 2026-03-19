@@ -49,4 +49,3 @@ func (k Keeper) GetMetricsState(ctx sdk.Context, valAddr sdk.ValAddress) (types.
 
 	return state, true
 }
-

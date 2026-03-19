@@ -43,9 +43,9 @@ var (
 // entries at any time. Base denom matching is channel-independent: approving
 // "uatom" allows ATOM arriving via any IBC channel/path.
 var DefaultAllowedBaseDenoms = []string{
-	"uatom",  // Cosmos Hub ATOM
-	"uosmo",  // Osmosis OSMO
-	"uusdc",  // Noble USDC (Circle)
+	"uatom", // Cosmos Hub ATOM
+	"uosmo", // Osmosis OSMO
+	"uusdc", // Noble USDC (Circle)
 }
 
 // erc20KeeperWithDenomCheck extends the upstream Erc20Keeper interface with
@@ -201,7 +201,7 @@ func (w *erc20PolicyKeeperWrapper) removeIBCDenomAllowed(ctx sdk.Context, denom 
 func (w *erc20PolicyKeeperWrapper) getAllowedDenoms(ctx sdk.Context) []string {
 	store := prefix.NewStore(ctx.KVStore(w.storeKey), policyAllowPfx)
 	iter := store.Iterator(nil, nil)
-	defer iter.Close()
+	defer func() { _ = iter.Close() }()
 
 	var denoms []string
 	for ; iter.Valid(); iter.Next() {
@@ -236,7 +236,7 @@ func (w *erc20PolicyKeeperWrapper) removeBaseDenomAllowed(ctx sdk.Context, baseD
 func (w *erc20PolicyKeeperWrapper) getAllowedBaseDenoms(ctx sdk.Context) []string {
 	store := prefix.NewStore(ctx.KVStore(w.storeKey), policyAllowBasePfx)
 	iter := store.Iterator(nil, nil)
-	defer iter.Close()
+	defer func() { _ = iter.Close() }()
 
 	var denoms []string
 	for ; iter.Valid(); iter.Next() {

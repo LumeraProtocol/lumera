@@ -52,9 +52,9 @@ func (k Keeper) ExportGenesis(ctx context.Context) (*types.GenesisState, error) 
 	}
 
 	return &types.GenesisState{
-		Params:                   params,
-		MigrationRecords:         records,
-		TotalMigrated:            totalMigrated,
-		TotalValidatorsMigrated:  totalValMigrated,
+		Params:                  params,
+		MigrationRecords:        records,
+		TotalMigrated:           totalMigrated,
+		TotalValidatorsMigrated: totalValMigrated,
 	}, nil
 }

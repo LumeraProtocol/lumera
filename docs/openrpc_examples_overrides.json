@@ -330,6 +330,96 @@
       "result": { "name": "result", "value": null }
     }
   ],
+  "eth_call": [
+    {
+      "name": "erc20-balance-of",
+      "summary": "Calls `balanceOf(address)` against an ERC-20 contract at the latest block.",
+      "params": [
+        {
+          "name": "args",
+          "value": {
+            "from": "0x1111111111111111111111111111111111111111",
+            "to": "0x2222222222222222222222222222222222222222",
+            "input": "0x70a082310000000000000000000000001111111111111111111111111111111111111111"
+          }
+        },
+        { "name": "blockNrOrHash", "value": "latest" },
+        { "name": "overrides", "value": {} }
+      ],
+      "result": { "name": "result", "value": "0x00000000000000000000000000000000000000000000000000000000000003e8" }
+    }
+  ],
+  "eth_createAccessList": [
+    {
+      "name": "build-access-list",
+      "summary": "Builds an access list for a contract call without broadcasting a transaction.",
+      "params": [
+        {
+          "name": "args",
+          "value": {
+            "from": "0x1111111111111111111111111111111111111111",
+            "to": "0x2222222222222222222222222222222222222222",
+            "input": "0x095ea7b3000000000000000000000000333333333333333333333333333333333333333300000000000000000000000000000000000000000000000000000000000003e8"
+          }
+        },
+        { "name": "blockNrOrHash", "value": "latest" }
+      ],
+      "result": {
+        "name": "result",
+        "value": {
+          "accessList": [
+            {
+              "address": "0x2222222222222222222222222222222222222222",
+              "storageKeys": [
+                "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          ],
+          "gasUsed": "0x5208"
+        }
+      }
+    }
+  ],
+  "eth_estimateGas": [
+    {
+      "name": "estimate-contract-call",
+      "summary": "Estimates gas for a contract call using EIP-1559 fee fields.",
+      "params": [
+        {
+          "name": "args",
+          "value": {
+            "from": "0x1111111111111111111111111111111111111111",
+            "to": "0x2222222222222222222222222222222222222222",
+            "maxFeePerGas": "0x3b9aca00",
+            "maxPriorityFeePerGas": "0x59682f00",
+            "input": "0xa9059cbb00000000000000000000000033333333333333333333333333333333333333330000000000000000000000000000000000000000000000000000000000000001"
+          }
+        },
+        { "name": "blockNrOrHash", "value": "latest" }
+      ],
+      "result": { "name": "result", "value": "0x5208" }
+    }
+  ],
+  "eth_sendTransaction": [
+    {
+      "name": "send-native-transfer",
+      "summary": "Submits an unsigned transaction object for the node-managed account to sign and broadcast.",
+      "params": [
+        {
+          "name": "args",
+          "value": {
+            "from": "0x1111111111111111111111111111111111111111",
+            "to": "0x2222222222222222222222222222222222222222",
+            "gas": "0x5208",
+            "maxFeePerGas": "0x3b9aca00",
+            "maxPriorityFeePerGas": "0x59682f00",
+            "value": "0xde0b6b3a7640000"
+          }
+        }
+      ],
+      "result": { "name": "result", "value": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+    }
+  ],
   "personal_ecRecover": [
     {
       "name": "recover-address",
@@ -520,7 +610,7 @@
       "result": { "name": "result", "value": null }
     }
   ],
-  "rpc_discover": [
+  "rpc.discover": [
     {
       "name": "openrpc-discovery",
       "summary": "Returns the embedded OpenRPC document served by the running node.",
@@ -530,7 +620,7 @@
           "openrpc": "1.2.6",
           "info": {
             "title": "Lumera Cosmos EVM JSON-RPC API",
-            "version": "cosmos/evm v0.5.1"
+            "version": "cosmos/evm v0.6.0"
           },
           "methods": []
         }

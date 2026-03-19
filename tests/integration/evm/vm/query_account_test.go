@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
+	testtext "github.com/LumeraProtocol/lumera/pkg/text"
 	evmtest "github.com/LumeraProtocol/lumera/tests/integration/evmtest"
 	testaccounts "github.com/LumeraProtocol/lumera/testutil/accounts"
-	testtext "github.com/LumeraProtocol/lumera/pkg/text"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )

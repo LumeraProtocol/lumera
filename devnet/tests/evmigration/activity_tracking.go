@@ -1,9 +1,15 @@
+// activity_tracking.go provides methods on AccountRecord for recording and
+// normalizing on-chain activity (delegations, grants, claims, actions, etc.)
+// used during prepare mode and validated after migration.
 package main
 
 const (
+	// bankSendMsgType is the protobuf type URL for MsgSend, used for authz grants.
 	bankSendMsgType = "/cosmos.bank.v1beta1.MsgSend"
 )
 
+// normalizeActivityTracking backfills the detailed activity slices from legacy
+// scalar fields for backward compatibility with older accounts files.
 func (rec *AccountRecord) normalizeActivityTracking() {
 	if len(rec.Delegations) == 0 && rec.HasDelegation && rec.DelegatedTo != "" {
 		rec.addDelegation(rec.DelegatedTo, "")
@@ -32,6 +38,7 @@ func (rec *AccountRecord) normalizeActivityTracking() {
 	rec.refreshLegacyFields()
 }
 
+// addDelegation records a delegation to the given validator, deduplicating by validator address.
 func (rec *AccountRecord) addDelegation(validator, amount string) {
 	if validator == "" {
 		return
@@ -49,6 +56,7 @@ func (rec *AccountRecord) addDelegation(validator, amount string) {
 	rec.refreshLegacyFields()
 }
 
+// addUnbonding records an unbonding delegation, deduplicating by validator address.
 func (rec *AccountRecord) addUnbonding(validator, amount string) {
 	if validator == "" {
 		return
@@ -66,6 +74,7 @@ func (rec *AccountRecord) addUnbonding(validator, amount string) {
 	rec.refreshLegacyFields()
 }
 
+// addRedelegation records a redelegation, deduplicating by validator pair.
 func (rec *AccountRecord) addRedelegation(srcValidator, dstValidator, amount string) {
 	if srcValidator == "" || dstValidator == "" || srcValidator == dstValidator {
 		return
@@ -88,6 +97,7 @@ func (rec *AccountRecord) addRedelegation(srcValidator, dstValidator, amount str
 	rec.refreshLegacyFields()
 }
 
+// addWithdrawAddress appends a withdraw address change, skipping consecutive duplicates.
 func (rec *AccountRecord) addWithdrawAddress(addr string) {
 	if addr == "" {
 		return
@@ -100,6 +110,7 @@ func (rec *AccountRecord) addWithdrawAddress(addr string) {
 	rec.refreshLegacyFields()
 }
 
+// addAuthzGrant records an authz grant to the given grantee, deduplicating by grantee address.
 func (rec *AccountRecord) addAuthzGrant(grantee, msgType string) {
 	if grantee == "" {
 		return
@@ -117,6 +128,7 @@ func (rec *AccountRecord) addAuthzGrant(grantee, msgType string) {
 	rec.refreshLegacyFields()
 }
 
+// addAuthzAsGrantee records an authz grant received from the given granter.
 func (rec *AccountRecord) addAuthzAsGrantee(granter, msgType string) {
 	if granter == "" {
 		return
@@ -134,6 +146,7 @@ func (rec *AccountRecord) addAuthzAsGrantee(granter, msgType string) {
 	rec.refreshLegacyFields()
 }
 
+// addFeegrant records a fee grant issued to the given grantee, deduplicating by grantee address.
 func (rec *AccountRecord) addFeegrant(grantee, spendLimit string) {
 	if grantee == "" {
 		return
@@ -151,6 +164,7 @@ func (rec *AccountRecord) addFeegrant(grantee, spendLimit string) {
 	rec.refreshLegacyFields()
 }
 
+// addFeegrantAsGrantee records a fee grant received from the given granter.
 func (rec *AccountRecord) addFeegrantAsGrantee(granter, spendLimit string) {
 	if granter == "" {
 		return
@@ -168,6 +182,7 @@ func (rec *AccountRecord) addFeegrantAsGrantee(granter, spendLimit string) {
 	rec.refreshLegacyFields()
 }
 
+// addAction records an action with basic fields, deduplicating by action ID.
 func (rec *AccountRecord) addAction(actionID, actionType, price string) {
 	if actionID == "" {
 		return
@@ -186,6 +201,7 @@ func (rec *AccountRecord) addAction(actionID, actionType, price string) {
 	rec.refreshLegacyFields()
 }
 
+// addActionFull records an action with all fields populated, deduplicating by action ID.
 func (rec *AccountRecord) addActionFull(actionID, actionType, price, expiration, state, metadata string, superNodes []string, blockHeight int64, createdViaSDK bool) {
 	if actionID == "" {
 		return
@@ -210,6 +226,7 @@ func (rec *AccountRecord) addActionFull(actionID, actionType, price, expiration,
 	rec.refreshLegacyFields()
 }
 
+// updateActionState updates the state field of an existing action record.
 func (rec *AccountRecord) updateActionState(actionID, state string) {
 	for i := range rec.Actions {
 		if rec.Actions[i].ActionID == actionID {
@@ -219,6 +236,7 @@ func (rec *AccountRecord) updateActionState(actionID, state string) {
 	}
 }
 
+// addClaim records a claim or delayed-claim activity, deduplicating by old address.
 func (rec *AccountRecord) addClaim(oldAddr, amount string, tier uint32, delayed bool, keyID int) {
 	if oldAddr == "" {
 		return
@@ -239,6 +257,7 @@ func (rec *AccountRecord) addClaim(oldAddr, amount string, tier uint32, delayed 
 	rec.refreshLegacyFields()
 }
 
+// hasDelayedClaim returns true if any recorded claim has a non-zero vesting tier.
 func (rec *AccountRecord) hasDelayedClaim() bool {
 	for _, claim := range rec.Claims {
 		if claim.Delayed || claim.Tier > 0 {
@@ -248,10 +267,13 @@ func (rec *AccountRecord) hasDelayedClaim() bool {
 	return false
 }
 
+// hasRecordedAction returns true if the account has any recorded action activity.
 func (rec *AccountRecord) hasRecordedAction() bool {
 	return len(rec.Actions) > 0 || rec.HasAction
 }
 
+// refreshLegacyFields syncs the boolean flags and scalar shorthand fields
+// (DelegatedTo, AuthzGrantedTo, etc.) from the detailed activity slices.
 func (rec *AccountRecord) refreshLegacyFields() {
 	rec.HasDelegation = len(rec.Delegations) > 0 || rec.HasDelegation
 	rec.HasUnbonding = len(rec.Unbondings) > 0 || rec.HasUnbonding

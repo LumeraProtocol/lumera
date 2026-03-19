@@ -42,11 +42,11 @@ func TestParse(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name              string
-		input             string
-		wantMaj, wantMin  int
-		wantPatch         int
-		wantOk            bool
+		name             string
+		input            string
+		wantMaj, wantMin int
+		wantPatch        int
+		wantOk           bool
 	}{
 		{name: "full", input: "v1.12.3", wantMaj: 1, wantMin: 12, wantPatch: 3, wantOk: true},
 		{name: "no prefix", input: "1.2.3", wantMaj: 1, wantMin: 2, wantPatch: 3, wantOk: true},

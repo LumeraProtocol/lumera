@@ -58,7 +58,7 @@ func (k Keeper) PruneOldEpochs(ctx sdk.Context, currentEpochID uint64, params ty
 
 func prunePrefixByWindowIDLeadingU64(store storetypes.KVStore, prefix []byte, minKeepEpochID uint64) error {
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	var toDelete [][]byte
 
@@ -92,7 +92,7 @@ func prunePrefixByWindowIDLeadingU64(store storetypes.KVStore, prefix []byte, mi
 // by parsing the final 8 bytes as the epoch id.
 func pruneReporterTrailingWindowID(store storetypes.KVStore, prefix []byte, minKeepWindowID uint64) {
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	var toDelete [][]byte
 
@@ -120,7 +120,7 @@ func pruneReporterTrailingWindowID(store storetypes.KVStore, prefix []byte, minK
 //	sc/<supernode>"/"<u64be(epoch_id)>"/"<reporter>
 func pruneSupernodeWindowReporter(store storetypes.KVStore, prefix []byte, minKeepWindowID uint64) {
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	var toDelete [][]byte
 

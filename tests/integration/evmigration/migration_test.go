@@ -312,11 +312,12 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_ValidatorMustUseMigra
 	// The genesis validator from app.Setup is a validator. We need to find its address.
 	// Instead, we'll look up an existing validator from staking state.
 	var valOperAddr sdk.ValAddress
-	s.app.StakingKeeper.IterateValidators(s.ctx, func(_ int64, val stakingtypes.ValidatorI) bool {
+	err := s.app.StakingKeeper.IterateValidators(s.ctx, func(_ int64, val stakingtypes.ValidatorI) bool {
 		valAddr, _ := sdk.ValAddressFromBech32(val.GetOperator())
 		valOperAddr = valAddr
 		return true // stop after first
 	})
+	s.Require().NoError(err)
 	s.Require().NotNil(valOperAddr, "should find at least one genesis validator")
 
 	legacyAddr := sdk.AccAddress(valOperAddr)
@@ -332,11 +333,10 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_ValidatorMustUseMigra
 	newPrivKey, newAddr := createNewEVMAddress(s.T())
 	msg := newClaimMsg(s.T(), privKey, legacyAddr, newPrivKey, newAddr)
 
-	_, err := s.msgServer.ClaimLegacyAccount(s.ctx, msg)
-	// The pubkey won't match legacyAddr (since it's a random key), so we expect
-	// the pubkey mismatch error. But if validation passes pubkey check first, then
-	// UseValidatorMigration. Both are acceptable — the important thing is an error.
-	s.Require().Error(err)
+	_, err = s.msgServer.ClaimLegacyAccount(s.ctx, msg)
+	// The validator check (GetValidator) runs before signature verification,
+	// so this must fail with ErrUseValidatorMigration specifically.
+	s.Require().ErrorIs(err, types.ErrUseValidatorMigration)
 }
 
 // TestClaimLegacyAccount_MultiDenom verifies migration of accounts with multiple denominations.

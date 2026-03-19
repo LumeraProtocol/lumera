@@ -515,7 +515,7 @@ func createTestInput(
 		distribution.NewAppModule(appCodec, distKeeper, accountKeeper, bankKeeper, stakingKeeper, subspace(distributiontypes.ModuleName)),
 		gov.NewAppModule(appCodec, govKeeper, accountKeeper, bankKeeper, subspace(govtypes.ModuleName)),
 	)
-	am.RegisterServices(module.NewConfigurator(appCodec, msgRouter, querier)) //nolint:errcheck
+	am.RegisterServices(module.NewConfigurator(appCodec, msgRouter, querier))
 	wasmtypes.RegisterMsgServer(msgRouter, wasmKeeper.NewMsgServerImpl(&keeper))
 	wasmtypes.RegisterQueryServer(querier, wasmKeeper.NewGrpcQuerier(appCodec, runtime.NewKVStoreService(keys[wasmtypes.ModuleName]), keeper, keeper.QueryGasLimit()))
 

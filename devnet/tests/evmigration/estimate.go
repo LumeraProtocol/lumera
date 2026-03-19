@@ -1,7 +1,11 @@
+// estimate.go implements the "estimate" mode, which queries and reports
+// migration estimates for all legacy accounts without performing any migrations.
 package main
 
 import "log"
 
+// classifyEstimateStatus categorizes a migration estimate into one of
+// "already_migrated", "ready_to_migrate", or "blocked".
 func classifyEstimateStatus(estimate migrationEstimate) (status string, reason string) {
 	if estimate.RejectionReason == "already migrated" {
 		return "already_migrated", ""
@@ -12,6 +16,7 @@ func classifyEstimateStatus(estimate migrationEstimate) (status string, reason s
 	return "blocked", estimate.RejectionReason
 }
 
+// logEstimateReport prints a detailed migration estimate report for a single account.
 func logEstimateReport(rec *AccountRecord, estimate migrationEstimate) {
 	status, reason := classifyEstimateStatus(estimate)
 	totalLinkedRecords := estimate.DelegationCount +
@@ -55,6 +60,7 @@ func logEstimateReport(rec *AccountRecord, estimate migrationEstimate) {
 	)
 }
 
+// runEstimate queries migration estimates for all legacy accounts and prints a summary.
 func runEstimate() {
 	ensureEVMMigrationRuntime("estimate mode")
 

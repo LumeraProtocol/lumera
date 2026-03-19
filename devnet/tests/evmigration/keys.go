@@ -1,3 +1,6 @@
+// keys.go provides key derivation, generation, import/export, signing, and
+// lumerad version detection. It handles both legacy (coin-type 118 / secp256k1)
+// and EVM (coin-type 60 / eth_secp256k1) key algorithms.
 package main
 
 import (
@@ -104,6 +107,7 @@ func generateAccount(name string, isLegacy bool) (AccountRecord, error) {
 	}, nil
 }
 
+// keyRecord holds a key entry as returned by "lumerad keys list --output json".
 type keyRecord struct {
 	Name    string `json:"name"`
 	Type    string `json:"type"`
@@ -116,14 +120,18 @@ var (
 	nonLegacyCoinTypeStr string = "60"
 )
 
+// useEthAlgoForNonLegacy returns true if non-legacy accounts should use eth_secp256k1.
 func useEthAlgoForNonLegacy() bool {
 	return nonLegacyCoinType == 60
 }
 
+// prepareRuntimeAllowed returns true if the detected coin type is compatible with prepare mode.
 func prepareRuntimeAllowed(coinType uint32) bool {
 	return coinType == 118
 }
 
+// ensurePrepareRuntime verifies the lumerad binary is pre-EVM (coin-type 118)
+// and fatally exits if the runtime does not support prepare mode.
 func ensurePrepareRuntime() {
 	coinType, version, err := detectNonLegacyCoinType()
 	if err != nil {
@@ -137,6 +145,8 @@ func ensurePrepareRuntime() {
 	log.Printf("prepare mode runtime check passed: detected pre-EVM lumerad %s (legacy coin-type 118)", version)
 }
 
+// ensureEVMMigrationRuntime verifies the lumerad binary is EVM-enabled (coin-type 60)
+// and fatally exits if it is not.
 func ensureEVMMigrationRuntime(mode string) {
 	coinType, version, err := detectNonLegacyCoinType()
 	if err != nil {
@@ -150,6 +160,8 @@ func ensureEVMMigrationRuntime(mode string) {
 	log.Printf("%s runtime check passed: detected lumerad %s (evm coin-type 60)", mode, version)
 }
 
+// initNonLegacyCoinType detects the lumerad version and sets the global
+// nonLegacyCoinType variable (118 for pre-EVM, 60 for EVM-enabled).
 func initNonLegacyCoinType() {
 	coinType, ver, err := detectNonLegacyCoinType()
 	if err != nil {
@@ -167,6 +179,8 @@ func initNonLegacyCoinType() {
 	nonLegacyCoinTypeStr = strconv.FormatUint(uint64(coinType), 10)
 }
 
+// detectNonLegacyCoinType probes the lumerad binary version and returns the
+// appropriate coin type (60 if >= EVM cutover version, 118 otherwise).
 func detectNonLegacyCoinType() (uint32, string, error) {
 	version, err := detectLumeradVersion()
 	if err != nil {
@@ -182,6 +196,7 @@ func detectNonLegacyCoinType() (uint32, string, error) {
 	return 118, version, nil
 }
 
+// detectLumeradVersion runs "lumerad version" and extracts the semantic version string.
 func detectLumeradVersion() (string, error) {
 	tryCmds := [][]string{
 		{*flagBin, "version"},
@@ -208,6 +223,8 @@ func detectLumeradVersion() (string, error) {
 	return "", fmt.Errorf("could not parse semantic version from: %s", truncate(string(lastOut), 200))
 }
 
+// extractSemver parses a semantic version (vX.Y.Z) from a string, trying
+// exact match, labelled "version:" lines, and fallback line scanning.
 func extractSemver(s string) (string, bool) {
 	// Best case: plain `lumerad version` outputs just "1.11.0" (or with leading v).
 	trimmed := strings.TrimSpace(s)
@@ -239,6 +256,7 @@ func extractSemver(s string) (string, bool) {
 	return "", false
 }
 
+// compareSemver returns -1, 0, or 1 based on the ordering of two semver strings.
 func compareSemver(a, b string) (int, error) {
 	parse := func(v string) ([3]int, error) {
 		s, ok := extractSemver(v)
@@ -322,6 +340,7 @@ func detectFunder() (string, error) {
 	return keys[0].Name, nil
 }
 
+// listKeys returns all keys from the lumerad test keyring.
 func listKeys() ([]keyRecord, error) {
 	args := []string{"keys", "list", "--keyring-backend", "test", "--output", "json"}
 	if *flagHome != "" {
@@ -349,6 +368,7 @@ func listKeys() ([]keyRecord, error) {
 	return nil, fmt.Errorf("unexpected keys list json: %s", truncate(string(out), 300))
 }
 
+// exportPrivateKeyHex exports the raw private key hex for a key in the test keyring.
 func exportPrivateKeyHex(name string) (string, error) {
 	args := []string{
 		"keys", "export", name,
@@ -366,6 +386,8 @@ func exportPrivateKeyHex(name string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
+// deriveAddressFromMnemonic derives the bech32 address for a mnemonic using
+// the appropriate coin type and key algorithm.
 func deriveAddressFromMnemonic(mnemonic string, isLegacy bool) (string, error) {
 	coinType := uint32(118)
 	if !isLegacy {
@@ -466,6 +488,7 @@ func deleteKey(name string) error {
 	return nil
 }
 
+// getAddress returns the bech32 address for a key name in the test keyring.
 func getAddress(name string) (string, error) {
 	args := []string{"keys", "show", name, "--keyring-backend", "test", "--address"}
 	if *flagHome != "" {
@@ -497,6 +520,8 @@ func signMigrationMessage(kind, mnemonic, legacyAddr, newAddr string) (string, e
 	return base64.StdEncoding.EncodeToString(sig), nil
 }
 
+// signMigrationMessageWithPrivHex signs the migration message using a raw
+// private key hex string. Returns the base64 signature and public key.
 func signMigrationMessageWithPrivHex(kind, privHex, legacyAddr, newAddr string) (sigB64 string, pubKeyB64 string, err error) {
 	privBz, err := hex.DecodeString(strings.TrimSpace(privHex))
 	if err != nil {
@@ -518,6 +543,8 @@ func signMigrationMessageWithPrivHex(kind, privHex, legacyAddr, newAddr string) 
 	return base64.StdEncoding.EncodeToString(sig), base64.StdEncoding.EncodeToString(pubKey.Key), nil
 }
 
+// signStringWithLegacyKey signs an arbitrary payload using a legacy (coin-type 118) key
+// derived from the mnemonic. Returns a base64-encoded signature.
 func signStringWithLegacyKey(mnemonic, payload string) (string, error) {
 	privKey, err := deriveKey(mnemonic, 118)
 	if err != nil {
@@ -530,6 +557,8 @@ func signStringWithLegacyKey(mnemonic, payload string) (string, error) {
 	return base64.StdEncoding.EncodeToString(sig), nil
 }
 
+// signStringWithPrivHex signs an arbitrary payload using a raw private key hex.
+// Returns a base64-encoded signature.
 func signStringWithPrivHex(privHex, payload string) (string, error) {
 	privBz, err := hex.DecodeString(strings.TrimSpace(privHex))
 	if err != nil {

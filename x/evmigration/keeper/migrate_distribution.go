@@ -70,6 +70,33 @@ func (k Keeper) redirectWithdrawAddrIfMigrated(ctx sdk.Context, legacyAddr sdk.A
 	return k.distributionKeeper.SetDelegatorWithdrawAddr(ctx, legacyAddr, legacyAddr)
 }
 
+// temporaryRedirectWithdrawAddr checks if addr's withdraw address points to an
+// already-migrated legacy address. If so, it redirects to self and returns the
+// original address + restored=true so the caller can restore it after the
+// withdrawal. This avoids the permanent clobbering that redirectWithdrawAddrIfMigrated
+// would cause for delegators whose own migration hasn't happened yet.
+func (k Keeper) temporaryRedirectWithdrawAddr(ctx sdk.Context, addr sdk.AccAddress) (origWD sdk.AccAddress, restored bool, err error) {
+	withdrawAddr, err := k.distributionKeeper.GetDelegatorWithdrawAddr(ctx, addr)
+	if err != nil {
+		return nil, false, nil // No custom withdraw address — default (self) is fine.
+	}
+
+	if withdrawAddr.Equals(addr) {
+		return nil, false, nil
+	}
+
+	has, err := k.MigrationRecords.Has(ctx, withdrawAddr.String())
+	if err != nil || !has {
+		return nil, false, nil // Not migrated — leave as-is.
+	}
+
+	// Temporarily redirect to self.
+	if err := k.distributionKeeper.SetDelegatorWithdrawAddr(ctx, addr, addr); err != nil {
+		return nil, false, err
+	}
+	return withdrawAddr, true, nil
+}
+
 func (k Keeper) ensureDelegatorStartingInfoReferenceCount(ctx sdk.Context, valAddr sdk.ValAddress, delAddr sdk.AccAddress) error {
 	startingInfo, err := k.distributionKeeper.GetDelegatorStartingInfo(ctx, valAddr, delAddr)
 	if err != nil {

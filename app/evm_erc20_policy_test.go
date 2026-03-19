@@ -417,7 +417,7 @@ func TestERC20PolicyMsg_SetRegistrationPolicy(t *testing.T) {
 
 	t.Run("add and remove base denoms", func(t *testing.T) {
 		resp, err := server.SetRegistrationPolicy(sdkCtx, &erc20policytypes.MsgSetRegistrationPolicy{
-			Authority:    govAddr.String(),
+			Authority:     govAddr.String(),
 			AddBaseDenoms: []string{"uatom", "uosmo"},
 		})
 		require.NoError(t, err)
@@ -427,7 +427,7 @@ func TestERC20PolicyMsg_SetRegistrationPolicy(t *testing.T) {
 
 		// Remove one.
 		resp, err = server.SetRegistrationPolicy(sdkCtx, &erc20policytypes.MsgSetRegistrationPolicy{
-			Authority:       govAddr.String(),
+			Authority:        govAddr.String(),
 			RemoveBaseDenoms: []string{"uosmo"},
 		})
 		require.NoError(t, err)
@@ -438,7 +438,7 @@ func TestERC20PolicyMsg_SetRegistrationPolicy(t *testing.T) {
 
 	t.Run("invalid base denom", func(t *testing.T) {
 		_, err := server.SetRegistrationPolicy(sdkCtx, &erc20policytypes.MsgSetRegistrationPolicy{
-			Authority:    govAddr.String(),
+			Authority:     govAddr.String(),
 			AddBaseDenoms: []string{""},
 		})
 		require.Error(t, err)

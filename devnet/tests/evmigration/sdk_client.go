@@ -1,3 +1,7 @@
+// sdk_client.go provides SDK client factories and helpers for interacting with
+// the chain via sdk-go. It supports both mnemonic-backed (in-memory keyring)
+// and filesystem-backed (test keyring) clients, and includes helpers for bank
+// sends, action queries, cascade uploads, and sample file creation.
 package main
 
 import (
@@ -88,6 +92,8 @@ func sdkUnifiedClient(ctx context.Context, keyName, mnemonic, address string) (*
 	return client, nil
 }
 
+// sdkKeyringClient creates a lumerasdk.Client backed by the local filesystem
+// test keyring. Used for operations that need an existing key (e.g. funder).
 func sdkKeyringClient(ctx context.Context, keyName, address string) (*lumerasdk.Client, error) {
 	grpcAddr := resolveGRPC()
 	rpcAddr := rpcForSDK(*flagRPC)
@@ -140,6 +146,7 @@ func sdkKeyringClient(ctx context.Context, keyName, address string) (*lumerasdk.
 	return client, nil
 }
 
+// getSDKLogger returns a lazily-initialized debug-level zap logger for the SDK client.
 func getSDKLogger() (*zap.Logger, error) {
 	sdkLoggerOnce.Do(func() {
 		cfg := zap.NewDevelopmentConfig()
@@ -149,6 +156,7 @@ func getSDKLogger() (*zap.Logger, error) {
 	return sdkLogger, sdkLoggerErr
 }
 
+// sdkWaitTxConfig returns the WaitTxConfig with a 1-second poll interval.
 func sdkWaitTxConfig() clientconfig.WaitTxConfig {
 	waitCfg := clientconfig.DefaultWaitTxConfig()
 	waitCfg.PollInterval = time.Second
@@ -188,6 +196,7 @@ func sdkGetAction(ctx context.Context, client *lumerasdk.Client, actionID string
 	return client.Blockchain.Action.GetAction(ctx, actionID)
 }
 
+// sdkSendBankTx builds, signs, and broadcasts a bank MsgSend via the SDK blockchain client.
 func sdkSendBankTx(
 	ctx context.Context,
 	client *sdkblockchain.Client,
@@ -223,6 +232,7 @@ func sdkSendBankTx(
 	return txHash, nil
 }
 
+// waitForSDKTxResult waits for tx inclusion and returns an error if the tx failed.
 func waitForSDKTxResult(ctx context.Context, client *sdkblockchain.Client, txHash string, timeout time.Duration) error {
 	waitCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -322,6 +332,8 @@ func createActionsWithSDK(
 	return nil
 }
 
+// runSDKActionWithSequenceRetry executes an SDK action function with up to
+// 3 retries on account sequence mismatches.
 func runSDKActionWithSequenceRetry(
 	ctx context.Context,
 	rec *AccountRecord,

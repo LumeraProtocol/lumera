@@ -14,6 +14,23 @@ This guide covers every EVM-related configuration option available in `app.toml`
 
 ---
 
+## Automatic Config Migration (v1.12.0+)
+
+Nodes upgrading from a pre-EVM binary (< v1.12.0) will have an `app.toml` that lacks the `[evm]`, `[evm.mempool]`, `[json-rpc]`, `[tls]`, and `[lumera.*]` sections. The Cosmos SDK only generates `app.toml` when the file does not exist, so these sections are never added automatically during a binary upgrade.
+
+Starting with v1.12.0, `lumerad` includes a **config migration helper** (`cmd/lumera/cmd/config_migrate.go`) that runs on every startup:
+
+1. Checks whether `evm.evm-chain-id` in the loaded config matches the Lumera constant (`76857769`).
+2. If it does not match (absent section defaults to the upstream cosmos/evm value `262144`, or `0` for entirely missing keys):
+   - Reads all existing settings from the current `app.toml` via Viper.
+   - Merges them with Lumera's EVM defaults (correct chain ID, JSON-RPC enabled, indexer enabled, `rpc` namespace for OpenRPC).
+   - Regenerates `app.toml` with the full template, preserving all operator customizations.
+3. Logs an `INFO` message when migration occurs.
+
+**No manual action is required.** After upgrading the binary and restarting, the node will automatically add the missing EVM configuration sections with safe defaults. Operators can then customize settings as described below.
+
+---
+
 ## 1. `[evm]` — Core EVM Module
 
 Controls the `x/vm` EVM execution engine.

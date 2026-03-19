@@ -1,3 +1,6 @@
+// migrate_validators.go implements the "migrate-validator" mode. It detects
+// the local validator key, submits a migrate-validator transaction, and verifies
+// that staking, supernode, action, and balance state were correctly re-keyed.
 package main
 
 import (
@@ -5,6 +8,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -12,6 +17,8 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
+// validatorCandidate holds the key name and addresses for a local validator
+// that is a candidate for migration.
 type validatorCandidate struct {
 	KeyName       string
 	LegacyAddress string
@@ -32,10 +39,12 @@ func isDestinationValidatorKey(k keyRecord) bool {
 	return strings.Contains(pubKey, "ethsecp256k1") || strings.Contains(pubKey, "eth_secp256k1")
 }
 
+// isLegacyValidatorKey returns true if the key is a legacy (non-destination) validator key.
 func isLegacyValidatorKey(k keyRecord) bool {
 	return !isDestinationValidatorKey(k)
 }
 
+// valoperFromAccAddress converts an account bech32 address to a validator operator address.
 func valoperFromAccAddress(accAddr string) (string, error) {
 	addr, err := sdk.AccAddressFromBech32(accAddr)
 	if err != nil {
@@ -44,6 +53,8 @@ func valoperFromAccAddress(accAddr string) (string, error) {
 	return sdk.ValAddress(addr).String(), nil
 }
 
+// runMigrateValidator detects the local validator key and migrates it to a new
+// coin-type 60 address. Requires exactly one local validator candidate.
 func runMigrateValidator() {
 	log.Println("=== MIGRATE-VALIDATOR MODE ===")
 	ensureEVMMigrationRuntime("migrate-validator mode")
@@ -122,6 +133,34 @@ func runMigrateValidator() {
 	}
 }
 
+// readValidatorMnemonic reads the genesis-address-mnemonic file from the same
+// status directory as the accounts JSON file.
+func readValidatorMnemonic() string {
+	statusDir := filepath.Dir(*flagFile)
+	mnemonicFile := filepath.Join(statusDir, "genesis-address-mnemonic")
+	data, err := os.ReadFile(mnemonicFile)
+	if err != nil {
+		log.Printf("  WARN: cannot read mnemonic from %s: %v", mnemonicFile, err)
+		return ""
+	}
+	return strings.TrimSpace(string(data))
+}
+
+// updateGenesisAddressFile overwrites the genesis-address file in the same
+// status directory as the accounts JSON, so downstream scripts use the
+// migrated validator address.
+func updateGenesisAddressFile(newAddr string) {
+	statusDir := filepath.Dir(*flagFile)
+	genesisFile := filepath.Join(statusDir, "genesis-address")
+	if err := os.WriteFile(genesisFile, []byte(newAddr+"\n"), 0o644); err != nil {
+		log.Printf("  WARN: failed to update genesis-address file %s: %v", genesisFile, err)
+	} else {
+		log.Printf("  updated genesis-address file: %s", genesisFile)
+	}
+}
+
+// pickValidatorCandidates matches on-chain validators against local keyring
+// keys to find legacy validator keys eligible for migration.
 func pickValidatorCandidates(validators []string, keys []keyRecord) []validatorCandidate {
 	keyByAddr := make(map[string]keyRecord, len(keys))
 	keyByName := make(map[string]keyRecord, len(keys))
@@ -192,6 +231,9 @@ func pickValidatorCandidates(validators []string, keys []keyRecord) []validatorC
 	return selected
 }
 
+// migrateOneValidator migrates a single validator, verifying staking, supernode,
+// action, and balance state before and after. Returns (true, false) on success,
+// (false, true) if already migrated, or (false, false) on failure.
 func migrateOneValidator(c validatorCandidate) (ok bool, skipped bool) {
 	log.Printf("--- migrate validator: key=%s legacy=%s valoper=%s ---", c.KeyName, c.LegacyAddress, c.LegacyValoper)
 
@@ -261,9 +303,29 @@ func migrateOneValidator(c validatorCandidate) (ok bool, skipped bool) {
 		log.Printf("  INFO: no supernode registered for %s", c.LegacyValoper)
 	}
 
-	newRec, err := createUniqueAccount(migratedAccountPrefix+"-"+strings.ReplaceAll(c.KeyName, "_", "-"), false)
+	// Snapshot pre-migration balance for post-migration verification.
+	preBalance, err := queryBalance(c.LegacyAddress)
 	if err != nil {
-		log.Printf("  FAIL: create destination key: %v", err)
+		log.Printf("  WARN: query pre-migration balance: %v", err)
+	} else {
+		log.Printf("  pre-migration balance: %d ulume", preBalance)
+	}
+
+	// Derive the destination key from the same mnemonic (coin-type 60) so the
+	// migrated address matches what wallets like MetaMask produce from the same seed.
+	mnemonic := readValidatorMnemonic()
+	if mnemonic == "" {
+		log.Printf("  FAIL: cannot read validator mnemonic from status dir; cannot derive coin-type 60 destination")
+		return false, false
+	}
+	tempRec := &AccountRecord{
+		Name:     c.KeyName,
+		Mnemonic: mnemonic,
+		IsLegacy: true,
+	}
+	newRec, err := createDestinationAccountFromLegacy(tempRec)
+	if err != nil {
+		log.Printf("  FAIL: create destination key from mnemonic: %v", err)
 		return false, false
 	}
 	privHex, err := exportPrivateKeyHex(c.KeyName)
@@ -359,11 +421,86 @@ func migrateOneValidator(c validatorCandidate) (ok bool, skipped bool) {
 		}
 	}
 
+	// Verify balance consistency across bank, EVM balance-bank, and EVM account queries.
+	if err := verifyPostMigrationBalances(newRec.Address, preBalance); err != nil {
+		log.Printf("  FAIL: post-migration balance checks: %v", err)
+		return false, false
+	}
+
+	// Update the genesis-address file so downstream scripts (network-maker,
+	// supernode-setup) use the migrated address.
+	updateGenesisAddressFile(newRec.Address)
+
+	// Update the validator AccountRecord in accounts.json if it exists.
+	updateValidatorAccountRecord(c.LegacyAddress, newRec.Address, newRec.Name, newValoper, preBalance)
+
 	log.Printf("  OK: validator migrated %s (%s) -> %s (%s) (new key=%s)",
 		c.LegacyAddress, c.LegacyValoper, newRec.Address, newValoper, newRec.Name)
 	return true, false
 }
 
+// verifyPostMigrationBalances checks that bank balance, EVM balance-bank, and
+// EVM account balance are consistent for the new address after migration.
+func verifyPostMigrationBalances(newAddr string, preBalance int64) error {
+	// 1. Bank balance on new bech32 address.
+	postBalance, err := queryBalance(newAddr)
+	if err != nil {
+		return fmt.Errorf("query bank balance: %w", err)
+	}
+	// Post-migration balance may differ from pre because rewards were withdrawn
+	// during migration. It must be >= pre (rewards add, nothing subtracts).
+	if postBalance < preBalance {
+		return fmt.Errorf("bank balance decreased: pre=%d post=%d", preBalance, postBalance)
+	}
+	log.Printf("  post-migration bank balance: %d ulume (pre=%d, delta=+%d)", postBalance, preBalance, postBalance-preBalance)
+
+	// 2. EVM balance-bank (ulume via hex address) must match bank balance.
+	hexAddr, err := queryBech32ToHex(newAddr)
+	if err != nil {
+		return fmt.Errorf("bech32-to-0x: %w", err)
+	}
+	evmBankBalance, err := queryEVMBalanceBank(hexAddr)
+	if err != nil {
+		return fmt.Errorf("evm balance-bank: %w", err)
+	}
+	if evmBankBalance != postBalance {
+		return fmt.Errorf("evm balance-bank mismatch: bank=%d evm-balance-bank=%d", postBalance, evmBankBalance)
+	}
+
+	// 3. EVM account balance (18-decimal) must equal bank balance * 10^12.
+	evmAccountBal, err := queryEVMAccountBalance(hexAddr)
+	if err != nil {
+		return fmt.Errorf("evm account: %w", err)
+	}
+	expectedEVM := fmt.Sprintf("%d000000000000", postBalance) // ulume * 10^12
+	if evmAccountBal != expectedEVM {
+		return fmt.Errorf("evm account balance mismatch: expected %s got %s", expectedEVM, evmAccountBal)
+	}
+	log.Printf("  EVM balance verified: bank=%d ulume, evm-balance-bank=%d ulume, evm-account=%s alume", postBalance, evmBankBalance, evmAccountBal)
+	return nil
+}
+
+// updateValidatorAccountRecord finds the validator's AccountRecord in the
+// loaded accounts file and updates it with post-migration state.
+func updateValidatorAccountRecord(legacyAddr, newAddr, newName, newValoper string, preBalance int64) {
+	af := loadAccounts(*flagFile)
+	for i := range af.Accounts {
+		if af.Accounts[i].Address == legacyAddr && af.Accounts[i].IsValidator {
+			af.Accounts[i].NewAddress = newAddr
+			af.Accounts[i].NewName = newName
+			af.Accounts[i].NewValoper = newValoper
+			af.Accounts[i].Migrated = true
+			af.Accounts[i].PreMigrationBalance = preBalance
+			saveAccounts(*flagFile, af)
+			log.Printf("  updated validator account record in %s", *flagFile)
+			return
+		}
+	}
+	log.Printf("  WARN: validator account %s not found in %s; account record not updated", legacyAddr, *flagFile)
+}
+
+// verifyValidatorActionMigration checks that all creator and supernode action
+// references were re-keyed from legacyAddr to newAddr.
 func verifyValidatorActionMigration(legacyAddr, newAddr string, preCreatorActionIDs, preSupernodeActionIDs []string) error {
 	if legacyIDs, err := queryActionsByCreator(legacyAddr); err != nil {
 		return fmt.Errorf("query legacy creator actions: %w", err)
@@ -420,6 +557,7 @@ func verifyValidatorActionMigration(legacyAddr, newAddr string, preCreatorAction
 	return nil
 }
 
+// missingIDs returns IDs present in expected but absent from got.
 func missingIDs(expected, got []string) []string {
 	gotSet := make(map[string]struct{}, len(got))
 	for _, id := range got {
@@ -434,6 +572,7 @@ func missingIDs(expected, got []string) []string {
 	return missing
 }
 
+// containsString returns true if target appears in the values slice.
 func containsString(values []string, target string) bool {
 	for _, value := range values {
 		if value == target {
@@ -443,6 +582,8 @@ func containsString(values []string, target string) bool {
 	return false
 }
 
+// queryMigrationRecord checks whether a migration record exists for the given
+// legacy address and returns the new address if found.
 func queryMigrationRecord(legacyAddr string) (exists bool, newAddr string) {
 	out, err := run("query", "evmigration", "migration-record", legacyAddr)
 	if err != nil {
@@ -462,6 +603,8 @@ func queryMigrationRecord(legacyAddr string) (exists bool, newAddr string) {
 	return true, resp.Record.NewAddress
 }
 
+// createUniqueAccount generates a new account with a unique key name derived
+// from baseName, skipping names that already exist in the keyring.
 func createUniqueAccount(baseName string, isLegacy bool) (AccountRecord, error) {
 	for i := 0; i < 50; i++ {
 		name := baseName

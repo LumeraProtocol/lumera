@@ -1,10 +1,10 @@
 package keeper
 
 import (
+	"bytes"
 	"fmt"
 	"reflect"
 	"strings"
-	"bytes"
 
 	"github.com/LumeraProtocol/lumera/x/action/v1/common"
 
@@ -12,8 +12,8 @@ import (
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
-	gogoproto "github.com/cosmos/gogoproto/proto"
 	"github.com/cosmos/gogoproto/jsonpb"
+	gogoproto "github.com/cosmos/gogoproto/proto"
 )
 
 // SenseActionHandler implements the ActionHandler interface for Sense actions
@@ -36,7 +36,7 @@ func (h SenseActionHandler) Process(metadataBytes []byte, msgType common.Message
 	if err := unmarshaller.Unmarshal(strings.NewReader(string(metadataBytes)), &metadata); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal sense metadata from JSON: %w", err)
 	}
-	
+
 	// Validate fields based on message type
 	switch msgType {
 	case common.MsgRequestAction:
@@ -93,7 +93,7 @@ func (h SenseActionHandler) ConvertProtobufToJSON(protobufData []byte) ([]byte, 
 	// Marshal to JSON format
 	marshaler := &jsonpb.Marshaler{
 		EmitDefaults: true,
-		EnumsAsInts: true,
+		EnumsAsInts:  true,
 	}
 	var buf bytes.Buffer
 	if err := marshaler.Marshal(&buf, &metadata); err != nil {

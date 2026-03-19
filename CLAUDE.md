@@ -31,7 +31,7 @@ go test -tags=integration ./tests/integration/... -v -run TestMsgClaim
 cd tests/systemtests && go test -tags=system_test -v . -run 'TestSupernodeMetricsE2E'
 
 # EVM-specific
-make openrpc                  # Regenerate OpenRPC spec -> docs/openrpc.json + app/openrpc/openrpc.json
+make openrpc                  # Regenerate OpenRPC spec -> docs/openrpc.json + app/openrpc/openrpc.json.gz
 
 # EVM integration tests (under tests/integration/evm/)
 # Most EVM suites use -tags='integration test'; IBC ERC20 suite uses -tags='test'
@@ -116,7 +116,7 @@ Key files:
 - `app/evm_runtime.go` - RegisterTxService/Close overrides for EVM lifecycle
 - `app/ibc.go` - IBC router with ERC20 middleware for v1 and v2 transfer stacks
 - `config/evm.go` - Chain ID, base fee, consensus max gas constants
-- `app/openrpc/` - Embedded OpenRPC spec served via `rpc_discover` and `/openrpc.json`
+- `app/openrpc/` - Gzip-compressed embedded OpenRPC spec served via `rpc_discover` and `/openrpc.json`; POST proxy for playground compatibility
 
 EVM integration tests live in `tests/integration/evm/` with subpackages: ante, contracts, feemarket, ibc, jsonrpc, mempool, precisebank, precompiles, vm. Most use `//go:build integration` tag; the IBC ERC20 tests use `//go:build test`.
 

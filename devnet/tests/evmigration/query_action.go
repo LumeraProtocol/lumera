@@ -1,3 +1,6 @@
+// query_action.go provides query helpers for the action module: listing actions
+// by creator or supernode, querying individual action fields, and extracting
+// action IDs from transaction event logs.
 package main
 
 import (
@@ -45,6 +48,7 @@ func queryActionsByCreator(creator string) ([]string, error) {
 	return ids, nil
 }
 
+// queryActionsBySupernode returns the action IDs that reference the given supernode address.
 func queryActionsBySupernode(supernode string) ([]string, error) {
 	out, err := run("query", "action", "list-actions-by-supernode", supernode)
 	if err != nil {
@@ -85,6 +89,7 @@ func queryActionCreator(actionID string) (string, error) {
 	return resp.Action.Creator, nil
 }
 
+// queryActionSupernodes returns the list of supernode addresses for a given action.
 func queryActionSupernodes(actionID string) ([]string, error) {
 	out, err := run("query", "action", "action", actionID)
 	if err != nil {

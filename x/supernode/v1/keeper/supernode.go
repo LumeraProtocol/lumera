@@ -115,7 +115,7 @@ func (k Keeper) GetAllSuperNodes(ctx sdk.Context, stateFilters ...types.SuperNod
 	store := prefix.NewStore(storeAdapter, []byte(types.SuperNodeKey))
 
 	iterator := store.Iterator(nil, nil)
-	defer iterator.Close()
+	defer func() { _ = iterator.Close() }()
 
 	var supernodes []types.SuperNode
 	filtering := shouldFilter(stateFilters...)

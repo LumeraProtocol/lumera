@@ -1,3 +1,6 @@
+// query_migration.go provides query helpers for the evmigration module:
+// migration estimates, stats, params, account info, and flexible JSON parsers
+// for handling inconsistent Cosmos SDK query output formats across versions.
 package main
 
 import (
@@ -9,6 +12,7 @@ import (
 	"time"
 )
 
+// migrationEstimate holds the result of a migration-estimate query for a single address.
 type migrationEstimate struct {
 	WouldSucceed       bool   `json:"would_succeed"`
 	RejectionReason    string `json:"rejection_reason"`
@@ -22,6 +26,7 @@ type migrationEstimate struct {
 	IsValidator        bool   `json:"is_validator"`
 }
 
+// migrationStats holds the global migration statistics from the evmigration module.
 type migrationStats struct {
 	TotalMigrated           int `json:"total_migrated"`
 	TotalLegacy             int `json:"total_legacy"`
@@ -30,6 +35,7 @@ type migrationStats struct {
 	TotalValidatorsLegacy   int `json:"total_validators_legacy"`
 }
 
+// migrationParams holds the evmigration module parameters.
 type migrationParams struct {
 	EnableMigration         bool  `json:"enable_migration"`
 	MigrationEndTime        int64 `json:"migration_end_time"`
@@ -37,6 +43,8 @@ type migrationParams struct {
 	MaxValidatorDelegations int   `json:"max_validator_delegations"`
 }
 
+// queryMigrationEstimate queries the evmigration module for a migration estimate
+// for the given legacy address.
 func queryMigrationEstimate(addr string) (migrationEstimate, error) {
 	out, err := run("query", "evmigration", "migration-estimate", addr)
 	if err != nil {
@@ -80,6 +88,8 @@ func queryMigrationEstimate(addr string) (migrationEstimate, error) {
 	return estimate, nil
 }
 
+// queryAccountNumberAndSequence returns the on-chain account number and sequence
+// for an address, handling multiple SDK JSON response shapes.
 func queryAccountNumberAndSequence(addr string) (accountNumber uint64, sequence uint64, err error) {
 	out, err := run("query", "auth", "account", addr)
 	if err != nil {
@@ -137,6 +147,7 @@ func queryAccountNumberAndSequence(addr string) (accountNumber uint64, sequence 
 	return accountNumber, sequence, nil
 }
 
+// queryAccountIsVesting returns true if the on-chain account is a vesting account.
 func queryAccountIsVesting(addr string) (bool, error) {
 	out, err := run("query", "auth", "account", addr)
 	if err != nil {
@@ -145,6 +156,7 @@ func queryAccountIsVesting(addr string) (bool, error) {
 	return authAccountLooksVesting(out), nil
 }
 
+// authAccountLooksVesting returns true if the auth account JSON output contains vesting indicators.
 func authAccountLooksVesting(out string) bool {
 	var payload any
 	if err := json.Unmarshal([]byte(out), &payload); err == nil {
@@ -155,6 +167,8 @@ func authAccountLooksVesting(out string) bool {
 	return strings.Contains(lower, "vestingaccount") || strings.Contains(lower, "/cosmos.vesting.")
 }
 
+// authAccountPayloadLooksVesting recursively checks if any value in the parsed
+// JSON payload indicates a vesting account type.
 func authAccountPayloadLooksVesting(v any) bool {
 	switch value := v.(type) {
 	case map[string]any:
@@ -176,11 +190,13 @@ func authAccountPayloadLooksVesting(v any) bool {
 	return false
 }
 
+// isVestingAccountType returns true if the type name indicates a vesting account.
 func isVestingAccountType(typeName string) bool {
 	lower := strings.ToLower(strings.TrimSpace(typeName))
 	return strings.Contains(lower, "vestingaccount") || strings.HasPrefix(lower, "/cosmos.vesting.")
 }
 
+// isAccountNotFoundErr returns true if the error indicates the account does not exist on-chain.
 func isAccountNotFoundErr(err error) bool {
 	if err == nil {
 		return false
@@ -190,6 +206,8 @@ func isAccountNotFoundErr(err error) bool {
 		strings.Contains(low, "not found")
 }
 
+// accountSequenceForFirstTx returns the account number and sequence, defaulting
+// to (0, 0) if the account does not yet exist on-chain.
 func accountSequenceForFirstTx(addr string) (accountNumber uint64, sequence uint64, err error) {
 	accountNumber, sequence, err = queryAccountNumberAndSequence(addr)
 	if err == nil {
@@ -201,6 +219,8 @@ func accountSequenceForFirstTx(addr string) (accountNumber uint64, sequence uint
 	return 0, 0, err
 }
 
+// parseSignatureMismatchAccountNumber extracts the expected account number from
+// a "signature verification failed" error message.
 func parseSignatureMismatchAccountNumber(err error) (uint64, bool) {
 	if err == nil {
 		return 0, false
@@ -222,6 +242,8 @@ func parseSignatureMismatchAccountNumber(err error) (uint64, bool) {
 	return n, true
 }
 
+// parseIncorrectAccountSequence extracts the expected and got sequence numbers
+// from an "incorrect account sequence" error message.
 func parseIncorrectAccountSequence(err error) (expected uint64, got uint64, ok bool) {
 	if err == nil {
 		return 0, 0, false
@@ -247,6 +269,7 @@ func parseIncorrectAccountSequence(err error) (expected uint64, got uint64, ok b
 	return expected, got, true
 }
 
+// waitForAccountOnChain polls until the account is queryable on-chain or the timeout expires.
 func waitForAccountOnChain(addr string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	var lastErr error
@@ -269,6 +292,7 @@ func waitForAccountOnChain(addr string, timeout time.Duration) error {
 	return fmt.Errorf("account %s not available on-chain after %s: %w", addr, timeout, lastErr)
 }
 
+// queryMigrationStats queries the global migration statistics from the evmigration module.
 func queryMigrationStats() (migrationStats, error) {
 	out, err := run("query", "evmigration", "migration-stats")
 	if err != nil {
@@ -299,6 +323,7 @@ func queryMigrationStats() (migrationStats, error) {
 	return stats, nil
 }
 
+// queryMigrationParams queries the evmigration module parameters.
 func queryMigrationParams() (migrationParams, error) {
 	out, err := run("query", "evmigration", "params")
 	if err != nil {
@@ -341,6 +366,7 @@ func queryMigrationParams() (migrationParams, error) {
 // Cosmos SDK query output is inconsistent across versions: numeric fields may
 // appear as JSON numbers or as quoted strings. These helpers handle both.
 
+// parseFlexibleJSONInt parses an int from JSON that may be a number or a quoted string.
 func parseFlexibleJSONInt(raw json.RawMessage) (int, error) {
 	if len(raw) == 0 {
 		return 0, nil
@@ -372,6 +398,7 @@ func parseFlexibleJSONInt(raw json.RawMessage) (int, error) {
 	return 0, fmt.Errorf("unsupported numeric format: %s", string(raw))
 }
 
+// parseFlexibleJSONInt64 parses an int64 from JSON that may be a number or a quoted string.
 func parseFlexibleJSONInt64(raw json.RawMessage) (int64, error) {
 	if len(raw) == 0 {
 		return 0, nil
@@ -403,6 +430,7 @@ func parseFlexibleJSONInt64(raw json.RawMessage) (int64, error) {
 	return 0, fmt.Errorf("unsupported numeric format: %s", string(raw))
 }
 
+// parseFlexibleJSONBool parses a bool from JSON that may be a boolean or a quoted string.
 func parseFlexibleJSONBool(raw json.RawMessage) (bool, error) {
 	if len(raw) == 0 {
 		return false, nil
@@ -429,6 +457,7 @@ func parseFlexibleJSONBool(raw json.RawMessage) (bool, error) {
 	return false, fmt.Errorf("unsupported bool format: %s", string(raw))
 }
 
+// parseFlexibleJSONString parses a string from JSON, falling back to raw content if unquoted.
 func parseFlexibleJSONString(raw json.RawMessage) string {
 	if len(raw) == 0 {
 		return ""

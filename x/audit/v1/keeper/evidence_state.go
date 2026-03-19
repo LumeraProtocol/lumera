@@ -33,7 +33,7 @@ func (k Keeper) deriveNextEvidenceID(ctx sdk.Context) uint64 {
 	store := prefix.NewStore(k.kvStore(ctx), types.EvidenceRecordPrefix())
 
 	iter := store.Iterator(nil, nil)
-	defer iter.Close()
+	defer func() { _ = iter.Close() }()
 
 	var maxID uint64
 	for ; iter.Valid(); iter.Next() {
@@ -92,7 +92,7 @@ func (k Keeper) GetAllEvidence(ctx sdk.Context) ([]types.Evidence, error) {
 	store := prefix.NewStore(storeAdapter, types.EvidenceRecordPrefix())
 
 	iter := store.Iterator(nil, nil)
-	defer iter.Close()
+	defer func() { _ = iter.Close() }()
 
 	evidence := make([]types.Evidence, 0)
 	for ; iter.Valid(); iter.Next() {

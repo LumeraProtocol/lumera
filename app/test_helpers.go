@@ -215,7 +215,7 @@ func setup(t testing.TB, chainID string, withGenesis bool, invCheckPeriod uint, 
 
 	snapshotDB, err := dbm.NewDB("metadata", dbm.GoLevelDBBackend, snapshotDir)
 	require.NoError(t, err)
-	t.Cleanup(func() { snapshotDB.Close() })
+	t.Cleanup(func() { _ = snapshotDB.Close() })
 	require.NoError(t, err)
 	snapshotStore, err := snapshots.NewStore(snapshotDB, snapshotDir)
 	require.NoError(t, err)
@@ -501,7 +501,7 @@ func NewTestNetworkFixture() network.TestFixture {
 	if err != nil {
 		panic(fmt.Sprintf("failed creating temporary directory: %v", err))
 	}
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir) }()
 
 	// Create initial app instance
 	app := New(

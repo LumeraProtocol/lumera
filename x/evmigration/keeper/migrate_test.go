@@ -808,11 +808,10 @@ func TestMigrateStaking_ActiveDelegations(t *testing.T) {
 	// migrateRedelegations
 	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), legacy, ^uint16(0)).Return(nil, nil)
 
-	// migrateWithdrawAddress
-	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacy).Return(legacy, nil)
+	// migrateWithdrawAddress — origWithdrawAddr is legacy (self).
 	f.distributionKeeper.EXPECT().SetDelegatorWithdrawAddr(gomock.Any(), newAddr, newAddr).Return(nil)
 
-	err := f.keeper.MigrateStaking(f.ctx, legacy, newAddr)
+	err := f.keeper.MigrateStaking(f.ctx, legacy, newAddr, legacy)
 	require.NoError(t, err)
 }
 
@@ -826,10 +825,10 @@ func TestMigrateStaking_NoDelegations(t *testing.T) {
 	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacy, ^uint16(0)).Return(nil, nil)
 	f.stakingKeeper.EXPECT().GetUnbondingDelegations(gomock.Any(), legacy, ^uint16(0)).Return(nil, nil)
 	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), legacy, ^uint16(0)).Return(nil, nil)
-	// migrateWithdrawAddress — no custom withdraw address.
-	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacy).Return(nil, fmt.Errorf("not set"))
+	// migrateWithdrawAddress — origWithdrawAddr is nil (not set).
+	f.distributionKeeper.EXPECT().SetDelegatorWithdrawAddr(gomock.Any(), newAddr, newAddr).Return(nil)
 
-	err := f.keeper.MigrateStaking(f.ctx, legacy, newAddr)
+	err := f.keeper.MigrateStaking(f.ctx, legacy, newAddr, nil)
 	require.NoError(t, err)
 }
 
@@ -844,10 +843,36 @@ func TestMigrateStaking_ThirdPartyWithdrawAddress(t *testing.T) {
 	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacy, ^uint16(0)).Return(nil, nil)
 	f.stakingKeeper.EXPECT().GetUnbondingDelegations(gomock.Any(), legacy, ^uint16(0)).Return(nil, nil)
 	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), legacy, ^uint16(0)).Return(nil, nil)
-	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacy).Return(thirdParty, nil)
 	f.distributionKeeper.EXPECT().SetDelegatorWithdrawAddr(gomock.Any(), newAddr, thirdParty).Return(nil)
 
-	err := f.keeper.MigrateStaking(f.ctx, legacy, newAddr)
+	err := f.keeper.MigrateStaking(f.ctx, legacy, newAddr, thirdParty)
+	require.NoError(t, err)
+}
+
+// TestMigrateStaking_MigratedThirdPartyWithdrawAddress verifies that when the
+// third-party withdraw address has already been migrated, the withdraw address
+// is resolved to that party's new (migrated) address via MigrationRecords.
+// This is the bug-16 regression test.
+func TestMigrateStaking_MigratedThirdPartyWithdrawAddress(t *testing.T) {
+	f := initMockFixture(t)
+	legacy := testAccAddr()
+	newAddr := testAccAddr()
+	thirdPartyLegacy := testAccAddr()
+	thirdPartyNew := testAccAddr()
+
+	// Seed a migration record for the third-party address — it was migrated earlier.
+	require.NoError(t, f.keeper.MigrationRecords.Set(f.ctx, thirdPartyLegacy.String(), types.MigrationRecord{
+		LegacyAddress: thirdPartyLegacy.String(),
+		NewAddress:    thirdPartyNew.String(),
+	}))
+
+	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacy, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetUnbondingDelegations(gomock.Any(), legacy, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), legacy, ^uint16(0)).Return(nil, nil)
+	// The withdraw address must be resolved to thirdPartyNew, not thirdPartyLegacy.
+	f.distributionKeeper.EXPECT().SetDelegatorWithdrawAddr(gomock.Any(), newAddr, thirdPartyNew).Return(nil)
+
+	err := f.keeper.MigrateStaking(f.ctx, legacy, newAddr, thirdPartyLegacy)
 	require.NoError(t, err)
 }
 
@@ -903,10 +928,10 @@ func TestMigrateStaking_WithUnbondingDelegation(t *testing.T) {
 	// migrateRedelegations
 	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), legacy, ^uint16(0)).Return(nil, nil)
 
-	// migrateWithdrawAddress
-	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacy).Return(nil, fmt.Errorf("not set"))
+	// migrateWithdrawAddress — origWithdrawAddr is nil (not set).
+	f.distributionKeeper.EXPECT().SetDelegatorWithdrawAddr(gomock.Any(), newAddr, newAddr).Return(nil)
 
-	err := f.keeper.MigrateStaking(f.ctx, legacy, newAddr)
+	err := f.keeper.MigrateStaking(f.ctx, legacy, newAddr, nil)
 	require.NoError(t, err)
 }
 
@@ -963,10 +988,10 @@ func TestMigrateStaking_WithRedelegation(t *testing.T) {
 	f.stakingKeeper.EXPECT().InsertRedelegationQueue(gomock.Any(), gomock.Any(), completionTime).Return(nil)
 	f.stakingKeeper.EXPECT().SetRedelegationByUnbondingID(gomock.Any(), gomock.Any(), uint64(99)).Return(nil)
 
-	// migrateWithdrawAddress
-	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacy).Return(nil, fmt.Errorf("not set"))
+	// migrateWithdrawAddress — origWithdrawAddr is nil (not set).
+	f.distributionKeeper.EXPECT().SetDelegatorWithdrawAddr(gomock.Any(), newAddr, newAddr).Return(nil)
 
-	err := f.keeper.MigrateStaking(f.ctx, legacy, newAddr)
+	err := f.keeper.MigrateStaking(f.ctx, legacy, newAddr, nil)
 	require.NoError(t, err)
 }
 
@@ -1013,10 +1038,10 @@ func TestMigrateStaking_UnbondingWithoutActiveDelegation(t *testing.T) {
 	// migrateRedelegations
 	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), legacy, ^uint16(0)).Return(nil, nil)
 
-	// migrateWithdrawAddress
-	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacy).Return(nil, fmt.Errorf("not set"))
+	// migrateWithdrawAddress — origWithdrawAddr is nil (not set).
+	f.distributionKeeper.EXPECT().SetDelegatorWithdrawAddr(gomock.Any(), newAddr, newAddr).Return(nil)
 
-	err := f.keeper.MigrateStaking(f.ctx, legacy, newAddr)
+	err := f.keeper.MigrateStaking(f.ctx, legacy, newAddr, nil)
 	require.NoError(t, err)
 }
 

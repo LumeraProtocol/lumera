@@ -83,13 +83,26 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 		_ = err
 	}
 	// Withdraw every delegator's pending rewards for this validator.
+	// If a delegator's withdraw address is an already-migrated legacy address,
+	// temporarily redirect to self for the withdrawal, then restore the original.
+	// This prevents dust from landing on dead addresses while preserving the
+	// delegator's intended third-party target for their own later migration.
 	for _, del := range delegations {
 		delAddr, err := sdk.AccAddressFromBech32(del.DelegatorAddress)
 		if err != nil {
 			return nil, err
 		}
+		origWD, restored, err := ms.temporaryRedirectWithdrawAddr(ctx, delAddr)
+		if err != nil {
+			return nil, fmt.Errorf("temporary redirect withdraw addr for delegator %s: %w", del.DelegatorAddress, err)
+		}
 		if _, err := ms.distributionKeeper.WithdrawDelegationRewards(ctx, delAddr, oldValAddr); err != nil {
 			return nil, fmt.Errorf("withdraw rewards for delegator %s: %w", del.DelegatorAddress, err)
+		}
+		if restored {
+			if err := ms.distributionKeeper.SetDelegatorWithdrawAddr(ctx, delAddr, origWD); err != nil {
+				return nil, fmt.Errorf("restore withdraw addr for delegator %s: %w", del.DelegatorAddress, err)
+			}
 		}
 	}
 

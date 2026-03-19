@@ -24,41 +24,49 @@ import (
 	_ "github.com/LumeraProtocol/lumera/config"
 )
 
+// DelegationActivity records a staking delegation performed by a legacy account.
 type DelegationActivity struct {
 	Validator string `json:"validator"`
 	Amount    string `json:"amount,omitempty"`
 }
 
+// UnbondingActivity records an unbonding delegation initiated by a legacy account.
 type UnbondingActivity struct {
 	Validator string `json:"validator"`
 	Amount    string `json:"amount,omitempty"`
 }
 
+// RedelegationActivity records a redelegation between validators by a legacy account.
 type RedelegationActivity struct {
 	SrcValidator string `json:"src_validator"`
 	DstValidator string `json:"dst_validator"`
 	Amount       string `json:"amount,omitempty"`
 }
 
+// WithdrawAddressActivity records a custom distribution withdraw address set by a legacy account.
 type WithdrawAddressActivity struct {
 	Address string `json:"address"`
 }
 
+// AuthzGrantActivity records an authz grant issued by a legacy account (as granter).
 type AuthzGrantActivity struct {
 	Grantee string `json:"grantee"`
 	MsgType string `json:"msg_type,omitempty"`
 }
 
+// AuthzReceiveActivity records an authz grant received by a legacy account (as grantee).
 type AuthzReceiveActivity struct {
 	Granter string `json:"granter"`
 	MsgType string `json:"msg_type,omitempty"`
 }
 
+// FeegrantActivity records a fee grant issued by a legacy account (as granter).
 type FeegrantActivity struct {
 	Grantee    string `json:"grantee"`
 	SpendLimit string `json:"spend_limit,omitempty"`
 }
 
+// FeegrantReceiveActivity records a fee grant received by a legacy account (as grantee).
 type FeegrantReceiveActivity struct {
 	Granter    string `json:"granter"`
 	SpendLimit string `json:"spend_limit,omitempty"`
@@ -126,6 +134,14 @@ type AccountRecord struct {
 	FeegrantGrantedTo string `json:"feegrant_granted_to,omitempty"`
 	FeegrantFrom      string `json:"feegrant_received_from,omitempty"`
 
+	// Validator fields (populated in prepare mode for validator accounts).
+	IsValidator bool   `json:"is_validator,omitempty"`
+	Valoper     string `json:"valoper,omitempty"`
+	NewValoper  string `json:"new_valoper,omitempty"` // populated after validator migration
+
+	// Pre-migration balance snapshot (populated at migration time).
+	PreMigrationBalance int64 `json:"pre_migration_balance,omitempty"`
+
 	// Migration state (populated in migrate mode).
 	NewName    string `json:"new_name,omitempty"`
 	NewAddress string `json:"new_address,omitempty"`
@@ -142,7 +158,7 @@ type AccountsFile struct {
 }
 
 var (
-	flagMode          = flag.String("mode", "", "prepare|estimate|migrate|migrate-validator|verify|cleanup")
+	flagMode          = flag.String("mode", "", "prepare|estimate|migrate|migrate-validator|migrate-all|verify|cleanup")
 	flagBin           = flag.String("bin", "lumerad", "lumerad binary path")
 	flagRPC           = flag.String("rpc", "tcp://localhost:26657", "RPC endpoint")
 	flagGRPC          = flag.String("grpc", "", "gRPC endpoint (default: derived from --rpc host + port 9090)")
@@ -168,6 +184,7 @@ var (
 	)
 )
 
+// main parses flags, detects the runtime coin type, and dispatches to the selected mode.
 func main() {
 	flag.Parse()
 
@@ -182,11 +199,13 @@ func main() {
 		runMigrate()
 	case "migrate-validator":
 		runMigrateValidator()
+	case "migrate-all":
+		runMigrateAll()
 	case "verify":
 		runVerify()
 	case "cleanup":
 		runCleanup()
 	default:
-		log.Fatalf("usage: -mode=prepare|estimate|migrate|migrate-validator|verify|cleanup")
+		log.Fatalf("usage: -mode=prepare|estimate|migrate|migrate-validator|migrate-all|verify|cleanup")
 	}
 }

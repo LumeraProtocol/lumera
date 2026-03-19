@@ -50,7 +50,7 @@ func TestSigVerificationGasConsumerMatrix(t *testing.T) {
 	// Build a multisignature object from plain signatures so we can exercise
 	// recursive gas accounting for nested signature data.
 	for i := 0; i < len(pkSet); i++ {
-		legacySig := legacytx.StdSignature{PubKey: pkSet[i], Signature: sigSet[i]} //nolint:staticcheck
+		legacySig := legacytx.StdSignature{PubKey: pkSet[i], Signature: sigSet[i]}
 		sigV2, err := legacytx.StdSignatureToSignatureV2(cdc, legacySig)
 		require.NoError(t, err)
 		require.NoError(t, multisig.AddSignatureV2(multisignature, sigV2, pkSet))

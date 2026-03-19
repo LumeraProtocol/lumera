@@ -9,8 +9,8 @@ import (
 	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/query"
-	"go.uber.org/mock/gomock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -72,18 +72,18 @@ func TestKeeper_ListActionsByCreator(t *testing.T) {
 				Creator: "",
 			},
 			expectedErr: status.Error(codes.InvalidArgument, "creator address must be provided"),
+		},
+		{
+			name: "invalid creator address format",
+			req: &types.QueryListActionsByCreatorRequest{
+				Creator: "invalid-address",
 			},
-			{
-				name: "invalid creator address format",
-				req: &types.QueryListActionsByCreatorRequest{
-					Creator: "invalid-address",
-				},
-				expectedErr: status.Error(codes.InvalidArgument, "invalid creator address"),
-			},
-			{
-				name: "no actions for creator",
-				req: &types.QueryListActionsByCreatorRequest{
-					Creator: creator,
+			expectedErr: status.Error(codes.InvalidArgument, "invalid creator address"),
+		},
+		{
+			name: "no actions for creator",
+			req: &types.QueryListActionsByCreatorRequest{
+				Creator: creator,
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
 				// store only actions for other creator

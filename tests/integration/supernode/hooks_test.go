@@ -355,7 +355,7 @@ func (suite *KeeperIntegrationSuite) TestValidatorBeginUnbondingHook() {
 				// Create a validator with insufficient self-delegation but sufficient supernode delegation
 				validatorAddr := sdk.ValAddress([]byte("validator_sd_ub"))
 				supernodeAccAddr := sdk.AccAddress([]byte("supernode_sd_ub"))
-				
+
 				supernode := sntypes.SuperNode{
 					ValidatorAddress: validatorAddr.String(),
 					SupernodeAccount: supernodeAccAddr.String(),

@@ -45,4 +45,3 @@ func resolveLumeraBinaryVersion(bin string) (string, error) {
 	}
 	return lumeraVersionCache, nil
 }
-

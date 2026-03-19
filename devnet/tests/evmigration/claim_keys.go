@@ -1,3 +1,7 @@
+// claim_keys.go provides deterministically generated Pastel keypairs for claim
+// testing. It generates numClaimKeys secp256k1 key pairs from fixed seeds,
+// computes Pastel base58 addresses, and provides signing helpers for the claim
+// verification message format.
 package main
 
 import (

@@ -104,7 +104,9 @@ func CreateUpgradeHandler(p appParams.AppUpgradeParams) upgradetypes.UpgradeHand
 		// erc20 InitGenesis is skipped above together with the other EVM modules.
 		// Unlike precisebank, erc20 persists module params in its own KV store, so
 		// an empty store would otherwise read back as both booleans=false.
-		p.Erc20Keeper.SetParams(ctx, erc20types.DefaultParams())
+		if err := p.Erc20Keeper.SetParams(ctx, erc20types.DefaultParams()); err != nil {
+			return nil, fmt.Errorf("set erc20 default params: %w", err)
+		}
 
 		p.Logger.Info(fmt.Sprintf("Successfully completed upgrade %s", UpgradeName))
 		return newVM, nil

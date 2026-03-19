@@ -43,7 +43,7 @@ type ChainConfig struct {
 	} `json:"daemon"`
 	GenesisAccountMnemonics []string `json:"genesis-account-mnemonics"`
 	SNAccountMnemonics      []string `json:"sn-account-mnemonics"`
-	API struct {
+	API                     struct {
 		EnableUnsafeCORS bool `json:"enable_unsafe_cors"`
 	} `json:"api"`
 	JSONRPC struct {
@@ -66,14 +66,14 @@ type ChainConfig struct {
 }
 
 type Validator struct {
-	Name                 string `json:"name"`
-	Moniker              string `json:"moniker"`
-	KeyName              string `json:"key_name"`
-	Port                 int    `json:"port"`
-	RPCPort              int    `json:"rpc_port"`
-	RESTPort             int    `json:"rest_port"`
-	GRPCPort             int    `json:"grpc_port"`
-	Supernode            struct {
+	Name      string `json:"name"`
+	Moniker   string `json:"moniker"`
+	KeyName   string `json:"key_name"`
+	Port      int    `json:"port"`
+	RPCPort   int    `json:"rpc_port"`
+	RESTPort  int    `json:"rest_port"`
+	GRPCPort  int    `json:"grpc_port"`
+	Supernode struct {
 		Port        int `json:"port,omitempty"`
 		P2PPort     int `json:"p2p_port,omitempty"`
 		GatewayPort int `json:"gateway_port,omitempty"`

@@ -6,8 +6,8 @@ import (
 
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
 	"github.com/cosmos/cosmos-sdk/testutil/network"
-	"github.com/stretchr/testify/require"
 	"github.com/spf13/viper"
+	"github.com/stretchr/testify/require"
 
 	"github.com/LumeraProtocol/lumera/app"
 )
@@ -41,8 +41,7 @@ func New(t *testing.T, configs ...Config) *Network {
 // DefaultConfig will initialize config for the network with custom application,
 // genesis and single validator. All other parameters are inherited from cosmos-sdk/testutil/network.DefaultConfig
 func DefaultConfig() network.Config {
-	var appOpts servertypes.AppOptions
-	appOpts = viper.New()
+	appOpts := servertypes.AppOptions(viper.New())
 	cfg, err := network.DefaultConfigWithAppConfig(app.AppConfig(appOpts))
 	if err != nil {
 		panic(err)

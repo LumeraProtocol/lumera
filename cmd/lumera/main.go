@@ -18,7 +18,7 @@ func main() {
 	if err := svrcmd.Execute(rootCmd, clienthelpers.EnvPrefix, app.DefaultNodeHome); err != nil {
 		// A context cancellation (e.g. SIGTERM) is a graceful shutdown, not an error.
 		if !errors.Is(err, context.Canceled) {
-			fmt.Fprintln(rootCmd.OutOrStderr(), err)
+			_, _ = fmt.Fprintln(rootCmd.OutOrStderr(), err)
 			os.Exit(1)
 		}
 	}

@@ -14,16 +14,16 @@ type LumeraEVMMempoolConfig struct {
 }
 
 type LumeraJSONRPCRateLimitConfig struct {
-	Enable           bool   `mapstructure:"enable"`
-	ProxyAddress     string `mapstructure:"proxy-address"`
-	RequestsPerSec   int    `mapstructure:"requests-per-second"`
-	Burst            int    `mapstructure:"burst"`
-	EntryTTL         string `mapstructure:"entry-ttl"`
+	Enable         bool   `mapstructure:"enable"`
+	ProxyAddress   string `mapstructure:"proxy-address"`
+	RequestsPerSec int    `mapstructure:"requests-per-second"`
+	Burst          int    `mapstructure:"burst"`
+	EntryTTL       string `mapstructure:"entry-ttl"`
 }
 
 type LumeraConfig struct {
-	EVMMempool       LumeraEVMMempoolConfig        `mapstructure:"evm-mempool"`
-	JSONRPCRateLimit LumeraJSONRPCRateLimitConfig   `mapstructure:"json-rpc-ratelimit"`
+	EVMMempool       LumeraEVMMempoolConfig       `mapstructure:"evm-mempool"`
+	JSONRPCRateLimit LumeraJSONRPCRateLimitConfig `mapstructure:"json-rpc-ratelimit"`
 }
 
 const lumeraConfigTemplate = `

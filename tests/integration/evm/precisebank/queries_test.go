@@ -12,9 +12,9 @@ import (
 	"time"
 
 	lcfg "github.com/LumeraProtocol/lumera/config"
+	testtext "github.com/LumeraProtocol/lumera/pkg/text"
 	evmtest "github.com/LumeraProtocol/lumera/tests/integration/evmtest"
 	testaccounts "github.com/LumeraProtocol/lumera/testutil/accounts"
-	testtext "github.com/LumeraProtocol/lumera/pkg/text"
 	precisebanktypes "github.com/cosmos/evm/x/precisebank/types"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )

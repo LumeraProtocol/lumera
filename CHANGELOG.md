@@ -29,7 +29,7 @@ Changes included since `v1.10.0` (range: `v1.10.0..v1.10.1`).
 Changes included since `v1.9.1` (range: `v1.9.1..v1.10.0`).
 
 - Cosmos SDK: upgraded from v0.50.14 to v0.53.5, CometBFT upgraded to v0.38.20
-- enabled unordered 
+- enabled unordered
 - migrated consensus params from `x/params` to `x/consensus` via baseapp.MigrateParams; removed `x/params` usage.
 - IBC: upgraded to IBC-Go from v10.3.0 to v10.5.0 with IBC v2 readiness (Router v2, v2 packet/event handling helpers).
 - Wasm: upgraded wasmd from v0.55.0-ibc2.0 to v0.61.6 and wasmvm from v3.0.0-ibc2.0 to v3.0.2.
@@ -43,7 +43,7 @@ Changes included since `v1.9.1` (range: `v1.9.1..v1.10.0`).
 
 Changes included since `v1.9.0` (range: `v1.9.0..v1.9.1`).
 
-.- Action/ICA: persist `app_pubkey` on new actions, expose `app_pubkey` in action query responses, and regenerate action protobufs.
+- Action/ICA: persist `app_pubkey` on new actions, expose `app_pubkey` in action query responses, and regenerate action protobufs.
 - Action/crypto: refreshed signature verification paths (ADR-36 fallback, DER→RS64) and added coverage for app_pubkey validation/caching + query output.
 - Devnet/Hermes: added ICA cascade flow tests and IBC helpers; updated Hermes configs/scripts and devnet setup scripts; removed legacy `devnet/tests/test-channel.sh`.
 - Dependencies/docs: updated devnet and root Go module files and refreshed `readme.md`.

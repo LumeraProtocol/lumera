@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	defaultLocalHost       = "127.0.0.1"
+	defaultLocalHost        = "127.0.0.1"
 	metaMaskExtensionOrigin = "chrome-extension://nkbihfbeogaeaoehlefnkodbefgpgknn"
 )
 

@@ -20,7 +20,7 @@ WASMVM_VERSION := v3@v3.0.2
 RELEASE_CGO_LDFLAGS ?= -Wl,-rpath,/usr/lib -Wl,--disable-new-dtags
 COSMOS_PROTO_VERSION := $(call module_version,github.com/cosmos/cosmos-proto)
 GOGOPROTO_VERSION := $(call module_version,github.com/cosmos/gogoproto)
-GOLANGCI_LINT_VERSION := $(call module_version,github.com/golangci/golangci-lint)
+GOLANGCI_LINT_VERSION := $(call module_version,github.com/golangci/golangci-lint/v2)
 BUF_VERSION := $(call module_version,github.com/bufbuild/buf)
 GRPC_GATEWAY_VERSION := $(call module_version,github.com/grpc-ecosystem/grpc-gateway)
 GRPC_GATEWAY_V2_VERSION := $(call module_version,github.com/grpc-ecosystem/grpc-gateway/v2)
@@ -34,7 +34,7 @@ TOOLS := \
 	github.com/bufbuild/buf/cmd/buf@$(BUF_VERSION) \
 	github.com/cosmos/gogoproto/protoc-gen-gocosmos@$(GOGOPROTO_VERSION) \
 	github.com/cosmos/gogoproto/protoc-gen-gogo@$(GOGOPROTO_VERSION) \
-	github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) \
+	github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) \
 	github.com/grpc-ecosystem/grpc-gateway/protoc-gen-grpc-gateway@$(GRPC_GATEWAY_VERSION) \
 	github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2@$(GRPC_GATEWAY_V2_VERSION) \
 	golang.org/x/tools/cmd/goimports@$(GO_TOOLS_VERSION) \
@@ -91,13 +91,13 @@ OPENRPC_GENERATOR_INPUTS := \
 	tools/openrpcgen/main.go \
 	docs/openrpc_examples_overrides.json
 
-app/openrpc/openrpc.json docs/openrpc.json: $(OPENRPC_GENERATOR_INPUTS)
+app/openrpc/openrpc.json.gz docs/openrpc.json: $(OPENRPC_GENERATOR_INPUTS)
 	@echo "Generating OpenRPC spec..."
 	${GO} run ./tools/openrpcgen -out docs/openrpc.json -examples docs/openrpc_examples_overrides.json
-	cp docs/openrpc.json app/openrpc/openrpc.json
-	@echo "OpenRPC spec written to docs/openrpc.json"
+	gzip -c docs/openrpc.json > app/openrpc/openrpc.json.gz
+	@echo "OpenRPC spec written to docs/openrpc.json (embedded as app/openrpc/openrpc.json.gz)"
 
-openrpc: app/openrpc/openrpc.json
+openrpc: app/openrpc/openrpc.json.gz
 
 build: build/lumerad
 
@@ -106,7 +106,7 @@ go.sum: go.mod
 	GOPROXY=${GOPROXY} ${GO} mod verify
 	GOPROXY=${GOPROXY} ${GO} mod tidy
 
-build/lumerad: $(GO_SRC) app/openrpc/openrpc.json go.sum Makefile
+build/lumerad: $(GO_SRC) app/openrpc/openrpc.json.gz go.sum Makefile
 	@echo "Building lumerad binary..."
 	@mkdir -p ${BUILD_DIR}
 	${BUF} generate --template proto/buf.gen.gogo.yaml --verbose
@@ -121,7 +121,7 @@ build-claiming-faucet:
 
 build-debug: build-debug/lumerad
 
-build-debug/lumerad: $(GO_SRC) app/openrpc/openrpc.json go.sum Makefile
+build-debug/lumerad: $(GO_SRC) app/openrpc/openrpc.json.gz go.sum Makefile
 	@echo "Building lumerad debug binary..."
 	@mkdir -p ${BUILD_DIR}
 	${IGNITE} chain build -t linux:amd64 --skip-proto --debug -v --output ${BUILD_DIR}/
@@ -130,7 +130,7 @@ build-debug/lumerad: $(GO_SRC) app/openrpc/openrpc.json go.sum Makefile
 release:
 	@echo "Creating release with ignite..."
 	@mkdir -p ${RELEASE_DIR}
-	@$(MAKE) --no-print-directory app/openrpc/openrpc.json
+	@$(MAKE) --no-print-directory app/openrpc/openrpc.json.gz
 	${BUF} generate --template proto/buf.gen.gogo.yaml --verbose
 	${BUF} generate --template proto/buf.gen.swagger.yaml --verbose
 	${IGNITE} generate openapi --yes --enable-proto-vendor --clear-cache

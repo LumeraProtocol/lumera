@@ -1,9 +1,12 @@
 package openrpc
 
 import (
+	"bytes"
+	"compress/gzip"
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"io"
 )
 
 const (
@@ -12,13 +15,23 @@ const (
 	apiVersion = "1.0"
 )
 
-//go:embed openrpc.json
-var embeddedSpec []byte
+//go:embed openrpc.json.gz
+var embeddedSpecGz []byte
 
 var embeddedSpecRaw json.RawMessage
 
 func init() {
-	embeddedSpecRaw = append(json.RawMessage(nil), embeddedSpec...)
+	r, err := gzip.NewReader(bytes.NewReader(embeddedSpecGz))
+	if err != nil {
+		panic(fmt.Sprintf("openrpc: decompress embedded spec: %v", err))
+	}
+	defer func() { _ = r.Close() }()
+
+	data, err := io.ReadAll(r)
+	if err != nil {
+		panic(fmt.Sprintf("openrpc: read decompressed spec: %v", err))
+	}
+	embeddedSpecRaw = data
 }
 
 // DiscoverDocument returns the embedded OpenRPC specification as a raw JSON object.

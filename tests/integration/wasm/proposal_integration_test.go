@@ -62,7 +62,7 @@ func TestLoadStoredGovV1Beta1LegacyTypes(t *testing.T) {
 		legacyContent v1beta1.Content
 	}{
 		"store code": {
-			legacyContent: &wasmtypes.StoreCodeProposal{ //nolint:staticcheck
+			legacyContent: &wasmtypes.StoreCodeProposal{
 				Title:        "Foo",
 				Description:  "Bar",
 				Source:       "https://example.com/",
@@ -73,7 +73,7 @@ func TestLoadStoredGovV1Beta1LegacyTypes(t *testing.T) {
 			},
 		},
 		"instantiate": {
-			legacyContent: &wasmtypes.InstantiateContractProposal{ //nolint:staticcheck
+			legacyContent: &wasmtypes.InstantiateContractProposal{
 				Title:       "Foo",
 				Description: "Bar",
 				RunAs:       myAddress.String(),
@@ -84,7 +84,7 @@ func TestLoadStoredGovV1Beta1LegacyTypes(t *testing.T) {
 			},
 		},
 		"instantiate2": {
-			legacyContent: &wasmtypes.InstantiateContract2Proposal{ //nolint:staticcheck
+			legacyContent: &wasmtypes.InstantiateContract2Proposal{
 				Title:       "Foo",
 				Description: "Bar",
 				RunAs:       myAddress.String(),
@@ -96,7 +96,7 @@ func TestLoadStoredGovV1Beta1LegacyTypes(t *testing.T) {
 			},
 		},
 		"store and instantiate": {
-			legacyContent: &wasmtypes.StoreAndInstantiateContractProposal{ //nolint:staticcheck
+			legacyContent: &wasmtypes.StoreAndInstantiateContractProposal{
 				Title:        "Foo",
 				Description:  "Bar",
 				RunAs:        myAddress.String(),
@@ -110,7 +110,7 @@ func TestLoadStoredGovV1Beta1LegacyTypes(t *testing.T) {
 			},
 		},
 		"migrate": {
-			legacyContent: &wasmtypes.MigrateContractProposal{ //nolint:staticcheck
+			legacyContent: &wasmtypes.MigrateContractProposal{
 				Title:       "Foo",
 				Description: "Bar",
 				Contract:    reflectExample.Contract.String(),
@@ -119,8 +119,7 @@ func TestLoadStoredGovV1Beta1LegacyTypes(t *testing.T) {
 			},
 		},
 		"execute": {
-			legacyContent: &wasmtypes.ExecuteContractProposal{ //nolint:staticcheck
-				Title:       "Foo",
+			legacyContent: &wasmtypes.ExecuteContractProposal{Title: "Foo",
 				Description: "Bar",
 				Contract:    reflectExample.Contract.String(),
 				RunAs:       reflectExample.CreatorAddr.String(),
@@ -139,45 +138,39 @@ func TestLoadStoredGovV1Beta1LegacyTypes(t *testing.T) {
 			},
 		},
 		"sudo": {
-			&wasmtypes.SudoContractProposal{ //nolint:staticcheck
-				Title:       "Foo",
+			&wasmtypes.SudoContractProposal{Title: "Foo",
 				Description: "Bar",
 				Contract:    hackatomExample.Contract.String(),
 				Msg:         stealMsgBz,
 			},
 		},
 		"update admin": {
-			legacyContent: &wasmtypes.UpdateAdminProposal{ //nolint:staticcheck
-				Title:       "Foo",
+			legacyContent: &wasmtypes.UpdateAdminProposal{Title: "Foo",
 				Description: "Bar",
 				Contract:    reflectExample.Contract.String(),
 				NewAdmin:    myAddress.String(),
 			},
 		},
 		"clear admin": {
-			legacyContent: &wasmtypes.ClearAdminProposal{ //nolint:staticcheck
-				Title:       "Foo",
+			legacyContent: &wasmtypes.ClearAdminProposal{Title: "Foo",
 				Description: "Bar",
 				Contract:    reflectExample.Contract.String(),
 			},
 		},
 		"pin codes": {
-			legacyContent: &wasmtypes.PinCodesProposal{ //nolint:staticcheck
-				Title:       "Foo",
+			legacyContent: &wasmtypes.PinCodesProposal{Title: "Foo",
 				Description: "Bar",
 				CodeIDs:     []uint64{reflectExample.CodeID},
 			},
 		},
 		"unpin codes": {
-			legacyContent: &wasmtypes.UnpinCodesProposal{ //nolint:staticcheck
-				Title:       "Foo",
+			legacyContent: &wasmtypes.UnpinCodesProposal{Title: "Foo",
 				Description: "Bar",
 				CodeIDs:     []uint64{reflectExample.CodeID},
 			},
 		},
 		"update instantiate config": {
-			legacyContent: &wasmtypes.UpdateInstantiateConfigProposal{ //nolint:staticcheck
-				Title:       "Foo",
+			legacyContent: &wasmtypes.UpdateInstantiateConfigProposal{Title: "Foo",
 				Description: "Bar",
 				AccessConfigUpdates: []wasmtypes.AccessConfigUpdate{
 					{CodeID: reflectExample.CodeID, InstantiatePermission: wasmtypes.AllowNobody},

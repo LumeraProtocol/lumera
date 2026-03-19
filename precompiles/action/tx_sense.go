@@ -106,7 +106,7 @@ func (p Precompile) FinalizeSense(
 
 	metadataJSON, err := json.Marshal(map[string]interface{}{
 		"dd_and_fingerprints_ids": ddAndFingerprintsIds,
-		"signatures":             signatures,
+		"signatures":              signatures,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("marshal sense finalize metadata: %w", err)

@@ -4,6 +4,7 @@
 package jsonrpc_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -63,7 +64,7 @@ func testOpenRPCDiscoverMethodCatalog(t *testing.T, node *evmtest.Node) {
 	}
 
 	requiredMethods := []string{
-		"rpc_discover",
+		"rpc.discover",
 		"eth_chainId",
 		"net_version",
 		"web3_clientVersion",
@@ -156,6 +157,116 @@ func TestOpenRPCHTTPDocumentEndpoint(t *testing.T) {
 		if _, ok := httpMethods[method]; !ok {
 			t.Fatalf("rpc_discover contains method missing in http /openrpc.json: %q", method)
 		}
+	}
+}
+
+func TestOpenRPCHTTPPOSTProxy(t *testing.T) {
+	t.Helper()
+
+	node := evmtest.NewEVMNode(t, "lumera-openrpc-http-proxy", 120)
+	node.AppendStartArgs("--api.enable=true")
+	node.StartAndWaitRPC()
+	defer node.Stop()
+
+	var directChainID string
+	node.MustJSONRPC(t, "eth_chainId", []any{}, &directChainID)
+
+	body := bytes.NewBufferString(`{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}`)
+	req, err := http.NewRequest(http.MethodPost, defaultAPIURL+appopenrpc.HTTPPath, body)
+	if err != nil {
+		t.Fatalf("build /openrpc.json POST request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := (&http.Client{Timeout: 3 * time.Second}).Do(req)
+	if err != nil {
+		t.Fatalf("POST /openrpc.json failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("unexpected /openrpc.json POST status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	var rpcResp struct {
+		Result string `json:"result"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&rpcResp); err != nil {
+		t.Fatalf("decode /openrpc.json POST response: %v", err)
+	}
+	if strings.TrimSpace(rpcResp.Result) == "" {
+		t.Fatalf("/openrpc.json POST returned empty result")
+	}
+	if rpcResp.Result != directChainID {
+		t.Fatalf("/openrpc.json POST chain id mismatch: got=%q want=%q", rpcResp.Result, directChainID)
+	}
+}
+
+func TestOpenRPCHTTPPOSTProxyRPCDiscoverAlias(t *testing.T) {
+	t.Helper()
+
+	node := evmtest.NewEVMNode(t, "lumera-openrpc-http-discover-alias", 120)
+	node.AppendStartArgs("--api.enable=true")
+	node.StartAndWaitRPC()
+	defer node.Stop()
+
+	body := bytes.NewBufferString(`{"jsonrpc":"2.0","id":1,"method":"rpc.discover","params":[]}`)
+	req, err := http.NewRequest(http.MethodPost, defaultAPIURL+appopenrpc.HTTPPath, body)
+	if err != nil {
+		t.Fatalf("build /openrpc.json rpc.discover request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := (&http.Client{Timeout: 3 * time.Second}).Do(req)
+	if err != nil {
+		t.Fatalf("POST /openrpc.json rpc.discover failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("unexpected /openrpc.json rpc.discover status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	var rpcResp struct {
+		Result openRPCDoc `json:"result"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&rpcResp); err != nil {
+		t.Fatalf("decode /openrpc.json rpc.discover response: %v", err)
+	}
+	if strings.TrimSpace(rpcResp.Result.OpenRPC) == "" {
+		t.Fatalf("/openrpc.json rpc.discover returned empty openrpc version")
+	}
+	if len(rpcResp.Result.Methods) == 0 {
+		t.Fatalf("/openrpc.json rpc.discover returned empty method catalog")
+	}
+}
+
+func TestOpenRPCDiscoverDotAliasOnJSONRPCPort(t *testing.T) {
+	t.Helper()
+
+	node := evmtest.NewEVMNode(t, "lumera-openrpc-rpc-discover-alias", 120)
+	node.StartAndWaitRPC()
+	defer node.Stop()
+
+	var directDoc openRPCDoc
+	node.MustJSONRPC(t, "rpc_discover", []any{}, &directDoc)
+
+	var aliasDoc openRPCDoc
+	node.MustJSONRPC(t, "rpc.discover", []any{}, &aliasDoc)
+
+	if strings.TrimSpace(aliasDoc.OpenRPC) == "" {
+		t.Fatalf("rpc.discover returned empty openrpc version")
+	}
+	if aliasDoc.OpenRPC != directDoc.OpenRPC {
+		t.Fatalf("rpc.discover openrpc version mismatch alias=%q direct=%q", aliasDoc.OpenRPC, directDoc.OpenRPC)
+	}
+	if strings.TrimSpace(aliasDoc.Info.Title) != strings.TrimSpace(directDoc.Info.Title) {
+		t.Fatalf("rpc.discover title mismatch alias=%q direct=%q", aliasDoc.Info.Title, directDoc.Info.Title)
+	}
+	if len(methodNameSet(aliasDoc)) != len(methodNameSet(directDoc)) {
+		t.Fatalf("rpc.discover method count mismatch alias=%d direct=%d", len(methodNameSet(aliasDoc)), len(methodNameSet(directDoc)))
 	}
 }
 

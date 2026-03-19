@@ -40,7 +40,7 @@ var (
 	// epochParamsSnapshotPrefix stores a per-epoch snapshot of assignment/gating-related params.
 	// Format: "eps/" + u64be(epoch_id)
 	epochParamsSnapshotPrefix = []byte("eps/")
-	reportPrefix      = []byte("r/")
+	reportPrefix              = []byte("r/")
 
 	reportIndexPrefix = []byte("ri/")
 

@@ -34,7 +34,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/server/api"
 	"github.com/cosmos/cosmos-sdk/server/config"
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
-	"github.com/spf13/cast"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	sdkmempool "github.com/cosmos/cosmos-sdk/types/mempool"
@@ -72,6 +71,7 @@ import (
 	slashingkeeper "github.com/cosmos/cosmos-sdk/x/slashing/keeper"
 	_ "github.com/cosmos/cosmos-sdk/x/staking" // import for side-effects
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
+	"github.com/spf13/cast"
 
 	"github.com/CosmWasm/wasmd/x/wasm"
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
@@ -153,6 +153,20 @@ type App struct {
 	// openRPCAllowedOrigins controls CORS for the /openrpc.json endpoint.
 	// Populated from [json-rpc] ws-origins at startup; empty means allow all.
 	openRPCAllowedOrigins []string
+	// openRPCJSONRPCAddr is the JSON-RPC server address used to rewrite the
+	// OpenRPC spec's servers[0].url so the playground POSTs to the right port.
+	openRPCJSONRPCAddr string
+	// jsonrpcAliasPublicAddr is the public JSON-RPC address configured by the
+	// operator. When direct rpc.discover aliasing is enabled, a small proxy
+	// listens here and forwards to jsonrpcAliasUpstreamAddr.
+	jsonrpcAliasPublicAddr string
+	// jsonrpcAliasUpstreamAddr is the internal loopback address used by the
+	// native cosmos/evm JSON-RPC server when the public address is fronted by
+	// Lumera's alias proxy.
+	jsonrpcAliasUpstreamAddr string
+	// jsonrpcAliasProxy is the optional compatibility proxy for dotted
+	// rpc.discover on the public JSON-RPC port.
+	jsonrpcAliasProxy *http.Server
 
 	// jsonrpcRateLimitProxy is the optional rate-limiting reverse proxy for JSON-RPC.
 	jsonrpcRateLimitProxy       *http.Server
@@ -283,6 +297,8 @@ func New(
 		)
 	)
 
+	app.configureJSONRPCAliasProxy(appOpts, logger)
+
 	var appModules map[string]appmodule.AppModule
 	if err := depinject.Inject(appConfig,
 		&appBuilder,
@@ -377,11 +393,18 @@ func New(
 	}
 
 	// Start optional JSON-RPC rate-limiting reverse proxy.
+	app.startJSONRPCAliasProxy(logger)
 	app.startJSONRPCRateLimitProxy(appOpts, logger)
 
 	// Reuse [json-rpc] ws-origins for OpenRPC CORS.
 	if origins, err := cast.ToStringSliceE(appOpts.Get("json-rpc.ws-origins")); err == nil {
 		app.openRPCAllowedOrigins = origins
+	}
+	// Store the operator-facing JSON-RPC address for OpenRPC server URL rewriting.
+	if app.openRPCJSONRPCAddr != "" {
+		// configured earlier by configureJSONRPCAliasProxy
+	} else if addr, ok := appOpts.Get("json-rpc.address").(string); ok && addr != "" {
+		app.openRPCJSONRPCAddr = addr
 	}
 
 	// **** SETUP UPGRADES (upgrade handlers and store loaders) ****
@@ -613,7 +636,7 @@ func (app *App) RegisterAPIRoutes(apiSvr *api.Server, apiConfig config.APIConfig
 	if err := server.RegisterSwaggerAPI(apiSvr.ClientCtx, apiSvr.Router, apiConfig.Swagger); err != nil {
 		panic(err)
 	}
-	apiSvr.Router.HandleFunc(appopenrpc.HTTPPath, appopenrpc.NewHTTPHandler(app.openRPCAllowedOrigins)).Methods(http.MethodGet, http.MethodHead, http.MethodOptions)
+	apiSvr.Router.HandleFunc(appopenrpc.HTTPPath, appopenrpc.NewHTTPHandler(app.openRPCAllowedOrigins, app.openRPCJSONRPCAddr)).Methods(http.MethodGet, http.MethodHead, http.MethodPost, http.MethodOptions)
 
 	// register app's OpenAPI routes.
 	docs.RegisterOpenAPIService(Name, apiSvr.Router)

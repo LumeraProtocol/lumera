@@ -55,7 +55,7 @@ func CallWithClient(ctx context.Context, httpClient *http.Client, rpcURL, method
 	if err != nil {
 		return err
 	}
-	defer httpResp.Body.Close()
+	defer func() { _ = httpResp.Body.Close() }()
 
 	var rpcResp struct {
 		Result json.RawMessage `json:"result"`
@@ -124,7 +124,7 @@ func CallBatch(ctx context.Context, rpcURL string, requests []BatchRequest) ([]B
 	if err != nil {
 		return nil, err
 	}
-	defer httpResp.Body.Close()
+	defer func() { _ = httpResp.Body.Close() }()
 
 	var rawResps []struct {
 		ID     int             `json:"id"`

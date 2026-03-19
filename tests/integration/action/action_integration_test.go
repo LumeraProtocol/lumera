@@ -28,9 +28,8 @@ type ActionIntegrationTestSuite struct {
 	msgServer actiontypes.MsgServer
 
 	// Test accounts for simulation
-	testAddrs    []sdk.AccAddress
-	testValAddrs []sdk.ValAddress
-	privKeys     []*secp256k1.PrivKey
+	testAddrs []sdk.AccAddress
+	privKeys  []*secp256k1.PrivKey
 }
 
 // SetupTest sets up a test suite
@@ -80,17 +79,6 @@ func (suite *ActionIntegrationTestSuite) SetupTest() {
 	require.NoError(suite.T(), err)
 }
 
-// createTestAddrs creates test addresses
-func createTestAddrs(numAddrs int) []sdk.AccAddress {
-	addrs := make([]sdk.AccAddress, numAddrs)
-	for i := 0; i < numAddrs; i++ {
-		addr := make([]byte, 20)
-		addr[0] = byte(i)
-		addrs[i] = sdk.AccAddress(addr)
-	}
-	return addrs
-}
-
 func createTestAddAddrsWithKeys(num int) ([]sdk.AccAddress, []*secp256k1.PrivKey, []*authtypes.BaseAccount) {
 	addrs := make([]sdk.AccAddress, num)
 	privs := make([]*secp256k1.PrivKey, num)
@@ -106,17 +94,6 @@ func createTestAddAddrsWithKeys(num int) ([]sdk.AccAddress, []*secp256k1.PrivKey
 		baseAccounts[i] = baseAcc
 	}
 	return addrs, privs, baseAccounts
-}
-
-// createTestValAddrs creates test validator addresses
-func createTestValAddrs(numAddrs int) []sdk.ValAddress {
-	addrs := make([]sdk.ValAddress, numAddrs)
-	for i := 0; i < numAddrs; i++ {
-		addr := make([]byte, 20)
-		addr[0] = byte(i)
-		addrs[i] = sdk.ValAddress(addr)
-	}
-	return addrs
 }
 
 // TestActionLifecycle tests the full action lifecycle

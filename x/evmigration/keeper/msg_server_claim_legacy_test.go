@@ -442,6 +442,87 @@ func TestClaimLegacyAccount_Success(t *testing.T) {
 	require.Equal(t, uint64(0), valCount)
 }
 
+// TestClaimLegacyAccount_MigratedThirdPartyWithdrawAddress verifies the full
+// ClaimLegacyAccount flow when the legacy account's withdraw address points to
+// a previously-migrated third-party address. This is the end-to-end regression
+// test for bug #16: the snapshot of origWithdrawAddr in migrateAccount (before
+// MigrateDistribution redirects it to self) must be passed through to
+// migrateWithdrawAddress so it resolves via MigrationRecords.
+func TestClaimLegacyAccount_MigratedThirdPartyWithdrawAddress(t *testing.T) {
+	f := initMsgServerFixture(t)
+
+	privKey := secp256k1.GenPrivKey()
+	pubKey := privKey.PubKey().(*secp256k1.PubKey)
+	legacyAddr := sdk.AccAddress(pubKey.Address())
+	newPrivKey, newAddr := testNewMigrationAccount(t)
+
+	// Third-party withdraw address that was already migrated.
+	thirdPartyLegacy := testAccAddr()
+	thirdPartyNew := testAccAddr()
+	require.NoError(t, f.keeper.MigrationRecords.Set(f.ctx, thirdPartyLegacy.String(), types.MigrationRecord{
+		LegacyAddress: thirdPartyLegacy.String(),
+		NewAddress:    thirdPartyNew.String(),
+	}))
+
+	baseAcc := authtypes.NewBaseAccountWithAddress(legacyAddr)
+
+	// preChecks: account exists and is not a module account.
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), legacyAddr).Return(baseAcc)
+	// Not a validator.
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), sdk.ValAddress(legacyAddr)).Return(
+		stakingtypes.Validator{}, stakingtypes.ErrNoValidatorFound,
+	)
+
+	// origWithdrawAddr snapshot: returns thirdPartyLegacy (the pre-redirect value).
+	// redirectWithdrawAddrIfMigrated: also reads it, sees it's migrated, resets to self.
+	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacyAddr).Return(thirdPartyLegacy, nil).Times(2)
+	// redirectWithdrawAddrIfMigrated resets to self for safe reward withdrawal.
+	f.distributionKeeper.EXPECT().SetDelegatorWithdrawAddr(gomock.Any(), legacyAddr, legacyAddr).Return(nil)
+
+	// Step 1: MigrateDistribution — no delegations.
+	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
+
+	// Step 2: MigrateStaking — no delegations, unbondings, or redelegations.
+	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetUnbondingDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
+	// migrateWithdrawAddress: must resolve thirdPartyLegacy → thirdPartyNew via MigrationRecords.
+	f.distributionKeeper.EXPECT().SetDelegatorWithdrawAddr(gomock.Any(), newAddr, thirdPartyNew).Return(nil)
+
+	// Step 3a: MigrateAuth — base account.
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), legacyAddr).Return(baseAcc)
+	f.accountKeeper.EXPECT().RemoveAccount(gomock.Any(), baseAcc)
+	newAcc := authtypes.NewBaseAccountWithAddress(newAddr)
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), newAddr).Return(nil)
+	f.accountKeeper.EXPECT().NewAccountWithAddress(gomock.Any(), newAddr).Return(newAcc)
+	f.accountKeeper.EXPECT().SetAccount(gomock.Any(), newAcc)
+
+	// Step 3b: MigrateBank — no balance.
+	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), legacyAddr).Return(sdk.Coins{})
+
+	// Steps 4-8: no authz/feegrant/supernode/action/claim to migrate.
+	f.authzKeeper.EXPECT().IterateGrants(gomock.Any(), gomock.Any())
+	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
+	f.supernodeKeeper.EXPECT().GetSuperNodeByAccount(gomock.Any(), legacyAddr.String()).Return(
+		sntypes.SuperNode{}, false, nil,
+	)
+	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
+	f.claimKeeper.EXPECT().IterateClaimRecords(gomock.Any(), gomock.Any()).Return(nil)
+
+	msg := &types.MsgClaimLegacyAccount{
+		LegacyAddress:   legacyAddr.String(),
+		NewAddress:      newAddr.String(),
+		LegacyPubKey:    pubKey.Key,
+		LegacySignature: signMigrationMessage(t, privKey, legacyAddr, newAddr),
+		NewPubKey:       newPrivKey.PubKey().(*evmcryptotypes.PubKey).Key,
+		NewSignature:    signNewMigrationMessage(t, keeperClaimKind, newPrivKey, legacyAddr, newAddr),
+	}
+
+	resp, err := f.msgServer.ClaimLegacyAccount(f.ctx, msg)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+}
+
 // --- Failure-path / atomicity tests ---
 // These tests verify that when a mid-migration step fails, the error propagates
 // to the caller (so CacheMultiStore rolls back) and no migration record or
@@ -486,9 +567,9 @@ func TestClaimLegacyAccount_FailAtDistribution(t *testing.T) {
 	f := initMsgServerFixture(t)
 	_, legacyAddr, _, msg := setupPassingPreChecks(t, f)
 
-	// Step 1: MigrateDistribution fails.
-	// redirectWithdrawAddrIfMigrated — withdraw addr returns self.
-	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacyAddr).Return(legacyAddr, nil)
+	// Snapshot + redirectWithdrawAddrIfMigrated both call GetDelegatorWithdrawAddr.
+	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacyAddr).Return(legacyAddr, nil).Times(2)
+	// Step 1: MigrateDistribution fails — GetDelegatorDelegations returns error.
 	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(
 		nil, fmt.Errorf("staking store corrupted"),
 	)
@@ -505,9 +586,9 @@ func TestClaimLegacyAccount_FailAtStaking(t *testing.T) {
 	f := initMsgServerFixture(t)
 	_, legacyAddr, _, msg := setupPassingPreChecks(t, f)
 
+	// Snapshot + redirectWithdrawAddrIfMigrated both call GetDelegatorWithdrawAddr.
+	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacyAddr).Return(legacyAddr, nil).Times(2)
 	// Step 1: MigrateDistribution succeeds (no delegations).
-	// redirectWithdrawAddrIfMigrated in MigrateDistribution.
-	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacyAddr).Return(legacyAddr, nil)
 	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
 
 	// Step 2: MigrateStaking — migrateActiveDelegations fails.

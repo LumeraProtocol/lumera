@@ -2,6 +2,48 @@
 
 ---
 
+## 1.12.0
+
+Changes included since `v1.11.1` (range: `v1.11.1..v1.12.0`).
+
+Full EVM integration documentation: [docs/evm-integration/main.md](docs/evm-integration/main.md)
+
+- Added Cosmos EVM v0.6.0 with four new modules: `x/vm` (EVM execution), `x/feemarket` (EIP-1559 dynamic base fee), `x/precisebank` (6-decimal `ulume` ↔ 18-decimal `alume` bridge), and `x/erc20` (STRv2 token pair registration + IBC middleware).
+- Added dual-route ante handler (`app/evm/ante.go`) routing Ethereum extension txs to the EVM path and all others to the Cosmos path, with pending tx listener support.
+- Added app-side EVM mempool (`app/evm_mempool.go`) with Ethereum-like sender ordering, nonce-gap handling, and same-nonce replacement rules.
+- Added async broadcast queue (`app/evm_broadcast.go`) to prevent mempool mutex re-entry deadlock during nonce-gap promotion.
+- Added 10 static precompiles: P256, Bech32, Staking, Distribution, ICS20, Bank, Gov, Slashing, plus custom Action (`0x0901`) and Supernode (`0x0902`) precompiles for Lumera-specific EVM→Cosmos calls.
+- Added JSON-RPC server and indexer enabled by default with 7 namespaces; optional per-IP rate limiting proxy (`app/evm_jsonrpc_ratelimit.go`) with configurable token bucket.
+- Added EVM tracing support configurable at runtime via `app.toml [evm] tracer` (json, struct, access_list, markdown).
+- Added OpenRPC discovery: `rpc_discover` JSON-RPC method, `GET /openrpc.json` HTTP endpoint with CORS, gzip-compressed spec embedded in binary (315 KB → 20 KB), and build-time generation via `tools/openrpcgen`.
+- Changed default key type to `eth_secp256k1` and BIP44 coin type from 118 to 60 for Ethereum-compatible wallet derivation (MetaMask, Ledger).
+- Added EVM chain ID `76857769`, base fee `0.0025 ulume/gas`, min gas price floor `0.0005 ulume/gas` (prevents zero-fee spam), and base fee change denominator `16` (~6.25% adjustment per block).
+- Added IBC ERC20 middleware wired on both v1 and v2 transfer stacks with governance-controlled registration policy (`all`/`allowlist`/`none`) via `MsgSetRegistrationPolicy`.
+- Added `x/evmigration` module for legacy coin-type-118 → 60 account migration with dual-signature verification, multi-module atomic state re-keying (auth, bank, staking, distribution, authz, feegrant, supernode, action, claim), and validator migration support.
+- Added fee-waiving ante decorator for migration txs (`ante/evmigration_fee_decorator.go`) since new addresses have zero balance pre-migration.
+- Added v1.12.0 upgrade handler with store additions for feemarket, precisebank, vm, erc20, and evmigration; post-migration finalization sets Lumera EVM params, feemarket params, and ERC20 defaults.
+- Added Action module precompile (`0x0901`) and Supernode module precompile (`0x0902`) giving Solidity contracts native access to `MsgRequestAction`/`MsgFinalizeAction` and supernode queries/registration respectively.
+- Added blocked-address protections: module accounts and all precompile addresses are excluded from bank sends to prevent accidental token loss.
+- Added centralized bank denom metadata (`config/bank_metadata.go`) and `RegisterExtraInterfaces` for `eth_secp256k1` crypto interface registration across SDK + EVM paths.
+- Added `RegisterTxService` override (`app/evm_runtime.go`) to capture the local CometBFT client for the async broadcast worker, replacing the stale HTTP client that `SetClientCtx` provides before CometBFT starts.
+- Added depinject custom signer wiring for `MsgEthereumTx` and safe early-RPC keeper coin info initialization (`SetKeeperDefaults`) to prevent panics before genesis runs.
+- CosmWasm (`wasmd v0.61.6`) and EVM coexist in the same runtime — Lumera is the only Cosmos chain shipping both simultaneously.
+- Added node operator EVM configuration guide (`docs/evm-integration/node-evm-config-guide.md`) covering `app.toml` tuning, RPC exposure, tracer config, and rate limit setup.
+- Added comprehensive EVM integration test suites under `tests/integration/evm/` covering ante, contracts, feemarket, IBC ERC20, JSON-RPC, mempool, precisebank, precompiles, and VM queries.
+- Added devnet evmigration end-to-end tests validating the full legacy account migration flow across a multi-validator network.
+
+---
+
+## 1.11.1
+
+Changes included since `v1.11.0` (range: `v1.11.0..v1.11.1`).
+
+- Added v1.11.1 upgrade handler that supports both direct upgrades from pre-audit binaries (e.g. v1.10.1→v1.11.1) and incremental upgrades from v1.11.0 by conditionally initializing the audit module.
+- Enforced a minimum floor of 15% for `audit.params.min_disk_free_percent` during upgrade.
+- Added conditional audit store loader so the audit store key is added only when upgrading from a version that lacks it.
+
+---
+
 ## 1.11.0
 
 Changes included since `v1.10.1` (range: `v1.10.1..v1.11.0`).

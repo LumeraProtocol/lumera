@@ -15,7 +15,7 @@ import (
 
 	gogoproto "github.com/cosmos/gogoproto/proto"
 
-	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
+	"github.com/LumeraProtocol/lumera/testutil/crypto"
 	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
@@ -383,11 +383,6 @@ func selectRandomActionType(r *rand.Rand) string {
 
 	// Return random selection
 	return actionTypes[r.Intn(len(actionTypes))]
-}
-
-// generateRandomOtiValues generates n random bytes as OTI value for CASCADE metadata
-func generateRandomOtiValues(n int) []byte {
-	return make([]byte, n)
 }
 
 // getRandomActiveSupernodes simulates getting a list of active supernodes from the system

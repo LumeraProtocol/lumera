@@ -10,6 +10,7 @@ DAEMON_HOME="${DAEMON_HOME:-/root/.lumera}"
 SN_BASEDIR="${SN_BASEDIR:-/root/.supernode}"
 
 LOGS_DIR="${LOGS_DIR:-/root/logs}"
+OLD_LOGS_DIR="${OLD_LOGS_DIR:-${LOGS_DIR}/old}"
 VALIDATOR_LOG="${VALIDATOR_LOG:-${LOGS_DIR}/validator.log}"
 SN_LOG="${SN_LOG:-${LOGS_DIR}/supernode.log}"
 NM_LOG="${NM_LOG:-${LOGS_DIR}/network-maker.log}"
@@ -38,7 +39,27 @@ run_stop() {
 }
 
 ensure_logs_dir() {
-	mkdir -p "${LOGS_DIR}"
+	mkdir -p "${LOGS_DIR}" "${OLD_LOGS_DIR}"
+}
+
+archive_log_file() {
+	local log_file="$1"
+	local ts base target suffix=1
+
+	[ -f "${log_file}" ] || return 0
+	[ -s "${log_file}" ] || return 0
+
+	ts="$(date '+%Y%m%d_%H_%M')"
+	base="$(basename "${log_file}")"
+	target="${OLD_LOGS_DIR}/${ts}.${base}"
+
+	while [ -e "${target}" ]; do
+		target="${OLD_LOGS_DIR}/${ts}.${suffix}.${base}"
+		suffix=$((suffix + 1))
+	done
+
+	mv "${log_file}" "${target}"
+	log "Archived ${log_file} -> ${target}"
 }
 
 start_lumera() {
@@ -55,10 +76,17 @@ start_lumera() {
 	fi
 
 	ensure_logs_dir
+	archive_log_file "${VALIDATOR_LOG}"
 	mkdir -p "$(dirname "${VALIDATOR_LOG}")" "${DAEMON_HOME}/config"
 
+	CLAIMS_LOCAL="${DAEMON_HOME}/config/claims.csv"
+	EXTRA_START_FLAGS=""
+	if [ -f "${CLAIMS_LOCAL}" ] && "${DAEMON}" start --help 2>&1 | grep -q 'skip-claims-check'; then
+		EXTRA_START_FLAGS="--skip-claims-check=false --claims-path=${CLAIMS_LOCAL}"
+	fi
 	log "Starting ${DAEMON}..."
-	"${DAEMON}" start --home "${DAEMON_HOME}" >"${VALIDATOR_LOG}" 2>&1 &
+	# shellcheck disable=SC2086
+	"${DAEMON}" start --home "${DAEMON_HOME}" ${EXTRA_START_FLAGS} >"${VALIDATOR_LOG}" 2>&1 &
 	log "${DAEMON} start requested; logging to ${VALIDATOR_LOG}"
 }
 
@@ -92,6 +120,7 @@ start_supernode() {
 	fi
 
 	ensure_logs_dir
+	archive_log_file "${SN_LOG}"
 	mkdir -p "$(dirname "${SN_LOG}")" "${SN_BASEDIR}"
 
 	log "Starting supernode (${bin})..."
@@ -113,6 +142,7 @@ start_network_maker() {
 	fi
 
 	ensure_logs_dir
+	archive_log_file "${NM_LOG}"
 	mkdir -p "$(dirname "${NM_LOG}")"
 
 	log "Starting network-maker..."

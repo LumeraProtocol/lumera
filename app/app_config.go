@@ -3,8 +3,8 @@ package app
 import (
 	"time"
 
-	"github.com/cosmos/cosmos-sdk/runtime"
 	"cosmossdk.io/depinject/appconfig"
+	"github.com/cosmos/cosmos-sdk/runtime"
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	runtimev1alpha1 "cosmossdk.io/api/cosmos/app/runtime/v1alpha1"
@@ -33,14 +33,17 @@ import (
 	evidencetypes "cosmossdk.io/x/evidence/types"
 	"cosmossdk.io/x/feegrant"
 	_ "cosmossdk.io/x/feegrant/module" // import for side-effects
-	_ "cosmossdk.io/x/upgrade"    // import for side-effects
+	_ "cosmossdk.io/x/upgrade"         // import for side-effects
 	upgradetypes "cosmossdk.io/x/upgrade/types"
+	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 	actionmodulev1 "github.com/LumeraProtocol/lumera/x/action/v1/module"
 	actionmoduletypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	auditmodulev1 "github.com/LumeraProtocol/lumera/x/audit/v1/module"
 	auditmoduletypes "github.com/LumeraProtocol/lumera/x/audit/v1/types"
 	claimmodulev1 "github.com/LumeraProtocol/lumera/x/claim/module"
 	claimmoduletypes "github.com/LumeraProtocol/lumera/x/claim/types"
+	_ "github.com/LumeraProtocol/lumera/x/evmigration/module"
+	evmigrationmoduletypes "github.com/LumeraProtocol/lumera/x/evmigration/types"
 	lumeraidmodulev1 "github.com/LumeraProtocol/lumera/x/lumeraid/module"
 	lumeraidmoduletypes "github.com/LumeraProtocol/lumera/x/lumeraid/types"
 	supernodemodulev1 "github.com/LumeraProtocol/lumera/x/supernode/v1/module"
@@ -49,8 +52,8 @@ import (
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	_ "github.com/cosmos/cosmos-sdk/x/auth/vesting" // import for side-effects
 	vestingtypes "github.com/cosmos/cosmos-sdk/x/auth/vesting/types"
-	_ "github.com/cosmos/cosmos-sdk/x/authz/module" // import for side-effects
 	"github.com/cosmos/cosmos-sdk/x/authz"
+	_ "github.com/cosmos/cosmos-sdk/x/authz/module" // import for side-effects
 	_ "github.com/cosmos/cosmos-sdk/x/bank"         // import for side-effects
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	_ "github.com/cosmos/cosmos-sdk/x/consensus" // import for side-effects
@@ -60,8 +63,8 @@ import (
 	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
 	_ "github.com/cosmos/cosmos-sdk/x/gov" // import for side-effects
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
-	_ "github.com/cosmos/cosmos-sdk/x/group/module" // import for side-effects
 	"github.com/cosmos/cosmos-sdk/x/group"
+	_ "github.com/cosmos/cosmos-sdk/x/group/module" // import for side-effects
 	_ "github.com/cosmos/cosmos-sdk/x/mint"         // import for side-effects
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	_ "github.com/cosmos/cosmos-sdk/x/params" // import for side-effects
@@ -70,15 +73,18 @@ import (
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	_ "github.com/cosmos/cosmos-sdk/x/staking" // import for side-effects
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
+	erc20types "github.com/cosmos/evm/x/erc20/types"
+	feemarkettypes "github.com/cosmos/evm/x/feemarket/types"
+	precisebanktypes "github.com/cosmos/evm/x/precisebank/types"
+	evmtypes "github.com/cosmos/evm/x/vm/types"
+	pfmtypes "github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v10/packetforward/types"
 	icatypes "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/types"
 	ibctransfertypes "github.com/cosmos/ibc-go/v10/modules/apps/transfer/types"
 	ibcexported "github.com/cosmos/ibc-go/v10/modules/core/exported"
-	ibctm "github.com/cosmos/ibc-go/v10/modules/light-clients/07-tendermint"
-	pfmtypes "github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v10/packetforward/types"
 	solomachine "github.com/cosmos/ibc-go/v10/modules/light-clients/06-solomachine"
-	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
+	ibctm "github.com/cosmos/ibc-go/v10/modules/light-clients/07-tendermint"
 
-	lcfg "github.com/LumeraProtocol/lumera/config"	
+	lcfg "github.com/LumeraProtocol/lumera/config"
 	// this line is used by starport scaffolding # stargate/app/moduleImport
 )
 
@@ -98,7 +104,6 @@ var (
 		slashingtypes.ModuleName,
 		govtypes.ModuleName,
 		minttypes.ModuleName,
-		genutiltypes.ModuleName,
 		evidencetypes.ModuleName,
 		authz.ModuleName,
 		feegrant.ModuleName,
@@ -107,20 +112,31 @@ var (
 		vestingtypes.ModuleName,
 		group.ModuleName,
 		circuittypes.ModuleName,
+		// evm modules
+		// EVM must come before precisebank: precisebank's InitGenesis calls
+		// GetEVMCoinDecimals() which requires EVM coin info set by Configure().
+		evmtypes.ModuleName, // EVM state machine (sets global coin info)
+		// Keep feemarket before genutil so genesis gentxs can use initialized
+		// feemarket params once EVM ante decorators are enabled.
+		feemarkettypes.ModuleName,
+		erc20types.ModuleName,       // ERC20 token pairs (needs EVM initialized)
+		precisebanktypes.ModuleName, // precise bank (needs EVM coin decimals)
+		genutiltypes.ModuleName,
 		// ibc modules
-		ibcexported.ModuleName,			// IBC core module
-		ibctransfertypes.ModuleName,	// IBC transfer module
-		icatypes.ModuleName,			// IBC interchain accounts module (host and controller)
-		pfmtypes.ModuleName, 			// IBC packet-forward-middleware
-		ibctm.ModuleName,				// IBC Tendermint light client
-		solomachine.ModuleName,			// IBC Solo Machine light client
-		// chain modules
+		ibcexported.ModuleName,      // IBC core module
+		ibctransfertypes.ModuleName, // IBC transfer module
+		icatypes.ModuleName,         // IBC interchain accounts module (host and controller)
+		pfmtypes.ModuleName,         // IBC packet-forward-middleware
+		ibctm.ModuleName,            // IBC Tendermint light client
+		solomachine.ModuleName,      // IBC Solo Machine light client
+		// Lumera custom modules
 		lumeraidmoduletypes.ModuleName,
 		wasmtypes.ModuleName,
 		claimmoduletypes.ModuleName,
 		supernodemoduletypes.ModuleName,
 		auditmoduletypes.ModuleName,
 		actionmoduletypes.ModuleName,
+		evmigrationmoduletypes.ModuleName,
 		// this line is used by starport scaffolding # stargate/app/initGenesis
 	}
 
@@ -130,6 +146,10 @@ var (
 	// NOTE: staking module is required if HistoricalEntries param > 0
 	// NOTE: capability module's beginblocker must come before any modules using capabilities (e.g. IBC)
 	beginBlockers = []string{
+		// evm modules
+		erc20types.ModuleName,
+		feemarkettypes.ModuleName,
+		evmtypes.ModuleName,
 		// cosmos sdk modules
 		minttypes.ModuleName,
 		distrtypes.ModuleName,
@@ -138,18 +158,20 @@ var (
 		stakingtypes.ModuleName,
 		authz.ModuleName,
 		genutiltypes.ModuleName,
+		precisebanktypes.ModuleName,
 		// ibc modules
 		ibcexported.ModuleName,
 		ibctransfertypes.ModuleName,
 		icatypes.ModuleName,
 		pfmtypes.ModuleName, // IBC packet-forward-middleware
-		// chain modules
+		// Lumera custom modules
 		lumeraidmoduletypes.ModuleName,
 		wasmtypes.ModuleName,
 		claimmoduletypes.ModuleName,
 		supernodemoduletypes.ModuleName,
 		auditmoduletypes.ModuleName,
 		actionmoduletypes.ModuleName,
+		evmigrationmoduletypes.ModuleName,
 		// this line is used by starport scaffolding # stargate/app/beginBlockers
 	}
 
@@ -172,6 +194,13 @@ var (
 		supernodemoduletypes.ModuleName,
 		auditmoduletypes.ModuleName,
 		actionmoduletypes.ModuleName,
+		// evm modules
+		erc20types.ModuleName,
+		evmtypes.ModuleName,
+		precisebanktypes.ModuleName,
+		evmigrationmoduletypes.ModuleName,
+		// NOTE: feemarket EndBlocker should be last to get the full block gas used
+		feemarkettypes.ModuleName,
 		// this line is used by starport scaffolding # stargate/app/endBlockers
 	}
 
@@ -179,6 +208,7 @@ var (
 	preBlockers = []string{
 		upgradetypes.ModuleName,
 		authtypes.ModuleName,
+		evmtypes.ModuleName, // EVM pre-block: initialize coin info for RPC
 		// this line is used by starport scaffolding # stargate/app/preBlockers
 	}
 
@@ -197,6 +227,10 @@ var (
 		{Account: claimmoduletypes.ModuleName, Permissions: []string{authtypes.Minter, authtypes.Burner, authtypes.Staking}},
 		{Account: supernodemoduletypes.ModuleName, Permissions: []string{authtypes.Minter, authtypes.Burner, authtypes.Staking}},
 		{Account: actionmoduletypes.ModuleName, Permissions: []string{authtypes.Minter, authtypes.Burner, authtypes.Staking}},
+		{Account: feemarkettypes.ModuleName},
+		{Account: precisebanktypes.ModuleName, Permissions: []string{authtypes.Minter, authtypes.Burner}},
+		{Account: evmtypes.ModuleName, Permissions: []string{authtypes.Minter, authtypes.Burner}},
+		{Account: erc20types.ModuleName, Permissions: []string{authtypes.Minter, authtypes.Burner}},
 		// this line is used by starport scaffolding # stargate/app/maccPerms
 	}
 
@@ -238,9 +272,9 @@ var (
 			{
 				Name: authtypes.ModuleName,
 				Config: appconfig.WrapAny(&authmodulev1.Module{
-					Bech32Prefix:             lcfg.AccountAddressPrefix,
+					Bech32Prefix:             lcfg.Bech32AccountAddressPrefix,
 					ModuleAccountPermissions: moduleAccPerms,
-					// Cosmos SDK 0.53.x new feature - unordered transactions 
+					// Cosmos SDK 0.53.x new feature - unordered transactions
 					// "Fire-and-forget" submission model with timeout_timestamp as TTL/replay protection
 					EnableUnorderedTransactions: true,
 					// By default modules authority is the governance module. This is configurable with the following:
@@ -259,12 +293,12 @@ var (
 				}),
 			},
 			{
-				Name:   stakingtypes.ModuleName,
+				Name: stakingtypes.ModuleName,
 				Config: appconfig.WrapAny(&stakingmodulev1.Module{
 					// NOTE: specifying a prefix is only necessary when using bech32 addresses
 					// If not specfied, the auth Bech32Prefix appended with "valoper" and "valcons" is used by default
-					Bech32PrefixValidator: lcfg.ValidatorAddressPrefix,
-					Bech32PrefixConsensus: lcfg.ConsNodeAddressPrefix,
+					Bech32PrefixValidator: lcfg.Bech32ValidatorAddressPrefix,
+					Bech32PrefixConsensus: lcfg.Bech32ConsNodeAddressPrefix,
 				}),
 			},
 			{
@@ -345,6 +379,10 @@ var (
 			{
 				Name:   actionmoduletypes.ModuleName,
 				Config: appconfig.WrapAny(&actionmodulev1.Module{}),
+			},
+			{
+				Name:   evmigrationmoduletypes.ModuleName,
+				Config: appconfig.WrapAny(&evmigrationmoduletypes.Module{}),
 			},
 			// this line is used by starport scaffolding # stargate/app/moduleConfig
 		},

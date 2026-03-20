@@ -1,9 +1,37 @@
 #!/bin/bash
+#
+# Host-side devnet configuration script.
+#
+# This script runs on the HOST (not inside Docker) as part of `make devnet-build-*`.
+# It prepares the shared volume (/tmp/<chain-id>/shared/) that all validator
+# containers will mount. Specifically:
+#
+#   1. Copies config.json + validators.json into /shared/config/
+#   2. Copies optional binaries (supernode, sncli, network-maker, test binaries)
+#      from BIN_DIR into /shared/release/ so containers can install them
+#
+# Usage:
+#   CONFIG_JSON=path/to/config.json VALIDATORS_JSON=path/to/validators.json \
+#     ./configure.sh [--bin-dir devnet/bin]
+#
+# The shared volume layout after this script:
+#   /tmp/<chain-id>/shared/
+#     config/config.json        ← chain config
+#     config/validators.json    ← validator specs
+#     release/supernode-linux-amd64  ← optional
+#     release/sncli                  ← optional
+#     release/sncli-config.toml      ← optional
+#     release/network-maker          ← optional
+#     release/nm-config.toml         ← optional (required if NM binary present)
+#     release/nm-ui/                 ← optional (NM static web UI)
+#     release/tests_*                ← optional test binaries
+#
 set -euo pipefail
 
 echo "Configuring Lumera for docker compose ..."
 
-# --- parse args -----------------------------------
+# ─── Argument Parsing ─────────────────────────────────────────────────────────
+
 BIN_DIR_ARG=""
 show_help() {
 	cat <<'EOF'
@@ -42,15 +70,14 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
-# --- resolve script dir & BIN_DIR (CLI > autodetect ../bin > empty) -----------
-
-# Get the absolute path to the directory containing this script
+# ─── Resolve Paths ────────────────────────────────────────────────────────────
+# BIN_DIR resolution order: --bin-dir flag > devnet/bin/ (auto-detected) > error
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Prefer git to find the real root; fallback to scripts/..
 REPO_ROOT="$(git -C "${SCRIPT_DIR}" rev-parse --show-toplevel 2>/dev/null || true)"
 [[ -n "${REPO_ROOT}" ]] || REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-# --- resolve BIN_DIR (CLI > repo-root/bin > empty) ----------------------------
+# Resolve BIN_DIR: CLI arg takes precedence, else auto-detect from repo layout
 if [[ -n "${BIN_DIR_ARG}" ]]; then
 	# Absolute path stays absolute; relative is interpreted from REPO_ROOT
 	if [[ "${BIN_DIR_ARG}" = /* ]]; then
@@ -78,11 +105,11 @@ else
 	exit 1
 fi
 
-# Require CONFIG_JSON environment variable
+# ─── Validate Inputs ──────────────────────────────────────────────────────────
+
 : "${CONFIG_JSON:?CONFIG_JSON environment variable must be set}"
 echo "[CONFIGURE] Lumera chain config is $CONFIG_JSON"
 
-# Require VALIDATORS_JSON environment variable
 : "${VALIDATORS_JSON:?VALIDATORS_JSON environment variable must be set}"
 echo "[CONFIGURE] Lumera validators config is $VALIDATORS_JSON"
 
@@ -97,8 +124,13 @@ if [ ! -f "${VALIDATORS_JSON}" ]; then
 fi
 
 if ! command -v jq >/dev/null 2>&1; then
-	echo "[CONFIGURE] jq is missing"
+	echo "[CONFIGURE] jq is missing" >&2
+	exit 1
 fi
+
+# ─── Shared Volume Setup ──────────────────────────────────────────────────────
+# The shared directory lives on the host at /tmp/<chain-id>/ and is bind-mounted
+# to /shared/ inside each Docker container.
 
 CHAIN_ID="$(jq -r '.chain.id' "${CONFIG_JSON}")"
 echo "[CONFIGURE] Lumera chain ID is $CHAIN_ID"
@@ -106,6 +138,8 @@ echo "[CONFIGURE] Lumera chain ID is $CHAIN_ID"
 SHARED_DIR="/tmp/${CHAIN_ID}/shared"
 CFG_DIR="${SHARED_DIR}/config"
 RELEASE_DIR="${SHARED_DIR}/release"
+
+# Binary names and config paths in BIN_DIR
 SN="supernode-linux-amd64"
 NM="network-maker"
 NM_CFG="${BIN_DIR}/nm-config.toml"
@@ -113,6 +147,10 @@ SNCLI="sncli"
 SNCLI_CFG="${BIN_DIR}/sncli-config.toml"
 NM_UI_SRC="${BIN_DIR}/nm-ui"
 NM_UI_DST="${RELEASE_DIR}/nm-ui"
+
+# ─── Binary Copy Functions ────────────────────────────────────────────────────
+# Each function copies a binary (+ optional config) from BIN_DIR to RELEASE_DIR.
+# All are optional — scripts in-container handle missing binaries gracefully.
 
 install_supernode() {
 	if [ -n "${BIN_DIR}" ] && [ -f "${BIN_DIR}/${SN}" ]; then
@@ -157,8 +195,9 @@ install_sncli() {
 	fi
 }
 
-install_ibc_tests() {
-	local test_bins=("tests_validator" "tests_hermes")
+# Copy devnet test binaries (used by `make devnet-evmigration-*` etc.)
+install_tests() {
+	local test_bins=("tests_validator" "tests_hermes" "tests_evmigration")
 	local bin
 	for bin in "${test_bins[@]}"; do
 		if [ -n "${BIN_DIR}" ] && [ -f "${BIN_DIR}/${bin}" ]; then
@@ -169,12 +208,18 @@ install_ibc_tests() {
 	done
 }
 
+# ─── Execute ──────────────────────────────────────────────────────────────────
+
 mkdir -p "${CFG_DIR}" "${RELEASE_DIR}"
+
+# Copy the two config files that drive all container-side setup scripts
 cp -f "${CONFIG_JSON}" "${VALIDATORS_JSON}" "${CFG_DIR}/"
 echo "[CONFIGURE] Configuration files copied to ${CFG_DIR}"
 
+# Copy optional binaries from BIN_DIR into the shared release directory
 install_supernode
 install_sncli
 install_nm
-install_ibc_tests
+install_tests
+
 echo "[CONFIGURE] Lumera configuration completed successfully."

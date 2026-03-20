@@ -1,0 +1,160 @@
+name: build
+
+on:
+  push:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+  pull_request:
+    branches: [master]
+  workflow_call:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  lint:
+    uses: ./.github/workflows/lint.yml
+
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6.0.1
+
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Run unit tests
+        run: make unit-tests
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6.0.1
+
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Run integration tests
+        run: make integration-tests
+
+  system-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git Safe Directory
+        uses: ./.github/actions/configure-git
+
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+
+      - name: Build and install lumerad
+        run: make install
+
+      - name: Prepare System Tests
+        run: go mod tidy
+        working-directory: tests/systemtests
+
+      - name: Run System Tests
+        run: make systemex-tests
+
+  build:
+    needs: [lint, unit-tests, integration-tests, system-tests]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git Safe Directory
+        uses: ./.github/actions/configure-git
+
+      - name: Setup Go
+        id: setup-go
+        uses: ./.github/actions/setup-go
+
+      - name: Install wasmvm library
+        uses: ./.github/actions/install-wasmvm
+
+      - name: Install tools
+        run: make install-tools
+
+      - name: Build release artifacts
+        run: make release
+        env:
+          RELEASE_CGO_LDFLAGS: "-Wl,-rpath,/usr/lib -Wl,--disable-new-dtags"
+
+      - name: Package Release Artifacts
+        run: |
+          cd release
+
+          tar_file=$(ls *.tar.gz)
+
+          file_path=$(tar -tzf "$tar_file" | head -n 2 | grep -v '/$' | grep lumerad | sed 's|^/||')
+          echo "Binary: $file_path"
+          tar xzf "$tar_file" -C .
+          ls -l "$file_path"
+
+          mkdir -p temp
+          mv "$file_path" temp/
+          ls -l temp/
+
+          rm "$tar_file"
+
+          cp /usr/lib/libwasmvm.x86_64.so temp/
+
+          cat > temp/install.sh << 'EOF'
+          #!/bin/bash
+          if [ "$EUID" -ne 0 ]; then
+            echo "Please run as root or with sudo"
+            exit 1
+          fi
+          cp lumerad /usr/local/bin
+          cp libwasmvm.x86_64.so /usr/lib/
+          ldconfig
+          echo "WASM library installed successfully"
+          EOF
+
+          chmod +x temp/install.sh
+
+          cd temp
+          tar czf "../$tar_file" ./*
+          cd ..
+
+          rm -rf temp
+
+          tar tvf "$tar_file"
+
+          sha256sum "$tar_file" > release_checksum
+
+      - name: Upload Release Artifacts
+        if: ${{ github.actor != 'nektos/act' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: release
+          if-no-files-found: error

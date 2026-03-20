@@ -1,0 +1,34 @@
+name: systemtests
+
+on:
+  push:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+
+jobs:
+  system-tests:
+    name: system
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git Safe Directory
+        uses: ./.github/actions/configure-git
+
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+
+      - name: Build and install lumerad
+        run: make install
+
+      - name: Prepare System Tests
+        run: go mod tidy
+        working-directory: tests/systemtests
+
+      - name: Run System Tests
+        run: make systemex-tests

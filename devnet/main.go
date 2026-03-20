@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"gen/config"
 	"gen/generators"
-	"path/filepath"
 	"log"
 	"os"
+	"path/filepath"
 )
 
 func main() {

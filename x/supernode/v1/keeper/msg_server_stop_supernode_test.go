@@ -5,12 +5,12 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
-	"go.uber.org/mock/gomock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
-	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
 func TestMsgServer_StopSupernode(t *testing.T) {
@@ -65,22 +65,22 @@ func TestMsgServer_StopSupernode(t *testing.T) {
 				evs := ctx.EventManager().Events()
 				foundEvt := false
 				for _, e := range evs {
-				    if e.Type != types.EventTypeSupernodeStopped {
-				        continue
-				    }
-				    kv := map[string]string{}
-				    for _, a := range e.Attributes {
-				        kv[string(a.Key)] = string(a.Value)
-				    }
-				    if kv[types.AttributeKeyValidatorAddress] == valAddr.String() &&
-				        kv[types.AttributeKeyReason] == "maintenance" &&
-				        kv[types.AttributeKeyOldState] == types.SuperNodeStateActive.String() &&
-				        kv[types.AttributeKeyHeight] != "" {
-				        foundEvt = true
-				        break
-				    }
-			        }
-			        require.True(t, foundEvt, "stop event with expected attributes not found")
+					if e.Type != types.EventTypeSupernodeStopped {
+						continue
+					}
+					kv := map[string]string{}
+					for _, a := range e.Attributes {
+						kv[string(a.Key)] = string(a.Value)
+					}
+					if kv[types.AttributeKeyValidatorAddress] == valAddr.String() &&
+						kv[types.AttributeKeyReason] == "maintenance" &&
+						kv[types.AttributeKeyOldState] == types.SuperNodeStateActive.String() &&
+						kv[types.AttributeKeyHeight] != "" {
+						foundEvt = true
+						break
+					}
+				}
+				require.True(t, foundEvt, "stop event with expected attributes not found")
 			},
 		},
 		{

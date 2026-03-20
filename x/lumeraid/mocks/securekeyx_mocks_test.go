@@ -1,24 +1,24 @@
 package lumeraidmocks
 
 import (
+	"crypto/ecdh"
 	"errors"
 	"testing"
-	"crypto/ecdh"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
-	"go.uber.org/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/mock/gomock"
 
 	_ "github.com/LumeraProtocol/lumera/app"
-	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"	
-	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-	. "github.com/LumeraProtocol/lumera/x/lumeraid/securekeyx"
 	"github.com/LumeraProtocol/lumera/testutil/accounts"
 	mocks "github.com/LumeraProtocol/lumera/testutil/mocks"
+	. "github.com/LumeraProtocol/lumera/x/lumeraid/securekeyx"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 )
 
 type SecureKeyExchangeTestSuite struct {
@@ -27,8 +27,8 @@ type SecureKeyExchangeTestSuite struct {
 	testAccounts []accounts.TestAccount
 	kr           keyring.Keyring
 
-	ctrl *gomock.Controller
-	mockKeyring *mocks.MockKeyring
+	ctrl          *gomock.Controller
+	mockKeyring   *mocks.MockKeyring
 	mockValidator *MockKeyExchangerValidator
 }
 

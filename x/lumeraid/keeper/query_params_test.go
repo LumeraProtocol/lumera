@@ -6,8 +6,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
-	"github.com/LumeraProtocol/lumera/x/lumeraid/types"
 	"github.com/LumeraProtocol/lumera/x/lumeraid/keeper"
+	"github.com/LumeraProtocol/lumera/x/lumeraid/types"
 )
 
 func TestParamsQuery(t *testing.T) {

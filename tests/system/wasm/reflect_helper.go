@@ -3,9 +3,9 @@ package wasm
 import (
 	"encoding/base64"
 	"encoding/json"
-	"path/filepath"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	wasmvmtypes "github.com/CosmWasm/wasmvm/v3/types"
@@ -20,7 +20,7 @@ import (
 	"github.com/LumeraProtocol/lumera/tests/ibctesting"
 )
 
-const TestDataDir = "../../testdata"	
+const TestDataDir = "../../testdata"
 
 func GetTestDataFilePath(filename string) string {
 	return filepath.Join(TestDataDir, filename)

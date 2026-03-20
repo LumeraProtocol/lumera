@@ -12,7 +12,6 @@ import (
 
 	sdkcodec "github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
-	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -20,6 +19,7 @@ import (
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	proto "github.com/cosmos/gogoproto/proto"
 
+	"github.com/LumeraProtocol/lumera/config"
 	lumeraidtypes "github.com/LumeraProtocol/lumera/x/lumeraid/types"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
@@ -173,7 +173,7 @@ func NewSecureKeyExchange(
 	}
 
 	interfaceRegistry := codectypes.NewInterfaceRegistry()
-	cryptocodec.RegisterInterfaces(interfaceRegistry)
+	config.RegisterExtraInterfaces(interfaceRegistry)
 	protoCodec := sdkcodec.NewProtoCodec(interfaceRegistry)
 
 	ske := &SecureKeyExchange{

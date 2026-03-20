@@ -216,7 +216,7 @@ func ActionKeeperWithAddress(t testing.TB, ctrl *gomock.Controller, accounts []A
 
 	// Set up the context
 	ctx := sdk.NewContext(stateStore, cmtproto.Header{}, false, log.NewNopLogger())
-	if accounts != nil && len(accounts) > 0 {
+	if len(accounts) > 0 {
 		for _, acc := range accounts {
 			account := authKeeper.NewAccountWithAddress(ctx, acc.Address)
 			err := account.SetPubKey(acc.PubKey)

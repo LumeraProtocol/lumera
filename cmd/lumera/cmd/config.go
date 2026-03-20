@@ -3,7 +3,65 @@ package cmd
 import (
 	cmtcfg "github.com/cometbft/cometbft/config"
 	serverconfig "github.com/cosmos/cosmos-sdk/server/config"
+	cosmosevmserverconfig "github.com/cosmos/evm/server/config"
+
+	appopenrpc "github.com/LumeraProtocol/lumera/app/openrpc"
+	lcfg "github.com/LumeraProtocol/lumera/config"
 )
+
+type LumeraEVMMempoolConfig struct {
+	BroadcastDebug bool `mapstructure:"broadcast-debug"`
+}
+
+type LumeraJSONRPCRateLimitConfig struct {
+	Enable         bool   `mapstructure:"enable"`
+	ProxyAddress   string `mapstructure:"proxy-address"`
+	RequestsPerSec int    `mapstructure:"requests-per-second"`
+	Burst          int    `mapstructure:"burst"`
+	EntryTTL       string `mapstructure:"entry-ttl"`
+	TrustedProxies string `mapstructure:"trusted-proxies"`
+}
+
+type LumeraConfig struct {
+	EVMMempool       LumeraEVMMempoolConfig       `mapstructure:"evm-mempool"`
+	JSONRPCRateLimit LumeraJSONRPCRateLimitConfig `mapstructure:"json-rpc-ratelimit"`
+}
+
+const lumeraConfigTemplate = `
+###############################################################################
+###                           Lumera Configuration                          ###
+###############################################################################
+
+[lumera.evm-mempool]
+# Enables detailed logs for async EVM mempool broadcast queue processing.
+broadcast-debug = {{ .Lumera.EVMMempool.BroadcastDebug }}
+
+[lumera.json-rpc-ratelimit]
+# Rate-limiting reverse proxy for the EVM JSON-RPC endpoint.
+# When enabled, a proxy server listens on proxy-address and forwards requests
+# to the internal JSON-RPC server with per-IP token bucket rate limiting.
+
+# Enable the rate-limiting proxy (default: false).
+enable = {{ .Lumera.JSONRPCRateLimit.Enable }}
+
+# Address the rate-limiting proxy listens on.
+proxy-address = "{{ .Lumera.JSONRPCRateLimit.ProxyAddress }}"
+
+# Sustained requests per second allowed per IP.
+requests-per-second = {{ .Lumera.JSONRPCRateLimit.RequestsPerSec }}
+
+# Maximum burst size per IP (token bucket capacity).
+burst = {{ .Lumera.JSONRPCRateLimit.Burst }}
+
+# Time-to-live for per-IP rate limiter entries (Go duration, e.g. "5m", "1h").
+# Entries are evicted after this duration of inactivity.
+entry-ttl = "{{ .Lumera.JSONRPCRateLimit.EntryTTL }}"
+
+# Comma-separated list of trusted reverse proxy CIDRs (e.g. "10.0.0.0/8, 172.16.0.0/12").
+# When set, X-Forwarded-For and X-Real-IP headers are only trusted from these sources.
+# When empty (default), client IP is always derived from the socket peer address.
+trusted-proxies = "{{ .Lumera.JSONRPCRateLimit.TrustedProxies }}"
+`
 
 // initCometBFTConfig helps to override default CometBFT Config values.
 // return cmtcfg.DefaultConfig if no custom configuration is required for the application.
@@ -17,46 +75,55 @@ func initCometBFTConfig() *cmtcfg.Config {
 	return cfg
 }
 
+// CustomAppConfig extends the SDK server config with EVM and Lumera sections.
+type CustomAppConfig struct {
+	serverconfig.Config `mapstructure:",squash"`
+
+	EVM     cosmosevmserverconfig.EVMConfig     `mapstructure:"evm"`
+	JSONRPC cosmosevmserverconfig.JSONRPCConfig `mapstructure:"json-rpc"`
+	TLS     cosmosevmserverconfig.TLSConfig     `mapstructure:"tls"`
+	Lumera  LumeraConfig                        `mapstructure:"lumera"`
+}
+
 // initAppConfig helps to override default appConfig template and configs.
 // return "", nil if no custom configuration is required for the application.
 func initAppConfig() (string, interface{}) {
-	// The following code snippet is just for reference.
-	type CustomAppConfig struct {
-		serverconfig.Config `mapstructure:",squash"`
-	}
-
-	// Optionally allow the chain developer to overwrite the SDK's default
-	// server config.
 	srvCfg := serverconfig.DefaultConfig()
-	// The SDK's default minimum gas price is set to "" (empty value) inside
-	// app.toml. If left empty by validators, the node will halt on startup.
-	// However, the chain developer can set a default app.toml value for their
-	// validators here.
-	//
-	// In summary:
-	// - if you leave srvCfg.MinGasPrices = "", all validators MUST tweak their
-	//   own app.toml config,
-	// - if you set srvCfg.MinGasPrices non-empty, validators CAN tweak their
-	//   own app.toml to override, or use this default value.
-	//
-	// In tests, we set the min gas prices to 0.
-	// srvCfg.MinGasPrices = "0stake"
-	// srvCfg.BaseConfig.IAVLDisableFastNode = true // disable fastnode by default
+	// Enable app-side mempool by default so EVM mempool integration paths
+	// (pending tx subscriptions, nonce-gap handling, replacement rules) work
+	// out-of-the-box without extra start flags.
+	srvCfg.Mempool.MaxTxs = 5000
+	evmCfg := cosmosevmserverconfig.DefaultEVMConfig()
+	evmCfg.EVMChainID = lcfg.EVMChainID
+
+	jsonRPCCfg := cosmosevmserverconfig.DefaultJSONRPCConfig()
+	// Run JSON-RPC + indexer without extra start flags; defaults can still be
+	// overridden via app.toml or CLI.
+	jsonRPCCfg.Enable = true
+	jsonRPCCfg.EnableIndexer = true
+	jsonRPCCfg.API = appopenrpc.EnsureNamespaceEnabled(jsonRPCCfg.API)
 
 	customAppConfig := CustomAppConfig{
-		Config: *srvCfg,
+		Config:  *srvCfg,
+		EVM:     *evmCfg,
+		JSONRPC: *jsonRPCCfg,
+		TLS:     *cosmosevmserverconfig.DefaultTLSConfig(),
+		Lumera: LumeraConfig{
+			EVMMempool: LumeraEVMMempoolConfig{
+				BroadcastDebug: false,
+			},
+			JSONRPCRateLimit: LumeraJSONRPCRateLimitConfig{
+				Enable:         false,
+				ProxyAddress:   "0.0.0.0:8547",
+				RequestsPerSec: 50,
+				Burst:          100,
+				EntryTTL:       "5m",
+				TrustedProxies: "",
+			},
+		},
 	}
 
-	customAppTemplate := serverconfig.DefaultConfigTemplate
-	// Edit the default template file
-	//
-	// customAppTemplate := serverconfig.DefaultConfigTemplate + `
-	// [wasm]
-	// # This is the maximum sdk gas (wasm and storage) that we allow for any x/wasm "smart" queries
-	// query_gas_limit = 300000
-	// # This is the number of wasm vm instances we keep cached in memory for speed-up
-	// # Warning: this is currently unstable and may lead to crashes, best to keep for 0 unless testing locally
-	// lru_size = 0`
+	customAppTemplate := serverconfig.DefaultConfigTemplate + cosmosevmserverconfig.DefaultEVMConfigTemplate + lumeraConfigTemplate
 
 	return customAppTemplate, customAppConfig
 }

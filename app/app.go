@@ -1,10 +1,13 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"strings"
+	"sync"
 
 	_ "cosmossdk.io/api/cosmos/tx/config/v1" // import for side-effects
 	clienthelpers "cosmossdk.io/client/v2/helpers"
@@ -33,6 +36,8 @@ import (
 	"github.com/cosmos/cosmos-sdk/server/config"
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
+	sdkmempool "github.com/cosmos/cosmos-sdk/types/mempool"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	"github.com/cosmos/cosmos-sdk/version"
 	"github.com/cosmos/cosmos-sdk/x/auth"
@@ -67,8 +72,11 @@ import (
 	slashingkeeper "github.com/cosmos/cosmos-sdk/x/slashing/keeper"
 	_ "github.com/cosmos/cosmos-sdk/x/staking" // import for side-effects
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
+	"github.com/spf13/cast"
 
+	"github.com/CosmWasm/wasmd/x/wasm"
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
+	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 	ibcpacketforwardkeeper "github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v10/packetforward/keeper"
 	icacontrollerkeeper "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/controller/keeper"
 	icahostkeeper "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/host/keeper"
@@ -76,13 +84,33 @@ import (
 	ibcporttypes "github.com/cosmos/ibc-go/v10/modules/core/05-port/types"
 	ibckeeper "github.com/cosmos/ibc-go/v10/modules/core/keeper"
 
+	"github.com/cosmos/cosmos-sdk/x/auth/ante"
+	"github.com/cosmos/cosmos-sdk/x/auth/posthandler"
+	evmante "github.com/cosmos/evm/ante"
+	evmantetypes "github.com/cosmos/evm/ante/types"
+	evmmempool "github.com/cosmos/evm/mempool"
+	evmserver "github.com/cosmos/evm/server"
+	cosmosevmutils "github.com/cosmos/evm/utils"
+	evmtypes "github.com/cosmos/evm/x/vm/types"
+	"github.com/ethereum/go-ethereum/common"
+	corevm "github.com/ethereum/go-ethereum/core/vm"
+
+	appevm "github.com/LumeraProtocol/lumera/app/evm"
+	appopenrpc "github.com/LumeraProtocol/lumera/app/openrpc"
 	upgrades "github.com/LumeraProtocol/lumera/app/upgrades"
 	appParams "github.com/LumeraProtocol/lumera/app/upgrades/params"
+	lcfg "github.com/LumeraProtocol/lumera/config"
 	actionmodulekeeper "github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	auditmodulekeeper "github.com/LumeraProtocol/lumera/x/audit/v1/keeper"
 	claimmodulekeeper "github.com/LumeraProtocol/lumera/x/claim/keeper"
+	evmigrationmodulekeeper "github.com/LumeraProtocol/lumera/x/evmigration/keeper"
+	evmigrationmodule "github.com/LumeraProtocol/lumera/x/evmigration/module"
 	lumeraidmodulekeeper "github.com/LumeraProtocol/lumera/x/lumeraid/keeper"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+	erc20keeper "github.com/cosmos/evm/x/erc20/keeper"
+	feemarketkeeper "github.com/cosmos/evm/x/feemarket/keeper"
+	precisebankkeeper "github.com/cosmos/evm/x/precisebank/keeper"
+	evmkeeper "github.com/cosmos/evm/x/vm/keeper"
 
 	// this line is used by starport scaffolding # stargate/app/moduleImport
 
@@ -101,6 +129,7 @@ var (
 var (
 	_ runtime.AppI            = (*App)(nil)
 	_ servertypes.Application = (*App)(nil)
+	_ evmserver.Application   = (*App)(nil)
 )
 
 // App extends an ABCI application, but with most of its parameters exported.
@@ -108,11 +137,42 @@ var (
 // capabilities aren't needed for testing.
 type App struct {
 	*runtime.App
-	legacyAmino       *codec.LegacyAmino
-	appCodec          codec.Codec
-	txConfig          client.TxConfig
-	interfaceRegistry codectypes.InterfaceRegistry
-	ibcRouter         *ibcporttypes.Router
+	legacyAmino        *codec.LegacyAmino
+	appCodec           codec.Codec
+	txConfig           client.TxConfig
+	clientCtx          client.Context
+	interfaceRegistry  codectypes.InterfaceRegistry
+	ibcRouter          *ibcporttypes.Router
+	pendingTxListeners []evmante.PendingTxListener
+	evmMempool         *evmmempool.ExperimentalEVMMempool
+	// evmTxBroadcaster is used to asynchronously broadcast promoted EVM transactions from the mempool to the network without blocking CheckTx execution.
+	evmTxBroadcaster *evmTxBroadcastDispatcher
+	// if true, the app will log additional information about mempool transaction broadcasts, which can be noisy but is useful for debugging mempool behavior.
+	evmBroadcastDebug  bool
+	evmBroadcastLogger log.Logger
+
+	// openRPCAllowedOrigins controls CORS for the /openrpc.json endpoint.
+	// Populated from [json-rpc] ws-origins at startup; empty means allow all.
+	openRPCAllowedOrigins []string
+	// openRPCJSONRPCAddr is the JSON-RPC server address used to rewrite the
+	// OpenRPC spec's servers[0].url so the playground POSTs to the right port.
+	openRPCJSONRPCAddr string
+	// jsonrpcAliasPublicAddr is the public JSON-RPC address configured by the
+	// operator. When direct rpc.discover aliasing is enabled, a small proxy
+	// listens here and forwards to jsonrpcAliasUpstreamAddr.
+	jsonrpcAliasPublicAddr string
+	// jsonrpcAliasUpstreamAddr is the internal loopback address used by the
+	// native cosmos/evm JSON-RPC server when the public address is fronted by
+	// Lumera's alias proxy.
+	jsonrpcAliasUpstreamAddr string
+	// jsonrpcAliasProxy is the optional compatibility proxy for dotted
+	// rpc.discover on the public JSON-RPC port.
+	jsonrpcAliasProxy *http.Server
+
+	// jsonrpcRateLimitProxy is the optional rate-limiting reverse proxy for JSON-RPC.
+	jsonrpcRateLimitProxy       *http.Server
+	jsonrpcRateLimitCleanupStop chan struct{}
+	jsonrpcRateLimitCloseOnce   *sync.Once
 
 	// keepers
 	// only keepers required by the app are exposed
@@ -150,6 +210,14 @@ type App struct {
 	SupernodeKeeper sntypes.SupernodeKeeper
 	AuditKeeper     auditmodulekeeper.Keeper
 	ActionKeeper    actionmodulekeeper.Keeper
+
+	// EVM keepers
+	FeeMarketKeeper    feemarketkeeper.Keeper
+	PreciseBankKeeper  precisebankkeeper.Keeper
+	EVMKeeper          *evmkeeper.Keeper
+	Erc20Keeper        erc20keeper.Keeper
+	EvmigrationKeeper  evmigrationmodulekeeper.Keeper
+	erc20PolicyWrapper *erc20PolicyKeeperWrapper
 	// this line is used by starport scaffolding # stargate/app/keeperDeclaration
 
 	// simulation manager
@@ -193,6 +261,13 @@ func AppConfig(appOpts servertypes.AppOptions) depinject.Config {
 				// this line is used by starport scaffolding # stargate/appConfig/moduleBasic
 			},
 		),
+		// EVM custom signers: MsgEthereumTx uses a non-standard signer derivation
+		// that must be registered with the interface registry via depinject.
+		depinject.Provide(appevm.ProvideCustomGetSigners),
+		// EVM migration messages authenticate both parties inside the message
+		// payload, so they intentionally expose zero Cosmos tx signers.
+		depinject.Provide(evmigrationmodule.ProvideCustomGetSigners),
+		depinject.Invoke(lcfg.RegisterExtraInterfaces),
 	)
 }
 
@@ -224,6 +299,8 @@ func New(
 		)
 	)
 
+	app.configureJSONRPCAliasProxy(appOpts, logger)
+
 	var appModules map[string]appmodule.AppModule
 	if err := depinject.Inject(appConfig,
 		&appBuilder,
@@ -252,27 +329,86 @@ func New(
 		&app.SupernodeKeeper,
 		&app.AuditKeeper,
 		&app.ActionKeeper,
+		&app.EvmigrationKeeper,
+
 		// this line is used by starport scaffolding # stargate/app/keeperDefinition
 	); err != nil {
 		panic(err)
 	}
+	// Keep LegacyAmino aligned with Cosmos EVM so SDK ante code paths that still
+	// marshal StdSignature via legacy.Cdc support eth_secp256k1 pubkeys.
+	registerLumeraLegacyAminoCodec(app.legacyAmino)
 
-	// add to default baseapp options
-	// enable optimistic execution
+	// add to default baseapp options, enable optimistic execution
 	baseAppOptions = append(baseAppOptions, baseapp.SetOptimisticExecution())
 
 	// build app
 	app.App = appBuilder.Build(db, traceStore, baseAppOptions...)
 	app.SetVersion(version.Version)
+	app.appendEVMPrecompileSendRestriction()
 
-	// register legacy modules
+	// configure EVM coin info (must happen before EVM module keepers are created)
+	if err := appevm.Configure(); err != nil {
+		panic(err)
+	}
+
+	// register EVM modules first — the ante handler (set during IBC/wasm registration)
+	// depends on EVM keepers (FeeMarketKeeper, EVMKeeper).
+	if err := app.registerEVMModules(appOpts); err != nil {
+		panic(err)
+	}
+
+	// Create the ERC20 registration policy wrapper (governance-controlled IBC voucher
+	// ERC20 auto-registration). Must be created before registerIBCModules, which wires
+	// the wrapper into the IBC transfer middleware stacks.
+	app.registerERC20Policy()
+
+	// register legacy modules (IBC, wasm)
 	if err := app.registerIBCModules(appOpts, wasmOpts...); err != nil {
+		panic(err)
+	}
+	// Inject IBC store keys into the EVM keeper's KV store map so the snapshot
+	// multi-store used by StateDB includes "ibc" and "transfer" stores.
+	// registerEVMModules captured kvStoreKeys() before IBC stores were registered;
+	// adding them here fixes Bug #6 (ICS20 precompile panic).
+	app.syncEVMStoreKeys()
+
+	// Enable Cosmos EVM static precompiles once IBC keepers are available.
+	app.configureEVMStaticPrecompiles()
+
+	// set ante and post handlers — must happen after all modules are registered
+	// since the ante handler depends on EVM, Wasm, and IBC keepers.
+	if err := app.setAnteHandler(appOpts); err != nil {
+		panic(err)
+	}
+	// wire the Cosmos EVM mempool into BaseApp after ante is set
+	if err := app.configureEVMMempool(appOpts, logger); err != nil {
+		panic(fmt.Errorf("failed to configure EVM mempool: %w", err))
+	}
+	if err := app.setPostHandler(); err != nil {
 		panic(err)
 	}
 
 	// register streaming services
 	if err := app.RegisterStreamingServices(appOpts, app.kvStoreKeys()); err != nil {
 		panic(err)
+	}
+
+	// Start JSON-RPC proxy stack. When rate limiting is enabled, it is
+	// injected directly into the alias proxy handler so the public port is
+	// always rate-limited. A separate rate-limit-only proxy is started only
+	// when the alias proxy is not active (no rpc.discover aliasing).
+	app.startJSONRPCProxyStack(appOpts, logger)
+
+	// Reuse [json-rpc] ws-origins for OpenRPC CORS.
+	if origins, err := cast.ToStringSliceE(appOpts.Get("json-rpc.ws-origins")); err == nil {
+		app.openRPCAllowedOrigins = origins
+	}
+	// Store the operator-facing JSON-RPC address for OpenRPC server URL rewriting.
+	if app.openRPCJSONRPCAddr != "" {
+		// configured earlier by configureJSONRPCAliasProxy
+	} else if addr, ok := appOpts.Get("json-rpc.address").(string); ok && addr != "" {
+		app.openRPCJSONRPCAddr = addr
 	}
 
 	// **** SETUP UPGRADES (upgrade handlers and store loaders) ****
@@ -297,6 +433,10 @@ func New(
 		if err := app.UpgradeKeeper.SetModuleVersionMap(ctx, app.ModuleManager.GetVersionMap()); err != nil {
 			panic(err)
 		}
+
+		// Pre-populate the ERC20 registration policy with default allowlist
+		// base denoms (uatom, uosmo, uusdc) on first genesis.
+		app.initERC20PolicyDefaults(ctx)
 
 		return app.App.InitChainer(ctx, req)
 	})
@@ -331,7 +471,11 @@ func (app *App) setupUpgrades() {
 		SupernodeKeeper:       app.SupernodeKeeper,
 		ParamsKeeper:          &app.ParamsKeeper,
 		ConsensusParamsKeeper: &app.ConsensusParamsKeeper,
-		AuditKeeper:     &app.AuditKeeper,
+		AuditKeeper:           &app.AuditKeeper,
+		BankKeeper:            app.BankKeeper,
+		EVMKeeper:             app.EVMKeeper,
+		FeeMarketKeeper:       &app.FeeMarketKeeper,
+		Erc20Keeper:           &app.Erc20Keeper,
 	}
 
 	allUpgrades := upgrades.AllUpgrades(params)
@@ -421,6 +565,23 @@ func (app *App) TxConfig() client.TxConfig {
 	return app.txConfig
 }
 
+// RegisterPendingTxListener registers a callback consumed by JSON-RPC pending
+// transaction streaming.
+func (app *App) RegisterPendingTxListener(listener func(common.Hash)) {
+	app.pendingTxListeners = append(app.pendingTxListeners, listener)
+}
+
+func (app *App) onPendingTx(hash common.Hash) {
+	for _, listener := range app.pendingTxListeners {
+		listener(hash)
+	}
+}
+
+// GetMempool returns the app-side EVM mempool when configured.
+func (app *App) GetMempool() sdkmempool.ExtMempool {
+	return app.evmMempool
+}
+
 // GetKey returns the KVStoreKey for the provided store key.
 func (app *App) GetKey(storeKey string) *storetypes.KVStoreKey {
 	kvStoreKey, ok := app.UnsafeFindStoreKey(storeKey).(*storetypes.KVStoreKey)
@@ -437,6 +598,15 @@ func (app *App) GetMemKey(storeKey string) *storetypes.MemoryStoreKey {
 		return nil
 	}
 
+	return key
+}
+
+// GetTransientKey returns the TransientStoreKey for the provided store key.
+func (app *App) GetTransientKey(storeKey string) *storetypes.TransientStoreKey {
+	key, ok := app.UnsafeFindStoreKey(storeKey).(*storetypes.TransientStoreKey)
+	if !ok {
+		return nil
+	}
 	return key
 }
 
@@ -470,6 +640,7 @@ func (app *App) RegisterAPIRoutes(apiSvr *api.Server, apiConfig config.APIConfig
 	if err := server.RegisterSwaggerAPI(apiSvr.ClientCtx, apiSvr.Router, apiConfig.Swagger); err != nil {
 		panic(err)
 	}
+	apiSvr.Router.HandleFunc(appopenrpc.HTTPPath, appopenrpc.NewHTTPHandler(app.openRPCAllowedOrigins, app.openRPCJSONRPCAddr)).Methods(http.MethodGet, http.MethodHead, http.MethodPost, http.MethodOptions)
 
 	// register app's OpenAPI routes.
 	docs.RegisterOpenAPIService(Name, apiSvr.Router)
@@ -487,19 +658,101 @@ func GetMaccPerms() map[string][]string {
 	return dup
 }
 
+// setPostHandler sets the app's post handler, which is responsible for post-processing transactions after they are executed.
+func (app *App) setPostHandler() error {
+	postHandler, err := posthandler.NewPostHandler(
+		posthandler.HandlerOptions{},
+	)
+	if err != nil {
+		return err
+	}
+	app.SetPostHandler(postHandler)
+	return nil
+}
+
+// setAnteHandler sets the app's ante handler, which is responsible for pre-processing transactions before they are executed.
+func (app *App) setAnteHandler(appOpts servertypes.AppOptions) error {
+	wasmConfig, err := wasm.ReadNodeConfig(appOpts)
+	if err != nil {
+		return fmt.Errorf("error while reading wasm config: %s", err)
+	}
+
+	anteHandler, err := appevm.NewAnteHandler(
+		appevm.HandlerOptions{
+			HandlerOptions: ante.HandlerOptions{
+				AccountKeeper:          app.AuthKeeper,
+				BankKeeper:             app.BankKeeper,
+				SignModeHandler:        app.txConfig.SignModeHandler(),
+				FeegrantKeeper:         app.FeeGrantKeeper,
+				SigGasConsumer:         evmante.SigVerificationGasConsumer,
+				ExtensionOptionChecker: evmantetypes.HasDynamicFeeExtensionOption,
+			},
+			IBCKeeper:             app.IBCKeeper,
+			WasmConfig:            &wasmConfig,
+			WasmKeeper:            app.WasmKeeper,
+			TXCounterStoreService: runtime.NewKVStoreService(app.GetKey(wasmtypes.StoreKey)),
+			CircuitKeeper:         &app.CircuitBreakerKeeper,
+			// EVM keepers for dual-routing ante handler
+			EVMAccountKeeper:  app.AuthKeeper,
+			FeeMarketKeeper:   app.FeeMarketKeeper,
+			EvmKeeper:         app.EVMKeeper,
+			PendingTxListener: app.onPendingTx,
+			// no max gas limit in the ante handler, as the EVM mempool will enforce its own max gas limit for transactions entering the mempool
+			MaxTxGasWanted: 0,
+			// enable dynamic fee checking by default, with the option to disable via app config
+			DynamicFeeChecker: true,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create AnteHandler: %s", err)
+	}
+
+	app.SetAnteHandler(anteHandler)
+	return nil
+}
+
 // BlockedAddresses returns all the app's blocked account addresses.
 func BlockedAddresses() map[string]bool {
 	result := make(map[string]bool)
 
 	if len(blockAccAddrs) > 0 {
-		for _, addr := range blockAccAddrs {
-			result[addr] = true
+		for _, moduleName := range blockAccAddrs {
+			result[authtypes.NewModuleAddress(moduleName).String()] = true
 		}
 	} else {
-		for addr := range GetMaccPerms() {
-			result[addr] = true
+		for moduleName := range GetMaccPerms() {
+			result[authtypes.NewModuleAddress(moduleName).String()] = true
 		}
 	}
 
+	for addr := range blockedPrecompileAddresses() {
+		result[addr] = true
+	}
+
 	return result
+}
+
+func blockedPrecompileAddresses() map[string]bool {
+	blocked := make(map[string]bool)
+
+	blockedPrecompilesHex := append([]string{}, evmtypes.AvailableStaticPrecompiles...)
+	for _, addr := range corevm.PrecompiledAddressesPrague {
+		blockedPrecompilesHex = append(blockedPrecompilesHex, addr.Hex())
+	}
+
+	for _, precompile := range blockedPrecompilesHex {
+		blocked[cosmosevmutils.Bech32StringFromHexAddress(precompile)] = true
+	}
+
+	return blocked
+}
+
+func (app *App) appendEVMPrecompileSendRestriction() {
+	blocked := blockedPrecompileAddresses()
+	app.BankKeeper.AppendSendRestriction(func(_ context.Context, _, toAddr sdk.AccAddress, _ sdk.Coins) (sdk.AccAddress, error) {
+		if blocked[toAddr.String()] {
+			return toAddr, sdkerrors.ErrUnauthorized.Wrapf("sending coins to EVM precompile address %s is not allowed", toAddr.String())
+		}
+		return toAddr, nil
+	})
 }

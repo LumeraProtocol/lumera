@@ -29,17 +29,47 @@ func (k Keeper) GetClaimRecord(ctx sdk.Context, address string) (val types.Claim
 func (k Keeper) SetClaimRecord(ctx sdk.Context, claimRecord types.ClaimRecord) error {
 	storeAdapter := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
 	store := prefix.NewStore(storeAdapter, types.KeyPrefix(types.ClaimRecordKey))
+	key := []byte(claimRecord.OldAddress)
+	isNewRecord := store.Get(key) == nil
 
 	b, err := k.cdc.Marshal(&claimRecord)
 	if err != nil {
 		return err
 	}
 
-	store.Set([]byte(claimRecord.OldAddress), b)
-	k.incrementClaimRecordCount(ctx)
+	store.Set(key, b)
+	if isNewRecord {
+		k.incrementClaimRecordCount(ctx)
+	}
+
 	return nil
 }
 
+// IterateClaimRecords iterates all claim records.
+// Returning stop=true from cb stops iteration early.
+func (k Keeper) IterateClaimRecords(ctx sdk.Context, cb func(claimRecord types.ClaimRecord) (stop bool, err error)) error {
+	storeAdapter := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
+	store := prefix.NewStore(storeAdapter, types.KeyPrefix(types.ClaimRecordKey))
+
+	iterator := store.Iterator(nil, nil)
+	defer func() { _ = iterator.Close() }()
+
+	for ; iterator.Valid(); iterator.Next() {
+		var record types.ClaimRecord
+		if err := k.cdc.Unmarshal(iterator.Value(), &record); err != nil {
+			return err
+		}
+		stop, err := cb(record)
+		if err != nil {
+			return err
+		}
+		if stop {
+			return nil
+		}
+	}
+
+	return nil
+}
 
 func (k Keeper) GetClaimRecordCount(ctx sdk.Context) uint64 {
 	storeAdapter := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))

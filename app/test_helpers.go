@@ -44,17 +44,16 @@ import (
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	ibcporttypes "github.com/cosmos/ibc-go/v10/modules/core/05-port/types"
 	ibcapi "github.com/cosmos/ibc-go/v10/modules/core/api"
 
+	appevm "github.com/LumeraProtocol/lumera/app/evm"
 	lcfg "github.com/LumeraProtocol/lumera/config"
 	ibcmock "github.com/LumeraProtocol/lumera/tests/ibctesting/mock"
 	mockv2 "github.com/LumeraProtocol/lumera/tests/ibctesting/mock/v2"
-	claimtypes "github.com/LumeraProtocol/lumera/x/claim/types"
 )
 
 const (
@@ -121,6 +120,24 @@ func NewTestApp(
 	}
 
 	return app, nil
+}
+
+// runOrSkipEVMTestTag executes fn and converts the missing '-tags=test' EVM
+// guard panic into a test skip so plain `go test ./...` does not hard-fail.
+func runOrSkipEVMTestTag(tb testing.TB, fn func()) {
+	tb.Helper()
+
+	defer func() {
+		if r := recover(); r != nil {
+			if appevm.IsTestTagRequiredPanic(r) || appevm.IsChainConfigAlreadySetPanic(r) {
+				tb.Skip(appevm.TestTagRequiredMessage())
+				return
+			}
+			panic(r)
+		}
+	}()
+
+	fn()
 }
 
 //// Setup initializes a new App instance for testing.
@@ -198,7 +215,7 @@ func setup(t testing.TB, chainID string, withGenesis bool, invCheckPeriod uint, 
 
 	snapshotDB, err := dbm.NewDB("metadata", dbm.GoLevelDBBackend, snapshotDir)
 	require.NoError(t, err)
-	t.Cleanup(func() { snapshotDB.Close() })
+	t.Cleanup(func() { _ = snapshotDB.Close() })
 	require.NoError(t, err)
 	snapshotStore, err := snapshots.NewStore(snapshotDB, snapshotDir)
 	require.NoError(t, err)
@@ -223,6 +240,9 @@ func setup(t testing.TB, chainID string, withGenesis bool, invCheckPeriod uint, 
 		true,
 		appOptions,
 		wasmOpts,
+		// Test apps use ephemeral stores; disable fastnode to avoid noisy
+		// one-time upgrade logs and keep execution deterministic.
+		bam.SetIAVLDisableFastNode(true),
 		bam.SetChainID(chainID),
 		bam.SetSnapshot(snapshotStore, snapshottypes.SnapshotOptions{KeepRecent: 2}),
 	)
@@ -275,13 +295,15 @@ func SetupWithGenesisValSet(
 ) *App {
 	tb.Helper()
 
+	// Reset EVM global state to avoid "already set" panics when creating
+	// multiple app instances in the same test process (e.g. IBC tests).
+	runOrSkipEVMTestTag(tb, appevm.ResetGlobalState)
+
 	app, genesisState := setup(tb, chainID, true, 5, wasmOpts...)
 	genesisState = GenesisStateWithValSet(tb, app.AppCodec(), genesisState, valSet, genAccs, balances...)
 
 	stateBytes, err := json.MarshalIndent(genesisState, "", " ")
 	require.NoError(tb, err)
-
-	viper.Set(claimtypes.FlagSkipClaimsCheck, true)
 
 	// init chain will set the validator set and initialize the genesis accounts
 	consensusParams := simtestutil.DefaultConsensusParams
@@ -467,7 +489,8 @@ func GenesisStateWithValSet(
 	}
 
 	// update total supply
-	bankGenesis := banktypes.NewGenesisState(banktypes.DefaultGenesisState().Params, balances, totalSupply, []banktypes.Metadata{}, []banktypes.SendEnabled{})
+	denomMetadata := []banktypes.Metadata{lcfg.ChainBankMetadata()}
+	bankGenesis := banktypes.NewGenesisState(banktypes.DefaultGenesisState().Params, balances, totalSupply, denomMetadata, []banktypes.SendEnabled{})
 	genesisState[banktypes.ModuleName] = codec.MustMarshalJSON(bankGenesis)
 
 	return genesisState
@@ -478,7 +501,7 @@ func NewTestNetworkFixture() network.TestFixture {
 	if err != nil {
 		panic(fmt.Sprintf("failed creating temporary directory: %v", err))
 	}
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir) }()
 
 	// Create initial app instance
 	app := New(
@@ -488,6 +511,7 @@ func NewTestNetworkFixture() network.TestFixture {
 		true,
 		simtestutil.NewAppOptionsWithFlagHome(dir),
 		GetDefaultWasmOptions(),
+		bam.SetIAVLDisableFastNode(true),
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed creating app: %v", err))
@@ -502,6 +526,7 @@ func NewTestNetworkFixture() network.TestFixture {
 			true,
 			simtestutil.NewAppOptionsWithFlagHome(val.GetCtx().Config.RootDir),
 			GetDefaultWasmOptions(),
+			bam.SetIAVLDisableFastNode(true),
 			bam.SetPruning(pruningtypes.NewPruningOptionsFromString(val.GetAppConfig().Pruning)),
 			bam.SetMinGasPrices(val.GetAppConfig().MinGasPrices),
 			bam.SetChainID(val.GetCtx().Viper.GetString(flags.FlagChainID)),

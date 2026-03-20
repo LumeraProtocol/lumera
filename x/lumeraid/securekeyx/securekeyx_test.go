@@ -9,9 +9,9 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	proto "github.com/cosmos/gogoproto/proto"
-	"go.uber.org/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	_ "github.com/LumeraProtocol/lumera/app"
 	"github.com/LumeraProtocol/lumera/testutil/accounts"
@@ -19,7 +19,6 @@ import (
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 )
-
 
 func TestCreateRequest_CurveNotSet(t *testing.T) {
 	ke := &SecureKeyExchange{}

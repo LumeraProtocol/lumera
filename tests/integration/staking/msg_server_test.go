@@ -58,8 +58,8 @@ func TestCancelUnbondingDelegation(t *testing.T) {
 		ctx.BlockTime().Add(time.Minute*10),
 		unbondingAmount.Amount,
 		0,
-		address.NewBech32Codec(lcfg.ValidatorAddressPrefix),
-		address.NewBech32Codec(lcfg.AccountAddressPrefix),
+		address.NewBech32Codec(lcfg.Bech32ValidatorAddressPrefix),
+		address.NewBech32Codec(lcfg.Bech32AccountAddressPrefix),
 	)
 
 	// set and retrieve a record

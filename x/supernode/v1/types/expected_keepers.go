@@ -20,6 +20,7 @@ import (
 // For Generating mocks only not used in depinject
 type SupernodeKeeper interface {
 	SetSuperNode(ctx sdk.Context, supernode SuperNode) error
+	DeleteSuperNode(ctx sdk.Context, valAddr sdk.ValAddress)
 	SetParams(ctx sdk.Context, params Params) error
 	CheckValidatorSupernodeEligibility(ctx sdk.Context, validator stakingtypes.ValidatorI, valAddr string, supernodeAccount string) error
 	SetSuperNodeStopped(ctx sdk.Context, valAddr sdk.ValAddress, reason string) error
@@ -28,6 +29,7 @@ type SupernodeKeeper interface {
 	RecoverSuperNodeFromPostponed(ctx sdk.Context, valAddr sdk.ValAddress) error
 	SetMetricsState(ctx sdk.Context, state SupernodeMetricsState) error
 	GetMetricsState(ctx sdk.Context, valAddr sdk.ValAddress) (SupernodeMetricsState, bool)
+	DeleteMetricsState(ctx sdk.Context, valAddr sdk.ValAddress)
 	Logger() log.Logger
 	GetAuthority() string
 	GetStakingKeeper() StakingKeeper

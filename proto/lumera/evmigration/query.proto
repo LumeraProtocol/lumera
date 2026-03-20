@@ -1,0 +1,190 @@
+syntax = "proto3";
+package lumera.evmigration;
+
+import "amino/amino.proto";
+import "cosmos/base/query/v1beta1/pagination.proto";
+import "cosmos_proto/cosmos.proto";
+import "gogoproto/gogo.proto";
+import "google/api/annotations.proto";
+import "lumera/evmigration/params.proto";
+import "lumera/evmigration/migration_record.proto";
+
+option go_package = "x/evmigration/types";
+
+// Query defines the gRPC querier service for the evmigration module.
+service Query {
+  // Params returns the current migration parameters.
+  rpc Params(QueryParamsRequest) returns (QueryParamsResponse) {
+    option (google.api.http).get = "/lumera/evmigration/params";
+  }
+
+  // MigrationRecord returns the migration record for a single legacy address.
+  // Returns nil record if the address has not been migrated.
+  rpc MigrationRecord(QueryMigrationRecordRequest) returns (QueryMigrationRecordResponse) {
+    option (google.api.http).get = "/lumera/evmigration/migration_record/{legacy_address}";
+  }
+
+  // MigrationRecords returns all completed migration records with pagination.
+  rpc MigrationRecords(QueryMigrationRecordsRequest) returns (QueryMigrationRecordsResponse) {
+    option (google.api.http).get = "/lumera/evmigration/migration_records";
+  }
+
+  // MigrationEstimate returns a dry-run estimate of what would be migrated
+  // for a given legacy address (delegation count, unbonding count, etc.).
+  // Useful for validators to pre-check before submitting MsgMigrateValidator.
+  rpc MigrationEstimate(QueryMigrationEstimateRequest) returns (QueryMigrationEstimateResponse) {
+    option (google.api.http).get = "/lumera/evmigration/migration_estimate/{legacy_address}";
+  }
+
+  // MigrationStats returns aggregate counters: total migrated, total legacy,
+  // total legacy staked, total validators migrated/legacy.
+  rpc MigrationStats(QueryMigrationStatsRequest) returns (QueryMigrationStatsResponse) {
+    option (google.api.http).get = "/lumera/evmigration/migration_stats";
+  }
+
+  // LegacyAccounts lists accounts that still use secp256k1 pubkey and have
+  // non-zero balance or delegations (i.e. accounts that should migrate).
+  rpc LegacyAccounts(QueryLegacyAccountsRequest) returns (QueryLegacyAccountsResponse) {
+    option (google.api.http).get = "/lumera/evmigration/legacy_accounts";
+  }
+
+  // MigratedAccounts lists all completed migrations with full detail.
+  rpc MigratedAccounts(QueryMigratedAccountsRequest) returns (QueryMigratedAccountsResponse) {
+    option (google.api.http).get = "/lumera/evmigration/migrated_accounts";
+  }
+}
+
+// QueryParamsRequest is the request type for the Query/Params RPC method.
+message QueryParamsRequest {}
+
+// QueryParamsResponse is the response type for the Query/Params RPC method.
+message QueryParamsResponse {
+  // params holds all the parameters of this module.
+  Params params = 1 [(gogoproto.nullable) = false, (amino.dont_omitempty) = true];
+}
+
+// QueryMigrationRecordRequest is the request type for the Query/MigrationRecord RPC method.
+message QueryMigrationRecordRequest {
+  // legacy_address is the coin-type-118 address to look up.
+  string legacy_address = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+}
+
+// QueryMigrationRecordResponse is the response type for the Query/MigrationRecord RPC method.
+message QueryMigrationRecordResponse {
+  // record is the migration record, or nil if not found.
+  MigrationRecord record = 1;
+}
+
+// QueryMigrationRecordsRequest is the request type for the Query/MigrationRecords RPC method.
+message QueryMigrationRecordsRequest {
+  // pagination defines an optional pagination for the request.
+  cosmos.base.query.v1beta1.PageRequest pagination = 1;
+}
+
+// QueryMigrationRecordsResponse is the response type for the Query/MigrationRecords RPC method.
+message QueryMigrationRecordsResponse {
+  // records is the list of completed migration records.
+  repeated MigrationRecord records = 1 [(gogoproto.nullable) = false];
+  // pagination defines the pagination in the response.
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+// QueryMigrationEstimateRequest is the request type for the Query/MigrationEstimate RPC method.
+message QueryMigrationEstimateRequest {
+  // legacy_address is the coin-type-118 address to estimate migration for.
+  string legacy_address = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+}
+
+// QueryMigrationEstimateResponse is the response type for the Query/MigrationEstimate RPC method.
+// It provides a dry-run estimate of what would be migrated.
+message QueryMigrationEstimateResponse {
+  // is_validator is true if the legacy address is a validator operator.
+  bool   is_validator       = 1;
+  // delegation_count is the number of active delegations from this address.
+  uint64 delegation_count   = 2;
+  // unbonding_count is the number of unbonding delegation entries.
+  uint64 unbonding_count    = 3;
+  // redelegation_count is the number of redelegation entries.
+  uint64 redelegation_count = 4;
+  // authz_grant_count is the number of authz grants as granter or grantee.
+  uint64 authz_grant_count  = 5;
+  // feegrant_count is the number of fee allowances as granter or grantee.
+  uint64 feegrant_count     = 6;
+  // total_touched is the sum of all records that would be re-keyed.
+  uint64 total_touched      = 7;
+  // would_succeed is false if migration would be rejected.
+  bool   would_succeed      = 8;
+  // rejection_reason is non-empty if would_succeed is false.
+  string rejection_reason   = 9;
+  // val_delegation_count is delegations TO this validator (from all delegators).
+  // Populated only when is_validator is true.
+  uint64 val_delegation_count   = 10;
+  // val_unbonding_count is unbonding delegations TO this validator.
+  // Populated only when is_validator is true.
+  uint64 val_unbonding_count    = 11;
+  // val_redelegation_count is redelegations referencing this validator as src or dst.
+  // Populated only when is_validator is true.
+  uint64 val_redelegation_count = 12;
+  // action_count is the number of action records where this address appears
+  // either as creator or in the SuperNodes list.
+  uint64 action_count = 13;
+}
+
+// QueryMigrationStatsRequest is the request type for the Query/MigrationStats RPC method.
+message QueryMigrationStatsRequest {}
+
+// QueryMigrationStatsResponse is the response type for the Query/MigrationStats RPC method.
+// It provides aggregate counters for the migration dashboard.
+message QueryMigrationStatsResponse {
+  // total_migrated is the number of accounts that completed migration (O(1) from state counter).
+  uint64 total_migrated            = 1;
+  // total_legacy is the number of accounts with secp256k1 pubkey and non-zero balance.
+  uint64 total_legacy              = 2;
+  // total_legacy_staked is the subset of total_legacy with active delegations.
+  uint64 total_legacy_staked       = 3;
+  // total_validators_migrated is the number of validators that completed migration.
+  uint64 total_validators_migrated = 4;
+  // total_validators_legacy is the number of validators with legacy operator address.
+  uint64 total_validators_legacy   = 5;
+}
+
+// QueryLegacyAccountsRequest is the request type for the Query/LegacyAccounts RPC method.
+message QueryLegacyAccountsRequest {
+  // pagination defines an optional pagination for the request.
+  cosmos.base.query.v1beta1.PageRequest pagination = 1;
+}
+
+// QueryLegacyAccountsResponse is the response type for the Query/LegacyAccounts RPC method.
+message QueryLegacyAccountsResponse {
+  // accounts is the list of legacy accounts that need migration.
+  repeated LegacyAccountInfo accounts = 1 [(gogoproto.nullable) = false];
+  // pagination defines the pagination in the response.
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+// LegacyAccountInfo provides summary information about a legacy account
+// that has not yet been migrated.
+message LegacyAccountInfo {
+  // address is the bech32 account address.
+  string address         = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  // balance_summary is a human-readable total balance across all denoms.
+  string balance_summary = 2;
+  // has_delegations is true if the account has active staking delegations.
+  bool   has_delegations = 3;
+  // is_validator is true if the account is a validator operator.
+  bool   is_validator    = 4;
+}
+
+// QueryMigratedAccountsRequest is the request type for the Query/MigratedAccounts RPC method.
+message QueryMigratedAccountsRequest {
+  // pagination defines an optional pagination for the request.
+  cosmos.base.query.v1beta1.PageRequest pagination = 1;
+}
+
+// QueryMigratedAccountsResponse is the response type for the Query/MigratedAccounts RPC method.
+message QueryMigratedAccountsResponse {
+  // records is the list of completed migration records.
+  repeated MigrationRecord records = 1 [(gogoproto.nullable) = false];
+  // pagination defines the pagination in the response.
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}

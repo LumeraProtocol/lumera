@@ -1,42 +1,47 @@
 package wasm_test
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/json"
-	"testing"
-	"time"
 	"fmt"
 	"os"
-	"bytes"
 	"path/filepath"
+	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
 	errorsmod "cosmossdk.io/errors"
-	"cosmossdk.io/x/evidence"
 	"cosmossdk.io/log"
 	sdkmath "cosmossdk.io/math"
 	"cosmossdk.io/store"
 	storemetrics "cosmossdk.io/store/metrics"
-	"cosmossdk.io/x/tx/signing"
 	storetypes "cosmossdk.io/store/types"
+	"cosmossdk.io/x/evidence"
+	"cosmossdk.io/x/tx/signing"
 	"cosmossdk.io/x/upgrade"
 	upgradekeeper "cosmossdk.io/x/upgrade/keeper"
 	upgradetypes "cosmossdk.io/x/upgrade/types"
 
-	addresscodec "github.com/cosmos/cosmos-sdk/codec/address"
+	dbm "github.com/cosmos/cosmos-db"
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/codec"
+	addresscodec "github.com/cosmos/cosmos-sdk/codec/address"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	secp256k1 "github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
-	dbm "github.com/cosmos/cosmos-db"
 	"github.com/cosmos/cosmos-sdk/runtime"
 	"github.com/cosmos/cosmos-sdk/std"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	sdkaddress "github.com/cosmos/cosmos-sdk/types/address"
+	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/types/module"
 
+	evidencetypes "cosmossdk.io/x/evidence/types"
+	"github.com/cometbft/cometbft/crypto"
+	"github.com/cometbft/cometbft/crypto/ed25519"
+	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	moduletestutil "github.com/cosmos/cosmos-sdk/types/module/testutil"
 	"github.com/cosmos/cosmos-sdk/x/auth"
 	authcodec "github.com/cosmos/cosmos-sdk/x/auth/codec"
 	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
@@ -49,36 +54,31 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/distribution"
 	distributionkeeper "github.com/cosmos/cosmos-sdk/x/distribution/keeper"
 	distributiontypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
-	evidencetypes "cosmossdk.io/x/evidence/types"
 	"github.com/cosmos/cosmos-sdk/x/gov"
+	govclient "github.com/cosmos/cosmos-sdk/x/gov/client"
 	govkeeper "github.com/cosmos/cosmos-sdk/x/gov/keeper"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	govtypesv1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
-	govclient "github.com/cosmos/cosmos-sdk/x/gov/client"
 	"github.com/cosmos/cosmos-sdk/x/mint"
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
-	moduletestutil "github.com/cosmos/cosmos-sdk/types/module/testutil"
 	"github.com/cosmos/cosmos-sdk/x/params"
+	paramsclient "github.com/cosmos/cosmos-sdk/x/params/client"
 	paramskeeper "github.com/cosmos/cosmos-sdk/x/params/keeper"
 	paramstypes "github.com/cosmos/cosmos-sdk/x/params/types"
-	paramsclient "github.com/cosmos/cosmos-sdk/x/params/client"
-	proto "github.com/cosmos/gogoproto/proto"
 	"github.com/cosmos/cosmos-sdk/x/slashing"
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	"github.com/cosmos/cosmos-sdk/x/staking"
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	"github.com/cometbft/cometbft/crypto"
-	"github.com/cometbft/cometbft/crypto/ed25519"
-	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	proto "github.com/cosmos/gogoproto/proto"
 
-	ibc "github.com/cosmos/ibc-go/v10/modules/core"
+	wasmKeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
+	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 	ibctransfer "github.com/cosmos/ibc-go/v10/modules/apps/transfer"
 	ibctransfertypes "github.com/cosmos/ibc-go/v10/modules/apps/transfer/types"
+	ibc "github.com/cosmos/ibc-go/v10/modules/core"
 	ibcexported "github.com/cosmos/ibc-go/v10/modules/core/exported"
 	ibckeeper "github.com/cosmos/ibc-go/v10/modules/core/keeper"
-	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
-	wasmKeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 
 	lcfg "github.com/LumeraProtocol/lumera/config"
 	ibcmock "github.com/LumeraProtocol/lumera/tests/ibctesting/mock"
@@ -270,15 +270,15 @@ func MakeEncodingConfig(t testing.TB) moduletestutil.TestEncodingConfig {
 		vesting.AppModule{},
 	)
 	signingOpts := signing.Options{
-		AddressCodec: addresscodec.NewBech32Codec(lcfg.AccountAddressPrefix),
-		ValidatorAddressCodec: addresscodec.NewBech32Codec(lcfg.ValidatorAddressPrefix),
+		AddressCodec:          addresscodec.NewBech32Codec(lcfg.Bech32AccountAddressPrefix),
+		ValidatorAddressCodec: addresscodec.NewBech32Codec(lcfg.Bech32ValidatorAddressPrefix),
 	}
 
 	protoFiles, err := proto.MergedRegistry()
 	require.NoError(t, err)
 
 	interfaceRegistry, err := codectypes.NewInterfaceRegistryWithOptions(codectypes.InterfaceRegistryOptions{
-		ProtoFiles: protoFiles,
+		ProtoFiles:     protoFiles,
 		SigningOptions: signingOpts,
 	})
 	require.NoError(t, err)
@@ -326,9 +326,10 @@ func createTestInput(
 		authzkeeper.StoreKey,
 		wasmtypes.StoreKey,
 	)
-	// Use test logger at info level to keep errors/warnings
-	logger := log.NewTestLoggerInfo(t)
+	// Keep integration test output quiet unless failures occur.
+	logger := log.NewTestLoggerError(t)
 	ms := store.NewCommitMultiStore(db, logger, storemetrics.NewNoOpMetrics())
+	ms.SetIAVLDisableFastNode(true)
 	for _, v := range keys {
 		ms.MountStoreWithDB(v, storetypes.StoreTypeIAVL, db)
 	}
@@ -389,8 +390,8 @@ func createTestInput(
 		runtime.NewKVStoreService(keys[authtypes.StoreKey]),
 		authtypes.ProtoBaseAccount,
 		maccPerms,
-		authcodec.NewBech32Codec(lcfg.AccountAddressPrefix),
-		lcfg.AccountAddressPrefix,
+		authcodec.NewBech32Codec(lcfg.Bech32AccountAddressPrefix),
+		lcfg.Bech32AccountAddressPrefix,
 		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
 	)
 	blockedAddrs := make(map[string]bool)
@@ -514,7 +515,7 @@ func createTestInput(
 		distribution.NewAppModule(appCodec, distKeeper, accountKeeper, bankKeeper, stakingKeeper, subspace(distributiontypes.ModuleName)),
 		gov.NewAppModule(appCodec, govKeeper, accountKeeper, bankKeeper, subspace(govtypes.ModuleName)),
 	)
-	am.RegisterServices(module.NewConfigurator(appCodec, msgRouter, querier)) //nolint:errcheck
+	am.RegisterServices(module.NewConfigurator(appCodec, msgRouter, querier))
 	wasmtypes.RegisterMsgServer(msgRouter, wasmKeeper.NewMsgServerImpl(&keeper))
 	wasmtypes.RegisterQueryServer(querier, wasmKeeper.NewGrpcQuerier(appCodec, runtime.NewKVStoreService(keys[wasmtypes.ModuleName]), keeper, keeper.QueryGasLimit()))
 

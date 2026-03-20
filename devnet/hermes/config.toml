@@ -16,8 +16,10 @@ enabled = true
 #      there is activity on a connection or channel they are involved with.
 refresh = true
 
-# Whether or not to enable misbehaviour detection for clients. [Default: true]
-misbehaviour = true
+# Whether or not to enable misbehaviour detection for clients.
+# Disabled for devnet tests: current chains don't emit the header payload Hermes expects
+# in UpdateClient events, which causes repeated non-fatal noise in logs.
+misbehaviour = false
 
 [mode.connections]
 # Whether or not to enable the connection workers for handshake completion. [Required]
@@ -35,7 +37,7 @@ enabled = true
 # Interval (in number of blocks) at which pending packets
 # should be periodically cleared. A value of '0' will disable
 # periodic packet clearing. [Default: 100]
-clear_interval = 100
+clear_interval = 10
 
 # Whether or not to clear packets on start. [Default: true]
 clear_on_start = true

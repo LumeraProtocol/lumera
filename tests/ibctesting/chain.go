@@ -13,8 +13,8 @@ import (
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 
@@ -25,6 +25,7 @@ import (
 	cmttypes "github.com/cometbft/cometbft/types"
 	cmtversion "github.com/cometbft/cometbft/version"
 
+	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	clienttypes "github.com/cosmos/ibc-go/v10/modules/core/02-client/types"
 	channeltypes "github.com/cosmos/ibc-go/v10/modules/core/04-channel/types"
 	channeltypesv2 "github.com/cosmos/ibc-go/v10/modules/core/04-channel/v2/types"
@@ -32,7 +33,6 @@ import (
 	host "github.com/cosmos/ibc-go/v10/modules/core/24-host"
 	"github.com/cosmos/ibc-go/v10/modules/core/exported"
 	ibctm "github.com/cosmos/ibc-go/v10/modules/light-clients/07-tendermint"
-	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 
 	"github.com/LumeraProtocol/lumera/app"
 	lcfg "github.com/LumeraProtocol/lumera/config"
@@ -91,7 +91,7 @@ type TestChain struct {
 
 	// PendingSendPackets is used to temporarily store IBC packets that are
 	// emitted during contract execution.
-	PendingSendPackets *[]channeltypes.Packet
+	PendingSendPackets   *[]channeltypes.Packet
 	PendingSendPacketsV2 *[]channeltypesv2.Packet
 }
 
@@ -151,6 +151,12 @@ func NewTestChainWithValSet(
 	}
 
 	app := app.SetupWithGenesisValSet(tb, valSet, genAccs, chainID, sdk.DefaultPowerReduction, genBals, wasmOpts...)
+	ctx := app.BaseApp.NewContext(false)
+	feeMarketParams := app.FeeMarketKeeper.GetParams(ctx)
+	feeMarketParams.NoBaseFee = true
+	feeMarketParams.BaseFee = sdkmath.LegacyZeroDec()
+	feeMarketParams.MinGasPrice = sdkmath.LegacyZeroDec()
+	require.NoError(tb, app.FeeMarketKeeper.SetParams(ctx, feeMarketParams))
 
 	// create current header and call begin block
 	header := cmtproto.Header{
@@ -163,21 +169,21 @@ func NewTestChainWithValSet(
 
 	// create an account to send transactions from
 	chain := &TestChain{
-		TB:                tb,
-		Coordinator:       coord,
-		ChainID:           chainID,
-		App:               app,
-		ProposedHeader:    header,
-		TxConfig:          txConfig,
-		Codec:             app.AppCodec(),
-		Vals:              valSet,
-		NextVals:          valSet,
-		Signers:           signers,
-		TrustedValidators: make(map[uint64]*cmttypes.ValidatorSet, 0),
-		SenderPrivKey:     senderAccs[0].SenderPrivKey,
-		SenderAccount:     senderAccs[0].SenderAccount,
-		SenderAccounts:    senderAccs,
-		PendingSendPackets: &[]channeltypes.Packet{},
+		TB:                   tb,
+		Coordinator:          coord,
+		ChainID:              chainID,
+		App:                  app,
+		ProposedHeader:       header,
+		TxConfig:             txConfig,
+		Codec:                app.AppCodec(),
+		Vals:                 valSet,
+		NextVals:             valSet,
+		Signers:              signers,
+		TrustedValidators:    make(map[uint64]*cmttypes.ValidatorSet, 0),
+		SenderPrivKey:        senderAccs[0].SenderPrivKey,
+		SenderAccount:        senderAccs[0].SenderAccount,
+		SenderAccounts:       senderAccs,
+		PendingSendPackets:   &[]channeltypes.Packet{},
 		PendingSendPacketsV2: &[]channeltypesv2.Packet{},
 	}
 
@@ -487,7 +493,7 @@ func CommitHeader(proposedHeader cmttypes.Header, valSet *cmttypes.ValidatorSet,
 	// Thus we iterate over the ordered validator set and construct a signer array
 	// from the signer map in the same order.
 	signerArr := make([]cmttypes.PrivValidator, len(valSet.Validators))
-	for i, v := range valSet.Validators { //nolint:staticcheck // need to check for nil validator set
+	for i, v := range valSet.Validators {
 		signerArr[i] = signers[v.Address.String()]
 	}
 

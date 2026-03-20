@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
+	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	ibctransfertypes "github.com/cosmos/ibc-go/v10/modules/apps/transfer/types"
 	channeltypes "github.com/cosmos/ibc-go/v10/modules/core/04-channel/types"
-	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	mockv2 "github.com/cosmos/ibc-go/v10/testing/mock/v2"
 	"github.com/stretchr/testify/require"
 

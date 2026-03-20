@@ -19,20 +19,11 @@ jobs:
       - name: Set up Go
         uses: ./.github/actions/setup-go
 
-      - name: Copy claims.csv to home directory
-        run: cp claims.csv $HOME/
-
-      - name: Install Ignite CLI
-        run: |
-          curl https://get.ignite.com/cli! | bash
-        env:
-          IGNITE_CLI_NO_ANALYTICS: 1
-
       - name: Install dependencies
         run: go mod download
 
       - name: Run unit tests
-        run: go test -v ./x/...
+        run: make unit-tests
 
   integration-tests:
     name: integration
@@ -45,20 +36,11 @@ jobs:
       - name: Set up Go
         uses: ./.github/actions/setup-go
 
-      - name: Copy claims.csv to home directory
-        run: cp claims.csv $HOME/
-
-      - name: Install Ignite CLI
-        run: |
-          curl https://get.ignite.com/cli! | bash
-        env:
-          IGNITE_CLI_NO_ANALYTICS: 1
-
       - name: Install dependencies
         run: go mod download
 
       - name: Run integration tests
-        run: go test -tags=integration ./tests/integration/... -v
+        run: make integration-tests
 
   simulation-tests:
     name: simulation
@@ -72,21 +54,8 @@ jobs:
       - name: Set up Go
         uses: ./.github/actions/setup-go
 
-      - name: Copy claims.csv to home directory
-        run: cp claims.csv $HOME/
-
-      - name: Install Ignite CLI
-        run: |
-          curl https://get.ignite.com/cli! | bash
-        env:
-          IGNITE_CLI_NO_ANALYTICS: 1
-
       - name: Install dependencies
         run: go mod download
 
-      - name: Run simulation tests
-        env:
-          GOMAXPROCS: 2
-          IGNITE_TELEMETRY_CONSENT: "no"
-        run: |
-          go test -v -benchmem -run=^$ -bench ^BenchmarkSimulation -cpuprofile cpu.out ./app -Commit=true
+      - name: Run simulation benchmark
+        run: make simulation-bench

@@ -65,6 +65,30 @@ func (mr *MockSupernodeKeeperMockRecorder) CheckValidatorSupernodeEligibility(ct
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CheckValidatorSupernodeEligibility", reflect.TypeOf((*MockSupernodeKeeper)(nil).CheckValidatorSupernodeEligibility), ctx, validator, valAddr, supernodeAccount)
 }
 
+// DeleteMetricsState mocks base method.
+func (m *MockSupernodeKeeper) DeleteMetricsState(ctx types0.Context, valAddr types0.ValAddress) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "DeleteMetricsState", ctx, valAddr)
+}
+
+// DeleteMetricsState indicates an expected call of DeleteMetricsState.
+func (mr *MockSupernodeKeeperMockRecorder) DeleteMetricsState(ctx, valAddr any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteMetricsState", reflect.TypeOf((*MockSupernodeKeeper)(nil).DeleteMetricsState), ctx, valAddr)
+}
+
+// DeleteSuperNode mocks base method.
+func (m *MockSupernodeKeeper) DeleteSuperNode(ctx types0.Context, valAddr types0.ValAddress) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "DeleteSuperNode", ctx, valAddr)
+}
+
+// DeleteSuperNode indicates an expected call of DeleteSuperNode.
+func (mr *MockSupernodeKeeperMockRecorder) DeleteSuperNode(ctx, valAddr any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSuperNode", reflect.TypeOf((*MockSupernodeKeeper)(nil).DeleteSuperNode), ctx, valAddr)
+}
+
 // GetAllSuperNodes mocks base method.
 func (m *MockSupernodeKeeper) GetAllSuperNodes(ctx types0.Context, stateFilters ...types.SuperNodeState) ([]types.SuperNode, error) {
 	m.ctrl.T.Helper()
@@ -265,6 +289,20 @@ func (mr *MockSupernodeKeeperMockRecorder) RankSuperNodesByDistance(blockHash, s
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RankSuperNodesByDistance", reflect.TypeOf((*MockSupernodeKeeper)(nil).RankSuperNodesByDistance), blockHash, supernodes, topN)
 }
 
+// RecoverSuperNodeFromPostponed mocks base method.
+func (m *MockSupernodeKeeper) RecoverSuperNodeFromPostponed(ctx types0.Context, valAddr types0.ValAddress) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RecoverSuperNodeFromPostponed", ctx, valAddr)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RecoverSuperNodeFromPostponed indicates an expected call of RecoverSuperNodeFromPostponed.
+func (mr *MockSupernodeKeeperMockRecorder) RecoverSuperNodeFromPostponed(ctx, valAddr any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecoverSuperNodeFromPostponed", reflect.TypeOf((*MockSupernodeKeeper)(nil).RecoverSuperNodeFromPostponed), ctx, valAddr)
+}
+
 // SetMetricsState mocks base method.
 func (m *MockSupernodeKeeper) SetMetricsState(ctx types0.Context, state types.SupernodeMetricsState) error {
 	m.ctrl.T.Helper()
@@ -333,20 +371,6 @@ func (m *MockSupernodeKeeper) SetSuperNodePostponed(ctx types0.Context, valAddr 
 func (mr *MockSupernodeKeeperMockRecorder) SetSuperNodePostponed(ctx, valAddr, reason any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSuperNodePostponed", reflect.TypeOf((*MockSupernodeKeeper)(nil).SetSuperNodePostponed), ctx, valAddr, reason)
-}
-
-// RecoverSuperNodeFromPostponed mocks base method.
-func (m *MockSupernodeKeeper) RecoverSuperNodeFromPostponed(ctx types0.Context, valAddr types0.ValAddress) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RecoverSuperNodeFromPostponed", ctx, valAddr)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// RecoverSuperNodeFromPostponed indicates an expected call of RecoverSuperNodeFromPostponed.
-func (mr *MockSupernodeKeeperMockRecorder) RecoverSuperNodeFromPostponed(ctx, valAddr any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecoverSuperNodeFromPostponed", reflect.TypeOf((*MockSupernodeKeeper)(nil).RecoverSuperNodeFromPostponed), ctx, valAddr)
 }
 
 // SetSuperNodeStopped mocks base method.

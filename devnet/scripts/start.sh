@@ -47,6 +47,7 @@ DAEMON_HOME="${DAEMON_HOME:-/root/.lumera}"
 
 SCRIPTS_DIR="/root/scripts"
 LOGS_DIR="/root/logs"
+OLD_LOGS_DIR="${LOGS_DIR}/old"
 VALIDATOR_LOG="${LOGS_DIR}/validator.log"
 SUPERNODE_LOG="${LOGS_DIR}/supernode.log"
 VALIDATOR_SETUP_OUT="${LOGS_DIR}/validator-setup.out"
@@ -58,7 +59,7 @@ LUMERA_RPC_PORT="${LUMERA_RPC_PORT:-26657}"
 LUMERA_GRPC_PORT="${LUMERA_GRPC_PORT:-9090}"
 LUMERA_RPC_ADDR="http://localhost:${LUMERA_RPC_PORT}"
 
-mkdir -p "${LOGS_DIR}" "${DAEMON_HOME}/config" "${STATUS_DIR}"
+mkdir -p "${LOGS_DIR}" "${OLD_LOGS_DIR}" "${DAEMON_HOME}/config" "${STATUS_DIR}"
 
 # Require MONIKER env (compose already sets it)
 : "${MONIKER:?MONIKER environment variable must be set}"
@@ -152,6 +153,34 @@ EOF
 run() {
 	echo "+ $*"
 	"$@"
+}
+
+archive_log_file() {
+	local log_file="$1"
+	local ts base target suffix=1
+
+	[ -f "${log_file}" ] || return 0
+	[ -s "${log_file}" ] || return 0
+
+	ts="$(date '+%Y%m%d_%H_%M')"
+	base="$(basename "${log_file}")"
+	target="${OLD_LOGS_DIR}/${ts}.${base}"
+
+	while [ -e "${target}" ]; do
+		target="${OLD_LOGS_DIR}/${ts}.${suffix}.${base}"
+		suffix=$((suffix + 1))
+	done
+
+	mv "${log_file}" "${target}"
+	echo "[BOOT] Archived ${log_file} -> ${target}"
+}
+
+archive_existing_logs() {
+	archive_log_file "${VALIDATOR_LOG}"
+	archive_log_file "${SUPERNODE_LOG}"
+	archive_log_file "${VALIDATOR_SETUP_OUT}"
+	archive_log_file "${SUPERNODE_SETUP_OUT}"
+	archive_log_file "${NETWORK_MAKER_SETUP_OUT}"
 }
 
 # Get current block height (integer), 0 if unknown
@@ -275,7 +304,14 @@ start_lumera() {
 	fi
 
 	echo "[BOOT] ${MONIKER}: Starting lumerad..."
-	run "${DAEMON}" start --home "${DAEMON_HOME}" >"${VALIDATOR_LOG}" 2>&1 &
+	CLAIMS_LOCAL="${DAEMON_HOME}/config/claims.csv"
+	EXTRA_START_FLAGS=""
+	if [ -f "${CLAIMS_LOCAL}" ] && "${DAEMON}" start --help 2>&1 | grep -q 'skip-claims-check'; then
+		EXTRA_START_FLAGS="--skip-claims-check=false --claims-path=${CLAIMS_LOCAL}"
+		echo "[BOOT] ${MONIKER}: Claims CSV found, loading claim records at genesis"
+	fi
+	# shellcheck disable=SC2086
+	run "${DAEMON}" start --home "${DAEMON_HOME}" ${EXTRA_START_FLAGS} >"${VALIDATOR_LOG}" 2>&1 &
 
 	if [ "${MONIKER}" = "${PRIMARY_MONIKER}" ]; then
 		mkdir -p "$(dirname "${PRIMARY_STARTED_FLAG}")"
@@ -290,6 +326,7 @@ tail_logs() {
 }
 
 run_auto_flow() {
+	archive_existing_logs
 	launch_network_maker_setup
 	launch_supernode_setup
 	launch_validator_setup
@@ -305,6 +342,7 @@ auto | "")
 	;;
 
 bootstrap)
+	archive_existing_logs
 	launch_network_maker_setup
 	launch_supernode_setup
 	launch_validator_setup
@@ -313,6 +351,7 @@ bootstrap)
 	;;
 
 run)
+	archive_existing_logs
 	wait_for_validator_setup
 	wait_for_n_blocks 3 || {
 		echo "[SN] Lumera chain not producing blocks in time; exiting."

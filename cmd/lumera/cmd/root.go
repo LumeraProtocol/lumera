@@ -20,6 +20,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/auth/tx"
 	authtxconfig "github.com/cosmos/cosmos-sdk/x/auth/tx/config"
 	"github.com/cosmos/cosmos-sdk/x/auth/types"
+	evmhd "github.com/cosmos/evm/crypto/hd"
 	proto "github.com/cosmos/gogoproto/proto"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -28,6 +29,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 
 	"github.com/LumeraProtocol/lumera/app"
+	appevm "github.com/LumeraProtocol/lumera/app/evm"
 	"github.com/LumeraProtocol/lumera/internal/legacyalias"
 )
 
@@ -35,6 +37,7 @@ import (
 func NewRootCmd() *cobra.Command {
 	// Ensure SDK placeholders use the Lumera daemon name.
 	version.AppName = app.Name + "d"
+	version.Name = app.Name
 
 	var (
 		autoCliOpts        autocli.AppOptions
@@ -62,6 +65,7 @@ func NewRootCmd() *cobra.Command {
 		Use:           app.Name + "d",
 		Short:         "Start lumera node",
 		SilenceErrors: true,
+		SilenceUsage:  true,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			// set the default command outputs
 			cmd.SetOut(cmd.OutOrStdout())
@@ -85,7 +89,18 @@ func NewRootCmd() *cobra.Command {
 			customAppTemplate, customAppConfig := initAppConfig()
 			customCMTConfig := initCometBFTConfig()
 
-			return server.InterceptConfigsPreRunHandler(cmd, customAppTemplate, customAppConfig, customCMTConfig)
+			if err := server.InterceptConfigsPreRunHandler(cmd, customAppTemplate, customAppConfig, customCMTConfig); err != nil {
+				return err
+			}
+
+			// Migrate app.toml for nodes upgrading from pre-EVM binaries.
+			// Adds [evm], [json-rpc], [tls], and [lumera.*] sections with
+			// Lumera defaults while preserving all existing operator settings.
+			if err := migrateAppConfigIfNeeded(cmd); err != nil {
+				return err
+			}
+
+			return validateStartJSONRPCNamespacePolicy(cmd)
 		},
 	}
 
@@ -97,12 +112,20 @@ func NewRootCmd() *cobra.Command {
 		moduleBasicManager[name] = module.CoreAppModuleBasicAdaptor(name, mod)
 		autoCliOpts.Modules[name] = mod
 	}
+	// EVM modules are currently manually wired in the app and need client-side
+	// registration for genesis defaults and AutoCLI.
+	evmModules := appevm.RegisterModules(clientCtx.Codec)
+	for name, mod := range evmModules {
+		moduleBasicManager[name] = module.CoreAppModuleBasicAdaptor(name, mod)
+		autoCliOpts.Modules[name] = mod
+	}
 
 	initRootCmd(rootCmd, clientCtx.TxConfig, moduleBasicManager)
 
 	overwriteFlagDefaults(rootCmd, map[string]string{
 		flags.FlagChainID:        strings.ReplaceAll(app.Name, "-", ""),
 		flags.FlagKeyringBackend: "test",
+		flags.FlagKeyType:        string(evmhd.EthSecp256k1Type),
 	})
 
 	if err := enhanceRootCommandWithLegacyAliases(rootCmd, autoCliOpts); err != nil {
@@ -180,7 +203,10 @@ func ProvideClientContext(
 		WithInput(os.Stdin).
 		WithAccountRetriever(types.AccountRetriever{}).
 		WithHomeDir(app.DefaultNodeHome).
-		WithViper(app.Name) // env variable prefix
+		WithViper(app.Name). // env variable prefix
+		// Cosmos EVM HD keyring options for CLI key management, ensuring compatibility with EVM-based accounts.
+		WithKeyringOptions(evmhd.EthSecp256k1Option()).
+		WithLedgerHasProtobuf(true)
 
 	// Read the config again to overwrite the default values with the values from the config file
 	clientCtx, _ = config.ReadFromClientConfig(clientCtx)

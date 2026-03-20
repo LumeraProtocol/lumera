@@ -13,14 +13,16 @@ const (
 	DefaultNetworkMakerHTTPPort      = 8080
 	DefaultNetworkMakerUIPort        = 8088
 	DefaultGRPCWebPort               = 9091
+	DefaultJSONRPCPort               = 8545
+	DefaultJSONRPCWSPort             = 8546
 	DefaultHermesSimdHostP2PPort     = 36656
 	DefaultHermesSimdHostRPCPort     = 36657
 	DefaultHermesSimdHostAPIPort     = 31317
 	DefaultHermesSimdHostGRPCPort    = 39090
 	DefaultHermesSimdHostGRPCWebPort = 39091
 
-	EnvNMAPIBase                     = "VITE_API_BASE"
-	EnvNMAPIToken                    = "VITE_API_KEY"
+	EnvNMAPIBase  = "VITE_API_BASE"
+	EnvNMAPIToken = "VITE_API_KEY"
 
 	FolderScripts   = "/root/scripts"
 	SubFolderShared = "shared"

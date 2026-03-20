@@ -41,7 +41,7 @@ func NewLumeradCLI(t *testing.T, sut *SystemUnderTest, verbose bool) *LumeradCli
 		sut.AwaitNextBlock,
 		sut.nodesCount,
 		filepath.Join(WorkDir, sut.outputDir),
-		"1"+lcfg.ChainDenom,
+		"500"+lcfg.ChainDenom,
 		verbose,
 		assert.NoError,
 		true,

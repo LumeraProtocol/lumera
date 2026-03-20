@@ -1,6 +1,7 @@
 {
     "chain": {
         "id": "lumera-devnet-1",
+        "evm_from_version": "v1.12.0",
         "denom": {
             "bond": "ulume",
             "mint": "ulume",
@@ -24,6 +25,40 @@
     "daemon": {
         "binary": "lumerad",
         "keyring_backend": "test"
+    },
+    "genesis-account-mnemonics": [
+        "supply race idle dune bounce canvas quantum advice slot there twin verify crime alert matrix sell rain tiger crime obey capital innocent hospital since",
+        "rotate evidence mask all churn injury blue crash deal fatal payment hotel add recall force nothing cycle notable cost offer match submit fat custom",
+        "modify order casual shield arm pen switch husband awake biology hire opinion all wealth fix any pilot rice violin obvious naive two priority hurt",
+        "bag soap filter health foam tattoo wear measure miracle level bacon rabbit enable club iron hazard ozone behind lady atom canvas pottery nature bench",
+        "tent fashion leader legend roast siren treat bomb surround loop payment fruit pool acquire current predict drip barely virtual unique they often carpet spice",
+        "since arctic repeat scale client fatal purity neither tortoise mammal sad special stone bargain peanut junk garlic carpet slab garage viable scatter useful fix",
+        "kitchen hidden sock endorse movie view glove vague mandate old legal media vital logic camp decline toss spawn suspect shy erase north excite country",
+        "atom entry abandon between exercise peasant health exact can boat remember latin mixture finish angry mesh ozone slight service jewel urge various universe coral",
+        "chuckle novel candy rather birth place acid property antique degree sword sheriff submit taste gather expand join assume annual attack census marriage limb proud",
+        "effort lamp bid topic submit race awake merge melody fancy turkey flat damage alley sick vague vault pitch job grant aware whip system night"
+    ],
+    "sn-account-mnemonics": [
+        "local milk helmet knock spy chalk remain spy room can cup right honey clever cool travel mix theory fall peanut ticket admit tonight thrive",
+        "inspire surprise champion perfect correct organ tell loyal raccoon gas duty cave oven aim chunk reopen caution gravity imitate spawn cattle person rain salad",
+        "when eternal sea region shop milk broccoli stable gun body artwork danger kiss imitate cushion short little art need patch remain expose kidney page",
+        "either fan share butter modify strategy puppy another whale antenna private pass bottom broccoli mesh idea profit canyon destroy script boring museum rail unaware",
+        "law promote fruit quality obtain easily crowd category walk web barrel gift bar bottom exile memory best issue decide finger name long post describe",
+        "buffalo orbit vapor unique common approve capable fashion romance embrace reform van silk impose rate keen square alcohol drastic regular rib shell bid twelve",
+        "whip rifle broccoli blue logic joy maze safe mechanic tomato tattoo boost media uniform craft wise steel fence transfer nurse brick enroll tobacco catalog",
+        "wreck invest present behind patrol hip cupboard clip version enemy stem music cake walk call evil autumn object siege outside private room usual tree",
+        "garment uniform energy short material bind black gold maximum clog again employ shock power mango cinnamon label silver minute twice later teach gaze noble",
+        "legend soup tree knife exile spirit twin grid congress paddle office private raw imitate shine right bubble produce sheriff happy bitter device believe tube"
+    ],
+    "api": {
+        "enable_unsafe_cors": true
+    },
+    "json-rpc": {
+        "enable": true,
+        "address": "0.0.0.0:8545",
+        "ws_address": "0.0.0.0:8546",
+        "api": "web3,eth,personal,net,txpool,debug,rpc",
+        "enable_indexer": true
     },
     "network-maker": {
         "enabled": true,

@@ -134,8 +134,25 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 	}
 
 	// --- Step V7: Account-level migration (shared with MsgClaimLegacyAccount) ---
-	// Migrates auth account (vesting-aware), bank balances, authz grants,
-	// feegrant allowances, and claim records.
+	// Migrates distribution rewards, staking positions (to OTHER validators),
+	// auth account (vesting-aware), bank balances, authz grants, feegrant
+	// allowances, and claim records.
+
+	// Snapshot the original withdraw address before MigrateDistribution may
+	// temporarily redirect it to self.
+	origWithdrawAddr, _ := ms.distributionKeeper.GetDelegatorWithdrawAddr(ctx, legacyAddr)
+
+	// Withdraw the operator's own delegation rewards from OTHER validators.
+	// V1 only withdrew rewards from delegators to THIS validator.
+	if err := ms.MigrateDistribution(ctx, legacyAddr); err != nil {
+		return nil, fmt.Errorf("migrate distribution: %w", err)
+	}
+
+	// Re-key the operator's delegations, unbonding delegations, and
+	// redelegations to OTHER validators (V4 handled delegations TO this validator).
+	if err := ms.MigrateStaking(ctx, legacyAddr, newAddr, origWithdrawAddr); err != nil {
+		return nil, fmt.Errorf("migrate staking: %w", err)
+	}
 
 	// Remove legacy auth account; for vesting accounts, extract schedule so it
 	// can be re-applied at the new address after the bank transfer.

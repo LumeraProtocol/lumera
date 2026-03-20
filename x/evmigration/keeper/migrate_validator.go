@@ -105,11 +105,13 @@ func (k Keeper) MigrateValidatorDelegations(ctx sdk.Context, oldValAddr, newValA
 			return err
 		}
 
-		// Initialize distribution starting info for (newValAddr, delegator).
-		startingInfo, _ := k.distributionKeeper.GetDelegatorStartingInfo(ctx, oldValAddr, delAddr)
-		startingInfo.PreviousPeriod = targetPeriod
-		startingInfo.Height = uint64(ctx.BlockHeight())
-		startingInfo.Stake = del.Shares
+		// Initialize fresh distribution starting info for (newValAddr, delegator).
+		// The old starting info was deleted above, so we always construct new info.
+		startingInfo := distrtypes.DelegatorStartingInfo{
+			PreviousPeriod: targetPeriod,
+			Height:         uint64(ctx.BlockHeight()),
+			Stake:          del.Shares,
+		}
 		if err := k.incrementHistoricalRewardsReferenceCount(ctx, newValAddr, targetPeriod); err != nil {
 			return err
 		}

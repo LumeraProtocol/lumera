@@ -1074,7 +1074,7 @@ func TestMigrateValidator_FailAtValidatorActions(t *testing.T) {
 // (step V7) propagates and no record is stored.
 func TestMigrateValidator_FailAtAuth(t *testing.T) {
 	f := initMsgServerFixture(t)
-	legacyAddr, _, oldValAddr, newValAddr, msg := setupPassingValPreChecks(t, f)
+	legacyAddr, newAddr, oldValAddr, newValAddr, msg := setupPassingValPreChecks(t, f)
 
 	// Steps V1-V4 succeed.
 	setupV1toV4(f.mockFixture, oldValAddr, newValAddr)
@@ -1083,7 +1083,19 @@ func TestMigrateValidator_FailAtAuth(t *testing.T) {
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), oldValAddr).Return(sntypes.SuperNode{}, false)
 	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
 
-	// Step V7: MigrateAuth fails — account not found.
+	// Step V7: MigrateDistribution + MigrateStaking succeed before MigrateAuth fails.
+	// Snapshot withdraw addr.
+	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacyAddr).Return(legacyAddr, nil)
+	// MigrateDistribution: redirect check (self → no-op), no delegations to other validators.
+	f.distributionKeeper.EXPECT().GetDelegatorWithdrawAddr(gomock.Any(), legacyAddr).Return(legacyAddr, nil)
+	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
+	// MigrateStaking: no delegations/unbonding/redelegations to other validators.
+	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetUnbondingDelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
+	f.distributionKeeper.EXPECT().SetDelegatorWithdrawAddr(gomock.Any(), newAddr, newAddr).Return(nil)
+
+	// MigrateAuth fails — account not found.
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), legacyAddr).Return(nil)
 
 	_, err := f.msgServer.MigrateValidator(f.ctx, msg)
@@ -1133,9 +1145,6 @@ func TestClaimLegacyAccount_WithDelegations(t *testing.T) {
 	f.stakingKeeper.EXPECT().SetDelegation(gomock.Any(), gomock.Any()).Return(nil)
 	f.distributionKeeper.EXPECT().GetValidatorCurrentRewards(gomock.Any(), valAddr).Return(
 		distrtypes.ValidatorCurrentRewards{Period: 5}, nil,
-	)
-	f.distributionKeeper.EXPECT().GetDelegatorStartingInfo(gomock.Any(), valAddr, legacyAddr).Return(
-		distrtypes.DelegatorStartingInfo{}, nil,
 	)
 	expectHistoricalRewardsIncrement(f.distributionKeeper, valAddr, 4, 1)
 	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), valAddr, newAddr, gomock.Any()).Return(nil)

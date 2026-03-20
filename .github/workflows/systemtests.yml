@@ -26,6 +26,9 @@ jobs:
       - name: Install Ignite CLI
         uses: ./.github/actions/install-ignite
 
+      - name: Generate OpenRPC spec
+        run: make openrpc
+
       - name: Build Chain
         run: |
           ./ignite chain build -y -t linux:amd64
@@ -38,5 +41,4 @@ jobs:
         working-directory: tests/systemtests
 
       - name: Run System Tests
-        run: go test -tags=system_test -timeout 20m -v .
-        working-directory: tests/systemtests
+        run: make systemex-tests

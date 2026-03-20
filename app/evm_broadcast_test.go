@@ -358,6 +358,93 @@ func TestBroadcastEVMTxFromFieldRecovery(t *testing.T) {
 	require.Equal(t, sender, recoveredAddr, "recovered sender must match signing key")
 }
 
+// TestBroadcastEVMTransactionsSyncAttemptsAllTxsOnFailure exercises the real
+// broadcastEVMTransactionsSync method to verify that a failure on the first tx
+// does NOT prevent subsequent txs from being attempted. This pins the
+// regression where the old code returned on the first error, causing
+// releasePending to mark unattempted txs as completed.
+//
+// Strategy: pass 3 unsigned txs. FromSignedEthereumTx fails for each (no
+// signature to recover). With the old early-return code we'd get 1 error;
+// with the fix we get 3 (one per tx).
+func TestBroadcastEVMTransactionsSyncAttemptsAllTxsOnFailure(t *testing.T) {
+	t.Parallel()
+
+	app := &App{}
+
+	tx1 := makeLegacyTx(1)
+	tx2 := makeLegacyTx(2)
+	tx3 := makeLegacyTx(3)
+
+	err := app.broadcastEVMTransactionsSync([]*ethtypes.Transaction{tx1, tx2, tx3})
+	require.Error(t, err)
+
+	// The joined error must contain failures for ALL 3 txs, not just the first.
+	errMsg := err.Error()
+	require.Contains(t, errMsg, tx1.Hash().Hex(), "tx1 error must be present")
+	require.Contains(t, errMsg, tx2.Hash().Hex(), "tx2 error must be present")
+	require.Contains(t, errMsg, tx3.Hash().Hex(), "tx3 error must be present")
+
+	// Count the individual errors via errors.Unwrap.
+	joined, ok := err.(interface{ Unwrap() []error })
+	require.True(t, ok, "error must be a joined error")
+	require.Len(t, joined.Unwrap(), 3, "must have exactly 3 errors (one per tx)")
+}
+
+// TestEVMTxBroadcastDispatcherPartialFailureAttemptsAllTxs verifies that when
+// the process callback returns an error for some txs, all txs in the batch
+// are still attempted (not abandoned on the first error) and all pending
+// hashes are released afterward.
+func TestEVMTxBroadcastDispatcherPartialFailureAttemptsAllTxs(t *testing.T) {
+	var attemptedHashes []common.Hash
+	var mu sync.Mutex
+
+	// Track which tx hashes the process callback sees.
+	dispatcher := newEVMTxBroadcastDispatcher(
+		log.NewNopLogger(),
+		4,
+		func(txs []*ethtypes.Transaction) error {
+			mu.Lock()
+			for _, tx := range txs {
+				attemptedHashes = append(attemptedHashes, tx.Hash())
+			}
+			mu.Unlock()
+			// Return an error — simulating partial failure.
+			return errors.New("some tx failed")
+		},
+	)
+	defer dispatcher.stop(2 * time.Second)
+
+	tx1 := makeLegacyTx(10)
+	tx2 := makeLegacyTx(20)
+	tx3 := makeLegacyTx(30)
+
+	accepted, deduped, err := dispatcher.enqueue([]*ethtypes.Transaction{tx1, tx2, tx3})
+	require.NoError(t, err)
+	require.Equal(t, 3, accepted)
+	require.Equal(t, 0, deduped)
+
+	// Wait for the batch to be processed.
+	require.Eventually(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(attemptedHashes) == 3
+	}, 2*time.Second, 10*time.Millisecond, "all 3 txs must be passed to the process callback")
+
+	// Verify all hashes were attempted.
+	mu.Lock()
+	require.Contains(t, attemptedHashes, tx1.Hash())
+	require.Contains(t, attemptedHashes, tx2.Hash())
+	require.Contains(t, attemptedHashes, tx3.Hash())
+	mu.Unlock()
+
+	// Verify all pending hashes are released (can re-enqueue the same txs).
+	require.Eventually(t, func() bool {
+		accepted, _, err := dispatcher.enqueue([]*ethtypes.Transaction{tx1, tx2, tx3})
+		return err == nil && accepted == 3
+	}, 2*time.Second, 10*time.Millisecond, "all pending hashes must be released after partial failure")
+}
+
 func makeLegacyTx(nonce uint64) *ethtypes.Transaction {
 	return ethtypes.NewTx(&ethtypes.LegacyTx{
 		Nonce:    nonce,

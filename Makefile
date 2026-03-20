@@ -140,7 +140,7 @@ release:
 ###################################################
 ###              Tests and Simulation           ###
 ###################################################
-.PHONY: unit-tests integration-tests system-tests simulation-tests all-tests lint system-metrics-test
+.PHONY: unit-tests integration-tests system-tests simulation-tests simulation-bench all-tests lint system-metrics-test
 
 all-tests: unit-tests integration-tests system-tests simulation-tests
 
@@ -152,7 +152,7 @@ unit-tests:
 	@echo "Running unit tests in x/..."
 	${GO} test ./x/... -v -coverprofile=coverage.out
 
-integration-tests:
+integration-tests: openrpc
 	@echo "Running integration tests..."
 	${GO} test -tags=integration,test -p 4 ./tests/integration/... -v
 
@@ -160,13 +160,17 @@ system-tests:
 	@echo "Running system tests..."
 	${GO} test -tags=system,test ./tests/system/... -v
 
-simulation-tests:
+simulation-tests: openrpc
 	@echo "Running simulation tests..."
 	${GO} test -tags='simulation test' ./tests/simulation/ -v -timeout 30m -args -Enabled=true -NumBlocks=200 -BlockSize=50 -Commit=true
 
+simulation-bench: openrpc
+	@echo "Running simulation benchmark..."
+	GOMAXPROCS=2 ${GO} test -v -benchmem -run='^$$' -bench '^BenchmarkSimulation' -cpuprofile cpu.out ./app -Commit=true
+
 systemex-tests:
 	@echo "Running system tests..."
-	cd ./tests/systemtests/ && go test -tags=system_test -v .
+	cd ./tests/systemtests/ && go test -tags=system_test -timeout 20m -v .
 
 system-metrics-test:
 	@echo "Running supernode metrics system tests (E2E + staleness)..."

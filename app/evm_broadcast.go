@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"runtime/debug"
@@ -308,6 +309,7 @@ func (app *App) broadcastEVMTransactionsSync(ethTxs []*ethtypes.Transaction) err
 		)
 	}
 
+	var errs []error
 	for _, ethTx := range ethTxs {
 		startedAt := time.Now()
 		if app.evmBroadcastDebug {
@@ -324,17 +326,20 @@ func (app *App) broadcastEVMTransactionsSync(ethTxs []*ethtypes.Transaction) err
 		msg := &evmtypes.MsgEthereumTx{}
 		ethSigner := ethtypes.LatestSignerForChainID(new(big.Int).SetUint64(lcfg.EVMChainID))
 		if err := msg.FromSignedEthereumTx(ethTx, ethSigner); err != nil {
-			return fmt.Errorf("failed to recover sender for tx %s: %w", ethTx.Hash().Hex(), err)
+			errs = append(errs, fmt.Errorf("failed to recover sender for tx %s: %w", ethTx.Hash().Hex(), err))
+			continue
 		}
 
 		txBuilder := app.txConfig.NewTxBuilder()
 		if err := txBuilder.SetMsgs(msg); err != nil {
-			return fmt.Errorf("failed to set msg in tx builder: %w", err)
+			errs = append(errs, fmt.Errorf("failed to set msg in tx builder: %w", err))
+			continue
 		}
 
 		txBytes, err := app.txConfig.TxEncoder()(txBuilder.GetTx())
 		if err != nil {
-			return fmt.Errorf("failed to encode transaction: %w", err)
+			errs = append(errs, fmt.Errorf("failed to encode transaction: %w", err))
+			continue
 		}
 
 		res, err := clientCtx.BroadcastTxSync(txBytes)
@@ -356,15 +361,17 @@ func (app *App) broadcastEVMTransactionsSync(ethTxs []*ethtypes.Transaction) err
 			)
 		}
 		if err != nil {
-			return fmt.Errorf("failed to broadcast transaction %s: %w", ethTx.Hash().Hex(), err)
+			errs = append(errs, fmt.Errorf("failed to broadcast transaction %s: %w", ethTx.Hash().Hex(), err))
+			continue
 		}
 		if res.Code != 0 {
-			return fmt.Errorf("transaction %s rejected by mempool: code=%d, log=%s", ethTx.Hash().Hex(), res.Code, res.RawLog)
+			errs = append(errs, fmt.Errorf("transaction %s rejected by mempool: code=%d, log=%s", ethTx.Hash().Hex(), res.Code, res.RawLog))
+			continue
 		}
 	}
 	if app.evmBroadcastDebug {
-		app.evmBroadcastLog().Debug("evm mempool broadcast batch end", "count", len(ethTxs))
+		app.evmBroadcastLog().Debug("evm mempool broadcast batch end", "count", len(ethTxs), "errors", len(errs))
 	}
 
-	return nil
+	return errors.Join(errs...)
 }

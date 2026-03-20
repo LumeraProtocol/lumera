@@ -26,7 +26,7 @@ jobs:
         run: go mod download
 
       - name: Run unit tests
-        run: go test -v ./x/...
+        run: make unit-tests
 
   integration-tests:
     name: integration
@@ -45,11 +45,8 @@ jobs:
       - name: Install dependencies
         run: go mod download
 
-      - name: Generate OpenRPC spec
-        run: make openrpc
-
       - name: Run integration tests
-        run: go test -tags=integration,test -p 4 ./tests/integration/... -v
+        run: make integration-tests
 
   simulation-tests:
     name: simulation
@@ -69,12 +66,7 @@ jobs:
       - name: Install dependencies
         run: go mod download
 
-      - name: Generate OpenRPC spec
-        run: make openrpc
-
-      - name: Run simulation tests
+      - name: Run simulation benchmark
         env:
-          GOMAXPROCS: 2
           IGNITE_TELEMETRY_CONSENT: "no"
-        run: |
-          go test -v -benchmem -run=^$ -bench ^BenchmarkSimulation -cpuprofile cpu.out ./app -Commit=true
+        run: make simulation-bench

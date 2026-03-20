@@ -45,6 +45,9 @@ jobs:
       - name: Install dependencies
         run: go mod download
 
+      - name: Generate OpenRPC spec
+        run: make openrpc
+
       - name: Run integration tests
         run: go test -tags=integration,test -p 4 ./tests/integration/... -v
 
@@ -65,6 +68,9 @@ jobs:
 
       - name: Install dependencies
         run: go mod download
+
+      - name: Generate OpenRPC spec
+        run: make openrpc
 
       - name: Run simulation tests
         env:

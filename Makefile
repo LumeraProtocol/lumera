@@ -139,7 +139,6 @@ go.sum: go.mod
 build/lumerad: $(GO_SRC) app/openrpc/openrpc.json.gz go.sum Makefile
 	@echo "Building lumerad binary..."
 	@mkdir -p ${BUILD_DIR}
-	${BUF} generate --template proto/buf.gen.gogo.yaml --verbose
 	GOFLAGS=${GOFLAGS} ${GO} build -mod=readonly $(if $(strip $(BUILD_TAGS)),-tags "$(BUILD_TAGS)",) -ldflags '$(BUILD_LDFLAGS)' -o ${BUILD_DIR}/$(APP_BINARY) ./$(APP_MAIN)
 	chmod +x ${BUILD_DIR}/$(APP_BINARY)
 

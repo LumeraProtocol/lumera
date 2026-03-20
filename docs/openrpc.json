@@ -681,11 +681,11 @@
               }
             },
             "required": [
+              "enableMemory",
               "enableReturnData",
               "tracerConfig",
               "disableStack",
-              "disableStorage",
-              "enableMemory"
+              "disableStorage"
             ],
             "type": "object",
             "x-go-type": "types.TraceConfig"
@@ -945,38 +945,38 @@
             }
           },
           "required": [
-            "Mallocs",
-            "MSpanSys",
-            "BuckHashSys",
-            "NumGC",
-            "DebugGC",
-            "BySize",
-            "HeapInuse",
-            "HeapObjects",
-            "MCacheInuse",
-            "TotalAlloc",
-            "HeapAlloc",
-            "HeapIdle",
             "StackSys",
             "NumForcedGC",
-            "GCSys",
-            "GCCPUFraction",
-            "Sys",
-            "MCacheSys",
-            "NextGC",
-            "Lookups",
+            "DebugGC",
+            "HeapAlloc",
+            "MSpanSys",
+            "BuckHashSys",
+            "Mallocs",
             "Frees",
-            "HeapReleased",
-            "OtherSys",
-            "PauseTotalNs",
-            "PauseEnd",
-            "EnableGC",
             "Alloc",
-            "HeapSys",
-            "StackInuse",
+            "Lookups",
+            "HeapObjects",
             "MSpanInuse",
+            "NumGC",
+            "EnableGC",
+            "TotalAlloc",
+            "Sys",
+            "HeapReleased",
+            "GCSys",
+            "PauseTotalNs",
+            "GCCPUFraction",
+            "HeapSys",
+            "PauseNs",
+            "BySize",
+            "HeapInuse",
+            "MCacheSys",
+            "OtherSys",
+            "NextGC",
+            "MCacheInuse",
             "LastGC",
-            "PauseNs"
+            "PauseEnd",
+            "HeapIdle",
+            "StackInuse"
           ],
           "type": "object",
           "x-go-type": "runtime.MemStats"
@@ -1652,11 +1652,11 @@
               }
             },
             "required": [
-              "disableStack",
               "disableStorage",
               "enableMemory",
               "enableReturnData",
-              "tracerConfig"
+              "tracerConfig",
+              "disableStack"
             ],
             "type": "object",
             "x-go-type": "types.TraceConfig"
@@ -1954,11 +1954,11 @@
               }
             },
             "required": [
-              "disableStack",
-              "disableStorage",
+              "tracerConfig",
               "enableMemory",
               "enableReturnData",
-              "tracerConfig"
+              "disableStack",
+              "disableStorage"
             ],
             "type": "object",
             "x-go-type": "types.TraceConfig"
@@ -2254,11 +2254,11 @@
               }
             },
             "required": [
-              "disableStack",
               "disableStorage",
               "enableMemory",
               "enableReturnData",
-              "tracerConfig"
+              "tracerConfig",
+              "disableStack"
             ],
             "type": "object",
             "x-go-type": "types.TraceConfig"
@@ -2768,11 +2768,11 @@
               }
             },
             "required": [
-              "tracerConfig",
               "disableStack",
               "disableStorage",
               "enableMemory",
-              "enableReturnData"
+              "enableReturnData",
+              "tracerConfig"
             ],
             "type": "object",
             "x-go-type": "types.TraceConfig"
@@ -3056,11 +3056,11 @@
               }
             },
             "required": [
-              "disableStorage",
               "enableMemory",
               "enableReturnData",
+              "disableStack",
               "tracerConfig",
-              "disableStack"
+              "disableStorage"
             ],
             "type": "object",
             "x-go-type": "types.TraceConfig"
@@ -5369,16 +5369,16 @@
               }
             },
             "required": [
-              "blockTimestamp",
+              "logIndex",
               "removed",
-              "address",
+              "topics",
               "blockNumber",
               "transactionHash",
-              "logIndex",
-              "topics",
-              "data",
               "transactionIndex",
-              "blockHash"
+              "blockHash",
+              "blockTimestamp",
+              "address",
+              "data"
             ],
             "type": "object",
             "x-go-type": "types.Log"
@@ -5661,16 +5661,16 @@
               }
             },
             "required": [
-              "blockHash",
+              "address",
+              "topics",
               "data",
               "blockNumber",
               "transactionHash",
+              "transactionIndex",
               "blockTimestamp",
               "logIndex",
-              "removed",
-              "address",
-              "topics",
-              "transactionIndex"
+              "blockHash",
+              "removed"
             ],
             "type": "object",
             "x-go-type": "types.Log"
@@ -5827,12 +5827,12 @@
             }
           },
           "required": [
+            "storageProof",
+            "address",
             "accountProof",
             "codeHash",
             "nonce",
-            "storageHash",
-            "storageProof",
-            "address"
+            "storageHash"
           ],
           "type": "object",
           "x-go-type": "types.AccountResult"
@@ -6207,12 +6207,12 @@
             }
           },
           "required": [
+            "type",
+            "from",
             "gas",
             "hash",
             "input",
-            "nonce",
-            "type",
-            "from"
+            "nonce"
           ],
           "type": "object",
           "x-go-type": "types.RPCTransaction"
@@ -6507,12 +6507,12 @@
             }
           },
           "required": [
-            "hash",
             "input",
             "nonce",
             "type",
             "from",
-            "gas"
+            "gas",
+            "hash"
           ],
           "type": "object",
           "x-go-type": "types.RPCTransaction"
@@ -6797,12 +6797,12 @@
             }
           },
           "required": [
-            "nonce",
-            "type",
             "from",
             "gas",
             "hash",
-            "input"
+            "input",
+            "nonce",
+            "type"
           ],
           "type": "object",
           "x-go-type": "types.RPCTransaction"
@@ -6989,16 +6989,16 @@
               }
             },
             "required": [
+              "transactionIndex",
+              "blockHash",
+              "blockTimestamp",
+              "logIndex",
+              "removed",
               "data",
               "blockNumber",
               "transactionHash",
-              "transactionIndex",
-              "logIndex",
               "address",
-              "topics",
-              "blockHash",
-              "blockTimestamp",
-              "removed"
+              "topics"
             ],
             "type": "object",
             "x-go-type": "types.Log"
@@ -8299,10 +8299,10 @@
               }
             },
             "required": [
-              "domain",
               "message",
               "types",
-              "primaryType"
+              "primaryType",
+              "domain"
             ],
             "type": "object",
             "x-go-type": "apitypes.TypedData"

@@ -19,9 +19,6 @@ jobs:
       - name: Set up Go
         uses: ./.github/actions/setup-go
 
-      - name: Install Ignite CLI
-        uses: ./.github/actions/install-ignite
-
       - name: Install dependencies
         run: go mod download
 
@@ -38,9 +35,6 @@ jobs:
 
       - name: Set up Go
         uses: ./.github/actions/setup-go
-
-      - name: Install Ignite CLI
-        uses: ./.github/actions/install-ignite
 
       - name: Install dependencies
         run: go mod download
@@ -60,13 +54,8 @@ jobs:
       - name: Set up Go
         uses: ./.github/actions/setup-go
 
-      - name: Install Ignite CLI
-        uses: ./.github/actions/install-ignite
-
       - name: Install dependencies
         run: go mod download
 
       - name: Run simulation benchmark
-        env:
-          IGNITE_TELEMETRY_CONSENT: "no"
         run: make simulation-bench

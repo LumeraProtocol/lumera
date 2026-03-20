@@ -23,18 +23,8 @@ jobs:
       - name: Set up Go
         uses: ./.github/actions/setup-go
 
-      - name: Install Ignite CLI
-        uses: ./.github/actions/install-ignite
-
-      - name: Generate OpenRPC spec
-        run: make openrpc
-
-      - name: Build Chain
-        run: |
-          ./ignite chain build -y -t linux:amd64
-        env:
-          DO_NOT_TRACK: 1
-          GOFLAGS: "-buildvcs=false"
+      - name: Build and install lumerad
+        run: make install
 
       - name: Prepare System Tests
         run: go mod tidy

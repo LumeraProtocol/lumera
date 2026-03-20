@@ -4,7 +4,6 @@
 
 # tools/paths
 GO ?= go
-IGNITE ?= ignite
 BUF ?= buf
 GOLANGCI_LINT ?= golangci-lint
 BUILD_DIR ?= build
@@ -13,7 +12,6 @@ RELEASE_TARGETS ?= linux:amd64
 GOPROXY ?= https://proxy.golang.org,direct
 
 module_version = $(strip $(shell EMSDK_QUIET=1 ${GO} list -m -f '{{.Version}}' $1 | tail -n 1))
-IGNITE_INSTALL_SCRIPT ?= https://get.ignite.com/cli!
 
 GOFLAGS = "-trimpath"
 
@@ -47,8 +45,7 @@ BUILD_LDFLAGS = \
 	-X github.com/cosmos/cosmos-sdk/version.AppName=$(APP_NAME)d \
 	-X github.com/cosmos/cosmos-sdk/version.Version=$(VERSION_TAG) \
 	-X github.com/cosmos/cosmos-sdk/version.Commit=$(GIT_HEAD_HASH) \
-	-X github.com/cosmos/cosmos-sdk/version.BuildTags=$(BUILD_TAGS_VERSION) \
-	-X github.com/LumeraProtocol/lumera/cmd/lumera/cmd.ChainID=$(CHAIN_ID)
+	-X github.com/cosmos/cosmos-sdk/version.BuildTags=$(BUILD_TAGS_VERSION)
 
 TOOLS := \
 	github.com/bufbuild/buf/cmd/buf@$(BUF_VERSION) \
@@ -75,8 +72,6 @@ install-tools:
 		echo "  $$tool"; \
 		EMSDK_QUIET=1 ${GO} install $$tool; \
 	done
-	@echo "Installing Ignite CLI (latest)..."
-	@curl -sSfL ${IGNITE_INSTALL_SCRIPT} | bash
 
 clean-proto:
 	@echo "Cleaning up protobuf generated files..."
@@ -85,8 +80,6 @@ clean-proto:
 	rm -f docs/static/openapi.yml
 
 clean-cache:
-	@echo "Cleaning Ignite cache..."
-	rm -rf ~/.ignite/cache
 	@echo "Cleaning Buf cache..."
 	${BUF} clean || true
 	rm -rf ~/.cache/buf || true
@@ -101,11 +94,25 @@ GO_SRC := $(shell find app -name "*.go") \
 	$(shell find config -name "*.go") \
 	$(shell find x -name "*.go")
 
-build-proto: clean-proto $(PROTO_SRC)
+install: build
+	@echo "Installing $(APP_BINARY) to $(shell ${GO} env GOPATH)/bin/..."
+	@cp ${BUILD_DIR}/$(APP_BINARY) $(shell ${GO} env GOPATH)/bin/
+
+build-proto: clean-proto $(PROTO_SRC) build-openapi
 	@echo "Processing proto files..."
 	${BUF} generate --template proto/buf.gen.gogo.yaml --verbose
 	${BUF} generate --template proto/buf.gen.swagger.yaml --verbose
-	${IGNITE} generate openapi --yes --enable-proto-vendor --clear-cache
+	@$(MAKE) --no-print-directory build-openapi
+
+build-openapi:
+	@echo "Generating vendor swagger from cosmos/evm protos..."
+	@rm -rf proto/vendor-swagger && mkdir -p proto/vendor-swagger
+	@EVM_PROTO_DIR=$$(${GO} list -m -f '{{.Dir}}' github.com/cosmos/evm)/proto && \
+	if [ -d "$$EVM_PROTO_DIR" ]; then \
+		${BUF} generate "$$EVM_PROTO_DIR" --template proto/buf.gen.swagger.yaml --output proto/vendor-swagger; \
+	fi
+	@echo "Merging swagger specs..."
+	${GO} run ./tools/openapigen -config tools/openapigen/config.toml -out docs/static/openapi.yml
 
 OPENRPC_GENERATOR_INPUTS := \
 	tools/openrpcgen/main.go \

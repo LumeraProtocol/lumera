@@ -162,7 +162,9 @@ func testIBCERC20MiddlewareDenomCollisionKeepsExistingMap(t *testing.T) {
 }
 
 // setupERC20MiddlewarePath boots a two-chain IBC path with base fee disabled
-// for deterministic packet fee behavior in tests.
+// for deterministic packet fee behavior in tests, and ERC20 registration policy
+// set to "all" so auto-registration works for any IBC denom (the default policy
+// is "allowlist" which only allows uatom/uosmo/uusdc base denoms).
 func setupERC20MiddlewarePath(t *testing.T) (*ibctesting.Coordinator, *ibctesting.TestChain, *ibctesting.TestChain, *ibctesting.Path) {
 	t.Helper()
 	coord := ibctesting.NewCoordinator(t, 2)
@@ -171,11 +173,23 @@ func setupERC20MiddlewarePath(t *testing.T) (*ibctesting.Coordinator, *ibctestin
 
 	disableBaseFeeForIBCTestChain(t, chainA)
 	disableBaseFeeForIBCTestChain(t, chainB)
+	setERC20PolicyAllForIBCTestChain(t, chainA)
+	setERC20PolicyAllForIBCTestChain(t, chainB)
 	coord.CommitBlock(chainA, chainB)
 
 	path := ibctesting.NewTransferPath(chainA, chainB)
 	path.Setup()
 	return coord, chainA, chainB, path
+}
+
+// setERC20PolicyAllForIBCTestChain sets the ERC20 registration policy to "all"
+// so that any IBC denom triggers auto-registration. Without this, the default
+// "allowlist" policy silently skips registration for denoms not in the allowlist.
+func setERC20PolicyAllForIBCTestChain(t *testing.T, chain *ibctesting.TestChain) {
+	t.Helper()
+	app := chain.GetLumeraApp()
+	ctx := chain.GetContext()
+	app.SetERC20RegistrationMode(ctx, "all")
 }
 
 // disableBaseFeeForIBCTestChain forces zero-fee-market constraints so ICS20

@@ -221,6 +221,11 @@ burst = 100
 
 # Time-to-live for per-IP rate limiter entries.
 entry-ttl = "5m"
+
+# Comma-separated list of trusted reverse proxy CIDRs.
+# X-Forwarded-For and X-Real-IP headers are only trusted from these sources.
+# When empty (default), client IP is always derived from the socket peer address.
+trusted-proxies = ""
 ```
 
 ### Tuning notes
@@ -229,6 +234,7 @@ entry-ttl = "5m"
 - **`requests-per-second`**: 50 rps is generous for individual users. Reduce to `10`–`20` for heavily loaded public endpoints.
 - **`burst`**: Allows short spikes. Set to 2–3× `requests-per-second` for a reasonable burst window.
 - **`entry-ttl`**: Controls memory usage. Shorter TTL frees memory faster but may re-admit recently limited IPs sooner.
+- **`trusted-proxies`**: Set this to the CIDRs of your load balancer / reverse proxy (e.g. `"10.0.0.0/8, 172.16.0.0/12"`). When empty, `X-Forwarded-For` and `X-Real-IP` headers are **ignored** and the rate limiter keys on the socket peer IP — this prevents clients from bypassing rate limits by spoofing headers. Single IPs (without `/mask`) are treated as `/32` (IPv4) or `/128` (IPv6).
 
 ### Deployment pattern
 
@@ -422,6 +428,7 @@ proxy-address = "0.0.0.0:8547"  # public-facing port
 requests-per-second = 20
 burst = 50
 entry-ttl = "5m"
+trusted-proxies = ""             # set to LB CIDRs if behind a reverse proxy
 ```
 
 ### Archive / debugging node

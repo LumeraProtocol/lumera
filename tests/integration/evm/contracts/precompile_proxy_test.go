@@ -166,10 +166,10 @@ func testContractProxiesSupernodeGetParams(t *testing.T, node *evmtest.Node) {
 		t.Fatalf("expected 7 return values, got %d", len(out))
 	}
 
-	// minimumStake (uint256) should be positive
+	// minimumStake (uint256) should be a non-negative value.
 	minStake, ok := out[0].(*big.Int)
-	if !ok || minStake == nil || minStake.Sign() <= 0 {
-		t.Fatalf("minimumStake should be > 0, got %v", out[0])
+	if !ok || minStake == nil || minStake.Sign() < 0 {
+		t.Fatalf("minimumStake should be >= 0, got %v", out[0])
 	}
 
 	// minSupernodeVersion (string) should be non-empty

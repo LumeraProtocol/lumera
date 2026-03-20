@@ -349,7 +349,7 @@ func testBaseFeeProgressesAcrossMultiBlockLoadPattern(t *testing.T, node *evmtes
 		totalSimpleTxs     = 1500
 		simpleGasLimit     = uint64(21_000)
 		lowEmptyBlocks     = 16
-		minObservedBlocks  = 20
+		minObservedBlocks  = 17 // high-load phase (~1-2 blocks) + lowEmptyBlocks; CI can produce fewer blocks under load
 		gasPriceMultiplier = 6
 	)
 

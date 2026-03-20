@@ -55,6 +55,11 @@ func TestEVMStatePreservationAcrossRestart(t *testing.T) {
 	// 4) Restart node (simulates binary upgrade).
 	node.RestartAndWaitRPC()
 
+	// Wait for at least one block after restart so consensus params (including
+	// block gas limit) are fully loaded. Without this, the GasWantedDecorator
+	// may see a zero block gas limit and reject all transactions.
+	node.WaitForBlockNumberAtLeast(t, preRestartBlock+1, 30*time.Second)
+
 	// 5) Verify contract code survives restart.
 	var postRestartCode string
 	node.MustJSONRPC(t, "eth_getCode", []any{contractAddress, "latest"}, &postRestartCode)

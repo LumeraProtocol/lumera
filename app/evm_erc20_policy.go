@@ -179,6 +179,13 @@ func (w *erc20PolicyKeeperWrapper) setRegistrationMode(ctx sdk.Context, mode str
 	store.Set(policyModeKey, []byte(mode))
 }
 
+// SetERC20RegistrationMode sets the ERC20 IBC auto-registration policy mode.
+// Valid values: "all", "allowlist", "none".
+// Exposed for test use — production code should use governance proposals.
+func (app *App) SetERC20RegistrationMode(ctx sdk.Context, mode string) {
+	app.erc20PolicyWrapper.setRegistrationMode(ctx, mode)
+}
+
 // isIBCDenomAllowed checks whether the given denom is in the allowlist.
 func (w *erc20PolicyKeeperWrapper) isIBCDenomAllowed(ctx sdk.Context, denom string) bool {
 	store := prefix.NewStore(ctx.KVStore(w.storeKey), policyAllowPfx)

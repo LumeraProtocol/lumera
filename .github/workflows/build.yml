@@ -69,17 +69,8 @@ jobs:
       - name: Set up Go
         uses: ./.github/actions/setup-go
 
-      - name: Install Ignite CLI
-        uses: ./.github/actions/install-ignite
-
-      - name: Generate OpenRPC spec
-        run: make openrpc
-
-      - name: Build Chain
-        run: ./ignite chain build -y -t linux:amd64
-        env:
-          DO_NOT_TRACK: 1
-          GOFLAGS: "-buildvcs=false"
+      - name: Build and install lumerad
+        run: make install
 
       - name: Prepare System Tests
         run: go mod tidy
@@ -106,63 +97,16 @@ jobs:
         id: setup-go
         uses: ./.github/actions/setup-go
 
-      - name: Prepare Build Variables
-        id: vars
-        run: |
-          set -euo pipefail
-
-          repo_name=${GITHUB_REPOSITORY##*/}
-
-          build_id=${GITHUB_SHA::7}
-          is_tag=false
-
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            build_id="${GITHUB_REF#refs/tags/}"
-            is_tag=true
-          fi
-
-          tarball_prefix="${repo_name}_${build_id}"
-
-          echo "build_id=$build_id" >> $GITHUB_OUTPUT
-          echo "tarball_prefix=${tarball_prefix}" >> $GITHUB_OUTPUT
-          echo "is_tag=${is_tag}" >> $GITHUB_OUTPUT
-
-      - name: Install Ignite CLI
-        uses: ./.github/actions/install-ignite
-
       - name: Install wasmvm library
         uses: ./.github/actions/install-wasmvm
 
-      - name: Install buf CLI
-        run: |
-          set -euo pipefail
-          BUF_VERSION="$(go list -m -f '{{.Version}}' github.com/bufbuild/buf)"
-          if [ -z "${BUF_VERSION}" ]; then
-            echo "Failed to resolve github.com/bufbuild/buf version from go.mod" >&2
-            exit 1
-          fi
-          go install "github.com/bufbuild/buf/cmd/buf@${BUF_VERSION}"
+      - name: Install tools
+        run: make install-tools
 
-      - name: Generate OpenRPC spec
-        run: make openrpc
-
-      - name: Build with Ignite CLI
-        run: |
-          buf --version
-          buf generate --template proto/buf.gen.gogo.yaml --verbose
-          buf generate --template proto/buf.gen.swagger.yaml --verbose
-          ./ignite version
-          ./ignite generate openapi --yes
-          ./ignite chain build --clear-cache --skip-proto --release --release.prefix ${{ steps.vars.outputs.tarball_prefix }} -y -t linux:amd64
+      - name: Build release artifacts
+        run: make release
         env:
-          DO_NOT_TRACK: 1
-          GOFLAGS: "-trimpath -buildvcs=false"
-          CGO_LDFLAGS: "-Wl,-rpath,/usr/lib -Wl,--disable-new-dtags"
-
-      - name: Fix Release Directory Permissions
-        run: |
-          sudo chown -R $USER:$USER release/
-          sudo chmod -R 755 release/
+          RELEASE_CGO_LDFLAGS: "-Wl,-rpath,/usr/lib -Wl,--disable-new-dtags"
 
       - name: Package Release Artifacts
         run: |

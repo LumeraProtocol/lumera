@@ -2,6 +2,7 @@ package keeper
 
 import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 )
 
@@ -59,23 +60,21 @@ func (k Keeper) migrateActiveDelegations(ctx sdk.Context, legacyAddr, newAddr sd
 			return err
 		}
 
-		// Initialize new distribution starting info.
-		// Get the validator's current rewards period to initialize correctly.
+		// Initialize fresh distribution starting info for the new delegation.
+		// The old starting info was deleted above, so we always create new info
+		// anchored at the current block height and rewards period.
 		currentRewards, err := k.distributionKeeper.GetValidatorCurrentRewards(ctx, valAddr)
 		if err != nil {
 			return err
 		}
-		startingInfo, err := k.distributionKeeper.GetDelegatorStartingInfo(ctx, valAddr, legacyAddr)
-		if err != nil {
-			// Starting info might not exist if rewards were just withdrawn.
-			// Create fresh starting info.
-			sdkCtx := sdk.UnwrapSDKContext(ctx)
-			startingInfo.Height = uint64(sdkCtx.BlockHeight())
-			startingInfo.PreviousPeriod = currentRewards.Period - 1
-			startingInfo.Stake = del.Shares
+		sdkCtx := sdk.UnwrapSDKContext(ctx)
+		previousPeriod := currentRewards.Period - 1
+		startingInfo := distrtypes.DelegatorStartingInfo{
+			Height:         uint64(sdkCtx.BlockHeight()),
+			PreviousPeriod: previousPeriod,
+			Stake:          del.Shares,
 		}
-		startingInfo.PreviousPeriod = currentRewards.Period - 1
-		if err := k.incrementHistoricalRewardsReferenceCount(ctx, valAddr, startingInfo.PreviousPeriod); err != nil {
+		if err := k.incrementHistoricalRewardsReferenceCount(ctx, valAddr, previousPeriod); err != nil {
 			return err
 		}
 		if err := k.distributionKeeper.SetDelegatorStartingInfo(ctx, valAddr, newAddr, startingInfo); err != nil {

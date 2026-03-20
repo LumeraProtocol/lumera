@@ -7,7 +7,9 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -272,4 +274,12 @@ func TestServeHTTPPostRewritesRPCDiscoverAlias(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	require.Equal(t, "rpc_discover", gotMethod)
+}
+
+func TestProxyHTTPClientHasTimeout(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, 30*time.Second, proxyHTTPClient.Timeout,
+		"proxyHTTPClient must have a 30s timeout to prevent indefinite blocking")
+	assert.NotEqual(t, http.DefaultClient, proxyHTTPClient,
+		"proxyHTTPClient must not be http.DefaultClient")
 }

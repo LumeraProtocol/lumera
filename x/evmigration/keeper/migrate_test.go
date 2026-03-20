@@ -798,7 +798,6 @@ func TestMigrateStaking_ActiveDelegations(t *testing.T) {
 	f.stakingKeeper.EXPECT().RemoveDelegation(gomock.Any(), del).Return(nil)
 	f.stakingKeeper.EXPECT().SetDelegation(gomock.Any(), gomock.Any()).Return(nil)
 	f.distributionKeeper.EXPECT().GetValidatorCurrentRewards(gomock.Any(), valAddr).Return(distrtypes.ValidatorCurrentRewards{Period: 5}, nil)
-	f.distributionKeeper.EXPECT().GetDelegatorStartingInfo(gomock.Any(), valAddr, legacy).Return(distrtypes.DelegatorStartingInfo{}, nil)
 	expectHistoricalRewardsIncrement(f.distributionKeeper, valAddr, 4, 1)
 	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), valAddr, newAddr, gomock.Any()).Return(nil)
 
@@ -908,7 +907,6 @@ func TestMigrateStaking_WithUnbondingDelegation(t *testing.T) {
 	f.stakingKeeper.EXPECT().RemoveDelegation(gomock.Any(), del).Return(nil)
 	f.stakingKeeper.EXPECT().SetDelegation(gomock.Any(), gomock.Any()).Return(nil)
 	f.distributionKeeper.EXPECT().GetValidatorCurrentRewards(gomock.Any(), valAddr).Return(distrtypes.ValidatorCurrentRewards{Period: 5}, nil)
-	f.distributionKeeper.EXPECT().GetDelegatorStartingInfo(gomock.Any(), valAddr, legacy).Return(distrtypes.DelegatorStartingInfo{}, nil)
 	expectHistoricalRewardsIncrement(f.distributionKeeper, valAddr, 4, 1)
 	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), valAddr, newAddr, gomock.Any()).Return(nil)
 
@@ -967,7 +965,6 @@ func TestMigrateStaking_WithRedelegation(t *testing.T) {
 	f.stakingKeeper.EXPECT().RemoveDelegation(gomock.Any(), del).Return(nil)
 	f.stakingKeeper.EXPECT().SetDelegation(gomock.Any(), gomock.Any()).Return(nil)
 	f.distributionKeeper.EXPECT().GetValidatorCurrentRewards(gomock.Any(), srcValAddr).Return(distrtypes.ValidatorCurrentRewards{Period: 3}, nil)
-	f.distributionKeeper.EXPECT().GetDelegatorStartingInfo(gomock.Any(), srcValAddr, legacy).Return(distrtypes.DelegatorStartingInfo{}, nil)
 	expectHistoricalRewardsIncrement(f.distributionKeeper, srcValAddr, 2, 1)
 	f.distributionKeeper.EXPECT().SetDelegatorStartingInfo(gomock.Any(), srcValAddr, newAddr, gomock.Any()).Return(nil)
 

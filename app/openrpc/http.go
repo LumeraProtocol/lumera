@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 )
 
 const HTTPPath = "/openrpc.json"
@@ -84,6 +85,13 @@ func NewHTTPHandler(allowedOrigins []string, jsonRPCAddr string) http.HandlerFun
 	}
 }
 
+// proxyHTTPClient is a dedicated client for upstream JSON-RPC calls with a
+// timeout matching the server's WriteTimeout. Using http.DefaultClient would
+// block indefinitely if the upstream becomes unresponsive.
+var proxyHTTPClient = &http.Client{
+	Timeout: 30 * time.Second,
+}
+
 func proxyJSONRPC(w http.ResponseWriter, r *http.Request, jsonRPCAddr string) error {
 	if jsonRPCAddr == "" {
 		return io.EOF
@@ -108,7 +116,7 @@ func proxyJSONRPC(w http.ResponseWriter, r *http.Request, jsonRPCAddr string) er
 		}
 	}
 
-	resp, err := http.DefaultClient.Do(upstreamReq)
+	resp, err := proxyHTTPClient.Do(upstreamReq)
 	if err != nil {
 		return err
 	}

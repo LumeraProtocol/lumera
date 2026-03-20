@@ -36,7 +36,7 @@ jobs:
         run: go mod download
 
       - name: Run unit tests
-        run: go test ./x/... -v
+        run: make unit-tests
 
   integration-tests:
     runs-on: ubuntu-latest
@@ -51,11 +51,8 @@ jobs:
       - name: Install dependencies
         run: go mod download
 
-      - name: Generate OpenRPC spec
-        run: make openrpc
-
       - name: Run integration tests
-        run: go test -tags=integration,test -p 4 ./tests/integration/... -v
+        run: make integration-tests
 
   system-tests:
     runs-on: ubuntu-latest
@@ -75,6 +72,9 @@ jobs:
       - name: Install Ignite CLI
         uses: ./.github/actions/install-ignite
 
+      - name: Generate OpenRPC spec
+        run: make openrpc
+
       - name: Build Chain
         run: ./ignite chain build -y -t linux:amd64
         env:
@@ -86,8 +86,7 @@ jobs:
         working-directory: tests/systemtests
 
       - name: Run System Tests
-        run: go test -tags=system_test -timeout 20m -v .
-        working-directory: tests/systemtests
+        run: make systemex-tests
 
   build:
     needs: [lint, unit-tests, integration-tests, system-tests]
@@ -143,6 +142,9 @@ jobs:
             exit 1
           fi
           go install "github.com/bufbuild/buf/cmd/buf@${BUF_VERSION}"
+
+      - name: Generate OpenRPC spec
+        run: make openrpc
 
       - name: Build with Ignite CLI
         run: |

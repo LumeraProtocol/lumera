@@ -124,7 +124,8 @@ if [ ! -f "${VALIDATORS_JSON}" ]; then
 fi
 
 if ! command -v jq >/dev/null 2>&1; then
-	echo "[CONFIGURE] jq is missing"
+	echo "[CONFIGURE] jq is missing" >&2
+	exit 1
 fi
 
 # ─── Shared Volume Setup ──────────────────────────────────────────────────────

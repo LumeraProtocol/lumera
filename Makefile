@@ -169,7 +169,7 @@ simulation-tests: openrpc
 
 simulation-bench: openrpc
 	@echo "Running simulation benchmark..."
-	GOMAXPROCS=2 ${GO} test -v -benchmem -run='^$$' -bench '^BenchmarkSimulation' -cpuprofile cpu.out ./app -Commit=true
+	GOMAXPROCS=2 ${GO} test -tags='simulation test' -v -benchmem -run='^$$' -bench '^BenchmarkSimulation' -cpuprofile cpu.out ./tests/simulation/ -Commit=true
 
 systemex-tests: openrpc
 	@echo "Running system tests..."

@@ -1,16 +1,6 @@
 name: lint
 
 on:
-  push:
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.gitignore'
-  pull_request:
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.gitignore'
   workflow_call:
 
 permissions:

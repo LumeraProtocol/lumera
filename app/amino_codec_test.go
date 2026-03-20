@@ -15,8 +15,7 @@ import (
 // SDK ante gas-size estimation paths that marshal legacy StdSignature work for
 // EVM eth_secp256k1 account pubkeys.
 func TestRegisterLumeraLegacyAminoCodecEnablesEthSecp256k1StdSignature(t *testing.T) {
-	t.Parallel()
-
+	// NOT parallel: this test mutates the global legacy.Cdc.
 	oldLegacyCodec := legacy.Cdc
 	t.Cleanup(func() {
 		legacy.Cdc = oldLegacyCodec

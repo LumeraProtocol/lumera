@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sync"
 	"strings"
 
 	_ "cosmossdk.io/api/cosmos/tx/config/v1" // import for side-effects
@@ -171,6 +172,7 @@ type App struct {
 	// jsonrpcRateLimitProxy is the optional rate-limiting reverse proxy for JSON-RPC.
 	jsonrpcRateLimitProxy       *http.Server
 	jsonrpcRateLimitCleanupStop chan struct{}
+	jsonrpcRateLimitCloseOnce   *sync.Once
 
 	// keepers
 	// only keepers required by the app are exposed

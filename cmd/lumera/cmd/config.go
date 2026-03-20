@@ -19,6 +19,7 @@ type LumeraJSONRPCRateLimitConfig struct {
 	RequestsPerSec int    `mapstructure:"requests-per-second"`
 	Burst          int    `mapstructure:"burst"`
 	EntryTTL       string `mapstructure:"entry-ttl"`
+	TrustedProxies string `mapstructure:"trusted-proxies"`
 }
 
 type LumeraConfig struct {
@@ -55,6 +56,11 @@ burst = {{ .Lumera.JSONRPCRateLimit.Burst }}
 # Time-to-live for per-IP rate limiter entries (Go duration, e.g. "5m", "1h").
 # Entries are evicted after this duration of inactivity.
 entry-ttl = "{{ .Lumera.JSONRPCRateLimit.EntryTTL }}"
+
+# Comma-separated list of trusted reverse proxy CIDRs (e.g. "10.0.0.0/8, 172.16.0.0/12").
+# When set, X-Forwarded-For and X-Real-IP headers are only trusted from these sources.
+# When empty (default), client IP is always derived from the socket peer address.
+trusted-proxies = "{{ .Lumera.JSONRPCRateLimit.TrustedProxies }}"
 `
 
 // initCometBFTConfig helps to override default CometBFT Config values.
@@ -112,6 +118,7 @@ func initAppConfig() (string, interface{}) {
 				RequestsPerSec: 50,
 				Burst:          100,
 				EntryTTL:       "5m",
+				TrustedProxies: "",
 			},
 		},
 	}

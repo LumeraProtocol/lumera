@@ -9,6 +9,7 @@ BUF ?= buf
 GOLANGCI_LINT ?= golangci-lint
 BUILD_DIR ?= build
 RELEASE_DIR ?= release
+RELEASE_TARGETS ?= linux:amd64
 GOPROXY ?= https://proxy.golang.org,direct
 
 module_version = $(strip $(shell EMSDK_QUIET=1 ${GO} list -m -f '{{.Version}}' $1 | tail -n 1))
@@ -29,6 +30,25 @@ GRPC_VERSION := $(call module_version,google.golang.org/grpc)
 PROTOBUF_VERSION := $(call module_version,google.golang.org/protobuf)
 GOCACHE := $(shell ${GO} env GOCACHE)
 GOMODCACHE := $(shell ${GO} env GOMODCACHE)
+APP_NAME ?= $(strip $(shell awk -F': *' '/^name:/ {print $$2; exit}' config.yml))
+APP_MAIN ?= $(strip $(shell awk 'BEGIN{in_build=0} /^build:/{in_build=1; next} in_build && /^[^[:space:]]/{exit} in_build && $$1=="main:"{print $$2; exit}' config.yml))
+APP_BINARY ?= $(strip $(shell awk 'BEGIN{in_build=0} /^build:/{in_build=1; next} in_build && /^[^[:space:]]/{exit} in_build && $$1=="binary:"{print $$2; exit}' config.yml))
+CHAIN_ID ?= $(strip $(shell awk -F': *' '/^[[:space:]]*chain_id:/ {print $$2; exit}' config.yml))
+APP_TITLE ?= $(strip $(shell printf '%s' '$(APP_NAME)' | sed 's/^./\U&/'))
+BUILD_TAGS ?=
+EMPTY :=
+SPACE := $(EMPTY) $(EMPTY)
+COMMA := ,
+BUILD_TAGS_VERSION := $(subst $(SPACE),$(COMMA),$(strip $(BUILD_TAGS)))
+GIT_HEAD_HASH ?= $(strip $(shell git rev-parse HEAD 2>/dev/null))
+VERSION_TAG ?= $(strip $(shell tag_ref=$$(git for-each-ref --merged HEAD --sort=-creatordate --format='%(refname:strip=2)' refs/tags | head -n1); if [ -z "$$tag_ref" ]; then printf ''; else tag_name=$${tag_ref#v}; tag_commit=$$(git rev-list -n1 "$$tag_ref" 2>/dev/null); head_commit=$$(git rev-parse HEAD 2>/dev/null); if [ "$$tag_commit" = "$$head_commit" ]; then printf '%s' "$$tag_name"; else printf '%s-%s' "$$tag_name" "$$(git rev-parse --short=8 HEAD 2>/dev/null)"; fi; fi))
+BUILD_LDFLAGS = \
+	-X github.com/cosmos/cosmos-sdk/version.Name=$(APP_TITLE) \
+	-X github.com/cosmos/cosmos-sdk/version.AppName=$(APP_NAME)d \
+	-X github.com/cosmos/cosmos-sdk/version.Version=$(VERSION_TAG) \
+	-X github.com/cosmos/cosmos-sdk/version.Commit=$(GIT_HEAD_HASH) \
+	-X github.com/cosmos/cosmos-sdk/version.BuildTags=$(BUILD_TAGS_VERSION) \
+	-X github.com/LumeraProtocol/lumera/cmd/lumera/cmd.ChainID=$(CHAIN_ID)
 
 TOOLS := \
 	github.com/bufbuild/buf/cmd/buf@$(BUF_VERSION) \
@@ -113,8 +133,8 @@ build/lumerad: $(GO_SRC) app/openrpc/openrpc.json.gz go.sum Makefile
 	@echo "Building lumerad binary..."
 	@mkdir -p ${BUILD_DIR}
 	${BUF} generate --template proto/buf.gen.gogo.yaml --verbose
-	GOFLAGS=${GOFLAGS} ${IGNITE} chain build -t linux:amd64 --skip-proto --output ${BUILD_DIR}/
-	chmod +x $(BUILD_DIR)/lumerad
+	GOFLAGS=${GOFLAGS} ${GO} build -mod=readonly $(if $(strip $(BUILD_TAGS)),-tags "$(BUILD_TAGS)",) -ldflags '$(BUILD_LDFLAGS)' -o ${BUILD_DIR}/$(APP_BINARY) ./$(APP_MAIN)
+	chmod +x ${BUILD_DIR}/$(APP_BINARY)
 
 build-claiming-faucet:
 	@echo "Building Claiming Faucet binary..."
@@ -127,17 +147,27 @@ build-debug: build-debug/lumerad
 build-debug/lumerad: $(GO_SRC) app/openrpc/openrpc.json.gz go.sum Makefile
 	@echo "Building lumerad debug binary..."
 	@mkdir -p ${BUILD_DIR}
-	${IGNITE} chain build -t linux:amd64 --skip-proto --debug -v --output ${BUILD_DIR}/
-	chmod +x $(BUILD_DIR)/lumerad
+	GOFLAGS=${GOFLAGS} ${GO} build -mod=readonly $(if $(strip $(BUILD_TAGS)),-tags "$(BUILD_TAGS)",) -gcflags="all=-N -l" -ldflags '$(BUILD_LDFLAGS)' -o ${BUILD_DIR}/$(APP_BINARY) ./$(APP_MAIN)
+	chmod +x ${BUILD_DIR}/$(APP_BINARY)
 
-release:
-	@echo "Creating release with ignite..."
+release: go.sum
+	@echo "Creating release artifacts..."
 	@mkdir -p ${RELEASE_DIR}
 	@$(MAKE) --no-print-directory app/openrpc/openrpc.json.gz
 	${BUF} generate --template proto/buf.gen.gogo.yaml --verbose
 	${BUF} generate --template proto/buf.gen.swagger.yaml --verbose
-	${IGNITE} generate openapi --yes --enable-proto-vendor --clear-cache
-	CGO_LDFLAGS="${RELEASE_CGO_LDFLAGS}" ${IGNITE} chain build -t linux:amd64 --skip-proto --release -v --output ${RELEASE_DIR}/
+	@rm -f ${RELEASE_DIR}/*.tar.gz ${RELEASE_DIR}/release_checksum
+	@for target in ${RELEASE_TARGETS}; do \
+		goos=$${target%:*}; \
+		goarch=$${target#*:}; \
+		outdir=$$(mktemp -d); \
+		echo "Building release target $$goos/$$goarch..."; \
+		CGO_LDFLAGS="${RELEASE_CGO_LDFLAGS}" GOFLAGS=${GOFLAGS} GOOS=$$goos GOARCH=$$goarch ${GO} build -mod=readonly $(if $(strip $(BUILD_TAGS)),-tags "$(BUILD_TAGS)",) -ldflags '$(BUILD_LDFLAGS)' -o $$outdir/${APP_BINARY} ./$(APP_MAIN); \
+		chmod +x $$outdir/${APP_BINARY}; \
+		tar -C $$outdir -czf ${RELEASE_DIR}/${APP_NAME}_$${goos}_$${goarch}.tar.gz ${APP_BINARY}; \
+		rm -rf $$outdir; \
+	done
+	@(cd ${RELEASE_DIR} && sha256sum *.tar.gz > release_checksum)
 	@echo "Release created in [${RELEASE_DIR}/] directory."
 
 ###################################################

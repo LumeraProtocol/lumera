@@ -169,7 +169,6 @@ func (k Keeper) migrateRedelegations(ctx sdk.Context, legacyAddr, newAddr sdk.Ac
 	return nil
 }
 
-// migrateWithdrawAddress updates the delegator withdraw address. If it was set
 // migrateWithdrawAddress updates the delegator withdraw address. origWithdrawAddr
 // is the withdraw address that was set before MigrateDistribution may have
 // temporarily redirected it to self for safe reward withdrawal.

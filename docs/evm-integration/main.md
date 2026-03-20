@@ -16,6 +16,7 @@ Related documents:
 - [remix-guide.md](remix-guide.md) — Testing smart contracts on Lumera with Remix IDE and MetaMask
 - [action-precompile.md](action-precompile.md) — Action module precompile (`0x0901`) ABI reference, usage examples, and design notes
 - [supernode-precompile.md](supernode-precompile.md) — Supernode module precompile (`0x0902`) ABI reference, usage examples, and design notes
+- [tune-guide.md](tune-guide.md) — Mainnet parameter tuning guide: fee market, gas limits, mempool, RPC limits, and peer-chain comparisons
 
 ## App Changes and Features
 

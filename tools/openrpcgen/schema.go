@@ -2,6 +2,7 @@ package main
 
 import (
 	"reflect"
+	"sort"
 	"strings"
 )
 
@@ -516,6 +517,7 @@ func structProperties(t reflect.Type, depth int) (map[string]any, []string) {
 	for r := range requiredSet {
 		required = append(required, r)
 	}
+	sort.Strings(required)
 
 	return props, required
 }

@@ -151,7 +151,7 @@ lint:
 	@echo "Running linters..."
 	@${GOLANGCI_LINT} run ./... --timeout=5m
 
-unit-tests:
+unit-tests: openrpc
 	@echo "Running unit tests in x/..."
 	${GO} test ./x/... -v -coverprofile=coverage.out
 
@@ -159,7 +159,7 @@ integration-tests: openrpc
 	@echo "Running integration tests..."
 	${GO} test -tags=integration,test -p 4 ./tests/integration/... -v
 
-system-tests:
+system-tests: openrpc
 	@echo "Running system tests..."
 	${GO} test -tags=system,test ./tests/system/... -v
 
@@ -171,7 +171,7 @@ simulation-bench: openrpc
 	@echo "Running simulation benchmark..."
 	GOMAXPROCS=2 ${GO} test -v -benchmem -run='^$$' -bench '^BenchmarkSimulation' -cpuprofile cpu.out ./app -Commit=true
 
-systemex-tests:
+systemex-tests: openrpc
 	@echo "Running system tests..."
 	cd ./tests/systemtests/ && go test -tags=system_test -timeout 20m -v .
 

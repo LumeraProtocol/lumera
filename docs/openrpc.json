@@ -219,12 +219,12 @@
             }
           },
           "required": [
+            "PauseEnd",
+            "PauseQuantiles",
             "LastGC",
             "NumGC",
             "PauseTotal",
-            "Pause",
-            "PauseEnd",
-            "PauseQuantiles"
+            "Pause"
           ],
           "type": "object",
           "x-go-type": "debug.GCStats"
@@ -681,11 +681,11 @@
               }
             },
             "required": [
-              "enableMemory",
               "enableReturnData",
               "tracerConfig",
               "disableStack",
-              "disableStorage"
+              "disableStorage",
+              "enableMemory"
             ],
             "type": "object",
             "x-go-type": "types.TraceConfig"
@@ -780,9 +780,9 @@
                   }
                 },
                 "required": [
+                  "Frees",
                   "Size",
-                  "Mallocs",
-                  "Frees"
+                  "Mallocs"
                 ],
                 "type": "object",
                 "x-go-type": "struct { Size uint32; Mallocs uint64; Frees uint64 }"
@@ -945,38 +945,38 @@
             }
           },
           "required": [
-            "StackSys",
-            "NumForcedGC",
+            "Alloc",
+            "NextGC",
+            "Sys",
+            "Mallocs",
+            "OtherSys",
+            "PauseTotalNs",
+            "Frees",
+            "HeapObjects",
+            "MCacheInuse",
+            "NumGC",
             "DebugGC",
+            "TotalAlloc",
+            "HeapSys",
+            "MCacheSys",
+            "StackInuse",
+            "PauseEnd",
+            "GCCPUFraction",
+            "BySize",
+            "StackSys",
+            "Lookups",
+            "HeapIdle",
+            "HeapReleased",
+            "MSpanInuse",
+            "BuckHashSys",
+            "LastGC",
             "HeapAlloc",
             "MSpanSys",
-            "BuckHashSys",
-            "Mallocs",
-            "Frees",
-            "Alloc",
-            "Lookups",
-            "HeapObjects",
-            "MSpanInuse",
-            "NumGC",
-            "EnableGC",
-            "TotalAlloc",
-            "Sys",
-            "HeapReleased",
-            "GCSys",
-            "PauseTotalNs",
-            "GCCPUFraction",
-            "HeapSys",
             "PauseNs",
-            "BySize",
+            "NumForcedGC",
+            "EnableGC",
             "HeapInuse",
-            "MCacheSys",
-            "OtherSys",
-            "NextGC",
-            "MCacheInuse",
-            "LastGC",
-            "PauseEnd",
-            "HeapIdle",
-            "StackInuse"
+            "GCSys"
           ],
           "type": "object",
           "x-go-type": "runtime.MemStats"
@@ -1652,11 +1652,11 @@
               }
             },
             "required": [
+              "disableStack",
               "disableStorage",
               "enableMemory",
               "enableReturnData",
-              "tracerConfig",
-              "disableStack"
+              "tracerConfig"
             ],
             "type": "object",
             "x-go-type": "types.TraceConfig"
@@ -1955,10 +1955,10 @@
             },
             "required": [
               "tracerConfig",
-              "enableMemory",
-              "enableReturnData",
               "disableStack",
-              "disableStorage"
+              "disableStorage",
+              "enableMemory",
+              "enableReturnData"
             ],
             "type": "object",
             "x-go-type": "types.TraceConfig"
@@ -2254,11 +2254,11 @@
               }
             },
             "required": [
-              "disableStorage",
               "enableMemory",
               "enableReturnData",
-              "tracerConfig",
-              "disableStack"
+              "disableStack",
+              "disableStorage",
+              "tracerConfig"
             ],
             "type": "object",
             "x-go-type": "types.TraceConfig"
@@ -2768,11 +2768,11 @@
               }
             },
             "required": [
-              "disableStack",
-              "disableStorage",
               "enableMemory",
               "enableReturnData",
-              "tracerConfig"
+              "tracerConfig",
+              "disableStack",
+              "disableStorage"
             ],
             "type": "object",
             "x-go-type": "types.TraceConfig"
@@ -3056,11 +3056,11 @@
               }
             },
             "required": [
-              "enableMemory",
               "enableReturnData",
               "disableStack",
-              "tracerConfig",
-              "disableStorage"
+              "disableStorage",
+              "enableMemory",
+              "tracerConfig"
             ],
             "type": "object",
             "x-go-type": "types.TraceConfig"
@@ -5369,6 +5369,7 @@
               }
             },
             "required": [
+              "data",
               "logIndex",
               "removed",
               "topics",
@@ -5377,8 +5378,7 @@
               "transactionIndex",
               "blockHash",
               "blockTimestamp",
-              "address",
-              "data"
+              "address"
             ],
             "type": "object",
             "x-go-type": "types.Log"
@@ -5661,16 +5661,16 @@
               }
             },
             "required": [
+              "blockHash",
+              "removed",
               "address",
-              "topics",
               "data",
-              "blockNumber",
-              "transactionHash",
-              "transactionIndex",
               "blockTimestamp",
               "logIndex",
-              "blockHash",
-              "removed"
+              "topics",
+              "blockNumber",
+              "transactionHash",
+              "transactionIndex"
             ],
             "type": "object",
             "x-go-type": "types.Log"
@@ -5827,12 +5827,12 @@
             }
           },
           "required": [
-            "storageProof",
             "address",
             "accountProof",
             "codeHash",
             "nonce",
-            "storageHash"
+            "storageHash",
+            "storageProof"
           ],
           "type": "object",
           "x-go-type": "types.AccountResult"
@@ -6207,12 +6207,12 @@
             }
           },
           "required": [
-            "type",
             "from",
             "gas",
             "hash",
             "input",
-            "nonce"
+            "nonce",
+            "type"
           ],
           "type": "object",
           "x-go-type": "types.RPCTransaction"
@@ -6507,12 +6507,12 @@
             }
           },
           "required": [
-            "input",
-            "nonce",
-            "type",
             "from",
             "gas",
-            "hash"
+            "hash",
+            "input",
+            "nonce",
+            "type"
           ],
           "type": "object",
           "x-go-type": "types.RPCTransaction"
@@ -6989,16 +6989,16 @@
               }
             },
             "required": [
-              "transactionIndex",
-              "blockHash",
-              "blockTimestamp",
-              "logIndex",
               "removed",
-              "data",
+              "topics",
               "blockNumber",
               "transactionHash",
               "address",
-              "topics"
+              "data",
+              "transactionIndex",
+              "blockHash",
+              "blockTimestamp",
+              "logIndex"
             ],
             "type": "object",
             "x-go-type": "types.Log"
@@ -8299,10 +8299,10 @@
               }
             },
             "required": [
+              "domain",
               "message",
               "types",
-              "primaryType",
-              "domain"
+              "primaryType"
             ],
             "type": "object",
             "x-go-type": "apitypes.TypedData"

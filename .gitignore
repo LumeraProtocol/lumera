@@ -26,3 +26,4 @@ build/
 *.swagger.json
 /openrpcgen
 /app/openrpc/*.gz
+proto/vendor-swagger/

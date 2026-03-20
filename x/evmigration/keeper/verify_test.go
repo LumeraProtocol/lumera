@@ -10,6 +10,7 @@ import (
 	evmcryptotypes "github.com/cosmos/evm/crypto/ethsecp256k1"
 	"github.com/stretchr/testify/require"
 
+	lcfg "github.com/LumeraProtocol/lumera/config"
 	"github.com/LumeraProtocol/lumera/x/evmigration/keeper"
 	"github.com/LumeraProtocol/lumera/x/evmigration/types"
 )
@@ -23,7 +24,7 @@ func signMigrationMessage(t *testing.T, privKey *secp256k1.PrivKey, legacyAddr, 
 
 func signLegacyMigrationMessage(t *testing.T, kind string, privKey *secp256k1.PrivKey, legacyAddr, newAddr sdk.AccAddress) []byte {
 	t.Helper()
-	msg := fmt.Sprintf("lumera-evm-migration:%s:%s:%s", kind, legacyAddr.String(), newAddr.String())
+	msg := fmt.Sprintf("lumera-evm-migration:%s:%d:%s:%s:%s", testChainID, lcfg.EVMChainID, kind, legacyAddr.String(), newAddr.String())
 	hash := sha256.Sum256([]byte(msg))
 	sig, err := privKey.Sign(hash[:])
 	require.NoError(t, err)
@@ -32,7 +33,7 @@ func signLegacyMigrationMessage(t *testing.T, kind string, privKey *secp256k1.Pr
 
 func signNewMigrationMessage(t *testing.T, kind string, privKey *evmcryptotypes.PrivKey, legacyAddr, newAddr sdk.AccAddress) []byte {
 	t.Helper()
-	msg := fmt.Sprintf("lumera-evm-migration:%s:%s:%s", kind, legacyAddr.String(), newAddr.String())
+	msg := fmt.Sprintf("lumera-evm-migration:%s:%d:%s:%s:%s", testChainID, lcfg.EVMChainID, kind, legacyAddr.String(), newAddr.String())
 	sig, err := privKey.Sign([]byte(msg))
 	require.NoError(t, err)
 	return sig
@@ -48,6 +49,7 @@ func testNewMigrationAccount(t *testing.T) (*evmcryptotypes.PrivKey, sdk.AccAddr
 const (
 	keeperClaimKind     = "claim"
 	keeperValidatorKind = "validator"
+	testChainID         = "lumera-test-1"
 )
 
 // TestVerifyLegacySignature_Valid verifies that a correctly signed migration
@@ -60,7 +62,7 @@ func TestVerifyLegacySignature_Valid(t *testing.T) {
 
 	sig := signMigrationMessage(t, privKey, legacyAddr, newAddr)
 
-	err := keeper.VerifyLegacySignature(keeperClaimKind, legacyAddr, newAddr, pubKey.Key, sig)
+	err := keeper.VerifyLegacySignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, pubKey.Key, sig)
 	require.NoError(t, err)
 }
 
@@ -71,11 +73,11 @@ func TestVerifyLegacySignature_InvalidPubKeySize(t *testing.T) {
 	_, newAddr := testNewMigrationAccount(t)
 
 	// Too short.
-	err := keeper.VerifyLegacySignature(keeperClaimKind, legacyAddr, newAddr, []byte{0x01, 0x02}, nil)
+	err := keeper.VerifyLegacySignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, []byte{0x01, 0x02}, nil)
 	require.ErrorIs(t, err, types.ErrInvalidLegacyPubKey)
 
 	// Too long.
-	err = keeper.VerifyLegacySignature(keeperClaimKind, legacyAddr, newAddr, make([]byte, 65), nil)
+	err = keeper.VerifyLegacySignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, make([]byte, 65), nil)
 	require.ErrorIs(t, err, types.ErrInvalidLegacyPubKey)
 }
 
@@ -89,7 +91,7 @@ func TestVerifyLegacySignature_PubKeyAddressMismatch(t *testing.T) {
 	wrongLegacyAddr := sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address())
 	_, newAddr := testNewMigrationAccount(t)
 
-	err := keeper.VerifyLegacySignature(keeperClaimKind, wrongLegacyAddr, newAddr, pubKey.Key, nil)
+	err := keeper.VerifyLegacySignature(testChainID, lcfg.EVMChainID, keeperClaimKind, wrongLegacyAddr, newAddr, pubKey.Key, nil)
 	require.ErrorIs(t, err, types.ErrPubKeyAddressMismatch)
 }
 
@@ -105,7 +107,7 @@ func TestVerifyLegacySignature_InvalidSignature(t *testing.T) {
 	otherPrivKey := secp256k1.GenPrivKey()
 	badSig := signMigrationMessage(t, otherPrivKey, legacyAddr, newAddr)
 
-	err := keeper.VerifyLegacySignature(keeperClaimKind, legacyAddr, newAddr, pubKey.Key, badSig)
+	err := keeper.VerifyLegacySignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, pubKey.Key, badSig)
 	require.ErrorIs(t, err, types.ErrInvalidLegacySignature)
 }
 
@@ -121,7 +123,7 @@ func TestVerifyLegacySignature_WrongMessage(t *testing.T) {
 	_, otherNewAddr := testNewMigrationAccount(t)
 	sig := signMigrationMessage(t, privKey, legacyAddr, otherNewAddr)
 
-	err := keeper.VerifyLegacySignature(keeperClaimKind, legacyAddr, newAddr, pubKey.Key, sig)
+	err := keeper.VerifyLegacySignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, pubKey.Key, sig)
 	require.ErrorIs(t, err, types.ErrInvalidLegacySignature)
 }
 
@@ -132,7 +134,7 @@ func TestVerifyLegacySignature_EmptySignature(t *testing.T) {
 	legacyAddr := sdk.AccAddress(pubKey.Address())
 	_, newAddr := testNewMigrationAccount(t)
 
-	err := keeper.VerifyLegacySignature(keeperClaimKind, legacyAddr, newAddr, pubKey.Key, nil)
+	err := keeper.VerifyLegacySignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, pubKey.Key, nil)
 	require.ErrorIs(t, err, types.ErrInvalidLegacySignature)
 }
 
@@ -144,7 +146,7 @@ func TestVerifyNewSignature_Valid(t *testing.T) {
 	pubKey := privKey.PubKey().(*evmcryptotypes.PubKey)
 	sig := signNewMigrationMessage(t, keeperClaimKind, privKey, legacyAddr, newAddr)
 
-	err := keeper.VerifyNewSignature(keeperClaimKind, legacyAddr, newAddr, pubKey.Key, sig)
+	err := keeper.VerifyNewSignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, pubKey.Key, sig)
 	require.NoError(t, err)
 }
 
@@ -156,7 +158,7 @@ func TestVerifyNewSignature_AddressMismatch(t *testing.T) {
 	_, wrongNewAddr := testNewMigrationAccount(t)
 	pubKey := privKey.PubKey().(*evmcryptotypes.PubKey)
 
-	err := keeper.VerifyNewSignature(keeperClaimKind, legacyAddr, wrongNewAddr, pubKey.Key, nil)
+	err := keeper.VerifyNewSignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, wrongNewAddr, pubKey.Key, nil)
 	require.ErrorIs(t, err, types.ErrNewPubKeyAddressMismatch)
 }
 
@@ -169,6 +171,6 @@ func TestVerifyNewSignature_InvalidSignature(t *testing.T) {
 	otherPrivKey, _ := testNewMigrationAccount(t)
 	badSig := signNewMigrationMessage(t, keeperClaimKind, otherPrivKey, legacyAddr, newAddr)
 
-	err := keeper.VerifyNewSignature(keeperClaimKind, legacyAddr, newAddr, pubKey.Key, badSig)
+	err := keeper.VerifyNewSignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, pubKey.Key, badSig)
 	require.ErrorIs(t, err, types.ErrInvalidNewSignature)
 }

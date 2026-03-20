@@ -292,3 +292,39 @@ Meanwhile, the EVM keeper (initialized in `x/vm/keeper/keeper.go:119`) correctly
 **Fix** (`cmd/lumera/cmd/config_migrate.go`): Added `migrateAppConfigIfNeeded()`, called from the root command's `PersistentPreRunE` after `InterceptConfigsPreRunHandler`. On every startup it checks whether `evm.evm-chain-id` in Viper matches `config.EVMChainID` (76857769). If not, it reads all existing settings from `app.toml` via Viper unmarshal, overwrites `EVM.EVMChainID` with the Lumera constant, ensures `JSONRPC.Enable`/`JSONRPC.EnableIndexer`/`rpc` API namespace are set, and regenerates `app.toml` with the full template (SDK + EVM + Lumera sections), preserving all operator customizations.
 
 **Tests**: `testBasicRPCMethods` (integration, `tests/integration/evm/jsonrpc/basic_methods_test.go`) — validates `eth_chainId` and `net_version` both return `76857769`. `verifyJSONRPCChainID` (devnet, `devnet/tests/evmigration/verify.go`) — runtime check after upgrade that both JSON-RPC methods return the correct chain ID.
+
+---
+
+### 20) JSON-RPC rate limiter does not front the public RPC port (security audit finding #1)
+
+**Symptom**: Operators enable the built-in rate limiter expecting their public JSON-RPC port to be protected, but attackers can bypass rate limiting by using the normal public alias proxy port instead of the separate rate-limit proxy port.
+
+**Root cause**: The alias proxy (`app/evm_jsonrpc_alias.go`) listens on the operator-configured public `json-rpc.address` and forwards to an internal loopback. The rate-limit proxy (`app/evm_jsonrpc_ratelimit.go`) listens on its own separate `lumera.json-rpc-ratelimit.proxy-address` (default `:8547`) and also forwards to the internal loopback. The two proxies operate independently — public traffic hits the alias proxy (no rate limiting), while the rate-limit proxy sits on a different port that external clients don't use by default.
+
+**Fix** (`app/evm_jsonrpc_ratelimit.go`, `app/evm_jsonrpc_alias.go`, `app/app.go`): Refactored the proxy stack so rate limiting is injected directly into the alias proxy's HTTP handler when enabled. `startJSONRPCProxyStack` decides the topology: when the alias proxy is active, rate limiting wraps its handler (one server, one port, rate-limited); when no alias proxy is active, a standalone rate-limit proxy is started as a fallback. The separate `proxy-address` config is only used in the standalone fallback mode.
+
+**Tests**: Existing rate-limiter unit tests (`TestExtractIP_*`, `TestStopJSONRPCRateLimitProxy_*`) validate the middleware and lifecycle. The architectural fix ensures the rate limiter is always in the request path of the public endpoint.
+
+---
+
+### 21) Validator migration gas pre-check undercounts destination-side redelegations (security audit finding #2)
+
+**Symptom**: A validator with many destination-side redelegations (other delegators redelegating TO this validator) can pass the `MaxValidatorDelegations` safety check and execute a migration that consumes more gas and state writes than governance intended.
+
+**Root cause**: The pre-check in `MsgMigrateValidator` used `GetRedelegationsFromSrcValidator` which only counts redelegations where the validator is the source. But the actual migration logic (`MigrateValidatorDelegations`) uses `IterateRedelegations` and re-keys redelegations where the validator appears as either source OR destination. The `MigrationEstimate` query had the same undercount.
+
+**Fix** (`x/evmigration/keeper/msg_server_migrate_validator.go`, `x/evmigration/keeper/query.go`): Replaced `GetRedelegationsFromSrcValidator` with `IterateRedelegations` checking both `ValidatorSrcAddress` and `ValidatorDstAddress` in the pre-check and estimate query, matching the execution logic.
+
+**Tests**: Updated mock expectations in `msg_server_migrate_validator_test.go` and `msg_server_claim_legacy_test.go` to use `IterateRedelegations`.
+
+---
+
+### 22) Migration proofs lack chain ID domain separation (security audit finding #4)
+
+**Symptom**: A migration proof signed for one Lumera network (e.g., testnet) could be replayed on another network (e.g., mainnet) because the signed payload did not include any chain-specific data.
+
+**Root cause**: The migration payload was `lumera-evm-migration:<kind>:<legacyAddr>:<newAddr>` — no chain ID, no EVM chain ID, no deadline.
+
+**Fix** (`x/evmigration/keeper/verify.go`, `x/evmigration/keeper/msg_server_claim_legacy.go`, `x/evmigration/keeper/msg_server_migrate_validator.go`, `x/evmigration/client/cli/tx.go`): Extended the payload format to `lumera-evm-migration:<chainID>:<evmChainID>:<kind>:<legacyAddr>:<newAddr>`. Both the Cosmos chain ID (distinguishes networks) and the EVM chain ID (distinguishes execution domains) are included. Callers pass `ctx.ChainID()` and `lcfg.EVMChainID`. The CLI uses `clientCtx.ChainID`. This is a breaking change to the proof format — existing pre-signed proofs are invalid.
+
+**Tests**: Updated all verify tests and signing helpers in `verify_test.go`, `msg_server_claim_legacy_test.go`, and `msg_server_migrate_validator_test.go` to include chain IDs. Test context wired with `WithChainID(testChainID)`.

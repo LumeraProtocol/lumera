@@ -8,6 +8,7 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
+	lcfg "github.com/LumeraProtocol/lumera/config"
 	"github.com/LumeraProtocol/lumera/x/evmigration/types"
 )
 
@@ -39,10 +40,10 @@ func (ms msgServer) ClaimLegacyAccount(goCtx context.Context, msg *types.MsgClai
 	}
 
 	// Verify both embedded proofs before touching state.
-	if err := VerifyLegacySignature(migrationPayloadKindClaim, legacyAddr, newAddr, msg.LegacyPubKey, msg.LegacySignature); err != nil {
+	if err := VerifyLegacySignature(ctx.ChainID(), lcfg.EVMChainID, migrationPayloadKindClaim, legacyAddr, newAddr, msg.LegacyPubKey, msg.LegacySignature); err != nil {
 		return nil, err
 	}
-	if err := VerifyNewSignature(migrationPayloadKindClaim, legacyAddr, newAddr, msg.NewPubKey, msg.NewSignature); err != nil {
+	if err := VerifyNewSignature(ctx.ChainID(), lcfg.EVMChainID, migrationPayloadKindClaim, legacyAddr, newAddr, msg.NewPubKey, msg.NewSignature); err != nil {
 		return nil, err
 	}
 

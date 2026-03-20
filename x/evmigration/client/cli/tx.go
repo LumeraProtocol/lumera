@@ -19,6 +19,7 @@ import (
 	signingtypes "github.com/cosmos/cosmos-sdk/types/tx/signing"
 	evmcryptotypes "github.com/cosmos/evm/crypto/ethsecp256k1"
 
+	lcfg "github.com/LumeraProtocol/lumera/config"
 	"github.com/LumeraProtocol/lumera/x/evmigration/types"
 )
 
@@ -232,7 +233,7 @@ func simulateMigrationGas(clientCtx client.Context, txf clienttx.Factory, msg mi
 }
 
 func signNewMigrationProof(clientCtx client.Context, proofKind, legacyAddress, newAddress string) ([]byte, []byte, error) {
-	payload := []byte(fmt.Sprintf("lumera-evm-migration:%s:%s:%s", proofKind, legacyAddress, newAddress))
+	payload := []byte(fmt.Sprintf("lumera-evm-migration:%s:%d:%s:%s:%s", clientCtx.ChainID, lcfg.EVMChainID, proofKind, legacyAddress, newAddress))
 
 	sig, pubKey, err := clientCtx.Keyring.Sign(clientCtx.FromName, payload, signingtypes.SignMode_SIGN_MODE_LEGACY_AMINO_JSON)
 	if err != nil {

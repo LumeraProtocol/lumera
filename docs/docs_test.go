@@ -12,12 +12,12 @@ import (
 
 // swaggerSpec represents the subset of Swagger 2.0 we validate.
 type swaggerSpec struct {
-	Swagger     string                            `json:"swagger"`
-	Info        map[string]any                    `json:"info"`
-	Paths       map[string]map[string]any         `json:"paths"`
-	Definitions map[string]map[string]any         `json:"definitions"`
-	Consumes    []string                          `json:"consumes"`
-	Produces    []string                          `json:"produces"`
+	Swagger     string                    `json:"swagger"`
+	Info        map[string]any            `json:"info"`
+	Paths       map[string]map[string]any `json:"paths"`
+	Definitions map[string]map[string]any `json:"definitions"`
+	Consumes    []string                  `json:"consumes"`
+	Produces    []string                  `json:"produces"`
 }
 
 func loadEmbeddedSpec(t *testing.T) swaggerSpec {

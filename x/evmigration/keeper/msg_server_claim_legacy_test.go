@@ -92,7 +92,8 @@ func initMsgServerFixture(t *testing.T) *msgServerFixture {
 	addrCodec := addresscodec.NewBech32Codec(sdk.GetConfig().GetBech32AccountAddrPrefix())
 	storeKey := storetypes.NewKVStoreKey(types.StoreKey)
 	storeService := runtime.NewKVStoreService(storeKey)
-	ctx := testutil.DefaultContextWithDB(t, storeKey, storetypes.NewTransientStoreKey("transient_test")).Ctx
+	ctx := testutil.DefaultContextWithDB(t, storeKey, storetypes.NewTransientStoreKey("transient_test")).Ctx.
+		WithChainID(testChainID)
 
 	authority := authtypes.NewModuleAddress(types.GovModuleName)
 
@@ -859,7 +860,7 @@ func setupPassingValPreChecks(t *testing.T, f *msgServerFixture) (
 	// No delegations/ubds/reds (under limit).
 	f.stakingKeeper.EXPECT().GetValidatorDelegations(gomock.Any(), oldValAddr).Return(nil, nil)
 	f.stakingKeeper.EXPECT().GetUnbondingDelegationsFromValidator(gomock.Any(), oldValAddr).Return(nil, nil)
-	f.stakingKeeper.EXPECT().GetRedelegationsFromSrcValidator(gomock.Any(), oldValAddr).Return(nil, nil)
+	f.stakingKeeper.EXPECT().IterateRedelegations(gomock.Any(), gomock.Any()).Return(nil)
 
 	msg := newValidatorMigrationMsg(t, privKey, legacyAddr, newPrivKey, newAddr)
 

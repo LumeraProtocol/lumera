@@ -105,22 +105,78 @@ func (rl *ipRateLimiter) cleanup() {
 	}
 }
 
-// startJSONRPCRateLimitProxy starts a rate-limiting reverse proxy in front of
-// the cosmos/evm JSON-RPC server. It reads config from appOpts and registers
-// the proxy server in the app for lifecycle management.
-func (app *App) startJSONRPCRateLimitProxy(appOpts servertypes.AppOptions, logger log.Logger) {
+// rateLimitConfig holds parsed rate-limiting parameters.
+type rateLimitConfig struct {
+	rps            int
+	burst          int
+	entryTTL       time.Duration
+	trustedProxies []*net.IPNet
+}
+
+// parseRateLimitConfig reads rate-limit settings from app options.
+// Returns nil if rate limiting is disabled.
+func parseRateLimitConfig(appOpts servertypes.AppOptions, logger log.Logger) *rateLimitConfig {
 	if !textutil.ParseAppOptionBool(appOpts.Get(rlOptEnable)) {
-		return
+		return nil
 	}
 
 	rlLogger := logger.With(log.ModuleKey, jsonrpcRateLimitLogModule)
+	return &rateLimitConfig{
+		rps:      castIntOr(appOpts.Get(rlOptRPS), defaultRLRPS),
+		burst:    castIntOr(appOpts.Get(rlOptBurst), defaultRLBurst),
+		entryTTL: castDurationOr(appOpts.Get(rlOptEntryTTL), defaultRLEntryTTL),
+		trustedProxies: parseTrustedProxies(
+			castStringOr(appOpts.Get(rlOptTrustedProxies), ""),
+			rlLogger,
+		),
+	}
+}
+
+// newRateLimitMiddleware wraps an http.Handler with per-IP rate limiting.
+// The returned cleanup channel and sync.Once must be used for lifecycle management.
+func newRateLimitMiddleware(
+	inner http.Handler,
+	cfg *rateLimitConfig,
+) (http.Handler, *ipRateLimiter) {
+	limiter := newIPRateLimiter(cfg.rps, cfg.burst, cfg.entryTTL)
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ip := extractIP(r, cfg.trustedProxies)
+		if !limiter.getLimiter(ip).Allow() {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte(`{"jsonrpc":"2.0","error":{"code":-32005,"message":"rate limit exceeded"},"id":null}`))
+			return
+		}
+		inner.ServeHTTP(w, r)
+	})
+
+	return handler, limiter
+}
+
+// startJSONRPCProxyStack starts the JSON-RPC proxy infrastructure.
+// When the alias proxy is active (rpc.discover aliasing), rate limiting is
+// injected directly into the alias proxy handler so the public port is always
+// rate-limited. When the alias proxy is NOT active, a standalone rate-limit
+// proxy is started on its own port as a fallback.
+func (app *App) startJSONRPCProxyStack(appOpts servertypes.AppOptions, logger log.Logger) {
+	rlCfg := parseRateLimitConfig(appOpts, logger)
+
+	if app.jsonrpcAliasPublicAddr != "" {
+		// Alias proxy is active — inject rate limiting into its handler.
+		app.startJSONRPCAliasProxy(logger, rlCfg)
+	} else if rlCfg != nil {
+		// No alias proxy — start standalone rate-limit proxy on its own port.
+		app.startStandaloneRateLimitProxy(appOpts, logger, rlCfg)
+	}
+}
+
+// startStandaloneRateLimitProxy starts a rate-limiting reverse proxy on a
+// separate port. Used only when the alias proxy is not active.
+func (app *App) startStandaloneRateLimitProxy(appOpts servertypes.AppOptions, logger log.Logger, cfg *rateLimitConfig) {
+	rlLogger := logger.With(log.ModuleKey, jsonrpcRateLimitLogModule)
 
 	proxyAddr := castStringOr(appOpts.Get(rlOptProxyAddr), defaultRLProxyAddr)
-	rps := castIntOr(appOpts.Get(rlOptRPS), defaultRLRPS)
-	burst := castIntOr(appOpts.Get(rlOptBurst), defaultRLBurst)
-	entryTTL := castDurationOr(appOpts.Get(rlOptEntryTTL), defaultRLEntryTTL)
-
-	// Upstream is the cosmos/evm JSON-RPC server address.
 	upstreamAddr := castStringOr(appOpts.Get("json-rpc.address"), "127.0.0.1:8545")
 	upstreamURL, err := url.Parse("http://" + upstreamAddr)
 	if err != nil {
@@ -128,38 +184,53 @@ func (app *App) startJSONRPCRateLimitProxy(appOpts servertypes.AppOptions, logge
 		return
 	}
 
-	trustedProxies := parseTrustedProxies(
-		castStringOr(appOpts.Get(rlOptTrustedProxies), ""),
-		rlLogger,
-	)
-
-	limiter := newIPRateLimiter(rps, burst, entryTTL)
 	proxy := httputil.NewSingleHostReverseProxy(upstreamURL)
-
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		ip := extractIP(r, trustedProxies)
-		if !limiter.getLimiter(ip).Allow() {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusTooManyRequests)
-			_, _ = w.Write([]byte(`{"jsonrpc":"2.0","error":{"code":-32005,"message":"rate limit exceeded"},"id":null}`))
-			return
-		}
-		proxy.ServeHTTP(w, r)
-	})
+	handler, limiter := newRateLimitMiddleware(proxy, cfg)
 
 	srv := &http.Server{
 		Addr:              proxyAddr,
-		Handler:           mux,
+		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
 
-	// Start cleanup goroutine.
+	cleanupStop, closeOnce := app.startRateLimitCleanup(limiter)
+
+	go func() {
+		ln, listenErr := net.Listen("tcp", proxyAddr)
+		if listenErr != nil {
+			rlLogger.Error("failed to listen for JSON-RPC rate limit proxy", "address", proxyAddr, "error", listenErr)
+			closeOnce.Do(func() { close(cleanupStop) })
+			return
+		}
+
+		rlLogger.Info(
+			"JSON-RPC rate-limiting proxy started (standalone)",
+			"proxy_address", proxyAddr,
+			"upstream", upstreamAddr,
+			"rps", cfg.rps,
+			"burst", cfg.burst,
+			"entry_ttl", cfg.entryTTL,
+		)
+
+		if serveErr := srv.Serve(ln); serveErr != nil && serveErr != http.ErrServerClosed {
+			rlLogger.Error("JSON-RPC rate limit proxy error", "error", serveErr)
+		}
+	}()
+
+	app.jsonrpcRateLimitProxy = srv
+	app.jsonrpcRateLimitCleanupStop = cleanupStop
+	app.jsonrpcRateLimitCloseOnce = closeOnce
+}
+
+// startRateLimitCleanup starts the background goroutine that evicts stale
+// per-IP limiter entries. Returns the stop channel and sync.Once guard.
+func (app *App) startRateLimitCleanup(limiter *ipRateLimiter) (chan struct{}, *sync.Once) {
 	cleanupStop := make(chan struct{})
-	closeCleanupOnce := sync.Once{}
+	closeOnce := sync.Once{}
+
 	go func() {
 		ticker := time.NewTicker(rlCleanupInterval)
 		defer ticker.Stop()
@@ -173,42 +244,21 @@ func (app *App) startJSONRPCRateLimitProxy(appOpts servertypes.AppOptions, logge
 		}
 	}()
 
-	// Start serving.
-	go func() {
-		ln, listenErr := net.Listen("tcp", proxyAddr)
-		if listenErr != nil {
-			rlLogger.Error("failed to listen for JSON-RPC rate limit proxy", "address", proxyAddr, "error", listenErr)
-			closeCleanupOnce.Do(func() { close(cleanupStop) })
-			return
-		}
-
-		rlLogger.Info(
-			"JSON-RPC rate-limiting proxy started",
-			"proxy_address", proxyAddr,
-			"upstream", upstreamAddr,
-			"rps", rps,
-			"burst", burst,
-			"entry_ttl", entryTTL,
-		)
-
-		if serveErr := srv.Serve(ln); serveErr != nil && serveErr != http.ErrServerClosed {
-			rlLogger.Error("JSON-RPC rate limit proxy error", "error", serveErr)
-		}
-	}()
-
-	app.jsonrpcRateLimitProxy = srv
-	app.jsonrpcRateLimitCleanupStop = cleanupStop
-	app.jsonrpcRateLimitCloseOnce = &closeCleanupOnce
+	return cleanupStop, &closeOnce
 }
 
-// stopJSONRPCRateLimitProxy gracefully shuts down the proxy server.
+// stopJSONRPCRateLimitProxy gracefully shuts down the standalone proxy server
+// (if any) and stops the rate-limit cleanup goroutine. The cleanup goroutine
+// may exist even without a standalone proxy when rate limiting is injected
+// into the alias proxy.
 func (app *App) stopJSONRPCRateLimitProxy() {
-	if app.jsonrpcRateLimitProxy == nil {
-		return
-	}
-
+	// Stop the cleanup goroutine regardless of whether a standalone proxy exists.
 	if app.jsonrpcRateLimitCloseOnce != nil {
 		app.jsonrpcRateLimitCloseOnce.Do(func() { close(app.jsonrpcRateLimitCleanupStop) })
+	}
+
+	if app.jsonrpcRateLimitProxy == nil {
+		return
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), rlShutdownTimeout)

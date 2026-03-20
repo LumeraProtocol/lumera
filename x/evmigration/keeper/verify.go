@@ -16,13 +16,13 @@ const (
 	migrationPayloadKindValidator = "validator"
 )
 
-func migrationPayload(kind string, legacyAddr, newAddr sdk.AccAddress) []byte {
-	return []byte(fmt.Sprintf("lumera-evm-migration:%s:%s:%s", kind, legacyAddr.String(), newAddr.String()))
+func migrationPayload(chainID string, evmChainID uint64, kind string, legacyAddr, newAddr sdk.AccAddress) []byte {
+	return []byte(fmt.Sprintf("lumera-evm-migration:%s:%d:%s:%s:%s", chainID, evmChainID, kind, legacyAddr.String(), newAddr.String()))
 }
 
 // VerifyLegacySignature verifies the legacy-account proof embedded in a
 // migration message. Legacy keys use Cosmos secp256k1 signing over SHA-256.
-func VerifyLegacySignature(kind string, legacyAddr, newAddr sdk.AccAddress, legacyPubKeyBytes, legacySignature []byte) error {
+func VerifyLegacySignature(chainID string, evmChainID uint64, kind string, legacyAddr, newAddr sdk.AccAddress, legacyPubKeyBytes, legacySignature []byte) error {
 	// Step 1: decode the compressed secp256k1 public key.
 	if len(legacyPubKeyBytes) != secp256k1.PubKeySize {
 		return types.ErrInvalidLegacyPubKey.Wrapf("expected %d bytes, got %d", secp256k1.PubKeySize, len(legacyPubKeyBytes))
@@ -38,7 +38,7 @@ func VerifyLegacySignature(kind string, legacyAddr, newAddr sdk.AccAddress, lega
 	}
 
 	// Step 3: construct canonical message hash.
-	hash := sha256.Sum256(migrationPayload(kind, legacyAddr, newAddr))
+	hash := sha256.Sum256(migrationPayload(chainID, evmChainID, kind, legacyAddr, newAddr))
 
 	// Step 4: verify the legacy signature.
 	if !pubKey.VerifySignature(hash[:], legacySignature) {
@@ -51,7 +51,7 @@ func VerifyLegacySignature(kind string, legacyAddr, newAddr sdk.AccAddress, lega
 // VerifyNewSignature verifies the destination-account proof embedded in a
 // migration message. New EVM addresses use eth_secp256k1 signing over the raw
 // payload, which the eth key implementation internally hashes with Keccak-256.
-func VerifyNewSignature(kind string, legacyAddr, newAddr sdk.AccAddress, newPubKeyBytes, newSignature []byte) error {
+func VerifyNewSignature(chainID string, evmChainID uint64, kind string, legacyAddr, newAddr sdk.AccAddress, newPubKeyBytes, newSignature []byte) error {
 	if len(newPubKeyBytes) != evmcryptotypes.PubKeySize {
 		return types.ErrInvalidNewPubKey.Wrapf("expected %d bytes, got %d", evmcryptotypes.PubKeySize, len(newPubKeyBytes))
 	}
@@ -64,7 +64,7 @@ func VerifyNewSignature(kind string, legacyAddr, newAddr sdk.AccAddress, newPubK
 		)
 	}
 
-	if !pubKey.VerifySignature(migrationPayload(kind, legacyAddr, newAddr), newSignature) {
+	if !pubKey.VerifySignature(migrationPayload(chainID, evmChainID, kind, legacyAddr, newAddr), newSignature) {
 		return types.ErrInvalidNewSignature
 	}
 

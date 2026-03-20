@@ -54,6 +54,7 @@ while ((SECONDS < deadline)); do
 	if [[ "$height" != "$LAST_HEIGHT" && "$height" =~ ^[0-9]+$ && "$height" != "0" ]]; then
 		echo -n "${height}-"
 		LAST_HEIGHT="$height"
+		CONSECUTIVE_PENDING_POLLS=0
 	fi
 	sleep "${INTERVAL}"
 done

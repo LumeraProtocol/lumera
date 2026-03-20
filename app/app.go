@@ -6,8 +6,8 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"sync"
 	"strings"
+	"sync"
 
 	_ "cosmossdk.io/api/cosmos/tx/config/v1" // import for side-effects
 	clienthelpers "cosmossdk.io/client/v2/helpers"

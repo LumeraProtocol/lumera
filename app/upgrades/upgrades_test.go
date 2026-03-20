@@ -112,35 +112,20 @@ func TestSetupUpgradesAndHandlers(t *testing.T) {
 	}
 }
 
-// TestV1120SkipsEVMInitGenesis verifies that the v1.12.0 upgrade handler
-// pre-populates fromVM with EVM module consensus versions, preventing
-// RunMigrations from running upstream InitGenesis (which would set
-// EvmDenom=aatom instead of ulume).
+// TestV1120SkipsEVMInitGenesis verifies that the v1.12.0 upgrade is
+// registered with a handler and that the upstream EVM DefaultParams
+// still use the denom value the upgrade is intended to guard against.
 func TestV1120SkipsEVMInitGenesis(t *testing.T) {
-	evmModules := map[string]uint64{
-		evmtypes.ModuleName:         1,
-		feemarkettypes.ModuleName:   1,
-		precisebanktypes.ModuleName: 1,
-		erc20types.ModuleName:       1,
-	}
-
 	params := newTestUpgradeParams("lumera-devnet-1")
 	config, found := SetupUpgrades(upgrade_v1_12_0.UpgradeName, params)
 	require.True(t, found)
 	require.NotNil(t, config.Handler)
 
-	// The handler modifies fromVM before calling RunMigrations.
-	// Since we can't easily run the full handler without keepers,
-	// we verify the upgrade handler source expectation: the consensus
-	// versions of all EVM modules must be 1 (what the handler sets in fromVM).
-	for mod, expectedVersion := range evmModules {
-		require.Equal(t, uint64(1), expectedVersion,
-			"EVM module %s consensus version should be 1 to match fromVM skip", mod)
-	}
-
-	// Also verify that upstream DefaultParams uses aatom (the bug we're guarding against).
+	// Verify that upstream DefaultParams uses the extended EVM denom
+	// (the behavior that the fromVM pre-population in the v1.12.0
+	// upgrade handler is intended to guard against).
 	require.Equal(t, evmtypes.DefaultEVMExtendedDenom, evmtypes.DefaultParams().EvmDenom,
-		"upstream DefaultParams().EvmDenom should be aatom — if this changes, review the fromVM skip in v1.12.0")
+		"upstream DefaultParams().EvmDenom should be the extended EVM denom — if this changes, review the fromVM skip in v1.12.0")
 }
 
 func newTestUpgradeParams(chainID string) appParams.AppUpgradeParams {

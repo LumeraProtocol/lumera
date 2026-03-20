@@ -152,7 +152,7 @@ release:
 
 all-tests: unit-tests integration-tests system-tests simulation-tests
 
-lint:
+lint: openrpc
 	@echo "Running linters..."
 	@${GOLANGCI_LINT} run ./... --timeout=5m
 

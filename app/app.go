@@ -394,9 +394,11 @@ func New(
 		panic(err)
 	}
 
-	// Start optional JSON-RPC rate-limiting reverse proxy.
-	app.startJSONRPCAliasProxy(logger)
-	app.startJSONRPCRateLimitProxy(appOpts, logger)
+	// Start JSON-RPC proxy stack. When rate limiting is enabled, it is
+	// injected directly into the alias proxy handler so the public port is
+	// always rate-limited. A separate rate-limit-only proxy is started only
+	// when the alias proxy is not active (no rpc.discover aliasing).
+	app.startJSONRPCProxyStack(appOpts, logger)
 
 	// Reuse [json-rpc] ws-origins for OpenRPC CORS.
 	if origins, err := cast.ToStringSliceE(appOpts.Get("json-rpc.ws-origins")); err == nil {

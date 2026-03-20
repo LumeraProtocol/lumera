@@ -7,6 +7,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 
+	lcfg "github.com/LumeraProtocol/lumera/config"
 	"github.com/LumeraProtocol/lumera/x/evmigration/types"
 )
 
@@ -57,11 +58,19 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 	if err != nil {
 		return nil, err
 	}
-	reds, err := ms.stakingKeeper.GetRedelegationsFromSrcValidator(ctx, oldValAddr)
-	if err != nil {
+	// Count redelegations where the validator appears as EITHER source or
+	// destination. The execution path (MigrateValidatorDelegations) re-keys
+	// both directions, so the safety bound must account for both.
+	var redCount int
+	if err := ms.stakingKeeper.IterateRedelegations(ctx, func(_ int64, red stakingtypes.Redelegation) bool {
+		if red.ValidatorSrcAddress == oldValAddr.String() || red.ValidatorDstAddress == oldValAddr.String() {
+			redCount++
+		}
+		return false
+	}); err != nil {
 		return nil, err
 	}
-	totalRecords := uint64(len(delegations) + len(ubds) + len(reds))
+	totalRecords := uint64(len(delegations) + len(ubds) + redCount)
 	if totalRecords > params.MaxValidatorDelegations {
 		return nil, types.ErrTooManyDelegators.Wrapf(
 			"total records %d exceeds max %d", totalRecords, params.MaxValidatorDelegations,
@@ -69,10 +78,10 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 	}
 
 	// Verify both embedded proofs before touching state.
-	if err := VerifyLegacySignature(migrationPayloadKindValidator, legacyAddr, newAddr, msg.LegacyPubKey, msg.LegacySignature); err != nil {
+	if err := VerifyLegacySignature(ctx.ChainID(), lcfg.EVMChainID, migrationPayloadKindValidator, legacyAddr, newAddr, msg.LegacyPubKey, msg.LegacySignature); err != nil {
 		return nil, err
 	}
-	if err := VerifyNewSignature(migrationPayloadKindValidator, legacyAddr, newAddr, msg.NewPubKey, msg.NewSignature); err != nil {
+	if err := VerifyNewSignature(ctx.ChainID(), lcfg.EVMChainID, migrationPayloadKindValidator, legacyAddr, newAddr, msg.NewPubKey, msg.NewSignature); err != nil {
 		return nil, err
 	}
 

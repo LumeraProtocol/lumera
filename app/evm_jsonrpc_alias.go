@@ -51,7 +51,10 @@ func (app *App) configureJSONRPCAliasProxy(appOpts servertypes.AppOptions, logge
 // JSON-RPC address and forwards requests to the internal cosmos/evm server.
 // POST request bodies are rewritten so rpc.discover works alongside the native
 // geth-style rpc_discover method.
-func (app *App) startJSONRPCAliasProxy(logger log.Logger) {
+//
+// When rlCfg is non-nil, per-IP rate limiting is injected directly into the
+// alias proxy handler, ensuring the public port is always rate-limited.
+func (app *App) startJSONRPCAliasProxy(logger log.Logger, rlCfg *rateLimitConfig) {
 	if app.jsonrpcAliasPublicAddr == "" || app.jsonrpcAliasUpstreamAddr == "" {
 		return
 	}
@@ -82,9 +85,26 @@ func (app *App) startJSONRPCAliasProxy(logger log.Logger) {
 		proxy.ServeHTTP(w, r)
 	})
 
+	// Wrap the alias handler with rate limiting when enabled.
+	var handler http.Handler = mux
+	if rlCfg != nil {
+		var limiter *ipRateLimiter
+		handler, limiter = newRateLimitMiddleware(mux, rlCfg)
+		cleanupStop, closeOnce := app.startRateLimitCleanup(limiter)
+		app.jsonrpcRateLimitCleanupStop = cleanupStop
+		app.jsonrpcRateLimitCloseOnce = closeOnce
+
+		aliasLogger.Info(
+			"JSON-RPC rate limiting enabled on public alias proxy",
+			"rps", rlCfg.rps,
+			"burst", rlCfg.burst,
+			"entry_ttl", rlCfg.entryTTL,
+		)
+	}
+
 	srv := &http.Server{
 		Addr:              app.jsonrpcAliasPublicAddr,
-		Handler:           mux,
+		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -102,6 +122,7 @@ func (app *App) startJSONRPCAliasProxy(logger log.Logger) {
 			"JSON-RPC alias proxy started",
 			"public_address", app.jsonrpcAliasPublicAddr,
 			"upstream", app.jsonrpcAliasUpstreamAddr,
+			"rate_limited", rlCfg != nil,
 		)
 
 		if serveErr := srv.Serve(ln); serveErr != nil && serveErr != http.ErrServerClosed {

@@ -507,6 +507,7 @@ tool (
 	github.com/cosmos/cosmos-proto/cmd/protoc-gen-go-pulsar
 	github.com/cosmos/gogoproto/protoc-gen-gocosmos
 	github.com/cosmos/gogoproto/protoc-gen-gogo
+	github.com/golangci/golangci-lint/cmd/golangci-lint
 	github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 	github.com/grpc-ecosystem/grpc-gateway/protoc-gen-grpc-gateway
 	github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2

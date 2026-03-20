@@ -238,6 +238,14 @@ trusted-proxies = ""
 
 ### Deployment pattern
 
+When the JSON-RPC alias proxy is active (the default), rate limiting is injected directly into the public port handler — no separate port is needed:
+
+```
+Internet → [alias proxy + rate-limit @ :8545] → [internal cosmos/evm server @ loopback]
+```
+
+When the alias proxy is disabled, a standalone rate-limit proxy listens on `proxy-address`:
+
 ```
 Internet → [lumera.json-rpc-ratelimit @ :8547] → [json-rpc @ 127.0.0.1:8545]
 ```

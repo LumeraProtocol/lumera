@@ -80,9 +80,16 @@ func (qs queryServer) MigrationEstimate(goCtx context.Context, req *types.QueryM
 		if ubds, err := qs.k.stakingKeeper.GetUnbondingDelegationsFromValidator(ctx, valAddr); err == nil {
 			resp.ValUnbondingCount = uint64(len(ubds))
 		}
-		if reds, err := qs.k.stakingKeeper.GetRedelegationsFromSrcValidator(ctx, valAddr); err == nil {
-			resp.ValRedelegationCount = uint64(len(reds))
-		}
+		// Count redelegations where the validator is source OR destination
+		// (both are re-keyed during migration).
+		var redCount uint64
+		_ = qs.k.stakingKeeper.IterateRedelegations(ctx, func(_ int64, red stakingtypes.Redelegation) bool {
+			if red.ValidatorSrcAddress == valAddr.String() || red.ValidatorDstAddress == valAddr.String() {
+				redCount++
+			}
+			return false
+		})
+		resp.ValRedelegationCount = redCount
 
 		// Check would_succeed.
 		params, _ := qs.k.Params.Get(ctx)

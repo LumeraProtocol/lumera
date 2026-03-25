@@ -3,6 +3,7 @@ package keeper
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	errorsmod "cosmossdk.io/errors"
@@ -11,6 +12,7 @@ import (
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/cosmos/gogoproto/jsonpb"
 	gogoproto "github.com/cosmos/gogoproto/proto"
+	"google.golang.org/protobuf/encoding/protowire"
 )
 
 const (
@@ -171,23 +173,43 @@ func (k Keeper) CreateEvidence(
 	return evidenceID, nil
 }
 
-type deterministicMarshaler interface {
-	XXX_Marshal([]byte, bool) ([]byte, error)
-	XXX_Size() int
+func marshalEvidenceMetadataDeterministic(msg gogoproto.Message) ([]byte, error) {
+	return gogoproto.Marshal(msg)
 }
 
-func marshalEvidenceMetadataDeterministic(msg gogoproto.Message) ([]byte, error) {
-	if m, ok := msg.(deterministicMarshaler); ok {
-		b := make([]byte, 0, m.XXX_Size())
-		return m.XXX_Marshal(b, true)
+func marshalCascadeClientFailureEvidenceMetadataDeterministic(m *types.CascadeClientFailureEvidenceMetadata) []byte {
+	out := make([]byte, 0, 256)
+
+	if m.ReporterComponent != types.CascadeClientFailureReporterComponent_CASCADE_CLIENT_FAILURE_REPORTER_COMPONENT_UNSPECIFIED {
+		out = protowire.AppendTag(out, 1, protowire.VarintType)
+		out = protowire.AppendVarint(out, uint64(m.ReporterComponent))
 	}
 
-	buf := gogoproto.NewBuffer(nil)
-	buf.SetDeterministic(true)
-	if err := buf.Marshal(msg); err != nil {
-		return nil, err
+	for _, acct := range m.TargetSupernodeAccounts {
+		out = protowire.AppendTag(out, 2, protowire.BytesType)
+		out = protowire.AppendString(out, acct)
 	}
-	return buf.Bytes(), nil
+
+	if len(m.Details) > 0 {
+		keys := make([]string, 0, len(m.Details))
+		for k := range m.Details {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		for _, k := range keys {
+			entry := make([]byte, 0, len(k)+len(m.Details[k])+8)
+			entry = protowire.AppendTag(entry, 1, protowire.BytesType)
+			entry = protowire.AppendString(entry, k)
+			entry = protowire.AppendTag(entry, 2, protowire.BytesType)
+			entry = protowire.AppendString(entry, m.Details[k])
+
+			out = protowire.AppendTag(out, 3, protowire.BytesType)
+			out = protowire.AppendBytes(out, entry)
+		}
+	}
+
+	return out
 }
 
 func marshalEvidenceMetadataJSON(evidenceType types.EvidenceType, metadataJSON string) ([]byte, error) {
@@ -227,7 +249,7 @@ func marshalEvidenceMetadataJSON(evidenceType types.EvidenceType, metadataJSON s
 		if err := u.Unmarshal(strings.NewReader(metadataJSON), &m); err != nil {
 			return nil, fmt.Errorf("unmarshal CascadeClientFailureEvidenceMetadata: %w", err)
 		}
-		return marshalEvidenceMetadataDeterministic(&m)
+		return marshalCascadeClientFailureEvidenceMetadataDeterministic(&m), nil
 
 	default:
 		return nil, fmt.Errorf("unsupported evidence_type: %s", evidenceType.String())

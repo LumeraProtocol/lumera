@@ -307,7 +307,7 @@ func (m *StorageChallengeFailureEvidenceMetadata) GetTranscriptHash() string {
 type CascadeClientFailureEvidenceMetadata struct {
 	// reporter_component identifies the emitting component.
 	ReporterComponent CascadeClientFailureReporterComponent `protobuf:"varint,1,opt,name=reporter_component,json=reporterComponent,proto3,enum=lumera.audit.v1.CascadeClientFailureReporterComponent" json:"reporter_component,omitempty"`
-	// target_supernode_accounts are implicated supernode accounts, when known.
+	// target_supernode_accounts are implicated supernode accounts
 	TargetSupernodeAccounts []string `protobuf:"bytes,2,rep,name=target_supernode_accounts,json=targetSupernodeAccounts,proto3" json:"target_supernode_accounts,omitempty"`
 	// details contains free-form diagnostic attributes (e.g. trace, endpoint, error).
 	Details map[string]string `protobuf:"bytes,3,rep,name=details,proto3" json:"details,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`

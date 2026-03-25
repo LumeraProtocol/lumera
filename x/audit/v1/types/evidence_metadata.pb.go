@@ -10,6 +10,7 @@ import (
 	io "io"
 	math "math"
 	math_bits "math/bits"
+	sort "sort"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -323,16 +324,12 @@ func (m *CascadeClientFailureEvidenceMetadata) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
 func (m *CascadeClientFailureEvidenceMetadata) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	if deterministic {
-		return xxx_messageInfo_CascadeClientFailureEvidenceMetadata.Marshal(b, m, deterministic)
-	} else {
-		b = b[:cap(b)]
-		n, err := m.MarshalToSizedBuffer(b)
-		if err != nil {
-			return nil, err
-		}
-		return b[:n], nil
+	b = b[:cap(b)]
+	n, err := m.MarshalToSizedBuffer(b)
+	if err != nil {
+		return nil, err
 	}
+	return b[:n], nil
 }
 func (m *CascadeClientFailureEvidenceMetadata) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_CascadeClientFailureEvidenceMetadata.Merge(m, src)
@@ -616,7 +613,13 @@ func (m *CascadeClientFailureEvidenceMetadata) MarshalToSizedBuffer(dAtA []byte)
 	var l int
 	_ = l
 	if len(m.Details) > 0 {
+		keysForDetails := make([]string, 0, len(m.Details))
 		for k := range m.Details {
+			keysForDetails = append(keysForDetails, k)
+		}
+		sort.Strings(keysForDetails)
+		for iNdEx := len(keysForDetails) - 1; iNdEx >= 0; iNdEx-- {
+			k := keysForDetails[iNdEx]
 			v := m.Details[k]
 			baseI := i
 			i -= len(v)

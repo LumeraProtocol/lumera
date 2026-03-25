@@ -171,10 +171,23 @@ func (k Keeper) CreateEvidence(
 	return evidenceID, nil
 }
 
+type deterministicMarshaler interface {
+	XXX_Marshal([]byte, bool) ([]byte, error)
+	XXX_Size() int
+}
+
 func marshalEvidenceMetadataDeterministic(msg gogoproto.Message) ([]byte, error) {
-	// We use generated Marshal() paths here. Map-bearing generated types are
-	// patched to sort keys before encoding, giving deterministic bytes.
-	return gogoproto.Marshal(msg)
+	if m, ok := msg.(deterministicMarshaler); ok {
+		b := make([]byte, 0, m.XXX_Size())
+		return m.XXX_Marshal(b, true)
+	}
+
+	buf := gogoproto.NewBuffer(nil)
+	buf.SetDeterministic(true)
+	if err := buf.Marshal(msg); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 func marshalEvidenceMetadataJSON(evidenceType types.EvidenceType, metadataJSON string) ([]byte, error) {

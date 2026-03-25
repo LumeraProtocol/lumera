@@ -12,6 +12,7 @@ import (
 	io "io"
 	math "math"
 	math_bits "math/bits"
+	sort "sort"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -41,16 +42,12 @@ func (m *MetricsAggregate) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
 func (m *MetricsAggregate) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	if deterministic {
-		return xxx_messageInfo_MetricsAggregate.Marshal(b, m, deterministic)
-	} else {
-		b = b[:cap(b)]
-		n, err := m.MarshalToSizedBuffer(b)
-		if err != nil {
-			return nil, err
-		}
-		return b[:n], nil
+	b = b[:cap(b)]
+	n, err := m.MarshalToSizedBuffer(b)
+	if err != nil {
+		return nil, err
 	}
+	return b[:n], nil
 }
 func (m *MetricsAggregate) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_MetricsAggregate.Merge(m, src)
@@ -147,7 +144,13 @@ func (m *MetricsAggregate) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		dAtA[i] = 0x10
 	}
 	if len(m.Metrics) > 0 {
+		keysForMetrics := make([]string, 0, len(m.Metrics))
 		for k := range m.Metrics {
+			keysForMetrics = append(keysForMetrics, k)
+		}
+		sort.Strings(keysForMetrics)
+		for iNdEx := len(keysForMetrics) - 1; iNdEx >= 0; iNdEx-- {
+			k := keysForMetrics[iNdEx]
 			v := m.Metrics[k]
 			baseI := i
 			i -= 8

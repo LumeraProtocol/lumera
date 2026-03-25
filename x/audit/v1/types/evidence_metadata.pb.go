@@ -10,7 +10,6 @@ import (
 	io "io"
 	math "math"
 	math_bits "math/bits"
-	sort "sort"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -308,7 +307,7 @@ func (m *StorageChallengeFailureEvidenceMetadata) GetTranscriptHash() string {
 type CascadeClientFailureEvidenceMetadata struct {
 	// reporter_component identifies the emitting component.
 	ReporterComponent CascadeClientFailureReporterComponent `protobuf:"varint,1,opt,name=reporter_component,json=reporterComponent,proto3,enum=lumera.audit.v1.CascadeClientFailureReporterComponent" json:"reporter_component,omitempty"`
-	// target_supernode_accounts are implicated supernode accounts, when known.
+	// target_supernode_accounts are implicated supernode accounts
 	TargetSupernodeAccounts []string `protobuf:"bytes,2,rep,name=target_supernode_accounts,json=targetSupernodeAccounts,proto3" json:"target_supernode_accounts,omitempty"`
 	// details contains free-form diagnostic attributes (e.g. trace, endpoint, error).
 	Details map[string]string `protobuf:"bytes,3,rep,name=details,proto3" json:"details,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
@@ -617,13 +616,7 @@ func (m *CascadeClientFailureEvidenceMetadata) MarshalToSizedBuffer(dAtA []byte)
 	var l int
 	_ = l
 	if len(m.Details) > 0 {
-		keysForDetails := make([]string, 0, len(m.Details))
 		for k := range m.Details {
-			keysForDetails = append(keysForDetails, k)
-		}
-		sort.Strings(keysForDetails)
-		for iNdEx := len(keysForDetails) - 1; iNdEx >= 0; iNdEx-- {
-			k := keysForDetails[iNdEx]
 			v := m.Details[k]
 			baseI := i
 			i -= len(v)

@@ -12,7 +12,6 @@ import (
 	io "io"
 	math "math"
 	math_bits "math/bits"
-	sort "sort"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -148,13 +147,7 @@ func (m *MetricsAggregate) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		dAtA[i] = 0x10
 	}
 	if len(m.Metrics) > 0 {
-		keysForMetrics := make([]string, 0, len(m.Metrics))
 		for k := range m.Metrics {
-			keysForMetrics = append(keysForMetrics, k)
-		}
-		sort.Strings(keysForMetrics)
-		for iNdEx := len(keysForMetrics) - 1; iNdEx >= 0; iNdEx-- {
-			k := keysForMetrics[iNdEx]
 			v := m.Metrics[k]
 			baseI := i
 			i -= 8

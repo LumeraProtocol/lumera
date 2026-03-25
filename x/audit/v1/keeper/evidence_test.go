@@ -98,19 +98,30 @@ func TestSubmitEvidenceAndQueries_CascadeClientFailure(t *testing.T) {
 	metaBz, err := json.Marshal(meta)
 	require.NoError(t, err)
 
-	resp, err := ms.SubmitEvidence(f.ctx, &types.MsgSubmitEvidence{
+	_, err = ms.SubmitEvidence(f.ctx, &types.MsgSubmitEvidence{
 		Creator:        reporter,
 		SubjectAddress: subject,
 		EvidenceType:   types.EvidenceType_EVIDENCE_TYPE_CASCADE_CLIENT_FAILURE,
 		ActionId:       "action-cascade-1",
 		Metadata:       string(metaBz),
 	})
-	require.NoError(t, err)
-	require.Equal(t, uint64(1), resp.EvidenceId)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "evidence type is reserved for the action module")
 
-	gotByID, err := qs.EvidenceById(f.ctx, &types.QueryEvidenceByIdRequest{EvidenceId: resp.EvidenceId})
+	respID, err := f.keeper.CreateEvidence(
+		f.ctx,
+		reporter,
+		subject,
+		"action-cascade-1",
+		types.EvidenceType_EVIDENCE_TYPE_CASCADE_CLIENT_FAILURE,
+		string(metaBz),
+	)
 	require.NoError(t, err)
-	require.Equal(t, resp.EvidenceId, gotByID.Evidence.EvidenceId)
+	require.Equal(t, uint64(1), respID)
+
+	gotByID, err := qs.EvidenceById(f.ctx, &types.QueryEvidenceByIdRequest{EvidenceId: respID})
+	require.NoError(t, err)
+	require.Equal(t, respID, gotByID.Evidence.EvidenceId)
 	require.Equal(t, subject, gotByID.Evidence.SubjectAddress)
 	require.Equal(t, reporter, gotByID.Evidence.ReporterAddress)
 	require.Equal(t, "action-cascade-1", gotByID.Evidence.ActionId)
@@ -126,12 +137,12 @@ func TestSubmitEvidenceAndQueries_CascadeClientFailure(t *testing.T) {
 	gotBySubject, err := qs.EvidenceBySubject(f.ctx, &types.QueryEvidenceBySubjectRequest{SubjectAddress: subject})
 	require.NoError(t, err)
 	require.Len(t, gotBySubject.Evidence, 1)
-	require.Equal(t, resp.EvidenceId, gotBySubject.Evidence[0].EvidenceId)
+	require.Equal(t, respID, gotBySubject.Evidence[0].EvidenceId)
 
 	gotByAction, err := qs.EvidenceByAction(f.ctx, &types.QueryEvidenceByActionRequest{ActionId: "action-cascade-1"})
 	require.NoError(t, err)
 	require.Len(t, gotByAction.Evidence, 1)
-	require.Equal(t, resp.EvidenceId, gotByAction.Evidence[0].EvidenceId)
+	require.Equal(t, respID, gotByAction.Evidence[0].EvidenceId)
 }
 
 func TestCreateEvidence_CascadeClientFailure_InvalidMetadata(t *testing.T) {

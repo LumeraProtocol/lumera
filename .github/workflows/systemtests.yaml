@@ -44,7 +44,7 @@ jobs:
 
       - name: Build Chain
         run: |
-          ./ignite chain build -y -t linux:amd64
+          ./ignite chain build --build.tags "ledger" -y -t linux:amd64
         env:
           DO_NOT_TRACK: 1
           GOFLAGS: "-buildvcs=false"

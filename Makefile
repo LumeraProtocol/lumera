@@ -11,6 +11,11 @@ BUILD_DIR ?= build
 RELEASE_DIR ?= release
 GOPROXY ?= https://proxy.golang.org,direct
 
+# Build tags for conditional compilation
+BUILD_TAGS ?= ledger
+
+CHAIN_BUILD ?= chain build $(if $(BUILD_TAGS),--build.tags "$(BUILD_TAGS)",)
+
 module_version = $(strip $(shell EMSDK_QUIET=1 ${GO} list -m -f '{{.Version}}' $1 | tail -n 1))
 IGNITE_INSTALL_SCRIPT ?= https://get.ignite.com/cli!
 
@@ -86,27 +91,27 @@ build-proto: clean-proto $(PROTO_SRC)
 	${BUF} generate --template proto/buf.gen.swagger.yaml --verbose
 	${IGNITE} generate openapi --yes --enable-proto-vendor --clear-cache
 
-build: build/lumerad
+build: ${BUILD_DIR}/lumerad
 
 go.sum: go.mod
 	@echo "Verifying and tidying go modules..."
 	GOPROXY=${GOPROXY} ${GO} mod verify
 	GOPROXY=${GOPROXY} ${GO} mod tidy
 
-build/lumerad: $(GO_SRC) go.sum Makefile
+${BUILD_DIR}/lumerad: $(GO_SRC) go.sum Makefile
 	@echo "Building lumerad binary..."
 	@mkdir -p ${BUILD_DIR}
 	${BUF} generate --template proto/buf.gen.gogo.yaml --verbose
-	GOFLAGS=${GOFLAGS} ${IGNITE} chain build -t linux:amd64 --skip-proto --output ${BUILD_DIR}/
+	GOFLAGS=${GOFLAGS} ${IGNITE} ${CHAIN_BUILD} -t linux:amd64 --skip-proto --output ${BUILD_DIR}/
 	chmod +x $(BUILD_DIR)/lumerad
 
-build-debug: build-debug/lumerad
+build-debug: ${BUILD_DIR}/debug/lumerad
 
-build-debug/lumerad: $(GO_SRC) go.sum Makefile
+${BUILD_DIR}/debug/lumerad: $(GO_SRC) go.sum Makefile
 	@echo "Building lumerad debug binary..."
 	@mkdir -p ${BUILD_DIR}
-	${IGNITE} chain build -t linux:amd64 --skip-proto --debug -v --output ${BUILD_DIR}/
-	chmod +x $(BUILD_DIR)/lumerad
+	${IGNITE} ${CHAIN_BUILD} -t linux:amd64 --skip-proto --debug -v --output ${BUILD_DIR}/debug/
+	chmod +x $(BUILD_DIR)/debug/lumerad
 
 release:
 	@echo "Creating release with ignite..."
@@ -114,7 +119,7 @@ release:
 	${BUF} generate --template proto/buf.gen.gogo.yaml --verbose
 	${BUF} generate --template proto/buf.gen.swagger.yaml --verbose
 	${IGNITE} generate openapi --yes --enable-proto-vendor --clear-cache
-	CGO_LDFLAGS="${RELEASE_CGO_LDFLAGS}" ${IGNITE} chain build -t linux:amd64 --skip-proto --release -v --output ${RELEASE_DIR}/
+	CGO_LDFLAGS="${RELEASE_CGO_LDFLAGS}" ${IGNITE} ${CHAIN_BUILD} -t linux:amd64 --skip-proto --release -v --output ${RELEASE_DIR}/
 	@echo "Release created in [${RELEASE_DIR}/] directory."
 
 ###################################################

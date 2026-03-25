@@ -10,6 +10,7 @@ import (
 	io "io"
 	math "math"
 	math_bits "math/bits"
+	sort "sort"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -616,7 +617,13 @@ func (m *CascadeClientFailureEvidenceMetadata) MarshalToSizedBuffer(dAtA []byte)
 	var l int
 	_ = l
 	if len(m.Details) > 0 {
+		keysForDetails := make([]string, 0, len(m.Details))
 		for k := range m.Details {
+			keysForDetails = append(keysForDetails, k)
+		}
+		sort.Strings(keysForDetails)
+		for iNdEx := len(keysForDetails) - 1; iNdEx >= 0; iNdEx-- {
+			k := keysForDetails[iNdEx]
 			v := m.Details[k]
 			baseI := i
 			i -= len(v)

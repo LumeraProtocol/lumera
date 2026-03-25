@@ -171,6 +171,25 @@ func (k Keeper) CreateEvidence(
 	return evidenceID, nil
 }
 
+type deterministicMarshaler interface {
+	XXX_Marshal([]byte, bool) ([]byte, error)
+	XXX_Size() int
+}
+
+func marshalEvidenceMetadataDeterministic(msg gogoproto.Message) ([]byte, error) {
+	if m, ok := msg.(deterministicMarshaler); ok {
+		b := make([]byte, 0, m.XXX_Size())
+		return m.XXX_Marshal(b, true)
+	}
+
+	buf := gogoproto.NewBuffer(nil)
+	buf.SetDeterministic(true)
+	if err := buf.Marshal(msg); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
 func marshalEvidenceMetadataJSON(evidenceType types.EvidenceType, metadataJSON string) ([]byte, error) {
 	u := &jsonpb.Unmarshaler{}
 
@@ -180,35 +199,35 @@ func marshalEvidenceMetadataJSON(evidenceType types.EvidenceType, metadataJSON s
 		if err := u.Unmarshal(strings.NewReader(metadataJSON), &m); err != nil {
 			return nil, fmt.Errorf("unmarshal ActionExpiredEvidenceMetadata: %w", err)
 		}
-		return gogoproto.Marshal(&m)
+		return marshalEvidenceMetadataDeterministic(&m)
 
 	case types.EvidenceType_EVIDENCE_TYPE_ACTION_FINALIZATION_SIGNATURE_FAILURE:
 		var m types.ActionFinalizationSignatureFailureEvidenceMetadata
 		if err := u.Unmarshal(strings.NewReader(metadataJSON), &m); err != nil {
 			return nil, fmt.Errorf("unmarshal ActionFinalizationSignatureFailureEvidenceMetadata: %w", err)
 		}
-		return gogoproto.Marshal(&m)
+		return marshalEvidenceMetadataDeterministic(&m)
 
 	case types.EvidenceType_EVIDENCE_TYPE_ACTION_FINALIZATION_NOT_IN_TOP_10:
 		var m types.ActionFinalizationNotInTop10EvidenceMetadata
 		if err := u.Unmarshal(strings.NewReader(metadataJSON), &m); err != nil {
 			return nil, fmt.Errorf("unmarshal ActionFinalizationNotInTop10EvidenceMetadata: %w", err)
 		}
-		return gogoproto.Marshal(&m)
+		return marshalEvidenceMetadataDeterministic(&m)
 
 	case types.EvidenceType_EVIDENCE_TYPE_STORAGE_CHALLENGE_FAILURE:
 		var m types.StorageChallengeFailureEvidenceMetadata
 		if err := u.Unmarshal(strings.NewReader(metadataJSON), &m); err != nil {
 			return nil, fmt.Errorf("unmarshal StorageChallengeFailureEvidenceMetadata: %w", err)
 		}
-		return gogoproto.Marshal(&m)
+		return marshalEvidenceMetadataDeterministic(&m)
 
 	case types.EvidenceType_EVIDENCE_TYPE_CASCADE_CLIENT_FAILURE:
 		var m types.CascadeClientFailureEvidenceMetadata
 		if err := u.Unmarshal(strings.NewReader(metadataJSON), &m); err != nil {
 			return nil, fmt.Errorf("unmarshal CascadeClientFailureEvidenceMetadata: %w", err)
 		}
-		return gogoproto.Marshal(&m)
+		return marshalEvidenceMetadataDeterministic(&m)
 
 	default:
 		return nil, fmt.Errorf("unsupported evidence_type: %s", evidenceType.String())

@@ -1,0 +1,27 @@
+name: map-consensus-inventory
+
+on:
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'proto/**'
+      - 'x/**'
+      - 'tests/**'
+      - '.github/scripts/map_consensus_inventory.sh'
+      - '.github/workflows/map-consensus-inventory.yml'
+  push:
+    branches: [ master ]
+    paths:
+      - 'proto/**'
+      - 'x/**'
+      - 'tests/**'
+      - '.github/scripts/map_consensus_inventory.sh'
+      - '.github/workflows/map-consensus-inventory.yml'
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.1
+      - name: Validate map-bearing consensus inventory
+        run: .github/scripts/map_consensus_inventory.sh

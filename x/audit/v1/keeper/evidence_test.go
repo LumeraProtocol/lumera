@@ -3,6 +3,7 @@ package keeper_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/LumeraProtocol/lumera/x/audit/v1/keeper"
@@ -152,4 +153,53 @@ func TestCreateEvidence_CascadeClientFailure_InvalidMetadata(t *testing.T) {
 	)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), types.ErrInvalidMetadata.Error())
+}
+
+func TestCreateEvidence_CascadeClientFailure_MetadataMarshalDeterministic(t *testing.T) {
+	f := initFixture(t)
+
+	reporter, err := f.addressCodec.BytesToString(bytes.Repeat([]byte{0x11}, 20))
+	require.NoError(t, err)
+	subject, err := f.addressCodec.BytesToString(bytes.Repeat([]byte{0x22}, 20))
+	require.NoError(t, err)
+	target, err := f.addressCodec.BytesToString(bytes.Repeat([]byte{0x33}, 20))
+	require.NoError(t, err)
+
+	meta := types.CascadeClientFailureEvidenceMetadata{
+		ReporterComponent: types.CascadeClientFailureReporterComponent_CASCADE_CLIENT_FAILURE_REPORTER_COMPONENT_SN_API_SERVER,
+		TargetSupernodeAccounts: []string{target},
+		Details: map[string]string{
+			"action_id":           "123637",
+			"error":               "decode symbols using RaptorQ: insufficient symbols to attempt decode",
+			"iteration":           "1",
+			"operation":           "download",
+			"supernode_account":   target,
+			"supernode_endpoint":  "18.190.53.108:4444",
+			"task_id":             "9700ec8a",
+		},
+	}
+	metaJSON, err := json.Marshal(meta)
+	require.NoError(t, err)
+
+	var first []byte
+	for i := 0; i < 40; i++ {
+		actionID := fmt.Sprintf("action-cascade-determinism-%d", i)
+		evidenceID, err := f.keeper.CreateEvidence(
+			f.ctx,
+			reporter,
+			subject,
+			actionID,
+			types.EvidenceType_EVIDENCE_TYPE_CASCADE_CLIENT_FAILURE,
+			string(metaJSON),
+		)
+		require.NoError(t, err)
+
+		got, found := f.keeper.GetEvidence(f.ctx, evidenceID)
+		require.True(t, found)
+		if i == 0 {
+			first = append([]byte(nil), got.Metadata...)
+			continue
+		}
+		require.Equal(t, first, got.Metadata)
+	}
 }

@@ -203,3 +203,172 @@ jobs:
           done
 
           echo "Consensus determinism canary passed"
+
+  determinism-restart-replay:
+    name: determinism-restart-replay (6 validators)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6.0.1
+
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+
+      - name: Install Specific Ignite CLI Version
+        run: |
+          IGNITE_VERSION="v29.2.0"
+          ARCH="linux_amd64"
+
+          curl -L "https://github.com/ignite/cli/releases/download/${IGNITE_VERSION}/ignite_${IGNITE_VERSION#v}_checksums.txt" -o checksums.txt
+          EXPECTED_CHECKSUM=$(grep "ignite_${IGNITE_VERSION#v}_${ARCH}.tar.gz" checksums.txt | awk '{print $1}')
+
+          curl -L "https://github.com/ignite/cli/releases/download/${IGNITE_VERSION}/ignite_${IGNITE_VERSION#v}_${ARCH}.tar.gz" -o ignite.tar.gz
+          ACTUAL_CHECKSUM=$(sha256sum ignite.tar.gz | awk '{print $1}')
+          if [ "$ACTUAL_CHECKSUM" != "$EXPECTED_CHECKSUM" ]; then
+            echo "Error: Checksum mismatch!"
+            exit 1
+          fi
+
+          tar -xzf ignite.tar.gz
+          chmod +x ignite
+
+      - name: Build chain binary
+        run: |
+          ./ignite chain build --build.tags "ledger" -y -t linux:amd64
+        env:
+          DO_NOT_TRACK: 1
+          GOFLAGS: "-buildvcs=false"
+
+      - name: Run restart + replay determinism check
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BIN="$(pwd)/build/lumerad"
+          WORK="$(pwd)/.ci-determinism-restart"
+          OUT="$WORK/testnet"
+          CHAIN_ID="testing"
+
+          mkdir -p "$WORK"
+          rm -rf "$OUT"
+
+          cleanup() {
+            pkill -f "${BIN} start" || true
+          }
+          trap cleanup EXIT
+
+          "$BIN" testnet init-files \
+            --chain-id="$CHAIN_ID" \
+            --output-dir="$OUT" \
+            --v=6 \
+            --keyring-backend=test \
+            --commit-timeout=900ms \
+            --minimum-gas-prices=0.000001ulume \
+            --single-host
+
+          for i in 0 1 2 3 4 5; do
+            "$BIN" start --trace --log_level=info --home "$OUT/node${i}/lumerad" >"$WORK/node${i}.log" 2>&1 &
+          done
+
+          for p in 26657 26658 26659 26660 26661 26662; do
+            for _ in $(seq 1 60); do
+              if curl -sf "http://127.0.0.1:${p}/status" >/dev/null; then
+                break
+              fi
+              sleep 1
+            done
+            curl -sf "http://127.0.0.1:${p}/status" >/dev/null
+          done
+
+          submit_bank_tx() {
+            local tag="$1"
+            "$BIN" tx bank send \
+              "$($BIN keys show node0 -a --home "$OUT/node0/lumerad" --keyring-backend test)" \
+              "$($BIN keys show node2 -a --home "$OUT/node2/lumerad" --keyring-backend test)" \
+              1ulume \
+              --from node0 \
+              --home "$OUT/node0/lumerad" \
+              --keyring-backend test \
+              --chain-id "$CHAIN_ID" \
+              --node tcp://127.0.0.1:26657 \
+              --fees 1ulume \
+              --broadcast-mode block \
+              --yes -o json > "$WORK/${tag}.json"
+
+            local txhash code
+            txhash=$(jq -r '.txhash // ""' "$WORK/${tag}.json")
+            code=$(jq -r '.code // 0' "$WORK/${tag}.json")
+            test -n "$txhash"
+            if [ "$code" != "0" ]; then
+              echo "bank send failed for ${tag}:"
+              cat "$WORK/${tag}.json"
+              exit 1
+            fi
+          }
+
+          check_consensus_window() {
+            local rounds="$1"
+            local prev_min_h=0
+            for _ in $(seq 1 "$rounds"); do
+              min_h=999999999
+              max_h=0
+
+              for p in 26657 26658 26659 26660 26661 26662; do
+                h=$(curl -sf "http://127.0.0.1:${p}/status" | jq -r '.result.sync_info.latest_block_height')
+                if [ "$h" -lt "$min_h" ]; then min_h="$h"; fi
+                if [ "$h" -gt "$max_h" ]; then max_h="$h"; fi
+              done
+
+              if [ "$prev_min_h" -gt 0 ] && [ "$min_h" -le "$prev_min_h" ]; then
+                echo "No progress detected: prev_min_h=$prev_min_h current_min_h=$min_h"
+                exit 1
+              fi
+              prev_min_h="$min_h"
+
+              if [ $((max_h - min_h)) -gt 3 ]; then
+                echo "Height skew too large: min_h=$min_h max_h=$max_h"
+                exit 1
+              fi
+
+              baseline=""
+              for p in 26657 26658 26659 26660 26661 26662; do
+                ah=$(curl -sf "http://127.0.0.1:${p}/block?height=${min_h}" | jq -r '.result.block.header.app_hash')
+                if [ -z "$baseline" ]; then
+                  baseline="$ah"
+                elif [ "$ah" != "$baseline" ]; then
+                  echo "App-hash divergence at height=${min_h}: baseline=$baseline got=$ah on port=$p"
+                  exit 1
+                fi
+              done
+
+              sleep 1
+            done
+          }
+
+          # pre-restart txs + consensus checks
+          submit_bank_tx pre-restart-1
+          submit_bank_tx pre-restart-2
+          check_consensus_window 10
+
+          # restart a follower validator and verify convergence continues.
+          pkill -f "$OUT/node5/lumerad" || true
+          sleep 2
+          "$BIN" start --trace --log_level=info --home "$OUT/node5/lumerad" >"$WORK/node5-restart.log" 2>&1 &
+
+          for _ in $(seq 1 60); do
+            if curl -sf "http://127.0.0.1:26662/status" >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl -sf "http://127.0.0.1:26662/status" >/dev/null
+
+          # post-restart txs + longer consensus checks
+          submit_bank_tx post-restart-1
+          submit_bank_tx post-restart-2
+          submit_bank_tx post-restart-3
+          check_consensus_window 20
+
+          echo "Consensus determinism restart/replay check passed"

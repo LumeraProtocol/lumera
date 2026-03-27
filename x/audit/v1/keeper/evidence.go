@@ -204,13 +204,23 @@ func marshalEvidenceMetadataJSON(evidenceType types.EvidenceType, metadataJSON s
 		return gogoproto.Marshal(&m)
 
 	case types.EvidenceType_EVIDENCE_TYPE_CASCADE_CLIENT_FAILURE:
-		var m types.CascadeClientFailureEvidenceMetadata
-		if err := u.Unmarshal(strings.NewReader(metadataJSON), &m); err != nil {
-			return nil, fmt.Errorf("unmarshal CascadeClientFailureEvidenceMetadata: %w", err)
-		}
-		return gogoproto.Marshal(&m)
+		return marshalCascadeClientFailureEvidenceMetadataDeterministic(u, metadataJSON)
 
 	default:
 		return nil, fmt.Errorf("unsupported evidence_type: %s", evidenceType.String())
 	}
+}
+
+func marshalCascadeClientFailureEvidenceMetadataDeterministic(u *jsonpb.Unmarshaler, metadataJSON string) ([]byte, error) {
+	var m types.CascadeClientFailureEvidenceMetadata
+	if err := u.Unmarshal(strings.NewReader(metadataJSON), &m); err != nil {
+		return nil, fmt.Errorf("unmarshal CascadeClientFailureEvidenceMetadata: %w", err)
+	}
+
+	buf := gogoproto.NewBuffer(nil)
+	buf.SetDeterministic(true)
+	if err := buf.Marshal(&m); err != nil {
+		return nil, fmt.Errorf("marshal CascadeClientFailureEvidenceMetadata deterministic: %w", err)
+	}
+	return buf.Bytes(), nil
 }

@@ -32,6 +32,11 @@ jobs:
       - name: Set up Go
         uses: ./.github/actions/setup-go
 
+      - name: Install jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
       - name: Install Specific Ignite CLI Version
         run: |
           IGNITE_VERSION="v29.2.0"
@@ -64,6 +69,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          command -v jq >/dev/null || { echo "jq is required but not found"; exit 1; }
 
           BIN="$(pwd)/build/lumerad"
           WORK="$(pwd)/.ci-determinism"
@@ -100,6 +107,20 @@ jobs:
             done
             curl -sf "http://127.0.0.1:${p}/status" >/dev/null
           done
+
+          # Wait until chain has produced first blocks before CLI/account queries.
+          for _ in $(seq 1 90); do
+            h=$(curl -sf "http://127.0.0.1:26657/status" | jq -r '.result.sync_info.latest_block_height // "0"')
+            if [[ "$h" =~ ^[0-9]+$ ]] && [ "$h" -ge 2 ]; then
+              break
+            fi
+            sleep 1
+          done
+          h=$(curl -sf "http://127.0.0.1:26657/status" | jq -r '.result.sync_info.latest_block_height // "0"')
+          if ! [[ "$h" =~ ^[0-9]+$ ]] || [ "$h" -lt 2 ]; then
+            echo "chain not ready, latest_block_height=$h"
+            exit 1
+          fi
 
           submit_evidence_tx() {
             local action_id="$1"

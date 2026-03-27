@@ -205,9 +205,13 @@ jobs:
           echo "Consensus determinism canary passed"
 
   determinism-restart-replay:
-    name: determinism-restart-replay (6 validators)
+    name: determinism-restart-replay (restart node${{ matrix.restart_node }})
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        restart_node: [1, 3, 5]
 
     steps:
       - name: Check out repository
@@ -250,6 +254,8 @@ jobs:
           WORK="$(pwd)/.ci-determinism-restart"
           OUT="$WORK/testnet"
           CHAIN_ID="testing"
+          RESTART_NODE="${{ matrix.restart_node }}"
+          RESTART_PORT="$((26657 + RESTART_NODE))"
 
           mkdir -p "$WORK"
           rm -rf "$OUT"
@@ -352,18 +358,18 @@ jobs:
           submit_bank_tx pre-restart-2
           check_consensus_window 10
 
-          # restart a follower validator and verify convergence continues.
-          pkill -f "$OUT/node5/lumerad" || true
+          # restart one validator and verify convergence continues.
+          pkill -f "$OUT/node${RESTART_NODE}/lumerad" || true
           sleep 2
-          "$BIN" start --trace --log_level=info --home "$OUT/node5/lumerad" >"$WORK/node5-restart.log" 2>&1 &
+          "$BIN" start --trace --log_level=info --home "$OUT/node${RESTART_NODE}/lumerad" >"$WORK/node${RESTART_NODE}-restart.log" 2>&1 &
 
           for _ in $(seq 1 60); do
-            if curl -sf "http://127.0.0.1:26662/status" >/dev/null; then
+            if curl -sf "http://127.0.0.1:${RESTART_PORT}/status" >/dev/null; then
               break
             fi
             sleep 1
           done
-          curl -sf "http://127.0.0.1:26662/status" >/dev/null
+          curl -sf "http://127.0.0.1:${RESTART_PORT}/status" >/dev/null
 
           # post-restart txs + longer consensus checks
           submit_bank_tx post-restart-1

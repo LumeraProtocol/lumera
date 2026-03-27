@@ -73,6 +73,16 @@ jobs:
           command -v jq >/dev/null || { echo "jq is required but not found"; exit 1; }
 
           BIN="$(pwd)/build/lumerad"
+          if [ ! -x "$BIN" ]; then
+            BIN="$(command -v lumerad || true)"
+          fi
+          if [ -z "$BIN" ] || [ ! -x "$BIN" ]; then
+            echo "lumerad binary not found after build"
+            ls -la "$(pwd)/build" || true
+            command -v lumerad || true
+            exit 1
+          fi
+
           WORK="$(pwd)/.ci-determinism"
           OUT="$WORK/testnet"
           CHAIN_ID="testing"

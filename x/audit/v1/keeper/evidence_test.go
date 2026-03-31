@@ -90,9 +90,14 @@ func TestSubmitEvidenceAndQueries_CascadeClientFailure(t *testing.T) {
 			targetA,
 			targetB,
 		},
-		Details: map[string]string{
-			"error":    "context deadline exceeded while streaming upload",
-			"trace_id": "trace-1234",
+		Details: &types.CascadeClientFailureDetails{
+			Operation:         "register",
+			Iteration:         "1",
+			SupernodeEndpoint: "18.190.53.108:4444",
+			SupernodeAccount:  targetA,
+			TaskId:            "task-1234",
+			Error:             "context deadline exceeded while streaming upload",
+			ActionId:          "action-cascade-1",
 		},
 	}
 	metaBz, err := json.Marshal(meta)

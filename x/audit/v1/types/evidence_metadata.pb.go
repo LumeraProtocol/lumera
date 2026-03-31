@@ -303,21 +303,120 @@ func (m *StorageChallengeFailureEvidenceMetadata) GetTranscriptHash() string {
 	return ""
 }
 
+type CascadeClientFailureDetails struct {
+	// operation is the SDK operation that failed (e.g. register, download).
+	Operation string `protobuf:"bytes,1,opt,name=operation,proto3" json:"operation,omitempty"`
+	// iteration is the retry attempt index represented by the client.
+	Iteration string `protobuf:"bytes,2,opt,name=iteration,proto3" json:"iteration,omitempty"`
+	// supernode_endpoint is the implicated supernode endpoint.
+	SupernodeEndpoint string `protobuf:"bytes,3,opt,name=supernode_endpoint,json=supernodeEndpoint,proto3" json:"supernode_endpoint,omitempty"`
+	// supernode_account is the implicated supernode account.
+	SupernodeAccount string `protobuf:"bytes,4,opt,name=supernode_account,json=supernodeAccount,proto3" json:"supernode_account,omitempty"`
+	// task_id is the client task identifier.
+	TaskId string `protobuf:"bytes,5,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
+	// error is the failure message observed by the client.
+	Error string `protobuf:"bytes,6,opt,name=error,proto3" json:"error,omitempty"`
+	// action_id is the action id tracked by the client.
+	ActionId string `protobuf:"bytes,7,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
+}
+
+func (m *CascadeClientFailureDetails) Reset()         { *m = CascadeClientFailureDetails{} }
+func (m *CascadeClientFailureDetails) String() string { return proto.CompactTextString(m) }
+func (*CascadeClientFailureDetails) ProtoMessage()    {}
+func (*CascadeClientFailureDetails) Descriptor() ([]byte, []int) {
+	return fileDescriptor_09b57e4c2349ab91, []int{4}
+}
+func (m *CascadeClientFailureDetails) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *CascadeClientFailureDetails) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_CascadeClientFailureDetails.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *CascadeClientFailureDetails) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_CascadeClientFailureDetails.Merge(m, src)
+}
+func (m *CascadeClientFailureDetails) XXX_Size() int {
+	return m.Size()
+}
+func (m *CascadeClientFailureDetails) XXX_DiscardUnknown() {
+	xxx_messageInfo_CascadeClientFailureDetails.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_CascadeClientFailureDetails proto.InternalMessageInfo
+
+func (m *CascadeClientFailureDetails) GetOperation() string {
+	if m != nil {
+		return m.Operation
+	}
+	return ""
+}
+
+func (m *CascadeClientFailureDetails) GetIteration() string {
+	if m != nil {
+		return m.Iteration
+	}
+	return ""
+}
+
+func (m *CascadeClientFailureDetails) GetSupernodeEndpoint() string {
+	if m != nil {
+		return m.SupernodeEndpoint
+	}
+	return ""
+}
+
+func (m *CascadeClientFailureDetails) GetSupernodeAccount() string {
+	if m != nil {
+		return m.SupernodeAccount
+	}
+	return ""
+}
+
+func (m *CascadeClientFailureDetails) GetTaskId() string {
+	if m != nil {
+		return m.TaskId
+	}
+	return ""
+}
+
+func (m *CascadeClientFailureDetails) GetError() string {
+	if m != nil {
+		return m.Error
+	}
+	return ""
+}
+
+func (m *CascadeClientFailureDetails) GetActionId() string {
+	if m != nil {
+		return m.ActionId
+	}
+	return ""
+}
+
 // CascadeClientFailureEvidenceMetadata is metadata for client-observed failures.
 type CascadeClientFailureEvidenceMetadata struct {
 	// reporter_component identifies the emitting component.
 	ReporterComponent CascadeClientFailureReporterComponent `protobuf:"varint,1,opt,name=reporter_component,json=reporterComponent,proto3,enum=lumera.audit.v1.CascadeClientFailureReporterComponent" json:"reporter_component,omitempty"`
-	// target_supernode_accounts are implicated supernode accounts, when known.
+	// target_supernode_accounts are implicated supernode accounts.
 	TargetSupernodeAccounts []string `protobuf:"bytes,2,rep,name=target_supernode_accounts,json=targetSupernodeAccounts,proto3" json:"target_supernode_accounts,omitempty"`
-	// details contains free-form diagnostic attributes (e.g. trace, endpoint, error).
-	Details map[string]string `protobuf:"bytes,3,rep,name=details,proto3" json:"details,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	// details is the structured failure payload reported by clients.
+	Details *CascadeClientFailureDetails `protobuf:"bytes,3,opt,name=details,proto3" json:"details,omitempty"`
 }
 
 func (m *CascadeClientFailureEvidenceMetadata) Reset()         { *m = CascadeClientFailureEvidenceMetadata{} }
 func (m *CascadeClientFailureEvidenceMetadata) String() string { return proto.CompactTextString(m) }
 func (*CascadeClientFailureEvidenceMetadata) ProtoMessage()    {}
 func (*CascadeClientFailureEvidenceMetadata) Descriptor() ([]byte, []int) {
-	return fileDescriptor_09b57e4c2349ab91, []int{4}
+	return fileDescriptor_09b57e4c2349ab91, []int{5}
 }
 func (m *CascadeClientFailureEvidenceMetadata) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -360,7 +459,7 @@ func (m *CascadeClientFailureEvidenceMetadata) GetTargetSupernodeAccounts() []st
 	return nil
 }
 
-func (m *CascadeClientFailureEvidenceMetadata) GetDetails() map[string]string {
+func (m *CascadeClientFailureEvidenceMetadata) GetDetails() *CascadeClientFailureDetails {
 	if m != nil {
 		return m.Details
 	}
@@ -373,8 +472,8 @@ func init() {
 	proto.RegisterType((*ActionFinalizationSignatureFailureEvidenceMetadata)(nil), "lumera.audit.v1.ActionFinalizationSignatureFailureEvidenceMetadata")
 	proto.RegisterType((*ActionFinalizationNotInTop10EvidenceMetadata)(nil), "lumera.audit.v1.ActionFinalizationNotInTop10EvidenceMetadata")
 	proto.RegisterType((*StorageChallengeFailureEvidenceMetadata)(nil), "lumera.audit.v1.StorageChallengeFailureEvidenceMetadata")
+	proto.RegisterType((*CascadeClientFailureDetails)(nil), "lumera.audit.v1.CascadeClientFailureDetails")
 	proto.RegisterType((*CascadeClientFailureEvidenceMetadata)(nil), "lumera.audit.v1.CascadeClientFailureEvidenceMetadata")
-	proto.RegisterMapType((map[string]string)(nil), "lumera.audit.v1.CascadeClientFailureEvidenceMetadata.DetailsEntry")
 }
 
 func init() {
@@ -382,51 +481,55 @@ func init() {
 }
 
 var fileDescriptor_09b57e4c2349ab91 = []byte{
-	// 695 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xbc, 0x55, 0x4d, 0x4f, 0xdb, 0x4a,
-	0x14, 0x8d, 0x13, 0x20, 0x8f, 0x01, 0x41, 0x9e, 0xf5, 0x24, 0x4c, 0xde, 0x23, 0x0a, 0xe8, 0x3d,
-	0x11, 0xa1, 0x47, 0x42, 0x78, 0x9f, 0xa5, 0x2b, 0xc7, 0x71, 0x5a, 0x17, 0x48, 0x22, 0x3b, 0xb0,
-	0xa8, 0xda, 0x8e, 0xa6, 0xf6, 0x25, 0xb1, 0xea, 0x78, 0xac, 0x99, 0x49, 0x44, 0xba, 0xe9, 0x0f,
-	0x68, 0x55, 0x75, 0xd1, 0x9f, 0xc2, 0x8f, 0xe8, 0x12, 0xb1, 0xea, 0xb2, 0x22, 0x7f, 0xa4, 0xb2,
-	0x9d, 0x40, 0x09, 0x20, 0xc1, 0x86, 0xdd, 0xdc, 0x7b, 0xcf, 0x39, 0x3a, 0x73, 0xe6, 0x26, 0x46,
-	0xeb, 0x5e, 0xaf, 0x0b, 0x8c, 0x94, 0x48, 0xcf, 0x71, 0x45, 0xa9, 0x5f, 0x2e, 0x41, 0xdf, 0x75,
-	0xc0, 0xb7, 0x01, 0x77, 0x41, 0x10, 0x87, 0x08, 0x52, 0x0c, 0x18, 0x15, 0x54, 0x5e, 0x8c, 0x81,
-	0xc5, 0x08, 0x58, 0xec, 0x97, 0xb3, 0xcb, 0x36, 0xe5, 0x5d, 0xca, 0x71, 0x34, 0x2e, 0xc5, 0x45,
-	0x8c, 0x5d, 0x7b, 0x87, 0x56, 0x54, 0x5b, 0xb8, 0xd4, 0xd7, 0x8f, 0x03, 0x97, 0x81, 0xa3, 0x8f,
-	0x34, 0xf7, 0x47, 0x92, 0xf2, 0x2b, 0x94, 0x15, 0x34, 0xc0, 0xe5, 0x2d, 0xdc, 0x27, 0x9e, 0xeb,
-	0x10, 0x41, 0x19, 0x26, 0x8e, 0xc3, 0x80, 0x73, 0xe0, 0x8a, 0x94, 0x4f, 0x15, 0x66, 0x2b, 0xab,
-	0x67, 0x27, 0x9b, 0x2b, 0x23, 0xd9, 0xc3, 0x31, 0x4a, 0x8d, 0x41, 0x96, 0x60, 0xae, 0xdf, 0x36,
-	0x97, 0x04, 0x0d, 0xca, 0x5b, 0x93, 0x43, 0xe0, 0x6b, 0x9f, 0x25, 0xb4, 0x1d, 0x3b, 0xa8, 0xb9,
-	0x3e, 0xf1, 0xdc, 0xb7, 0x24, 0x3c, 0x5b, 0x6e, 0xdb, 0x27, 0xa2, 0xc7, 0xa0, 0x46, 0x5c, 0xaf,
-	0xc7, 0xe0, 0xc1, 0x6d, 0x7d, 0x94, 0xd0, 0x9f, 0xd7, 0x6d, 0xd5, 0xa9, 0x30, 0xfc, 0x56, 0x48,
-	0x79, 0x70, 0x43, 0x1f, 0x52, 0x68, 0xdd, 0x12, 0x94, 0x91, 0x36, 0x68, 0x1d, 0xe2, 0x79, 0xe0,
-	0xb7, 0x6f, 0x0d, 0x67, 0x19, 0xfd, 0x04, 0x01, 0xb5, 0x3b, 0xd8, 0x75, 0x14, 0x29, 0x2f, 0x15,
-	0xa6, 0xcc, 0x74, 0x54, 0x1b, 0x8e, 0xfc, 0x12, 0xfd, 0x66, 0x8f, 0xe9, 0x0c, 0xf3, 0x5e, 0x00,
-	0xcc, 0xa7, 0x0e, 0x60, 0x62, 0xdb, 0xb4, 0xe7, 0x0b, 0x25, 0x99, 0x97, 0x0a, 0xb3, 0x95, 0x5f,
-	0xcf, 0x4e, 0x36, 0x97, 0x46, 0x46, 0x55, 0xdb, 0xbe, 0x6a, 0x31, 0x7b, 0x29, 0x60, 0x8d, 0xf9,
-	0x6a, 0x4c, 0xbf, 0x22, 0xef, 0xdc, 0x20, 0x9f, 0xba, 0x8f, 0xbc, 0x73, 0x4d, 0x7e, 0x15, 0xcd,
-	0x5f, 0x4c, 0xc3, 0xcb, 0x4d, 0x85, 0x72, 0xe6, 0xdc, 0x45, 0xcf, 0x70, 0xc2, 0xbb, 0x1f, 0xb9,
-	0x1e, 0xe0, 0x37, 0x30, 0x50, 0xa6, 0xa3, 0x71, 0x3a, 0xac, 0x77, 0x61, 0x10, 0xb2, 0x8f, 0xe2,
-	0xc4, 0xb0, 0x18, 0x04, 0xa0, 0xcc, 0xc4, 0xec, 0x51, 0xaf, 0x35, 0x08, 0x40, 0x5e, 0x47, 0x8b,
-	0x82, 0x11, 0x9f, 0xdb, 0xcc, 0x0d, 0x04, 0xee, 0x10, 0xde, 0x51, 0xd2, 0x11, 0x6a, 0xe1, 0xb2,
-	0xfd, 0x94, 0xf0, 0xce, 0xda, 0x30, 0x89, 0x7e, 0xd7, 0x08, 0xb7, 0x89, 0x03, 0x9a, 0xe7, 0x82,
-	0x2f, 0x6e, 0x7b, 0x0b, 0x40, 0x32, 0x83, 0x80, 0x32, 0x01, 0x0c, 0xdb, 0xb4, 0x1b, 0x50, 0x1f,
-	0x7c, 0x11, 0xbd, 0xca, 0xc2, 0xf6, 0xbf, 0xc5, 0x89, 0x5f, 0x6a, 0xf1, 0x26, 0x49, 0x73, 0x44,
-	0xd7, 0xc6, 0x6c, 0xf3, 0x67, 0x36, 0xd9, 0x92, 0x77, 0xd0, 0xb2, 0x20, 0xac, 0x0d, 0xe2, 0x7a,
-	0xe8, 0x5c, 0x49, 0x86, 0xdb, 0x67, 0x2e, 0xc5, 0x80, 0xc9, 0x50, 0xb9, 0xfc, 0x02, 0xa5, 0x1d,
-	0x10, 0xc4, 0xf5, 0xb8, 0x92, 0xca, 0xa7, 0x0a, 0x73, 0xdb, 0x95, 0x3b, 0xf9, 0x9a, 0xbc, 0x6a,
-	0xb1, 0x1a, 0x8b, 0xe8, 0xbe, 0x60, 0x03, 0x73, 0x2c, 0x99, 0xdd, 0x41, 0xf3, 0x3f, 0x0e, 0xe4,
-	0x0c, 0x4a, 0x85, 0x6f, 0x23, 0x45, 0xb1, 0x86, 0x47, 0xf9, 0x17, 0x34, 0xdd, 0x27, 0x5e, 0x0f,
-	0xe2, 0xe5, 0x33, 0xe3, 0x62, 0x27, 0xf9, 0xbf, 0xb4, 0xf1, 0x3e, 0x89, 0xfe, 0xb8, 0x53, 0x24,
-	0xf2, 0x23, 0xf4, 0x8f, 0xa6, 0x5a, 0x9a, 0x5a, 0xd5, 0xb1, 0xb6, 0x67, 0xe8, 0xf5, 0x16, 0xae,
-	0xa9, 0xc6, 0xde, 0x81, 0xa9, 0x63, 0x53, 0x6f, 0x36, 0xcc, 0x96, 0x6e, 0x62, 0xad, 0xb1, 0xdf,
-	0x6c, 0xd4, 0xc3, 0xd1, 0x41, 0xdd, 0x6a, 0xea, 0x9a, 0x51, 0x33, 0xf4, 0x6a, 0x26, 0x21, 0x3f,
-	0x46, 0xff, 0xdd, 0x9d, 0x6a, 0xd5, 0xb1, 0xda, 0x34, 0xb0, 0xa5, 0x9b, 0x87, 0xba, 0x99, 0x91,
-	0xe4, 0xbf, 0xd1, 0xd6, 0x3d, 0xc8, 0xd5, 0x5d, 0xfc, 0xa4, 0x91, 0x49, 0xde, 0x9f, 0xf5, 0xcc,
-	0xca, 0xa4, 0x2a, 0x1b, 0x5f, 0xce, 0x73, 0xd2, 0xe9, 0x79, 0x4e, 0xfa, 0x76, 0x9e, 0x93, 0x3e,
-	0x0d, 0x73, 0x89, 0xd3, 0x61, 0x2e, 0xf1, 0x75, 0x98, 0x4b, 0x3c, 0xcf, 0x1c, 0x5f, 0x7e, 0x15,
-	0xc2, 0xd5, 0xe6, 0xaf, 0x67, 0xa2, 0xbf, 0xf7, 0xbf, 0xbe, 0x07, 0x00, 0x00, 0xff, 0xff, 0x2b,
-	0x5d, 0xe1, 0x2f, 0x35, 0x06, 0x00, 0x00,
+	// 763 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xbc, 0x55, 0xdd, 0x6e, 0x1a, 0x47,
+	0x14, 0x66, 0xc1, 0x31, 0x61, 0x52, 0x25, 0x78, 0x54, 0x09, 0x6c, 0x27, 0xc8, 0x41, 0xad, 0x6c,
+	0x45, 0x31, 0x18, 0xf7, 0x4f, 0x6d, 0xaf, 0xd6, 0xcb, 0xd2, 0x6c, 0x93, 0x00, 0xda, 0x25, 0xb9,
+	0xa8, 0xd4, 0x8e, 0xa6, 0x3b, 0x27, 0x30, 0xca, 0xb2, 0xb3, 0x9a, 0x19, 0x50, 0xe8, 0x4d, 0x1f,
+	0xa0, 0x55, 0xd5, 0x4a, 0xbd, 0xee, 0x53, 0xe4, 0x21, 0x7a, 0x19, 0xf9, 0xaa, 0x97, 0x95, 0xfd,
+	0x22, 0xd5, 0xfe, 0x00, 0x32, 0xb8, 0x8a, 0x7d, 0xe3, 0xbb, 0x3d, 0xe7, 0x3b, 0xdf, 0xa7, 0x33,
+	0xdf, 0x39, 0xb3, 0x83, 0xf6, 0x83, 0xc9, 0x18, 0x24, 0x6d, 0xd2, 0x09, 0xe3, 0xba, 0x39, 0x6d,
+	0x35, 0x61, 0xca, 0x19, 0x84, 0x3e, 0x90, 0x31, 0x68, 0xca, 0xa8, 0xa6, 0x8d, 0x48, 0x0a, 0x2d,
+	0xf0, 0xbd, 0xb4, 0xb0, 0x91, 0x14, 0x36, 0xa6, 0xad, 0x9d, 0x6d, 0x5f, 0xa8, 0xb1, 0x50, 0x24,
+	0x81, 0x9b, 0x69, 0x90, 0xd6, 0xd6, 0x7f, 0x46, 0x0f, 0x4c, 0x5f, 0x73, 0x11, 0xda, 0x6f, 0x22,
+	0x2e, 0x81, 0xd9, 0x99, 0xe6, 0xf3, 0x4c, 0x12, 0xff, 0x80, 0x76, 0xb4, 0x88, 0x48, 0xeb, 0x88,
+	0x4c, 0x69, 0xc0, 0x19, 0xd5, 0x42, 0x12, 0xca, 0x98, 0x04, 0xa5, 0x40, 0x55, 0x8d, 0xbd, 0xc2,
+	0x41, 0xe9, 0xe4, 0xe1, 0xe9, 0xdb, 0xc3, 0x07, 0x99, 0xec, 0xcb, 0x79, 0x95, 0x99, 0x16, 0x79,
+	0x5a, 0xf2, 0x70, 0xe8, 0x56, 0xb4, 0x88, 0x5a, 0x47, 0xab, 0x20, 0xa8, 0xfa, 0x9f, 0x06, 0x3a,
+	0x4e, 0x3b, 0xe8, 0xf0, 0x90, 0x06, 0xfc, 0x27, 0x1a, 0x7f, 0x7b, 0x7c, 0x18, 0x52, 0x3d, 0x91,
+	0xd0, 0xa1, 0x3c, 0x98, 0x48, 0xb8, 0xf1, 0xb6, 0x7e, 0x33, 0xd0, 0xe3, 0xf5, 0xb6, 0xba, 0x42,
+	0x3b, 0xe1, 0x20, 0xa6, 0xdc, 0x78, 0x43, 0xbf, 0x16, 0xd0, 0xbe, 0xa7, 0x85, 0xa4, 0x43, 0xb0,
+	0x46, 0x34, 0x08, 0x20, 0x1c, 0xfe, 0xaf, 0x39, 0xdb, 0xe8, 0x36, 0x44, 0xc2, 0x1f, 0x11, 0xce,
+	0xaa, 0xc6, 0x9e, 0x71, 0xb0, 0xe1, 0x16, 0x93, 0xd8, 0x61, 0xf8, 0x7b, 0x74, 0xdf, 0x9f, 0xd3,
+	0x25, 0x51, 0x93, 0x08, 0x64, 0x28, 0x18, 0x10, 0xea, 0xfb, 0x62, 0x12, 0xea, 0x6a, 0x7e, 0xcf,
+	0x38, 0x28, 0x9d, 0xec, 0x9e, 0xbe, 0x3d, 0xac, 0x64, 0x8d, 0x9a, 0xbe, 0x7f, 0xb1, 0xc5, 0x9d,
+	0xa5, 0x80, 0x37, 0xe7, 0x9b, 0x29, 0xfd, 0x82, 0x3c, 0xbb, 0x44, 0xbe, 0x70, 0x1d, 0x79, 0xb6,
+	0x26, 0xff, 0x10, 0x7d, 0xb0, 0x40, 0xe3, 0xc3, 0x6d, 0xc4, 0x72, 0xee, 0x9d, 0x45, 0xce, 0x61,
+	0xf1, 0xd9, 0x5f, 0xf1, 0x00, 0xc8, 0x6b, 0x98, 0x55, 0x6f, 0x25, 0x70, 0x31, 0x8e, 0x9f, 0xc2,
+	0x2c, 0x66, 0xbf, 0x4a, 0x1d, 0x23, 0x7a, 0x16, 0x41, 0x75, 0x33, 0x65, 0x67, 0xb9, 0xc1, 0x2c,
+	0x02, 0xbc, 0x8f, 0xee, 0x69, 0x49, 0x43, 0xe5, 0x4b, 0x1e, 0x69, 0x32, 0xa2, 0x6a, 0x54, 0x2d,
+	0x26, 0x55, 0x77, 0x97, 0xe9, 0x27, 0x54, 0x8d, 0xea, 0x7f, 0xe5, 0xd1, 0xae, 0x45, 0x95, 0x4f,
+	0x19, 0x58, 0x01, 0x87, 0x50, 0x67, 0xb3, 0x68, 0x83, 0xa6, 0x3c, 0x50, 0xf8, 0x3e, 0x2a, 0x89,
+	0x08, 0x64, 0xb2, 0x35, 0xc9, 0x0c, 0x4a, 0xee, 0x32, 0x11, 0xa3, 0x5c, 0xcf, 0xd1, 0x7c, 0x8a,
+	0x2e, 0x12, 0xf8, 0x10, 0xe1, 0xa5, 0x73, 0x10, 0xb2, 0x48, 0xf0, 0xb9, 0x75, 0xee, 0xd6, 0x02,
+	0xb1, 0x33, 0x00, 0x3f, 0x41, 0x5b, 0xeb, 0x46, 0x6f, 0xbc, 0xdf, 0xe8, 0xb2, 0x5a, 0xb5, 0xb7,
+	0x82, 0x8a, 0x9a, 0xaa, 0xd7, 0xb1, 0xb3, 0xa9, 0x75, 0x9b, 0x71, 0xe8, 0x30, 0xfc, 0x21, 0xba,
+	0x05, 0x52, 0x0a, 0x99, 0x59, 0x96, 0x06, 0x78, 0x17, 0x95, 0x68, 0x72, 0x45, 0x62, 0x42, 0x6a,
+	0xd3, 0xed, 0x34, 0xe1, 0xb0, 0xfa, 0x1f, 0x79, 0xf4, 0xd1, 0x65, 0x06, 0xad, 0x2d, 0x2b, 0x20,
+	0x2c, 0x21, 0x12, 0x52, 0x83, 0x24, 0xbe, 0x18, 0x47, 0x22, 0x84, 0x50, 0x27, 0x96, 0xdd, 0x3d,
+	0xfe, 0xbc, 0xb1, 0xf2, 0x2b, 0x6b, 0x5c, 0x26, 0xe9, 0x66, 0x74, 0x6b, 0xce, 0x76, 0xb7, 0xe4,
+	0x6a, 0x0a, 0x7f, 0x85, 0xb6, 0x35, 0x95, 0x43, 0xd0, 0xeb, 0x5b, 0xa9, 0xaa, 0xf9, 0xf8, 0x7a,
+	0xba, 0x95, 0xb4, 0x60, 0x75, 0xeb, 0x14, 0xee, 0xa0, 0x22, 0x4b, 0xe7, 0x9a, 0x4c, 0xe1, 0xce,
+	0xf1, 0xe3, 0x2b, 0xf5, 0x95, 0xed, 0x82, 0x3b, 0x27, 0x3f, 0xfa, 0x25, 0x8f, 0x3e, 0xbe, 0xd2,
+	0x01, 0xf0, 0x97, 0xe8, 0x33, 0xcb, 0xf4, 0x2c, 0xb3, 0x6d, 0x13, 0xeb, 0x99, 0x63, 0x77, 0x07,
+	0xa4, 0x63, 0x3a, 0xcf, 0x5e, 0xb8, 0x36, 0x71, 0xed, 0x7e, 0xcf, 0x1d, 0xd8, 0x2e, 0xb1, 0x7a,
+	0xcf, 0xfb, 0xbd, 0x6e, 0x0c, 0xbd, 0xe8, 0x7a, 0x7d, 0xdb, 0x72, 0x3a, 0x8e, 0xdd, 0x2e, 0xe7,
+	0xf0, 0xd7, 0xe8, 0x8b, 0xab, 0x53, 0xbd, 0x2e, 0x31, 0xfb, 0x0e, 0xf1, 0x6c, 0xf7, 0xa5, 0xed,
+	0x96, 0x0d, 0xfc, 0x29, 0x3a, 0xba, 0x06, 0xb9, 0xfd, 0x94, 0x7c, 0xd3, 0x2b, 0xe7, 0xaf, 0xcf,
+	0xfa, 0xd6, 0x2b, 0x17, 0x4e, 0x1e, 0xfd, 0x7d, 0x56, 0x33, 0xde, 0x9d, 0xd5, 0x8c, 0x7f, 0xcf,
+	0x6a, 0xc6, 0xef, 0xe7, 0xb5, 0xdc, 0xbb, 0xf3, 0x5a, 0xee, 0x9f, 0xf3, 0x5a, 0xee, 0xbb, 0xf2,
+	0x9b, 0xe5, 0x23, 0x17, 0xdf, 0x54, 0xf5, 0xe3, 0x66, 0xf2, 0x5a, 0x7d, 0xf2, 0x5f, 0x00, 0x00,
+	0x00, 0xff, 0xff, 0x4b, 0x3b, 0x3e, 0xf2, 0x04, 0x07, 0x00, 0x00,
 }
 
 func (m *ActionExpiredEvidenceMetadata) Marshal() (dAtA []byte, err error) {
@@ -595,6 +698,78 @@ func (m *StorageChallengeFailureEvidenceMetadata) MarshalToSizedBuffer(dAtA []by
 	return len(dAtA) - i, nil
 }
 
+func (m *CascadeClientFailureDetails) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *CascadeClientFailureDetails) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *CascadeClientFailureDetails) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.ActionId) > 0 {
+		i -= len(m.ActionId)
+		copy(dAtA[i:], m.ActionId)
+		i = encodeVarintEvidenceMetadata(dAtA, i, uint64(len(m.ActionId)))
+		i--
+		dAtA[i] = 0x3a
+	}
+	if len(m.Error) > 0 {
+		i -= len(m.Error)
+		copy(dAtA[i:], m.Error)
+		i = encodeVarintEvidenceMetadata(dAtA, i, uint64(len(m.Error)))
+		i--
+		dAtA[i] = 0x32
+	}
+	if len(m.TaskId) > 0 {
+		i -= len(m.TaskId)
+		copy(dAtA[i:], m.TaskId)
+		i = encodeVarintEvidenceMetadata(dAtA, i, uint64(len(m.TaskId)))
+		i--
+		dAtA[i] = 0x2a
+	}
+	if len(m.SupernodeAccount) > 0 {
+		i -= len(m.SupernodeAccount)
+		copy(dAtA[i:], m.SupernodeAccount)
+		i = encodeVarintEvidenceMetadata(dAtA, i, uint64(len(m.SupernodeAccount)))
+		i--
+		dAtA[i] = 0x22
+	}
+	if len(m.SupernodeEndpoint) > 0 {
+		i -= len(m.SupernodeEndpoint)
+		copy(dAtA[i:], m.SupernodeEndpoint)
+		i = encodeVarintEvidenceMetadata(dAtA, i, uint64(len(m.SupernodeEndpoint)))
+		i--
+		dAtA[i] = 0x1a
+	}
+	if len(m.Iteration) > 0 {
+		i -= len(m.Iteration)
+		copy(dAtA[i:], m.Iteration)
+		i = encodeVarintEvidenceMetadata(dAtA, i, uint64(len(m.Iteration)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if len(m.Operation) > 0 {
+		i -= len(m.Operation)
+		copy(dAtA[i:], m.Operation)
+		i = encodeVarintEvidenceMetadata(dAtA, i, uint64(len(m.Operation)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
 func (m *CascadeClientFailureEvidenceMetadata) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -615,24 +790,17 @@ func (m *CascadeClientFailureEvidenceMetadata) MarshalToSizedBuffer(dAtA []byte)
 	_ = i
 	var l int
 	_ = l
-	if len(m.Details) > 0 {
-		for k := range m.Details {
-			v := m.Details[k]
-			baseI := i
-			i -= len(v)
-			copy(dAtA[i:], v)
-			i = encodeVarintEvidenceMetadata(dAtA, i, uint64(len(v)))
-			i--
-			dAtA[i] = 0x12
-			i -= len(k)
-			copy(dAtA[i:], k)
-			i = encodeVarintEvidenceMetadata(dAtA, i, uint64(len(k)))
-			i--
-			dAtA[i] = 0xa
-			i = encodeVarintEvidenceMetadata(dAtA, i, uint64(baseI-i))
-			i--
-			dAtA[i] = 0x1a
+	if m.Details != nil {
+		{
+			size, err := m.Details.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintEvidenceMetadata(dAtA, i, uint64(size))
 		}
+		i--
+		dAtA[i] = 0x1a
 	}
 	if len(m.TargetSupernodeAccounts) > 0 {
 		for iNdEx := len(m.TargetSupernodeAccounts) - 1; iNdEx >= 0; iNdEx-- {
@@ -743,6 +911,43 @@ func (m *StorageChallengeFailureEvidenceMetadata) Size() (n int) {
 	return n
 }
 
+func (m *CascadeClientFailureDetails) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Operation)
+	if l > 0 {
+		n += 1 + l + sovEvidenceMetadata(uint64(l))
+	}
+	l = len(m.Iteration)
+	if l > 0 {
+		n += 1 + l + sovEvidenceMetadata(uint64(l))
+	}
+	l = len(m.SupernodeEndpoint)
+	if l > 0 {
+		n += 1 + l + sovEvidenceMetadata(uint64(l))
+	}
+	l = len(m.SupernodeAccount)
+	if l > 0 {
+		n += 1 + l + sovEvidenceMetadata(uint64(l))
+	}
+	l = len(m.TaskId)
+	if l > 0 {
+		n += 1 + l + sovEvidenceMetadata(uint64(l))
+	}
+	l = len(m.Error)
+	if l > 0 {
+		n += 1 + l + sovEvidenceMetadata(uint64(l))
+	}
+	l = len(m.ActionId)
+	if l > 0 {
+		n += 1 + l + sovEvidenceMetadata(uint64(l))
+	}
+	return n
+}
+
 func (m *CascadeClientFailureEvidenceMetadata) Size() (n int) {
 	if m == nil {
 		return 0
@@ -758,13 +963,9 @@ func (m *CascadeClientFailureEvidenceMetadata) Size() (n int) {
 			n += 1 + l + sovEvidenceMetadata(uint64(l))
 		}
 	}
-	if len(m.Details) > 0 {
-		for k, v := range m.Details {
-			_ = k
-			_ = v
-			mapEntrySize := 1 + len(k) + sovEvidenceMetadata(uint64(len(k))) + 1 + len(v) + sovEvidenceMetadata(uint64(len(v)))
-			n += mapEntrySize + 1 + sovEvidenceMetadata(uint64(mapEntrySize))
-		}
+	if m.Details != nil {
+		l = m.Details.Size()
+		n += 1 + l + sovEvidenceMetadata(uint64(l))
 	}
 	return n
 }
@@ -1282,6 +1483,280 @@ func (m *StorageChallengeFailureEvidenceMetadata) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+func (m *CascadeClientFailureDetails) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowEvidenceMetadata
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: CascadeClientFailureDetails: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: CascadeClientFailureDetails: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Operation", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowEvidenceMetadata
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthEvidenceMetadata
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthEvidenceMetadata
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Operation = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Iteration", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowEvidenceMetadata
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthEvidenceMetadata
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthEvidenceMetadata
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Iteration = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SupernodeEndpoint", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowEvidenceMetadata
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthEvidenceMetadata
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthEvidenceMetadata
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SupernodeEndpoint = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SupernodeAccount", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowEvidenceMetadata
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthEvidenceMetadata
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthEvidenceMetadata
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SupernodeAccount = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TaskId", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowEvidenceMetadata
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthEvidenceMetadata
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthEvidenceMetadata
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.TaskId = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Error", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowEvidenceMetadata
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthEvidenceMetadata
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthEvidenceMetadata
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Error = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 7:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ActionId", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowEvidenceMetadata
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthEvidenceMetadata
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthEvidenceMetadata
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ActionId = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipEvidenceMetadata(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthEvidenceMetadata
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func (m *CascadeClientFailureEvidenceMetadata) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1392,102 +1867,11 @@ func (m *CascadeClientFailureEvidenceMetadata) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if m.Details == nil {
-				m.Details = make(map[string]string)
+				m.Details = &CascadeClientFailureDetails{}
 			}
-			var mapkey string
-			var mapvalue string
-			for iNdEx < postIndex {
-				entryPreIndex := iNdEx
-				var wire uint64
-				for shift := uint(0); ; shift += 7 {
-					if shift >= 64 {
-						return ErrIntOverflowEvidenceMetadata
-					}
-					if iNdEx >= l {
-						return io.ErrUnexpectedEOF
-					}
-					b := dAtA[iNdEx]
-					iNdEx++
-					wire |= uint64(b&0x7F) << shift
-					if b < 0x80 {
-						break
-					}
-				}
-				fieldNum := int32(wire >> 3)
-				if fieldNum == 1 {
-					var stringLenmapkey uint64
-					for shift := uint(0); ; shift += 7 {
-						if shift >= 64 {
-							return ErrIntOverflowEvidenceMetadata
-						}
-						if iNdEx >= l {
-							return io.ErrUnexpectedEOF
-						}
-						b := dAtA[iNdEx]
-						iNdEx++
-						stringLenmapkey |= uint64(b&0x7F) << shift
-						if b < 0x80 {
-							break
-						}
-					}
-					intStringLenmapkey := int(stringLenmapkey)
-					if intStringLenmapkey < 0 {
-						return ErrInvalidLengthEvidenceMetadata
-					}
-					postStringIndexmapkey := iNdEx + intStringLenmapkey
-					if postStringIndexmapkey < 0 {
-						return ErrInvalidLengthEvidenceMetadata
-					}
-					if postStringIndexmapkey > l {
-						return io.ErrUnexpectedEOF
-					}
-					mapkey = string(dAtA[iNdEx:postStringIndexmapkey])
-					iNdEx = postStringIndexmapkey
-				} else if fieldNum == 2 {
-					var stringLenmapvalue uint64
-					for shift := uint(0); ; shift += 7 {
-						if shift >= 64 {
-							return ErrIntOverflowEvidenceMetadata
-						}
-						if iNdEx >= l {
-							return io.ErrUnexpectedEOF
-						}
-						b := dAtA[iNdEx]
-						iNdEx++
-						stringLenmapvalue |= uint64(b&0x7F) << shift
-						if b < 0x80 {
-							break
-						}
-					}
-					intStringLenmapvalue := int(stringLenmapvalue)
-					if intStringLenmapvalue < 0 {
-						return ErrInvalidLengthEvidenceMetadata
-					}
-					postStringIndexmapvalue := iNdEx + intStringLenmapvalue
-					if postStringIndexmapvalue < 0 {
-						return ErrInvalidLengthEvidenceMetadata
-					}
-					if postStringIndexmapvalue > l {
-						return io.ErrUnexpectedEOF
-					}
-					mapvalue = string(dAtA[iNdEx:postStringIndexmapvalue])
-					iNdEx = postStringIndexmapvalue
-				} else {
-					iNdEx = entryPreIndex
-					skippy, err := skipEvidenceMetadata(dAtA[iNdEx:])
-					if err != nil {
-						return err
-					}
-					if (skippy < 0) || (iNdEx+skippy) < 0 {
-						return ErrInvalidLengthEvidenceMetadata
-					}
-					if (iNdEx + skippy) > postIndex {
-						return io.ErrUnexpectedEOF
-					}
-					iNdEx += skippy
-				}
+			if err := m.Details.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
 			}
-			m.Details[mapkey] = mapvalue
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

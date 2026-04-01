@@ -57,6 +57,8 @@ make devnet-clean             # Remove all devnet data (/tmp/lumera-devnet-1/)
 
 **Note**: `claims.csv` is only needed if genesis `TotalClaimableAmount > 0` (claiming period ended 2025-01-01; default is now 0).
 
+**Rule**: After completing any multi-file code change, run `make lint` and fix any issues before considering the task done. Lint must pass cleanly (0 issues).
+
 ## Architecture
 
 ### Cosmos SDK App (depinject wiring)

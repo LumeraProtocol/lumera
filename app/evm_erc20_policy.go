@@ -25,8 +25,8 @@ import (
 // Policy mode and KV key constants are defined in erc20policytypes.
 // Local aliases for conciseness within this file.
 var (
-	policyModeKey         = erc20policytypes.PolicyModeKey
-	policyAllowPfx        = erc20policytypes.PolicyAllowPfx
+	policyModeKey           = erc20policytypes.PolicyModeKey
+	policyAllowPfx          = erc20policytypes.PolicyAllowPfx
 	policyAllowBaseTracePfx = erc20policytypes.PolicyAllowBaseTracePfx
 )
 

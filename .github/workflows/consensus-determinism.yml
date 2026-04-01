@@ -102,7 +102,8 @@ jobs:
             --keyring-backend=test \
             --commit-timeout=900ms \
             --minimum-gas-prices=0.000001ulume \
-            --single-host
+            --single-host \
+            --starting-ip-address=127.0.0.1
 
           for i in 0 1 2 3 4 5; do
             "$BIN" start --trace --log_level=info --home "$OUT/node${i}/lumerad" >"$WORK/node${i}.log" 2>&1 &
@@ -129,8 +130,34 @@ jobs:
           h=$(curl -sf "http://127.0.0.1:26657/status" | jq -r '.result.sync_info.latest_block_height // "0"')
           if ! [[ "$h" =~ ^[0-9]+$ ]] || [ "$h" -lt 2 ]; then
             echo "chain not ready, latest_block_height=$h"
+            for i in 0 1 2 3 4 5; do
+              echo "===== node${i}.log (tail) ====="
+              tail -n 120 "$WORK/node${i}.log" || true
+            done
             exit 1
           fi
+
+          wait_for_tx() {
+            local txhash="$1"
+            local out_file="$2"
+
+            for _ in $(seq 1 60); do
+              if "$BIN" query tx "$txhash" --type hash --node tcp://127.0.0.1:26657 -o json > "$out_file" 2>/dev/null; then
+                local code
+                code=$(jq -r '.code // .tx_response.code // 0' "$out_file")
+                if [ "$code" != "0" ]; then
+                  echo "tx failed for ${txhash}:"
+                  cat "$out_file"
+                  exit 1
+                fi
+                return 0
+              fi
+              sleep 1
+            done
+
+            echo "tx not found after timeout: ${txhash}"
+            return 1
+          }
 
           submit_evidence_tx() {
             local action_id="$1"
@@ -142,7 +169,7 @@ jobs:
               --chain-id "$CHAIN_ID" \
               --node tcp://127.0.0.1:26657 \
               --fees 1ulume \
-              --broadcast-mode block \
+              --broadcast-mode sync \
               --yes -o json > "$WORK/${action_id}.json"
 
             local txhash code
@@ -150,10 +177,11 @@ jobs:
             code=$(jq -r '.code // 0' "$WORK/${action_id}.json")
             test -n "$txhash"
             if [ "$code" != "0" ]; then
-              echo "submit-evidence failed for ${action_id}:"
+              echo "submit-evidence check-tx failed for ${action_id}:"
               cat "$WORK/${action_id}.json"
               exit 1
             fi
+            wait_for_tx "$txhash" "$WORK/${action_id}.deliver.json"
           }
 
           submit_bank_tx() {
@@ -168,7 +196,7 @@ jobs:
               --chain-id "$CHAIN_ID" \
               --node tcp://127.0.0.1:26657 \
               --fees 1ulume \
-              --broadcast-mode block \
+              --broadcast-mode sync \
               --yes -o json > "$WORK/${tag}.json"
 
             local txhash code
@@ -176,15 +204,18 @@ jobs:
             code=$(jq -r '.code // 0' "$WORK/${tag}.json")
             test -n "$txhash"
             if [ "$code" != "0" ]; then
-              echo "bank send failed for ${tag}:"
+              echo "bank send check-tx failed for ${tag}:"
               cat "$WORK/${tag}.json"
               exit 1
             fi
+            wait_for_tx "$txhash" "$WORK/${tag}.deliver.json"
           }
 
           check_consensus_window() {
             local rounds="$1"
             local prev_min_h=0
+            local stall_rounds=0
+
             for _ in $(seq 1 "$rounds"); do
               min_h=999999999
               max_h=0
@@ -195,9 +226,19 @@ jobs:
                 if [ "$h" -gt "$max_h" ]; then max_h="$h"; fi
               done
 
-              if [ "$prev_min_h" -gt 0 ] && [ "$min_h" -le "$prev_min_h" ]; then
-                echo "No progress detected: prev_min_h=$prev_min_h current_min_h=$min_h"
-                exit 1
+              if [ "$prev_min_h" -gt 0 ]; then
+                if [ "$min_h" -lt "$prev_min_h" ]; then
+                  echo "Height regressed: prev_min_h=$prev_min_h current_min_h=$min_h"
+                  exit 1
+                elif [ "$min_h" -eq "$prev_min_h" ]; then
+                  stall_rounds=$((stall_rounds + 1))
+                  if [ "$stall_rounds" -gt 3 ]; then
+                    echo "No progress detected for 4 rounds: min_h=$min_h"
+                    exit 1
+                  fi
+                else
+                  stall_rounds=0
+                fi
               fi
               prev_min_h="$min_h"
 

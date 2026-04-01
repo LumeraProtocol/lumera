@@ -120,7 +120,7 @@ devnet-build-default: _check-devnet-default-cfg
 		EXTERNAL_GENESIS_FILE="$$(realpath "$$GENESIS_FILE")" \
 		EXTERNAL_CLAIMS_FILE="$$(realpath $(DEFAULT_CLAIMS_FILE))"
 
-.PHONY: devnet-build-172 _check-devnet-172-cfg devnet-build-191 _check-devnet-191-cfg devnet-build-1110 _check-devnet-1110-cfg
+.PHONY: devnet-build-172 _check-devnet-172-cfg devnet-build-191 _check-devnet-191-cfg devnet-build-1111 _check-devnet-1111-cfg
 devnet-build-172:
 	@$(MAKE) devnet-build \
 		DEVNET_BUILD_LUMERA=0 \
@@ -143,14 +143,14 @@ _check-devnet-191-cfg:
 	@[ -f "$$(realpath $(DEFAULT_GENESIS_FILE))" ] || (echo "Missing DEFAULT_GENESIS_FILE: $$(realpath $(DEFAULT_GENESIS_FILE))"; exit 1)
 	@[ -f "$$(realpath $(DEFAULT_CLAIMS_FILE))" ] || (echo "Missing DEFAULT_CLAIMS_FILE: $$(realpath $(DEFAULT_CLAIMS_FILE))"; exit 1)
 
-devnet-build-1110:
+devnet-build-1111:
 	@$(MAKE) devnet-build \
 		DEVNET_BUILD_LUMERA=0 \
-		DEVNET_BIN_DIR=devnet/bin-v1.11.0 \
+		DEVNET_BIN_DIR=devnet/bin-v1.11.1 \
 		EXTERNAL_GENESIS_FILE="$$(realpath $(DEFAULT_GENESIS_FILE))" \
 		EXTERNAL_CLAIMS_FILE="$$(realpath $(DEFAULT_CLAIMS_FILE))"
 
-_check-devnet-1110-cfg:
+_check-devnet-1111-cfg:
 	@[ -f "$$(realpath $(DEFAULT_GENESIS_FILE))" ] || (echo "Missing DEFAULT_GENESIS_FILE: $$(realpath $(DEFAULT_GENESIS_FILE))"; exit 1)
 	@[ -f "$$(realpath $(DEFAULT_CLAIMS_FILE))" ] || (echo "Missing DEFAULT_CLAIMS_FILE: $$(realpath $(DEFAULT_CLAIMS_FILE))"; exit 1)
 
@@ -410,7 +410,7 @@ devnet-update-scripts:
 	fi
 
 .PHONY: devnet-new-172 devnet-new-191 devnet-new-1110 devnet-upgrade-180 devnet-upgrade-191 
-.PHONY: devnet-upgrade-1100 devnet-upgrade-1101 devnet-upgrade-1110 devnet-upgrade-1120
+.PHONY: devnet-upgrade-1100 devnet-upgrade-1101 devnet-upgrade-1111 devnet-upgrade-1120
 
 devnet-upgrade-180:
 	@cd devnet/scripts && ./upgrade.sh v1.8.0 auto-height ../bin-v1.8.0
@@ -445,10 +445,10 @@ devnet-new-191:
 	sleep 10
 	$(MAKE) devnet-up
 
-devnet-new-1110:
+devnet-new-1111:
 	$(MAKE) devnet-down
 	$(MAKE) devnet-clean
-	$(MAKE) devnet-build-1110
+	$(MAKE) devnet-build-1111
 	sleep 10
 	$(MAKE) devnet-up
 
@@ -458,22 +458,22 @@ devnet-evm-upgrade:
 	@mkdir -p devnet/logs
 	@echo "Logging to $(DEVNET_EVM_UPGRADE_LOG)"
 	@bash -c 'set -euo pipefail; { \
-	echo "==> Stage: install v1.11.0 devnet"; \
+	echo "==> Stage: install v1.11.1 devnet"; \
 	if ! $(MAKE) devnet-down; then \
-		echo "ERROR: stage install v1.11.0 devnet failed during devnet-down" >&2; \
+		echo "ERROR: stage install v1.11.1 devnet failed during devnet-down" >&2; \
 		exit 1; \
 	fi; \
 	if ! $(MAKE) devnet-clean; then \
-		echo "ERROR: stage install v1.11.0 devnet failed during devnet-clean" >&2; \
+		echo "ERROR: stage install v1.11.1 devnet failed during devnet-clean" >&2; \
 		exit 1; \
 	fi; \
-	if ! $(MAKE) devnet-build-1110; then \
-		echo "ERROR: stage install v1.11.0 devnet failed during devnet-build-1110" >&2; \
+	if ! $(MAKE) devnet-build-1111; then \
+		echo "ERROR: stage install v1.11.1 devnet failed during devnet-build-1111" >&2; \
 		exit 1; \
 	fi; \
 	sleep 10; \
 	if ! $(MAKE) devnet-up-detach; then \
-		echo "ERROR: stage install v1.11.0 devnet failed during devnet-up-detach" >&2; \
+		echo "ERROR: stage install v1.11.1 devnet failed during devnet-up-detach" >&2; \
 		exit 1; \
 	fi; \
 	echo "==> Stage: wait for height 40"; \

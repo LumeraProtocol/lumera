@@ -65,13 +65,11 @@ message MsgClaimLegacyAccount {
   // Also accepts ADR-036 signArbitrary signatures (Keplr/Leap wallet path).
   bytes legacy_signature = 4;
 
-  reserved 5;
-
   // new_signature: eth_secp256k1 signature over
   //   Keccak256("lumera-evm-migration:<chain_id>:<evm_chain_id>:claim:<legacy_address>:<new_address>")
   // proving the destination key holder consents to receive migrated state.
   // Also accepts EIP-191 personal_sign signatures (Keplr/Leap wallet path).
-  bytes new_signature = 6;
+  bytes new_signature = 5;
 }
 
 // MsgClaimLegacyAccountResponse is the response type for MsgClaimLegacyAccount.
@@ -94,12 +92,11 @@ message MsgMigrateValidator {
   // proving legacy key holder consents to the EVM migration.
   // Also accepts ADR-036 signArbitrary signatures (Keplr/Leap wallet path).
   bytes legacy_signature = 4;
-  reserved 5;
   // new_signature: eth_secp256k1 signature over
   //   Keccak256("lumera-evm-migration:<chain_id>:<evm_chain_id>:validator:<legacy_address>:<new_address>")
   // proving the destination key holder consents to receive the migrated validator state.
   // Also accepts EIP-191 personal_sign signatures (Keplr/Leap wallet path).
-  bytes new_signature = 6;
+  bytes new_signature = 5;
 }
 
 // MsgMigrateValidatorResponse is the response type for MsgMigrateValidator.

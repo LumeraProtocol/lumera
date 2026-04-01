@@ -37,10 +37,7 @@ Current fields:
 - `legacy_signature`
 - `new_signature`
 
-Proto details:
-
-- `new_pub_key` field `5` is now reserved in both messages.
-- `new_signature` remains field `6`.
+Proto field numbers: `new_address=1`, `legacy_address=2`, `legacy_pub_key=3`, `legacy_signature=4`, `new_signature=5`.
 
 Relevant files:
 

@@ -409,7 +409,7 @@ devnet-update-scripts:
 		echo "No containers were updated. Ensure the devnet is running."; \
 	fi
 
-.PHONY: devnet-new-172 devnet-new-191 devnet-new-1110 devnet-upgrade-180 devnet-upgrade-191 
+.PHONY: devnet-new-172 devnet-new-191 devnet-new-1111 devnet-upgrade-180 devnet-upgrade-191 
 .PHONY: devnet-upgrade-1100 devnet-upgrade-1101 devnet-upgrade-1111 devnet-upgrade-1120
 
 devnet-upgrade-180:

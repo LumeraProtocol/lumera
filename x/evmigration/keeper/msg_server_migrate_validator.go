@@ -81,7 +81,7 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 	if err := VerifyLegacySignature(ctx.ChainID(), lcfg.EVMChainID, migrationPayloadKindValidator, legacyAddr, newAddr, msg.LegacyPubKey, msg.LegacySignature); err != nil {
 		return nil, err
 	}
-	if err := VerifyNewSignature(ctx.ChainID(), lcfg.EVMChainID, migrationPayloadKindValidator, legacyAddr, newAddr, msg.NewPubKey, msg.NewSignature); err != nil {
+	if err := VerifyNewSignature(ctx.ChainID(), lcfg.EVMChainID, migrationPayloadKindValidator, legacyAddr, newAddr, msg.NewSignature); err != nil {
 		return nil, err
 	}
 

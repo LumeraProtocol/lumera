@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/LumeraProtocol/lumera/app"
+	lcfg "github.com/LumeraProtocol/lumera/config"
 	evmigrationkeeper "github.com/LumeraProtocol/lumera/x/evmigration/keeper"
 	"github.com/LumeraProtocol/lumera/x/evmigration/types"
 )
@@ -44,7 +45,15 @@ func (s *MigrationIntegrationSuite) SetupTest() {
 	os.Setenv("SYSTEM_TESTS", "true")
 
 	s.app = app.Setup(s.T())
-	s.ctx = s.app.BaseApp.NewContext(true)
+	// NewContext(true) doesn't carry chain ID or block time from InitChain
+	// in SDK v0.53. We set both explicitly:
+	//   - ChainID must match app.Setup's "testing" for signature verification.
+	//   - BlockTime must be realistic (not zero-value year 0001) because vesting
+	//     accounts compute EndTime relative to it, and feegrant expiry checks
+	//     compare against it.
+	s.ctx = s.app.BaseApp.NewContext(true).
+		WithChainID(integrationTestChainID).
+		WithBlockTime(time.Now().UTC())
 	s.keeper = s.app.EvmigrationKeeper
 	s.msgServer = evmigrationkeeper.NewMsgServerImpl(s.keeper)
 	s.authority = authtypes.NewModuleAddress(govtypes.ModuleName)
@@ -58,10 +67,12 @@ func TestMigrationIntegration(t *testing.T) {
 	suite.Run(t, new(MigrationIntegrationSuite))
 }
 
+const integrationTestChainID = "testing" // must match app.Setup's chainID
+
 // signMigration creates a valid legacy signature for the migration message.
 func signMigration(t *testing.T, privKey *secp256k1.PrivKey, legacyAddr, newAddr sdk.AccAddress) []byte {
 	t.Helper()
-	msg := fmt.Sprintf("lumera-evm-migration:claim:%s:%s", legacyAddr.String(), newAddr.String())
+	msg := fmt.Sprintf("lumera-evm-migration:%s:%d:claim:%s:%s", integrationTestChainID, lcfg.EVMChainID, legacyAddr.String(), newAddr.String())
 	hash := sha256.Sum256([]byte(msg))
 	sig, err := privKey.Sign(hash[:])
 	require.NoError(t, err)
@@ -70,7 +81,7 @@ func signMigration(t *testing.T, privKey *secp256k1.PrivKey, legacyAddr, newAddr
 
 func signValidatorMigration(t *testing.T, privKey *secp256k1.PrivKey, legacyAddr, newAddr sdk.AccAddress) []byte {
 	t.Helper()
-	msg := fmt.Sprintf("lumera-evm-migration:validator:%s:%s", legacyAddr.String(), newAddr.String())
+	msg := fmt.Sprintf("lumera-evm-migration:%s:%d:validator:%s:%s", integrationTestChainID, lcfg.EVMChainID, legacyAddr.String(), newAddr.String())
 	hash := sha256.Sum256([]byte(msg))
 	sig, err := privKey.Sign(hash[:])
 	require.NoError(t, err)
@@ -79,7 +90,7 @@ func signValidatorMigration(t *testing.T, privKey *secp256k1.PrivKey, legacyAddr
 
 func signNewMigration(t *testing.T, kind string, privKey *evmcryptotypes.PrivKey, legacyAddr, newAddr sdk.AccAddress) []byte {
 	t.Helper()
-	msg := fmt.Sprintf("lumera-evm-migration:%s:%s:%s", kind, legacyAddr.String(), newAddr.String())
+	msg := fmt.Sprintf("lumera-evm-migration:%s:%d:%s:%s:%s", integrationTestChainID, lcfg.EVMChainID, kind, legacyAddr.String(), newAddr.String())
 	sig, err := privKey.Sign([]byte(msg))
 	require.NoError(t, err)
 	return sig
@@ -99,7 +110,6 @@ func newClaimMsg(t *testing.T, legacyPrivKey *secp256k1.PrivKey, legacyAddr sdk.
 		NewAddress:      newAddr.String(),
 		LegacyPubKey:    legacyPrivKey.PubKey().(*secp256k1.PubKey).Key,
 		LegacySignature: signMigration(t, legacyPrivKey, legacyAddr, newAddr),
-		NewPubKey:       newPrivKey.PubKey().(*evmcryptotypes.PubKey).Key,
 		NewSignature:    signNewMigration(t, "claim", newPrivKey, legacyAddr, newAddr),
 	}
 }
@@ -111,7 +121,6 @@ func newValidatorMsg(t *testing.T, legacyPrivKey *secp256k1.PrivKey, legacyAddr 
 		NewAddress:      newAddr.String(),
 		LegacyPubKey:    legacyPrivKey.PubKey().(*secp256k1.PubKey).Key,
 		LegacySignature: signValidatorMigration(t, legacyPrivKey, legacyAddr, newAddr),
-		NewPubKey:       newPrivKey.PubKey().(*evmcryptotypes.PubKey).Key,
 		NewSignature:    signNewMigration(t, "validator", newPrivKey, legacyAddr, newAddr),
 	}
 }
@@ -206,13 +215,12 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_MigratesAndRevokesFee
 	s.Require().NoError(err)
 
 	// Legacy feegrant entries must be gone after migration.
-	oldOutgoing, err := s.app.FeeGrantKeeper.GetAllowance(s.ctx, legacyAddr, outgoingGrantee)
-	s.Require().NoError(err)
-	s.Require().Nil(oldOutgoing)
+	// GetAllowance returns an error (not nil) when the grant doesn't exist.
+	_, err = s.app.FeeGrantKeeper.GetAllowance(s.ctx, legacyAddr, outgoingGrantee)
+	s.Require().Error(err, "legacy outgoing feegrant should be removed")
 
-	oldIncoming, err := s.app.FeeGrantKeeper.GetAllowance(s.ctx, incomingGranter, legacyAddr)
-	s.Require().NoError(err)
-	s.Require().Nil(oldIncoming)
+	_, err = s.app.FeeGrantKeeper.GetAllowance(s.ctx, incomingGranter, legacyAddr)
+	s.Require().Error(err, "legacy incoming feegrant should be removed")
 
 	// The same allowances must exist under the migrated address.
 	newOutgoing, err := s.app.FeeGrantKeeper.GetAllowance(s.ctx, newAddr, outgoingGrantee)
@@ -625,7 +633,8 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_AfterValidatorMigrati
 
 	oldVal, err := s.app.StakingKeeper.GetValidator(s.ctx, oldValAddr)
 	s.Require().NoError(err)
-	_, err = s.app.StakingKeeper.Delegate(s.ctx, delegatorLegacyAddr, delegatorStake, stakingtypes.Bonded, oldVal, true)
+	// tokenSrc must be Unbonded for a fresh delegation from the user's balance.
+	_, err = s.app.StakingKeeper.Delegate(s.ctx, delegatorLegacyAddr, delegatorStake, stakingtypes.Unbonded, oldVal, true)
 	s.Require().NoError(err)
 
 	// Migrate the validator first.

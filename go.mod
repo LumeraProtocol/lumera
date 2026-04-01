@@ -48,6 +48,7 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/grpc-ecosystem/grpc-gateway v1.16.0
 	github.com/holiman/uint256 v1.3.2
+	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/cast v1.10.0
 	github.com/spf13/cobra v1.10.2
@@ -366,7 +367,6 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
-	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/petermattis/goid v0.0.0-20240813172612-4fcff4a6cae7 // indirect
 	github.com/pion/dtls/v2 v2.2.7 // indirect
 	github.com/pion/logging v0.2.2 // indirect
@@ -507,7 +507,6 @@ tool (
 	github.com/cosmos/cosmos-proto/cmd/protoc-gen-go-pulsar
 	github.com/cosmos/gogoproto/protoc-gen-gocosmos
 	github.com/cosmos/gogoproto/protoc-gen-gogo
-	github.com/golangci/golangci-lint/cmd/golangci-lint
 	github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 	github.com/grpc-ecosystem/grpc-gateway/protoc-gen-grpc-gateway
 	github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2

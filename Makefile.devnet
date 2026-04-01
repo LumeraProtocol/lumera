@@ -374,7 +374,7 @@ devnet-update-scripts:
 		exit 1; \
 	fi
 	@services="$$(docker compose -f $(COMPOSE_FILE) ps --services)"; \
-	common_scripts="start.sh stop.sh restart.sh validator-setup.sh supernode-setup.sh network-maker-setup.sh"; \
+	common_scripts="start.sh stop.sh restart.sh lumera-helper.sh validator-setup.sh supernode-setup.sh network-maker-setup.sh"; \
 	updated=0; \
 	for svc in $$services; do \
 		container="$$(docker compose -f $(COMPOSE_FILE) ps -q $$svc)"; \

@@ -178,7 +178,8 @@ func testSupernodeReportMetricsTxPathFailsForWrongCaller(t *testing.T, node *evm
 	wrongKey, wrongAddr := testaccounts.MustGenerateEthKey(t)
 
 	// Fund the wrong account so it can send a tx.
-	fundTx(t, node, wrongAddr, big.NewInt(1_000_000_000_000))
+	// 1e18 covers gas_price * gas_limit with margin.
+	fundTx(t, node, wrongAddr, new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil))
 
 	callerBech32 := node.KeyInfo().Address
 	accAddr, err := sdk.AccAddressFromBech32(callerBech32)

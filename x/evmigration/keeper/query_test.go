@@ -55,6 +55,41 @@ func TestQueryMigrationRecord_NotFound(t *testing.T) {
 	require.Nil(t, resp.Record)
 }
 
+func TestQueryMigrationRecordByNewAddress_Found(t *testing.T) {
+	f := initMockFixture(t)
+	qs := keeper.NewQueryServerImpl(f.keeper)
+
+	legacyAddr := testAccAddr()
+	newAddr := testAccAddr()
+	record := types.MigrationRecord{
+		LegacyAddress:   legacyAddr.String(),
+		NewAddress:      newAddr.String(),
+		MigrationTime:   100,
+		MigrationHeight: 10,
+	}
+	require.NoError(t, f.keeper.MigrationRecords.Set(f.ctx, legacyAddr.String(), record))
+	require.NoError(t, f.keeper.MigrationRecordByNewAddress.Set(f.ctx, newAddr.String(), legacyAddr.String()))
+
+	resp, err := qs.MigrationRecordByNewAddress(f.ctx, &types.QueryMigrationRecordByNewAddressRequest{
+		NewAddress: newAddr.String(),
+	})
+	require.NoError(t, err)
+	require.NotNil(t, resp.Record)
+	require.Equal(t, legacyAddr.String(), resp.Record.LegacyAddress)
+	require.Equal(t, newAddr.String(), resp.Record.NewAddress)
+}
+
+func TestQueryMigrationRecordByNewAddress_NotFound(t *testing.T) {
+	f := initMockFixture(t)
+	qs := keeper.NewQueryServerImpl(f.keeper)
+
+	resp, err := qs.MigrationRecordByNewAddress(f.ctx, &types.QueryMigrationRecordByNewAddressRequest{
+		NewAddress: testAccAddr().String(),
+	})
+	require.NoError(t, err)
+	require.Nil(t, resp.Record)
+}
+
 // --- MigrationRecords query tests ---
 
 // TestQueryMigrationRecords_Paginated verifies paginated listing of all migration records.
@@ -91,15 +126,56 @@ func TestQueryMigrationStats(t *testing.T) {
 	require.NoError(t, f.keeper.MigrationCounter.Set(f.ctx, 5))
 	require.NoError(t, f.keeper.ValidatorMigrationCounter.Set(f.ctx, 2))
 
-	// Mock IterateAccounts — no legacy accounts.
-	f.accountKeeper.EXPECT().IterateAccounts(gomock.Any(), gomock.Any()).Times(2)
-	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), gomock.Any()).AnyTimes()
+	legacyPK := secp256k1.GenPrivKey().PubKey()
+	legacyAddr := sdk.AccAddress(legacyPK.Address())
+	legacyAcc := authtypes.NewBaseAccountWithAddress(legacyAddr)
+	require.NoError(t, legacyAcc.SetPubKey(legacyPK))
+
+	validatorPK := secp256k1.GenPrivKey().PubKey()
+	validatorAddr := sdk.AccAddress(validatorPK.Address())
+	validatorAcc := authtypes.NewBaseAccountWithAddress(validatorAddr)
+	require.NoError(t, validatorAcc.SetPubKey(validatorPK))
+
+	migratedPK := secp256k1.GenPrivKey().PubKey()
+	migratedAddr := sdk.AccAddress(migratedPK.Address())
+	migratedAcc := authtypes.NewBaseAccountWithAddress(migratedAddr)
+	require.NoError(t, migratedAcc.SetPubKey(migratedPK))
+	require.NoError(t, f.keeper.MigrationRecords.Set(f.ctx, migratedAddr.String(), types.MigrationRecord{
+		LegacyAddress: migratedAddr.String(),
+		NewAddress:    testAccAddr().String(),
+	}))
+
+	f.accountKeeper.EXPECT().IterateAccounts(gomock.Any(), gomock.Any()).
+		Do(func(_ any, cb func(sdk.AccountI) bool) {
+			cb(legacyAcc)
+			cb(validatorAcc)
+			cb(migratedAcc)
+		})
+
+	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), legacyAddr).Return(
+		sdk.NewCoins(sdk.NewInt64Coin("ulume", 1000)),
+	)
+	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), validatorAddr).Return(sdk.Coins{})
+	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, uint16(1)).Return(
+		[]stakingtypes.Delegation{
+			stakingtypes.NewDelegation(legacyAddr.String(), testAccAddr().String(), math.LegacyNewDec(100)),
+		}, nil,
+	)
+	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), validatorAddr, uint16(1)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), sdk.ValAddress(legacyAddr)).Return(
+		stakingtypes.Validator{}, stakingtypes.ErrNoValidatorFound,
+	)
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), sdk.ValAddress(validatorAddr)).Return(
+		stakingtypes.Validator{OperatorAddress: sdk.ValAddress(validatorAddr).String()}, nil,
+	)
 
 	resp, err := qs.MigrationStats(f.ctx, &types.QueryMigrationStatsRequest{})
 	require.NoError(t, err)
 	require.Equal(t, uint64(5), resp.TotalMigrated)
 	require.Equal(t, uint64(2), resp.TotalValidatorsMigrated)
+	require.Equal(t, uint64(2), resp.TotalLegacy)
+	require.Equal(t, uint64(1), resp.TotalLegacyStaked)
+	require.Equal(t, uint64(1), resp.TotalValidatorsLegacy)
 }
 
 // --- MigrationEstimate query tests ---
@@ -252,7 +328,9 @@ func TestQueryLegacyAccounts_Pagination(t *testing.T) {
 
 	// Each account triggers balance, delegation, and validator checks (x2 calls).
 	for _, addr := range addrs {
-		f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(sdk.Coins{}).Times(2)
+		f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(
+			sdk.NewCoins(sdk.NewInt64Coin("ulume", 1)),
+		).Times(2)
 		f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), addr, uint16(1)).Return(nil, nil).Times(2)
 		f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), sdk.ValAddress(addr)).Return(
 			stakingtypes.Validator{}, stakingtypes.ErrNoValidatorFound,
@@ -311,7 +389,9 @@ func TestQueryLegacyAccounts_OffsetBeyondTotal(t *testing.T) {
 		Do(func(_ any, cb func(sdk.AccountI) bool) {
 			cb(acc)
 		})
-	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(sdk.Coins{})
+	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(
+		sdk.NewCoins(sdk.NewInt64Coin("ulume", 1)),
+	)
 	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), addr, uint16(1)).Return(nil, nil)
 	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), sdk.ValAddress(addr)).Return(
 		stakingtypes.Validator{}, stakingtypes.ErrNoValidatorFound,
@@ -340,7 +420,9 @@ func TestQueryLegacyAccounts_DefaultLimit(t *testing.T) {
 		Do(func(_ any, cb func(sdk.AccountI) bool) {
 			cb(acc)
 		})
-	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(sdk.Coins{})
+	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(
+		sdk.NewCoins(sdk.NewInt64Coin("ulume", 1)),
+	)
 	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), addr, uint16(1)).Return(nil, nil)
 	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), sdk.ValAddress(addr)).Return(
 		stakingtypes.Validator{}, stakingtypes.ErrNoValidatorFound,

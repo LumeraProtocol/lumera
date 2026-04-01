@@ -436,6 +436,32 @@ func setMempoolMaxTxsInAppToml(t *testing.T, homeDir string, maxTxs int) {
 	}
 }
 
+// setCometMempoolSize sets `size` under the `[mempool]` section in config.toml.
+// This controls how many txs CometBFT accepts into its mempool before rejecting.
+func setCometMempoolSize(t *testing.T, homeDir string, size int) {
+	t.Helper()
+
+	configTomlPath := filepath.Join(homeDir, "config", "config.toml")
+	configToml, err := os.ReadFile(configTomlPath)
+	if err != nil {
+		t.Fatalf("read config.toml: %v", err)
+	}
+
+	configTomlStr := string(configToml)
+	target := fmt.Sprintf("size = %d", size)
+	// Match `size = <number>` only under [mempool] section.
+	// CometBFT config.toml has `size` under [mempool] as the mempool capacity.
+	re := regexp.MustCompile(`(?m)(^\[mempool\].*\n(?:.*\n)*?)^size = [0-9]+`)
+	updated := re.ReplaceAllString(configTomlStr, "${1}"+target)
+	if updated == configTomlStr {
+		t.Fatalf("failed to update mempool size in config.toml")
+	}
+
+	if err := os.WriteFile(configTomlPath, []byte(updated), 0o644); err != nil {
+		t.Fatalf("write config.toml: %v", err)
+	}
+}
+
 // setCometTxIndexer sets `[tx_index].indexer` in Comet config.toml.
 func setCometTxIndexer(t *testing.T, homeDir, indexer string) {
 	t.Helper()

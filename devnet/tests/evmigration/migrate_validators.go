@@ -125,6 +125,10 @@ func runMigrateValidator() {
 			log.Fatalf("post-check failed: validators_migrated did not increase (before=%d after=%d)",
 				initialStats.TotalValidatorsMigrated, finalStats.TotalValidatorsMigrated)
 		}
+		if haveFinalStats && initialStats.TotalValidatorsLegacy > 0 && finalStats.TotalValidatorsLegacy >= initialStats.TotalValidatorsLegacy {
+			log.Fatalf("post-check failed: validators_legacy did not decrease (before=%d after=%d)",
+				initialStats.TotalValidatorsLegacy, finalStats.TotalValidatorsLegacy)
+		}
 	}
 
 	log.Printf("validator migration summary: migrated=%d skipped=%d failed=%d", okCount, skipCount, failCount)

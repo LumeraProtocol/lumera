@@ -302,7 +302,7 @@ Final operational readiness for mainnet.
 
 |     | Item                                     | Priority           | Notes                                                         |
 | --- | ---------------------------------------- | ------------------ | ------------------------------------------------------------- |
-| [ ] | Security audit of EVM integration        | **Critical** | All comparable chains had dedicated EVM audits                |
+| [x] | Security audit of EVM integration        | **Critical** | All comparable chains had dedicated EVM audits                |
 | [x] | CORS origin lockdown per environment     | High               | `app/openrpc/http.go` — reuses `[json-rpc] ws-origins`   |
 | [x] | JSON-RPC namespace exposure profiles     | High               | `cmd/lumera/cmd/jsonrpc_policy.go` — mainnet startup guard |
 | [ ] | Fee market monitoring runbook            | High               | Base fee tracking, gas utilization, alerting thresholds       |

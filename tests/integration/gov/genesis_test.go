@@ -16,6 +16,7 @@ import (
 
 	appevm "github.com/LumeraProtocol/lumera/app/evm"
 	lcfg "github.com/LumeraProtocol/lumera/config"
+	evmigrationmodule "github.com/LumeraProtocol/lumera/x/evmigration/module"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/runtime"
 	"github.com/cosmos/cosmos-sdk/testutil/configurator"
@@ -92,6 +93,7 @@ func TestImportExportQueues(t *testing.T) {
 			appConfig,
 			depinject.Supply(log.NewNopLogger()),
 			depinject.Provide(appevm.ProvideCustomGetSigners),
+			depinject.Provide(evmigrationmodule.ProvideCustomGetSigners),
 		),
 		simtestutil.DefaultStartUpConfig(),
 		&s1.AccountKeeper, &s1.BankKeeper, &s1.DistrKeeper, &s1.GovKeeper, &s1.StakingKeeper, &s1.cdc, &s1.appBuilder,
@@ -156,6 +158,7 @@ func TestImportExportQueues(t *testing.T) {
 			appConfig,
 			depinject.Supply(log.NewNopLogger()),
 			depinject.Provide(appevm.ProvideCustomGetSigners),
+			depinject.Provide(evmigrationmodule.ProvideCustomGetSigners),
 		),
 		conf2,
 		&s2.AccountKeeper, &s2.BankKeeper, &s2.DistrKeeper, &s2.GovKeeper, &s2.StakingKeeper, &s2.cdc, &s2.appBuilder,

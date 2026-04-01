@@ -504,6 +504,15 @@ func getAddress(name string) (string, error) {
 
 // --- Signing ---
 
+// evmChainID is the Lumera EVM chain ID used in migration payload signing.
+// Must match config/evm.go EVMChainID.
+const evmChainID uint64 = 76857769
+
+// migrationPayloadMsg builds the canonical migration payload string.
+func migrationPayloadMsg(kind, legacyAddr, newAddr string) string {
+	return fmt.Sprintf("lumera-evm-migration:%s:%d:%s:%s:%s", *flagChainID, evmChainID, kind, legacyAddr, newAddr)
+}
+
 // signMigrationMessage creates a legacy signature for the migration message.
 func signMigrationMessage(kind, mnemonic, legacyAddr, newAddr string) (string, error) {
 	privKey, err := deriveKey(mnemonic, 118)
@@ -511,7 +520,7 @@ func signMigrationMessage(kind, mnemonic, legacyAddr, newAddr string) (string, e
 		return "", fmt.Errorf("derive legacy key: %w", err)
 	}
 
-	msg := fmt.Sprintf("lumera-evm-migration:%s:%s:%s", kind, legacyAddr, newAddr)
+	msg := migrationPayloadMsg(kind, legacyAddr, newAddr)
 	hash := sha256.Sum256([]byte(msg))
 	sig, err := privKey.Sign(hash[:])
 	if err != nil {
@@ -533,7 +542,7 @@ func signMigrationMessageWithPrivHex(kind, privHex, legacyAddr, newAddr string) 
 	privKey := &secp256k1.PrivKey{Key: privBz}
 	pubKey := privKey.PubKey().(*secp256k1.PubKey)
 
-	msg := fmt.Sprintf("lumera-evm-migration:%s:%s:%s", kind, legacyAddr, newAddr)
+	msg := migrationPayloadMsg(kind, legacyAddr, newAddr)
 	hash := sha256.Sum256([]byte(msg))
 	sig, err := privKey.Sign(hash[:])
 	if err != nil {

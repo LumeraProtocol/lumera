@@ -36,9 +36,6 @@ func (msg *MsgClaimLegacyAccount) ValidateBasic() error {
 	if len(msg.LegacySignature) == 0 {
 		return ErrInvalidLegacySignature.Wrap("legacy_signature is required")
 	}
-	if len(msg.NewPubKey) != 33 {
-		return ErrInvalidNewPubKey.Wrap("compressed eth_secp256k1 public key must be 33 bytes")
-	}
 	if len(msg.NewSignature) == 0 {
 		return ErrInvalidNewSignature.Wrap("new_signature is required")
 	}
@@ -52,8 +49,7 @@ func (msg *MsgClaimLegacyAccount) MigrationNewAddress() string { return msg.NewA
 func (msg *MsgClaimLegacyAccount) MigrationLegacyAddress() string { return msg.LegacyAddress }
 
 // MigrationSetNewProof attaches the destination-account proof derived by the custom CLI.
-func (msg *MsgClaimLegacyAccount) MigrationSetNewProof(pubKey, signature []byte) {
-	msg.NewPubKey = pubKey
+func (msg *MsgClaimLegacyAccount) MigrationSetNewProof(signature []byte) {
 	msg.NewSignature = signature
 }
 
@@ -73,9 +69,6 @@ func (msg *MsgMigrateValidator) ValidateBasic() error {
 	if len(msg.LegacySignature) == 0 {
 		return ErrInvalidLegacySignature.Wrap("legacy_signature is required")
 	}
-	if len(msg.NewPubKey) != 33 {
-		return ErrInvalidNewPubKey.Wrap("compressed eth_secp256k1 public key must be 33 bytes")
-	}
 	if len(msg.NewSignature) == 0 {
 		return ErrInvalidNewSignature.Wrap("new_signature is required")
 	}
@@ -89,7 +82,6 @@ func (msg *MsgMigrateValidator) MigrationNewAddress() string { return msg.NewAdd
 func (msg *MsgMigrateValidator) MigrationLegacyAddress() string { return msg.LegacyAddress }
 
 // MigrationSetNewProof attaches the destination-account proof derived by the custom CLI.
-func (msg *MsgMigrateValidator) MigrationSetNewProof(pubKey, signature []byte) {
-	msg.NewPubKey = pubKey
+func (msg *MsgMigrateValidator) MigrationSetNewProof(signature []byte) {
 	msg.NewSignature = signature
 }

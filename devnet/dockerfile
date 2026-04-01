@@ -37,11 +37,14 @@ RUN curl -fsSL https://deb.nodesource.com/setup_25.x | bash - && \
 # Update libraries cache & create directories
 RUN ldconfig && mkdir -p ${SCRIPTS_DEST_DIR} /root/.lumerad
 
+ENV PATH="${SCRIPTS_DEST_DIR}:${PATH}"
+
 # Copy scripts with correct paths
 COPY --chmod=0755 \
     ${SCRIPTS_SRC_DIR}/start.sh \
     ${SCRIPTS_SRC_DIR}/stop.sh \
     ${SCRIPTS_SRC_DIR}/restart.sh \
+    ${SCRIPTS_SRC_DIR}/lumera-helper.sh \
     ${SCRIPTS_SRC_DIR}/validator-setup.sh \
     ${SCRIPTS_SRC_DIR}/supernode-setup.sh \
     ${SCRIPTS_SRC_DIR}/network-maker-setup.sh \

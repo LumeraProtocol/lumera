@@ -22,6 +22,8 @@ type Keeper struct {
 
 	// MigrationRecords stores completed migration records keyed by legacy address.
 	MigrationRecords collections.Map[string, types.MigrationRecord]
+	// MigrationRecordByNewAddress stores the legacy address for a completed migration keyed by new address.
+	MigrationRecordByNewAddress collections.Map[string, string]
 
 	// MigrationCounter stores the total number of completed migrations.
 	MigrationCounter collections.Item[uint64]
@@ -73,6 +75,7 @@ func NewKeeper(
 
 		Params:                    collections.NewItem(sb, types.ParamsKey, "params", codec.CollValue[types.Params](cdc)),
 		MigrationRecords:          collections.NewMap(sb, types.MigrationRecordKeyPrefix, "migration_records", collections.StringKey, codec.CollValue[types.MigrationRecord](cdc)),
+		MigrationRecordByNewAddress: collections.NewMap(sb, types.MigrationRecordByNewAddressKeyPrefix, "migration_record_by_new_address", collections.StringKey, collections.StringValue),
 		MigrationCounter:          collections.NewItem(sb, types.MigrationCounterKey, "migration_counter", collections.Uint64Value),
 		ValidatorMigrationCounter: collections.NewItem(sb, types.ValidatorMigrationCounterKey, "validator_migration_counter", collections.Uint64Value),
 		BlockMigrationCounter:     collections.NewMap(sb, types.BlockMigrationCounterPrefix, "block_migration_counter", collections.Int64Key, collections.Uint64Value),

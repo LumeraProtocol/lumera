@@ -149,6 +149,10 @@ func runMigrate() {
 		if delta < migrated {
 			log.Fatalf("post-check failed: migration-stats delta=%d is lower than newly migrated accounts=%d", delta, migrated)
 		}
+		if migrated > 0 && initialStats.TotalLegacy > 0 && finalStats.TotalLegacy >= initialStats.TotalLegacy {
+			log.Fatalf("post-check failed: migration-stats total_legacy did not decrease after migration (before=%d after=%d newly_migrated=%d)",
+				initialStats.TotalLegacy, finalStats.TotalLegacy, migrated)
+		}
 		log.Printf("  post-check: migration-stats total_migrated delta=%d (newly migrated=%d, already on-chain=%d)",
 			delta, migrated, alreadyMigrated)
 	}
@@ -309,6 +313,10 @@ func runMigrateAll() {
 		delta := finalStats.TotalMigrated - initialStats.TotalMigrated
 		if delta < migrated {
 			log.Fatalf("post-check failed: migration-stats delta=%d is lower than newly migrated=%d", delta, migrated)
+		}
+		if migrated > 0 && initialStats.TotalLegacy > 0 && finalStats.TotalLegacy >= initialStats.TotalLegacy {
+			log.Fatalf("post-check failed: migration-stats total_legacy did not decrease after migration (before=%d after=%d newly_migrated=%d)",
+				initialStats.TotalLegacy, finalStats.TotalLegacy, migrated)
 		}
 		log.Printf("  post-check: migration-stats total_migrated delta=%d (newly migrated=%d, already on-chain=%d)",
 			delta, migrated, alreadyMigrated)

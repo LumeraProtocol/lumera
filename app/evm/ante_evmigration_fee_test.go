@@ -104,7 +104,6 @@ func validMigrationMsg(t *testing.T) *evmigrationtypes.MsgClaimLegacyAccount {
 		NewAddress:      newAddr.String(),
 		LegacyPubKey:    make([]byte, 33),
 		LegacySignature: []byte{1},
-		NewPubKey:       make([]byte, 33),
 		NewSignature:    []byte{1},
 	}
 }

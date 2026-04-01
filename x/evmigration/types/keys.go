@@ -20,6 +20,9 @@ var (
 	// MigrationRecordKeyPrefix is the prefix for migration records keyed by legacy address.
 	MigrationRecordKeyPrefix = collections.NewPrefix("mr_")
 
+	// MigrationRecordByNewAddressKeyPrefix is the prefix for migration record lookups keyed by new address.
+	MigrationRecordByNewAddressKeyPrefix = collections.NewPrefix("mrna_")
+
 	// MigrationCounterKey stores the total_migrated counter.
 	MigrationCounterKey = collections.NewPrefix("mc_")
 

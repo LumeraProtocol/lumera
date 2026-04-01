@@ -123,7 +123,7 @@ type migrationProofMsg interface {
 	sdk.Msg
 	MigrationNewAddress() string
 	MigrationLegacyAddress() string
-	MigrationSetNewProof(pubKey, signature []byte)
+	MigrationSetNewProof(signature []byte)
 }
 
 func runMigrationTx(cmd *cobra.Command, msg migrationProofMsg, proofKind string) error {
@@ -135,11 +135,11 @@ func runMigrationTx(cmd *cobra.Command, msg migrationProofMsg, proofKind string)
 		return err
 	}
 
-	pubKey, signature, err := signNewMigrationProof(clientCtx, proofKind, msg.MigrationLegacyAddress(), msg.MigrationNewAddress())
+	signature, err := signNewMigrationProof(clientCtx, proofKind, msg.MigrationLegacyAddress(), msg.MigrationNewAddress())
 	if err != nil {
 		return err
 	}
-	msg.MigrationSetNewProof(pubKey, signature)
+	msg.MigrationSetNewProof(signature)
 	if validateBasic, ok := msg.(sdk.HasValidateBasic); ok {
 		if err := validateBasic.ValidateBasic(); err != nil {
 			return err
@@ -232,20 +232,19 @@ func simulateMigrationGas(clientCtx client.Context, txf clienttx.Factory, msg mi
 	return simRes, adjustedGas, nil
 }
 
-func signNewMigrationProof(clientCtx client.Context, proofKind, legacyAddress, newAddress string) ([]byte, []byte, error) {
+func signNewMigrationProof(clientCtx client.Context, proofKind, legacyAddress, newAddress string) ([]byte, error) {
 	payload := []byte(fmt.Sprintf("lumera-evm-migration:%s:%d:%s:%s:%s", clientCtx.ChainID, lcfg.EVMChainID, proofKind, legacyAddress, newAddress))
 
 	sig, pubKey, err := clientCtx.Keyring.Sign(clientCtx.FromName, payload, signingtypes.SignMode_SIGN_MODE_LEGACY_AMINO_JSON)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	ethPubKey, ok := pubKey.(*evmcryptotypes.PubKey)
-	if !ok {
-		return nil, nil, fmt.Errorf("key %q must use eth_secp256k1, got %T", clientCtx.FromName, pubKey)
+	if _, ok := pubKey.(*evmcryptotypes.PubKey); !ok {
+		return nil, fmt.Errorf("key %q must use eth_secp256k1, got %T", clientCtx.FromName, pubKey)
 	}
 
-	return ethPubKey.Bytes(), sig, nil
+	return sig, nil
 }
 
 func confirmMigrationTx(clientCtx client.Context, txBuilder client.TxBuilder) (bool, error) {

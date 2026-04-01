@@ -49,7 +49,6 @@ func newClaimMigrationMsg(
 		NewAddress:      newAddr.String(),
 		LegacyPubKey:    legacyPrivKey.PubKey().(*secp256k1.PubKey).Key,
 		LegacySignature: signMigrationMessage(t, legacyPrivKey, legacyAddr, newAddr),
-		NewPubKey:       newPrivKey.PubKey().(*evmcryptotypes.PubKey).Key,
 		NewSignature:    signNewMigrationMessage(t, keeperClaimKind, newPrivKey, legacyAddr, newAddr),
 	}
 }
@@ -68,7 +67,6 @@ func newValidatorMigrationMsg(
 		NewAddress:      newAddr.String(),
 		LegacyPubKey:    legacyPrivKey.PubKey().(*secp256k1.PubKey).Key,
 		LegacySignature: signLegacyMigrationMessage(t, keeperValidatorKind, legacyPrivKey, legacyAddr, newAddr),
-		NewPubKey:       newPrivKey.PubKey().(*evmcryptotypes.PubKey).Key,
 		NewSignature:    signNewMigrationMessage(t, keeperValidatorKind, newPrivKey, legacyAddr, newAddr),
 	}
 }
@@ -254,7 +252,6 @@ func TestPreChecks_NewAddressWasMigrated(t *testing.T) {
 		NewAddress:      newAddr.String(),
 		LegacyPubKey:    privKey.PubKey().(*secp256k1.PubKey).Key,
 		LegacySignature: signMigrationMessage(t, privKey, legacyAddr, newAddr),
-		NewPubKey:       newPrivKey.PubKey().(*evmcryptotypes.PubKey).Key,
 		NewSignature:    signNewMigrationMessage(t, keeperClaimKind, newPrivKey, legacyAddr, newAddr),
 	}
 
@@ -321,7 +318,6 @@ func TestClaimLegacyAccount_ValidatorMustUseMigrateValidator(t *testing.T) {
 		NewAddress:      newAddr.String(),
 		LegacyPubKey:    privKey.PubKey().(*secp256k1.PubKey).Key,
 		LegacySignature: signMigrationMessage(t, privKey, legacyAddr, newAddr),
-		NewPubKey:       newPrivKey.PubKey().(*evmcryptotypes.PubKey).Key,
 		NewSignature:    signNewMigrationMessage(t, keeperClaimKind, newPrivKey, legacyAddr, newAddr),
 	}
 
@@ -515,7 +511,6 @@ func TestClaimLegacyAccount_MigratedThirdPartyWithdrawAddress(t *testing.T) {
 		NewAddress:      newAddr.String(),
 		LegacyPubKey:    pubKey.Key,
 		LegacySignature: signMigrationMessage(t, privKey, legacyAddr, newAddr),
-		NewPubKey:       newPrivKey.PubKey().(*evmcryptotypes.PubKey).Key,
 		NewSignature:    signNewMigrationMessage(t, keeperClaimKind, newPrivKey, legacyAddr, newAddr),
 	}
 
@@ -1185,7 +1180,6 @@ func TestClaimLegacyAccount_WithDelegations(t *testing.T) {
 		NewAddress:      newAddr.String(),
 		LegacyPubKey:    pubKey.Key,
 		LegacySignature: signMigrationMessage(t, privKey, legacyAddr, newAddr),
-		NewPubKey:       newPrivKey.PubKey().(*evmcryptotypes.PubKey).Key,
 		NewSignature:    signNewMigrationMessage(t, keeperClaimKind, newPrivKey, legacyAddr, newAddr),
 	}
 

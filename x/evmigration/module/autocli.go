@@ -24,6 +24,12 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "legacy_address"}},
 				},
 				{
+					RpcMethod:      "MigrationRecordByNewAddress",
+					Use:            "migration-record-by-new-address [new-address]",
+					Short:          "Query a migration record by new address",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "new_address"}},
+				},
+				{
 					RpcMethod: "MigrationRecords",
 					Use:       "migration-records",
 					Short:     "List all migration records",

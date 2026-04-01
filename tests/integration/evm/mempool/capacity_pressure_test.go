@@ -26,6 +26,7 @@ func TestMempoolCapacityRejectsOverflow(t *testing.T) {
 	// Standalone node because we need a tiny mempool capacity.
 	node := evmtest.NewEVMNode(t, "lumera-mempool-cap", 600)
 	evmtest.SetMempoolMaxTxsInAppToml(t, node.HomeDir(), 4)
+	evmtest.SetCometMempoolSize(t, node.HomeDir(), 4)
 	node.StartAndWaitRPC()
 	defer node.Stop()
 

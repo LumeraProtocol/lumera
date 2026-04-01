@@ -2,6 +2,7 @@ package keeper_test
 
 import (
 	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"testing"
 
@@ -36,6 +37,9 @@ func signNewMigrationMessage(t *testing.T, kind string, privKey *evmcryptotypes.
 	msg := fmt.Sprintf("lumera-evm-migration:%s:%d:%s:%s:%s", testChainID, lcfg.EVMChainID, kind, legacyAddr.String(), newAddr.String())
 	sig, err := privKey.Sign([]byte(msg))
 	require.NoError(t, err)
+	if len(sig) == 65 {
+		return sig[:64]
+	}
 	return sig
 }
 
@@ -143,34 +147,227 @@ func TestVerifyLegacySignature_EmptySignature(t *testing.T) {
 func TestVerifyNewSignature_Valid(t *testing.T) {
 	legacyAddr := sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address())
 	privKey, newAddr := testNewMigrationAccount(t)
-	pubKey := privKey.PubKey().(*evmcryptotypes.PubKey)
 	sig := signNewMigrationMessage(t, keeperClaimKind, privKey, legacyAddr, newAddr)
 
-	err := keeper.VerifyNewSignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, pubKey.Key, sig)
+	err := keeper.VerifyNewSignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, sig)
 	require.NoError(t, err)
 }
 
-// TestVerifyNewSignature_AddressMismatch rejects when the new pubkey does not
-// derive to the claimed destination address.
+// TestVerifyNewSignature_AddressMismatch rejects when the recovered signer does
+// not derive to the claimed destination address.
 func TestVerifyNewSignature_AddressMismatch(t *testing.T) {
 	legacyAddr := sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address())
-	privKey, _ := testNewMigrationAccount(t)
-	_, wrongNewAddr := testNewMigrationAccount(t)
-	pubKey := privKey.PubKey().(*evmcryptotypes.PubKey)
+	wrongPrivKey, _ := testNewMigrationAccount(t)
+	_, newAddr := testNewMigrationAccount(t)
+	sig := signNewMigrationMessage(t, keeperClaimKind, wrongPrivKey, legacyAddr, newAddr)
 
-	err := keeper.VerifyNewSignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, wrongNewAddr, pubKey.Key, nil)
+	err := keeper.VerifyNewSignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, sig)
 	require.ErrorIs(t, err, types.ErrNewPubKeyAddressMismatch)
 }
 
-// TestVerifyNewSignature_InvalidSignature rejects signatures produced by a
-// different destination private key.
+// TestVerifyNewSignature_InvalidSignature rejects malformed signatures that
+// cannot recover any signer.
 func TestVerifyNewSignature_InvalidSignature(t *testing.T) {
 	legacyAddr := sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address())
-	privKey, newAddr := testNewMigrationAccount(t)
-	pubKey := privKey.PubKey().(*evmcryptotypes.PubKey)
-	otherPrivKey, _ := testNewMigrationAccount(t)
-	badSig := signNewMigrationMessage(t, keeperClaimKind, otherPrivKey, legacyAddr, newAddr)
+	_, newAddr := testNewMigrationAccount(t)
+	badSig := []byte{0x01}
 
-	err := keeper.VerifyNewSignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, pubKey.Key, badSig)
+	err := keeper.VerifyNewSignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, badSig)
+	require.ErrorIs(t, err, types.ErrInvalidNewSignature)
+}
+
+// --- EIP-191 personal_sign tests (new key, wallet path) ---
+
+// testMigrationPayload reconstructs the canonical payload for test signing.
+func testMigrationPayload(kind string, legacyAddr, newAddr sdk.AccAddress) []byte {
+	return []byte(fmt.Sprintf("lumera-evm-migration:%s:%d:%s:%s:%s", testChainID, lcfg.EVMChainID, kind, legacyAddr.String(), newAddr.String()))
+}
+
+// signNewMigrationEIP191 simulates what a wallet's personal_sign does:
+// sign(Keccak256("\x19Ethereum Signed Message:\n" + len(payload) + payload))
+// eth_secp256k1.Sign(msg) internally does Keccak256(msg) when len(msg) != 32,
+// so passing the EIP-191-prefixed payload produces the correct digest.
+func signNewMigrationEIP191(t *testing.T, kind string, privKey *evmcryptotypes.PrivKey, legacyAddr, newAddr sdk.AccAddress) []byte {
+	t.Helper()
+	payload := testMigrationPayload(kind, legacyAddr, newAddr)
+	prefix := fmt.Appendf(nil, "\x19Ethereum Signed Message:\n%d", len(payload))
+	eip191Msg := append(prefix, payload...)
+	sig, err := privKey.Sign(eip191Msg)
+	require.NoError(t, err)
+	return sig
+}
+
+// TestVerifyNewSignature_EIP191 verifies that an EIP-191 personal_sign
+// signature (as produced by Keplr/Leap Ethereum provider) passes verification.
+func TestVerifyNewSignature_EIP191(t *testing.T) {
+	legacyAddr := sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address())
+	privKey, newAddr := testNewMigrationAccount(t)
+	sig := signNewMigrationEIP191(t, keeperClaimKind, privKey, legacyAddr, newAddr)
+
+	err := keeper.VerifyNewSignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, sig)
+	require.NoError(t, err)
+}
+
+// TestVerifyNewSignature_EIP191_Validator verifies the EIP-191 path works
+// for the "validator" kind as well.
+func TestVerifyNewSignature_EIP191_Validator(t *testing.T) {
+	legacyAddr := sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address())
+	privKey, newAddr := testNewMigrationAccount(t)
+	sig := signNewMigrationEIP191(t, keeperValidatorKind, privKey, legacyAddr, newAddr)
+
+	err := keeper.VerifyNewSignature(testChainID, lcfg.EVMChainID, keeperValidatorKind, legacyAddr, newAddr, sig)
+	require.NoError(t, err)
+}
+
+// TestVerifyNewSignature_EIP191_WrongKey rejects an EIP-191 signature from the
+// wrong destination private key.
+func TestVerifyNewSignature_EIP191_WrongKey(t *testing.T) {
+	legacyAddr := sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address())
+	otherPrivKey, _ := testNewMigrationAccount(t)
+	_, newAddr := testNewMigrationAccount(t)
+	badSig := signNewMigrationEIP191(t, keeperClaimKind, otherPrivKey, legacyAddr, newAddr)
+
+	err := keeper.VerifyNewSignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, badSig)
+	require.ErrorIs(t, err, types.ErrNewPubKeyAddressMismatch)
+}
+
+// --- ADR-036 signArbitrary tests (legacy key, wallet path) ---
+
+// testADR036SignDoc builds the canonical ADR-036 sign doc (same logic as
+// keeper.adr036SignDoc, independently implemented for test verification).
+func testADR036SignDoc(signer string, data []byte) []byte {
+	return []byte(fmt.Sprintf(
+		`{"account_number":"0","chain_id":"","fee":{"amount":[],"gas":"0"},`+
+			`"memo":"","msgs":[{"type":"sign/MsgSignData","value":`+
+			`{"data":"%s","signer":"%s"}}],"sequence":"0"}`,
+		base64.StdEncoding.EncodeToString(data), signer,
+	))
+}
+
+// signLegacyMigrationADR036 simulates what Keplr's signArbitrary does:
+// Sign(adr036_doc) — the SDK's secp256k1.Sign internally does SHA256(adr036_doc).
+func signLegacyMigrationADR036(t *testing.T, kind string, privKey *secp256k1.PrivKey, legacyAddr, newAddr sdk.AccAddress) []byte {
+	t.Helper()
+	payload := testMigrationPayload(kind, legacyAddr, newAddr)
+	adr036Doc := testADR036SignDoc(legacyAddr.String(), payload)
+	// secp256k1.Sign(msg) internally does SHA256(msg) then ECDSA signs.
+	sig, err := privKey.Sign(adr036Doc)
+	require.NoError(t, err)
+	return sig
+}
+
+// TestVerifyLegacySignature_ADR036 verifies that an ADR-036 signArbitrary
+// signature (as produced by Keplr/Leap) passes verification.
+func TestVerifyLegacySignature_ADR036(t *testing.T) {
+	privKey := secp256k1.GenPrivKey()
+	pubKey := privKey.PubKey().(*secp256k1.PubKey)
+	legacyAddr := sdk.AccAddress(pubKey.Address())
+	_, newAddr := testNewMigrationAccount(t)
+
+	sig := signLegacyMigrationADR036(t, keeperClaimKind, privKey, legacyAddr, newAddr)
+
+	err := keeper.VerifyLegacySignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, pubKey.Key, sig)
+	require.NoError(t, err)
+}
+
+// TestVerifyLegacySignature_ADR036_Validator verifies the ADR-036 path works
+// for the "validator" kind.
+func TestVerifyLegacySignature_ADR036_Validator(t *testing.T) {
+	privKey := secp256k1.GenPrivKey()
+	pubKey := privKey.PubKey().(*secp256k1.PubKey)
+	legacyAddr := sdk.AccAddress(pubKey.Address())
+	_, newAddr := testNewMigrationAccount(t)
+
+	sig := signLegacyMigrationADR036(t, keeperValidatorKind, privKey, legacyAddr, newAddr)
+
+	err := keeper.VerifyLegacySignature(testChainID, lcfg.EVMChainID, keeperValidatorKind, legacyAddr, newAddr, pubKey.Key, sig)
+	require.NoError(t, err)
+}
+
+// TestVerifyLegacySignature_ADR036_WrongKey rejects an ADR-036 signature from
+// the wrong private key.
+func TestVerifyLegacySignature_ADR036_WrongKey(t *testing.T) {
+	privKey := secp256k1.GenPrivKey()
+	pubKey := privKey.PubKey().(*secp256k1.PubKey)
+	legacyAddr := sdk.AccAddress(pubKey.Address())
+	_, newAddr := testNewMigrationAccount(t)
+
+	otherPrivKey := secp256k1.GenPrivKey()
+	badSig := signLegacyMigrationADR036(t, keeperClaimKind, otherPrivKey, legacyAddr, newAddr)
+
+	err := keeper.VerifyLegacySignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, pubKey.Key, badSig)
+	require.ErrorIs(t, err, types.ErrInvalidLegacySignature)
+}
+
+// TestVerifyLegacySignature_ADR036_WrongSigner rejects an ADR-036 signature
+// where the signer field doesn't match (different address in the sign doc).
+func TestVerifyLegacySignature_ADR036_WrongSigner(t *testing.T) {
+	privKey := secp256k1.GenPrivKey()
+	pubKey := privKey.PubKey().(*secp256k1.PubKey)
+	legacyAddr := sdk.AccAddress(pubKey.Address())
+	_, newAddr := testNewMigrationAccount(t)
+
+	// Build ADR-036 doc with wrong signer address.
+	payload := testMigrationPayload(keeperClaimKind, legacyAddr, newAddr)
+	wrongSignerDoc := testADR036SignDoc("lumera1wrongsigneraddress", payload)
+	sig, err := privKey.Sign(wrongSignerDoc)
+	require.NoError(t, err)
+
+	// The verifier builds the ADR-036 doc using legacyAddr, so a doc signed
+	// with a different signer produces a different digest → verification fails.
+	err = keeper.VerifyLegacySignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, pubKey.Key, sig)
+	require.ErrorIs(t, err, types.ErrInvalidLegacySignature)
+}
+
+// TestVerifyLegacySignature_ADR036_DocFormat verifies that the test's ADR-036
+// doc matches the expected canonical form byte-for-byte.
+func TestVerifyLegacySignature_ADR036_DocFormat(t *testing.T) {
+	data := []byte("test-payload")
+	signer := "lumera1abc123"
+	doc := testADR036SignDoc(signer, data)
+
+	// Verify JSON structure: fields alphabetically sorted, no whitespace.
+	expected := fmt.Sprintf(
+		`{"account_number":"0","chain_id":"","fee":{"amount":[],"gas":"0"},`+
+			`"memo":"","msgs":[{"type":"sign/MsgSignData","value":`+
+			`{"data":"%s","signer":"%s"}}],"sequence":"0"}`,
+		base64.StdEncoding.EncodeToString(data), signer,
+	)
+	require.Equal(t, expected, string(doc))
+}
+
+// TestVerifyNewSignature_EIP191_PayloadFormat verifies that the EIP-191 prefix
+// is constructed correctly for a known payload.
+func TestVerifyNewSignature_EIP191_PayloadFormat(t *testing.T) {
+	msg := []byte("hello")
+	prefix := fmt.Appendf(nil, "\x19Ethereum Signed Message:\n%d", len(msg))
+	eip191 := append(prefix, msg...)
+	require.Equal(t, "\x19Ethereum Signed Message:\n5hello", string(eip191))
+}
+
+// TestVerifyLegacySignature_BothPathsRejectGarbage verifies that neither the
+// raw nor ADR-036 path accepts a completely garbage signature.
+func TestVerifyLegacySignature_BothPathsRejectGarbage(t *testing.T) {
+	privKey := secp256k1.GenPrivKey()
+	pubKey := privKey.PubKey().(*secp256k1.PubKey)
+	legacyAddr := sdk.AccAddress(pubKey.Address())
+	_, newAddr := testNewMigrationAccount(t)
+
+	// A valid-length but wrong signature (64 bytes of zeros).
+	garbageSig := make([]byte, 64)
+
+	err := keeper.VerifyLegacySignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, pubKey.Key, garbageSig)
+	require.ErrorIs(t, err, types.ErrInvalidLegacySignature)
+}
+
+// TestVerifyNewSignature_BothPathsRejectGarbage verifies that neither the
+// raw nor EIP-191 path accepts a completely garbage signature.
+func TestVerifyNewSignature_BothPathsRejectGarbage(t *testing.T) {
+	legacyAddr := sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address())
+	_, newAddr := testNewMigrationAccount(t)
+
+	garbageSig := []byte{0x01, 0x02, 0x03}
+
+	err := keeper.VerifyNewSignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, garbageSig)
 	require.ErrorIs(t, err, types.ErrInvalidNewSignature)
 }

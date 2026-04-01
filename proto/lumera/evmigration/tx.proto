@@ -60,16 +60,17 @@ message MsgClaimLegacyAccount {
   bytes legacy_pub_key = 3;
 
   // legacy_signature: secp256k1 signature over
-  //   SHA256("lumera-evm-migration:claim:<legacy_address>:<new_address>")
+  //   SHA256("lumera-evm-migration:<chain_id>:<evm_chain_id>:claim:<legacy_address>:<new_address>")
   // proving legacy key holder consents to the EVM migration.
+  // Also accepts ADR-036 signArbitrary signatures (Keplr/Leap wallet path).
   bytes legacy_signature = 4;
 
-  // new_pub_key: compressed eth_secp256k1 public key of the destination account.
-  bytes new_pub_key = 5;
+  reserved 5;
 
   // new_signature: eth_secp256k1 signature over
-  //   Keccak256("lumera-evm-migration:claim:<legacy_address>:<new_address>")
+  //   Keccak256("lumera-evm-migration:<chain_id>:<evm_chain_id>:claim:<legacy_address>:<new_address>")
   // proving the destination key holder consents to receive migrated state.
+  // Also accepts EIP-191 personal_sign signatures (Keplr/Leap wallet path).
   bytes new_signature = 6;
 }
 
@@ -89,14 +90,15 @@ message MsgMigrateValidator {
   // legacy_pub_key is the compressed secp256k1 public key of the legacy account.
   bytes legacy_pub_key = 3;
   // legacy_signature: secp256k1 signature over
-  //   SHA256("lumera-evm-migration:validator:<legacy_address>:<new_address>")
+  //   SHA256("lumera-evm-migration:<chain_id>:<evm_chain_id>:validator:<legacy_address>:<new_address>")
   // proving legacy key holder consents to the EVM migration.
+  // Also accepts ADR-036 signArbitrary signatures (Keplr/Leap wallet path).
   bytes legacy_signature = 4;
-  // new_pub_key is the compressed eth_secp256k1 public key of the destination account.
-  bytes new_pub_key = 5;
+  reserved 5;
   // new_signature: eth_secp256k1 signature over
-  //   Keccak256("lumera-evm-migration:validator:<legacy_address>:<new_address>")
+  //   Keccak256("lumera-evm-migration:<chain_id>:<evm_chain_id>:validator:<legacy_address>:<new_address>")
   // proving the destination key holder consents to receive the migrated validator state.
+  // Also accepts EIP-191 personal_sign signatures (Keplr/Leap wallet path).
   bytes new_signature = 6;
 }
 

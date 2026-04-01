@@ -62,7 +62,7 @@ func testPrecompileGasMeteringAccuracy(t *testing.T, node *evmtest.Node) {
 		t.Fatalf("pack distribution input: %v", err)
 	}
 
-	govInput, err := govprecompile.ABI.Pack(govprecompile.GetParamsMethod, "voting")
+	govInput, err := govprecompile.ABI.Pack(govprecompile.GetParamsMethod)
 	if err != nil {
 		t.Fatalf("pack gov input: %v", err)
 	}

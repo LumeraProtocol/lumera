@@ -43,7 +43,7 @@ func (ms msgServer) ClaimLegacyAccount(goCtx context.Context, msg *types.MsgClai
 	if err := VerifyLegacySignature(ctx.ChainID(), lcfg.EVMChainID, migrationPayloadKindClaim, legacyAddr, newAddr, msg.LegacyPubKey, msg.LegacySignature); err != nil {
 		return nil, err
 	}
-	if err := VerifyNewSignature(ctx.ChainID(), lcfg.EVMChainID, migrationPayloadKindClaim, legacyAddr, newAddr, msg.NewPubKey, msg.NewSignature); err != nil {
+	if err := VerifyNewSignature(ctx.ChainID(), lcfg.EVMChainID, migrationPayloadKindClaim, legacyAddr, newAddr, msg.NewSignature); err != nil {
 		return nil, err
 	}
 
@@ -198,6 +198,9 @@ func (ms msgServer) finalizeMigration(ctx sdk.Context, legacyAddr, newAddr sdk.A
 	}
 
 	if err := ms.MigrationRecords.Set(ctx, legacyAddr.String(), record); err != nil {
+		return err
+	}
+	if err := ms.MigrationRecordByNewAddress.Set(ctx, newAddr.String(), legacyAddr.String()); err != nil {
 		return err
 	}
 

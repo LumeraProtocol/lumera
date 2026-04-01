@@ -51,6 +51,14 @@ func TestGenesis(t *testing.T) {
 	require.Equal(t, records[1].LegacyAddress, got.MigrationRecords[1].LegacyAddress)
 	require.Equal(t, records[1].NewAddress, got.MigrationRecords[1].NewAddress)
 
+	// Secondary new-address index is populated on init.
+	legacy1, err := f.keeper.MigrationRecordByNewAddress.Get(f.ctx, records[0].NewAddress)
+	require.NoError(t, err)
+	require.Equal(t, records[0].LegacyAddress, legacy1)
+	legacy2, err := f.keeper.MigrationRecordByNewAddress.Get(f.ctx, records[1].NewAddress)
+	require.NoError(t, err)
+	require.Equal(t, records[1].LegacyAddress, legacy2)
+
 	// Counters round-trip.
 	require.Equal(t, uint64(7), got.TotalMigrated)
 	require.Equal(t, uint64(3), got.TotalValidatorsMigrated)

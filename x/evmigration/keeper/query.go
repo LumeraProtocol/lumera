@@ -30,6 +30,44 @@ type queryServer struct {
 	k Keeper
 }
 
+type legacyAccountStatus struct {
+	balances       sdk.Coins
+	hasDelegations bool
+	isValidator    bool
+}
+
+func (qs queryServer) remainingLegacyAccountStatus(ctx sdk.Context, acc sdk.AccountI) (legacyAccountStatus, bool) {
+	status := legacyAccountStatus{}
+
+	pk := acc.GetPubKey()
+	if pk == nil {
+		return status, false
+	}
+	if _, ok := pk.(*secp256k1.PubKey); !ok {
+		return status, false
+	}
+
+	addr := acc.GetAddress()
+	if hasMigrated, err := qs.k.MigrationRecords.Has(ctx, addr.String()); err == nil && hasMigrated {
+		return status, false
+	}
+
+	status.balances = qs.k.bankKeeper.GetAllBalances(ctx, addr)
+	if dels, err := qs.k.stakingKeeper.GetDelegatorDelegations(ctx, addr, 1); err == nil && len(dels) > 0 {
+		status.hasDelegations = true
+	}
+	if _, err := qs.k.stakingKeeper.GetValidator(ctx, sdk.ValAddress(addr)); err == nil {
+		status.isValidator = true
+	}
+
+	// "Remaining legacy" means the account still has state that actually needs migration.
+	if status.balances.IsZero() && !status.hasDelegations && !status.isValidator {
+		return status, false
+	}
+
+	return status, true
+}
+
 func (qs queryServer) MigrationRecord(ctx context.Context, req *types.QueryMigrationRecordRequest) (*types.QueryMigrationRecordResponse, error) {
 	record, err := qs.k.MigrationRecords.Get(ctx, req.LegacyAddress)
 	if err != nil {
@@ -39,6 +77,26 @@ func (qs queryServer) MigrationRecord(ctx context.Context, req *types.QueryMigra
 		return nil, err
 	}
 	return &types.QueryMigrationRecordResponse{Record: &record}, nil
+}
+
+func (qs queryServer) MigrationRecordByNewAddress(ctx context.Context, req *types.QueryMigrationRecordByNewAddressRequest) (*types.QueryMigrationRecordByNewAddressResponse, error) {
+	legacyAddress, err := qs.k.MigrationRecordByNewAddress.Get(ctx, req.NewAddress)
+	if err != nil {
+		if errors.Is(err, collections.ErrNotFound) {
+			return &types.QueryMigrationRecordByNewAddressResponse{}, nil
+		}
+		return nil, err
+	}
+
+	record, err := qs.k.MigrationRecords.Get(ctx, legacyAddress)
+	if err != nil {
+		if errors.Is(err, collections.ErrNotFound) {
+			return &types.QueryMigrationRecordByNewAddressResponse{}, nil
+		}
+		return nil, err
+	}
+
+	return &types.QueryMigrationRecordByNewAddressResponse{Record: &record}, nil
 }
 
 func (qs queryServer) MigrationRecords(ctx context.Context, req *types.QueryMigrationRecordsRequest) (*types.QueryMigrationRecordsResponse, error) {
@@ -183,31 +241,15 @@ func (qs queryServer) MigrationStats(goCtx context.Context, _ *types.QueryMigrat
 		resp.TotalValidatorsMigrated = count
 	}
 
-	// Computed on-the-fly: count legacy accounts (secp256k1 pubkey).
+	// Computed on-the-fly: count remaining legacy accounts that still need migration.
 	qs.k.accountKeeper.IterateAccounts(ctx, func(acc sdk.AccountI) bool {
-		pk := acc.GetPubKey()
-		if pk == nil {
-			return false
-		}
-		if _, ok := pk.(*secp256k1.PubKey); ok {
+		status, shouldCount := qs.remainingLegacyAccountStatus(ctx, acc)
+		if shouldCount {
 			resp.TotalLegacy++
-			// Check if has delegations.
-			if dels, err := qs.k.stakingKeeper.GetDelegatorDelegations(ctx, acc.GetAddress(), 1); err == nil && len(dels) > 0 {
+			if status.hasDelegations {
 				resp.TotalLegacyStaked++
 			}
-		}
-		return false
-	})
-
-	// Count legacy validators.
-	qs.k.accountKeeper.IterateAccounts(ctx, func(acc sdk.AccountI) bool {
-		pk := acc.GetPubKey()
-		if pk == nil {
-			return false
-		}
-		if _, ok := pk.(*secp256k1.PubKey); ok {
-			valAddr := sdk.ValAddress(acc.GetAddress())
-			if _, err := qs.k.stakingKeeper.GetValidator(ctx, valAddr); err == nil {
+			if status.isValidator {
 				resp.TotalValidatorsLegacy++
 			}
 		}
@@ -224,11 +266,8 @@ func (qs queryServer) LegacyAccounts(goCtx context.Context, req *types.QueryLega
 	// This is a node-side query, not consensus-critical.
 	var accounts []types.LegacyAccountInfo
 	qs.k.accountKeeper.IterateAccounts(ctx, func(acc sdk.AccountI) bool {
-		pk := acc.GetPubKey()
-		if pk == nil {
-			return false
-		}
-		if _, ok := pk.(*secp256k1.PubKey); !ok {
+		status, shouldInclude := qs.remainingLegacyAccountStatus(ctx, acc)
+		if !shouldInclude {
 			return false
 		}
 
@@ -238,21 +277,11 @@ func (qs queryServer) LegacyAccounts(goCtx context.Context, req *types.QueryLega
 		}
 
 		// Balance summary.
-		balances := qs.k.bankKeeper.GetAllBalances(ctx, addr)
-		if !balances.IsZero() {
-			info.BalanceSummary = balances.String()
+		if !status.balances.IsZero() {
+			info.BalanceSummary = status.balances.String()
 		}
-
-		// Check delegations.
-		if dels, err := qs.k.stakingKeeper.GetDelegatorDelegations(ctx, addr, 1); err == nil && len(dels) > 0 {
-			info.HasDelegations = true
-		}
-
-		// Check if validator.
-		valAddr := sdk.ValAddress(addr)
-		if _, err := qs.k.stakingKeeper.GetValidator(ctx, valAddr); err == nil {
-			info.IsValidator = true
-		}
+		info.HasDelegations = status.hasDelegations
+		info.IsValidator = status.isValidator
 
 		accounts = append(accounts, info)
 		return false

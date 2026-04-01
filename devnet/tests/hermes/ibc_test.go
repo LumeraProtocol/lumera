@@ -8,8 +8,8 @@ import (
 
 	"gen/tests/ibcutil"
 
+	_ "github.com/LumeraProtocol/lumera/config" // init() sets Bech32 prefixes and seals config
 	textutil "github.com/LumeraProtocol/lumera/pkg/text"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -126,8 +126,6 @@ func (s *lumeraHermesSuite) SetupSuite() {
 	s.lumeraICAFeeBuffer = textutil.EnvOrDefault("LUMERA_ICA_FUND_FEE_BUFFER", defaultLumeraICAFeeBuf)
 	s.lumeraKeyStyle = resolveLumeraKeyStyle()
 	s.T().Logf("Lumera key style for Hermes tests: %s", s.lumeraKeyStyle)
-
-	ensureLumeraBech32Prefixes()
 
 	info, err := ibcutil.LoadChannelInfo(s.channelInfoPath)
 	s.Require().NoError(err, "load channel info")
@@ -291,13 +289,3 @@ func (s *lumeraHermesSuite) requireLumeraEVMModeOrSkip() {
 	s.T().Skipf("skip EVM-mode transfer assertion: lumera key style is %q", s.lumeraKeyStyle)
 }
 
-func ensureLumeraBech32Prefixes() {
-	cfg := sdk.GetConfig()
-	if cfg.GetBech32AccountAddrPrefix() == "lumera" {
-		return
-	}
-	cfg.SetBech32PrefixForAccount("lumera", "lumerapub")
-	cfg.SetBech32PrefixForValidator("lumeravaloper", "lumeravaloperpub")
-	cfg.SetBech32PrefixForConsensusNode("lumeravalcons", "lumeravalconspub")
-	cfg.Seal()
-}

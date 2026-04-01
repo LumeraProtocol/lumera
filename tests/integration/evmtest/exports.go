@@ -34,6 +34,10 @@ func SetMempoolMaxTxsInAppToml(t *testing.T, homeDir string, maxTxs int) {
 	setMempoolMaxTxsInAppToml(t, homeDir, maxTxs)
 }
 
+func SetCometMempoolSize(t *testing.T, homeDir string, size int) {
+	setCometMempoolSize(t, homeDir, size)
+}
+
 func SetCometTxIndexer(t *testing.T, homeDir, indexer string) {
 	setCometTxIndexer(t, homeDir, indexer)
 }

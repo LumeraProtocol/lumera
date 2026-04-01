@@ -16,6 +16,9 @@ func (k Keeper) InitGenesis(ctx context.Context, genState types.GenesisState) er
 		if err := k.MigrationRecords.Set(ctx, record.LegacyAddress, record); err != nil {
 			return err
 		}
+		if err := k.MigrationRecordByNewAddress.Set(ctx, record.NewAddress, record.LegacyAddress); err != nil {
+			return err
+		}
 	}
 
 	if err := k.MigrationCounter.Set(ctx, genState.TotalMigrated); err != nil {

@@ -288,19 +288,19 @@ func (p Precompile) ReportMetrics(
 		return nil, fmt.Errorf("invalid caller address: %w", err)
 	}
 	metricsArg := args[2].(struct {
-		VersionMajor     uint32 `abi:"versionMajor"`
-		VersionMinor     uint32 `abi:"versionMinor"`
-		VersionPatch     uint32 `abi:"versionPatch"`
-		CpuCoresTotal    uint32 `abi:"cpuCoresTotal"`
-		CpuUsagePercent  uint64 `abi:"cpuUsagePercent"`
-		MemTotalGb       uint64 `abi:"memTotalGb"`
-		MemUsagePercent  uint64 `abi:"memUsagePercent"`
-		MemFreeGb        uint64 `abi:"memFreeGb"`
-		DiskTotalGb      uint64 `abi:"diskTotalGb"`
-		DiskUsagePercent uint64 `abi:"diskUsagePercent"`
-		DiskFreeGb       uint64 `abi:"diskFreeGb"`
-		UptimeSeconds    uint64 `abi:"uptimeSeconds"`
-		PeersCount       uint32 `abi:"peersCount"`
+		VersionMajor     uint32 `json:"versionMajor"`
+		VersionMinor     uint32 `json:"versionMinor"`
+		VersionPatch     uint32 `json:"versionPatch"`
+		CpuCoresTotal    uint32 `json:"cpuCoresTotal"`
+		CpuUsagePercent  uint64 `json:"cpuUsagePercent"`
+		MemTotalGb       uint64 `json:"memTotalGb"`
+		MemUsagePercent  uint64 `json:"memUsagePercent"`
+		MemFreeGb        uint64 `json:"memFreeGb"`
+		DiskTotalGb      uint64 `json:"diskTotalGb"`
+		DiskUsagePercent uint64 `json:"diskUsagePercent"`
+		DiskFreeGb       uint64 `json:"diskFreeGb"`
+		UptimeSeconds    uint64 `json:"uptimeSeconds"`
+		PeersCount       uint32 `json:"peersCount"`
 	})
 
 	metrics := sntypes.SupernodeMetrics{

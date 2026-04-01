@@ -14,8 +14,6 @@ GOPROXY ?= https://proxy.golang.org,direct
 # Build tags for conditional compilation
 BUILD_TAGS ?= ledger
 
-CHAIN_BUILD ?= chain build $(if $(BUILD_TAGS),--build.tags "$(BUILD_TAGS)",)
-
 module_version = $(strip $(shell EMSDK_QUIET=1 ${GO} list -m -f '{{.Version}}' $1 | tail -n 1))
 
 GOFLAGS = "-trimpath"

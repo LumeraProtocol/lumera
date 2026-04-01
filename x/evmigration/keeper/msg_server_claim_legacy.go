@@ -104,13 +104,22 @@ func (ms msgServer) preChecks(ctx sdk.Context, legacyAddr, newAddr sdk.AccAddres
 		return types.ErrAlreadyMigrated
 	}
 
-	// 6. New address must not be a previously-migrated legacy address
+	// 6a. New address must not be a previously-migrated legacy address
 	has, err = ms.MigrationRecords.Has(ctx, newAddr.String())
 	if err != nil {
 		return err
 	}
 	if has {
 		return types.ErrNewAddressWasMigrated
+	}
+
+	// 6b. New address must not already be a migration destination
+	has, err = ms.MigrationRecordByNewAddress.Has(ctx, newAddr.String())
+	if err != nil {
+		return err
+	}
+	if has {
+		return types.ErrNewAddressAlreadyUsed
 	}
 
 	// 7. Legacy address must not be a module account

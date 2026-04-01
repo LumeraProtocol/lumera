@@ -259,6 +259,30 @@ func TestPreChecks_NewAddressWasMigrated(t *testing.T) {
 	require.ErrorIs(t, err, types.ErrNewAddressWasMigrated)
 }
 
+// TestPreChecks_NewAddressAlreadyUsed verifies that a new address cannot be
+// used if it was already the destination of a prior migration.
+func TestPreChecks_NewAddressAlreadyUsed(t *testing.T) {
+	f := initMsgServerFixture(t)
+
+	privKey := secp256k1.GenPrivKey()
+	legacyAddr := sdk.AccAddress(privKey.PubKey().Address())
+	newPrivKey, newAddr := testNewMigrationAccount(t)
+
+	// Store a reverse index entry: newAddr was already used as a destination.
+	require.NoError(t, f.keeper.MigrationRecordByNewAddress.Set(f.ctx, newAddr.String(), testAccAddr().String()))
+
+	msg := &types.MsgClaimLegacyAccount{
+		LegacyAddress:   legacyAddr.String(),
+		NewAddress:      newAddr.String(),
+		LegacyPubKey:    privKey.PubKey().(*secp256k1.PubKey).Key,
+		LegacySignature: signMigrationMessage(t, privKey, legacyAddr, newAddr),
+		NewSignature:    signNewMigrationMessage(t, keeperClaimKind, newPrivKey, legacyAddr, newAddr),
+	}
+
+	_, err := f.msgServer.ClaimLegacyAccount(f.ctx, msg)
+	require.ErrorIs(t, err, types.ErrNewAddressAlreadyUsed)
+}
+
 // TestPreChecks_ModuleAccount verifies that module accounts cannot be migrated.
 func TestPreChecks_ModuleAccount(t *testing.T) {
 	f := initMsgServerFixture(t)

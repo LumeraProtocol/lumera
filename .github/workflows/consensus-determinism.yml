@@ -1,0 +1,262 @@
+name: consensus-determinism
+
+on:
+  pull_request:
+    branches: [ master ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+  push:
+    branches: [ master ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+
+jobs:
+  determinism-pipeline:
+    name: determinism-pipeline (canary + restart 1/3/5)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git Safe Directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+
+      - name: Install jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Install Specific Ignite CLI Version
+        run: |
+          IGNITE_VERSION="v29.2.0"
+          ARCH="linux_amd64"
+
+          curl -L "https://github.com/ignite/cli/releases/download/${IGNITE_VERSION}/ignite_${IGNITE_VERSION#v}_checksums.txt" -o checksums.txt
+          EXPECTED_CHECKSUM=$(grep "ignite_${IGNITE_VERSION#v}_${ARCH}.tar.gz" checksums.txt | awk '{print $1}')
+
+          curl -L "https://github.com/ignite/cli/releases/download/${IGNITE_VERSION}/ignite_${IGNITE_VERSION#v}_${ARCH}.tar.gz" -o ignite.tar.gz
+          ACTUAL_CHECKSUM=$(sha256sum ignite.tar.gz | awk '{print $1}')
+          if [ "$ACTUAL_CHECKSUM" != "$EXPECTED_CHECKSUM" ]; then
+            echo "Error: Checksum mismatch!"
+            exit 1
+          fi
+
+          tar -xzf ignite.tar.gz
+          chmod +x ignite
+
+      - name: Build chain binary
+        run: |
+          ./ignite chain build --build.tags "ledger" -y -t linux:amd64
+        env:
+          DO_NOT_TRACK: 1
+          GOFLAGS: "-buildvcs=false"
+
+      - name: Map-bearing consensus risk gate
+        run: .github/scripts/map_consensus_inventory.sh
+
+      - name: Run determinism canary + restart replay
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          command -v jq >/dev/null || { echo "jq is required but not found"; exit 1; }
+
+          BIN="$(pwd)/build/lumerad"
+          if [ ! -x "$BIN" ]; then
+            BIN="$(command -v lumerad || true)"
+          fi
+          if [ -z "$BIN" ] || [ ! -x "$BIN" ]; then
+            echo "lumerad binary not found after build"
+            ls -la "$(pwd)/build" || true
+            command -v lumerad || true
+            exit 1
+          fi
+
+          WORK="$(pwd)/.ci-determinism"
+          OUT="$WORK/testnet"
+          CHAIN_ID="testing"
+
+          mkdir -p "$WORK"
+          rm -rf "$OUT"
+
+          cleanup() {
+            pkill -f "${BIN} start" || true
+          }
+          trap cleanup EXIT
+
+          "$BIN" testnet init-files \
+            --chain-id="$CHAIN_ID" \
+            --output-dir="$OUT" \
+            --v=6 \
+            --keyring-backend=test \
+            --commit-timeout=900ms \
+            --minimum-gas-prices=0.000001ulume \
+            --single-host
+
+          for i in 0 1 2 3 4 5; do
+            "$BIN" start --trace --log_level=info --home "$OUT/node${i}/lumerad" >"$WORK/node${i}.log" 2>&1 &
+          done
+
+          for p in 26657 26658 26659 26660 26661 26662; do
+            for _ in $(seq 1 60); do
+              if curl -sf "http://127.0.0.1:${p}/status" >/dev/null; then
+                break
+              fi
+              sleep 1
+            done
+            curl -sf "http://127.0.0.1:${p}/status" >/dev/null
+          done
+
+          # Wait until chain has produced first blocks before CLI/account queries.
+          for _ in $(seq 1 90); do
+            h=$(curl -sf "http://127.0.0.1:26657/status" | jq -r '.result.sync_info.latest_block_height // "0"')
+            if [[ "$h" =~ ^[0-9]+$ ]] && [ "$h" -ge 2 ]; then
+              break
+            fi
+            sleep 1
+          done
+          h=$(curl -sf "http://127.0.0.1:26657/status" | jq -r '.result.sync_info.latest_block_height // "0"')
+          if ! [[ "$h" =~ ^[0-9]+$ ]] || [ "$h" -lt 2 ]; then
+            echo "chain not ready, latest_block_height=$h"
+            exit 1
+          fi
+
+          submit_evidence_tx() {
+            local action_id="$1"
+            local meta_json="$2"
+            "$BIN" tx audit submit-evidence "$SUBJECT" cascade-client-failure "$action_id" "$meta_json" \
+              --from node0 \
+              --home "$OUT/node0/lumerad" \
+              --keyring-backend test \
+              --chain-id "$CHAIN_ID" \
+              --node tcp://127.0.0.1:26657 \
+              --fees 1ulume \
+              --broadcast-mode block \
+              --yes -o json > "$WORK/${action_id}.json"
+
+            local txhash code
+            txhash=$(jq -r '.txhash // ""' "$WORK/${action_id}.json")
+            code=$(jq -r '.code // 0' "$WORK/${action_id}.json")
+            test -n "$txhash"
+            if [ "$code" != "0" ]; then
+              echo "submit-evidence failed for ${action_id}:"
+              cat "$WORK/${action_id}.json"
+              exit 1
+            fi
+          }
+
+          submit_bank_tx() {
+            local tag="$1"
+            "$BIN" tx bank send \
+              "$($BIN keys show node0 -a --home "$OUT/node0/lumerad" --keyring-backend test)" \
+              "$($BIN keys show node2 -a --home "$OUT/node2/lumerad" --keyring-backend test)" \
+              1ulume \
+              --from node0 \
+              --home "$OUT/node0/lumerad" \
+              --keyring-backend test \
+              --chain-id "$CHAIN_ID" \
+              --node tcp://127.0.0.1:26657 \
+              --fees 1ulume \
+              --broadcast-mode block \
+              --yes -o json > "$WORK/${tag}.json"
+
+            local txhash code
+            txhash=$(jq -r '.txhash // ""' "$WORK/${tag}.json")
+            code=$(jq -r '.code // 0' "$WORK/${tag}.json")
+            test -n "$txhash"
+            if [ "$code" != "0" ]; then
+              echo "bank send failed for ${tag}:"
+              cat "$WORK/${tag}.json"
+              exit 1
+            fi
+          }
+
+          check_consensus_window() {
+            local rounds="$1"
+            local prev_min_h=0
+            for _ in $(seq 1 "$rounds"); do
+              min_h=999999999
+              max_h=0
+
+              for p in 26657 26658 26659 26660 26661 26662; do
+                h=$(curl -sf "http://127.0.0.1:${p}/status" | jq -r '.result.sync_info.latest_block_height')
+                if [ "$h" -lt "$min_h" ]; then min_h="$h"; fi
+                if [ "$h" -gt "$max_h" ]; then max_h="$h"; fi
+              done
+
+              if [ "$prev_min_h" -gt 0 ] && [ "$min_h" -le "$prev_min_h" ]; then
+                echo "No progress detected: prev_min_h=$prev_min_h current_min_h=$min_h"
+                exit 1
+              fi
+              prev_min_h="$min_h"
+
+              if [ $((max_h - min_h)) -gt 3 ]; then
+                echo "Height skew too large: min_h=$min_h max_h=$max_h"
+                exit 1
+              fi
+
+              baseline=""
+              for p in 26657 26658 26659 26660 26661 26662; do
+                ah=$(curl -sf "http://127.0.0.1:${p}/block?height=${min_h}" | jq -r '.result.block.header.app_hash')
+                if [ -z "$baseline" ]; then
+                  baseline="$ah"
+                elif [ "$ah" != "$baseline" ]; then
+                  echo "App-hash divergence at height=${min_h}: baseline=$baseline got=$ah on port=$p"
+                  exit 1
+                fi
+              done
+
+              sleep 1
+            done
+          }
+
+          SUBJECT=$("$BIN" keys show node1 -a --home "$OUT/node1/lumerad" --keyring-backend test)
+
+          META1='{"reporter_component":2,"target_supernode_accounts":["lumera1mfldjaqc7ec5rlh4k58yttv3cd978gzl070zk6"],"details":{"action_id":"123637","error":"download failed: insufficient symbols","iteration":"1","operation":"download","supernode_account":"lumera1mfldjaqc7ec5rlh4k58yttv3cd978gzl070zk6","supernode_endpoint":"18.190.53.108:4444","task_id":"9700ec8a"}}'
+          META2='{"reporter_component":2,"target_supernode_accounts":["lumera1mfldjaqc7ec5rlh4k58yttv3cd978gzl070zk6"],"details":{"task_id":"9700ec8a","supernode_endpoint":"18.190.53.108:4444","supernode_account":"lumera1mfldjaqc7ec5rlh4k58yttv3cd978gzl070zk6","operation":"download","iteration":"1","error":"download failed: insufficient symbols","action_id":"123637"}}'
+          META3='{"target_supernode_accounts":["lumera1mfldjaqc7ec5rlh4k58yttv3cd978gzl070zk6"],"details":{"supernode_endpoint":"18.190.53.108:4444","task_id":"9700ec8a","operation":"download","error":"download failed: insufficient symbols","supernode_account":"lumera1mfldjaqc7ec5rlh4k58yttv3cd978gzl070zk6","action_id":"123637","iteration":"1"},"reporter_component":2}'
+          META4='{"details":{"iteration":"1","action_id":"123637","supernode_account":"lumera1mfldjaqc7ec5rlh4k58yttv3cd978gzl070zk6","error":"download failed: insufficient symbols","operation":"download","task_id":"9700ec8a","supernode_endpoint":"18.190.53.108:4444"},"reporter_component":2,"target_supernode_accounts":["lumera1mfldjaqc7ec5rlh4k58yttv3cd978gzl070zk6"]}'
+
+          submit_evidence_tx ci-canary-1 "$META1"
+          submit_evidence_tx ci-canary-2 "$META2"
+          submit_evidence_tx ci-canary-3 "$META3"
+          submit_evidence_tx ci-canary-4 "$META4"
+
+          submit_bank_tx ci-bank-1
+          submit_bank_tx ci-bank-2
+          submit_bank_tx ci-bank-3
+          check_consensus_window 15
+
+          for restart_node in 1 3 5; do
+            restart_port=$((26657 + restart_node))
+            echo "Restarting node${restart_node} on port ${restart_port}"
+
+            pkill -f "$OUT/node${restart_node}/lumerad" || true
+            sleep 2
+            "$BIN" start --trace --log_level=info --home "$OUT/node${restart_node}/lumerad" >"$WORK/node${restart_node}-restart.log" 2>&1 &
+
+            for _ in $(seq 1 60); do
+              if curl -sf "http://127.0.0.1:${restart_port}/status" >/dev/null; then
+                break
+              fi
+              sleep 1
+            done
+            curl -sf "http://127.0.0.1:${restart_port}/status" >/dev/null
+
+            submit_bank_tx "post-restart-${restart_node}-1"
+            submit_bank_tx "post-restart-${restart_node}-2"
+            check_consensus_window 10
+          done
+
+          echo "Consensus determinism pipeline passed"

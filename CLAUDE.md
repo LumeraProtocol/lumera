@@ -132,7 +132,7 @@ EVM integration tests live in `tests/integration/evm/` with subpackages: ante, c
 
 ### Key Configuration
 
-- Go toolchain: 1.25.5
+- Go toolchain: 1.26.1
 - Bech32 prefixes defined in `config/config.go` (lumera, lumeravaloper, lumeravalcons)
 - Chain denom: `ulume` (coin type 60 / Ethereum-compatible, EVM extended denom `alume` at 18 decimals)
 - EVM chain ID: `76857769`, key type: `eth_secp256k1`

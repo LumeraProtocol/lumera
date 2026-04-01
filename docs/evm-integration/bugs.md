@@ -328,3 +328,17 @@ Meanwhile, the EVM keeper (initialized in `x/vm/keeper/keeper.go:119`) correctly
 **Fix** (`x/evmigration/keeper/verify.go`, `x/evmigration/keeper/msg_server_claim_legacy.go`, `x/evmigration/keeper/msg_server_migrate_validator.go`, `x/evmigration/client/cli/tx.go`): Extended the payload format to `lumera-evm-migration:<chainID>:<evmChainID>:<kind>:<legacyAddr>:<newAddr>`. Both the Cosmos chain ID (distinguishes networks) and the EVM chain ID (distinguishes execution domains) are included. Callers pass `ctx.ChainID()` and `lcfg.EVMChainID`. The CLI uses `clientCtx.ChainID`. This is a breaking change to the proof format — existing pre-signed proofs are invalid.
 
 **Tests**: Updated all verify tests and signing helpers in `verify_test.go`, `msg_server_claim_legacy_test.go`, and `msg_server_migrate_validator_test.go` to include chain IDs. Test context wired with `WithChainID(testChainID)`.
+
+---
+
+### 23) Missing duplicate-destination check allows two legacy accounts to migrate to the same new address
+
+**Severity**: Medium
+
+**Symptom**: Two different legacy accounts can both migrate to the same new address. The second migration silently overwrites the `MigrationRecordByNewAddress` reverse index entry from the first migration, making the first migration's reverse lookup unreachable.
+
+**Root cause**: `preChecks` (shared by both `ClaimLegacyAccount` and `MigrateValidator`) validated that `newAddr` was not a previously-migrated *legacy* address (step 6, via `MigrationRecords`), but did not check whether `newAddr` was already used as a *destination* in a prior migration. The `MigrationRecordByNewAddress` reverse index (populated in `finalizeMigration`) was never consulted during pre-checks.
+
+**Fix** (`x/evmigration/keeper/msg_server_claim_legacy.go`, `x/evmigration/types/errors.go`): Added step 6b in `preChecks` — queries `MigrationRecordByNewAddress.Has(ctx, newAddr)` and returns `ErrNewAddressAlreadyUsed` (code 1119) if the address was already a migration destination. Since `preChecks` is shared, both `ClaimLegacyAccount` and `MigrateValidator` are protected.
+
+**Tests**: `TestPreChecks_NewAddressAlreadyUsed` — seeds a `MigrationRecordByNewAddress` entry for the target address and verifies the claim is rejected with `ErrNewAddressAlreadyUsed`.

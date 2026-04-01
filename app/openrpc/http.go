@@ -1,7 +1,9 @@
 package openrpc
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -94,7 +96,7 @@ var proxyHTTPClient = &http.Client{
 
 func proxyJSONRPC(w http.ResponseWriter, r *http.Request, jsonRPCAddr string) error {
 	if jsonRPCAddr == "" {
-		return io.EOF
+		return errors.New("json-rpc upstream not configured")
 	}
 
 	body, err := io.ReadAll(r.Body)
@@ -105,7 +107,7 @@ func proxyJSONRPC(w http.ResponseWriter, r *http.Request, jsonRPCAddr string) er
 
 	body = rewriteRPCDiscoverAlias(body)
 
-	upstreamReq, err := http.NewRequestWithContext(r.Context(), http.MethodPost, "http://"+jsonRPCAddr, strings.NewReader(string(body)))
+	upstreamReq, err := http.NewRequestWithContext(r.Context(), http.MethodPost, "http://"+jsonRPCAddr, bytes.NewReader(body))
 	if err != nil {
 		return err
 	}

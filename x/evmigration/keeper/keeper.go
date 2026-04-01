@@ -73,12 +73,12 @@ func NewKeeper(
 		addressCodec: addressCodec,
 		authority:    authority,
 
-		Params:                    collections.NewItem(sb, types.ParamsKey, "params", codec.CollValue[types.Params](cdc)),
-		MigrationRecords:          collections.NewMap(sb, types.MigrationRecordKeyPrefix, "migration_records", collections.StringKey, codec.CollValue[types.MigrationRecord](cdc)),
+		Params:                      collections.NewItem(sb, types.ParamsKey, "params", codec.CollValue[types.Params](cdc)),
+		MigrationRecords:            collections.NewMap(sb, types.MigrationRecordKeyPrefix, "migration_records", collections.StringKey, codec.CollValue[types.MigrationRecord](cdc)),
 		MigrationRecordByNewAddress: collections.NewMap(sb, types.MigrationRecordByNewAddressKeyPrefix, "migration_record_by_new_address", collections.StringKey, collections.StringValue),
-		MigrationCounter:          collections.NewItem(sb, types.MigrationCounterKey, "migration_counter", collections.Uint64Value),
-		ValidatorMigrationCounter: collections.NewItem(sb, types.ValidatorMigrationCounterKey, "validator_migration_counter", collections.Uint64Value),
-		BlockMigrationCounter:     collections.NewMap(sb, types.BlockMigrationCounterPrefix, "block_migration_counter", collections.Int64Key, collections.Uint64Value),
+		MigrationCounter:            collections.NewItem(sb, types.MigrationCounterKey, "migration_counter", collections.Uint64Value),
+		ValidatorMigrationCounter:   collections.NewItem(sb, types.ValidatorMigrationCounterKey, "validator_migration_counter", collections.Uint64Value),
+		BlockMigrationCounter:       collections.NewMap(sb, types.BlockMigrationCounterPrefix, "block_migration_counter", collections.Int64Key, collections.Uint64Value),
 
 		accountKeeper:      accountKeeper,
 		bankKeeper:         bankKeeper,

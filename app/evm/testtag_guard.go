@@ -1,5 +1,7 @@
 package evm
 
+import "strings"
+
 const testTagRequiredMessage = "EVM tests require the 'test' build tag: go test -tags=test ./..."
 
 type testTagRequiredPanic struct{}
@@ -23,9 +25,11 @@ func IsTestTagRequiredPanic(v any) bool {
 // the "chainConfig already set" error from cosmos-evm's global chain config.
 // Without '-tags=test', a second App instantiation in the same process
 // triggers this because the prod SetChainConfig is not resettable.
+// We match a stable prefix rather than the full message to avoid breakage
+// if upstream rewrites the error text.
 func IsChainConfigAlreadySetPanic(v any) bool {
 	if err, ok := v.(error); ok {
-		return err.Error() == "chainConfig already set. Cannot set again the chainConfig"
+		return strings.Contains(err.Error(), "chainConfig already set")
 	}
 	return false
 }

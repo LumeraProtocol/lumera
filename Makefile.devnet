@@ -424,8 +424,8 @@ devnet-upgrade-1100:
 devnet-upgrade-1101:
 	@cd devnet/scripts && ./upgrade.sh v1.10.1 auto-height ../bin-v1.10.1
 
-devnet-upgrade-1110:
-	@cd devnet/scripts && ./upgrade.sh v1.11.0 auto-height ../bin-v1.11.0
+devnet-upgrade-1111:
+	@cd devnet/scripts && ./upgrade.sh v1.11.1 auto-height ../bin-v1.11.1
 
 devnet-upgrade-1120:
 	@$(MAKE) devnet-refresh-bin

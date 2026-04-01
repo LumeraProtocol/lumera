@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"cosmossdk.io/store/prefix"
 	storetypes "cosmossdk.io/store/types"
 	upgradetypes "cosmossdk.io/x/upgrade/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
@@ -16,6 +17,7 @@ import (
 	appevm "github.com/LumeraProtocol/lumera/app/evm"
 	appParams "github.com/LumeraProtocol/lumera/app/upgrades/params"
 	lcfg "github.com/LumeraProtocol/lumera/config"
+	erc20policytypes "github.com/LumeraProtocol/lumera/x/erc20policy/types"
 	evmigrationtypes "github.com/LumeraProtocol/lumera/x/evmigration/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
@@ -104,8 +106,27 @@ func CreateUpgradeHandler(p appParams.AppUpgradeParams) upgradetypes.UpgradeHand
 		// erc20 InitGenesis is skipped above together with the other EVM modules.
 		// Unlike precisebank, erc20 persists module params in its own KV store, so
 		// an empty store would otherwise read back as both booleans=false.
-		if err := p.Erc20Keeper.SetParams(ctx, erc20types.DefaultParams()); err != nil {
+		if err := p.Erc20Keeper.SetParams(ctx, appevm.LumeraERC20DefaultParams()); err != nil {
 			return nil, fmt.Errorf("set erc20 default params: %w", err)
+		}
+
+		// Initialize the ERC20 IBC auto-registration policy. On fresh genesis this
+		// is handled by initERC20PolicyDefaults in InitChainer, but upgrade paths
+		// skip InitChainer so the policy must be seeded here.
+		if p.Erc20StoreKey != nil {
+			erc20Store := ctx.KVStore(p.Erc20StoreKey)
+			if !erc20Store.Has(erc20policytypes.PolicyModeKey) {
+				erc20Store.Set(erc20policytypes.PolicyModeKey, []byte(erc20policytypes.PolicyModeAllowlist))
+				tracePfxStore := prefix.NewStore(erc20Store, erc20policytypes.PolicyAllowBaseTracePfx)
+				for _, entry := range erc20policytypes.DefaultAllowedBaseDenomTraces {
+					traceKey := erc20policytypes.EncodeTraceKey(entry.Trace)
+					key := append([]byte(entry.BaseDenom), 0x00)
+					key = append(key, traceKey...)
+					tracePfxStore.Set(key, []byte{1})
+				}
+				p.Logger.Info("Initialized ERC20 registration policy", "mode", erc20policytypes.PolicyModeAllowlist,
+					"base_denom_traces", len(erc20policytypes.DefaultAllowedBaseDenomTraces))
+			}
 		}
 
 		p.Logger.Info(fmt.Sprintf("Successfully completed upgrade %s", UpgradeName))

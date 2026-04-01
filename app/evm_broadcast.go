@@ -276,6 +276,9 @@ func (app *App) broadcastEVMTransactions(ethTxs []*ethtypes.Transaction) error {
 
 	accepted, deduped, err := app.evmTxBroadcaster.enqueue(ethTxs)
 	if err != nil {
+		if app.evmMempoolMetrics != nil {
+			app.evmMempoolMetrics.IncRejectionBy(rejSourceBroadcastEnqueue, rejReasonQueueFull, len(ethTxs)-deduped)
+		}
 		return err
 	}
 
@@ -365,6 +368,8 @@ func (app *App) broadcastEVMTransactionsSync(ethTxs []*ethtypes.Transaction) err
 			continue
 		}
 		if res.Code != 0 {
+			// Note: rejection is already counted by the wrapped CheckTxHandler
+			// in configureEVMMempool — no need to increment here.
 			errs = append(errs, fmt.Errorf("transaction %s rejected by mempool: code=%d, log=%s", ethTx.Hash().Hex(), res.Code, res.RawLog))
 			continue
 		}

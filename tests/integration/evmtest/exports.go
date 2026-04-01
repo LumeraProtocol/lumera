@@ -42,6 +42,14 @@ func SetCometTxIndexer(t *testing.T, homeDir, indexer string) {
 	setCometTxIndexer(t, homeDir, indexer)
 }
 
+func EnablePrometheusMetrics(t *testing.T, homeDir string, apiAddress string) {
+	enablePrometheusMetrics(t, homeDir, apiAddress)
+}
+
+func FreePort(t *testing.T) int {
+	return freePort(t)
+}
+
 func SendOneCosmosBankTx(t *testing.T, node *Node) string {
 	return sendOneCosmosBankTx(t, node)
 }

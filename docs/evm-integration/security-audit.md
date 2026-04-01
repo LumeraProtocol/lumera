@@ -1,6 +1,6 @@
 # EVM Integration Security Audit
 
-**Date:** 2026-03-20
+**Date:** 2026-03-20 (updated 2026-04-01)
 **Auditor:** Codex static review
 **Scope:** Lumera EVM app wiring, ante, mempool/broadcast, JSON-RPC exposure, static precompiles, ERC20 IBC registration policy, and `x/evmigration`
 
@@ -14,13 +14,15 @@ The EVM integration is materially stronger than a typical first Cosmos-EVM launc
 - Supernode precompile caller-binding fix
 - Action precompile soft-rejection handling fix
 
-The remaining risk is concentrated in three places:
+At the time of audit, the risk was concentrated in three places. Two have since been fixed:
 
-1. public JSON-RPC rate limiting is easy to bypass with the current proxy topology
-2. validator-migration gas bounding undercounts redelegations after the destination-side redelegation fix
-3. ERC20 auto-registration allowlisting trusts base denoms without IBC provenance
+1. ~~public JSON-RPC rate limiting is easy to bypass with the current proxy topology~~ — **FIXED (Bug #20)**: rate limiter now wraps the public alias listener
+2. ~~validator-migration gas bounding undercounts redelegations after the destination-side redelegation fix~~ — **FIXED (Bug #21)**: pre-check now counts both source and destination redelegations
+3. ERC20 auto-registration allowlisting trusts base denoms without IBC provenance — **OPEN**
 
-I did not find evidence of an active critical auth bypass in the currently checked-in EVM entry points. The main launch blockers are operational and denial-of-service related rather than signature-validation failures.
+Additionally, migration proof domain separation was partially addressed (Bug #22: chain IDs added, expiry still missing).
+
+I did not find evidence of an active critical auth bypass in the currently checked-in EVM entry points. The remaining launch consideration is the ERC20 provenance policy (Finding #3).
 
 ## Method
 
@@ -32,7 +34,7 @@ This review was a code and documentation audit of the current repository state. 
 
 ## Findings
 
-### 1. High: JSON-RPC rate-limit proxy does not actually front the public JSON-RPC address
+### 1. High: JSON-RPC rate-limit proxy does not actually front the public JSON-RPC address — FIXED (Bug #20)
 
 **Affected code**
 
@@ -68,7 +70,7 @@ This is a security-control bypass caused by startup wiring, not by misconfigured
 
 Blocker before advertising the built-in rate limiter as a public-RPC protection mechanism.
 
-### 2. Medium: validator migration gas cap undercounts destination-side redelegations
+### 2. Medium: validator migration gas cap undercounts destination-side redelegations — FIXED (Bug #21)
 
 **Affected code**
 
@@ -108,34 +110,28 @@ This is a classic post-fix invariant drift: execution logic was widened, but the
 
 Fix before relying on `MaxValidatorDelegations` as a DoS guardrail.
 
-### 3. Medium: ERC20 allowlist is provenance-blind for base denoms, including default genesis entries
+### 3. Medium: ERC20 allowlist is provenance-blind for base denoms, including default genesis entries — FIXED
 
 **Affected code**
 
-- `app/evm_erc20_policy.go:41-49`
-- `app/evm_erc20_policy.go:117-127`
-- `app/evm_erc20_policy.go:285-293`
+- `app/evm_erc20_policy.go` — `OnRecvPacket`, `buildFullTrace`, trace-bound store helpers
+- `x/erc20policy/types/keys.go` — `PolicyAllowBaseTracePfx`, `EncodeTraceKey`, `DecodeTraceKey`
+- `proto/lumera/erc20policy/tx.proto` — `SourceHop`, `AllowedBaseDenomTrace` messages
 
-**What happens**
+**What happens (original issue)**
 
-In allowlist mode, an IBC voucher is auto-registered as an ERC20 if either:
+In allowlist mode, an IBC voucher was auto-registered as an ERC20 if either:
 
-- its exact `ibc/...` denom hash is allowlisted, or
-- its **base denom** is allowlisted
+- its exact `ibc/...` denom hash was allowlisted, or
+- its **base denom** was allowlisted (channel-independent)
 
-The base-denom path is explicitly channel-independent. The default genesis allowlist pre-approves:
-
-- `uatom`
-- `uosmo`
-- `uusdc`
-
-So any IBC asset arriving with one of those base denoms from any channel or path is eligible for auto-registration, even if its provenance is not the intended hub/chain/path.
+The base-denom path was explicitly channel-independent. The default genesis allowlist pre-approved `uatom`, `uosmo`, `uusdc` — so any IBC asset arriving with one of those base denoms from any channel or path was eligible for auto-registration, even if its provenance was not the intended hub/chain/path.
 
 **Impact**
 
-- counterfeit or lookalike vouchers can gain first-class ERC20 UX simply by sharing a base denom
-- users and integrators can confuse assets with different provenance but the same base symbol/denom
-- a governance decision intended to approve one source of `uusdc` or `uatom` effectively approves all sources
+- counterfeit or lookalike vouchers could gain first-class ERC20 UX simply by sharing a base denom
+- users and integrators could confuse assets with different provenance but the same base symbol/denom
+- a governance decision intended to approve one source of `uusdc` or `uatom` effectively approved all sources
 
 **Why this matters**
 
@@ -147,11 +143,13 @@ IBC security is denomination-plus-provenance, not base denom alone. Collapsing t
 - if base-denom approval is retained, bind it to additional provenance such as source channel, client, or canonical trace
 - reconsider shipping permissive default base-denom entries at genesis
 
+**Fix (2026-04-01)**: Base denom allowlist entries now require full IBC trace verification. Each entry binds a base denom (e.g. `uatom`) to a specific expected denom trace — the full sequence of `[{destPort, destChannel}, ...priorHops]`. A token is admitted only if both its base denom AND its full received trace exactly match an allowed entry. Default entries (uatom, uosmo, uusdc, inj) are stored with empty traces, making them inert placeholders that never match real IBC packets (all packets have at least one hop). Governance must bind real IBC channels via `MsgSetRegistrationPolicy` with `add_base_denom_traces` before these entries become active. All three original recommendations are now implemented: exact `ibc/` allowlisting is preferred, base-denom entries are bound to provenance (full trace), and default entries are inert at genesis.
+
 **Priority**
 
-Should be tightened before mainnet if the chain intends to present ERC20 auto-registration as an asset-trust control.
+Resolved. All three recommendations implemented.
 
-### 4. Low: migration proofs are domain-separated by message kind and addresses, but not by chain ID or expiry
+### 4. Low: migration proofs are domain-separated by message kind and addresses, but not by chain ID or expiry — PARTIALLY FIXED (Bug #22)
 
 **Affected code**
 
@@ -161,27 +159,28 @@ Should be tightened before mainnet if the chain intends to present ERC20 auto-re
 
 **What happens**
 
-The signed payload is:
+The signed payload was originally:
 
 `lumera-evm-migration:<kind>:<legacyAddr>:<newAddr>`
 
-It does not include:
+**Partial fix (Bug #22):** The payload now includes both chain IDs:
 
-- chain ID
-- genesis hash
+`lumera-evm-migration:<chainID>:<evmChainID>:<kind>:<legacyAddr>:<newAddr>`
+
+This prevents cross-network replay. However, the payload still does not include:
+
 - expiration time
 - timeout height
 
-**Impact**
+**Remaining impact**
 
-- the same proof is replayable across Lumera environments or forks that share address formats and state ancestry
 - signed migration intents do not expire
 
-This is not a direct theft vector because the proof still binds funds to the intended `newAddr`, but it weakens domain separation and makes operational replay harder to reason about.
+This is not a direct theft vector because the proof binds funds to the intended `newAddr` and is now chain-specific, but indefinite validity makes operational replay harder to reason about.
 
 **Recommendation**
 
-- include chain ID and a deadline in any future proof format
+- include a deadline in any future proof format revision
 - if compatibility must be preserved, support a v2 proof alongside the current format and deprecate the old one for new migrations
 
 ## Strengths
@@ -201,11 +200,11 @@ These are not all code bugs, but they are worth doing before or shortly after la
 
 - Set a finite `migration_end_time` before mainnet. Open-ended migration windows increase long-tail operational risk.
 - Treat JSON-RPC tracing as a privileged operator feature. Keep it disabled on public RPC unless traffic is tightly controlled.
-- Add metrics for mempool queue depth, EVM broadcast failures, and rate-limit hits so operators can see attacks in progress.
+- ~~Add metrics for mempool queue depth, EVM broadcast failures, and rate-limit hits so operators can see attacks in progress.~~ — **DONE**: `app/evm_mempool_metrics.go` exposes Prometheus gauges (`size`, `pending`, `queued`, `broadcast_queue_depth`) and a labeled rejection counter (`rejections_total{source,reason}`), validated by 10 unit tests and 2 Prometheus e2e integration tests.
 - Add an integration test that verifies "rate-limit enabled" really constrains the public RPC port, not only the alternate proxy port.
 - Add a validator-migration regression test for destination-only redelegation fan-in.
-- Add policy tests around "same base denom, different IBC trace" to force an explicit trust decision.
+- ~~Add policy tests around "same base denom, different IBC trace" to force an explicit trust decision.~~ — **DONE**: `TestERC20Policy_AllowlistMode_BlocksWrongChannel`, `BlocksMultiHopOnSameChannel`, and `MultiHopTraceAllowed` verify that the same base denom (`uatom`) is blocked or allowed based on its full IBC trace, forcing an explicit governance trust decision per provenance path.
 
 ## Conclusion
 
-The EVM integration is close to mainnet-ready from a code-security perspective, and it is notably ahead of many first-wave Cosmos-EVM launches in defensive engineering. The biggest remaining issue is that one advertised protection, built-in JSON-RPC rate limiting, is not actually in the request path of the public RPC endpoint by default. After that, the next most important fixes are aligning validator-migration safety bounds with real execution and tightening ERC20 admission policy to respect IBC provenance.
+The EVM integration is mainnet-ready from a code-security perspective, and it is notably ahead of many first-wave Cosmos-EVM launches in defensive engineering. Findings #1 (rate-limit bypass) and #2 (gas cap undercount) have been fixed. Finding #4 (proof domain separation) has been partially addressed with chain ID inclusion. Finding #3 (provenance-blind base-denom allowlist) has been fixed: base denom entries now require full IBC trace verification, and default genesis entries are inert placeholders until governance binds real channels.

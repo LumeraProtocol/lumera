@@ -164,7 +164,8 @@ func testIBCERC20MiddlewareDenomCollisionKeepsExistingMap(t *testing.T) {
 // setupERC20MiddlewarePath boots a two-chain IBC path with base fee disabled
 // for deterministic packet fee behavior in tests, and ERC20 registration policy
 // set to "all" so auto-registration works for any IBC denom (the default policy
-// is "allowlist" which only allows uatom/uosmo/uusdc base denoms).
+// is "allowlist" with provenance-bound base denom entries that are inert
+// placeholders until governance binds real IBC channels).
 func setupERC20MiddlewarePath(t *testing.T) (*ibctesting.Coordinator, *ibctesting.TestChain, *ibctesting.TestChain, *ibctesting.Path) {
 	t.Helper()
 	coord := ibctesting.NewCoordinator(t, 2)

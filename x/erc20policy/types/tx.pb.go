@@ -30,6 +30,115 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
+// SourceHop represents a single port/channel pair in an IBC denom trace.
+type SourceHop struct {
+	PortId    string `protobuf:"bytes,1,opt,name=port_id,json=portId,proto3" json:"port_id,omitempty"`
+	ChannelId string `protobuf:"bytes,2,opt,name=channel_id,json=channelId,proto3" json:"channel_id,omitempty"`
+}
+
+func (m *SourceHop) Reset()         { *m = SourceHop{} }
+func (m *SourceHop) String() string { return proto.CompactTextString(m) }
+func (*SourceHop) ProtoMessage()    {}
+func (*SourceHop) Descriptor() ([]byte, []int) {
+	return fileDescriptor_61f6ae3f2cfed8d9, []int{0}
+}
+func (m *SourceHop) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *SourceHop) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_SourceHop.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *SourceHop) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_SourceHop.Merge(m, src)
+}
+func (m *SourceHop) XXX_Size() int {
+	return m.Size()
+}
+func (m *SourceHop) XXX_DiscardUnknown() {
+	xxx_messageInfo_SourceHop.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_SourceHop proto.InternalMessageInfo
+
+func (m *SourceHop) GetPortId() string {
+	if m != nil {
+		return m.PortId
+	}
+	return ""
+}
+
+func (m *SourceHop) GetChannelId() string {
+	if m != nil {
+		return m.ChannelId
+	}
+	return ""
+}
+
+// AllowedBaseDenomTrace binds a base denomination to a specific IBC provenance
+// path. The trace is the full expected sequence of hops for the received denom:
+// [{destPort, destChannel}, ...priorHops]. An empty trace is a valid placeholder
+// that never matches a real IBC packet (all packets have at least one hop).
+type AllowedBaseDenomTrace struct {
+	BaseDenom string       `protobuf:"bytes,1,opt,name=base_denom,json=baseDenom,proto3" json:"base_denom,omitempty"`
+	Trace     []*SourceHop `protobuf:"bytes,2,rep,name=trace,proto3" json:"trace,omitempty"`
+}
+
+func (m *AllowedBaseDenomTrace) Reset()         { *m = AllowedBaseDenomTrace{} }
+func (m *AllowedBaseDenomTrace) String() string { return proto.CompactTextString(m) }
+func (*AllowedBaseDenomTrace) ProtoMessage()    {}
+func (*AllowedBaseDenomTrace) Descriptor() ([]byte, []int) {
+	return fileDescriptor_61f6ae3f2cfed8d9, []int{1}
+}
+func (m *AllowedBaseDenomTrace) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *AllowedBaseDenomTrace) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_AllowedBaseDenomTrace.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *AllowedBaseDenomTrace) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_AllowedBaseDenomTrace.Merge(m, src)
+}
+func (m *AllowedBaseDenomTrace) XXX_Size() int {
+	return m.Size()
+}
+func (m *AllowedBaseDenomTrace) XXX_DiscardUnknown() {
+	xxx_messageInfo_AllowedBaseDenomTrace.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_AllowedBaseDenomTrace proto.InternalMessageInfo
+
+func (m *AllowedBaseDenomTrace) GetBaseDenom() string {
+	if m != nil {
+		return m.BaseDenom
+	}
+	return ""
+}
+
+func (m *AllowedBaseDenomTrace) GetTrace() []*SourceHop {
+	if m != nil {
+		return m.Trace
+	}
+	return nil
+}
+
 // MsgSetRegistrationPolicy configures the IBC voucher ERC20 auto-registration
 // policy. It allows governance to control which IBC denoms are automatically
 // registered as ERC20 token pairs on first IBC receive.
@@ -44,21 +153,20 @@ type MsgSetRegistrationPolicy struct {
 	AddDenoms []string `protobuf:"bytes,3,rep,name=add_denoms,json=addDenoms,proto3" json:"add_denoms,omitempty"`
 	// remove_denoms is a list of exact IBC denoms to remove from the allowlist.
 	RemoveDenoms []string `protobuf:"bytes,4,rep,name=remove_denoms,json=removeDenoms,proto3" json:"remove_denoms,omitempty"`
-	// add_base_denoms is a list of base token denominations (e.g. "uatom",
-	// "uosmo") to add to the base denom allowlist. Base denom matching is
-	// channel-independent: approving "uatom" allows ATOM arriving via any
-	// IBC channel or multi-hop path.
-	AddBaseDenoms []string `protobuf:"bytes,5,rep,name=add_base_denoms,json=addBaseDenoms,proto3" json:"add_base_denoms,omitempty"`
-	// remove_base_denoms is a list of base denominations to remove from the
-	// base denom allowlist.
-	RemoveBaseDenoms []string `protobuf:"bytes,6,rep,name=remove_base_denoms,json=removeBaseDenoms,proto3" json:"remove_base_denoms,omitempty"`
+	// add_base_denom_traces adds provenance-bound base denom entries to the
+	// allowlist. Each entry binds a base denom (e.g. "uatom") to a specific
+	// IBC trace (the full expected hop sequence). Governance must provide the
+	// trace to activate a base denom entry.
+	AddBaseDenomTraces []*AllowedBaseDenomTrace `protobuf:"bytes,5,rep,name=add_base_denom_traces,json=addBaseDenomTraces,proto3" json:"add_base_denom_traces,omitempty"`
+	// remove_base_denom_traces removes provenance-bound base denom entries.
+	RemoveBaseDenomTraces []*AllowedBaseDenomTrace `protobuf:"bytes,6,rep,name=remove_base_denom_traces,json=removeBaseDenomTraces,proto3" json:"remove_base_denom_traces,omitempty"`
 }
 
 func (m *MsgSetRegistrationPolicy) Reset()         { *m = MsgSetRegistrationPolicy{} }
 func (m *MsgSetRegistrationPolicy) String() string { return proto.CompactTextString(m) }
 func (*MsgSetRegistrationPolicy) ProtoMessage()    {}
 func (*MsgSetRegistrationPolicy) Descriptor() ([]byte, []int) {
-	return fileDescriptor_61f6ae3f2cfed8d9, []int{0}
+	return fileDescriptor_61f6ae3f2cfed8d9, []int{2}
 }
 func (m *MsgSetRegistrationPolicy) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -115,16 +223,16 @@ func (m *MsgSetRegistrationPolicy) GetRemoveDenoms() []string {
 	return nil
 }
 
-func (m *MsgSetRegistrationPolicy) GetAddBaseDenoms() []string {
+func (m *MsgSetRegistrationPolicy) GetAddBaseDenomTraces() []*AllowedBaseDenomTrace {
 	if m != nil {
-		return m.AddBaseDenoms
+		return m.AddBaseDenomTraces
 	}
 	return nil
 }
 
-func (m *MsgSetRegistrationPolicy) GetRemoveBaseDenoms() []string {
+func (m *MsgSetRegistrationPolicy) GetRemoveBaseDenomTraces() []*AllowedBaseDenomTrace {
 	if m != nil {
-		return m.RemoveBaseDenoms
+		return m.RemoveBaseDenomTraces
 	}
 	return nil
 }
@@ -138,7 +246,7 @@ func (m *MsgSetRegistrationPolicyResponse) Reset()         { *m = MsgSetRegistra
 func (m *MsgSetRegistrationPolicyResponse) String() string { return proto.CompactTextString(m) }
 func (*MsgSetRegistrationPolicyResponse) ProtoMessage()    {}
 func (*MsgSetRegistrationPolicyResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_61f6ae3f2cfed8d9, []int{1}
+	return fileDescriptor_61f6ae3f2cfed8d9, []int{3}
 }
 func (m *MsgSetRegistrationPolicyResponse) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -168,6 +276,8 @@ func (m *MsgSetRegistrationPolicyResponse) XXX_DiscardUnknown() {
 var xxx_messageInfo_MsgSetRegistrationPolicyResponse proto.InternalMessageInfo
 
 func init() {
+	proto.RegisterType((*SourceHop)(nil), "lumera.erc20policy.SourceHop")
+	proto.RegisterType((*AllowedBaseDenomTrace)(nil), "lumera.erc20policy.AllowedBaseDenomTrace")
 	proto.RegisterType((*MsgSetRegistrationPolicy)(nil), "lumera.erc20policy.MsgSetRegistrationPolicy")
 	proto.RegisterType((*MsgSetRegistrationPolicyResponse)(nil), "lumera.erc20policy.MsgSetRegistrationPolicyResponse")
 }
@@ -175,31 +285,38 @@ func init() {
 func init() { proto.RegisterFile("lumera/erc20policy/tx.proto", fileDescriptor_61f6ae3f2cfed8d9) }
 
 var fileDescriptor_61f6ae3f2cfed8d9 = []byte{
-	// 382 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0x92, 0xce, 0x29, 0xcd, 0x4d,
-	0x2d, 0x4a, 0xd4, 0x4f, 0x2d, 0x4a, 0x36, 0x32, 0x28, 0xc8, 0xcf, 0xc9, 0x4c, 0xae, 0xd4, 0x2f,
-	0xa9, 0xd0, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0x12, 0x82, 0x48, 0xea, 0x21, 0x49, 0x4a, 0x09,
-	0x26, 0xe6, 0x66, 0xe6, 0xe5, 0xeb, 0x83, 0x49, 0x88, 0x32, 0x29, 0xf1, 0xe4, 0xfc, 0xe2, 0xdc,
-	0xfc, 0x62, 0xfd, 0xdc, 0xe2, 0x74, 0xfd, 0x32, 0x43, 0x10, 0x05, 0x95, 0x90, 0x84, 0x48, 0xc4,
-	0x83, 0x79, 0xfa, 0x10, 0x0e, 0x44, 0x4a, 0xe9, 0x00, 0x13, 0x97, 0x84, 0x6f, 0x71, 0x7a, 0x70,
-	0x6a, 0x49, 0x50, 0x6a, 0x7a, 0x66, 0x71, 0x49, 0x51, 0x62, 0x49, 0x66, 0x7e, 0x5e, 0x00, 0xd8,
-	0x0e, 0x21, 0x33, 0x2e, 0xce, 0xc4, 0xd2, 0x92, 0x8c, 0xfc, 0xa2, 0xcc, 0x92, 0x4a, 0x09, 0x46,
-	0x05, 0x46, 0x0d, 0x4e, 0x27, 0x89, 0x4b, 0x5b, 0x74, 0x45, 0xa0, 0x26, 0x38, 0xa6, 0xa4, 0x14,
-	0xa5, 0x16, 0x17, 0x07, 0x97, 0x14, 0x65, 0xe6, 0xa5, 0x07, 0x21, 0x94, 0x0a, 0x09, 0x71, 0xb1,
-	0xe4, 0xe6, 0xa7, 0xa4, 0x4a, 0x30, 0x81, 0xb4, 0x04, 0x81, 0xd9, 0x42, 0xb2, 0x5c, 0x5c, 0x89,
-	0x29, 0x29, 0xf1, 0x29, 0xa9, 0x79, 0xf9, 0xb9, 0xc5, 0x12, 0xcc, 0x0a, 0xcc, 0x1a, 0x9c, 0x41,
-	0x9c, 0x89, 0x29, 0x29, 0x2e, 0x60, 0x01, 0x21, 0x65, 0x2e, 0xde, 0xa2, 0xd4, 0xdc, 0xfc, 0xb2,
-	0x54, 0x98, 0x0a, 0x16, 0xb0, 0x0a, 0x1e, 0x88, 0x20, 0x54, 0x91, 0x1a, 0x17, 0x3f, 0xc8, 0x8c,
-	0xa4, 0xc4, 0x62, 0xb8, 0x32, 0x56, 0xb0, 0x32, 0xde, 0xc4, 0x94, 0x14, 0xa7, 0xc4, 0x62, 0x98,
-	0x3a, 0x1d, 0x2e, 0x21, 0xa8, 0x61, 0xc8, 0x4a, 0xd9, 0xc0, 0x4a, 0x05, 0x20, 0x32, 0x08, 0xd5,
-	0x56, 0x76, 0x4d, 0xcf, 0x37, 0x68, 0x21, 0x5c, 0xdf, 0xf5, 0x7c, 0x83, 0x96, 0x36, 0x96, 0xd8,
-	0xc0, 0x15, 0x4a, 0x4a, 0x4a, 0x5c, 0x0a, 0xb8, 0xe4, 0x82, 0x52, 0x8b, 0x0b, 0xf2, 0xf3, 0x8a,
-	0x53, 0x8d, 0x3a, 0x19, 0xb9, 0x98, 0x7d, 0x8b, 0xd3, 0x85, 0xaa, 0xb9, 0x44, 0xb1, 0x07, 0xb5,
-	0x8e, 0x1e, 0x66, 0x1c, 0xeb, 0xe1, 0x32, 0x56, 0xca, 0x84, 0x14, 0xd5, 0x30, 0x47, 0x48, 0xb1,
-	0x36, 0x3c, 0xdf, 0xa0, 0xc5, 0xe8, 0xa4, 0x7b, 0xe2, 0x91, 0x1c, 0xe3, 0x85, 0x47, 0x72, 0x8c,
-	0x0f, 0x1e, 0xc9, 0x31, 0x4e, 0x78, 0x2c, 0xc7, 0x70, 0xe1, 0xb1, 0x1c, 0xc3, 0x8d, 0xc7, 0x72,
-	0x0c, 0x51, 0xc2, 0x15, 0xa8, 0xe9, 0xaf, 0xb2, 0x20, 0xb5, 0x38, 0x89, 0x0d, 0x9c, 0x50, 0x8c,
-	0x01, 0x01, 0x00, 0x00, 0xff, 0xff, 0x74, 0x32, 0x19, 0x7e, 0xa2, 0x02, 0x00, 0x00,
+	// 485 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x94, 0x53, 0x31, 0x6f, 0xd3, 0x40,
+	0x14, 0x8e, 0xeb, 0x26, 0xc8, 0x07, 0x0c, 0x1c, 0x44, 0x35, 0x41, 0xb5, 0x22, 0xb3, 0x94, 0x40,
+	0x63, 0x48, 0x11, 0x03, 0x03, 0x52, 0x03, 0x03, 0x1d, 0x2a, 0x21, 0x87, 0x09, 0x21, 0x45, 0x17,
+	0xdf, 0x93, 0x6b, 0x61, 0xfb, 0xac, 0xbb, 0x4b, 0x69, 0xc4, 0x82, 0xd8, 0x60, 0xe2, 0x87, 0x30,
+	0x64, 0xe0, 0x47, 0x30, 0x56, 0x4c, 0x8c, 0x28, 0x19, 0xf2, 0x37, 0xd0, 0xdd, 0x39, 0x04, 0x5a,
+	0x67, 0xc8, 0x62, 0xfb, 0xbd, 0xef, 0xf3, 0x7b, 0xdf, 0xf7, 0xee, 0x1e, 0xba, 0x93, 0x8e, 0x33,
+	0xe0, 0x24, 0x00, 0x1e, 0xf5, 0x1e, 0x16, 0x2c, 0x4d, 0xa2, 0x49, 0x20, 0xcf, 0xba, 0x05, 0x67,
+	0x92, 0x61, 0x6c, 0xc0, 0xee, 0x3f, 0x60, 0xeb, 0x06, 0xc9, 0x92, 0x9c, 0x05, 0xfa, 0x69, 0x68,
+	0xad, 0x9d, 0x88, 0x89, 0x8c, 0x89, 0x20, 0x13, 0x71, 0x70, 0xfa, 0x48, 0xbd, 0x4a, 0xe0, 0xb6,
+	0x01, 0x86, 0x3a, 0x0a, 0x4c, 0x60, 0x20, 0xff, 0x39, 0x72, 0x06, 0x6c, 0xcc, 0x23, 0x78, 0xc9,
+	0x0a, 0xbc, 0x83, 0xae, 0x14, 0x8c, 0xcb, 0x61, 0x42, 0x5d, 0xab, 0x6d, 0xed, 0x39, 0x61, 0x43,
+	0x85, 0x47, 0x14, 0xef, 0x22, 0x14, 0x9d, 0x90, 0x3c, 0x87, 0x54, 0x61, 0x5b, 0x1a, 0x73, 0xca,
+	0xcc, 0x11, 0xf5, 0xdf, 0xa1, 0xe6, 0x61, 0x9a, 0xb2, 0xf7, 0x40, 0xfb, 0x44, 0xc0, 0x0b, 0xc8,
+	0x59, 0xf6, 0x9a, 0x93, 0x08, 0xd4, 0x7f, 0x23, 0x22, 0x60, 0x48, 0x55, 0xaa, 0xac, 0xe9, 0x8c,
+	0x96, 0x1c, 0x7c, 0x80, 0xea, 0x52, 0xf1, 0xdc, 0xad, 0xb6, 0xbd, 0x77, 0xb5, 0xb7, 0xdb, 0xbd,
+	0xec, 0xb3, 0xfb, 0x57, 0x5d, 0x68, 0xb8, 0xfe, 0x37, 0x1b, 0xb9, 0xc7, 0x22, 0x1e, 0x80, 0x0c,
+	0x21, 0x4e, 0x84, 0xe4, 0x44, 0x26, 0x2c, 0x7f, 0xa5, 0xd9, 0xf8, 0x09, 0x72, 0xc8, 0x58, 0x9e,
+	0x30, 0x9e, 0xc8, 0x89, 0xe9, 0xd7, 0x77, 0x7f, 0x7e, 0xdf, 0xbf, 0x55, 0x7a, 0x3e, 0xa4, 0x94,
+	0x83, 0x10, 0x03, 0xc9, 0x93, 0x3c, 0x0e, 0x57, 0x54, 0x8c, 0xd1, 0x76, 0xc6, 0x28, 0x94, 0xd6,
+	0xf4, 0xb7, 0x12, 0x4f, 0x28, 0x35, 0xda, 0x85, 0x6b, 0xb7, 0x6d, 0x25, 0x9e, 0x50, 0xaa, 0xb5,
+	0x0b, 0x7c, 0x17, 0x5d, 0xe7, 0x90, 0xb1, 0x53, 0x58, 0x32, 0xb6, 0x35, 0xe3, 0x9a, 0x49, 0x96,
+	0xa4, 0xb7, 0xa8, 0xa9, 0x6a, 0xac, 0x86, 0x30, 0xd4, 0x26, 0x84, 0x5b, 0xd7, 0x8e, 0xef, 0x55,
+	0x39, 0xae, 0x1c, 0x65, 0x88, 0x09, 0xbd, 0x90, 0x12, 0x78, 0x84, 0xdc, 0x52, 0xc2, 0xe5, 0x06,
+	0x8d, 0x4d, 0x1b, 0x34, 0x4d, 0xa9, 0x0b, 0x3d, 0x9e, 0x3e, 0xfb, 0xb4, 0x98, 0x76, 0x56, 0x93,
+	0xfa, 0xb2, 0x98, 0x76, 0xee, 0x57, 0xdc, 0xd5, 0x75, 0x27, 0xe2, 0xfb, 0xa8, 0xbd, 0x0e, 0x0b,
+	0x41, 0x14, 0x2c, 0x17, 0xd0, 0xfb, 0x6c, 0x21, 0xfb, 0x58, 0xc4, 0xf8, 0x03, 0x6a, 0x56, 0x1f,
+	0xeb, 0x83, 0x2a, 0x1b, 0xeb, 0xca, 0xb6, 0x1e, 0x6f, 0xc2, 0x5e, 0x8a, 0x68, 0xd5, 0x3f, 0x2e,
+	0xa6, 0x1d, 0xab, 0xbf, 0xff, 0x63, 0xe6, 0x59, 0xe7, 0x33, 0xcf, 0xfa, 0x3d, 0xf3, 0xac, 0xaf,
+	0x73, 0xaf, 0x76, 0x3e, 0xf7, 0x6a, 0xbf, 0xe6, 0x5e, 0xed, 0xcd, 0xcd, 0xb3, 0xff, 0xb7, 0x73,
+	0x52, 0x80, 0x18, 0x35, 0xf4, 0x1a, 0x1d, 0xfc, 0x09, 0x00, 0x00, 0xff, 0xff, 0xd6, 0x12, 0x41,
+	0x33, 0xc0, 0x03, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -287,6 +404,87 @@ var _Msg_serviceDesc = grpc.ServiceDesc{
 	Metadata: "lumera/erc20policy/tx.proto",
 }
 
+func (m *SourceHop) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *SourceHop) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *SourceHop) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.ChannelId) > 0 {
+		i -= len(m.ChannelId)
+		copy(dAtA[i:], m.ChannelId)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.ChannelId)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if len(m.PortId) > 0 {
+		i -= len(m.PortId)
+		copy(dAtA[i:], m.PortId)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.PortId)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *AllowedBaseDenomTrace) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *AllowedBaseDenomTrace) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *AllowedBaseDenomTrace) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Trace) > 0 {
+		for iNdEx := len(m.Trace) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Trace[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintTx(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x12
+		}
+	}
+	if len(m.BaseDenom) > 0 {
+		i -= len(m.BaseDenom)
+		copy(dAtA[i:], m.BaseDenom)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.BaseDenom)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
 func (m *MsgSetRegistrationPolicy) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -307,20 +505,30 @@ func (m *MsgSetRegistrationPolicy) MarshalToSizedBuffer(dAtA []byte) (int, error
 	_ = i
 	var l int
 	_ = l
-	if len(m.RemoveBaseDenoms) > 0 {
-		for iNdEx := len(m.RemoveBaseDenoms) - 1; iNdEx >= 0; iNdEx-- {
-			i -= len(m.RemoveBaseDenoms[iNdEx])
-			copy(dAtA[i:], m.RemoveBaseDenoms[iNdEx])
-			i = encodeVarintTx(dAtA, i, uint64(len(m.RemoveBaseDenoms[iNdEx])))
+	if len(m.RemoveBaseDenomTraces) > 0 {
+		for iNdEx := len(m.RemoveBaseDenomTraces) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.RemoveBaseDenomTraces[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintTx(dAtA, i, uint64(size))
+			}
 			i--
 			dAtA[i] = 0x32
 		}
 	}
-	if len(m.AddBaseDenoms) > 0 {
-		for iNdEx := len(m.AddBaseDenoms) - 1; iNdEx >= 0; iNdEx-- {
-			i -= len(m.AddBaseDenoms[iNdEx])
-			copy(dAtA[i:], m.AddBaseDenoms[iNdEx])
-			i = encodeVarintTx(dAtA, i, uint64(len(m.AddBaseDenoms[iNdEx])))
+	if len(m.AddBaseDenomTraces) > 0 {
+		for iNdEx := len(m.AddBaseDenomTraces) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.AddBaseDenomTraces[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintTx(dAtA, i, uint64(size))
+			}
 			i--
 			dAtA[i] = 0x2a
 		}
@@ -394,6 +602,42 @@ func encodeVarintTx(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
+func (m *SourceHop) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.PortId)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	l = len(m.ChannelId)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	return n
+}
+
+func (m *AllowedBaseDenomTrace) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.BaseDenom)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	if len(m.Trace) > 0 {
+		for _, e := range m.Trace {
+			l = e.Size()
+			n += 1 + l + sovTx(uint64(l))
+		}
+	}
+	return n
+}
+
 func (m *MsgSetRegistrationPolicy) Size() (n int) {
 	if m == nil {
 		return 0
@@ -420,15 +664,15 @@ func (m *MsgSetRegistrationPolicy) Size() (n int) {
 			n += 1 + l + sovTx(uint64(l))
 		}
 	}
-	if len(m.AddBaseDenoms) > 0 {
-		for _, s := range m.AddBaseDenoms {
-			l = len(s)
+	if len(m.AddBaseDenomTraces) > 0 {
+		for _, e := range m.AddBaseDenomTraces {
+			l = e.Size()
 			n += 1 + l + sovTx(uint64(l))
 		}
 	}
-	if len(m.RemoveBaseDenoms) > 0 {
-		for _, s := range m.RemoveBaseDenoms {
-			l = len(s)
+	if len(m.RemoveBaseDenomTraces) > 0 {
+		for _, e := range m.RemoveBaseDenomTraces {
+			l = e.Size()
 			n += 1 + l + sovTx(uint64(l))
 		}
 	}
@@ -449,6 +693,236 @@ func sovTx(x uint64) (n int) {
 }
 func sozTx(x uint64) (n int) {
 	return sovTx(uint64((x << 1) ^ uint64((int64(x) >> 63))))
+}
+func (m *SourceHop) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTx
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: SourceHop: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: SourceHop: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PortId", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.PortId = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ChannelId", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ChannelId = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTx(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthTx
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *AllowedBaseDenomTrace) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTx
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: AllowedBaseDenomTrace: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: AllowedBaseDenomTrace: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field BaseDenom", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.BaseDenom = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Trace", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Trace = append(m.Trace, &SourceHop{})
+			if err := m.Trace[len(m.Trace)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTx(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthTx
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
 }
 func (m *MsgSetRegistrationPolicy) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
@@ -609,9 +1083,9 @@ func (m *MsgSetRegistrationPolicy) Unmarshal(dAtA []byte) error {
 			iNdEx = postIndex
 		case 5:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field AddBaseDenoms", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field AddBaseDenomTraces", wireType)
 			}
-			var stringLen uint64
+			var msglen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowTx
@@ -621,29 +1095,31 @@ func (m *MsgSetRegistrationPolicy) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
+				msglen |= int(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
+			if msglen < 0 {
 				return ErrInvalidLengthTx
 			}
-			postIndex := iNdEx + intStringLen
+			postIndex := iNdEx + msglen
 			if postIndex < 0 {
 				return ErrInvalidLengthTx
 			}
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.AddBaseDenoms = append(m.AddBaseDenoms, string(dAtA[iNdEx:postIndex]))
+			m.AddBaseDenomTraces = append(m.AddBaseDenomTraces, &AllowedBaseDenomTrace{})
+			if err := m.AddBaseDenomTraces[len(m.AddBaseDenomTraces)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
 			iNdEx = postIndex
 		case 6:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field RemoveBaseDenoms", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field RemoveBaseDenomTraces", wireType)
 			}
-			var stringLen uint64
+			var msglen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowTx
@@ -653,23 +1129,25 @@ func (m *MsgSetRegistrationPolicy) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
+				msglen |= int(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
+			if msglen < 0 {
 				return ErrInvalidLengthTx
 			}
-			postIndex := iNdEx + intStringLen
+			postIndex := iNdEx + msglen
 			if postIndex < 0 {
 				return ErrInvalidLengthTx
 			}
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.RemoveBaseDenoms = append(m.RemoveBaseDenoms, string(dAtA[iNdEx:postIndex]))
+			m.RemoveBaseDenomTraces = append(m.RemoveBaseDenomTraces, &AllowedBaseDenomTrace{})
+			if err := m.RemoveBaseDenomTraces[len(m.RemoveBaseDenomTraces)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Lumera is a Cosmos SDK blockchain (v0.53.5) built with Ignite CLI, supporting CosmWasm smart contracts, IBC cross-chain messaging, and four custom modules. The binary is `lumerad`, the native token denom is `ulume`, and addresses use the `lumera` Bech32 prefix.
+Lumera is a Cosmos SDK blockchain (v0.53.6) built with Ignite CLI, supporting CosmWasm smart contracts, IBC cross-chain messaging, and four custom modules. The binary is `lumerad`, the native token denom is `ulume`, and addresses use the `lumera` Bech32 prefix.
 
 ## Build & Development Commands
 
@@ -111,7 +111,8 @@ Key files:
 - `app/evm.go` - Keeper wiring, circular dependency resolution (`&app.Erc20Keeper` pointer)
 - `app/evm/ante.go` - Dual-route ante handler (EVM vs Cosmos path)
 - `app/evm/precompiles.go` - Static precompiles (bank, staking, distribution, gov, ics20, bech32, p256, slashing)
-- `app/evm_mempool.go` - EVM-aware app-side mempool wiring
+- `app/evm_mempool.go` - EVM-aware app-side mempool wiring + wrapped CheckTx rejection counter
+- `app/evm_mempool_metrics.go` - Prometheus collector (gauges: size, pending, queued, broadcast_queue_depth; labeled counter: rejections_total{source,reason})
 - `app/evm_broadcast.go` - Async broadcast queue (prevents mempool deadlock)
 - `app/evm_runtime.go` - RegisterTxService/Close overrides for EVM lifecycle
 - `app/ibc.go` - IBC router with ERC20 middleware for v1 and v2 transfer stacks

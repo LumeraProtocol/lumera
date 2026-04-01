@@ -1,6 +1,6 @@
 # Lumera EVM Integration Roadmap
 
-**Last updated**: 2026-03-19
+**Last updated**: 2026-04-01
 **Cosmos EVM version**: v0.6.0
 **Target**: Mainnet-ready EVM integration
 
@@ -66,7 +66,6 @@ EIP-1559 fee market with Lumera-specific tuning.
 | [x] | Consensus max gas: 25,000,000                  | `config/evm.go`                                                         |
 | [x] | Dynamic base fee enabled by default            | `app/evm/genesis.go`                                                    |
 | [x] | Fee distribution via standard SDK path         | Full effective gas price -> fee collector -> x/distribution               |
-| [ ] | Raise block gas limit via governance           | DEFERRED — 25M is adequate for launch; increase for heavy DeFi if needed |
 
 ---
 
@@ -84,7 +83,7 @@ EVM-aware app-side mempool with deadlock prevention.
 | [x] | `broadcast-debug` app.toml toggle             | `cmd/lumera/cmd/config.go`                                       |
 | [x] | Default `max_txs=5000`                        | App config defaults                                                |
 | [x] | Mempool eviction / capacity pressure testing    | `tests/integration/evm/mempool/capacity_pressure_test.go`        |
-| [ ] | Mempool metrics / observability                 | TODO — Expose mempool size, pending count, rejection rate metrics |
+| [x] | Mempool metrics / observability                 | `app/evm_mempool_metrics.go` — Prometheus gauges (size, pending, queued, broadcast\_queue\_depth) + labeled rejection counter (`rejections_total{source,reason}`) |
 
 ---
 
@@ -136,7 +135,7 @@ Cross-chain token registration and transfer.
 | [x] | ERC20 IBC middleware — v2 transfer stack       | `app/ibc.go`                                                         |
 | [x] | Governance-controlled ERC20 registration policy | `app/evm_erc20_policy.go` — `all`/`allowlist`(default)/`none` |
 | [x] | `MsgSetRegistrationPolicy` governance message | `app/evm_erc20_policy_msg.go`                                        |
-| [x] | Base denom allowlist (uatom, uosmo, uusdc)      | `app/evm_erc20_policy.go`                                            |
+| [x] | Provenance-bound base denom allowlist (uatom, uosmo, uusdc, inj — with IBC trace verification) | `app/evm_erc20_policy.go`                                            |
 | [x] | IBC store keys synced to EVM snapshot           | `app/evm.go` — `syncEVMStoreKeys()`, Bug #6 fix                   |
 | [x] | EVMTransferKeeper ICS4Wrapper back-reference    | `app/ibc.go`                                                         |
 | [ ] | ICS20 precompile transfer tx test               | TODO — Pending IBC channel config in integration test setup           |
@@ -172,6 +171,8 @@ Chain upgrade handling for EVM module stores.
 | [x] | Adaptive store upgrade manager                                          | `app/upgrades/store_upgrade_manager.go`                                                         |
 | [x] | EVM keeper refs in upgrade params                                       | `app/upgrades/params/params.go`                                                                 |
 | [x] | ERC20 param finalization after skipped `InitGenesis`                  | `app/upgrades/v1_12_0/upgrade.go`                                                               |
+| [x] | `PermissionlessRegistration` disabled (governance-only token pairs)  | `app/evm/genesis.go` — `LumeraERC20DefaultParams()`, Bug #24                                 |
+| [x] | ERC20 registration policy seeded during upgrade                        | `app/upgrades/v1_12_0/upgrade.go` — mode + provenance-bound base denom traces, Bug #25        |
 | [x] | Chain upgrade EVM state preservation test                               | `tests/integration/evm/contracts/upgrade_preservation_test.go`                                  |
 | [x] | `app.toml` config migration for pre-EVM nodes (Bug #19)               | `cmd/lumera/cmd/config_migrate.go` — auto-adds [evm], [json-rpc], [tls], [lumera.*] on startup |
 
@@ -211,22 +212,22 @@ Coin-type-118-to-60 account migration with dual-signature verification.
 
 Comprehensive test coverage across all layers.
 
-### Unit Tests (~244)
+### Unit Tests (~262)
 
 |     | Area                                                     | Tests |
 | --- | -------------------------------------------------------- | ----- |
-| [x] | App wiring / genesis / precompiles / mempool / broadcast | 37    |
+| [x] | App wiring / genesis / precompiles / mempool / broadcast | 38    |
 | [x] | EVM ante decorators                                      | 28    |
 | [x] | EVM module/config guard                                  | 6     |
 | [x] | Fee market                                               | 9     |
 | [x] | Precisebank                                              | 39    |
 | [x] | OpenRPC / generator                                      | 15    |
-| [x] | ERC20 policy                                             | 14    |
+| [x] | ERC20 policy                                             | 31    |
 | [x] | EVMigration keeper                                       | 107   |
 | [x] | EVMigration types / module / CLI                         | 8     |
 | [x] | Ante (evmigration fee, validate-basic)                   | 5     |
 
-### Integration Tests (~115)
+### Integration Tests (~121)
 
 |     | Area                                                                         | Tests |
 | --- | ---------------------------------------------------------------------------- | ----- |
@@ -235,7 +236,7 @@ Comprehensive test coverage across all layers.
 | [x] | Fee market                                                                   | 8     |
 | [x] | IBC ERC20                                                                    | 7     |
 | [x] | JSON-RPC / indexer (+ batch RPC)                                             | 23    |
-| [x] | Mempool (+ capacity pressure, WS subscriptions)                              | 10    |
+| [x] | Mempool (+ capacity pressure, WS subscriptions, metrics e2e)                 | 16    |
 | [x] | Precisebank                                                                  | 6     |
 | [x] | Precompiles (+ gas metering + action module)                                 | 21    |
 | [x] | VM queries / state                                                           | 12    |
@@ -335,24 +336,24 @@ External infrastructure for production ecosystem.
 | ----- | -------------------------- | ----------- | ----------------- |
 | 1     | Core EVM Runtime           | DONE        | 17/17             |
 | 2     | Ante Handler & Tx Routing  | DONE        | 13/13             |
-| 3     | Feemarket Configuration    | DONE        | 6/7               |
-| 4     | Mempool & Broadcast        | DONE        | 8/9               |
+| 3     | Feemarket Configuration    | DONE        | 6/6               |
+| 4     | Mempool & Broadcast        | DONE        | 9/9               |
 | 5     | JSON-RPC & Indexer         | DONE        | 9/9               |
 | 6     | Static Precompiles         | DONE        | 10/11             |
 | 7     | IBC + ERC20 Middleware     | DONE        | 7/8               |
 | 8     | OpenRPC Discovery          | DONE        | 10/10             |
-| 9     | Store Upgrades & Migration | DONE        | 6/6               |
+| 9     | Store Upgrades & Migration | DONE        | 8/8               |
 | 10    | Legacy Account Migration   | DONE        | 21/21             |
 | 11    | Testing                    | DONE        | 37/37             |
 | 12    | Custom Lumera Precompiles  | DONE        | 6/6               |
 | 13    | CosmWasm + EVM Interaction | TODO        | 0/4               |
-| 14    | Production Hardening       | IN PROGRESS | 3/8               |
+| 14    | Production Hardening       | IN PROGRESS | 4/8               |
 | 15    | Ecosystem & Tooling        | IN PROGRESS | 2/7               |
-|       | **TOTAL**            |             | **155/163** |
+|       | **TOTAL**            |             | **159/164** |
 
 ### Before Mainnet (Critical Path)
 
-1. **Security audit** (Phase 14) — non-negotiable for any Cosmos EVM chain
+1. ~~**Security audit** (Phase 14)~~ — DONE
 2. **Block explorer** (Phase 15) — user-facing ecosystem requirement
 3. **Monitoring runbook** (Phase 14) — operator readiness
 

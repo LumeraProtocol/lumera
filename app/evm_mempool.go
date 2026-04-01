@@ -3,12 +3,15 @@ package app
 import (
 	"cosmossdk.io/log"
 
+	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/client"
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkmempool "github.com/cosmos/cosmos-sdk/types/mempool"
 	evmconfig "github.com/cosmos/evm/config"
 	evmmempool "github.com/cosmos/evm/mempool"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // configureEVMMempool wires the Cosmos EVM mempool into BaseApp after ante is set.
@@ -59,7 +62,32 @@ func (app *App) configureEVMMempool(appOpts servertypes.AppOptions, logger log.L
 
 	app.evmMempool = evmMempool
 	app.SetMempool(evmMempool)
-	app.SetCheckTxHandler(evmmempool.NewCheckTxHandler(evmMempool))
+
+	// Wrap the upstream CheckTxHandler so that rejected transactions
+	// (non-zero response code or error) increment the labeled Prometheus
+	// rejection counter with source="checktx".
+	upstreamCheckTx := evmmempool.NewCheckTxHandler(evmMempool)
+	app.SetCheckTxHandler(func(runTx sdk.RunTx, req *abci.RequestCheckTx) (*abci.ResponseCheckTx, error) {
+		resp, err := upstreamCheckTx(runTx, req)
+		if app.evmMempoolMetrics != nil && (err != nil || (resp != nil && resp.Code != 0)) {
+			app.evmMempoolMetrics.IncRejection(rejSourceCheckTx, rejReasonAnte)
+			if app.evmBroadcastDebug {
+				code := int64(-1)
+				rawLog := ""
+				if resp != nil {
+					code = int64(resp.Code)
+					rawLog = resp.Log
+				}
+				app.evmBroadcastLog().Debug(
+					"checktx rejection counted",
+					"code", code,
+					"log", rawLog,
+					"err", err,
+				)
+			}
+		}
+		return resp, err
+	})
 
 	// PrepareProposal must use EVM-aware signer extraction so Ethereum txs are
 	// ordered by (sender, nonce) correctly in proposal selection.
@@ -70,6 +98,18 @@ func (app *App) configureEVMMempool(appOpts servertypes.AppOptions, logger log.L
 		),
 	)
 	app.SetPrepareProposal(abciProposalHandler.PrepareProposalHandler())
+
+	// Register Prometheus metrics for the EVM mempool. Gauges are read from
+	// live mempool state on each scrape; the rejection counter is incremented
+	// by broadcastEVMTransactions and CheckTx paths.
+	var broadcastQueueLenFn func() int
+	if app.evmTxBroadcaster != nil {
+		broadcastQueueLenFn = app.evmTxBroadcaster.queueLen
+	}
+	app.evmMempoolMetrics = newEVMMempoolMetrics(evmMempool, broadcastQueueLenFn)
+	if err := prometheus.Register(app.evmMempoolMetrics); err != nil {
+		logger.Warn("failed to register EVM mempool Prometheus metrics (may already be registered)", "err", err)
+	}
 
 	return nil
 }

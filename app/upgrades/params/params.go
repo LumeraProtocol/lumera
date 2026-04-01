@@ -2,6 +2,7 @@ package params
 
 import (
 	"cosmossdk.io/log"
+	storetypes "cosmossdk.io/store/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
 	consensuskeeper "github.com/cosmos/cosmos-sdk/x/consensus/keeper"
@@ -34,4 +35,5 @@ type AppUpgradeParams struct {
 	EVMKeeper             *evmkeeper.Keeper
 	FeeMarketKeeper       *feemarketkeeper.Keeper
 	Erc20Keeper           *erc20keeper.Keeper
+	Erc20StoreKey         *storetypes.KVStoreKey
 }

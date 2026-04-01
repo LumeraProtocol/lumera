@@ -60,6 +60,11 @@ func TestLumeraGenesisDefaults(t *testing.T) {
 		t,
 		feeGenesis.Params.BaseFee.Equal(sdkmath.LegacyMustNewDecFromStr(lcfg.FeeMarketDefaultBaseFee)),
 	)
+
+	erc20Params := evm.LumeraERC20DefaultParams()
+	require.True(t, erc20Params.EnableErc20, "ERC20 should be enabled")
+	require.False(t, erc20Params.PermissionlessRegistration,
+		"PermissionlessRegistration should be disabled — token pair registration requires governance")
 }
 
 // TestUpstreamDefaultEvmDenomIsNotLumera documents that cosmos/evm v0.6.0
@@ -85,6 +90,25 @@ func TestUpstreamDefaultEvmDenomIsNotLumera(t *testing.T) {
 		"Lumera EVM genesis should use ChainDenom (ulume)")
 	require.Equal(t, lcfg.ChainEVMExtendedDenom, lumeraGenesis.Params.ExtendedDenomOptions.ExtendedDenom,
 		"Lumera EVM genesis should use ChainEVMExtendedDenom (alume)")
+}
+
+// TestUpstreamERC20DefaultParamsArePermissive documents that cosmos/evm v0.6.0
+// erc20types.DefaultParams() enables PermissionlessRegistration. Lumera
+// overrides this via LumeraERC20DefaultParams(). If this test fails, upstream
+// defaults have changed and the override may need revisiting.
+func TestUpstreamERC20DefaultParamsArePermissive(t *testing.T) {
+	t.Parallel()
+
+	upstream := erc20types.DefaultParams()
+	require.True(t, upstream.EnableErc20)
+	require.True(t, upstream.PermissionlessRegistration,
+		"upstream DefaultParams should enable permissionless registration — "+
+			"Lumera overrides this to false via LumeraERC20DefaultParams()")
+
+	lumera := evm.LumeraERC20DefaultParams()
+	require.True(t, lumera.EnableErc20)
+	require.False(t, lumera.PermissionlessRegistration,
+		"Lumera must disable permissionless registration for security")
 }
 
 // TestRegisterModulesMatrix checks EVM module registration wiring used by CLI

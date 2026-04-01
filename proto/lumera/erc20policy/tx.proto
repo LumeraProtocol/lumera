@@ -17,6 +17,21 @@ service Msg {
       returns (MsgSetRegistrationPolicyResponse);
 }
 
+// SourceHop represents a single port/channel pair in an IBC denom trace.
+message SourceHop {
+  string port_id = 1;
+  string channel_id = 2;
+}
+
+// AllowedBaseDenomTrace binds a base denomination to a specific IBC provenance
+// path. The trace is the full expected sequence of hops for the received denom:
+// [{destPort, destChannel}, ...priorHops]. An empty trace is a valid placeholder
+// that never matches a real IBC packet (all packets have at least one hop).
+message AllowedBaseDenomTrace {
+  string base_denom = 1;
+  repeated SourceHop trace = 2;
+}
+
 // MsgSetRegistrationPolicy configures the IBC voucher ERC20 auto-registration
 // policy. It allows governance to control which IBC denoms are automatically
 // registered as ERC20 token pairs on first IBC receive.
@@ -38,15 +53,14 @@ message MsgSetRegistrationPolicy {
   // remove_denoms is a list of exact IBC denoms to remove from the allowlist.
   repeated string remove_denoms = 4;
 
-  // add_base_denoms is a list of base token denominations (e.g. "uatom",
-  // "uosmo") to add to the base denom allowlist. Base denom matching is
-  // channel-independent: approving "uatom" allows ATOM arriving via any
-  // IBC channel or multi-hop path.
-  repeated string add_base_denoms = 5;
+  // add_base_denom_traces adds provenance-bound base denom entries to the
+  // allowlist. Each entry binds a base denom (e.g. "uatom") to a specific
+  // IBC trace (the full expected hop sequence). Governance must provide the
+  // trace to activate a base denom entry.
+  repeated AllowedBaseDenomTrace add_base_denom_traces = 5;
 
-  // remove_base_denoms is a list of base denominations to remove from the
-  // base denom allowlist.
-  repeated string remove_base_denoms = 6;
+  // remove_base_denom_traces removes provenance-bound base denom entries.
+  repeated AllowedBaseDenomTrace remove_base_denom_traces = 6;
 }
 
 // MsgSetRegistrationPolicyResponse is the response type for

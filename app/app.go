@@ -108,6 +108,7 @@ import (
 	lumeraidmodulekeeper "github.com/LumeraProtocol/lumera/x/lumeraid/keeper"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	erc20keeper "github.com/cosmos/evm/x/erc20/keeper"
+	erc20types "github.com/cosmos/evm/x/erc20/types"
 	feemarketkeeper "github.com/cosmos/evm/x/feemarket/keeper"
 	precisebankkeeper "github.com/cosmos/evm/x/precisebank/keeper"
 	evmkeeper "github.com/cosmos/evm/x/vm/keeper"
@@ -150,6 +151,9 @@ type App struct {
 	// if true, the app will log additional information about mempool transaction broadcasts, which can be noisy but is useful for debugging mempool behavior.
 	evmBroadcastDebug  bool
 	evmBroadcastLogger log.Logger
+	// evmMempoolMetrics exposes Prometheus gauges (size, pending, queued) and a
+	// rejection counter for the app-side EVM mempool.
+	evmMempoolMetrics *evmMempoolMetrics
 
 	// openRPCAllowedOrigins controls CORS for the /openrpc.json endpoint.
 	// Populated from [json-rpc] ws-origins at startup; empty means allow all.
@@ -476,6 +480,7 @@ func (app *App) setupUpgrades() {
 		EVMKeeper:             app.EVMKeeper,
 		FeeMarketKeeper:       &app.FeeMarketKeeper,
 		Erc20Keeper:           &app.Erc20Keeper,
+		Erc20StoreKey:         app.GetKey(erc20types.StoreKey),
 	}
 
 	allUpgrades := upgrades.AllUpgrades(params)

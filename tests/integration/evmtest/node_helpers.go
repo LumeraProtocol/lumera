@@ -462,6 +462,42 @@ func setCometMempoolSize(t *testing.T, homeDir string, size int) {
 	}
 }
 
+// enablePrometheusMetrics enables the Cosmos SDK telemetry sink and API server
+// so that /metrics is available at the given apiAddress. The caller must
+// allocate a free port and pass it as "tcp://127.0.0.1:<port>".
+func enablePrometheusMetrics(t *testing.T, homeDir string, apiAddress string) {
+	t.Helper()
+
+	appTomlPath := filepath.Join(homeDir, "config", "app.toml")
+	appToml, err := os.ReadFile(appTomlPath)
+	if err != nil {
+		t.Fatalf("read app.toml: %v", err)
+	}
+	s := string(appToml)
+
+	// Enable the API server (hosts /metrics).
+	s = regexp.MustCompile(`(?m)(^\[api\]\n(?:.*\n)*?)^enable = false`).
+		ReplaceAllString(s, "${1}enable = true")
+
+	// Set API listen address to the allocated port.
+	s = regexp.MustCompile(`(?m)^address = "tcp://localhost:1317"`).
+		ReplaceAllString(s, fmt.Sprintf(`address = "%s"`, apiAddress))
+
+	// Enable telemetry (section-aware to avoid matching other "enabled" keys).
+	s = regexp.MustCompile(`(?m)(^\[telemetry\]\n(?:.*\n)*?)^enabled = false`).
+		ReplaceAllString(s, "${1}enabled = true")
+	s = regexp.MustCompile(`(?m)^prometheus-retention-time = [0-9]+`).
+		ReplaceAllString(s, "prometheus-retention-time = 60")
+
+	if s == string(appToml) {
+		t.Fatalf("failed to enable Prometheus metrics in app.toml")
+	}
+
+	if err := os.WriteFile(appTomlPath, []byte(s), 0o644); err != nil {
+		t.Fatalf("write app.toml: %v", err)
+	}
+}
+
 // setCometTxIndexer sets `[tx_index].indexer` in Comet config.toml.
 func setCometTxIndexer(t *testing.T, homeDir, indexer string) {
 	t.Helper()

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"strings"
 
 	"cosmossdk.io/log"
@@ -21,32 +22,13 @@ import (
 	"github.com/cosmos/ibc-go/v10/modules/core/exported"
 )
 
-// Registration policy mode constants.
-const (
-	// PolicyModeAll allows all IBC denoms to auto-register as ERC20 (default, backwards-compatible).
-	PolicyModeAll = "all"
-	// PolicyModeAllowlist only allows governance-approved IBC denoms to auto-register.
-	PolicyModeAllowlist = "allowlist"
-	// PolicyModeNone disables all IBC denom auto-registration.
-	PolicyModeNone = "none"
-)
-
-// KV store prefixes under the erc20 store key for policy state.
+// Policy mode and KV key constants are defined in erc20policytypes.
+// Local aliases for conciseness within this file.
 var (
-	policyModeKey      = []byte("lumera/erc20policy/mode")
-	policyAllowPfx     = []byte("lumera/erc20policy/allow/")
-	policyAllowBasePfx = []byte("lumera/erc20policy/allowbase/")
+	policyModeKey         = erc20policytypes.PolicyModeKey
+	policyAllowPfx        = erc20policytypes.PolicyAllowPfx
+	policyAllowBaseTracePfx = erc20policytypes.PolicyAllowBaseTracePfx
 )
-
-// DefaultAllowedBaseDenoms are well-known token base denominations that are
-// pre-populated in the allowlist on genesis. Governance can add or remove
-// entries at any time. Base denom matching is channel-independent: approving
-// "uatom" allows ATOM arriving via any IBC channel/path.
-var DefaultAllowedBaseDenoms = []string{
-	"uatom", // Cosmos Hub ATOM
-	"uosmo", // Osmosis OSMO
-	"uusdc", // Noble USDC (Circle)
-}
 
 // erc20KeeperWithDenomCheck extends the upstream Erc20Keeper interface with
 // IsDenomRegistered, used to skip policy checks for already-registered denoms.
@@ -87,7 +69,7 @@ func (w *erc20PolicyKeeperWrapper) OnRecvPacket(
 	mode := w.getRegistrationMode(ctx)
 
 	// Fast path: "all" mode delegates unconditionally (default behavior).
-	if mode == PolicyModeAll {
+	if mode == erc20policytypes.PolicyModeAll {
 		return w.inner.OnRecvPacket(ctx, packet, ack)
 	}
 
@@ -114,16 +96,20 @@ func (w *erc20PolicyKeeperWrapper) OnRecvPacket(
 		return w.inner.OnRecvPacket(ctx, packet, ack)
 	}
 
-	// Extract the base denom (e.g. "uatom") for base-denom allowlist matching.
+	// Extract the base denom (e.g. "uatom") for provenance-bound matching.
 	baseDenom := token.Denom.Base
 
 	// Apply policy for unregistered IBC denoms.
 	switch mode {
-	case PolicyModeNone:
+	case erc20policytypes.PolicyModeNone:
 		// IBC transfer succeeds; ERC20 registration is skipped.
 		return ack
-	case PolicyModeAllowlist:
-		if w.isIBCDenomAllowed(ctx, coin.Denom) || w.isBaseDenomAllowed(ctx, baseDenom) {
+	case erc20policytypes.PolicyModeAllowlist:
+		if w.isIBCDenomAllowed(ctx, coin.Denom) {
+			return w.inner.OnRecvPacket(ctx, packet, ack)
+		}
+		fullTrace := buildFullTrace(packet, token.Denom.Trace)
+		if w.isBaseDenomTraceAllowed(ctx, baseDenom, fullTrace) {
 			return w.inner.OnRecvPacket(ctx, packet, ack)
 		}
 		// Not in any allowlist — skip registration.
@@ -132,6 +118,23 @@ func (w *erc20PolicyKeeperWrapper) OnRecvPacket(
 		// Unknown mode, fall back to permissive behavior.
 		return w.inner.OnRecvPacket(ctx, packet, ack)
 	}
+}
+
+// buildFullTrace constructs the complete received denom trace by prepending
+// the packet's destination hop to the incoming trace from the packet data.
+func buildFullTrace(packet channeltypes.Packet, incomingTrace []transfertypes.Hop) []*erc20policytypes.SourceHop {
+	hops := make([]*erc20policytypes.SourceHop, 0, 1+len(incomingTrace))
+	hops = append(hops, &erc20policytypes.SourceHop{
+		PortId:    packet.GetDestPort(),
+		ChannelId: packet.GetDestChannel(),
+	})
+	for _, hop := range incomingTrace {
+		hops = append(hops, &erc20policytypes.SourceHop{
+			PortId:    hop.PortId,
+			ChannelId: hop.ChannelId,
+		})
+	}
+	return hops
 }
 
 // OnAcknowledgementPacket passes through to the inner keeper.
@@ -163,12 +166,12 @@ func (w *erc20PolicyKeeperWrapper) Logger(ctx sdk.Context) log.Logger {
 // ---------------------------------------------------------------------------
 
 // getRegistrationMode returns the current policy mode from the KV store.
-// Returns PolicyModeAllowlist if no mode has been set (secure default for new chains).
+// Returns erc20policytypes.PolicyModeAllowlist if no mode has been set (secure default for new chains).
 func (w *erc20PolicyKeeperWrapper) getRegistrationMode(ctx sdk.Context) string {
 	store := ctx.KVStore(w.storeKey)
 	bz := store.Get(policyModeKey)
 	if bz == nil {
-		return PolicyModeAllowlist
+		return erc20policytypes.PolicyModeAllowlist
 	}
 	return string(bz)
 }
@@ -218,38 +221,82 @@ func (w *erc20PolicyKeeperWrapper) getAllowedDenoms(ctx sdk.Context) []string {
 }
 
 // ---------------------------------------------------------------------------
-// Base denom allowlist helpers (channel-independent matching)
+// Provenance-bound base denom trace helpers
 // ---------------------------------------------------------------------------
 
-// isBaseDenomAllowed checks whether the given base denom (e.g. "uatom") is allowed.
-func (w *erc20PolicyKeeperWrapper) isBaseDenomAllowed(ctx sdk.Context, baseDenom string) bool {
-	store := prefix.NewStore(ctx.KVStore(w.storeKey), policyAllowBasePfx)
-	return store.Has([]byte(baseDenom))
+// baseDenomTraceStoreKey constructs the full KV key for a base denom + trace entry.
+// Format: baseDenom + "\x00" + traceKey
+func baseDenomTraceStoreKey(baseDenom string, trace []*erc20policytypes.SourceHop) []byte {
+	traceKey := erc20policytypes.EncodeTraceKey(trace)
+	key := make([]byte, 0, len(baseDenom)+1+len(traceKey))
+	key = append(key, []byte(baseDenom)...)
+	key = append(key, 0x00)
+	key = append(key, traceKey...)
+	return key
 }
 
-// setBaseDenomAllowed adds a base denom to the allowlist.
-func (w *erc20PolicyKeeperWrapper) setBaseDenomAllowed(ctx sdk.Context, baseDenom string) {
-	store := prefix.NewStore(ctx.KVStore(w.storeKey), policyAllowBasePfx)
-	store.Set([]byte(baseDenom), []byte{1})
+// setBaseDenomTraceAllowed adds a provenance-bound base denom entry.
+func (w *erc20PolicyKeeperWrapper) setBaseDenomTraceAllowed(ctx sdk.Context, baseDenom string, trace []*erc20policytypes.SourceHop) {
+	store := prefix.NewStore(ctx.KVStore(w.storeKey), policyAllowBaseTracePfx)
+	store.Set(baseDenomTraceStoreKey(baseDenom, trace), []byte{1})
 }
 
-// removeBaseDenomAllowed removes a base denom from the allowlist.
-func (w *erc20PolicyKeeperWrapper) removeBaseDenomAllowed(ctx sdk.Context, baseDenom string) {
-	store := prefix.NewStore(ctx.KVStore(w.storeKey), policyAllowBasePfx)
-	store.Delete([]byte(baseDenom))
+// removeBaseDenomTraceAllowed removes a specific provenance-bound base denom entry.
+func (w *erc20PolicyKeeperWrapper) removeBaseDenomTraceAllowed(ctx sdk.Context, baseDenom string, trace []*erc20policytypes.SourceHop) {
+	store := prefix.NewStore(ctx.KVStore(w.storeKey), policyAllowBaseTracePfx)
+	store.Delete(baseDenomTraceStoreKey(baseDenom, trace))
 }
 
-// getAllowedBaseDenoms returns all base denoms currently in the allowlist.
-func (w *erc20PolicyKeeperWrapper) getAllowedBaseDenoms(ctx sdk.Context) []string {
-	store := prefix.NewStore(ctx.KVStore(w.storeKey), policyAllowBasePfx)
+// removeAllBaseDenomTraces deletes all trace entries for a given base denom.
+func (w *erc20PolicyKeeperWrapper) removeAllBaseDenomTraces(ctx sdk.Context, baseDenom string) {
+	store := prefix.NewStore(ctx.KVStore(w.storeKey), policyAllowBaseTracePfx)
+	pfx := append([]byte(baseDenom), 0x00)
+	iter := store.Iterator(pfx, storetypes.PrefixEndBytes(pfx))
+	defer func() { _ = iter.Close() }()
+
+	var keys [][]byte
+	for ; iter.Valid(); iter.Next() {
+		keys = append(keys, append([]byte(nil), iter.Key()...))
+	}
+	for _, k := range keys {
+		store.Delete(k)
+	}
+}
+
+// isBaseDenomTraceAllowed checks whether the given base denom + full trace
+// exactly matches an allowed entry. Empty-trace entries (placeholders) never
+// match because fullTrace always has at least one hop for a real IBC packet.
+func (w *erc20PolicyKeeperWrapper) isBaseDenomTraceAllowed(ctx sdk.Context, baseDenom string, fullTrace []*erc20policytypes.SourceHop) bool {
+	if len(fullTrace) == 0 {
+		return false // real IBC packets always have at least one hop
+	}
+	store := prefix.NewStore(ctx.KVStore(w.storeKey), policyAllowBaseTracePfx)
+	return store.Has(baseDenomTraceStoreKey(baseDenom, fullTrace))
+}
+
+// getAllowedBaseDenomTraces returns all provenance-bound base denom entries.
+func (w *erc20PolicyKeeperWrapper) getAllowedBaseDenomTraces(ctx sdk.Context) []erc20policytypes.AllowedBaseDenomTrace {
+	store := prefix.NewStore(ctx.KVStore(w.storeKey), policyAllowBaseTracePfx)
 	iter := store.Iterator(nil, nil)
 	defer func() { _ = iter.Close() }()
 
-	var denoms []string
+	var entries []erc20policytypes.AllowedBaseDenomTrace
 	for ; iter.Valid(); iter.Next() {
-		denoms = append(denoms, string(iter.Key()))
+		key := iter.Key()
+		// Key format: baseDenom + "\x00" + traceKey
+		idx := bytes.IndexByte(key, 0x00)
+		if idx < 0 {
+			continue
+		}
+		baseDenom := string(key[:idx])
+		traceKey := key[idx+1:]
+		hops := erc20policytypes.DecodeTraceKey(traceKey)
+		entries = append(entries, erc20policytypes.AllowedBaseDenomTrace{
+			BaseDenom: baseDenom,
+			Trace:     hops,
+		})
 	}
-	return denoms
+	return entries
 }
 
 // ---------------------------------------------------------------------------
@@ -279,16 +326,18 @@ func (app *App) registerERC20Policy() {
 	)
 }
 
-// initERC20PolicyDefaults writes the default allowlist base denoms into the KV
-// store on first genesis. It is a no-op if the mode key already exists (i.e.
-// the chain has already been initialized or upgraded).
+// initERC20PolicyDefaults writes the default provenance-bound base denom entries
+// into the KV store on first genesis. Entries have empty traces (inert
+// placeholders — governance must bind real channels before they match). It is a
+// no-op if the mode key already exists (i.e. the chain has already been
+// initialized or upgraded).
 func (app *App) initERC20PolicyDefaults(ctx sdk.Context) {
 	store := ctx.KVStore(app.GetKey(erc20types.StoreKey))
 	if store.Has(policyModeKey) {
 		return // already initialized
 	}
-	app.erc20PolicyWrapper.setRegistrationMode(ctx, PolicyModeAllowlist)
-	for _, base := range DefaultAllowedBaseDenoms {
-		app.erc20PolicyWrapper.setBaseDenomAllowed(ctx, base)
+	app.erc20PolicyWrapper.setRegistrationMode(ctx, erc20policytypes.PolicyModeAllowlist)
+	for _, entry := range erc20policytypes.DefaultAllowedBaseDenomTraces {
+		app.erc20PolicyWrapper.setBaseDenomTraceAllowed(ctx, entry.BaseDenom, entry.Trace)
 	}
 }

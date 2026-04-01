@@ -7,7 +7,7 @@ See [main.md](main.md) for architecture, app changes, and operational details.
 
 ## Executive Summary
 
-Lumera ships **~398 EVM-related tests** spanning unit, integration, and devnet levels — the most comprehensive pre-mainnet EVM test suite in the Cosmos ecosystem. For context:
+Lumera ships **~420 EVM-related tests** spanning unit, integration, and devnet levels — the most comprehensive pre-mainnet EVM test suite in the Cosmos ecosystem. For context:
 
 - **Evmos** — the first Cosmos EVM chain — launched mainnet with primarily unit tests and a handful of end-to-end scripts; their integration test suite was built incrementally*after* mainnet issues surfaced (e.g., the zero-base-fee spam incident).
 - **Kava** — relied heavily on simulation tests and manual QA for their EVM launch; structured integration tests came later.
@@ -18,7 +18,7 @@ Lumera's suite goes beyond any of these baselines **before** mainnet:
 | Capability                                                                       | Lumera                                  | Typical Cosmos EVM chain at launch        |
 | -------------------------------------------------------------------------------- | --------------------------------------- | ----------------------------------------- |
 | Dual-route ante handler tests (EVM + Cosmos path)                                | 28 unit + 3 integration                 | Rarely tested separately                  |
-| App-side mempool (ordering, nonce gaps, replacement, capacity, WS subscriptions) | 12 integration                          | None (relies on CometBFT mempool)         |
+| App-side mempool (ordering, nonce gaps, replacement, capacity, WS subscriptions, metrics) | 16 integration + 10 unit (metrics)      | None (relies on CometBFT mempool)         |
 | Async broadcast queue (deadlock prevention)                                      | 4 unit                                  | Not applicable (novel to Lumera)          |
 | JSON-RPC batching, persistence across restart                                    | 23 integration                          | Basic RPC smoke tests                     |
 | ERC20/IBC middleware (v1 + v2 stacks)                                            | 7 integration + 14 unit (policy)        | Partial or post-launch                    |
@@ -45,7 +45,7 @@ All three previously identified critical test gaps (mempool capacity pressure, b
 | **Unit**        | app/feemarket                        | 9                                                                       | Excellent — params validation, base fee calculation, begin/end block, GRPC queries                                                                                                                                                                                                 |
 | **Unit**        | app/precisebank                      | 39                                                                      | Excellent — invariants, error parity with bank, mint/burn, lifecycle, permissions, types                                                                                                                                                                                           |
 | **Unit**        | app/evm/ante                         | 28                                                                      | Excellent — path routing, authz limits, nonce, gas, sig verification, mono decorator, genesis skip, fee checker                                                                                                                                                                    |
-| **Unit**        | app/evm\_broadcast, app/evm\_mempool | 14                                                                      | High — async broadcast queue, dedupe, re-entry hazard, pending tx listener, queue full/panic recovery, partial failure attempts all txs, broadcastEVMTransactionsSync regression (all txs attempted on failure)                                                                     |
+| **Unit**        | app/evm\_broadcast, app/evm\_mempool, app/evm\_mempool\_metrics | 24                                                                      | High — async broadcast queue, dedupe, re-entry hazard, pending tx listener, queue full/panic recovery, partial failure attempts all txs, broadcastEVMTransactionsSync regression (all txs attempted on failure), Prometheus metrics (describe, collect, labeled rejections, label independence, broadcast queue depth, wiring, size-excludes-queued, CheckTx wrapper) |
 | **Unit**        | app/evm, app/evm/config              | 10                                                                      | High — genesis defaults, module order, permissions, precompiles, preinstalls, static config                                                                                                                                                                                        |
 | **Unit**        | app/evm\_erc20\_policy               | 14                                                                      | High — 3 modes, base denom + exact ibc/ allowlist CRUD, init defaults, governance msg handler                                                                                                                                                                                      |
 | **Unit**        | app/ibc\_erc20                       | 1                                                                       | Low — wiring verification only; integration tests cover functional paths                                                                                                                                                                                                           |
@@ -59,7 +59,7 @@ All three previously identified critical test gaps (mempool capacity pressure, b
 | **Integration** | evm/ante                             | 3                                                                       | Medium — authz generic grant reject/allow, cosmos tx fee enforcement                                                                                                                                                                                                               |
 | **Integration** | evm/jsonrpc                          | 23                                                                      | Very high — basic methods, backend methods, receipts, logs, mixed blocks, tx ordering, block lookup, persistence across restart, OpenRPC endpoint, account state, indexer disabled, batch requests                                                                                 |
 | **Integration** | evm/precompiles                      | 29                                                                      | High — bank, staking, distribution, gov, bech32, p256, slashing (params, signing infos, unjail), ICS20 (denoms, denomHash, denom), action (getParams, getActionFee, getActionsByState, getActionsByCreator, requestCascade bad-sig, approveAction non-existent), supernode (getParams, listSuperNodes, getTopSuperNodesForBlock, register tx, reportMetrics tx, reportMetrics auth), delegate tx, withdraw address tx, gas metering accuracy (6 precompiles), estimate-vs-actual |
-| **Integration** | evm/mempool                          | 12                                                                      | High — fee priority ordering, contention ordering, nonce gap promotion, pending subscription, disabled mode, nonce replacement, capacity overflow, rapid replacement race, newHeads/logs WS subscriptions                                                                          |
+| **Integration** | evm/mempool                          | 16                                                                      | High — fee priority ordering, contention ordering, nonce gap promotion, pending subscription, disabled mode, nonce replacement, capacity overflow, rapid replacement race, newHeads/logs WS subscriptions, txpool\_status pending/queued verification, overflow rejection observability, Prometheus /metrics e2e scrape (gauges + labeled rejections via CometBFT CheckTx) |
 | **Integration** | evm/contracts                        | 15                                                                      | High — deploy/call/revert/persistence, CALL, DELEGATECALL, CREATE2, STATICCALL, code + storage persistence across restart, EVM state preservation across restart, concurrent mixed operations, ERC20 approve/allowance/transferFrom, contract→precompile proxy (action + supernode) |
 | **Integration** | evm/ibc                              | 7                                                                       | High — registration on recv, disabled skip, invalid receiver, denom collision, round-trip transfer, secondary denom, burn-back                                                                                                                                                     |
 | **Integration** | evm/vm                               | 12                                                                      | High — params, address conversion, account queries (hex/bech32), balance compat, storage key format, code/storage match JSON-RPC, historical nonce/code/storage snapshots, ERC20 balance                                                                                           |
@@ -71,7 +71,7 @@ All three previously identified critical test gaps (mempool capacity pressure, b
 | **Devnet**      | devnet/ibc                           | 1                                                                       | Low — basic IBC connectivity                                                                                                                                                                                                                                                       |
 | **Devnet**      | devnet/version                       | 1                                                                       | Low — binary version mode check                                                                                                                                                                                                                                                    |
 |                       |                                      |                                                                         |                                                                                                                                                                                                                                                                                     |
-|                       | **Totals**                     | **Unit: ~244 · Integration: ~125 · Devnet: 12+ · Total: ~406** |                                                                                                                                                                                                                                                                                     |
+|                       | **Totals**                     | **Unit: ~253 · Integration: ~127 · Devnet: 12+ · Total: ~417** |                                                                                                                                                                                                                                                                                     |
 
 ### Gaps and next steps
 
@@ -98,7 +98,7 @@ All three previously identified critical test gaps (mempool capacity pressure, b
 
 ### Bottom line
 
-Lumera's EVM integration is **architecturally excellent and feature-complete** for its current scope, and it is already ahead in several operator-facing areas (tracing, rate limiting, governance-controlled ERC20 voucher policy, and mempool hardening). The main remaining gap versus mature production Cosmos EVM chains is **final operational hardening and ecosystem surface**: security audit, CORS/namespace lock-down playbooks, monitoring, and external block explorer.
+Lumera's EVM integration is **architecturally excellent and feature-complete** for its current scope, and it is already ahead in several operator-facing areas (tracing, rate limiting, governance-controlled ERC20 voucher policy, and mempool hardening). Security audit, CORS origin lockdown, and JSON-RPC namespace exposure profiles are all complete. The main remaining gap versus mature production Cosmos EVM chains is **ecosystem surface**: monitoring runbook and external block explorer.
 
 ---
 
@@ -115,6 +115,7 @@ Primary files:
 - `app/evm_mempool_test.go`
 - `app/evm_mempool_reentry_test.go`
 - `app/evm_broadcast_test.go`
+- `app/evm_mempool_metrics_test.go`
 - `app/pending_tx_listener_test.go`
 - `app/ibc_erc20_middleware_test.go`
 - `app/ibc_test.go`
@@ -148,6 +149,15 @@ Primary files:
 | `TestEVMTxBroadcastDispatcherReleasesPendingAfterProcessError`      | Verifies pending hashes are released after broadcast process errors.                                                                                                                                                            |
 | `TestEVMTxBroadcastDispatcherEnqueueRemainsNonBlocking`             | Verifies enqueue does not block while worker is processing.                                                                                                                                                                     |
 | `TestBroadcastEVMTxFromFieldRecovery`                               | Regression guard:`FromEthereumTx` leaves `From` empty; `FromSignedEthereumTx` recovers the sender.                                                                                                                        |
+| `TestEVMMempoolMetricsDescribeReturnsAllDescriptors`                | Verifies Describe emits all 5 expected metric descriptors (size, pending, queued, broadcast\_queue\_depth, rejections\_total).                                                                                                    |
+| `TestEVMMempoolMetricsCollectReturnsGaugesAndCounter`               | Verifies Collect emits 4 gauges + 1 counter with sensible initial values.                                                                                                                                                        |
+| `TestEVMMempoolMetricsIncRejections`                                | Verifies rejection counter increments correctly for single and bulk operations.                                                                                                                                                   |
+| `TestEVMMempoolMetricsIncRejectionsBy_ZeroAndNegativeIgnored`       | Verifies zero and negative values do not modify the rejection counter.                                                                                                                                                            |
+| `TestEVMMempoolMetricsNilBroadcastQueueLenFn`                       | Verifies nil broadcastQueueLenFn produces zero broadcast\_queue\_depth without panic.                                                                                                                                             |
+| `TestEVMMempoolMetricsWiredOnAppStartup`                            | Verifies metrics collector is initialized and wired into App struct during startup.                                                                                                                                                |
+| `TestEVMMempoolMetricsBroadcastQueueDepthReportsLive`               | Verifies broadcast\_queue\_depth gauge reads live value from provided function on each scrape.                                                                                                                                     |
+| `TestEVMMempoolMetricsSizeExcludesQueued`                           | Verifies size gauge reflects only proposal-eligible txs (pending + cosmos pool), not queued nonce-gap txs.                                                                                                                         |
+| `TestEVMMempoolMetricsCheckTxWrapperIncrementsRejections`           | Verifies the CheckTx handler wrapper increments the rejection counter on invalid tx submission.                                                                                                                                     |
 | `TestRegisterPendingTxListenerFanout`                               | Verifies registered pending-tx listeners are invoked for each pending hash event.                                                                                                                                               |
 | `TestIBCERC20MiddlewareWiring`                                      | Verifies IBC transfer stack includes ERC20 middleware wiring in app composition.                                                                                                                                                |
 | `TestIsInterchainAccount`                                           | Verifies ICA account type detection helper behavior.                                                                                                                                                                            |
@@ -174,13 +184,16 @@ Primary files:
 | `TestERC20Policy_AllowlistMode_AllowsListed`                        | "allowlist" mode allows governance-approved denoms.                                                                                                                                                                             |
 | `TestERC20Policy_PassthroughMethods`                                | `OnAcknowledgementPacket`, `OnTimeoutPacket`, `Logger` pass through to inner keeper.                                                                                                                                      |
 | `TestERC20Policy_AllowlistCRUD`                                     | Allowlist add/remove/list operations work correctly.                                                                                                                                                                            |
-| `TestERC20Policy_AllowlistMode_AllowsBaseDenom`                     | "allowlist" mode allows IBC denoms whose base denom (e.g. "uatom") is in the base denom allowlist.                                                                                                                              |
-| `TestERC20Policy_AllowlistMode_BlocksUnlistedBaseDenom`             | "allowlist" mode blocks IBC denoms whose base denom is not in either allowlist.                                                                                                                                                 |
-| `TestERC20Policy_BaseDenomCRUD`                                     | Base denom allowlist add/remove/list operations work correctly.                                                                                                                                                                 |
-| `TestERC20Policy_InitDefaults`                                      | `initERC20PolicyDefaults` sets mode to "allowlist" and populates `DefaultAllowedBaseDenoms`; is idempotent.                                                                                                                 |
-| `TestERC20PolicyMsg_SetRegistrationPolicy`                          | Governance message handler: authority validation, mode changes, ibc denom add/remove, base denom add/remove, error cases.                                                                                                       |
+| `TestERC20Policy_AllowlistMode_DirectTransferAllowed`               | Allows IBC denom whose base denom and full trace match an allowed entry.                                                                                                                                                        |
+| `TestERC20Policy_AllowlistMode_BlocksWrongChannel`                  | Blocks IBC denom arriving via non-allowed channel even with allowed base denom.                                                                                                                                                 |
+| `TestERC20Policy_AllowlistMode_BlocksMultiHopOnSameChannel`        | Single-hop trace blocks multi-hop uatom relayed through the same destination channel.                                                                                                                                           |
+| `TestERC20Policy_AllowlistMode_MultiHopTraceAllowed`               | 2-hop trace restriction matches correct multi-hop path.                                                                                                                                                                         |
+| `TestERC20Policy_AllowlistMode_EmptyTracePlaceholder`              | Entry with empty trace never matches any real IBC packet.                                                                                                                                                                       |
+| `TestERC20Policy_BaseDenomTraceCRUD`                                | Trace-bound base denom add/remove/list operations work correctly, including `removeAllBaseDenomTraces`.                                                                                                                         |
+| `TestERC20Policy_InitDefaults`                                      | `initERC20PolicyDefaults` sets mode to "allowlist" and populates `DefaultAllowedBaseDenomTraces` with empty traces (inert placeholders); is idempotent.                                                                      |
+| `TestERC20PolicyMsg_SetRegistrationPolicy`                          | Governance message handler: authority validation, mode changes, ibc denom add/remove, base denom trace add/remove, validation errors.                                                                                           |
 | `TestV1120SkipsEVMInitGenesis`                                      | Verifies the v1.12.0 upgrade handler pre-populates `fromVM` with EVM module consensus versions to skip `InitGenesis`, preventing upstream `DefaultParams().EvmDenom = "aatom"` from polluting the EVM coin info KV store. |
-| `TestV1120InitializesERC20ParamsWhenInitGenesisIsSkipped`           | Verifies the v1.12.0 upgrade handler backfills `x/erc20` default params after skipping `InitGenesis`, so upgraded chains do not come up with `EnableErc20=false` and `PermissionlessRegistration=false`.                |
+| `TestV1120InitializesERC20ParamsWhenInitGenesisIsSkipped`           | Verifies the v1.12.0 upgrade handler backfills Lumera ERC20 params (`EnableErc20=true`, `PermissionlessRegistration=false`) after skipping `InitGenesis`, and seeds the ERC20 registration policy (mode=`allowlist`, provenance-bound base denom traces as inert placeholders). Bugs #8, #24, #25. |
 
 ### B) EVM ante unit tests (`app/evm`)
 
@@ -590,8 +603,8 @@ Suites:
 
 ### F) Mempool integration
 
-Purpose: validates app-side EVM mempool behavior for ordering, pending visibility, nonce handling, and replacement policy.
-Suite: `tests/integration/evm/mempool/suite_test.go`
+Purpose: validates app-side EVM mempool behavior for ordering, pending visibility, nonce handling, replacement policy, and metrics observability.
+Suite: `tests/integration/evm/mempool/suite_test.go`, `tests/integration/evm/mempool/metrics_txpool_status_test.go`, `tests/integration/evm/mempool/metrics_prometheus_e2e_test.go`
 
 | Test                                        | Description                                                                           |
 | ------------------------------------------- | ------------------------------------------------------------------------------------- |
@@ -606,6 +619,10 @@ Suite: `tests/integration/evm/mempool/suite_test.go`
 | `NewHeadsSubscriptionEmitsBlocks`         | WS `newHeads` subscription receives block header with expected fields.              |
 | `LogsSubscriptionEmitsEvents`             | WS `logs` subscription receives LOG1 event from a deployed contract.                |
 | `NewHeadsSubscriptionMultipleBlocks`      | WS `newHeads` delivers 3 consecutive headers with monotonically increasing numbers. |
+| `TestTxPoolStatusReflectsPendingAndQueued`| Verifies txpool\_status JSON-RPC reports correct pending/queued counts after sequential and nonce-gap txs. |
+| `TestTxPoolStatusOverflowKeepsPoolBounded` | Verifies flooding a low-capacity mempool results in rejections and txpool\_status reflects the bounded pool size. |
+| `TestPrometheusMetricsExposeMempoolGauges` | E2E: starts a node with Prometheus telemetry enabled, scrapes `/metrics?format=prometheus`, verifies gauge metrics exist, submits sequential txs (pending increases), submits nonce-gap tx (queued increases). |
+| `TestPrometheusRejectionsCountedViaCometCheckTx` | E2E: submits malformed bytes via CometBFT `broadcast_tx_sync`, verifies `rejections_total{source="checktx",reason="ante"}` counter increases on `/metrics` scrape. |
 
 ### G) Precisebank integration
 
@@ -692,18 +709,17 @@ See [devnet-tests.md](devnet-tests.md) for full details on the EVM migration dev
 
 ### High priority (before mainnet)
 
-1. **Security audit of EVM integration layer** — All comparable chains (Evmos, Kava, Cronos) underwent dedicated EVM audits before mainnet.
-2. **Production JSON-RPC hardening profile** — Rate limiting is implemented, but deployment profiles should explicitly lock CORS origins and namespace exposure (`debug`, `personal`, `admin`) per environment.
+1. ~~**Security audit of EVM integration layer**~~ — DONE. See [security-audit.md](security-audit.md).
+2. ~~**Production JSON-RPC hardening profile**~~ — DONE. CORS origin lockdown (`app/openrpc/http.go`), namespace exposure lockdown (`cmd/lumera/cmd/jsonrpc_policy.go`), rate limiter fixed to front public port (Bug #20).
+3. **External block explorer integration** — Blockscout or Etherscan-compatible explorer. All comparable chains have this at mainnet.
 
 ### Medium priority
 
-1. **Lumera module precompiles** — Action module precompile implemented at `0x0901` with typed Cascade/Sense request/finalize + generic approve + all queries (`precompiles/action/`). Supernode module precompile implemented at `0x0902` with register/deregister/start/stop/update/reportMetrics + all queries (`precompiles/supernode/`). Other chains (Evmos: staking/distribution/IBC/vesting, Kava: swap/earn) ship custom precompiles at launch.
-2. **CosmWasm + EVM interaction design** — Document whether/how CosmWasm contracts and EVM contracts can interact. Consider a bridge mechanism, shared query paths, or explicit isolation. Lumera is the only Cosmos EVM chain also running CosmWasm, so there is no precedent to follow.
-3. **Chain upgrade EVM state preservation test** — Deploy a contract, perform upgrade, verify contract still works. No test currently validates EVM state survives a chain upgrade.
-4. **External block explorer integration** — Blockscout or Etherscan-compatible explorer. All comparable chains have this at mainnet.
+1. **CosmWasm + EVM interaction design** — Document whether/how CosmWasm contracts and EVM contracts can interact. Consider a bridge mechanism, shared query paths, or explicit isolation. Lumera is the only Cosmos EVM chain also running CosmWasm, so there is no precedent to follow.
+2. **Ops monitoring runbook** — Document fee market monitoring (base fee tracking, gas utilization trends), alerting thresholds, and common failure mode diagnosis.
+3. **EVM governance proposals** — Mechanism to toggle precompiles and adjust EVM params via on-chain governance (Evmos has dedicated governance proposals for this).
 
 ### Low priority
 
-1. **Precompile gas metering benchmarks** — Validate actual gas consumption vs expected for each precompile and compare against upstream Cosmos EVM defaults.
-2. **Ops monitoring runbook** — Document fee market monitoring (base fee tracking, gas utilization trends), alerting thresholds, and common failure mode diagnosis.
-3. **EVM governance proposals** — Mechanism to toggle precompiles and adjust EVM params via on-chain governance (Evmos has dedicated governance proposals for this).
+1. **Multi-validator EVM consensus scenarios** — Expand devnet tests beyond single-validator assertions.
+2. **ERC20 provenance policy tests** — Add tests for "same base denom, different IBC trace" to validate admission policy (security audit Finding #3).

@@ -264,16 +264,12 @@ type MsgMigrateValidator struct {
 	// legacy_pub_key is the compressed secp256k1 public key of the legacy account.
 	LegacyPubKey []byte `protobuf:"bytes,3,opt,name=legacy_pub_key,json=legacyPubKey,proto3" json:"legacy_pub_key,omitempty"`
 	// legacy_signature: secp256k1 signature over
-	//
-	//	SHA256("lumera-evm-migration:<chain_id>:<evm_chain_id>:validator:<legacy_address>:<new_address>")
-	//
+	//   SHA256("lumera-evm-migration:<chain_id>:<evm_chain_id>:validator:<legacy_address>:<new_address>")
 	// proving legacy key holder consents to the EVM migration.
 	// Also accepts ADR-036 signArbitrary signatures (Keplr/Leap wallet path).
 	LegacySignature []byte `protobuf:"bytes,4,opt,name=legacy_signature,json=legacySignature,proto3" json:"legacy_signature,omitempty"`
 	// new_signature: eth_secp256k1 signature over
-	//
-	//	Keccak256("lumera-evm-migration:<chain_id>:<evm_chain_id>:validator:<legacy_address>:<new_address>")
-	//
+	//   Keccak256("lumera-evm-migration:<chain_id>:<evm_chain_id>:validator:<legacy_address>:<new_address>")
 	// proving the destination key holder consents to receive the migrated validator state.
 	// Also accepts EIP-191 personal_sign signatures (Keplr/Leap wallet path).
 	NewSignature []byte `protobuf:"bytes,5,opt,name=new_signature,json=newSignature,proto3" json:"new_signature,omitempty"`

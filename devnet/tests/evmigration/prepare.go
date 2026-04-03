@@ -212,10 +212,10 @@ func runPrepare() {
 	}
 
 	log.Println("--- Waiting for supernode upload readiness ---")
-	if waitForEligibleCascadeSupernodes(validators, 90*time.Second) {
-		log.Println("  cascade uploads enabled: at least one registered supernode is ACTIVE")
+	if waitForEligibleCascadeSupernodes(validators, 180*time.Second) {
+		log.Println("  cascade uploads enabled: at least one ACTIVE supernode reports peers > 1")
 	} else {
-		log.Println("  WARN: no ACTIVE cascade supernodes detected within 90s; upload-backed action creation may still fail")
+		log.Println("  WARN: no ACTIVE supernode reported peers > 1 within 180s; upload-backed action creation may still fail")
 	}
 
 	// Create activity for legacy accounts in parallel batches.

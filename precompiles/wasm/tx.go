@@ -32,11 +32,8 @@ func (p Precompile) executeWasm(
 		return nil, err
 	}
 
-	// Convert EVM caller to bech32
-	caller, err := crossruntime.EVMAddrToBech32(p.addrCdc, contract.Caller())
-	if err != nil {
-		return nil, fmt.Errorf("invalid caller address: %w", err)
-	}
+	// Convert EVM caller to sdk.AccAddress (20-byte truncation, matching EVM address derivation)
+	callerAddr := sdk.AccAddress(contract.Caller().Bytes())
 
 	// Convert bech32 contract address to sdk.AccAddress
 	wasmAddr, err := sdk.AccAddressFromBech32(contractAddr)
@@ -47,12 +44,12 @@ func (p Precompile) executeWasm(
 	p.Logger(ctx).Debug(
 		"tx called",
 		"method", method.Name,
-		"caller", caller,
+		"caller", callerAddr.String(),
 		"wasm_contract", contractAddr,
 	)
 
 	// Execute the CosmWasm contract (non-payable: no funds)
-	resp, err := p.wasmPermKeeper.Execute(ctx, wasmAddr, sdk.AccAddress(contract.Caller().Bytes()), msgBytes, sdk.Coins{})
+	resp, err := p.wasmPermKeeper.Execute(ctx, wasmAddr, callerAddr, msgBytes, sdk.Coins{})
 	if err != nil {
 		return nil, fmt.Errorf("wasm execute failed: %w", err)
 	}

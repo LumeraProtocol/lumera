@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
-	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 	wasmvmtypes "github.com/CosmWasm/wasmvm/v3/types"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -79,7 +78,12 @@ type EVMAccountResponse struct {
 // capped at DefaultCrossRuntimeGasCap or the remaining gas on the meter.
 func gasCapForCall(ctx sdk.Context) uint64 {
 	meter := ctx.GasMeter()
-	remaining := meter.Limit() - meter.GasConsumed()
+	consumed := meter.GasConsumed()
+	limit := meter.Limit()
+	if consumed >= limit {
+		return 0
+	}
+	remaining := limit - consumed
 	if remaining > DefaultCrossRuntimeGasCap {
 		return DefaultCrossRuntimeGasCap
 	}
@@ -364,6 +368,3 @@ func EVMWasmPluginOpts(evmKeeper *keeper.Keeper) []wasmkeeper.Option {
 
 // Ensure evmMessageHandler satisfies the Messenger interface at compile time.
 var _ wasmkeeper.Messenger = (*evmMessageHandler)(nil)
-
-// Suppress unused import lint for wasmtypes (used for ErrUnknownMsg awareness).
-var _ = wasmtypes.ErrUnknownMsg

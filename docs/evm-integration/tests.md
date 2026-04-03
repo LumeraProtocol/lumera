@@ -69,7 +69,7 @@ All three previously identified critical test gaps (mempool capacity pressure, b
 | **Devnet**      | EVM / fee market / cross-peer / IBC  | 12+   | High — [details](tests/devnet.md) |
 | **Devnet**      | EVMigration tool                     | 7 modes | High — [details](tests/devnet.md#evm-migration-devnet-tests) |
 |                 |                                      |       |                  |
-|                 | **Totals**                           | **Unit: ~297 · Integration: ~146 · Devnet: 12+ · Total: ~470** | |
+|                 | **Totals**                           | **Unit: ~397 · Integration: ~146 · Devnet: 12+ · Total: ~555** | |
 
 ### Gaps and next steps
 

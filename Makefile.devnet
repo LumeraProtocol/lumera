@@ -1,5 +1,6 @@
 .PHONY: devnet-build devnet-tests-build devnet-up devnet-reset devnet-up-detach devnet-down devnet-stop devnet-clean devnet-deploy-tar devnet-upgrade devnet-new devnet-start devnet-evm-upgrade
 .PHONY: devnet-build-default _check-devnet-default-cfg _devnet-select-default-genesis devnet-refresh-bin devnet-upgrade-binaries devnet-upgrade-binaries-default devnet-update-scripts
+.PHONY: devnet-download-binaries
 .PHONY: devnet-evmigration-sync-bin devnet-evmigration-prepare devnet-evmigration-estimate devnet-evmigration-migrate devnet-evmigration-migrate-validator devnet-evmigration-cleanup
 .PHONY: devnet-evmigrationp-prepare devnet-evmigrationp-estimate devnet-evmigrationp-migrate devnet-evmigrationp-migrate-validator devnet-evmigrationp-migrate-all devnet-evmigrationp-cleanup
 
@@ -367,6 +368,16 @@ devnet-refresh-bin:
 	fi; \
 	chmod +x "${DEVNET_BIN_DIR}/lumerad"; \
 	echo "Refreshed ${DEVNET_BIN_DIR} from current repo build."
+
+# Download pre-built binaries for a specific lumera version from GitHub releases.
+# Usage: make devnet-download-binaries VERSION=v1.11.1
+devnet-download-binaries:
+	@if [ -z "$(VERSION)" ]; then \
+		echo "Usage: make devnet-download-binaries VERSION=<lumera-version>"; \
+		echo "  e.g. make devnet-download-binaries VERSION=v1.11.1"; \
+		exit 1; \
+	fi
+	@./devnet/scripts/download-binaries.sh "$(VERSION)"
 
 devnet-update-scripts:
 	@if [ ! -f "$(COMPOSE_FILE)" ]; then \

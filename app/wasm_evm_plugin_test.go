@@ -3,6 +3,7 @@ package app
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"cosmossdk.io/log"
@@ -320,7 +321,7 @@ func TestEVMMessageHandler_InvalidContractAddress(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for invalid EVM address, got nil")
 	}
-	if !containsString(err.Error(), "invalid target contract") {
+	if !strings.Contains(err.Error(), "invalid target contract") {
 		t.Fatalf("unexpected error message: %v", err)
 	}
 }
@@ -336,7 +337,7 @@ func TestEVMMessageHandler_InvalidCalldataHex(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for invalid calldata hex, got nil")
 	}
-	if !containsString(err.Error(), "invalid calldata hex") {
+	if !strings.Contains(err.Error(), "invalid calldata hex") {
 		t.Fatalf("unexpected error message: %v", err)
 	}
 }
@@ -441,23 +442,4 @@ func TestEVMQueryHandler_EVMAccountReentrancyBlocked(t *testing.T) {
 	if !errors.Is(err, crossruntime.ErrReentrancyNotAllowed) {
 		t.Fatalf("expected ErrReentrancyNotAllowed, got: %v", err)
 	}
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-func containsString(haystack, needle string) bool {
-	return len(haystack) >= len(needle) && (haystack == needle ||
-		len(needle) == 0 ||
-		(len(haystack) > 0 && searchSubstring(haystack, needle)))
-}
-
-func searchSubstring(s, sub string) bool {
-	for i := 0; i <= len(s)-len(sub); i++ {
-		if s[i:i+len(sub)] == sub {
-			return true
-		}
-	}
-	return false
 }

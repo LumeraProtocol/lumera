@@ -47,12 +47,20 @@ go test -tags='test' ./tests/integration/evm/ibc/... -v -timeout 5m
 # All EVM integration tests at once:
 go test -tags='integration test' ./tests/integration/evm/... -v -timeout 15m
 
-# Devnet (local Docker testnet with 3 validators + Hermes relayer)
+# Devnet (local Docker testnet with 5 validators + Hermes relayer)
 make devnet-new               # Full clean rebuild + start
 make devnet-build-default     # Build devnet from default config
-make devnet-up                # Start containers
-make devnet-down              # Stop containers
+make devnet-up                # Start containers (attached)
+make devnet-up-detach         # Start containers (detached)
+make devnet-down              # Stop and remove containers
+make devnet-stop              # Stop containers (keep state)
+make devnet-start             # Start stopped containers
 make devnet-clean             # Remove all devnet data (/tmp/lumera-devnet-1/)
+make devnet-refresh-bin       # Copy build/lumerad into devnet/bin/ (run after make build)
+make devnet-upgrade-binaries  # Copy devnet/bin/ into all containers + restart (run devnet-refresh-bin first)
+make devnet-update-scripts    # Update devnet scripts in containers
+make devnet-reset             # Reset chain state, keep config
+make devnet-evm-upgrade       # Run EVM upgrade on devnet
 ```
 
 **Note**: `claims.csv` is only needed if genesis `TotalClaimableAmount > 0` (claiming period ended 2025-01-01; default is now 0).

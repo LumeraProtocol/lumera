@@ -360,35 +360,11 @@ func migrateOne(rec *AccountRecord) migrateResult {
 	rec.NewName = newRec.Name
 	rec.NewAddress = newRec.Address
 
-	// Sign the migration message using the legacy private key.
-	var sigB64, pubB64 string
-	if rec.Mnemonic != "" {
-		sigB64, err = signMigrationMessage("claim", rec.Mnemonic, rec.Address, newRec.Address)
-		if err != nil {
-			log.Printf("  FAIL: sign for %s: %v", rec.Name, err)
-			return migrateFailed
-		}
-		pubB64 = rec.PubKeyB64
-	} else {
-		// No mnemonic (key reused from keyring); export private key hex.
-		privHex, expErr := exportPrivateKeyHex(rec.Name)
-		if expErr != nil {
-			log.Printf("  FAIL: export key for %s: %v", rec.Name, expErr)
-			return migrateFailed
-		}
-		sigB64, pubB64, err = signMigrationMessageWithPrivHex("claim", privHex, rec.Address, newRec.Address)
-		if err != nil {
-			log.Printf("  FAIL: sign for %s: %v", rec.Name, err)
-			return migrateFailed
-		}
-	}
-
-	// Submit the migration transaction.
-	// AutoCLI positional args: [new-address] [legacy-address] [legacy-pub-key] [legacy-signature]
+	// Submit the migration transaction — both legacy and new keys are in the
+	// keyring, so the CLI handles proof signing internally.
 	_, err = runTx(
 		"tx", "evmigration", "claim-legacy-account",
-		newRec.Address, rec.Address, pubB64, sigB64,
-		"--from", newRec.Name)
+		rec.Name, newRec.Name)
 	if err != nil {
 		log.Printf("  FAIL: claim-legacy-account %s -> %s: %v", rec.Name, newRec.Address, err)
 		return migrateFailed

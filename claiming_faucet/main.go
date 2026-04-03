@@ -542,6 +542,9 @@ func (s *Server) handlePing(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	// Set Lumera bech32 prefixes so addresses encode/decode correctly.
+	lumeracfg.SetupConfig()
+
 	// Create server
 	server, err := NewServer("config.json")
 	if err != nil {

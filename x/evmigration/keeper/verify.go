@@ -91,7 +91,9 @@ func VerifyLegacySignature(chainID string, evmChainID uint64, kind string, legac
 		return nil
 	}
 
-	return types.ErrInvalidLegacySignature
+	return types.ErrInvalidLegacySignature.Wrapf(
+		"payload was signed for chain-id %q; verify the --chain-id flag matches the target chain", chainID,
+	)
 }
 
 func normalizeRecoverySignatures(signature []byte) ([][]byte, error) {
@@ -169,6 +171,8 @@ func findMatchingRecoveredAddress(hash []byte, signature []byte, expected sdk.Ac
 func VerifyNewSignature(chainID string, evmChainID uint64, kind string, legacyAddr, newAddr sdk.AccAddress, newSignature []byte) error {
 	payload := migrationPayload(chainID, evmChainID, kind, legacyAddr, newAddr)
 
+	chainIDHint := fmt.Sprintf("; if the signing chain-id differs from %q the recovered address will not match", chainID)
+
 	// Try 1: raw payload — CLI / keyring signing path.
 	if derivedAddr, ok, err := findMatchingRecoveredAddress(ethcrypto.Keccak256(payload), newSignature, newAddr); err == nil {
 		if ok {
@@ -179,11 +183,11 @@ func VerifyNewSignature(chainID string, evmChainID uint64, kind string, legacyAd
 				return nil
 			}
 			return types.ErrNewPubKeyAddressMismatch.Wrapf(
-				"recovered signer derives to %s, expected %s", eip191DerivedAddr, newAddr,
+				"recovered signer derives to %s, expected %s%s", eip191DerivedAddr, newAddr, chainIDHint,
 			)
 		}
 		return types.ErrNewPubKeyAddressMismatch.Wrapf(
-			"recovered signer derives to %s, expected %s", derivedAddr, newAddr,
+			"recovered signer derives to %s, expected %s%s", derivedAddr, newAddr, chainIDHint,
 		)
 	}
 
@@ -193,9 +197,11 @@ func VerifyNewSignature(chainID string, evmChainID uint64, kind string, legacyAd
 			return nil
 		}
 		return types.ErrNewPubKeyAddressMismatch.Wrapf(
-			"recovered signer derives to %s, expected %s", derivedAddr, newAddr,
+			"recovered signer derives to %s, expected %s%s", derivedAddr, newAddr, chainIDHint,
 		)
 	}
 
-	return types.ErrInvalidNewSignature
+	return types.ErrInvalidNewSignature.Wrapf(
+		"payload was signed for chain-id %q; verify the --chain-id flag matches the target chain", chainID,
+	)
 }

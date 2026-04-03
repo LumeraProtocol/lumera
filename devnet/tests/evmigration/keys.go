@@ -4,7 +4,6 @@
 package main
 
 import (
-	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -368,24 +367,6 @@ func listKeys() ([]keyRecord, error) {
 	return nil, fmt.Errorf("unexpected keys list json: %s", truncate(string(out), 300))
 }
 
-// exportPrivateKeyHex exports the raw private key hex for a key in the test keyring.
-func exportPrivateKeyHex(name string) (string, error) {
-	args := []string{
-		"keys", "export", name,
-		"--unsafe", "--unarmored-hex", "--yes",
-		"--keyring-backend", "test",
-	}
-	if *flagHome != "" {
-		args = append(args, "--home", *flagHome)
-	}
-	cmd := exec.Command(*flagBin, args...)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("keys export %s: %s\n%w", name, string(out), err)
-	}
-	return strings.TrimSpace(string(out)), nil
-}
-
 // deriveAddressFromMnemonic derives the bech32 address for a mnemonic using
 // the appropriate coin type and key algorithm.
 func deriveAddressFromMnemonic(mnemonic string, isLegacy bool) (string, error) {
@@ -502,69 +483,6 @@ func getAddress(name string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-// --- Signing ---
-
-// evmChainID is the Lumera EVM chain ID used in migration payload signing.
-// Must match config/evm.go EVMChainID.
-const evmChainID uint64 = 76857769
-
-// migrationPayloadMsg builds the canonical migration payload string.
-func migrationPayloadMsg(kind, legacyAddr, newAddr string) string {
-	return fmt.Sprintf("lumera-evm-migration:%s:%d:%s:%s:%s", *flagChainID, evmChainID, kind, legacyAddr, newAddr)
-}
-
-// signMigrationMessage creates a legacy signature for the migration message.
-func signMigrationMessage(kind, mnemonic, legacyAddr, newAddr string) (string, error) {
-	privKey, err := deriveKey(mnemonic, 118)
-	if err != nil {
-		return "", fmt.Errorf("derive legacy key: %w", err)
-	}
-
-	msg := migrationPayloadMsg(kind, legacyAddr, newAddr)
-	hash := sha256.Sum256([]byte(msg))
-	sig, err := privKey.Sign(hash[:])
-	if err != nil {
-		return "", fmt.Errorf("sign: %w", err)
-	}
-	return base64.StdEncoding.EncodeToString(sig), nil
-}
-
-// signMigrationMessageWithPrivHex signs the migration message using a raw
-// private key hex string. Returns the base64 signature and public key.
-func signMigrationMessageWithPrivHex(kind, privHex, legacyAddr, newAddr string) (sigB64 string, pubKeyB64 string, err error) {
-	privBz, err := hex.DecodeString(strings.TrimSpace(privHex))
-	if err != nil {
-		return "", "", fmt.Errorf("decode private key hex: %w", err)
-	}
-	if len(privBz) != 32 {
-		return "", "", fmt.Errorf("unexpected private key length: %d", len(privBz))
-	}
-	privKey := &secp256k1.PrivKey{Key: privBz}
-	pubKey := privKey.PubKey().(*secp256k1.PubKey)
-
-	msg := migrationPayloadMsg(kind, legacyAddr, newAddr)
-	hash := sha256.Sum256([]byte(msg))
-	sig, err := privKey.Sign(hash[:])
-	if err != nil {
-		return "", "", fmt.Errorf("sign: %w", err)
-	}
-
-	return base64.StdEncoding.EncodeToString(sig), base64.StdEncoding.EncodeToString(pubKey.Key), nil
-}
-
-// signStringWithLegacyKey signs an arbitrary payload using a legacy (coin-type 118) key
-// derived from the mnemonic. Returns a base64-encoded signature.
-func signStringWithLegacyKey(mnemonic, payload string) (string, error) {
-	privKey, err := deriveKey(mnemonic, 118)
-	if err != nil {
-		return "", fmt.Errorf("derive legacy key: %w", err)
-	}
-	sig, err := privKey.Sign([]byte(payload))
-	if err != nil {
-		return "", fmt.Errorf("sign payload: %w", err)
-	}
-	return base64.StdEncoding.EncodeToString(sig), nil
-}
 
 // signStringWithPrivHex signs an arbitrary payload using a raw private key hex.
 // Returns a base64-encoded signature.

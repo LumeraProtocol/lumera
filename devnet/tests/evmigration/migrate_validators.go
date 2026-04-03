@@ -4,7 +4,6 @@
 package main
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -13,7 +12,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
@@ -332,32 +330,11 @@ func migrateOneValidator(c validatorCandidate) (ok bool, skipped bool) {
 		log.Printf("  FAIL: create destination key from mnemonic: %v", err)
 		return false, false
 	}
-	privHex, err := exportPrivateKeyHex(c.KeyName)
-	if err != nil {
-		log.Printf("  FAIL: export validator key: %v", err)
-		return false, false
-	}
-	sigB64, pubB64, err := signMigrationMessageWithPrivHex("validator", privHex, c.LegacyAddress, newRec.Address)
-	if err != nil {
-		log.Printf("  FAIL: sign migration payload: %v", err)
-		return false, false
-	}
-
-	pubBz, err := base64.StdEncoding.DecodeString(pubB64)
-	if err != nil {
-		log.Printf("  FAIL: decode pubkey b64: %v", err)
-		return false, false
-	}
-	legacyPub := &secp256k1.PubKey{Key: pubBz}
-	if sdk.AccAddress(legacyPub.Address()).String() != c.LegacyAddress {
-		log.Printf("  FAIL: exported key does not match legacy validator address")
-		return false, false
-	}
-
+	// Submit the migration transaction — both legacy and new keys are in the
+	// keyring, so the CLI handles proof signing internally.
 	_, err = runTx(
 		"tx", "evmigration", "migrate-validator",
-		newRec.Address, c.LegacyAddress, pubB64, sigB64,
-		"--from", newRec.Name)
+		c.KeyName, newRec.Name)
 	if err != nil {
 		log.Printf("  FAIL: migrate-validator tx failed: %v", err)
 		return false, false

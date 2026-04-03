@@ -372,6 +372,7 @@ write_user_account_record() {
 
 	if [ ! -f "${USER_ACCOUNTS_FILE}" ]; then
 		printf '[]\n' >"${USER_ACCOUNTS_FILE}"
+		chmod 644 "${USER_ACCOUNTS_FILE}"
 	fi
 
 	tmp_file="$(mktemp)"
@@ -404,7 +405,9 @@ write_user_account_record() {
 			created_at: $created_at
 		}]
 		' "${USER_ACCOUNTS_FILE}" >"${tmp_file}"
+	chmod 644 "${tmp_file}"
 	mv "${tmp_file}" "${USER_ACCOUNTS_FILE}"
+	chmod 644 "${USER_ACCOUNTS_FILE}"
 }
 
 cmd_new_account() {

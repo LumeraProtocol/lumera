@@ -19,6 +19,7 @@ Related documents:
 - [tune-guide.md](tune-guide.md) — Mainnet parameter tuning guide: fee market, gas limits, mempool, RPC limits, and peer-chain comparisons
 - [security-audit.md](security-audit.md) — Security audit findings and recommendations
 - [evmigration-ui.md](evmigration-ui.md) — EVM legacy account migration portal UI and wallet rollout
+- [evmigration-user-guide.md](evmigration-user-guide.md) — Step-by-step migration guide for end users (Portal + Keplr and CLI methods)
 - [devnet-tests.md](devnet-tests.md) — Devnet end-to-end migration test tool documentation
 - [block-explorer.md](block-explorer.md) — External block explorer (Blockscout) integration plan and deployment steps
 

@@ -11,7 +11,7 @@ import (
 //
 // NOTE: Vesting precompile is intentionally excluded because Cosmos EVM's
 // DefaultStaticPrecompiles registry does not currently install an implementation
-// for evmtypes.VestingPrecompileAddress in v0.5.1.
+// for evmtypes.VestingPrecompileAddress.
 var LumeraActiveStaticPrecompiles = []string{
 	evmtypes.P256PrecompileAddress,
 	evmtypes.Bech32PrecompileAddress,

@@ -5,6 +5,7 @@ import (
 
 	"cosmossdk.io/math"
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/query"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
@@ -126,54 +127,77 @@ func TestQueryMigrationStats(t *testing.T) {
 	require.NoError(t, f.keeper.MigrationCounter.Set(f.ctx, 5))
 	require.NoError(t, f.keeper.ValidatorMigrationCounter.Set(f.ctx, 2))
 
+	// Account with secp256k1 pubkey and balance → counted as legacy.
 	legacyPK := secp256k1.GenPrivKey().PubKey()
 	legacyAddr := sdk.AccAddress(legacyPK.Address())
 	legacyAcc := authtypes.NewBaseAccountWithAddress(legacyAddr)
 	require.NoError(t, legacyAcc.SetPubKey(legacyPK))
 
+	// Validator account with secp256k1 pubkey → counted as legacy validator.
 	validatorPK := secp256k1.GenPrivKey().PubKey()
 	validatorAddr := sdk.AccAddress(validatorPK.Address())
 	validatorAcc := authtypes.NewBaseAccountWithAddress(validatorAddr)
 	require.NoError(t, validatorAcc.SetPubKey(validatorPK))
 
+	// Already-migrated account → excluded from legacy count.
 	migratedPK := secp256k1.GenPrivKey().PubKey()
 	migratedAddr := sdk.AccAddress(migratedPK.Address())
 	migratedAcc := authtypes.NewBaseAccountWithAddress(migratedAddr)
 	require.NoError(t, migratedAcc.SetPubKey(migratedPK))
+	migratedNewAddr := testAccAddr()
 	require.NoError(t, f.keeper.MigrationRecords.Set(f.ctx, migratedAddr.String(), types.MigrationRecord{
 		LegacyAddress: migratedAddr.String(),
-		NewAddress:    testAccAddr().String(),
+		NewAddress:    migratedNewAddr.String(),
 	}))
+
+	// Nil-pubkey account with balance → counted as legacy (funded but never signed).
+	nilPKAddr := testAccAddr()
+	nilPKAcc := authtypes.NewBaseAccountWithAddress(nilPKAddr)
+
+	// Migration destination account (nil pubkey, has balance) → excluded.
+	migDestAddr := migratedNewAddr
+	migDestAcc := authtypes.NewBaseAccountWithAddress(migDestAddr)
+	require.NoError(t, f.keeper.MigrationRecordByNewAddress.Set(f.ctx, migDestAddr.String(), migratedAddr.String()))
 
 	f.accountKeeper.EXPECT().IterateAccounts(gomock.Any(), gomock.Any()).
 		Do(func(_ any, cb func(sdk.AccountI) bool) {
 			cb(legacyAcc)
 			cb(validatorAcc)
 			cb(migratedAcc)
+			cb(nilPKAcc)
+			cb(migDestAcc)
 		})
 
 	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), legacyAddr).Return(
 		sdk.NewCoins(sdk.NewInt64Coin("ulume", 1000)),
 	)
 	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), validatorAddr).Return(sdk.Coins{})
+	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), nilPKAddr).Return(
+		sdk.NewCoins(sdk.NewInt64Coin("ulume", 500)),
+	)
 	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), legacyAddr, uint16(1)).Return(
 		[]stakingtypes.Delegation{
 			stakingtypes.NewDelegation(legacyAddr.String(), testAccAddr().String(), math.LegacyNewDec(100)),
 		}, nil,
 	)
 	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), validatorAddr, uint16(1)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), nilPKAddr, uint16(1)).Return(nil, nil)
 	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), sdk.ValAddress(legacyAddr)).Return(
 		stakingtypes.Validator{}, stakingtypes.ErrNoValidatorFound,
 	)
 	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), sdk.ValAddress(validatorAddr)).Return(
 		stakingtypes.Validator{OperatorAddress: sdk.ValAddress(validatorAddr).String()}, nil,
 	)
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), sdk.ValAddress(nilPKAddr)).Return(
+		stakingtypes.Validator{}, stakingtypes.ErrNoValidatorFound,
+	)
 
 	resp, err := qs.MigrationStats(f.ctx, &types.QueryMigrationStatsRequest{})
 	require.NoError(t, err)
 	require.Equal(t, uint64(5), resp.TotalMigrated)
 	require.Equal(t, uint64(2), resp.TotalValidatorsMigrated)
-	require.Equal(t, uint64(2), resp.TotalLegacy)
+	// 3 legacy: legacyAcc + validatorAcc + nilPKAcc (migrated excluded, migDest excluded).
+	require.Equal(t, uint64(3), resp.TotalLegacy)
 	require.Equal(t, uint64(1), resp.TotalLegacyStaked)
 	require.Equal(t, uint64(1), resp.TotalValidatorsLegacy)
 }
@@ -216,6 +240,15 @@ func TestQueryMigrationEstimate_NonValidator(t *testing.T) {
 		},
 	)
 
+	// Has balance.
+	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(
+		sdk.NewCoins(sdk.NewCoin("ulume", math.NewInt(5000000000))),
+	)
+	// No supernode.
+	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), sdk.ValAddress(addr)).Return(
+		sntypes.SuperNode{}, false,
+	)
+
 	resp, err := qs.MigrationEstimate(f.ctx, &types.QueryMigrationEstimateRequest{
 		LegacyAddress: addr.String(),
 	})
@@ -225,6 +258,8 @@ func TestQueryMigrationEstimate_NonValidator(t *testing.T) {
 	require.Equal(t, uint64(2), resp.DelegationCount)
 	require.Equal(t, uint64(2), resp.ActionCount)
 	require.Equal(t, uint64(4), resp.TotalTouched)
+	require.Equal(t, "5000000000ulume", resp.BalanceSummary)
+	require.False(t, resp.HasSupernode)
 }
 
 // TestQueryMigrationEstimate_AlreadyMigrated verifies that already-migrated addresses
@@ -252,6 +287,10 @@ func TestQueryMigrationEstimate_AlreadyMigrated(t *testing.T) {
 	f.authzKeeper.EXPECT().IterateGrants(gomock.Any(), gomock.Any())
 	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
 	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
+	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(sdk.Coins{})
+	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), sdk.ValAddress(addr)).Return(
+		sntypes.SuperNode{}, false,
+	)
 
 	resp, err := qs.MigrationEstimate(f.ctx, &types.QueryMigrationEstimateRequest{
 		LegacyAddress: addr.String(),
@@ -259,6 +298,8 @@ func TestQueryMigrationEstimate_AlreadyMigrated(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, resp.WouldSucceed)
 	require.Equal(t, "already migrated", resp.RejectionReason)
+	require.Empty(t, resp.BalanceSummary)
+	require.False(t, resp.HasSupernode)
 }
 
 // --- LegacyAccounts query tests ---
@@ -433,6 +474,60 @@ func TestQueryLegacyAccounts_DefaultLimit(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, resp.Accounts, 1)
 	require.Equal(t, uint64(1), resp.Pagination.Total)
+}
+
+// TestQueryLegacyAccounts_NilPubkeyIncluded verifies that accounts with nil pubkey
+// but non-zero balance are counted as legacy (funded but never signed).
+func TestQueryLegacyAccounts_NilPubkeyIncluded(t *testing.T) {
+	f := initMockFixture(t)
+	qs := keeper.NewQueryServerImpl(f.keeper)
+
+	nilPKAddr := testAccAddr()
+	nilPKAcc := authtypes.NewBaseAccountWithAddress(nilPKAddr)
+
+	f.accountKeeper.EXPECT().IterateAccounts(gomock.Any(), gomock.Any()).
+		Do(func(_ any, cb func(sdk.AccountI) bool) {
+			cb(nilPKAcc)
+		})
+	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), nilPKAddr).Return(
+		sdk.NewCoins(sdk.NewInt64Coin("ulume", 5000)),
+	)
+	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), nilPKAddr, uint16(1)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), sdk.ValAddress(nilPKAddr)).Return(
+		stakingtypes.Validator{}, stakingtypes.ErrNoValidatorFound,
+	)
+
+	resp, err := qs.LegacyAccounts(f.ctx, &types.QueryLegacyAccountsRequest{
+		Pagination: &query.PageRequest{Limit: 10},
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.Accounts, 1)
+	require.Equal(t, nilPKAddr.String(), resp.Accounts[0].Address)
+}
+
+// TestQueryLegacyAccounts_MigrationDestExcluded verifies that migration destination
+// accounts (nil pubkey, non-zero balance) are NOT counted as legacy.
+func TestQueryLegacyAccounts_MigrationDestExcluded(t *testing.T) {
+	f := initMockFixture(t)
+	qs := keeper.NewQueryServerImpl(f.keeper)
+
+	// Migration destination with balance → should be excluded.
+	destAddr := testAccAddr()
+	destAcc := authtypes.NewBaseAccountWithAddress(destAddr)
+	legacyAddr := testAccAddr()
+	require.NoError(t, f.keeper.MigrationRecordByNewAddress.Set(f.ctx, destAddr.String(), legacyAddr.String()))
+
+	f.accountKeeper.EXPECT().IterateAccounts(gomock.Any(), gomock.Any()).
+		Do(func(_ any, cb func(sdk.AccountI) bool) {
+			cb(destAcc)
+		})
+
+	resp, err := qs.LegacyAccounts(f.ctx, &types.QueryLegacyAccountsRequest{
+		Pagination: &query.PageRequest{Limit: 10},
+	})
+	require.NoError(t, err)
+	require.Empty(t, resp.Accounts)
+	require.Equal(t, uint64(0), resp.Pagination.Total)
 }
 
 // --- MigratedAccounts query tests ---

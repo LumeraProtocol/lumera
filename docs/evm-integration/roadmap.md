@@ -212,7 +212,7 @@ Coin-type-118-to-60 account migration with dual-signature verification.
 
 Comprehensive test coverage across all layers.
 
-### Unit Tests (~262)
+### Unit Tests (~298)
 
 |     | Area                                                     | Tests |
 | --- | -------------------------------------------------------- | ----- |
@@ -223,8 +223,9 @@ Comprehensive test coverage across all layers.
 | [x] | Precisebank                                              | 39    |
 | [x] | OpenRPC / generator                                      | 15    |
 | [x] | ERC20 policy                                             | 31    |
-| [x] | EVMigration keeper                                       | 107   |
-| [x] | EVMigration types / module / CLI                         | 8     |
+| [x] | EVMigration keeper                                       | 109   |
+| [x] | EVMigration types / module                               | 5     |
+| [x] | EVMigration CLI (two positional args: legacy-key, new-key) | 26    |
 | [x] | Ante (evmigration fee, validate-basic)                   | 5     |
 
 ### Integration Tests (~121)

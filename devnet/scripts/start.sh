@@ -306,7 +306,7 @@ start_lumera() {
 	echo "[BOOT] ${MONIKER}: Starting lumerad..."
 	CLAIMS_LOCAL="${DAEMON_HOME}/config/claims.csv"
 	EXTRA_START_FLAGS=""
-	if [ -f "${CLAIMS_LOCAL}" ] && "${DAEMON}" start --help 2>&1 | grep -q 'skip-claims-check'; then
+	if [ -f "${CLAIMS_LOCAL}" ] && "${DAEMON}" start --help 2>&1 | grep -q 'skip-claims-check' && "${DAEMON}" start --help 2>&1 | grep -q 'claims-path'; then
 		EXTRA_START_FLAGS="--skip-claims-check=false --claims-path=${CLAIMS_LOCAL}"
 		echo "[BOOT] ${MONIKER}: Claims CSV found, loading claim records at genesis"
 	fi

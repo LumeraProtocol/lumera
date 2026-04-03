@@ -39,16 +39,31 @@ type legacyAccountStatus struct {
 func (qs queryServer) remainingLegacyAccountStatus(ctx sdk.Context, acc sdk.AccountI) (legacyAccountStatus, bool) {
 	status := legacyAccountStatus{}
 
-	pk := acc.GetPubKey()
-	if pk == nil {
-		return status, false
-	}
-	if _, ok := pk.(*secp256k1.PubKey); !ok {
+	// Skip module accounts — they cannot be migrated.
+	if _, ok := acc.(sdk.ModuleAccountI); ok {
 		return status, false
 	}
 
+	pk := acc.GetPubKey()
+	if pk != nil {
+		// Account has a pubkey — only count secp256k1 (legacy key type).
+		// eth_secp256k1, ed25519, etc. are new/non-legacy key types.
+		if _, ok := pk.(*secp256k1.PubKey); !ok {
+			return status, false
+		}
+	}
+	// pk == nil: account was funded but never signed a tx. These are still
+	// legacy accounts that hold funds on pre-EVM addresses and need migration.
+
 	addr := acc.GetAddress()
-	if hasMigrated, err := qs.k.MigrationRecords.Has(ctx, addr.String()); err == nil && hasMigrated {
+	addrStr := addr.String()
+
+	if hasMigrated, err := qs.k.MigrationRecords.Has(ctx, addrStr); err == nil && hasMigrated {
+		return status, false
+	}
+
+	// Exclude migration destination accounts (new EVM addresses created by migration).
+	if isNewAddr, err := qs.k.MigrationRecordByNewAddress.Has(ctx, addrStr); err == nil && isNewAddr {
 		return status, false
 	}
 
@@ -215,6 +230,17 @@ func (qs queryServer) MigrationEstimate(goCtx context.Context, req *types.QueryM
 		}
 		return false
 	})
+
+	// Balance summary.
+	balances := qs.k.bankKeeper.GetAllBalances(ctx, addr)
+	if !balances.IsZero() {
+		resp.BalanceSummary = balances.String()
+	}
+
+	// Check supernode registration.
+	if _, found := qs.k.supernodeKeeper.QuerySuperNode(ctx, sdk.ValAddress(addr)); found {
+		resp.HasSupernode = true
+	}
 
 	resp.TotalTouched = resp.DelegationCount + resp.UnbondingCount + resp.RedelegationCount +
 		resp.AuthzGrantCount + resp.FeegrantCount + resp.ActionCount +

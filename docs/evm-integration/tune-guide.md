@@ -454,7 +454,7 @@ These parameters affect **RPC node operators** and **dApp developers**, not end-
 | Attribute | Value |
 |-----------|-------|
 | **Lumera default** | Configurable: `"all"`, `"allowlist"`, or `"none"` |
-| **Default allowed base denoms** | `uatom`, `uosmo`, `uusdc` |
+| **Default allowed base denoms** | `uatom`, `uosmo`, `uusdc`, `inj` |
 | **Governance changeable** | Yes (via `MsgSetRegistrationPolicy`) |
 
 **What it does:** Controls which IBC tokens automatically get ERC20 representations. In `"all"` mode, any IBC token that arrives gets an ERC20 contract deployed. In `"allowlist"` mode, only pre-approved tokens do.

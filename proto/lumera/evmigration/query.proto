@@ -146,6 +146,10 @@ message QueryMigrationEstimateResponse {
   // action_count is the number of action records where this address appears
   // either as creator or in the SuperNodes list.
   uint64 action_count = 13;
+  // balance_summary is a human-readable total balance across all denoms (e.g. "10000000000ulume").
+  string balance_summary = 14;
+  // has_supernode is true if the legacy address owns a registered supernode.
+  bool   has_supernode   = 15;
 }
 
 // QueryMigrationStatsRequest is the request type for the Query/MigrationStats RPC method.

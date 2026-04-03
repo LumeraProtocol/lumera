@@ -371,3 +371,44 @@ func TestVerifyNewSignature_BothPathsRejectGarbage(t *testing.T) {
 	err := keeper.VerifyNewSignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, garbageSig)
 	require.ErrorIs(t, err, types.ErrInvalidNewSignature)
 }
+
+// TestVerifyLegacySignature_ChainIDMismatch verifies that a valid signature
+// signed with a different chain ID is rejected and the error hints at the
+// chain ID used during verification.
+func TestVerifyLegacySignature_ChainIDMismatch(t *testing.T) {
+	privKey := secp256k1.GenPrivKey()
+	pubKey := privKey.PubKey().(*secp256k1.PubKey)
+	legacyAddr := sdk.AccAddress(pubKey.Address())
+	_, newAddr := testNewMigrationAccount(t)
+
+	// Sign with a different chain ID.
+	wrongChainID := "lumera-wrong-99"
+	msg := fmt.Sprintf("lumera-evm-migration:%s:%d:%s:%s:%s", wrongChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr.String(), newAddr.String())
+	hash := sha256.Sum256([]byte(msg))
+	sig, err := privKey.Sign(hash[:])
+	require.NoError(t, err)
+
+	// Verify against the correct chain ID — should fail.
+	err = keeper.VerifyLegacySignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, pubKey.Key, sig)
+	require.ErrorIs(t, err, types.ErrInvalidLegacySignature)
+	require.ErrorContains(t, err, testChainID, "error must include the expected chain ID to help diagnose mismatches")
+}
+
+// TestVerifyNewSignature_ChainIDMismatch verifies that a valid new-key
+// signature signed with a different chain ID is rejected and the error
+// hints at the chain ID.
+func TestVerifyNewSignature_ChainIDMismatch(t *testing.T) {
+	legacyAddr := sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address())
+	newPrivKey, newAddr := testNewMigrationAccount(t)
+
+	// Sign with a different chain ID.
+	wrongChainID := "lumera-wrong-99"
+	payload := []byte(fmt.Sprintf("lumera-evm-migration:%s:%d:%s:%s:%s", wrongChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr.String(), newAddr.String()))
+	sig, err := newPrivKey.Sign(payload)
+	require.NoError(t, err)
+
+	// Verify against the correct chain ID — should fail.
+	err = keeper.VerifyNewSignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, sig)
+	require.Error(t, err)
+	require.ErrorContains(t, err, testChainID, "error must include the expected chain ID to help diagnose mismatches")
+}

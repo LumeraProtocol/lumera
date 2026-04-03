@@ -1,6 +1,7 @@
 package openrpc
 
 import (
+	"strings"
 	"sync"
 
 	evmmempool "github.com/cosmos/evm/mempool"
@@ -46,7 +47,7 @@ func RegisterJSONRPCNamespace() error {
 // EnsureNamespaceEnabled appends the OpenRPC discovery namespace to a namespace list.
 func EnsureNamespaceEnabled(namespaces []string) []string {
 	for _, ns := range namespaces {
-		if ns == Namespace {
+		if strings.EqualFold(strings.TrimSpace(ns), Namespace) {
 			return namespaces
 		}
 	}

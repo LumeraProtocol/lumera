@@ -3,7 +3,7 @@ package cli
 import (
 	"bufio"
 	"context"
-	"encoding/base64"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"os"
@@ -13,7 +13,9 @@ import (
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/cosmos/cosmos-sdk/client/input"
+	"github.com/cosmos/cosmos-sdk/client/rpc"
 	clienttx "github.com/cosmos/cosmos-sdk/client/tx"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
 	signingtypes "github.com/cosmos/cosmos-sdk/types/tx/signing"
@@ -26,6 +28,9 @@ import (
 const (
 	migrationProofKindClaim     = "claim"
 	migrationProofKindValidator = "validator"
+
+	flagTxTimeout    = "tx-timeout"
+	defaultTxTimeout = "30s"
 )
 
 // GetTxCmd returns the custom tx commands for evmigration.
@@ -49,74 +54,154 @@ func GetTxCmd() *cobra.Command {
 
 func cmdClaimLegacyAccount() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "claim-legacy-account [new-address] [legacy-address] [legacy-pub-key] [legacy-signature]",
+		Use:   "claim-legacy-account <legacy-key> <new-key>",
 		Short: "Migrate on-chain state from legacy to new address",
-		Args:  cobra.ExactArgs(4),
+		Long: `Migrate on-chain state from a legacy (coin-type 118) address to a new (coin-type 60) address.
+
+Both keys must be in the keyring. The CLI derives addresses, generates
+both proofs, simulates gas, and broadcasts. No fee is charged.
+
+  lumerad tx evmigration claim-legacy-account legacy-key new-key
+
+<legacy-key> must be a secp256k1 key (coin-type 118).
+<new-key> must be an eth_secp256k1 key (coin-type 60).
+Both keys must come from the same mnemonic.`,
+		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			msg, err := buildClaimLegacyAccountMsg(args)
+			if err := preflightChainIDCheck(cmd); err != nil {
+				return err
+			}
+			msg, newKeyName, err := resolveClaimMsg(cmd, args[0], args[1])
 			if err != nil {
 				return err
 			}
-			return runMigrationTx(cmd, msg, migrationProofKindClaim)
+			return runMigrationTx(cmd, msg, migrationProofKindClaim, newKeyName)
 		},
 	}
 	flags.AddTxFlagsToCmd(cmd)
+	cmd.Flags().String(flagTxTimeout, defaultTxTimeout, "How long to wait for the transaction to be included in a block (e.g. 30s, 1m)")
 	return cmd
 }
 
 func cmdMigrateValidator() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "migrate-validator [new-address] [legacy-address] [legacy-pub-key] [legacy-signature]",
+		Use:   "migrate-validator <legacy-validator-key> <new-validator-evm-key>",
 		Short: "Migrate a validator operator from legacy to new address",
-		Args:  cobra.ExactArgs(4),
+		Long: `Migrate a validator operator from a legacy (coin-type 118) address to a new (coin-type 60) address.
+
+Both keys must be in the keyring. The CLI derives addresses, generates
+both proofs, simulates gas, and broadcasts. No fee is charged.
+
+  lumerad tx evmigration migrate-validator legacy-validator-key new-validator-evm-key
+
+<legacy-validator-key> must be a secp256k1 key (coin-type 118).
+<new-validator-evm-key> must be an eth_secp256k1 key (coin-type 60).
+Both keys must come from the same mnemonic.
+
+WARNING: Stop your validator node before running this command.
+Restart it immediately after the transaction is confirmed.`,
+		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			msg, err := buildMigrateValidatorMsg(args)
+			if err := preflightChainIDCheck(cmd); err != nil {
+				return err
+			}
+			msg, newKeyName, err := resolveValidatorMsg(cmd, args[0], args[1])
 			if err != nil {
 				return err
 			}
-			return runMigrationTx(cmd, msg, migrationProofKindValidator)
+			return runMigrationTx(cmd, msg, migrationProofKindValidator, newKeyName)
 		},
 	}
 	flags.AddTxFlagsToCmd(cmd)
+	cmd.Flags().String(flagTxTimeout, defaultTxTimeout, "How long to wait for the transaction to be included in a block (e.g. 30s, 1m)")
 	return cmd
 }
 
-func buildClaimLegacyAccountMsg(args []string) (*types.MsgClaimLegacyAccount, error) {
-	pubKey, err := decodeCLIBase64Arg("legacy-pub-key", args[2])
+// resolveClaimMsg builds a MsgClaimLegacyAccount from the two key names (positional args).
+func resolveClaimMsg(cmd *cobra.Command, legacyKeyName, newKeyName string) (*types.MsgClaimLegacyAccount, string, error) {
+	clientCtx, err := client.GetClientTxContext(cmd)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	signature, err := decodeCLIBase64Arg("legacy-signature", args[3])
+	newAddr, legacyAddr, pubKey, sig, err := signLegacyProofFromKeyring(clientCtx, legacyKeyName, newKeyName, migrationProofKindClaim)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-
-	msg := &types.MsgClaimLegacyAccount{
-		NewAddress:      args[0],
-		LegacyAddress:   args[1],
+	return &types.MsgClaimLegacyAccount{
+		NewAddress:      newAddr,
+		LegacyAddress:   legacyAddr,
 		LegacyPubKey:    pubKey,
-		LegacySignature: signature,
-	}
-	return msg, nil
+		LegacySignature: sig,
+	}, newKeyName, nil
 }
 
-func buildMigrateValidatorMsg(args []string) (*types.MsgMigrateValidator, error) {
-	pubKey, err := decodeCLIBase64Arg("legacy-pub-key", args[2])
+// resolveValidatorMsg builds a MsgMigrateValidator from the two key names (positional args).
+func resolveValidatorMsg(cmd *cobra.Command, legacyKeyName, newKeyName string) (*types.MsgMigrateValidator, string, error) {
+	clientCtx, err := client.GetClientTxContext(cmd)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	signature, err := decodeCLIBase64Arg("legacy-signature", args[3])
+	newAddr, legacyAddr, pubKey, sig, err := signLegacyProofFromKeyring(clientCtx, legacyKeyName, newKeyName, migrationProofKindValidator)
 	if err != nil {
-		return nil, err
+		return nil, "", err
+	}
+	return &types.MsgMigrateValidator{
+		NewAddress:      newAddr,
+		LegacyAddress:   legacyAddr,
+		LegacyPubKey:    pubKey,
+		LegacySignature: sig,
+	}, newKeyName, nil
+}
+
+// signLegacyProofFromKeyring extracts both keys from the keyring, validates
+// their types, derives bech32 addresses, builds the migration payload, signs
+// SHA256(payload) with the legacy key, and returns all values needed for the message.
+func signLegacyProofFromKeyring(clientCtx client.Context, legacyKeyName, newKeyName, proofKind string) (newAddr, legacyAddr string, pubKeyBytes, signature []byte, err error) {
+	// Resolve new address from the new key name.
+	newRecord, err := clientCtx.Keyring.Key(newKeyName)
+	if err != nil {
+		return "", "", nil, nil, fmt.Errorf("new key %q not found in keyring: %w", newKeyName, err)
+	}
+	newPubKey, err := newRecord.GetPubKey()
+	if err != nil {
+		return "", "", nil, nil, fmt.Errorf("cannot get public key for %q: %w", newKeyName, err)
+	}
+	newAddr = sdk.AccAddress(newPubKey.Address()).String()
+
+	// Look up the legacy key.
+	legacyRecord, err := clientCtx.Keyring.Key(legacyKeyName)
+	if err != nil {
+		return "", "", nil, nil, fmt.Errorf("legacy key %q not found in keyring: %w", legacyKeyName, err)
 	}
 
-	msg := &types.MsgMigrateValidator{
-		NewAddress:      args[0],
-		LegacyAddress:   args[1],
-		LegacyPubKey:    pubKey,
-		LegacySignature: signature,
+	legacyPubKey, err := legacyRecord.GetPubKey()
+	if err != nil {
+		return "", "", nil, nil, fmt.Errorf("cannot get public key for %q: %w", legacyKeyName, err)
 	}
-	return msg, nil
+
+	// Ensure it is a secp256k1 key (legacy cosmos key type).
+	if _, ok := legacyPubKey.(*secp256k1.PubKey); !ok {
+		return "", "", nil, nil, fmt.Errorf("key %q must be secp256k1 (legacy), got %T; use --coin-type 118 --algo secp256k1 when importing", legacyKeyName, legacyPubKey)
+	}
+
+	legacyAddr = sdk.AccAddress(legacyPubKey.Address()).String()
+	pubKeyBytes = legacyPubKey.Bytes()
+
+	if newAddr == legacyAddr {
+		return "", "", nil, nil, fmt.Errorf("new key address %s and legacy key address %s are identical; they must be different keys (coin-type 60 vs 118)", newAddr, legacyAddr)
+	}
+
+	// Build and sign the payload.
+	payload := fmt.Sprintf("lumera-evm-migration:%s:%d:%s:%s:%s",
+		clientCtx.ChainID, lcfg.EVMChainID, proofKind, legacyAddr, newAddr)
+	hash := sha256.Sum256([]byte(payload))
+
+	signature, _, err = clientCtx.Keyring.Sign(legacyKeyName, hash[:], signingtypes.SignMode_SIGN_MODE_UNSPECIFIED)
+	if err != nil {
+		return "", "", nil, nil, fmt.Errorf("failed to sign legacy proof with key %q: %w", legacyKeyName, err)
+	}
+
+	return newAddr, legacyAddr, pubKeyBytes, signature, nil
 }
 
 type migrationProofMsg interface {
@@ -126,16 +211,13 @@ type migrationProofMsg interface {
 	MigrationSetNewProof(signature []byte)
 }
 
-func runMigrationTx(cmd *cobra.Command, msg migrationProofMsg, proofKind string) error {
+func runMigrationTx(cmd *cobra.Command, msg migrationProofMsg, proofKind, newKeyName string) error {
 	clientCtx, err := client.GetClientTxContext(cmd)
 	if err != nil {
 		return err
 	}
-	if err := ensureFromMatchesNewAddress(clientCtx, msg.MigrationNewAddress()); err != nil {
-		return err
-	}
 
-	signature, err := signNewMigrationProof(clientCtx, proofKind, msg.MigrationLegacyAddress(), msg.MigrationNewAddress())
+	signature, err := signNewMigrationProof(clientCtx, newKeyName, proofKind, msg.MigrationLegacyAddress(), msg.MigrationNewAddress())
 	if err != nil {
 		return err
 	}
@@ -151,17 +233,20 @@ func runMigrationTx(cmd *cobra.Command, msg migrationProofMsg, proofKind string)
 		return err
 	}
 
+	// Migration transactions are fee-free (EVMigrationFeeDecorator zeroes
+	// min-gas-prices), but still require a gas limit. Default to auto-simulation
+	// with 1.5x adjustment so the user doesn't need --gas or --gas-prices flags.
+	if txf.GasAdjustment() <= 1.0 {
+		txf = txf.WithGasAdjustment(1.5)
+	}
+
 	// The tx itself remains unsigned. Generate-only and offline modes still
 	// operate on the standard unsigned tx builder.
 	if clientCtx.GenerateOnly {
 		return txf.PrintUnsignedTx(clientCtx, msg)
 	}
 
-	if txf.SimulateAndExecute() || clientCtx.Simulate {
-		if clientCtx.Offline {
-			return errors.New("cannot estimate gas in offline mode")
-		}
-
+	if !clientCtx.Offline {
 		// Migration txs are intentionally unsigned at the Cosmos tx layer, so the
 		// SDK's generic gas estimator cannot be used here: it injects a simulated
 		// signer based on --from, which makes the tx invalid ("expected 0, got 1").
@@ -202,6 +287,31 @@ func runMigrationTx(cmd *cobra.Command, msg migrationProofMsg, proofKind string)
 		return err
 	}
 
+	// BroadcastTx in sync mode only confirms mempool acceptance (code 0).
+	// Use the SDK's wait-tx command to get the actual execution result so we
+	// surface on-chain errors (e.g. out-of-gas) instead of silently reporting success.
+	if res.Code == 0 && res.Height == 0 && !clientCtx.Offline {
+		txTimeout, _ := cmd.Flags().GetString(flagTxTimeout)
+		if txTimeout == "" {
+			txTimeout = defaultTxTimeout
+		}
+		waitCmd := rpc.WaitTxCmd()
+		waitCmd.SetArgs([]string{res.TxHash, "--timeout", txTimeout})
+		waitCmd.SetContext(cmd.Context())
+		// WaitTxCmd already registers query flags internally, so we only
+		// inject the client context (which carries the node URL) — do NOT
+		// call AddQueryFlagsToCmd again or --node will panic on redefinition.
+		if err := client.SetCmdClientContextHandler(clientCtx, waitCmd); err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "transaction broadcast succeeded (hash: %s) but could not confirm execution: %v\n", res.TxHash, err)
+			return clientCtx.PrintProto(res)
+		}
+		if err := waitCmd.Execute(); err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "transaction broadcast succeeded (hash: %s) but could not confirm execution: %v\n", res.TxHash, err)
+			return clientCtx.PrintProto(res)
+		}
+		return nil
+	}
+
 	return clientCtx.PrintProto(res)
 }
 
@@ -232,16 +342,16 @@ func simulateMigrationGas(clientCtx client.Context, txf clienttx.Factory, msg mi
 	return simRes, adjustedGas, nil
 }
 
-func signNewMigrationProof(clientCtx client.Context, proofKind, legacyAddress, newAddress string) ([]byte, error) {
+func signNewMigrationProof(clientCtx client.Context, newKeyName, proofKind, legacyAddress, newAddress string) ([]byte, error) {
 	payload := []byte(fmt.Sprintf("lumera-evm-migration:%s:%d:%s:%s:%s", clientCtx.ChainID, lcfg.EVMChainID, proofKind, legacyAddress, newAddress))
 
-	sig, pubKey, err := clientCtx.Keyring.Sign(clientCtx.FromName, payload, signingtypes.SignMode_SIGN_MODE_LEGACY_AMINO_JSON)
+	sig, pubKey, err := clientCtx.Keyring.Sign(newKeyName, payload, signingtypes.SignMode_SIGN_MODE_LEGACY_AMINO_JSON)
 	if err != nil {
 		return nil, err
 	}
 
 	if _, ok := pubKey.(*evmcryptotypes.PubKey); !ok {
-		return nil, fmt.Errorf("key %q must use eth_secp256k1, got %T", clientCtx.FromName, pubKey)
+		return nil, fmt.Errorf("key %q must use eth_secp256k1, got %T", newKeyName, pubKey)
 	}
 
 	return sig, nil
@@ -266,24 +376,28 @@ func confirmMigrationTx(clientCtx client.Context, txBuilder client.TxBuilder) (b
 	return input.GetConfirmation("confirm transaction before broadcasting", buf, os.Stderr)
 }
 
-func ensureFromMatchesNewAddress(clientCtx client.Context, newAddress string) error {
-	fromAddress := clientCtx.GetFromAddress()
-	if fromAddress.Empty() {
-		return errors.New("missing --from address")
+// preflightChainIDCheck queries the node's status and checks that --chain-id
+// matches the node's chain ID. Migration proofs embed the chain ID in the
+// signed payload, so a mismatch causes cryptic signature verification failures.
+// Must be called before proof signing.
+func preflightChainIDCheck(cmd *cobra.Command) error {
+	clientCtx, err := client.GetClientTxContext(cmd)
+	if err != nil || clientCtx.Offline {
+		return nil // offline mode — skip check
 	}
-	if fromAddress.String() != newAddress {
-		return fmt.Errorf("--from address %s must match new-address %s", fromAddress.String(), newAddress)
+	node, err := clientCtx.GetNode()
+	if err != nil {
+		return nil // no node configured — skip check
+	}
+	status, err := node.Status(context.Background())
+	if err != nil {
+		return nil // node unreachable — let later RPC calls surface the error
+	}
+	nodeChainID := status.NodeInfo.Network
+	if clientCtx.ChainID != "" && clientCtx.ChainID != nodeChainID {
+		return fmt.Errorf("chain-id mismatch: --chain-id is %q but the node reports %q; "+
+			"migration proofs are bound to the chain ID and will fail verification on-chain",
+			clientCtx.ChainID, nodeChainID)
 	}
 	return nil
-}
-
-func decodeCLIBase64Arg(name, value string) ([]byte, error) {
-	decoded, err := base64.StdEncoding.DecodeString(value)
-	if err != nil {
-		return nil, fmt.Errorf("%s must be base64-encoded: %w", name, err)
-	}
-	if len(decoded) == 0 {
-		return nil, fmt.Errorf("%s must not be empty", name)
-	}
-	return decoded, nil
 }

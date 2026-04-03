@@ -119,6 +119,13 @@ func NewRootCmd() *cobra.Command {
 		moduleBasicManager[name] = module.CoreAppModuleBasicAdaptor(name, mod)
 		autoCliOpts.Modules[name] = mod
 	}
+	// CosmWasm is manually wired and needs client-side registration for
+	// tx/query CLI commands (GetTxCmd/GetQueryCmd).
+	wasmModules := app.RegisterWasm(clientCtx.Codec)
+	for name, mod := range wasmModules {
+		moduleBasicManager[name] = module.CoreAppModuleBasicAdaptor(name, mod)
+		autoCliOpts.Modules[name] = mod
+	}
 
 	initRootCmd(rootCmd, clientCtx.TxConfig, moduleBasicManager)
 

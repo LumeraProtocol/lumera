@@ -3,13 +3,13 @@ package app
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"strconv"
-	"strings"
 	"time"
 
 	"cosmossdk.io/log"
@@ -149,10 +149,64 @@ func (app *App) stopJSONRPCAliasProxy() {
 	app.jsonrpcAliasProxy = nil
 }
 
+// rewriteJSONRPCDiscoverAlias rewrites "rpc.discover" method calls to
+// "rpc_discover" in JSON-RPC request bodies. Handles both single requests
+// and batch arrays. Falls back to the original body on parse errors.
 func rewriteJSONRPCDiscoverAlias(body []byte) []byte {
-	replacer := strings.NewReplacer(
-		`"method":"rpc.discover"`, `"method":"rpc_discover"`,
-		`"method": "rpc.discover"`, `"method": "rpc_discover"`,
-	)
-	return []byte(replacer.Replace(string(body)))
+	trimmed := bytes.TrimSpace(body)
+	if len(trimmed) == 0 {
+		return body
+	}
+
+	// JSON-RPC batch request (array)
+	if trimmed[0] == '[' {
+		var batch []json.RawMessage
+		if err := json.Unmarshal(trimmed, &batch); err != nil {
+			return body
+		}
+		changed := false
+		for i, raw := range batch {
+			if rewritten, ok := rewriteDiscoverMethod(raw); ok {
+				batch[i] = rewritten
+				changed = true
+			}
+		}
+		if !changed {
+			return body
+		}
+		out, err := json.Marshal(batch)
+		if err != nil {
+			return body
+		}
+		return out
+	}
+
+	// Single JSON-RPC request
+	if rewritten, ok := rewriteDiscoverMethod(trimmed); ok {
+		return rewritten
+	}
+	return body
+}
+
+// rewriteDiscoverMethod rewrites "method":"rpc.discover" to "rpc_discover"
+// in a single JSON-RPC request object. Returns (rewritten, true) if changed.
+func rewriteDiscoverMethod(raw json.RawMessage) (json.RawMessage, bool) {
+	var req struct {
+		Method string `json:"method"`
+	}
+	if err := json.Unmarshal(raw, &req); err != nil || req.Method != "rpc.discover" {
+		return raw, false
+	}
+
+	// Unmarshal into a generic map to preserve all fields, then patch method.
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &obj); err != nil {
+		return raw, false
+	}
+	obj["method"] = json.RawMessage(`"rpc_discover"`)
+	out, err := json.Marshal(obj)
+	if err != nil {
+		return raw, false
+	}
+	return out, true
 }

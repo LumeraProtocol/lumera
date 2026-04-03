@@ -8,13 +8,17 @@ import (
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 	wasmvmtypes "github.com/CosmWasm/wasmvm/v3/types"
+	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/runtime"
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
+	"github.com/cosmos/cosmos-sdk/types/module"
 	"github.com/cosmos/cosmos-sdk/types/msgservice"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	distrkeeper "github.com/cosmos/cosmos-sdk/x/distribution/keeper"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	"github.com/cosmos/gogoproto/proto"
+
+	"cosmossdk.io/core/appmodule"
 )
 
 func uint32Ptr(v uint32) *uint32 {
@@ -125,4 +129,21 @@ func (app *App) registerWasmModules(
 	)
 
 	return &wasmStackIBCHandler, nil
+}
+
+// RegisterWasm registers the CosmWasm module for client-side CLI (GetTxCmd/
+// GetQueryCmd) and AutoCLI. Like IBC and EVM, wasm is manually wired and
+// not available via depinject, so it must be registered explicitly.
+func RegisterWasm(cdc codec.Codec) map[string]appmodule.AppModule {
+	modules := map[string]appmodule.AppModule{
+		wasmtypes.ModuleName: wasm.NewAppModule(cdc, nil, nil, nil, nil, nil, nil),
+	}
+
+	for _, m := range modules {
+		if mr, ok := m.(module.AppModuleBasic); ok {
+			mr.RegisterInterfaces(cdc.InterfaceRegistry())
+		}
+	}
+
+	return modules
 }

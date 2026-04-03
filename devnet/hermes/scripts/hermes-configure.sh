@@ -107,7 +107,7 @@ version_ge() {
 
 	[ -n "${current}" ] || return 1
 	[ -n "${floor}" ] || return 0
-	printf '%s\n' "${floor}" "${current}" | sort -V | head -n1 | grep -q "^${floor}$"
+	printf '%s\n' "${floor}" "${current}" | sort -V | head -n1 | grep -Fxq -- "${floor}"
 }
 
 normalize_version() {

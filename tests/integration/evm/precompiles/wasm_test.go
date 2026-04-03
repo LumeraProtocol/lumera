@@ -107,16 +107,17 @@ func mustRunLumeraCLI(t *testing.T, node *evmtest.Node, args ...string) string {
 func mustExtractTxHash(t *testing.T, output string) string {
 	t.Helper()
 
-	// The CLI output may contain log lines before JSON; find the JSON object.
+	// The CLI output may contain log lines before/after the JSON object.
+	// Use a decoder to parse only the first JSON object.
 	idx := strings.Index(output, "{")
 	if idx < 0 {
 		t.Fatalf("no JSON in CLI output: %s", output)
 	}
-	jsonStr := output[idx:]
 
 	var resp map[string]any
-	if err := json.Unmarshal([]byte(jsonStr), &resp); err != nil {
-		t.Fatalf("decode broadcast response: %v\nraw: %s", err, jsonStr)
+	dec := json.NewDecoder(strings.NewReader(output[idx:]))
+	if err := dec.Decode(&resp); err != nil {
+		t.Fatalf("decode broadcast response: %v\nraw: %s", err, output[idx:])
 	}
 
 	txhash, ok := resp["txhash"].(string)

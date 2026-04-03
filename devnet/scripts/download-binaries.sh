@@ -89,9 +89,17 @@ if [[ -n "${LUMERA_TAG}" ]]; then
 
 	echo "  Extracting lumerad and libwasmvm..."
 	tar xzf "${LUMERA_TAR}" -C "${TMPDIR}"
-	# tarball contains ./lumerad and ./libwasmvm.x86_64.so at root
-	[[ -f "${TMPDIR}/lumerad" ]] && cp -f "${TMPDIR}/lumerad" "${BIN_DIR}/lumerad"
-	[[ -f "${TMPDIR}/libwasmvm.x86_64.so" ]] && cp -f "${TMPDIR}/libwasmvm.x86_64.so" "${BIN_DIR}/libwasmvm.x86_64.so"
+	# tarball must contain ./lumerad and ./libwasmvm.x86_64.so at root
+	if [[ ! -f "${TMPDIR}/lumerad" ]]; then
+		echo "  ERROR: expected lumerad in ${LUMERA_ASSET}, but ${TMPDIR}/lumerad was not found after extraction" >&2
+		exit 1
+	fi
+	if [[ ! -f "${TMPDIR}/libwasmvm.x86_64.so" ]]; then
+		echo "  ERROR: expected libwasmvm.x86_64.so in ${LUMERA_ASSET}, but ${TMPDIR}/libwasmvm.x86_64.so was not found after extraction" >&2
+		exit 1
+	fi
+	cp -f "${TMPDIR}/lumerad" "${BIN_DIR}/lumerad"
+	cp -f "${TMPDIR}/libwasmvm.x86_64.so" "${BIN_DIR}/libwasmvm.x86_64.so"
 	chmod +x "${BIN_DIR}/lumerad"
 	echo "  -> lumerad $(${BIN_DIR}/lumerad version 2>/dev/null | head -1 || echo '(version check skipped)')"
 	# clean up tarball extracts for next component

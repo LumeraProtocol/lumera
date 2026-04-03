@@ -8,7 +8,7 @@ import (
 	"sync"
 )
 
-const firstEVMVersion = "v1.12.0"
+const firstEVMVersion = "v1.20.0"
 
 var (
 	lumeraVersionOnce  sync.Once

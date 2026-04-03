@@ -4,7 +4,7 @@
 
 The `tests_evmigration` tool is a standalone binary for end-to-end testing of the `x/evmigration` module on the Lumera devnet. It validates the chain's ability to atomically migrate account state when upgrading from legacy Cosmos key derivation (coin-type 118, `secp256k1`) to EVM-compatible key derivation (coin-type 60, `eth_secp256k1`).
 
-When Lumera upgrades to support EVM (v1.12.0), the same mnemonic produces a **different on-chain address** under coin-type 60. The evmigration module provides `MsgClaimLegacyAccount` and `MsgMigrateValidator` transactions that atomically transfer all state from the old address to the new one. This tool creates realistic pre-migration state, then exercises and verifies those migration paths.
+When Lumera upgrades to support EVM (v1.20.0), the same mnemonic produces a **different on-chain address** under coin-type 60. The evmigration module provides `MsgClaimLegacyAccount` and `MsgMigrateValidator` transactions that atomically transfer all state from the old address to the new one. This tool creates realistic pre-migration state, then exercises and verifies those migration paths.
 
 Source code: `devnet/tests/evmigration/`
 
@@ -70,7 +70,7 @@ Output: `accounts.json` file containing the complete `AccountRecord` for each ac
 
 ### 2. `estimate` — Query Migration Readiness (Post-EVM)
 
-Run **after** the EVM upgrade (on v1.12.0). Queries the `migration-estimate` RPC endpoint for every legacy account.
+Run **after** the EVM upgrade (on v1.20.0). Queries the `migration-estimate` RPC endpoint for every legacy account.
 
 Returns per account:
 
@@ -198,7 +198,7 @@ Loads `accounts.json` and deletes all test keys from the local keyring (`~/.lume
 | `-gas`                 | `500000`                | Gas limit (fixed value avoids simulation sequence races)                                                   |
 | `-gas-adjustment`      | `1.5`                   | Gas adjustment (only with `--gas=auto`)                                                                  |
 | `-gas-prices`          | `0.025ulume`            | Gas prices                                                                                                 |
-| `-evm-cutover-version` | `v1.12.0`               | Version where coin-type switches to 60                                                                     |
+| `-evm-cutover-version` | `v1.20.0`               | Version where coin-type switches to 60                                                                     |
 | `-num-accounts`        | `5`                     | Number of legacy accounts to generate                                                                      |
 | `-num-extra`           | `5`                     | Number of extra (non-migration) accounts                                                                   |
 | `-account-tag`         | (auto-detect)             | Account name prefix tag (e.g.`val1` → `pre-evm-val1-000`)                                             |
@@ -239,7 +239,7 @@ The parallel targets use the `_run_evmigration_in_containers_parallel` macro, wh
 
 ### Full upgrade pipeline (`devnet-evm-upgrade`)
 
-The `make devnet-evm-upgrade` target runs the **complete end-to-end EVM upgrade cycle** as a single automated pipeline. It orchestrates all stages from a clean v1.11.0 devnet through to a fully migrated v1.12.0 chain, using the parallel targets for speed:
+The `make devnet-evm-upgrade` target runs the **complete end-to-end EVM upgrade cycle** as a single automated pipeline. It orchestrates all stages from a clean v1.11.0 devnet through to a fully migrated v1.20.0 chain, using the parallel targets for speed:
 
 | Stage                     | What it does                                                                            |
 | ------------------------- | --------------------------------------------------------------------------------------- |
@@ -247,7 +247,7 @@ The `make devnet-evm-upgrade` target runs the **complete end-to-end EVM upgrade 
 | 2. Wait for height 40     | Waits for the chain to produce blocks (confirms v1.11.1 is healthy)                     |
 | 3. Prepare legacy state   | `devnet-evmigrationp-prepare` (parallel across all validators)                        |
 | 4. Wait for +5 blocks     | Lets prepared state settle into committed blocks                                        |
-| 5. Upgrade to v1.12.0     | `devnet-upgrade-1120` (governance proposal → vote → halt → binary swap → restart) |
+| 5. Upgrade to v1.20.0     | `devnet-upgrade-1200` (governance proposal → vote → halt → binary swap → restart) |
 | 6. Check estimates        | `devnet-evmigrationp-estimate` (verify all accounts are `ready_to_migrate`)         |
 | 7. Migrate validators     | `devnet-evmigrationp-migrate-validator` (validator operators first)                   |
 | 8. Migrate accounts       | `devnet-evmigrationp-migrate` (regular accounts second)                               |
@@ -314,21 +314,21 @@ make devnet-evmigration-prepare
 
 This creates legacy accounts and activity on each validator node. Accounts JSON files are written to `/shared/status/<moniker>/evmigration-accounts.json` inside the containers.
 
-### Step 3: Upgrade to v1.12.0 (EVM)
+### Step 3: Upgrade to v1.20.0 (EVM)
 
 ```bash
-make devnet-upgrade-1120
+make devnet-upgrade-1200
 ```
 
-This calls `devnet/scripts/upgrade.sh v1.12.0 auto-height ../bin`, which:
+This calls `devnet/scripts/upgrade.sh v1.20.0 auto-height ../bin`, which:
 
-1. **Submits a software-upgrade governance proposal** for`v1.12.0` at`current_height + 100`.
+1. **Submits a software-upgrade governance proposal** for`v1.20.0` at`current_height + 100`.
 2. **Retrieves the proposal ID** and verifies it.
 3. **Votes yes with all validators** (if in voting period).
 4. **Waits for the chain to reach the upgrade height** (chain halts automatically).
 5. **Swaps binaries**: stops containers, copies all files from`devnet/bin/` (the current build) to the shared release directory, restarts containers.
 
-The `devnet/bin/` directory must contain the v1.12.0 `lumerad` binary (built by `make build`).
+The `devnet/bin/` directory must contain the v1.20.0 `lumerad` binary (built by `make build`).
 
 ### Step 4: Check migration estimates
 
@@ -385,5 +385,5 @@ All modes are **idempotent**:
 
 The tool validates the running `lumerad` version:
 
-- **prepare** mode enforces`lumerad version < v1.12.0` (coin-type 118 environment).
-- **estimate / migrate / migrate-validator** modes enforce`lumerad version >= v1.12.0` (coin-type 60 environment).
+- **prepare** mode enforces`lumerad version < v1.20.0` (coin-type 118 environment).
+- **estimate / migrate / migrate-validator** modes enforce`lumerad version >= v1.20.0` (coin-type 60 environment).

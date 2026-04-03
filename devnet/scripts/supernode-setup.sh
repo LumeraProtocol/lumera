@@ -20,7 +20,7 @@
 #   SUPERNODE_GATEWAY_PORT - HTTP gateway port (default 8002)
 #   TX_GAS_PRICES      - Override gas price (auto-detected after EVM activation)
 #   LUMERA_VERSION     - Optional version hint (binary version takes precedence)
-#   LUMERA_FIRST_EVM_VERSION - Chain version that introduced EVM (default v1.12.0)
+#   LUMERA_FIRST_EVM_VERSION - Chain version that introduced EVM (default v1.20.0)
 #
 # Coordination:
 #   Reads config from /shared/config/{config.json,validators.json}
@@ -191,7 +191,7 @@ version_ge() {
 	printf '%s\n' "${normalized_floor}" "${normalized_current}" | sort -V | head -n1 | grep -q "^${normalized_floor}\$"
 }
 
-# Strip leading/trailing whitespace and "v" prefix: "  v1.12.0 " → "1.12.0"
+# Strip leading/trailing whitespace and "v" prefix: "  v1.20.0 " → "1.20.0"
 normalize_version() {
 	local version="${1:-}"
 	version="${version#"${version%%[![:space:]]*}"}"
@@ -250,7 +250,7 @@ get_first_evm_version() {
 	fi
 
 	if [[ -z "$version" || "$version" == "null" ]]; then
-		version="v1.12.0"
+		version="v1.20.0"
 	fi
 
 	printf '%s' "$(normalize_version "${version}")"

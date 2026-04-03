@@ -69,7 +69,7 @@ func TestLumeraGenesisDefaults(t *testing.T) {
 
 // TestUpstreamDefaultEvmDenomIsNotLumera documents that cosmos/evm v0.6.0
 // DefaultParams().EvmDenom = DefaultEVMExtendedDenom = "aatom", NOT "ulume".
-// This is why the v1.12.0 upgrade handler must skip InitGenesis for EVM modules
+// This is why the v1.20.0 upgrade handler must skip InitGenesis for EVM modules
 // (via fromVM pre-population) and manually set Lumera params. If this test
 // fails, the upstream default has changed and the upgrade handler may need updating.
 func TestUpstreamDefaultEvmDenomIsNotLumera(t *testing.T) {

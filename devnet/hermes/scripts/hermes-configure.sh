@@ -84,7 +84,7 @@ ran_capture() {
 
 : "${LUMERA_CHAIN_ID:=lumera-devnet-1}"
 : "${LUMERA_VERSION:=}"
-: "${LUMERA_FIRST_EVM_VERSION:=v1.12.0}"
+: "${LUMERA_FIRST_EVM_VERSION:=v1.20.0}"
 : "${LUMERA_KEY_STYLE:=}"
 : "${LUMERA_RPC_ADDR:=http://supernova_validator_1:26657}"
 : "${LUMERA_GRPC_ADDR:=http://supernova_validator_1:9090}"

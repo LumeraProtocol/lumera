@@ -44,7 +44,7 @@ DEFAULT_GENESIS_FILE := devnet/default-config/devnet-genesis.json
 DEFAULT_GENESIS_EVM_FILE := devnet/default-config/devnet-genesis-evm.json
 DEFAULT_CLAIMS_FILE := devnet/default-config/claims.csv
 ORIG_GENESIS_FILE := devnet/default-config/devnet-genesis-orig.json
-EVM_CUTOVER_VERSION ?= v1.12.0
+EVM_CUTOVER_VERSION ?= v1.20.0
 DEVNET_UPGRADE_RELEASE ?= auto
 
 devnet-tests-build:
@@ -410,7 +410,7 @@ devnet-update-scripts:
 	fi
 
 .PHONY: devnet-new-172 devnet-new-191 devnet-new-1111 devnet-upgrade-180 devnet-upgrade-191
-.PHONY: devnet-upgrade-1100 devnet-upgrade-1101 devnet-upgrade-1111 devnet-upgrade-1120 devnet-evm-upgrade
+.PHONY: devnet-upgrade-1100 devnet-upgrade-1101 devnet-upgrade-1111 devnet-upgrade-1200 devnet-evm-upgrade
 
 devnet-upgrade-180:
 	@cd devnet/scripts && ./upgrade.sh v1.8.0 auto-height ../bin-v1.8.0
@@ -427,9 +427,9 @@ devnet-upgrade-1101:
 devnet-upgrade-1111:
 	@cd devnet/scripts && ./upgrade.sh v1.11.1 auto-height ../bin-v1.11.1
 
-devnet-upgrade-1120:
+devnet-upgrade-1200:
 	@$(MAKE) devnet-refresh-bin
-	@cd devnet/scripts && ./upgrade.sh v1.12.0 auto-height ../bin
+	@cd devnet/scripts && ./upgrade.sh v1.20.0 auto-height ../bin
 
 devnet-new-172:
 	$(MAKE) devnet-down
@@ -498,9 +498,9 @@ devnet-evm-upgrade:
 		echo "ERROR: stage post-prepare wait failed while waiting for height $${target_height}" >&2; \
 		exit 1; \
 	fi; \
-	echo "==> Stage: devnet-upgrade-1120"; \
-	if ! $(MAKE) devnet-upgrade-1120; then \
-		echo "ERROR: stage devnet-upgrade-1120 failed" >&2; \
+	echo "==> Stage: devnet-upgrade-1200"; \
+	if ! $(MAKE) devnet-upgrade-1200; then \
+		echo "ERROR: stage devnet-upgrade-1200 failed" >&2; \
 		exit 1; \
 	fi; \
 	current_height="$$(docker compose -f $(COMPOSE_FILE) exec -T supernova_validator_1 \

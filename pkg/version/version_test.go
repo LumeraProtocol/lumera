@@ -11,19 +11,19 @@ func TestGTE(t *testing.T) {
 		floor   string
 		want    bool
 	}{
-		{name: "equal", current: "v1.12.0", floor: "v1.12.0", want: true},
-		{name: "greater patch", current: "v1.12.1", floor: "v1.12.0", want: true},
-		{name: "greater minor", current: "v1.13.0", floor: "v1.12.0", want: true},
+		{name: "equal", current: "v1.20.0", floor: "v1.20.0", want: true},
+		{name: "greater patch", current: "v1.20.1", floor: "v1.20.0", want: true},
+		{name: "greater minor", current: "v1.21.0", floor: "v1.20.0", want: true},
 		{name: "greater major", current: "v2.0.0", floor: "v1.99.99", want: true},
-		{name: "lower patch", current: "v1.11.9", floor: "v1.12.0", want: false},
-		{name: "lower minor", current: "v1.11.0", floor: "v1.12.0", want: false},
+		{name: "lower patch", current: "v1.11.9", floor: "v1.20.0", want: false},
+		{name: "lower minor", current: "v1.11.0", floor: "v1.20.0", want: false},
 		{name: "lower major", current: "v0.9.0", floor: "v1.0.0", want: false},
-		{name: "suffix handled", current: "v1.12.0-rc1", floor: "v1.12.0", want: true},
-		{name: "plus metadata handled", current: "v1.12.0+build1", floor: "v1.12.0", want: true},
-		{name: "no v prefix", current: "1.12.0", floor: "1.12.0", want: true},
-		{name: "two-part version", current: "v1.12", floor: "v1.12.0", want: true},
+		{name: "suffix handled", current: "v1.20.0-rc1", floor: "v1.20.0", want: true},
+		{name: "plus metadata handled", current: "v1.20.0+build1", floor: "v1.20.0", want: true},
+		{name: "no v prefix", current: "1.20.0", floor: "1.20.0", want: true},
+		{name: "two-part version", current: "v1.20", floor: "v1.20.0", want: true},
 		{name: "fallback string compare equal", current: "vnext", floor: "vnext", want: true},
-		{name: "fallback string compare mismatch", current: "vnext", floor: "v1.12.0", want: false},
+		{name: "fallback string compare mismatch", current: "vnext", floor: "v1.20.0", want: false},
 	}
 
 	for _, tc := range tests {

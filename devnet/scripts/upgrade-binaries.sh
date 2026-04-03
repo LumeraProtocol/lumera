@@ -61,8 +61,8 @@ versions_match() {
 	expected_core="$(release_core_version "${expected}")"
 	actual_core="$(release_core_version "${actual}")"
 
-	# Accept local/dev builds like 1.12.0-<gitsha> when the requested
-	# upgrade target is the stable release 1.12.0.
+	# Accept local/dev builds like 1.20.0-<gitsha> when the requested
+	# upgrade target is the stable release 1.20.0.
 	if [[ -n "${expected_core}" && "${expected}" == "${expected_core}" && "${actual_core}" == "${expected_core}" ]]; then
 		return 0
 	fi

@@ -131,7 +131,7 @@ Primary files:
 - `cmd/lumera/cmd/config_test.go`
 - `cmd/lumera/cmd/root_test.go`
 - `app/upgrades/upgrades_test.go`
-- `app/upgrades/v1_12_0/upgrade_test.go`
+- `app/upgrades/v1_20_0/upgrade_test.go`
 
 | Test                                                                  | Description                                                                                                                                                                                                                     |
 | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -192,8 +192,8 @@ Primary files:
 | `TestERC20Policy_BaseDenomTraceCRUD`                                | Trace-bound base denom add/remove/list operations work correctly, including `removeAllBaseDenomTraces`.                                                                                                                         |
 | `TestERC20Policy_InitDefaults`                                      | `initERC20PolicyDefaults` sets mode to "allowlist" and populates `DefaultAllowedBaseDenomTraces` with empty traces (inert placeholders); is idempotent.                                                                      |
 | `TestERC20PolicyMsg_SetRegistrationPolicy`                          | Governance message handler: authority validation, mode changes, ibc denom add/remove, base denom trace add/remove, validation errors.                                                                                           |
-| `TestV1120SkipsEVMInitGenesis`                                      | Verifies the v1.12.0 upgrade handler pre-populates `fromVM` with EVM module consensus versions to skip `InitGenesis`, preventing upstream `DefaultParams().EvmDenom = "aatom"` from polluting the EVM coin info KV store. |
-| `TestV1120InitializesERC20ParamsWhenInitGenesisIsSkipped`           | Verifies the v1.12.0 upgrade handler backfills Lumera ERC20 params (`EnableErc20=true`, `PermissionlessRegistration=false`) after skipping `InitGenesis`, and seeds the ERC20 registration policy (mode=`allowlist`, provenance-bound base denom traces as inert placeholders). Bugs #8, #24, #25. |
+| `TestV1200SkipsEVMInitGenesis`                                      | Verifies the v1.20.0 upgrade handler pre-populates `fromVM` with EVM module consensus versions to skip `InitGenesis`, preventing upstream `DefaultParams().EvmDenom = "aatom"` from polluting the EVM coin info KV store. |
+| `TestV1200InitializesERC20ParamsWhenInitGenesisIsSkipped`           | Verifies the v1.20.0 upgrade handler backfills Lumera ERC20 params (`EnableErc20=true`, `PermissionlessRegistration=false`) after skipping `InitGenesis`, and seeds the ERC20 registration policy (mode=`allowlist`, provenance-bound base denom traces as inert placeholders). Bugs #8, #24, #25. |
 
 ### B) EVM ante unit tests (`app/evm`)
 
@@ -247,7 +247,7 @@ Primary files:
 | `TestProvideCustomGetSigners`            | Verifies custom signer provider exposes MsgEthereumTx custom get-signer registration.                                                                                            |
 | `TestLumeraGenesisDefaults`              | Verifies Lumera EVM and feemarket genesis defaults match expected chain settings.                                                                                                |
 | `TestRegisterModulesMatrix`              | Verifies CLI-side registration map includes all EVM modules and wrappers.                                                                                                        |
-| `TestUpstreamDefaultEvmDenomIsNotLumera` | Documents that cosmos/evm v0.6.0 `DefaultParams().EvmDenom` = `"aatom"` (not `"ulume"`), validating why the v1.12.0 upgrade handler must skip InitGenesis for EVM modules. |
+| `TestUpstreamDefaultEvmDenomIsNotLumera` | Documents that cosmos/evm v0.6.0 `DefaultParams().EvmDenom` = `"aatom"` (not `"ulume"`), validating why the v1.20.0 upgrade handler must skip InitGenesis for EVM modules. |
 | `TestResetGlobalStateRequiresTestTag`    | Verifies reset helper is guarded and requires `test` build tag.                                                                                                                |
 | `TestSetKeeperDefaultsRequiresTestTag`   | Verifies keeper-default mutation helper is guarded behind `test` tag.                                                                                                          |
 

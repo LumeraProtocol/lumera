@@ -621,14 +621,14 @@ configure_nm_accounts() {
 
 # ═════════════════════════════════════════════════════════════════════════════
 # EVM ACCOUNT MIGRATION
-# When the chain upgrades to v1.12.0+, NM account keys must switch from
+# When the chain upgrades to v1.20.0+, NM account keys must switch from
 # secp256k1 (coin 118) to eth_secp256k1 (coin 60). This section detects the
 # upgrade and re-derives all NM keys from the same mnemonics using the EVM
 # key type. Address files and config are updated afterward.
 # ═════════════════════════════════════════════════════════════════════════════
 
 EVM_HD_PATH="m/44'/60'/0'/0/0"
-LUMERA_FIRST_EVM_VERSION="${LUMERA_FIRST_EVM_VERSION:-v1.12.0}"
+LUMERA_FIRST_EVM_VERSION="${LUMERA_FIRST_EVM_VERSION:-v1.20.0}"
 
 normalize_version() {
 	local v="${1:-}"

@@ -318,13 +318,13 @@ Benefits/new features:
 
 Files:
 
-- `app/upgrades/v1_12_0/upgrade.go`
+- `app/upgrades/v1_20_0/upgrade.go`
 - `app/upgrades/store_upgrade_manager.go`
 - `app/upgrades/upgrades.go`
 
 Changes:
 
-- Added v1.12.0 store upgrades for:
+- Added v1.20.0 store upgrades for:
   - feemarket
   - precisebank
   - vm
@@ -621,7 +621,7 @@ After this integration:
 - Precisebank enables 18-decimal extended-denom accounting while preserving Cosmos bank compatibility.
 - Static precompiles expose Cosmos functionality (bank/staking/distribution/gov/bech32/p256/slashing/ics20) to EVM contracts.
 - IBC ERC20 middleware wiring enables ERC20-aware ICS20 receive/mapping flows for cross-chain token paths.
-- Upgrade path includes EVM store migrations (v1.12.0) with adaptive store-manager support for safer network evolution.
+- Upgrade path includes EVM store migrations (v1.20.0) with adaptive store-manager support for safer network evolution.
 - OpenRPC method catalog is available from the running node over:
   - JSON-RPC:`rpc_discover`
   - HTTP API server:`/openrpc.json` (CORS-enabled for browser tooling)
@@ -712,7 +712,7 @@ Comparing the requirements in `docs/Lumera_Cosmos_EVM_Integration.pdf` against t
 | EVM mempool with nonce ordering                  | Done                    | ExperimentalEVMMempool wired                                                                                                                                                                                                                                                              |
 | Ethereum JSON-RPC server                         | Done                    | 7 namespaces + rpc_discover                                                                                                                                                                                                                                                               |
 | EVM chain ID configured                          | Done                    | 76857769                                                                                                                                                                                                                                                                                  |
-| Store upgrades at activation height              | Done                    | v1.12.0 handler for 5 stores (feemarket, precisebank, vm, erc20, evmigration)                                                                                                                                                                                                             |
+| Store upgrades at activation height              | Done                    | v1.20.0 handler for 5 stores (feemarket, precisebank, vm, erc20, evmigration)                                                                                                                                                                                                             |
 | **Base fee distribution path**             | **Done**          | Full effective gas price (base + tip) distributed via standard SDK fee collection /`x/distribution`                                                                                                                                                                                     |
 | **IBC voucher ERC20 registration policy**  | **Done**          | Governance-controlled via `MsgSetRegistrationPolicy` with 3 modes: `all`, `allowlist` (default), `none`. Two allowlist types: exact `ibc/` denom and provenance-bound base denom with full IBC trace verification. Default entries (uatom, uosmo, uusdc, inj) are inert until governance binds channels. See `app/evm_erc20_policy.go` |
 | **Lumera module precompiles**              | **Done**          | Action (`0x0901`) and Supernode (`0x0902`) precompiles implemented in `precompiles/action/` and `precompiles/supernode/`                                                                                                                                                                  |

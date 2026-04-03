@@ -13,13 +13,13 @@ func TestVersionGTE(t *testing.T) {
 		floor   string
 		want    bool
 	}{
-		{name: "equal", current: "v1.12.0", floor: "v1.12.0", want: true},
-		{name: "greater patch", current: "v1.12.1", floor: "v1.12.0", want: true},
-		{name: "greater minor", current: "v1.13.0", floor: "v1.12.0", want: true},
-		{name: "lower patch", current: "v1.11.9", floor: "v1.12.0", want: false},
-		{name: "suffix handled", current: "v1.12.0-rc1", floor: "v1.12.0", want: true},
-		{name: "plus metadata handled", current: "v1.12.0+build1", floor: "v1.12.0", want: true},
-		{name: "fallback string compare", current: "vnext", floor: "v1.12.0", want: false},
+		{name: "equal", current: "v1.20.0", floor: "v1.20.0", want: true},
+		{name: "greater patch", current: "v1.20.1", floor: "v1.20.0", want: true},
+		{name: "greater minor", current: "v1.21.0", floor: "v1.20.0", want: true},
+		{name: "lower patch", current: "v1.11.9", floor: "v1.20.0", want: false},
+		{name: "suffix handled", current: "v1.20.0-rc1", floor: "v1.20.0", want: true},
+		{name: "plus metadata handled", current: "v1.20.0+build1", floor: "v1.20.0", want: true},
+		{name: "fallback string compare", current: "vnext", floor: "v1.20.0", want: false},
 	}
 
 	for _, tc := range tests {

@@ -167,12 +167,12 @@ Chain upgrade handling for EVM module stores.
 
 |     | Item                                                                    | Files / Notes                                                                                     |
 | --- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| [x] | v1.12.0 store upgrades (feemarket, precisebank, vm, erc20, evmigration) | `app/upgrades/v1_12_0/upgrade.go`                                                               |
+| [x] | v1.20.0 store upgrades (feemarket, precisebank, vm, erc20, evmigration) | `app/upgrades/v1_20_0/upgrade.go`                                                               |
 | [x] | Adaptive store upgrade manager                                          | `app/upgrades/store_upgrade_manager.go`                                                         |
 | [x] | EVM keeper refs in upgrade params                                       | `app/upgrades/params/params.go`                                                                 |
-| [x] | ERC20 param finalization after skipped `InitGenesis`                  | `app/upgrades/v1_12_0/upgrade.go`                                                               |
+| [x] | ERC20 param finalization after skipped `InitGenesis`                  | `app/upgrades/v1_20_0/upgrade.go`                                                               |
 | [x] | `PermissionlessRegistration` disabled (governance-only token pairs)  | `app/evm/genesis.go` — `LumeraERC20DefaultParams()`, Bug #24                                 |
-| [x] | ERC20 registration policy seeded during upgrade                        | `app/upgrades/v1_12_0/upgrade.go` — mode + provenance-bound base denom traces, Bug #25        |
+| [x] | ERC20 registration policy seeded during upgrade                        | `app/upgrades/v1_20_0/upgrade.go` — mode + provenance-bound base denom traces, Bug #25        |
 | [x] | Chain upgrade EVM state preservation test                               | `tests/integration/evm/contracts/upgrade_preservation_test.go`                                  |
 | [x] | `app.toml` config migration for pre-EVM nodes (Bug #19)               | `cmd/lumera/cmd/config_migrate.go` — auto-adds [evm], [json-rpc], [tls], [lumera.*] on startup |
 
@@ -258,7 +258,7 @@ Comprehensive test coverage across all layers.
 | --- | --------------------------------------------------------------------------------------------- |
 | [x] | Devnet EVMigration: full cycle on 5-validator devnet (prepare → migrate-all → verify)       |
 | [x] | MetaMask: balance query, send tx on fresh devnet chain (genesis EVM)                          |
-| [x] | MetaMask: balance query, send tx after v1.11.0 → v1.12.0 upgrade (config migration verified) |
+| [x] | MetaMask: balance query, send tx after v1.11.0 → v1.20.0 upgrade (config migration verified) |
 | [x] | Remix IDE: Counter contract deploy + interact via Injected Provider (devnet)                  |
 | [x] | OpenRPC Playground: spec browsing + "Try It" method execution via POST proxy                  |
 

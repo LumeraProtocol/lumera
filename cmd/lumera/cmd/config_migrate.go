@@ -16,7 +16,7 @@ import (
 )
 
 // migrateAppConfigIfNeeded checks whether the running app.toml is missing
-// any EVM configuration sections added in the v1.12.0 upgrade and, if so,
+// any EVM configuration sections added in the v1.20.0 upgrade and, if so,
 // regenerates the file with Lumera defaults while preserving every existing
 // operator setting. It also reloads the corrected values into the in-memory
 // Viper instance so the current process uses them immediately (no restart
@@ -127,7 +127,7 @@ func doMigrateAppConfig(v *viper.Viper, appCfgPath string) error {
 }
 
 // isEVMMigratedKey returns true for keys that belong to sections added or
-// corrected by the v1.12.0 config migration. These keys are always force-set
+// corrected by the v1.20.0 config migration. These keys are always force-set
 // into the live Viper after migration, overriding any stale in-memory values.
 func isEVMMigratedKey(key string) bool {
 	for _, prefix := range evmMigratedPrefixes {
@@ -145,7 +145,7 @@ var evmMigratedPrefixes = []string{
 	"lumera.",
 }
 
-// needsConfigMigration returns true if any v1.12.0 config section is missing
+// needsConfigMigration returns true if any v1.20.0 config section is missing
 // or has an incorrect sentinel value. Checks multiple keys so that partial
 // manual edits (e.g. operator set evm-chain-id but not [lumera.*]) are still
 // caught.

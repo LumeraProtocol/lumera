@@ -107,25 +107,25 @@ app.go:
 
 ### 7) Upgrade handler seeds `aatom` denom instead of `alume` in EVM coin info
 
-**Symptom**: After v1.12.0 chain upgrade, Cosmos txs fail with `"provided fee < minimum global fee (2567ulume < 43aatom)"`. The feemarket `MinGasPriceDecorator` reads `GetEVMCoinDenom()` which returns `"aatom"` — the wrong denom for Lumera.
+**Symptom**: After v1.20.0 chain upgrade, Cosmos txs fail with `"provided fee < minimum global fee (2567ulume < 43aatom)"`. The feemarket `MinGasPriceDecorator` reads `GetEVMCoinDenom()` which returns `"aatom"` — the wrong denom for Lumera.
 
 **Root cause**: During `RunMigrations`, the SDK calls `DefaultGenesis()` → `InitGenesis()` for new modules not present in `fromVM`. cosmos/evm v0.6.0's `DefaultParams().EvmDenom = DefaultEVMExtendedDenom = "aatom"`, so the upstream `InitGenesis` writes `aatom` into the EVM coin info KV store. The post-migration `SetParams` + `InitEvmCoinInfo` with Lumera params runs after, but the global `evmCoinInfo` is already sealed by `sync.Once` in `PreBlock`.
 
-**Fix** (`app/upgrades/v1_12_0/upgrade.go`): Pre-populate `fromVM` with consensus versions for all four EVM modules (`vm`, `feemarket`, `precisebank`, `erc20`) before calling `RunMigrations`. Per Cosmos SDK docs, `fromVM[module] = ConsensusVersion` causes `RunMigrations` to skip `InitGenesis` for that module. The handler then manually sets Lumera-specific params and initializes coin info with the correct `ulume`/`alume` denoms.
+**Fix** (`app/upgrades/v1_20_0/upgrade.go`): Pre-populate `fromVM` with consensus versions for all four EVM modules (`vm`, `feemarket`, `precisebank`, `erc20`) before calling `RunMigrations`. Per Cosmos SDK docs, `fromVM[module] = ConsensusVersion` causes `RunMigrations` to skip `InitGenesis` for that module. The handler then manually sets Lumera-specific params and initializes coin info with the correct `ulume`/`alume` denoms.
 
-**Tests**: `TestUpstreamDefaultEvmDenomIsNotLumera` (sentinel: detects if upstream changes their default), `TestV1120SkipsEVMInitGenesis` (verifies fromVM skip pattern is in place).
+**Tests**: `TestUpstreamDefaultEvmDenomIsNotLumera` (sentinel: detects if upstream changes their default), `TestV1200SkipsEVMInitGenesis` (verifies fromVM skip pattern is in place).
 
 ---
 
 ### 8) Upgrade handler leaves `x/erc20` disabled after skipped `InitGenesis`
 
-**Symptom**: After the v1.12.0 upgrade, ERC20 registration/conversion behavior can appear silently disabled even though the module store exists. Querying ERC20 params reads back `EnableErc20=false` and `PermissionlessRegistration=false`.
+**Symptom**: After the v1.20.0 upgrade, ERC20 registration/conversion behavior can appear silently disabled even though the module store exists. Querying ERC20 params reads back `EnableErc20=false` and `PermissionlessRegistration=false`.
 
 **Root cause**: The same `fromVM[module] = ConsensusVersion` pattern used to skip unsafe upstream `InitGenesis` for new EVM modules also skips `x/erc20` parameter initialization. Unlike `x/precisebank`, `x/erc20` persists booleans in its own KV store and interprets missing keys as `false`, so a brand-new upgraded store comes up effectively disabled unless the upgrade handler writes defaults explicitly.
 
-**Fix** (`app/upgrades/v1_12_0/upgrade.go`, `app/upgrades/params/params.go`, `app/app.go`): Wire the ERC20 keeper into the upgrade params bundle and explicitly call `Erc20Keeper.SetParams(ctx, erc20types.DefaultParams())` after `RunMigrations`. This preserves the `InitGenesis` skip for denom/coin-info safety while restoring the intended default ERC20 behavior.
+**Fix** (`app/upgrades/v1_20_0/upgrade.go`, `app/upgrades/params/params.go`, `app/app.go`): Wire the ERC20 keeper into the upgrade params bundle and explicitly call `Erc20Keeper.SetParams(ctx, erc20types.DefaultParams())` after `RunMigrations`. This preserves the `InitGenesis` skip for denom/coin-info safety while restoring the intended default ERC20 behavior.
 
-**Tests**: `TestV1120InitializesERC20ParamsWhenInitGenesisIsSkipped` reproduces the skipped-`InitGenesis` state by clearing the ERC20 param keys, runs the v1.12.0 handler, and verifies the default params are restored.
+**Tests**: `TestV1200InitializesERC20ParamsWhenInitGenesisIsSkipped` reproduces the skipped-`InitGenesis` state by clearing the ERC20 param keys, runs the v1.20.0 handler, and verifies the default params are restored.
 
 ---
 
@@ -283,7 +283,7 @@ The `migrate-all` mode's random interleaving made this bug observable: some dele
 
 ### 19) MetaMask/EVM clients see wrong chain ID after upgrade (app.toml missing `[evm]` section)
 
-**Symptom**: After upgrading from a pre-EVM binary (< v1.12.0), MetaMask transactions fail. `eth_chainId` returns `0x494c1a9` (76857769, correct), but the JSON-RPC backend internally uses chain ID `262144` (the cosmos/evm upstream default) for transaction validation. MetaMask sends transactions signed with chain ID `76857769`; the backend's `SendRawTransaction` rejects them with `incorrect chain-id; expected 262144, got 76857769`. `net_version` also returns `262144` instead of `76857769`.
+**Symptom**: After upgrading from a pre-EVM binary (< v1.20.0), MetaMask transactions fail. `eth_chainId` returns `0x494c1a9` (76857769, correct), but the JSON-RPC backend internally uses chain ID `262144` (the cosmos/evm upstream default) for transaction validation. MetaMask sends transactions signed with chain ID `76857769`; the backend's `SendRawTransaction` rejects them with `incorrect chain-id; expected 262144, got 76857769`. `net_version` also returns `262144` instead of `76857769`.
 
 **Root cause**: The JSON-RPC backend reads `evm-chain-id` from `app.toml` (`rpc/backend/backend.go:207`). Nodes that existed before the EVM upgrade keep their old `app.toml`, which has no `[evm]` section. The Cosmos SDK only generates `app.toml` when the file does not exist (`server/util.go:284`), so the new EVM sections are never added. The backend falls back to `cosmosevmserverconfig.DefaultEVMChainID = 262144`.
 
@@ -351,22 +351,22 @@ Meanwhile, the EVM keeper (initialized in `x/vm/keeper/keeper.go:119`) correctly
 
 **Symptom**: Any account can call `MsgRegisterERC20` to create a token pair mapping any ERC20 contract to a Cosmos coin denom without a governance proposal, enabling denom squatting, phishing tokens, and state bloat.
 
-**Root cause**: The upstream `erc20types.DefaultParams()` sets `PermissionlessRegistration=true`. The v1.12.0 upgrade handler was using `DefaultParams()` directly, inheriting this permissive default.
+**Root cause**: The upstream `erc20types.DefaultParams()` sets `PermissionlessRegistration=true`. The v1.20.0 upgrade handler was using `DefaultParams()` directly, inheriting this permissive default.
 
-**Fix** (`app/evm/genesis.go`, `app/upgrades/v1_12_0/upgrade.go`): Introduced `LumeraERC20DefaultParams()` in `app/evm/genesis.go` returning `NewParams(true, false)` — ERC20 enabled but permissionless registration disabled. The upgrade handler and any future genesis paths use this centralized default instead of the upstream `DefaultParams()`. Token pair registration now requires a governance proposal.
+**Fix** (`app/evm/genesis.go`, `app/upgrades/v1_20_0/upgrade.go`): Introduced `LumeraERC20DefaultParams()` in `app/evm/genesis.go` returning `NewParams(true, false)` — ERC20 enabled but permissionless registration disabled. The upgrade handler and any future genesis paths use this centralized default instead of the upstream `DefaultParams()`. Token pair registration now requires a governance proposal.
 
-**Tests**: `TestV1120InitializesERC20ParamsWhenInitGenesisIsSkipped` updated to assert `PermissionlessRegistration=false`.
+**Tests**: `TestV1200InitializesERC20ParamsWhenInitGenesisIsSkipped` updated to assert `PermissionlessRegistration=false`.
 
 ---
 
-### 25) Upgrade handler does not initialize ERC20 registration policy (empty allowlist after v1.12.0)
+### 25) Upgrade handler does not initialize ERC20 registration policy (empty allowlist after v1.20.0)
 
 **Severity**: Medium
 
-**Symptom**: After the v1.12.0 upgrade on an existing chain, the ERC20 registration policy KV store is empty — no mode key and no base denom allowlist entries. The `getRegistrationMode()` function defaults to `"allowlist"` when the key is missing, but with an empty allowlist no IBC denoms (not even well-known ones like uatom, uosmo, uusdc — stored as inert placeholders until governance binds IBC channels) can auto-register as ERC20 tokens.
+**Symptom**: After the v1.20.0 upgrade on an existing chain, the ERC20 registration policy KV store is empty — no mode key and no base denom allowlist entries. The `getRegistrationMode()` function defaults to `"allowlist"` when the key is missing, but with an empty allowlist no IBC denoms (not even well-known ones like uatom, uosmo, uusdc — stored as inert placeholders until governance binds IBC channels) can auto-register as ERC20 tokens.
 
-**Root cause**: `initERC20PolicyDefaults` (which writes the policy mode and pre-populates `DefaultAllowedBaseDenomTraces`) is called only in `InitChainer` for fresh genesis. The v1.12.0 upgrade path skips `InitChainer`, so the policy store is never seeded on upgraded chains.
+**Root cause**: `initERC20PolicyDefaults` (which writes the policy mode and pre-populates `DefaultAllowedBaseDenomTraces`) is called only in `InitChainer` for fresh genesis. The v1.20.0 upgrade path skips `InitChainer`, so the policy store is never seeded on upgraded chains.
 
-**Fix** (`app/upgrades/v1_12_0/upgrade.go`, `app/upgrades/params/params.go`, `x/erc20policy/types/keys.go`): The upgrade handler now writes the policy mode key (`"allowlist"`) and default provenance-bound base denom trace entries after setting ERC20 params. Policy constants (`PolicyMode*`, KV keys, `DefaultAllowedBaseDenomTraces`) were moved from unexported vars in `app/` to the shared `x/erc20policy/types` package so both `app` and the upgrade handler can reference them. The `Erc20StoreKey` field was added to `AppUpgradeParams` to give the handler KV store access. Entries are stored under `PolicyAllowBaseTracePfx` with empty traces (inert placeholders).
+**Fix** (`app/upgrades/v1_20_0/upgrade.go`, `app/upgrades/params/params.go`, `x/erc20policy/types/keys.go`): The upgrade handler now writes the policy mode key (`"allowlist"`) and default provenance-bound base denom trace entries after setting ERC20 params. Policy constants (`PolicyMode*`, KV keys, `DefaultAllowedBaseDenomTraces`) were moved from unexported vars in `app/` to the shared `x/erc20policy/types` package so both `app` and the upgrade handler can reference them. The `Erc20StoreKey` field was added to `AppUpgradeParams` to give the handler KV store access. Entries are stored under `PolicyAllowBaseTracePfx` with empty traces (inert placeholders).
 
-**Tests**: `TestV1120InitializesERC20ParamsWhenInitGenesisIsSkipped` extended to verify the policy mode is set to `"allowlist"` and all default base denom traces are present in the allowlist after the upgrade.
+**Tests**: `TestV1200InitializesERC20ParamsWhenInitGenesisIsSkipped` extended to verify the policy mode is set to `"allowlist"` and all default base denom traces are present in the allowlist after the upgrade.

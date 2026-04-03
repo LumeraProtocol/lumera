@@ -1,4 +1,4 @@
-package v1_12_0
+package v1_20_0
 
 import (
 	"context"
@@ -23,7 +23,7 @@ import (
 )
 
 // UpgradeName is the on-chain name used for this upgrade.
-const UpgradeName = "v1.12.0"
+const UpgradeName = "v1.20.0"
 
 // StoreUpgrades declares store additions for this upgrade.
 var StoreUpgrades = storetypes.StoreUpgrades{
@@ -36,7 +36,7 @@ var StoreUpgrades = storetypes.StoreUpgrades{
 	},
 }
 
-// CreateUpgradeHandler executes v1.12.0 migrations and finalizes Lumera-specific
+// CreateUpgradeHandler executes v1.20.0 migrations and finalizes Lumera-specific
 // EVM params so upgraded chains don't retain upstream atom defaults.
 func CreateUpgradeHandler(p appParams.AppUpgradeParams) upgradetypes.UpgradeHandler {
 	return func(goCtx context.Context, _ upgradetypes.Plan, fromVM module.VersionMap) (module.VersionMap, error) {

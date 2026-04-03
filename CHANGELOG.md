@@ -2,9 +2,9 @@
 
 ---
 
-## 1.12.0
+## 1.20.0
 
-Changes included since `v1.11.1` (range: `v1.11.1..v1.12.0`).
+Changes included since `v1.11.1` (range: `v1.11.1..v1.20.0`).
 
 Full EVM integration documentation: [docs/evm-integration/main.md](docs/evm-integration/main.md)
 
@@ -21,13 +21,19 @@ Full EVM integration documentation: [docs/evm-integration/main.md](docs/evm-inte
 - Added IBC ERC20 middleware wired on both v1 and v2 transfer stacks with governance-controlled registration policy (`all`/`allowlist`/`none`) via `MsgSetRegistrationPolicy`.
 - Added `x/evmigration` module for legacy coin-type-118 → 60 account migration with dual-signature verification, multi-module atomic state re-keying (auth, bank, staking, distribution, authz, feegrant, supernode, action, claim), and validator migration support.
 - Added fee-waiving ante decorator for migration txs (`ante/evmigration_fee_decorator.go`) since new addresses have zero balance pre-migration.
-- Added v1.12.0 upgrade handler with store additions for feemarket, precisebank, vm, erc20, and evmigration; post-migration finalization sets Lumera EVM params, feemarket params, and ERC20 defaults.
+- Added v1.20.0 upgrade handler with store additions for feemarket, precisebank, vm, erc20, and evmigration; post-migration finalization sets Lumera EVM params, feemarket params, and ERC20 defaults.
 - Added Action module precompile (`0x0901`) and Supernode module precompile (`0x0902`) giving Solidity contracts native access to `MsgRequestAction`/`MsgFinalizeAction` and supernode queries/registration respectively.
 - Added blocked-address protections: module accounts and all precompile addresses are excluded from bank sends to prevent accidental token loss.
 - Added centralized bank denom metadata (`config/bank_metadata.go`) and `RegisterExtraInterfaces` for `eth_secp256k1` crypto interface registration across SDK + EVM paths.
 - Added `RegisterTxService` override (`app/evm_runtime.go`) to capture the local CometBFT client for the async broadcast worker, replacing the stale HTTP client that `SetClientCtx` provides before CometBFT starts.
 - Added depinject custom signer wiring for `MsgEthereumTx` and safe early-RPC keeper coin info initialization (`SetKeeperDefaults`) to prevent panics before genesis runs.
 - CosmWasm (`wasmd v0.61.6`) and EVM coexist in the same runtime — Lumera is the only Cosmos chain shipping both simultaneously.
+- Added evmigration query endpoints for migration planning and monitoring: `MigrationEstimate` (pre-migration impact analysis with delegation/unbonding/redelegation/authz/feegrant counts), `MigrationStats` (on-chain progress tracking), `LegacyAccounts` (paginated unmigrated account listing), and `MigratedAccounts` (searchable migration history).
+- Added dual signature verification in evmigration: legacy proofs accept both raw SHA-256 CLI signing and ADR-036 wallet signing (Keplr/Leap); new address proofs accept both raw Keccak-256 and EIP-191 `personal_sign` (MetaMask), ensuring compatibility across all major wallet types.
+- Added `app.toml` auto-config migration (`cmd/lumera/cmd/config_migrate.go`) for nodes upgrading from pre-EVM binaries — automatically detects missing `[evm]`, `[json-rpc]`, `[tls]`, and `[lumera.*]` sections and regenerates `app.toml` with Lumera defaults while preserving existing operator settings.
+- Added EVM mempool Prometheus metrics (`app/evm_mempool_metrics.go`): gauges for mempool size, pending/queued counts, and broadcast queue depth; labeled rejection counter (`rejections_total{source,reason}`) for observability.
+- Added `MsgSetRegistrationPolicy` governance message for ERC20 IBC auto-registration: operators can toggle policy between `all`, `allowlist`, and `none` modes; pre-populated genesis allowlist includes inert base denom traces for major tokens (uatom, uosmo, uusdc, inj) ready for governance channel binding.
+- Added evmigration user guide (`docs/evm-integration/evmigration-user-guide.md`) with step-by-step instructions for legacy account migration using CLI, Keplr, and MetaMask wallets.
 - Added node operator EVM configuration guide (`docs/evm-integration/node-evm-config-guide.md`) covering `app.toml` tuning, RPC exposure, tracer config, and rate limit setup.
 - Added comprehensive EVM integration test suites under `tests/integration/evm/` covering ante, contracts, feemarket, IBC ERC20, JSON-RPC, mempool, precisebank, precompiles, and VM queries.
 - Added devnet evmigration end-to-end tests validating the full legacy account migration flow across a multi-validator network.

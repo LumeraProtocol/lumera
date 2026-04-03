@@ -169,7 +169,7 @@ var (
 	flagGas           = flag.String("gas", "500000", "gas limit for transactions (fixed value avoids simulation sequence races)")
 	flagGasAdj        = flag.String("gas-adjustment", "1.5", "gas adjustment (only used with --gas=auto)")
 	flagGasPrices     = flag.String("gas-prices", "0.025ulume", "gas prices")
-	flagEVMCutoverVer = flag.String("evm-cutover-version", "v1.12.0", "lumerad version where non-legacy accounts switch to coin-type 60")
+	flagEVMCutoverVer = flag.String("evm-cutover-version", "v1.20.0", "lumerad version where non-legacy accounts switch to coin-type 60")
 	flagNumAccounts   = flag.Int("num-accounts", 5, "number of legacy accounts to generate")
 	flagNumExtra      = flag.Int("num-extra", 5, "number of extra (non-migration) accounts")
 	flagAccountTag    = flag.String(

@@ -8,7 +8,7 @@ import (
 
 const (
 	// DefaultEVMFromVersion is the first Lumera version where EVM key style is enabled.
-	DefaultEVMFromVersion = "v1.12.0"
+	DefaultEVMFromVersion = "v1.20.0"
 )
 
 // ChainConfig represents the chain configuration structure

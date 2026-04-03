@@ -1,4 +1,4 @@
-package v1_12_0_test
+package v1_20_0_test
 
 import (
 	"testing"
@@ -14,11 +14,11 @@ import (
 	lumeraapp "github.com/LumeraProtocol/lumera/app"
 	appevm "github.com/LumeraProtocol/lumera/app/evm"
 	appParams "github.com/LumeraProtocol/lumera/app/upgrades/params"
-	upgradev1120 "github.com/LumeraProtocol/lumera/app/upgrades/v1_12_0"
+	upgradev1200 "github.com/LumeraProtocol/lumera/app/upgrades/v1_20_0"
 	erc20policytypes "github.com/LumeraProtocol/lumera/x/erc20policy/types"
 )
 
-func TestV1120InitializesERC20ParamsWhenInitGenesisIsSkipped(t *testing.T) {
+func TestV1200InitializesERC20ParamsWhenInitGenesisIsSkipped(t *testing.T) {
 	app := lumeraapp.Setup(t)
 	ctx := app.BaseApp.NewContext(false)
 
@@ -32,7 +32,7 @@ func TestV1120InitializesERC20ParamsWhenInitGenesisIsSkipped(t *testing.T) {
 
 	erc20StoreKey := app.GetKey(erc20types.StoreKey)
 
-	handler := upgradev1120.CreateUpgradeHandler(appParams.AppUpgradeParams{
+	handler := upgradev1200.CreateUpgradeHandler(appParams.AppUpgradeParams{
 		Logger:          log.NewNopLogger(),
 		ModuleManager:   module.NewManager(),
 		Configurator:    module.NewConfigurator(nil, nil, nil),

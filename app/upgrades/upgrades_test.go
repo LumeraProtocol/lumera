@@ -15,7 +15,7 @@ import (
 	upgrade_v1_10_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_10_1"
 	upgrade_v1_11_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_11_0"
 	upgrade_v1_11_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_11_1"
-	upgrade_v1_12_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_12_0"
+	upgrade_v1_20_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_20_0"
 	upgrade_v1_6_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_6_1"
 	upgrade_v1_8_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_0"
 	upgrade_v1_8_4 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_4"
@@ -42,7 +42,7 @@ func TestUpgradeNamesOrder(t *testing.T) {
 		upgrade_v1_10_1.UpgradeName,
 		upgrade_v1_11_0.UpgradeName,
 		upgrade_v1_11_1.UpgradeName,
-		upgrade_v1_12_0.UpgradeName,
+		upgrade_v1_20_0.UpgradeName,
 	}
 	require.Equal(t, expected, upgradeNames, "upgradeNames should stay in ascending order")
 }
@@ -81,11 +81,11 @@ func TestSetupUpgradesAndHandlers(t *testing.T) {
 				if upgradeName == upgrade_v1_10_0.UpgradeName && config.StoreUpgrade != nil {
 					require.Contains(t, config.StoreUpgrade.Deleted, crisistypes.StoreKey, "v1.10.0 should delete crisis store key")
 				}
-				if upgradeName == upgrade_v1_12_0.UpgradeName && config.StoreUpgrade != nil {
-					require.Contains(t, config.StoreUpgrade.Added, feemarkettypes.StoreKey, "v1.12.0 should add feemarket store key")
-					require.Contains(t, config.StoreUpgrade.Added, precisebanktypes.StoreKey, "v1.12.0 should add precisebank store key")
-					require.Contains(t, config.StoreUpgrade.Added, evmtypes.StoreKey, "v1.12.0 should add evm store key")
-					require.Contains(t, config.StoreUpgrade.Added, erc20types.StoreKey, "v1.12.0 should add erc20 store key")
+				if upgradeName == upgrade_v1_20_0.UpgradeName && config.StoreUpgrade != nil {
+					require.Contains(t, config.StoreUpgrade.Added, feemarkettypes.StoreKey, "v1.20.0 should add feemarket store key")
+					require.Contains(t, config.StoreUpgrade.Added, precisebanktypes.StoreKey, "v1.20.0 should add precisebank store key")
+					require.Contains(t, config.StoreUpgrade.Added, evmtypes.StoreKey, "v1.20.0 should add evm store key")
+					require.Contains(t, config.StoreUpgrade.Added, erc20types.StoreKey, "v1.20.0 should add erc20 store key")
 				}
 
 				if config.Handler == nil {
@@ -93,7 +93,7 @@ func TestSetupUpgradesAndHandlers(t *testing.T) {
 				}
 
 				// Custom upgrades that need keepers are skipped in this lightweight harness.
-				if upgradeName == upgrade_v1_9_0.UpgradeName || upgradeName == upgrade_v1_10_0.UpgradeName || upgradeName == upgrade_v1_10_1.UpgradeName || upgradeName == upgrade_v1_11_0.UpgradeName || upgradeName == upgrade_v1_11_1.UpgradeName || upgradeName == upgrade_v1_12_0.UpgradeName {
+				if upgradeName == upgrade_v1_9_0.UpgradeName || upgradeName == upgrade_v1_10_0.UpgradeName || upgradeName == upgrade_v1_10_1.UpgradeName || upgradeName == upgrade_v1_11_0.UpgradeName || upgradeName == upgrade_v1_11_1.UpgradeName || upgradeName == upgrade_v1_20_0.UpgradeName {
 					continue
 				}
 
@@ -112,20 +112,20 @@ func TestSetupUpgradesAndHandlers(t *testing.T) {
 	}
 }
 
-// TestV1120SkipsEVMInitGenesis verifies that the v1.12.0 upgrade is
+// TestV1200SkipsEVMInitGenesis verifies that the v1.20.0 upgrade is
 // registered with a handler and that the upstream EVM DefaultParams
 // still use the denom value the upgrade is intended to guard against.
-func TestV1120SkipsEVMInitGenesis(t *testing.T) {
+func TestV1200SkipsEVMInitGenesis(t *testing.T) {
 	params := newTestUpgradeParams("lumera-devnet-1")
-	config, found := SetupUpgrades(upgrade_v1_12_0.UpgradeName, params)
+	config, found := SetupUpgrades(upgrade_v1_20_0.UpgradeName, params)
 	require.True(t, found)
 	require.NotNil(t, config.Handler)
 
 	// Verify that upstream DefaultParams uses the extended EVM denom
-	// (the behavior that the fromVM pre-population in the v1.12.0
+	// (the behavior that the fromVM pre-population in the v1.20.0
 	// upgrade handler is intended to guard against).
 	require.Equal(t, evmtypes.DefaultEVMExtendedDenom, evmtypes.DefaultParams().EvmDenom,
-		"upstream DefaultParams().EvmDenom should be the extended EVM denom — if this changes, review the fromVM skip in v1.12.0")
+		"upstream DefaultParams().EvmDenom should be the extended EVM denom — if this changes, review the fromVM skip in v1.20.0")
 }
 
 func newTestUpgradeParams(chainID string) appParams.AppUpgradeParams {
@@ -156,7 +156,7 @@ func expectStoreUpgrade(upgradeName, chainID string) bool {
 		return true
 	case upgrade_v1_10_1.UpgradeName, upgrade_v1_11_0.UpgradeName, upgrade_v1_11_1.UpgradeName:
 		return true
-	case upgrade_v1_12_0.UpgradeName:
+	case upgrade_v1_20_0.UpgradeName:
 		return true
 	default:
 		return false

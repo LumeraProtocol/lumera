@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	defaultFirstEVMVersion = "v1.12.0"
+	defaultFirstEVMVersion = "v1.20.0"
 	defaultConfigPath      = "/shared/config/config.json"
 )
 

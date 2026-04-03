@@ -32,3 +32,20 @@ func TestLatestSupernodeState(t *testing.T) {
 		t.Fatalf("latestSupernodeState() = %q, want %q", got, "SUPERNODE_STATE_ACTIVE")
 	}
 }
+
+func TestLatestSupernodeHost(t *testing.T) {
+	record := &SuperNodeRecord{
+		PrevIPAddresses: []struct {
+			Address string `json:"address"`
+			Height  string `json:"height"`
+		}{
+			{Address: "172.28.0.11:4444", Height: "7"},
+			{Address: "172.28.0.12:4444", Height: "9"},
+			{Address: "172.28.0.13:4444", Height: "8"},
+		},
+	}
+
+	if got := latestSupernodeHost(record); got != "172.28.0.12" {
+		t.Fatalf("latestSupernodeHost() = %q, want %q", got, "172.28.0.12")
+	}
+}

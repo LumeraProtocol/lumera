@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -63,6 +65,15 @@ type SuperNodeMetricsState struct {
 	} `json:"metrics"`
 	ReportCount string `json:"report_count"`
 	Height      string `json:"height"`
+}
+
+// SupernodeGatewayStatus mirrors the supernode HTTP gateway status response.
+type SupernodeGatewayStatus struct {
+	Version   string `json:"version"`
+	IPAddress string `json:"ip_address"`
+	Network   *struct {
+		PeersCount int32 `json:"peers_count"`
+	} `json:"network"`
 }
 
 // querySupernodeByValoper queries the supernode record by its validator operator address.
@@ -129,8 +140,62 @@ func latestSupernodeState(sn *SuperNodeRecord) string {
 	return bestState
 }
 
-// waitForEligibleCascadeSupernodes polls until at least one active supernode is
-// found or the timeout expires. Returns true if an eligible supernode was found.
+// latestSupernodeHost returns the host portion of the latest registered supernode endpoint.
+func latestSupernodeHost(sn *SuperNodeRecord) string {
+	if sn == nil || len(sn.PrevIPAddresses) == 0 {
+		return ""
+	}
+
+	bestAddress := ""
+	var bestHeight int64 = -1
+	for _, ip := range sn.PrevIPAddresses {
+		height, err := strconv.ParseInt(strings.TrimSpace(ip.Height), 10, 64)
+		if err != nil {
+			height = -1
+		}
+		if height > bestHeight {
+			bestHeight = height
+			bestAddress = strings.TrimSpace(ip.Address)
+		}
+	}
+	if bestAddress == "" {
+		return ""
+	}
+
+	host, _, err := net.SplitHostPort(bestAddress)
+	if err == nil && host != "" {
+		return host
+	}
+	return bestAddress
+}
+
+// querySupernodeGatewayStatus queries the supernode HTTP gateway status API.
+func querySupernodeGatewayStatus(host string) (*SupernodeGatewayStatus, error) {
+	host = strings.TrimSpace(host)
+	if host == "" {
+		return nil, fmt.Errorf("empty supernode host")
+	}
+
+	client := &http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Get(fmt.Sprintf("http://%s:8002/api/v1/status?include_p2p_metrics=true", host))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status: %s", resp.Status)
+	}
+
+	var status SupernodeGatewayStatus
+	if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
+		return nil, err
+	}
+	return &status, nil
+}
+
+// waitForEligibleCascadeSupernodes polls until at least one ACTIVE supernode
+// reports peers > 1 on the local status API, or the timeout expires.
 func waitForEligibleCascadeSupernodes(validators []string, timeout time.Duration) bool {
 	if len(validators) == 0 {
 		return false
@@ -138,37 +203,38 @@ func waitForEligibleCascadeSupernodes(validators []string, timeout time.Duration
 
 	deadline := time.Now().Add(timeout)
 	lastEligible := -1
-	lastReported := -1
-	lastMetricsReady := -1
+	lastStatusReported := -1
+	lastPeersReady := -1
 
 	for {
-		eligible := 0
-		reported := 0
-		metricsReady := 0
+		active := 0
+		statusReported := 0
+		peersReady := 0
 
 		for _, valoper := range validators {
 			sn, err := querySupernodeByValoper(valoper)
-			if err == nil && sn != nil && sn.SupernodeAccount != "" && latestSupernodeState(sn) == "SUPERNODE_STATE_ACTIVE" {
-				eligible++
-			}
-
-			metrics, err := querySupernodeMetricsByValoper(valoper)
-			if err != nil || metrics == nil {
+			if err != nil || sn == nil || sn.SupernodeAccount == "" || latestSupernodeState(sn) != "SUPERNODE_STATE_ACTIVE" {
 				continue
 			}
-			reported++
-			if metrics.Metrics != nil && metrics.Metrics.PeersCount > 1 {
-				metricsReady++
+			active++
+
+			status, err := querySupernodeGatewayStatus(latestSupernodeHost(sn))
+			if err != nil || status == nil {
+				continue
+			}
+			statusReported++
+			if status.Network != nil && status.Network.PeersCount > 1 {
+				peersReady++
 			}
 		}
 
-		if eligible != lastEligible || reported != lastReported || metricsReady != lastMetricsReady {
-			log.Printf("  INFO: cascade supernode readiness: eligible=%d reported=%d peers_ready=%d total=%d", eligible, reported, metricsReady, len(validators))
-			lastEligible = eligible
-			lastReported = reported
-			lastMetricsReady = metricsReady
+		if active != lastEligible || statusReported != lastStatusReported || peersReady != lastPeersReady {
+			log.Printf("  INFO: cascade supernode readiness: active=%d status_reported=%d peers_ready=%d total=%d", active, statusReported, peersReady, len(validators))
+			lastEligible = active
+			lastStatusReported = statusReported
+			lastPeersReady = peersReady
 		}
-		if eligible > 0 {
+		if peersReady > 0 {
 			return true
 		}
 		if time.Now().After(deadline) {

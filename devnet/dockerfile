@@ -41,6 +41,8 @@ ENV PATH="${SCRIPTS_DEST_DIR}:${PATH}"
 
 # Copy scripts with correct paths
 COPY --chmod=0755 \
+    ${SCRIPTS_SRC_DIR}/common.sh \
+    ${SCRIPTS_SRC_DIR}/account-registry.sh \
     ${SCRIPTS_SRC_DIR}/start.sh \
     ${SCRIPTS_SRC_DIR}/stop.sh \
     ${SCRIPTS_SRC_DIR}/restart.sh \

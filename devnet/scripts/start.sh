@@ -24,6 +24,10 @@
 # --------------------------------------------------------------------------------------------------
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/common.sh"
+
 START_MODE="${START_MODE:-auto}"
 
 SHARED_DIR="/shared"
@@ -148,11 +152,6 @@ EOF
 
 	echo "[BOOT] Starting nginx to serve network-maker UI on port ${NM_UI_PORT}"
 	nginx
-}
-
-run() {
-	echo "+ $*"
-	"$@"
 }
 
 archive_log_file() {

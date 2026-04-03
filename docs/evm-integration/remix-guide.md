@@ -276,5 +276,5 @@ Check the Remix console for the full error. Common causes:
 ## Next steps
 
 - **Deploy ERC-20 tokens**: Use OpenZeppelin's ERC-20 template in Remix to create a token on Lumera
-- **Interact with precompiles**: Lumera exposes native chain functionality (staking, governance, IBC transfers) via[precompile contracts](action-precompile.md) callable from Solidity
+- **Interact with precompiles**: Lumera exposes native chain functionality (staking, governance, IBC transfers) via [precompile contracts](precompiles/precompiles.md) callable from Solidity
 - **Use Hardhat/Foundry**: For production workflows, configure Hardhat or Foundry with the Lumera JSON-RPC endpoint

@@ -6,6 +6,7 @@ import (
 	storetypes "cosmossdk.io/store/types"
 	actionprecompile "github.com/LumeraProtocol/lumera/precompiles/action"
 	supernodeprecompile "github.com/LumeraProtocol/lumera/precompiles/supernode"
+	wasmprecompile "github.com/LumeraProtocol/lumera/precompiles/wasm"
 	precompiletypes "github.com/cosmos/evm/precompiles/types"
 
 	"github.com/spf13/cast"
@@ -174,6 +175,14 @@ func (app *App) configureEVMStaticPrecompiles() {
 		app.AuthKeeper.AddressCodec(),
 	)
 	precompiles[supernodePC.Address()] = supernodePC
+
+	// Register Lumera custom precompile: CosmWasm bridge
+	wasmPC := wasmprecompile.NewPrecompile(
+		app.WasmKeeper,
+		app.PreciseBankKeeper,
+		app.AuthKeeper.AddressCodec(),
+	)
+	precompiles[wasmPC.Address()] = wasmPC
 
 	app.EVMKeeper.WithStaticPrecompiles(precompiles)
 }

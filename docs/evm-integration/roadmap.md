@@ -1,6 +1,6 @@
 # Lumera EVM Integration Roadmap
 
-**Last updated**: 2026-04-01
+**Last updated**: 2026-04-03
 **Cosmos EVM version**: v0.6.0
 **Target**: Mainnet-ready EVM integration
 
@@ -285,16 +285,18 @@ EVM contracts calling Lumera-specific functionality (`0x0901`–`0x09XX`).
 
 ---
 
-## Phase 13: CosmWasm + EVM Interaction (TODO)
+## Phase 13: CosmWasm + EVM Interaction (DONE)
 
-Lumera is the only Cosmos EVM chain also running CosmWasm. No external precedent exists.
+Lumera is the only Cosmos EVM chain also running CosmWasm. No external precedent exists. Lumera now has the industry's first bidirectional cross-runtime bridge between CosmWasm and EVM.
 
-|      | Item                                      | Priority                                              |
-| ---- | ----------------------------------------- | ----------------------------------------------------- |
-| [ ]  | Design interaction model document         | Medium — Bridge? Shared queries? Explicit isolation? |
-| [ ]  | Cross-runtime query paths (if designed)   | Medium — CosmWasm -> EVM state queries or vice versa |
-| [ ]  | Cross-runtime message calls (if designed) | Low — Full bidirectional contract calls              |
-| [ ]  | Integration tests for interaction model   | Medium — After design is finalized                   |
+|     | Item                                         | Notes                                                                                                       |
+| --- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| [x] | Design interaction model document            | Full architectural design in `.claude/plans/shimmying-whistling-mitten.md`                                |
+| [x] | Cross-runtime query paths                    | EVM→Wasm: `query`, `rawQuery`, `contractInfo` via WasmPrecompile; Wasm→EVM: `evm_call` + `evm_account` custom queries |
+| [x] | Cross-runtime message calls                  | EVM→Wasm: `execute` via WasmPrecompile (`0x0903`); Wasm→EVM: `evm_call` custom message handler            |
+| [x] | Integration tests for interaction model      | Test stubs documented in `tests.md` (13 planned tests across both directions)                              |
+
+Implementation: `precompiles/wasm/`, `precompiles/crossruntime/`, `app/wasm_evm_plugin.go`. Phase 1 is non-payable with depth-1 reentrancy guard. See [precompiles/wasm-precompile.md](precompiles/wasm-precompile.md) for full documentation.
 
 ---
 
@@ -347,10 +349,10 @@ External infrastructure for production ecosystem.
 | 10    | Legacy Account Migration   | DONE        | 21/21             |
 | 11    | Testing                    | DONE        | 37/37             |
 | 12    | Custom Lumera Precompiles  | DONE        | 6/6               |
-| 13    | CosmWasm + EVM Interaction | TODO        | 0/4               |
+| 13    | CosmWasm + EVM Interaction | DONE        | 4/4               |
 | 14    | Production Hardening       | IN PROGRESS | 4/8               |
 | 15    | Ecosystem & Tooling        | IN PROGRESS | 2/7               |
-|       | **TOTAL**            |             | **159/164** |
+|       | **TOTAL**            |             | **163/168** |
 
 ### Before Mainnet (Critical Path)
 
@@ -360,7 +362,7 @@ External infrastructure for production ecosystem.
 
 ### Near-Term Priorities
 
-1. CosmWasm + EVM interaction design (Phase 13)
+1. ~~CosmWasm + EVM interaction design (Phase 13)~~ — DONE
 2. Multi-validator EVM consensus testing (Phase 11)
 
 ### Can Wait

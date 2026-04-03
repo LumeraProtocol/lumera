@@ -41,6 +41,10 @@
 #
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/common.sh"
+
 # ─── Prerequisites ────────────────────────────────────────────────────────────
 
 # Require MONIKER env (compose already sets it)
@@ -62,7 +66,6 @@ FINAL_GENESIS_SHARED="${CFG_DIR}/final_genesis.json"  # Final genesis (after col
 EXTERNAL_GENESIS="${CFG_DIR}/external_genesis.json"   # Template genesis from host
 PEERS_SHARED="${CFG_DIR}/persistent_peers.txt"        # Peer list built by primary
 GENTX_DIR="${CFG_DIR}/gentx"               # Shared directory for gentx exchange
-ADDR_DIR="${SHARED_DIR}/addresses"         # Secondary validators publish their addresses here
 STATUS_DIR="${SHARED_DIR}/status"
 RELEASE_DIR="${SHARED_DIR}/release"
 
@@ -74,6 +77,7 @@ SETUP_COMPLETE_FLAG="${STATUS_DIR}/setup_complete"         # Primary: all setup 
 NODE_STATUS_DIR="${STATUS_DIR}/${MONIKER}"
 NODE_SETUP_COMPLETE_FLAG="${NODE_STATUS_DIR}/setup_complete"
 GENESIS_MNEMONIC_FILE="${NODE_STATUS_DIR}/genesis-address-mnemonic"
+GOV_MNEMONIC_FILE="${NODE_STATUS_DIR}/governance-address-mnemonic"
 LOCKS_DIR="${STATUS_DIR}/locks"
 
 # ─── Hermes IBC Relayer ──────────────────────────────────────────────────────
@@ -170,30 +174,7 @@ IS_PRIMARY="0"
 
 echo "[SETUP] MONIKER=${MONIKER} KEY_NAME=${KEY_NAME} PRIMARY=${IS_PRIMARY} CHAIN_ID=${CHAIN_ID}"
 mkdir -p "${DAEMON_HOME}/config"
-
-# ═════════════════════════════════════════════════════════════════════════════
-# UTILITY FUNCTIONS
-# ═════════════════════════════════════════════════════════════════════════════
-
-# Log and execute a command (output goes to stdout)
-run() {
-	echo "+ $*"
-	"$@"
-}
-
-# Log a command to stderr (so stdout can be captured by the caller)
-run_capture() {
-	echo "+ $*" >&2 # goes to stderr, not captured
-	"$@"
-}
-
-# Delete and re-import a key from mnemonic (destructive — always replaces)
-recover_key_from_mnemonic() {
-	local key_name="$1"
-	local mnemonic="$2"
-	run ${DAEMON} keys delete "${key_name}" --keyring-backend "${KEYRING_BACKEND}" -y >/dev/null 2>&1 || true
-	printf '%s\n' "${mnemonic}" | run ${DAEMON} keys add "${key_name}" --recover --keyring-backend "${KEYRING_BACKEND}" >/dev/null
-}
+accounts_registry_init "${NODE_STATUS_DIR}" "${CFG_CHAIN}"
 
 # ─── File Locking ─────────────────────────────────────────────────────────────
 # Multiple containers write to /shared/ concurrently. These helpers use flock
@@ -238,6 +219,52 @@ verify_gentx_file() {
 		return 1
 	fi
 	return 0
+}
+
+collect_secondary_genesis_accounts() {
+	local other od registry key_name addr funded_base funded_denom legacy_file bal
+
+	while IFS= read -r other; do
+		[ "${other}" = "${MONIKER}" ] && continue
+		od="${STATUS_DIR}/${other}"
+		registry="${od}/accounts.json"
+		key_name="$(jq -r --arg m "${other}" '.[] | select(.moniker == $m) | .key_name' "${CFG_VALS}")"
+
+		if [[ -f "${registry}" && -n "${key_name}" && "${key_name}" != "null" ]]; then
+			addr="$(jq -r --arg name "${key_name}" '
+				(map(select(.name == $name)) | first | .address) // empty
+			' "${registry}" 2>/dev/null || true)"
+			funded_base="$(jq -r --arg name "${key_name}" '
+				(map(select(.name == $name)) | first | .funded.base_amount) // empty
+			' "${registry}" 2>/dev/null || true)"
+			funded_denom="$(jq -r --arg name "${key_name}" '
+				(map(select(.name == $name)) | first | .funded.base_denom) // empty
+			' "${registry}" 2>/dev/null || true)"
+			if [[ -n "${addr}" && -n "${funded_base}" && "${funded_base}" != "null" ]]; then
+				[[ -z "${funded_denom}" || "${funded_denom}" == "null" ]] && funded_denom="${DENOM}"
+				run ${DAEMON} genesis add-genesis-account "${addr}" "${funded_base}${funded_denom}"
+				continue
+			fi
+		fi
+
+		legacy_file=""
+		if [[ -f "${od}/genesis-address" ]]; then
+			legacy_file="${od}/genesis-address"
+		fi
+		if [[ -n "${legacy_file}" ]]; then
+			addr="$(cat "${legacy_file}")"
+			if [[ -n "${addr}" ]]; then
+				bal="$(jq -r --arg m "${other}" '.[] | select(.moniker == $m) | .initial_distribution.account_balance' "${CFG_VALS}")"
+				if [[ -n "${bal}" && "${bal}" != "null" ]]; then
+					run ${DAEMON} genesis add-genesis-account "${addr}" "${bal}"
+					continue
+				fi
+			fi
+		fi
+
+		echo "[SETUP] ERROR: missing genesis account registry entry for ${other} (${key_name})."
+		exit 1
+	done < <(jq -r '.[].moniker' "${CFG_VALS}")
 }
 
 # ─── Node Discovery ───────────────────────────────────────────────────────────
@@ -419,13 +446,6 @@ ensure_hermes_relayer_account() {
 	fi
 }
 
-# Block until a file exists and is non-empty (coordination primitive)
-wait_for_file() {
-	while [ ! -s "$1" ]; do
-		sleep 1
-	done
-}
-
 # ═════════════════════════════════════════════════════════════════════════════
 # CHAIN INITIALIZATION
 # Initialize the node's data directory and create/recover the validator key.
@@ -534,14 +554,19 @@ primary_validator_setup() {
 	fi
 	run ${DAEMON} genesis add-genesis-account "${addr}" "${ACCOUNT_BAL}"
 	printf '%s\n' "${addr}" >"${NODE_STATUS_DIR}/genesis-address"
+	accounts_registry_upsert "${KEY_NAME}" "${addr}" "$(cat "${GENESIS_MNEMONIC_FILE}" 2>/dev/null || true)" "cosmos" "${ACCOUNT_BAL}" "genesis" ""
 
 	# Create a governance key — used to submit upgrade proposals and vote.
 	# Gets a large genesis balance (1T ulume) so it can cover proposal deposits.
-	local gov_addr
+	local gov_addr gov_json gov_mnemonic
 	gov_addr="$(run_capture ${DAEMON} keys show governance_key -a --keyring-backend "${KEYRING_BACKEND}" 2>/dev/null || true)"
 	gov_addr="$(printf '%s' "${gov_addr}" | tr -d '\r\n')"
 	if [ -z "${gov_addr}" ]; then
-		run ${DAEMON} keys add governance_key --keyring-backend "${KEYRING_BACKEND}" >/dev/null
+		gov_json="$(run_capture ${DAEMON} keys add governance_key --keyring-backend "${KEYRING_BACKEND}" --output json)"
+		gov_mnemonic="$(printf '%s' "${gov_json}" | jq -r '.mnemonic // empty' 2>/dev/null || true)"
+		if [ -n "${gov_mnemonic}" ]; then
+			printf '%s\n' "${gov_mnemonic}" >"${GOV_MNEMONIC_FILE}"
+		fi
 		gov_addr="$(run_capture ${DAEMON} keys show governance_key -a --keyring-backend "${KEYRING_BACKEND}")"
 		gov_addr="$(printf '%s' "${gov_addr}" | tr -d '\r\n')"
 	fi
@@ -549,8 +574,12 @@ primary_validator_setup() {
 		echo "[SETUP] ERROR: Unable to obtain governance key address"
 		exit 1
 	fi
+	if [ -z "${gov_mnemonic:-}" ] && [ -s "${GOV_MNEMONIC_FILE}" ]; then
+		gov_mnemonic="$(cat "${GOV_MNEMONIC_FILE}")"
+	fi
 	printf '%s\n' "${gov_addr}" >${SHARED_DIR}/governance_address
 	run ${DAEMON} genesis add-genesis-account "${gov_addr}" "1000000000000${DENOM}"
+	accounts_registry_upsert "governance_key" "${gov_addr}" "${gov_mnemonic:-}" "cosmos" "1000000000000${DENOM}" "genesis" ""
 
 	ensure_hermes_relayer_account
 
@@ -559,7 +588,7 @@ primary_validator_setup() {
 	# own keys + gentx. The initial genesis has primary + governance + Hermes
 	# accounts but not yet the secondary accounts or any gentx.
 	cp "${GENESIS_LOCAL}" "${GENESIS_SHARED}"
-	mkdir -p "${GENTX_DIR}" "${ADDR_DIR}"
+	mkdir -p "${GENTX_DIR}"
 	echo "true" >"${GENESIS_READY_FLAG}"
 
 	# Publish own node ID for peer discovery before waiting
@@ -581,17 +610,11 @@ primary_validator_setup() {
 	done
 
 	# ── Collect secondary accounts ──
-	# Secondaries publish their address + balance to /shared/addresses/<addr>.
-	# The primary adds each as a genesis account so they appear in final genesis.
-	echo "[SETUP] Collecting addresses & gentx from secondaries..."
-	if compgen -G "${ADDR_DIR}/*" >/dev/null; then
-		while IFS= read -r file; do
-			[ -f "$file" ] || continue
-			bal="$(cat "$file")"
-			addr="$(basename "$file")"
-			run ${DAEMON} genesis add-genesis-account "${addr}" "${bal}"
-		done < <(find ${ADDR_DIR} -type f)
-	fi
+	# Secondary validator genesis accounts are persisted in each validator's
+	# status registry (/shared/status/<moniker>/accounts.json). The primary adds
+	# them to genesis before collecting gentxs.
+	echo "[SETUP] Collecting secondary genesis accounts & gentx from status registries..."
+	collect_secondary_genesis_accounts
 
 	# ── Generate primary's own gentx ──
 	# gentx = "genesis transaction" that self-delegates STAKE_AMOUNT to this
@@ -661,7 +684,8 @@ secondary_validator_setup() {
 
 	# Create key (if not already present) and add own genesis account.
 	# The genesis account must be added to the LOCAL genesis copy so that
-	# gentx validation passes. The primary also gets the account via /shared/addresses/.
+	# gentx validation passes. The primary reads the same account metadata from
+	# this validator's /shared/status/<moniker>/accounts.json registry.
 	addr="$(run_capture ${DAEMON} keys show "${KEY_NAME}" -a --keyring-backend "${KEYRING_BACKEND}")"
 	addr="$(printf '%s' "${addr}" | tr -d '\r\n')"
 	if [ -z "${addr}" ]; then
@@ -680,7 +704,7 @@ secondary_validator_setup() {
 	run ${DAEMON} genesis add-genesis-account "${addr}" "${ACCOUNT_BAL}"
 	ensure_hermes_relayer_account
 
-	mkdir -p "${GENTX_LOCAL_DIR}" "${GENTX_DIR}" "${ADDR_DIR}"
+	mkdir -p "${GENTX_LOCAL_DIR}" "${GENTX_DIR}"
 
 	if compgen -G "${GENTX_LOCAL_DIR}/gentx-*.json" >/dev/null; then
 		echo "[SETUP] gentx already exists in ${GENTX_LOCAL_DIR}, skipping generation"
@@ -697,11 +721,11 @@ secondary_validator_setup() {
 	fi
 	verify_gentx_file "${gentx_file}" || exit 1
 
-	# Publish gentx + address to /shared/ for primary to collect.
-	# The address file is named by the address itself; its content is the balance.
+	# Publish gentx for primary collection. The validator genesis account itself
+	# is already persisted in this validator's status registry.
 	copy_with_lock "gentx" cp "${gentx_file}" "${GENTX_DIR}/${MONIKER}_gentx.json"
-	write_with_lock "addresses" "${ADDR_DIR}/${addr}" "${ACCOUNT_BAL}"
 	printf '%s\n' "${addr}" >"${NODE_STATUS_DIR}/genesis-address"
+	accounts_registry_upsert "${KEY_NAME}" "${addr}" "$(cat "${GENESIS_MNEMONIC_FILE}" 2>/dev/null || true)" "cosmos" "${ACCOUNT_BAL}" "genesis" ""
 
 	# write own markers for peer discovery
 	write_node_markers

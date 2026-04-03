@@ -24,7 +24,7 @@ Lumera's suite goes beyond any of these baselines **before** mainnet:
 | ERC20/IBC middleware (v1 + v2 stacks)                                            | 7 integration + 14 unit (policy)        | Partial or post-launch                    |
 | Precisebank (6↔18 decimal bridge)                                               | 39 unit + 6 integration                 | Not applicable (novel to Lumera)          |
 | Feemarket (EIP-1559)                                                             | 9 unit + 8 integration                  | Inherited from upstream, rarely augmented |
-| Precompile coverage (9 precompiles + gas metering + action + supernode modules)   | 29 integration                          | Smoke-level                               |
+| Precompile coverage (10 precompiles + gas metering + action + supernode + wasm modules)   | 29+ integration                         | Smoke-level                               |
 | Account migration (coin-type 118→60)                                            | 102 unit + 14 integration + devnet tool | Not applicable (novel to Lumera)          |
 | OpenRPC discovery + spec sync                                                    | 15 unit + 2 integration                 | No chain has this                         |
 | WebSocket subscriptions (newHeads, logs, pending)                                | 4 integration                           | Untested or manual                        |
@@ -125,6 +125,9 @@ Primary files:
 - `app/evm_erc20_policy.go`
 - `app/evm_erc20_policy_msg.go`
 - `app/evm_erc20_policy_test.go`
+- `app/wasm_evm_plugin_test.go`
+- `precompiles/crossruntime/guard_test.go`
+- `precompiles/crossruntime/addr_test.go`
 - `proto/lumera/erc20policy/tx.proto`
 - `x/erc20policy/types/tx.pb.go`
 - `x/erc20policy/types/codec.go`
@@ -194,6 +197,22 @@ Primary files:
 | `TestERC20PolicyMsg_SetRegistrationPolicy`                          | Governance message handler: authority validation, mode changes, ibc denom add/remove, base denom trace add/remove, validation errors.                                                                                           |
 | `TestV1200SkipsEVMInitGenesis`                                      | Verifies the v1.20.0 upgrade handler pre-populates `fromVM` with EVM module consensus versions to skip `InitGenesis`, preventing upstream `DefaultParams().EvmDenom = "aatom"` from polluting the EVM coin info KV store. |
 | `TestV1200InitializesERC20ParamsWhenInitGenesisIsSkipped`           | Verifies the v1.20.0 upgrade handler backfills Lumera ERC20 params (`EnableErc20=true`, `PermissionlessRegistration=false`) after skipping `InitGenesis`, and seeds the ERC20 registration policy (mode=`allowlist`, provenance-bound base denom traces as inert placeholders). Bugs #8, #24, #25. |
+| `TestParseEVMAddress_Valid`                                        | Verifies strict EVM address parser accepts valid 40-char hex with/without 0x prefix.                                                                                                                                           |
+| `TestParseEVMAddress_Invalid`                                      | Verifies strict parser rejects too-short, too-long, invalid hex, and empty addresses.                                                                                                                                           |
+| `TestParseHexBytes_Valid`                                          | Verifies hex bytes parser handles 0x-prefixed, bare hex, and empty inputs.                                                                                                                                                      |
+| `TestParseHexBytes_Invalid`                                        | Verifies hex bytes parser rejects invalid hex and odd-length inputs.                                                                                                                                                            |
+| `TestGasCapForCall_*` (4 cases)                                    | Verifies gas cap helper returns min(remaining, DefaultCrossRuntimeGasCap=3M) correctly.                                                                                                                                         |
+| `TestGetCrossRuntimeDepth_ZeroByDefault`                           | Verifies fresh context has depth 0.                                                                                                                                                                                             |
+| `TestWithIncrementedDepth_*` (3 cases)                             | Verifies depth increments, double-increments, and does not mutate parent context.                                                                                                                                                |
+| `TestCheckAndIncrementDepth_SucceedsAtZero`                        | Verifies increment succeeds at depth 0.                                                                                                                                                                                         |
+| `TestCheckAndIncrementDepth_FailsAtMax`                            | Verifies increment returns `ErrReentrancyNotAllowed` at depth 1 (MaxCrossRuntimeDepth).                                                                                                                                       |
+| `TestCheckAndIncrementDepth_FailsBeyondMax`                        | Verifies increment fails at depth > max.                                                                                                                                                                                        |
+| `TestCheckAndIncrementDepth_DoesNotMutateOnError`                  | Verifies context is unchanged when reentrancy check fails.                                                                                                                                                                      |
+| `TestEVMAddrToBech32_Roundtrip`                                    | Verifies EVM address → bech32 → EVM address roundtrip.                                                                                                                                                                        |
+| `TestBech32ToEVMAddr_InvalidBech32`                                | Verifies invalid bech32 string returns error.                                                                                                                                                                                   |
+| `TestBech32ToEVMAddr_WrongPrefix`                                  | Verifies wrong bech32 prefix (cosmos vs lumera) returns error.                                                                                                                                                                  |
+| `TestAccAddrToEVMAddr_20Bytes`                                     | Verifies SDK AccAddress → EVM address conversion with full 20-byte input.                                                                                                                                                      |
+| `TestEVMAddrToBech32_ZeroAddress`                                  | Verifies zero address roundtrips correctly.                                                                                                                                                                                     |
 
 ### B) EVM ante unit tests (`app/evm`)
 
@@ -703,6 +722,51 @@ Suite: `tests/integration/evm/precompiles/suite_test.go`
 | `ActionApproveActionTxPathFailsForNonExistent`             | Verifies approveAction reverts for non-existent action ID.                                |
 | `PrecompileGasMeteringAccuracy`                            | Verifies each precompile consumes bounded, non-trivial gas (6 precompiles).               |
 | `PrecompileGasEstimateMatchesActual`                       | Verifies eth_estimateGas is within 3x of actual gasUsed for bank precompile.              |
+| `WasmPrecompileDeployAndQuery`                             | Deploys hackatom.wasm via CLI, queries `{"verifier":{}}` via precompile `query` method, verifies response contains verifier address. |
+| `WasmPrecompileContractInfoViaEthCall`                     | Verifies `contractInfo` returns correct code ID, creator, admin, and label for deployed contract. |
+| `WasmPrecompileRawQueryViaEthCall`                         | Verifies `rawQuery` reads raw `"config"` storage key from deployed hackatom contract.     |
+| `WasmPrecompileExecuteTxPath`                              | Executes hackatom `{"release":{}}` via precompile `execute`, verifies receipt status=0x1. |
+| `WasmPrecompileExecuteEmitsEvent`                          | Verifies `WasmExecuted` EVM log is emitted with correct precompile address and topic signature. |
+| `WasmPrecompileSenderIdentity`                             | Verifies `execute` succeeds when sender matches verifier (proves `contract.Caller()` is forwarded, not tx.origin). |
+| `WasmPrecompileGasConsumption`                             | Verifies non-zero, meaningful gas consumption (>21k) for cross-runtime execute calls.      |
+| `WasmPrecompileEstimateGas`                                | Verifies `eth_estimateGas` returns a bounded estimate for wasm precompile query calls.    |
+| `WasmPrecompileExecuteFailsWithBadMessage`                 | Verifies unrecognized execute message `{"nonexistent_method":{}}` causes receipt status=0x0. |
+| `WasmPrecompileQueryInvalidContract`                       | Verifies querying a non-existent bech32 address errors or returns empty.                   |
+| `WasmPrecompileContractInfoNotFound`                       | Verifies `contractInfo` for non-existent contract errors.                                  |
+| `WasmPrecompileInvalidBech32Fails`                         | Verifies invalid bech32 address causes tx revert (status=0x0).                             |
+
+### H2) CosmWasm -> EVM plugin unit tests
+
+Purpose: validates custom message handler and query handler decorator control flow (dispatch, passthrough, reentrancy, validation).
+Suite: `app/wasm_evm_plugin_test.go`
+
+| Test                                                         | Description                                                                               |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| `EVMMessageHandler_NilCustomPassesThrough`                   | Verifies nil Custom field delegates to next handler in chain.                              |
+| `EVMMessageHandler_NonEVMCustomPassesThrough`                | Verifies non-`evm_call` custom JSON delegates to next handler.                           |
+| `EVMMessageHandler_MalformedJSONPassesThrough`               | Verifies malformed JSON in Custom delegates to next handler.                               |
+| `EVMMessageHandler_EVMCallNilPassesThrough`                  | Verifies `{"evm_call":null}` delegates to next handler.                                  |
+| `EVMMessageHandler_ReentrancyBlocked`                        | Verifies EVM call from depth=1 returns `ErrReentrancyNotAllowed`.                        |
+| `EVMMessageHandler_InvalidContractAddress`                   | Verifies malformed EVM hex address (`0xSHORT`) returns "invalid target contract" error.  |
+| `EVMMessageHandler_InvalidCalldataHex`                       | Verifies invalid calldata hex (`0xZZZZ`) returns "invalid calldata hex" error.           |
+| `EVMQueryHandler_NilCustomPassesThrough`                     | Verifies nil Custom query field delegates to wrapped handler.                              |
+| `EVMQueryHandler_NonEVMCustomPassesThrough`                  | Verifies non-EVM custom query JSON delegates to wrapped handler.                           |
+| `EVMQueryHandler_MalformedJSONPassesThrough`                 | Verifies malformed JSON in custom query delegates to wrapped handler.                      |
+| `EVMQueryHandler_EVMCallReentrancyBlocked`                   | Verifies `evm_call` query at depth=1 returns reentrancy error.                           |
+| `EVMQueryHandler_EVMAccountReentrancyBlocked`                | Verifies `evm_account` query at depth=1 returns reentrancy error.                        |
+
+### H3) CosmWasm -> EVM plugin end-to-end integration (planned)
+
+Purpose: validates full Wasm->EVM call paths with actual EVM contract execution.
+Suite: `tests/integration/wasm/evm_plugin_test.go` (requires custom CosmWasm contract with `evm_call` support)
+
+| Test                                                         | Description                                                                               |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| `WasmToEVMCallTxPath`                                      | CosmWasm contract calls an EVM contract via `evm_call` custom message, verifies state change. |
+| `WasmToEVMCallQueryPath`                                   | CosmWasm contract queries an EVM contract via `evm_call` custom query, verifies return data.  |
+| `WasmToEVMAccountQuery`                                    | CosmWasm contract queries EVM account info via `evm_account` custom query.                |
+| `WasmToEVMCallGasCapEnforced`                              | Verifies per-call gas cap is enforced for Wasm->EVM calls.                                |
+| `WasmToEVMCallSenderIdentity`                              | Verifies the EVM contract sees the wasm contract address as `msg.sender`.                |
 
 ### I) VM query/state integration
 
@@ -751,7 +815,7 @@ See [devnet-tests.md](devnet-tests.md) for full details on the EVM migration dev
 
 ### Medium priority
 
-1. **CosmWasm + EVM interaction design** — Document whether/how CosmWasm contracts and EVM contracts can interact. Consider a bridge mechanism, shared query paths, or explicit isolation. Lumera is the only Cosmos EVM chain also running CosmWasm, so there is no precedent to follow.
+1. ~~**CosmWasm + EVM interaction design**~~ — DONE. Bidirectional cross-runtime bridge implemented: WasmPrecompile (0x0903) for EVM->CosmWasm, custom message/query handlers for CosmWasm->EVM. Phase 1 is non-payable with depth-1 reentrancy guard. See `precompiles/wasm/` and `app/wasm_evm_plugin.go`.
 2. **Ops monitoring runbook** — Document fee market monitoring (base fee tracking, gas utilization trends), alerting thresholds, and common failure mode diagnosis.
 3. **EVM governance proposals** — Mechanism to toggle precompiles and adjust EVM params via on-chain governance (Evmos has dedicated governance proposals for this).
 

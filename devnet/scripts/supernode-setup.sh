@@ -29,6 +29,10 @@
 #
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/common.sh"
+
 # ─── Prerequisites ────────────────────────────────────────────────────────────
 
 # Require MONIKER env (compose already sets it)
@@ -51,6 +55,8 @@ DAEMON="lumerad"
 CHAIN_ID="lumera-devnet-1"
 KEYRING_BACKEND="test"
 DENOM="ulume"
+VERSION_LOG_PREFIX="[SN]"
+LUMERA_SUPPORTS_EVM_VERBOSE=1
 TX_GAS_PRICES="${TX_GAS_PRICES:-0.03ulume}"
 
 # After EVM activation, the feemarket module enforces a minimum global fee in
@@ -137,6 +143,7 @@ SNCLI_KEY_NAME="sncli-account"
 # Loaded later by load_configured_mnemonics() from config.json
 SN_CONFIG_MNEMONIC=""
 SNCLI_CONFIG_MNEMONIC=""
+accounts_registry_init "${NODE_STATUS_DIR}" "${CFG_CHAIN}"
 
 # Derive supernode key name from validator moniker:
 #   "supernova_validator_1_key" → "supernova_supernode_1_key"
@@ -153,130 +160,10 @@ SN_LEGACY_HD_PATH="m/44'/118'/0'/0/0"
 SN_EVM_HD_PATH="m/44'/60'/0'/0/0"
 
 # ═════════════════════════════════════════════════════════════════════════════
-# UTILITY FUNCTIONS
-# ═════════════════════════════════════════════════════════════════════════════
-
-# Log and execute a command (output goes to stdout)
-run() {
-	echo "+ $*"
-	"$@"
-}
-
-# Log a command to stderr (so stdout can be captured by the caller)
-run_capture() {
-	echo "+ $*" >&2 # goes to stderr, not captured
-	"$@"
-}
-
-# Delete and re-import a key from mnemonic (destructive — always replaces)
-recover_key_from_mnemonic() {
-	local key_name="$1"
-	local mnemonic="$2"
-	run ${DAEMON} keys delete "${key_name}" --keyring-backend "${KEYRING_BACKEND}" -y >/dev/null 2>&1 || true
-	printf '%s\n' "${mnemonic}" | run ${DAEMON} keys add "${key_name}" --recover --keyring-backend "${KEYRING_BACKEND}" >/dev/null
-}
-
-# ═════════════════════════════════════════════════════════════════════════════
 # VERSION DETECTION
 # Determines the running lumerad version and whether EVM features are active.
 # Version comparison is used to decide key types (legacy vs EVM) and gas pricing.
 # ═════════════════════════════════════════════════════════════════════════════
-
-# Returns 0 if $1 >= $2 using semver comparison (via sort -V)
-version_ge() {
-	local current normalized_current normalized_floor
-	current="${1:-}"
-	normalized_current="$(normalize_version "${current}")"
-	normalized_floor="$(normalize_version "${2:-}")"
-	printf '%s\n' "${normalized_floor}" "${normalized_current}" | sort -V | head -n1 | grep -q "^${normalized_floor}\$"
-}
-
-# Strip leading/trailing whitespace and "v" prefix: "  v1.20.0 " → "1.20.0"
-normalize_version() {
-	local version="${1:-}"
-	version="${version#"${version%%[![:space:]]*}"}"
-	version="${version%"${version##*[![:space:]]}"}"
-	version="${version#v}"
-	printf '%s' "${version}"
-}
-
-# Detect the running lumerad version using three sources (in priority order):
-#   1. `lumerad version` binary output (most authoritative)
-#   2. LUMERA_VERSION env var (set by docker-compose, may be stale after upgrade)
-#   3. config.json .chain.version field (fallback)
-get_lumerad_version() {
-	local version=""
-	local env_version="${LUMERA_VERSION:-}"
-	local config_version=""
-
-	version="$($DAEMON version 2>/dev/null | grep -Eo 'v?[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?' | head -n1 || true)"
-	version="$(normalize_version "${version}")"
-	env_version="$(normalize_version "${env_version}")"
-	if [[ -n "$version" ]]; then
-		if [[ -n "$env_version" && "$env_version" != "null" && "$env_version" != "$version" ]]; then
-			echo "[SN] Ignoring stale LUMERA_VERSION=v${env_version}; detected lumerad binary version ${version}." >&2
-		fi
-		printf '%s' "${version}"
-		return 0
-	fi
-
-	if [[ -n "$env_version" && "$env_version" != "null" ]]; then
-		printf '%s' "${env_version}"
-		return 0
-	fi
-
-	if [[ -f "${CFG_CHAIN}" ]]; then
-		config_version="$(jq -r '.chain.version // empty' "${CFG_CHAIN}" 2>/dev/null || true)"
-	fi
-	config_version="$(normalize_version "${config_version}")"
-
-	if [[ -n "$config_version" && "$config_version" != "null" ]]; then
-		printf '%s' "${config_version}"
-		return 0
-	fi
-
-	printf '%s' "${version}"
-}
-
-# Return the chain version that first introduced EVM support.
-# Used by lumera_supports_evm() to decide whether to set up EVM keys.
-get_first_evm_version() {
-	local version=""
-
-	if [[ -n "${LUMERA_FIRST_EVM_VERSION:-}" && "${LUMERA_FIRST_EVM_VERSION}" != "null" ]]; then
-		version="${LUMERA_FIRST_EVM_VERSION}"
-	elif [[ -f "${CFG_CHAIN}" ]]; then
-		version="$(jq -r '.chain.evm_from_version // empty' "${CFG_CHAIN}" 2>/dev/null || true)"
-	fi
-
-	if [[ -z "$version" || "$version" == "null" ]]; then
-		version="v1.20.0"
-	fi
-
-	printf '%s' "$(normalize_version "${version}")"
-}
-
-# Returns 0 if the current lumerad binary version >= the EVM cutover version.
-# When true, keys must use eth_secp256k1 (coin 60) instead of secp256k1 (coin 118).
-lumera_supports_evm() {
-	local current_version first_evm_version
-
-	current_version="$(get_lumerad_version)"
-	first_evm_version="$(get_first_evm_version)"
-
-	if [[ -z "$current_version" || "$current_version" == "null" ]]; then
-		echo "[SN] Unable to determine lumerad version; assuming no EVM migration support."
-		return 1
-	fi
-
-	if version_ge "$current_version" "$first_evm_version"; then
-		echo "[SN] Lumera version v${current_version} has EVM support (cutover v${first_evm_version})."
-		return 0
-	fi
-
-	echo "[SN] Lumera version v${current_version} is pre-EVM (cutover v${first_evm_version}); skipping EVM key migration setup."
-	return 1
-}
 
 # ═════════════════════════════════════════════════════════════════════════════
 # KEY MANAGEMENT
@@ -637,90 +524,6 @@ require_crudini() {
 # confirming transactions. Used during funding and registration.
 # ═════════════════════════════════════════════════════════════════════════════
 
-# Wait for a transaction to be included in a block.
-# Strategy: first try WebSocket subscription (fast, event-driven), then fall
-# back to polling `q tx` by hash every $interval seconds until $timeout.
-wait_for_tx() {
-	local txhash="$1"
-	local timeout="${2:-90}"
-	local interval="${3:-3}"
-
-	if [[ -z "$txhash" ]]; then
-		echo "[SN] wait_for_tx: missing tx hash"
-		return 2
-	fi
-
-	echo "[SN] Waiting for tx $txhash (up to ${timeout}s) via WebSocket…"
-	local wait_args=(q wait-tx "$txhash" --output json --timeout "${timeout}s")
-	[[ -n "$LUMERA_RPC_ADDR" ]] && wait_args+=(--node "$LUMERA_RPC_ADDR")
-
-	# Try WebSocket subscription first
-	local out rc=0
-	out="$($DAEMON "${wait_args[@]}" 2>&1)"
-	rc=$?
-	if [[ $rc -eq 0 ]] && jq -e . >/dev/null 2>&1 <<<"$out"; then
-		local code height gas_used gas_wanted raw_log ts
-		code=$(jq -r 'try .code // "null"' <<<"$out")
-		height=$(jq -r 'try .height // "0"' <<<"$out")
-		gas_used=$(jq -r 'try .gas_used // ""' <<<"$out")
-		gas_wanted=$(jq -r 'try .gas_wanted // ""' <<<"$out")
-		raw_log=$(jq -r 'try .raw_log // ""' <<<"$out")
-		ts=$(jq -r 'try .timestamp // ""' <<<"$out")
-
-		if [[ "$code" == "0" || "$code" == "null" ]]; then
-			echo "[SN] Tx $txhash confirmed at height $height (gas $gas_used/$gas_wanted) $ts"
-			return 0
-		else
-			echo "[SN] Tx $txhash FAILED at height $height: code=$code"
-			[[ -n "$raw_log" ]] && echo "[SN] raw_log: $raw_log"
-			return 1
-		fi
-	else
-		echo "[SN] WebSocket wait failed/timeout; falling back to RPC polling…"
-	fi
-
-	# Fallback: poll q tx by hash (works even if indexer is null, once node surfaces it)
-	local deadline=$((SECONDS + timeout))
-	while ((SECONDS < deadline)); do
-		local tx_args=(q tx "$txhash" --output json)
-		[[ -n "${LUMERA_RPC_ADDR:-}" ]] && tx_args+=(--node "$LUMERA_RPC_ADDR")
-
-		out="$($DAEMON "${tx_args[@]}" 2>&1)" || true
-
-		# If it's valid JSON, try to read fields; otherwise keep waiting on common "not found" cases
-		if jq -e . >/dev/null 2>&1 <<<"$out"; then
-			local height code codespace raw_log gas_used gas_wanted
-			height=$(jq -r 'try .height // "0"' <<<"$out")
-			code=$(jq -r 'try .code // "null"' <<<"$out")
-			codespace=$(jq -r 'try .codespace // ""' <<<"$out")
-			raw_log=$(jq -r 'try .raw_log // ""' <<<"$out")
-			gas_used=$(jq -r 'try .gas_used // ""' <<<"$out")
-			gas_wanted=$(jq -r 'try .gas_wanted // ""' <<<"$out")
-
-			if [[ "$height" != "0" && "$height" != "null" ]]; then
-				if [[ "$code" == "0" || "$code" == "null" ]]; then
-					echo "[SN] Tx $txhash confirmed at height $height (gas $gas_used/$gas_wanted)"
-					return 0
-				else
-					echo "[SN] Tx $txhash FAILED at height $height: code=$code codespace=${codespace:-N/A}"
-					[[ -n "$raw_log" ]] && echo "[SN] raw_log: $raw_log"
-					return 1
-				fi
-			fi
-		else
-			# Non-JSON or "not found" cases: keep polling
-			# Typical texts: "tx (...) not found", RPC -32603, or empty while indexing.
-			:
-		fi
-
-		sleep "$interval"
-	done
-
-	echo "[SN] Timeout: tx $txhash not found/committed after ${timeout}s."
-	echo "[SN] Hints: ensure RPC reachable (check \$LUMERA_RPC_ADDR), and node is not lagging."
-	return 2
-}
-
 # Get current block height (integer), 0 if unknown
 current_height() {
 	curl -sf "${LUMERA_RPC_ADDR}/status" |
@@ -888,6 +691,7 @@ update_addresses_after_evm_migration() {
 		echo "[SN] Saved pre-EVM supernode address to ${SN_ADDR_FILE}-pre-evm"
 	fi
 	echo "$new_sn_addr" >"$SN_ADDR_FILE"
+	accounts_registry_upsert "${configured_key_name}" "${new_sn_addr}" "$(cat "$SN_MNEMONIC_FILE" 2>/dev/null || true)" "cosmos" "10000000${DENOM}" "${KEY_NAME}" ""
 	SN_ADDR="$new_sn_addr"
 	echo "[SN] Updated supernode-address: $new_sn_addr"
 
@@ -951,6 +755,7 @@ migrate_sncli_account_if_needed() {
 
 	# Update address file and sncli config.
 	echo "$new_addr" >"$SNCLI_ADDR_FILE"
+	accounts_registry_upsert "${SNCLI_KEY_NAME}" "${new_addr}" "$(cat "$SNCLI_MNEMONIC_FILE" 2>/dev/null || true)" "cosmos" "${SNCLI_FUND_AMOUNT}${DENOM}" "${KEY_NAME}" ""
 	crudini --set "${SNCLI_CFG}" keyring local_address "\"$new_addr\""
 	echo "[SNCLI] Updated sncli config keyring.local_address: $new_addr"
 
@@ -1288,6 +1093,7 @@ configure_supernode() {
 			exit 1
 		fi
 	fi
+	accounts_registry_upsert "${configured_sn_key_name:-${SN_KEY_NAME}}" "${SN_ADDR}" "$(cat "$SN_MNEMONIC_FILE" 2>/dev/null || true)" "cosmos" "10000000${DENOM}" "${KEY_NAME}" "${SEND_TX_HASH:-}"
 }
 
 # Returns 0 if registered to SN_ADDR and last state is SUPERNODE_STATE_ACTIVE, else 1
@@ -1457,6 +1263,7 @@ configure_sncli() {
 			exit 1
 		fi
 	fi
+	accounts_registry_upsert "${SNCLI_KEY_NAME}" "${addr}" "$(cat "${SNCLI_MNEMONIC_FILE}" 2>/dev/null || true)" "cosmos" "${SNCLI_FUND_AMOUNT}${DENOM}" "${KEY_NAME}" "${send_tx_hash:-}"
 
 	# Write sncli connection config — points to this container's local endpoints
 	# [lumera] section: chain connection

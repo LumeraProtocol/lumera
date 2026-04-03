@@ -15,6 +15,8 @@ fi
 BINARIES_DIR="$(cd "${BINARIES_DIR}" && pwd)"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/common.sh"
 DEVNET_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 COMPOSE_FILE="${DEVNET_ROOT}/docker-compose.yml"
 
@@ -30,45 +32,6 @@ SHARED_LUMERAD="${RELEASE_DIR}/lumerad"
 COMPOSE_STOP_TIMEOUT="${COMPOSE_STOP_TIMEOUT:-30}"
 COMPOSE_UP_TIMEOUT="${COMPOSE_UP_TIMEOUT:-120}"
 COMPOSE_READY_TIMEOUT="${COMPOSE_READY_TIMEOUT:-90}"
-
-normalize_version() {
-	local version="${1:-}"
-	version="${version#"${version%%[![:space:]]*}"}"
-	version="${version%"${version##*[![:space:]]}"}"
-	version="${version#v}"
-	printf '%s\n' "${version}"
-}
-
-release_core_version() {
-	local version
-	version="$(normalize_version "${1:-}")"
-	printf '%s\n' "${version}" | grep -Eo '^[0-9]+\.[0-9]+\.[0-9]+' | head -n 1
-}
-
-versions_match() {
-	local expected actual expected_core actual_core
-	expected="$(normalize_version "${1:-}")"
-	actual="$(normalize_version "${2:-}")"
-
-	if [[ -z "${expected}" || -z "${actual}" ]]; then
-		return 1
-	fi
-
-	if [[ "${expected}" == "${actual}" ]]; then
-		return 0
-	fi
-
-	expected_core="$(release_core_version "${expected}")"
-	actual_core="$(release_core_version "${actual}")"
-
-	# Accept local/dev builds like 1.20.0-<gitsha> when the requested
-	# upgrade target is the stable release 1.20.0.
-	if [[ -n "${expected_core}" && "${expected}" == "${expected_core}" && "${actual_core}" == "${expected_core}" ]]; then
-		return 0
-	fi
-
-	return 1
-}
 
 binary_version() {
 	local binary="$1"

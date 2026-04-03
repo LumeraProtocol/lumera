@@ -11,6 +11,8 @@ REQUESTED_HEIGHT="$2"
 BINARIES_DIR="$3"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/common.sh"
 DEVNET_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 COMPOSE_FILE="${DEVNET_ROOT}/docker-compose.yml"
 SERVICE="${SERVICE_NAME:-supernova_validator_1}"
@@ -36,44 +38,6 @@ detect_upgrade_halt() {
 	if echo "${logs}" | grep -qE "UPGRADE.*\"${RELEASE_NAME}\".*NEEDED"; then
 		return 0
 	fi
-	return 1
-}
-
-# Check if the node is already running the target version (upgrade already completed).
-normalize_version() {
-	local v="${1:-}"
-	v="${v#"${v%%[![:space:]]*}"}"
-	v="${v%"${v##*[![:space:]]}"}"
-	v="${v#v}"
-	printf '%s\n' "${v}"
-}
-
-release_core_version() {
-	local version
-	version="$(normalize_version "${1:-}")"
-	printf '%s\n' "${version}" | grep -Eo '^[0-9]+\.[0-9]+\.[0-9]+' | head -n 1
-}
-
-versions_match() {
-	local expected actual expected_core actual_core
-	expected="$(normalize_version "${1:-}")"
-	actual="$(normalize_version "${2:-}")"
-
-	if [[ -z "${expected}" || -z "${actual}" ]]; then
-		return 1
-	fi
-
-	if [[ "${expected}" == "${actual}" ]]; then
-		return 0
-	fi
-
-	expected_core="$(release_core_version "${expected}")"
-	actual_core="$(release_core_version "${actual}")"
-
-	if [[ -n "${expected_core}" && "${expected}" == "${expected_core}" && "${actual_core}" == "${expected_core}" ]]; then
-		return 0
-	fi
-
 	return 1
 }
 

@@ -3,6 +3,7 @@ package evm
 import (
 	actionprecompile "github.com/LumeraProtocol/lumera/precompiles/action"
 	supernodeprecompile "github.com/LumeraProtocol/lumera/precompiles/supernode"
+	wasmprecompile "github.com/LumeraProtocol/lumera/precompiles/wasm"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
 )
 
@@ -24,4 +25,5 @@ var LumeraActiveStaticPrecompiles = []string{
 	// Lumera custom precompiles
 	actionprecompile.ActionPrecompileAddress,
 	supernodeprecompile.SupernodePrecompileAddress,
+	wasmprecompile.WasmPrecompileAddress,
 }

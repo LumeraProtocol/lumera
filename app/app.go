@@ -367,6 +367,11 @@ func New(
 	// the wrapper into the IBC transfer middleware stacks.
 	app.registerERC20Policy()
 
+	// Wire EVM<->CosmWasm cross-runtime plugins into the wasm keeper.
+	// EVMKeeper is available (created above); these options are applied when
+	// the wasm keeper is constructed inside registerIBCModules.
+	wasmOpts = append(wasmOpts, EVMWasmPluginOpts(app.EVMKeeper)...)
+
 	// register legacy modules (IBC, wasm)
 	if err := app.registerIBCModules(appOpts, wasmOpts...); err != nil {
 		panic(err)

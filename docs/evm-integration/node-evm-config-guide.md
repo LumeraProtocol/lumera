@@ -291,7 +291,7 @@ The fee market is configured via genesis parameters (governable on-chain), not `
 
 ## 7. Static Precompiles
 
-Lumera enables 10 static precompiles at genesis. These are not configurable via `app.toml` — they are set in the EVM genesis state and can be toggled via governance.
+Lumera enables 11 static precompiles at genesis. These are not configurable via `app.toml` — they are set in the EVM genesis state and can be toggled via governance.
 
 | Address | Precompile | Purpose |
 |---------|-----------|---------|
@@ -305,6 +305,7 @@ Lumera enables 10 static precompiles at genesis. These are not configurable via 
 | `0x0800` | Slashing | Query validator slashing info from EVM |
 | `0x0901` | Action | Request/finalize/approve Cascade & Sense actions from EVM |
 | `0x0902` | Supernode | Register/manage supernodes and query metrics from EVM |
+| `0x0903` | Wasm | Execute/query CosmWasm contracts from EVM (cross-runtime bridge) |
 
 **Note**: Native sends to precompile addresses are blocked by a bank send restriction to prevent accidental token loss.
 

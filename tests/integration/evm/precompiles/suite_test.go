@@ -121,4 +121,72 @@ func TestPrecompilesSuite(t *testing.T) {
 	t.Run("PrecompileGasEstimateMatchesActual", func(t *testing.T) {
 		testPrecompileGasEstimateMatchesActual(t, node)
 	})
+
+	// Wasm precompile tests (EVM -> CosmWasm direction)
+	// Deploy hackatom contract once, reuse across tests.
+	var wasmInfo wasmContractInfo
+	t.Run("WasmPrecompileDeployAndQuery", func(t *testing.T) {
+		// This test deploys the contract and runs the first query.
+		// The contract info is captured for subsequent tests.
+		testWasmPrecompileQueryViaEthCall(t, node)
+		// Re-deploy for the remaining tests that need the info struct
+		wasmInfo = deployHackatom(t, node)
+	})
+	t.Run("WasmPrecompileContractInfoViaEthCall", func(t *testing.T) {
+		if wasmInfo.Addr == "" {
+			t.Skip("wasm contract not deployed")
+		}
+		testWasmPrecompileContractInfoViaEthCall(t, node, wasmInfo)
+	})
+	t.Run("WasmPrecompileRawQueryViaEthCall", func(t *testing.T) {
+		if wasmInfo.Addr == "" {
+			t.Skip("wasm contract not deployed")
+		}
+		testWasmPrecompileRawQueryViaEthCall(t, node, wasmInfo)
+	})
+	t.Run("WasmPrecompileExecuteTxPath", func(t *testing.T) {
+		if wasmInfo.Addr == "" {
+			t.Skip("wasm contract not deployed")
+		}
+		testWasmPrecompileExecuteTxPath(t, node, wasmInfo)
+	})
+	t.Run("WasmPrecompileExecuteEmitsEvent", func(t *testing.T) {
+		if wasmInfo.Addr == "" {
+			t.Skip("wasm contract not deployed")
+		}
+		testWasmPrecompileExecuteEmitsWasmExecutedEvent(t, node, wasmInfo)
+	})
+	t.Run("WasmPrecompileSenderIdentity", func(t *testing.T) {
+		if wasmInfo.Addr == "" {
+			t.Skip("wasm contract not deployed")
+		}
+		testWasmPrecompileSenderIdentity(t, node, wasmInfo)
+	})
+	t.Run("WasmPrecompileGasConsumption", func(t *testing.T) {
+		if wasmInfo.Addr == "" {
+			t.Skip("wasm contract not deployed")
+		}
+		testWasmPrecompileGasConsumption(t, node, wasmInfo)
+	})
+	t.Run("WasmPrecompileEstimateGas", func(t *testing.T) {
+		if wasmInfo.Addr == "" {
+			t.Skip("wasm contract not deployed")
+		}
+		testWasmPrecompileEstimateGas(t, node, wasmInfo)
+	})
+	t.Run("WasmPrecompileExecuteFailsWithBadMessage", func(t *testing.T) {
+		if wasmInfo.Addr == "" {
+			t.Skip("wasm contract not deployed")
+		}
+		testWasmPrecompileExecuteFailsWithBadMessage(t, node, wasmInfo)
+	})
+	t.Run("WasmPrecompileQueryInvalidContract", func(t *testing.T) {
+		testWasmPrecompileQueryInvalidContract(t, node)
+	})
+	t.Run("WasmPrecompileContractInfoNotFound", func(t *testing.T) {
+		testWasmPrecompileContractInfoNotFound(t, node)
+	})
+	t.Run("WasmPrecompileInvalidBech32Fails", func(t *testing.T) {
+		testWasmPrecompileInvalidBech32Fails(t, node)
+	})
 }

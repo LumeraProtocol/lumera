@@ -261,6 +261,7 @@ func buildStartArgs(homeDir string, ports nodePorts, haltHeight int) []string {
 		"--json-rpc.ws-address", fmt.Sprintf("127.0.0.1:%d", ports.JSONWSRPC),
 		"--address", fmt.Sprintf("tcp://127.0.0.1:%d", ports.ABCI),
 		"--p2p.laddr", fmt.Sprintf("tcp://127.0.0.1:%d", ports.P2P),
+		"--rpc.pprof_laddr", "",
 		"--log_no_color",
 	}
 }

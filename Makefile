@@ -185,25 +185,29 @@ release: go.sum
 
 all-tests: unit-tests integration-tests system-tests simulation-tests
 
+# Set NOCACHE=1 to force tests to run from scratch (disables Go test caching).
+# Example: make unit-tests NOCACHE=1
+NOCACHE_FLAG := $(if $(NOCACHE),-count=1)
+
 lint: openrpc
 	@echo "Running linters..."
 	@${GOLANGCI_LINT} run ./... --timeout=5m
 
 unit-tests: openrpc
 	@echo "Running unit tests in x/..."
-	${GO} test ./x/... -v -coverprofile=coverage.out
+	${GO} test ./x/... -v -coverprofile=coverage.out $(NOCACHE_FLAG)
 
 integration-tests: openrpc
 	@echo "Running integration tests..."
-	${GO} test -tags=integration,test -p 4 ./tests/integration/... -v
+	${GO} test -tags=integration,test -p 4 ./tests/integration/... -v $(NOCACHE_FLAG)
 
 system-tests: openrpc
 	@echo "Running system tests..."
-	${GO} test -tags=system,test ./tests/system/... -v
+	${GO} test -tags=system,test ./tests/system/... -v $(NOCACHE_FLAG)
 
 simulation-tests: openrpc
 	@echo "Running simulation tests..."
-	${GO} test -tags='simulation test' ./tests/simulation/ -v -timeout 30m -args -Enabled=true -NumBlocks=200 -BlockSize=50 -Commit=true
+	${GO} test -tags='simulation test' ./tests/simulation/ -v -timeout 30m $(NOCACHE_FLAG) -args -Enabled=true -NumBlocks=200 -BlockSize=50 -Commit=true
 
 simulation-bench: openrpc
 	@echo "Running simulation benchmark..."
@@ -211,8 +215,8 @@ simulation-bench: openrpc
 
 systemex-tests: openrpc
 	@echo "Running system tests..."
-	cd ./tests/systemtests/ && go test -tags=system_test -timeout 20m -v .
+	cd ./tests/systemtests/ && go test -tags=system_test -timeout 20m -v . $(NOCACHE_FLAG)
 
 system-metrics-test:
 	@echo "Running supernode metrics system tests (E2E + staleness)..."
-	cd ./tests/systemtests/ && go test -tags=system_test -timeout 20m -v . -run 'TestSupernodeMetrics(E2E|StalenessAndRecovery)'
+	cd ./tests/systemtests/ && go test -tags=system_test -timeout 20m -v . -run 'TestSupernodeMetrics(E2E|StalenessAndRecovery)' $(NOCACHE_FLAG)

@@ -82,7 +82,7 @@ jobs:
 
   build:
     needs: [lint, unit-tests, integration-tests, system-tests]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 30
 
     steps:

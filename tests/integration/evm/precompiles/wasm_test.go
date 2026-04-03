@@ -96,7 +96,7 @@ func mustRunLumeraCLI(t *testing.T, node *evmtest.Node, args ...string) string {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	out, err := evmtest.RunCommand(ctx, node.RepoRoot(), filepath.Join(node.RepoRoot(), "build", "lumerad"), fullArgs...)
+	out, err := evmtest.RunCommand(ctx, node.RepoRoot(), node.BinPath(), fullArgs...)
 	if err != nil {
 		t.Fatalf("lumerad CLI failed: %v\noutput: %s", err, out)
 	}
@@ -140,8 +140,7 @@ func mustQueryCodeID(t *testing.T, node *evmtest.Node, txHash string) string {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	binPath := filepath.Join(node.RepoRoot(), "build", "lumerad")
-	out, err := evmtest.RunCommand(ctx, node.RepoRoot(), binPath,
+	out, err := evmtest.RunCommand(ctx, node.RepoRoot(), node.BinPath(),
 		"query", "tx", txHash,
 		"--node", node.CometRPCURL(),
 		"--output", "json",
@@ -192,8 +191,7 @@ func mustQueryContractAddr(t *testing.T, node *evmtest.Node, codeID string) stri
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	binPath := filepath.Join(node.RepoRoot(), "build", "lumerad")
-	out, err := evmtest.RunCommand(ctx, node.RepoRoot(), binPath,
+	out, err := evmtest.RunCommand(ctx, node.RepoRoot(), node.BinPath(),
 		"query", "wasm", "list-contract-by-code", codeID,
 		"--node", node.CometRPCURL(),
 		"--output", "json",

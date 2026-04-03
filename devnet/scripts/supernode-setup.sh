@@ -121,8 +121,6 @@ SN_BIN_SRC="${RELEASE_DIR}/${SN}"
 SN_BIN_SRC_ALT="${RELEASE_DIR}/${SN_ALT}"
 SN_BIN_DST="/usr/local/bin/${SN}"
 NODE_STATUS_DIR="${STATUS_DIR}/${MONIKER}"
-SN_MNEMONIC_FILE="${NODE_STATUS_DIR}/sn_mnemonic"
-SN_ADDR_FILE="${NODE_STATUS_DIR}/supernode-address"
 
 # Container's Docker-network IP (used for P2P listen address and endpoint registration)
 IP_ADDR="$(hostname -i | awk '{print $1}')"
@@ -229,6 +227,16 @@ is_legacy_pubkey_type() {
 is_evm_pubkey_type() {
 	local pubkey_type="${1:-}"
 	[[ -n "$pubkey_type" && "$pubkey_type" == *"ethsecp256k1"* ]]
+}
+
+registry_account_address() {
+	local account_name="$1"
+	accounts_registry_get_field "${account_name}" "address"
+}
+
+registry_account_mnemonic() {
+	local account_name="$1"
+	accounts_registry_get_field "${account_name}" "mnemonic"
 }
 
 # Convenience wrappers: ensure a key of the right type exists in the right keyring.
@@ -685,15 +693,9 @@ update_addresses_after_evm_migration() {
 		return 0
 	fi
 
-	# Preserve old address file as -pre-evm, write new address.
-	if [[ -f "$SN_ADDR_FILE" ]]; then
-		cp -f "$SN_ADDR_FILE" "${SN_ADDR_FILE}-pre-evm"
-		echo "[SN] Saved pre-EVM supernode address to ${SN_ADDR_FILE}-pre-evm"
-	fi
-	echo "$new_sn_addr" >"$SN_ADDR_FILE"
-	accounts_registry_upsert "${configured_key_name}" "${new_sn_addr}" "$(cat "$SN_MNEMONIC_FILE" 2>/dev/null || true)" "cosmos" "10000000${DENOM}" "${KEY_NAME}" ""
+	accounts_registry_upsert "${configured_key_name}" "${new_sn_addr}" "$(registry_account_mnemonic "${configured_key_name}")" "cosmos" "10000000${DENOM}" "${KEY_NAME}" ""
 	SN_ADDR="$new_sn_addr"
-	echo "[SN] Updated supernode-address: $new_sn_addr"
+	echo "[SN] Updated supernode account registry entry: $new_sn_addr"
 
 	# Update sncli config with new supernode address (if sncli is configured).
 	if [[ -f "$SNCLI_CFG" ]] && have crudini; then
@@ -973,7 +975,7 @@ configure_supernode_p2p_listen() {
 # Main supernode configuration function. Handles the full key + config + funding
 # flow in this order:
 #   1. Create or recover the supernode key (three sources: config mnemonic,
-#      persisted mnemonic file, or generate new)
+#      persisted registry mnemonic, or generate new)
 #   2. Resolve addresses (supernode, validator, valoper, genesis)
 #   3. Initialize config.yml via `supernode init` if it doesn't exist
 #   4. Prepare EVM migration keys if applicable
@@ -981,46 +983,51 @@ configure_supernode_p2p_listen() {
 configure_supernode() {
 	echo "[SN] Ensuring SN key exists..."
 	mkdir -p "$SN_BASEDIR" "${NODE_STATUS_DIR}"
+	local bootstrap_sn_key_name persisted_supernode_mnemonic active_supernode_mnemonic configured_sn_key_name
 
 	# Key recovery priority:
 	#   1. Pre-configured mnemonic from config.json (deterministic across rebuilds)
-	#   2. Previously persisted mnemonic file (survives container restart)
+	#   2. Previously persisted mnemonic in accounts.json (survives container restart)
 	#   3. Generate a fresh key (first run with no config)
+	bootstrap_sn_key_name="${SN_KEY_NAME}"
+	if [ -f "$SN_CONFIG" ]; then
+		bootstrap_sn_key_name="$(get_supernode_config_value "$SN_CONFIG" "key_name")"
+		[[ -z "$bootstrap_sn_key_name" ]] && bootstrap_sn_key_name="${SN_KEY_NAME}"
+	fi
+	persisted_supernode_mnemonic="$(registry_account_mnemonic "${bootstrap_sn_key_name}")"
+	active_supernode_mnemonic="${persisted_supernode_mnemonic}"
 	if [ -n "${SN_CONFIG_MNEMONIC}" ]; then
-		local bootstrap_sn_key_name
-		echo "${SN_CONFIG_MNEMONIC}" >"${SN_MNEMONIC_FILE}"
-		bootstrap_sn_key_name="${SN_KEY_NAME}"
-		if [ -f "$SN_CONFIG" ]; then
-			bootstrap_sn_key_name="$(get_supernode_config_value "$SN_CONFIG" "key_name")"
-			[[ -z "$bootstrap_sn_key_name" ]] && bootstrap_sn_key_name="${SN_KEY_NAME}"
-		fi
+		active_supernode_mnemonic="${SN_CONFIG_MNEMONIC}"
 		if run $DAEMON keys show "$bootstrap_sn_key_name" --keyring-backend "$KEYRING_BACKEND" >/dev/null 2>&1; then
 			echo "[SN] Preserving existing ${bootstrap_sn_key_name} from configured sn-account-mnemonics entry."
 		else
 			ensure_legacy_key_from_mnemonic "${bootstrap_sn_key_name}" "${SN_CONFIG_MNEMONIC}"
 			echo "[SN] Recovered legacy ${bootstrap_sn_key_name} from configured sn-account-mnemonics entry."
 		fi
-	elif [ -f "$SN_MNEMONIC_FILE" ]; then
+	elif [ -n "${persisted_supernode_mnemonic}" ]; then
 		if ! run $DAEMON keys show "$SN_KEY_NAME" --keyring-backend "$KEYRING_BACKEND" >/dev/null 2>&1; then
-			ensure_legacy_key_from_mnemonic "$SN_KEY_NAME" "$(cat "$SN_MNEMONIC_FILE")"
+			ensure_legacy_key_from_mnemonic "$SN_KEY_NAME" "${persisted_supernode_mnemonic}"
 		fi
 	else
 		run $DAEMON keys delete "$SN_KEY_NAME" --keyring-backend "$KEYRING_BACKEND" -y || true
 		MNEMONIC_JSON="$(run_capture $DAEMON keys add "$SN_KEY_NAME" --keyring-backend "$KEYRING_BACKEND" --output json)"
 		echo "[SN] Generated new supernode key: $MNEMONIC_JSON"
-		echo "$MNEMONIC_JSON" | jq -r .mnemonic >"$SN_MNEMONIC_FILE"
+		active_supernode_mnemonic="$(echo "$MNEMONIC_JSON" | jq -r .mnemonic)"
 	fi
 
 	# Resolve all addresses needed for registration and funding
 	SN_ADDR="$(run_capture $DAEMON keys show "$SN_KEY_NAME" -a --keyring-backend "$KEYRING_BACKEND")"
 	echo "[SN] Supernode address: $SN_ADDR"
-	echo "$SN_ADDR" >"$SN_ADDR_FILE"
 	VAL_ADDR="$(run_capture $DAEMON keys show "$KEY_NAME" -a --keyring-backend "$KEYRING_BACKEND")"
 	echo "[SN] Validator address: $VAL_ADDR"
 	VALOPER_ADDR="$(run_capture $DAEMON keys show "$KEY_NAME" --bech val -a --keyring-backend "$KEYRING_BACKEND")"
 	echo "[SN] Validator operator address: $VALOPER_ADDR"
 
-	GENESIS_ADDR="$(cat ${NODE_STATUS_DIR}/genesis-address)"
+	GENESIS_ADDR="$(registry_account_address "${KEY_NAME}")"
+	if [[ -z "${GENESIS_ADDR}" ]]; then
+		echo "[SN] ERROR: Missing validator funding address for ${KEY_NAME} in accounts registry."
+		exit 1
+	fi
 	echo "[SN] Genesis address: $GENESIS_ADDR"
 
 	SN_ENDPOINT="${IP_ADDR}:${SN_PORT}"
@@ -1030,6 +1037,10 @@ configure_supernode() {
 	# records the key_name, chain_id, and gRPC endpoint.
 	echo "[SN] Init config if missing..."
 	if [ ! -f "$SN_BASEDIR/config.yml" ]; then
+		if [[ -z "${active_supernode_mnemonic}" ]]; then
+			echo "[SN] ERROR: missing supernode mnemonic in accounts registry; cannot initialize ${SN_CONFIG}."
+			exit 1
+		fi
 		run ${SN} init -y --force \
 			--basedir "$SN_BASEDIR" \
 			--keyring-backend "$KEYRING_BACKEND" \
@@ -1037,7 +1048,7 @@ configure_supernode() {
 			--supernode-addr "$IP_ADDR" \
 			--supernode-port "$SN_PORT" \
 			--recover \
-			--mnemonic "$(cat "$SN_MNEMONIC_FILE")" \
+			--mnemonic "${active_supernode_mnemonic}" \
 			--lumera-grpc "localhost:${LUMERA_GRPC_PORT}" \
 			--chain-id "$CHAIN_ID"
 
@@ -1046,16 +1057,17 @@ configure_supernode() {
 	fi
 
 	# Derive EVM keys if the chain has been upgraded past the EVM cutover version
-	maybe_prepare_supernode_migration "$(cat "$SN_MNEMONIC_FILE")"
+	maybe_prepare_supernode_migration "${active_supernode_mnemonic}"
 
 	# Re-read the supernode address from config — migration may have changed
 	# which key is active (e.g. from legacy to evm_key_name)
-	local configured_sn_key_name
 	configured_sn_key_name="$(get_supernode_config_value "$SN_CONFIG" "key_name")"
 	if [[ -n "$configured_sn_key_name" ]]; then
 		SN_ADDR="$(run_capture $DAEMON keys show "$configured_sn_key_name" -a --keyring-backend "$KEYRING_BACKEND")"
 		echo "[SN] Supernode address (${configured_sn_key_name}): $SN_ADDR"
-		echo "$SN_ADDR" >"$SN_ADDR_FILE"
+		if [[ -z "${active_supernode_mnemonic}" ]]; then
+			active_supernode_mnemonic="$(registry_account_mnemonic "${configured_sn_key_name}")"
+		fi
 	fi
 
 	# Fund the supernode account from the validator's genesis account if balance
@@ -1093,7 +1105,7 @@ configure_supernode() {
 			exit 1
 		fi
 	fi
-	accounts_registry_upsert "${configured_sn_key_name:-${SN_KEY_NAME}}" "${SN_ADDR}" "$(cat "$SN_MNEMONIC_FILE" 2>/dev/null || true)" "cosmos" "10000000${DENOM}" "${KEY_NAME}" "${SEND_TX_HASH:-}"
+	accounts_registry_upsert "${configured_sn_key_name:-${SN_KEY_NAME}}" "${SN_ADDR}" "${active_supernode_mnemonic}" "cosmos" "10000000${DENOM}" "${KEY_NAME}" "${SEND_TX_HASH:-}"
 }
 
 # Returns 0 if registered to SN_ADDR and last state is SUPERNODE_STATE_ACTIVE, else 1

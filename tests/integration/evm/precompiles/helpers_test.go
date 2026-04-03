@@ -4,6 +4,7 @@
 package precompiles_test
 
 import (
+	"context"
 	"math/big"
 	"strings"
 	"testing"
@@ -11,6 +12,7 @@ import (
 
 	evmtest "github.com/LumeraProtocol/lumera/tests/integration/evmtest"
 	testaccounts "github.com/LumeraProtocol/lumera/testutil/accounts"
+	testjsonrpc "github.com/LumeraProtocol/lumera/testutil/jsonrpc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )
@@ -39,6 +41,25 @@ func mustEthCallPrecompile(t *testing.T, node *evmtest.Node, to string, input []
 	}
 
 	return resultBz
+}
+
+// mustEthCallPrecompileError executes an eth_call expected to fail and returns
+// the JSON-RPC error for assertion.
+func mustEthCallPrecompileError(t *testing.T, node *evmtest.Node, to string, input []byte) error {
+	t.Helper()
+
+	var resultHex string
+	err := testjsonrpc.Call(context.Background(), node.RPCURL(), "eth_call", []any{
+		map[string]any{
+			"to":   to,
+			"data": hexutil.Encode(input),
+		},
+		"latest",
+	}, &resultHex)
+	if err == nil {
+		t.Fatalf("expected eth_call error for precompile %s, got success with result %q", to, resultHex)
+	}
+	return err
 }
 
 // sendPrecompileLegacyTx signs and broadcasts a legacy tx that calls a

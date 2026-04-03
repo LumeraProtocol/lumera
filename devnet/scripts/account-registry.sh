@@ -103,7 +103,7 @@ accounts_registry_upsert() {
 	local funded_coin="$5"
 	local funding_key="$6"
 	local funding_txhash="$7"
-	local created_at tmp_file funded_base funded_base_denom funded_display
+	local created_at tmp_file funded_base="" funded_base_denom="" funded_display=""
 
 	ensure_accounts_registry
 	created_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
@@ -151,4 +151,23 @@ accounts_registry_upsert() {
 	chmod 644 "${tmp_file}"
 	mv "${tmp_file}" "${ACCOUNTS_FILE}"
 	chmod 644 "${ACCOUNTS_FILE}"
+}
+
+accounts_registry_get_field() {
+	local name="$1"
+	local field_path="$2"
+
+	ensure_accounts_registry
+	jq -r \
+		--arg name "${name}" \
+		--arg field_path "${field_path}" \
+		'
+		(map(select(.name == $name)) | first) as $entry
+		| if $entry == null then
+			empty
+		  else
+			($field_path | split(".")) as $path
+			| ($entry | getpath($path)) // empty
+		  end
+		' "${ACCOUNTS_FILE}" 2>/dev/null || true
 }

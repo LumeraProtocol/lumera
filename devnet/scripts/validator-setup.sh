@@ -76,7 +76,6 @@ SETUP_COMPLETE_FLAG="${STATUS_DIR}/setup_complete"         # Primary: all setup 
 # Per-node status directory (node ID, addresses, keys, flags)
 NODE_STATUS_DIR="${STATUS_DIR}/${MONIKER}"
 NODE_SETUP_COMPLETE_FLAG="${NODE_STATUS_DIR}/setup_complete"
-GENESIS_MNEMONIC_FILE="${NODE_STATUS_DIR}/genesis-address-mnemonic"
 GOV_MNEMONIC_FILE="${NODE_STATUS_DIR}/governance-address-mnemonic"
 LOCKS_DIR="${STATUS_DIR}/locks"
 
@@ -222,7 +221,7 @@ verify_gentx_file() {
 }
 
 collect_secondary_genesis_accounts() {
-	local other od registry key_name addr funded_base funded_denom legacy_file bal
+	local other od registry key_name addr funded_base funded_denom
 
 	while IFS= read -r other; do
 		[ "${other}" = "${MONIKER}" ] && continue
@@ -244,21 +243,6 @@ collect_secondary_genesis_accounts() {
 				[[ -z "${funded_denom}" || "${funded_denom}" == "null" ]] && funded_denom="${DENOM}"
 				run ${DAEMON} genesis add-genesis-account "${addr}" "${funded_base}${funded_denom}"
 				continue
-			fi
-		fi
-
-		legacy_file=""
-		if [[ -f "${od}/genesis-address" ]]; then
-			legacy_file="${od}/genesis-address"
-		fi
-		if [[ -n "${legacy_file}" ]]; then
-			addr="$(cat "${legacy_file}")"
-			if [[ -n "${addr}" ]]; then
-				bal="$(jq -r --arg m "${other}" '.[] | select(.moniker == $m) | .initial_distribution.account_balance' "${CFG_VALS}")"
-				if [[ -n "${bal}" && "${bal}" != "null" ]]; then
-					run ${DAEMON} genesis add-genesis-account "${addr}" "${bal}"
-					continue
-				fi
 			fi
 		fi
 
@@ -458,6 +442,8 @@ ensure_hermes_relayer_account() {
 #   2. Existing key in keyring (survives container restart via volume mount)
 #   3. Generate a fresh key (first run with no config)
 init_if_needed() {
+	local registry_mnemonic=""
+
 	if [ -f "${GENESIS_LOCAL}" ]; then
 		echo "[SETUP] ${MONIKER} already initialized (genesis exists)."
 	else
@@ -470,30 +456,36 @@ init_if_needed() {
 	# Ensure validator key exists. If a mnemonic is configured for this validator
 	# index in config.json, always recover from it to keep addresses deterministic.
 	local addr mnemonic key_json
+	registry_mnemonic="$(accounts_registry_get_field "${KEY_NAME}" "mnemonic")"
 	if [ -n "${GENESIS_ACCOUNT_MNEMONIC}" ]; then
 		recover_key_from_mnemonic "${KEY_NAME}" "${GENESIS_ACCOUNT_MNEMONIC}"
 		addr="$(run_capture ${DAEMON} keys show "${KEY_NAME}" -a --keyring-backend "${KEYRING_BACKEND}" 2>/dev/null || true)"
 		addr="$(printf '%s' "${addr}" | tr -d '\r\n')"
-		printf '%s\n' "${GENESIS_ACCOUNT_MNEMONIC}" >"${GENESIS_MNEMONIC_FILE}"
 		echo "[SETUP] Recovered ${KEY_NAME} from configured genesis mnemonic (validator index ${VAL_INDEX})"
 	else
 		addr="$(run_capture ${DAEMON} keys show "${KEY_NAME}" -a --keyring-backend "${KEYRING_BACKEND}" 2>/dev/null || true)"
 		addr="$(printf '%s' "${addr}" | tr -d '\r\n')"
 		if [ -z "${addr}" ]; then
-			key_json="$(run_capture ${DAEMON} keys add "${KEY_NAME}" --keyring-backend "${KEYRING_BACKEND}" --output json)"
-			addr="$(printf '%s' "${key_json}" | jq -r '.address // empty' 2>/dev/null || true)"
-			addr="$(printf '%s' "${addr}" | tr -d '\r\n')"
-			mnemonic="$(printf '%s' "${key_json}" | jq -r '.mnemonic // empty' 2>/dev/null || true)"
-			if [ -n "${mnemonic}" ]; then
-				printf '%s\n' "${mnemonic}" >"${GENESIS_MNEMONIC_FILE}"
-				echo "[SETUP] Wrote validator mnemonic to ${GENESIS_MNEMONIC_FILE}"
+			if [ -n "${registry_mnemonic}" ]; then
+				recover_key_from_mnemonic "${KEY_NAME}" "${registry_mnemonic}"
+				addr="$(run_capture ${DAEMON} keys show "${KEY_NAME}" -a --keyring-backend "${KEYRING_BACKEND}" 2>/dev/null || true)"
+				addr="$(printf '%s' "${addr}" | tr -d '\r\n')"
+				echo "[SETUP] Recovered ${KEY_NAME} from accounts registry mnemonic."
 			else
-				echo "[SETUP] WARNING: mnemonic is empty for ${KEY_NAME}; ${GENESIS_MNEMONIC_FILE} was not written"
+				key_json="$(run_capture ${DAEMON} keys add "${KEY_NAME}" --keyring-backend "${KEYRING_BACKEND}" --output json)"
+				addr="$(printf '%s' "${key_json}" | jq -r '.address // empty' 2>/dev/null || true)"
+				addr="$(printf '%s' "${addr}" | tr -d '\r\n')"
+				mnemonic="$(printf '%s' "${key_json}" | jq -r '.mnemonic // empty' 2>/dev/null || true)"
+				if [ -n "${mnemonic}" ]; then
+					echo "[SETUP] Captured validator mnemonic in accounts registry."
+				else
+					echo "[SETUP] WARNING: mnemonic is empty for ${KEY_NAME}; accounts registry mnemonic was not written"
+				fi
 			fi
 		else
 			echo "[SETUP] Key ${KEY_NAME} already exists with address ${addr}"
-			if [ ! -s "${GENESIS_MNEMONIC_FILE}" ]; then
-				echo "[SETUP] WARNING: ${GENESIS_MNEMONIC_FILE} is missing; mnemonic cannot be reconstructed for existing key"
+			if [ -z "${registry_mnemonic}" ]; then
+				echo "[SETUP] WARNING: accounts registry mnemonic is missing for ${KEY_NAME}; mnemonic cannot be reconstructed for existing key"
 			fi
 		fi
 	fi
@@ -501,6 +493,9 @@ init_if_needed() {
 	if [ -z "${addr}" ]; then
 		addr="$(run_capture ${DAEMON} keys show "${KEY_NAME}" -a --keyring-backend "${KEYRING_BACKEND}" 2>/dev/null || true)"
 		addr="$(printf '%s' "${addr}" | tr -d '\r\n')"
+	fi
+	if [ -n "${addr}" ]; then
+		accounts_registry_upsert "${KEY_NAME}" "${addr}" "${GENESIS_ACCOUNT_MNEMONIC:-${mnemonic:-${registry_mnemonic}}}" "cosmos" "" "" ""
 	fi
 }
 
@@ -553,8 +548,7 @@ primary_validator_setup() {
 		exit 1
 	fi
 	run ${DAEMON} genesis add-genesis-account "${addr}" "${ACCOUNT_BAL}"
-	printf '%s\n' "${addr}" >"${NODE_STATUS_DIR}/genesis-address"
-	accounts_registry_upsert "${KEY_NAME}" "${addr}" "$(cat "${GENESIS_MNEMONIC_FILE}" 2>/dev/null || true)" "cosmos" "${ACCOUNT_BAL}" "genesis" ""
+	accounts_registry_upsert "${KEY_NAME}" "${addr}" "$(accounts_registry_get_field "${KEY_NAME}" "mnemonic")" "cosmos" "${ACCOUNT_BAL}" "genesis" ""
 
 	# Create a governance key — used to submit upgrade proposals and vote.
 	# Gets a large genesis balance (1T ulume) so it can cover proposal deposits.
@@ -724,8 +718,7 @@ secondary_validator_setup() {
 	# Publish gentx for primary collection. The validator genesis account itself
 	# is already persisted in this validator's status registry.
 	copy_with_lock "gentx" cp "${gentx_file}" "${GENTX_DIR}/${MONIKER}_gentx.json"
-	printf '%s\n' "${addr}" >"${NODE_STATUS_DIR}/genesis-address"
-	accounts_registry_upsert "${KEY_NAME}" "${addr}" "$(cat "${GENESIS_MNEMONIC_FILE}" 2>/dev/null || true)" "cosmos" "${ACCOUNT_BAL}" "genesis" ""
+	accounts_registry_upsert "${KEY_NAME}" "${addr}" "$(accounts_registry_get_field "${KEY_NAME}" "mnemonic")" "cosmos" "${ACCOUNT_BAL}" "genesis" ""
 
 	# write own markers for peer discovery
 	write_node_markers

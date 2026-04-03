@@ -17,7 +17,7 @@
 #   - validators.json has "network-maker": false (or missing) for this MONIKER
 #
 # Dependencies (must complete before this script runs):
-#   - validator-setup.sh → provides genesis-address file
+#   - validator-setup.sh → provides validator account entry in accounts.json
 #   - supernode-setup.sh → provides running supernode endpoint
 #
 # Environment:
@@ -76,8 +76,6 @@ NM_HTTP_PORT="${NM_HTTP_PORT:-8080}"
 NM_KEY_PREFIX="nm-account"
 NM_MNEMONIC_FILE_BASE="${NODE_STATUS_DIR}/nm_mnemonic"
 NM_ADDR_FILE="${NODE_STATUS_DIR}/nm-address"
-GENESIS_ADDR_FILE="${NODE_STATUS_DIR}/genesis-address"  # Written by validator-setup.sh
-SN_ADDR_FILE="${NODE_STATUS_DIR}/supernode-address"      # Written by supernode-setup.sh
 
 # Arrays populated by configure_nm_accounts()
 declare -a NM_ACCOUNT_KEY_NAMES=()
@@ -542,16 +540,19 @@ wait_for_all_funding_txs() {
 	done
 }
 
+validator_funding_address() {
+	accounts_registry_get_field "${KEY_NAME}" "address"
+}
+
 # Create all NM accounts (keys + funding). Populates NM_ACCOUNT_KEY_NAMES
 # and NM_ACCOUNT_ADDRESSES arrays used by configure_nm() to write config.
 configure_nm_accounts() {
-	if [ ! -f "${GENESIS_ADDR_FILE}" ]; then
-		echo "[NM] ERROR: Missing ${GENESIS_ADDR_FILE} (created by validator-setup)."
+	local genesis_addr
+	genesis_addr="$(validator_funding_address)"
+	if [[ -z "${genesis_addr}" ]]; then
+		echo "[NM] ERROR: Missing validator funding address for ${KEY_NAME} in accounts registry."
 		exit 1
 	fi
-
-	local genesis_addr
-	genesis_addr="$(cat "${GENESIS_ADDR_FILE}")"
 
 	NM_ACCOUNT_KEY_NAMES=()
 	NM_ACCOUNT_ADDRESSES=()
@@ -648,9 +649,7 @@ maybe_migrate_nm_accounts_to_evm() {
 	fi
 
 	local genesis_addr=""
-	if [[ -f "$GENESIS_ADDR_FILE" ]]; then
-		genesis_addr="$(cat "$GENESIS_ADDR_FILE")"
-	fi
+	genesis_addr="$(validator_funding_address)"
 
 	: >"${NM_ADDR_FILE}"
 	local idx key_name mnemonic_file old_addr new_addr

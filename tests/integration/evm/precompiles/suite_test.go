@@ -180,6 +180,12 @@ func TestPrecompilesSuite(t *testing.T) {
 		}
 		testWasmPrecompileExecuteFailsWithBadMessage(t, node, wasmInfo)
 	})
+	t.Run("WasmPrecompileExecuteRejectedInEthCall", func(t *testing.T) {
+		if wasmInfo.Addr == "" {
+			t.Skip("wasm contract not deployed")
+		}
+		testWasmPrecompileExecuteRejectedInEthCall(t, node, wasmInfo)
+	})
 	t.Run("WasmPrecompileQueryInvalidContract", func(t *testing.T) {
 		testWasmPrecompileQueryInvalidContract(t, node)
 	})

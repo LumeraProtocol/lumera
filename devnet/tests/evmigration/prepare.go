@@ -11,7 +11,6 @@ import (
 	"log"
 	"math/rand"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -101,33 +100,29 @@ func runPrepare() {
 	// their state (balance, delegations, etc.) alongside regular accounts.
 	log.Println("--- Recording validator accounts ---")
 	keys, _ := listKeys()
+	keyByAddress := make(map[string]string, len(keys))
+	for _, k := range keys {
+		keyByAddress[k.Address] = k.Name
+	}
+	recordedLocalValidator := false
 	for _, valoper := range validators {
 		valAddr, err := sdk.ValAddressFromBech32(valoper)
 		if err != nil {
 			continue
 		}
 		accAddr := sdk.AccAddress(valAddr).String()
+		keyName, ok := keyByAddress[accAddr]
+		if !ok {
+			continue
+		}
+		recordedLocalValidator = true
 		// Check if this validator account is already tracked.
 		if _, ok := existingByName[accAddr]; ok {
 			continue
 		}
-		// Find the matching key in the keyring.
-		var keyName, mnemonic string
-		for _, k := range keys {
-			if k.Address == accAddr {
-				keyName = k.Name
-				break
-			}
-		}
-		if keyName == "" {
-			log.Printf("  SKIP: no local key for validator %s (%s)", valoper, accAddr)
-			continue
-		}
-		// Read mnemonic from status dir.
-		mnemonicFile := filepath.Join(filepath.Dir(*flagFile), "genesis-address-mnemonic")
-		if data, err := os.ReadFile(mnemonicFile); err == nil {
-			mnemonic = strings.TrimSpace(string(data))
-		}
+		var mnemonic string
+		// Read mnemonic from the validator status account registry.
+		mnemonic = readStatusRegistryMnemonic(keyName)
 		// Derive the legacy public key from the mnemonic so it can be used
 		// in the claim-legacy-account tx during migrate-all mode.
 		var pubKeyB64 string
@@ -154,6 +149,9 @@ func runPrepare() {
 		existingByName[accAddr] = len(af.Accounts) - 1
 		existingByName[keyName] = len(af.Accounts) - 1
 		log.Printf("  recorded validator %s: %s (%s) balance=%d", keyName, accAddr, valoper, bal)
+	}
+	if !recordedLocalValidator {
+		log.Printf("  WARN: no local validator key matched the active validator set")
 	}
 
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))

@@ -16,6 +16,7 @@ import (
 	wasmprecompile "github.com/LumeraProtocol/lumera/precompiles/wasm"
 	evmtest "github.com/LumeraProtocol/lumera/tests/integration/evmtest"
 	testaccounts "github.com/LumeraProtocol/lumera/testutil/accounts"
+	testjsonrpc "github.com/LumeraProtocol/lumera/testutil/jsonrpc"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
@@ -417,6 +418,36 @@ func testWasmPrecompileExecuteEmitsWasmExecutedEvent(t *testing.T, node *evmtest
 	if !strings.EqualFold(topic0, eventID.Hex()) {
 		t.Fatalf("topic[0] mismatch: got %q, want %q", topic0, eventID.Hex())
 	}
+
+	dataHex, _ := log0["data"].(string)
+	if strings.TrimSpace(dataHex) == "" {
+		t.Fatal("expected non-empty log data for WasmExecuted event")
+	}
+	data, err := hexutil.Decode(dataHex)
+	if err != nil {
+		t.Fatalf("decode log data: %v", err)
+	}
+
+	values, err := wasmprecompile.ABI.Events["WasmExecuted"].Inputs.NonIndexed().Unpack(data)
+	if err != nil {
+		t.Fatalf("unpack WasmExecuted log data: %v", err)
+	}
+	if len(values) != 2 {
+		t.Fatalf("expected 2 non-indexed event values, got %d", len(values))
+	}
+
+	contractAddr, ok := values[0].(string)
+	if !ok || contractAddr != info.Addr {
+		t.Fatalf("event contract address mismatch: got %#v want %q", values[0], info.Addr)
+	}
+
+	response, ok := values[1].([]byte)
+	if !ok {
+		t.Fatalf("unexpected response type in event data: %#v", values[1])
+	}
+	if len(response) == 0 {
+		t.Fatal("expected non-empty response bytes in WasmExecuted event")
+	}
 }
 
 // testWasmPrecompileSenderIdentity verifies that the wasm contract sees the
@@ -460,23 +491,10 @@ func testWasmPrecompileQueryInvalidContract(t *testing.T, node *evmtest.Node) {
 		t.Fatalf("pack query input: %v", err)
 	}
 
-	// eth_call should revert/error for non-existent contract
-	var resultHex string
-	node.MustJSONRPC(t, "eth_call", []any{
-		map[string]any{
-			"to":   wasmprecompile.WasmPrecompileAddress,
-			"data": hexutil.Encode(input),
-		},
-		"latest",
-	}, &resultHex)
-
-	// An error from eth_call means the precompile reverted, which is correct.
-	// If we get here with a result, it means the call didn't revert — which
-	// could happen if the node wraps it. Check the result is empty/error.
-	// Note: Some node implementations return an error in the JSON-RPC response
-	// rather than a result, which MustJSONRPC would handle by failing.
-	// If the call "succeeds" with empty data, that's also acceptable as a
-	// signal that the contract wasn't found.
+	err = mustEthCallPrecompileError(t, node, wasmprecompile.WasmPrecompileAddress, input)
+	if _, ok := err.(*testjsonrpc.RPCError); !ok {
+		t.Fatalf("expected JSON-RPC error for missing wasm contract, got %T: %v", err, err)
+	}
 }
 
 // testWasmPrecompileContractInfoNotFound verifies contractInfo for a
@@ -490,18 +508,10 @@ func testWasmPrecompileContractInfoNotFound(t *testing.T, node *evmtest.Node) {
 		t.Fatalf("pack contractInfo input: %v", err)
 	}
 
-	// This should fail — either revert in EVM or return error in JSON-RPC
-	var resultHex string
-	node.MustJSONRPC(t, "eth_call", []any{
-		map[string]any{
-			"to":   wasmprecompile.WasmPrecompileAddress,
-			"data": hexutil.Encode(input),
-		},
-		"latest",
-	}, &resultHex)
-
-	// If we get here, the precompile didn't crash. For non-existent contracts,
-	// it may return an error via eth_call error field or a revert.
+	err = mustEthCallPrecompileError(t, node, wasmprecompile.WasmPrecompileAddress, input)
+	if _, ok := err.(*testjsonrpc.RPCError); !ok {
+		t.Fatalf("expected JSON-RPC error for missing wasm contract info, got %T: %v", err, err)
+	}
 }
 
 // testWasmPrecompileGasConsumption verifies that wasm precompile calls consume
@@ -591,6 +601,23 @@ func testWasmPrecompileEstimateGas(t *testing.T, node *evmtest.Node, info wasmCo
 	// base tx cost (21k) but less than our generous gas limit
 	if estimate < 21_000 || estimate > 800_000 {
 		t.Fatalf("gas estimate %d out of expected range [21000, 800000]", estimate)
+	}
+}
+
+// testWasmPrecompileExecuteRejectedInEthCall verifies that the state-changing
+// execute entrypoint cannot be used through read-only eth_call.
+func testWasmPrecompileExecuteRejectedInEthCall(t *testing.T, node *evmtest.Node, info wasmContractInfo) {
+	t.Helper()
+
+	execMsg := []byte(`{"release":{}}`)
+	input, err := wasmprecompile.ABI.Pack(wasmprecompile.ExecuteMethod, info.Addr, execMsg)
+	if err != nil {
+		t.Fatalf("pack execute input: %v", err)
+	}
+
+	err = mustEthCallPrecompileError(t, node, wasmprecompile.WasmPrecompileAddress, input)
+	if _, ok := err.(*testjsonrpc.RPCError); !ok {
+		t.Fatalf("expected JSON-RPC error for eth_call execute, got %T: %v", err, err)
 	}
 }
 

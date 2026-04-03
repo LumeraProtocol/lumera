@@ -246,7 +246,7 @@ When the flag is true and the `network-maker` binary/template exist in `devnet/b
 
 - Waits for `lumerad` RPC and the Supernode endpoint to become healthy before executing.
 - Produces keys named `nm-account`, `nm-account-2`, … up to `max_accounts`, storing mnemonics under `/shared/status/<moniker>/nm_mnemonic[-N]` and addresses inside `/shared/status/<moniker>/nm-address`.
-- Funds any empty account from the validator’s genesis key (`/shared/status/<moniker>/genesis-address`) with the configured `account_balance` and confirms the transactions on-chain.
+- Funds any empty account from the validator’s account entry in `/shared/status/<moniker>/accounts.json` with the configured `account_balance` and confirms the transactions on-chain.
 - Writes the final addresses into `/root/.network-maker/config.toml` via repeated `[[keyring.accounts]]` blocks and records scanner directories `/root/nm-files` plus `/shared/nm-files` for convenient document drop zones.
 
 Adjust `max_accounts` when you need additional faucet-style wallets and update `account_balance` with a denom-suffixed amount (or a raw number that automatically adds the staking denom). This allows automated funding for Supernode scenarios or any devnet tests that require multiple funded signers per validator container.

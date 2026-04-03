@@ -7,8 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 
@@ -132,32 +130,6 @@ func runMigrateValidator() {
 	log.Printf("validator migration summary: migrated=%d skipped=%d failed=%d", okCount, skipCount, failCount)
 	if failCount > 0 {
 		log.Fatalf("validator migration completed with %d failures", failCount)
-	}
-}
-
-// readValidatorMnemonic reads the genesis-address-mnemonic file from the same
-// status directory as the accounts JSON file.
-func readValidatorMnemonic() string {
-	statusDir := filepath.Dir(*flagFile)
-	mnemonicFile := filepath.Join(statusDir, "genesis-address-mnemonic")
-	data, err := os.ReadFile(mnemonicFile)
-	if err != nil {
-		log.Printf("  WARN: cannot read mnemonic from %s: %v", mnemonicFile, err)
-		return ""
-	}
-	return strings.TrimSpace(string(data))
-}
-
-// updateGenesisAddressFile overwrites the genesis-address file in the same
-// status directory as the accounts JSON, so downstream scripts use the
-// migrated validator address.
-func updateGenesisAddressFile(newAddr string) {
-	statusDir := filepath.Dir(*flagFile)
-	genesisFile := filepath.Join(statusDir, "genesis-address")
-	if err := os.WriteFile(genesisFile, []byte(newAddr+"\n"), 0o644); err != nil {
-		log.Printf("  WARN: failed to update genesis-address file %s: %v", genesisFile, err)
-	} else {
-		log.Printf("  updated genesis-address file: %s", genesisFile)
 	}
 }
 
@@ -315,9 +287,9 @@ func migrateOneValidator(c validatorCandidate) (ok bool, skipped bool) {
 
 	// Derive the destination key from the same mnemonic (coin-type 60) so the
 	// migrated address matches what wallets like MetaMask produce from the same seed.
-	mnemonic := readValidatorMnemonic()
+	mnemonic := readStatusRegistryMnemonic(c.KeyName)
 	if mnemonic == "" {
-		log.Printf("  FAIL: cannot read validator mnemonic from status dir; cannot derive coin-type 60 destination")
+		log.Printf("  FAIL: cannot read validator mnemonic from account registry; cannot derive coin-type 60 destination")
 		return false, false
 	}
 	tempRec := &AccountRecord{
@@ -408,9 +380,9 @@ func migrateOneValidator(c validatorCandidate) (ok bool, skipped bool) {
 		return false, false
 	}
 
-	// Update the genesis-address file so downstream scripts (network-maker,
-	// supernode-setup) use the migrated address.
-	updateGenesisAddressFile(newRec.Address)
+	// Update the validator account registry entry so downstream scripts
+	// resolve the migrated funding address from accounts.json.
+	updateStatusRegistryAddress(c.KeyName, newRec.Address)
 
 	// Update the validator AccountRecord in accounts.json if it exists.
 	updateValidatorAccountRecord(c.LegacyAddress, newRec.Address, newRec.Name, newValoper, preBalance)

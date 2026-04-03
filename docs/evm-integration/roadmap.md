@@ -228,7 +228,7 @@ Comprehensive test coverage across all layers.
 | [x] | EVMigration CLI (two positional args: legacy-key, new-key) | 26    |
 | [x] | Ante (evmigration fee, validate-basic)                   | 5     |
 
-### Integration Tests (~121)
+### Integration Tests (~130)
 
 |     | Area                                                                         | Tests |
 | --- | ---------------------------------------------------------------------------- | ----- |
@@ -239,7 +239,7 @@ Comprehensive test coverage across all layers.
 | [x] | JSON-RPC / indexer (+ batch RPC)                                             | 23    |
 | [x] | Mempool (+ capacity pressure, WS subscriptions, metrics e2e)                 | 16    |
 | [x] | Precisebank                                                                  | 6     |
-| [x] | Precompiles (+ gas metering + action module)                                 | 21    |
+| [x] | Precompiles (+ gas metering + action + supernode + wasm modules)             | 30    |
 | [x] | VM queries / state                                                           | 12    |
 | [x] | EVMigration                                                                  | 14    |
 

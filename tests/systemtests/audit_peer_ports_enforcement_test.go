@@ -11,10 +11,7 @@ import (
 
 func TestAuditPeerPortsUnanimousClosedPostponesAfterConsecutiveWindows(t *testing.T) {
 	const (
-		// Keep epochs long enough in real time to avoid end-blocker enforcement
-		// (missing-report postponement) during setup. With 900ms commit timeout,
-		// 20 blocks ≈ 18s — enough for StartChain + CLI init + 2 registrations.
-		epochLengthBlocks = uint64(20)
+		epochLengthBlocks = uint64(10)
 	)
 	const originHeight = int64(1)
 
@@ -37,6 +34,12 @@ func TestAuditPeerPortsUnanimousClosedPostponesAfterConsecutiveWindows(t *testin
 	registerSupernode(t, cli, n1, "192.168.1.2")
 
 	currentHeight := sut.AwaitNextBlock(t)
+
+	// Submit filler reports for the current epoch to prevent missing-report enforcement
+	// from postponing supernodes before the test epochs start (consecutive_epochs_to_postpone=2).
+	submitFillerReports(t, cli, originHeight, epochLengthBlocks, currentHeight, []testNodeIdentity{n0, n1})
+
+	currentHeight = sut.AwaitNextBlock(t)
 	epochID1, epoch1Start := nextEpochAfterHeight(originHeight, epochLengthBlocks, currentHeight)
 	epochID2 := epochID1 + 1
 	epoch2Start := epoch1Start + int64(epochLengthBlocks)

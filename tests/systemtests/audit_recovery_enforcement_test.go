@@ -11,7 +11,10 @@ import (
 
 func TestAuditRecovery_PostponedBecomesActiveWithSelfAndPeerOpen_NoHostThresholds(t *testing.T) {
 	const (
-		epochLengthBlocks = uint64(10)
+		// Keep epochs long enough in real time to avoid end-blocker enforcement
+		// (missing-report postponement) during setup. With 900ms commit timeout,
+		// 20 blocks ≈ 18s — enough for StartChain + CLI init + 2 registrations.
+		epochLengthBlocks = uint64(20)
 	)
 	const originHeight = int64(1)
 

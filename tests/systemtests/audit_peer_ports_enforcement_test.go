@@ -11,7 +11,10 @@ import (
 
 func TestAuditPeerPortsUnanimousClosedPostponesAfterConsecutiveWindows(t *testing.T) {
 	const (
-		epochLengthBlocks = uint64(10)
+		// Use 20-block epochs so that chain setup (StartChain + CLI init + 2 registrations,
+		// ~10-12 blocks) always completes within epoch 0. This prevents missing-report
+		// enforcement from postponing supernodes before the test's target epochs start.
+		epochLengthBlocks = uint64(20)
 	)
 	const originHeight = int64(1)
 
@@ -34,12 +37,6 @@ func TestAuditPeerPortsUnanimousClosedPostponesAfterConsecutiveWindows(t *testin
 	registerSupernode(t, cli, n1, "192.168.1.2")
 
 	currentHeight := sut.AwaitNextBlock(t)
-
-	// Submit filler reports for the current epoch to prevent missing-report enforcement
-	// from postponing supernodes before the test epochs start (consecutive_epochs_to_postpone=2).
-	submitFillerReports(t, cli, originHeight, epochLengthBlocks, currentHeight, []testNodeIdentity{n0, n1})
-
-	currentHeight = sut.AwaitNextBlock(t)
 	epochID1, epoch1Start := nextEpochAfterHeight(originHeight, epochLengthBlocks, currentHeight)
 	epochID2 := epochID1 + 1
 	epoch2Start := epoch1Start + int64(epochLengthBlocks)

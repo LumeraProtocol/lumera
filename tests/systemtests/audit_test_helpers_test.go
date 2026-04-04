@@ -88,32 +88,10 @@ func awaitAtLeastHeight(t *testing.T, height int64) {
 	if sut.currentHeight >= height {
 		return
 	}
-	sut.AwaitBlockHeight(t, height)
-}
-
-// submitFillerReports submits valid host+peer reports for the current epoch for each node.
-// This prevents missing-report enforcement from postponing nodes during setup when the chain
-// has advanced past epoch 0 before the test begins submitting real reports.
-// All peer observations use PORT_STATE_OPEN so they do not contribute to CLOSED streaks.
-func submitFillerReports(t *testing.T, cli *LumeradCli, originHeight int64, epochLengthBlocks uint64, currentHeight int64, nodes []testNodeIdentity) {
-	t.Helper()
-	if epochLengthBlocks == 0 {
-		return
-	}
-	currentEpochID := uint64((currentHeight - originHeight) / int64(epochLengthBlocks))
-	epochStart := originHeight + int64(currentEpochID)*int64(epochLengthBlocks)
-	awaitAtLeastHeight(t, epochStart)
-
-	host := auditHostReportJSON([]string{"PORT_STATE_OPEN"})
-	for _, n := range nodes {
-		assigned := auditQueryAssignedTargets(t, currentEpochID, true, n.accAddr)
-		var obs []string
-		for _, target := range assigned.TargetSupernodeAccounts {
-			obs = append(obs, storageChallengeObservationJSON(target, []string{"PORT_STATE_OPEN"}))
-		}
-		resp := submitEpochReport(t, cli, n.nodeName, currentEpochID, host, obs)
-		RequireTxSuccess(t, resp)
-	}
+	// Use 2x default timeout to handle slow CI environments where actual block
+	// production is slower than the configured blockTime.
+	timeout := time.Duration(height-sut.currentHeight+5) * sut.blockTime * 2
+	sut.AwaitBlockHeight(t, height, timeout)
 }
 
 // pickEpochForStartAtOrAfter returns the first epoch whose start height is >= minStartHeight.

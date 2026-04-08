@@ -1,6 +1,6 @@
 ---
 name: bridge-evaluator
-description: Generate user-facing test scenarios, E2E tests, and feedback templates. Use ONLY after a quality gate has passed (docs/gates-evals/gate-report.md shows PASS).
+description: Generate user-facing test scenarios, E2E tests, and feedback templates. Use ONLY after a quality gate has passed (docs/gates-evals/S10-S15-gate-report.md shows PASS).
 tools:
   - Read
   - Write

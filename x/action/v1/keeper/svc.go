@@ -57,20 +57,17 @@ func (k *Keeper) VerifyChunkProofs(
 		return nil
 	}
 
-	params := k.GetParams(ctx)
-	challengeCount, minChunks := GetSVCParams(params)
-
-	if commitment.NumChunks < minChunks {
-		// Small files are out of challenge scope.
+	// Verification must be anchored to the immutable registration commitment,
+	// not mutable runtime params. Governance updates between registration and
+	// finalization must not change proof-count/index expectations.
+	expectedIndices := commitment.ChallengeIndices
+	if len(expectedIndices) == 0 {
+		// Backward compatibility: older commitments may not carry challenge indices.
 		return nil
 	}
 
-	expectedCount := challengeCount
-	if expectedCount > commitment.NumChunks {
-		expectedCount = commitment.NumChunks
-	}
-
-	if uint32(len(proofs)) != expectedCount {
+	expectedCount := len(expectedIndices)
+	if len(proofs) != expectedCount {
 		err := errorsmod.Wrapf(actiontypes.ErrWrongProofCount, "expected %d proofs, got %d", expectedCount, len(proofs))
 		emitSVCEvidenceEvent(ctx, action.ActionID, superNodeAccount, err.Error())
 		return err
@@ -84,13 +81,6 @@ func (k *Keeper) VerifyChunkProofs(
 	}
 
 	// Read expected challenge indices from the stored commitment.
-	expectedIndices := commitment.ChallengeIndices
-	if uint32(len(expectedIndices)) != expectedCount {
-		err = errorsmod.Wrapf(actiontypes.ErrInvalidMetadata,
-			"commitment has %d challenge_indices, expected %d", len(expectedIndices), expectedCount)
-		emitSVCEvidenceEvent(ctx, action.ActionID, superNodeAccount, err.Error())
-		return err
-	}
 
 	for i, proof := range proofs {
 		if proof == nil {

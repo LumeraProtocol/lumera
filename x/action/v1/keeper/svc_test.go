@@ -55,10 +55,29 @@ func TestVerifyChunkProofs(t *testing.T) {
 		assertSVCEvidenceEvent(t, ctx.EventManager().Events())
 	})
 
-	t.Run("AT16_svc_skipped_for_small_files", func(t *testing.T) {
+	t.Run("AT16_svc_skipped_when_commitment_has_no_indices", func(t *testing.T) {
 		k, ctx, action, supernode, _ := setupSVCFixture(t, 3)
 
-		err := k.VerifyChunkProofs(ctx, action, supernode, nil)
+		var metadata actiontypes.CascadeMetadata
+		require.NoError(t, gogoproto.Unmarshal(action.Metadata, &metadata))
+		metadata.AvailabilityCommitment.ChallengeIndices = nil
+		metaBz, err := gogoproto.Marshal(&metadata)
+		require.NoError(t, err)
+		action.Metadata = metaBz
+
+		err = k.VerifyChunkProofs(ctx, action, supernode, nil)
+		require.NoError(t, err)
+	})
+
+	t.Run("AT17_param_changes_do_not_break_committed_proofs", func(t *testing.T) {
+		k, ctx, action, supernode, expected := setupSVCFixture(t, 8)
+
+		params := k.GetParams(ctx)
+		params.SvcChallengeCount = 4
+		params.SvcMinChunksForChallenge = 2
+		require.NoError(t, k.SetParams(ctx, params))
+
+		err := k.VerifyChunkProofs(ctx, action, supernode, expected)
 		require.NoError(t, err)
 	})
 }

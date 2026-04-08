@@ -22,8 +22,10 @@ var (
 	KeyExpirationDuration   = []byte("ExpirationDuration")
 	KeyMinProcessingTime    = []byte("MinProcessingTime")
 	KeyMaxProcessingTime    = []byte("MaxProcessingTime")
-	KeySuperNodeFeeShare    = []byte("SuperNodeFeeShare")
-	KeyFoundationFeeShare   = []byte("FoundationFeeShare")
+	KeySuperNodeFeeShare          = []byte("SuperNodeFeeShare")
+	KeyFoundationFeeShare         = []byte("FoundationFeeShare")
+	KeySVCChallengeCount          = []byte("SVCChallengeCount")
+	KeySVCMinChunksForChallenge   = []byte("SVCMinChunksForChallenge")
 )
 
 // Default parameter values
@@ -37,8 +39,10 @@ var (
 	DefaultExpirationDuration   = 24 * time.Hour                           // 24 hour expiration
 	DefaultMinProcessingTime    = 1 * time.Minute                          // 1 minute minimum processing time
 	DefaultMaxProcessingTime    = 1 * time.Hour                            // 1 hour maximum processing time
-	DefaultSuperNodeFeeShare    = "1.000000000000000000"                   // 1.0 (100%)
-	DefaultFoundationFeeShare   = "0.000000000000000000"                   // 0.0 (0%)
+	DefaultSuperNodeFeeShare          = "1.000000000000000000"                   // 1.0 (100%)
+	DefaultFoundationFeeShare         = "0.000000000000000000"                   // 0.0 (0%)
+	DefaultSVCChallengeCount          = uint32(8)                                // LEP-5: number of chunks to challenge
+	DefaultSVCMinChunksForChallenge   = uint32(4)                                // LEP-5: minimum chunks required for SVC
 )
 
 // ParamKeyTable the param key table for launch module
@@ -59,19 +63,23 @@ func NewParams(
 	maxProcessingTime time.Duration,
 	superNodeFeeShare string,
 	foundationFeeShare string,
+	svcChallengeCount uint32,
+	svcMinChunksForChallenge uint32,
 ) Params {
 	return Params{
-		BaseActionFee:        baseActionFee,
-		FeePerKbyte:          feePerKbyte,
-		MaxActionsPerBlock:   maxActionsPerBlock,
-		MinSuperNodes:        minSuperNodes,
-		MaxDdAndFingerprints: maxDdAndFingerprints,
-		MaxRaptorQSymbols:    maxRaptorQSymbols,
-		ExpirationDuration:   expirationDuration,
-		MinProcessingTime:    minProcessingTime,
-		MaxProcessingTime:    maxProcessingTime,
-		SuperNodeFeeShare:    superNodeFeeShare,
-		FoundationFeeShare:   foundationFeeShare,
+		BaseActionFee:            baseActionFee,
+		FeePerKbyte:              feePerKbyte,
+		MaxActionsPerBlock:       maxActionsPerBlock,
+		MinSuperNodes:            minSuperNodes,
+		MaxDdAndFingerprints:     maxDdAndFingerprints,
+		MaxRaptorQSymbols:        maxRaptorQSymbols,
+		ExpirationDuration:       expirationDuration,
+		MinProcessingTime:        minProcessingTime,
+		MaxProcessingTime:        maxProcessingTime,
+		SuperNodeFeeShare:        superNodeFeeShare,
+		FoundationFeeShare:       foundationFeeShare,
+		SvcChallengeCount:        svcChallengeCount,
+		SvcMinChunksForChallenge: svcMinChunksForChallenge,
 	}
 }
 
@@ -89,6 +97,8 @@ func DefaultParams() Params {
 		DefaultMaxProcessingTime,
 		DefaultSuperNodeFeeShare,
 		DefaultFoundationFeeShare,
+		DefaultSVCChallengeCount,
+		DefaultSVCMinChunksForChallenge,
 	)
 }
 
@@ -106,6 +116,8 @@ func (p *Params) ParamSetPairs() paramtypes.ParamSetPairs {
 		paramtypes.NewParamSetPair(KeyMaxProcessingTime, &p.MaxProcessingTime, validateDuration),
 		paramtypes.NewParamSetPair(KeySuperNodeFeeShare, &p.SuperNodeFeeShare, validateDecString),
 		paramtypes.NewParamSetPair(KeyFoundationFeeShare, &p.FoundationFeeShare, validateDecString),
+		paramtypes.NewParamSetPair(KeySVCChallengeCount, &p.SvcChallengeCount, validateUint32),
+		paramtypes.NewParamSetPair(KeySVCMinChunksForChallenge, &p.SvcMinChunksForChallenge, validateUint32),
 	}
 }
 
@@ -155,6 +167,14 @@ func (p Params) Validate() error {
 		return err
 	}
 
+	if err := validateUint32(p.SvcChallengeCount); err != nil {
+		return err
+	}
+
+	if err := validateUint32(p.SvcMinChunksForChallenge); err != nil {
+		return err
+	}
+
 	// Additional validation rules
 	if p.MinProcessingTime >= p.MaxProcessingTime {
 		return fmt.Errorf("min processing time must be less than max processing time")
@@ -196,6 +216,15 @@ func validateCoin(v interface{}) error {
 
 func validateUint64(v interface{}) error {
 	_, ok := v.(uint64)
+	if !ok {
+		return fmt.Errorf("invalid parameter type: %T", v)
+	}
+
+	return nil
+}
+
+func validateUint32(v interface{}) error {
+	_, ok := v.(uint32)
 	if !ok {
 		return fmt.Errorf("invalid parameter type: %T", v)
 	}

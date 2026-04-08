@@ -52,7 +52,9 @@ contract LumeraDashboard {
             overview.minSuperNodes,
             ,  // expirationDuration
             ,  // superNodeFeeShare
-               // foundationFeeShare
+            ,  // foundationFeeShare
+            ,  // svcChallengeCount
+               // svcMinChunksForChallenge
         ) = ACTION.getParams();
 
         // Supernode params + count
@@ -93,7 +95,7 @@ contract LumeraDashboard {
         view
         returns (bool ready, uint64 totalSupernodes, uint64 minRequired)
     {
-        (, , , minRequired, , , ) = ACTION.getParams();
+        (, , , minRequired, , , , , ) = ACTION.getParams();
         (, totalSupernodes) = SUPERNODE.listSuperNodes(0, 1);
         ready = totalSupernodes >= minRequired;
     }

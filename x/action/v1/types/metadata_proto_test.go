@@ -104,4 +104,3 @@ func TestCascadeMetadataRoundTripWithNewFields(t *testing.T) {
 	require.NoError(t, proto.Unmarshal(bz, &decoded))
 	require.Equal(t, extended, &decoded)
 }
-

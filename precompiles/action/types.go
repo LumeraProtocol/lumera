@@ -14,6 +14,27 @@ import (
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 )
 
+// ABIAvailabilityCommitment is the ABI-compatible struct for LEP 5 file commitments.
+// Field names and types must match the ABI definition exactly.
+type ABIAvailabilityCommitment struct {
+	CommitmentType   string   `abi:"commitmentType"`
+	HashAlgo         uint8    `abi:"hashAlgo"`
+	ChunkSize        uint32   `abi:"chunkSize"`
+	TotalSize        uint64   `abi:"totalSize"`
+	NumChunks        uint32   `abi:"numChunks"`
+	Root             []byte   `abi:"root"`
+	ChallengeIndices []uint32 `abi:"challengeIndices"`
+}
+
+// ABIChunkProof is the ABI-compatible struct for LEP 5 Merkle inclusion proofs.
+// Field names and types must match the ABI definition exactly.
+type ABIChunkProof struct {
+	ChunkIndex     uint32   `abi:"chunkIndex"`
+	LeafHash       []byte   `abi:"leafHash"`
+	PathHashes     [][]byte `abi:"pathHashes"`
+	PathDirections []bool   `abi:"pathDirections"`
+}
+
 // ActionInfo is the ABI-compatible struct returned by query methods.
 // Field names and types must match the ABI definition exactly.
 type ActionInfo struct {

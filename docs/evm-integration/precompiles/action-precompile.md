@@ -63,6 +63,25 @@ interface IAction {
 
     // ─── Structs ───────────────────────────────────────────
 
+    /// @notice LEP 5 availability commitment for Cascade storage verification.
+    struct AvailabilityCommitment {
+        string   commitmentType;    // e.g. "merkle_blake3"
+        uint8    hashAlgo;          // 0=unspecified, 1=BLAKE3, 2=SHA256
+        uint32   chunkSize;
+        uint64   totalSize;
+        uint32   numChunks;
+        bytes    root;              // Merkle root hash
+        uint32[] challengeIndices;  // chunk indices the supernode must prove
+    }
+
+    /// @notice LEP 5 Merkle inclusion proof for a single challenged chunk.
+    struct ChunkProof {
+        uint32   chunkIndex;
+        bytes    leafHash;
+        bytes[]  pathHashes;
+        bool[]   pathDirections;    // true = right sibling
+    }
+
     struct ActionInfo {
         string   actionId;
         address  creator;
@@ -110,19 +129,22 @@ interface IAction {
         string calldata dataHash,
         string calldata fileName,
         uint64 rqIdsIc,
-        bytes  calldata signatures,
+        string calldata signatures,
         uint256 price,
         int64  expirationTime,
-        uint64 fileSizeKbs
+        uint64 fileSizeKbs,
+        AvailabilityCommitment calldata commitment  // LEP 5 (pass empty root to skip)
     ) external returns (string memory actionId);
 
     /// @notice Finalize a Cascade action with storage proof.
-    /// @param actionId  The action to finalize
-    /// @param rqIdsIds  RaptorQ symbol identifiers produced by the supernode
-    /// @return success  True if finalization succeeded
+    /// @param actionId    The action to finalize
+    /// @param rqIdsIds    RaptorQ symbol identifiers produced by the supernode
+    /// @param chunkProofs LEP 5 Merkle proofs for challenged chunks (pass empty for pre-LEP5)
+    /// @return success    True if finalization succeeded
     function finalizeCascade(
         string calldata actionId,
-        string[] calldata rqIdsIds
+        string[] calldata rqIdsIds,
+        ChunkProof[] calldata chunkProofs
     ) external returns (bool success);
 
     // ─── Sense (typed) ─────────────────────────────────────
@@ -177,7 +199,9 @@ interface IAction {
             uint64  minSuperNodes,
             int64   expirationDuration,
             string memory superNodeFeeShare,
-            string memory foundationFeeShare
+            string memory foundationFeeShare,
+            uint32  svcChallengeCount,          // LEP 5
+            uint32  svcMinChunksForChallenge    // LEP 5
         );
 
     /// @notice List actions by state (paginated, max 100 per call).
@@ -351,7 +375,7 @@ contract ActionFeeCalculator {
         uint64  maxActionsPerBlock,
         uint64  minSuperNodes
     ) {
-        (baseActionFee, feePerKbyte, maxActionsPerBlock, minSuperNodes,,,) = ACTION.getParams();
+        (baseActionFee, feePerKbyte, maxActionsPerBlock, minSuperNodes,,,,,) = ACTION.getParams();
     }
 }
 ```
@@ -410,9 +434,9 @@ const ACTION_ADDRESS = "0x0000000000000000000000000000000000000901";
 // Minimal ABI for the methods you need
 const ACTION_ABI = [
   "function getActionFee(uint64 dataSizeKbs) view returns (uint256 baseFee, uint256 perKbFee, uint256 totalFee)",
-  "function getParams() view returns (uint256 baseActionFee, uint256 feePerKbyte, uint64 maxActionsPerBlock, uint64 minSuperNodes, int64 expirationDuration, string superNodeFeeShare, string foundationFeeShare)",
+  "function getParams() view returns (uint256 baseActionFee, uint256 feePerKbyte, uint64 maxActionsPerBlock, uint64 minSuperNodes, int64 expirationDuration, string superNodeFeeShare, string foundationFeeShare, uint32 svcChallengeCount, uint32 svcMinChunksForChallenge)",
   "function getAction(string actionId) view returns (tuple(string actionId, address creator, uint8 actionType, uint8 state, string metadata, uint256 price, int64 expirationTime, int64 blockHeight, address[] superNodes))",
-  "function requestCascade(string dataHash, string fileName, uint64 rqIdsIc, bytes signatures, uint256 price, int64 expirationTime, uint64 fileSizeKbs) returns (string actionId)",
+  "function requestCascade(string dataHash, string fileName, uint64 rqIdsIc, string signatures, uint256 price, int64 expirationTime, uint64 fileSizeKbs, tuple(string commitmentType, uint8 hashAlgo, uint32 chunkSize, uint64 totalSize, uint32 numChunks, bytes root, uint32[] challengeIndices) commitment) returns (string actionId)",
   "function approveAction(string actionId) returns (bool success)",
   "event ActionRequested(string indexed actionId, address indexed creator, uint8 actionType, uint256 price)",
 ];
@@ -481,6 +505,10 @@ For example, `requestCascade(dataHash, fileName, rqIdsIc, signatures, ...)` beco
 ```
 
 This is passed as the `Metadata` field of `MsgRequestAction`. The keeper's `ActionRegistry` then deserializes it into the appropriate protobuf type (`CascadeMetadata` or `SenseMetadata`).
+
+#### LEP 5 Fields
+
+When the `AvailabilityCommitment` struct is provided (non-empty `root`), the JSON metadata includes an `availability_commitment` object. Similarly, `finalizeCascade` includes `chunk_proofs` when proofs are provided. The keeper validates Merkle proofs against the committed root during finalization.
 
 ### Address Translation
 

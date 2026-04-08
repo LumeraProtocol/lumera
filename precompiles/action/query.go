@@ -212,6 +212,8 @@ func (p Precompile) GetParams(
 		expDuration,
 		params.SuperNodeFeeShare,
 		params.FoundationFeeShare,
+		params.SvcChallengeCount,
+		params.SvcMinChunksForChallenge,
 	)
 }
 

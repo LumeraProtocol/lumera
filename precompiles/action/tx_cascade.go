@@ -30,8 +30,8 @@ func (p Precompile) RequestCascade(
 	method *abi.Method,
 	args []interface{},
 ) ([]byte, error) {
-	if len(args) != 7 {
-		return nil, fmt.Errorf("requestCascade: expected 7 args, got %d", len(args))
+	if len(args) != 8 {
+		return nil, fmt.Errorf("requestCascade: expected 8 args, got %d", len(args))
 	}
 
 	dataHash := args[0].(string)
@@ -41,6 +41,15 @@ func (p Precompile) RequestCascade(
 	price := args[4].(*big.Int)
 	expirationTime := args[5].(int64)
 	fileSizeKbs := args[6].(uint64)
+	commitment := args[7].(struct {
+		CommitmentType   string   `json:"commitmentType"`
+		HashAlgo         uint8    `json:"hashAlgo"`
+		ChunkSize        uint32   `json:"chunkSize"`
+		TotalSize        uint64   `json:"totalSize"`
+		NumChunks        uint32   `json:"numChunks"`
+		Root             []byte   `json:"root"`
+		ChallengeIndices []uint32 `json:"challengeIndices"`
+	})
 
 	creator, err := evmAddrToBech32(p.addrCdc, contract.Caller())
 	if err != nil {
@@ -49,12 +58,27 @@ func (p Precompile) RequestCascade(
 
 	// Build Cascade metadata as JSON — the message server's handler will parse
 	// and validate it, then convert to protobuf binary internally.
-	metadataJSON, err := json.Marshal(map[string]interface{}{
+	meta := map[string]interface{}{
 		"data_hash":  dataHash,
 		"file_name":  fileName,
 		"rq_ids_ic":  rqIdsIc,
 		"signatures": signatures,
-	})
+	}
+
+	// Include LEP 5 availability commitment if provided (non-empty root).
+	if len(commitment.Root) > 0 {
+		meta["availability_commitment"] = map[string]interface{}{
+			"commitment_type":   commitment.CommitmentType,
+			"hash_algo":         commitment.HashAlgo,
+			"chunk_size":        commitment.ChunkSize,
+			"total_size":        commitment.TotalSize,
+			"num_chunks":        commitment.NumChunks,
+			"root":              commitment.Root,
+			"challenge_indices": commitment.ChallengeIndices,
+		}
+	}
+
+	metadataJSON, err := json.Marshal(meta)
 	if err != nil {
 		return nil, fmt.Errorf("marshal cascade metadata: %w", err)
 	}
@@ -98,21 +122,43 @@ func (p Precompile) FinalizeCascade(
 	method *abi.Method,
 	args []interface{},
 ) ([]byte, error) {
-	if len(args) != 2 {
-		return nil, fmt.Errorf("finalizeCascade: expected 2 args, got %d", len(args))
+	if len(args) != 3 {
+		return nil, fmt.Errorf("finalizeCascade: expected 3 args, got %d", len(args))
 	}
 
 	actionId := args[0].(string)
 	rqIdsIds := args[1].([]string)
+	rawProofs := args[2].([]struct {
+		ChunkIndex     uint32   `json:"chunkIndex"`
+		LeafHash       []byte   `json:"leafHash"`
+		PathHashes     [][]byte `json:"pathHashes"`
+		PathDirections []bool   `json:"pathDirections"`
+	})
 
 	caller, err := evmAddrToBech32(p.addrCdc, contract.Caller())
 	if err != nil {
 		return nil, fmt.Errorf("invalid caller address: %w", err)
 	}
 
-	metadataJSON, err := json.Marshal(map[string]interface{}{
+	meta := map[string]interface{}{
 		"rq_ids_ids": rqIdsIds,
-	})
+	}
+
+	// Include LEP 5 chunk proofs if provided.
+	if len(rawProofs) > 0 {
+		proofs := make([]map[string]interface{}, len(rawProofs))
+		for i, p := range rawProofs {
+			proofs[i] = map[string]interface{}{
+				"chunk_index":     p.ChunkIndex,
+				"leaf_hash":       p.LeafHash,
+				"path_hashes":     p.PathHashes,
+				"path_directions": p.PathDirections,
+			}
+		}
+		meta["chunk_proofs"] = proofs
+	}
+
+	metadataJSON, err := json.Marshal(meta)
 	if err != nil {
 		return nil, fmt.Errorf("marshal cascade finalize metadata: %w", err)
 	}

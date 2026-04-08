@@ -45,7 +45,9 @@ contract ActionClient {
             uint64 minSuperNodes,
             int64 expirationDuration,
             string memory superNodeFeeShare,
-            string memory foundationFeeShare
+            string memory foundationFeeShare,
+            uint32 svcChallengeCount,
+            uint32 svcMinChunksForChallenge
         )
     {
         return ACTION.getParams();
@@ -84,7 +86,8 @@ contract ActionClient {
         string calldata signatures,
         uint256 price,
         int64 expirationTime,
-        uint64 fileSizeKbs
+        uint64 fileSizeKbs,
+        IAction.AvailabilityCommitment calldata commitment
     ) external returns (string memory actionId) {
         actionId = ACTION.requestCascade(
             dataHash,
@@ -93,7 +96,8 @@ contract ActionClient {
             signatures,
             price,
             expirationTime,
-            fileSizeKbs
+            fileSizeKbs,
+            commitment
         );
 
         emit CascadeRequested(msg.sender, actionId, price);
@@ -108,7 +112,8 @@ contract ActionClient {
         uint64 rqIdsIc,
         string calldata signatures,
         int64 expirationTime,
-        uint64 fileSizeKbs
+        uint64 fileSizeKbs,
+        IAction.AvailabilityCommitment calldata commitment
     ) external returns (string memory actionId, uint256 totalFee) {
         // Step 1: Query the current fee
         (, , totalFee) = ACTION.getActionFee(fileSizeKbs);
@@ -123,7 +128,8 @@ contract ActionClient {
             signatures,
             totalFee,
             expirationTime,
-            fileSizeKbs
+            fileSizeKbs,
+            commitment
         );
 
         emit CascadeRequested(msg.sender, actionId, totalFee);

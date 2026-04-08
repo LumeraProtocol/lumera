@@ -114,6 +114,48 @@
           "internalType": "uint64",
           "name": "fileSizeKbs",
           "type": "uint64"
+        },
+        {
+          "components": [
+            {
+              "internalType": "string",
+              "name": "commitmentType",
+              "type": "string"
+            },
+            {
+              "internalType": "uint8",
+              "name": "hashAlgo",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint32",
+              "name": "chunkSize",
+              "type": "uint32"
+            },
+            {
+              "internalType": "uint64",
+              "name": "totalSize",
+              "type": "uint64"
+            },
+            {
+              "internalType": "uint32",
+              "name": "numChunks",
+              "type": "uint32"
+            },
+            {
+              "internalType": "bytes",
+              "name": "root",
+              "type": "bytes"
+            },
+            {
+              "internalType": "uint32[]",
+              "name": "challengeIndices",
+              "type": "uint32[]"
+            }
+          ],
+          "internalType": "struct IAction.AvailabilityCommitment",
+          "name": "commitment",
+          "type": "tuple"
         }
       ],
       "name": "requestCascade",
@@ -177,6 +219,33 @@
           "internalType": "string[]",
           "name": "rqIdsIds",
           "type": "string[]"
+        },
+        {
+          "components": [
+            {
+              "internalType": "uint32",
+              "name": "chunkIndex",
+              "type": "uint32"
+            },
+            {
+              "internalType": "bytes",
+              "name": "leafHash",
+              "type": "bytes"
+            },
+            {
+              "internalType": "bytes[]",
+              "name": "pathHashes",
+              "type": "bytes[]"
+            },
+            {
+              "internalType": "bool[]",
+              "name": "pathDirections",
+              "type": "bool[]"
+            }
+          ],
+          "internalType": "struct IAction.ChunkProof[]",
+          "name": "chunkProofs",
+          "type": "tuple[]"
         }
       ],
       "name": "finalizeCascade",
@@ -614,6 +683,16 @@
           "internalType": "string",
           "name": "foundationFeeShare",
           "type": "string"
+        },
+        {
+          "internalType": "uint32",
+          "name": "svcChallengeCount",
+          "type": "uint32"
+        },
+        {
+          "internalType": "uint32",
+          "name": "svcMinChunksForChallenge",
+          "type": "uint32"
         }
       ],
       "stateMutability": "view",

@@ -11,6 +11,25 @@ interface IAction {
     // Structs
     // -----------------------------------------------------------------------
 
+    /// @notice LEP 5 availability commitment for Cascade storage verification.
+    struct AvailabilityCommitment {
+        string commitmentType;    // e.g. "merkle_blake3"
+        uint8 hashAlgo;           // 0 = unspecified, 1 = BLAKE3, 2 = SHA256
+        uint32 chunkSize;         // bytes per chunk
+        uint64 totalSize;         // total file size in bytes
+        uint32 numChunks;         // number of chunks
+        bytes root;               // Merkle root hash
+        uint32[] challengeIndices; // chunk indices the supernode must prove
+    }
+
+    /// @notice LEP 5 Merkle inclusion proof for a single challenged chunk.
+    struct ChunkProof {
+        uint32 chunkIndex;        // which chunk this proves
+        bytes leafHash;           // hash of the chunk data
+        bytes[] pathHashes;       // sibling hashes along the Merkle path
+        bool[] pathDirections;    // true = right sibling, false = left
+    }
+
     /// @notice Represents a single action on the Lumera chain.
     struct ActionInfo {
         string actionId;
@@ -52,6 +71,7 @@ interface IAction {
     /// @param price        Fee to pay (ulume)
     /// @param expirationTime Unix timestamp for action expiry
     /// @param fileSizeKbs  File size in kilobytes (used for fee calculation)
+    /// @param commitment   LEP 5 availability commitment (pass empty root to skip)
     /// @return actionId    The generated action ID
     function requestCascade(
         string calldata dataHash,
@@ -60,7 +80,8 @@ interface IAction {
         string calldata signatures,
         uint256 price,
         int64 expirationTime,
-        uint64 fileSizeKbs
+        uint64 fileSizeKbs,
+        AvailabilityCommitment calldata commitment
     ) external returns (string memory actionId);
 
     /// @notice Request a Sense analysis action.
@@ -78,9 +99,27 @@ interface IAction {
         uint64 fileSizeKbs
     ) external returns (string memory actionId);
 
-    // NOTE: finalizeCascade / finalizeSense are omitted from this interface.
-    // Finalization is a supernode-internal operation — supernodes submit
-    // MsgFinalizeAction via Cosmos SDK transactions, not through the EVM.
+    /// @notice Finalize a Cascade action with storage proofs.
+    /// @param actionId    The action to finalize
+    /// @param rqIdsIds    Redundancy IDs assigned during storage
+    /// @param chunkProofs LEP 5 Merkle proofs for challenged chunks (pass empty for pre-LEP5)
+    /// @return success    True if the action reached Done state
+    function finalizeCascade(
+        string calldata actionId,
+        string[] calldata rqIdsIds,
+        ChunkProof[] calldata chunkProofs
+    ) external returns (bool success);
+
+    /// @notice Finalize a Sense analysis action with results.
+    /// @param actionId              The action to finalize
+    /// @param ddAndFingerprintsIds  DD and fingerprint result IDs
+    /// @param signatures            Supernode signatures
+    /// @return success              True if the action reached Done state
+    function finalizeSense(
+        string calldata actionId,
+        string[] calldata ddAndFingerprintsIds,
+        string calldata signatures
+    ) external returns (bool success);
 
     /// @notice Approve a pending action (governance/creator approval).
     /// @param actionId The action to approve
@@ -129,13 +168,15 @@ interface IAction {
     ) external view returns (ActionInfo[] memory actions, uint64 total);
 
     /// @notice Get the action module parameters.
-    /// @return baseActionFee       Fixed base fee per action (ulume)
-    /// @return feePerKbyte         Per-kilobyte fee rate (ulume)
-    /// @return maxActionsPerBlock  Max actions allowed in a single block
-    /// @return minSuperNodes       Min supernodes required to process an action
-    /// @return expirationDuration  Default expiry duration (seconds)
-    /// @return superNodeFeeShare   Supernode fee share (decimal string, e.g. "0.85")
-    /// @return foundationFeeShare  Foundation fee share (decimal string, e.g. "0.15")
+    /// @return baseActionFee              Fixed base fee per action (ulume)
+    /// @return feePerKbyte                Per-kilobyte fee rate (ulume)
+    /// @return maxActionsPerBlock         Max actions allowed in a single block
+    /// @return minSuperNodes              Min supernodes required to process an action
+    /// @return expirationDuration         Default expiry duration (seconds)
+    /// @return superNodeFeeShare          Supernode fee share (decimal string, e.g. "0.85")
+    /// @return foundationFeeShare         Foundation fee share (decimal string, e.g. "0.15")
+    /// @return svcChallengeCount          LEP 5: number of chunks to challenge
+    /// @return svcMinChunksForChallenge   LEP 5: minimum chunks required for SVC
     function getParams() external view returns (
         uint256 baseActionFee,
         uint256 feePerKbyte,
@@ -143,6 +184,8 @@ interface IAction {
         uint64 minSuperNodes,
         int64 expirationDuration,
         string memory superNodeFeeShare,
-        string memory foundationFeeShare
+        string memory foundationFeeShare,
+        uint32 svcChallengeCount,
+        uint32 svcMinChunksForChallenge
     );
 }

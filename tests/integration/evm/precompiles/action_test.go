@@ -31,9 +31,10 @@ func testActionPrecompileGetParamsViaEthCall(t *testing.T, node *evmtest.Node) {
 	}
 
 	// getParams returns: baseActionFee, feePerKbyte, maxActionsPerBlock, minSuperNodes,
-	//                     expirationDuration, superNodeFeeShare, foundationFeeShare
-	if len(out) != 7 {
-		t.Fatalf("expected 7 return values from getParams, got %d", len(out))
+	//                     expirationDuration, superNodeFeeShare, foundationFeeShare,
+	//                     svcChallengeCount, svcMinChunksForChallenge
+	if len(out) != 9 {
+		t.Fatalf("expected 9 return values from getParams, got %d", len(out))
 	}
 
 	baseActionFee, ok := out[0].(*big.Int)
@@ -71,6 +72,22 @@ func testActionPrecompileGetParamsViaEthCall(t *testing.T, node *evmtest.Node) {
 		t.Fatalf("unexpected foundationFeeShare: %#v", out[6])
 	}
 	_ = foundationFeeShare
+
+	// LEP 5 SVC parameters
+	svcChallengeCount, ok := out[7].(uint32)
+	if !ok {
+		t.Fatalf("unexpected svcChallengeCount type: %#v", out[7])
+	}
+	// Default is 8 (from keeper constant SVCChallengeCount)
+	if svcChallengeCount == 0 {
+		t.Logf("svcChallengeCount is 0 (params not yet set via governance)")
+	}
+
+	svcMinChunksForChallenge, ok := out[8].(uint32)
+	if !ok {
+		t.Fatalf("unexpected svcMinChunksForChallenge type: %#v", out[8])
+	}
+	_ = svcMinChunksForChallenge
 }
 
 // testActionPrecompileGetActionFeeViaEthCall verifies the action precompile

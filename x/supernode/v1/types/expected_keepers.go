@@ -40,6 +40,13 @@ type SupernodeKeeper interface {
 	GetSuperNodesPaginated(ctx sdk.Context, pagination *query.PageRequest, stateFilters ...SuperNodeState) ([]*SuperNode, *query.PageResponse, error)
 	IsSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress) bool
 	IsEligibleAndNotJailedValidator(ctx sdk.Context, valAddr sdk.ValAddress) bool
+	GetLastDistributionHeight(ctx sdk.Context) int64
+	SetLastDistributionHeight(ctx sdk.Context, height int64)
+	GetPoolBalance(ctx sdk.Context) sdk.Coins
+	GetTotalDistributed(ctx sdk.Context) sdk.Coins
+	GetSNDistState(ctx sdk.Context, valAddr string) (SNDistState, bool)
+	GetRegistrationFeeShareBps(ctx sdk.Context) uint64
+	CountEligibleSNs(ctx sdk.Context) uint64
 }
 
 // StakingKeeper defines the expected interface for the Staking module.
@@ -61,12 +68,16 @@ type SlashingKeeper interface {
 // AccountKeeper defines the expected interface for the Account module.
 type AccountKeeper interface {
 	GetAccount(context.Context, sdk.AccAddress) sdk.AccountI // only used for simulation
+	GetModuleAddress(moduleName string) sdk.AccAddress
+	GetModuleAccount(ctx context.Context, moduleName string) sdk.ModuleAccountI
 }
 
 // BankKeeper defines the expected interface for the Bank module.
 type BankKeeper interface {
 	SpendableCoins(context.Context, sdk.AccAddress) sdk.Coins
 	GetBalance(ctx context.Context, addr sdk.AccAddress, denom string) sdk.Coin
+	GetAllBalances(ctx context.Context, addr sdk.AccAddress) sdk.Coins
+	SendCoinsFromModuleToAccount(ctx context.Context, senderModule string, recipientAddr sdk.AccAddress, amt sdk.Coins) error
 }
 
 // StakingHooks event hooks for staking validator object (noalias)

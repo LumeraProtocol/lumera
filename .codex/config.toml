@@ -1,0 +1,13 @@
+# BRIDGE v2.1 Project Configuration for Codex
+# Place this in .codex/config.toml at your project root
+
+# Allow AGENTS.md to provide full project context.
+project_doc_max_bytes = 65536
+
+# Optional BRIDGE profile aligned to current Codex docs/changelog.
+# Activate with: codex --profile bridge
+[profiles.bridge]
+model = "gpt-5-codex"
+model_reasoning_summary = "auto"
+# Web search is intentionally omitted from profile defaults for broad
+# cross-version compatibility. Enable per run with: codex --profile bridge --search

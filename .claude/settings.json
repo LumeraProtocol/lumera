@@ -1,0 +1,67 @@
+{
+    "permissions": {
+        "allow": [
+            "Bash(git *)",
+            "Bash(ls *)",
+            "Bash(find *)",
+            "Bash(tree *)",
+            "Bash(cat *)",
+            "Bash(head *)",
+            "Bash(tail *)",
+            "Bash(wc *)",
+            "Bash(grep *)",
+            "Bash(rg *)",
+            "Bash(diff *)",
+            "Bash(sort *)",
+            "Bash(echo *)",
+            "Bash(pwd)",
+            "Bash(which *)",
+            "Bash(file *)",
+            "Bash(stat *)",
+            "Bash(jq *)"
+        ],
+        "deny": [
+            "Read(.env*)",
+            "Read(./secrets/**)",
+            "Bash(rm -rf *)"
+        ]
+    },
+    "hooks": {
+        "SessionStart": [
+            {
+                "matcher": "startup",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh\"",
+                        "timeout": 10
+                    }
+                ]
+            }
+        ],
+        "PreToolUse": [
+            {
+                "matcher": "Bash",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/auto-approve-cd-git.sh\"",
+                        "timeout": 5
+                    }
+                ]
+            }
+        ],
+        "PostToolUse": [
+            {
+                "matcher": "Edit|Write",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/post-edit-lint.sh\"",
+                        "timeout": 30
+                    }
+                ]
+            }
+        ]
+    }
+}

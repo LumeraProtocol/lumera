@@ -165,6 +165,46 @@ func (mr *MockQueryClientMockRecorder) Params(ctx, in any, opts ...any) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Params", reflect.TypeOf((*MockQueryClient)(nil).Params), varargs...)
 }
 
+// PoolState mocks base method.
+func (m *MockQueryClient) PoolState(ctx context.Context, in *types.QueryPoolStateRequest, opts ...grpc.CallOption) (*types.QueryPoolStateResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, in}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PoolState", varargs...)
+	ret0, _ := ret[0].(*types.QueryPoolStateResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PoolState indicates an expected call of PoolState.
+func (mr *MockQueryClientMockRecorder) PoolState(ctx, in any, opts ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, in}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PoolState", reflect.TypeOf((*MockQueryClient)(nil).PoolState), varargs...)
+}
+
+// SNEligibility mocks base method.
+func (m *MockQueryClient) SNEligibility(ctx context.Context, in *types.QuerySNEligibilityRequest, opts ...grpc.CallOption) (*types.QuerySNEligibilityResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, in}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "SNEligibility", varargs...)
+	ret0, _ := ret[0].(*types.QuerySNEligibilityResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SNEligibility indicates an expected call of SNEligibility.
+func (mr *MockQueryClientMockRecorder) SNEligibility(ctx, in any, opts ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, in}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SNEligibility", reflect.TypeOf((*MockQueryClient)(nil).SNEligibility), varargs...)
+}
+
 // MockQueryServer is a mock of QueryServer interface.
 type MockQueryServer struct {
 	ctrl     *gomock.Controller
@@ -262,6 +302,36 @@ func (m *MockQueryServer) ListSuperNodes(arg0 context.Context, arg1 *types.Query
 func (mr *MockQueryServerMockRecorder) ListSuperNodes(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListSuperNodes", reflect.TypeOf((*MockQueryServer)(nil).ListSuperNodes), arg0, arg1)
+}
+
+// PoolState mocks base method.
+func (m *MockQueryServer) PoolState(arg0 context.Context, arg1 *types.QueryPoolStateRequest) (*types.QueryPoolStateResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PoolState", arg0, arg1)
+	ret0, _ := ret[0].(*types.QueryPoolStateResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PoolState indicates an expected call of PoolState.
+func (mr *MockQueryServerMockRecorder) PoolState(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PoolState", reflect.TypeOf((*MockQueryServer)(nil).PoolState), arg0, arg1)
+}
+
+// SNEligibility mocks base method.
+func (m *MockQueryServer) SNEligibility(arg0 context.Context, arg1 *types.QuerySNEligibilityRequest) (*types.QuerySNEligibilityResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SNEligibility", arg0, arg1)
+	ret0, _ := ret[0].(*types.QuerySNEligibilityResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SNEligibility indicates an expected call of SNEligibility.
+func (mr *MockQueryServerMockRecorder) SNEligibility(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SNEligibility", reflect.TypeOf((*MockQueryServer)(nil).SNEligibility), arg0, arg1)
 }
 
 // Params mocks base method.

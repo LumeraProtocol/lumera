@@ -23,6 +23,7 @@ type (
 
 		bankKeeper     types.BankKeeper
 		stakingKeeper  types.StakingKeeper
+		accountKeeper  types.AccountKeeper
 		slashingKeeper types.SlashingKeeper
 
 		//auditKeeper     types.AuditKeeper // future Audit module
@@ -37,6 +38,7 @@ func NewKeeper(
 
 	bankKeeper types.BankKeeper,
 	stakingKeeper types.StakingKeeper,
+	accountKeeper types.AccountKeeper,
 	slashingKeeper types.SlashingKeeper,
 ) Keeper {
 	if _, err := sdk.AccAddressFromBech32(authority); err != nil {
@@ -51,6 +53,7 @@ func NewKeeper(
 
 		bankKeeper:     bankKeeper,
 		stakingKeeper:  stakingKeeper,
+		accountKeeper:  accountKeeper,
 		slashingKeeper: slashingKeeper,
 	}
 }

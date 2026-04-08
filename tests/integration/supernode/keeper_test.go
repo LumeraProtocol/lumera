@@ -50,6 +50,7 @@ func (suite *KeeperIntegrationSuite) SetupSuite() {
 		suite.authority.String(),
 		suite.app.BankKeeper,
 		suite.app.StakingKeeper,
+		suite.app.AuthKeeper,
 		suite.app.SlashingKeeper,
 	)
 	suite.keeper = k

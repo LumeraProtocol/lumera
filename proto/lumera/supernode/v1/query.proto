@@ -7,6 +7,7 @@ import "amino/amino.proto";
 import "gogoproto/gogo.proto";
 import "google/api/annotations.proto";
 import "cosmos/base/query/v1beta1/pagination.proto";
+import "cosmos/base/v1beta1/coin.proto";
 import "lumera/supernode/v1/params.proto";
 import "lumera/supernode/v1/super_node.proto";
 import "lumera/supernode/v1/supernode_state.proto";
@@ -49,6 +50,16 @@ service Query {
   rpc GetMetrics (QueryGetMetricsRequest) returns (QueryGetMetricsResponse) {
     option (google.api.http).get = "/LumeraProtocol/lumera/supernode/v1/metrics/{validatorAddress}";
   
+  }
+
+  // PoolState queries the current state of the Everlight pool.
+  rpc PoolState (QueryPoolStateRequest) returns (QueryPoolStateResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/supernode/v1/pool_state";
+  }
+
+  // SNEligibility queries whether a specific SuperNode is eligible for payouts.
+  rpc SNEligibility (QuerySNEligibilityRequest) returns (QuerySNEligibilityResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/supernode/v1/sn_eligibility/{validator_address}";
   }
 }
 
@@ -113,4 +124,41 @@ message QueryGetMetricsRequest {
 // QueryGetMetricsResponse is response type for the Query/GetMetrics RPC method.
 message QueryGetMetricsResponse {
   SupernodeMetricsState metrics_state = 1;
+}
+
+// QueryPoolStateRequest is request type for the Query/PoolState RPC method.
+message QueryPoolStateRequest {}
+
+// QueryPoolStateResponse is response type for the Query/PoolState RPC method.
+message QueryPoolStateResponse {
+  // balance is the current undistributed pool balance.
+  repeated cosmos.base.v1beta1.Coin balance = 1 [
+    (gogoproto.nullable) = false,
+    (gogoproto.castrepeated) = "github.com/cosmos/cosmos-sdk/types.Coins"
+  ];
+
+  // last_distribution_height is the block height of the last distribution.
+  int64 last_distribution_height = 2;
+
+  // total_distributed is the cumulative amount distributed.
+  repeated cosmos.base.v1beta1.Coin total_distributed = 3 [
+    (gogoproto.nullable) = false,
+    (gogoproto.castrepeated) = "github.com/cosmos/cosmos-sdk/types.Coins"
+  ];
+
+  // eligible_sn_count is the number of SuperNodes currently eligible for payouts.
+  uint64 eligible_sn_count = 4;
+}
+
+// QuerySNEligibilityRequest is request type for the Query/SNEligibility RPC method.
+message QuerySNEligibilityRequest {
+  string validator_address = 1;
+}
+
+// QuerySNEligibilityResponse is response type for the Query/SNEligibility RPC method.
+message QuerySNEligibilityResponse {
+  bool eligible = 1;
+  string reason = 2;
+  double cascade_kademlia_db_bytes = 3;
+  double smoothed_weight = 4;
 }

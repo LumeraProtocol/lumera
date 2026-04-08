@@ -68,6 +68,17 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 						},
 					},
 				},
+				{
+					RpcMethod: "PoolState",
+					Use:       "pool-state",
+					Short:     "Query the everlight pool state (balance, distribution info)",
+				},
+				{
+					RpcMethod:      "SNEligibility",
+					Use:            "sn-eligibility [validator-address]",
+					Short:          "Query whether a supernode is eligible for everlight payouts",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validator_address"}},
+				},
 
 				// this line is used by ignite scaffolding # autocli/query
 			},

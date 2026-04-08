@@ -684,6 +684,7 @@ func setupKeeperForTest(
 		authority,
 		bankKeeper,
 		stakingKeeper,
+		nil,
 		slashingKeeper,
 	)
 

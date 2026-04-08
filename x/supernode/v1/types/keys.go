@@ -6,6 +6,10 @@ const (
 	// ModuleName defines the module name
 	ModuleName = "supernode"
 
+	// EverlightPoolAccountName is the named module account used for Everlight
+	// funding and payouts within x/supernode.
+	EverlightPoolAccountName = "everlight"
+
 	// StoreKey defines the primary module store key
 	StoreKey = ModuleName
 
@@ -28,6 +32,16 @@ var (
 	// MetricsStateKey prefix for storing latest SupernodeMetricsState
 	// entries keyed by validator address.
 	MetricsStateKey = []byte("snm_")
+
+	// LastDistributionHeightKey stores the last Everlight distribution height.
+	LastDistributionHeightKey = []byte("ldh")
+
+	// TotalDistributedKey stores the cumulative Everlight payout total.
+	TotalDistributedKey = []byte("td")
+
+	// SNDistStatePrefix stores per-validator Everlight distribution state.
+	// It must not share the "sn_" prefix used by supernode primary records.
+	SNDistStatePrefix = []byte("rdist/")
 )
 
 func KeyPrefix(p string) []byte {
@@ -43,4 +57,12 @@ func GetSupernodeKey(valAddr sdk.ValAddress) []byte {
 // by validator address.
 func GetMetricsStateKey(valAddr sdk.ValAddress) []byte {
 	return append(MetricsStateKey, valAddr.Bytes()...)
+}
+
+// SNDistStateKey returns the store key for a validator's distribution state.
+func SNDistStateKey(valAddr string) []byte {
+	key := make([]byte, len(SNDistStatePrefix)+len(valAddr))
+	copy(key, SNDistStatePrefix)
+	copy(key[len(SNDistStatePrefix):], valAddr)
+	return key
 }

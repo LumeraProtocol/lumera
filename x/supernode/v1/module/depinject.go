@@ -1,9 +1,8 @@
-
 package supernode
 
 import (
-	"cosmossdk.io/core/store"
 	"cosmossdk.io/core/appmodule"
+	"cosmossdk.io/core/store"
 	"cosmossdk.io/depinject"
 	"cosmossdk.io/depinject/appconfig"
 	"cosmossdk.io/log"
@@ -67,6 +66,7 @@ func ProvideModule(in ModuleInputs) ModuleOutputs {
 		authority.String(),
 		in.BankKeeper,
 		in.StakingKeeper,
+		in.AccountKeeper,
 		in.SlashingKeeper,
 	)
 

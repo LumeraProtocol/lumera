@@ -49,7 +49,7 @@ func TestReportSupernodeMetrics_SingleReportRecoversPostponed(t *testing.T) {
 			},
 		},
 		Metrics: &types.MetricsAggregate{
-			Metrics:     make(map[string]float64),
+			Metrics:     []*types.MetricValue{},
 			ReportCount: 1,
 			Height:      1, // Very old height to simulate staleness
 		},

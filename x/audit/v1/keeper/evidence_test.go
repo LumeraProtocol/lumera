@@ -90,9 +90,14 @@ func TestSubmitEvidenceAndQueries_CascadeClientFailure(t *testing.T) {
 			targetA,
 			targetB,
 		},
-		Details: map[string]string{
-			"error":    "context deadline exceeded while streaming upload",
-			"trace_id": "trace-1234",
+		Details: &types.CascadeClientFailureDetails{
+			Operation:         "register",
+			Iteration:         "1",
+			SupernodeEndpoint: "18.190.53.108:4444",
+			SupernodeAccount:  targetA,
+			TaskId:            "task-1234",
+			Error:             "context deadline exceeded while streaming upload",
+			ActionId:          "action-cascade-1",
 		},
 	}
 	metaBz, err := json.Marshal(meta)
@@ -152,4 +157,68 @@ func TestCreateEvidence_CascadeClientFailure_InvalidMetadata(t *testing.T) {
 	)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), types.ErrInvalidMetadata.Error())
+}
+
+func TestCreateEvidence_StorageChallengeFailure_ValidStructuredMetadata(t *testing.T) {
+	f := initFixture(t)
+
+	reporter, err := f.addressCodec.BytesToString(bytes.Repeat([]byte{0x11}, 20))
+	require.NoError(t, err)
+	target, err := f.addressCodec.BytesToString(bytes.Repeat([]byte{0x33}, 20))
+	require.NoError(t, err)
+
+	params := f.keeper.GetParams(f.ctx)
+	params.ScEnabled = true
+	require.NoError(t, f.keeper.SetParams(f.ctx, params))
+
+	anchor := types.EpochAnchor{
+		EpochId:                 7,
+		ActiveSupernodeAccounts: []string{reporter},
+		TargetSupernodeAccounts: []string{target},
+		Seed:                    bytes.Repeat([]byte{0x7a}, 32),
+	}
+	f.keeper.SetEpochAnchor(f.ctx, anchor)
+
+	meta := types.StorageChallengeFailureEvidenceMetadata{
+		EpochId:                    anchor.EpochId,
+		ChallengerSupernodeAccount: reporter,
+		ChallengedSupernodeAccount: target,
+		ChallengeId:                "challenge-7",
+		FileKey:                    "file-key-1",
+		FailureType:                "INVALID_PROOF",
+		TranscriptHash:             "deadbeef",
+	}
+	metaJSON, err := json.Marshal(meta)
+	require.NoError(t, err)
+
+	id, err := f.keeper.CreateEvidence(
+		f.ctx,
+		reporter,
+		target,
+		"",
+		types.EvidenceType_EVIDENCE_TYPE_STORAGE_CHALLENGE_FAILURE,
+		string(metaJSON),
+	)
+	require.NoError(t, err)
+	require.Equal(t, uint64(1), id)
+}
+
+func TestCreateEvidence_StorageChallengeFailure_InvalidMetadata(t *testing.T) {
+	f := initFixture(t)
+
+	reporter, err := f.addressCodec.BytesToString(bytes.Repeat([]byte{0x11}, 20))
+	require.NoError(t, err)
+	subject, err := f.addressCodec.BytesToString(bytes.Repeat([]byte{0x22}, 20))
+	require.NoError(t, err)
+
+	_, err = f.keeper.CreateEvidence(
+		f.ctx,
+		reporter,
+		subject,
+		"",
+		types.EvidenceType_EVIDENCE_TYPE_STORAGE_CHALLENGE_FAILURE,
+		`{"challenge_id":"c1"}`,
+	)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "challenger_supernode_account is required")
 }

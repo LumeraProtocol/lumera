@@ -22,7 +22,7 @@ projectBrief.md
 tests/systemtests/testnet
 tests/systemtests/__debug_bin*
 build/
-.claude/settings.json
+.claude/
 *.swagger.json
 /openrpcgen
 /app/openrpc/*.gz

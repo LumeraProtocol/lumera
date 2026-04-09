@@ -219,7 +219,7 @@ func addSupernode(snKeeper *mockSupernodeKeeper, valAddr sdk.ValAddress, accAddr
 }
 
 func fundPool(bankKeeper *mockBankKeeper, amount int64) {
-	moduleAddr := authtypes.NewModuleAddress(sntypes.EverlightPoolAccountName)
+	moduleAddr := authtypes.NewModuleAddress(sntypes.ModuleName)
 	bankKeeper.balances[moduleAddr.String()] = sdk.NewCoins(sdk.NewCoin("ulume", sdkmath.NewInt(amount)))
 }
 

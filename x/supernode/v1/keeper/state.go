@@ -38,7 +38,7 @@ func (k Keeper) SetLastDistributionHeight(ctx sdk.Context, height int64) {
 
 // GetPoolBalance returns the current balance of the everlight module account.
 func (k Keeper) GetPoolBalance(ctx sdk.Context) sdk.Coins {
-	moduleAddr := k.accountKeeper.GetModuleAddress(types.EverlightPoolAccountName)
+	moduleAddr := k.accountKeeper.GetModuleAddress(types.ModuleName)
 	return k.bankKeeper.GetAllBalances(ctx, moduleAddr)
 }
 

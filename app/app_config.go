@@ -197,7 +197,6 @@ var (
 		{Account: claimmoduletypes.ModuleName, Permissions: []string{authtypes.Minter, authtypes.Burner, authtypes.Staking}},
 		{Account: supernodemoduletypes.ModuleName, Permissions: []string{authtypes.Minter, authtypes.Burner, authtypes.Staking}},
 		{Account: actionmoduletypes.ModuleName, Permissions: []string{authtypes.Minter, authtypes.Burner, authtypes.Staking}},
-		{Account: supernodemoduletypes.EverlightPoolAccountName},
 		// this line is used by starport scaffolding # stargate/app/maccPerms
 	}
 

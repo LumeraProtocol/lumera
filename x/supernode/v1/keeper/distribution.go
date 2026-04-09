@@ -238,7 +238,7 @@ func (k Keeper) distributePool(ctx sdk.Context) error {
 	// 6. Execute payouts via bank module.
 	for _, p := range payouts {
 		coins := sdk.NewCoins(sdk.NewCoin(lcfg.ChainDenom, p.amount))
-		if err := k.bankKeeper.SendCoinsFromModuleToAccount(ctx, sntypes.EverlightPoolAccountName, p.addr, coins); err != nil {
+		if err := k.bankKeeper.SendCoinsFromModuleToAccount(ctx, sntypes.ModuleName, p.addr, coins); err != nil {
 			return fmt.Errorf("failed to send distribution to %s: %w", p.addr, err)
 		}
 

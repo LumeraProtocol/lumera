@@ -637,7 +637,7 @@ func (k *Keeper) DistributeFees(ctx sdk.Context, actionID string) error {
 			rewardDistributionAmount := fee.Amount.MulRaw(int64(rewardDistributionBps)).QuoRaw(10000)
 			if rewardDistributionAmount.IsPositive() {
 				rewardDistributionCoin := sdk.NewCoin(fee.Denom, rewardDistributionAmount)
-				err := k.bankKeeper.SendCoinsFromModuleToModule(ctx, actiontypes.ModuleName, sntypes.EverlightPoolAccountName, sdk.NewCoins(rewardDistributionCoin))
+				err := k.bankKeeper.SendCoinsFromModuleToModule(ctx, actiontypes.ModuleName, sntypes.ModuleName, sdk.NewCoins(rewardDistributionCoin))
 				if err != nil {
 					return errors.Wrap(err, "failed to send reward-distribution fee share")
 				}

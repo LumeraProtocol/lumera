@@ -6,10 +6,6 @@ const (
 	// ModuleName defines the module name
 	ModuleName = "supernode"
 
-	// EverlightPoolAccountName is the named module account used for Everlight
-	// funding and payouts within x/supernode.
-	EverlightPoolAccountName = "everlight"
-
 	// StoreKey defines the primary module store key
 	StoreKey = ModuleName
 

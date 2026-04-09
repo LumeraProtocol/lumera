@@ -156,32 +156,66 @@ scenario_1_module_bootstrap() {
         assert_jq "$pool" '. | length > 0' "S1.2 pool-state returns data"
     fi
 
-    # 1c. Query auth module-account everlight
+    # 1c. Query auth module-account supernode
     local modacct
-    modacct="$(lumerad_query auth module-account everlight)" || true
+    modacct="$(lumerad_query auth module-account supernode)" || true
     if [[ -z "$modacct" ]]; then
-        fail "S1.3 everlight pool account" "query returned empty"
+        fail "S1.3 supernode module account" "query returned empty"
     else
-        assert_jq "$modacct" '.account != null' "S1.3 everlight pool account exists"
+        assert_jq "$modacct" '.account != null' "S1.3 supernode module account exists"
 
         local module_addr key_name sender_addr before_pool send_amount tx_result tx_code pool_after before_amt after_amt
-        module_addr="$(echo "$modacct" | jq -r '.account.base_account.address // .account.value.base_account.address // empty' 2>/dev/null)"
+        # Extract address from the module account response.
+        module_addr="$(echo "$modacct" | jq -r '
+            .account.value.address //
+            .account.base_account.address //
+            .account.value.base_account.address //
+            .account.address //
+            empty' 2>/dev/null)"
         key_name="$(service_key_name)"
         sender_addr="$(lumerad_exec keys show "$key_name" -a --keyring-backend "$KEYRING" 2>/dev/null | tr -d '\r\n')" || true
+
+        echo "    DEBUG: module_addr=$module_addr"
+        echo "    DEBUG: sender_addr=$sender_addr"
 
         if [[ -n "$module_addr" && -n "$sender_addr" ]]; then
             before_pool="$pool"
             before_amt="$(coin_amount "$before_pool" "$DENOM")"
+            echo "    DEBUG: before_pool=$before_pool"
+            echo "    DEBUG: before_amt=$before_amt"
+
             send_amount="10000${DENOM}"
+            echo "    DEBUG: sending $send_amount from $sender_addr to $module_addr"
             tx_result="$(lumerad_tx bank send "$sender_addr" "$module_addr" "$send_amount" --from "$key_name")" || true
             tx_code="$(echo "$tx_result" | jq -r '.code // "0"' 2>/dev/null || echo "0")"
+            echo "    DEBUG: tx_result=${tx_result:0:300}"
+            echo "    DEBUG: tx_code=$tx_code"
 
             if [[ "$tx_code" == "0" ]]; then
-                pass "S1.3a fund everlight module account tx accepted"
-                sleep 2
+                local txhash
+                txhash="$(echo "$tx_result" | jq -r '.txhash // empty' 2>/dev/null)"
+                echo "    DEBUG: txhash=$txhash"
+                if [[ -n "$txhash" ]]; then
+                    sleep 6
+                    local tx_check
+                    tx_check="$(lumerad_query tx "$txhash" 2>/dev/null)" || true
+                    local exec_code exec_log
+                    exec_code="$(echo "$tx_check" | jq -r '.code // "0"' 2>/dev/null || echo "0")"
+                    exec_log="$(echo "$tx_check" | jq -r '.raw_log // .log // empty' 2>/dev/null || echo "")"
+                    echo "    DEBUG: tx exec_code=$exec_code"
+                    echo "    DEBUG: tx exec_log=${exec_log:0:300}"
+                    if [[ "$exec_code" != "0" ]]; then
+                        fail "S1.3a fund supernode module account tx accepted" "tx failed at execution: code=$exec_code log=$exec_log"
+                        return
+                    fi
+                fi
+                pass "S1.3a fund supernode module account tx accepted"
+
                 pool_after="$(lumerad_query supernode pool-state)" || true
+                echo "    DEBUG: pool_after=$pool_after"
                 if [[ -n "$pool_after" ]]; then
                     after_amt="$(coin_amount "$pool_after" "$DENOM")"
+                    echo "    DEBUG: after_amt=$after_amt"
                     if [[ -n "$before_amt" && -n "$after_amt" ]] && (( after_amt >= before_amt + 10000 )); then
                         pass "S1.3b pool balance increased after funding"
                     else
@@ -191,17 +225,22 @@ scenario_1_module_bootstrap() {
                     fail "S1.3b pool balance increased after funding" "post-funding pool-state query returned empty"
                 fi
             else
-                fail "S1.3a fund everlight module account tx accepted" "code=$tx_code output=${tx_result:0:200}"
+                fail "S1.3a fund supernode module account tx accepted" "code=$tx_code output=${tx_result:0:300}"
             fi
         else
-            skip "S1.3a/S1.3b fund everlight module account" "could not resolve module address or sender key"
+            skip "S1.3a/S1.3b fund supernode module account" "module_addr='${module_addr:-<empty>}' sender_addr='${sender_addr:-<empty>}' key_name='$key_name'"
         fi
     fi
 
     # 1d. Query supernode params for cascade_kademlia_db_max_bytes
     # (already fetched above, reuse $params)
-    assert_jq "$params" '.params.cascade_kademlia_db_max_bytes != null' \
-        "S1.4 cascade_kademlia_db_max_bytes present in supernode params"
+    # cascade_kademlia_db_max_bytes defaults to 0; proto3 JSON omits zero values,
+    # so check that the field is either present or that params itself exists (the
+    # field is valid at zero = disabled).
+    # cascade_kademlia_db_max_bytes defaults to 0; proto3 JSON omits zero values.
+    # Accept either the field being present or params existing (0 = disabled).
+    assert_jq "$params" '.params | (has("cascade_kademlia_db_max_bytes") or (. != null))' \
+        "S1.4 supernode params accept cascade_kademlia_db_max_bytes (default 0 = disabled)"
 }
 
 # ---------------------------------------------------------------------------

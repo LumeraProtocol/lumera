@@ -8,7 +8,7 @@ Gate Result: PASS (2026-04-08)
 ## How to Use
 
 1. Build the chain: `make build`
-2. Start the local environment: `make devnet-clean && make devnet-new && make devnet-up`
+2. Start the local environment: `make devnet-clean && make devnet-new-no-hermes && make devnet-up`
 3. Run the scripted smoke coverage first: `make devnet-tests-everlight`
 4. Execute each scenario step-by-step on the running devnet.
 4. Record results in the checklists.

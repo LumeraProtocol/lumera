@@ -63,6 +63,7 @@ func (k Keeper) GetAuthority() string {
 	return k.authority
 }
 
+
 // Logger returns a module-specific logger.
 func (k Keeper) Logger() log.Logger {
 	return k.logger.With("module", fmt.Sprintf("x/%s", types.ModuleName))

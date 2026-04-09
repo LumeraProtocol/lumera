@@ -135,7 +135,6 @@ func TestEvaluateComplianceRequiresOpenPorts(t *testing.T) {
 func TestEvaluateComplianceStorageFullOnly(t *testing.T) {
 	ctx := sdk.NewContext(nil, tmproto.Header{Height: 10}, false, log.NewNopLogger())
 	params := types.DefaultParams()
-	params.CascadeKademliaDbMaxBytes = 1_000_000_000 // 1 GB threshold
 
 	metrics := types.SupernodeMetrics{
 		VersionMajor:           2,
@@ -147,11 +146,11 @@ func TestEvaluateComplianceStorageFullOnly(t *testing.T) {
 		MemUsagePercent:        float64(params.MaxMemUsagePercent - 10),
 		MemFreeGb:              float64(params.MinMemGb) / 2,
 		DiskTotalGb:            float64(params.MinStorageGb),
-		DiskUsagePercent:       float64(params.MaxStorageUsagePercent - 10),
-		DiskFreeGb:             float64(params.MinStorageGb) / 2,
+		DiskUsagePercent:       float64(params.MaxStorageUsagePercent + 1), // exceeds max → STORAGE_FULL
+		DiskFreeGb:             float64(params.MinStorageGb) * 0.05,
 		UptimeSeconds:          100,
 		PeersCount:             10,
-		CascadeKademliaDbBytes: 1_500_000_000, // exceeds threshold
+		CascadeKademliaDbBytes: 1_500_000_000,
 	}
 	for _, port := range params.RequiredOpenPorts {
 		metrics.OpenPorts = append(metrics.OpenPorts, types.PortStatus{
@@ -171,7 +170,6 @@ func TestEvaluateComplianceStorageFullOnly(t *testing.T) {
 func TestEvaluateComplianceStorageFullPlusOtherIssue(t *testing.T) {
 	ctx := sdk.NewContext(nil, tmproto.Header{Height: 10}, false, log.NewNopLogger())
 	params := types.DefaultParams()
-	params.CascadeKademliaDbMaxBytes = 1_000_000_000
 
 	metrics := types.SupernodeMetrics{
 		VersionMajor:           2,
@@ -183,8 +181,8 @@ func TestEvaluateComplianceStorageFullPlusOtherIssue(t *testing.T) {
 		MemUsagePercent:        float64(params.MaxMemUsagePercent - 10),
 		MemFreeGb:              float64(params.MinMemGb) / 2,
 		DiskTotalGb:            float64(params.MinStorageGb),
-		DiskUsagePercent:       float64(params.MaxStorageUsagePercent - 10),
-		DiskFreeGb:             float64(params.MinStorageGb) / 2,
+		DiskUsagePercent:       float64(params.MaxStorageUsagePercent + 1), // exceeds max → STORAGE_FULL
+		DiskFreeGb:             float64(params.MinStorageGb) * 0.05,
 		UptimeSeconds:          100,
 		PeersCount:             0, // fails peers check
 		CascadeKademliaDbBytes: 1_500_000_000,
@@ -203,10 +201,9 @@ func TestEvaluateComplianceStorageFullPlusOtherIssue(t *testing.T) {
 	require.True(t, containsSubstring(result.Issues, "peers_count"))
 }
 
-func TestEvaluateComplianceStorageFullDisabledWhenZeroThreshold(t *testing.T) {
+func TestEvaluateComplianceDiskUsageBelowMaxIsNotStorageFull(t *testing.T) {
 	ctx := sdk.NewContext(nil, tmproto.Header{Height: 10}, false, log.NewNopLogger())
 	params := types.DefaultParams()
-	// Default: CascadeKademliaDbMaxBytes == 0 (disabled)
 
 	metrics := types.SupernodeMetrics{
 		VersionMajor:           2,
@@ -218,11 +215,11 @@ func TestEvaluateComplianceStorageFullDisabledWhenZeroThreshold(t *testing.T) {
 		MemUsagePercent:        float64(params.MaxMemUsagePercent - 10),
 		MemFreeGb:              float64(params.MinMemGb) / 2,
 		DiskTotalGb:            float64(params.MinStorageGb),
-		DiskUsagePercent:       float64(params.MaxStorageUsagePercent - 10),
+		DiskUsagePercent:       float64(params.MaxStorageUsagePercent - 10), // within bounds
 		DiskFreeGb:             float64(params.MinStorageGb) / 2,
 		UptimeSeconds:          100,
 		PeersCount:             10,
-		CascadeKademliaDbBytes: 999_999_999_999, // huge, but threshold disabled
+		CascadeKademliaDbBytes: 999_999_999_999, // large, but irrelevant for STORAGE_FULL
 	}
 	for _, port := range params.RequiredOpenPorts {
 		metrics.OpenPorts = append(metrics.OpenPorts, types.PortStatus{
@@ -233,14 +230,13 @@ func TestEvaluateComplianceStorageFullDisabledWhenZeroThreshold(t *testing.T) {
 
 	result := evaluateCompliance(ctx, params, metrics)
 
-	require.True(t, result.IsCompliant(), "should be compliant when threshold is disabled")
+	require.True(t, result.IsCompliant(), "should be compliant when disk usage is within bounds")
 	require.False(t, result.StorageFull)
 }
 
 func TestEvaluateComplianceRejectsInvalidCascadeKademliaBytes(t *testing.T) {
 	ctx := sdk.NewContext(nil, tmproto.Header{Height: 10}, false, log.NewNopLogger())
 	params := types.DefaultParams()
-	params.CascadeKademliaDbMaxBytes = 1_000_000_000
 
 	baseMetrics := types.SupernodeMetrics{
 		VersionMajor:     2,

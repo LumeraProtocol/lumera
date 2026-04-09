@@ -41,7 +41,7 @@ The lumera repo is the knowledge provider. Other repos consume chain state.
 
 Changes:
 - `proto/lumera/supernode/v1/supernode_state.proto` — add `SUPERNODE_STATE_STORAGE_FULL = 6`
-- `proto/lumera/supernode/v1/params.proto` — add `cascade_kademlia_db_max_bytes` (field 19) + `RewardDistribution` sub-message (field 20)
+- `proto/lumera/supernode/v1/params.proto` — add `RewardDistribution` sub-message (field 19)
 - `proto/lumera/supernode/v1/metrics.proto` — add `cascade_kademlia_db_bytes` (field 15)
 - `proto/lumera/supernode/v1/query.proto` — add Everlight pool state, eligibility, payout history queries
 - `proto/lumera/supernode/v1/genesis.proto` — extend with Everlight pool state

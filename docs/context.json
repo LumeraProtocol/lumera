@@ -110,7 +110,7 @@
       "name": "SuperNode Proto Extensions for Everlight",
       "status": "done",
       "slice": "S10",
-      "notes": "SUPERNODE_STATE_STORAGE_FULL (=6) added to enum, cascade_kademlia_db_max_bytes (field 19) to SN params, cascade_kademlia_db_bytes (field 15) to SN metrics. Distribution params added to SN params. Codegen fixed by adding missing coin.proto import in query.proto.",
+      "notes": "SUPERNODE_STATE_STORAGE_FULL (=6) added to enum, cascade_kademlia_db_bytes (field 15) to SN metrics. RewardDistribution (field 19) added to SN params. Codegen fixed by adding missing coin.proto import in query.proto. STORAGE_FULL is driven by disk_usage_percent > max_storage_usage_percent.",
       "evidence": [
         "make build-proto (exit 0)"
       ]

@@ -277,7 +277,6 @@ func TestReportSupernodeMetrics_StorageFullFromPostponedEmitsStorageFullEvent(t 
 	require.NoError(t, k.SetSuperNode(ctx, supernode))
 
 	params := types.DefaultParams()
-	params.CascadeKademliaDbMaxBytes = 1_000
 	require.NoError(t, k.SetParams(ctx, params))
 
 	metrics := types.SupernodeMetrics{
@@ -290,8 +289,8 @@ func TestReportSupernodeMetrics_StorageFullFromPostponedEmitsStorageFullEvent(t 
 		MemUsagePercent:        float64(params.MaxMemUsagePercent - 10),
 		MemFreeGb:              float64(params.MinMemGb) / 2,
 		DiskTotalGb:            float64(params.MinStorageGb),
-		DiskUsagePercent:       float64(params.MaxStorageUsagePercent - 10),
-		DiskFreeGb:             float64(params.MinStorageGb) / 2,
+		DiskUsagePercent:       float64(params.MaxStorageUsagePercent + 1), // exceeds max → STORAGE_FULL
+		DiskFreeGb:             float64(params.MinStorageGb) * 0.05,
 		UptimeSeconds:          100,
 		PeersCount:             10,
 		CascadeKademliaDbBytes: 2_000,
@@ -317,7 +316,7 @@ func TestReportSupernodeMetrics_StorageFullFromPostponedEmitsStorageFullEvent(t 
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	require.False(t, resp.Compliant)
-	require.Contains(t, resp.Issues, "cascade storage capacity full")
+	require.Contains(t, resp.Issues, "disk storage full")
 
 	stored, found := k.QuerySuperNode(ctx, valAddr)
 	require.True(t, found)
@@ -348,10 +347,9 @@ func TestReportSupernodeMetrics_StorageFullRecoversToActive(t *testing.T) {
 	require.NoError(t, k.SetSuperNode(ctx, supernode))
 
 	params := types.DefaultParams()
-	params.CascadeKademliaDbMaxBytes = 10_000
 	require.NoError(t, k.SetParams(ctx, params))
 
-	// Build fully compliant metrics with cascade_kademlia_db_bytes BELOW the threshold.
+	// Build fully compliant metrics with disk usage below the threshold.
 	metrics := types.SupernodeMetrics{
 		VersionMajor:           2,
 		VersionMinor:           0,
@@ -362,11 +360,11 @@ func TestReportSupernodeMetrics_StorageFullRecoversToActive(t *testing.T) {
 		MemUsagePercent:        float64(params.MaxMemUsagePercent - 10),
 		MemFreeGb:              float64(params.MinMemGb) / 2,
 		DiskTotalGb:            float64(params.MinStorageGb),
-		DiskUsagePercent:       float64(params.MaxStorageUsagePercent - 10),
+		DiskUsagePercent:       float64(params.MaxStorageUsagePercent - 10), // within bounds → recovers
 		DiskFreeGb:             float64(params.MinStorageGb) / 2,
 		UptimeSeconds:          100,
 		PeersCount:             10,
-		CascadeKademliaDbBytes: 5_000, // below threshold of 10_000
+		CascadeKademliaDbBytes: 5_000,
 	}
 	for _, port := range params.RequiredOpenPorts {
 		metrics.OpenPorts = append(metrics.OpenPorts, types.PortStatus{

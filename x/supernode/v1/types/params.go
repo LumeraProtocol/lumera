@@ -77,7 +77,6 @@ const (
 	DefaultMaxMemUsagePercent          uint64 = 90
 	DefaultMinStorageGB                uint64 = 1000
 	DefaultMaxStorageUsagePercent      uint64 = 90
-	DefaultCascadeKademliaDBMaxBytes   uint64 = 0
 )
 
 var DefaultRequiredOpenPorts = []uint32{4444, 4445, 8002}
@@ -129,9 +128,6 @@ func (p Params) WithDefaults() Params {
 	}
 	if out.RequiredOpenPorts == nil {
 		out.RequiredOpenPorts = append([]uint32(nil), DefaultRequiredOpenPorts...)
-	}
-	if out.CascadeKademliaDbMaxBytes == 0 {
-		out.CascadeKademliaDbMaxBytes = DefaultCascadeKademliaDBMaxBytes
 	}
 	if out.RewardDistribution == nil {
 		dist := *DefaultRewardDistribution

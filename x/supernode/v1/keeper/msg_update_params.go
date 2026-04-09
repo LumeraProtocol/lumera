@@ -104,10 +104,6 @@ func mergeParams(base, incoming types.Params) types.Params {
 		merged.RequiredOpenPorts = incoming.RequiredOpenPorts
 	}
 
-	if incoming.CascadeKademliaDbMaxBytes != 0 {
-		merged.CascadeKademliaDbMaxBytes = incoming.CascadeKademliaDbMaxBytes
-	}
-
 	if incoming.RewardDistribution != nil {
 		if merged.RewardDistribution == nil {
 			merged.RewardDistribution = &types.RewardDistribution{}

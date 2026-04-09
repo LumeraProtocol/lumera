@@ -39,7 +39,7 @@ Gate Result: PASS (2026-04-08)
 ### Steps:
 1. Query supernode params:
    `lumerad query supernode params`
-   -> Expected: `reward_distribution` is present with non-zero defaults and `cascade_kademlia_db_max_bytes` is present.
+   -> Expected: `reward_distribution` is present with non-zero defaults and `max_storage_usage_percent` is present.
 
 2. Query pool state through supernode:
    `lumerad query supernode pool-state`
@@ -69,12 +69,12 @@ Gate Result: PASS (2026-04-08)
 ## Scenario 2: [F12, F13] STORAGE_FULL State Transitions
 
 **Goal:** Verify storage-only violations transition a SuperNode to `STORAGE_FULL`, while mixed violations still result in `POSTPONED`.
-**Preconditions:** Running devnet with at least one registered SuperNode. `cascade_kademlia_db_max_bytes` set to a low test value.
+**Preconditions:** Running devnet with at least one registered SuperNode. `max_storage_usage_percent` set to a testable value.
 **Linked:** F12, F13, AT30, AT31, AT32, AT33
 
 ### Steps:
-1. Set `cascade_kademlia_db_max_bytes` to a testable threshold.
-   -> Expected: Param update is accepted and queryable via `lumerad query supernode params`.
+1. Verify `max_storage_usage_percent` is set to a testable threshold (default 90).
+   -> Expected: Param is queryable via `lumerad query supernode params`.
 
 2. Register a SuperNode and confirm it starts as `ACTIVE`.
    -> Expected: `lumerad query supernode get-super-node <validator-address>` shows `ACTIVE`.

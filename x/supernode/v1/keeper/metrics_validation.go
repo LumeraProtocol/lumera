@@ -18,15 +18,14 @@ func buildVersion(m types.SupernodeMetrics) (*semver.Version, error) {
 }
 
 // ComplianceResult holds the outcome of a compliance evaluation, separating
-// storage-capacity-only violations (cascade_kademlia_db_bytes >= threshold)
-// from other compliance issues. This enables the STORAGE_FULL state: when the
-// only problem is Cascade storage capacity, the node enters STORAGE_FULL
-// (compute-eligible) instead of POSTPONED (all-services-excluded).
+// disk-usage violations (disk_usage_percent > max_storage_usage_percent) from
+// other compliance issues. This enables the STORAGE_FULL state: when the only
+// problem is disk capacity, the node enters STORAGE_FULL (compute-eligible)
+// instead of POSTPONED (all-services-excluded).
 type ComplianceResult struct {
 	// Issues lists all non-storage compliance violations.
 	Issues []string
-	// StorageFull is true when cascade_kademlia_db_bytes >= cascade_kademlia_db_max_bytes
-	// and the threshold is enabled (> 0).
+	// StorageFull is true when disk_usage_percent exceeds max_storage_usage_percent.
 	StorageFull bool
 }
 
@@ -42,7 +41,7 @@ func (r ComplianceResult) AllIssues() []string {
 	}
 	all := make([]string, len(r.Issues), len(r.Issues)+1)
 	copy(all, r.Issues)
-	return append(all, "cascade storage capacity full")
+	return append(all, "disk storage full")
 }
 
 // evaluateCompliance validates the reported metrics against the configured
@@ -137,11 +136,15 @@ func evaluateCompliance(ctx sdk.Context, params types.Params, m types.SupernodeM
 	if m.DiskTotalGb < float64(params.MinStorageGb) {
 		issues = append(issues, fmt.Sprintf("disk total %.2f below minimum %d", m.DiskTotalGb, params.MinStorageGb))
 	}
-	if m.DiskUsagePercent > float64(params.MaxStorageUsagePercent) {
-		issues = append(issues, fmt.Sprintf("disk usage %.2f above max %d", m.DiskUsagePercent, params.MaxStorageUsagePercent))
-	}
 	if m.DiskUsagePercent < 0 || m.DiskUsagePercent > 100 {
 		issues = append(issues, "disk.usage_percent outside 0-100 range")
+	}
+
+	// Disk usage above max_storage_usage_percent triggers STORAGE_FULL (not
+	// POSTPONED). This is evaluated separately so the node can remain eligible
+	// for compute services while being excluded from new Cascade storage.
+	if m.DiskUsagePercent > float64(params.MaxStorageUsagePercent) {
+		storageFull = true
 	}
 
 	// 5) Network checks: explicit CLOSED required ports cause immediate non-compliance.
@@ -193,15 +196,10 @@ func evaluateCompliance(ctx sdk.Context, params types.Params, m types.SupernodeM
 		issues = append(issues, "peers_count must be > 0")
 	}
 
-	// 7) Cascade Kademlia DB capacity check (Everlight STORAGE_FULL).
-	// This is evaluated separately: if the only violation is storage capacity,
-	// the node enters STORAGE_FULL instead of POSTPONED.
+	// 7) cascade_kademlia_db_bytes sanity check (used for payout weight only).
 	checkFinite("cascade_kademlia_db_bytes", m.CascadeKademliaDbBytes)
 	if m.CascadeKademliaDbBytes < 0 {
 		issues = append(issues, "cascade_kademlia_db_bytes must be >= 0")
-	}
-	if params.CascadeKademliaDbMaxBytes > 0 && m.CascadeKademliaDbBytes >= float64(params.CascadeKademliaDbMaxBytes) {
-		storageFull = true
 	}
 
 	return ComplianceResult{Issues: issues, StorageFull: storageFull}

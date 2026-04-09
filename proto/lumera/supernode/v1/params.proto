@@ -67,9 +67,5 @@ message Params {
 
   repeated uint32 required_open_ports = 18 [(gogoproto.moretags) = "yaml:\"required_open_ports\""];
 
-  // Cascade Kademlia DB size threshold (bytes) for STORAGE_FULL state.
-  // 0 = disabled (no STORAGE_FULL transitions).
-  uint64 cascade_kademlia_db_max_bytes = 19 [(gogoproto.moretags) = "yaml:\"cascade_kademlia_db_max_bytes\""];
-
-  RewardDistribution reward_distribution = 20 [(gogoproto.moretags) = "yaml:\"reward_distribution\""];
+  RewardDistribution reward_distribution = 19 [(gogoproto.moretags) = "yaml:\"reward_distribution\""];
 }

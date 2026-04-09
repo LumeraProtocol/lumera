@@ -43,9 +43,22 @@ lumerad_exec() {
     docker compose -f "$COMPOSE_FILE" exec -T "$SERVICE" lumerad "$@"
 }
 
+lumerad_exec_service() {
+    local service="$1"
+    shift
+    docker compose -f "$COMPOSE_FILE" exec -T "$service" lumerad "$@"
+}
+
 # Run lumerad query and return JSON.
 lumerad_query() {
     lumerad_exec query "$@" --output json 2>/dev/null
+}
+
+supernode_metrics_rest() {
+    local validator="$1"
+    docker compose -f "$COMPOSE_FILE" exec -T "$SERVICE" \
+        curl -s -X GET "http://localhost:1317/LumeraProtocol/lumera/supernode/v1/metrics/${validator}" \
+        -H "accept: application/json" 2>/dev/null
 }
 
 # Run lumerad tx and return JSON (broadcast sync).
@@ -59,14 +72,108 @@ lumerad_tx() {
         --yes 2>/dev/null
 }
 
+lumerad_tx_service() {
+    local service="$1"
+    shift
+    lumerad_exec_service "$service" tx "$@" \
+        --chain-id "$CHAIN_ID" \
+        --keyring-backend "$KEYRING" \
+        --fees "$FEES" \
+        --broadcast-mode sync \
+        --output json \
+        --yes 2>/dev/null
+}
+
+tx_code_from_json() {
+    local json="$1"
+    echo "$json" | jq -r '.code // "0"' 2>/dev/null || echo "0"
+}
+
+is_sequence_mismatch() {
+    local json="$1"
+    local code raw_log
+    code="$(tx_code_from_json "$json")"
+    raw_log="$(echo "$json" | jq -r '.raw_log // empty' 2>/dev/null || echo "")"
+    [[ "$code" == "32" ]] && [[ "$raw_log" == *"account sequence mismatch"* ]]
+}
+
+run_tx_with_retry() {
+    local service="$1"
+    shift
+    local attempt result
+
+    for attempt in 1 2 3; do
+        result="$(lumerad_tx_service "$service" "$@")" || true
+        if ! is_sequence_mismatch "$result"; then
+            echo "$result"
+            return 0
+        fi
+        echo "    WARN: sequence mismatch on $service tx attempt $attempt, retrying..." >&2
+        sleep 2
+    done
+
+    echo "$result"
+    return 0
+}
+
 service_key_name() {
     echo "${SERVICE}_key"
 }
 
 get_first_validator_address() {
     local list_json
-    list_json="$(lumerad_query supernode list-super-nodes)" || return 1
-    echo "$list_json" | jq -r '.supernode[]?.validator_address // empty' | head -n 1
+    list_json="$(lumerad_query supernode list-supernodes)" || return 1
+    echo "$list_json" | jq -r '.supernodes[]?.validator_address // empty' | head -n 1
+}
+
+service_account_address() {
+    local key_name
+    key_name="$(service_key_name)"
+    lumerad_exec keys show "$key_name" -a --keyring-backend "$KEYRING" 2>/dev/null | tr -d '\r\n'
+}
+
+service_supernode_key_name() {
+    echo "${SERVICE/supernova_validator/supernova_supernode}_key"
+}
+
+service_supernode_account_address() {
+    local key_name
+    key_name="$(service_supernode_key_name)"
+    lumerad_exec keys show "$key_name" -a --keyring-backend "$KEYRING" 2>/dev/null | tr -d '\r\n'
+}
+
+get_service_supernode() {
+    local account="$1"
+    local list_json
+    list_json="$(lumerad_query supernode list-supernodes)" || return 1
+    echo "$list_json" | jq -c --arg account "$account" '.supernodes[]? | select(.supernode_account == $account)' 2>/dev/null | head -n 1
+}
+
+get_service_validator_address() {
+    local account sn_json
+    account="$(service_supernode_account_address)" || return 1
+    [[ -n "$account" ]] || return 1
+    sn_json="$(get_service_supernode "$account")" || return 1
+    echo "$sn_json" | jq -r '.validator_address // empty' 2>/dev/null
+}
+
+wait_for_supernode_state() {
+    local validator="$1" expected="$2" timeout_s="${3:-30}"
+    local deadline=$((SECONDS + timeout_s))
+    local last_state=""
+
+    while (( SECONDS < deadline )); do
+        local sn_json
+        sn_json="$(lumerad_query supernode get-supernode "$validator")" || true
+        last_state="$(echo "$sn_json" | jq -r '.supernode.states[-1].state // empty' 2>/dev/null)"
+        if [[ "$last_state" == "$expected" ]]; then
+            return 0
+        fi
+        sleep 2
+    done
+
+    echo "$last_state"
+    return 1
 }
 
 coin_amount() {
@@ -185,8 +292,8 @@ scenario_1_module_bootstrap() {
 
             send_amount="10000${DENOM}"
             echo "    DEBUG: sending $send_amount from $sender_addr to $module_addr"
-            tx_result="$(lumerad_tx bank send "$sender_addr" "$module_addr" "$send_amount" --from "$key_name")" || true
-            tx_code="$(echo "$tx_result" | jq -r '.code // "0"' 2>/dev/null || echo "0")"
+            tx_result="$(run_tx_with_retry "$SERVICE" bank send "$sender_addr" "$module_addr" "$send_amount" --from "$key_name")" || true
+            tx_code="$(tx_code_from_json "$tx_result")"
             echo "    DEBUG: tx_result=${tx_result:0:300}"
             echo "    DEBUG: tx_code=$tx_code"
 
@@ -231,15 +338,139 @@ scenario_1_module_bootstrap() {
         fi
     fi
 
-    # 1d. Query supernode params for cascade_kademlia_db_max_bytes
-    # (already fetched above, reuse $params)
-    # cascade_kademlia_db_max_bytes defaults to 0; proto3 JSON omits zero values,
-    # so check that the field is either present or that params itself exists (the
-    # field is valid at zero = disabled).
-    # cascade_kademlia_db_max_bytes defaults to 0; proto3 JSON omits zero values.
-    # Accept either the field being present or params existing (0 = disabled).
-    assert_jq "$params" '.params | (has("cascade_kademlia_db_max_bytes") or (. != null))' \
-        "S1.4 supernode params accept cascade_kademlia_db_max_bytes (default 0 = disabled)"
+    # 1d. Verify max_storage_usage_percent is set (drives STORAGE_FULL transitions).
+    assert_jq "$params" '.params.max_storage_usage_percent != null' \
+        "S1.4 max_storage_usage_percent present in supernode params"
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 2: STORAGE_FULL State Transition (F12, F13)
+# ---------------------------------------------------------------------------
+scenario_2_storage_full_transition() {
+    echo ""
+    echo "=== Scenario 2: STORAGE_FULL State Transition (F12, F13) ==="
+
+    local service_addr
+    service_addr="$(service_supernode_account_address)" || true
+    if [[ -z "$service_addr" ]]; then
+        skip "S2.1 resolve service account" "could not resolve $(service_supernode_key_name)"
+        return
+    fi
+
+    local sn_json
+    sn_json="$(get_service_supernode "$service_addr")" || true
+    if [[ -z "$sn_json" ]]; then
+        skip "S2.1 resolve service supernode" "no supernode found for account $service_addr"
+        return
+    fi
+
+    local validator_addr supernode_account current_state
+    validator_addr="$(echo "$sn_json" | jq -r '.validator_address // empty' 2>/dev/null)"
+    supernode_account="$(echo "$sn_json" | jq -r '.supernode_account // empty' 2>/dev/null)"
+    current_state="$(echo "$sn_json" | jq -r '.states[-1].state // empty' 2>/dev/null)"
+
+    if [[ -z "$validator_addr" || -z "$supernode_account" ]]; then
+        skip "S2.1 resolve service supernode" "missing validator or supernode account in query response"
+        return
+    fi
+    if [[ "$current_state" == "SUPERNODE_STATE_STORAGE_FULL" ]]; then
+        skip "S2.1 resolve service supernode" "service supernode is already in STORAGE_FULL"
+        return
+    fi
+    pass "S2.1 resolved service supernode (validator=$validator_addr state=${current_state:-unknown})"
+
+    local params max_usage target_usage ports_json metrics_json
+    params="$(lumerad_query supernode params)" || true
+    if [[ -z "$params" ]]; then
+        fail "S2.2 supernode params query" "query returned empty"
+        return
+    fi
+
+    max_usage="$(echo "$params" | jq -r '.params.max_storage_usage_percent // empty' 2>/dev/null)"
+    if [[ -z "$max_usage" || ! "$max_usage" =~ ^[0-9]+$ ]]; then
+        fail "S2.2 supernode params query" "invalid max_storage_usage_percent=$max_usage"
+        return
+    fi
+
+    target_usage=$(( max_usage + 1 ))
+    if (( target_usage > 100 )); then
+        skip "S2.2 disk-full report threshold" "max_storage_usage_percent=$max_usage leaves no valid >threshold test value"
+        return
+    fi
+
+    ports_json="$(echo "$params" | jq -c '.params.required_open_ports // [] | map({port: ., state: "PORT_STATE_OPEN"})' 2>/dev/null)"
+    if [[ -z "$ports_json" || "$ports_json" == "null" ]]; then
+        ports_json="[]"
+    fi
+
+    metrics_json="$(jq -cn \
+        --argjson usage "$target_usage" \
+        --argjson ports "$ports_json" \
+        '{
+            version_major: 2,
+            version_minor: 0,
+            version_patch: 0,
+            cpu_cores_total: 16,
+            cpu_usage_percent: 25,
+            mem_total_gb: 64,
+            mem_usage_percent: 40,
+            mem_free_gb: 32,
+            disk_total_gb: 2000,
+            disk_usage_percent: $usage,
+            disk_free_gb: 50,
+            uptime_seconds: 3600,
+            peers_count: 10,
+            cascade_kademlia_db_bytes: 2147483648,
+            open_ports: $ports
+        }')"
+
+    local key_name tx_result tx_code txhash tx_check exec_code
+    key_name="$(service_supernode_key_name)"
+    tx_result="$(run_tx_with_retry "$SERVICE" supernode report-supernode-metrics \
+        --validator-address "$validator_addr" \
+        --metrics "$metrics_json" \
+        --from "$key_name")" || true
+    tx_code="$(tx_code_from_json "$tx_result")"
+
+    if [[ "$tx_code" != "0" ]]; then
+        fail "S2.3 report disk-full metrics tx accepted" "code=$tx_code output=${tx_result:0:300}"
+        return
+    fi
+
+    txhash="$(echo "$tx_result" | jq -r '.txhash // empty' 2>/dev/null)"
+    if [[ -z "$txhash" ]]; then
+        fail "S2.3 report disk-full metrics tx accepted" "missing txhash output=${tx_result:0:300}"
+        return
+    fi
+
+    sleep 6
+    tx_check="$(lumerad_query tx "$txhash")" || true
+    exec_code="$(echo "$tx_check" | jq -r '.code // "0"' 2>/dev/null || echo "0")"
+    if [[ "$exec_code" != "0" ]]; then
+        fail "S2.3 report disk-full metrics tx accepted" "tx execution failed code=$exec_code"
+        return
+    fi
+    pass "S2.3 report disk-full metrics tx accepted"
+
+    local metrics_state reported_usage
+    metrics_state="$(supernode_metrics_rest "$validator_addr")" || true
+    if [[ -n "$metrics_state" ]] && [[ "$(echo "$metrics_state" | jq -r '.code // empty' 2>/dev/null)" != "5" ]]; then
+        reported_usage="$(echo "$metrics_state" | jq -r '.metrics_state.metrics.disk_usage_percent // empty' 2>/dev/null)"
+        if [[ "$reported_usage" == "$target_usage" ]]; then
+            pass "S2.4 reported disk usage stored on-chain (value=$reported_usage)"
+        else
+            fail "S2.4 reported disk usage stored on-chain" "expected=$target_usage actual=$reported_usage"
+        fi
+    else
+        fail "S2.4 reported disk usage stored on-chain" "metrics query returned empty"
+    fi
+
+    local observed_state
+    if observed_state="$(wait_for_supernode_state "$validator_addr" "SUPERNODE_STATE_STORAGE_FULL" 30)"; then
+        pass "S2.5 supernode transitions to STORAGE_FULL after disk-full report"
+    else
+        fail "S2.5 supernode transitions to STORAGE_FULL after disk-full report" "final_state=$observed_state"
+    fi
 }
 
 # ---------------------------------------------------------------------------
@@ -341,7 +572,7 @@ PROPEOF
 
     # Submit the proposal.
     local submit_result submit_code
-    submit_result="$(lumerad_tx gov submit-proposal "$proposal_file" --from "$key_name" 2>&1)" || true
+    submit_result="$(run_tx_with_retry "$SERVICE" gov submit-proposal "$proposal_file" --from "$key_name")" || true
     submit_code="$(echo "$submit_result" | jq -r '.code // empty' 2>/dev/null || echo "")"
     echo "    DEBUG: submit_result=${submit_result:0:400}"
 
@@ -383,14 +614,7 @@ PROPEOF
     for voter_svc in supernova_validator_1 supernova_validator_2; do
         local voter_key="${voter_svc}_key"
         local vote_result vote_code
-        vote_result="$(docker compose -f "$COMPOSE_FILE" exec -T "$voter_svc" lumerad tx gov vote "$proposal_id" yes \
-            --from "$voter_key" \
-            --chain-id "$CHAIN_ID" \
-            --keyring-backend "$KEYRING" \
-            --fees "$FEES" \
-            --broadcast-mode sync \
-            --output json \
-            --yes 2>/dev/null)" || true
+        vote_result="$(run_tx_with_retry "$voter_svc" gov vote "$proposal_id" yes --from "$voter_key")" || true
         vote_code="$(echo "$vote_result" | jq -r '.code // empty' 2>/dev/null || echo "")"
         echo "    DEBUG: vote from $voter_svc code=$vote_code txhash=$(echo "$vote_result" | jq -r '.txhash // empty' 2>/dev/null)"
 
@@ -457,44 +681,44 @@ scenario_8_proto_compatibility() {
     echo ""
     echo "=== Scenario 8: Proto Compatibility (F10, F11) ==="
 
-    # 8a. Query supernode params for cascade_kademlia_db_max_bytes
-    # Note: proto3 JSON omits zero-value fields (omitempty). The default is 0
-    # (disabled), so the field may be absent. We accept either present or absent
-    # (treating absent as 0 = disabled).
+    # 8a. Query supernode params for current STORAGE_FULL behavior.
     local snparams
     snparams="$(lumerad_query supernode params)" || true
     if [[ -z "$snparams" ]]; then
         fail "S8.1 supernode params" "query returned empty"
     else
-        local db_max
-        db_max="$(echo "$snparams" | jq -r '.params.cascade_kademlia_db_max_bytes // "0"')"
-        if [[ "$db_max" =~ ^[0-9]+$ ]]; then
-            pass "S8.1 cascade_kademlia_db_max_bytes in supernode params (value=$db_max, 0=disabled)"
+        local max_usage
+        max_usage="$(echo "$snparams" | jq -r '.params.max_storage_usage_percent // "0"')"
+        if [[ "$max_usage" =~ ^[0-9]+$ ]] && (( max_usage > 0 )); then
+            pass "S8.1 max_storage_usage_percent in supernode params (value=$max_usage)"
         else
-            fail "S8.1 cascade_kademlia_db_max_bytes in supernode params" "unexpected value=$db_max"
+            fail "S8.1 max_storage_usage_percent in supernode params" "unexpected value=$max_usage"
         fi
     fi
 
-    local first_validator
-    first_validator="$(get_first_validator_address)" || true
-    if [[ -n "$first_validator" ]]; then
+    local target_validator
+    target_validator="$(get_service_validator_address)" || true
+    if [[ -z "$target_validator" ]]; then
+        target_validator="$(get_first_validator_address)" || true
+    fi
+    if [[ -n "$target_validator" ]]; then
         local sn metrics
-        sn="$(lumerad_query supernode get-super-node "$first_validator")" || true
+        sn="$(lumerad_query supernode get-supernode "$target_validator")" || true
         if [[ -n "$sn" ]]; then
-            assert_jq "$sn" '.super_node.validator_address != null' \
+            assert_jq "$sn" '.supernode.validator_address != null' \
                 "S8.1a supernode query returns validator record"
-            assert_jq "$sn" '.super_node.states | length > 0' \
+            assert_jq "$sn" '.supernode.states | length > 0' \
                 "S8.1b supernode query exposes state history"
         else
-            fail "S8.1a supernode query returns validator record" "query returned empty for $first_validator"
+            fail "S8.1a supernode query returns validator record" "query returned empty for $target_validator"
         fi
 
-        metrics="$(lumerad_query supernode get-metrics "$first_validator")" || true
-        if [[ -n "$metrics" ]]; then
+        metrics="$(supernode_metrics_rest "$target_validator")" || true
+        if [[ -n "$metrics" ]] && [[ "$(echo "$metrics" | jq -r '.code // empty' 2>/dev/null)" != "5" ]]; then
             assert_jq "$metrics" '.metrics_state.metrics.cascade_kademlia_db_bytes != null' \
                 "S8.1c cascade_kademlia_db_bytes present in metrics query"
         else
-            skip "S8.1c cascade_kademlia_db_bytes present in metrics query" "no metrics found for $first_validator"
+            skip "S8.1c cascade_kademlia_db_bytes present in metrics query" "no metrics found for $target_validator"
         fi
     else
         skip "S8.1a/S8.1c live supernode proto checks" "no registered supernode found on devnet"
@@ -508,12 +732,6 @@ scenario_8_proto_compatibility() {
 scenario_stubs() {
     echo ""
     echo "=== Scenarios requiring registered supernodes (stubbed) ==="
-
-    # Scenario 2: STORAGE_FULL State Transitions (F12, F13)
-    # Requires: registered supernode, setting cascade_kademlia_db_max_bytes via
-    # governance, reporting metrics with MsgReportSupernodeMetrics exceeding the
-    # threshold. Needs a full supernode registration flow including staking.
-    skip "S2 STORAGE_FULL transitions" "requires registered supernode with metrics reporting"
 
     # Scenario 3: Periodic Distribution -- Happy Path (F15)
     # Requires: 2+ registered supernodes with varying cascade_kademlia_db_bytes,
@@ -576,6 +794,7 @@ main() {
     scenario_6_registration_fee_share
     scenario_7_governance
     scenario_8_proto_compatibility
+    scenario_2_storage_full_transition
     scenario_stubs
 
     # Summary

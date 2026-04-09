@@ -158,7 +158,7 @@ If funding falls below aggregate storage costs, governance can adjust parameters
 - `usage_growth_cap_bps_per_period` — maximum rate of self-reported usage increase
 
 ### Eligibility Parameters
-- `cascade_kademlia_db_max_bytes` — Cascade storage threshold for `STORAGE_FULL` state
+- `max_storage_usage_percent` — Disk usage threshold for `STORAGE_FULL` state (existing param, default 90%)
 
 ### Endowment Parameters (Phase 3)
 - Tiered pricing table — endowment cost per retention tier (5y / 10y / 25y)

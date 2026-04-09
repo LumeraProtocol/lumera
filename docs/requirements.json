@@ -116,8 +116,8 @@
       "Finalization: SuperNode provides ChunkProof array for the stored challenge_indices; keeper verifies against stored root",
       "Verification skip: if num_chunks < svc_min_chunks_for_challenge, SVC is bypassed",
       "Soft-launch: SVC fields accepted but not required until enforcement height",
-      "STORAGE_FULL transition: only if cascade_kademlia_db_bytes >= cascade_kademlia_db_max_bytes AND no other compliance violations",
-      "STORAGE_FULL recovery: when cascade_kademlia_db_bytes drops below threshold",
+      "STORAGE_FULL transition: only if disk_usage_percent > max_storage_usage_percent AND no other compliance violations",
+      "STORAGE_FULL recovery: when disk_usage_percent drops below max_storage_usage_percent",
       "STORAGE_FULL + other violations: transitions to POSTPONED (more restrictive wins)",
       "Everlight distribution: every payment_period_blocks, pool balance distributed proportionally by smoothed cascade_kademlia_db_bytes to eligible SNs"
     ]
@@ -211,7 +211,7 @@
     {
       "id": "F10",
       "name": "SuperNode Proto Extensions for Everlight",
-      "description": "Add SUPERNODE_STATE_STORAGE_FULL (=6) to SuperNodeState enum in supernode_state.proto. Add cascade_kademlia_db_max_bytes (field 19, uint64) to supernode Params. Add cascade_kademlia_db_bytes (field 15, double) to SupernodeMetrics. Run buf codegen and verify compiled Go types.",
+      "description": "Add SUPERNODE_STATE_STORAGE_FULL (=6) to SuperNodeState enum in supernode_state.proto. Add cascade_kademlia_db_bytes (field 15, double) to SupernodeMetrics. Add RewardDistribution (field 19) to supernode Params. STORAGE_FULL is driven by disk_usage_percent > max_storage_usage_percent. Run buf codegen and verify compiled Go types.",
       "acceptance_tests": [
         "AT30"
       ],
@@ -295,7 +295,7 @@
     {
       "id": "F18",
       "name": "Chain Upgrade Handler (Everlight)",
-      "description": "Create upgrade handler for the chain version introducing Everlight. Initialize supernode Params with RewardDistribution defaults and cascade_kademlia_db_max_bytes default (0 = disabled). No separate store key needed — Everlight state lives in the supernode KV store. Existing SN states and actions unaffected.",
+      "description": "Create upgrade handler for the chain version introducing Everlight. Initialize supernode Params with RewardDistribution defaults. No separate store key needed — Everlight state lives in the supernode KV store. Existing SN states and actions unaffected.",
       "acceptance_tests": [
         "AT42",
         "AT43"
@@ -520,7 +520,7 @@
       "id": "UF03",
       "name": "SuperNode Storage Capacity Exhaustion",
       "steps": [
-        "SuperNode's Cascade Kademlia DB grows to cascade_kademlia_db_max_bytes",
+        "SuperNode's disk usage exceeds max_storage_usage_percent",
         "SuperNode reports cascade_kademlia_db_bytes via LEP-4 metrics",
         "Chain evaluates compliance: only storage threshold exceeded",
         "SuperNode transitions to STORAGE_FULL state",
@@ -594,7 +594,7 @@
       "MsgRequestAction: extended CascadeMetadata.availability_commitment field (includes challenge_indices)",
       "MsgFinalizeAction: extended CascadeMetadata.chunk_proofs field",
       "Query params: includes svc_challenge_count, svc_min_chunks_for_challenge",
-      "x/supernode Query: Params includes cascade_kademlia_db_max_bytes and reward_distribution",
+      "x/supernode Query: Params includes reward_distribution and max_storage_usage_percent",
       "x/supernode Query: PoolState and SNEligibility expose the embedded Everlight surface",
       "x/supernode Tx: MsgUpdateParams governs both supernode and embedded Everlight params"
     ],

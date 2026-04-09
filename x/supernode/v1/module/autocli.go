@@ -22,7 +22,8 @@ Flags:
 func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 	return &autocliv1.ModuleOptions{
 		Query: &autocliv1.ServiceCommandDescriptor{
-			Service: types.Query_serviceDesc.ServiceName,
+			Service:              types.Query_serviceDesc.ServiceName,
+			EnhanceCustomCommand: true,
 			RpcCommandOptions: []*autocliv1.RpcCommandOptions{
 				{
 					RpcMethod: "Params",
@@ -67,6 +68,10 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 							DefaultValue: "SUPERNODE_STATE_ACTIVE",
 						},
 					},
+				},
+				{
+					RpcMethod: "GetMetrics",
+					Skip:      true, // custom command to avoid AutoCLI aminojson float64 marshal bug
 				},
 
 				// this line is used by ignite scaffolding # autocli/query

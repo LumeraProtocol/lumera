@@ -55,7 +55,7 @@ func TestEverlightIntegration(t *testing.T) {
 
 // everlightBalance returns the current ulume balance of the everlight module account.
 func (s *EverlightIntegrationSuite) everlightBalance() sdkmath.Int {
-	moduleAddr := s.app.AuthKeeper.GetModuleAddress(sntypes.EverlightPoolAccountName)
+	moduleAddr := s.app.AuthKeeper.GetModuleAddress(sntypes.ModuleName)
 	return s.app.BankKeeper.GetBalance(s.ctx, moduleAddr, lcfg.ChainDenom).Amount
 }
 
@@ -65,7 +65,7 @@ func (s *EverlightIntegrationSuite) everlightBalance() sdkmath.Int {
 func (s *EverlightIntegrationSuite) fundEverlightPool(amt int64) {
 	coins := sdk.NewCoins(sdk.NewInt64Coin(lcfg.ChainDenom, amt))
 	require.NoError(s.T(), s.app.BankKeeper.MintCoins(s.ctx, minttypes.ModuleName, coins))
-	require.NoError(s.T(), s.app.BankKeeper.SendCoinsFromModuleToModule(s.ctx, minttypes.ModuleName, sntypes.EverlightPoolAccountName, coins))
+	require.NoError(s.T(), s.app.BankKeeper.SendCoinsFromModuleToModule(s.ctx, minttypes.ModuleName, sntypes.ModuleName, coins))
 }
 
 // createTestAddr generates a fresh secp256k1 key pair and registers the
@@ -128,9 +128,9 @@ func (s *EverlightIntegrationSuite) TestEverlightParams() {
 
 func (s *EverlightIntegrationSuite) TestEverlightModuleAccount() {
 	// 1. Verify the module account exists.
-	moduleAcc := s.app.AuthKeeper.GetModuleAccount(s.ctx, sntypes.EverlightPoolAccountName)
+	moduleAcc := s.app.AuthKeeper.GetModuleAccount(s.ctx, sntypes.ModuleName)
 	require.NotNil(s.T(), moduleAcc)
-	require.Equal(s.T(), sntypes.EverlightPoolAccountName, moduleAcc.GetName())
+	require.Equal(s.T(), sntypes.ModuleName, moduleAcc.GetName())
 
 	// 2. Record the initial balance (genesis may have routed some funds here).
 	initialBal := s.everlightBalance()

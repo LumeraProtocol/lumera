@@ -62,14 +62,14 @@ func TestEverlightE2E(t *testing.T) {
 // ---------- helpers ----------
 
 func (s *EverlightE2ESuite) everlightBalance() sdkmath.Int {
-	moduleAddr := s.app.AuthKeeper.GetModuleAddress(sntypes.EverlightPoolAccountName)
+	moduleAddr := s.app.AuthKeeper.GetModuleAddress(sntypes.ModuleName)
 	return s.app.BankKeeper.GetBalance(s.ctx, moduleAddr, lcfg.ChainDenom).Amount
 }
 
 func (s *EverlightE2ESuite) fundEverlightPool(amt int64) {
 	coins := sdk.NewCoins(sdk.NewInt64Coin(lcfg.ChainDenom, amt))
 	require.NoError(s.T(), s.app.BankKeeper.MintCoins(s.ctx, minttypes.ModuleName, coins))
-	require.NoError(s.T(), s.app.BankKeeper.SendCoinsFromModuleToModule(s.ctx, minttypes.ModuleName, sntypes.EverlightPoolAccountName, coins))
+	require.NoError(s.T(), s.app.BankKeeper.SendCoinsFromModuleToModule(s.ctx, minttypes.ModuleName, sntypes.ModuleName, coins))
 }
 
 func (s *EverlightE2ESuite) createSuperNode(dbBytes float64, state sntypes.SuperNodeState) (sdk.AccAddress, sdk.ValAddress) {

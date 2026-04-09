@@ -22,7 +22,8 @@ Flags:
 func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 	return &autocliv1.ModuleOptions{
 		Query: &autocliv1.ServiceCommandDescriptor{
-			Service: types.Query_serviceDesc.ServiceName,
+			Service:              types.Query_serviceDesc.ServiceName,
+			EnhanceCustomCommand: true,
 			RpcCommandOptions: []*autocliv1.RpcCommandOptions{
 				{
 					RpcMethod: "Params",

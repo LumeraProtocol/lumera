@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"cosmossdk.io/client/v2/autocli"
 	"cosmossdk.io/core/appmodule"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -12,9 +13,11 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
+	"github.com/spf13/cobra"
 
 	// this line is used by starport scaffolding # 1
 
+	"github.com/LumeraProtocol/lumera/x/supernode/v1/client/cli"
 	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
 	"github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
@@ -29,6 +32,8 @@ var (
 	_ appmodule.AppModule       = (*AppModule)(nil)
 	_ appmodule.HasBeginBlocker = (*AppModule)(nil)
 	_ appmodule.HasEndBlocker   = (*AppModule)(nil)
+
+	_ autocli.HasCustomQueryCommand = (*AppModule)(nil)
 )
 
 // ----------------------------------------------------------------------------
@@ -83,6 +88,12 @@ func (AppModuleBasic) RegisterGRPCGatewayRoutes(clientCtx client.Context, mux *r
 	}
 }
 
+// GetQueryCmd returns the custom query commands for the supernode module.
+// AutoCLI enhances this root command and preserves all non-custom query commands.
+func (ab AppModuleBasic) GetQueryCmd() *cobra.Command {
+	return cli.GetCustomQueryCmd()
+}
+
 // ----------------------------------------------------------------------------
 // AppModule
 // ----------------------------------------------------------------------------
@@ -94,6 +105,10 @@ type AppModule struct {
 	keeper        keeper.Keeper
 	accountKeeper types.AccountKeeper
 	bankKeeper    types.BankKeeper
+}
+
+func (am AppModule) HasCustomQueryCommand() bool {
+	return true
 }
 
 func NewAppModule(

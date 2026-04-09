@@ -28,6 +28,7 @@ CHAIN_ID="lumera-devnet-1"
 KEYRING="test"
 DENOM="ulume"
 FEES="5000${DENOM}"
+VALIDATOR_SERVICES=(supernova_validator_1 supernova_validator_2 supernova_validator_3 supernova_validator_4 supernova_validator_5)
 
 PASS_COUNT=0
 FAIL_COUNT=0
@@ -54,11 +55,61 @@ lumerad_query() {
     lumerad_exec query "$@" --output json 2>/dev/null
 }
 
-supernode_metrics_rest() {
+supernode_metrics_query() {
     local validator="$1"
-    docker compose -f "$COMPOSE_FILE" exec -T "$SERVICE" \
-        curl -s -X GET "http://localhost:1317/LumeraProtocol/lumera/supernode/v1/metrics/${validator}" \
-        -H "accept: application/json" 2>/dev/null
+    lumerad_query supernode get-metrics "$validator"
+}
+
+supernode_metrics_query_debug() {
+    local validator="$1"
+    local tmp_out tmp_err rc
+    tmp_out="$(mktemp)"
+    tmp_err="$(mktemp)"
+
+    if docker compose -f "$COMPOSE_FILE" exec -T "$SERVICE" \
+        lumerad query supernode get-metrics "$validator" --output json >"$tmp_out" 2>"$tmp_err"; then
+        rc=0
+    else
+        rc=$?
+    fi
+
+    printf '    DEBUG: metrics cmd: docker compose -f %s exec -T %s lumerad query supernode get-metrics %s --output json\n' \
+        "$COMPOSE_FILE" "$SERVICE" "$validator" >&2
+    printf '    DEBUG: metrics exit_code=%s\n' "$rc" >&2
+    if [[ -s "$tmp_out" ]]; then
+        printf '    DEBUG: metrics stdout=%s\n' "$(cat "$tmp_out")" >&2
+    else
+        printf '    DEBUG: metrics stdout=<empty>\n' >&2
+    fi
+    if [[ -s "$tmp_err" ]]; then
+        printf '    DEBUG: metrics stderr=%s\n' "$(cat "$tmp_err")" >&2
+    else
+        printf '    DEBUG: metrics stderr=<empty>\n' >&2
+    fi
+
+    cat "$tmp_out"
+
+    rm -f "$tmp_out" "$tmp_err"
+    return "$rc"
+}
+
+wait_for_supernode_metrics_query() {
+    local validator="$1" timeout_s="${2:-12}"
+    local deadline=$((SECONDS + timeout_s))
+    local metrics code
+
+    while (( SECONDS < deadline )); do
+        metrics="$(supernode_metrics_query "$validator")" || true
+        code="$(echo "$metrics" | jq -r '.code // empty' 2>/dev/null || true)"
+        if [[ -n "$metrics" && "$code" != "5" ]]; then
+            printf '%s\n' "$metrics"
+            return 0
+        fi
+        sleep 2
+    done
+
+    printf '%s\n' "${metrics:-}"
+    return 1
 }
 
 # Run lumerad tx and return JSON (broadcast sync).
@@ -136,10 +187,21 @@ service_supernode_key_name() {
     echo "${SERVICE/supernova_validator/supernova_supernode}_key"
 }
 
+supernode_key_name_for_service() {
+    local service="$1"
+    echo "${service/supernova_validator/supernova_supernode}_key"
+}
+
 service_supernode_account_address() {
     local key_name
     key_name="$(service_supernode_key_name)"
     lumerad_exec keys show "$key_name" -a --keyring-backend "$KEYRING" 2>/dev/null | tr -d '\r\n'
+}
+
+service_supernode_account_address_for_service() {
+    local service="$1" key_name
+    key_name="$(supernode_key_name_for_service "$service")"
+    lumerad_exec_service "$service" keys show "$key_name" -a --keyring-backend "$KEYRING" 2>/dev/null | tr -d '\r\n'
 }
 
 get_service_supernode() {
@@ -155,6 +217,14 @@ get_service_validator_address() {
     [[ -n "$account" ]] || return 1
     sn_json="$(get_service_supernode "$account")" || return 1
     echo "$sn_json" | jq -r '.validator_address // empty' 2>/dev/null
+}
+
+get_supernode_for_service() {
+    local service="$1" account list_json
+    account="$(service_supernode_account_address_for_service "$service")" || return 1
+    [[ -n "$account" ]] || return 1
+    list_json="$(lumerad_query supernode list-supernodes)" || return 1
+    echo "$list_json" | jq -c --arg account "$account" '.supernodes[]? | select(.supernode_account == $account)' 2>/dev/null | head -n 1
 }
 
 wait_for_supernode_state() {
@@ -185,6 +255,101 @@ coin_amount() {
             | (.amount | tonumber)
         ] | add // 0
     ' 2>/dev/null
+}
+
+bank_balance_amount() {
+    local service="$1" address="$2"
+    local balances
+    balances="$(lumerad_exec_service "$service" q bank balances "$address" -o json 2>/dev/null)" || return 1
+    echo "$balances" | jq -r --arg denom "$DENOM" '[.balances[]? | select(.denom == $denom) | (.amount | tonumber)] | add // 0' 2>/dev/null
+}
+
+current_block_height() {
+    lumerad_exec status 2>/dev/null | jq -r '.sync_info.latest_block_height // "0"' 2>/dev/null
+}
+
+wait_for_blocks() {
+    local blocks="$1"
+    local start now target
+    start="$(current_block_height)"
+    [[ "$start" =~ ^[0-9]+$ ]] || start=0
+    target=$(( start + blocks ))
+    while true; do
+        now="$(current_block_height)"
+        [[ "$now" =~ ^[0-9]+$ ]] || now=0
+        if (( now >= target )); then
+            return 0
+        fi
+        sleep 2
+    done
+}
+
+report_metrics_for_service() {
+    local service="$1" validator_addr="$2" cascade_bytes="$3" disk_usage="$4"
+    local key_name params ports_json metrics_json tx_result tx_code txhash tx_check exec_code
+
+    key_name="$(supernode_key_name_for_service "$service")"
+    params="$(lumerad_query supernode params)" || true
+    ports_json="$(echo "$params" | jq -c '.params.required_open_ports // [] | map({port: ., state: "PORT_STATE_OPEN"})' 2>/dev/null)"
+    if [[ -z "$ports_json" || "$ports_json" == "null" ]]; then
+        ports_json="[]"
+    fi
+
+    metrics_json="$(jq -cn \
+        --argjson bytes "$cascade_bytes" \
+        --argjson usage "$disk_usage" \
+        --argjson ports "$ports_json" \
+        '{
+            version_major: 2,
+            version_minor: 0,
+            version_patch: 0,
+            cpu_cores_total: 16,
+            cpu_usage_percent: 25,
+            mem_total_gb: 64,
+            mem_usage_percent: 40,
+            mem_free_gb: 32,
+            disk_total_gb: 2000,
+            disk_usage_percent: $usage,
+            disk_free_gb: 200,
+            uptime_seconds: 3600,
+            peers_count: 10,
+            cascade_kademlia_db_bytes: $bytes,
+            open_ports: $ports
+        }')"
+
+    tx_result="$(run_tx_with_retry "$service" supernode report-supernode-metrics \
+        --validator-address "$validator_addr" \
+        --metrics "$metrics_json" \
+        --from "$key_name")" || true
+    tx_code="$(tx_code_from_json "$tx_result")"
+    if [[ "$tx_code" != "0" ]]; then
+        echo "code=$tx_code output=${tx_result:0:300}"
+        return 1
+    fi
+
+    txhash="$(echo "$tx_result" | jq -r '.txhash // empty' 2>/dev/null)"
+    [[ -n "$txhash" ]] || return 1
+    sleep 6
+    tx_check="$(lumerad_query tx "$txhash")" || true
+    exec_code="$(echo "$tx_check" | jq -r '.code // "0"' 2>/dev/null || echo "0")"
+    [[ "$exec_code" == "0" ]]
+}
+
+wait_for_distribution_height_change() {
+    local baseline="$1" timeout_s="${2:-40}"
+    local deadline=$((SECONDS + timeout_s))
+    local current
+    while (( SECONDS < deadline )); do
+        current="$(lumerad_query supernode pool-state | jq -r '.last_distribution_height // "0"' 2>/dev/null)"
+        [[ "$current" =~ ^[0-9]+$ ]] || current=0
+        if (( current > baseline )); then
+            echo "$current"
+            return 0
+        fi
+        sleep 2
+    done
+    echo "$current"
+    return 1
 }
 
 # Record a PASS result.
@@ -453,7 +618,7 @@ scenario_2_storage_full_transition() {
     pass "S2.3 report disk-full metrics tx accepted"
 
     local metrics_state reported_usage
-    metrics_state="$(supernode_metrics_rest "$validator_addr")" || true
+    metrics_state="$(wait_for_supernode_metrics_query "$validator_addr" 12)" || true
     if [[ -n "$metrics_state" ]] && [[ "$(echo "$metrics_state" | jq -r '.code // empty' 2>/dev/null)" != "5" ]]; then
         reported_usage="$(echo "$metrics_state" | jq -r '.metrics_state.metrics.disk_usage_percent // empty' 2>/dev/null)"
         if [[ "$reported_usage" == "$target_usage" ]]; then
@@ -544,15 +709,19 @@ scenario_7_governance() {
     echo "    DEBUG: gov_addr=$gov_addr"
 
     # Read the current payment_period_blocks so we can change it.
-    local orig_ppb
+    local orig_ppb new_ppb
     orig_ppb="$(echo "$params" | jq -r '.params.reward_distribution.payment_period_blocks // "100"')"
-    local new_ppb=$(( orig_ppb + 50 ))
+    new_ppb=2
     echo "    DEBUG: orig_ppb=$orig_ppb new_ppb=$new_ppb"
 
     # Build a full set of current params with the one field changed.
     local current_params updated_params
     current_params="$(echo "$params" | jq '.params')"
-    updated_params="$(echo "$current_params" | jq --arg ppb "$new_ppb" '.reward_distribution.payment_period_blocks = $ppb')"
+    updated_params="$(echo "$current_params" | jq \
+        --arg ppb "$new_ppb" \
+        '.reward_distribution.payment_period_blocks = ($ppb | tonumber)
+         | .reward_distribution.new_sn_ramp_up_periods = 1
+         | .reward_distribution.measurement_smoothing_periods = 1')"
 
     # Write the proposal JSON into the container.
     local proposal_file="/tmp/sn_param_proposal.json"
@@ -566,7 +735,7 @@ scenario_7_governance() {
     "deposit": "1000000000${DENOM}",
     "metadata": "",
     "title": "Update Supernode Params (devnet test)",
-    "summary": "Automated devnet test: change payment_period_blocks from $orig_ppb to $new_ppb"
+    "summary": "Automated devnet test: set payment_period_blocks=$new_ppb, new_sn_ramp_up_periods=1, measurement_smoothing_periods=1"
 }
 PROPEOF
 
@@ -668,9 +837,150 @@ PROPEOF
     echo "    DEBUG: expected=$new_ppb actual=$new_ppb_actual"
 
     if [[ "$new_ppb_actual" == "$new_ppb" ]]; then
-        pass "S7.6 param updated via governance (payment_period_blocks: $orig_ppb -> $new_ppb)"
+        pass "S7.6 param updated via governance (payment_period_blocks: $orig_ppb -> $new_ppb; ramp-up/smoothing tuned for devnet)"
     else
         fail "S7.6 param updated via governance" "expected=$new_ppb actual=$new_ppb_actual"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 3: Periodic Distribution -- Happy Path (F15)
+# ---------------------------------------------------------------------------
+scenario_3_periodic_distribution_happy_path() {
+    echo ""
+    echo "=== Scenario 3: Periodic Distribution -- Happy Path (F15) ==="
+
+    local service_a service_b sn_a sn_b validator_a validator_b account_a account_b
+    service_a="${VALIDATOR_SERVICES[1]}"
+    service_b="${VALIDATOR_SERVICES[2]}"
+    sn_a="$(get_supernode_for_service "$service_a")" || true
+    sn_b="$(get_supernode_for_service "$service_b")" || true
+    if [[ -z "$sn_a" || -z "$sn_b" ]]; then
+        skip "S3 periodic distribution happy path" "could not resolve two service-owned supernodes"
+        return
+    fi
+
+    validator_a="$(echo "$sn_a" | jq -r '.validator_address // empty' 2>/dev/null)"
+    validator_b="$(echo "$sn_b" | jq -r '.validator_address // empty' 2>/dev/null)"
+    account_a="$(echo "$sn_a" | jq -r '.supernode_account // empty' 2>/dev/null)"
+    account_b="$(echo "$sn_b" | jq -r '.supernode_account // empty' 2>/dev/null)"
+    if [[ -z "$validator_a" || -z "$validator_b" || -z "$account_a" || -z "$account_b" ]]; then
+        skip "S3 periodic distribution happy path" "resolved supernode records are incomplete"
+        return
+    fi
+
+    if report_metrics_for_service "$service_a" "$validator_a" 2147483648 40; then
+        pass "S3.1 metrics reported for first supernode (2 GiB)"
+    else
+        fail "S3.1 metrics reported for first supernode" "metrics tx failed for $validator_a"
+        return
+    fi
+
+    if report_metrics_for_service "$service_b" "$validator_b" 4294967296 40; then
+        pass "S3.2 metrics reported for second supernode (4 GiB)"
+    else
+        fail "S3.2 metrics reported for second supernode" "metrics tx failed for $validator_b"
+        return
+    fi
+
+    local bal_a_before bal_b_before pool_before last_height_before module_addr sender_addr fund_result fund_code
+    bal_a_before="$(bank_balance_amount "$SERVICE" "$account_a")" || bal_a_before=0
+    bal_b_before="$(bank_balance_amount "$SERVICE" "$account_b")" || bal_b_before=0
+    pool_before="$(lumerad_query supernode pool-state)" || true
+    last_height_before="$(echo "$pool_before" | jq -r '.last_distribution_height // "0"' 2>/dev/null)"
+    [[ "$last_height_before" =~ ^[0-9]+$ ]] || last_height_before=0
+
+    module_addr="$(lumerad_query auth module-account supernode | jq -r '.account.value.address // .account.base_account.address // .account.value.base_account.address // .account.address // empty' 2>/dev/null)"
+    sender_addr="$(service_account_address)" || true
+    fund_result="$(run_tx_with_retry "$SERVICE" bank send "$sender_addr" "$module_addr" "500000${DENOM}" --from "$(service_key_name)")" || true
+    fund_code="$(tx_code_from_json "$fund_result")"
+    if [[ "$fund_code" != "0" ]]; then
+        fail "S3.3 fund everlight pool for distribution" "code=$fund_code output=${fund_result:0:300}"
+        return
+    fi
+    pass "S3.3 fund everlight pool for distribution"
+
+    wait_for_blocks 3
+
+    local last_height_after
+    if last_height_after="$(wait_for_distribution_height_change "$last_height_before" 40)"; then
+        pass "S3.4 distribution triggered after metrics + funding (height=$last_height_after)"
+    else
+        fail "S3.4 distribution triggered after metrics + funding" "last_distribution_height stayed at $last_height_after"
+        return
+    fi
+
+    local bal_a_after bal_b_after
+    bal_a_after="$(bank_balance_amount "$SERVICE" "$account_a")" || bal_a_after=0
+    bal_b_after="$(bank_balance_amount "$SERVICE" "$account_b")" || bal_b_after=0
+    if (( bal_a_after > bal_a_before )); then
+        pass "S3.5 first supernode received payout"
+    else
+        fail "S3.5 first supernode received payout" "before=$bal_a_before after=$bal_a_after"
+    fi
+    if (( bal_b_after > bal_b_before )); then
+        pass "S3.6 second supernode received payout"
+    else
+        fail "S3.6 second supernode received payout" "before=$bal_b_before after=$bal_b_after"
+    fi
+    if (( bal_b_after - bal_b_before > bal_a_after - bal_a_before )); then
+        pass "S3.7 higher cascade bytes receives larger payout"
+    else
+        fail "S3.7 higher cascade bytes receives larger payout" "delta_a=$((bal_a_after-bal_a_before)) delta_b=$((bal_b_after-bal_b_before))"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Scenario 4: Distribution Edge Cases (F15)
+# ---------------------------------------------------------------------------
+scenario_4_distribution_edge_cases() {
+    echo ""
+    echo "=== Scenario 4: Distribution Edge Cases (F15) ==="
+
+    local service_storage service_low sn_storage sn_low validator_storage validator_low
+    service_storage="$SERVICE"
+    service_low="${VALIDATOR_SERVICES[2]}"
+    sn_storage="$(get_supernode_for_service "$service_storage")" || true
+    sn_low="$(get_supernode_for_service "$service_low")" || true
+    if [[ -z "$sn_storage" || -z "$sn_low" ]]; then
+        skip "S4 distribution edge cases" "could not resolve storage-full and low-byte supernodes"
+        return
+    fi
+
+    validator_storage="$(echo "$sn_storage" | jq -r '.validator_address // empty' 2>/dev/null)"
+    validator_low="$(echo "$sn_low" | jq -r '.validator_address // empty' 2>/dev/null)"
+    if [[ -z "$validator_storage" || -z "$validator_low" ]]; then
+        skip "S4 distribution edge cases" "resolved validator addresses are empty"
+        return
+    fi
+
+    local storage_state storage_eligibility low_eligibility
+    storage_state="$(lumerad_query supernode get-supernode "$validator_storage" | jq -r '.supernode.states[-1].state // empty' 2>/dev/null)"
+    if [[ "$storage_state" != "SUPERNODE_STATE_STORAGE_FULL" ]]; then
+        skip "S4 distribution edge cases" "service supernode is not STORAGE_FULL yet"
+        return
+    fi
+
+    storage_eligibility="$(lumerad_query supernode sn-eligibility "$validator_storage" -o json)" || true
+    if [[ "$(echo "$storage_eligibility" | jq -r '.eligible // false' 2>/dev/null)" == "true" ]]; then
+        pass "S4.1 STORAGE_FULL supernode remains Everlight payout-eligible"
+    else
+        fail "S4.1 STORAGE_FULL supernode remains Everlight payout-eligible" "response=${storage_eligibility:0:300}"
+    fi
+
+    if report_metrics_for_service "$service_low" "$validator_low" 104857600 40; then
+        pass "S4.2 low-byte metrics reported for comparison supernode"
+    else
+        fail "S4.2 low-byte metrics reported for comparison supernode" "metrics tx failed for $validator_low"
+        return
+    fi
+
+    low_eligibility="$(lumerad_query supernode sn-eligibility "$validator_low" -o json)" || true
+    if [[ "$(echo "$low_eligibility" | jq -r '.eligible // false' 2>/dev/null)" == "false" ]] &&
+       [[ "$(echo "$low_eligibility" | jq -r '.reason // empty' 2>/dev/null)" == "cascade bytes below minimum threshold" ]]; then
+        pass "S4.3 below-threshold supernode is excluded from payouts"
+    else
+        fail "S4.3 below-threshold supernode is excluded from payouts" "response=${low_eligibility:0:300}"
     fi
 }
 
@@ -713,12 +1023,12 @@ scenario_8_proto_compatibility() {
             fail "S8.1a supernode query returns validator record" "query returned empty for $target_validator"
         fi
 
-        metrics="$(supernode_metrics_rest "$target_validator")" || true
+        metrics="$(supernode_metrics_query_debug "$target_validator")" || true
         if [[ -n "$metrics" ]] && [[ "$(echo "$metrics" | jq -r '.code // empty' 2>/dev/null)" != "5" ]]; then
             assert_jq "$metrics" '.metrics_state.metrics.cascade_kademlia_db_bytes != null' \
                 "S8.1c cascade_kademlia_db_bytes present in metrics query"
         else
-            skip "S8.1c cascade_kademlia_db_bytes present in metrics query" "no metrics found for $target_validator"
+            fail "S8.1c cascade_kademlia_db_bytes present in metrics query" "metrics query returned empty or not found for $target_validator"
         fi
     else
         skip "S8.1a/S8.1c live supernode proto checks" "no registered supernode found on devnet"
@@ -732,16 +1042,6 @@ scenario_8_proto_compatibility() {
 scenario_stubs() {
     echo ""
     echo "=== Scenarios requiring registered supernodes (stubbed) ==="
-
-    # Scenario 3: Periodic Distribution -- Happy Path (F15)
-    # Requires: 2+ registered supernodes with varying cascade_kademlia_db_bytes,
-    # funded Everlight pool, small payment_period_blocks. Needs supernode
-    # registration and multiple block advancement.
-    skip "S3 periodic distribution happy path" "requires multiple registered supernodes with metrics"
-
-    # Scenario 4: Distribution Edge Cases (F15)
-    # Requires: configurable supernodes with varying states and metric values.
-    skip "S4 distribution edge cases" "requires configurable supernodes"
 
     # Scenario 5: Anti-Gaming Guardrails (F15)
     # Requires: supernodes across multiple distribution periods with varying
@@ -795,6 +1095,8 @@ main() {
     scenario_7_governance
     scenario_8_proto_compatibility
     scenario_2_storage_full_transition
+    scenario_4_distribution_edge_cases
+    scenario_3_periodic_distribution_happy_path
     scenario_stubs
 
     # Summary

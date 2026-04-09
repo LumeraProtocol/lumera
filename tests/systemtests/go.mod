@@ -1,6 +1,6 @@
 module github.com/LumeraProtocol/lumera/tests/systemtests
 
-go 1.25.5
+go 1.25.9
 
 replace (
 	github.com/LumeraProtocol/lumera => ../../
@@ -12,7 +12,7 @@ replace (
 require (
 	cosmossdk.io/math v1.5.3
 	github.com/LumeraProtocol/lumera v1.9.1
-	github.com/cometbft/cometbft v0.38.20
+	github.com/cometbft/cometbft v0.38.21
 	github.com/cosmos/cosmos-sdk v0.53.5
 	github.com/tidwall/gjson v1.14.2
 	github.com/tidwall/sjson v1.2.5

@@ -138,6 +138,12 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 						},
 					},
 				},
+				{
+					RpcMethod:      "ReportSupernodeMetrics",
+					Use:            "report-supernode-metrics [validator-address]",
+					Short:          "Report structured metrics for a supernode",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validator_address"}},
+				},
 				// this line is used by ignite scaffolding # autocli/tx
 			},
 		},

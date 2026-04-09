@@ -36,6 +36,15 @@ func (k Keeper) SetLastDistributionHeight(ctx sdk.Context, height int64) {
 	store.Set(types.LastDistributionHeightKey, bz)
 }
 
+// EnsureModuleAccount materialises the supernode ModuleAccount in the account
+// store. Must be called during InitGenesis so that later bank sends to the
+// module address do not silently create a BaseAccount instead.
+func (k Keeper) EnsureModuleAccount(ctx sdk.Context) {
+	if k.accountKeeper != nil {
+		k.accountKeeper.GetModuleAccount(ctx, types.ModuleName)
+	}
+}
+
 // GetPoolBalance returns the current balance of the everlight module account.
 func (k Keeper) GetPoolBalance(ctx sdk.Context) sdk.Coins {
 	moduleAddr := k.accountKeeper.GetModuleAddress(types.ModuleName)

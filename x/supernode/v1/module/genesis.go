@@ -14,6 +14,12 @@ func InitGenesis(ctx sdk.Context, k keeper.Keeper, genState types.GenesisState) 
 		panic(err)
 	}
 	k.SetLastDistributionHeight(ctx, genState.LastDistributionHeight)
+
+	// Ensure the supernode module account is persisted in the account store.
+	// Without this, the address exists in maccPerms but no ModuleAccount object
+	// is stored — the first bank send to the address would create a BaseAccount
+	// instead, permanently corrupting the module account.
+	k.EnsureModuleAccount(ctx)
 }
 
 // ExportGenesis returns the module's exported genesis.

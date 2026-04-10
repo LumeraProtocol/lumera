@@ -82,6 +82,7 @@ jobs:
             BUF_VERSION="v1.57.2"
           fi
           go install "github.com/bufbuild/buf/cmd/buf@${BUF_VERSION}"
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       - name: Build with Ignite CLI
         run: |

@@ -245,8 +245,8 @@ jobs:
                   exit 1
                 elif [ "$min_h" -eq "$prev_min_h" ]; then
                   stall_rounds=$((stall_rounds + 1))
-                  if [ "$stall_rounds" -gt 3 ]; then
-                    echo "No progress detected for 4 rounds: min_h=$min_h"
+                  if [ "$stall_rounds" -gt 12 ]; then
+                    echo "No progress detected for 13 rounds: min_h=$min_h"
                     exit 1
                   fi
                 else

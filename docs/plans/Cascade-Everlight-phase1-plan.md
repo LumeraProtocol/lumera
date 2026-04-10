@@ -41,7 +41,7 @@ The lumera repo is the knowledge provider. Other repos consume chain state.
 
 Changes:
 - `proto/lumera/supernode/v1/supernode_state.proto` — add `SUPERNODE_STATE_STORAGE_FULL = 6`
-- `proto/lumera/supernode/v1/params.proto` — add `RewardDistribution` sub-message (field 19). STORAGE_FULL uses existing `max_storage_usage_percent`.
+- `proto/lumera/supernode/v1/params.proto` — add `RewardDistribution` sub-message (field 19). `STORAGE_FULL` uses existing `max_storage_usage_percent`.
 - `proto/lumera/supernode/v1/metrics.proto` — add `cascade_kademlia_db_bytes` (field 15)
 - `proto/lumera/supernode/v1/query.proto` — add Everlight pool state, eligibility, payout history queries
 - `proto/lumera/supernode/v1/genesis.proto` — extend with Everlight pool state
@@ -49,10 +49,10 @@ Changes:
 ### S11 — STORAGE_FULL State + Compliance Bifurcation
 
 **Features:** F12 (STORAGE_FULL state), F13 (Compliance bifurcation)
-**Goal:** SNs with only storage-capacity violations enter STORAGE_FULL, not POSTPONED. STORAGE_FULL nodes excluded from new Cascade storage assignments but **continue receiving Everlight payouts** for held data. POSTPONED nodes lose all eligibility including payouts.
+**Goal:** SNs with only disk-capacity violations enter STORAGE_FULL, not POSTPONED. STORAGE_FULL nodes are excluded from new Cascade storage assignments but **continue receiving Everlight payouts** for held data. POSTPONED nodes lose all eligibility including payouts.
 
 Changes:
-- `x/supernode/v1/keeper/metrics_validation.go` — split `evaluateCompliance` to identify storage-only vs other violations
+- `x/supernode/v1/keeper/metrics_validation.go` — split `evaluateCompliance` to identify disk-usage-only vs other violations
 - `x/supernode/v1/keeper/metrics_state.go` — add `markStorageFull()`, `recoverFromStorageFull()`
 - `x/supernode/v1/keeper/msg_server_report_supernode_metrics.go` — handle STORAGE_FULL transitions
 - `x/supernode/v1/keeper/abci.go` — handle STORAGE_FULL in staleness handler
@@ -94,11 +94,11 @@ Note: F17 (Block reward share via `x/distribution`) is out of scope for Phase 1 
 ### S15 — Upgrade Handler + Integration Tests
 
 **Features:** F18 (Chain upgrade)
-**Goal:** Clean upgrade from v1.10.1. Everlight params initialized within supernode. Pool account registered.
+**Goal:** Clean upgrade using the branch's target upgrade version. Everlight params initialized within supernode. Pool account registered.
 
 Changes:
-- `app/upgrades/v1_11_0/` — upgrade handler (initialize Everlight params in supernode, register pool account)
-- `app/upgrades/upgrades.go` — register v1.11.0
+- `app/upgrades/v1_15_0/` — upgrade handler (initialize Everlight params in supernode, register pool account)
+- `app/upgrades/upgrades.go` — register v1.15.0
 - Integration tests for full flow
 
 ---
@@ -107,7 +107,7 @@ Changes:
 
 | ID | Question | Impact |
 |---|---|---|
-| OQ10 | Upgrade version — v1.11.0 or different? Other features bundling in? | S15 |
+| OQ10 | Upgrade version — **resolved in current branch:** v1.15.0 | S15 |
 | OQ12 | Fee routing — **resolved:** full 2% Community Pool share of registration fees redirected to Everlight pool (`registration_fee_share_bps` = 200). | S14 |
 | OQ13 | Cascade SN selection — **resolved:** STORAGE_FULL nodes excluded from Cascade selection. Verified via AT31. | S11 |
 | OQ14 | Module account permissions — **resolved:** receive+distribute only, no Minter/Burner. | S12 |
@@ -118,9 +118,9 @@ Changes:
 
 | ID | Description |
 |---|---|
-| AT30 | SN with only cascade_kademlia_db_bytes violation → STORAGE_FULL (not POSTPONED) |
+| AT30 | SN with only `disk_usage_percent > max_storage_usage_percent` violation → STORAGE_FULL (not POSTPONED) |
 | AT31 | STORAGE_FULL SN excluded from Cascade selection, included in Sense/Agents |
-| AT32 | STORAGE_FULL SN recovers to ACTIVE when storage freed |
+| AT32 | STORAGE_FULL SN recovers to ACTIVE when disk usage drops below threshold |
 | AT33 | STORAGE_FULL + other violation → POSTPONED (more restrictive wins) |
 | AT34 | Everlight pool account accepts MsgSend transfers |
 | AT35 | Pool distributes proportionally by cascade_kademlia_db_bytes at period boundary |

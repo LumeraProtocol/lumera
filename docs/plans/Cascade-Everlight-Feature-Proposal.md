@@ -182,7 +182,7 @@ Phase 3 fields (`TotalEndowmentStaked`, `PendingEndowmentRewards`) will be added
 
 ### 6.4 Governance Parameters (added to supernode Params)
 
-The Everlight parameters are added to the existing `x/supernode` Params proto as a nested `Distribution` sub-message at field 20:
+The Everlight parameters are added to the existing `x/supernode` Params proto as a nested `Distribution` sub-message at field 19:
 
 ```protobuf
 message RewardDistribution {
@@ -195,7 +195,7 @@ message RewardDistribution {
 }
 
 // In existing supernode Params message:
-RewardDistribution reward_distribution = 20;
+RewardDistribution reward_distribution = 19;
 ```
 
 The nested message keeps Everlight params cleanly separated within supernode Params. Endowment parameters (Phase 3) will be owned by the `x/endowment` module.
@@ -331,9 +331,9 @@ Payouts are weighted by **`cascade.kademlia_db_bytes`** — the actual Cascade d
 
 | Mechanism | Parameter | Purpose |
 |---|---|---|
-| Growth cap | `usage_growth_cap_bps_per_epoch` | Limits how fast a node's reported share can increase per distribution period |
-| Smoothing window | `measurement_smoothing_epochs` | Rolling average prevents point-in-time manipulation |
-| New-SN ramp-up | `new_sn_ramp_up_epochs` | New nodes receive partial weight until established |
+| Growth cap | `usage_growth_cap_bps_per_period` | Limits how fast a node's reported share can increase per distribution period |
+| Smoothing window | `measurement_smoothing_periods` | Rolling average prevents point-in-time manipulation |
+| New-SN ramp-up | `new_sn_ramp_up_periods` | New nodes receive partial weight until established |
 | Minimum threshold | `min_cascade_bytes_for_payment` | Excludes dust/spam nodes from distribution |
 
 ### 9.3 Eligibility Checklist
@@ -357,9 +357,8 @@ For each distribution period, an SN is eligible for payouts if:
 - Governance may initiate Community Pool transfer proposals at any time
 
 **Chain upgrade deliverables:**
-- `STORAGE_FULL` state added to SuperNode module protobuf; LEP-4 compliance logic updated
+- `STORAGE_FULL` state added to SuperNode module protobuf; LEP-4 compliance logic updated so `disk_usage_percent > max_storage_usage_percent` with no other violations routes to `STORAGE_FULL`
 - `cascade.kademlia_db_bytes` metric key added to LEP-4 schema; SuperNode software updated to report it
-- `cascade_kademlia_db_max_bytes` parameter added to SuperNode module
 - Cascade action selection updated to exclude `STORAGE_FULL` nodes; Sense/Agents selection unchanged
 - `x/supernode` extended with: Everlight pool account (receive + distribute only), EndBlocker distribution every `payment_period_blocks`, Everlight params, pool state and eligibility query endpoints — no separate module
 - `x/action` modified: `2%` registration fee share to Everlight pool

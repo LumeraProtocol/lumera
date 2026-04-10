@@ -15,8 +15,9 @@ import (
 
 	lumeraapp "github.com/LumeraProtocol/lumera/app"
 	lcfg "github.com/LumeraProtocol/lumera/config"
-	supernodemodule "github.com/LumeraProtocol/lumera/x/supernode/v1/module"
+	audittypes "github.com/LumeraProtocol/lumera/x/audit/v1/types"
 	snkeeper "github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	supernodemodule "github.com/LumeraProtocol/lumera/x/supernode/v1/module"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
@@ -233,18 +234,17 @@ func (s *EverlightIntegrationSuite) TestEverlightEndBlockerDistribution() {
 	err := s.app.SupernodeKeeper.SetSuperNode(s.ctx, sn)
 	require.NoError(s.T(), err)
 
-	// 3. Set metrics for the supernode above the minimum threshold.
-	// Default MinCascadeBytesForPayment = 1073741824 (1 GB).
-	// Set to 2 GB to be clearly above threshold.
-	metricsState := sntypes.SupernodeMetricsState{
-		ValidatorAddress: valAddr.String(),
-		Metrics: &sntypes.SupernodeMetrics{
+	// 3. Set audit epoch report above minimum threshold (source-of-truth for payout weight).
+	epochID, _, _, err := s.app.AuditKeeper.GetCurrentEpochInfo(s.ctx)
+	require.NoError(s.T(), err)
+	err = s.app.AuditKeeper.SetReport(s.ctx, audittypes.EpochReport{
+		SupernodeAccount: snAccAddr.String(),
+		EpochId:          epochID,
+		ReportHeight:     s.ctx.BlockHeight(),
+		HostReport: audittypes.HostReport{
 			CascadeKademliaDbBytes: 2_147_483_648, // 2 GB
 		},
-		ReportCount: 1,
-		Height:      1,
-	}
-	err = s.app.SupernodeKeeper.SetMetricsState(s.ctx, metricsState)
+	})
 	require.NoError(s.T(), err)
 
 	// 4. Set params with a very short PaymentPeriodBlocks so we trigger distribution.

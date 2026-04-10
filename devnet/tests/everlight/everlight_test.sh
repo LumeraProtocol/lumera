@@ -352,6 +352,48 @@ wait_for_distribution_height_change() {
     return 1
 }
 
+audit_current_epoch_id() {
+    lumerad_query audit current-epoch | jq -r '.epoch_id // empty' 2>/dev/null
+}
+
+submit_audit_report_for_service() {
+    local service="$1" cascade_bytes="$2" disk_usage="$3"
+    local key_name host_json epoch_id tx_result tx_code txhash tx_check exec_code
+
+    key_name="$(supernode_key_name_for_service "$service")"
+    epoch_id="$(audit_current_epoch_id)"
+    if [[ -z "$epoch_id" ]]; then
+        echo "missing current epoch id"
+        return 1
+    fi
+
+    host_json="$(jq -cn \
+        --argjson bytes "$cascade_bytes" \
+        --argjson usage "$disk_usage" \
+        '{
+            cpu_usage_percent: 25,
+            mem_usage_percent: 40,
+            disk_usage_percent: $usage,
+            inbound_port_states: [],
+            failed_actions_count: 0,
+            cascade_kademlia_db_bytes: $bytes
+        }')"
+
+    tx_result="$(run_tx_with_retry "$service" audit submit-epoch-report "$epoch_id" "$host_json" --from "$key_name")" || true
+    tx_code="$(tx_code_from_json "$tx_result")"
+    if [[ "$tx_code" != "0" ]]; then
+        echo "code=$tx_code output=${tx_result:0:300}"
+        return 1
+    fi
+
+    txhash="$(echo "$tx_result" | jq -r '.txhash // empty' 2>/dev/null)"
+    [[ -n "$txhash" ]] || return 1
+    sleep 6
+    tx_check="$(lumerad_query tx "$txhash")" || true
+    exec_code="$(echo "$tx_check" | jq -r '.code // "0"' 2>/dev/null || echo "0")"
+    [[ "$exec_code" == "0" ]]
+}
+
 # Record a PASS result.
 pass() {
     local name="$1"
@@ -879,17 +921,17 @@ scenario_3_periodic_distribution_happy_path() {
         return
     fi
 
-    if report_metrics_for_service "$service_a" "$validator_a" 2147483648 40; then
-        pass "S3.1 metrics reported for first supernode (2 GiB)"
+    if submit_audit_report_for_service "$service_a" 2147483648 40; then
+        pass "S3.1 audit report submitted for first supernode (2 GiB)"
     else
-        fail "S3.1 metrics reported for first supernode" "metrics tx failed for $validator_a"
+        fail "S3.1 audit report submitted for first supernode" "audit report tx failed for $validator_a"
         return
     fi
 
-    if report_metrics_for_service "$service_b" "$validator_b" 4294967296 40; then
-        pass "S3.2 metrics reported for second supernode (4 GiB)"
+    if submit_audit_report_for_service "$service_b" 4294967296 40; then
+        pass "S3.2 audit report submitted for second supernode (4 GiB)"
     else
-        fail "S3.2 metrics reported for second supernode" "metrics tx failed for $validator_b"
+        fail "S3.2 audit report submitted for second supernode" "audit report tx failed for $validator_b"
         return
     fi
 
@@ -978,10 +1020,10 @@ scenario_4_distribution_edge_cases() {
         fail "S4.1 STORAGE_FULL supernode remains Everlight payout-eligible" "response=${storage_eligibility:0:300}"
     fi
 
-    if report_metrics_for_service "$service_low" "$validator_low" 104857600 40; then
-        pass "S4.2 low-byte metrics reported for comparison supernode"
+    if submit_audit_report_for_service "$service_low" 104857600 40; then
+        pass "S4.2 low-byte audit report submitted for comparison supernode"
     else
-        fail "S4.2 low-byte metrics reported for comparison supernode" "metrics tx failed for $validator_low"
+        fail "S4.2 low-byte audit report submitted for comparison supernode" "audit report tx failed for $validator_low"
         return
     fi
 

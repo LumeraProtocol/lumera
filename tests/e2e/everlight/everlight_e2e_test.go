@@ -28,8 +28,9 @@ import (
 
 	lumeraapp "github.com/LumeraProtocol/lumera/app"
 	lcfg "github.com/LumeraProtocol/lumera/config"
-	supernodemodule "github.com/LumeraProtocol/lumera/x/supernode/v1/module"
+	audittypes "github.com/LumeraProtocol/lumera/x/audit/v1/types"
 	snkeeper "github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
+	supernodemodule "github.com/LumeraProtocol/lumera/x/supernode/v1/module"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
@@ -38,11 +39,11 @@ import (
 type EverlightE2ESuite struct {
 	suite.Suite
 
-	app       *lumeraapp.App
-	ctx       sdk.Context
-	keeper    sntypes.SupernodeKeeper
+	app        *lumeraapp.App
+	ctx        sdk.Context
+	keeper     sntypes.SupernodeKeeper
 	keeperImpl *snkeeper.Keeper
-	authority sdk.AccAddress
+	authority  sdk.AccAddress
 }
 
 func (s *EverlightE2ESuite) SetupTest() {
@@ -92,15 +93,16 @@ func (s *EverlightE2ESuite) createSuperNode(dbBytes float64, state sntypes.Super
 	}
 	require.NoError(s.T(), s.app.SupernodeKeeper.SetSuperNode(s.ctx, sn))
 
-	metricsState := sntypes.SupernodeMetricsState{
-		ValidatorAddress: valAddr.String(),
-		Metrics: &sntypes.SupernodeMetrics{
+	epochID, _, _, err := s.app.AuditKeeper.GetCurrentEpochInfo(s.ctx)
+	require.NoError(s.T(), err)
+	require.NoError(s.T(), s.app.AuditKeeper.SetReport(s.ctx, audittypes.EpochReport{
+		SupernodeAccount: addr.String(),
+		EpochId:          epochID,
+		ReportHeight:     s.ctx.BlockHeight(),
+		HostReport: audittypes.HostReport{
 			CascadeKademliaDbBytes: dbBytes,
 		},
-		ReportCount: 1,
-		Height:      s.ctx.BlockHeight(),
-	}
-	require.NoError(s.T(), s.app.SupernodeKeeper.SetMetricsState(s.ctx, metricsState))
+	}))
 
 	return addr, valAddr
 }
@@ -111,9 +113,9 @@ func (s *EverlightE2ESuite) createSuperNode(dbBytes float64, state sntypes.Super
 // distributes via bank keeper, proportionally by cascade_kademlia_db_bytes.
 func (s *EverlightE2ESuite) TestE2E_MultiSNProportionalDistribution() {
 	// Setup: 3 SNs with 1GB, 2GB, 3GB respectively (total 6GB)
-	snA, _ := s.createSuperNode(1_073_741_824, sntypes.SuperNodeStateActive)   // 1 GB
-	snB, _ := s.createSuperNode(2_147_483_648, sntypes.SuperNodeStateActive)   // 2 GB
-	snC, _ := s.createSuperNode(3_221_225_472, sntypes.SuperNodeStateActive)   // 3 GB
+	snA, _ := s.createSuperNode(1_073_741_824, sntypes.SuperNodeStateActive) // 1 GB
+	snB, _ := s.createSuperNode(2_147_483_648, sntypes.SuperNodeStateActive) // 2 GB
+	snC, _ := s.createSuperNode(3_221_225_472, sntypes.SuperNodeStateActive) // 3 GB
 
 	params := s.keeper.GetParams(s.ctx)
 	params.RewardDistribution.PaymentPeriodBlocks = 5
@@ -173,8 +175,8 @@ func (s *EverlightE2ESuite) TestE2E_StorageFullNodesReceivePayouts() {
 // Validates: SNs below min_cascade_bytes_for_payment are excluded from distribution.
 func (s *EverlightE2ESuite) TestE2E_BelowThresholdExclusion() {
 	// SN-A above threshold (2GB), SN-B below threshold (100MB)
-	snAbove, _ := s.createSuperNode(2_147_483_648, sntypes.SuperNodeStateActive)  // 2 GB
-	snBelow, _ := s.createSuperNode(104_857_600, sntypes.SuperNodeStateActive)    // 100 MB
+	snAbove, _ := s.createSuperNode(2_147_483_648, sntypes.SuperNodeStateActive) // 2 GB
+	snBelow, _ := s.createSuperNode(104_857_600, sntypes.SuperNodeStateActive)   // 100 MB
 
 	params := s.keeper.GetParams(s.ctx)
 	params.RewardDistribution.PaymentPeriodBlocks = 5

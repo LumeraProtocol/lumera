@@ -261,6 +261,12 @@ func New(
 	// enable optimistic execution
 	baseAppOptions = append(baseAppOptions, baseapp.SetOptimisticExecution())
 
+	// Wire post-construction cross-module dependency to avoid depinject cycle:
+	// supernode payout logic consumes audit report data.
+	if supernodeWithAudit, ok := app.SupernodeKeeper.(interface{ SetAuditKeeper(sntypes.AuditKeeper) }); ok {
+		supernodeWithAudit.SetAuditKeeper(app.AuditKeeper)
+	}
+
 	// build app
 	app.App = appBuilder.Build(db, traceStore, baseAppOptions...)
 	app.SetVersion(version.Version)
@@ -331,7 +337,7 @@ func (app *App) setupUpgrades() {
 		SupernodeKeeper:       app.SupernodeKeeper,
 		ParamsKeeper:          &app.ParamsKeeper,
 		ConsensusParamsKeeper: &app.ConsensusParamsKeeper,
-		AuditKeeper:     &app.AuditKeeper,
+		AuditKeeper:           &app.AuditKeeper,
 	}
 
 	allUpgrades := upgrades.AllUpgrades(params)

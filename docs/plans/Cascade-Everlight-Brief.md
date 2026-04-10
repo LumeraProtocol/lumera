@@ -180,9 +180,9 @@ If funding falls below aggregate storage costs, governance can adjust parameters
 - Add **`STORAGE_FULL`** SuperNode state; update LEP-4 compliance logic to route storage-only violations to `STORAGE_FULL` (not `POSTPONED`)
 - Add **`cascade_kademlia_db_bytes`** metric to LEP-4 self-reporting schema (SNs already collect this internally)
 - Update Cascade action selection to exclude `STORAGE_FULL` nodes; Sense/Agents selection unaffected
-- Extend **`x/supernode`** with Everlight pool account, block-height-driven periodic distribution (EndBlocker with `payment_period_blocks`), Everlight governance parameters, and query endpoints — no separate module needed
+- Extend **`x/supernode`** with supernode module account (Everlight pool in Phase 1), block-height-driven periodic distribution (EndBlocker with `payment_period_blocks`), Everlight governance parameters, and query endpoints — no separate module needed
 - Route **2% of registration fees** to Everlight pool via action module changes
-- **Pre-upgrade (operational):** Foundation sends staking rewards to the Everlight pool account address via standard `MsgSend`; governance begins Community Pool transfers if desired
+- **Pre-upgrade (operational):** Foundation sends staking rewards to the supernode module account address (Everlight pool in Phase 1) via standard `MsgSend`; governance begins Community Pool transfers if desired
 
 **Outcome:** SNs receive ongoing retention compensation immediately. Disk-full nodes remain productive. Pool funded by Foundation transfers, registration fee share, and Community Pool governance transfers.
 
@@ -259,7 +259,7 @@ If funding falls below aggregate storage costs, governance can adjust parameters
 
 Approve **Cascade Everlight** as the retention compensation model:
 
-1. **Immediately (operational):** Foundation routes staking rewards to Everlight pool account address; governance considers Community Pool transfer proposals
+1. **Immediately (operational):** Foundation routes staking rewards to supernode module account address (Everlight pool in Phase 1); governance considers Community Pool transfer proposals
 2. **Phase 1 (chain upgrade):** `STORAGE_FULL` state, `cascade_kademlia_db_bytes` metric, Everlight pool + distribution logic within `x/supernode`, registration fee share routing
 3. **Phase 2 (chain upgrade):** LEP-6 storage-truth enforcement, LEP-5 challenge-response proofs, snscope cross-validation, score-based anti-gaming (developed outside this project)
 4. **Phase 3 (chain upgrade):** `x/endowment` module for "N-year guarantee" tier system

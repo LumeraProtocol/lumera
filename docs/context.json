@@ -1,6 +1,6 @@
 {
   "schema_version": "context.v1",
-  "updated": "2026-04-08T23:17:23Z",
+  "updated": "2026-04-10T02:12:01Z",
   "project": {
     "name": "lumera",
     "note": "Multi-repo project. lumera (this) is the knowledge provider. Related repos: supernode, sdk-go, sdk-js."
@@ -202,9 +202,9 @@
     }
   ],
   "handoff": {
-    "stopped_at": "Everlight migration completed: reward-distribution proto, keeper, queries, genesis, and fee routing are consolidated into x/supernode; x/everlight and proto/lumera/everlight are removed; targeted package, integration, E2E, and upgrade tests are passing.",
-    "next_immediate": "Run a fresh BRIDGE gate/eval pass against the consolidated design and update any downstream consumer repos that still expect the old everlight package paths.",
-    "watch_out": "Historical docs and gate artifacts still mention x/everlight as a standalone module; treat those as pre-migration history, not current architecture. AT40 remains deferred to Phase 4."
+    "stopped_at": "S10-S15 accepted closed by operator after PASS gate and devnet validation review. Everlight Phase 1 remains consolidated in x/supernode; prefixed gate/eval artifacts are current.",
+    "next_immediate": "Handle downstream consumer updates for the embedded supernode Everlight surface and revisit the three skipped devnet checks in a later follow-up slice if needed.",
+    "watch_out": "Three devnet cases were intentionally skipped and are deferred, not executed. Historical docs and older gate artifacts may still mention standalone x/everlight; AT40 remains deferred to Phase 4."
   },
   "next_slice": null,
   "commands_to_run": {
@@ -224,6 +224,7 @@
     "devnet_up": "make devnet-up — starts devnet"
   },
   "recent_decisions": [
+    "2026-04-10: Operator accepted S10-S15 as closed after reviewing the 2026-04-09 PASS gate and devnet status. Three devnet checks were skipped intentionally and deferred for later follow-up, but did not block closure.",
     "2026-04-08: Everlight consolidated into x/supernode — standalone x/everlight module and proto/lumera/everlight/ removed. All Everlight state, keeper logic, queries, and params are embedded in x/supernode. Pool account registered as named sub-account 'everlight' with no permissions.",
     "2026-04-08: Phase 1 scope clarified — registration-fee routing only; block reward routing (F17/AT40) deferred to optional Phase 4; no x/distribution modification in Phase 1.",
     "2026-04-08: Cross-repo integration gate added: IAT01-IAT04 run after lumera tag and downstream consumer updates.",
@@ -237,7 +238,8 @@
   ],
   "blockers": [
     "AT32 (STORAGE_FULL recovery test) — RESOLVED 2026-04-08, gate passed",
-    "IAT01-IAT04 remain pending until lumera publishes a tagged Everlight release and downstream consumers update"
+    "IAT01-IAT04 remain pending until lumera publishes a tagged Everlight release and downstream consumers update",
+    "Three devnet evaluation checks for S10-S15 were skipped by operator and deferred for later follow-up; they are not blocking slice closure"
   ],
   "discrepancies": [
     "F17 fully removed from codebase; deferred to optional Phase 4 with no implementation in this branch"
@@ -350,6 +352,42 @@
       "warnings": 4,
       "coverage": "n/a",
       "notes": "Gate kept in PASS state for Everlight scope. Whole-project govulncheck ./... reported 8 reachable vulnerabilities across 6 modules and make lint reported 111 diagnostics, but both were explicitly treated as non-blocking warnings because they fall outside the Everlight slice boundary."
+    },
+    {
+      "date": "2026-04-09",
+      "result": "pass",
+      "features": [
+        "F10",
+        "F11",
+        "F12",
+        "F13",
+        "F14",
+        "F15",
+        "F16",
+        "F18"
+      ],
+      "blocking_issues": 0,
+      "warnings": 2,
+      "coverage": "n/a",
+      "notes": "Re-gate after STORAGE_FULL trigger refactor (disk_usage_percent), cascade_kademlia_db_max_bytes full removal, EnsureModuleAccount fix, EverlightPoolAccountName removal, devnet test rewrite. All unit/integration/E2E/upgrade tests pass. Dead code grep clean. AT30-AT39, AT41-AT45 verified. AT40 deferred. Lint/govulncheck waived per operator."
+    },
+    {
+      "date": "2026-04-09",
+      "result": "pass",
+      "features": [
+        "F10",
+        "F11",
+        "F12",
+        "F13",
+        "F14",
+        "F15",
+        "F16",
+        "F18"
+      ],
+      "blocking_issues": 0,
+      "warnings": 2,
+      "coverage": "n/a",
+      "notes": "Fresh re-gate at commit 4cc12ec. All functional tests pass (unit, integration, E2E, upgrade). go build ./... clean. make build clean. Dead code verified removed (CascadeKademliaDbMaxBytes, cascade_kademlia_db_max_bytes, EverlightPoolAccountName, x/everlight). All 6 design points confirmed in code. AT30-AT39, AT41-AT45 verified. AT40 deferred. Lint/govulncheck waived per operator."
     }
   ],
   "eval_history": [
@@ -369,6 +407,17 @@
       "scenarios_generated": 10,
       "e2e_tests_generated": 7,
       "awaiting_feedback": true,
+      "features": ["F10", "F11", "F12", "F13", "F14", "F15", "F16", "F18"],
+      "files": [
+        "docs/gates-evals/S10-S15-eval-scenarios.md",
+        "tests/e2e/everlight/everlight_e2e_test.go"
+      ]
+    },
+    {
+      "date": "2026-04-09",
+      "scenarios_generated": 10,
+      "e2e_tests_generated": 7,
+      "awaiting_feedback": false,
       "features": ["F10", "F11", "F12", "F13", "F14", "F15", "F16", "F18"],
       "files": [
         "docs/gates-evals/S10-S15-eval-scenarios.md",

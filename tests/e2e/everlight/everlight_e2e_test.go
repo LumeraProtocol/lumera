@@ -8,8 +8,8 @@
 // These tests validate the following E2E critical paths:
 //   - Full distribution lifecycle (UF04, UF05)
 //   - STORAGE_FULL state transitions with Everlight payout eligibility (UF03)
-//   - Registration fee share routing end-to-end (UF02 tail)
-//   - Cross-module interactions: supernode keeper <-> everlight keeper <-> bank keeper
+//   - Registration fee share routing coverage remains in the manual/devnet eval pack
+//   - Cross-module interactions inside the embedded supernode design: supernode keeper <-> bank/auth/gov
 //   - Anti-gaming guardrails under realistic multi-SN conditions
 package everlight_e2e
 
@@ -33,8 +33,8 @@ import (
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
-// EverlightE2ESuite exercises full cross-module flows that span the supernode,
-// everlight, bank, and auth modules in a single app instance.
+// EverlightE2ESuite exercises full cross-module flows that span the embedded
+// supernode Everlight logic plus the bank, auth, and gov modules in a single app instance.
 type EverlightE2ESuite struct {
 	suite.Suite
 

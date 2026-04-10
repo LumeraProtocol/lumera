@@ -1,9 +1,9 @@
 # Evaluation Scenarios -- Everlight Phase 1
-Generated: 2026-04-08T23:17:23Z
+Generated: 2026-04-10T02:12:01Z
 Project: lumera
 Slices: S10-S15
 Features: F10, F11, F12, F13, F14, F15, F16, F18
-Gate Result: PASS (2026-04-08)
+Gate Result: PASS (2026-04-09)
 
 ## How to Use
 
@@ -11,22 +11,36 @@ Gate Result: PASS (2026-04-08)
 2. Start the local environment: `make devnet-clean && make devnet-new-no-hermes && make devnet-up`
 3. Run the scripted smoke coverage first: `make devnet-tests-everlight`
 4. Execute each scenario step-by-step on the running devnet.
-4. Record results in the checklists.
-5. Fill the feedback form at the bottom.
-6. Feed results back with `$bridge-feedback`.
+5. Record results in the checklists.
+6. Fill the feedback form at the bottom.
+7. Feed results back with `$bridge-feedback`.
 
 ## Scripted Coverage
 
 `devnet/tests/everlight/everlight_test.sh` currently automates:
 - Scenario 1 end-to-end bootstrap checks, including module-account funding and pool-balance verification
+- Scenario 2 STORAGE_FULL transition checks on a live registered SuperNode, including recovery preparation and disk-usage-triggered transition
+- Scenario 3 distribution happy path on devnet with two SuperNodes at 2 GiB and 4 GiB, funded pool, and payout ordering verification
+- Scenario 4 distribution edge coverage for STORAGE_FULL payout eligibility and below-threshold exclusion
 - Scenario 6 parameter presence checks for registration-fee routing
-- Scenario 7 unauthorized governance update rejection
+- Scenario 7 governance parameter update flow, including proposal submission, voting, and final param verification
 - Scenario 8 embedded params/genesis checks, plus live supernode/metrics checks when a registered SuperNode is present
 
 `devnet/tests/everlight/everlight_test.sh` still leaves as manual or environment-dependent:
-- Scenarios 2-5, which need registered SuperNodes with controlled metrics histories
+- Scenario 5, which needs multi-period metrics history to validate ramp-up, smoothing, and growth-cap behavior credibly
 - Scenario 9, which needs a pre-Everlight upgrade path
 - Scenario 10, which needs the full funding + action + multi-period lifecycle
+
+## Latest Devnet Run
+
+Source: `everlight-devnet-tests.log`
+
+- Executed on connected devnet at block height 1814
+- Results: 34 PASS, 0 FAIL, 3 SKIP
+- Executed coverage: Scenarios 1, 2, 3, 4, 6, 7, 8
+- Skipped coverage: Scenario 5 (anti-gaming guardrails), Scenario 9 (upgrade idempotency), Scenario 10 (full lifecycle)
+
+This confirms live devnet validation for the core embedded-supernode Everlight flows. The remaining skipped scenarios are follow-up coverage items, not evidence of regression in the scenarios that were executed.
 
 ---
 

@@ -195,9 +195,9 @@
       "name": "Chain Upgrade Handler (Everlight)",
       "status": "done",
       "slice": "S15",
-      "notes": "v1.15.0 upgrade now aligns with the embedded-supernode design: no standalone everlight store is added, and consolidated supernode genesis/params handle Everlight state.",
+      "notes": "v1.12.0 upgrade now aligns with the embedded-supernode design: no standalone everlight store is added, and consolidated supernode genesis/params handle Everlight state.",
       "evidence": [
-        "go test ./app/upgrades/v1_15_0 -count=1 (exit 0)"
+        "go test ./app/upgrades/v1_12_0 -count=1 (exit 0)"
       ]
     }
   ],

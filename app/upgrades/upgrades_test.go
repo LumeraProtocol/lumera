@@ -15,7 +15,7 @@ import (
 	upgrade_v1_10_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_10_1"
 	upgrade_v1_11_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_11_0"
 	upgrade_v1_11_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_11_1"
-	upgrade_v1_15_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_15_0"
+	upgrade_v1_12_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_12_0"
 	upgrade_v1_6_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_6_1"
 	upgrade_v1_8_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_0"
 	upgrade_v1_8_4 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_4"
@@ -38,7 +38,7 @@ func TestUpgradeNamesOrder(t *testing.T) {
 		upgrade_v1_10_1.UpgradeName,
 		upgrade_v1_11_0.UpgradeName,
 		upgrade_v1_11_1.UpgradeName,
-		upgrade_v1_15_0.UpgradeName,
+		upgrade_v1_12_0.UpgradeName,
 	}
 	require.Equal(t, expected, upgradeNames, "upgradeNames should stay in ascending order")
 }
@@ -89,7 +89,7 @@ func TestSetupUpgradesAndHandlers(t *testing.T) {
 					upgradeName == upgrade_v1_10_1.UpgradeName ||
 					upgradeName == upgrade_v1_11_0.UpgradeName ||
 					upgradeName == upgrade_v1_11_1.UpgradeName ||
-					upgradeName == upgrade_v1_15_0.UpgradeName {
+					upgradeName == upgrade_v1_12_0.UpgradeName {
 					continue
 				}
 
@@ -138,7 +138,7 @@ func expectStoreUpgrade(upgradeName, chainID string) bool {
 		upgrade_v1_11_0.UpgradeName,
 		upgrade_v1_11_1.UpgradeName:
 		return true
-	case upgrade_v1_15_0.UpgradeName:
+	case upgrade_v1_12_0.UpgradeName:
 		return true
 	default:
 		return false

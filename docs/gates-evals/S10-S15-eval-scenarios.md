@@ -46,7 +46,7 @@ This confirms live devnet validation for the core embedded-supernode Everlight f
 
 ## Scenario 1: [F14, F18] Embedded Everlight Surface Bootstraps Cleanly
 
-**Goal:** Verify the v1.15.0 upgrade exposes Everlight functionality through the embedded `supernode` API surface rather than a standalone module.
+**Goal:** Verify the v1.12.0 upgrade exposes Everlight functionality through the embedded `supernode` API surface rather than a standalone module.
 **Preconditions:** Fresh devnet or upgraded chain with the current binary.
 **Linked:** F11, F14, F18, AT34, AT41, AT42, AT43
 
@@ -281,7 +281,7 @@ This confirms live devnet validation for the core embedded-supernode Everlight f
 **Linked:** F18, AT42, AT43
 
 ### Steps:
-1. Start from pre-Everlight state and perform the v1.15.0 upgrade.
+1. Start from pre-Everlight state and perform the v1.12.0 upgrade.
 2. Query existing SuperNodes.
    -> Expected: Existing states are preserved.
 

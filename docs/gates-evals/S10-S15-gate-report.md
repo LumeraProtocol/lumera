@@ -12,7 +12,7 @@ Fresh re-gate of Everlight Phase 1 features. All functional tests, typecheck, an
 - Unit (x/supernode/v1/...): keeper, module, types -- all passed - PASS
 - Integration (tests/integration/everlight/...): passed (0.589s) - PASS
 - E2E (tests/e2e/everlight/...): passed (0.538s) - PASS
-- Upgrade (app/upgrades/v1_15_0/...): passed (0.037s) - PASS
+- Upgrade (app/upgrades/v1_12_0/...): passed (0.037s) - PASS
 
 ## Code Quality
 - Typecheck (`go build ./...`): 0 errors - PASS

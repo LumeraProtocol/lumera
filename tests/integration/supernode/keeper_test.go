@@ -52,6 +52,7 @@ func (suite *KeeperIntegrationSuite) SetupSuite() {
 		suite.app.StakingKeeper,
 		suite.app.AuthKeeper,
 		suite.app.SlashingKeeper,
+		nil,
 	)
 	suite.keeper = k
 	suite.queryServer = keeper.NewQueryServerImpl(k)

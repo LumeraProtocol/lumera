@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"cosmossdk.io/log"
@@ -20,7 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	sdkmath "cosmossdk.io/math"
-
+	audittypes "github.com/LumeraProtocol/lumera/x/audit/v1/types"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
 
@@ -95,15 +96,10 @@ type mockSupernodeKeeper struct {
 	keeper     *Keeper
 	ctx        sdk.Context
 	supernodes []sntypes.SuperNode
-	metrics    map[string]sntypes.SupernodeMetricsState
 }
 
 func newMockSupernodeKeeper(k *Keeper, ctx sdk.Context) *mockSupernodeKeeper {
-	return &mockSupernodeKeeper{
-		keeper:  k,
-		ctx:     ctx,
-		metrics: make(map[string]sntypes.SupernodeMetricsState),
-	}
+	return &mockSupernodeKeeper{keeper: k, ctx: ctx}
 }
 
 func (m *mockSupernodeKeeper) GetAllSuperNodes(_ sdk.Context, stateFilters ...sntypes.SuperNodeState) ([]sntypes.SuperNode, error) {
@@ -126,14 +122,42 @@ func (m *mockSupernodeKeeper) GetAllSuperNodes(_ sdk.Context, stateFilters ...sn
 	return result, nil
 }
 
-func (m *mockSupernodeKeeper) GetMetricsState(_ sdk.Context, valAddr sdk.ValAddress) (sntypes.SupernodeMetricsState, bool) {
-	state, ok := m.metrics[valAddr.String()]
-	return state, ok
+type mockAuditKeeper struct {
+	currentEpochID uint64
+	reports        map[string]audittypes.EpochReport
+}
+
+func newMockAuditKeeper() *mockAuditKeeper {
+	return &mockAuditKeeper{currentEpochID: 1, reports: make(map[string]audittypes.EpochReport)}
+}
+
+func reportKey(epochID uint64, account string) string {
+	return fmt.Sprintf("%d:%s", epochID, account)
+}
+
+func (m *mockAuditKeeper) GetCurrentEpochInfo(_ sdk.Context) (uint64, int64, int64, error) {
+	return m.currentEpochID, 0, 0, nil
+}
+
+func (m *mockAuditKeeper) GetReport(_ sdk.Context, epochID uint64, reporterSupernodeAccount string) (audittypes.EpochReport, bool) {
+	r, ok := m.reports[reportKey(epochID, reporterSupernodeAccount)]
+	return r, ok
+}
+
+func (m *mockAuditKeeper) setReport(epochID uint64, reporter string, height int64, bytes float64) {
+	m.reports[reportKey(epochID, reporter)] = audittypes.EpochReport{
+		SupernodeAccount: reporter,
+		EpochId:          epochID,
+		ReportHeight:     height,
+		HostReport: audittypes.HostReport{
+			CascadeKademliaDbBytes: bytes,
+		},
+	}
 }
 
 // --- Test helpers ---
 
-func setupTestKeeper(t *testing.T) (Keeper, sdk.Context, *mockBankKeeper, *mockSupernodeKeeper) {
+func setupTestKeeper(t *testing.T) (Keeper, sdk.Context, *mockBankKeeper, *mockSupernodeKeeper, *mockAuditKeeper) {
 	t.Helper()
 
 	storeKey := storetypes.NewKVStoreKey(sntypes.StoreKey)
@@ -147,6 +171,7 @@ func setupTestKeeper(t *testing.T) (Keeper, sdk.Context, *mockBankKeeper, *mockS
 	authority := authtypes.NewModuleAddress(govtypes.ModuleName)
 
 	bankKeeper := newMockBankKeeper()
+	auditKeeper := newMockAuditKeeper()
 	accountKeeper := &mockAccountKeeper{}
 	k := NewKeeper(
 		cdc,
@@ -157,6 +182,7 @@ func setupTestKeeper(t *testing.T) (Keeper, sdk.Context, *mockBankKeeper, *mockS
 		nil,
 		accountKeeper,
 		nil,
+		auditKeeper,
 	)
 
 	ctx := sdk.NewContext(stateStore, cmtproto.Header{Height: 1}, false, log.NewNopLogger())
@@ -165,7 +191,7 @@ func setupTestKeeper(t *testing.T) (Keeper, sdk.Context, *mockBankKeeper, *mockS
 	// Initialize params.
 	require.NoError(t, k.SetParams(ctx, sntypes.DefaultParams()))
 
-	return k, ctx, bankKeeper, snKeeper
+	return k, ctx, bankKeeper, snKeeper, auditKeeper
 }
 
 // makeValAddr creates a deterministic validator address for testing.
@@ -184,7 +210,7 @@ func makeAccAddr(i int) sdk.AccAddress {
 	return sdk.AccAddress(addr)
 }
 
-func addSupernode(snKeeper *mockSupernodeKeeper, valAddr sdk.ValAddress, accAddr sdk.AccAddress, state sntypes.SuperNodeState, cascadeBytes float64) {
+func addSupernode(snKeeper *mockSupernodeKeeper, auditKeeper *mockAuditKeeper, valAddr sdk.ValAddress, accAddr sdk.AccAddress, state sntypes.SuperNodeState, cascadeBytes float64) {
 	valBech32, err := sdk.Bech32ifyAddressBytes(lcfg.ValidatorAddressPrefix, valAddr)
 	if err != nil {
 		panic(err)
@@ -205,16 +231,11 @@ func addSupernode(snKeeper *mockSupernodeKeeper, valAddr sdk.ValAddress, accAddr
 		},
 	}
 	snKeeper.supernodes = append(snKeeper.supernodes, sn)
-	snKeeper.metrics[valAddr.String()] = sntypes.SupernodeMetricsState{
-		ValidatorAddress: valBech32,
-		Metrics: &sntypes.SupernodeMetrics{
-			CascadeKademliaDbBytes: cascadeBytes,
-		},
-		Height: snKeeper.ctx.BlockHeight(),
-	}
 	if snKeeper.keeper != nil {
 		_ = snKeeper.keeper.SetSuperNode(snKeeper.ctx, sn)
-		_ = snKeeper.keeper.SetMetricsState(snKeeper.ctx, snKeeper.metrics[valAddr.String()])
+	}
+	if auditKeeper != nil {
+		auditKeeper.setReport(auditKeeper.currentEpochID, accBech32, snKeeper.ctx.BlockHeight(), cascadeBytes)
 	}
 }
 
@@ -227,7 +248,7 @@ func fundPool(bankKeeper *mockBankKeeper, amount int64) {
 
 // AT35: Pool distributes proportionally by cascade_kademlia_db_bytes at period boundary.
 func TestDistributePoolProportionally(t *testing.T) {
-	k, ctx, bankKeeper, snKeeper := setupTestKeeper(t)
+	k, ctx, bankKeeper, snKeeper, auditKeeper := setupTestKeeper(t)
 
 	// Set params with a small period for testing.
 	params := sntypes.DefaultParams()
@@ -244,8 +265,8 @@ func TestDistributePoolProportionally(t *testing.T) {
 	val2 := makeValAddr(2)
 	acc2 := makeAccAddr(2)
 
-	addSupernode(snKeeper, val1, acc1, sntypes.SuperNodeStateActive, 3000)
-	addSupernode(snKeeper, val2, acc2, sntypes.SuperNodeStateActive, 7000)
+	addSupernode(snKeeper, auditKeeper, val1, acc1, sntypes.SuperNodeStateActive, 3000)
+	addSupernode(snKeeper, auditKeeper, val2, acc2, sntypes.SuperNodeStateActive, 7000)
 
 	// Fund pool with 10000 ulume.
 	fundPool(bankKeeper, 10000)
@@ -285,7 +306,7 @@ func TestDistributePoolProportionally(t *testing.T) {
 }
 
 func TestGetLastDistributionHeightInvalidEncodingReturnsZero(t *testing.T) {
-	k, ctx, _, _ := setupTestKeeper(t)
+	k, ctx, _, _, _ := setupTestKeeper(t)
 
 	store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
 	store.Set(sntypes.LastDistributionHeightKey, []byte{1, 2, 3})
@@ -294,7 +315,7 @@ func TestGetLastDistributionHeightInvalidEncodingReturnsZero(t *testing.T) {
 }
 
 func TestGetTotalDistributedInvalidEncodingReturnsEmpty(t *testing.T) {
-	k, ctx, _, _ := setupTestKeeper(t)
+	k, ctx, _, _, _ := setupTestKeeper(t)
 
 	store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
 	store.Set(sntypes.TotalDistributedKey, []byte("not-json"))
@@ -304,7 +325,7 @@ func TestGetTotalDistributedInvalidEncodingReturnsEmpty(t *testing.T) {
 
 // AT36: SNs below min_cascade_bytes_for_payment excluded from distribution.
 func TestMinCascadeBytesThreshold(t *testing.T) {
-	k, ctx, bankKeeper, snKeeper := setupTestKeeper(t)
+	k, ctx, bankKeeper, snKeeper, auditKeeper := setupTestKeeper(t)
 
 	params := sntypes.DefaultParams()
 	params.RewardDistribution.PaymentPeriodBlocks = 10
@@ -320,8 +341,8 @@ func TestMinCascadeBytesThreshold(t *testing.T) {
 	val2 := makeValAddr(2)
 	acc2 := makeAccAddr(2)
 
-	addSupernode(snKeeper, val1, acc1, sntypes.SuperNodeStateActive, 3000)
-	addSupernode(snKeeper, val2, acc2, sntypes.SuperNodeStateActive, 7000)
+	addSupernode(snKeeper, auditKeeper, val1, acc1, sntypes.SuperNodeStateActive, 3000)
+	addSupernode(snKeeper, auditKeeper, val2, acc2, sntypes.SuperNodeStateActive, 7000)
 
 	fundPool(bankKeeper, 10000)
 
@@ -339,7 +360,7 @@ func TestMinCascadeBytesThreshold(t *testing.T) {
 
 // AT37: New SN receives ramped-up (partial) payout weight during ramp-up period.
 func TestNewSNRampUp(t *testing.T) {
-	k, ctx, bankKeeper, snKeeper := setupTestKeeper(t)
+	k, ctx, bankKeeper, snKeeper, auditKeeper := setupTestKeeper(t)
 
 	params := sntypes.DefaultParams()
 	params.RewardDistribution.PaymentPeriodBlocks = 10
@@ -355,8 +376,8 @@ func TestNewSNRampUp(t *testing.T) {
 	val2 := makeValAddr(2) // New SN (0 periods)
 	acc2 := makeAccAddr(2)
 
-	addSupernode(snKeeper, val1, acc1, sntypes.SuperNodeStateActive, 10000)
-	addSupernode(snKeeper, val2, acc2, sntypes.SuperNodeStateActive, 10000)
+	addSupernode(snKeeper, auditKeeper, val1, acc1, sntypes.SuperNodeStateActive, 10000)
+	addSupernode(snKeeper, auditKeeper, val2, acc2, sntypes.SuperNodeStateActive, 10000)
 
 	// Set SN1 as established (4 periods active).
 	k.SetSNDistState(ctx, val1.String(), SNDistState{
@@ -396,7 +417,7 @@ func TestNewSNRampUp(t *testing.T) {
 
 // AT38: Usage growth cap limits reported cascade bytes increase per period.
 func TestUsageGrowthCap(t *testing.T) {
-	k, ctx, bankKeeper, snKeeper := setupTestKeeper(t)
+	k, ctx, bankKeeper, snKeeper, auditKeeper := setupTestKeeper(t)
 
 	params := sntypes.DefaultParams()
 	params.RewardDistribution.PaymentPeriodBlocks = 10
@@ -409,7 +430,7 @@ func TestUsageGrowthCap(t *testing.T) {
 	// Single SN reporting 20000 bytes, but previous was 10000.
 	val1 := makeValAddr(1)
 	acc1 := makeAccAddr(1)
-	addSupernode(snKeeper, val1, acc1, sntypes.SuperNodeStateActive, 20000)
+	addSupernode(snKeeper, auditKeeper, val1, acc1, sntypes.SuperNodeStateActive, 20000)
 
 	// Previous period had 10000 bytes.
 	k.SetSNDistState(ctx, val1.String(), SNDistState{
@@ -441,7 +462,7 @@ func TestUsageGrowthCap(t *testing.T) {
 
 // AT44: Pool with zero balance produces no distribution and no panic.
 func TestZeroPoolBalance(t *testing.T) {
-	k, ctx, bankKeeper, snKeeper := setupTestKeeper(t)
+	k, ctx, bankKeeper, snKeeper, auditKeeper := setupTestKeeper(t)
 
 	params := sntypes.DefaultParams()
 	params.RewardDistribution.PaymentPeriodBlocks = 10
@@ -453,7 +474,7 @@ func TestZeroPoolBalance(t *testing.T) {
 
 	val1 := makeValAddr(1)
 	acc1 := makeAccAddr(1)
-	addSupernode(snKeeper, val1, acc1, sntypes.SuperNodeStateActive, 5000)
+	addSupernode(snKeeper, auditKeeper, val1, acc1, sntypes.SuperNodeStateActive, 5000)
 
 	// Pool balance is zero (no funding).
 
@@ -473,7 +494,7 @@ func TestZeroPoolBalance(t *testing.T) {
 
 // AT45: No eligible SNs produces no distribution and no panic.
 func TestNoEligibleSNs(t *testing.T) {
-	k, ctx, bankKeeper, _ := setupTestKeeper(t)
+	k, ctx, bankKeeper, _, _ := setupTestKeeper(t)
 
 	params := sntypes.DefaultParams()
 	params.RewardDistribution.PaymentPeriodBlocks = 10
@@ -502,7 +523,7 @@ func TestNoEligibleSNs(t *testing.T) {
 
 // Test EndBlocker period check.
 func TestEndBlockerPeriodCheck(t *testing.T) {
-	k, ctx, bankKeeper, snKeeper := setupTestKeeper(t)
+	k, ctx, bankKeeper, snKeeper, auditKeeper := setupTestKeeper(t)
 
 	params := sntypes.DefaultParams()
 	params.RewardDistribution.PaymentPeriodBlocks = 100
@@ -514,7 +535,7 @@ func TestEndBlockerPeriodCheck(t *testing.T) {
 
 	val1 := makeValAddr(1)
 	acc1 := makeAccAddr(1)
-	addSupernode(snKeeper, val1, acc1, sntypes.SuperNodeStateActive, 5000)
+	addSupernode(snKeeper, auditKeeper, val1, acc1, sntypes.SuperNodeStateActive, 5000)
 	fundPool(bankKeeper, 10000)
 
 	// Set last distribution at height 50. Current height 100 (only 50 blocks elapsed, need 100).
@@ -536,7 +557,7 @@ func TestEndBlockerPeriodCheck(t *testing.T) {
 
 // Test STORAGE_FULL SNs are also eligible.
 func TestStorageFullSNsEligible(t *testing.T) {
-	k, ctx, bankKeeper, snKeeper := setupTestKeeper(t)
+	k, ctx, bankKeeper, snKeeper, auditKeeper := setupTestKeeper(t)
 
 	params := sntypes.DefaultParams()
 	params.RewardDistribution.PaymentPeriodBlocks = 10
@@ -548,7 +569,7 @@ func TestStorageFullSNsEligible(t *testing.T) {
 
 	val1 := makeValAddr(1)
 	acc1 := makeAccAddr(1)
-	addSupernode(snKeeper, val1, acc1, sntypes.SuperNodeStateStorageFull, 5000)
+	addSupernode(snKeeper, auditKeeper, val1, acc1, sntypes.SuperNodeStateStorageFull, 5000)
 
 	fundPool(bankKeeper, 10000)
 
@@ -613,7 +634,7 @@ func TestComputeRampUpWeight(t *testing.T) {
 
 // Test SNDistState persistence.
 func TestSNDistStatePersistence(t *testing.T) {
-	k, ctx, _, _ := setupTestKeeper(t)
+	k, ctx, _, _, _ := setupTestKeeper(t)
 
 	valAddr := makeValAddr(1).String()
 
@@ -641,7 +662,7 @@ func TestSNDistStatePersistence(t *testing.T) {
 
 // Test total distributed tracking.
 func TestTotalDistributed(t *testing.T) {
-	k, ctx, _, _ := setupTestKeeper(t)
+	k, ctx, _, _, _ := setupTestKeeper(t)
 
 	// Initially empty.
 	total := k.GetTotalDistributed(ctx)
@@ -660,7 +681,7 @@ func TestTotalDistributed(t *testing.T) {
 
 // Test that SNs without metrics are skipped.
 func TestSNWithoutMetricsSkipped(t *testing.T) {
-	k, ctx, bankKeeper, snKeeper := setupTestKeeper(t)
+	k, ctx, bankKeeper, snKeeper, auditKeeper := setupTestKeeper(t)
 
 	params := sntypes.DefaultParams()
 	params.RewardDistribution.PaymentPeriodBlocks = 10
@@ -686,7 +707,7 @@ func TestSNWithoutMetricsSkipped(t *testing.T) {
 	// Add SN2 with metrics.
 	val2 := makeValAddr(2)
 	acc2 := makeAccAddr(2)
-	addSupernode(snKeeper, val2, acc2, sntypes.SuperNodeStateActive, 5000)
+	addSupernode(snKeeper, auditKeeper, val2, acc2, sntypes.SuperNodeStateActive, 5000)
 
 	fundPool(bankKeeper, 10000)
 

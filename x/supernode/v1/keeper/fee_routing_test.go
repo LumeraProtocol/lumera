@@ -15,7 +15,7 @@ import (
 // GetRegistrationFeeShareBps, which the action module's DistributeFees
 // uses to calculate and route the registration fee share.
 func TestGetRegistrationFeeShareBps(t *testing.T) {
-	k, ctx, _, _ := setupTestKeeper(t)
+	k, ctx, _, _, _ := setupTestKeeper(t)
 
 	// Default params have RegistrationFeeShareBps = 200 (2%).
 	bps := k.GetRegistrationFeeShareBps(ctx)

@@ -28,19 +28,12 @@ func (k Keeper) CountEligibleSNs(ctx sdk.Context) uint64 {
 
 	var count uint64
 	for _, sn := range supernodes {
-		valAddr, err := sdk.ValAddressFromBech32(sn.ValidatorAddress)
-		if err != nil {
-			continue
-		}
-
-		metricsState, found := k.GetMetricsState(ctx, valAddr)
+		rawBytes, reportHeight, found := k.getLatestCascadeBytesFromAudit(ctx, sn.SupernodeAccount)
 		if !found {
 			continue
 		}
-
-		rawBytes := float64(0)
-		if metricsState.Metrics != nil {
-			rawBytes = metricsState.Metrics.CascadeKademliaDbBytes
+		if !isFreshByBlockHeight(ctx.BlockHeight(), reportHeight, params.MetricsFreshnessMaxBlocks) {
+			continue
 		}
 
 		distState, exists := k.GetSNDistState(ctx, sn.ValidatorAddress)
@@ -84,7 +77,7 @@ func (k Keeper) distributePool(ctx sdk.Context) error {
 	// If pool balance is zero, emit event and return (AT44).
 	if poolUlume.IsZero() {
 		ctx.EventManager().EmitEvent(
-				sdk.NewEvent(
+			sdk.NewEvent(
 				sntypes.EventTypeDistribution,
 				sdk.NewAttribute(sntypes.AttributeKeyRewardSkipReason, "pool_balance_zero"),
 				sdk.NewAttribute(sntypes.AttributeKeyRewardPoolBalance, "0"),
@@ -108,22 +101,14 @@ func (k Keeper) distributePool(ctx sdk.Context) error {
 	// 3. Build candidates, applying anti-gaming rules.
 	candidates := make([]snCandidate, 0, len(supernodes))
 	for _, sn := range supernodes {
-		valAddr, err := sdk.ValAddressFromBech32(sn.ValidatorAddress)
-		if err != nil {
-			k.Logger().Error("invalid validator address in supernode", "addr", sn.ValidatorAddress, "err", err)
-			continue
-		}
-
-		// Read metrics state.
-		metricsState, found := k.GetMetricsState(ctx, valAddr)
+		rawBytes, reportHeight, found := k.getLatestCascadeBytesFromAudit(ctx, sn.SupernodeAccount)
 		if !found {
-			// SN has no metrics reported yet; skip.
+			// SN has no usable audit report yet; skip.
 			continue
 		}
-
-		rawBytes := float64(0)
-		if metricsState.Metrics != nil {
-			rawBytes = metricsState.Metrics.CascadeKademliaDbBytes
+		if !isFreshByBlockHeight(currentHeight, reportHeight, params.MetricsFreshnessMaxBlocks) {
+			// Report is stale by block-height freshness rule; skip.
+			continue
 		}
 
 		// Load existing per-SN distribution state.
@@ -174,7 +159,7 @@ func (k Keeper) distributePool(ctx sdk.Context) error {
 	// If no eligible SNs, emit event and return (AT45).
 	if len(candidates) == 0 {
 		ctx.EventManager().EmitEvent(
-				sdk.NewEvent(
+			sdk.NewEvent(
 				sntypes.EventTypeDistribution,
 				sdk.NewAttribute(sntypes.AttributeKeyRewardSkipReason, "no_eligible_supernodes"),
 				sdk.NewAttribute(sntypes.AttributeKeyRewardPoolBalance, poolUlume.String()),
@@ -272,7 +257,7 @@ func (k Keeper) distributePool(ctx sdk.Context) error {
 
 	// 9. Emit summary event.
 	ctx.EventManager().EmitEvent(
-			sdk.NewEvent(
+		sdk.NewEvent(
 			sntypes.EventTypeDistribution,
 			sdk.NewAttribute(sntypes.AttributeKeyRewardEligibleCount, strconv.Itoa(len(candidates))),
 			sdk.NewAttribute(sntypes.AttributeKeyRewardTotalPayout, totalDistributed.String()),

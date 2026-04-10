@@ -45,6 +45,7 @@ func setupKeeperForInternalTest(t testing.TB) (Keeper, sdk.Context) {
 		nil,
 		nil,
 		nil,
+		nil,
 	)
 
 	ctx := sdk.NewContext(stateStore, cmtproto.Header{}, false, log.NewNopLogger())

@@ -1,4 +1,0 @@
-type = "repo"
-description = "lumera repo"
-workspace = "lumera-dev"
-platform = ["claude-code", "codex"]

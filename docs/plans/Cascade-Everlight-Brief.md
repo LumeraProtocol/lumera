@@ -48,17 +48,20 @@ Users **register once**. SuperNodes get **paid continuously** for retained data.
 
 ### Move 1 — `STORAGE_FULL` SuperNode State: Service-Aware Capacity Management
 
-When a SuperNode's Cascade storage capacity crosses a threshold, it enters a new **`STORAGE_FULL`** state — distinct from the existing `POSTPONED` state used for general non-compliance. `STORAGE_FULL` nodes are excluded only from storage-related service selection, while remaining fully eligible for compute workloads.
+When a SuperNode's Cascade storage capacity crosses a threshold, it enters a new **`STORAGE_FULL`** state — distinct from the existing `POSTPONED` state used for general non-compliance. `STORAGE_FULL` nodes are excluded only from new storage assignments, while remaining fully eligible for compute workloads **and continuing to receive Everlight storage retention payouts** for the Cascade data they already hold. This is the core economic distinction: STORAGE_FULL nodes keep getting paid for existing data; POSTPONED nodes do not.
 
-| Service Type | `STORAGE_FULL` Node Eligible? |
-|---|---|
-| Cascade (storage) | ❌ Excluded |
-| Sense (compute) | ✅ Remains eligible |
-| Agents (compute) | ✅ Remains eligible |
+| Capability | `STORAGE_FULL` | `POSTPONED` |
+|---|---|---|
+| New Cascade storage assignments | ❌ Excluded | ❌ Excluded |
+| Sense (compute) | ✅ Eligible | ❌ Excluded |
+| Agents (compute) | ✅ Eligible | ❌ Excluded |
+| **Everlight storage retention payouts** | **✅ Yes — paid for held data** | **❌ Not eligible** |
 
-**What triggers `STORAGE_FULL`:** The SuperNode's self-reported Cascade Kademlia DB size reaches the configured threshold. This is a new metric — `cascade_kademlia_db_bytes` — added to the LEP-4 health reporting schema. Unlike raw disk usage, this measures only actual Cascade data held, which is what matters for storage eligibility.
+**What triggers `STORAGE_FULL`:** The SuperNode's `disk_usage_percent` exceeds `max_storage_usage_percent` (an existing supernode param) AND no other compliance violations exist. This reuses the existing storage metric rather than introducing a new threshold parameter.
 
-**Simple message:** "Disk-full nodes can still do compute work. Storage capacity is measured by what's actually stored in Cascade, not total disk usage."
+A separate metric — `cascade_kademlia_db_bytes` — is also reported via LEP-4 and used for **Everlight payout weighting** (proportional distribution), but it does not drive the STORAGE_FULL state transition.
+
+**Simple message:** "Disk-full nodes can still do compute work. Storage capacity is measured by disk usage percent."
 
 ---
 
@@ -158,7 +161,7 @@ If funding falls below aggregate storage costs, governance can adjust parameters
 - `usage_growth_cap_bps_per_period` — maximum rate of self-reported usage increase
 
 ### Eligibility Parameters
-- `max_storage_usage_percent` — Disk usage threshold for `STORAGE_FULL` state (existing param, default 90%)
+- `max_storage_usage_percent` — disk usage threshold for `STORAGE_FULL` state (existing supernode param)
 
 ### Endowment Parameters (Phase 3)
 - Tiered pricing table — endowment cost per retention tier (5y / 10y / 25y)

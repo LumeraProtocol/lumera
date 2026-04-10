@@ -41,7 +41,7 @@ The lumera repo is the knowledge provider. Other repos consume chain state.
 
 Changes:
 - `proto/lumera/supernode/v1/supernode_state.proto` — add `SUPERNODE_STATE_STORAGE_FULL = 6`
-- `proto/lumera/supernode/v1/params.proto` — add `RewardDistribution` sub-message (field 19)
+- `proto/lumera/supernode/v1/params.proto` — add `RewardDistribution` sub-message (field 19). STORAGE_FULL uses existing `max_storage_usage_percent`.
 - `proto/lumera/supernode/v1/metrics.proto` — add `cascade_kademlia_db_bytes` (field 15)
 - `proto/lumera/supernode/v1/query.proto` — add Everlight pool state, eligibility, payout history queries
 - `proto/lumera/supernode/v1/genesis.proto` — extend with Everlight pool state
@@ -49,7 +49,7 @@ Changes:
 ### S11 — STORAGE_FULL State + Compliance Bifurcation
 
 **Features:** F12 (STORAGE_FULL state), F13 (Compliance bifurcation)
-**Goal:** SNs with only storage-capacity violations enter STORAGE_FULL, not POSTPONED. STORAGE_FULL nodes excluded from Cascade selection only.
+**Goal:** SNs with only storage-capacity violations enter STORAGE_FULL, not POSTPONED. STORAGE_FULL nodes excluded from new Cascade storage assignments but **continue receiving Everlight payouts** for held data. POSTPONED nodes lose all eligibility including payouts.
 
 Changes:
 - `x/supernode/v1/keeper/metrics_validation.go` — split `evaluateCompliance` to identify storage-only vs other violations

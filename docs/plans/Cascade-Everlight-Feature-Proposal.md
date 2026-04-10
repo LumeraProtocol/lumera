@@ -98,9 +98,9 @@ enum SuperNodeState {
 
 LEP-4 compliance evaluation bifurcates:
 
-- If the **only** failing metric is disk usage (`disk_usage_percent` > `max_storage_usage_percent`) → transition to `STORAGE_FULL`
+- If the **only** failing metric is disk storage capacity (`disk_usage_percent` > `max_storage_usage_percent`) → transition to `STORAGE_FULL`
 - If any other compliance threshold fails (CPU, memory, version, ports) → transition to `POSTPONED` (existing behavior)
-- If both disk capacity and other metrics fail → transition to `POSTPONED` (more restrictive state takes precedence)
+- If both storage capacity and other metrics fail → transition to `POSTPONED` (more restrictive state takes precedence)
 
 ```
 [ACTIVE] ──storage full only──> [STORAGE_FULL]
@@ -109,35 +109,35 @@ LEP-4 compliance evaluation bifurcates:
 [STORAGE_FULL] ──other non-compliance added──> [POSTPONED]
 ```
 
-### 5.4 Service Eligibility Matrix
+### 5.4 Service & Payout Eligibility Matrix
 
-| State | Cascade | Sense | Agents | Payout Eligible |
+| State | New Cascade Storage | Sense | Agents | **Everlight Storage Payouts** |
 |---|---|---|---|---|
-| `ACTIVE` | ✅ | ✅ | ✅ | ✅ |
-| `STORAGE_FULL` | ❌ | ✅ | ✅ | ✅ (for existing held data) |
-| `POSTPONED` | ❌ | ❌ | ❌ | ❌ |
-| `DISABLED` | ❌ | ❌ | ❌ | ❌ |
+| `ACTIVE` | ✅ | ✅ | ✅ | **✅ Yes** |
+| `STORAGE_FULL` | ❌ | ✅ | ✅ | **✅ Yes — paid for held data** |
+| `POSTPONED` | ❌ | ❌ | ❌ | **❌ Not eligible** |
+| `DISABLED` | ❌ | ❌ | ❌ | **❌ Not eligible** |
 
-**Payout eligibility for `STORAGE_FULL` nodes:** A `STORAGE_FULL` node is still holding Cascade data — it has simply reached capacity. It should continue receiving payouts proportional to the data it holds. It is excluded from new storage assignments only.
+**This is the core economic motivation for STORAGE_FULL:** A `STORAGE_FULL` node is still holding Cascade data in its local Kademlia DB — it has simply reached disk capacity. It **continues receiving Everlight payouts proportional to `cascade_kademlia_db_bytes`** (the data it holds). It is excluded from new storage assignments only. A `POSTPONED` node, by contrast, loses all eligibility — including payouts — because it has non-storage compliance violations that may indicate the node is unreliable.
 
-### 5.5 LEP-4 Metric Addition: `cascade_kademlia_db_bytes`
+### 5.5 LEP-4 Metric: `cascade_kademlia_db_bytes` (Everlight Payout Weighting)
 
-The current LEP-4 schema reports raw filesystem metrics (`disk_free_gb`, `disk_usage_percent`) with no awareness of how much disk is Cascade data vs. chain state vs. other processes. Two nodes with the same free disk could hold wildly different amounts of Cascade data.
+A new LEP-4 metric reports the actual Cascade data held by each SuperNode. This metric is used for **Everlight payout weighting** (proportional distribution), not for STORAGE_FULL state transitions.
 
 **New metric key:** `cascade_kademlia_db_bytes` (integer reported as double, consistent with LEP-4 schema convention)
 
-SuperNode processes already collect Kademlia DB size internally for the status probe endpoint. This is a reporting addition only — no new internal measurement logic required. This metric is used exclusively for **payout weight calculation** in the Everlight distribution — it is NOT used for STORAGE_FULL transitions.
+SuperNode processes already collect Kademlia DB size internally for the status probe endpoint. This is a reporting addition only — no new internal measurement logic required.
 
 **Updated LEP-4 metric table (storage section):**
 
-| Key | Description | Value Type |
-|---|---|---|
-| `disk.total_gb` | Total disk space in GB | positive double |
-| `disk.free_gb` | Available disk space in GB | positive double |
-| `disk.usage_percent` | Overall disk usage % | 0–100 |
-| `cascade.kademlia_db_bytes` | **NEW** — Bytes held in Cascade Kademlia store (payout weight) | integer as double |
+| Key | Description | Value Type | Used For |
+|---|---|---|---|
+| `disk.total_gb` | Total disk space in GB | positive double | compliance |
+| `disk.free_gb` | Available disk space in GB | positive double | compliance |
+| `disk.usage_percent` | Overall disk usage % | 0–100 | compliance + **STORAGE_FULL trigger** |
+| `cascade.kademlia_db_bytes` | **NEW** — Bytes held in Cascade Kademlia store | integer as double | **Everlight payout weighting** |
 
-**STORAGE_FULL trigger:** The existing `max_storage_usage_percent` param (default: 90) drives STORAGE_FULL transitions. When `disk_usage_percent` exceeds this threshold and no other compliance issues exist, the node enters STORAGE_FULL instead of POSTPONED.
+**STORAGE_FULL uses existing param:** `max_storage_usage_percent` (already in supernode Params). No new threshold parameter needed — `cascade_kademlia_db_max_bytes` was removed from the proto.
 
 ---
 
@@ -359,7 +359,7 @@ For each distribution period, an SN is eligible for payouts if:
 **Chain upgrade deliverables:**
 - `STORAGE_FULL` state added to SuperNode module protobuf; LEP-4 compliance logic updated
 - `cascade.kademlia_db_bytes` metric key added to LEP-4 schema; SuperNode software updated to report it
-- `max_storage_usage_percent` reused for `STORAGE_FULL` trigger (disk usage exceeding threshold)
+- `cascade_kademlia_db_max_bytes` parameter added to SuperNode module
 - Cascade action selection updated to exclude `STORAGE_FULL` nodes; Sense/Agents selection unchanged
 - `x/supernode` extended with: Everlight pool account (receive + distribute only), EndBlocker distribution every `payment_period_blocks`, Everlight params, pool state and eligibility query endpoints — no separate module
 - `x/action` modified: `2%` registration fee share to Everlight pool

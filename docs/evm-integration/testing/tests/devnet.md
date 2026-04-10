@@ -11,4 +11,4 @@ Test source: `devnet/tests/validator/evm_test.go`
 
 ## EVM Migration Devnet Tests
 
-See [devnet-tests.md](../devnet-tests.md) for full details on the EVM migration devnet test binary (modes, usage, and coverage).
+See [devnet-tests.md](../../evmigration/devnet-tests.md) for full details on the EVM migration devnet test binary (modes, usage, and coverage).

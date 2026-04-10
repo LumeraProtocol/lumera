@@ -2,7 +2,7 @@
 
 Tracking issues discovered during EVM integration testing and devnet operation.
 
-See [main.md](main.md) for the full integration document.
+See [main.md](../main.md) for the full integration document.
 
 ---
 

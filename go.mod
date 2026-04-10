@@ -1,6 +1,6 @@
 module github.com/LumeraProtocol/lumera
 
-go 1.26.1
+go 1.26.2
 
 replace (
 	github.com/envoyproxy/protoc-gen-validate => github.com/bufbuild/protoc-gen-validate v1.3.0

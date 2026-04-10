@@ -115,7 +115,7 @@ make devnet-evmigrationp-verify
 make devnet-evmigrationp-cleanup
 ```
 
-See [../evm-integration/devnet-tests.md](../evm-integration/devnet-tests.md) for comprehensive documentation of the `tests_evmigration` tool, including all operating modes, module coverage, and verification strategies.
+See [../evm-integration/evmigration/devnet-tests.md](../evm-integration/evmigration/devnet-tests.md) for comprehensive documentation of the `tests_evmigration` tool, including all operating modes, module coverage, and verification strategies.
 
 ## Manual upgrade walkthrough
 

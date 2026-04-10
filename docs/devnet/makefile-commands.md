@@ -55,7 +55,7 @@ All targets are declared in `Makefile.devnet` and exposed through the root `Make
 
 ## EVM migration test targets
 
-These targets run the `tests_evmigration` binary inside the devnet. See [../evm-integration/devnet-tests.md](../evm-integration/devnet-tests.md) for full documentation.
+These targets run the `tests_evmigration` binary inside the devnet. See [../evm-integration/evmigration/devnet-tests.md](../evm-integration/evmigration/devnet-tests.md) for full documentation.
 
 ### Sequential mode
 

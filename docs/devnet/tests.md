@@ -8,7 +8,7 @@ The devnet includes three test suites that run inside Docker containers against 
 | --- | --- | --- | --- |
 | `tests_validator` | `devnet/tests/validator/` | Any validator container | EVM JSON-RPC, IBC from Lumera side, LEP-5 cascade, port accessibility |
 | `tests_hermes` | `devnet/tests/hermes/` | Hermes container | IBC from simd side, Interchain Accounts (ICA), cascade via ICA |
-| `tests_evmigration` | `devnet/tests/evmigration/` | Hermes container | End-to-end EVM migration (see [../evm-integration/devnet-tests.md](../evm-integration/devnet-tests.md)) |
+| `tests_evmigration` | `devnet/tests/evmigration/` | Hermes container | End-to-end EVM migration (see [../evm-integration/evmigration/devnet-tests.md](../evm-integration/evmigration/devnet-tests.md)) |
 
 ### Shared utilities
 
@@ -200,7 +200,7 @@ End-to-end ICA (Interchain Accounts) flow testing the full cascade upload/downlo
 
 ## EVM migration tests (`tests_evmigration`)
 
-This is a standalone binary (not a Go test binary) with 6 operating modes. See [../evm-integration/devnet-tests.md](../evm-integration/devnet-tests.md) for comprehensive documentation.
+This is a standalone binary (not a Go test binary) with 6 operating modes. See [../evm-integration/evmigration/devnet-tests.md](../evm-integration/evmigration/devnet-tests.md) for comprehensive documentation.
 
 Modes: `prepare`, `estimate`, `migrate`, `migrate-validator`, `verify`, `cleanup`
 

@@ -29,8 +29,8 @@ The Lumera devnet is a Docker-based local test network that runs 5 validator nod
 
 | Document | Description |
 | --- | --- |
-| [../evm-integration/devnet-tests.md](../evm-integration/devnet-tests.md) | `tests_evmigration` end-to-end migration test tool |
-| [../evm-integration/tests.md](../evm-integration/tests.md) | Full test inventory (unit, integration, devnet) |
+| [../evm-integration/evmigration/devnet-tests.md](../evm-integration/evmigration/devnet-tests.md) | `tests_evmigration` end-to-end migration test tool |
+| [../evm-integration/testing/tests.md](../evm-integration/testing/tests.md) | Full test inventory (unit, integration, devnet) |
 | [../lumera-ports.md](../lumera-ports.md) | Port defaults, config keys, and CLI flags for `lumerad` |
 
 ## Architecture

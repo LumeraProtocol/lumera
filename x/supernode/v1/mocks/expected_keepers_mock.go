@@ -836,6 +836,22 @@ func (mr *MockSupernodeKeeperMockRecorder) GetLastDistributionHeight(ctx any) *g
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastDistributionHeight", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetLastDistributionHeight), ctx)
 }
 
+// GetLatestCascadeBytesForPayout mocks base method.
+func (m *MockSupernodeKeeper) GetLatestCascadeBytesForPayout(ctx types0.Context, supernodeAccount string) (float64, int64, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLatestCascadeBytesForPayout", ctx, supernodeAccount)
+	ret0, _ := ret[0].(float64)
+	ret1, _ := ret[1].(int64)
+	ret2, _ := ret[2].(bool)
+	return ret0, ret1, ret2
+}
+
+// GetLatestCascadeBytesForPayout indicates an expected call of GetLatestCascadeBytesForPayout.
+func (mr *MockSupernodeKeeperMockRecorder) GetLatestCascadeBytesForPayout(ctx, supernodeAccount any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLatestCascadeBytesForPayout", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetLatestCascadeBytesForPayout), ctx, supernodeAccount)
+}
+
 // GetPoolBalance mocks base method.
 func (m *MockSupernodeKeeper) GetPoolBalance(ctx types0.Context) types0.Coins {
 	m.ctrl.T.Helper()

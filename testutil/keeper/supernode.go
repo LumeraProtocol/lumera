@@ -37,7 +37,7 @@ func SupernodeKeeper(t testing.TB) (keeper.Keeper, sdk.Context) {
 		cdc,
 		runtime.NewKVStoreService(storeKey),
 		log.NewNopLogger(),
-		authority.String(),
+		authority.String(), nil,
 		nil,
 		nil,
 		nil,

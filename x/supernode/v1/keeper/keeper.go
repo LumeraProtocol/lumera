@@ -25,8 +25,7 @@ type (
 		stakingKeeper  types.StakingKeeper
 		accountKeeper  types.AccountKeeper
 		slashingKeeper types.SlashingKeeper
-
-		//auditKeeper     types.AuditKeeper // future Audit module
+		auditKeeper    types.AuditKeeper
 	}
 )
 
@@ -40,6 +39,7 @@ func NewKeeper(
 	stakingKeeper types.StakingKeeper,
 	accountKeeper types.AccountKeeper,
 	slashingKeeper types.SlashingKeeper,
+	auditKeeper types.AuditKeeper,
 ) Keeper {
 	if _, err := sdk.AccAddressFromBech32(authority); err != nil {
 		panic(fmt.Sprintf("invalid authority address: %s", authority))
@@ -55,6 +55,7 @@ func NewKeeper(
 		stakingKeeper:  stakingKeeper,
 		accountKeeper:  accountKeeper,
 		slashingKeeper: slashingKeeper,
+		auditKeeper:    auditKeeper,
 	}
 }
 
@@ -62,7 +63,6 @@ func NewKeeper(
 func (k Keeper) GetAuthority() string {
 	return k.authority
 }
-
 
 // Logger returns a module-specific logger.
 func (k Keeper) Logger() log.Logger {

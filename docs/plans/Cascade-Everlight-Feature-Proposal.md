@@ -148,7 +148,7 @@ SuperNode processes already collect Kademlia DB size internally for the status p
 All Everlight logic lives within the existing `x/supernode` module — no separate module. This simplifies wiring, avoids cross-keeper dependencies (distribution already reads supernode metrics), and keeps the module count lean. A separate `x/endowment` module is planned for Phase 3 when the scope justifies it.
 
 The `x/supernode` module is extended with:
-- A named **Everlight pool account** (sub-account of the supernode module)
+- The **existing supernode module account**, used as the Everlight pool in Phase 1 (no separate named sub-account)
 - An EndBlocker extension that checks if `payment_period_blocks` have elapsed for periodic distribution
 - Everlight governance parameters added to supernode Params
 - Query endpoints for pool state, payout history, and SN eligibility
@@ -157,13 +157,9 @@ The `x/supernode` module is extended with:
 
 ### 6.2 Pool Account
 
-```
-// Named account within x/supernode module
-PoolAccountName = "everlight"
-// Registered as a module account with receive + distribute only; no Minter/Burner
-```
+In Phase 1, Everlight uses the existing `x/supernode` module account as the pool account (no separate dedicated account).
 
-The pool account accepts `MsgSend` transfers from any address, including the Foundation wallet. This is how Foundation pre-funding works prior to the upgrade and as ongoing supplemental funding. The pool account has no Minter, Burner, or governance voting permissions.
+The supernode module account accepts `MsgSend` transfers from any address, including the Foundation wallet. This is how Foundation pre-funding works prior to the upgrade and as ongoing supplemental funding.
 
 ### 6.3 On-Chain State
 
@@ -259,7 +255,7 @@ func (k Keeper) everlightDistribute(ctx sdk.Context) {
 
 ### 8.1 Foundation Direct Transfers (Operational — No Chain Change)
 
-The Foundation claims its own staking rewards and sends them to the Everlight pool account using standard `MsgSend`. This works from day one — before any chain upgrade — because the named account address is deterministic.
+The Foundation claims its own staking rewards and sends them to the supernode module account (Everlight pool in Phase 1) using standard `MsgSend`. This works from day one — before any chain upgrade — because the module account address is deterministic.
 
 ```
 foundation_wallet  --MsgSend-->  cosmos1<everlight_pool_account>
@@ -355,14 +351,14 @@ For each distribution period, an SN is eligible for payouts if:
 **Summary:** `STORAGE_FULL` SN state + `cascade_kademlia_db_bytes` metric + Everlight pool and distribution within `x/supernode` + registration fee share routing.
 
 **Pre-upgrade (operational, no chain change):**
-- Foundation begins routing staking rewards to the Everlight pool account address via `MsgSend`
+- Foundation begins routing staking rewards to the supernode module account address (Everlight pool in Phase 1) via `MsgSend`
 - Governance may initiate Community Pool transfer proposals at any time
 
 **Chain upgrade deliverables:**
 - `STORAGE_FULL` state added to SuperNode module protobuf; LEP-4 compliance logic updated so `disk_usage_percent > max_storage_usage_percent` with no other violations routes to `STORAGE_FULL`
 - `cascade_kademlia_db_bytes` metric key added to LEP-4 schema; SuperNode software updated to report it
 - Cascade action selection updated to exclude `STORAGE_FULL` nodes; Sense/Agents selection unchanged
-- `x/supernode` extended with: Everlight pool account (receive + distribute only), EndBlocker distribution every `payment_period_blocks`, Everlight params, pool state and eligibility query endpoints — no separate module
+- `x/supernode` extended with: supernode module account (Everlight pool in Phase 1) (receive + distribute only), EndBlocker distribution every `payment_period_blocks`, Everlight params, pool state and eligibility query endpoints — no separate module
 - `x/action` modified: `2%` registration fee share to Everlight pool
 
 **Outcome:** SNs receive compensation from first distribution period. Disk-full nodes remain productive. Pool funded by Foundation transfers, registration fee share, and Community Pool governance transfers.
@@ -427,7 +423,7 @@ For each distribution period, an SN is eligible for payouts if:
 | **Endowment Principal Erosion** — slashing of delegated validators reduces endowment principal | Low | Critical | Governance validator whitelist; per-validator delegation cap; `risk_buffer_bps` yield retention to recapitalize against minor slash events. |
 | **Macro-Economic Decoupling** — LUME price crash or hardware cost spike makes payouts insufficient | Medium | High | Diversified funding (5 streams); compute revenue (Sense/Agents) supplements storage costs via `STORAGE_FULL` nodes; governance levers to adjust parameters. |
 | **Block Processing Overhead** — distributing to many SNs per distribution period is too slow | Low | High | EndBlocker height check is cheap (runs every block); actual distribution only runs once per `payment_period_blocks`. Minimum threshold excludes dust nodes. Batching fallback if SN count exceeds limit. |
-| **Governance Capture** — large endowment pool gives pool account outsized voting power | Low | High | Disable voting rights on Everlight pool account (standard Cosmos SDK capability). |
+| **Governance Capture** — large endowment pool gives pool account outsized voting power | Low | High | Phase 1 uses existing supernode module account as pool; dedicated-account permission hardening is deferred and tracked separately. |
 | **Marketing vs. Reality Gap** — users interpret "best-effort permanence" as "forever" | Medium | Medium | Explicit UI framing: "Guaranteed Term: X Years." No "Permaweb" branding. Legally distinct tier records on-chain. |
 
 ### Overall Risk Posture

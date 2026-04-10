@@ -67,7 +67,7 @@ Changes:
 - `x/supernode/v1/keeper/everlight_pool.go` — pool balance, distribution height tracking
 - `x/supernode/v1/keeper/everlight_queries.go` — pool state, SN eligibility queries
 - `x/supernode/v1/types/` — Everlight pool state types
-- `app/app_config.go` — register Everlight pool account (named account within supernode)
+- `app/app_config.go` — use existing supernode module account as Everlight pool in Phase 1 (no separate named account)
 
 ### S13 — Periodic Distribution Logic
 
@@ -86,7 +86,7 @@ Changes:
 **Goal:** Registration fee share flows to Everlight pool.
 
 Changes:
-- `x/action/v1/keeper/action.go` (`DistributeFees`) — route configured bps to Everlight pool account
+- `x/action/v1/keeper/action.go` (`DistributeFees`) — route configured bps to supernode module account (Everlight pool in Phase 1)
 - `x/action/v1/types/expected_keepers.go` — add interface for Everlight-aware bank ops
 
 Note: F17 (Block reward share via `x/distribution`) is out of scope for Phase 1 — see Phase 4 in the roadmap.
@@ -97,7 +97,7 @@ Note: F17 (Block reward share via `x/distribution`) is out of scope for Phase 1 
 **Goal:** Clean upgrade using the branch's target upgrade version. Everlight params initialized within supernode. Pool account registered.
 
 Changes:
-- `app/upgrades/v1_15_0/` — upgrade handler (initialize Everlight params in supernode, register pool account)
+- `app/upgrades/v1_11_x/` — upgrade handler (initialize Everlight params in supernode, initialize pool state in supernode module account model)
 - `app/upgrades/upgrades.go` — register v1.11.x
 - Integration tests for full flow
 
@@ -110,7 +110,7 @@ Changes:
 | OQ10 | Upgrade version — **resolved in current branch:** v1.11.x | S15 |
 | OQ12 | Fee routing — **resolved:** full 2% Community Pool share of registration fees redirected to Everlight pool (`registration_fee_share_bps` = 200). | S14 |
 | OQ13 | Cascade SN selection — **resolved:** STORAGE_FULL nodes excluded from Cascade selection. Verified via AT31. | S11 |
-| OQ14 | Module account permissions — **resolved:** receive+distribute only, no Minter/Burner. | S12 |
+| OQ14 | Module account permissions — **resolved:** Phase 1 uses existing supernode module account permissions; no separate constrained Everlight account. | S12 |
 
 ---
 
@@ -122,14 +122,14 @@ Changes:
 | AT31 | STORAGE_FULL SN excluded from Cascade selection, included in Sense/Agents |
 | AT32 | STORAGE_FULL SN recovers to ACTIVE when disk usage drops below threshold |
 | AT33 | STORAGE_FULL + other violation → POSTPONED (more restrictive wins) |
-| AT34 | Everlight pool account accepts MsgSend transfers |
+| AT34 | supernode module account (Everlight pool in Phase 1) accepts MsgSend transfers |
 | AT35 | Pool distributes proportionally by cascade_kademlia_db_bytes at period boundary |
 | AT36 | SNs below min_cascade_bytes_for_payment excluded from distribution |
 | AT37 | New SN receives ramped-up (partial) payout weight |
 | AT38 | Usage growth cap limits reported cascade bytes increase per period |
 | AT39 | Registration fee share flows to Everlight pool on action finalization |
 | AT41 | All Everlight params governable via MsgUpdateParams |
-| AT42 | Upgrade handler initializes Everlight params within supernode and registers pool account |
+| AT42 | Upgrade handler initializes Everlight params within supernode for module-account-based pool model |
 | AT43 | Existing SN states and actions unaffected by upgrade |
 | AT44 | Pool with zero balance → no distribution, no panic |
 | AT45 | No eligible SNs → no distribution, no panic |
@@ -142,7 +142,7 @@ Changes:
 |---|---|---|
 | R10 | Metric gaming — SNs inflate cascade_kademlia_db_bytes | Growth cap + smoothing window + new-SN ramp-up from day one. Phase 2 (LEP-6) adds compound storage challenges and node suspicion scoring. |
 | R12 | Proto field conflicts with in-flight changes | Coordinate: SN params field 19, SN metrics field 15, SN state enum value 6 |
-| R13 | Pool account security | Everlight pool account: receive + distribute only, no Minter/Burner, no voting rights. |
+| R13 | Pool account security | Phase 1 uses existing supernode module account as pool; permission hardening of a dedicated account is explicitly out of scope for this phase. |
 | R14 | Multi-repo coordination delays | lumera ships first; other repos only need updated proto bindings |
 
 ---

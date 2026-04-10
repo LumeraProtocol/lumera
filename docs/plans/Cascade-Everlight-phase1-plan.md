@@ -98,7 +98,7 @@ Note: F17 (Block reward share via `x/distribution`) is out of scope for Phase 1 
 
 Changes:
 - `app/upgrades/v1_15_0/` — upgrade handler (initialize Everlight params in supernode, register pool account)
-- `app/upgrades/upgrades.go` — register v1.15.0
+- `app/upgrades/upgrades.go` — register v1.11.x
 - Integration tests for full flow
 
 ---
@@ -107,7 +107,7 @@ Changes:
 
 | ID | Question | Impact |
 |---|---|---|
-| OQ10 | Upgrade version — **resolved in current branch:** v1.15.0 | S15 |
+| OQ10 | Upgrade version — **resolved in current branch:** v1.11.x | S15 |
 | OQ12 | Fee routing — **resolved:** full 2% Community Pool share of registration fees redirected to Everlight pool (`registration_fee_share_bps` = 200). | S14 |
 | OQ13 | Cascade SN selection — **resolved:** STORAGE_FULL nodes excluded from Cascade selection. Verified via AT31. | S11 |
 | OQ14 | Module account permissions — **resolved:** receive+distribute only, no Minter/Burner. | S12 |

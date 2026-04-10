@@ -135,7 +135,7 @@ SuperNode processes already collect Kademlia DB size internally for the status p
 | `disk.total_gb` | Total disk space in GB | positive double | compliance |
 | `disk.free_gb` | Available disk space in GB | positive double | compliance |
 | `disk.usage_percent` | Overall disk usage % | 0–100 | compliance + **STORAGE_FULL trigger** |
-| `cascade.kademlia_db_bytes` | **NEW** — Bytes held in Cascade Kademlia store | integer as double | **Everlight payout weighting** |
+| `cascade_kademlia_db_bytes` | **NEW** — Bytes held in Cascade Kademlia store | integer as double | **Everlight payout weighting** |
 
 **STORAGE_FULL uses existing param:** `max_storage_usage_percent` (already in supernode Params). No new threshold parameter needed — `cascade_kademlia_db_max_bytes` was removed from the proto.
 
@@ -325,7 +325,9 @@ Applies to all action types (Cascade, Sense, Agents) — every service contribut
 
 ### 9.1 Weight Metric
 
-Payouts are weighted by **`cascade.kademlia_db_bytes`** — the actual Cascade data held in the node's Kademlia store, as self-reported via LEP-4. This is more meaningful than raw disk usage (which includes chain state and OS overhead) and more directly proportional to actual retention costs.
+Payouts are weighted by **`cascade_kademlia_db_bytes`** — the actual Cascade data held in the node's Kademlia store, as self-reported via LEP-4. This is more meaningful than raw disk usage (which includes chain state and OS overhead) and more directly proportional to actual retention costs.
+
+**Rounding semantics (Phase 1):** per-SN payout shares are truncated to integer coin amounts; any remainder (dust) stays in the pool for future periods.
 
 ### 9.2 Anti-Gaming Guardrails (Active from Phase 1)
 
@@ -340,7 +342,7 @@ Payouts are weighted by **`cascade.kademlia_db_bytes`** — the actual Cascade d
 
 For each distribution period, an SN is eligible for payouts if:
 - State is `ACTIVE` or `STORAGE_FULL`
-- `cascade.kademlia_db_bytes` ≥ `min_cascade_bytes_for_payment`
+- `cascade_kademlia_db_bytes` ≥ `min_cascade_bytes_for_payment`
 - LEP-4 report is within `metrics_freshness_max_blocks` (not stale)
 - (Phase 2+) Challenge pass rate meets minimum threshold
 
@@ -358,7 +360,7 @@ For each distribution period, an SN is eligible for payouts if:
 
 **Chain upgrade deliverables:**
 - `STORAGE_FULL` state added to SuperNode module protobuf; LEP-4 compliance logic updated so `disk_usage_percent > max_storage_usage_percent` with no other violations routes to `STORAGE_FULL`
-- `cascade.kademlia_db_bytes` metric key added to LEP-4 schema; SuperNode software updated to report it
+- `cascade_kademlia_db_bytes` metric key added to LEP-4 schema; SuperNode software updated to report it
 - Cascade action selection updated to exclude `STORAGE_FULL` nodes; Sense/Agents selection unchanged
 - `x/supernode` extended with: Everlight pool account (receive + distribute only), EndBlocker distribution every `payment_period_blocks`, Everlight params, pool state and eligibility query endpoints — no separate module
 - `x/action` modified: `2%` registration fee share to Everlight pool
@@ -381,7 +383,7 @@ For each distribution period, an SN is eligible for payouts if:
 
 **Additional Phase 2 deliverables:**
 - LEP-5 challenge-response proofs integrated with Everlight eligibility: unchallenged or failed SNs receive partial payouts; fully audited SNs receive full payouts
-- snscope formally integrated: persistent discrepancies between self-reported `cascade.kademlia_db_bytes` and snscope observations trigger on-chain governance alerts
+- snscope formally integrated: persistent discrepancies between self-reported `cascade_kademlia_db_bytes` and snscope observations trigger on-chain governance alerts
 - Score-band-driven postpone/probation decisions for storage-specific audit enforcement
 
 **Outcome:** Payout system resistant to manipulation. Storage truth measured directly, not inferred from reachability. Full payouts require demonstrated data retention.
@@ -421,7 +423,7 @@ For each distribution period, an SN is eligible for payouts if:
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| **Metric Gaming (Sybil Storage)** — SNs inflate `cascade.kademlia_db_bytes` in Phase 1 to capture excess payouts | High | High | Growth caps + smoothing window + new-SN ramp-up from day one. Phase 2 (LEP-6) adds compound storage challenges with node suspicion scoring, reporter reliability scoring, and ticket deterioration tracking. snscope cross-validation adds external validation layer. |
+| **Metric Gaming (Sybil Storage)** — SNs inflate `cascade_kademlia_db_bytes` in Phase 1 to capture excess payouts | High | High | Growth caps + smoothing window + new-SN ramp-up from day one. Phase 2 (LEP-6) adds compound storage challenges with node suspicion scoring, reporter reliability scoring, and ticket deterioration tracking. snscope cross-validation adds external validation layer. |
 | **Endowment Principal Erosion** — slashing of delegated validators reduces endowment principal | Low | Critical | Governance validator whitelist; per-validator delegation cap; `risk_buffer_bps` yield retention to recapitalize against minor slash events. |
 | **Macro-Economic Decoupling** — LUME price crash or hardware cost spike makes payouts insufficient | Medium | High | Diversified funding (5 streams); compute revenue (Sense/Agents) supplements storage costs via `STORAGE_FULL` nodes; governance levers to adjust parameters. |
 | **Block Processing Overhead** — distributing to many SNs per distribution period is too slow | Low | High | EndBlocker height check is cheap (runs every block); actual distribution only runs once per `payment_period_blocks`. Minimum threshold excludes dust nodes. Batching fallback if SN count exceeds limit. |

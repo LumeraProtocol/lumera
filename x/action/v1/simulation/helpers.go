@@ -1042,7 +1042,7 @@ func registerSupernode(r *rand.Rand, ctx sdk.Context, k keeper.Keeper, accs []si
 		Evidence:         []*sntypes.Evidence{},
 		Note:             version,
 		Metrics: &sntypes.MetricsAggregate{
-			Metrics:     make(map[string]float64),
+			Metrics:     []*sntypes.MetricValue{},
 			ReportCount: 0,
 		},
 		States: []*sntypes.SuperNodeStateRecord{

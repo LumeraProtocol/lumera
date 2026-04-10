@@ -33,6 +33,6 @@
         "account_balance": "10000000ulume"
     },
     "hermes": {
-        "enabled": true
+        "enabled": false
     }
 }

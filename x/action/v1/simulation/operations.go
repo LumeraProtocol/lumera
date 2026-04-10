@@ -123,6 +123,10 @@ func WeightedOperations(
 			weightActionExpirationSim, // Lower weight for state transition simulation
 			SimulateActionExpiration(ak, bk, k),
 		),
+		simulation.NewWeightedOperation(
+			weightMsgFinalizeAction, // LEP-5 full SVC flow: register with commitment, finalize with proofs
+			SimulateMsgCascadeWithSVCFlow(ak, bk, k),
+		),
 	}
 
 	return operations

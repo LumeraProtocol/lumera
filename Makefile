@@ -18,7 +18,7 @@ module_version = $(strip $(shell EMSDK_QUIET=1 ${GO} list -m -f '{{.Version}}' $
 
 GOFLAGS = "-trimpath"
 
-WASMVM_VERSION := v3@v3.0.2
+WASMVM_VERSION := v3@v3.0.3
 RELEASE_CGO_LDFLAGS ?= -Wl,-rpath,/usr/lib -Wl,--disable-new-dtags
 COSMOS_PROTO_VERSION := $(call module_version,github.com/cosmos/cosmos-proto)
 GOGOPROTO_VERSION := $(call module_version,github.com/cosmos/gogoproto)

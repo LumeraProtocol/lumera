@@ -35,11 +35,18 @@ CFG_DIR="${SHARED_DIR}/config"
 CFG_CHAIN="${CFG_DIR}/config.json"
 CFG_VALS="${CFG_DIR}/validators.json"
 RELEASE_DIR="${SHARED_DIR}/release"
-NM_UI_DIR="${RELEASE_DIR}/nm-ui"
+NM_UI_DIR="${RELEASE_DIR}/uploader-ui"
 STATUS_DIR="${SHARED_DIR}/status"
 SETUP_COMPLETE="${STATUS_DIR}/setup_complete"
 SN="supernode-linux-amd64"
-NM="network-maker"
+# Detect which uploader binary is in the release dir
+if [ -f "${RELEASE_DIR}/lumera-uploader" ]; then
+	NM="lumera-uploader"
+elif [ -f "${RELEASE_DIR}/network-maker" ]; then
+	NM="network-maker"
+else
+	NM="lumera-uploader"
+fi
 LUMERAD="lumerad"
 LUMERA_SRC_BIN="${RELEASE_DIR}/${LUMERAD}"
 LUMERA_DST_BIN="/usr/local/bin/${LUMERAD}"
@@ -56,7 +63,7 @@ VALIDATOR_LOG="${LOGS_DIR}/validator.log"
 SUPERNODE_LOG="${LOGS_DIR}/supernode.log"
 VALIDATOR_SETUP_OUT="${LOGS_DIR}/validator-setup.out"
 SUPERNODE_SETUP_OUT="${LOGS_DIR}/supernode-setup.out"
-NETWORK_MAKER_SETUP_OUT="${LOGS_DIR}/network-maker-setup.out"
+UPLOADER_SETUP_OUT="${LOGS_DIR}/lumera-uploader-setup.out"
 NM_UI_PORT="${NM_UI_PORT:-8088}"
 
 LUMERA_RPC_PORT="${LUMERA_RPC_PORT:-26657}"
@@ -112,13 +119,13 @@ inject_nm_ui_env() {
 	local files
 	files="$(grep -rl "http://127.0.0.1:8080" "${NM_UI_DIR}" || true)"
 	if [ -z "${files}" ]; then
-		echo "[BOOT] network-maker UI: no API base placeholder found to inject."
+		echo "[BOOT] ${NM} UI: no API base placeholder found to inject."
 		return 0
 	fi
 
 	local escaped_base="${api_base//\//\\/}"
 	escaped_base="${escaped_base//&/\\&}"
-	echo "[BOOT] network-maker UI: injecting API base ${api_base}"
+	echo "[BOOT] ${NM} UI: injecting API base ${api_base}"
 	# Replace default API base baked into the static bundle with runtime value
 	while IFS= read -r f; do
 		sed -i "s|http://127.0.0.1:8080|${escaped_base}|g" "$f"
@@ -127,13 +134,13 @@ inject_nm_ui_env() {
 
 start_nm_ui_if_present() {
 	if [ ! -d "${NM_UI_DIR}" ] || [ ! -f "${NM_UI_DIR}/index.html" ]; then
-		echo "[BOOT] network-maker UI not found at ${NM_UI_DIR}; skipping nginx"
+		echo "[BOOT] ${NM} UI not found at ${NM_UI_DIR}; skipping nginx"
 		return
 	fi
 
 	inject_nm_ui_env
 
-	cat >/etc/nginx/conf.d/network-maker-ui.conf <<EOF
+	cat >/etc/nginx/conf.d/lumera-uploader-ui.conf <<EOF
 server {
     listen ${NM_UI_PORT};
     server_name _;
@@ -146,11 +153,11 @@ server {
 EOF
 
 	if pgrep -x nginx >/dev/null 2>&1; then
-		echo "[BOOT] nginx already running; skipping start for network-maker UI."
+		echo "[BOOT] nginx already running; skipping start for ${NM} UI."
 		return
 	fi
 
-	echo "[BOOT] Starting nginx to serve network-maker UI on port ${NM_UI_PORT}"
+	echo "[BOOT] Starting nginx to serve ${NM} UI on port ${NM_UI_PORT}"
 	nginx
 }
 
@@ -179,7 +186,7 @@ archive_existing_logs() {
 	archive_log_file "${SUPERNODE_LOG}"
 	archive_log_file "${VALIDATOR_SETUP_OUT}"
 	archive_log_file "${SUPERNODE_SETUP_OUT}"
-	archive_log_file "${NETWORK_MAKER_SETUP_OUT}"
+	archive_log_file "${UPLOADER_SETUP_OUT}"
 }
 
 # Get current block height (integer), 0 if unknown
@@ -289,10 +296,10 @@ launch_validator_setup() {
 	fi
 }
 
-launch_network_maker_setup() {
-	if [ -x "${SCRIPTS_DIR}/network-maker-setup.sh" ] && [ -f "${RELEASE_DIR}/${NM}" ]; then
-		echo "[BOOT] ${MONIKER}: Launching Network Maker setup in background..."
-		nohup bash "${SCRIPTS_DIR}/network-maker-setup.sh" >"${NETWORK_MAKER_SETUP_OUT}" 2>&1 &
+launch_uploader_setup() {
+	if [ -x "${SCRIPTS_DIR}/lumera-uploader-setup.sh" ] && [ -f "${RELEASE_DIR}/${NM}" ]; then
+		echo "[BOOT] ${MONIKER}: Launching Lumera Uploader setup in background..."
+		nohup bash "${SCRIPTS_DIR}/lumera-uploader-setup.sh" >"${UPLOADER_SETUP_OUT}" 2>&1 &
 	fi
 }
 
@@ -320,13 +327,13 @@ start_lumera() {
 }
 
 tail_logs() {
-	touch "${VALIDATOR_LOG}" "${SUPERNODE_LOG}" "${SUPERNODE_SETUP_OUT}" "${VALIDATOR_SETUP_OUT}" "${NETWORK_MAKER_SETUP_OUT}"
-	exec tail -F "${VALIDATOR_LOG}" "${SUPERNODE_LOG}" "${SUPERNODE_SETUP_OUT}" "${VALIDATOR_SETUP_OUT}" "${NETWORK_MAKER_SETUP_OUT}"
+	touch "${VALIDATOR_LOG}" "${SUPERNODE_LOG}" "${SUPERNODE_SETUP_OUT}" "${VALIDATOR_SETUP_OUT}" "${UPLOADER_SETUP_OUT}"
+	exec tail -F "${VALIDATOR_LOG}" "${SUPERNODE_LOG}" "${SUPERNODE_SETUP_OUT}" "${VALIDATOR_SETUP_OUT}" "${UPLOADER_SETUP_OUT}"
 }
 
 run_auto_flow() {
 	archive_existing_logs
-	launch_network_maker_setup
+	launch_uploader_setup
 	launch_supernode_setup
 	launch_validator_setup
 	wait_for_validator_setup
@@ -342,7 +349,7 @@ auto | "")
 
 bootstrap)
 	archive_existing_logs
-	launch_network_maker_setup
+	launch_uploader_setup
 	launch_supernode_setup
 	launch_validator_setup
 	wait_for_validator_setup

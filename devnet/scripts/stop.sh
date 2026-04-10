@@ -2,7 +2,7 @@
 # stop.sh — stop devnet services inside a validator container
 # Usage:
 #   ./stop.sh                    # stop all known services
-#   ./stop.sh nm|sn|lumera|nginx
+#   ./stop.sh uploader|sn|lumera|nginx
 set -euo pipefail
 
 DAEMON="${DAEMON:-lumerad}"
@@ -13,15 +13,19 @@ log() {
 	echo "[STOP] $*"
 }
 
-stop_nm() {
-	local name="network-maker"
-
-	if pgrep -x "${name}" >/dev/null 2>&1; then
-		log "Stopping network-maker..."
-		pkill -x "${name}" || true
-		log "network-maker stop requested."
-	else
-		log "network-maker is not running."
+stop_uploader() {
+	local stopped=0
+	# Handle both new (lumera-uploader) and old (network-maker) binary names
+	for name in "lumera-uploader" "network-maker"; do
+		if pgrep -x "${name}" >/dev/null 2>&1; then
+			log "Stopping ${name}..."
+			pkill -x "${name}" || true
+			log "${name} stop requested."
+			stopped=1
+		fi
+	done
+	if ((stopped == 0)); then
+		log "lumera-uploader is not running."
 	fi
 }
 
@@ -82,21 +86,21 @@ stop_lumera() {
 }
 
 stop_all() {
-	stop_nm
+	stop_uploader
 	stop_sn
 	stop_nginx
 	stop_lumera
 }
 
 usage() {
-	echo "Usage: $0 [nm|sn|lumera|nginx|all]" >&2
+	echo "Usage: $0 [uploader|sn|lumera|nginx|all]" >&2
 	exit 1
 }
 
 target="${1:-all}"
 case "${target}" in
-nm | network-maker)
-	stop_nm
+uploader | nm | network-maker | lumera-uploader | ul)
+	stop_uploader
 	;;
 sn | supernode)
 	stop_sn

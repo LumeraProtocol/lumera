@@ -152,6 +152,31 @@ lumera_supports_evm() {
 	return 1
 }
 
+# ─── Uploader Binary Name Resolution ─────────────────────────────────────────
+# Starting from Lumera v1.11.0 the "network-maker" project was renamed to
+# "lumera-uploader". Scripts that need the binary/log/home names should call
+# resolve_uploader_name() to get the correct value for the running version.
+#
+# The threshold version can be overridden via LUMERA_FIRST_UPLOADER_VERSION.
+LUMERA_FIRST_UPLOADER_VERSION="${LUMERA_FIRST_UPLOADER_VERSION:-1.11.0}"
+
+# resolve_uploader_name [version]
+#   Prints "lumera-uploader" if the given (or detected) lumerad version >= 1.11.0,
+#   otherwise "network-maker".
+resolve_uploader_name() {
+	local ver="${1:-}"
+	if [[ -z "${ver}" ]]; then
+		ver="$(get_lumerad_version 2>/dev/null || true)"
+	fi
+	ver="$(normalize_version "${ver}")"
+	if [[ -n "${ver}" ]] && version_ge "${ver}" "${LUMERA_FIRST_UPLOADER_VERSION}"; then
+		printf "lumera-uploader"
+	else
+		printf "network-maker"
+	fi
+}
+
+
 wait_for_tx() {
 	local txhash="$1"
 	local timeout="${2:-90}"

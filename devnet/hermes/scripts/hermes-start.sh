@@ -188,7 +188,7 @@ if [ -z "${LUMERA_FIRST_EVM_VERSION:-}" ] || [ "${LUMERA_FIRST_EVM_VERSION}" = "
 fi
 
 if command -v jq >/dev/null 2>&1 && [ -f "${VALIDATORS_JSON}" ]; then
-	FIRST_VALIDATOR_SERVICE="$(jq -r '([.[] | select(."network-maker"==true) | .name] | first) // empty' "${VALIDATORS_JSON}")"
+	FIRST_VALIDATOR_SERVICE="$(jq -r '([.[] | select((."lumera-uploader"==true) or (."lumera-uploader".enabled==true)) | .name] | first) // empty' "${VALIDATORS_JSON}")"
 	if [ -z "${FIRST_VALIDATOR_SERVICE}" ] || [ "${FIRST_VALIDATOR_SERVICE}" = "null" ]; then
 		FIRST_VALIDATOR_SERVICE="$(jq -r '.[0].name // empty' "${VALIDATORS_JSON}")"
 	fi

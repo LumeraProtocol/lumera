@@ -277,25 +277,25 @@ func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validat
 			service.DependsOn = []string{validators[0].Name}
 		}
 
-		if validator.NetworkMaker.Enabled {
-			nmGrpc := validator.NetworkMaker.GRPCPort
+		if validator.LumeraUploader.Enabled {
+			nmGrpc := validator.LumeraUploader.GRPCPort
 			if nmGrpc == 0 {
-				nmGrpc = DefaultNetworkMakerGRPCPort
+				nmGrpc = DefaultLumeraUploaderGRPCPort
 			}
-			nmHTTP := validator.NetworkMaker.HTTPPort
+			nmHTTP := validator.LumeraUploader.HTTPPort
 			if nmHTTP == 0 {
-				nmHTTP = DefaultNetworkMakerHTTPPort
+				nmHTTP = DefaultLumeraUploaderHTTPPort
 			}
 			service.Ports = append(service.Ports,
-				fmt.Sprintf("%d:%d", nmGrpc, DefaultNetworkMakerGRPCPort),
-				fmt.Sprintf("%d:%d", nmHTTP, DefaultNetworkMakerHTTPPort),
-				fmt.Sprintf("%d:%d", DefaultNetworkMakerUIPort, DefaultNetworkMakerUIPort),
+				fmt.Sprintf("%d:%d", nmGrpc, DefaultLumeraUploaderGRPCPort),
+				fmt.Sprintf("%d:%d", nmHTTP, DefaultLumeraUploaderHTTPPort),
+				fmt.Sprintf("%d:%d", DefaultLumeraUploaderUIPort, DefaultLumeraUploaderUIPort),
 			)
 
-			if config.NetworkMaker.GRPCPort > 0 {
+			if config.LumeraUploader.GRPCPort > 0 {
 				env[EnvNMAPIBase] = fmt.Sprintf("http://localhost:%d", nmHTTP)
 			}
-			if config.NetworkMaker.AccountBalance != "" {
+			if config.LumeraUploader.AccountBalance != "" {
 				// reserve env slot for key if provided in config (optional)
 			}
 		}

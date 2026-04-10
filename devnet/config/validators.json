@@ -60,7 +60,7 @@
       "port": 8565,
       "ws_port": 8566
     },
-    "network-maker": {
+    "lumera-uploader": {
       "enabled": true,
       "grpc_port": 50051,
       "http_port": 8080

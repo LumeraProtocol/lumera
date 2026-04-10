@@ -9,9 +9,9 @@ const (
 	DefaultSupernodePort             = 4444
 	DefaultSupernodeP2PPort          = 4445
 	DefaultSupernodeGatewayPort      = 8002
-	DefaultNetworkMakerGRPCPort      = 50051
-	DefaultNetworkMakerHTTPPort      = 8080
-	DefaultNetworkMakerUIPort        = 8088
+	DefaultLumeraUploaderGRPCPort      = 50051
+	DefaultLumeraUploaderHTTPPort      = 8080
+	DefaultLumeraUploaderUIPort        = 8088
 	DefaultGRPCWebPort               = 9091
 	DefaultJSONRPCPort               = 8545
 	DefaultJSONRPCWSPort             = 8546

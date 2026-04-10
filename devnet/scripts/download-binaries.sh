@@ -9,7 +9,7 @@
 #   ./devnet/scripts/download-binaries.sh v1.11.1
 #
 # The script reads devnet/config/binaries.json, looks up the requested version,
-# and downloads lumerad, libwasmvm, supernode, and network-maker into the
+# and downloads lumerad, libwasmvm, supernode, and lumera-uploader (or network-maker for <v1.11.0) into the
 # corresponding bin-<version> directory under devnet/.
 
 set -euo pipefail
@@ -118,28 +118,61 @@ if [[ -n "${SN_TAG}" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# 3. Network-maker (tarball with binary + ui)
+# 3. Lumera Uploader / Network-maker (tarball with binary + ui)
+#    >= v1.11.0 the project is called "lumera-uploader"; older uses "network-maker".
 # ---------------------------------------------------------------------------
+
+# Simple host-side version comparison (no common.sh dependency).
+_version_strip_v() { local v="${1#v}"; printf '%s' "$v"; }
+_host_version_ge() {
+	local cur="$(_version_strip_v "$1")" floor="$(_version_strip_v "$2")"
+	printf '%s\n' "$floor" "$cur" | sort -V | head -n 1 | grep -q "^${floor}\$"
+}
+
+UPLOADER_TAG=""
+UPLOADER_BIN_NAME=""
+UPLOADER_REPO=""
+
+# Try new name first (lumera_uploader), fall back to old (network_maker)
+LU_TAG="$(echo "${VERSION_ENTRY}" | jq -r '.lumera_uploader.tag // empty')"
 NM_TAG="$(echo "${VERSION_ENTRY}" | jq -r '.network_maker.tag // empty')"
-if [[ -n "${NM_TAG}" ]]; then
-	NM_ASSET="network-maker_${NM_TAG}_linux_amd64.tar.gz"
-	NM_TAR="${TMPDIR}/${NM_ASSET}"
 
-	echo "--- network-maker ${NM_TAG} ---"
-	download_asset "network-maker" "${NM_TAG}" "${NM_ASSET}" "${NM_TAR}"
+if [[ -n "${LU_TAG}" ]] || _host_version_ge "${VERSION}" "v1.11.0"; then
+	UPLOADER_TAG="${LU_TAG}"
+	UPLOADER_BIN_NAME="lumera-uploader"
+	UPLOADER_REPO="lumera-uploader"
+elif [[ -n "${NM_TAG}" ]]; then
+	UPLOADER_TAG="${NM_TAG}"
+	UPLOADER_BIN_NAME="network-maker"
+	UPLOADER_REPO="network-maker"
+fi
 
-	echo "  Extracting network-maker..."
-	NM_EXTRACT="${TMPDIR}/nm"
-	mkdir -p "${NM_EXTRACT}"
-	tar xzf "${NM_TAR}" -C "${NM_EXTRACT}"
+if [[ -n "${UPLOADER_TAG}" ]]; then
+	UL_ASSET="${UPLOADER_BIN_NAME}_${UPLOADER_TAG}_linux_amd64.tar.gz"
+	UL_TAR="${TMPDIR}/${UL_ASSET}"
 
-	[[ -f "${NM_EXTRACT}/network-maker" ]] && cp -f "${NM_EXTRACT}/network-maker" "${BIN_DIR}/network-maker" && chmod +x "${BIN_DIR}/network-maker"
-	[[ -f "${NM_EXTRACT}/config.toml" ]] && cp -f "${NM_EXTRACT}/config.toml" "${BIN_DIR}/nm-config.toml"
-	if [[ -d "${NM_EXTRACT}/ui" ]]; then
-		rm -rf "${BIN_DIR}/nm-ui"
-		cp -rf "${NM_EXTRACT}/ui" "${BIN_DIR}/nm-ui"
+	echo "--- ${UPLOADER_BIN_NAME} ${UPLOADER_TAG} ---"
+	download_asset "${UPLOADER_REPO}" "${UPLOADER_TAG}" "${UL_ASSET}" "${UL_TAR}"
+
+	echo "  Extracting ${UPLOADER_BIN_NAME}..."
+	UL_EXTRACT="${TMPDIR}/ul"
+	mkdir -p "${UL_EXTRACT}"
+	tar xzf "${UL_TAR}" -C "${UL_EXTRACT}"
+
+	# The tarball may contain either the old or new binary name
+	for candidate in "${UPLOADER_BIN_NAME}" "network-maker" "lumera-uploader"; do
+		if [[ -f "${UL_EXTRACT}/${candidate}" ]]; then
+			cp -f "${UL_EXTRACT}/${candidate}" "${BIN_DIR}/${UPLOADER_BIN_NAME}"
+			chmod +x "${BIN_DIR}/${UPLOADER_BIN_NAME}"
+			break
+		fi
+	done
+	[[ -f "${UL_EXTRACT}/config.toml" ]] && cp -f "${UL_EXTRACT}/config.toml" "${BIN_DIR}/uploader-config.toml"
+	if [[ -d "${UL_EXTRACT}/ui" ]]; then
+		rm -rf "${BIN_DIR}/uploader-ui"
+		cp -rf "${UL_EXTRACT}/ui" "${BIN_DIR}/uploader-ui"
 	fi
-	echo "  -> network-maker installed"
+	echo "  -> ${UPLOADER_BIN_NAME} installed"
 fi
 
 echo ""

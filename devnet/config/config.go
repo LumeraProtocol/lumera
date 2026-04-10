@@ -53,13 +53,13 @@ type ChainConfig struct {
 		API           string `json:"api"`
 		EnableIndexer bool   `json:"enable_indexer"`
 	} `json:"json-rpc"`
-	NetworkMaker struct {
+	LumeraUploader struct {
 		MaxAccounts    int    `json:"max_accounts"`
 		AccountBalance string `json:"account_balance"`
 		Enabled        bool   `json:"enabled"`
 		GRPCPort       int    `json:"grpc_port"`
 		HTTPPort       int    `json:"http_port"`
-	} `json:"network-maker"`
+	} `json:"lumera-uploader"`
 	Hermes struct {
 		Enabled bool `json:"enabled"`
 	} `json:"hermes"`
@@ -88,11 +88,11 @@ type Validator struct {
 		ValidatorStake string `json:"validator_stake"`
 	} `json:"initial_distribution"`
 
-	NetworkMaker struct {
+	LumeraUploader struct {
 		Enabled  bool `json:"enabled,omitempty"`
 		GRPCPort int  `json:"grpc_port,omitempty"`
 		HTTPPort int  `json:"http_port,omitempty"`
-	} `json:"network-maker,omitempty"`
+	} `json:"lumera-uploader,omitempty"`
 }
 
 func LoadConfigs(configPath, validatorsPath string) (*ChainConfig, []Validator, error) {

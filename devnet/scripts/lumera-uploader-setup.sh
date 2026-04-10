@@ -1,20 +1,25 @@
 #!/bin/bash
-# /root/scripts/network-maker-setup.sh
+# /root/scripts/lumera-uploader-setup.sh
 #
-# Network-maker setup and lifecycle script for Lumera devnet.
+# Lumera Uploader (formerly network-maker) setup and lifecycle script for devnet.
 #
-# Network-maker is a multi-account management service used for NFT/scanner
+# Lumera Uploader is a multi-account management service used for NFT/scanner
 # operations. It runs on a single validator (typically validator_3, controlled
-# by validators.json "network-maker" flag). It provides gRPC + HTTP APIs for
+# by validators.json "lumera-uploader" flag). It provides gRPC + HTTP APIs for
 # managing accounts, scanning files, and submitting transactions.
+#
+# The project was renamed from "network-maker" to "lumera-uploader" starting
+# with Lumera v1.11.0. This script supports both names for backward compat:
+#   >= v1.11.0  →  binary "lumera-uploader", home ~/.lumera-uploader, log lumera-uploader.log
+#   <  v1.11.0  →  binary "network-maker",   home ~/.network-maker,   log network-maker.log
 #
 # Modes (env START_MODE):
 #   run   (default)  Install binary, create/fund accounts, configure, and start.
 #   wait             Only wait until lumerad RPC + supernode are ready, then exit.
 #
 # This script is a no-op (exits 0) if:
-#   - /shared/release/network-maker binary is missing, OR
-#   - validators.json has "network-maker": false (or missing) for this MONIKER
+#   - /shared/release/<binary> is missing, OR
+#   - validators.json has "lumera-uploader": false (or missing) for this MONIKER
 #
 # Dependencies (must complete before this script runs):
 #   - validator-setup.sh → provides validator account entry in accounts.json
@@ -56,22 +61,46 @@ IP_ADDR="$(hostname -i | awk '{print $1}')"
 SN_ENDPOINT="${IP_ADDR}:${SUPERNODE_PORT}"
 DAEMON="${DAEMON:-lumerad}"
 DAEMON_HOME="${DAEMON_HOME:-/root/.lumera}"
-VERSION_LOG_PREFIX="[NM]"
+VERSION_LOG_PREFIX="[UL]"
 
-# Network-maker binary and config paths
-NM="network-maker"
+# ─── Version-aware binary name resolution ────────────────────────────────────
+# Resolve whether to use "lumera-uploader" or "network-maker" based on lumerad
+# version.  If lumerad is not yet installed we probe the release dir for whichever
+# binary actually exists.
+_resolve_nm_name() {
+	# Try lumerad version first
+	local resolved
+	resolved="$(resolve_uploader_name 2>/dev/null || true)"
+	if [[ -n "${resolved}" ]]; then
+		printf '%s' "${resolved}"
+		return
+	fi
+	# Fallback: check which binary is in the release dir
+	if [[ -f "${RELEASE_DIR}/lumera-uploader" ]]; then
+		printf 'lumera-uploader'
+	else
+		printf 'network-maker'
+	fi
+}
+
+NM="$(_resolve_nm_name)"
 NM_SRC_BIN="${RELEASE_DIR}/${NM}"       # Source: copied from host by configure.sh
 NM_DST_BIN="/usr/local/bin/${NM}"       # Destination: installed location
 NM_HOME="/root/.${NM}"                  # Runtime home directory
 NM_FILES_DIR="/root/nm-files"           # Local scanner directory
 NM_FILES_DIR_SHARED="/shared/nm-files"  # Shared scanner directory (across containers)
-NM_LOG="${NM_LOG:-/root/logs/network-maker.log}"
-NM_TEMPLATE="${RELEASE_DIR}/nm-config.toml"  # Config template from host
+NM_LOG="${NM_LOG:-/root/logs/${NM}.log}"
+NM_TEMPLATE="${RELEASE_DIR}/uploader-config.toml"  # Config template from host
 NM_CONFIG="${NM_HOME}/config.toml"           # Active config (patched from template)
 NM_GRPC_PORT="${NM_GRPC_PORT:-50051}"
 NM_HTTP_PORT="${NM_HTTP_PORT:-8080}"
 
-# Account management — network-maker gets its own funded keyring accounts
+echo "[UL] Using uploader binary name: ${NM}"
+
+# JSON config key — always "lumera-uploader" (config.json uses this canonical name)
+NM_CFG_KEY="lumera-uploader"
+
+# Account management — uploader gets its own funded keyring accounts
 # separate from the validator and supernode accounts.
 NM_KEY_PREFIX="nm-account"
 NM_MNEMONIC_FILE_BASE="${NODE_STATUS_DIR}/nm_mnemonic"
@@ -88,7 +117,7 @@ accounts_registry_init "${NODE_STATUS_DIR}" "${CFG_CHAIN}"
 
 # Exit with success (0) so the container keeps running even when NM is skipped
 fail_soft() {
-	echo "[NM] $*"
+	echo "[UL] $*"
 	exit 0
 }
 
@@ -115,19 +144,19 @@ wait_for_block_height_increase() {
 		sleep 1
 		((elapsed++))
 	done
-	echo "[NM] Timeout waiting for new block after height ${prev_height}." >&2
+	echo "[UL] Timeout waiting for new block after height ${prev_height}." >&2
 	exit 1
 }
 
 # ─── Read Config ──────────────────────────────────────────────────────────────
-have jq || echo "[NM] WARNING: jq is missing; attempting to proceed."
+have jq || echo "[UL] WARNING: jq is missing; attempting to proceed."
 
 [ -f "${CFG_CHAIN}" ] || {
-	echo "[NM] Missing ${CFG_CHAIN}"
+	echo "[UL] Missing ${CFG_CHAIN}"
 	exit 1
 }
 [ -f "${CFG_VALS}" ] || {
-	echo "[NM] Missing ${CFG_VALS}"
+	echo "[UL] Missing ${CFG_VALS}"
 	exit 1
 }
 
@@ -135,19 +164,19 @@ have jq || echo "[NM] WARNING: jq is missing; attempting to proceed."
 CHAIN_ID="$(jq -r '.chain.id' "${CFG_CHAIN}")"
 DENOM="$(jq -r '.chain.denom.bond' "${CFG_CHAIN}")"
 KEYRING_BACKEND="$(jq -r '.daemon.keyring_backend' "${CFG_CHAIN}")"
-# Number of NM accounts to create (configurable in config.json → network-maker.max_accounts)
+# Number of NM accounts to create (configurable in config.json → lumera-uploader.max_accounts)
 DEFAULT_NM_MAX_ACCOUNTS=1
 NM_MAX_ACCOUNTS="${DEFAULT_NM_MAX_ACCOUNTS}"
-NM_CFG_MAX_ACCOUNTS="$(jq -r 'try .["network-maker"].max_accounts // ""' "${CFG_CHAIN}")"
+NM_CFG_MAX_ACCOUNTS="$(jq -r --arg k "${NM_CFG_KEY}" 'try .[$k].max_accounts // ""' "${CFG_CHAIN}")"
 if [[ "${NM_CFG_MAX_ACCOUNTS}" =~ ^[0-9]+$ ]]; then
 	if [ "${NM_CFG_MAX_ACCOUNTS}" -ge 1 ]; then
 		NM_MAX_ACCOUNTS="${NM_CFG_MAX_ACCOUNTS}"
 	else
-		echo "[NM] max_accounts must be >=1; using default ${DEFAULT_NM_MAX_ACCOUNTS}"
+		echo "[UL] max_accounts must be >=1; using default ${DEFAULT_NM_MAX_ACCOUNTS}"
 	fi
 fi
 DEFAULT_NM_ACCOUNT_BALANCE="10000000${DENOM}"
-NM_ACCOUNT_BALANCE="$(jq -r 'try .["network-maker"].account_balance // ""' "${CFG_CHAIN}")"
+NM_ACCOUNT_BALANCE="$(jq -r --arg k "${NM_CFG_KEY}" 'try .[$k].account_balance // ""' "${CFG_CHAIN}")"
 if [ -z "${NM_ACCOUNT_BALANCE}" ] || [ "${NM_ACCOUNT_BALANCE}" = "null" ]; then
 	NM_ACCOUNT_BALANCE="${DEFAULT_NM_ACCOUNT_BALANCE}"
 fi
@@ -155,16 +184,16 @@ if [[ "${NM_ACCOUNT_BALANCE}" =~ ^[0-9]+$ ]]; then
 	NM_ACCOUNT_BALANCE="${NM_ACCOUNT_BALANCE}${DENOM}"
 fi
 
-# Load this validator's record and check if network-maker is enabled for it
+# Load this validator's record and check if lumera-uploader is enabled for it
 VAL_REC_JSON="$(jq -c --arg m "$MONIKER" '[.[] | select(.moniker==$m)][0]' "${CFG_VALS}")"
 [ -n "${VAL_REC_JSON}" ] && [ "${VAL_REC_JSON}" != "null" ] || {
-	echo "[NM] Validator moniker ${MONIKER} not found in validators.json"
+	echo "[UL] Validator moniker ${MONIKER} not found in validators.json"
 	exit 1
 }
 
-NM_ENABLED="$(echo "${VAL_REC_JSON}" | jq -r 'try .["network-maker"].enabled // .["network-maker"] // "false"')"
-NM_GRPC_PORT="$(echo "${VAL_REC_JSON}" | jq -r 'try .["network-maker"].grpc_port // empty')"
-NM_HTTP_PORT="$(echo "${VAL_REC_JSON}" | jq -r 'try .["network-maker"].http_port // empty')"
+NM_ENABLED="$(echo "${VAL_REC_JSON}" | jq -r 'try .["lumera-uploader"].enabled // .["lumera-uploader"] // "false"')"
+NM_GRPC_PORT="$(echo "${VAL_REC_JSON}" | jq -r 'try .["lumera-uploader"].grpc_port // empty')"
+NM_HTTP_PORT="$(echo "${VAL_REC_JSON}" | jq -r 'try .["lumera-uploader"].http_port // empty')"
 if [ -z "${NM_GRPC_PORT}" ] || [ "${NM_GRPC_PORT}" = "null" ]; then NM_GRPC_PORT="${NM_GRPC_PORT:-50051}"; fi
 if [ -z "${NM_HTTP_PORT}" ] || [ "${NM_HTTP_PORT}" = "null" ]; then NM_HTTP_PORT="${NM_HTTP_PORT:-8080}"; fi
 
@@ -176,10 +205,10 @@ if [ "${START_MODE}" = "wait" ]; then
 else
 	# In run mode, skip entirely if prereqs say "not applicable".
 	if [ ! -f "${NM_SRC_BIN}" ]; then
-		fail_soft "network-maker binary not found at ${NM_SRC_BIN}; skipping."
+		fail_soft "${NM} binary not found at ${NM_SRC_BIN}; skipping."
 	fi
 	if [ "${NM_ENABLED}" != "true" ]; then
-		fail_soft "validators.json has \"network-maker\": false (or missing) for ${MONIKER}; skipping."
+		fail_soft "validators.json has \"lumera-uploader\": false (or missing) for ${MONIKER}; skipping."
 	fi
 fi
 
@@ -187,25 +216,31 @@ fi
 # PROCESS LIFECYCLE
 # ═════════════════════════════════════════════════════════════════════════════
 
-# Start network-maker as a background process (idempotent)
-start_network_maker() {
+# Start uploader as a background process (idempotent)
+start_uploader() {
 	if pgrep -x ${NM} >/dev/null 2>&1; then
-		echo "[NM] network-maker already running; skipping start."
+		echo "[UL] ${NM} already running; skipping start."
 	else
-		echo "[NM] Starting network-maker…"
+		echo "[UL] Starting ${NM}…"
 		# If your binary uses a subcommand like "start", adjust below accordingly.
 		run ${NM} >"${NM_LOG}" 2>&1 &
-		echo "[NM] network-maker started; logging to ${NM_LOG}"
+		echo "[UL] ${NM} started; logging to ${NM_LOG}"
 	fi
 }
 
-stop_network_maker_if_running() {
-	if pgrep -x ${NM} >/dev/null 2>&1; then
-		echo "[NM] Stopping network-maker…"
-		pkill -x ${NM}
-		echo "[NM] network-maker stopped."
-	else
-		echo "[NM] network-maker is not running."
+stop_uploader_if_running() {
+	# Stop whichever name is running (handles upgrades across the rename)
+	local stopped=0
+	for name in "lumera-uploader" "network-maker"; do
+		if pgrep -x "${name}" >/dev/null 2>&1; then
+			echo "[UL] Stopping ${name}…"
+			pkill -x "${name}"
+			echo "[UL] ${name} stopped."
+			stopped=1
+		fi
+	done
+	if [ "${stopped}" -eq 0 ]; then
+		echo "[UL] ${NM} is not running."
 	fi
 }
 
@@ -223,7 +258,7 @@ add_dir_to_scanner() {
 
 	# Ensure file exists
 	[ -f "$cfg" ] || {
-		echo "[NM] add_dir_to_scanner: config '$cfg' not found"
+		echo "[UL] add_dir_to_scanner: config '$cfg' not found"
 		return 1
 	}
 
@@ -280,7 +315,7 @@ configure_nm() {
 
 	# ----- write config from template and patch values -----
 	if [ ! -f "${NM_TEMPLATE}" ]; then
-		echo "[NM] ERROR: Missing NM template: ${NM_TEMPLATE}"
+		echo "[UL] ERROR: Missing NM template: ${NM_TEMPLATE}"
 		exit 1
 	fi
 
@@ -291,9 +326,9 @@ configure_nm() {
 	add_dir_to_scanner "${NM_FILES_DIR_SHARED}" "$cfg"
 	chmod a+w "${NM_FILES_DIR_SHARED}"
 
-	echo "[NM] Scanner directories are configured to include: ${NM_FILES_DIR}, ${NM_FILES_DIR_SHARED}"
+	echo "[UL] Scanner directories are configured to include: ${NM_FILES_DIR}, ${NM_FILES_DIR_SHARED}"
 
-	echo "[NM] Configuring network-maker: $cfg"
+	echo "[UL] Configuring ${NM}: $cfg"
 
 	# lumera section
 	crudini --set "$cfg" lumera grpc_endpoint "\"localhost:${LUMERA_GRPC_PORT}\""
@@ -301,9 +336,9 @@ configure_nm() {
 	crudini --set "$cfg" lumera chain_id "\"$CHAIN_ID\""
 	crudini --set "$cfg" lumera denom "\"$DENOM\""
 
-	# monitor (grpc/http) listeners
-	crudini --set "$cfg" network-maker grpc_listen "\"0.0.0.0:${NM_GRPC_PORT}\""
-	crudini --set "$cfg" network-maker http_gateway_listen "\"0.0.0.0:${NM_HTTP_PORT}\""
+	# monitor (grpc/http) listeners — use the resolved binary name as TOML section
+	crudini --set "$cfg" "${NM}" grpc_listen "\"0.0.0.0:${NM_GRPC_PORT}\""
+	crudini --set "$cfg" "${NM}" http_gateway_listen "\"0.0.0.0:${NM_HTTP_PORT}\""
 
 	# keyring section
 	crudini --set "$cfg" keyring backend "\"$KEYRING_BACKEND\""
@@ -318,7 +353,7 @@ update_nm_keyring_accounts() {
 	local cfg="$1"
 	local total_accounts="${#NM_ACCOUNT_KEY_NAMES[@]}"
 	if [ "${total_accounts}" -eq 0 ]; then
-		echo "[NM] WARNING: No network-maker accounts available to write into ${cfg}"
+		echo "[UL] WARNING: No uploader accounts available to write into ${cfg}"
 		return
 	fi
 
@@ -351,7 +386,7 @@ update_nm_keyring_accounts() {
 		done
 	} >>"${cfg}"
 
-	echo "[NM] Configured ${total_accounts} network-maker account(s) in ${cfg}"
+	echo "[UL] Configured ${total_accounts} uploader account(s) in ${cfg}"
 }
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -361,15 +396,15 @@ update_nm_keyring_accounts() {
 # ═════════════════════════════════════════════════════════════════════════════
 
 wait_for_lumera() {
-	echo "[NM] Waiting for lumerad RPC at ${LUMERA_RPC_ADDR}..."
+	echo "[UL] Waiting for lumerad RPC at ${LUMERA_RPC_ADDR}..."
 	for i in $(seq 1 180); do
 		if curl -sf "${LUMERA_RPC_ADDR}/status" >/dev/null 2>&1; then
-			echo "[NM] lumerad RPC is up."
+			echo "[UL] lumerad RPC is up."
 			return 0
 		fi
 		sleep 1
 	done
-	echo "[NM] lumerad RPC did not become ready in time."
+	echo "[UL] lumerad RPC did not become ready in time."
 	return 1
 }
 
@@ -381,7 +416,7 @@ wait_for_supernode() {
 	local port="${ep##*:}"
 	local timeout="${SUPERNODE_INSTALL_WAIT_TIMEOUT:-300}"
 
-	echo "[NM] Waiting ${timeout} secs for supernode on ${host}:${port}…"
+	echo "[UL] Waiting ${timeout} secs for supernode on ${host}:${port}…"
 
 	# Consider local-only process check if endpoint is on this machine
 	local is_local=0
@@ -392,21 +427,21 @@ wait_for_supernode() {
 	for i in $(seq 1 "$timeout"); do
 		# If local endpoint, also accept presence of the process
 		if [ "$is_local" -eq 1 ] && pgrep -x supernode >/dev/null 2>&1; then
-			echo "[NM] supernode process detected."
+			echo "[UL] supernode process detected."
 			return 0
 		fi
 
 		# TCP check
 		if (exec 3<>"/dev/tcp/${host}/${port}") 2>/dev/null; then
 			exec 3>&-
-			echo "[NM] supernode port ${port} at ${host} is reachable."
+			echo "[UL] supernode port ${port} at ${host} is reachable."
 			return 0
 		fi
 
 		sleep 1
 	done
 
-	echo "[NM] supernode did not become ready in time (${timeout}s) at ${host}:${port}."
+	echo "[UL] supernode did not become ready in time (${timeout}s) at ${host}:${port}."
 	return 1
 }
 
@@ -417,14 +452,14 @@ wait_for_supernode() {
 # Copy NM binary from shared release dir to /usr/local/bin/ (idempotent)
 install_network_maker_binary() {
 	if [ ! -f "${NM_DST_BIN}" ]; then
-		echo "[NM] Installing ${NM} binary..."
+		echo "[UL] Installing ${NM} binary..."
 		run cp -f "${NM_SRC_BIN}" "${NM_DST_BIN}"
 		run chmod +x "${NM_DST_BIN}"
 	else
 		if cmp -s "${NM_SRC_BIN}" "${NM_DST_BIN}"; then
-			echo "[NM] ${NM} binary already up-to-date at ${NM_DST_BIN}; skipping install."
+			echo "[UL] ${NM} binary already up-to-date at ${NM_DST_BIN}; skipping install."
 		else
-			echo "[NM] Updating ${NM} binary at ${NM_DST_BIN}..."
+			echo "[UL] Updating ${NM} binary at ${NM_DST_BIN}..."
 			run cp -f "${NM_SRC_BIN}" "${NM_DST_BIN}"
 			run chmod +x "${NM_DST_BIN}"
 		fi
@@ -445,13 +480,13 @@ ensure_nm_key() {
 	local mnemonic_file="$2"
 
 	if run ${DAEMON} keys show "${key_name}" --keyring-backend "${KEYRING_BACKEND}" >/dev/null 2>&1; then
-		echo "[NM] Key ${key_name} already exists." >&2
+		echo "[UL] Key ${key_name} already exists." >&2
 	else
 		if [ -s "${mnemonic_file}" ]; then
-			echo "[NM] Recovering ${key_name} from saved mnemonic." >&2
+			echo "[UL] Recovering ${key_name} from saved mnemonic." >&2
 			(cat "${mnemonic_file}") | run ${DAEMON} keys add "${key_name}" --recover --keyring-backend "${KEYRING_BACKEND}" >/dev/null
 		else
-			echo "[NM] Creating new key ${key_name}…" >&2
+			echo "[UL] Creating new key ${key_name}…" >&2
 			local mnemonic_json
 			mnemonic_json="$(run_capture ${DAEMON} keys add "${key_name}" --keyring-backend "${KEYRING_BACKEND}" --output json)"
 			echo "${mnemonic_json}" | jq -r .mnemonic >"${mnemonic_file}"
@@ -475,11 +510,11 @@ fund_nm_account_if_needed() {
 	bal_json="$(run_capture ${DAEMON} q bank balances "${account_addr}" --output json)"
 	bal="$(echo "${bal_json}" | jq -r --arg d "${DENOM}" '([.balances[]? | select(.denom==$d) | .amount] | first) // "0"')"
 	[[ -z "${bal}" ]] && bal="0"
-	echo "[NM] Current ${key_name} balance: ${bal}${DENOM}" >&2
+	echo "[UL] Current ${key_name} balance: ${bal}${DENOM}" >&2
 
 	if ((bal == 0)); then
 		sleep 5
-		echo "[NM] Funding ${key_name} with ${NM_ACCOUNT_BALANCE} from genesis address ${genesis_addr}…" >&2
+		echo "[UL] Funding ${key_name} with ${NM_ACCOUNT_BALANCE} from genesis address ${genesis_addr}…" >&2
 		local send_json txhash
 		send_json="$(run_capture ${DAEMON} tx bank send "${genesis_addr}" "${account_addr}" "${NM_ACCOUNT_BALANCE}" \
 			--chain-id "${CHAIN_ID}" --keyring-backend "${KEYRING_BACKEND}" \
@@ -490,11 +525,11 @@ fund_nm_account_if_needed() {
 		if [ -n "${txhash}" ] && [ "${txhash}" != "null" ]; then
 			printf "%s" "${txhash}"
 		else
-			echo "[NM] Could not obtain txhash for funding transaction" >&2
+			echo "[UL] Could not obtain txhash for funding transaction" >&2
 			exit 1
 		fi
 	else
-		echo "[NM] ${key_name} already funded; skipping." >&2
+		echo "[UL] ${key_name} already funded; skipping." >&2
 		printf ""
 	fi
 }
@@ -532,9 +567,9 @@ fund_nm_accounts() {
 wait_for_all_funding_txs() {
 	local txhash
 	for txhash in "${NM_FUND_TX_HASHES[@]}"; do
-		echo "[NM] Waiting for funding tx ${txhash} to confirm…" >&2
+		echo "[UL] Waiting for funding tx ${txhash} to confirm…" >&2
 		wait_for_tx "${txhash}" || {
-			echo "[NM] Funding tx ${txhash} failed or not found." >&2
+			echo "[UL] Funding tx ${txhash} failed or not found." >&2
 			exit 1
 		}
 	done
@@ -550,7 +585,7 @@ configure_nm_accounts() {
 	local genesis_addr
 	genesis_addr="$(validator_funding_address)"
 	if [[ -z "${genesis_addr}" ]]; then
-		echo "[NM] ERROR: Missing validator funding address for ${KEY_NAME} in accounts registry."
+		echo "[UL] ERROR: Missing validator funding address for ${KEY_NAME} in accounts registry."
 		exit 1
 	fi
 
@@ -571,7 +606,7 @@ configure_nm_accounts() {
 		fi
 
 		account_addr="$(ensure_nm_key "${key_name}" "${mnemonic_file}")"
-		echo "[NM] ${key_name} address: ${account_addr}"
+		echo "[UL] ${key_name} address: ${account_addr}"
 
 		NM_ACCOUNT_KEY_NAMES+=("${key_name}")
 		NM_ACCOUNT_ADDRESSES+=("${account_addr}")
@@ -583,7 +618,7 @@ configure_nm_accounts() {
 	starting_height="$(latest_block_height)"
 	fund_nm_accounts "${genesis_addr}" "${starting_height}"
 
-	echo "[NM] Prepared ${#NM_ACCOUNT_KEY_NAMES[@]} network-maker account(s)."
+	echo "[UL] Prepared ${#NM_ACCOUNT_KEY_NAMES[@]} uploader account(s)."
 }
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -632,20 +667,20 @@ maybe_migrate_nm_accounts_to_evm() {
 	local first_type
 	first_type="$(key_pubkey_type "${NM_ACCOUNT_KEY_NAMES[0]}" || true)"
 	if is_evm_pubkey_type "$first_type"; then
-		echo "[NM] NM accounts already use EVM key type; skipping migration."
+		echo "[UL] NM accounts already use EVM key type; skipping migration."
 		return 0
 	fi
 	if ! is_legacy_pubkey_type "$first_type"; then
-		echo "[NM] NM account ${NM_ACCOUNT_KEY_NAMES[0]} has unknown key type ${first_type:-missing}; skipping migration."
+		echo "[UL] NM account ${NM_ACCOUNT_KEY_NAMES[0]} has unknown key type ${first_type:-missing}; skipping migration."
 		return 0
 	fi
 
-	echo "[NM] Chain supports EVM — migrating ${total} NM account(s) from legacy to EVM key type."
+	echo "[UL] Chain supports EVM — migrating ${total} NM account(s) from legacy to EVM key type."
 
 	# Save old nm-address file.
 	if [[ -f "$NM_ADDR_FILE" ]]; then
 		cp -f "$NM_ADDR_FILE" "${NM_ADDR_FILE}-pre-evm"
-		echo "[NM] Saved pre-EVM address file to ${NM_ADDR_FILE}-pre-evm"
+		echo "[UL] Saved pre-EVM address file to ${NM_ADDR_FILE}-pre-evm"
 	fi
 
 	local genesis_addr=""
@@ -662,7 +697,7 @@ maybe_migrate_nm_accounts_to_evm() {
 		fi
 
 		if [[ ! -s "$mnemonic_file" ]]; then
-			echo "[NM] WARN: No mnemonic for ${key_name} at ${mnemonic_file}; cannot migrate."
+			echo "[UL] WARN: No mnemonic for ${key_name} at ${mnemonic_file}; cannot migrate."
 			printf "%s,%s\n" "${key_name}" "${NM_ACCOUNT_ADDRESSES[$idx]}" >>"${NM_ADDR_FILE}"
 			continue
 		fi
@@ -682,7 +717,7 @@ maybe_migrate_nm_accounts_to_evm() {
 		new_addr="$(run_capture $DAEMON keys show "$key_name" -a --keyring-backend "$KEYRING_BACKEND")"
 		NM_ACCOUNT_ADDRESSES[$idx]="$new_addr"
 		printf "%s,%s\n" "${key_name}" "${new_addr}" >>"${NM_ADDR_FILE}"
-		echo "[NM] Migrated ${key_name}: ${old_addr} -> ${new_addr}"
+		echo "[UL] Migrated ${key_name}: ${old_addr} -> ${new_addr}"
 
 		# Fund the new address if needed.
 		if [[ -n "$genesis_addr" ]]; then
@@ -691,7 +726,7 @@ maybe_migrate_nm_accounts_to_evm() {
 				jq -r --arg d "$DENOM" '([.balances[]? | select(.denom==$d) | .amount] | first) // "0"')"
 			[[ -z "$bal" ]] && bal="0"
 			if ((bal == 0)); then
-				echo "[NM] Funding migrated ${key_name} ($new_addr)..."
+				echo "[UL] Funding migrated ${key_name} ($new_addr)..."
 				local send_json txhash
 				send_json="$($DAEMON tx bank send "$genesis_addr" "$new_addr" "$NM_ACCOUNT_BALANCE" \
 					--chain-id "$CHAIN_ID" --keyring-backend "$KEYRING_BACKEND" \
@@ -699,7 +734,7 @@ maybe_migrate_nm_accounts_to_evm() {
 					--yes --output json 2>/dev/null || true)"
 				txhash="$(echo "$send_json" | jq -r '.txhash // empty')"
 				if [[ -n "$txhash" ]]; then
-					wait_for_tx "$txhash" || echo "[NM] WARN: funding tx may not have confirmed"
+					wait_for_tx "$txhash" || echo "[UL] WARN: funding tx may not have confirmed"
 				fi
 				# Wait for a new block to avoid sequence conflicts.
 				local h; h="$(latest_block_height)"
@@ -710,7 +745,7 @@ maybe_migrate_nm_accounts_to_evm() {
 		accounts_registry_upsert "${key_name}" "${new_addr}" "$(cat "${mnemonic_file}" 2>/dev/null || true)" "cosmos" "${NM_ACCOUNT_BALANCE}" "${KEY_NAME}" ""
 	done
 
-	echo "[NM] EVM migration complete for ${total} NM account(s)."
+	echo "[UL] EVM migration complete for ${total} NM account(s)."
 }
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -719,13 +754,13 @@ maybe_migrate_nm_accounts_to_evm() {
 # Execution order:
 #   1. Wait mode: just wait for lumerad + supernode, then exit
 #   2. Run mode:
-#      a. Stop any leftover NM process
+#      a. Stop any leftover uploader process
 #      b. Install binary from shared release dir
 #      c. Wait for chain + supernode readiness
-#      d. Create/fund NM accounts
+#      d. Create/fund uploader accounts
 #      e. Migrate accounts to EVM if chain upgraded
 #      f. Build config from template
-#      g. Start NM process
+#      g. Start uploader process
 # ═════════════════════════════════════════════════════════════════════════════
 
 if [ "${START_MODE}" = "wait" ]; then
@@ -734,14 +769,14 @@ if [ "${START_MODE}" = "wait" ]; then
 	exit 0
 fi
 
-stop_network_maker_if_running
+stop_uploader_if_running
 install_network_maker_binary
 
-# Both chain and supernode must be ready before we can fund accounts or start NM
-wait_for_lumera || fail_soft "Chain not ready; skipping NM."
-wait_for_supernode || fail_soft "Supernode not ready; skipping NM."
+# Both chain and supernode must be ready before we can fund accounts or start uploader
+wait_for_lumera || fail_soft "Chain not ready; skipping uploader."
+wait_for_supernode || fail_soft "Supernode not ready; skipping uploader."
 
 configure_nm_accounts    # Create keys + fund from genesis account
 maybe_migrate_nm_accounts_to_evm  # Re-key to EVM if chain was upgraded
 configure_nm             # Build config.toml from template + runtime values
-start_network_maker      # Launch NM process in background
+start_uploader           # Launch uploader process in background

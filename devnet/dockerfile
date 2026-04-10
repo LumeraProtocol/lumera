@@ -29,7 +29,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ripgrep \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js (for network-maker UI tooling) using NodeSource 25.x
+# Install Node.js (for lumera-uploader UI tooling) using NodeSource 25.x
 RUN curl -fsSL https://deb.nodesource.com/setup_25.x | bash - && \
     apt-get update && apt-get install -y --no-install-recommends nodejs && \
     rm -rf /var/lib/apt/lists/*
@@ -49,7 +49,7 @@ COPY --chmod=0755 \
     ${SCRIPTS_SRC_DIR}/lumera-helper.sh \
     ${SCRIPTS_SRC_DIR}/validator-setup.sh \
     ${SCRIPTS_SRC_DIR}/supernode-setup.sh \
-    ${SCRIPTS_SRC_DIR}/network-maker-setup.sh \
+    ${SCRIPTS_SRC_DIR}/lumera-uploader-setup.sh \
     ${SCRIPTS_DEST_DIR}/
 
 # Expose necessary ports

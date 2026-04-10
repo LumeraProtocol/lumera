@@ -7,7 +7,7 @@
 # containers will mount. Specifically:
 #
 #   1. Copies config.json + validators.json into /shared/config/
-#   2. Copies optional binaries (supernode, sncli, network-maker, test binaries)
+#   2. Copies optional binaries (supernode, sncli, lumera-uploader/network-maker, test binaries)
 #      from BIN_DIR into /shared/release/ so containers can install them
 #
 # Usage:
@@ -21,9 +21,9 @@
 #     release/supernode-linux-amd64  ← optional
 #     release/sncli                  ← optional
 #     release/sncli-config.toml      ← optional
-#     release/network-maker          ← optional
-#     release/nm-config.toml         ← optional (required if NM binary present)
-#     release/nm-ui/                 ← optional (NM static web UI)
+#     release/lumera-uploader         ← optional (or network-maker for <v1.11.0)
+#     release/uploader-config.toml   ← optional (required if uploader binary present)
+#     release/uploader-ui/           ← optional (uploader static web UI)
 #     release/tests_*                ← optional test binaries
 #
 set -euo pipefail
@@ -39,7 +39,7 @@ Usage: configure.sh [--bin-dir DIR]
 
 Options:
   -b, --bin-dir DIR   Directory containing binaries/configs to copy - absolute or relative to the repo root
-                      (supernode-linux-amd64, sncli, network-maker, configs).
+                      (supernode-linux-amd64, sncli, lumera-uploader/network-maker, configs).
   -h, --help          Show this help and exit.
 EOF
 }
@@ -141,12 +141,19 @@ RELEASE_DIR="${SHARED_DIR}/release"
 
 # Binary names and config paths in BIN_DIR
 SN="supernode-linux-amd64"
-NM="network-maker"
-NM_CFG="${BIN_DIR}/nm-config.toml"
+# Detect which uploader binary is present (lumera-uploader >= v1.11.0, network-maker for older)
+if [[ -n "${BIN_DIR}" && -f "${BIN_DIR}/lumera-uploader" ]]; then
+	NM="lumera-uploader"
+elif [[ -n "${BIN_DIR}" && -f "${BIN_DIR}/network-maker" ]]; then
+	NM="network-maker"
+else
+	NM="lumera-uploader"  # default to new name
+fi
+NM_CFG="${BIN_DIR}/uploader-config.toml"
 SNCLI="sncli"
 SNCLI_CFG="${BIN_DIR}/sncli-config.toml"
-NM_UI_SRC="${BIN_DIR}/nm-ui"
-NM_UI_DST="${RELEASE_DIR}/nm-ui"
+NM_UI_SRC="${BIN_DIR}/uploader-ui"
+NM_UI_DST="${RELEASE_DIR}/uploader-ui"
 
 # ─── Binary Copy Functions ────────────────────────────────────────────────────
 # Each function copies a binary (+ optional config) from BIN_DIR to RELEASE_DIR.
@@ -162,21 +169,21 @@ install_supernode() {
 
 install_nm() {
 	if [ -n "${BIN_DIR}" ] && [ -f "${BIN_DIR}/${NM}" ]; then
-		# if nm-config.toml is missing - return an error
+		# if uploader-config.toml is missing - return an error
 		if [ ! -f "${NM_CFG}" ]; then
 			echo "[CONFIGURE] Missing ${NM_CFG}"
 			exit 1
 		fi
-		echo "[CONFIGURE] Copying network-maker file from ${BIN_DIR} to ${RELEASE_DIR}"
+		echo "[CONFIGURE] Copying ${NM} files from ${BIN_DIR} to ${RELEASE_DIR}"
 		cp -f "${BIN_DIR}/${NM}" "${NM_CFG}" "${RELEASE_DIR}/"
 		chmod 755 "${RELEASE_DIR}/${NM}"
 
 		if [ -d "${NM_UI_SRC}" ]; then
-			echo "[CONFIGURE] Copying network-maker UI from ${NM_UI_SRC} to ${NM_UI_DST}"
+			echo "[CONFIGURE] Copying ${NM} UI from ${NM_UI_SRC} to ${NM_UI_DST}"
 			rm -rf "${NM_UI_DST}"
 			cp -r "${NM_UI_SRC}" "${NM_UI_DST}"
 		else
-			echo "[CONFIGURE] network-maker UI not found at ${NM_UI_SRC}; skipping UI copy"
+			echo "[CONFIGURE] ${NM} UI not found at ${NM_UI_SRC}; skipping UI copy"
 		fi
 	fi
 }

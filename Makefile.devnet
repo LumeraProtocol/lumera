@@ -32,7 +32,7 @@ CLAIMS_FILE := $(SHARED_CONFIG_DIR)/claims.csv
 COMPOSE_FILE := devnet/docker-compose.yml
 
 DEVNET_BUILD_LUMERA ?= 1      # 1 = build lumerad for devnet setup, 0 = skip
-# directory to take lumerad/supernode/network-maker/sncli binaries from
+# directory to take lumerad/supernode/lumera-uploader/sncli binaries from
 DEVNET_BIN_DIR ?= devnet/bin
 DEVNET_BIN_DIR_ABS := $(abspath $(DEVNET_BIN_DIR))
 
@@ -50,6 +50,8 @@ DEVNET_UPGRADE_RELEASE ?= auto
 
 devnet-tests-build:
 	@mkdir -p "${DEVNET_BIN_DIR_ABS}"
+	@echo "Tidying devnet go modules..."
+	@cd devnet && $(GO) mod tidy
 	@echo "Building devnet test binaries..."
 	@echo "  -> building tests_validator (${DEVNET_BIN_DIR_ABS}/tests_validator)"
 	@cd devnet && $(GO) test -c -o "${DEVNET_BIN_DIR_ABS}/tests_validator" ./tests/validator
@@ -385,7 +387,7 @@ devnet-update-scripts:
 		exit 1; \
 	fi
 	@services="$$(docker compose -f $(COMPOSE_FILE) ps --services)"; \
-	common_scripts="common.sh account-registry.sh start.sh stop.sh restart.sh lumera-helper.sh validator-setup.sh supernode-setup.sh network-maker-setup.sh"; \
+	common_scripts="common.sh account-registry.sh start.sh stop.sh restart.sh lumera-helper.sh validator-setup.sh supernode-setup.sh lumera-uploader-setup.sh"; \
 	updated=0; \
 	for svc in $$services; do \
 		container="$$(docker compose -f $(COMPOSE_FILE) ps -q $$svc)"; \

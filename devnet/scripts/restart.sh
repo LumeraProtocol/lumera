@@ -2,7 +2,7 @@
 # restart.sh — restart devnet services inside a validator container
 # Usage:
 #   ./restart.sh                   # restart all known services
-#   ./restart.sh nm|sn|lumera|nginx
+#   ./restart.sh uploader|sn|lumera|nginx
 set -euo pipefail
 
 DAEMON="${DAEMON:-lumerad}"
@@ -13,11 +13,11 @@ LOGS_DIR="${LOGS_DIR:-/root/logs}"
 OLD_LOGS_DIR="${OLD_LOGS_DIR:-${LOGS_DIR}/old}"
 VALIDATOR_LOG="${VALIDATOR_LOG:-${LOGS_DIR}/validator.log}"
 SN_LOG="${SN_LOG:-${LOGS_DIR}/supernode.log}"
-NM_LOG="${NM_LOG:-${LOGS_DIR}/network-maker.log}"
+NM_LOG="${NM_LOG:-${LOGS_DIR}/lumera-uploader.log}"
 
 SHARED_DIR="/shared"
 RELEASE_DIR="${SHARED_DIR}/release"
-NM_UI_DIR="${NM_UI_DIR:-${RELEASE_DIR}/nm-ui}"
+NM_UI_DIR="${NM_UI_DIR:-${RELEASE_DIR}/uploader-ui}"
 NM_UI_PORT="${NM_UI_PORT:-8088}"
 
 LUMERA_RPC_PORT="${LUMERA_RPC_PORT:-26657}"
@@ -128,16 +128,21 @@ start_supernode() {
 	log "Supernode start requested; logging to ${SN_LOG}"
 }
 
-start_network_maker() {
-	local name="network-maker"
+start_uploader() {
+	# Try lumera-uploader first, fall back to network-maker
+	local name=""
+	for candidate in "lumera-uploader" "network-maker"; do
+		if pgrep -x "${candidate}" >/dev/null 2>&1; then
+			log "${candidate} already running."
+			return 0
+		fi
+		if [[ -z "${name}" ]] && command -v "${candidate}" >/dev/null 2>&1; then
+			name="${candidate}"
+		fi
+	done
 
-	if pgrep -x "${name}" >/dev/null 2>&1; then
-		log "network-maker already running."
-		return 0
-	fi
-
-	if ! command -v "${name}" >/dev/null 2>&1; then
-		log "network-maker binary not found; skipping start."
+	if [[ -z "${name}" ]]; then
+		log "lumera-uploader binary not found; skipping start."
 		return 0
 	fi
 
@@ -145,9 +150,9 @@ start_network_maker() {
 	archive_log_file "${NM_LOG}"
 	mkdir -p "$(dirname "${NM_LOG}")"
 
-	log "Starting network-maker..."
+	log "Starting ${name}..."
 	"${name}" >"${NM_LOG}" 2>&1 &
-	log "network-maker start requested; logging to ${NM_LOG}"
+	log "${name} start requested; logging to ${NM_LOG}"
 }
 
 start_nginx() {
@@ -157,12 +162,12 @@ start_nginx() {
 	fi
 
 	if [ ! -d "${NM_UI_DIR}" ] || [ ! -f "${NM_UI_DIR}/index.html" ]; then
-		log "network-maker UI not found at ${NM_UI_DIR}; skipping nginx start."
+		log "lumera-uploader UI not found at ${NM_UI_DIR}; skipping nginx start."
 		return 0
 	fi
 
 	mkdir -p /etc/nginx/conf.d
-	cat >/etc/nginx/conf.d/network-maker-ui.conf <<EOF
+	cat >/etc/nginx/conf.d/lumera-uploader-ui.conf <<EOF
 server {
     listen ${NM_UI_PORT};
     server_name _;
@@ -174,7 +179,7 @@ server {
 }
 EOF
 
-	log "Starting nginx to serve network-maker UI on port ${NM_UI_PORT}..."
+	log "Starting nginx to serve lumera-uploader UI on port ${NM_UI_PORT}..."
 	nginx
 	log "nginx start requested."
 }
@@ -183,13 +188,13 @@ restart_all() {
 	run_stop all
 	start_lumera
 	start_supernode
-	start_network_maker
+	start_uploader
 	start_nginx
 }
 
-restart_nm() {
-	run_stop nm
-	start_network_maker
+restart_uploader() {
+	run_stop uploader
+	start_uploader
 }
 
 restart_sn() {
@@ -208,14 +213,14 @@ restart_lumera() {
 }
 
 usage() {
-	echo "Usage: $0 [nm|sn|lumera|nginx|all]" >&2
+	echo "Usage: $0 [uploader|sn|lumera|nginx|all]" >&2
 	exit 1
 }
 
 target="${1:-all}"
 case "${target}" in
-nm | network-maker)
-	restart_nm
+uploader | nm | network-maker | lumera-uploader | ul)
+	restart_uploader
 	;;
 sn | supernode)
 	restart_sn

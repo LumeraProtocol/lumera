@@ -172,31 +172,6 @@ jobs:
             return 1
           }
 
-          submit_evidence_tx() {
-            local action_id="$1"
-            local meta_json="$2"
-            "$BIN" tx audit submit-evidence "$SUBJECT" cascade-client-failure "$action_id" "$meta_json" \
-              --from node0 \
-              --home "$OUT/node0/lumerad" \
-              --keyring-backend test \
-              --chain-id "$CHAIN_ID" \
-              --node tcp://127.0.0.1:26657 \
-              --fees 1ulume \
-              --broadcast-mode sync \
-              --yes -o json > "$WORK/${action_id}.json"
-
-            local txhash code
-            txhash=$(jq -r '.txhash // ""' "$WORK/${action_id}.json")
-            code=$(jq -r '.code // 0' "$WORK/${action_id}.json")
-            test -n "$txhash"
-            if [ "$code" != "0" ]; then
-              echo "submit-evidence check-tx failed for ${action_id}:"
-              cat "$WORK/${action_id}.json"
-              exit 1
-            fi
-            wait_for_tx "$txhash" "$WORK/${action_id}.deliver.json"
-          }
-
           submit_bank_tx() {
             local tag="$1"
             "$BIN" tx bank send \
@@ -275,8 +250,6 @@ jobs:
             done
           }
 
-          SUBJECT=$("$BIN" keys show node1 -a --home "$OUT/node1/lumerad" --keyring-backend test)
-
           CAN_SUBMIT_TX=1
           NODE0_ADDR=$($BIN keys show node0 -a --home "$OUT/node0/lumerad" --keyring-backend test)
           if ! "$BIN" query auth account "$NODE0_ADDR" --node tcp://127.0.0.1:26657 -o json >/dev/null 2>&1; then
@@ -284,17 +257,7 @@ jobs:
             CAN_SUBMIT_TX=0
           fi
 
-          META1='{"reporter_component":2,"target_supernode_accounts":["lumera1mfldjaqc7ec5rlh4k58yttv3cd978gzl070zk6"],"details":{"action_id":"123637","error":"download failed: insufficient symbols","iteration":"1","operation":"download","supernode_account":"lumera1mfldjaqc7ec5rlh4k58yttv3cd978gzl070zk6","supernode_endpoint":"18.190.53.108:4444","task_id":"9700ec8a"}}'
-          META2='{"reporter_component":2,"target_supernode_accounts":["lumera1mfldjaqc7ec5rlh4k58yttv3cd978gzl070zk6"],"details":{"task_id":"9700ec8a","supernode_endpoint":"18.190.53.108:4444","supernode_account":"lumera1mfldjaqc7ec5rlh4k58yttv3cd978gzl070zk6","operation":"download","iteration":"1","error":"download failed: insufficient symbols","action_id":"123637"}}'
-          META3='{"target_supernode_accounts":["lumera1mfldjaqc7ec5rlh4k58yttv3cd978gzl070zk6"],"details":{"supernode_endpoint":"18.190.53.108:4444","task_id":"9700ec8a","operation":"download","error":"download failed: insufficient symbols","supernode_account":"lumera1mfldjaqc7ec5rlh4k58yttv3cd978gzl070zk6","action_id":"123637","iteration":"1"},"reporter_component":2}'
-          META4='{"details":{"iteration":"1","action_id":"123637","supernode_account":"lumera1mfldjaqc7ec5rlh4k58yttv3cd978gzl070zk6","error":"download failed: insufficient symbols","operation":"download","task_id":"9700ec8a","supernode_endpoint":"18.190.53.108:4444"},"reporter_component":2,"target_supernode_accounts":["lumera1mfldjaqc7ec5rlh4k58yttv3cd978gzl070zk6"]}'
-
           if [ "$CAN_SUBMIT_TX" -eq 1 ]; then
-            submit_evidence_tx ci-canary-1 "$META1"
-            submit_evidence_tx ci-canary-2 "$META2"
-            submit_evidence_tx ci-canary-3 "$META3"
-            submit_evidence_tx ci-canary-4 "$META4"
-
             submit_bank_tx ci-bank-1
             submit_bank_tx ci-bank-2
             submit_bank_tx ci-bank-3

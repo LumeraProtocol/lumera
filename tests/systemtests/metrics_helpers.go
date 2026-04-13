@@ -20,7 +20,8 @@ func reportSupernodeMetrics(t *testing.T, cli *LumeradCli, fromKey, valAddr, acc
 
 	out := cli.CustomCommand(
 		"tx", "supernode", "report-supernode-metrics",
-		"--validator-address", valAddr,
+		valAddr,
+		"--supernode-account", account,
 		"--metrics", string(metricsJSON),
 		"--from", fromKey,
 	)

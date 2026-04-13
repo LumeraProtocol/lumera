@@ -24,6 +24,9 @@ func SimulateMsgFinalizeActionSuccessSense(
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
 		// 1. Register Action
 		actionID, _ := registerSenseAction(r, ctx, accs, bk, k, ak)
+		if actionID == "" {
+			return simtypes.NoOpMsg(types.ModuleName, "MsgFinalizeAction", "no account with sufficient funds"), nil, nil
+		}
 
 		// 2. Select three random supernode accounts
 		supernodes, err := getRandomActiveSupernodes(r, ctx, 3, ak, k, accs)
@@ -67,6 +70,9 @@ func SimulateMsgFinalizeActionSuccessCascade(
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
 		// 1. Create a PENDING CASCADE action
 		actionID, _ := registerCascadeAction(r, ctx, accs, bk, k, ak)
+		if actionID == "" {
+			return simtypes.NoOpMsg(types.ModuleName, "MsgFinalizeAction", "no account with sufficient funds"), nil, nil
+		}
 
 		// 2. Select three random supernode accounts
 		supernodes, err := getRandomActiveSupernodes(r, ctx, 1, ak, k, accs)
@@ -157,6 +163,9 @@ func SimulateMsgFinalizeActionInvalidState(
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
 		// 1. Create a DONE action
 		actionID, action := registerSenseOrCascadeAction(r, ctx, accs, k, bk, ak)
+		if action == nil {
+			return simtypes.NoOpMsg(types.ModuleName, "MsgFinalizeAction", "no account with sufficient funds"), nil, nil
+		}
 		supernodes, err := finalizeAction(r, ctx, k, ak, bk, actionID, action.ActionType, accs)
 		if err != nil {
 			return simtypes.NoOpMsg(types.ModuleName, sdk.MsgTypeURL(&types.MsgFinalizeAction{}), "failed to get random supernodes"), nil, nil
@@ -223,6 +232,9 @@ func SimulateMsgFinalizeActionUnauthorized(
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
 		// 1. Create a PENDING action
 		actionID, action := registerSenseOrCascadeAction(r, ctx, accs, k, bk, ak)
+		if action == nil {
+			return simtypes.NoOpMsg(types.ModuleName, "MsgFinalizeAction", "no account with sufficient funds"), nil, nil
+		}
 
 		// 2. Create valid metadata using regular NON supernode accounts
 		metadata := generateValidFinalizeMetadata(1, 50, action.ActionType.String(), accs, "")
@@ -278,6 +290,9 @@ func SimulateMsgFinalizeActionSenseConsensus(
 
 		// 1. Create a PENDING SENSE action
 		actionID, msg := registerSenseAction(r, ctx, accs, bk, k, ak)
+		if msg == nil {
+			return simtypes.NoOpMsg(types.ModuleName, "MsgFinalizeAction", "no account with sufficient funds"), nil, nil
+		}
 
 		// 2. Select three random supernode accounts
 		supernodes, err := getRandomActiveSupernodes(r, ctx, 3, ak, k, accs)
@@ -455,6 +470,9 @@ func SimulateMsgFinalizeActionMetadataValidation(
 		} else {
 			// CASCADE action
 			actionID, _ = registerCascadeAction(r, ctx, accs, bk, k, ak)
+		}
+		if actionID == "" {
+			return simtypes.NoOpMsg(types.ModuleName, "MsgFinalizeAction", "no account with sufficient funds"), nil, nil
 		}
 
 		// 2. Get the created action

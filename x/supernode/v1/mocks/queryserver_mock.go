@@ -165,6 +165,26 @@ func (mr *MockQueryClientMockRecorder) Params(ctx, in any, opts ...any) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Params", reflect.TypeOf((*MockQueryClient)(nil).Params), varargs...)
 }
 
+// PayoutHistory mocks base method.
+func (m *MockQueryClient) PayoutHistory(ctx context.Context, in *types.QueryPayoutHistoryRequest, opts ...grpc.CallOption) (*types.QueryPayoutHistoryResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, in}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PayoutHistory", varargs...)
+	ret0, _ := ret[0].(*types.QueryPayoutHistoryResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PayoutHistory indicates an expected call of PayoutHistory.
+func (mr *MockQueryClientMockRecorder) PayoutHistory(ctx, in any, opts ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, in}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PayoutHistory", reflect.TypeOf((*MockQueryClient)(nil).PayoutHistory), varargs...)
+}
+
 // PoolState mocks base method.
 func (m *MockQueryClient) PoolState(ctx context.Context, in *types.QueryPoolStateRequest, opts ...grpc.CallOption) (*types.QueryPoolStateResponse, error) {
 	m.ctrl.T.Helper()
@@ -302,6 +322,21 @@ func (m *MockQueryServer) ListSuperNodes(arg0 context.Context, arg1 *types.Query
 func (mr *MockQueryServerMockRecorder) ListSuperNodes(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListSuperNodes", reflect.TypeOf((*MockQueryServer)(nil).ListSuperNodes), arg0, arg1)
+}
+
+// PayoutHistory mocks base method.
+func (m *MockQueryServer) PayoutHistory(arg0 context.Context, arg1 *types.QueryPayoutHistoryRequest) (*types.QueryPayoutHistoryResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PayoutHistory", arg0, arg1)
+	ret0, _ := ret[0].(*types.QueryPayoutHistoryResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PayoutHistory indicates an expected call of PayoutHistory.
+func (mr *MockQueryServerMockRecorder) PayoutHistory(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PayoutHistory", reflect.TypeOf((*MockQueryServer)(nil).PayoutHistory), arg0, arg1)
 }
 
 // PoolState mocks base method.

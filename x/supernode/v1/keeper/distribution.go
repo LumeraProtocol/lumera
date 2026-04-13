@@ -227,6 +227,17 @@ func (k Keeper) distributePool(ctx sdk.Context) error {
 			return fmt.Errorf("failed to send distribution to %s: %w", p.addr, err)
 		}
 
+		k.AppendPayoutHistoryEntry(ctx, &sntypes.PayoutHistoryEntry{
+			Height:           currentHeight,
+			ValidatorAddress: p.cand.validatorAddr,
+			SupernodeAccount: p.cand.supernodeAccount,
+			Amount:           coins,
+			RawBytes:         p.cand.rawBytes,
+			SmoothedBytes:    p.cand.smoothedBytes,
+			EffectiveWeight:  p.cand.effectiveWeight,
+			RampWeight:       p.cand.rampWeight,
+		})
+
 		// Emit per-SN distribution event.
 		ctx.EventManager().EmitEvent(
 			sdk.NewEvent(

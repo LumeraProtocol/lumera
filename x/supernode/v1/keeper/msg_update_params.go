@@ -105,27 +105,11 @@ func mergeParams(base, incoming types.Params) types.Params {
 	}
 
 	if incoming.RewardDistribution != nil {
-		if merged.RewardDistribution == nil {
-			merged.RewardDistribution = &types.RewardDistribution{}
-		}
-		if incoming.RewardDistribution.PaymentPeriodBlocks != 0 {
-			merged.RewardDistribution.PaymentPeriodBlocks = incoming.RewardDistribution.PaymentPeriodBlocks
-		}
-		if incoming.RewardDistribution.RegistrationFeeShareBps != 0 {
-			merged.RewardDistribution.RegistrationFeeShareBps = incoming.RewardDistribution.RegistrationFeeShareBps
-		}
-		if incoming.RewardDistribution.MinCascadeBytesForPayment != 0 {
-			merged.RewardDistribution.MinCascadeBytesForPayment = incoming.RewardDistribution.MinCascadeBytesForPayment
-		}
-		if incoming.RewardDistribution.NewSnRampUpPeriods != 0 {
-			merged.RewardDistribution.NewSnRampUpPeriods = incoming.RewardDistribution.NewSnRampUpPeriods
-		}
-		if incoming.RewardDistribution.MeasurementSmoothingPeriods != 0 {
-			merged.RewardDistribution.MeasurementSmoothingPeriods = incoming.RewardDistribution.MeasurementSmoothingPeriods
-		}
-		if incoming.RewardDistribution.UsageGrowthCapBpsPerPeriod != 0 {
-			merged.RewardDistribution.UsageGrowthCapBpsPerPeriod = incoming.RewardDistribution.UsageGrowthCapBpsPerPeriod
-		}
+		// RewardDistribution is treated as a full nested update when present.
+		// This preserves explicit zero values for fields where zero is valid
+		// (e.g. registration_fee_share_bps=0, new_sn_ramp_up_periods=0).
+		distCopy := *incoming.RewardDistribution
+		merged.RewardDistribution = &distCopy
 	}
 
 	return merged

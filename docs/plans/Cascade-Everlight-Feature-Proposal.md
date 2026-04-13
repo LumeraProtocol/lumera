@@ -128,6 +128,8 @@ A new LEP-4 metric reports the actual Cascade data held by each SuperNode. This 
 
 SuperNode processes already collect Kademlia DB size internally for the status probe endpoint. This is a reporting addition only — no new internal measurement logic required.
 
+Implementation note: Everlight payout weighting reads this value from audit epoch reports. Legacy supernode health reports continue to drive compliance state transitions but are not used as payout-byte source.
+
 **Updated LEP-4 metric table (storage section):**
 
 | Key | Description | Value Type | Used For |
@@ -224,7 +226,7 @@ func (k Keeper) everlightDistribute(ctx sdk.Context) {
         return
     }
 
-    // Read smoothed cascade_kademlia_db_bytes from LEP-4 metrics (same keeper — no cross-module call)
+    // Read latest cascade_kademlia_db_bytes from audit epoch reports (HostReport)
     // Eligible: ACTIVE or STORAGE_FULL, meets min_cascade_bytes_for_payment
     eligibleSNs := k.GetEligibleStorageSNsWithSmoothedMetrics(ctx)
     totalBytes := sdk.ZeroInt()
@@ -321,7 +323,7 @@ Applies to all action types (Cascade, Sense, Agents) — every service contribut
 
 ### 9.1 Weight Metric
 
-Payouts are weighted by **`cascade_kademlia_db_bytes`** — the actual Cascade data held in the node's Kademlia store, as self-reported via LEP-4. This is more meaningful than raw disk usage (which includes chain state and OS overhead) and more directly proportional to actual retention costs.
+Payouts are weighted by **`cascade_kademlia_db_bytes`** — the actual Cascade data held in the node's Kademlia store, sourced from audit epoch reports (`HostReport.cascade_kademlia_db_bytes`). This is more meaningful than raw disk usage (which includes chain state and OS overhead) and more directly proportional to actual retention costs.
 
 **Rounding semantics (Phase 1):** per-SN payout shares are truncated to integer coin amounts; any remainder (dust) stays in the pool for future periods.
 

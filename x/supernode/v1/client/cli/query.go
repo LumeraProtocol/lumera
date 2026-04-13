@@ -20,6 +20,7 @@ func GetCustomQueryCmd() *cobra.Command {
 	supernodeQueryCmd.AddCommand(
 		CmdGetMetrics(),
 		CmdSNEligibility(),
+		CmdPayoutHistory(),
 	)
 
 	return supernodeQueryCmd

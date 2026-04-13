@@ -3,6 +3,7 @@ package keeper
 import (
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"math"
 
 	"github.com/cosmos/cosmos-sdk/runtime"
@@ -31,6 +32,10 @@ func (k Keeper) GetLastDistributionHeight(ctx sdk.Context) int64 {
 // SetLastDistributionHeight stores the block height of the last distribution.
 func (k Keeper) SetLastDistributionHeight(ctx sdk.Context, height int64) {
 	store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
+	if height < 0 {
+		k.Logger().Error("negative last distribution height; clamping to zero", "height", height)
+		height = 0
+	}
 	bz := make([]byte, 8)
 	binary.BigEndian.PutUint64(bz, uint64(height))
 	store.Set(types.LastDistributionHeightKey, bz)
@@ -105,6 +110,16 @@ func (k Keeper) SetSNDistState(ctx sdk.Context, valAddr string, state SNDistStat
 		panic("failed to marshal SN dist state: " + err.Error())
 	}
 	store.Set(types.SNDistStateKey(valAddr), bz)
+}
+
+// AppendPayoutHistoryEntry stores one payout-history row for a validator.
+func (k Keeper) AppendPayoutHistoryEntry(ctx sdk.Context, entry *types.PayoutHistoryEntry) {
+	if entry == nil || entry.ValidatorAddress == "" {
+		return
+	}
+	store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
+	key := []byte(fmt.Sprintf("%s%020d", string(types.PayoutHistoryPrefixForValidator(entry.ValidatorAddress)), entry.Height))
+	store.Set(key, k.cdc.MustMarshal(entry))
 }
 
 // applyGrowthCap limits the reported bytes growth to the configured cap per period.

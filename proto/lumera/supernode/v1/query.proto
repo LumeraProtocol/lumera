@@ -61,6 +61,11 @@ service Query {
   rpc SNEligibility (QuerySNEligibilityRequest) returns (QuerySNEligibilityResponse) {
     option (google.api.http).get = "/LumeraProtocol/lumera/supernode/v1/sn_eligibility/{validator_address}";
   }
+
+  // PayoutHistory returns distribution payout history for a validator.
+  rpc PayoutHistory (QueryPayoutHistoryRequest) returns (QueryPayoutHistoryResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/supernode/v1/payout_history/{validator_address}";
+  }
 }
 
 // QueryParamsRequest is request type for the Query/Params RPC method.
@@ -161,4 +166,28 @@ message QuerySNEligibilityResponse {
   string reason = 2;
   double cascade_kademlia_db_bytes = 3;
   double smoothed_weight = 4;
+}
+
+message PayoutHistoryEntry {
+  int64 height = 1;
+  string validator_address = 2;
+  string supernode_account = 3;
+  repeated cosmos.base.v1beta1.Coin amount = 4 [
+    (gogoproto.nullable) = false,
+    (gogoproto.castrepeated) = "github.com/cosmos/cosmos-sdk/types.Coins"
+  ];
+  double raw_bytes = 5;
+  double smoothed_bytes = 6;
+  double effective_weight = 7;
+  double ramp_weight = 8;
+}
+
+message QueryPayoutHistoryRequest {
+  string validator_address = 1;
+  cosmos.base.query.v1beta1.PageRequest pagination = 2;
+}
+
+message QueryPayoutHistoryResponse {
+  repeated PayoutHistoryEntry entries = 1 [(gogoproto.nullable) = false];
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
 }

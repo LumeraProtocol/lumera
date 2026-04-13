@@ -13,6 +13,9 @@ func InitGenesis(ctx sdk.Context, k keeper.Keeper, genState types.GenesisState) 
 	if err := k.SetParams(ctx, genState.Params); err != nil {
 		panic(err)
 	}
+	if genState.LastDistributionHeight < 0 {
+		panic("invalid supernode genesis: last_distribution_height must be >= 0")
+	}
 	k.SetLastDistributionHeight(ctx, genState.LastDistributionHeight)
 
 	// Ensure the supernode module account is persisted in the account store.

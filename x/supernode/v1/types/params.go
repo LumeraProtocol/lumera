@@ -139,9 +139,6 @@ func (p Params) WithDefaults() Params {
 		if out.RewardDistribution.MinCascadeBytesForPayment == 0 {
 			out.RewardDistribution.MinCascadeBytesForPayment = DefaultRewardDistribution.MinCascadeBytesForPayment
 		}
-		if out.RewardDistribution.NewSnRampUpPeriods == 0 {
-			out.RewardDistribution.NewSnRampUpPeriods = DefaultRewardDistribution.NewSnRampUpPeriods
-		}
 		if out.RewardDistribution.MeasurementSmoothingPeriods == 0 {
 			out.RewardDistribution.MeasurementSmoothingPeriods = DefaultRewardDistribution.MeasurementSmoothingPeriods
 		}

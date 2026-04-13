@@ -61,6 +61,8 @@ When a SuperNode's Cascade storage capacity crosses a threshold, it enters a new
 
 A separate metric — `cascade_kademlia_db_bytes` — is also reported via LEP-4 and used for **Everlight payout weighting** (proportional distribution), but it does not drive the STORAGE_FULL state transition.
 
+Implementation note: payout weighting reads this value from audit epoch reports. Legacy `x/supernode` health reports still drive compliance transitions but are not payout-byte source.
+
 **Simple message:** "Disk-full nodes can still do compute work. Storage capacity is measured by disk usage percent."
 
 ---
@@ -117,7 +119,7 @@ Every payment period (driven by block-height interval):
 
 1. The Everlight SN Pool balance is calculated from all incoming sources
 2. EndBlocker checks if `payment_period_blocks` have elapsed since last distribution
-3. Pool distributes to eligible SuperNodes **proportional to `cascade_kademlia_db_bytes`** reported via LEP-4
+3. Pool distributes to eligible SuperNodes **proportional to `cascade_kademlia_db_bytes`** sourced from audit epoch reports (`HostReport.cascade_kademlia_db_bytes`)
 4. SNs must meet minimum storage thresholds to qualify
 
 **MVP Measurement:** Self-reported Cascade Kademlia DB size with guardrails (growth caps, smoothing window, new-SN ramp-up period).

@@ -80,6 +80,12 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					Short:          "Query whether a supernode is eligible for everlight payouts",
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validator_address"}},
 				},
+				{
+					RpcMethod:      "PayoutHistory",
+					Use:            "payout-history [validator-address]",
+					Short:          "Query payout history for a supernode validator",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validator_address"}},
+				},
 
 				// this line is used by ignite scaffolding # autocli/query
 			},

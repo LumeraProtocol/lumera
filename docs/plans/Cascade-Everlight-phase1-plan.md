@@ -61,7 +61,7 @@ Changes:
 ### S12 — Everlight Pool + Keeper Extensions
 
 **Features:** F14 (Everlight pool and queries within x/supernode)
-**Goal:** Pool account registered, Everlight params added to supernode, genesis import/export extended, query endpoints for pool state and eligibility.
+**Goal:** Pool account registered, Everlight params added to supernode, genesis import/export extended, query endpoints for pool state, eligibility, and payout history.
 
 Changes:
 - `x/supernode/v1/keeper/everlight_pool.go` — pool balance, distribution height tracking
@@ -152,3 +152,34 @@ Changes:
 - **Phase 2 (LEP-6):** Storage-truth enforcement (compound challenges, node suspicion scoring, ticket deterioration), LEP-5 challenge-response proofs gate payouts, snscope cross-validation. Developed outside this project.
 - **Phase 3:** x/endowment module, per-registration endowments, N-year guarantees
 - **Phase 4 (optional):** x/distribution surgery for block reward share routing (~1% of Community Pool allocation to Everlight pool), optional x/epochs migration
+
+---
+
+## Supernode-side integration knowledge (authoritative implementation notes)
+
+This section is maintained as the durable integration contract for supernode team implementation.
+
+### 1) Source of payout bytes (critical)
+- Chain payout weighting uses **audit epoch reports**, not legacy supernode health reports.
+- Value path in reports: `HostReport.CascadeKademliaDbBytes`.
+- Supernode must submit this field in `MsgSubmitEpochReport` host report each epoch.
+- Keeper path: `x/supernode/v1/keeper/audit_metrics.go#getLatestCascadeBytesFromAudit`.
+
+### 2) Legacy health reports behavior
+- Legacy `x/supernode` health reports (`MsgReportSupernodeMetrics`) are still used for supernode compliance state transitions (`ACTIVE/POSTPONED/STORAGE_FULL`).
+- They are **not** the payout-byte source for Everlight distribution.
+
+### 3) Query default behavior for STORAGE_FULL
+- `GetTopSuperNodesForBlock` default behavior (no explicit `state` filter): excludes both `POSTPONED` and `STORAGE_FULL`.
+- To include `STORAGE_FULL`, caller must explicitly request state (e.g. `SUPERNODE_STATE_STORAGE_FULL`).
+- This default matters for all downstream callers that rely on this query without explicit state semantics.
+
+### 4) What exact metric name/value to send
+- Metric name: `cascade_kademlia_db_bytes`.
+- Wire location for payout source: `audit.v1 HostReport.cascade_kademlia_db_bytes` in epoch report.
+- Unit: raw bytes (numeric double in proto representation; semantically bytes).
+
+### 5) Payout-eligibility queries
+- `PoolState`: pool balance, last distribution height, total distributed, eligible SN count.
+- `SNEligibility`: per-validator payout eligibility + current byte/smoothed weight view.
+- `PayoutHistory`: per-validator historical payout rows.

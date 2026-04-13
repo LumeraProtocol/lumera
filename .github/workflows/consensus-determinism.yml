@@ -79,7 +79,7 @@ jobs:
             --v=6 \
             --keyring-backend=test \
             --commit-timeout=900ms \
-            --minimum-gas-prices=0.000001ulume \
+            --minimum-gas-prices=0.001ulume \
             --single-host \
             --starting-ip-address=127.0.0.1
 
@@ -146,7 +146,7 @@ jobs:
               --keyring-backend test \
               --chain-id "$CHAIN_ID" \
               --node tcp://127.0.0.1:26657 \
-              --fees 1ulume \
+              --fees 500ulume \
               --broadcast-mode sync \
               --yes -o json > "$WORK/${action_id}.json"
 
@@ -173,7 +173,7 @@ jobs:
               --keyring-backend test \
               --chain-id "$CHAIN_ID" \
               --node tcp://127.0.0.1:26657 \
-              --fees 1ulume \
+              --fees 500ulume \
               --broadcast-mode sync \
               --yes -o json > "$WORK/${tag}.json"
 

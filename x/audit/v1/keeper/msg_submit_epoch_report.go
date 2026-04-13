@@ -32,7 +32,7 @@ func (m msgServer) SubmitEpochReport(ctx context.Context, req *types.MsgSubmitEp
 		return nil, errorsmod.Wrapf(types.ErrInvalidEpochID, "epoch_id not accepted at height %d", sdkCtx.BlockHeight())
 	}
 
-	_, found, err := m.supernodeKeeper.GetSuperNodeByAccount(sdkCtx, req.Creator)
+	reporterSN, found, err := m.supernodeKeeper.GetSuperNodeByAccount(sdkCtx, req.Creator)
 	if err != nil {
 		return nil, err
 	}
@@ -156,5 +156,6 @@ func (m msgServer) SubmitEpochReport(ctx context.Context, req *types.MsgSubmitEp
 		m.SetStorageChallengeReportIndex(sdkCtx, supernodeAccount, req.EpochId, reporterAccount)
 	}
 
+	_ = reporterSN // validated for reporter membership above
 	return &types.MsgSubmitEpochReportResponse{}, nil
 }

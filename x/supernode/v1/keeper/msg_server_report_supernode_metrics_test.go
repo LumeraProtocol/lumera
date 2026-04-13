@@ -109,15 +109,14 @@ func TestReportSupernodeMetrics_SingleReportRecoversPostponed(t *testing.T) {
 	require.NotNil(t, resp)
 	require.True(t, resp.Compliant)
 
-	// The supernode should now have recovered from POSTPONED to its last
-	// non-postponed state (ACTIVE) in a single report.
+	// Legacy metrics path no longer applies state transitions.
 	stored, found := k.QuerySuperNode(ctx, valAddr)
 	require.True(t, found)
 	require.NotEmpty(t, stored.States)
-	require.Equal(t, types.SuperNodeStateActive, stored.States[len(stored.States)-1].State)
+	require.Equal(t, types.SuperNodeStatePostponed, stored.States[len(stored.States)-1].State)
 }
 
-func TestReportSupernodeMetrics_ClosedRequiredPortPostpones(t *testing.T) {
+func TestReportSupernodeMetrics_ClosedRequiredPortDoesNotPostpone(t *testing.T) {
 	k, ctx := keepertest.SupernodeKeeper(t)
 	ctx = ctx.WithBlockHeight(100)
 
@@ -190,10 +189,10 @@ func TestReportSupernodeMetrics_ClosedRequiredPortPostpones(t *testing.T) {
 	stored, found := k.QuerySuperNode(ctx, valAddr)
 	require.True(t, found)
 	require.NotEmpty(t, stored.States)
-	require.Equal(t, types.SuperNodeStatePostponed, stored.States[len(stored.States)-1].State)
+	require.Equal(t, types.SuperNodeStateActive, stored.States[len(stored.States)-1].State)
 }
 
-func TestReportSupernodeMetrics_EmptyPortsStillPersistsAndRecovers(t *testing.T) {
+func TestReportSupernodeMetrics_EmptyPortsStillPersistsAndDoesNotRecover(t *testing.T) {
 	k, ctx := keepertest.SupernodeKeeper(t)
 	ctx = ctx.WithBlockHeight(100)
 
@@ -250,14 +249,14 @@ func TestReportSupernodeMetrics_EmptyPortsStillPersistsAndRecovers(t *testing.T)
 
 	stored, found := k.QuerySuperNode(ctx, valAddr)
 	require.True(t, found)
-	require.Equal(t, types.SuperNodeStateActive, stored.States[len(stored.States)-1].State)
+	require.Equal(t, types.SuperNodeStatePostponed, stored.States[len(stored.States)-1].State)
 
 	state, ok := k.GetMetricsState(ctx, valAddr)
 	require.True(t, ok, "report should persist metrics state")
 	require.Equal(t, ctx.BlockHeight(), state.Height)
 }
 
-func TestReportSupernodeMetrics_StorageFullFromPostponedEmitsStorageFullEvent(t *testing.T) {
+func TestReportSupernodeMetrics_StorageFullSignalDoesNotTransitionState(t *testing.T) {
 	k, ctx := keepertest.SupernodeKeeper(t)
 	ctx = ctx.WithBlockHeight(100)
 
@@ -320,14 +319,14 @@ func TestReportSupernodeMetrics_StorageFullFromPostponedEmitsStorageFullEvent(t 
 
 	stored, found := k.QuerySuperNode(ctx, valAddr)
 	require.True(t, found)
-	require.Equal(t, types.SuperNodeStateStorageFull, stored.States[len(stored.States)-1].State)
+	require.Equal(t, types.SuperNodeStatePostponed, stored.States[len(stored.States)-1].State)
 
 	events := ctx.EventManager().Events()
-	require.True(t, hasEventType(events, types.EventTypeSupernodeStorageFull))
+	require.False(t, hasEventType(events, types.EventTypeSupernodeStorageFull))
 	require.False(t, hasEventType(events, types.EventTypeSupernodeRecovered))
 }
 
-func TestReportSupernodeMetrics_StorageFullRecoversToActive(t *testing.T) {
+func TestReportSupernodeMetrics_DoesNotRecoverFromStorageFull(t *testing.T) {
 	k, ctx := keepertest.SupernodeKeeper(t)
 	ctx = ctx.WithBlockHeight(100)
 
@@ -388,15 +387,14 @@ func TestReportSupernodeMetrics_StorageFullRecoversToActive(t *testing.T) {
 	require.NotNil(t, resp)
 	require.True(t, resp.Compliant)
 
-	// SN should have recovered from STORAGE_FULL back to ACTIVE.
+	// Legacy metrics path does not recover STORAGE_FULL. State remains unchanged.
 	stored, found := k.QuerySuperNode(ctx, valAddr)
 	require.True(t, found)
 	require.NotEmpty(t, stored.States)
-	require.Equal(t, types.SuperNodeStateActive, stored.States[len(stored.States)-1].State)
+	require.Equal(t, types.SuperNodeStateStorageFull, stored.States[len(stored.States)-1].State)
 
-	// Verify the recovery event was emitted.
 	events := ctx.EventManager().Events()
-	require.True(t, hasEventType(events, types.EventTypeSupernodeStorageRecovered))
+	require.False(t, hasEventType(events, types.EventTypeSupernodeStorageRecovered))
 }
 
 func hasEventType(events sdk.Events, eventType string) bool {

@@ -82,6 +82,7 @@ import (
 	auditmodulekeeper "github.com/LumeraProtocol/lumera/x/audit/v1/keeper"
 	claimmodulekeeper "github.com/LumeraProtocol/lumera/x/claim/keeper"
 	lumeraidmodulekeeper "github.com/LumeraProtocol/lumera/x/lumeraid/keeper"
+	supernodekeeper "github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
 	// this line is used by starport scaffolding # stargate/app/moduleImport
@@ -263,6 +264,7 @@ func New(
 
 	// Wire post-construction cross-module dependency to avoid depinject cycle:
 	// supernode payout logic consumes audit report data.
+	supernodekeeper.SetGlobalAuditKeeper(app.AuditKeeper)
 	if supernodeWithAudit, ok := app.SupernodeKeeper.(interface{ SetAuditKeeper(sntypes.AuditKeeper) }); ok {
 		supernodeWithAudit.SetAuditKeeper(app.AuditKeeper)
 	}

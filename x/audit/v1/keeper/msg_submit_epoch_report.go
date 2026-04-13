@@ -121,6 +121,9 @@ func (m msgServer) SubmitEpochReport(ctx context.Context, req *types.MsgSubmitEp
 			return nil, errorsmod.Wrap(types.ErrInvalidPeerObservations, "peer observations do not cover all assigned targets")
 		}
 	}
+	if err := validateStorageProofResults(reporterAccount, allowedTargets, isProber, req.StorageProofResults); err != nil {
+		return nil, err
+	}
 
 	if m.HasReport(sdkCtx, req.EpochId, reporterAccount) {
 		return nil, errorsmod.Wrap(types.ErrDuplicateReport, "report already submitted for this epoch")
@@ -132,6 +135,7 @@ func (m msgServer) SubmitEpochReport(ctx context.Context, req *types.MsgSubmitEp
 		ReportHeight:                 sdkCtx.BlockHeight(),
 		HostReport:                   req.HostReport,
 		StorageChallengeObservations: req.StorageChallengeObservations,
+		StorageProofResults:          req.StorageProofResults,
 	}
 
 	if err := m.SetReport(sdkCtx, report); err != nil {

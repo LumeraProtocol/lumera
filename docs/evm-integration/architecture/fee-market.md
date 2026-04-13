@@ -10,8 +10,6 @@ Compared to "classic" Cosmos fee behavior (static `minimum-gas-prices` filtering
 - **Priority tips** (a.k.a. "tip") become an explicit mechanism to bid for faster tx inclusion.
 - **Transaction selection / replacement behavior** becomes Ethereum-like (fee-priority + nonce ordering, and higher-fee replacement for the same nonce).
 
-![EIP-1559 Fee Market in Cosmos EVM](../assets/fee-market.png)
-
 ## Dynamic fee model (EIP-1559 semantics)
 
 EIP-1559 splits what clients think of as "gas price" into components:
@@ -39,6 +37,8 @@ The effective minimum fee for EVM transactions is the **highest** of:
 1. **Local minimum**: per-validator node config (`minimum-gas-prices` in `app.toml`)
 2. **Global minimum**: a chain-wide parameter (`MinGasPrice`)
 3. **Base fee**: the current protocol-calculated base fee
+
+![EIP-1559 Fee Market in Cosmos EVM](../assets/fee-market.png)
 
 This means:
 - even if base fee is low, local/global minimums can still reject low-priced transactions

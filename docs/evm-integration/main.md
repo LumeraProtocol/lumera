@@ -16,6 +16,7 @@ Lumera's EVM integration is designed as a deeply integrated, production-ready la
 - [gap-analysis.md](architecture/gap-analysis.md) — Design document vs implementation status matrix and intentional constraints
 - [comparison.md](architecture/comparison.md) — Cross-chain comparison with Evmos, Kava, Cronos, Canto, and Injective
 - [roadmap.md](architecture/roadmap.md) — EVM integration roadmap and planning
+- [rollout.md](architecture/rollout.md) — Staged rollout plan for `v1.20.0`, including devnet, testnet, mainnet, and account migration communications
 
 ### Precompiles
 

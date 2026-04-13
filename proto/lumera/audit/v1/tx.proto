@@ -54,6 +54,7 @@ message MsgSubmitEpochReport {
 
   HostReport host_report = 3 [(gogoproto.nullable) = false];
   repeated StorageChallengeObservation storage_challenge_observations = 4;
+  repeated StorageProofResult storage_proof_results = 5;
 }
 
 message MsgSubmitEpochReportResponse {}

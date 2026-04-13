@@ -37,30 +37,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y jq
 
-      - name: Install Specific Ignite CLI Version
-        run: |
-          IGNITE_VERSION="v29.2.0"
-          ARCH="linux_amd64"
-
-          curl -L "https://github.com/ignite/cli/releases/download/${IGNITE_VERSION}/ignite_${IGNITE_VERSION#v}_checksums.txt" -o checksums.txt
-          EXPECTED_CHECKSUM=$(grep "ignite_${IGNITE_VERSION#v}_${ARCH}.tar.gz" checksums.txt | awk '{print $1}')
-
-          curl -L "https://github.com/ignite/cli/releases/download/${IGNITE_VERSION}/ignite_${IGNITE_VERSION#v}_${ARCH}.tar.gz" -o ignite.tar.gz
-          ACTUAL_CHECKSUM=$(sha256sum ignite.tar.gz | awk '{print $1}')
-          if [ "$ACTUAL_CHECKSUM" != "$EXPECTED_CHECKSUM" ]; then
-            echo "Error: Checksum mismatch!"
-            exit 1
-          fi
-
-          tar -xzf ignite.tar.gz
-          chmod +x ignite
-
       - name: Build chain binary
-        run: |
-          ./ignite chain build --build.tags "ledger" -y -t linux:amd64
-        env:
-          DO_NOT_TRACK: 1
-          GOFLAGS: "-buildvcs=false"
+        run: make build
 
       - name: Map-bearing consensus risk gate
         run: .github/scripts/map_consensus_inventory.sh

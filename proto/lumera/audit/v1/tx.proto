@@ -24,6 +24,15 @@ service Msg {
 
   // SubmitEvidence defines the SubmitEvidence RPC.
   rpc SubmitEvidence(MsgSubmitEvidence) returns (MsgSubmitEvidenceResponse);
+
+  // SubmitStorageRecheckEvidence defines the storage-truth recheck submission path.
+  rpc SubmitStorageRecheckEvidence(MsgSubmitStorageRecheckEvidence) returns (MsgSubmitStorageRecheckEvidenceResponse);
+
+  // ClaimHealComplete defines the healer claim path for a chain-tracked heal op.
+  rpc ClaimHealComplete(MsgClaimHealComplete) returns (MsgClaimHealCompleteResponse);
+
+  // SubmitHealVerification defines the verifier submission path for a chain-tracked heal op.
+  rpc SubmitHealVerification(MsgSubmitHealVerification) returns (MsgSubmitHealVerificationResponse);
 }
 
 message MsgUpdateParams {
@@ -65,3 +74,42 @@ message MsgSubmitEvidence {
 message MsgSubmitEvidenceResponse {
   uint64 evidence_id = 1;
 }
+
+message MsgSubmitStorageRecheckEvidence {
+  option (cosmos.msg.v1.signer) = "creator";
+
+  string creator = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  uint64 epoch_id = 2;
+  string challenged_supernode_account = 3 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  string ticket_id = 4;
+  string challenged_result_transcript_hash = 5;
+  string recheck_transcript_hash = 6;
+  StorageProofResultClass recheck_result_class = 7;
+  string details = 8;
+}
+
+message MsgSubmitStorageRecheckEvidenceResponse {}
+
+message MsgClaimHealComplete {
+  option (cosmos.msg.v1.signer) = "creator";
+
+  string creator = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  uint64 heal_op_id = 2;
+  string ticket_id = 3;
+  string heal_manifest_hash = 4;
+  string details = 5;
+}
+
+message MsgClaimHealCompleteResponse {}
+
+message MsgSubmitHealVerification {
+  option (cosmos.msg.v1.signer) = "creator";
+
+  string creator = 1 [(cosmos_proto.scalar) = "cosmos.AddressString"];
+  uint64 heal_op_id = 2;
+  bool verified = 3;
+  string verification_hash = 4;
+  string details = 5;
+}
+
+message MsgSubmitHealVerificationResponse {}

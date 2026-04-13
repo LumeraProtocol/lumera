@@ -49,6 +49,36 @@ func (k Keeper) InitGenesis(ctx context.Context, genState types.GenesisState) er
 	}
 	k.SetNextEvidenceID(sdkCtx, nextEvidenceID)
 
+	nextHealOpID := uint64(1)
+	if genState.NextHealOpId != 0 {
+		nextHealOpID = genState.NextHealOpId
+	}
+
+	for _, state := range genState.NodeSuspicionStates {
+		if err := k.SetNodeSuspicionState(sdkCtx, state); err != nil {
+			return err
+		}
+	}
+	for _, state := range genState.ReporterReliabilityStates {
+		if err := k.SetReporterReliabilityState(sdkCtx, state); err != nil {
+			return err
+		}
+	}
+	for _, state := range genState.TicketDeteriorationStates {
+		if err := k.SetTicketDeteriorationState(sdkCtx, state); err != nil {
+			return err
+		}
+	}
+	for _, healOp := range genState.HealOps {
+		if err := k.SetHealOp(sdkCtx, healOp); err != nil {
+			return err
+		}
+		if healOp.HealOpId >= nextHealOpID {
+			nextHealOpID = healOp.HealOpId + 1
+		}
+	}
+	k.SetNextHealOpID(sdkCtx, nextHealOpID)
+
 	return nil
 }
 
@@ -71,6 +101,34 @@ func (k Keeper) ExportGenesis(ctx context.Context) (*types.GenesisState, error) 
 
 	if genesis.NextEvidenceId == 0 {
 		return nil, errors.New("invalid next evidence id")
+	}
+
+	nodeSuspicionStates, err := k.GetAllNodeSuspicionStates(sdkCtx)
+	if err != nil {
+		return nil, err
+	}
+	genesis.NodeSuspicionStates = nodeSuspicionStates
+
+	reporterReliabilityStates, err := k.GetAllReporterReliabilityStates(sdkCtx)
+	if err != nil {
+		return nil, err
+	}
+	genesis.ReporterReliabilityStates = reporterReliabilityStates
+
+	ticketDeteriorationStates, err := k.GetAllTicketDeteriorationStates(sdkCtx)
+	if err != nil {
+		return nil, err
+	}
+	genesis.TicketDeteriorationStates = ticketDeteriorationStates
+
+	healOps, err := k.GetAllHealOps(sdkCtx)
+	if err != nil {
+		return nil, err
+	}
+	genesis.HealOps = healOps
+	genesis.NextHealOpId = k.GetNextHealOpID(sdkCtx)
+	if genesis.NextHealOpId == 0 {
+		return nil, errors.New("invalid next heal op id")
 	}
 
 	return genesis, nil

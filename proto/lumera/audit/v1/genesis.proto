@@ -8,6 +8,7 @@ import "gogoproto/gogo.proto";
 
 import "lumera/audit/v1/params.proto";
 import "lumera/audit/v1/evidence.proto";
+import "lumera/audit/v1/audit.proto";
 
 // GenesisState defines the audit module's genesis state.
 message GenesisState {
@@ -21,4 +22,12 @@ message GenesisState {
 
   // next_evidence_id is the next id to use for chain-assigned ids.
   uint64 next_evidence_id = 3;
+
+  repeated NodeSuspicionState node_suspicion_states = 4 [(gogoproto.nullable) = false];
+  repeated ReporterReliabilityState reporter_reliability_states = 5 [(gogoproto.nullable) = false];
+  repeated TicketDeteriorationState ticket_deterioration_states = 6 [(gogoproto.nullable) = false];
+  repeated HealOp heal_ops = 7 [(gogoproto.nullable) = false];
+
+  // next_heal_op_id is the next id to use for storage-truth heal operations.
+  uint64 next_heal_op_id = 8;
 }

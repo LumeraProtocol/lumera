@@ -23,7 +23,12 @@ func TestGenesisParamsRoundTrip(t *testing.T) {
 
 	require.EqualExportedValues(t, genesisState.Params, got.Params)
 	require.Equal(t, uint64(1), got.NextEvidenceId)
+	require.Equal(t, uint64(1), got.NextHealOpId)
 	require.Empty(t, got.Evidence)
+	require.Empty(t, got.NodeSuspicionStates)
+	require.Empty(t, got.ReporterReliabilityStates)
+	require.Empty(t, got.TicketDeteriorationStates)
+	require.Empty(t, got.HealOps)
 }
 
 func TestGenesisEvidenceRoundTripSetsNextID(t *testing.T) {
@@ -53,4 +58,5 @@ func TestGenesisEvidenceRoundTripSetsNextID(t *testing.T) {
 	require.Len(t, got.Evidence, 1)
 	require.Equal(t, ev.EvidenceId, got.Evidence[0].EvidenceId)
 	require.Equal(t, uint64(8), got.NextEvidenceId)
+	require.Equal(t, uint64(1), got.NextHealOpId)
 }

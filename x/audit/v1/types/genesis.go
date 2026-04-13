@@ -8,6 +8,7 @@ func DefaultGenesis() *GenesisState {
 	return &GenesisState{
 		Params:         DefaultParams(),
 		NextEvidenceId: 1,
+		NextHealOpId:   1,
 	}
 }
 

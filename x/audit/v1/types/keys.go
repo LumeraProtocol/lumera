@@ -40,7 +40,7 @@ var (
 	// epochParamsSnapshotPrefix stores a per-epoch snapshot of assignment/gating-related params.
 	// Format: "eps/" + u64be(epoch_id)
 	epochParamsSnapshotPrefix = []byte("eps/")
-	reportPrefix      = []byte("r/")
+	reportPrefix              = []byte("r/")
 
 	reportIndexPrefix = []byte("ri/")
 
@@ -71,6 +71,22 @@ var (
 	evidenceEpochCountPrefix = []byte("eve/")
 
 	actionFinalizationPostponementPrefix = []byte("ap/af/")
+
+	// Storage-truth state:
+	// - NodeSuspicionStateKey:          "st/ns/" + supernode_account
+	// - ReporterReliabilityStateKey:    "st/rr/" + reporter_supernode_account
+	// - TicketDeteriorationStateKey:    "st/td/" + ticket_id
+	// - HealOpKey:                      "st/ho/" + u64be(heal_op_id)
+	// - HealOpByTicketIndexKey:         "st/hot/" + ticket_id + 0x00 + u64be(heal_op_id)
+	// - HealOpByStatusIndexKey:         "st/hos/" + u32be(status) + u64be(heal_op_id)
+	// - NextHealOpIDKey:                "st/next_ho_id"
+	nodeSuspicionStatePrefix       = []byte("st/ns/")
+	reporterReliabilityStatePrefix = []byte("st/rr/")
+	ticketDeteriorationStatePrefix = []byte("st/td/")
+	healOpPrefix                   = []byte("st/ho/")
+	healOpByTicketIndexPrefix      = []byte("st/hot/")
+	healOpByStatusIndexPrefix      = []byte("st/hos/")
+	nextHealOpIDKey                = []byte("st/next_ho_id")
 )
 
 // EpochAnchorKey returns the store key for the EpochAnchor identified by epochID.
@@ -280,4 +296,84 @@ func ActionFinalizationPostponementKey(supernodeAccount string) []byte {
 
 func ActionFinalizationPostponementPrefix() []byte {
 	return actionFinalizationPostponementPrefix
+}
+
+func NodeSuspicionStateKey(supernodeAccount string) []byte {
+	key := make([]byte, 0, len(nodeSuspicionStatePrefix)+len(supernodeAccount))
+	key = append(key, nodeSuspicionStatePrefix...)
+	key = append(key, supernodeAccount...)
+	return key
+}
+
+func NodeSuspicionStatePrefix() []byte {
+	return nodeSuspicionStatePrefix
+}
+
+func ReporterReliabilityStateKey(reporterSupernodeAccount string) []byte {
+	key := make([]byte, 0, len(reporterReliabilityStatePrefix)+len(reporterSupernodeAccount))
+	key = append(key, reporterReliabilityStatePrefix...)
+	key = append(key, reporterSupernodeAccount...)
+	return key
+}
+
+func ReporterReliabilityStatePrefix() []byte {
+	return reporterReliabilityStatePrefix
+}
+
+func TicketDeteriorationStateKey(ticketID string) []byte {
+	key := make([]byte, 0, len(ticketDeteriorationStatePrefix)+len(ticketID))
+	key = append(key, ticketDeteriorationStatePrefix...)
+	key = append(key, ticketID...)
+	return key
+}
+
+func TicketDeteriorationStatePrefix() []byte {
+	return ticketDeteriorationStatePrefix
+}
+
+func HealOpKey(healOpID uint64) []byte {
+	key := make([]byte, 0, len(healOpPrefix)+8)
+	key = append(key, healOpPrefix...)
+	key = binary.BigEndian.AppendUint64(key, healOpID)
+	return key
+}
+
+func HealOpPrefix() []byte {
+	return healOpPrefix
+}
+
+func HealOpByTicketIndexKey(ticketID string, healOpID uint64) []byte {
+	key := make([]byte, 0, len(healOpByTicketIndexPrefix)+len(ticketID)+1+8) // "st/hot/" + ticket + 0x00 + u64be(heal_op_id)
+	key = append(key, healOpByTicketIndexPrefix...)
+	key = append(key, ticketID...)
+	key = append(key, 0)
+	key = binary.BigEndian.AppendUint64(key, healOpID)
+	return key
+}
+
+func HealOpByTicketIndexPrefix(ticketID string) []byte {
+	key := make([]byte, 0, len(healOpByTicketIndexPrefix)+len(ticketID)+1) // "st/hot/" + ticket + 0x00
+	key = append(key, healOpByTicketIndexPrefix...)
+	key = append(key, ticketID...)
+	key = append(key, 0)
+	return key
+}
+
+func HealOpByStatusIndexKey(status HealOpStatus, healOpID uint64) []byte {
+	key := make([]byte, 0, len(healOpByStatusIndexPrefix)+4+8) // "st/hos/" + u32be(status) + u64be(heal_op_id)
+	key = append(key, healOpByStatusIndexPrefix...)
+	key = binary.BigEndian.AppendUint32(key, uint32(status))
+	key = binary.BigEndian.AppendUint64(key, healOpID)
+	return key
+}
+
+func HealOpByStatusIndexPrefix(status HealOpStatus) []byte {
+	key := make([]byte, 0, len(healOpByStatusIndexPrefix)+4) // "st/hos/" + u32be(status)
+	key = append(key, healOpByStatusIndexPrefix...)
+	key = binary.BigEndian.AppendUint32(key, uint32(status))
+	return key
+}
+
+func NextHealOpIDKey() []byte {
+	return nextHealOpIDKey
 }

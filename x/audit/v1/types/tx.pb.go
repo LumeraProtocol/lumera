@@ -346,6 +346,368 @@ func (m *MsgSubmitEvidenceResponse) GetEvidenceId() uint64 {
 	return 0
 }
 
+type MsgSubmitStorageRecheckEvidence struct {
+	Creator                        string                  `protobuf:"bytes,1,opt,name=creator,proto3" json:"creator,omitempty"`
+	EpochId                        uint64                  `protobuf:"varint,2,opt,name=epoch_id,json=epochId,proto3" json:"epoch_id,omitempty"`
+	ChallengedSupernodeAccount     string                  `protobuf:"bytes,3,opt,name=challenged_supernode_account,json=challengedSupernodeAccount,proto3" json:"challenged_supernode_account,omitempty"`
+	TicketId                       string                  `protobuf:"bytes,4,opt,name=ticket_id,json=ticketId,proto3" json:"ticket_id,omitempty"`
+	ChallengedResultTranscriptHash string                  `protobuf:"bytes,5,opt,name=challenged_result_transcript_hash,json=challengedResultTranscriptHash,proto3" json:"challenged_result_transcript_hash,omitempty"`
+	RecheckTranscriptHash          string                  `protobuf:"bytes,6,opt,name=recheck_transcript_hash,json=recheckTranscriptHash,proto3" json:"recheck_transcript_hash,omitempty"`
+	RecheckResultClass             StorageProofResultClass `protobuf:"varint,7,opt,name=recheck_result_class,json=recheckResultClass,proto3,enum=lumera.audit.v1.StorageProofResultClass" json:"recheck_result_class,omitempty"`
+	Details                        string                  `protobuf:"bytes,8,opt,name=details,proto3" json:"details,omitempty"`
+}
+
+func (m *MsgSubmitStorageRecheckEvidence) Reset()         { *m = MsgSubmitStorageRecheckEvidence{} }
+func (m *MsgSubmitStorageRecheckEvidence) String() string { return proto.CompactTextString(m) }
+func (*MsgSubmitStorageRecheckEvidence) ProtoMessage()    {}
+func (*MsgSubmitStorageRecheckEvidence) Descriptor() ([]byte, []int) {
+	return fileDescriptor_4b5ba410ad359f63, []int{6}
+}
+func (m *MsgSubmitStorageRecheckEvidence) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *MsgSubmitStorageRecheckEvidence) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_MsgSubmitStorageRecheckEvidence.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *MsgSubmitStorageRecheckEvidence) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MsgSubmitStorageRecheckEvidence.Merge(m, src)
+}
+func (m *MsgSubmitStorageRecheckEvidence) XXX_Size() int {
+	return m.Size()
+}
+func (m *MsgSubmitStorageRecheckEvidence) XXX_DiscardUnknown() {
+	xxx_messageInfo_MsgSubmitStorageRecheckEvidence.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_MsgSubmitStorageRecheckEvidence proto.InternalMessageInfo
+
+func (m *MsgSubmitStorageRecheckEvidence) GetCreator() string {
+	if m != nil {
+		return m.Creator
+	}
+	return ""
+}
+
+func (m *MsgSubmitStorageRecheckEvidence) GetEpochId() uint64 {
+	if m != nil {
+		return m.EpochId
+	}
+	return 0
+}
+
+func (m *MsgSubmitStorageRecheckEvidence) GetChallengedSupernodeAccount() string {
+	if m != nil {
+		return m.ChallengedSupernodeAccount
+	}
+	return ""
+}
+
+func (m *MsgSubmitStorageRecheckEvidence) GetTicketId() string {
+	if m != nil {
+		return m.TicketId
+	}
+	return ""
+}
+
+func (m *MsgSubmitStorageRecheckEvidence) GetChallengedResultTranscriptHash() string {
+	if m != nil {
+		return m.ChallengedResultTranscriptHash
+	}
+	return ""
+}
+
+func (m *MsgSubmitStorageRecheckEvidence) GetRecheckTranscriptHash() string {
+	if m != nil {
+		return m.RecheckTranscriptHash
+	}
+	return ""
+}
+
+func (m *MsgSubmitStorageRecheckEvidence) GetRecheckResultClass() StorageProofResultClass {
+	if m != nil {
+		return m.RecheckResultClass
+	}
+	return StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_UNSPECIFIED
+}
+
+func (m *MsgSubmitStorageRecheckEvidence) GetDetails() string {
+	if m != nil {
+		return m.Details
+	}
+	return ""
+}
+
+type MsgSubmitStorageRecheckEvidenceResponse struct {
+}
+
+func (m *MsgSubmitStorageRecheckEvidenceResponse) Reset() {
+	*m = MsgSubmitStorageRecheckEvidenceResponse{}
+}
+func (m *MsgSubmitStorageRecheckEvidenceResponse) String() string { return proto.CompactTextString(m) }
+func (*MsgSubmitStorageRecheckEvidenceResponse) ProtoMessage()    {}
+func (*MsgSubmitStorageRecheckEvidenceResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_4b5ba410ad359f63, []int{7}
+}
+func (m *MsgSubmitStorageRecheckEvidenceResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *MsgSubmitStorageRecheckEvidenceResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_MsgSubmitStorageRecheckEvidenceResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *MsgSubmitStorageRecheckEvidenceResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MsgSubmitStorageRecheckEvidenceResponse.Merge(m, src)
+}
+func (m *MsgSubmitStorageRecheckEvidenceResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *MsgSubmitStorageRecheckEvidenceResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_MsgSubmitStorageRecheckEvidenceResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_MsgSubmitStorageRecheckEvidenceResponse proto.InternalMessageInfo
+
+type MsgClaimHealComplete struct {
+	Creator          string `protobuf:"bytes,1,opt,name=creator,proto3" json:"creator,omitempty"`
+	HealOpId         uint64 `protobuf:"varint,2,opt,name=heal_op_id,json=healOpId,proto3" json:"heal_op_id,omitempty"`
+	TicketId         string `protobuf:"bytes,3,opt,name=ticket_id,json=ticketId,proto3" json:"ticket_id,omitempty"`
+	HealManifestHash string `protobuf:"bytes,4,opt,name=heal_manifest_hash,json=healManifestHash,proto3" json:"heal_manifest_hash,omitempty"`
+	Details          string `protobuf:"bytes,5,opt,name=details,proto3" json:"details,omitempty"`
+}
+
+func (m *MsgClaimHealComplete) Reset()         { *m = MsgClaimHealComplete{} }
+func (m *MsgClaimHealComplete) String() string { return proto.CompactTextString(m) }
+func (*MsgClaimHealComplete) ProtoMessage()    {}
+func (*MsgClaimHealComplete) Descriptor() ([]byte, []int) {
+	return fileDescriptor_4b5ba410ad359f63, []int{8}
+}
+func (m *MsgClaimHealComplete) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *MsgClaimHealComplete) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_MsgClaimHealComplete.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *MsgClaimHealComplete) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MsgClaimHealComplete.Merge(m, src)
+}
+func (m *MsgClaimHealComplete) XXX_Size() int {
+	return m.Size()
+}
+func (m *MsgClaimHealComplete) XXX_DiscardUnknown() {
+	xxx_messageInfo_MsgClaimHealComplete.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_MsgClaimHealComplete proto.InternalMessageInfo
+
+func (m *MsgClaimHealComplete) GetCreator() string {
+	if m != nil {
+		return m.Creator
+	}
+	return ""
+}
+
+func (m *MsgClaimHealComplete) GetHealOpId() uint64 {
+	if m != nil {
+		return m.HealOpId
+	}
+	return 0
+}
+
+func (m *MsgClaimHealComplete) GetTicketId() string {
+	if m != nil {
+		return m.TicketId
+	}
+	return ""
+}
+
+func (m *MsgClaimHealComplete) GetHealManifestHash() string {
+	if m != nil {
+		return m.HealManifestHash
+	}
+	return ""
+}
+
+func (m *MsgClaimHealComplete) GetDetails() string {
+	if m != nil {
+		return m.Details
+	}
+	return ""
+}
+
+type MsgClaimHealCompleteResponse struct {
+}
+
+func (m *MsgClaimHealCompleteResponse) Reset()         { *m = MsgClaimHealCompleteResponse{} }
+func (m *MsgClaimHealCompleteResponse) String() string { return proto.CompactTextString(m) }
+func (*MsgClaimHealCompleteResponse) ProtoMessage()    {}
+func (*MsgClaimHealCompleteResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_4b5ba410ad359f63, []int{9}
+}
+func (m *MsgClaimHealCompleteResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *MsgClaimHealCompleteResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_MsgClaimHealCompleteResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *MsgClaimHealCompleteResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MsgClaimHealCompleteResponse.Merge(m, src)
+}
+func (m *MsgClaimHealCompleteResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *MsgClaimHealCompleteResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_MsgClaimHealCompleteResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_MsgClaimHealCompleteResponse proto.InternalMessageInfo
+
+type MsgSubmitHealVerification struct {
+	Creator          string `protobuf:"bytes,1,opt,name=creator,proto3" json:"creator,omitempty"`
+	HealOpId         uint64 `protobuf:"varint,2,opt,name=heal_op_id,json=healOpId,proto3" json:"heal_op_id,omitempty"`
+	Verified         bool   `protobuf:"varint,3,opt,name=verified,proto3" json:"verified,omitempty"`
+	VerificationHash string `protobuf:"bytes,4,opt,name=verification_hash,json=verificationHash,proto3" json:"verification_hash,omitempty"`
+	Details          string `protobuf:"bytes,5,opt,name=details,proto3" json:"details,omitempty"`
+}
+
+func (m *MsgSubmitHealVerification) Reset()         { *m = MsgSubmitHealVerification{} }
+func (m *MsgSubmitHealVerification) String() string { return proto.CompactTextString(m) }
+func (*MsgSubmitHealVerification) ProtoMessage()    {}
+func (*MsgSubmitHealVerification) Descriptor() ([]byte, []int) {
+	return fileDescriptor_4b5ba410ad359f63, []int{10}
+}
+func (m *MsgSubmitHealVerification) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *MsgSubmitHealVerification) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_MsgSubmitHealVerification.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *MsgSubmitHealVerification) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MsgSubmitHealVerification.Merge(m, src)
+}
+func (m *MsgSubmitHealVerification) XXX_Size() int {
+	return m.Size()
+}
+func (m *MsgSubmitHealVerification) XXX_DiscardUnknown() {
+	xxx_messageInfo_MsgSubmitHealVerification.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_MsgSubmitHealVerification proto.InternalMessageInfo
+
+func (m *MsgSubmitHealVerification) GetCreator() string {
+	if m != nil {
+		return m.Creator
+	}
+	return ""
+}
+
+func (m *MsgSubmitHealVerification) GetHealOpId() uint64 {
+	if m != nil {
+		return m.HealOpId
+	}
+	return 0
+}
+
+func (m *MsgSubmitHealVerification) GetVerified() bool {
+	if m != nil {
+		return m.Verified
+	}
+	return false
+}
+
+func (m *MsgSubmitHealVerification) GetVerificationHash() string {
+	if m != nil {
+		return m.VerificationHash
+	}
+	return ""
+}
+
+func (m *MsgSubmitHealVerification) GetDetails() string {
+	if m != nil {
+		return m.Details
+	}
+	return ""
+}
+
+type MsgSubmitHealVerificationResponse struct {
+}
+
+func (m *MsgSubmitHealVerificationResponse) Reset()         { *m = MsgSubmitHealVerificationResponse{} }
+func (m *MsgSubmitHealVerificationResponse) String() string { return proto.CompactTextString(m) }
+func (*MsgSubmitHealVerificationResponse) ProtoMessage()    {}
+func (*MsgSubmitHealVerificationResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_4b5ba410ad359f63, []int{11}
+}
+func (m *MsgSubmitHealVerificationResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *MsgSubmitHealVerificationResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_MsgSubmitHealVerificationResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *MsgSubmitHealVerificationResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MsgSubmitHealVerificationResponse.Merge(m, src)
+}
+func (m *MsgSubmitHealVerificationResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *MsgSubmitHealVerificationResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_MsgSubmitHealVerificationResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_MsgSubmitHealVerificationResponse proto.InternalMessageInfo
+
 func init() {
 	proto.RegisterType((*MsgUpdateParams)(nil), "lumera.audit.v1.MsgUpdateParams")
 	proto.RegisterType((*MsgUpdateParamsResponse)(nil), "lumera.audit.v1.MsgUpdateParamsResponse")
@@ -353,53 +715,82 @@ func init() {
 	proto.RegisterType((*MsgSubmitEpochReportResponse)(nil), "lumera.audit.v1.MsgSubmitEpochReportResponse")
 	proto.RegisterType((*MsgSubmitEvidence)(nil), "lumera.audit.v1.MsgSubmitEvidence")
 	proto.RegisterType((*MsgSubmitEvidenceResponse)(nil), "lumera.audit.v1.MsgSubmitEvidenceResponse")
+	proto.RegisterType((*MsgSubmitStorageRecheckEvidence)(nil), "lumera.audit.v1.MsgSubmitStorageRecheckEvidence")
+	proto.RegisterType((*MsgSubmitStorageRecheckEvidenceResponse)(nil), "lumera.audit.v1.MsgSubmitStorageRecheckEvidenceResponse")
+	proto.RegisterType((*MsgClaimHealComplete)(nil), "lumera.audit.v1.MsgClaimHealComplete")
+	proto.RegisterType((*MsgClaimHealCompleteResponse)(nil), "lumera.audit.v1.MsgClaimHealCompleteResponse")
+	proto.RegisterType((*MsgSubmitHealVerification)(nil), "lumera.audit.v1.MsgSubmitHealVerification")
+	proto.RegisterType((*MsgSubmitHealVerificationResponse)(nil), "lumera.audit.v1.MsgSubmitHealVerificationResponse")
 }
 
 func init() { proto.RegisterFile("lumera/audit/v1/tx.proto", fileDescriptor_4b5ba410ad359f63) }
 
 var fileDescriptor_4b5ba410ad359f63 = []byte{
-	// 652 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x54, 0xbf, 0x6f, 0xd3, 0x40,
-	0x14, 0x8e, 0xd3, 0xf4, 0x47, 0x5e, 0x4a, 0x4b, 0x4f, 0x95, 0xea, 0xb8, 0xc5, 0x0d, 0x91, 0x90,
-	0xa2, 0x88, 0x26, 0x6a, 0x40, 0x0c, 0x15, 0x4b, 0x8d, 0x90, 0xe8, 0x50, 0x81, 0x5c, 0x58, 0xba,
-	0x98, 0x8b, 0x7d, 0x72, 0x8c, 0x6a, 0x9f, 0x75, 0x77, 0x89, 0xda, 0x0d, 0x31, 0x32, 0xb1, 0xf0,
-	0x3f, 0x20, 0xb1, 0x74, 0x80, 0x89, 0x7f, 0xa0, 0x63, 0xc5, 0xc4, 0x84, 0x50, 0x3b, 0xf4, 0xdf,
-	0x40, 0xbe, 0xb3, 0x93, 0x62, 0x97, 0x16, 0xb1, 0x44, 0xbe, 0xf7, 0x7d, 0xdf, 0xbb, 0xef, 0x7d,
-	0x79, 0x36, 0xe8, 0x07, 0xc3, 0x90, 0x30, 0xdc, 0xc5, 0x43, 0x2f, 0x10, 0xdd, 0xd1, 0x66, 0x57,
-	0x1c, 0x76, 0x62, 0x46, 0x05, 0x45, 0x8b, 0x0a, 0xe9, 0x48, 0xa4, 0x33, 0xda, 0x34, 0x96, 0x70,
-	0x18, 0x44, 0xb4, 0x2b, 0x7f, 0x15, 0xc7, 0x58, 0xf6, 0xa9, 0x4f, 0xe5, 0x63, 0x37, 0x79, 0x4a,
-	0xab, 0x2b, 0x2e, 0xe5, 0x21, 0xe5, 0xdd, 0x90, 0xfb, 0x49, 0xc7, 0x90, 0xfb, 0x29, 0x50, 0x57,
-	0x80, 0xa3, 0x14, 0xea, 0x90, 0x42, 0xab, 0x79, 0x1f, 0xea, 0x5a, 0x05, 0xae, 0xe5, 0xc1, 0x18,
-	0x33, 0x1c, 0x66, 0x52, 0x33, 0x8f, 0x92, 0x51, 0xe0, 0x91, 0xc8, 0x25, 0x0a, 0x6f, 0x7e, 0xd3,
-	0x60, 0x71, 0x97, 0xfb, 0xaf, 0x62, 0x0f, 0x0b, 0xf2, 0x42, 0x2a, 0xd1, 0x23, 0xa8, 0xe2, 0xa1,
-	0x18, 0x50, 0x16, 0x88, 0x23, 0x5d, 0x6b, 0x68, 0xad, 0xaa, 0xa5, 0x7f, 0xff, 0xb2, 0xb1, 0x9c,
-	0x7a, 0xda, 0xf6, 0x3c, 0x46, 0x38, 0xdf, 0x13, 0x2c, 0x88, 0x7c, 0x7b, 0x42, 0x45, 0x5b, 0x30,
-	0xa3, 0xee, 0xd6, 0xcb, 0x0d, 0xad, 0x55, 0xeb, 0xad, 0x74, 0x72, 0x29, 0x75, 0xd4, 0x05, 0x56,
-	0xf5, 0xe4, 0xe7, 0x7a, 0xe9, 0xd3, 0xc5, 0x71, 0x5b, 0xb3, 0x53, 0xc5, 0xd6, 0xc3, 0x77, 0x17,
-	0xc7, 0xed, 0x49, 0xaf, 0xf7, 0x17, 0xc7, 0xed, 0xbb, 0xa9, 0xf5, 0xc3, 0x89, 0xf9, 0x9c, 0xd3,
-	0x66, 0x1d, 0x56, 0x72, 0x25, 0x9b, 0xf0, 0x98, 0x46, 0x9c, 0x34, 0x3f, 0x97, 0x61, 0x79, 0x97,
-	0xfb, 0x7b, 0xc3, 0x7e, 0x18, 0x88, 0xa7, 0x31, 0x75, 0x07, 0x36, 0x89, 0x29, 0x13, 0xa8, 0x07,
-	0xb3, 0x2e, 0x23, 0x58, 0x50, 0x76, 0xe3, 0x6c, 0x19, 0x11, 0xd5, 0x61, 0x8e, 0x24, 0x2d, 0x9c,
-	0xc0, 0x93, 0xb3, 0x55, 0xec, 0x59, 0x79, 0xde, 0xf1, 0x90, 0x05, 0xb5, 0x01, 0xe5, 0xc2, 0x61,
-	0xb2, 0xbb, 0x3e, 0x25, 0x27, 0x5f, 0x2d, 0x4c, 0xfe, 0x8c, 0x72, 0xa1, 0x0c, 0x58, 0x95, 0x64,
-	0x7a, 0x1b, 0x06, 0xe3, 0x0a, 0x62, 0x60, 0x72, 0x41, 0x19, 0xf6, 0x89, 0xe3, 0x0e, 0xf0, 0xc1,
-	0x01, 0x89, 0x7c, 0xe2, 0xd0, 0x3e, 0x27, 0x6c, 0x84, 0x45, 0x40, 0x23, 0xae, 0x57, 0x1a, 0x53,
-	0xad, 0x5a, 0xef, 0x7e, 0xa1, 0xed, 0x9e, 0x92, 0x3d, 0xc9, 0x54, 0xcf, 0x27, 0x22, 0x7b, 0x8d,
-	0xff, 0x1d, 0xe4, 0x5b, 0xf3, 0x49, 0xe0, 0xd9, 0x80, 0x4d, 0x13, 0xd6, 0xae, 0x0a, 0x6b, 0x9c,
-	0xe6, 0xc7, 0x32, 0x2c, 0x4d, 0x08, 0xe9, 0x0a, 0xfd, 0x57, 0x94, 0xdb, 0xb0, 0xc8, 0x87, 0xfd,
-	0x37, 0xc4, 0x15, 0x0e, 0x56, 0x0c, 0x99, 0xe8, 0x75, 0xda, 0x85, 0x54, 0x90, 0x56, 0x91, 0x05,
-	0xb7, 0xb2, 0x2d, 0x76, 0xc4, 0x51, 0x4c, 0x64, 0xe8, 0x0b, 0xbd, 0x3b, 0x85, 0x74, 0x32, 0xa3,
-	0x2f, 0x8f, 0x62, 0x62, 0xcf, 0x93, 0x4b, 0x27, 0xb4, 0x0a, 0x55, 0xec, 0x26, 0x49, 0x24, 0x7f,
-	0x69, 0x25, 0x31, 0x60, 0xcf, 0xa9, 0xc2, 0x8e, 0x87, 0x0c, 0x98, 0x0b, 0x89, 0xc0, 0x1e, 0x16,
-	0x58, 0x9f, 0x56, 0x58, 0x76, 0xce, 0xe5, 0xf6, 0x18, 0xea, 0x85, 0x58, 0xb2, 0xd0, 0xd0, 0x3a,
-	0xd4, 0xc6, 0x3e, 0x03, 0x4f, 0x46, 0x54, 0xb1, 0x21, 0x2b, 0xed, 0x78, 0xbd, 0xaf, 0x65, 0x98,
-	0xda, 0xe5, 0x3e, 0xda, 0x87, 0xf9, 0x3f, 0x5e, 0xc0, 0x46, 0x61, 0x92, 0xdc, 0x96, 0x1b, 0xad,
-	0x9b, 0x18, 0x63, 0x13, 0x01, 0x2c, 0x15, 0xdf, 0x81, 0x7b, 0x57, 0xc9, 0x0b, 0x34, 0x63, 0xe3,
-	0x9f, 0x68, 0xe3, 0xab, 0x5e, 0xc3, 0x42, 0x6e, 0x41, 0x9a, 0xd7, 0x34, 0x48, 0x39, 0x46, 0xfb,
-	0x66, 0x4e, 0x76, 0x83, 0x31, 0xfd, 0x36, 0xf9, 0x68, 0x58, 0xed, 0x93, 0x33, 0x53, 0x3b, 0x3d,
-	0x33, 0xb5, 0x5f, 0x67, 0xa6, 0xf6, 0xe1, 0xdc, 0x2c, 0x9d, 0x9e, 0x9b, 0xa5, 0x1f, 0xe7, 0x66,
-	0x69, 0xff, 0xf6, 0xa5, 0x8f, 0x45, 0xb2, 0x1a, 0xbc, 0x3f, 0x23, 0xbf, 0x73, 0x0f, 0x7e, 0x07,
-	0x00, 0x00, 0xff, 0xff, 0x08, 0x61, 0x98, 0x8b, 0xcc, 0x05, 0x00, 0x00,
+	// 1013 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xb4, 0x56, 0xcf, 0x4e, 0xe3, 0x46,
+	0x18, 0xc7, 0x24, 0x40, 0x32, 0x50, 0x58, 0x2c, 0xda, 0x18, 0x93, 0x1a, 0x48, 0x55, 0x35, 0x4d,
+	0x97, 0xa4, 0x9b, 0x56, 0xab, 0x0a, 0xf5, 0x42, 0x50, 0x25, 0x72, 0x40, 0xbb, 0x32, 0xdb, 0x1e,
+	0x90, 0x2a, 0x77, 0xb0, 0x07, 0xdb, 0x5d, 0xdb, 0x63, 0xcd, 0x4c, 0x22, 0xb8, 0x55, 0x3d, 0xee,
+	0xa9, 0x97, 0x3e, 0x43, 0x2b, 0xf5, 0xc2, 0x61, 0x6f, 0x7d, 0x81, 0x3d, 0xae, 0xf6, 0x54, 0xa9,
+	0xd2, 0xaa, 0x82, 0x03, 0x0f, 0xd0, 0x17, 0xa8, 0x3c, 0x63, 0x3b, 0xc6, 0x4e, 0xc2, 0x2e, 0xd5,
+	0x5e, 0xa2, 0xcc, 0xf7, 0xfd, 0x7e, 0xdf, 0x9f, 0xdf, 0x7c, 0x33, 0x63, 0xa0, 0x78, 0x03, 0x1f,
+	0x11, 0xd8, 0x81, 0x03, 0xcb, 0x65, 0x9d, 0xe1, 0x83, 0x0e, 0x3b, 0x6b, 0x87, 0x04, 0x33, 0x2c,
+	0xaf, 0x08, 0x4f, 0x9b, 0x7b, 0xda, 0xc3, 0x07, 0xea, 0x2a, 0xf4, 0xdd, 0x00, 0x77, 0xf8, 0xaf,
+	0xc0, 0xa8, 0x6b, 0x36, 0xb6, 0x31, 0xff, 0xdb, 0x89, 0xfe, 0xc5, 0xd6, 0x9a, 0x89, 0xa9, 0x8f,
+	0x69, 0xc7, 0xa7, 0x76, 0x14, 0xd1, 0xa7, 0x76, 0xec, 0x58, 0x17, 0x0e, 0x43, 0x30, 0xc4, 0x22,
+	0x76, 0x6d, 0xe4, 0xeb, 0x10, 0x69, 0x85, 0xb3, 0x9e, 0x77, 0x86, 0x90, 0x40, 0x3f, 0xa1, 0x6a,
+	0x79, 0x2f, 0x1a, 0xba, 0x16, 0x0a, 0x4c, 0x24, 0xfc, 0x8d, 0x3f, 0x25, 0xb0, 0x72, 0x48, 0xed,
+	0x6f, 0x43, 0x0b, 0x32, 0xf4, 0x98, 0x33, 0xe5, 0x87, 0xa0, 0x0a, 0x07, 0xcc, 0xc1, 0xc4, 0x65,
+	0xe7, 0x8a, 0xb4, 0x25, 0x35, 0xab, 0x3d, 0xe5, 0xd5, 0xf3, 0x9d, 0xb5, 0xb8, 0xa6, 0x3d, 0xcb,
+	0x22, 0x88, 0xd2, 0x23, 0x46, 0xdc, 0xc0, 0xd6, 0x47, 0x50, 0x79, 0x17, 0xcc, 0x8b, 0xdc, 0xca,
+	0xec, 0x96, 0xd4, 0x5c, 0xec, 0xd6, 0xda, 0x39, 0x95, 0xda, 0x22, 0x41, 0xaf, 0xfa, 0xe2, 0xf5,
+	0xe6, 0xcc, 0xef, 0xd7, 0x17, 0x2d, 0x49, 0x8f, 0x19, 0xbb, 0x5f, 0xfe, 0x7c, 0x7d, 0xd1, 0x1a,
+	0xc5, 0x7a, 0x76, 0x7d, 0xd1, 0xda, 0x8e, 0x4b, 0x3f, 0x1b, 0x15, 0x9f, 0xab, 0xb4, 0xb1, 0x0e,
+	0x6a, 0x39, 0x93, 0x8e, 0x68, 0x88, 0x03, 0x8a, 0x1a, 0x7f, 0xcc, 0x82, 0xb5, 0x43, 0x6a, 0x1f,
+	0x0d, 0x4e, 0x7c, 0x97, 0x7d, 0x13, 0x62, 0xd3, 0xd1, 0x51, 0x88, 0x09, 0x93, 0xbb, 0x60, 0xc1,
+	0x24, 0x08, 0x32, 0x4c, 0x6e, 0xed, 0x2d, 0x01, 0xca, 0xeb, 0xa0, 0x82, 0xa2, 0x10, 0x86, 0x6b,
+	0xf1, 0xde, 0xca, 0xfa, 0x02, 0x5f, 0xf7, 0x2d, 0xb9, 0x07, 0x16, 0x1d, 0x4c, 0x99, 0x41, 0x78,
+	0x74, 0xa5, 0xc4, 0x3b, 0xdf, 0x28, 0x74, 0x7e, 0x80, 0x29, 0x13, 0x05, 0xf4, 0xca, 0x51, 0xf7,
+	0x3a, 0x70, 0x52, 0x8b, 0x4c, 0x80, 0x46, 0x19, 0x26, 0xd0, 0x46, 0x86, 0xe9, 0x40, 0xcf, 0x43,
+	0x81, 0x8d, 0x0c, 0x7c, 0x42, 0x11, 0x19, 0x42, 0xe6, 0xe2, 0x80, 0x2a, 0xe5, 0xad, 0x52, 0x73,
+	0xb1, 0x7b, 0xbf, 0x10, 0xf6, 0x48, 0xd0, 0xf6, 0x13, 0xd6, 0xa3, 0x11, 0x49, 0xaf, 0xd3, 0xc9,
+	0x4e, 0xba, 0xbb, 0x14, 0x09, 0x9e, 0x34, 0xd8, 0xd0, 0x40, 0x7d, 0x9c, 0x58, 0xa9, 0x9a, 0xbf,
+	0xce, 0x82, 0xd5, 0x11, 0x20, 0x1e, 0xa1, 0x3b, 0x49, 0xb9, 0x07, 0x56, 0xe8, 0xe0, 0xe4, 0x47,
+	0x64, 0x32, 0x03, 0x0a, 0x04, 0x57, 0x74, 0x1a, 0x77, 0x39, 0x26, 0xc4, 0x56, 0xb9, 0x07, 0xde,
+	0x4b, 0xa6, 0xd8, 0x60, 0xe7, 0x21, 0xe2, 0xa2, 0x2f, 0x77, 0x3f, 0x2c, 0xa8, 0x93, 0x14, 0xfa,
+	0xe4, 0x3c, 0x44, 0xfa, 0x12, 0xca, 0xac, 0xe4, 0x0d, 0x50, 0x85, 0x66, 0xa4, 0x44, 0xb4, 0xa5,
+	0xe5, 0xa8, 0x00, 0xbd, 0x22, 0x0c, 0x7d, 0x4b, 0x56, 0x41, 0xc5, 0x47, 0x0c, 0x5a, 0x90, 0x41,
+	0x65, 0x4e, 0xf8, 0x92, 0x75, 0x4e, 0xb7, 0xaf, 0xc1, 0x7a, 0x41, 0x96, 0x44, 0x34, 0x79, 0x13,
+	0x2c, 0xa6, 0x75, 0xba, 0x16, 0x97, 0xa8, 0xac, 0x83, 0xc4, 0xd4, 0xb7, 0x1a, 0xff, 0x96, 0xc0,
+	0x66, 0x4a, 0x8f, 0xb7, 0x52, 0x47, 0xa6, 0x83, 0xcc, 0xa7, 0xff, 0x4b, 0xe3, 0x29, 0xe3, 0xfa,
+	0x3d, 0xa8, 0xa7, 0x23, 0x66, 0x19, 0x74, 0x10, 0x22, 0x12, 0x60, 0x0b, 0x19, 0xd0, 0x34, 0xf1,
+	0x20, 0x10, 0xf3, 0x5b, 0xed, 0x6d, 0xbc, 0x7a, 0xbe, 0x53, 0x4b, 0x72, 0x98, 0xe6, 0xcd, 0x34,
+	0xea, 0x28, 0xc0, 0x51, 0xc2, 0xdf, 0x13, 0xf4, 0x48, 0x56, 0xe6, 0x9a, 0x4f, 0x11, 0xcb, 0xc8,
+	0x2a, 0x0c, 0x7d, 0x4b, 0xee, 0x83, 0xed, 0x4c, 0x6e, 0x82, 0xe8, 0xc0, 0x63, 0x06, 0x23, 0x30,
+	0xa0, 0x26, 0x71, 0x43, 0x66, 0x38, 0x90, 0x3a, 0xb1, 0xde, 0xda, 0x08, 0xa8, 0x73, 0xdc, 0x93,
+	0x14, 0x76, 0x00, 0xa9, 0x23, 0x3f, 0x04, 0x35, 0x22, 0x84, 0x2a, 0x04, 0x98, 0xe7, 0x01, 0xde,
+	0x8f, 0xdd, 0x39, 0xde, 0x31, 0x58, 0x4b, 0x78, 0x71, 0x7e, 0xd3, 0x83, 0x94, 0x2a, 0x0b, 0x7c,
+	0x82, 0x9a, 0x93, 0xce, 0xd7, 0x63, 0x82, 0xf1, 0xa9, 0x28, 0x64, 0x3f, 0xc2, 0xeb, 0x72, 0x1c,
+	0x25, 0x63, 0x93, 0x15, 0xb0, 0x60, 0x21, 0x06, 0x5d, 0x8f, 0x2a, 0x15, 0x5e, 0x43, 0xb2, 0xcc,
+	0xcd, 0xcc, 0xa7, 0xe0, 0x93, 0x5b, 0x36, 0x3d, 0x3d, 0x76, 0x7f, 0x4b, 0xfc, 0x12, 0xdb, 0xf7,
+	0xa0, 0xeb, 0x1f, 0x20, 0xe8, 0xed, 0x63, 0x3f, 0xf4, 0x10, 0xbb, 0xdb, 0x54, 0xd4, 0x01, 0x70,
+	0x10, 0xf4, 0x0c, 0x1c, 0x8e, 0xe6, 0xa2, 0x12, 0x59, 0x1e, 0x85, 0x7d, 0xeb, 0xe6, 0xce, 0x95,
+	0x72, 0x3b, 0x77, 0x1f, 0xc8, 0x9c, 0xea, 0xc3, 0xc0, 0x3d, 0x45, 0x34, 0x56, 0x5a, 0xec, 0xef,
+	0xbd, 0xc8, 0x73, 0x18, 0x3b, 0xb8, 0xc8, 0x19, 0x21, 0xe6, 0xa6, 0x09, 0x21, 0x2e, 0x9d, 0x42,
+	0x73, 0x69, 0xf7, 0xaf, 0xa5, 0xcc, 0xe9, 0x8a, 0x10, 0xdf, 0x21, 0xe2, 0x9e, 0xba, 0x26, 0xbf,
+	0xc1, 0xde, 0x81, 0x04, 0x2a, 0xa8, 0x0c, 0x79, 0x06, 0x24, 0x14, 0xa8, 0xe8, 0xe9, 0x5a, 0xfe,
+	0x0c, 0xac, 0x0e, 0x33, 0xd9, 0x6f, 0x08, 0x90, 0x75, 0xbc, 0x95, 0x00, 0x1f, 0x81, 0xed, 0x89,
+	0xfd, 0x25, 0x2a, 0x74, 0x7f, 0x9b, 0x03, 0xa5, 0x43, 0x6a, 0xcb, 0xc7, 0x60, 0xe9, 0xc6, 0x2b,
+	0xbd, 0x55, 0x18, 0xd6, 0xdc, 0x53, 0xa8, 0x36, 0x6f, 0x43, 0xa4, 0x37, 0x95, 0x0b, 0x56, 0x8b,
+	0x0f, 0xe5, 0xc7, 0xe3, 0xe8, 0x05, 0x98, 0xba, 0xf3, 0x46, 0xb0, 0x34, 0xd5, 0x0f, 0x60, 0x39,
+	0xf7, 0x8a, 0x34, 0xa6, 0x04, 0x88, 0x31, 0x6a, 0xeb, 0x76, 0x4c, 0x9a, 0xe1, 0x99, 0x04, 0xea,
+	0x53, 0xaf, 0xd4, 0xcf, 0x27, 0x07, 0x1b, 0xcf, 0x50, 0xbf, 0x7a, 0x5b, 0x46, 0x56, 0xd9, 0xe2,
+	0xe9, 0x1d, 0xab, 0x6c, 0x01, 0x36, 0x5e, 0xd9, 0x89, 0xc7, 0x45, 0x3e, 0x03, 0x1f, 0x4c, 0x38,
+	0x2a, 0x53, 0xd4, 0xcb, 0x63, 0xd5, 0xee, 0x9b, 0x63, 0x93, 0xcc, 0xea, 0xdc, 0x4f, 0xd1, 0xb7,
+	0x5c, 0xaf, 0xf5, 0xe2, 0x52, 0x93, 0x5e, 0x5e, 0x6a, 0xd2, 0x3f, 0x97, 0x9a, 0xf4, 0xcb, 0x95,
+	0x36, 0xf3, 0xf2, 0x4a, 0x9b, 0xf9, 0xeb, 0x4a, 0x9b, 0x39, 0xbe, 0x97, 0xf9, 0x86, 0x8b, 0x5e,
+	0x6c, 0x7a, 0x32, 0xcf, 0x3f, 0x3f, 0xbf, 0xf8, 0x2f, 0x00, 0x00, 0xff, 0xff, 0x95, 0x74, 0xb8,
+	0x10, 0x63, 0x0b, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -420,6 +811,12 @@ type MsgClient interface {
 	SubmitEpochReport(ctx context.Context, in *MsgSubmitEpochReport, opts ...grpc.CallOption) (*MsgSubmitEpochReportResponse, error)
 	// SubmitEvidence defines the SubmitEvidence RPC.
 	SubmitEvidence(ctx context.Context, in *MsgSubmitEvidence, opts ...grpc.CallOption) (*MsgSubmitEvidenceResponse, error)
+	// SubmitStorageRecheckEvidence defines the storage-truth recheck submission path.
+	SubmitStorageRecheckEvidence(ctx context.Context, in *MsgSubmitStorageRecheckEvidence, opts ...grpc.CallOption) (*MsgSubmitStorageRecheckEvidenceResponse, error)
+	// ClaimHealComplete defines the healer claim path for a chain-tracked heal op.
+	ClaimHealComplete(ctx context.Context, in *MsgClaimHealComplete, opts ...grpc.CallOption) (*MsgClaimHealCompleteResponse, error)
+	// SubmitHealVerification defines the verifier submission path for a chain-tracked heal op.
+	SubmitHealVerification(ctx context.Context, in *MsgSubmitHealVerification, opts ...grpc.CallOption) (*MsgSubmitHealVerificationResponse, error)
 }
 
 type msgClient struct {
@@ -457,6 +854,33 @@ func (c *msgClient) SubmitEvidence(ctx context.Context, in *MsgSubmitEvidence, o
 	return out, nil
 }
 
+func (c *msgClient) SubmitStorageRecheckEvidence(ctx context.Context, in *MsgSubmitStorageRecheckEvidence, opts ...grpc.CallOption) (*MsgSubmitStorageRecheckEvidenceResponse, error) {
+	out := new(MsgSubmitStorageRecheckEvidenceResponse)
+	err := c.cc.Invoke(ctx, "/lumera.audit.v1.Msg/SubmitStorageRecheckEvidence", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *msgClient) ClaimHealComplete(ctx context.Context, in *MsgClaimHealComplete, opts ...grpc.CallOption) (*MsgClaimHealCompleteResponse, error) {
+	out := new(MsgClaimHealCompleteResponse)
+	err := c.cc.Invoke(ctx, "/lumera.audit.v1.Msg/ClaimHealComplete", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *msgClient) SubmitHealVerification(ctx context.Context, in *MsgSubmitHealVerification, opts ...grpc.CallOption) (*MsgSubmitHealVerificationResponse, error) {
+	out := new(MsgSubmitHealVerificationResponse)
+	err := c.cc.Invoke(ctx, "/lumera.audit.v1.Msg/SubmitHealVerification", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MsgServer is the server API for Msg service.
 type MsgServer interface {
 	// UpdateParams defines a (governance) operation for updating the module
@@ -465,6 +889,12 @@ type MsgServer interface {
 	SubmitEpochReport(context.Context, *MsgSubmitEpochReport) (*MsgSubmitEpochReportResponse, error)
 	// SubmitEvidence defines the SubmitEvidence RPC.
 	SubmitEvidence(context.Context, *MsgSubmitEvidence) (*MsgSubmitEvidenceResponse, error)
+	// SubmitStorageRecheckEvidence defines the storage-truth recheck submission path.
+	SubmitStorageRecheckEvidence(context.Context, *MsgSubmitStorageRecheckEvidence) (*MsgSubmitStorageRecheckEvidenceResponse, error)
+	// ClaimHealComplete defines the healer claim path for a chain-tracked heal op.
+	ClaimHealComplete(context.Context, *MsgClaimHealComplete) (*MsgClaimHealCompleteResponse, error)
+	// SubmitHealVerification defines the verifier submission path for a chain-tracked heal op.
+	SubmitHealVerification(context.Context, *MsgSubmitHealVerification) (*MsgSubmitHealVerificationResponse, error)
 }
 
 // UnimplementedMsgServer can be embedded to have forward compatible implementations.
@@ -479,6 +909,15 @@ func (*UnimplementedMsgServer) SubmitEpochReport(ctx context.Context, req *MsgSu
 }
 func (*UnimplementedMsgServer) SubmitEvidence(ctx context.Context, req *MsgSubmitEvidence) (*MsgSubmitEvidenceResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SubmitEvidence not implemented")
+}
+func (*UnimplementedMsgServer) SubmitStorageRecheckEvidence(ctx context.Context, req *MsgSubmitStorageRecheckEvidence) (*MsgSubmitStorageRecheckEvidenceResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SubmitStorageRecheckEvidence not implemented")
+}
+func (*UnimplementedMsgServer) ClaimHealComplete(ctx context.Context, req *MsgClaimHealComplete) (*MsgClaimHealCompleteResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ClaimHealComplete not implemented")
+}
+func (*UnimplementedMsgServer) SubmitHealVerification(ctx context.Context, req *MsgSubmitHealVerification) (*MsgSubmitHealVerificationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SubmitHealVerification not implemented")
 }
 
 func RegisterMsgServer(s grpc1.Server, srv MsgServer) {
@@ -539,6 +978,60 @@ func _Msg_SubmitEvidence_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Msg_SubmitStorageRecheckEvidence_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MsgSubmitStorageRecheckEvidence)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServer).SubmitStorageRecheckEvidence(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/lumera.audit.v1.Msg/SubmitStorageRecheckEvidence",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServer).SubmitStorageRecheckEvidence(ctx, req.(*MsgSubmitStorageRecheckEvidence))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Msg_ClaimHealComplete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MsgClaimHealComplete)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServer).ClaimHealComplete(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/lumera.audit.v1.Msg/ClaimHealComplete",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServer).ClaimHealComplete(ctx, req.(*MsgClaimHealComplete))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Msg_SubmitHealVerification_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MsgSubmitHealVerification)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServer).SubmitHealVerification(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/lumera.audit.v1.Msg/SubmitHealVerification",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServer).SubmitHealVerification(ctx, req.(*MsgSubmitHealVerification))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var Msg_serviceDesc = _Msg_serviceDesc
 var _Msg_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "lumera.audit.v1.Msg",
@@ -555,6 +1048,18 @@ var _Msg_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SubmitEvidence",
 			Handler:    _Msg_SubmitEvidence_Handler,
+		},
+		{
+			MethodName: "SubmitStorageRecheckEvidence",
+			Handler:    _Msg_SubmitStorageRecheckEvidence_Handler,
+		},
+		{
+			MethodName: "ClaimHealComplete",
+			Handler:    _Msg_ClaimHealComplete_Handler,
+		},
+		{
+			MethodName: "SubmitHealVerification",
+			Handler:    _Msg_SubmitHealVerification_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -790,6 +1295,265 @@ func (m *MsgSubmitEvidenceResponse) MarshalToSizedBuffer(dAtA []byte) (int, erro
 	return len(dAtA) - i, nil
 }
 
+func (m *MsgSubmitStorageRecheckEvidence) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *MsgSubmitStorageRecheckEvidence) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *MsgSubmitStorageRecheckEvidence) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Details) > 0 {
+		i -= len(m.Details)
+		copy(dAtA[i:], m.Details)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.Details)))
+		i--
+		dAtA[i] = 0x42
+	}
+	if m.RecheckResultClass != 0 {
+		i = encodeVarintTx(dAtA, i, uint64(m.RecheckResultClass))
+		i--
+		dAtA[i] = 0x38
+	}
+	if len(m.RecheckTranscriptHash) > 0 {
+		i -= len(m.RecheckTranscriptHash)
+		copy(dAtA[i:], m.RecheckTranscriptHash)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.RecheckTranscriptHash)))
+		i--
+		dAtA[i] = 0x32
+	}
+	if len(m.ChallengedResultTranscriptHash) > 0 {
+		i -= len(m.ChallengedResultTranscriptHash)
+		copy(dAtA[i:], m.ChallengedResultTranscriptHash)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.ChallengedResultTranscriptHash)))
+		i--
+		dAtA[i] = 0x2a
+	}
+	if len(m.TicketId) > 0 {
+		i -= len(m.TicketId)
+		copy(dAtA[i:], m.TicketId)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.TicketId)))
+		i--
+		dAtA[i] = 0x22
+	}
+	if len(m.ChallengedSupernodeAccount) > 0 {
+		i -= len(m.ChallengedSupernodeAccount)
+		copy(dAtA[i:], m.ChallengedSupernodeAccount)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.ChallengedSupernodeAccount)))
+		i--
+		dAtA[i] = 0x1a
+	}
+	if m.EpochId != 0 {
+		i = encodeVarintTx(dAtA, i, uint64(m.EpochId))
+		i--
+		dAtA[i] = 0x10
+	}
+	if len(m.Creator) > 0 {
+		i -= len(m.Creator)
+		copy(dAtA[i:], m.Creator)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.Creator)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *MsgSubmitStorageRecheckEvidenceResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *MsgSubmitStorageRecheckEvidenceResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *MsgSubmitStorageRecheckEvidenceResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	return len(dAtA) - i, nil
+}
+
+func (m *MsgClaimHealComplete) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *MsgClaimHealComplete) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *MsgClaimHealComplete) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Details) > 0 {
+		i -= len(m.Details)
+		copy(dAtA[i:], m.Details)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.Details)))
+		i--
+		dAtA[i] = 0x2a
+	}
+	if len(m.HealManifestHash) > 0 {
+		i -= len(m.HealManifestHash)
+		copy(dAtA[i:], m.HealManifestHash)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.HealManifestHash)))
+		i--
+		dAtA[i] = 0x22
+	}
+	if len(m.TicketId) > 0 {
+		i -= len(m.TicketId)
+		copy(dAtA[i:], m.TicketId)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.TicketId)))
+		i--
+		dAtA[i] = 0x1a
+	}
+	if m.HealOpId != 0 {
+		i = encodeVarintTx(dAtA, i, uint64(m.HealOpId))
+		i--
+		dAtA[i] = 0x10
+	}
+	if len(m.Creator) > 0 {
+		i -= len(m.Creator)
+		copy(dAtA[i:], m.Creator)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.Creator)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *MsgClaimHealCompleteResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *MsgClaimHealCompleteResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *MsgClaimHealCompleteResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	return len(dAtA) - i, nil
+}
+
+func (m *MsgSubmitHealVerification) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *MsgSubmitHealVerification) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *MsgSubmitHealVerification) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Details) > 0 {
+		i -= len(m.Details)
+		copy(dAtA[i:], m.Details)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.Details)))
+		i--
+		dAtA[i] = 0x2a
+	}
+	if len(m.VerificationHash) > 0 {
+		i -= len(m.VerificationHash)
+		copy(dAtA[i:], m.VerificationHash)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.VerificationHash)))
+		i--
+		dAtA[i] = 0x22
+	}
+	if m.Verified {
+		i--
+		if m.Verified {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x18
+	}
+	if m.HealOpId != 0 {
+		i = encodeVarintTx(dAtA, i, uint64(m.HealOpId))
+		i--
+		dAtA[i] = 0x10
+	}
+	if len(m.Creator) > 0 {
+		i -= len(m.Creator)
+		copy(dAtA[i:], m.Creator)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.Creator)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *MsgSubmitHealVerificationResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *MsgSubmitHealVerificationResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *MsgSubmitHealVerificationResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	return len(dAtA) - i, nil
+}
+
 func encodeVarintTx(dAtA []byte, offset int, v uint64) int {
 	offset -= sovTx(v)
 	base := offset
@@ -895,6 +1659,127 @@ func (m *MsgSubmitEvidenceResponse) Size() (n int) {
 	if m.EvidenceId != 0 {
 		n += 1 + sovTx(uint64(m.EvidenceId))
 	}
+	return n
+}
+
+func (m *MsgSubmitStorageRecheckEvidence) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Creator)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	if m.EpochId != 0 {
+		n += 1 + sovTx(uint64(m.EpochId))
+	}
+	l = len(m.ChallengedSupernodeAccount)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	l = len(m.TicketId)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	l = len(m.ChallengedResultTranscriptHash)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	l = len(m.RecheckTranscriptHash)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	if m.RecheckResultClass != 0 {
+		n += 1 + sovTx(uint64(m.RecheckResultClass))
+	}
+	l = len(m.Details)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	return n
+}
+
+func (m *MsgSubmitStorageRecheckEvidenceResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	return n
+}
+
+func (m *MsgClaimHealComplete) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Creator)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	if m.HealOpId != 0 {
+		n += 1 + sovTx(uint64(m.HealOpId))
+	}
+	l = len(m.TicketId)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	l = len(m.HealManifestHash)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	l = len(m.Details)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	return n
+}
+
+func (m *MsgClaimHealCompleteResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	return n
+}
+
+func (m *MsgSubmitHealVerification) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Creator)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	if m.HealOpId != 0 {
+		n += 1 + sovTx(uint64(m.HealOpId))
+	}
+	if m.Verified {
+		n += 2
+	}
+	l = len(m.VerificationHash)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	l = len(m.Details)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	return n
+}
+
+func (m *MsgSubmitHealVerificationResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
 	return n
 }
 
@@ -1532,6 +2417,818 @@ func (m *MsgSubmitEvidenceResponse) Unmarshal(dAtA []byte) error {
 					break
 				}
 			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTx(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthTx
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *MsgSubmitStorageRecheckEvidence) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTx
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MsgSubmitStorageRecheckEvidence: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MsgSubmitStorageRecheckEvidence: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Creator", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Creator = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field EpochId", wireType)
+			}
+			m.EpochId = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.EpochId |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ChallengedSupernodeAccount", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ChallengedSupernodeAccount = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TicketId", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.TicketId = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ChallengedResultTranscriptHash", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ChallengedResultTranscriptHash = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RecheckTranscriptHash", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.RecheckTranscriptHash = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 7:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RecheckResultClass", wireType)
+			}
+			m.RecheckResultClass = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.RecheckResultClass |= StorageProofResultClass(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 8:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Details", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Details = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTx(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthTx
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *MsgSubmitStorageRecheckEvidenceResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTx
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MsgSubmitStorageRecheckEvidenceResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MsgSubmitStorageRecheckEvidenceResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTx(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthTx
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *MsgClaimHealComplete) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTx
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MsgClaimHealComplete: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MsgClaimHealComplete: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Creator", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Creator = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field HealOpId", wireType)
+			}
+			m.HealOpId = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.HealOpId |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TicketId", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.TicketId = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field HealManifestHash", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.HealManifestHash = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Details", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Details = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTx(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthTx
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *MsgClaimHealCompleteResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTx
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MsgClaimHealCompleteResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MsgClaimHealCompleteResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTx(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthTx
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *MsgSubmitHealVerification) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTx
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MsgSubmitHealVerification: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MsgSubmitHealVerification: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Creator", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Creator = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field HealOpId", wireType)
+			}
+			m.HealOpId = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.HealOpId |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Verified", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Verified = bool(v != 0)
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field VerificationHash", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.VerificationHash = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Details", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Details = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTx(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthTx
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *MsgSubmitHealVerificationResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTx
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MsgSubmitHealVerificationResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MsgSubmitHealVerificationResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
 		default:
 			iNdEx = preIndex
 			skippy, err := skipTx(dAtA[iNdEx:])

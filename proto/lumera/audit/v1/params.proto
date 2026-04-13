@@ -6,6 +6,13 @@ option go_package = "x/audit/v1/types";
 import "amino/amino.proto";
 import "gogoproto/gogo.proto";
 
+enum StorageTruthEnforcementMode {
+  STORAGE_TRUTH_ENFORCEMENT_MODE_UNSPECIFIED = 0;
+  STORAGE_TRUTH_ENFORCEMENT_MODE_SHADOW      = 1;
+  STORAGE_TRUTH_ENFORCEMENT_MODE_SOFT        = 2;
+  STORAGE_TRUTH_ENFORCEMENT_MODE_FULL        = 3;
+}
+
 // Params defines the parameters for the audit module.
 message Params {
   option (gogoproto.equal) = true;
@@ -86,4 +93,27 @@ message Params {
   // Storage Challenge (SC) params.
   bool   sc_enabled = 19;
   uint32 sc_challengers_per_epoch = 20;
+
+  // Storage-truth challenge shape params.
+  uint64 storage_truth_recent_bucket_max_blocks = 21;
+  uint64 storage_truth_old_bucket_min_blocks = 22;
+  uint32 storage_truth_challenge_target_divisor = 23;
+  uint32 storage_truth_compound_ranges_per_artifact = 24;
+  uint32 storage_truth_compound_range_len_bytes = 25;
+
+  // Storage-truth scoring and healing params.
+  uint32 storage_truth_max_self_heal_ops_per_epoch = 26;
+  uint32 storage_truth_probation_epochs = 27;
+  int64 storage_truth_node_suspicion_decay_per_epoch = 28;
+  int64 storage_truth_reporter_reliability_decay_per_epoch = 29;
+  int64 storage_truth_ticket_deterioration_decay_per_epoch = 30;
+  int64 storage_truth_node_suspicion_threshold_watch = 31;
+  int64 storage_truth_node_suspicion_threshold_probation = 32;
+  int64 storage_truth_node_suspicion_threshold_postpone = 33;
+  int64 storage_truth_reporter_reliability_low_trust_threshold = 34;
+  int64 storage_truth_reporter_reliability_ineligible_threshold = 35;
+  int64 storage_truth_ticket_deterioration_heal_threshold = 36;
+
+  // Storage-truth rollout gate.
+  StorageTruthEnforcementMode storage_truth_enforcement_mode = 37;
 }

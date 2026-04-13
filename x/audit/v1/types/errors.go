@@ -18,4 +18,6 @@ var (
 	ErrInvalidSubject      = errorsmod.Register(ModuleName, 1103, "invalid subject address")
 	ErrInvalidReporter     = errorsmod.Register(ModuleName, 1104, "invalid reporter address")
 	ErrInvalidActionID     = errorsmod.Register(ModuleName, 1105, "invalid action id")
+
+	ErrNotImplemented = errorsmod.Register(ModuleName, 1200, "not implemented")
 )

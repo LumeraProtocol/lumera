@@ -267,6 +267,15 @@ func testActionRequestCascadeTxPathFailsWithBadSignature(t *testing.T, node *evm
 		big.NewInt(100_000),                       // price
 		int64(time.Now().Add(1*time.Hour).Unix()), // expirationTime
 		uint64(100),                               // fileSizeKbs
+		struct {
+			CommitmentType   string   `json:"commitmentType"`
+			HashAlgo         uint8    `json:"hashAlgo"`
+			ChunkSize        uint32   `json:"chunkSize"`
+			TotalSize        uint64   `json:"totalSize"`
+			NumChunks        uint32   `json:"numChunks"`
+			Root             []byte   `json:"root"`
+			ChallengeIndices []uint32 `json:"challengeIndices"`
+		}{}, // empty commitment — ignored by handler when Root is empty
 	)
 	if err != nil {
 		t.Fatalf("pack requestCascade input: %v", err)

@@ -125,13 +125,13 @@ func testContractProxiesActionGetParams(t *testing.T, node *evmtest.Node) {
 	// Call proxy → STATICCALL → action precompile
 	resultBz := ethCallProxy(t, node, proxyAddr, calldata)
 
-	// Decode and validate the 7-tuple response
+	// Decode and validate the 9-tuple response (7 original + 2 LEP-5 cascade fields)
 	out, err := actionprecompile.ABI.Unpack(actionprecompile.GetParamsMethod, resultBz)
 	if err != nil {
 		t.Fatalf("unpack getParams: %v", err)
 	}
-	if len(out) != 7 {
-		t.Fatalf("expected 7 return values, got %d", len(out))
+	if len(out) != 9 {
+		t.Fatalf("expected 9 return values, got %d", len(out))
 	}
 
 	// baseActionFee (uint256) should be positive

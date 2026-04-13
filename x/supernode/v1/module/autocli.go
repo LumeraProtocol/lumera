@@ -22,7 +22,8 @@ Flags:
 func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 	return &autocliv1.ModuleOptions{
 		Query: &autocliv1.ServiceCommandDescriptor{
-			Service: types.Query_serviceDesc.ServiceName,
+			Service:              types.Query_serviceDesc.ServiceName,
+			EnhanceCustomCommand: true,
 			RpcCommandOptions: []*autocliv1.RpcCommandOptions{
 				{
 					RpcMethod: "Params",
@@ -52,6 +53,15 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					Use:            "list-supernodes",
 					Short:          "Query list-supernodes",
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{},
+				},
+				{
+					// Keep this on the generic AutoCLI path for consistency with the rest of the
+					// module's query surface. Note that response printing for this float-bearing
+					// payload is still limited on the generic path in this environment.
+					RpcMethod:      "GetMetrics",
+					Use:            "get-metrics [validator-address]",
+					Short:          "Query the latest supernode metrics for a validator",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validatorAddress"}},
 				},
 				{
 					RpcMethod: "GetTopSuperNodesForBlock",
@@ -133,6 +143,12 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 							DefaultValue: types.DefaultP2PPort,
 						},
 					},
+				},
+				{
+					RpcMethod:      "ReportSupernodeMetrics",
+					Use:            "report-supernode-metrics [validator-address]",
+					Short:          "Report structured metrics for a supernode",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validator_address"}},
 				},
 				// this line is used by ignite scaffolding # autocli/tx
 			},

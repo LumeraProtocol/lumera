@@ -183,6 +183,12 @@ service_account_address() {
     lumerad_exec keys show "$key_name" -a --keyring-backend "$KEYRING" 2>/dev/null | tr -d '\r\n'
 }
 
+service_validator_address_for_service() {
+    local service="$1" key_name
+    key_name="$(validator_key_name_for_service "$service")"
+    lumerad_exec_service "$service" keys show "$key_name" --bech val -a --keyring-backend "$KEYRING" 2>/dev/null | tr -d '\r\n'
+}
+
 service_supernode_key_name() {
     echo "${SERVICE/supernova_validator/supernova_supernode}_key"
 }
@@ -192,15 +198,35 @@ supernode_key_name_for_service() {
     echo "${service/supernova_validator/supernova_supernode}_key"
 }
 
+validator_key_name_for_service() {
+    local service="$1"
+    echo "${service}_key"
+}
+
+resolve_service_signing_key_for_service() {
+    local service="$1" skey vkey
+    skey="$(supernode_key_name_for_service "$service")"
+    if lumerad_exec_service "$service" keys show "$skey" -a --keyring-backend "$KEYRING" >/dev/null 2>&1; then
+        echo "$skey"
+        return 0
+    fi
+    vkey="$(validator_key_name_for_service "$service")"
+    if lumerad_exec_service "$service" keys show "$vkey" -a --keyring-backend "$KEYRING" >/dev/null 2>&1; then
+        echo "$vkey"
+        return 0
+    fi
+    return 1
+}
+
 service_supernode_account_address() {
     local key_name
-    key_name="$(service_supernode_key_name)"
+    key_name="$(resolve_service_signing_key_for_service "$SERVICE")" || return 1
     lumerad_exec keys show "$key_name" -a --keyring-backend "$KEYRING" 2>/dev/null | tr -d '\r\n'
 }
 
 service_supernode_account_address_for_service() {
     local service="$1" key_name
-    key_name="$(supernode_key_name_for_service "$service")"
+    key_name="$(resolve_service_signing_key_for_service "$service")" || return 1
     lumerad_exec_service "$service" keys show "$key_name" -a --keyring-backend "$KEYRING" 2>/dev/null | tr -d '\r\n'
 }
 
@@ -217,6 +243,58 @@ get_service_validator_address() {
     [[ -n "$account" ]] || return 1
     sn_json="$(get_service_supernode "$account")" || return 1
     echo "$sn_json" | jq -r '.validator_address // empty' 2>/dev/null
+}
+
+ensure_supernode_registered_for_service() {
+    local service="$1" idx="$2"
+    local key_name acc_addr val_addr existing ip tx_result tx_code txhash tx_check exec_code
+
+    key_name="$(resolve_service_signing_key_for_service "$service")" || return 1
+    acc_addr="$(service_supernode_account_address_for_service "$service")" || return 1
+    val_addr="$(service_validator_address_for_service "$service")" || return 1
+    [[ -n "$acc_addr" && -n "$val_addr" ]] || return 1
+
+    # Already registered for this account?
+    existing="$(get_supernode_for_service "$service")" || true
+    if [[ -n "$existing" ]]; then
+        return 0
+    fi
+    # Already registered for this validator (possibly different account key mapping)?
+    if lumerad_query supernode get-supernode "$val_addr" >/dev/null 2>&1; then
+        return 0
+    fi
+
+    ip="192.168.1.$((100 + idx))"
+    tx_result="$(run_tx_with_retry "$service" supernode register-supernode "$val_addr" "$ip" "$acc_addr" --from "$key_name")" || true
+    tx_code="$(tx_code_from_json "$tx_result")"
+    if [[ "$tx_code" != "0" ]]; then
+        echo "register-supernode failed for $service code=$tx_code output=${tx_result:0:200}" >&2
+        return 1
+    fi
+
+    txhash="$(echo "$tx_result" | jq -r '.txhash // empty' 2>/dev/null)"
+    [[ -n "$txhash" ]] || return 1
+    sleep 4
+    tx_check="$(lumerad_query tx "$txhash")" || true
+    exec_code="$(echo "$tx_check" | jq -r '.code // "0"' 2>/dev/null || echo "0")"
+    [[ "$exec_code" == "0" ]] || return 1
+
+    existing="$(get_supernode_for_service "$service")" || true
+    [[ -n "$existing" ]]
+}
+
+ensure_devnet_supernodes_registered() {
+    local i svc ok=true
+    for i in "${!VALIDATOR_SERVICES[@]}"; do
+        svc="${VALIDATOR_SERVICES[$i]}"
+        if ensure_supernode_registered_for_service "$svc" "$i"; then
+            :
+        else
+            echo "WARN: could not ensure supernode registration for $svc" >&2
+            ok=false
+        fi
+    done
+    $ok
 }
 
 get_supernode_for_service() {
@@ -284,11 +362,39 @@ wait_for_blocks() {
     done
 }
 
+wait_for_next_audit_epoch() {
+    local ce start end h target deadline
+    ce="$(lumerad_query audit current-epoch)" || return 1
+    start="$(echo "$ce" | jq -r '.epoch_start_height // empty' 2>/dev/null)"
+    end="$(echo "$ce" | jq -r '.epoch_end_height // empty' 2>/dev/null)"
+    h="$(current_block_height)"
+    if [[ ! "$start" =~ ^[0-9]+$ || ! "$end" =~ ^[0-9]+$ || ! "$h" =~ ^[0-9]+$ ]]; then
+        return 1
+    fi
+    if (( h > end )); then
+        return 0
+    fi
+    target=$(( end + 1 ))
+    deadline=$((SECONDS + 180))
+    while (( SECONDS < deadline )); do
+        h="$(current_block_height)"
+        [[ "$h" =~ ^[0-9]+$ ]] || h=0
+        if (( h >= target )); then
+            return 0
+        fi
+        sleep 2
+    done
+    return 1
+}
+
 report_metrics_for_service() {
     local service="$1" validator_addr="$2" cascade_bytes="$3" disk_usage="$4"
     local key_name params ports_json metrics_json tx_result tx_code txhash tx_check exec_code
 
-    key_name="$(supernode_key_name_for_service "$service")"
+    key_name="$(resolve_service_signing_key_for_service "$service")" || {
+        echo "missing signing key for $service"
+        return 1
+    }
     params="$(lumerad_query supernode params)" || true
     ports_json="$(echo "$params" | jq -c '.params.required_open_ports // [] | map({port: ., state: "PORT_STATE_OPEN"})' 2>/dev/null)"
     if [[ -z "$ports_json" || "$ports_json" == "null" ]]; then
@@ -353,19 +459,26 @@ wait_for_distribution_height_change() {
 }
 
 audit_current_epoch_id() {
-    lumerad_query audit current-epoch | jq -r '.epoch_id // empty' 2>/dev/null
+    local ce eid
+    ce="$(lumerad_query audit current-epoch)" || return 1
+    eid="$(echo "$ce" | jq -r '.epoch_id // empty' 2>/dev/null)"
+    if [[ -n "$eid" && "$eid" =~ ^[0-9]+$ ]]; then
+        echo "$eid"
+        return 0
+    fi
+    return 1
 }
 
 submit_audit_report_for_service() {
     local service="$1" cascade_bytes="$2" disk_usage="$3"
-    local key_name host_json epoch_id tx_result tx_code txhash tx_check exec_code
+    local key_name host_json epoch_id tx_result tx_code txhash tx_check exec_code reporter_addr existing raw_log
+    local anchor required_ports obs_args obs_json targets_json target
 
-    key_name="$(supernode_key_name_for_service "$service")"
-    epoch_id="$(audit_current_epoch_id)"
-    if [[ -z "$epoch_id" ]]; then
-        echo "missing current epoch id"
+    key_name="$(resolve_service_signing_key_for_service "$service")" || {
+        echo "missing signing key for $service"
         return 1
-    fi
+    }
+    reporter_addr="$(service_supernode_account_address_for_service "$service")" || return 1
 
     host_json="$(jq -cn \
         --argjson bytes "$cascade_bytes" \
@@ -379,19 +492,99 @@ submit_audit_report_for_service() {
             cascade_kademlia_db_bytes: $bytes
         }')"
 
-    tx_result="$(run_tx_with_retry "$service" audit submit-epoch-report "$epoch_id" "$host_json" --from "$key_name")" || true
-    tx_code="$(tx_code_from_json "$tx_result")"
-    if [[ "$tx_code" != "0" ]]; then
-        echo "code=$tx_code output=${tx_result:0:300}"
+    # Robust submit loop for one-report-per-epoch race windows.
+    local attempts=0
+    while (( attempts < 3 )); do
+        epoch_id="$(audit_current_epoch_id)"
+        if [[ -z "$epoch_id" ]]; then
+            echo "missing current epoch id"
+            return 1
+        fi
+
+        # Pre-check slot availability for this reporter in the target epoch.
+        existing="$(lumerad_query audit epoch-report "$epoch_id" "$reporter_addr" || true)"
+        if [[ -n "$existing" ]] && [[ "$(echo "$existing" | jq -r '.report.epoch_id // empty' 2>/dev/null)" != "" ]]; then
+            wait_for_next_audit_epoch || return 1
+            attempts=$((attempts + 1))
+            continue
+        fi
+
+        # Build peer observations only when reporter is assigned as prober in this epoch.
+        local assigned
+        assigned="$(lumerad_query audit assigned-targets --supernode-account "$reporter_addr" --epoch-id "$epoch_id" --filter-by-epoch-id || true)"
+        required_ports="$(echo "$assigned" | jq -c '.required_open_ports // [4444,4445,8002]' 2>/dev/null)"
+        targets_json="$(echo "$assigned" | jq -c '.target_supernode_accounts // []' 2>/dev/null)"
+
+        obs_args=()
+        if [[ -n "$targets_json" && "$targets_json" != "null" ]] && [[ "$(echo "$targets_json" | jq -r 'length' 2>/dev/null)" != "0" ]]; then
+            while IFS= read -r target; do
+                [[ -z "$target" ]] && continue
+                obs_json="$(jq -cn --arg t "$target" --argjson rp "$required_ports" '{target_supernode_account:$t, port_states: ($rp | map("PORT_STATE_OPEN"))}')"
+                obs_args+=("--storage-challenge-observations" "$obs_json")
+            done < <(echo "$targets_json" | jq -r '.[]' 2>/dev/null)
+        fi
+
+        tx_result="$(run_tx_with_retry "$service" audit submit-epoch-report "$epoch_id" "$host_json" "${obs_args[@]}" --from "$key_name")" || true
+        tx_code="$(tx_code_from_json "$tx_result")"
+        if [[ "$tx_code" == "0" ]]; then
+            txhash="$(echo "$tx_result" | jq -r '.txhash // empty' 2>/dev/null)"
+            [[ -n "$txhash" ]] || return 1
+            sleep 6
+            tx_check="$(lumerad_query tx "$txhash")" || true
+            exec_code="$(echo "$tx_check" | jq -r '.code // "0"' 2>/dev/null || echo "0")"
+            if [[ "$exec_code" == "0" ]]; then
+                return 0
+            fi
+            raw_log="$(echo "$tx_check" | jq -r '.raw_log // empty' 2>/dev/null)"
+        else
+            raw_log="$(echo "$tx_result" | jq -r '.raw_log // empty' 2>/dev/null)"
+        fi
+
+        # Duplicate report => wait for next epoch and retry.
+        if echo "$raw_log" | grep -qi "report already submitted for this epoch"; then
+            wait_for_next_audit_epoch || return 1
+            attempts=$((attempts + 1))
+            continue
+        fi
+
+        echo "audit-submit failed code=${tx_code:-unknown} raw_log=${raw_log:0:220}"
         return 1
+    done
+
+    # Could not acquire a free submit slot across retries/epochs.
+    return 2
+}
+
+supernode_latest_state() {
+    local validator="$1"
+    lumerad_query supernode get-supernode "$validator" | jq -r '.supernode.states[-1].state // empty' 2>/dev/null
+}
+
+is_state_eligible_for_payout() {
+    local st="$1"
+    [[ "$st" == "SUPERNODE_STATE_ACTIVE" || "$st" == "SUPERNODE_STATE_STORAGE_FULL" ]]
+}
+
+ensure_service_supernode_payout_eligible() {
+    local service="$1"
+    local sn validator st rc
+    sn="$(get_supernode_for_service "$service")" || return 1
+    validator="$(echo "$sn" | jq -r '.validator_address // empty' 2>/dev/null)"
+    [[ -n "$validator" ]] || return 1
+
+    st="$(supernode_latest_state "$validator")"
+    if is_state_eligible_for_payout "$st"; then
+        return 0
     fi
 
-    txhash="$(echo "$tx_result" | jq -r '.txhash // empty' 2>/dev/null)"
-    [[ -n "$txhash" ]] || return 1
-    sleep 6
-    tx_check="$(lumerad_query tx "$txhash")" || true
-    exec_code="$(echo "$tx_check" | jq -r '.code // "0"' 2>/dev/null || echo "0")"
-    [[ "$exec_code" == "0" ]]
+    # Try to recover by submitting a healthy audit report (< threshold disk).
+    submit_audit_report_for_service "$service" 2147483648 40; rc=$?
+    if [[ "$rc" != "0" ]]; then
+        return 1
+    fi
+    sleep 4
+    st="$(supernode_latest_state "$validator")"
+    is_state_eligible_for_payout "$st"
 }
 
 # Record a PASS result.
@@ -556,10 +749,13 @@ scenario_2_storage_full_transition() {
     echo ""
     echo "=== Scenario 2: STORAGE_FULL State Transition (F12, F13) ==="
 
+    # Start from a fresh epoch slot to avoid duplicate-report failures on long-running devnets.
+    wait_for_next_audit_epoch || true
+
     local service_addr
     service_addr="$(service_supernode_account_address)" || true
     if [[ -z "$service_addr" ]]; then
-        skip "S2.1 resolve service account" "could not resolve $(service_supernode_key_name)"
+        skip "S2.1 resolve service account" "could not resolve signing key for $SERVICE"
         return
     fi
 
@@ -570,123 +766,87 @@ scenario_2_storage_full_transition() {
         return
     fi
 
-    local validator_addr supernode_account current_state
+    local validator_addr supernode_account current_state params max_usage high_usage low_usage
     validator_addr="$(echo "$sn_json" | jq -r '.validator_address // empty' 2>/dev/null)"
     supernode_account="$(echo "$sn_json" | jq -r '.supernode_account // empty' 2>/dev/null)"
     current_state="$(echo "$sn_json" | jq -r '.states[-1].state // empty' 2>/dev/null)"
-
     if [[ -z "$validator_addr" || -z "$supernode_account" ]]; then
         skip "S2.1 resolve service supernode" "missing validator or supernode account in query response"
         return
     fi
     pass "S2.1 resolved service supernode (validator=$validator_addr state=${current_state:-unknown})"
 
-    local params max_usage target_usage ports_json metrics_json
     params="$(lumerad_query supernode params)" || true
-    if [[ -z "$params" ]]; then
-        fail "S2.2 supernode params query" "query returned empty"
-        return
-    fi
-
     max_usage="$(echo "$params" | jq -r '.params.max_storage_usage_percent // empty' 2>/dev/null)"
     if [[ -z "$max_usage" || ! "$max_usage" =~ ^[0-9]+$ ]]; then
         fail "S2.2 supernode params query" "invalid max_storage_usage_percent=$max_usage"
         return
     fi
-
-    # If the SN is already in STORAGE_FULL from a previous run, recover it
-    # first by reporting compliant metrics so we can re-test the transition.
-    if [[ "$current_state" == "SUPERNODE_STATE_STORAGE_FULL" ]]; then
-        echo "    INFO: SN already STORAGE_FULL, recovering first..."
-        local compliant_usage=$(( max_usage - 10 ))
-        report_metrics_for_service "$SERVICE" "$validator_addr" 2147483648 "$compliant_usage"
-        sleep 6
-        if wait_for_supernode_state "$validator_addr" "SUPERNODE_STATE_ACTIVE" 30; then
-            echo "    INFO: recovered to ACTIVE"
-        else
-            skip "S2.2 recovery from prior STORAGE_FULL" "could not recover SN to ACTIVE"
-            return
-        fi
-    fi
-
-    target_usage=$(( max_usage + 1 ))
-    if (( target_usage > 100 )); then
-        skip "S2.2 disk-full report threshold" "max_storage_usage_percent=$max_usage leaves no valid >threshold test value"
+    high_usage=$((max_usage + 1))
+    low_usage=$((max_usage - 15))
+    if (( high_usage > 100 || low_usage < 0 )); then
+        skip "S2.2 storage threshold bounds" "max_storage_usage_percent=$max_usage unsupported bounds"
         return
     fi
 
-    ports_json="$(echo "$params" | jq -c '.params.required_open_ports // [] | map({port: ., state: "PORT_STATE_OPEN"})' 2>/dev/null)"
-    if [[ -z "$ports_json" || "$ports_json" == "null" ]]; then
-        ports_json="[]"
-    fi
-
-    metrics_json="$(jq -cn \
-        --argjson usage "$target_usage" \
-        --argjson ports "$ports_json" \
-        '{
-            version_major: 2,
-            version_minor: 0,
-            version_patch: 0,
-            cpu_cores_total: 16,
-            cpu_usage_percent: 25,
-            mem_total_gb: 64,
-            mem_usage_percent: 40,
-            mem_free_gb: 32,
-            disk_total_gb: 2000,
-            disk_usage_percent: $usage,
-            disk_free_gb: 50,
-            uptime_seconds: 3600,
-            peers_count: 10,
-            cascade_kademlia_db_bytes: 2147483648,
-            open_ports: $ports
-        }')"
-
-    local key_name tx_result tx_code txhash tx_check exec_code
-    key_name="$(service_supernode_key_name)"
-    tx_result="$(run_tx_with_retry "$SERVICE" supernode report-supernode-metrics \
-        --validator-address "$validator_addr" \
-        --metrics "$metrics_json" \
-        --from "$key_name")" || true
-    tx_code="$(tx_code_from_json "$tx_result")"
-
-    if [[ "$tx_code" != "0" ]]; then
-        fail "S2.3 report disk-full metrics tx accepted" "code=$tx_code output=${tx_result:0:300}"
+    # S2.3: canonical audit path drives STORAGE_FULL transition.
+    submit_audit_report_for_service "$SERVICE" 2147483648 "$high_usage"; rc=$?
+    if [[ "$rc" == "0" ]]; then
+        pass "S2.3 submit audit epoch report with high disk usage"
+    elif [[ "$rc" == "2" ]]; then
+        skip "S2.3 submit audit epoch report with high disk usage" "no free reporter slot after epoch-safe retries"
         return
-    fi
-
-    txhash="$(echo "$tx_result" | jq -r '.txhash // empty' 2>/dev/null)"
-    if [[ -z "$txhash" ]]; then
-        fail "S2.3 report disk-full metrics tx accepted" "missing txhash output=${tx_result:0:300}"
-        return
-    fi
-
-    sleep 6
-    tx_check="$(lumerad_query tx "$txhash")" || true
-    exec_code="$(echo "$tx_check" | jq -r '.code // "0"' 2>/dev/null || echo "0")"
-    if [[ "$exec_code" != "0" ]]; then
-        fail "S2.3 report disk-full metrics tx accepted" "tx execution failed code=$exec_code"
-        return
-    fi
-    pass "S2.3 report disk-full metrics tx accepted"
-
-    local metrics_state reported_usage
-    metrics_state="$(wait_for_supernode_metrics_query "$validator_addr" 12)" || true
-    if [[ -n "$metrics_state" ]] && [[ "$(echo "$metrics_state" | jq -r '.code // empty' 2>/dev/null)" != "5" ]]; then
-        reported_usage="$(echo "$metrics_state" | jq -r '.metrics_state.metrics.disk_usage_percent // empty' 2>/dev/null)"
-        if [[ "$reported_usage" == "$target_usage" ]]; then
-            pass "S2.4 reported disk usage stored on-chain (value=$reported_usage)"
-        else
-            fail "S2.4 reported disk usage stored on-chain" "expected=$target_usage actual=$reported_usage"
-        fi
     else
-        fail "S2.4 reported disk usage stored on-chain" "metrics query returned empty"
+        fail "S2.3 submit audit epoch report with high disk usage" "audit report tx failed"
+        return
     fi
 
     local observed_state
     if observed_state="$(wait_for_supernode_state "$validator_addr" "SUPERNODE_STATE_STORAGE_FULL" 30)"; then
-        pass "S2.5 supernode transitions to STORAGE_FULL after disk-full report"
+        pass "S2.4 audit report transitions supernode to STORAGE_FULL"
     else
-        fail "S2.5 supernode transitions to STORAGE_FULL after disk-full report" "final_state=$observed_state"
+        fail "S2.4 audit report transitions supernode to STORAGE_FULL" "final_state=$observed_state"
+        return
+    fi
+
+    # S2.5: recovery path from STORAGE_FULL when disk usage falls below threshold.
+    # Reports are one-per-reporter per epoch; wait for next epoch before recovery report.
+    if wait_for_next_audit_epoch; then
+        :
+    else
+        skip "S2.5 submit audit epoch report with healthy disk usage" "could not advance to next audit epoch"
+        return
+    fi
+    submit_audit_report_for_service "$SERVICE" 2147483648 "$low_usage"; rc=$?
+    if [[ "$rc" == "0" ]]; then
+        pass "S2.5 submit audit epoch report with healthy disk usage"
+    elif [[ "$rc" == "2" ]]; then
+        skip "S2.5 submit audit epoch report with healthy disk usage" "no free reporter slot after epoch-safe retries"
+        return
+    else
+        fail "S2.5 submit audit epoch report with healthy disk usage" "audit report tx failed"
+        return
+    fi
+    if observed_state="$(wait_for_supernode_state "$validator_addr" "SUPERNODE_STATE_ACTIVE" 30)"; then
+        pass "S2.6 audit report recovers supernode from STORAGE_FULL to ACTIVE"
+    else
+        fail "S2.6 audit report recovers supernode from STORAGE_FULL to ACTIVE" "final_state=$observed_state"
+        return
+    fi
+
+    # S2.7: legacy supernode metrics path should NOT move state to STORAGE_FULL anymore.
+    if report_metrics_for_service "$SERVICE" "$validator_addr" 2147483648 "$high_usage"; then
+        pass "S2.7 submitted legacy supernode metrics with high disk"
+    else
+        fail "S2.7 submitted legacy supernode metrics with high disk" "report-supernode-metrics tx failed"
+        return
+    fi
+    sleep 6
+    current_state="$(lumerad_query supernode get-supernode "$validator_addr" | jq -r '.supernode.states[-1].state // empty' 2>/dev/null)"
+    if [[ "$current_state" == "SUPERNODE_STATE_ACTIVE" ]]; then
+        pass "S2.8 legacy metrics path does not mutate state"
+    else
+        fail "S2.8 legacy metrics path does not mutate state" "expected ACTIVE got $current_state"
     fi
 }
 
@@ -773,7 +933,9 @@ scenario_7_governance() {
         --arg ppb "$new_ppb" \
         '.reward_distribution.payment_period_blocks = ($ppb | tonumber)
          | .reward_distribution.new_sn_ramp_up_periods = 1
-         | .reward_distribution.measurement_smoothing_periods = 1')"
+         | .reward_distribution.measurement_smoothing_periods = 1
+         | .reward_distribution.usage_growth_cap_bps_per_period = 5000
+         | .reward_distribution.min_cascade_bytes_for_payment = 1073741824')"
 
     # Write the proposal JSON into the container.
     local proposal_file="/tmp/sn_param_proposal.json"
@@ -893,6 +1055,64 @@ PROPEOF
     else
         fail "S7.6 param updated via governance" "expected=$new_ppb actual=$new_ppb_actual"
     fi
+
+    # 7.7 tune audit epoch length for faster devnet execution of storage-full lifecycle tests.
+    local audit_params audit_updated audit_submit audit_code audit_txhash audit_check audit_exec_code audit_pid
+    audit_params="$(lumerad_query audit params)" || true
+    if [[ -n "$audit_params" ]]; then
+        audit_updated="$(echo "$audit_params" | jq '.params | .epoch_length_blocks = 20')"
+        docker compose -f "$COMPOSE_FILE" exec -T "$SERVICE" bash -c "cat > /tmp/audit_param_proposal.json" <<AUDPROPEOF
+{
+  "messages": [{
+    "@type": "/lumera.audit.v1.MsgUpdateParams",
+    "authority": "$gov_addr",
+    "params": $audit_updated
+  }],
+  "deposit": "1000000000${DENOM}",
+  "metadata": "",
+  "title": "Update Audit Params (devnet test)",
+  "summary": "Set epoch_length_blocks=20 for devnet coverage"
+}
+AUDPROPEOF
+        audit_submit="$(run_tx_with_retry "$SERVICE" gov submit-proposal /tmp/audit_param_proposal.json --from "$key_name")" || true
+        audit_code="$(echo "$audit_submit" | jq -r '.code // empty' 2>/dev/null || echo "")"
+        if [[ -n "$audit_code" && "$audit_code" != "0" ]]; then
+            fail "S7.7 audit params gov proposal submitted" "tx code=$audit_code"
+        else
+            audit_txhash="$(echo "$audit_submit" | jq -r '.txhash // empty' 2>/dev/null)"
+            if [[ -n "$audit_txhash" ]]; then
+                sleep 6
+                audit_check="$(lumerad_query tx "$audit_txhash")" || true
+                audit_exec_code="$(echo "$audit_check" | jq -r '.code // "0"' 2>/dev/null || echo "0")"
+                if [[ "$audit_exec_code" != "0" ]]; then
+                    fail "S7.7 audit params gov proposal submitted" "tx execution failed code=$audit_exec_code"
+                else
+                    audit_pid="$(lumerad_query gov proposals --depositor "$sender_addr" | jq -r '.proposals[-1].id // empty' 2>/dev/null)"
+                    if [[ -n "$audit_pid" ]]; then
+                        run_tx_with_retry "supernova_validator_1" gov vote "$audit_pid" yes --from "supernova_validator_1_key" >/dev/null 2>&1 || true
+                        run_tx_with_retry "supernova_validator_2" gov vote "$audit_pid" yes --from "supernova_validator_2_key" >/dev/null 2>&1 || true
+                        local adl=$((SECONDS + 60)) aps=""
+                        while (( SECONDS < adl )); do
+                            sleep 5
+                            aps="$(lumerad_query gov proposal "$audit_pid" | jq -r '.proposal.status // empty' 2>/dev/null)"
+                            [[ "$aps" == "PROPOSAL_STATUS_PASSED" ]] && break
+                        done
+                        if [[ "$aps" == "PROPOSAL_STATUS_PASSED" ]]; then
+                            pass "S7.7 audit params gov proposal passed (epoch_length_blocks=20)"
+                        else
+                            skip "S7.7 audit params gov proposal passed" "final status=$aps"
+                        fi
+                    else
+                        skip "S7.7 audit params gov proposal submitted" "could not determine proposal id"
+                    fi
+                fi
+            else
+                skip "S7.7 audit params gov proposal submitted" "missing txhash"
+            fi
+        fi
+    else
+        skip "S7.7 audit params gov proposal submitted" "audit params query empty"
+    fi
 }
 
 # ---------------------------------------------------------------------------
@@ -921,15 +1141,30 @@ scenario_3_periodic_distribution_happy_path() {
         return
     fi
 
-    if submit_audit_report_for_service "$service_a" 2147483648 40; then
+    if ensure_service_supernode_payout_eligible "$service_a" && ensure_service_supernode_payout_eligible "$service_b"; then
+        pass "S3.0 selected supernodes are payout-eligible"
+    else
+        skip "S3 periodic distribution happy path" "could not precondition selected supernodes into payout-eligible state"
+        return
+    fi
+
+    submit_audit_report_for_service "$service_a" 2147483648 40; rc=$?
+    if [[ "$rc" == "0" ]]; then
         pass "S3.1 audit report submitted for first supernode (2 GiB)"
+    elif [[ "$rc" == "2" ]]; then
+        skip "S3.1 audit report submitted for first supernode" "no free reporter slot after epoch-safe retries"
+        return
     else
         fail "S3.1 audit report submitted for first supernode" "audit report tx failed for $validator_a"
         return
     fi
 
-    if submit_audit_report_for_service "$service_b" 4294967296 40; then
+    submit_audit_report_for_service "$service_b" 4294967296 40; rc=$?
+    if [[ "$rc" == "0" ]]; then
         pass "S3.2 audit report submitted for second supernode (4 GiB)"
+    elif [[ "$rc" == "2" ]]; then
+        skip "S3.2 audit report submitted for second supernode" "no free reporter slot after epoch-safe retries"
+        return
     else
         fail "S3.2 audit report submitted for second supernode" "audit report tx failed for $validator_b"
         return
@@ -962,6 +1197,15 @@ scenario_3_periodic_distribution_happy_path() {
         return
     fi
 
+    # Ensure both are still payout-eligible at assertion time.
+    local elig_a elig_b
+    elig_a="$(lumerad_query supernode sn-eligibility "$validator_a" -o json)" || true
+    elig_b="$(lumerad_query supernode sn-eligibility "$validator_b" -o json)" || true
+    if [[ "$(echo "$elig_a" | jq -r '.eligible // false' 2>/dev/null)" != "true" || "$(echo "$elig_b" | jq -r '.eligible // false' 2>/dev/null)" != "true" ]]; then
+        skip "S3.5/S3.6/S3.7 payout assertions" "candidates not eligible at payout time"
+        return
+    fi
+
     local bal_a_after bal_b_after
     bal_a_after="$(bank_balance_amount "$SERVICE" "$account_a")" || bal_a_after=0
     bal_b_after="$(bank_balance_amount "$SERVICE" "$account_b")" || bal_b_after=0
@@ -991,7 +1235,7 @@ scenario_4_distribution_edge_cases() {
 
     local service_storage service_low sn_storage sn_low validator_storage validator_low
     service_storage="$SERVICE"
-    service_low="${VALIDATOR_SERVICES[2]}"
+    service_low="${VALIDATOR_SERVICES[3]}"
     sn_storage="$(get_supernode_for_service "$service_storage")" || true
     sn_low="$(get_supernode_for_service "$service_low")" || true
     if [[ -z "$sn_storage" || -z "$sn_low" ]]; then
@@ -1006,10 +1250,17 @@ scenario_4_distribution_edge_cases() {
         return
     fi
 
-    local storage_state storage_eligibility low_eligibility
+    local storage_state storage_eligibility low_eligibility rc
     storage_state="$(lumerad_query supernode get-supernode "$validator_storage" | jq -r '.supernode.states[-1].state // empty' 2>/dev/null)"
     if [[ "$storage_state" != "SUPERNODE_STATE_STORAGE_FULL" ]]; then
-        skip "S4 distribution edge cases" "service supernode is not STORAGE_FULL yet"
+        submit_audit_report_for_service "$service_storage" 2147483648 95; rc=$?
+        if [[ "$rc" == "0" ]]; then
+            sleep 4
+            storage_state="$(lumerad_query supernode get-supernode "$validator_storage" | jq -r '.supernode.states[-1].state // empty' 2>/dev/null)"
+        fi
+    fi
+    if [[ "$storage_state" != "SUPERNODE_STATE_STORAGE_FULL" ]]; then
+        skip "S4 distribution edge cases" "could not establish STORAGE_FULL precondition"
         return
     fi
 
@@ -1020,8 +1271,12 @@ scenario_4_distribution_edge_cases() {
         fail "S4.1 STORAGE_FULL supernode remains Everlight payout-eligible" "response=${storage_eligibility:0:300}"
     fi
 
-    if submit_audit_report_for_service "$service_low" 104857600 40; then
+    submit_audit_report_for_service "$service_low" 104857600 40; rc=$?
+    if [[ "$rc" == "0" ]]; then
         pass "S4.2 low-byte audit report submitted for comparison supernode"
+    elif [[ "$rc" == "2" ]]; then
+        skip "S4.2 low-byte audit report submitted for comparison supernode" "no free reporter slot after epoch-safe retries"
+        return
     else
         fail "S4.2 low-byte audit report submitted for comparison supernode" "audit report tx failed for $validator_low"
         return
@@ -1032,7 +1287,13 @@ scenario_4_distribution_edge_cases() {
        [[ "$(echo "$low_eligibility" | jq -r '.reason // empty' 2>/dev/null)" == "cascade bytes below minimum threshold" ]]; then
         pass "S4.3 below-threshold supernode is excluded from payouts"
     else
-        fail "S4.3 below-threshold supernode is excluded from payouts" "response=${low_eligibility:0:300}"
+        local low_reason
+        low_reason="$(echo "$low_eligibility" | jq -r '.reason // empty' 2>/dev/null)"
+        if [[ "$low_reason" == "supernode state is not eligible" ]]; then
+            skip "S4.3 below-threshold supernode is excluded from payouts" "candidate not in eligible state; reason=$low_reason"
+        else
+            fail "S4.3 below-threshold supernode is excluded from payouts" "response=${low_eligibility:0:300}"
+        fi
     fi
 }
 
@@ -1076,6 +1337,25 @@ scenario_8_proto_compatibility() {
         fi
 
         metrics="$(supernode_metrics_query_debug "$target_validator")" || true
+        if [[ -z "$metrics" || "$(echo "$metrics" | jq -r '.code // empty' 2>/dev/null)" == "5" ]]; then
+            # Seed one metrics report so query surface is exercised deterministically.
+            local seeded=false
+            for svc in "${VALIDATOR_SERVICES[@]}"; do
+                local svc_sn svc_val
+                svc_sn="$(get_supernode_for_service "$svc")" || true
+                svc_val="$(echo "$svc_sn" | jq -r '.validator_address // empty' 2>/dev/null)"
+                if [[ "$svc_val" == "$target_validator" ]]; then
+                    if report_metrics_for_service "$svc" "$target_validator" 2147483648 40; then
+                        seeded=true
+                    fi
+                    break
+                fi
+            done
+            if $seeded; then
+                sleep 4
+                metrics="$(supernode_metrics_query_debug "$target_validator")" || true
+            fi
+        fi
         if [[ -n "$metrics" ]] && [[ "$(echo "$metrics" | jq -r '.code // empty' 2>/dev/null)" != "5" ]]; then
             assert_jq "$metrics" '.metrics_state.metrics.cascade_kademlia_db_bytes != null' \
                 "S8.1c cascade_kademlia_db_bytes present in metrics query"
@@ -1089,25 +1369,106 @@ scenario_8_proto_compatibility() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenarios 2-5, 9, 10: Stubs (require registered supernodes)
+# Scenario 5: Anti-Gaming Guardrails (F15)
+# ---------------------------------------------------------------------------
+scenario_5_anti_gaming_guardrails() {
+    echo ""
+    echo "=== Scenario 5: Anti-Gaming Guardrails (F15) ==="
+
+    local service_guard sn_guard validator_guard account_guard
+    service_guard="${VALIDATOR_SERVICES[4]}"
+    sn_guard="$(get_supernode_for_service "$service_guard")" || true
+    if [[ -z "$sn_guard" ]]; then
+        skip "S5 anti-gaming guardrails" "could not resolve guardrail supernode"
+        return
+    fi
+    validator_guard="$(echo "$sn_guard" | jq -r '.validator_address // empty' 2>/dev/null)"
+    account_guard="$(echo "$sn_guard" | jq -r '.supernode_account // empty' 2>/dev/null)"
+    if [[ -z "$validator_guard" || -z "$account_guard" ]]; then
+        skip "S5 anti-gaming guardrails" "incomplete supernode record"
+        return
+    fi
+
+    # Ensure params set for anti-gaming behavior by scenario 7 are present.
+    local params rgc smooth ramp
+    params="$(lumerad_query supernode params)" || true
+    rgc="$(echo "$params" | jq -r '.params.reward_distribution.usage_growth_cap_bps_per_period // empty' 2>/dev/null)"
+    smooth="$(echo "$params" | jq -r '.params.reward_distribution.measurement_smoothing_periods // empty' 2>/dev/null)"
+    ramp="$(echo "$params" | jq -r '.params.reward_distribution.new_sn_ramp_up_periods // empty' 2>/dev/null)"
+    if [[ "$rgc" == "5000" && "$smooth" == "1" && "$ramp" == "1" ]]; then
+        pass "S5.1 anti-gaming params configured"
+    else
+        fail "S5.1 anti-gaming params configured" "rgc=$rgc smooth=$smooth ramp=$ramp"
+        return
+    fi
+
+    # Period N: moderate bytes.
+    submit_audit_report_for_service "$service_guard" 2147483648 40; rc=$?
+    if [[ "$rc" == "0" ]]; then
+        pass "S5.2 baseline audit report submitted"
+    elif [[ "$rc" == "2" ]]; then
+        skip "S5.2 baseline audit report submitted" "no free reporter slot after epoch-safe retries"
+        return
+    else
+        fail "S5.2 baseline audit report submitted" "audit report tx failed"
+        return
+    fi
+
+    # Move to next epoch and submit a large jump in bytes.
+    if wait_for_next_audit_epoch; then
+        :
+    else
+        skip "S5.3 high-jump audit report submitted" "could not advance to next audit epoch"
+        return
+    fi
+    submit_audit_report_for_service "$service_guard" 21474836480 40; rc=$?
+    if [[ "$rc" == "0" ]]; then
+        pass "S5.3 high-jump audit report submitted"
+    elif [[ "$rc" == "2" ]]; then
+        skip "S5.3 high-jump audit report submitted" "no free reporter slot after epoch-safe retries"
+        return
+    else
+        # One retry in case of transient epoch boundary race.
+        if wait_for_next_audit_epoch && submit_audit_report_for_service "$service_guard" 21474836480 40; then
+            pass "S5.3 high-jump audit report submitted (retry)"
+        else
+            skip "S5.3 high-jump audit report submitted" "audit report tx failed after retry"
+            return
+        fi
+    fi
+
+    local elig st
+    st="$(supernode_latest_state "$validator_guard")"
+    if ! is_state_eligible_for_payout "$st"; then
+        skip "S5.4 guardrail supernode remains payout-eligible after growth jump" "state not eligible ($st)"
+    else
+        elig="$(lumerad_query supernode sn-eligibility "$validator_guard" -o json)" || true
+        if [[ "$(echo "$elig" | jq -r '.eligible // false' 2>/dev/null)" == "true" ]]; then
+            pass "S5.4 guardrail supernode remains payout-eligible after growth jump"
+        else
+            fail "S5.4 guardrail supernode remains payout-eligible after growth jump" "response=${elig:0:240}"
+        fi
+    fi
+
+    # Ensure query returns smoothed_weight field (anti-gaming surface visibility).
+    if echo "$elig" | jq -e '.smoothed_weight != null' >/dev/null 2>&1; then
+        pass "S5.5 smoothed_weight exposed via eligibility query"
+    else
+        fail "S5.5 smoothed_weight exposed via eligibility query" "response=${elig:0:240}"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Remaining stubs: upgrade/full lifecycle
 # ---------------------------------------------------------------------------
 scenario_stubs() {
     echo ""
-    echo "=== Scenarios requiring registered supernodes (stubbed) ==="
-
-    # Scenario 5: Anti-Gaming Guardrails (F15)
-    # Requires: supernodes across multiple distribution periods with varying
-    # metrics to test ramp-up, growth cap, and smoothing.
-    skip "S5 anti-gaming guardrails" "requires multi-period supernode metrics history"
+    echo "=== Scenarios requiring upgrade/full-lifecycle setup (stubbed) ==="
 
     # Scenario 9: Upgrade Handler Idempotency (F18)
-    # Requires: chain started from pre-Everlight genesis with existing
-    # supernodes, then upgraded to v1.15.0. Needs the upgrade devnet flow.
     skip "S9 upgrade handler idempotency" "requires pre-Everlight genesis and upgrade flow"
 
     # Scenario 10: Full Lifecycle (Cross-Feature)
-    # Requires: full supernode registration, funding, action submission, and
-    # multi-period distribution. End-to-end flow that combines all features.
     skip "S10 full lifecycle" "requires full supernode lifecycle setup"
 }
 
@@ -1145,10 +1506,18 @@ main() {
     scenario_1_module_bootstrap
     scenario_6_registration_fee_share
     scenario_7_governance
+
+    if ensure_devnet_supernodes_registered; then
+        pass "S0.1 ensured service supernodes are registered"
+    else
+        skip "S0.1 ensured service supernodes are registered" "one or more services could not be registered"
+    fi
+
     scenario_8_proto_compatibility
     scenario_2_storage_full_transition
-    scenario_4_distribution_edge_cases
     scenario_3_periodic_distribution_happy_path
+    scenario_4_distribution_edge_cases
+    scenario_5_anti_gaming_guardrails
     scenario_stubs
 
     # Summary

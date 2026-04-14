@@ -85,12 +85,12 @@ func (m msgServer) SubmitEpochReport(ctx context.Context, req *types.MsgSubmitEp
 	if !isProber {
 		// Not a prober for this epoch (e.g. POSTPONED). Peer observations are not accepted.
 		if len(req.StorageChallengeObservations) > 0 {
-			return nil, errorsmod.Wrap(types.ErrInvalidReporterState, "reporter not eligible for storage challenge observations in this epoch")
+			return nil, errorsmod.Wrap(types.ErrInvalidReporterState, "reporter is not assigned as epoch prober; peer target observations are not accepted")
 		}
 	} else {
 		// Probers must submit peer observations for all assigned targets for the epoch.
 		if len(req.StorageChallengeObservations) != len(allowedTargets) {
-			return nil, errorsmod.Wrapf(types.ErrInvalidPeerObservations, "expected storage challenge observations for %d assigned targets; got %d", len(allowedTargets), len(req.StorageChallengeObservations))
+			return nil, errorsmod.Wrapf(types.ErrInvalidPeerObservations, "expected peer target observations for %d assigned targets; got %d", len(allowedTargets), len(req.StorageChallengeObservations))
 		}
 
 		seenTargets := make(map[string]struct{}, len(req.StorageChallengeObservations))

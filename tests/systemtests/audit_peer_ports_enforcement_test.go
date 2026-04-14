@@ -4,10 +4,19 @@ package system
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/sjson"
 )
+
+func awaitAtLeastHeightWithSlackPeerPorts(t *testing.T, height int64) {
+	t.Helper()
+	if sut.currentHeight >= height {
+		return
+	}
+	sut.AwaitBlockHeight(t, height, 45*time.Second)
+}
 
 func TestAuditPeerPortsUnanimousClosedPostponesAfterConsecutiveWindows(t *testing.T) {
 	const (
@@ -36,36 +45,44 @@ func TestAuditPeerPortsUnanimousClosedPostponesAfterConsecutiveWindows(t *testin
 	currentHeight := sut.AwaitNextBlock(t)
 	epochID1, epoch1Start := nextEpochAfterHeight(originHeight, epochLengthBlocks, currentHeight)
 	epochID2 := epochID1 + 1
-	epochID3 := epochID2 + 1
 	epoch2Start := epoch1Start + int64(epochLengthBlocks)
-	epoch3Start := epoch2Start + int64(epochLengthBlocks)
-	enforce3 := epoch3Start + int64(epochLengthBlocks)
+	enforce2 := epoch2Start + int64(epochLengthBlocks)
 
 	hostOpen := auditHostReportJSON([]string{"PORT_STATE_OPEN"})
 
-	submitWindow := func(epochID uint64, epochStart int64) {
-		awaitAtLeastHeight(t, epochStart)
-		a0 := auditQueryAssignedTargets(t, epochID, true, n0.accAddr)
-		a1 := auditQueryAssignedTargets(t, epochID, true, n1.accAddr)
-		require.Len(t, a0.TargetSupernodeAccounts, 1)
-		require.Len(t, a1.TargetSupernodeAccounts, 1)
-
-		tx0 := submitEpochReport(t, cli, n0.nodeName, epochID, hostOpen, []string{
-			storageChallengeObservationJSON(a0.TargetSupernodeAccounts[0], []string{"PORT_STATE_CLOSED"}),
-		})
-		RequireTxSuccess(t, tx0)
-		tx1 := submitEpochReport(t, cli, n1.nodeName, epochID, hostOpen, []string{
-			storageChallengeObservationJSON(a1.TargetSupernodeAccounts[0], []string{"PORT_STATE_OPEN"}),
-		})
-		RequireTxSuccess(t, tx1)
+	buildObs := func(targets []string, closeFor string) []string {
+		obs := make([]string, 0, len(targets))
+		for _, target := range targets {
+			state := []string{"PORT_STATE_OPEN"}
+			if target == closeFor {
+				state = []string{"PORT_STATE_CLOSED"}
+			}
+			obs = append(obs, storageChallengeObservationJSON(target, state))
+		}
+		return obs
 	}
 
-	// 3 consecutive windows: node0 reports target as CLOSED, node1 reports OPEN.
-	submitWindow(epochID1, epoch1Start)
-	submitWindow(epochID2, epoch2Start)
-	submitWindow(epochID3, epoch3Start)
+	// Window 1: report using keeper-assigned targets for this epoch.
+	awaitAtLeastHeightWithSlackPeerPorts(t, epoch1Start)
+	assigned0e1 := auditQueryAssignedTargets(t, epochID1, true, n0.accAddr)
+	assigned1e1 := auditQueryAssignedTargets(t, epochID1, true, n1.accAddr)
 
-	awaitAtLeastHeight(t, enforce3)
+	tx0e1 := submitEpochReport(t, cli, n0.nodeName, epochID1, hostOpen, buildObs(assigned0e1.TargetSupernodeAccounts, n1.accAddr))
+	RequireTxSuccess(t, tx0e1)
+	tx1e1 := submitEpochReport(t, cli, n1.nodeName, epochID1, hostOpen, buildObs(assigned1e1.TargetSupernodeAccounts, ""))
+	RequireTxSuccess(t, tx1e1)
+
+	// Window 2: repeat -> node1 should be POSTPONED at window end due to consecutive unanimous CLOSED.
+	awaitAtLeastHeightWithSlackPeerPorts(t, epoch2Start)
+	assigned0e2 := auditQueryAssignedTargets(t, epochID2, true, n0.accAddr)
+	assigned1e2 := auditQueryAssignedTargets(t, epochID2, true, n1.accAddr)
+
+	tx0e2 := submitEpochReport(t, cli, n0.nodeName, epochID2, hostOpen, buildObs(assigned0e2.TargetSupernodeAccounts, n1.accAddr))
+	RequireTxSuccess(t, tx0e2)
+	tx1e2 := submitEpochReport(t, cli, n1.nodeName, epochID2, hostOpen, buildObs(assigned1e2.TargetSupernodeAccounts, ""))
+	RequireTxSuccess(t, tx1e2)
+
+	awaitAtLeastHeightWithSlackPeerPorts(t, enforce2)
 
 	require.Equal(t, "SUPERNODE_STATE_ACTIVE", querySupernodeLatestState(t, cli, n0.valAddr))
 	require.Equal(t, "SUPERNODE_STATE_POSTPONED", querySupernodeLatestState(t, cli, n1.valAddr))

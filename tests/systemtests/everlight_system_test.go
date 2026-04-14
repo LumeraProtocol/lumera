@@ -15,13 +15,14 @@ import (
 	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
-func everlightHostReportJSON(diskUsagePercent float64) string {
+func everlightHostReportJSON(diskUsagePercent float64, cascadeBytes float64) string {
 	bz, _ := json.Marshal(map[string]any{
-		"cpu_usage_percent":    10.0,
-		"mem_usage_percent":    10.0,
-		"disk_usage_percent":   diskUsagePercent,
-		"failed_actions_count": 0,
-		"inbound_port_states":  []string{},
+		"cpu_usage_percent":         10.0,
+		"mem_usage_percent":         10.0,
+		"disk_usage_percent":        diskUsagePercent,
+		"failed_actions_count":      0,
+		"inbound_port_states":       []string{},
+		"cascade_kademlia_db_bytes": cascadeBytes,
 	})
 	return string(bz)
 }
@@ -57,7 +58,7 @@ func TestEverlightSystem_AuditDrivesStorageFullState(t *testing.T) {
 	awaitAtLeastHeight(t, epoch1Start)
 
 	// Report high disk usage through audit epoch report -> STORAGE_FULL transition.
-	hostHighDisk := everlightHostReportJSON(95.0)
+	hostHighDisk := everlightHostReportJSON(95.0, 2_000_000)
 	tx := submitEpochReport(t, cli, n0.nodeName, epochID1, hostHighDisk, nil)
 	t.Logf("submit tx: %s", tx)
 	RequireTxSuccess(t, tx)
@@ -76,6 +77,15 @@ func TestEverlightSystem_AuditDrivesStorageFullState(t *testing.T) {
 	RequireTxSuccess(t, submitEpochReport(t, cli, n0.nodeName, epochID2, hostHighDisk, nil))
 	sut.AwaitNextBlock(t)
 	require.Equal(t, "SUPERNODE_STATE_STORAGE_FULL", querySupernodeLatestState(t, cli, n0.valAddr))
+
+	// Recovery path: when storage goes below threshold in follow-up epoch reports, return to ACTIVE.
+	epochID3 := epochID2 + 1
+	epoch3Start := epoch2Start + int64(epochLengthBlocks)
+	awaitAtLeastHeight(t, epoch3Start)
+	hostRecovered := everlightHostReportJSON(40.0, 2_000_000)
+	RequireTxSuccess(t, submitEpochReport(t, cli, n0.nodeName, epochID3, hostRecovered, nil))
+	sut.AwaitNextBlock(t)
+	require.Equal(t, "SUPERNODE_STATE_ACTIVE", querySupernodeLatestState(t, cli, n0.valAddr))
 }
 
 func TestEverlightSystem_PayoutAndHistoryWhileStorageFull(t *testing.T) {

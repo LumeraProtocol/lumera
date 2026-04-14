@@ -77,7 +77,7 @@ func TestLEP5CascadeRegisterWithCommitment(t *testing.T) {
 	// Build a valid signature: base64(data).base64(sig).
 	sigData := base64.StdEncoding.EncodeToString([]byte("rqid-1"))
 
-	expirationTime := fmt.Sprintf("%d", time.Now().Add(10*time.Minute).Unix())
+	expirationTime := fmt.Sprintf("%d", time.Now().Add(25*time.Hour).Unix())
 
 	metadata := fmt.Sprintf(
 		`{"data_hash":"abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890","file_name":"test.bin","rq_ids_ic":1,"signatures":"%s.fake","availability_commitment":%s}`,

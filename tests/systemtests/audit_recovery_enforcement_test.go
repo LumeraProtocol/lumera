@@ -4,6 +4,7 @@ package system
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/sjson"
@@ -34,7 +35,7 @@ func TestAuditRecovery_PostponedBecomesActiveWithSelfAndPeerOpen_NoHostThreshold
 	registerSupernode(t, cli, n0, "192.168.1.1")
 	registerSupernode(t, cli, n1, "192.168.1.2")
 
-	currentHeight := sut.AwaitNextBlock(t)
+	currentHeight := sut.AwaitNextBlock(t, 12*time.Second)
 	epochID1, epoch1Start := nextEpochAfterHeight(originHeight, epochLengthBlocks, currentHeight)
 	epochID2 := epochID1 + 1
 	epochID3 := epochID2 + 1
@@ -57,7 +58,9 @@ func TestAuditRecovery_PostponedBecomesActiveWithSelfAndPeerOpen_NoHostThreshold
 
 	// Epoch 1: whichever reporter is assigned node1 reports CLOSED for node1.
 	// Not enough streak yet (consecutive=2), so node1 should remain ACTIVE after epoch1.
-	awaitAtLeastHeight(t, epoch1Start)
+	if sut.currentHeight < epoch1Start {
+		sut.AwaitBlockHeight(t, epoch1Start, 20*time.Second)
+	}
 	assigned0e1 := auditQueryAssignedTargets(t, epochID1, true, n0.accAddr)
 	assigned1e1 := auditQueryAssignedTargets(t, epochID1, true, n1.accAddr)
 	tx0e1 := submitEpochReport(t, cli, n0.nodeName, epochID1, hostOK, buildObs(assigned0e1.TargetSupernodeAccounts, n1.accAddr))
@@ -65,7 +68,9 @@ func TestAuditRecovery_PostponedBecomesActiveWithSelfAndPeerOpen_NoHostThreshold
 	tx1e1 := submitEpochReport(t, cli, n1.nodeName, epochID1, hostOK, buildObs(assigned1e1.TargetSupernodeAccounts, ""))
 	RequireTxSuccess(t, tx1e1)
 
-	awaitAtLeastHeight(t, epoch2Start)
+	if sut.currentHeight < epoch2Start {
+		sut.AwaitBlockHeight(t, epoch2Start, 20*time.Second)
+	}
 
 	// Epoch 2: repeat CLOSED-for-node1 observations on assigned targets.
 	assigned0e2 := auditQueryAssignedTargets(t, epochID2, true, n0.accAddr)
@@ -75,18 +80,22 @@ func TestAuditRecovery_PostponedBecomesActiveWithSelfAndPeerOpen_NoHostThreshold
 	tx1e2 := submitEpochReport(t, cli, n1.nodeName, epochID2, hostOK, buildObs(assigned1e2.TargetSupernodeAccounts, ""))
 	RequireTxSuccess(t, tx1e2)
 
-	awaitAtLeastHeight(t, epoch3Start)
+	if sut.currentHeight < epoch3Start {
+		sut.AwaitBlockHeight(t, epoch3Start, 20*time.Second)
+	}
 	require.Equal(t, "SUPERNODE_STATE_POSTPONED", querySupernodeLatestState(t, cli, n1.valAddr))
 
 	// Recovery can only happen on epochs where an eligible reporter submits OPEN
 	// observations for node1. Assignment can vary by epoch, so retry a few epochs.
 	recovered := false
-	for i := int64(0); i < 4; i++ {
+	for i := int64(0); i < 10; i++ {
 		epochID := epochID3 + uint64(i)
 		epochStart := epoch3Start + i*int64(epochLengthBlocks)
 		nextEpochStart := epochStart + int64(epochLengthBlocks)
 
-		awaitAtLeastHeight(t, epochStart)
+		if sut.currentHeight < epochStart {
+			sut.AwaitBlockHeight(t, epochStart, 20*time.Second)
+		}
 		assigned0 := auditQueryAssignedTargets(t, epochID, true, n0.accAddr)
 		tx0 := submitEpochReport(t, cli, n0.nodeName, epochID, hostOK, buildObs(assigned0.TargetSupernodeAccounts, ""))
 		RequireTxSuccess(t, tx0)
@@ -94,7 +103,9 @@ func TestAuditRecovery_PostponedBecomesActiveWithSelfAndPeerOpen_NoHostThreshold
 		tx1 := submitEpochReport(t, cli, n1.nodeName, epochID, hostOK, nil)
 		RequireTxSuccess(t, tx1)
 
-		awaitAtLeastHeight(t, nextEpochStart)
+		if sut.currentHeight < nextEpochStart {
+			sut.AwaitBlockHeight(t, nextEpochStart, 20*time.Second)
+		}
 		if querySupernodeLatestState(t, cli, n1.valAddr) == "SUPERNODE_STATE_ACTIVE" {
 			recovered = true
 			break

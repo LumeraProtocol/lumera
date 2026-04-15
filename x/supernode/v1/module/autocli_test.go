@@ -18,24 +18,28 @@ func TestAutoCLIOptions_CoversAllRPCs(t *testing.T) {
 	autoclitest.AssertServiceMethodsCovered(t, types.Msg_serviceDesc, opts.Tx.RpcCommandOptions, "UpdateParams")
 }
 
-func TestAutoCLIOptions_GetMetrics(t *testing.T) {
-	opts := AppModule{}.AutoCLIOptions()
-	require.NotNil(t, opts)
-	require.NotNil(t, opts.Query)
-
-	var found bool
-	for _, rpc := range opts.Query.RpcCommandOptions {
-		if rpc.GetRpcMethod() != "GetMetrics" {
-			continue
-		}
-
-		found = true
-		require.Equal(t, "get-metrics [validator-address]", rpc.GetUse())
-		require.Len(t, rpc.GetPositionalArgs(), 1)
-		require.Equal(t, "validatorAddress", rpc.GetPositionalArgs()[0].GetProtoField())
+func TestAutoCLIOptions_QueryGetMetricsIsCustom(t *testing.T) {
+	am := AppModule{}
+	opts := am.AutoCLIOptions()
+	if opts == nil || opts.Query == nil {
+		t.Fatalf("query autocli options must be set")
+	}
+	if !opts.Query.EnhanceCustomCommand {
+		t.Fatalf("query EnhanceCustomCommand must be true")
 	}
 
-	require.True(t, found, "GetMetrics query should be exposed via AutoCLI")
+	found := false
+	for _, rpc := range opts.Query.RpcCommandOptions {
+		if rpc.RpcMethod == "GetMetrics" {
+			found = true
+			if !rpc.Skip {
+				t.Fatalf("GetMetrics must be skipped in AutoCLI")
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("GetMetrics rpc option not found")
+	}
 }
 
 func TestAutoCLIOptions_ReportSupernodeMetrics(t *testing.T) {

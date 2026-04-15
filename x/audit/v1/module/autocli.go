@@ -9,7 +9,8 @@ import (
 func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 	return &autocliv1.ModuleOptions{
 		Query: &autocliv1.ServiceCommandDescriptor{
-			Service: types.Query_serviceDesc.ServiceName,
+			Service:              types.Query_serviceDesc.ServiceName,
+			EnhanceCustomCommand: true,
 			RpcCommandOptions: []*autocliv1.RpcCommandOptions{
 				{
 					RpcMethod: "Params",
@@ -57,16 +58,12 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "supernode_account"}},
 				},
 				{
-					RpcMethod:      "EpochReport",
-					Use:            "epoch-report [epoch-id] [supernode-account]",
-					Short:          "Query an epoch report by epoch and reporter",
-					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "epoch_id"}, {ProtoField: "supernode_account"}},
+					RpcMethod: "EpochReport",
+					Skip:      true, // custom command to avoid AutoCLI aminojson float64 marshal bug
 				},
 				{
-					RpcMethod:      "EpochReportsByReporter",
-					Use:            "epoch-reports-by-reporter [supernode-account]",
-					Short:          "List epoch reports submitted by a reporter",
-					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "supernode_account"}},
+					RpcMethod: "EpochReportsByReporter",
+					Skip:      true, // custom command to avoid AutoCLI aminojson float64 marshal bug
 				},
 				{
 					RpcMethod:      "StorageChallengeReports",
@@ -76,11 +73,7 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 				},
 				{
 					RpcMethod: "HostReports",
-					Use:       "host-reports [supernode-account]",
-					Short:     "List host reports submitted by a supernode across epochs",
-					PositionalArgs: []*autocliv1.PositionalArgDescriptor{
-						{ProtoField: "supernode_account"},
-					},
+					Skip:      true, // custom command to avoid AutoCLI aminojson float64 marshal bug
 				},
 				// this line is used by ignite scaffolding # autocli/query
 			},

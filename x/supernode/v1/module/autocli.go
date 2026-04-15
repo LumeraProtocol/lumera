@@ -48,15 +48,7 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					Short:          "Query list-supernodes",
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{},
 				},
-				{
-					// Keep this on the generic AutoCLI path for consistency with the rest of the
-					// module's query surface. Note that response printing for this float-bearing
-					// payload is still limited on the generic path in this environment.
-					RpcMethod:      "GetMetrics",
-					Use:            "get-metrics [validator-address]",
-					Short:          "Query the latest supernode metrics for a validator",
-					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validatorAddress"}},
-				},
+
 				{
 					RpcMethod: "GetTopSuperNodesForBlock",
 					Use:       "get-top-supernodes-for-block [block-height]",
@@ -77,6 +69,10 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 							DefaultValue: "SUPERNODE_STATE_ACTIVE",
 						},
 					},
+				},
+				{
+					RpcMethod: "GetMetrics",
+					Skip:      true, // custom command to avoid AutoCLI aminojson float64 marshal bug
 				},
 
 				// this line is used by ignite scaffolding # autocli/query

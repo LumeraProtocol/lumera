@@ -42,7 +42,7 @@ func TestAuditPeerPortsUnanimousClosedPostponesAfterConsecutiveWindows(t *testin
 	registerSupernode(t, cli, n0, "192.168.1.1")
 	registerSupernode(t, cli, n1, "192.168.1.2")
 
-	currentHeight := sut.AwaitNextBlock(t)
+	currentHeight := sut.AwaitNextBlock(t, 12*time.Second)
 	epochID1, epoch1Start := nextEpochAfterHeight(originHeight, epochLengthBlocks, currentHeight)
 	epochID2 := epochID1 + 1
 	epoch2Start := epoch1Start + int64(epochLengthBlocks)

@@ -38,6 +38,10 @@ func TestAutoCLIOptions_QueryFloatCommandsAreCustom(t *testing.T) {
 		if _, ok := wantSkipped[rpc.RpcMethod]; ok {
 			wantSkipped[rpc.RpcMethod] = rpc.Skip
 		}
+		if rpc.RpcMethod == "AssignedTargets" {
+			require.Len(t, rpc.PositionalArgs, 1)
+			require.Equal(t, "supernode_account", rpc.PositionalArgs[0].ProtoField)
+		}
 	}
 
 	for method, skipped := range wantSkipped {

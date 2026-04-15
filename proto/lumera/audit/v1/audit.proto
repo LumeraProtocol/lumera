@@ -86,11 +86,20 @@ message NodeSuspicionState {
   uint64 last_updated_epoch = 3;
 }
 
+enum ReporterTrustBand {
+  REPORTER_TRUST_BAND_UNSPECIFIED           = 0;
+  REPORTER_TRUST_BAND_NORMAL                = 1;
+  REPORTER_TRUST_BAND_LOW_TRUST             = 2;
+  REPORTER_TRUST_BAND_CHALLENGER_INELIGIBLE = 3;
+}
+
 // ReporterReliabilityState is the persisted storage-truth reporter reliability snapshot.
 message ReporterReliabilityState {
   string reporter_supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
   int64 reliability_score = 2;
   uint64 last_updated_epoch = 3;
+  ReporterTrustBand trust_band = 4;
+  uint64 contradiction_count = 5;
 }
 
 // TicketDeteriorationState is the persisted storage-truth ticket deterioration snapshot.
@@ -101,6 +110,13 @@ message TicketDeteriorationState {
   uint64 active_heal_op_id = 4;
   uint64 probation_until_epoch = 5;
   uint64 last_heal_epoch = 6;
+  uint64 last_failure_epoch = 7;
+  uint32 recent_failure_epoch_count = 8;
+  uint64 contradiction_count = 9;
+  string last_target_supernode_account = 10 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  string last_reporter_supernode_account = 11 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  StorageProofResultClass last_result_class = 12;
+  uint64 last_result_epoch = 13;
 }
 
 enum HealOpStatus {

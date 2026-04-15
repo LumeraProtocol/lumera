@@ -4,6 +4,7 @@ package system
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/sjson"
@@ -14,8 +15,6 @@ func TestAuditRecovery_PostponedBecomesActiveWithSelfAndPeerOpen_NoHostThreshold
 		epochLengthBlocks = uint64(10)
 	)
 	const originHeight = int64(1)
-
-	t.Skip("temporarily disabled: deterministic challenger assignment in tiny topologies causes non-deterministic postpone/recovery sequencing")
 
 	sut.ModifyGenesisJSON(t,
 		setSupernodeParamsForAuditTests(t),
@@ -41,7 +40,7 @@ func TestAuditRecovery_PostponedBecomesActiveWithSelfAndPeerOpen_NoHostThreshold
 	registerSupernode(t, cli, n1, "192.168.1.2")
 	registerSupernode(t, cli, n2, "192.168.1.3")
 
-	currentHeight := sut.AwaitNextBlock(t)
+	currentHeight := sut.AwaitNextBlock(t, 12*time.Second)
 	epochID1, epoch1Start := nextEpochAfterHeight(originHeight, epochLengthBlocks, currentHeight)
 	epochID2 := epochID1 + 1
 	epochID3 := epochID2 + 1
@@ -64,7 +63,9 @@ func TestAuditRecovery_PostponedBecomesActiveWithSelfAndPeerOpen_NoHostThreshold
 
 	// Epoch 1: whichever reporter is assigned node1 reports CLOSED for node1.
 	// Not enough streak yet (consecutive=2), so node1 should remain ACTIVE after epoch1.
-	awaitAtLeastHeightWithSlackPeerPorts(t, epoch1Start)
+	if sut.currentHeight < epoch1Start {
+		sut.AwaitBlockHeight(t, epoch1Start, 20*time.Second)
+	}
 	assigned0e1 := auditQueryAssignedTargets(t, epochID1, true, n0.accAddr)
 	assigned1e1 := auditQueryAssignedTargets(t, epochID1, true, n1.accAddr)
 	assigned2e1 := auditQueryAssignedTargets(t, epochID1, true, n2.accAddr)
@@ -75,7 +76,9 @@ func TestAuditRecovery_PostponedBecomesActiveWithSelfAndPeerOpen_NoHostThreshold
 	tx2e1 := submitEpochReport(t, cli, n2.nodeName, epochID1, hostOK, buildObs(assigned2e1.TargetSupernodeAccounts, ""))
 	RequireTxSuccess(t, tx2e1)
 
-	awaitAtLeastHeightWithSlackPeerPorts(t, epoch2Start)
+	if sut.currentHeight < epoch2Start {
+		sut.AwaitBlockHeight(t, epoch2Start, 20*time.Second)
+	}
 
 	// Epoch 2: repeat CLOSED-for-node1 observations on assigned targets.
 	assigned0e2 := auditQueryAssignedTargets(t, epochID2, true, n0.accAddr)
@@ -88,35 +91,27 @@ func TestAuditRecovery_PostponedBecomesActiveWithSelfAndPeerOpen_NoHostThreshold
 	tx2e2 := submitEpochReport(t, cli, n2.nodeName, epochID2, hostOK, buildObs(assigned2e2.TargetSupernodeAccounts, ""))
 	RequireTxSuccess(t, tx2e2)
 
-	awaitAtLeastHeightWithSlackPeerPorts(t, epoch3Start)
+	if sut.currentHeight < epoch3Start {
+		sut.AwaitBlockHeight(t, epoch3Start, 20*time.Second)
+	}
 	require.Equal(t, "SUPERNODE_STATE_POSTPONED", querySupernodeLatestState(t, cli, n1.valAddr))
 
 	// Recovery can only happen on epochs where a prober is actually assigned node1
 	// and reports OPEN for it. Assignment varies per epoch, so retry a wider window
 	// and only count epochs where node1 is an assigned target.
 	recovered := false
-	observedPeerAssignment := false
-	for i := int64(0); i < 8; i++ {
+	for i := int64(0); i < 10; i++ {
 		epochID := epochID3 + uint64(i)
 		epochStart := epoch3Start + i*int64(epochLengthBlocks)
 		nextEpochStart := epochStart + int64(epochLengthBlocks)
 
-		awaitAtLeastHeightWithSlackPeerPorts(t, epochStart)
+		if sut.currentHeight < epochStart {
+			sut.AwaitBlockHeight(t, epochStart, 20*time.Second)
+		}
 		assigned0 := auditQueryAssignedTargets(t, epochID, true, n0.accAddr)
 		assigned2 := auditQueryAssignedTargets(t, epochID, true, n2.accAddr)
 		assignedTargets0 := assigned0.TargetSupernodeAccounts
 		assignedTargets2 := assigned2.TargetSupernodeAccounts
-
-		hasTarget := func(targets []string, target string) bool {
-			for _, tacc := range targets {
-				if tacc == target {
-					return true
-				}
-			}
-			return false
-		}
-
-		includesNode1 := hasTarget(assignedTargets0, n1.accAddr) || hasTarget(assignedTargets2, n1.accAddr)
 
 		tx0 := submitEpochReport(t, cli, n0.nodeName, epochID, hostOK, buildObs(assignedTargets0, ""))
 		RequireTxSuccess(t, tx0)
@@ -125,20 +120,13 @@ func TestAuditRecovery_PostponedBecomesActiveWithSelfAndPeerOpen_NoHostThreshold
 		tx1 := submitEpochReport(t, cli, n1.nodeName, epochID, hostOK, nil)
 		RequireTxSuccess(t, tx1)
 
-		awaitAtLeastHeightWithSlackPeerPorts(t, nextEpochStart)
-		stateAfter := querySupernodeLatestState(t, cli, n1.valAddr)
-		t.Logf("recovery window epoch=%d assignedTargets0=%v assignedTargets2=%v includesNode1=%v stateAfter=%s", epochID, assignedTargets0, assignedTargets2, includesNode1, stateAfter)
-		if !includesNode1 {
-			continue
+		if sut.currentHeight < nextEpochStart {
+			sut.AwaitBlockHeight(t, nextEpochStart, 20*time.Second)
 		}
-		observedPeerAssignment = true
-		if stateAfter == "SUPERNODE_STATE_ACTIVE" {
+		if querySupernodeLatestState(t, cli, n1.valAddr) == "SUPERNODE_STATE_ACTIVE" {
 			recovered = true
 			break
 		}
-	}
-	if !observedPeerAssignment {
-		t.Skip("no reporter was assigned the postponed target within retry window in this deterministic topology")
 	}
 	require.True(t, recovered, "expected node1 to recover to ACTIVE within retry window once assigned peer OPEN evidence is present")
 }

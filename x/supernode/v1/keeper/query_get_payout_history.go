@@ -22,7 +22,7 @@ func (q queryServer) PayoutHistory(goCtx context.Context, req *types.QueryPayout
 	}
 
 	ctx := sdk.UnwrapSDKContext(goCtx)
-	keeperImpl, ok := q.k.(Keeper)
+	keeperImpl, ok := q.k.(*Keeper)
 	if !ok {
 		return nil, status.Error(codes.Internal, "unexpected keeper implementation")
 	}

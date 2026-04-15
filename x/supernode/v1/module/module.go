@@ -90,7 +90,7 @@ func (AppModuleBasic) RegisterGRPCGatewayRoutes(clientCtx client.Context, mux *r
 
 // GetQueryCmd returns the custom query commands for the supernode module.
 // AutoCLI enhances this root command and preserves all non-custom query commands.
-func (ab AppModuleBasic) GetQueryCmd() *cobra.Command {
+func (AppModuleBasic) GetQueryCmd() *cobra.Command {
 	return cli.GetCustomQueryCmd()
 }
 

@@ -160,5 +160,9 @@ func (m msgServer) SubmitEpochReport(ctx context.Context, req *types.MsgSubmitEp
 		m.SetStorageChallengeReportIndex(sdkCtx, supernodeAccount, req.EpochId, reporterAccount)
 	}
 
+	if err := m.applyStorageTruthScores(sdkCtx, req.EpochId, reporterAccount, req.StorageProofResults); err != nil {
+		return nil, err
+	}
+
 	return &types.MsgSubmitEpochReportResponse{}, nil
 }

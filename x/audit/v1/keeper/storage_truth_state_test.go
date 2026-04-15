@@ -35,6 +35,8 @@ func TestReporterReliabilityStateRoundTrip(t *testing.T) {
 		ReporterSupernodeAccount: "lumera1reporter0000000000000000000000000m09fa",
 		ReliabilityScore:         -5,
 		LastUpdatedEpoch:         8,
+		TrustBand:                types.ReporterTrustBand_REPORTER_TRUST_BAND_LOW_TRUST,
+		ContradictionCount:       3,
 	}
 
 	require.False(t, f.keeper.HasReporterReliabilityState(f.ctx, state.ReporterSupernodeAccount))
@@ -49,12 +51,19 @@ func TestTicketDeteriorationStateRoundTrip(t *testing.T) {
 	f := initFixture(t)
 
 	state := types.TicketDeteriorationState{
-		TicketId:            "ticket-1",
-		DeteriorationScore:  25,
-		LastUpdatedEpoch:    9,
-		ActiveHealOpId:      3,
-		ProbationUntilEpoch: 12,
-		LastHealEpoch:       10,
+		TicketId:                     "ticket-1",
+		DeteriorationScore:           25,
+		LastUpdatedEpoch:             9,
+		ActiveHealOpId:               3,
+		ProbationUntilEpoch:          12,
+		LastHealEpoch:                10,
+		LastFailureEpoch:             8,
+		RecentFailureEpochCount:      2,
+		ContradictionCount:           1,
+		LastTargetSupernodeAccount:   "lumera1target0000000000000000000000000g6we",
+		LastReporterSupernodeAccount: "lumera1reporter0000000000000000000000000m09fa",
+		LastResultClass:              types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH,
+		LastResultEpoch:              9,
 	}
 
 	require.False(t, f.keeper.HasTicketDeteriorationState(f.ctx, state.TicketId))

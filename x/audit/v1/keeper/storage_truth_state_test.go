@@ -116,3 +116,33 @@ func TestHealOpAndNextIDRoundTrip(t *testing.T) {
 	require.True(t, found)
 	require.Equal(t, healOp, got)
 }
+
+func TestHealOpVerificationRoundTrip(t *testing.T) {
+	f := initFixture(t)
+
+	healOpID := uint64(44)
+	verifierA := "lumera1verifiera00000000000000000000000h7v3e"
+	verifierB := "lumera1verifierb00000000000000000000000z9f3r"
+
+	require.False(t, f.keeper.HasHealOpVerification(f.ctx, healOpID, verifierA))
+	_, found := f.keeper.GetHealOpVerification(f.ctx, healOpID, verifierA)
+	require.False(t, found)
+
+	f.keeper.SetHealOpVerification(f.ctx, healOpID, verifierA, true)
+	f.keeper.SetHealOpVerification(f.ctx, healOpID, verifierB, false)
+
+	require.True(t, f.keeper.HasHealOpVerification(f.ctx, healOpID, verifierA))
+	value, found := f.keeper.GetHealOpVerification(f.ctx, healOpID, verifierA)
+	require.True(t, found)
+	require.True(t, value)
+
+	value, found = f.keeper.GetHealOpVerification(f.ctx, healOpID, verifierB)
+	require.True(t, found)
+	require.False(t, value)
+
+	all, err := f.keeper.GetAllHealOpVerifications(f.ctx, healOpID)
+	require.NoError(t, err)
+	require.Len(t, all, 2)
+	require.True(t, all[verifierA])
+	require.False(t, all[verifierB])
+}

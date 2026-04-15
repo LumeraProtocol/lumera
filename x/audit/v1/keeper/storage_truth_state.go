@@ -192,3 +192,45 @@ func (k Keeper) GetAllHealOps(ctx sdk.Context) ([]types.HealOp, error) {
 	}
 	return healOps, nil
 }
+
+func (k Keeper) HasHealOpVerification(ctx sdk.Context, healOpID uint64, verifierSupernodeAccount string) bool {
+	store := k.kvStore(ctx)
+	return store.Has(types.HealOpVerificationKey(healOpID, verifierSupernodeAccount))
+}
+
+func (k Keeper) SetHealOpVerification(ctx sdk.Context, healOpID uint64, verifierSupernodeAccount string, verified bool) {
+	store := k.kvStore(ctx)
+	value := byte(0)
+	if verified {
+		value = 1
+	}
+	store.Set(types.HealOpVerificationKey(healOpID, verifierSupernodeAccount), []byte{value})
+}
+
+func (k Keeper) GetHealOpVerification(ctx sdk.Context, healOpID uint64, verifierSupernodeAccount string) (bool, bool) {
+	store := k.kvStore(ctx)
+	bz := store.Get(types.HealOpVerificationKey(healOpID, verifierSupernodeAccount))
+	if len(bz) == 0 {
+		return false, false
+	}
+	return bz[0] == 1, true
+}
+
+func (k Keeper) GetAllHealOpVerifications(ctx sdk.Context, healOpID uint64) (map[string]bool, error) {
+	store := k.kvStore(ctx)
+	prefix := types.HealOpVerificationPrefix(healOpID)
+	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
+	defer it.Close()
+
+	verifications := make(map[string]bool)
+	for ; it.Valid(); it.Next() {
+		key := it.Key()
+		if len(key) <= len(prefix) {
+			continue
+		}
+		verifier := string(key[len(prefix):])
+		value := len(it.Value()) != 0 && it.Value()[0] == 1
+		verifications[verifier] = value
+	}
+	return verifications, nil
+}

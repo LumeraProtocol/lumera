@@ -52,5 +52,9 @@ func (k Keeper) EndBlocker(ctx context.Context) error {
 		return err
 	}
 
+	if err := k.ProcessStorageTruthHealOpsAtEpochEnd(sdkCtx, epoch.EpochID, params); err != nil {
+		return err
+	}
+
 	return k.PruneOldEpochs(sdkCtx, epoch.EpochID, params)
 }

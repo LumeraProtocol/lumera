@@ -13,6 +13,12 @@ var (
 	ErrReporterNotFound        = errorsmod.Register(ModuleName, 7, "reporter supernode not found")
 	ErrInvalidReporterState    = errorsmod.Register(ModuleName, 8, "invalid reporter state")
 	ErrInvalidStorageProofs    = errorsmod.Register(ModuleName, 9, "invalid storage proof results")
+	ErrInvalidRecheckEvidence  = errorsmod.Register(ModuleName, 10, "invalid storage recheck evidence")
+	ErrHealOpNotFound          = errorsmod.Register(ModuleName, 11, "heal op not found")
+	ErrHealOpUnauthorized      = errorsmod.Register(ModuleName, 12, "heal op unauthorized actor")
+	ErrHealOpInvalidState      = errorsmod.Register(ModuleName, 13, "heal op invalid state transition")
+	ErrHealOpTicketMismatch    = errorsmod.Register(ModuleName, 14, "heal op ticket mismatch")
+	ErrHealVerificationExists  = errorsmod.Register(ModuleName, 15, "heal verification already submitted")
 
 	ErrInvalidEvidenceType = errorsmod.Register(ModuleName, 1101, "invalid evidence type")
 	ErrInvalidMetadata     = errorsmod.Register(ModuleName, 1102, "invalid evidence metadata")

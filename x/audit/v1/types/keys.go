@@ -79,6 +79,7 @@ var (
 	// - HealOpKey:                      "st/ho/" + u64be(heal_op_id)
 	// - HealOpByTicketIndexKey:         "st/hot/" + ticket_id + 0x00 + u64be(heal_op_id)
 	// - HealOpByStatusIndexKey:         "st/hos/" + u32be(status) + u64be(heal_op_id)
+	// - HealOpVerificationKey:          "st/hov/" + u64be(heal_op_id) + "/" + verifier_supernode_account
 	// - NextHealOpIDKey:                "st/next_ho_id"
 	nodeSuspicionStatePrefix       = []byte("st/ns/")
 	reporterReliabilityStatePrefix = []byte("st/rr/")
@@ -86,6 +87,7 @@ var (
 	healOpPrefix                   = []byte("st/ho/")
 	healOpByTicketIndexPrefix      = []byte("st/hot/")
 	healOpByStatusIndexPrefix      = []byte("st/hos/")
+	healOpVerificationPrefix       = []byte("st/hov/")
 	nextHealOpIDKey                = []byte("st/next_ho_id")
 )
 
@@ -376,4 +378,21 @@ func HealOpByStatusIndexPrefix(status HealOpStatus) []byte {
 
 func NextHealOpIDKey() []byte {
 	return nextHealOpIDKey
+}
+
+func HealOpVerificationKey(healOpID uint64, verifierSupernodeAccount string) []byte {
+	key := make([]byte, 0, len(healOpVerificationPrefix)+8+1+len(verifierSupernodeAccount)) // "st/hov/" + u64be(heal_op_id) + "/" + verifier
+	key = append(key, healOpVerificationPrefix...)
+	key = binary.BigEndian.AppendUint64(key, healOpID)
+	key = append(key, '/')
+	key = append(key, verifierSupernodeAccount...)
+	return key
+}
+
+func HealOpVerificationPrefix(healOpID uint64) []byte {
+	key := make([]byte, 0, len(healOpVerificationPrefix)+8+1) // "st/hov/" + u64be(heal_op_id) + "/"
+	key = append(key, healOpVerificationPrefix...)
+	key = binary.BigEndian.AppendUint64(key, healOpID)
+	key = append(key, '/')
+	return key
 }

@@ -103,7 +103,7 @@ func TestDeregisterSupernode(t *testing.T) {
 					},
 					Note: "1.0.0",
 					Metrics: &sntypes.MetricsAggregate{
-						Metrics:     make(map[string]float64),
+						Metrics:     []*sntypes.MetricValue{},
 						ReportCount: 0,
 					},
 					Evidence: []*sntypes.Evidence{},
@@ -193,7 +193,7 @@ func TestDeregisterSupernode(t *testing.T) {
 					},
 					Note: "1.0.0",
 					Metrics: &sntypes.MetricsAggregate{
-						Metrics:     make(map[string]float64),
+						Metrics:     []*sntypes.MetricValue{},
 						ReportCount: 0,
 					},
 					Evidence: []*sntypes.Evidence{},
@@ -233,7 +233,7 @@ func TestDeregisterSupernode(t *testing.T) {
 					},
 					Note: "1.0.0",
 					Metrics: &sntypes.MetricsAggregate{
-						Metrics:     make(map[string]float64),
+						Metrics:     []*sntypes.MetricValue{},
 						ReportCount: 0,
 					},
 					Evidence: []*sntypes.Evidence{},

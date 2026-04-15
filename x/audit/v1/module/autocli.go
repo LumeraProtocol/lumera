@@ -41,6 +41,23 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					Short:     "Query current audit epoch boundaries",
 				},
 				{
+					RpcMethod:      "EpochAnchor",
+					Use:            "epoch-anchor [epoch-id]",
+					Short:          "Query the persisted anchor for an epoch",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "epoch_id"}},
+				},
+				{
+					RpcMethod: "CurrentEpochAnchor",
+					Use:       "current-epoch-anchor",
+					Short:     "Query the persisted anchor for the current epoch",
+				},
+				{
+					RpcMethod:      "AssignedTargets",
+					Use:            "assigned-targets [supernode-account]",
+					Short:          "Query the current or filtered target assignments for a reporter",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "supernode_account"}},
+				},
+				{
 					RpcMethod: "EpochReport",
 					Skip:      true, // custom command to avoid AutoCLI aminojson float64 marshal bug
 				},

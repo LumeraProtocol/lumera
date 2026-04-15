@@ -48,6 +48,7 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					Short:          "Query list-supernodes",
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{},
 				},
+
 				{
 					RpcMethod: "GetTopSuperNodesForBlock",
 					Use:       "get-top-supernodes-for-block [block-height]",
@@ -132,6 +133,12 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 							DefaultValue: types.DefaultP2PPort,
 						},
 					},
+				},
+				{
+					RpcMethod:      "ReportSupernodeMetrics",
+					Use:            "report-supernode-metrics [validator-address]",
+					Short:          "Report structured metrics for a supernode",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validator_address"}},
 				},
 				// this line is used by ignite scaffolding # autocli/tx
 			},

@@ -43,5 +43,5 @@ func TestAuditSubmitReport_ProberRequiresAllPeerObservations(t *testing.T) {
 
 	host := auditHostReportJSON([]string{"PORT_STATE_OPEN"})
 	txResp := submitEpochReport(t, cli, n0.nodeName, epochID, host, nil)
-	RequireTxFailure(t, txResp, "expected storage challenge observations")
+	RequireTxFailure(t, txResp, "expected peer target observations")
 }

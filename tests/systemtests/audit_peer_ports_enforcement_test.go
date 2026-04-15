@@ -47,6 +47,9 @@ func TestAuditPeerPortsUnanimousClosedPostponesAfterConsecutiveWindows(t *testin
 	epochID2 := epochID1 + 1
 	epoch2Start := epoch1Start + int64(epochLengthBlocks)
 	enforce2 := epoch2Start + int64(epochLengthBlocks)
+	epochID3 := epochID2 + 1
+	epoch3Start := epoch2Start + int64(epochLengthBlocks)
+	enforce3 := epoch3Start + int64(epochLengthBlocks)
 
 	hostOpen := auditHostReportJSON([]string{"PORT_STATE_OPEN"})
 
@@ -72,7 +75,7 @@ func TestAuditPeerPortsUnanimousClosedPostponesAfterConsecutiveWindows(t *testin
 	tx1e1 := submitEpochReport(t, cli, n1.nodeName, epochID1, hostOpen, buildObs(assigned1e1.TargetSupernodeAccounts, ""))
 	RequireTxSuccess(t, tx1e1)
 
-	// Window 2: repeat -> node1 should be POSTPONED at window end due to consecutive unanimous CLOSED.
+	// Window 2: repeat CLOSED observation, still below the 3-epoch postponement threshold.
 	awaitAtLeastHeightWithSlackPeerPorts(t, epoch2Start)
 	assigned0e2 := auditQueryAssignedTargets(t, epochID2, true, n0.accAddr)
 	assigned1e2 := auditQueryAssignedTargets(t, epochID2, true, n1.accAddr)
@@ -83,6 +86,20 @@ func TestAuditPeerPortsUnanimousClosedPostponesAfterConsecutiveWindows(t *testin
 	RequireTxSuccess(t, tx1e2)
 
 	awaitAtLeastHeightWithSlackPeerPorts(t, enforce2)
+	require.Equal(t, "SUPERNODE_STATE_ACTIVE", querySupernodeLatestState(t, cli, n0.valAddr))
+	require.Equal(t, "SUPERNODE_STATE_ACTIVE", querySupernodeLatestState(t, cli, n1.valAddr))
+
+	// Window 3: third consecutive unanimous CLOSED should postpone node1.
+	awaitAtLeastHeightWithSlackPeerPorts(t, epoch3Start)
+	assigned0e3 := auditQueryAssignedTargets(t, epochID3, true, n0.accAddr)
+	assigned1e3 := auditQueryAssignedTargets(t, epochID3, true, n1.accAddr)
+
+	tx0e3 := submitEpochReport(t, cli, n0.nodeName, epochID3, hostOpen, buildObs(assigned0e3.TargetSupernodeAccounts, n1.accAddr))
+	RequireTxSuccess(t, tx0e3)
+	tx1e3 := submitEpochReport(t, cli, n1.nodeName, epochID3, hostOpen, buildObs(assigned1e3.TargetSupernodeAccounts, ""))
+	RequireTxSuccess(t, tx1e3)
+
+	awaitAtLeastHeightWithSlackPeerPorts(t, enforce3)
 
 	require.Equal(t, "SUPERNODE_STATE_ACTIVE", querySupernodeLatestState(t, cli, n0.valAddr))
 	require.Equal(t, "SUPERNODE_STATE_POSTPONED", querySupernodeLatestState(t, cli, n1.valAddr))

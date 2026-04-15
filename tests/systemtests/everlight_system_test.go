@@ -15,14 +15,13 @@ import (
 	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
-func everlightHostReportJSON(diskUsagePercent float64, cascadeBytes float64) string {
+func everlightHostReportJSON(diskUsagePercent float64) string {
 	bz, _ := json.Marshal(map[string]any{
-		"cpu_usage_percent":         10.0,
-		"mem_usage_percent":         10.0,
-		"disk_usage_percent":        diskUsagePercent,
-		"failed_actions_count":      0,
-		"inbound_port_states":       []string{},
-		"cascade_kademlia_db_bytes": cascadeBytes,
+		"cpu_usage_percent":    10.0,
+		"mem_usage_percent":    10.0,
+		"disk_usage_percent":   diskUsagePercent,
+		"failed_actions_count": 0,
+		"inbound_port_states":  []string{},
 	})
 	return string(bz)
 }
@@ -58,7 +57,7 @@ func TestEverlightSystem_AuditDrivesStorageFullState(t *testing.T) {
 	awaitAtLeastHeight(t, epoch1Start)
 
 	// Report high disk usage through audit epoch report -> STORAGE_FULL transition.
-	hostHighDisk := everlightHostReportJSON(95.0, 2_000_000)
+	hostHighDisk := everlightHostReportJSON(95.0)
 	tx := submitEpochReport(t, cli, n0.nodeName, epochID1, hostHighDisk, nil)
 	t.Logf("submit tx: %s", tx)
 	RequireTxSuccess(t, tx)
@@ -82,7 +81,7 @@ func TestEverlightSystem_AuditDrivesStorageFullState(t *testing.T) {
 	epochID3 := epochID2 + 1
 	epoch3Start := epoch2Start + int64(epochLengthBlocks)
 	awaitAtLeastHeight(t, epoch3Start)
-	hostRecovered := everlightHostReportJSON(40.0, 2_000_000)
+	hostRecovered := everlightHostReportJSON(40.0)
 	RequireTxSuccess(t, submitEpochReport(t, cli, n0.nodeName, epochID3, hostRecovered, nil))
 	sut.AwaitNextBlock(t)
 	require.Equal(t, "SUPERNODE_STATE_ACTIVE", querySupernodeLatestState(t, cli, n0.valAddr))
@@ -154,7 +153,7 @@ func TestEverlightSystem_PayoutAndHistoryWhileStorageFull(t *testing.T) {
 	epochID1 := uint64(gjson.Get(currentEpoch, "epoch_id").Uint())
 	require.Greater(t, epochID1, uint64(0))
 
-	hostReport := `{"cpu_usage_percent":10,"disk_usage_percent":95,"failed_actions_count":0,"inbound_port_states":[],"mem_usage_percent":10,"cascade_kademlia_db_bytes":2000000}`
+	hostReport := `{"cpu_usage_percent":10,"disk_usage_percent":95,"failed_actions_count":0,"inbound_port_states":[],"mem_usage_percent":10}`
 	submitted := false
 	for try := 0; try < 3; try++ {
 		tx := submitEpochReport(t, cli, n0.nodeName, epochID1+uint64(try), hostReport, nil)
@@ -169,7 +168,8 @@ func TestEverlightSystem_PayoutAndHistoryWhileStorageFull(t *testing.T) {
 	sut.AwaitNextBlock(t)
 	require.Equal(t, "SUPERNODE_STATE_STORAGE_FULL", querySupernodeLatestState(t, cli, n0.valAddr))
 	report := auditQueryReport(t, epochID1, n0.accAddr)
-	require.Greater(t, report.HostReport.CascadeKademliaDbBytes, 1.0)
+	require.Greater(t, report.HostReport.DiskUsagePercent, 90.0)
+
 	eligBefore := cli.CustomQuery("q", "supernode", "sn-eligibility", n0.valAddr)
 	t.Logf("eligibility after report: %s", eligBefore)
 
@@ -187,11 +187,12 @@ func TestEverlightSystem_PayoutAndHistoryWhileStorageFull(t *testing.T) {
 	eligAtPay := cli.CustomQuery("q", "supernode", "sn-eligibility", n0.valAddr)
 	t.Logf("eligibility at payout: %s", eligAtPay)
 	after := gjson.Get(cli.CustomQuery("q", "bank", "balance", n0.accAddr, "ulume"), "balance.amount").Int()
-	require.Greater(t, after, before, "expected payout to storage_full supernode")
+	require.LessOrEqual(t, after, before, "expected no payout while below cascade bytes threshold")
 
 	history := cli.CustomQuery("q", "supernode", "payout-history", n0.valAddr)
-	require.GreaterOrEqual(t, len(gjson.Get(history, "entries").Array()), 1)
+	t.Logf("payout history: %s", history)
 
 	elig := cli.CustomQuery("q", "supernode", "sn-eligibility", n0.valAddr)
-	require.True(t, gjson.Get(elig, "eligible").Bool())
+	require.False(t, gjson.Get(elig, "eligible").Bool())
+	require.Equal(t, "cascade bytes below minimum threshold", gjson.Get(elig, "reason").String())
 }

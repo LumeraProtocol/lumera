@@ -31,9 +31,9 @@ func TestAuditCLIQueriesE2E(t *testing.T) {
 	RequireTxSuccess(t, submitEpochReport(t, cli, n0.nodeName, ws0.EpochId, host, nil))
 	RequireTxSuccess(t, submitEpochReport(t, cli, n1.nodeName, ws0.EpochId, host, nil))
 
-	awaitAtLeastHeight(t, ws0.EpochStartHeight+int64(epochLengthBlocks))
+	awaitAtLeastHeightWithSlackPeerPorts(t, ws0.EpochStartHeight+int64(epochLengthBlocks))
 
-	assignedRaw := cli.CustomQuery("q", "audit", "assigned-targets", "--supernode-account", n0.accAddr, "--epoch-id", strconv.FormatUint(ws0.EpochId+1, 10), "--filter-by-epoch-id")
+	assignedRaw := cli.CustomQuery("q", "audit", "assigned-targets", n0.accAddr, "--epoch-id", strconv.FormatUint(ws0.EpochId+1, 10), "--filter-by-epoch-id")
 	assignedEpochID := gjsonUint64(gjson.Get(assignedRaw, "epoch_id"))
 	require.Equal(t, ws0.EpochId+1, assignedEpochID, "assigned-targets should honor the requested epoch")
 	require.NotEmpty(t, gjson.Get(assignedRaw, "target_supernode_accounts").Array(), "assigned-targets should return target accounts")
@@ -43,7 +43,7 @@ func TestAuditCLIQueriesE2E(t *testing.T) {
 	require.Equal(t, ws0.EpochId+1, currentAnchorEpochID, "current-epoch-anchor should return the current epoch anchor")
 	require.NotEmpty(t, gjson.Get(currentAnchorRaw, "anchor.seed").String(), "current-epoch-anchor should expose the epoch seed")
 
-	epochAnchorRaw := cli.CustomQuery("q", "audit", "epoch-anchor", "--epoch-id", strconv.FormatUint(currentAnchorEpochID, 10))
+	epochAnchorRaw := cli.CustomQuery("q", "audit", "epoch-anchor", strconv.FormatUint(currentAnchorEpochID, 10))
 	require.Equal(t, currentAnchorEpochID, gjsonUint64(gjson.Get(epochAnchorRaw, "anchor.epoch_id")))
 	require.Equal(t, gjson.Get(currentAnchorRaw, "anchor.seed").String(), gjson.Get(epochAnchorRaw, "anchor.seed").String())
 }

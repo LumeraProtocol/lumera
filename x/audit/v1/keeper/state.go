@@ -50,7 +50,7 @@ func (k Keeper) SetReport(ctx sdk.Context, r types.EpochReport) error {
 	isStorageFull := r.HostReport.DiskUsagePercent > maxStorage
 
 	switch latest {
-	case supernodetypes.SuperNodeStateDisabled, supernodetypes.SuperNodeStateStopped, supernodetypes.SuperNodeStatePenalized:
+	case supernodetypes.SuperNodeStateDisabled, supernodetypes.SuperNodeStateStopped, supernodetypes.SuperNodeStatePenalized, supernodetypes.SuperNodeStatePostponed:
 		return nil
 	}
 

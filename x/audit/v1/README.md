@@ -44,8 +44,8 @@ Epoch boundaries are computed deterministically from params:
 At `epoch_start_height`, `BeginBlocker` creates an `EpochAnchor` if it does not already exist. The anchor stores:
 
 - `seed`: 32-byte deterministic seed derived at epoch start
-- `active_supernode_accounts`: sorted ACTIVE supernode accounts at epoch start
-- `target_supernode_accounts`: sorted (ACTIVE + POSTPONED) supernode accounts at epoch start
+- `active_supernode_accounts`: sorted (ACTIVE + STORAGE_FULL) supernode accounts at epoch start
+- `target_supernode_accounts`: sorted (ACTIVE + STORAGE_FULL + POSTPONED) supernode accounts at epoch start
 - commitment fields (`params_commitment`, `active_set_commitment`, `targets_set_commitment`)
 
 Note: commitment fields are stored on-chain but are not currently validated/used by the module logic.
@@ -68,7 +68,7 @@ Report submission rules:
 
 Peer observation requirements are enforced at `MsgSubmitEpochReport` time:
 
-- If the reporter is **ACTIVE at epoch start** (i.e. is present in `EpochAnchor.active_supernode_accounts`), the chain deterministically computes the reporter’s assigned targets and requires exactly one observation per target (no extras, no duplicates).
+- If the reporter is **ACTIVE or STORAGE_FULL at epoch start** (i.e. is present in `EpochAnchor.active_supernode_accounts`), the chain deterministically computes the reporter’s assigned targets and requires exactly one observation per target (no extras, no duplicates).
 - If the reporter is **not** ACTIVE at epoch start, `storage_challenge_observations` must be empty.
 
 Assignments are derived from:

@@ -53,7 +53,7 @@ func TestEnforceEpochEnd_EmptyActiveSet_PostponedCannotRecover(t *testing.T) {
 
 	// Mock: no ACTIVE supernodes, two POSTPONED.
 	f.supernodeKeeper.EXPECT().
-		GetAllSuperNodes(gomock.AssignableToTypeOf(f.ctx), sntypes.SuperNodeStateActive).
+		GetAllSuperNodes(gomock.AssignableToTypeOf(f.ctx), sntypes.SuperNodeStateActive, sntypes.SuperNodeStateStorageFull).
 		Return([]sntypes.SuperNode{}, nil).
 		Times(1)
 	f.supernodeKeeper.EXPECT().
@@ -117,7 +117,7 @@ func TestEnforceEpochEnd_LegacyRecoveredSN_SurvivesWithReport(t *testing.T) {
 	// Simulate: both were recovered to ACTIVE mid-epoch via legacy metrics.
 	// At epoch end, the audit enforcement sees them as ACTIVE.
 	f.supernodeKeeper.EXPECT().
-		GetAllSuperNodes(gomock.AssignableToTypeOf(f.ctx), sntypes.SuperNodeStateActive).
+		GetAllSuperNodes(gomock.AssignableToTypeOf(f.ctx), sntypes.SuperNodeStateActive, sntypes.SuperNodeStateStorageFull).
 		Return([]sntypes.SuperNode{sn0, sn1}, nil).
 		Times(1)
 	f.supernodeKeeper.EXPECT().

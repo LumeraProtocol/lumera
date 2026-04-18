@@ -4,9 +4,12 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+	"sort"
 	"testing"
 
+	kmultisig "github.com/cosmos/cosmos-sdk/crypto/keys/multisig"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	evmcryptotypes "github.com/cosmos/evm/crypto/ethsecp256k1"
 	"github.com/stretchr/testify/require"
@@ -448,4 +451,118 @@ func TestVerifyNewSignature_ChainIDMismatch(t *testing.T) {
 	err = keeper.VerifyNewSignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, sig)
 	require.Error(t, err)
 	require.ErrorContains(t, err, testChainID, "error must include the expected chain ID to help diagnose mismatches")
+}
+
+// makeMultisigAccount creates N secp256k1 sub-keys and the resulting
+// LegacyAminoPubKey for a K-of-N multisig.
+func makeMultisigAccount(t *testing.T, threshold, n int) (*kmultisig.LegacyAminoPubKey, []*secp256k1.PrivKey, sdk.AccAddress) {
+	t.Helper()
+	privKeys := make([]*secp256k1.PrivKey, n)
+	pubKeys := make([]cryptotypes.PubKey, n)
+	for i := 0; i < n; i++ {
+		privKeys[i] = secp256k1.GenPrivKey()
+		pubKeys[i] = privKeys[i].PubKey()
+	}
+	multiPK := kmultisig.NewLegacyAminoPubKey(threshold, pubKeys)
+	addr := sdk.AccAddress(multiPK.Address())
+	return multiPK, privKeys, addr
+}
+
+// buildMultisigProof builds a valid MultisigProof signed by the K sub-keys at
+// signerIdxs. format selects CLI (SHA256) or ADR-036 envelope.
+func buildMultisigProof(t *testing.T, kind string, multiPK *kmultisig.LegacyAminoPubKey, privKeys []*secp256k1.PrivKey, signerIdxs []int, legacyAddr, newAddr sdk.AccAddress, format types.SigFormat) *types.LegacyProof {
+	t.Helper()
+	payload := fmt.Sprintf("lumera-evm-migration:%s:%d:%s:%s:%s",
+		testChainID, lcfg.EVMChainID, kind, legacyAddr.String(), newAddr.String())
+
+	sort.Ints(signerIdxs)
+	subPubKeys := make([][]byte, len(multiPK.GetPubKeys()))
+	for i, pk := range multiPK.GetPubKeys() {
+		subPubKeys[i] = pk.Bytes()
+	}
+
+	indices := make([]uint32, len(signerIdxs))
+	sigs := make([][]byte, len(signerIdxs))
+	for i, idx := range signerIdxs {
+		indices[i] = uint32(idx)
+		if format == types.SigFormat_SIG_FORMAT_ADR036 {
+			signerAddr := sdk.AccAddress(privKeys[idx].PubKey().Address()).String()
+			doc := []byte(fmt.Sprintf(`{"account_number":"0","chain_id":"","fee":{"amount":[],"gas":"0"},"memo":"","msgs":[{"type":"sign/MsgSignData","value":{"data":"%s","signer":"%s"}}],"sequence":"0"}`,
+				base64.StdEncoding.EncodeToString([]byte(payload)), signerAddr))
+			sig, err := privKeys[idx].Sign(doc)
+			require.NoError(t, err)
+			sigs[i] = sig
+			continue
+		}
+		hash := sha256.Sum256([]byte(payload))
+		sig, err := privKeys[idx].Sign(hash[:])
+		require.NoError(t, err)
+		sigs[i] = sig
+	}
+	return &types.LegacyProof{Proof: &types.LegacyProof_Multisig{Multisig: &types.MultisigProof{
+		Threshold:     uint32(multiPK.Threshold),
+		SubPubKeys:    subPubKeys,
+		SignerIndices: indices,
+		SubSignatures: sigs,
+		SigFormat:     format,
+	}}}
+}
+
+func TestVerifyLegacyProof_Multisig_Valid_CLI(t *testing.T) {
+	multiPK, privs, legacyAddr := makeMultisigAccount(t, 2, 3)
+	_, newAddr := testNewMigrationAccount(t)
+	proof := buildMultisigProof(t, keeperClaimKind, multiPK, privs, []int{0, 2}, legacyAddr, newAddr, types.SigFormat_SIG_FORMAT_CLI)
+	require.NoError(t, proof.ValidateBasic())
+	require.NoError(t, keeper.VerifyLegacyProof(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, proof))
+}
+
+func TestVerifyLegacyProof_Multisig_Valid_ADR036(t *testing.T) {
+	multiPK, privs, legacyAddr := makeMultisigAccount(t, 2, 3)
+	_, newAddr := testNewMigrationAccount(t)
+	proof := buildMultisigProof(t, keeperClaimKind, multiPK, privs, []int{1, 2}, legacyAddr, newAddr, types.SigFormat_SIG_FORMAT_ADR036)
+	require.NoError(t, proof.ValidateBasic())
+	require.NoError(t, keeper.VerifyLegacyProof(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, proof))
+}
+
+func TestVerifyLegacyProof_Multisig_1of1(t *testing.T) {
+	multiPK, privs, legacyAddr := makeMultisigAccount(t, 1, 1)
+	_, newAddr := testNewMigrationAccount(t)
+	proof := buildMultisigProof(t, keeperClaimKind, multiPK, privs, []int{0}, legacyAddr, newAddr, types.SigFormat_SIG_FORMAT_CLI)
+	require.NoError(t, keeper.VerifyLegacyProof(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, proof))
+}
+
+func TestVerifyLegacyProof_Multisig_WrongAddress(t *testing.T) {
+	multiPK, privs, legacyAddr := makeMultisigAccount(t, 2, 3)
+	_, newAddr := testNewMigrationAccount(t)
+	proof := buildMultisigProof(t, keeperClaimKind, multiPK, privs, []int{0, 1}, legacyAddr, newAddr, types.SigFormat_SIG_FORMAT_CLI)
+
+	bogusAddr := sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address())
+	err := keeper.VerifyLegacyProof(testChainID, lcfg.EVMChainID, keeperClaimKind, bogusAddr, newAddr, proof)
+	require.ErrorContains(t, err, "multisig pubkey derives to")
+}
+
+func TestVerifyLegacyProof_Multisig_InvalidSubSig(t *testing.T) {
+	multiPK, privs, legacyAddr := makeMultisigAccount(t, 2, 3)
+	_, newAddr := testNewMigrationAccount(t)
+	proof := buildMultisigProof(t, keeperClaimKind, multiPK, privs, []int{0, 1}, legacyAddr, newAddr, types.SigFormat_SIG_FORMAT_CLI)
+	// Corrupt the second sub-signature.
+	proof.GetMultisig().SubSignatures[1][0] ^= 0xFF
+	err := keeper.VerifyLegacyProof(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, proof)
+	require.ErrorContains(t, err, "sub-sig 1")
+}
+
+func TestVerifyLegacyProof_Multisig_MaxBoundary(t *testing.T) {
+	multiPK, privs, legacyAddr := makeMultisigAccount(t, 20, 20)
+	_, newAddr := testNewMigrationAccount(t)
+	signerIdxs := make([]int, 20)
+	for i := range signerIdxs {
+		signerIdxs[i] = i
+	}
+	proof := buildMultisigProof(t, keeperClaimKind, multiPK, privs, signerIdxs, legacyAddr, newAddr, types.SigFormat_SIG_FORMAT_CLI)
+	require.NoError(t, proof.ValidateBasic())
+	require.NoError(t, proof.ValidateParams(20))
+	require.NoError(t, keeper.VerifyLegacyProof(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, proof))
+
+	// Same proof should fail the param cap when MaxMultisigSubKeys=19.
+	require.ErrorContains(t, proof.ValidateParams(19), "exceeds max 19")
 }

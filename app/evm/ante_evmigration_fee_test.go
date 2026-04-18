@@ -100,10 +100,13 @@ func validMigrationMsg(t *testing.T) *evmigrationtypes.MsgClaimLegacyAccount {
 	require.False(t, legacy.Equals(newAddr))
 
 	return &evmigrationtypes.MsgClaimLegacyAccount{
-		LegacyAddress:   legacy.String(),
-		NewAddress:      newAddr.String(),
-		LegacyPubKey:    make([]byte, 33),
-		LegacySignature: []byte{1},
-		NewSignature:    []byte{1},
+		LegacyAddress: legacy.String(),
+		NewAddress:    newAddr.String(),
+		LegacyProof: evmigrationtypes.LegacyProof{Proof: &evmigrationtypes.LegacyProof_Single{Single: &evmigrationtypes.SingleKeyProof{
+			PubKey:    make([]byte, 33),
+			Signature: []byte{1},
+			SigFormat: evmigrationtypes.SigFormat_SIG_FORMAT_CLI,
+		}}},
+		NewSignature: []byte{1},
 	}
 }

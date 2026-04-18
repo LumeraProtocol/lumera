@@ -78,7 +78,11 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 	}
 
 	// Verify both embedded proofs before touching state.
-	if err := VerifyLegacySignature(ctx.ChainID(), lcfg.EVMChainID, migrationPayloadKindValidator, legacyAddr, newAddr, msg.LegacyPubKey, msg.LegacySignature); err != nil {
+	// Enforce governance-adjustable multisig cap before crypto work.
+	if err := msg.LegacyProof.ValidateParams(params.MaxMultisigSubKeys); err != nil {
+		return nil, err
+	}
+	if err := VerifyLegacyProof(ctx.ChainID(), lcfg.EVMChainID, migrationPayloadKindValidator, legacyAddr, newAddr, &msg.LegacyProof); err != nil {
 		return nil, err
 	}
 	if err := VerifyNewSignature(ctx.ChainID(), lcfg.EVMChainID, migrationPayloadKindValidator, legacyAddr, newAddr, msg.NewSignature); err != nil {

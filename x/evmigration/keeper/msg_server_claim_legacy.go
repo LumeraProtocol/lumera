@@ -40,7 +40,15 @@ func (ms msgServer) ClaimLegacyAccount(goCtx context.Context, msg *types.MsgClai
 	}
 
 	// Verify both embedded proofs before touching state.
-	if err := VerifyLegacySignature(ctx.ChainID(), lcfg.EVMChainID, migrationPayloadKindClaim, legacyAddr, newAddr, msg.LegacyPubKey, msg.LegacySignature); err != nil {
+	// Enforce governance-adjustable multisig cap before crypto work.
+	params, err := ms.Params.Get(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := msg.LegacyProof.ValidateParams(params.MaxMultisigSubKeys); err != nil {
+		return nil, err
+	}
+	if err := VerifyLegacyProof(ctx.ChainID(), lcfg.EVMChainID, migrationPayloadKindClaim, legacyAddr, newAddr, &msg.LegacyProof); err != nil {
 		return nil, err
 	}
 	if err := VerifyNewSignature(ctx.ChainID(), lcfg.EVMChainID, migrationPayloadKindClaim, legacyAddr, newAddr, msg.NewSignature); err != nil {

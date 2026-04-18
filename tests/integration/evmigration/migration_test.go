@@ -106,22 +106,28 @@ func createNewEVMAddress(t *testing.T) (*evmcryptotypes.PrivKey, sdk.AccAddress)
 func newClaimMsg(t *testing.T, legacyPrivKey *secp256k1.PrivKey, legacyAddr sdk.AccAddress, newPrivKey *evmcryptotypes.PrivKey, newAddr sdk.AccAddress) *types.MsgClaimLegacyAccount {
 	t.Helper()
 	return &types.MsgClaimLegacyAccount{
-		LegacyAddress:   legacyAddr.String(),
-		NewAddress:      newAddr.String(),
-		LegacyPubKey:    legacyPrivKey.PubKey().(*secp256k1.PubKey).Key,
-		LegacySignature: signMigration(t, legacyPrivKey, legacyAddr, newAddr),
-		NewSignature:    signNewMigration(t, "claim", newPrivKey, legacyAddr, newAddr),
+		LegacyAddress: legacyAddr.String(),
+		NewAddress:    newAddr.String(),
+		LegacyProof: types.LegacyProof{Proof: &types.LegacyProof_Single{Single: &types.SingleKeyProof{
+			PubKey:    legacyPrivKey.PubKey().(*secp256k1.PubKey).Key,
+			Signature: signMigration(t, legacyPrivKey, legacyAddr, newAddr),
+			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
+		}}},
+		NewSignature: signNewMigration(t, "claim", newPrivKey, legacyAddr, newAddr),
 	}
 }
 
 func newValidatorMsg(t *testing.T, legacyPrivKey *secp256k1.PrivKey, legacyAddr sdk.AccAddress, newPrivKey *evmcryptotypes.PrivKey, newAddr sdk.AccAddress) *types.MsgMigrateValidator {
 	t.Helper()
 	return &types.MsgMigrateValidator{
-		LegacyAddress:   legacyAddr.String(),
-		NewAddress:      newAddr.String(),
-		LegacyPubKey:    legacyPrivKey.PubKey().(*secp256k1.PubKey).Key,
-		LegacySignature: signValidatorMigration(t, legacyPrivKey, legacyAddr, newAddr),
-		NewSignature:    signNewMigration(t, "validator", newPrivKey, legacyAddr, newAddr),
+		LegacyAddress: legacyAddr.String(),
+		NewAddress:    newAddr.String(),
+		LegacyProof: types.LegacyProof{Proof: &types.LegacyProof_Single{Single: &types.SingleKeyProof{
+			PubKey:    legacyPrivKey.PubKey().(*secp256k1.PubKey).Key,
+			Signature: signValidatorMigration(t, legacyPrivKey, legacyAddr, newAddr),
+			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
+		}}},
+		NewSignature: signNewMigration(t, "validator", newPrivKey, legacyAddr, newAddr),
 	}
 }
 
@@ -306,7 +312,7 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_InvalidSignature() {
 	badSig := signMigration(s.T(), otherPrivKey, legacyAddr, newAddr)
 
 	msg := newClaimMsg(s.T(), privKey, legacyAddr, newPrivKey, newAddr)
-	msg.LegacySignature = badSig
+	msg.LegacyProof.Proof.(*types.LegacyProof_Single).Single.Signature = badSig
 
 	_, err := s.msgServer.ClaimLegacyAccount(s.ctx, msg)
 	s.Require().ErrorIs(err, types.ErrInvalidLegacySignature)

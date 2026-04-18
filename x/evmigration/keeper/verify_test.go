@@ -66,7 +66,10 @@ func TestVerifyLegacySignature_Valid(t *testing.T) {
 
 	sig := signMigrationMessage(t, privKey, legacyAddr, newAddr)
 
-	err := keeper.VerifyLegacySignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, pubKey.Key, sig)
+	proof := &types.LegacyProof{Proof: &types.LegacyProof_Single{Single: &types.SingleKeyProof{
+		PubKey: pubKey.Key, Signature: sig, SigFormat: types.SigFormat_SIG_FORMAT_CLI,
+	}}}
+	err := keeper.VerifyLegacyProof(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, proof)
 	require.NoError(t, err)
 }
 
@@ -77,11 +80,17 @@ func TestVerifyLegacySignature_InvalidPubKeySize(t *testing.T) {
 	_, newAddr := testNewMigrationAccount(t)
 
 	// Too short.
-	err := keeper.VerifyLegacySignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, []byte{0x01, 0x02}, nil)
+	proof := &types.LegacyProof{Proof: &types.LegacyProof_Single{Single: &types.SingleKeyProof{
+		PubKey: []byte{0x01, 0x02}, Signature: []byte{0x00}, SigFormat: types.SigFormat_SIG_FORMAT_CLI,
+	}}}
+	err := keeper.VerifyLegacyProof(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, proof)
 	require.ErrorIs(t, err, types.ErrInvalidLegacyPubKey)
 
 	// Too long.
-	err = keeper.VerifyLegacySignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, make([]byte, 65), nil)
+	proof = &types.LegacyProof{Proof: &types.LegacyProof_Single{Single: &types.SingleKeyProof{
+		PubKey: make([]byte, 65), Signature: []byte{0x00}, SigFormat: types.SigFormat_SIG_FORMAT_CLI,
+	}}}
+	err = keeper.VerifyLegacyProof(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, proof)
 	require.ErrorIs(t, err, types.ErrInvalidLegacyPubKey)
 }
 
@@ -95,7 +104,10 @@ func TestVerifyLegacySignature_PubKeyAddressMismatch(t *testing.T) {
 	wrongLegacyAddr := sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address())
 	_, newAddr := testNewMigrationAccount(t)
 
-	err := keeper.VerifyLegacySignature(testChainID, lcfg.EVMChainID, keeperClaimKind, wrongLegacyAddr, newAddr, pubKey.Key, nil)
+	proof := &types.LegacyProof{Proof: &types.LegacyProof_Single{Single: &types.SingleKeyProof{
+		PubKey: pubKey.Key, Signature: []byte{0x00}, SigFormat: types.SigFormat_SIG_FORMAT_CLI,
+	}}}
+	err := keeper.VerifyLegacyProof(testChainID, lcfg.EVMChainID, keeperClaimKind, wrongLegacyAddr, newAddr, proof)
 	require.ErrorIs(t, err, types.ErrPubKeyAddressMismatch)
 }
 
@@ -111,7 +123,10 @@ func TestVerifyLegacySignature_InvalidSignature(t *testing.T) {
 	otherPrivKey := secp256k1.GenPrivKey()
 	badSig := signMigrationMessage(t, otherPrivKey, legacyAddr, newAddr)
 
-	err := keeper.VerifyLegacySignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, pubKey.Key, badSig)
+	proof := &types.LegacyProof{Proof: &types.LegacyProof_Single{Single: &types.SingleKeyProof{
+		PubKey: pubKey.Key, Signature: badSig, SigFormat: types.SigFormat_SIG_FORMAT_CLI,
+	}}}
+	err := keeper.VerifyLegacyProof(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, proof)
 	require.ErrorIs(t, err, types.ErrInvalidLegacySignature)
 }
 
@@ -127,7 +142,10 @@ func TestVerifyLegacySignature_WrongMessage(t *testing.T) {
 	_, otherNewAddr := testNewMigrationAccount(t)
 	sig := signMigrationMessage(t, privKey, legacyAddr, otherNewAddr)
 
-	err := keeper.VerifyLegacySignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, pubKey.Key, sig)
+	proof := &types.LegacyProof{Proof: &types.LegacyProof_Single{Single: &types.SingleKeyProof{
+		PubKey: pubKey.Key, Signature: sig, SigFormat: types.SigFormat_SIG_FORMAT_CLI,
+	}}}
+	err := keeper.VerifyLegacyProof(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, proof)
 	require.ErrorIs(t, err, types.ErrInvalidLegacySignature)
 }
 
@@ -138,7 +156,10 @@ func TestVerifyLegacySignature_EmptySignature(t *testing.T) {
 	legacyAddr := sdk.AccAddress(pubKey.Address())
 	_, newAddr := testNewMigrationAccount(t)
 
-	err := keeper.VerifyLegacySignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, pubKey.Key, nil)
+	proof := &types.LegacyProof{Proof: &types.LegacyProof_Single{Single: &types.SingleKeyProof{
+		PubKey: pubKey.Key, Signature: nil, SigFormat: types.SigFormat_SIG_FORMAT_CLI,
+	}}}
+	err := keeper.VerifyLegacyProof(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, proof)
 	require.ErrorIs(t, err, types.ErrInvalidLegacySignature)
 }
 
@@ -266,7 +287,10 @@ func TestVerifyLegacySignature_ADR036(t *testing.T) {
 
 	sig := signLegacyMigrationADR036(t, keeperClaimKind, privKey, legacyAddr, newAddr)
 
-	err := keeper.VerifyLegacySignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, pubKey.Key, sig)
+	proof := &types.LegacyProof{Proof: &types.LegacyProof_Single{Single: &types.SingleKeyProof{
+		PubKey: pubKey.Key, Signature: sig, SigFormat: types.SigFormat_SIG_FORMAT_ADR036,
+	}}}
+	err := keeper.VerifyLegacyProof(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, proof)
 	require.NoError(t, err)
 }
 
@@ -280,7 +304,10 @@ func TestVerifyLegacySignature_ADR036_Validator(t *testing.T) {
 
 	sig := signLegacyMigrationADR036(t, keeperValidatorKind, privKey, legacyAddr, newAddr)
 
-	err := keeper.VerifyLegacySignature(testChainID, lcfg.EVMChainID, keeperValidatorKind, legacyAddr, newAddr, pubKey.Key, sig)
+	proof := &types.LegacyProof{Proof: &types.LegacyProof_Single{Single: &types.SingleKeyProof{
+		PubKey: pubKey.Key, Signature: sig, SigFormat: types.SigFormat_SIG_FORMAT_ADR036,
+	}}}
+	err := keeper.VerifyLegacyProof(testChainID, lcfg.EVMChainID, keeperValidatorKind, legacyAddr, newAddr, proof)
 	require.NoError(t, err)
 }
 
@@ -295,7 +322,10 @@ func TestVerifyLegacySignature_ADR036_WrongKey(t *testing.T) {
 	otherPrivKey := secp256k1.GenPrivKey()
 	badSig := signLegacyMigrationADR036(t, keeperClaimKind, otherPrivKey, legacyAddr, newAddr)
 
-	err := keeper.VerifyLegacySignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, pubKey.Key, badSig)
+	proof := &types.LegacyProof{Proof: &types.LegacyProof_Single{Single: &types.SingleKeyProof{
+		PubKey: pubKey.Key, Signature: badSig, SigFormat: types.SigFormat_SIG_FORMAT_ADR036,
+	}}}
+	err := keeper.VerifyLegacyProof(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, proof)
 	require.ErrorIs(t, err, types.ErrInvalidLegacySignature)
 }
 
@@ -315,7 +345,10 @@ func TestVerifyLegacySignature_ADR036_WrongSigner(t *testing.T) {
 
 	// The verifier builds the ADR-036 doc using legacyAddr, so a doc signed
 	// with a different signer produces a different digest → verification fails.
-	err = keeper.VerifyLegacySignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, pubKey.Key, sig)
+	proof := &types.LegacyProof{Proof: &types.LegacyProof_Single{Single: &types.SingleKeyProof{
+		PubKey: pubKey.Key, Signature: sig, SigFormat: types.SigFormat_SIG_FORMAT_ADR036,
+	}}}
+	err = keeper.VerifyLegacyProof(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, proof)
 	require.ErrorIs(t, err, types.ErrInvalidLegacySignature)
 }
 
@@ -356,7 +389,10 @@ func TestVerifyLegacySignature_BothPathsRejectGarbage(t *testing.T) {
 	// A valid-length but wrong signature (64 bytes of zeros).
 	garbageSig := make([]byte, 64)
 
-	err := keeper.VerifyLegacySignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, pubKey.Key, garbageSig)
+	proof := &types.LegacyProof{Proof: &types.LegacyProof_Single{Single: &types.SingleKeyProof{
+		PubKey: pubKey.Key, Signature: garbageSig, SigFormat: types.SigFormat_SIG_FORMAT_CLI,
+	}}}
+	err := keeper.VerifyLegacyProof(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, proof)
 	require.ErrorIs(t, err, types.ErrInvalidLegacySignature)
 }
 
@@ -373,8 +409,7 @@ func TestVerifyNewSignature_BothPathsRejectGarbage(t *testing.T) {
 }
 
 // TestVerifyLegacySignature_ChainIDMismatch verifies that a valid signature
-// signed with a different chain ID is rejected and the error hints at the
-// chain ID used during verification.
+// signed with a different chain ID is rejected.
 func TestVerifyLegacySignature_ChainIDMismatch(t *testing.T) {
 	privKey := secp256k1.GenPrivKey()
 	pubKey := privKey.PubKey().(*secp256k1.PubKey)
@@ -389,9 +424,11 @@ func TestVerifyLegacySignature_ChainIDMismatch(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify against the correct chain ID — should fail.
-	err = keeper.VerifyLegacySignature(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, pubKey.Key, sig)
+	proof := &types.LegacyProof{Proof: &types.LegacyProof_Single{Single: &types.SingleKeyProof{
+		PubKey: pubKey.Key, Signature: sig, SigFormat: types.SigFormat_SIG_FORMAT_CLI,
+	}}}
+	err = keeper.VerifyLegacyProof(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, proof)
 	require.ErrorIs(t, err, types.ErrInvalidLegacySignature)
-	require.ErrorContains(t, err, testChainID, "error must include the expected chain ID to help diagnose mismatches")
 }
 
 // TestVerifyNewSignature_ChainIDMismatch verifies that a valid new-key

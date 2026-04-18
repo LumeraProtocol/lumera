@@ -8,7 +8,6 @@ import (
 	"github.com/LumeraProtocol/lumera/x/evmigration/types"
 )
 
-
 func TestSingleKeyProof_ValidateBasic(t *testing.T) {
 	validPK := make([]byte, 33)
 	validSig := make([]byte, 64)

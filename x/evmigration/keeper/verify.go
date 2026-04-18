@@ -5,8 +5,8 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	kmultisig "github.com/cosmos/cosmos-sdk/crypto/keys/multisig"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
@@ -128,48 +128,30 @@ func verifyMultisigProof(payload []byte, legacyAddr sdk.AccAddress, m *types.Mul
 	return nil
 }
 
-// VerifyLegacySignature verifies the legacy-account proof embedded in a
-// migration message. Legacy keys use Cosmos secp256k1 signing over SHA-256.
+// VerifyLegacyProof verifies a migration proof against the canonical payload.
+// Replaces the previous VerifyLegacySignature; the new shape accommodates
+// both single-key and multisig legacy accounts via the LegacyProof oneof.
 //
-// Two signature formats are accepted:
-//   - Try 1 (CLI/keyring): Sign(SHA256(payload)) — the SDK's secp256k1.Sign
-//     internally does SHA256, so the actual signature is over SHA256(SHA256(payload)).
-//     VerifySignature also internally hashes, so we pass SHA256(payload).
-//   - Try 2 (Keplr/Leap signArbitrary): Sign(adr036_doc) — Keplr wraps the
-//     payload in ADR-036 canonical JSON before signing. We reconstruct the same
-//     doc and pass it to VerifySignature (which internally hashes it).
-func VerifyLegacySignature(chainID string, evmChainID uint64, kind string, legacyAddr, newAddr sdk.AccAddress, legacyPubKeyBytes, legacySignature []byte) error {
-	// Step 1: decode the compressed secp256k1 public key.
-	if len(legacyPubKeyBytes) != secp256k1.PubKeySize {
-		return types.ErrInvalidLegacyPubKey.Wrapf("expected %d bytes, got %d", secp256k1.PubKeySize, len(legacyPubKeyBytes))
+// Param-dependent limits (MaxMultisigSubKeys) must be enforced by the caller
+// via proof.ValidateParams(params.MaxMultisigSubKeys) before invoking this
+// function, since VerifyLegacyProof does not have access to keeper state.
+func VerifyLegacyProof(
+	chainID string, evmChainID uint64, kind string,
+	legacyAddr, newAddr sdk.AccAddress,
+	proof *types.LegacyProof,
+) error {
+	if proof == nil {
+		return types.ErrInvalidLegacyProof.Wrap("legacy_proof required")
 	}
-	pubKey := &secp256k1.PubKey{Key: legacyPubKeyBytes}
-
-	// Step 2: derive address and verify it matches legacy_address.
-	derivedAddr := sdk.AccAddress(pubKey.Address())
-	if !derivedAddr.Equals(legacyAddr) {
-		return types.ErrPubKeyAddressMismatch.Wrapf(
-			"pubkey derives to %s, expected %s", derivedAddr, legacyAddr,
-		)
-	}
-
 	payload := migrationPayload(chainID, evmChainID, kind, legacyAddr, newAddr)
-
-	// Try 1: raw SHA256(payload) — CLI / keyring signing path.
-	hash := sha256.Sum256(payload)
-	if pubKey.VerifySignature(hash[:], legacySignature) {
-		return nil
+	switch p := proof.Proof.(type) {
+	case *types.LegacyProof_Single:
+		return verifySingleKeyProof(payload, legacyAddr, p.Single)
+	case *types.LegacyProof_Multisig:
+		return verifyMultisigProof(payload, legacyAddr, p.Multisig)
+	default:
+		return types.ErrInvalidLegacyProof.Wrap("no proof set")
 	}
-
-	// Try 2: ADR-036 signArbitrary — Keplr/Leap wallet signing.
-	adr036Doc := adr036SignDoc(legacyAddr.String(), payload)
-	if pubKey.VerifySignature(adr036Doc, legacySignature) {
-		return nil
-	}
-
-	return types.ErrInvalidLegacySignature.Wrapf(
-		"payload was signed for chain-id %q; verify the --chain-id flag matches the target chain", chainID,
-	)
 }
 
 func normalizeRecoverySignatures(signature []byte) ([][]byte, error) {

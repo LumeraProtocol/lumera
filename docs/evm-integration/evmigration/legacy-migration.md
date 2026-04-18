@@ -92,3 +92,76 @@ x/evmigration/
 | 7     | Testing                         | In Progress |
 
 ---
+
+## Multisig account migration
+
+Legacy accounts backed by a flat K-of-N multisig pubkey (Cosmos `multisig.LegacyAminoPubKey` with all sub-keys `secp256k1`) can migrate to a single `eth_secp256k1` EOA using the same messages as regular accounts.
+
+### What is supported
+
+Flat K-of-N multisig legacy accounts where every sub-key is `secp256k1`. The verifier is `verifyMultisigProof` in `x/evmigration/keeper/verify.go`. The coordinator collects exactly K signatures from K of the N co-signers and submits a single `MsgClaimLegacyAccount` or `MsgMigrateValidator` with a `MultisigProof` in the `legacy_proof` field.
+
+### What is NOT supported
+
+- Nested multisig (multisig of multisigs)
+- Sub-keys of types other than `secp256k1` (e.g. `ed25519`)
+- Multisig on the destination side — the new address must be a plain `eth_secp256k1` EOA
+- Native wallet (Keplr/Leap) multisig signing UX — the four-step CLI flow is required
+
+### Wire format
+
+Both `MsgClaimLegacyAccount` and `MsgMigrateValidator` carry `legacy_proof` as a protobuf oneof (defined in `proto/lumera/evmigration/proof.proto`):
+
+```protobuf
+oneof legacy_proof {
+  SingleKeyProof single   = 1;
+  MultisigProof  multisig = 2;
+}
+```
+
+`SingleKeyProof` carries `pub_key`, `signature`, and `sig_format`. `MultisigProof` carries:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `threshold` | `uint32` | K — number of signatures required |
+| `sub_pub_keys` | `[]bytes` | All N compressed secp256k1 sub-keys (33 bytes each), in declaration order |
+| `signer_indices` | `[]uint32` | 0-based indices (into `sub_pub_keys`) of the K signers — must be strictly ascending |
+| `sub_signatures` | `[]bytes` | Signatures from the K signers, parallel to `signer_indices` |
+| `sig_format` | `SigFormat` | `SIG_FORMAT_CLI` or `SIG_FORMAT_ADR036` — applies to all sub-signatures |
+
+### Invariants enforced at verification time
+
+- `len(signer_indices) == threshold` — exactly K signatures, no more, no less
+- `signer_indices` is strictly ascending — no duplicate signers
+- Each entry in `sub_pub_keys` is exactly 33 bytes (compressed secp256k1)
+- `sig_format` must be non-zero (`SIG_FORMAT_UNSPECIFIED` is rejected)
+- `len(sub_pub_keys) <= params.MaxMultisigSubKeys` (default 20) — enforced by `ValidateParams`
+
+### Preconditions
+
+The legacy multisig pubkey must be non-nil on-chain. A multisig account that was funded but has never signed a transaction has a nil pubkey stored in `x/auth`. The verifier cannot reconstruct the multisig structure from a nil pubkey.
+
+**Remediation:** have one authorized co-signer submit any valid transaction from the multisig account (e.g., a 1-ulume self-send via `lumerad tx bank send`). That transaction causes the chain to store the full multisig pubkey on-chain. Confirm with:
+
+```bash
+lumerad query auth account <multisig-legacy-address>
+```
+
+The response should show a `multisig` key with all sub-keys listed.
+
+### Four-step CLI flow
+
+Migration of a multisig account uses four offline commands. See [user-guide.md](./user-guide.md#migrating-a-multisig-account) for the full walkthrough with example arguments.
+
+1. **Coordinator** generates the proof payload template with `generate-proof-payload`.
+2. **Each co-signer** signs independently on their own machine with `sign-proof`.
+3. **Coordinator** merges the threshold-many partial signatures with `combine-proof`.
+4. **Coordinator** broadcasts the assembled transaction with `submit-proof`.
+
+### MigrationEstimate preflight
+
+The `MigrationEstimate` query (`lumerad query evmigration migration-estimate <address>`) pre-flight check detects unsupported multisig shapes:
+
+- If `is_multisig = true` and the sub-key types are all `secp256k1` and `num_signers <= MaxMultisigSubKeys`, the estimate returns `would_succeed: true`.
+- If any sub-key is not `secp256k1`, or if `num_signers > MaxMultisigSubKeys`, the estimate returns `would_succeed: false` with a descriptive `rejection_reason`.
+- `is_multisig`, `threshold`, and `num_signers` are included in the response so the portal and CLI can branch on proof shape before prompting users.

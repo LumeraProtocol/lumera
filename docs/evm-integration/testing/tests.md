@@ -51,7 +51,8 @@ All three previously identified critical test gaps (mempool capacity pressure, b
 | **Unit**        | OpenRPC / generator                  | 15    | High — [details](tests/unit-openrpc.md) |
 | **Unit**        | JSON-RPC rate limiting               | 25    | High — right-to-left XFF parsing, trusted-hop skipping, CIDR parsing |
 | **Unit**        | ERC20 policy                         | 14    | High — 3 modes, base denom + exact ibc/ allowlist CRUD |
-| **Unit**        | EVMigration keeper                   | 116   | Excellent — [details](tests/unit-evmigration.md) |
+| **Unit**        | EVMigration keeper                   | 116+  | Excellent — [details](tests/unit-evmigration.md) |
+| **Unit**        | EVMigration types (proof)            | 6     | High — `TestMultisigProof_ValidateBasic`, `TestMultisigProof_ValidateParams_SizeCap`, `TestLegacyProof_ValidateBasic_Dispatch`, `TestSingleKeyProof_ValidateBasic` and variants |
 | **Unit**        | EVMigration CLI                      | 26    | High — [details](tests/unit-evmigration-cli.md) |
 | **Unit**        | Cross-runtime bridge (plugin helpers + crossruntime) | 46 | High — [details](tests/integration-precompiles.md#cosmwasm---evm-plugin-unit-tests) |
 |                 |                                      |       |                  |
@@ -64,7 +65,7 @@ All three previously identified critical test gaps (mempool capacity pressure, b
 | **Integration** | Precisebank                          | 6     | High — [details](tests/integration-precisebank.md) |
 | **Integration** | Precompiles (standard + custom + wasm) | 42   | High — [details](tests/integration-precompiles.md) |
 | **Integration** | VM queries / state                   | 12    | High — [details](tests/integration-vm.md) |
-| **Integration** | EVMigration                          | 14    | High — [details](tests/integration-evmigration.md) |
+| **Integration** | EVMigration                          | 14+   | High — [details](tests/integration-evmigration.md) |
 |                 |                                      |       |                  |
 | **Devnet**      | EVM / fee market / cross-peer / IBC  | 12+   | High — [details](tests/devnet.md) |
 | **Devnet**      | EVMigration tool                     | 7 modes | High — [details](tests/devnet.md#evm-migration-devnet-tests) |
@@ -114,7 +115,8 @@ Each area has its own detailed file with per-test descriptions:
 | Fee market (EIP-1559) | [unit-feemarket.md](tests/unit-feemarket.md) | 9 |
 | Precisebank (6↔18 bridge) | [unit-precisebank.md](tests/unit-precisebank.md) | 39 |
 | OpenRPC & generator | [unit-openrpc.md](tests/unit-openrpc.md) | 15 |
-| EVMigration keeper | [unit-evmigration.md](tests/unit-evmigration.md) | 116 |
+| EVMigration keeper | [unit-evmigration.md](tests/unit-evmigration.md) | 116+ |
+| EVMigration types (proof) | `x/evmigration/types/proof_test.go` | 6 |
 | EVMigration CLI | [unit-evmigration-cli.md](tests/unit-evmigration-cli.md) | 26 |
 
 ### Integration Tests
@@ -130,13 +132,62 @@ Each area has its own detailed file with per-test descriptions:
 | Precisebank | [integration-precisebank.md](tests/integration-precisebank.md) | 6 |
 | Precompiles (standard + custom + wasm + crossruntime) | [integration-precompiles.md](tests/integration-precompiles.md) | 42 |
 | VM queries / state | [integration-vm.md](tests/integration-vm.md) | 12 |
-| EVMigration | [integration-evmigration.md](tests/integration-evmigration.md) | 14 |
+| EVMigration | [integration-evmigration.md](tests/integration-evmigration.md) | 14+ |
 
 ### Devnet Tests
 
 | Area | File | Tests |
 | ---- | ---- | ----- |
 | EVM, fee market, cross-peer, IBC, migration | [devnet.md](tests/devnet.md) | 12+ |
+| EVMigration multisig CLI flow | `devnet/tests/evmigration/multisig.go` | 1 mode |
+
+### Multisig support tests (added with multisig feature)
+
+The tables below list the individual tests added for multisig proof support. They supplement the counts in the rows above.
+
+#### Unit — verifier (`x/evmigration/keeper/verify_test.go`)
+
+| Test | Description |
+| ---- | ----------- |
+| `TestVerifyLegacyProof_Multisig_ValidCLI` | 2-of-3 multisig with CLI sig format passes verifier. |
+| `TestVerifyLegacyProof_Multisig_ValidADR036` | 2-of-3 multisig with ADR-036 sig format passes verifier. |
+| `TestVerifyLegacyProof_Multisig_1of1` | 1-of-1 multisig (degenerate edge case) passes verifier. |
+| `TestVerifyLegacyProof_Multisig_WrongAddress` | Proof whose recovered address does not match `legacy_address` is rejected. |
+| `TestVerifyLegacyProof_Multisig_InvalidSubSig` | One corrupted sub-signature causes rejection. |
+| `TestVerifyLegacyProof_Multisig_N20Boundary` | N=20 (at `MaxMultisigSubKeys`) passes; N=21 is rejected by `ValidateParams`. |
+
+#### Unit — type validation (`x/evmigration/types/proof_test.go`)
+
+| Test | Description |
+| ---- | ----------- |
+| `TestSingleKeyProof_ValidateBasic` | Valid and invalid `SingleKeyProof` shapes (nil pub_key, nil sig, unspecified format). |
+| `TestMultisigProof_ValidateBasic` | Valid and invalid `MultisigProof` shapes (zero threshold, mismatched indices/sigs length, non-ascending indices, wrong sub-key size, unspecified format). |
+| `TestMultisigProof_ValidateParams_SizeCap` | `ValidateParams` rejects when `len(sub_pub_keys) > MaxMultisigSubKeys`. |
+| `TestLegacyProof_ValidateBasic_Dispatch` | `LegacyProof.ValidateBasic` dispatches to the correct sub-validator and rejects a nil oneof. |
+
+#### Unit — query server (`x/evmigration/keeper/query_test.go`)
+
+| Test | Description |
+| ---- | ----------- |
+| `TestLegacyAccounts_Multisig` | `LegacyAccounts` response includes `is_multisig=true`, correct `threshold` and `num_signers` for a multisig account. |
+| `TestMigrationEstimate_Multisig_Supported` | Estimate returns `would_succeed=true` for a valid K-of-N secp256k1 multisig. |
+| `TestMigrationEstimate_Multisig_TooManySubKeys` | Estimate returns `would_succeed=false` when `num_signers > MaxMultisigSubKeys`. |
+| `TestMigrationEstimate_Multisig_NonSecp256k1` | Estimate returns `would_succeed=false` when any sub-key is not secp256k1. |
+
+#### Integration (`tests/integration/evmigration/migration_test.go`)
+
+| Test | Description |
+| ---- | ----------- |
+| `TestClaimLegacyAccount_Multisig_Success` | End-to-end 2-of-3 multisig migration: balances move, migration record stored. |
+| `TestClaimLegacyAccount_Multisig_ADR036` | ADR-036 sig format path for multisig. |
+| `TestClaimLegacyAccount_Multisig_ReplayRejected` | Second migration attempt on same multisig address is rejected. |
+| `TestClaimLegacyAccount_Multisig_CorruptedSubSig` | Corrupted sub-signature causes rejection with appropriate error. |
+
+#### Devnet (`devnet/tests/evmigration/multisig.go`)
+
+| Mode | Description |
+| ---- | ----------- |
+| `tests_evmigration -mode=multisig` | Exercises the full four-step offline CLI flow: `generate-proof-payload` → `sign-proof` (per co-signer) → `combine-proof` → `submit-proof`. Verifies the migration record on-chain after broadcast. |
 
 ---
 

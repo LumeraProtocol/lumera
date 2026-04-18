@@ -121,3 +121,34 @@ Files: `x/evmigration/keeper/verify_test.go`, `x/evmigration/keeper/migrate_test
 | `TestUpdateParams_ValidAuthority` | Correct authority updates params successfully. |
 
 **Additional regression coverage**: `TestKeeper_GetSuperNodeByAccount` (in `x/supernode/v1/keeper/`) confirms `GetSuperNodeByAccount` returns the correct supernode for a given account address, exercising the index used by `MigrateSupernode`.
+
+## Multisig support tests
+
+### Multisig verifier tests (`x/evmigration/keeper/verify_test.go`)
+
+| Test | Description |
+| ---- | ----------- |
+| `TestVerifyLegacyProof_Multisig_ValidCLI` | 2-of-3 multisig with CLI sig format passes verifier. |
+| `TestVerifyLegacyProof_Multisig_ValidADR036` | 2-of-3 multisig with ADR-036 sig format passes verifier. |
+| `TestVerifyLegacyProof_Multisig_1of1` | 1-of-1 multisig (degenerate edge case) passes verifier. |
+| `TestVerifyLegacyProof_Multisig_WrongAddress` | Proof whose recovered address does not match `legacy_address` is rejected. |
+| `TestVerifyLegacyProof_Multisig_InvalidSubSig` | One corrupted sub-signature causes rejection. |
+| `TestVerifyLegacyProof_Multisig_N20Boundary` | N=20 (at `MaxMultisigSubKeys`) passes; N=21 is rejected by `ValidateParams`. |
+
+### Multisig query tests (`x/evmigration/keeper/query_test.go`)
+
+| Test | Description |
+| ---- | ----------- |
+| `TestLegacyAccounts_Multisig` | `LegacyAccounts` response includes `is_multisig=true`, correct `threshold` and `num_signers`. |
+| `TestMigrationEstimate_Multisig_Supported` | Estimate returns `would_succeed=true` for a valid K-of-N secp256k1 multisig. |
+| `TestMigrationEstimate_Multisig_TooManySubKeys` | Estimate returns `would_succeed=false` when `num_signers > MaxMultisigSubKeys`. |
+| `TestMigrationEstimate_Multisig_NonSecp256k1` | Estimate returns `would_succeed=false` when any sub-key is not secp256k1. |
+
+### Type validation tests (`x/evmigration/types/proof_test.go`)
+
+| Test | Description |
+| ---- | ----------- |
+| `TestSingleKeyProof_ValidateBasic` | Valid and invalid `SingleKeyProof` shapes (nil pub_key, nil sig, unspecified format). |
+| `TestMultisigProof_ValidateBasic` | Valid and invalid `MultisigProof` shapes (zero threshold, mismatched indices/sigs length, non-ascending indices, wrong sub-key size, unspecified format). |
+| `TestMultisigProof_ValidateParams_SizeCap` | `ValidateParams` rejects when `len(sub_pub_keys) > MaxMultisigSubKeys`. |
+| `TestLegacyProof_ValidateBasic_Dispatch` | `LegacyProof.ValidateBasic` dispatches to the correct sub-validator and rejects a nil oneof. |

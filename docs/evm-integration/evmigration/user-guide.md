@@ -774,3 +774,84 @@ Check the `migration_end_time` parameter. If it's `0`, there is no deadline (onl
 **Q: My validator has too many delegators and migration is rejected. What do I do?**
 
 The `max_validator_delegations` parameter (default 2000) limits how many records can be re-keyed in one transaction. If your validator exceeds this, governance may increase the limit, or delegators can redelegate before validator migration.
+
+---
+
+## Migrating a multisig account
+
+Multisig legacy accounts (flat K-of-N secp256k1) use an offline, coordinator-driven flow with four commands. The portal wizard does not support multisig — use the CLI.
+
+See [legacy-migration.md](./legacy-migration.md#multisig-account-migration) for the architecture and wire-format reference.
+
+### Precondition: ensure the pubkey is on-chain
+
+If the multisig account has never signed a transaction, its pubkey is nil on-chain and migration will fail. Submit any transaction from the multisig account first, for example a 1-ulume self-send. Then confirm the key is stored:
+
+```bash
+lumerad query auth account <multisig-legacy-address>
+```
+
+The response must show a `multisig` key listing all sub-keys.
+
+### Step 1: Coordinator generates the proof payload template
+
+The coordinator (any co-signer who will drive the flow) creates a JSON template that describes the migration and contains the unsigned payload:
+
+```bash
+lumerad tx evmigration generate-proof-payload \
+  --legacy <multisig-bech32> \
+  --new <new-eth-bech32> \
+  --kind claim \
+  --chain-id lumera-devnet-1 \
+  --out proof.json
+```
+
+`--kind` is `claim` for `MsgClaimLegacyAccount` and `validator` for `MsgMigrateValidator`. The output `proof.json` contains the canonical payload string, the multisig pub-key structure, and empty signature slots for each co-signer.
+
+Distribute `proof.json` to all co-signers who will provide signatures.
+
+### Step 2: Each co-signer signs on their own machine
+
+Each participating co-signer imports their individual sub-key and runs:
+
+```bash
+lumerad tx evmigration sign-proof proof.json \
+  --from <my-sub-key> --keyring-backend test \
+  --out my-partial.json
+```
+
+`sign-proof` is idempotent — re-running it overwrites the partial output file with a fresh signature. Each co-signer produces their own `<name>-partial.json` file. Send all partial files back to the coordinator.
+
+### Step 3: Coordinator merges the threshold-many partials
+
+The coordinator collects at least K partial files (where K is the multisig threshold) and merges them:
+
+```bash
+lumerad tx evmigration combine-proof \
+  alice-partial.json bob-partial.json \
+  --out tx.json --chain-id lumera-devnet-1
+```
+
+`combine-proof` validates cross-file consistency before merging: it checks that all partials share the same `chain_id`, `legacy_address`, `new_address`, multisig threshold, and `sub_pub_keys` list. It rejects mismatched files before writing `tx.json`.
+
+### Step 4: Broadcast the assembled transaction
+
+The coordinator broadcasts using the new EVM key as the transaction signer:
+
+```bash
+lumerad tx evmigration submit-proof tx.json \
+  --from <new-eth-key> \
+  --chain-id lumera-devnet-1 --keyring-backend test -y
+```
+
+On success, verify the migration record:
+
+```bash
+lumerad query evmigration migration-record <multisig-legacy-address>
+```
+
+### Notes
+
+- **Cold-wallet / nil-pubkey single-sig accounts**: if a single-key legacy account has never signed a transaction (nil pubkey on-chain), use the `--legacy-key` flag with `sign-proof` to supply the key directly from the keyring. The standard `claim-legacy-account` command does not handle nil pubkeys.
+- `combine-proof` requires exactly threshold-many partials — passing fewer raises an error; passing more is accepted and the first K valid partials are used.
+- After a successful migration, follow the same post-migration steps as for any other account (add the new Lumera EVM chain definition to Keplr, verify balances at the new address, etc.).

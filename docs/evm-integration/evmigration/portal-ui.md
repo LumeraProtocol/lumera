@@ -29,19 +29,61 @@ lumera-evm-migration:lumera-mainnet-1:76857769:validator:lumera1legacy...:lumera
 
 ### 1.2 Message Shape
 
-Current fields:
+Both `MsgClaimLegacyAccount` and `MsgMigrateValidator` carry a `legacy_proof` oneof field in place of the former flat `legacy_pub_key` / `legacy_signature` fields:
 
-- `new_address`
-- `legacy_address`
-- `legacy_pub_key`
-- `legacy_signature`
-- `new_signature`
+| Field | Proto # | Description |
+|-------|---------|-------------|
+| `new_address` | 1 | Destination address (`eth_secp256k1`, coin-type 60) |
+| `legacy_address` | 2 | Source address (`secp256k1`, coin-type 118) |
+| `legacy_proof` | 3 | Oneof: `single` (SingleKeyProof) or `multisig` (MultisigProof) |
+| `new_signature` | 4 | EVM signature over the migration payload (unchanged) |
 
-Proto field numbers: `new_address=1`, `legacy_address=2`, `legacy_pub_key=3`, `legacy_signature=4`, `new_signature=5`.
+#### SingleKeyProof (field `legacy_proof.single`)
+
+```json
+{
+  "legacy_proof": {
+    "single": {
+      "pub_key": "<base64 of 33-byte compressed secp256k1>",
+      "signature": "<base64 of signature>",
+      "sig_format": "SIG_FORMAT_CLI"
+    }
+  }
+}
+```
+
+`sig_format` values: `SIG_FORMAT_CLI` (sign over `SHA256(payload)` via keyring) or `SIG_FORMAT_ADR036` (Keplr/Leap `signArbitrary` ADR-036 canonical JSON).
+
+#### MultisigProof (field `legacy_proof.multisig`)
+
+```json
+{
+  "legacy_proof": {
+    "multisig": {
+      "threshold": 2,
+      "sub_pub_keys": ["<base64>", "<base64>", "<base64>"],
+      "signer_indices": [0, 2],
+      "sub_signatures": ["<base64>", "<base64>"],
+      "sig_format": "SIG_FORMAT_CLI"
+    }
+  }
+}
+```
+
+`sub_pub_keys` lists all N sub-keys in declaration order (33 bytes each, compressed secp256k1). `signer_indices` identifies which K of the N sub-keys signed (0-based, strictly ascending). `sub_signatures` are parallel to `signer_indices`. `sig_format` applies to all sub-signatures.
+
+#### MultisigProof invariants enforced by the verifier
+
+- `len(signer_indices) == threshold` — exactly K signatures
+- `signer_indices` is strictly ascending — no duplicate signers
+- Each entry in `sub_pub_keys` is exactly 33 bytes
+- `sig_format` must not be `SIG_FORMAT_UNSPECIFIED`
+- `len(sub_pub_keys) <= params.MaxMultisigSubKeys` (default 20)
 
 Relevant files:
 
 - [tx.proto](/home/akobrin/p/lumera/proto/lumera/evmigration/tx.proto)
+- [proof.proto](/home/akobrin/p/lumera/proto/lumera/evmigration/proof.proto)
 - [verify.go](/home/akobrin/p/lumera/x/evmigration/keeper/verify.go)
 
 ### 1.3 Verification Rules
@@ -692,12 +734,33 @@ Suggested message:
 
 ## 10. Implementation Checklist
 
+### Client implementation notes: multisig detection
+
+Both `LegacyAccountInfo` (returned by the `LegacyAccounts` query) and `QueryMigrationEstimateResponse` (returned by `MigrationEstimate`) now include three multisig fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `is_multisig` | `bool` | `true` when the on-chain pubkey is a flat Cosmos multisig |
+| `threshold` | `uint32` | K (signatures required); 0 when `!is_multisig` |
+| `num_signers` | `uint32` | N (total sub-keys); 0 when `!is_multisig` |
+
+Frontends should branch on `is_multisig` to select the correct proof-building UX:
+
+- `is_multisig = false` → standard single-key flow (single Keplr `signArbitrary` call)
+- `is_multisig = true` → offline four-step multisig flow (not supported by the portal wizard; direct users to the CLI)
+
+If `is_multisig = true` and `num_signers > MaxMultisigSubKeys` or any sub-key is non-secp256k1, `would_succeed` is `false` and `rejection_reason` describes the unsupported shape.
+
+---
+
 Current chain-side implementation:
 
 - legacy verifier accepts raw CLI and ADR-036 wallet signatures
 - new verifier recovers signer from signature and accepts raw or EIP-191 wallet signatures
 - reverse migration lookup by `new_address` added
 - migration stats semantics tightened (includes nil-pubkey accounts, excludes module accounts and migration destinations)
+- `legacy_proof` oneof replaces flat `legacy_pub_key` / `legacy_signature` fields; both `SingleKeyProof` and `MultisigProof` shapes supported
+- `is_multisig`, `threshold`, `num_signers` added to `LegacyAccountInfo` and `QueryMigrationEstimateResponse`
 
 Current portal-side implementation:
 

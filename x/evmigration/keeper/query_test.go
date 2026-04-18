@@ -6,6 +6,9 @@ import (
 	"cosmossdk.io/math"
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+	kmultisig "github.com/cosmos/cosmos-sdk/crypto/keys/multisig"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/query"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
@@ -13,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
 
 	"github.com/LumeraProtocol/lumera/x/evmigration/keeper"
 	"github.com/LumeraProtocol/lumera/x/evmigration/types"
@@ -248,6 +251,8 @@ func TestQueryMigrationEstimate_NonValidator(t *testing.T) {
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), sdk.ValAddress(addr)).Return(
 		sntypes.SuperNode{}, false,
 	)
+	// No account stored → multisig preflight skipped.
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), addr).Return(nil)
 
 	resp, err := qs.MigrationEstimate(f.ctx, &types.QueryMigrationEstimateRequest{
 		LegacyAddress: addr.String(),
@@ -291,6 +296,8 @@ func TestQueryMigrationEstimate_AlreadyMigrated(t *testing.T) {
 	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), sdk.ValAddress(addr)).Return(
 		sntypes.SuperNode{}, false,
 	)
+	// No account stored → multisig preflight skipped.
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), addr).Return(nil)
 
 	resp, err := qs.MigrationEstimate(f.ctx, &types.QueryMigrationEstimateRequest{
 		LegacyAddress: addr.String(),
@@ -551,4 +558,159 @@ func TestQueryMigratedAccounts(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Len(t, resp.Records, 2)
+}
+
+// --- Multisig query tests (Tasks 12, 13, 14) ---
+
+// TestLegacyAccounts_Multisig verifies that a multisig account (flat secp256k1
+// sub-keys) appears in the legacy list with correct is_multisig/threshold/num_signers.
+func TestLegacyAccounts_Multisig(t *testing.T) {
+	f := initMockFixture(t)
+	qs := keeper.NewQueryServerImpl(f.keeper)
+
+	pubs := make([]cryptotypes.PubKey, 3)
+	for i := 0; i < 3; i++ {
+		pubs[i] = secp256k1.GenPrivKey().PubKey()
+	}
+	multiPK := kmultisig.NewLegacyAminoPubKey(2, pubs)
+	addr := sdk.AccAddress(multiPK.Address())
+	acc := authtypes.NewBaseAccountWithAddress(addr)
+	require.NoError(t, acc.SetPubKey(multiPK))
+
+	f.accountKeeper.EXPECT().IterateAccounts(gomock.Any(), gomock.Any()).
+		Do(func(_ any, cb func(sdk.AccountI) bool) {
+			cb(acc)
+		})
+
+	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(
+		sdk.NewCoins(sdk.NewInt64Coin("ulume", 1000)),
+	)
+	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), addr, uint16(1)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), sdk.ValAddress(addr)).Return(
+		stakingtypes.Validator{}, stakingtypes.ErrNoValidatorFound,
+	)
+
+	resp, err := qs.LegacyAccounts(f.ctx, &types.QueryLegacyAccountsRequest{
+		Pagination: &query.PageRequest{Limit: 10},
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.Accounts, 1)
+	found := resp.Accounts[0]
+	require.Equal(t, addr.String(), found.Address)
+	require.True(t, found.IsMultisig)
+	require.Equal(t, uint32(2), found.Threshold)
+	require.Equal(t, uint32(3), found.NumSigners)
+}
+
+// TestMigrationEstimate_Multisig_Supported verifies that a supported 2-of-3
+// secp256k1 multisig returns WouldSucceed=true with correct metadata.
+func TestMigrationEstimate_Multisig_Supported(t *testing.T) {
+	f := initMockFixture(t)
+	qs := keeper.NewQueryServerImpl(f.keeper)
+
+	pubs := make([]cryptotypes.PubKey, 3)
+	for i := 0; i < 3; i++ {
+		pubs[i] = secp256k1.GenPrivKey().PubKey()
+	}
+	multiPK := kmultisig.NewLegacyAminoPubKey(2, pubs)
+	addr := sdk.AccAddress(multiPK.Address())
+	acc := authtypes.NewBaseAccountWithAddress(addr)
+	require.NoError(t, acc.SetPubKey(multiPK))
+
+	valAddr := sdk.ValAddress(addr)
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), valAddr).Return(
+		stakingtypes.Validator{}, stakingtypes.ErrNoValidatorFound,
+	)
+	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), addr, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetUnbondingDelegations(gomock.Any(), addr, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), addr, ^uint16(0)).Return(nil, nil)
+	f.authzKeeper.EXPECT().IterateGrants(gomock.Any(), gomock.Any())
+	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
+	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
+	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(sdk.Coins{})
+	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), valAddr).Return(sntypes.SuperNode{}, false)
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), addr).Return(acc)
+
+	resp, err := qs.MigrationEstimate(f.ctx, &types.QueryMigrationEstimateRequest{
+		LegacyAddress: addr.String(),
+	})
+	require.NoError(t, err)
+	require.True(t, resp.IsMultisig)
+	require.Equal(t, uint32(2), resp.Threshold)
+	require.Equal(t, uint32(3), resp.NumSigners)
+	require.True(t, resp.WouldSucceed)
+}
+
+// TestMigrationEstimate_Multisig_TooManySubKeys verifies that a multisig with
+// N=21 sub-keys (> default cap 20) returns WouldSucceed=false.
+func TestMigrationEstimate_Multisig_TooManySubKeys(t *testing.T) {
+	f := initMockFixture(t)
+	qs := keeper.NewQueryServerImpl(f.keeper)
+
+	pubs := make([]cryptotypes.PubKey, 21)
+	for i := 0; i < 21; i++ {
+		pubs[i] = secp256k1.GenPrivKey().PubKey()
+	}
+	multiPK := kmultisig.NewLegacyAminoPubKey(1, pubs)
+	addr := sdk.AccAddress(multiPK.Address())
+	acc := authtypes.NewBaseAccountWithAddress(addr)
+	require.NoError(t, acc.SetPubKey(multiPK))
+
+	valAddr := sdk.ValAddress(addr)
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), valAddr).Return(
+		stakingtypes.Validator{}, stakingtypes.ErrNoValidatorFound,
+	)
+	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), addr, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetUnbondingDelegations(gomock.Any(), addr, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), addr, ^uint16(0)).Return(nil, nil)
+	f.authzKeeper.EXPECT().IterateGrants(gomock.Any(), gomock.Any())
+	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
+	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
+	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(sdk.Coins{})
+	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), valAddr).Return(sntypes.SuperNode{}, false)
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), addr).Return(acc)
+
+	resp, err := qs.MigrationEstimate(f.ctx, &types.QueryMigrationEstimateRequest{
+		LegacyAddress: addr.String(),
+	})
+	require.NoError(t, err)
+	require.True(t, resp.IsMultisig)
+	require.False(t, resp.WouldSucceed)
+	require.Contains(t, resp.RejectionReason, "max is 20")
+}
+
+// TestMigrationEstimate_Multisig_NonSecp256k1SubKey verifies that a multisig
+// containing an ed25519 sub-key returns WouldSucceed=false with "non-secp256k1".
+func TestMigrationEstimate_Multisig_NonSecp256k1SubKey(t *testing.T) {
+	f := initMockFixture(t)
+	qs := keeper.NewQueryServerImpl(f.keeper)
+
+	sec := secp256k1.GenPrivKey().PubKey()
+	ed := ed25519.GenPrivKey().PubKey()
+	multiPK := kmultisig.NewLegacyAminoPubKey(1, []cryptotypes.PubKey{sec, ed})
+	addr := sdk.AccAddress(multiPK.Address())
+	acc := authtypes.NewBaseAccountWithAddress(addr)
+	require.NoError(t, acc.SetPubKey(multiPK))
+
+	valAddr := sdk.ValAddress(addr)
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), valAddr).Return(
+		stakingtypes.Validator{}, stakingtypes.ErrNoValidatorFound,
+	)
+	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), addr, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetUnbondingDelegations(gomock.Any(), addr, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), addr, ^uint16(0)).Return(nil, nil)
+	f.authzKeeper.EXPECT().IterateGrants(gomock.Any(), gomock.Any())
+	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
+	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
+	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(sdk.Coins{})
+	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), valAddr).Return(sntypes.SuperNode{}, false)
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), addr).Return(acc)
+
+	resp, err := qs.MigrationEstimate(f.ctx, &types.QueryMigrationEstimateRequest{
+		LegacyAddress: addr.String(),
+	})
+	require.NoError(t, err)
+	require.True(t, resp.IsMultisig)
+	require.False(t, resp.WouldSucceed)
+	require.Contains(t, resp.RejectionReason, "non-secp256k1")
 }

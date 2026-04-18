@@ -2,13 +2,15 @@ package keeper
 
 import (
 	"context"
-
 	"errors"
+	"fmt"
 
 	"cosmossdk.io/collections"
 	"cosmossdk.io/x/feegrant"
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	kmultisig "github.com/cosmos/cosmos-sdk/crypto/keys/multisig"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/query"
 	"github.com/cosmos/cosmos-sdk/x/authz"
@@ -36,6 +38,26 @@ type legacyAccountStatus struct {
 	isValidator    bool
 }
 
+// isLegacyPubKey reports whether pk is a key type migratable by the
+// evmigration module: either a plain secp256k1.PubKey or a flat multisig
+// whose sub-keys are all secp256k1. Nested multisig and non-secp256k1
+// sub-keys are rejected.
+func isLegacyPubKey(pk cryptotypes.PubKey) bool {
+	switch key := pk.(type) {
+	case *secp256k1.PubKey:
+		return true
+	case *kmultisig.LegacyAminoPubKey:
+		for _, sub := range key.GetPubKeys() {
+			if _, ok := sub.(*secp256k1.PubKey); !ok {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
+}
+
 func (qs queryServer) remainingLegacyAccountStatus(ctx sdk.Context, acc sdk.AccountI) (legacyAccountStatus, bool) {
 	status := legacyAccountStatus{}
 
@@ -45,15 +67,12 @@ func (qs queryServer) remainingLegacyAccountStatus(ctx sdk.Context, acc sdk.Acco
 	}
 
 	pk := acc.GetPubKey()
-	if pk != nil {
-		// Account has a pubkey — only count secp256k1 (legacy key type).
-		// eth_secp256k1, ed25519, etc. are new/non-legacy key types.
-		if _, ok := pk.(*secp256k1.PubKey); !ok {
-			return status, false
-		}
+	if pk != nil && !isLegacyPubKey(pk) {
+		// Non-legacy key type (eth_secp256k1, ed25519, non-secp256k1 multisig, etc.).
+		return status, false
 	}
-	// pk == nil: account was funded but never signed a tx. These are still
-	// legacy accounts that hold funds on pre-EVM addresses and need migration.
+	// pk == nil OR pk is a legacy-compatible key (secp256k1 or flat multisig of secp256k1).
+	// Nil-pubkey accounts are funded-but-never-signed — still legacy-migratable for single-key.
 
 	addr := acc.GetAddress()
 	addrStr := addr.String()
@@ -141,6 +160,9 @@ func (qs queryServer) MigrationEstimate(goCtx context.Context, req *types.QueryM
 
 	resp := &types.QueryMigrationEstimateResponse{}
 
+	// Fetch params once for use in validator and multisig preflight checks.
+	params, _ := qs.k.Params.Get(ctx)
+
 	// Check if validator.
 	valAddr := sdk.ValAddress(addr)
 	val, valErr := qs.k.stakingKeeper.GetValidator(ctx, valAddr)
@@ -165,7 +187,6 @@ func (qs queryServer) MigrationEstimate(goCtx context.Context, req *types.QueryM
 		resp.ValRedelegationCount = redCount
 
 		// Check would_succeed.
-		params, _ := qs.k.Params.Get(ctx)
 		totalRecords := resp.ValDelegationCount + resp.ValUnbondingCount + resp.ValRedelegationCount
 		if totalRecords > params.MaxValidatorDelegations {
 			resp.WouldSucceed = false
@@ -252,6 +273,35 @@ func (qs queryServer) MigrationEstimate(goCtx context.Context, req *types.QueryM
 		resp.RejectionReason = "already migrated"
 	}
 
+	// Multisig feasibility preflight.
+	if acc := qs.k.accountKeeper.GetAccount(ctx, addr); acc != nil {
+		if pk := acc.GetPubKey(); pk != nil {
+			if ms, ok := pk.(*kmultisig.LegacyAminoPubKey); ok {
+				resp.IsMultisig = true
+				resp.Threshold = uint32(ms.Threshold)
+				resp.NumSigners = uint32(len(ms.GetPubKeys()))
+
+				// Reject nested / non-secp256k1 sub-keys.
+				for _, sub := range ms.GetPubKeys() {
+					if _, ok := sub.(*secp256k1.PubKey); !ok {
+						resp.WouldSucceed = false
+						resp.RejectionReason = "multisig contains non-secp256k1 sub-key (unsupported)"
+						break
+					}
+				}
+				// Size cap against MaxMultisigSubKeys.
+				if resp.WouldSucceed && resp.NumSigners > params.MaxMultisigSubKeys {
+					resp.WouldSucceed = false
+					resp.RejectionReason = fmt.Sprintf("multisig has %d sub-keys; max is %d",
+						resp.NumSigners, params.MaxMultisigSubKeys)
+				}
+			}
+		}
+		// Nil pubkey: cannot distinguish single-key vs multisig from the account
+		// alone. Preflight does not flag this case; detection is deferred to
+		// the CLI's generate-proof-payload command (see design spec).
+	}
+
 	return resp, nil
 }
 
@@ -308,6 +358,15 @@ func (qs queryServer) LegacyAccounts(goCtx context.Context, req *types.QueryLega
 		}
 		info.HasDelegations = status.hasDelegations
 		info.IsValidator = status.isValidator
+
+		// Populate multisig metadata when the on-chain pubkey is multisig.
+		if pk := acc.GetPubKey(); pk != nil {
+			if ms, ok := pk.(*kmultisig.LegacyAminoPubKey); ok {
+				info.IsMultisig = true
+				info.Threshold = uint32(ms.Threshold)
+				info.NumSigners = uint32(len(ms.GetPubKeys()))
+			}
+		}
 
 		accounts = append(accounts, info)
 		return false

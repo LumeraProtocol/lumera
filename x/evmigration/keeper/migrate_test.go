@@ -85,7 +85,7 @@ func initMockFixture(t *testing.T) *mockFixture {
 	)
 
 	// Initialize params with migration enabled.
-	params := types.NewParams(true, 0, 50, 2000)
+	params := types.NewParams(true, 0, 50, 2000, 20)
 	require.NoError(t, k.Params.Set(ctx, params))
 	require.NoError(t, k.MigrationCounter.Set(ctx, 0))
 	require.NoError(t, k.ValidatorMigrationCounter.Set(ctx, 0))
@@ -1496,7 +1496,7 @@ func TestUpdateParams_ValidAuthority(t *testing.T) {
 	ms := keeper.NewMsgServerImpl(f.keeper)
 
 	authority := authtypes.NewModuleAddress(types.GovModuleName)
-	newParams := types.NewParams(false, 100, 25, 1000)
+	newParams := types.NewParams(false, 100, 25, 1000, 20)
 	req := &types.MsgUpdateParams{
 		Authority: authority.String(),
 		Params:    newParams,

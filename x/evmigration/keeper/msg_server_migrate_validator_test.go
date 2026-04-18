@@ -75,7 +75,7 @@ func TestMigrateValidator_TooManyDelegators(t *testing.T) {
 	f := initMsgServerFixture(t)
 
 	// Set max to 1 for easy testing.
-	params := types.NewParams(true, 0, 50, 1)
+	params := types.NewParams(true, 0, 50, 1, 20)
 	require.NoError(t, f.keeper.Params.Set(f.ctx, params))
 
 	privKey := secp256k1.GenPrivKey()

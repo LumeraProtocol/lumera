@@ -150,7 +150,7 @@ func (s *MigrationIntegrationSuite) createFundedLegacyAccount(coins sdk.Coins) (
 
 // enableMigration sets evmigration params to allow migrations.
 func (s *MigrationIntegrationSuite) enableMigration() {
-	params := types.NewParams(true, 0, 50, 2000)
+	params := types.NewParams(true, 0, 50, 2000, 20)
 	s.Require().NoError(s.keeper.Params.Set(s.ctx, params))
 }
 
@@ -236,7 +236,7 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_MigratesAndRevokesFee
 
 // TestClaimLegacyAccount_MigrationDisabled verifies rejection when migrations are disabled.
 func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_MigrationDisabled() {
-	params := types.NewParams(false, 0, 50, 2000)
+	params := types.NewParams(false, 0, 50, 2000, 20)
 	s.Require().NoError(s.keeper.Params.Set(s.ctx, params))
 
 	coins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 100))

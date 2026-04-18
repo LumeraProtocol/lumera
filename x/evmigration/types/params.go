@@ -46,6 +46,9 @@ var (
 	DefaultMaxMigrationsPerBlock uint64 = 50
 	// DefaultMaxValidatorDelegations caps delegation records for validator migration.
 	DefaultMaxValidatorDelegations uint64 = 2000
+	// DefaultMaxMultisigSubKeys caps the number of sub-keys a multisig legacy
+	// account may have when migrating. Bounds per-tx verification cost.
+	DefaultMaxMultisigSubKeys uint32 = 20
 )
 
 // NewParams creates a new Params instance.
@@ -54,12 +57,14 @@ func NewParams(
 	migrationEndTime int64,
 	maxMigrationsPerBlock uint64,
 	maxValidatorDelegations uint64,
+	maxMultisigSubKeys uint32,
 ) Params {
 	return Params{
 		EnableMigration:         enableMigration,
 		MigrationEndTime:        migrationEndTime,
 		MaxMigrationsPerBlock:   maxMigrationsPerBlock,
 		MaxValidatorDelegations: maxValidatorDelegations,
+		MaxMultisigSubKeys:      maxMultisigSubKeys,
 	}
 }
 
@@ -70,6 +75,7 @@ func DefaultParams() Params {
 		DefaultMigrationEndTime,
 		DefaultMaxMigrationsPerBlock,
 		DefaultMaxValidatorDelegations,
+		DefaultMaxMultisigSubKeys,
 	)
 }
 
@@ -80,6 +86,9 @@ func (p Params) Validate() error {
 	}
 	if p.MaxValidatorDelegations == 0 {
 		return fmt.Errorf("max_validator_delegations must be positive")
+	}
+	if p.MaxMultisigSubKeys == 0 {
+		return fmt.Errorf("max_multisig_sub_keys must be positive")
 	}
 	return nil
 }

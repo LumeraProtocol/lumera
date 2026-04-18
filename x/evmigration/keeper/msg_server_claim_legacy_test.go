@@ -112,7 +112,7 @@ func initMsgServerFixture(t *testing.T) *msgServerFixture {
 	)
 
 	// Initialize params with migration enabled.
-	params := types.NewParams(true, 0, 50, 2000)
+	params := types.NewParams(true, 0, 50, 2000, 20)
 	require.NoError(t, k.Params.Set(ctx, params))
 	require.NoError(t, k.MigrationCounter.Set(ctx, 0))
 	require.NoError(t, k.ValidatorMigrationCounter.Set(ctx, 0))
@@ -145,7 +145,7 @@ func TestPreChecks_MigrationDisabled(t *testing.T) {
 	f := initMsgServerFixture(t)
 
 	// Disable migration.
-	params := types.NewParams(false, 0, 50, 2000)
+	params := types.NewParams(false, 0, 50, 2000, 20)
 	require.NoError(t, f.keeper.Params.Set(f.ctx, params))
 
 	privKey := secp256k1.GenPrivKey()
@@ -165,7 +165,7 @@ func TestPreChecks_MigrationWindowClosed(t *testing.T) {
 
 	// Set migration end time in the past.
 	pastTime := f.ctx.BlockTime().Add(-1 * time.Hour).Unix()
-	params := types.NewParams(true, pastTime, 50, 2000)
+	params := types.NewParams(true, pastTime, 50, 2000, 20)
 	require.NoError(t, f.keeper.Params.Set(f.ctx, params))
 
 	privKey := secp256k1.GenPrivKey()

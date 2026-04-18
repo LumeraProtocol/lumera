@@ -51,7 +51,7 @@ func TestMsgUpdateParams_ValidateBasic(t *testing.T) {
 			name: "invalid params",
 			msg: types.MsgUpdateParams{
 				Authority: validAddr(),
-				Params:    types.NewParams(true, 0, 0, 100),
+				Params:    types.NewParams(true, 0, 0, 100, 20),
 			},
 		},
 	}
@@ -244,4 +244,13 @@ func TestMsgMigrateValidator_ValidateBasic(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestParams_MaxMultisigSubKeys(t *testing.T) {
+	p := types.DefaultParams()
+	require.Equal(t, uint32(20), p.MaxMultisigSubKeys)
+	require.NoError(t, p.Validate())
+
+	p.MaxMultisigSubKeys = 0
+	require.ErrorContains(t, p.Validate(), "max_multisig_sub_keys must be positive")
 }

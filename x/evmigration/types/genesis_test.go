@@ -21,21 +21,21 @@ func TestGenesisState_Validate(t *testing.T) {
 		{
 			desc: "valid genesis state with custom params",
 			genState: &types.GenesisState{
-				Params: types.NewParams(true, 1000000, 100, 3000),
+				Params: types.NewParams(true, 1000000, 100, 3000, 20),
 			},
 			valid: true,
 		},
 		{
 			desc: "invalid: zero max_migrations_per_block",
 			genState: &types.GenesisState{
-				Params: types.NewParams(true, 1000000, 0, 2000),
+				Params: types.NewParams(true, 1000000, 0, 2000, 20),
 			},
 			valid: false,
 		},
 		{
 			desc: "invalid: zero max_validator_delegations",
 			genState: &types.GenesisState{
-				Params: types.NewParams(true, 1000000, 50, 0),
+				Params: types.NewParams(true, 1000000, 50, 0, 20),
 			},
 			valid: false,
 		},

@@ -38,7 +38,7 @@ func TestMsgUpdateParams(t *testing.T) {
 			name: "invalid params: zero max_migrations_per_block",
 			input: &types.MsgUpdateParams{
 				Authority: authorityStr,
-				Params:    types.NewParams(true, 1000, 0, 2000),
+				Params:    types.NewParams(true, 1000, 0, 2000, 20),
 			},
 			expErr:    true,
 			expErrMsg: "max_migrations_per_block must be positive",

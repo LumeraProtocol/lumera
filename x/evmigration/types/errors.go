@@ -26,4 +26,5 @@ var (
 	ErrNewPubKeyAddressMismatch   = errors.Register(ModuleName, 1117, "new signature does not derive to new address")
 	ErrInvalidNewSignature        = errors.Register(ModuleName, 1118, "new signature verification failed")
 	ErrNewAddressAlreadyUsed      = errors.Register(ModuleName, 1119, "new address was already used as a migration destination")
+	ErrInvalidLegacyProof         = errors.Register(ModuleName, 1120, "invalid legacy proof")
 )

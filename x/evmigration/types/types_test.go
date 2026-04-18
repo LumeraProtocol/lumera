@@ -15,6 +15,17 @@ func validAddr() string {
 	return sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address()).String()
 }
 
+// validSingleProof returns a LegacyProof with a well-formed SingleKeyProof.
+func validSingleProof(pub *secp256k1.PubKey) types.LegacyProof {
+	return types.LegacyProof{
+		Proof: &types.LegacyProof_Single{Single: &types.SingleKeyProof{
+			PubKey:    pub.Key,
+			Signature: []byte("sig"),
+			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
+		}},
+	}
+}
+
 func TestMsgUpdateParams_ValidateBasic(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -69,6 +80,8 @@ func TestMsgClaimLegacyAccount_ValidateBasic(t *testing.T) {
 	legacyAddr := sdk.AccAddress(legacyPub.Address()).String()
 	newAddr := validAddr()
 
+	goodProof := validSingleProof(legacyPub)
+
 	tests := []struct {
 		name    string
 		msg     types.MsgClaimLegacyAccount
@@ -77,54 +90,55 @@ func TestMsgClaimLegacyAccount_ValidateBasic(t *testing.T) {
 		{
 			name: "valid",
 			msg: types.MsgClaimLegacyAccount{
-				NewAddress:      newAddr,
-				LegacyAddress:   legacyAddr,
-				LegacyPubKey:    legacyPub.Key,
-				LegacySignature: []byte("sig"),
-				NewSignature:    []byte("new-sig"),
+				NewAddress:    newAddr,
+				LegacyAddress: legacyAddr,
+				LegacyProof:   goodProof,
+				NewSignature:  []byte("new-sig"),
 			},
 		},
 		{
 			name: "invalid new_address",
 			msg: types.MsgClaimLegacyAccount{
-				NewAddress:      "bad",
-				LegacyAddress:   legacyAddr,
-				LegacyPubKey:    legacyPub.Key,
-				LegacySignature: []byte("sig"),
-				NewSignature:    []byte("new-sig"),
+				NewAddress:    "bad",
+				LegacyAddress: legacyAddr,
+				LegacyProof:   goodProof,
+				NewSignature:  []byte("new-sig"),
 			},
 			wantErr: sdkerrors.ErrInvalidAddress,
 		},
 		{
 			name: "invalid legacy_address",
 			msg: types.MsgClaimLegacyAccount{
-				NewAddress:      newAddr,
-				LegacyAddress:   "bad",
-				LegacyPubKey:    legacyPub.Key,
-				LegacySignature: []byte("sig"),
-				NewSignature:    []byte("new-sig"),
+				NewAddress:    newAddr,
+				LegacyAddress: "bad",
+				LegacyProof:   goodProof,
+				NewSignature:  []byte("new-sig"),
 			},
 			wantErr: sdkerrors.ErrInvalidAddress,
 		},
 		{
 			name: "same address",
 			msg: types.MsgClaimLegacyAccount{
-				NewAddress:      legacyAddr,
-				LegacyAddress:   legacyAddr,
-				LegacyPubKey:    legacyPub.Key,
-				LegacySignature: []byte("sig"),
-				NewSignature:    []byte("new-sig"),
+				NewAddress:    legacyAddr,
+				LegacyAddress: legacyAddr,
+				LegacyProof:   goodProof,
+				NewSignature:  []byte("new-sig"),
 			},
 			wantErr: types.ErrSameAddress,
 		},
 		{
 			name: "invalid pubkey size",
 			msg: types.MsgClaimLegacyAccount{
-				NewAddress:      newAddr,
-				LegacyAddress:   legacyAddr,
-				LegacyPubKey:    []byte{0x01, 0x02},
-				LegacySignature: []byte("sig"),
-				NewSignature:    []byte("new-sig"),
+				NewAddress:    newAddr,
+				LegacyAddress: legacyAddr,
+				LegacyProof: types.LegacyProof{
+					Proof: &types.LegacyProof_Single{Single: &types.SingleKeyProof{
+						PubKey:    []byte{0x01, 0x02},
+						Signature: []byte("sig"),
+						SigFormat: types.SigFormat_SIG_FORMAT_CLI,
+					}},
+				},
+				NewSignature: []byte("new-sig"),
 			},
 			wantErr: types.ErrInvalidLegacyPubKey,
 		},
@@ -133,18 +147,23 @@ func TestMsgClaimLegacyAccount_ValidateBasic(t *testing.T) {
 			msg: types.MsgClaimLegacyAccount{
 				NewAddress:    newAddr,
 				LegacyAddress: legacyAddr,
-				LegacyPubKey:  legacyPub.Key,
-				NewSignature:  []byte("new-sig"),
+				LegacyProof: types.LegacyProof{
+					Proof: &types.LegacyProof_Single{Single: &types.SingleKeyProof{
+						PubKey:    legacyPub.Key,
+						Signature: nil,
+						SigFormat: types.SigFormat_SIG_FORMAT_CLI,
+					}},
+				},
+				NewSignature: []byte("new-sig"),
 			},
 			wantErr: types.ErrInvalidLegacySignature,
 		},
 		{
 			name: "empty new signature",
 			msg: types.MsgClaimLegacyAccount{
-				NewAddress:      newAddr,
-				LegacyAddress:   legacyAddr,
-				LegacyPubKey:    legacyPub.Key,
-				LegacySignature: []byte("sig"),
+				NewAddress:    newAddr,
+				LegacyAddress: legacyAddr,
+				LegacyProof:   goodProof,
 			},
 			wantErr: types.ErrInvalidNewSignature,
 		},
@@ -168,6 +187,8 @@ func TestMsgMigrateValidator_ValidateBasic(t *testing.T) {
 	legacyAddr := sdk.AccAddress(legacyPub.Address()).String()
 	newAddr := validAddr()
 
+	goodProof := validSingleProof(legacyPub)
+
 	tests := []struct {
 		name    string
 		msg     types.MsgMigrateValidator
@@ -176,42 +197,38 @@ func TestMsgMigrateValidator_ValidateBasic(t *testing.T) {
 		{
 			name: "valid",
 			msg: types.MsgMigrateValidator{
-				NewAddress:      newAddr,
-				LegacyAddress:   legacyAddr,
-				LegacyPubKey:    legacyPub.Key,
-				LegacySignature: []byte("sig"),
-				NewSignature:    []byte("new-sig"),
+				NewAddress:    newAddr,
+				LegacyAddress: legacyAddr,
+				LegacyProof:   goodProof,
+				NewSignature:  []byte("new-sig"),
 			},
 		},
 		{
 			name: "invalid new_address",
 			msg: types.MsgMigrateValidator{
-				NewAddress:      "bad",
-				LegacyAddress:   legacyAddr,
-				LegacyPubKey:    legacyPub.Key,
-				LegacySignature: []byte("sig"),
-				NewSignature:    []byte("new-sig"),
+				NewAddress:    "bad",
+				LegacyAddress: legacyAddr,
+				LegacyProof:   goodProof,
+				NewSignature:  []byte("new-sig"),
 			},
 			wantErr: sdkerrors.ErrInvalidAddress,
 		},
 		{
 			name: "same address",
 			msg: types.MsgMigrateValidator{
-				NewAddress:      legacyAddr,
-				LegacyAddress:   legacyAddr,
-				LegacyPubKey:    legacyPub.Key,
-				LegacySignature: []byte("sig"),
-				NewSignature:    []byte("new-sig"),
+				NewAddress:    legacyAddr,
+				LegacyAddress: legacyAddr,
+				LegacyProof:   goodProof,
+				NewSignature:  []byte("new-sig"),
 			},
 			wantErr: types.ErrSameAddress,
 		},
 		{
 			name: "missing new signature",
 			msg: types.MsgMigrateValidator{
-				NewAddress:      newAddr,
-				LegacyAddress:   legacyAddr,
-				LegacyPubKey:    legacyPub.Key,
-				LegacySignature: []byte("sig"),
+				NewAddress:    newAddr,
+				LegacyAddress: legacyAddr,
+				LegacyProof:   goodProof,
 			},
 			wantErr: types.ErrInvalidNewSignature,
 		},

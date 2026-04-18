@@ -30,11 +30,8 @@ func (msg *MsgClaimLegacyAccount) ValidateBasic() error {
 	if msg.NewAddress == msg.LegacyAddress {
 		return ErrSameAddress
 	}
-	if len(msg.LegacyPubKey) != 33 {
-		return ErrInvalidLegacyPubKey.Wrap("compressed secp256k1 public key must be 33 bytes")
-	}
-	if len(msg.LegacySignature) == 0 {
-		return ErrInvalidLegacySignature.Wrap("legacy_signature is required")
+	if err := msg.LegacyProof.ValidateBasic(); err != nil {
+		return err
 	}
 	if len(msg.NewSignature) == 0 {
 		return ErrInvalidNewSignature.Wrap("new_signature is required")
@@ -63,11 +60,8 @@ func (msg *MsgMigrateValidator) ValidateBasic() error {
 	if msg.NewAddress == msg.LegacyAddress {
 		return ErrSameAddress
 	}
-	if len(msg.LegacyPubKey) != 33 {
-		return ErrInvalidLegacyPubKey.Wrap("compressed secp256k1 public key must be 33 bytes")
-	}
-	if len(msg.LegacySignature) == 0 {
-		return ErrInvalidLegacySignature.Wrap("legacy_signature is required")
+	if err := msg.LegacyProof.ValidateBasic(); err != nil {
+		return err
 	}
 	if len(msg.NewSignature) == 0 {
 		return ErrInvalidNewSignature.Wrap("new_signature is required")

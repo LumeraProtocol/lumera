@@ -712,3 +712,102 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_LegacyAccountRemoved(
 	newAcc := s.app.AuthKeeper.GetAccount(s.ctx, newAddr)
 	s.Require().NotNil(newAcc, "new account should exist after migration")
 }
+
+// --- Multisig integration tests ---
+
+// TestClaimLegacyAccount_Multisig_Success migrates a 2-of-3 multisig legacy
+// account to a single eth EOA.
+func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_Multisig_Success() {
+	s.enableMigration()
+
+	coins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 1_000_000))
+	multiPK, privs, legacyAddr := s.createFundedMultisigAccount(2, 3, coins)
+	newPrivKey, newAddr := createNewEVMAddress(s.T())
+
+	proof := SignMultisigProof(s.T(), integrationTestChainID, "claim", multiPK, privs, []int{0, 2}, legacyAddr, newAddr, types.SigFormat_SIG_FORMAT_CLI)
+
+	msg := &types.MsgClaimLegacyAccount{
+		NewAddress:    newAddr.String(),
+		LegacyAddress: legacyAddr.String(),
+		LegacyProof:   *proof,
+		NewSignature:  signNewMigration(s.T(), "claim", newPrivKey, legacyAddr, newAddr),
+	}
+	_, err := s.msgServer.ClaimLegacyAccount(s.ctx, msg)
+	s.Require().NoError(err)
+
+	legacyBal := s.app.BankKeeper.GetAllBalances(s.ctx, legacyAddr)
+	newBal := s.app.BankKeeper.GetAllBalances(s.ctx, newAddr)
+	s.Require().True(legacyBal.IsZero())
+	s.Require().True(newBal.AmountOf("ulume").Equal(sdkmath.NewInt(1_000_000)))
+
+	rec, err := s.keeper.MigrationRecords.Get(s.ctx, legacyAddr.String())
+	s.Require().NoError(err)
+	s.Require().Equal(newAddr.String(), rec.NewAddress)
+}
+
+// TestClaimLegacyAccount_Multisig_ADR036 verifies ADR-036 sub-signature format.
+func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_Multisig_ADR036() {
+	s.enableMigration()
+
+	coins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 500_000))
+	multiPK, privs, legacyAddr := s.createFundedMultisigAccount(2, 3, coins)
+	newPrivKey, newAddr := createNewEVMAddress(s.T())
+
+	proof := SignMultisigProof(s.T(), integrationTestChainID, "claim", multiPK, privs, []int{1, 2}, legacyAddr, newAddr, types.SigFormat_SIG_FORMAT_ADR036)
+
+	msg := &types.MsgClaimLegacyAccount{
+		NewAddress:    newAddr.String(),
+		LegacyAddress: legacyAddr.String(),
+		LegacyProof:   *proof,
+		NewSignature:  signNewMigration(s.T(), "claim", newPrivKey, legacyAddr, newAddr),
+	}
+	_, err := s.msgServer.ClaimLegacyAccount(s.ctx, msg)
+	s.Require().NoError(err)
+}
+
+// TestClaimLegacyAccount_Multisig_Replay verifies the replay guard on a migrated multisig.
+func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_Multisig_Replay() {
+	s.enableMigration()
+
+	coins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 1_000_000))
+	multiPK, privs, legacyAddr := s.createFundedMultisigAccount(2, 3, coins)
+	newPrivKey, newAddr := createNewEVMAddress(s.T())
+
+	proof := SignMultisigProof(s.T(), integrationTestChainID, "claim", multiPK, privs, []int{0, 1}, legacyAddr, newAddr, types.SigFormat_SIG_FORMAT_CLI)
+	msg := &types.MsgClaimLegacyAccount{
+		NewAddress:    newAddr.String(),
+		LegacyAddress: legacyAddr.String(),
+		LegacyProof:   *proof,
+		NewSignature:  signNewMigration(s.T(), "claim", newPrivKey, legacyAddr, newAddr),
+	}
+	_, err := s.msgServer.ClaimLegacyAccount(s.ctx, msg)
+	s.Require().NoError(err)
+
+	// Replay must fail.
+	_, err = s.msgServer.ClaimLegacyAccount(s.ctx, msg)
+	s.Require().Error(err)
+	s.Require().ErrorContains(err, "has already been migrated")
+}
+
+// TestClaimLegacyAccount_Multisig_CorruptedSubSig verifies sub-sig tampering is rejected.
+func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_Multisig_CorruptedSubSig() {
+	s.enableMigration()
+
+	coins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 1_000_000))
+	multiPK, privs, legacyAddr := s.createFundedMultisigAccount(2, 3, coins)
+	newPrivKey, newAddr := createNewEVMAddress(s.T())
+
+	proof := SignMultisigProof(s.T(), integrationTestChainID, "claim", multiPK, privs, []int{0, 2}, legacyAddr, newAddr, types.SigFormat_SIG_FORMAT_CLI)
+	// Corrupt the first sub-signature.
+	proof.GetMultisig().SubSignatures[0][0] ^= 0xFF
+
+	msg := &types.MsgClaimLegacyAccount{
+		NewAddress:    newAddr.String(),
+		LegacyAddress: legacyAddr.String(),
+		LegacyProof:   *proof,
+		NewSignature:  signNewMigration(s.T(), "claim", newPrivKey, legacyAddr, newAddr),
+	}
+	_, err := s.msgServer.ClaimLegacyAccount(s.ctx, msg)
+	s.Require().Error(err)
+	s.Require().ErrorContains(err, "sub-sig 0")
+}

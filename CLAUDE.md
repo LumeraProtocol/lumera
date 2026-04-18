@@ -149,5 +149,5 @@ EVM integration tests live in `tests/integration/evm/` with subpackages: ante, c
 - Bech32 prefixes defined in `config/config.go` (lumera, lumeravaloper, lumeravalcons)
 - Chain denom: `ulume` (coin type 60 / Ethereum-compatible, EVM extended denom `alume` at 18 decimals)
 - EVM chain ID: `76857769`, key type: `eth_secp256k1`
-- CosmWasm: wasmd v0.61.6 with wasmvm v3.0.2 (requires `libwasmvm.x86_64.so` at runtime)
+- CosmWasm: wasmd v0.61.6 with wasmvm v3.0.3 (requires `libwasmvm.x86_64.so` at runtime)
 - Ignite scaffolding comments (`# stargate/app/...`) mark extension points - preserve these when editing

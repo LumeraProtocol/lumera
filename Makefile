@@ -143,6 +143,13 @@ ${BUILD_DIR}/lumerad: $(GO_SRC) app/openrpc/openrpc.json.gz go.sum Makefile
 	@mkdir -p ${BUILD_DIR}
 	GOFLAGS=${GOFLAGS} ${GO} build -mod=readonly $(if $(strip $(BUILD_TAGS)),-tags "$(BUILD_TAGS)",) -ldflags '$(BUILD_LDFLAGS)' -o ${BUILD_DIR}/$(APP_BINARY) ./$(APP_MAIN)
 	chmod +x ${BUILD_DIR}/$(APP_BINARY)
+	@WASMVM_SO="$$(find $$(${GO} env GOPATH)/pkg/mod/github.com/!cosm!wasm/wasmvm/$(WASMVM_VERSION) -name 'libwasmvm.x86_64.so' -print -quit 2>/dev/null)"; \
+	if [ -n "$$WASMVM_SO" ]; then \
+		cp -f "$$WASMVM_SO" ${BUILD_DIR}/libwasmvm.x86_64.so; \
+		echo "Copied libwasmvm.x86_64.so from module cache"; \
+	else \
+		echo "Warning: libwasmvm.x86_64.so not found in module cache for wasmvm/$(WASMVM_VERSION)"; \
+	fi
 
 build-claiming-faucet:
 	@echo "Building Claiming Faucet binary..."

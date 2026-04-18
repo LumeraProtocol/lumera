@@ -41,4 +41,9 @@ message Params {
   // Validators that exceed the cap must shed delegations before migrating.
   // Default: 2000.
   uint64 max_validator_delegations = 4;
+
+  // max_multisig_sub_keys caps the number of sub-keys in a multisig legacy
+  // account's MultisigProof. Bounds per-tx verification cost.
+  // Default: 20.
+  uint32 max_multisig_sub_keys = 5;
 }

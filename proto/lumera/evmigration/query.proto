@@ -150,6 +150,13 @@ message QueryMigrationEstimateResponse {
   string balance_summary = 14;
   // has_supernode is true if the legacy address owns a registered supernode.
   bool   has_supernode   = 15;
+  // is_multisig is true when the account's on-chain pubkey is a flat Cosmos
+  // multisig of secp256k1 sub-keys.
+  bool   is_multisig = 16;
+  // threshold is K for K-of-N multisig (0 when !is_multisig).
+  uint32 threshold   = 17;
+  // num_signers is N for K-of-N multisig (0 when !is_multisig).
+  uint32 num_signers = 18;
 }
 
 // QueryMigrationStatsRequest is the request type for the Query/MigrationStats RPC method.
@@ -195,6 +202,13 @@ message LegacyAccountInfo {
   bool   has_delegations = 3;
   // is_validator is true if the account is a validator operator.
   bool   is_validator    = 4;
+  // is_multisig is true when the account's on-chain pubkey is a flat Cosmos
+  // multisig of secp256k1 sub-keys.
+  bool   is_multisig = 5;
+  // threshold is K for K-of-N multisig (0 when !is_multisig).
+  uint32 threshold   = 6;
+  // num_signers is N for K-of-N multisig (0 when !is_multisig).
+  uint32 num_signers = 7;
 }
 
 // QueryMigratedAccountsRequest is the request type for the Query/MigratedAccounts RPC method.

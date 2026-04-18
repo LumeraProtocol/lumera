@@ -6,6 +6,8 @@ import (
 	"fmt"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+	kmultisig "github.com/cosmos/cosmos-sdk/crypto/keys/multisig"
+	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 
@@ -50,6 +52,80 @@ func adr036SignDoc(signer string, data []byte) []byte {
 			`{"data":"%s","signer":"%s"}}],"sequence":"0"}`,
 		base64.StdEncoding.EncodeToString(data), signer,
 	))
+}
+
+// verifySecp256k1Sig checks a single secp256k1 signature over the migration
+// payload, accepting either the CLI (raw SHA256) or ADR-036 (canonical JSON)
+// envelope as indicated by format. signerAddr must be the bech32 address
+// derived from pk — for single-key proofs this is legacyAddr, and for
+// multisig proofs it is the individual sub-signer's address.
+func verifySecp256k1Sig(pk *secp256k1.PubKey, signerAddr sdk.AccAddress, payload, sig []byte, format types.SigFormat) error {
+	switch format {
+	case types.SigFormat_SIG_FORMAT_CLI:
+		hash := sha256.Sum256(payload)
+		if pk.VerifySignature(hash[:], sig) {
+			return nil
+		}
+	case types.SigFormat_SIG_FORMAT_ADR036:
+		doc := adr036SignDoc(signerAddr.String(), payload)
+		if pk.VerifySignature(doc, sig) {
+			return nil
+		}
+	default:
+		return types.ErrInvalidLegacyProof.Wrap("sig_format unspecified")
+	}
+	return types.ErrInvalidLegacySignature
+}
+
+// verifySingleKeyProof validates a SingleKeyProof against the migration payload.
+func verifySingleKeyProof(payload []byte, legacyAddr sdk.AccAddress, p *types.SingleKeyProof) error {
+	if len(p.PubKey) != secp256k1.PubKeySize {
+		return types.ErrInvalidLegacyPubKey.Wrapf("expected %d bytes, got %d", secp256k1.PubKeySize, len(p.PubKey))
+	}
+	pk := &secp256k1.PubKey{Key: p.PubKey}
+	derived := sdk.AccAddress(pk.Address())
+	if !derived.Equals(legacyAddr) {
+		return types.ErrPubKeyAddressMismatch.Wrapf(
+			"pubkey derives to %s, expected %s", derived, legacyAddr)
+	}
+	return verifySecp256k1Sig(pk, legacyAddr, payload, p.Signature, p.SigFormat)
+}
+
+// verifyMultisigProof validates a MultisigProof against the migration payload.
+// Reconstructs the LegacyAminoPubKey from sub-keys + threshold, confirms it
+// derives to legacyAddr, then verifies each sub-signature against its
+// claimed sub-key.
+func verifyMultisigProof(payload []byte, legacyAddr sdk.AccAddress, m *types.MultisigProof) error {
+	subPubKeys := make([]cryptotypes.PubKey, len(m.SubPubKeys))
+	for i, raw := range m.SubPubKeys {
+		if len(raw) != secp256k1.PubKeySize {
+			return types.ErrInvalidLegacyPubKey.Wrapf("sub_pub_keys[%d]: expected %d bytes, got %d",
+				i, secp256k1.PubKeySize, len(raw))
+		}
+		subPubKeys[i] = &secp256k1.PubKey{Key: raw}
+	}
+	multiPK := kmultisig.NewLegacyAminoPubKey(int(m.Threshold), subPubKeys)
+	derived := sdk.AccAddress(multiPK.Address())
+	if !derived.Equals(legacyAddr) {
+		return types.ErrPubKeyAddressMismatch.Wrapf(
+			"multisig pubkey derives to %s, expected %s", derived, legacyAddr)
+	}
+	for i, idx := range m.SignerIndices {
+		if int(idx) >= len(subPubKeys) {
+			return types.ErrInvalidLegacyProof.Wrapf(
+				"signer_indices[%d]=%d out of range", i, idx)
+		}
+		signerPK, ok := subPubKeys[idx].(*secp256k1.PubKey)
+		if !ok {
+			return types.ErrInvalidLegacyPubKey.Wrap("sub-key not secp256k1 (should be unreachable)")
+		}
+		signerAddr := sdk.AccAddress(signerPK.Address())
+		if err := verifySecp256k1Sig(signerPK, signerAddr, payload, m.SubSignatures[i], m.SigFormat); err != nil {
+			return types.ErrInvalidLegacySignature.Wrapf(
+				"sub-sig %d (signer %s) invalid: %s", i, signerAddr, err)
+		}
+	}
+	return nil
 }
 
 // VerifyLegacySignature verifies the legacy-account proof embedded in a

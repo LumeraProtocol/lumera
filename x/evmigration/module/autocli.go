@@ -67,25 +67,11 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 				},
 				{
 					RpcMethod: "ClaimLegacyAccount",
-					Use:       "claim-legacy-account [new-address] [legacy-address] [legacy-pub-key] [legacy-signature]",
-					Short:     "Migrate on-chain state from legacy to new address",
-					PositionalArgs: []*autocliv1.PositionalArgDescriptor{
-						{ProtoField: "new_address"},
-						{ProtoField: "legacy_address"},
-						{ProtoField: "legacy_pub_key"},
-						{ProtoField: "legacy_signature"},
-					},
+					Skip:      true, // custom hand-written command in x/evmigration/client/cli/tx.go (legacy_proof is a oneof)
 				},
 				{
 					RpcMethod: "MigrateValidator",
-					Use:       "migrate-validator [new-address] [legacy-address] [legacy-pub-key] [legacy-signature]",
-					Short:     "Migrate a validator operator from legacy to new address",
-					PositionalArgs: []*autocliv1.PositionalArgDescriptor{
-						{ProtoField: "new_address"},
-						{ProtoField: "legacy_address"},
-						{ProtoField: "legacy_pub_key"},
-						{ProtoField: "legacy_signature"},
-					},
+					Skip:      true, // custom hand-written command in x/evmigration/client/cli/tx.go (legacy_proof is a oneof)
 				},
 			},
 		},

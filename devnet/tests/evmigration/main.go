@@ -6,6 +6,7 @@
 //	estimate           — run AFTER the EVM upgrade to query migration estimates only
 //	migrate            — run AFTER the EVM upgrade to migrate accounts in batches
 //	migrate-validator  — run AFTER the EVM upgrade to migrate the local validator operator
+//	multisig           — run AFTER the EVM upgrade to exercise the four-step multisig CLI flow
 //	cleanup            — remove test keys from the local keyring (based on accounts JSON)
 //
 // Usage:
@@ -14,6 +15,7 @@
 //	tests_evmigration -mode=estimate -bin=lumerad -rpc=tcp://localhost:26657 -chain-id=lumera-devnet-1 -accounts=accounts.json
 //	tests_evmigration -mode=migrate -bin=lumerad -rpc=tcp://localhost:26657 -chain-id=lumera-devnet-1 -accounts=accounts.json
 //	tests_evmigration -mode=migrate-validator -bin=lumerad -rpc=tcp://localhost:26657 -chain-id=lumera-devnet-1
+//	tests_evmigration -mode=multisig -bin=lumerad -rpc=tcp://localhost:26657 -chain-id=lumera-devnet-1 -funder=validator0
 //	tests_evmigration -mode=cleanup -bin=lumerad -accounts=accounts.json
 package main
 
@@ -158,7 +160,7 @@ type AccountsFile struct {
 }
 
 var (
-	flagMode          = flag.String("mode", "", "prepare|estimate|migrate|migrate-validator|migrate-all|verify|cleanup")
+	flagMode          = flag.String("mode", "", "prepare|estimate|migrate|migrate-validator|migrate-all|multisig|verify|cleanup")
 	flagBin           = flag.String("bin", "lumerad", "lumerad binary path")
 	flagRPC           = flag.String("rpc", "tcp://localhost:26657", "RPC endpoint")
 	flagGRPC          = flag.String("grpc", "", "gRPC endpoint (default: derived from --rpc host + port 9090)")
@@ -201,11 +203,15 @@ func main() {
 		runMigrateValidator()
 	case "migrate-all":
 		runMigrateAll()
+	case "multisig":
+		if err := RunMultisigMigration(); err != nil {
+			log.Fatalf("multisig mode failed: %v", err)
+		}
 	case "verify":
 		runVerify()
 	case "cleanup":
 		runCleanup()
 	default:
-		log.Fatalf("usage: -mode=prepare|estimate|migrate|migrate-validator|migrate-all|verify|cleanup")
+		log.Fatalf("usage: -mode=prepare|estimate|migrate|migrate-validator|migrate-all|multisig|verify|cleanup")
 	}
 }

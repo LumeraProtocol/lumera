@@ -47,6 +47,10 @@ func GetTxCmd() *cobra.Command {
 	evmigrationTxCmd.AddCommand(
 		cmdClaimLegacyAccount(),
 		cmdMigrateValidator(),
+		cmdGenerateProofPayload(),
+		cmdSignProof(),
+		cmdCombineProof(),
+		cmdSubmitProof(),
 	)
 
 	return evmigrationTxCmd

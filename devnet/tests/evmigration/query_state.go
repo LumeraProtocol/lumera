@@ -25,10 +25,18 @@ func saveAccounts(path string, af *AccountsFile) {
 	}
 }
 
-// loadAccounts reads and parses the accounts JSON file.
+// loadAccounts reads and parses the accounts JSON file. When the file is
+// missing — which happens on hosts where prepare mode skipped (e.g. multisig
+// validator hosts) — this exits cleanly with code 0 instead of fatalling, so
+// downstream modes (estimate, migrate, verify) don't turn a legitimate "nothing
+// to do here" into a pipeline failure.
 func loadAccounts(path string) *AccountsFile {
 	data, err := os.ReadFile(path)
 	if err != nil {
+		if os.IsNotExist(err) {
+			log.Printf("SKIP: accounts file %s not found — nothing to do on this host (prepare likely skipped)", path)
+			os.Exit(0)
+		}
 		log.Fatalf("read %s: %v", path, err)
 	}
 	var af AccountsFile

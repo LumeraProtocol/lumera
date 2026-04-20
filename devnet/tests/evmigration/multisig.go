@@ -485,14 +485,21 @@ func runFourStepMigration(kind, legacyAddr, newKeyName, newAddr string, members 
 	}
 
 	// Step 5a: generate-proof-payload
+	// generate-proof-payload is registered via AddQueryFlagsToCmd, which does
+	// not include --keyring-backend. For an on-chain multisig account the
+	// command reads the pubkey from chain and doesn't touch the keyring, so
+	// the flag isn't needed.
 	log.Printf("  [migration step 1] generate-proof-payload (%s): %s -> %s", kind, legacyAddr, newAddr)
+	// --chain-id is required: the payload string includes it, and the keeper's
+	// verifySecp256k1Sig reconstructs the payload using ctx.ChainID(). Without
+	// it, pp.ChainID is empty and the signatures won't verify on-chain.
 	genArgs := buildLumeraArgs(
 		"tx", "evmigration", "generate-proof-payload",
 		"--legacy", legacyAddr,
 		"--new", newAddr,
 		"--kind", kind,
 		"--out", proofFile,
-		"--keyring-backend", "test",
+		"--chain-id", *flagChainID,
 	)
 	cmd := exec.Command(*flagBin, genArgs...)
 	genOut, genErr := cmd.CombinedOutput()
@@ -533,6 +540,7 @@ func runFourStepMigration(kind, legacyAddr, newKeyName, newAddr string, members 
 	submitArgs := buildLumeraArgs(
 		"tx", "evmigration", "submit-proof", txFile,
 		"--from", newKeyName,
+		"--chain-id", *flagChainID,
 		"--keyring-backend", "test",
 		"--gas", "auto",
 		"--gas-adjustment", *flagGasAdj,

@@ -22,10 +22,20 @@ func (q queryServer) PayoutHistory(goCtx context.Context, req *types.QueryPayout
 	}
 
 	ctx := sdk.UnwrapSDKContext(goCtx)
-	keeperImpl, ok := q.k.(*Keeper)
-	if !ok {
+
+	var keeperImpl Keeper
+	switch k := q.k.(type) {
+	case Keeper:
+		keeperImpl = k
+	case *Keeper:
+		if k == nil {
+			return nil, status.Error(codes.Internal, "unexpected keeper implementation")
+		}
+		keeperImpl = *k
+	default:
 		return nil, status.Error(codes.Internal, "unexpected keeper implementation")
 	}
+
 	store := prefix.NewStore(runtime.KVStoreAdapter(keeperImpl.storeService.OpenKVStore(ctx)), types.PayoutHistoryPrefixForValidator(req.ValidatorAddress))
 
 	entries := make([]types.PayoutHistoryEntry, 0)

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"testing"
 )
@@ -67,4 +68,23 @@ func TestAuthAccountLooksPermanentLocked(t *testing.T) {
 			t.Fatal("expected delayed vesting account not to be treated as permanent locked")
 		}
 	})
+}
+
+// TestAuthAccountPayloadTypeName_IgnoresNestedPubkeyType verifies that a
+// BaseAccount with a nested public_key.@type doesn't leak the pubkey type as
+// the "account type" — regression test for a previous map-iteration-order bug
+// where Go's random map walk could surface /cosmos.crypto.secp256k1.PubKey
+// instead of the surrounding /cosmos.auth.v1beta1.BaseAccount.
+func TestAuthAccountPayloadTypeName_IgnoresNestedPubkeyType(t *testing.T) {
+	raw := `{"account":{"@type":"/cosmos.auth.v1beta1.BaseAccount","address":"lumera1test","public_key":{"@type":"/cosmos.crypto.secp256k1.PubKey","key":"AAA"}}}`
+	var parsed any
+	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	// Run many times to exercise Go's randomized map iteration order.
+	for i := 0; i < 50; i++ {
+		if got := authAccountPayloadTypeName(parsed); got != "/cosmos.auth.v1beta1.BaseAccount" {
+			t.Fatalf("iteration %d: expected BaseAccount @type, got %q", i, got)
+		}
+	}
 }

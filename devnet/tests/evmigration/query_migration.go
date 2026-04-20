@@ -137,8 +137,14 @@ func queryAccountNumberAndSequence(addr string) (accountNumber uint64, sequence 
 			seqStr = resp.Account.BaseAccount.Sequence
 		}
 	}
-	if accNumStr == "" || seqStr == "" {
-		return 0, 0, fmt.Errorf("account_number/sequence missing in auth account response: %s", truncate(out, 300))
+	// Cosmos SDK omits `sequence` from JSON when it's 0 (fresh accounts that
+	// haven't sent any tx yet). Treat missing sequence as 0; only reject when
+	// the account itself is absent from the response.
+	if accNumStr == "" {
+		return 0, 0, fmt.Errorf("account_number missing in auth account response: %s", truncate(out, 300))
+	}
+	if seqStr == "" {
+		seqStr = "0"
 	}
 
 	accountNumber, err = strconv.ParseUint(accNumStr, 10, 64)
@@ -245,15 +251,22 @@ func authAccountPayloadMatchesType(v any, match func(string) bool) bool {
 	return false
 }
 
-// authAccountPayloadTypeName recursively extracts the first auth account type
-// name found in parsed query JSON.
+// authAccountPayloadTypeName extracts the outermost auth account type from
+// parsed query JSON. At each map level the direct `@type`/`type` key wins over
+// recursion, so nested pubkey `@type` fields (e.g. /cosmos.crypto.secp256k1.PubKey)
+// don't mask the surrounding account type (e.g. /cosmos.auth.v1beta1.BaseAccount).
+// This matters because Go map iteration order is randomized — a recurse-first
+// walk could return the pubkey type on one run and the account type on another.
 func authAccountPayloadTypeName(v any) string {
 	switch value := v.(type) {
 	case map[string]any:
-		for key, nested := range value {
-			if key == "@type" || key == "type" {
-				return fmt.Sprint(nested)
-			}
+		if raw, ok := value["@type"]; ok {
+			return fmt.Sprint(raw)
+		}
+		if raw, ok := value["type"]; ok {
+			return fmt.Sprint(raw)
+		}
+		for _, nested := range value {
 			if typeName := authAccountPayloadTypeName(nested); typeName != "" {
 				return typeName
 			}

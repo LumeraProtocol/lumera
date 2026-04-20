@@ -7,6 +7,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"math/rand"
@@ -48,6 +49,10 @@ func runPrepare() {
 	if *flagFunder == "" {
 		name, err := detectFunder()
 		if err != nil {
+			if errors.Is(err, errNoSingleSigValidatorFunder) {
+				log.Printf("SKIP: no single-sig validator funder on this host (likely a multisig-validator host); nothing to prepare")
+				return
+			}
 			log.Fatalf("no -funder provided and auto-detect failed: %v", err)
 		}
 		*flagFunder = name

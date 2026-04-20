@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os/exec"
@@ -307,9 +308,19 @@ func compareSemver(a, b string) (int, error) {
 	return 0, nil
 }
 
+// errNoSingleSigValidatorFunder signals that the local keyring has no
+// single-sig key matching an on-chain validator operator address. This is the
+// expected state on a multisig-validator host: the validator's composite key
+// can't discharge a single --from signer, and no other key is guaranteed to
+// hold enough balance to seed test fixtures. Callers that can gracefully skip
+// (e.g. prepare mode) check for this sentinel.
+var errNoSingleSigValidatorFunder = errors.New("no single-sig validator funder key on this host")
+
 // detectFunder picks a funder from the local keyring by finding the first key
 // whose address matches an active validator's operator address (i.e. a genesis
-// validator account that is guaranteed to have funds).
+// validator account that is guaranteed to have funds). Returns
+// errNoSingleSigValidatorFunder when no such key exists — callers decide
+// whether to fatal or skip.
 func detectFunder() (string, error) {
 	keys, err := listKeys()
 	if err != nil {
@@ -321,8 +332,7 @@ func detectFunder() (string, error) {
 
 	validators, err := getValidators()
 	if err != nil {
-		// Fall back to first key if we can't query validators.
-		return keys[0].Name, nil
+		return "", fmt.Errorf("get validators: %w", err)
 	}
 
 	valAccAddrs := make(map[string]struct{}, len(validators))
@@ -334,10 +344,9 @@ func detectFunder() (string, error) {
 		valAccAddrs[sdk.AccAddress(valAddr).String()] = struct{}{}
 	}
 
-	// Prefer a validator genesis key as funder; if none match, fall back to the
-	// first non-multisig key. Multisig composite keys are skipped because a
-	// single `--from` signer can't discharge their threshold requirement.
-	var fallback string
+	// Only accept a single-sig key whose address matches a validator operator.
+	// Any other candidate (sub-signer key, hermes, gov, etc.) isn't
+	// guaranteed to have enough genesis balance to seed fixtures.
 	for _, k := range keys {
 		if isMultisigKeyRecord(k) {
 			continue
@@ -345,14 +354,8 @@ func detectFunder() (string, error) {
 		if _, ok := valAccAddrs[k.Address]; ok {
 			return k.Name, nil
 		}
-		if fallback == "" {
-			fallback = k.Name
-		}
 	}
-	if fallback != "" {
-		return fallback, nil
-	}
-	return "", fmt.Errorf("no non-multisig funder key available in keyring (all %d keys are multisig composites)", len(keys))
+	return "", errNoSingleSigValidatorFunder
 }
 
 // listKeys returns all keys from the lumerad test keyring.

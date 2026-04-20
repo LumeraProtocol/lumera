@@ -168,12 +168,17 @@ func ensureMultisigCompositeKey(multisigKeyName string, members []string, thresh
 		return getAddress(multisigKeyName)
 	}
 
-	args := buildLumeraArgs(
+	// `keys add` is a pure keyring operation; it rejects --node, so skip
+	// buildLumeraArgs here and only append --home when set.
+	args := []string{
 		"keys", "add", multisigKeyName,
 		"--multisig", strings.Join(members, ","),
 		"--multisig-threshold", fmt.Sprintf("%d", threshold),
 		"--keyring-backend", "test",
-	)
+	}
+	if *flagHome != "" {
+		args = append(args, "--home", *flagHome)
+	}
 	cmd := exec.Command(*flagBin, args...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {

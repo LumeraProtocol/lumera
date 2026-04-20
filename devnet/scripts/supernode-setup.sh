@@ -246,10 +246,12 @@ query_account_number_sequence() {
 	local addr="$1"
 	local out
 	out="$(run_capture ${DAEMON} q auth account "${addr}" --output json 2>/dev/null || true)"
+	# SDK omits sequence from JSON when it's 0. Require only account_number
+	# here and default missing sequence to "0".
 	jq -r '
 		.. | objects
-		| select(has("account_number") and has("sequence"))
-		| "\(.account_number)\t\(.sequence)"
+		| select(has("account_number"))
+		| "\(.account_number)\t\(.sequence // "0")"
 	' <<<"${out}" | head -n1
 }
 

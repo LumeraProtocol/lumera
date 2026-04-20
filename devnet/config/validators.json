@@ -38,6 +38,11 @@
       "port": 8555,
       "ws_port": 8556
     },
+    "multisig": {
+      "enabled": true,
+      "threshold": 2,
+      "signer_count": 3
+    },
     "initial_distribution": {
       "account_balance": "2000000000000ulume",
       "validator_stake": "1000000000000ulume"

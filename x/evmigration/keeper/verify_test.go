@@ -551,6 +551,28 @@ func TestVerifyLegacyProof_Multisig_InvalidSubSig(t *testing.T) {
 	require.ErrorContains(t, err, "sub-sig 1")
 }
 
+func TestVerifyLegacyProof_Multisig_LengthMismatchRejectedBeforeVerification(t *testing.T) {
+	multiPK, _, legacyAddr := makeMultisigAccount(t, 2, 3)
+	_, newAddr := testNewMigrationAccount(t)
+
+	subPubKeys := make([][]byte, len(multiPK.GetPubKeys()))
+	for i, pk := range multiPK.GetPubKeys() {
+		subPubKeys[i] = pk.Bytes()
+	}
+	proof := &types.LegacyProof{Proof: &types.LegacyProof_Multisig{Multisig: &types.MultisigProof{
+		Threshold:     2,
+		SubPubKeys:    subPubKeys,
+		SignerIndices: []uint32{0, 1},
+		SubSignatures: [][]byte{make([]byte, 64)},
+		SigFormat:     types.SigFormat_SIG_FORMAT_CLI,
+	}}}
+
+	require.NotPanics(t, func() {
+		err := keeper.VerifyLegacyProof(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, proof)
+		require.ErrorContains(t, err, "sub_signatures length mismatch")
+	})
+}
+
 func TestVerifyLegacyProof_Multisig_MaxBoundary(t *testing.T) {
 	multiPK, privs, legacyAddr := makeMultisigAccount(t, 20, 20)
 	_, newAddr := testNewMigrationAccount(t)

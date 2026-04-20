@@ -45,3 +45,26 @@ func TestAuthAccountLooksVesting(t *testing.T) {
 		}
 	})
 }
+
+func TestAuthAccountLooksPermanentLocked(t *testing.T) {
+	t.Run("proto permanent locked type", func(t *testing.T) {
+		out := `{"account":{"@type":"/cosmos.vesting.v1beta1.PermanentLockedAccount","base_vesting_account":{"base_account":{"address":"lumera1test"}}}}`
+		if !authAccountLooksPermanentLocked(out) {
+			t.Fatal("expected permanent locked account to be detected")
+		}
+	})
+
+	t.Run("legacy amino permanent locked type", func(t *testing.T) {
+		out := `{"account":{"type":"cosmos-sdk/PermanentLockedAccount","value":{"base_vesting_account":{"base_account":{"address":"lumera1test"}}}}}`
+		if !authAccountLooksPermanentLocked(out) {
+			t.Fatal("expected legacy permanent locked account to be detected")
+		}
+	})
+
+	t.Run("different vesting type", func(t *testing.T) {
+		out := `{"account":{"@type":"/cosmos.vesting.v1beta1.DelayedVestingAccount","base_vesting_account":{"base_account":{"address":"lumera1test"}}}}`
+		if authAccountLooksPermanentLocked(out) {
+			t.Fatal("expected delayed vesting account not to be treated as permanent locked")
+		}
+	})
+}

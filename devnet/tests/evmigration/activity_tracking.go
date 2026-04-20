@@ -267,6 +267,12 @@ func (rec *AccountRecord) hasDelayedClaim() bool {
 	return false
 }
 
+// expectsPermanentLockedAccount returns true if this account should remain a
+// PermanentLockedAccount across migration.
+func (rec *AccountRecord) expectsPermanentLockedAccount() bool {
+	return isPermanentLockedAccountType(rec.ExpectedAuthAccountType)
+}
+
 // hasRecordedAction returns true if the account has any recorded action activity.
 func (rec *AccountRecord) hasRecordedAction() bool {
 	return len(rec.Actions) > 0 || rec.HasAction

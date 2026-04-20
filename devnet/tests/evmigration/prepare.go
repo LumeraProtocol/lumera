@@ -31,6 +31,13 @@ const (
 	migratedExtraAccountPrefix    = "evmex"
 	legacyPreparedAccountPrefixV0 = "evm_test"
 	extraPreparedAccountPrefixV0  = "evm_testex"
+	permanentLockedAccountSuffix  = "plock"
+	multisigAccountSuffix         = "msig"
+
+	permanentLockedFixtureAmount = "12000000ulume"
+	permanentLockedFixtureTopUp  = "4000000ulume"
+	multisigFixtureAmount        = "12000000ulume"
+	multisigFixtureDelegateAmt   = "300000ulume"
 )
 
 // runPrepare generates test accounts, funds them, and creates on-chain activity
@@ -47,7 +54,7 @@ func runPrepare() {
 		log.Printf("auto-detected funder from keyring: %s", name)
 	}
 
-	log.Printf("=== PREPARE MODE: generating %d legacy + %d extra accounts ===",
+	log.Printf("=== PREPARE MODE: generating %d legacy + permanent-locked + multisig fixtures + %d extra accounts ===",
 		*flagNumAccounts, *flagNumExtra)
 
 	validators, err := getValidators()
@@ -100,9 +107,9 @@ func runPrepare() {
 	// their state (balance, delegations, etc.) alongside regular accounts.
 	log.Println("--- Recording validator accounts ---")
 	keys, _ := listKeys()
-	keyByAddress := make(map[string]string, len(keys))
+	keyByAddress := make(map[string]keyRecord, len(keys))
 	for _, k := range keys {
-		keyByAddress[k.Address] = k.Name
+		keyByAddress[k.Address] = k
 	}
 	recordedLocalValidator := false
 	for _, valoper := range validators {
@@ -111,10 +118,11 @@ func runPrepare() {
 			continue
 		}
 		accAddr := sdk.AccAddress(valAddr).String()
-		keyName, ok := keyByAddress[accAddr]
+		key, ok := keyByAddress[accAddr]
 		if !ok {
 			continue
 		}
+		keyName := key.Name
 		recordedLocalValidator = true
 		// Check if this validator account is already tracked.
 		if _, ok := existingByName[accAddr]; ok {
@@ -144,6 +152,11 @@ func runPrepare() {
 			HasBalance:  bal > 0,
 			IsValidator: true,
 			Valoper:     valoper,
+			IsMultisig:  isMultisigKeyRecord(key),
+		}
+		if rec.IsMultisig {
+			rec.MultisigThreshold = defaultMultisigThreshold
+			rec.MultisigMemberKeys = derivedMultisigMemberKeys(keyName, defaultMultisigSigners)
 		}
 		af.Accounts = append(af.Accounts, rec)
 		existingByName[accAddr] = len(af.Accounts) - 1
@@ -160,6 +173,48 @@ func runPrepare() {
 
 	// Generate legacy accounts (will be migrated).
 	log.Println("--- Generating legacy accounts ---")
+	permanentLockedName := buildPermanentLockedPreparedAccountName(accountTag)
+	if idx, ok := existingByName[permanentLockedName]; ok {
+		af.Accounts[idx].ExpectedAuthAccountType = protoPermanentLockedAccountType
+		legacyIdx = append(legacyIdx, idx)
+		log.Printf("  reusing permanent-locked fixture %s: %s", af.Accounts[idx].Name, af.Accounts[idx].Address)
+	} else {
+		rec, err := ensureAccount(permanentLockedName, true)
+		if err != nil {
+			log.Fatalf("ensure permanent-locked account %s: %v", permanentLockedName, err)
+		}
+		rec.ExpectedAuthAccountType = protoPermanentLockedAccountType
+		af.Accounts = append(af.Accounts, rec)
+		idx := len(af.Accounts) - 1
+		existingByName[permanentLockedName] = idx
+		legacyIdx = append(legacyIdx, idx)
+		log.Printf("  created permanent-locked fixture %s: %s", permanentLockedName, rec.Address)
+	}
+	multisigName := buildMultisigPreparedAccountName(accountTag)
+	if idx, ok := existingByName[multisigName]; ok {
+		af.Accounts[idx].IsMultisig = true
+		if af.Accounts[idx].MultisigThreshold == 0 {
+			af.Accounts[idx].MultisigThreshold = defaultMultisigThreshold
+		}
+		if len(af.Accounts[idx].MultisigMemberKeys) == 0 {
+			af.Accounts[idx].MultisigMemberKeys = derivedMultisigMemberKeys(multisigName, defaultMultisigSigners)
+		}
+		legacyIdx = append(legacyIdx, idx)
+		log.Printf("  reusing multisig fixture %s: %s", af.Accounts[idx].Name, af.Accounts[idx].Address)
+	} else {
+		rec := AccountRecord{
+			Name:               multisigName,
+			IsLegacy:           true,
+			IsMultisig:         true,
+			MultisigThreshold:  defaultMultisigThreshold,
+			MultisigMemberKeys: derivedMultisigMemberKeys(multisigName, defaultMultisigSigners),
+		}
+		af.Accounts = append(af.Accounts, rec)
+		idx := len(af.Accounts) - 1
+		existingByName[multisigName] = idx
+		legacyIdx = append(legacyIdx, idx)
+		log.Printf("  created multisig fixture record %s", multisigName)
+	}
 	for i := 0; i < *flagNumAccounts; i++ {
 		name := buildPreparedAccountName(legacyPreparedAccountPrefix, accountTag, i)
 		if idx, ok := findPreparedAccountIndex(existingByName, legacyPreparedAccountPrefix, accountTag, i); ok {
@@ -204,6 +259,15 @@ func runPrepare() {
 	// Save after key generation so reruns find accounts even if later steps fail.
 	saveAccounts(*flagFile, af)
 
+	log.Println("--- Creating permanent-locked fixture ---")
+	if err := ensurePermanentLockedLegacyFixture(&af.Accounts[legacyIdx[0]]); err != nil {
+		log.Fatalf("ensure permanent-locked fixture: %v", err)
+	}
+	log.Println("--- Creating multisig fixture ---")
+	if err := ensureMultisigLegacyFixture(&af.Accounts[legacyIdx[1]], validators); err != nil {
+		log.Fatalf("ensure multisig fixture: %v", err)
+	}
+
 	// Fund all accounts.
 	log.Println("--- Funding accounts ---")
 	if err := fundAccountsBatched(af, rng); err != nil {
@@ -224,6 +288,9 @@ func runPrepare() {
 	log.Println("--- Creating legacy account activity (phase 1: own-account ops) ---")
 	runParallel(legacyIdx, 5, func(ordinal, idx int) {
 		rec := &af.Accounts[idx]
+		if rec.IsMultisig {
+			return
+		}
 		if !rec.HasBalance {
 			return
 		}
@@ -481,6 +548,9 @@ func runPrepare() {
 	log.Println("--- Creating legacy account activity (phase 2: cross-account ops) ---")
 	for ordinal, idx := range legacyIdx {
 		rec := &af.Accounts[idx]
+		if rec.IsMultisig {
+			continue
+		}
 		if !rec.HasBalance {
 			continue
 		}
@@ -817,6 +887,10 @@ func runPrepare() {
 			if !rec.HasBalance || claimKeyIdx >= len(preseededClaimKeysByIndex) {
 				continue
 			}
+			if rec.expectsPermanentLockedAccount() {
+				log.Printf("  %s is the permanent-locked fixture; skipping claim activity to preserve auth account type", rec.Name)
+				continue
+			}
 			if !ensureSenderAccountReady(rec) {
 				continue
 			}
@@ -921,7 +995,7 @@ func runPrepare() {
 
 	// Print summary.
 	var nLegacy, nExtra, nDelegated, nUnbonding, nRedelegation, nWithdraw, nAuthz, nAuthzRecv, nFeegrant, nFeegrantRecv int
-	var nClaim, nDelayedClaim, nAction int
+	var nClaim, nDelayedClaim, nAction, nPermanentLocked int
 	for _, rec := range af.Accounts {
 		if rec.IsLegacy {
 			nLegacy++
@@ -960,11 +1034,15 @@ func runPrepare() {
 			}
 		}
 		nAction += len(rec.Actions)
+		if rec.expectsPermanentLockedAccount() {
+			nPermanentLocked++
+		}
 	}
 	log.Printf(
 		"  prepare_activity_summary:\n"+
 			"    legacy_accounts: %d\n"+
 			"    extra_accounts: %d\n"+
+			"    permanent_locked_fixtures: %d\n"+
 			"    delegated_accounts: %d\n"+
 			"    unbonding_accounts: %d\n"+
 			"    redelegation_accounts: %d\n"+
@@ -976,7 +1054,7 @@ func runPrepare() {
 			"    instant_claims: %d\n"+
 			"    delayed_claims: %d\n"+
 			"    actions: %d",
-		nLegacy, nExtra, nDelegated, nUnbonding, nRedelegation, nWithdraw,
+		nLegacy, nExtra, nPermanentLocked, nDelegated, nUnbonding, nRedelegation, nWithdraw,
 		nAuthz, nAuthzRecv, nFeegrant, nFeegrantRecv, nClaim, nDelayedClaim, nAction,
 	)
 }
@@ -987,6 +1065,22 @@ func buildPreparedAccountName(prefix, tag string, idx int) string {
 		return fmt.Sprintf("%s-%03d", prefix, idx)
 	}
 	return fmt.Sprintf("%s-%s-%03d", prefix, tag, idx)
+}
+
+// buildPermanentLockedPreparedAccountName constructs the dedicated permanent
+// locked fixture key name, for example "pre-evm-val1-plock".
+func buildPermanentLockedPreparedAccountName(tag string) string {
+	if tag == "" {
+		return fmt.Sprintf("%s-%s", legacyPreparedAccountPrefix, permanentLockedAccountSuffix)
+	}
+	return fmt.Sprintf("%s-%s-%s", legacyPreparedAccountPrefix, tag, permanentLockedAccountSuffix)
+}
+
+func buildMultisigPreparedAccountName(tag string) string {
+	if tag == "" {
+		return fmt.Sprintf("%s-%s", legacyPreparedAccountPrefix, multisigAccountSuffix)
+	}
+	return fmt.Sprintf("%s-%s-%s", legacyPreparedAccountPrefix, tag, multisigAccountSuffix)
 }
 
 // batchedFundingWaitTimeout returns a scaling timeout for batched funding based on account count.
@@ -1128,6 +1222,10 @@ func sanitizePrepareAccountTag(tag string) string {
 // ensureSenderAccountReady verifies that the account's key exists in the keyring
 // and has a non-zero balance. Returns false if the account cannot send transactions.
 func ensureSenderAccountReady(rec *AccountRecord) bool {
+	if rec.IsMultisig {
+		log.Printf("  INFO: %s is multisig; skipping single-signer sender path", rec.Name)
+		return false
+	}
 	addr, err := getAddress(rec.Name)
 	if err != nil {
 		rec.HasBalance = false
@@ -1145,6 +1243,149 @@ func ensureSenderAccountReady(rec *AccountRecord) bool {
 		return false
 	}
 	return true
+}
+
+// ensurePermanentLockedLegacyFixture creates or reuses the dedicated
+// PermanentLockedAccount fixture, then tops it up with liquid tokens so it can
+// pay fees and create staking activity during prepare mode.
+func ensurePermanentLockedLegacyFixture(rec *AccountRecord) error {
+	if rec == nil {
+		return fmt.Errorf("nil permanent-locked fixture record")
+	}
+
+	rec.ExpectedAuthAccountType = protoPermanentLockedAccountType
+	accountType, err := queryAuthAccountType(rec.Address)
+	switch {
+	case err == nil && isPermanentLockedAccountType(accountType):
+		log.Printf("  permanent-locked fixture already exists on-chain: %s (%s)", rec.Name, accountType)
+	case err == nil:
+		return fmt.Errorf("fixture %s already exists on-chain as %s, expected %s", rec.Name, accountType, protoPermanentLockedAccountType)
+	case !isAccountNotFoundErr(err):
+		return fmt.Errorf("query existing permanent-locked fixture %s: %w", rec.Name, err)
+	default:
+		if _, err := runTx(
+			"tx", "vesting", "create-permanent-locked-account",
+			rec.Address, permanentLockedFixtureAmount,
+			"--from", *flagFunder,
+		); err != nil {
+			return fmt.Errorf("create permanent-locked fixture %s: %w", rec.Name, err)
+		}
+
+		accountType, err = queryAuthAccountType(rec.Address)
+		if err != nil {
+			return fmt.Errorf("query created permanent-locked fixture %s: %w", rec.Name, err)
+		}
+		if !isPermanentLockedAccountType(accountType) {
+			return fmt.Errorf("created fixture %s has unexpected auth account type %s", rec.Name, accountType)
+		}
+		log.Printf("  created permanent-locked fixture %s with locked balance %s", rec.Name, permanentLockedFixtureAmount)
+	}
+
+	funderAddr, err := getAddress(*flagFunder)
+	if err != nil {
+		return fmt.Errorf("get funder address for permanent-locked top-up: %w", err)
+	}
+	if _, err := runTx(
+		"tx", "bank", "send",
+		funderAddr, rec.Address, permanentLockedFixtureTopUp,
+		"--from", *flagFunder,
+	); err != nil {
+		return fmt.Errorf("top up permanent-locked fixture %s: %w", rec.Name, err)
+	}
+
+	bal, err := queryBalance(rec.Address)
+	if err != nil {
+		return fmt.Errorf("query balance for permanent-locked fixture %s: %w", rec.Name, err)
+	}
+	rec.HasBalance = bal > 0
+	log.Printf("  permanent-locked fixture ready: %s total_balance=%d", rec.Name, bal)
+	return nil
+}
+
+func ensureMultisigLegacyFixture(rec *AccountRecord, validators []string) error {
+	if rec == nil {
+		return fmt.Errorf("nil multisig fixture record")
+	}
+	if len(validators) == 0 {
+		return fmt.Errorf("multisig fixture requires at least one validator")
+	}
+	if rec.Name == "" {
+		return fmt.Errorf("multisig fixture missing key name")
+	}
+	if len(rec.MultisigMemberKeys) == 0 {
+		rec.MultisigMemberKeys = derivedMultisigMemberKeys(rec.Name, defaultMultisigSigners)
+	}
+	if rec.MultisigThreshold == 0 {
+		rec.MultisigThreshold = defaultMultisigThreshold
+	}
+	rec.IsMultisig = true
+
+	members, addr, err := createNamedMultisigKey(rec.Name, rec.MultisigThreshold, rec.MultisigMemberKeys)
+	if err != nil {
+		return fmt.Errorf("create multisig key %s: %w", rec.Name, err)
+	}
+	rec.MultisigMemberKeys = members
+	rec.Address = addr
+
+	bal, err := queryBalance(rec.Address)
+	switch {
+	case err == nil && bal > 0:
+		rec.HasBalance = true
+	case err != nil && !isAccountNotFoundErr(err):
+		return fmt.Errorf("query multisig fixture balance %s: %w", rec.Name, err)
+	default:
+		funderAddr, addrErr := getAddress(*flagFunder)
+		if addrErr != nil {
+			return fmt.Errorf("get funder address for multisig fixture: %w", addrErr)
+		}
+		if _, txErr := runTx(
+			"tx", "bank", "send",
+			funderAddr, rec.Address, multisigFixtureAmount,
+			"--from", *flagFunder,
+		); txErr != nil {
+			return fmt.Errorf("fund multisig fixture %s: %w", rec.Name, txErr)
+		}
+		bal, err = queryBalance(rec.Address)
+		if err != nil {
+			return fmt.Errorf("query funded multisig fixture %s: %w", rec.Name, err)
+		}
+		rec.HasBalance = bal > 0
+	}
+	if !rec.HasBalance {
+		return fmt.Errorf("multisig fixture %s has no spendable balance", rec.Name)
+	}
+
+	if err := registerMultisigPubKey(rec.Name, rec.Address, rec.MultisigMemberKeys); err != nil {
+		if !strings.Contains(strings.ToLower(err.Error()), "incorrect account sequence") {
+			return fmt.Errorf("register multisig pubkey %s: %w", rec.Name, err)
+		}
+		if err := waitForNextBlock(20 * time.Second); err != nil {
+			log.Printf("  WARN: wait after multisig pubkey sequence conflict: %v", err)
+		}
+		if retryErr := registerMultisigPubKey(rec.Name, rec.Address, rec.MultisigMemberKeys); retryErr != nil {
+			return fmt.Errorf("register multisig pubkey %s after retry: %w", rec.Name, retryErr)
+		}
+	}
+
+	targetVal := validators[0]
+	if count, err := queryDelegationToValidatorCount(rec.Address, targetVal); err == nil && count > 0 {
+		rec.addDelegation(targetVal, multisigFixtureDelegateAmt)
+		log.Printf("  multisig fixture %s already delegated to %s", rec.Name, targetVal)
+		return nil
+	}
+
+	unsignedFile := tmpFile("multisig-delegate-unsigned-*.json")
+	defer os.Remove(unsignedFile)
+	if err := buildUnsignedMultisigDelegateTx(rec.Name, rec.Address, targetVal, multisigFixtureDelegateAmt, unsignedFile); err != nil {
+		return fmt.Errorf("build multisig delegate tx %s: %w", rec.Name, err)
+	}
+	if err := signAndBroadcastMultisigTx(unsignedFile, rec.Name, rec.Address, rec.MultisigMemberKeys); err != nil {
+		return fmt.Errorf("broadcast multisig delegate tx %s: %w", rec.Name, err)
+	}
+
+	rec.addDelegation(targetVal, multisigFixtureDelegateAmt)
+	log.Printf("  multisig fixture ready: %s balance=%d delegated %s to %s", rec.Name, bal, multisigFixtureDelegateAmt, targetVal)
+	return nil
 }
 
 // reconcileAccountsWithKeyring verifies all account keys match the keyring,
@@ -1413,6 +1654,10 @@ func fundAccountsBatched(af *AccountsFile, rng *rand.Rand) error {
 	pending := make([]pendingFund, 0, len(af.Accounts))
 	for i := range af.Accounts {
 		rec := &af.Accounts[i]
+		if rec.HasBalance {
+			log.Printf("  funding skip %s: already funded/prepared", rec.Name)
+			continue
+		}
 		amount := fmt.Sprintf("%dulume", 10_000_000+rng.Intn(10_000_000))
 		accNum := accountNumber
 		seq := sequence
@@ -1512,7 +1757,7 @@ func validatePreparedState(af *AccountsFile) int {
 	var errCount int
 	var legacyWithBalance int
 	var scenarioUnbonding, scenarioRedelegation, scenarioWithdraw, scenarioAuthzAsGrantee, scenarioFeegrantAsGrantee int
-	var scenarioClaim, scenarioDelayedClaim, scenarioAction int
+	var scenarioClaim, scenarioDelayedClaim, scenarioAction, scenarioPermanentLocked, scenarioMultisig int
 
 	for i := range af.Accounts {
 		rec := &af.Accounts[i]
@@ -1564,6 +1809,18 @@ func validatePreparedState(af *AccountsFile) int {
 			scenarioAction++
 		}
 
+		errs, hit = validatePreparedPermanentLockedFixture(rec)
+		errCount += errs
+		if hit {
+			scenarioPermanentLocked++
+		}
+
+		errs, hit = validatePreparedMultisigFixture(rec)
+		errCount += errs
+		if hit {
+			scenarioMultisig++
+		}
+
 		instant, delayed, errs := validatePreparedClaims(rec)
 		errCount += errs
 		scenarioClaim += instant
@@ -1595,6 +1852,14 @@ func validatePreparedState(af *AccountsFile) int {
 		log.Printf("  ERROR: no legacy account with action scenario created")
 		errCount++
 	}
+	if scenarioPermanentLocked == 0 {
+		log.Printf("  ERROR: no permanent-locked migration fixture created")
+		errCount++
+	}
+	if scenarioMultisig == 0 {
+		log.Printf("  ERROR: no multisig migration fixture created")
+		errCount++
+	}
 	if legacyWithBalance >= 2 && scenarioClaim == 0 {
 		log.Printf("  ERROR: no instant claim scenario exercised")
 		errCount++
@@ -1615,6 +1880,65 @@ func validatePreparedState(af *AccountsFile) int {
 	}
 
 	return errCount
+}
+
+// validatePreparedPermanentLockedFixture checks that the dedicated fixture
+// account exists on-chain as a PermanentLockedAccount and still has delegation
+// activity to exercise the migration path.
+func validatePreparedPermanentLockedFixture(rec *AccountRecord) (int, bool) {
+	if rec == nil || !rec.expectsPermanentLockedAccount() {
+		return 0, false
+	}
+
+	var errCount int
+	accountType, err := queryAuthAccountType(rec.Address)
+	if err != nil {
+		log.Printf("  ERROR: query auth account type %s: %v", rec.Name, err)
+		errCount++
+	} else if !isPermanentLockedAccountType(accountType) {
+		log.Printf("  ERROR: expected permanent-locked auth account for %s, got %s", rec.Name, accountType)
+		errCount++
+	}
+
+	n, err := queryDelegationCount(rec.Address)
+	if err != nil {
+		log.Printf("  ERROR: query permanent-locked delegations %s: %v", rec.Name, err)
+		errCount++
+	} else if n == 0 {
+		log.Printf("  ERROR: expected permanent-locked fixture %s to have at least one delegation", rec.Name)
+		errCount++
+	}
+
+	return errCount, true
+}
+
+func validatePreparedMultisigFixture(rec *AccountRecord) (int, bool) {
+	if rec == nil || !rec.IsMultisig {
+		return 0, false
+	}
+
+	var errCount int
+	n, err := queryDelegationCount(rec.Address)
+	if err != nil {
+		log.Printf("  ERROR: query multisig delegations %s: %v", rec.Name, err)
+		errCount++
+	} else if n == 0 {
+		log.Printf("  ERROR: expected multisig fixture %s to have at least one delegation", rec.Name)
+		errCount++
+	}
+
+	if !keyExists(rec.Name) {
+		log.Printf("  ERROR: multisig fixture key %s missing from keyring", rec.Name)
+		errCount++
+	}
+	for _, member := range rec.MultisigMemberKeys {
+		if !keyExists(member) {
+			log.Printf("  ERROR: multisig signer %s missing from keyring", member)
+			errCount++
+		}
+	}
+
+	return errCount, true
 }
 
 // validatePreparedDelegations checks that delegations recorded in the account

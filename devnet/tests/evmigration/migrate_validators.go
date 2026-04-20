@@ -19,6 +19,9 @@ type validatorCandidate struct {
 	KeyName       string
 	LegacyAddress string
 	LegacyValoper string
+	IsMultisig    bool
+	Threshold     int
+	MemberKeys    []string
 }
 
 // Destination keys created during migrate-validator runs use eth_secp256k1 and
@@ -173,11 +176,17 @@ func pickValidatorCandidates(validators []string, keys []keyRecord) []validatorC
 				log.Printf("WARN: key %q (%s) is not a current validator", name, k.Address)
 				continue
 			}
-			selected = append(selected, validatorCandidate{
+			candidate := validatorCandidate{
 				KeyName:       name,
 				LegacyAddress: k.Address,
 				LegacyValoper: valoper,
-			})
+				IsMultisig:    isMultisigKeyRecord(k),
+			}
+			if candidate.IsMultisig {
+				candidate.Threshold = defaultMultisigThreshold
+				candidate.MemberKeys = derivedMultisigMemberKeys(name, defaultMultisigSigners)
+			}
+			selected = append(selected, candidate)
 		}
 		return selected
 	}
@@ -196,11 +205,17 @@ func pickValidatorCandidates(validators []string, keys []keyRecord) []validatorC
 		if !isLegacyValidatorKey(k) {
 			continue
 		}
-		selected = append(selected, validatorCandidate{
+		candidate := validatorCandidate{
 			KeyName:       k.Name,
 			LegacyAddress: accAddr,
 			LegacyValoper: valoper,
-		})
+			IsMultisig:    isMultisigKeyRecord(k),
+		}
+		if candidate.IsMultisig {
+			candidate.Threshold = defaultMultisigThreshold
+			candidate.MemberKeys = derivedMultisigMemberKeys(k.Name, defaultMultisigSigners)
+		}
+		selected = append(selected, candidate)
 	}
 	return selected
 }
@@ -287,29 +302,39 @@ func migrateOneValidator(c validatorCandidate) (ok bool, skipped bool) {
 
 	// Derive the destination key from the same mnemonic (coin-type 60) so the
 	// migrated address matches what wallets like MetaMask produce from the same seed.
-	mnemonic := readStatusRegistryMnemonic(c.KeyName)
-	if mnemonic == "" {
+	tempRec := &AccountRecord{
+		Name:               c.KeyName,
+		Mnemonic:           readStatusRegistryMnemonic(c.KeyName),
+		IsLegacy:           true,
+		IsMultisig:         c.IsMultisig,
+		MultisigThreshold:  c.Threshold,
+		MultisigMemberKeys: append([]string(nil), c.MemberKeys...),
+	}
+	if !c.IsMultisig && tempRec.Mnemonic == "" {
 		log.Printf("  FAIL: cannot read validator mnemonic from account registry; cannot derive coin-type 60 destination")
 		return false, false
 	}
-	tempRec := &AccountRecord{
-		Name:     c.KeyName,
-		Mnemonic: mnemonic,
-		IsLegacy: true,
-	}
 	newRec, err := createDestinationAccountFromLegacy(tempRec)
 	if err != nil {
-		log.Printf("  FAIL: create destination key from mnemonic: %v", err)
+		log.Printf("  FAIL: create destination key: %v", err)
 		return false, false
 	}
-	// Submit the migration transaction — both legacy and new keys are in the
-	// keyring, so the CLI handles proof signing internally.
-	_, err = runTx(
-		"tx", "evmigration", "migrate-validator",
-		c.KeyName, newRec.Name)
-	if err != nil {
-		log.Printf("  FAIL: migrate-validator tx failed: %v", err)
-		return false, false
+	if c.IsMultisig {
+		err = runFourStepMigration("validator", c.LegacyAddress, newRec.Name, newRec.Address, c.MemberKeys)
+		if err != nil {
+			log.Printf("  FAIL: multisig validator migration tx failed: %v", err)
+			return false, false
+		}
+	} else {
+		// Submit the migration transaction — both legacy and new keys are in the
+		// keyring, so the CLI handles proof signing internally.
+		_, err = runTx(
+			"tx", "evmigration", "migrate-validator",
+			c.KeyName, newRec.Name)
+		if err != nil {
+			log.Printf("  FAIL: migrate-validator tx failed: %v", err)
+			return false, false
+		}
 	}
 
 	// Verify migration record.

@@ -114,6 +114,11 @@ type keyRecord struct {
 	PubKey  string `json:"pubkey"`
 }
 
+func isMultisigKeyRecord(k keyRecord) bool {
+	pubKey := strings.ToLower(strings.TrimSpace(k.PubKey))
+	return strings.Contains(pubKey, "legacyaminopubkey") || strings.Contains(pubKey, "multisig")
+}
+
 var (
 	nonLegacyCoinType    uint32 = 60
 	nonLegacyCoinTypeStr string = "60"
@@ -330,9 +335,19 @@ func detectFunder() (string, error) {
 	}
 
 	for _, k := range keys {
+		if isMultisigKeyRecord(k) {
+			continue
+		}
 		if _, ok := valAccAddrs[k.Address]; ok {
 			return k.Name, nil
 		}
+	}
+
+	for _, k := range keys {
+		if isMultisigKeyRecord(k) {
+			continue
+		}
+		return k.Name, nil
 	}
 
 	// No validator key found; fall back to first key.
@@ -482,7 +497,6 @@ func getAddress(name string) (string, error) {
 	}
 	return strings.TrimSpace(string(out)), nil
 }
-
 
 // signStringWithPrivHex signs an arbitrary payload using a raw private key hex.
 // Returns a base64-encoded signature.

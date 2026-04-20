@@ -151,6 +151,10 @@ else
 	SN_KEY_NAME="${KEY_NAME}_sn"
 fi
 
+VAL_REC_JSON="$(jq -c --arg m "$MONIKER" '[.[] | select(.moniker==$m)][0]' "${CFG_VALS}" 2>/dev/null || true)"
+VALIDATOR_MULTISIG_ENABLED="$(printf '%s' "${VAL_REC_JSON}" | jq -r '.multisig.enabled // false' 2>/dev/null || printf false)"
+VALIDATOR_MULTISIG_THRESHOLD="$(printf '%s' "${VAL_REC_JSON}" | jq -r '.multisig.threshold // 2' 2>/dev/null || printf 2)"
+
 # HD derivation paths: legacy Cosmos (coin 118) vs EVM-compatible (coin 60)
 # The same mnemonic derives different addresses on each path.
 # Pre-EVM chains use 118; post-EVM chains use 60 (eth_secp256k1).
@@ -227,6 +231,78 @@ is_legacy_pubkey_type() {
 is_evm_pubkey_type() {
 	local pubkey_type="${1:-}"
 	[[ -n "$pubkey_type" && "$pubkey_type" == *"ethsecp256k1"* ]]
+}
+
+validator_is_multisig() {
+	[[ "${VALIDATOR_MULTISIG_ENABLED}" == "true" ]]
+}
+
+validator_multisig_signer_key() {
+	local idx="$1"
+	printf '%s-signer-%s\n' "${KEY_NAME}" "${idx}"
+}
+
+query_account_number_sequence() {
+	local addr="$1"
+	local out
+	out="$(run_capture ${DAEMON} q auth account "${addr}" --output json 2>/dev/null || true)"
+	jq -r '
+		.. | objects
+		| select(has("account_number") and has("sequence"))
+		| "\(.account_number)\t\(.sequence)"
+	' <<<"${out}" | head -n1
+}
+
+register_supernode_multisig() {
+	local acc_seq acc_num seq unsigned_file sig1 sig2 signed_file bcast_json tx_hash
+	IFS=$'\t' read -r acc_num seq < <(query_account_number_sequence "${VAL_ADDR}")
+	if [[ -z "${acc_num}" || -z "${seq}" ]]; then
+		echo "[SN] ERROR: failed to query validator multisig account number/sequence for ${VAL_ADDR}"
+		return 1
+	fi
+
+	unsigned_file="$(mktemp /tmp/sn-register-unsigned.XXXXXX.json)"
+	sig1="$(mktemp /tmp/sn-register-sig1.XXXXXX.json)"
+	sig2="$(mktemp /tmp/sn-register-sig2.XXXXXX.json)"
+	signed_file="$(mktemp /tmp/sn-register-signed.XXXXXX.json)"
+
+	run_capture ${DAEMON} tx supernode register-supernode \
+		"${VALOPER_ADDR}" "${SN_ENDPOINT}" "${SN_ADDR}" \
+		--from "${KEY_NAME}" --chain-id "${CHAIN_ID}" --keyring-backend "${KEYRING_BACKEND}" \
+		--account-number "${acc_num}" --sequence "${seq}" \
+		--gas 500000 --gas-prices "${TX_GAS_PRICES}" \
+		--generate-only --output json >"${unsigned_file}"
+
+	run_capture ${DAEMON} tx sign "${unsigned_file}" \
+		--from "$(validator_multisig_signer_key 1)" \
+		--multisig "${VAL_ADDR}" \
+		--keyring-backend "${KEYRING_BACKEND}" \
+		--chain-id "${CHAIN_ID}" \
+		--account-number "${acc_num}" --sequence "${seq}" \
+		--sign-mode amino-json \
+		--output json >"${sig1}"
+	run_capture ${DAEMON} tx sign "${unsigned_file}" \
+		--from "$(validator_multisig_signer_key 2)" \
+		--multisig "${VAL_ADDR}" \
+		--keyring-backend "${KEYRING_BACKEND}" \
+		--chain-id "${CHAIN_ID}" \
+		--account-number "${acc_num}" --sequence "${seq}" \
+		--sign-mode amino-json \
+		--output json >"${sig2}"
+	run_capture ${DAEMON} tx multisign "${unsigned_file}" "${KEY_NAME}" \
+		"${sig1}" "${sig2}" \
+		--keyring-backend "${KEYRING_BACKEND}" \
+		--chain-id "${CHAIN_ID}" \
+		--output json >"${signed_file}"
+
+	bcast_json="$(run_capture ${DAEMON} tx broadcast "${signed_file}" --broadcast-mode sync --output json)"
+	tx_hash="$(echo "${bcast_json}" | jq -r '.txhash // empty')"
+	rm -f "${unsigned_file}" "${sig1}" "${sig2}" "${signed_file}"
+	if [[ -z "${tx_hash}" ]]; then
+		echo "[SN] ERROR: failed to obtain txhash for multisig registration"
+		return 1
+	fi
+	wait_for_tx "${tx_hash}"
 }
 
 registry_account_address() {
@@ -919,19 +995,26 @@ register_supernode() {
 		echo "[SN] Supernode is in ${SN_LAST_STATE} state; skipping registration."
 	else
 		echo "[SN] Registering supernode..."
-		REG_TX_JSON="$(run_capture $DAEMON tx supernode register-supernode \
-			"$VALOPER_ADDR" "$SN_ENDPOINT" "$SN_ADDR" \
-			--from "$KEY_NAME" --chain-id "$CHAIN_ID" --keyring-backend "$KEYRING_BACKEND" \
-			--gas auto --gas-adjustment 1.5 --gas-prices "${TX_GAS_PRICES}" -y --output json)"
-		REG_TX_HASH="$(echo "$REG_TX_JSON" | jq -r .txhash)"
-		if [[ -n "$REG_TX_HASH" && "$REG_TX_HASH" != "null" ]]; then
-			wait_for_tx "$REG_TX_HASH" || {
+		if validator_is_multisig; then
+			register_supernode_multisig || {
 				echo "[SN] Registration tx failed/timeout"
 				exit 1
 			}
 		else
-			echo "[SN] Failed to obtain txhash for registration"
-			exit 1
+			REG_TX_JSON="$(run_capture $DAEMON tx supernode register-supernode \
+				"$VALOPER_ADDR" "$SN_ENDPOINT" "$SN_ADDR" \
+				--from "$KEY_NAME" --chain-id "$CHAIN_ID" --keyring-backend "$KEYRING_BACKEND" \
+				--gas auto --gas-adjustment 1.5 --gas-prices "${TX_GAS_PRICES}" -y --output json)"
+			REG_TX_HASH="$(echo "$REG_TX_JSON" | jq -r .txhash)"
+			if [[ -n "$REG_TX_HASH" && "$REG_TX_HASH" != "null" ]]; then
+				wait_for_tx "$REG_TX_HASH" || {
+					echo "[SN] Registration tx failed/timeout"
+					exit 1
+				}
+			else
+				echo "[SN] Failed to obtain txhash for registration"
+				exit 1
+			fi
 		fi
 		if is_sn_registered_active; then
 			echo "[SN] Supernode registered successfully and is now ACTIVE."

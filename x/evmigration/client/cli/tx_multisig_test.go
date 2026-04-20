@@ -56,3 +56,10 @@ func TestAssertPartialProofsConsistent_ProofKindMismatch(t *testing.T) {
 	err := cli.AssertPartialProofsConsistent(a, b)
 	require.ErrorContains(t, err, "proof-kind mismatch")
 }
+
+func TestAssertPartialProofsConsistent_PayloadHexMismatch(t *testing.T) {
+	a := &cli.PartialProof{PayloadHex: "aa", Multisig: &cli.PartialMultisig{}}
+	b := &cli.PartialProof{PayloadHex: "bb", Multisig: &cli.PartialMultisig{}}
+	err := cli.AssertPartialProofsConsistent(a, b)
+	require.ErrorContains(t, err, "payload_hex mismatch")
+}

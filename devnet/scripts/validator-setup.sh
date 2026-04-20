@@ -153,6 +153,15 @@ STAKE_AMOUNT="$(echo "${VAL_REC_JSON}" | jq -r '.initial_distribution.validator_
 ACCOUNT_BAL="$(echo "${VAL_REC_JSON}" | jq -r '.initial_distribution.account_balance')"
 P2P_HOST_PORT="$(echo "${VAL_REC_JSON}" | jq --arg port "${DEFAULT_P2P_PORT}" -r '.port // $port')"
 VAL_INDEX="$(jq -r --arg m "${MONIKER}" 'map(.moniker) | index($m) // -1' "${CFG_VALS}")"
+MULTISIG_ENABLED="$(echo "${VAL_REC_JSON}" | jq -r '.multisig.enabled // false')"
+MULTISIG_THRESHOLD="$(echo "${VAL_REC_JSON}" | jq -r '.multisig.threshold // 2')"
+MULTISIG_SIGNER_COUNT="$(echo "${VAL_REC_JSON}" | jq -r '.multisig.signer_count // 3')"
+declare -a MULTISIG_MEMBER_KEYS=()
+if [[ "${MULTISIG_ENABLED}" == "true" ]]; then
+	for ((i = 1; i <= MULTISIG_SIGNER_COUNT; i++)); do
+		MULTISIG_MEMBER_KEYS+=("${KEY_NAME}-signer-${i}")
+	done
+fi
 # Load pre-configured mnemonic for deterministic addresses across devnet rebuilds.
 # If absent, a new key will be generated in init_if_needed().
 GENESIS_ACCOUNT_MNEMONIC=""
@@ -218,6 +227,91 @@ verify_gentx_file() {
 		return 1
 	fi
 	return 0
+}
+
+validator_is_multisig() {
+	[[ "${MULTISIG_ENABLED}" == "true" ]]
+}
+
+ensure_validator_multisig_keys() {
+	local member addr key_json mnemonic joined_members
+	if ! validator_is_multisig; then
+		return 0
+	fi
+
+	for member in "${MULTISIG_MEMBER_KEYS[@]}"; do
+		addr="$(run_capture ${DAEMON} keys show "${member}" -a --keyring-backend "${KEYRING_BACKEND}" 2>/dev/null || true)"
+		addr="$(printf '%s' "${addr}" | tr -d '\r\n')"
+		mnemonic="$(accounts_registry_get_field "${member}" "mnemonic")"
+		if [[ -z "${addr}" ]]; then
+			if [[ -n "${mnemonic}" ]]; then
+				recover_key_from_mnemonic "${member}" "${mnemonic}"
+			else
+				key_json="$(run_capture ${DAEMON} keys add "${member}" --keyring-backend "${KEYRING_BACKEND}" --output json)"
+				mnemonic="$(printf '%s' "${key_json}" | jq -r '.mnemonic // empty' 2>/dev/null || true)"
+			fi
+			addr="$(run_capture ${DAEMON} keys show "${member}" -a --keyring-backend "${KEYRING_BACKEND}" 2>/dev/null || true)"
+			addr="$(printf '%s' "${addr}" | tr -d '\r\n')"
+		fi
+		accounts_registry_upsert "${member}" "${addr}" "${mnemonic}" "cosmos" "" "" ""
+	done
+
+	addr="$(run_capture ${DAEMON} keys show "${KEY_NAME}" -a --keyring-backend "${KEYRING_BACKEND}" 2>/dev/null || true)"
+	addr="$(printf '%s' "${addr}" | tr -d '\r\n')"
+	if [[ -z "${addr}" ]]; then
+		joined_members="$(IFS=,; printf '%s' "${MULTISIG_MEMBER_KEYS[*]}")"
+		run ${DAEMON} keys add "${KEY_NAME}" \
+			--multisig "${joined_members}" \
+			--multisig-threshold "${MULTISIG_THRESHOLD}" \
+			--keyring-backend "${KEYRING_BACKEND}" >/dev/null
+		addr="$(run_capture ${DAEMON} keys show "${KEY_NAME}" -a --keyring-backend "${KEYRING_BACKEND}")"
+		addr="$(printf '%s' "${addr}" | tr -d '\r\n')"
+	fi
+	accounts_registry_upsert "${KEY_NAME}" "${addr}" "" "multisig" "" "" ""
+}
+
+build_multisig_gentx() {
+	local gentx_file="$1"
+	local unsigned_file sig1 sig2 multisig_addr
+
+	unsigned_file="$(mktemp "${GENTX_LOCAL_DIR}/gentx-unsigned.XXXXXX.json")"
+	sig1="$(mktemp "${GENTX_LOCAL_DIR}/gentx-sig1.XXXXXX.json")"
+	sig2="$(mktemp "${GENTX_LOCAL_DIR}/gentx-sig2.XXXXXX.json")"
+	multisig_addr="$(run_capture ${DAEMON} keys show "${KEY_NAME}" -a --keyring-backend "${KEYRING_BACKEND}" 2>/dev/null || true)"
+	multisig_addr="$(printf '%s' "${multisig_addr}" | tr -d '\r\n')"
+
+	run ${DAEMON} genesis gentx "${KEY_NAME}" "${STAKE_AMOUNT}" \
+		--chain-id "${CHAIN_ID}" \
+		--keyring-backend "${KEYRING_BACKEND}" \
+		--generate-only \
+		--output-document "${unsigned_file}"
+
+	run_capture ${DAEMON} tx sign "${unsigned_file}" \
+		--from "${MULTISIG_MEMBER_KEYS[0]}" \
+		--multisig "${multisig_addr}" \
+		--keyring-backend "${KEYRING_BACKEND}" \
+		--chain-id "${CHAIN_ID}" \
+		--account-number 0 \
+		--sequence 0 \
+		--sign-mode amino-json \
+		--output json >"${sig1}"
+	run_capture ${DAEMON} tx sign "${unsigned_file}" \
+		--from "${MULTISIG_MEMBER_KEYS[1]}" \
+		--multisig "${multisig_addr}" \
+		--keyring-backend "${KEYRING_BACKEND}" \
+		--chain-id "${CHAIN_ID}" \
+		--account-number 0 \
+		--sequence 0 \
+		--sign-mode amino-json \
+		--output json >"${sig2}"
+
+	run_capture ${DAEMON} tx multisign "${unsigned_file}" "${KEY_NAME}" \
+		"${sig1}" "${sig2}" \
+		--keyring-backend "${KEYRING_BACKEND}" \
+		--chain-id "${CHAIN_ID}" \
+		--output json >"${gentx_file}"
+	verify_gentx_file "${gentx_file}" || return 1
+	rm -f "${unsigned_file}" "${sig1}" "${sig2}"
 }
 
 collect_secondary_genesis_accounts() {
@@ -457,6 +551,15 @@ init_if_needed() {
 	# index in config.json, always recover from it to keep addresses deterministic.
 	local addr mnemonic key_json
 	registry_mnemonic="$(accounts_registry_get_field "${KEY_NAME}" "mnemonic")"
+	if validator_is_multisig; then
+		ensure_validator_multisig_keys
+		addr="$(run_capture ${DAEMON} keys show "${KEY_NAME}" -a --keyring-backend "${KEYRING_BACKEND}" 2>/dev/null || true)"
+		addr="$(printf '%s' "${addr}" | tr -d '\r\n')"
+		if [ -n "${addr}" ]; then
+			accounts_registry_upsert "${KEY_NAME}" "${addr}" "" "multisig" "" "" ""
+		fi
+		return
+	fi
 	if [ -n "${GENESIS_ACCOUNT_MNEMONIC}" ]; then
 		recover_key_from_mnemonic "${KEY_NAME}" "${GENESIS_ACCOUNT_MNEMONIC}"
 		addr="$(run_capture ${DAEMON} keys show "${KEY_NAME}" -a --keyring-backend "${KEYRING_BACKEND}" 2>/dev/null || true)"
@@ -548,7 +651,11 @@ primary_validator_setup() {
 		exit 1
 	fi
 	run ${DAEMON} genesis add-genesis-account "${addr}" "${ACCOUNT_BAL}"
-	accounts_registry_upsert "${KEY_NAME}" "${addr}" "$(accounts_registry_get_field "${KEY_NAME}" "mnemonic")" "cosmos" "${ACCOUNT_BAL}" "genesis" ""
+	if validator_is_multisig; then
+		accounts_registry_upsert "${KEY_NAME}" "${addr}" "" "multisig" "${ACCOUNT_BAL}" "genesis" ""
+	else
+		accounts_registry_upsert "${KEY_NAME}" "${addr}" "$(accounts_registry_get_field "${KEY_NAME}" "mnemonic")" "cosmos" "${ACCOUNT_BAL}" "genesis" ""
+	fi
 
 	# Create a governance key — used to submit upgrade proposals and vote.
 	# Gets a large genesis balance (1T ulume) so it can cover proposal deposits.
@@ -613,9 +720,13 @@ primary_validator_setup() {
 	# ── Generate primary's own gentx ──
 	# gentx = "genesis transaction" that self-delegates STAKE_AMOUNT to this
 	# validator. Each validator creates one; primary collects them all.
-	run ${DAEMON} genesis gentx "${KEY_NAME}" "${STAKE_AMOUNT}" \
-		--chain-id "${CHAIN_ID}" \
-		--keyring-backend "${KEYRING_BACKEND}"
+	if validator_is_multisig; then
+		build_multisig_gentx "${GENTX_LOCAL_DIR}/${MONIKER}_gentx.json"
+	else
+		run ${DAEMON} genesis gentx "${KEY_NAME}" "${STAKE_AMOUNT}" \
+			--chain-id "${CHAIN_ID}" \
+			--keyring-backend "${KEYRING_BACKEND}"
+	fi
 
 	for file in "${GENTX_LOCAL_DIR}"/gentx-*.json; do
 		[ -f "${file}" ] || continue
@@ -683,7 +794,9 @@ secondary_validator_setup() {
 	addr="$(run_capture ${DAEMON} keys show "${KEY_NAME}" -a --keyring-backend "${KEYRING_BACKEND}")"
 	addr="$(printf '%s' "${addr}" | tr -d '\r\n')"
 	if [ -z "${addr}" ]; then
-		if [ -n "${GENESIS_ACCOUNT_MNEMONIC}" ]; then
+		if validator_is_multisig; then
+			ensure_validator_multisig_keys
+		elif [ -n "${GENESIS_ACCOUNT_MNEMONIC}" ]; then
 			recover_key_from_mnemonic "${KEY_NAME}" "${GENESIS_ACCOUNT_MNEMONIC}"
 		else
 			run ${DAEMON} keys add "${KEY_NAME}" --keyring-backend "${KEYRING_BACKEND}" >/dev/null
@@ -703,8 +816,12 @@ secondary_validator_setup() {
 	if compgen -G "${GENTX_LOCAL_DIR}/gentx-*.json" >/dev/null; then
 		echo "[SETUP] gentx already exists in ${GENTX_LOCAL_DIR}, skipping generation"
 	else
-		run ${DAEMON} genesis gentx "${KEY_NAME}" "${STAKE_AMOUNT}" \
-			--chain-id "${CHAIN_ID}" --keyring-backend "${KEYRING_BACKEND}"
+		if validator_is_multisig; then
+			build_multisig_gentx "${GENTX_LOCAL_DIR}/${MONIKER}_gentx.json"
+		else
+			run ${DAEMON} genesis gentx "${KEY_NAME}" "${STAKE_AMOUNT}" \
+				--chain-id "${CHAIN_ID}" --keyring-backend "${KEYRING_BACKEND}"
+		fi
 	fi
 
 	local gentx_file
@@ -718,7 +835,11 @@ secondary_validator_setup() {
 	# Publish gentx for primary collection. The validator genesis account itself
 	# is already persisted in this validator's status registry.
 	copy_with_lock "gentx" cp "${gentx_file}" "${GENTX_DIR}/${MONIKER}_gentx.json"
-	accounts_registry_upsert "${KEY_NAME}" "${addr}" "$(accounts_registry_get_field "${KEY_NAME}" "mnemonic")" "cosmos" "${ACCOUNT_BAL}" "genesis" ""
+	if validator_is_multisig; then
+		accounts_registry_upsert "${KEY_NAME}" "${addr}" "" "multisig" "${ACCOUNT_BAL}" "genesis" ""
+	else
+		accounts_registry_upsert "${KEY_NAME}" "${addr}" "$(accounts_registry_get_field "${KEY_NAME}" "mnemonic")" "cosmos" "${ACCOUNT_BAL}" "genesis" ""
+	fi
 
 	# write own markers for peer discovery
 	write_node_markers

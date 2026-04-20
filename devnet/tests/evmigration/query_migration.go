@@ -12,6 +12,11 @@ import (
 	"time"
 )
 
+const (
+	protoPermanentLockedAccountType  = "/cosmos.vesting.v1beta1.PermanentLockedAccount"
+	legacyPermanentLockedAccountType = "cosmos-sdk/PermanentLockedAccount"
+)
+
 // migrationEstimate holds the result of a migration-estimate query for a single address.
 type migrationEstimate struct {
 	WouldSucceed       bool   `json:"would_succeed"`
@@ -147,6 +152,19 @@ func queryAccountNumberAndSequence(addr string) (accountNumber uint64, sequence 
 	return accountNumber, sequence, nil
 }
 
+// queryAuthAccountType returns the auth account type name for an address.
+func queryAuthAccountType(addr string) (string, error) {
+	out, err := run("query", "auth", "account", addr)
+	if err != nil {
+		return "", fmt.Errorf("query auth account: %s\n%w", out, err)
+	}
+
+	if typeName := authAccountTypeName(out); typeName != "" {
+		return typeName, nil
+	}
+	return "", fmt.Errorf("account type missing in auth account response: %s", truncate(out, 300))
+}
+
 // queryAccountIsVesting returns true if the on-chain account is a vesting account.
 func queryAccountIsVesting(addr string) (bool, error) {
 	out, err := run("query", "auth", "account", addr)
@@ -154,6 +172,16 @@ func queryAccountIsVesting(addr string) (bool, error) {
 		return false, fmt.Errorf("query auth account: %s\n%w", out, err)
 	}
 	return authAccountLooksVesting(out), nil
+}
+
+// queryAccountIsPermanentLocked returns true if the on-chain account is a
+// PermanentLockedAccount.
+func queryAccountIsPermanentLocked(addr string) (bool, error) {
+	out, err := run("query", "auth", "account", addr)
+	if err != nil {
+		return false, fmt.Errorf("query auth account: %s\n%w", out, err)
+	}
+	return authAccountLooksPermanentLocked(out), nil
 }
 
 // authAccountLooksVesting returns true if the auth account JSON output contains vesting indicators.
@@ -167,22 +195,49 @@ func authAccountLooksVesting(out string) bool {
 	return strings.Contains(lower, "vestingaccount") || strings.Contains(lower, "/cosmos.vesting.")
 }
 
+// authAccountLooksPermanentLocked returns true if the auth account JSON output
+// identifies a PermanentLockedAccount.
+func authAccountLooksPermanentLocked(out string) bool {
+	var payload any
+	if err := json.Unmarshal([]byte(out), &payload); err == nil {
+		return authAccountPayloadMatchesType(payload, isPermanentLockedAccountType)
+	}
+
+	lower := strings.ToLower(out)
+	return strings.Contains(lower, "permanentlockedaccount")
+}
+
+// authAccountTypeName extracts the first auth account type name from query JSON.
+func authAccountTypeName(out string) string {
+	var payload any
+	if err := json.Unmarshal([]byte(out), &payload); err == nil {
+		return authAccountPayloadTypeName(payload)
+	}
+	return ""
+}
+
 // authAccountPayloadLooksVesting recursively checks if any value in the parsed
 // JSON payload indicates a vesting account type.
 func authAccountPayloadLooksVesting(v any) bool {
+	return authAccountPayloadMatchesType(v, isVestingAccountType)
+}
+
+// authAccountPayloadMatchesType recursively checks whether any parsed JSON node
+// advertises an auth account type satisfying match.
+func authAccountPayloadMatchesType(v any, match func(string) bool) bool {
 	switch value := v.(type) {
 	case map[string]any:
 		for key, nested := range value {
-			if (key == "@type" || key == "type") && isVestingAccountType(fmt.Sprint(nested)) {
+			if (key == "@type" || key == "type") && match(fmt.Sprint(nested)) {
 				return true
 			}
-			if authAccountPayloadLooksVesting(nested) {
+			if authAccountPayloadMatchesType(nested, match) {
 				return true
 			}
 		}
 	case []any:
 		for _, nested := range value {
-			if authAccountPayloadLooksVesting(nested) {
+			if authAccountPayloadMatchesType(nested, match) {
 				return true
 			}
 		}
@@ -190,10 +245,42 @@ func authAccountPayloadLooksVesting(v any) bool {
 	return false
 }
 
+// authAccountPayloadTypeName recursively extracts the first auth account type
+// name found in parsed query JSON.
+func authAccountPayloadTypeName(v any) string {
+	switch value := v.(type) {
+	case map[string]any:
+		for key, nested := range value {
+			if key == "@type" || key == "type" {
+				return fmt.Sprint(nested)
+			}
+			if typeName := authAccountPayloadTypeName(nested); typeName != "" {
+				return typeName
+			}
+		}
+	case []any:
+		for _, nested := range value {
+			if typeName := authAccountPayloadTypeName(nested); typeName != "" {
+				return typeName
+			}
+		}
+	}
+	return ""
+}
+
 // isVestingAccountType returns true if the type name indicates a vesting account.
 func isVestingAccountType(typeName string) bool {
 	lower := strings.ToLower(strings.TrimSpace(typeName))
 	return strings.Contains(lower, "vestingaccount") || strings.HasPrefix(lower, "/cosmos.vesting.")
+}
+
+// isPermanentLockedAccountType returns true if the type name indicates a
+// PermanentLockedAccount in proto or amino JSON.
+func isPermanentLockedAccountType(typeName string) bool {
+	lower := strings.ToLower(strings.TrimSpace(typeName))
+	return lower == strings.ToLower(protoPermanentLockedAccountType) ||
+		lower == strings.ToLower(legacyPermanentLockedAccountType) ||
+		strings.Contains(lower, "permanentlockedaccount")
 }
 
 // isAccountNotFoundErr returns true if the error indicates the account does not exist on-chain.

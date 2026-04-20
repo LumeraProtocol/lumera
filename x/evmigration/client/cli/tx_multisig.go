@@ -87,14 +87,8 @@ func LoadPartialProof(path string) (*PartialProof, error) {
 	if err := json.Unmarshal(b, &pp); err != nil {
 		return nil, fmt.Errorf("parse %s: %w", path, err)
 	}
-	if pp.Version != partialProofVersion {
-		return nil, fmt.Errorf("unsupported partial_proof version %d (expected %d)", pp.Version, partialProofVersion)
-	}
-	if pp.Single == nil && pp.Multisig == nil {
-		return nil, fmt.Errorf("partial proof has neither 'single' nor 'multisig' section")
-	}
-	if pp.Single != nil && pp.Multisig != nil {
-		return nil, fmt.Errorf("partial proof has both 'single' and 'multisig' sections")
+	if err := validatePartialProof(&pp); err != nil {
+		return nil, err
 	}
 	return &pp, nil
 }
@@ -154,10 +148,58 @@ func decodeSubPubKeys(ms *PartialMultisig) ([][]byte, error) {
 	return out, nil
 }
 
+func canonicalPayloadBytes(pp *PartialProof) []byte {
+	return []byte(ComputePayload(pp.ChainID, pp.EVMChainID, pp.Kind, pp.LegacyAddress, pp.NewAddress))
+}
+
+func validatePartialProof(pp *PartialProof) error {
+	if pp.Version != partialProofVersion {
+		return fmt.Errorf("unsupported partial_proof version %d (expected %d)", pp.Version, partialProofVersion)
+	}
+	if pp.Kind != "claim" && pp.Kind != "validator" {
+		return fmt.Errorf("partial proof has invalid kind %q", pp.Kind)
+	}
+	if pp.Single == nil && pp.Multisig == nil {
+		return fmt.Errorf("partial proof has neither 'single' nor 'multisig' section")
+	}
+	if pp.Single != nil && pp.Multisig != nil {
+		return fmt.Errorf("partial proof has both 'single' and 'multisig' sections")
+	}
+	payloadBytes, err := hex.DecodeString(pp.PayloadHex)
+	if err != nil {
+		return fmt.Errorf("payload_hex: %w", err)
+	}
+	if !bytes.Equal(payloadBytes, canonicalPayloadBytes(pp)) {
+		return fmt.Errorf("payload_hex does not match chain_id/kind/legacy_address/new_address fields")
+	}
+	return nil
+}
+
+func verifyPartialSignature(pkBytes, payload, sig []byte, sigFmt types.SigFormat) bool {
+	pk := &secp256k1.PubKey{Key: pkBytes}
+	switch sigFmt {
+	case types.SigFormat_SIG_FORMAT_CLI:
+		hash := sha256.Sum256(payload)
+		return pk.VerifySignature(hash[:], sig)
+	case types.SigFormat_SIG_FORMAT_ADR036:
+		signerAddr := sdk.AccAddress(pk.Address()).String()
+		doc := []byte(fmt.Sprintf(
+			`{"account_number":"0","chain_id":"","fee":{"amount":[],"gas":"0"},`+
+				`"memo":"","msgs":[{"type":"sign/MsgSignData","value":`+
+				`{"data":"%s","signer":"%s"}}],"sequence":"0"}`,
+			base64.StdEncoding.EncodeToString(payload), signerAddr,
+		))
+		return pk.VerifySignature(doc, sig)
+	default:
+		return false
+	}
+}
+
 // assembleMultisigProof merges partial sub-signatures into a MultisigProof.
-// Signatures are deduplicated by index (last write wins). If fewer than
-// threshold valid entries are present, returns an error.
-func assembleMultisigProof(ms *PartialMultisig, partials []PartialSubSignature) (*types.MultisigProof, error) {
+// Signatures are deduplicated by index (last write wins). If more than K
+// signatures are present, the first K valid signatures in signer-index order
+// are selected so stale/corrupted extras do not poison the assembled proof.
+func assembleMultisigProof(ms *PartialMultisig, payload []byte, partials []PartialSubSignature) (*types.MultisigProof, error) {
 	sigFmt, err := ParseSigFormat(ms.SigFormat)
 	if err != nil {
 		return nil, err
@@ -185,15 +227,26 @@ func assembleMultisigProof(ms *PartialMultisig, partials []PartialSubSignature) 
 		indices = append(indices, idx)
 	}
 	sort.Slice(indices, func(i, j int) bool { return indices[i] < indices[j] })
-	indices = indices[:ms.Threshold]
-	sigs := make([][]byte, len(indices))
-	for i, idx := range indices {
-		sigs[i] = byIdx[idx]
+	validIndices := make([]uint32, 0, len(indices))
+	sigs := make([][]byte, 0, len(indices))
+	for _, idx := range indices {
+		sig := byIdx[idx]
+		if !verifyPartialSignature(subs[idx], payload, sig, sigFmt) {
+			continue
+		}
+		validIndices = append(validIndices, idx)
+		sigs = append(sigs, sig)
+		if uint32(len(validIndices)) == ms.Threshold {
+			break
+		}
+	}
+	if uint32(len(validIndices)) < ms.Threshold {
+		return nil, fmt.Errorf("need %d valid partial signatures, have %d", ms.Threshold, len(validIndices))
 	}
 	return &types.MultisigProof{
 		Threshold:     ms.Threshold,
 		SubPubKeys:    subs,
-		SignerIndices: indices,
+		SignerIndices: validIndices,
 		SubSignatures: sigs,
 		SigFormat:     sigFmt,
 	}, nil
@@ -243,6 +296,9 @@ func AssertPartialProofsConsistent(a, b *PartialProof) error {
 	}
 	if a.EVMChainID != b.EVMChainID {
 		return fmt.Errorf("evm_chain_id mismatch: %d vs %d", a.EVMChainID, b.EVMChainID)
+	}
+	if a.PayloadHex != b.PayloadHex {
+		return fmt.Errorf("payload_hex mismatch")
 	}
 	if (a.Single == nil) != (b.Single == nil) {
 		return fmt.Errorf("proof-kind mismatch: one has 'single', the other does not")
@@ -466,10 +522,7 @@ func cmdSignProof() *cobra.Command {
 				return fmt.Errorf("--from key %q is not secp256k1 (got %T)", fromKey, kp)
 			}
 
-			payloadBytes, err := hex.DecodeString(pp.PayloadHex)
-			if err != nil {
-				return fmt.Errorf("decode payload_hex: %w", err)
-			}
+			payloadBytes := canonicalPayloadBytes(pp)
 
 			var idx uint32
 			var found bool
@@ -591,7 +644,7 @@ func cmdCombineProof() *cobra.Command {
 				}
 				legacyProof = types.LegacyProof{Proof: &types.LegacyProof_Single{Single: sp}}
 			case merged.Multisig != nil:
-				mp, err := assembleMultisigProof(merged.Multisig, merged.PartialSigs)
+				mp, err := assembleMultisigProof(merged.Multisig, canonicalPayloadBytes(merged), merged.PartialSigs)
 				if err != nil {
 					return err
 				}

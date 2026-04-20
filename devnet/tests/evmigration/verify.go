@@ -23,9 +23,10 @@ func runVerify() {
 	for _, rec := range af.Accounts {
 		if rec.IsLegacy && rec.Migrated && rec.Address != "" {
 			targets = append(targets, verifyTarget{
-				name:       rec.Name,
-				legacyAddr: rec.Address,
-				newAddr:    rec.NewAddress,
+				name:                rec.Name,
+				legacyAddr:          rec.Address,
+				newAddr:             rec.NewAddress,
+				expectedAccountType: rec.ExpectedAuthAccountType,
 			})
 		}
 	}
@@ -70,6 +71,16 @@ func runVerify() {
 		if t.newAddr != "" {
 			if wdAddr, err := queryWithdrawAddress(t.newAddr); err == nil && wdAddr == t.legacyAddr {
 				addIssue(t, "distribution", fmt.Sprintf("new address withdraw-addr still points to legacy: %s", wdAddr))
+			}
+		}
+
+		// ── auth: preserved account type on migrated destination ──────
+		if t.newAddr != "" && t.expectedAccountType != "" {
+			accountType, err := queryAuthAccountType(t.newAddr)
+			if err != nil {
+				addIssue(t, "auth", fmt.Sprintf("query new auth account type failed: %v", err))
+			} else if isPermanentLockedAccountType(t.expectedAccountType) && !isPermanentLockedAccountType(accountType) {
+				addIssue(t, "auth", fmt.Sprintf("expected new auth account type PermanentLockedAccount, got %s", accountType))
 			}
 		}
 
@@ -354,9 +365,10 @@ func verifySupernodeRecords(targets []verifyTarget, issues *[]issue) {
 }
 
 type verifyTarget = struct {
-	name       string
-	legacyAddr string
-	newAddr    string
+	name                string
+	legacyAddr          string
+	newAddr             string
+	expectedAccountType string
 }
 
 // expectedEVMChainID is the Lumera EVM chain ID (config/evm.go).

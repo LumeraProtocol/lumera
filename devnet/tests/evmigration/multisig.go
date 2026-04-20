@@ -1,11 +1,14 @@
-// multisig.go implements the "multisig" mode. It seeds a 2-of-3 secp256k1
-// multisig legacy account, funds it, issues a 1-ulume self-send so the
-// multisig pubkey is recorded on-chain (required by generate-proof-payload),
-// then runs the four-step evmigration CLI flow:
+// multisig.go provides reusable multisig helpers for the devnet evmigration
+// harness. The standalone "multisig" mode still exists as a smoke test, and
+// prepare/migrate flows also use the same helpers for integrated multisig
+// fixtures.
+//
+// The core reusable path is:
 //
 //	generate-proof-payload → sign-proof × 2 → combine-proof → submit-proof
 //
-// Finally it verifies the migration record exists and that balances moved.
+// For legacy multisig accounts, a 1-ulume self-send is used beforehand so the
+// multisig pubkey is recorded on-chain (required by generate-proof-payload).
 package main
 
 import (
@@ -20,14 +23,28 @@ import (
 // multisigKeyNames is a fixed set of key names used by this mode. Using
 // well-known names makes reruns and manual inspection easier.
 const (
-	multisigSigner1Name  = "multisig-signer-1"
-	multisigSigner2Name  = "multisig-signer-2"
-	multisigSigner3Name  = "multisig-signer-3"
-	multisigAccountName  = "multisig-account"
-	multisigNewKeyName   = "multisig-new"
-	multisigFundAmount   = "1000000ulume"
-	multisigSelfSendAmt  = "1ulume"
+	defaultMultisigThreshold = 2
+	defaultMultisigSigners   = 3
+
+	multisigSigner1Name = "multisig-signer-1"
+	multisigSigner2Name = "multisig-signer-2"
+	multisigSigner3Name = "multisig-signer-3"
+	multisigAccountName = "multisig-account"
+	multisigNewKeyName  = "multisig-new"
+	multisigFundAmount  = "1000000ulume"
+	multisigSelfSendAmt = "1ulume"
 )
+
+func derivedMultisigMemberKeys(baseName string, signerCount int) []string {
+	if signerCount < 1 {
+		signerCount = defaultMultisigSigners
+	}
+	members := make([]string, 0, signerCount)
+	for i := 1; i <= signerCount; i++ {
+		members = append(members, fmt.Sprintf("%s-signer-%d", baseName, i))
+	}
+	return members
+}
 
 // RunMultisigMigration is the main entry point for the "multisig" mode. It
 // orchestrates the full flow end-to-end and returns an error if any step fails.
@@ -68,7 +85,7 @@ func RunMultisigMigration() error {
 	// Step 3: Self-send 1ulume from the multisig so its pubkey lands on-chain.
 	// This is a precondition for generate-proof-payload on multisig accounts
 	// (which requires the on-chain pubkey to be populated).
-	if err := registerMultisigPubKey(multisigAddr, members); err != nil {
+	if err := registerMultisigPubKey(multisigAccountName, multisigAddr, members); err != nil {
 		return fmt.Errorf("step 3 (register multisig pubkey via self-send): %w", err)
 	}
 	if err := waitForNextBlock(20 * time.Second); err != nil {
@@ -76,14 +93,14 @@ func RunMultisigMigration() error {
 	}
 
 	// Step 4: Create the new EVM destination key (eth_secp256k1, coin-type 60).
-	newAddr, err := createNewEVMKey()
+	newRec, err := createOrReuseFreshEVMKey(multisigNewKeyName)
 	if err != nil {
 		return fmt.Errorf("step 4 (create new EVM key): %w", err)
 	}
-	log.Printf("  new EVM key: %s (%s)", multisigNewKeyName, newAddr)
+	log.Printf("  new EVM key: %s (%s)", newRec.Name, newRec.Address)
 
 	// Steps 5–8: Run the four-step migration flow.
-	if err := runFourStepMigration(multisigAddr, newAddr, members); err != nil {
+	if err := runFourStepMigration("claim", multisigAddr, newRec.Name, newRec.Address, members); err != nil {
 		return fmt.Errorf("step 5 (four-step migration): %w", err)
 	}
 	if err := waitForNextBlock(20 * time.Second); err != nil {
@@ -91,7 +108,7 @@ func RunMultisigMigration() error {
 	}
 
 	// Step 9: Verify the migration record and balances.
-	if err := verifyMultisigMigration(multisigAddr, newAddr); err != nil {
+	if err := verifyMultisigMigration(multisigAddr, newRec.Address); err != nil {
 		return fmt.Errorf("step 9 (verify migration): %w", err)
 	}
 
@@ -103,48 +120,71 @@ func RunMultisigMigration() error {
 // composite key. Returns the member key names and the multisig bech32 address.
 // Keys are reused from the keyring if they already exist (rerun-safe).
 func createMultisigKeys() (members []string, multisigAddr string, err error) {
-	memberNames := []string{multisigSigner1Name, multisigSigner2Name, multisigSigner3Name}
+	return createNamedMultisigKey(multisigAccountName, defaultMultisigThreshold, []string{
+		multisigSigner1Name,
+		multisigSigner2Name,
+		multisigSigner3Name,
+	})
+}
 
-	// Create (or reuse) individual secp256k1 signer keys (coin-type 118 = legacy Cosmos).
+func createNamedMultisigKey(multisigKeyName string, threshold int, memberNames []string) (members []string, multisigAddr string, err error) {
+	if threshold < 1 {
+		return nil, "", fmt.Errorf("invalid multisig threshold %d", threshold)
+	}
+	if len(memberNames) < threshold {
+		return nil, "", fmt.Errorf("multisig key %s has %d members, need at least threshold %d", multisigKeyName, len(memberNames), threshold)
+	}
+	if err := ensureMultisigMembers(memberNames); err != nil {
+		return nil, "", err
+	}
+	addr, err := ensureMultisigCompositeKey(multisigKeyName, memberNames, threshold)
+	if err != nil {
+		return nil, "", err
+	}
+	return append([]string(nil), memberNames...), addr, nil
+}
+
+func ensureMultisigMembers(memberNames []string) error {
 	for _, name := range memberNames {
 		if keyExists(name) {
 			log.Printf("  key %s already in keyring, reusing", name)
 			continue
 		}
-		rec, genErr := generateAccount(name, true /* isLegacy → coin-type 118, secp256k1 */)
-		if genErr != nil {
-			return nil, "", fmt.Errorf("generate key %s: %w", name, genErr)
+		rec, err := generateAccount(name, true)
+		if err != nil {
+			return fmt.Errorf("generate key %s: %w", name, err)
 		}
-		if impErr := importKey(name, rec.Mnemonic, true); impErr != nil {
-			return nil, "", fmt.Errorf("import key %s: %w", name, impErr)
+		if err := importKey(name, rec.Mnemonic, true); err != nil {
+			return fmt.Errorf("import key %s: %w", name, err)
 		}
 		log.Printf("  created signer key %s (%s)", name, rec.Address)
 	}
-	members = memberNames
+	return nil
+}
 
-	// Create (or reuse) the multisig composite key.
-	if keyExists(multisigAccountName) {
-		log.Printf("  multisig key %s already in keyring, reusing", multisigAccountName)
-	} else {
-		args := buildLumeraArgs(
-			"keys", "add", multisigAccountName,
-			"--multisig", strings.Join(memberNames, ","),
-			"--multisig-threshold", "2",
-			"--keyring-backend", "test",
-		)
-		cmd := exec.Command(*flagBin, args...)
-		out, cmdErr := cmd.CombinedOutput()
-		if cmdErr != nil {
-			return nil, "", fmt.Errorf("keys add multisig %s: %s\n%w", multisigAccountName, string(out), cmdErr)
-		}
-		log.Printf("  created multisig key %s", multisigAccountName)
+func ensureMultisigCompositeKey(multisigKeyName string, members []string, threshold int) (string, error) {
+	if keyExists(multisigKeyName) {
+		log.Printf("  multisig key %s already in keyring, reusing", multisigKeyName)
+		return getAddress(multisigKeyName)
 	}
 
-	addr, err := getAddress(multisigAccountName)
+	args := buildLumeraArgs(
+		"keys", "add", multisigKeyName,
+		"--multisig", strings.Join(members, ","),
+		"--multisig-threshold", fmt.Sprintf("%d", threshold),
+		"--keyring-backend", "test",
+	)
+	cmd := exec.Command(*flagBin, args...)
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, "", fmt.Errorf("get multisig address: %w", err)
+		return "", fmt.Errorf("keys add multisig %s: %s\n%w", multisigKeyName, string(out), err)
 	}
-	return members, addr, nil
+	log.Printf("  created multisig key %s", multisigKeyName)
+	addr, err := getAddress(multisigKeyName)
+	if err != nil {
+		return "", fmt.Errorf("get multisig address %s: %w", multisigKeyName, err)
+	}
+	return addr, nil
 }
 
 // registerMultisigPubKey issues a 1-ulume self-send from the multisig account
@@ -152,8 +192,11 @@ func createMultisigKeys() (members []string, multisigAddr string, err error) {
 // is required before generate-proof-payload can read the pubkey from the chain.
 //
 // Flow: generate-only → each member signs → tx multisign → broadcast.
-func registerMultisigPubKey(multisigAddr string, members []string) error {
+func registerMultisigPubKey(multisigKeyName, multisigAddr string, members []string) error {
 	log.Printf("  registering multisig pubkey via 1-ulume self-send from %s", multisigAddr)
+	if len(members) < defaultMultisigThreshold {
+		return fmt.Errorf("multisig %s has %d members, need at least %d signers", multisigKeyName, len(members), defaultMultisigThreshold)
+	}
 
 	// Temp files for the unsigned tx and per-member signatures.
 	unsignedFile := tmpFile("multisig-unsigned-*.json")
@@ -183,7 +226,7 @@ func registerMultisigPubKey(multisigAddr string, members []string) error {
 	unsignedArgs := buildLumeraArgs(
 		"tx", "bank", "send",
 		multisigAddr, multisigAddr, multisigSelfSendAmt,
-		"--from", multisigAccountName,
+		"--from", multisigKeyName,
 		"--keyring-backend", "test",
 		"--chain-id", *flagChainID,
 		"--account-number", fmt.Sprintf("%d", accNum),
@@ -203,7 +246,7 @@ func registerMultisigPubKey(multisigAddr string, members []string) error {
 	}
 
 	// 2. Each member signs the unsigned tx.
-	for i, member := range members[:2] { // threshold is 2; signer-1 and signer-2 sign
+	for i, member := range members[:defaultMultisigThreshold] {
 		signArgs := buildLumeraArgs(
 			"tx", "sign", unsignedFile,
 			"--from", member,
@@ -228,7 +271,7 @@ func registerMultisigPubKey(multisigAddr string, members []string) error {
 
 	// 3. Combine signatures via tx multisign.
 	multisignArgs := buildLumeraArgs(
-		"tx", "multisign", unsignedFile, multisigAccountName,
+		"tx", "multisign", unsignedFile, multisigKeyName,
 		sigFiles[0], sigFiles[1],
 		"--keyring-backend", "test",
 		"--chain-id", *flagChainID,
@@ -272,31 +315,149 @@ func registerMultisigPubKey(multisigAddr string, members []string) error {
 	return nil
 }
 
-// createNewEVMKey creates (or reuses) the eth_secp256k1 destination key.
-// Returns the bech32 address of the new key.
-func createNewEVMKey() (string, error) {
-	if keyExists(multisigNewKeyName) {
-		addr, err := getAddress(multisigNewKeyName)
-		if err != nil {
-			return "", fmt.Errorf("get address for existing new EVM key %s: %w", multisigNewKeyName, err)
+func buildUnsignedMultisigDelegateTx(multisigKeyName, multisigAddr, validatorAddr, amount, outFile string) error {
+	accNum, seq, err := queryAccountNumberAndSequence(multisigAddr)
+	if err != nil {
+		if waitErr := waitForAccountOnChain(multisigAddr, 30*time.Second); waitErr != nil {
+			return fmt.Errorf("wait for multisig account on-chain: %w", waitErr)
 		}
-		log.Printf("  new EVM key %s already in keyring (%s), reusing", multisigNewKeyName, addr)
-		return addr, nil
+		accNum, seq, err = queryAccountNumberAndSequence(multisigAddr)
+		if err != nil {
+			return fmt.Errorf("query account number/sequence for %s: %w", multisigAddr, err)
+		}
 	}
 
-	// Generate a new eth_secp256k1 key (coin-type 60).
-	rec, err := generateAccount(multisigNewKeyName, false /* not legacy → eth_secp256k1, coin-type 60 */)
+	unsignedArgs := buildLumeraArgs(
+		"tx", "staking", "delegate",
+		validatorAddr, amount,
+		"--from", multisigKeyName,
+		"--keyring-backend", "test",
+		"--chain-id", *flagChainID,
+		"--account-number", fmt.Sprintf("%d", accNum),
+		"--sequence", fmt.Sprintf("%d", seq),
+		"--gas", *flagGas,
+		"--gas-prices", *flagGasPrices,
+		"--generate-only",
+		"--output", "json",
+	)
+	cmd := exec.Command(*flagBin, unsignedArgs...)
+	unsignedOut, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("generate new EVM key: %w", err)
+		return fmt.Errorf("generate unsigned multisig delegate tx: %s\n%w", string(unsignedOut), err)
 	}
-	if err := importKey(multisigNewKeyName, rec.Mnemonic, false); err != nil {
-		return "", fmt.Errorf("import new EVM key %s: %w", multisigNewKeyName, err)
+	if err := os.WriteFile(outFile, unsignedOut, 0o600); err != nil {
+		return fmt.Errorf("write unsigned multisig delegate tx to %s: %w", outFile, err)
 	}
-	addr, err := getAddress(multisigNewKeyName)
+	return nil
+}
+
+func signAndBroadcastMultisigTx(unsignedFile, multisigKeyName, multisigAddr string, members []string) error {
+	if len(members) < defaultMultisigThreshold {
+		return fmt.Errorf("multisig %s has %d members, need at least %d", multisigKeyName, len(members), defaultMultisigThreshold)
+	}
+
+	accNum, seq, err := queryAccountNumberAndSequence(multisigAddr)
 	if err != nil {
-		return "", fmt.Errorf("get address for new EVM key %s: %w", multisigNewKeyName, err)
+		return fmt.Errorf("query account number/sequence for %s: %w", multisigAddr, err)
 	}
-	return addr, nil
+
+	sigFiles := make([]string, defaultMultisigThreshold)
+	for i := range sigFiles {
+		sigFiles[i] = tmpFile(fmt.Sprintf("multisig-sig%d-*.json", i+1))
+		defer os.Remove(sigFiles[i]) //nolint:gocritic // intentional deferred cleanup
+	}
+	signedFile := tmpFile("multisig-signed-*.json")
+	defer os.Remove(signedFile)
+
+	for i, member := range members[:defaultMultisigThreshold] {
+		signArgs := buildLumeraArgs(
+			"tx", "sign", unsignedFile,
+			"--from", member,
+			"--multisig", multisigAddr,
+			"--keyring-backend", "test",
+			"--chain-id", *flagChainID,
+			"--account-number", fmt.Sprintf("%d", accNum),
+			"--sequence", fmt.Sprintf("%d", seq),
+			"--sign-mode", "amino-json",
+			"--output", "json",
+		)
+		cmd := exec.Command(*flagBin, signArgs...)
+		sigOut, sigErr := cmd.CombinedOutput()
+		if sigErr != nil {
+			return fmt.Errorf("sign tx with %s: %s\n%w", member, string(sigOut), sigErr)
+		}
+		if err := os.WriteFile(sigFiles[i], sigOut, 0o600); err != nil {
+			return fmt.Errorf("write signature %s to %s: %w", member, sigFiles[i], err)
+		}
+	}
+
+	multisignArgs := buildLumeraArgs(
+		"tx", "multisign", unsignedFile, multisigKeyName,
+		sigFiles[0], sigFiles[1],
+		"--keyring-backend", "test",
+		"--chain-id", *flagChainID,
+		"--output", "json",
+	)
+	cmd := exec.Command(*flagBin, multisignArgs...)
+	msignOut, msignErr := cmd.CombinedOutput()
+	if msignErr != nil {
+		return fmt.Errorf("tx multisign: %s\n%w", string(msignOut), msignErr)
+	}
+	if err := os.WriteFile(signedFile, msignOut, 0o600); err != nil {
+		return fmt.Errorf("write signed tx to %s: %w", signedFile, err)
+	}
+
+	broadcastArgs := buildLumeraArgs(
+		"tx", "broadcast", signedFile,
+		"--broadcast-mode", "sync",
+		"--output", "json",
+	)
+	cmd = exec.Command(*flagBin, broadcastArgs...)
+	bcastOut, bcastErr := cmd.CombinedOutput()
+	bcastStr := strings.TrimSpace(string(bcastOut))
+	if bcastErr != nil {
+		return fmt.Errorf("broadcast multisig tx: %s\n%w", bcastStr, bcastErr)
+	}
+	txHash := extractTxHash(bcastStr)
+	if txHash != "" {
+		code, rawLog, err := waitForTxResult(txHash, 45*time.Second)
+		if err != nil {
+			return fmt.Errorf("wait for multisig tx %s: %w", txHash, err)
+		}
+		if code != 0 {
+			return fmt.Errorf("multisig tx failed code=%d raw_log=%s", code, rawLog)
+		}
+	}
+	return nil
+}
+
+// createNewEVMKey creates (or reuses) the eth_secp256k1 destination key.
+// Returns the bech32 address of the new key.
+func createOrReuseFreshEVMKey(keyName string) (AccountRecord, error) {
+	if keyExists(keyName) {
+		addr, err := getAddress(keyName)
+		if err != nil {
+			return AccountRecord{}, fmt.Errorf("get address for existing new EVM key %s: %w", keyName, err)
+		}
+		log.Printf("  new EVM key %s already in keyring (%s), reusing", keyName, addr)
+		return AccountRecord{Name: keyName, Address: addr, IsLegacy: false}, nil
+	}
+
+	rec, err := generateAccount(keyName, false)
+	if err != nil {
+		return AccountRecord{}, fmt.Errorf("generate new EVM key %s: %w", keyName, err)
+	}
+	if err := importKey(keyName, rec.Mnemonic, false); err != nil {
+		return AccountRecord{}, fmt.Errorf("import new EVM key %s: %w", keyName, err)
+	}
+	addr, err := getAddress(keyName)
+	if err != nil {
+		return AccountRecord{}, fmt.Errorf("get address for new EVM key %s: %w", keyName, err)
+	}
+	rec.Address = addr
+	rec.Name = keyName
+	rec.IsLegacy = false
+	return rec, nil
 }
 
 // runFourStepMigration executes the four-step CLI migration flow:
@@ -305,20 +466,26 @@ func createNewEVMKey() (string, error) {
 //  2. sign-proof proof.json  --from multisig-signer-1
 //  3. sign-proof proof.json  --from multisig-signer-3  (any 2-of-3)
 //  4. combine-proof proof.json --out tx.json
-//  5. submit-proof tx.json   --from multisig-new
-func runFourStepMigration(multisigAddr, newAddr string, members []string) error {
+//  5. submit-proof tx.json   --from the new destination key
+func runFourStepMigration(kind, legacyAddr, newKeyName, newAddr string, members []string) error {
 	proofFile := tmpFile("multisig-proof-*.json")
 	defer os.Remove(proofFile)
 	txFile := tmpFile("multisig-tx-*.json")
 	defer os.Remove(txFile)
+	if len(members) < defaultMultisigThreshold {
+		return fmt.Errorf("multisig proof flow requires at least %d members, got %d", defaultMultisigThreshold, len(members))
+	}
+	if kind == "" {
+		kind = "claim"
+	}
 
 	// Step 5a: generate-proof-payload
-	log.Printf("  [migration step 1] generate-proof-payload: %s -> %s", multisigAddr, newAddr)
+	log.Printf("  [migration step 1] generate-proof-payload (%s): %s -> %s", kind, legacyAddr, newAddr)
 	genArgs := buildLumeraArgs(
 		"tx", "evmigration", "generate-proof-payload",
-		"--legacy", multisigAddr,
+		"--legacy", legacyAddr,
 		"--new", newAddr,
-		"--kind", "claim",
+		"--kind", kind,
 		"--out", proofFile,
 		"--keyring-backend", "test",
 	)
@@ -357,10 +524,10 @@ func runFourStepMigration(multisigAddr, newAddr string, members []string) error 
 	log.Printf("  unsigned tx written to %s", txFile)
 
 	// Step 5e: submit-proof — signs new_signature with the EVM key and broadcasts.
-	log.Printf("  [migration step 5] submit-proof with %s", multisigNewKeyName)
+	log.Printf("  [migration step 5] submit-proof with %s", newKeyName)
 	submitArgs := buildLumeraArgs(
 		"tx", "evmigration", "submit-proof", txFile,
-		"--from", multisigNewKeyName,
+		"--from", newKeyName,
 		"--keyring-backend", "test",
 		"--gas", "auto",
 		"--gas-adjustment", *flagGasAdj,

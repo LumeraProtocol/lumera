@@ -361,13 +361,22 @@ func migrateOne(rec *AccountRecord) migrateResult {
 	rec.NewAddress = newRec.Address
 
 	// Submit the migration transaction — both legacy and new keys are in the
-	// keyring, so the CLI handles proof signing internally.
-	_, err = runTx(
-		"tx", "evmigration", "claim-legacy-account",
-		rec.Name, newRec.Name)
-	if err != nil {
-		log.Printf("  FAIL: claim-legacy-account %s -> %s: %v", rec.Name, newRec.Address, err)
-		return migrateFailed
+	// keyring, so the CLI handles proof signing internally for single-key
+	// accounts. Multisig accounts go through the explicit four-step proof flow.
+	if rec.IsMultisig {
+		err = runFourStepMigration("claim", rec.Address, newRec.Name, newRec.Address, rec.MultisigMemberKeys)
+		if err != nil {
+			log.Printf("  FAIL: multisig claim flow %s -> %s: %v", rec.Name, newRec.Address, err)
+			return migrateFailed
+		}
+	} else {
+		_, err = runTx(
+			"tx", "evmigration", "claim-legacy-account",
+			rec.Name, newRec.Name)
+		if err != nil {
+			log.Printf("  FAIL: claim-legacy-account %s -> %s: %v", rec.Name, newRec.Address, err)
+			return migrateFailed
+		}
 	}
 
 	// Verify migration-record exists and points to the expected new address.
@@ -394,6 +403,34 @@ func migrateOne(rec *AccountRecord) migrateResult {
 // createDestinationAccountFromLegacy derives a coin-type 60 destination key
 // from the legacy account's mnemonic and imports it into the keyring.
 func createDestinationAccountFromLegacy(rec *AccountRecord) (AccountRecord, error) {
+	if rec.IsMultisig {
+		if rec.NewName != "" {
+			if addr, err := getAddress(rec.NewName); err == nil {
+				return AccountRecord{Name: rec.NewName, Address: addr, IsLegacy: false}, nil
+			}
+		}
+		baseName := migratedAccountBaseName(rec.Name, rec.IsLegacy)
+		for i := 0; i < 50; i++ {
+			name := baseName
+			if i > 0 {
+				name = fmt.Sprintf("%s-%02d", baseName, i)
+			}
+			if addr, err := getAddress(name); err == nil {
+				return AccountRecord{Name: name, Address: addr, IsLegacy: false}, nil
+			}
+			newRec, err := createOrReuseFreshEVMKey(name)
+			if err != nil {
+				low := strings.ToLower(err.Error())
+				if strings.Contains(low, "already exists") || strings.Contains(low, "key exists") {
+					continue
+				}
+				return AccountRecord{}, err
+			}
+			return newRec, nil
+		}
+		return AccountRecord{}, fmt.Errorf("unable to create unique multisig destination key for %s", rec.Name)
+	}
+
 	if strings.TrimSpace(rec.Mnemonic) == "" {
 		return AccountRecord{}, fmt.Errorf("legacy account %s has no mnemonic; cannot derive coin-type 60 destination from the same mnemonic", rec.Name)
 	}
@@ -571,11 +608,32 @@ func validateLegacyPostMigration(rec *AccountRecord) error {
 	issues = append(issues, validatePostMigrationFeegrants(rec)...)
 	issues = append(issues, validatePostMigrationFeegrantsReceived(rec)...)
 	issues = append(issues, validatePostMigrationActions(rec)...)
+	issues = append(issues, validatePostMigrationAccountType(rec)...)
 
 	if len(issues) == 0 {
 		return nil
 	}
 	return errors.New(strings.Join(issues, "; "))
+}
+
+// validatePostMigrationAccountType checks that auth account type expectations
+// survive migration for accounts that explicitly require it.
+func validatePostMigrationAccountType(rec *AccountRecord) []string {
+	if rec == nil || rec.NewAddress == "" || rec.ExpectedAuthAccountType == "" {
+		return nil
+	}
+
+	accountType, err := queryAuthAccountType(rec.NewAddress)
+	if err != nil {
+		return []string{fmt.Sprintf("query new auth account type failed: %v", err)}
+	}
+	if rec.expectsPermanentLockedAccount() && !isPermanentLockedAccountType(accountType) {
+		return []string{fmt.Sprintf("expected new auth account type PermanentLockedAccount, got %s", accountType)}
+	}
+	if !rec.expectsPermanentLockedAccount() && accountType != rec.ExpectedAuthAccountType {
+		return []string{fmt.Sprintf("expected new auth account type %s, got %s", rec.ExpectedAuthAccountType, accountType)}
+	}
+	return nil
 }
 
 // validatePostMigrationDelegations checks that delegations moved from the legacy
@@ -1089,6 +1147,16 @@ func cleanupLegacyKeys(af *AccountsFile) {
 		}
 		deleted++
 		log.Printf("  deleted legacy key: %s (migrated to %s)", rec.Name, rec.NewName)
+		if rec.IsMultisig {
+			for _, member := range rec.MultisigMemberKeys {
+				if err := deleteKey(member); err != nil {
+					log.Printf("  WARN: failed to delete multisig signer key %s: %v", member, err)
+					continue
+				}
+				deleted++
+				log.Printf("  deleted multisig signer key: %s", member)
+			}
+		}
 	}
 	log.Printf("  cleaned up %d legacy keys", deleted)
 }

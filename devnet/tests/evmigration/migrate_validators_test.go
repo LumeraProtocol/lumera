@@ -86,3 +86,44 @@ func TestPickValidatorCandidatesExplicitKeyRejectsMigratedDestinationKey(t *test
 		t.Fatalf("expected legacy validator key, got %s", candidates[0].KeyName)
 	}
 }
+
+func TestPickValidatorCandidatesMarksMultisigValidator(t *testing.T) {
+	setLumeraBech32Prefixes()
+	*flagValidatorKeys = ""
+
+	legacyAddr := "lumera1ld2a96xxu660tk77w787rd33rlw9gutlp7f767"
+	keys := []keyRecord{
+		{
+			Name:    "supernova_validator_2_key",
+			Address: legacyAddr,
+			PubKey:  `{"@type":"/cosmos.crypto.multisig.LegacyAminoPubKey","threshold":2}`,
+		},
+	}
+
+	candidates := pickValidatorCandidates([]string{
+		mustValoperFromAcc(t, legacyAddr),
+	}, keys)
+
+	if len(candidates) != 1 {
+		t.Fatalf("expected 1 candidate, got %d: %#v", len(candidates), candidates)
+	}
+	if !candidates[0].IsMultisig {
+		t.Fatalf("expected multisig candidate, got %#v", candidates[0])
+	}
+	if candidates[0].Threshold != defaultMultisigThreshold {
+		t.Fatalf("expected threshold %d, got %d", defaultMultisigThreshold, candidates[0].Threshold)
+	}
+	expectedMembers := []string{
+		"supernova_validator_2_key-signer-1",
+		"supernova_validator_2_key-signer-2",
+		"supernova_validator_2_key-signer-3",
+	}
+	if len(candidates[0].MemberKeys) != len(expectedMembers) {
+		t.Fatalf("expected %d member keys, got %d: %#v", len(expectedMembers), len(candidates[0].MemberKeys), candidates[0].MemberKeys)
+	}
+	for i, expected := range expectedMembers {
+		if candidates[0].MemberKeys[i] != expected {
+			t.Fatalf("expected member %d to be %s, got %s", i, expected, candidates[0].MemberKeys[i])
+		}
+	}
+}

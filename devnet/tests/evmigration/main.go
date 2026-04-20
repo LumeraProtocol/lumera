@@ -104,6 +104,9 @@ type AccountRecord struct {
 	PubKeyB64  string `json:"pubkey_b64"` // base64-encoded compressed secp256k1 pubkey
 	IsLegacy   bool   `json:"is_legacy"`
 	HasBalance bool   `json:"has_balance"`
+	// ExpectedAuthAccountType records an auth account type that should be
+	// preserved across migration for this account.
+	ExpectedAuthAccountType string `json:"expected_auth_account_type,omitempty"`
 
 	// Activity flags (populated in prepare mode).
 	HasDelegation      bool `json:"has_delegation,omitempty"`
@@ -140,6 +143,12 @@ type AccountRecord struct {
 	IsValidator bool   `json:"is_validator,omitempty"`
 	Valoper     string `json:"valoper,omitempty"`
 	NewValoper  string `json:"new_valoper,omitempty"` // populated after validator migration
+
+	// Multisig metadata is populated for legacy composite-key accounts that must
+	// migrate via the four-step proof flow instead of mnemonic-based migration.
+	IsMultisig         bool     `json:"is_multisig,omitempty"`
+	MultisigThreshold  int      `json:"multisig_threshold,omitempty"`
+	MultisigMemberKeys []string `json:"multisig_member_keys,omitempty"`
 
 	// Pre-migration balance snapshot (populated at migration time).
 	PreMigrationBalance int64 `json:"pre_migration_balance,omitempty"`

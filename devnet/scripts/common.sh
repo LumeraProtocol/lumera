@@ -258,3 +258,60 @@ recover_key_from_mnemonic() {
 	run "${DAEMON}" keys delete "${key_name}" --keyring-backend "${KEYRING_BACKEND}" -y >/dev/null 2>&1 || true
 	printf '%s\n' "${mnemonic}" | run "${DAEMON}" keys add "${key_name}" --recover --keyring-backend "${KEYRING_BACKEND}" >/dev/null
 }
+
+# multisig_sign_unsigned collects 2-of-N threshold signatures for an unsigned
+# cosmos tx JSON and writes a fully-signed multisig tx JSON to stdout.
+# Callers redirect stdout to a file for subsequent `tx broadcast`.
+#
+# Positional args:
+#   $1 unsigned_file  input path produced by `tx <cmd> --generate-only`
+#   $2 multisig_key   keyring name of the multisig composite key
+#   $3 multisig_addr  bech32 address of the multisig account
+#   $4 signer1        keyring name of first sub-key to sign with
+#   $5 signer2        keyring name of second sub-key to sign with
+#   $6 account_num    multisig account's auth account_number
+#   $7 sequence       multisig account's current sequence
+#
+# Uses ${DAEMON}, ${KEYRING_BACKEND}, ${CHAIN_ID} from the sourcing script's
+# environment. Aborts (via set -e) if any step fails. Temp sig files are
+# cleaned up before returning.
+multisig_sign_unsigned() {
+	local unsigned_file="$1"
+	local multisig_key="$2"
+	local multisig_addr="$3"
+	local signer1="$4"
+	local signer2="$5"
+	local acc_num="$6"
+	local seq="$7"
+	local sig1 sig2 rc
+	sig1="$(mktemp /tmp/multisig-sig1.XXXXXX.json)"
+	sig2="$(mktemp /tmp/multisig-sig2.XXXXXX.json)"
+
+	rc=0
+	{
+		run_capture ${DAEMON} tx sign "${unsigned_file}" \
+			--from "${signer1}" \
+			--multisig "${multisig_addr}" \
+			--keyring-backend "${KEYRING_BACKEND}" \
+			--chain-id "${CHAIN_ID}" \
+			--account-number "${acc_num}" --sequence "${seq}" \
+			--sign-mode amino-json \
+			--output json >"${sig1}" &&
+		run_capture ${DAEMON} tx sign "${unsigned_file}" \
+			--from "${signer2}" \
+			--multisig "${multisig_addr}" \
+			--keyring-backend "${KEYRING_BACKEND}" \
+			--chain-id "${CHAIN_ID}" \
+			--account-number "${acc_num}" --sequence "${seq}" \
+			--sign-mode amino-json \
+			--output json >"${sig2}" &&
+		run_capture ${DAEMON} tx multisign "${unsigned_file}" "${multisig_key}" \
+			"${sig1}" "${sig2}" \
+			--keyring-backend "${KEYRING_BACKEND}" \
+			--chain-id "${CHAIN_ID}" \
+			--output json
+	} || rc=$?
+
+	rm -f "${sig1}" "${sig2}"
+	return "${rc}"
+}

@@ -272,11 +272,9 @@ ensure_validator_multisig_keys() {
 
 build_multisig_gentx() {
 	local gentx_file="$1"
-	local unsigned_file sig1 sig2 multisig_addr
+	local unsigned_file multisig_addr
 
 	unsigned_file="$(mktemp "${GENTX_LOCAL_DIR}/gentx-unsigned.XXXXXX.json")"
-	sig1="$(mktemp "${GENTX_LOCAL_DIR}/gentx-sig1.XXXXXX.json")"
-	sig2="$(mktemp "${GENTX_LOCAL_DIR}/gentx-sig2.XXXXXX.json")"
 	multisig_addr="$(run_capture ${DAEMON} keys show "${KEY_NAME}" -a --keyring-backend "${KEYRING_BACKEND}" 2>/dev/null || true)"
 	multisig_addr="$(printf '%s' "${multisig_addr}" | tr -d '\r\n')"
 
@@ -286,32 +284,15 @@ build_multisig_gentx() {
 		--generate-only \
 		--output-document "${unsigned_file}"
 
-	run_capture ${DAEMON} tx sign "${unsigned_file}" \
-		--from "${MULTISIG_MEMBER_KEYS[0]}" \
-		--multisig "${multisig_addr}" \
-		--keyring-backend "${KEYRING_BACKEND}" \
-		--chain-id "${CHAIN_ID}" \
-		--account-number 0 \
-		--sequence 0 \
-		--sign-mode amino-json \
-		--output json >"${sig1}"
-	run_capture ${DAEMON} tx sign "${unsigned_file}" \
-		--from "${MULTISIG_MEMBER_KEYS[1]}" \
-		--multisig "${multisig_addr}" \
-		--keyring-backend "${KEYRING_BACKEND}" \
-		--chain-id "${CHAIN_ID}" \
-		--account-number 0 \
-		--sequence 0 \
-		--sign-mode amino-json \
-		--output json >"${sig2}"
+	# Gentx signs against a not-yet-on-chain account, so account_number and
+	# sequence are both 0.
+	multisig_sign_unsigned "${unsigned_file}" \
+		"${KEY_NAME}" "${multisig_addr}" \
+		"${MULTISIG_MEMBER_KEYS[0]}" "${MULTISIG_MEMBER_KEYS[1]}" \
+		0 0 >"${gentx_file}"
 
-	run_capture ${DAEMON} tx multisign "${unsigned_file}" "${KEY_NAME}" \
-		"${sig1}" "${sig2}" \
-		--keyring-backend "${KEYRING_BACKEND}" \
-		--chain-id "${CHAIN_ID}" \
-		--output json >"${gentx_file}"
 	verify_gentx_file "${gentx_file}" || return 1
-	rm -f "${unsigned_file}" "${sig1}" "${sig2}"
+	rm -f "${unsigned_file}"
 }
 
 collect_secondary_genesis_accounts() {

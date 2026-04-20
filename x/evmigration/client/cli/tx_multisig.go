@@ -42,7 +42,7 @@ const (
 // the multi-step offline signing flow. It is never stored on-chain.
 type PartialProof struct {
 	Version       int                   `json:"version"`
-	Kind          string                `json:"kind"` // "claim" | "validator"
+	Kind          string                `json:"kind"` // migrationProofKindClaim | migrationProofKindValidator
 	LegacyAddress string                `json:"legacy_address"`
 	NewAddress    string                `json:"new_address"`
 	ChainID       string                `json:"chain_id"`
@@ -156,8 +156,9 @@ func validatePartialProof(pp *PartialProof) error {
 	if pp.Version != partialProofVersion {
 		return fmt.Errorf("unsupported partial_proof version %d (expected %d)", pp.Version, partialProofVersion)
 	}
-	if pp.Kind != "claim" && pp.Kind != "validator" {
-		return fmt.Errorf("partial proof has invalid kind %q", pp.Kind)
+	if pp.Kind != migrationProofKindClaim && pp.Kind != migrationProofKindValidator {
+		return fmt.Errorf("partial proof has invalid kind %q (expected %q or %q)",
+			pp.Kind, migrationProofKindClaim, migrationProofKindValidator)
 	}
 	if pp.Single == nil && pp.Multisig == nil {
 		return fmt.Errorf("partial proof has neither 'single' nor 'multisig' section")
@@ -182,13 +183,18 @@ func verifyPartialSignature(pkBytes, payload, sig []byte, sigFmt types.SigFormat
 		hash := sha256.Sum256(payload)
 		return pk.VerifySignature(hash[:], sig)
 	case types.SigFormat_SIG_FORMAT_ADR036:
+		// ADR-036 canonical sign doc for MsgSignData. Fields are alphabetically
+		// sorted (Amino canonical form) and must be byte-for-byte identical to
+		// what the wallet / `lumerad tx sign --sign-mode amino-json` produces,
+		// because secp256k1.VerifySignature hashes the doc and compares to the
+		// sig's hash. Keep in lockstep with keeper/verify.go:adr036SignDoc.
 		signerAddr := sdk.AccAddress(pk.Address()).String()
-		doc := []byte(fmt.Sprintf(
+		doc := fmt.Appendf(nil,
 			`{"account_number":"0","chain_id":"","fee":{"amount":[],"gas":"0"},`+
 				`"memo":"","msgs":[{"type":"sign/MsgSignData","value":`+
 				`{"data":"%s","signer":"%s"}}],"sequence":"0"}`,
 			base64.StdEncoding.EncodeToString(payload), signerAddr,
-		))
+		)
 		return pk.VerifySignature(doc, sig)
 	default:
 		return false
@@ -370,8 +376,9 @@ accounts, pass --legacy-key to seed the pubkey from your local keyring.`,
 			legacyKey, _ := cmd.Flags().GetString(flagLegacyKey)
 			sigFmtStr, _ := cmd.Flags().GetString(flagSigFormat)
 
-			if kind != "claim" && kind != "validator" {
-				return fmt.Errorf("--kind must be 'claim' or 'validator'")
+			if kind != migrationProofKindClaim && kind != migrationProofKindValidator {
+				return fmt.Errorf("--kind must be %q or %q",
+					migrationProofKindClaim, migrationProofKindValidator)
 			}
 			if _, err := ParseSigFormat(sigFmtStr); err != nil {
 				return err
@@ -478,7 +485,9 @@ accounts, pass --legacy-key to seed the pubkey from your local keyring.`,
 	flags.AddQueryFlagsToCmd(cmd)
 	cmd.Flags().String(flagLegacyAddr, "", "Legacy (coin-type 118) bech32 address to migrate from")
 	cmd.Flags().String(flagNewAddr, "", "New (coin-type 60) bech32 destination address")
-	cmd.Flags().String(flagKind, "claim", "'claim' for account migration or 'validator' for operator migration")
+	cmd.Flags().String(flagKind, migrationProofKindClaim,
+		fmt.Sprintf("%q for account migration or %q for operator migration",
+			migrationProofKindClaim, migrationProofKindValidator))
 	cmd.Flags().Uint64(flagEVMChainID, 0, "EVM chain ID (defaults to lcfg.EVMChainID)")
 	cmd.Flags().String(flagOut, "", "Output file path; if empty, writes JSON to stdout")
 	cmd.Flags().String(flagLegacyKey, "", "Local keyring key name to seed pubkey for nil-pubkey single-sig accounts")
@@ -657,13 +666,13 @@ func cmdCombineProof() *cobra.Command {
 
 			var unsignedMsg sdk.Msg
 			switch merged.Kind {
-			case "claim":
+			case migrationProofKindClaim:
 				unsignedMsg = &types.MsgClaimLegacyAccount{
 					NewAddress:    merged.NewAddress,
 					LegacyAddress: merged.LegacyAddress,
 					LegacyProof:   legacyProof,
 				}
-			case "validator":
+			case migrationProofKindValidator:
 				unsignedMsg = &types.MsgMigrateValidator{
 					NewAddress:    merged.NewAddress,
 					LegacyAddress: merged.LegacyAddress,

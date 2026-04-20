@@ -334,6 +334,10 @@ func detectFunder() (string, error) {
 		valAccAddrs[sdk.AccAddress(valAddr).String()] = struct{}{}
 	}
 
+	// Prefer a validator genesis key as funder; if none match, fall back to the
+	// first non-multisig key. Multisig composite keys are skipped because a
+	// single `--from` signer can't discharge their threshold requirement.
+	var fallback string
 	for _, k := range keys {
 		if isMultisigKeyRecord(k) {
 			continue
@@ -341,17 +345,14 @@ func detectFunder() (string, error) {
 		if _, ok := valAccAddrs[k.Address]; ok {
 			return k.Name, nil
 		}
-	}
-
-	for _, k := range keys {
-		if isMultisigKeyRecord(k) {
-			continue
+		if fallback == "" {
+			fallback = k.Name
 		}
-		return k.Name, nil
 	}
-
-	// No validator key found; fall back to first key.
-	return keys[0].Name, nil
+	if fallback != "" {
+		return fallback, nil
+	}
+	return "", fmt.Errorf("no non-multisig funder key available in keyring (all %d keys are multisig composites)", len(keys))
 }
 
 // listKeys returns all keys from the lumerad test keyring.

@@ -254,7 +254,7 @@ query_account_number_sequence() {
 }
 
 register_supernode_multisig() {
-	local acc_seq acc_num seq unsigned_file sig1 sig2 signed_file bcast_json tx_hash
+	local acc_num seq unsigned_file signed_file bcast_json tx_hash
 	IFS=$'\t' read -r acc_num seq < <(query_account_number_sequence "${VAL_ADDR}")
 	if [[ -z "${acc_num}" || -z "${seq}" ]]; then
 		echo "[SN] ERROR: failed to query validator multisig account number/sequence for ${VAL_ADDR}"
@@ -262,8 +262,6 @@ register_supernode_multisig() {
 	fi
 
 	unsigned_file="$(mktemp /tmp/sn-register-unsigned.XXXXXX.json)"
-	sig1="$(mktemp /tmp/sn-register-sig1.XXXXXX.json)"
-	sig2="$(mktemp /tmp/sn-register-sig2.XXXXXX.json)"
 	signed_file="$(mktemp /tmp/sn-register-signed.XXXXXX.json)"
 
 	run_capture ${DAEMON} tx supernode register-supernode \
@@ -273,31 +271,14 @@ register_supernode_multisig() {
 		--gas 500000 --gas-prices "${TX_GAS_PRICES}" \
 		--generate-only --output json >"${unsigned_file}"
 
-	run_capture ${DAEMON} tx sign "${unsigned_file}" \
-		--from "$(validator_multisig_signer_key 1)" \
-		--multisig "${VAL_ADDR}" \
-		--keyring-backend "${KEYRING_BACKEND}" \
-		--chain-id "${CHAIN_ID}" \
-		--account-number "${acc_num}" --sequence "${seq}" \
-		--sign-mode amino-json \
-		--output json >"${sig1}"
-	run_capture ${DAEMON} tx sign "${unsigned_file}" \
-		--from "$(validator_multisig_signer_key 2)" \
-		--multisig "${VAL_ADDR}" \
-		--keyring-backend "${KEYRING_BACKEND}" \
-		--chain-id "${CHAIN_ID}" \
-		--account-number "${acc_num}" --sequence "${seq}" \
-		--sign-mode amino-json \
-		--output json >"${sig2}"
-	run_capture ${DAEMON} tx multisign "${unsigned_file}" "${KEY_NAME}" \
-		"${sig1}" "${sig2}" \
-		--keyring-backend "${KEYRING_BACKEND}" \
-		--chain-id "${CHAIN_ID}" \
-		--output json >"${signed_file}"
+	multisig_sign_unsigned "${unsigned_file}" \
+		"${KEY_NAME}" "${VAL_ADDR}" \
+		"$(validator_multisig_signer_key 1)" "$(validator_multisig_signer_key 2)" \
+		"${acc_num}" "${seq}" >"${signed_file}"
 
 	bcast_json="$(run_capture ${DAEMON} tx broadcast "${signed_file}" --broadcast-mode sync --output json)"
 	tx_hash="$(echo "${bcast_json}" | jq -r '.txhash // empty')"
-	rm -f "${unsigned_file}" "${sig1}" "${sig2}" "${signed_file}"
+	rm -f "${unsigned_file}" "${signed_file}"
 	if [[ -z "${tx_hash}" ]]; then
 		echo "[SN] ERROR: failed to obtain txhash for multisig registration"
 		return 1

@@ -51,38 +51,42 @@ func TestSubmitEpochReport_StorageTruthScoresByResultClass(t *testing.T) {
 		expectedTicketID    string
 	}{
 		{
-			name:                "pass",
+			// PASS + RECENT: node=-3, reporter=-4 (clamped to 0 from 0), ticket=-2 (clamped to 0)
+			name:                "pass recent",
 			class:               types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS,
 			bucket:              types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT,
-			expectedNodeScore:   int64Ptr(-2),
-			expectedReporter:    2,
-			expectedTicketScore: int64Ptr(-3),
+			expectedNodeScore:   int64Ptr(0), // clamped at 0
+			expectedReporter:    0,           // clamped at 0 (positive-penalty model)
+			expectedTicketScore: int64Ptr(0), // clamped at 0
 			expectedTicketID:    "ticket-1",
 		},
 		{
-			name:                "hash mismatch",
+			// HASH_MISMATCH + INDEX: node=+26, reporter=+1, ticket=+12
+			name:                "hash mismatch index artifact",
 			class:               types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH,
 			bucket:              types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT,
-			expectedNodeScore:   int64Ptr(12),
+			expectedNodeScore:   int64Ptr(26),
 			expectedReporter:    1,
 			expectedTicketScore: int64Ptr(12),
 			expectedTicketID:    "ticket-1",
 		},
 		{
+			// TIMEOUT: node=+7, reporter=-1 clamped to 0, ticket=+3
 			name:                "timeout",
 			class:               types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_TIMEOUT_OR_NO_RESPONSE,
 			bucket:              types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT,
-			expectedNodeScore:   int64Ptr(4),
-			expectedReporter:    -1,
-			expectedTicketScore: int64Ptr(4),
+			expectedNodeScore:   int64Ptr(7),
+			expectedReporter:    0, // clamped at 0 (was -1 before penalty model flip)
+			expectedTicketScore: int64Ptr(3),
 			expectedTicketID:    "ticket-1",
 		},
 		{
+			// OBSERVER_QUORUM_FAIL: node=+4, reporter=-3 clamped to 0, ticket=+5
 			name:                "observer quorum fail",
 			class:               types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_OBSERVER_QUORUM_FAIL,
 			bucket:              types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT,
-			expectedNodeScore:   int64Ptr(3),
-			expectedReporter:    -3,
+			expectedNodeScore:   int64Ptr(4),
+			expectedReporter:    0, // clamped at 0
 			expectedTicketScore: int64Ptr(5),
 			expectedTicketID:    "ticket-1",
 		},
@@ -95,20 +99,22 @@ func TestSubmitEpochReport_StorageTruthScoresByResultClass(t *testing.T) {
 			expectedTicketScore: nil,
 		},
 		{
+			// INVALID_TRANSCRIPT: reporter=-8 clamped to 0
 			name:                "invalid transcript",
 			class:               types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_INVALID_TRANSCRIPT,
 			bucket:              types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT,
 			expectedNodeScore:   nil,
-			expectedReporter:    -8,
+			expectedReporter:    0, // clamped at 0
 			expectedTicketScore: nil,
 		},
 		{
+			// RECHECK_CONFIRMED_FAIL: node=+15, reporter=+3, ticket=+8
 			name:                "recheck confirmed fail",
 			class:               types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_RECHECK_CONFIRMED_FAIL,
 			bucket:              types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECHECK,
-			expectedNodeScore:   int64Ptr(20),
+			expectedNodeScore:   int64Ptr(15),
 			expectedReporter:    3,
-			expectedTicketScore: int64Ptr(20),
+			expectedTicketScore: int64Ptr(8),
 			expectedTicketID:    "ticket-1",
 		},
 	}
@@ -184,25 +190,34 @@ func TestSubmitEpochReport_StorageTruthScoresApplyDecay(t *testing.T) {
 	ms := keeper.NewMsgServerImpl(f.keeper)
 
 	params := f.keeper.GetParams(f.ctx).WithDefaults()
-	params.StorageTruthNodeSuspicionDecayPerEpoch = 2
-	params.StorageTruthReporterReliabilityDecayPerEpoch = 3
-	params.StorageTruthTicketDeteriorationDecayPerEpoch = 4
+	// Use proper exponential decay factors (range 1..1000).
+	// 920 means 0.920/epoch (LEP6.md §14 node decay).
+	// 900 means 0.900/epoch (LEP6.md §15/16 reporter/ticket decay).
+	params.StorageTruthNodeSuspicionDecayPerEpoch = 920
+	params.StorageTruthReporterReliabilityDecayPerEpoch = 900
+	params.StorageTruthTicketDeteriorationDecayPerEpoch = 900
 	require.NoError(t, f.keeper.SetParams(f.ctx, params))
 
 	reporter := "sn-aaa-reporter"
 	target := "sn-bbb-target"
 	ticketID := "ticket-1"
 
+	// Node: suspicion=50, epoch=0, now epoch=3, decay=920 (0.92/epoch)
+	// decayTowardZero(50, 920, 3): 50→46→42→38. Then +26 (HASH_MISMATCH INDEX) = 64.
 	require.NoError(t, f.keeper.SetNodeSuspicionState(f.ctx, types.NodeSuspicionState{
 		SupernodeAccount: target,
-		SuspicionScore:   10,
+		SuspicionScore:   50,
 		LastUpdatedEpoch: 0,
 	}))
+	// Reporter: score=10 (some existing penalty), decays over 3 epochs with factor=900.
+	// decayTowardZero(10, 900, 3): 10→9→8→7. Then +1 (HASH_MISMATCH reporter delta) = 8.
 	require.NoError(t, f.keeper.SetReporterReliabilityState(f.ctx, types.ReporterReliabilityState{
 		ReporterSupernodeAccount: reporter,
-		ReliabilityScore:         -9,
+		ReliabilityScore:         10,
 		LastUpdatedEpoch:         0,
 	}))
+	// Ticket: score=20, epoch=0, now epoch=3, decay=900.
+	// decayTowardZero(20, 900, 3): 20→18→16→14. Then +12 (HASH_MISMATCH INDEX ticket delta) = 26.
 	require.NoError(t, f.keeper.SetTicketDeteriorationState(f.ctx, types.TicketDeteriorationState{
 		TicketId:            ticketID,
 		DeteriorationScore:  20,
@@ -240,20 +255,24 @@ func TestSubmitEpochReport_StorageTruthScoresApplyDecay(t *testing.T) {
 
 	nodeState, found := f.keeper.GetNodeSuspicionState(f.ctx, target)
 	require.True(t, found)
-	require.Equal(t, int64(16), nodeState.SuspicionScore) // (10 - 2*3) + 12
+	// decayTowardZero(50, 920, 3): 50→46→42→38.
+	// Reporter score decays to 7, so trust multiplier is 93%; floor(26*93/100)=24 → 62.
+	require.Equal(t, int64(62), nodeState.SuspicionScore)
 	require.Equal(t, uint64(3), nodeState.LastUpdatedEpoch)
 
 	reporterState, found := f.keeper.GetReporterReliabilityState(f.ctx, reporter)
 	require.True(t, found)
-	require.Equal(t, int64(1), reporterState.ReliabilityScore) // (-9 + 3*3) + 1 => 1
+	// decayTowardZero(10, 900, 3): 10→9→8→7. +1 (HASH_MISMATCH reporter) = 8.
+	require.Equal(t, int64(8), reporterState.ReliabilityScore)
 	require.Equal(t, uint64(3), reporterState.LastUpdatedEpoch)
 	require.Equal(t, types.ReporterTrustBand_REPORTER_TRUST_BAND_NORMAL, reporterState.TrustBand)
 
 	ticketState, found := f.keeper.GetTicketDeteriorationState(f.ctx, ticketID)
 	require.True(t, found)
-	require.Equal(t, int64(20), ticketState.DeteriorationScore) // (20 - 4*3) + 12 => 20
+	// Reporter trust multiplier also scales ticket delta: floor(12*93/100)=11, so 14+11=25.
+	require.Equal(t, int64(25), ticketState.DeteriorationScore)
 	require.Equal(t, uint64(3), ticketState.LastUpdatedEpoch)
-	// Existing lifecycle metadata remains intact in PR3.
+	// Existing lifecycle metadata remains intact.
 	require.Equal(t, uint64(9), ticketState.ActiveHealOpId)
 	require.Equal(t, uint64(11), ticketState.ProbationUntilEpoch)
 	require.Equal(t, uint64(1), ticketState.LastHealEpoch)
@@ -316,9 +335,10 @@ func TestSubmitEpochReport_StorageTruthScoreEventsAreEmitted(t *testing.T) {
 		require.Equal(t, types.ReporterTrustBand_REPORTER_TRUST_BAND_NORMAL.String(), attrs[types.AttributeKeyReporterTrustBand])
 		require.Equal(t, "0", attrs[types.AttributeKeyRepeatedFailureCount])
 		require.Equal(t, "false", attrs[types.AttributeKeyContradictionDetected])
-		require.Equal(t, "-2", attrs[types.AttributeKeyNodeSuspicionScore])
-		require.Equal(t, "2", attrs[types.AttributeKeyReporterReliabilityScore])
-		require.Equal(t, "-3", attrs[types.AttributeKeyTicketDeteriorationScore])
+		// PASS RECENT: node=-3 clamped to 0, reporter=-4 clamped to 0, ticket=-2 clamped to 0
+		require.Equal(t, "0", attrs[types.AttributeKeyNodeSuspicionScore])
+		require.Equal(t, "0", attrs[types.AttributeKeyReporterReliabilityScore])
+		require.Equal(t, "0", attrs[types.AttributeKeyTicketDeteriorationScore])
 	}
 	require.True(t, found, "expected storage truth score update event")
 }
@@ -367,8 +387,10 @@ func TestSubmitEpochReport_LowTrustReporterScalesNodeAndTicketDeltas(t *testing.
 	ms := keeper.NewMsgServerImpl(f.keeper)
 
 	params := f.keeper.GetParams(f.ctx).WithDefaults()
-	params.StorageTruthReporterReliabilityLowTrustThreshold = -10
-	params.StorageTruthReporterReliabilityIneligibleThreshold = -50
+	// Positive-penalty model: low_trust=10, degraded=30, ineligible=50
+	params.StorageTruthReporterReliabilityLowTrustThreshold = 10
+	params.StorageTruthReporterReliabilityDegradedThreshold = 30
+	params.StorageTruthReporterReliabilityIneligibleThreshold = 50
 	require.NoError(t, f.keeper.SetParams(f.ctx, params))
 
 	reporter := "sn-aaa-reporter"
@@ -378,9 +400,10 @@ func TestSubmitEpochReport_LowTrustReporterScalesNodeAndTicketDeltas(t *testing.
 		Return(sntypes.SuperNode{}, true, nil).
 		AnyTimes()
 
+	// Set reporter score to +20 = LOW_TRUST in positive-penalty model.
 	require.NoError(t, f.keeper.SetReporterReliabilityState(f.ctx, types.ReporterReliabilityState{
 		ReporterSupernodeAccount: reporter,
-		ReliabilityScore:         -20,
+		ReliabilityScore:         20,
 		LastUpdatedEpoch:         0,
 		TrustBand:                types.ReporterTrustBand_REPORTER_TRUST_BAND_LOW_TRUST,
 	}))
@@ -402,17 +425,20 @@ func TestSubmitEpochReport_LowTrustReporterScalesNodeAndTicketDeltas(t *testing.
 	})
 	require.NoError(t, err)
 
+	// Reporter score 20 gives continuous trust multiplier max(50, 100-20)=80.
+	// HASH_MISMATCH INDEX delta +26 node, +12 ticket: floor(26*80/100)=20, floor(12*80/100)=9.
 	nodeState, found := f.keeper.GetNodeSuspicionState(f.ctx, target)
 	require.True(t, found)
-	require.Equal(t, int64(6), nodeState.SuspicionScore)
+	require.Equal(t, int64(20), nodeState.SuspicionScore)
 
 	ticketState, found := f.keeper.GetTicketDeteriorationState(f.ctx, "ticket-1")
 	require.True(t, found)
-	require.Equal(t, int64(6), ticketState.DeteriorationScore)
+	require.Equal(t, int64(9), ticketState.DeteriorationScore)
 
 	reporterState, found := f.keeper.GetReporterReliabilityState(f.ctx, reporter)
 	require.True(t, found)
-	require.Equal(t, int64(-19), reporterState.ReliabilityScore)
+	// Reporter: score=20, no decay (same epoch), HASH_MISMATCH reporter delta +1 = 21.
+	require.Equal(t, int64(21), reporterState.ReliabilityScore)
 	require.Equal(t, types.ReporterTrustBand_REPORTER_TRUST_BAND_LOW_TRUST, reporterState.TrustBand)
 }
 
@@ -463,13 +489,72 @@ func TestSubmitEpochReport_RepeatedDistinctTicketFailuresEscalate(t *testing.T) 
 
 	nodeState, found := f.keeper.GetNodeSuspicionState(f.ctx, target)
 	require.True(t, found)
-	require.Equal(t, int64(14), nodeState.SuspicionScore) // 12 + escalation bonus 2
+	// Same-ticket repeat is no longer counted as a distinct-ticket node escalation.
+	require.Equal(t, int64(26), nodeState.SuspicionScore)
 
 	ticketState, found := f.keeper.GetTicketDeteriorationState(f.ctx, "ticket-1")
 	require.True(t, found)
-	require.Equal(t, int64(20), ticketState.DeteriorationScore) // 7 decays to 6, then +12 +2
+	// Ticket score=7, decays 1 epoch with default decay=920: floor(7*0.920)=6.
+	// Then +12 (INDEX HASH_MISMATCH delta) + 6 (same-holder repeat §16) = 24.
+	require.Equal(t, int64(24), ticketState.DeteriorationScore)
 	require.Equal(t, uint32(2), ticketState.RecentFailureEpochCount)
 	require.Equal(t, uint64(2), ticketState.LastFailureEpoch)
+}
+
+func TestSubmitEpochReport_DistinctTicketFailuresEscalateNodeSuspicion(t *testing.T) {
+	f := initFixture(t)
+	ms := keeper.NewMsgServerImpl(f.keeper)
+
+	reporter := "sn-aaa-reporter"
+	target := "sn-bbb-target"
+	f.supernodeKeeper.EXPECT().
+		GetSuperNodeByAccount(gomock.Any(), reporter).
+		Return(sntypes.SuperNode{}, true, nil).
+		AnyTimes()
+
+	f.ctx = f.ctx.WithBlockHeight(401).WithEventManager(sdk.NewEventManager()) // epoch_id = 1
+	seedEpochAnchorForReportTest(t, f, 1, []string{reporter, target}, []string{reporter, target})
+	first := baseStorageProofResult(types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH)
+	first.TicketId = "ticket-distinct-1"
+	first.TranscriptHash = "tx-distinct-1"
+	_, err := ms.SubmitEpochReport(f.ctx, &types.MsgSubmitEpochReport{
+		Creator: reporter,
+		EpochId: 1,
+		HostReport: types.HostReport{
+			InboundPortStates: fullOpenPortStates(),
+		},
+		StorageChallengeObservations: []*types.StorageChallengeObservation{{
+			TargetSupernodeAccount: target,
+			PortStates:             fullOpenPortStates(),
+		}},
+		StorageProofResults: []*types.StorageProofResult{first},
+	})
+	require.NoError(t, err)
+
+	f.ctx = f.ctx.WithBlockHeight(801).WithEventManager(sdk.NewEventManager()) // epoch_id = 2
+	seedEpochAnchorForReportTest(t, f, 2, []string{reporter, target}, []string{reporter, target})
+	second := baseStorageProofResult(types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH)
+	second.TicketId = "ticket-distinct-2"
+	second.TranscriptHash = "tx-distinct-2"
+	_, err = ms.SubmitEpochReport(f.ctx, &types.MsgSubmitEpochReport{
+		Creator: reporter,
+		EpochId: 2,
+		HostReport: types.HostReport{
+			InboundPortStates: fullOpenPortStates(),
+		},
+		StorageChallengeObservations: []*types.StorageChallengeObservation{{
+			TargetSupernodeAccount: target,
+			PortStates:             fullOpenPortStates(),
+		}},
+		StorageProofResults: []*types.StorageProofResult{second},
+	})
+	require.NoError(t, err)
+
+	nodeState, found := f.keeper.GetNodeSuspicionState(f.ctx, target)
+	require.True(t, found)
+	// First fail score 26 decays one epoch at 0.92 to 23; second distinct ticket adds 26+10.
+	require.Equal(t, int64(59), nodeState.SuspicionScore)
+	require.Equal(t, uint32(2), nodeState.DistinctTicketFailWindow)
 }
 
 func TestSubmitEpochReport_EpochZeroFailureWindowCarriesIntoNextEpoch(t *testing.T) {
@@ -520,13 +605,15 @@ func TestSubmitEpochReport_EpochZeroFailureWindowCarriesIntoNextEpoch(t *testing
 
 	nodeState, found := f.keeper.GetNodeSuspicionState(f.ctx, target)
 	require.True(t, found)
-	require.Equal(t, int64(14), nodeState.SuspicionScore) // 12 base + 2 escalation bonus from epoch-0 carryover
+	// Same-ticket repeat is no longer counted as a distinct-ticket node escalation.
+	require.Equal(t, int64(26), nodeState.SuspicionScore)
 
 	ticketState, found := f.keeper.GetTicketDeteriorationState(f.ctx, "ticket-epoch-zero")
 	require.True(t, found)
 	require.Equal(t, uint32(2), ticketState.RecentFailureEpochCount)
 	require.Equal(t, uint64(1), ticketState.LastFailureEpoch)
-	require.Equal(t, int64(25), ticketState.DeteriorationScore) // 11 after decay, then +12 +2
+	// Ticket: 12 decays 1 epoch at 900: floor(12*0.900)=10. +12 (INDEX HASH) + 6 (same-holder repeat §16) = 28.
+	require.Equal(t, int64(28), ticketState.DeteriorationScore)
 }
 
 func TestSubmitEpochReport_ContradictionsPenalizeBothReportersAndTrackState(t *testing.T) {
@@ -579,13 +666,17 @@ func TestSubmitEpochReport_ContradictionsPenalizeBothReportersAndTrackState(t *t
 
 	currentReporterState, found := f.keeper.GetReporterReliabilityState(f.ctx, reporter)
 	require.True(t, found)
-	require.Equal(t, int64(-4), currentReporterState.ReliabilityScore) // +2 pass delta, -6 contradiction penalty
+	// Current reporter gets PASS (-4 recovery) + contradiction penalty (-4) = -8.
+	// Starting from 0 and clamped to 0: max(0, 0 + (-4) + (-4)) = 0.
+	require.Equal(t, int64(0), currentReporterState.ReliabilityScore)
 	require.Equal(t, uint64(1), currentReporterState.ContradictionCount)
 	require.Equal(t, types.ReporterTrustBand_REPORTER_TRUST_BAND_NORMAL, currentReporterState.TrustBand)
 
 	previousReporterState, found := f.keeper.GetReporterReliabilityState(f.ctx, previousReporter)
 	require.True(t, found)
-	require.Equal(t, int64(3), previousReporterState.ReliabilityScore) // 10 decays to 9, then -6
+	// Previous reporter: score=10, decays 1 epoch at 920: floor(10*0.920)=9.
+	// Then +12 (contradiction penalty from LEP6.md §15.1) = 21.
+	require.Equal(t, int64(21), previousReporterState.ReliabilityScore)
 	require.Equal(t, uint64(1), previousReporterState.ContradictionCount)
 
 	ticketState, found := f.keeper.GetTicketDeteriorationState(f.ctx, "ticket-1")

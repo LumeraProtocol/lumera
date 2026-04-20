@@ -275,3 +275,86 @@ func TestSubmitEpochReport_RejectsMalformedStorageProofResults(t *testing.T) {
 		})
 	}
 }
+
+func TestSubmitEpochReport_FullModeRequiresRecentAndOldStorageProofs(t *testing.T) {
+	f := initFixture(t)
+	f.ctx = f.ctx.WithBlockHeight(1)
+
+	params := types.DefaultParams().WithDefaults()
+	params.StorageTruthEnforcementMode = types.StorageTruthEnforcementMode_STORAGE_TRUTH_ENFORCEMENT_MODE_FULL
+	require.NoError(t, f.keeper.SetParams(f.ctx, params))
+
+	ms := keeper.NewMsgServerImpl(f.keeper)
+
+	reporter := "sn-aaa-reporter"
+	target := "sn-bbb-target"
+
+	f.supernodeKeeper.EXPECT().
+		GetSuperNodeByAccount(gomock.Any(), reporter).
+		Return(sntypes.SuperNode{}, true, nil).
+		AnyTimes()
+
+	seedEpochAnchorForReportTest(t, f, 0, []string{reporter, target}, []string{reporter, target})
+
+	portStates := make([]types.PortState, len(types.DefaultRequiredOpenPorts))
+	for i := range portStates {
+		portStates[i] = types.PortState_PORT_STATE_OPEN
+	}
+
+	recent := &types.StorageProofResult{
+		TargetSupernodeAccount:     target,
+		ChallengerSupernodeAccount: reporter,
+		TicketId:                   "ticket-recent",
+		BucketType:                 types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT,
+		ArtifactClass:              types.StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_INDEX,
+		ArtifactOrdinal:            1,
+		ArtifactKey:                "artifact-recent",
+		ResultClass:                types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS,
+		TranscriptHash:             "transcript-recent",
+	}
+
+	_, err := ms.SubmitEpochReport(f.ctx, &types.MsgSubmitEpochReport{
+		Creator: reporter,
+		EpochId: 0,
+		HostReport: types.HostReport{
+			InboundPortStates: portStates,
+		},
+		StorageChallengeObservations: []*types.StorageChallengeObservation{
+			{
+				TargetSupernodeAccount: target,
+				PortStates:             portStates,
+			},
+		},
+		StorageProofResults: []*types.StorageProofResult{recent},
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "must have exactly one RECENT and one OLD")
+
+	old := &types.StorageProofResult{
+		TargetSupernodeAccount:     target,
+		ChallengerSupernodeAccount: reporter,
+		TicketId:                   "ticket-old",
+		BucketType:                 types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_OLD,
+		ArtifactClass:              types.StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_SYMBOL,
+		ArtifactOrdinal:            2,
+		ArtifactKey:                "artifact-old",
+		ResultClass:                types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS,
+		TranscriptHash:             "transcript-old",
+	}
+
+	_, err = ms.SubmitEpochReport(f.ctx, &types.MsgSubmitEpochReport{
+		Creator: reporter,
+		EpochId: 0,
+		HostReport: types.HostReport{
+			InboundPortStates: portStates,
+		},
+		StorageChallengeObservations: []*types.StorageChallengeObservation{
+			{
+				TargetSupernodeAccount: target,
+				PortStates:             portStates,
+			},
+		},
+		StorageProofResults: []*types.StorageProofResult{recent, old},
+	})
+	require.NoError(t, err)
+}

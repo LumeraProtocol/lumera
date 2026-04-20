@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"fmt"
+	"strconv"
 
 	storetypes "cosmossdk.io/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -13,6 +14,7 @@ import (
 const (
 	postponeReasonActionFinalizationSignatureFailure = "audit_action_finalization_signature_failure"
 	postponeReasonActionFinalizationNotInTop10       = "audit_action_finalization_not_in_top_10"
+	postponeReasonStorageTruth                       = "audit_storage_truth_suspicion"
 )
 
 // EnforceEpochEnd evaluates the completed epoch and updates supernode states accordingly.
@@ -32,6 +34,16 @@ func (k Keeper) EnforceEpochEnd(ctx sdk.Context, epochID uint64, params types.Pa
 	// Postpone ACTIVE supernodes that fail criteria.
 	for _, sn := range active {
 		if sn.SupernodeAccount == "" {
+			continue
+		}
+
+		// Emit storage-truth band events (all modes >= SHADOW) and postpone if mode >= SOFT.
+		if err := k.applyStorageTruthBandAtEpochEnd(ctx, sn, epochID, params); err != nil {
+			return err
+		}
+
+		// Skip legacy postpone checks if already postponed by storage-truth enforcement above.
+		if _, alreadyStorageTruthPostponed := k.getStorageTruthPostponedAtEpochID(ctx, sn.SupernodeAccount); alreadyStorageTruthPostponed {
 			continue
 		}
 
@@ -75,8 +87,77 @@ func (k Keeper) EnforceEpochEnd(ctx sdk.Context, epochID uint64, params types.Pa
 			return err
 		}
 		k.clearActionFinalizationPostponedAtEpochID(ctx, sn.SupernodeAccount)
+		k.clearStorageTruthPostponedAtEpochID(ctx, sn.SupernodeAccount)
 	}
 
+	return nil
+}
+
+// applyStorageTruthBandAtEpochEnd emits band events for all modes >= SHADOW and
+// postpones the node if mode >= SOFT and the suspicion score meets the postpone threshold.
+func (k Keeper) applyStorageTruthBandAtEpochEnd(ctx sdk.Context, sn sntypes.SuperNode, epochID uint64, params types.Params) error {
+	mode := params.StorageTruthEnforcementMode
+	if mode == types.StorageTruthEnforcementMode_STORAGE_TRUTH_ENFORCEMENT_MODE_UNSPECIFIED {
+		return nil
+	}
+
+	state, found := k.GetNodeSuspicionState(ctx, sn.SupernodeAccount)
+	if !found {
+		return nil
+	}
+
+	score := decayTowardZero(state.SuspicionScore, params.StorageTruthNodeSuspicionDecayPerEpoch, epochDelta(epochID, state.LastUpdatedEpoch))
+	if score <= 0 {
+		return nil
+	}
+
+	band := storageTruthBandForScore(score, params)
+	if band == storageTruthBandNone {
+		return nil
+	}
+
+	// Emit band event.
+	eventType := storageTruthBandEventType(band)
+	ctx.EventManager().EmitEvent(sdk.NewEvent(
+		eventType,
+		sdk.NewAttribute(sdk.AttributeKeyModule, types.ModuleName),
+		sdk.NewAttribute(types.AttributeKeyTargetSupernodeAccount, sn.SupernodeAccount),
+		sdk.NewAttribute(types.AttributeKeyEpochID, strconv.FormatUint(epochID, 10)),
+		sdk.NewAttribute(types.AttributeKeyNodeSuspicionScore, strconv.FormatInt(score, 10)),
+		sdk.NewAttribute(types.AttributeKeyStorageTruthBand, strconv.Itoa(int(band))),
+		sdk.NewAttribute(types.AttributeKeyEnforcementMode, mode.String()),
+	))
+
+	// SHADOW mode: events only — no state transitions.
+	if mode == types.StorageTruthEnforcementMode_STORAGE_TRUTH_ENFORCEMENT_MODE_SHADOW {
+		return nil
+	}
+
+	// SOFT/FULL: actually postpone when at or above the postpone threshold AND predicates are met.
+	if band < storageTruthBandPostpone {
+		return nil
+	}
+
+	// Check enforcement matrix predicates before postponing.
+	if !k.storageTruthPostponePredicatesMet(ctx, sn.SupernodeAccount, band, epochID, params) {
+		// Score is above threshold but predicates not met — event already emitted, no postpone.
+		return nil
+	}
+
+	if err := k.setSupernodePostponed(ctx, sn, postponeReasonStorageTruth); err != nil {
+		return err
+	}
+	k.setStorageTruthPostponedAtEpochID(ctx, sn.SupernodeAccount, epochID)
+	k.clearActionFinalizationPostponedAtEpochID(ctx, sn.SupernodeAccount)
+
+	ctx.EventManager().EmitEvent(sdk.NewEvent(
+		types.EventTypeStorageTruthEnforced,
+		sdk.NewAttribute(sdk.AttributeKeyModule, types.ModuleName),
+		sdk.NewAttribute(types.AttributeKeyTargetSupernodeAccount, sn.SupernodeAccount),
+		sdk.NewAttribute(types.AttributeKeyEpochID, strconv.FormatUint(epochID, 10)),
+		sdk.NewAttribute(types.AttributeKeyNodeSuspicionScore, strconv.FormatInt(score, 10)),
+		sdk.NewAttribute(types.AttributeKeyEnforcementMode, mode.String()),
+	))
 	return nil
 }
 
@@ -135,6 +216,11 @@ func (k Keeper) shouldPostponeAtEpochEnd(ctx sdk.Context, supernodeAccount strin
 }
 
 func (k Keeper) shouldRecoverAtEpochEnd(ctx sdk.Context, supernodeAccount string, epochID uint64, params types.Params) (bool, error) {
+	// If the supernode was postponed due to storage-truth suspicion, use score-decay-based recovery.
+	if _, ok := k.getStorageTruthPostponedAtEpochID(ctx, supernodeAccount); ok {
+		return k.shouldRecoverFromStorageTruthPostponement(ctx, supernodeAccount, epochID, params), nil
+	}
+
 	// If the supernode was postponed due to action-finalization evidence, it recovers using the
 	// action-finalization recovery rules (not the host/peer-port recovery rules).
 	if postponedAtEpochID, ok := k.getActionFinalizationPostponedAtEpochID(ctx, supernodeAccount); ok {
@@ -443,6 +529,171 @@ func (k Keeper) recoverSupernodeActive(ctx sdk.Context, sn sntypes.SuperNode) er
 		return err
 	}
 	return k.supernodeKeeper.RecoverSuperNodeFromPostponed(ctx, valAddr)
+}
+
+// storageTruthBand represents a node suspicion severity level.
+type storageTruthBand int
+
+const (
+	storageTruthBandNone           storageTruthBand = iota // score < watch threshold
+	storageTruthBandWatch                                  // score >= watch threshold
+	storageTruthBandProbation                              // score >= probation threshold
+	storageTruthBandPostpone                               // score >= postpone threshold
+	storageTruthBandStrongPostpone                         // score >= strong_postpone threshold
+)
+
+func storageTruthBandForScore(score int64, params types.Params) storageTruthBand {
+	switch {
+	case params.StorageTruthNodeSuspicionThresholdStrongPostpone > 0 && score >= params.StorageTruthNodeSuspicionThresholdStrongPostpone:
+		return storageTruthBandStrongPostpone
+	case params.StorageTruthNodeSuspicionThresholdPostpone > 0 && score >= params.StorageTruthNodeSuspicionThresholdPostpone:
+		return storageTruthBandPostpone
+	case params.StorageTruthNodeSuspicionThresholdProbation > 0 && score >= params.StorageTruthNodeSuspicionThresholdProbation:
+		return storageTruthBandProbation
+	case params.StorageTruthNodeSuspicionThresholdWatch > 0 && score >= params.StorageTruthNodeSuspicionThresholdWatch:
+		return storageTruthBandWatch
+	default:
+		return storageTruthBandNone
+	}
+}
+
+func storageTruthBandEventType(band storageTruthBand) string {
+	switch band {
+	case storageTruthBandStrongPostpone:
+		return types.EventTypeStorageTruthBandPostpone // reuse postpone event type for strong postpone
+	case storageTruthBandPostpone:
+		return types.EventTypeStorageTruthBandPostpone
+	case storageTruthBandProbation:
+		return types.EventTypeStorageTruthBandProbation
+	default:
+		return types.EventTypeStorageTruthBandWatch
+	}
+}
+
+// shouldRecoverFromStorageTruthPostponement returns true if the node's current
+// (decayed) suspicion score has fallen below the watch threshold AND the node
+// has accumulated the required number of clean passes.
+func (k Keeper) shouldRecoverFromStorageTruthPostponement(ctx sdk.Context, supernodeAccount string, epochID uint64, params types.Params) bool {
+	state, found := k.GetNodeSuspicionState(ctx, supernodeAccount)
+	if !found {
+		// No score state means no suspicion — allow recovery (no clean pass requirement without state).
+		return true
+	}
+	score := decayTowardZero(state.SuspicionScore, params.StorageTruthNodeSuspicionDecayPerEpoch, epochDelta(epochID, state.LastUpdatedEpoch))
+	watchThreshold := params.StorageTruthNodeSuspicionThresholdWatch
+	if watchThreshold <= 0 {
+		watchThreshold = 1
+	}
+	if score >= watchThreshold {
+		return false
+	}
+	// Score is below watch threshold — also require sufficient clean passes.
+	requiredPasses := params.StorageTruthRecoveryCleanPassCount
+	if requiredPasses == 0 {
+		requiredPasses = 3
+	}
+	return state.CleanPassCount >= requiredPasses
+}
+
+// storageTruthPostponePredicatesMet checks whether the enforcement matrix predicates
+// are satisfied for the given band (postpone or strong-postpone).
+func (k Keeper) storageTruthPostponePredicatesMet(ctx sdk.Context, supernodeAccount string, band storageTruthBand, epochID uint64, params types.Params) bool {
+	state, found := k.GetNodeSuspicionState(ctx, supernodeAccount)
+	if !found {
+		return false
+	}
+
+	switch band {
+	case storageTruthBandPostpone:
+		// Postpone predicates per LEP6.md §17 — any one of three conditions:
+		// 1. 1 recent Class A fault plus any second failure in 14 epochs.
+		classAWindow := uint64(params.StorageTruthClassAFaultWindow)
+		if classAWindow == 0 {
+			classAWindow = 14
+		}
+		classBWindow := uint64(params.StorageTruthClassBFaultWindow)
+		if classBWindow == 0 {
+			classBWindow = 7
+		}
+		recentClassA, err := k.hasNodeFailure(ctx, supernodeAccount, storageTruthWindowStart(epochID, classAWindow), epochID, func(record storageTruthNodeFailureRecord) bool {
+			return types.StorageProofBucketType(record.BucketType) == types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT && storageTruthIsClassAFault(record)
+		})
+		if err != nil {
+			return false
+		}
+		_, secondFailureEvents, err := k.distinctNodeFailedTickets(ctx, supernodeAccount, storageTruthWindowStart(epochID, classAWindow), epochID, nil)
+		if err != nil {
+			return false
+		}
+		classAMet := recentClassA && secondFailureEvents >= 2
+		if secondFailureEvents == 0 {
+			classAMet = state.ClassACountWindow >= 1 && (state.ClassACountWindow+state.ClassBCountWindow) >= 2
+		}
+		// 2. 4 Class B faults in 7 epochs.
+		_, classBEvents, err := k.distinctNodeFailedTickets(ctx, supernodeAccount, storageTruthWindowStart(epochID, classBWindow), epochID, func(record storageTruthNodeFailureRecord) bool {
+			return storageTruthIsClassBFault(record)
+		})
+		if err != nil {
+			return false
+		}
+		classBMet := classBEvents >= 4
+		if classBEvents == 0 {
+			classBMet = state.ClassBCountWindow >= 4
+		}
+		// 3. 2 old Class A faults on distinct tickets in 21 epochs.
+		const oldClassAFaultWindow = uint64(21)
+		oldClassATickets, _, err := k.distinctNodeFailedTickets(ctx, supernodeAccount, storageTruthWindowStart(epochID, oldClassAFaultWindow), epochID, func(record storageTruthNodeFailureRecord) bool {
+			return types.StorageProofBucketType(record.BucketType) == types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_OLD && storageTruthIsClassAFault(record)
+		})
+		if err != nil {
+			return false
+		}
+		oldClassAMet := len(oldClassATickets) >= 2
+		if len(oldClassATickets) == 0 {
+			oldClassAMet = state.ClassACountWindow >= 2 && state.LastOldFailEpoch > 0 && epochDelta(epochID, state.LastOldFailEpoch) < oldClassAFaultWindow
+		}
+		return classAMet || classBMet || oldClassAMet
+
+	case storageTruthBandStrongPostpone:
+		classAWindow := uint64(params.StorageTruthClassAFaultWindow)
+		if classAWindow == 0 {
+			classAWindow = 14
+		}
+		classATickets, _, err := k.distinctNodeFailedTickets(ctx, supernodeAccount, storageTruthWindowStart(epochID, classAWindow), epochID, func(record storageTruthNodeFailureRecord) bool {
+			return storageTruthIsClassAFault(record)
+		})
+		if err != nil {
+			return false
+		}
+		indexFailure, err := k.hasNodeFailure(ctx, supernodeAccount, storageTruthWindowStart(epochID, classAWindow), epochID, func(record storageTruthNodeFailureRecord) bool {
+			return types.StorageProofArtifactClass(record.ArtifactClass) == types.StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_INDEX
+		})
+		if err != nil {
+			return false
+		}
+		classAMet := len(classATickets) >= 2
+		if len(classATickets) == 0 {
+			classAMet = state.ClassACountWindow >= 2
+		}
+		indexMet := indexFailure || state.LastIndexFailEpoch > 0
+		return classAMet || indexMet || k.hasStorageTruthFailedHeal(ctx, supernodeAccount, storageTruthWindowStart(epochID, classAWindow), epochID)
+
+	default:
+		return true
+	}
+}
+
+func storageTruthIsClassAFault(record storageTruthNodeFailureRecord) bool {
+	class := types.StorageProofResultClass(record.ResultClass)
+	if class == types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH ||
+		class == types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_RECHECK_CONFIRMED_FAIL {
+		return true
+	}
+	return types.StorageProofArtifactClass(record.ArtifactClass) == types.StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_INDEX
+}
+
+func storageTruthIsClassBFault(record storageTruthNodeFailureRecord) bool {
+	return types.StorageProofResultClass(record.ResultClass) == types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_TIMEOUT_OR_NO_RESPONSE
 }
 
 func (k Keeper) missingReportsForConsecutiveEpochs(ctx sdk.Context, supernodeAccount string, epochID uint64, consecutive uint32) bool {

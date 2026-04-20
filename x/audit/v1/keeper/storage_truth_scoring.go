@@ -17,6 +17,7 @@ type storageTruthScoreDeltas struct {
 
 type storageTruthResultBookkeeping struct {
 	reporterTrustBand         types.ReporterTrustBand
+	reporterTrustMultiplier   int64
 	repeatedFailureCount      uint32
 	contradictionDetected     bool
 	contradictedReporter      string
@@ -52,7 +53,7 @@ func (k Keeper) applyStorageTruthScores(
 			continue
 		}
 
-		deltas := storageTruthScoreDeltasForResultClass(result.ResultClass)
+		deltas := storageTruthScoreDeltasForResult(result)
 		bookkeeping, err := k.storageTruthBookkeepingForResult(ctx, epochID, reporterAccount, result, params)
 		if err != nil {
 			return err
@@ -61,15 +62,21 @@ func (k Keeper) applyStorageTruthScores(
 		deltas.reporterReliability = addInt64Saturated(deltas.reporterReliability, bookkeeping.currentReporterPenalty)
 		deltas.nodeSuspicion = addInt64Saturated(deltas.nodeSuspicion, bookkeeping.nodeBonus)
 		deltas.ticketDeterioration = addInt64Saturated(deltas.ticketDeterioration, bookkeeping.ticketBonus)
-		deltas.nodeSuspicion = scaleInt64TowardZero(deltas.nodeSuspicion, reporterTrustMultiplierNumerator(bookkeeping.reporterTrustBand), 100)
-		deltas.ticketDeterioration = scaleInt64TowardZero(deltas.ticketDeterioration, reporterTrustMultiplierNumerator(bookkeeping.reporterTrustBand), 100)
+		deltas.nodeSuspicion = scaleInt64TowardZero(deltas.nodeSuspicion, bookkeeping.reporterTrustMultiplier, 100)
+		deltas.ticketDeterioration = scaleInt64TowardZero(deltas.ticketDeterioration, bookkeeping.reporterTrustMultiplier, 100)
+
+		// Clamp positive (failure) node and ticket deltas to >= 0 after scaling.
+		if deltas.nodeSuspicion < 0 {
+			// Pass deltas are negative and should stay negative — only clamp the result after applying.
+		}
 
 		nodeScore, nodeUpdated, err := k.applyNodeSuspicionDelta(
 			ctx,
 			epochID,
-			result.TargetSupernodeAccount,
+			result,
 			deltas.nodeSuspicion,
 			params.StorageTruthNodeSuspicionDecayPerEpoch,
+			params,
 		)
 		if err != nil {
 			return err
@@ -82,6 +89,7 @@ func (k Keeper) applyStorageTruthScores(
 			deltas.reporterReliability,
 			params.StorageTruthReporterReliabilityDecayPerEpoch,
 			boolToUint64(bookkeeping.contradictionDetected),
+			params,
 		)
 		if err != nil {
 			return err
@@ -95,9 +103,19 @@ func (k Keeper) applyStorageTruthScores(
 				bookkeeping.contradictedReporterDelta,
 				params.StorageTruthReporterReliabilityDecayPerEpoch,
 				1,
+				params,
 			); err != nil {
 				return err
 			}
+		}
+
+		if result.BucketType != types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECHECK {
+			if err := k.setStorageTruthReporterResult(ctx, epochID, reporterAccount, result); err != nil {
+				return err
+			}
+		}
+		if err := k.setStorageTruthNodeFailure(ctx, epochID, reporterAccount, result); err != nil {
+			return err
 		}
 
 		ticketState, ticketUpdated, err := k.applyTicketDeteriorationDelta(
@@ -150,13 +168,15 @@ func (k Keeper) applyStorageTruthScores(
 func (k Keeper) applyNodeSuspicionDelta(
 	ctx sdk.Context,
 	epochID uint64,
-	supernodeAccount string,
+	result *types.StorageProofResult,
 	delta int64,
 	decayPerEpoch int64,
+	params types.Params,
 ) (int64, bool, error) {
-	if supernodeAccount == "" {
+	if result == nil || result.TargetSupernodeAccount == "" {
 		return 0, false, nil
 	}
+	supernodeAccount := result.TargetSupernodeAccount
 	state, found := k.GetNodeSuspicionState(ctx, supernodeAccount)
 	if !found && delta == 0 {
 		return 0, false, nil
@@ -167,16 +187,78 @@ func (k Keeper) applyNodeSuspicionDelta(
 		current = decayTowardZero(state.SuspicionScore, decayPerEpoch, epochDelta(epochID, state.LastUpdatedEpoch))
 	}
 	next := addInt64Saturated(current, delta)
-
-	nextState := types.NodeSuspicionState{
-		SupernodeAccount: supernodeAccount,
-		SuspicionScore:   next,
-		LastUpdatedEpoch: epochID,
+	// Clamp node suspicion at >= 0.
+	if next < 0 {
+		next = 0
 	}
+
+	nextState := state
+	nextState.SupernodeAccount = supernodeAccount
+	nextState.SuspicionScore = next
+	nextState.LastUpdatedEpoch = epochID
+
+	// Update state history tracking fields.
+	if result != nil {
+		k.updateNodeSuspicionHistoryFields(&nextState, result, epochID, params)
+	}
+
 	if err := k.SetNodeSuspicionState(ctx, nextState); err != nil {
 		return 0, false, err
 	}
 	return next, true, nil
+}
+
+// updateNodeSuspicionHistoryFields updates the history-tracking fields of NodeSuspicionState.
+func (k Keeper) updateNodeSuspicionHistoryFields(state *types.NodeSuspicionState, result *types.StorageProofResult, epochID uint64, params types.Params) {
+	window := uint64(params.StorageTruthPatternEscalationWindow)
+	if window == 0 {
+		window = 14
+	}
+
+	isFailure := isStorageTruthFailureClass(result.ResultClass)
+	isPass := result.ResultClass == types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS
+
+	if isPass {
+		state.CleanPassCount++
+		state.LastCleanPassEpoch = epochID
+	}
+
+	if isFailure {
+		// Track bucket-specific fail epochs.
+		switch result.BucketType {
+		case types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT:
+			state.LastRecentFailEpoch = epochID
+		case types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_OLD:
+			state.LastOldFailEpoch = epochID
+		}
+
+		// Track index fail epoch.
+		if result.ArtifactClass == types.StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_INDEX {
+			state.LastIndexFailEpoch = epochID
+		}
+
+		// Reset window if stale.
+		if epochID-state.WindowStartEpoch >= window {
+			state.WindowStartEpoch = epochID
+			state.DistinctTicketFailWindow = 0
+			state.ClassACountWindow = 0
+			state.ClassBCountWindow = 0
+		}
+
+		// Track distinct ticket fail (simplified: increment per failure in window).
+		state.DistinctTicketFailWindow++
+
+		// Class A: HASH_MISMATCH, RECHECK_CONFIRMED_FAIL, index fails.
+		switch result.ResultClass {
+		case types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH,
+			types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_RECHECK_CONFIRMED_FAIL:
+			state.ClassACountWindow++
+			state.LastClassAEpoch = epochID
+		case types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_TIMEOUT_OR_NO_RESPONSE:
+			state.ClassBCountWindow++
+			state.LastClassBEpoch = epochID
+		}
+	}
 }
 
 func (k Keeper) applyReporterReliabilityDelta(
@@ -186,6 +268,7 @@ func (k Keeper) applyReporterReliabilityDelta(
 	delta int64,
 	decayPerEpoch int64,
 	contradictionIncrements uint64,
+	params types.Params,
 ) (types.ReporterReliabilityState, bool, error) {
 	if reporterAccount == "" {
 		return types.ReporterReliabilityState{}, false, nil
@@ -200,14 +283,44 @@ func (k Keeper) applyReporterReliabilityDelta(
 		current = decayTowardZero(state.ReliabilityScore, decayPerEpoch, epochDelta(epochID, state.LastUpdatedEpoch))
 	}
 	next := addInt64Saturated(current, delta)
-
-	nextState := types.ReporterReliabilityState{
-		ReporterSupernodeAccount: reporterAccount,
-		ReliabilityScore:         next,
-		LastUpdatedEpoch:         epochID,
-		TrustBand:                reporterTrustBandForScore(next, k.GetParams(ctx).WithDefaults()),
-		ContradictionCount:       state.ContradictionCount + contradictionIncrements,
+	// Clamp reporter reliability at >= 0 (positive-penalty model).
+	if next < 0 {
+		next = 0
 	}
+
+	// Update window tracking.
+	nextState := state
+	nextState.ReporterSupernodeAccount = reporterAccount
+	nextState.ReliabilityScore = next
+	nextState.LastUpdatedEpoch = epochID
+	nextState.TrustBand = reporterTrustBandForScore(next, params)
+	nextState.ContradictionCount = state.ContradictionCount + contradictionIncrements
+	if nextState.TrustBand == types.ReporterTrustBand_REPORTER_TRUST_BAND_CHALLENGER_INELIGIBLE {
+		nextState.IneligibleUntilEpoch = epochID + 7
+	} else if next < params.StorageTruthReporterReliabilityIneligibleThreshold {
+		nextState.IneligibleUntilEpoch = 0
+	}
+
+	// Update divergence window tracking.
+	divergenceWindow := uint64(params.StorageTruthDivergenceWindowEpochs)
+	if divergenceWindow == 0 {
+		divergenceWindow = 14
+	}
+	if epochID-state.WindowStartEpoch >= divergenceWindow {
+		nextState.WindowStartEpoch = epochID
+		nextState.WindowPositiveCount = 0
+		nextState.WindowNegativeCount = 0
+	}
+	if delta > 0 {
+		if nextState.WindowNegativeCount < math.MaxUint32 {
+			nextState.WindowNegativeCount++
+		}
+	} else if delta < 0 {
+		if nextState.WindowPositiveCount < math.MaxUint32 {
+			nextState.WindowPositiveCount++
+		}
+	}
+
 	if err := k.SetReporterReliabilityState(ctx, nextState); err != nil {
 		return types.ReporterReliabilityState{}, false, err
 	}
@@ -236,19 +349,46 @@ func (k Keeper) applyTicketDeteriorationDelta(
 		current = decayTowardZero(state.DeteriorationScore, decayPerEpoch, epochDelta(epochID, state.LastUpdatedEpoch))
 	}
 	next := addInt64Saturated(current, delta)
+	// Clamp ticket deterioration at >= 0.
+	if next < 0 {
+		next = 0
+	}
 
 	nextState := state
 	nextState.TicketId = ticketID
 	nextState.DeteriorationScore = next
 	nextState.LastUpdatedEpoch = epochID
 	if result != nil {
-		if isStorageTruthFailureClass(result.ResultClass) && epochID != state.LastFailureEpoch {
+		isFailure := isStorageTruthFailureClass(result.ResultClass)
+		if isFailure && epochID != state.LastFailureEpoch {
 			nextState.LastFailureEpoch = epochID
 			nextState.RecentFailureEpochCount = updateRecentFailureEpochCount(state, epochID, k.GetParams(ctx).WithDefaults())
 		} else if !found {
 			nextState.RecentFailureEpochCount = 0
 		}
 		if result.TicketId != "" {
+			// Track distinct holder failure count.
+			if isFailure && state.LastTargetSupernodeAccount != "" && state.LastTargetSupernodeAccount != result.TargetSupernodeAccount {
+				if nextState.DistinctHolderFailureCount < math.MaxUint32 {
+					nextState.DistinctHolderFailureCount++
+				}
+			}
+
+			// Track last index failure epoch.
+			if isFailure && result.ArtifactClass == types.StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_INDEX {
+				nextState.LastIndexFailureEpoch = epochID
+			}
+
+			// Track bucket-specific failure epochs.
+			if isFailure {
+				switch result.BucketType {
+				case types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT:
+					nextState.RecentBucketFailureEpoch = epochID
+				case types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_OLD:
+					nextState.OldBucketFailureEpoch = epochID
+				}
+			}
+
 			nextState.LastTargetSupernodeAccount = result.TargetSupernodeAccount
 			nextState.LastReporterSupernodeAccount = reporterAccount
 			nextState.LastResultClass = result.ResultClass
@@ -266,29 +406,60 @@ func (k Keeper) applyTicketDeteriorationDelta(
 	return nextState, true, nil
 }
 
-func storageTruthScoreDeltasForResultClass(class types.StorageProofResultClass) storageTruthScoreDeltas {
-	switch class {
+// storageTruthScoreDeltasForResult returns score deltas based on result class, artifact class, and bucket type.
+// This replaces the old storageTruthScoreDeltasForResultClass function.
+func storageTruthScoreDeltasForResult(result *types.StorageProofResult) storageTruthScoreDeltas {
+	if result == nil {
+		return storageTruthScoreDeltas{}
+	}
+	switch result.ResultClass {
 	case types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS:
-		return storageTruthScoreDeltas{
-			nodeSuspicion:       -2,
-			reporterReliability: 2,
-			ticketDeterioration: -3,
+		// PASS deltas are REDUCTIONS (negative). Reporter delta is -4 (recovery in positive-penalty model).
+		switch result.BucketType {
+		case types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT:
+			return storageTruthScoreDeltas{
+				nodeSuspicion:       -3,
+				reporterReliability: -4,
+				ticketDeterioration: -2,
+			}
+		case types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_OLD:
+			return storageTruthScoreDeltas{
+				nodeSuspicion:       -2,
+				reporterReliability: -4,
+				ticketDeterioration: -3,
+			}
+		default:
+			return storageTruthScoreDeltas{
+				nodeSuspicion:       -2,
+				reporterReliability: -4,
+				ticketDeterioration: -2,
+			}
 		}
 	case types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH:
-		return storageTruthScoreDeltas{
-			nodeSuspicion:       12,
-			reporterReliability: 1,
-			ticketDeterioration: 12,
+		// Dispatch on artifact class.
+		switch result.ArtifactClass {
+		case types.StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_INDEX:
+			return storageTruthScoreDeltas{
+				nodeSuspicion:       26,
+				reporterReliability: 1,
+				ticketDeterioration: 12,
+			}
+		default: // SYMBOL or UNSPECIFIED — use symbol values as safe default.
+			return storageTruthScoreDeltas{
+				nodeSuspicion:       18,
+				reporterReliability: 1,
+				ticketDeterioration: 5,
+			}
 		}
 	case types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_TIMEOUT_OR_NO_RESPONSE:
 		return storageTruthScoreDeltas{
-			nodeSuspicion:       4,
+			nodeSuspicion:       7,
 			reporterReliability: -1,
-			ticketDeterioration: 4,
+			ticketDeterioration: 3,
 		}
 	case types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_OBSERVER_QUORUM_FAIL:
 		return storageTruthScoreDeltas{
-			nodeSuspicion:       3,
+			nodeSuspicion:       4,
 			reporterReliability: -3,
 			ticketDeterioration: 5,
 		}
@@ -306,9 +477,9 @@ func storageTruthScoreDeltasForResultClass(class types.StorageProofResultClass) 
 		}
 	case types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_RECHECK_CONFIRMED_FAIL:
 		return storageTruthScoreDeltas{
-			nodeSuspicion:       20,
+			nodeSuspicion:       15,
 			reporterReliability: 3,
-			ticketDeterioration: 20,
+			ticketDeterioration: 8,
 		}
 	default:
 		return storageTruthScoreDeltas{}
@@ -330,7 +501,8 @@ func (k Keeper) storageTruthBookkeepingForResult(
 	params types.Params,
 ) (storageTruthResultBookkeeping, error) {
 	bookkeeping := storageTruthResultBookkeeping{
-		reporterTrustBand: types.ReporterTrustBand_REPORTER_TRUST_BAND_NORMAL,
+		reporterTrustBand:       types.ReporterTrustBand_REPORTER_TRUST_BAND_NORMAL,
+		reporterTrustMultiplier: 100,
 	}
 	if result == nil {
 		return bookkeeping, nil
@@ -341,38 +513,76 @@ func (k Keeper) storageTruthBookkeepingForResult(
 		reliabilityScore = decayTowardZero(state.ReliabilityScore, params.StorageTruthReporterReliabilityDecayPerEpoch, epochDelta(epochID, state.LastUpdatedEpoch))
 	}
 	bookkeeping.reporterTrustBand = reporterTrustBandForScore(reliabilityScore, params)
+	bookkeeping.reporterTrustMultiplier = reporterTrustMultiplierNumerator(reliabilityScore)
 
 	if result.TicketId == "" {
 		return bookkeeping, nil
 	}
 
 	ticketState, found := k.GetTicketDeteriorationState(ctx, result.TicketId)
-	if !found {
-		if isStorageTruthFailureClass(result.ResultClass) {
-			bookkeeping.repeatedFailureCount = 1
-		}
-		return bookkeeping, nil
-	}
-
 	if isStorageTruthFailureClass(result.ResultClass) {
-		bookkeeping.repeatedFailureCount = updateRecentFailureEpochCount(ticketState, epochID, params)
-		if bookkeeping.repeatedFailureCount > 1 && epochID != ticketState.LastFailureEpoch {
-			bonus := repeatedFailureEscalationBonus(bookkeeping.repeatedFailureCount)
-			bookkeeping.nodeBonus = bonus
-			bookkeeping.ticketBonus = bonus
+		patternWindow := uint64(params.StorageTruthPatternEscalationWindow)
+		if patternWindow == 0 {
+			patternWindow = 14
 		}
-	} else {
+		tickets, _, err := k.distinctNodeFailedTickets(ctx, result.TargetSupernodeAccount, storageTruthWindowStart(epochID, patternWindow), epochID, nil)
+		if err != nil {
+			return bookkeeping, err
+		}
+		tickets[result.TicketId] = struct{}{}
+		bookkeeping.repeatedFailureCount = uint32(len(tickets))
+		if bookkeeping.repeatedFailureCount > 1 {
+			// §14: node suspicion pattern escalation based on distinct ticket count.
+			bookkeeping.nodeBonus = repeatedFailureEscalationBonus(bookkeeping.repeatedFailureCount)
+		}
+		if found {
+			// §16: ticket deterioration escalation distinguishes holder identity.
+			// Different holder failing same ticket in window: +10.
+			// Same holder failing same ticket in a different epoch: +6.
+			if epochID != ticketState.LastFailureEpoch && ticketState.LastTargetSupernodeAccount != "" {
+				if ticketState.LastTargetSupernodeAccount != result.TargetSupernodeAccount {
+					bookkeeping.ticketBonus = 10
+				} else {
+					bookkeeping.ticketBonus = 6
+				}
+			}
+		}
+
+		// §14 cross-bucket pattern escalation: +12 if both recent AND old fails within pattern window.
+		if result.TargetSupernodeAccount != "" {
+			currentIsRecent := result.BucketType == types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT
+			currentIsOld := result.BucketType == types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_OLD
+			recentFailed, err := k.hasNodeFailure(ctx, result.TargetSupernodeAccount, storageTruthWindowStart(epochID, patternWindow), epochID, func(record storageTruthNodeFailureRecord) bool {
+				return types.StorageProofBucketType(record.BucketType) == types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT
+			})
+			if err != nil {
+				return bookkeeping, err
+			}
+			oldFailed, err := k.hasNodeFailure(ctx, result.TargetSupernodeAccount, storageTruthWindowStart(epochID, patternWindow), epochID, func(record storageTruthNodeFailureRecord) bool {
+				return types.StorageProofBucketType(record.BucketType) == types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_OLD
+			})
+			if err != nil {
+				return bookkeeping, err
+			}
+			if (currentIsRecent || recentFailed) && (currentIsOld || oldFailed) {
+				bookkeeping.nodeBonus = addInt64Saturated(bookkeeping.nodeBonus, 12)
+			}
+		}
+	} else if found {
 		bookkeeping.repeatedFailureCount = ticketState.RecentFailureEpochCount
 	}
 
-	if ticketState.LastResultEpoch < epochID &&
+	if found && ticketState.LastResultEpoch < epochID &&
 		ticketState.LastTargetSupernodeAccount == result.TargetSupernodeAccount &&
 		storageTruthResultsContradict(ticketState.LastResultClass, result.ResultClass) {
 		bookkeeping.contradictionDetected = true
-		bookkeeping.currentReporterPenalty = -6
+		// Current reporter: clean-pass recovery (-4). The contradiction itself is logged.
+		bookkeeping.currentReporterPenalty = -4
 		if ticketState.LastReporterSupernodeAccount != "" && ticketState.LastReporterSupernodeAccount != reporterAccount {
 			bookkeeping.contradictedReporter = ticketState.LastReporterSupernodeAccount
-			bookkeeping.contradictedReporterDelta = -6
+			// Prior reporter submitted a fail that now looks suspicious after a clean pass.
+			// LEP6.md §15.1 second bullet: +12 penalty.
+			bookkeeping.contradictedReporterDelta = 12
 		}
 	}
 
@@ -380,25 +590,43 @@ func (k Keeper) storageTruthBookkeepingForResult(
 }
 
 func reporterTrustBandForScore(score int64, params types.Params) types.ReporterTrustBand {
+	// Positive-penalty model: R=0 is clean, higher R = more problematic.
+	ineligibleThreshold := params.StorageTruthReporterReliabilityIneligibleThreshold
+	if ineligibleThreshold <= 0 {
+		ineligibleThreshold = 90
+	}
+	degradedThreshold := params.StorageTruthReporterReliabilityDegradedThreshold
+	if degradedThreshold <= 0 {
+		degradedThreshold = 50
+	}
+	lowTrustThreshold := params.StorageTruthReporterReliabilityLowTrustThreshold
+	if lowTrustThreshold <= 0 {
+		lowTrustThreshold = 20
+	}
+
 	switch {
-	case score <= params.StorageTruthReporterReliabilityIneligibleThreshold:
+	case score >= ineligibleThreshold:
 		return types.ReporterTrustBand_REPORTER_TRUST_BAND_CHALLENGER_INELIGIBLE
-	case score <= params.StorageTruthReporterReliabilityLowTrustThreshold:
+	case score >= degradedThreshold:
+		return types.ReporterTrustBand_REPORTER_TRUST_BAND_DEGRADED
+	case score >= lowTrustThreshold:
 		return types.ReporterTrustBand_REPORTER_TRUST_BAND_LOW_TRUST
 	default:
 		return types.ReporterTrustBand_REPORTER_TRUST_BAND_NORMAL
 	}
 }
 
-func reporterTrustMultiplierNumerator(band types.ReporterTrustBand) int64 {
-	switch band {
-	case types.ReporterTrustBand_REPORTER_TRUST_BAND_LOW_TRUST:
-		return 50
-	case types.ReporterTrustBand_REPORTER_TRUST_BAND_CHALLENGER_INELIGIBLE:
-		return 25
-	default:
+// reporterTrustMultiplierNumerator implements the continuous formula: max(50, 100 - score)
+// for positive-penalty model where score >= 0. Returns numerator/100 as multiplier.
+func reporterTrustMultiplierNumerator(score int64) int64 {
+	if score <= 0 {
 		return 100
 	}
+	numerator := 100 - score
+	if numerator < 50 {
+		return 50
+	}
+	return numerator
 }
 
 func scaleInt64TowardZero(value, numerator, denominator int64) int64 {
@@ -457,15 +685,26 @@ func updateRecentFailureEpochCount(state types.TicketDeteriorationState, epochID
 	return state.RecentFailureEpochCount + 1
 }
 
+// repeatedFailureEscalationBonus implements spec-aligned pattern escalation.
+// Returns the pattern bonus for the node and ticket based on distinct ticket fail count.
+// Per LEP6.md §14: second distinct failed ticket in last 14 epochs: +10;
+// third or more: +15.
 func repeatedFailureEscalationBonus(count uint32) int64 {
-	if count <= 1 {
+	switch {
+	case count <= 1:
+		return 0
+	case count == 2:
+		return 10
+	default: // count >= 3
+		return 15
+	}
+}
+
+func storageTruthWindowStart(epochID uint64, window uint64) uint64 {
+	if window == 0 || epochID+1 <= window {
 		return 0
 	}
-	bonusSteps := count - 1
-	if bonusSteps > 3 {
-		bonusSteps = 3
-	}
-	return int64(bonusSteps) * 2
+	return epochID - window + 1
 }
 
 func boolToUint64(v bool) uint64 {
@@ -475,21 +714,61 @@ func boolToUint64(v bool) uint64 {
 	return 0
 }
 
-func decayTowardZero(score, decayPerEpoch int64, elapsedEpochs uint64) int64 {
-	if score == 0 || decayPerEpoch <= 0 || elapsedEpochs == 0 {
+// decayTowardZero applies exponential decay to score.
+// factorNumerator is the decay factor * 1000 (e.g., 920 means 0.920 per epoch).
+// Formula: score * (factorNumerator/1000)^elapsedEpochs using integer arithmetic.
+// Returns max(0, result) for positive scores, min(0, result) for negative.
+// Capped at 50 iterations to prevent runaway (beyond 50 epochs, any reasonable factor decays below 1).
+// For factorNumerator > 1000, returns score unchanged (no decay).
+// For factorNumerator <= 0 or elapsedEpochs == 0, returns score unchanged.
+func decayTowardZero(score, factorNumerator int64, elapsedEpochs uint64) int64 {
+	if score == 0 || elapsedEpochs == 0 {
 		return score
 	}
-	decayTotal := mulInt64ByUint64Saturated(decayPerEpoch, elapsedEpochs)
+	if factorNumerator <= 0 {
+		return score
+	}
+	if factorNumerator > 1000 {
+		// Factor > 1.0 means growth, not decay — treat as no decay.
+		return score
+	}
+	if factorNumerator == 1000 {
+		// Factor = 1.0 means no decay.
+		return score
+	}
+
+	// Iterative multiplication to avoid floating point.
+	// Cap at 50 iterations.
+	iterations := elapsedEpochs
+	if iterations > 50 {
+		iterations = 50
+	}
+
+	result := score
+	for i := uint64(0); i < iterations; i++ {
+		if result > 0 {
+			result = (result * factorNumerator) / 1000
+			if result <= 0 {
+				return 0
+			}
+		} else {
+			result = (result * factorNumerator) / 1000
+			if result >= 0 {
+				return 0
+			}
+		}
+	}
+
 	if score > 0 {
-		if decayTotal >= score {
+		if result < 0 {
 			return 0
 		}
-		return score - decayTotal
+		return result
 	}
-	if decayTotal >= -score {
+	if result > 0 {
 		return 0
 	}
-	return score + decayTotal
+	return result
 }
 
 func mulInt64ByUint64Saturated(v int64, m uint64) int64 {

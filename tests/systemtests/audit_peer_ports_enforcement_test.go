@@ -18,6 +18,7 @@ func TestAuditPeerPortsUnanimousClosedPostponesAfterConsecutiveWindows(t *testin
 	sut.ModifyGenesisJSON(t,
 		setSupernodeParamsForAuditTests(t),
 		setAuditParamsForFastEpochs(t, epochLengthBlocks, 1, 1, 1, []uint32{4444}),
+		setStorageTruthEnforcementModeUnspecified(t),
 		func(genesis []byte) []byte {
 			state, err := sjson.SetRawBytes(genesis, "app_state.audit.params.consecutive_epochs_to_postpone", []byte("2"))
 			require.NoError(t, err)
@@ -48,7 +49,7 @@ func TestAuditPeerPortsUnanimousClosedPostponesAfterConsecutiveWindows(t *testin
 
 	// Window 1: node0 reports node1 as CLOSED, node1 reports node0 as OPEN.
 	awaitAtLeastHeight(t, epoch1Start)
-	seed1 := headerHashAtHeight(t, sut.rpcAddr, epoch1Start)
+	seed1 := epochSeedAtHeight(t, sut.rpcAddr, epoch1Start, epochID1)
 	targets0e1, ok := assignedTargets(seed1, senders, receivers, kEpoch, n0.accAddr)
 	require.True(t, ok)
 	require.Len(t, targets0e1, 1)
@@ -67,7 +68,7 @@ func TestAuditPeerPortsUnanimousClosedPostponesAfterConsecutiveWindows(t *testin
 
 	// Window 2: repeat -> node1 should be POSTPONED at window end due to consecutive unanimous CLOSED.
 	awaitAtLeastHeight(t, epoch2Start)
-	seed2 := headerHashAtHeight(t, sut.rpcAddr, epoch2Start)
+	seed2 := epochSeedAtHeight(t, sut.rpcAddr, epoch2Start, epochID2)
 	targets0e2, ok := assignedTargets(seed2, senders, receivers, kEpoch, n0.accAddr)
 	require.True(t, ok)
 	require.Len(t, targets0e2, 1)

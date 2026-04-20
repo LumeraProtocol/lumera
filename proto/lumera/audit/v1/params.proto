@@ -116,4 +116,28 @@ message Params {
 
   // Storage-truth rollout gate.
   StorageTruthEnforcementMode storage_truth_enforcement_mode = 37;
+
+  // New LEP-6 spec-alignment params.
+  // Reporter reliability degraded threshold (positive-penalty model).
+  int64 storage_truth_reporter_reliability_degraded_threshold = 38;
+
+  // Pattern escalation window in epochs (default 14).
+  uint32 storage_truth_pattern_escalation_window = 39;
+
+  // Statistical divergence scoring params.
+  uint32 storage_truth_divergence_window_epochs = 40;
+  uint32 storage_truth_reporter_min_reports_for_divergence = 41;
+
+  // Strong-postpone threshold (default 140).
+  int64 storage_truth_node_suspicion_threshold_strong_postpone = 42;
+
+  // Recovery requires this many clean passes (default 3).
+  uint32 storage_truth_recovery_clean_pass_count = 43;
+
+  // Class A and B fault windows.
+  uint32 storage_truth_class_a_fault_window = 44;
+  uint32 storage_truth_class_b_fault_window = 45;
+
+  // Heal deadline in epochs (default 3).
+  uint32 storage_truth_heal_deadline_epochs = 46;
 }

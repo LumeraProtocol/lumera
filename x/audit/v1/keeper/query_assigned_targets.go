@@ -60,7 +60,8 @@ func (q queryServer) AssignedTargets(ctx context.Context, req *types.QueryAssign
 		assignParams = snap.WithDefaults()
 	}
 
-	targets, _, err := computeAuditPeerTargetsForReporter(&assignParams, anchor.ActiveSupernodeAccounts, anchor.TargetSupernodeAccounts, anchor.Seed, req.SupernodeAccount)
+	eligibleChallengers := q.k.storageTruthEligibleChallengers(sdkCtx, anchor.ActiveSupernodeAccounts, epochID, assignParams)
+	targets, _, err := computeAuditPeerTargetsForReporter(&assignParams, eligibleChallengers, anchor.TargetSupernodeAccounts, anchor.Seed, req.SupernodeAccount)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

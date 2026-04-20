@@ -62,6 +62,9 @@ func (k Keeper) expireStorageTruthHealOpsAtEpochEnd(ctx sdk.Context, epochID uin
 }
 
 func (k Keeper) scheduleStorageTruthHealOpsAtEpochEnd(ctx sdk.Context, epochID uint64, params types.Params) error {
+	if params.StorageTruthEnforcementMode == types.StorageTruthEnforcementMode_STORAGE_TRUTH_ENFORCEMENT_MODE_UNSPECIFIED {
+		return nil
+	}
 	if params.StorageTruthMaxSelfHealOpsPerEpoch == 0 {
 		return nil
 	}
@@ -94,8 +97,11 @@ func (k Keeper) scheduleStorageTruthHealOpsAtEpochEnd(ctx sdk.Context, epochID u
 	}
 
 	type candidate struct {
-		ticketID string
-		score    int64
+		ticketID                   string
+		score                      int64
+		hasIndexFailure            bool
+		distinctHolderFailureCount uint32
+		lastFailureEpoch           uint64
 	}
 	candidates := make([]candidate, 0, len(ticketStates))
 
@@ -126,14 +132,42 @@ func (k Keeper) scheduleStorageTruthHealOpsAtEpochEnd(ctx sdk.Context, epochID u
 			continue
 		}
 
-		candidates = append(candidates, candidate{ticketID: state.TicketId, score: state.DeteriorationScore})
+		// Eligibility predicate: must have holder diversity, index failure, or repeated failures.
+		isHealEligible := (state.DistinctHolderFailureCount >= 2) ||
+			(state.LastIndexFailureEpoch > 0) ||
+			(state.RecentFailureEpochCount >= 2)
+		if !isHealEligible {
+			continue
+		}
+
+		candidates = append(candidates, candidate{
+			ticketID:                   state.TicketId,
+			score:                      state.DeteriorationScore,
+			hasIndexFailure:            state.LastIndexFailureEpoch > 0,
+			distinctHolderFailureCount: state.DistinctHolderFailureCount,
+			lastFailureEpoch:           state.LastFailureEpoch,
+		})
 	}
 
+	// Priority sort per spec:
+	// 1. Score descending
+	// 2. last_index_failure_epoch != 0 (true first)
+	// 3. distinct_holder_failure_count descending
+	// 4. last_failure_epoch ascending (oldest first)
 	sort.Slice(candidates, func(i, j int) bool {
-		if candidates[i].score == candidates[j].score {
-			return candidates[i].ticketID < candidates[j].ticketID
+		if candidates[i].score != candidates[j].score {
+			return candidates[i].score > candidates[j].score
 		}
-		return candidates[i].score > candidates[j].score
+		if candidates[i].hasIndexFailure != candidates[j].hasIndexFailure {
+			return candidates[i].hasIndexFailure // true first
+		}
+		if candidates[i].distinctHolderFailureCount != candidates[j].distinctHolderFailureCount {
+			return candidates[i].distinctHolderFailureCount > candidates[j].distinctHolderFailureCount
+		}
+		if candidates[i].lastFailureEpoch != candidates[j].lastFailureEpoch {
+			return candidates[i].lastFailureEpoch < candidates[j].lastFailureEpoch // oldest first
+		}
+		return candidates[i].ticketID < candidates[j].ticketID
 	})
 
 	scheduled := uint32(0)
@@ -143,7 +177,14 @@ func (k Keeper) scheduleStorageTruthHealOpsAtEpochEnd(ctx sdk.Context, epochID u
 		}
 
 		healer, verifiers := assignStorageTruthHealParticipants(activeAccounts, cand.ticketID, epochID)
+		if len(verifiers) == 0 {
+			continue
+		}
 		healOpID := k.GetNextHealOpID(ctx)
+		deadlineEpochs := uint64(params.StorageTruthHealDeadlineEpochs)
+		if deadlineEpochs == 0 {
+			deadlineEpochs = 3
+		}
 		healOp := types.HealOp{
 			HealOpId:                  healOpID,
 			TicketId:                  cand.ticketID,
@@ -153,7 +194,7 @@ func (k Keeper) scheduleStorageTruthHealOpsAtEpochEnd(ctx sdk.Context, epochID u
 			Status:                    types.HealOpStatus_HEAL_OP_STATUS_SCHEDULED,
 			CreatedHeight:             uint64(ctx.BlockHeight()),
 			UpdatedHeight:             uint64(ctx.BlockHeight()),
-			DeadlineEpochId:           epochID + 1,
+			DeadlineEpochId:           epochID + deadlineEpochs,
 		}
 
 		if err := k.SetHealOp(ctx, healOp); err != nil {

@@ -32,12 +32,14 @@ func TestProcessStorageTruthHealOpsAtEpochEnd_SchedulesByPriority(t *testing.T) 
 	}))
 
 	require.NoError(t, f.keeper.SetTicketDeteriorationState(f.ctx, types.TicketDeteriorationState{
-		TicketId:           "ticket-high",
-		DeteriorationScore: 90,
+		TicketId:                   "ticket-high",
+		DeteriorationScore:         90,
+		DistinctHolderFailureCount: 2, // meets eligibility predicate
 	}))
 	require.NoError(t, f.keeper.SetTicketDeteriorationState(f.ctx, types.TicketDeteriorationState{
-		TicketId:           "ticket-mid",
-		DeteriorationScore: 50,
+		TicketId:                   "ticket-mid",
+		DeteriorationScore:         50,
+		DistinctHolderFailureCount: 2, // meets eligibility predicate
 	}))
 	require.NoError(t, f.keeper.SetTicketDeteriorationState(f.ctx, types.TicketDeteriorationState{
 		TicketId:           "ticket-low",

@@ -181,7 +181,8 @@ func TestStorageTruthQueries_ReflectScoredReportIngestion(t *testing.T) {
 
 	nodeResp, err := qs.NodeSuspicionState(f.ctx, &types.QueryNodeSuspicionStateRequest{SupernodeAccount: target})
 	require.NoError(t, err)
-	require.Equal(t, int64(12), nodeResp.State.SuspicionScore)
+	// HASH_MISMATCH + INDEX artifact: node=+26 (spec-aligned value)
+	require.Equal(t, int64(26), nodeResp.State.SuspicionScore)
 	require.Equal(t, uint64(0), nodeResp.State.LastUpdatedEpoch)
 
 	reporterResp, err := qs.ReporterReliabilityState(f.ctx, &types.QueryReporterReliabilityStateRequest{

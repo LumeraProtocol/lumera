@@ -26,7 +26,8 @@ func TestParamsWithDefaultsSetsStorageTruthFields(t *testing.T) {
 	require.Equal(t, DefaultStorageTruthOldBucketMinBlocks, p.StorageTruthOldBucketMinBlocks)
 	require.Equal(t, DefaultStorageTruthChallengeTargetDivisor, p.StorageTruthChallengeTargetDivisor)
 	require.Equal(t, DefaultStorageTruthMaxSelfHealOpsPerEpoch, p.StorageTruthMaxSelfHealOpsPerEpoch)
-	require.Equal(t, DefaultStorageTruthEnforcementMode, p.StorageTruthEnforcementMode)
+	// UNSPECIFIED is a valid no-op mode; WithDefaults does not promote it to SHADOW.
+	require.Equal(t, StorageTruthEnforcementMode_STORAGE_TRUTH_ENFORCEMENT_MODE_UNSPECIFIED, p.StorageTruthEnforcementMode)
 }
 
 func TestParamsValidateStorageTruthFailures(t *testing.T) {

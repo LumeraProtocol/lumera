@@ -62,10 +62,128 @@ func (m msgServer) SubmitStorageRecheckEvidence(ctx context.Context, req *types.
 		return nil, errorsmod.Wrap(types.ErrInvalidRecheckEvidence, "recheck_result_class is invalid")
 	}
 
-	return nil, errorsmod.Wrap(
-		types.ErrNotImplemented,
-		"storage recheck submission is not active in the LEP-6 heal-op lifecycle milestone",
-	)
+	challengedRecord, found, err := m.getStorageProofTranscriptRecord(sdkCtx, req.ChallengedResultTranscriptHash)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, errorsmod.Wrap(types.ErrInvalidRecheckEvidence, "challenged_result_transcript_hash does not reference a submitted storage proof result")
+	}
+	if challengedRecord.EpochID != req.EpochId {
+		return nil, errorsmod.Wrapf(types.ErrInvalidRecheckEvidence, "challenged result epoch %d does not match request epoch %d", challengedRecord.EpochID, req.EpochId)
+	}
+	if challengedRecord.TicketID != req.TicketId {
+		return nil, errorsmod.Wrap(types.ErrInvalidRecheckEvidence, "challenged result ticket_id does not match request ticket_id")
+	}
+	if challengedRecord.TargetAccount != req.ChallengedSupernodeAccount {
+		return nil, errorsmod.Wrap(types.ErrInvalidRecheckEvidence, "challenged result target does not match challenged_supernode_account")
+	}
+	if challengedRecord.ReporterAccount == req.Creator {
+		return nil, errorsmod.Wrap(types.ErrInvalidRecheckEvidence, "creator must be independent from the challenged result reporter")
+	}
+	if !challengedRecord.RecheckEligible {
+		return nil, errorsmod.Wrap(types.ErrInvalidRecheckEvidence, "challenged result class is not recheck-eligible")
+	}
+
+	// Replay protection: one recheck per (epoch, ticket, creator).
+	if m.HasRecheckEvidence(sdkCtx, req.EpochId, req.TicketId, req.Creator) {
+		return nil, errorsmod.Wrapf(types.ErrInvalidRecheckEvidence, "recheck evidence already submitted for epoch %d ticket %q by %q", req.EpochId, req.TicketId, req.Creator)
+	}
+	m.SetRecheckEvidence(sdkCtx, req.EpochId, req.TicketId, req.Creator)
+
+	// Derive current epoch for scoring context.
+	params := m.GetParams(sdkCtx).WithDefaults()
+	currentEpoch, err := deriveEpochAtHeight(sdkCtx.BlockHeight(), params)
+	if err != nil {
+		return nil, err
+	}
+
+	// Capture the original reporter BEFORE applyStorageTruthScores updates the ticket state.
+	// If the recheck result is PASS (overturn), we apply a +25 penalty to the original reporter.
+	// If the recheck result is RECHECK_CONFIRMED_FAIL (confirms), we apply a -3 reward.
+	var overturnOriginalReporter, confirmOriginalReporter string
+	if ticketState, found := m.GetTicketDeteriorationState(sdkCtx, req.TicketId); found {
+		origReporter := ticketState.LastReporterSupernodeAccount
+		if origReporter != "" && origReporter != req.Creator {
+			switch req.RecheckResultClass {
+			case types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS:
+				overturnOriginalReporter = origReporter
+			case types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_RECHECK_CONFIRMED_FAIL:
+				confirmOriginalReporter = origReporter
+			}
+		}
+	}
+
+	// Synthesise a StorageProofResult carrying the recheck outcome and apply scores.
+	recheckResult := &types.StorageProofResult{
+		TicketId:               req.TicketId,
+		TargetSupernodeAccount: req.ChallengedSupernodeAccount,
+		ResultClass:            req.RecheckResultClass,
+		BucketType:             types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECHECK,
+	}
+	if err := m.applyStorageTruthScores(sdkCtx, currentEpoch.EpochID, req.Creator, []*types.StorageProofResult{recheckResult}); err != nil {
+		return nil, err
+	}
+
+	// Recheck overturn penalty: if recheck result is PASS, it overturns the original fail.
+	// Penalize the original reporter by +25.
+	if overturnOriginalReporter != "" {
+		if _, _, err := m.applyReporterReliabilityDelta(
+			sdkCtx,
+			currentEpoch.EpochID,
+			overturnOriginalReporter,
+			25, // +25 overturn penalty
+			params.StorageTruthReporterReliabilityDecayPerEpoch,
+			1,
+			params,
+		); err != nil {
+			return nil, err
+		}
+		sdkCtx.EventManager().EmitEvent(sdk.NewEvent(
+			types.EventTypeStorageTruthScoreUpdated,
+			sdk.NewAttribute(sdk.AttributeKeyModule, types.ModuleName),
+			sdk.NewAttribute(types.AttributeKeyEpochID, strconv.FormatUint(currentEpoch.EpochID, 10)),
+			sdk.NewAttribute(types.AttributeKeyContradictedReporter, overturnOriginalReporter),
+			sdk.NewAttribute(types.AttributeKeyRecheckResultClass, req.RecheckResultClass.String()),
+		))
+	}
+
+	// §15.3: recheck confirms original fail — reward the correct original reporter with -3.
+	if confirmOriginalReporter != "" {
+		if _, _, err := m.applyReporterReliabilityDelta(
+			sdkCtx,
+			currentEpoch.EpochID,
+			confirmOriginalReporter,
+			-3, // recovery credit for confirmed correct fail
+			params.StorageTruthReporterReliabilityDecayPerEpoch,
+			0,
+			params,
+		); err != nil {
+			return nil, err
+		}
+	}
+	if overturnOriginalReporter != "" {
+		if err := m.markStorageTruthReporterResultRecheck(sdkCtx, overturnOriginalReporter, req.ChallengedResultTranscriptHash, false); err != nil {
+			return nil, err
+		}
+	}
+	if confirmOriginalReporter != "" {
+		if err := m.markStorageTruthReporterResultRecheck(sdkCtx, confirmOriginalReporter, req.ChallengedResultTranscriptHash, true); err != nil {
+			return nil, err
+		}
+	}
+
+	sdkCtx.EventManager().EmitEvent(sdk.NewEvent(
+		types.EventTypeStorageRecheckEvidence,
+		sdk.NewAttribute(sdk.AttributeKeyModule, types.ModuleName),
+		sdk.NewAttribute(types.AttributeKeyEpochID, strconv.FormatUint(req.EpochId, 10)),
+		sdk.NewAttribute(types.AttributeKeyReporterSupernodeAccount, req.Creator),
+		sdk.NewAttribute(types.AttributeKeyTargetSupernodeAccount, req.ChallengedSupernodeAccount),
+		sdk.NewAttribute(types.AttributeKeyTicketID, req.TicketId),
+		sdk.NewAttribute(types.AttributeKeyRecheckResultClass, req.RecheckResultClass.String()),
+	))
+
+	return &types.MsgSubmitStorageRecheckEvidenceResponse{}, nil
 }
 
 func (m msgServer) ClaimHealComplete(ctx context.Context, req *types.MsgClaimHealComplete) (*types.MsgClaimHealCompleteResponse, error) {
@@ -105,21 +223,8 @@ func (m msgServer) ClaimHealComplete(ctx context.Context, req *types.MsgClaimHea
 	healOp.ResultHash = req.HealManifestHash
 	healOp.Notes = appendStorageTruthNote(healOp.Notes, req.Details)
 
-	// Single-node networks may not have verifier assignments; finalize immediately.
 	if len(healOp.VerifierSupernodeAccounts) == 0 {
-		if err := m.finalizeHealOp(sdkCtx, healOp, true, req.HealManifestHash, req.Details); err != nil {
-			return nil, err
-		}
-		sdkCtx.EventManager().EmitEvent(
-			sdk.NewEvent(
-				types.EventTypeHealOpVerified,
-				sdk.NewAttribute(sdk.AttributeKeyModule, types.ModuleName),
-				sdk.NewAttribute(types.AttributeKeyHealOpID, strconv.FormatUint(healOp.HealOpId, 10)),
-				sdk.NewAttribute(types.AttributeKeyTicketID, healOp.TicketId),
-				sdk.NewAttribute(types.AttributeKeyHealerSupernodeAccount, req.Creator),
-			),
-		)
-		return &types.MsgClaimHealCompleteResponse{}, nil
+		return nil, errorsmod.Wrap(types.ErrHealOpInvalidState, "heal op has no independent verifier assignments")
 	}
 
 	if err := m.SetHealOp(sdkCtx, healOp); err != nil {
@@ -190,7 +295,11 @@ func (m msgServer) SubmitHealVerification(ctx context.Context, req *types.MsgSub
 		}
 	}
 
-	if negative > 0 {
+	// Majority quorum: need majority of verifiers to agree (positive or negative).
+	n := len(healOp.VerifierSupernodeAccounts)
+	majority := n/2 + 1
+
+	if negative >= majority {
 		if err := m.finalizeHealOp(sdkCtx, healOp, false, req.VerificationHash, req.Details); err != nil {
 			return nil, err
 		}
@@ -207,7 +316,7 @@ func (m msgServer) SubmitHealVerification(ctx context.Context, req *types.MsgSub
 		return &types.MsgSubmitHealVerificationResponse{}, nil
 	}
 
-	if positive == len(healOp.VerifierSupernodeAccounts) {
+	if positive >= majority {
 		if err := m.finalizeHealOp(sdkCtx, healOp, true, req.VerificationHash, req.Details); err != nil {
 			return nil, err
 		}
@@ -224,6 +333,7 @@ func (m msgServer) SubmitHealVerification(ctx context.Context, req *types.MsgSub
 		return &types.MsgSubmitHealVerificationResponse{}, nil
 	}
 
+	// Not enough votes yet — accumulate and wait.
 	return &types.MsgSubmitHealVerificationResponse{}, nil
 }
 
@@ -255,13 +365,27 @@ func (m msgServer) finalizeHealOp(
 	if ticketState.ActiveHealOpId == healOp.HealOpId {
 		ticketState.ActiveHealOpId = 0
 	}
+
+	params := m.GetParams(ctx).WithDefaults()
+	currentEpoch, err := deriveEpochAtHeight(ctx.BlockHeight(), params)
+	if err != nil {
+		return err
+	}
+
 	if verified {
-		currentEpoch, err := deriveEpochAtHeight(ctx.BlockHeight(), m.GetParams(ctx).WithDefaults())
-		if err != nil {
-			return err
+		// Post-heal score reset: D = max(8, floor(D_old * 0.25))
+		oldScore := ticketState.DeteriorationScore
+		resetScore := oldScore / 4
+		if resetScore < 8 {
+			resetScore = 8
 		}
+		ticketState.DeteriorationScore = resetScore
 		ticketState.LastHealEpoch = currentEpoch.EpochID
-		ticketState.ProbationUntilEpoch = currentEpoch.EpochID + uint64(m.GetParams(ctx).WithDefaults().StorageTruthProbationEpochs)
+		ticketState.ProbationUntilEpoch = currentEpoch.EpochID + uint64(params.StorageTruthProbationEpochs)
+	} else {
+		// Failed heal: D += 15
+		ticketState.DeteriorationScore = addInt64Saturated(ticketState.DeteriorationScore, 15)
+		m.setStorageTruthFailedHeal(ctx, healOp.HealerSupernodeAccount, currentEpoch.EpochID, healOp.TicketId)
 	}
 	return m.SetTicketDeteriorationState(ctx, ticketState)
 }

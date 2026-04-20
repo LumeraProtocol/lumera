@@ -58,6 +58,12 @@ enum StorageProofResultClass {
 }
 
 // StorageProofResult captures one storage-truth storage-proof check outcome.
+//
+// NOTE: StorageProofResult intentionally stores only transcript_hash as a commitment
+// to the full challenge transcript. Derivation inputs (epoch_seed, ranges) are
+// deterministic from on-chain params and epoch anchor. Challenger signatures and
+// observer attestations are held off-chain; transcript_hash serves as the
+// chain-minimal commitment. This is intentional design — see LEP6.md §12.2.
 message StorageProofResult {
   string target_supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
   string challenger_supernode_account = 2 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
@@ -84,6 +90,17 @@ message NodeSuspicionState {
   string supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
   int64 suspicion_score = 2;
   uint64 last_updated_epoch = 3;
+  uint64 last_recent_fail_epoch = 4;
+  uint64 last_old_fail_epoch = 5;
+  uint32 distinct_ticket_fail_window = 6;
+  uint64 window_start_epoch = 7;
+  uint32 class_a_count_window = 8;
+  uint64 last_class_a_epoch = 9;
+  uint32 class_b_count_window = 10;
+  uint64 last_class_b_epoch = 11;
+  uint32 clean_pass_count = 12;
+  uint64 last_clean_pass_epoch = 13;
+  uint64 last_index_fail_epoch = 14;
 }
 
 enum ReporterTrustBand {
@@ -91,6 +108,7 @@ enum ReporterTrustBand {
   REPORTER_TRUST_BAND_NORMAL                = 1;
   REPORTER_TRUST_BAND_LOW_TRUST             = 2;
   REPORTER_TRUST_BAND_CHALLENGER_INELIGIBLE = 3;
+  REPORTER_TRUST_BAND_DEGRADED              = 4;
 }
 
 // ReporterReliabilityState is the persisted storage-truth reporter reliability snapshot.
@@ -100,6 +118,10 @@ message ReporterReliabilityState {
   uint64 last_updated_epoch = 3;
   ReporterTrustBand trust_band = 4;
   uint64 contradiction_count = 5;
+  uint64 ineligible_until_epoch = 6;
+  uint32 window_positive_count = 7;
+  uint32 window_negative_count = 8;
+  uint64 window_start_epoch = 9;
 }
 
 // TicketDeteriorationState is the persisted storage-truth ticket deterioration snapshot.
@@ -117,6 +139,10 @@ message TicketDeteriorationState {
   string last_reporter_supernode_account = 11 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
   StorageProofResultClass last_result_class = 12;
   uint64 last_result_epoch = 13;
+  uint32 distinct_holder_failure_count = 14;
+  uint64 last_index_failure_epoch = 15;
+  uint64 recent_bucket_failure_epoch = 16;
+  uint64 old_bucket_failure_epoch = 17;
 }
 
 enum HealOpStatus {

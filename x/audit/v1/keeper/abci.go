@@ -52,6 +52,10 @@ func (k Keeper) EndBlocker(ctx context.Context) error {
 		return err
 	}
 
+	if err := k.ApplyReporterDivergenceAtEpochEnd(sdkCtx, epoch.EpochID, params); err != nil {
+		return err
+	}
+
 	if err := k.ProcessStorageTruthHealOpsAtEpochEnd(sdkCtx, epoch.EpochID, params); err != nil {
 		return err
 	}

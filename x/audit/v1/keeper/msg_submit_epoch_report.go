@@ -54,7 +54,8 @@ func (m msgServer) SubmitEpochReport(ctx context.Context, req *types.MsgSubmitEp
 		assignParams = snap.WithDefaults()
 	}
 
-	allowedTargetsList, isProber, err := computeAuditPeerTargetsForReporter(&assignParams, anchor.ActiveSupernodeAccounts, anchor.TargetSupernodeAccounts, anchor.Seed, reporterAccount)
+	eligibleChallengers := m.storageTruthEligibleChallengers(sdkCtx, anchor.ActiveSupernodeAccounts, req.EpochId, assignParams)
+	allowedTargetsList, isProber, err := computeAuditPeerTargetsForReporter(&assignParams, eligibleChallengers, anchor.TargetSupernodeAccounts, anchor.Seed, reporterAccount)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +122,8 @@ func (m msgServer) SubmitEpochReport(ctx context.Context, req *types.MsgSubmitEp
 			return nil, errorsmod.Wrap(types.ErrInvalidPeerObservations, "peer observations do not cover all assigned targets")
 		}
 	}
-	if err := validateStorageProofResults(reporterAccount, allowedTargets, isProber, req.StorageProofResults); err != nil {
+	enforceCompoundStorageProofs := assignParams.StorageTruthEnforcementMode == types.StorageTruthEnforcementMode_STORAGE_TRUTH_ENFORCEMENT_MODE_FULL
+	if err := validateStorageProofResults(reporterAccount, allowedTargets, isProber, enforceCompoundStorageProofs, req.StorageProofResults); err != nil {
 		return nil, err
 	}
 
@@ -158,6 +160,10 @@ func (m msgServer) SubmitEpochReport(ctx context.Context, req *types.MsgSubmitEp
 		}
 		seenSupernodes[supernodeAccount] = struct{}{}
 		m.SetStorageChallengeReportIndex(sdkCtx, supernodeAccount, req.EpochId, reporterAccount)
+	}
+
+	if err := m.indexStorageProofTranscripts(sdkCtx, req.EpochId, reporterAccount, req.StorageProofResults); err != nil {
+		return nil, err
 	}
 
 	if err := m.applyStorageTruthScores(sdkCtx, req.EpochId, reporterAccount, req.StorageProofResults); err != nil {

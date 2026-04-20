@@ -17,8 +17,17 @@ type storageProofDescriptorKey struct {
 	artifactOrd   uint32
 }
 
-func validateStorageProofResults(reporterAccount string, allowedTargets map[string]struct{}, isProber bool, results []*types.StorageProofResult) error {
+func validateStorageProofResults(
+	reporterAccount string,
+	allowedTargets map[string]struct{},
+	isProber bool,
+	enforceCompoundCoverage bool,
+	results []*types.StorageProofResult,
+) error {
 	if len(results) == 0 {
+		if enforceCompoundCoverage && isProber && len(allowedTargets) > 0 {
+			return errorsmod.Wrap(types.ErrInvalidStorageProofs, "storage_proof_results must include RECENT and OLD entries for every assigned target")
+		}
 		return nil
 	}
 	if !isProber {
@@ -122,5 +131,56 @@ func validateStorageProofResults(reporterAccount string, allowedTargets map[stri
 		seen[key] = struct{}{}
 	}
 
+	if enforceCompoundCoverage {
+		if err := validateCompoundStorageProofCoverage(allowedTargets, results); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func validateCompoundStorageProofCoverage(allowedTargets map[string]struct{}, results []*types.StorageProofResult) error {
+	type bucketCoverage struct {
+		recent bool
+		old    bool
+	}
+
+	coverage := make(map[string]bucketCoverage, len(allowedTargets))
+	for target := range allowedTargets {
+		coverage[target] = bucketCoverage{}
+	}
+
+	for i, result := range results {
+		if result == nil {
+			continue
+		}
+		cov, ok := coverage[result.TargetSupernodeAccount]
+		if !ok {
+			continue
+		}
+		fieldName := fmt.Sprintf("storage_proof_results[%d]", i)
+		switch result.BucketType {
+		case types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT:
+			if cov.recent {
+				return errorsmod.Wrap(types.ErrInvalidStorageProofs, fieldName+" duplicates RECENT storage proof for assigned target")
+			}
+			cov.recent = true
+		case types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_OLD:
+			if cov.old {
+				return errorsmod.Wrap(types.ErrInvalidStorageProofs, fieldName+" duplicates OLD storage proof for assigned target")
+			}
+			cov.old = true
+		default:
+			continue
+		}
+		coverage[result.TargetSupernodeAccount] = cov
+	}
+
+	for target, cov := range coverage {
+		if !cov.recent || !cov.old {
+			return errorsmod.Wrapf(types.ErrInvalidStorageProofs, "assigned target %q must have exactly one RECENT and one OLD storage proof result", target)
+		}
+	}
 	return nil
 }

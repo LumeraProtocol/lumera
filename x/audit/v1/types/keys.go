@@ -72,6 +72,10 @@ var (
 
 	actionFinalizationPostponementPrefix = []byte("ap/af/")
 
+	// Storage-truth postponement state:
+	// - StorageTruthPostponementKey: "ap/st/" + supernode_account -> 8 bytes u64be(postponed_at_epoch_id)
+	storageTruthPostponementPrefix = []byte("ap/st/")
+
 	// Storage-truth state:
 	// - NodeSuspicionStateKey:          "st/ns/" + supernode_account
 	// - ReporterReliabilityStateKey:    "st/rr/" + reporter_supernode_account
@@ -89,6 +93,20 @@ var (
 	healOpByStatusIndexPrefix      = []byte("st/hos/")
 	healOpVerificationPrefix       = []byte("st/hov/")
 	nextHealOpIDKey                = []byte("st/next_ho_id")
+
+	// Recheck evidence dedup:
+	// - RecheckEvidenceKey: "st/rce/" + u64be(epoch_id) + "/" + ticket_id + 0x00 + creator_account
+	recheckEvidencePrefix = []byte("st/rce/")
+
+	// Storage-truth fact indexes:
+	// - StorageProofTranscriptKey:      "st/spt/" + transcript_hash -> storageProofTranscriptRecord JSON
+	// - NodeStorageTruthFailureKey:     "st/nf/" + supernode_account + "/" + u64be(epoch_id) + "/" + ticket_id + 0x00 + reporter_account -> storageTruthNodeFailureRecord JSON
+	// - ReporterStorageTruthResultKey:  "st/rrs/" + reporter_account + "/" + u64be(epoch_id) + "/" + ticket_id + 0x00 + target_account -> storageTruthReporterResultRecord JSON
+	// - StorageTruthFailedHealKey:      "st/fh/" + supernode_account + "/" + u64be(epoch_id) + "/" + ticket_id -> empty
+	storageProofTranscriptPrefix     = []byte("st/spt/")
+	nodeStorageTruthFailurePrefix    = []byte("st/nf/")
+	reporterStorageTruthResultPrefix = []byte("st/rrs/")
+	storageTruthFailedHealPrefix     = []byte("st/fh/")
 )
 
 // EpochAnchorKey returns the store key for the EpochAnchor identified by epochID.
@@ -393,6 +411,98 @@ func HealOpVerificationPrefix(healOpID uint64) []byte {
 	key := make([]byte, 0, len(healOpVerificationPrefix)+8+1) // "st/hov/" + u64be(heal_op_id) + "/"
 	key = append(key, healOpVerificationPrefix...)
 	key = binary.BigEndian.AppendUint64(key, healOpID)
+	key = append(key, '/')
+	return key
+}
+
+func StorageTruthPostponementKey(supernodeAccount string) []byte {
+	key := make([]byte, 0, len(storageTruthPostponementPrefix)+len(supernodeAccount))
+	key = append(key, storageTruthPostponementPrefix...)
+	key = append(key, supernodeAccount...)
+	return key
+}
+
+func StorageTruthPostponementPrefix() []byte {
+	return storageTruthPostponementPrefix
+}
+
+// RecheckEvidenceKey returns the dedup key for a recheck evidence submission.
+// Format: "st/rce/" + u64be(epoch_id) + "/" + ticket_id + 0x00 + creator_account
+func RecheckEvidenceKey(epochID uint64, ticketID string, creatorAccount string) []byte {
+	key := make([]byte, 0, len(recheckEvidencePrefix)+8+1+len(ticketID)+1+len(creatorAccount))
+	key = append(key, recheckEvidencePrefix...)
+	key = binary.BigEndian.AppendUint64(key, epochID)
+	key = append(key, '/')
+	key = append(key, ticketID...)
+	key = append(key, 0) // delimiter allows ticket_id to contain '/'
+	key = append(key, creatorAccount...)
+	return key
+}
+
+func StorageProofTranscriptKey(transcriptHash string) []byte {
+	key := make([]byte, 0, len(storageProofTranscriptPrefix)+len(transcriptHash))
+	key = append(key, storageProofTranscriptPrefix...)
+	key = append(key, transcriptHash...)
+	return key
+}
+
+func NodeStorageTruthFailureKey(supernodeAccount string, epochID uint64, ticketID string, reporterAccount string) []byte {
+	key := make([]byte, 0, len(nodeStorageTruthFailurePrefix)+len(supernodeAccount)+1+8+1+len(ticketID)+1+len(reporterAccount))
+	key = append(key, nodeStorageTruthFailurePrefix...)
+	key = append(key, supernodeAccount...)
+	key = append(key, '/')
+	key = binary.BigEndian.AppendUint64(key, epochID)
+	key = append(key, '/')
+	key = append(key, ticketID...)
+	key = append(key, 0)
+	key = append(key, reporterAccount...)
+	return key
+}
+
+func NodeStorageTruthFailurePrefix(supernodeAccount string) []byte {
+	key := make([]byte, 0, len(nodeStorageTruthFailurePrefix)+len(supernodeAccount)+1)
+	key = append(key, nodeStorageTruthFailurePrefix...)
+	key = append(key, supernodeAccount...)
+	key = append(key, '/')
+	return key
+}
+
+func ReporterStorageTruthResultKey(reporterAccount string, epochID uint64, ticketID string, targetAccount string) []byte {
+	key := make([]byte, 0, len(reporterStorageTruthResultPrefix)+len(reporterAccount)+1+8+1+len(ticketID)+1+len(targetAccount))
+	key = append(key, reporterStorageTruthResultPrefix...)
+	key = append(key, reporterAccount...)
+	key = append(key, '/')
+	key = binary.BigEndian.AppendUint64(key, epochID)
+	key = append(key, '/')
+	key = append(key, ticketID...)
+	key = append(key, 0)
+	key = append(key, targetAccount...)
+	return key
+}
+
+func ReporterStorageTruthResultPrefix(reporterAccount string) []byte {
+	key := make([]byte, 0, len(reporterStorageTruthResultPrefix)+len(reporterAccount)+1)
+	key = append(key, reporterStorageTruthResultPrefix...)
+	key = append(key, reporterAccount...)
+	key = append(key, '/')
+	return key
+}
+
+func StorageTruthFailedHealKey(supernodeAccount string, epochID uint64, ticketID string) []byte {
+	key := make([]byte, 0, len(storageTruthFailedHealPrefix)+len(supernodeAccount)+1+8+1+len(ticketID))
+	key = append(key, storageTruthFailedHealPrefix...)
+	key = append(key, supernodeAccount...)
+	key = append(key, '/')
+	key = binary.BigEndian.AppendUint64(key, epochID)
+	key = append(key, '/')
+	key = append(key, ticketID...)
+	return key
+}
+
+func StorageTruthFailedHealPrefix(supernodeAccount string) []byte {
+	key := make([]byte, 0, len(storageTruthFailedHealPrefix)+len(supernodeAccount)+1)
+	key = append(key, storageTruthFailedHealPrefix...)
+	key = append(key, supernodeAccount...)
 	key = append(key, '/')
 	return key
 }

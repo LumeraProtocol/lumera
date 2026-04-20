@@ -287,6 +287,11 @@ multisig_sign_unsigned() {
 	sig1="$(mktemp /tmp/multisig-sig1.XXXXXX.json)"
 	sig2="$(mktemp /tmp/multisig-sig2.XXXXXX.json)"
 
+	# --offline is required so `tx sign` trusts the caller-supplied
+	# --account-number and --sequence instead of reaching out to the chain
+	# (which may not be up yet during the gentx ceremony). Per SDK docs,
+	# without --offline those two flags are silently ignored and overwritten
+	# with values fetched from a full node.
 	rc=0
 	{
 		run_capture ${DAEMON} tx sign "${unsigned_file}" \
@@ -295,7 +300,7 @@ multisig_sign_unsigned() {
 			--keyring-backend "${KEYRING_BACKEND}" \
 			--chain-id "${CHAIN_ID}" \
 			--account-number "${acc_num}" --sequence "${seq}" \
-			--sign-mode amino-json \
+			--sign-mode amino-json --offline \
 			--output json >"${sig1}" &&
 		run_capture ${DAEMON} tx sign "${unsigned_file}" \
 			--from "${signer2}" \
@@ -303,12 +308,13 @@ multisig_sign_unsigned() {
 			--keyring-backend "${KEYRING_BACKEND}" \
 			--chain-id "${CHAIN_ID}" \
 			--account-number "${acc_num}" --sequence "${seq}" \
-			--sign-mode amino-json \
+			--sign-mode amino-json --offline \
 			--output json >"${sig2}" &&
 		run_capture ${DAEMON} tx multisign "${unsigned_file}" "${multisig_key}" \
 			"${sig1}" "${sig2}" \
 			--keyring-backend "${KEYRING_BACKEND}" \
 			--chain-id "${CHAIN_ID}" \
+			--offline --account-number "${acc_num}" --sequence "${seq}" \
 			--output json
 	} || rc=$?
 

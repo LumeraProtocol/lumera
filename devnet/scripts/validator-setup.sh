@@ -274,15 +274,28 @@ build_multisig_gentx() {
 	local gentx_file="$1"
 	local unsigned_file multisig_addr
 
-	unsigned_file="$(mktemp "${GENTX_LOCAL_DIR}/gentx-unsigned.XXXXXX.json")"
+	# Keep the unsigned tempfile outside ${GENTX_LOCAL_DIR}: the script's
+	# downstream globs (gentx-*.json) would otherwise match it and collect a
+	# half-baked tx into genesis.
+	unsigned_file="$(mktemp /tmp/gentx-unsigned.XXXXXX.json)"
 	multisig_addr="$(run_capture ${DAEMON} keys show "${KEY_NAME}" -a --keyring-backend "${KEYRING_BACKEND}" 2>/dev/null || true)"
 	multisig_addr="$(printf '%s' "${multisig_addr}" | tr -d '\r\n')"
 
-	run ${DAEMON} genesis gentx "${KEY_NAME}" "${STAKE_AMOUNT}" \
+	# With a multisig (offline) key, cosmos-sdk's `genesis gentx` short-circuits
+	# to PrintUnsignedTx and silently ignores --output-document (see
+	# x/genutil/client/cli/gentx.go @ v0.53.6 lines 162-165). Capture stdout
+	# into the file ourselves; stderr carries the "Offline key passed in…"
+	# notice and is left on the log.
+	run_capture ${DAEMON} genesis gentx "${KEY_NAME}" "${STAKE_AMOUNT}" \
 		--chain-id "${CHAIN_ID}" \
 		--keyring-backend "${KEYRING_BACKEND}" \
 		--generate-only \
-		--output-document "${unsigned_file}"
+		>"${unsigned_file}"
+
+	if [[ ! -s "${unsigned_file}" ]]; then
+		echo "[SETUP] ERROR: gentx produced empty unsigned tx at ${unsigned_file}" >&2
+		return 1
+	fi
 
 	# Gentx signs against a not-yet-on-chain account, so account_number and
 	# sequence are both 0.
@@ -291,6 +304,11 @@ build_multisig_gentx() {
 		"${MULTISIG_MEMBER_KEYS[0]}" "${MULTISIG_MEMBER_KEYS[1]}" \
 		0 0 >"${gentx_file}"
 
+	if [[ ! -s "${gentx_file}" ]]; then
+		echo "[SETUP] ERROR: multisign produced empty gentx at ${gentx_file}" >&2
+		rm -f "${unsigned_file}"
+		return 1
+	fi
 	verify_gentx_file "${gentx_file}" || return 1
 	rm -f "${unsigned_file}"
 }
@@ -702,7 +720,7 @@ primary_validator_setup() {
 	# gentx = "genesis transaction" that self-delegates STAKE_AMOUNT to this
 	# validator. Each validator creates one; primary collects them all.
 	if validator_is_multisig; then
-		build_multisig_gentx "${GENTX_LOCAL_DIR}/${MONIKER}_gentx.json"
+		build_multisig_gentx "${GENTX_LOCAL_DIR}/gentx-${MONIKER}.json"
 	else
 		run ${DAEMON} genesis gentx "${KEY_NAME}" "${STAKE_AMOUNT}" \
 			--chain-id "${CHAIN_ID}" \
@@ -798,7 +816,7 @@ secondary_validator_setup() {
 		echo "[SETUP] gentx already exists in ${GENTX_LOCAL_DIR}, skipping generation"
 	else
 		if validator_is_multisig; then
-			build_multisig_gentx "${GENTX_LOCAL_DIR}/${MONIKER}_gentx.json"
+			build_multisig_gentx "${GENTX_LOCAL_DIR}/gentx-${MONIKER}.json"
 		else
 			run ${DAEMON} genesis gentx "${KEY_NAME}" "${STAKE_AMOUNT}" \
 				--chain-id "${CHAIN_ID}" --keyring-backend "${KEYRING_BACKEND}"

@@ -29,6 +29,36 @@
         "foundation_fee_share": "0.000000000000000000"
       }
     },
+    "audit": {
+      "params": {
+        "epoch_length_blocks": "400",
+        "epoch_zero_height": "1",
+        "peer_quorum_reports": 3,
+        "min_probe_targets_per_epoch": 3,
+        "max_probe_targets_per_epoch": 5,
+        "required_open_ports": [
+          4444,
+          4445,
+          8002
+        ],
+        "min_cpu_free_percent": 0,
+        "min_mem_free_percent": 0,
+        "min_disk_free_percent": 0,
+        "consecutive_epochs_to_postpone": 1,
+        "keep_last_epoch_entries": "200",
+        "peer_port_postpone_threshold_percent": 100,
+        "action_finalization_signature_failure_evidences_per_epoch": 1,
+        "action_finalization_signature_failure_consecutive_epochs": 1,
+        "action_finalization_not_in_top10_evidences_per_epoch": 1,
+        "action_finalization_not_in_top10_consecutive_epochs": 1,
+        "action_finalization_recovery_epochs": 1,
+        "action_finalization_recovery_max_total_bad_evidences": 1,
+        "sc_enabled": true,
+        "sc_challengers_per_epoch": 0
+      },
+      "evidence": [],
+      "next_evidence_id": "1"
+    },
     "auth": {
       "params": {
         "max_memo_characters": "256",
@@ -213,7 +243,7 @@
           }
         ],
         "expedited_threshold": "0.667000000000000000",
-        "expedited_voting_period": "4m",
+        "expedited_voting_period": "15s",
         "max_deposit_period": "172800s",
         "min_deposit": [
           {
@@ -228,7 +258,7 @@
         "quorum": "0.334000000000000000",
         "threshold": "0.500000000000000000",
         "veto_threshold": "0.334000000000000000",
-        "voting_period": "5m"
+        "voting_period": "30s"
       },
       "proposals": [],
       "starting_proposal_id": "1",
@@ -351,6 +381,14 @@
     },
     "supernode": {
       "params": {
+        "reward_distribution": {
+          "payment_period_blocks": "100800",
+          "registration_fee_share_bps": "200",
+          "min_cascade_bytes_for_payment": "1073741824",
+          "new_sn_ramp_up_periods": "4",
+          "measurement_smoothing_periods": "4",
+          "usage_growth_cap_bps_per_period": "1000"
+        },
         "minimum_stake_for_sn": {
           "denom": "ulume",
           "amount": "25000000000"
@@ -361,7 +399,8 @@
         "slashing_fraction": "",
         "evidence_retention_period": "",
         "metrics_thresholds": ""
-      }
+      },
+      "last_distribution_height": "0"
     },
     "transfer": {
       "port_id": "transfer",

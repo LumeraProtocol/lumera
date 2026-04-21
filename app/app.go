@@ -82,6 +82,7 @@ import (
 	auditmodulekeeper "github.com/LumeraProtocol/lumera/x/audit/v1/keeper"
 	claimmodulekeeper "github.com/LumeraProtocol/lumera/x/claim/keeper"
 	lumeraidmodulekeeper "github.com/LumeraProtocol/lumera/x/lumeraid/keeper"
+	supernodekeeper "github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
 	// this line is used by starport scaffolding # stargate/app/moduleImport
@@ -261,6 +262,13 @@ func New(
 	// enable optimistic execution
 	baseAppOptions = append(baseAppOptions, baseapp.SetOptimisticExecution())
 
+	// Wire post-construction cross-module dependency to avoid depinject cycle:
+	// supernode payout logic consumes audit report data.
+	supernodekeeper.SetGlobalAuditKeeper(app.AuditKeeper)
+	if supernodeWithAudit, ok := app.SupernodeKeeper.(interface{ SetAuditKeeper(sntypes.AuditKeeper) }); ok {
+		supernodeWithAudit.SetAuditKeeper(app.AuditKeeper)
+	}
+
 	// build app
 	app.App = appBuilder.Build(db, traceStore, baseAppOptions...)
 	app.SetVersion(version.Version)
@@ -331,7 +339,7 @@ func (app *App) setupUpgrades() {
 		SupernodeKeeper:       app.SupernodeKeeper,
 		ParamsKeeper:          &app.ParamsKeeper,
 		ConsensusParamsKeeper: &app.ConsensusParamsKeeper,
-		AuditKeeper:     &app.AuditKeeper,
+		AuditKeeper:           &app.AuditKeeper,
 	}
 
 	allUpgrades := upgrades.AllUpgrades(params)

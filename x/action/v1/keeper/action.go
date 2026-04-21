@@ -630,6 +630,22 @@ func (k *Keeper) DistributeFees(ctx sdk.Context, actionID string) error {
 		return nil // No supernodes to pay
 	}
 
+	// Route the configured reward-distribution share to the supernode-owned pool.
+	if k.rewardDistributionKeeper != nil {
+		rewardDistributionBps := k.rewardDistributionKeeper.GetRegistrationFeeShareBps(ctx)
+		if rewardDistributionBps > 0 && fee.Amount.GT(math.ZeroInt()) {
+			rewardDistributionAmount := fee.Amount.MulRaw(int64(rewardDistributionBps)).QuoRaw(10000)
+			if rewardDistributionAmount.IsPositive() {
+				rewardDistributionCoin := sdk.NewCoin(fee.Denom, rewardDistributionAmount)
+				err := k.bankKeeper.SendCoinsFromModuleToModule(ctx, actiontypes.ModuleName, sntypes.ModuleName, sdk.NewCoins(rewardDistributionCoin))
+				if err != nil {
+					return errors.Wrap(err, "failed to send reward-distribution fee share")
+				}
+				fee.Amount = fee.Amount.Sub(rewardDistributionAmount)
+			}
+		}
+	}
+
 	params := k.GetParams(ctx)
 	if params.FoundationFeeShare != "" {
 		foundationFeeShareDec, err := math.LegacyNewDecFromStr(params.FoundationFeeShare)

@@ -32,7 +32,7 @@ func (m msgServer) SubmitEpochReport(ctx context.Context, req *types.MsgSubmitEp
 		return nil, errorsmod.Wrapf(types.ErrInvalidEpochID, "epoch_id not accepted at height %d", sdkCtx.BlockHeight())
 	}
 
-	_, found, err := m.supernodeKeeper.GetSuperNodeByAccount(sdkCtx, req.Creator)
+	reporterSN, found, err := m.supernodeKeeper.GetSuperNodeByAccount(sdkCtx, req.Creator)
 	if err != nil {
 		return nil, err
 	}
@@ -85,12 +85,12 @@ func (m msgServer) SubmitEpochReport(ctx context.Context, req *types.MsgSubmitEp
 	if !isProber {
 		// Not a prober for this epoch (e.g. POSTPONED). Peer observations are not accepted.
 		if len(req.StorageChallengeObservations) > 0 {
-			return nil, errorsmod.Wrap(types.ErrInvalidReporterState, "reporter not eligible for storage challenge observations in this epoch")
+			return nil, errorsmod.Wrap(types.ErrInvalidReporterState, "reporter is not assigned as epoch prober; peer target observations are not accepted")
 		}
 	} else {
 		// Probers must submit peer observations for all assigned targets for the epoch.
 		if len(req.StorageChallengeObservations) != len(allowedTargets) {
-			return nil, errorsmod.Wrapf(types.ErrInvalidPeerObservations, "expected storage challenge observations for %d assigned targets; got %d", len(allowedTargets), len(req.StorageChallengeObservations))
+			return nil, errorsmod.Wrapf(types.ErrInvalidPeerObservations, "expected peer target observations for %d assigned targets; got %d", len(allowedTargets), len(req.StorageChallengeObservations))
 		}
 
 		seenTargets := make(map[string]struct{}, len(req.StorageChallengeObservations))
@@ -156,5 +156,6 @@ func (m msgServer) SubmitEpochReport(ctx context.Context, req *types.MsgSubmitEp
 		m.SetStorageChallengeReportIndex(sdkCtx, supernodeAccount, req.EpochId, reporterAccount)
 	}
 
+	_ = reporterSN // validated for reporter membership above
 	return &types.MsgSubmitEpochReportResponse{}, nil
 }

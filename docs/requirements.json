@@ -1,0 +1,978 @@
+{
+  "schema_version": "bridge.v2",
+  "project": {
+    "name": "lumera",
+    "one_liner": "Cosmos SDK blockchain with Cascade/Sense action processing via SuperNodes",
+    "mission": "Provide verifiable data storage and processing actions on the Lumera blockchain with sustainable SuperNode compensation",
+    "target_users": [
+      "SuperNode operators",
+      "Client SDK developers",
+      "Chain validators"
+    ],
+    "success_metrics": [
+      "Malicious finalization attempts blocked",
+      "All Cascade finalizations include valid Merkle proofs",
+      "SuperNodes receive ongoing retention compensation proportional to stored data",
+      "STORAGE_FULL nodes remain productive for compute workloads"
+    ]
+  },
+  "scope": {
+    "in_scope": [
+      "LEP-5: Merkle tree library for chunk-based file commitment (BLAKE3)",
+      "LEP-5: Protobuf schema additions (AvailabilityCommitment with HashAlgo enum and challenge_indices, ChunkProof, Params)",
+      "LEP-5: Client-provided challenge index storage and validation",
+      "LEP-5: Registration-time commitment validation in CascadeActionHandler",
+      "LEP-5: Finalization-time proof verification in keeper against stored commitment and indices",
+      "LEP-5: Module parameter governance for SVC settings",
+      "LEP-5: Chain upgrade handler for new params and soft-launch",
+      "Everlight P1: STORAGE_FULL SuperNode state with service-aware eligibility",
+      "Everlight P1: cascade_kademlia_db_bytes LEP-4 metric addition",
+      "Everlight P1: reward-distribution logic embedded in x/supernode (pool account, block-height periodic distribution, RewardDistribution params, PoolState/SNEligibility queries)",
+      "Everlight P1: Registration fee share routing to Everlight pool account within x/supernode",
+      "Everlight P1: Anti-gaming guardrails (growth cap, smoothing, ramp-up)",
+      "Everlight P1: Chain upgrade handler initializing consolidated supernode params"
+    ],
+    "out_of_scope": [
+      "Symbol-level Merkle commitment (future SYMBOL_MERKLE_V1)",
+      "Continuous storage re-challenges / Proof of Space-Time",
+      "Compressed multi-proofs / batch proof optimization",
+      "Client JS SDK changes (off-chain, separate repo — sdk-js)",
+      "SuperNode gRPC server changes (off-chain, separate repo — supernode)",
+      "Go SDK binding updates (off-chain, separate repo — sdk-go)",
+      "Everlight Phase 2 (LEP-6): Storage-truth enforcement — compound challenges, node suspicion scoring, reporter reliability scoring, ticket deterioration scoring, self-healing. Developed outside this project.",
+      "Everlight Phase 2: LEP-5 challenge-response proof gating for payouts",
+      "Everlight Phase 2: snscope cross-validation oracle integration",
+      "Everlight Phase 3: x/endowment module and per-registration endowments",
+      "Everlight Phase 4 (optional): Block reward share routing via x/distribution AllocateTokens modification",
+      "Everlight Phase 4 (optional): x/epochs migration for distribution trigger",
+      "x/epochs module integration (not available yet — Phase 1 uses block-height EndBlocker)"
+    ],
+    "non_goals": [
+      "Changing existing RaptorQ ID verification logic",
+      "Modifying Sense action flow",
+      "Unconditional forever storage marketing promises",
+      "Per-file endowment health tracking (Phase 3)",
+      "Fully trustless byte-accurate storage accounting (Phase 2+)",
+      "Modifying x/distribution AllocateTokens (Phase 4)"
+    ],
+    "assumptions": [
+      "BLAKE3 is available via lukechampine.com/blake3, already used throughout Lumera codebase",
+      "Challenge indices are chosen by the client at registration time and stored in AvailabilityCommitment.challenge_indices (proto field 7); the keeper reads them directly at finalization",
+      "No protocol-level hard limit on file size; implementation should handle ~1 GiB files as a practical upper operational target",
+      "Protobuf codegen tooling (buf) is configured and working",
+      "Existing CascadeMetadata can be extended with new fields without breaking existing actions",
+      "SuperNode processes already collect Kademlia DB size internally — cascade_kademlia_db_bytes is a reporting addition only",
+      "x/epochs module is not yet available; Phase 1 uses block-height modulus for distribution periods",
+      "Foundation can pre-fund the Everlight pool account (named 'everlight', managed by x/supernode) via MsgSend before chain upgrade",
+      "Phase 1 funding: Foundation transfers + registration fee share + Community Pool governance transfers (no block reward routing)",
+      "Multi-repo project: lumera is the knowledge provider; supernode, sdk-go, sdk-js consume chain types"
+    ]
+  },
+  "constraints": {
+    "languages": [
+      "Go 1.21+",
+      "Protobuf3"
+    ],
+    "platforms": [
+      "Cosmos SDK v0.53.5"
+    ],
+    "must_use": [
+      "BLAKE3 (lukechampine.com/blake3) for all hashing",
+      "gogoproto for protobuf marshaling",
+      "Domain-separated hashing: 0x00 leaf prefix, 0x01 internal prefix",
+      "Big-endian integer encoding",
+      "HashAlgo enum (HASH_ALGO_BLAKE3) instead of string for hash_algo field",
+      "depinject for module wiring (Cosmos SDK v0.53.x pattern)",
+      "Existing upgrade handler pattern (app/upgrades/)"
+    ],
+    "must_not_use": [
+      "External Merkle tree libraries - must be self-contained",
+      "Non-deterministic randomness for challenge index generation",
+      "x/epochs module (not available yet — use block-height epoch)"
+    ],
+    "compliance_security_notes": [
+      "Second-preimage attack prevention via domain-separated hashing",
+      "Challenge indices committed upfront by client; SuperNode must prove possession of those exact chunks",
+      "All on-chain verification must be deterministic across validators",
+      "Everlight pool account must not have minter/burner/staking/voting permissions",
+      "Anti-gaming guardrails required from day one (growth cap, smoothing, ramp-up)"
+    ]
+  },
+  "domain_model": {
+    "core_entities": [
+      "AvailabilityCommitment: on-chain Merkle root commitment set at registration, includes client-provided challenge_indices",
+      "ChunkProof: Merkle inclusion proof for a specific chunk index",
+      "CascadeMetadata: extended with availability_commitment and chunk_proofs fields",
+      "Params: extended with svc_challenge_count and svc_min_chunks_for_challenge",
+      "MerkleTree: in-memory tree built from file chunks with BLAKE3 domain-separated hashing",
+      "ChallengeIndices: client-provided chunk indices stored in AvailabilityCommitment at registration; keeper validates proofs match these stored indices",
+      "SuperNodeState.STORAGE_FULL: new state for storage-capacity-exhausted nodes; compute-eligible",
+      "EverlightPool: named module account ('everlight') within x/supernode holding undistributed retention compensation funds",
+      "RewardDistribution: embedded proto message in supernode Params governing funding shares, payout eligibility, and anti-gaming settings",
+      "cascade_kademlia_db_bytes: LEP-4 metric reporting actual Cascade data held by a SuperNode"
+    ],
+    "state_machine_notes": [
+      "Registration: client includes AvailabilityCommitment with challenge_indices in CascadeMetadata",
+      "Finalization: SuperNode provides ChunkProof array for the stored challenge_indices; keeper verifies against stored root",
+      "Verification skip: if num_chunks < svc_min_chunks_for_challenge, SVC is bypassed",
+      "Soft-launch: SVC fields accepted but not required until enforcement height",
+      "STORAGE_FULL transition: only if disk_usage_percent > max_storage_usage_percent AND no other compliance violations",
+      "STORAGE_FULL recovery: when disk_usage_percent drops below max_storage_usage_percent",
+      "STORAGE_FULL + other violations: transitions to POSTPONED (more restrictive wins)",
+      "Everlight distribution: every payment_period_blocks, pool balance distributed proportionally by smoothed cascade_kademlia_db_bytes to eligible SNs"
+    ]
+  },
+  "features": [
+    {
+      "id": "F01",
+      "name": "Merkle Tree Library",
+      "description": "Pure Go library implementing domain-separated BLAKE3 Merkle tree: leaf hashing (0x00 || uint32be(idx) || chunk), internal node hashing (0x01 || left || right), tree construction from chunks with per-level odd-node duplication, proof generation for any leaf index, and proof verification against a root hash.",
+      "acceptance_tests": [
+        "AT01",
+        "AT02",
+        "AT03",
+        "AT04"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "F02",
+      "name": "Protobuf Schema Extensions",
+      "description": "Add AvailabilityCommitment message (commitment_type, HashAlgo enum hash_algo, chunk_size, total_size, num_chunks, root, challenge_indices), ChunkProof message (chunk_index, leaf_hash, path_hashes, path_directions), extend CascadeMetadata with availability_commitment (field 8) and chunk_proofs (field 9), and extend Params with svc_challenge_count (field 12) and svc_min_chunks_for_challenge (field 13). Run buf codegen.",
+      "acceptance_tests": [
+        "AT05",
+        "AT06"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "F03",
+      "name": "Challenge Index Generation",
+      "description": "Client generates challenge indices and stores them in AvailabilityCommitment.challenge_indices at registration. Indices must be unique, within valid range, and match svc_challenge_count. The keeper reads these stored indices at finalization — no block-hash-based derivation at finalization time. DeriveIndices is a reference algorithm in the LEP-5 spec for client-side use; the on-chain module only validates and stores the indices.",
+      "acceptance_tests": [
+        "AT07",
+        "AT08"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "F04",
+      "name": "Registration Commitment Validation",
+      "description": "Extend CascadeActionHandler.Process (MsgRequestAction path) and RegisterAction to validate AvailabilityCommitment fields when present: commitment_type must be 'lep5/chunk-merkle/v1', hash_algo must be HASH_ALGO_BLAKE3 (enum), chunk_size must be a power of 2 in [1024, 262144], num_chunks must equal ceil(total_size / chunk_size), root must be exactly 32 bytes. For files >= svc_min_chunks_for_challenge x 1024 bytes, num_chunks must be >= svc_min_chunks_for_challenge (client must reduce chunk_size for small files). Store commitment (including challenge_indices) in on-chain CascadeMetadata.",
+      "acceptance_tests": [
+        "AT09",
+        "AT10",
+        "AT11"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "F05",
+      "name": "Finalization Proof Verification",
+      "description": "Add VerifyChunkProofs to action keeper called during CascadeActionHandler.FinalizeAction. Read expected challenge indices from stored AvailabilityCommitment.ChallengeIndices, verify each ChunkProof has correct index and valid BLAKE3 Merkle path against stored commitment root. Skip verification when num_chunks < svc_min_chunks_for_challenge. Integrate into GetUpdatedMetadata to persist proofs.",
+      "acceptance_tests": [
+        "AT12",
+        "AT13",
+        "AT14",
+        "AT15",
+        "AT16"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "F06",
+      "name": "Module Parameters and Governance",
+      "description": "SVC params (svc_challenge_count=8, svc_min_chunks_for_challenge=4) are protocol constants with hardcoded defaults in keeper via getSVCParamsOrDefault(). Proto fields exist (Params fields 12, 13) for future flexibility. No governance wiring needed — these are not values that should be changed by governance.",
+      "acceptance_tests": [
+        "AT17",
+        "AT18"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "F07",
+      "name": "Chain Upgrade and Migration (LEP-5)",
+      "description": "Create upgrade handler for the version introducing LEP-5. Initialize new params with defaults, including governance-controlled lep5_enabled_height for soft-launch/enforcement transition. Existing finalized actions are unaffected. New Cascade registrations after activation must include AvailabilityCommitment.",
+      "acceptance_tests": [
+        "AT19",
+        "AT20"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "F08",
+      "name": "LEP-5 Multi-Category Tests",
+      "description": "LEP-5 tests across all project test categories: integration tests (testify suite with full app), system tests (ibctesting coordinator), simulation tests (randomized SVC flow), systemex tests (CLI-based), and devnet docker E2E tests (validator-side). All exercise the full Cascade register-with-commitment -> finalize-with-proofs -> DONE flow.",
+      "acceptance_tests": [
+        "AT21"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "F10",
+      "name": "SuperNode Proto Extensions for Everlight",
+      "description": "Add SUPERNODE_STATE_STORAGE_FULL (=6) to SuperNodeState enum in supernode_state.proto. Add cascade_kademlia_db_bytes (field 15, double) to SupernodeMetrics. Add RewardDistribution (field 19) to supernode Params. STORAGE_FULL is driven by disk_usage_percent > max_storage_usage_percent. Run buf codegen and verify compiled Go types.",
+      "acceptance_tests": [
+        "AT30"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "F11",
+      "name": "Everlight Module Proto Schemas",
+      "description": "Embed the Everlight proto surface into proto/lumera/supernode/v1 by adding reward_distribution params, genesis fields, and query endpoints for pool state and SN eligibility. Run buf codegen and verify the consolidated API surface compiles.",
+      "acceptance_tests": [
+        "AT41"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "F12",
+      "name": "STORAGE_FULL SuperNode State",
+      "description": "Implement STORAGE_FULL state transitions in supernode keeper. markStorageFull() and recoverFromStorageFull() helpers. STORAGE_FULL nodes remain eligible for Sense and Agents but excluded from Cascade storage selection. STORAGE_FULL nodes continue receiving Everlight payouts for existing held data.",
+      "acceptance_tests": [
+        "AT30",
+        "AT31",
+        "AT32",
+        "AT33"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "F13",
+      "name": "Compliance Bifurcation",
+      "description": "Modify evaluateCompliance to separate storage-capacity-only violations (cascade_kademlia_db_bytes >= threshold) from other compliance violations. When only storage is the issue, transition to STORAGE_FULL instead of POSTPONED. When both storage and other issues exist, use POSTPONED (more restrictive). Update HandleMetricsStaleness and metrics report handler accordingly.",
+      "acceptance_tests": [
+        "AT30",
+        "AT33"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "F14",
+      "name": "Everlight Module Core",
+      "description": "Embed Everlight state and keeper logic into x/supernode with a dedicated Everlight pool account, KV state for distribution tracking, genesis import/export, governance params via MsgUpdateParams, and query endpoints for pool state and SN eligibility. Register the pool account in app_config.go and remove the standalone x/everlight module.",
+      "acceptance_tests": [
+        "AT34",
+        "AT41",
+        "AT44",
+        "AT45"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "F15",
+      "name": "Periodic Distribution Logic",
+      "description": "EndBlocker checks if payment_period_blocks have elapsed since last distribution. On trigger: read cascade_kademlia_db_bytes from supernode metrics store for all eligible SNs (ACTIVE or STORAGE_FULL, above min threshold, fresh metrics). Apply smoothing window, growth cap, and new-SN ramp-up. Distribute pool balance proportionally. Emit distribution event.",
+      "acceptance_tests": [
+        "AT35",
+        "AT36",
+        "AT37",
+        "AT38",
+        "AT44",
+        "AT45"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "F16",
+      "name": "Registration Fee Share Routing",
+      "description": "Modify action DistributeFees to route the configured bps share of registration fees to the Everlight pool account (managed by x/supernode) instead of (or in addition to) the Community Pool. The share is controlled by supernode Params.RewardDistribution.registration_fee_share_bps. Applies to all action types (Cascade, Sense, Agents).",
+      "acceptance_tests": [
+        "AT39"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "F17",
+      "name": "Block Reward Share Routing",
+      "description": "Optional Phase 4: route a configured bps share of block rewards to the Everlight pool via x/distribution integration. Not part of Phase 1.",
+      "acceptance_tests": [
+        "AT40"
+      ],
+      "status": "deferred"
+    },
+    {
+      "id": "F18",
+      "name": "Chain Upgrade Handler (Everlight)",
+      "description": "Create upgrade handler for the chain version introducing Everlight. Initialize supernode Params with RewardDistribution defaults. No separate store key needed — Everlight state lives in the supernode KV store. Existing SN states and actions unaffected.",
+      "acceptance_tests": [
+        "AT42",
+        "AT43"
+      ],
+      "status": "done"
+    }
+  ],
+  "acceptance_tests": [
+    {
+      "id": "AT01",
+      "feature": "F01",
+      "description": "Merkle tree from N chunks produces deterministic root"
+    },
+    {
+      "id": "AT02",
+      "feature": "F01",
+      "description": "Proof for any leaf index verifies against root"
+    },
+    {
+      "id": "AT03",
+      "feature": "F01",
+      "description": "Tampered proof/leaf/root fails verification"
+    },
+    {
+      "id": "AT04",
+      "feature": "F01",
+      "description": "Edge cases: 1 chunk, 2 chunks, odd counts, large trees"
+    },
+    {
+      "id": "AT05",
+      "feature": "F02",
+      "description": "AvailabilityCommitment and ChunkProof round-trip marshal/unmarshal"
+    },
+    {
+      "id": "AT06",
+      "feature": "F02",
+      "description": "Extended CascadeMetadata backward compatible (old data without new fields)"
+    },
+    {
+      "id": "AT07",
+      "feature": "F03",
+      "description": "Challenge indices validated: unique, in range, correct count"
+    },
+    {
+      "id": "AT08",
+      "feature": "F03",
+      "description": "Invalid indices rejected (duplicates, out of range, wrong count)"
+    },
+    {
+      "id": "AT09",
+      "feature": "F04",
+      "description": "Valid commitment accepted and stored in CascadeMetadata"
+    },
+    {
+      "id": "AT10",
+      "feature": "F04",
+      "description": "Invalid commitment fields rejected with specific errors"
+    },
+    {
+      "id": "AT11",
+      "feature": "F04",
+      "description": "Registration without commitment succeeds (backward compat)"
+    },
+    {
+      "id": "AT12",
+      "feature": "F05",
+      "description": "Valid proofs for all challenge indices pass verification"
+    },
+    {
+      "id": "AT13",
+      "feature": "F05",
+      "description": "Invalid proof (wrong index, bad path) fails verification"
+    },
+    {
+      "id": "AT14",
+      "feature": "F05",
+      "description": "Missing proofs (wrong count) fail verification"
+    },
+    {
+      "id": "AT15",
+      "feature": "F05",
+      "description": "SVC skipped for files below svc_min_chunks_for_challenge"
+    },
+    {
+      "id": "AT16",
+      "feature": "F05",
+      "description": "SVC failure emits evidence event"
+    },
+    {
+      "id": "AT17",
+      "feature": "F06",
+      "description": "getSVCParamsOrDefault returns hardcoded defaults"
+    },
+    {
+      "id": "AT18",
+      "feature": "F06",
+      "description": "Proto fields 12/13 exist in generated code"
+    },
+    {
+      "id": "AT19",
+      "feature": "F07",
+      "description": "Upgrade handler initializes LEP-5 params"
+    },
+    {
+      "id": "AT20",
+      "feature": "F07",
+      "description": "Pre-upgrade actions without commitment remain valid"
+    },
+    {
+      "id": "AT21",
+      "feature": "F08",
+      "description": "LEP-5 tests pass across all test categories"
+    },
+    {
+      "id": "AT30",
+      "feature": "F12",
+      "description": "SN with only cascade_kademlia_db_bytes violation transitions to STORAGE_FULL (not POSTPONED)"
+    },
+    {
+      "id": "AT31",
+      "feature": "F12",
+      "description": "STORAGE_FULL SN excluded from Cascade selection, included in Sense/Agents selection"
+    },
+    {
+      "id": "AT32",
+      "feature": "F12",
+      "description": "STORAGE_FULL SN recovers to ACTIVE when storage drops below threshold"
+    },
+    {
+      "id": "AT33",
+      "feature": "F13",
+      "description": "SN with storage violation + other violation transitions to POSTPONED"
+    },
+    {
+      "id": "AT34",
+      "feature": "F14",
+      "description": "Everlight pool account (within x/supernode) accepts MsgSend transfers"
+    },
+    {
+      "id": "AT35",
+      "feature": "F15",
+      "description": "Pool distributes proportionally by cascade_kademlia_db_bytes at period boundary"
+    },
+    {
+      "id": "AT36",
+      "feature": "F15",
+      "description": "SNs below min_cascade_bytes_for_payment excluded from distribution"
+    },
+    {
+      "id": "AT37",
+      "feature": "F15",
+      "description": "New SN receives ramped-up (partial) payout weight during ramp-up period"
+    },
+    {
+      "id": "AT38",
+      "feature": "F15",
+      "description": "Usage growth cap limits reported cascade bytes increase per period"
+    },
+    {
+      "id": "AT39",
+      "feature": "F16",
+      "description": "Registration fee share flows to Everlight pool on action finalization"
+    },
+    {
+      "id": "AT40",
+      "feature": "F17",
+      "description": "Phase 4 only: block reward share flows to Everlight pool"
+    },
+    {
+      "id": "AT41",
+      "feature": "F14",
+      "description": "All Everlight params (RewardDistribution) governable via supernode MsgUpdateParams"
+    },
+    {
+      "id": "AT42",
+      "feature": "F18",
+      "description": "Upgrade handler initializes supernode RewardDistribution params with defaults"
+    },
+    {
+      "id": "AT43",
+      "feature": "F18",
+      "description": "Existing SN states and actions unaffected by Everlight upgrade"
+    },
+    {
+      "id": "AT44",
+      "feature": "F15",
+      "description": "Pool with zero balance produces no distribution and no panic"
+    },
+    {
+      "id": "AT45",
+      "feature": "F15",
+      "description": "No eligible SNs produces no distribution and no panic"
+    }
+  ],
+  "user_flows": [
+    {
+      "id": "UF01",
+      "name": "Cascade Registration with Commitment",
+      "steps": [
+        "Client chunks file into 256 KiB pieces",
+        "Client computes BLAKE3 domain-separated leaf hashes and builds Merkle tree",
+        "Client generates challenge indices (using DeriveIndices reference algorithm or custom logic)",
+        "Client creates AvailabilityCommitment with root, total_size, num_chunks, chunk_size, hash_algo=HASH_ALGO_BLAKE3, and challenge_indices",
+        "Client submits MsgRequestAction with CascadeMetadata including commitment",
+        "Action module validates commitment fields and stores on-chain (including challenge_indices)"
+      ]
+    },
+    {
+      "id": "UF02",
+      "name": "Cascade Finalization with Proofs",
+      "steps": [
+        "SuperNode receives file, verifies data_hash, rebuilds BLAKE3 Merkle tree",
+        "SuperNode verifies computed root matches on-chain commitment root",
+        "SuperNode reads challenge_indices from the stored on-chain AvailabilityCommitment",
+        "SuperNode generates BLAKE3 Merkle proofs for the challenged chunks",
+        "SuperNode submits MsgFinalizeAction with chunk_proofs",
+        "Action module reads expected indices from stored commitment.ChallengeIndices, verifies each proof against stored root",
+        "On success: state -> DONE, fees released (with Everlight pool share)"
+      ]
+    },
+    {
+      "id": "UF03",
+      "name": "SuperNode Storage Capacity Exhaustion",
+      "steps": [
+        "SuperNode's disk usage exceeds max_storage_usage_percent",
+        "SuperNode reports cascade_kademlia_db_bytes via LEP-4 metrics",
+        "Chain evaluates compliance: only storage threshold exceeded",
+        "SuperNode transitions to STORAGE_FULL state",
+        "SuperNode excluded from new Cascade storage assignments",
+        "SuperNode remains eligible for Sense and Agents work",
+        "SuperNode continues receiving Everlight payouts for held data",
+        "When storage freed, SuperNode recovers to ACTIVE"
+      ]
+    },
+    {
+      "id": "UF04",
+      "name": "Everlight Pool Distribution Cycle",
+      "steps": [
+        "Pool accumulates funds from: Foundation MsgSend, registration fee share, Community Pool governance transfers",
+        "payment_period_blocks elapse since last distribution",
+        "x/supernode EndBlocker triggers distribution",
+        "Supernode keeper reads cascade_kademlia_db_bytes from all SNs via metrics store",
+        "Filters: ACTIVE or STORAGE_FULL, above min threshold, fresh metrics",
+        "Applies smoothing window and growth cap to each SN's weight",
+        "Distributes pool balance proportionally to eligible SNs",
+        "Emits distribution event with block height, total paid, SN count"
+      ]
+    },
+    {
+      "id": "UF05",
+      "name": "Foundation Pre-Funding",
+      "steps": [
+        "Foundation wallet sends LUME to Everlight pool account (named 'everlight', managed by x/supernode) via MsgSend",
+        "Pool account balance increases",
+        "Next distribution cycle includes these funds",
+        "No chain upgrade required for this flow"
+      ]
+    }
+  ],
+  "nfr": {
+    "performance_budgets": [
+      "Merkle proof verification: ~15,000 gas per proof",
+      "Total finalization overhead with m=8: ~145,000 gas",
+      "Registration overhead: ~25,000 gas for commitment storage",
+      "Everlight distribution: O(N) where N = eligible SNs; runs once per payment_period_blocks, not per block"
+    ],
+    "reliability": [
+      "Deterministic verification: all validators must read identical challenge indices from stored commitment",
+      "Proof verification must be pure function of on-chain state",
+      "Everlight distribution must be deterministic across all validators",
+      "Zero-balance pool and zero-eligible-SN edge cases must not panic"
+    ],
+    "security": [
+      "Domain-separated hashing prevents second-preimage attacks",
+      "Challenge indices committed upfront by client; SuperNode cannot predict which chunks it needs before seeing the on-chain commitment",
+      "m=8 gives <0.4% evasion probability for storing <50% of file",
+      "BLAKE3 collision resistance: ~2^128 security",
+      "Everlight pool account must not have governance voting rights",
+      "Anti-gaming guardrails active from Phase 1 (growth cap, smoothing, ramp-up)"
+    ],
+    "observability": [
+      "Log challenge indices and verification results in keeper",
+      "Emit events for SVC verification pass/fail",
+      "Emit explicit SVC failure evidence event consumable by audit module",
+      "Emit Everlight distribution events (block height, total payout, SN count, per-SN amounts)",
+      "Emit STORAGE_FULL transition events"
+    ],
+    "scalability": [
+      "O(log N) proof size per challenged chunk",
+      "O(m * log N) total verification cost",
+      "Distribution runs once per payment period, not per block"
+    ]
+  },
+  "interfaces": {
+    "apis": [
+      "MsgRequestAction: extended CascadeMetadata.availability_commitment field (includes challenge_indices)",
+      "MsgFinalizeAction: extended CascadeMetadata.chunk_proofs field",
+      "Query params: includes svc_challenge_count, svc_min_chunks_for_challenge",
+      "x/supernode Query: Params includes reward_distribution and max_storage_usage_percent",
+      "x/supernode Query: PoolState and SNEligibility expose the embedded Everlight surface",
+      "x/supernode Tx: MsgUpdateParams governs both supernode and embedded Everlight params"
+    ],
+    "external_services": [
+      "SuperNode binary: must report cascade_kademlia_db_bytes in LEP-4 metrics (supernode repo change)",
+      "sdk-go: updated proto bindings for Everlight queries",
+      "sdk-js: updated proto bindings for Everlight queries"
+    ]
+  },
+  "quality_gates": {
+    "ci_required": true,
+    "tests": {
+      "unit": true,
+      "integration": true,
+      "e2e": "optional",
+      "coverage_target": "80%"
+    },
+    "linters_typechecks": [
+      "golangci-lint",
+      "buf lint"
+    ],
+    "security_checks": [
+      "Merkle tree test vectors from LEP-5 section 10",
+      "Everlight distribution determinism test (multi-validator consensus)",
+      "Module account permission audit"
+    ],
+    "performance_budgets": {
+      "bundle_size": "",
+      "api_response": "",
+      "page_load": ""
+    }
+  },
+  "execution": {
+    "recommended_slices": [
+      {
+        "id": "S01",
+        "name": "Merkle Tree Library + Tests",
+        "features": [
+          "F01"
+        ],
+        "acceptance_tests": [
+          "AT01",
+          "AT02",
+          "AT03",
+          "AT04"
+        ],
+        "goal": "Ship a standalone, fully tested Merkle tree package under x/action/v1/merkle/ with BLAKE3 domain-separated hashing, tree construction, proof generation, and proof verification.",
+        "status": "done"
+      },
+      {
+        "id": "S02",
+        "name": "Protobuf Schemas + Codegen",
+        "features": [
+          "F02"
+        ],
+        "acceptance_tests": [
+          "AT05",
+          "AT06"
+        ],
+        "goal": "Add AvailabilityCommitment (with HashAlgo enum and challenge_indices), ChunkProof messages to metadata.proto, extend CascadeMetadata and Params, run buf generate, verify compiled Go types.",
+        "status": "done"
+      },
+      {
+        "id": "S03",
+        "name": "Challenge Index Generation + Tests",
+        "features": [
+          "F03"
+        ],
+        "acceptance_tests": [
+          "AT07",
+          "AT08"
+        ],
+        "goal": "Challenge indices are client-provided at registration and validated on-chain. DeriveIndices is a spec reference algorithm for client-side use; the on-chain module validates uniqueness, range, and count.",
+        "status": "done"
+      },
+      {
+        "id": "S04",
+        "name": "Registration Commitment Validation",
+        "features": [
+          "F04"
+        ],
+        "acceptance_tests": [
+          "AT09",
+          "AT10",
+          "AT11"
+        ],
+        "goal": "Extend CascadeActionHandler to validate and store AvailabilityCommitment (including challenge_indices) during MsgRequestAction processing.",
+        "status": "done"
+      },
+      {
+        "id": "S05",
+        "name": "Finalization Proof Verification",
+        "features": [
+          "F05"
+        ],
+        "acceptance_tests": [
+          "AT12",
+          "AT13",
+          "AT14",
+          "AT15",
+          "AT16"
+        ],
+        "goal": "Implement VerifyChunkProofs in keeper, read challenge indices from stored commitment, verify BLAKE3 Merkle proofs against stored root.",
+        "status": "done"
+      },
+      {
+        "id": "S06",
+        "name": "LEP-5 Module Params + Migration",
+        "features": [
+          "F06",
+          "F07"
+        ],
+        "acceptance_tests": [
+          "AT17",
+          "AT18",
+          "AT19",
+          "AT20"
+        ],
+        "goal": "Add SVC params to module, create upgrade handler, test genesis import/export and governance updates.",
+        "status": "done",
+        "notes": "F06 done (protocol constants). F07 done (completed outside BRIDGE scope)."
+      },
+      {
+        "id": "S07",
+        "name": "LEP-5 Integration + System + Simulation + Systemex Tests",
+        "features": [
+          "F04",
+          "F05",
+          "F08"
+        ],
+        "acceptance_tests": [
+          "AT09",
+          "AT12",
+          "AT13",
+          "AT14",
+          "AT15",
+          "AT16",
+          "AT21"
+        ],
+        "goal": "LEP-5 tests across all Makefile test categories.",
+        "status": "done"
+      },
+      {
+        "id": "S10",
+        "name": "Everlight Proto Schemas + Codegen",
+        "features": [
+          "F10",
+          "F11"
+        ],
+        "acceptance_tests": [
+          "AT30",
+          "AT41"
+        ],
+        "goal": "All Everlight proto definitions live under the supernode API surface. Codegen passes and consolidated Go types compile.",
+        "status": "done"
+      },
+      {
+        "id": "S11",
+        "name": "STORAGE_FULL State + Compliance Bifurcation",
+        "features": [
+          "F12",
+          "F13"
+        ],
+        "acceptance_tests": [
+          "AT30",
+          "AT31",
+          "AT32",
+          "AT33"
+        ],
+        "goal": "SNs with only storage-capacity violations enter STORAGE_FULL, not POSTPONED. STORAGE_FULL nodes excluded from Cascade selection only.",
+        "status": "done"
+      },
+      {
+        "id": "S12",
+        "name": "Everlight Module Core",
+        "features": [
+          "F14"
+        ],
+        "acceptance_tests": [
+          "AT34",
+          "AT41",
+          "AT44",
+          "AT45"
+        ],
+        "goal": "Everlight state, keeper logic, genesis, params, and queries embedded in x/supernode. Pool account registered in app_config. No distribution yet.",
+        "status": "done"
+      },
+      {
+        "id": "S13",
+        "name": "Periodic Distribution Logic",
+        "features": [
+          "F15"
+        ],
+        "acceptance_tests": [
+          "AT35",
+          "AT36",
+          "AT37",
+          "AT38",
+          "AT44",
+          "AT45"
+        ],
+        "goal": "EndBlocker distributes pool balance to eligible SNs every payment_period_blocks.",
+        "status": "done"
+      },
+      {
+        "id": "S14",
+        "name": "Registration Fee Routing",
+        "features": [
+          "F16"
+        ],
+        "acceptance_tests": [
+          "AT39"
+        ],
+        "goal": "Registration fee share flows to Everlight pool.",
+        "status": "done"
+      },
+      {
+        "id": "S15",
+        "name": "Everlight Upgrade Handler + Integration Tests",
+        "features": [
+          "F18"
+        ],
+        "acceptance_tests": [
+          "AT42",
+          "AT43"
+        ],
+        "goal": "Clean upgrade from v1.10.1. Supernode RewardDistribution params initialized. Integration tests for full flow.",
+        "status": "done"
+      }
+    ],
+    "open_questions": [],
+    "risks": [
+      {
+        "id": "R01",
+        "description": "Protobuf field number conflicts if other features concurrently add fields to CascadeMetadata or Params",
+        "mitigation": "Coordinate field numbers before S02; use high field numbers (8, 9 for metadata; 12, 13 for params)"
+      },
+      {
+        "id": "R02",
+        "description": "Client-provided challenge indices could theoretically be biased toward chunks the client knows the SuperNode has",
+        "mitigation": "Governance-enforced minimum challenge count (svc_challenge_count); indices must be unique and within valid range; future enhancement could add server-side randomness mixing"
+      },
+      {
+        "id": "R03",
+        "description": "Backward compatibility: existing actions with no commitment must not fail after upgrade",
+        "mitigation": "AT20 explicitly tests this; skip SVC when commitment is nil"
+      },
+      {
+        "id": "R04",
+        "description": "Unbounded file sizes can increase Merkle depth, proof size, and memory pressure during proof generation",
+        "mitigation": "No hard protocol cap, but validate behavior around ~1 GiB practical target and keep proof verification complexity bounded to O(m * log N)"
+      },
+      {
+        "id": "R10",
+        "description": "Metric gaming — SNs inflate cascade_kademlia_db_bytes to capture excess payouts",
+        "mitigation": "Growth cap + smoothing window + new-SN ramp-up from day one. Phase 2 (LEP-6) adds compound storage challenges with node suspicion scoring and ticket deterioration tracking."
+      },
+      {
+        "id": "R12",
+        "description": "Proto field conflicts with in-flight changes for Everlight",
+        "mitigation": "Coordinate: SN params field 19, SN metrics field 15, SN state enum value 6"
+      },
+      {
+        "id": "R13",
+        "description": "New module account security — could accumulate significant funds",
+        "mitigation": "Everlight pool account (named 'everlight' in x/supernode): receive + distribute only, no Minter/Burner/Staking permissions, no voting rights."
+      },
+      {
+        "id": "R14",
+        "description": "Multi-repo coordination delays between lumera, supernode, sdk-go, sdk-js",
+        "mitigation": "lumera ships proto definitions first; other repos only need updated proto bindings"
+      }
+    ]
+  },
+  "workspace": {
+    "topology": "multi-repo",
+    "control_repo": "../lumera-dev",
+    "repos": [
+      {
+        "repo_id": "lumera-dev",
+        "path": "../lumera-dev",
+        "role": "planning hub"
+      },
+      {
+        "repo_id": "lumera",
+        "path": ".",
+        "default_branch": "master",
+        "role": "blockchain daemon — knowledge provider for protos and chain logic"
+      },
+      {
+        "repo_id": "supernode",
+        "path": "../supernode",
+        "default_branch": "master",
+        "role": "proof-of-service server layer — consumes lumera chain types"
+      },
+      {
+        "repo_id": "sdk-go",
+        "path": "../sdk-go",
+        "default_branch": "main",
+        "role": "Go SDK — consumes lumera chain types"
+      },
+      {
+        "repo_id": "sdk-js",
+        "path": "../sdk-js",
+        "default_branch": "master",
+        "role": "JS/TS browser SDK — consumes lumera proto definitions via Telescope codegen"
+      }
+    ],
+    "cross_repo_contracts": [
+      {
+        "name": "Lumera Proto Definitions",
+        "source": "lumera:proto/",
+        "consumers": [
+          "supernode",
+          "sdk-go",
+          "sdk-js"
+        ],
+        "note": "lumera proto files are source of truth for supernode and SDKs"
+      },
+      {
+        "name": "SuperNode State Enum",
+        "source": "lumera:proto/lumera/supernode/v1/supernode_state.proto",
+        "consumers": [
+          "supernode:sdk/adapters/lumera/types.go"
+        ],
+        "note": "SUPERNODE_STATE_STORAGE_FULL (=6) must match between chain proto and SDK adapter"
+      },
+      {
+        "name": "SupernodeMetrics.cascade_kademlia_db_bytes",
+        "source": "lumera:proto/lumera/supernode/v1/supernode.proto field 15",
+        "consumers": [
+          "supernode:supernode/supernode_metrics/metrics_collection.go"
+        ],
+        "note": "Field type double, reported in bytes (converted from MB)"
+      },
+      {
+        "name": "Everlight Surface in SuperNode Protos",
+        "source": "lumera:proto/lumera/supernode/v1/ (RewardDistribution, PoolState, SNEligibility)",
+        "consumers": [
+          "sdk-go:blockchain/",
+          "sdk-js:src/codegen/"
+        ],
+        "note": "Everlight query types are embedded in the supernode proto package; SDKs consume them via the supernode service routes"
+      }
+    ],
+    "integration_acceptance_tests": [
+      {
+        "id": "IAT01",
+        "description": "supernode go.mod builds with tagged lumera release containing Everlight protos (no local replace directive)",
+        "repos": [
+          "lumera",
+          "supernode"
+        ]
+      },
+      {
+        "id": "IAT02",
+        "description": "supernode ParseSupernodeState recognizes SUPERNODE_STATE_STORAGE_FULL (=6) matching lumera proto enum value",
+        "repos": [
+          "lumera",
+          "supernode"
+        ]
+      },
+      {
+        "id": "IAT03",
+        "description": "sdk-go builds with tagged lumera release and can query supernode PoolState/SNEligibility endpoints",
+        "repos": [
+          "lumera",
+          "sdk-go"
+        ]
+      },
+      {
+        "id": "IAT04",
+        "description": "sdk-js Telescope codegen succeeds against lumera supernode proto definitions including Everlight surface",
+        "repos": [
+          "lumera",
+          "sdk-js"
+        ]
+      }
+    ]
+  }
+}

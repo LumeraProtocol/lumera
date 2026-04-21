@@ -1,6 +1,6 @@
 module github.com/LumeraProtocol/lumera/tests/systemtests
 
-go 1.25.5
+go 1.25.9
 
 replace (
 	github.com/LumeraProtocol/lumera => ../../
@@ -12,7 +12,7 @@ replace (
 require (
 	cosmossdk.io/math v1.5.3
 	github.com/LumeraProtocol/lumera v1.9.1
-	github.com/cometbft/cometbft v0.38.20
+	github.com/cometbft/cometbft v0.38.21
 	github.com/cosmos/cosmos-sdk v0.53.5
 	github.com/tidwall/gjson v1.14.2
 	github.com/tidwall/sjson v1.2.5
@@ -36,7 +36,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/syndtr/goleveldb v1.0.1-0.20220721030215-126854af5e6d // indirect
 	google.golang.org/genproto v0.0.0-20250603155806-513f23925822 // indirect
-	google.golang.org/grpc v1.77.0 // indirect
+	google.golang.org/grpc v1.77.0
 )
 
 require (

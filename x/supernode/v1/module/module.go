@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"cosmossdk.io/client/v2/autocli"
 	"cosmossdk.io/core/appmodule"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -31,6 +32,8 @@ var (
 	_ appmodule.AppModule       = (*AppModule)(nil)
 	_ appmodule.HasBeginBlocker = (*AppModule)(nil)
 	_ appmodule.HasEndBlocker   = (*AppModule)(nil)
+
+	_ autocli.HasCustomQueryCommand = (*AppModule)(nil)
 )
 
 // ----------------------------------------------------------------------------
@@ -85,7 +88,8 @@ func (AppModuleBasic) RegisterGRPCGatewayRoutes(clientCtx client.Context, mux *r
 	}
 }
 
-// GetQueryCmd returns custom query commands for the supernode module.
+// GetQueryCmd returns the custom query commands for the supernode module.
+// AutoCLI enhances this root command and preserves all non-custom query commands.
 func (AppModuleBasic) GetQueryCmd() *cobra.Command {
 	return cli.GetCustomQueryCmd()
 }

@@ -33,8 +33,6 @@ jobs:
       - name: Setup Go
         id: setup-go
         uses: ./.github/actions/setup-go
-        with:
-          version: "1.25.6"
 
       - name: Prepare Build Variables
         id: vars
@@ -77,12 +75,12 @@ jobs:
       - name: Install buf CLI
         run: |
           set -euo pipefail
-          BUF_VERSION="$(go list -m -f '{{.Version}}' github.com/bufbuild/buf)"
-          if [ -z "${BUF_VERSION}" ]; then
-            echo "Failed to resolve github.com/bufbuild/buf version from go.mod" >&2
-            exit 1
+          BUF_VERSION="$(go list -m -f '{{.Version}}' github.com/bufbuild/buf 2>/dev/null || true)"
+          if [ -z "${BUF_VERSION}" ] || [ "${BUF_VERSION}" = "<nil>" ]; then
+            BUF_VERSION="v1.57.2"
           fi
           go install "github.com/bufbuild/buf/cmd/buf@${BUF_VERSION}"
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       - name: Build with Ignite CLI
         run: |

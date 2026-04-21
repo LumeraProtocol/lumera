@@ -1,5 +1,6 @@
 .PHONY: devnet-build devnet-tests-build devnet-up devnet-reset devnet-up-detach devnet-down devnet-stop devnet-clean devnet-deploy-tar devnet-upgrade devnet-new devnet-start
 .PHONY: devnet-build-default _check-devnet-default-cfg devnet-upgrade-binaries devnet-upgrade-binaries-default devnet-update-scripts
+.PHONY: devnet-tests-everlight devnet-new-no-hermes
 
 ##### Devnet Makefile ########################################
 #
@@ -361,3 +362,12 @@ devnet-deploy-tar:
 		rm devnet/external_genesis.json; \
 	fi
 	@echo "Created devnet-deploy.tar.gz with the required files."
+
+devnet-tests-everlight:
+	@echo "Running Everlight devnet tests..."
+	@bash devnet/tests/everlight/everlight_test.sh
+
+devnet-new-no-hermes:
+	$(MAKE) devnet-down
+	$(MAKE) devnet-clean
+	$(MAKE) devnet-build-default CONFIG_JSON=config/config-no-hermes.json

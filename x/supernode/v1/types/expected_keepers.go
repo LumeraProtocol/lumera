@@ -10,6 +10,7 @@ import (
 	"cosmossdk.io/core/address"
 	"cosmossdk.io/log"
 	sdkmath "cosmossdk.io/math"
+	audittypes "github.com/LumeraProtocol/lumera/x/audit/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/query"
 
@@ -40,6 +41,14 @@ type SupernodeKeeper interface {
 	GetSuperNodesPaginated(ctx sdk.Context, pagination *query.PageRequest, stateFilters ...SuperNodeState) ([]*SuperNode, *query.PageResponse, error)
 	IsSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress) bool
 	IsEligibleAndNotJailedValidator(ctx sdk.Context, valAddr sdk.ValAddress) bool
+	GetLastDistributionHeight(ctx sdk.Context) int64
+	SetLastDistributionHeight(ctx sdk.Context, height int64)
+	GetPoolBalance(ctx sdk.Context) sdk.Coins
+	GetTotalDistributed(ctx sdk.Context) sdk.Coins
+	GetSNDistState(ctx sdk.Context, valAddr string) (SNDistState, bool)
+	GetRegistrationFeeShareBps(ctx sdk.Context) uint64
+	CountEligibleSNs(ctx sdk.Context) uint64
+	GetLatestCascadeBytesForPayout(ctx sdk.Context, supernodeAccount string) (float64, int64, bool)
 }
 
 // StakingKeeper defines the expected interface for the Staking module.
@@ -48,6 +57,12 @@ type StakingKeeper interface {
 	Validator(context.Context, sdk.ValAddress) (stakingtypes.ValidatorI, error)            // get a particular validator by operator address
 	ValidatorByConsAddr(context.Context, sdk.ConsAddress) (stakingtypes.ValidatorI, error) // get a particular validator by consensus address
 	Delegation(ctx context.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress) (stakingtypes.DelegationI, error)
+}
+
+// AuditKeeper defines the audit-source methods used by Everlight payout logic.
+type AuditKeeper interface {
+	GetCurrentEpochInfo(ctx sdk.Context) (epochID uint64, startHeight int64, endHeight int64, err error)
+	GetReport(ctx sdk.Context, epochID uint64, reporterSupernodeAccount string) (audittypes.EpochReport, bool)
 }
 
 // SlashingKeeper defines the expected interface for the Slashing module.
@@ -61,12 +76,16 @@ type SlashingKeeper interface {
 // AccountKeeper defines the expected interface for the Account module.
 type AccountKeeper interface {
 	GetAccount(context.Context, sdk.AccAddress) sdk.AccountI // only used for simulation
+	GetModuleAddress(moduleName string) sdk.AccAddress
+	GetModuleAccount(ctx context.Context, moduleName string) sdk.ModuleAccountI
 }
 
 // BankKeeper defines the expected interface for the Bank module.
 type BankKeeper interface {
 	SpendableCoins(context.Context, sdk.AccAddress) sdk.Coins
 	GetBalance(ctx context.Context, addr sdk.AccAddress, denom string) sdk.Coin
+	GetAllBalances(ctx context.Context, addr sdk.AccAddress) sdk.Coins
+	SendCoinsFromModuleToAccount(ctx context.Context, senderModule string, recipientAddr sdk.AccAddress, amt sdk.Coins) error
 }
 
 // StakingHooks event hooks for staking validator object (noalias)

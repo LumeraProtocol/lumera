@@ -71,6 +71,23 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					},
 				},
 				{
+					RpcMethod: "PoolState",
+					Use:       "pool-state",
+					Short:     "Query the everlight pool state (balance, distribution info)",
+				},
+				{
+					RpcMethod:      "SNEligibility",
+					Use:            "sn-eligibility [validator-address]",
+					Short:          "Query whether a supernode is eligible for everlight payouts",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validator_address"}},
+				},
+				{
+					RpcMethod:      "PayoutHistory",
+					Use:            "payout-history [validator-address]",
+					Short:          "Query payout history for a supernode validator",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validator_address"}},
+				},
+				{
 					RpcMethod: "GetMetrics",
 					Skip:      true, // custom command to avoid AutoCLI aminojson float64 marshal bug
 				},

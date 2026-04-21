@@ -53,6 +53,48 @@ func recoverFromPostponed(ctx sdk.Context, keeper types.SupernodeKeeper, sn *typ
 	return nil
 }
 
+func markStorageFull(ctx sdk.Context, keeper types.SupernodeKeeper, sn *types.SuperNode) error {
+	if len(sn.States) == 0 {
+		return errorsmod.Wrap(sdkerrors.ErrInvalidRequest, "supernode state missing")
+	}
+	last := sn.States[len(sn.States)-1]
+	if last.State == types.SuperNodeStateStorageFull {
+		return nil
+	}
+	sn.States = append(sn.States, &types.SuperNodeStateRecord{State: types.SuperNodeStateStorageFull, Height: ctx.BlockHeight()})
+	if err := keeper.SetSuperNode(ctx, *sn); err != nil {
+		return err
+	}
+	ctx.EventManager().EmitEvent(
+		sdk.NewEvent(
+			types.EventTypeSupernodeStorageFull,
+			sdk.NewAttribute(types.AttributeKeyValidatorAddress, sn.ValidatorAddress),
+			sdk.NewAttribute(types.AttributeKeyOldState, last.State.String()),
+			sdk.NewAttribute(types.AttributeKeyHeight, stringHeight(ctx.BlockHeight())),
+		),
+	)
+	return nil
+}
+
+func recoverFromStorageFull(ctx sdk.Context, keeper types.SupernodeKeeper, sn *types.SuperNode, target types.SuperNodeState) error {
+	if target == types.SuperNodeStateUnspecified {
+		target = types.SuperNodeStateActive
+	}
+	sn.States = append(sn.States, &types.SuperNodeStateRecord{State: target, Height: ctx.BlockHeight()})
+	if err := keeper.SetSuperNode(ctx, *sn); err != nil {
+		return err
+	}
+	ctx.EventManager().EmitEvent(
+		sdk.NewEvent(
+			types.EventTypeSupernodeStorageRecovered,
+			sdk.NewAttribute(types.AttributeKeyValidatorAddress, sn.ValidatorAddress),
+			sdk.NewAttribute(types.AttributeKeyOldState, types.SuperNodeStateStorageFull.String()),
+			sdk.NewAttribute(types.AttributeKeyHeight, stringHeight(ctx.BlockHeight())),
+		),
+	)
+	return nil
+}
+
 func stringHeight(height int64) string {
 	return strconv.FormatInt(height, 10)
 }

@@ -1,0 +1,38 @@
+{
+    "chain": {
+        "id": "lumera-devnet-1",
+        "denom": {
+            "bond": "ulume",
+            "mint": "ulume",
+            "minimum_gas_price": "0.025ulume"
+        }
+    },
+    "docker": {
+        "network_name": "lumera-network",
+        "container_prefix": "lumera",
+        "volume_prefix": "lumera"
+    },
+    "paths": {
+        "base": {
+            "host": "~",
+            "container": "/root"
+        },
+        "directories": {
+            "daemon": ".lumera"
+        }
+    },
+    "daemon": {
+        "binary": "lumerad",
+        "keyring_backend": "test"
+    },
+    "network-maker": {
+        "enabled": true,
+        "grpc_port": 50051,
+        "http_port": 8080,
+        "max_accounts": 3,
+        "account_balance": "10000000ulume"
+    },
+    "hermes": {
+        "enabled": false
+    }
+}

@@ -24,8 +24,10 @@ func (am AppModule) WeightedOperations(simState module.SimulationState) []simtyp
 	operations := make([]simtypes.WeightedOperation, 0)
 
 	const (
-		opWeightMsgSubmitEvidence          = "op_weight_msg_submit_evidence"
-		defaultWeightMsgSubmitEvidence int = 100
+		opWeightMsgSubmitEvidence                     = "op_weight_msg_submit_evidence"
+		defaultWeightMsgSubmitEvidence            int = 100
+		opWeightMsgSubmitEpochReportVariance          = "op_weight_msg_submit_epoch_report_variance"
+		defaultWeightMsgSubmitEpochReportVariance int = 100
 	)
 
 	var weightMsgSubmitEvidence int
@@ -38,6 +40,17 @@ func (am AppModule) WeightedOperations(simState module.SimulationState) []simtyp
 	operations = append(operations, simulation.NewWeightedOperation(
 		weightMsgSubmitEvidence,
 		auditsimulation.SimulateMsgSubmitEvidence(am.authKeeper, am.bankKeeper, am.keeper, simState.TxConfig),
+	))
+
+	var weightMsgSubmitEpochReportVariance int
+	simState.AppParams.GetOrGenerate(opWeightMsgSubmitEpochReportVariance, &weightMsgSubmitEpochReportVariance, nil,
+		func(_ *rand.Rand) {
+			weightMsgSubmitEpochReportVariance = defaultWeightMsgSubmitEpochReportVariance
+		},
+	)
+	operations = append(operations, simulation.NewWeightedOperation(
+		weightMsgSubmitEpochReportVariance,
+		auditsimulation.SimulateMsgSubmitEpochReportVariance(am.keeper),
 	))
 
 	return operations

@@ -882,5 +882,5 @@ lumerad query evmigration migration-record <multisig-legacy-address>
 
 - **Threshold and members are defined by the on-chain pubkey**, not by the CLI. `generate-proof-payload` reads the K and the N sub-keys from the chain; you don't pass them as flags.
 - **Cold-wallet / nil-pubkey single-sig accounts**: if a *single-key* (non-multisig) legacy account has never signed a transaction, use `generate-proof-payload --legacy-key <local-keyring-key>` to seed the pubkey from a local key. This is distinct from the multisig flow — multisig accounts must have their multisig pubkey already populated on-chain.
-- **Supernode operator multisig migration** is not supported by the supernode daemon itself. If your supernode runs with a multisig legacy key, run the four-step flow above manually; the next supernode restart will detect the on-chain migration record and finish local cleanup (delete legacy key, update `config.yml`) via the idempotent path.
+- **Supernode operators** have their own step-by-step walkthrough for both the single-sig automatic path and the multisig manual path — see [supernode-migration.md](supernode-migration.md).
 - **After a successful migration** follow the same post-migration steps as for any other account (add the new Lumera EVM chain definition to Keplr, verify balances at the new address, etc.).

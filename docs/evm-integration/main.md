@@ -35,6 +35,7 @@ Lumera's EVM integration is designed as a deeply integrated, production-ready la
 ### User Guides
 
 - [migration.md](user-guides/migration.md) — Step-by-step legacy-account migration guide for end users (Portal + Keplr, CLI, and multisig offline flow)
+- [supernode-migration.md](user-guides/supernode-migration.md) — Supernode operator migration guide (single-sig automatic path and multisig manual `lumerad` CLI path)
 - [node-evm-config-guide.md](user-guides/node-evm-config-guide.md) — Node operator EVM configuration guide (app.toml tuning, RPC exposure, tracer config)
 - [tune-guide.md](user-guides/tune-guide.md) — Mainnet parameter tuning guide: fee market, gas limits, mempool, RPC limits, and peer-chain comparisons
 

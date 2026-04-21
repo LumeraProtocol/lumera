@@ -423,6 +423,28 @@ func queryMigrationStats() (migrationStats, error) {
 	return stats, nil
 }
 
+// queryLegacyAccountAddresses returns the addresses of all accounts still in
+// the chain's legacy-accounts set (i.e. not yet migrated).
+func queryLegacyAccountAddresses() ([]string, error) {
+	out, err := run("query", "evmigration", "legacy-accounts")
+	if err != nil {
+		return nil, fmt.Errorf("query legacy-accounts: %s\n%w", out, err)
+	}
+	var resp struct {
+		Accounts []struct {
+			Address string `json:"address"`
+		} `json:"accounts"`
+	}
+	if err := json.Unmarshal([]byte(out), &resp); err != nil {
+		return nil, fmt.Errorf("parse legacy-accounts: %s\n%w", truncate(out, 300), err)
+	}
+	addrs := make([]string, 0, len(resp.Accounts))
+	for _, a := range resp.Accounts {
+		addrs = append(addrs, a.Address)
+	}
+	return addrs, nil
+}
+
 // queryMigrationParams queries the evmigration module parameters.
 func queryMigrationParams() (migrationParams, error) {
 	out, err := run("query", "evmigration", "params")

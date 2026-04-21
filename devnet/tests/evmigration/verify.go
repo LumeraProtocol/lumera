@@ -160,6 +160,8 @@ func runVerify() {
 	// Report results.
 	log.Println("--- Verify Results ---")
 
+	logVerifyFinalSummary(targets)
+
 	// Filter out evmigration issues (those are expected/allowed).
 	var nonEvmIssues []issue
 	for _, iss := range issues {
@@ -188,6 +190,41 @@ func runVerify() {
 		}
 	}
 	log.Fatalf("FAIL: %d legacy addresses have leftover state", len(addrIssues))
+}
+
+// logVerifyFinalSummary prints the global migration stats plus the list of
+// legacy addresses still remaining on-chain. Intended as an end-of-verify
+// snapshot so the reader doesn't have to run a separate query to see what the
+// pipeline ultimately left behind.
+func logVerifyFinalSummary(targets []verifyTarget) {
+	log.Println("--- Final migration stats ---")
+	if stats, err := queryMigrationStats(); err != nil {
+		log.Printf("  WARN: migration-stats: %v", err)
+	} else {
+		log.Printf("  migrated=%d legacy=%d legacy_staked=%d validators_migrated=%d validators_legacy=%d",
+			stats.TotalMigrated, stats.TotalLegacy, stats.TotalLegacyStaked,
+			stats.TotalValidatorsMigrated, stats.TotalValidatorsLegacy)
+	}
+	log.Printf("  this host verified %d migrated addresses", len(targets))
+
+	addrs, err := queryLegacyAccountAddresses()
+	if err != nil {
+		log.Printf("  WARN: legacy-accounts: %v", err)
+		return
+	}
+	if len(addrs) == 0 {
+		log.Printf("  no legacy accounts remaining on-chain")
+		return
+	}
+	const maxListed = 20
+	log.Printf("  %d legacy account(s) still on-chain (showing up to %d):", len(addrs), maxListed)
+	for i, a := range addrs {
+		if i >= maxListed {
+			log.Printf("    ... (%d more)", len(addrs)-maxListed)
+			break
+		}
+		log.Printf("    %s", a)
+	}
 }
 
 // ─── Query helpers specific to verify ────────────────────────────────────────

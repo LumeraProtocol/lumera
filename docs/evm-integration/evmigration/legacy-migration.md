@@ -151,7 +151,7 @@ The response should show a `multisig` key with all sub-keys listed.
 
 ### Four-step CLI flow
 
-Migration of a multisig account uses four offline commands. See [user-guide.md](./user-guide.md#migrating-a-multisig-account) for the full walkthrough with example arguments.
+Migration of a multisig account uses four offline commands. See [migration.md](../user-guides/migration.md#migrating-a-multisig-account) for the full walkthrough with example arguments.
 
 1. **Coordinator** generates the proof payload template with `generate-proof-payload`.
 2. **Each co-signer** signs independently on their own machine with `sign-proof`.

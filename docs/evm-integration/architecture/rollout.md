@@ -62,8 +62,8 @@ This means rollout work is now primarily operational: release qualification, sta
 
 - [OpenRPC Discovery and Playground Guide](../guides/openrpc-playground.md) — OpenRPC discovery and interactive method testing
 - [Testing Smart Contracts on Lumera with Remix IDE](../guides/remix-guide.md) — deploy and test a simple Solidity contract through MetaMask
-- [Node Operator EVM Configuration Guide](../guides/node-evm-config-guide.md) — validator and RPC-node configuration checks
-- [Mainnet Parameter Tuning Guide](../guides/tune-guide.md) — EVM parameter review and operational tuning
+- [Node Operator EVM Configuration Guide](../user-guides/node-evm-config-guide.md) — validator and RPC-node configuration checks
+- [Mainnet Parameter Tuning Guide](../user-guides/tune-guide.md) — EVM parameter review and operational tuning
 - [External Block Explorer Integration Plan](../guides/block-explorer.md) — block explorer rollout on testnet and mainnet
 - [CosmWasm Cross-Runtime Bridge — Wasm Precompile & EVM Plugin](../precompiles/wasm-precompile.md) — bidirectional CosmWasm↔EVM bridge behavior and test targets
 
@@ -198,7 +198,7 @@ Before touching any live network, cut an RC for `v1.20.0` and re-run the full va
 - verify MetaMask connectivity and transaction flows against the RC
 - verify Keplr-based migration flows against the RC
 - deploy and test a simple Solidity contract against the RC using the [Remix guide](../guides/remix-guide.md)
-- validate operator-facing config defaults against the [Node Operator EVM Configuration Guide](../guides/node-evm-config-guide.md)
+- validate operator-facing config defaults against the [Node Operator EVM Configuration Guide](../user-guides/node-evm-config-guide.md)
 - complete the first version of the fee market monitoring runbook and disaster recovery procedure for EVM state
 - run baseline load and performance benchmarks for mixed Cosmos + EVM traffic
 - decide whether migration-proof expiry will be implemented before mainnet or accepted as a documented limitation with a finite migration window
@@ -392,7 +392,7 @@ Validate the upgrade and migration flow on a public network with external valida
   - push the target height
   - republish the timeline
   - resubmit a new proposal
-- publish validator upgrade guide with links to the [Node Operator EVM Configuration Guide](../guides/node-evm-config-guide.md) and [Mainnet Parameter Tuning Guide](../guides/tune-guide.md)
+- publish validator upgrade guide with links to the [Node Operator EVM Configuration Guide](../user-guides/node-evm-config-guide.md) and [Mainnet Parameter Tuning Guide](../user-guides/tune-guide.md)
 - publish user migration guide and portal/CLI instructions
 - confirm how external testers will obtain testnet funds:
   - preferred path: EVM-compatible faucet for the upgraded testnet
@@ -499,8 +499,8 @@ Convert successful testnet results into a production-ready mainnet release packa
 - final OpenRPC playground test checklist
 - final simple-contract deployment checklist based on the [Remix guide](../guides/remix-guide.md)
 - final RPC, wallet, explorer, and exchange integration notes
-- final node-operator configuration checklist based on the [Node Operator EVM Configuration Guide](../guides/node-evm-config-guide.md)
-- final EVM parameter review using the [Mainnet Parameter Tuning Guide](../guides/tune-guide.md)
+- final node-operator configuration checklist based on the [Node Operator EVM Configuration Guide](../user-guides/node-evm-config-guide.md)
+- final EVM parameter review using the [Mainnet Parameter Tuning Guide](../user-guides/tune-guide.md)
 - final block explorer rollout checklist based on the [External Block Explorer Integration Plan](../guides/block-explorer.md)
 - final fee market monitoring runbook
 - final disaster recovery procedure covering EVM state, upgrade incidents, and migration incidents

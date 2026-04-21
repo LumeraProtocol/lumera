@@ -32,12 +32,16 @@ Lumera's EVM integration is designed as a deeply integrated, production-ready la
 - [bugs.md](testing/bugs.md) — Bugs found and fixed during EVM integration
 - [security-audit.md](testing/security-audit.md) — Security audit findings and recommendations
 
-### Guides
+### User Guides
 
-- [node-evm-config-guide.md](guides/node-evm-config-guide.md) — Node operator EVM configuration guide (app.toml tuning, RPC exposure, tracer config)
+- [migration.md](user-guides/migration.md) — Step-by-step legacy-account migration guide for end users (Portal + Keplr, CLI, and multisig offline flow)
+- [node-evm-config-guide.md](user-guides/node-evm-config-guide.md) — Node operator EVM configuration guide (app.toml tuning, RPC exposure, tracer config)
+- [tune-guide.md](user-guides/tune-guide.md) — Mainnet parameter tuning guide: fee market, gas limits, mempool, RPC limits, and peer-chain comparisons
+
+### Developer Guides
+
 - [openrpc-playground.md](guides/openrpc-playground.md) — OpenRPC discovery and playground guide (access methods, devnet ports, CORS, interactive explorer)
 - [remix-guide.md](guides/remix-guide.md) — Testing smart contracts on Lumera with Remix IDE and MetaMask
-- [tune-guide.md](guides/tune-guide.md) — Mainnet parameter tuning guide: fee market, gas limits, mempool, RPC limits, and peer-chain comparisons
 - [block-explorer.md](guides/block-explorer.md) — External block explorer (Blockscout) integration plan and deployment steps
 
 ## Operational Outcomes

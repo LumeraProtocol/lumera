@@ -310,7 +310,7 @@ Final operational readiness for mainnet.
 | [x] | CORS origin lockdown per environment     | High               | `app/openrpc/http.go` — reuses `[json-rpc] ws-origins`   |
 | [x] | JSON-RPC namespace exposure profiles     | High               | `cmd/lumera/cmd/jsonrpc_policy.go` — mainnet startup guard |
 | [ ] | Fee market monitoring runbook            | High               | Base fee tracking, gas utilization, alerting thresholds       |
-| [x] | Node operator EVM configuration guide    | High               | `docs/evm-integration/node-evm-config-guide.md`             |
+| [x] | Node operator EVM configuration guide    | High               | `docs/evm-integration/user-guides/node-evm-config-guide.md`             |
 | [ ] | Disaster recovery procedures (EVM state) | Medium             | Recovery from corrupt EVM state, indexer rebuild              |
 | [ ] | Load testing / performance benchmarks    | Medium             | TPS under mixed Cosmos+EVM workload                           |
 | [ ] | EVM governance proposal workflows        | Low                | Documented gov flows for precompile toggles, param changes    |

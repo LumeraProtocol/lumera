@@ -7,7 +7,7 @@ The EVM integration changes the default coin type from 118 (`secp256k1`) to 60 (
 | Document | Description |
 | --- | --- |
 | [legacy-migration.md](legacy-migration.md) | `x/evmigration` module architecture, messages, params, migration sequence, queries, and implementation status |
-| [user-guide.md](user-guide.md) | Step-by-step migration guide for end users (Portal + Keplr and CLI methods) |
+| [migration.md](../user-guides/migration.md) | Step-by-step migration guide for end users (Portal + Keplr and CLI methods) |
 | [portal-ui.md](portal-ui.md) | EVM Migration Portal UI and wallet rollout |
 | [devnet-tests.md](devnet-tests.md) | `tests_evmigration` devnet end-to-end test tool (modes, module coverage, Makefile targets) |
 

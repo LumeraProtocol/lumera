@@ -1,6 +1,6 @@
 # EVM Legacy Account Migration - User Guide
 
-**Last updated**: 2026-04-02
+**Last updated**: 2026-04-21
 **Applies to**: Lumera chain with `x/evmigration` module enabled (post-EVM upgrade)
 
 ---
@@ -73,7 +73,7 @@ Click **Connect Keplr**. If the Lumera chain is not yet added to Keplr, the port
 
 After connecting, the portal automatically checks your wallet address against the chain and shows your migration status. If you have a legacy (coin-type 118) account with on-chain state, you will see the green **"Ready to Migrate"** badge with a summary of your assets:
 
-![Portal main page showing legacy account ready for migration](assets/evmigration-1.jpg)
+![Portal main page showing legacy account ready for migration](../assets/evmigration-1.jpg)
 
 The status panel shows:
 
@@ -89,7 +89,7 @@ The top progress bar shows the overall migration progress across all accounts on
 
 The wizard opens with a review of what will be migrated. Verify that all the information is correct:
 
-![Step 1: Review — eligibility, addresses, and balance summary](assets/evmigration-2.jpg)
+![Step 1: Review — eligibility, addresses, and balance summary](../assets/evmigration-2.jpg)
 
 Key things to check:
 
@@ -110,13 +110,13 @@ Click **NEXT** when ready.
 
 This step collects two cryptographic proofs that authenticate you as the owner of both the legacy and new addresses. No private keys leave your device — all signing happens locally in Keplr.
 
-![Step 2: Sign & Confirm — proofs needed](assets/evmigration-3.jpg)
+![Step 2: Sign & Confirm — proofs needed](../assets/evmigration-3.jpg)
 
 Click the **SIGN MIGRATION PROOFS** button. Keplr will open **two signature popups** in sequence:
 
 **First popup — Legacy proof (ADR-036 signArbitrary):**
 
-![Keplr signature request for legacy proof — ADR-036 format](assets/evmigration-4.jpg)
+![Keplr signature request for legacy proof — ADR-036 format](../assets/evmigration-4.jpg)
 
 This is the legacy account proof. Notice:
 
@@ -130,7 +130,7 @@ Click **Approve** to sign with your legacy key.
 
 **Second popup — New proof (EIP-191 personal_sign):**
 
-![Keplr signature request for new proof — Ethereum personal_sign](assets/evmigration-5.jpg)
+![Keplr signature request for new proof — Ethereum personal_sign](../assets/evmigration-5.jpg)
 
 This is the new address proof. Notice the differences:
 
@@ -142,7 +142,7 @@ Click **Approve** to sign with your new (coin-type 60) key.
 
 After both signatures are collected, the portal shows green checkmarks next to each proof:
 
-![Step 2 completed — both proofs signed, ready to migrate](assets/evmigration-6.jpg)
+![Step 2 completed — both proofs signed, ready to migrate](../assets/evmigration-6.jpg)
 
 Both proofs are now signed:
 
@@ -157,7 +157,7 @@ Check the **"I understand this is irreversible and all on-chain state will move 
 
 The portal broadcasts the transaction and waits for confirmation (typically one block, 5-6 seconds). On success:
 
-![Migration Successful — post-migration checklist and transaction hash](assets/evmigration-7.jpg)
+![Migration Successful — post-migration checklist and transaction hash](../assets/evmigration-7.jpg)
 
 The result screen shows:
 
@@ -170,7 +170,7 @@ The result screen shows:
 
 Click **DONE** to close the wizard. The main page now shows your migration record and updated progress counters:
 
-![Post-migration main page — migration record visible, Keplr still on old derivation](assets/evmigration-8.jpg)
+![Post-migration main page — migration record visible, Keplr still on old derivation](../assets/evmigration-8.jpg)
 
 However, notice that Keplr is still using the old coin-type 118 chain definition. The next step switches it to the new EVM-compatible definition.
 
@@ -185,7 +185,7 @@ The chain registry provides two Lumera definitions for this purpose:
 
 The Portal prompts you to add the new chain definition via Keplr's `suggestChain` mechanism:
 
-![Keplr suggest chain dialog — adding Lumera with coin-type 60 and EVM features](assets/evmigration-9.jpg)
+![Keplr suggest chain dialog — adding Lumera with coin-type 60 and EVM features](../assets/evmigration-9.jpg)
 
 Review the chain configuration — you should see coin-type 60 and Ethereum-compatible settings — and click **Approve**. This adds the new Lumera definition to Keplr alongside the legacy one.
 
@@ -193,7 +193,7 @@ After approving, disconnect and reconnect your wallet in the Portal. The Portal 
 
 If you skip this step and reconnect without switching, you will see a **"Wallet Derivation Path Mismatch"** warning because Keplr is still using the old coin-type 118 derivation:
 
-![Post-migration with stale Keplr — derivation path mismatch warning](assets/evmigration-10.jpg)
+![Post-migration with stale Keplr — derivation path mismatch warning](../assets/evmigration-10.jpg)
 
 This shows Keplr using the old address while the Portal knows your correct EVM address. To resolve it, go back and add the new chain definition as described above.
 
@@ -208,7 +208,7 @@ This shows Keplr using the old address while the Portal knows your correct EVM a
 
 After switching to the new chain definition (or re-importing), the Portal shows a clean state with the correct EVM address and your migration record:
 
-![After switching to new chain definition — clean state with migration record](assets/evmigration-11.jpg)
+![After switching to new chain definition — clean state with migration record](../assets/evmigration-11.jpg)
 
 Notice the badges at the top now show **"chain coin-type 60"** and **"wallet coin-type 60"** — both aligned. Your migration record is displayed with the legacy address, new Lumera address, and Ethereum hex address. The old Lumera (Legacy) chain entry can be removed from Keplr.
 
@@ -779,36 +779,51 @@ The `max_validator_delegations` parameter (default 2000) limits how many records
 
 ## Migrating a multisig account
 
-Multisig legacy accounts (flat K-of-N secp256k1) use an offline, coordinator-driven flow with four commands. The portal wizard does not support multisig — use the CLI.
+Multisig legacy accounts (flat K-of-N `secp256k1`) use an offline, coordinator-driven flow with four commands. The portal wizard does not support multisig — use the CLI.
 
-See [legacy-migration.md](./legacy-migration.md#multisig-account-migration) for the architecture and wire-format reference.
+See [legacy-migration.md](../evmigration/legacy-migration.md#multisig-account-migration) for the architecture and wire-format reference.
 
-### Precondition: ensure the pubkey is on-chain
+### Overview
 
-If the multisig account has never signed a transaction, its pubkey is nil on-chain and migration will fail. Submit any transaction from the multisig account first, for example a 1-ulume self-send. Then confirm the key is stored:
+| Step | Who runs it | Command | Produces |
+|------|-------------|---------|----------|
+| 1 | Coordinator (once) | `generate-proof-payload` | `proof.json` — payload template |
+| 2 | Each of K co-signers | `sign-proof` | one `*-partial.json` per signer |
+| 3 | Coordinator | `combine-proof` | `tx.json` — assembled unsigned tx |
+| 4 | Coordinator | `submit-proof` | broadcasts to chain |
+
+The payload is identical across all co-signers; what differs is whose sub-key signed it. The coordinator only assembles and broadcasts — they don't need any of the legacy sub-keys.
+
+### Precondition: ensure the multisig pubkey is on-chain
+
+If the multisig account has never signed a transaction, its pubkey is nil on-chain and `generate-proof-payload` will fail. Submit any transaction from the multisig account first (for example a 1-ulume self-send). Then confirm the key is stored:
 
 ```bash
 lumerad query auth account <multisig-legacy-address>
 ```
 
-The response must show a `multisig` key listing all sub-keys.
+The response must show a `multisig` pubkey structure listing all sub-keys.
 
 ### Step 1: Coordinator generates the proof payload template
 
-The coordinator (any co-signer who will drive the flow) creates a JSON template that describes the migration and contains the unsigned payload:
+The coordinator (any co-signer who will drive the flow) creates a JSON template that describes the migration and contains the canonical signed payload:
 
 ```bash
 lumerad tx evmigration generate-proof-payload \
   --legacy <multisig-bech32> \
   --new <new-eth-bech32> \
   --kind claim \
-  --chain-id lumera-devnet-1 \
+  --chain-id <chain-id> \
   --out proof.json
 ```
 
-`--kind` is `claim` for `MsgClaimLegacyAccount` and `validator` for `MsgMigrateValidator`. The output `proof.json` contains the canonical payload string, the multisig pub-key structure, and empty signature slots for each co-signer.
+- `--kind claim` targets `MsgClaimLegacyAccount`; `--kind validator` targets `MsgMigrateValidator`. The chain uses different keeper entry points for each.
+- `--chain-id` is **required**: the payload string `lumera-evm-migration:<chain-id>:<evm-chain-id>:<kind>:<legacy>:<new>` embeds the chain ID. The keeper reconstructs this server-side with `ctx.ChainID()`, so an empty or wrong `--chain-id` on the client makes every sub-signature fail verification with `sub-sig 0 invalid`.
+- `--sig-format` (optional, default `SIG_FORMAT_CLI`): use `SIG_FORMAT_ADR036` only when sub-signers sign via a wallet that emits ADR-036 `signArbitrary` output (e.g. Keplr). CLI keyring signers should stick with `SIG_FORMAT_CLI`.
+- `--legacy-key` (optional): for a legacy single-sig account whose pubkey is nil on-chain. Not used for multisig flows — the multisig pubkey is read from chain.
+- `generate-proof-payload` is a query-style command and **does not accept `--keyring-backend`**. The other three commands require it because they touch the local keyring.
 
-Distribute `proof.json` to all co-signers who will provide signatures.
+The output `proof.json` contains the canonical payload string, the `payload_hex` digest, the multisig sub-key list, and empty `partial_signatures`. Distribute it to all co-signers.
 
 ### Step 2: Each co-signer signs on their own machine
 
@@ -816,35 +831,48 @@ Each participating co-signer imports their individual sub-key and runs:
 
 ```bash
 lumerad tx evmigration sign-proof proof.json \
-  --from <my-sub-key> --keyring-backend test \
+  --from <my-sub-key> \
+  --keyring-backend <backend> \
+  --chain-id <chain-id> \
   --out my-partial.json
 ```
 
-`sign-proof` is idempotent — re-running it overwrites the partial output file with a fresh signature. Each co-signer produces their own `<name>-partial.json` file. Send all partial files back to the coordinator.
+- `sign-proof` is idempotent: re-running it removes any previous entry for the same signer index and appends a fresh signature. `--out` defaults to the input path if omitted (useful for round-tripping one file through multiple signers in test scenarios).
+- Each co-signer produces their own `<name>-partial.json`. Send all partial files back to the coordinator.
+- `sign-proof` will reject a file whose `payload_hex` doesn't match a canonical reconstruction from the other fields — this catches accidental tampering or field edits between steps.
 
-### Step 3: Coordinator merges the threshold-many partials
+### Step 3: Coordinator combines the partials
 
 The coordinator collects at least K partial files (where K is the multisig threshold) and merges them:
 
 ```bash
 lumerad tx evmigration combine-proof \
   alice-partial.json bob-partial.json \
-  --out tx.json --chain-id lumera-devnet-1
+  --out tx.json
 ```
 
-`combine-proof` validates cross-file consistency before merging: it checks that all partials share the same `chain_id`, `legacy_address`, `new_address`, multisig threshold, and `sub_pub_keys` list. It rejects mismatched files before writing `tx.json`.
+`combine-proof` validates cross-file consistency before merging — it rejects the set if any two partials disagree on `chain_id`, `evm_chain_id`, `legacy_address`, `new_address`, `payload_hex`, proof kind, or the `sub_pub_keys` list. It also verifies each partial signature against its declared sub-pub-key.
+
+Selection behavior after validation:
+
+- Each partial signature is verified under the sub-pub-key it claims; invalid entries are silently skipped (not fatal).
+- Among the verified partials, the first K in ascending signer-index order are included in the assembled proof.
+- If fewer than K partials verify, `combine-proof` errors with `need <K> valid partial signatures, have <N>` and does not write `tx.json`.
+
+Passing *more* than K partials is accepted — extras beyond the threshold are ignored. Passing fewer than K raises the error above.
 
 ### Step 4: Broadcast the assembled transaction
 
-The coordinator broadcasts using the new EVM key as the transaction signer:
+The coordinator broadcasts using the new EVM destination key as the transaction signer:
 
 ```bash
 lumerad tx evmigration submit-proof tx.json \
   --from <new-eth-key> \
-  --chain-id lumera-devnet-1 --keyring-backend test -y
+  --chain-id <chain-id> \
+  --keyring-backend <backend> -y
 ```
 
-On success, verify the migration record:
+`submit-proof` signs the `new_signature` field with the EVM key, wraps the message in an unsigned Cosmos tx (no fee), and broadcasts. On success, verify the migration record:
 
 ```bash
 lumerad query evmigration migration-record <multisig-legacy-address>
@@ -852,6 +880,7 @@ lumerad query evmigration migration-record <multisig-legacy-address>
 
 ### Notes
 
-- **Cold-wallet / nil-pubkey single-sig accounts**: if a single-key legacy account has never signed a transaction (nil pubkey on-chain), use the `--legacy-key` flag with `sign-proof` to supply the key directly from the keyring. The standard `claim-legacy-account` command does not handle nil pubkeys.
-- `combine-proof` requires exactly threshold-many partials — passing fewer raises an error; passing more is accepted and the first K valid partials are used.
-- After a successful migration, follow the same post-migration steps as for any other account (add the new Lumera EVM chain definition to Keplr, verify balances at the new address, etc.).
+- **Threshold and members are defined by the on-chain pubkey**, not by the CLI. `generate-proof-payload` reads the K and the N sub-keys from the chain; you don't pass them as flags.
+- **Cold-wallet / nil-pubkey single-sig accounts**: if a *single-key* (non-multisig) legacy account has never signed a transaction, use `generate-proof-payload --legacy-key <local-keyring-key>` to seed the pubkey from a local key. This is distinct from the multisig flow — multisig accounts must have their multisig pubkey already populated on-chain.
+- **Supernode operator multisig migration** is not supported by the supernode daemon itself. If your supernode runs with a multisig legacy key, run the four-step flow above manually; the next supernode restart will detect the on-chain migration record and finish local cleanup (delete legacy key, update `config.yml`) via the idempotent path.
+- **After a successful migration** follow the same post-migration steps as for any other account (add the new Lumera EVM chain definition to Keplr, verify balances at the new address, etc.).

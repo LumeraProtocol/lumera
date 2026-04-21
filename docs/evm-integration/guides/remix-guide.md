@@ -241,7 +241,7 @@ The contract records the deployer as `owner`. Click the **owner** button (blue �
 
 ### MetaMask shows wrong chain ID
 
-Ensure your MetaMask network is configured with chain ID `76857769`. If the node was upgraded from a pre-EVM binary, verify that `app.toml` has the correct `[evm]` section (see [node-evm-config-guide.md](node-evm-config-guide.md) — the config migration runs automatically on first startup after upgrade).
+Ensure your MetaMask network is configured with chain ID `76857769`. If the node was upgraded from a pre-EVM binary, verify that `app.toml` has the correct `[evm]` section (see [node-evm-config-guide.md](../user-guides/node-evm-config-guide.md) — the config migration runs automatically on first startup after upgrade).
 
 ### Transaction fails with "nonce too low"
 

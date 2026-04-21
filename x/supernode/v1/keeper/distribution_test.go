@@ -721,3 +721,16 @@ func TestSNWithoutMetricsSkipped(t *testing.T) {
 	require.Len(t, bankKeeper.sent, 1)
 	require.Equal(t, acc2.String(), bankKeeper.sent[0].to)
 }
+
+// TestEverlightDenomMatchesConfig asserts that the package-local everlightDenom
+// constant (defined in distribution.go to avoid transitively importing
+// lumera/config and sealing the SDK bech32 config at package-init time) stays
+// in lock-step with the canonical chain denomination.
+//
+// If this test fails, either update everlightDenom in distribution.go to match
+// config.ChainDenom, or if the chain's native denom actually changed, update
+// both sides together (and check all other hard-coded "ulume" references).
+func TestEverlightDenomMatchesConfig(t *testing.T) {
+	require.Equal(t, lcfg.ChainDenom, everlightDenom,
+		"keeper.everlightDenom must match config.ChainDenom")
+}

@@ -8,9 +8,19 @@ import (
 	sdkmath "cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
-	lcfg "github.com/LumeraProtocol/lumera/config"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 )
+
+// everlightDenom is the chain native denomination used for payout accounting.
+//
+// This mirrors lumera/config.ChainDenom. It is kept as a package-local constant
+// (instead of importing lumera/config) because lumera/config's init() seals the
+// SDK Bech32 config at import time. Downstream Go consumers of
+// x/supernode/v1/keeper (notably the supernode repo pulling this package in via
+// sdk/action → cascadekit) then panic when they later initialize their own
+// bech32 config. A consistency test in distribution_test.go asserts this value
+// stays equal to lumera/config.ChainDenom.
+const everlightDenom = "ulume"
 
 // countEligibleSNs returns the number of supernodes currently eligible for distribution.
 func (k Keeper) CountEligibleSNs(ctx sdk.Context) uint64 {
@@ -72,7 +82,7 @@ func (k Keeper) distributePool(ctx sdk.Context) error {
 
 	// 1. Get pool balance.
 	poolBalance := k.GetPoolBalance(ctx)
-	poolUlume := poolBalance.AmountOf(lcfg.ChainDenom)
+	poolUlume := poolBalance.AmountOf(everlightDenom)
 
 	// If pool balance is zero, emit event and return (AT44).
 	if poolUlume.IsZero() {
@@ -222,7 +232,7 @@ func (k Keeper) distributePool(ctx sdk.Context) error {
 
 	// 6. Execute payouts via bank module.
 	for _, p := range payouts {
-		coins := sdk.NewCoins(sdk.NewCoin(lcfg.ChainDenom, p.amount))
+		coins := sdk.NewCoins(sdk.NewCoin(everlightDenom, p.amount))
 		if err := k.bankKeeper.SendCoinsFromModuleToAccount(ctx, sntypes.ModuleName, p.addr, coins); err != nil {
 			return fmt.Errorf("failed to send distribution to %s: %w", p.addr, err)
 		}
@@ -262,7 +272,7 @@ func (k Keeper) distributePool(ctx sdk.Context) error {
 	}
 
 	// 8. Update global state.
-	totalPayoutCoins := sdk.NewCoins(sdk.NewCoin(lcfg.ChainDenom, totalDistributed))
+	totalPayoutCoins := sdk.NewCoins(sdk.NewCoin(everlightDenom, totalDistributed))
 	k.AddTotalDistributed(ctx, totalPayoutCoins)
 	k.SetLastDistributionHeight(ctx, currentHeight)
 

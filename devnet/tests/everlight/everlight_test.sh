@@ -937,6 +937,22 @@ scenario_7_governance() {
          | .reward_distribution.usage_growth_cap_bps_per_period = 5000
          | .reward_distribution.min_cascade_bytes_for_payment = 1073741824')"
 
+    # Determine the proposal deposit. Read min_deposit from gov params instead
+    # of hard-coding 1_000_000_000 (which is not guaranteed to fit in the
+    # funded test key's balance on all devnet genesis configs, and was the
+    # root cause of spurious S7.2 "code=5 insufficient funds" failures).
+    local gov_params min_deposit_amt
+    gov_params="$(lumerad_query gov params)" || true
+    min_deposit_amt="$(echo "$gov_params" | jq -r \
+        '(.params.min_deposit[]? | select(.denom == "'"$DENOM"'") | .amount)
+         // (.min_deposit[]? | select(.denom == "'"$DENOM"'") | .amount)
+         // empty' 2>/dev/null)"
+    if ! [[ "$min_deposit_amt" =~ ^[0-9]+$ ]] || (( min_deposit_amt == 0 )); then
+        # Fallback to a conservative default if gov query shape is unexpected.
+        min_deposit_amt=10000000
+    fi
+    echo "    DEBUG: gov min_deposit=${min_deposit_amt}${DENOM}"
+
     # Write the proposal JSON into the container.
     local proposal_file="/tmp/sn_param_proposal.json"
     docker compose -f "$COMPOSE_FILE" exec -T "$SERVICE" bash -c "cat > $proposal_file" <<PROPEOF
@@ -946,7 +962,7 @@ scenario_7_governance() {
         "authority": "$gov_addr",
         "params": $updated_params
     }],
-    "deposit": "1000000000${DENOM}",
+    "deposit": "${min_deposit_amt}${DENOM}",
     "metadata": "",
     "title": "Update Supernode Params (devnet test)",
     "summary": "Automated devnet test: set payment_period_blocks=$new_ppb, new_sn_ramp_up_periods=1, measurement_smoothing_periods=1"
@@ -1336,31 +1352,44 @@ scenario_8_proto_compatibility() {
             fail "S8.1a supernode query returns validator record" "query returned empty for $target_validator"
         fi
 
-        metrics="$(supernode_metrics_query_debug "$target_validator")" || true
-        if [[ -z "$metrics" || "$(echo "$metrics" | jq -r '.code // empty' 2>/dev/null)" == "5" ]]; then
-            # Seed one metrics report so query surface is exercised deterministically.
-            local seeded=false
-            for svc in "${VALIDATOR_SERVICES[@]}"; do
-                local svc_sn svc_val
-                svc_sn="$(get_supernode_for_service "$svc")" || true
-                svc_val="$(echo "$svc_sn" | jq -r '.validator_address // empty' 2>/dev/null)"
-                if [[ "$svc_val" == "$target_validator" ]]; then
-                    if report_metrics_for_service "$svc" "$target_validator" 2147483648 40; then
-                        seeded=true
-                    fi
-                    break
-                fi
-            done
-            if $seeded; then
-                sleep 4
-                metrics="$(supernode_metrics_query_debug "$target_validator")" || true
-            fi
-        fi
-        if [[ -n "$metrics" ]] && [[ "$(echo "$metrics" | jq -r '.code // empty' 2>/dev/null)" != "5" ]]; then
-            assert_jq "$metrics" '.metrics_state.metrics.cascade_kademlia_db_bytes != null' \
-                "S8.1c cascade_kademlia_db_bytes present in metrics query"
+        # S8.1c: verify cascade_kademlia_db_bytes surfaces in the proto.
+        # Under PR #113 the legacy flat `get-metrics` surface was removed in
+        # favour of the per-SN `sn-eligibility` response (which carries the
+        # smoothed byte counts that drive Everlight payouts). Query both: a
+        # pass on either surface satisfies the proto-compat assertion.
+        local elig
+        elig="$(lumerad_query supernode sn-eligibility "$target_validator")" || true
+        if [[ -n "$elig" ]] \
+            && echo "$elig" | jq -e '.cascade_kademlia_db_bytes != null' >/dev/null 2>&1; then
+            pass "S8.1c cascade_kademlia_db_bytes present in sn-eligibility query"
         else
-            fail "S8.1c cascade_kademlia_db_bytes present in metrics query" "metrics query returned empty or not found for $target_validator"
+            metrics="$(supernode_metrics_query_debug "$target_validator")" || true
+            if [[ -z "$metrics" || "$(echo "$metrics" | jq -r '.code // empty' 2>/dev/null)" == "5" ]]; then
+                # Seed one metrics report so the legacy surface can be exercised if still wired.
+                local seeded=false
+                for svc in "${VALIDATOR_SERVICES[@]}"; do
+                    local svc_sn svc_val
+                    svc_sn="$(get_supernode_for_service "$svc")" || true
+                    svc_val="$(echo "$svc_sn" | jq -r '.validator_address // empty' 2>/dev/null)"
+                    if [[ "$svc_val" == "$target_validator" ]]; then
+                        if report_metrics_for_service "$svc" "$target_validator" 2147483648 40; then
+                            seeded=true
+                        fi
+                        break
+                    fi
+                done
+                if $seeded; then
+                    sleep 4
+                    metrics="$(supernode_metrics_query_debug "$target_validator")" || true
+                fi
+            fi
+            if [[ -n "$metrics" ]] && [[ "$(echo "$metrics" | jq -r '.code // empty' 2>/dev/null)" != "5" ]]; then
+                assert_jq "$metrics" '.metrics_state.metrics.cascade_kademlia_db_bytes != null' \
+                    "S8.1c cascade_kademlia_db_bytes present in metrics query (legacy surface)"
+            else
+                fail "S8.1c cascade_kademlia_db_bytes present" \
+                    "neither sn-eligibility nor get-metrics exposed cascade_kademlia_db_bytes for $target_validator"
+            fi
         fi
     else
         skip "S8.1a/S8.1c live supernode proto checks" "no registered supernode found on devnet"

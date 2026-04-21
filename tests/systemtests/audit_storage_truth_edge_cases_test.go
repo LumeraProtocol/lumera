@@ -69,7 +69,7 @@ func TestStorageTruth_FullMode_PostponesLikeSoft(t *testing.T) {
 	epoch1End := epoch1Start + int64(epochLengthBlocks)
 	awaitAtLeastHeight(t, epoch1Start)
 
-	proberResp, prober := findAssignedProberForTarget(t, epochID1, []testNodeIdentity{n0, n1, n2}, n1.accAddr)
+	proberResp, prober, target := findAssignedProberAndTarget(t, epochID1, []testNodeIdentity{n0, n1, n2})
 
 	portStates := make([]string, len(proberResp.RequiredOpenPorts))
 	for i := range portStates {
@@ -83,7 +83,7 @@ func TestStorageTruth_FullMode_PostponesLikeSoft(t *testing.T) {
 		"--gas", "500000",
 		"--storage-proof-results", buildStorageProofResultJSONWithClass(
 			prober.accAddr,
-			n1.accAddr,
+			target.accAddr,
 			ticketID+"-recent",
 			"hash-full-mode-recent",
 			"STORAGE_PROOF_BUCKET_TYPE_RECENT",
@@ -91,7 +91,7 @@ func TestStorageTruth_FullMode_PostponesLikeSoft(t *testing.T) {
 		),
 		"--storage-proof-results", buildStorageProofResultJSONWithClass(
 			prober.accAddr,
-			n1.accAddr,
+			target.accAddr,
 			ticketID+"-old",
 			"hash-full-mode-old",
 			"STORAGE_PROOF_BUCKET_TYPE_OLD",
@@ -107,10 +107,10 @@ func TestStorageTruth_FullMode_PostponesLikeSoft(t *testing.T) {
 	awaitAtLeastHeight(t, epoch1End)
 	sut.AwaitNextBlock(t)
 
-	require.Equal(t, "SUPERNODE_STATE_POSTPONED", querySupernodeLatestState(t, cli, n1.valAddr),
-		"FULL mode must postpone n1 when index hash mismatches exceed threshold and satisfy postpone predicates")
-	require.Equal(t, "SUPERNODE_STATE_ACTIVE", querySupernodeLatestState(t, cli, n0.valAddr),
-		"challenger n0 must remain ACTIVE")
+	require.Equal(t, "SUPERNODE_STATE_POSTPONED", querySupernodeLatestState(t, cli, target.valAddr),
+		"FULL mode must postpone target when index hash mismatches exceed threshold and satisfy postpone predicates")
+	require.Equal(t, "SUPERNODE_STATE_ACTIVE", querySupernodeLatestState(t, cli, prober.valAddr),
+		"challenger must remain ACTIVE")
 }
 
 // ── Test 2: UNSPECIFIED mode is a no-op ──────────────────────────────────────
@@ -158,15 +158,17 @@ func TestStorageTruth_UnspecifiedMode_NeitherPostponesNorSchedulesHealOps(t *tes
 	epochID1, epoch1Start := nextEpochAfterHeight(originHeight, epochLengthBlocks, currentHeight)
 	epoch1End := epoch1Start + int64(epochLengthBlocks)
 	awaitAtLeastHeight(t, epoch1Start)
+	nodes := []testNodeIdentity{n0, n1, n2}
+	_, _, target := findAssignedProberAndTarget(t, epochID1, nodes)
 
 	// Seed transcript record (UNSPECIFIED uses k-based assignment; divisor param is irrelevant here).
-	rechecker := seedProofTranscripts(t, cli, epochID1, []testNodeIdentity{n0, n2}, n1.accAddr,
+	rechecker := seedProofTranscripts(t, cli, epochID1, nodes, target.accAddr,
 		[]transcriptSeed{{ticketID: ticketID, transcriptHash: "hash-unspec-orig"}}, false)
 
 	recheckResp := submitStorageRecheckEvidence(t, cli,
 		rechecker.nodeName,
 		epochID1,
-		n1.accAddr,
+		target.accAddr,
 		ticketID,
 		"hash-unspec-orig",
 		"hash-unspec-recheck",
@@ -179,8 +181,8 @@ func TestStorageTruth_UnspecifiedMode_NeitherPostponesNorSchedulesHealOps(t *tes
 	sut.AwaitNextBlock(t)
 
 	// UNSPECIFIED: no postponement.
-	require.Equal(t, "SUPERNODE_STATE_ACTIVE", querySupernodeLatestState(t, cli, n1.valAddr),
-		"UNSPECIFIED mode must not postpone n1")
+	require.Equal(t, "SUPERNODE_STATE_ACTIVE", querySupernodeLatestState(t, cli, target.valAddr),
+		"UNSPECIFIED mode must not postpone target")
 
 	// UNSPECIFIED: no heal ops scheduled.
 	healOps := auditQueryHealOpsByTicketST(t, ticketID)
@@ -240,6 +242,8 @@ func TestStorageTruth_ScoreDecay_TriggersRecovery(t *testing.T) {
 	epoch3End := epoch1End + 2*int64(epochLengthBlocks)
 
 	awaitAtLeastHeight(t, epoch1Start)
+	nodes := []testNodeIdentity{n0, n1, n2}
+	_, _, target := findAssignedProberAndTarget(t, epochID1, nodes)
 
 	// Seed all 3 transcript records in one epoch report from the prober; get rechecker.
 	var decaySeeds []transcriptSeed
@@ -249,14 +253,14 @@ func TestStorageTruth_ScoreDecay_TriggersRecovery(t *testing.T) {
 			transcriptHash: fmt.Sprintf("orig-hash-%d", i),
 		})
 	}
-	rechecker := seedProofTranscripts(t, cli, epochID1, []testNodeIdentity{n0, n2}, n1.accAddr, decaySeeds, false)
+	rechecker := seedProofTranscripts(t, cli, epochID1, nodes, target.accAddr, decaySeeds, false)
 
-	// Submit 3 recheks against n1 with distinct ticket IDs → suspicion exceeds 50.
+	// Submit 3 recheks against target with distinct ticket IDs → suspicion exceeds 50.
 	for i := 0; i < 3; i++ {
 		resp := submitStorageRecheckEvidence(t, cli,
 			rechecker.nodeName,
 			epochID1,
-			n1.accAddr,
+			target.accAddr,
 			fmt.Sprintf("edge-ticket-decay-%d", i),
 			fmt.Sprintf("orig-hash-%d", i),
 			fmt.Sprintf("recheck-hash-%d", i),
@@ -269,16 +273,16 @@ func TestStorageTruth_ScoreDecay_TriggersRecovery(t *testing.T) {
 	// Epoch 1 end: score exceeds postpone threshold 50 → POSTPONED.
 	awaitAtLeastHeight(t, epoch1End)
 	sut.AwaitNextBlock(t)
-	require.Equal(t, "SUPERNODE_STATE_POSTPONED", querySupernodeLatestState(t, cli, n1.valAddr),
-		"n1 must be POSTPONED after suspicion 60 exceeds threshold 50")
+	require.Equal(t, "SUPERNODE_STATE_POSTPONED", querySupernodeLatestState(t, cli, target.valAddr),
+		"target must be POSTPONED after suspicion 60 exceeds threshold 50")
 
 	// Epoch 3 end: multiplicative decay brings the score below watch(20), but the
 	// recovery clean-pass gate keeps the node POSTPONED.
 	// Use an explicit 120s timeout: waiting 28 blocks can exceed the default window under load.
 	sut.AwaitBlockHeight(t, epoch3End, 120*time.Second)
 	sut.AwaitNextBlock(t)
-	require.Equal(t, "SUPERNODE_STATE_POSTPONED", querySupernodeLatestState(t, cli, n1.valAddr),
-		"n1 must remain POSTPONED until recovery clean-pass requirements are met")
+	require.Equal(t, "SUPERNODE_STATE_POSTPONED", querySupernodeLatestState(t, cli, target.valAddr),
+		"target must remain POSTPONED until recovery clean-pass requirements are met")
 }
 
 // ── Test 4: multiple recheck evidence accumulates per-node score ──────────────
@@ -323,10 +327,12 @@ func TestStorageTruth_MultipleRecheckEvidence_AccumulatesScore(t *testing.T) {
 	currentHeight := sut.AwaitNextBlock(t)
 	epochID1, epoch1Start := nextEpochAfterHeight(originHeight, epochLengthBlocks, currentHeight)
 	awaitAtLeastHeight(t, epoch1Start)
+	nodes := []testNodeIdentity{n0, n1, n2}
+	_, _, target := findAssignedProberAndTarget(t, epochID1, nodes)
 
 	// Verify no suspicion state before any recheck.
-	_, found := auditQueryNodeSuspicionStateST(t, n1.accAddr)
-	require.False(t, found, "n1 must have no suspicion state before any recheck evidence")
+	_, found := auditQueryNodeSuspicionStateST(t, target.accAddr)
+	require.False(t, found, "target must have no suspicion state before any recheck evidence")
 
 	// Seed all 4 transcript records (each recheck ticket needs its own transcript hash).
 	var multiSeeds []transcriptSeed
@@ -336,7 +342,7 @@ func TestStorageTruth_MultipleRecheckEvidence_AccumulatesScore(t *testing.T) {
 			transcriptHash: fmt.Sprintf("orig-hash-%d", i),
 		})
 	}
-	rechecker := seedProofTranscripts(t, cli, epochID1, []testNodeIdentity{n0, n2}, n1.accAddr, multiSeeds, false)
+	rechecker := seedProofTranscripts(t, cli, epochID1, nodes, target.accAddr, multiSeeds, false)
 
 	// Submit 4 recheks with distinct ticket IDs and hashes. Base node delta is 15;
 	// repeated distinct ticket failures add escalation bonuses.
@@ -344,7 +350,7 @@ func TestStorageTruth_MultipleRecheckEvidence_AccumulatesScore(t *testing.T) {
 		resp := submitStorageRecheckEvidence(t, cli,
 			rechecker.nodeName,
 			epochID1,
-			n1.accAddr,
+			target.accAddr,
 			"multi-ticket-"+strconv.Itoa(i),
 			fmt.Sprintf("orig-hash-%d", i),
 			fmt.Sprintf("recheck-hash-%d", i),
@@ -354,22 +360,18 @@ func TestStorageTruth_MultipleRecheckEvidence_AccumulatesScore(t *testing.T) {
 		sut.AwaitNextBlock(t)
 	}
 
-	nodeState, found := auditQueryNodeSuspicionStateST(t, n1.accAddr)
-	require.True(t, found, "n1 must have suspicion state after 4 recheks")
-	require.Equal(t, int64(154), nodeState.SuspicionScore,
+	nodeState, found := auditQueryNodeSuspicionStateST(t, target.accAddr)
+	require.True(t, found, "target must have suspicion state after 4 recheks")
+	require.Equal(t, int64(160), nodeState.SuspicionScore,
 		"4 rechecks should include base +15 deltas and repeated-failure escalation bonuses")
 
-	// Also verify 4 ticket deterioration states were created. The first recheck uses
-	// the clean reporter multiplier (8); later rechecks use the reporter's accumulated
-	// reliability penalty and scale to 7.
+	// Also verify 4 ticket deterioration states were created. Recheck-confirmed
+	// failures are confirmed outcomes, so reporter trust scaling does not reduce
+	// their ticket deterioration delta.
 	for i := 0; i < 4; i++ {
 		td, found := auditQueryTicketDeteriorationStateST(t, "multi-ticket-"+strconv.Itoa(i))
 		require.True(t, found, "ticket %d must have deterioration state", i)
-		expected := int64(7)
-		if i == 0 {
-			expected = 8
-		}
-		require.Equal(t, expected, td.DeteriorationScore)
+		require.Equal(t, int64(8), td.DeteriorationScore)
 	}
 }
 

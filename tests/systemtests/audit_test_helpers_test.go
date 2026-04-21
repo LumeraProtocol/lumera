@@ -407,6 +407,43 @@ func setStorageTruthEnforcementModeUnspecified(t *testing.T) GenesisMutator {
 	}
 }
 
+func seedStorageTruthSyntheticTicketCounts(t *testing.T, genesis []byte) []byte {
+	t.Helper()
+
+	ticketIDs := []string{
+		"sys-test-ticket-recheck-1",
+		"sys-test-ticket-soft-postpone",
+		"sys-test-ticket-shadow-nopostpone",
+		"sys-test-ticket-heal-lifecycle-1",
+		"edge-ticket-full-mode-recent",
+		"edge-ticket-full-mode-old",
+		"edge-ticket-unspecified",
+		"edge-ticket-failed-heal",
+		"edge-ticket-replay",
+	}
+	for i := 0; i < 3; i++ {
+		ticketIDs = append(ticketIDs, fmt.Sprintf("edge-ticket-decay-%d", i))
+	}
+	for i := 0; i < 4; i++ {
+		ticketIDs = append(ticketIDs, fmt.Sprintf("multi-ticket-%d", i))
+	}
+
+	states := make([]map[string]any, 0, len(ticketIDs))
+	for _, ticketID := range ticketIDs {
+		states = append(states, map[string]any{
+			"ticket_id":             ticketID,
+			"index_artifact_count":  8,
+			"symbol_artifact_count": 8,
+		})
+	}
+	bz, err := json.Marshal(states)
+	require.NoError(t, err)
+
+	state, err := sjson.SetRawBytes(genesis, "app_state.audit.ticket_artifact_count_states", bz)
+	require.NoError(t, err)
+	return state
+}
+
 // buildStorageProofResultJSON builds a single StorageProofResult JSON object for the
 // --storage-proof-results CLI flag.
 //

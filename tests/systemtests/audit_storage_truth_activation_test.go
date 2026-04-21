@@ -112,6 +112,8 @@ func setStorageTruthTestParams(
 			[]byte(fmt.Sprintf("%q", strconv.FormatInt(strongPostpone, 10))))
 		require.NoError(t, err)
 
+		state = seedStorageTruthSyntheticTicketCounts(t, state)
+
 		return state
 	}
 }

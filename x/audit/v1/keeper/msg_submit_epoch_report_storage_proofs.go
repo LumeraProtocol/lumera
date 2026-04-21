@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	errorsmod "cosmossdk.io/errors"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/LumeraProtocol/lumera/x/audit/v1/types"
 )
@@ -101,6 +102,18 @@ func validateStorageProofResults(
 			if result.TicketId == "" {
 				return errorsmod.Wrap(types.ErrInvalidStorageProofs, fieldName+".ticket_id is required")
 			}
+			if result.ArtifactCount == 0 {
+				return errorsmod.Wrap(types.ErrInvalidStorageProofs, fieldName+".artifact_count must be > 0")
+			}
+			if result.ArtifactOrdinal >= result.ArtifactCount {
+				return errorsmod.Wrap(types.ErrInvalidStorageProofs, fieldName+".artifact_ordinal must be < artifact_count")
+			}
+			if result.DerivationInputHash == "" {
+				return errorsmod.Wrap(types.ErrInvalidStorageProofs, fieldName+".derivation_input_hash is required")
+			}
+			if result.ChallengerSignature == "" {
+				return errorsmod.Wrap(types.ErrInvalidStorageProofs, fieldName+".challenger_signature is required")
+			}
 			switch result.ArtifactClass {
 			case types.StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_INDEX,
 				types.StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_SYMBOL:
@@ -137,6 +150,83 @@ func validateStorageProofResults(
 		}
 	}
 
+	return nil
+}
+
+func (k Keeper) validateAndAnchorStorageProofArtifactCounts(ctx sdk.Context, results []*types.StorageProofResult) error {
+	if len(results) == 0 {
+		return nil
+	}
+
+	for i, result := range results {
+		if result == nil || result.ResultClass == types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_NO_ELIGIBLE_TICKET {
+			continue
+		}
+		fieldName := fmt.Sprintf("storage_proof_results[%d]", i)
+
+		state, found := k.GetTicketArtifactCountState(ctx, result.TicketId)
+		if !found {
+			return errorsmod.Wrapf(
+				types.ErrInvalidStorageProofs,
+				"%s ticket %q has no canonical artifact counts anchored on-chain",
+				fieldName,
+				result.TicketId,
+			)
+		}
+		if state.IndexArtifactCount == 0 || state.SymbolArtifactCount == 0 {
+			return errorsmod.Wrapf(
+				types.ErrInvalidStorageProofs,
+				"%s ticket %q has incomplete canonical artifact counts",
+				fieldName,
+				result.TicketId,
+			)
+		}
+
+		switch result.ArtifactClass {
+		case types.StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_INDEX:
+			if state.IndexArtifactCount != result.ArtifactCount {
+				return errorsmod.Wrapf(
+					types.ErrInvalidStorageProofs,
+					"%s index artifact_count %d does not match canonical count %d for ticket %q",
+					fieldName,
+					result.ArtifactCount,
+					state.IndexArtifactCount,
+					result.TicketId,
+				)
+			}
+			if result.ArtifactOrdinal >= state.IndexArtifactCount {
+				return errorsmod.Wrapf(
+					types.ErrInvalidStorageProofs,
+					"%s artifact_ordinal %d out of range for canonical index artifact_count %d",
+					fieldName,
+					result.ArtifactOrdinal,
+					state.IndexArtifactCount,
+				)
+			}
+		case types.StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_SYMBOL:
+			if state.SymbolArtifactCount != result.ArtifactCount {
+				return errorsmod.Wrapf(
+					types.ErrInvalidStorageProofs,
+					"%s symbol artifact_count %d does not match canonical count %d for ticket %q",
+					fieldName,
+					result.ArtifactCount,
+					state.SymbolArtifactCount,
+					result.TicketId,
+				)
+			}
+			if result.ArtifactOrdinal >= state.SymbolArtifactCount {
+				return errorsmod.Wrapf(
+					types.ErrInvalidStorageProofs,
+					"%s artifact_ordinal %d out of range for canonical symbol artifact_count %d",
+					fieldName,
+					result.ArtifactOrdinal,
+					state.SymbolArtifactCount,
+				)
+			}
+		default:
+			return errorsmod.Wrap(types.ErrInvalidStorageProofs, fieldName+".artifact_class is invalid")
+		}
+	}
 	return nil
 }
 

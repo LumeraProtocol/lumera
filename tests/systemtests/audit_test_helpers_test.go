@@ -424,6 +424,9 @@ func buildStorageProofResultJSONWithClass(challengerAcct, targetAcct, ticketID, 
 		"artifact_class":               "STORAGE_PROOF_ARTIFACT_CLASS_INDEX",
 		"artifact_key":                 "seed-artifact-key",
 		"artifact_ordinal":             0,
+		"artifact_count":               8,
+		"derivation_input_hash":        "seed-derivation-hash",
+		"challenger_signature":         "seed-challenger-signature",
 	})
 	return string(bz)
 }

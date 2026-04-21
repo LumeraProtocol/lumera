@@ -22,7 +22,10 @@ func seedIndexedChallengeResult(t *testing.T, f *fixture, originalReporter strin
 		ArtifactClass:              types.StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_INDEX,
 		ArtifactKey:                "artifact-key-" + ticketID,
 		ArtifactOrdinal:            1,
+		ArtifactCount:              8,
 		TranscriptHash:             transcriptHash,
+		DerivationInputHash:        "derivation-hash-" + ticketID,
+		ChallengerSignature:        "challenger-signature-" + ticketID,
 	}
 	require.NoError(t, f.keeper.IndexStorageProofTranscripts(f.ctx, 0, originalReporter, []*types.StorageProofResult{result}))
 	require.NoError(t, f.keeper.SetTicketDeteriorationState(f.ctx, types.TicketDeteriorationState{
@@ -95,6 +98,26 @@ func TestMsgSubmitStorageRecheckEvidence(t *testing.T) {
 	nodeState, found := f.keeper.GetNodeSuspicionState(f.ctx, challenged)
 	require.True(t, found)
 	require.Greater(t, nodeState.SuspicionScore, int64(0))
+
+	// A second rechecker cannot link the same challenged transcript to a different
+	// recheck transcript hash.
+	secondRechecker := "sn-ddd-rechecker-2"
+	f.supernodeKeeper.EXPECT().
+		GetSuperNodeByAccount(gomock.Any(), secondRechecker).
+		Return(sntypes.SuperNode{}, true, nil).
+		AnyTimes()
+
+	_, err = ms.SubmitStorageRecheckEvidence(f.ctx, &types.MsgSubmitStorageRecheckEvidence{
+		Creator:                        secondRechecker,
+		EpochId:                        0,
+		ChallengedSupernodeAccount:     challenged,
+		TicketId:                       "ticket-1",
+		ChallengedResultTranscriptHash: "old-hash",
+		RecheckTranscriptHash:          "new-hash-2",
+		RecheckResultClass:             types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS,
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "already linked")
 
 	// Replay must fail.
 	_, err = ms.SubmitStorageRecheckEvidence(f.ctx, &types.MsgSubmitStorageRecheckEvidence{

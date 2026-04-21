@@ -18,6 +18,7 @@ type storageTruthScoreDeltas struct {
 type storageTruthResultBookkeeping struct {
 	reporterTrustBand         types.ReporterTrustBand
 	reporterTrustMultiplier   int64
+	applyTrustScaling         bool
 	repeatedFailureCount      uint32
 	contradictionDetected     bool
 	contradictedReporter      string
@@ -62,8 +63,15 @@ func (k Keeper) applyStorageTruthScores(
 		deltas.reporterReliability = addInt64Saturated(deltas.reporterReliability, bookkeeping.currentReporterPenalty)
 		deltas.nodeSuspicion = addInt64Saturated(deltas.nodeSuspicion, bookkeeping.nodeBonus)
 		deltas.ticketDeterioration = addInt64Saturated(deltas.ticketDeterioration, bookkeeping.ticketBonus)
-		deltas.nodeSuspicion = scaleInt64TowardZero(deltas.nodeSuspicion, bookkeeping.reporterTrustMultiplier, 100)
-		deltas.ticketDeterioration = scaleInt64TowardZero(deltas.ticketDeterioration, bookkeeping.reporterTrustMultiplier, 100)
+		// Trust scaling applies to provisional failure impact only.
+		if bookkeeping.applyTrustScaling {
+			if deltas.nodeSuspicion > 0 {
+				deltas.nodeSuspicion = scaleInt64TowardZero(deltas.nodeSuspicion, bookkeeping.reporterTrustMultiplier, 100)
+			}
+			if deltas.ticketDeterioration > 0 {
+				deltas.ticketDeterioration = scaleInt64TowardZero(deltas.ticketDeterioration, bookkeeping.reporterTrustMultiplier, 100)
+			}
+		}
 
 		// Clamp positive (failure) node and ticket deltas to >= 0 after scaling.
 		if deltas.nodeSuspicion < 0 {
@@ -248,13 +256,17 @@ func (k Keeper) updateNodeSuspicionHistoryFields(state *types.NodeSuspicionState
 		// Track distinct ticket fail (simplified: increment per failure in window).
 		state.DistinctTicketFailWindow++
 
-		// Class A: HASH_MISMATCH, RECHECK_CONFIRMED_FAIL, index fails.
-		switch result.ResultClass {
-		case types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH,
-			types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_RECHECK_CONFIRMED_FAIL:
+		// Class A: HASH_MISMATCH, RECHECK_CONFIRMED_FAIL, and any INDEX artifact failure.
+		isClassA := result.ResultClass == types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH ||
+			result.ResultClass == types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_RECHECK_CONFIRMED_FAIL ||
+			result.ArtifactClass == types.StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_INDEX
+		if isClassA {
 			state.ClassACountWindow++
 			state.LastClassAEpoch = epochID
-		case types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_TIMEOUT_OR_NO_RESPONSE:
+			// Recovery needs clean passes with no new Class A failures.
+			state.CleanPassCount = 0
+		}
+		if result.ResultClass == types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_TIMEOUT_OR_NO_RESPONSE {
 			state.ClassBCountWindow++
 			state.LastClassBEpoch = epochID
 		}
@@ -514,6 +526,9 @@ func (k Keeper) storageTruthBookkeepingForResult(
 	}
 	bookkeeping.reporterTrustBand = reporterTrustBandForScore(reliabilityScore, params)
 	bookkeeping.reporterTrustMultiplier = reporterTrustMultiplierNumerator(reliabilityScore)
+	bookkeeping.applyTrustScaling = isStorageTruthFailureClass(result.ResultClass) &&
+		result.ResultClass != types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_RECHECK_CONFIRMED_FAIL &&
+		result.BucketType != types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECHECK
 
 	if result.TicketId == "" {
 		return bookkeeping, nil
@@ -574,19 +589,53 @@ func (k Keeper) storageTruthBookkeepingForResult(
 
 	if found && ticketState.LastResultEpoch < epochID &&
 		ticketState.LastTargetSupernodeAccount == result.TargetSupernodeAccount &&
-		storageTruthResultsContradict(ticketState.LastResultClass, result.ResultClass) {
-		bookkeeping.contradictionDetected = true
-		// Current reporter: clean-pass recovery (-4). The contradiction itself is logged.
-		bookkeeping.currentReporterPenalty = -4
-		if ticketState.LastReporterSupernodeAccount != "" && ticketState.LastReporterSupernodeAccount != reporterAccount {
-			bookkeeping.contradictedReporter = ticketState.LastReporterSupernodeAccount
-			// Prior reporter submitted a fail that now looks suspicious after a clean pass.
-			// LEP6.md §15.1 second bullet: +12 penalty.
-			bookkeeping.contradictedReporterDelta = 12
+		isStorageTruthFailureClass(ticketState.LastResultClass) &&
+		result.ResultClass == types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS {
+		confirmed, err := k.hasStorageTruthContradictionConfirmation(
+			ctx,
+			epochID,
+			result.TicketId,
+			result.TargetSupernodeAccount,
+			reporterAccount,
+			7,
+		)
+		if err != nil {
+			return bookkeeping, err
+		}
+		if confirmed {
+			bookkeeping.contradictionDetected = true
+			// Current reporter: clean-pass recovery signal.
+			bookkeeping.currentReporterPenalty = -4
+			if ticketState.LastReporterSupernodeAccount != "" && ticketState.LastReporterSupernodeAccount != reporterAccount {
+				bookkeeping.contradictedReporter = ticketState.LastReporterSupernodeAccount
+				bookkeeping.contradictedReporterDelta = 12
+			}
 		}
 	}
 
 	return bookkeeping, nil
+}
+
+func (k Keeper) hasStorageTruthContradictionConfirmation(
+	ctx sdk.Context,
+	epochID uint64,
+	ticketID string,
+	targetAccount string,
+	currentReporter string,
+	window uint64,
+) (bool, error) {
+	if ticketID == "" || targetAccount == "" {
+		return false, nil
+	}
+	startEpoch := storageTruthWindowStart(epochID, window)
+	independentPass, err := k.hasIndependentReporterPassInWindow(ctx, ticketID, targetAccount, currentReporter, startEpoch, epochID)
+	if err != nil {
+		return false, err
+	}
+	if independentPass {
+		return true, nil
+	}
+	return k.hasCleanRecheckInWindow(ctx, ticketID, targetAccount, startEpoch, epochID)
 }
 
 func reporterTrustBandForScore(score int64, params types.Params) types.ReporterTrustBand {

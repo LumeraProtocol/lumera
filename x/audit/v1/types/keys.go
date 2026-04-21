@@ -80,6 +80,7 @@ var (
 	// - NodeSuspicionStateKey:          "st/ns/" + supernode_account
 	// - ReporterReliabilityStateKey:    "st/rr/" + reporter_supernode_account
 	// - TicketDeteriorationStateKey:    "st/td/" + ticket_id
+	// - TicketArtifactCountStateKey:    "st/tac/" + ticket_id
 	// - HealOpKey:                      "st/ho/" + u64be(heal_op_id)
 	// - HealOpByTicketIndexKey:         "st/hot/" + ticket_id + 0x00 + u64be(heal_op_id)
 	// - HealOpByStatusIndexKey:         "st/hos/" + u32be(status) + u64be(heal_op_id)
@@ -88,6 +89,7 @@ var (
 	nodeSuspicionStatePrefix       = []byte("st/ns/")
 	reporterReliabilityStatePrefix = []byte("st/rr/")
 	ticketDeteriorationStatePrefix = []byte("st/td/")
+	ticketArtifactCountStatePrefix = []byte("st/tac/")
 	healOpPrefix                   = []byte("st/ho/")
 	healOpByTicketIndexPrefix      = []byte("st/hot/")
 	healOpByStatusIndexPrefix      = []byte("st/hos/")
@@ -351,6 +353,17 @@ func TicketDeteriorationStatePrefix() []byte {
 	return ticketDeteriorationStatePrefix
 }
 
+func TicketArtifactCountStateKey(ticketID string) []byte {
+	key := make([]byte, 0, len(ticketArtifactCountStatePrefix)+len(ticketID))
+	key = append(key, ticketArtifactCountStatePrefix...)
+	key = append(key, ticketID...)
+	return key
+}
+
+func TicketArtifactCountStatePrefix() []byte {
+	return ticketArtifactCountStatePrefix
+}
+
 func HealOpKey(healOpID uint64) []byte {
 	key := make([]byte, 0, len(healOpPrefix)+8)
 	key = append(key, healOpPrefix...)
@@ -446,6 +459,10 @@ func StorageProofTranscriptKey(transcriptHash string) []byte {
 	return key
 }
 
+func StorageProofTranscriptPrefix() []byte {
+	return storageProofTranscriptPrefix
+}
+
 func NodeStorageTruthFailureKey(supernodeAccount string, epochID uint64, ticketID string, reporterAccount string) []byte {
 	key := make([]byte, 0, len(nodeStorageTruthFailurePrefix)+len(supernodeAccount)+1+8+1+len(ticketID)+1+len(reporterAccount))
 	key = append(key, nodeStorageTruthFailurePrefix...)
@@ -486,6 +503,10 @@ func ReporterStorageTruthResultPrefix(reporterAccount string) []byte {
 	key = append(key, reporterAccount...)
 	key = append(key, '/')
 	return key
+}
+
+func ReporterStorageTruthResultRootPrefix() []byte {
+	return reporterStorageTruthResultPrefix
 }
 
 func StorageTruthFailedHealKey(supernodeAccount string, epochID uint64, ticketID string) []byte {

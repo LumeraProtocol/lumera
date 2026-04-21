@@ -29,6 +29,54 @@ func seedEpochAnchorForReportTest(t *testing.T, f *fixture, epochID uint64, acti
 	require.NoError(t, err)
 }
 
+func seedTicketArtifactCountsForResults(t *testing.T, f *fixture, results ...*types.StorageProofResult) {
+	t.Helper()
+
+	type counts struct {
+		index  uint32
+		symbol uint32
+	}
+	perTicket := make(map[string]counts)
+
+	for _, result := range results {
+		if result == nil || result.TicketId == "" {
+			continue
+		}
+		if result.ResultClass == types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_NO_ELIGIBLE_TICKET {
+			continue
+		}
+
+		current := perTicket[result.TicketId]
+		switch result.ArtifactClass {
+		case types.StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_INDEX:
+			if current.index == 0 {
+				current.index = result.ArtifactCount
+			}
+		case types.StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_SYMBOL:
+			if current.symbol == 0 {
+				current.symbol = result.ArtifactCount
+			}
+		}
+		if current.index == 0 && current.symbol != 0 {
+			current.index = current.symbol
+		}
+		if current.symbol == 0 && current.index != 0 {
+			current.symbol = current.index
+		}
+		perTicket[result.TicketId] = current
+	}
+
+	for ticketID, c := range perTicket {
+		if c.index == 0 {
+			c.index = 1
+		}
+		if c.symbol == 0 {
+			c.symbol = c.index
+		}
+		require.NoError(t, f.keeper.SetStorageTruthTicketArtifactCounts(f.ctx, ticketID, c.index, c.symbol))
+	}
+}
+
 func TestSubmitEpochReport_ValidatesInboundPortStatesLength(t *testing.T) {
 	f := initFixture(t)
 	f.ctx = f.ctx.WithBlockHeight(1)
@@ -111,10 +159,14 @@ func TestSubmitEpochReport_PersistsStorageProofResults(t *testing.T) {
 		BucketType:                 types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT,
 		ArtifactClass:              types.StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_INDEX,
 		ArtifactOrdinal:            0,
+		ArtifactCount:              8,
 		ArtifactKey:                "artifact-key-1",
 		ResultClass:                types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS,
 		TranscriptHash:             "transcript-hash-1",
+		DerivationInputHash:        "derivation-hash-1",
+		ChallengerSignature:        "challenger-signature-1",
 	}
+	seedTicketArtifactCountsForResults(t, f, result)
 
 	_, err := ms.SubmitEpochReport(f.ctx, &types.MsgSubmitEpochReport{
 		Creator: reporter,
@@ -183,9 +235,12 @@ func TestSubmitEpochReport_RejectsMalformedStorageProofResults(t *testing.T) {
 			BucketType:                 types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT,
 			ArtifactClass:              types.StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_INDEX,
 			ArtifactOrdinal:            1,
+			ArtifactCount:              8,
 			ArtifactKey:                "artifact-key-1",
 			ResultClass:                types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS,
 			TranscriptHash:             "transcript-hash-1",
+			DerivationInputHash:        "derivation-hash-1",
+			ChallengerSignature:        "challenger-signature-1",
 		}
 	}
 
@@ -211,6 +266,27 @@ func TestSubmitEpochReport_RejectsMalformedStorageProofResults(t *testing.T) {
 				return []*types.StorageProofResult{result}
 			},
 			wantSubstring: "ticket_id is required",
+		},
+		{
+			name: "missing derivation input hash",
+			buildResults: func() []*types.StorageProofResult {
+				result := baseResult()
+				result.DerivationInputHash = ""
+				return []*types.StorageProofResult{result}
+			},
+			wantSubstring: "derivation_input_hash is required",
+		},
+		{
+			name: "mismatched canonical artifact count for same ticket class",
+			buildResults: func() []*types.StorageProofResult {
+				resultA := baseResult()
+				resultB := baseResult()
+				resultB.ArtifactOrdinal = 2
+				resultB.ArtifactKey = "artifact-key-2"
+				resultB.ArtifactCount = 9
+				return []*types.StorageProofResult{resultA, resultB}
+			},
+			wantSubstring: "does not match canonical count",
 		},
 		{
 			name: "recheck confirmed fail requires recheck bucket",
@@ -254,6 +330,12 @@ func TestSubmitEpochReport_RejectsMalformedStorageProofResults(t *testing.T) {
 			for i := range portStates {
 				portStates[i] = types.PortState_PORT_STATE_OPEN
 			}
+			results := tc.buildResults()
+			if tc.name == "mismatched canonical artifact count for same ticket class" {
+				require.NoError(t, f.keeper.SetStorageTruthTicketArtifactCounts(f.ctx, "ticket-1", 8, 8))
+			} else {
+				seedTicketArtifactCountsForResults(t, f, results...)
+			}
 
 			_, err := ms.SubmitEpochReport(f.ctx, &types.MsgSubmitEpochReport{
 				Creator: reporter,
@@ -267,7 +349,7 @@ func TestSubmitEpochReport_RejectsMalformedStorageProofResults(t *testing.T) {
 						PortStates:             portStates,
 					},
 				},
-				StorageProofResults: tc.buildResults(),
+				StorageProofResults: results,
 			})
 			require.Error(t, err)
 			require.Contains(t, err.Error(), types.ErrInvalidStorageProofs.Error())
@@ -308,10 +390,14 @@ func TestSubmitEpochReport_FullModeRequiresRecentAndOldStorageProofs(t *testing.
 		BucketType:                 types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT,
 		ArtifactClass:              types.StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_INDEX,
 		ArtifactOrdinal:            1,
+		ArtifactCount:              8,
 		ArtifactKey:                "artifact-recent",
 		ResultClass:                types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS,
 		TranscriptHash:             "transcript-recent",
+		DerivationInputHash:        "derivation-hash-recent",
+		ChallengerSignature:        "challenger-signature-recent",
 	}
+	seedTicketArtifactCountsForResults(t, f, recent)
 
 	_, err := ms.SubmitEpochReport(f.ctx, &types.MsgSubmitEpochReport{
 		Creator: reporter,
@@ -337,10 +423,14 @@ func TestSubmitEpochReport_FullModeRequiresRecentAndOldStorageProofs(t *testing.
 		BucketType:                 types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_OLD,
 		ArtifactClass:              types.StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_SYMBOL,
 		ArtifactOrdinal:            2,
+		ArtifactCount:              16,
 		ArtifactKey:                "artifact-old",
 		ResultClass:                types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS,
 		TranscriptHash:             "transcript-old",
+		DerivationInputHash:        "derivation-hash-old",
+		ChallengerSignature:        "challenger-signature-old",
 	}
+	seedTicketArtifactCountsForResults(t, f, old)
 
 	_, err = ms.SubmitEpochReport(f.ctx, &types.MsgSubmitEpochReport{
 		Creator: reporter,

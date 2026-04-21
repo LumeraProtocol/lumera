@@ -74,6 +74,38 @@ func TestTicketDeteriorationStateRoundTrip(t *testing.T) {
 	require.Equal(t, state, got)
 }
 
+func TestTicketArtifactCountStateRoundTrip(t *testing.T) {
+	f := initFixture(t)
+
+	state := types.TicketArtifactCountState{
+		TicketId:            "ticket-artifacts-1",
+		IndexArtifactCount:  32,
+		SymbolArtifactCount: 128,
+	}
+
+	require.False(t, f.keeper.HasTicketArtifactCountState(f.ctx, state.TicketId))
+	require.NoError(t, f.keeper.SetTicketArtifactCountState(f.ctx, state))
+	require.True(t, f.keeper.HasTicketArtifactCountState(f.ctx, state.TicketId))
+
+	got, found := f.keeper.GetTicketArtifactCountState(f.ctx, state.TicketId)
+	require.True(t, found)
+	require.Equal(t, state, got)
+}
+
+func TestSetStorageTruthTicketArtifactCounts_ImmutableOnceSet(t *testing.T) {
+	f := initFixture(t)
+
+	require.NoError(t, f.keeper.SetStorageTruthTicketArtifactCounts(f.ctx, "ticket-artifacts-2", 10, 40))
+
+	// Exact replay is allowed.
+	require.NoError(t, f.keeper.SetStorageTruthTicketArtifactCounts(f.ctx, "ticket-artifacts-2", 10, 40))
+
+	// Divergent values are rejected.
+	err := f.keeper.SetStorageTruthTicketArtifactCounts(f.ctx, "ticket-artifacts-2", 11, 40)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "immutable")
+}
+
 func TestHealOpAndNextIDRoundTrip(t *testing.T) {
 	f := initFixture(t)
 

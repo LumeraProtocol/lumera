@@ -19,6 +19,7 @@ var (
 	ErrHealOpInvalidState      = errorsmod.Register(ModuleName, 13, "heal op invalid state transition")
 	ErrHealOpTicketMismatch    = errorsmod.Register(ModuleName, 14, "heal op ticket mismatch")
 	ErrHealVerificationExists  = errorsmod.Register(ModuleName, 15, "heal verification already submitted")
+	ErrTicketArtifactMismatch  = errorsmod.Register(ModuleName, 16, "ticket artifact count mismatch")
 
 	ErrInvalidEvidenceType = errorsmod.Register(ModuleName, 1101, "invalid evidence type")
 	ErrInvalidMetadata     = errorsmod.Register(ModuleName, 1102, "invalid evidence metadata")

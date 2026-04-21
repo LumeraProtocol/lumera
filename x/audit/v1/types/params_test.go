@@ -51,3 +51,14 @@ func TestParamsValidateStorageTruthFailures(t *testing.T) {
 	p4.StorageTruthEnforcementMode = StorageTruthEnforcementMode(99)
 	require.ErrorContains(t, p4.Validate(), "storage_truth_enforcement_mode is invalid")
 }
+
+func TestParamsWithDefaults_DerivesBucketThresholdsFromEpochLength(t *testing.T) {
+	p := Params{
+		EpochLengthBlocks: 100,
+	}
+	p = p.WithDefaults()
+
+	require.Equal(t, uint64(300), p.StorageTruthRecentBucketMaxBlocks)
+	require.Equal(t, uint64(3000), p.StorageTruthOldBucketMinBlocks)
+	require.NoError(t, p.Validate())
+}

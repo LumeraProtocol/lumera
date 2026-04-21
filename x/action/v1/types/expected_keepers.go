@@ -65,6 +65,7 @@ type AuditKeeper interface {
 		evidenceType audittypes.EvidenceType,
 		metadataJSON string,
 	) (uint64, error)
+	SetStorageTruthTicketArtifactCounts(ctx context.Context, ticketID string, indexArtifactCount uint32, symbolArtifactCount uint32) error
 }
 
 // ParamSubspace defines the expected Subspace interface for parameters.

@@ -74,6 +74,7 @@ func (k Keeper) EnforceEpochEnd(ctx sdk.Context, epochID uint64, params types.Pa
 		if sn.SupernodeAccount == "" {
 			continue
 		}
+		_, storageTruthPostponed := k.getStorageTruthPostponedAtEpochID(ctx, sn.SupernodeAccount)
 
 		shouldRecover, err := k.shouldRecoverAtEpochEnd(ctx, sn.SupernodeAccount, epochID, params)
 		if err != nil {
@@ -88,6 +89,15 @@ func (k Keeper) EnforceEpochEnd(ctx sdk.Context, epochID uint64, params types.Pa
 		}
 		k.clearActionFinalizationPostponedAtEpochID(ctx, sn.SupernodeAccount)
 		k.clearStorageTruthPostponedAtEpochID(ctx, sn.SupernodeAccount)
+
+		if storageTruthPostponed {
+			ctx.EventManager().EmitEvent(sdk.NewEvent(
+				types.EventTypeStorageTruthRecovered,
+				sdk.NewAttribute(sdk.AttributeKeyModule, types.ModuleName),
+				sdk.NewAttribute(types.AttributeKeyTargetSupernodeAccount, sn.SupernodeAccount),
+				sdk.NewAttribute(types.AttributeKeyEpochID, strconv.FormatUint(epochID, 10)),
+			))
+		}
 	}
 
 	return nil
@@ -592,7 +602,14 @@ func (k Keeper) shouldRecoverFromStorageTruthPostponement(ctx sdk.Context, super
 	if requiredPasses == 0 {
 		requiredPasses = 3
 	}
-	return state.CleanPassCount >= requiredPasses
+	if state.CleanPassCount < requiredPasses {
+		return false
+	}
+	// Recovery additionally requires no new Class A failure after the clean-pass streak starts.
+	if state.LastClassAEpoch != 0 && state.LastCleanPassEpoch <= state.LastClassAEpoch {
+		return false
+	}
+	return true
 }
 
 // storageTruthPostponePredicatesMet checks whether the enforcement matrix predicates

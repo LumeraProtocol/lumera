@@ -3,6 +3,7 @@ package keeper
 import (
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 
 	storetypes "cosmossdk.io/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -11,19 +12,24 @@ import (
 )
 
 type storageProofTranscriptRecord struct {
-	EpochID               uint64 `json:"epoch_id"`
-	ReporterAccount       string `json:"reporter_account"`
-	TargetAccount         string `json:"target_account"`
-	TicketID              string `json:"ticket_id"`
-	ResultClass           int32  `json:"result_class"`
-	BucketType            int32  `json:"bucket_type"`
-	ArtifactClass         int32  `json:"artifact_class"`
-	ArtifactKey           string `json:"artifact_key,omitempty"`
-	ArtifactOrdinal       uint32 `json:"artifact_ordinal,omitempty"`
-	RecheckEligible       bool   `json:"recheck_eligible"`
-	ConfirmedByRecheck    bool   `json:"confirmed_by_recheck,omitempty"`
-	ContradictedByRecheck bool   `json:"contradicted_by_recheck,omitempty"`
-	RecheckTranscriptHash string `json:"recheck_transcript_hash,omitempty"`
+	EpochID                  uint64   `json:"epoch_id"`
+	ReporterAccount          string   `json:"reporter_account"`
+	TargetAccount            string   `json:"target_account"`
+	TicketID                 string   `json:"ticket_id"`
+	ResultClass              int32    `json:"result_class"`
+	BucketType               int32    `json:"bucket_type"`
+	ArtifactClass            int32    `json:"artifact_class"`
+	ArtifactKey              string   `json:"artifact_key,omitempty"`
+	ArtifactOrdinal          uint32   `json:"artifact_ordinal,omitempty"`
+	ArtifactCount            uint32   `json:"artifact_count,omitempty"`
+	DerivationInputHash      string   `json:"derivation_input_hash,omitempty"`
+	ChallengerSignature      string   `json:"challenger_signature,omitempty"`
+	ObserverAttestations     []string `json:"observer_attestation_signatures,omitempty"`
+	RecheckEligible          bool     `json:"recheck_eligible"`
+	ConfirmedByRecheck       bool     `json:"confirmed_by_recheck,omitempty"`
+	ContradictedByRecheck    bool     `json:"contradicted_by_recheck,omitempty"`
+	RecheckTranscriptHash    string   `json:"recheck_transcript_hash,omitempty"`
+	ChallengedTranscriptHash string   `json:"challenged_transcript_hash,omitempty"`
 }
 
 type storageTruthNodeFailureRecord struct {
@@ -52,16 +58,20 @@ func (k Keeper) indexStorageProofTranscripts(ctx sdk.Context, epochID uint64, re
 			continue
 		}
 		record := storageProofTranscriptRecord{
-			EpochID:         epochID,
-			ReporterAccount: reporterAccount,
-			TargetAccount:   result.TargetSupernodeAccount,
-			TicketID:        result.TicketId,
-			ResultClass:     int32(result.ResultClass),
-			BucketType:      int32(result.BucketType),
-			ArtifactClass:   int32(result.ArtifactClass),
-			ArtifactKey:     result.ArtifactKey,
-			ArtifactOrdinal: result.ArtifactOrdinal,
-			RecheckEligible: isStorageTruthRecheckEligible(result.ResultClass),
+			EpochID:              epochID,
+			ReporterAccount:      reporterAccount,
+			TargetAccount:        result.TargetSupernodeAccount,
+			TicketID:             result.TicketId,
+			ResultClass:          int32(result.ResultClass),
+			BucketType:           int32(result.BucketType),
+			ArtifactClass:        int32(result.ArtifactClass),
+			ArtifactKey:          result.ArtifactKey,
+			ArtifactOrdinal:      result.ArtifactOrdinal,
+			ArtifactCount:        result.ArtifactCount,
+			DerivationInputHash:  result.DerivationInputHash,
+			ChallengerSignature:  result.ChallengerSignature,
+			ObserverAttestations: append([]string(nil), result.ObserverAttestationSignatures...),
+			RecheckEligible:      isStorageTruthRecheckEligible(result.ResultClass),
 		}
 		if err := k.setStorageProofTranscriptRecord(ctx, result.TranscriptHash, record); err != nil {
 			return err
@@ -162,6 +172,55 @@ func (k Keeper) markStorageTruthReporterResultRecheck(ctx sdk.Context, reporterA
 	return nil
 }
 
+func (k Keeper) linkStorageTruthRecheckTranscript(
+	ctx sdk.Context,
+	challengedTranscriptHash string,
+	recheckTranscriptHash string,
+	recheckerAccount string,
+	recheckResultClass types.StorageProofResultClass,
+) error {
+	challenged, found, err := k.getStorageProofTranscriptRecord(ctx, challengedTranscriptHash)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return nil
+	}
+	if challenged.RecheckTranscriptHash != "" && challenged.RecheckTranscriptHash != recheckTranscriptHash {
+		return fmt.Errorf("challenged transcript %q already linked to recheck transcript %q", challengedTranscriptHash, challenged.RecheckTranscriptHash)
+	}
+
+	challenged.RecheckTranscriptHash = recheckTranscriptHash
+	if err := k.setStorageProofTranscriptRecord(ctx, challengedTranscriptHash, challenged); err != nil {
+		return err
+	}
+
+	if _, exists, err := k.getStorageProofTranscriptRecord(ctx, recheckTranscriptHash); err != nil {
+		return err
+	} else if exists {
+		return nil
+	}
+
+	recheckRecord := storageProofTranscriptRecord{
+		EpochID:                  challenged.EpochID,
+		ReporterAccount:          recheckerAccount,
+		TargetAccount:            challenged.TargetAccount,
+		TicketID:                 challenged.TicketID,
+		ResultClass:              int32(recheckResultClass),
+		BucketType:               int32(types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECHECK),
+		ArtifactClass:            challenged.ArtifactClass,
+		ArtifactKey:              challenged.ArtifactKey,
+		ArtifactOrdinal:          challenged.ArtifactOrdinal,
+		ArtifactCount:            challenged.ArtifactCount,
+		DerivationInputHash:      challenged.DerivationInputHash,
+		ChallengerSignature:      challenged.ChallengerSignature,
+		ObserverAttestations:     append([]string(nil), challenged.ObserverAttestations...),
+		RecheckEligible:          false,
+		ChallengedTranscriptHash: challengedTranscriptHash,
+	}
+	return k.setStorageProofTranscriptRecord(ctx, recheckTranscriptHash, recheckRecord)
+}
+
 func (k Keeper) distinctNodeFailedTickets(ctx sdk.Context, supernodeAccount string, startEpoch uint64, endEpoch uint64, include func(storageTruthNodeFailureRecord) bool) (map[string]struct{}, uint32, error) {
 	tickets := make(map[string]struct{})
 	var events uint32
@@ -192,6 +251,73 @@ func (k Keeper) distinctNodeFailedTickets(ctx sdk.Context, supernodeAccount stri
 func (k Keeper) hasNodeFailure(ctx sdk.Context, supernodeAccount string, startEpoch uint64, endEpoch uint64, include func(storageTruthNodeFailureRecord) bool) (bool, error) {
 	_, events, err := k.distinctNodeFailedTickets(ctx, supernodeAccount, startEpoch, endEpoch, include)
 	return events > 0, err
+}
+
+func (k Keeper) hasIndependentReporterPassInWindow(
+	ctx sdk.Context,
+	ticketID string,
+	targetAccount string,
+	excludeReporter string,
+	startEpoch uint64,
+	endEpoch uint64,
+) (bool, error) {
+	prefix := types.ReporterStorageTruthResultRootPrefix()
+	it := k.kvStore(ctx).Iterator(prefix, storetypes.PrefixEndBytes(prefix))
+	defer it.Close()
+
+	for ; it.Valid(); it.Next() {
+		var record storageTruthReporterResultRecord
+		if err := json.Unmarshal(it.Value(), &record); err != nil {
+			return false, err
+		}
+		if record.EpochID < startEpoch || record.EpochID > endEpoch {
+			continue
+		}
+		if record.TicketID != ticketID || record.Target != targetAccount {
+			continue
+		}
+		if types.StorageProofResultClass(record.ResultClass) != types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS {
+			continue
+		}
+		if record.Reporter == "" || record.Reporter == excludeReporter {
+			continue
+		}
+		return true, nil
+	}
+	return false, nil
+}
+
+func (k Keeper) hasCleanRecheckInWindow(
+	ctx sdk.Context,
+	ticketID string,
+	targetAccount string,
+	startEpoch uint64,
+	endEpoch uint64,
+) (bool, error) {
+	prefix := types.StorageProofTranscriptPrefix()
+	it := k.kvStore(ctx).Iterator(prefix, storetypes.PrefixEndBytes(prefix))
+	defer it.Close()
+
+	for ; it.Valid(); it.Next() {
+		var record storageProofTranscriptRecord
+		if err := json.Unmarshal(it.Value(), &record); err != nil {
+			return false, err
+		}
+		if record.EpochID < startEpoch || record.EpochID > endEpoch {
+			continue
+		}
+		if record.TicketID != ticketID || record.TargetAccount != targetAccount {
+			continue
+		}
+		if types.StorageProofBucketType(record.BucketType) != types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECHECK {
+			continue
+		}
+		if types.StorageProofResultClass(record.ResultClass) != types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS {
+			continue
+		}
+		return true, nil
+	}
+	return false, nil
 }
 
 func (k Keeper) setStorageTruthFailedHeal(ctx sdk.Context, supernodeAccount string, epochID uint64, ticketID string) {

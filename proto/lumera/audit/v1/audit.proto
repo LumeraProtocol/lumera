@@ -59,11 +59,8 @@ enum StorageProofResultClass {
 
 // StorageProofResult captures one storage-truth storage-proof check outcome.
 //
-// NOTE: StorageProofResult intentionally stores only transcript_hash as a commitment
-// to the full challenge transcript. Derivation inputs (epoch_seed, ranges) are
-// deterministic from on-chain params and epoch anchor. Challenger signatures and
-// observer attestations are held off-chain; transcript_hash serves as the
-// chain-minimal commitment. This is intentional design — see LEP6.md §12.2.
+// NOTE: StorageProofResult stores transcript_hash plus a compact deterministic
+// derivation/signature envelope so transcript disagreements become explicit on-chain.
 message StorageProofResult {
   string target_supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
   string challenger_supernode_account = 2 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
@@ -83,6 +80,21 @@ message StorageProofResult {
 
   // details is an optional short diagnostic summary for non-pass outcomes.
   string details = 10;
+
+  // artifact_count is the class-specific denominator used for deterministic
+  // ordinal selection: artifact_ordinal = H(...) mod artifact_count.
+  uint32 artifact_count = 11;
+
+  // derivation_input_hash commits deterministic derivation inputs (seed, range
+  // selection inputs, and resolver inputs) used off-chain for transcript build.
+  string derivation_input_hash = 12;
+
+  // challenger_signature is the challenger's signature over transcript commitment.
+  string challenger_signature = 13;
+
+  // observer_attestation_signatures carries observer attestations for the
+  // transcript commitment when available.
+  repeated string observer_attestation_signatures = 14;
 }
 
 // NodeSuspicionState is the persisted storage-truth node-level suspicion snapshot.
@@ -143,6 +155,14 @@ message TicketDeteriorationState {
   uint64 last_index_failure_epoch = 15;
   uint64 recent_bucket_failure_epoch = 16;
   uint64 old_bucket_failure_epoch = 17;
+}
+
+// TicketArtifactCountState stores canonical per-ticket artifact counts used to
+// validate deterministic ordinal selection inputs.
+message TicketArtifactCountState {
+  string ticket_id = 1;
+  uint32 index_artifact_count = 2;
+  uint32 symbol_artifact_count = 3;
 }
 
 enum HealOpStatus {

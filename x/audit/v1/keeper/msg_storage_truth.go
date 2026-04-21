@@ -90,6 +90,15 @@ func (m msgServer) SubmitStorageRecheckEvidence(ctx context.Context, req *types.
 		return nil, errorsmod.Wrapf(types.ErrInvalidRecheckEvidence, "recheck evidence already submitted for epoch %d ticket %q by %q", req.EpochId, req.TicketId, req.Creator)
 	}
 	m.SetRecheckEvidence(sdkCtx, req.EpochId, req.TicketId, req.Creator)
+	if err := m.linkStorageTruthRecheckTranscript(
+		sdkCtx,
+		req.ChallengedResultTranscriptHash,
+		req.RecheckTranscriptHash,
+		req.Creator,
+		req.RecheckResultClass,
+	); err != nil {
+		return nil, err
+	}
 
 	// Derive current epoch for scoring context.
 	params := m.GetParams(sdkCtx).WithDefaults()
@@ -385,6 +394,11 @@ func (m msgServer) finalizeHealOp(
 	} else {
 		// Failed heal: D += 15
 		ticketState.DeteriorationScore = addInt64Saturated(ticketState.DeteriorationScore, 15)
+		// Failed heals enter a cooldown window before re-scheduling.
+		cooldownUntil := currentEpoch.EpochID + uint64(params.StorageTruthProbationEpochs)
+		if ticketState.ProbationUntilEpoch < cooldownUntil {
+			ticketState.ProbationUntilEpoch = cooldownUntil
+		}
 		m.setStorageTruthFailedHeal(ctx, healOp.HealerSupernodeAccount, currentEpoch.EpochID, healOp.TicketId)
 	}
 	return m.SetTicketDeteriorationState(ctx, ticketState)

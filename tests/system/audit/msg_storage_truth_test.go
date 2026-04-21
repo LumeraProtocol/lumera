@@ -100,7 +100,10 @@ func (s *AuditSystemTestSuite) seedIndexedChallengeResult(t *testing.T, original
 		ArtifactClass:              types.StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_INDEX,
 		ArtifactKey:                "artifact-key-" + ticketID,
 		ArtifactOrdinal:            1,
+		ArtifactCount:              8,
 		TranscriptHash:             transcriptHash,
+		DerivationInputHash:        "derivation-hash-" + ticketID,
+		ChallengerSignature:        "challenger-signature-" + ticketID,
 	}
 	require.NoError(t, s.app.AuditKeeper.IndexStorageProofTranscripts(s.sdkCtx, 0, originalReporter, []*types.StorageProofResult{result}))
 	require.NoError(t, s.app.AuditKeeper.SetTicketDeteriorationState(s.sdkCtx, types.TicketDeteriorationState{
@@ -242,6 +245,7 @@ func TestSubmitStorageRecheckEvidence_AccumulatesAcrossTickets(t *testing.T) {
 
 	// Three rechecks against the same node with different ticket IDs.
 	// RECHECK_CONFIRMED_FAIL applies +15 plus LEP-6 distinct-ticket escalation.
+	// Trust scaling does not apply to recheck-confirmed failures.
 	for i := 0; i < 3; i++ {
 		ticketID := "ticket-acc-" + string(rune('1'+i))
 		transcriptHash := "hash-orig-" + string(rune('1'+i))
@@ -261,7 +265,7 @@ func TestSubmitStorageRecheckEvidence_AccumulatesAcrossTickets(t *testing.T) {
 
 	state, found := s.app.AuditKeeper.GetNodeSuspicionState(s.sdkCtx, acc2.String())
 	require.True(t, found)
-	require.Equal(t, int64(67), state.SuspicionScore)
+	require.Equal(t, int64(70), state.SuspicionScore)
 }
 
 func TestSubmitStorageRecheckEvidence_PassResultNoSuspicionIncrease(t *testing.T) {

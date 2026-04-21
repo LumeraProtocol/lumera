@@ -69,6 +69,11 @@ func (k Keeper) InitGenesis(ctx context.Context, genState types.GenesisState) er
 			return err
 		}
 	}
+	for _, state := range genState.TicketArtifactCountStates {
+		if err := k.SetTicketArtifactCountState(sdkCtx, state); err != nil {
+			return err
+		}
+	}
 	for _, healOp := range genState.HealOps {
 		if err := k.SetHealOp(sdkCtx, healOp); err != nil {
 			return err
@@ -120,6 +125,12 @@ func (k Keeper) ExportGenesis(ctx context.Context) (*types.GenesisState, error) 
 		return nil, err
 	}
 	genesis.TicketDeteriorationStates = ticketDeteriorationStates
+
+	ticketArtifactCountStates, err := k.GetAllTicketArtifactCountStates(sdkCtx)
+	if err != nil {
+		return nil, err
+	}
+	genesis.TicketArtifactCountStates = ticketArtifactCountStates
 
 	healOps, err := k.GetAllHealOps(sdkCtx)
 	if err != nil {

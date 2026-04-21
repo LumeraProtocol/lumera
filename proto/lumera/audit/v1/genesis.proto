@@ -30,4 +30,6 @@ message GenesisState {
 
   // next_heal_op_id is the next id to use for storage-truth heal operations.
   uint64 next_heal_op_id = 8;
+
+  repeated TicketArtifactCountState ticket_artifact_count_states = 9 [(gogoproto.nullable) = false];
 }

@@ -151,6 +151,21 @@ func TestStorageTruthQueries_ReflectScoredReportIngestion(t *testing.T) {
 	seedEpochAnchorForReportTest(t, f, 0, []string{reporter, target}, []string{reporter, target})
 
 	portStates := fullOpenPortStates()
+	result := &types.StorageProofResult{
+		TargetSupernodeAccount:     target,
+		ChallengerSupernodeAccount: reporter,
+		TicketId:                   "ticket-query-score-1",
+		BucketType:                 types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT,
+		ArtifactClass:              types.StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_INDEX,
+		ArtifactOrdinal:            1,
+		ArtifactCount:              8,
+		ArtifactKey:                "artifact-key-1",
+		ResultClass:                types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH,
+		TranscriptHash:             "transcript-hash-1",
+		DerivationInputHash:        "derivation-hash-1",
+		ChallengerSignature:        "challenger-signature-1",
+	}
+	seedTicketArtifactCountsForResults(t, f, result)
 	_, err := ms.SubmitEpochReport(f.ctx, &types.MsgSubmitEpochReport{
 		Creator: reporter,
 		EpochId: 0,
@@ -163,19 +178,7 @@ func TestStorageTruthQueries_ReflectScoredReportIngestion(t *testing.T) {
 				PortStates:             portStates,
 			},
 		},
-		StorageProofResults: []*types.StorageProofResult{
-			{
-				TargetSupernodeAccount:     target,
-				ChallengerSupernodeAccount: reporter,
-				TicketId:                   "ticket-query-score-1",
-				BucketType:                 types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT,
-				ArtifactClass:              types.StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_INDEX,
-				ArtifactOrdinal:            1,
-				ArtifactKey:                "artifact-key-1",
-				ResultClass:                types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH,
-				TranscriptHash:             "transcript-hash-1",
-			},
-		},
+		StorageProofResults: []*types.StorageProofResult{result},
 	})
 	require.NoError(t, err)
 

@@ -28,6 +28,7 @@ func TestGenesisParamsRoundTrip(t *testing.T) {
 	require.Empty(t, got.NodeSuspicionStates)
 	require.Empty(t, got.ReporterReliabilityStates)
 	require.Empty(t, got.TicketDeteriorationStates)
+	require.Empty(t, got.TicketArtifactCountStates)
 	require.Empty(t, got.HealOps)
 }
 
@@ -59,4 +60,26 @@ func TestGenesisEvidenceRoundTripSetsNextID(t *testing.T) {
 	require.Equal(t, ev.EvidenceId, got.Evidence[0].EvidenceId)
 	require.Equal(t, uint64(8), got.NextEvidenceId)
 	require.Equal(t, uint64(1), got.NextHealOpId)
+}
+
+func TestGenesisRoundTripWithTicketArtifactCountStates(t *testing.T) {
+	f := initFixture(t)
+
+	genesisState := types.GenesisState{
+		Params: types.DefaultParams(),
+		TicketArtifactCountStates: []types.TicketArtifactCountState{
+			{
+				TicketId:            "ticket-1",
+				IndexArtifactCount:  32,
+				SymbolArtifactCount: 128,
+			},
+		},
+	}
+
+	require.NoError(t, f.keeper.InitGenesis(f.ctx, genesisState))
+
+	got, err := f.keeper.ExportGenesis(f.ctx)
+	require.NoError(t, err)
+	require.Len(t, got.TicketArtifactCountStates, 1)
+	require.Equal(t, genesisState.TicketArtifactCountStates[0], got.TicketArtifactCountStates[0])
 }

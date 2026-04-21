@@ -36,7 +36,10 @@ func baseStorageProofResult(class types.StorageProofResultClass) *types.StorageP
 	result.TicketId = "ticket-1"
 	result.ArtifactClass = types.StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_INDEX
 	result.ArtifactOrdinal = 1
+	result.ArtifactCount = 8
 	result.ArtifactKey = "artifact-key-1"
+	result.DerivationInputHash = "derivation-hash-1"
+	result.ChallengerSignature = "challenger-signature-1"
 	return result
 }
 
@@ -136,6 +139,7 @@ func TestSubmitEpochReport_StorageTruthScoresByResultClass(t *testing.T) {
 
 			result := baseStorageProofResult(tc.class)
 			result.BucketType = tc.bucket
+			seedTicketArtifactCountsForResults(t, f, result)
 
 			_, err := ms.SubmitEpochReport(f.ctx, &types.MsgSubmitEpochReport{
 				Creator: reporter,
@@ -236,7 +240,7 @@ func TestSubmitEpochReport_StorageTruthScoresApplyDecay(t *testing.T) {
 
 	result := baseStorageProofResult(types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH)
 	result.TicketId = ticketID
-
+	seedTicketArtifactCountsForResults(t, f, result)
 	_, err := ms.SubmitEpochReport(f.ctx, &types.MsgSubmitEpochReport{
 		Creator: reporter,
 		EpochId: 3,
@@ -292,6 +296,8 @@ func TestSubmitEpochReport_StorageTruthScoreEventsAreEmitted(t *testing.T) {
 		AnyTimes()
 
 	seedEpochAnchorForReportTest(t, f, 0, []string{reporter, target}, []string{reporter, target})
+	result := baseStorageProofResult(types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS)
+	seedTicketArtifactCountsForResults(t, f, result)
 
 	_, err := ms.SubmitEpochReport(f.ctx, &types.MsgSubmitEpochReport{
 		Creator: reporter,
@@ -305,9 +311,7 @@ func TestSubmitEpochReport_StorageTruthScoreEventsAreEmitted(t *testing.T) {
 				PortStates:             fullOpenPortStates(),
 			},
 		},
-		StorageProofResults: []*types.StorageProofResult{
-			baseStorageProofResult(types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS),
-		},
+		StorageProofResults: []*types.StorageProofResult{result},
 	})
 	require.NoError(t, err)
 
@@ -358,6 +362,8 @@ func TestSubmitEpochReport_NoStorageProofResults_DoesNotCreateStorageTruthStates
 
 	seedEpochAnchorForReportTest(t, f, 0, []string{reporter, target}, []string{reporter, target})
 
+	result := baseStorageProofResult(types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH)
+	seedTicketArtifactCountsForResults(t, f, result)
 	_, err := ms.SubmitEpochReport(f.ctx, &types.MsgSubmitEpochReport{
 		Creator: reporter,
 		EpochId: 0,
@@ -408,6 +414,8 @@ func TestSubmitEpochReport_LowTrustReporterScalesNodeAndTicketDeltas(t *testing.
 		TrustBand:                types.ReporterTrustBand_REPORTER_TRUST_BAND_LOW_TRUST,
 	}))
 	seedEpochAnchorForReportTest(t, f, 0, []string{reporter, target}, []string{reporter, target})
+	result := baseStorageProofResult(types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH)
+	seedTicketArtifactCountsForResults(t, f, result)
 
 	_, err := ms.SubmitEpochReport(f.ctx, &types.MsgSubmitEpochReport{
 		Creator: reporter,
@@ -419,9 +427,7 @@ func TestSubmitEpochReport_LowTrustReporterScalesNodeAndTicketDeltas(t *testing.
 			TargetSupernodeAccount: target,
 			PortStates:             fullOpenPortStates(),
 		}},
-		StorageProofResults: []*types.StorageProofResult{
-			baseStorageProofResult(types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH),
-		},
+		StorageProofResults: []*types.StorageProofResult{result},
 	})
 	require.NoError(t, err)
 
@@ -471,6 +477,8 @@ func TestSubmitEpochReport_RepeatedDistinctTicketFailuresEscalate(t *testing.T) 
 	}))
 	seedEpochAnchorForReportTest(t, f, 2, []string{reporter, target}, []string{reporter, target})
 
+	result := baseStorageProofResult(types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH)
+	seedTicketArtifactCountsForResults(t, f, result)
 	_, err := ms.SubmitEpochReport(f.ctx, &types.MsgSubmitEpochReport{
 		Creator: reporter,
 		EpochId: 2,
@@ -481,9 +489,7 @@ func TestSubmitEpochReport_RepeatedDistinctTicketFailuresEscalate(t *testing.T) 
 			TargetSupernodeAccount: target,
 			PortStates:             fullOpenPortStates(),
 		}},
-		StorageProofResults: []*types.StorageProofResult{
-			baseStorageProofResult(types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH),
-		},
+		StorageProofResults: []*types.StorageProofResult{result},
 	})
 	require.NoError(t, err)
 
@@ -517,6 +523,7 @@ func TestSubmitEpochReport_DistinctTicketFailuresEscalateNodeSuspicion(t *testin
 	first := baseStorageProofResult(types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH)
 	first.TicketId = "ticket-distinct-1"
 	first.TranscriptHash = "tx-distinct-1"
+	seedTicketArtifactCountsForResults(t, f, first)
 	_, err := ms.SubmitEpochReport(f.ctx, &types.MsgSubmitEpochReport{
 		Creator: reporter,
 		EpochId: 1,
@@ -536,6 +543,7 @@ func TestSubmitEpochReport_DistinctTicketFailuresEscalateNodeSuspicion(t *testin
 	second := baseStorageProofResult(types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH)
 	second.TicketId = "ticket-distinct-2"
 	second.TranscriptHash = "tx-distinct-2"
+	seedTicketArtifactCountsForResults(t, f, second)
 	_, err = ms.SubmitEpochReport(f.ctx, &types.MsgSubmitEpochReport{
 		Creator: reporter,
 		EpochId: 2,
@@ -588,6 +596,7 @@ func TestSubmitEpochReport_EpochZeroFailureWindowCarriesIntoNextEpoch(t *testing
 
 	result := baseStorageProofResult(types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH)
 	result.TicketId = "ticket-epoch-zero"
+	seedTicketArtifactCountsForResults(t, f, result)
 
 	_, err := ms.SubmitEpochReport(f.ctx, &types.MsgSubmitEpochReport{
 		Creator: reporter,
@@ -618,14 +627,19 @@ func TestSubmitEpochReport_EpochZeroFailureWindowCarriesIntoNextEpoch(t *testing
 
 func TestSubmitEpochReport_ContradictionsPenalizeBothReportersAndTrackState(t *testing.T) {
 	f := initFixture(t)
-	f.ctx = f.ctx.WithBlockHeight(401).WithEventManager(sdk.NewEventManager()) // epoch_id = 1
+	f.ctx = f.ctx.WithBlockHeight(1).WithEventManager(sdk.NewEventManager()) // epoch_id = 0
 	ms := keeper.NewMsgServerImpl(f.keeper)
 
 	reporter := "sn-aaa-reporter"
 	previousReporter := "sn-ccc-previous"
+	independentReporter := "sn-ddd-independent"
 	target := "sn-bbb-target"
 	f.supernodeKeeper.EXPECT().
 		GetSuperNodeByAccount(gomock.Any(), reporter).
+		Return(sntypes.SuperNode{}, true, nil).
+		AnyTimes()
+	f.supernodeKeeper.EXPECT().
+		GetSuperNodeByAccount(gomock.Any(), independentReporter).
 		Return(sntypes.SuperNode{}, true, nil).
 		AnyTimes()
 
@@ -646,9 +660,46 @@ func TestSubmitEpochReport_ContradictionsPenalizeBothReportersAndTrackState(t *t
 		LastFailureEpoch:             0,
 		RecentFailureEpochCount:      1,
 	}))
-	seedEpochAnchorForReportTest(t, f, 1, []string{reporter, target}, []string{reporter, target})
+	seedEpochAnchorForReportTest(t, f, 0, []string{independentReporter, target}, []string{target})
+	seedEpochAnchorForReportTest(t, f, 1, []string{reporter, target}, []string{target})
 
+	independentPass := baseStorageProofResult(types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS)
+	independentPass.ChallengerSupernodeAccount = independentReporter
+	independentPass.TranscriptHash = "tx-independent-pass"
+	seedTicketArtifactCountsForResults(t, f, independentPass)
 	_, err := ms.SubmitEpochReport(f.ctx, &types.MsgSubmitEpochReport{
+		Creator: independentReporter,
+		EpochId: 0,
+		HostReport: types.HostReport{
+			InboundPortStates: fullOpenPortStates(),
+		},
+		StorageChallengeObservations: []*types.StorageChallengeObservation{{
+			TargetSupernodeAccount: target,
+			PortStates:             fullOpenPortStates(),
+		}},
+		StorageProofResults: []*types.StorageProofResult{independentPass},
+	})
+	require.NoError(t, err)
+
+	// Keep contradiction source as previous reporter failure while retaining independent PASS fact in index.
+	require.NoError(t, f.keeper.SetTicketDeteriorationState(f.ctx, types.TicketDeteriorationState{
+		TicketId:                     "ticket-1",
+		DeteriorationScore:           12,
+		LastUpdatedEpoch:             0,
+		LastTargetSupernodeAccount:   target,
+		LastReporterSupernodeAccount: previousReporter,
+		LastResultClass:              types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH,
+		LastResultEpoch:              0,
+		LastFailureEpoch:             0,
+		RecentFailureEpochCount:      1,
+	}))
+
+	f.ctx = f.ctx.WithBlockHeight(401).WithEventManager(sdk.NewEventManager()) // epoch_id = 1
+
+	currentPass := baseStorageProofResult(types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS)
+	seedTicketArtifactCountsForResults(t, f, currentPass)
+
+	_, err = ms.SubmitEpochReport(f.ctx, &types.MsgSubmitEpochReport{
 		Creator: reporter,
 		EpochId: 1,
 		HostReport: types.HostReport{
@@ -658,9 +709,7 @@ func TestSubmitEpochReport_ContradictionsPenalizeBothReportersAndTrackState(t *t
 			TargetSupernodeAccount: target,
 			PortStates:             fullOpenPortStates(),
 		}},
-		StorageProofResults: []*types.StorageProofResult{
-			baseStorageProofResult(types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS),
-		},
+		StorageProofResults: []*types.StorageProofResult{currentPass},
 	})
 	require.NoError(t, err)
 

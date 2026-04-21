@@ -129,6 +129,46 @@ func (k Keeper) GetAllTicketDeteriorationStates(ctx sdk.Context) ([]types.Ticket
 	return states, nil
 }
 
+func (k Keeper) HasTicketArtifactCountState(ctx sdk.Context, ticketID string) bool {
+	store := k.kvStore(ctx)
+	return store.Has(types.TicketArtifactCountStateKey(ticketID))
+}
+
+func (k Keeper) GetTicketArtifactCountState(ctx sdk.Context, ticketID string) (types.TicketArtifactCountState, bool) {
+	store := k.kvStore(ctx)
+	bz := store.Get(types.TicketArtifactCountStateKey(ticketID))
+	if bz == nil {
+		return types.TicketArtifactCountState{}, false
+	}
+	var state types.TicketArtifactCountState
+	k.cdc.MustUnmarshal(bz, &state)
+	return state, true
+}
+
+func (k Keeper) SetTicketArtifactCountState(ctx sdk.Context, state types.TicketArtifactCountState) error {
+	store := k.kvStore(ctx)
+	bz, err := k.cdc.Marshal(&state)
+	if err != nil {
+		return err
+	}
+	store.Set(types.TicketArtifactCountStateKey(state.TicketId), bz)
+	return nil
+}
+
+func (k Keeper) GetAllTicketArtifactCountStates(ctx sdk.Context) ([]types.TicketArtifactCountState, error) {
+	store := k.kvStore(ctx)
+	it := store.Iterator(types.TicketArtifactCountStatePrefix(), storetypes.PrefixEndBytes(types.TicketArtifactCountStatePrefix()))
+	defer it.Close()
+
+	states := make([]types.TicketArtifactCountState, 0)
+	for ; it.Valid(); it.Next() {
+		var state types.TicketArtifactCountState
+		k.cdc.MustUnmarshal(it.Value(), &state)
+		states = append(states, state)
+	}
+	return states, nil
+}
+
 func (k Keeper) GetNextHealOpID(ctx sdk.Context) uint64 {
 	store := k.kvStore(ctx)
 	bz := store.Get(types.NextHealOpIDKey())

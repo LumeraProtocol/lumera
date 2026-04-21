@@ -4,7 +4,7 @@ This guide documents the `lumera` implementation of LEP-6 storage-truth enforcem
 
 Priority design source: `/home/openclaw/workspace/docs/LEP6.md`
 
-Branch: `LEP-6-activation`
+Branch: `LEP-6-consensus-gap-fixes` (derived from `LEP-6-activation`)
 
 ## Reviewer Summary
 
@@ -80,8 +80,12 @@ Routine LEP-6 proof evidence is submitted through `storage_proof_results`.
 - `result_class = 8`
 - `transcript_hash = 9`
 - `details = 10`
+- `artifact_count = 11`
+- `derivation_input_hash = 12`
+- `challenger_signature = 13`
+- `observer_attestation_signatures = 14`
 
-`transcript_hash` is the chain commitment to the full storage-proof transcript. The chain validates the proof descriptor, assignment, result class, and scoring consequences against that commitment.
+`transcript_hash` is the primary chain commitment. LEP-6 activation also persists derivation/signature envelope fields so transcript disagreements are explicit and auditable.
 
 ### Bucket Enum Values
 
@@ -167,8 +171,8 @@ All LEP-6 params are defined in `x/audit/v1/types/params.go` and exposed in `pro
 
 ### Storage-Truth Challenge Shape
 
-- `DefaultStorageTruthRecentBucketMaxBlocks = 7200`
-- `DefaultStorageTruthOldBucketMinBlocks = 7201`
+- `DefaultStorageTruthRecentBucketMaxBlocks = 3 * epoch_length_blocks` (default `1200`)
+- `DefaultStorageTruthOldBucketMinBlocks = 30 * epoch_length_blocks` (default `12000`)
 - `DefaultStorageTruthChallengeTargetDivisor = 3`
 - `DefaultStorageTruthCompoundRangesPerArtifact = 4`
 - `DefaultStorageTruthCompoundRangeLenBytes = 256`
@@ -456,6 +460,18 @@ All other result classes require:
 - non-empty `ticket_id`
 - artifact class `INDEX` or `SYMBOL`
 - non-empty `artifact_key`
+- `artifact_count > 0`
+- `artifact_ordinal < artifact_count`
+- non-empty `derivation_input_hash`
+- non-empty `challenger_signature`
+
+Canonical artifact-count anchoring:
+
+- every non-`NO_ELIGIBLE_TICKET` proof result must reference a ticket with canonical on-chain artifact counts
+- canonical counts are anchored at ticket finalization and stored per ticket as class-specific counts (`index`, `symbol`)
+- submitted `artifact_count` must match the canonical class-specific count for the ticket
+- submitted `artifact_ordinal` must be in range for that canonical class-specific count
+- canonical counts are immutable once anchored
 
 FULL-mode compound coverage:
 
@@ -529,7 +545,7 @@ For `RECHECK_CONFIRMED_FAIL`:
 
 ### Reporter Trust Scaling
 
-Before node and ticket deltas are applied, positive and negative node/ticket deltas are scaled by reporter trust:
+Before node and ticket deltas are applied, provisional failure node/ticket deltas are scaled by reporter trust:
 
 ```text
 multiplier_numerator = max(50, 100 - reporter_reliability_score)
@@ -544,6 +560,13 @@ Examples:
 - `R >= 50` remains floored at `50%`
 
 Reporter reliability deltas are not scaled by this multiplier.
+
+Scaling scope:
+
+- trust scaling applies only to failure classes
+- trust scaling does not apply to `RECHECK_CONFIRMED_FAIL`
+- trust scaling does not apply to bucket `RECHECK`
+- pass deltas are not trust-scaled
 
 ### Pattern Escalation
 
@@ -566,10 +589,13 @@ Ticket holder pattern:
 
 Contradiction pattern:
 
-- a later `PASS` contradicting an earlier failure, or a later failure contradicting an earlier `PASS`, marks contradiction
-- current reporter receives `-4` recovery/credit
-- previous different reporter receives `+12`
-- contradiction count increments for the affected reporter/ticket
+- contradiction handling is evaluated for a later `PASS` against an earlier failure on the same `ticket_id` and target
+- contradiction penalties apply only after confirmation:
+  - at least one independent reporter `PASS` in the rolling 7-epoch window (the current `PASS` is the second distinct pass), or
+  - a clean recheck `PASS` in the same window
+- when confirmed, current reporter receives `-4` recovery/credit
+- when confirmed and prior reporter is different, prior reporter receives `+12`
+- contradiction count increments for the affected reporter/ticket state
 
 ### NodeSuspicionState Fields
 
@@ -598,6 +624,7 @@ History updates:
 - INDEX failures set `last_index_fail_epoch`
 - Class A window counts track `HASH_MISMATCH`, `RECHECK_CONFIRMED_FAIL`, and index failures
 - Class B window counts track `TIMEOUT_OR_NO_RESPONSE`
+- Class A failures reset `clean_pass_count` so recovery requires a clean streak after the latest Class A
 
 ### ReporterReliabilityState Fields
 
@@ -716,7 +743,6 @@ Record fields:
 - `ticket_id`
 - `target_account`
 - `result_class`
-- `transcript_hash`
 - `confirmed_by_recheck`
 - `overturned_by_recheck`
 
@@ -788,6 +814,7 @@ Recovery:
 - decayed suspicion score must be below watch threshold
 - if watch threshold is not positive, effective watch threshold is `1`
 - clean pass count must be at least `storage_truth_recovery_clean_pass_count`, default `3`
+- latest clean pass epoch must be after latest Class A epoch when Class A history exists
 - if no node suspicion state exists, recovery is allowed
 
 ## Reporter Divergence
@@ -858,6 +885,7 @@ Validation:
 - creator must be independent from the challenged result reporter
 - challenged result class must be recheck-eligible
 - replay key `(epoch_id, ticket_id, creator)` must not already exist
+- challenged transcript is linked to `recheck_transcript_hash`, and the recheck transcript hash is indexed with a back-reference to the challenged transcript hash
 
 Replay protection key:
 
@@ -1044,6 +1072,7 @@ Post-finalization ticket handling:
 - verified heal sets `last_heal_epoch = current_epoch`
 - verified heal sets `probation_until_epoch = current_epoch + storage_truth_probation_epochs`
 - failed heal applies `D += 15`
+- failed heal extends `probation_until_epoch` to at least `current_epoch + storage_truth_probation_epochs`
 - failed heal records a failed-heal fact for the healer
 
 ## Queries
@@ -1134,6 +1163,61 @@ Storage-truth param keys:
 - `StorageTruthClassBFaultWindow`
 - `StorageTruthHealDeadlineEpochs`
 
+## Release Callouts And Activation Plan
+
+This section lists behavior-impacting callouts for production rollout and the required activation order.
+
+### Critical Callouts
+
+- `x/action` is already live; LEP-6 is not yet released. This is supported, but activation must be staged.
+- Storage-proof validation now requires canonical per-ticket artifact counts for all non-`NO_ELIGIBLE_TICKET` results.
+- Canonical counts are immutable once anchored; incorrect anchors become persistent data issues for that ticket.
+- Existing finalized cascade tickets from before LEP-6 may not have anchored artifact counts in audit state.
+- If LEP-6 report ingestion is active before historical backfill, proofs for those tickets can be rejected due to missing canonical counts.
+- `FULL` mode introduces strict RECENT/OLD per-target proof coverage. Enabling it before reporter fleet readiness can cause report rejection and operational instability.
+
+### Non-Breaking Guardrails
+
+- Keep `storage_truth_enforcement_mode = UNSPECIFIED` during binary rollout to avoid behavior changes while data readiness is validated.
+- Enable LEP-6 modes only after data and client readiness gates are complete.
+- Treat `FULL` as the final stage only after successful `SHADOW` and `SOFT` observation windows.
+
+### Mandatory Pre-Activation Data Plan
+
+Before enabling LEP-6 enforcement behavior (`SHADOW`, `SOFT`, or `FULL`) on a chain with historical tickets:
+
+- Run a one-time backfill/migration to seed `TicketArtifactCountState` for finalized cascade tickets that do not yet have canonical counts.
+- Backfill source of truth is finalized cascade metadata:
+  - use explicit `index_artifact_count` / `symbol_artifact_count` when present
+  - for legacy finalized payloads, derive deterministic fallback from finalized symbol IDs where applicable
+- Reject/flag tickets where deterministic counts cannot be derived safely; do not silently guess.
+- Produce an audit report of:
+  - total finalized cascade tickets
+  - total already anchored
+  - total newly backfilled
+  - total unresolved/excluded (must be zero before activation)
+
+### Staged Activation Sequence
+
+1. Binary rollout: deploy LEP-6 code while mode is pinned to `UNSPECIFIED`.
+2. Data migration: complete artifact-count backfill and verify unresolved count is zero.
+3. Client readiness: ensure supernode/reporter version compatibility for LEP-6 proof fields and recheck/heal tx flow.
+4. Shadow phase: switch to `SHADOW`, monitor score state/events and report acceptance.
+5. Soft phase: switch to `SOFT` after stable shadow window and predicate sanity checks.
+6. Full phase: switch to `FULL` only after sustained proof completeness and stable reporter operations.
+
+### Go/No-Go Checks Per Stage
+
+- No-go for `SHADOW` and above:
+  - missing canonical artifact counts for any ticket likely to be challenged
+  - unresolved backfill exceptions
+- No-go for `SOFT`:
+  - unstable reporter participation
+  - unexpected spikes in rejected reports
+- No-go for `FULL`:
+  - incomplete RECENT/OLD proof coverage by eligible reporters
+  - frequent operational fallbacks or manual intervention
+
 ## File Map
 
 Core implementation files:
@@ -1141,6 +1225,7 @@ Core implementation files:
 - `x/audit/v1/keeper/audit_peer_assignment.go`: deterministic reporter-target assignment and challenger eligibility
 - `x/audit/v1/keeper/msg_submit_epoch_report.go`: report validation, assignment checks, scoring invocation
 - `x/audit/v1/keeper/msg_submit_epoch_report_storage_proofs.go`: storage proof result shape and FULL-mode coverage validation
+- `x/audit/v1/keeper/storage_truth_ticket_artifact_counts.go`: canonical ticket artifact count anchoring and immutability
 - `x/audit/v1/keeper/storage_truth_scoring.go`: node/reporter/ticket score deltas, decay, trust scaling, pattern handling
 - `x/audit/v1/keeper/storage_truth_fact_indexes.go`: transcript, node-failure, reporter-result, and failed-heal indexes
 - `x/audit/v1/keeper/storage_truth_divergence.go`: reporter outlier detection and penalty
@@ -1153,6 +1238,7 @@ Core implementation files:
 - `x/audit/v1/keeper/query_storage_truth.go`: query handlers
 - `x/audit/v1/keeper/genesis.go`: genesis import/export
 - `x/audit/v1/keeper/abci.go`: epoch-end wiring
+- `x/action/v1/keeper/action.go`: cascade finalization hook that anchors canonical per-ticket artifact counts in audit state
 
 Types, params, events, module integration:
 
@@ -1210,11 +1296,12 @@ The implemented `lumera` code captures the LEP-6 business rules needed for on-ch
 - deterministic one-third target coverage using `storage_truth_challenge_target_divisor`
 - RECENT/OLD compound evidence in FULL mode
 - strict proof shape validation and transcript indexing
+- strict canonical per-ticket artifact-count anchoring for deterministic artifact ordinal checks
 - node suspicion scoring with Class A/Class B windows and pattern escalation
-- reporter reliability with positive-penalty trust bands and continuous trust scaling
+- reporter reliability with positive-penalty trust bands and provisional-failure trust scaling
 - challenger ineligibility from reporter reliability
 - ticket deterioration with holder-diversity, index-failure, and repeated-failure predicates
 - storage-truth enforcement bands and recovery gates
-- recheck evidence replay protection and transcript-linked scoring
+- recheck evidence replay protection, transcript-linked scoring, and contradiction confirmation hooks
 - deterministic heal scheduling, deadline expiry, majority verification, post-heal reset, and probation
 - query, genesis, events, params, AutoCLI, simulation, and tests for the new state

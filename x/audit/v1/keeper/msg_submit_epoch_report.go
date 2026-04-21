@@ -126,6 +126,9 @@ func (m msgServer) SubmitEpochReport(ctx context.Context, req *types.MsgSubmitEp
 	if err := validateStorageProofResults(reporterAccount, allowedTargets, isProber, enforceCompoundStorageProofs, req.StorageProofResults); err != nil {
 		return nil, err
 	}
+	if err := m.validateAndAnchorStorageProofArtifactCounts(sdkCtx, req.StorageProofResults); err != nil {
+		return nil, err
+	}
 
 	if m.HasReport(sdkCtx, req.EpochId, reporterAccount) {
 		return nil, errorsmod.Wrap(types.ErrDuplicateReport, "report already submitted for this epoch")

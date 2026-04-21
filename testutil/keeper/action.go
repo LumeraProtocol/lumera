@@ -140,8 +140,9 @@ func (m *MockStakingKeeper) Validator(ctx context.Context, addr sdk.ValAddress) 
 }
 
 type MockAuditKeeper struct {
-	nextEvidenceID uint64
-	CreateCalls    []MockAuditKeeperCreateEvidenceCall
+	nextEvidenceID       uint64
+	CreateCalls          []MockAuditKeeperCreateEvidenceCall
+	TicketArtifactCounts map[string]MockAuditKeeperTicketArtifactCount
 }
 
 type MockAuditKeeperCreateEvidenceCall struct {
@@ -152,8 +153,16 @@ type MockAuditKeeperCreateEvidenceCall struct {
 	MetadataJSON    string
 }
 
+type MockAuditKeeperTicketArtifactCount struct {
+	IndexArtifactCount  uint32
+	SymbolArtifactCount uint32
+}
+
 func NewMockAuditKeeper() *MockAuditKeeper {
-	return &MockAuditKeeper{nextEvidenceID: 1}
+	return &MockAuditKeeper{
+		nextEvidenceID:       1,
+		TicketArtifactCounts: make(map[string]MockAuditKeeperTicketArtifactCount),
+	}
 }
 
 func (m *MockAuditKeeper) CreateEvidence(
@@ -177,6 +186,22 @@ func (m *MockAuditKeeper) CreateEvidence(
 		MetadataJSON:    metadataJSON,
 	})
 	return id, nil
+}
+
+func (m *MockAuditKeeper) SetStorageTruthTicketArtifactCounts(
+	ctx context.Context,
+	ticketID string,
+	indexArtifactCount uint32,
+	symbolArtifactCount uint32,
+) error {
+	if ticketID == "" {
+		return nil
+	}
+	m.TicketArtifactCounts[ticketID] = MockAuditKeeperTicketArtifactCount{
+		IndexArtifactCount:  indexArtifactCount,
+		SymbolArtifactCount: symbolArtifactCount,
+	}
+	return nil
 }
 
 type AccountPair struct {

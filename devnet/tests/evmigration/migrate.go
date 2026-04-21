@@ -55,7 +55,6 @@ func runMigrate() {
 	// Query initial migration stats.
 	log.Println("--- Initial migration stats ---")
 	initialStats, haveInitialStats := queryAndLogMigrationStats()
-	printMigrationStats()
 
 	// Collect legacy accounts that need migration.
 	var legacyIdx []int
@@ -142,7 +141,6 @@ func runMigrate() {
 	// Final stats.
 	log.Println("--- Final migration stats ---")
 	finalStats, haveFinalStats := queryAndLogMigrationStats()
-	printMigrationStats()
 
 	if haveInitialStats && haveFinalStats {
 		delta := finalStats.TotalMigrated - initialStats.TotalMigrated
@@ -204,7 +202,6 @@ func runMigrateAll() {
 
 	log.Println("--- Initial migration stats ---")
 	initialStats, haveInitialStats := queryAndLogMigrationStats()
-	printMigrationStats()
 
 	// Build unified queue: legacy accounts + local validator candidate.
 	var queue []migrationItem
@@ -307,7 +304,6 @@ func runMigrateAll() {
 
 	log.Println("--- Final migration stats ---")
 	finalStats, haveFinalStats := queryAndLogMigrationStats()
-	printMigrationStats()
 
 	if haveInitialStats && haveFinalStats {
 		delta := finalStats.TotalMigrated - initialStats.TotalMigrated

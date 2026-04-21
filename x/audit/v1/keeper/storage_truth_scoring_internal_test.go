@@ -103,9 +103,9 @@ func TestStorageTruthScoreDeltasForResult(t *testing.T) {
 				ResultClass: types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_OBSERVER_QUORUM_FAIL,
 			},
 			expect: storageTruthScoreDeltas{
-				nodeSuspicion:       4,
-				reporterReliability: -3,
-				ticketDeterioration: 5,
+				nodeSuspicion:       0,
+				reporterReliability: 0,
+				ticketDeterioration: 0,
 			},
 		},
 		{
@@ -115,7 +115,7 @@ func TestStorageTruthScoreDeltasForResult(t *testing.T) {
 			},
 			expect: storageTruthScoreDeltas{
 				nodeSuspicion:       0,
-				reporterReliability: 1,
+				reporterReliability: 0,
 				ticketDeterioration: 0,
 			},
 		},
@@ -126,7 +126,7 @@ func TestStorageTruthScoreDeltasForResult(t *testing.T) {
 			},
 			expect: storageTruthScoreDeltas{
 				nodeSuspicion:       0,
-				reporterReliability: -8,
+				reporterReliability: 0,
 				ticketDeterioration: 0,
 			},
 		},
@@ -184,6 +184,22 @@ func TestDecayTowardZero(t *testing.T) {
 			require.Equal(t, tc.expect, result, "score=%d factor=%d elapsed=%d", tc.score, tc.factor, tc.elapsed)
 		})
 	}
+}
+
+func TestUpdateRecentFailureEpochCount_UsesPatternEscalationWindow(t *testing.T) {
+	params := types.DefaultParams().WithDefaults()
+	params.StorageTruthPatternEscalationWindow = 14
+	params.StorageTruthProbationEpochs = 3
+
+	state := types.TicketDeteriorationState{
+		LastFailureEpoch:        1,
+		RecentFailureEpochCount: 2,
+	}
+
+	// 10-1 = 9: outside probation window (3), inside pattern window (14) => increment.
+	require.Equal(t, uint32(3), updateRecentFailureEpochCount(state, 10, params))
+	// 20-1 = 19: outside pattern window => reset.
+	require.Equal(t, uint32(1), updateRecentFailureEpochCount(state, 20, params))
 }
 
 func TestDecayExponentialMultiEpoch(t *testing.T) {

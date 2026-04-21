@@ -63,6 +63,9 @@ var (
 	KeyStorageTruthClassAFaultWindow                    = []byte("StorageTruthClassAFaultWindow")
 	KeyStorageTruthClassBFaultWindow                    = []byte("StorageTruthClassBFaultWindow")
 	KeyStorageTruthHealDeadlineEpochs                   = []byte("StorageTruthHealDeadlineEpochs")
+	KeyStorageTruthOldClassAFaultWindow                 = []byte("StorageTruthOldClassAFaultWindow")
+	KeyStorageTruthContradictionWindowEpochs            = []byte("StorageTruthContradictionWindowEpochs")
+	KeyStorageTruthReporterIneligibleDurationEpochs     = []byte("StorageTruthReporterIneligibleDurationEpochs")
 )
 
 var (
@@ -154,6 +157,9 @@ var (
 	DefaultStorageTruthClassAFaultWindow                    = uint32(14)
 	DefaultStorageTruthClassBFaultWindow                    = uint32(7)
 	DefaultStorageTruthHealDeadlineEpochs                   = uint32(3)
+	DefaultStorageTruthOldClassAFaultWindow                 = uint32(21)
+	DefaultStorageTruthContradictionWindowEpochs            = uint32(7)
+	DefaultStorageTruthReporterIneligibleDurationEpochs     = uint32(7)
 )
 
 // Params notes
@@ -245,6 +251,9 @@ func NewParams(
 	storageTruthClassAFaultWindow uint32,
 	storageTruthClassBFaultWindow uint32,
 	storageTruthHealDeadlineEpochs uint32,
+	storageTruthOldClassAFaultWindow uint32,
+	storageTruthContradictionWindowEpochs uint32,
+	storageTruthReporterIneligibleDurationEpochs uint32,
 ) Params {
 	return Params{
 		EpochLengthBlocks:                epochLengthBlocks,
@@ -298,6 +307,9 @@ func NewParams(
 		StorageTruthClassAFaultWindow:                    storageTruthClassAFaultWindow,
 		StorageTruthClassBFaultWindow:                    storageTruthClassBFaultWindow,
 		StorageTruthHealDeadlineEpochs:                   storageTruthHealDeadlineEpochs,
+		StorageTruthOldClassAFaultWindow:                 storageTruthOldClassAFaultWindow,
+		StorageTruthContradictionWindowEpochs:            storageTruthContradictionWindowEpochs,
+		StorageTruthReporterIneligibleDurationEpochs:     storageTruthReporterIneligibleDurationEpochs,
 	}
 }
 
@@ -349,6 +361,9 @@ func DefaultParams() Params {
 		DefaultStorageTruthClassAFaultWindow,
 		DefaultStorageTruthClassBFaultWindow,
 		DefaultStorageTruthHealDeadlineEpochs,
+		DefaultStorageTruthOldClassAFaultWindow,
+		DefaultStorageTruthContradictionWindowEpochs,
+		DefaultStorageTruthReporterIneligibleDurationEpochs,
 	)
 }
 
@@ -473,6 +488,15 @@ func (p Params) WithDefaults() Params {
 	if p.StorageTruthHealDeadlineEpochs == 0 {
 		p.StorageTruthHealDeadlineEpochs = DefaultStorageTruthHealDeadlineEpochs
 	}
+	if p.StorageTruthOldClassAFaultWindow == 0 {
+		p.StorageTruthOldClassAFaultWindow = DefaultStorageTruthOldClassAFaultWindow
+	}
+	if p.StorageTruthContradictionWindowEpochs == 0 {
+		p.StorageTruthContradictionWindowEpochs = DefaultStorageTruthContradictionWindowEpochs
+	}
+	if p.StorageTruthReporterIneligibleDurationEpochs == 0 {
+		p.StorageTruthReporterIneligibleDurationEpochs = DefaultStorageTruthReporterIneligibleDurationEpochs
+	}
 	return p
 }
 
@@ -527,6 +551,9 @@ func (p *Params) ParamSetPairs() paramtypes.ParamSetPairs {
 		paramtypes.NewParamSetPair(KeyStorageTruthClassAFaultWindow, &p.StorageTruthClassAFaultWindow, validateUint32),
 		paramtypes.NewParamSetPair(KeyStorageTruthClassBFaultWindow, &p.StorageTruthClassBFaultWindow, validateUint32),
 		paramtypes.NewParamSetPair(KeyStorageTruthHealDeadlineEpochs, &p.StorageTruthHealDeadlineEpochs, validateUint32),
+		paramtypes.NewParamSetPair(KeyStorageTruthOldClassAFaultWindow, &p.StorageTruthOldClassAFaultWindow, validateUint32),
+		paramtypes.NewParamSetPair(KeyStorageTruthContradictionWindowEpochs, &p.StorageTruthContradictionWindowEpochs, validateUint32),
+		paramtypes.NewParamSetPair(KeyStorageTruthReporterIneligibleDurationEpochs, &p.StorageTruthReporterIneligibleDurationEpochs, validateUint32),
 	}
 }
 
@@ -583,6 +610,21 @@ func (p Params) Validate() error {
 			requiredHistory = v
 		}
 		if v := uint64(p.ActionFinalizationRecoveryEpochs); v > requiredHistory {
+			requiredHistory = v
+		}
+		if v := uint64(p.StorageTruthClassAFaultWindow); v > requiredHistory {
+			requiredHistory = v
+		}
+		if v := uint64(p.StorageTruthClassBFaultWindow); v > requiredHistory {
+			requiredHistory = v
+		}
+		if v := uint64(p.StorageTruthOldClassAFaultWindow); v > requiredHistory {
+			requiredHistory = v
+		}
+		if v := uint64(p.StorageTruthPatternEscalationWindow); v > requiredHistory {
+			requiredHistory = v
+		}
+		if v := uint64(p.StorageTruthContradictionWindowEpochs); v > requiredHistory {
 			requiredHistory = v
 		}
 		if requiredHistory > 0 && p.KeepLastEpochEntries < requiredHistory {
@@ -668,6 +710,18 @@ func (p Params) Validate() error {
 	}
 	if p.StorageTruthNodeSuspicionThresholdPostpone > p.StorageTruthNodeSuspicionThresholdStrongPostpone {
 		return fmt.Errorf("storage_truth_node_suspicion_threshold_postpone must be <= storage_truth_node_suspicion_threshold_strong_postpone")
+	}
+	if p.StorageTruthOldClassAFaultWindow == 0 {
+		return fmt.Errorf("storage_truth_old_class_a_fault_window must be > 0")
+	}
+	if p.StorageTruthOldClassAFaultWindow < p.StorageTruthClassAFaultWindow {
+		return fmt.Errorf("storage_truth_old_class_a_fault_window must be >= storage_truth_class_a_fault_window")
+	}
+	if p.StorageTruthContradictionWindowEpochs == 0 {
+		return fmt.Errorf("storage_truth_contradiction_window_epochs must be > 0")
+	}
+	if p.StorageTruthReporterIneligibleDurationEpochs == 0 {
+		return fmt.Errorf("storage_truth_reporter_ineligible_duration_epochs must be > 0")
 	}
 	switch p.StorageTruthEnforcementMode {
 	case StorageTruthEnforcementMode_STORAGE_TRUTH_ENFORCEMENT_MODE_UNSPECIFIED,

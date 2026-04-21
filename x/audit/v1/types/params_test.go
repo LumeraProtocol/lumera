@@ -14,6 +14,9 @@ func TestDefaultParamsIncludeStorageTruthDefaults(t *testing.T) {
 	require.Equal(t, DefaultStorageTruthChallengeTargetDivisor, p.StorageTruthChallengeTargetDivisor)
 	require.Equal(t, DefaultStorageTruthCompoundRangesPerArtifact, p.StorageTruthCompoundRangesPerArtifact)
 	require.Equal(t, DefaultStorageTruthCompoundRangeLenBytes, p.StorageTruthCompoundRangeLenBytes)
+	require.Equal(t, DefaultStorageTruthOldClassAFaultWindow, p.StorageTruthOldClassAFaultWindow)
+	require.Equal(t, DefaultStorageTruthContradictionWindowEpochs, p.StorageTruthContradictionWindowEpochs)
+	require.Equal(t, DefaultStorageTruthReporterIneligibleDurationEpochs, p.StorageTruthReporterIneligibleDurationEpochs)
 	require.Equal(t, DefaultStorageTruthEnforcementMode, p.StorageTruthEnforcementMode)
 	require.NoError(t, p.Validate())
 }
@@ -26,6 +29,9 @@ func TestParamsWithDefaultsSetsStorageTruthFields(t *testing.T) {
 	require.Equal(t, DefaultStorageTruthOldBucketMinBlocks, p.StorageTruthOldBucketMinBlocks)
 	require.Equal(t, DefaultStorageTruthChallengeTargetDivisor, p.StorageTruthChallengeTargetDivisor)
 	require.Equal(t, DefaultStorageTruthMaxSelfHealOpsPerEpoch, p.StorageTruthMaxSelfHealOpsPerEpoch)
+	require.Equal(t, DefaultStorageTruthOldClassAFaultWindow, p.StorageTruthOldClassAFaultWindow)
+	require.Equal(t, DefaultStorageTruthContradictionWindowEpochs, p.StorageTruthContradictionWindowEpochs)
+	require.Equal(t, DefaultStorageTruthReporterIneligibleDurationEpochs, p.StorageTruthReporterIneligibleDurationEpochs)
 	// UNSPECIFIED is a valid no-op mode; WithDefaults does not promote it to SHADOW.
 	require.Equal(t, StorageTruthEnforcementMode_STORAGE_TRUTH_ENFORCEMENT_MODE_UNSPECIFIED, p.StorageTruthEnforcementMode)
 }
@@ -50,6 +56,10 @@ func TestParamsValidateStorageTruthFailures(t *testing.T) {
 	p4 := base
 	p4.StorageTruthEnforcementMode = StorageTruthEnforcementMode(99)
 	require.ErrorContains(t, p4.Validate(), "storage_truth_enforcement_mode is invalid")
+
+	p5 := base
+	p5.StorageTruthOldClassAFaultWindow = p5.StorageTruthClassAFaultWindow - 1
+	require.ErrorContains(t, p5.Validate(), "storage_truth_old_class_a_fault_window must be >=")
 }
 
 func TestParamsWithDefaults_DerivesBucketThresholdsFromEpochLength(t *testing.T) {

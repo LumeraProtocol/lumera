@@ -247,6 +247,7 @@ func TestSubmitEpochReport_RejectsMalformedStorageProofResults(t *testing.T) {
 	testCases := []struct {
 		name          string
 		buildResults  func() []*types.StorageProofResult
+		prepare       func(t *testing.T, f *fixture)
 		wantSubstring string
 	}{
 		{
@@ -286,7 +287,45 @@ func TestSubmitEpochReport_RejectsMalformedStorageProofResults(t *testing.T) {
 				resultB.ArtifactCount = 9
 				return []*types.StorageProofResult{resultA, resultB}
 			},
+			prepare: func(t *testing.T, f *fixture) {
+				t.Helper()
+				require.NoError(t, f.keeper.SetStorageTruthTicketArtifactCounts(f.ctx, "ticket-1", 8, 8))
+			},
 			wantSubstring: "does not match canonical count",
+		},
+		{
+			name: "no eligible conflicts with recently observed eligible history",
+			buildResults: func() []*types.StorageProofResult {
+				return []*types.StorageProofResult{
+					{
+						TargetSupernodeAccount:     "sn-bbb-target",
+						ChallengerSupernodeAccount: "sn-aaa-reporter",
+						BucketType:                 types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT,
+						ArtifactClass:              types.StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_UNSPECIFIED,
+						ResultClass:                types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_NO_ELIGIBLE_TICKET,
+						TranscriptHash:             "transcript-hash-no-eligible",
+					},
+				}
+			},
+			prepare: func(t *testing.T, f *fixture) {
+				t.Helper()
+				seen := &types.StorageProofResult{
+					TargetSupernodeAccount:     "sn-bbb-target",
+					ChallengerSupernodeAccount: "sn-zzz-seed",
+					TicketId:                   "ticket-seen-1",
+					BucketType:                 types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT,
+					ArtifactClass:              types.StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_INDEX,
+					ArtifactOrdinal:            0,
+					ArtifactCount:              8,
+					ArtifactKey:                "artifact-seen-1",
+					ResultClass:                types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS,
+					TranscriptHash:             "transcript-seen-1",
+					DerivationInputHash:        "derivation-seen-1",
+					ChallengerSignature:        "signature-seen-1",
+				}
+				require.NoError(t, f.keeper.IndexStorageProofTranscripts(f.ctx, 0, "sn-zzz-seed", []*types.StorageProofResult{seen}))
+			},
+			wantSubstring: "conflicts with recently observed eligible ticket history",
 		},
 		{
 			name: "recheck confirmed fail requires recheck bucket",
@@ -331,11 +370,10 @@ func TestSubmitEpochReport_RejectsMalformedStorageProofResults(t *testing.T) {
 				portStates[i] = types.PortState_PORT_STATE_OPEN
 			}
 			results := tc.buildResults()
-			if tc.name == "mismatched canonical artifact count for same ticket class" {
-				require.NoError(t, f.keeper.SetStorageTruthTicketArtifactCounts(f.ctx, "ticket-1", 8, 8))
-			} else {
-				seedTicketArtifactCountsForResults(t, f, results...)
+			if tc.prepare != nil {
+				tc.prepare(t, f)
 			}
+			seedTicketArtifactCountsForResults(t, f, results...)
 
 			_, err := ms.SubmitEpochReport(f.ctx, &types.MsgSubmitEpochReport{
 				Creator: reporter,

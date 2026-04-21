@@ -308,7 +308,11 @@ func (k Keeper) applyReporterReliabilityDelta(
 	nextState.TrustBand = reporterTrustBandForScore(next, params)
 	nextState.ContradictionCount = state.ContradictionCount + contradictionIncrements
 	if nextState.TrustBand == types.ReporterTrustBand_REPORTER_TRUST_BAND_CHALLENGER_INELIGIBLE {
-		nextState.IneligibleUntilEpoch = epochID + 7
+		ineligibleDuration := uint64(params.StorageTruthReporterIneligibleDurationEpochs)
+		if ineligibleDuration == 0 {
+			ineligibleDuration = 7
+		}
+		nextState.IneligibleUntilEpoch = epochID + ineligibleDuration
 	} else if next < params.StorageTruthReporterReliabilityIneligibleThreshold {
 		nextState.IneligibleUntilEpoch = 0
 	}
@@ -471,20 +475,20 @@ func storageTruthScoreDeltasForResult(result *types.StorageProofResult) storageT
 		}
 	case types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_OBSERVER_QUORUM_FAIL:
 		return storageTruthScoreDeltas{
-			nodeSuspicion:       4,
-			reporterReliability: -3,
-			ticketDeterioration: 5,
+			nodeSuspicion:       0,
+			reporterReliability: 0,
+			ticketDeterioration: 0,
 		}
 	case types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_NO_ELIGIBLE_TICKET:
 		return storageTruthScoreDeltas{
 			nodeSuspicion:       0,
-			reporterReliability: 1,
+			reporterReliability: 0,
 			ticketDeterioration: 0,
 		}
 	case types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_INVALID_TRANSCRIPT:
 		return storageTruthScoreDeltas{
 			nodeSuspicion:       0,
-			reporterReliability: -8,
+			reporterReliability: 0,
 			ticketDeterioration: 0,
 		}
 	case types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_RECHECK_CONFIRMED_FAIL:
@@ -591,13 +595,17 @@ func (k Keeper) storageTruthBookkeepingForResult(
 		ticketState.LastTargetSupernodeAccount == result.TargetSupernodeAccount &&
 		isStorageTruthFailureClass(ticketState.LastResultClass) &&
 		result.ResultClass == types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS {
+		contradictionWindow := uint64(params.StorageTruthContradictionWindowEpochs)
+		if contradictionWindow == 0 {
+			contradictionWindow = 7
+		}
 		confirmed, err := k.hasStorageTruthContradictionConfirmation(
 			ctx,
 			epochID,
 			result.TicketId,
 			result.TargetSupernodeAccount,
 			reporterAccount,
-			7,
+			contradictionWindow,
 		)
 		if err != nil {
 			return bookkeeping, err
@@ -721,7 +729,10 @@ func updateRecentFailureEpochCount(state types.TicketDeteriorationState, epochID
 	if state.RecentFailureEpochCount == 0 {
 		return 1
 	}
-	window := uint64(params.StorageTruthProbationEpochs)
+	window := uint64(params.StorageTruthPatternEscalationWindow)
+	if window == 0 {
+		window = 14
+	}
 	if window < 2 {
 		window = 2
 	}

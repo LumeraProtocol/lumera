@@ -49,7 +49,7 @@ func TestSubmitEpochReport_StorageTruthScoresByResultClass(t *testing.T) {
 		class               types.StorageProofResultClass
 		bucket              types.StorageProofBucketType
 		expectedNodeScore   *int64
-		expectedReporter    int64
+		expectedReporter    *int64
 		expectedTicketScore *int64
 		expectedTicketID    string
 	}{
@@ -59,7 +59,7 @@ func TestSubmitEpochReport_StorageTruthScoresByResultClass(t *testing.T) {
 			class:               types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS,
 			bucket:              types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT,
 			expectedNodeScore:   int64Ptr(0), // clamped at 0
-			expectedReporter:    0,           // clamped at 0 (positive-penalty model)
+			expectedReporter:    int64Ptr(0), // clamped at 0 (positive-penalty model)
 			expectedTicketScore: int64Ptr(0), // clamped at 0
 			expectedTicketID:    "ticket-1",
 		},
@@ -69,7 +69,7 @@ func TestSubmitEpochReport_StorageTruthScoresByResultClass(t *testing.T) {
 			class:               types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH,
 			bucket:              types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT,
 			expectedNodeScore:   int64Ptr(26),
-			expectedReporter:    1,
+			expectedReporter:    int64Ptr(1),
 			expectedTicketScore: int64Ptr(12),
 			expectedTicketID:    "ticket-1",
 		},
@@ -79,18 +79,18 @@ func TestSubmitEpochReport_StorageTruthScoresByResultClass(t *testing.T) {
 			class:               types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_TIMEOUT_OR_NO_RESPONSE,
 			bucket:              types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT,
 			expectedNodeScore:   int64Ptr(7),
-			expectedReporter:    0, // clamped at 0 (was -1 before penalty model flip)
+			expectedReporter:    int64Ptr(0), // clamped at 0 (was -1 before penalty model flip)
 			expectedTicketScore: int64Ptr(3),
 			expectedTicketID:    "ticket-1",
 		},
 		{
-			// OBSERVER_QUORUM_FAIL: node=+4, reporter=-3 clamped to 0, ticket=+5
+			// OBSERVER_QUORUM_FAIL: class-C ambiguous signal, no direct score impact.
 			name:                "observer quorum fail",
 			class:               types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_OBSERVER_QUORUM_FAIL,
 			bucket:              types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT,
-			expectedNodeScore:   int64Ptr(4),
-			expectedReporter:    0, // clamped at 0
-			expectedTicketScore: int64Ptr(5),
+			expectedNodeScore:   nil,
+			expectedReporter:    nil,
+			expectedTicketScore: nil,
 			expectedTicketID:    "ticket-1",
 		},
 		{
@@ -98,16 +98,16 @@ func TestSubmitEpochReport_StorageTruthScoresByResultClass(t *testing.T) {
 			class:               types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_NO_ELIGIBLE_TICKET,
 			bucket:              types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT,
 			expectedNodeScore:   nil,
-			expectedReporter:    1,
+			expectedReporter:    nil,
 			expectedTicketScore: nil,
 		},
 		{
-			// INVALID_TRANSCRIPT: reporter=-8 clamped to 0
+			// INVALID_TRANSCRIPT: malformed transcript class, no direct score impact.
 			name:                "invalid transcript",
 			class:               types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_INVALID_TRANSCRIPT,
 			bucket:              types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT,
 			expectedNodeScore:   nil,
-			expectedReporter:    0, // clamped at 0
+			expectedReporter:    nil,
 			expectedTicketScore: nil,
 		},
 		{
@@ -116,7 +116,7 @@ func TestSubmitEpochReport_StorageTruthScoresByResultClass(t *testing.T) {
 			class:               types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_RECHECK_CONFIRMED_FAIL,
 			bucket:              types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECHECK,
 			expectedNodeScore:   int64Ptr(15),
-			expectedReporter:    3,
+			expectedReporter:    int64Ptr(3),
 			expectedTicketScore: int64Ptr(8),
 			expectedTicketID:    "ticket-1",
 		},
@@ -167,10 +167,14 @@ func TestSubmitEpochReport_StorageTruthScoresByResultClass(t *testing.T) {
 			}
 
 			reporterState, found := f.keeper.GetReporterReliabilityState(f.ctx, reporter)
-			require.True(t, found)
-			require.Equal(t, tc.expectedReporter, reporterState.ReliabilityScore)
-			require.Equal(t, uint64(0), reporterState.LastUpdatedEpoch)
-			require.Equal(t, types.ReporterTrustBand_REPORTER_TRUST_BAND_NORMAL, reporterState.TrustBand)
+			if tc.expectedReporter == nil {
+				require.False(t, found)
+			} else {
+				require.True(t, found)
+				require.Equal(t, *tc.expectedReporter, reporterState.ReliabilityScore)
+				require.Equal(t, uint64(0), reporterState.LastUpdatedEpoch)
+				require.Equal(t, types.ReporterTrustBand_REPORTER_TRUST_BAND_NORMAL, reporterState.TrustBand)
+			}
 
 			ticketState, found := f.keeper.GetTicketDeteriorationState(f.ctx, tc.expectedTicketID)
 			if tc.expectedTicketScore == nil {

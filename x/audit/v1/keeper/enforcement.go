@@ -657,8 +657,11 @@ func (k Keeper) storageTruthPostponePredicatesMet(ctx sdk.Context, supernodeAcco
 		if classBEvents == 0 {
 			classBMet = state.ClassBCountWindow >= 4
 		}
-		// 3. 2 old Class A faults on distinct tickets in 21 epochs.
-		const oldClassAFaultWindow = uint64(21)
+		// 3. 2 old Class A faults on distinct tickets in the configured old-Class-A window.
+		oldClassAFaultWindow := uint64(params.StorageTruthOldClassAFaultWindow)
+		if oldClassAFaultWindow == 0 {
+			oldClassAFaultWindow = 21
+		}
 		oldClassATickets, _, err := k.distinctNodeFailedTickets(ctx, supernodeAccount, storageTruthWindowStart(epochID, oldClassAFaultWindow), epochID, func(record storageTruthNodeFailureRecord) bool {
 			return types.StorageProofBucketType(record.BucketType) == types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_OLD && storageTruthIsClassAFault(record)
 		})

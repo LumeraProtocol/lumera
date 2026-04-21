@@ -126,7 +126,7 @@ func (m msgServer) SubmitEpochReport(ctx context.Context, req *types.MsgSubmitEp
 	if err := validateStorageProofResults(reporterAccount, allowedTargets, isProber, enforceCompoundStorageProofs, req.StorageProofResults); err != nil {
 		return nil, err
 	}
-	if err := m.validateAndAnchorStorageProofArtifactCounts(sdkCtx, req.StorageProofResults); err != nil {
+	if err := m.validateAndAnchorStorageProofArtifactCounts(sdkCtx, req.EpochId, assignParams, req.StorageProofResults); err != nil {
 		return nil, err
 	}
 

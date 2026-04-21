@@ -1,9 +1,11 @@
 package keeper
 
 import (
+	"encoding/json"
 	"fmt"
 
 	errorsmod "cosmossdk.io/errors"
+	storetypes "cosmossdk.io/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/LumeraProtocol/lumera/x/audit/v1/types"
@@ -153,16 +155,27 @@ func validateStorageProofResults(
 	return nil
 }
 
-func (k Keeper) validateAndAnchorStorageProofArtifactCounts(ctx sdk.Context, results []*types.StorageProofResult) error {
+func (k Keeper) validateAndAnchorStorageProofArtifactCounts(
+	ctx sdk.Context,
+	epochID uint64,
+	params types.Params,
+	results []*types.StorageProofResult,
+) error {
 	if len(results) == 0 {
 		return nil
 	}
 
 	for i, result := range results {
-		if result == nil || result.ResultClass == types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_NO_ELIGIBLE_TICKET {
+		if result == nil {
 			continue
 		}
 		fieldName := fmt.Sprintf("storage_proof_results[%d]", i)
+		if result.ResultClass == types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_NO_ELIGIBLE_TICKET {
+			if err := k.validateNoEligibleTicketConsistency(ctx, epochID, params, result, fieldName); err != nil {
+				return err
+			}
+			continue
+		}
 
 		state, found := k.GetTicketArtifactCountState(ctx, result.TicketId)
 		if !found {
@@ -228,6 +241,113 @@ func (k Keeper) validateAndAnchorStorageProofArtifactCounts(ctx sdk.Context, res
 		}
 	}
 	return nil
+}
+
+func (k Keeper) validateNoEligibleTicketConsistency(
+	ctx sdk.Context,
+	epochID uint64,
+	params types.Params,
+	result *types.StorageProofResult,
+	fieldName string,
+) error {
+	if result == nil ||
+		result.ResultClass != types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_NO_ELIGIBLE_TICKET ||
+		result.TargetSupernodeAccount == "" {
+		return nil
+	}
+
+	window := storageTruthNoEligibleConsistencyWindow(result.BucketType, params)
+	startEpoch := storageTruthWindowStart(epochID, window)
+	seenEligible, err := k.hasObservedEligibleTicketForTargetBucketInWindow(
+		ctx,
+		result.TargetSupernodeAccount,
+		result.BucketType,
+		startEpoch,
+		epochID,
+	)
+	if err != nil {
+		return err
+	}
+	if seenEligible {
+		return errorsmod.Wrapf(
+			types.ErrInvalidStorageProofs,
+			"%s NO_ELIGIBLE_TICKET conflicts with recently observed eligible ticket history for target %q bucket %s",
+			fieldName,
+			result.TargetSupernodeAccount,
+			result.BucketType.String(),
+		)
+	}
+	return nil
+}
+
+func storageTruthNoEligibleConsistencyWindow(bucket types.StorageProofBucketType, params types.Params) uint64 {
+	switch bucket {
+	case types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT:
+		if params.EpochLengthBlocks == 0 || params.StorageTruthRecentBucketMaxBlocks == 0 {
+			return 3
+		}
+		window := params.StorageTruthRecentBucketMaxBlocks / params.EpochLengthBlocks
+		if params.StorageTruthRecentBucketMaxBlocks%params.EpochLengthBlocks != 0 {
+			window++
+		}
+		if window == 0 {
+			window = 1
+		}
+		return window
+	case types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_OLD:
+		// Use the old-Class-A lookback baseline so recent known OLD eligibility cannot
+		// be suppressed by NO_ELIGIBLE submissions.
+		window := uint64(params.StorageTruthOldClassAFaultWindow)
+		if window == 0 {
+			window = 21
+		}
+		return window
+	default:
+		window := uint64(params.StorageTruthPatternEscalationWindow)
+		if window == 0 {
+			window = 14
+		}
+		return window
+	}
+}
+
+func (k Keeper) hasObservedEligibleTicketForTargetBucketInWindow(
+	ctx sdk.Context,
+	target string,
+	bucket types.StorageProofBucketType,
+	startEpoch uint64,
+	endEpoch uint64,
+) (bool, error) {
+	if target == "" {
+		return false, nil
+	}
+	prefix := types.StorageProofTranscriptPrefix()
+	it := k.kvStore(ctx).Iterator(prefix, storetypes.PrefixEndBytes(prefix))
+	defer it.Close()
+
+	for ; it.Valid(); it.Next() {
+		var record storageProofTranscriptRecord
+		if err := json.Unmarshal(it.Value(), &record); err != nil {
+			return false, err
+		}
+		if record.EpochID < startEpoch || record.EpochID > endEpoch {
+			continue
+		}
+		if record.TargetAccount != target {
+			continue
+		}
+		if types.StorageProofBucketType(record.BucketType) != bucket {
+			continue
+		}
+		if types.StorageProofResultClass(record.ResultClass) == types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_NO_ELIGIBLE_TICKET {
+			continue
+		}
+		if record.TicketID == "" {
+			continue
+		}
+		return true, nil
+	}
+	return false, nil
 }
 
 func validateCompoundStorageProofCoverage(allowedTargets map[string]struct{}, results []*types.StorageProofResult) error {

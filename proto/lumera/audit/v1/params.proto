@@ -140,4 +140,13 @@ message Params {
 
   // Heal deadline in epochs (default 3).
   uint32 storage_truth_heal_deadline_epochs = 46;
+
+  // OLD Class-A distinct-ticket window in epochs (default 21).
+  uint32 storage_truth_old_class_a_fault_window = 47;
+
+  // Contradiction confirmation window in epochs (default 7).
+  uint32 storage_truth_contradiction_window_epochs = 48;
+
+  // Reporter challenger ineligibility duration in epochs (default 7).
+  uint32 storage_truth_reporter_ineligible_duration_epochs = 49;
 }

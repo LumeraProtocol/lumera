@@ -279,7 +279,7 @@ Trust band mapping:
 - `CHALLENGER_INELIGIBLE = 3`
 - `DEGRADED = 4`
 
-When a reporter enters `CHALLENGER_INELIGIBLE`, `ineligible_until_epoch = current_epoch + 7`.
+When a reporter enters `CHALLENGER_INELIGIBLE`, `ineligible_until_epoch = current_epoch + storage_truth_reporter_ineligible_duration_epochs` (default `+7`).
 
 ### Pattern, Divergence, And Recovery Windows
 
@@ -289,10 +289,9 @@ When a reporter enters `CHALLENGER_INELIGIBLE`, `ineligible_until_epoch = curren
 - `DefaultStorageTruthRecoveryCleanPassCount = 3`
 - `DefaultStorageTruthClassAFaultWindow = 14`
 - `DefaultStorageTruthClassBFaultWindow = 7`
-
-Additional fixed predicate constant in enforcement:
-
-- old Class A faults are evaluated over `21` epochs
+- `DefaultStorageTruthOldClassAFaultWindow = 21`
+- `DefaultStorageTruthContradictionWindowEpochs = 7`
+- `DefaultStorageTruthReporterIneligibleDurationEpochs = 7`
 
 ### Store Key Prefixes
 
@@ -472,6 +471,7 @@ Canonical artifact-count anchoring:
 - submitted `artifact_count` must match the canonical class-specific count for the ticket
 - submitted `artifact_ordinal` must be in range for that canonical class-specific count
 - canonical counts are immutable once anchored
+- `NO_ELIGIBLE_TICKET` submissions are rejected when recent transcript history already shows eligible tickets for the same target and bucket inside the bucket-consistency window
 
 FULL-mode compound coverage:
 
@@ -521,20 +521,20 @@ For `TIMEOUT_OR_NO_RESPONSE`:
 
 For `OBSERVER_QUORUM_FAIL`:
 
-- node `+4`
-- reporter `-3`
-- ticket `+5`
+- node `0`
+- reporter `0`
+- ticket `0`
 
 For `NO_ELIGIBLE_TICKET`:
 
 - node `0`
-- reporter `+1`
+- reporter `0`
 - ticket `0`
 
 For `INVALID_TRANSCRIPT`:
 
 - node `0`
-- reporter `-8`
+- reporter `0`
 - ticket `0`
 
 For `RECHECK_CONFIRMED_FAIL`:
@@ -591,7 +591,7 @@ Contradiction pattern:
 
 - contradiction handling is evaluated for a later `PASS` against an earlier failure on the same `ticket_id` and target
 - contradiction penalties apply only after confirmation:
-  - at least one independent reporter `PASS` in the rolling 7-epoch window (the current `PASS` is the second distinct pass), or
+  - at least one independent reporter `PASS` in the rolling `storage_truth_contradiction_window_epochs` window (default `7`; the current `PASS` is the second distinct pass), or
   - a clean recheck `PASS` in the same window
 - when confirmed, current reporter receives `-4` recovery/credit
 - when confirmed and prior reporter is different, prior reporter receives `+12`
@@ -671,7 +671,7 @@ Window behavior:
 Recent failure epoch count:
 
 - starts at `1` for the first failure
-- increments when a new failure epoch occurs within `storage_truth_probation_epochs`
+- increments when a new failure epoch occurs within `storage_truth_pattern_escalation_window`
 - resets to `1` if the next failure is outside that window
 - has a minimum effective window of `2` epochs
 
@@ -1162,6 +1162,9 @@ Storage-truth param keys:
 - `StorageTruthClassAFaultWindow`
 - `StorageTruthClassBFaultWindow`
 - `StorageTruthHealDeadlineEpochs`
+- `StorageTruthOldClassAFaultWindow`
+- `StorageTruthContradictionWindowEpochs`
+- `StorageTruthReporterIneligibleDurationEpochs`
 
 ## Release Callouts And Activation Plan
 

@@ -358,6 +358,38 @@ func detectFunder() (string, error) {
 	return "", errNoSingleSigValidatorFunder
 }
 
+// findLocalMultisigValidator returns the multisig composite key that matches
+// an on-chain validator's operator address (if one exists on this host's
+// keyring). Used by prepare's bootstrap path to seed a single-sig funder from
+// the composite's genesis balance.
+func findLocalMultisigValidator() (keyName, addr string, err error) {
+	keys, err := listKeys()
+	if err != nil {
+		return "", "", fmt.Errorf("list keys: %w", err)
+	}
+	validators, err := getValidators()
+	if err != nil {
+		return "", "", fmt.Errorf("get validators: %w", err)
+	}
+	valAccAddrs := make(map[string]struct{}, len(validators))
+	for _, valoper := range validators {
+		valAddr, err := sdk.ValAddressFromBech32(valoper)
+		if err != nil {
+			continue
+		}
+		valAccAddrs[sdk.AccAddress(valAddr).String()] = struct{}{}
+	}
+	for _, k := range keys {
+		if !isMultisigKeyRecord(k) {
+			continue
+		}
+		if _, ok := valAccAddrs[k.Address]; ok {
+			return k.Name, k.Address, nil
+		}
+	}
+	return "", "", fmt.Errorf("no multisig validator key found in local keyring")
+}
+
 // listKeys returns all keys from the lumerad test keyring.
 func listKeys() ([]keyRecord, error) {
 	args := []string{"keys", "list", "--keyring-backend", "test", "--output", "json"}

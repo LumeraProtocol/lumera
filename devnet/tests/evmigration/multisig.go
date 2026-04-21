@@ -320,6 +320,45 @@ func registerMultisigPubKey(multisigKeyName, multisigAddr string, members []stri
 	return nil
 }
 
+// buildUnsignedMultisigBankSendTx generates an unsigned bank-send tx with
+// multisigAddr as the sender. The caller uses signAndBroadcastMultisigTx to
+// collect the threshold signatures and broadcast it.
+func buildUnsignedMultisigBankSendTx(multisigKeyName, multisigAddr, toAddr, amount, outFile string) error {
+	accNum, seq, err := queryAccountNumberAndSequence(multisigAddr)
+	if err != nil {
+		if waitErr := waitForAccountOnChain(multisigAddr, 30*time.Second); waitErr != nil {
+			return fmt.Errorf("wait for multisig account on-chain: %w", waitErr)
+		}
+		accNum, seq, err = queryAccountNumberAndSequence(multisigAddr)
+		if err != nil {
+			return fmt.Errorf("query account number/sequence for %s: %w", multisigAddr, err)
+		}
+	}
+
+	unsignedArgs := buildLumeraArgs(
+		"tx", "bank", "send",
+		multisigAddr, toAddr, amount,
+		"--from", multisigKeyName,
+		"--keyring-backend", "test",
+		"--chain-id", *flagChainID,
+		"--account-number", fmt.Sprintf("%d", accNum),
+		"--sequence", fmt.Sprintf("%d", seq),
+		"--gas", *flagGas,
+		"--gas-prices", *flagGasPrices,
+		"--generate-only",
+		"--output", "json",
+	)
+	cmd := exec.Command(*flagBin, unsignedArgs...)
+	unsignedOut, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("generate unsigned multisig bank-send tx: %s\n%w", string(unsignedOut), err)
+	}
+	if err := os.WriteFile(outFile, unsignedOut, 0o600); err != nil {
+		return fmt.Errorf("write unsigned multisig bank-send tx to %s: %w", outFile, err)
+	}
+	return nil
+}
+
 func buildUnsignedMultisigDelegateTx(multisigKeyName, multisigAddr, validatorAddr, amount, outFile string) error {
 	accNum, seq, err := queryAccountNumberAndSequence(multisigAddr)
 	if err != nil {

@@ -50,13 +50,20 @@ func runPrepare() {
 		name, err := detectFunder()
 		if err != nil {
 			if errors.Is(err, errNoSingleSigValidatorFunder) {
-				log.Printf("SKIP: no single-sig validator funder on this host (likely a multisig-validator host); nothing to prepare")
-				return
+				bootstrapped, berr := bootstrapMultisigFunder()
+				if berr != nil {
+					log.Printf("SKIP: no single-sig validator funder on this host and multisig bootstrap failed: %v", berr)
+					return
+				}
+				*flagFunder = bootstrapped
+				log.Printf("auto-detected funder via multisig bootstrap: %s", bootstrapped)
+			} else {
+				log.Fatalf("no -funder provided and auto-detect failed: %v", err)
 			}
-			log.Fatalf("no -funder provided and auto-detect failed: %v", err)
+		} else {
+			*flagFunder = name
+			log.Printf("auto-detected funder from keyring: %s", name)
 		}
-		*flagFunder = name
-		log.Printf("auto-detected funder from keyring: %s", name)
 	}
 
 	log.Printf("=== PREPARE MODE: generating %d legacy + permanent-locked + multisig fixtures + %d extra accounts ===",
@@ -1248,6 +1255,78 @@ func ensureSenderAccountReady(rec *AccountRecord) bool {
 		return false
 	}
 	return true
+}
+
+// bootstrapMultisigFunder seeds a dedicated single-sig prepare funder on a
+// multisig-validator host by transferring genesis balance from the local
+// multisig composite via a one-time 2-of-N bank-send. Returns the funder's
+// keyring name so the tag regex (`validator[_-]?(\d+)`) still fires on it.
+//
+// The funder key name is prepare-funder-<composite-key-name>, so a composite
+// named "supernova_validator_2_key" produces tag "val2" as usual. Idempotent
+// across reruns: existing keys are reused, and the multisig send is skipped
+// if the funder balance is already above bootstrapMultisigFunderMinBalance.
+const (
+	// Composite on devnet starts with ~1T liquid (account_balance − validator_stake),
+	// minus a few tens of thousands in gentx/setup fees. 800B leaves generous
+	// headroom for that delta while still dwarfing what prepare actually needs
+	// (~500M for all 17 accounts + fixtures).
+	bootstrapMultisigFunderSeedAmount = "800000000000ulume"
+	bootstrapMultisigFunderMinBalance = int64(500_000_000_000)
+)
+
+func bootstrapMultisigFunder() (string, error) {
+	compositeName, compositeAddr, err := findLocalMultisigValidator()
+	if err != nil {
+		return "", fmt.Errorf("find local multisig validator: %w", err)
+	}
+	log.Printf("bootstrap: local multisig validator = %s (%s)", compositeName, compositeAddr)
+
+	members := derivedMultisigMemberKeys(compositeName, defaultMultisigSigners)
+	for _, m := range members {
+		if !keyExists(m) {
+			return "", fmt.Errorf("multisig member key %s missing from keyring", m)
+		}
+	}
+
+	funderName := "prepare-funder-" + compositeName
+	if !keyExists(funderName) {
+		rec, genErr := generateAccount(funderName, true /* legacy coin-type 118 */)
+		if genErr != nil {
+			return "", fmt.Errorf("generate bootstrap funder key %s: %w", funderName, genErr)
+		}
+		if impErr := importKey(funderName, rec.Mnemonic, true); impErr != nil {
+			return "", fmt.Errorf("import bootstrap funder key %s: %w", funderName, impErr)
+		}
+		log.Printf("bootstrap: created funder key %s (%s)", funderName, rec.Address)
+	} else {
+		log.Printf("bootstrap: reusing funder key %s", funderName)
+	}
+	funderAddr, err := getAddress(funderName)
+	if err != nil {
+		return "", fmt.Errorf("get funder addr %s: %w", funderName, err)
+	}
+
+	bal, balErr := queryBalance(funderAddr)
+	if balErr != nil && !isAccountNotFoundErr(balErr) {
+		return "", fmt.Errorf("query funder balance: %w", balErr)
+	}
+	if bal >= bootstrapMultisigFunderMinBalance {
+		log.Printf("bootstrap: funder %s already has sufficient balance (%d ulume)", funderName, bal)
+		return funderName, nil
+	}
+	log.Printf("bootstrap: funding %s from multisig composite (amount=%s)", funderName, bootstrapMultisigFunderSeedAmount)
+
+	unsignedFile := tmpFile("bootstrap-fund-unsigned-*.json")
+	defer os.Remove(unsignedFile)
+	if err := buildUnsignedMultisigBankSendTx(compositeName, compositeAddr, funderAddr, bootstrapMultisigFunderSeedAmount, unsignedFile); err != nil {
+		return "", fmt.Errorf("build bootstrap fund tx: %w", err)
+	}
+	if err := signAndBroadcastMultisigTx(unsignedFile, compositeName, compositeAddr, members); err != nil {
+		return "", fmt.Errorf("sign/broadcast bootstrap fund tx: %w", err)
+	}
+	log.Printf("bootstrap: funder %s seeded successfully", funderName)
+	return funderName, nil
 }
 
 // ensurePermanentLockedLegacyFixture creates or reuses the dedicated

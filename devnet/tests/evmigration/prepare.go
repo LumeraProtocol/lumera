@@ -179,8 +179,6 @@ func runPrepare() {
 		log.Printf("  WARN: no local validator key matched the active validator set")
 	}
 
-	recordInfrastructureLegacyAccounts(af, existingByName)
-
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	legacyIdx := make([]int, 0, *flagNumAccounts)
 	extraIdx := make([]int, 0, *flagNumExtra)
@@ -991,6 +989,18 @@ func runPrepare() {
 		}
 	}
 
+	// Record per-host infrastructure keys (governance, sncli, bootstrap funder)
+	// as legacy accounts so migrate-all picks them up. Runs AFTER activity
+	// phases so that late-arriving keys (sncli-account is provisioned by
+	// supernode-setup.sh, which finishes in parallel with prepare) are
+	// visible in the keyring by now.
+	existingByNameAfterActivity := make(map[string]int, len(af.Accounts))
+	for i, rec := range af.Accounts {
+		existingByNameAfterActivity[rec.Name] = i
+		existingByNameAfterActivity[rec.Address] = i
+	}
+	recordInfrastructureLegacyAccounts(af, existingByNameAfterActivity)
+
 	// Validate prepared scenarios against chain state and fail if critical coverage is missing.
 	for i := range af.Accounts {
 		af.Accounts[i].normalizeActivityTracking()
@@ -1275,6 +1285,38 @@ func infrastructureLegacyKeyCandidates() []string {
 	return candidates
 }
 
+// infrastructureCandidateReadyTimeout bounds how long recordInfrastructureLegacyAccounts
+// polls for an expected infrastructure key to show up in the keyring + status
+// registry. supernode-setup.sh provisions sncli-account in parallel with
+// prepare mode, so on a fresh pipeline run it may not yet exist when we
+// reach the recording step.
+const infrastructureCandidateReadyTimeout = 90 * time.Second
+
+// waitForInfrastructureKeyReady returns true if `name` has both a keyring
+// entry and a mnemonic in the shared status registry within the timeout. This
+// is a best-effort hedge against late provisioning; if the key truly doesn't
+// exist on this host (e.g. governance_key on a secondary validator) it just
+// returns false after the first quick check without sleeping.
+func waitForInfrastructureKeyReady(name string, timeout time.Duration) bool {
+	if keyExists(name) && readStatusRegistryMnemonic(name) != "" {
+		return true
+	}
+	// If neither the keyring nor the registry knows about this name at all,
+	// there's nothing to wait for — it's a candidate that doesn't apply to
+	// this host (e.g. governance_key on a secondary validator).
+	if !keyExists(name) && readStatusRegistryMnemonic(name) == "" {
+		return false
+	}
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if keyExists(name) && readStatusRegistryMnemonic(name) != "" {
+			return true
+		}
+		time.Sleep(3 * time.Second)
+	}
+	return false
+}
+
 // recordInfrastructureLegacyAccounts appends AccountRecord entries for the
 // well-known, per-host legacy keys (governance, sncli, bootstrap funder) so
 // migrate-all picks them up alongside the pre-evm-* fixtures. Skips any key
@@ -1286,7 +1328,7 @@ func recordInfrastructureLegacyAccounts(af *AccountsFile, existingByName map[str
 		if _, ok := existingByName[name]; ok {
 			continue
 		}
-		if !keyExists(name) {
+		if !waitForInfrastructureKeyReady(name, infrastructureCandidateReadyTimeout) {
 			continue
 		}
 		addr, err := getAddress(name)

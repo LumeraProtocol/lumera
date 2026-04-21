@@ -45,6 +45,43 @@ func readStatusRegistryMnemonic(name string) string {
 	return ""
 }
 
+// appendStatusRegistryAccount adds a {name, address, mnemonic} entry to the
+// shared status registry if it isn't already present. Idempotent by name.
+func appendStatusRegistryAccount(name, address, mnemonic string) {
+	registryFile := statusRegistryFile()
+	data, err := os.ReadFile(registryFile)
+	if err != nil {
+		log.Printf("  WARN: cannot read account registry %s: %v", registryFile, err)
+		return
+	}
+	var accounts []map[string]any
+	if err := json.Unmarshal(data, &accounts); err != nil {
+		log.Printf("  WARN: cannot parse account registry %s: %v", registryFile, err)
+		return
+	}
+	for _, account := range accounts {
+		if fmtName, _ := account["name"].(string); fmtName == name {
+			return
+		}
+	}
+	accounts = append(accounts, map[string]any{
+		"name":     name,
+		"address":  address,
+		"mnemonic": mnemonic,
+	})
+	encoded, err := json.MarshalIndent(accounts, "", "  ")
+	if err != nil {
+		log.Printf("  WARN: cannot encode updated account registry %s: %v", registryFile, err)
+		return
+	}
+	encoded = append(encoded, '\n')
+	if err := os.WriteFile(registryFile, encoded, 0o644); err != nil {
+		log.Printf("  WARN: failed to append to account registry %s: %v", registryFile, err)
+		return
+	}
+	log.Printf("  appended %s to account registry %s", name, registryFile)
+}
+
 func updateStatusRegistryAddress(name, newAddr string) {
 	registryFile := statusRegistryFile()
 	data, err := os.ReadFile(registryFile)

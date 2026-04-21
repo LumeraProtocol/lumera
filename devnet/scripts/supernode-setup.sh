@@ -255,6 +255,53 @@ query_account_number_sequence() {
 	' <<<"${out}" | head -n1
 }
 
+# bank_send_from_validator sends `amount` to `dest_addr` from the local
+# validator's genesis account. On single-sig hosts this is a plain `tx bank
+# send`; on multisig-validator hosts it runs generate-only → 2-of-N offline
+# signing → broadcast via the shared multisig_sign_unsigned helper. Prints the
+# broadcast-response JSON to stdout (with .txhash when successful) so callers
+# can parse the result uniformly. Returns 0 on success, nonzero on failure.
+bank_send_from_validator() {
+	local dest_addr="$1" amount="$2"
+	local tag="${3:-[SN]}"
+
+	if validator_is_multisig; then
+		local acc_num seq unsigned_file signed_file rc
+		IFS=$'\t' read -r acc_num seq < <(query_account_number_sequence "${GENESIS_ADDR}")
+		if [[ -z "${acc_num}" || -z "${seq}" ]]; then
+			echo "${tag} ERROR: failed to query multisig account number/sequence for ${GENESIS_ADDR}" >&2
+			return 1
+		fi
+
+		unsigned_file="$(mktemp /tmp/sn-bank-send-unsigned.XXXXXX.json)"
+		signed_file="$(mktemp /tmp/sn-bank-send-signed.XXXXXX.json)"
+		rc=0
+		{
+			run_capture ${DAEMON} tx bank send "${GENESIS_ADDR}" "${dest_addr}" "${amount}" \
+				--from "${KEY_NAME}" --chain-id "${CHAIN_ID}" --keyring-backend "${KEYRING_BACKEND}" \
+				--account-number "${acc_num}" --sequence "${seq}" \
+				--gas 200000 --gas-prices "${TX_GAS_PRICES}" \
+				--generate-only --output json >"${unsigned_file}" &&
+			multisig_sign_unsigned "${unsigned_file}" \
+				"${KEY_NAME}" "${GENESIS_ADDR}" \
+				"$(validator_multisig_signer_key 1)" "$(validator_multisig_signer_key 2)" \
+				"${acc_num}" "${seq}" >"${signed_file}" &&
+			run_capture ${DAEMON} tx broadcast "${signed_file}" \
+				--broadcast-mode sync --output json
+		} || rc=$?
+		rm -f "${unsigned_file}" "${signed_file}"
+		return "${rc}"
+	fi
+
+	# Single-sig path: let cosmos-sdk resolve --from via the FROM_ADDR positional.
+	run_capture ${DAEMON} tx bank send "${GENESIS_ADDR}" "${dest_addr}" "${amount}" \
+		--chain-id "${CHAIN_ID}" \
+		--keyring-backend "${KEYRING_BACKEND}" \
+		--gas auto --gas-adjustment 1.3 \
+		--gas-prices "${TX_GAS_PRICES}" \
+		--output json --yes
+}
+
 register_supernode_multisig() {
 	local acc_num seq unsigned_file signed_file bcast_json tx_hash
 	IFS=$'\t' read -r acc_num seq < <(query_account_number_sequence "${VAL_ADDR}")
@@ -828,12 +875,7 @@ migrate_sncli_account_if_needed() {
 	if ((bal < SNCLI_MIN_AMOUNT)); then
 		echo "[SNCLI] Funding migrated ${SNCLI_KEY_NAME} ($new_addr)..."
 		local send_json txhash
-		send_json="$($DAEMON tx bank send "$GENESIS_ADDR" "$new_addr" "${SNCLI_FUND_AMOUNT}${DENOM}" \
-			--chain-id "$CHAIN_ID" \
-			--keyring-backend "$KEYRING_BACKEND" \
-			--gas auto --gas-adjustment 1.3 \
-			--gas-prices "${TX_GAS_PRICES}" \
-			--output json --yes 2>/dev/null || true)"
+		send_json="$(bank_send_from_validator "$new_addr" "${SNCLI_FUND_AMOUNT}${DENOM}" "[SNCLI]" 2>/dev/null || true)"
 		txhash="$(echo "$send_json" | jq -r '.txhash // empty')"
 		if [[ -n "$txhash" ]]; then
 			wait_for_tx "$txhash" || echo "[SNCLI] WARN: funding tx may not have confirmed"
@@ -1152,13 +1194,7 @@ configure_supernode() {
 	[[ -z "$BAL" ]] && BAL="0"
 	if ((BAL < 1000000)); then
 		echo "[SN] Funding Supernode account..."
-		SEND_TX_JSON="$(run_capture $DAEMON tx bank send "$GENESIS_ADDR" "$SN_ADDR" "10000000${DENOM}" \
-			--chain-id "$CHAIN_ID" \
-			--keyring-backend "$KEYRING_BACKEND" \
-			--gas auto \
-			--gas-adjustment 1.3 \
-			--gas-prices "${TX_GAS_PRICES}" \
-			--output json --yes)"
+		SEND_TX_JSON="$(bank_send_from_validator "$SN_ADDR" "10000000${DENOM}" "[SN]")"
 		echo "[SN] Send tx output: $SEND_TX_JSON"
 		SEND_TX_HASH="$(echo "$SEND_TX_JSON" | jq -r .txhash)"
 		if [ -n "$SEND_TX_HASH" ] && [ "$SEND_TX_HASH" != "null" ]; then
@@ -1322,13 +1358,7 @@ configure_sncli() {
 	[[ -z "$bal" ]] && bal="0"
 	if ((bal < ${SNCLI_MIN_AMOUNT})); then
 		echo "[SNCLI] Funding ${SNCLI_KEY_NAME}..."
-		send_tx_json="$(run_capture $DAEMON tx bank send "$GENESIS_ADDR" "$addr" "${SNCLI_FUND_AMOUNT}${DENOM}" \
-			--chain-id "$CHAIN_ID" \
-			--keyring-backend "$KEYRING_BACKEND" \
-			--gas auto \
-			--gas-adjustment 1.3 \
-			--gas-prices "${TX_GAS_PRICES}" \
-			--output json --yes)"
+		send_tx_json="$(bank_send_from_validator "$addr" "${SNCLI_FUND_AMOUNT}${DENOM}" "[SNCLI]")"
 		echo "[SNCLI] Send tx output: $send_tx_json"
 		send_tx_hash="$(echo "$send_tx_json" | jq -r .txhash)"
 		if [ -n "$send_tx_hash" ] && [ "$send_tx_hash" != "null" ]; then

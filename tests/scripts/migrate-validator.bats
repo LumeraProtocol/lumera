@@ -44,3 +44,23 @@ setup() {
   [ "$status" -eq 10 ]
   [[ "$output" == *"node"* ]]
 }
+
+@test "migrate-validator.sh full happy path (broadcast + verify) exits 0" {
+  local state_dir state_file
+  state_dir=$(mktemp -d)
+  state_file="$state_dir/state"
+  run env \
+    SHIM_ESTIMATE_FIXTURE=estimate-validator-ok \
+    SHIM_STATE_FILE="$state_file" \
+    SHIM_RECORD_AFTER_FIXTURE=record-post-migration \
+    SHIM_BANK_AFTER_FIXTURE=bank-balances-empty \
+    "$SCRIPTS_DIR/migrate-validator.sh" \
+    --binary "$SHIM" \
+    --chain-id shim-test \
+    --i-have-stopped-the-node --yes \
+    vkey newkey
+  rm -rf "$state_dir"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"validator migration complete"* ]]
+  [[ "$output" == *"Restart lumerad"* ]]
+}

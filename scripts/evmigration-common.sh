@@ -305,3 +305,73 @@ assert_new_address_unused() {
     exit 5
   fi
 }
+
+# ---- Bank snapshot, tx polling, verification --------------------------------
+
+snapshot_bank_balances() {
+  local addr="$1"
+  lumerad_q bank balances "$addr"
+}
+
+# wait_for_tx <hash>
+# Polls `query tx <hash>` every second for up to 30s. Exits non-zero on
+# timeout or if the final response reports a non-zero code.
+wait_for_tx() {
+  local hash="$1"
+  local deadline=$(( SECONDS + 30 ))
+  local code=""
+  while (( SECONDS < deadline )); do
+    local json
+    if json=$(lumerad_q tx "$hash" 2>/dev/null); then
+      code=$(jq -r '.code // empty' <<<"$json")
+      if [[ -n "$code" ]]; then
+        if (( code == 0 )); then
+          return 0
+        fi
+        log_error "tx $hash failed with code $code: $(jq -r '.raw_log' <<<"$json")"
+        return 1
+      fi
+    fi
+    sleep 1
+  done
+  log_error "timed out waiting for tx $hash to be indexed"
+  return 1
+}
+
+# verify_migration <legacy> <new> <pre-broadcast-legacy-balances-json>
+verify_migration() {
+  local legacy="$1" new="$2" snap_json="$3"
+
+  # 1. Migration record must exist and point to <new>.
+  local rec_json
+  rec_json=$(lumerad_q evmigration migration-record "$legacy" 2>/dev/null || printf '{}')
+  local rec_new
+  rec_new=$(jq -r '.record.new_address // empty' <<<"$rec_json")
+  if [[ "$rec_new" != "$new" ]]; then
+    log_error "post-check: migration record for $legacy does not point to $new (got: '$rec_new')"
+    exit 7
+  fi
+
+  # 2. Legacy balances must be all zero (account removed or empty).
+  local legacy_after
+  legacy_after=$(lumerad_q bank balances "$legacy" 2>/dev/null || printf '{"balances":[]}')
+  if [[ "$(jq -r '[.balances[].amount | tonumber] | add // 0' <<<"$legacy_after")" != "0" ]]; then
+    log_error "post-check: legacy address $legacy still has non-zero balance"
+    exit 7
+  fi
+
+  # 3. For every {denom,amount} in snap_json, new balances must be >= amount.
+  local new_after
+  new_after=$(lumerad_q bank balances "$new")
+  local diff
+  diff=$(jq --argjson new "$new_after" '
+    [ .balances[] as $s
+      | ($new.balances | map(select(.denom==$s.denom)) | .[0].amount // "0") as $na
+      | select(($na|tonumber) < ($s.amount|tonumber))
+      | {denom: $s.denom, expected: $s.amount, actual: $na}
+    ]' <<<"$snap_json")
+  if [[ "$(jq -r 'length' <<<"$diff")" != "0" ]]; then
+    log_error "post-check: new balances fall short of pre-broadcast snapshot: $diff"
+    exit 7
+  fi
+}

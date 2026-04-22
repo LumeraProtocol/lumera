@@ -246,3 +246,30 @@ setup_shim() {
   '
   [ "$status" -eq 5 ]
 }
+
+# ---- Bank snapshot, tx polling, verification ---------------------------------
+
+@test "snapshot_bank_balances returns structured JSON" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'; NODE=tcp://local:1
+    snapshot_bank_balances lumera1legacy
+  '
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.balances | length == 1'
+}
+
+@test "wait_for_tx returns 0 when shim reports code 0" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'; NODE=tcp://local:1
+    wait_for_tx DEADBEEF
+  '
+  [ "$status" -eq 0 ]
+}
+
+@test "verify_migration is exercised end-to-end in Task 10 integration tests" {
+  skip "covered by migrate-account.bats and migrate-validator.bats"
+}

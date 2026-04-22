@@ -31,8 +31,9 @@ setup() {
 }
 
 @test "migrate-account.sh full happy path (broadcast + verify) exits 0" {
-  local state_file
-  state_file=$(mktemp -u)  # don't create it; shim's tx handler will.
+  local state_dir state_file
+  state_dir=$(mktemp -d)
+  state_file="$state_dir/state"
   run env \
     SHIM_STATE_FILE="$state_file" \
     SHIM_RECORD_AFTER_FIXTURE=record-post-migration \
@@ -42,7 +43,7 @@ setup() {
     --chain-id shim-test \
     --yes \
     legacykey newkey
-  rm -f "$state_file"
+  rm -rf "$state_dir"
   [ "$status" -eq 0 ]
   [[ "$output" == *"migration complete"* ]]
 }

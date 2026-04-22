@@ -206,3 +206,43 @@ setup_shim() {
   [ "$status" -eq 4 ]
   [[ "$output" == *"legacy account not found"* ]]
 }
+
+@test "assert_not_migrated passes when no record" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'; NODE=tcp://local:1
+    assert_not_migrated lumera1anything
+  '
+  [ "$status" -eq 0 ]
+}
+
+@test "assert_not_migrated exits 5 when record exists" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'; NODE=tcp://local:1
+    SHIM_RECORD_FIXTURE=record-found assert_not_migrated lumera1anything
+  '
+  [ "$status" -eq 5 ]
+}
+
+@test "assert_new_address_unused passes when neither query returns a record" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'; NODE=tcp://local:1
+    assert_new_address_unused lumera1newxxxxxx
+  '
+  [ "$status" -eq 0 ]
+}
+
+@test "assert_new_address_unused exits 5 when new-address lookup returns record" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'; NODE=tcp://local:1
+    SHIM_RECORD_FIXTURE=record-found assert_new_address_unused lumera1newxxxxxx
+  '
+  [ "$status" -eq 5 ]
+}

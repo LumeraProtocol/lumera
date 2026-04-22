@@ -274,3 +274,34 @@ assert_estimate_succeeds() {
     exit 4
   fi
 }
+
+# ---- Migration-record assertions -------------------------------------------
+
+# _record_present <query-subcommand> <addr>
+# Returns 0 if the query returns a JSON object with a non-empty ".record".
+_record_present() {
+  local subcmd="$1" addr="$2"
+  local json
+  json=$(lumerad_q evmigration "$subcmd" "$addr" 2>/dev/null || printf '{}')
+  [[ "$(jq -r '.record.legacy_address // empty' <<<"$json")" != "" ]]
+}
+
+assert_not_migrated() {
+  local addr="$1"
+  if _record_present migration-record "$addr"; then
+    log_error "legacy address $addr has already been migrated"
+    exit 5
+  fi
+}
+
+assert_new_address_unused() {
+  local addr="$1"
+  if _record_present migration-record "$addr"; then
+    log_error "new address $addr was previously migrated as a legacy address"
+    exit 5
+  fi
+  if _record_present migration-record-by-new-address "$addr"; then
+    log_error "new address $addr is already a migration destination"
+    exit 5
+  fi
+}

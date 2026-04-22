@@ -36,11 +36,14 @@ setup() {
 }
 
 @test "migrate-validator.sh rejects missing downtime ack" {
+  # Close stdin so the script's `read -r reply` returns EOF immediately
+  # instead of blocking on terminal input. The `read ... || true` in the
+  # script then proceeds with an empty reply, which fails the ack check.
   run env SHIM_ESTIMATE_FIXTURE=estimate-validator-ok \
     "$SCRIPTS_DIR/migrate-validator.sh" \
     --binary "$SHIM" --chain-id shim-test \
     --yes --dry-run \
-    vkey ekey
+    vkey ekey </dev/null
   [ "$status" -eq 10 ]
   [[ "$output" == *"node"* ]]
 }

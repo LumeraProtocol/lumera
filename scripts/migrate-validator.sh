@@ -73,6 +73,14 @@ migration. The node MUST be stopped before broadcasting this tx.
 BANNER
 
   if (( node_stopped != 1 )); then
+    # Require a TTY so non-interactive runs (systemd, cron, SSH without -t)
+    # fail fast instead of blocking forever on `read`. Operators running
+    # without a TTY must pass --i-have-stopped-the-node explicitly.
+    if [[ ! -t 0 ]]; then
+      log_error "validator downtime not acknowledged and no TTY available"
+      log_error "re-run with --i-have-stopped-the-node to confirm non-interactively"
+      exit 10
+    fi
     local reply=""
     printf 'Type "yes" to confirm the node is stopped: ' >&2
     read -r reply || true

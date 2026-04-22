@@ -366,6 +366,58 @@ lumerad keys delete legacy-key --keyring-backend test
 
 ---
 
+## Method 3: Shell Helper Scripts
+
+The repository ships two bash wrappers in [scripts/](../../../scripts/) that layer safety rails on top of the Method 2 CLI flow:
+
+- `scripts/migrate-account.sh` — regular account migration (`claim-legacy-account`)
+- `scripts/migrate-validator.sh` — validator migration (`migrate-validator`)
+
+Both scripts:
+
+- Detect and reject multisig accounts (use the offline 4-step flow in [legacy-migration.md](../evmigration/legacy-migration.md#multisig-account-migration) for those).
+- Run `migration-estimate` before broadcast so you see what moves and why it might fail.
+- Compare post-migration balances against a pre-broadcast snapshot.
+
+### Single-sig account migration
+
+```bash
+./scripts/migrate-account.sh legacy-key new-key \
+  --chain-id lumera-mainnet-1 \
+  --node tcp://rpc.lumera:26657 \
+  --keyring-backend test
+```
+
+Use `--mnemonic-file <path>` (file must be mode 0600) to import both keys from a mnemonic in one step. Add `--dry-run` to preview without broadcasting.
+
+### Single-sig validator migration
+
+```bash
+./scripts/migrate-validator.sh legacy-op-key new-evm-key \
+  --chain-id lumera-mainnet-1 \
+  --node tcp://rpc.lumera:26657 \
+  --keyring-backend test \
+  --i-have-stopped-the-node
+```
+
+`--i-have-stopped-the-node` acknowledges the jailing risk; omitting it makes the script prompt interactively. `--yes` does NOT satisfy this acknowledgement — that's deliberate.
+
+### Exit codes
+
+| Code | Meaning |
+|---|---|
+| `0` | Success, or dry-run completed cleanly |
+| `1` | Usage error / bad flags / bad input file permissions / key name collision |
+| `2` | Environment error: binary missing, jq missing, node unreachable, unsupported binary version |
+| `3` | Multisig rejected; use offline flow |
+| `4` | Pre-flight estimate returned `would_succeed=false` |
+| `5` | Account already migrated (or new address already used) |
+| `6` | Wrong-script or delegation-cap error |
+| `7` | Broadcast succeeded but post-migration verification failed — investigate manually |
+| `10` | User aborted at a confirmation prompt |
+
+---
+
 ## Quick Reference: Query Commands
 
 These queries are useful before, during, and after migration:

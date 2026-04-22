@@ -140,3 +140,27 @@ setup_shim() {
   # Output should be a JSON object (from record-not-found fixture = "{}").
   [[ "$output" == *"{"* ]]
 }
+
+@test "resolve_address returns keys-show output" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'
+    NODE="tcp://local:26657"
+    KEYRING_BACKEND="test"
+    resolve_address mykey
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == lumera1* ]]
+}
+
+@test "lumera_to_valoper parses debug addr output" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'
+    lumera_to_valoper lumera1anything
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == lumeravaloper* ]]
+}

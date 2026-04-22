@@ -189,3 +189,29 @@ lumerad_keys() {
   _read_keyring_flags
   "$BIN" keys "$@" "${_KRF[@]}"
 }
+
+# ---- Address helpers -------------------------------------------------------
+
+resolve_address() {
+  local key_name="$1"
+  local addr
+  if ! addr=$(lumerad_keys show "$key_name" -a 2>/dev/null); then
+    log_error "key not found in keyring: $key_name"
+    exit 1
+  fi
+  printf '%s\n' "$addr"
+}
+
+# lumera_to_valoper converts a lumera1... bech32 to its lumeravaloper1... form
+# by shelling out to `lumerad debug addr`. Output format verified at spec time:
+#   Bech32 Val: lumeravaloper...
+lumera_to_valoper() {
+  local addr="$1"
+  local valoper
+  valoper=$("$BIN" debug addr "$addr" 2>/dev/null | awk -F': ' '/^Bech32 Val: /{print $2; exit}')
+  if [[ -z "$valoper" ]]; then
+    log_error "cannot derive valoper for $addr"
+    exit 2
+  fi
+  printf '%s\n' "$valoper"
+}

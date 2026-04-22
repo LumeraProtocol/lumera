@@ -39,3 +39,53 @@ setup() {
   [ "$status" -eq 0 ]
   [[ "$output" != *$'\033'* ]]
 }
+
+@test "parse_common_flags populates defaults" {
+  parse_common_flags legacy new
+  [ "$LEGACY_KEY" = "legacy" ]
+  [ "$NEW_KEY" = "new" ]
+  [ "$KEYRING_BACKEND" = "test" ]
+  [ "$YES" = "0" ]
+  [ "$DRY_RUN" = "0" ]
+  [ "$BIN" = "lumerad" ]
+}
+
+@test "parse_common_flags handles all supported flags" {
+  parse_common_flags \
+    --node tcp://node:26657 \
+    --chain-id lumera-devnet \
+    --keyring-backend file \
+    --keyring-dir /tmp/kr \
+    --home /tmp/home \
+    --mnemonic-file /tmp/m \
+    --yes --dry-run \
+    --binary /opt/lumerad \
+    mykey1 mykey2
+  [ "$NODE" = "tcp://node:26657" ]
+  [ "$CHAIN_ID" = "lumera-devnet" ]
+  [ "$KEYRING_BACKEND" = "file" ]
+  [ "$KEYRING_DIR" = "/tmp/kr" ]
+  [ "$HOME_DIR" = "/tmp/home" ]
+  [ "$MNEMONIC_FILE" = "/tmp/m" ]
+  [ "$YES" = "1" ]
+  [ "$DRY_RUN" = "1" ]
+  [ "$BIN" = "/opt/lumerad" ]
+  [ "$LEGACY_KEY" = "mykey1" ]
+  [ "$NEW_KEY" = "mykey2" ]
+}
+
+@test "parse_common_flags rejects unknown flag with exit 1" {
+  run bash -c 'source '"$SCRIPTS_DIR"'/evmigration-common.sh; parse_common_flags --bogus k1 k2'
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"unknown flag"* ]]
+}
+
+@test "parse_common_flags rejects missing positional with exit 1" {
+  run bash -c 'source '"$SCRIPTS_DIR"'/evmigration-common.sh; parse_common_flags onlyone'
+  [ "$status" -eq 1 ]
+}
+
+@test "parse_common_flags defaults NODE from env" {
+  LUMERA_NODE="tcp://from-env:26657" parse_common_flags legacy new
+  [ "$NODE" = "tcp://from-env:26657" ]
+}

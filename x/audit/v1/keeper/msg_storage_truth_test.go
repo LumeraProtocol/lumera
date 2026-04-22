@@ -243,7 +243,7 @@ func TestMsgClaimHealComplete_SingleNodeFinalizesImmediately(t *testing.T) {
 	require.True(t, found)
 	require.Equal(t, types.HealOpStatus_HEAL_OP_STATUS_VERIFIED, finalized.Status)
 	require.Equal(t, "manifest-single", finalized.ResultHash)
-	require.Contains(t, finalized.Notes, "single node finalized")
+	require.Equal(t, "single node finalized", finalized.Notes)
 
 	ticketState, found := f.keeper.GetTicketDeteriorationState(f.ctx, healOp.TicketId)
 	require.True(t, found)

@@ -13,19 +13,20 @@ import (
 )
 
 func (k Keeper) ProcessStorageTruthHealOpsAtEpochEnd(ctx sdk.Context, epochID uint64, params types.Params) error {
-	if err := k.expireStorageTruthHealOpsAtEpochEnd(ctx, epochID); err != nil {
-		return err
-	}
-	return k.scheduleStorageTruthHealOpsAtEpochEnd(ctx, epochID, params)
-}
-
-func (k Keeper) expireStorageTruthHealOpsAtEpochEnd(ctx sdk.Context, epochID uint64) error {
 	healOps, err := k.GetAllHealOps(ctx)
 	if err != nil {
 		return err
 	}
 
-	for _, healOp := range healOps {
+	healOps, err = k.expireStorageTruthHealOpsAtEpochEnd(ctx, epochID, healOps)
+	if err != nil {
+		return err
+	}
+	return k.scheduleStorageTruthHealOpsAtEpochEnd(ctx, epochID, params, healOps)
+}
+
+func (k Keeper) expireStorageTruthHealOpsAtEpochEnd(ctx sdk.Context, epochID uint64, healOps []types.HealOp) ([]types.HealOp, error) {
+	for i, healOp := range healOps {
 		if isHealOpFinalStatus(healOp.Status) {
 			continue
 		}
@@ -36,14 +37,15 @@ func (k Keeper) expireStorageTruthHealOpsAtEpochEnd(ctx sdk.Context, epochID uin
 		healOp.Status = types.HealOpStatus_HEAL_OP_STATUS_EXPIRED
 		healOp.UpdatedHeight = uint64(ctx.BlockHeight())
 		if err := k.SetHealOp(ctx, healOp); err != nil {
-			return err
+			return nil, err
 		}
+		healOps[i] = healOp
 
 		ticketState, found := k.GetTicketDeteriorationState(ctx, healOp.TicketId)
 		if found && ticketState.ActiveHealOpId == healOp.HealOpId {
 			ticketState.ActiveHealOpId = 0
 			if err := k.SetTicketDeteriorationState(ctx, ticketState); err != nil {
-				return err
+				return nil, err
 			}
 		}
 
@@ -58,10 +60,10 @@ func (k Keeper) expireStorageTruthHealOpsAtEpochEnd(ctx sdk.Context, epochID uin
 		)
 	}
 
-	return nil
+	return healOps, nil
 }
 
-func (k Keeper) scheduleStorageTruthHealOpsAtEpochEnd(ctx sdk.Context, epochID uint64, params types.Params) error {
+func (k Keeper) scheduleStorageTruthHealOpsAtEpochEnd(ctx sdk.Context, epochID uint64, params types.Params, healOps []types.HealOp) error {
 	if params.StorageTruthMaxSelfHealOpsPerEpoch == 0 {
 		return nil
 	}
@@ -74,10 +76,6 @@ func (k Keeper) scheduleStorageTruthHealOpsAtEpochEnd(ctx sdk.Context, epochID u
 		return nil
 	}
 
-	healOps, err := k.GetAllHealOps(ctx)
-	if err != nil {
-		return err
-	}
 	nonFinalByID := make(map[uint64]types.HealOp, len(healOps))
 	openByTicket := make(map[string]types.HealOp, len(healOps))
 	for _, healOp := range healOps {

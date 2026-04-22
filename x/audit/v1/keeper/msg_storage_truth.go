@@ -107,7 +107,8 @@ func (m msgServer) ClaimHealComplete(ctx context.Context, req *types.MsgClaimHea
 
 	// Single-node networks may not have verifier assignments; finalize immediately.
 	if len(healOp.VerifierSupernodeAccounts) == 0 {
-		if err := m.finalizeHealOp(sdkCtx, healOp, true, req.HealManifestHash, req.Details); err != nil {
+		// Details were already appended above when marking healer-reported.
+		if err := m.finalizeHealOp(sdkCtx, healOp, true, req.HealManifestHash, ""); err != nil {
 			return nil, err
 		}
 		sdkCtx.EventManager().EmitEvent(
@@ -256,12 +257,13 @@ func (m msgServer) finalizeHealOp(
 		ticketState.ActiveHealOpId = 0
 	}
 	if verified {
-		currentEpoch, err := deriveEpochAtHeight(ctx.BlockHeight(), m.GetParams(ctx).WithDefaults())
+		params := m.GetParams(ctx)
+		currentEpoch, err := deriveEpochAtHeight(ctx.BlockHeight(), params)
 		if err != nil {
 			return err
 		}
 		ticketState.LastHealEpoch = currentEpoch.EpochID
-		ticketState.ProbationUntilEpoch = currentEpoch.EpochID + uint64(m.GetParams(ctx).WithDefaults().StorageTruthProbationEpochs)
+		ticketState.ProbationUntilEpoch = currentEpoch.EpochID + uint64(params.StorageTruthProbationEpochs)
 	}
 	return m.SetTicketDeteriorationState(ctx, ticketState)
 }

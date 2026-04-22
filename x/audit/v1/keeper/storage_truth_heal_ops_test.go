@@ -116,3 +116,47 @@ func TestProcessStorageTruthHealOpsAtEpochEnd_ExpiresPastDeadline(t *testing.T) 
 	require.True(t, found)
 	require.Equal(t, uint64(0), ticketState.ActiveHealOpId)
 }
+
+func TestProcessStorageTruthHealOpsAtEpochEnd_ExpiredOpDoesNotBlockReschedule(t *testing.T) {
+	f := initFixture(t)
+	f.ctx = f.ctx.WithBlockHeight(1600).WithEventManager(sdk.NewEventManager()) // epoch 3 end
+
+	params := f.keeper.GetParams(f.ctx).WithDefaults()
+	params.StorageTruthTicketDeteriorationHealThreshold = 40
+	params.StorageTruthMaxSelfHealOpsPerEpoch = 1
+	require.NoError(t, f.keeper.SetParams(f.ctx, params))
+
+	activeAccounts := []string{"sn-aaa", "sn-bbb", "sn-ccc"}
+	seedEpochAnchorForReportTest(t, f, 3, activeAccounts, activeAccounts)
+
+	require.NoError(t, f.keeper.SetHealOp(f.ctx, types.HealOp{
+		HealOpId:                  700,
+		TicketId:                  "ticket-expire",
+		ScheduledEpochId:          1,
+		HealerSupernodeAccount:    "sn-healer",
+		VerifierSupernodeAccounts: []string{"sn-verifier"},
+		Status:                    types.HealOpStatus_HEAL_OP_STATUS_HEALER_REPORTED,
+		DeadlineEpochId:           3,
+	}))
+	require.NoError(t, f.keeper.SetTicketDeteriorationState(f.ctx, types.TicketDeteriorationState{
+		TicketId:           "ticket-expire",
+		DeteriorationScore: 100,
+		ActiveHealOpId:     700,
+	}))
+	f.keeper.SetNextHealOpID(f.ctx, 800)
+
+	require.NoError(t, f.keeper.ProcessStorageTruthHealOpsAtEpochEnd(f.ctx, 3, params))
+
+	expired, found := f.keeper.GetHealOp(f.ctx, 700)
+	require.True(t, found)
+	require.Equal(t, types.HealOpStatus_HEAL_OP_STATUS_EXPIRED, expired.Status)
+
+	rescheduled, found := f.keeper.GetHealOp(f.ctx, 800)
+	require.True(t, found)
+	require.Equal(t, "ticket-expire", rescheduled.TicketId)
+	require.Equal(t, types.HealOpStatus_HEAL_OP_STATUS_SCHEDULED, rescheduled.Status)
+
+	ticketState, found := f.keeper.GetTicketDeteriorationState(f.ctx, "ticket-expire")
+	require.True(t, found)
+	require.Equal(t, uint64(800), ticketState.ActiveHealOpId)
+}

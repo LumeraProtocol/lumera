@@ -135,6 +135,18 @@ lumerad tx evmigration migrate-validator val-legacy val-new \
   --node tcp://<trusted-rpc>:26657
 ```
 
+> **Shell helper alternative.** The bundled `scripts/migrate-validator.sh` wraps this command (plus the pre-flight estimate in Step 3, the delegation-cap check, post-migration verification against a pre-broadcast balance snapshot, and the post-migration checklist) into a single safer invocation. Use it when you want one command that enforces the guards rather than running each check by hand:
+>
+> ```bash
+> ./scripts/migrate-validator.sh val-legacy val-new \
+>   --keyring-backend file \
+>   --chain-id <chain-id> \
+>   --node tcp://<trusted-rpc>:26657 \
+>   --i-have-stopped-the-node
+> ```
+>
+> `--i-have-stopped-the-node` acknowledges the jailing risk non-interactively (required for systemd / CI / non-TTY runs; omitting it makes the script prompt for the literal word `yes`). `--yes` alone does **not** satisfy this check. See [migration-scripts.md](migration-scripts.md) for full flag reference, exit codes, and troubleshooting.
+
 The CLI:
 
 1. Reads both keys from the keyring.
@@ -378,7 +390,8 @@ Migrate the validator first; `MsgMigrateValidator` handles the supernode side as
 
 ## Related documentation
 
-- [migration.md](migration.md) — chain-level end-user migration guide (Portal + Keplr, single-sig CLI walkthrough, query reference)
+- [migration.md](migration.md) — chain-level end-user migration guide (Portal + Keplr, shell scripts, raw CLI)
+- [migration-scripts.md](migration-scripts.md) — reference for `migrate-validator.sh` and `migrate-account.sh` (flags, exit codes, troubleshooting, non-interactive / CI usage)
 - [supernode-migration.md](supernode-migration.md) — supernode operator migration (automatic single-sig path, manual multisig path)
 - [legacy-migration.md](../evmigration/legacy-migration.md) — `x/evmigration` module architecture, proto shapes, keeper logic, and the full reference for the offline proof flow
 - [node-evm-config-guide.md](node-evm-config-guide.md) — post-upgrade `app.toml` / RPC configuration for full nodes and validators

@@ -241,6 +241,8 @@ Both scripts:
 - Run `migration-estimate` before broadcast so you see what moves and why it might fail.
 - Compare post-migration balances against a pre-broadcast snapshot.
 
+The abbreviated invocations below cover the common cases. For the full reference — all flags, exit codes, troubleshooting keyed by exit code, mnemonic-file flow, and non-interactive / CI usage — see [migration-scripts.md](migration-scripts.md).
+
 ### Single-sig account migration
 
 ```bash

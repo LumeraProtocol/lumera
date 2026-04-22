@@ -27,6 +27,15 @@ Both paths land in the same final state (new EVM key registered as supernode, le
 
 Path B is useful when you want to use Keplr's UX to see each step (the Portal shows balances, delegations, and a pre-migration checklist), when you need to migrate the account's balance urgently for non-supernode reasons, or when your node ops team and your wallet custody team are different people.
 
+> **Terminal alternative for Path B.** If you prefer to stay in a shell rather than use Keplr, you can drive the account-level migration with the bundled shell helper scripts instead of the Portal — the end state (on-chain migration record + matching local key) is identical, and the supernode daemon's `alreadyMigrated` branch activates the same way on restart. See [migration-scripts.md](migration-scripts.md) for the full walkthrough, including multisig rejection, pre-flight estimates, and exit codes. In short:
+>
+> ```bash
+> ./scripts/migrate-account.sh legacy-key new-key \
+>   --chain-id lumera-mainnet-1 --node tcp://rpc.lumera:26657
+> ```
+>
+> Then continue with Step B3 (recover the new EVM key into the supernode keyring) onward.
+
 **Why both paths work deterministically**: `supernode keys recover` derives keys at HD path `m/44'/60'/0'/0/0` using `eth_secp256k1`. Keplr uses the identical derivation for Lumera's EVM chain definition. Given the same mnemonic, both produce the exact same bech32 address — so the new address in the on-chain migration record matches what the supernode derives locally, and the `alreadyMigrated` branch activates cleanly.
 
 If you chose Path B, the steps below are the same but in Step 3 the logs will show a *skipped* broadcast (see the **Path B log variant** callout in that section).
@@ -382,7 +391,8 @@ Regenerate `proof.json` with the correct `--chain-id`, have the affected signer 
 
 ## Related documentation
 
-- [migration.md](migration.md) — chain-level end-user migration guide (Portal + Keplr, single-sig CLI)
+- [migration.md](migration.md) — chain-level end-user migration guide (Portal + Keplr, shell scripts, raw CLI)
+- [migration-scripts.md](migration-scripts.md) — reference for the bundled `migrate-account.sh` / `migrate-validator.sh` shell helpers (flags, exit codes, troubleshooting)
 - [validator-migration.md](validator-migration.md) — validator operator migration guide (maintenance window,`max_validator_delegations` check, consensus key handling)
 - [legacy-migration.md](../evmigration/legacy-migration.md) —`x/evmigration` module architecture, proto shapes, keeper logic, and the full reference for the offline proof flow
 - [node-evm-config-guide.md](node-evm-config-guide.md) — post-upgrade`app.toml` / RPC configuration for full nodes and validators

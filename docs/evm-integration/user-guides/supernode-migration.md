@@ -22,8 +22,8 @@ Migration is idempotent end-to-end: if anything fails mid-flight, restart the da
 
 Both paths land in the same final state (new EVM key registered as supernode, legacy key deleted, `config.yml` updated). The operator steps are identical — what differs is whether the daemon initiates the on-chain migration or just finalizes one you already submitted.
 
-- **Path A — Supernode daemon migrates for you (recommended default).** You recover a new EVM key into the supernode keyring, add `evm_key_name` to `config.yml`, and restart. The daemon detects the legacy key, dual-signs with both keys, and broadcasts `MsgClaimLegacyAccount` itself. This is the flow the rest of this guide documents in steps 1–4.
-- **Path B — Migrate via Keplr + Portal first, then let the supernode finalize.** You use the Portal's standard [end-user migration](migration.md#method-1-portal--keplr-recommended) (browser + Keplr) to submit the migration transaction yourself. Then on the supernode host, you recover the same EVM key into the supernode's keyring, update `config.yml`, and restart. On startup the daemon sees the on-chain migration record, matches it against your configured `evm_key_name`, skips the broadcast, and performs only local cleanup.
+- **Path A — Supernode daemon migrates for you (recommended default).** You recover a new EVM key into the supernode keyring, add`evm_key_name` to`config.yml`, and restart. The daemon detects the legacy key, dual-signs with both keys, and broadcasts`MsgClaimLegacyAccount` itself. This is the flow the rest of this guide documents in steps 1–4.
+- **Path B — Migrate via Keplr + Portal first, then let the supernode finalize.** You use the Portal's standard[end-user migration](migration.md#method-1-portal--keplr-recommended) (browser + Keplr) to submit the migration transaction yourself. Then on the supernode host, you recover the same EVM key into the supernode's keyring, update`config.yml`, and restart. On startup the daemon sees the on-chain migration record, matches it against your configured`evm_key_name`, skips the broadcast, and performs only local cleanup.
 
 Path B is useful when you want to use Keplr's UX to see each step (the Portal shows balances, delegations, and a pre-migration checklist), when you need to migrate the account's balance urgently for non-supernode reasons, or when your node ops team and your wallet custody team are different people.
 
@@ -139,6 +139,95 @@ grep -E "key_name|identity|evm_key_name" ~/.supernode/config.yml
 ```
 
 You should see `key_name: <evm-key-name>`, `identity: <new-evm-address>`, and no `evm_key_name` line.
+
+---
+
+## Path B — Migrating via Portal + Keplr first
+
+Use this section if you chose Path B from the ["Two ways to migrate"](#two-ways-to-migrate-pick-one) choice above. Follow the steps in order — don't interleave with Path A steps.
+
+### Before you start
+
+- You need the **same mnemonic** in Keplr (for the Portal) and on the supernode host (for `supernode keys recover`). The deterministic address match between the Portal-submitted migration record and the key you'll import into the supernode keyring depends on this.
+- Decide *when* you'll run each step. A safe order is: stop the supernode → migrate in Keplr → recover the EVM key → edit config → restart. Leaving the supernode running between the Portal migration and the final restart is not harmful (the legacy account no longer exists on-chain, so the supernode's outgoing txs will fail fast), but it produces alarming-looking errors in the logs until you restart.
+
+### Step B1 — Stop the supernode
+
+```bash
+systemctl stop supernode   # or whatever init system you use
+```
+
+Stopping avoids log noise and ensures no inflight txs from the legacy key race with the migration.
+
+### Step B2 — Migrate the account via the Portal (Keplr)
+
+Follow the standard end-user migration flow in [migration.md → Method 1: Portal + Keplr](migration.md#method-1-portal--keplr-recommended). The supernode account behaves like any other Keplr account in this flow — there's nothing supernode-specific to do in the browser.
+
+Quick summary of what you'll do:
+
+1. Open the Lumera Portal's **Claim** page.
+2. Connect Keplr with the mnemonic that currently controls the legacy supernode account.
+3. The portal auto-detects the legacy account, shows your balance/delegations/supernode status, and offers a "Ready to Migrate" wizard.
+4. Click through Review → Sign & Confirm → Submit. Keplr will pop up twice to sign the legacy proof (ADR-036) and the new proof (Ethereum `personal_sign`).
+5. The portal confirms the transaction and shows the migration record with `new_address`.
+
+After the Portal shows success, verify the on-chain record on the host (or on the Portal's success screen):
+
+```bash
+lumerad query evmigration migration-record <legacy-address>
+```
+
+Note the `new_address` — you'll verify that it matches what the supernode derives locally in Step B5.
+
+### Step B3 — Recover the new EVM key into the supernode keyring
+
+Exactly the same operation as Path A's Step 1. **Use the same mnemonic you used in Keplr** — this is the critical piece that makes Path B work:
+
+```bash
+supernode keys recover <evm-key-name> --mnemonic "twelve or twenty four mnemonic words ..."
+supernode keys list
+```
+
+Confirm the printed EVM address matches the `new_address` you saw in the Portal and in the migration record. If they don't match, stop — you're using a different mnemonic than Keplr did, and the supernode will refuse to finalize.
+
+### Step B4 — Add `evm_key_name` to `config.yml`
+
+Exactly the same operation as Path A's Step 2:
+
+```yaml
+supernode:
+  key_name: supernode-legacy       # existing legacy key (unchanged)
+  evm_key_name: supernode-evm      # must match the name you chose in Step B3
+  identity: "lumera1...legacyaddr" # existing legacy address — daemon will rewrite on restart
+  # ...
+```
+
+### Step B5 — Restart the supernode (local cleanup only)
+
+```bash
+systemctl start supernode
+```
+
+On startup the daemon:
+
+1. Detects the legacy key in the keyring (`is_legacy_key=true`).
+2. Queries `MigrationRecord(legacyAddr)` — finds the record you submitted via Keplr.
+3. Compares the record's `new_address` to the address derived from your locally-imported `evm_key_name` — they match (same mnemonic, same HD path, same algorithm).
+4. Sets `alreadyMigrated=true` and **skips the broadcast step entirely**.
+5. Performs only local cleanup: rewrites `config.yml` (`key_name` → evm key name, `identity` → new address, removes `evm_key_name`), deletes the old legacy key from the keyring.
+
+Expected logs — see the [Path B log variant](#path-b-log-variant--already-migrated-via-keplr) callout in Step 3 for the exact sequence. The key line is `INFO  Account already migrated on-chain, skipping broadcast`.
+
+### Step B6 — Verify
+
+Same as Path A's [Step 4 — Verify](#step-4--verify). Three queries — migration record, supernode registration at the new address, and `config.yml` state — all should reflect the new EVM address.
+
+### Path B gotchas
+
+- **Different mnemonic on supernode host**: if the mnemonic you recover with `supernode keys recover` is *not* the one you used in Keplr, the derived bech32 addresses differ, and the daemon logs `migration record exists on-chain but new address mismatch` and exits. Recover with the Keplr mnemonic and retry.
+- **Picked the wrong Keplr account**: if Keplr held multiple accounts and you migrated the wrong one, the on-chain migration record points to the wrong legacy address. Check the Portal's success page for the legacy address it migrated from — it must match your supernode's current `identity`.
+- **Supernode never stopped**: if the supernode kept running between Step B2 and Step B5, its outbound txs will have been erroring with "account not found" for the duration. This is cosmetic — the final restart clears the state. But stop-first is cleaner.
+- **Multisig legacy account**: Path B does not apply to multisig supernode accounts — Keplr can't drive a K-of-N ceremony. See the [Multisig supernode accounts](#multisig-supernode-accounts) section.
 
 ---
 

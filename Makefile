@@ -179,7 +179,10 @@ release: go.sum
 		echo "Building release target $$goos/$$goarch..."; \
 		CGO_LDFLAGS="${RELEASE_CGO_LDFLAGS}" GOFLAGS=${GOFLAGS} GOOS=$$goos GOARCH=$$goarch ${GO} build -mod=readonly $(if $(strip $(BUILD_TAGS)),-tags "$(BUILD_TAGS)",) -ldflags '$(BUILD_LDFLAGS)' -o $$outdir/${APP_BINARY} ./$(APP_MAIN); \
 		chmod +x $$outdir/${APP_BINARY}; \
-		tar -C $$outdir -czf ${RELEASE_DIR}/${APP_NAME}_$${goos}_$${goarch}.tar.gz ${APP_BINARY}; \
+		mkdir -p $$outdir/scripts; \
+		cp scripts/evmigration-common.sh scripts/migrate-account.sh scripts/migrate-validator.sh $$outdir/scripts/; \
+		chmod +x $$outdir/scripts/migrate-account.sh $$outdir/scripts/migrate-validator.sh; \
+		tar -C $$outdir -czf ${RELEASE_DIR}/${APP_NAME}_$${goos}_$${goarch}.tar.gz ${APP_BINARY} scripts; \
 		rm -rf $$outdir; \
 	done
 	@(cd ${RELEASE_DIR} && sha256sum *.tar.gz > release_checksum)

@@ -132,3 +132,60 @@ parse_common_flags() {
   # shellcheck disable=SC2034
   NEW_KEY="${positional[1]}"
 }
+
+# ---- Environment requirements -----------------------------------------------
+
+require_jq() {
+  if ! command -v jq >/dev/null 2>&1; then
+    log_error "jq is required but not found on PATH"
+    exit 2
+  fi
+}
+
+require_binary() {
+  if ! command -v "$BIN" >/dev/null 2>&1 && [[ ! -x "$BIN" ]]; then
+    log_error "lumerad binary not found: $BIN"
+    exit 2
+  fi
+  if ! "$BIN" query evmigration --help >/dev/null 2>&1; then
+    log_error "$BIN does not support 'query evmigration' — needs a post-EVM-upgrade build"
+    exit 2
+  fi
+}
+
+# ---- lumerad wrappers -------------------------------------------------------
+
+# Returns (via stdout, one per line) the keyring flags derived from globals.
+_keyring_flags() {
+  local flags=(--keyring-backend "$KEYRING_BACKEND")
+  [[ -n "${KEYRING_DIR:-}" ]] && flags+=(--keyring-dir "$KEYRING_DIR")
+  [[ -n "${HOME_DIR:-}"    ]] && flags+=(--home "$HOME_DIR")
+  printf '%s\n' "${flags[@]}"
+}
+
+_read_keyring_flags() {
+  mapfile -t _KRF < <(_keyring_flags)
+}
+
+lumerad_q() {
+  _read_keyring_flags
+  "$BIN" query "$@" --node "$NODE" --output json
+}
+
+lumerad_tx() {
+  if [[ -z "${CHAIN_ID:-}" ]]; then
+    log_error "--chain-id (or \$LUMERA_CHAIN_ID) is required for tx commands"
+    exit 1
+  fi
+  _read_keyring_flags
+  "$BIN" tx "$@" \
+    --node "$NODE" \
+    --chain-id "$CHAIN_ID" \
+    "${_KRF[@]}" \
+    --output json
+}
+
+lumerad_keys() {
+  _read_keyring_flags
+  "$BIN" keys "$@" "${_KRF[@]}"
+}

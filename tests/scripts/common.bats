@@ -101,3 +101,42 @@ setup() {
   [ "$status" -eq 1 ]
   [[ "$output" == *"--chain-id requires a value"* ]]
 }
+
+# ---- require_jq / require_binary / lumerad wrappers -------------------------
+
+setup_shim() {
+  SHIM_BIN="$BATS_TEST_DIRNAME/fixtures/lumerad-shim.sh"
+  BIN="$SHIM_BIN"
+  NODE="tcp://localhost:26657"
+  CHAIN_ID="shim-test"
+  KEYRING_BACKEND="test"
+}
+
+@test "require_jq passes when jq exists" {
+  run bash -c 'source '"$SCRIPTS_DIR"'/evmigration-common.sh; require_jq'
+  [ "$status" -eq 0 ]
+}
+
+@test "require_binary accepts shim" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'
+    require_binary
+  '
+  [ "$status" -eq 0 ]
+}
+
+@test "lumerad_q invokes the binary with routed query" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'
+    NODE="tcp://example:1234"
+    KEYRING_BACKEND="test"
+    lumerad_q evmigration migration-record lumera1anything
+  '
+  [ "$status" -eq 0 ]
+  # Output should be a JSON object (from record-not-found fixture = "{}").
+  [[ "$output" == *"{"* ]]
+}

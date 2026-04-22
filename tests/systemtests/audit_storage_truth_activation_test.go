@@ -45,7 +45,7 @@ import (
 //   - postponeThreshold: suspicion score at which the node is postponed (SOFT/FULL only)
 //   - watchThreshold: suspicion score at which Watch band begins
 //   - healThreshold: ticket deterioration score at which heal ops are scheduled
-//   - decayPerEpoch: score decay applied each epoch (0 disables decay)
+//   - decayPerEpoch: score decay factor per epoch; 0 maps to 1000/no decay for tests
 //   - maxHealOps: maximum self-heal ops scheduled per epoch
 func setStorageTruthTestParams(
 	t *testing.T,
@@ -87,9 +87,13 @@ func setStorageTruthTestParams(
 			[]byte(fmt.Sprintf("%q", strconv.FormatInt(healThreshold, 10))))
 		require.NoError(t, err)
 
+		effectiveDecay := decayPerEpoch
+		if effectiveDecay == 0 {
+			effectiveDecay = 1000
+		}
 		state, err = sjson.SetRawBytes(state,
 			"app_state.audit.params.storage_truth_node_suspicion_decay_per_epoch",
-			[]byte(fmt.Sprintf("%q", strconv.FormatInt(decayPerEpoch, 10))))
+			[]byte(fmt.Sprintf("%q", strconv.FormatInt(effectiveDecay, 10))))
 		require.NoError(t, err)
 
 		// uint32: proto3 JSON number.

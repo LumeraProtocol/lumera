@@ -13,6 +13,7 @@
   "feegrant_count": 0,
   "total_touched": 0,
   "has_supernode": false,
+  "action_count": 0,
   "balance_summary": "1000000ulume",
   "would_succeed": false,
   "rejection_reason": "legacy account not found"

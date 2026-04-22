@@ -241,6 +241,7 @@ preflight_estimate() {
 
   # Human summary to stderr.
   local balance delegations unbonding redelegations authz feegrants supernode would
+  local actions is_validator is_multisig threshold num_signers val_dels val_unb val_red
   balance=$(jq -r '.balance_summary' <<<"$json")
   delegations=$(jq -r '.delegation_count' <<<"$json")
   unbonding=$(jq -r '.unbonding_count' <<<"$json")
@@ -249,17 +250,37 @@ preflight_estimate() {
   feegrants=$(jq -r '.feegrant_count' <<<"$json")
   supernode=$(jq -r 'if .has_supernode then "yes" else "no" end' <<<"$json")
   would=$(jq -r 'if .would_succeed then "yes" else "no" end' <<<"$json")
+  actions=$(jq -r '.action_count' <<<"$json")
+  is_validator=$(jq -r 'if .is_validator then "yes" else "no" end' <<<"$json")
+  is_multisig=$(jq -r 'if .is_multisig then "yes" else "no" end' <<<"$json")
+  threshold=$(jq -r '.threshold' <<<"$json")
+  num_signers=$(jq -r '.num_signers' <<<"$json")
+  val_dels=$(jq -r '.val_delegation_count' <<<"$json")
+  val_unb=$(jq -r '.val_unbonding_count' <<<"$json")
+  val_red=$(jq -r '.val_redelegation_count' <<<"$json")
 
   {
     printf 'Migration preview for %s:\n' "$addr"
-    printf '  Balance:        %s\n' "$balance"
-    printf '  Delegations:    %s\n' "$delegations"
-    printf '  Unbonding:      %s\n' "$unbonding"
-    printf '  Redelegations:  %s\n' "$redelegations"
-    printf '  Authz:          %s\n' "$authz"
-    printf '  Feegrants:      %s\n' "$feegrants"
-    printf '  Supernode:      %s\n' "$supernode"
-    printf '  Would succeed:  %s\n' "$would"
+    printf '  Validator:         %s\n' "$is_validator"
+    if [[ "$is_validator" == "yes" ]]; then
+      printf '  Val delegations:   %s (to validator)\n' "$val_dels"
+      printf '  Val unbondings:    %s (to validator)\n' "$val_unb"
+      printf '  Val redelegations: %s (src or dst)\n' "$val_red"
+    fi
+    printf '  Multisig:          %s' "$is_multisig"
+    if [[ "$is_multisig" == "yes" ]]; then
+      printf ' (%s-of-%s)' "$threshold" "$num_signers"
+    fi
+    printf '\n'
+    printf '  Balance:           %s\n' "$balance"
+    printf '  Delegations:       %s\n' "$delegations"
+    printf '  Unbonding:         %s\n' "$unbonding"
+    printf '  Redelegations:     %s\n' "$redelegations"
+    printf '  Authz grants:      %s\n' "$authz"
+    printf '  Feegrants:         %s\n' "$feegrants"
+    printf '  Actions:           %s\n' "$actions"
+    printf '  Supernode:         %s\n' "$supernode"
+    printf '  Would succeed:     %s\n' "$would"
   } >&2
 
   printf '%s\n' "$json"

@@ -104,7 +104,7 @@ From here on, the supernode runs on the EVM key with no further intervention.
 
 ### Path B log variant — already migrated via Keplr
 
-If you chose Path B and already submitted the migration via the Portal + Keplr flow, the restart logs look like this instead:
+If you chose Path B and already submitted the migration via the Portal + Keplr flow, the restart supernode logs look like this instead:
 
 ```text
 INFO  EVM module detected on chain

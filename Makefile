@@ -189,6 +189,7 @@ release: go.sum
 ###              Tests and Simulation           ###
 ###################################################
 .PHONY: unit-tests integration-tests system-tests simulation-tests simulation-bench all-tests lint system-metrics-test
+.PHONY: lint-scripts test-scripts
 
 all-tests: unit-tests integration-tests system-tests simulation-tests
 
@@ -196,7 +197,15 @@ all-tests: unit-tests integration-tests system-tests simulation-tests
 # Example: make unit-tests NOCACHE=1
 NOCACHE_FLAG := $(if $(NOCACHE),-count=1)
 
-lint: openrpc
+lint-scripts:
+	@echo "Running shellcheck on scripts/ ..."
+	@shellcheck -x scripts/evmigration-common.sh scripts/migrate-account.sh scripts/migrate-validator.sh
+
+test-scripts:
+	@echo "Running bats tests for scripts/ ..."
+	@bats tests/scripts/
+
+lint: openrpc lint-scripts
 	@echo "Running linters..."
 	@${GOLANGCI_LINT} run ./... --timeout=5m
 

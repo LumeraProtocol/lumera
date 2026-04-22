@@ -276,9 +276,6 @@ setup_shim() {
   [ "$status" -eq 0 ]
 }
 
-@test "verify_migration is exercised end-to-end in Task 10 integration tests" {
-  skip "covered by migrate-account.bats and migrate-validator.bats"
-}
 
 # ---- Confirmation and mnemonic flow -----------------------------------------
 

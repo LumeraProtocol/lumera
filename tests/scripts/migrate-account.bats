@@ -29,3 +29,20 @@ setup() {
   run "$SCRIPTS_DIR/migrate-account.sh" --chain-id x onlyone
   [ "$status" -eq 1 ]
 }
+
+@test "migrate-account.sh full happy path (broadcast + verify) exits 0" {
+  local state_file
+  state_file=$(mktemp -u)  # don't create it; shim's tx handler will.
+  run env \
+    SHIM_STATE_FILE="$state_file" \
+    SHIM_RECORD_AFTER_FIXTURE=record-post-migration \
+    SHIM_BANK_AFTER_FIXTURE=bank-balances-empty \
+    "$SCRIPTS_DIR/migrate-account.sh" \
+    --binary "$SHIM" \
+    --chain-id shim-test \
+    --yes \
+    legacykey newkey
+  rm -f "$state_file"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"migration complete"* ]]
+}

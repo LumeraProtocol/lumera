@@ -355,9 +355,11 @@ verify_migration() {
   local legacy="$1" new="$2" snap_json="$3"
 
   # 1. Migration record must exist and point to <new>.
-  local rec_json
-  rec_json=$(lumerad_q evmigration migration-record "$legacy" 2>/dev/null || printf '{}')
-  local rec_new
+  local rec_json rec_new
+  if ! rec_json=$(lumerad_q evmigration migration-record "$legacy" 2>/dev/null); then
+    log_error "post-check: could not query migration-record for $legacy — verify manually"
+    exit 7
+  fi
   rec_new=$(jq -r '.record.new_address // empty' <<<"$rec_json")
   if [[ "$rec_new" != "$new" ]]; then
     log_error "post-check: migration record for $legacy does not point to $new (got: '$rec_new')"
@@ -366,7 +368,10 @@ verify_migration() {
 
   # 2. Legacy balances must be all zero (account removed or empty).
   local legacy_after
-  legacy_after=$(lumerad_q bank balances "$legacy" 2>/dev/null || printf '{"balances":[]}')
+  if ! legacy_after=$(lumerad_q bank balances "$legacy" 2>/dev/null); then
+    log_error "post-check: could not query legacy bank balances for $legacy — verify manually"
+    exit 7
+  fi
   if [[ "$(jq -r '[.balances[].amount | tonumber] | add // 0' <<<"$legacy_after")" != "0" ]]; then
     log_error "post-check: legacy address $legacy still has non-zero balance"
     exit 7
@@ -374,7 +379,10 @@ verify_migration() {
 
   # 3. For every {denom,amount} in snap_json, new balances must be >= amount.
   local new_after
-  new_after=$(lumerad_q bank balances "$new")
+  if ! new_after=$(lumerad_q bank balances "$new" 2>/dev/null); then
+    log_error "post-check: could not query new bank balances for $new — verify manually"
+    exit 7
+  fi
   local diff
   diff=$(jq --argjson new "$new_after" '
     [ .balances[] as $s

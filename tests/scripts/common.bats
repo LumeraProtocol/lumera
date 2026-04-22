@@ -89,3 +89,15 @@ setup() {
   LUMERA_NODE="tcp://from-env:26657" parse_common_flags legacy new
   [ "$NODE" = "tcp://from-env:26657" ]
 }
+
+@test "parse_common_flags aborts when --node has no value" {
+  run bash -c 'source '"$SCRIPTS_DIR"'/evmigration-common.sh; parse_common_flags --node' 2>&1
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"--node requires a value"* ]]
+}
+
+@test "parse_common_flags aborts when --chain-id has no value" {
+  run bash -c 'source '"$SCRIPTS_DIR"'/evmigration-common.sh; parse_common_flags legacy new --chain-id' 2>&1
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"--chain-id requires a value"* ]]
+}

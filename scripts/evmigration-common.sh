@@ -60,6 +60,16 @@ log_error() { printf '%sERROR%s %s\n' "$_C_ERR"  "$_C_RESET" "$*" >&2; }
 
 # ---- Flag parsing -----------------------------------------------------------
 
+# _require_value <flag-name> <arg-count>
+# Aborts with a guided error if the value side of a two-arg flag is missing.
+_require_value() {
+  if (( $2 < 2 )); then
+    log_error "$1 requires a value"
+    _usage
+    exit 1
+  fi
+}
+
 _usage() {
   cat >&2 <<'USAGE'
 Usage: <script> <legacy-key> <new-key> [flags]
@@ -79,42 +89,32 @@ USAGE
 
 parse_common_flags() {
   # Reset in case of double-invocation in tests.
-  # shellcheck disable=SC2034
+  # shellcheck disable=SC2034  # globals consumed by entry scripts
   NODE="${LUMERA_NODE:-tcp://localhost:26657}"
-  # shellcheck disable=SC2034
   CHAIN_ID="${LUMERA_CHAIN_ID:-}"
-  # shellcheck disable=SC2034
   KEYRING_BACKEND="test"
-  # shellcheck disable=SC2034
   KEYRING_DIR=""
-  # shellcheck disable=SC2034
   HOME_DIR=""
-  # shellcheck disable=SC2034
   MNEMONIC_FILE=""
-  # shellcheck disable=SC2034
   YES=0
-  # shellcheck disable=SC2034
   DRY_RUN=0
-  # shellcheck disable=SC2034
   BIN="lumerad"
-  # shellcheck disable=SC2034
   LEGACY_KEY=""
-  # shellcheck disable=SC2034
   NEW_KEY=""
 
   local positional=()
-  # shellcheck disable=SC2034
+  # shellcheck disable=SC2034  # globals consumed by entry scripts
   while (( $# > 0 )); do
     case "$1" in
-      --node)            NODE="$2"; shift 2 ;;
-      --chain-id)        CHAIN_ID="$2"; shift 2 ;;
-      --keyring-backend) KEYRING_BACKEND="$2"; shift 2 ;;
-      --keyring-dir)     KEYRING_DIR="$2"; shift 2 ;;
-      --home)            HOME_DIR="$2"; shift 2 ;;
-      --mnemonic-file)   MNEMONIC_FILE="$2"; shift 2 ;;
+      --node)            _require_value "$1" "$#"; NODE="$2"; shift 2 ;;
+      --chain-id)        _require_value "$1" "$#"; CHAIN_ID="$2"; shift 2 ;;
+      --keyring-backend) _require_value "$1" "$#"; KEYRING_BACKEND="$2"; shift 2 ;;
+      --keyring-dir)     _require_value "$1" "$#"; KEYRING_DIR="$2"; shift 2 ;;
+      --home)            _require_value "$1" "$#"; HOME_DIR="$2"; shift 2 ;;
+      --mnemonic-file)   _require_value "$1" "$#"; MNEMONIC_FILE="$2"; shift 2 ;;
       --yes|-y)          YES=1; shift ;;
       --dry-run)         DRY_RUN=1; shift ;;
-      --binary)          BIN="$2"; shift 2 ;;
+      --binary)          _require_value "$1" "$#"; BIN="$2"; shift 2 ;;
       -h|--help)         _usage; exit 0 ;;
       --) shift; positional+=("$@"); break ;;
       --*) log_error "unknown flag: $1"; _usage; exit 1 ;;

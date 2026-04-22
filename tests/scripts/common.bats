@@ -253,6 +253,17 @@ setup_shim() {
   [ "$status" -eq 5 ]
 }
 
+@test "_record_present exits 2 when the query itself fails" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'; NODE=tcp://local:1
+    SHIM_EXIT=1 SHIM_STDERR="simulated rpc failure" _record_present migration-record lumera1anything
+  '
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"could not query"* ]]
+}
+
 # ---- Bank snapshot, tx polling, verification ---------------------------------
 
 @test "snapshot_bank_balances returns structured JSON" {

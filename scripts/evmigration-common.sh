@@ -315,7 +315,10 @@ assert_estimate_succeeds() {
 _record_present() {
   local subcmd="$1" addr="$2"
   local json
-  json=$(lumerad_q evmigration "$subcmd" "$addr" 2>/dev/null || printf '{}')
+  if ! json=$(lumerad_q evmigration "$subcmd" "$addr" 2>/dev/null); then
+    log_error "could not query evmigration $subcmd for $addr"
+    exit 2
+  fi
   [[ "$(jq -r '.record.legacy_address // empty' <<<"$json")" != "" ]]
 }
 

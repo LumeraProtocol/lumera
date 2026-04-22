@@ -165,12 +165,9 @@ ${BUILD_DIR}/debug/lumerad: $(GO_SRC) app/openrpc/openrpc.json.gz go.sum Makefil
 	GOFLAGS=${GOFLAGS} ${GO} build -mod=readonly $(if $(strip $(BUILD_TAGS)),-tags "$(BUILD_TAGS)",) -gcflags="all=-N -l" -ldflags '$(BUILD_LDFLAGS)' -o ${BUILD_DIR}/$(APP_BINARY) ./$(APP_MAIN)
 	chmod +x ${BUILD_DIR}/$(APP_BINARY)
 
-release: go.sum
+release: go.sum build-proto openrpc
 	@echo "Creating release artifacts..."
 	@mkdir -p ${RELEASE_DIR}
-	@$(MAKE) --no-print-directory app/openrpc/openrpc.json.gz
-	${BUF} generate --template proto/buf.gen.gogo.yaml --verbose
-	${BUF} generate --template proto/buf.gen.swagger.yaml --verbose
 	@rm -f ${RELEASE_DIR}/*.tar.gz ${RELEASE_DIR}/release_checksum
 	@for target in ${RELEASE_TARGETS}; do \
 		goos=$${target%:*}; \

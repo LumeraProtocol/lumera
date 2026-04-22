@@ -164,3 +164,45 @@ setup_shim() {
   [ "$status" -eq 0 ]
   [[ "$output" == lumeravaloper* ]]
 }
+
+@test "preflight_estimate emits raw JSON on stdout, summary on stderr" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'
+    NODE=tcp://local:26657
+    preflight_estimate lumera1example 2>/dev/null
+  '
+  [ "$status" -eq 0 ]
+  # stdout must be parseable JSON and contain the fields
+  echo "$output" | jq -e '.is_multisig == false'
+}
+
+@test "assert_single_sig passes on non-multisig estimate" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    assert_single_sig "$(cat '"$BATS_TEST_DIRNAME"'/fixtures/estimate-ok.json)"
+  '
+  [ "$status" -eq 0 ]
+}
+
+@test "assert_single_sig rejects multisig estimate with exit 3" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    assert_single_sig "$(cat '"$BATS_TEST_DIRNAME"'/fixtures/estimate-multisig.json)"
+  '
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"multisig"* ]]
+}
+
+@test "assert_estimate_succeeds exits 4 on would_succeed=false" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    assert_estimate_succeeds "$(cat '"$BATS_TEST_DIRNAME"'/fixtures/estimate-rejected.json)"
+  '
+  [ "$status" -eq 4 ]
+  [[ "$output" == *"legacy account not found"* ]]
+}

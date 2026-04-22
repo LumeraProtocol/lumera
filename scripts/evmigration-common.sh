@@ -215,3 +215,62 @@ lumera_to_valoper() {
   fi
   printf '%s\n' "$valoper"
 }
+
+# ---- Pre-flight estimate ---------------------------------------------------
+
+# preflight_estimate <legacy-addr>
+# Emits raw migration-estimate JSON on stdout; a human summary on stderr.
+# Does NOT assert on would_succeed — callers run the more specific checks
+# (multisig, validator-cap) first so they can return their own exit codes.
+preflight_estimate() {
+  local addr="$1"
+  local json
+  json=$(lumerad_q evmigration migration-estimate "$addr")
+
+  # Human summary to stderr.
+  local balance delegations unbonding redelegations authz feegrants supernode would
+  balance=$(jq -r '.balance_summary' <<<"$json")
+  delegations=$(jq -r '.delegation_count' <<<"$json")
+  unbonding=$(jq -r '.unbonding_count' <<<"$json")
+  redelegations=$(jq -r '.redelegation_count' <<<"$json")
+  authz=$(jq -r '.authz_grant_count' <<<"$json")
+  feegrants=$(jq -r '.feegrant_count' <<<"$json")
+  supernode=$(jq -r 'if .has_supernode then "yes" else "no" end' <<<"$json")
+  would=$(jq -r 'if .would_succeed then "yes" else "no" end' <<<"$json")
+
+  {
+    printf 'Migration preview for %s:\n' "$addr"
+    printf '  Balance:        %s\n' "$balance"
+    printf '  Delegations:    %s\n' "$delegations"
+    printf '  Unbonding:      %s\n' "$unbonding"
+    printf '  Redelegations:  %s\n' "$redelegations"
+    printf '  Authz:          %s\n' "$authz"
+    printf '  Feegrants:      %s\n' "$feegrants"
+    printf '  Supernode:      %s\n' "$supernode"
+    printf '  Would succeed:  %s\n' "$would"
+  } >&2
+
+  printf '%s\n' "$json"
+}
+
+assert_single_sig() {
+  local json="$1"
+  if [[ "$(jq -r '.is_multisig' <<<"$json")" == "true" ]]; then
+    local k n
+    k=$(jq -r '.threshold' <<<"$json")
+    n=$(jq -r '.num_signers' <<<"$json")
+    log_error "legacy account is a ${k}-of-${n} multisig; this script supports single-sig only"
+    log_error "use the offline flow: see docs/design/evmigration-multisig-design.md"
+    exit 3
+  fi
+}
+
+assert_estimate_succeeds() {
+  local json="$1"
+  if [[ "$(jq -r '.would_succeed' <<<"$json")" != "true" ]]; then
+    local reason
+    reason=$(jq -r '.rejection_reason' <<<"$json")
+    log_error "pre-flight: migration would fail: $reason"
+    exit 4
+  fi
+}

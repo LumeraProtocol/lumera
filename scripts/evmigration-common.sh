@@ -375,3 +375,80 @@ verify_migration() {
     exit 7
   fi
 }
+
+# ---- Confirmation -----------------------------------------------------------
+
+# confirm <prompt>
+# Returns 0 on user confirmation or when YES=1 is set; exits 10 on refusal.
+confirm() {
+  local prompt="$1"
+  if (( YES == 1 )); then
+    return 0
+  fi
+  local reply=""
+  printf '%s [y/N] ' "$prompt" >&2
+  read -r reply || true
+  if [[ "$reply" =~ ^[Yy]([Ee][Ss])?$ ]]; then
+    return 0
+  fi
+  log_error "aborted by user"
+  exit 10
+}
+
+# ---- Mnemonic flow ---------------------------------------------------------
+
+_MNEMONIC_CLEANUP_KEYS=()
+
+cleanup_mnemonic_keys() {
+  local k
+  for k in "${_MNEMONIC_CLEANUP_KEYS[@]:-}"; do
+    [[ -z "$k" ]] && continue
+    lumerad_keys delete "$k" --yes >/dev/null 2>&1 || true
+  done
+}
+
+import_from_mnemonic() {
+  local mfile="$1" legacy_name="$2" new_name="$3"
+
+  if [[ ! -f "$mfile" ]]; then
+    log_error "mnemonic file not found: $mfile"
+    exit 1
+  fi
+  # Require mode 0600 or stricter (no group/world bits).
+  local mode
+  mode=$(stat -c '%a' "$mfile" 2>/dev/null || stat -f '%A' "$mfile" 2>/dev/null || echo "")
+  if [[ -z "$mode" ]]; then
+    log_error "cannot stat $mfile"
+    exit 1
+  fi
+  # Reject if last two octal digits are non-zero.
+  if [[ "${mode: -2}" != "00" ]]; then
+    log_error "mnemonic file $mfile must be mode 0600 (got $mode)"
+    exit 1
+  fi
+
+  # Abort if either key name already exists in the keyring.
+  if lumerad_keys show "$legacy_name" -a >/dev/null 2>&1; then
+    log_error "key '$legacy_name' already exists in keyring"
+    exit 1
+  fi
+  if lumerad_keys show "$new_name" -a >/dev/null 2>&1; then
+    log_error "key '$new_name' already exists in keyring"
+    exit 1
+  fi
+
+  local mnemonic
+  mnemonic=$(< "$mfile")
+
+  # Register cleanup before doing anything else that might fail.
+  _MNEMONIC_CLEANUP_KEYS=("$legacy_name" "$new_name")
+  # shellcheck disable=SC2154  # rc is captured at trap runtime
+  trap 'rc=$?; cleanup_mnemonic_keys; exit "$rc"' EXIT
+
+  printf '%s\n' "$mnemonic" | lumerad_keys add "$legacy_name" \
+    --recover --coin-type 118 --algo secp256k1
+  printf '%s\n' "$mnemonic" | lumerad_keys add "$new_name" \
+    --recover --coin-type 60 --algo eth_secp256k1
+
+  unset mnemonic
+}

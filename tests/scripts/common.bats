@@ -273,3 +273,45 @@ setup_shim() {
 @test "verify_migration is exercised end-to-end in Task 10 integration tests" {
   skip "covered by migrate-account.bats and migrate-validator.bats"
 }
+
+# ---- Confirmation and mnemonic flow -----------------------------------------
+
+@test "confirm returns 0 immediately when YES=1" {
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    YES=1
+    confirm "proceed?"
+  '
+  [ "$status" -eq 0 ]
+}
+
+@test "confirm exits 10 on user no" {
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    YES=0
+    echo "n" | confirm "proceed?"
+  '
+  [ "$status" -eq 10 ]
+}
+
+@test "confirm returns 0 on user yes" {
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    YES=0
+    echo "y" | confirm "proceed?"
+  '
+  [ "$status" -eq 0 ]
+}
+
+@test "import_from_mnemonic rejects world-readable file with exit 1" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'
+    mf=$(mktemp); echo "test mnemonic" > "$mf"; chmod 0644 "$mf"
+    import_from_mnemonic "$mf" k1 k2
+    rm -f "$mf"
+  '
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"mode 0600"* ]]
+}

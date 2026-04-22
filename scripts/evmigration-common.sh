@@ -60,11 +60,16 @@ log_error() { printf '%sERROR%s %s\n' "$_C_ERR"  "$_C_RESET" "$*" >&2; }
 
 # ---- Flag parsing -----------------------------------------------------------
 
-# _require_value <flag-name> <arg-count>
-# Aborts with a guided error if the value side of a two-arg flag is missing.
+# _require_value <flag-name> <arg-count> <next-arg-or-empty>
+# Aborts if the next argument is missing or looks like another flag.
 _require_value() {
   if (( $2 < 2 )); then
     log_error "$1 requires a value"
+    _usage
+    exit 1
+  fi
+  if [[ "${3-}" == --* ]]; then
+    log_error "$1 requires a value (got flag-shaped arg: $3)"
     _usage
     exit 1
   fi
@@ -106,15 +111,15 @@ parse_common_flags() {
   # shellcheck disable=SC2034  # globals consumed by entry scripts
   while (( $# > 0 )); do
     case "$1" in
-      --node)            _require_value "$1" "$#"; NODE="$2"; shift 2 ;;
-      --chain-id)        _require_value "$1" "$#"; CHAIN_ID="$2"; shift 2 ;;
-      --keyring-backend) _require_value "$1" "$#"; KEYRING_BACKEND="$2"; shift 2 ;;
-      --keyring-dir)     _require_value "$1" "$#"; KEYRING_DIR="$2"; shift 2 ;;
-      --home)            _require_value "$1" "$#"; HOME_DIR="$2"; shift 2 ;;
-      --mnemonic-file)   _require_value "$1" "$#"; MNEMONIC_FILE="$2"; shift 2 ;;
+      --node)            _require_value "$1" "$#" "${2-}"; NODE="$2"; shift 2 ;;
+      --chain-id)        _require_value "$1" "$#" "${2-}"; CHAIN_ID="$2"; shift 2 ;;
+      --keyring-backend) _require_value "$1" "$#" "${2-}"; KEYRING_BACKEND="$2"; shift 2 ;;
+      --keyring-dir)     _require_value "$1" "$#" "${2-}"; KEYRING_DIR="$2"; shift 2 ;;
+      --home)            _require_value "$1" "$#" "${2-}"; HOME_DIR="$2"; shift 2 ;;
+      --mnemonic-file)   _require_value "$1" "$#" "${2-}"; MNEMONIC_FILE="$2"; shift 2 ;;
       --yes|-y)          YES=1; shift ;;
       --dry-run)         DRY_RUN=1; shift ;;
-      --binary)          _require_value "$1" "$#"; BIN="$2"; shift 2 ;;
+      --binary)          _require_value "$1" "$#" "${2-}"; BIN="$2"; shift 2 ;;
       -h|--help)         _usage; exit 0 ;;
       --) shift; positional+=("$@"); break ;;
       --*) log_error "unknown flag: $1"; _usage; exit 1 ;;

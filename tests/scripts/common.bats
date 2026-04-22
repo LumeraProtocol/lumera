@@ -102,6 +102,12 @@ setup() {
   [[ "$output" == *"--chain-id requires a value"* ]]
 }
 
+@test "parse_common_flags rejects flag-shaped value for --node" {
+  run bash -c 'source '"$SCRIPTS_DIR"'/evmigration-common.sh; parse_common_flags --node --chain-id legacy new'
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"requires a value"* ]]
+}
+
 # ---- require_jq / require_binary / lumerad wrappers -------------------------
 
 setup_shim() {

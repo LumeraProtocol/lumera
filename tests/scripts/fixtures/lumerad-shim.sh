@@ -53,9 +53,11 @@ Bech32 Val: lumeravalopershimxxxxxxxxxxxxxxxxxxxxxxxxxx
 Bech32 Con: lumeravalconsshimxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ADDR
     ;;
+  "query evmigration --help"*)                            printf 'help stub\n' ;;
+  "tx evmigration claim-legacy-account --help"*)         printf 'help stub\n' ;;
+  "tx evmigration migrate-validator --help"*)            printf 'help stub\n' ;;
   "tx evmigration"*)                                      emit broadcast-success ;;
   "version"*)                                             printf 'v0.0.0-shim\n' ;;
-  "query evmigration --help"*)                            printf 'help stub\n' ;;
   *) printf 'shim: unhandled args: %s\n' "$*" >&2; exit 1 ;;
 esac
 

@@ -147,10 +147,17 @@ require_binary() {
     log_error "lumerad binary not found: $BIN"
     exit 2
   fi
-  if ! "$BIN" query evmigration --help >/dev/null 2>&1; then
-    log_error "$BIN does not support 'query evmigration' — needs a post-EVM-upgrade build"
-    exit 2
-  fi
+  local probe
+  for probe in \
+    "query evmigration" \
+    "tx evmigration claim-legacy-account" \
+    "tx evmigration migrate-validator"; do
+    # shellcheck disable=SC2086  # intentional word-splitting of probe
+    if ! "$BIN" $probe --help >/dev/null 2>&1; then
+      log_error "$BIN does not support '$probe' — needs a post-EVM-upgrade build"
+      exit 2
+    fi
+  done
 }
 
 # ---- lumerad wrappers -------------------------------------------------------

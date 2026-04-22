@@ -38,3 +38,22 @@ BIN="lumerad"
 LEGACY_KEY=""
 # shellcheck disable=SC2034
 NEW_KEY=""
+
+# ---- Logging ----------------------------------------------------------------
+
+# Colors are emitted only when stderr is a TTY. Set NO_COLOR=1 to force off.
+_color_init() {
+  if [[ -t 2 && -z "${NO_COLOR:-}" ]]; then
+    _C_INFO=$'\033[36m'   # cyan
+    _C_WARN=$'\033[33m'   # yellow
+    _C_ERR=$'\033[31m'    # red
+    _C_RESET=$'\033[0m'
+  else
+    _C_INFO="" _C_WARN="" _C_ERR="" _C_RESET=""
+  fi
+}
+_color_init
+
+log_info()  { printf '%sINFO%s  %s\n' "$_C_INFO" "$_C_RESET" "$*" >&2; }
+log_warn()  { printf '%sWARN%s  %s\n' "$_C_WARN" "$_C_RESET" "$*" >&2; }
+log_error() { printf '%sERROR%s %s\n' "$_C_ERR"  "$_C_RESET" "$*" >&2; }

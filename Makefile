@@ -100,7 +100,7 @@ install: build
 	@echo "Installing $(APP_BINARY) to $(shell ${GO} env GOPATH)/bin/..."
 	@cp ${BUILD_DIR}/$(APP_BINARY) $(shell ${GO} env GOPATH)/bin/
 
-build-proto: clean-proto $(PROTO_SRC) build-openapi
+build-proto: clean-proto $(PROTO_SRC)
 	@echo "Processing proto files..."
 	${BUF} generate --template proto/buf.gen.gogo.yaml --verbose
 	${BUF} generate --template proto/buf.gen.swagger.yaml --verbose

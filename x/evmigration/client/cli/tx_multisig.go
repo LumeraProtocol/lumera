@@ -900,7 +900,7 @@ index's entry in place rather than duplicating it.`,
 				}
 				signInput, err := legacySigningInput(payload, pp.Legacy.SigFormat, signerAddr)
 				if err != nil {
-					return err
+					return fmt.Errorf("--from: %w", err)
 				}
 				sig, _, err := clientCtx.Keyring.Sign(fromKey, signInput, signingtypes.SignMode_SIGN_MODE_UNSPECIFIED)
 				if err != nil {
@@ -923,7 +923,7 @@ index's entry in place rather than duplicating it.`,
 				}
 				signInput, err := newSigningInput(payload, pp.New.SigFormat, signerAddr)
 				if err != nil {
-					return err
+					return fmt.Errorf("--new-key: %w", err)
 				}
 				// Eth keyring uses LEGACY_AMINO_JSON sign mode for the interface;
 				// internally it applies Keccak256 to whatever bytes we hand it.

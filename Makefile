@@ -199,7 +199,7 @@ NOCACHE_FLAG := $(if $(NOCACHE),-count=1)
 
 lint-scripts:
 	@echo "Running shellcheck on scripts/ ..."
-	@shellcheck -x scripts/evmigration-common.sh scripts/migrate-account.sh scripts/migrate-validator.sh
+	@shellcheck -x scripts/evmigration-common.sh scripts/migrate-account.sh scripts/migrate-validator.sh scripts/migrate-multisig.sh
 
 test-scripts:
 	@echo "Running bats tests for scripts/ ..."

@@ -1036,11 +1036,15 @@ to --out, with both legacy_proof and new_proof populated.`,
 			// Final sanity check: the assembled msg must satisfy ValidateBasic.
 			// Belt-and-suspenders — duplicate-index dedupe and per-side selection
 			// are already enforced by buildProofFromPartial, but this guarantees
-			// we never write a malformed tx to disk.
-			if vb, ok := msg.(sdk.HasValidateBasic); ok {
-				if err := vb.ValidateBasic(); err != nil {
-					return fmt.Errorf("assembled message failed ValidateBasic: %w", err)
-				}
+			// we never write a malformed tx to disk. Fail-closed: if a future
+			// migration msg type is added to the switch above without a
+			// ValidateBasic method, trip here rather than silently bypass.
+			vb, ok := msg.(sdk.HasValidateBasic)
+			if !ok {
+				return fmt.Errorf("BUG: assembled msg type %T does not implement ValidateBasic", msg)
+			}
+			if err := vb.ValidateBasic(); err != nil {
+				return fmt.Errorf("assembled message failed ValidateBasic: %w", err)
 			}
 
 			// Build the unsigned tx JSON.

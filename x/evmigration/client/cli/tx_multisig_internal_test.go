@@ -101,6 +101,29 @@ func TestBuildProofFromPartial_SingleKey_WrongIndex(t *testing.T) {
 	require.ErrorContains(t, err, "expects index=0")
 }
 
+// TestBuildProofFromPartial_SingleKey_InvalidSig_Aborts exercises the single-key
+// crypto-failure branch at tx_multisig.go:288. Unlike multisig (drop-and-warn),
+// the single-key side has no fallback signer, so a bad signature must abort.
+func TestBuildProofFromPartial_SingleKey_InvalidSig_Aborts(t *testing.T) {
+	priv := secp256k1.GenPrivKey()
+	pk := priv.PubKey().(*secp256k1.PubKey)
+	payload := []byte("lumera-evm-migration:lumera-test-1:76857769:claim:legacy:new")
+
+	// 64 zero bytes is a well-formed-looking but cryptographically invalid
+	// Cosmos secp256k1 signature — passes length checks, fails verification.
+	garbageSig := make([]byte, 64)
+
+	side := &SideSpec{
+		PubKey:    base64.StdEncoding.EncodeToString(pk.Bytes()),
+		SigFormat: "SIG_FORMAT_CLI",
+	}
+	sigs := []PartialSignature{{Index: 0, Signature: base64.StdEncoding.EncodeToString(garbageSig)}}
+
+	_, err := buildProofFromPartial(side, sigs, payload, sigverify.SubKeyTypeCosmosSecp256k1, "legacy", io.Discard)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "single-key partial signature invalid")
+}
+
 // ---------- buildProofFromPartial — multisig Cosmos side ----------
 
 func TestBuildProofFromPartial_Multisig_Valid2of3(t *testing.T) {
@@ -207,6 +230,40 @@ func TestBuildProofFromPartial_Multisig_OutOfRangeIndex_Dropped(t *testing.T) {
 	require.NotNil(t, mp)
 	// Only index 0 survives; index 5 is dropped.
 	require.Equal(t, []uint32{0}, mp.SignerIndices)
+}
+
+// TestBuildProofFromPartial_Multisig_BadBase64Sig_Dropped exercises the drop-and-warn
+// branch at tx_multisig.go:319-323 where a sig entry fails base64 decode. This is
+// structurally distinct from out-of-range-index and bad-crypto-sig drops: it catches
+// corruption at the decode step, before crypto verification is even attempted.
+func TestBuildProofFromPartial_Multisig_BadBase64Sig_Dropped(t *testing.T) {
+	privs := []*secp256k1.PrivKey{
+		secp256k1.GenPrivKey(),
+		secp256k1.GenPrivKey(),
+		secp256k1.GenPrivKey(),
+	}
+	payload := []byte("lumera-evm-migration:lumera-test-1:76857769:claim:legacy:new")
+
+	subPubKeys := make([]string, len(privs))
+	for i, p := range privs {
+		subPubKeys[i] = base64.StdEncoding.EncodeToString(p.PubKey().Bytes())
+	}
+
+	// Indices 0 and 1: valid base64 + valid sigs. Index 2: malformed base64.
+	sigs := []PartialSignature{
+		{Index: 0, Signature: base64.StdEncoding.EncodeToString(cosmosSign(t, privs[0], payload))},
+		{Index: 1, Signature: base64.StdEncoding.EncodeToString(cosmosSign(t, privs[1], payload))},
+		{Index: 2, Signature: "!!!not-base64!!!"},
+	}
+	side := &SideSpec{Threshold: 2, SubPubKeys: subPubKeys, SigFormat: "SIG_FORMAT_CLI"}
+
+	proof, err := buildProofFromPartial(side, sigs, payload, sigverify.SubKeyTypeCosmosSecp256k1, "legacy", io.Discard)
+	require.NoError(t, err)
+	mp := proof.GetMultisig()
+	require.NotNil(t, mp)
+	// Index 2 dropped at decode step; result uses only indices 0 and 1.
+	require.Equal(t, []uint32{0, 1}, mp.SignerIndices)
+	require.Len(t, mp.SubSignatures, 2)
 }
 
 func TestBuildProofFromPartial_Multisig_WrongPubKeyLength(t *testing.T) {

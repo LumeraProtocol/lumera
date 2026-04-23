@@ -80,6 +80,9 @@ func SingleKeyProofValidateBasic(s *SingleKeyProof) error {
 }
 
 func (m *MultisigProof) validateBasic(side Side) error {
+	if m == nil {
+		return ErrInvalidMigrationProof.Wrap("multisig proof nil")
+	}
 	if m.SigFormat == SigFormat_SIG_FORMAT_EIP191 {
 		return ErrInvalidMigrationProof.Wrap("EIP191 is not valid for multisig proofs on either side")
 	}

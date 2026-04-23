@@ -369,3 +369,30 @@ func TestMigrationProof_ValidateBasic_Multisig_RejectWrongSubSigLenPerSide(t *te
 	require.Error(t, err)
 	require.ErrorContains(t, err, "65 bytes")
 }
+
+// TestMigrationProof_ValidateBasic_Multisig_AcceptNewSide locks in the positive
+// Multisig+SideNew path: a well-formed multisig proof with 65-byte sub-signatures
+// and CLI format must be accepted on SideNew.
+func TestMigrationProof_ValidateBasic_Multisig_AcceptNewSide(t *testing.T) {
+	proof := &types.MigrationProof{Proof: &types.MigrationProof_Multisig{Multisig: &types.MultisigProof{
+		Threshold:     1,
+		SubPubKeys:    [][]byte{make([]byte, secp256k1.PubKeySize)},
+		SignerIndices: []uint32{0},
+		SubSignatures: [][]byte{make([]byte, 65)}, // correct for new side
+		SigFormat:     types.SigFormat_SIG_FORMAT_CLI,
+	}}}
+	require.NoError(t, proof.ValidateBasic(types.SideNew))
+}
+
+// TestMigrationProof_ValidateBasic_Multisig_NilMultisigInner locks in the nil
+// guard inside MultisigProof.validateBasic. Without the guard, the dispatch at
+// MigrationProof.ValidateBasic would hand a nil *MultisigProof into
+// validateBasic, which then panics on m.SigFormat access.
+func TestMigrationProof_ValidateBasic_Multisig_NilMultisigInner(t *testing.T) {
+	proof := &types.MigrationProof{Proof: &types.MigrationProof_Multisig{Multisig: nil}}
+	for _, side := range []types.Side{types.SideLegacy, types.SideNew} {
+		err := proof.ValidateBasic(side)
+		require.Error(t, err, "nil multisig must produce an error, not panic")
+		require.ErrorContains(t, err, "multisig proof nil")
+	}
+}

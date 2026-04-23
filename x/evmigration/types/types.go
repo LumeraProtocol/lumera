@@ -48,10 +48,15 @@ func (msg *MsgClaimLegacyAccount) MigrationLegacyAddress() string { return msg.L
 // MigrationSetNewProof attaches the destination-account proof derived by the custom CLI.
 // The raw EVM signature is wrapped in a SingleKeyProof; VerifyNewSignature recovers
 // the signer's public key directly from the signature bytes without needing PubKey.
+// SigFormat_SIG_FORMAT_CLI matches what the one-shot CLI produces via
+// Keyring.Sign with SIGN_MODE_LEGACY_AMINO_JSON — the eth keyring signs
+// Keccak256(payload) directly (no EIP-191 envelope). This method is deleted
+// in Task 13; until then, the format must match the actual signing envelope
+// so Tasks 10/11's format-aware verifier accepts the adapter output.
 func (msg *MsgClaimLegacyAccount) MigrationSetNewProof(signature []byte) {
 	msg.NewProof = MigrationProof{Proof: &MigrationProof_Single{Single: &SingleKeyProof{
 		Signature: signature,
-		SigFormat: SigFormat_SIG_FORMAT_EIP191,
+		SigFormat: SigFormat_SIG_FORMAT_CLI,
 	}}}
 }
 
@@ -81,11 +86,10 @@ func (msg *MsgMigrateValidator) MigrationNewAddress() string { return msg.NewAdd
 func (msg *MsgMigrateValidator) MigrationLegacyAddress() string { return msg.LegacyAddress }
 
 // MigrationSetNewProof attaches the destination-account proof derived by the custom CLI.
-// The raw EVM signature is wrapped in a SingleKeyProof; VerifyNewSignature recovers
-// the signer's public key directly from the signature bytes without needing PubKey.
+// See the MsgClaimLegacyAccount counterpart above for the SigFormat rationale.
 func (msg *MsgMigrateValidator) MigrationSetNewProof(signature []byte) {
 	msg.NewProof = MigrationProof{Proof: &MigrationProof_Single{Single: &SingleKeyProof{
 		Signature: signature,
-		SigFormat: SigFormat_SIG_FORMAT_EIP191,
+		SigFormat: SigFormat_SIG_FORMAT_CLI,
 	}}}
 }

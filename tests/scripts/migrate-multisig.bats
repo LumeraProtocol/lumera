@@ -34,10 +34,116 @@ setup() {
   [[ "$output" == *"Usage:"* ]]
 }
 
-@test "migrate-multisig.sh stubbed subcommands (submit) reach stub and exit 2" {
-  run "$SCRIPTS_DIR/migrate-multisig.sh" submit
-  [ "$status" -eq 2 ]
-  [[ "$output" == *"not yet implemented"* ]]
+@test "submit dry-run exits 0 without broadcasting (claim)" {
+  local state_dir; state_dir=$(mktemp -d)
+  local state_file="$state_dir/state"
+  run env \
+    SHIM_STATE_FILE="$state_file" \
+    SHIM_ESTIMATE_FIXTURE=estimate-multisig \
+    "$SCRIPTS_DIR/migrate-multisig.sh" submit "$FIX_DIR/combined-tx.json" \
+      --binary "$SHIM" \
+      --from new-eth-key \
+      --chain-id shim-test \
+      --node tcp://local:1 \
+      --yes --dry-run
+  [ "$status" -eq 0 ]
+  [ ! -f "$state_file" ]
+  rm -rf "$state_dir"
+}
+
+@test "submit happy path (broadcast + verify) exits 0" {
+  local state_dir; state_dir=$(mktemp -d)
+  local state_file="$state_dir/state"
+  run env \
+    SHIM_STATE_FILE="$state_file" \
+    SHIM_ESTIMATE_FIXTURE=estimate-multisig \
+    SHIM_RECORD_AFTER_FIXTURE=record-post-migration \
+    SHIM_BANK_AFTER_FIXTURE=bank-balances-empty \
+    "$SCRIPTS_DIR/migrate-multisig.sh" submit "$FIX_DIR/combined-tx.json" \
+      --binary "$SHIM" \
+      --from new-eth-key \
+      --chain-id shim-test \
+      --node tcp://local:1 \
+      --yes
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"migration complete"* ]]
+  rm -rf "$state_dir"
+}
+
+@test "submit rejects single-key proof tx JSON (exit 3)" {
+  run "$SCRIPTS_DIR/migrate-multisig.sh" submit "$FIX_DIR/combined-tx-single.json" \
+      --binary "$SHIM" \
+      --from new-eth-key \
+      --chain-id shim-test \
+      --node tcp://local:1 \
+      --yes --dry-run
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"single-key"* ]]
+}
+
+@test "submit rejects --from with wrong algorithm (exit 1)" {
+  run "$SCRIPTS_DIR/migrate-multisig.sh" submit "$FIX_DIR/combined-tx.json" \
+      --binary "$SHIM" \
+      --from wrong-algo \
+      --chain-id shim-test \
+      --node tcp://local:1 \
+      --yes --dry-run
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"eth_secp256k1"* ]]
+}
+
+@test "submit aborts with exit 4 when estimate flips to would_succeed=false" {
+  run env SHIM_ESTIMATE_FIXTURE=estimate-multisig-rejected \
+    "$SCRIPTS_DIR/migrate-multisig.sh" submit "$FIX_DIR/combined-tx.json" \
+      --binary "$SHIM" \
+      --from new-eth-key \
+      --chain-id shim-test \
+      --node tcp://local:1 \
+      --yes --dry-run
+  [ "$status" -eq 4 ]
+}
+
+@test "submit validator kind without --i-have-stopped-the-node in non-TTY exits 10" {
+  local tmp; tmp=$(mktemp -d)
+  jq '.body.messages[0]."@type" = "/lumera.evmigration.MsgMigrateValidator"' \
+    "$FIX_DIR/combined-tx.json" > "$tmp/tx.json"
+  run env SHIM_ESTIMATE_FIXTURE=estimate-multisig-validator \
+    "$SCRIPTS_DIR/migrate-multisig.sh" submit "$tmp/tx.json" \
+      --binary "$SHIM" \
+      --from new-eth-key \
+      --chain-id shim-test \
+      --node tcp://local:1 \
+      --yes --dry-run </dev/null
+  [ "$status" -eq 10 ]
+  [[ "$output" == *"node"* ]] || [[ "$output" == *"downtime"* ]]
+  rm -rf "$tmp"
+}
+
+@test "submit validator kind with --i-have-stopped-the-node proceeds" {
+  local tmp; tmp=$(mktemp -d)
+  jq '.body.messages[0]."@type" = "/lumera.evmigration.MsgMigrateValidator"' \
+    "$FIX_DIR/combined-tx.json" > "$tmp/tx.json"
+  run env SHIM_ESTIMATE_FIXTURE=estimate-multisig-validator \
+    "$SCRIPTS_DIR/migrate-multisig.sh" submit "$tmp/tx.json" \
+      --binary "$SHIM" \
+      --from new-eth-key \
+      --chain-id shim-test \
+      --node tcp://local:1 \
+      --yes --dry-run --i-have-stopped-the-node
+  [ "$status" -eq 0 ]
+  rm -rf "$tmp"
+}
+
+@test "submit exits 1 with no positional" {
+  run "$SCRIPTS_DIR/migrate-multisig.sh" submit \
+    --binary "$SHIM" --from new-eth-key --chain-id shim --node tcp://local:1
+  [ "$status" -eq 1 ]
+}
+
+@test "submit exits 1 without --from" {
+  run "$SCRIPTS_DIR/migrate-multisig.sh" submit "$FIX_DIR/combined-tx.json" \
+    --binary "$SHIM" --chain-id shim --node tcp://local:1
+  [ "$status" -eq 1 ]
 }
 
 @test "generate writes proof.json on happy path (multisig, claim)" {

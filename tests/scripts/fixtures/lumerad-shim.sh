@@ -150,6 +150,9 @@ ADDR
     emit_or_write "${SHIM_COMBINED_FIXTURE:-combined-tx}" "$@"
     ;;
   "tx evmigration submit-proof"*)
+    if [[ -n "${SHIM_STATE_FILE:-}" ]]; then
+      touch "$SHIM_STATE_FILE"
+    fi
     emit broadcast-success
     ;;
   "tx evmigration"*)

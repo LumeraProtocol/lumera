@@ -261,7 +261,170 @@ C_USAGE
   fi
   log_info "combined tx written to $out"
 }
-_mms_submit()   { log_error "submit not yet implemented";   exit 2; }
+_mms_submit() {
+  local input="" from="" chain_id="" node="" binary="lumerad"
+  local keyring_backend="test" keyring_dir="" home_dir=""
+  local yes=0 dry_run=0 node_stopped=0
+  local positional=()
+  while (( $# > 0 )); do
+    case "$1" in
+      --from)             _require_value "$1" "$#" "${2-}"; from="$2"; shift 2 ;;
+      --chain-id)         _require_value "$1" "$#" "${2-}"; chain_id="$2"; shift 2 ;;
+      --node)             _require_value "$1" "$#" "${2-}"; node="$2"; shift 2 ;;
+      --binary)           _require_value "$1" "$#" "${2-}"; binary="$2"; shift 2 ;;
+      --keyring-backend)  _require_value "$1" "$#" "${2-}"; keyring_backend="$2"; shift 2 ;;
+      --keyring-dir)      _require_value "$1" "$#" "${2-}"; keyring_dir="$2"; shift 2 ;;
+      --home)             _require_value "$1" "$#" "${2-}"; home_dir="$2"; shift 2 ;;
+      --yes|-y)           yes=1; shift ;;
+      --dry-run)          dry_run=1; shift ;;
+      --i-have-stopped-the-node) node_stopped=1; shift ;;
+      -h|--help)
+        cat >&2 <<'SU_USAGE'
+Usage: migrate-multisig.sh submit <tx.json> --from <new-eth-key> \
+  --chain-id <id> --node <url> [--keyring-backend <b>] [--keyring-dir <dir>] [--home <dir>] \
+  [--yes] [--dry-run] [--i-have-stopped-the-node] [--binary <path>]
+SU_USAGE
+        exit 0 ;;
+      --*) log_error "unknown flag: $1"; exit 1 ;;
+      *)   positional+=("$1"); shift ;;
+    esac
+  done
+
+  if (( ${#positional[@]} != 1 )); then
+    log_error "submit: expected exactly one positional argument (<tx.json>)"
+    exit 1
+  fi
+  input="${positional[0]}"
+
+  local f
+  for f in from chain_id node; do
+    if [[ -z "${!f}" ]]; then
+      log_error "submit: --${f//_/-} is required"
+      exit 1
+    fi
+  done
+
+  # shellcheck disable=SC2034
+  BIN="$binary"
+  # shellcheck disable=SC2034
+  NODE="$node"
+  # shellcheck disable=SC2034
+  CHAIN_ID="$chain_id"
+  # shellcheck disable=SC2034
+  KEYRING_BACKEND="$keyring_backend"
+  # shellcheck disable=SC2034
+  KEYRING_DIR="$keyring_dir"
+  # shellcheck disable=SC2034
+  HOME_DIR="$home_dir"
+  # shellcheck disable=SC2034
+  YES="$yes"
+  # shellcheck disable=SC2034
+  DRY_RUN="$dry_run"
+
+  require_multisig_binary
+  require_jq
+
+  # Parse + validate tx.json. Rejects single-key proofs (exit 3),
+  # missing fields / malformed (exit 9). Emits compact summary JSON.
+  local tx_meta
+  tx_meta=$(read_migration_tx_file "$input")
+  local legacy new kind threshold num_signers
+  legacy=$(jq -r '.legacy_address' <<<"$tx_meta")
+  new=$(jq -r '.new_address' <<<"$tx_meta")
+  kind=$(jq -r '.kind' <<<"$tx_meta")
+  threshold=$(jq -r '.threshold' <<<"$tx_meta")
+  num_signers=$(jq -r '.num_signers' <<<"$tx_meta")
+
+  # --from must be eth_secp256k1 and resolve to the tx's new_address.
+  assert_eth_key "$from"
+  local from_addr
+  from_addr=$(resolve_address "$from")
+  if [[ "$from_addr" != "$new" ]]; then
+    log_error "--from '$from' resolves to $from_addr but tx new_address is $new"
+    exit 1
+  fi
+
+  assert_not_migrated "$legacy"
+  assert_new_address_unused "$new"
+
+  # Fresh estimate — catches ceremony-duration chain-state drift.
+  local estimate
+  estimate=$(preflight_estimate "$legacy")
+  assert_multisig "$estimate"
+  assert_estimate_succeeds "$estimate"
+
+  local snap
+  snap=$(snapshot_bank_balances "$legacy")
+
+  # Confirmation banner
+  {
+    printf '\n==== Multisig migration submit ====\n'
+    printf '  Kind:      %s\n' "$kind"
+    printf '  Multisig:  %s-of-%s\n' "$threshold" "$num_signers"
+    printf '  Legacy:    %s\n' "$legacy"
+    printf '  New:       %s\n' "$new"
+    printf '  From:      %s\n' "$from"
+    printf '===================================\n\n'
+  } >&2
+
+  # Validator kind needs separate downtime acknowledgement.
+  if [[ "$kind" == "validator" ]]; then
+    cat >&2 <<'BANNER'
+================================================================
+WARNING — VALIDATOR MIGRATION
+Your validator will miss blocks and may be jailed during
+migration. The node MUST be stopped before broadcasting this tx.
+================================================================
+BANNER
+    if (( node_stopped != 1 )); then
+      if [[ ! -t 0 ]]; then
+        log_error "validator downtime not acknowledged and no TTY available"
+        log_error "re-run with --i-have-stopped-the-node to confirm non-interactively"
+        exit 10
+      fi
+      local reply=""
+      printf 'Type "yes" to confirm the node is stopped: ' >&2
+      read -r reply || true
+      if [[ "$reply" != "yes" ]]; then
+        log_error "validator downtime not acknowledged"
+        exit 10
+      fi
+    fi
+  fi
+
+  confirm "Proceed with broadcast?"
+
+  if (( DRY_RUN == 1 )); then
+    log_info "--dry-run: stopping before broadcast"
+    return 0
+  fi
+
+  local args=(tx evmigration submit-proof "$input"
+    --from "$from"
+    --chain-id "$chain_id"
+    --node "$node"
+    --keyring-backend "$keyring_backend")
+  [[ -n "$keyring_dir" ]] && args+=(--keyring-dir "$keyring_dir")
+  [[ -n "$home_dir"    ]] && args+=(--home "$home_dir")
+  (( yes == 1 )) && args+=(-y)
+
+  local broadcast_json tx_hash
+  broadcast_json=$("$BIN" "${args[@]}")
+  tx_hash=$(jq -r '.txhash' <<<"$broadcast_json" 2>/dev/null || printf '')
+  if [[ -z "$tx_hash" || "$tx_hash" == "null" ]]; then
+    log_error "broadcast returned no txhash: $broadcast_json"
+    exit 2
+  fi
+
+  log_info "broadcast tx $tx_hash; waiting for inclusion..."
+  wait_for_tx "$tx_hash"
+  verify_migration "$legacy" "$new" "$snap"
+
+  log_info "migration complete"
+  log_info "  legacy: $legacy"
+  log_info "  new:    $new"
+  log_info "  tx:     $tx_hash"
+}
 
 main() {
   if (( $# == 0 )); then

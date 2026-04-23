@@ -158,7 +158,7 @@ lumerad tx evmigration submit-proof tx.json \
 
 For single-key sides, the `SideSpec` uses `pub_key` (base64 of the 33-byte compressed pubkey) with `threshold` and `sub_pub_keys` omitted. For multisig sides, `pub_key` is omitted and `threshold` + `sub_pub_keys` are set.
 
-Ground truth: [`x/evmigration/client/cli/tx_multisig.go:53-100`](/home/akobrin/p/lumera/x/evmigration/client/cli/tx_multisig.go).
+Ground truth: [`x/evmigration/client/cli/tx_multisig.go:53-100`](../../../x/evmigration/client/cli/tx_multisig.go#L53-L100).
 
 ### Gotchas
 

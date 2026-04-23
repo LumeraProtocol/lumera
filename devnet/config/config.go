@@ -91,6 +91,13 @@ type Validator struct {
 		ValidatorStake string `json:"validator_stake"`
 	} `json:"initial_distribution"`
 
+	Multisig struct {
+		Enabled     bool   `json:"enabled,omitempty"`
+		Threshold   int    `json:"threshold,omitempty"`
+		SignerCount int    `json:"signer_count,omitempty"`
+		VestingType string `json:"vesting_type,omitempty"`
+	} `json:"multisig,omitempty"`
+
 	LumeraUploader struct {
 		Enabled  bool `json:"enabled,omitempty"`
 		GRPCPort int  `json:"grpc_port,omitempty"`

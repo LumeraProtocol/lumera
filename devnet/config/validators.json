@@ -41,7 +41,8 @@
     "multisig": {
       "enabled": true,
       "threshold": 2,
-      "signer_count": 3
+      "signer_count": 3,
+      "vesting_type": "PermanentLocked"
     },
     "initial_distribution": {
       "account_balance": "2000000000000ulume",

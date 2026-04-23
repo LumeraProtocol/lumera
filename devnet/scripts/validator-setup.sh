@@ -156,6 +156,8 @@ VAL_INDEX="$(jq -r --arg m "${MONIKER}" 'map(.moniker) | index($m) // -1' "${CFG
 MULTISIG_ENABLED="$(echo "${VAL_REC_JSON}" | jq -r '.multisig.enabled // false')"
 MULTISIG_THRESHOLD="$(echo "${VAL_REC_JSON}" | jq -r '.multisig.threshold // 2')"
 MULTISIG_SIGNER_COUNT="$(echo "${VAL_REC_JSON}" | jq -r '.multisig.signer_count // 3')"
+MULTISIG_VESTING_TYPE="$(echo "${VAL_REC_JSON}" | jq -r '.multisig.vesting_type // ""')"
+[ "${MULTISIG_VESTING_TYPE}" = "null" ] && MULTISIG_VESTING_TYPE=""
 declare -a MULTISIG_MEMBER_KEYS=()
 if [[ "${MULTISIG_ENABLED}" == "true" ]]; then
 	for ((i = 1; i <= MULTISIG_SIGNER_COUNT; i++)); do
@@ -231,6 +233,121 @@ verify_gentx_file() {
 
 validator_is_multisig() {
 	[[ "${MULTISIG_ENABLED}" == "true" ]]
+}
+
+# Rewrite a BaseAccount entry in genesis.json into a PermanentLockedAccount
+# wrapping the same base account, with original_vesting = ${coins}. This is
+# the only way to express a PermanentLockedAccount at genesis time — the
+# Cosmos SDK CLI's add-genesis-account only supports Delayed/ContinuousVesting
+# (end_time > 0), whereas PermanentLockedAccount requires end_time == 0.
+wrap_account_as_permanent_locked() {
+	local genesis_file="$1"
+	local addr="$2"
+	local coins_str="$3"
+	local tmp
+
+	if [ -z "${addr}" ] || [ -z "${coins_str}" ]; then
+		echo "[SETUP] ERROR: wrap_account_as_permanent_locked: addr and coins are required" >&2
+		return 1
+	fi
+
+	tmp="$(mktemp "${genesis_file}.vesting.XXXXXX")"
+	jq --arg addr "${addr}" --arg coins "${coins_str}" '
+		def parse_coins($s):
+			[ $s
+			  | split(",")
+			  | .[]
+			  | capture("^(?<amount>[0-9]+)(?<denom>[a-zA-Z][a-zA-Z0-9/:._-]*)$")
+			  | { denom: .denom, amount: .amount }
+			];
+		.app_state.auth.accounts |= map(
+			if (.["@type"] == "/cosmos.auth.v1beta1.BaseAccount" and .address == $addr) then
+				{
+					"@type": "/cosmos.vesting.v1beta1.PermanentLockedAccount",
+					base_vesting_account: {
+						base_account: .,
+						original_vesting: parse_coins($coins),
+						delegated_free: [],
+						delegated_vesting: [],
+						end_time: "0"
+					}
+				}
+			else
+				.
+			end
+		)
+	' "${genesis_file}" >"${tmp}"
+
+	if ! jq -e --arg addr "${addr}" '
+		.app_state.auth.accounts | any(
+			.["@type"] == "/cosmos.vesting.v1beta1.PermanentLockedAccount"
+			and .base_vesting_account.base_account.address == $addr
+		)
+	' "${tmp}" >/dev/null; then
+		rm -f "${tmp}"
+		echo "[SETUP] ERROR: wrap for ${addr} did not produce a PermanentLockedAccount entry (is the base account present in genesis?)" >&2
+		return 1
+	fi
+
+	mv "${tmp}" "${genesis_file}"
+}
+
+# Scan validators.json and, for each validator with multisig.enabled == true
+# and a recognised multisig.vesting_type, convert its genesis account into the
+# corresponding vesting account in the given genesis file. Intended to run on
+# the primary after `collect-gentxs` and before publishing FINAL_GENESIS_SHARED
+# so every validator consumes the same transformed genesis.
+apply_multisig_vesting_overrides() {
+	local genesis_file="$1"
+	local other vtype key_name addr funded_base funded_denom registry
+
+	if [ ! -f "${genesis_file}" ]; then
+		echo "[SETUP] ERROR: apply_multisig_vesting_overrides: missing ${genesis_file}" >&2
+		return 1
+	fi
+
+	while IFS= read -r other; do
+		vtype="$(jq -r --arg m "${other}" '
+			[.[] | select(.moniker == $m)][0]
+			| if (.multisig.enabled == true) then (.multisig.vesting_type // "") else "" end
+		' "${CFG_VALS}")"
+		[ "${vtype}" = "null" ] && vtype=""
+		[ -z "${vtype}" ] && continue
+
+		key_name="$(jq -r --arg m "${other}" '.[] | select(.moniker == $m) | .key_name' "${CFG_VALS}")"
+		registry="${STATUS_DIR}/${other}/accounts.json"
+		if [[ ! -f "${registry}" || -z "${key_name}" || "${key_name}" = "null" ]]; then
+			echo "[SETUP] ERROR: missing registry/key_name for multisig vesting override on ${other}" >&2
+			return 1
+		fi
+
+		addr="$(jq -r --arg name "${key_name}" '
+			(map(select(.name == $name)) | first | .address) // empty
+		' "${registry}")"
+		funded_base="$(jq -r --arg name "${key_name}" '
+			(map(select(.name == $name)) | first | .funded.base_amount) // empty
+		' "${registry}")"
+		funded_denom="$(jq -r --arg name "${key_name}" '
+			(map(select(.name == $name)) | first | .funded.base_denom) // empty
+		' "${registry}")"
+		[[ -z "${funded_denom}" || "${funded_denom}" = "null" ]] && funded_denom="${DENOM}"
+
+		if [[ -z "${addr}" || -z "${funded_base}" || "${funded_base}" = "null" ]]; then
+			echo "[SETUP] ERROR: cannot resolve address/balance for multisig vesting override on ${other}" >&2
+			return 1
+		fi
+
+		case "${vtype}" in
+		PermanentLocked)
+			echo "[SETUP] Wrapping multisig validator ${other} (${addr}) as PermanentLockedAccount with original_vesting=${funded_base}${funded_denom}"
+			wrap_account_as_permanent_locked "${genesis_file}" "${addr}" "${funded_base}${funded_denom}" || return 1
+			;;
+		*)
+			echo "[SETUP] ERROR: unsupported multisig.vesting_type '${vtype}' for ${other} (only 'PermanentLocked' is implemented)" >&2
+			return 1
+			;;
+		esac
+	done < <(jq -r '.[].moniker' "${CFG_VALS}")
 }
 
 ensure_validator_multisig_keys() {
@@ -749,6 +866,13 @@ primary_validator_setup() {
 		done
 	fi
 	run ${DAEMON} genesis collect-gentxs
+
+	# ── Multisig vesting overrides ──
+	# The SDK CLI only produces Delayed/Continuous vesting accounts; anything
+	# else (e.g. PermanentLocked) is applied here by rewriting genesis.json
+	# after collect-gentxs, so every validator consumes the same transformed
+	# accounts when they copy FINAL_GENESIS_SHARED below.
+	apply_multisig_vesting_overrides "${GENESIS_LOCAL}"
 
 	# ── Publish final genesis + peers ──
 	# This is the authoritative genesis that all validators will use.

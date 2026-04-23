@@ -519,6 +519,8 @@ The `max_validator_delegations` parameter (default 2000) limits how many records
 
 ## Migrating a multisig account
 
+> **Script wrapper available.** The bundled `scripts/migrate-multisig.sh` layers pre-flight, file-integrity, and post-broadcast verification onto each of the four steps below. For day-to-day use, prefer the script walkthrough at [migration-scripts.md → Multisig migration](migration-scripts.md#multisig-migration). The raw-CLI reference that follows is the canonical source for field semantics and remains useful when debugging.
+
 Multisig legacy accounts (flat K-of-N `secp256k1`) use an offline, coordinator-driven flow with four commands. The portal wizard does not support multisig — use the CLI.
 
 See [legacy-migration.md](../evmigration/legacy-migration.md#multisig-account-migration) for the architecture and wire-format reference.

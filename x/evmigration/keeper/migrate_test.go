@@ -489,7 +489,7 @@ func TestMigrateAuth_PreExistingVestingDestination_Rejected(t *testing.T) {
 	// No GetAccount(legacy), no RemoveAccount, no SetAccount.
 
 	_, err = f.keeper.MigrateAuth(f.ctx, legacy, newAddr, nil)
-	require.ErrorIs(t, err, types.ErrPubKeyAddressMismatch)
+	require.ErrorIs(t, err, types.ErrInvalidMigrationDestination)
 	require.Contains(t, err.Error(), "non-BaseAccount")
 }
 
@@ -565,6 +565,47 @@ func TestMigrateAuth_MultisigDestination_PreExistingMatchingPubKey_Idempotent(t 
 		// Pubkey must still be the original matching key — not nil, not overwritten.
 		require.NotNil(t, acc.GetPubKey())
 		require.Equal(t, multiPK.Bytes(), acc.GetPubKey().Bytes())
+	})
+
+	vi, err := f.keeper.MigrateAuth(f.ctx, legacy, newAddr, proof)
+	require.NoError(t, err)
+	require.Nil(t, vi)
+}
+
+// TestMigrateAuth_MultisigDestination_PreExistingFundedButNeverSigned_SetsPubKey
+// verifies the third positive-case branch: a pre-existing BaseAccount at newAddr
+// with nil pubkey (funded-but-never-signed — someone sent coins to the address
+// pre-migration but no tx has been signed yet). MigrateAuth must reuse the
+// existing account (no NewAccountWithAddress call), set the multisig pubkey on
+// it, and persist via SetAccount. Distinct from:
+//   - SetsPubKey (fresh account case, NewAccountWithAddress IS called)
+//   - PreExistingMatchingPubKey_Idempotent (pubkey already matches, SetPubKey skipped)
+func TestMigrateAuth_MultisigDestination_PreExistingFundedButNeverSigned_SetsPubKey(t *testing.T) {
+	f := initMockFixture(t)
+	legacy := testAccAddr()
+
+	// threshold=2 must match deriveMultisigAddr so MigrateAuth's address check passes.
+	proof, subKeys := makeMultisigProof(t, 2, 2)
+	newAddr := deriveMultisigAddr(subKeys, 2)
+
+	// Pre-existing account with NIL pubkey (funded but never signed).
+	existingAcc := authtypes.NewBaseAccountWithAddress(newAddr)
+	require.Nil(t, existingAcc.GetPubKey(), "fixture precondition: pubkey must start nil")
+
+	legacyAcc := authtypes.NewBaseAccountWithAddress(legacy)
+	multiPK := kmultisig.NewLegacyAminoPubKey(2, subKeys)
+
+	// Phase 1 probe: returns existing nil-pubkey account.
+	// This is the ONE AND ONLY GetAccount(newAddr) call.
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), newAddr).Return(existingAcc)
+	// Phase 2: legacy fetch + removal. NO NewAccountWithAddress — we reuse existingAcc.
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), legacy).Return(legacyAcc)
+	f.accountKeeper.EXPECT().RemoveAccount(gomock.Any(), legacyAcc)
+	// SetAccount must receive the existing account with the multisig pubkey set on it.
+	f.accountKeeper.EXPECT().SetAccount(gomock.Any(), existingAcc).Do(func(_ any, acc sdk.AccountI) {
+		require.NotNil(t, acc.GetPubKey(), "SetPubKey must have fired for the nil-pubkey funded-but-never-signed case")
+		require.Equal(t, multiPK.Bytes(), acc.GetPubKey().Bytes(),
+			"persisted pubkey must match the reconstructed multisig")
 	})
 
 	vi, err := f.keeper.MigrateAuth(f.ctx, legacy, newAddr, proof)

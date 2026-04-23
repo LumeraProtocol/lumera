@@ -25,9 +25,15 @@ var (
 	ErrValidatorUnbonding = errors.Register(ModuleName, 1114, "validator is unbonding or unbonded; wait for completion")
 	ErrTooManyDelegators  = errors.Register(ModuleName, 1115, "validator has too many delegators; exceeds max_validator_delegations")
 
-	// Codes 1116, 1117, 1118 left intentionally unregistered — reclaimed from the
-	// side-specific ErrInvalidNewPubKey / ErrNewPubKeyAddressMismatch / ErrInvalidNewSignature
-	// which no longer exist. Do not reuse these codes in this module.
+	// Migration to a destination account of an unsupported type (vesting,
+	// smart/contract, any non-plain-BaseAccount). Rejected at MigrateAuth
+	// Phase 1 type-safety check because FinalizeVestingAccount would silently
+	// clobber pre-existing special-type state.
+	ErrInvalidMigrationDestination = errors.Register(ModuleName, 1116, "invalid migration destination account type")
+
+	// Codes 1117, 1118 left intentionally unregistered — reclaimed from the
+	// side-specific ErrNewPubKeyAddressMismatch / ErrInvalidNewSignature which
+	// no longer exist. Do not reuse these codes in this module.
 
 	ErrNewAddressAlreadyUsed = errors.Register(ModuleName, 1119, "new address was already used as a migration destination")
 	ErrInvalidMigrationProof = errors.Register(ModuleName, 1120, "invalid migration proof")

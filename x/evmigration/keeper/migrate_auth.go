@@ -70,7 +70,7 @@ func (k Keeper) MigrateAuth(
 			// Covers vesting accounts (Continuous/Delayed/Periodic/PermanentLocked),
 			// any future smart-account / contract-account type, and any third-party
 			// wrapper type the module hasn't been taught about.
-			return nil, types.ErrPubKeyAddressMismatch.Wrapf(
+			return nil, types.ErrInvalidMigrationDestination.Wrapf(
 				"destination %s has non-BaseAccount type %T; migration to existing special accounts (vesting, module, etc.) is not supported — choose a fresh destination",
 				newAddr, existingNewAcc,
 			)

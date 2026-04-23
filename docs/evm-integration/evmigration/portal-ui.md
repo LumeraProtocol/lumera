@@ -806,3 +806,30 @@ These links are relevant because Keplr behavior here is an external dependency.
   - <https://github.com/chainapsis/keplr-chain-registry>
 - Keplr issue #232 — stale coinType surviving chain removal:
   - <https://github.com/chainapsis/keplr-wallet/issues/232>
+
+---
+
+## 12. Multisig destination
+
+For legacy **multisig** accounts, the destination is itself a K-of-N multisig built from `eth_secp256k1` sub-keys — **not** a single EOA address derived from a connected wallet. This changes what any portal-UI multisig path needs to collect from the user.
+
+### What the UI must gather
+
+The destination multisig is derived entirely client-side (or by an offline coordinator) from:
+
+- **N fresh `eth_secp256k1` sub-key pubkeys** — one per co-signer. Each is a base64-encoded 33-byte compressed pubkey.
+- **Threshold K** — the number of signatures required to migrate. Must equal the legacy multisig's threshold (mirror-source rule).
+
+The resulting `new_address` is computed from `kmultisig.NewLegacyAminoPubKey(K, subs)` over the new eth sub-keys. It is a Cosmos SDK bech32 under the `lumera` prefix, **not** an Ethereum 20-byte hex address.
+
+### PartialProof v2 schema
+
+Rather than a single ADR-036 / `personal_sign` round trip, multisig migration requires every participating co-signer to sign the same `PartialProof` (the v2 on-disk coordination artifact) on **both** the legacy and the new side, then the coordinator combines partials and submits an unsigned-at-the-Cosmos-layer tx. The full v2 schema, the four-step CLI walkthrough, and the gotchas (co-signer dual key requirement, nil-pubkey legacy accounts, non-EVM-addressable destination) are documented in [`evmigration/main.md` § Multisig account migration](main.md#multisig-account-migration).
+
+### Non-goal
+
+Originating `MsgEthereumTx` from the new multisig destination is a non-goal. Multisig bech32 addresses are not valid senders for EVM transactions — there is no single ECDSA signature that authenticates K-of-N. Operators who want EVM DeFi access should configure a separate single-EOA withdraw address via `MsgSetWithdrawAddress` after migration.
+
+### Current portal status
+
+The portal wizard detects `is_multisig=true` from `MigrationEstimate` and directs users to the CLI flow (see section 10 above). A guided in-browser multisig ceremony is not implemented: multiple independent signers coordinating off-chain is a poor fit for a single browser tab, and the CLI already provides a durable, auditable artifact (`PartialProof` JSON) for cross-host coordination.

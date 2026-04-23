@@ -182,12 +182,33 @@ The tables below list the individual tests added for multisig proof support. The
 | `TestClaimLegacyAccount_Multisig_ADR036` | ADR-036 sig format path for multisig. |
 | `TestClaimLegacyAccount_Multisig_ReplayRejected` | Second migration attempt on same multisig address is rejected. |
 | `TestClaimLegacyAccount_Multisig_CorruptedSubSig` | Corrupted sub-signature causes rejection with appropriate error. |
+| `TestClaimLegacyAccount_MultisigToMultisig` | End-to-end 2-of-3 Cosmos-multisig → 2-of-3 eth-multisig migration: destination derived from `kmultisig.NewLegacyAminoPubKey` over eth sub-keys; balances move; migration record stored; `MigrateAuth` sets the new multisig `LegacyAminoPubKey` on-chain. |
+| `TestMigrateValidator_MultisigToMultisig` | `MsgMigrateValidator` variant of the multisig→multisig flow: validator operator re-keys to the eth multisig; `x/staking`, `x/distribution`, `x/supernode` state re-keyed to the new operator bech32. |
+| `TestClaimLegacyAccount_MultisigVesting_ToMultisig` | PermanentLocked vesting account owned by a legacy multisig migrates to an eth multisig while preserving the vesting schedule and locked amount. |
+| `TestClaimLegacyAccount_Multisig_WrongThreshold_LegacySide` | Proof with `legacy.threshold` not matching the multisig's on-chain `LegacyAminoPubKey` threshold is rejected by the verifier. |
+| `TestClaimLegacyAccount_Multisig_WrongThreshold_NewSide` | Proof with `new.threshold` not matching the number of new-side partial signatures is rejected by the verifier. |
+| `TestClaimLegacyAccount_Multisig_ADR036_BothSides` | ADR-036 sig format accepted on both legacy and new sides for a multisig→multisig migration. |
+| `TestQueryMigrationEstimate_Multisig_Success` | `MigrationEstimate` returns `would_succeed=true` and estimated gas for a supported multisig source. |
+| `TestQueryMigrationEstimate_Multisig_SizeCapped` | `MigrationEstimate` returns `would_succeed=false` when `num_signers > MaxMultisigSubKeys`. |
+| `TestQueryMigrationEstimate_Multisig_NonSecp256k1SubKey` | `MigrationEstimate` returns `would_succeed=false` when any legacy sub-key is not secp256k1. |
 
-#### Devnet (`devnet/tests/evmigration/multisig.go`)
+#### Unit — CLI multisig (`x/evmigration/client/cli/tx_multisig_internal_test.go`)
+
+| Test | Description |
+| ---- | ----------- |
+| `TestCLI_MultisigToMultisig_EndToEnd` | End-to-end in-process CLI walkthrough: `generate-proof-payload` → `sign-proof` (per co-signer, both sides) → `combine-proof` → `submit-proof` produces a well-formed tx with zero envelope signatures. |
+| `TestBuildProofFromPartial_*` | Suite covering the `buildProofFromPartial` helper: valid partials produce a `MigrationProof` with K lowest-ascending-index sub-signatures on each side; invalid partials are dropped with stderr warnings; fewer than K valid on either side errors with `need <K> valid partial signatures, have <N>`. |
+| `TestCmdSubmitProof_*` | Regression locks for `submit-proof`: rejects `--from`, rejects fee-payer flags, accepts only `tx.json` + `--chain-id`, builds an unsigned tx with zero signer infos. |
+| `TestVerifyMigrationProof_NewSide_Multisig_*` | Keeper-side verification of the new-side multisig proof: valid K-of-N passes, wrong threshold / duplicate indices / non-ascending indices / non-eth-secp256k1 sub-key all rejected with specific errors. |
+
+#### Devnet (`devnet/tests/evmigration/`)
 
 | Mode | Description |
 | ---- | ----------- |
 | `tests_evmigration -mode=multisig` | Exercises the full four-step offline CLI flow: `generate-proof-payload` → `sign-proof` (per co-signer) → `combine-proof` → `submit-proof`. Verifies the migration record on-chain after broadcast. |
+| `tests_evmigration -mode=multisig` (multisig→multisig) | 2-of-3 Cosmos-multisig → 2-of-3 eth-multisig balance migration; verifies `MigrationRecord` on-chain and asserts `MigrateAuth` set the new multisig `LegacyAminoPubKey` on the destination `BaseAccount`. |
+| `tests_evmigration -mode=multisig-vesting` | PermanentLocked vesting multisig source → eth multisig destination; verifies vesting schedule, original vesting amount, and locked balance are preserved after `MigrateAuth` rewrites the account. |
+| `tests_evmigration -mode=multisig-validator` | Multisig validator operator → eth multisig re-key via `MsgMigrateValidator`; post-migration sanity check submits `MsgEditValidator` from the new multisig to assert all Cosmos-side operator ops work end-to-end. |
 
 ---
 

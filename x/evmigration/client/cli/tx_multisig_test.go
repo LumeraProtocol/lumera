@@ -2,6 +2,8 @@ package cli_test
 
 import (
 	"encoding/hex"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -16,18 +18,23 @@ func TestComputePayload_StableFormat(t *testing.T) {
 
 func TestPartialProof_RoundTrip(t *testing.T) {
 	pp := &cli.PartialProof{
-		Version:       1,
+		Version:       2,
 		Kind:          "claim",
 		LegacyAddress: "lumera1abc",
 		NewAddress:    "lumera1xyz",
 		ChainID:       "lumera-test-1",
 		EVMChainID:    76857769,
 		PayloadHex:    hex.EncodeToString([]byte("p")),
-		Single: &cli.PartialSingle{
-			PubKeyB64: "AAAA",
+		Legacy: &cli.SideSpec{
+			PubKey:    "AAAA",
 			SigFormat: "SIG_FORMAT_CLI",
 		},
-		PartialSigs: []cli.PartialSubSignature{{Index: 0, SignatureB64: "BBBB"}},
+		New: &cli.SideSpec{
+			PubKey:    "CCCC",
+			SigFormat: "SIG_FORMAT_CLI",
+		},
+		PartialLegacySignatures: []cli.PartialSignature{{Index: 0, Signature: "BBBB"}},
+		PartialNewSignatures:    []cli.PartialSignature{},
 	}
 	b, err := pp.MarshalIndent()
 	require.NoError(t, err)
@@ -36,30 +43,62 @@ func TestPartialProof_RoundTrip(t *testing.T) {
 
 func TestAssertPartialProofsConsistent_Matching(t *testing.T) {
 	a := &cli.PartialProof{
-		Version: 1, Kind: "claim", LegacyAddress: "A", NewAddress: "B", ChainID: "c", EVMChainID: 1,
-		Multisig: &cli.PartialMultisig{Threshold: 2, SubPubKeysB64: []string{"x", "y", "z"}, SigFormat: "SIG_FORMAT_CLI"},
+		Version: 2, Kind: "claim", LegacyAddress: "A", NewAddress: "B", ChainID: "c", EVMChainID: 1,
+		Legacy: &cli.SideSpec{Threshold: 2, SubPubKeys: []string{"x", "y", "z"}, SigFormat: "SIG_FORMAT_CLI"},
+		New:    &cli.SideSpec{Threshold: 2, SubPubKeys: []string{"p", "q", "r"}, SigFormat: "SIG_FORMAT_CLI"},
 	}
 	b := *a
 	require.NoError(t, cli.AssertPartialProofsConsistent(a, &b))
 }
 
 func TestAssertPartialProofsConsistent_ChainIDMismatch(t *testing.T) {
-	a := &cli.PartialProof{ChainID: "c1", Multisig: &cli.PartialMultisig{}}
-	b := &cli.PartialProof{ChainID: "c2", Multisig: &cli.PartialMultisig{}}
+	a := &cli.PartialProof{
+		ChainID: "c1",
+		Legacy:  &cli.SideSpec{},
+		New:     &cli.SideSpec{},
+	}
+	b := &cli.PartialProof{
+		ChainID: "c2",
+		Legacy:  &cli.SideSpec{},
+		New:     &cli.SideSpec{},
+	}
 	err := cli.AssertPartialProofsConsistent(a, b)
-	require.ErrorContains(t, err, "chain_id mismatch")
+	require.ErrorContains(t, err, "chain_id differs")
 }
 
-func TestAssertPartialProofsConsistent_ProofKindMismatch(t *testing.T) {
-	a := &cli.PartialProof{Single: &cli.PartialSingle{}}
-	b := &cli.PartialProof{Multisig: &cli.PartialMultisig{}}
+func TestAssertPartialProofsConsistent_SideSpecPresenceMismatch(t *testing.T) {
+	a := &cli.PartialProof{Legacy: &cli.SideSpec{PubKey: "AA", SigFormat: "SIG_FORMAT_CLI"}, New: nil}
+	b := &cli.PartialProof{Legacy: &cli.SideSpec{PubKey: "AA", SigFormat: "SIG_FORMAT_CLI"}, New: &cli.SideSpec{}}
 	err := cli.AssertPartialProofsConsistent(a, b)
-	require.ErrorContains(t, err, "proof-kind mismatch")
+	require.ErrorContains(t, err, "new side spec presence differs")
 }
 
 func TestAssertPartialProofsConsistent_PayloadHexMismatch(t *testing.T) {
-	a := &cli.PartialProof{PayloadHex: "aa", Multisig: &cli.PartialMultisig{}}
-	b := &cli.PartialProof{PayloadHex: "bb", Multisig: &cli.PartialMultisig{}}
+	a := &cli.PartialProof{PayloadHex: "aa", Legacy: &cli.SideSpec{}, New: &cli.SideSpec{}}
+	b := &cli.PartialProof{PayloadHex: "bb", Legacy: &cli.SideSpec{}, New: &cli.SideSpec{}}
 	err := cli.AssertPartialProofsConsistent(a, b)
-	require.ErrorContains(t, err, "payload_hex mismatch")
+	require.ErrorContains(t, err, "payload_hex differs")
+}
+
+// TestLoadPartialProof_V1File_VersionMismatchError verifies that a v1-shape JSON
+// file gives "unsupported version 1 (expected 2)", NOT "unknown field".
+func TestLoadPartialProof_V1File_VersionMismatchError(t *testing.T) {
+	raw := []byte(`{"version": 1, "single": {"pub_key_b64": "AAAA"}, "partial_sigs": []}`)
+	tmp := filepath.Join(t.TempDir(), "v1.json")
+	require.NoError(t, os.WriteFile(tmp, raw, 0o600))
+	_, err := cli.LoadPartialProof(tmp)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unsupported partial_proof version 1 (expected 2)")
+	require.NotContains(t, err.Error(), "unknown field")
+}
+
+// TestLoadPartialProof_V2FileWithFutureField_UnknownFieldError verifies that a v2
+// file with an unrecognized field gets an "unknown field" error, not a version error.
+func TestLoadPartialProof_V2FileWithFutureField_UnknownFieldError(t *testing.T) {
+	raw := []byte(`{"version": 2, "future_field": "something", "kind": "claim"}`)
+	tmp := filepath.Join(t.TempDir(), "v2-future.json")
+	require.NoError(t, os.WriteFile(tmp, raw, 0o600))
+	_, err := cli.LoadPartialProof(tmp)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unknown field")
 }

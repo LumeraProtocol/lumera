@@ -20,56 +20,70 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	signingtypes "github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	evmcryptotypes "github.com/cosmos/evm/crypto/ethsecp256k1"
 
 	lcfg "github.com/LumeraProtocol/lumera/config"
 	"github.com/LumeraProtocol/lumera/x/evmigration/types"
 )
 
 // partialProofVersion is the current on-disk format version for PartialProof.
-const partialProofVersion = 1
+const partialProofVersion = 2
 
 const (
-	flagLegacyAddr = "legacy"
-	flagNewAddr    = "new"
-	flagKind       = "kind"
-	flagEVMChainID = "evm-chain-id"
-	flagOut        = "out"
-	flagLegacyKey  = "legacy-key"
-	flagSigFormat  = "sig-format"
+	flagLegacyAddr    = "legacy"
+	flagNewAddr       = "new"
+	flagKind          = "kind"
+	flagEVMChainID    = "evm-chain-id"
+	flagOut           = "out"
+	flagLegacyKey     = "legacy-key"
+	flagSigFormat     = "sig-format"
+	flagNewKey        = "new-key"
+	flagNewSubPubKeys = "new-sub-pub-keys"
+	flagNewThreshold  = "new-threshold"
 )
 
 // PartialProof is a coordination artifact passed between co-signers during
 // the multi-step offline signing flow. It is never stored on-chain.
+//
+// Version 2 schema: each side (legacy and new) has its own SideSpec describing
+// whether it is single-key or multisig and what sig format to use. Partial
+// signatures are separated into per-side slices.
 type PartialProof struct {
-	Version       int                   `json:"version"`
-	Kind          string                `json:"kind"` // migrationProofKindClaim | migrationProofKindValidator
-	LegacyAddress string                `json:"legacy_address"`
-	NewAddress    string                `json:"new_address"`
-	ChainID       string                `json:"chain_id"`
-	EVMChainID    uint64                `json:"evm_chain_id"`
-	PayloadHex    string                `json:"payload_hex"`
-	Single        *PartialSingle        `json:"single,omitempty"`
-	Multisig      *PartialMultisig      `json:"multisig,omitempty"`
-	PartialSigs   []PartialSubSignature `json:"partial_signatures"`
+	Version                 int                `json:"version"`
+	Kind                    string             `json:"kind"` // migrationProofKindClaim | migrationProofKindValidator
+	LegacyAddress           string             `json:"legacy_address"`
+	NewAddress              string             `json:"new_address"`
+	ChainID                 string             `json:"chain_id"`
+	EVMChainID              uint64             `json:"evm_chain_id"`
+	PayloadHex              string             `json:"payload_hex"`
+	Legacy                  *SideSpec          `json:"legacy,omitempty"`
+	New                     *SideSpec          `json:"new,omitempty"`
+	PartialLegacySignatures []PartialSignature `json:"partial_legacy_signatures"`
+	PartialNewSignatures    []PartialSignature `json:"partial_new_signatures"`
 }
 
-// PartialSingle holds pubkey material for single-key offline proofs.
-type PartialSingle struct {
-	PubKeyB64 string `json:"pub_key_b64"`
+// SideSpec describes the pubkey configuration for one side of a migration proof.
+// For single-key: PubKey is set (base64-encoded 33-byte compressed pubkey); Threshold/SubPubKeys are empty.
+// For multisig:   Threshold and SubPubKeys are set; PubKey is empty.
+type SideSpec struct {
+	// For single-key: base64-encoded 33-byte compressed pubkey.
+	// For multisig:   empty.
+	PubKey string `json:"pub_key,omitempty"`
+	// For multisig: minimum signers required.
+	// For single-key: 0 (omitted).
+	Threshold uint32 `json:"threshold,omitempty"`
+	// For multisig: base64-encoded 33-byte compressed pubkeys, one per signer.
+	// For single-key: nil (omitted).
+	SubPubKeys []string `json:"sub_pub_keys,omitempty"`
+	// Signing envelope. One of: SIG_FORMAT_CLI, SIG_FORMAT_ADR036, SIG_FORMAT_EIP191.
+	// EIP-191 is only valid on the new side for single-key proofs.
 	SigFormat string `json:"sig_format"`
 }
 
-// PartialMultisig holds pubkey material for multisig offline proofs.
-type PartialMultisig struct {
-	Threshold     uint32   `json:"threshold"`
-	SubPubKeysB64 []string `json:"sub_pub_keys_b64"`
-	SigFormat     string   `json:"sig_format"`
-}
-
-// PartialSubSignature holds one signer's contribution to the proof.
-type PartialSubSignature struct {
-	Index        uint32 `json:"index"`
-	SignatureB64 string `json:"signature_b64"`
+// PartialSignature holds one signer's contribution to one side of the proof.
+type PartialSignature struct {
+	Index     uint32 `json:"index"`
+	Signature string `json:"signature"` // base64-encoded
 }
 
 // MarshalIndent writes JSON with 2-space indent for human-readable review.
@@ -77,14 +91,35 @@ func (pp *PartialProof) MarshalIndent() ([]byte, error) {
 	return json.MarshalIndent(pp, "", "  ")
 }
 
-// LoadPartialProof reads a PartialProof JSON file and validates its version.
+// LoadPartialProof reads a PartialProof JSON file and validates its version
+// and contents. Uses a two-pass approach: first a tolerant version probe to
+// give a clear "unsupported version" error for v1 files, then a strict
+// DisallowUnknownFields decode to catch forward-drift within v2.
 func LoadPartialProof(path string) (*PartialProof, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", path, err)
 	}
+
+	// Pass 1: tolerant version probe. Use ordinary json.Unmarshal so unknown
+	// v1 fields (single, multisig, partial_sigs) don't trigger an error
+	// before we read the version field.
+	var probe struct {
+		Version int `json:"version"`
+	}
+	if err := json.Unmarshal(b, &probe); err != nil {
+		return nil, fmt.Errorf("parse %s: %w", path, err)
+	}
+	if probe.Version != partialProofVersion {
+		return nil, fmt.Errorf("unsupported partial_proof version %d (expected %d)", probe.Version, partialProofVersion)
+	}
+
+	// Pass 2: strict decode once version is confirmed. Unknown fields at this
+	// point indicate forward-drift within the v2 lineage.
+	dec := json.NewDecoder(bytes.NewReader(b))
+	dec.DisallowUnknownFields()
 	var pp PartialProof
-	if err := json.Unmarshal(b, &pp); err != nil {
+	if err := dec.Decode(&pp); err != nil {
 		return nil, fmt.Errorf("parse %s: %w", path, err)
 	}
 	if err := validatePartialProof(&pp); err != nil {
@@ -109,6 +144,8 @@ func ParseSigFormat(s string) (types.SigFormat, error) {
 		return types.SigFormat_SIG_FORMAT_CLI, nil
 	case "SIG_FORMAT_ADR036":
 		return types.SigFormat_SIG_FORMAT_ADR036, nil
+	case "SIG_FORMAT_EIP191":
+		return types.SigFormat_SIG_FORMAT_EIP191, nil
 	default:
 		return types.SigFormat_SIG_FORMAT_UNSPECIFIED, fmt.Errorf("unknown sig_format %q", s)
 	}
@@ -121,6 +158,8 @@ func SigFormatString(f types.SigFormat) string {
 		return "SIG_FORMAT_CLI"
 	case types.SigFormat_SIG_FORMAT_ADR036:
 		return "SIG_FORMAT_ADR036"
+	case types.SigFormat_SIG_FORMAT_EIP191:
+		return "SIG_FORMAT_EIP191"
 	default:
 		return "SIG_FORMAT_UNSPECIFIED"
 	}
@@ -129,23 +168,6 @@ func SigFormatString(f types.SigFormat) string {
 // ComputePayload builds the canonical migration payload bytes. Exported for tests.
 func ComputePayload(chainID string, evmChainID uint64, kind, legacyAddr, newAddr string) string {
 	return fmt.Sprintf("lumera-evm-migration:%s:%d:%s:%s:%s", chainID, evmChainID, kind, legacyAddr, newAddr)
-}
-
-// decodeSubPubKeys decodes the base64 sub-pubkeys from a PartialMultisig.
-func decodeSubPubKeys(ms *PartialMultisig) ([][]byte, error) {
-	out := make([][]byte, len(ms.SubPubKeysB64))
-	for i, s := range ms.SubPubKeysB64 {
-		b, err := base64.StdEncoding.DecodeString(s)
-		if err != nil {
-			return nil, fmt.Errorf("sub_pub_keys_b64[%d]: %w", i, err)
-		}
-		if len(b) != secp256k1.PubKeySize {
-			return nil, fmt.Errorf("sub_pub_keys_b64[%d]: expected %d bytes, got %d",
-				i, secp256k1.PubKeySize, len(b))
-		}
-		out[i] = b
-	}
-	return out, nil
 }
 
 func canonicalPayloadBytes(pp *PartialProof) []byte {
@@ -160,11 +182,17 @@ func validatePartialProof(pp *PartialProof) error {
 		return fmt.Errorf("partial proof has invalid kind %q (expected %q or %q)",
 			pp.Kind, migrationProofKindClaim, migrationProofKindValidator)
 	}
-	if pp.Single == nil && pp.Multisig == nil {
-		return fmt.Errorf("partial proof has neither 'single' nor 'multisig' section")
+	if pp.Legacy == nil {
+		return fmt.Errorf("partial proof missing 'legacy' side spec")
 	}
-	if pp.Single != nil && pp.Multisig != nil {
-		return fmt.Errorf("partial proof has both 'single' and 'multisig' sections")
+	if pp.New == nil {
+		return fmt.Errorf("partial proof missing 'new' side spec")
+	}
+	if err := validateSideSpec("legacy", pp.Legacy); err != nil {
+		return err
+	}
+	if err := validateSideSpec("new", pp.New); err != nil {
+		return err
 	}
 	payloadBytes, err := hex.DecodeString(pp.PayloadHex)
 	if err != nil {
@@ -176,18 +204,108 @@ func validatePartialProof(pp *PartialProof) error {
 	return nil
 }
 
-func verifyPartialSignature(pkBytes, payload, sig []byte, sigFmt types.SigFormat) bool {
+// validateSideSpec enforces: single XOR multisig; threshold bounds; sig_format valid;
+// EIP-191 scoping (legacy side rejects, multisig rejects).
+func validateSideSpec(label string, s *SideSpec) error {
+	isSingle := s.PubKey != ""
+	isMulti := s.Threshold > 0 || len(s.SubPubKeys) > 0
+	switch {
+	case !isSingle && !isMulti:
+		return fmt.Errorf("%s side: neither pub_key nor sub_pub_keys set", label)
+	case isSingle && isMulti:
+		return fmt.Errorf("%s side: both single-key (pub_key) and multisig (threshold/sub_pub_keys) fields are set", label)
+	case isMulti && s.Threshold == 0:
+		return fmt.Errorf("%s side: multisig has threshold=0", label)
+	case isMulti && int(s.Threshold) > len(s.SubPubKeys):
+		return fmt.Errorf("%s side: threshold=%d exceeds sub_pub_keys count=%d", label, s.Threshold, len(s.SubPubKeys))
+	}
+	if s.SigFormat == "" {
+		return fmt.Errorf("%s side: sig_format empty", label)
+	}
+	parsed, err := ParseSigFormat(s.SigFormat)
+	if err != nil {
+		return fmt.Errorf("%s side: sig_format %q: %w", label, s.SigFormat, err)
+	}
+	if parsed == types.SigFormat_SIG_FORMAT_EIP191 {
+		if label == "legacy" {
+			return fmt.Errorf("%s side: SIG_FORMAT_EIP191 is not valid on the legacy side", label)
+		}
+		if isMulti {
+			return fmt.Errorf("%s side: SIG_FORMAT_EIP191 is not valid for multisig proofs", label)
+		}
+	}
+	return nil
+}
+
+// assembleMultisigProof merges partial sub-signatures into a MultisigProof.
+// Signatures are deduplicated by index (last write wins). If more than K
+// signatures are present, the first K valid signatures in signer-index order
+// are selected so stale/corrupted extras do not poison the assembled proof.
+//
+// NOTE: Task 16 (combine-proof) will replace the inline secp256k1 verification
+// here with sigverify.VerifyCosmosSecp256k1 / sigverify.VerifyEthSecp256k1.
+func assembleMultisigProof(ss *SideSpec, payload []byte, partials []PartialSignature) (*types.MultisigProof, error) {
+	sigFmt, err := ParseSigFormat(ss.SigFormat)
+	if err != nil {
+		return nil, err
+	}
+	subs, err := decodeSideSubPubKeys(ss)
+	if err != nil {
+		return nil, err
+	}
+	byIdx := map[uint32][]byte{}
+	for _, p := range partials {
+		if int(p.Index) >= len(subs) {
+			return nil, fmt.Errorf("partial signature index %d out of range (N=%d)", p.Index, len(subs))
+		}
+		sig, err := base64.StdEncoding.DecodeString(p.Signature)
+		if err != nil {
+			return nil, fmt.Errorf("partial signature %d: %w", p.Index, err)
+		}
+		byIdx[p.Index] = sig
+	}
+	if uint32(len(byIdx)) < ss.Threshold {
+		return nil, fmt.Errorf("need %d partial signatures, have %d", ss.Threshold, len(byIdx))
+	}
+	indices := make([]uint32, 0, len(byIdx))
+	for idx := range byIdx {
+		indices = append(indices, idx)
+	}
+	sort.Slice(indices, func(i, j int) bool { return indices[i] < indices[j] })
+	validIndices := make([]uint32, 0, len(indices))
+	sigs := make([][]byte, 0, len(indices))
+	for _, idx := range indices {
+		sig := byIdx[idx]
+		if !verifySideSubSig(subs[idx], payload, sig, sigFmt) {
+			continue
+		}
+		validIndices = append(validIndices, idx)
+		sigs = append(sigs, sig)
+		if uint32(len(validIndices)) == ss.Threshold {
+			break
+		}
+	}
+	if uint32(len(validIndices)) < ss.Threshold {
+		return nil, fmt.Errorf("need %d valid partial signatures, have %d", ss.Threshold, len(validIndices))
+	}
+	return &types.MultisigProof{
+		Threshold:     ss.Threshold,
+		SubPubKeys:    subs,
+		SignerIndices: validIndices,
+		SubSignatures: sigs,
+		SigFormat:     sigFmt,
+	}, nil
+}
+
+// verifySideSubSig verifies a single sub-signature against a Cosmos secp256k1 pubkey.
+// NOTE: Task 16 (combine-proof) will replace this with sigverify.VerifyCosmosSecp256k1.
+func verifySideSubSig(pkBytes, payload, sig []byte, sigFmt types.SigFormat) bool {
 	pk := &secp256k1.PubKey{Key: pkBytes}
 	switch sigFmt {
 	case types.SigFormat_SIG_FORMAT_CLI:
 		hash := sha256.Sum256(payload)
 		return pk.VerifySignature(hash[:], sig)
 	case types.SigFormat_SIG_FORMAT_ADR036:
-		// ADR-036 canonical sign doc for MsgSignData. Fields are alphabetically
-		// sorted (Amino canonical form) and must be byte-for-byte identical to
-		// what the wallet / `lumerad tx sign --sign-mode amino-json` produces,
-		// because secp256k1.VerifySignature hashes the doc and compares to the
-		// sig's hash. Keep in lockstep with keeper/verify.go:adr036SignDoc.
 		signerAddr := sdk.AccAddress(pk.Address()).String()
 		doc := fmt.Appendf(nil,
 			`{"account_number":"0","chain_id":"","fee":{"amount":[],"gas":"0"},`+
@@ -201,72 +319,32 @@ func verifyPartialSignature(pkBytes, payload, sig []byte, sigFmt types.SigFormat
 	}
 }
 
-// assembleMultisigProof merges partial sub-signatures into a MultisigProof.
-// Signatures are deduplicated by index (last write wins). If more than K
-// signatures are present, the first K valid signatures in signer-index order
-// are selected so stale/corrupted extras do not poison the assembled proof.
-func assembleMultisigProof(ms *PartialMultisig, payload []byte, partials []PartialSubSignature) (*types.MultisigProof, error) {
-	sigFmt, err := ParseSigFormat(ms.SigFormat)
-	if err != nil {
-		return nil, err
-	}
-	subs, err := decodeSubPubKeys(ms)
-	if err != nil {
-		return nil, err
-	}
-	byIdx := map[uint32][]byte{}
-	for _, p := range partials {
-		if int(p.Index) >= len(subs) {
-			return nil, fmt.Errorf("partial signature index %d out of range (N=%d)", p.Index, len(subs))
-		}
-		sig, err := base64.StdEncoding.DecodeString(p.SignatureB64)
+// decodeSideSubPubKeys decodes the base64 sub-pubkeys from a multisig SideSpec.
+func decodeSideSubPubKeys(ss *SideSpec) ([][]byte, error) {
+	out := make([][]byte, len(ss.SubPubKeys))
+	for i, s := range ss.SubPubKeys {
+		b, err := base64.StdEncoding.DecodeString(s)
 		if err != nil {
-			return nil, fmt.Errorf("partial signature %d: %w", p.Index, err)
+			return nil, fmt.Errorf("sub_pub_keys[%d]: %w", i, err)
 		}
-		byIdx[p.Index] = sig
-	}
-	if uint32(len(byIdx)) < ms.Threshold {
-		return nil, fmt.Errorf("need %d partial signatures, have %d", ms.Threshold, len(byIdx))
-	}
-	indices := make([]uint32, 0, len(byIdx))
-	for idx := range byIdx {
-		indices = append(indices, idx)
-	}
-	sort.Slice(indices, func(i, j int) bool { return indices[i] < indices[j] })
-	validIndices := make([]uint32, 0, len(indices))
-	sigs := make([][]byte, 0, len(indices))
-	for _, idx := range indices {
-		sig := byIdx[idx]
-		if !verifyPartialSignature(subs[idx], payload, sig, sigFmt) {
-			continue
+		if len(b) != secp256k1.PubKeySize {
+			return nil, fmt.Errorf("sub_pub_keys[%d]: expected %d bytes, got %d",
+				i, secp256k1.PubKeySize, len(b))
 		}
-		validIndices = append(validIndices, idx)
-		sigs = append(sigs, sig)
-		if uint32(len(validIndices)) == ms.Threshold {
-			break
-		}
+		out[i] = b
 	}
-	if uint32(len(validIndices)) < ms.Threshold {
-		return nil, fmt.Errorf("need %d valid partial signatures, have %d", ms.Threshold, len(validIndices))
-	}
-	return &types.MultisigProof{
-		Threshold:     ms.Threshold,
-		SubPubKeys:    subs,
-		SignerIndices: validIndices,
-		SubSignatures: sigs,
-		SigFormat:     sigFmt,
-	}, nil
+	return out, nil
 }
 
 // assembleSingleProof builds a SingleKeyProof from a single-entry partial list.
-func assembleSingleProof(ss *PartialSingle, partials []PartialSubSignature) (*types.SingleKeyProof, error) {
+func assembleSingleProof(ss *SideSpec, partials []PartialSignature) (*types.SingleKeyProof, error) {
 	sigFmt, err := ParseSigFormat(ss.SigFormat)
 	if err != nil {
 		return nil, err
 	}
-	pub, err := base64.StdEncoding.DecodeString(ss.PubKeyB64)
+	pub, err := base64.StdEncoding.DecodeString(ss.PubKey)
 	if err != nil {
-		return nil, fmt.Errorf("pub_key_b64: %w", err)
+		return nil, fmt.Errorf("pub_key: %w", err)
 	}
 	if len(partials) < 1 {
 		return nil, fmt.Errorf("need 1 partial signature for single-key proof")
@@ -276,11 +354,11 @@ func assembleSingleProof(ss *PartialSingle, partials []PartialSubSignature) (*ty
 		if p.Index != 0 {
 			return nil, fmt.Errorf("single-key proof must have index=0, got %d", p.Index)
 		}
-		sigB64 = p.SignatureB64
+		sigB64 = p.Signature
 	}
 	sig, err := base64.StdEncoding.DecodeString(sigB64)
 	if err != nil {
-		return nil, fmt.Errorf("signature_b64: %w", err)
+		return nil, fmt.Errorf("signature: %w", err)
 	}
 	return &types.SingleKeyProof{PubKey: pub, Signature: sig, SigFormat: sigFmt}, nil
 }
@@ -288,55 +366,68 @@ func assembleSingleProof(ss *PartialSingle, partials []PartialSubSignature) (*ty
 // AssertPartialProofsConsistent verifies two PartialProof files agree on
 // every field that would change the assembled tx identity. Exported for testing.
 func AssertPartialProofsConsistent(a, b *PartialProof) error {
+	if a.Version != b.Version {
+		return fmt.Errorf("version differs: %d vs %d", a.Version, b.Version)
+	}
 	if a.Kind != b.Kind {
-		return fmt.Errorf("kind mismatch: %q vs %q", a.Kind, b.Kind)
-	}
-	if a.LegacyAddress != b.LegacyAddress {
-		return fmt.Errorf("legacy_address mismatch: %s vs %s", a.LegacyAddress, b.LegacyAddress)
-	}
-	if a.NewAddress != b.NewAddress {
-		return fmt.Errorf("new_address mismatch: %s vs %s", a.NewAddress, b.NewAddress)
+		return fmt.Errorf("kind differs: %q vs %q", a.Kind, b.Kind)
 	}
 	if a.ChainID != b.ChainID {
-		return fmt.Errorf("chain_id mismatch: %s vs %s", a.ChainID, b.ChainID)
+		return fmt.Errorf("chain_id differs: %q vs %q", a.ChainID, b.ChainID)
 	}
 	if a.EVMChainID != b.EVMChainID {
-		return fmt.Errorf("evm_chain_id mismatch: %d vs %d", a.EVMChainID, b.EVMChainID)
+		return fmt.Errorf("evm_chain_id differs: %d vs %d", a.EVMChainID, b.EVMChainID)
+	}
+	if a.LegacyAddress != b.LegacyAddress {
+		return fmt.Errorf("legacy_address differs: %q vs %q", a.LegacyAddress, b.LegacyAddress)
+	}
+	if a.NewAddress != b.NewAddress {
+		return fmt.Errorf("new_address differs: %q vs %q", a.NewAddress, b.NewAddress)
 	}
 	if a.PayloadHex != b.PayloadHex {
-		return fmt.Errorf("payload_hex mismatch")
+		return fmt.Errorf("payload_hex differs (chain_id/kind/legacy_address/new_address mismatch between files)")
 	}
-	if (a.Single == nil) != (b.Single == nil) {
-		return fmt.Errorf("proof-kind mismatch: one has 'single', the other does not")
+	if err := assertSideSpecsEqual("legacy", a.Legacy, b.Legacy); err != nil {
+		return err
 	}
-	if (a.Multisig == nil) != (b.Multisig == nil) {
-		return fmt.Errorf("proof-kind mismatch: one has 'multisig', the other does not")
-	}
-	if a.Single != nil {
-		if a.Single.PubKeyB64 != b.Single.PubKeyB64 {
-			return fmt.Errorf("single.pub_key_b64 mismatch")
-		}
-		if a.Single.SigFormat != b.Single.SigFormat {
-			return fmt.Errorf("sig_format mismatch: %s vs %s", a.Single.SigFormat, b.Single.SigFormat)
-		}
-	}
-	if a.Multisig != nil {
-		if a.Multisig.Threshold != b.Multisig.Threshold {
-			return fmt.Errorf("threshold mismatch: %d vs %d", a.Multisig.Threshold, b.Multisig.Threshold)
-		}
-		if a.Multisig.SigFormat != b.Multisig.SigFormat {
-			return fmt.Errorf("sig_format mismatch: %s vs %s", a.Multisig.SigFormat, b.Multisig.SigFormat)
-		}
-		if len(a.Multisig.SubPubKeysB64) != len(b.Multisig.SubPubKeysB64) {
-			return fmt.Errorf("num sub_pub_keys mismatch: %d vs %d", len(a.Multisig.SubPubKeysB64), len(b.Multisig.SubPubKeysB64))
-		}
-		for i := range a.Multisig.SubPubKeysB64 {
-			if a.Multisig.SubPubKeysB64[i] != b.Multisig.SubPubKeysB64[i] {
-				return fmt.Errorf("sub_pub_keys_b64[%d] mismatch", i)
-			}
-		}
+	if err := assertSideSpecsEqual("new", a.New, b.New); err != nil {
+		return err
 	}
 	return nil
+}
+
+func assertSideSpecsEqual(label string, a, b *SideSpec) error {
+	if (a == nil) != (b == nil) {
+		return fmt.Errorf("%s side spec presence differs between partial files", label)
+	}
+	if a == nil {
+		return nil
+	}
+	if a.PubKey != b.PubKey {
+		return fmt.Errorf("%s side pub_key differs", label)
+	}
+	if a.Threshold != b.Threshold {
+		return fmt.Errorf("%s side threshold differs: %d vs %d", label, a.Threshold, b.Threshold)
+	}
+	if !slicesEqualString(a.SubPubKeys, b.SubPubKeys) {
+		return fmt.Errorf("%s side sub_pub_keys differ", label)
+	}
+	if a.SigFormat != b.SigFormat {
+		return fmt.Errorf("%s side sig_format differs: %q vs %q", label, a.SigFormat, b.SigFormat)
+	}
+	return nil
+}
+
+func slicesEqualString(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // hexEncode encodes payload bytes to hex for PartialProof.PayloadHex.
@@ -355,14 +446,119 @@ func fetchAccount(clientCtx client.Context, addr sdk.AccAddress) (cryptotypes.Pu
 // keep unused-import guard
 var _ = signingtypes.SignMode_SIGN_MODE_UNSPECIFIED
 
+// resolveEthSubKey accepts either a keyring key-name or a base64-encoded
+// 33-byte compressed eth_secp256k1 pubkey and returns the raw pubkey bytes.
+// Errors if the spec resolves to a non-ethsecp256k1 key.
+func resolveEthSubKey(clientCtx client.Context, spec string) ([]byte, error) {
+	if rec, err := clientCtx.Keyring.Key(spec); err == nil {
+		pk, err := rec.GetPubKey()
+		if err != nil {
+			return nil, fmt.Errorf("cannot get pubkey for key %q: %w", spec, err)
+		}
+		ethPK, ok := pk.(*evmcryptotypes.PubKey)
+		if !ok {
+			return nil, fmt.Errorf("key %q is %T, expected eth_secp256k1", spec, pk)
+		}
+		return ethPK.Key, nil
+	}
+	raw, err := base64.StdEncoding.DecodeString(spec)
+	if err != nil {
+		return nil, fmt.Errorf("%q is neither a keyring key nor a base64-encoded pubkey: %w", spec, err)
+	}
+	if len(raw) != 33 {
+		return nil, fmt.Errorf("base64 pubkey %q decodes to %d bytes, expected 33", spec, len(raw))
+	}
+	return raw, nil
+}
+
+// buildLegacySideSpec builds the legacy SideSpec from the on-chain pubkey, handling
+// four cases: on-chain secp256k1 / on-chain multisig / nil+--legacy-key / nil without.
+func buildLegacySideSpec(clientCtx client.Context, accPubKey cryptotypes.PubKey, legacyKeyName, sigFmt string, legacyAddr sdk.AccAddress) (*SideSpec, error) {
+	switch pk := accPubKey.(type) {
+	case *secp256k1.PubKey:
+		if legacyKeyName != "" {
+			rec, err := clientCtx.Keyring.Key(legacyKeyName)
+			if err != nil {
+				return nil, fmt.Errorf("--legacy-key %q not found: %w", legacyKeyName, err)
+			}
+			kp, err := rec.GetPubKey()
+			if err != nil {
+				return nil, err
+			}
+			if !bytes.Equal(kp.Bytes(), pk.Bytes()) {
+				return nil, fmt.Errorf("--legacy-key pubkey does not match on-chain pubkey for %s", legacyAddr)
+			}
+		}
+		return &SideSpec{
+			PubKey:    base64.StdEncoding.EncodeToString(pk.Bytes()),
+			SigFormat: sigFmt,
+		}, nil
+
+	case *kmultisig.LegacyAminoPubKey:
+		if legacyKeyName != "" {
+			return nil, fmt.Errorf("--legacy-key is not applicable to multisig accounts; co-signers sign via sign-proof")
+		}
+		subs := pk.GetPubKeys()
+		subBytes := make([]string, len(subs))
+		for i, sub := range subs {
+			cpk, ok := sub.(*secp256k1.PubKey)
+			if !ok {
+				return nil, fmt.Errorf("legacy multisig sub-key %d is %T, expected Cosmos secp256k1", i, sub)
+			}
+			subBytes[i] = base64.StdEncoding.EncodeToString(cpk.Bytes())
+		}
+		return &SideSpec{
+			Threshold:  uint32(pk.Threshold),
+			SubPubKeys: subBytes,
+			SigFormat:  sigFmt,
+		}, nil
+
+	case nil:
+		if legacyKeyName == "" {
+			return nil, fmt.Errorf(
+				"account at %s has no on-chain pubkey record; pass --legacy-key to seed the pubkey from your keyring (single-sig only), or for a multisig address submit a 1-ulume self-send first",
+				legacyAddr,
+			)
+		}
+		rec, err := clientCtx.Keyring.Key(legacyKeyName)
+		if err != nil {
+			return nil, fmt.Errorf("--legacy-key %q not found: %w", legacyKeyName, err)
+		}
+		kp, err := rec.GetPubKey()
+		if err != nil {
+			return nil, err
+		}
+		cpk, ok := kp.(*secp256k1.PubKey)
+		if !ok {
+			return nil, fmt.Errorf("--legacy-key is %T, expected Cosmos secp256k1 (eth keys belong on --new-key)", kp)
+		}
+		derivedAddr := sdk.AccAddress(cpk.Address())
+		if !derivedAddr.Equals(legacyAddr) {
+			return nil, fmt.Errorf("--legacy-key derives to %s, not the requested --legacy %s", derivedAddr, legacyAddr)
+		}
+		return &SideSpec{
+			PubKey:    base64.StdEncoding.EncodeToString(cpk.Bytes()),
+			SigFormat: sigFmt,
+		}, nil
+
+	default:
+		return nil, fmt.Errorf("legacy account has unsupported pubkey type %T (expected Cosmos secp256k1 or LegacyAminoPubKey)", pk)
+	}
+}
+
 func cmdGenerateProofPayload() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "generate-proof-payload",
 		Short: "Generate a PartialProof template for offline multi-party signing",
 		Long: `Generate an unsigned PartialProof JSON file for offline multi-party
-coordination. For multisig accounts the sub-pubkeys and threshold are
-read from the on-chain account record. For nil-pubkey single-key
-accounts, pass --legacy-key to seed the pubkey from your local keyring.`,
+coordination. The legacy side is resolved from the on-chain account record;
+the new (destination) side is specified via --new-key (single-key) or
+--new-sub-pub-keys + --new-threshold (multisig).
+
+For nil-pubkey single-key legacy accounts, pass --legacy-key to seed the
+pubkey from your local keyring. For multisig legacy accounts, the pubkey
+is read from the on-chain account record (submit a 1-ulume self-send first
+if the account has no on-chain pubkey).`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			clientCtx, err := client.GetClientTxContext(cmd)
 			if err != nil {
@@ -375,6 +571,9 @@ accounts, pass --legacy-key to seed the pubkey from your local keyring.`,
 			out, _ := cmd.Flags().GetString(flagOut)
 			legacyKey, _ := cmd.Flags().GetString(flagLegacyKey)
 			sigFmtStr, _ := cmd.Flags().GetString(flagSigFormat)
+			newKey, _ := cmd.Flags().GetString(flagNewKey)
+			newSubPubKeys, _ := cmd.Flags().GetStringSlice(flagNewSubPubKeys)
+			newThreshold, _ := cmd.Flags().GetUint32(flagNewThreshold)
 
 			if kind != migrationProofKindClaim && kind != migrationProofKindValidator {
 				return fmt.Errorf("--kind must be %q or %q",
@@ -387,12 +586,67 @@ accounts, pass --legacy-key to seed the pubkey from your local keyring.`,
 				evmChainID = lcfg.EVMChainID
 			}
 
+			// Validate mutual exclusivity of new-side flags.
+			hasNewKey := newKey != ""
+			hasNewSubs := len(newSubPubKeys) > 0
+			switch {
+			case !hasNewKey && !hasNewSubs:
+				return fmt.Errorf("one of --new-key or --new-sub-pub-keys is required to specify the destination side")
+			case hasNewKey && hasNewSubs:
+				return fmt.Errorf("--new-key and --new-sub-pub-keys are mutually exclusive")
+			case hasNewSubs && newThreshold == 0:
+				return fmt.Errorf("--new-threshold is required with --new-sub-pub-keys")
+			}
+
 			legacyAddr, err := sdk.AccAddressFromBech32(legacyStr)
 			if err != nil {
 				return fmt.Errorf("--legacy: %w", err)
 			}
-			if _, err := sdk.AccAddressFromBech32(newStr); err != nil {
-				return fmt.Errorf("--new: %w", err)
+
+			// Derive the authoritative new address from key material.
+			var derivedNewAddr string
+			var newSide *SideSpec
+			if hasNewKey {
+				// Single-key new side: resolve from keyring.
+				ethPubKeyBytes, err := resolveEthSubKey(clientCtx, newKey)
+				if err != nil {
+					return fmt.Errorf("--new-key: %w", err)
+				}
+				ethPK := &evmcryptotypes.PubKey{Key: ethPubKeyBytes}
+				derivedNewAddr = sdk.AccAddress(ethPK.Address()).String()
+				newSide = &SideSpec{
+					PubKey:    base64.StdEncoding.EncodeToString(ethPubKeyBytes),
+					SigFormat: "SIG_FORMAT_EIP191", // default for eth single-key new side
+				}
+			} else {
+				// Multisig new side: resolve each sub-key.
+				if int(newThreshold) > len(newSubPubKeys) {
+					return fmt.Errorf("--new-threshold=%d exceeds --new-sub-pub-keys count=%d", newThreshold, len(newSubPubKeys))
+				}
+				ethSubKeys := make([]cryptotypes.PubKey, len(newSubPubKeys))
+				subPubKeyB64s := make([]string, len(newSubPubKeys))
+				for i, spec := range newSubPubKeys {
+					raw, err := resolveEthSubKey(clientCtx, spec)
+					if err != nil {
+						return fmt.Errorf("--new-sub-pub-keys[%d]: %w", i, err)
+					}
+					ethSubKeys[i] = &evmcryptotypes.PubKey{Key: raw}
+					subPubKeyB64s[i] = base64.StdEncoding.EncodeToString(raw)
+				}
+				multiPK := kmultisig.NewLegacyAminoPubKey(int(newThreshold), ethSubKeys)
+				derivedNewAddr = sdk.AccAddress(multiPK.Address()).String()
+				newSide = &SideSpec{
+					Threshold:  newThreshold,
+					SubPubKeys: subPubKeyB64s,
+					SigFormat:  sigFmtStr, // multisig new side uses the caller-specified format
+				}
+			}
+
+			// If --new was supplied, cross-check against derived address.
+			if newStr != "" {
+				if newStr != derivedNewAddr {
+					return fmt.Errorf("--new %s does not match the address derived from key material (%s)", newStr, derivedNewAddr)
+				}
 			}
 
 			accPubKey, err := fetchAccount(clientCtx, legacyAddr)
@@ -400,75 +654,47 @@ accounts, pass --legacy-key to seed the pubkey from your local keyring.`,
 				return err
 			}
 
-			pp := &PartialProof{
-				Version:       partialProofVersion,
-				Kind:          kind,
-				LegacyAddress: legacyStr,
-				NewAddress:    newStr,
-				ChainID:       clientCtx.ChainID,
-				EVMChainID:    evmChainID,
-				PayloadHex:    hexEncode([]byte(ComputePayload(clientCtx.ChainID, evmChainID, kind, legacyStr, newStr))),
-				PartialSigs:   []PartialSubSignature{},
+			legacySide, err := buildLegacySideSpec(clientCtx, accPubKey, legacyKey, sigFmtStr, legacyAddr)
+			if err != nil {
+				return err
 			}
 
-			switch pk := accPubKey.(type) {
-			case *secp256k1.PubKey:
-				if legacyKey != "" {
-					rec, err := clientCtx.Keyring.Key(legacyKey)
-					if err != nil {
-						return fmt.Errorf("--legacy-key %q not found: %w", legacyKey, err)
+			// Shape-mirror check: legacy and new must both be single or both multisig.
+			legacyIsSingle := legacySide.PubKey != ""
+			newIsSingle := newSide.PubKey != ""
+			if legacyIsSingle != newIsSingle {
+				return fmt.Errorf("legacy and new sides must have the same shape: legacy is %s but new is %s",
+					sideShapeLabel(legacyIsSingle), sideShapeLabel(newIsSingle))
+			}
+
+			// Key-reuse guard: no new sub-pubkey may equal any legacy sub-pubkey.
+			if !newIsSingle {
+				legacySubs := legacySide.SubPubKeys
+				for _, ns := range newSide.SubPubKeys {
+					for _, ls := range legacySubs {
+						if ns == ls {
+							return fmt.Errorf("destination sub-key %s matches a legacy sub-key; generate fresh eth keys for the new side", ns)
+						}
 					}
-					kp, err := rec.GetPubKey()
-					if err != nil {
-						return err
-					}
-					if !bytes.Equal(kp.Bytes(), pk.Bytes()) {
-						return fmt.Errorf("--legacy-key pubkey does not match on-chain pubkey")
-					}
 				}
-				pp.Single = &PartialSingle{
-					PubKeyB64: base64.StdEncoding.EncodeToString(pk.Bytes()),
-					SigFormat: sigFmtStr,
-				}
-			case *kmultisig.LegacyAminoPubKey:
-				if legacyKey != "" {
-					return fmt.Errorf("--legacy-key is not applicable for multisig accounts")
-				}
-				subs := make([]string, len(pk.GetPubKeys()))
-				for i, k := range pk.GetPubKeys() {
-					subs[i] = base64.StdEncoding.EncodeToString(k.Bytes())
-				}
-				pp.Multisig = &PartialMultisig{
-					Threshold:     uint32(pk.Threshold),
-					SubPubKeysB64: subs,
-					SigFormat:     sigFmtStr,
-				}
-			case nil:
-				if legacyKey == "" {
-					return fmt.Errorf("account at %s has no on-chain pubkey record; pass --legacy-key to seed the pubkey from your keyring (single-sig only), or for a multisig address submit a 1-ulume self-send first", legacyAddr)
-				}
-				rec, err := clientCtx.Keyring.Key(legacyKey)
-				if err != nil {
-					return fmt.Errorf("--legacy-key %q not found: %w", legacyKey, err)
-				}
-				kp, err := rec.GetPubKey()
-				if err != nil {
-					return err
-				}
-				secp, ok := kp.(*secp256k1.PubKey)
-				if !ok {
-					return fmt.Errorf("--legacy-key %q is not secp256k1 (got %T)", legacyKey, kp)
-				}
-				if !sdk.AccAddress(secp.Address()).Equals(legacyAddr) {
-					return fmt.Errorf("--legacy-key derives to %s, expected %s",
-						sdk.AccAddress(secp.Address()), legacyAddr)
-				}
-				pp.Single = &PartialSingle{
-					PubKeyB64: base64.StdEncoding.EncodeToString(secp.Bytes()),
-					SigFormat: sigFmtStr,
-				}
-			default:
-				return fmt.Errorf("unsupported pubkey type %T", pk)
+			}
+
+			pp := &PartialProof{
+				Version:                 partialProofVersion,
+				Kind:                    kind,
+				LegacyAddress:           legacyStr,
+				NewAddress:              derivedNewAddr,
+				ChainID:                 clientCtx.ChainID,
+				EVMChainID:              evmChainID,
+				PayloadHex:              hexEncode([]byte(ComputePayload(clientCtx.ChainID, evmChainID, kind, legacyStr, derivedNewAddr))),
+				Legacy:                  legacySide,
+				New:                     newSide,
+				PartialLegacySignatures: []PartialSignature{},
+				PartialNewSignatures:    []PartialSignature{},
+			}
+
+			if err := validatePartialProof(pp); err != nil {
+				return fmt.Errorf("BUG: generated proof fails validation: %w", err)
 			}
 
 			if out == "" {
@@ -484,24 +710,38 @@ accounts, pass --legacy-key to seed the pubkey from your local keyring.`,
 	}
 	flags.AddQueryFlagsToCmd(cmd)
 	cmd.Flags().String(flagLegacyAddr, "", "Legacy (coin-type 118) bech32 address to migrate from")
-	cmd.Flags().String(flagNewAddr, "", "New (coin-type 60) bech32 destination address")
+	cmd.Flags().String(flagNewAddr, "", "New (coin-type 60) bech32 destination address (optional; cross-checked when supplied)")
 	cmd.Flags().String(flagKind, migrationProofKindClaim,
 		fmt.Sprintf("%q for account migration or %q for operator migration",
 			migrationProofKindClaim, migrationProofKindValidator))
 	cmd.Flags().Uint64(flagEVMChainID, 0, "EVM chain ID (defaults to lcfg.EVMChainID)")
 	cmd.Flags().String(flagOut, "", "Output file path; if empty, writes JSON to stdout")
 	cmd.Flags().String(flagLegacyKey, "", "Local keyring key name to seed pubkey for nil-pubkey single-sig accounts")
-	cmd.Flags().String(flagSigFormat, "SIG_FORMAT_CLI", "Signing envelope: SIG_FORMAT_CLI or SIG_FORMAT_ADR036")
+	cmd.Flags().String(flagSigFormat, "SIG_FORMAT_CLI", "Signing envelope for legacy side: SIG_FORMAT_CLI or SIG_FORMAT_ADR036")
+	cmd.Flags().String(flagNewKey, "", "Keyring name of the destination-side single-key (must be eth_secp256k1). Mutually exclusive with --new-sub-pub-keys.")
+	cmd.Flags().StringSlice(flagNewSubPubKeys, nil, "Comma-separated list of destination-side sub-keys. Each entry is either a keyring key name or a base64-encoded 33-byte eth_secp256k1 pubkey.")
+	cmd.Flags().Uint32(flagNewThreshold, 0, "Threshold K for the destination-side multisig. Required with --new-sub-pub-keys.")
 	_ = cmd.MarkFlagRequired(flagLegacyAddr)
-	_ = cmd.MarkFlagRequired(flagNewAddr)
 	return cmd
+}
+
+// sideShapeLabel returns "single-key" or "multisig" for error messages.
+func sideShapeLabel(isSingle bool) string {
+	if isSingle {
+		return "single-key"
+	}
+	return "multisig"
 }
 
 func cmdSignProof() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "sign-proof <partial-proof.json>",
 		Short: "Append your sub-signature to a PartialProof file",
-		Args:  cobra.ExactArgs(1),
+		Long: `Append your sub-signature to a PartialProof file.
+
+This command signs the legacy side of the proof. Task 15 will extend
+this command to support signing the new (destination) side as well.`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clientCtx, err := client.GetClientTxContext(cmd)
 			if err != nil {
@@ -533,21 +773,27 @@ func cmdSignProof() *cobra.Command {
 
 			payloadBytes := canonicalPayloadBytes(pp)
 
+			// NOTE (Task 15): sign-proof will be extended to support signing the
+			// new side (eth_secp256k1 / EIP-191). For now only the legacy side
+			// is signed here to keep the build green while Tasks 15-16 are pending.
 			var idx uint32
 			var found bool
+			legacySide := pp.Legacy
 			switch {
-			case pp.Single != nil:
-				pub, err := base64.StdEncoding.DecodeString(pp.Single.PubKeyB64)
+			case legacySide != nil && legacySide.PubKey != "":
+				// Single-key legacy side.
+				pub, err := base64.StdEncoding.DecodeString(legacySide.PubKey)
 				if err != nil {
 					return err
 				}
 				if !bytes.Equal(pub, secp.Bytes()) {
-					return fmt.Errorf("--from key does not match single proof's pubkey")
+					return fmt.Errorf("--from key does not match legacy single proof's pubkey")
 				}
 				idx = 0
 				found = true
-			case pp.Multisig != nil:
-				for i, s := range pp.Multisig.SubPubKeysB64 {
+			case legacySide != nil && len(legacySide.SubPubKeys) > 0:
+				// Multisig legacy side.
+				for i, s := range legacySide.SubPubKeys {
 					b, err := base64.StdEncoding.DecodeString(s)
 					if err != nil {
 						return err
@@ -559,20 +805,14 @@ func cmdSignProof() *cobra.Command {
 					}
 				}
 				if !found {
-					return fmt.Errorf("--from key is not a member of the multisig")
+					return fmt.Errorf("--from key is not a member of the legacy multisig")
 				}
 			}
 			if !found {
-				return fmt.Errorf("partial proof has neither single nor multisig; cannot sign")
+				return fmt.Errorf("partial proof has no legacy side; cannot sign")
 			}
 
-			var sigFmtStr string
-			if pp.Single != nil {
-				sigFmtStr = pp.Single.SigFormat
-			} else {
-				sigFmtStr = pp.Multisig.SigFormat
-			}
-
+			sigFmtStr := legacySide.SigFormat
 			var sig []byte
 			switch sigFmtStr {
 			case "SIG_FORMAT_CLI":
@@ -591,15 +831,15 @@ func cmdSignProof() *cobra.Command {
 			}
 
 			// Idempotent upsert: remove existing entry for this index, then append.
-			filtered := pp.PartialSigs[:0]
-			for _, p := range pp.PartialSigs {
+			filtered := pp.PartialLegacySignatures[:0]
+			for _, p := range pp.PartialLegacySignatures {
 				if p.Index != idx {
 					filtered = append(filtered, p)
 				}
 			}
-			pp.PartialSigs = append(filtered, PartialSubSignature{
-				Index:        idx,
-				SignatureB64: base64.StdEncoding.EncodeToString(sig),
+			pp.PartialLegacySignatures = append(filtered, PartialSignature{
+				Index:     idx,
+				Signature: base64.StdEncoding.EncodeToString(sig),
 			})
 
 			return SavePartialProof(out, pp)
@@ -614,7 +854,12 @@ func cmdCombineProof() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "combine-proof <partial1.json> [<partial2.json> ...]",
 		Short: "Merge partial proofs into an unsigned tx JSON",
-		Args:  cobra.MinimumNArgs(1),
+		Long: `Merge partial proofs from multiple co-signers into an unsigned tx JSON.
+
+NOTE (Task 16): This command will be extended to assemble both the legacy
+and new proofs independently. For now it assembles only the legacy proof
+to keep the build green while Task 16 is pending.`,
+		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			out, _ := cmd.Flags().GetString(flagOut)
 			if out == "" {
@@ -633,27 +878,41 @@ func cmdCombineProof() *cobra.Command {
 				if err := AssertPartialProofsConsistent(merged, other); err != nil {
 					return fmt.Errorf("%s: %w", p, err)
 				}
-				for _, ps := range other.PartialSigs {
-					filtered := merged.PartialSigs[:0]
-					for _, m := range merged.PartialSigs {
+				// Merge legacy signatures (idempotent by index).
+				for _, ps := range other.PartialLegacySignatures {
+					filtered := merged.PartialLegacySignatures[:0]
+					for _, m := range merged.PartialLegacySignatures {
 						if m.Index != ps.Index {
 							filtered = append(filtered, m)
 						}
 					}
-					merged.PartialSigs = append(filtered, ps)
+					merged.PartialLegacySignatures = append(filtered, ps)
+				}
+				// Merge new signatures (idempotent by index).
+				for _, ps := range other.PartialNewSignatures {
+					filtered := merged.PartialNewSignatures[:0]
+					for _, m := range merged.PartialNewSignatures {
+						if m.Index != ps.Index {
+							filtered = append(filtered, m)
+						}
+					}
+					merged.PartialNewSignatures = append(filtered, ps)
 				}
 			}
 
+			// NOTE (Task 16): combine-proof will assemble both legacy and new proofs.
+			// Currently only the legacy proof is assembled; new proof assembly is
+			// stubbed until Task 16 fills in the full dual-side combine logic.
 			var legacyProof types.MigrationProof
 			switch {
-			case merged.Single != nil:
-				sp, err := assembleSingleProof(merged.Single, merged.PartialSigs)
+			case merged.Legacy != nil && merged.Legacy.PubKey != "":
+				sp, err := assembleSingleProof(merged.Legacy, merged.PartialLegacySignatures)
 				if err != nil {
 					return err
 				}
 				legacyProof = types.MigrationProof{Proof: &types.MigrationProof_Single{Single: sp}}
-			case merged.Multisig != nil:
-				mp, err := assembleMultisigProof(merged.Multisig, canonicalPayloadBytes(merged), merged.PartialSigs)
+			case merged.Legacy != nil && len(merged.Legacy.SubPubKeys) > 0:
+				mp, err := assembleMultisigProof(merged.Legacy, canonicalPayloadBytes(merged), merged.PartialLegacySignatures)
 				if err != nil {
 					return err
 				}
@@ -661,7 +920,7 @@ func cmdCombineProof() *cobra.Command {
 			}
 
 			if err := legacyProof.ValidateBasic(types.SideLegacy); err != nil {
-				return fmt.Errorf("assembled proof fails ValidateBasic: %w", err)
+				return fmt.Errorf("assembled legacy proof fails ValidateBasic: %w", err)
 			}
 
 			var unsignedMsg sdk.Msg

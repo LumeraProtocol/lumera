@@ -24,12 +24,18 @@ func TestLoadPartialProof_RejectsPayloadFieldMismatch(t *testing.T) {
 		NewAddress:    "lumera1new",
 		ChainID:       "lumera-test-1",
 		EVMChainID:    76857769,
-		PayloadHex:    hex.EncodeToString([]byte("lumera-evm-migration:lumera-test-1:76857769:claim:lumera1legacy:lumera1other")),
-		Single: &PartialSingle{
-			PubKeyB64: "AAAA",
+		// PayloadHex contains "lumera1other" not "lumera1new" — mismatch.
+		PayloadHex: hex.EncodeToString([]byte("lumera-evm-migration:lumera-test-1:76857769:claim:lumera1legacy:lumera1other")),
+		Legacy: &SideSpec{
+			PubKey:    "AAAA",
 			SigFormat: "SIG_FORMAT_CLI",
 		},
-		PartialSigs: []PartialSubSignature{},
+		New: &SideSpec{
+			PubKey:    "BBBB",
+			SigFormat: "SIG_FORMAT_CLI",
+		},
+		PartialLegacySignatures: []PartialSignature{},
+		PartialNewSignatures:    []PartialSignature{},
 	}
 
 	b, err := json.Marshal(pp)
@@ -51,30 +57,31 @@ func TestAssembleMultisigProof_PrefersValidSubsetWhenExtrasPresent(t *testing.T)
 	payload := []byte("lumera-evm-migration:lumera-test-1:76857769:claim:legacy:new")
 
 	subPubKeys := make([]string, len(privs))
-	partials := make([]PartialSubSignature, len(privs))
+	partials := make([]PartialSignature, len(privs))
 	for i, priv := range privs {
 		subPubKeys[i] = base64.StdEncoding.EncodeToString(priv.PubKey().Bytes())
 		hash := sha256.Sum256(payload)
 		sig, err := priv.Sign(hash[:])
 		require.NoError(t, err)
-		partials[i] = PartialSubSignature{
-			Index:        uint32(i),
-			SignatureB64: base64.StdEncoding.EncodeToString(sig),
+		partials[i] = PartialSignature{
+			Index:     uint32(i),
+			Signature: base64.StdEncoding.EncodeToString(sig),
 		}
 	}
 
 	// Corrupt the lowest-index signature. The combiner should skip it and keep
 	// the other two valid signatures instead of blindly truncating to indices 0,1.
-	sig0, err := base64.StdEncoding.DecodeString(partials[0].SignatureB64)
+	sig0, err := base64.StdEncoding.DecodeString(partials[0].Signature)
 	require.NoError(t, err)
 	sig0[0] ^= 0xFF
-	partials[0].SignatureB64 = base64.StdEncoding.EncodeToString(sig0)
+	partials[0].Signature = base64.StdEncoding.EncodeToString(sig0)
 
-	proof, err := assembleMultisigProof(&PartialMultisig{
-		Threshold:     2,
-		SubPubKeysB64: subPubKeys,
-		SigFormat:     "SIG_FORMAT_CLI",
-	}, payload, partials)
+	ss := &SideSpec{
+		Threshold:  2,
+		SubPubKeys: subPubKeys,
+		SigFormat:  "SIG_FORMAT_CLI",
+	}
+	proof, err := assembleMultisigProof(ss, payload, partials)
 	require.NoError(t, err)
 	require.Equal(t, []uint32{1, 2}, proof.SignerIndices)
 	require.Len(t, proof.SubSignatures, 2)

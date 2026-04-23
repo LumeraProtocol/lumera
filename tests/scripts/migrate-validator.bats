@@ -25,6 +25,26 @@ setup() {
   [[ "$output" == *"not a validator"* ]]
 }
 
+@test "migrate-validator.sh rejects non-secp256k1 legacy key before preflight" {
+  run env SHIM_ESTIMATE_FIXTURE=estimate-validator-ok \
+    "$SCRIPTS_DIR/migrate-validator.sh" \
+    --binary "$SHIM" --chain-id shim-test \
+    --i-have-stopped-the-node --yes --dry-run \
+    legacy-eth ekey
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"coin-type 118"* ]]
+}
+
+@test "migrate-validator.sh rejects non-eth new key before preflight" {
+  run env SHIM_ESTIMATE_FIXTURE=estimate-validator-ok \
+    "$SCRIPTS_DIR/migrate-validator.sh" \
+    --binary "$SHIM" --chain-id shim-test \
+    --i-have-stopped-the-node --yes --dry-run \
+    vkey wrong-algo
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"eth_secp256k1"* ]]
+}
+
 @test "migrate-validator.sh rejects over-cap with exit 6" {
   run env SHIM_ESTIMATE_FIXTURE=estimate-validator-over-cap \
     "$SCRIPTS_DIR/migrate-validator.sh" \

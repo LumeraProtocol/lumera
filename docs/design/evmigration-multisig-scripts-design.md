@@ -61,12 +61,15 @@ Unknown subcommands, missing subcommand, or `-h`/`--help` print a subcommand ind
 
 `generate` is query-style and does not touch the local keyring. The wrapper should not accept `--keyring-backend`, `--keyring-dir`, or `--home` for this subcommand; those flags belong to `sign` and `submit`.
 
+Implementation note: do **not** call this through the existing `lumerad_tx` helper, because that helper appends keyring flags. Use a small `lumerad_tx_query_style` wrapper that forwards only `--node`, `--chain-id`, and the subcommand's own flags.
+
 **Pre-flight:**
 
 - `--chain-id` is required (empty chain-id produces silently non-verifying sub-signatures — documented footgun in [evmigration-multisig-design.md](evmigration-multisig-design.md)).
 - Query `auth account <legacy>` first and inspect the pubkey. If the pubkey is nil, abort with exit code 8 and the remediation: "multisig pubkey is not seeded on-chain; submit any transaction from the multisig account first, then retry." There is no `--legacy-key` recovery path for multisig because a local key cannot provide the trusted threshold and full sub-key set.
 - If the pubkey is non-nil, query `migration-estimate <legacy>` and abort with exit code 3 if `is_multisig == false` (pointing at `migrate-account.sh` / `migrate-validator.sh` instead).
 - `--kind` must be `claim` or `validator`. `validator` is additionally gated: if it's selected and the estimate reports `is_validator == false`, abort with exit code 6.
+- Run `assert_estimate_succeeds` and `assert_new_address_unused <new>` so already-migrated accounts, disabled/closed migration windows, unsupported multisig shapes, over-cap validators, and reused destination addresses fail before co-signers spend time producing partial files. `submit` repeats these checks because the ceremony can span time.
 
 **Success output:** the specified `--out` file exists and contains a valid `PartialProof` template: `kind`, `legacy_address`, `new_address`, `chain_id`, `evm_chain_id`, `payload_hex`, `multisig.threshold`, `multisig.sub_pub_keys_b64`, `multisig.sig_format`, and an empty `partial_signatures` array.
 
@@ -87,6 +90,7 @@ Unknown subcommands, missing subcommand, or `-h`/`--help` print a subcommand ind
 - Input file exists and parses as JSON.
 - Validate `payload_hex` against a canonical reconstruction from the other fields. Abort exit 9 on mismatch (catches tampering or mistakenly-edited fields).
 - Extract `multisig.sub_pub_keys_b64` from the file, then resolve `--from`'s pubkey from the keyring and confirm it matches one of the listed sub-key pubkeys. Abort exit 1 if the signer isn't in the set (catches "wrong key" mistakes early, which otherwise only surface at `combine` time when the keeper-side pubkey verification fails).
+- Reject `single` partial-proof files with exit 3 and a pointer to `migrate-account.sh` / `migrate-validator.sh`; this wrapper is multisig-only even though the raw `lumerad` multi-step CLI also supports single-key cold-wallet proofs.
 
 **Success output:** `--out` contains a partial with the signer's `{index, signature_b64}` entry appended. The `partial_signatures` array is idempotent — re-running `sign` with the same `--from` replaces the existing entry for that signer index.
 
@@ -133,7 +137,7 @@ No `--node` or `--chain-id` — `combine` is pure local file assembly.
 
 **Pre-flight (identical in spirit to `migrate-account.sh`'s happy path):**
 
-- `<tx.json>` exists and parses. Extract `legacy_address` and `new_address` from its embedded proof.
+- `<tx.json>` exists and parses. Extract `legacy_address`, `new_address`, kind, and multisig metadata from `body.messages[0]` in the unsigned tx JSON, accepting only `/lumera.evmigration.MsgClaimLegacyAccount` and `/lumera.evmigration.MsgMigrateValidator` with `legacy_proof.multisig` set. Reject single-key tx JSON with exit 3 and a pointer to the single-sig scripts.
 - Resolve `--from`'s address and verify it matches `new_address` (operators running submit with the wrong destination key is a common failure mode).
 - Verify `--from` is `eth_secp256k1` — reject other algorithms with exit 1 and a clear message.
 - Run `assert_not_migrated <legacy>` and `assert_new_address_unused <new>` (shared with single-sig flow).
@@ -154,11 +158,16 @@ New functions added to `scripts/evmigration-common.sh`:
 | Function | Purpose |
 |---|---|
 | `assert_multisig <estimate-json>` | Inverse of `assert_single_sig`. If `is_multisig == false`, abort exit 3 with a pointer to `migrate-account.sh` / `migrate-validator.sh` |
+| `require_multisig_binary` | Extends `require_binary` by probing `tx evmigration generate-proof-payload`, `sign-proof`, `combine-proof`, and `submit-proof` so an old `lumerad` binary fails before any ceremony step |
+| `lumerad_tx_query_style` | Calls `lumerad tx ...` commands implemented with query flags (`generate-proof-payload`) without adding keyring flags |
 | `auth_account_json <addr>` | Cached `lumerad_q auth account <addr>` wrapper returning JSON |
-| `auth_pubkey_type <addr>` | Returns one of `none` (nil), `single-sig`, `multisig`, or `unknown` based on the `.account.pub_key."@type"` field |
-| `read_proof_file <path>` | Reads and validates a proof or partial JSON file. Validates required fields (`kind`, `legacy_address`, `new_address`, `chain_id`, `evm_chain_id`, `payload_hex`, `multisig.threshold`, `multisig.sub_pub_keys_b64`, `multisig.sig_format`, `partial_signatures`), verifies `payload_hex` matches canonical reconstruction from the other fields, confirms `multisig.threshold` and the `sub_pub_keys_b64` list length are internally consistent. Emits the JSON on stdout, human summary on stderr. Fails exit 9 on any violation |
-| `summarize_partials <files...>` | Parses all inputs, prints the K-of-N signed matrix shown in §3.3, returns 0 if threshold satisfied, non-zero otherwise |
-| `assert_eth_key <key-name>` | Confirms the given key in the keyring is `eth_secp256k1` (matching the algorithm the EVM path uses) |
+| `auth_pubkey_type <addr>` | Returns one of `none` (nil), `single-sig`, `multisig`, or `unknown`. Must search both `.account.pub_key` and nested base-account shapes such as `.account.base_account.pub_key`, because vesting/account wrapper responses do not always put the pubkey at the top level |
+| `key_pubkey_b64 <key-name>` | Reads `lumerad keys show <key-name> --output json` and returns the base64 public key bytes for local membership checks |
+| `assert_secp256k1_key <key-name>` | Confirms the given key in the keyring is legacy Cosmos `secp256k1`, used by `sign` before comparing against `multisig.sub_pub_keys_b64` |
+| `assert_eth_key <key-name>` | Confirms the given key in the keyring is `eth_secp256k1`, used by `submit` |
+| `read_proof_file <path>` | Reads and validates a multisig proof or partial JSON file. Validates required fields (`kind`, `legacy_address`, `new_address`, `chain_id`, `evm_chain_id`, `payload_hex`, `multisig.threshold`, `multisig.sub_pub_keys_b64`, `multisig.sig_format`, `partial_signatures`), rejects `single` proof files, verifies `payload_hex` matches canonical reconstruction from the other fields, validates base64 fields, enforces partial-signature indices are in range, and confirms `1 <= threshold <= len(sub_pub_keys_b64)`. Emits the JSON on stdout, human summary on stderr. Fails exit 9 on any violation |
+| `read_migration_tx_file <path>` | Reads the unsigned tx JSON from `combine`, verifies exactly one supported evmigration message with `legacy_proof.multisig` set, rejects single-key proof txs with exit 3, and emits a compact JSON object with `legacy_address`, `new_address`, `kind`, `threshold`, and `num_signers` for submit preflight |
+| `summarize_partials <files...>` | Parses all inputs, enforces cross-file consistency, prints the K-of-N entry-presence matrix shown in §3.3, returns 0 if at least K distinct signer indices are present, non-zero otherwise |
 
 All new functions follow the existing style (short, composable, fail-closed, one responsibility each).
 
@@ -170,6 +179,8 @@ All new functions follow the existing style (short, composable, fail-closed, one
 ERROR legacy account is a K-of-N multisig; use scripts/migrate-multisig.sh for the offline 4-step flow
 ERROR see docs/evm-integration/user-guides/migration-scripts.md#multisig
 ```
+
+Also update `Makefile`'s `lint-scripts` target to include `scripts/migrate-multisig.sh` alongside the existing scripts; otherwise CI can pass without shellchecking the new entry point.
 
 ## 6. Exit codes
 
@@ -211,6 +222,8 @@ The script is a single file so that the subcommand dispatch logic lives in one p
 - `generate` rejects single-sig (exit 3)
 - `generate` rejects when chain-id unset (exit 1)
 - `generate` rejects keyring-specific flags (`--keyring-backend`, `--keyring-dir`, `--home`) as usage errors (exit 1)
+- `generate` aborts with exit 4 when `migration-estimate.would_succeed=false`
+- `generate` aborts with exit 5 when `--new` is already used as a migration destination
 - `generate` exits 8 when the on-chain pubkey is nil and prints the "seed the multisig pubkey on-chain first" remediation
 - `sign` rejects a partial with tampered `payload_hex` (exit 9)
 - `sign` rejects when `--from` is not in the sub-key set (exit 1)
@@ -220,6 +233,7 @@ The script is a single file so that the subcommand dispatch logic lives in one p
 - `combine` happy path assembles tx.json
 - `submit` happy path — pre-flight + broadcast + verify, exits 0
 - `submit` rejects when `--from` address doesn't match tx's `new_address` (exit 1)
+- `submit` rejects single-key proof tx JSON with exit 3
 - `submit` aborts with exit 4 when `migration-estimate` flips to `would_succeed=false` between `generate` and `submit` (simulate via `SHIM_ESTIMATE_FIXTURE=estimate-rejected`)
 - `submit` validator path requires typed downtime acknowledgement or `--i-have-stopped-the-node` (exit 10 on refusal)
 - `submit` dry-run exits 0 without broadcasting
@@ -228,9 +242,12 @@ The script is a single file so that the subcommand dispatch logic lives in one p
 
 `tests/scripts/fixtures/lumerad-shim.sh` adds:
 
-- Routes for `tx evmigration generate-proof-payload *`, `tx evmigration sign-proof *`, `tx evmigration combine-proof *`, `tx evmigration submit-proof *` — each emits a corresponding fixture (`proof-template.json`, `partial-bob.json`, `combined-tx.json`, `broadcast-success.json`).
+- Routes for `tx evmigration generate-proof-payload *`, `tx evmigration sign-proof *`, `tx evmigration combine-proof *`, `tx evmigration submit-proof *` — each emits a corresponding fixture (`proof-template.json`, `partial-bob.json`, `combined-tx.json`, `broadcast-success.json`). These routes must appear before the generic `tx evmigration*` catch-all route in the shim.
 - Multisig auth-account fixture (`auth-account-multisig.json`) with `LegacyAminoPubKey` type and three sub-keys.
+- Nested-account variant fixture (`auth-account-multisig-nested.json`) to prove `auth_pubkey_type` finds `.account.base_account.pub_key`.
 - Nil-pubkey auth-account fixture (`auth-account-nilpubkey.json`) with `"pub_key": null`.
+- Keyring JSON fixtures for `keys show <subkey> --output json` and `keys show <new-eth-key> --output json`, covering legacy `secp256k1`, `eth_secp256k1`, wrong-algorithm, and wrong-subkey cases.
+- PartialProof fixtures using the implementation field names (`sub_pub_keys_b64`, `signature_b64`) for happy path, tampered `payload_hex`, below-threshold entries, and K-present-but-invalid-signature scenarios.
 - Per-command fixture env var `SHIM_AUTH_FIXTURE` (already exists from Task 4); extend with a `SHIM_AUTH_TYPE=multisig|nilpubkey|single` router for readability.
 
 ### 8.3 Integration (devnet matrix — manual)
@@ -241,7 +258,7 @@ Acceptance test against `make devnet-new`: fund a 2-of-3 multisig account, run t
 
 - [docs/evm-integration/user-guides/migration-scripts.md](../evm-integration/user-guides/migration-scripts.md) — add a new top-level section "Multisig migration" covering the four subcommands, preflight messages, exit codes 8 and 9, and a walkthrough of a 2-of-3 ceremony with three terminal windows.
 - [docs/evm-integration/user-guides/migration.md](../evm-integration/user-guides/migration.md) — the existing "Migrating a multisig account" section gets a pointer to `migrate-multisig.sh` at the top, before the raw-CLI walkthrough. The raw-CLI walkthrough stays as the canonical reference.
-- [Makefile](../../Makefile) — `release` target already copies all `scripts/*.sh` to the tarball via an explicit list; extend the list with `migrate-multisig.sh`.
+- [Makefile](../../Makefile) — `release` target already copies all migration scripts to the tarball via an explicit list; extend the copy list and `chmod +x` list with `migrate-multisig.sh`.
 - No changes to [evmigration-multisig-design.md](evmigration-multisig-design.md) — that doc describes the wire format and keeper logic, which the scripts wrap but don't change.
 
 ## 10. Out of scope / explicit deferrals

@@ -52,6 +52,8 @@ source "${SCRIPT_DIR}/evmigration-common.sh"
 | `lumerad_tx <args...>` | Thin wrapper that runs `"$BIN" tx "$@" --node "$NODE" --chain-id "$CHAIN_ID" --keyring-backend "$KEYRING_BACKEND" --output json`, injecting `--keyring-dir` and `--home` when set |
 | `lumerad_keys <args...>` | Thin wrapper for `lumerad keys` with the same keyring flags |
 | `resolve_address <key-name>` | Returns bech32 via `lumerad keys show <k> -a` |
+| `assert_secp256k1_key <key-name>` | Confirms the legacy key's pubkey type is `/cosmos.crypto.secp256k1.PubKey`; mnemonic mode imports this key with coin-type 118 |
+| `assert_eth_key <key-name>` | Confirms the new key's pubkey type is an `eth_secp256k1` variant; mnemonic mode imports this key with coin-type 60 |
 | `assert_single_sig <estimate-json>` | Reads `is_multisig` from a captured `migration-estimate` response (see 4.4); errors with exit code 3 if true |
 | `assert_not_migrated <bech32>` | Queries `migration-record <addr>`; errors with exit code 5 if one exists |
 | `assert_new_address_unused <bech32>` | Queries `migration-record <new-addr>` and `migration-record-by-new-address <new-addr>`; errors with exit code 5 if either returns a record |
@@ -160,28 +162,29 @@ Any failure exits 7 with a loud message instructing the user to query the tx has
 
 1. `parse_common_flags "$@"`, `require_binary`, `require_jq`.
 2. If `$MNEMONIC_FILE` set: `import_from_mnemonic` (installs cleanup trap).
-3. `legacy_addr=$(resolve_address "$LEGACY_KEY")`, `new_addr=$(resolve_address "$NEW_KEY")`.
-4. `assert_not_migrated "$legacy_addr"` and `assert_new_address_unused "$new_addr"`.
-5. `estimate_json=$(preflight_estimate "$legacy_addr")` — captures full JSON from stdout for later reuse; prints the human summary to stderr.
-6. `assert_single_sig "$estimate_json"` (reads `is_multisig`).
-7. **Validator check**: if `estimate_json`'s `is_validator` field is true (or, equivalently, `lumerad_q staking validator "$(lumera_to_valoper "$legacy_addr")"` returns a record), abort with exit 6:
+3. `assert_secp256k1_key "$LEGACY_KEY"` and `assert_eth_key "$NEW_KEY"` fail fast if either key name points at the wrong signing algorithm. The script cannot prove the original HD coin type for arbitrary pre-existing keyring entries; in `--mnemonic-file` mode, the import step enforces coin-type 118 for the legacy key and coin-type 60 for the new key.
+4. `legacy_addr=$(resolve_address "$LEGACY_KEY")`, `new_addr=$(resolve_address "$NEW_KEY")`.
+5. `assert_not_migrated "$legacy_addr"` and `assert_new_address_unused "$new_addr"`.
+6. `estimate_json=$(preflight_estimate "$legacy_addr")` — captures full JSON from stdout for later reuse; prints the human summary to stderr.
+7. `assert_single_sig "$estimate_json"` (reads `is_multisig`).
+8. **Validator check**: if `estimate_json`'s `is_validator` field is true (or, equivalently, `lumerad_q staking validator "$(lumera_to_valoper "$legacy_addr")"` returns a record), abort with exit 6:
    *"This account is a validator. Use scripts/migrate-validator.sh instead."*
    The valoper conversion shells out to `lumerad debug addr` (see Appendix A).
-8. `assert_estimate_succeeds "$estimate_json"`; exits 4 for generic estimate failures such as disabled migration or closed migration window.
-9. If `estimate_json.has_supernode == true`, log a warning that the supernode registration will move with the account.
-10. `legacy_balance_snapshot=$(snapshot_bank_balances "$legacy_addr")`.
-11. `confirm "Proceed with migration from $legacy_addr to $new_addr?"`.
-12. If `$DRY_RUN`: exit 0 here.
-13. Broadcast:
+9. `assert_estimate_succeeds "$estimate_json"`; exits 4 for generic estimate failures such as disabled migration or closed migration window.
+10. If `estimate_json.has_supernode == true`, log a warning that the supernode registration will move with the account.
+11. `legacy_balance_snapshot=$(snapshot_bank_balances "$legacy_addr")`.
+12. `confirm "Proceed with migration from $legacy_addr to $new_addr?"`.
+13. If `$DRY_RUN`: exit 0 here.
+14. Broadcast:
 
     ```bash
     tx_json=$(lumerad_tx evmigration claim-legacy-account "$LEGACY_KEY" "$NEW_KEY" --yes)
     tx_hash=$(jq -r '.txhash // empty' <<<"$tx_json")
     ```
 
-14. Require `tx_hash` to be non-empty, then run `wait_for_tx "$tx_hash"`. The command's custom CLI path already waits for sync broadcasts internally, but the script still polls/query-checks the hash so post-migration verification starts from an execution-confirmed tx response.
-15. `verify_migration "$legacy_addr" "$new_addr" "$legacy_balance_snapshot"`.
-16. Print a success summary with the tx hash and the new bech32 / hex addresses.
+15. Require `tx_hash` to be non-empty, then run `wait_for_tx "$tx_hash"`. The command's custom CLI path already waits for sync broadcasts internally, but the script still polls/query-checks the hash so post-migration verification starts from an execution-confirmed tx response.
+16. `verify_migration "$legacy_addr" "$new_addr" "$legacy_balance_snapshot"`.
+17. Print a success summary with the tx hash and the new bech32 / hex addresses.
 
 ## 6. `migrate-validator.sh`
 
@@ -196,13 +199,14 @@ Any failure exits 7 with a loud message instructing the user to query the tx has
 1. Entry-point script pre-parses and strips `--i-have-stopped-the-node` (setting a local `NODE_STOPPED=1`) before calling `parse_common_flags` with the remaining args.
 2. `parse_common_flags "$@"`, `require_binary`, `require_jq`.
 3. If `$MNEMONIC_FILE` set: `import_from_mnemonic` (installs cleanup trap).
-4. `legacy_addr=$(resolve_address "$LEGACY_KEY")`, `new_addr=$(resolve_address "$NEW_KEY")`.
-5. `assert_not_migrated "$legacy_addr"` and `assert_new_address_unused "$new_addr"`.
-6. `estimate_json=$(preflight_estimate "$legacy_addr")`.
-7. `assert_single_sig "$estimate_json"`.
-8. **Reverse validator check**: if `estimate_json.is_validator == false`, abort with exit 6:
+4. `assert_secp256k1_key "$LEGACY_KEY"` and `assert_eth_key "$NEW_KEY"` fail fast if either key name points at the wrong signing algorithm. The script cannot prove the original HD coin type for arbitrary pre-existing keyring entries; in `--mnemonic-file` mode, the import step enforces coin-type 118 for the legacy key and coin-type 60 for the new key.
+5. `legacy_addr=$(resolve_address "$LEGACY_KEY")`, `new_addr=$(resolve_address "$NEW_KEY")`.
+6. `assert_not_migrated "$legacy_addr"` and `assert_new_address_unused "$new_addr"`.
+7. `estimate_json=$(preflight_estimate "$legacy_addr")`.
+8. `assert_single_sig "$estimate_json"`.
+9. **Reverse validator check**: if `estimate_json.is_validator == false`, abort with exit 6:
    *"This account is not a validator. Use scripts/migrate-account.sh instead."*
-9. **Delegation cap check** (uses `val_*_count` fields that count records *referencing the validator*, matching what the keeper enforces in [msg_server_migrate_validator.go](../../x/evmigration/keeper/msg_server_migrate_validator.go) via `GetValidatorDelegations` / `GetUnbondingDelegationsFromValidator` / redelegations by src-or-dst):
+10. **Delegation cap check** (uses `val_*_count` fields that count records *referencing the validator*, matching what the keeper enforces in [msg_server_migrate_validator.go](../../x/evmigration/keeper/msg_server_migrate_validator.go) via `GetValidatorDelegations` / `GetUnbondingDelegationsFromValidator` / redelegations by src-or-dst):
 
    ```bash
    cap=$(lumerad_q evmigration params | jq -r '.params.max_validator_delegations')
@@ -211,9 +215,9 @@ Any failure exits 7 with a loud message instructing the user to query the tx has
 
    Abort with exit 6 if `total > cap`. Log a warning if `total > cap * 9 / 10`.
 
-10. `assert_estimate_succeeds "$estimate_json"`; exits 4 for non-cap estimate failures such as unbonding/unbonded validator status, disabled migration, or closed migration window.
-11. `legacy_balance_snapshot=$(snapshot_bank_balances "$legacy_addr")`.
-12. **Validator downtime banner**:
+11. `assert_estimate_succeeds "$estimate_json"`; exits 4 for non-cap estimate failures such as unbonding/unbonded validator status, disabled migration, or closed migration window.
+12. `legacy_balance_snapshot=$(snapshot_bank_balances "$legacy_addr")`.
+13. **Validator downtime banner**:
 
     ```text
     ================================================================
@@ -225,11 +229,11 @@ Any failure exits 7 with a loud message instructing the user to query the tx has
 
     Require a separate confirmation, satisfied by EITHER the pre-stripped `--i-have-stopped-the-node` flag (step 1, `NODE_STOPPED=1`) OR an interactive typed `yes` / `no` response (must be the full word "yes"). `--yes` does NOT satisfy this check — this is the one place the script is deliberately more interactive than the account path.
 
-13. `confirm "Proceed with validator migration from $legacy_addr to $new_addr?"`.
-14. If `$DRY_RUN`: exit 0.
-15. Broadcast `lumerad tx evmigration migrate-validator "$LEGACY_KEY" "$NEW_KEY" --yes`, capture `.txhash`, and require it to be non-empty.
-16. `wait_for_tx "$tx_hash"`, then `verify_migration "$legacy_addr" "$new_addr" "$legacy_balance_snapshot"`.
-17. Print post-migration checklist:
+14. `confirm "Proceed with validator migration from $legacy_addr to $new_addr?"`.
+15. If `$DRY_RUN`: exit 0.
+16. Broadcast `lumerad tx evmigration migrate-validator "$LEGACY_KEY" "$NEW_KEY" --yes`, capture `.txhash`, and require it to be non-empty.
+17. `wait_for_tx "$tx_hash"`, then `verify_migration "$legacy_addr" "$new_addr" "$legacy_balance_snapshot"`.
+18. Print post-migration checklist:
     - Import `$NEW_KEY` into the production keyring at the correct `--keyring-backend`.
     - Restart the validator binary.
     - Verify the validator's new operator address via `lumerad_q staking validator <new-valoper>`.

@@ -447,6 +447,32 @@ setup_shim() {
   [ "$output" = "A1111111111111111111111111111111111111111111" ]
 }
 
+@test "key_pubkey_b64 accepts object-shaped pubkey JSON" {
+  setup_shim
+  local tmp; tmp=$(mktemp -d)
+  cp "$BATS_TEST_DIRNAME/fixtures/lumerad-shim.sh" "$tmp/lumerad-shim.sh"
+  mkdir -p "$tmp"
+  cat > "$tmp/keys-show-object-sub.json" <<'JSON'
+{
+  "name": "object-sub",
+  "type": "local",
+  "address": "lumera1objectsub1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "pubkey": {
+    "@type": "/cosmos.crypto.secp256k1.PubKey",
+    "key": "A4444444444444444444444444444444444444444444"
+  }
+}
+JSON
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$tmp"'/lumerad-shim.sh
+    key_pubkey_b64 object-sub
+  '
+  rm -rf "$tmp"
+  [ "$status" -eq 0 ]
+  [ "$output" = "A4444444444444444444444444444444444444444444" ]
+}
+
 @test "assert_secp256k1_key passes for alice-sub" {
   setup_shim
   run bash -c '
@@ -599,7 +625,7 @@ setup_shim() {
   local tmp; tmp=$(mktemp)
   local payload ph
   payload='lumera-evm-migration:different-chain:76857769:claim:lumera1shimaddr1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx:lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
-  ph=$(printf '%s' "$payload" | sha256sum | awk '{print $1}')
+  ph=$(printf '%s' "$payload" | od -An -tx1 -v | tr -d ' \n')
   jq --arg ph "$ph" '.chain_id = "different-chain" | .payload_hex = $ph' \
     "$BATS_TEST_DIRNAME/fixtures/partial-bob.json" > "$tmp"
   run bash -c '

@@ -586,22 +586,28 @@ auth_pubkey_type() {
 # Reads lumerad keys show <key-name> --output json and extracts base64 pubkey bytes.
 key_pubkey_b64() {
   local key_name="$1"
-  local info pk_inner
+  local info pk_inner pk_key
   if ! info=$(lumerad_keys show "$key_name" --output json 2>/dev/null); then
     log_error "key not found in keyring: $key_name"
     exit 1
   fi
-  # .pubkey is a stringified JSON blob; parse it and extract .key.
-  pk_inner=$(jq -r '.pubkey' <<<"$info")
+  # Some SDK versions return .pubkey as a stringified JSON blob; others return
+  # it as an object. Accept both shapes.
+  pk_inner=$(jq -c '.pubkey | if type == "string" then fromjson else . end' <<<"$info" 2>/dev/null || printf '')
   if [[ -z "$pk_inner" || "$pk_inner" == "null" ]]; then
     log_error "key '$key_name' has no pubkey field"
     exit 1
   fi
-  jq -r '.key' <<<"$pk_inner"
+  pk_key=$(jq -r '.key // empty' <<<"$pk_inner")
+  if [[ -z "$pk_key" ]]; then
+    log_error "key '$key_name' has no pubkey key bytes"
+    exit 1
+  fi
+  printf '%s\n' "$pk_key"
 }
 
 # assert_secp256k1_key <key-name>
-# For sign. Confirms the key is legacy Cosmos /cosmos.crypto.secp256k1.PubKey.
+# Confirms the key is a legacy Cosmos /cosmos.crypto.secp256k1.PubKey.
 assert_secp256k1_key() {
   local key_name="$1"
   local info pk_type
@@ -609,9 +615,9 @@ assert_secp256k1_key() {
     log_error "key not found in keyring: $key_name"
     exit 1
   fi
-  pk_type=$(jq -r '.pubkey | fromjson | ."@type"' <<<"$info" 2>/dev/null || printf 'unknown')
+  pk_type=$(jq -r '(.pubkey | if type == "string" then fromjson else . end | ."@type") // "unknown"' <<<"$info" 2>/dev/null || printf 'unknown')
   if [[ "$pk_type" != "/cosmos.crypto.secp256k1.PubKey" ]]; then
-    log_error "key '$key_name' is not secp256k1 (got $pk_type) — sign requires a legacy multisig sub-key"
+    log_error "key '$key_name' is not secp256k1 (got $pk_type) — legacy migration requires a coin-type 118 secp256k1 key"
     exit 1
   fi
 }
@@ -625,7 +631,7 @@ assert_eth_key() {
     log_error "key not found in keyring: $key_name"
     exit 1
   fi
-  pk_type=$(jq -r '.pubkey | fromjson | ."@type"' <<<"$info" 2>/dev/null || printf 'unknown')
+  pk_type=$(jq -r '(.pubkey | if type == "string" then fromjson else . end | ."@type") // "unknown"' <<<"$info" 2>/dev/null || printf 'unknown')
   case "$pk_type" in
     /cosmos.crypto.ethsecp256k1.PubKey|\
     /ethermint.crypto.v1.ethsecp256k1.PubKey|\
@@ -634,6 +640,10 @@ assert_eth_key() {
       log_error "key '$key_name' is not eth_secp256k1 (got $pk_type) — submit requires the new EVM destination key"
       exit 1 ;;
   esac
+}
+
+_payload_hex() {
+  printf '%s' "$1" | od -An -tx1 -v | tr -d ' \n'
 }
 
 # read_proof_file <path>
@@ -710,7 +720,7 @@ read_proof_file() {
   legacy_f=$(jq -r '.legacy_address' <<<"$json")
   new_f=$(jq -r '.new_address' <<<"$json")
   payload="lumera-evm-migration:${chain_id_f}:${evm_chain_id}:${kind_f}:${legacy_f}:${new_f}"
-  calc=$(printf '%s' "$payload" | sha256sum | awk '{print $1}')
+  calc=$(_payload_hex "$payload")
   got=$(jq -r '.payload_hex' <<<"$json")
   if [[ "$calc" != "$got" ]]; then
     log_error "payload_hex mismatch in $path (expected $calc, got $got)"
@@ -766,7 +776,16 @@ read_migration_tx_file() {
 
   local threshold num_signers
   threshold=$(jq -r '.body.messages[0].legacy_proof.multisig.threshold' <<<"$json")
-  num_signers=$(jq -r '.body.messages[0].legacy_proof.multisig.sub_pub_keys_b64 | length' <<<"$json")
+  num_signers=$(jq -r '
+    .body.messages[0].legacy_proof.multisig
+    | if has("sub_pub_keys_b64") then .sub_pub_keys_b64 | length
+      elif has("sub_pub_keys") then .sub_pub_keys | length
+      else null end
+  ' <<<"$json")
+  if [[ -z "$threshold" || "$threshold" == "null" || -z "$num_signers" || "$num_signers" == "null" ]]; then
+    log_error "tx file $path has incomplete legacy_proof.multisig fields"
+    exit 9
+  fi
 
   jq -nc \
     --arg legacy "$legacy" \

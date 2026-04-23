@@ -173,7 +173,7 @@ S_USAGE
   # shellcheck disable=SC2034
   HOME_DIR="$home_dir"
 
-  require_binary
+  require_multisig_binary
   require_jq
 
   # Parse + validate the input proof/partial. read_proof_file rejects
@@ -236,6 +236,7 @@ C_USAGE
   # shellcheck disable=SC2034
   BIN="$binary"
 
+  require_multisig_binary
   require_jq
 
   # Per-file + cross-file consistency check. summarize_partials prints the

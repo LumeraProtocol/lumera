@@ -413,7 +413,7 @@ EOF
   local tmp; tmp=$(mktemp -d)
   local payload ph
   payload='lumera-evm-migration:different-chain:76857769:claim:lumera1shimaddr1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx:lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
-  ph=$(printf '%s' "$payload" | sha256sum | awk '{print $1}')
+  ph=$(printf '%s' "$payload" | od -An -tx1 -v | tr -d ' \n')
   jq --arg ph "$ph" '.chain_id = "different-chain" | .payload_hex = $ph' \
     "$FIX_DIR/partial-bob.json" > "$tmp/bob-bad.json"
   run "$SCRIPTS_DIR/migrate-multisig.sh" combine \
@@ -427,7 +427,7 @@ EOF
 
 @test "combine exits 4 when lumerad reports below-threshold valid sigs" {
   local tmp; tmp=$(mktemp -d)
-  run env SHIM_EXIT=1 SHIM_STDERR="Error: need 2 valid partial signatures, have 1" \
+  run env SHIM_COMBINE_EXIT=1 SHIM_STDERR="Error: need 2 valid partial signatures, have 1" \
     "$SCRIPTS_DIR/migrate-multisig.sh" combine \
       "$FIX_DIR/partial-alice.json" "$FIX_DIR/partial-bob.json" \
       --binary "$SHIM" \

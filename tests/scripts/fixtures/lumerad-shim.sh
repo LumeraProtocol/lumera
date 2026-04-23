@@ -3,6 +3,7 @@
 # Mock lumerad binary for bats tests. Routes on argv to fixtures/*.json.
 # Override behavior with env vars:
 #   SHIM_EXIT=<n>         force exit code n
+#   SHIM_COMBINE_EXIT=<n> force exit code for tx evmigration combine-proof only
 #   SHIM_FIXTURE=<name>   force a specific fixture name (without .json)
 #   SHIM_STDERR=<msg>     emit this to stderr before exiting
 #
@@ -119,7 +120,7 @@ case "$*" in
       fi
     else
       case "$*" in
-        *"newkey"*|*"new-eth-key"*) printf 'lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n' ;;
+        *"newkey"*|*"new-eth-key"*|*"ekey"*) printf 'lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n' ;;
         *)                          printf 'lumera1shimaddr1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n' ;;
       esac
     fi
@@ -148,6 +149,7 @@ ADDR
     ;;
   "tx evmigration combine-proof"*)
     emit_or_write "${SHIM_COMBINED_FIXTURE:-combined-tx}" "$@"
+    exit "${SHIM_COMBINE_EXIT:-${SHIM_EXIT:-0}}"
     ;;
   "tx evmigration submit-proof"*)
     if [[ -n "${SHIM_STATE_FILE:-}" ]]; then

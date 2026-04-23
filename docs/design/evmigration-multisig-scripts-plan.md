@@ -1066,7 +1066,7 @@ S_USAGE
 
   # Canonical payload_hex reconstruction check:
   # payload = "lumera-evm-migration:{chain_id}:{evm_chain_id}:{kind}:{legacy}:{new}"
-  # payload_hex = SHA256(payload) encoded as lowercase hex.
+  # payload_hex = raw payload bytes encoded as lowercase hex.
   # We recompute and compare; mismatch => exit 9.
   local chain_id_f evm_chain_id kind_f legacy_f new_f payload payload_hex_calc payload_hex_got
   chain_id_f=$(jq -r '.chain_id' <<<"$pjson")
@@ -1075,7 +1075,7 @@ S_USAGE
   legacy_f=$(jq -r '.legacy_address' <<<"$pjson")
   new_f=$(jq -r '.new_address' <<<"$pjson")
   payload="lumera-evm-migration:${chain_id_f}:${evm_chain_id}:${kind_f}:${legacy_f}:${new_f}"
-  payload_hex_calc=$(printf '%s' "$payload" | sha256sum | awk '{print $1}')
+  payload_hex_calc=$(printf '%s' "$payload" | od -An -tx1 -v | tr -d ' \n')
   payload_hex_got=$(jq -r '.payload_hex' <<<"$pjson")
   if [[ "$payload_hex_calc" != "$payload_hex_got" ]]; then
     log_error "payload_hex mismatch in $input (expected $payload_hex_calc, got $payload_hex_got)"

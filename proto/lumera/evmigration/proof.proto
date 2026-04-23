@@ -1,42 +1,33 @@
 syntax = "proto3";
 package lumera.evmigration;
 
-option go_package = "x/evmigration/types";
+option go_package = "x/evmigration/types"; // matches existing evmigration protos; do NOT use the full github.com path — buf generates files at module root from this relative form
 
-// SigFormat enumerates accepted signing envelopes for legacy-side signatures.
+// SigFormat enumerates accepted signing envelopes for migration proofs.
 enum SigFormat {
   SIG_FORMAT_UNSPECIFIED = 0;
-  SIG_FORMAT_CLI         = 1; // Sign(SHA256(payload)) via keyring
+  SIG_FORMAT_CLI         = 1; // Sign(SHA256(payload)) via Cosmos keyring; Sign(payload → Keccak256) for eth keyring
   SIG_FORMAT_ADR036      = 2; // ADR-036 signArbitrary canonical JSON
+  SIG_FORMAT_EIP191      = 3; // Eth "\x19Ethereum Signed Message:\n…" envelope — new-side single-key proofs only
 }
 
-// LegacyProof authenticates a legacy-account holder.
-// Exactly one oneof case must be set.
-message LegacyProof {
+message MigrationProof {
   oneof proof {
     SingleKeyProof single   = 1;
     MultisigProof  multisig = 2;
   }
 }
 
-// SingleKeyProof is a single compressed secp256k1 key + signature.
 message SingleKeyProof {
-  // 33-byte compressed secp256k1 public key.
   bytes pub_key        = 1;
-  // 64-byte raw secp256k1 signature (CLI) or canonical ADR-036 signature.
   bytes signature      = 2;
   SigFormat sig_format = 3;
 }
 
-// MultisigProof is a flat K-of-N multisig with all sub-keys secp256k1.
 message MultisigProof {
-  // threshold is K: the minimum number of valid sub-signatures required.
-  uint32 threshold = 1;
-  // sub_pub_keys lists all N sub-keys in original ordering, 33 bytes each.
-  repeated bytes sub_pub_keys = 2;
-  // signer_indices lists exactly K distinct indices into sub_pub_keys, strictly ascending.
+  uint32 threshold               = 1;
+  repeated bytes sub_pub_keys    = 2;
   repeated uint32 signer_indices = 3;
-  // sub_signatures are in the same order as signer_indices.
-  repeated bytes sub_signatures = 4;
-  SigFormat sig_format = 5;
+  repeated bytes sub_signatures  = 4;
+  SigFormat sig_format           = 5;
 }

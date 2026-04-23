@@ -14,11 +14,14 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 
+	kmultisig "github.com/cosmos/cosmos-sdk/crypto/keys/multisig"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	ethsecp256k1 "github.com/cosmos/evm/crypto/ethsecp256k1"
 	evmcryptotypes "github.com/cosmos/evm/crypto/ethsecp256k1"
 
+	"github.com/LumeraProtocol/lumera/x/evmigration/keeper"
 	"github.com/LumeraProtocol/lumera/x/evmigration/types"
 	"github.com/LumeraProtocol/lumera/x/evmigration/types/sigverify"
 )
@@ -642,4 +645,197 @@ func TestCmdSubmitProof_DoesNotRequireFrom(t *testing.T) {
 	_, isRequired := fromFlag.Annotations[cobra.BashCompOneRequiredFlag]
 	require.False(t, isRequired,
 		"--from must NOT be marked required; submit-proof is file-driven and does not sign")
+}
+
+// ---------- End-to-end multisig→multisig pipeline ----------
+
+// TestCLI_MultisigToMultisig_EndToEnd exercises the complete four-step CLI
+// flow IN PROCESS with real file IO between stages, but without a test network.
+// It proves that the output of combine-proof is a valid MigrationProof for
+// both sides that would pass server-side keeper.VerifyMigrationProof.
+//
+// Pipeline:
+//  1. generate-proof-payload → unsigned PartialProof on disk
+//  2. sign-proof (cosigner #1) → signed-1.json with legacy[0] + new[0]
+//  3. sign-proof (cosigner #2) → signed-2.json with legacy[1] + new[1]
+//  4. combine-proof → merge, buildProofFromPartial per side → MigrationProof
+//
+// Assertions:
+//   - Each side emits MultisigProof{Threshold=2, SignerIndices=[0,1]}.
+//   - keeper.VerifyMigrationProof passes for both sides with the right
+//     keyType and boundAddr.
+//   - MsgClaimLegacyAccount{LegacyProof, NewProof}.ValidateBasic passes.
+//
+// Deliberately skipped: network-backed tx submission (--from/keyring/grpc
+// plumbing). That surface is covered by Tasks 19-21 which drive the msg
+// server directly with real keeper state.
+func TestCLI_MultisigToMultisig_EndToEnd(t *testing.T) {
+	const (
+		chainID    = "lumera-test-1"
+		evmChainID = uint64(76857769)
+		kind       = "claim"
+	)
+
+	// === SETUP: legacy side — 3 Cosmos secp256k1 sub-keys, 2-of-3 multisig ===
+	legacyPrivs := []*secp256k1.PrivKey{
+		secp256k1.GenPrivKey(),
+		secp256k1.GenPrivKey(),
+		secp256k1.GenPrivKey(),
+	}
+	legacySubPubs := make([]cryptotypes.PubKey, len(legacyPrivs))
+	legacySubB64 := make([]string, len(legacyPrivs))
+	for i, p := range legacyPrivs {
+		legacySubPubs[i] = p.PubKey()
+		legacySubB64[i] = base64.StdEncoding.EncodeToString(p.PubKey().Bytes())
+	}
+	legacyMultiPK := kmultisig.NewLegacyAminoPubKey(2, legacySubPubs)
+	legacyAddr := sdk.AccAddress(legacyMultiPK.Address())
+
+	// === SETUP: new side — 3 eth_secp256k1 sub-keys, 2-of-3 multisig ===
+	ethPrivs := make([]*ethsecp256k1.PrivKey, 3)
+	newSubPubs := make([]cryptotypes.PubKey, 3)
+	newSubB64 := make([]string, 3)
+	for i := range ethPrivs {
+		p, err := ethsecp256k1.GenerateKey()
+		require.NoError(t, err)
+		ethPrivs[i] = p
+		pk := p.PubKey().(*evmcryptotypes.PubKey)
+		newSubPubs[i] = pk
+		newSubB64[i] = base64.StdEncoding.EncodeToString(pk.Key)
+	}
+	newMultiPK := kmultisig.NewLegacyAminoPubKey(2, newSubPubs)
+	newAddr := sdk.AccAddress(newMultiPK.Address())
+
+	// Canonical payload — same formula the keeper uses for verification.
+	payloadStr := ComputePayload(chainID, evmChainID, kind, legacyAddr.String(), newAddr.String())
+	payload := []byte(payloadStr)
+	payloadHex := hex.EncodeToString(payload)
+
+	tmpDir := t.TempDir()
+	payloadPath := filepath.Join(tmpDir, "payload.json")
+	signed1Path := filepath.Join(tmpDir, "signed-1.json")
+	signed2Path := filepath.Join(tmpDir, "signed-2.json")
+
+	// === STEP A: generate-proof-payload (in-memory equivalent) ===
+	ppA := &PartialProof{
+		Version:       partialProofVersion,
+		Kind:          kind,
+		LegacyAddress: legacyAddr.String(),
+		NewAddress:    newAddr.String(),
+		ChainID:       chainID,
+		EVMChainID:    evmChainID,
+		PayloadHex:    payloadHex,
+		Legacy: &SideSpec{
+			Threshold:  2,
+			SubPubKeys: legacySubB64,
+			SigFormat:  "SIG_FORMAT_CLI",
+		},
+		New: &SideSpec{
+			Threshold:  2,
+			SubPubKeys: newSubB64,
+			SigFormat:  "SIG_FORMAT_CLI",
+		},
+		PartialLegacySignatures: []PartialSignature{},
+		PartialNewSignatures:    []PartialSignature{},
+	}
+	require.NoError(t, SavePartialProof(payloadPath, ppA))
+	// Round-trip through the loader to catch schema/validation regressions.
+	loaded, err := LoadPartialProof(payloadPath)
+	require.NoError(t, err)
+	require.Equal(t, partialProofVersion, loaded.Version)
+	require.Equal(t, kind, loaded.Kind)
+	require.Equal(t, legacyAddr.String(), loaded.LegacyAddress)
+	require.Equal(t, newAddr.String(), loaded.NewAddress)
+
+	// === STEP B: sign-proof cosigner #1 (legacy-sub-0 + eth-sub-0) ===
+	pp1, err := LoadPartialProof(payloadPath)
+	require.NoError(t, err)
+	pp1.PartialLegacySignatures = upsertSig(pp1.PartialLegacySignatures, PartialSignature{
+		Index:     0,
+		Signature: base64.StdEncoding.EncodeToString(cosmosSign(t, legacyPrivs[0], payload)),
+	})
+	pp1.PartialNewSignatures = upsertSig(pp1.PartialNewSignatures, PartialSignature{
+		Index:     0,
+		Signature: base64.StdEncoding.EncodeToString(ethSign(t, ethPrivs[0], payload)),
+	})
+	require.NoError(t, SavePartialProof(signed1Path, pp1))
+
+	// === STEP C: sign-proof cosigner #2 (legacy-sub-1 + eth-sub-1) ===
+	pp2, err := LoadPartialProof(payloadPath)
+	require.NoError(t, err)
+	pp2.PartialLegacySignatures = upsertSig(pp2.PartialLegacySignatures, PartialSignature{
+		Index:     1,
+		Signature: base64.StdEncoding.EncodeToString(cosmosSign(t, legacyPrivs[1], payload)),
+	})
+	pp2.PartialNewSignatures = upsertSig(pp2.PartialNewSignatures, PartialSignature{
+		Index:     1,
+		Signature: base64.StdEncoding.EncodeToString(ethSign(t, ethPrivs[1], payload)),
+	})
+	require.NoError(t, SavePartialProof(signed2Path, pp2))
+
+	// === STEP D: combine-proof ===
+	merged, err := LoadPartialProof(signed1Path)
+	require.NoError(t, err)
+	other, err := LoadPartialProof(signed2Path)
+	require.NoError(t, err)
+	require.NoError(t, AssertPartialProofsConsistent(merged, other))
+	for _, p := range other.PartialLegacySignatures {
+		merged.PartialLegacySignatures = upsertSig(merged.PartialLegacySignatures, p)
+	}
+	for _, p := range other.PartialNewSignatures {
+		merged.PartialNewSignatures = upsertSig(merged.PartialNewSignatures, p)
+	}
+	require.Len(t, merged.PartialLegacySignatures, 2)
+	require.Len(t, merged.PartialNewSignatures, 2)
+
+	mergedPayload, err := hex.DecodeString(merged.PayloadHex)
+	require.NoError(t, err)
+
+	legacyProof, err := buildProofFromPartial(
+		merged.Legacy, merged.PartialLegacySignatures, mergedPayload,
+		sigverify.SubKeyTypeCosmosSecp256k1, "legacy", io.Discard,
+	)
+	require.NoError(t, err)
+	newProof, err := buildProofFromPartial(
+		merged.New, merged.PartialNewSignatures, mergedPayload,
+		sigverify.SubKeyTypeEthSecp256k1, "new", io.Discard,
+	)
+	require.NoError(t, err)
+
+	// === ASSERTIONS: shape of combine-proof output ===
+	legacyMP := legacyProof.GetMultisig()
+	require.NotNil(t, legacyMP, "legacy side must emit a MultisigProof")
+	require.Equal(t, uint32(2), legacyMP.Threshold)
+	require.Equal(t, []uint32{0, 1}, legacyMP.SignerIndices)
+	require.Len(t, legacyMP.SubSignatures, 2)
+	require.Equal(t, types.SigFormat_SIG_FORMAT_CLI, legacyMP.SigFormat)
+
+	newMP := newProof.GetMultisig()
+	require.NotNil(t, newMP, "new side must emit a MultisigProof")
+	require.Equal(t, uint32(2), newMP.Threshold)
+	require.Equal(t, []uint32{0, 1}, newMP.SignerIndices)
+	require.Len(t, newMP.SubSignatures, 2)
+	require.Equal(t, types.SigFormat_SIG_FORMAT_CLI, newMP.SigFormat)
+
+	// === ASSERTIONS: server-side verifier accepts both sides ===
+	require.NoError(t, keeper.VerifyMigrationProof(
+		chainID, evmChainID, kind,
+		legacyAddr, newAddr, legacyAddr,
+		&legacyProof, sigverify.SubKeyTypeCosmosSecp256k1,
+	), "keeper.VerifyMigrationProof must accept the legacy-side proof")
+
+	require.NoError(t, keeper.VerifyMigrationProof(
+		chainID, evmChainID, kind,
+		legacyAddr, newAddr, newAddr,
+		&newProof, sigverify.SubKeyTypeEthSecp256k1,
+	), "keeper.VerifyMigrationProof must accept the new-side proof")
+
+	// === ASSERTION: the assembled MsgClaimLegacyAccount passes ValidateBasic ===
+	msg := &types.MsgClaimLegacyAccount{
+		LegacyAddress: legacyAddr.String(),
+		NewAddress:    newAddr.String(),
+		LegacyProof:   legacyProof,
+		NewProof:      newProof,
+	}
+	require.NoError(t, msg.ValidateBasic())
 }

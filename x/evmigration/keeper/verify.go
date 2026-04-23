@@ -22,9 +22,10 @@ func migrationPayload(chainID string, evmChainID uint64, kind string, legacyAddr
 	return []byte(fmt.Sprintf("lumera-evm-migration:%s:%d:%s:%s:%s", chainID, evmChainID, kind, legacyAddr.String(), newAddr.String()))
 }
 
-// verifySingleKeyProofSide validates a SingleKeyProof given an explicit sub-key type.
-// It is the side-parametric successor to verifySingleKeyProof; the old function
-// stays alive until Task 8 cleanup.
+// verifySingleKeyProofSide validates a SingleKeyProof given an explicit sub-key
+// type. Side is implied by keyType (SubKeyTypeCosmosSecp256k1 → legacy side,
+// SubKeyTypeEthSecp256k1 → new side). The caller is expected to pass the
+// correct boundAddr for the side (legacyAddr for Cosmos, newAddr for eth).
 func verifySingleKeyProofSide(payload []byte, boundAddr sdk.AccAddress, p *types.SingleKeyProof, keyType sigverify.SubKeyType) error {
 	if len(p.PubKey) != secp256k1.PubKeySize {
 		return types.ErrInvalidMigrationPubKey.Wrapf("expected %d bytes, got %d", secp256k1.PubKeySize, len(p.PubKey))

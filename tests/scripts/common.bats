@@ -329,3 +329,44 @@ setup_shim() {
   [ "$status" -eq 1 ]
   [[ "$output" == *"mode 0600"* ]]
 }
+
+@test "shim generate-proof-payload writes to --out path" {
+  local tmp
+  tmp=$(mktemp)
+  run "$BATS_TEST_DIRNAME/fixtures/lumerad-shim.sh" \
+    tx evmigration generate-proof-payload \
+    --legacy lumera1x --new lumera1y --kind claim \
+    --chain-id shim --out "$tmp"
+  [ "$status" -eq 0 ]
+  [ -f "$tmp" ]
+  run jq -r '.kind' "$tmp"
+  [ "$output" = "claim" ]
+  rm -f "$tmp"
+}
+
+@test "shim SHIM_AUTH_TYPE=multisig returns multisig auth-account" {
+  run env SHIM_AUTH_TYPE=multisig \
+    "$BATS_TEST_DIRNAME/fixtures/lumerad-shim.sh" query auth account lumera1x
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.account.pub_key."@type" == "/cosmos.crypto.multisig.LegacyAminoPubKey"'
+}
+
+@test "shim SHIM_AUTH_TYPE=multisig-nested returns nested pubkey" {
+  run env SHIM_AUTH_TYPE=multisig-nested \
+    "$BATS_TEST_DIRNAME/fixtures/lumerad-shim.sh" query auth account lumera1x
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.account.base_vesting_account.base_account.pub_key."@type" == "/cosmos.crypto.multisig.LegacyAminoPubKey"'
+}
+
+@test "shim SHIM_AUTH_TYPE=nilpubkey returns nil pub_key" {
+  run env SHIM_AUTH_TYPE=nilpubkey \
+    "$BATS_TEST_DIRNAME/fixtures/lumerad-shim.sh" query auth account lumera1x
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.account.pub_key == null'
+}
+
+@test "shim keys show --output json returns alice-sub fixture" {
+  run "$BATS_TEST_DIRNAME/fixtures/lumerad-shim.sh" keys show alice-sub --output json
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.name == "alice-sub"'
+}

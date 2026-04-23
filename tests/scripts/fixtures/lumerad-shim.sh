@@ -37,6 +37,28 @@ emit() {
   cat "$path"
 }
 
+# emit_or_write <fixture-name> <all-original-argv>
+# If argv contains `--out <path>`, copy fixture to that path and print a
+# short confirmation on stdout (matching the lumerad CLI's tx commands
+# that write their output to --out). Otherwise, emit fixture to stdout.
+emit_or_write() {
+  local fixture="$1"
+  shift
+  local out_path=""
+  while (( $# > 0 )); do
+    case "$1" in
+      --out) out_path="$2"; shift 2 ;;
+      *) shift ;;
+    esac
+  done
+  if [[ -n "$out_path" ]]; then
+    cp "$fixtures_dir/$fixture.json" "$out_path"
+    printf 'wrote %s\n' "$out_path"
+  else
+    emit "$fixture"
+  fi
+}
+
 if [[ -n "${SHIM_FIXTURE:-}" ]]; then
   emit "$SHIM_FIXTURE"
   exit "${SHIM_EXIT:-0}"
@@ -55,7 +77,14 @@ case "$*" in
     ;;
   "query evmigration migration-record-by-new-address "*)  emit "${SHIM_RECORD_FIXTURE:-record-not-found}" ;;
   "query evmigration params"*)                            emit "${SHIM_PARAMS_FIXTURE:-params}" ;;
-  "query auth account "*)                                 emit "${SHIM_AUTH_FIXTURE:-auth-account}" ;;
+  "query auth account "*)
+    case "${SHIM_AUTH_TYPE:-single}" in
+      multisig)         emit auth-account-multisig ;;
+      multisig-nested)  emit auth-account-multisig-nested ;;
+      nilpubkey)        emit auth-account-nilpubkey ;;
+      *)                emit "${SHIM_AUTH_FIXTURE:-auth-account}" ;;
+    esac
+    ;;
   "query bank balances lumera1newshim"*)
     emit "${SHIM_BANK_NEW_FIXTURE:-bank-balances}" ;;
   "query bank balances "*)
@@ -67,10 +96,33 @@ case "$*" in
     ;;
   "query tx "*)                                           emit "${SHIM_TX_FIXTURE:-tx-success}" ;;
   "keys show "*)
-    case "$*" in
-      *"newkey"*) printf 'lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n' ;;
-      *)          printf 'lumera1shimaddr1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n' ;;
-    esac
+    # Route on the key name (second word after "show") and presence of --output json.
+    # If --output json: emit a keys-show-<name>.json fixture; fall back to a generic one.
+    # If -a (or default): emit the stub address like before.
+    __has_json=0; __key_name=""
+    __i=0
+    for __arg in "$@"; do
+      __i=$((__i+1))
+      if (( __i == 3 )); then
+        __key_name="$__arg"
+      fi
+      [[ "$__arg" == "--output" ]] && __has_json=1
+      [[ "$__arg" == "json" ]] && __has_json=$(( __has_json == 1 ? 2 : __has_json ))
+    done
+    if (( __has_json >= 2 )); then
+      __fixture="keys-show-$__key_name"
+      if [[ -f "$fixtures_dir/$__fixture.json" ]]; then
+        emit "$__fixture"
+      else
+        # Fallback: synthesize a minimal JSON so unknown key names still return valid shape
+        printf '{"name":"%s","type":"local","address":"lumera1shimaddr1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx","pubkey":"{\\"@type\\":\\"/cosmos.crypto.secp256k1.PubKey\\",\\"key\\":\\"A0000000000000000000000000000000000000000000\\"}"}\n' "$__key_name"
+      fi
+    else
+      case "$*" in
+        *"newkey"*|*"new-eth-key"*) printf 'lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n' ;;
+        *)                          printf 'lumera1shimaddr1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n' ;;
+      esac
+    fi
     ;;
   "debug addr "*)
     cat <<'ADDR'
@@ -84,6 +136,18 @@ ADDR
   "query evmigration --help"*)                            printf 'help stub\n' ;;
   "tx evmigration claim-legacy-account --help"*)         printf 'help stub\n' ;;
   "tx evmigration migrate-validator --help"*)            printf 'help stub\n' ;;
+  "tx evmigration generate-proof-payload"*)
+    emit_or_write "${SHIM_PROOF_FIXTURE:-proof-template}" "$@"
+    ;;
+  "tx evmigration sign-proof"*)
+    emit_or_write "${SHIM_PARTIAL_FIXTURE:-partial-alice}" "$@"
+    ;;
+  "tx evmigration combine-proof"*)
+    emit_or_write "${SHIM_COMBINED_FIXTURE:-combined-tx}" "$@"
+    ;;
+  "tx evmigration submit-proof"*)
+    emit broadcast-success
+    ;;
   "tx evmigration"*)
     if [[ -n "${SHIM_STATE_FILE:-}" ]]; then
       touch "$SHIM_STATE_FILE"

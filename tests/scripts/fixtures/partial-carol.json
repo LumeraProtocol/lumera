@@ -1,0 +1,20 @@
+{
+  "kind": "claim",
+  "legacy_address": "lumera1shimaddr1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "new_address": "lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "chain_id": "shim-test",
+  "evm_chain_id": "76857769",
+  "payload_hex": "e797b89fe172576bbcbffe707c6da06c536645ea644736c751b7ca5d1aefed67",
+  "multisig": {
+    "threshold": 2,
+    "sub_pub_keys_b64": [
+      "A1111111111111111111111111111111111111111111",
+      "A2222222222222222222222222222222222222222222",
+      "A3333333333333333333333333333333333333333333"
+    ],
+    "sig_format": "SIG_FORMAT_CLI"
+  },
+  "partial_signatures": [
+    {"index": 2, "signature_b64": "Y2Fyb2wx"}
+  ]
+}

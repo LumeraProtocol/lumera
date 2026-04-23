@@ -136,6 +136,10 @@ ADDR
   "query evmigration --help"*)                            printf 'help stub\n' ;;
   "tx evmigration claim-legacy-account --help"*)         printf 'help stub\n' ;;
   "tx evmigration migrate-validator --help"*)            printf 'help stub\n' ;;
+  "tx evmigration generate-proof-payload --help"*)       printf 'help stub\n' ;;
+  "tx evmigration sign-proof --help"*)                   printf 'help stub\n' ;;
+  "tx evmigration combine-proof --help"*)                printf 'help stub\n' ;;
+  "tx evmigration submit-proof --help"*)                 printf 'help stub\n' ;;
   "tx evmigration generate-proof-payload"*)
     emit_or_write "${SHIM_PROOF_FIXTURE:-proof-template}" "$@"
     ;;

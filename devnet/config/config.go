@@ -46,6 +46,9 @@ type ChainConfig struct {
 	API                     struct {
 		EnableUnsafeCORS bool `json:"enable_unsafe_cors"`
 	} `json:"api"`
+	RPC struct {
+		CORSAllowedOrigins []string `json:"cors_allowed_origins"`
+	} `json:"rpc"`
 	JSONRPC struct {
 		Enable        bool   `json:"enable"`
 		Address       string `json:"address"`

@@ -53,6 +53,9 @@
     "api": {
         "enable_unsafe_cors": true
     },
+    "rpc": {
+        "cors_allowed_origins": ["*"]
+    },
     "json-rpc": {
         "enable": true,
         "address": "0.0.0.0:8545",

@@ -414,9 +414,11 @@ configure_node_config() {
 	local api_port="${LUMERA_API_PORT:-1317}"
 	local grpc_port="${LUMERA_GRPC_PORT:-9090}"
 	local rpc_port="${LUMERA_RPC_PORT:-26657}"
-	local api_enable_unsafe_cors jsonrpc_enable jsonrpc_address jsonrpc_ws_address jsonrpc_api jsonrpc_enable_indexer
+	local api_enable_unsafe_cors jsonrpc_enable jsonrpc_address jsonrpc_ws_address jsonrpc_api jsonrpc_enable_indexer rpc_cors_allowed_origins
 
 	api_enable_unsafe_cors="$(jq -r '.api.enable_unsafe_cors // true' "${CFG_CHAIN}")"
+	# Compact JSON array ("[…]"); valid TOML inline-array syntax, so crudini can write it verbatim.
+	rpc_cors_allowed_origins="$(jq -c '.rpc.cors_allowed_origins // ["*"]' "${CFG_CHAIN}")"
 	jsonrpc_enable="$(jq -r '.["json-rpc"].enable // true' "${CFG_CHAIN}")"
 	jsonrpc_address="$(jq -r '.["json-rpc"].address // "0.0.0.0:8545"' "${CFG_CHAIN}")"
 	jsonrpc_ws_address="$(jq -r '.["json-rpc"].ws_address // "0.0.0.0:8546"' "${CFG_CHAIN}")"
@@ -455,6 +457,9 @@ configure_node_config() {
 
 	if [ -f "${CONFIG_TOML}" ]; then
 		run crudini --set "${CONFIG_TOML}" rpc laddr "\"tcp://0.0.0.0:${rpc_port}\""
+		# Needed so browser clients (e.g. Vite dev servers) can reach CometBFT RPC
+		# from a different origin; otherwise the browser blocks the request.
+		run crudini --set "${CONFIG_TOML}" rpc cors_allowed_origins "${rpc_cors_allowed_origins}"
 		echo "[SETUP] Updated ${CONFIG_TOML} RPC configuration."
 	else
 		echo "[SETUP] WARNING: ${CONFIG_TOML} not found; skipping config.toml update"

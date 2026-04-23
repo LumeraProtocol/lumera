@@ -756,6 +756,108 @@ func tmpFile(pattern string) string {
 	return f.Name()
 }
 
+// ensureMultisigLegacyPermanentLockedFixture sets up the default multisig
+// legacy fixture as a PermanentLockedAccount. Rerun-safe. Returns the sub-key
+// member names and the composite key's bech32 address (same shape as
+// createMultisigKeys), so callers can treat this as a drop-in replacement for
+// the plain-BaseAccount variant.
+//
+// Flow:
+//  1. Create (or reuse) the 3 Cosmos secp256k1 signer keys + 2-of-3 composite.
+//  2. If the composite address is NOT yet a PermanentLockedAccount on chain:
+//     run `tx vesting create-permanent-locked-account <addr> <locked-amt>`
+//     from the funder. If it already exists as some other account type (e.g.
+//     plain BaseAccount from a prior run with the non-vesting fixture),
+//     return an error — caller must clean devnet state first.
+//  3. Top up with liquid coins via `tx bank send` so the self-send that
+//     publishes the multisig pubkey has gas money.
+//  4. registerMultisigPubKey to publish the composite pubkey on chain.
+//
+// The caller (Task 23) then runs the four-step migration flow as usual.
+func ensureMultisigLegacyPermanentLockedFixture() (members []string, multisigAddr string, err error) {
+	if *flagFunder == "" {
+		name, dErr := detectFunder()
+		if dErr != nil {
+			return nil, "", fmt.Errorf("detect funder: %w", dErr)
+		}
+		*flagFunder = name
+		log.Printf("  auto-detected funder: %s", *flagFunder)
+	}
+	funderAddr, err := getAddress(*flagFunder)
+	if err != nil {
+		return nil, "", fmt.Errorf("get funder address: %w", err)
+	}
+
+	// Step 1: Create (or reuse) the 3-signer Cosmos secp256k1 composite key.
+	members, multisigAddr, err = createMultisigKeys()
+	if err != nil {
+		return nil, "", fmt.Errorf("create multisig keys: %w", err)
+	}
+	log.Printf("  multisig (permanent-locked) address: %s (signers: %v)", multisigAddr, members)
+
+	// Step 2: Ensure the composite address is a PermanentLockedAccount on chain.
+	accountType, err := queryAuthAccountType(multisigAddr)
+	switch {
+	case err == nil && isPermanentLockedAccountType(accountType):
+		log.Printf("  multisig permanent-locked fixture already exists on-chain: %s (%s)", multisigAddr, accountType)
+	case err == nil:
+		return nil, "", fmt.Errorf(
+			"multisig address %s already exists on-chain as %s, expected PermanentLockedAccount; clean devnet state and retry",
+			multisigAddr, accountType,
+		)
+	case !isAccountNotFoundErr(err):
+		return nil, "", fmt.Errorf("query auth account type for %s: %w", multisigAddr, err)
+	default:
+		log.Printf("  creating permanent-locked account %s with locked balance %s (funder: %s)",
+			multisigAddr, permanentLockedFixtureAmount, *flagFunder)
+		if _, err := runTx(
+			"tx", "vesting", "create-permanent-locked-account",
+			multisigAddr, permanentLockedFixtureAmount,
+			"--from", *flagFunder,
+		); err != nil {
+			return nil, "", fmt.Errorf("create permanent-locked account %s: %w", multisigAddr, err)
+		}
+		accountType, err = queryAuthAccountType(multisigAddr)
+		if err != nil {
+			return nil, "", fmt.Errorf("query created permanent-locked fixture %s: %w", multisigAddr, err)
+		}
+		if !isPermanentLockedAccountType(accountType) {
+			return nil, "", fmt.Errorf(
+				"created fixture %s has unexpected auth account type %s (expected PermanentLockedAccount)",
+				multisigAddr, accountType,
+			)
+		}
+		log.Printf("  created permanent-locked multisig fixture %s", multisigAddr)
+	}
+
+	if err := waitForNextBlock(20 * time.Second); err != nil {
+		log.Printf("  WARN: wait for next block after permanent-locked create: %v", err)
+	}
+
+	// Step 3: Top up with liquid coins so the self-send has gas money.
+	// PermanentLocked fully locks the vesting balance; a separate spendable
+	// balance is needed to pay fees. Always run (idempotent re-funding is
+	// harmless — fees come out of liquid balance anyway).
+	log.Printf("  topping up %s with %s (liquid) from %s", multisigAddr, permanentLockedFixtureTopUp, *flagFunder)
+	if _, err := runTx(
+		"tx", "bank", "send",
+		funderAddr, multisigAddr, permanentLockedFixtureTopUp,
+		"--from", *flagFunder,
+	); err != nil {
+		return nil, "", fmt.Errorf("top up permanent-locked multisig fixture %s: %w", multisigAddr, err)
+	}
+	if err := waitForNextBlock(20 * time.Second); err != nil {
+		log.Printf("  WARN: wait for next block after permanent-locked top-up: %v", err)
+	}
+
+	// Step 4: Publish the composite pubkey via the 1-ulume self-send.
+	if err := registerMultisigPubKey(multisigAccountName, multisigAddr, members); err != nil {
+		return nil, "", fmt.Errorf("register multisig pubkey via self-send: %w", err)
+	}
+
+	return members, multisigAddr, nil
+}
+
 // extractTxHash extracts the txhash value from a JSON broadcast response.
 // Returns empty string if not found.
 func extractTxHash(out string) string {

@@ -22,25 +22,28 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
-// SigFormat enumerates accepted signing envelopes for legacy-side signatures.
+// SigFormat enumerates accepted signing envelopes for migration proofs.
 type SigFormat int32
 
 const (
 	SigFormat_SIG_FORMAT_UNSPECIFIED SigFormat = 0
 	SigFormat_SIG_FORMAT_CLI         SigFormat = 1
 	SigFormat_SIG_FORMAT_ADR036      SigFormat = 2
+	SigFormat_SIG_FORMAT_EIP191      SigFormat = 3
 )
 
 var SigFormat_name = map[int32]string{
 	0: "SIG_FORMAT_UNSPECIFIED",
 	1: "SIG_FORMAT_CLI",
 	2: "SIG_FORMAT_ADR036",
+	3: "SIG_FORMAT_EIP191",
 }
 
 var SigFormat_value = map[string]int32{
 	"SIG_FORMAT_UNSPECIFIED": 0,
 	"SIG_FORMAT_CLI":         1,
 	"SIG_FORMAT_ADR036":      2,
+	"SIG_FORMAT_EIP191":      3,
 }
 
 func (x SigFormat) String() string {
@@ -51,27 +54,25 @@ func (SigFormat) EnumDescriptor() ([]byte, []int) {
 	return fileDescriptor_d1a587b82ddfc112, []int{0}
 }
 
-// LegacyProof authenticates a legacy-account holder.
-// Exactly one oneof case must be set.
-type LegacyProof struct {
+type MigrationProof struct {
 	// Types that are valid to be assigned to Proof:
-	//	*LegacyProof_Single
-	//	*LegacyProof_Multisig
-	Proof isLegacyProof_Proof `protobuf_oneof:"proof"`
+	//	*MigrationProof_Single
+	//	*MigrationProof_Multisig
+	Proof isMigrationProof_Proof `protobuf_oneof:"proof"`
 }
 
-func (m *LegacyProof) Reset()         { *m = LegacyProof{} }
-func (m *LegacyProof) String() string { return proto.CompactTextString(m) }
-func (*LegacyProof) ProtoMessage()    {}
-func (*LegacyProof) Descriptor() ([]byte, []int) {
+func (m *MigrationProof) Reset()         { *m = MigrationProof{} }
+func (m *MigrationProof) String() string { return proto.CompactTextString(m) }
+func (*MigrationProof) ProtoMessage()    {}
+func (*MigrationProof) Descriptor() ([]byte, []int) {
 	return fileDescriptor_d1a587b82ddfc112, []int{0}
 }
-func (m *LegacyProof) XXX_Unmarshal(b []byte) error {
+func (m *MigrationProof) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
 }
-func (m *LegacyProof) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+func (m *MigrationProof) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	if deterministic {
-		return xxx_messageInfo_LegacyProof.Marshal(b, m, deterministic)
+		return xxx_messageInfo_MigrationProof.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
 		n, err := m.MarshalToSizedBuffer(b)
@@ -81,68 +82,65 @@ func (m *LegacyProof) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) 
 		return b[:n], nil
 	}
 }
-func (m *LegacyProof) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_LegacyProof.Merge(m, src)
+func (m *MigrationProof) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MigrationProof.Merge(m, src)
 }
-func (m *LegacyProof) XXX_Size() int {
+func (m *MigrationProof) XXX_Size() int {
 	return m.Size()
 }
-func (m *LegacyProof) XXX_DiscardUnknown() {
-	xxx_messageInfo_LegacyProof.DiscardUnknown(m)
+func (m *MigrationProof) XXX_DiscardUnknown() {
+	xxx_messageInfo_MigrationProof.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_LegacyProof proto.InternalMessageInfo
+var xxx_messageInfo_MigrationProof proto.InternalMessageInfo
 
-type isLegacyProof_Proof interface {
-	isLegacyProof_Proof()
+type isMigrationProof_Proof interface {
+	isMigrationProof_Proof()
 	MarshalTo([]byte) (int, error)
 	Size() int
 }
 
-type LegacyProof_Single struct {
+type MigrationProof_Single struct {
 	Single *SingleKeyProof `protobuf:"bytes,1,opt,name=single,proto3,oneof" json:"single,omitempty"`
 }
-type LegacyProof_Multisig struct {
+type MigrationProof_Multisig struct {
 	Multisig *MultisigProof `protobuf:"bytes,2,opt,name=multisig,proto3,oneof" json:"multisig,omitempty"`
 }
 
-func (*LegacyProof_Single) isLegacyProof_Proof()   {}
-func (*LegacyProof_Multisig) isLegacyProof_Proof() {}
+func (*MigrationProof_Single) isMigrationProof_Proof()   {}
+func (*MigrationProof_Multisig) isMigrationProof_Proof() {}
 
-func (m *LegacyProof) GetProof() isLegacyProof_Proof {
+func (m *MigrationProof) GetProof() isMigrationProof_Proof {
 	if m != nil {
 		return m.Proof
 	}
 	return nil
 }
 
-func (m *LegacyProof) GetSingle() *SingleKeyProof {
-	if x, ok := m.GetProof().(*LegacyProof_Single); ok {
+func (m *MigrationProof) GetSingle() *SingleKeyProof {
+	if x, ok := m.GetProof().(*MigrationProof_Single); ok {
 		return x.Single
 	}
 	return nil
 }
 
-func (m *LegacyProof) GetMultisig() *MultisigProof {
-	if x, ok := m.GetProof().(*LegacyProof_Multisig); ok {
+func (m *MigrationProof) GetMultisig() *MultisigProof {
+	if x, ok := m.GetProof().(*MigrationProof_Multisig); ok {
 		return x.Multisig
 	}
 	return nil
 }
 
 // XXX_OneofWrappers is for the internal use of the proto package.
-func (*LegacyProof) XXX_OneofWrappers() []interface{} {
+func (*MigrationProof) XXX_OneofWrappers() []interface{} {
 	return []interface{}{
-		(*LegacyProof_Single)(nil),
-		(*LegacyProof_Multisig)(nil),
+		(*MigrationProof_Single)(nil),
+		(*MigrationProof_Multisig)(nil),
 	}
 }
 
-// SingleKeyProof is a single compressed secp256k1 key + signature.
 type SingleKeyProof struct {
-	// 33-byte compressed secp256k1 public key.
-	PubKey []byte `protobuf:"bytes,1,opt,name=pub_key,json=pubKey,proto3" json:"pub_key,omitempty"`
-	// 64-byte raw secp256k1 signature (CLI) or canonical ADR-036 signature.
+	PubKey    []byte    `protobuf:"bytes,1,opt,name=pub_key,json=pubKey,proto3" json:"pub_key,omitempty"`
 	Signature []byte    `protobuf:"bytes,2,opt,name=signature,proto3" json:"signature,omitempty"`
 	SigFormat SigFormat `protobuf:"varint,3,opt,name=sig_format,json=sigFormat,proto3,enum=lumera.evmigration.SigFormat" json:"sig_format,omitempty"`
 }
@@ -201,15 +199,10 @@ func (m *SingleKeyProof) GetSigFormat() SigFormat {
 	return SigFormat_SIG_FORMAT_UNSPECIFIED
 }
 
-// MultisigProof is a flat K-of-N multisig with all sub-keys secp256k1.
 type MultisigProof struct {
-	// threshold is K: the minimum number of valid sub-signatures required.
-	Threshold uint32 `protobuf:"varint,1,opt,name=threshold,proto3" json:"threshold,omitempty"`
-	// sub_pub_keys lists all N sub-keys in original ordering, 33 bytes each.
-	SubPubKeys [][]byte `protobuf:"bytes,2,rep,name=sub_pub_keys,json=subPubKeys,proto3" json:"sub_pub_keys,omitempty"`
-	// signer_indices lists exactly K distinct indices into sub_pub_keys, strictly ascending.
-	SignerIndices []uint32 `protobuf:"varint,3,rep,packed,name=signer_indices,json=signerIndices,proto3" json:"signer_indices,omitempty"`
-	// sub_signatures are in the same order as signer_indices.
+	Threshold     uint32    `protobuf:"varint,1,opt,name=threshold,proto3" json:"threshold,omitempty"`
+	SubPubKeys    [][]byte  `protobuf:"bytes,2,rep,name=sub_pub_keys,json=subPubKeys,proto3" json:"sub_pub_keys,omitempty"`
+	SignerIndices []uint32  `protobuf:"varint,3,rep,packed,name=signer_indices,json=signerIndices,proto3" json:"signer_indices,omitempty"`
 	SubSignatures [][]byte  `protobuf:"bytes,4,rep,name=sub_signatures,json=subSignatures,proto3" json:"sub_signatures,omitempty"`
 	SigFormat     SigFormat `protobuf:"varint,5,opt,name=sig_format,json=sigFormat,proto3,enum=lumera.evmigration.SigFormat" json:"sig_format,omitempty"`
 }
@@ -284,7 +277,7 @@ func (m *MultisigProof) GetSigFormat() SigFormat {
 
 func init() {
 	proto.RegisterEnum("lumera.evmigration.SigFormat", SigFormat_name, SigFormat_value)
-	proto.RegisterType((*LegacyProof)(nil), "lumera.evmigration.LegacyProof")
+	proto.RegisterType((*MigrationProof)(nil), "lumera.evmigration.MigrationProof")
 	proto.RegisterType((*SingleKeyProof)(nil), "lumera.evmigration.SingleKeyProof")
 	proto.RegisterType((*MultisigProof)(nil), "lumera.evmigration.MultisigProof")
 }
@@ -292,37 +285,38 @@ func init() {
 func init() { proto.RegisterFile("lumera/evmigration/proof.proto", fileDescriptor_d1a587b82ddfc112) }
 
 var fileDescriptor_d1a587b82ddfc112 = []byte{
-	// 424 bytes of a gzipped FileDescriptorProto
+	// 433 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x94, 0x92, 0x4f, 0x6b, 0xd4, 0x40,
-	0x18, 0xc6, 0x33, 0xbb, 0x76, 0x6b, 0xdf, 0x26, 0x61, 0x1d, 0x51, 0x83, 0x68, 0x88, 0x01, 0x21,
-	0x08, 0xa6, 0xd2, 0x82, 0xa7, 0x82, 0xf4, 0xdf, 0x6a, 0x68, 0xab, 0xcb, 0x44, 0x2f, 0x5e, 0x42,
-	0xd2, 0x4e, 0xd3, 0xc1, 0xfc, 0x63, 0x26, 0x23, 0xe6, 0x03, 0x78, 0xf7, 0xe2, 0x77, 0xf2, 0xd8,
-	0xa3, 0xe0, 0x45, 0x76, 0xbf, 0x88, 0xec, 0x64, 0x4d, 0x77, 0x75, 0x2f, 0xbd, 0x0d, 0xcf, 0xfb,
-	0xfc, 0xe6, 0x7d, 0x1e, 0x78, 0xc1, 0xce, 0x64, 0x4e, 0x79, 0xbc, 0x45, 0x3f, 0xe7, 0x2c, 0xe5,
-	0x71, 0xcd, 0xca, 0x62, 0xab, 0xe2, 0x65, 0x79, 0xe1, 0x57, 0xbc, 0xac, 0x4b, 0x8c, 0xdb, 0xb9,
-	0xbf, 0x30, 0x77, 0xbf, 0x23, 0xd8, 0x3c, 0xa1, 0x69, 0x7c, 0xd6, 0x8c, 0x67, 0x4e, 0xbc, 0x0b,
-	0x03, 0xc1, 0x8a, 0x34, 0xa3, 0x16, 0x72, 0x90, 0xb7, 0xb9, 0xed, 0xfa, 0xff, 0x43, 0x7e, 0xa8,
-	0x1c, 0xc7, 0xb4, 0x65, 0xde, 0x68, 0x64, 0xce, 0xe0, 0x57, 0x70, 0x3b, 0x97, 0x59, 0xcd, 0x04,
-	0x4b, 0xad, 0x9e, 0xe2, 0x9f, 0xac, 0xe2, 0x4f, 0xe7, 0x9e, 0xbf, 0x78, 0x07, 0xed, 0xaf, 0xc3,
-	0x9a, 0x4a, 0xec, 0x7e, 0x45, 0x60, 0x2e, 0xaf, 0xc1, 0x0f, 0x60, 0xbd, 0x92, 0x49, 0xf4, 0x89,
-	0x36, 0x2a, 0x9b, 0x4e, 0x06, 0x95, 0x4c, 0x8e, 0x69, 0x83, 0x1f, 0xc1, 0x86, 0x60, 0x69, 0x11,
-	0xd7, 0x92, 0x53, 0xb5, 0x56, 0x27, 0xd7, 0x02, 0xde, 0x05, 0x10, 0x2c, 0x8d, 0x2e, 0x4a, 0x9e,
-	0xc7, 0xb5, 0xd5, 0x77, 0x90, 0x67, 0x6e, 0x3f, 0x5e, 0xdd, 0x2a, 0x1d, 0x29, 0x93, 0xa2, 0xdb,
-	0xa7, 0xfb, 0x0b, 0x81, 0xb1, 0x14, 0x77, 0xb6, 0xad, 0xbe, 0xe4, 0x54, 0x5c, 0x96, 0xd9, 0xb9,
-	0x0a, 0x62, 0x90, 0x6b, 0x01, 0x3b, 0xa0, 0x0b, 0x99, 0x44, 0xf3, 0xa0, 0xc2, 0xea, 0x39, 0x7d,
-	0x4f, 0x27, 0x20, 0x64, 0x32, 0x56, 0x61, 0x05, 0x7e, 0x0a, 0xe6, 0x2c, 0x1c, 0xe5, 0x11, 0x2b,
-	0xce, 0xd9, 0x19, 0x15, 0x56, 0xdf, 0xe9, 0x7b, 0x06, 0x31, 0x5a, 0x35, 0x68, 0x45, 0x65, 0x93,
-	0x49, 0xd4, 0xf5, 0x10, 0xd6, 0x2d, 0xf5, 0x95, 0x21, 0x64, 0x12, 0x76, 0xe2, 0x3f, 0xed, 0xd6,
-	0x6e, 0xd6, 0xee, 0x19, 0x81, 0x8d, 0x4e, 0xc7, 0x0f, 0xe1, 0x7e, 0x18, 0xbc, 0x8e, 0x46, 0xef,
-	0xc8, 0xe9, 0xde, 0xfb, 0xe8, 0xc3, 0xdb, 0x70, 0x7c, 0x74, 0x10, 0x8c, 0x82, 0xa3, 0xc3, 0xa1,
-	0x86, 0x31, 0x98, 0x0b, 0xb3, 0x83, 0x93, 0x60, 0x88, 0xf0, 0x3d, 0xb8, 0xb3, 0xa0, 0xed, 0x1d,
-	0x92, 0x17, 0x3b, 0x2f, 0x87, 0xbd, 0xfd, 0xe7, 0x3f, 0x26, 0x36, 0xba, 0x9a, 0xd8, 0xe8, 0xf7,
-	0xc4, 0x46, 0xdf, 0xa6, 0xb6, 0x76, 0x35, 0xb5, 0xb5, 0x9f, 0x53, 0x5b, 0xfb, 0x78, 0xf7, 0xcb,
-	0xd2, 0x69, 0xd6, 0x4d, 0x45, 0x45, 0x32, 0x50, 0xb7, 0xb9, 0xf3, 0x27, 0x00, 0x00, 0xff, 0xff,
-	0xac, 0x6e, 0x17, 0xfe, 0xbd, 0x02, 0x00, 0x00,
+	0x18, 0xc6, 0x33, 0x1b, 0xbb, 0xb5, 0xaf, 0x9b, 0xb0, 0x8e, 0xa8, 0x41, 0x34, 0xc4, 0x05, 0x61,
+	0x11, 0x4c, 0x6d, 0x0b, 0x82, 0x50, 0x90, 0xfe, 0xd9, 0xd5, 0x50, 0x57, 0xc3, 0x44, 0x2f, 0x5e,
+	0x42, 0x62, 0xa7, 0xe9, 0x60, 0xfe, 0x31, 0x93, 0x11, 0xf3, 0x01, 0xbc, 0x7b, 0xf4, 0x23, 0x79,
+	0xec, 0x51, 0xf0, 0x22, 0xbb, 0x5f, 0x44, 0x76, 0xb2, 0x4d, 0x77, 0x6b, 0x2f, 0xbd, 0x25, 0xcf,
+	0xfb, 0xfc, 0xe6, 0x7d, 0x1e, 0x78, 0xc1, 0x4e, 0x65, 0x46, 0x79, 0xb4, 0x49, 0xbf, 0x66, 0x2c,
+	0xe1, 0x51, 0xc5, 0x8a, 0x7c, 0xb3, 0xe4, 0x45, 0x71, 0xe2, 0x96, 0xbc, 0xa8, 0x0a, 0x8c, 0x9b,
+	0xb9, 0xbb, 0x34, 0x1f, 0xfc, 0x44, 0x60, 0x4e, 0xce, 0xff, 0xfc, 0xb9, 0x19, 0xef, 0x42, 0x57,
+	0xb0, 0x3c, 0x49, 0xa9, 0x85, 0x1c, 0x34, 0xbc, 0xb5, 0x3d, 0x70, 0xff, 0xe7, 0xdc, 0x40, 0x39,
+	0x8e, 0x68, 0xad, 0x98, 0x37, 0x1a, 0x59, 0x30, 0xf8, 0x15, 0xdc, 0xcc, 0x64, 0x5a, 0x31, 0xc1,
+	0x12, 0xab, 0xa3, 0xf8, 0xc7, 0x57, 0xf1, 0x93, 0x85, 0xe7, 0x1c, 0x6f, 0xa1, 0xfd, 0x75, 0x58,
+	0x53, 0xa1, 0x07, 0xdf, 0x11, 0x98, 0xab, 0x6b, 0xf0, 0x7d, 0x58, 0x2f, 0x65, 0x1c, 0x7e, 0xa1,
+	0xb5, 0xca, 0xd6, 0x23, 0xdd, 0x52, 0xc6, 0x47, 0xb4, 0xc6, 0x0f, 0x61, 0x43, 0xb0, 0x24, 0x8f,
+	0x2a, 0xc9, 0xa9, 0x5a, 0xdb, 0x23, 0x17, 0x02, 0xde, 0x05, 0x10, 0x2c, 0x09, 0x4f, 0x0a, 0x9e,
+	0x45, 0x95, 0xa5, 0x3b, 0x68, 0x68, 0x6e, 0x3f, 0xba, 0xba, 0x55, 0x32, 0x56, 0x26, 0x45, 0x37,
+	0x9f, 0x83, 0x3f, 0x08, 0x8c, 0x95, 0xb8, 0xf3, 0x6d, 0xd5, 0x29, 0xa7, 0xe2, 0xb4, 0x48, 0x8f,
+	0x55, 0x10, 0x83, 0x5c, 0x08, 0xd8, 0x81, 0x9e, 0x90, 0x71, 0xb8, 0x08, 0x2a, 0xac, 0x8e, 0xa3,
+	0x0f, 0x7b, 0x04, 0x84, 0x8c, 0x7d, 0x15, 0x56, 0xe0, 0x27, 0x60, 0xce, 0xc3, 0x51, 0x1e, 0xb2,
+	0xfc, 0x98, 0x7d, 0xa6, 0xc2, 0xd2, 0x1d, 0x7d, 0x68, 0x10, 0xa3, 0x51, 0xbd, 0x46, 0x54, 0x36,
+	0x19, 0x87, 0x6d, 0x0f, 0x61, 0xdd, 0x50, 0x4f, 0x19, 0x42, 0xc6, 0x41, 0x2b, 0x5e, 0x6a, 0xb7,
+	0x76, 0xbd, 0x76, 0x4f, 0x19, 0x6c, 0xb4, 0x3a, 0x7e, 0x00, 0xf7, 0x02, 0xef, 0x75, 0x38, 0x7e,
+	0x4f, 0x26, 0x7b, 0x1f, 0xc2, 0x8f, 0xef, 0x02, 0x7f, 0x74, 0xe0, 0x8d, 0xbd, 0xd1, 0x61, 0x5f,
+	0xc3, 0x18, 0xcc, 0xa5, 0xd9, 0xc1, 0x5b, 0xaf, 0x8f, 0xf0, 0x5d, 0xb8, 0xbd, 0xa4, 0xed, 0x1d,
+	0x92, 0xe7, 0x3b, 0x2f, 0xfa, 0x9d, 0x4b, 0xf2, 0xc8, 0xf3, 0xb7, 0x5e, 0x6e, 0xf5, 0xf5, 0xfd,
+	0x67, 0xbf, 0xa6, 0x36, 0x3a, 0x9b, 0xda, 0xe8, 0xef, 0xd4, 0x46, 0x3f, 0x66, 0xb6, 0x76, 0x36,
+	0xb3, 0xb5, 0xdf, 0x33, 0x5b, 0xfb, 0x74, 0xe7, 0xdb, 0xca, 0xd1, 0x56, 0x75, 0x49, 0x45, 0xdc,
+	0x55, 0x57, 0xbb, 0xf3, 0x2f, 0x00, 0x00, 0xff, 0xff, 0xe8, 0xf4, 0x28, 0x51, 0xd7, 0x02, 0x00,
+	0x00,
 }
 
-func (m *LegacyProof) Marshal() (dAtA []byte, err error) {
+func (m *MigrationProof) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
 	n, err := m.MarshalToSizedBuffer(dAtA[:size])
@@ -332,12 +326,12 @@ func (m *LegacyProof) Marshal() (dAtA []byte, err error) {
 	return dAtA[:n], nil
 }
 
-func (m *LegacyProof) MarshalTo(dAtA []byte) (int, error) {
+func (m *MigrationProof) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *LegacyProof) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *MigrationProof) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
@@ -354,12 +348,12 @@ func (m *LegacyProof) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
-func (m *LegacyProof_Single) MarshalTo(dAtA []byte) (int, error) {
+func (m *MigrationProof_Single) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *LegacyProof_Single) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *MigrationProof_Single) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	if m.Single != nil {
 		{
@@ -375,12 +369,12 @@ func (m *LegacyProof_Single) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	}
 	return len(dAtA) - i, nil
 }
-func (m *LegacyProof_Multisig) MarshalTo(dAtA []byte) (int, error) {
+func (m *MigrationProof_Multisig) MarshalTo(dAtA []byte) (int, error) {
 	size := m.Size()
 	return m.MarshalToSizedBuffer(dAtA[:size])
 }
 
-func (m *LegacyProof_Multisig) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+func (m *MigrationProof_Multisig) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	if m.Multisig != nil {
 		{
@@ -518,7 +512,7 @@ func encodeVarintProof(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
-func (m *LegacyProof) Size() (n int) {
+func (m *MigrationProof) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -530,7 +524,7 @@ func (m *LegacyProof) Size() (n int) {
 	return n
 }
 
-func (m *LegacyProof_Single) Size() (n int) {
+func (m *MigrationProof_Single) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -542,7 +536,7 @@ func (m *LegacyProof_Single) Size() (n int) {
 	}
 	return n
 }
-func (m *LegacyProof_Multisig) Size() (n int) {
+func (m *MigrationProof_Multisig) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -614,7 +608,7 @@ func sovProof(x uint64) (n int) {
 func sozProof(x uint64) (n int) {
 	return sovProof(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
-func (m *LegacyProof) Unmarshal(dAtA []byte) error {
+func (m *MigrationProof) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
 	for iNdEx < l {
@@ -637,10 +631,10 @@ func (m *LegacyProof) Unmarshal(dAtA []byte) error {
 		fieldNum := int32(wire >> 3)
 		wireType := int(wire & 0x7)
 		if wireType == 4 {
-			return fmt.Errorf("proto: LegacyProof: wiretype end group for non-group")
+			return fmt.Errorf("proto: MigrationProof: wiretype end group for non-group")
 		}
 		if fieldNum <= 0 {
-			return fmt.Errorf("proto: LegacyProof: illegal tag %d (wire type %d)", fieldNum, wire)
+			return fmt.Errorf("proto: MigrationProof: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		case 1:
@@ -676,7 +670,7 @@ func (m *LegacyProof) Unmarshal(dAtA []byte) error {
 			if err := v.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
-			m.Proof = &LegacyProof_Single{v}
+			m.Proof = &MigrationProof_Single{v}
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
@@ -711,7 +705,7 @@ func (m *LegacyProof) Unmarshal(dAtA []byte) error {
 			if err := v.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
-			m.Proof = &LegacyProof_Multisig{v}
+			m.Proof = &MigrationProof_Multisig{v}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

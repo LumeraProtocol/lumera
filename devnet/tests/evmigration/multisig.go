@@ -12,6 +12,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -1011,4 +1012,276 @@ func extractTxHash(out string) string {
 		return ""
 	}
 	return strings.TrimSpace(rest[:end])
+}
+
+// RunMultisigVestingMigration is the entry point for the "multisig-vesting"
+// mode. It wraps the legacy multisig composite as a PermanentLockedAccount
+// before exercising the four-step multisig-to-multisig migration, and verifies
+// that the destination account inherits the PermanentLockedAccount type.
+func RunMultisigVestingMigration() error {
+	log.Println("=== MULTISIG-VESTING MODE ===")
+	ensureEVMMigrationRuntime("multisig-vesting mode")
+
+	if *flagFunder == "" {
+		name, err := detectFunder()
+		if err != nil {
+			return fmt.Errorf("step 0 (detect funder): %w", err)
+		}
+		*flagFunder = name
+		log.Printf("  auto-detected funder: %s", *flagFunder)
+	}
+	funderAddr, err := getAddress(*flagFunder)
+	if err != nil {
+		return fmt.Errorf("step 0 (funder address): %w", err)
+	}
+	log.Printf("  funder: %s (%s)", *flagFunder, funderAddr)
+
+	// Step 1: Set up the PermanentLocked-wrapped multisig legacy fixture.
+	members, multisigAddr, err := ensureMultisigLegacyPermanentLockedFixture()
+	if err != nil {
+		return fmt.Errorf("step 1 (permanent-locked multisig fixture): %w", err)
+	}
+	log.Printf("  permanent-locked multisig address: %s (signers: %v)", multisigAddr, members)
+
+	// Step 2: Build the new-side 2-of-3 eth_secp256k1 multisig destination.
+	newCompositeAddr, newSubKeyNames, err := ensureNewMultisigFixture()
+	if err != nil {
+		return fmt.Errorf("step 2 (new multisig fixture): %w", err)
+	}
+	log.Printf("  new multisig destination: %s (sub-keys: %v)", newCompositeAddr, newSubKeyNames)
+
+	// Step 3: Run the multisig-to-multisig four-step migration (kind=claim).
+	if err := runFourStepMigrationMultisig(
+		"claim",
+		multisigAddr, members,
+		newCompositeAddr, newSubKeyNames, defaultMultisigThreshold,
+	); err != nil {
+		return fmt.Errorf("step 3 (four-step migration): %w", err)
+	}
+	if err := waitForNextBlock(20 * time.Second); err != nil {
+		log.Printf("  WARN: wait for next block after migration tx: %v", err)
+	}
+
+	// Step 4: Verify migration + PermanentLockedAccount preservation.
+	if err := verifyVestingMultisigMigration(multisigAddr, newCompositeAddr); err != nil {
+		return fmt.Errorf("step 4 (verify vesting multisig migration): %w", err)
+	}
+
+	log.Println("=== MULTISIG-VESTING MODE: SUCCESS ===")
+	return nil
+}
+
+// verifyVestingMultisigMigration runs the standard multisig migration checks
+// (record exists, balances moved) and additionally asserts the destination
+// address inherited the PermanentLockedAccount wrapper from the legacy side.
+func verifyVestingMultisigMigration(multisigAddr, newAddr string) error {
+	if err := verifyMultisigMigration(multisigAddr, newAddr); err != nil {
+		return err
+	}
+	accountType, err := queryAuthAccountType(newAddr)
+	if err != nil {
+		return fmt.Errorf("query auth account type for new address %s: %w", newAddr, err)
+	}
+	if !isPermanentLockedAccountType(accountType) {
+		return fmt.Errorf(
+			"new address %s has auth account type %s, expected PermanentLockedAccount (vesting wrapper must be preserved across migration)",
+			newAddr, accountType,
+		)
+	}
+	log.Printf("  new address auth account type: %s (PermanentLockedAccount preserved)", accountType)
+	return nil
+}
+
+// RunMultisigValidatorMigration is the entry point for the "multisig-validator"
+// mode. It discovers a pre-seeded multisig validator on the devnet cluster,
+// migrates its operator via the four-step multisig-to-multisig flow, and then
+// exercises the new eth-multisig operator by signing a MsgEditValidator with
+// 2-of-3 sub-keys.
+//
+// Validator creation via multisig is intentionally out of scope — the test
+// assumes a pre-existing multisig validator. If none is found on this host,
+// the function returns early with a log message (dry-run variant).
+func RunMultisigValidatorMigration() error {
+	log.Println("=== MULTISIG-VALIDATOR MODE ===")
+	ensureEVMMigrationRuntime("multisig-validator mode")
+
+	if *flagFunder == "" {
+		name, err := detectFunder()
+		if err != nil {
+			return fmt.Errorf("step 0 (detect funder): %w", err)
+		}
+		*flagFunder = name
+		log.Printf("  auto-detected funder: %s", *flagFunder)
+	}
+
+	// Step 1: Discover an existing multisig validator in the local keyring.
+	compositeName, multisigAddr, err := findLocalMultisigValidator()
+	if err != nil {
+		log.Printf("  SKIP: no multisig validator found in local keyring (%v)", err)
+		log.Println("  NOTE: multisig-validator mode requires a pre-seeded multisig validator on the devnet cluster")
+		log.Println("=== MULTISIG-VALIDATOR MODE: SKIPPED (no multisig validator) ===")
+		return nil
+	}
+	members := derivedMultisigMemberKeys(compositeName, defaultMultisigSigners)
+	legacyValoper, err := valoperFromAccAddress(multisigAddr)
+	if err != nil {
+		return fmt.Errorf("step 1 (derive legacy valoper): %w", err)
+	}
+	log.Printf("  discovered multisig validator: composite=%s addr=%s valoper=%s signers=%v",
+		compositeName, multisigAddr, legacyValoper, members)
+
+	// Guard: skip if this validator already migrated (e.g. rerun on same devnet).
+	if already, recNewAddr := queryMigrationRecord(multisigAddr); already {
+		log.Printf("  SKIP: validator %s already migrated to %s", multisigAddr, recNewAddr)
+		log.Println("=== MULTISIG-VALIDATOR MODE: SKIPPED (already migrated) ===")
+		return nil
+	}
+
+	// Step 2: Build the new-side 2-of-3 eth_secp256k1 multisig destination.
+	newCompositeAddr, newSubKeyNames, err := ensureNewMultisigFixture()
+	if err != nil {
+		return fmt.Errorf("step 2 (new multisig fixture): %w", err)
+	}
+	log.Printf("  new multisig destination: %s (sub-keys: %v)", newCompositeAddr, newSubKeyNames)
+
+	// Step 3: Run the multisig-to-multisig four-step migration (kind=validator).
+	if err := runFourStepMigrationMultisig(
+		"validator",
+		multisigAddr, members,
+		newCompositeAddr, newSubKeyNames, defaultMultisigThreshold,
+	); err != nil {
+		return fmt.Errorf("step 3 (four-step migration): %w", err)
+	}
+	if err := waitForNextBlock(20 * time.Second); err != nil {
+		log.Printf("  WARN: wait for next block after migration tx: %v", err)
+	}
+
+	// Step 4: Derive the new valoper from the new composite address and verify.
+	newValoper, err := valoperFromAccAddress(newCompositeAddr)
+	if err != nil {
+		return fmt.Errorf("step 4 (derive new valoper): %w", err)
+	}
+	log.Printf("  new validator operator: %s (valoper=%s)", newCompositeAddr, newValoper)
+
+	// Step 5: Post-migration MsgEditValidator signed by 2-of-3 eth sub-keys.
+	newMoniker := fmt.Sprintf("multisig-eth-edited-%d", time.Now().Unix())
+	if err := signAndBroadcastMsgEditValidator(
+		multisigNewCompositeName, newCompositeAddr, newSubKeyNames, newValoper, newMoniker,
+	); err != nil {
+		return fmt.Errorf("step 5 (post-migration MsgEditValidator): %w", err)
+	}
+	if err := waitForNextBlock(20 * time.Second); err != nil {
+		log.Printf("  WARN: wait for next block after edit-validator tx: %v", err)
+	}
+
+	// Step 6: Verify the moniker updated on the new validator record.
+	gotMoniker, err := queryValidatorMoniker(newValoper)
+	if err != nil {
+		return fmt.Errorf("step 6 (query new validator): %w", err)
+	}
+	if gotMoniker != newMoniker {
+		return fmt.Errorf("validator moniker mismatch: got %q, want %q", gotMoniker, newMoniker)
+	}
+	log.Printf("  new validator moniker updated: %s", gotMoniker)
+
+	log.Println("=== MULTISIG-VALIDATOR MODE: SUCCESS ===")
+	return nil
+}
+
+// signAndBroadcastMsgEditValidator builds an unsigned `tx staking edit-validator`
+// transaction from the new eth-multisig operator account, collects K-of-N
+// sub-key signatures via `tx sign --multisig`, combines them with `tx multisign`,
+// and broadcasts the result.
+//
+// This mirrors signAndBroadcastMultisigTx but is parameterized for a
+// destination eth-multisig key whose account already exists on-chain.
+func signAndBroadcastMsgEditValidator(
+	newCompositeName, newCompositeAddr string,
+	newSubKeyNames []string,
+	newValAddr, newMoniker string,
+) error {
+	if len(newSubKeyNames) < defaultMultisigThreshold {
+		return fmt.Errorf("new multisig %s has %d sub-keys, need at least %d",
+			newCompositeName, len(newSubKeyNames), defaultMultisigThreshold)
+	}
+
+	unsignedFile := tmpFile("edit-val-unsigned-*.json")
+	defer os.Remove(unsignedFile)
+
+	// 1. Generate the unsigned edit-validator tx (generate-only).
+	accNum, seq, err := queryAccountNumberAndSequence(newCompositeAddr)
+	if err != nil {
+		if waitErr := waitForAccountOnChain(newCompositeAddr, 30*time.Second); waitErr != nil {
+			return fmt.Errorf("wait for new composite account on-chain: %w", waitErr)
+		}
+		accNum, seq, err = queryAccountNumberAndSequence(newCompositeAddr)
+		if err != nil {
+			return fmt.Errorf("query account number/sequence for %s: %w", newCompositeAddr, err)
+		}
+	}
+
+	unsignedArgs := buildLumeraArgs(
+		"tx", "staking", "edit-validator",
+		"--new-moniker", newMoniker,
+		"--from", newCompositeName,
+		"--keyring-backend", "test",
+		"--chain-id", *flagChainID,
+		"--account-number", fmt.Sprintf("%d", accNum),
+		"--sequence", fmt.Sprintf("%d", seq),
+		"--gas", *flagGas,
+		"--gas-prices", *flagGasPrices,
+		"--generate-only",
+		"--output", "json",
+	)
+	cmd := exec.Command(*flagBin, unsignedArgs...)
+	unsignedOut, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("generate unsigned edit-validator tx: %s\n%w", string(unsignedOut), err)
+	}
+	// lumerad emits the unsigned tx on stdout; the CLI's --node flag is resolved by
+	// the caller via buildLumeraArgs. The tx is emitted to stdout and we persist it
+	// to disk so `tx sign --multisig` + `tx multisign` + `tx broadcast` can consume
+	// it from file.
+	// Note: staking edit-validator is a generate-only tx; --node is unnecessary but
+	// accepted, and --output json makes the result machine-readable.
+	// Log a note that the --from key is a multisig composite (not directly signing).
+	log.Printf("  generated unsigned edit-validator tx (new moniker: %s, valoper: %s)",
+		newMoniker, newValAddr)
+	if err := os.WriteFile(unsignedFile, unsignedOut, 0o600); err != nil {
+		return fmt.Errorf("write unsigned edit-validator tx to %s: %w", unsignedFile, err)
+	}
+
+	// 2. Delegate to the shared multisig sign/combine/broadcast helper.
+	if err := signAndBroadcastMultisigTx(unsignedFile, newCompositeName, newCompositeAddr, newSubKeyNames); err != nil {
+		return fmt.Errorf("sign/broadcast edit-validator tx: %w", err)
+	}
+	log.Printf("  edit-validator tx broadcast (moniker=%q)", newMoniker)
+	return nil
+}
+
+// queryValidatorMoniker returns the moniker string for a validator operator
+// address by querying `staking validator`.
+func queryValidatorMoniker(valoper string) (string, error) {
+	out, err := run("query", "staking", "validator", valoper)
+	if err != nil {
+		return "", fmt.Errorf("query staking validator %s: %s\n%w", valoper, out, err)
+	}
+	var resp struct {
+		Validator struct {
+			Description struct {
+				Moniker string `json:"moniker"`
+			} `json:"description"`
+		} `json:"validator"`
+		// Some CLI responses place the validator at the top level.
+		Description struct {
+			Moniker string `json:"moniker"`
+		} `json:"description"`
+	}
+	if err := json.Unmarshal([]byte(out), &resp); err != nil {
+		return "", fmt.Errorf("parse validator %s: %w", valoper, err)
+	}
+	if resp.Validator.Description.Moniker != "" {
+		return resp.Validator.Description.Moniker, nil
+	}
+	return resp.Description.Moniker, nil
 }

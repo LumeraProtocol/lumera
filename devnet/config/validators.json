@@ -95,6 +95,11 @@
     "initial_distribution": {
       "account_balance": "2000000000000ulume",
       "validator_stake": "1000000000000ulume"
+    },
+    "test_accounts": {
+      "count": 10,
+      "balance_base": "10000ulume",
+      "balance_increment": "5000ulume"
     }
   },
   {

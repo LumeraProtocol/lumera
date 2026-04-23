@@ -47,6 +47,7 @@ COPY --chmod=0755 \
     ${SCRIPTS_SRC_DIR}/stop.sh \
     ${SCRIPTS_SRC_DIR}/restart.sh \
     ${SCRIPTS_SRC_DIR}/lumera-helper.sh \
+    ${SCRIPTS_SRC_DIR}/test-accounts-setup.sh \
     ${SCRIPTS_SRC_DIR}/validator-setup.sh \
     ${SCRIPTS_SRC_DIR}/supernode-setup.sh \
     ${SCRIPTS_SRC_DIR}/lumera-uploader-setup.sh \

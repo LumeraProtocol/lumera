@@ -96,6 +96,12 @@ type Validator struct {
 		GRPCPort int  `json:"grpc_port,omitempty"`
 		HTTPPort int  `json:"http_port,omitempty"`
 	} `json:"lumera-uploader,omitempty"`
+
+	TestAccounts struct {
+		Count            int    `json:"count,omitempty"`
+		BalanceBase      string `json:"balance_base,omitempty"`
+		BalanceIncrement string `json:"balance_increment,omitempty"`
+	} `json:"test_accounts,omitempty"`
 }
 
 func LoadConfigs(configPath, validatorsPath string) (*ChainConfig, []Validator, error) {

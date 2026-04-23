@@ -64,6 +64,7 @@ SUPERNODE_LOG="${LOGS_DIR}/supernode.log"
 VALIDATOR_SETUP_OUT="${LOGS_DIR}/validator-setup.out"
 SUPERNODE_SETUP_OUT="${LOGS_DIR}/supernode-setup.out"
 UPLOADER_SETUP_OUT="${LOGS_DIR}/lumera-uploader-setup.out"
+TEST_ACCOUNTS_SETUP_OUT="${LOGS_DIR}/test-accounts-setup.out"
 NM_UI_PORT="${NM_UI_PORT:-8088}"
 
 LUMERA_RPC_PORT="${LUMERA_RPC_PORT:-26657}"
@@ -187,6 +188,7 @@ archive_existing_logs() {
 	archive_log_file "${VALIDATOR_SETUP_OUT}"
 	archive_log_file "${SUPERNODE_SETUP_OUT}"
 	archive_log_file "${UPLOADER_SETUP_OUT}"
+	archive_log_file "${TEST_ACCOUNTS_SETUP_OUT}"
 }
 
 # Get current block height (integer), 0 if unknown
@@ -303,6 +305,24 @@ launch_uploader_setup() {
 	fi
 }
 
+launch_test_accounts_setup() {
+	# Only fire if the validators.json entry for this node has a non-empty
+	# test_accounts block with count > 0. Fund and creation run against the
+	# live chain so this is launched in background after start_lumera.
+	if [ ! -x "${SCRIPTS_DIR}/test-accounts-setup.sh" ]; then
+		return
+	fi
+	local count
+	count="$(jq -r --arg m "${MONIKER}" '
+		[.[] | select(.moniker==$m)][0] | try .test_accounts.count // 0
+	' "${CFG_VALS}" 2>/dev/null || echo 0)"
+	if ! [[ "${count}" =~ ^[0-9]+$ ]] || [ "${count}" -eq 0 ]; then
+		return
+	fi
+	echo "[BOOT] ${MONIKER}: Launching test-accounts setup in background (count=${count})..."
+	nohup bash "${SCRIPTS_DIR}/test-accounts-setup.sh" >"${TEST_ACCOUNTS_SETUP_OUT}" 2>&1 &
+}
+
 start_lumera() {
 	if [ "${MONIKER}" != "${PRIMARY_MONIKER}" ]; then
 		echo "[BOOT] ${MONIKER}: Waiting for primary (${PRIMARY_MONIKER}) to start lumerad..."
@@ -327,8 +347,8 @@ start_lumera() {
 }
 
 tail_logs() {
-	touch "${VALIDATOR_LOG}" "${SUPERNODE_LOG}" "${SUPERNODE_SETUP_OUT}" "${VALIDATOR_SETUP_OUT}" "${UPLOADER_SETUP_OUT}"
-	exec tail -F "${VALIDATOR_LOG}" "${SUPERNODE_LOG}" "${SUPERNODE_SETUP_OUT}" "${VALIDATOR_SETUP_OUT}" "${UPLOADER_SETUP_OUT}"
+	touch "${VALIDATOR_LOG}" "${SUPERNODE_LOG}" "${SUPERNODE_SETUP_OUT}" "${VALIDATOR_SETUP_OUT}" "${UPLOADER_SETUP_OUT}" "${TEST_ACCOUNTS_SETUP_OUT}"
+	exec tail -F "${VALIDATOR_LOG}" "${SUPERNODE_LOG}" "${SUPERNODE_SETUP_OUT}" "${VALIDATOR_SETUP_OUT}" "${UPLOADER_SETUP_OUT}" "${TEST_ACCOUNTS_SETUP_OUT}"
 }
 
 run_auto_flow() {
@@ -338,6 +358,7 @@ run_auto_flow() {
 	launch_validator_setup
 	wait_for_validator_setup
 	start_lumera
+	launch_test_accounts_setup
 	start_nm_ui_if_present
 	tail_logs
 }
@@ -364,6 +385,7 @@ run)
 		exit 1
 	}
 	start_lumera
+	launch_test_accounts_setup
 	start_nm_ui_if_present
 	tail_logs
 	;;

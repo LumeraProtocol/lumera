@@ -17,13 +17,18 @@ require_cmd() {
 usage() {
 	cat <<'EOF'
 Usage:
-  lumera-helper.sh new-account N
+  lumera-helper.sh new-account AMOUNT
   lumera-helper.sh list-accounts
 
 Commands:
-  new-account N   Create a new keyring account, fund it with N LUME from this
-                  node's genesis account, and print the mnemonic + address.
-  list-accounts   List generated user accounts as "key: address".
+  new-account AMOUNT  Create a new keyring account, fund it from this node's
+                      genesis account, and print the mnemonic + address.
+                      AMOUNT can be either:
+                        - a bare number, interpreted as display units (LUME)
+                          e.g. "5" → 5 LUME
+                        - a number with the chain base denom suffix
+                          e.g. "10000ulume" → 10000ulume (base units)
+  list-accounts       List generated user accounts as "key: address".
 EOF
 }
 
@@ -411,13 +416,38 @@ write_user_account_record() {
 }
 
 cmd_new_account() {
-	local amount_display="$1"
-	local amount_base key_name account_type
+	local amount_arg="$1"
+	local amount_base amount_display key_name account_type
 
 	load_config
 	assert_chain_ready
 
-	amount_base="$(parse_lume_amount_to_base "${amount_display}" "${DISPLAY_EXPONENT}")"
+	# Accept either a bare number (interpreted as display units / LUME) or
+	# an explicit base-denom amount like "10000ulume" (taken verbatim).
+	if [[ "${amount_arg}" =~ ^([0-9]+)${BASE_DENOM}$ ]]; then
+		amount_base="${BASH_REMATCH[1]}"
+		amount_display="$(awk -v v="${amount_base}" -v e="${DISPLAY_EXPONENT}" '
+			BEGIN {
+				n = length(v)
+				if (n <= e) {
+					pad = ""
+					for (i = 0; i < e - n; i++) pad = pad "0"
+					frac = pad v
+					whole = "0"
+				} else {
+					whole = substr(v, 1, n - e)
+					frac = substr(v, n - e + 1)
+				}
+				sub(/0+$/, "", frac)
+				if (frac == "") print whole
+				else print whole "." frac
+			}
+		')"
+	else
+		amount_display="${amount_arg}"
+		amount_base="$(parse_lume_amount_to_base "${amount_display}" "${DISPLAY_EXPONENT}")"
+	fi
+
 	if [ "${amount_base}" = "0" ]; then
 		echo "ERROR: amount must be greater than zero" >&2
 		exit 1
@@ -455,7 +485,7 @@ main() {
 	case "$1" in
 	new-account)
 		[ $# -eq 2 ] || {
-			echo "ERROR: new-account requires exactly one amount argument" >&2
+			echo "ERROR: new-account requires exactly one amount argument (bare number = LUME, or e.g. '10000ulume')" >&2
 			usage
 			exit 1
 		}

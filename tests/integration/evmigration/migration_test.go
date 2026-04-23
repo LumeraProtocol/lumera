@@ -18,6 +18,7 @@ import (
 	vestingtypes "github.com/cosmos/cosmos-sdk/x/auth/vesting/types"
 	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
+	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	evmcryptotypes "github.com/cosmos/evm/crypto/ethsecp256k1"
 	"github.com/stretchr/testify/require"
@@ -879,4 +880,117 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_MultisigToMultisig() 
 	s.Require().True(legacyBal.IsZero())
 	newBal := s.app.BankKeeper.GetBalance(s.ctx, newAddr, "ulume")
 	s.Require().Equal(int64(1_000_000_000), newBal.Amount.Int64())
+}
+
+// TestMigrateValidator_MultisigToMultisig migrates a validator whose operator
+// is a 2-of-3 Cosmos multisig to a 2-of-3 eth_secp256k1 multisig destination.
+// It asserts structural re-keying (validator record, delegations, distribution,
+// balance, migration record) and then invokes MsgEditValidator with the new
+// multisig-eth ValAddress to prove the staking module accepts the re-keyed
+// operator post-migration.
+//
+// NOTE: This integration layer calls msgServer.X(ctx, msg) directly and does
+// NOT exercise the ante handler where multisig-eth signature verification
+// happens. Full ante-handler-driven signature verification for multisig-eth
+// signing is covered by devnet integration tests (Tasks 23-24) using a real
+// lumerad binary.
+func (s *MigrationIntegrationSuite) TestMigrateValidator_MultisigToMultisig() {
+	s.enableMigration()
+
+	// === Setup: legacy Cosmos multisig operator, bonded validator, and
+	// destination eth multisig. ===
+	operatorCoins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 2_000_000))
+	selfBondAmt := sdkmath.NewInt(1_000_000)
+	legacyMultiPK, legacyPrivs, legacyAddr := s.createFundedMultisigAccount(2, 3, operatorCoins)
+	oldValAddr, extDelegatorAddr := s.createTestValidator(legacyAddr, selfBondAmt)
+
+	newMultiPK, newPrivs, newAddr := BuildMultisigNewAccount(s.T(), 2, 3)
+	newValAddr := sdk.ValAddress(newAddr)
+
+	// === Migrate multisig → multisig. ===
+	legacyProof := SignMultisigProof(s.T(), integrationTestChainID, "validator",
+		legacyMultiPK, legacyPrivs, []int{0, 2}, legacyAddr, newAddr,
+		types.SigFormat_SIG_FORMAT_CLI)
+	newProof := SignNewMultisigProof(s.T(), integrationTestChainID, "validator",
+		newMultiPK, newPrivs, []int{0, 2}, legacyAddr, newAddr,
+		types.SigFormat_SIG_FORMAT_CLI)
+
+	msg := &types.MsgMigrateValidator{
+		LegacyAddress: legacyAddr.String(),
+		NewAddress:    newAddr.String(),
+		LegacyProof:   *legacyProof,
+		NewProof:      *newProof,
+	}
+	_, err := s.msgServer.MigrateValidator(s.ctx, msg)
+	s.Require().NoError(err)
+
+	// === Assert structural re-keying. ===
+	// Validator record re-keyed to the new multisig-eth valoper.
+	newVal, err := s.app.StakingKeeper.GetValidator(s.ctx, newValAddr)
+	s.Require().NoError(err)
+	s.Require().Equal(newValAddr.String(), newVal.OperatorAddress)
+	s.Require().Equal(stakingtypes.Bonded, newVal.Status)
+
+	// Old operator's validator record is orphaned (no delegations remain);
+	// removing a bonded validator record outright would destroy distribution
+	// state, so the migration leaves it dangling. The new record is canonical.
+	oldDels, err := s.app.StakingKeeper.GetValidatorDelegations(s.ctx, oldValAddr)
+	s.Require().NoError(err)
+	s.Require().Empty(oldDels)
+
+	// Delegations re-keyed (self + external).
+	dels, err := s.app.StakingKeeper.GetValidatorDelegations(s.ctx, newValAddr)
+	s.Require().NoError(err)
+	s.Require().Len(dels, 2)
+	for _, del := range dels {
+		s.Require().Equal(newValAddr.String(), del.ValidatorAddress)
+	}
+
+	// External delegator's delegation now points at new valoper.
+	extDels, err := s.app.StakingKeeper.GetDelegatorDelegations(s.ctx, extDelegatorAddr, 10)
+	s.Require().NoError(err)
+	s.Require().Len(extDels, 1)
+	s.Require().Equal(newValAddr.String(), extDels[0].ValidatorAddress)
+
+	// Distribution state re-keyed.
+	_, err = s.app.DistrKeeper.GetValidatorCurrentRewards(s.ctx, newValAddr)
+	s.Require().NoError(err)
+
+	// Destination BaseAccount carries the reconstructed eth multisig pubkey.
+	newAcc := s.app.AuthKeeper.GetAccount(s.ctx, newAddr)
+	s.Require().NotNil(newAcc)
+	s.Require().NotNil(newAcc.GetPubKey())
+	s.Require().Equal(newAddr.Bytes(), newAcc.GetPubKey().Address().Bytes())
+	s.Require().Equal(newMultiPK.Bytes(), newAcc.GetPubKey().Bytes())
+
+	// Legacy balance fully moved.
+	legacyBal := s.app.BankKeeper.GetAllBalances(s.ctx, legacyAddr)
+	s.Require().True(legacyBal.IsZero())
+
+	// Migration record created.
+	rec, err := s.keeper.MigrationRecords.Get(s.ctx, legacyAddr.String())
+	s.Require().NoError(err)
+	s.Require().Equal(newAddr.String(), rec.NewAddress)
+
+	// === Post-migration MsgEditValidator updates the moniker. ===
+	// This proves the new multisig-eth operator is accepted by the staking
+	// module. Signature verification is NOT exercised at this layer (ante
+	// bypassed); devnet tests exercise the full signed-tx path.
+	editMsg := &stakingtypes.MsgEditValidator{
+		ValidatorAddress: newValAddr.String(),
+		Description: stakingtypes.Description{
+			Moniker:         "edited-by-multisig-eth",
+			Identity:        stakingtypes.DoNotModifyDesc,
+			Website:         stakingtypes.DoNotModifyDesc,
+			SecurityContact: stakingtypes.DoNotModifyDesc,
+			Details:         stakingtypes.DoNotModifyDesc,
+		},
+	}
+	stakingMsgServer := stakingkeeper.NewMsgServerImpl(s.app.StakingKeeper)
+	_, err = stakingMsgServer.EditValidator(s.ctx, editMsg)
+	s.Require().NoError(err)
+
+	updatedVal, err := s.app.StakingKeeper.GetValidator(s.ctx, newValAddr)
+	s.Require().NoError(err)
+	s.Require().Equal("edited-by-multisig-eth", updatedVal.Description.Moniker)
 }

@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"sort"
 
@@ -238,130 +239,123 @@ func validateSideSpec(label string, s *SideSpec) error {
 	return nil
 }
 
-// assembleMultisigProof merges partial sub-signatures into a MultisigProof.
-// Signatures are deduplicated by index (last write wins). If more than K
-// signatures are present, the first K valid signatures in signer-index order
-// are selected so stale/corrupted extras do not poison the assembled proof.
-//
-// NOTE: Task 16 (combine-proof) will replace the inline secp256k1 verification
-// here with sigverify.VerifyCosmosSecp256k1 / sigverify.VerifyEthSecp256k1.
-func assembleMultisigProof(ss *SideSpec, payload []byte, partials []PartialSignature) (*types.MultisigProof, error) {
-	sigFmt, err := ParseSigFormat(ss.SigFormat)
+// decodeBase64 wraps base64.StdEncoding.DecodeString with a field-aware error.
+func decodeBase64(field, in string) ([]byte, error) {
+	out, err := base64.StdEncoding.DecodeString(in)
 	if err != nil {
-		return nil, err
-	}
-	subs, err := decodeSideSubPubKeys(ss)
-	if err != nil {
-		return nil, err
-	}
-	byIdx := map[uint32][]byte{}
-	for _, p := range partials {
-		if int(p.Index) >= len(subs) {
-			return nil, fmt.Errorf("partial signature index %d out of range (N=%d)", p.Index, len(subs))
-		}
-		sig, err := base64.StdEncoding.DecodeString(p.Signature)
-		if err != nil {
-			return nil, fmt.Errorf("partial signature %d: %w", p.Index, err)
-		}
-		byIdx[p.Index] = sig
-	}
-	if uint32(len(byIdx)) < ss.Threshold {
-		return nil, fmt.Errorf("need %d partial signatures, have %d", ss.Threshold, len(byIdx))
-	}
-	indices := make([]uint32, 0, len(byIdx))
-	for idx := range byIdx {
-		indices = append(indices, idx)
-	}
-	sort.Slice(indices, func(i, j int) bool { return indices[i] < indices[j] })
-	validIndices := make([]uint32, 0, len(indices))
-	sigs := make([][]byte, 0, len(indices))
-	for _, idx := range indices {
-		sig := byIdx[idx]
-		if !verifySideSubSig(subs[idx], payload, sig, sigFmt) {
-			continue
-		}
-		validIndices = append(validIndices, idx)
-		sigs = append(sigs, sig)
-		if uint32(len(validIndices)) == ss.Threshold {
-			break
-		}
-	}
-	if uint32(len(validIndices)) < ss.Threshold {
-		return nil, fmt.Errorf("need %d valid partial signatures, have %d", ss.Threshold, len(validIndices))
-	}
-	return &types.MultisigProof{
-		Threshold:     ss.Threshold,
-		SubPubKeys:    subs,
-		SignerIndices: validIndices,
-		SubSignatures: sigs,
-		SigFormat:     sigFmt,
-	}, nil
-}
-
-// verifySideSubSig verifies a single sub-signature against a Cosmos secp256k1 pubkey.
-// NOTE: Task 16 (combine-proof) will replace this with sigverify.VerifyCosmosSecp256k1.
-func verifySideSubSig(pkBytes, payload, sig []byte, sigFmt types.SigFormat) bool {
-	pk := &secp256k1.PubKey{Key: pkBytes}
-	switch sigFmt {
-	case types.SigFormat_SIG_FORMAT_CLI:
-		hash := sha256.Sum256(payload)
-		return pk.VerifySignature(hash[:], sig)
-	case types.SigFormat_SIG_FORMAT_ADR036:
-		signerAddr := sdk.AccAddress(pk.Address()).String()
-		doc := fmt.Appendf(nil,
-			`{"account_number":"0","chain_id":"","fee":{"amount":[],"gas":"0"},`+
-				`"memo":"","msgs":[{"type":"sign/MsgSignData","value":`+
-				`{"data":"%s","signer":"%s"}}],"sequence":"0"}`,
-			base64.StdEncoding.EncodeToString(payload), signerAddr,
-		)
-		return pk.VerifySignature(doc, sig)
-	default:
-		return false
-	}
-}
-
-// decodeSideSubPubKeys decodes the base64 sub-pubkeys from a multisig SideSpec.
-func decodeSideSubPubKeys(ss *SideSpec) ([][]byte, error) {
-	out := make([][]byte, len(ss.SubPubKeys))
-	for i, s := range ss.SubPubKeys {
-		b, err := base64.StdEncoding.DecodeString(s)
-		if err != nil {
-			return nil, fmt.Errorf("sub_pub_keys[%d]: %w", i, err)
-		}
-		if len(b) != secp256k1.PubKeySize {
-			return nil, fmt.Errorf("sub_pub_keys[%d]: expected %d bytes, got %d",
-				i, secp256k1.PubKeySize, len(b))
-		}
-		out[i] = b
+		return nil, fmt.Errorf("%s: %w", field, err)
 	}
 	return out, nil
 }
 
-// assembleSingleProof builds a SingleKeyProof from a single-entry partial list.
-func assembleSingleProof(ss *SideSpec, partials []PartialSignature) (*types.SingleKeyProof, error) {
-	sigFmt, err := ParseSigFormat(ss.SigFormat)
+// buildProofFromPartial assembles a MigrationProof from a partial-file side spec
+// and the merged partial signatures for that side. Verifies every merged partial
+// cryptographically (drops invalid with warnings), selects K valid partials with
+// lowest ascending indices, assembles the proof.
+//
+// For single-key sides (side.PubKey != ""): expects exactly one partial at index 0.
+// For multisig sides (side.Threshold > 0): requires at least K valid partials.
+func buildProofFromPartial(
+	side *SideSpec, sigs []PartialSignature, payload []byte,
+	keyType sigverify.SubKeyType, sideLabel string, stderr io.Writer,
+) (types.MigrationProof, error) {
+	format, err := ParseSigFormat(side.SigFormat)
 	if err != nil {
-		return nil, err
+		return types.MigrationProof{}, fmt.Errorf("%s side sig_format %q: %w", sideLabel, side.SigFormat, err)
 	}
-	pub, err := base64.StdEncoding.DecodeString(ss.PubKey)
-	if err != nil {
-		return nil, fmt.Errorf("pub_key: %w", err)
-	}
-	if len(partials) < 1 {
-		return nil, fmt.Errorf("need 1 partial signature for single-key proof")
-	}
-	var sigB64 string
-	for _, p := range partials {
-		if p.Index != 0 {
-			return nil, fmt.Errorf("single-key proof must have index=0, got %d", p.Index)
+
+	// Single-key side: strict exactly-one-at-index-0.
+	if side.PubKey != "" {
+		switch {
+		case len(sigs) == 0:
+			return types.MigrationProof{}, fmt.Errorf("%s side has no partial signature (single-key side expects exactly one at index 0)", sideLabel)
+		case len(sigs) > 1:
+			return types.MigrationProof{}, fmt.Errorf("%s side has %d partial signatures; single-key side expects exactly one at index 0", sideLabel, len(sigs))
+		case sigs[0].Index != 0:
+			return types.MigrationProof{}, fmt.Errorf("%s side partial signature has index=%d; single-key side expects index=0", sideLabel, sigs[0].Index)
 		}
-		sigB64 = p.Signature
+		pkBytes, err := decodeBase64(sideLabel+".pub_key", side.PubKey)
+		if err != nil {
+			return types.MigrationProof{}, err
+		}
+		if len(pkBytes) != secp256k1.PubKeySize {
+			return types.MigrationProof{}, fmt.Errorf("%s side single-key pub_key: expected %d bytes, got %d", sideLabel, secp256k1.PubKeySize, len(pkBytes))
+		}
+		sigBytes, err := decodeBase64(fmt.Sprintf("%s.partial_signatures[0].signature", sideLabel), sigs[0].Signature)
+		if err != nil {
+			return types.MigrationProof{}, err
+		}
+		if err := verifyOne(keyType, pkBytes, payload, sigBytes, format); err != nil {
+			return types.MigrationProof{}, fmt.Errorf("%s side single-key partial signature invalid: %w", sideLabel, err)
+		}
+		return types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
+			PubKey: pkBytes, Signature: sigBytes, SigFormat: format,
+		}}}, nil
 	}
-	sig, err := base64.StdEncoding.DecodeString(sigB64)
-	if err != nil {
-		return nil, fmt.Errorf("signature: %w", err)
+
+	// Multisig: verify every merged partial, drop invalid, select K valid ascending.
+	subPubs := make([][]byte, len(side.SubPubKeys))
+	for i, k := range side.SubPubKeys {
+		raw, err := decodeBase64(fmt.Sprintf("%s.sub_pub_keys[%d]", sideLabel, i), k)
+		if err != nil {
+			return types.MigrationProof{}, err
+		}
+		if len(raw) != secp256k1.PubKeySize {
+			return types.MigrationProof{}, fmt.Errorf("%s side sub_pub_keys[%d]: expected %d bytes, got %d", sideLabel, i, secp256k1.PubKeySize, len(raw))
+		}
+		subPubs[i] = raw
 	}
-	return &types.SingleKeyProof{PubKey: pub, Signature: sig, SigFormat: sigFmt}, nil
+
+	// Sort merged sigs by index for canonical ordering.
+	sort.Slice(sigs, func(i, j int) bool { return sigs[i].Index < sigs[j].Index })
+
+	validIdxs := make([]uint32, 0, len(sigs))
+	validSigs := make([][]byte, 0, len(sigs))
+	for _, ps := range sigs {
+		if int(ps.Index) >= len(subPubs) {
+			_, _ = fmt.Fprintf(stderr, "WARN %s side: dropping partial at index %d (out of range for N=%d)\n", sideLabel, ps.Index, len(subPubs))
+			continue
+		}
+		sigBytes, err := decodeBase64(fmt.Sprintf("%s.partial_signatures[index=%d].signature", sideLabel, ps.Index), ps.Signature)
+		if err != nil {
+			_, _ = fmt.Fprintf(stderr, "WARN %s side: dropping partial at index %d (base64 decode error): %s\n", sideLabel, ps.Index, err)
+			continue
+		}
+		if err := verifyOne(keyType, subPubs[ps.Index], payload, sigBytes, format); err != nil {
+			_, _ = fmt.Fprintf(stderr, "WARN %s side: dropping partial at index %d: %s\n", sideLabel, ps.Index, err)
+			continue
+		}
+		validIdxs = append(validIdxs, ps.Index)
+		validSigs = append(validSigs, sigBytes)
+	}
+
+	if uint32(len(validIdxs)) < side.Threshold {
+		return types.MigrationProof{}, fmt.Errorf("need %d valid partial signatures on %s side, have %d",
+			side.Threshold, sideLabel, len(validIdxs))
+	}
+
+	// Select the first K valid ones (lowest indices, already ascending).
+	validIdxs = validIdxs[:int(side.Threshold)]
+	validSigs = validSigs[:int(side.Threshold)]
+
+	return types.MigrationProof{Proof: &types.MigrationProof_Multisig{Multisig: &types.MultisigProof{
+		Threshold: side.Threshold, SubPubKeys: subPubs,
+		SignerIndices: validIdxs, SubSignatures: validSigs, SigFormat: format,
+	}}}, nil
+}
+
+// verifyOne dispatches to the right sigverify helper based on keyType.
+func verifyOne(keyType sigverify.SubKeyType, pubKeyBytes, payload, sig []byte, format types.SigFormat) error {
+	switch keyType {
+	case sigverify.SubKeyTypeCosmosSecp256k1:
+		pk := &secp256k1.PubKey{Key: pubKeyBytes}
+		return sigverify.VerifyCosmosSecp256k1(pk, sdk.AccAddress(pk.Address()), payload, sig, format)
+	case sigverify.SubKeyTypeEthSecp256k1:
+		pk := &evmcryptotypes.PubKey{Key: pubKeyBytes}
+		return sigverify.VerifyEthSecp256k1(pk, sdk.AccAddress(pk.Address()), payload, sig, format)
+	default:
+		return fmt.Errorf("unknown sub-key type")
+	}
 }
 
 // AssertPartialProofsConsistent verifies two PartialProof files agree on
@@ -947,108 +941,103 @@ index's entry in place rather than duplicating it.`,
 
 func cmdCombineProof() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "combine-proof <partial1.json> [<partial2.json> ...]",
-		Short: "Merge partial proofs into an unsigned tx JSON",
-		Long: `Merge partial proofs from multiple co-signers into an unsigned tx JSON.
-
-NOTE (Task 16): This command will be extended to assemble both the legacy
-and new proofs independently. For now it assembles only the legacy proof
-to keep the build green while Task 16 is pending.`,
+		Use:   "combine-proof <partial1.json> [<partial2.json> ...] --out <tx.json>",
+		Short: "Merge partial proofs into a fully-signed migration tx",
+		Long: `Merge partials produced by sign-proof (possibly from multiple machines)
+into a migration transaction. Validates all inputs agree on legacy_address,
+new_address, chain_id, evm_chain_id, kind, sig_format (per side), threshold
+(per side), and sub_pub_keys (per side). Verifies each partial signature
+cryptographically; drops invalid ones with a stderr warning and selects the K
+valid partials with lowest ascending indices. Writes an unsigned migration tx
+to --out, with both legacy_proof and new_proof populated.`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			out, _ := cmd.Flags().GetString(flagOut)
-			if out == "" {
-				return fmt.Errorf("--out is required")
-			}
-
-			merged, err := LoadPartialProof(args[0])
-			if err != nil {
-				return err
-			}
-			for _, p := range args[1:] {
-				other, err := LoadPartialProof(p)
-				if err != nil {
-					return err
-				}
-				if err := AssertPartialProofsConsistent(merged, other); err != nil {
-					return fmt.Errorf("%s: %w", p, err)
-				}
-				// Merge legacy signatures (idempotent by index).
-				for _, ps := range other.PartialLegacySignatures {
-					filtered := merged.PartialLegacySignatures[:0]
-					for _, m := range merged.PartialLegacySignatures {
-						if m.Index != ps.Index {
-							filtered = append(filtered, m)
-						}
-					}
-					merged.PartialLegacySignatures = append(filtered, ps)
-				}
-				// Merge new signatures (idempotent by index).
-				for _, ps := range other.PartialNewSignatures {
-					filtered := merged.PartialNewSignatures[:0]
-					for _, m := range merged.PartialNewSignatures {
-						if m.Index != ps.Index {
-							filtered = append(filtered, m)
-						}
-					}
-					merged.PartialNewSignatures = append(filtered, ps)
-				}
-			}
-
-			// NOTE (Task 16): combine-proof will assemble both legacy and new proofs.
-			// Currently only the legacy proof is assembled; new proof assembly is
-			// stubbed until Task 16 fills in the full dual-side combine logic.
-			var legacyProof types.MigrationProof
-			switch {
-			case merged.Legacy != nil && merged.Legacy.PubKey != "":
-				sp, err := assembleSingleProof(merged.Legacy, merged.PartialLegacySignatures)
-				if err != nil {
-					return err
-				}
-				legacyProof = types.MigrationProof{Proof: &types.MigrationProof_Single{Single: sp}}
-			case merged.Legacy != nil && len(merged.Legacy.SubPubKeys) > 0:
-				mp, err := assembleMultisigProof(merged.Legacy, canonicalPayloadBytes(merged), merged.PartialLegacySignatures)
-				if err != nil {
-					return err
-				}
-				legacyProof = types.MigrationProof{Proof: &types.MigrationProof_Multisig{Multisig: mp}}
-			}
-
-			if err := legacyProof.ValidateBasic(types.SideLegacy); err != nil {
-				return fmt.Errorf("assembled legacy proof fails ValidateBasic: %w", err)
-			}
-
-			var unsignedMsg sdk.Msg
-			switch merged.Kind {
-			case migrationProofKindClaim:
-				unsignedMsg = &types.MsgClaimLegacyAccount{
-					NewAddress:    merged.NewAddress,
-					LegacyAddress: merged.LegacyAddress,
-					LegacyProof:   legacyProof,
-				}
-			case migrationProofKindValidator:
-				unsignedMsg = &types.MsgMigrateValidator{
-					NewAddress:    merged.NewAddress,
-					LegacyAddress: merged.LegacyAddress,
-					LegacyProof:   legacyProof,
-				}
-			default:
-				return fmt.Errorf("unknown kind %q", merged.Kind)
-			}
-
 			clientCtx, err := client.GetClientTxContext(cmd)
 			if err != nil {
 				return err
 			}
-			txb := clientCtx.TxConfig.NewTxBuilder()
-			if err := txb.SetMsgs(unsignedMsg); err != nil {
-				return err
+			outPath, _ := cmd.Flags().GetString(flagOut)
+			if outPath == "" {
+				return fmt.Errorf("--out is required")
 			}
-			bts, err := clientCtx.TxConfig.TxJSONEncoder()(txb.GetTx())
+
+			// Load and cross-validate all partials.
+			merged, err := LoadPartialProof(args[0])
+			if err != nil {
+				return fmt.Errorf("%s: %w", args[0], err)
+			}
+			for _, path := range args[1:] {
+				other, err := LoadPartialProof(path)
+				if err != nil {
+					return fmt.Errorf("%s: %w", path, err)
+				}
+				if err := AssertPartialProofsConsistent(merged, other); err != nil {
+					return fmt.Errorf("%s vs %s: %w", args[0], path, err)
+				}
+				// Merge partial signatures (idempotent by index; later files win for duplicate indices).
+				for _, p := range other.PartialLegacySignatures {
+					merged.PartialLegacySignatures = upsertSig(merged.PartialLegacySignatures, p)
+				}
+				for _, p := range other.PartialNewSignatures {
+					merged.PartialNewSignatures = upsertSig(merged.PartialNewSignatures, p)
+				}
+			}
+
+			payload, err := hex.DecodeString(merged.PayloadHex)
+			if err != nil {
+				return fmt.Errorf("invalid payload_hex in partial file: %w", err)
+			}
+
+			// Verify both sides and assemble proofs.
+			legacyProof, err := buildProofFromPartial(
+				merged.Legacy, merged.PartialLegacySignatures, payload,
+				sigverify.SubKeyTypeCosmosSecp256k1, "legacy", cmd.ErrOrStderr(),
+			)
 			if err != nil {
 				return err
 			}
-			return os.WriteFile(out, bts, 0o600)
+			newProof, err := buildProofFromPartial(
+				merged.New, merged.PartialNewSignatures, payload,
+				sigverify.SubKeyTypeEthSecp256k1, "new", cmd.ErrOrStderr(),
+			)
+			if err != nil {
+				return err
+			}
+
+			// Assemble the final Msg based on kind.
+			var msg sdk.Msg
+			switch merged.Kind {
+			case migrationProofKindClaim:
+				msg = &types.MsgClaimLegacyAccount{
+					LegacyAddress: merged.LegacyAddress,
+					NewAddress:    merged.NewAddress,
+					LegacyProof:   legacyProof,
+					NewProof:      newProof,
+				}
+			case migrationProofKindValidator:
+				msg = &types.MsgMigrateValidator{
+					LegacyAddress: merged.LegacyAddress,
+					NewAddress:    merged.NewAddress,
+					LegacyProof:   legacyProof,
+					NewProof:      newProof,
+				}
+			default:
+				return fmt.Errorf("unsupported kind %q", merged.Kind)
+			}
+
+			// Build the unsigned tx JSON.
+			txb := clientCtx.TxConfig.NewTxBuilder()
+			if err := txb.SetMsgs(msg); err != nil {
+				return fmt.Errorf("set msgs: %w", err)
+			}
+			txBytes, err := clientCtx.TxConfig.TxJSONEncoder()(txb.GetTx())
+			if err != nil {
+				return fmt.Errorf("encode tx: %w", err)
+			}
+			if err := os.WriteFile(outPath, txBytes, 0o600); err != nil {
+				return fmt.Errorf("write %s: %w", outPath, err)
+			}
+			return nil
 		},
 	}
 	flags.AddTxFlagsToCmd(cmd)

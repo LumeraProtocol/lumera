@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,9 +13,271 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	ethsecp256k1 "github.com/cosmos/evm/crypto/ethsecp256k1"
+	evmcryptotypes "github.com/cosmos/evm/crypto/ethsecp256k1"
 
+	"github.com/LumeraProtocol/lumera/x/evmigration/types"
 	"github.com/LumeraProtocol/lumera/x/evmigration/types/sigverify"
 )
+
+// cosmosSign produces a SIG_FORMAT_CLI Cosmos secp256k1 signature over payload.
+func cosmosSign(t *testing.T, priv *secp256k1.PrivKey, payload []byte) []byte {
+	t.Helper()
+	hash := sha256.Sum256(payload)
+	sig, err := priv.Sign(hash[:])
+	require.NoError(t, err)
+	return sig
+}
+
+// ethSign produces a SIG_FORMAT_CLI eth_secp256k1 signature over payload
+// (65-byte R||S||V; the eth keyring applies Keccak256 internally).
+func ethSign(t *testing.T, priv *ethsecp256k1.PrivKey, payload []byte) []byte {
+	t.Helper()
+	sig, err := priv.Sign(payload)
+	require.NoError(t, err)
+	return sig
+}
+
+// ---------- buildProofFromPartial — single-key Cosmos side ----------
+
+func TestBuildProofFromPartial_SingleKey_Valid(t *testing.T) {
+	priv := secp256k1.GenPrivKey()
+	pk := priv.PubKey().(*secp256k1.PubKey)
+	payload := []byte("lumera-evm-migration:lumera-test-1:76857769:claim:legacy:new")
+	sig := cosmosSign(t, priv, payload)
+
+	side := &SideSpec{
+		PubKey:    base64.StdEncoding.EncodeToString(pk.Bytes()),
+		SigFormat: "SIG_FORMAT_CLI",
+	}
+	sigs := []PartialSignature{{Index: 0, Signature: base64.StdEncoding.EncodeToString(sig)}}
+
+	proof, err := buildProofFromPartial(side, sigs, payload, sigverify.SubKeyTypeCosmosSecp256k1, "legacy", io.Discard)
+	require.NoError(t, err)
+	sp := proof.GetSingle()
+	require.NotNil(t, sp)
+	require.Equal(t, pk.Bytes(), sp.PubKey)
+	require.Equal(t, sig, sp.Signature)
+	require.Equal(t, types.SigFormat_SIG_FORMAT_CLI, sp.SigFormat)
+}
+
+func TestBuildProofFromPartial_SingleKey_MissingSig(t *testing.T) {
+	priv := secp256k1.GenPrivKey()
+	pk := priv.PubKey().(*secp256k1.PubKey)
+	side := &SideSpec{
+		PubKey:    base64.StdEncoding.EncodeToString(pk.Bytes()),
+		SigFormat: "SIG_FORMAT_CLI",
+	}
+	_, err := buildProofFromPartial(side, nil, []byte("payload"), sigverify.SubKeyTypeCosmosSecp256k1, "legacy", io.Discard)
+	require.ErrorContains(t, err, "no partial signature")
+}
+
+func TestBuildProofFromPartial_SingleKey_TooMany(t *testing.T) {
+	priv := secp256k1.GenPrivKey()
+	pk := priv.PubKey().(*secp256k1.PubKey)
+	side := &SideSpec{
+		PubKey:    base64.StdEncoding.EncodeToString(pk.Bytes()),
+		SigFormat: "SIG_FORMAT_CLI",
+	}
+	sigs := []PartialSignature{
+		{Index: 0, Signature: "AAAA"},
+		{Index: 0, Signature: "BBBB"},
+	}
+	_, err := buildProofFromPartial(side, sigs, []byte("payload"), sigverify.SubKeyTypeCosmosSecp256k1, "legacy", io.Discard)
+	require.ErrorContains(t, err, "single-key side expects exactly one at index 0")
+}
+
+func TestBuildProofFromPartial_SingleKey_WrongIndex(t *testing.T) {
+	priv := secp256k1.GenPrivKey()
+	pk := priv.PubKey().(*secp256k1.PubKey)
+	side := &SideSpec{
+		PubKey:    base64.StdEncoding.EncodeToString(pk.Bytes()),
+		SigFormat: "SIG_FORMAT_CLI",
+	}
+	sigs := []PartialSignature{{Index: 1, Signature: "AAAA"}}
+	_, err := buildProofFromPartial(side, sigs, []byte("payload"), sigverify.SubKeyTypeCosmosSecp256k1, "legacy", io.Discard)
+	require.ErrorContains(t, err, "index=1")
+	require.ErrorContains(t, err, "expects index=0")
+}
+
+// ---------- buildProofFromPartial — multisig Cosmos side ----------
+
+func TestBuildProofFromPartial_Multisig_Valid2of3(t *testing.T) {
+	privs := []*secp256k1.PrivKey{
+		secp256k1.GenPrivKey(),
+		secp256k1.GenPrivKey(),
+		secp256k1.GenPrivKey(),
+	}
+	payload := []byte("lumera-evm-migration:lumera-test-1:76857769:claim:legacy:new")
+
+	subPubKeys := make([]string, len(privs))
+	for i, p := range privs {
+		subPubKeys[i] = base64.StdEncoding.EncodeToString(p.PubKey().Bytes())
+	}
+
+	// Provide valid sigs at indices 0 and 2.
+	sigs := []PartialSignature{
+		{Index: 0, Signature: base64.StdEncoding.EncodeToString(cosmosSign(t, privs[0], payload))},
+		{Index: 2, Signature: base64.StdEncoding.EncodeToString(cosmosSign(t, privs[2], payload))},
+	}
+	side := &SideSpec{Threshold: 2, SubPubKeys: subPubKeys, SigFormat: "SIG_FORMAT_CLI"}
+
+	proof, err := buildProofFromPartial(side, sigs, payload, sigverify.SubKeyTypeCosmosSecp256k1, "legacy", io.Discard)
+	require.NoError(t, err)
+	mp := proof.GetMultisig()
+	require.NotNil(t, mp)
+	require.Equal(t, []uint32{0, 2}, mp.SignerIndices)
+	require.Len(t, mp.SubSignatures, 2)
+}
+
+func TestBuildProofFromPartial_Multisig_DropsInvalidPartial_SelectsValidHigherIndex(t *testing.T) {
+	privs := []*secp256k1.PrivKey{
+		secp256k1.GenPrivKey(),
+		secp256k1.GenPrivKey(),
+		secp256k1.GenPrivKey(),
+	}
+	payload := []byte("lumera-evm-migration:lumera-test-1:76857769:claim:legacy:new")
+	wrongPayload := []byte("lumera-evm-migration:lumera-test-1:76857769:claim:legacy:WRONG")
+
+	subPubKeys := make([]string, len(privs))
+	for i, p := range privs {
+		subPubKeys[i] = base64.StdEncoding.EncodeToString(p.PubKey().Bytes())
+	}
+
+	// Index 0: signed over the wrong payload — will fail verification.
+	// Indices 1 and 2: valid.
+	sigs := []PartialSignature{
+		{Index: 0, Signature: base64.StdEncoding.EncodeToString(cosmosSign(t, privs[0], wrongPayload))},
+		{Index: 1, Signature: base64.StdEncoding.EncodeToString(cosmosSign(t, privs[1], payload))},
+		{Index: 2, Signature: base64.StdEncoding.EncodeToString(cosmosSign(t, privs[2], payload))},
+	}
+	side := &SideSpec{Threshold: 2, SubPubKeys: subPubKeys, SigFormat: "SIG_FORMAT_CLI"}
+
+	proof, err := buildProofFromPartial(side, sigs, payload, sigverify.SubKeyTypeCosmosSecp256k1, "legacy", io.Discard)
+	require.NoError(t, err)
+	mp := proof.GetMultisig()
+	require.NotNil(t, mp)
+	// Index 0 must be dropped; result must use indices 1 and 2.
+	require.Equal(t, []uint32{1, 2}, mp.SignerIndices)
+	require.Len(t, mp.SubSignatures, 2)
+}
+
+func TestBuildProofFromPartial_Multisig_BelowThresholdAfterDrops(t *testing.T) {
+	privs := []*secp256k1.PrivKey{
+		secp256k1.GenPrivKey(),
+		secp256k1.GenPrivKey(),
+	}
+	payload := []byte("lumera-evm-migration:lumera-test-1:76857769:claim:legacy:new")
+	wrongPayload := []byte("wrong-payload")
+
+	subPubKeys := make([]string, len(privs))
+	for i, p := range privs {
+		subPubKeys[i] = base64.StdEncoding.EncodeToString(p.PubKey().Bytes())
+	}
+
+	// Both sigs signed over wrong payload — both invalid.
+	sigs := []PartialSignature{
+		{Index: 0, Signature: base64.StdEncoding.EncodeToString(cosmosSign(t, privs[0], wrongPayload))},
+		{Index: 1, Signature: base64.StdEncoding.EncodeToString(cosmosSign(t, privs[1], wrongPayload))},
+	}
+	side := &SideSpec{Threshold: 2, SubPubKeys: subPubKeys, SigFormat: "SIG_FORMAT_CLI"}
+
+	_, err := buildProofFromPartial(side, sigs, payload, sigverify.SubKeyTypeCosmosSecp256k1, "legacy", io.Discard)
+	require.ErrorContains(t, err, "need 2 valid partial signatures on legacy side, have 0")
+}
+
+func TestBuildProofFromPartial_Multisig_OutOfRangeIndex_Dropped(t *testing.T) {
+	priv := secp256k1.GenPrivKey()
+	payload := []byte("lumera-evm-migration:lumera-test-1:76857769:claim:legacy:new")
+
+	subPubKeys := []string{
+		base64.StdEncoding.EncodeToString(priv.PubKey().Bytes()),
+	}
+	// Index 5 is out of range for N=1; index 0 is valid.
+	sigs := []PartialSignature{
+		{Index: 0, Signature: base64.StdEncoding.EncodeToString(cosmosSign(t, priv, payload))},
+		{Index: 5, Signature: base64.StdEncoding.EncodeToString(cosmosSign(t, priv, payload))},
+	}
+	side := &SideSpec{Threshold: 1, SubPubKeys: subPubKeys, SigFormat: "SIG_FORMAT_CLI"}
+
+	proof, err := buildProofFromPartial(side, sigs, payload, sigverify.SubKeyTypeCosmosSecp256k1, "legacy", io.Discard)
+	require.NoError(t, err)
+	mp := proof.GetMultisig()
+	require.NotNil(t, mp)
+	// Only index 0 survives; index 5 is dropped.
+	require.Equal(t, []uint32{0}, mp.SignerIndices)
+}
+
+func TestBuildProofFromPartial_Multisig_WrongPubKeyLength(t *testing.T) {
+	// SubPubKeys entry decodes to only 4 bytes — must error.
+	side := &SideSpec{
+		Threshold:  1,
+		SubPubKeys: []string{base64.StdEncoding.EncodeToString([]byte{0x01, 0x02, 0x03, 0x04})},
+		SigFormat:  "SIG_FORMAT_CLI",
+	}
+	_, err := buildProofFromPartial(side, nil, []byte("payload"), sigverify.SubKeyTypeCosmosSecp256k1, "legacy", io.Discard)
+	require.ErrorContains(t, err, "sub_pub_keys[0]")
+	require.ErrorContains(t, err, "expected 33 bytes")
+}
+
+// ---------- buildProofFromPartial — single-key eth side ----------
+
+func TestBuildProofFromPartial_SingleKey_Eth_Valid(t *testing.T) {
+	priv, err := ethsecp256k1.GenerateKey()
+	require.NoError(t, err)
+	pk := priv.PubKey().(*evmcryptotypes.PubKey)
+	payload := []byte("lumera-evm-migration:lumera-test-1:76857769:claim:legacy:new")
+	sig := ethSign(t, priv, payload)
+	require.Len(t, sig, 65)
+
+	// Verify the eth sig verifies (sanity check before feeding buildProofFromPartial).
+	require.NoError(t, sigverify.VerifyEthSecp256k1(pk, sdk.AccAddress(pk.Address()), payload, sig, types.SigFormat_SIG_FORMAT_CLI))
+
+	side := &SideSpec{
+		PubKey:    base64.StdEncoding.EncodeToString(pk.Key),
+		SigFormat: "SIG_FORMAT_CLI",
+	}
+	sigs := []PartialSignature{{Index: 0, Signature: base64.StdEncoding.EncodeToString(sig)}}
+
+	proof, err := buildProofFromPartial(side, sigs, payload, sigverify.SubKeyTypeEthSecp256k1, "new", io.Discard)
+	require.NoError(t, err)
+	sp := proof.GetSingle()
+	require.NotNil(t, sp)
+	require.Equal(t, pk.Key, sp.PubKey)
+}
+
+// ---------- AssertPartialProofsConsistent mismatch ----------
+
+func TestCombineProof_MismatchedPayloads_Rejected(t *testing.T) {
+	// Build two PartialProof files that differ in chain_id. Write each to disk,
+	// then call AssertPartialProofsConsistent directly (no tx config needed).
+	makeProof := func(chainID string) *PartialProof {
+		payload := []byte(ComputePayload(chainID, 76857769, "claim", "lumera1legacy", "lumera1new"))
+		return &PartialProof{
+			Version:                 partialProofVersion,
+			Kind:                    "claim",
+			LegacyAddress:           "lumera1legacy",
+			NewAddress:              "lumera1new",
+			ChainID:                 chainID,
+			EVMChainID:              76857769,
+			PayloadHex:              hex.EncodeToString(payload),
+			Legacy:                  &SideSpec{PubKey: "AAAA", SigFormat: "SIG_FORMAT_CLI"},
+			New:                     &SideSpec{PubKey: "BBBB", SigFormat: "SIG_FORMAT_CLI"},
+			PartialLegacySignatures: []PartialSignature{},
+			PartialNewSignatures:    []PartialSignature{},
+		}
+	}
+
+	a := makeProof("lumera-test-1")
+	b := makeProof("lumera-test-2")
+
+	err := AssertPartialProofsConsistent(a, b)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "chain_id differs")
+}
+
+// ---------- existing tests below (unchanged) ----------
 
 func TestLoadPartialProof_RejectsPayloadFieldMismatch(t *testing.T) {
 	t.Helper()
@@ -50,7 +313,9 @@ func TestLoadPartialProof_RejectsPayloadFieldMismatch(t *testing.T) {
 	require.ErrorContains(t, err, "payload_hex does not match")
 }
 
-func TestAssembleMultisigProof_PrefersValidSubsetWhenExtrasPresent(t *testing.T) {
+// TestBuildProofFromPartial_PrefersValidSubsetWhenExtrasPresent replaces the
+// deleted TestAssembleMultisigProof_PrefersValidSubsetWhenExtrasPresent.
+func TestBuildProofFromPartial_PrefersValidSubsetWhenExtrasPresent(t *testing.T) {
 	privs := []*secp256k1.PrivKey{
 		secp256k1.GenPrivKey(),
 		secp256k1.GenPrivKey(),
@@ -62,9 +327,7 @@ func TestAssembleMultisigProof_PrefersValidSubsetWhenExtrasPresent(t *testing.T)
 	partials := make([]PartialSignature, len(privs))
 	for i, priv := range privs {
 		subPubKeys[i] = base64.StdEncoding.EncodeToString(priv.PubKey().Bytes())
-		hash := sha256.Sum256(payload)
-		sig, err := priv.Sign(hash[:])
-		require.NoError(t, err)
+		sig := cosmosSign(t, priv, payload)
 		partials[i] = PartialSignature{
 			Index:     uint32(i),
 			Signature: base64.StdEncoding.EncodeToString(sig),
@@ -83,10 +346,12 @@ func TestAssembleMultisigProof_PrefersValidSubsetWhenExtrasPresent(t *testing.T)
 		SubPubKeys: subPubKeys,
 		SigFormat:  "SIG_FORMAT_CLI",
 	}
-	proof, err := assembleMultisigProof(ss, payload, partials)
+	proof, err := buildProofFromPartial(ss, partials, payload, sigverify.SubKeyTypeCosmosSecp256k1, "legacy", io.Discard)
 	require.NoError(t, err)
-	require.Equal(t, []uint32{1, 2}, proof.SignerIndices)
-	require.Len(t, proof.SubSignatures, 2)
+	mp := proof.GetMultisig()
+	require.NotNil(t, mp)
+	require.Equal(t, []uint32{1, 2}, mp.SignerIndices)
+	require.Len(t, mp.SubSignatures, 2)
 }
 
 // ---------- upsertSig tests ----------

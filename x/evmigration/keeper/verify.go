@@ -224,6 +224,13 @@ func verifyMultisigProofSide(payload []byte, boundAddr sdk.AccAddress, m *types.
 			if err := sigverify.VerifyEthSecp256k1(pk, signerAddr, payload, m.SubSignatures[i], m.SigFormat); err != nil {
 				return types.ErrInvalidMigrationSignature.Wrapf("sub-sig %d (signer %s) invalid: %s", i, signerAddr, err)
 			}
+		default:
+			// Provably unreachable today — the construction loop above only produces
+			// *secp256k1.PubKey or *ethsecp256k1.PubKey entries. This default arm is
+			// a permanent safety hedge: if a future task adds a third sub-key type
+			// to the construction switch and forgets to update this verification
+			// switch, we return an error instead of silently skipping sig check.
+			return types.ErrInvalidMigrationPubKey.Wrapf("unexpected sub-key type %T at index %d (should be unreachable)", pk, idx)
 		}
 	}
 	return nil

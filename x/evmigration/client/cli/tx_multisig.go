@@ -644,20 +644,20 @@ func cmdCombineProof() *cobra.Command {
 				}
 			}
 
-			var legacyProof types.LegacyProof
+			var legacyProof types.MigrationProof
 			switch {
 			case merged.Single != nil:
 				sp, err := assembleSingleProof(merged.Single, merged.PartialSigs)
 				if err != nil {
 					return err
 				}
-				legacyProof = types.LegacyProof{Proof: &types.LegacyProof_Single{Single: sp}}
+				legacyProof = types.MigrationProof{Proof: &types.MigrationProof_Single{Single: sp}}
 			case merged.Multisig != nil:
 				mp, err := assembleMultisigProof(merged.Multisig, canonicalPayloadBytes(merged), merged.PartialSigs)
 				if err != nil {
 					return err
 				}
-				legacyProof = types.LegacyProof{Proof: &types.LegacyProof_Multisig{Multisig: mp}}
+				legacyProof = types.MigrationProof{Proof: &types.MigrationProof_Multisig{Multisig: mp}}
 			}
 
 			if err := legacyProof.ValidateBasic(); err != nil {

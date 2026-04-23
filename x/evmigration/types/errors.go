@@ -16,15 +16,19 @@ var (
 	ErrCannotMigrateModuleAccount = errors.Register(ModuleName, 1107, "cannot migrate a module account")
 	ErrUseValidatorMigration      = errors.Register(ModuleName, 1108, "legacy address is a validator operator; use MsgMigrateValidator instead")
 	ErrLegacyAccountNotFound      = errors.Register(ModuleName, 1109, "legacy account not found in x/auth")
-	ErrInvalidLegacyPubKey        = errors.Register(ModuleName, 1110, "invalid legacy public key")
-	ErrPubKeyAddressMismatch      = errors.Register(ModuleName, 1111, "legacy public key does not derive to legacy address")
-	ErrInvalidLegacySignature     = errors.Register(ModuleName, 1112, "legacy signature verification failed")
-	ErrNotValidator               = errors.Register(ModuleName, 1113, "legacy address is not a validator operator")
-	ErrValidatorUnbonding         = errors.Register(ModuleName, 1114, "validator is unbonding or unbonded; wait for completion")
-	ErrTooManyDelegators          = errors.Register(ModuleName, 1115, "validator has too many delegators; exceeds max_validator_delegations")
-	ErrInvalidNewPubKey           = errors.Register(ModuleName, 1116, "invalid new public key")
-	ErrNewPubKeyAddressMismatch   = errors.Register(ModuleName, 1117, "new signature does not derive to new address")
-	ErrInvalidNewSignature        = errors.Register(ModuleName, 1118, "new signature verification failed")
-	ErrNewAddressAlreadyUsed      = errors.Register(ModuleName, 1119, "new address was already used as a migration destination")
-	ErrInvalidLegacyProof         = errors.Register(ModuleName, 1120, "invalid legacy proof")
+
+	ErrInvalidMigrationPubKey    = errors.Register(ModuleName, 1110, "invalid public key in migration proof")
+	ErrPubKeyAddressMismatch     = errors.Register(ModuleName, 1111, "public key does not derive to claimed address")
+	ErrInvalidMigrationSignature = errors.Register(ModuleName, 1112, "migration signature verification failed")
+
+	ErrNotValidator       = errors.Register(ModuleName, 1113, "legacy address is not a validator operator")
+	ErrValidatorUnbonding = errors.Register(ModuleName, 1114, "validator is unbonding or unbonded; wait for completion")
+	ErrTooManyDelegators  = errors.Register(ModuleName, 1115, "validator has too many delegators; exceeds max_validator_delegations")
+
+	// Codes 1116, 1117, 1118 left intentionally unregistered — reclaimed from the
+	// side-specific ErrInvalidNewPubKey / ErrNewPubKeyAddressMismatch / ErrInvalidNewSignature
+	// which no longer exist. Do not reuse these codes in this module.
+
+	ErrNewAddressAlreadyUsed = errors.Register(ModuleName, 1119, "new address was already used as a migration destination")
+	ErrInvalidMigrationProof = errors.Register(ModuleName, 1120, "invalid migration proof")
 )

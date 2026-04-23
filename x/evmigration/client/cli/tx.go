@@ -134,7 +134,7 @@ func resolveClaimMsg(cmd *cobra.Command, legacyKeyName, newKeyName string) (*typ
 	return &types.MsgClaimLegacyAccount{
 		NewAddress:    newAddr,
 		LegacyAddress: legacyAddr,
-		LegacyProof: types.LegacyProof{Proof: &types.LegacyProof_Single{Single: &types.SingleKeyProof{
+		LegacyProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
 			PubKey:    pubKey,
 			Signature: sig,
 			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
@@ -155,7 +155,7 @@ func resolveValidatorMsg(cmd *cobra.Command, legacyKeyName, newKeyName string) (
 	return &types.MsgMigrateValidator{
 		NewAddress:    newAddr,
 		LegacyAddress: legacyAddr,
-		LegacyProof: types.LegacyProof{Proof: &types.LegacyProof_Single{Single: &types.SingleKeyProof{
+		LegacyProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
 			PubKey:    pubKey,
 			Signature: sig,
 			SigFormat: types.SigFormat_SIG_FORMAT_CLI,

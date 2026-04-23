@@ -72,15 +72,15 @@ func verifySecp256k1Sig(pk *secp256k1.PubKey, signerAddr sdk.AccAddress, payload
 			return nil
 		}
 	default:
-		return types.ErrInvalidLegacyProof.Wrap("sig_format unspecified")
+		return types.ErrInvalidMigrationProof.Wrap("sig_format unspecified")
 	}
-	return types.ErrInvalidLegacySignature
+	return types.ErrInvalidMigrationSignature
 }
 
 // verifySingleKeyProof validates a SingleKeyProof against the migration payload.
 func verifySingleKeyProof(payload []byte, legacyAddr sdk.AccAddress, p *types.SingleKeyProof) error {
 	if len(p.PubKey) != secp256k1.PubKeySize {
-		return types.ErrInvalidLegacyPubKey.Wrapf("expected %d bytes, got %d", secp256k1.PubKeySize, len(p.PubKey))
+		return types.ErrInvalidMigrationPubKey.Wrapf("expected %d bytes, got %d", secp256k1.PubKeySize, len(p.PubKey))
 	}
 	pk := &secp256k1.PubKey{Key: p.PubKey}
 	derived := sdk.AccAddress(pk.Address())
@@ -99,7 +99,7 @@ func verifyMultisigProof(payload []byte, legacyAddr sdk.AccAddress, m *types.Mul
 	subPubKeys := make([]cryptotypes.PubKey, len(m.SubPubKeys))
 	for i, raw := range m.SubPubKeys {
 		if len(raw) != secp256k1.PubKeySize {
-			return types.ErrInvalidLegacyPubKey.Wrapf("sub_pub_keys[%d]: expected %d bytes, got %d",
+			return types.ErrInvalidMigrationPubKey.Wrapf("sub_pub_keys[%d]: expected %d bytes, got %d",
 				i, secp256k1.PubKeySize, len(raw))
 		}
 		subPubKeys[i] = &secp256k1.PubKey{Key: raw}
@@ -112,16 +112,16 @@ func verifyMultisigProof(payload []byte, legacyAddr sdk.AccAddress, m *types.Mul
 	}
 	for i, idx := range m.SignerIndices {
 		if int(idx) >= len(subPubKeys) {
-			return types.ErrInvalidLegacyProof.Wrapf(
+			return types.ErrInvalidMigrationProof.Wrapf(
 				"signer_indices[%d]=%d out of range", i, idx)
 		}
 		signerPK, ok := subPubKeys[idx].(*secp256k1.PubKey)
 		if !ok {
-			return types.ErrInvalidLegacyPubKey.Wrap("sub-key not secp256k1 (should be unreachable)")
+			return types.ErrInvalidMigrationPubKey.Wrap("sub-key not secp256k1 (should be unreachable)")
 		}
 		signerAddr := sdk.AccAddress(signerPK.Address())
 		if err := verifySecp256k1Sig(signerPK, signerAddr, payload, m.SubSignatures[i], m.SigFormat); err != nil {
-			return types.ErrInvalidLegacySignature.Wrapf(
+			return types.ErrInvalidMigrationSignature.Wrapf(
 				"sub-sig %d (signer %s) invalid: %s", i, signerAddr, err)
 		}
 	}
@@ -130,7 +130,7 @@ func verifyMultisigProof(payload []byte, legacyAddr sdk.AccAddress, m *types.Mul
 
 // VerifyLegacyProof verifies a migration proof against the canonical payload.
 // Replaces the previous VerifyLegacySignature; the new shape accommodates
-// both single-key and multisig legacy accounts via the LegacyProof oneof.
+// both single-key and multisig legacy accounts via the MigrationProof oneof.
 //
 // Param-dependent limits (MaxMultisigSubKeys) must be enforced by the caller
 // via proof.ValidateParams(params.MaxMultisigSubKeys) before invoking this
@@ -138,22 +138,22 @@ func verifyMultisigProof(payload []byte, legacyAddr sdk.AccAddress, m *types.Mul
 func VerifyLegacyProof(
 	chainID string, evmChainID uint64, kind string,
 	legacyAddr, newAddr sdk.AccAddress,
-	proof *types.LegacyProof,
+	proof *types.MigrationProof,
 ) error {
 	if proof == nil {
-		return types.ErrInvalidLegacyProof.Wrap("legacy_proof required")
+		return types.ErrInvalidMigrationProof.Wrap("legacy_proof required")
 	}
 	if err := proof.ValidateBasic(); err != nil {
 		return err
 	}
 	payload := migrationPayload(chainID, evmChainID, kind, legacyAddr, newAddr)
 	switch p := proof.Proof.(type) {
-	case *types.LegacyProof_Single:
+	case *types.MigrationProof_Single:
 		return verifySingleKeyProof(payload, legacyAddr, p.Single)
-	case *types.LegacyProof_Multisig:
+	case *types.MigrationProof_Multisig:
 		return verifyMultisigProof(payload, legacyAddr, p.Multisig)
 	default:
-		return types.ErrInvalidLegacyProof.Wrap("no proof set")
+		return types.ErrInvalidMigrationProof.Wrap("no proof set")
 	}
 }
 
@@ -172,11 +172,11 @@ func normalizeRecoverySignatures(signature []byte) ([][]byte, error) {
 			candidate[64] -= 27
 		}
 		if candidate[64] > 3 {
-			return nil, types.ErrInvalidNewSignature.Wrapf("unsupported recovery id %d", signature[64])
+			return nil, types.ErrInvalidMigrationSignature.Wrapf("unsupported recovery id %d", signature[64])
 		}
 		return [][]byte{candidate}, nil
 	default:
-		return nil, types.ErrInvalidNewSignature.Wrapf("expected 64 or 65 bytes, got %d", len(signature))
+		return nil, types.ErrInvalidMigrationSignature.Wrapf("expected 64 or 65 bytes, got %d", len(signature))
 	}
 }
 
@@ -203,7 +203,7 @@ func recoverDerivedNewAddresses(hash []byte, signature []byte) ([]sdk.AccAddress
 	if lastErr != nil {
 		return nil, lastErr
 	}
-	return nil, types.ErrInvalidNewSignature
+	return nil, types.ErrInvalidMigrationSignature
 }
 
 func findMatchingRecoveredAddress(hash []byte, signature []byte, expected sdk.AccAddress) (sdk.AccAddress, bool, error) {
@@ -243,11 +243,11 @@ func VerifyNewSignature(chainID string, evmChainID uint64, kind string, legacyAd
 			if eip191OK {
 				return nil
 			}
-			return types.ErrNewPubKeyAddressMismatch.Wrapf(
+			return types.ErrPubKeyAddressMismatch.Wrapf(
 				"recovered signer derives to %s, expected %s%s", eip191DerivedAddr, newAddr, chainIDHint,
 			)
 		}
-		return types.ErrNewPubKeyAddressMismatch.Wrapf(
+		return types.ErrPubKeyAddressMismatch.Wrapf(
 			"recovered signer derives to %s, expected %s%s", derivedAddr, newAddr, chainIDHint,
 		)
 	}
@@ -257,12 +257,12 @@ func VerifyNewSignature(chainID string, evmChainID uint64, kind string, legacyAd
 		if ok {
 			return nil
 		}
-		return types.ErrNewPubKeyAddressMismatch.Wrapf(
+		return types.ErrPubKeyAddressMismatch.Wrapf(
 			"recovered signer derives to %s, expected %s%s", derivedAddr, newAddr, chainIDHint,
 		)
 	}
 
-	return types.ErrInvalidNewSignature.Wrapf(
+	return types.ErrInvalidMigrationSignature.Wrapf(
 		"payload was signed for chain-id %q; verify the --chain-id flag matches the target chain", chainID,
 	)
 }

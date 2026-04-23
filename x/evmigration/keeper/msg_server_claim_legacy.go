@@ -51,7 +51,11 @@ func (ms msgServer) ClaimLegacyAccount(goCtx context.Context, msg *types.MsgClai
 	if err := VerifyLegacyProof(ctx.ChainID(), lcfg.EVMChainID, migrationPayloadKindClaim, legacyAddr, newAddr, &msg.LegacyProof); err != nil {
 		return nil, err
 	}
-	if err := VerifyNewSignature(ctx.ChainID(), lcfg.EVMChainID, migrationPayloadKindClaim, legacyAddr, newAddr, msg.NewSignature); err != nil {
+	var newSig []byte
+	if s := msg.NewProof.GetSingle(); s != nil {
+		newSig = s.Signature
+	}
+	if err := VerifyNewSignature(ctx.ChainID(), lcfg.EVMChainID, migrationPayloadKindClaim, legacyAddr, newAddr, newSig); err != nil {
 		return nil, err
 	}
 

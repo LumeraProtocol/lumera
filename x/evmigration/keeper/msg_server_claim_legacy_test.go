@@ -47,12 +47,15 @@ func newClaimMigrationMsg(
 	return &types.MsgClaimLegacyAccount{
 		LegacyAddress: legacyAddr.String(),
 		NewAddress:    newAddr.String(),
-		LegacyProof: types.LegacyProof{Proof: &types.LegacyProof_Single{Single: &types.SingleKeyProof{
+		LegacyProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
 			PubKey:    legacyPrivKey.PubKey().(*secp256k1.PubKey).Key,
 			Signature: signMigrationMessage(t, legacyPrivKey, legacyAddr, newAddr),
 			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
 		}}},
-		NewSignature: signNewMigrationMessage(t, keeperClaimKind, newPrivKey, legacyAddr, newAddr),
+		NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
+			Signature: signNewMigrationMessage(t, keeperClaimKind, newPrivKey, legacyAddr, newAddr),
+			SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
+		}}},
 	}
 }
 
@@ -68,12 +71,15 @@ func newValidatorMigrationMsg(
 	return &types.MsgMigrateValidator{
 		LegacyAddress: legacyAddr.String(),
 		NewAddress:    newAddr.String(),
-		LegacyProof: types.LegacyProof{Proof: &types.LegacyProof_Single{Single: &types.SingleKeyProof{
+		LegacyProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
 			PubKey:    legacyPrivKey.PubKey().(*secp256k1.PubKey).Key,
 			Signature: signLegacyMigrationMessage(t, keeperValidatorKind, legacyPrivKey, legacyAddr, newAddr),
 			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
 		}}},
-		NewSignature: signNewMigrationMessage(t, keeperValidatorKind, newPrivKey, legacyAddr, newAddr),
+		NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
+			Signature: signNewMigrationMessage(t, keeperValidatorKind, newPrivKey, legacyAddr, newAddr),
+			SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
+		}}},
 	}
 }
 
@@ -256,12 +262,15 @@ func TestPreChecks_NewAddressWasMigrated(t *testing.T) {
 	msg := &types.MsgClaimLegacyAccount{
 		LegacyAddress: legacyAddr.String(),
 		NewAddress:    newAddr.String(),
-		LegacyProof: types.LegacyProof{Proof: &types.LegacyProof_Single{Single: &types.SingleKeyProof{
+		LegacyProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
 			PubKey:    privKey.PubKey().(*secp256k1.PubKey).Key,
 			Signature: signMigrationMessage(t, privKey, legacyAddr, newAddr),
 			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
 		}}},
-		NewSignature: signNewMigrationMessage(t, keeperClaimKind, newPrivKey, legacyAddr, newAddr),
+		NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
+			Signature: signNewMigrationMessage(t, keeperClaimKind, newPrivKey, legacyAddr, newAddr),
+			SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
+		}}},
 	}
 
 	_, err := f.msgServer.ClaimLegacyAccount(f.ctx, msg)
@@ -283,12 +292,15 @@ func TestPreChecks_NewAddressAlreadyUsed(t *testing.T) {
 	msg := &types.MsgClaimLegacyAccount{
 		LegacyAddress: legacyAddr.String(),
 		NewAddress:    newAddr.String(),
-		LegacyProof: types.LegacyProof{Proof: &types.LegacyProof_Single{Single: &types.SingleKeyProof{
+		LegacyProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
 			PubKey:    privKey.PubKey().(*secp256k1.PubKey).Key,
 			Signature: signMigrationMessage(t, privKey, legacyAddr, newAddr),
 			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
 		}}},
-		NewSignature: signNewMigrationMessage(t, keeperClaimKind, newPrivKey, legacyAddr, newAddr),
+		NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
+			Signature: signNewMigrationMessage(t, keeperClaimKind, newPrivKey, legacyAddr, newAddr),
+			SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
+		}}},
 	}
 
 	_, err := f.msgServer.ClaimLegacyAccount(f.ctx, msg)
@@ -352,12 +364,15 @@ func TestClaimLegacyAccount_ValidatorMustUseMigrateValidator(t *testing.T) {
 	msg := &types.MsgClaimLegacyAccount{
 		LegacyAddress: legacyAddr.String(),
 		NewAddress:    newAddr.String(),
-		LegacyProof: types.LegacyProof{Proof: &types.LegacyProof_Single{Single: &types.SingleKeyProof{
+		LegacyProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
 			PubKey:    privKey.PubKey().(*secp256k1.PubKey).Key,
 			Signature: signMigrationMessage(t, privKey, legacyAddr, newAddr),
 			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
 		}}},
-		NewSignature: signNewMigrationMessage(t, keeperClaimKind, newPrivKey, legacyAddr, newAddr),
+		NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
+			Signature: signNewMigrationMessage(t, keeperClaimKind, newPrivKey, legacyAddr, newAddr),
+			SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
+		}}},
 	}
 
 	_, err := f.msgServer.ClaimLegacyAccount(f.ctx, msg)
@@ -384,10 +399,10 @@ func TestClaimLegacyAccount_InvalidSignature(t *testing.T) {
 	)
 
 	msg := newClaimMigrationMsg(t, privKey, legacyAddr, newPrivKey, newAddr)
-	msg.LegacyProof.Proof.(*types.LegacyProof_Single).Single.Signature = []byte("bad-signature")
+	msg.LegacyProof.Proof.(*types.MigrationProof_Single).Single.Signature = []byte("bad-signature")
 
 	_, err := f.msgServer.ClaimLegacyAccount(f.ctx, msg)
-	require.ErrorIs(t, err, types.ErrInvalidLegacySignature)
+	require.ErrorIs(t, err, types.ErrInvalidMigrationSignature)
 }
 
 // TestClaimLegacyAccount_Success verifies the full happy-path claim flow:
@@ -548,12 +563,15 @@ func TestClaimLegacyAccount_MigratedThirdPartyWithdrawAddress(t *testing.T) {
 	msg := &types.MsgClaimLegacyAccount{
 		LegacyAddress: legacyAddr.String(),
 		NewAddress:    newAddr.String(),
-		LegacyProof: types.LegacyProof{Proof: &types.LegacyProof_Single{Single: &types.SingleKeyProof{
+		LegacyProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
 			PubKey:    pubKey.Key,
 			Signature: signMigrationMessage(t, privKey, legacyAddr, newAddr),
 			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
 		}}},
-		NewSignature: signNewMigrationMessage(t, keeperClaimKind, newPrivKey, legacyAddr, newAddr),
+		NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
+			Signature: signNewMigrationMessage(t, keeperClaimKind, newPrivKey, legacyAddr, newAddr),
+			SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
+		}}},
 	}
 
 	resp, err := f.msgServer.ClaimLegacyAccount(f.ctx, msg)
@@ -1220,12 +1238,15 @@ func TestClaimLegacyAccount_WithDelegations(t *testing.T) {
 	msg := &types.MsgClaimLegacyAccount{
 		LegacyAddress: legacyAddr.String(),
 		NewAddress:    newAddr.String(),
-		LegacyProof: types.LegacyProof{Proof: &types.LegacyProof_Single{Single: &types.SingleKeyProof{
+		LegacyProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
 			PubKey:    pubKey.Key,
 			Signature: signMigrationMessage(t, privKey, legacyAddr, newAddr),
 			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
 		}}},
-		NewSignature: signNewMigrationMessage(t, keeperClaimKind, newPrivKey, legacyAddr, newAddr),
+		NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
+			Signature: signNewMigrationMessage(t, keeperClaimKind, newPrivKey, legacyAddr, newAddr),
+			SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
+		}}},
 	}
 
 	resp, err := f.msgServer.ClaimLegacyAccount(f.ctx, msg)

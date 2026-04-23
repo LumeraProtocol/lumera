@@ -239,13 +239,13 @@ func TestMultisigProof_ValidateParams_SizeCap(t *testing.T) {
 	require.NoError(t, types.MultisigProofValidateParams(proof, 20))
 }
 
-func TestLegacyProof_ValidateBasic_Dispatch(t *testing.T) {
+func TestMigrationProof_ValidateBasic_Dispatch(t *testing.T) {
 	validPK := make([]byte, 33)
 	validSig := make([]byte, 64)
 
 	t.Run("single", func(t *testing.T) {
-		p := &types.LegacyProof{
-			Proof: &types.LegacyProof_Single{Single: &types.SingleKeyProof{
+		p := &types.MigrationProof{
+			Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
 				PubKey: validPK, Signature: validSig, SigFormat: types.SigFormat_SIG_FORMAT_CLI,
 			}},
 		}
@@ -255,8 +255,8 @@ func TestLegacyProof_ValidateBasic_Dispatch(t *testing.T) {
 		subKeys := [][]byte{make([]byte, 33), make([]byte, 33)}
 		subKeys[0][0] = 1
 		subKeys[1][0] = 2
-		p := &types.LegacyProof{
-			Proof: &types.LegacyProof_Multisig{Multisig: &types.MultisigProof{
+		p := &types.MigrationProof{
+			Proof: &types.MigrationProof_Multisig{Multisig: &types.MultisigProof{
 				Threshold:     1,
 				SubPubKeys:    subKeys,
 				SignerIndices: []uint32{0},
@@ -267,13 +267,13 @@ func TestLegacyProof_ValidateBasic_Dispatch(t *testing.T) {
 		require.NoError(t, p.ValidateBasic())
 	})
 	t.Run("neither set", func(t *testing.T) {
-		p := &types.LegacyProof{}
+		p := &types.MigrationProof{}
 		err := p.ValidateBasic()
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "oneof not set")
 	})
 	t.Run("nil proof", func(t *testing.T) {
-		var p *types.LegacyProof
+		var p *types.MigrationProof
 		err := p.ValidateBasic()
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "legacy_proof required")

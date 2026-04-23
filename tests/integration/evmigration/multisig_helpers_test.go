@@ -45,7 +45,7 @@ func SignMultisigProof(
 	signerIdxs []int,
 	legacyAddr, newAddr sdk.AccAddress,
 	format types.SigFormat,
-) *types.LegacyProof {
+) *types.MigrationProof {
 	t.Helper()
 	payload := fmt.Sprintf("lumera-evm-migration:%s:%d:%s:%s:%s",
 		chainID, lcfg.EVMChainID, kind, legacyAddr.String(), newAddr.String())
@@ -74,7 +74,7 @@ func SignMultisigProof(
 	for i, p := range multiPK.GetPubKeys() {
 		subPubKeys[i] = p.Bytes()
 	}
-	return &types.LegacyProof{Proof: &types.LegacyProof_Multisig{Multisig: &types.MultisigProof{
+	return &types.MigrationProof{Proof: &types.MigrationProof_Multisig{Multisig: &types.MultisigProof{
 		Threshold:     uint32(multiPK.Threshold),
 		SubPubKeys:    subPubKeys,
 		SignerIndices: indices,

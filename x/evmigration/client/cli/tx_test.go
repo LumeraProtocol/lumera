@@ -73,7 +73,7 @@ func clientCtxWithKeyring(kr keyring.Keyring) client.Context {
 
 // ---------- signLegacyProofFromKeyring tests ----------
 
-func TestSignLegacyProof_ValidKeys(t *testing.T) {
+func TestSignMigrationProof_ValidKeys(t *testing.T) {
 	kr := newTestKeyring(t)
 	addLegacyKey(t, kr, "legacy", testMnemonic)
 	evmRec := addEVMKey(t, kr, "evm", testMnemonic)
@@ -95,7 +95,7 @@ func TestSignLegacyProof_ValidKeys(t *testing.T) {
 	require.True(t, legacyPK.VerifySignature(hash[:], sig), "legacy signature must verify")
 }
 
-func TestSignLegacyProof_ValidatorKind(t *testing.T) {
+func TestSignMigrationProof_ValidatorKind(t *testing.T) {
 	kr := newTestKeyring(t)
 	addLegacyKey(t, kr, "legacy", testMnemonic)
 	addEVMKey(t, kr, "evm", testMnemonic)
@@ -113,7 +113,7 @@ func TestSignLegacyProof_ValidatorKind(t *testing.T) {
 	require.True(t, legacyPK.VerifySignature(hash[:], sig))
 }
 
-func TestSignLegacyProof_LegacyKeyNotFound(t *testing.T) {
+func TestSignMigrationProof_LegacyKeyNotFound(t *testing.T) {
 	kr := newTestKeyring(t)
 	addEVMKey(t, kr, "evm", testMnemonic)
 
@@ -123,7 +123,7 @@ func TestSignLegacyProof_LegacyKeyNotFound(t *testing.T) {
 	require.ErrorContains(t, err, "not found in keyring")
 }
 
-func TestSignLegacyProof_NewKeyNotFound(t *testing.T) {
+func TestSignMigrationProof_NewKeyNotFound(t *testing.T) {
 	kr := newTestKeyring(t)
 	addLegacyKey(t, kr, "legacy", testMnemonic)
 
@@ -134,7 +134,7 @@ func TestSignLegacyProof_NewKeyNotFound(t *testing.T) {
 	require.ErrorContains(t, err, "not found in keyring")
 }
 
-func TestSignLegacyProof_WrongKeyType_EthSecp256k1(t *testing.T) {
+func TestSignMigrationProof_WrongKeyType_EthSecp256k1(t *testing.T) {
 	kr := newTestKeyring(t)
 	// Import as eth_secp256k1 (coin-type 60) for both — the legacy key must be secp256k1.
 	addEVMKey(t, kr, "wrong-legacy", testMnemonic)
@@ -151,7 +151,7 @@ func TestSignLegacyProof_WrongKeyType_EthSecp256k1(t *testing.T) {
 	require.ErrorContains(t, err, "coin-type 118")
 }
 
-func TestSignLegacyProof_SameAddressRejected(t *testing.T) {
+func TestSignMigrationProof_SameAddressRejected(t *testing.T) {
 	kr := newTestKeyring(t)
 	// Import the same key as both legacy secp256k1 and as "new".
 	// This shouldn't normally produce the same address (different key types),
@@ -165,7 +165,7 @@ func TestSignLegacyProof_SameAddressRejected(t *testing.T) {
 	require.ErrorContains(t, err, "identical")
 }
 
-func TestSignLegacyProof_DifferentMnemonics(t *testing.T) {
+func TestSignMigrationProof_DifferentMnemonics(t *testing.T) {
 	kr := newTestKeyring(t)
 	addLegacyKey(t, kr, "legacy", testMnemonic)
 
@@ -181,7 +181,7 @@ func TestSignLegacyProof_DifferentMnemonics(t *testing.T) {
 	require.NotEqual(t, newAddr, legacyAddr)
 }
 
-func TestSignLegacyProof_ChainIDInPayload(t *testing.T) {
+func TestSignMigrationProof_ChainIDInPayload(t *testing.T) {
 	kr := newTestKeyring(t)
 	addLegacyKey(t, kr, "legacy", testMnemonic)
 	addEVMKey(t, kr, "evm", testMnemonic)
@@ -298,7 +298,7 @@ func TestGasAdjustment_DefaultOverriddenTo1_5(t *testing.T) {
 
 // ---------- integration: signLegacyProof signature verification ----------
 
-func TestSignLegacyProof_SignatureVerifiesWithPubKey(t *testing.T) {
+func TestSignMigrationProof_SignatureVerifiesWithPubKey(t *testing.T) {
 	// Full round-trip: generate proof, then verify the signature independently.
 	kr := newTestKeyring(t)
 	addLegacyKey(t, kr, "legacy", testMnemonic)
@@ -319,7 +319,7 @@ func TestSignLegacyProof_SignatureVerifiesWithPubKey(t *testing.T) {
 	require.True(t, legacyPK.VerifySignature(hash[:], sig))
 }
 
-func TestSignLegacyProof_PubKeyDerivedAddressMatchesReturned(t *testing.T) {
+func TestSignMigrationProof_PubKeyDerivedAddressMatchesReturned(t *testing.T) {
 	kr := newTestKeyring(t)
 	legacyRec := addLegacyKey(t, kr, "legacy", testMnemonic)
 	addEVMKey(t, kr, "evm", testMnemonic)
@@ -351,7 +351,7 @@ func TestSignNewProof_OutputIsEthSecp256k1(t *testing.T) {
 
 // ---------- edge case: multiple keys same keyring ----------
 
-func TestSignLegacyProof_MultipleKeysInKeyring(t *testing.T) {
+func TestSignMigrationProof_MultipleKeysInKeyring(t *testing.T) {
 	kr := newTestKeyring(t)
 	// Import two different mnemonics.
 	addLegacyKey(t, kr, "legacy-1", testMnemonic)
@@ -376,7 +376,7 @@ func TestSignLegacyProof_MultipleKeysInKeyring(t *testing.T) {
 
 // ---------- edge case: proof kind affects payload ----------
 
-func TestSignLegacyProof_DifferentKindsDifferentSignatures(t *testing.T) {
+func TestSignMigrationProof_DifferentKindsDifferentSignatures(t *testing.T) {
 	kr := newTestKeyring(t)
 	addLegacyKey(t, kr, "legacy", testMnemonic)
 	addEVMKey(t, kr, "evm", testMnemonic)
@@ -410,7 +410,7 @@ func TestSignNewProof_RejectsNonEVMKey(t *testing.T) {
 
 // ---------- signLegacyProof: returned pubkey is correct type ----------
 
-func TestSignLegacyProof_ReturnedPubKeyIsSecp256k1(t *testing.T) {
+func TestSignMigrationProof_ReturnedPubKeyIsSecp256k1(t *testing.T) {
 	kr := newTestKeyring(t)
 	addLegacyKey(t, kr, "legacy", testMnemonic)
 	addEVMKey(t, kr, "evm", testMnemonic)

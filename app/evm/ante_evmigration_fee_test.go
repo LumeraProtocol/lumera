@@ -102,11 +102,14 @@ func validMigrationMsg(t *testing.T) *evmigrationtypes.MsgClaimLegacyAccount {
 	return &evmigrationtypes.MsgClaimLegacyAccount{
 		LegacyAddress: legacy.String(),
 		NewAddress:    newAddr.String(),
-		LegacyProof: evmigrationtypes.LegacyProof{Proof: &evmigrationtypes.LegacyProof_Single{Single: &evmigrationtypes.SingleKeyProof{
+		LegacyProof: evmigrationtypes.MigrationProof{Proof: &evmigrationtypes.MigrationProof_Single{Single: &evmigrationtypes.SingleKeyProof{
 			PubKey:    make([]byte, 33),
 			Signature: []byte{1},
 			SigFormat: evmigrationtypes.SigFormat_SIG_FORMAT_CLI,
 		}}},
-		NewSignature: []byte{1},
+		NewProof: evmigrationtypes.MigrationProof{Proof: &evmigrationtypes.MigrationProof_Single{Single: &evmigrationtypes.SingleKeyProof{
+			Signature: []byte{1},
+			SigFormat: evmigrationtypes.SigFormat_SIG_FORMAT_EIP191,
+		}}},
 	}
 }

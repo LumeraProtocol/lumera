@@ -15,10 +15,10 @@ func validAddr() string {
 	return sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address()).String()
 }
 
-// validSingleProof returns a LegacyProof with a well-formed SingleKeyProof.
-func validSingleProof(pub *secp256k1.PubKey) types.LegacyProof {
-	return types.LegacyProof{
-		Proof: &types.LegacyProof_Single{Single: &types.SingleKeyProof{
+// validSingleProof returns a MigrationProof with a well-formed SingleKeyProof.
+func validSingleProof(pub *secp256k1.PubKey) types.MigrationProof {
+	return types.MigrationProof{
+		Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
 			PubKey:    pub.Key,
 			Signature: []byte("sig"),
 			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
@@ -93,7 +93,10 @@ func TestMsgClaimLegacyAccount_ValidateBasic(t *testing.T) {
 				NewAddress:    newAddr,
 				LegacyAddress: legacyAddr,
 				LegacyProof:   goodProof,
-				NewSignature:  []byte("new-sig"),
+				NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
+					Signature: []byte("new-sig"),
+					SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
+				}}},
 			},
 		},
 		{
@@ -102,7 +105,10 @@ func TestMsgClaimLegacyAccount_ValidateBasic(t *testing.T) {
 				NewAddress:    "bad",
 				LegacyAddress: legacyAddr,
 				LegacyProof:   goodProof,
-				NewSignature:  []byte("new-sig"),
+				NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
+					Signature: []byte("new-sig"),
+					SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
+				}}},
 			},
 			wantErr: sdkerrors.ErrInvalidAddress,
 		},
@@ -112,7 +118,10 @@ func TestMsgClaimLegacyAccount_ValidateBasic(t *testing.T) {
 				NewAddress:    newAddr,
 				LegacyAddress: "bad",
 				LegacyProof:   goodProof,
-				NewSignature:  []byte("new-sig"),
+				NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
+					Signature: []byte("new-sig"),
+					SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
+				}}},
 			},
 			wantErr: sdkerrors.ErrInvalidAddress,
 		},
@@ -122,7 +131,10 @@ func TestMsgClaimLegacyAccount_ValidateBasic(t *testing.T) {
 				NewAddress:    legacyAddr,
 				LegacyAddress: legacyAddr,
 				LegacyProof:   goodProof,
-				NewSignature:  []byte("new-sig"),
+				NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
+					Signature: []byte("new-sig"),
+					SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
+				}}},
 			},
 			wantErr: types.ErrSameAddress,
 		},
@@ -131,32 +143,38 @@ func TestMsgClaimLegacyAccount_ValidateBasic(t *testing.T) {
 			msg: types.MsgClaimLegacyAccount{
 				NewAddress:    newAddr,
 				LegacyAddress: legacyAddr,
-				LegacyProof: types.LegacyProof{
-					Proof: &types.LegacyProof_Single{Single: &types.SingleKeyProof{
+				LegacyProof: types.MigrationProof{
+					Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
 						PubKey:    []byte{0x01, 0x02},
 						Signature: []byte("sig"),
 						SigFormat: types.SigFormat_SIG_FORMAT_CLI,
 					}},
 				},
-				NewSignature: []byte("new-sig"),
+				NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
+					Signature: []byte("new-sig"),
+					SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
+				}}},
 			},
-			wantErr: types.ErrInvalidLegacyPubKey,
+			wantErr: types.ErrInvalidMigrationPubKey,
 		},
 		{
 			name: "empty signature",
 			msg: types.MsgClaimLegacyAccount{
 				NewAddress:    newAddr,
 				LegacyAddress: legacyAddr,
-				LegacyProof: types.LegacyProof{
-					Proof: &types.LegacyProof_Single{Single: &types.SingleKeyProof{
+				LegacyProof: types.MigrationProof{
+					Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
 						PubKey:    legacyPub.Key,
 						Signature: nil,
 						SigFormat: types.SigFormat_SIG_FORMAT_CLI,
 					}},
 				},
-				NewSignature: []byte("new-sig"),
+				NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
+					Signature: []byte("new-sig"),
+					SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
+				}}},
 			},
-			wantErr: types.ErrInvalidLegacySignature,
+			wantErr: types.ErrInvalidMigrationSignature,
 		},
 		{
 			name: "empty new signature",
@@ -165,7 +183,7 @@ func TestMsgClaimLegacyAccount_ValidateBasic(t *testing.T) {
 				LegacyAddress: legacyAddr,
 				LegacyProof:   goodProof,
 			},
-			wantErr: types.ErrInvalidNewSignature,
+			wantErr: types.ErrInvalidMigrationSignature,
 		},
 	}
 
@@ -200,7 +218,10 @@ func TestMsgMigrateValidator_ValidateBasic(t *testing.T) {
 				NewAddress:    newAddr,
 				LegacyAddress: legacyAddr,
 				LegacyProof:   goodProof,
-				NewSignature:  []byte("new-sig"),
+				NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
+					Signature: []byte("new-sig"),
+					SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
+				}}},
 			},
 		},
 		{
@@ -209,7 +230,10 @@ func TestMsgMigrateValidator_ValidateBasic(t *testing.T) {
 				NewAddress:    "bad",
 				LegacyAddress: legacyAddr,
 				LegacyProof:   goodProof,
-				NewSignature:  []byte("new-sig"),
+				NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
+					Signature: []byte("new-sig"),
+					SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
+				}}},
 			},
 			wantErr: sdkerrors.ErrInvalidAddress,
 		},
@@ -219,7 +243,10 @@ func TestMsgMigrateValidator_ValidateBasic(t *testing.T) {
 				NewAddress:    legacyAddr,
 				LegacyAddress: legacyAddr,
 				LegacyProof:   goodProof,
-				NewSignature:  []byte("new-sig"),
+				NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
+					Signature: []byte("new-sig"),
+					SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
+				}}},
 			},
 			wantErr: types.ErrSameAddress,
 		},
@@ -230,7 +257,7 @@ func TestMsgMigrateValidator_ValidateBasic(t *testing.T) {
 				LegacyAddress: legacyAddr,
 				LegacyProof:   goodProof,
 			},
-			wantErr: types.ErrInvalidNewSignature,
+			wantErr: types.ErrInvalidMigrationSignature,
 		},
 	}
 

@@ -33,8 +33,8 @@ func (msg *MsgClaimLegacyAccount) ValidateBasic() error {
 	if err := msg.LegacyProof.ValidateBasic(); err != nil {
 		return err
 	}
-	if len(msg.NewSignature) == 0 {
-		return ErrInvalidNewSignature.Wrap("new_signature is required")
+	if s := msg.NewProof.GetSingle(); s == nil || len(s.Signature) == 0 {
+		return ErrInvalidMigrationSignature.Wrap("new_proof signature is required")
 	}
 	return nil
 }
@@ -46,8 +46,13 @@ func (msg *MsgClaimLegacyAccount) MigrationNewAddress() string { return msg.NewA
 func (msg *MsgClaimLegacyAccount) MigrationLegacyAddress() string { return msg.LegacyAddress }
 
 // MigrationSetNewProof attaches the destination-account proof derived by the custom CLI.
+// The raw EVM signature is wrapped in a SingleKeyProof; VerifyNewSignature recovers
+// the signer's public key directly from the signature bytes without needing PubKey.
 func (msg *MsgClaimLegacyAccount) MigrationSetNewProof(signature []byte) {
-	msg.NewSignature = signature
+	msg.NewProof = MigrationProof{Proof: &MigrationProof_Single{Single: &SingleKeyProof{
+		Signature: signature,
+		SigFormat: SigFormat_SIG_FORMAT_EIP191,
+	}}}
 }
 
 func (msg *MsgMigrateValidator) ValidateBasic() error {
@@ -63,8 +68,8 @@ func (msg *MsgMigrateValidator) ValidateBasic() error {
 	if err := msg.LegacyProof.ValidateBasic(); err != nil {
 		return err
 	}
-	if len(msg.NewSignature) == 0 {
-		return ErrInvalidNewSignature.Wrap("new_signature is required")
+	if s := msg.NewProof.GetSingle(); s == nil || len(s.Signature) == 0 {
+		return ErrInvalidMigrationSignature.Wrap("new_proof signature is required")
 	}
 	return nil
 }
@@ -76,6 +81,11 @@ func (msg *MsgMigrateValidator) MigrationNewAddress() string { return msg.NewAdd
 func (msg *MsgMigrateValidator) MigrationLegacyAddress() string { return msg.LegacyAddress }
 
 // MigrationSetNewProof attaches the destination-account proof derived by the custom CLI.
+// The raw EVM signature is wrapped in a SingleKeyProof; VerifyNewSignature recovers
+// the signer's public key directly from the signature bytes without needing PubKey.
 func (msg *MsgMigrateValidator) MigrationSetNewProof(signature []byte) {
-	msg.NewSignature = signature
+	msg.NewProof = MigrationProof{Proof: &MigrationProof_Single{Single: &SingleKeyProof{
+		Signature: signature,
+		SigFormat: SigFormat_SIG_FORMAT_EIP191,
+	}}}
 }

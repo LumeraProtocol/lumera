@@ -85,10 +85,11 @@ func newValidatorMigrationMsg(
 			Signature: signLegacyMigrationMessage(t, keeperValidatorKind, legacyPrivKey, legacyAddr, newAddr),
 			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
 		}}},
-		NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
-			Signature: signNewMigrationMessage(t, keeperValidatorKind, newPrivKey, legacyAddr, newAddr),
-			SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
-		}}},
+		NewProof: newSingleKeyProofNew(
+			newPrivKey.PubKey().Bytes(),
+			signNewMigrationEIP191(t, keeperValidatorKind, newPrivKey, legacyAddr, newAddr),
+			types.SigFormat_SIG_FORMAT_EIP191,
+		),
 	}
 }
 

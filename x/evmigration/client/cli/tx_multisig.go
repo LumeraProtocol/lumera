@@ -729,17 +729,7 @@ func cmdSubmitProof() *cobra.Command {
 				return fmt.Errorf("unexpected msg type %T", msgs[0])
 			}
 
-			var kind string
-			switch msgs[0].(type) {
-			case *types.MsgClaimLegacyAccount:
-				kind = migrationProofKindClaim
-			case *types.MsgMigrateValidator:
-				kind = migrationProofKindValidator
-			default:
-				return fmt.Errorf("unexpected msg type %T", msgs[0])
-			}
-
-			return runMigrationTx(cmd, mpm, kind, clientCtx.FromName)
+			return runMigrationTx(cmd, mpm)
 		},
 	}
 	flags.AddTxFlagsToCmd(cmd)

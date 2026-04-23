@@ -75,11 +75,11 @@ Both keys must come from the same mnemonic.`,
 			if err := preflightChainIDCheck(cmd); err != nil {
 				return err
 			}
-			msg, newKeyName, err := resolveClaimMsg(cmd, args[0], args[1])
+			msg, _, err := resolveClaimMsg(cmd, args[0], args[1])
 			if err != nil {
 				return err
 			}
-			return runMigrationTx(cmd, msg, migrationProofKindClaim, newKeyName)
+			return runMigrationTx(cmd, msg)
 		},
 	}
 	flags.AddTxFlagsToCmd(cmd)
@@ -109,11 +109,11 @@ Restart it immediately after the transaction is confirmed.`,
 			if err := preflightChainIDCheck(cmd); err != nil {
 				return err
 			}
-			msg, newKeyName, err := resolveValidatorMsg(cmd, args[0], args[1])
+			msg, _, err := resolveValidatorMsg(cmd, args[0], args[1])
 			if err != nil {
 				return err
 			}
-			return runMigrationTx(cmd, msg, migrationProofKindValidator, newKeyName)
+			return runMigrationTx(cmd, msg)
 		},
 	}
 	flags.AddTxFlagsToCmd(cmd)
@@ -122,12 +122,18 @@ Restart it immediately after the transaction is confirmed.`,
 }
 
 // resolveClaimMsg builds a MsgClaimLegacyAccount from the two key names (positional args).
+// Both LegacyProof and NewProof are fully assembled here so that runMigrationTx only
+// needs to validate, simulate gas, and broadcast the pre-assembled message.
 func resolveClaimMsg(cmd *cobra.Command, legacyKeyName, newKeyName string) (*types.MsgClaimLegacyAccount, string, error) {
 	clientCtx, err := client.GetClientTxContext(cmd)
 	if err != nil {
 		return nil, "", err
 	}
 	newAddr, legacyAddr, pubKey, sig, err := signLegacyProofFromKeyring(clientCtx, legacyKeyName, newKeyName, migrationProofKindClaim)
+	if err != nil {
+		return nil, "", err
+	}
+	newProof, err := buildNewSingleProof(clientCtx, newKeyName, migrationProofKindClaim, legacyAddr, newAddr)
 	if err != nil {
 		return nil, "", err
 	}
@@ -139,16 +145,23 @@ func resolveClaimMsg(cmd *cobra.Command, legacyKeyName, newKeyName string) (*typ
 			Signature: sig,
 			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
 		}}},
+		NewProof: newProof,
 	}, newKeyName, nil
 }
 
 // resolveValidatorMsg builds a MsgMigrateValidator from the two key names (positional args).
+// Both LegacyProof and NewProof are fully assembled here so that runMigrationTx only
+// needs to validate, simulate gas, and broadcast the pre-assembled message.
 func resolveValidatorMsg(cmd *cobra.Command, legacyKeyName, newKeyName string) (*types.MsgMigrateValidator, string, error) {
 	clientCtx, err := client.GetClientTxContext(cmd)
 	if err != nil {
 		return nil, "", err
 	}
 	newAddr, legacyAddr, pubKey, sig, err := signLegacyProofFromKeyring(clientCtx, legacyKeyName, newKeyName, migrationProofKindValidator)
+	if err != nil {
+		return nil, "", err
+	}
+	newProof, err := buildNewSingleProof(clientCtx, newKeyName, migrationProofKindValidator, legacyAddr, newAddr)
 	if err != nil {
 		return nil, "", err
 	}
@@ -160,6 +173,7 @@ func resolveValidatorMsg(cmd *cobra.Command, legacyKeyName, newKeyName string) (
 			Signature: sig,
 			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
 		}}},
+		NewProof: newProof,
 	}, newKeyName, nil
 }
 
@@ -218,20 +232,17 @@ type migrationProofMsg interface {
 	sdk.Msg
 	MigrationNewAddress() string
 	MigrationLegacyAddress() string
-	MigrationSetNewProof(signature []byte)
 }
 
-func runMigrationTx(cmd *cobra.Command, msg migrationProofMsg, proofKind, newKeyName string) error {
+// runMigrationTx validates, simulates gas, and broadcasts the pre-assembled migration
+// message. Both proofs must already be populated by the caller (resolveClaimMsg /
+// resolveValidatorMsg build the full MigrationProof{Single} up-front for both halves).
+func runMigrationTx(cmd *cobra.Command, msg migrationProofMsg) error {
 	clientCtx, err := client.GetClientTxContext(cmd)
 	if err != nil {
 		return err
 	}
 
-	signature, err := signNewMigrationProof(clientCtx, newKeyName, proofKind, msg.MigrationLegacyAddress(), msg.MigrationNewAddress())
-	if err != nil {
-		return err
-	}
-	msg.MigrationSetNewProof(signature)
 	if validateBasic, ok := msg.(sdk.HasValidateBasic); ok {
 		if err := validateBasic.ValidateBasic(); err != nil {
 			return err
@@ -352,19 +363,33 @@ func simulateMigrationGas(clientCtx client.Context, txf clienttx.Factory, msg mi
 	return simRes, adjustedGas, nil
 }
 
-func signNewMigrationProof(clientCtx client.Context, newKeyName, proofKind, legacyAddress, newAddress string) ([]byte, error) {
-	payload := []byte(fmt.Sprintf("lumera-evm-migration:%s:%d:%s:%s:%s", clientCtx.ChainID, lcfg.EVMChainID, proofKind, legacyAddress, newAddress))
+// buildNewSingleProof produces a fully-assembled MigrationProof{Single} for the
+// new (eth) side of a migration: looks up newKeyName in the keyring, asserts
+// it's an eth_secp256k1 key, signs the canonical migration payload, and wraps
+// the resulting pubkey+signature into a SingleKeyProof with SIG_FORMAT_CLI.
+//
+// Replaces the Task 4 adapter MigrationSetNewProof + the deleted helper
+// signNewMigrationProof. The full SingleKeyProof lets the side-aware
+// verifier (VerifyMigrationProof with SubKeyTypeEthSecp256k1) accept the message.
+func buildNewSingleProof(clientCtx client.Context, newKeyName, proofKind, legacyAddress, newAddress string) (types.MigrationProof, error) {
+	payload := []byte(fmt.Sprintf("lumera-evm-migration:%s:%d:%s:%s:%s",
+		clientCtx.ChainID, lcfg.EVMChainID, proofKind, legacyAddress, newAddress))
 
 	sig, pubKey, err := clientCtx.Keyring.Sign(newKeyName, payload, signingtypes.SignMode_SIGN_MODE_LEGACY_AMINO_JSON)
 	if err != nil {
-		return nil, err
+		return types.MigrationProof{}, err
 	}
 
-	if _, ok := pubKey.(*evmcryptotypes.PubKey); !ok {
-		return nil, fmt.Errorf("key %q must use eth_secp256k1, got %T", newKeyName, pubKey)
+	ethPK, ok := pubKey.(*evmcryptotypes.PubKey)
+	if !ok {
+		return types.MigrationProof{}, fmt.Errorf("key %q must use eth_secp256k1, got %T", newKeyName, pubKey)
 	}
 
-	return sig, nil
+	return types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
+		PubKey:    ethPK.Key,
+		Signature: sig,
+		SigFormat: types.SigFormat_SIG_FORMAT_CLI,
+	}}}, nil
 }
 
 func confirmMigrationTx(clientCtx client.Context, txBuilder client.TxBuilder) (bool, error) {

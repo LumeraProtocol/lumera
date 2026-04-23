@@ -207,35 +207,39 @@ func TestSignMigrationProof_ChainIDInPayload(t *testing.T) {
 	require.False(t, legacyPK.VerifySignature(wrongHash[:], sig))
 }
 
-// ---------- signNewMigrationProof tests ----------
+// ---------- buildNewSingleProof tests ----------
 
-func TestSignNewProof_ValidEVMKey(t *testing.T) {
+func TestBuildNewSingleProof_ValidEVMKey(t *testing.T) {
 	kr := newTestKeyring(t)
 	evmRec := addEVMKey(t, kr, "evm", testMnemonic)
 	evmAddr := recordAddress(t, evmRec)
 
 	ctx := clientCtxWithKeyring(kr)
-	sig, err := signNewMigrationProof(ctx, "evm", migrationProofKindClaim, "lumera1legacy", evmAddr)
+	proof, err := buildNewSingleProof(ctx, "evm", migrationProofKindClaim, "lumera1legacy", evmAddr)
 
 	require.NoError(t, err)
-	require.NotEmpty(t, sig)
+	single := proof.GetSingle()
+	require.NotNil(t, single)
+	require.NotEmpty(t, single.Signature)
+	require.NotEmpty(t, single.PubKey)
+	require.Len(t, single.PubKey, 33, "eth_secp256k1 compressed pubkey is 33 bytes")
 }
 
-func TestSignNewProof_WrongKeyType_Secp256k1(t *testing.T) {
+func TestBuildNewSingleProof_WrongKeyType_Secp256k1(t *testing.T) {
 	kr := newTestKeyring(t)
 	addLegacyKey(t, kr, "legacy", testMnemonic)
 
 	ctx := clientCtxWithKeyring(kr)
-	_, err := signNewMigrationProof(ctx, "legacy", migrationProofKindClaim, "lumera1legacy", "lumera1new")
+	_, err := buildNewSingleProof(ctx, "legacy", migrationProofKindClaim, "lumera1legacy", "lumera1new")
 
 	require.ErrorContains(t, err, "eth_secp256k1")
 }
 
-func TestSignNewProof_KeyNotFound(t *testing.T) {
+func TestBuildNewSingleProof_KeyNotFound(t *testing.T) {
 	kr := newTestKeyring(t)
 
 	ctx := clientCtxWithKeyring(kr)
-	_, err := signNewMigrationProof(ctx, "ghost-key", migrationProofKindClaim, "lumera1legacy", "lumera1new")
+	_, err := buildNewSingleProof(ctx, "ghost-key", migrationProofKindClaim, "lumera1legacy", "lumera1new")
 
 	require.Error(t, err)
 }
@@ -335,18 +339,20 @@ func TestSignMigrationProof_PubKeyDerivedAddressMatchesReturned(t *testing.T) {
 	require.Equal(t, expectedAddr, derivedAddr)
 }
 
-func TestSignNewProof_OutputIsEthSecp256k1(t *testing.T) {
+func TestBuildNewSingleProof_OutputIsEthSecp256k1(t *testing.T) {
 	kr := newTestKeyring(t)
 	evmRec := addEVMKey(t, kr, "evm", testMnemonic)
 	evmAddr := recordAddress(t, evmRec)
 
 	ctx := clientCtxWithKeyring(kr)
-	sig, err := signNewMigrationProof(ctx, "evm", migrationProofKindClaim, "lumera1legacy", evmAddr)
+	proof, err := buildNewSingleProof(ctx, "evm", migrationProofKindClaim, "lumera1legacy", evmAddr)
 	require.NoError(t, err)
 
+	single := proof.GetSingle()
+	require.NotNil(t, single)
 	// eth_secp256k1 signatures are 65 bytes (R || S || V).
-	require.True(t, len(sig) == 64 || len(sig) == 65,
-		"eth_secp256k1 signature should be 64 or 65 bytes, got %d", len(sig))
+	require.True(t, len(single.Signature) == 64 || len(single.Signature) == 65,
+		"eth_secp256k1 signature should be 64 or 65 bytes, got %d", len(single.Signature))
 }
 
 // ---------- edge case: multiple keys same keyring ----------
@@ -394,14 +400,14 @@ func TestSignMigrationProof_DifferentKindsDifferentSignatures(t *testing.T) {
 
 // ---------- new proof: key type validation ----------
 
-func TestSignNewProof_RejectsNonEVMKey(t *testing.T) {
+func TestBuildNewSingleProof_RejectsNonEVMKey(t *testing.T) {
 	kr := newTestKeyring(t)
 	// Only legacy key in keyring — no eth_secp256k1.
 	legacyRec := addLegacyKey(t, kr, "legacy", testMnemonic)
 	fromAddr := recordAddress(t, legacyRec)
 
 	ctx := clientCtxWithKeyring(kr)
-	_, err := signNewMigrationProof(ctx, "legacy", migrationProofKindClaim, "lumera1old", fromAddr)
+	_, err := buildNewSingleProof(ctx, "legacy", migrationProofKindClaim, "lumera1old", fromAddr)
 
 	require.ErrorContains(t, err, "eth_secp256k1")
 	// Verify it tells the user what type it got.
@@ -426,9 +432,9 @@ func TestSignMigrationProof_ReturnedPubKeyIsSecp256k1(t *testing.T) {
 		"compressed secp256k1 pubkey must start with 0x02 or 0x03, got 0x%02x", pubKeyBytes[0])
 }
 
-// ---------- new proof: key type assertion ----------
+// ---------- buildNewSingleProof: key type assertion ----------
 
-func TestSignNewProof_ReturnedSigFromEVMKey(t *testing.T) {
+func TestBuildNewSingleProof_ReturnedSigFromEVMKey(t *testing.T) {
 	kr := newTestKeyring(t)
 	evmRec := addEVMKey(t, kr, "evm", testMnemonic)
 
@@ -436,22 +442,25 @@ func TestSignNewProof_ReturnedSigFromEVMKey(t *testing.T) {
 	require.IsType(t, &evmcrypto.PubKey{}, evmPK, "test setup: EVM key must be eth_secp256k1")
 
 	ctx := clientCtxWithKeyring(kr)
-	sig, err := signNewMigrationProof(ctx, "evm", migrationProofKindClaim, "lumera1legacy", recordAddress(t, evmRec))
+	proof, err := buildNewSingleProof(ctx, "evm", migrationProofKindClaim, "lumera1legacy", recordAddress(t, evmRec))
 	require.NoError(t, err)
-	require.NotEmpty(t, sig)
+
+	single := proof.GetSingle()
+	require.NotNil(t, single)
+	require.NotEmpty(t, single.Signature)
 
 	// Verify the new-proof payload is signed with the raw payload bytes (no hashing
 	// in the Sign call — the keyring internally applies Keccak256 for eth_secp256k1).
 	payload := fmt.Sprintf("lumera-evm-migration:%s:%d:%s:%s:%s",
 		"lumera-test-1", lumeracfg.EVMChainID, migrationProofKindClaim, "lumera1legacy", recordAddress(t, evmRec))
 	_ = payload // Signature verification against recovered address is done chain-side.
-	require.True(t, len(sig) >= 64, "signature must be at least 64 bytes")
+	require.True(t, len(single.Signature) >= 64, "signature must be at least 64 bytes")
 }
 
-// ---------- signNewMigrationProof: sign mode ----------
+// ---------- buildNewSingleProof: sign mode ----------
 
-func TestSignNewProof_UsesLegacyAminoSignMode(t *testing.T) {
-	// Verify that signNewMigrationProof uses SIGN_MODE_LEGACY_AMINO_JSON.
+func TestBuildNewSingleProof_UsesLegacyAminoSignMode(t *testing.T) {
+	// Verify that buildNewSingleProof uses SIGN_MODE_LEGACY_AMINO_JSON.
 	// We test this indirectly: the function passes the raw payload to Keyring.Sign
 	// with SIGN_MODE_LEGACY_AMINO_JSON. For eth_secp256k1, the keyring applies
 	// Keccak256 internally and produces a recoverable signature. If we passed
@@ -463,8 +472,9 @@ func TestSignNewProof_UsesLegacyAminoSignMode(t *testing.T) {
 	ctx := clientCtxWithKeyring(kr)
 
 	// Sign via the function.
-	sig1, err := signNewMigrationProof(ctx, "evm", migrationProofKindClaim, "lumera1legacy", evmAddr)
+	proof, err := buildNewSingleProof(ctx, "evm", migrationProofKindClaim, "lumera1legacy", evmAddr)
 	require.NoError(t, err)
+	sig1 := proof.GetSingle().Signature
 
 	// Sign the same payload directly via keyring with the same sign mode.
 	payload := []byte(fmt.Sprintf("lumera-evm-migration:%s:%d:%s:%s:%s",

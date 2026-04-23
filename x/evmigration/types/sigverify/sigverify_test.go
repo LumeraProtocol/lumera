@@ -45,6 +45,41 @@ func TestVerifyCosmosSecp256k1_EIP191_Rejected(t *testing.T) {
 	require.ErrorContains(t, err, "EIP191 is not valid for Cosmos secp256k1")
 }
 
+// TestVerifyCosmosSecp256k1_InvalidSigFormat covers the default branch of the
+// format switch: SIG_FORMAT_UNSPECIFIED must be rejected with a clear error.
+func TestVerifyCosmosSecp256k1_InvalidSigFormat(t *testing.T) {
+	priv := secp256k1.GenPrivKey()
+	pk := priv.PubKey().(*secp256k1.PubKey)
+	err := sigverify.VerifyCosmosSecp256k1(pk, sdk.AccAddress(pk.Address()), []byte("x"), make([]byte, 64), types.SigFormat_SIG_FORMAT_UNSPECIFIED)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "sig_format unspecified")
+}
+
+// TestVerifyCosmosSecp256k1_WrongKey asserts that a valid-format signature
+// produced by one key does NOT verify under a different pubkey — the
+// ErrInvalidMigrationSignature fallthrough path.
+func TestVerifyCosmosSecp256k1_WrongKey(t *testing.T) {
+	privA := secp256k1.GenPrivKey()
+	privB := secp256k1.GenPrivKey()
+	pkB := privB.PubKey().(*secp256k1.PubKey)
+	payload := []byte("payload-bytes")
+	hash := sha256.Sum256(payload)
+	sig, err := privA.Sign(hash[:]) // signed by A
+	require.NoError(t, err)
+	// Verify under B's pubkey — should fail.
+	err = sigverify.VerifyCosmosSecp256k1(pkB, sdk.AccAddress(pkB.Address()), payload, sig, types.SigFormat_SIG_FORMAT_CLI)
+	require.Error(t, err)
+	require.ErrorIs(t, err, types.ErrInvalidMigrationSignature)
+
+	// Same for ADR036 format.
+	docB := sigverify.ADR036SignDoc(sdk.AccAddress(pkB.Address()).String(), payload)
+	sigB, err := privA.Sign(docB) // A signs B's doc
+	require.NoError(t, err)
+	err = sigverify.VerifyCosmosSecp256k1(pkB, sdk.AccAddress(pkB.Address()), payload, sigB, types.SigFormat_SIG_FORMAT_ADR036)
+	require.Error(t, err)
+	require.ErrorIs(t, err, types.ErrInvalidMigrationSignature)
+}
+
 // --- Eth secp256k1 ---
 
 // Cosmos EVM v0.6.0's ethsecp256k1.PrivKey.Sign returns a 65-byte recoverable
@@ -137,4 +172,23 @@ func TestVerifyEthSecp256k1_InvalidSigFormat(t *testing.T) {
 	err = sigverify.VerifyEthSecp256k1(pk, sdk.AccAddress(pk.Address()), []byte("x"), sig, types.SigFormat_SIG_FORMAT_UNSPECIFIED)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "sig_format unspecified")
+}
+
+// TestVerifyEthSecp256k1_WrongKey asserts that a valid 65-byte signature from
+// one key does NOT verify under a different pubkey — distinct from the
+// length-reject paths and distinct from the V-byte-ignored test, which use
+// the same key pair throughout.
+func TestVerifyEthSecp256k1_WrongKey(t *testing.T) {
+	privA, err := ethsecp256k1.GenerateKey()
+	require.NoError(t, err)
+	privB, err := ethsecp256k1.GenerateKey()
+	require.NoError(t, err)
+	pkB := privB.PubKey().(*ethsecp256k1.PubKey)
+	payload := []byte("payload-bytes")
+	sig, err := privA.Sign(payload)
+	require.NoError(t, err)
+	require.Equal(t, 65, len(sig))
+	err = sigverify.VerifyEthSecp256k1(pkB, sdk.AccAddress(pkB.Address()), payload, sig, types.SigFormat_SIG_FORMAT_CLI)
+	require.Error(t, err)
+	require.ErrorIs(t, err, types.ErrInvalidMigrationSignature)
 }

@@ -34,8 +34,8 @@ setup() {
   [[ "$output" == *"Usage:"* ]]
 }
 
-@test "migrate-multisig.sh stubbed subcommands (combine/submit) reach stub and exit 2" {
-  run "$SCRIPTS_DIR/migrate-multisig.sh" combine
+@test "migrate-multisig.sh stubbed subcommands (submit) reach stub and exit 2" {
+  run "$SCRIPTS_DIR/migrate-multisig.sh" submit
   [ "$status" -eq 2 ]
   [[ "$output" == *"not yet implemented"* ]]
 }
@@ -277,4 +277,79 @@ EOF
     "$FIX_DIR/proof-template.json" "$FIX_DIR/partial-alice.json" \
     --binary "$SHIM" --from alice-sub --chain-id shim --out /tmp/unused.json
   [ "$status" -eq 1 ]
+}
+
+@test "combine happy path assembles tx.json with 2 of 3 partials" {
+  local tmp; tmp=$(mktemp -d)
+  run "$SCRIPTS_DIR/migrate-multisig.sh" combine \
+    "$FIX_DIR/partial-alice.json" "$FIX_DIR/partial-bob.json" \
+    --binary "$SHIM" \
+    --out "$tmp/tx.json"
+  [ "$status" -eq 0 ]
+  [ -f "$tmp/tx.json" ]
+  [[ "$output" == *"Entry threshold satisfied: yes"* ]]
+  rm -rf "$tmp"
+}
+
+@test "combine exits 4 when fewer than K entries (single partial, K=2)" {
+  local tmp; tmp=$(mktemp -d)
+  run "$SCRIPTS_DIR/migrate-multisig.sh" combine \
+    "$FIX_DIR/partial-alice.json" \
+    --binary "$SHIM" \
+    --out "$tmp/tx.json"
+  [ "$status" -eq 4 ]
+  [[ "$output" == *"Entry threshold satisfied: no"* ]]
+  [ ! -f "$tmp/tx.json" ]
+  rm -rf "$tmp"
+}
+
+@test "combine exits 9 on cross-file chain_id mismatch" {
+  local tmp; tmp=$(mktemp -d)
+  local payload ph
+  payload='lumera-evm-migration:different-chain:76857769:claim:lumera1shimaddr1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx:lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+  ph=$(printf '%s' "$payload" | sha256sum | awk '{print $1}')
+  jq --arg ph "$ph" '.chain_id = "different-chain" | .payload_hex = $ph' \
+    "$FIX_DIR/partial-bob.json" > "$tmp/bob-bad.json"
+  run "$SCRIPTS_DIR/migrate-multisig.sh" combine \
+    "$FIX_DIR/partial-alice.json" "$tmp/bob-bad.json" \
+    --binary "$SHIM" \
+    --out "$tmp/tx.json"
+  [ "$status" -eq 9 ]
+  [[ "$output" == *"chain_id"* ]]
+  rm -rf "$tmp"
+}
+
+@test "combine exits 4 when lumerad reports below-threshold valid sigs" {
+  local tmp; tmp=$(mktemp -d)
+  run env SHIM_EXIT=1 SHIM_STDERR="Error: need 2 valid partial signatures, have 1" \
+    "$SCRIPTS_DIR/migrate-multisig.sh" combine \
+      "$FIX_DIR/partial-alice.json" "$FIX_DIR/partial-bob.json" \
+      --binary "$SHIM" \
+      --out "$tmp/tx.json"
+  [ "$status" -eq 4 ]
+  rm -rf "$tmp"
+}
+
+@test "combine exits 1 with no partials" {
+  run "$SCRIPTS_DIR/migrate-multisig.sh" combine \
+    --binary "$SHIM" --out /tmp/unused.json
+  [ "$status" -eq 1 ]
+}
+
+@test "combine exits 1 without --out" {
+  run "$SCRIPTS_DIR/migrate-multisig.sh" combine \
+    "$FIX_DIR/partial-alice.json" "$FIX_DIR/partial-bob.json" \
+    --binary "$SHIM"
+  [ "$status" -eq 1 ]
+}
+
+@test "combine passes file list through to lumerad" {
+  local tmp; tmp=$(mktemp -d)
+  run "$SCRIPTS_DIR/migrate-multisig.sh" combine \
+    "$FIX_DIR/partial-alice.json" "$FIX_DIR/partial-bob.json" "$FIX_DIR/partial-carol.json" \
+    --binary "$SHIM" \
+    --out "$tmp/tx.json"
+  [ "$status" -eq 0 ]
+  [ -f "$tmp/tx.json" ]
+  rm -rf "$tmp"
 }

@@ -207,7 +207,60 @@ S_USAGE
   "$BIN" "${args[@]}"
   log_info "partial written to $out"
 }
-_mms_combine()  { log_error "combine not yet implemented";  exit 2; }
+_mms_combine() {
+  local out="" binary="lumerad"
+  local positional=()
+  while (( $# > 0 )); do
+    case "$1" in
+      --out)     _require_value "$1" "$#" "${2-}"; out="$2"; shift 2 ;;
+      --binary)  _require_value "$1" "$#" "${2-}"; binary="$2"; shift 2 ;;
+      -h|--help)
+        cat >&2 <<'C_USAGE'
+Usage: migrate-multisig.sh combine <partial1.json> <partial2.json> [...] --out <tx.json> [--binary <path>]
+C_USAGE
+        exit 0 ;;
+      --*) log_error "unknown flag: $1"; exit 1 ;;
+      *)   positional+=("$1"); shift ;;
+    esac
+  done
+
+  if (( ${#positional[@]} < 1 )); then
+    log_error "combine: at least one partial file required"
+    exit 1
+  fi
+  if [[ -z "$out" ]]; then
+    log_error "combine: --out is required"
+    exit 1
+  fi
+
+  # shellcheck disable=SC2034
+  BIN="$binary"
+
+  require_jq
+
+  # Per-file + cross-file consistency check. summarize_partials prints the
+  # K-of-N entry-presence matrix to stderr and exits 9 on cross-file
+  # disagreement (it calls read_proof_file internally, which rejects
+  # single-key proofs with exit 3 and bad payload_hex with exit 9).
+  # Returns 0 iff distinct signer indices >= threshold.
+  if ! summarize_partials "${positional[@]}"; then
+    exit 4
+  fi
+
+  # Pass through to lumerad combine-proof. If lumerad reports fewer valid
+  # signatures than the threshold, map its exit to exit 4.
+  local args=(tx evmigration combine-proof "${positional[@]}" --out "$out")
+  local combine_out combine_rc=0
+  combine_out=$("$BIN" "${args[@]}" 2>&1) || combine_rc=$?
+  printf '%s\n' "$combine_out" >&2
+  if [[ "$combine_out" == *"need "*"valid partial signatures"* ]]; then
+    exit 4
+  fi
+  if (( combine_rc != 0 )); then
+    exit "$combine_rc"
+  fi
+  log_info "combined tx written to $out"
+}
 _mms_submit()   { log_error "submit not yet implemented";   exit 2; }
 
 main() {

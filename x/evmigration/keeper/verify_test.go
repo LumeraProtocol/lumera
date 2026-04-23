@@ -512,7 +512,7 @@ func TestVerifyMigrationProof_Multisig_Valid_CLI(t *testing.T) {
 	multiPK, privs, legacyAddr := makeMultisigAccount(t, 2, 3)
 	_, newAddr := testNewMigrationAccount(t)
 	proof := buildMultisigProof(t, keeperClaimKind, multiPK, privs, []int{0, 2}, legacyAddr, newAddr, types.SigFormat_SIG_FORMAT_CLI)
-	require.NoError(t, proof.ValidateBasic())
+	require.NoError(t, proof.ValidateBasic(types.SideLegacy))
 	require.NoError(t, keeper.VerifyLegacyProof(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, proof))
 }
 
@@ -520,7 +520,7 @@ func TestVerifyMigrationProof_Multisig_Valid_ADR036(t *testing.T) {
 	multiPK, privs, legacyAddr := makeMultisigAccount(t, 2, 3)
 	_, newAddr := testNewMigrationAccount(t)
 	proof := buildMultisigProof(t, keeperClaimKind, multiPK, privs, []int{1, 2}, legacyAddr, newAddr, types.SigFormat_SIG_FORMAT_ADR036)
-	require.NoError(t, proof.ValidateBasic())
+	require.NoError(t, proof.ValidateBasic(types.SideLegacy))
 	require.NoError(t, keeper.VerifyLegacyProof(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, proof))
 }
 
@@ -581,7 +581,7 @@ func TestVerifyMigrationProof_Multisig_MaxBoundary(t *testing.T) {
 		signerIdxs[i] = i
 	}
 	proof := buildMultisigProof(t, keeperClaimKind, multiPK, privs, signerIdxs, legacyAddr, newAddr, types.SigFormat_SIG_FORMAT_CLI)
-	require.NoError(t, proof.ValidateBasic())
+	require.NoError(t, proof.ValidateBasic(types.SideLegacy))
 	require.NoError(t, proof.ValidateParams(20))
 	require.NoError(t, keeper.VerifyLegacyProof(testChainID, lcfg.EVMChainID, keeperClaimKind, legacyAddr, newAddr, proof))
 

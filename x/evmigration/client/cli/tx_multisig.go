@@ -660,7 +660,7 @@ func cmdCombineProof() *cobra.Command {
 				legacyProof = types.MigrationProof{Proof: &types.MigrationProof_Multisig{Multisig: mp}}
 			}
 
-			if err := legacyProof.ValidateBasic(); err != nil {
+			if err := legacyProof.ValidateBasic(types.SideLegacy); err != nil {
 				return fmt.Errorf("assembled proof fails ValidateBasic: %w", err)
 			}
 

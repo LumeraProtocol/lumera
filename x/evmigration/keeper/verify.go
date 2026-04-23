@@ -143,7 +143,7 @@ func VerifyLegacyProof(
 	if proof == nil {
 		return types.ErrInvalidMigrationProof.Wrap("legacy_proof required")
 	}
-	if err := proof.ValidateBasic(); err != nil {
+	if err := proof.ValidateBasic(types.SideLegacy); err != nil {
 		return err
 	}
 	payload := migrationPayload(chainID, evmChainID, kind, legacyAddr, newAddr)

@@ -30,11 +30,11 @@ func (msg *MsgClaimLegacyAccount) ValidateBasic() error {
 	if msg.NewAddress == msg.LegacyAddress {
 		return ErrSameAddress
 	}
-	if err := msg.LegacyProof.ValidateBasic(); err != nil {
+	if err := msg.LegacyProof.ValidateBasic(SideLegacy); err != nil {
 		return err
 	}
-	if s := msg.NewProof.GetSingle(); s == nil || len(s.Signature) == 0 {
-		return ErrInvalidMigrationSignature.Wrap("new_proof signature is required")
+	if err := msg.NewProof.ValidateBasic(SideNew); err != nil {
+		return err
 	}
 	return nil
 }
@@ -70,11 +70,11 @@ func (msg *MsgMigrateValidator) ValidateBasic() error {
 	if msg.NewAddress == msg.LegacyAddress {
 		return ErrSameAddress
 	}
-	if err := msg.LegacyProof.ValidateBasic(); err != nil {
+	if err := msg.LegacyProof.ValidateBasic(SideLegacy); err != nil {
 		return err
 	}
-	if s := msg.NewProof.GetSingle(); s == nil || len(s.Signature) == 0 {
-		return ErrInvalidMigrationSignature.Wrap("new_proof signature is required")
+	if err := msg.NewProof.ValidateBasic(SideNew); err != nil {
+		return err
 	}
 	return nil
 }

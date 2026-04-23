@@ -15,13 +15,26 @@ func validAddr() string {
 	return sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address()).String()
 }
 
-// validSingleProof returns a MigrationProof with a well-formed SingleKeyProof.
+// validSingleProof returns a MigrationProof with a well-formed SingleKeyProof
+// using legacy-side rules (Cosmos secp256k1, 64-byte signature).
 func validSingleProof(pub *secp256k1.PubKey) types.MigrationProof {
 	return types.MigrationProof{
 		Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
 			PubKey:    pub.Key,
-			Signature: []byte("sig"),
+			Signature: make([]byte, 64),
 			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
+		}},
+	}
+}
+
+// validNewProof returns a MigrationProof with a well-formed new-side SingleKeyProof
+// (eth_secp256k1, 65-byte R||S||V signature, EIP-191 format).
+func validNewProof() types.MigrationProof {
+	return types.MigrationProof{
+		Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
+			PubKey:    make([]byte, 33),
+			Signature: make([]byte, 65),
+			SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
 		}},
 	}
 }
@@ -82,6 +95,8 @@ func TestMsgClaimLegacyAccount_ValidateBasic(t *testing.T) {
 
 	goodProof := validSingleProof(legacyPub)
 
+	goodNewProof := validNewProof()
+
 	tests := []struct {
 		name    string
 		msg     types.MsgClaimLegacyAccount
@@ -93,10 +108,7 @@ func TestMsgClaimLegacyAccount_ValidateBasic(t *testing.T) {
 				NewAddress:    newAddr,
 				LegacyAddress: legacyAddr,
 				LegacyProof:   goodProof,
-				NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
-					Signature: []byte("new-sig"),
-					SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
-				}}},
+				NewProof:      goodNewProof,
 			},
 		},
 		{
@@ -105,10 +117,7 @@ func TestMsgClaimLegacyAccount_ValidateBasic(t *testing.T) {
 				NewAddress:    "bad",
 				LegacyAddress: legacyAddr,
 				LegacyProof:   goodProof,
-				NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
-					Signature: []byte("new-sig"),
-					SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
-				}}},
+				NewProof:      goodNewProof,
 			},
 			wantErr: sdkerrors.ErrInvalidAddress,
 		},
@@ -118,10 +127,7 @@ func TestMsgClaimLegacyAccount_ValidateBasic(t *testing.T) {
 				NewAddress:    newAddr,
 				LegacyAddress: "bad",
 				LegacyProof:   goodProof,
-				NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
-					Signature: []byte("new-sig"),
-					SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
-				}}},
+				NewProof:      goodNewProof,
 			},
 			wantErr: sdkerrors.ErrInvalidAddress,
 		},
@@ -131,10 +137,7 @@ func TestMsgClaimLegacyAccount_ValidateBasic(t *testing.T) {
 				NewAddress:    legacyAddr,
 				LegacyAddress: legacyAddr,
 				LegacyProof:   goodProof,
-				NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
-					Signature: []byte("new-sig"),
-					SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
-				}}},
+				NewProof:      goodNewProof,
 			},
 			wantErr: types.ErrSameAddress,
 		},
@@ -146,19 +149,16 @@ func TestMsgClaimLegacyAccount_ValidateBasic(t *testing.T) {
 				LegacyProof: types.MigrationProof{
 					Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
 						PubKey:    []byte{0x01, 0x02},
-						Signature: []byte("sig"),
+						Signature: make([]byte, 64),
 						SigFormat: types.SigFormat_SIG_FORMAT_CLI,
 					}},
 				},
-				NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
-					Signature: []byte("new-sig"),
-					SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
-				}}},
+				NewProof: goodNewProof,
 			},
 			wantErr: types.ErrInvalidMigrationPubKey,
 		},
 		{
-			name: "empty signature",
+			name: "wrong legacy signature length",
 			msg: types.MsgClaimLegacyAccount{
 				NewAddress:    newAddr,
 				LegacyAddress: legacyAddr,
@@ -169,21 +169,18 @@ func TestMsgClaimLegacyAccount_ValidateBasic(t *testing.T) {
 						SigFormat: types.SigFormat_SIG_FORMAT_CLI,
 					}},
 				},
-				NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
-					Signature: []byte("new-sig"),
-					SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
-				}}},
+				NewProof: goodNewProof,
 			},
 			wantErr: types.ErrInvalidMigrationSignature,
 		},
 		{
-			name: "empty new signature",
+			name: "missing new proof",
 			msg: types.MsgClaimLegacyAccount{
 				NewAddress:    newAddr,
 				LegacyAddress: legacyAddr,
 				LegacyProof:   goodProof,
 			},
-			wantErr: types.ErrInvalidMigrationSignature,
+			wantErr: types.ErrInvalidMigrationProof,
 		},
 	}
 
@@ -207,6 +204,8 @@ func TestMsgMigrateValidator_ValidateBasic(t *testing.T) {
 
 	goodProof := validSingleProof(legacyPub)
 
+	goodNewProof := validNewProof()
+
 	tests := []struct {
 		name    string
 		msg     types.MsgMigrateValidator
@@ -218,10 +217,7 @@ func TestMsgMigrateValidator_ValidateBasic(t *testing.T) {
 				NewAddress:    newAddr,
 				LegacyAddress: legacyAddr,
 				LegacyProof:   goodProof,
-				NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
-					Signature: []byte("new-sig"),
-					SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
-				}}},
+				NewProof:      goodNewProof,
 			},
 		},
 		{
@@ -230,10 +226,7 @@ func TestMsgMigrateValidator_ValidateBasic(t *testing.T) {
 				NewAddress:    "bad",
 				LegacyAddress: legacyAddr,
 				LegacyProof:   goodProof,
-				NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
-					Signature: []byte("new-sig"),
-					SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
-				}}},
+				NewProof:      goodNewProof,
 			},
 			wantErr: sdkerrors.ErrInvalidAddress,
 		},
@@ -243,21 +236,18 @@ func TestMsgMigrateValidator_ValidateBasic(t *testing.T) {
 				NewAddress:    legacyAddr,
 				LegacyAddress: legacyAddr,
 				LegacyProof:   goodProof,
-				NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
-					Signature: []byte("new-sig"),
-					SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
-				}}},
+				NewProof:      goodNewProof,
 			},
 			wantErr: types.ErrSameAddress,
 		},
 		{
-			name: "missing new signature",
+			name: "missing new proof",
 			msg: types.MsgMigrateValidator{
 				NewAddress:    newAddr,
 				LegacyAddress: legacyAddr,
 				LegacyProof:   goodProof,
 			},
-			wantErr: types.ErrInvalidMigrationSignature,
+			wantErr: types.ErrInvalidMigrationProof,
 		},
 	}
 

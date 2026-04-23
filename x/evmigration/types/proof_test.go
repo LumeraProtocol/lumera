@@ -3,6 +3,7 @@ package types_test
 import (
 	"testing"
 
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	"github.com/stretchr/testify/require"
 
 	"github.com/LumeraProtocol/lumera/x/evmigration/types"
@@ -25,17 +26,17 @@ func TestSingleKeyProof_ValidateBasic(t *testing.T) {
 		{
 			name:    "wrong pubkey length",
 			proof:   &types.SingleKeyProof{PubKey: make([]byte, 32), Signature: validSig, SigFormat: types.SigFormat_SIG_FORMAT_CLI},
-			wantErr: "must be 33 bytes",
+			wantErr: "expected 33 bytes",
 		},
 		{
 			name:    "empty signature",
 			proof:   &types.SingleKeyProof{PubKey: validPK, Signature: nil, SigFormat: types.SigFormat_SIG_FORMAT_CLI},
-			wantErr: "signature required",
+			wantErr: "64 bytes",
 		},
 		{
 			name:    "unspecified sig format",
 			proof:   &types.SingleKeyProof{PubKey: validPK, Signature: validSig, SigFormat: types.SigFormat_SIG_FORMAT_UNSPECIFIED},
-			wantErr: "sig_format required",
+			wantErr: "sig_format unspecified",
 		},
 	}
 	for _, tc := range cases {
@@ -186,7 +187,7 @@ func TestMultisigProof_ValidateBasic(t *testing.T) {
 				SubSignatures: [][]byte{validSig, validSig},
 				SigFormat:     types.SigFormat_SIG_FORMAT_CLI,
 			},
-			wantErr: "must be 33 bytes",
+			wantErr: "expected 33 bytes",
 		},
 		{
 			name: "unspecified sig format",
@@ -241,17 +242,26 @@ func TestMultisigProof_ValidateParams_SizeCap(t *testing.T) {
 
 func TestMigrationProof_ValidateBasic_Dispatch(t *testing.T) {
 	validPK := make([]byte, 33)
-	validSig := make([]byte, 64)
+	validSig64 := make([]byte, 64)
+	validSig65 := make([]byte, 65)
 
-	t.Run("single", func(t *testing.T) {
+	t.Run("single legacy side", func(t *testing.T) {
 		p := &types.MigrationProof{
 			Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
-				PubKey: validPK, Signature: validSig, SigFormat: types.SigFormat_SIG_FORMAT_CLI,
+				PubKey: validPK, Signature: validSig64, SigFormat: types.SigFormat_SIG_FORMAT_CLI,
 			}},
 		}
-		require.NoError(t, p.ValidateBasic())
+		require.NoError(t, p.ValidateBasic(types.SideLegacy))
 	})
-	t.Run("multisig", func(t *testing.T) {
+	t.Run("single new side", func(t *testing.T) {
+		p := &types.MigrationProof{
+			Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
+				PubKey: validPK, Signature: validSig65, SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
+			}},
+		}
+		require.NoError(t, p.ValidateBasic(types.SideNew))
+	})
+	t.Run("multisig legacy side", func(t *testing.T) {
 		subKeys := [][]byte{make([]byte, 33), make([]byte, 33)}
 		subKeys[0][0] = 1
 		subKeys[1][0] = 2
@@ -260,22 +270,102 @@ func TestMigrationProof_ValidateBasic_Dispatch(t *testing.T) {
 				Threshold:     1,
 				SubPubKeys:    subKeys,
 				SignerIndices: []uint32{0},
-				SubSignatures: [][]byte{validSig},
+				SubSignatures: [][]byte{validSig64},
 				SigFormat:     types.SigFormat_SIG_FORMAT_CLI,
 			}},
 		}
-		require.NoError(t, p.ValidateBasic())
+		require.NoError(t, p.ValidateBasic(types.SideLegacy))
 	})
 	t.Run("neither set", func(t *testing.T) {
 		p := &types.MigrationProof{}
-		err := p.ValidateBasic()
+		err := p.ValidateBasic(types.SideLegacy)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "oneof not set")
 	})
 	t.Run("nil proof", func(t *testing.T) {
 		var p *types.MigrationProof
-		err := p.ValidateBasic()
+		err := p.ValidateBasic(types.SideLegacy)
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "legacy_proof required")
+		require.Contains(t, err.Error(), "migration_proof required")
 	})
+}
+
+func TestMigrationProof_ValidateBasic_SingleKey_EIP191_RejectedOnLegacySide(t *testing.T) {
+	proof := &types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
+		PubKey:    make([]byte, secp256k1.PubKeySize),
+		Signature: make([]byte, 64), // legacy-correct length so the EIP191 rejection is what fires
+		SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
+	}}}
+	err := proof.ValidateBasic(types.SideLegacy)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "EIP191")
+}
+
+func TestMigrationProof_ValidateBasic_SingleKey_EIP191_AcceptedOnNewSide(t *testing.T) {
+	proof := &types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
+		PubKey:    make([]byte, secp256k1.PubKeySize),
+		Signature: make([]byte, 65),
+		SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
+	}}}
+	require.NoError(t, proof.ValidateBasic(types.SideNew))
+}
+
+func TestMigrationProof_ValidateBasic_SingleKey_RejectWrongSigLenPerSide(t *testing.T) {
+	// Legacy side: 65-byte sig rejected.
+	legacy := &types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
+		PubKey:    make([]byte, secp256k1.PubKeySize),
+		Signature: make([]byte, 65),
+		SigFormat: types.SigFormat_SIG_FORMAT_CLI,
+	}}}
+	err := legacy.ValidateBasic(types.SideLegacy)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "64 bytes")
+
+	// New side: 64-byte sig rejected.
+	newSide := &types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
+		PubKey:    make([]byte, secp256k1.PubKeySize),
+		Signature: make([]byte, 64),
+		SigFormat: types.SigFormat_SIG_FORMAT_CLI,
+	}}}
+	err = newSide.ValidateBasic(types.SideNew)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "65 bytes")
+}
+
+func TestMigrationProof_ValidateBasic_Multisig_EIP191_Rejected(t *testing.T) {
+	proof := &types.MigrationProof{Proof: &types.MigrationProof_Multisig{Multisig: &types.MultisigProof{
+		Threshold:     1,
+		SubPubKeys:    [][]byte{make([]byte, secp256k1.PubKeySize)},
+		SignerIndices: []uint32{0},
+		SubSignatures: [][]byte{make([]byte, 64)},
+		SigFormat:     types.SigFormat_SIG_FORMAT_EIP191,
+	}}}
+	for _, side := range []types.Side{types.SideLegacy, types.SideNew} {
+		err := proof.ValidateBasic(side)
+		require.ErrorContains(t, err, "EIP191")
+	}
+}
+
+func TestMigrationProof_ValidateBasic_Multisig_RejectWrongSubSigLenPerSide(t *testing.T) {
+	legacy := &types.MigrationProof{Proof: &types.MigrationProof_Multisig{Multisig: &types.MultisigProof{
+		Threshold:     1,
+		SubPubKeys:    [][]byte{make([]byte, secp256k1.PubKeySize)},
+		SignerIndices: []uint32{0},
+		SubSignatures: [][]byte{make([]byte, 65)}, // wrong for legacy
+		SigFormat:     types.SigFormat_SIG_FORMAT_CLI,
+	}}}
+	err := legacy.ValidateBasic(types.SideLegacy)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "64 bytes")
+
+	newSide := &types.MigrationProof{Proof: &types.MigrationProof_Multisig{Multisig: &types.MultisigProof{
+		Threshold:     1,
+		SubPubKeys:    [][]byte{make([]byte, secp256k1.PubKeySize)},
+		SignerIndices: []uint32{0},
+		SubSignatures: [][]byte{make([]byte, 64)}, // wrong for new
+		SigFormat:     types.SigFormat_SIG_FORMAT_CLI,
+	}}}
+	err = newSide.ValidateBasic(types.SideNew)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "65 bytes")
 }

@@ -33,6 +33,12 @@ const (
 	multisigNewKeyName  = "multisig-new"
 	multisigFundAmount  = "1000000ulume"
 	multisigSelfSendAmt = "1ulume"
+
+	// New-side eth_secp256k1 sub-keys for multisig-to-multisig destinations.
+	multisigNewSigner1Name   = "multisig-new-signer-1"
+	multisigNewSigner2Name   = "multisig-new-signer-2"
+	multisigNewSigner3Name   = "multisig-new-signer-3"
+	multisigNewCompositeName = "multisig-new-account"
 )
 
 func derivedMultisigMemberKeys(baseName string, signerCount int) []string {
@@ -44,6 +50,69 @@ func derivedMultisigMemberKeys(baseName string, signerCount int) []string {
 		members = append(members, fmt.Sprintf("%s-signer-%d", baseName, i))
 	}
 	return members
+}
+
+// derivedMultisigNewSubKeys mirrors derivedMultisigMemberKeys but yields names
+// for the new-side eth_secp256k1 sub-keys used as members of the new-side
+// composite multisig.
+func derivedMultisigNewSubKeys(baseName string, signerCount int) []string {
+	if signerCount < 1 {
+		signerCount = defaultMultisigSigners
+	}
+	members := make([]string, 0, signerCount)
+	for i := 1; i <= signerCount; i++ {
+		members = append(members, fmt.Sprintf("%s-new-signer-%d", baseName, i))
+	}
+	return members
+}
+
+// ensureMultisigNewSubKeys creates (or reuses) signerCount eth_secp256k1 keys
+// under names derived from baseName, used as sub-keys in the new-side multisig
+// destination. Returns the key names (suitable for `keys add --multisig`).
+// Rerun-safe: existing keys are reused as-is.
+func ensureMultisigNewSubKeys(baseName string, signerCount int) ([]string, error) {
+	names := derivedMultisigNewSubKeys(baseName, signerCount)
+	for _, name := range names {
+		if _, err := createOrReuseFreshEVMKey(name); err != nil {
+			return nil, fmt.Errorf("create new-side sub-key %s: %w", name, err)
+		}
+	}
+	return names, nil
+}
+
+// ensureMultisigNewComposite creates (or reuses) a K-of-N multisig composite
+// key over eth_secp256k1 sub-keys. Thin wrapper over ensureMultisigCompositeKey,
+// which is key-type-agnostic: Cosmos SDK's LegacyAminoPubKey is defined over
+// the cryptotypes.PubKey interface and accepts eth_secp256k1 members.
+func ensureMultisigNewComposite(compositeName string, subKeyNames []string, threshold int) (string, error) {
+	return ensureMultisigCompositeKey(compositeName, subKeyNames, threshold)
+}
+
+// ensureNewMultisigFixture creates 3 eth_secp256k1 sub-keys + a K-of-N composite
+// multisig key over them under the default fixture names. Returns the composite
+// key's bech32 address and the sub-key names. Rerun-safe.
+func ensureNewMultisigFixture() (compositeAddr string, subKeyNames []string, err error) {
+	subKeys := []string{multisigNewSigner1Name, multisigNewSigner2Name, multisigNewSigner3Name}
+	if _, err := ensureMultisigNewSubKeys("multisig", defaultMultisigSigners); err != nil {
+		return "", nil, fmt.Errorf("create new-side sub-keys: %w", err)
+	}
+	addr, err := ensureMultisigNewComposite(multisigNewCompositeName, subKeys, defaultMultisigThreshold)
+	if err != nil {
+		return "", nil, fmt.Errorf("create new-side composite: %w", err)
+	}
+	return addr, subKeys, nil
+}
+
+// getLegacyMultisigKeys returns the 3 legacy sub-key names and the composite
+// key name for the default multisig fixture (suitable for CLI invocations).
+func getLegacyMultisigKeys() (subKeys []string, compositeName string) {
+	return []string{multisigSigner1Name, multisigSigner2Name, multisigSigner3Name}, multisigAccountName
+}
+
+// getNewMultisigKeys returns the 3 new-side eth sub-key names and the new
+// composite key name for the default multisig fixture.
+func getNewMultisigKeys() (subKeys []string, compositeName string) {
+	return []string{multisigNewSigner1Name, multisigNewSigner2Name, multisigNewSigner3Name}, multisigNewCompositeName
 }
 
 // RunMultisigMigration is the main entry point for the "multisig" mode. It

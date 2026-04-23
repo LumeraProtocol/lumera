@@ -829,3 +829,54 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_Multisig_CorruptedSub
 	s.Require().Error(err)
 	s.Require().ErrorContains(err, "sub-sig 0")
 }
+
+// TestClaimLegacyAccount_MultisigToMultisig migrates a 2-of-3 Cosmos multisig
+// legacy account to a 2-of-3 eth_secp256k1 multisig destination. Asserts:
+//   - Migration record created with the correct new bech32.
+//   - Destination BaseAccount has PubKey set to the reconstructed eth multisig pubkey.
+//   - Full balance migrated.
+//   - Legacy account balance is zero.
+func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_MultisigToMultisig() {
+	s.enableMigration()
+
+	coins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 1_000_000_000))
+	legacyMultiPK, legacyPrivs, legacyAddr := s.createFundedMultisigAccount(2, 3, coins)
+	newMultiPK, newPrivs, newAddr := BuildMultisigNewAccount(s.T(), 2, 3)
+
+	legacyProof := SignMultisigProof(s.T(), integrationTestChainID, "claim",
+		legacyMultiPK, legacyPrivs, []int{0, 2}, legacyAddr, newAddr,
+		types.SigFormat_SIG_FORMAT_CLI)
+	newProof := SignNewMultisigProof(s.T(), integrationTestChainID, "claim",
+		newMultiPK, newPrivs, []int{0, 2}, legacyAddr, newAddr,
+		types.SigFormat_SIG_FORMAT_CLI)
+
+	msg := &types.MsgClaimLegacyAccount{
+		LegacyAddress: legacyAddr.String(),
+		NewAddress:    newAddr.String(),
+		LegacyProof:   *legacyProof,
+		NewProof:      *newProof,
+	}
+
+	_, err := s.msgServer.ClaimLegacyAccount(s.ctx, msg)
+	s.Require().NoError(err)
+
+	// Migration record
+	rec, err := s.keeper.MigrationRecords.Get(s.ctx, legacyAddr.String())
+	s.Require().NoError(err)
+	s.Require().Equal(newAddr.String(), rec.NewAddress)
+
+	// Destination BaseAccount has the reconstructed eth multisig pubkey.
+	newAcc := s.app.AuthKeeper.GetAccount(s.ctx, newAddr)
+	s.Require().NotNil(newAcc)
+	s.Require().NotNil(newAcc.GetPubKey())
+	// The pubkey on the account should derive to newAddr (the multisig address).
+	s.Require().Equal(newAddr.Bytes(), newAcc.GetPubKey().Address().Bytes())
+	// And the actual pubkey bytes should match the reconstructed multiPK bytes.
+	s.Require().Equal(newMultiPK.Bytes(), newAcc.GetPubKey().Bytes())
+
+	// Balances moved.
+	legacyBal := s.app.BankKeeper.GetAllBalances(s.ctx, legacyAddr)
+	s.Require().True(legacyBal.IsZero())
+	newBal := s.app.BankKeeper.GetBalance(s.ctx, newAddr, "ulume")
+	s.Require().Equal(int64(1_000_000_000), newBal.Amount.Int64())
+}

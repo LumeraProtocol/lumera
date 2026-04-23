@@ -12,10 +12,12 @@ import (
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	evmcryptotypes "github.com/cosmos/evm/crypto/ethsecp256k1"
 	"github.com/stretchr/testify/require"
 
 	lcfg "github.com/LumeraProtocol/lumera/config"
 	"github.com/LumeraProtocol/lumera/x/evmigration/types"
+	"github.com/LumeraProtocol/lumera/x/evmigration/types/sigverify"
 )
 
 // BuildMultisigLegacyAccount creates an in-memory K-of-N multisig of
@@ -66,6 +68,82 @@ func SignMultisigProof(
 		}
 		hash := sha256.Sum256([]byte(payload))
 		sig, err := privs[idx].Sign(hash[:])
+		require.NoError(t, err)
+		sigs[i] = sig
+	}
+
+	subPubKeys := make([][]byte, len(multiPK.GetPubKeys()))
+	for i, p := range multiPK.GetPubKeys() {
+		subPubKeys[i] = p.Bytes()
+	}
+	return &types.MigrationProof{Proof: &types.MigrationProof_Multisig{Multisig: &types.MultisigProof{
+		Threshold:     uint32(multiPK.Threshold),
+		SubPubKeys:    subPubKeys,
+		SignerIndices: indices,
+		SubSignatures: sigs,
+		SigFormat:     format,
+	}}}
+}
+
+// BuildMultisigNewAccount creates an in-memory K-of-N multisig of
+// eth_secp256k1 sub-keys and returns the multisig pubkey, sub-private-keys,
+// and derived bech32 address. Mirrors BuildMultisigLegacyAccount for the
+// new-side (coin-type-60) of a multisig→multisig migration.
+func BuildMultisigNewAccount(t *testing.T, k, n int) (*multisig.LegacyAminoPubKey, []*evmcryptotypes.PrivKey, sdk.AccAddress) {
+	t.Helper()
+	privs := make([]*evmcryptotypes.PrivKey, n)
+	pubs := make([]cryptotypes.PubKey, n)
+	for i := 0; i < n; i++ {
+		p, err := evmcryptotypes.GenerateKey()
+		require.NoError(t, err)
+		privs[i] = p
+		pubs[i] = p.PubKey()
+	}
+	multiPK := multisig.NewLegacyAminoPubKey(k, pubs)
+	return multiPK, privs, sdk.AccAddress(multiPK.Address())
+}
+
+// SignNewMultisigProof builds a MultisigProof signed by the K eth_secp256k1
+// sub-keys at signerIdxs. format selects the per-sub-sig envelope:
+//   - SIG_FORMAT_CLI    : sign raw payload. The eth keyring applies Keccak256
+//     internally; this matches VerifyEthSecp256k1 which also Keccak256's.
+//   - SIG_FORMAT_EIP191 : sign EIP191PersonalSignPayload(payload). The keyring
+//     still Keccak256's, which matches the verifier.
+//   - SIG_FORMAT_ADR036 : sign ADR036SignDoc(signerAddr, payload) where
+//     signerAddr is the eth sub-key's own bech32 lumera address.
+//
+// chainID must match the integration suite's chain_id.
+func SignNewMultisigProof(
+	t *testing.T,
+	chainID string,
+	kind string,
+	multiPK *multisig.LegacyAminoPubKey,
+	privs []*evmcryptotypes.PrivKey,
+	signerIdxs []int,
+	legacyAddr, newAddr sdk.AccAddress,
+	format types.SigFormat,
+) *types.MigrationProof {
+	t.Helper()
+	payload := fmt.Sprintf("lumera-evm-migration:%s:%d:%s:%s:%s",
+		chainID, lcfg.EVMChainID, kind, legacyAddr.String(), newAddr.String())
+
+	sort.Ints(signerIdxs)
+	indices := make([]uint32, len(signerIdxs))
+	sigs := make([][]byte, len(signerIdxs))
+	for i, idx := range signerIdxs {
+		indices[i] = uint32(idx)
+		var toSign []byte
+		switch format {
+		case types.SigFormat_SIG_FORMAT_EIP191:
+			toSign = sigverify.EIP191PersonalSignPayload([]byte(payload))
+		case types.SigFormat_SIG_FORMAT_ADR036:
+			signerAddr := sdk.AccAddress(privs[idx].PubKey().Address()).String()
+			toSign = sigverify.ADR036SignDoc(signerAddr, []byte(payload))
+		default:
+			// SIG_FORMAT_CLI: sign the raw payload; eth keyring Keccak256's internally.
+			toSign = []byte(payload)
+		}
+		sig, err := privs[idx].Sign(toSign)
 		require.NoError(t, err)
 		sigs[i] = sig
 	}

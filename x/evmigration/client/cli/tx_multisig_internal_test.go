@@ -8,8 +8,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
@@ -607,4 +609,37 @@ func TestFindSubKeyIndex_KeyNotFound(t *testing.T) {
 	ctx := clientCtxWithKeyring(kr)
 	_, err := findSubKeyIndex(ctx, "nonexistent", spec, sigverify.SubKeyTypeCosmosSecp256k1)
 	require.ErrorContains(t, err, "not found in keyring")
+}
+
+// ---------- cmdSubmitProof regression-lock tests ----------
+
+// TestCmdSubmitProof_HelpTextDoesNotMentionSigning locks down the post-Task-13
+// contract that submit-proof does not sign anything. If a future refactor
+// reintroduces signing language into the help text, this test fails, forcing
+// the author to explicitly acknowledge the change. The actual runtime path is
+// runMigrationTx -> BuildUnsignedTx -> BroadcastTx (no signing).
+func TestCmdSubmitProof_HelpTextDoesNotMentionSigning(t *testing.T) {
+	cmd := cmdSubmitProof()
+	help := cmd.Short + "\n" + cmd.Long
+	for _, banned := range []string{"sign", "Sign", "signature", "new_signature", "--from eth"} {
+		require.NotContains(t, help, banned,
+			"submit-proof help text must not mention %q; the command does not sign anything", banned)
+	}
+	// Sanity-check: make sure we actually read something (guards against a future
+	// refactor that strips Short entirely and silently passes the banned-strings check).
+	require.NotEmpty(t, strings.TrimSpace(cmd.Short), "Short description must be set")
+}
+
+// TestCmdSubmitProof_DoesNotRequireFrom verifies that --from stays optional.
+// Migration txs are unsigned at the Cosmos layer (GetSigners() returns empty),
+// so submit-proof is file-driven and does not need a funded account. If a
+// future change accidentally calls cmd.MarkFlagRequired("from"), this test
+// fails.
+func TestCmdSubmitProof_DoesNotRequireFrom(t *testing.T) {
+	cmd := cmdSubmitProof()
+	fromFlag := cmd.Flags().Lookup("from")
+	require.NotNil(t, fromFlag, "--from flag must exist (added by flags.AddTxFlagsToCmd)")
+	_, isRequired := fromFlag.Annotations[cobra.BashCompOneRequiredFlag]
+	require.False(t, isRequired,
+		"--from must NOT be marked required; submit-proof is file-driven and does not sign")
 }

@@ -1048,7 +1048,7 @@ to --out, with both legacy_proof and new_proof populated.`,
 func cmdSubmitProof() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "submit-proof <tx.json>",
-		Short: "Sign new_signature with --from eth key, simulate gas, broadcast",
+		Short: "Broadcast a pre-assembled migration tx from a JSON file",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clientCtx, err := client.GetClientTxContext(cmd)

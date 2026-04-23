@@ -667,8 +667,17 @@ if the account has no on-chain pubkey).`,
 					sideShapeLabel(legacyIsSingle), sideShapeLabel(newIsSingle))
 			}
 
-			// Key-reuse guard: no new sub-pubkey may equal any legacy sub-pubkey.
-			if !newIsSingle {
+			// Key-reuse guard: the same 33-byte compressed secp256k1 pubkey must not
+			// appear on both sides. Cosmos secp256k1 and eth_secp256k1 share the curve
+			// and the compressed-SEC1 encoding, so a user who accidentally reuses the
+			// SAME private key for both sides would have identical base64 pubkey
+			// strings. Catch it here before a migration ceremony is built around a
+			// self-collision that defeats the point of key rotation.
+			if newIsSingle {
+				if legacySide.PubKey == newSide.PubKey {
+					return fmt.Errorf("destination pub_key %s matches the legacy pub_key; generate a fresh eth key for the new side", newSide.PubKey)
+				}
+			} else {
 				legacySubs := legacySide.SubPubKeys
 				for _, ns := range newSide.SubPubKeys {
 					for _, ls := range legacySubs {

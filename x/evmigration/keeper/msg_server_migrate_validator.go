@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	errorsmod "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 
 	lcfg "github.com/LumeraProtocol/lumera/config"
@@ -43,6 +45,13 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 	// Reject if validator is unbonding or unbonded.
 	if val.Status == stakingtypes.Unbonding || val.Status == stakingtypes.Unbonded {
 		return nil, types.ErrValidatorUnbonding
+	}
+
+	// Reject if the destination address is already a validator operator. Without
+	// this check, MigrateValidatorRecord.SetValidator(newValAddr, val) would
+	// silently overwrite the existing validator record.
+	if _, err := ms.stakingKeeper.GetValidator(ctx, newValAddr); err == nil {
+		return nil, types.ErrNewAddressIsValidator.Wrapf("new address %s is already a validator operator", newValAddr.String())
 	}
 
 	// Total delegation/unbonding/redelegation record count must not exceed
@@ -104,8 +113,11 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 	// --- Step V1: Withdraw all commission and delegation rewards ---
 	// Must happen before re-keying so rewards accrue to the correct addresses.
 	if _, err := ms.distributionKeeper.WithdrawValidatorCommission(ctx, oldValAddr); err != nil {
-		// Commission may be zero — that returns an error we can safely ignore.
-		_ = err
+		// ErrNoValidatorCommission is expected when commission is zero — ignore it.
+		// Any other distribution error (e.g. store corruption) must abort migration.
+		if !errorsmod.IsOf(err, distrtypes.ErrNoValidatorCommission) {
+			return nil, fmt.Errorf("withdraw validator commission: %w", err)
+		}
 	}
 	// Withdraw every delegator's pending rewards for this validator.
 	// If a delegator's withdraw address is an already-migrated legacy address,

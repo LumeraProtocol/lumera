@@ -86,11 +86,16 @@ func TestMigrateValidator_TooManyDelegators(t *testing.T) {
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), legacyAddr).Return(baseAcc)
 
 	oldValAddr := sdk.ValAddress(legacyAddr)
+	newValAddr := sdk.ValAddress(newAddr)
 	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), oldValAddr).Return(
 		stakingtypes.Validator{
 			OperatorAddress: legacyAddr.String(),
 			Status:          stakingtypes.Bonded,
 		}, nil,
+	)
+	// Destination is not already a validator.
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), newValAddr).Return(
+		stakingtypes.Validator{}, stakingtypes.ErrNoValidatorFound,
 	)
 
 	// 2 delegations > max of 1.
@@ -133,6 +138,10 @@ func TestMigrateValidator_Success(t *testing.T) {
 		Status:          stakingtypes.Bonded,
 	}
 	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), oldValAddr).Return(val, nil)
+	// Destination is not already a validator.
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), newValAddr).Return(
+		stakingtypes.Validator{}, stakingtypes.ErrNoValidatorFound,
+	)
 
 	// Delegation count check — 1 delegation, no unbonding/redelegations.
 	del := stakingtypes.NewDelegation(legacyAddr.String(), oldValAddr.String(), math.LegacyNewDec(100))
@@ -303,6 +312,10 @@ func TestMigrateValidator_OperatorDelegationsToOtherValidators(t *testing.T) {
 		Status:          stakingtypes.Bonded,
 	}
 	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), oldValAddr).Return(val, nil)
+	// Destination is not already a validator.
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), newValAddr).Return(
+		stakingtypes.Validator{}, stakingtypes.ErrNoValidatorFound,
+	)
 
 	// Self-delegation only (to own validator).
 	selfDel := stakingtypes.NewDelegation(legacyAddr.String(), oldValAddr.String(), math.LegacyNewDec(100))
@@ -491,6 +504,10 @@ func TestMigrateValidator_ThirdPartyWithdrawAddrPreserved(t *testing.T) {
 		Status:          stakingtypes.Bonded,
 	}
 	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), oldValAddr).Return(val, nil)
+	// Destination is not already a validator.
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), newValAddr).Return(
+		stakingtypes.Validator{}, stakingtypes.ErrNoValidatorFound,
+	)
 
 	// Two delegations: self-delegation + third-party delegator.
 	selfDel := stakingtypes.NewDelegation(legacyAddr.String(), oldValAddr.String(), math.LegacyNewDec(100))

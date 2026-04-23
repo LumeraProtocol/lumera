@@ -14,6 +14,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/types/query"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	vestingtypes "github.com/cosmos/cosmos-sdk/x/auth/vesting/types"
 	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
@@ -1258,4 +1259,119 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_Multisig_ADR036_BothS
 	s.Require().NotNil(newAcc)
 	s.Require().NotNil(newAcc.GetPubKey())
 	s.Require().Equal(newMultiPK.Bytes(), newAcc.GetPubKey().Bytes())
+}
+
+// TestMigrateValidator_RejectsDestinationAlreadyValidator verifies that
+// MigrateValidator rejects a destination address whose ValAddress is already a
+// validator operator. Without the guard, MigrateValidatorRecord.SetValidator
+// would silently overwrite the pre-existing destination validator record.
+func (s *MigrationIntegrationSuite) TestMigrateValidator_RejectsDestinationAlreadyValidator() {
+	s.enableMigration()
+
+	// Legacy validator (source of migration).
+	selfBondAmt := sdkmath.NewInt(1_000_000)
+	operatorCoins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 2_000_000))
+	legacyPrivKey, legacyAddr := s.createFundedLegacyAccount(operatorCoins)
+	s.createTestValidator(legacyAddr, selfBondAmt)
+
+	// Pre-seed the destination address as an existing validator.
+	// createTestValidator treats its arg as a funded legacy account whose
+	// ValAddress becomes the validator operator, so we create a funded legacy
+	// account at newAddr and use it as the destination. Using a secp256k1
+	// destination here is fine: the check under test runs before signature
+	// verification, so an EVM destination signature is not required.
+	_, newAddr := s.createFundedLegacyAccount(sdk.NewCoins(sdk.NewInt64Coin("ulume", 2_000_000)))
+	s.createTestValidator(newAddr, sdkmath.NewInt(500_000))
+
+	// Build a MigrateValidator message. Destination proof is not reachable in
+	// this test (the guard fires first), so an EVM key is unnecessary — we use
+	// a dummy evmcryptotypes key just to populate the message structurally.
+	newPrivKey, err := evmcryptotypes.GenerateKey()
+	s.Require().NoError(err)
+	msg := &types.MsgMigrateValidator{
+		LegacyAddress: legacyAddr.String(),
+		NewAddress:    newAddr.String(),
+		LegacyProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
+			PubKey:    legacyPrivKey.PubKey().(*secp256k1.PubKey).Key,
+			Signature: signValidatorMigration(s.T(), legacyPrivKey, legacyAddr, newAddr),
+			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
+		}}},
+		NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
+			PubKey:    newPrivKey.PubKey().(*evmcryptotypes.PubKey).Key,
+			Signature: signNewMigration(s.T(), "validator", newPrivKey, legacyAddr, newAddr),
+			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
+		}}},
+	}
+
+	_, err = s.msgServer.MigrateValidator(s.ctx, msg)
+	s.Require().Error(err)
+	s.Require().ErrorIs(err, types.ErrNewAddressIsValidator)
+	s.Require().ErrorContains(err, "already a validator operator")
+}
+
+// TestQueryLegacyAccounts_Pagination_KeyRoundtrip verifies that
+// LegacyAccounts honors Pagination.Key as a big-endian-encoded offset,
+// allowing clients to round-trip pages via NextKey from the prior response.
+//
+// The test tolerates pre-existing funded accounts from the test genesis
+// (e.g. the default validator operator): what we verify is that
+//
+//   - each page emits NextKey of length 8 while more results remain;
+//   - feeding NextKey back as Pagination.Key advances past the prior page
+//     (no duplicates across consecutive pages);
+//   - the final page (covering the Total) emits NextKey == nil.
+func (s *MigrationIntegrationSuite) TestQueryLegacyAccounts_Pagination_KeyRoundtrip() {
+	s.enableMigration()
+	qs := evmigrationkeeper.NewQueryServerImpl(s.keeper)
+
+	// Five additional funded legacy accounts on top of whatever the genesis
+	// fixture already has.
+	coins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 1_000))
+	for i := 0; i < 5; i++ {
+		s.createFundedLegacyAccount(coins)
+	}
+
+	// Page 1: Limit=2, no Key/Offset.
+	resp1, err := qs.LegacyAccounts(s.ctx, &types.QueryLegacyAccountsRequest{
+		Pagination: &query.PageRequest{Limit: 2},
+	})
+	s.Require().NoError(err)
+	s.Require().Len(resp1.Accounts, 2)
+	s.Require().NotNil(resp1.Pagination)
+	total := resp1.Pagination.Total
+	s.Require().GreaterOrEqual(total, uint64(5), "at least the 5 created accounts should be enumerated")
+	s.Require().Len(resp1.Pagination.NextKey, 8, "NextKey must be big-endian uint64 offset")
+
+	// Page 2: Limit=2, Key=resp1.NextKey. Must be disjoint from page 1.
+	resp2, err := qs.LegacyAccounts(s.ctx, &types.QueryLegacyAccountsRequest{
+		Pagination: &query.PageRequest{Key: resp1.Pagination.NextKey, Limit: 2},
+	})
+	s.Require().NoError(err)
+	s.Require().NotEmpty(resp2.Accounts)
+	s.Require().LessOrEqual(len(resp2.Accounts), 2)
+	s.Require().NotNil(resp2.Pagination)
+
+	page1Addrs := map[string]bool{resp1.Accounts[0].Address: true, resp1.Accounts[1].Address: true}
+	for _, a := range resp2.Accounts {
+		s.Require().False(page1Addrs[a.Address], "page 2 account %s duplicates page 1", a.Address)
+	}
+
+	// Walk remaining pages using each response's NextKey until it is nil. The
+	// final page must have NextKey == nil; intermediate pages must have
+	// NextKey of length 8.
+	lastNextKey := resp2.Pagination.NextKey
+	seen := 0
+	for i := 0; lastNextKey != nil; i++ {
+		s.Require().Len(lastNextKey, 8, "intermediate NextKey must be 8-byte big-endian offset")
+		resp, err := qs.LegacyAccounts(s.ctx, &types.QueryLegacyAccountsRequest{
+			Pagination: &query.PageRequest{Key: lastNextKey, Limit: 2},
+		})
+		s.Require().NoError(err)
+		s.Require().NotEmpty(resp.Accounts)
+		lastNextKey = resp.Pagination.NextKey
+		seen += len(resp.Accounts)
+		s.Require().Less(i, 100, "pagination loop runaway")
+	}
+	s.Require().Nil(lastNextKey, "final page must not emit NextKey")
+	_ = seen
 }

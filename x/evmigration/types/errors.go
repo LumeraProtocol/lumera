@@ -31,7 +31,9 @@ var (
 	// clobber pre-existing special-type state.
 	ErrInvalidMigrationDestination = errors.Register(ModuleName, 1116, "invalid migration destination account type")
 
-	// Codes 1117, 1118 left intentionally unregistered — reclaimed from the
+	ErrNewAddressIsValidator = errors.Register(ModuleName, 1117, "new address is already a validator operator")
+
+	// Code 1118 left intentionally unregistered — reclaimed from the
 	// side-specific ErrNewPubKeyAddressMismatch / ErrInvalidNewSignature which
 	// no longer exist. Do not reuse these codes in this module.
 

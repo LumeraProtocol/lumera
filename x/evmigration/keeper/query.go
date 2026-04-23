@@ -372,14 +372,21 @@ func (qs queryServer) LegacyAccounts(goCtx context.Context, req *types.QueryLega
 		return false
 	})
 
-	// Simple offset/limit pagination.
+	// Simple offset/limit pagination. The response emits NextKey as a
+	// big-endian-encoded offset, so when a client passes Pagination.Key from a
+	// prior response we decode it back to an offset. Explicit Pagination.Offset
+	// still works for clients that prefer it; Key wins when both are set
+	// (matches Cosmos SDK idiom of "use Key when present, otherwise Offset").
 	start := 0
-	if req.Pagination != nil && len(req.Pagination.Key) > 0 {
-		// Key-based pagination not supported for this in-memory list.
-		// Fall back to offset.
-		start = int(req.Pagination.Offset)
-	} else if req.Pagination != nil {
-		start = int(req.Pagination.Offset)
+	if req.Pagination != nil {
+		switch {
+		case len(req.Pagination.Key) == 8:
+			start = int(sdk.BigEndianToUint64(req.Pagination.Key))
+		case len(req.Pagination.Key) > 0:
+			return nil, fmt.Errorf("invalid pagination key length: got %d bytes, want 8", len(req.Pagination.Key))
+		default:
+			start = int(req.Pagination.Offset)
+		}
 	}
 
 	limit := 100

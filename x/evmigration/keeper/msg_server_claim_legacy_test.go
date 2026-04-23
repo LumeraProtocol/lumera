@@ -923,6 +923,11 @@ func setupPassingValPreChecks(t *testing.T, f *msgServerFixture) (
 		stakingtypes.Validator{OperatorAddress: oldValAddr.String(), Status: stakingtypes.Bonded}, nil,
 	)
 
+	// Destination is NOT already a validator (post-unbonding-check guard).
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), newValAddr).Return(
+		stakingtypes.Validator{}, stakingtypes.ErrNoValidatorFound,
+	)
+
 	// No delegations/ubds/reds (under limit).
 	f.stakingKeeper.EXPECT().GetValidatorDelegations(gomock.Any(), oldValAddr).Return(nil, nil)
 	f.stakingKeeper.EXPECT().GetUnbondingDelegationsFromValidator(gomock.Any(), oldValAddr).Return(nil, nil)
@@ -994,9 +999,9 @@ func TestMigrateValidator_FailAtValidatorRecord(t *testing.T) {
 	f := initMsgServerFixture(t)
 	legacyAddr, _, oldValAddr, _, msg := setupPassingValPreChecks(t, f)
 
-	// Step V1: WithdrawValidatorCommission (no commission).
+	// Step V1: WithdrawValidatorCommission (no commission — sentinel error is swallowed).
 	f.distributionKeeper.EXPECT().WithdrawValidatorCommission(gomock.Any(), oldValAddr).Return(
-		sdk.Coins{}, fmt.Errorf("no commission"),
+		sdk.Coins{}, distrtypes.ErrNoValidatorCommission,
 	)
 
 	// Step V2: MigrateValidatorRecord fails at GetValidator.

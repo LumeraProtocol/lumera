@@ -124,7 +124,89 @@ G_USAGE
   lumerad_tx_query_style "${args[@]}"
   log_info "done — distribute $out to the K co-signers"
 }
-_mms_sign()     { log_error "sign not yet implemented";     exit 2; }
+_mms_sign() {
+  local input="" from="" chain_id="" out="" binary="lumerad"
+  local keyring_backend="test" keyring_dir="" home_dir=""
+  local positional=()
+  while (( $# > 0 )); do
+    case "$1" in
+      --from)             _require_value "$1" "$#" "${2-}"; from="$2"; shift 2 ;;
+      --chain-id)         _require_value "$1" "$#" "${2-}"; chain_id="$2"; shift 2 ;;
+      --out)              _require_value "$1" "$#" "${2-}"; out="$2"; shift 2 ;;
+      --binary)           _require_value "$1" "$#" "${2-}"; binary="$2"; shift 2 ;;
+      --keyring-backend)  _require_value "$1" "$#" "${2-}"; keyring_backend="$2"; shift 2 ;;
+      --keyring-dir)      _require_value "$1" "$#" "${2-}"; keyring_dir="$2"; shift 2 ;;
+      --home)             _require_value "$1" "$#" "${2-}"; home_dir="$2"; shift 2 ;;
+      -h|--help)
+        cat >&2 <<'S_USAGE'
+Usage: migrate-multisig.sh sign <proof-or-partial.json> --from <my-sub-key> \
+  --chain-id <id> --out <partial.json> [--keyring-backend <b>] [--keyring-dir <dir>] [--home <dir>] [--binary <path>]
+S_USAGE
+        exit 0 ;;
+      --*) log_error "unknown flag: $1"; exit 1 ;;
+      *)   positional+=("$1"); shift ;;
+    esac
+  done
+
+  if (( ${#positional[@]} != 1 )); then
+    log_error "sign: expected exactly one positional argument (<proof-or-partial.json>)"
+    exit 1
+  fi
+  input="${positional[0]}"
+
+  local f
+  for f in from chain_id out; do
+    if [[ -z "${!f}" ]]; then
+      log_error "sign: --${f//_/-} is required"
+      exit 1
+    fi
+  done
+
+  # shellcheck disable=SC2034
+  BIN="$binary"
+  # shellcheck disable=SC2034
+  CHAIN_ID="$chain_id"
+  # shellcheck disable=SC2034
+  KEYRING_BACKEND="$keyring_backend"
+  # shellcheck disable=SC2034
+  KEYRING_DIR="$keyring_dir"
+  # shellcheck disable=SC2034
+  HOME_DIR="$home_dir"
+
+  require_binary
+  require_jq
+
+  # Parse + validate the input proof/partial. read_proof_file rejects
+  # single-key proofs (exit 3), bad payload_hex (exit 9), missing fields
+  # (exit 9), and structural issues (exit 9).
+  local pjson
+  pjson=$(read_proof_file "$input")
+
+  # Confirm --from is a legacy secp256k1 sub-key, not an eth key.
+  assert_secp256k1_key "$from"
+
+  # Confirm --from's pubkey is in the proof's sub-key set.
+  local from_pubkey listed
+  from_pubkey=$(key_pubkey_b64 "$from")
+  listed=$(jq -r '.multisig.sub_pub_keys_b64[]' <<<"$pjson")
+  if ! grep -qFx "$from_pubkey" <<<"$listed"; then
+    log_error "key '$from' pubkey is not among the multisig sub-keys in $input"
+    exit 1
+  fi
+
+  # Pass through to lumerad tx evmigration sign-proof.
+  local args=(tx evmigration sign-proof "$input"
+    --from "$from"
+    --chain-id "$chain_id"
+    --out "$out"
+    --keyring-backend "$keyring_backend")
+  [[ -n "$keyring_dir" ]] && args+=(--keyring-dir "$keyring_dir")
+  [[ -n "$home_dir"    ]] && args+=(--home "$home_dir")
+
+  log_info "signing $input as '$from'"
+  "$BIN" "${args[@]}"
+  log_info "partial written to $out"
+}
 _mms_combine()  { log_error "combine not yet implemented";  exit 2; }
 _mms_submit()   { log_error "submit not yet implemented";   exit 2; }
 

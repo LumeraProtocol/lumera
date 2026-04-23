@@ -34,8 +34,8 @@ setup() {
   [[ "$output" == *"Usage:"* ]]
 }
 
-@test "migrate-multisig.sh stubbed subcommands (sign/combine/submit) reach stub and exit 2" {
-  run "$SCRIPTS_DIR/migrate-multisig.sh" sign
+@test "migrate-multisig.sh stubbed subcommands (combine/submit) reach stub and exit 2" {
+  run "$SCRIPTS_DIR/migrate-multisig.sh" combine
   [ "$status" -eq 2 ]
   [[ "$output" == *"not yet implemented"* ]]
 }
@@ -178,4 +178,103 @@ setup() {
     --kind claim --chain-id shim-test --node tcp://local:1 \
     --out /tmp/unused.json
   [ "$status" -eq 5 ]
+}
+
+@test "sign happy path writes a partial (alice-sub in set)" {
+  local tmp; tmp=$(mktemp -d)
+  cp "$FIX_DIR/proof-template.json" "$tmp/proof.json"
+  run "$SCRIPTS_DIR/migrate-multisig.sh" sign "$tmp/proof.json" \
+      --binary "$SHIM" \
+      --from alice-sub \
+      --chain-id shim-test \
+      --out "$tmp/alice-partial.json"
+  [ "$status" -eq 0 ]
+  [ -f "$tmp/alice-partial.json" ]
+  rm -rf "$tmp"
+}
+
+@test "sign rejects tampered payload_hex (exit 9)" {
+  local tmp; tmp=$(mktemp -d)
+  jq '.payload_hex = "00"' "$FIX_DIR/proof-template.json" > "$tmp/bad.json"
+  run "$SCRIPTS_DIR/migrate-multisig.sh" sign "$tmp/bad.json" \
+      --binary "$SHIM" \
+      --from alice-sub \
+      --chain-id shim-test \
+      --out "$tmp/out.json"
+  [ "$status" -eq 9 ]
+  [[ "$output" == *"payload_hex"* ]]
+  rm -rf "$tmp"
+}
+
+@test "sign rejects single-key proof with exit 3" {
+  local tmp; tmp=$(mktemp -d)
+  # Construct a minimal single-proof file
+  cat > "$tmp/single.json" <<'EOF'
+{
+  "kind": "claim",
+  "legacy_address": "lumera1",
+  "new_address": "lumera2",
+  "chain_id": "shim",
+  "evm_chain_id": "76857769",
+  "payload_hex": "0000000000000000000000000000000000000000000000000000000000000000",
+  "single": {
+    "sig_format": "SIG_FORMAT_CLI",
+    "signature_b64": "c2luZ2xl"
+  },
+  "partial_signatures": []
+}
+EOF
+  run "$SCRIPTS_DIR/migrate-multisig.sh" sign "$tmp/single.json" \
+      --binary "$SHIM" \
+      --from alice-sub \
+      --chain-id shim-test \
+      --out "$tmp/out.json"
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"single-key"* ]] || [[ "$output" == *"single"* ]]
+  rm -rf "$tmp"
+}
+
+@test "sign rejects --from not in sub-key set (exit 1)" {
+  local tmp; tmp=$(mktemp -d)
+  cp "$FIX_DIR/proof-template.json" "$tmp/proof.json"
+  run "$SCRIPTS_DIR/migrate-multisig.sh" sign "$tmp/proof.json" \
+      --binary "$SHIM" \
+      --from wrong-sub \
+      --chain-id shim-test \
+      --out "$tmp/out.json"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"sub-key"* ]]
+  rm -rf "$tmp"
+}
+
+@test "sign rejects eth_secp256k1 key as --from (exit 1)" {
+  local tmp; tmp=$(mktemp -d)
+  cp "$FIX_DIR/proof-template.json" "$tmp/proof.json"
+  run "$SCRIPTS_DIR/migrate-multisig.sh" sign "$tmp/proof.json" \
+      --binary "$SHIM" \
+      --from new-eth-key \
+      --chain-id shim-test \
+      --out "$tmp/out.json"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"secp256k1"* ]]
+  rm -rf "$tmp"
+}
+
+@test "sign exits 1 with no --from" {
+  run "$SCRIPTS_DIR/migrate-multisig.sh" sign "$FIX_DIR/proof-template.json" \
+    --binary "$SHIM" --chain-id shim --out /tmp/unused.json
+  [ "$status" -eq 1 ]
+}
+
+@test "sign exits 1 with no positional argument" {
+  run "$SCRIPTS_DIR/migrate-multisig.sh" sign \
+    --binary "$SHIM" --from alice-sub --chain-id shim --out /tmp/unused.json
+  [ "$status" -eq 1 ]
+}
+
+@test "sign exits 1 with multiple positional arguments" {
+  run "$SCRIPTS_DIR/migrate-multisig.sh" sign \
+    "$FIX_DIR/proof-template.json" "$FIX_DIR/partial-alice.json" \
+    --binary "$SHIM" --from alice-sub --chain-id shim --out /tmp/unused.json
+  [ "$status" -eq 1 ]
 }

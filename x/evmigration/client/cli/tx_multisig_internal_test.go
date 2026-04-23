@@ -271,6 +271,41 @@ func TestBuildProofFromPartial_Multisig_BadBase64Sig_Dropped(t *testing.T) {
 	require.Len(t, mp.SubSignatures, 2)
 }
 
+// TestBuildProofFromPartial_Multisig_DedupeDuplicateIndex exercises the
+// dedupe guard: two partial entries at the same Index should be collapsed
+// to one in the resulting MultisigProof (keeping the first).
+func TestBuildProofFromPartial_Multisig_DedupeDuplicateIndex(t *testing.T) {
+	privs := []*secp256k1.PrivKey{
+		secp256k1.GenPrivKey(),
+		secp256k1.GenPrivKey(),
+		secp256k1.GenPrivKey(),
+	}
+	payload := []byte("lumera-evm-migration:lumera-test-1:76857769:claim:legacy:new")
+	subPubKeys := make([]string, len(privs))
+	for i, p := range privs {
+		subPubKeys[i] = base64.StdEncoding.EncodeToString(p.PubKey().Bytes())
+	}
+
+	// Two valid sigs at Index=0 (same signer, same payload — deterministic),
+	// plus one at Index=1. Below dedupe, all three would land in the proof.
+	sig0a := cosmosSign(t, privs[0], payload)
+	sig0b := cosmosSign(t, privs[0], payload) // second invocation of same signer
+	sig1 := cosmosSign(t, privs[1], payload)
+	sigs := []PartialSignature{
+		{Index: 0, Signature: base64.StdEncoding.EncodeToString(sig0a)},
+		{Index: 0, Signature: base64.StdEncoding.EncodeToString(sig0b)},
+		{Index: 1, Signature: base64.StdEncoding.EncodeToString(sig1)},
+	}
+	side := &SideSpec{Threshold: 2, SubPubKeys: subPubKeys, SigFormat: "SIG_FORMAT_CLI"}
+
+	proof, err := buildProofFromPartial(side, sigs, payload, sigverify.SubKeyTypeCosmosSecp256k1, "legacy", io.Discard)
+	require.NoError(t, err)
+	mp := proof.GetMultisig()
+	require.NotNil(t, mp)
+	require.Equal(t, []uint32{0, 1}, mp.SignerIndices)
+	require.Len(t, mp.SubSignatures, 2)
+}
+
 func TestBuildProofFromPartial_Multisig_WrongPubKeyLength(t *testing.T) {
 	// SubPubKeys entry decodes to only 4 bytes — must error.
 	side := &SideSpec{

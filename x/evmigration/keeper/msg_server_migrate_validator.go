@@ -38,8 +38,13 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 	newValAddr := sdk.ValAddress(newAddr)
 
 	val, err := ms.stakingKeeper.GetValidator(ctx, oldValAddr)
-	if err != nil {
+	switch {
+	case err == nil:
+		// proceed
+	case errorsmod.IsOf(err, stakingtypes.ErrNoValidatorFound):
 		return nil, types.ErrNotValidator
+	default:
+		return nil, fmt.Errorf("lookup source validator: %w", err)
 	}
 
 	// Reject if validator is unbonding or unbonded.
@@ -50,8 +55,13 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 	// Reject if the destination address is already a validator operator. Without
 	// this check, MigrateValidatorRecord.SetValidator(newValAddr, val) would
 	// silently overwrite the existing validator record.
-	if _, err := ms.stakingKeeper.GetValidator(ctx, newValAddr); err == nil {
+	switch _, err := ms.stakingKeeper.GetValidator(ctx, newValAddr); {
+	case err == nil:
 		return nil, types.ErrNewAddressIsValidator.Wrapf("new address %s is already a validator operator", newValAddr.String())
+	case errorsmod.IsOf(err, stakingtypes.ErrNoValidatorFound):
+		// OK — destination has no existing validator record.
+	default:
+		return nil, fmt.Errorf("check destination validator: %w", err)
 	}
 
 	// Total delegation/unbonding/redelegation record count must not exceed

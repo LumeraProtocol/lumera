@@ -312,6 +312,14 @@ func buildProofFromPartial(
 	validIdxs := make([]uint32, 0, len(sigs))
 	validSigs := make([][]byte, 0, len(sigs))
 	for _, ps := range sigs {
+		// Dedupe: strictly ascending unique indices are required by
+		// MultisigProof.validateBasic. If a partial file happens to contain
+		// two entries at the same index (e.g. a co-signer re-ran sign-proof
+		// within one file), keep the first valid one and warn on subsequent.
+		if len(validIdxs) > 0 && validIdxs[len(validIdxs)-1] == ps.Index {
+			_, _ = fmt.Fprintf(stderr, "WARN %s side: dropping duplicate partial at index %d (already accepted)\n", sideLabel, ps.Index)
+			continue
+		}
 		if int(ps.Index) >= len(subPubs) {
 			_, _ = fmt.Fprintf(stderr, "WARN %s side: dropping partial at index %d (out of range for N=%d)\n", sideLabel, ps.Index, len(subPubs))
 			continue
@@ -1023,6 +1031,16 @@ to --out, with both legacy_proof and new_proof populated.`,
 				}
 			default:
 				return fmt.Errorf("unsupported kind %q", merged.Kind)
+			}
+
+			// Final sanity check: the assembled msg must satisfy ValidateBasic.
+			// Belt-and-suspenders — duplicate-index dedupe and per-side selection
+			// are already enforced by buildProofFromPartial, but this guarantees
+			// we never write a malformed tx to disk.
+			if vb, ok := msg.(sdk.HasValidateBasic); ok {
+				if err := vb.ValidateBasic(); err != nil {
+					return fmt.Errorf("assembled message failed ValidateBasic: %w", err)
+				}
 			}
 
 			// Build the unsigned tx JSON.

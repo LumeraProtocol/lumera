@@ -6,7 +6,9 @@ import (
 	"strconv"
 	"time"
 
+	errorsmod "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 
 	lcfg "github.com/LumeraProtocol/lumera/config"
 	"github.com/LumeraProtocol/lumera/x/evmigration/types"
@@ -36,8 +38,13 @@ func (ms msgServer) ClaimLegacyAccount(goCtx context.Context, msg *types.MsgClai
 
 	// Check: legacy address must NOT be a validator operator.
 	oldValAddr := sdk.ValAddress(legacyAddr)
-	if _, err := ms.stakingKeeper.GetValidator(ctx, oldValAddr); err == nil {
+	switch _, err := ms.stakingKeeper.GetValidator(ctx, oldValAddr); {
+	case err == nil:
 		return nil, types.ErrUseValidatorMigration
+	case errorsmod.IsOf(err, stakingtypes.ErrNoValidatorFound):
+		// OK — legacy addr is not a validator operator, proceed with claim flow.
+	default:
+		return nil, fmt.Errorf("check legacy validator: %w", err)
 	}
 
 	// Verify both embedded proofs before touching state.

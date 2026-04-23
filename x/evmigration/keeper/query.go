@@ -161,7 +161,10 @@ func (qs queryServer) MigrationEstimate(goCtx context.Context, req *types.QueryM
 	resp := &types.QueryMigrationEstimateResponse{}
 
 	// Fetch params once for use in validator and multisig preflight checks.
-	params, _ := qs.k.Params.Get(ctx)
+	params, err := qs.k.Params.Get(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("load params for migration estimate: %w", err)
+	}
 
 	// Check if validator.
 	valAddr := sdk.ValAddress(addr)

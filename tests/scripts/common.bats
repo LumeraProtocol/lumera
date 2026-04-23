@@ -370,3 +370,245 @@ setup_shim() {
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.name == "alice-sub"'
 }
+
+# ---- Multisig helpers -------------------------------------------------------
+
+@test "assert_multisig passes on multisig estimate" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    assert_multisig "$(cat '"$BATS_TEST_DIRNAME"'/fixtures/estimate-multisig.json)"
+  '
+  [ "$status" -eq 0 ]
+}
+
+@test "assert_multisig rejects single-sig estimate with exit 3" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    assert_multisig "$(cat '"$BATS_TEST_DIRNAME"'/fixtures/estimate-ok.json)"
+  '
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"not a multisig"* ]]
+}
+
+@test "auth_pubkey_type identifies multisig (top-level)" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'; NODE=tcp://local:1
+    SHIM_AUTH_TYPE=multisig auth_pubkey_type lumera1x
+  '
+  [ "$status" -eq 0 ]
+  [ "$output" = "multisig" ]
+}
+
+@test "auth_pubkey_type identifies multisig (nested base_account)" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'; NODE=tcp://local:1
+    SHIM_AUTH_TYPE=multisig-nested auth_pubkey_type lumera1x
+  '
+  [ "$status" -eq 0 ]
+  [ "$output" = "multisig" ]
+}
+
+@test "auth_pubkey_type identifies nil pubkey" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'; NODE=tcp://local:1
+    SHIM_AUTH_TYPE=nilpubkey auth_pubkey_type lumera1x
+  '
+  [ "$status" -eq 0 ]
+  [ "$output" = "none" ]
+}
+
+@test "auth_pubkey_type identifies single-sig" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'; NODE=tcp://local:1
+    auth_pubkey_type lumera1x
+  '
+  [ "$status" -eq 0 ]
+  [ "$output" = "single-sig" ]
+}
+
+@test "key_pubkey_b64 extracts alice-sub's base64 key" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'
+    key_pubkey_b64 alice-sub
+  '
+  [ "$status" -eq 0 ]
+  [ "$output" = "A1111111111111111111111111111111111111111111" ]
+}
+
+@test "assert_secp256k1_key passes for alice-sub" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'
+    assert_secp256k1_key alice-sub
+  '
+  [ "$status" -eq 0 ]
+}
+
+@test "assert_secp256k1_key rejects new-eth-key (exit 1)" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'
+    assert_secp256k1_key new-eth-key
+  '
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"secp256k1"* ]]
+}
+
+@test "assert_eth_key passes for new-eth-key" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'
+    assert_eth_key new-eth-key
+  '
+  [ "$status" -eq 0 ]
+}
+
+@test "assert_eth_key rejects wrong-algo (exit 1)" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'
+    assert_eth_key wrong-algo
+  '
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"eth_secp256k1"* ]]
+}
+
+@test "read_proof_file validates proof-template.json and emits JSON" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    read_proof_file '"$BATS_TEST_DIRNAME"'/fixtures/proof-template.json
+  '
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.kind == "claim" and .multisig.threshold == 2'
+}
+
+@test "read_proof_file exits 9 on missing required field" {
+  setup_shim
+  local tmp; tmp=$(mktemp)
+  echo '{"kind":"claim","multisig":{"threshold":2,"sub_pub_keys_b64":["x"],"sig_format":"a"}}' > "$tmp"
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    read_proof_file '"$tmp"'
+  '
+  rm -f "$tmp"
+  [ "$status" -eq 9 ]
+  [[ "$output" == *"missing required field"* ]]
+}
+
+@test "read_proof_file exits 9 on payload_hex mismatch" {
+  setup_shim
+  local tmp; tmp=$(mktemp)
+  jq '.payload_hex = "00"' "$BATS_TEST_DIRNAME/fixtures/proof-template.json" > "$tmp"
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    read_proof_file '"$tmp"'
+  '
+  rm -f "$tmp"
+  [ "$status" -eq 9 ]
+  [[ "$output" == *"payload_hex"* ]]
+}
+
+@test "read_proof_file exits 3 on single-key proof" {
+  setup_shim
+  local tmp; tmp=$(mktemp)
+  echo '{"kind":"claim","legacy_address":"a","new_address":"b","chain_id":"c","evm_chain_id":"1","payload_hex":"00","single":{"sig_format":"x","signature_b64":"y"},"partial_signatures":[]}' > "$tmp"
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    read_proof_file '"$tmp"'
+  '
+  rm -f "$tmp"
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"single-key"* ]]
+}
+
+@test "read_proof_file exits 9 when partial index out of range" {
+  setup_shim
+  local tmp; tmp=$(mktemp)
+  jq '.partial_signatures = [{"index": 99, "signature_b64": "abc"}]' \
+    "$BATS_TEST_DIRNAME/fixtures/proof-template.json" > "$tmp"
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    read_proof_file '"$tmp"'
+  '
+  rm -f "$tmp"
+  [ "$status" -eq 9 ]
+  [[ "$output" == *"out of range"* ]]
+}
+
+@test "read_migration_tx_file validates multisig tx JSON" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    read_migration_tx_file '"$BATS_TEST_DIRNAME"'/fixtures/combined-tx.json
+  '
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.kind == "claim" and .threshold == 2 and .num_signers == 3'
+}
+
+@test "read_migration_tx_file exits 3 on single-key proof tx" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    read_migration_tx_file '"$BATS_TEST_DIRNAME"'/fixtures/combined-tx-single.json
+  '
+  [ "$status" -eq 3 ]
+  [[ "$output" == *"single-key"* ]]
+}
+
+@test "summarize_partials reports threshold satisfied at 2-of-3" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    summarize_partials \
+      '"$BATS_TEST_DIRNAME"'/fixtures/partial-alice.json \
+      '"$BATS_TEST_DIRNAME"'/fixtures/partial-bob.json
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"2 >= 2"* ]]
+}
+
+@test "summarize_partials returns non-zero when below threshold" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    summarize_partials '"$BATS_TEST_DIRNAME"'/fixtures/partial-alice.json
+  '
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"no"* ]]
+}
+
+@test "summarize_partials exits 9 on cross-file chain_id mismatch" {
+  setup_shim
+  local tmp; tmp=$(mktemp)
+  local payload ph
+  payload='lumera-evm-migration:different-chain:76857769:claim:lumera1shimaddr1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx:lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+  ph=$(printf '%s' "$payload" | sha256sum | awk '{print $1}')
+  jq --arg ph "$ph" '.chain_id = "different-chain" | .payload_hex = $ph' \
+    "$BATS_TEST_DIRNAME/fixtures/partial-bob.json" > "$tmp"
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    summarize_partials \
+      '"$BATS_TEST_DIRNAME"'/fixtures/partial-alice.json \
+      '"$tmp"'
+  '
+  rm -f "$tmp"
+  [ "$status" -eq 9 ]
+  [[ "$output" == *"chain_id"* ]]
+}

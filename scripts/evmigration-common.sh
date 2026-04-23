@@ -496,3 +496,375 @@ import_from_mnemonic() {
 
   unset mnemonic
 }
+
+# ---- Multisig helpers -------------------------------------------------------
+
+# assert_multisig <estimate-json>
+# Opposite of assert_single_sig. Exit 3 if the estimate's is_multisig != true.
+assert_multisig() {
+  local json="$1"
+  if [[ "$(jq -r '.is_multisig' <<<"$json")" != "true" ]]; then
+    log_error "legacy account is not a multisig; use migrate-account.sh / migrate-validator.sh for single-sig accounts"
+    exit 3
+  fi
+}
+
+# require_multisig_binary
+# Extends require_binary by probing all four multisig tx subcommands.
+require_multisig_binary() {
+  require_binary
+  local probe
+  for probe in \
+    "tx evmigration generate-proof-payload" \
+    "tx evmigration sign-proof" \
+    "tx evmigration combine-proof" \
+    "tx evmigration submit-proof"; do
+    # shellcheck disable=SC2086
+    if ! "$BIN" $probe --help >/dev/null 2>&1; then
+      log_error "$BIN does not support '$probe' — needs a post-EVM-upgrade build with multisig migration"
+      exit 2
+    fi
+  done
+}
+
+# lumerad_tx_query_style <args...>
+# Invokes lumerad tx <args> without keyring flags. Used for generate-proof-payload
+# which is implemented under tx but is query-style and doesn't accept --keyring-backend.
+lumerad_tx_query_style() {
+  if [[ -z "${CHAIN_ID:-}" ]]; then
+    log_error "--chain-id is required"
+    exit 1
+  fi
+  "$BIN" tx "$@" \
+    --node "$NODE" \
+    --chain-id "$CHAIN_ID" \
+    --output json
+}
+
+# auth_account_json <addr>
+# Thin wrapper around lumerad_q auth account, fails closed with exit 2 on RPC failure.
+auth_account_json() {
+  local addr="$1"
+  local json
+  if ! json=$(lumerad_q auth account "$addr" 2>/dev/null); then
+    log_error "could not query auth account for $addr"
+    exit 2
+  fi
+  printf '%s\n' "$json"
+}
+
+# auth_pubkey_type <addr>
+# Returns one of: none | single-sig | multisig | unknown.
+# Searches both top-level and nested base-account shapes.
+auth_pubkey_type() {
+  local addr="$1"
+  local json pk_type
+  json=$(auth_account_json "$addr")
+  # Try several known locations in priority order.
+  pk_type=$(jq -r '
+    [
+      .account.pub_key,
+      .account.base_account.pub_key,
+      .account.base_vesting_account.base_account.pub_key
+    ]
+    | map(select(. != null))
+    | (.[0] // null)
+    | if . == null then "null" else (."@type" // "unknown") end
+  ' <<<"$json")
+  case "$pk_type" in
+    null)                                                 printf 'none\n' ;;
+    /cosmos.crypto.multisig.LegacyAminoPubKey)            printf 'multisig\n' ;;
+    /cosmos.crypto.secp256k1.PubKey|\
+    /cosmos.crypto.ethsecp256k1.PubKey|\
+    /ethermint.crypto.v1.ethsecp256k1.PubKey|\
+    /cosmos.evm.crypto.v1.ethsecp256k1.PubKey)            printf 'single-sig\n' ;;
+    *)                                                    printf 'unknown\n' ;;
+  esac
+}
+
+# key_pubkey_b64 <key-name>
+# Reads lumerad keys show <key-name> --output json and extracts base64 pubkey bytes.
+key_pubkey_b64() {
+  local key_name="$1"
+  local info pk_inner
+  if ! info=$(lumerad_keys show "$key_name" --output json 2>/dev/null); then
+    log_error "key not found in keyring: $key_name"
+    exit 1
+  fi
+  # .pubkey is a stringified JSON blob; parse it and extract .key.
+  pk_inner=$(jq -r '.pubkey' <<<"$info")
+  if [[ -z "$pk_inner" || "$pk_inner" == "null" ]]; then
+    log_error "key '$key_name' has no pubkey field"
+    exit 1
+  fi
+  jq -r '.key' <<<"$pk_inner"
+}
+
+# assert_secp256k1_key <key-name>
+# For sign. Confirms the key is legacy Cosmos /cosmos.crypto.secp256k1.PubKey.
+assert_secp256k1_key() {
+  local key_name="$1"
+  local info pk_type
+  if ! info=$(lumerad_keys show "$key_name" --output json 2>/dev/null); then
+    log_error "key not found in keyring: $key_name"
+    exit 1
+  fi
+  pk_type=$(jq -r '.pubkey | fromjson | ."@type"' <<<"$info" 2>/dev/null || printf 'unknown')
+  if [[ "$pk_type" != "/cosmos.crypto.secp256k1.PubKey" ]]; then
+    log_error "key '$key_name' is not secp256k1 (got $pk_type) — sign requires a legacy multisig sub-key"
+    exit 1
+  fi
+}
+
+# assert_eth_key <key-name>
+# For submit. Confirms the key is an eth_secp256k1 variant.
+assert_eth_key() {
+  local key_name="$1"
+  local info pk_type
+  if ! info=$(lumerad_keys show "$key_name" --output json 2>/dev/null); then
+    log_error "key not found in keyring: $key_name"
+    exit 1
+  fi
+  pk_type=$(jq -r '.pubkey | fromjson | ."@type"' <<<"$info" 2>/dev/null || printf 'unknown')
+  case "$pk_type" in
+    /cosmos.crypto.ethsecp256k1.PubKey|\
+    /ethermint.crypto.v1.ethsecp256k1.PubKey|\
+    /cosmos.evm.crypto.v1.ethsecp256k1.PubKey) ;;
+    *)
+      log_error "key '$key_name' is not eth_secp256k1 (got $pk_type) — submit requires the new EVM destination key"
+      exit 1 ;;
+  esac
+}
+
+# read_proof_file <path>
+# Reads a proof or partial JSON file, validates structure and integrity.
+# Emits validated JSON on stdout; compact summary on stderr.
+# Exit 9 on structural/integrity violations; exit 3 on single-proof detection.
+read_proof_file() {
+  local path="$1"
+  if [[ ! -f "$path" ]]; then
+    log_error "proof file not found: $path"
+    exit 9
+  fi
+  local json
+  if ! json=$(jq -e . "$path" 2>/dev/null); then
+    log_error "proof file is not valid JSON: $path"
+    exit 9
+  fi
+
+  # Reject single-proof files (wrapper is multisig-only).
+  if [[ "$(jq -r 'has("single") // false' <<<"$json")" == "true" ]]; then
+    log_error "proof file $path is a single-key proof; use migrate-account.sh / migrate-validator.sh"
+    exit 3
+  fi
+  if [[ "$(jq -r 'has("multisig") // false' <<<"$json")" != "true" ]]; then
+    log_error "proof file $path has no multisig field; this wrapper is multisig-only"
+    exit 3
+  fi
+
+  # Required fields
+  local required=(
+    ".kind" ".legacy_address" ".new_address"
+    ".chain_id" ".evm_chain_id" ".payload_hex"
+    ".multisig.threshold" ".multisig.sub_pub_keys_b64"
+    ".multisig.sig_format" ".partial_signatures"
+  )
+  local field
+  for field in "${required[@]}"; do
+    if [[ "$(jq -r "$field // \"__missing__\"" <<<"$json")" == "__missing__" ]]; then
+      log_error "missing required field in $path: $field"
+      exit 9
+    fi
+  done
+
+  # Threshold bounds
+  local threshold sub_count
+  threshold=$(jq -r '.multisig.threshold' <<<"$json")
+  sub_count=$(jq -r '.multisig.sub_pub_keys_b64 | length' <<<"$json")
+  if (( threshold < 1 || threshold > sub_count )); then
+    log_error "invalid multisig structure in $path: threshold=$threshold sub_keys=$sub_count"
+    exit 9
+  fi
+
+  # Partial signature indices in range; signatures non-empty
+  local idx sig
+  local -a indices=()
+  while IFS=$'\t' read -r idx sig; do
+    [[ -z "$idx" ]] && continue
+    if ! [[ "$idx" =~ ^[0-9]+$ ]] || (( idx < 0 || idx >= sub_count )); then
+      log_error "partial_signatures index $idx out of range [0,$sub_count) in $path"
+      exit 9
+    fi
+    if [[ -z "$sig" || "$sig" == "null" ]]; then
+      log_error "partial_signatures entry with index $idx has empty signature in $path"
+      exit 9
+    fi
+    indices+=("$idx")
+  done < <(jq -r '.partial_signatures[]? | [.index, .signature_b64] | @tsv' <<<"$json")
+
+  # Canonical payload_hex reconstruction
+  local chain_id_f evm_chain_id kind_f legacy_f new_f payload calc got
+  chain_id_f=$(jq -r '.chain_id' <<<"$json")
+  evm_chain_id=$(jq -r '.evm_chain_id' <<<"$json")
+  kind_f=$(jq -r '.kind' <<<"$json")
+  legacy_f=$(jq -r '.legacy_address' <<<"$json")
+  new_f=$(jq -r '.new_address' <<<"$json")
+  payload="lumera-evm-migration:${chain_id_f}:${evm_chain_id}:${kind_f}:${legacy_f}:${new_f}"
+  calc=$(printf '%s' "$payload" | sha256sum | awk '{print $1}')
+  got=$(jq -r '.payload_hex' <<<"$json")
+  if [[ "$calc" != "$got" ]]; then
+    log_error "payload_hex mismatch in $path (expected $calc, got $got)"
+    exit 9
+  fi
+
+  printf '%s\n' "$json"
+}
+
+# read_migration_tx_file <path>
+# Reads unsigned tx JSON produced by combine. Verifies exactly one supported
+# evmigration message with legacy_proof.multisig set.
+# Rejects single-key proof txs with exit 3.
+# Emits compact JSON {legacy_address, new_address, kind, threshold, num_signers} on stdout.
+read_migration_tx_file() {
+  local path="$1"
+  if [[ ! -f "$path" ]]; then
+    log_error "tx file not found: $path"
+    exit 9
+  fi
+  local json
+  if ! json=$(jq -e . "$path" 2>/dev/null); then
+    log_error "tx file is not valid JSON: $path"
+    exit 9
+  fi
+
+  local msg_count
+  msg_count=$(jq -r '.body.messages | length' <<<"$json")
+  if [[ "$msg_count" != "1" ]]; then
+    log_error "expected exactly 1 message in $path, got $msg_count"
+    exit 9
+  fi
+
+  local msg_type legacy new_addr kind
+  msg_type=$(jq -r '.body.messages[0]."@type"' <<<"$json")
+  legacy=$(jq -r '.body.messages[0].legacy_address' <<<"$json")
+  new_addr=$(jq -r '.body.messages[0].new_address' <<<"$json")
+  case "$msg_type" in
+    /lumera.evmigration.MsgClaimLegacyAccount) kind="claim" ;;
+    /lumera.evmigration.MsgMigrateValidator)   kind="validator" ;;
+    *) log_error "unrecognized message type in $path: $msg_type"; exit 9 ;;
+  esac
+
+  # Must be a multisig proof, not a single-key proof.
+  if [[ "$(jq -r '.body.messages[0].legacy_proof | has("single")' <<<"$json")" == "true" ]]; then
+    log_error "tx file $path uses a single-key proof; use migrate-account.sh / migrate-validator.sh"
+    exit 3
+  fi
+  if [[ "$(jq -r '.body.messages[0].legacy_proof | has("multisig")' <<<"$json")" != "true" ]]; then
+    log_error "tx file $path has no legacy_proof.multisig"
+    exit 9
+  fi
+
+  local threshold num_signers
+  threshold=$(jq -r '.body.messages[0].legacy_proof.multisig.threshold' <<<"$json")
+  num_signers=$(jq -r '.body.messages[0].legacy_proof.multisig.sub_pub_keys_b64 | length' <<<"$json")
+
+  jq -nc \
+    --arg legacy "$legacy" \
+    --arg new "$new_addr" \
+    --arg kind "$kind" \
+    --argjson threshold "$threshold" \
+    --argjson num_signers "$num_signers" \
+    '{legacy_address:$legacy, new_address:$new, kind:$kind, threshold:$threshold, num_signers:$num_signers}'
+}
+
+# summarize_partials <files...>
+# Reads each partial via read_proof_file, enforces cross-file consistency.
+# Prints K-of-N entry-presence matrix to stderr.
+# Returns 0 iff distinct-signer count >= threshold, 1 otherwise.
+summarize_partials() {
+  local files=("$@")
+  if (( ${#files[@]} == 0 )); then
+    log_error "summarize_partials: no partial files given"
+    exit 1
+  fi
+
+  local first_json first_chain first_evm first_legacy first_new first_payload first_kind
+  local first_threshold first_subkeys first_sigfmt first_subcount
+  first_json=$(read_proof_file "${files[0]}")
+  first_chain=$(jq -r '.chain_id' <<<"$first_json")
+  first_evm=$(jq -r '.evm_chain_id' <<<"$first_json")
+  first_legacy=$(jq -r '.legacy_address' <<<"$first_json")
+  first_new=$(jq -r '.new_address' <<<"$first_json")
+  first_payload=$(jq -r '.payload_hex' <<<"$first_json")
+  first_kind=$(jq -r '.kind' <<<"$first_json")
+  first_threshold=$(jq -r '.multisig.threshold' <<<"$first_json")
+  first_subkeys=$(jq -c '.multisig.sub_pub_keys_b64' <<<"$first_json")
+  first_sigfmt=$(jq -r '.multisig.sig_format' <<<"$first_json")
+  first_subcount=$(jq -r '.multisig.sub_pub_keys_b64 | length' <<<"$first_json")
+
+  local -A index_to_file=()
+  local idx
+  while read -r idx; do
+    [[ -z "$idx" ]] && continue
+    index_to_file[$idx]="${files[0]}"
+  done < <(jq -r '.partial_signatures[].index' <<<"$first_json")
+
+  local f
+  for f in "${files[@]:1}"; do
+    local j
+    j=$(read_proof_file "$f")
+    local checks=(
+      "chain_id:$first_chain:.chain_id"
+      "evm_chain_id:$first_evm:.evm_chain_id"
+      "legacy_address:$first_legacy:.legacy_address"
+      "new_address:$first_new:.new_address"
+      "payload_hex:$first_payload:.payload_hex"
+      "kind:$first_kind:.kind"
+      "threshold:$first_threshold:.multisig.threshold"
+      "sig_format:$first_sigfmt:.multisig.sig_format"
+    )
+    local entry
+    for entry in "${checks[@]}"; do
+      local name="${entry%%:*}"
+      local rest="${entry#*:}"
+      local expected="${rest%:*}"
+      local jq_path="${rest##*:}"
+      local got
+      got=$(jq -r "$jq_path" <<<"$j")
+      if [[ "$got" != "$expected" ]]; then
+        log_error "partial $f disagrees on $name (expected $expected, got $got)"
+        exit 9
+      fi
+    done
+    local j_subkeys
+    j_subkeys=$(jq -c '.multisig.sub_pub_keys_b64' <<<"$j")
+    if [[ "$j_subkeys" != "$first_subkeys" ]]; then
+      log_error "partial $f disagrees on multisig.sub_pub_keys_b64"
+      exit 9
+    fi
+    while read -r idx; do
+      [[ -z "$idx" ]] && continue
+      index_to_file[$idx]="$f"
+    done < <(jq -r '.partial_signatures[].index' <<<"$j")
+  done
+
+  {
+    printf 'Partial signature entries (%s-of-%s required):\n' "$first_threshold" "$first_subcount"
+    local i
+    for (( i=0; i<first_subcount; i++ )); do
+      if [[ -n "${index_to_file[$i]:-}" ]]; then
+        printf '  [X] signer %s  %s\n' "$i" "${index_to_file[$i]}"
+      else
+        printf '  [ ] signer %s  (missing)\n' "$i"
+      fi
+    done
+    local present=${#index_to_file[@]}
+    if (( present >= first_threshold )); then
+      printf 'Entry threshold satisfied: yes (%s >= %s)\n' "$present" "$first_threshold"
+    else
+      printf 'Entry threshold satisfied: no (%s < %s)\n' "$present" "$first_threshold"
+    fi
+  } >&2
+
+  (( ${#index_to_file[@]} >= first_threshold ))
+}

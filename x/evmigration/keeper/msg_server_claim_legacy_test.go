@@ -35,6 +35,14 @@ type msgServerFixture struct {
 	msgServer types.MsgServer
 }
 
+// newSingleKeyProofNew builds a valid new-side MigrationProof (eth_secp256k1,
+// 65-byte EIP-191 signature) for use in msg-server test fixtures.
+func newSingleKeyProofNew(pk []byte, sig []byte, format types.SigFormat) types.MigrationProof {
+	return types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
+		PubKey: pk, Signature: sig, SigFormat: format,
+	}}}
+}
+
 func newClaimMigrationMsg(
 	t *testing.T,
 	legacyPrivKey *secp256k1.PrivKey,
@@ -52,10 +60,11 @@ func newClaimMigrationMsg(
 			Signature: signMigrationMessage(t, legacyPrivKey, legacyAddr, newAddr),
 			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
 		}}},
-		NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
-			Signature: signNewMigrationMessage(t, keeperClaimKind, newPrivKey, legacyAddr, newAddr),
-			SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
-		}}},
+		NewProof: newSingleKeyProofNew(
+			newPrivKey.PubKey().Bytes(),
+			signNewMigrationEIP191(t, keeperClaimKind, newPrivKey, legacyAddr, newAddr),
+			types.SigFormat_SIG_FORMAT_EIP191,
+		),
 	}
 }
 
@@ -568,10 +577,11 @@ func TestClaimLegacyAccount_MigratedThirdPartyWithdrawAddress(t *testing.T) {
 			Signature: signMigrationMessage(t, privKey, legacyAddr, newAddr),
 			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
 		}}},
-		NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
-			Signature: signNewMigrationMessage(t, keeperClaimKind, newPrivKey, legacyAddr, newAddr),
-			SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
-		}}},
+		NewProof: newSingleKeyProofNew(
+			newPrivKey.PubKey().Bytes(),
+			signNewMigrationEIP191(t, keeperClaimKind, newPrivKey, legacyAddr, newAddr),
+			types.SigFormat_SIG_FORMAT_EIP191,
+		),
 	}
 
 	resp, err := f.msgServer.ClaimLegacyAccount(f.ctx, msg)
@@ -1243,10 +1253,11 @@ func TestClaimLegacyAccount_WithDelegations(t *testing.T) {
 			Signature: signMigrationMessage(t, privKey, legacyAddr, newAddr),
 			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
 		}}},
-		NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
-			Signature: signNewMigrationMessage(t, keeperClaimKind, newPrivKey, legacyAddr, newAddr),
-			SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
-		}}},
+		NewProof: newSingleKeyProofNew(
+			newPrivKey.PubKey().Bytes(),
+			signNewMigrationEIP191(t, keeperClaimKind, newPrivKey, legacyAddr, newAddr),
+			types.SigFormat_SIG_FORMAT_EIP191,
+		),
 	}
 
 	resp, err := f.msgServer.ClaimLegacyAccount(f.ctx, msg)

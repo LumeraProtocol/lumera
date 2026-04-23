@@ -10,6 +10,7 @@ import (
 
 	lcfg "github.com/LumeraProtocol/lumera/config"
 	"github.com/LumeraProtocol/lumera/x/evmigration/types"
+	"github.com/LumeraProtocol/lumera/x/evmigration/types/sigverify"
 )
 
 // ClaimLegacyAccount migrates on-chain state from a legacy (coin-type-118)
@@ -48,14 +49,21 @@ func (ms msgServer) ClaimLegacyAccount(goCtx context.Context, msg *types.MsgClai
 	if err := msg.LegacyProof.ValidateParams(params.MaxMultisigSubKeys); err != nil {
 		return nil, err
 	}
-	if err := VerifyLegacyProof(ctx.ChainID(), lcfg.EVMChainID, migrationPayloadKindClaim, legacyAddr, newAddr, &msg.LegacyProof); err != nil {
+	if err := msg.NewProof.ValidateParams(params.MaxMultisigSubKeys); err != nil {
 		return nil, err
 	}
-	var newSig []byte
-	if s := msg.NewProof.GetSingle(); s != nil {
-		newSig = s.Signature
+	if err := VerifyMigrationProof(
+		ctx.ChainID(), lcfg.EVMChainID, migrationPayloadKindClaim,
+		legacyAddr, newAddr, legacyAddr,
+		&msg.LegacyProof, sigverify.SubKeyTypeCosmosSecp256k1,
+	); err != nil {
+		return nil, err
 	}
-	if err := VerifyNewSignature(ctx.ChainID(), lcfg.EVMChainID, migrationPayloadKindClaim, legacyAddr, newAddr, newSig); err != nil {
+	if err := VerifyMigrationProof(
+		ctx.ChainID(), lcfg.EVMChainID, migrationPayloadKindClaim,
+		legacyAddr, newAddr, newAddr,
+		&msg.NewProof, sigverify.SubKeyTypeEthSecp256k1,
+	); err != nil {
 		return nil, err
 	}
 

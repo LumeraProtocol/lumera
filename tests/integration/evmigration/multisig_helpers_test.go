@@ -179,3 +179,59 @@ func (s *MigrationIntegrationSuite) createFundedMultisigAccount(k, n int, coins 
 
 	return multiPK, privs, addr
 }
+
+// registerAndFundMultisigPubKey registers the given multisig pubkey under its
+// derived address in auth and funds it via the bank module. Used by tests that
+// need to construct a multisig pubkey with custom sub-key composition (e.g. a
+// size-capped N>20 multisig, or a mixed multisig containing a non-secp256k1
+// sub-key) that the standard BuildMultisigLegacyAccount helper doesn't support.
+func (s *MigrationIntegrationSuite) registerAndFundMultisigPubKey(
+	multiPK *multisig.LegacyAminoPubKey,
+	coins sdk.Coins,
+) sdk.AccAddress {
+	addr := sdk.AccAddress(multiPK.Address())
+
+	acc := s.app.AuthKeeper.NewAccountWithAddress(s.ctx, addr)
+	baseAcc, ok := acc.(*authtypes.BaseAccount)
+	s.Require().True(ok)
+	s.Require().NoError(baseAcc.SetPubKey(multiPK))
+	s.app.AuthKeeper.SetAccount(s.ctx, baseAcc)
+
+	if !coins.IsZero() {
+		s.Require().NoError(s.app.BankKeeper.MintCoins(s.ctx, "mint", coins))
+		s.Require().NoError(s.app.BankKeeper.SendCoinsFromModuleToAccount(s.ctx, "mint", addr, coins))
+	}
+
+	return addr
+}
+
+// buildLargeCosmosMultisig creates a K-of-N Cosmos secp256k1 multisig pubkey
+// (no auth/bank registration). Variant of BuildMultisigLegacyAccount that
+// returns only what's needed for estimate-only tests. Used for the size-cap
+// branch of QueryMigrationEstimate where N > MaxMultisigSubKeys.
+func buildLargeCosmosMultisig(t *testing.T, k, n int) *multisig.LegacyAminoPubKey {
+	t.Helper()
+	pubs := make([]cryptotypes.PubKey, n)
+	for i := 0; i < n; i++ {
+		pubs[i] = secp256k1.GenPrivKey().PubKey()
+	}
+	return multisig.NewLegacyAminoPubKey(k, pubs)
+}
+
+// buildMultisigWithEthSubKey constructs a K-of-N multisig where one sub-key is
+// an eth_secp256k1 pubkey (unsupported on the legacy side). Used by the
+// non-secp256k1 rejection branch of QueryMigrationEstimate.
+func buildMultisigWithEthSubKey(t *testing.T, k int) *multisig.LegacyAminoPubKey {
+	t.Helper()
+	cosmosPriv1 := secp256k1.GenPrivKey()
+	cosmosPriv2 := secp256k1.GenPrivKey()
+	ethPriv, err := evmcryptotypes.GenerateKey()
+	require.NoError(t, err)
+
+	subs := []cryptotypes.PubKey{
+		cosmosPriv1.PubKey(),
+		cosmosPriv2.PubKey(),
+		ethPriv.PubKey(),
+	}
+	return multisig.NewLegacyAminoPubKey(k, subs)
+}

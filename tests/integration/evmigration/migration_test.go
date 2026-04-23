@@ -476,6 +476,80 @@ func (s *MigrationIntegrationSuite) TestQueryMigrationEstimate_Integration() {
 	s.Require().Equal(uint64(0), resp.DelegationCount)
 }
 
+// TestQueryMigrationEstimate_Multisig_Success verifies that a valid K-of-N
+// Cosmos secp256k1 multisig account is detected by the preflight: IsMultisig
+// is set, threshold/num_signers match the pubkey, and WouldSucceed remains
+// true because no rejection branch fires (all sub-keys secp256k1, N within
+// MaxMultisigSubKeys). Covers the happy path of the multisig preflight at
+// x/evmigration/keeper/query.go:278-303.
+func (s *MigrationIntegrationSuite) TestQueryMigrationEstimate_Multisig_Success() {
+	s.enableMigration()
+	qs := evmigrationkeeper.NewQueryServerImpl(s.keeper)
+
+	coins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 500_000))
+	_, _, legacyAddr := s.createFundedMultisigAccount(2, 3, coins)
+
+	resp, err := qs.MigrationEstimate(s.ctx, &types.QueryMigrationEstimateRequest{
+		LegacyAddress: legacyAddr.String(),
+	})
+	s.Require().NoError(err)
+	s.Require().True(resp.IsMultisig, "multisig account should be detected")
+	s.Require().Equal(uint32(2), resp.Threshold)
+	s.Require().Equal(uint32(3), resp.NumSigners)
+	s.Require().False(resp.IsValidator)
+	s.Require().True(resp.WouldSucceed, "2-of-3 secp256k1 multisig should pass preflight")
+	s.Require().Empty(resp.RejectionReason)
+}
+
+// TestQueryMigrationEstimate_Multisig_SizeCapped verifies that a multisig with
+// N sub-keys exceeding params.MaxMultisigSubKeys (default 20) is rejected by
+// the preflight with the exact "multisig has X sub-keys; max is Y" format from
+// query.go:295.
+func (s *MigrationIntegrationSuite) TestQueryMigrationEstimate_Multisig_SizeCapped() {
+	s.enableMigration()
+	qs := evmigrationkeeper.NewQueryServerImpl(s.keeper)
+
+	// Default MaxMultisigSubKeys is 20 (see types/params.go). 21-of-25 exceeds it.
+	multiPK := buildLargeCosmosMultisig(s.T(), 21, 25)
+	legacyAddr := s.registerAndFundMultisigPubKey(multiPK,
+		sdk.NewCoins(sdk.NewInt64Coin("ulume", 1_000)))
+
+	resp, err := qs.MigrationEstimate(s.ctx, &types.QueryMigrationEstimateRequest{
+		LegacyAddress: legacyAddr.String(),
+	})
+	s.Require().NoError(err)
+	s.Require().True(resp.IsMultisig)
+	s.Require().Equal(uint32(21), resp.Threshold)
+	s.Require().Equal(uint32(25), resp.NumSigners)
+	s.Require().False(resp.WouldSucceed, "N>MaxMultisigSubKeys must reject")
+	s.Require().Contains(resp.RejectionReason, "25 sub-keys")
+	s.Require().Contains(resp.RejectionReason, "max is 20")
+}
+
+// TestQueryMigrationEstimate_Multisig_NonSecp256k1SubKey verifies that a
+// multisig containing an eth_secp256k1 sub-key on the legacy side is rejected
+// by the preflight with the "non-secp256k1 sub-key" reason from query.go:288.
+// The legacy side must be plain Cosmos secp256k1 only.
+func (s *MigrationIntegrationSuite) TestQueryMigrationEstimate_Multisig_NonSecp256k1SubKey() {
+	s.enableMigration()
+	qs := evmigrationkeeper.NewQueryServerImpl(s.keeper)
+
+	// 2-of-3 where one sub-key is eth_secp256k1 (unsupported on legacy side).
+	multiPK := buildMultisigWithEthSubKey(s.T(), 2)
+	legacyAddr := s.registerAndFundMultisigPubKey(multiPK,
+		sdk.NewCoins(sdk.NewInt64Coin("ulume", 1_000)))
+
+	resp, err := qs.MigrationEstimate(s.ctx, &types.QueryMigrationEstimateRequest{
+		LegacyAddress: legacyAddr.String(),
+	})
+	s.Require().NoError(err)
+	s.Require().True(resp.IsMultisig)
+	s.Require().Equal(uint32(2), resp.Threshold)
+	s.Require().Equal(uint32(3), resp.NumSigners)
+	s.Require().False(resp.WouldSucceed, "non-secp256k1 sub-key must reject")
+	s.Require().Contains(resp.RejectionReason, "non-secp256k1 sub-key")
+}
+
 // --- MigrateValidator integration tests ---
 
 // createTestValidator creates a bonded validator with a secp256k1 operator key

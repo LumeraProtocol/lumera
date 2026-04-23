@@ -107,8 +107,10 @@ func TestVerifyLegacySignature_PubKeyAddressMismatch(t *testing.T) {
 	wrongLegacyAddr := sdk.AccAddress(secp256k1.GenPrivKey().PubKey().Address())
 	_, newAddr := testNewMigrationAccount(t)
 
+	// Use a 64-byte zero signature so ValidateBasic(SideLegacy) passes the
+	// length check and we reach the pubkey-address mismatch check.
 	proof := &types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
-		PubKey: pubKey.Key, Signature: []byte{0x00}, SigFormat: types.SigFormat_SIG_FORMAT_CLI,
+		PubKey: pubKey.Key, Signature: make([]byte, 64), SigFormat: types.SigFormat_SIG_FORMAT_CLI,
 	}}}
 	err := keeper.VerifyLegacyProof(testChainID, lcfg.EVMChainID, keeperClaimKind, wrongLegacyAddr, newAddr, proof)
 	require.ErrorIs(t, err, types.ErrPubKeyAddressMismatch)

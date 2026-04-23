@@ -9,9 +9,11 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	ethsecp256k1 "github.com/cosmos/evm/crypto/ethsecp256k1"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/LumeraProtocol/lumera/x/evmigration/types"
+	"github.com/LumeraProtocol/lumera/x/evmigration/types/sigverify"
 )
 
 const (
@@ -152,6 +154,111 @@ func VerifyLegacyProof(
 		return verifySingleKeyProof(payload, legacyAddr, p.Single)
 	case *types.MigrationProof_Multisig:
 		return verifyMultisigProof(payload, legacyAddr, p.Multisig)
+	default:
+		return types.ErrInvalidMigrationProof.Wrap("no proof set")
+	}
+}
+
+// verifySingleKeyProofSide validates a SingleKeyProof given an explicit sub-key type.
+// It is the side-parametric successor to verifySingleKeyProof; the old function
+// stays alive until Task 8 cleanup.
+func verifySingleKeyProofSide(payload []byte, boundAddr sdk.AccAddress, p *types.SingleKeyProof, keyType sigverify.SubKeyType) error {
+	if len(p.PubKey) != secp256k1.PubKeySize {
+		return types.ErrInvalidMigrationPubKey.Wrapf("expected %d bytes, got %d", secp256k1.PubKeySize, len(p.PubKey))
+	}
+	switch keyType {
+	case sigverify.SubKeyTypeCosmosSecp256k1:
+		pk := &secp256k1.PubKey{Key: p.PubKey}
+		derived := sdk.AccAddress(pk.Address())
+		if !derived.Equals(boundAddr) {
+			return types.ErrPubKeyAddressMismatch.Wrapf("pubkey derives to %s, expected %s", derived, boundAddr)
+		}
+		return sigverify.VerifyCosmosSecp256k1(pk, boundAddr, payload, p.Signature, p.SigFormat)
+	case sigverify.SubKeyTypeEthSecp256k1:
+		pk := &ethsecp256k1.PubKey{Key: p.PubKey}
+		derived := sdk.AccAddress(pk.Address())
+		if !derived.Equals(boundAddr) {
+			return types.ErrPubKeyAddressMismatch.Wrapf("pubkey derives to %s, expected %s", derived, boundAddr)
+		}
+		return sigverify.VerifyEthSecp256k1(pk, boundAddr, payload, p.Signature, p.SigFormat)
+	default:
+		return types.ErrInvalidMigrationProof.Wrap("unknown sub-key type")
+	}
+}
+
+// verifyMultisigProofSide reconstructs the LegacyAminoPubKey over the given
+// SubKeyType, asserts it derives to boundAddr, then verifies each sub-signature
+// using the matching per-sub-key helper.
+func verifyMultisigProofSide(payload []byte, boundAddr sdk.AccAddress, m *types.MultisigProof, keyType sigverify.SubKeyType) error {
+	subPubKeys := make([]cryptotypes.PubKey, len(m.SubPubKeys))
+	for i, raw := range m.SubPubKeys {
+		if len(raw) != secp256k1.PubKeySize {
+			return types.ErrInvalidMigrationPubKey.Wrapf("sub_pub_keys[%d]: expected %d bytes, got %d", i, secp256k1.PubKeySize, len(raw))
+		}
+		switch keyType {
+		case sigverify.SubKeyTypeCosmosSecp256k1:
+			subPubKeys[i] = &secp256k1.PubKey{Key: raw}
+		case sigverify.SubKeyTypeEthSecp256k1:
+			subPubKeys[i] = &ethsecp256k1.PubKey{Key: raw}
+		default:
+			return types.ErrInvalidMigrationProof.Wrap("unknown sub-key type")
+		}
+	}
+	multiPK := kmultisig.NewLegacyAminoPubKey(int(m.Threshold), subPubKeys)
+	derived := sdk.AccAddress(multiPK.Address())
+	if !derived.Equals(boundAddr) {
+		return types.ErrPubKeyAddressMismatch.Wrapf("multisig pubkey derives to %s, expected %s", derived, boundAddr)
+	}
+	for i, idx := range m.SignerIndices {
+		if int(idx) >= len(subPubKeys) {
+			return types.ErrInvalidMigrationProof.Wrapf("signer_indices[%d]=%d out of range", i, idx)
+		}
+		switch pk := subPubKeys[idx].(type) {
+		case *secp256k1.PubKey:
+			signerAddr := sdk.AccAddress(pk.Address())
+			if err := sigverify.VerifyCosmosSecp256k1(pk, signerAddr, payload, m.SubSignatures[i], m.SigFormat); err != nil {
+				return types.ErrInvalidMigrationSignature.Wrapf("sub-sig %d (signer %s) invalid: %s", i, signerAddr, err)
+			}
+		case *ethsecp256k1.PubKey:
+			signerAddr := sdk.AccAddress(pk.Address())
+			if err := sigverify.VerifyEthSecp256k1(pk, signerAddr, payload, m.SubSignatures[i], m.SigFormat); err != nil {
+				return types.ErrInvalidMigrationSignature.Wrapf("sub-sig %d (signer %s) invalid: %s", i, signerAddr, err)
+			}
+		}
+	}
+	return nil
+}
+
+// VerifyMigrationProof verifies a migration proof against the canonical payload.
+// Parameterized by sigverify.SubKeyType: legacy side passes
+// sigverify.SubKeyTypeCosmosSecp256k1 and boundAddr=legacyAddr; new side passes
+// sigverify.SubKeyTypeEthSecp256k1 and boundAddr=newAddr.
+//
+// Param-dependent limits (MaxMultisigSubKeys) must be enforced by the caller
+// via proof.ValidateParams(params.MaxMultisigSubKeys) before invoking this
+// function, since VerifyMigrationProof does not have access to keeper state.
+func VerifyMigrationProof(
+	chainID string, evmChainID uint64, kind string,
+	legacyAddr, newAddr, boundAddr sdk.AccAddress,
+	proof *types.MigrationProof,
+	keyType sigverify.SubKeyType,
+) error {
+	if proof == nil {
+		return types.ErrInvalidMigrationProof.Wrap("proof required")
+	}
+	side := types.SideLegacy
+	if keyType == sigverify.SubKeyTypeEthSecp256k1 {
+		side = types.SideNew
+	}
+	if err := proof.ValidateBasic(side); err != nil {
+		return err
+	}
+	payload := migrationPayload(chainID, evmChainID, kind, legacyAddr, newAddr)
+	switch p := proof.Proof.(type) {
+	case *types.MigrationProof_Single:
+		return verifySingleKeyProofSide(payload, boundAddr, p.Single, keyType)
+	case *types.MigrationProof_Multisig:
+		return verifyMultisigProofSide(payload, boundAddr, p.Multisig, keyType)
 	default:
 		return types.ErrInvalidMigrationProof.Wrap("no proof set")
 	}

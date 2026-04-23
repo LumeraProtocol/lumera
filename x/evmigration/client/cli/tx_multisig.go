@@ -24,6 +24,7 @@ import (
 
 	lcfg "github.com/LumeraProtocol/lumera/config"
 	"github.com/LumeraProtocol/lumera/x/evmigration/types"
+	"github.com/LumeraProtocol/lumera/x/evmigration/types/sigverify"
 )
 
 // partialProofVersion is the current on-disk format version for PartialProof.
@@ -742,24 +743,140 @@ func sideShapeLabel(isSingle bool) string {
 	return "multisig"
 }
 
+// legacySigningInput returns the bytes to pass to Keyring.Sign for a
+// Cosmos-secp256k1-side partial, matching what sigverify.VerifyCosmosSecp256k1
+// expects at verification time.
+//   - SIG_FORMAT_CLI: sha256(payload) — keyring.Sign hashes again internally;
+//     verifier calls pk.VerifySignature(sha256(payload), sig) which also
+//     hashes internally, so both sides end up at sha256(sha256(payload)).
+//   - SIG_FORMAT_ADR036: canonical ADR-036 sign doc.
+//   - SIG_FORMAT_EIP191: error — EIP-191 is not valid on the legacy side.
+func legacySigningInput(payload []byte, format string, signerAddr string) ([]byte, error) {
+	switch format {
+	case types.SigFormat_SIG_FORMAT_CLI.String():
+		h := sha256.Sum256(payload)
+		return h[:], nil
+	case types.SigFormat_SIG_FORMAT_ADR036.String():
+		return sigverify.ADR036SignDoc(signerAddr, payload), nil
+	case types.SigFormat_SIG_FORMAT_EIP191.String():
+		return nil, fmt.Errorf("SIG_FORMAT_EIP191 is not valid on the legacy side")
+	default:
+		return nil, fmt.Errorf("unsupported legacy sig_format %q", format)
+	}
+}
+
+// newSigningInput returns the bytes to pass to Keyring.Sign for an
+// eth-secp256k1-side partial. The eth keyring applies Keccak256 internally,
+// so we pass the payload as-is for SIG_FORMAT_CLI (no pre-hash). For EIP-191
+// we wrap in the personal-sign envelope.
+func newSigningInput(payload []byte, format string, signerAddr string) ([]byte, error) {
+	switch format {
+	case types.SigFormat_SIG_FORMAT_CLI.String():
+		return payload, nil
+	case types.SigFormat_SIG_FORMAT_EIP191.String():
+		return sigverify.EIP191PersonalSignPayload(payload), nil
+	case types.SigFormat_SIG_FORMAT_ADR036.String():
+		return sigverify.ADR036SignDoc(signerAddr, payload), nil
+	default:
+		return nil, fmt.Errorf("unsupported new sig_format %q", format)
+	}
+}
+
+// findSubKeyIndex looks up keyName in the keyring, matches its pubkey against
+// spec.SubPubKeys (for multisig) or spec.PubKey (for single-key), and returns
+// the sub-key index. Errors on key not found, type mismatch, or pubkey mismatch.
+func findSubKeyIndex(clientCtx client.Context, keyName string, spec *SideSpec, expected sigverify.SubKeyType) (uint32, error) {
+	rec, err := clientCtx.Keyring.Key(keyName)
+	if err != nil {
+		return 0, fmt.Errorf("key %q not found in keyring: %w", keyName, err)
+	}
+	pk, err := rec.GetPubKey()
+	if err != nil {
+		return 0, err
+	}
+	var keyBytes []byte
+	switch expected {
+	case sigverify.SubKeyTypeCosmosSecp256k1:
+		cpk, ok := pk.(*secp256k1.PubKey)
+		if !ok {
+			return 0, fmt.Errorf("key %q is %T, expected Cosmos secp256k1", keyName, pk)
+		}
+		keyBytes = cpk.Bytes()
+	case sigverify.SubKeyTypeEthSecp256k1:
+		epk, ok := pk.(*evmcryptotypes.PubKey)
+		if !ok {
+			return 0, fmt.Errorf("key %q is %T, expected eth_secp256k1", keyName, pk)
+		}
+		keyBytes = epk.Key
+	default:
+		return 0, fmt.Errorf("unknown expected sub-key type")
+	}
+	target := base64.StdEncoding.EncodeToString(keyBytes)
+	// Single-key side:
+	if spec.PubKey != "" {
+		if spec.PubKey != target {
+			return 0, fmt.Errorf("key %q pubkey does not match partial.PubKey", keyName)
+		}
+		return 0, nil
+	}
+	// Multisig side:
+	for i, k := range spec.SubPubKeys {
+		if k == target {
+			return uint32(i), nil
+		}
+	}
+	return 0, fmt.Errorf("key %q pubkey is not a member of partial.SubPubKeys", keyName)
+}
+
+// deriveSubKeyAddr returns the bech32 address of keyName from the keyring.
+func deriveSubKeyAddr(clientCtx client.Context, keyName string) (string, error) {
+	rec, err := clientCtx.Keyring.Key(keyName)
+	if err != nil {
+		return "", fmt.Errorf("cannot look up key %q for signer-address derivation: %w", keyName, err)
+	}
+	addr, err := rec.GetAddress()
+	if err != nil {
+		return "", fmt.Errorf("cannot derive address for key %q: %w", keyName, err)
+	}
+	return addr.String(), nil
+}
+
+// upsertSig replaces any entry at the same index, otherwise appends — idempotent.
+func upsertSig(existing []PartialSignature, fresh PartialSignature) []PartialSignature {
+	filtered := existing[:0]
+	for _, p := range existing {
+		if p.Index != fresh.Index {
+			filtered = append(filtered, p)
+		}
+	}
+	return append(filtered, fresh)
+}
+
 func cmdSignProof() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "sign-proof <partial-proof.json>",
-		Short: "Append your sub-signature to a PartialProof file",
-		Long: `Append your sub-signature to a PartialProof file.
+		Short: "Add a legacy sub-signature and/or a new sub-signature to a partial proof file",
+		Long: `Each co-signer runs sign-proof on their own machine against their own
+keyring. Supply --from <legacy-sub-key> to sign the legacy half, and/or
+--new-key <new-eth-sub-key> to sign the new half. At least one must be set.
 
-This command signs the legacy side of the proof. Task 15 will extend
-this command to support signing the new (destination) side as well.`,
+Signatures are idempotent: re-running with the same key replaces that
+index's entry in place rather than duplicating it.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clientCtx, err := client.GetClientTxContext(cmd)
 			if err != nil {
 				return err
 			}
-			fromKey := clientCtx.FromName
-			out, _ := cmd.Flags().GetString(flagOut)
-			if out == "" {
-				out = args[0]
+
+			fromKey, _ := cmd.Flags().GetString(flags.FlagFrom)
+			newKey, _ := cmd.Flags().GetString(flagNewKey)
+			outPath, _ := cmd.Flags().GetString(flagOut)
+			if outPath == "" {
+				outPath = args[0]
+			}
+			if fromKey == "" && newKey == "" {
+				return fmt.Errorf("at least one of --from (legacy sub-key) or --new-key (new sub-key) must be supplied")
 			}
 
 			pp, err := LoadPartialProof(args[0])
@@ -767,91 +884,60 @@ this command to support signing the new (destination) side as well.`,
 				return err
 			}
 
-			rec, err := clientCtx.Keyring.Key(fromKey)
+			payload, err := hex.DecodeString(pp.PayloadHex)
 			if err != nil {
-				return fmt.Errorf("--from key %q not found: %w", fromKey, err)
-			}
-			kp, err := rec.GetPubKey()
-			if err != nil {
-				return err
-			}
-			secp, ok := kp.(*secp256k1.PubKey)
-			if !ok {
-				return fmt.Errorf("--from key %q is not secp256k1 (got %T)", fromKey, kp)
+				return fmt.Errorf("invalid payload_hex in partial file: %w", err)
 			}
 
-			payloadBytes := canonicalPayloadBytes(pp)
-
-			// NOTE (Task 15): sign-proof will be extended to support signing the
-			// new side (eth_secp256k1 / EIP-191). For now only the legacy side
-			// is signed here to keep the build green while Tasks 15-16 are pending.
-			var idx uint32
-			var found bool
-			legacySide := pp.Legacy
-			switch {
-			case legacySide != nil && legacySide.PubKey != "":
-				// Single-key legacy side.
-				pub, err := base64.StdEncoding.DecodeString(legacySide.PubKey)
+			if fromKey != "" {
+				idx, err := findSubKeyIndex(clientCtx, fromKey, pp.Legacy, sigverify.SubKeyTypeCosmosSecp256k1)
+				if err != nil {
+					return fmt.Errorf("--from: %w", err)
+				}
+				signerAddr, err := deriveSubKeyAddr(clientCtx, fromKey)
+				if err != nil {
+					return fmt.Errorf("--from: %w", err)
+				}
+				signInput, err := legacySigningInput(payload, pp.Legacy.SigFormat, signerAddr)
 				if err != nil {
 					return err
 				}
-				if !bytes.Equal(pub, secp.Bytes()) {
-					return fmt.Errorf("--from key does not match legacy single proof's pubkey")
+				sig, _, err := clientCtx.Keyring.Sign(fromKey, signInput, signingtypes.SignMode_SIGN_MODE_UNSPECIFIED)
+				if err != nil {
+					return fmt.Errorf("legacy sign: %w", err)
 				}
-				idx = 0
-				found = true
-			case legacySide != nil && len(legacySide.SubPubKeys) > 0:
-				// Multisig legacy side.
-				for i, s := range legacySide.SubPubKeys {
-					b, err := base64.StdEncoding.DecodeString(s)
-					if err != nil {
-						return err
-					}
-					if bytes.Equal(b, secp.Bytes()) {
-						idx = uint32(i)
-						found = true
-						break
-					}
-				}
-				if !found {
-					return fmt.Errorf("--from key is not a member of the legacy multisig")
-				}
-			}
-			if !found {
-				return fmt.Errorf("partial proof has no legacy side; cannot sign")
+				pp.PartialLegacySignatures = upsertSig(pp.PartialLegacySignatures, PartialSignature{
+					Index:     idx,
+					Signature: base64.StdEncoding.EncodeToString(sig),
+				})
 			}
 
-			sigFmtStr := legacySide.SigFormat
-			var sig []byte
-			switch sigFmtStr {
-			case "SIG_FORMAT_CLI":
-				hash := sha256.Sum256(payloadBytes)
-				sig, _, err = clientCtx.Keyring.Sign(fromKey, hash[:], signingtypes.SignMode_SIGN_MODE_UNSPECIFIED)
-			case "SIG_FORMAT_ADR036":
-				signerAddr := sdk.AccAddress(secp.Address()).String()
-				doc := []byte(fmt.Sprintf(`{"account_number":"0","chain_id":"","fee":{"amount":[],"gas":"0"},"memo":"","msgs":[{"type":"sign/MsgSignData","value":{"data":"%s","signer":"%s"}}],"sequence":"0"}`,
-					base64.StdEncoding.EncodeToString(payloadBytes), signerAddr))
-				sig, _, err = clientCtx.Keyring.Sign(fromKey, doc, signingtypes.SignMode_SIGN_MODE_UNSPECIFIED)
-			default:
-				return fmt.Errorf("unsupported sig_format %q", sigFmtStr)
-			}
-			if err != nil {
-				return fmt.Errorf("sign: %w", err)
-			}
-
-			// Idempotent upsert: remove existing entry for this index, then append.
-			filtered := pp.PartialLegacySignatures[:0]
-			for _, p := range pp.PartialLegacySignatures {
-				if p.Index != idx {
-					filtered = append(filtered, p)
+			if newKey != "" {
+				idx, err := findSubKeyIndex(clientCtx, newKey, pp.New, sigverify.SubKeyTypeEthSecp256k1)
+				if err != nil {
+					return fmt.Errorf("--new-key: %w", err)
 				}
+				signerAddr, err := deriveSubKeyAddr(clientCtx, newKey)
+				if err != nil {
+					return fmt.Errorf("--new-key: %w", err)
+				}
+				signInput, err := newSigningInput(payload, pp.New.SigFormat, signerAddr)
+				if err != nil {
+					return err
+				}
+				// Eth keyring uses LEGACY_AMINO_JSON sign mode for the interface;
+				// internally it applies Keccak256 to whatever bytes we hand it.
+				sig, _, err := clientCtx.Keyring.Sign(newKey, signInput, signingtypes.SignMode_SIGN_MODE_LEGACY_AMINO_JSON)
+				if err != nil {
+					return fmt.Errorf("new sign: %w", err)
+				}
+				pp.PartialNewSignatures = upsertSig(pp.PartialNewSignatures, PartialSignature{
+					Index:     idx,
+					Signature: base64.StdEncoding.EncodeToString(sig),
+				})
 			}
-			pp.PartialLegacySignatures = append(filtered, PartialSignature{
-				Index:     idx,
-				Signature: base64.StdEncoding.EncodeToString(sig),
-			})
 
-			return SavePartialProof(out, pp)
+			return SavePartialProof(outPath, pp)
 		},
 	}
 	flags.AddTxFlagsToCmd(cmd)

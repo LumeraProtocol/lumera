@@ -8,7 +8,9 @@ import (
 	storetypes "cosmossdk.io/store/types"
 	"cosmossdk.io/x/feegrant"
 	addresscodec "github.com/cosmos/cosmos-sdk/codec/address"
+	kmultisig "github.com/cosmos/cosmos-sdk/crypto/keys/multisig"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/cosmos/cosmos-sdk/runtime"
 	"github.com/cosmos/cosmos-sdk/testutil"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -18,6 +20,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/authz"
 	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
+	ethsecp256k1 "github.com/cosmos/evm/crypto/ethsecp256k1"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
@@ -153,14 +156,16 @@ func TestMigrateAuth_BaseAccount(t *testing.T) {
 	newAddr := testAccAddr()
 	baseAcc := authtypes.NewBaseAccountWithAddress(legacy)
 
+	// Phase 1 probe: GetAccount(newAddr) is called first.
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), newAddr).Return(nil)
+	// Phase 2: fetch + remove legacy, then create new account.
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), legacy).Return(baseAcc)
 	f.accountKeeper.EXPECT().RemoveAccount(gomock.Any(), baseAcc)
-	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), newAddr).Return(nil)
 	newAcc := authtypes.NewBaseAccountWithAddress(newAddr)
 	f.accountKeeper.EXPECT().NewAccountWithAddress(gomock.Any(), newAddr).Return(newAcc)
 	f.accountKeeper.EXPECT().SetAccount(gomock.Any(), newAcc)
 
-	vi, err := f.keeper.MigrateAuth(f.ctx, legacy, newAddr)
+	vi, err := f.keeper.MigrateAuth(f.ctx, legacy, newAddr, nil)
 	require.NoError(t, err)
 	require.Nil(t, vi)
 }
@@ -178,14 +183,16 @@ func TestMigrateAuth_ContinuousVesting(t *testing.T) {
 	require.NoError(t, err)
 	cva := vestingtypes.NewContinuousVestingAccountRaw(bva, 500000)
 
+	// Phase 1 probe: GetAccount(newAddr) is called first.
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), newAddr).Return(nil)
+	// Phase 2: fetch + remove legacy, then create new account.
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), legacy).Return(cva)
 	f.accountKeeper.EXPECT().RemoveAccount(gomock.Any(), cva)
-	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), newAddr).Return(nil)
 	newAcc := authtypes.NewBaseAccountWithAddress(newAddr)
 	f.accountKeeper.EXPECT().NewAccountWithAddress(gomock.Any(), newAddr).Return(newAcc)
 	f.accountKeeper.EXPECT().SetAccount(gomock.Any(), newAcc)
 
-	vi, err := f.keeper.MigrateAuth(f.ctx, legacy, newAddr)
+	vi, err := f.keeper.MigrateAuth(f.ctx, legacy, newAddr, nil)
 	require.NoError(t, err)
 	require.NotNil(t, vi)
 	require.Equal(t, origVesting, vi.OriginalVesting)
@@ -206,14 +213,16 @@ func TestMigrateAuth_DelayedVesting(t *testing.T) {
 	require.NoError(t, err)
 	dva := vestingtypes.NewDelayedVestingAccountRaw(bva)
 
+	// Phase 1 probe: GetAccount(newAddr) is called first.
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), newAddr).Return(nil)
+	// Phase 2: fetch + remove legacy, then create new account.
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), legacy).Return(dva)
 	f.accountKeeper.EXPECT().RemoveAccount(gomock.Any(), dva)
-	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), newAddr).Return(nil)
 	newAcc := authtypes.NewBaseAccountWithAddress(newAddr)
 	f.accountKeeper.EXPECT().NewAccountWithAddress(gomock.Any(), newAddr).Return(newAcc)
 	f.accountKeeper.EXPECT().SetAccount(gomock.Any(), newAcc)
 
-	vi, err := f.keeper.MigrateAuth(f.ctx, legacy, newAddr)
+	vi, err := f.keeper.MigrateAuth(f.ctx, legacy, newAddr, nil)
 	require.NoError(t, err)
 	require.NotNil(t, vi)
 	require.Equal(t, int64(2000000), vi.EndTime)
@@ -236,14 +245,16 @@ func TestMigrateAuth_PeriodicVesting(t *testing.T) {
 	}
 	pva := vestingtypes.NewPeriodicVestingAccountRaw(bva, 1000000, periods)
 
+	// Phase 1 probe: GetAccount(newAddr) is called first.
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), newAddr).Return(nil)
+	// Phase 2: fetch + remove legacy, then create new account.
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), legacy).Return(pva)
 	f.accountKeeper.EXPECT().RemoveAccount(gomock.Any(), pva)
-	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), newAddr).Return(nil)
 	newAcc := authtypes.NewBaseAccountWithAddress(newAddr)
 	f.accountKeeper.EXPECT().NewAccountWithAddress(gomock.Any(), newAddr).Return(newAcc)
 	f.accountKeeper.EXPECT().SetAccount(gomock.Any(), newAcc)
 
-	vi, err := f.keeper.MigrateAuth(f.ctx, legacy, newAddr)
+	vi, err := f.keeper.MigrateAuth(f.ctx, legacy, newAddr, nil)
 	require.NoError(t, err)
 	require.NotNil(t, vi)
 	require.Len(t, vi.Periods, 2)
@@ -261,29 +272,35 @@ func TestMigrateAuth_PermanentLocked(t *testing.T) {
 	pla, err := vestingtypes.NewPermanentLockedAccount(baseAcc, origVesting)
 	require.NoError(t, err)
 
+	// Phase 1 probe: GetAccount(newAddr) is called first.
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), newAddr).Return(nil)
+	// Phase 2: fetch + remove legacy, then create new account.
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), legacy).Return(pla)
 	f.accountKeeper.EXPECT().RemoveAccount(gomock.Any(), pla)
-	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), newAddr).Return(nil)
 	newAcc := authtypes.NewBaseAccountWithAddress(newAddr)
 	f.accountKeeper.EXPECT().NewAccountWithAddress(gomock.Any(), newAddr).Return(newAcc)
 	f.accountKeeper.EXPECT().SetAccount(gomock.Any(), newAcc)
 
-	vi, err := f.keeper.MigrateAuth(f.ctx, legacy, newAddr)
+	vi, err := f.keeper.MigrateAuth(f.ctx, legacy, newAddr, nil)
 	require.NoError(t, err)
 	require.NotNil(t, vi)
 	require.Equal(t, origVesting, vi.OriginalVesting)
 }
 
 // TestMigrateAuth_ModuleAccount verifies that module accounts are rejected.
+// The legacy module-account check is in Phase 2; Phase 1 probe of newAddr runs first.
 func TestMigrateAuth_ModuleAccount(t *testing.T) {
 	f := initMockFixture(t)
 	legacy := testAccAddr()
 	newAddr := testAccAddr()
 
+	// Phase 1 probe: newAddr is fresh.
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), newAddr).Return(nil)
+	// Phase 2: legacy fetch returns a module account → rejected.
 	modAcc := authtypes.NewEmptyModuleAccount("bonded_tokens_pool")
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), legacy).Return(modAcc)
 
-	vi, err := f.keeper.MigrateAuth(f.ctx, legacy, newAddr)
+	vi, err := f.keeper.MigrateAuth(f.ctx, legacy, newAddr, nil)
 	require.ErrorIs(t, err, types.ErrCannotMigrateModuleAccount)
 	require.Nil(t, vi)
 }
@@ -294,30 +311,349 @@ func TestMigrateAuth_AccountNotFound(t *testing.T) {
 	legacy := testAccAddr()
 	newAddr := testAccAddr()
 
+	// Phase 1 probe: newAddr is fresh.
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), newAddr).Return(nil)
+	// Phase 2: legacy fetch returns nil → ErrLegacyAccountNotFound.
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), legacy).Return(nil)
 
-	vi, err := f.keeper.MigrateAuth(f.ctx, legacy, newAddr)
+	vi, err := f.keeper.MigrateAuth(f.ctx, legacy, newAddr, nil)
 	require.ErrorIs(t, err, types.ErrLegacyAccountNotFound)
 	require.Nil(t, vi)
 }
 
 // TestMigrateAuth_NewAddressAlreadyExists verifies that if the new address already
-// has an account, it is reused instead of creating a new one.
+// has a plain BaseAccount, it is reused (not recreated) and SetAccount is still called.
 func TestMigrateAuth_NewAddressAlreadyExists(t *testing.T) {
 	f := initMockFixture(t)
 	legacy := testAccAddr()
 	newAddr := testAccAddr()
 	baseAcc := authtypes.NewBaseAccountWithAddress(legacy)
 
-	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), legacy).Return(baseAcc)
-	f.accountKeeper.EXPECT().RemoveAccount(gomock.Any(), baseAcc)
-	// New address already has an account — should not create a new one.
+	// Phase 1 probe: newAddr already has a BaseAccount.
 	existingAcc := authtypes.NewBaseAccountWithAddress(newAddr)
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), newAddr).Return(existingAcc)
+	// Phase 2: fetch + remove legacy, reuse cached existingAcc, call SetAccount.
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), legacy).Return(baseAcc)
+	f.accountKeeper.EXPECT().RemoveAccount(gomock.Any(), baseAcc)
+	f.accountKeeper.EXPECT().SetAccount(gomock.Any(), existingAcc)
 
-	vi, err := f.keeper.MigrateAuth(f.ctx, legacy, newAddr)
+	vi, err := f.keeper.MigrateAuth(f.ctx, legacy, newAddr, nil)
 	require.NoError(t, err)
 	require.Nil(t, vi)
+}
+
+// --- MigrateAuth Phase 1/2 new tests ---
+
+// makeMultisigProof builds a well-formed new-side MultisigProof from freshly
+// generated eth_secp256k1 keys and returns both the proof and the slice of
+// public keys so callers can derive the expected multisig address.
+func makeMultisigProof(t *testing.T, n int, threshold uint32) (*types.MigrationProof, []cryptotypes.PubKey) {
+	t.Helper()
+	subKeys := make([]cryptotypes.PubKey, n)
+	rawKeys := make([][]byte, n)
+	sigs := make([][]byte, int(threshold))
+	idxs := make([]uint32, int(threshold))
+
+	for i := 0; i < n; i++ {
+		priv, err := ethsecp256k1.GenerateKey()
+		require.NoError(t, err)
+		subKeys[i] = priv.PubKey()
+		rawKeys[i] = priv.PubKey().Bytes()
+	}
+	for i := uint32(0); i < threshold; i++ {
+		sigs[i] = make([]byte, 65) // 65-byte new-side sub-sig placeholder
+		idxs[i] = i
+	}
+
+	proof := &types.MigrationProof{
+		Proof: &types.MigrationProof_Multisig{
+			Multisig: &types.MultisigProof{
+				Threshold:     threshold,
+				SubPubKeys:    rawKeys,
+				SignerIndices: idxs,
+				SubSignatures: sigs,
+				SigFormat:     types.SigFormat_SIG_FORMAT_CLI,
+			},
+		},
+	}
+	return proof, subKeys
+}
+
+// deriveMultisigAddr reconstructs the LegacyAminoPubKey address from a slice
+// of eth_secp256k1 public keys and a threshold, matching MigrateAuth's logic.
+func deriveMultisigAddr(subKeys []cryptotypes.PubKey, threshold int) sdk.AccAddress {
+	multiPK := kmultisig.NewLegacyAminoPubKey(threshold, subKeys)
+	return sdk.AccAddress(multiPK.Address())
+}
+
+// TestMigrateAuth_MultisigDestination_SetsPubKey verifies that a multisig destProof
+// causes the reconstructed pubkey to be persisted on the new account.
+func TestMigrateAuth_MultisigDestination_SetsPubKey(t *testing.T) {
+	f := initMockFixture(t)
+	legacy := testAccAddr()
+
+	// threshold in proof and in deriveMultisigAddr must match for address check to pass.
+	proof, subKeys := makeMultisigProof(t, 3, 2)
+	newAddr := deriveMultisigAddr(subKeys, 2)
+
+	legacyAcc := authtypes.NewBaseAccountWithAddress(legacy)
+
+	// Phase 1 probe: newAddr is fresh.
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), newAddr).Return(nil)
+	// Phase 2.
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), legacy).Return(legacyAcc)
+	f.accountKeeper.EXPECT().RemoveAccount(gomock.Any(), legacyAcc)
+	newAcc := authtypes.NewBaseAccountWithAddress(newAddr)
+	f.accountKeeper.EXPECT().NewAccountWithAddress(gomock.Any(), newAddr).Return(newAcc)
+	f.accountKeeper.EXPECT().SetAccount(gomock.Any(), gomock.Any()).Do(func(_ any, acc sdk.AccountI) {
+		require.NotNil(t, acc.GetPubKey(), "expected multisig pubkey to be set on new account")
+		// threshold=2 matches what makeMultisigProof encoded.
+		expected := kmultisig.NewLegacyAminoPubKey(2, subKeys)
+		require.Equal(t, expected.Bytes(), acc.GetPubKey().Bytes())
+	})
+
+	vi, err := f.keeper.MigrateAuth(f.ctx, legacy, newAddr, proof)
+	require.NoError(t, err)
+	require.Nil(t, vi)
+}
+
+// TestMigrateAuth_SingleKeyDestination_NilPubKey verifies that a single-key destProof
+// leaves the new BaseAccount with a nil pubkey (consistent with pre-refactor behaviour).
+func TestMigrateAuth_SingleKeyDestination_NilPubKey(t *testing.T) {
+	f := initMockFixture(t)
+	legacy := testAccAddr()
+	newAddr := testAccAddr()
+	legacyAcc := authtypes.NewBaseAccountWithAddress(legacy)
+
+	priv, err := ethsecp256k1.GenerateKey()
+	require.NoError(t, err)
+	singleProof := &types.MigrationProof{
+		Proof: &types.MigrationProof_Single{
+			Single: &types.SingleKeyProof{
+				PubKey:    priv.PubKey().Bytes(),
+				Signature: make([]byte, 65),
+				SigFormat: types.SigFormat_SIG_FORMAT_CLI,
+			},
+		},
+	}
+
+	// Phase 1 probe: newAddr is fresh.
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), newAddr).Return(nil)
+	// Phase 2.
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), legacy).Return(legacyAcc)
+	f.accountKeeper.EXPECT().RemoveAccount(gomock.Any(), legacyAcc)
+	newAcc := authtypes.NewBaseAccountWithAddress(newAddr)
+	f.accountKeeper.EXPECT().NewAccountWithAddress(gomock.Any(), newAddr).Return(newAcc)
+	f.accountKeeper.EXPECT().SetAccount(gomock.Any(), gomock.Any()).Do(func(_ any, acc sdk.AccountI) {
+		require.Nil(t, acc.GetPubKey(), "expected nil pubkey for single-key proof")
+	})
+
+	vi, err := f.keeper.MigrateAuth(f.ctx, legacy, newAddr, singleProof)
+	require.NoError(t, err)
+	require.Nil(t, vi)
+}
+
+// TestMigrateAuth_MultisigDestination_AddressMismatch verifies that a multisig
+// destProof whose sub-keys derive to a different address than newAddr is rejected
+// in Phase 1 with no state mutation.
+func TestMigrateAuth_MultisigDestination_AddressMismatch(t *testing.T) {
+	f := initMockFixture(t)
+	// newAddr is a random address that will NOT match the multisig derivation.
+	newAddr := testAccAddr()
+
+	proof, _ := makeMultisigProof(t, 2, 1)
+
+	// Phase 1 probe: newAddr is fresh (only call allowed before rejection).
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), newAddr).Return(nil)
+	// No further keeper calls — rejection must be pre-mutation.
+
+	_, err := f.keeper.MigrateAuth(f.ctx, testAccAddr(), newAddr, proof)
+	require.ErrorIs(t, err, types.ErrPubKeyAddressMismatch)
+}
+
+// TestMigrateAuth_PreExistingVestingDestination_Rejected verifies that a pre-existing
+// ContinuousVestingAccount at newAddr is rejected in Phase 1 with no state mutation.
+func TestMigrateAuth_PreExistingVestingDestination_Rejected(t *testing.T) {
+	f := initMockFixture(t)
+	legacy := testAccAddr()
+	newAddr := testAccAddr()
+
+	baseAcc := authtypes.NewBaseAccountWithAddress(newAddr)
+	origVesting := sdk.NewCoins(sdk.NewInt64Coin("ulume", 500))
+	bva, err := vestingtypes.NewBaseVestingAccount(baseAcc, origVesting, 1000000)
+	require.NoError(t, err)
+	cva := vestingtypes.NewContinuousVestingAccountRaw(bva, 500000)
+
+	// Phase 1 probe: returns a vesting account → rejected immediately.
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), newAddr).Return(cva)
+	// No GetAccount(legacy), no RemoveAccount, no SetAccount.
+
+	_, err = f.keeper.MigrateAuth(f.ctx, legacy, newAddr, nil)
+	require.ErrorIs(t, err, types.ErrPubKeyAddressMismatch)
+	require.Contains(t, err.Error(), "non-BaseAccount")
+}
+
+// TestMigrateAuth_PreExistingModuleDestination_Rejected verifies that a pre-existing
+// ModuleAccount at newAddr is rejected in Phase 1 with ErrCannotMigrateModuleAccount.
+func TestMigrateAuth_PreExistingModuleDestination_Rejected(t *testing.T) {
+	f := initMockFixture(t)
+	legacy := testAccAddr()
+	// Use the module account's own address as newAddr.
+	modAcc := authtypes.NewEmptyModuleAccount("test_pool")
+	newAddr := modAcc.GetAddress()
+
+	// Phase 1 probe: returns a module account → rejected immediately.
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), newAddr).Return(modAcc)
+	// No GetAccount(legacy), no RemoveAccount, no SetAccount.
+
+	_, err := f.keeper.MigrateAuth(f.ctx, legacy, newAddr, nil)
+	require.ErrorIs(t, err, types.ErrCannotMigrateModuleAccount)
+}
+
+// TestMigrateAuth_MultisigDestination_PreExistingMismatchedPubKey_Rejected verifies
+// that a pre-existing BaseAccount at newAddr with a DIFFERENT pubkey already set
+// causes a pre-mutation rejection (refusing to overwrite).
+func TestMigrateAuth_MultisigDestination_PreExistingMismatchedPubKey_Rejected(t *testing.T) {
+	f := initMockFixture(t)
+
+	// threshold must equal the value passed to deriveMultisigAddr so the address
+	// derivation inside MigrateAuth matches newAddr.
+	proof, subKeys := makeMultisigProof(t, 2, 2)
+	newAddr := deriveMultisigAddr(subKeys, 2)
+
+	// Pre-existing account with a DIFFERENT pubkey.
+	otherPriv, err := ethsecp256k1.GenerateKey()
+	require.NoError(t, err)
+	existingAcc := authtypes.NewBaseAccountWithAddress(newAddr)
+	require.NoError(t, existingAcc.SetPubKey(otherPriv.PubKey()))
+
+	// Phase 1 probe: returns existing account with mismatched pubkey → rejected.
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), newAddr).Return(existingAcc)
+	// No GetAccount(legacy), no RemoveAccount, no SetAccount.
+
+	_, err = f.keeper.MigrateAuth(f.ctx, testAccAddr(), newAddr, proof)
+	require.ErrorIs(t, err, types.ErrPubKeyAddressMismatch)
+	require.Contains(t, err.Error(), "refusing to overwrite")
+}
+
+// TestMigrateAuth_MultisigDestination_PreExistingMatchingPubKey_Idempotent verifies
+// that a pre-existing BaseAccount at newAddr with the CORRECT multisig pubkey already
+// set succeeds without calling SetPubKey again (idempotent re-run).
+// GetAccount(newAddr) is called exactly ONCE (Phase 1 probe reused in Phase 2).
+func TestMigrateAuth_MultisigDestination_PreExistingMatchingPubKey_Idempotent(t *testing.T) {
+	f := initMockFixture(t)
+	legacy := testAccAddr()
+
+	// threshold=2 must match deriveMultisigAddr so MigrateAuth's address check passes.
+	proof, subKeys := makeMultisigProof(t, 2, 2)
+	newAddr := deriveMultisigAddr(subKeys, 2)
+
+	// Pre-existing account with the MATCHING multisig pubkey.
+	multiPK := kmultisig.NewLegacyAminoPubKey(2, subKeys)
+	existingAcc := authtypes.NewBaseAccountWithAddress(newAddr)
+	require.NoError(t, existingAcc.SetPubKey(multiPK))
+
+	legacyAcc := authtypes.NewBaseAccountWithAddress(legacy)
+
+	// Phase 1 probe: returns existing account with matching pubkey.
+	// This is the ONE AND ONLY GetAccount(newAddr) call.
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), newAddr).Return(existingAcc)
+	// Phase 2: legacy removal, then SetAccount (pubkey already set → skipped internally).
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), legacy).Return(legacyAcc)
+	f.accountKeeper.EXPECT().RemoveAccount(gomock.Any(), legacyAcc)
+	f.accountKeeper.EXPECT().SetAccount(gomock.Any(), existingAcc).Do(func(_ any, acc sdk.AccountI) {
+		// Pubkey must still be the original matching key — not nil, not overwritten.
+		require.NotNil(t, acc.GetPubKey())
+		require.Equal(t, multiPK.Bytes(), acc.GetPubKey().Bytes())
+	})
+
+	vi, err := f.keeper.MigrateAuth(f.ctx, legacy, newAddr, proof)
+	require.NoError(t, err)
+	require.Nil(t, vi)
+}
+
+// TestMigrateAuth_MultisigDestination_MalformedDestProof is a table-driven test
+// covering 4 malformed destProof cases. Each must be rejected in Phase 1 with
+// NO accountKeeper calls at all (strict gomock catches any leak).
+func TestMigrateAuth_MultisigDestination_MalformedDestProof(t *testing.T) {
+	priv1, _ := ethsecp256k1.GenerateKey()
+	priv2, _ := ethsecp256k1.GenerateKey()
+	goodKey1 := priv1.PubKey().Bytes()
+	goodKey2 := priv2.PubKey().Bytes()
+
+	cases := []struct {
+		name  string
+		proof *types.MigrationProof
+	}{
+		{
+			name: "threshold_zero",
+			proof: &types.MigrationProof{
+				Proof: &types.MigrationProof_Multisig{
+					Multisig: &types.MultisigProof{
+						Threshold:     0,
+						SubPubKeys:    [][]byte{goodKey1, goodKey2},
+						SignerIndices: []uint32{},
+						SubSignatures: [][]byte{},
+						SigFormat:     types.SigFormat_SIG_FORMAT_CLI,
+					},
+				},
+			},
+		},
+		{
+			name: "threshold_exceeds_n",
+			proof: &types.MigrationProof{
+				Proof: &types.MigrationProof_Multisig{
+					Multisig: &types.MultisigProof{
+						Threshold:     3,
+						SubPubKeys:    [][]byte{goodKey1, goodKey2},
+						SignerIndices: []uint32{0, 1, 0}, // wrong count but threshold=3 > N=2
+						SubSignatures: [][]byte{make([]byte, 65), make([]byte, 65), make([]byte, 65)},
+						SigFormat:     types.SigFormat_SIG_FORMAT_CLI,
+					},
+				},
+			},
+		},
+		{
+			name: "sub_pub_key_wrong_length",
+			proof: &types.MigrationProof{
+				Proof: &types.MigrationProof_Multisig{
+					Multisig: &types.MultisigProof{
+						Threshold:     1,
+						SubPubKeys:    [][]byte{{0x01, 0x02}}, // wrong length
+						SignerIndices: []uint32{0},
+						SubSignatures: [][]byte{make([]byte, 65)},
+						SigFormat:     types.SigFormat_SIG_FORMAT_CLI,
+					},
+				},
+			},
+		},
+		{
+			name: "multisig_with_eip191_format",
+			proof: &types.MigrationProof{
+				Proof: &types.MigrationProof_Multisig{
+					Multisig: &types.MultisigProof{
+						Threshold:     1,
+						SubPubKeys:    [][]byte{goodKey1},
+						SignerIndices: []uint32{0},
+						SubSignatures: [][]byte{make([]byte, 65)},
+						SigFormat:     types.SigFormat_SIG_FORMAT_EIP191,
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			f := initMockFixture(t)
+			// strict gomock: any unexpected call fails the test.
+			// No EXPECT() calls registered — proof rejection must happen
+			// before any keeper interaction.
+
+			_, err := f.keeper.MigrateAuth(f.ctx, testAccAddr(), testAccAddr(), tc.proof)
+			require.Error(t, err, "expected rejection for case %s", tc.name)
+		})
+	}
 }
 
 // --- FinalizeVestingAccount tests ---

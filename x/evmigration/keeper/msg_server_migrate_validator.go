@@ -181,7 +181,7 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 
 	// Remove legacy auth account; for vesting accounts, extract schedule so it
 	// can be re-applied at the new address after the bank transfer.
-	vestingInfo, err := ms.MigrateAuth(ctx, legacyAddr, newAddr)
+	vestingInfo, err := ms.MigrateAuth(ctx, legacyAddr, newAddr, &msg.NewProof)
 	if err != nil {
 		return nil, fmt.Errorf("migrate auth: %w", err)
 	}

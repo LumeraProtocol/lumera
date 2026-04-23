@@ -68,7 +68,7 @@ func (ms msgServer) ClaimLegacyAccount(goCtx context.Context, msg *types.MsgClai
 	}
 
 	// --- Execute migration steps ---
-	if err := ms.migrateAccount(ctx, legacyAddr, newAddr); err != nil {
+	if err := ms.migrateAccount(ctx, legacyAddr, newAddr, &msg.NewProof); err != nil {
 		return nil, err
 	}
 
@@ -156,7 +156,7 @@ func (ms msgServer) preChecks(ctx sdk.Context, legacyAddr, newAddr sdk.AccAddres
 
 // migrateAccount performs the account-level migration steps shared by both
 // ClaimLegacyAccount and MigrateValidator (Steps 1-8 from the plan).
-func (ms msgServer) migrateAccount(ctx sdk.Context, legacyAddr, newAddr sdk.AccAddress) error {
+func (ms msgServer) migrateAccount(ctx sdk.Context, legacyAddr, newAddr sdk.AccAddress, destProof *types.MigrationProof) error {
 	// Snapshot the original withdraw address before MigrateDistribution
 	// may temporarily redirect it to self (see redirectWithdrawAddrIfMigrated).
 	origWithdrawAddr, _ := ms.distributionKeeper.GetDelegatorWithdrawAddr(ctx, legacyAddr)
@@ -172,7 +172,7 @@ func (ms msgServer) migrateAccount(ctx sdk.Context, legacyAddr, newAddr sdk.AccA
 	}
 
 	// Step 3a: Migrate auth account (vesting-aware: remove lock before bank transfer).
-	vestingInfo, err := ms.MigrateAuth(ctx, legacyAddr, newAddr)
+	vestingInfo, err := ms.MigrateAuth(ctx, legacyAddr, newAddr, destProof)
 	if err != nil {
 		return fmt.Errorf("migrate auth: %w", err)
 	}

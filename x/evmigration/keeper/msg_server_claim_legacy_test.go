@@ -1162,7 +1162,8 @@ func TestMigrateValidator_FailAtAuth(t *testing.T) {
 	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), legacyAddr, ^uint16(0)).Return(nil, nil)
 	f.distributionKeeper.EXPECT().SetDelegatorWithdrawAddr(gomock.Any(), newAddr, newAddr).Return(nil)
 
-	// MigrateAuth fails — account not found.
+	// MigrateAuth fails — Phase 1 probe of newAddr succeeds (fresh), then legacy not found.
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), newAddr).Return(nil)
 	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), legacyAddr).Return(nil)
 
 	_, err := f.msgServer.MigrateValidator(f.ctx, msg)

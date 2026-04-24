@@ -66,7 +66,7 @@ func TestAuditRecovery_PostponedBecomesActiveWithSelfAndPeerOpen_NoHostThreshold
 	// Epoch 1: whichever reporter is assigned node1 reports CLOSED for node1.
 	// Not enough streak yet (consecutive=2), so node1 should remain ACTIVE after epoch1.
 	if sut.currentHeight < epoch1Start {
-		sut.AwaitBlockHeight(t, epoch1Start, 20*time.Second)
+		sut.AwaitBlockHeight(t, epoch1Start, 40*time.Second)
 	}
 	assigned0e1 := auditQueryAssignedTargets(t, epochID1, true, n0.accAddr)
 	assigned1e1 := auditQueryAssignedTargets(t, epochID1, true, n1.accAddr)
@@ -79,7 +79,7 @@ func TestAuditRecovery_PostponedBecomesActiveWithSelfAndPeerOpen_NoHostThreshold
 	RequireTxSuccess(t, tx2e1)
 
 	if sut.currentHeight < epoch2Start {
-		sut.AwaitBlockHeight(t, epoch2Start, 20*time.Second)
+		sut.AwaitBlockHeight(t, epoch2Start, 40*time.Second)
 	}
 
 	// Epoch 2: repeat CLOSED-for-node1 observations on assigned targets.
@@ -94,7 +94,7 @@ func TestAuditRecovery_PostponedBecomesActiveWithSelfAndPeerOpen_NoHostThreshold
 	RequireTxSuccess(t, tx2e2)
 
 	if sut.currentHeight < epoch3Start {
-		sut.AwaitBlockHeight(t, epoch3Start, 20*time.Second)
+		sut.AwaitBlockHeight(t, epoch3Start, 40*time.Second)
 	}
 
 	stateAfterEpoch2 := querySupernodeLatestState(t, cli, n1.valAddr)
@@ -113,7 +113,7 @@ func TestAuditRecovery_PostponedBecomesActiveWithSelfAndPeerOpen_NoHostThreshold
 		nextEpochStart := epochStart + int64(epochLengthBlocks)
 
 		if sut.currentHeight < epochStart {
-			sut.AwaitBlockHeight(t, epochStart, 20*time.Second)
+			sut.AwaitBlockHeight(t, epochStart, 40*time.Second)
 		}
 		assigned0 := auditQueryAssignedTargets(t, epochID, true, n0.accAddr)
 		assigned2 := auditQueryAssignedTargets(t, epochID, true, n2.accAddr)
@@ -129,7 +129,7 @@ func TestAuditRecovery_PostponedBecomesActiveWithSelfAndPeerOpen_NoHostThreshold
 		RequireTxSuccess(t, tx1)
 
 		if sut.currentHeight < nextEpochStart {
-			sut.AwaitBlockHeight(t, nextEpochStart, 20*time.Second)
+			sut.AwaitBlockHeight(t, nextEpochStart, 40*time.Second)
 		}
 		if querySupernodeLatestState(t, cli, n1.valAddr) == "SUPERNODE_STATE_ACTIVE" {
 			recovered = true

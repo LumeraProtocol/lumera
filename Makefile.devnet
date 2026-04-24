@@ -1,5 +1,7 @@
 .PHONY: devnet-build devnet-tests-build devnet-up devnet-reset devnet-up-detach devnet-down devnet-stop devnet-clean devnet-deploy-tar devnet-upgrade devnet-new devnet-start devnet-evm-upgrade
-.PHONY: devnet-build-default _check-devnet-default-cfg _devnet-select-default-genesis devnet-refresh-bin devnet-upgrade-binaries devnet-upgrade-binaries-default devnet-update-scripts
+.PHONY: devnet-build-default _devnet-select-default-genesis devnet-refresh-bin devnet-upgrade-binaries devnet-upgrade-binaries-default devnet-update-scripts
+.PHONY: devnet-build-version devnet-new-version devnet-upgrade-version
+.PHONY: _check-devnet-version-bin _check-devnet-build-version-cfg
 .PHONY: devnet-download-binaries
 .PHONY: devnet-evmigration-sync-bin devnet-evmigration-prepare devnet-evmigration-estimate devnet-evmigration-migrate devnet-evmigration-migrate-validator devnet-evmigration-cleanup
 .PHONY: devnet-evmigrationp-prepare devnet-evmigrationp-estimate devnet-evmigrationp-migrate devnet-evmigrationp-migrate-validator devnet-evmigrationp-migrate-all devnet-evmigrationp-cleanup
@@ -7,19 +9,51 @@
 
 ##### Devnet Makefile ########################################
 #
-# To use external genesis - provide path to it via EXTERNAL_GENESIS_FILE
-# Examples:
-#   Using default config files:
-#   make devnet-build \
-#  		EXTERNAL_CLAIMS_FILE=~/claims.csv \
-# 		EXTERNAL_GENESIS_FILE=~/genesis.json
+# Targets for managing a local Dockerized devnet (5 validators + Hermes
+# relayer). State lives in /tmp/lumera-devnet-1/ and devnet/bin*/.
 #
-#   Using custom config files:
+# ── Build from local source ───────────────────────────────────
+#   make devnet-build-default                       # build + configure using locally compiled lumerad
+#   make devnet-refresh-bin                         # rebuild lumerad and copy into devnet/bin/
+#
+# ── Build from a pre-downloaded release ───────────────────────
+#   make devnet-download-binaries VERSION=v1.12.0   # fetch release binaries into devnet/bin-<VERSION>/
+#   make devnet-build-version     VERSION=v1.12.0   # build + configure using those binaries
+#
+# ── Lifecycle (on an already-built devnet) ────────────────────
+#   make devnet-up                                  # start containers (foreground)
+#   make devnet-up-detach                           # start containers (background)
+#   make devnet-stop / make devnet-start            # stop / start without wiping state
+#   make devnet-down                                # stop and remove containers
+#   make devnet-clean                               # wipe all devnet state (requires sudo)
+#   make devnet-reset                               # reset validator keys, keep config
+#
+# ── Full reset + rebuild + start ──────────────────────────────
+#   make devnet-new                                 # down + clean + build-default + up
+#   make devnet-new-version VERSION=v1.12.0         # same, using a pre-downloaded release
+#
+# ── In-place upgrade (while devnet is running) ────────────────
+#   make devnet-upgrade-version VERSION=v1.12.0     # upgrade to a pre-downloaded release
+#   make devnet-upgrade-1200                        # upgrade to locally-built v1.20.0 (EVM)
+#   make devnet-evm-upgrade                         # scripted v1.12.0 -> v1.20.0 evmigration flow
+#
+# ── External genesis / claims (override inputs to devnet-build) ──
 #   make devnet-build \
-# 		CONFIG_JSON=path/to/custom/config.json \
-# 		VALIDATORS_JSON=path/to/custom/validators.json \
-# 		EXTERNAL_CLAIMS_FILE=claims.csv \
-# 		EXTERNAL_GENESIS_FILE=template_genesis.json
+#       EXTERNAL_CLAIMS_FILE=~/claims.csv \
+#       EXTERNAL_GENESIS_FILE=~/genesis.json
+#   # Optional: CONFIG_JSON=path/to/config.json VALIDATORS_JSON=path/to/validators.json
+#
+# ── Container maintenance ─────────────────────────────────────
+#   make devnet-update-scripts                      # push updated devnet/scripts/*.sh into running containers
+#
+# ── EVM migration (per-validator tools) ───────────────────────
+#   make devnet-evmigration-prepare                 # one-at-a-time per validator
+#   make devnet-evmigrationp-prepare                # parallel across validators
+#   # estimate / migrate / migrate-validator / migrate-all / verify / cleanup
+#
+# Tip: any `devnet-*-<N>` alias (e.g. devnet-build-1111, devnet-new-1120)
+# is a thin delegator to the corresponding `-version VERSION=vX.Y.Z` target.
+##############################################################
 
 DEVNET_DIR := /tmp/lumera-devnet-1
 SHARED_DIR := ${DEVNET_DIR}/shared
@@ -116,7 +150,7 @@ devnet-build:
 		exit 1; \
 	fi
 
-devnet-build-default: _check-devnet-default-cfg
+devnet-build-default:
 	@GENESIS_FILE="$$( $(MAKE) --no-print-directory _devnet-select-default-genesis )"; \
 	echo "Using default genesis template: $$GENESIS_FILE"; \
 	$(MAKE) devnet-build \
@@ -124,44 +158,42 @@ devnet-build-default: _check-devnet-default-cfg
 		EXTERNAL_GENESIS_FILE="$$(realpath "$$GENESIS_FILE")" \
 		EXTERNAL_CLAIMS_FILE="$$(realpath $(DEFAULT_CLAIMS_FILE))"
 
-.PHONY: devnet-build-172 _check-devnet-172-cfg devnet-build-191 _check-devnet-191-cfg devnet-build-1111 _check-devnet-1111-cfg
-devnet-build-172:
-	@$(MAKE) devnet-build \
+# Build devnet from pre-downloaded binaries for a specific lumera version.
+# Expects devnet/bin-<VERSION>/ to already contain the binaries (populate with
+# `make devnet-download-binaries VERSION=<VERSION>`). The genesis template is
+# auto-selected based on VERSION vs EVM_CUTOVER_VERSION.
+# Usage: make devnet-build-version VERSION=v1.12.0
+devnet-build-version: _check-devnet-build-version-cfg
+	@GENESIS_FILE="$$( LUMERA_VERSION=$(VERSION) $(MAKE) --no-print-directory _devnet-select-default-genesis )"; \
+	echo "Using genesis template: $$GENESIS_FILE for $(VERSION)"; \
+	$(MAKE) devnet-build \
 		DEVNET_BUILD_LUMERA=0 \
-		DEVNET_BIN_DIR=devnet/bin-v1.7.2 \
-		EXTERNAL_GENESIS_FILE="$$(realpath $(ORIG_GENESIS_FILE))" \
+		DEVNET_BIN_DIR=devnet/bin-$(VERSION) \
+		EXTERNAL_GENESIS_FILE="$$(realpath "$$GENESIS_FILE")" \
 		EXTERNAL_CLAIMS_FILE="$$(realpath $(DEFAULT_CLAIMS_FILE))"
 
-_check-devnet-172-cfg:
-	@[ -f "$$(realpath $(ORIG_GENESIS_FILE))" ] || (echo "Missing ORIG_GENESIS_FILE: $$(realpath $(ORIG_GENESIS_FILE))"; exit 1)
-	@[ -f "$$(realpath $(DEFAULT_CLAIMS_FILE))" ] || (echo "Missing DEFAULT_CLAIMS_FILE: $$(realpath $(DEFAULT_CLAIMS_FILE))"; exit 1)
+_check-devnet-version-bin:
+	@if [ -z "$(VERSION)" ]; then \
+		echo "VERSION is required (e.g. VERSION=v1.12.0)"; \
+		exit 1; \
+	fi
+	@if [ ! -f "devnet/bin-$(VERSION)/lumerad" ]; then \
+		echo "Missing binary: devnet/bin-$(VERSION)/lumerad"; \
+		echo "Run: make devnet-download-binaries VERSION=$(VERSION)"; \
+		exit 1; \
+	fi
 
-devnet-build-191:
-	@$(MAKE) devnet-build \
-		DEVNET_BUILD_LUMERA=0 \
-		DEVNET_BIN_DIR=devnet/bin-v1.9.1 \
-		EXTERNAL_GENESIS_FILE="$$(realpath $(DEFAULT_GENESIS_FILE))" \
-		EXTERNAL_CLAIMS_FILE="$$(realpath $(DEFAULT_CLAIMS_FILE))"
+_check-devnet-build-version-cfg: _check-devnet-version-bin
+	@[ -f "$$(realpath $(DEFAULT_GENESIS_FILE))" ] || (echo "Missing DEFAULT_GENESIS_FILE: $(DEFAULT_GENESIS_FILE)"; exit 1)
+	@[ -f "$$(realpath $(DEFAULT_GENESIS_EVM_FILE))" ] || (echo "Missing DEFAULT_GENESIS_EVM_FILE: $(DEFAULT_GENESIS_EVM_FILE)"; exit 1)
+	@[ -f "$$(realpath $(DEFAULT_CLAIMS_FILE))" ] || (echo "Missing DEFAULT_CLAIMS_FILE: $(DEFAULT_CLAIMS_FILE)"; exit 1)
 
-_check-devnet-191-cfg:
-	@[ -f "$$(realpath $(DEFAULT_GENESIS_FILE))" ] || (echo "Missing DEFAULT_GENESIS_FILE: $$(realpath $(DEFAULT_GENESIS_FILE))"; exit 1)
-	@[ -f "$$(realpath $(DEFAULT_CLAIMS_FILE))" ] || (echo "Missing DEFAULT_CLAIMS_FILE: $$(realpath $(DEFAULT_CLAIMS_FILE))"; exit 1)
-
+.PHONY: devnet-build-1111 devnet-build-1120
 devnet-build-1111:
-	@$(MAKE) devnet-build \
-		DEVNET_BUILD_LUMERA=0 \
-		DEVNET_BIN_DIR=devnet/bin-v1.11.1 \
-		EXTERNAL_GENESIS_FILE="$$(realpath $(DEFAULT_GENESIS_FILE))" \
-		EXTERNAL_CLAIMS_FILE="$$(realpath $(DEFAULT_CLAIMS_FILE))"
+	@$(MAKE) devnet-build-version VERSION=v1.11.1
 
-_check-devnet-1111-cfg:
-	@[ -f "$$(realpath $(DEFAULT_GENESIS_FILE))" ] || (echo "Missing DEFAULT_GENESIS_FILE: $$(realpath $(DEFAULT_GENESIS_FILE))"; exit 1)
-	@[ -f "$$(realpath $(DEFAULT_CLAIMS_FILE))" ] || (echo "Missing DEFAULT_CLAIMS_FILE: $$(realpath $(DEFAULT_CLAIMS_FILE))"; exit 1)
-
-_check-devnet-default-cfg:
-	@[ -f "$$(realpath $(DEFAULT_GENESIS_FILE))" ] || (echo "Missing DEFAULT_GENESIS_FILE: $$(realpath $(DEFAULT_GENESIS_FILE))"; exit 1)
-	@[ -f "$$(realpath $(DEFAULT_GENESIS_EVM_FILE))" ] || (echo "Missing DEFAULT_GENESIS_EVM_FILE: $$(realpath $(DEFAULT_GENESIS_EVM_FILE))"; exit 1)
-	@[ -f "$$(realpath $(DEFAULT_CLAIMS_FILE))" ] || (echo "Missing DEFAULT_CLAIMS_FILE: $$(realpath $(DEFAULT_CLAIMS_FILE))"; exit 1)
+devnet-build-1120:
+	@$(MAKE) devnet-build-version VERSION=v1.12.0
 
 _devnet-select-default-genesis:
 	@set -e; \
@@ -373,11 +405,11 @@ devnet-refresh-bin:
 	echo "Refreshed ${DEVNET_BIN_DIR} from current repo build."
 
 # Download pre-built binaries for a specific lumera version from GitHub releases.
-# Usage: make devnet-download-binaries VERSION=v1.11.1
+# Usage: make devnet-download-binaries VERSION=v1.12.0
 devnet-download-binaries:
 	@if [ -z "$(VERSION)" ]; then \
 		echo "Usage: make devnet-download-binaries VERSION=<lumera-version>"; \
-		echo "  e.g. make devnet-download-binaries VERSION=v1.11.1"; \
+		echo "  e.g. make devnet-download-binaries VERSION=v1.12.0"; \
 		exit 1; \
 	fi
 	@./devnet/scripts/download-binaries.sh "$(VERSION)"
@@ -388,7 +420,7 @@ devnet-update-scripts:
 		exit 1; \
 	fi
 	@services="$$(docker compose -f $(COMPOSE_FILE) ps --services)"; \
-	common_scripts="common.sh account-registry.sh start.sh stop.sh restart.sh lumera-helper.sh validator-setup.sh supernode-setup.sh lumera-uploader-setup.sh"; \
+	common_scripts="common.sh account-registry.sh start.sh stop.sh restart.sh lumera-helper.sh validator-setup.sh supernode-setup.sh lumera-uploader-setup.sh test-accounts-setup.sh"; \
 	updated=0; \
 	for svc in $$services; do \
 		container="$$(docker compose -f $(COMPOSE_FILE) ps -q $$svc)"; \
@@ -423,48 +455,49 @@ devnet-update-scripts:
 		echo "No containers were updated. Ensure the devnet is running."; \
 	fi
 
-.PHONY: devnet-new-172 devnet-new-191 devnet-new-1111 devnet-upgrade-180 devnet-upgrade-191
-.PHONY: devnet-upgrade-1100 devnet-upgrade-1101 devnet-upgrade-1111 devnet-upgrade-1200 devnet-evm-upgrade
+.PHONY: devnet-new-1111 devnet-new-1120
+.PHONY: devnet-upgrade-1111 devnet-upgrade-1120 devnet-upgrade-1200
+.PHONY: devnet-evm-upgrade
 
-devnet-upgrade-180:
-	@cd devnet/scripts && ./upgrade.sh v1.8.0 auto-height ../bin-v1.8.0
+# Upgrade a running devnet to a pre-downloaded lumera version.
+# Expects devnet/bin-<VERSION>/ to already contain the binaries.
+# Usage: make devnet-upgrade-version VERSION=v1.12.0
+devnet-upgrade-version: _check-devnet-version-bin
+	@cd devnet/scripts && ./upgrade.sh $(VERSION) auto-height ../bin-$(VERSION)
 
-devnet-upgrade-191:
-	@cd devnet/scripts && ./upgrade.sh v1.9.1 auto-height ../bin-v1.9.1
-
-devnet-upgrade-1100:
-	@cd devnet/scripts && ./upgrade.sh v1.10.0 auto-height ../bin-v1.10.0
-
-devnet-upgrade-1101:
-	@cd devnet/scripts && ./upgrade.sh v1.10.1 auto-height ../bin-v1.10.1
+# Full reset + rebuild + start for a specific pre-downloaded version.
+# Stops running containers, wipes devnet state, rebuilds from
+# devnet/bin-<VERSION>/, and starts the stack attached.
+# Usage: make devnet-new-version VERSION=v1.12.0
+devnet-new-version:
+	@if [ -z "$(VERSION)" ]; then \
+		echo "VERSION is required. Usage: make devnet-new-version VERSION=v1.12.0"; \
+		exit 1; \
+	fi
+	$(MAKE) devnet-down
+	$(MAKE) devnet-clean
+	$(MAKE) devnet-build-version VERSION=$(VERSION)
+	sleep 10
+	$(MAKE) devnet-up
 
 devnet-upgrade-1111:
-	@cd devnet/scripts && ./upgrade.sh v1.11.1 auto-height ../bin-v1.11.1
+	@$(MAKE) devnet-upgrade-version VERSION=v1.11.1
 
+devnet-upgrade-1120:
+	@$(MAKE) devnet-upgrade-version VERSION=v1.12.0
+
+# Special case: upgrade to the locally-built version (devnet/bin, not
+# devnet/bin-<VERSION>). Stays separate from devnet-upgrade-version because
+# the binary source differs (local repo build vs pre-downloaded release).
 devnet-upgrade-1200:
 	@$(MAKE) devnet-refresh-bin
 	@cd devnet/scripts && ./upgrade.sh v1.20.0 auto-height ../bin
 
-devnet-new-172:
-	$(MAKE) devnet-down
-	$(MAKE) devnet-clean
-	$(MAKE) devnet-build-172
-	sleep 10
-	$(MAKE) devnet-up
-
-devnet-new-191:
-	$(MAKE) devnet-down
-	$(MAKE) devnet-clean
-	$(MAKE) devnet-build-191
-	sleep 10
-	$(MAKE) devnet-up
-
 devnet-new-1111:
-	$(MAKE) devnet-down
-	$(MAKE) devnet-clean
-	$(MAKE) devnet-build-1111
-	sleep 10
-	$(MAKE) devnet-up
+	@$(MAKE) devnet-new-version VERSION=v1.11.1
+
+devnet-new-1120:
+	@$(MAKE) devnet-new-version VERSION=v1.12.0
 
 DEVNET_EVM_UPGRADE_LOG ?= devnet/logs/evm-upgrade-$(shell date +%Y%m%d-%H%M).log
 
@@ -472,22 +505,24 @@ devnet-evm-upgrade:
 	@mkdir -p devnet/logs
 	@echo "Logging to $(DEVNET_EVM_UPGRADE_LOG)"
 	@bash -c 'set -euo pipefail; { \
-	echo "==> Stage: install v1.11.1 devnet"; \
+	BASE_VERSION=v1.12.0; \
+	EVM_VERSION=v1.20.0; \
+	echo "==> Stage: install $$BASE_VERSION devnet"; \
 	if ! $(MAKE) devnet-down; then \
-		echo "ERROR: stage install v1.11.1 devnet failed during devnet-down" >&2; \
+		echo "ERROR: stage install $$BASE_VERSION devnet failed during devnet-down" >&2; \
 		exit 1; \
 	fi; \
 	if ! $(MAKE) devnet-clean; then \
-		echo "ERROR: stage install v1.11.1 devnet failed during devnet-clean" >&2; \
+		echo "ERROR: stage install $$BASE_VERSION devnet failed during devnet-clean" >&2; \
 		exit 1; \
 	fi; \
-	if ! $(MAKE) devnet-build-1111; then \
-		echo "ERROR: stage install v1.11.1 devnet failed during devnet-build-1111" >&2; \
+	if ! $(MAKE) devnet-build-version VERSION=$$BASE_VERSION; then \
+		echo "ERROR: stage install $$BASE_VERSION devnet failed during devnet-build-version" >&2; \
 		exit 1; \
 	fi; \
 	sleep 10; \
 	if ! $(MAKE) devnet-up-detach; then \
-		echo "ERROR: stage install v1.11.1 devnet failed during devnet-up-detach" >&2; \
+		echo "ERROR: stage install $$BASE_VERSION devnet failed during devnet-up-detach" >&2; \
 		exit 1; \
 	fi; \
 	echo "==> Stage: wait for height 40"; \
@@ -512,9 +547,9 @@ devnet-evm-upgrade:
 		echo "ERROR: stage post-prepare wait failed while waiting for height $${target_height}" >&2; \
 		exit 1; \
 	fi; \
-	echo "==> Stage: devnet-upgrade-1200"; \
+	echo "==> Stage: upgrade to $$EVM_VERSION"; \
 	if ! $(MAKE) devnet-upgrade-1200; then \
-		echo "ERROR: stage devnet-upgrade-1200 failed" >&2; \
+		echo "ERROR: stage upgrade to $$EVM_VERSION failed" >&2; \
 		exit 1; \
 	fi; \
 	current_height="$$(docker compose -f $(COMPOSE_FILE) exec -T supernova_validator_1 \

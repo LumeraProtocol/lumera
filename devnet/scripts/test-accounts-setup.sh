@@ -107,18 +107,155 @@ DENOM_SFX="${BASE_DENOM_SFX:-${INCR_DENOM_SFX}}"
 
 wait_for_lumera() {
 	log "Waiting for lumerad RPC at ${LUMERA_RPC_ADDR}..."
+	local rpc_up=0
 	for _ in $(seq 1 300); do
 		if curl -sf "${LUMERA_RPC_ADDR}/status" >/dev/null 2>&1; then
-			log "lumerad RPC is up."
+			rpc_up=1
+			break
+		fi
+		sleep 1
+	done
+	if [ "${rpc_up}" -ne 1 ]; then
+		log "ERROR: lumerad RPC did not become ready in time."
+		return 1
+	fi
+
+	# RPC is up, but tx submission fails with "lumera is not ready; please
+	# wait for first block: invalid height" until the chain commits block 1.
+	log "lumerad RPC is up; waiting for first committed block..."
+	for _ in $(seq 1 300); do
+		local height
+		height="$(curl -sf "${LUMERA_RPC_ADDR}/status" 2>/dev/null |
+			jq -r '.result.sync_info.latest_block_height // "0"' 2>/dev/null)"
+		if [[ "${height}" =~ ^[0-9]+$ ]] && [ "${height}" -ge 1 ]; then
+			log "First block committed (height=${height})."
 			return 0
 		fi
 		sleep 1
 	done
-	log "ERROR: lumerad RPC did not become ready in time."
+	log "ERROR: lumerad did not produce a block in time."
 	return 1
 }
 
 wait_for_lumera || exit 1
+
+# ── Dedicated temp funder ──────────────────────────────────────────────
+# We provision all test accounts via a dedicated temp funder key rather
+# than the validator's genesis key. Without this, test-accounts-setup and
+# supernode-setup race on the validator-genesis sequence (both background
+# scripts issue tx bank sends concurrently once the first block lands),
+# and one side loses with "account sequence mismatch".
+# By sending a single bootstrap tx genesis → temp-funder and then funding
+# all N test accounts from the temp funder, we collapse the contention
+# window from N txs to 1.
+CHAIN_ID="$(jq -r '.chain.id' "${CFG_CHAIN}")"
+BASE_DENOM="$(jq -r '.chain.denom.bond' "${CFG_CHAIN}")"
+KEYRING_BACKEND="$(jq -r '.daemon.keyring_backend' "${CFG_CHAIN}")"
+DAEMON="$(jq -r '.daemon.binary' "${CFG_CHAIN}")"
+DAEMON_HOME_BASE="$(jq -r '.paths.base.container' "${CFG_CHAIN}")"
+DAEMON_DIR="$(jq -r '.paths.directories.daemon' "${CFG_CHAIN}")"
+DAEMON_HOME="${DAEMON_HOME_BASE}/${DAEMON_DIR}"
+MIN_GAS_PRICE="$(jq -r '.chain.denom.minimum_gas_price // "0.025ulume"' "${CFG_CHAIN}")"
+VAL_KEY_NAME="$(printf '%s' "${VAL_REC_JSON}" | jq -r '.key_name')"
+
+# Bind the shared /shared/status/<moniker>/accounts.json registry so we can
+# persist the temp funder alongside other validator-local accounts (survives
+# the EVM upgrade; visible to tools that read the registry post-upgrade).
+NODE_STATUS_DIR="${SHARED_DIR}/status/${MONIKER}"
+mkdir -p "${NODE_STATUS_DIR}"
+accounts_registry_init "${NODE_STATUS_DIR}" "${CFG_CHAIN}"
+
+# Closed-form sum: count*base + incr*count*(count-1)/2. Pad per-tx gas
+# headroom (bank send with --gas auto typically uses ~5–6k ulume at
+# 0.03ulume/gas; 10k × count is a comfortable margin).
+TA_TOTAL=$((TA_COUNT * BASE_NUM + INCR_NUM * TA_COUNT * (TA_COUNT - 1) / 2))
+TA_GAS_HEADROOM=$((TA_COUNT * 10000))
+TA_FUNDER_AMOUNT=$((TA_TOTAL + TA_GAS_HEADROOM))
+TA_FUNDER_KEY="ta-funder-${MONIKER}"
+
+log "Temp funder ${TA_FUNDER_KEY} target balance: ${TA_FUNDER_AMOUNT}${BASE_DENOM} (accounts=${TA_TOTAL}, gas=${TA_GAS_HEADROOM})"
+
+TA_FUNDER_MNEMONIC=""
+if ! "${DAEMON}" --home "${DAEMON_HOME}" keys show "${TA_FUNDER_KEY}" \
+	--keyring-backend "${KEYRING_BACKEND}" >/dev/null 2>&1; then
+	log "Creating temp funder key ${TA_FUNDER_KEY}..."
+	# `keys add --output json` emits a JSON object on stdout (with mnemonic)
+	# and a banner warning on stderr; capture stdout only to keep parsing clean.
+	TA_FUNDER_ADD_JSON="$("${DAEMON}" --home "${DAEMON_HOME}" keys add "${TA_FUNDER_KEY}" \
+		--keyring-backend "${KEYRING_BACKEND}" --output json)"
+	TA_FUNDER_MNEMONIC="$(printf '%s' "${TA_FUNDER_ADD_JSON}" | jq -r '.mnemonic // empty' 2>/dev/null || true)"
+fi
+TA_FUNDER_ADDR="$("${DAEMON}" --home "${DAEMON_HOME}" keys show "${TA_FUNDER_KEY}" -a \
+	--keyring-backend "${KEYRING_BACKEND}")"
+
+# Idempotent top-up: only send the delta if current balance is short.
+current_balance="$("${DAEMON}" q bank balances "${TA_FUNDER_ADDR}" --output json 2>/dev/null |
+	jq -r --arg denom "${BASE_DENOM}" '([.balances[]? | select(.denom == $denom) | .amount] | first) // "0"')"
+[[ -z "${current_balance}" ]] && current_balance="0"
+
+TA_FUNDER_TXHASH=""
+if ((current_balance < TA_FUNDER_AMOUNT)); then
+	topup=$((TA_FUNDER_AMOUNT - current_balance))
+	# Retry loop: if the tx races with supernode-setup on the validator
+	# genesis sequence, CheckTx may pass but the tx gets dropped from the
+	# mempool when the other side commits first. Detect that via a short
+	# wait_for_tx timeout and re-sign+re-broadcast with a fresh sequence.
+	# Explicit --gas skips the gRPC Simulate roundtrip (which on a freshly-
+	# started node can stall for tens of seconds).
+	TA_MAX_FUND_ATTEMPTS="${TA_MAX_FUND_ATTEMPTS:-5}"
+	TA_WAIT_PER_ATTEMPT="${TA_WAIT_PER_ATTEMPT:-20}"
+	attempt=0
+	while :; do
+		attempt=$((attempt + 1))
+		log "[attempt ${attempt}/${TA_MAX_FUND_ATTEMPTS}] Funding ${TA_FUNDER_KEY} (${TA_FUNDER_ADDR}) with ${topup}${BASE_DENOM} from ${VAL_KEY_NAME}..."
+		fund_out="$("${DAEMON}" tx bank send "${VAL_KEY_NAME}" "${TA_FUNDER_ADDR}" "${topup}${BASE_DENOM}" \
+			--home "${DAEMON_HOME}" \
+			--chain-id "${CHAIN_ID}" \
+			--keyring-backend "${KEYRING_BACKEND}" \
+			--gas 200000 \
+			--gas-prices "${MIN_GAS_PRICE}" \
+			--broadcast-mode sync \
+			--output json --yes 2>&1)" || true
+		code="$(printf '%s' "${fund_out}" | jq -r 'try .code // 1' 2>/dev/null || echo 1)"
+		raw_log="$(printf '%s' "${fund_out}" | jq -r 'try .raw_log // empty' 2>/dev/null || true)"
+		TA_FUNDER_TXHASH="$(printf '%s' "${fund_out}" | jq -r 'try .txhash // empty' 2>/dev/null || true)"
+		if [ "${code}" = "0" ] && [ -n "${TA_FUNDER_TXHASH}" ]; then
+			if TX_WAIT_LOG_PREFIX="${LOG_PREFIX}" wait_for_tx "${TA_FUNDER_TXHASH}" "${TA_WAIT_PER_ATTEMPT}" 2; then
+				break
+			fi
+			log "[attempt ${attempt}] tx ${TA_FUNDER_TXHASH} did not confirm in ${TA_WAIT_PER_ATTEMPT}s (likely dropped from mempool); retrying."
+		elif printf '%s' "${raw_log}${fund_out}" | grep -q 'account sequence mismatch'; then
+			log "[attempt ${attempt}] sequence mismatch at CheckTx; retrying."
+		else
+			log "ERROR: temp-funder fund tx failed (code=${code}) and is not a retriable sequence issue: ${fund_out}"
+			exit 1
+		fi
+		if ((attempt >= TA_MAX_FUND_ATTEMPTS)); then
+			log "ERROR: failed to fund ${TA_FUNDER_KEY} after ${attempt} attempts."
+			exit 1
+		fi
+		sleep $(((RANDOM % 3) + 2))
+	done
+else
+	log "Temp funder ${TA_FUNDER_KEY} already has ${current_balance}${BASE_DENOM} (>= ${TA_FUNDER_AMOUNT})."
+fi
+
+# Persist into the shared accounts registry. Upsert preserves existing
+# fields (mnemonic, first-seen txhash) when we pass empty strings, so on
+# rerun we don't clobber data captured on the initial bootstrap.
+accounts_registry_upsert \
+	"${TA_FUNDER_KEY}" \
+	"${TA_FUNDER_ADDR}" \
+	"${TA_FUNDER_MNEMONIC}" \
+	"cosmos" \
+	"${TA_FUNDER_AMOUNT}${BASE_DENOM}" \
+	"${VAL_KEY_NAME}" \
+	"${TA_FUNDER_TXHASH}"
+log "Registered ${TA_FUNDER_KEY} in ${NODE_STATUS_DIR}/accounts.json"
+
+# Route all subsequent `lumera-helper.sh new-account` calls through the
+# temp funder so no further tx hits the validator genesis sequence.
+export FUNDER_KEY_NAME="${TA_FUNDER_KEY}"
 
 log "Provisioning ${TA_COUNT} test account(s): base=${TA_BASE}, incr=${TA_INCR}"
 

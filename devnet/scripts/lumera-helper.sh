@@ -70,7 +70,12 @@ load_config() {
 		exit 1
 	fi
 
-	FUNDER_KEY_NAME="$(printf '%s' "${VAL_REC_JSON}" | jq -r '.key_name')"
+	# Honor a caller-supplied FUNDER_KEY_NAME (e.g. test-accounts-setup routes
+	# funding through a dedicated temp key to avoid sequence races on the
+	# shared validator genesis key). Default to the validator's own key.
+	if [ -z "${FUNDER_KEY_NAME:-}" ]; then
+		FUNDER_KEY_NAME="$(printf '%s' "${VAL_REC_JSON}" | jq -r '.key_name')"
+	fi
 	DAEMON_HOME="${DAEMON_HOME_BASE}/${DAEMON_DIR}"
 	GENESIS_LOCAL="${DAEMON_HOME}/config/genesis.json"
 	RPC_PORT="${LUMERA_RPC_PORT:-26657}"
@@ -217,14 +222,16 @@ next_account_name() {
 		case "${name}" in
 		"${prefix}"-*)
 			suffix="${name#${prefix}-}"
-			if [[ "${suffix}" =~ ^[0-9]+$ ]] && ((suffix > max_id)); then
+			# Force base-10 parsing: suffixes like "008"/"009" would otherwise be
+			# interpreted as octal inside (( )) and fail with "value too great for base".
+			if [[ "${suffix}" =~ ^[0-9]+$ ]] && ((10#${suffix} > 10#${max_id})); then
 				max_id="${suffix}"
 			fi
 			;;
 		esac
 	done <<<"${names}"
 
-	printf '%s-%03d' "${prefix}" "$((max_id + 1))"
+	printf '%s-%03d' "${prefix}" "$((10#${max_id} + 1))"
 }
 
 cmd_list_accounts() {

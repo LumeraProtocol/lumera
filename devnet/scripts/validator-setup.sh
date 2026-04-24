@@ -265,7 +265,7 @@ wrap_account_as_permanent_locked() {
 				{
 					"@type": "/cosmos.vesting.v1beta1.PermanentLockedAccount",
 					base_vesting_account: {
-						base_account: .,
+						base_account: (. | del(.["@type"])),
 						original_vesting: parse_coins($coins),
 						delegated_free: [],
 						delegated_vesting: [],

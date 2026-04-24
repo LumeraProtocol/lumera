@@ -70,6 +70,21 @@ func (s *lumeraValidatorSuite) SetupSuite() {
 	s.lumeraDenom = textutil.EnvOrDefault("LUMERA_DENOM", defaultLumeraDenom)
 	s.simdREST = textutil.EnvOrDefault("SIMD_REST_ADDR", defaultSimdREST)
 
+	// Skip the entire IBC suite when the Hermes/simd side of the devnet is
+	// not deployed. The channel metadata file is written only after
+	// hermes-channel.sh completes, and the simd recipient address is
+	// published by simd setup; a missing file on either side means IBC
+	// infrastructure is absent, not that an IBC invariant is broken.
+	simdAddrFile := textutil.EnvOrDefault("SIMD_RECIPIENT_ADDR_FILE", defaultSimdAddrFile)
+	if _, err := os.Stat(s.channelInfoPath); os.IsNotExist(err) {
+		s.T().Skipf("skip IBC suite: %s not found (hermes not deployed?)", s.channelInfoPath)
+		return
+	}
+	if _, err := os.Stat(simdAddrFile); os.IsNotExist(err) {
+		s.T().Skipf("skip IBC suite: %s not found (simd not deployed?)", simdAddrFile)
+		return
+	}
+
 	info, err := ibcutil.LoadChannelInfo(s.channelInfoPath)
 	s.Require().NoError(err, "load channel info")
 	s.info = info
@@ -100,7 +115,6 @@ func (s *lumeraValidatorSuite) SetupSuite() {
 	s.Require().NotEmpty(s.channelID, "channel_id missing in %s", s.channelInfoPath)
 
 	// Default simd recipient from shared file for transfer tests.
-	simdAddrFile := textutil.EnvOrDefault("SIMD_RECIPIENT_ADDR_FILE", defaultSimdAddrFile)
 	addr, err := ibcutil.ReadAddress(simdAddrFile)
 	s.Require().NoError(err, "read simd recipient address")
 	s.simdRecipient = addr

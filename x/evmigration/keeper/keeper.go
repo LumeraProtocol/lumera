@@ -11,6 +11,15 @@ import (
 	"github.com/LumeraProtocol/lumera/x/evmigration/types"
 )
 
+// stakingStoreHandle holds a mutable reference to staking's KVStoreService.
+// Populated post-depinject via SetStakingStoreService. The pointer is shared
+// across all Keeper copies (value-type Keeper returned by NewKeeper gets
+// cloned to app.EvmigrationKeeper and AppModule.keeper; both copies see the
+// same underlying cell). Only used by DeleteValidatorRecordNoHooks.
+type stakingStoreHandle struct {
+	svc corestore.KVStoreService
+}
+
 type Keeper struct {
 	storeService corestore.KVStoreService
 	cdc          codec.Codec
@@ -19,6 +28,11 @@ type Keeper struct {
 
 	Schema collections.Schema
 	Params collections.Item[types.Params]
+
+	// stakingStoreHandle grants this keeper migration-only raw write access to
+	// x/staking's KV namespace. Wired post-build in app.go via
+	// SetStakingStoreService; used exclusively by DeleteValidatorRecordNoHooks.
+	stakingStoreHandle *stakingStoreHandle
 
 	// MigrationRecords stores completed migration records keyed by legacy address.
 	MigrationRecords collections.Map[string, types.MigrationRecord]
@@ -89,6 +103,11 @@ func NewKeeper(
 		supernodeKeeper:    supernodeKeeper,
 		actionKeeper:       actionKeeper,
 		claimKeeper:        claimKeeper,
+
+		// Allocate once so value-copies of Keeper (e.g. app.EvmigrationKeeper
+		// and AppModule.keeper) share the same mutable handle. app.go writes
+		// the staking store service into it post-build.
+		stakingStoreHandle: &stakingStoreHandle{},
 	}
 
 	schema, err := sb.Build()
@@ -103,4 +122,16 @@ func NewKeeper(
 // GetAuthority returns the module's authority.
 func (k Keeper) GetAuthority() []byte {
 	return k.authority
+}
+
+// SetStakingStoreService wires the staking module's KVStoreService into this
+// keeper. Required before DeleteValidatorRecordNoHooks is callable. Called
+// from app.go after app.AppBuilder.Build completes.
+//
+// UNSAFE / MIGRATION-ONLY: this grants this keeper raw write access to
+// staking's KV namespace, bypassing all staking keeper invariants and hooks.
+// It exists exclusively to finalize validator operator migration. Do NOT use
+// for any other purpose.
+func (k *Keeper) SetStakingStoreService(svc corestore.KVStoreService) {
+	k.stakingStoreHandle.svc = svc
 }

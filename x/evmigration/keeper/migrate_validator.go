@@ -11,12 +11,11 @@ import (
 // MigrateValidatorRecord re-keys the validator record from oldValAddr to newValAddr.
 // Updates power index, last validator power, and ConsAddr mapping.
 //
-// Note: the old validator KV entry at oldValAddr is left orphaned rather than
-// deleted. RemoveValidator cannot be used because (a) it rejects bonded
-// validators and (b) its AfterValidatorRemoved hook destroys distribution
-// state needed for migration. The orphaned record is inert: its power index
-// is removed, all delegations/distribution/ConsAddr point to newValAddr, and
-// the migration-records check prevents re-migration.
+// Note: MigrateValidatorRecord intentionally leaves the old validator KV row
+// untouched — RemoveValidator rejects bonded validators and its
+// AfterValidatorRemoved hook destroys distribution state mid-migration.
+// The final delete is performed by DeleteValidatorRecordNoHooks at the end
+// of MigrateValidator, after all state has been re-homed under newValAddr.
 func (k Keeper) MigrateValidatorRecord(ctx sdk.Context, oldValAddr, newValAddr sdk.ValAddress) error {
 	val, err := k.stakingKeeper.GetValidator(ctx, oldValAddr)
 	if err != nil {

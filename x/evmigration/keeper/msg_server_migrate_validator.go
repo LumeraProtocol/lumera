@@ -235,7 +235,15 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 		return nil, fmt.Errorf("migrate claim: %w", err)
 	}
 
-	// --- Step V8: Finalize — store record, increment counters, emit event ---
+	// --- Step V8: Delete orphaned main validator KV row ---
+	// After all re-keying has landed under newValAddr, drop the now-dead main
+	// validator entry at oldValAddr so staking iteration paths don't observe
+	// two rows. See migrate_validator_finalize.go for the safety reasoning.
+	if err := ms.DeleteValidatorRecordNoHooks(ctx, oldValAddr, newValAddr); err != nil {
+		return nil, fmt.Errorf("delete orphaned validator record: %w", err)
+	}
+
+	// --- Step V9: Finalize — store record, increment counters, emit event ---
 	if err := ms.finalizeMigration(ctx, legacyAddr, newAddr, true); err != nil {
 		return nil, err
 	}

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	errorsmod "cosmossdk.io/errors"
 	sdkmath "cosmossdk.io/math"
 	"cosmossdk.io/x/feegrant"
 
@@ -1374,4 +1375,43 @@ func (s *MigrationIntegrationSuite) TestQueryLegacyAccounts_Pagination_KeyRoundt
 	}
 	s.Require().Nil(lastNextKey, "final page must not emit NextKey")
 	_ = seen
+}
+
+// TestMigrateValidator_NoOrphanedValidatorRecord asserts that after a successful
+// validator migration, the staking keeper's main validator store has exactly
+// ONE record for this operator (at newValAddr, not oldValAddr). Locks in the
+// fix for Finding #1: DeleteValidatorRecordNoHooks removes the dead old row.
+func (s *MigrationIntegrationSuite) TestMigrateValidator_NoOrphanedValidatorRecord() {
+	s.enableMigration()
+
+	// Use the existing single-key validator setup.
+	selfBondAmt := sdkmath.NewInt(1_000_000)
+	operatorCoins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 2_000_000))
+	legacyPrivKey, legacyAddr := s.createFundedLegacyAccount(operatorCoins)
+	oldValAddr, _ := s.createTestValidator(legacyAddr, selfBondAmt)
+
+	newPrivKey, newAddr := createNewEVMAddress(s.T())
+	newValAddr := sdk.ValAddress(newAddr)
+
+	msg := newValidatorMsg(s.T(), legacyPrivKey, legacyAddr, newPrivKey, newAddr)
+	_, err := s.msgServer.MigrateValidator(s.ctx, msg)
+	s.Require().NoError(err)
+
+	// New record exists.
+	_, err = s.app.StakingKeeper.GetValidator(s.ctx, newValAddr)
+	s.Require().NoError(err)
+
+	// Old record GONE (the fix).
+	_, err = s.app.StakingKeeper.GetValidator(s.ctx, oldValAddr)
+	s.Require().Error(err, "old validator row must be deleted after migration")
+	s.Require().True(errorsmod.IsOf(err, stakingtypes.ErrNoValidatorFound),
+		"unexpected error from GetValidator on deleted old addr: %v", err)
+
+	// And iterating all validators must NOT surface both rows.
+	allVals, err := s.app.StakingKeeper.GetAllValidators(s.ctx)
+	s.Require().NoError(err)
+	for _, v := range allVals {
+		s.Require().NotEqual(oldValAddr.String(), v.OperatorAddress,
+			"GetAllValidators must not surface the orphaned old operator")
+	}
 }

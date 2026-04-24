@@ -72,6 +72,7 @@ import (
 	slashingkeeper "github.com/cosmos/cosmos-sdk/x/slashing/keeper"
 	_ "github.com/cosmos/cosmos-sdk/x/staking" // import for side-effects
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
+	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/spf13/cast"
 
 	"github.com/CosmWasm/wasmd/x/wasm"
@@ -350,6 +351,13 @@ func New(
 	app.App = appBuilder.Build(db, traceStore, baseAppOptions...)
 	app.SetVersion(version.Version)
 	app.appendEVMPrecompileSendRestriction()
+
+	// Grant the evmigration keeper raw delete access to staking's KV namespace
+	// for MigrateValidator's final orphan-cleanup step (see
+	// DeleteValidatorRecordNoHooks). Unsafe / migration-only.
+	app.EvmigrationKeeper.SetStakingStoreService(
+		runtime.NewKVStoreService(app.GetKey(stakingtypes.StoreKey)),
+	)
 
 	// configure EVM coin info (must happen before EVM module keepers are created)
 	if err := appevm.Configure(); err != nil {

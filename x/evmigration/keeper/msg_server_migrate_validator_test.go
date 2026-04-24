@@ -263,6 +263,9 @@ func TestMigrateValidator_Success(t *testing.T) {
 	// MigrateClaim — no claim records targeting this address.
 	f.claimKeeper.EXPECT().IterateClaimRecords(gomock.Any(), gomock.Any()).Return(nil)
 
+	// Step V8: DeleteValidatorRecordNoHooks precondition — new validator exists.
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), newValAddr).Return(val, nil)
+
 	msg := newValidatorMigrationMsg(t, privKey, legacyAddr, newPrivKey, newAddr)
 
 	resp, err := f.msgServer.MigrateValidator(f.ctx, msg)
@@ -457,6 +460,9 @@ func TestMigrateValidator_OperatorDelegationsToOtherValidators(t *testing.T) {
 	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
 	f.claimKeeper.EXPECT().IterateClaimRecords(gomock.Any(), gomock.Any()).Return(nil)
 
+	// Step V8: DeleteValidatorRecordNoHooks precondition — new validator exists.
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), newValAddr).Return(val, nil)
+
 	msg := newValidatorMigrationMsg(t, privKey, legacyAddr, newPrivKey, newAddr)
 	resp, err := f.msgServer.MigrateValidator(f.ctx, msg)
 	require.NoError(t, err)
@@ -618,6 +624,9 @@ func TestMigrateValidator_ThirdPartyWithdrawAddrPreserved(t *testing.T) {
 	f.authzKeeper.EXPECT().IterateGrants(gomock.Any(), gomock.Any())
 	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
 	f.claimKeeper.EXPECT().IterateClaimRecords(gomock.Any(), gomock.Any()).Return(nil)
+
+	// Step V8: DeleteValidatorRecordNoHooks precondition — new validator exists.
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), newValAddr).Return(val, nil)
 
 	msg := newValidatorMigrationMsg(t, privKey, legacyAddr, newPrivKey, newAddr)
 	resp, err := f.msgServer.MigrateValidator(f.ctx, msg)

@@ -133,6 +133,11 @@ func initMsgServerFixture(t *testing.T) *msgServerFixture {
 		claimKeeper,
 	)
 
+	// Wire a dummy staking store service so DeleteValidatorRecordNoHooks can run
+	// in unit tests (the store itself is isolated and any delete is a safe no-op
+	// against non-existent keys). Production wiring happens in app.go.
+	k.SetStakingStoreService(storeService)
+
 	// Initialize params with migration enabled.
 	params := types.NewParams(true, 0, 50, 2000, 20)
 	require.NoError(t, k.Params.Set(ctx, params))

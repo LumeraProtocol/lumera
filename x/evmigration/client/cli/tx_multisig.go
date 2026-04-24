@@ -35,7 +35,6 @@ const (
 	flagLegacyAddr    = "legacy"
 	flagNewAddr       = "new"
 	flagKind          = "kind"
-	flagEVMChainID    = "evm-chain-id"
 	flagOut           = "out"
 	flagLegacyKey     = "legacy-key"
 	flagSigFormat     = "sig-format"
@@ -556,7 +555,6 @@ if the account has no on-chain pubkey).`,
 			legacyStr, _ := cmd.Flags().GetString(flagLegacyAddr)
 			newStr, _ := cmd.Flags().GetString(flagNewAddr)
 			kind, _ := cmd.Flags().GetString(flagKind)
-			evmChainID, _ := cmd.Flags().GetUint64(flagEVMChainID)
 			out, _ := cmd.Flags().GetString(flagOut)
 			legacyKey, _ := cmd.Flags().GetString(flagLegacyKey)
 			sigFmtStr, _ := cmd.Flags().GetString(flagSigFormat)
@@ -571,9 +569,10 @@ if the account has no on-chain pubkey).`,
 			if _, err := ParseSigFormat(sigFmtStr); err != nil {
 				return err
 			}
-			if evmChainID == 0 {
-				evmChainID = lcfg.EVMChainID
-			}
+			// EVM chain ID is not user-configurable: the keeper always verifies
+			// against lcfg.EVMChainID (compile-time constant), so any other value
+			// would produce proofs that verify locally but fail on-chain.
+			evmChainID := lcfg.EVMChainID
 
 			// Validate mutual exclusivity of new-side flags.
 			hasNewKey := newKey != ""
@@ -717,13 +716,15 @@ if the account has no on-chain pubkey).`,
 			return SavePartialProof(out, pp)
 		},
 	}
-	flags.AddQueryFlagsToCmd(cmd)
+	// Tx flags (not query flags) — generate-proof-payload doesn't broadcast,
+	// but it DOES need keyring access (clientCtx.Keyring.Key) to resolve
+	// --new-sub-pub-keys / --legacy-key entries that are local key names.
+	flags.AddTxFlagsToCmd(cmd)
 	cmd.Flags().String(flagLegacyAddr, "", "Legacy (coin-type 118) bech32 address to migrate from")
 	cmd.Flags().String(flagNewAddr, "", "New (coin-type 60) bech32 destination address (optional; cross-checked when supplied)")
 	cmd.Flags().String(flagKind, migrationProofKindClaim,
 		fmt.Sprintf("%q for account migration or %q for operator migration",
 			migrationProofKindClaim, migrationProofKindValidator))
-	cmd.Flags().Uint64(flagEVMChainID, 0, "EVM chain ID (defaults to lcfg.EVMChainID)")
 	cmd.Flags().String(flagOut, "", "Output file path; if empty, writes JSON to stdout")
 	cmd.Flags().String(flagLegacyKey, "", "Local keyring key name to seed pubkey for nil-pubkey single-sig accounts")
 	cmd.Flags().String(flagSigFormat, "SIG_FORMAT_CLI", "Signing envelope for legacy side: SIG_FORMAT_CLI or SIG_FORMAT_ADR036")

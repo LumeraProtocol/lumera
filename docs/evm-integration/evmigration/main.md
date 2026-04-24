@@ -86,13 +86,14 @@ lumerad tx evmigration generate-proof-payload \
   --new-threshold 2 \
   --kind claim \
   --chain-id <chain-id> \
+  --keyring-backend <backend> \
   --out proof.json
 ```
 
 - `--new-sub-pub-keys` accepts either keyring key names (resolved locally) or base64-encoded compressed 33-byte `eth_secp256k1` pubkeys. Mix freely.
 - `--new-threshold` is **required** whenever `--new-sub-pub-keys` is used.
 - `--kind claim` targets `MsgClaimLegacyAccount`; use `--kind validator` for `MsgMigrateValidator`.
-- `generate-proof-payload` is a query-style command and does not accept `--keyring-backend` for signing.
+- `generate-proof-payload` does not broadcast anything, but it **does** need keyring access (to resolve `--new-sub-pub-keys` / `--legacy-key` entries that are local key names). Pass `--keyring-backend` (and `--keyring-dir` / `--home` when applicable).
 
 Distribute `proof.json` to all K+ co-signers.
 

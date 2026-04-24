@@ -292,7 +292,7 @@ This section only applies if your validator's **operator key** is a K-of-N multi
 
 ### Why the single-command path doesn't work
 
-`lumerad tx evmigration migrate-validator` signs with a single `--from` key. A multisig composite can't single-sign, so the command can't drive the migration. Instead, use the four-step offline proof flow with `--kind validator`.
+`lumerad tx evmigration migrate-validator` signs with a single `--from` key. A multisig composite can't single-sign, so the command can't drive the migration. Instead, use the four-step offline proof flow with `--kind validator`. The destination **must** also be a K-of-N multisig of `eth_secp256k1` sub-keys — the mirror-source rule (`types.ValidateProofPair`) is a consensus invariant, so migrating a 2-of-3 legacy operator to a single-EOA or 3-of-5 destination is rejected at `ValidateBasic` with `ErrMirrorSourceMismatch` (code 1121).
 
 ### Flow overview
 
@@ -304,10 +304,22 @@ This section only applies if your validator's **operator key** is a K-of-N multi
 
    The response must show a `multisig` pubkey listing all N sub-keys.
 
-2. **Recover the new EVM operator key** from the same mnemonic used to derive the multisig sub-keys' bundle seed (if applicable) or create a fresh key for the new validator operator:
+2. **Each co-signer generates a fresh `eth_secp256k1` sub-key** in their own keyring:
 
    ```bash
-   lumerad keys add val-new --recover --coin-type 60 --algo eth_secp256k1 --keyring-backend file
+   lumerad keys add val-eth-<N> --key-type eth_secp256k1 --keyring-backend file
+   ```
+
+   The coordinator collects the N eth pubkeys (or local key-names, if sub-signers share a keyring), then derives the destination composite:
+
+   ```bash
+   lumerad keys add val-msig-new \
+     --multisig val-eth-1,val-eth-2,val-eth-3 \
+     --multisig-threshold 2 \
+     --keyring-backend file
+
+   lumerad keys show val-msig-new --address
+   # lumera1...  <-- this is the new operator address
    ```
 
 3. **Coordinator generates the proof payload** with `--kind validator`:
@@ -315,23 +327,28 @@ This section only applies if your validator's **operator key** is a K-of-N multi
    ```bash
    lumerad tx evmigration generate-proof-payload \
      --legacy <multisig-legacy-address> \
-     --new <new-evm-address> \
+     --new-sub-pub-keys val-eth-1,val-eth-2,val-eth-3 \
+     --new-threshold 2 \
      --kind validator \
      --chain-id <chain-id> \
+     --keyring-backend file \
      --out proof.json
    ```
 
-   `--chain-id` is **required** — the signed payload embeds it. `generate-proof-payload` is a query-style command and does **not** accept `--keyring-backend`.
+   `--chain-id` is **required** — the signed payload embeds it. `generate-proof-payload` needs keyring access to resolve `--new-sub-pub-keys` key names, so pass `--keyring-backend` (and `--keyring-dir` / `--home` when applicable). Mirror-source rule: `--new-threshold` must equal the legacy threshold K and the number of entries in `--new-sub-pub-keys` must equal the legacy N; the CLI rejects a mismatch before writing `proof.json`.
 
-4. **Each of the K sub-signers signs**:
+4. **Each co-signer signs both sides** in a single invocation (legacy sub-key + destination eth sub-key):
 
    ```bash
    lumerad tx evmigration sign-proof proof.json \
-     --from <my-sub-key-name> \
-     --keyring-backend <backend> \
+     --from    <my-legacy-sub-key> \
+     --new-key <my-eth-sub-key> \
+     --keyring-backend file \
      --chain-id <chain-id> \
      --out my-partial.json
    ```
+
+   At least one of `--from` / `--new-key` is required; a co-signer who holds only one sub-key passes only that flag. Re-running is idempotent (replaces the signer's prior entries on the corresponding side).
 
 5. **Stop the validator** before broadcasting:
 
@@ -347,21 +364,21 @@ This section only applies if your validator's **operator key** is a K-of-N multi
      --out tx.json
 
    lumerad tx evmigration submit-proof tx.json \
-     --from <new-evm-key-name> \
      --chain-id <chain-id> \
-     --keyring-backend <backend> \
      --node tcp://<trusted-rpc>:26657 -y
    ```
 
-7. **Restart the validator** and verify as in steps 6–7 of the single-sig flow.
+   `submit-proof` does **not** sign at the Cosmos layer — migration messages declare zero signers, fees are waived by the evmigration ante handler. There is no `--from`.
 
-`combine-proof` verifies each partial under its sub-pub-key, skips invalid entries, and selects the first K valid partials in signer-index order. If fewer than K verify, it errors with `need <K> valid partial signatures, have <N>` and writes nothing.
+7. **Restart the validator** and verify as in steps 6–7 of the single-sig flow. Note: the queryable operator address is now the new multisig bech32 (`val-msig-new`), not an EOA.
+
+`combine-proof` verifies each partial under its sub-pub-key on **both sides**, skips invalid entries, and selects the first K valid partials per side in signer-index order. If fewer than K verify on either side, it errors with `need <K> valid partial signatures on <side> side, have <N>` and writes nothing.
 
 ### Multisig-specific notes
 
 - The multisig **operator** migration re-keys all the same state as single-sig validator migration (delegations, distribution, supernode record, etc.).
-- The resulting validator has a **single-sig EVM operator key**, not a multisig. Migration does not preserve the multisig topology on the new side — the `submit-proof` signer becomes the new authoritative operator.
-- If you want the new operator to also be a multisig, set up a new K-of-N eth_secp256k1 multisig **after** migration using standard cosmos-sdk `keys add --multisig` plus a `MsgEditValidator` to point at it. This is outside the evmigration flow.
+- The new operator is a `LegacyAminoPubKey` multisig of `eth_secp256k1` sub-keys with the **same K and N** as the legacy operator (mirror-source rule, enforced at consensus by `types.ValidateProofPair`). The destination bech32 can perform all Cosmos-side operations (staking, supernode, governance, IBC, authz) but **cannot** originate `MsgEthereumTx` — it's not an EVM-addressable 20-byte address. Operators who want EVM DeFi access for commissions should configure a separate single-EOA withdraw address via `MsgSetWithdrawAddress` after migration.
+- If you specifically want to collapse a K-of-N multisig into a single-EOA operator, do the K-of-N → K-of-N migration first, then in a follow-up transaction vote the multisig quorum to execute `MsgSend` + `MsgEditValidator` (re-keying via normal x/staking operations). There is no single-step "multisig → EOA" migration in evmigration.
 - See [legacy-migration.md](../evmigration/legacy-migration.md) for the wire-format and keeper-side verification logic.
 
 ---

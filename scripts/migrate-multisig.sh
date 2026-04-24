@@ -28,7 +28,7 @@ USAGE
 
 _mms_generate() {
   local legacy="" new="" kind="" chain_id="" node="" out=""
-  local sig_format="" binary="lumerad" evm_chain_id=""
+  local sig_format="" binary="lumerad"
   local new_sub_pub_keys="" new_threshold="" legacy_key=""
   local keyring_backend="test" keyring_dir="" home_dir=""
   while (( $# > 0 )); do
@@ -40,7 +40,6 @@ _mms_generate() {
       --node)             _require_value "$1" "$#" "${2-}"; node="$2"; shift 2 ;;
       --out)              _require_value "$1" "$#" "${2-}"; out="$2"; shift 2 ;;
       --sig-format)       _require_value "$1" "$#" "${2-}"; sig_format="$2"; shift 2 ;;
-      --evm-chain-id)     _require_value "$1" "$#" "${2-}"; evm_chain_id="$2"; shift 2 ;;
       --new-sub-pub-keys) _require_value "$1" "$#" "${2-}"; new_sub_pub_keys="$2"; shift 2 ;;
       --new-threshold)    _require_value "$1" "$#" "${2-}"; new_threshold="$2"; shift 2 ;;
       --legacy-key)       _require_value "$1" "$#" "${2-}"; legacy_key="$2"; shift 2 ;;
@@ -55,12 +54,14 @@ Usage: migrate-multisig.sh generate --legacy <multisig-addr> \
   --chain-id <id> --node <url> --out <path> \
   [--new <new-multisig-addr>]         Cross-checks the address derived from new-sub-pub-keys
   [--sig-format SIG_FORMAT_CLI|SIG_FORMAT_ADR036]
-  [--evm-chain-id <id>]               Defaults to config.EVMChainID
   [--keyring-backend <b>] [--keyring-dir <dir>] [--home <dir>]
   [--binary <path>]
 
 --new-sub-pub-keys entries may be either local keyring key names (eth_secp256k1)
 or base64-encoded compressed 33-byte eth_secp256k1 pubkeys. Mix freely.
+
+The EVM chain ID is fixed by the binary (lcfg.EVMChainID) and not
+user-configurable — the keeper always verifies against that constant.
 G_USAGE
         exit 0 ;;
       *) log_error "unknown flag: $1"; exit 1 ;;
@@ -146,7 +147,6 @@ G_USAGE
     --new-threshold "$new_threshold")
   [[ -n "$new"           ]] && args+=(--new "$new")
   [[ -n "$sig_format"    ]] && args+=(--sig-format "$sig_format")
-  [[ -n "$evm_chain_id"  ]] && args+=(--evm-chain-id "$evm_chain_id")
   [[ -n "$legacy_key"    ]] && args+=(--legacy-key "$legacy_key")
   args+=(--keyring-backend "$keyring_backend")
   [[ -n "$keyring_dir" ]] && args+=(--keyring-dir "$keyring_dir")

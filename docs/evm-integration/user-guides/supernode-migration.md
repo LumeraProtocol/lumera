@@ -370,6 +370,7 @@ lumerad tx evmigration generate-proof-payload \
   --new-threshold 2 \
   --kind claim \
   --chain-id <chain-id> \
+  --keyring-backend <backend> \
   --out proof.json
 ```
 
@@ -377,7 +378,7 @@ lumerad tx evmigration generate-proof-payload \
 - `--new-threshold` is **required** whenever `--new-sub-pub-keys` is set.
 - `--kind claim` targets `MsgClaimLegacyAccount`; use `--kind validator` if the multisig is also a validator operator.
 - `--chain-id` is **required** — it is embedded in the signed payload, so an empty or wrong value makes every sub-signature fail verification on-chain.
-- `generate-proof-payload` is a query-style command and does **not** accept `--keyring-backend` for signing.
+- `generate-proof-payload` does not broadcast anything, but it **does** need keyring access (to resolve `--new-sub-pub-keys` / `--legacy-key` entries that are local key names). Pass `--keyring-backend` (and `--keyring-dir` / `--home` when applicable).
 
 Distribute `proof.json` to all co-signers.
 

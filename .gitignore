@@ -22,6 +22,11 @@ projectBrief.md
 tests/systemtests/testnet
 tests/systemtests/__debug_bin*
 build/
+
+# Accidentally committed in the original scaffolding commit; the directory
+# is a Go `package main` (tests_evmigration devnet tool), so a bare
+# `go build` in that dir writes a binary at this path. Keep it out.
+devnet/tests/evmigration/evmigration
 .claude/
 *.swagger.json
 /openrpcgen

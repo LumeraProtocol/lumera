@@ -89,13 +89,25 @@ func (m *MultisigProof) validateBasic(side Side) error {
 	if err := m.validateStructure(); err != nil {
 		return err
 	}
-	// Length-check EVERY sub_pub_key (not just indexed ones) — LegacyAminoPubKey.Address()
-	// consumes all N sub-keys during derivation.
+	// Every sub_pub_key must be a 33-byte compressed SEC1 encoding, AND all N
+	// entries must be pairwise distinct. Length alone is insufficient: a
+	// duplicate entry lets one keyholder be counted as two distinct signers
+	// against the K-of-N threshold. On-curve validity is intentionally NOT
+	// enforced here — an off-curve slot reduces the operator's own signer
+	// pool (they can't produce a valid signature against it) but has no
+	// chain-level impact; adding the check would invalidate a wide set of
+	// placeholder-pubkey test fixtures for a pure hygiene benefit.
+	seen := make(map[string]int, len(m.SubPubKeys))
 	for i, raw := range m.SubPubKeys {
 		if len(raw) != secp256k1.PubKeySize {
 			return ErrInvalidMigrationPubKey.Wrapf("sub_pub_keys[%d]: expected %d bytes, got %d",
 				i, secp256k1.PubKeySize, len(raw))
 		}
+		key := string(raw)
+		if prior, dup := seen[key]; dup {
+			return ErrInvalidMigrationPubKey.Wrapf("sub_pub_keys[%d] duplicates sub_pub_keys[%d]", i, prior)
+		}
+		seen[key] = i
 	}
 	// Per-side sub-signature length enforcement.
 	expectedSigLen := 64
@@ -207,6 +219,26 @@ func ValidateProofPair(legacy, newProof *MigrationProof) error {
 			return errorsmod.Wrapf(ErrMirrorSourceMismatch,
 				"sub_pub_keys: legacy N=%d new N=%d",
 				len(legMulti.Multisig.SubPubKeys), len(newMulti.Multisig.SubPubKeys))
+		}
+		// signer_indices must match across sides. This enforces the operational
+		// invariant that the same K signer positions approve both halves (see
+		// main.md "each co-signer must hold both their legacy Cosmos sub-key AND
+		// their destination-side eth sub-key"). Without this check, one set of
+		// K legacy holders could authorize a migration that a disjoint set of K
+		// new-side holders co-signed — the chain couldn't tell the two quorums
+		// were different people.
+		legIdx := legMulti.Multisig.SignerIndices
+		newIdx := newMulti.Multisig.SignerIndices
+		if len(legIdx) != len(newIdx) {
+			return errorsmod.Wrapf(ErrMirrorSourceMismatch,
+				"signer_indices length: legacy=%d new=%d", len(legIdx), len(newIdx))
+		}
+		for i := range legIdx {
+			if legIdx[i] != newIdx[i] {
+				return errorsmod.Wrapf(ErrMirrorSourceMismatch,
+					"signer_indices differ at position %d: legacy=%d new=%d",
+					i, legIdx[i], newIdx[i])
+			}
 		}
 		return nil
 	default:

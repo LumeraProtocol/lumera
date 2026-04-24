@@ -332,6 +332,46 @@ func TestValidateProofPair_MirrorSourceRule(t *testing.T) {
 	}
 }
 
+// TestValidateProofPair_SignerIndicesMustMatch exercises the consensus-level
+// binding between the two sides: legacy_proof.signer_indices must equal
+// new_proof.signer_indices (same K positions approve both halves). Without
+// this check, two disjoint K-subsets could each authorize one side.
+func TestValidateProofPair_SignerIndicesMustMatch(t *testing.T) {
+	// Build two 2-of-3 multisig proofs that would otherwise mirror but
+	// disagree on which 2 indices signed.
+	legacy := validMultisigProof(2, 3, types.SideLegacy)
+	newSide := validMultisigProof(2, 3, types.SideNew)
+	// legacy signed by [0,1]; force new to be signed by [0,2].
+	newMulti := newSide.GetMultisig()
+	newMulti.SignerIndices = []uint32{0, 2}
+	newMulti.SubSignatures = [][]byte{make([]byte, 65), make([]byte, 65)}
+
+	err := types.ValidateProofPair(&legacy, &newSide)
+	require.ErrorIs(t, err, types.ErrMirrorSourceMismatch)
+	require.Contains(t, err.Error(), "signer_indices")
+}
+
+// TestMultisigProof_ValidateBasic_RejectsDuplicateSubKeys locks the uniqueness
+// invariant: a duplicate sub_pub_key entry would let one keyholder be counted
+// as two distinct signers against the K-of-N threshold.
+func TestMultisigProof_ValidateBasic_RejectsDuplicateSubKeys(t *testing.T) {
+	dup := make([]byte, secp256k1.PubKeySize)
+	dup[0] = 0x02
+	distinct := make([]byte, secp256k1.PubKeySize)
+	distinct[0] = 0x03
+	proof := &types.MigrationProof{Proof: &types.MigrationProof_Multisig{Multisig: &types.MultisigProof{
+		Threshold: 2,
+		// Two copies of `dup` at positions 0 and 2.
+		SubPubKeys:    [][]byte{dup, distinct, dup},
+		SignerIndices: []uint32{0, 1},
+		SubSignatures: [][]byte{make([]byte, 64), make([]byte, 64)},
+		SigFormat:     types.SigFormat_SIG_FORMAT_CLI,
+	}}}
+	err := proof.ValidateBasic(types.SideLegacy)
+	require.ErrorIs(t, err, types.ErrInvalidMigrationPubKey)
+	require.Contains(t, err.Error(), "duplicates sub_pub_keys[0]")
+}
+
 // TestValidateProofPair_NilInputsReturnErrorNotPanic guards the helper against
 // nil proofs / typed-nil oneof wrappers / nil inner MultisigProof. Direct
 // callers (tests, tooling, future refactors) shouldn't be able to panic it.

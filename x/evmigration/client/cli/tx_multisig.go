@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"sort"
+	"slices"
 
 	"github.com/spf13/cobra"
 
@@ -233,75 +233,73 @@ func decodeBase64(field, in string) ([]byte, error) {
 	return out, nil
 }
 
-// buildProofFromPartial assembles a MigrationProof from a partial-file side spec
-// and the merged partial signatures for that side. Verifies every merged partial
-// cryptographically (drops invalid with warnings), selects K valid partials with
-// lowest ascending indices, assembles the proof.
-//
-// For single-key sides (side.PubKey != ""): expects exactly one partial at index 0.
-// For multisig sides (side.Threshold > 0): requires at least K valid partials.
-func buildProofFromPartial(
+// buildSingleProof assembles a single-key MigrationProof from a side spec and
+// its single partial signature. Strict: exactly one partial at index 0, and
+// it must verify under the spec's pub_key.
+func buildSingleProof(
 	side *SideSpec, sigs []PartialSignature, payload []byte,
-	keyType sigverify.SubKeyType, sideLabel string, stderr io.Writer,
+	keyType sigverify.SubKeyType, sideLabel string,
 ) (types.MigrationProof, error) {
 	format, err := ParseSigFormat(side.SigFormat)
 	if err != nil {
 		return types.MigrationProof{}, fmt.Errorf("%s side sig_format %q: %w", sideLabel, side.SigFormat, err)
 	}
-
-	// Single-key side: strict exactly-one-at-index-0.
-	if side.PubKey != "" {
-		switch {
-		case len(sigs) == 0:
-			return types.MigrationProof{}, fmt.Errorf("%s side has no partial signature (single-key side expects exactly one at index 0)", sideLabel)
-		case len(sigs) > 1:
-			return types.MigrationProof{}, fmt.Errorf("%s side has %d partial signatures; single-key side expects exactly one at index 0", sideLabel, len(sigs))
-		case sigs[0].Index != 0:
-			return types.MigrationProof{}, fmt.Errorf("%s side partial signature has index=%d; single-key side expects index=0", sideLabel, sigs[0].Index)
-		}
-		pkBytes, err := decodeBase64(sideLabel+".pub_key", side.PubKey)
-		if err != nil {
-			return types.MigrationProof{}, err
-		}
-		if len(pkBytes) != secp256k1.PubKeySize {
-			return types.MigrationProof{}, fmt.Errorf("%s side single-key pub_key: expected %d bytes, got %d", sideLabel, secp256k1.PubKeySize, len(pkBytes))
-		}
-		sigBytes, err := decodeBase64(fmt.Sprintf("%s.partial_signatures[0].signature", sideLabel), sigs[0].Signature)
-		if err != nil {
-			return types.MigrationProof{}, err
-		}
-		if err := verifyOne(keyType, pkBytes, payload, sigBytes, format); err != nil {
-			return types.MigrationProof{}, fmt.Errorf("%s side single-key partial signature invalid: %w", sideLabel, err)
-		}
-		return types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
-			PubKey: pkBytes, Signature: sigBytes, SigFormat: format,
-		}}}, nil
+	switch {
+	case len(sigs) == 0:
+		return types.MigrationProof{}, fmt.Errorf("%s side has no partial signature (single-key side expects exactly one at index 0)", sideLabel)
+	case len(sigs) > 1:
+		return types.MigrationProof{}, fmt.Errorf("%s side has %d partial signatures; single-key side expects exactly one at index 0", sideLabel, len(sigs))
+	case sigs[0].Index != 0:
+		return types.MigrationProof{}, fmt.Errorf("%s side partial signature has index=%d; single-key side expects index=0", sideLabel, sigs[0].Index)
 	}
+	pkBytes, err := decodeBase64(sideLabel+".pub_key", side.PubKey)
+	if err != nil {
+		return types.MigrationProof{}, err
+	}
+	if len(pkBytes) != secp256k1.PubKeySize {
+		return types.MigrationProof{}, fmt.Errorf("%s side single-key pub_key: expected %d bytes, got %d", sideLabel, secp256k1.PubKeySize, len(pkBytes))
+	}
+	sigBytes, err := decodeBase64(fmt.Sprintf("%s.partial_signatures[0].signature", sideLabel), sigs[0].Signature)
+	if err != nil {
+		return types.MigrationProof{}, err
+	}
+	if err := verifyOne(keyType, pkBytes, payload, sigBytes, format); err != nil {
+		return types.MigrationProof{}, fmt.Errorf("%s side single-key partial signature invalid: %w", sideLabel, err)
+	}
+	return types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
+		PubKey: pkBytes, Signature: sigBytes, SigFormat: format,
+	}}}, nil
+}
 
-	// Multisig: verify every merged partial, drop invalid, select K valid ascending.
+// verifyMultisigPartialsForSide verifies each merged partial on one multisig
+// side, drops invalid ones with a stderr warning, and returns the valid ones
+// keyed by signer index plus the decoded N sub-pubkey list. Does NOT enforce
+// a K-threshold — the caller (cmdCombineProof) cross-intersects with the
+// other side's valid set to satisfy the consensus-level mirror-source rule
+// (legacy_proof.signer_indices == new_proof.signer_indices).
+func verifyMultisigPartialsForSide(
+	side *SideSpec, sigs []PartialSignature, payload []byte,
+	keyType sigverify.SubKeyType, sideLabel string, stderr io.Writer,
+) (map[uint32][]byte, [][]byte, error) {
+	format, err := ParseSigFormat(side.SigFormat)
+	if err != nil {
+		return nil, nil, fmt.Errorf("%s side sig_format %q: %w", sideLabel, side.SigFormat, err)
+	}
 	subPubs := make([][]byte, len(side.SubPubKeys))
 	for i, k := range side.SubPubKeys {
 		raw, err := decodeBase64(fmt.Sprintf("%s.sub_pub_keys[%d]", sideLabel, i), k)
 		if err != nil {
-			return types.MigrationProof{}, err
+			return nil, nil, err
 		}
 		if len(raw) != secp256k1.PubKeySize {
-			return types.MigrationProof{}, fmt.Errorf("%s side sub_pub_keys[%d]: expected %d bytes, got %d", sideLabel, i, secp256k1.PubKeySize, len(raw))
+			return nil, nil, fmt.Errorf("%s side sub_pub_keys[%d]: expected %d bytes, got %d", sideLabel, i, secp256k1.PubKeySize, len(raw))
 		}
 		subPubs[i] = raw
 	}
 
-	// Sort merged sigs by index for canonical ordering.
-	sort.Slice(sigs, func(i, j int) bool { return sigs[i].Index < sigs[j].Index })
-
-	validIdxs := make([]uint32, 0, len(sigs))
-	validSigs := make([][]byte, 0, len(sigs))
+	validSigs := make(map[uint32][]byte, len(sigs))
 	for _, ps := range sigs {
-		// Dedupe: strictly ascending unique indices are required by
-		// MultisigProof.validateBasic. If a partial file happens to contain
-		// two entries at the same index (e.g. a co-signer re-ran sign-proof
-		// within one file), keep the first valid one and warn on subsequent.
-		if len(validIdxs) > 0 && validIdxs[len(validIdxs)-1] == ps.Index {
+		if _, dup := validSigs[ps.Index]; dup {
 			_, _ = fmt.Fprintf(stderr, "WARN %s side: dropping duplicate partial at index %d (already accepted)\n", sideLabel, ps.Index)
 			continue
 		}
@@ -318,23 +316,142 @@ func buildProofFromPartial(
 			_, _ = fmt.Fprintf(stderr, "WARN %s side: dropping partial at index %d: %s\n", sideLabel, ps.Index, err)
 			continue
 		}
-		validIdxs = append(validIdxs, ps.Index)
-		validSigs = append(validSigs, sigBytes)
+		validSigs[ps.Index] = sigBytes
 	}
+	return validSigs, subPubs, nil
+}
 
-	if uint32(len(validIdxs)) < side.Threshold {
-		return types.MigrationProof{}, fmt.Errorf("need %d valid partial signatures on %s side, have %d",
-			side.Threshold, sideLabel, len(validIdxs))
+// assembleMultisigProof packs verified sub-pubkeys, chosen signer indices,
+// and their sigs into a MigrationProof_Multisig. Indices must be sorted
+// strictly ascending; callers are expected to have intersected with the
+// other side's valid set beforehand.
+func assembleMultisigProof(
+	subPubs [][]byte, threshold uint32, indices []uint32,
+	sigsByIdx map[uint32][]byte, format types.SigFormat,
+) types.MigrationProof {
+	sigs := make([][]byte, len(indices))
+	for i, idx := range indices {
+		sigs[i] = sigsByIdx[idx]
 	}
-
-	// Select the first K valid ones (lowest indices, already ascending).
-	validIdxs = validIdxs[:int(side.Threshold)]
-	validSigs = validSigs[:int(side.Threshold)]
-
 	return types.MigrationProof{Proof: &types.MigrationProof_Multisig{Multisig: &types.MultisigProof{
-		Threshold: side.Threshold, SubPubKeys: subPubs,
-		SignerIndices: validIdxs, SubSignatures: validSigs, SigFormat: format,
-	}}}, nil
+		Threshold: threshold, SubPubKeys: subPubs,
+		SignerIndices: indices, SubSignatures: sigs, SigFormat: format,
+	}}}
+}
+
+// buildMigrationProofs assembles the (legacy_proof, new_proof) pair from a
+// merged PartialProof. Single↔single sides build independently; multisig↔
+// multisig sides verify each side and then intersect the valid signer-index
+// sets before selecting K, so the two proofs carry the SAME signer_indices —
+// the operational binding the docs promise and the consensus-level
+// mirror-source rule (types.ValidateProofPair) requires. Mixed shapes are
+// rejected here rather than allowing an invalid tx to reach ValidateBasic.
+func buildMigrationProofs(
+	stderr io.Writer, pp *PartialProof, payload []byte,
+) (types.MigrationProof, types.MigrationProof, error) {
+	legSingle := pp.Legacy.PubKey != ""
+	newSingle := pp.New.PubKey != ""
+	switch {
+	case legSingle && newSingle:
+		legacyProof, err := buildSingleProof(pp.Legacy, pp.PartialLegacySignatures, payload,
+			sigverify.SubKeyTypeCosmosSecp256k1, "legacy")
+		if err != nil {
+			return types.MigrationProof{}, types.MigrationProof{}, err
+		}
+		newProof, err := buildSingleProof(pp.New, pp.PartialNewSignatures, payload,
+			sigverify.SubKeyTypeEthSecp256k1, "new")
+		if err != nil {
+			return types.MigrationProof{}, types.MigrationProof{}, err
+		}
+		return legacyProof, newProof, nil
+
+	case !legSingle && !newSingle:
+		legValid, legSubs, err := verifyMultisigPartialsForSide(
+			pp.Legacy, pp.PartialLegacySignatures, payload,
+			sigverify.SubKeyTypeCosmosSecp256k1, "legacy", stderr,
+		)
+		if err != nil {
+			return types.MigrationProof{}, types.MigrationProof{}, err
+		}
+		newValid, newSubs, err := verifyMultisigPartialsForSide(
+			pp.New, pp.PartialNewSignatures, payload,
+			sigverify.SubKeyTypeEthSecp256k1, "new", stderr,
+		)
+		if err != nil {
+			return types.MigrationProof{}, types.MigrationProof{}, err
+		}
+		shared := make([]uint32, 0, len(legValid))
+		for idx := range legValid {
+			if _, ok := newValid[idx]; ok {
+				shared = append(shared, idx)
+			}
+		}
+		slices.Sort(shared)
+		if pp.Legacy.Threshold != pp.New.Threshold {
+			return types.MigrationProof{}, types.MigrationProof{}, fmt.Errorf(
+				"mirror-source rule: legacy threshold K=%d != new threshold K=%d",
+				pp.Legacy.Threshold, pp.New.Threshold)
+		}
+		K := pp.Legacy.Threshold
+		if uint32(len(shared)) < K {
+			return types.MigrationProof{}, types.MigrationProof{}, fmt.Errorf(
+				"need %d valid partial signatures signed on BOTH sides at matching indices, have %d "+
+					"(mirror-source rule requires legacy_proof.signer_indices == new_proof.signer_indices)",
+				K, len(shared))
+		}
+		picked := shared[:K]
+		legFmt, _ := ParseSigFormat(pp.Legacy.SigFormat)
+		newFmt, _ := ParseSigFormat(pp.New.SigFormat)
+		return assembleMultisigProof(legSubs, K, picked, legValid, legFmt),
+			assembleMultisigProof(newSubs, K, picked, newValid, newFmt),
+			nil
+
+	default:
+		// Mixed shapes — ValidateProofPair would reject; surface it here for a
+		// cleaner error and to avoid writing a tx.json that's guaranteed to fail.
+		legShape := "single-key"
+		if !legSingle {
+			legShape = "multisig"
+		}
+		newShape := "single-key"
+		if !newSingle {
+			newShape = "multisig"
+		}
+		return types.MigrationProof{}, types.MigrationProof{}, fmt.Errorf(
+			"mirror-source rule: legacy=%s new=%s — sides must match shape", legShape, newShape)
+	}
+}
+
+// buildProofFromPartial is a per-side convenience that assembles a proof
+// independently — used by unit tests that exercise one side's verify/assemble
+// behavior in isolation. Production combine-proof does NOT use this helper,
+// because it must intersect valid indices across sides to satisfy the
+// mirror-source rule. For a single-key side: delegates to buildSingleProof.
+// For a multisig side: verifies all partials, picks the first K valid ones
+// in ascending index order, and assembles.
+func buildProofFromPartial(
+	side *SideSpec, sigs []PartialSignature, payload []byte,
+	keyType sigverify.SubKeyType, sideLabel string, stderr io.Writer,
+) (types.MigrationProof, error) {
+	if side.PubKey != "" {
+		return buildSingleProof(side, sigs, payload, keyType, sideLabel)
+	}
+	validSigs, subPubs, err := verifyMultisigPartialsForSide(side, sigs, payload, keyType, sideLabel, stderr)
+	if err != nil {
+		return types.MigrationProof{}, err
+	}
+	if uint32(len(validSigs)) < side.Threshold {
+		return types.MigrationProof{}, fmt.Errorf("need %d valid partial signatures on %s side, have %d",
+			side.Threshold, sideLabel, len(validSigs))
+	}
+	indices := make([]uint32, 0, len(validSigs))
+	for idx := range validSigs {
+		indices = append(indices, idx)
+	}
+	slices.Sort(indices)
+	indices = indices[:int(side.Threshold)]
+	format, _ := ParseSigFormat(side.SigFormat)
+	return assembleMultisigProof(subPubs, side.Threshold, indices, validSigs, format), nil
 }
 
 // verifyOne dispatches to the right sigverify helper based on keyType.
@@ -1001,18 +1118,7 @@ to --out, with both legacy_proof and new_proof populated.`,
 				return fmt.Errorf("invalid payload_hex in partial file: %w", err)
 			}
 
-			// Verify both sides and assemble proofs.
-			legacyProof, err := buildProofFromPartial(
-				merged.Legacy, merged.PartialLegacySignatures, payload,
-				sigverify.SubKeyTypeCosmosSecp256k1, "legacy", cmd.ErrOrStderr(),
-			)
-			if err != nil {
-				return err
-			}
-			newProof, err := buildProofFromPartial(
-				merged.New, merged.PartialNewSignatures, payload,
-				sigverify.SubKeyTypeEthSecp256k1, "new", cmd.ErrOrStderr(),
-			)
+			legacyProof, newProof, err := buildMigrationProofs(cmd.ErrOrStderr(), merged, payload)
 			if err != nil {
 				return err
 			}
@@ -1102,7 +1208,19 @@ func cmdSubmitProof() *cobra.Command {
 			return runMigrationTx(cmd, mpm)
 		},
 	}
-	flags.AddTxFlagsToCmd(cmd)
+	// submit-proof broadcasts an UNSIGNED tx (zero-signer migration messages,
+	// fees waived by the evmigration ante handler). Exposing --from / --fees /
+	// --gas-prices / --sign-mode / --fee-payer / --fee-granter would mislead
+	// operators into thinking they need to sign or pay. Advertise only the
+	// flags that actually affect this command: context plumbing (query +
+	// keyring), --chain-id (required for broadcast routing and payload-
+	// reconstruction cross-check), broadcast mode, skip-confirm, and the
+	// inclusion-wait timeout.
+	flags.AddQueryFlagsToCmd(cmd)
+	flags.AddKeyringFlags(cmd.Flags())
+	cmd.Flags().String(flags.FlagChainID, "", "The network chain ID")
+	cmd.Flags().StringP(flags.FlagBroadcastMode, "b", flags.BroadcastSync, "Transaction broadcasting mode (sync|async)")
+	cmd.Flags().BoolP(flags.FlagSkipConfirmation, "y", false, "Skip tx broadcasting prompt confirmation")
 	cmd.Flags().String(flagTxTimeout, defaultTxTimeout, "How long to wait for the transaction to be included in a block")
 	return cmd
 }

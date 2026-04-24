@@ -11,7 +11,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 
 	kmultisig "github.com/cosmos/cosmos-sdk/crypto/keys/multisig"
@@ -668,18 +667,30 @@ func TestCmdSubmitProof_HelpTextDoesNotMentionSigning(t *testing.T) {
 	require.NotEmpty(t, strings.TrimSpace(cmd.Short), "Short description must be set")
 }
 
-// TestCmdSubmitProof_DoesNotRequireFrom verifies that --from stays optional.
-// Migration txs are unsigned at the Cosmos layer (GetSigners() returns empty),
-// so submit-proof is file-driven and does not need a funded account. If a
-// future change accidentally calls cmd.MarkFlagRequired("from"), this test
-// fails.
-func TestCmdSubmitProof_DoesNotRequireFrom(t *testing.T) {
+// TestCmdSubmitProof_DoesNotExposeSigningFlags locks in the narrower flag
+// surface: migration txs are unsigned at the Cosmos layer (GetSigners()
+// returns empty, fees waived by the ante handler), so --from / --fees /
+// --gas / --sign-mode / --fee-payer have no effect and should NOT be
+// advertised on --help. A future change that reintroduces flags.AddTxFlagsToCmd
+// here would re-add these and mislead operators into thinking they need to
+// sign or pay.
+func TestCmdSubmitProof_DoesNotExposeSigningFlags(t *testing.T) {
 	cmd := cmdSubmitProof()
-	fromFlag := cmd.Flags().Lookup("from")
-	require.NotNil(t, fromFlag, "--from flag must exist (added by flags.AddTxFlagsToCmd)")
-	_, isRequired := fromFlag.Annotations[cobra.BashCompOneRequiredFlag]
-	require.False(t, isRequired,
-		"--from must NOT be marked required; submit-proof is file-driven and does not sign")
+	for _, name := range []string{
+		"from", "fees", "fee-payer", "fee-granter",
+		"gas", "gas-adjustment", "gas-prices",
+		"sign-mode", "offline", "generate-only",
+	} {
+		require.Nilf(t, cmd.Flags().Lookup(name),
+			"--%s must NOT be advertised on submit-proof (command does not sign or pay)", name)
+	}
+	// Flags that DO affect submit-proof should still be present.
+	for _, name := range []string{
+		"node", "chain-id", "keyring-backend", "keyring-dir",
+		"broadcast-mode", "yes", "tx-timeout",
+	} {
+		require.NotNilf(t, cmd.Flags().Lookup(name), "--%s must be advertised on submit-proof", name)
+	}
 }
 
 // ---------- End-to-end multisig→multisig pipeline ----------

@@ -31,7 +31,7 @@ func TestAuditCLIQueriesE2E(t *testing.T) {
 	RequireTxSuccess(t, submitEpochReport(t, cli, n0.nodeName, ws0.EpochId, host, nil))
 	RequireTxSuccess(t, submitEpochReport(t, cli, n1.nodeName, ws0.EpochId, host, nil))
 
-	awaitAtLeastHeight(t, ws0.EpochStartHeight+int64(epochLengthBlocks))
+	awaitAtLeastHeightWithSlackPeerPorts(t, ws0.EpochStartHeight+int64(epochLengthBlocks))
 
 	assignedRaw := cli.CustomQuery("q", "audit", "assigned-targets", n0.accAddr, "--epoch-id", strconv.FormatUint(ws0.EpochId+1, 10), "--filter-by-epoch-id")
 	assignedEpochID := gjsonUint64(gjson.Get(assignedRaw, "epoch_id"))

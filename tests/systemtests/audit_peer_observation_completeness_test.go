@@ -5,6 +5,7 @@ package system
 import (
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/sjson"
@@ -37,11 +38,13 @@ func TestAuditSubmitReport_ProberRequiresAllPeerObservations(t *testing.T) {
 	registerSupernode(t, cli, n0, "192.168.1.1")
 	registerSupernode(t, cli, n1, "192.168.1.2")
 
-	currentHeight := sut.AwaitNextBlock(t)
+	currentHeight := sut.AwaitNextBlock(t, 12*time.Second)
 	epochID, epochStartHeight := nextEpochAfterHeight(originHeight, epochLengthBlocks, currentHeight)
-	awaitAtLeastHeight(t, epochStartHeight)
+	if sut.currentHeight < epochStartHeight {
+		sut.AwaitBlockHeight(t, epochStartHeight, 20*time.Second)
+	}
 
 	host := auditHostReportJSON([]string{"PORT_STATE_OPEN"})
 	txResp := submitEpochReport(t, cli, n0.nodeName, epochID, host, nil)
-	RequireTxFailure(t, txResp, "expected storage challenge observations")
+	RequireTxFailure(t, txResp, "expected peer target observations")
 }

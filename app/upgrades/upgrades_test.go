@@ -15,6 +15,7 @@ import (
 	upgrade_v1_10_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_10_1"
 	upgrade_v1_11_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_11_0"
 	upgrade_v1_11_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_11_1"
+	upgrade_v1_12_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_12_0"
 	upgrade_v1_20_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_20_0"
 	upgrade_v1_6_1 "github.com/LumeraProtocol/lumera/app/upgrades/v1_6_1"
 	upgrade_v1_8_0 "github.com/LumeraProtocol/lumera/app/upgrades/v1_8_0"
@@ -42,6 +43,7 @@ func TestUpgradeNamesOrder(t *testing.T) {
 		upgrade_v1_10_1.UpgradeName,
 		upgrade_v1_11_0.UpgradeName,
 		upgrade_v1_11_1.UpgradeName,
+		upgrade_v1_12_0.UpgradeName,
 		upgrade_v1_20_0.UpgradeName,
 	}
 	require.Equal(t, expected, upgradeNames, "upgradeNames should stay in ascending order")
@@ -93,7 +95,13 @@ func TestSetupUpgradesAndHandlers(t *testing.T) {
 				}
 
 				// Custom upgrades that need keepers are skipped in this lightweight harness.
-				if upgradeName == upgrade_v1_9_0.UpgradeName || upgradeName == upgrade_v1_10_0.UpgradeName || upgradeName == upgrade_v1_10_1.UpgradeName || upgradeName == upgrade_v1_11_0.UpgradeName || upgradeName == upgrade_v1_11_1.UpgradeName || upgradeName == upgrade_v1_20_0.UpgradeName {
+				if upgradeName == upgrade_v1_9_0.UpgradeName ||
+					upgradeName == upgrade_v1_10_0.UpgradeName ||
+					upgradeName == upgrade_v1_10_1.UpgradeName ||
+					upgradeName == upgrade_v1_11_0.UpgradeName ||
+					upgradeName == upgrade_v1_11_1.UpgradeName ||
+					upgradeName == upgrade_v1_12_0.UpgradeName ||
+					upgradeName == upgrade_v1_20_0.UpgradeName {
 					continue
 				}
 
@@ -154,7 +162,11 @@ func expectStoreUpgrade(upgradeName, chainID string) bool {
 		return IsMainnet(chainID)
 	case upgrade_v1_10_0.UpgradeName:
 		return true
-	case upgrade_v1_10_1.UpgradeName, upgrade_v1_11_0.UpgradeName, upgrade_v1_11_1.UpgradeName:
+	case upgrade_v1_10_1.UpgradeName,
+		upgrade_v1_11_0.UpgradeName,
+		upgrade_v1_11_1.UpgradeName:
+		return true
+	case upgrade_v1_12_0.UpgradeName:
 		return true
 	case upgrade_v1_20_0.UpgradeName:
 		return true

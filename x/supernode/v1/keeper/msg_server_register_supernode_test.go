@@ -684,7 +684,9 @@ func setupKeeperForTest(
 		authority,
 		bankKeeper,
 		stakingKeeper,
+		nil,
 		slashingKeeper,
+		nil,
 	)
 
 	sdkCtx := sdk.NewContext(stateStore, cmtproto.Header{}, false, log.NewNopLogger())

@@ -626,6 +626,34 @@ func (mr *MockBankKeeperMockRecorder) GetBalance(ctx, addr, denom any) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBalance", reflect.TypeOf((*MockBankKeeper)(nil).GetBalance), ctx, addr, denom)
 }
 
+// GetAllBalances mocks base method.
+func (m *MockBankKeeper) GetAllBalances(ctx context.Context, addr types0.AccAddress) types0.Coins {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAllBalances", ctx, addr)
+	ret0, _ := ret[0].(types0.Coins)
+	return ret0
+}
+
+// GetAllBalances indicates an expected call of GetAllBalances.
+func (mr *MockBankKeeperMockRecorder) GetAllBalances(ctx, addr any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAllBalances", reflect.TypeOf((*MockBankKeeper)(nil).GetAllBalances), ctx, addr)
+}
+
+// SendCoinsFromModuleToAccount mocks base method.
+func (m *MockBankKeeper) SendCoinsFromModuleToAccount(ctx context.Context, senderModule string, recipientAddr types0.AccAddress, amt types0.Coins) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SendCoinsFromModuleToAccount", ctx, senderModule, recipientAddr, amt)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SendCoinsFromModuleToAccount indicates an expected call of SendCoinsFromModuleToAccount.
+func (mr *MockBankKeeperMockRecorder) SendCoinsFromModuleToAccount(ctx, senderModule, recipientAddr, amt any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendCoinsFromModuleToAccount", reflect.TypeOf((*MockBankKeeper)(nil).SendCoinsFromModuleToAccount), ctx, senderModule, recipientAddr, amt)
+}
+
 // SpendableCoins mocks base method.
 func (m *MockBankKeeper) SpendableCoins(arg0 context.Context, arg1 types0.AccAddress) types0.Coins {
 	m.ctrl.T.Helper()
@@ -802,4 +830,117 @@ func (m *MockStakingHooks) BeforeValidatorSlashed(ctx context.Context, valAddr t
 func (mr *MockStakingHooksMockRecorder) BeforeValidatorSlashed(ctx, valAddr, fraction any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BeforeValidatorSlashed", reflect.TypeOf((*MockStakingHooks)(nil).BeforeValidatorSlashed), ctx, valAddr, fraction)
+}
+
+// CountEligibleSNs mocks base method.
+func (m *MockSupernodeKeeper) CountEligibleSNs(ctx types0.Context) uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CountEligibleSNs", ctx)
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// CountEligibleSNs indicates an expected call of CountEligibleSNs.
+func (mr *MockSupernodeKeeperMockRecorder) CountEligibleSNs(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountEligibleSNs", reflect.TypeOf((*MockSupernodeKeeper)(nil).CountEligibleSNs), ctx)
+}
+
+// GetLastDistributionHeight mocks base method.
+func (m *MockSupernodeKeeper) GetLastDistributionHeight(ctx types0.Context) int64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLastDistributionHeight", ctx)
+	ret0, _ := ret[0].(int64)
+	return ret0
+}
+
+// GetLastDistributionHeight indicates an expected call of GetLastDistributionHeight.
+func (mr *MockSupernodeKeeperMockRecorder) GetLastDistributionHeight(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastDistributionHeight", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetLastDistributionHeight), ctx)
+}
+
+// GetLatestCascadeBytesForPayout mocks base method.
+func (m *MockSupernodeKeeper) GetLatestCascadeBytesForPayout(ctx types0.Context, supernodeAccount string) (float64, int64, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLatestCascadeBytesForPayout", ctx, supernodeAccount)
+	ret0, _ := ret[0].(float64)
+	ret1, _ := ret[1].(int64)
+	ret2, _ := ret[2].(bool)
+	return ret0, ret1, ret2
+}
+
+// GetLatestCascadeBytesForPayout indicates an expected call of GetLatestCascadeBytesForPayout.
+func (mr *MockSupernodeKeeperMockRecorder) GetLatestCascadeBytesForPayout(ctx, supernodeAccount any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLatestCascadeBytesForPayout", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetLatestCascadeBytesForPayout), ctx, supernodeAccount)
+}
+
+// GetPoolBalance mocks base method.
+func (m *MockSupernodeKeeper) GetPoolBalance(ctx types0.Context) types0.Coins {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPoolBalance", ctx)
+	ret0, _ := ret[0].(types0.Coins)
+	return ret0
+}
+
+// GetPoolBalance indicates an expected call of GetPoolBalance.
+func (mr *MockSupernodeKeeperMockRecorder) GetPoolBalance(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPoolBalance", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetPoolBalance), ctx)
+}
+
+// GetTotalDistributed mocks base method.
+func (m *MockSupernodeKeeper) GetTotalDistributed(ctx types0.Context) types0.Coins {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetTotalDistributed", ctx)
+	ret0, _ := ret[0].(types0.Coins)
+	return ret0
+}
+
+// GetTotalDistributed indicates an expected call of GetTotalDistributed.
+func (mr *MockSupernodeKeeperMockRecorder) GetTotalDistributed(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTotalDistributed", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetTotalDistributed), ctx)
+}
+
+// GetSNDistState mocks base method.
+func (m *MockSupernodeKeeper) GetSNDistState(ctx types0.Context, valAddr string) (types.SNDistState, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSNDistState", ctx, valAddr)
+	ret0, _ := ret[0].(types.SNDistState)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetSNDistState indicates an expected call of GetSNDistState.
+func (mr *MockSupernodeKeeperMockRecorder) GetSNDistState(ctx, valAddr any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSNDistState", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetSNDistState), ctx, valAddr)
+}
+
+// GetRegistrationFeeShareBps mocks base method.
+func (m *MockSupernodeKeeper) GetRegistrationFeeShareBps(ctx types0.Context) uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRegistrationFeeShareBps", ctx)
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// GetRegistrationFeeShareBps indicates an expected call of GetRegistrationFeeShareBps.
+func (mr *MockSupernodeKeeperMockRecorder) GetRegistrationFeeShareBps(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRegistrationFeeShareBps", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetRegistrationFeeShareBps), ctx)
+}
+
+// SetLastDistributionHeight mocks base method.
+func (m *MockSupernodeKeeper) SetLastDistributionHeight(ctx types0.Context, height int64) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetLastDistributionHeight", ctx, height)
+}
+
+// SetLastDistributionHeight indicates an expected call of SetLastDistributionHeight.
+func (mr *MockSupernodeKeeperMockRecorder) SetLastDistributionHeight(ctx, height any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastDistributionHeight", reflect.TypeOf((*MockSupernodeKeeper)(nil).SetLastDistributionHeight), ctx, height)
 }

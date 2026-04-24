@@ -218,9 +218,9 @@ install_tests() {
 # ─── Execute ──────────────────────────────────────────────────────────────────
 
 mkdir -p "${CFG_DIR}" "${RELEASE_DIR}"
-
-# Copy the two config files that drive all container-side setup scripts
-cp -f "${CONFIG_JSON}" "${VALIDATORS_JSON}" "${CFG_DIR}/"
+# Always copy as config.json / validators.json so start.sh finds them by expected name
+cp -f "${CONFIG_JSON}" "${CFG_DIR}/config.json"
+cp -f "${VALIDATORS_JSON}" "${CFG_DIR}/validators.json"
 echo "[CONFIGURE] Configuration files copied to ${CFG_DIR}"
 
 # Copy optional binaries from BIN_DIR into the shared release directory

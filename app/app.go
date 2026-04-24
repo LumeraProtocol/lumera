@@ -107,6 +107,7 @@ import (
 	evmigrationmodulekeeper "github.com/LumeraProtocol/lumera/x/evmigration/keeper"
 	evmigrationmodule "github.com/LumeraProtocol/lumera/x/evmigration/module"
 	lumeraidmodulekeeper "github.com/LumeraProtocol/lumera/x/lumeraid/keeper"
+	supernodekeeper "github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	erc20keeper "github.com/cosmos/evm/x/erc20/keeper"
 	erc20types "github.com/cosmos/evm/x/erc20/types"
@@ -346,6 +347,13 @@ func New(
 
 	// add to default baseapp options, enable optimistic execution
 	baseAppOptions = append(baseAppOptions, baseapp.SetOptimisticExecution())
+
+	// Wire post-construction cross-module dependency to avoid depinject cycle:
+	// supernode payout logic consumes audit report data.
+	supernodekeeper.SetGlobalAuditKeeper(app.AuditKeeper)
+	if supernodeWithAudit, ok := app.SupernodeKeeper.(interface{ SetAuditKeeper(sntypes.AuditKeeper) }); ok {
+		supernodeWithAudit.SetAuditKeeper(app.AuditKeeper)
+	}
 
 	// build app
 	app.App = appBuilder.Build(db, traceStore, baseAppOptions...)

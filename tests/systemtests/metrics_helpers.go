@@ -18,10 +18,8 @@ func reportSupernodeMetrics(t *testing.T, cli *LumeradCli, fromKey, valAddr, acc
 	metricsJSON, err := json.Marshal(metrics)
 	require.NoError(t, err)
 
-	// AutoCLI populates the signer field (supernode_account) from --from.
 	out := cli.CustomCommand(
-		"tx", "supernode", "report-supernode-metrics",
-		valAddr,
+		"tx", "supernode", "report-supernode-metrics", valAddr,
 		"--metrics", string(metricsJSON),
 		"--from", fromKey,
 	)

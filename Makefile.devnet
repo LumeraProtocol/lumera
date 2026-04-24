@@ -3,6 +3,7 @@
 .PHONY: devnet-download-binaries
 .PHONY: devnet-evmigration-sync-bin devnet-evmigration-prepare devnet-evmigration-estimate devnet-evmigration-migrate devnet-evmigration-migrate-validator devnet-evmigration-cleanup
 .PHONY: devnet-evmigrationp-prepare devnet-evmigrationp-estimate devnet-evmigrationp-migrate devnet-evmigrationp-migrate-validator devnet-evmigrationp-migrate-all devnet-evmigrationp-cleanup
+.PHONY: devnet-tests-everlight devnet-new-no-hermes
 
 ##### Devnet Makefile ########################################
 #
@@ -737,3 +738,12 @@ devnet-evmigrationp-verify: devnet-evmigration-sync-bin
 
 devnet-evmigrationp-cleanup: devnet-evmigration-sync-bin
 	$(call _run_evmigration_in_containers_parallel,cleanup)
+
+devnet-tests-everlight:
+	@echo "Running Everlight devnet tests..."
+	@bash devnet/tests/everlight/everlight_test.sh
+
+devnet-new-no-hermes:
+	$(MAKE) devnet-down
+	$(MAKE) devnet-clean
+	$(MAKE) devnet-build-default CONFIG_JSON=config/config-no-hermes.json

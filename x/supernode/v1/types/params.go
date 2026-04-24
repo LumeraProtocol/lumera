@@ -81,6 +81,15 @@ const (
 
 var DefaultRequiredOpenPorts = []uint32{4444, 4445, 8002}
 
+var DefaultRewardDistribution = &RewardDistribution{
+	PaymentPeriodBlocks:         100800,     // ~7 days at 6s blocks
+	RegistrationFeeShareBps:     200,        // 2%
+	MinCascadeBytesForPayment:   1073741824, // 1 GiB
+	NewSnRampUpPeriods:          4,
+	MeasurementSmoothingPeriods: 4,
+	UsageGrowthCapBpsPerPeriod:  1000, // 10%
+}
+
 // WithDefaults returns a copy of the params with any zero-value LEP-4 fields
 // populated from the module defaults. This is used to keep older genesis files
 // and proposals (that omit the new metrics fields) backwards compatible.
@@ -119,6 +128,23 @@ func (p Params) WithDefaults() Params {
 	}
 	if out.RequiredOpenPorts == nil {
 		out.RequiredOpenPorts = append([]uint32(nil), DefaultRequiredOpenPorts...)
+	}
+	if out.RewardDistribution == nil {
+		dist := *DefaultRewardDistribution
+		out.RewardDistribution = &dist
+	} else {
+		if out.RewardDistribution.PaymentPeriodBlocks == 0 {
+			out.RewardDistribution.PaymentPeriodBlocks = DefaultRewardDistribution.PaymentPeriodBlocks
+		}
+		if out.RewardDistribution.MinCascadeBytesForPayment == 0 {
+			out.RewardDistribution.MinCascadeBytesForPayment = DefaultRewardDistribution.MinCascadeBytesForPayment
+		}
+		if out.RewardDistribution.MeasurementSmoothingPeriods == 0 {
+			out.RewardDistribution.MeasurementSmoothingPeriods = DefaultRewardDistribution.MeasurementSmoothingPeriods
+		}
+		if out.RewardDistribution.UsageGrowthCapBpsPerPeriod == 0 {
+			out.RewardDistribution.UsageGrowthCapBpsPerPeriod = DefaultRewardDistribution.UsageGrowthCapBpsPerPeriod
+		}
 	}
 
 	return out
@@ -193,7 +219,7 @@ func DefaultParams() Params {
 		DefaultMinStorageGB,
 		DefaultMaxStorageUsagePercent,
 		DefaultRequiredOpenPorts,
-	)
+	).WithDefaults()
 }
 
 // ParamSetPairs get the params.ParamSet
@@ -282,6 +308,21 @@ func (p Params) Validate() error {
 	}
 	if err := validateRequiredPorts(p.RequiredOpenPorts); err != nil {
 		return err
+	}
+	if p.RewardDistribution == nil {
+		return fmt.Errorf("reward_distribution must be present")
+	}
+	if p.RewardDistribution.PaymentPeriodBlocks == 0 {
+		return fmt.Errorf("payment_period_blocks must be greater than zero")
+	}
+	if p.RewardDistribution.RegistrationFeeShareBps > 10000 {
+		return fmt.Errorf("registration_fee_share_bps must be <= 10000")
+	}
+	if p.RewardDistribution.MinCascadeBytesForPayment == 0 {
+		return fmt.Errorf("min_cascade_bytes_for_payment must be greater than zero")
+	}
+	if p.RewardDistribution.MeasurementSmoothingPeriods == 0 {
+		return fmt.Errorf("measurement_smoothing_periods must be greater than zero")
 	}
 
 	return nil

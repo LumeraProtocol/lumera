@@ -39,7 +39,7 @@ func TestAuditHostRequirements_UsageZeroBypassesMinimums(t *testing.T) {
 	epochID, epochStartHeight := nextEpochAfterHeight(originHeight, epochLengthBlocks, currentHeight)
 	enforceHeight := epochStartHeight + int64(epochLengthBlocks)
 
-	awaitAtLeastHeight(t, epochStartHeight)
+	awaitAtLeastHeightWithSlackPeerPorts(t, epochStartHeight)
 
 	// Use the on-chain assignment query so tests track current assignment logic.
 	assigned0 := auditQueryAssignedTargets(t, epochID, true, n0.accAddr)
@@ -84,7 +84,7 @@ func TestAuditHostRequirements_UsageZeroBypassesMinimums(t *testing.T) {
 	require.Len(t, r0.StorageChallengeObservations, 1)
 	require.Equal(t, assigned0.TargetSupernodeAccounts[0], r0.StorageChallengeObservations[0].TargetSupernodeAccount)
 
-	awaitAtLeastHeight(t, enforceHeight)
+	awaitAtLeastHeightWithSlackPeerPorts(t, enforceHeight)
 
 	require.Equal(t, "SUPERNODE_STATE_ACTIVE", querySupernodeLatestState(t, cli, n0.valAddr))
 	require.Equal(t, "SUPERNODE_STATE_ACTIVE", querySupernodeLatestState(t, cli, n1.valAddr))

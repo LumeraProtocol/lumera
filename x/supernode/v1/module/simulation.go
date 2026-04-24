@@ -47,6 +47,12 @@ const (
 	// TODO: Determine the simulation weight value
 	defaultWeightMsgUpdateSupernodeInvalidAccount int = 20
 
+	opWeightEverlightDistributionTick          = "op_weight_everlight_distribution_tick"
+	defaultWeightEverlightDistributionTick int = 100
+
+	opWeightEverlightEligibilityChurn          = "op_weight_everlight_eligibility_churn"
+	defaultWeightEverlightEligibilityChurn int = 100
+
 	// this line is used by starport scaffolding # simapp/module/const
 )
 
@@ -134,6 +140,28 @@ func (am AppModule) WeightedOperations(simState module.SimulationState) []simtyp
 	operations = append(operations, simulation.NewWeightedOperation(
 		weightMsgUpdateSupernodeInvalidAccount,
 		supernodesimulation.SimulateMsgUpdateSupernodeInvalidAccount(am.accountKeeper, am.bankKeeper, am.keeper),
+	))
+
+	var weightEverlightDistributionTick int
+	simState.AppParams.GetOrGenerate(opWeightEverlightDistributionTick, &weightEverlightDistributionTick, nil,
+		func(_ *rand.Rand) {
+			weightEverlightDistributionTick = defaultWeightEverlightDistributionTick
+		},
+	)
+	operations = append(operations, simulation.NewWeightedOperation(
+		weightEverlightDistributionTick,
+		supernodesimulation.SimulateEverlightDistributionTick(am.keeper),
+	))
+
+	var weightEverlightEligibilityChurn int
+	simState.AppParams.GetOrGenerate(opWeightEverlightEligibilityChurn, &weightEverlightEligibilityChurn, nil,
+		func(_ *rand.Rand) {
+			weightEverlightEligibilityChurn = defaultWeightEverlightEligibilityChurn
+		},
+	)
+	operations = append(operations, simulation.NewWeightedOperation(
+		weightEverlightEligibilityChurn,
+		supernodesimulation.SimulateEverlightEligibilityChurn(am.keeper),
 	))
 
 	// this line is used by starport scaffolding # simapp/module/operation

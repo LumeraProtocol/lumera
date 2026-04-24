@@ -66,7 +66,9 @@ func ProvideModule(in ModuleInputs) ModuleOutputs {
 		authority.String(),
 		in.BankKeeper,
 		in.StakingKeeper,
+		in.AccountKeeper,
 		in.SlashingKeeper,
+		nil,
 	)
 
 	m := NewAppModule(

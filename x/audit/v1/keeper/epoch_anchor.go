@@ -49,11 +49,11 @@ func (k Keeper) CreateEpochAnchorIfNeeded(ctx sdk.Context, epochID uint64, epoch
 		return fmt.Errorf("epoch anchor must be created at epoch start height: want=%d got=%d", epochStartHeight, ctx.BlockHeight())
 	}
 
-	active, err := k.supernodeKeeper.GetAllSuperNodes(ctx, sntypes.SuperNodeStateActive)
+	active, err := k.supernodeKeeper.GetAllSuperNodes(ctx, sntypes.SuperNodeStateActive, sntypes.SuperNodeStateStorageFull)
 	if err != nil {
 		return err
 	}
-	targetsSN, err := k.supernodeKeeper.GetAllSuperNodes(ctx, sntypes.SuperNodeStateActive, sntypes.SuperNodeStatePostponed)
+	targetsSN, err := k.supernodeKeeper.GetAllSuperNodes(ctx, sntypes.SuperNodeStateActive, sntypes.SuperNodeStateStorageFull, sntypes.SuperNodeStatePostponed)
 	if err != nil {
 		return err
 	}

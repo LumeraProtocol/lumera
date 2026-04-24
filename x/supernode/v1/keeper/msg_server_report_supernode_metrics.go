@@ -50,9 +50,10 @@ func (m msgServer) ReportSupernodeMetrics(goCtx context.Context, msg *types.MsgR
 	}
 
 	params := m.GetParams(ctx)
-	// Compliance evaluation operates only on the structured metrics payload.
-	issues := evaluateCompliance(ctx, params, msg.Metrics)
-	compliant := len(issues) == 0
+	// Compliance evaluation separates storage-capacity violations from other issues.
+	result := evaluateCompliance(ctx, params, msg.Metrics)
+	compliant := result.IsCompliant()
+	allIssues := result.AllIssues()
 
 	// Persist the latest structured metrics in the dedicated metrics state table.
 	// Any report updates the metrics height/report count; UNKNOWN values are
@@ -73,32 +74,10 @@ func (m msgServer) ReportSupernodeMetrics(goCtx context.Context, msg *types.MsgR
 		return nil, err
 	}
 
-	// State transition handling
-	stateChanged := false
-	if len(sn.States) > 0 {
-		lastState := sn.States[len(sn.States)-1].State
-		if compliant {
-			if lastState == types.SuperNodeStatePostponed {
-				target := lastNonPostponedState(sn.States)
-				if err := recoverFromPostponed(ctx, m.SupernodeKeeper, &sn, target); err != nil {
-					return nil, err
-				}
-				stateChanged = true
-			}
-		} else {
-			if lastState != types.SuperNodeStatePostponed {
-				if err := markPostponed(ctx, m.SupernodeKeeper, &sn, strings.Join(issues, ";")); err != nil {
-					return nil, err
-				}
-				stateChanged = true
-			}
-		}
-	}
-
-	if !stateChanged {
-		if err := m.SetSuperNode(ctx, sn); err != nil {
-			return nil, err
-		}
+	// Legacy supernode metrics reporting no longer performs supernode state transitions.
+	// State transitions for STORAGE_FULL are owned by the audit epoch-report path.
+	if err := m.SetSuperNode(ctx, sn); err != nil {
+		return nil, err
 	}
 
 	ctx.EventManager().EmitEvent(
@@ -107,12 +86,12 @@ func (m msgServer) ReportSupernodeMetrics(goCtx context.Context, msg *types.MsgR
 			sdk.NewAttribute(types.AttributeKeyValidatorAddress, msg.ValidatorAddress),
 			sdk.NewAttribute(types.AttributeKeySupernodeAccount, msg.SupernodeAccount),
 			sdk.NewAttribute(types.AttributeKeyCompliant, boolToString(compliant)),
-			sdk.NewAttribute(types.AttributeKeyIssues, strings.Join(issues, ";")),
+			sdk.NewAttribute(types.AttributeKeyIssues, strings.Join(allIssues, ";")),
 			sdk.NewAttribute(types.AttributeKeyHeight, stringHeight(ctx.BlockHeight())),
 		),
 	)
 
-	return &types.MsgReportSupernodeMetricsResponse{Compliant: compliant, Issues: issues}, nil
+	return &types.MsgReportSupernodeMetricsResponse{Compliant: compliant, Issues: allIssues}, nil
 }
 
 func boolToString(v bool) string {

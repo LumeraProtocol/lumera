@@ -88,9 +88,15 @@ func awaitAtLeastHeight(t *testing.T, height int64) {
 	if sut.currentHeight >= height {
 		return
 	}
-	// Use 2x default timeout to handle slow CI environments where actual block
-	// production is slower than the configured blockTime.
-	timeout := time.Duration(height-sut.currentHeight+5) * sut.blockTime * 2
+	// Use a generous timeout that scales with the target delta and never falls
+	// below 30s. The default in sut.AwaitBlockHeight (delta+3 blocks * blockTime)
+	// is too tight on loaded CI runners where block production can slip, and
+	// caused intermittent "block N not reached within Xs" flakes.
+	delta := height - sut.currentHeight
+	timeout := time.Duration(delta+15) * sut.blockTime
+	if timeout < 30*time.Second {
+		timeout = 30 * time.Second
+	}
 	sut.AwaitBlockHeight(t, height, timeout)
 }
 

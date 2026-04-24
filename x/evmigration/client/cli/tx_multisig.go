@@ -844,8 +844,12 @@ func deriveSubKeyAddr(clientCtx client.Context, keyName string) (string, error) 
 }
 
 // upsertSig replaces any entry at the same index, otherwise appends — idempotent.
+// Returns a NEW slice — never aliases the caller's backing array — so a caller
+// that retains a reference to the input slice is not surprised by in-place
+// mutation. All current call sites reassign the result to the same field, so
+// this is a defensive choice against future callers.
 func upsertSig(existing []PartialSignature, fresh PartialSignature) []PartialSignature {
-	filtered := existing[:0]
+	filtered := make([]PartialSignature, 0, len(existing)+1)
 	for _, p := range existing {
 		if p.Index != fresh.Index {
 			filtered = append(filtered, p)

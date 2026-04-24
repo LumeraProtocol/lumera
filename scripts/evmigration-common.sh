@@ -181,7 +181,7 @@ _read_keyring_flags() {
 
 lumerad_q() {
   _read_keyring_flags
-  "$BIN" query "$@" --node "$NODE" --output json
+  "$BIN" query "$@" --node "$NODE" "${_KRF[@]}" --output json
 }
 
 lumerad_tx() {

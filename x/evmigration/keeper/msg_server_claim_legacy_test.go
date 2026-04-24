@@ -284,7 +284,7 @@ func TestPreChecks_NewAddressWasMigrated(t *testing.T) {
 		}}},
 		NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
 			Signature: signNewMigrationMessage(t, keeperClaimKind, newPrivKey, legacyAddr, newAddr),
-			SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
+			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
 		}}},
 	}
 
@@ -314,7 +314,7 @@ func TestPreChecks_NewAddressAlreadyUsed(t *testing.T) {
 		}}},
 		NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
 			Signature: signNewMigrationMessage(t, keeperClaimKind, newPrivKey, legacyAddr, newAddr),
-			SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
+			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
 		}}},
 	}
 
@@ -386,7 +386,7 @@ func TestClaimLegacyAccount_ValidatorMustUseMigrateValidator(t *testing.T) {
 		}}},
 		NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
 			Signature: signNewMigrationMessage(t, keeperClaimKind, newPrivKey, legacyAddr, newAddr),
-			SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
+			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
 		}}},
 	}
 

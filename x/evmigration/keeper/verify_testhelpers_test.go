@@ -48,14 +48,15 @@ func signLegacyMigrationMessage(t *testing.T, kind string, privKey *secp256k1.Pr
 	return sig
 }
 
+// signNewMigrationMessage produces a raw SIG_FORMAT_CLI-shaped new-side signature
+// (eth keyring applies Keccak256 internally; caller passes raw payload). The
+// returned signature is strictly 65 bytes (R||S||V) — matching the shape
+// VerifyEthSecp256k1 expects under the strict schema.
 func signNewMigrationMessage(t *testing.T, kind string, privKey *evmcryptotypes.PrivKey, legacyAddr, newAddr sdk.AccAddress) []byte {
 	t.Helper()
 	msg := fmt.Sprintf("lumera-evm-migration:%s:%d:%s:%s:%s", testChainID, lcfg.EVMChainID, kind, legacyAddr.String(), newAddr.String())
 	sig, err := privKey.Sign([]byte(msg))
 	require.NoError(t, err)
-	if len(sig) == 65 {
-		return sig[:64]
-	}
 	return sig
 }
 

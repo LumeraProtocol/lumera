@@ -11,6 +11,23 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=./evmigration-common.sh disable=SC1091
 source "${SCRIPT_DIR}/evmigration-common.sh"
 
+_USAGE_DESCRIPTION="Migrate a single-signature legacy account (coin-type 118) to its EVM-compatible
+counterpart (coin-type 60, eth_secp256k1). Pre-flight runs MigrationEstimate
+and aborts on multisig accounts, validator operators, or any state the chain
+would reject. Takes a pre-broadcast balance snapshot and verifies after tx
+inclusion that balances moved correctly."
+
+_USAGE_EXAMPLES="  # Standard migration — both keys already in the keyring:
+  migrate-account.sh alice alice-new \\
+    --chain-id lumera-mainnet-1 --node tcp://rpc.lumera:26657
+
+  # Import both keys from a single mnemonic file first (file mode must be 0600):
+  migrate-account.sh alice alice-new \\
+    --chain-id lumera-mainnet-1 --mnemonic-file /run/user/1000/alice.seed
+
+  # Dry-run only (pre-flight + preview, no broadcast):
+  migrate-account.sh alice alice-new --chain-id lumera-mainnet-1 --dry-run"
+
 main() {
   parse_common_flags "$@"
   require_binary

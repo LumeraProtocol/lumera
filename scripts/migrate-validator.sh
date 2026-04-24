@@ -11,6 +11,32 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=./evmigration-common.sh disable=SC1091
 source "${SCRIPT_DIR}/evmigration-common.sh"
 
+_USAGE_DESCRIPTION="Migrate a single-signature validator operator from legacy (coin-type 118)
+to EVM-compatible (coin-type 60, eth_secp256k1) keys. Pre-flight runs
+MigrationEstimate, rejects non-validator accounts, and aborts if the
+validator's delegation+unbonding+redelegation count would exceed
+max_validator_delegations. Requires the node to be stopped before
+broadcast — will miss blocks and may be jailed during migration."
+
+_USAGE_EXTRA_FLAGS="
+Validator-specific flags:
+  --i-have-stopped-the-node  Acknowledge downtime non-interactively (required
+                             for systemd / CI / non-TTY runs; --yes alone does
+                             NOT satisfy this check)"
+
+_USAGE_EXAMPLES="  # Standard interactive migration (prompts for downtime confirmation):
+  systemctl stop lumerad
+  migrate-validator.sh myval myval-new \\
+    --chain-id lumera-mainnet-1 --node tcp://rpc.lumera:26657
+
+  # Non-interactive (CI/systemd) — pre-acknowledge downtime:
+  migrate-validator.sh myval myval-new \\
+    --chain-id lumera-mainnet-1 --node tcp://rpc.lumera:26657 \\
+    --yes --i-have-stopped-the-node
+
+  # Dry-run only (pre-flight, cap check, downtime prompt, no broadcast):
+  migrate-validator.sh myval myval-new --chain-id ... --dry-run"
+
 main() {
   # Pre-strip validator-only flag so parse_common_flags doesn't see it.
   local node_stopped=0

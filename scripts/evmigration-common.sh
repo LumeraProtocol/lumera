@@ -75,13 +75,34 @@ _require_value() {
   fi
 }
 
+# Entry scripts may set these before parse_common_flags to customize --help:
+#   _USAGE_DESCRIPTION   one short paragraph explaining what the script does
+#   _USAGE_EXAMPLES      indented example invocations shown under "Examples:"
+#   _USAGE_EXTRA_FLAGS   script-specific flag block shown after the common flags
+# shellcheck disable=SC2034
+_USAGE_DESCRIPTION="${_USAGE_DESCRIPTION:-}"
+# shellcheck disable=SC2034
+_USAGE_EXAMPLES="${_USAGE_EXAMPLES:-}"
+# shellcheck disable=SC2034
+_USAGE_EXTRA_FLAGS="${_USAGE_EXTRA_FLAGS:-}"
+
+# shellcheck disable=SC2120  # $1 is optional; defaults to the entry script's basename.
 _usage() {
-  cat >&2 <<'USAGE'
-Usage: <script> <legacy-key> <new-key> [flags]
+  # Default to the entry script's basename ($0 in a sourced helper resolves to
+  # the script the user invoked, not to this library). Callers may override
+  # explicitly, e.g. _usage migrate-validator.sh, for synthetic contexts.
+  local script_name="${1:-$(basename "$0")}"
+  cat >&2 <<USAGE
+Usage: $script_name <legacy-key> <new-key> [flags]
+USAGE
+  if [[ -n "${_USAGE_DESCRIPTION:-}" ]]; then
+    printf '\n%s\n' "$_USAGE_DESCRIPTION" >&2
+  fi
+  cat >&2 <<USAGE
 
 Flags:
-  --node <url>              RPC endpoint (default $LUMERA_NODE or tcp://localhost:26657)
-  --chain-id <id>           Chain ID (default $LUMERA_CHAIN_ID; required)
+  --node <url>              RPC endpoint (default \$LUMERA_NODE or tcp://localhost:26657)
+  --chain-id <id>           Chain ID (default \$LUMERA_CHAIN_ID; required)
   --keyring-backend <b>     test|file|os (default test)
   --keyring-dir <dir>       Keyring directory (overrides --home for keys)
   --home <dir>              lumerad home directory
@@ -90,6 +111,12 @@ Flags:
   --dry-run                 Run pre-flight only; do not broadcast
   --binary <path>           Override lumerad binary (default: lumerad on PATH)
 USAGE
+  if [[ -n "${_USAGE_EXTRA_FLAGS:-}" ]]; then
+    printf '%s\n' "$_USAGE_EXTRA_FLAGS" >&2
+  fi
+  if [[ -n "${_USAGE_EXAMPLES:-}" ]]; then
+    printf '\nExamples:\n%s\n' "$_USAGE_EXAMPLES" >&2
+  fi
 }
 
 parse_common_flags() {

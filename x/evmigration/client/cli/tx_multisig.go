@@ -730,11 +730,20 @@ if the account has no on-chain pubkey).`,
 				}
 				ethSubKeys := make([]cryptotypes.PubKey, len(newSubPubKeys))
 				subPubKeyB64s := make([]string, len(newSubPubKeys))
+				// Pairwise-uniqueness guard — MultisigProof.validateBasic rejects
+				// duplicate sub_pub_keys at consensus (one keyholder would count
+				// as two distinct signers against K-of-N), so surface it here
+				// before co-signers run the ceremony.
+				seenNew := make(map[string]int, len(newSubPubKeys))
 				for i, spec := range newSubPubKeys {
 					raw, err := resolveEthSubKey(clientCtx, spec)
 					if err != nil {
 						return fmt.Errorf("--new-sub-pub-keys[%d]: %w", i, err)
 					}
+					if prior, dup := seenNew[string(raw)]; dup {
+						return fmt.Errorf("--new-sub-pub-keys[%d] duplicates --new-sub-pub-keys[%d]; each sub-key must be distinct", i, prior)
+					}
+					seenNew[string(raw)] = i
 					ethSubKeys[i] = &evmcryptotypes.PubKey{Key: raw}
 					subPubKeyB64s[i] = base64.StdEncoding.EncodeToString(raw)
 				}

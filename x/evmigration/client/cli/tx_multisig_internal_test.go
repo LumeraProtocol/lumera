@@ -1004,6 +1004,28 @@ func TestBuildMigrationProofs_IntersectionBelowThreshold(t *testing.T) {
 	require.Contains(t, err.Error(), "signed on BOTH sides at matching indices")
 }
 
+// TestBuildMigrationProofs_IntersectionHasOneButNeedsK pins the specific
+// regression shape a reviewer flagged: legacy valid at {0,1}, new valid at
+// {0,2}, K=2. Intersection is {0} — non-empty but below threshold. Catches
+// an off-by-one where len(intersection) > 0 is mistakenly treated as
+// "enough," producing a tx that would fail mirror-source at submit time.
+func TestBuildMigrationProofs_IntersectionHasOneButNeedsK(t *testing.T) {
+	legacySide, newSide, payload, signLegacy, signNew := multisigTestFixture(t)
+	pp := &PartialProof{
+		Version:                 partialProofVersion,
+		Kind:                    migrationProofKindClaim,
+		Legacy:                  legacySide,
+		New:                     newSide,
+		PartialLegacySignatures: []PartialSignature{signLegacy(0), signLegacy(1)},
+		PartialNewSignatures:    []PartialSignature{signNew(0), signNew(2)},
+	}
+
+	_, _, err := buildMigrationProofs(io.Discard, pp, payload)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "signed on BOTH sides at matching indices")
+	require.Contains(t, err.Error(), "have 1")
+}
+
 // TestBuildMigrationProofs_RejectsMixedShape covers the final dispatcher
 // branch: a single-key legacy paired with a multisig new (or vice versa) is
 // caught here before reaching ValidateBasic, so combine-proof never writes

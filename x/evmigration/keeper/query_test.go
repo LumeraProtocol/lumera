@@ -714,3 +714,44 @@ func TestMigrationEstimate_Multisig_NonSecp256k1SubKey(t *testing.T) {
 	require.False(t, resp.WouldSucceed)
 	require.Contains(t, resp.RejectionReason, "non-secp256k1")
 }
+
+// TestMigrationEstimate_Multisig_DuplicateSubKey verifies that a legacy
+// multisig with a duplicated sub-key (SDK construction permits this, unlike
+// evmigration's MultisigProof.validateBasic which rejects it at consensus)
+// is flagged at preflight with WouldSucceed=false. Without this check,
+// co-signers would run a full K-of-N ceremony only to have submit-proof
+// fail with ErrInvalidMigrationPubKey.
+func TestMigrationEstimate_Multisig_DuplicateSubKey(t *testing.T) {
+	f := initMockFixture(t)
+	qs := keeper.NewQueryServerImpl(f.keeper)
+
+	shared := secp256k1.GenPrivKey().PubKey()
+	distinct := secp256k1.GenPrivKey().PubKey()
+	// Positions 0 and 2 carry the same sub-key; position 1 is distinct.
+	multiPK := kmultisig.NewLegacyAminoPubKey(2, []cryptotypes.PubKey{shared, distinct, shared})
+	addr := sdk.AccAddress(multiPK.Address())
+	acc := authtypes.NewBaseAccountWithAddress(addr)
+	require.NoError(t, acc.SetPubKey(multiPK))
+
+	valAddr := sdk.ValAddress(addr)
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), valAddr).Return(
+		stakingtypes.Validator{}, stakingtypes.ErrNoValidatorFound,
+	)
+	f.stakingKeeper.EXPECT().GetDelegatorDelegations(gomock.Any(), addr, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetUnbondingDelegations(gomock.Any(), addr, ^uint16(0)).Return(nil, nil)
+	f.stakingKeeper.EXPECT().GetRedelegations(gomock.Any(), addr, ^uint16(0)).Return(nil, nil)
+	f.authzKeeper.EXPECT().IterateGrants(gomock.Any(), gomock.Any())
+	f.feegrantKeeper.EXPECT().IterateAllFeeAllowances(gomock.Any(), gomock.Any()).Return(nil)
+	f.actionKeeper.EXPECT().IterateActions(gomock.Any(), gomock.Any()).Return(nil)
+	f.bankKeeper.EXPECT().GetAllBalances(gomock.Any(), addr).Return(sdk.Coins{})
+	f.supernodeKeeper.EXPECT().QuerySuperNode(gomock.Any(), valAddr).Return(sntypes.SuperNode{}, false)
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), addr).Return(acc)
+
+	resp, err := qs.MigrationEstimate(f.ctx, &types.QueryMigrationEstimateRequest{
+		LegacyAddress: addr.String(),
+	})
+	require.NoError(t, err)
+	require.True(t, resp.IsMultisig)
+	require.False(t, resp.WouldSucceed)
+	require.Contains(t, resp.RejectionReason, "duplicates sub_pub_keys[0]")
+}

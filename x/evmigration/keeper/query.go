@@ -284,13 +284,27 @@ func (qs queryServer) MigrationEstimate(goCtx context.Context, req *types.QueryM
 				resp.Threshold = uint32(ms.Threshold)
 				resp.NumSigners = uint32(len(ms.GetPubKeys()))
 
-				// Reject nested / non-secp256k1 sub-keys.
-				for _, sub := range ms.GetPubKeys() {
+				// Reject nested / non-secp256k1 sub-keys, and duplicate sub-keys.
+				// SDK multisig construction itself permits duplicates, but the
+				// migration verifier (MultisigProof.validateBasic) rejects them
+				// at consensus — without this preflight, an existing duplicate-
+				// sub-key legacy multisig would report would_succeed=true and
+				// only fail after the K-of-N signing ceremony.
+				seen := make(map[string]int, len(ms.GetPubKeys()))
+				for i, sub := range ms.GetPubKeys() {
 					if _, ok := sub.(*secp256k1.PubKey); !ok {
 						resp.WouldSucceed = false
 						resp.RejectionReason = "multisig contains non-secp256k1 sub-key (unsupported)"
 						break
 					}
+					key := string(sub.Bytes())
+					if prior, dup := seen[key]; dup {
+						resp.WouldSucceed = false
+						resp.RejectionReason = fmt.Sprintf(
+							"multisig sub_pub_keys[%d] duplicates sub_pub_keys[%d] (would fail ValidateBasic)", i, prior)
+						break
+					}
+					seen[key] = i
 				}
 				// Size cap against MaxMultisigSubKeys.
 				if resp.WouldSucceed && resp.NumSigners > params.MaxMultisigSubKeys {

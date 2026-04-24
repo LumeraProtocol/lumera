@@ -130,7 +130,7 @@ lumerad tx evmigration submit-proof tx.json \
   --chain-id <chain-id>
 ```
 
-`combine-proof` verifies every partial on both sides, drops invalid entries with a stderr warning, and selects the K valid partials with the lowest ascending indices **on each side independently**. If fewer than K verify on either side, it errors with `need <K> valid partial signatures, have <N>` and writes nothing.
+`combine-proof` verifies every partial on both sides, drops invalid entries with a stderr warning, then **intersects** the valid signer-index sets across the two sides and selects the first K indices present on BOTH. This is what makes `legacy_proof.signer_indices == new_proof.signer_indices` (the consensus mirror-source rule). A co-signer who signs only one side doesn't contribute toward quorum unless another co-signer supplies the other side's signature at the same index. If the intersection has fewer than K entries, combine-proof errors out with `need <K> valid partial signatures signed on BOTH sides at matching indices, have <N>` and writes nothing.
 
 `submit-proof` does **not** sign at the Cosmos layer. Migration messages declare zero signers (authorization is fully embedded in `legacy_proof` and `new_proof`), fees are waived by the evmigration ante handler, and replay is prevented by the keeper's `MigrationRecords.Has(legacyAddr)` check. There is no `--from`, no fee-payer, and no envelope signature — `submit-proof` just loads `tx.json`, runs `ValidateBasic`, simulates gas via the migration-specific estimator, builds an unsigned tx, and broadcasts.
 

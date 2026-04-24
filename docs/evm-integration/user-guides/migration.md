@@ -606,7 +606,7 @@ lumerad tx evmigration combine-proof \
   --out tx.json
 ```
 
-`combine-proof` validates cross-file consistency — it rejects the set if any two partials disagree on `chain_id`, `evm_chain_id`, `legacy_address`, `new_address`, `payload_hex`, `kind`, or the per-side `threshold` / `sig_format` / `sub_pub_keys`. It verifies every partial signature cryptographically on **both** sides, drops invalid entries with a stderr warning, and selects the first K valid partials in ascending index order **per side**. If fewer than K verify on either side, it errors with `need <K> valid partial signatures on <side> side, have <N>` and writes nothing.
+`combine-proof` validates cross-file consistency — it rejects the set if any two partials disagree on `chain_id`, `evm_chain_id`, `legacy_address`, `new_address`, `payload_hex`, `kind`, or the per-side `threshold` / `sig_format` / `sub_pub_keys`. It verifies every partial signature cryptographically on **both** sides, drops invalid entries with a stderr warning, then **intersects** the valid signer-index sets across the two sides and selects the first K indices present on BOTH. This is what satisfies the consensus mirror-source rule (`legacy_proof.signer_indices == new_proof.signer_indices`). A one-sided partial (e.g. co-signer Alice signed only the legacy side) does not count toward quorum unless another co-signer supplied a new-side signature at the same index. If the intersection has fewer than K entries, it errors with `need <K> valid partial signatures signed on BOTH sides at matching indices, have <N>` and writes nothing.
 
 ### Step 4: Broadcast the assembled transaction
 

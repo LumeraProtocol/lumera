@@ -414,7 +414,7 @@ lumerad tx evmigration combine-proof \
   --out tx.json
 ```
 
-`combine-proof` rejects the set if any two partials disagree on `chain_id`, `evm_chain_id`, `legacy_address`, `new_address`, `payload_hex`, proof kind, or either side's `sub_pub_keys` list. It verifies every merged partial on both legacy and new sides, drops invalid entries with a stderr warning, and selects the K valid partials with the lowest ascending indices **on each side independently**. If fewer than K verify on either side, it errors with `need <K> valid partial signatures, have <N>` and writes nothing.
+`combine-proof` rejects the set if any two partials disagree on `chain_id`, `evm_chain_id`, `legacy_address`, `new_address`, `payload_hex`, proof kind, or either side's `sub_pub_keys` list. It verifies every merged partial on both legacy and new sides, drops invalid entries with a stderr warning, then **intersects** the valid signer-index sets across the two sides and selects the first K indices present on BOTH. This is what guarantees `legacy_proof.signer_indices == new_proof.signer_indices`, the consensus-level mirror-source rule. A one-sided partial (e.g. a co-signer who signed only the legacy half because they lost their eth sub-key) does not contribute toward quorum unless another co-signer supplied the new-side signature at the same index. If the intersection has fewer than K entries, combine-proof errors with `need <K> valid partial signatures signed on BOTH sides at matching indices, have <N>` and writes nothing.
 
 #### Step 6 — Coordinator submits the pre-assembled tx
 

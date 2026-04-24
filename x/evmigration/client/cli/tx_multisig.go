@@ -716,10 +716,13 @@ if the account has no on-chain pubkey).`,
 			return SavePartialProof(out, pp)
 		},
 	}
-	// Tx flags (not query flags) — generate-proof-payload doesn't broadcast,
-	// but it DOES need keyring access (clientCtx.Keyring.Key) to resolve
-	// --new-sub-pub-keys / --legacy-key entries that are local key names.
-	flags.AddTxFlagsToCmd(cmd)
+	// Query flags + keyring flags — generate-proof-payload doesn't broadcast
+	// (no --from / --fee / --gas surface), but it DOES need keyring access
+	// (clientCtx.Keyring.Key) to resolve --new-sub-pub-keys / --legacy-key
+	// entries that are local key names. Using the narrower pair keeps --help
+	// focused on the flags that actually affect this command.
+	flags.AddQueryFlagsToCmd(cmd)
+	flags.AddKeyringFlags(cmd.Flags())
 	cmd.Flags().String(flagLegacyAddr, "", "Legacy (coin-type 118) bech32 address to migrate from")
 	cmd.Flags().String(flagNewAddr, "", "New (coin-type 60) bech32 destination address (optional; cross-checked when supplied)")
 	cmd.Flags().String(flagKind, migrationProofKindClaim,

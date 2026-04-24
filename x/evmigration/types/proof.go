@@ -174,8 +174,10 @@ func MultisigProofValidateParams(m *MultisigProof, maxSubKeys uint32) error {
 // ValidateProofPair enforces the mirror-source rule across a migration's
 // (legacy, new) proof pair: both sides must share shape (single↔single or
 // multisig↔multisig), and when both multisig, threshold (K) and sub-key
-// count (N) must match. Call after both proofs have passed their per-side
-// ValidateBasic.
+// count (N) must match. Typically called after both proofs have passed
+// their per-side ValidateBasic, but the helper is defensive — it returns
+// a structured error for any nil proof / nil inner wrapper / nil oneof
+// member rather than panicking on malformed in-memory input.
 func ValidateProofPair(legacy, newProof *MigrationProof) error {
 	if legacy == nil || newProof == nil {
 		return ErrInvalidMigrationProof.Wrap("proof pair: nil proof")
@@ -188,6 +190,14 @@ func ValidateProofPair(legacy, newProof *MigrationProof) error {
 	case legIsSingle && newIsSingle:
 		return nil
 	case legIsMulti && newIsMulti:
+		// Guard against typed-nil oneof wrappers and a nil inner MultisigProof
+		// so direct callers can't trigger a panic on malformed input.
+		if legMulti == nil || legMulti.Multisig == nil {
+			return ErrInvalidMigrationProof.Wrap("proof pair: legacy multisig proof is nil")
+		}
+		if newMulti == nil || newMulti.Multisig == nil {
+			return ErrInvalidMigrationProof.Wrap("proof pair: new multisig proof is nil")
+		}
 		if legMulti.Multisig.Threshold != newMulti.Multisig.Threshold {
 			return errorsmod.Wrapf(ErrMirrorSourceMismatch,
 				"threshold: legacy K=%d new K=%d",

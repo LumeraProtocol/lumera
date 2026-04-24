@@ -332,6 +332,40 @@ func TestValidateProofPair_MirrorSourceRule(t *testing.T) {
 	}
 }
 
+// TestValidateProofPair_NilInputsReturnErrorNotPanic guards the helper against
+// nil proofs / typed-nil oneof wrappers / nil inner MultisigProof. Direct
+// callers (tests, tooling, future refactors) shouldn't be able to panic it.
+func TestValidateProofPair_NilInputsReturnErrorNotPanic(t *testing.T) {
+	goodMulti := validMultisigProof(2, 3, types.SideLegacy)
+	nilInnerMulti := types.MigrationProof{
+		Proof: &types.MigrationProof_Multisig{Multisig: nil},
+	}
+	nilOneof := types.MigrationProof{}
+	tests := []struct {
+		name           string
+		legacy, newP   *types.MigrationProof
+		wantErrIs      error
+		wantErrContain string
+	}{
+		{name: "both nil pointers", legacy: nil, newP: nil, wantErrIs: types.ErrInvalidMigrationProof},
+		{name: "legacy nil pointer", legacy: nil, newP: &goodMulti, wantErrIs: types.ErrInvalidMigrationProof},
+		{name: "new nil pointer", legacy: &goodMulti, newP: nil, wantErrIs: types.ErrInvalidMigrationProof},
+		{name: "legacy multisig with nil inner", legacy: &nilInnerMulti, newP: &goodMulti, wantErrIs: types.ErrInvalidMigrationProof, wantErrContain: "legacy multisig"},
+		{name: "new multisig with nil inner", legacy: &goodMulti, newP: &nilInnerMulti, wantErrIs: types.ErrInvalidMigrationProof, wantErrContain: "new multisig"},
+		{name: "legacy oneof unset", legacy: &nilOneof, newP: &goodMulti, wantErrIs: types.ErrMirrorSourceMismatch},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := types.ValidateProofPair(tc.legacy, tc.newP)
+			require.Error(t, err)
+			require.ErrorIs(t, err, tc.wantErrIs)
+			if tc.wantErrContain != "" {
+				require.Contains(t, err.Error(), tc.wantErrContain)
+			}
+		})
+	}
+}
+
 // TestMsgClaimLegacyAccount_ValidateBasic_MirrorSource confirms the consensus
 // check fires through the full ValidateBasic path (not just the helper).
 func TestMsgClaimLegacyAccount_ValidateBasic_MirrorSource(t *testing.T) {

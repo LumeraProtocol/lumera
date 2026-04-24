@@ -95,27 +95,36 @@ x/evmigration/
 
 ## Multisig account migration
 
-Legacy accounts backed by a flat K-of-N multisig pubkey (Cosmos `multisig.LegacyAminoPubKey` with all sub-keys `secp256k1`) can migrate to a single `eth_secp256k1` EOA using the same messages as regular accounts.
+Legacy accounts backed by a flat K-of-N multisig pubkey (Cosmos `multisig.LegacyAminoPubKey` with all sub-keys `secp256k1`) migrate to a **multisig-of-`eth_secp256k1`** destination with the **same K and N** — the mirror-source rule. The CLI walkthrough lives in [main.md § Multisig account migration](main.md#multisig-account-migration) and [migration-scripts.md § Multisig migration](../user-guides/migration-scripts.md#multisig-migration); this section is the keeper-side reference.
 
 ### What is supported
 
-Flat K-of-N multisig legacy accounts where every sub-key is `secp256k1`. The verifier is `verifyMultisigProof` in `x/evmigration/keeper/verify.go`. The coordinator collects exactly K signatures from K of the N co-signers and submits a single `MsgClaimLegacyAccount` or `MsgMigrateValidator` with a `MultisigProof` in the `legacy_proof` field.
+Flat K-of-N multisig legacy accounts where every sub-key is `secp256k1`. The verifier is `verifyMultisigProof` in `x/evmigration/keeper/verify.go`, called independently for `legacy_proof` and `new_proof`. Co-signers collect exactly K sub-signatures per side via the `generate-proof-payload` → `sign-proof` → `combine-proof` → `submit-proof` flow; the submitted tx carries two `MultisigProof`s, both validated by the keeper and compared for shape/K/N by `types.ValidateProofPair`.
+
+### Consensus invariants
+
+- **Mirror-source rule** — enforced by `types.ValidateProofPair` (called from `MsgClaimLegacyAccount.ValidateBasic` and `MsgMigrateValidator.ValidateBasic`). Both sides must share shape (single↔single or multisig↔multisig); when both multisig, threshold (K) and sub-key count (N) must match. Rejected with `ErrMirrorSourceMismatch` (code 1121).
+- **Per-side sub-key typing** — `legacy_proof` sub-keys must be Cosmos `secp256k1`; `new_proof` sub-keys must be `eth_secp256k1`. The verifier dispatches on `SubKeyType` at each side.
+- **Zero-signer tx** — migration messages declare no signers. Authorization is embedded in the proof bytes; fees are waived by the evmigration ante handler; replay is prevented by `MigrationRecords.Has(legacyAddr)`.
 
 ### What is NOT supported
 
-- Nested multisig (multisig of multisigs)
-- Sub-keys of types other than `secp256k1` (e.g. `ed25519`)
-- Multisig on the destination side — the new address must be a plain `eth_secp256k1` EOA
-- Native wallet (Keplr/Leap) multisig signing UX — the four-step CLI flow is required
+- Nested multisig (multisig of multisigs) on either side.
+- Sub-keys of types other than `secp256k1` (legacy) / `eth_secp256k1` (new) — e.g. `ed25519` is rejected with an invalid-pubkey error during proof verification.
+- Asymmetric shape or K/N migrations — e.g. 2-of-3 legacy → 1-of-1 new, or multisig legacy → single-key new. Rejected at `ValidateBasic` by the mirror-source rule.
+- Native wallet (Keplr/Leap) multisig signing UX — the four-step offline CLI flow is required.
+- The new multisig bech32 is a Cosmos SDK address derived from `kmultisig.NewLegacyAminoPubKey`; it is **not** an EVM-addressable 20-byte address and cannot originate `MsgEthereumTx`. Operators who want EVM DeFi access for commissions/rewards should configure a separate single-EOA withdraw address via `MsgSetWithdrawAddress` after migration.
 
 ### Wire format
 
-Both `MsgClaimLegacyAccount` and `MsgMigrateValidator` carry `legacy_proof` as a protobuf oneof (defined in `proto/lumera/evmigration/proof.proto`):
+Both `MsgClaimLegacyAccount` and `MsgMigrateValidator` carry `legacy_proof` and `new_proof` as protobuf oneofs of the same `MigrationProof` shape (defined in `proto/lumera/evmigration/proof.proto`):
 
 ```protobuf
-oneof legacy_proof {
-  SingleKeyProof single   = 1;
-  MultisigProof  multisig = 2;
+message MigrationProof {
+  oneof proof {
+    SingleKeyProof single   = 1;
+    MultisigProof  multisig = 2;
+  }
 }
 ```
 

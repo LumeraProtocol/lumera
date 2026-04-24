@@ -147,14 +147,14 @@ The tables below list the individual tests added for multisig proof support. The
 
 #### Unit — verifier (`x/evmigration/keeper/verify_test.go`)
 
+Names were renamed in the v2/MigrationProof refactor; legacy `TestVerifyLegacyProof_Multisig_*` entries were merged into the dual-side `TestVerifyMigrationProof_*` suite.
+
 | Test | Description |
 | ---- | ----------- |
-| `TestVerifyLegacyProof_Multisig_ValidCLI` | 2-of-3 multisig with CLI sig format passes verifier. |
-| `TestVerifyLegacyProof_Multisig_ValidADR036` | 2-of-3 multisig with ADR-036 sig format passes verifier. |
-| `TestVerifyLegacyProof_Multisig_1of1` | 1-of-1 multisig (degenerate edge case) passes verifier. |
-| `TestVerifyLegacyProof_Multisig_WrongAddress` | Proof whose recovered address does not match `legacy_address` is rejected. |
-| `TestVerifyLegacyProof_Multisig_InvalidSubSig` | One corrupted sub-signature causes rejection. |
-| `TestVerifyLegacyProof_Multisig_N20Boundary` | N=20 (at `MaxMultisigSubKeys`) passes; N=21 is rejected by `ValidateParams`. |
+| `TestVerifyMigrationProof_NewSide_Multisig_Valid2of3` | 2-of-3 new-side multisig over eth sub-keys passes the verifier. |
+| `TestVerifyMigrationProof_NewSide_Multisig_AminoAddressMismatch_OnKeyTypeSwap` | Proof whose `LegacyAminoPubKey` address does not match `new_address` is rejected (catches key-type confusion between Cosmos and eth sub-keys). |
+| `TestVerifyMigrationProof_NewSide_Multisig_SubSigInvalid_UnderCosmosKeyBytes` | Sub-signature over Cosmos-key-bytes fails verification on eth-side (format-boundary test). |
+| Legacy-side multisig verifier paths | Exercised in integration via `TestClaimLegacyAccount_Multisig_*`; unit-level coverage replaced by `TestVerifyMigrationProof_*`. |
 
 #### Unit — type validation (`x/evmigration/types/proof_test.go`)
 
@@ -163,7 +163,14 @@ The tables below list the individual tests added for multisig proof support. The
 | `TestSingleKeyProof_ValidateBasic` | Valid and invalid `SingleKeyProof` shapes (nil pub_key, nil sig, unspecified format). |
 | `TestMultisigProof_ValidateBasic` | Valid and invalid `MultisigProof` shapes (zero threshold, mismatched indices/sigs length, non-ascending indices, wrong sub-key size, unspecified format). |
 | `TestMultisigProof_ValidateParams_SizeCap` | `ValidateParams` rejects when `len(sub_pub_keys) > MaxMultisigSubKeys`. |
-| `TestLegacyProof_ValidateBasic_Dispatch` | `LegacyProof.ValidateBasic` dispatches to the correct sub-validator and rejects a nil oneof. |
+| `TestMultisigProof_ValidateBasic_RejectsDuplicateSubKeys` | Rejects a `sub_pub_keys` list containing pairwise-duplicate entries with `ErrInvalidMigrationPubKey`. Prevents one keyholder from being counted as two distinct signers toward K-of-N. |
+| `TestMigrationProof_ValidateBasic_Dispatch` | `MigrationProof.ValidateBasic` dispatches to the correct sub-validator and rejects a nil oneof. Side-aware (SideLegacy / SideNew). |
+| `TestValidateProofPair_MirrorSourceRule` | 6-case matrix enforcing the cross-side mirror-source invariant: single↔single ok, multi↔multi with matching K/N ok, shape mismatch (single↔multi or multi↔single) rejected, K mismatch rejected, N mismatch rejected — all failures return `ErrMirrorSourceMismatch` (code 1121). |
+| `TestValidateProofPair_SignerIndicesMustMatch` | Multi-multi pair where `legacy_proof.signer_indices != new_proof.signer_indices` is rejected — catches two disjoint K-subsets each authorizing one side. |
+| `TestValidateProofPair_NilInputsReturnErrorNotPanic` | Defensive nil-guards on nil proofs, typed-nil oneof wrappers, and nil inner `MultisigProof` — direct callers outside ValidateBasic can't panic the helper. |
+| `TestMsgClaimLegacyAccount_ValidateBasic_MirrorSource` | Shape-mismatch (multi↔single) routes through full `Msg*.ValidateBasic` path and rejects with `ErrMirrorSourceMismatch`. Validator-message equivalent exists as `TestMsgMigrateValidator_ValidateBasic_MirrorSource`. |
+| `TestMsgClaimLegacyAccount_ValidateBasic_SignerIndicesMismatch` | Cross-side `signer_indices` mismatch routes through full `Msg*.ValidateBasic`. Validator equivalent: `TestMsgMigrateValidator_ValidateBasic_SignerIndicesMismatch`. |
+| `TestMsgClaimLegacyAccount_ValidateBasic_DuplicateSubKeys` | Duplicate legacy-side sub-keys routes through full `Msg*.ValidateBasic`. Validator equivalent: `TestMsgMigrateValidator_ValidateBasic_DuplicateSubKeys` (exercises new-side duplicate). |
 
 #### Unit — query server (`x/evmigration/keeper/query_test.go`)
 
@@ -173,6 +180,7 @@ The tables below list the individual tests added for multisig proof support. The
 | `TestMigrationEstimate_Multisig_Supported` | Estimate returns `would_succeed=true` for a valid K-of-N secp256k1 multisig. |
 | `TestMigrationEstimate_Multisig_TooManySubKeys` | Estimate returns `would_succeed=false` when `num_signers > MaxMultisigSubKeys`. |
 | `TestMigrationEstimate_Multisig_NonSecp256k1` | Estimate returns `would_succeed=false` when any sub-key is not secp256k1. |
+| `TestMigrationEstimate_Multisig_DuplicateSubKey` | Estimate returns `would_succeed=false` when any two sub-key entries are byte-equal — preflight mirror of `MultisigProof.validateBasic`'s consensus-level duplicate rejection, so operators don't run a K-of-N ceremony that would fail at submit. |
 
 #### Integration (`tests/integration/evmigration/migration_test.go`)
 
@@ -185,8 +193,8 @@ The tables below list the individual tests added for multisig proof support. The
 | `TestClaimLegacyAccount_MultisigToMultisig` | End-to-end 2-of-3 Cosmos-multisig → 2-of-3 eth-multisig migration: destination derived from `kmultisig.NewLegacyAminoPubKey` over eth sub-keys; balances move; migration record stored; `MigrateAuth` sets the new multisig `LegacyAminoPubKey` on-chain. |
 | `TestMigrateValidator_MultisigToMultisig` | `MsgMigrateValidator` variant of the multisig→multisig flow: validator operator re-keys to the eth multisig; `x/staking`, `x/distribution`, `x/supernode` state re-keyed to the new operator bech32. |
 | `TestClaimLegacyAccount_MultisigVesting_ToMultisig` | PermanentLocked vesting account owned by a legacy multisig migrates to an eth multisig while preserving the vesting schedule and locked amount. |
-| `TestClaimLegacyAccount_Multisig_WrongThreshold_LegacySide` | Proof with `legacy.threshold` not matching the multisig's on-chain `LegacyAminoPubKey` threshold is rejected by the verifier. |
-| `TestClaimLegacyAccount_Multisig_WrongThreshold_NewSide` | Proof with `new.threshold` not matching the number of new-side partial signatures is rejected by the verifier. |
+| `TestClaimLegacyAccount_Multisig_WrongThreshold_LegacySide` | Truncated `signer_indices` on the legacy side (K=2 claimed but only 1 entry supplied) rejected via `MultisigProof.validateStructure` with `expected exactly K=... signer_indices`. |
+| `TestClaimLegacyAccount_Multisig_WrongThreshold_NewSide` | Truncated `signer_indices` on the new side (K=2 claimed but only 1 entry supplied) rejected via `MultisigProof.validateStructure`. |
 | `TestClaimLegacyAccount_Multisig_ADR036_BothSides` | ADR-036 sig format accepted on both legacy and new sides for a multisig→multisig migration. |
 | `TestQueryMigrationEstimate_Multisig_Success` | `MigrationEstimate` returns `would_succeed=true` and estimated gas for a supported multisig source. |
 | `TestQueryMigrationEstimate_Multisig_SizeCapped` | `MigrationEstimate` returns `would_succeed=false` when `num_signers > MaxMultisigSubKeys`. |
@@ -197,8 +205,13 @@ The tables below list the individual tests added for multisig proof support. The
 | Test | Description |
 | ---- | ----------- |
 | `TestCLI_MultisigToMultisig_EndToEnd` | End-to-end in-process CLI walkthrough: `generate-proof-payload` → `sign-proof` (per co-signer, both sides) → `combine-proof` → `submit-proof` produces a well-formed tx with zero envelope signatures. |
-| `TestBuildProofFromPartial_*` | Suite covering the `buildProofFromPartial` helper: valid partials produce a `MigrationProof` with K lowest-ascending-index sub-signatures on each side; invalid partials are dropped with stderr warnings; fewer than K valid on either side errors with `need <K> valid partial signatures, have <N>`. |
-| `TestCmdSubmitProof_*` | Regression locks for `submit-proof`: rejects `--from`, rejects fee-payer flags, accepts only `tx.json` + `--chain-id`, builds an unsigned tx with zero signer infos. |
+| `TestBuildProofFromPartial_*` | Per-side test-helper suite (independent K selection). Covers valid 2-of-3, drops invalid with warnings, below-threshold-after-drops errors with `need <K> valid partial signatures, have <N>`, out-of-range index dropped, bad base64 dropped, duplicate-index deduped, wrong pubkey length rejected. |
+| `TestBuildMigrationProofs_IntersectsIndicesAcrossSides` | Production `combine-proof` dispatcher picks **intersected** indices: legacy signed at `[0,1,2]`, new signed at `[1,2]` → assembled proofs share `signer_indices=[1,2]` on BOTH sides (not legacy=`[0,1]` vs new=`[1,2]`). Locks in the cross-side intersection that makes tx output pass the mirror-source rule. |
+| `TestBuildMigrationProofs_IntersectionBelowThreshold` | Empty intersection (legacy at `[0,1]`, new at `[2]`, K=2) — dispatcher errors with `signed on BOTH sides at matching indices`. |
+| `TestBuildMigrationProofs_IntersectionHasOneButNeedsK` | Non-empty-but-below-K intersection (legacy at `[0,1]`, new at `[0,2]`, K=2, shared=`{0}`) — rejects "have 1". Pins the off-by-one where `len(intersection) > 0` might be mistakenly treated as "enough." |
+| `TestBuildMigrationProofs_RejectsMixedShape` | Single-key legacy + multisig new (or vice versa) is caught at combine time, before writing a tx.json that would fail `ValidateBasic.ValidateProofPair`. |
+| `TestValidateSideSpec_RejectsDuplicateSubKeys` | A 2-of-3 SideSpec where positions 0 and 2 carry the same base64 sub-key is rejected by `validateSideSpec` — catches duplicates on both `generate-proof-payload` authoring and `LoadPartialProof`. |
+| `TestCmdSubmitProof_DoesNotExposeSigningFlags` | Flag-surface lock: `--from`, `--fees`, `--fee-payer`, `--fee-granter`, `--gas`, `--gas-adjustment`, `--gas-prices`, `--sign-mode`, `--offline`, `--generate-only` are NOT advertised on `submit-proof` (zero-signer command); `--node`, `--chain-id`, `--keyring-backend`, `--keyring-dir`, `--broadcast-mode`, `--yes`, `--tx-timeout` ARE. |
 | `TestVerifyMigrationProof_NewSide_Multisig_*` | Keeper-side verification of the new-side multisig proof: valid K-of-N passes, wrong threshold / duplicate indices / non-ascending indices / non-eth-secp256k1 sub-key all rejected with specific errors. |
 
 #### Devnet (`devnet/tests/evmigration/`)
@@ -209,6 +222,29 @@ The tables below list the individual tests added for multisig proof support. The
 | `tests_evmigration -mode=multisig` (multisig→multisig) | 2-of-3 Cosmos-multisig → 2-of-3 eth-multisig balance migration; verifies `MigrationRecord` on-chain and asserts `MigrateAuth` set the new multisig `LegacyAminoPubKey` on the destination `BaseAccount`. |
 | `tests_evmigration -mode=multisig-vesting` | PermanentLocked vesting multisig source → eth multisig destination; verifies vesting schedule, original vesting amount, and locked balance are preserved after `MigrateAuth` rewrites the account. |
 | `tests_evmigration -mode=multisig-validator` | Multisig validator operator → eth multisig re-key via `MsgMigrateValidator`; post-migration sanity check submits `MsgEditValidator` from the new multisig to assert all Cosmos-side operator ops work end-to-end. |
+
+#### BATS — wrapper scripts (`tests/scripts/`)
+
+| Suite | Coverage |
+| ----- | -------- |
+| `tests/scripts/common.bats` | 61 tests: logging, flag parsing, keyring flag passthrough, multisig auth-type routing, `auth_pubkey_type`, `assert_secp256k1_key` / `assert_eth_key`, `read_proof_file` happy-path + missing-field + payload-hex-mismatch + single-key-rejection + out-of-range partial, `read_migration_tx_file` for multisig + single-key rejection, `summarize_partials` per-side + **matching-index intersection gate** (fails when legacy `[0,1]` and new `[0,2]` are presented — per-side thresholds both "yes" but shared count below K), cross-file chain-id mismatch. |
+| `tests/scripts/migrate-multisig.bats` | 38 tests: subcommand dispatch; `submit` dry-run / happy path / rejects `--from` as unknown flag / validator-downtime ack / exit 3 on non-multisig tx / exit 4 on estimate flip; `generate` happy path (claim + validator) / exit 8 on nil pubkey / exit 3 on single-sig / exit 6 on kind-validator-on-non-validator / exit 4 on estimate / exit 5 on already-migrated / missing required flags; `sign` happy path / tampered payload / v1-proof-file rejection / key-not-in-sub-key-set / eth-key-as-legacy / exit-1 on no `--from`/`--new-key`; `combine` matching-index matrix output / sub-threshold exit 4 / cross-file consistency exit 9 / lumerad below-threshold mapping / flag wiring. |
+
+---
+
+### Known multisig test-coverage gaps
+
+Coverage is strong at unit and preflight layers. The remaining gaps are all at the **integration layer**, where a hand-crafted `MsgClaim` / `MsgMigrateValidator` would exercise a consensus rule through the full ante-handler + msg-server pipeline (not just via the helper function in isolation). Worth adding before mainnet:
+
+| # | Gap | Why it matters |
+| --- | --- | --- |
+| 1 | `TestClaimLegacyAccount_Multisig_MirrorSourceMismatch_Shape` | Cross-side shape mismatch (single legacy + multi new, or vice versa) at the full `Msg*.ValidateBasic` path. Currently only exercised in isolation via `TestValidateProofPair_MirrorSourceRule`. |
+| 2 | `TestClaimLegacyAccount_Multisig_MirrorSourceMismatch_KN` | Cross-side K/N mismatch (e.g. 2-of-3 legacy → 3-of-5 new) through the full msg-server pipeline. Distinct from `WrongThreshold_LegacySide/NewSide`, which test single-side `signer_indices` truncation, not cross-side K/N divergence. |
+| 3 | `TestClaimLegacyAccount_Multisig_SignerIndicesMismatch` | Cross-side disjoint K-subsets (legacy signed at `[0,1]`, new at `[0,2]`) rejected at integration — helper test `TestValidateProofPair_SignerIndicesMustMatch` covers it in isolation. |
+| 4 | `TestClaimLegacyAccount_Multisig_DuplicateSubKey_Submit` | Duplicate sub-key rejected at submit time via `MsgClaim`. Currently covered in preflight (`TestMigrationEstimate_Multisig_DuplicateSubKey`) and at unit level (`TestMultisigProof_ValidateBasic_RejectsDuplicateSubKeys`); no integration-level submit-path test. |
+| 5 | `tests_evmigration -mode=multisig-large-kn` | Devnet mode exercising a larger K/N combination (e.g. 5-of-7). All current devnet modes are 2-of-3; a larger case would stress governance-param interaction and sub-key fixture generation at scale. Low priority — unit `MigrationEstimate_Multisig_TooManySubKeys` already exercises the cap boundary. |
+
+All five are additive regression tests, not design changes — each pins a consensus invariant that's already enforced, at a layer where a subtle regression could slip past unit coverage. Items 1–4 are **Medium** priority; item 5 is **Low**.
 
 ---
 

@@ -94,30 +94,16 @@ func (pp *PartialProof) MarshalIndent() ([]byte, error) {
 }
 
 // LoadPartialProof reads a PartialProof JSON file and validates its version
-// and contents. Uses a two-pass approach: first a tolerant version probe to
-// give a clear "unsupported version" error for v1 files, then a strict
-// DisallowUnknownFields decode to catch forward-drift within v2.
+// and contents. Strict decode with DisallowUnknownFields catches both
+// forward-drift within the v2 lineage and pre-v2 shapes (v1 files have
+// unknown top-level fields like `single`, `multisig`, or `partial_sigs` and
+// surface a generic "unknown field" error — v1 backcompat is intentionally
+// not supported).
 func LoadPartialProof(path string) (*PartialProof, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", path, err)
 	}
-
-	// Pass 1: tolerant version probe. Use ordinary json.Unmarshal so unknown
-	// v1 fields (single, multisig, partial_sigs) don't trigger an error
-	// before we read the version field.
-	var probe struct {
-		Version int `json:"version"`
-	}
-	if err := json.Unmarshal(b, &probe); err != nil {
-		return nil, fmt.Errorf("parse %s: %w", path, err)
-	}
-	if probe.Version != partialProofVersion {
-		return nil, fmt.Errorf("unsupported partial_proof version %d (expected %d)", probe.Version, partialProofVersion)
-	}
-
-	// Pass 2: strict decode once version is confirmed. Unknown fields at this
-	// point indicate forward-drift within the v2 lineage.
 	dec := json.NewDecoder(bytes.NewReader(b))
 	dec.DisallowUnknownFields()
 	var pp PartialProof
@@ -662,12 +648,23 @@ if the account has no on-chain pubkey).`,
 				return err
 			}
 
-			// Shape-mirror check: legacy and new must both be single or both multisig.
+			// Mirror-source rule — enforced at consensus via
+			// types.ValidateProofPair; surfaced here for early feedback.
 			legacyIsSingle := legacySide.PubKey != ""
 			newIsSingle := newSide.PubKey != ""
 			if legacyIsSingle != newIsSingle {
 				return fmt.Errorf("legacy and new sides must have the same shape: legacy is %s but new is %s",
 					sideShapeLabel(legacyIsSingle), sideShapeLabel(newIsSingle))
+			}
+			if !legacyIsSingle {
+				if legacySide.Threshold != newSide.Threshold {
+					return fmt.Errorf("mirror-source rule: legacy threshold K=%d does not match new threshold K=%d",
+						legacySide.Threshold, newSide.Threshold)
+				}
+				if len(legacySide.SubPubKeys) != len(newSide.SubPubKeys) {
+					return fmt.Errorf("mirror-source rule: legacy sub-keys N=%d does not match new sub-keys N=%d",
+						len(legacySide.SubPubKeys), len(newSide.SubPubKeys))
+				}
 			}
 
 			// Key-reuse guard: the same 33-byte compressed secp256k1 pubkey must not

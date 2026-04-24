@@ -170,3 +170,51 @@ func MultisigProofValidateParams(m *MultisigProof, maxSubKeys uint32) error {
 	}
 	return nil
 }
+
+// ValidateProofPair enforces the mirror-source rule across a migration's
+// (legacy, new) proof pair: both sides must share shape (single↔single or
+// multisig↔multisig), and when both multisig, threshold (K) and sub-key
+// count (N) must match. Call after both proofs have passed their per-side
+// ValidateBasic.
+func ValidateProofPair(legacy, newProof *MigrationProof) error {
+	if legacy == nil || newProof == nil {
+		return ErrInvalidMigrationProof.Wrap("proof pair: nil proof")
+	}
+	legMulti, legIsMulti := legacy.Proof.(*MigrationProof_Multisig)
+	_, legIsSingle := legacy.Proof.(*MigrationProof_Single)
+	newMulti, newIsMulti := newProof.Proof.(*MigrationProof_Multisig)
+	_, newIsSingle := newProof.Proof.(*MigrationProof_Single)
+	switch {
+	case legIsSingle && newIsSingle:
+		return nil
+	case legIsMulti && newIsMulti:
+		if legMulti.Multisig.Threshold != newMulti.Multisig.Threshold {
+			return errorsmod.Wrapf(ErrMirrorSourceMismatch,
+				"threshold: legacy K=%d new K=%d",
+				legMulti.Multisig.Threshold, newMulti.Multisig.Threshold)
+		}
+		if len(legMulti.Multisig.SubPubKeys) != len(newMulti.Multisig.SubPubKeys) {
+			return errorsmod.Wrapf(ErrMirrorSourceMismatch,
+				"sub_pub_keys: legacy N=%d new N=%d",
+				len(legMulti.Multisig.SubPubKeys), len(newMulti.Multisig.SubPubKeys))
+		}
+		return nil
+	default:
+		return errorsmod.Wrapf(ErrMirrorSourceMismatch,
+			"shape: legacy=%s new=%s", proofShape(legacy), proofShape(newProof))
+	}
+}
+
+func proofShape(p *MigrationProof) string {
+	if p == nil || p.Proof == nil {
+		return "unset"
+	}
+	switch p.Proof.(type) {
+	case *MigrationProof_Single:
+		return "single"
+	case *MigrationProof_Multisig:
+		return "multisig"
+	default:
+		return "unknown"
+	}
+}

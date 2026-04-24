@@ -43,12 +43,12 @@ See [legacy-migration.md](legacy-migration.md) for the full module reference.
 
 ## Multisig account migration
 
-When the legacy account is a K-of-N Cosmos multisig (a `LegacyAminoPubKey` recorded on the account's `BaseAccount.PubKey`), the migration target is **also** a K-of-N multisig, but constructed from `eth_secp256k1` sub-keys. This is the **mirror-source rule**:
+When the legacy account is a K-of-N Cosmos multisig (a `LegacyAminoPubKey` recorded on the account's `BaseAccount.PubKey`), the migration target is **also** a K-of-N multisig, but constructed from `eth_secp256k1` sub-keys. This is the **mirror-source rule**, enforced as a **consensus invariant** by [`types.ValidateProofPair`](../../../x/evmigration/types/proof.go) — called from `MsgClaimLegacyAccount.ValidateBasic` and `MsgMigrateValidator.ValidateBasic`. A tx that attempts to migrate a 2-of-3 legacy multisig to a 1-of-1 or 3-of-5 destination is rejected on-chain with `ErrMirrorSourceMismatch` (code 1121) before any crypto verification runs.
 
 | Legacy shape | New shape |
 | --- | --- |
 | Single `secp256k1` EOA | Single `eth_secp256k1` EOA |
-| K-of-N Cosmos multisig | K-of-N multisig of `eth_secp256k1` sub-keys (same K and N) |
+| K-of-N Cosmos multisig | K-of-N multisig of `eth_secp256k1` sub-keys (same K and same N) |
 
 The threshold and fan-out (K and N) are preserved across the migration. What changes is the sub-key algorithm on each side:
 

@@ -522,13 +522,14 @@ JSON
     read_proof_file '"$BATS_TEST_DIRNAME"'/fixtures/proof-template.json
   '
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.kind == "claim" and .multisig.threshold == 2'
+  echo "$output" | jq -e '.kind == "claim" and .legacy.threshold == 2 and .new.threshold == 2'
 }
 
 @test "read_proof_file exits 9 on missing required field" {
   setup_shim
   local tmp; tmp=$(mktemp)
-  echo '{"kind":"claim","multisig":{"threshold":2,"sub_pub_keys_b64":["x"],"sig_format":"a"}}' > "$tmp"
+  # Valid top-level version + legacy/new skeleton but missing chain_id/payload_hex etc.
+  echo '{"version":2,"kind":"claim","legacy":{"threshold":2,"sub_pub_keys":["x"],"sig_format":"a"},"new":{"threshold":2,"sub_pub_keys":["y"],"sig_format":"a"}}' > "$tmp"
   run bash -c '
     source '"$SCRIPTS_DIR"'/evmigration-common.sh
     read_proof_file '"$tmp"'
@@ -551,23 +552,26 @@ JSON
   [[ "$output" == *"payload_hex"* ]]
 }
 
-@test "read_proof_file exits 3 on single-key proof" {
+@test "read_proof_file exits 3 on single-key-on-either-side" {
   setup_shim
+  # v2 shape with the new side a single-key (pub_key set, no threshold) —
+  # mirror-source rule rejects single-single and mixed; wrapper is multisig-only.
   local tmp; tmp=$(mktemp)
-  echo '{"kind":"claim","legacy_address":"a","new_address":"b","chain_id":"c","evm_chain_id":"1","payload_hex":"00","single":{"sig_format":"x","signature_b64":"y"},"partial_signatures":[]}' > "$tmp"
+  jq '.new = {"pub_key": "Zm9v", "sig_format": "SIG_FORMAT_EIP191"}' \
+    "$BATS_TEST_DIRNAME/fixtures/proof-template.json" > "$tmp"
   run bash -c '
     source '"$SCRIPTS_DIR"'/evmigration-common.sh
     read_proof_file '"$tmp"'
   '
   rm -f "$tmp"
   [ "$status" -eq 3 ]
-  [[ "$output" == *"single-key"* ]]
+  [[ "$output" == *"multisig"*"multisig"* ]]
 }
 
 @test "read_proof_file exits 9 when partial index out of range" {
   setup_shim
   local tmp; tmp=$(mktemp)
-  jq '.partial_signatures = [{"index": 99, "signature_b64": "abc"}]' \
+  jq '.partial_legacy_signatures = [{"index": 99, "signature": "abc"}]' \
     "$BATS_TEST_DIRNAME/fixtures/proof-template.json" > "$tmp"
   run bash -c '
     source '"$SCRIPTS_DIR"'/evmigration-common.sh
@@ -585,7 +589,7 @@ JSON
     read_migration_tx_file '"$BATS_TEST_DIRNAME"'/fixtures/combined-tx.json
   '
   [ "$status" -eq 0 ]
-  echo "$output" | jq -e '.kind == "claim" and .threshold == 2 and .num_signers == 3'
+  echo "$output" | jq -e '.kind == "claim" and .threshold == 2 and .num_signers == 3 and .new_threshold == 2 and .new_num_signers == 3'
 }
 
 @test "read_migration_tx_file exits 3 on single-key proof tx" {
@@ -595,7 +599,7 @@ JSON
     read_migration_tx_file '"$BATS_TEST_DIRNAME"'/fixtures/combined-tx-single.json
   '
   [ "$status" -eq 3 ]
-  [[ "$output" == *"single-key"* ]]
+  [[ "$output" == *"multisig"*"multisig"* ]]
 }
 
 @test "summarize_partials reports threshold satisfied at 2-of-3" {

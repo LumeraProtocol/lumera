@@ -39,4 +39,9 @@ var (
 
 	ErrNewAddressAlreadyUsed = errors.Register(ModuleName, 1119, "new address was already used as a migration destination")
 	ErrInvalidMigrationProof = errors.Register(ModuleName, 1120, "invalid migration proof")
+
+	// Mirror-source rule: legacy and new proofs must share shape (both single
+	// or both multisig); when both multisig, threshold (K) and sub-key count
+	// (N) must match. A 2-of-3 legacy must migrate to a 2-of-3 destination.
+	ErrMirrorSourceMismatch = errors.Register(ModuleName, 1121, "legacy and new proofs violate the mirror-source rule")
 )

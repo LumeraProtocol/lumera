@@ -300,38 +300,62 @@ func migrateOneValidator(c validatorCandidate) (ok bool, skipped bool) {
 		log.Printf("  pre-migration balance: %d ulume", preBalance)
 	}
 
-	// Derive the destination key from the same mnemonic (coin-type 60) so the
-	// migrated address matches what wallets like MetaMask produce from the same seed.
-	tempRec := &AccountRecord{
-		Name:               c.KeyName,
-		Mnemonic:           readStatusRegistryMnemonic(c.KeyName),
-		IsLegacy:           true,
-		IsMultisig:         c.IsMultisig,
-		MultisigThreshold:  c.Threshold,
-		MultisigMemberKeys: append([]string(nil), c.MemberKeys...),
-	}
-	if !c.IsMultisig && tempRec.Mnemonic == "" {
-		log.Printf("  FAIL: cannot read validator mnemonic from account registry; cannot derive coin-type 60 destination")
-		return false, false
-	}
-	newRec, err := createDestinationAccountFromLegacy(tempRec)
-	if err != nil {
-		log.Printf("  FAIL: create destination key: %v", err)
-		return false, false
-	}
+	// Build the destination. Mirror-source rule: multisig legacy → multisig
+	// new (K-of-N eth_secp256k1 sub-keys); single validator → single eth key
+	// derived from the same mnemonic.
+	var newName, newAddress string
+	var newSubKeys []string
+	var multisigThreshold int
 	if c.IsMultisig {
-		err = runFourStepMigration("validator", c.LegacyAddress, newRec.Name, newRec.Address, c.MemberKeys)
+		threshold := c.Threshold
+		if threshold == 0 {
+			threshold = defaultMultisigThreshold
+		}
+		signers := len(c.MemberKeys)
+		if signers == 0 {
+			signers = defaultMultisigSigners
+		}
+		compositeAddr, subKeys, err := createDestinationMultisigFromLegacy(c.KeyName, threshold, signers)
 		if err != nil {
+			log.Printf("  FAIL: create new-side multisig for %s: %v", c.KeyName, err)
+			return false, false
+		}
+		newName = c.KeyName + "-new-msig"
+		newAddress = compositeAddr
+		newSubKeys = subKeys
+		multisigThreshold = threshold
+	} else {
+		tempRec := &AccountRecord{
+			Name:     c.KeyName,
+			Mnemonic: readStatusRegistryMnemonic(c.KeyName),
+			IsLegacy: true,
+		}
+		if tempRec.Mnemonic == "" {
+			log.Printf("  FAIL: cannot read validator mnemonic from account registry; cannot derive coin-type 60 destination")
+			return false, false
+		}
+		newRec, err := createDestinationAccountFromLegacy(tempRec)
+		if err != nil {
+			log.Printf("  FAIL: create destination key: %v", err)
+			return false, false
+		}
+		newName = newRec.Name
+		newAddress = newRec.Address
+	}
+
+	if c.IsMultisig {
+		if err := runFourStepMigrationMultisig(
+			"validator", c.LegacyAddress, c.MemberKeys,
+			newAddress, newSubKeys, multisigThreshold,
+		); err != nil {
 			log.Printf("  FAIL: multisig validator migration tx failed: %v", err)
 			return false, false
 		}
 	} else {
-		// Submit the migration transaction — both legacy and new keys are in the
-		// keyring, so the CLI handles proof signing internally.
-		_, err = runTx(
+		if _, err := runTx(
 			"tx", "evmigration", "migrate-validator",
-			c.KeyName, newRec.Name)
-		if err != nil {
+			c.KeyName, newName,
+		); err != nil {
 			log.Printf("  FAIL: migrate-validator tx failed: %v", err)
 			return false, false
 		}
@@ -343,8 +367,8 @@ func migrateOneValidator(c validatorCandidate) (ok bool, skipped bool) {
 		log.Printf("  FAIL: migration-record not found after tx")
 		return false, false
 	}
-	if recNewAddr != newRec.Address {
-		log.Printf("  FAIL: migration-record new_address mismatch, expected=%s got=%s", newRec.Address, recNewAddr)
+	if recNewAddr != newAddress {
+		log.Printf("  FAIL: migration-record new_address mismatch, expected=%s got=%s", newAddress, recNewAddr)
 		return false, false
 	}
 
@@ -367,7 +391,7 @@ func migrateOneValidator(c validatorCandidate) (ok bool, skipped bool) {
 	}
 
 	// Verify the validator exists under new valoper address.
-	newAcc, err := sdk.AccAddressFromBech32(newRec.Address)
+	newAcc, err := sdk.AccAddressFromBech32(newAddress)
 	if err != nil {
 		log.Printf("  FAIL: parse new address: %v", err)
 		return false, false
@@ -387,33 +411,33 @@ func migrateOneValidator(c validatorCandidate) (ok bool, skipped bool) {
 		log.Printf("  FAIL: validator delegator count mismatch pre=%d post=%d", preDelegators, postDelegators)
 		return false, false
 	}
-	if err := verifyValidatorActionMigration(c.LegacyAddress, newRec.Address, preCreatorActionIDs, preSupernodeActionIDs); err != nil {
+	if err := verifyValidatorActionMigration(c.LegacyAddress, newAddress, preCreatorActionIDs, preSupernodeActionIDs); err != nil {
 		log.Printf("  FAIL: validator action migration checks: %v", err)
 		return false, false
 	}
 
 	if preSupernode != nil {
-		if err := verifySupernodeMigration(c.LegacyValoper, newValoper, c.LegacyAddress, newRec.Address, preSupernode, preMetrics); err != nil {
+		if err := verifySupernodeMigration(c.LegacyValoper, newValoper, c.LegacyAddress, newAddress, preSupernode, preMetrics); err != nil {
 			log.Printf("  FAIL: supernode migration checks: %v", err)
 			return false, false
 		}
 	}
 
 	// Verify balance consistency across bank, EVM balance-bank, and EVM account queries.
-	if err := verifyPostMigrationBalances(newRec.Address, preBalance); err != nil {
+	if err := verifyPostMigrationBalances(newAddress, preBalance); err != nil {
 		log.Printf("  FAIL: post-migration balance checks: %v", err)
 		return false, false
 	}
 
 	// Update the validator account registry entry so downstream scripts
 	// resolve the migrated funding address from accounts.json.
-	updateStatusRegistryAddress(c.KeyName, newRec.Address)
+	updateStatusRegistryAddress(c.KeyName, newAddress)
 
 	// Update the validator AccountRecord in accounts.json if it exists.
-	updateValidatorAccountRecord(c.LegacyAddress, newRec.Address, newRec.Name, newValoper, preBalance)
+	updateValidatorAccountRecord(c.LegacyAddress, newAddress, newName, newValoper, preBalance)
 
 	log.Printf("  OK: validator migrated %s (%s) -> %s (%s) (new key=%s)",
-		c.LegacyAddress, c.LegacyValoper, newRec.Address, newValoper, newRec.Name)
+		c.LegacyAddress, c.LegacyValoper, newAddress, newValoper, newName)
 	return true, false
 }
 

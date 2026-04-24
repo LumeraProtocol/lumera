@@ -88,6 +88,23 @@ func ensureMultisigNewComposite(compositeName string, subKeyNames []string, thre
 	return ensureMultisigCompositeKey(compositeName, subKeyNames, threshold)
 }
 
+// createDestinationMultisigFromLegacy builds a per-account K-of-N eth_secp256k1
+// multisig destination keyed off legacyName, used by migrate-all / migrate-
+// validators to satisfy the mirror-source rule for multisig legacy accounts.
+// Sub-keys are named "<legacyName>-new-signer-{1..N}"; the composite is
+// "<legacyName>-new-msig". Rerun-safe.
+func createDestinationMultisigFromLegacy(legacyName string, threshold, signers int) (string, []string, error) {
+	subKeys, err := ensureMultisigNewSubKeys(legacyName, signers)
+	if err != nil {
+		return "", nil, fmt.Errorf("create new-side sub-keys for %s: %w", legacyName, err)
+	}
+	addr, err := ensureMultisigCompositeKey(legacyName+"-new-msig", subKeys, threshold)
+	if err != nil {
+		return "", nil, fmt.Errorf("create new-side composite for %s: %w", legacyName, err)
+	}
+	return addr, subKeys, nil
+}
+
 // ensureNewMultisigFixture creates 3 eth_secp256k1 sub-keys + a K-of-N composite
 // multisig key over them under the default fixture names. Returns the composite
 // key's bech32 address and the sub-key names. Rerun-safe.
@@ -577,126 +594,6 @@ func createOrReuseFreshEVMKey(keyName string) (AccountRecord, error) {
 	rec.Name = keyName
 	rec.IsLegacy = false
 	return rec, nil
-}
-
-// runFourStepMigration executes the four-step CLI migration flow:
-//
-//  1. generate-proof-payload -> proof.json
-//  2. sign-proof proof.json  --from multisig-signer-1
-//  3. sign-proof proof.json  --from multisig-signer-3  (any 2-of-3)
-//  4. combine-proof proof.json --out tx.json
-//  5. submit-proof tx.json   --from the new destination key
-func runFourStepMigration(kind, legacyAddr, newKeyName, newAddr string, members []string) error {
-	proofFile := tmpFile("multisig-proof-*.json")
-	defer os.Remove(proofFile)
-	txFile := tmpFile("multisig-tx-*.json")
-	defer os.Remove(txFile)
-	if len(members) < defaultMultisigThreshold {
-		return fmt.Errorf("multisig proof flow requires at least %d members, got %d", defaultMultisigThreshold, len(members))
-	}
-	if kind == "" {
-		kind = "claim"
-	}
-
-	// Step 5a: generate-proof-payload
-	// generate-proof-payload is registered via AddQueryFlagsToCmd, which does
-	// not include --keyring-backend. For an on-chain multisig account the
-	// command reads the pubkey from chain and doesn't touch the keyring, so
-	// the flag isn't needed.
-	log.Printf("  [migration step 1] generate-proof-payload (%s): %s -> %s", kind, legacyAddr, newAddr)
-	// --chain-id is required: the payload string includes it, and the keeper's
-	// verifySecp256k1Sig reconstructs the payload using ctx.ChainID(). Without
-	// it, pp.ChainID is empty and the signatures won't verify on-chain.
-	genArgs := buildLumeraArgs(
-		"tx", "evmigration", "generate-proof-payload",
-		"--legacy", legacyAddr,
-		"--new", newAddr,
-		"--kind", kind,
-		"--out", proofFile,
-		"--chain-id", *flagChainID,
-	)
-	cmd := exec.Command(*flagBin, genArgs...)
-	genOut, genErr := cmd.CombinedOutput()
-	if genErr != nil {
-		return fmt.Errorf("generate-proof-payload: %s\n%w", string(genOut), genErr)
-	}
-	log.Printf("  proof payload written to %s", proofFile)
-
-	// Step 5b: sign-proof with signer-1 (index 0).
-	log.Printf("  [migration step 2] sign-proof with %s", members[0])
-	if err := runSignProof(proofFile, members[0]); err != nil {
-		return fmt.Errorf("sign-proof (%s): %w", members[0], err)
-	}
-
-	// Step 5c: sign-proof with signer-3 (index 2) — gives us indices 0 and 2
-	// for a 2-of-3 threshold. Any two signers satisfy the threshold.
-	log.Printf("  [migration step 3] sign-proof with %s", members[2])
-	if err := runSignProof(proofFile, members[2]); err != nil {
-		return fmt.Errorf("sign-proof (%s): %w", members[2], err)
-	}
-
-	// Step 5d: combine-proof (merges both partial sigs into an unsigned tx JSON).
-	log.Printf("  [migration step 4] combine-proof -> %s", txFile)
-	combineArgs := buildLumeraArgs(
-		"tx", "evmigration", "combine-proof", proofFile,
-		"--out", txFile,
-		"--keyring-backend", "test",
-	)
-	cmd = exec.Command(*flagBin, combineArgs...)
-	combineOut, combineErr := cmd.CombinedOutput()
-	if combineErr != nil {
-		return fmt.Errorf("combine-proof: %s\n%w", string(combineOut), combineErr)
-	}
-	log.Printf("  unsigned tx written to %s", txFile)
-
-	// Step 5e: submit-proof — signs new_signature with the EVM key and broadcasts.
-	log.Printf("  [migration step 5] submit-proof with %s", newKeyName)
-	submitArgs := buildLumeraArgs(
-		"tx", "evmigration", "submit-proof", txFile,
-		"--from", newKeyName,
-		"--chain-id", *flagChainID,
-		"--keyring-backend", "test",
-		"--gas", "auto",
-		"--gas-adjustment", *flagGasAdj,
-		"--gas-prices", *flagGasPrices,
-		"--yes",
-		"--broadcast-mode", "sync",
-	)
-	cmd = exec.Command(*flagBin, submitArgs...)
-	submitOut, submitErr := cmd.CombinedOutput()
-	submitStr := strings.TrimSpace(string(submitOut))
-	if submitErr != nil {
-		return fmt.Errorf("submit-proof: %s\n%w", submitStr, submitErr)
-	}
-
-	txHash := extractTxHash(submitStr)
-	if txHash != "" {
-		code, rawLog, err := waitForTxResult(txHash, 45*time.Second)
-		if err != nil {
-			return fmt.Errorf("wait for submit-proof tx %s: %w", txHash, err)
-		}
-		if code != 0 {
-			return fmt.Errorf("submit-proof tx failed code=%d raw_log=%s", code, rawLog)
-		}
-	}
-
-	log.Printf("  submit-proof confirmed (hash: %s)", txHash)
-	return nil
-}
-
-// runSignProof appends one sub-signature to the PartialProof file at path.
-func runSignProof(proofPath, fromKey string) error {
-	signArgs := buildLumeraArgs(
-		"tx", "evmigration", "sign-proof", proofPath,
-		"--from", fromKey,
-		"--keyring-backend", "test",
-	)
-	cmd := exec.Command(*flagBin, signArgs...)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("sign-proof --from %s: %s\n%w", fromKey, string(out), err)
-	}
-	return nil
 }
 
 // runFourStepMigrationMultisig executes the four-step CLI migration flow for

@@ -263,6 +263,116 @@ func TestMsgMigrateValidator_ValidateBasic(t *testing.T) {
 	}
 }
 
+// validMultisigProof returns a MigrationProof carrying a well-formed K-of-N
+// MultisigProof on the requested side. All sub-keys are random secp256k1
+// pubkeys; signatures are zero-filled at the per-side expected length.
+func validMultisigProof(threshold, n int, side types.Side) types.MigrationProof {
+	subs := make([][]byte, n)
+	for i := range n {
+		subs[i] = secp256k1.GenPrivKey().PubKey().(*secp256k1.PubKey).Key
+	}
+	sigLen := 64
+	if side == types.SideNew {
+		sigLen = 65
+	}
+	indices := make([]uint32, threshold)
+	sigs := make([][]byte, threshold)
+	for i := range threshold {
+		indices[i] = uint32(i)
+		sigs[i] = make([]byte, sigLen)
+	}
+	return types.MigrationProof{
+		Proof: &types.MigrationProof_Multisig{Multisig: &types.MultisigProof{
+			Threshold:     uint32(threshold),
+			SubPubKeys:    subs,
+			SignerIndices: indices,
+			SubSignatures: sigs,
+			SigFormat:     types.SigFormat_SIG_FORMAT_CLI,
+		}},
+	}
+}
+
+// TestValidateProofPair_MirrorSourceRule exercises the 6-case matrix that
+// defines the consensus-level mirror-source invariant:
+//   - single↔single and multi↔multi with matching K/N must pass;
+//   - any shape mismatch (single↔multi, multi↔single) or K/N mismatch
+//     between two multisig sides must fail with ErrMirrorSourceMismatch.
+func TestValidateProofPair_MirrorSourceRule(t *testing.T) {
+	legacySingle := validSingleProof(secp256k1.GenPrivKey().PubKey().(*secp256k1.PubKey))
+	newSingle := validNewProof()
+	legacyMulti2of3 := validMultisigProof(2, 3, types.SideLegacy)
+	newMulti2of3 := validMultisigProof(2, 3, types.SideNew)
+	newMulti1of1 := validMultisigProof(1, 1, types.SideNew)
+	newMulti3of5 := validMultisigProof(3, 5, types.SideNew)
+
+	tests := []struct {
+		name    string
+		legacy  types.MigrationProof
+		newP    types.MigrationProof
+		wantErr error
+	}{
+		{name: "single/single ok", legacy: legacySingle, newP: newSingle},
+		{name: "multi2of3/multi2of3 ok", legacy: legacyMulti2of3, newP: newMulti2of3},
+		{name: "shape: legacy single, new multi", legacy: legacySingle, newP: newMulti2of3, wantErr: types.ErrMirrorSourceMismatch},
+		{name: "shape: legacy multi, new single", legacy: legacyMulti2of3, newP: newSingle, wantErr: types.ErrMirrorSourceMismatch},
+		{name: "K mismatch: 2of3 -> 3of5", legacy: legacyMulti2of3, newP: newMulti3of5, wantErr: types.ErrMirrorSourceMismatch},
+		{name: "N mismatch + K mismatch: 2of3 -> 1of1", legacy: legacyMulti2of3, newP: newMulti1of1, wantErr: types.ErrMirrorSourceMismatch},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			legacy := tc.legacy
+			newP := tc.newP
+			err := types.ValidateProofPair(&legacy, &newP)
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+// TestMsgClaimLegacyAccount_ValidateBasic_MirrorSource confirms the consensus
+// check fires through the full ValidateBasic path (not just the helper).
+func TestMsgClaimLegacyAccount_ValidateBasic_MirrorSource(t *testing.T) {
+	legacyKey := secp256k1.GenPrivKey()
+	legacyPub := legacyKey.PubKey().(*secp256k1.PubKey)
+	legacyAddr := sdk.AccAddress(legacyPub.Address()).String()
+	newAddr := validAddr()
+
+	// 2-of-3 legacy → 1-of-1 new: shape and K/N both diverge.
+	legMulti := validMultisigProof(2, 3, types.SideLegacy)
+	newMulti1of1 := validMultisigProof(1, 1, types.SideNew)
+	msg := types.MsgClaimLegacyAccount{
+		NewAddress:    newAddr,
+		LegacyAddress: legacyAddr,
+		LegacyProof:   legMulti,
+		NewProof:      newMulti1of1,
+	}
+	err := msg.ValidateBasic()
+	require.ErrorIs(t, err, types.ErrMirrorSourceMismatch)
+}
+
+// TestMsgMigrateValidator_ValidateBasic_MirrorSource mirrors the above for the
+// validator migration message.
+func TestMsgMigrateValidator_ValidateBasic_MirrorSource(t *testing.T) {
+	legacyKey := secp256k1.GenPrivKey()
+	legacyPub := legacyKey.PubKey().(*secp256k1.PubKey)
+	legacyAddr := sdk.AccAddress(legacyPub.Address()).String()
+	newAddr := validAddr()
+
+	legSingle := validSingleProof(legacyPub)
+	newMulti := validMultisigProof(2, 3, types.SideNew)
+	msg := types.MsgMigrateValidator{
+		NewAddress:    newAddr,
+		LegacyAddress: legacyAddr,
+		LegacyProof:   legSingle,
+		NewProof:      newMulti,
+	}
+	err := msg.ValidateBasic()
+	require.ErrorIs(t, err, types.ErrMirrorSourceMismatch)
+}
+
 func TestParams_MaxMultisigSubKeys(t *testing.T) {
 	p := types.DefaultParams()
 	require.Equal(t, uint32(20), p.MaxMultisigSubKeys)

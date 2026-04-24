@@ -34,6 +34,9 @@ setup() {
   [[ "$output" == *"Usage:"* ]]
 }
 
+# --- submit ---------------------------------------------------------------
+# submit-proof no longer takes --from — migration messages are zero-signer
+# (authorization is embedded in legacy_proof/new_proof; fees waived by ante).
 @test "submit dry-run exits 0 without broadcasting (claim)" {
   local state_dir; state_dir=$(mktemp -d)
   local state_file="$state_dir/state"
@@ -42,7 +45,6 @@ setup() {
     SHIM_ESTIMATE_FIXTURE=estimate-multisig \
     "$SCRIPTS_DIR/migrate-multisig.sh" submit "$FIX_DIR/combined-tx.json" \
       --binary "$SHIM" \
-      --from new-eth-key \
       --chain-id shim-test \
       --node tcp://local:1 \
       --yes --dry-run
@@ -61,7 +63,6 @@ setup() {
     SHIM_BANK_AFTER_FIXTURE=bank-balances-empty \
     "$SCRIPTS_DIR/migrate-multisig.sh" submit "$FIX_DIR/combined-tx.json" \
       --binary "$SHIM" \
-      --from new-eth-key \
       --chain-id shim-test \
       --node tcp://local:1 \
       --yes
@@ -70,33 +71,31 @@ setup() {
   rm -rf "$state_dir"
 }
 
-@test "submit rejects single-key proof tx JSON (exit 3)" {
+@test "submit rejects non-multisig tx JSON (exit 3)" {
   run "$SCRIPTS_DIR/migrate-multisig.sh" submit "$FIX_DIR/combined-tx-single.json" \
       --binary "$SHIM" \
-      --from new-eth-key \
       --chain-id shim-test \
       --node tcp://local:1 \
       --yes --dry-run
   [ "$status" -eq 3 ]
-  [[ "$output" == *"single-key"* ]]
+  [[ "$output" == *"multisig"*"multisig"* ]]
 }
 
-@test "submit rejects --from with wrong algorithm (exit 1)" {
+@test "submit rejects --from as unknown flag (exit 1)" {
   run "$SCRIPTS_DIR/migrate-multisig.sh" submit "$FIX_DIR/combined-tx.json" \
       --binary "$SHIM" \
-      --from wrong-algo \
+      --from some-key \
       --chain-id shim-test \
       --node tcp://local:1 \
       --yes --dry-run
   [ "$status" -eq 1 ]
-  [[ "$output" == *"eth_secp256k1"* ]]
+  [[ "$output" == *"unknown flag"* ]]
 }
 
 @test "submit aborts with exit 4 when estimate flips to would_succeed=false" {
   run env SHIM_ESTIMATE_FIXTURE=estimate-multisig-rejected \
     "$SCRIPTS_DIR/migrate-multisig.sh" submit "$FIX_DIR/combined-tx.json" \
       --binary "$SHIM" \
-      --from new-eth-key \
       --chain-id shim-test \
       --node tcp://local:1 \
       --yes --dry-run
@@ -110,7 +109,6 @@ setup() {
   run env SHIM_ESTIMATE_FIXTURE=estimate-multisig-validator \
     "$SCRIPTS_DIR/migrate-multisig.sh" submit "$tmp/tx.json" \
       --binary "$SHIM" \
-      --from new-eth-key \
       --chain-id shim-test \
       --node tcp://local:1 \
       --yes --dry-run </dev/null
@@ -126,7 +124,6 @@ setup() {
   run env SHIM_ESTIMATE_FIXTURE=estimate-multisig-validator \
     "$SCRIPTS_DIR/migrate-multisig.sh" submit "$tmp/tx.json" \
       --binary "$SHIM" \
-      --from new-eth-key \
       --chain-id shim-test \
       --node tcp://local:1 \
       --yes --dry-run --i-have-stopped-the-node
@@ -136,16 +133,14 @@ setup() {
 
 @test "submit exits 1 with no positional" {
   run "$SCRIPTS_DIR/migrate-multisig.sh" submit \
-    --binary "$SHIM" --from new-eth-key --chain-id shim --node tcp://local:1
-  [ "$status" -eq 1 ]
-}
-
-@test "submit exits 1 without --from" {
-  run "$SCRIPTS_DIR/migrate-multisig.sh" submit "$FIX_DIR/combined-tx.json" \
     --binary "$SHIM" --chain-id shim --node tcp://local:1
   [ "$status" -eq 1 ]
 }
 
+# --- generate -------------------------------------------------------------
+# generate now requires --new-sub-pub-keys + --new-threshold (multisig-only
+# wrapper). Keyring flags are now accepted (the CLI needs keyring access to
+# resolve key-names passed in --new-sub-pub-keys).
 @test "generate writes proof.json on happy path (multisig, claim)" {
   local tmp; tmp=$(mktemp -d)
   run env SHIM_AUTH_TYPE=multisig SHIM_ESTIMATE_FIXTURE=estimate-multisig \
@@ -153,6 +148,8 @@ setup() {
     --binary "$SHIM" \
     --legacy lumera1shimaddr1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
     --new    lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
+    --new-sub-pub-keys k1,k2,k3 \
+    --new-threshold 2 \
     --kind   claim \
     --chain-id shim-test \
     --node tcp://local:1 \
@@ -171,6 +168,8 @@ setup() {
     --binary "$SHIM" \
     --legacy lumera1shimaddr1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
     --new    lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
+    --new-sub-pub-keys k1,k2,k3 \
+    --new-threshold 2 \
     --kind   validator \
     --chain-id shim-test \
     --node tcp://local:1 \
@@ -183,7 +182,8 @@ setup() {
 @test "generate aborts when chain-id is missing (exit 1)" {
   run "$SCRIPTS_DIR/migrate-multisig.sh" generate \
     --binary "$SHIM" \
-    --legacy lumera1x --new lumera1y --kind claim \
+    --legacy lumera1x --new lumera1y \
+    --new-sub-pub-keys k1,k2,k3 --new-threshold 2 --kind claim \
     --node tcp://local:1 --out /tmp/unused.json
   [ "$status" -eq 1 ]
   [[ "$output" == *"chain-id"* ]]
@@ -197,34 +197,24 @@ setup() {
   [[ "$output" == *"required"* ]]
 }
 
-@test "generate rejects --keyring-backend (exit 1, pure query)" {
+@test "generate aborts when --new-sub-pub-keys is missing (exit 1)" {
   run "$SCRIPTS_DIR/migrate-multisig.sh" generate \
     --binary "$SHIM" \
-    --legacy lumera1x --new lumera1y --kind claim \
-    --chain-id shim --node tcp://local:1 --out /tmp/unused.json \
-    --keyring-backend test
+    --legacy lumera1x --new lumera1y \
+    --new-threshold 2 --kind claim \
+    --chain-id shim --node tcp://local:1 --out /tmp/unused.json
   [ "$status" -eq 1 ]
-  [[ "$output" == *"keyring"* ]]
+  [[ "$output" == *"new-sub-pub-keys"* ]]
 }
 
-@test "generate rejects --keyring-dir (exit 1)" {
+@test "generate aborts when --new-threshold is missing (exit 1)" {
   run "$SCRIPTS_DIR/migrate-multisig.sh" generate \
     --binary "$SHIM" \
-    --legacy lumera1x --new lumera1y --kind claim \
-    --chain-id shim --node tcp://local:1 --out /tmp/unused.json \
-    --keyring-dir /tmp/kr
+    --legacy lumera1x --new lumera1y \
+    --new-sub-pub-keys k1,k2,k3 --kind claim \
+    --chain-id shim --node tcp://local:1 --out /tmp/unused.json
   [ "$status" -eq 1 ]
-  [[ "$output" == *"keyring"* ]]
-}
-
-@test "generate rejects --home (exit 1)" {
-  run "$SCRIPTS_DIR/migrate-multisig.sh" generate \
-    --binary "$SHIM" \
-    --legacy lumera1x --new lumera1y --kind claim \
-    --chain-id shim --node tcp://local:1 --out /tmp/unused.json \
-    --home /tmp/home
-  [ "$status" -eq 1 ]
-  [[ "$output" == *"keyring"* ]]
+  [[ "$output" == *"new-threshold"* ]]
 }
 
 @test "generate exits 8 when multisig pubkey is nil on-chain" {
@@ -233,6 +223,7 @@ setup() {
     --binary "$SHIM" \
     --legacy lumera1nilpubkey1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
     --new lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
+    --new-sub-pub-keys k1,k2,k3 --new-threshold 2 \
     --kind claim --chain-id shim-test --node tcp://local:1 \
     --out /tmp/unused.json
   [ "$status" -eq 8 ]
@@ -243,7 +234,8 @@ setup() {
   run env SHIM_AUTH_TYPE=single \
     "$SCRIPTS_DIR/migrate-multisig.sh" generate \
     --binary "$SHIM" \
-    --legacy lumera1x --new lumera1y --kind claim \
+    --legacy lumera1x --new lumera1y \
+    --new-sub-pub-keys k1,k2,k3 --new-threshold 2 --kind claim \
     --chain-id shim-test --node tcp://local:1 \
     --out /tmp/unused.json
   [ "$status" -eq 3 ]
@@ -256,6 +248,7 @@ setup() {
     --binary "$SHIM" \
     --legacy lumera1shimaddr1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
     --new lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
+    --new-sub-pub-keys k1,k2,k3 --new-threshold 2 \
     --kind validator \
     --chain-id shim-test --node tcp://local:1 \
     --out /tmp/unused.json
@@ -269,6 +262,7 @@ setup() {
     --binary "$SHIM" \
     --legacy lumera1shimaddr1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
     --new lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
+    --new-sub-pub-keys k1,k2,k3 --new-threshold 2 \
     --kind claim --chain-id shim-test --node tcp://local:1 \
     --out /tmp/unused.json
   [ "$status" -eq 4 ]
@@ -281,12 +275,16 @@ setup() {
     --binary "$SHIM" \
     --legacy lumera1shimaddr1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
     --new lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
+    --new-sub-pub-keys k1,k2,k3 --new-threshold 2 \
     --kind claim --chain-id shim-test --node tcp://local:1 \
     --out /tmp/unused.json
   [ "$status" -eq 5 ]
 }
 
-@test "sign happy path writes a partial (alice-sub in set)" {
+# --- sign -----------------------------------------------------------------
+# sign now accepts either --from (legacy sub-key) or --new-key (eth sub-key)
+# or both. At least one is required.
+@test "sign happy path writes a partial (alice-sub in legacy set)" {
   local tmp; tmp=$(mktemp -d)
   cp "$FIX_DIR/proof-template.json" "$tmp/proof.json"
   run "$SCRIPTS_DIR/migrate-multisig.sh" sign "$tmp/proof.json" \
@@ -312,35 +310,33 @@ setup() {
   rm -rf "$tmp"
 }
 
-@test "sign rejects single-key proof with exit 3" {
+@test "sign rejects v1-shape proof file (unsupported version)" {
   local tmp; tmp=$(mktemp -d)
-  # Construct a minimal single-proof file
-  cat > "$tmp/single.json" <<'EOF'
+  # v1-style proof: no version, top-level multisig, flat partial_signatures.
+  # read_proof_file gates on version=2.
+  cat > "$tmp/v1.json" <<'EOF'
 {
   "kind": "claim",
   "legacy_address": "lumera1",
   "new_address": "lumera2",
   "chain_id": "shim",
   "evm_chain_id": "76857769",
-  "payload_hex": "0000000000000000000000000000000000000000000000000000000000000000",
-  "single": {
-    "sig_format": "SIG_FORMAT_CLI",
-    "signature_b64": "c2luZ2xl"
-  },
+  "payload_hex": "0000",
+  "multisig": {"threshold": 2, "sub_pub_keys_b64": ["x"], "sig_format": "SIG_FORMAT_CLI"},
   "partial_signatures": []
 }
 EOF
-  run "$SCRIPTS_DIR/migrate-multisig.sh" sign "$tmp/single.json" \
+  run "$SCRIPTS_DIR/migrate-multisig.sh" sign "$tmp/v1.json" \
       --binary "$SHIM" \
       --from alice-sub \
       --chain-id shim-test \
       --out "$tmp/out.json"
-  [ "$status" -eq 3 ]
-  [[ "$output" == *"single-key"* ]] || [[ "$output" == *"single"* ]]
+  [ "$status" -eq 9 ]
+  [[ "$output" == *"unsupported version"* ]]
   rm -rf "$tmp"
 }
 
-@test "sign rejects --from not in sub-key set (exit 1)" {
+@test "sign rejects --from not in legacy sub-key set (exit 1)" {
   local tmp; tmp=$(mktemp -d)
   cp "$FIX_DIR/proof-template.json" "$tmp/proof.json"
   run "$SCRIPTS_DIR/migrate-multisig.sh" sign "$tmp/proof.json" \
@@ -349,7 +345,7 @@ EOF
       --chain-id shim-test \
       --out "$tmp/out.json"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"sub-key"* ]]
+  [[ "$output" == *"legacy.sub_pub_keys"* ]]
   rm -rf "$tmp"
 }
 
@@ -366,10 +362,11 @@ EOF
   rm -rf "$tmp"
 }
 
-@test "sign exits 1 with no --from" {
+@test "sign exits 1 when neither --from nor --new-key is set" {
   run "$SCRIPTS_DIR/migrate-multisig.sh" sign "$FIX_DIR/proof-template.json" \
     --binary "$SHIM" --chain-id shim --out /tmp/unused.json
   [ "$status" -eq 1 ]
+  [[ "$output" == *"--from"* ]] || [[ "$output" == *"--new-key"* ]]
 }
 
 @test "sign exits 1 with no positional argument" {
@@ -385,6 +382,7 @@ EOF
   [ "$status" -eq 1 ]
 }
 
+# --- combine --------------------------------------------------------------
 @test "combine happy path assembles tx.json with 2 of 3 partials" {
   local tmp; tmp=$(mktemp -d)
   run "$SCRIPTS_DIR/migrate-multisig.sh" combine \
@@ -393,7 +391,8 @@ EOF
     --out "$tmp/tx.json"
   [ "$status" -eq 0 ]
   [ -f "$tmp/tx.json" ]
-  [[ "$output" == *"Entry threshold satisfied: yes"* ]]
+  [[ "$output" == *"Legacy threshold satisfied: yes"* ]]
+  [[ "$output" == *"New threshold satisfied: yes"* ]]
   rm -rf "$tmp"
 }
 
@@ -404,7 +403,7 @@ EOF
     --binary "$SHIM" \
     --out "$tmp/tx.json"
   [ "$status" -eq 4 ]
-  [[ "$output" == *"Entry threshold satisfied: no"* ]]
+  [[ "$output" == *"threshold satisfied: no"* ]]
   [ ! -f "$tmp/tx.json" ]
   rm -rf "$tmp"
 }
@@ -427,7 +426,7 @@ EOF
 
 @test "combine exits 4 when lumerad reports below-threshold valid sigs" {
   local tmp; tmp=$(mktemp -d)
-  run env SHIM_COMBINE_EXIT=1 SHIM_STDERR="Error: need 2 valid partial signatures, have 1" \
+  run env SHIM_COMBINE_EXIT=1 SHIM_STDERR="Error: need 2 valid partial signatures on legacy side, have 1" \
     "$SCRIPTS_DIR/migrate-multisig.sh" combine \
       "$FIX_DIR/partial-alice.json" "$FIX_DIR/partial-bob.json" \
       --binary "$SHIM" \

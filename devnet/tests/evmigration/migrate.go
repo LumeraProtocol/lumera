@@ -347,30 +347,56 @@ func migrateOne(rec *AccountRecord) migrateResult {
 	// Query migration estimate before migrating.
 	verifyMigrationEstimate(rec, false)
 
-	// Create destination key from the same mnemonic (coin-type 60 + eth_secp256k1).
-	newRec, err := createDestinationAccountFromLegacy(rec)
-	if err != nil {
-		log.Printf("  WARN: create destination key for %s: %v", rec.Name, err)
-		return migrateFailed
-	}
-	rec.NewName = newRec.Name
-	rec.NewAddress = newRec.Address
-
-	// Submit the migration transaction — both legacy and new keys are in the
-	// keyring, so the CLI handles proof signing internally for single-key
-	// accounts. Multisig accounts go through the explicit four-step proof flow.
+	// Build the destination account. Mirror-source rule: multisig legacy →
+	// multisig new (K-of-N eth_secp256k1 sub-keys); single legacy → single
+	// eth key derived from the same mnemonic.
+	var newName, newAddress string
+	var newSubKeys []string
+	var multisigThreshold int
 	if rec.IsMultisig {
-		err = runFourStepMigration("claim", rec.Address, newRec.Name, newRec.Address, rec.MultisigMemberKeys)
+		threshold := rec.MultisigThreshold
+		if threshold == 0 {
+			threshold = defaultMultisigThreshold
+		}
+		signers := len(rec.MultisigMemberKeys)
+		if signers == 0 {
+			signers = defaultMultisigSigners
+		}
+		compositeAddr, subKeys, err := createDestinationMultisigFromLegacy(rec.Name, threshold, signers)
 		if err != nil {
-			log.Printf("  FAIL: multisig claim flow %s -> %s: %v", rec.Name, newRec.Address, err)
+			log.Printf("  WARN: create new-side multisig for %s: %v", rec.Name, err)
+			return migrateFailed
+		}
+		newName = rec.Name + "-new-msig"
+		newAddress = compositeAddr
+		newSubKeys = subKeys
+		multisigThreshold = threshold
+	} else {
+		newRec, err := createDestinationAccountFromLegacy(rec)
+		if err != nil {
+			log.Printf("  WARN: create destination key for %s: %v", rec.Name, err)
+			return migrateFailed
+		}
+		newName = newRec.Name
+		newAddress = newRec.Address
+	}
+	rec.NewName = newName
+	rec.NewAddress = newAddress
+
+	if rec.IsMultisig {
+		if err := runFourStepMigrationMultisig(
+			"claim", rec.Address, rec.MultisigMemberKeys,
+			newAddress, newSubKeys, multisigThreshold,
+		); err != nil {
+			log.Printf("  FAIL: multisig claim flow %s -> %s: %v", rec.Name, newAddress, err)
 			return migrateFailed
 		}
 	} else {
-		_, err = runTx(
+		if _, err := runTx(
 			"tx", "evmigration", "claim-legacy-account",
-			rec.Name, newRec.Name)
-		if err != nil {
-			log.Printf("  FAIL: claim-legacy-account %s -> %s: %v", rec.Name, newRec.Address, err)
+			rec.Name, newName,
+		); err != nil {
+			log.Printf("  FAIL: claim-legacy-account %s -> %s: %v", rec.Name, newAddress, err)
 			return migrateFailed
 		}
 	}
@@ -381,8 +407,8 @@ func migrateOne(rec *AccountRecord) migrateResult {
 		log.Printf("  FAIL: migration-record missing after tx for %s", rec.Name)
 		return migrateFailed
 	}
-	if recNewAddr != newRec.Address {
-		log.Printf("  FAIL: migration-record mismatch for %s: expected=%s got=%s", rec.Name, newRec.Address, recNewAddr)
+	if recNewAddr != newAddress {
+		log.Printf("  FAIL: migration-record mismatch for %s: expected=%s got=%s", rec.Name, newAddress, recNewAddr)
 		return migrateFailed
 	}
 
@@ -392,41 +418,15 @@ func migrateOne(rec *AccountRecord) migrateResult {
 		return migrateFailed
 	}
 
-	log.Printf("  OK: %s (%s) -> %s (%s)", rec.Name, rec.Address, newRec.Name, newRec.Address)
+	log.Printf("  OK: %s (%s) -> %s (%s)", rec.Name, rec.Address, newName, newAddress)
 	return migrateNew
 }
 
 // createDestinationAccountFromLegacy derives a coin-type 60 destination key
 // from the legacy account's mnemonic and imports it into the keyring.
+// Single-sig only; multisig legacy accounts use createDestinationMultisigFromLegacy
+// to satisfy the mirror-source rule.
 func createDestinationAccountFromLegacy(rec *AccountRecord) (AccountRecord, error) {
-	if rec.IsMultisig {
-		if rec.NewName != "" {
-			if addr, err := getAddress(rec.NewName); err == nil {
-				return AccountRecord{Name: rec.NewName, Address: addr, IsLegacy: false}, nil
-			}
-		}
-		baseName := migratedAccountBaseName(rec.Name, rec.IsLegacy)
-		for i := 0; i < 50; i++ {
-			name := baseName
-			if i > 0 {
-				name = fmt.Sprintf("%s-%02d", baseName, i)
-			}
-			if addr, err := getAddress(name); err == nil {
-				return AccountRecord{Name: name, Address: addr, IsLegacy: false}, nil
-			}
-			newRec, err := createOrReuseFreshEVMKey(name)
-			if err != nil {
-				low := strings.ToLower(err.Error())
-				if strings.Contains(low, "already exists") || strings.Contains(low, "key exists") {
-					continue
-				}
-				return AccountRecord{}, err
-			}
-			return newRec, nil
-		}
-		return AccountRecord{}, fmt.Errorf("unable to create unique multisig destination key for %s", rec.Name)
-	}
-
 	if strings.TrimSpace(rec.Mnemonic) == "" {
 		return AccountRecord{}, fmt.Errorf("legacy account %s has no mnemonic; cannot derive coin-type 60 destination from the same mnemonic", rec.Name)
 	}

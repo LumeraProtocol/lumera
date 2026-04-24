@@ -36,7 +36,7 @@ func (msg *MsgClaimLegacyAccount) ValidateBasic() error {
 	if err := msg.NewProof.ValidateBasic(SideNew); err != nil {
 		return err
 	}
-	return nil
+	return ValidateProofPair(&msg.LegacyProof, &msg.NewProof)
 }
 
 // MigrationNewAddress returns the destination address used by the custom CLI flow.
@@ -61,7 +61,7 @@ func (msg *MsgMigrateValidator) ValidateBasic() error {
 	if err := msg.NewProof.ValidateBasic(SideNew); err != nil {
 		return err
 	}
-	return nil
+	return ValidateProofPair(&msg.LegacyProof, &msg.NewProof)
 }
 
 // MigrationNewAddress returns the destination address used by the custom CLI flow.

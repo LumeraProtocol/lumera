@@ -80,18 +80,6 @@ func TestAssertPartialProofsConsistent_PayloadHexMismatch(t *testing.T) {
 	require.ErrorContains(t, err, "payload_hex differs")
 }
 
-// TestLoadPartialProof_V1File_VersionMismatchError verifies that a v1-shape JSON
-// file gives "unsupported version 1 (expected 2)", NOT "unknown field".
-func TestLoadPartialProof_V1File_VersionMismatchError(t *testing.T) {
-	raw := []byte(`{"version": 1, "single": {"pub_key_b64": "AAAA"}, "partial_sigs": []}`)
-	tmp := filepath.Join(t.TempDir(), "v1.json")
-	require.NoError(t, os.WriteFile(tmp, raw, 0o600))
-	_, err := cli.LoadPartialProof(tmp)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "unsupported partial_proof version 1 (expected 2)")
-	require.NotContains(t, err.Error(), "unknown field")
-}
-
 // TestLoadPartialProof_V2FileWithFutureField_UnknownFieldError verifies that a v2
 // file with an unrecognized field gets an "unknown field" error, not a version error.
 func TestLoadPartialProof_V2FileWithFutureField_UnknownFieldError(t *testing.T) {

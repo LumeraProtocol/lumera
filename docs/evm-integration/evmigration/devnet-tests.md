@@ -103,8 +103,8 @@ Migrates all legacy accounts using `MsgClaimLegacyAccount`. Per-account flow:
 2. Query`migration-estimate` — verify`WouldSucceed=true`.
 3. Derive the new EVM-compatible address from the same mnemonic using coin-type 60.
 4. Create a new keyring entry for the destination address.
-5. Sign the migration payload:`sign("claim", legacy_privkey, legacy_addr, new_addr)` → base64 signature.
-6. Submit`MsgClaimLegacyAccount(new_address, legacy_address, legacy_pubkey_b64, signature_b64)`, signed by the new address key (zero-fee via the EVMigrationFeeDecorator).
+5. Sign the migration payload on both sides: legacy Cosmos sub-key signs `SHA256(payload)`; new eth sub-key signs `Keccak256(payload)`.
+6. Submit `MsgClaimLegacyAccount(new_address, legacy_address, legacy_proof, new_proof)` — each proof is a `MigrationProof` oneof (single-key here, multisig when the legacy account is multisig). Migration messages declare zero signers; fees are waived by the EVMigrationFeeDecorator.
 7. Verify on-chain`migration-record` exists with the correct new address.
 
 Execution strategy:

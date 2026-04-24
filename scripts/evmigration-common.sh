@@ -527,20 +527,6 @@ require_multisig_binary() {
   done
 }
 
-# lumerad_tx_query_style <args...>
-# Invokes lumerad tx <args> without keyring flags. Used for generate-proof-payload
-# which is implemented under tx but is query-style and doesn't accept --keyring-backend.
-lumerad_tx_query_style() {
-  if [[ -z "${CHAIN_ID:-}" ]]; then
-    log_error "--chain-id is required"
-    exit 1
-  fi
-  "$BIN" tx "$@" \
-    --node "$NODE" \
-    --chain-id "$CHAIN_ID" \
-    --output json
-}
-
 # auth_account_json <addr>
 # Thin wrapper around lumerad_q auth account, fails closed with exit 2 on RPC failure.
 auth_account_json() {
@@ -647,9 +633,13 @@ _payload_hex() {
 }
 
 # read_proof_file <path>
-# Reads a proof or partial JSON file, validates structure and integrity.
+# Reads a v2 PartialProof JSON file, validates structure and integrity.
+# v2 shape: sibling .legacy and .new SideSpecs, each single-key (pub_key) XOR
+# multisig (threshold + sub_pub_keys); partials split into per-side slices
+# .partial_legacy_signatures and .partial_new_signatures.
 # Emits validated JSON on stdout; compact summary on stderr.
-# Exit 9 on structural/integrity violations; exit 3 on single-proof detection.
+# Exit 9 on structural/integrity violations; exit 3 on single-key-on-either-side
+# (this wrapper is multisig→multisig only).
 read_proof_file() {
   local path="$1"
   if [[ ! -f "$path" ]]; then
@@ -662,22 +652,21 @@ read_proof_file() {
     exit 9
   fi
 
-  # Reject single-proof files (wrapper is multisig-only).
-  if [[ "$(jq -r 'has("single") // false' <<<"$json")" == "true" ]]; then
-    log_error "proof file $path is a single-key proof; use migrate-account.sh / migrate-validator.sh"
-    exit 3
-  fi
-  if [[ "$(jq -r 'has("multisig") // false' <<<"$json")" != "true" ]]; then
-    log_error "proof file $path has no multisig field; this wrapper is multisig-only"
-    exit 3
+  # Version gate — only v2 is supported.
+  local version
+  version=$(jq -r '.version // empty' <<<"$json")
+  if [[ "$version" != "2" ]]; then
+    log_error "proof file $path has unsupported version '$version' (expected 2)"
+    exit 9
   fi
 
-  # Required fields
+  # Required top-level fields
   local required=(
     ".kind" ".legacy_address" ".new_address"
     ".chain_id" ".evm_chain_id" ".payload_hex"
-    ".multisig.threshold" ".multisig.sub_pub_keys_b64"
-    ".multisig.sig_format" ".partial_signatures"
+    ".legacy" ".new"
+    ".legacy.sig_format" ".new.sig_format"
+    ".partial_legacy_signatures" ".partial_new_signatures"
   )
   local field
   for field in "${required[@]}"; do
@@ -687,30 +676,41 @@ read_proof_file() {
     fi
   done
 
-  # Threshold bounds
-  local threshold sub_count
-  threshold=$(jq -r '.multisig.threshold' <<<"$json")
-  sub_count=$(jq -r '.multisig.sub_pub_keys_b64 | length' <<<"$json")
-  if (( threshold < 1 || threshold > sub_count )); then
-    log_error "invalid multisig structure in $path: threshold=$threshold sub_keys=$sub_count"
-    exit 9
+  # Reject single-key on either side — wrapper is multisig→multisig only.
+  # In v2, multisig sides set both threshold and sub_pub_keys; single-key sides
+  # set pub_key instead (and omit threshold/sub_pub_keys via omitempty).
+  local legacy_is_multi new_is_multi
+  legacy_is_multi=$(jq -r '(.legacy | has("threshold") and has("sub_pub_keys"))' <<<"$json")
+  new_is_multi=$(jq -r '(.new | has("threshold") and has("sub_pub_keys"))' <<<"$json")
+  if [[ "$legacy_is_multi" != "true" || "$new_is_multi" != "true" ]]; then
+    log_error "proof file $path is not a multisig→multisig proof; use migrate-account.sh or migrate-validator.sh for single-key migrations"
+    exit 3
   fi
 
-  # Partial signature indices in range; signatures non-empty
-  local idx sig
-  local -a indices=()
-  while IFS=$'\t' read -r idx sig; do
-    [[ -z "$idx" ]] && continue
-    if ! [[ "$idx" =~ ^[0-9]+$ ]] || (( idx < 0 || idx >= sub_count )); then
-      log_error "partial_signatures index $idx out of range [0,$sub_count) in $path"
+  # Per-side threshold bounds and per-side partial index/signature checks.
+  local s
+  for s in legacy new; do
+    local t n
+    t=$(jq -r ".$s.threshold" <<<"$json")
+    n=$(jq -r ".$s.sub_pub_keys | length" <<<"$json")
+    if ! [[ "$t" =~ ^[0-9]+$ ]] || (( t < 1 || t > n )); then
+      log_error "invalid multisig structure in $path on $s side: threshold=$t sub_keys=$n"
       exit 9
     fi
-    if [[ -z "$sig" || "$sig" == "null" ]]; then
-      log_error "partial_signatures entry with index $idx has empty signature in $path"
-      exit 9
-    fi
-    indices+=("$idx")
-  done < <(jq -r '.partial_signatures[]? | [.index, .signature_b64] | @tsv' <<<"$json")
+
+    local idx sig
+    while IFS=$'\t' read -r idx sig; do
+      [[ -z "$idx" ]] && continue
+      if ! [[ "$idx" =~ ^[0-9]+$ ]] || (( idx < 0 || idx >= n )); then
+        log_error "partial_${s}_signatures index $idx out of range [0,$n) in $path"
+        exit 9
+      fi
+      if [[ -z "$sig" || "$sig" == "null" ]]; then
+        log_error "partial_${s}_signatures entry with index $idx has empty signature in $path"
+        exit 9
+      fi
+    done < <(jq -r ".partial_${s}_signatures[]? | [.index, .signature] | @tsv" <<<"$json")
+  done
 
   # Canonical payload_hex reconstruction
   local chain_id_f evm_chain_id kind_f legacy_f new_f payload calc got
@@ -731,10 +731,14 @@ read_proof_file() {
 }
 
 # read_migration_tx_file <path>
-# Reads unsigned tx JSON produced by combine. Verifies exactly one supported
-# evmigration message with legacy_proof.multisig set.
-# Rejects single-key proof txs with exit 3.
-# Emits compact JSON {legacy_address, new_address, kind, threshold, num_signers} on stdout.
+# Reads unsigned tx JSON produced by combine-proof. Verifies exactly one
+# supported evmigration message with both legacy_proof.multisig and
+# new_proof.multisig set (wrapper is multisig→multisig only).
+# Rejects single-key proof txs on either side with exit 3.
+# Emits compact JSON on stdout:
+#   {legacy_address, new_address, kind,
+#    threshold, num_signers,                    # legacy side
+#    new_threshold, new_num_signers}            # new side
 read_migration_tx_file() {
   local path="$1"
   if [[ ! -f "$path" ]]; then
@@ -764,28 +768,30 @@ read_migration_tx_file() {
     *) log_error "unrecognized message type in $path: $msg_type"; exit 9 ;;
   esac
 
-  # Must be a multisig proof, not a single-key proof.
-  if [[ "$(jq -r '.body.messages[0].legacy_proof | has("single")' <<<"$json")" == "true" ]]; then
-    log_error "tx file $path uses a single-key proof; use migrate-account.sh / migrate-validator.sh"
+  # Both proofs must be multisig for this wrapper.
+  local legacy_is_multi new_is_multi
+  legacy_is_multi=$(jq -r '.body.messages[0].legacy_proof | has("multisig")' <<<"$json")
+  new_is_multi=$(jq -r '.body.messages[0].new_proof | has("multisig")' <<<"$json")
+  if [[ "$legacy_is_multi" != "true" || "$new_is_multi" != "true" ]]; then
+    log_error "tx file $path is not a multisig→multisig migration; use migrate-account.sh / migrate-validator.sh for single-key migrations"
     exit 3
   fi
-  if [[ "$(jq -r '.body.messages[0].legacy_proof | has("multisig")' <<<"$json")" != "true" ]]; then
-    log_error "tx file $path has no legacy_proof.multisig"
-    exit 9
-  fi
 
-  local threshold num_signers
+  # Field name is sub_pub_keys (no _b64 suffix) — it is the proto-JSON
+  # rendering of MultisigProof.sub_pub_keys (repeated bytes; each entry is
+  # base64 in JSON).
+  local threshold num_signers new_threshold new_num_signers
   threshold=$(jq -r '.body.messages[0].legacy_proof.multisig.threshold' <<<"$json")
-  num_signers=$(jq -r '
-    .body.messages[0].legacy_proof.multisig
-    | if has("sub_pub_keys_b64") then .sub_pub_keys_b64 | length
-      elif has("sub_pub_keys") then .sub_pub_keys | length
-      else null end
-  ' <<<"$json")
-  if [[ -z "$threshold" || "$threshold" == "null" || -z "$num_signers" || "$num_signers" == "null" ]]; then
-    log_error "tx file $path has incomplete legacy_proof.multisig fields"
-    exit 9
-  fi
+  num_signers=$(jq -r '.body.messages[0].legacy_proof.multisig.sub_pub_keys | length' <<<"$json")
+  new_threshold=$(jq -r '.body.messages[0].new_proof.multisig.threshold' <<<"$json")
+  new_num_signers=$(jq -r '.body.messages[0].new_proof.multisig.sub_pub_keys | length' <<<"$json")
+  local v
+  for v in threshold num_signers new_threshold new_num_signers; do
+    if [[ -z "${!v}" || "${!v}" == "null" ]]; then
+      log_error "tx file $path has incomplete multisig proof fields ($v missing)"
+      exit 9
+    fi
+  done
 
   jq -nc \
     --arg legacy "$legacy" \
@@ -793,13 +799,19 @@ read_migration_tx_file() {
     --arg kind "$kind" \
     --argjson threshold "$threshold" \
     --argjson num_signers "$num_signers" \
-    '{legacy_address:$legacy, new_address:$new, kind:$kind, threshold:$threshold, num_signers:$num_signers}'
+    --argjson new_threshold "$new_threshold" \
+    --argjson new_num_signers "$new_num_signers" \
+    '{legacy_address:$legacy, new_address:$new, kind:$kind,
+      threshold:$threshold, num_signers:$num_signers,
+      new_threshold:$new_threshold, new_num_signers:$new_num_signers}'
 }
 
 # summarize_partials <files...>
-# Reads each partial via read_proof_file, enforces cross-file consistency.
-# Prints K-of-N entry-presence matrix to stderr.
-# Returns 0 iff distinct-signer count >= threshold, 1 otherwise.
+# Reads each partial via read_proof_file, enforces cross-file consistency on
+# BOTH sides (legacy + new), and prints per-side K-of-N entry-presence matrices
+# to stderr. Returns 0 iff distinct-signer counts >= threshold on BOTH sides,
+# non-zero otherwise. The shape-mirror rule implies legacy K==new K and legacy
+# N==new N, but we check per side regardless to surface the actual gap.
 summarize_partials() {
   local files=("$@")
   if (( ${#files[@]} == 0 )); then
@@ -807,26 +819,38 @@ summarize_partials() {
     exit 1
   fi
 
-  local first_json first_chain first_evm first_legacy first_new first_payload first_kind
-  local first_threshold first_subkeys first_sigfmt first_subcount
+  local first_json
   first_json=$(read_proof_file "${files[0]}")
+  local first_chain first_evm first_legacy first_new first_payload first_kind
   first_chain=$(jq -r '.chain_id' <<<"$first_json")
   first_evm=$(jq -r '.evm_chain_id' <<<"$first_json")
   first_legacy=$(jq -r '.legacy_address' <<<"$first_json")
   first_new=$(jq -r '.new_address' <<<"$first_json")
   first_payload=$(jq -r '.payload_hex' <<<"$first_json")
   first_kind=$(jq -r '.kind' <<<"$first_json")
-  first_threshold=$(jq -r '.multisig.threshold' <<<"$first_json")
-  first_subkeys=$(jq -c '.multisig.sub_pub_keys_b64' <<<"$first_json")
-  first_sigfmt=$(jq -r '.multisig.sig_format' <<<"$first_json")
-  first_subcount=$(jq -r '.multisig.sub_pub_keys_b64 | length' <<<"$first_json")
 
-  local -A index_to_file=()
+  local first_leg_threshold first_leg_subkeys first_leg_sigfmt first_leg_subcount
+  local first_new_threshold first_new_subkeys first_new_sigfmt first_new_subcount
+  first_leg_threshold=$(jq -r '.legacy.threshold' <<<"$first_json")
+  first_leg_subkeys=$(jq -c '.legacy.sub_pub_keys' <<<"$first_json")
+  first_leg_sigfmt=$(jq -r '.legacy.sig_format' <<<"$first_json")
+  first_leg_subcount=$(jq -r '.legacy.sub_pub_keys | length' <<<"$first_json")
+  first_new_threshold=$(jq -r '.new.threshold' <<<"$first_json")
+  first_new_subkeys=$(jq -c '.new.sub_pub_keys' <<<"$first_json")
+  first_new_sigfmt=$(jq -r '.new.sig_format' <<<"$first_json")
+  first_new_subcount=$(jq -r '.new.sub_pub_keys | length' <<<"$first_json")
+
+  local -A legacy_index_to_file=()
+  local -A new_index_to_file=()
   local idx
   while read -r idx; do
     [[ -z "$idx" ]] && continue
-    index_to_file[$idx]="${files[0]}"
-  done < <(jq -r '.partial_signatures[].index' <<<"$first_json")
+    legacy_index_to_file[$idx]="${files[0]}"
+  done < <(jq -r '.partial_legacy_signatures[].index' <<<"$first_json")
+  while read -r idx; do
+    [[ -z "$idx" ]] && continue
+    new_index_to_file[$idx]="${files[0]}"
+  done < <(jq -r '.partial_new_signatures[].index' <<<"$first_json")
 
   local f
   for f in "${files[@]:1}"; do
@@ -839,8 +863,10 @@ summarize_partials() {
       "new_address:$first_new:.new_address"
       "payload_hex:$first_payload:.payload_hex"
       "kind:$first_kind:.kind"
-      "threshold:$first_threshold:.multisig.threshold"
-      "sig_format:$first_sigfmt:.multisig.sig_format"
+      "legacy.threshold:$first_leg_threshold:.legacy.threshold"
+      "legacy.sig_format:$first_leg_sigfmt:.legacy.sig_format"
+      "new.threshold:$first_new_threshold:.new.threshold"
+      "new.sig_format:$first_new_sigfmt:.new.sig_format"
     )
     local entry
     for entry in "${checks[@]}"; do
@@ -855,35 +881,59 @@ summarize_partials() {
         exit 9
       fi
     done
-    local j_subkeys
-    j_subkeys=$(jq -c '.multisig.sub_pub_keys_b64' <<<"$j")
-    if [[ "$j_subkeys" != "$first_subkeys" ]]; then
-      log_error "partial $f disagrees on multisig.sub_pub_keys_b64"
+    local j_leg_subkeys j_new_subkeys
+    j_leg_subkeys=$(jq -c '.legacy.sub_pub_keys' <<<"$j")
+    if [[ "$j_leg_subkeys" != "$first_leg_subkeys" ]]; then
+      log_error "partial $f disagrees on legacy.sub_pub_keys"
+      exit 9
+    fi
+    j_new_subkeys=$(jq -c '.new.sub_pub_keys' <<<"$j")
+    if [[ "$j_new_subkeys" != "$first_new_subkeys" ]]; then
+      log_error "partial $f disagrees on new.sub_pub_keys"
       exit 9
     fi
     while read -r idx; do
       [[ -z "$idx" ]] && continue
-      index_to_file[$idx]="$f"
-    done < <(jq -r '.partial_signatures[].index' <<<"$j")
+      legacy_index_to_file[$idx]="$f"
+    done < <(jq -r '.partial_legacy_signatures[].index' <<<"$j")
+    while read -r idx; do
+      [[ -z "$idx" ]] && continue
+      new_index_to_file[$idx]="$f"
+    done < <(jq -r '.partial_new_signatures[].index' <<<"$j")
   done
 
+  local leg_present=${#legacy_index_to_file[@]}
+  local new_present=${#new_index_to_file[@]}
   {
-    printf 'Partial signature entries (%s-of-%s required):\n' "$first_threshold" "$first_subcount"
+    printf 'Legacy-side partials (%s-of-%s required):\n' "$first_leg_threshold" "$first_leg_subcount"
     local i
-    for (( i=0; i<first_subcount; i++ )); do
-      if [[ -n "${index_to_file[$i]:-}" ]]; then
-        printf '  [X] signer %s  %s\n' "$i" "${index_to_file[$i]}"
+    for (( i=0; i<first_leg_subcount; i++ )); do
+      if [[ -n "${legacy_index_to_file[$i]:-}" ]]; then
+        printf '  [X] signer %s  %s\n' "$i" "${legacy_index_to_file[$i]}"
       else
         printf '  [ ] signer %s  (missing)\n' "$i"
       fi
     done
-    local present=${#index_to_file[@]}
-    if (( present >= first_threshold )); then
-      printf 'Entry threshold satisfied: yes (%s >= %s)\n' "$present" "$first_threshold"
+    if (( leg_present >= first_leg_threshold )); then
+      printf 'Legacy threshold satisfied: yes (%s >= %s)\n' "$leg_present" "$first_leg_threshold"
     else
-      printf 'Entry threshold satisfied: no (%s < %s)\n' "$present" "$first_threshold"
+      printf 'Legacy threshold satisfied: no (%s < %s)\n' "$leg_present" "$first_leg_threshold"
+    fi
+
+    printf 'New-side partials (%s-of-%s required):\n' "$first_new_threshold" "$first_new_subcount"
+    for (( i=0; i<first_new_subcount; i++ )); do
+      if [[ -n "${new_index_to_file[$i]:-}" ]]; then
+        printf '  [X] signer %s  %s\n' "$i" "${new_index_to_file[$i]}"
+      else
+        printf '  [ ] signer %s  (missing)\n' "$i"
+      fi
+    done
+    if (( new_present >= first_new_threshold )); then
+      printf 'New threshold satisfied: yes (%s >= %s)\n' "$new_present" "$first_new_threshold"
+    else
+      printf 'New threshold satisfied: no (%s < %s)\n' "$new_present" "$first_new_threshold"
     fi
   } >&2
 
-  (( ${#index_to_file[@]} >= first_threshold ))
+  (( leg_present >= first_leg_threshold )) && (( new_present >= first_new_threshold ))
 }

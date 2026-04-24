@@ -364,39 +364,46 @@ The scripts never prompt for a keyring password — that's governed entirely by 
 
 ## Multisig migration
 
-Multisig legacy accounts use a four-step offline ceremony rather than a single command — one coordinator and K co-signers across different machines. The `scripts/migrate-multisig.sh` wrapper layers the same pre-flight and verification rails onto each step. Before you begin:
+Multisig legacy accounts use a four-step offline ceremony rather than a single command — one coordinator and K co-signers across different machines. The destination is **also** a K-of-N multisig, built from `eth_secp256k1` sub-keys (the "mirror-source rule" — see [evmigration/main.md → Multisig account migration](../evmigration/main.md#multisig-account-migration)). The `scripts/migrate-multisig.sh` wrapper layers the same pre-flight and verification rails onto each step. Before you begin:
 
 - Every co-signer and the coordinator need `lumerad` (post-EVM-upgrade) and `jq` on their machine.
 - The multisig's on-chain pubkey must already be seeded (any prior multisig-signed transaction registers it). If it's nil, submit any multisig-signed tx first — e.g. a 1-`ulume` self-send via `lumerad tx bank send`.
-- The coordinator derives a single `eth_secp256k1` destination key from a mnemonic (`lumerad keys add --coin-type 60 --algo eth_secp256k1 --recover`). The ceremony migrates all legacy state to this EOA.
+- Each co-signer generates a fresh `eth_secp256k1` sub-key in their own keyring (`lumerad keys add <name>-eth --key-type eth_secp256k1`). The coordinator collects the N eth pubkeys (or local key-names, if signers share a keyring) and derives the new multisig address with `lumerad keys add --multisig ... --multisig-threshold K`.
 
 ### Step 1 — Coordinator: generate the proof template
 
 ```bash
 ./scripts/migrate-multisig.sh generate \
   --legacy lumera1<multisig-bech32> \
-  --new    lumera1<new-eth-bech32> \
+  --new-sub-pub-keys <k1>,<k2>,<k3> \
+  --new-threshold    2 \
   --kind   claim \
   --chain-id lumera-mainnet-1 \
   --node tcp://rpc.lumera:26657 \
+  --keyring-backend file \
   --out  proof.json
 ```
+
+`--new-sub-pub-keys` entries may be local keyring key names (if the coordinator imported each co-signer's eth pubkey) **or** base64-encoded 33-byte compressed `eth_secp256k1` pubkeys — mix freely. `--new` is optional; if supplied, the CLI cross-checks it against the address derived from `--new-sub-pub-keys` and `--new-threshold`. `--sig-format` applies to the legacy side (default `SIG_FORMAT_CLI`); the new side defaults to the same for multisig.
 
 Use `--kind validator` if the multisig holds a validator operator. The wrapper checks `is_multisig` and `is_validator` against the pre-flight estimate and aborts with exit 3 (not multisig) or exit 6 (validator flag on non-validator) before calling `lumerad`. If the on-chain pubkey is nil, it exits 8 with the remediation printed. If the migration-estimate already says `would_succeed=false` (governance disabled migration, deadline passed, validator over cap), it exits 4 before wasting co-signer time on a doomed ceremony.
 
 Distribute `proof.json` to all co-signers.
 
-### Step 2 — Each co-signer: append a partial signature
+### Step 2 — Each co-signer: append partial signatures (both sides)
+
+Each co-signer holds their legacy Cosmos sub-key **and** their destination-side eth sub-key in the same keyring, and signs both sides in one invocation:
 
 ```bash
 ./scripts/migrate-multisig.sh sign proof.json \
-  --from alice-sub \
+  --from    alice-legacy-sub \
+  --new-key alice-eth-sub \
   --chain-id lumera-mainnet-1 \
   --keyring-backend file \
   --out alice-partial.json
 ```
 
-The wrapper validates the proof file's `payload_hex` against a canonical reconstruction (catches tampering; exit 9) and confirms the `--from` key's pubkey is in the multisig's sub-key set (catches "wrong signer" mistakes; exit 1) before invoking `lumerad tx evmigration sign-proof`. Each signer sends their `*-partial.json` back to the coordinator.
+`--from` signs the legacy half; `--new-key` signs the new half. At least one is required; a co-signer who holds only one sub-key passes only that flag. The wrapper validates the proof file's `payload_hex` against a canonical reconstruction (catches tampering; exit 9), confirms `--from`'s pubkey is in `legacy.sub_pub_keys`, and `--new-key`'s pubkey is in `new.sub_pub_keys` (catches "wrong signer" mistakes; exit 1). Re-running overwrites the signer's prior entries on both sides (idempotent). Each signer sends their `*-partial.json` back to the coordinator.
 
 ### Step 3 — Coordinator: combine partials
 
@@ -406,29 +413,34 @@ The wrapper validates the proof file's `payload_hex` against a canonical reconst
   --out tx.json
 ```
 
-The wrapper cross-checks that every partial agrees on `chain_id`, `legacy_address`, `new_address`, `payload_hex`, `kind`, `multisig.threshold`, `multisig.sig_format`, and the `sub_pub_keys_b64` list (exit 9 on disagreement). It prints a K-of-N entry-presence summary:
+The wrapper cross-checks that every partial agrees on `chain_id`, `legacy_address`, `new_address`, `payload_hex`, `kind`, and the per-side `threshold`, `sig_format`, and `sub_pub_keys` lists (exit 9 on disagreement). It prints **two** K-of-N entry-presence matrices — one per side:
 
 ```text
-Partial signature entries (2-of-3 required):
+Legacy-side partials (2-of-3 required):
   [X] signer 0  alice-partial.json
   [X] signer 1  bob-partial.json
   [ ] signer 2  (missing)
-Entry threshold satisfied: yes (2 >= 2)
+Legacy threshold satisfied: yes (2 >= 2)
+New-side partials (2-of-3 required):
+  [X] signer 0  alice-partial.json
+  [X] signer 1  bob-partial.json
+  [ ] signer 2  (missing)
+New threshold satisfied: yes (2 >= 2)
 ```
 
-If fewer than K entries are present, it aborts with exit 4 before calling `lumerad`. If `lumerad combine-proof` itself reports fewer than K *cryptographically valid* signatures (wrong key, tampered payload), the wrapper maps that to exit 4 as well.
+If either side is short of threshold, it aborts with exit 4 before calling `lumerad`. If `lumerad combine-proof` itself reports fewer than K *cryptographically valid* signatures on either side (wrong key, tampered payload), the wrapper maps that to exit 4 as well.
 
 ### Step 4 — Coordinator: submit
 
 ```bash
 ./scripts/migrate-multisig.sh submit tx.json \
-  --from new-eth-key \
   --chain-id lumera-mainnet-1 \
-  --node tcp://rpc.lumera:26657 \
-  --keyring-backend file
+  --node tcp://rpc.lumera:26657
 ```
 
-Pre-flight checks (in order): reject single-key proof tx JSON (exit 3); `--from` is `eth_secp256k1` and resolves to the tx's `new_address`; the legacy address has no migration record yet; the new address isn't already a migration destination; a fresh `migration-estimate` still reports `would_succeed: true` (catches state drift during a multi-hour or multi-day ceremony — governance could have disabled migration, a validator could have exceeded `max_validator_delegations`). After broadcast it waits for inclusion and verifies the migration record matches.
+`submit-proof` does **not** sign at the Cosmos tx layer — migration messages declare zero signers (authorization is embedded in the proof bytes), fees are waived by the evmigration ante handler, and replay is prevented by the keeper's migration record. There is no `--from`; `--keyring-backend` / `--keyring-dir` / `--home` are accepted for SDK-context plumbing only.
+
+Pre-flight checks (in order): reject non-multisig→multisig tx JSON (exit 3); the legacy address has no migration record yet; the new address isn't already a migration destination; a fresh `migration-estimate` still reports `would_succeed: true` (catches state drift during a multi-hour or multi-day ceremony — governance could have disabled migration, a validator could have exceeded `max_validator_delegations`). After broadcast it waits for inclusion and verifies the migration record matches.
 
 For `--kind validator` tx files, the submit step prints the same downtime banner as `migrate-validator.sh` and requires either `--i-have-stopped-the-node` or a typed `yes` response. `--yes` does not satisfy this check.
 
@@ -439,14 +451,16 @@ In addition to the codes shared with single-sig scripts ([Exit codes](#exit-code
 | Code | Meaning |
 |---|---|
 | `8` | Multisig pubkey not seeded on-chain; submit any multisig-signed tx first |
-| `9` | Input file integrity check failed (JSON parse, missing field, payload_hex mismatch, cross-file disagreement) |
+| `9` | Input file integrity check failed (JSON parse, missing field, payload_hex mismatch, cross-file disagreement, unsupported version) |
 
 ### Multisig troubleshooting
 
 - **Exit 8 on `generate`**: the multisig has never signed a tx. Run any transaction from the multisig account first (smallest: `lumerad tx bank send <multisig-addr> <multisig-addr> 1ulume --from <sub-key>` in the usual multisig coordinator flow). Then retry.
 - **Exit 9 on `sign` with "payload_hex mismatch"**: someone edited a field in the proof after generation. Regenerate from the coordinator and redistribute.
-- **Exit 1 on `sign` with "sub-key" error**: the `--from` key's pubkey isn't listed in the template's `multisig.sub_pub_keys_b64`. Confirm you imported the correct sub-key into your local keyring (wrong key name, wrong mnemonic, wrong HD path).
-- **Exit 4 on `combine`**: either you passed fewer than K partial files, or one or more partials had invalid signatures. The wrapper prints the entry-presence summary before invoking `lumerad`; if entries look fine but `lumerad` reports below-threshold valid sigs, the bad signer needs to re-sign.
+- **Exit 9 on `sign` with "unsupported version"**: the proof file was produced by an older `lumerad` with the v1 schema. Regenerate with a post-upgrade binary; v1 files are not migratable in place.
+- **Exit 1 on `sign` with "not among legacy.sub_pub_keys"**: the `--from` key's pubkey isn't listed in the template's `legacy.sub_pub_keys`. Confirm you imported the correct Cosmos sub-key (wrong key name, wrong mnemonic, wrong HD path — coin-type must be 118 for legacy sub-keys).
+- **Exit 1 on `sign` with "not among new.sub_pub_keys"**: the `--new-key` pubkey isn't in the template's new-side sub-keys — most commonly because the coordinator built `--new-sub-pub-keys` from a different set of eth keys than the co-signers now hold.
+- **Exit 4 on `combine`**: either you passed partials short of K on either side, or one or more partials had invalid signatures. The wrapper prints per-side entry-presence summaries before invoking `lumerad`; if entries look fine but `lumerad` reports below-threshold valid sigs, the bad signer needs to re-sign.
 - **Exit 4 on `submit`**: chain state changed during the ceremony (governance disabled migration, deadline passed, validator over cap). The `rejection_reason` from the fresh estimate is printed.
 
 ---

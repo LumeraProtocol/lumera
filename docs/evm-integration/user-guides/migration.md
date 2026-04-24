@@ -548,44 +548,48 @@ The response must show a `multisig` pubkey structure listing all sub-keys.
 
 ### Step 1: Coordinator generates the proof payload template
 
-The coordinator (any co-signer who will drive the flow) creates a JSON template that describes the migration and contains the canonical signed payload:
+The destination of a K-of-N legacy multisig is **also** a K-of-N multisig, built from fresh `eth_secp256k1` sub-keys (mirror-source rule — see [evmigration/main.md → Multisig account migration](../evmigration/main.md#multisig-account-migration)). Each co-signer generates their own eth sub-key; the coordinator collects the N eth pubkeys (or local key-names) and runs:
 
 ```bash
 lumerad tx evmigration generate-proof-payload \
   --legacy <multisig-bech32> \
-  --new <new-eth-bech32> \
+  --new-sub-pub-keys <eth-k1>,<eth-k2>,<eth-k3> \
+  --new-threshold    2 \
   --kind claim \
   --chain-id <chain-id> \
+  --keyring-backend <backend> \
   --out proof.json
 ```
 
-- `--kind claim` targets `MsgClaimLegacyAccount`; `--kind validator` targets `MsgMigrateValidator`. The chain uses different keeper entry points for each.
-- `--chain-id` is **required**: the payload string `lumera-evm-migration:<chain-id>:<evm-chain-id>:<kind>:<legacy>:<new>` embeds the chain ID. The keeper reconstructs this server-side with `ctx.ChainID()`, so an empty or wrong `--chain-id` on the client makes every sub-signature fail verification with `sub-sig 0 invalid`.
-- `--sig-format` (optional, default `SIG_FORMAT_CLI`): use `SIG_FORMAT_ADR036` only when sub-signers sign via a wallet that emits ADR-036 `signArbitrary` output (e.g. Keplr). CLI keyring signers should stick with `SIG_FORMAT_CLI`.
-- `--legacy-key` (optional): for a legacy single-sig account whose pubkey is nil on-chain. Not used for multisig flows — the multisig pubkey is read from chain.
-- `generate-proof-payload` is a query-style command and **does not accept `--keyring-backend`**. The other three commands require it because they touch the local keyring.
+- `--new-sub-pub-keys` entries are either local keyring key names (eth_secp256k1) or base64-encoded 33-byte compressed eth pubkeys. Mix freely. `--new-threshold` is required with `--new-sub-pub-keys`.
+- `--new <bech32>` is optional; the CLI derives the new multisig address from the sub-keys/threshold and cross-checks `--new` if supplied.
+- `--kind claim` targets `MsgClaimLegacyAccount`; `--kind validator` targets `MsgMigrateValidator`.
+- `--chain-id` is **required**: the payload string `lumera-evm-migration:<chain-id>:<evm-chain-id>:<kind>:<legacy>:<new>` embeds the chain ID. An empty or wrong `--chain-id` makes every sub-signature fail verification with `sub-sig 0 invalid`.
+- `--sig-format` (optional, default `SIG_FORMAT_CLI`) applies to the legacy side. Use `SIG_FORMAT_ADR036` only when sub-signers sign via a wallet that emits ADR-036 `signArbitrary` output (e.g. Keplr).
+- `generate-proof-payload` **needs keyring access** to resolve `--new-sub-pub-keys` key names, so pass `--keyring-backend` (and `--keyring-dir` / `--home` when needed). It still does not broadcast anything.
 
-The output `proof.json` contains the canonical payload string, the `payload_hex` digest, the multisig sub-key list, and empty `partial_signatures`. Distribute it to all co-signers.
+The output `proof.json` is a v2 `PartialProof` with two sibling `SideSpec`s (`legacy` and `new`), each listing `threshold` + `sub_pub_keys`, plus empty `partial_legacy_signatures` and `partial_new_signatures` arrays. Distribute to all co-signers.
 
-### Step 2: Each co-signer signs on their own machine
+### Step 2: Each co-signer signs both sides on their own machine
 
-Each participating co-signer imports their individual sub-key and runs:
+Each co-signer holds their legacy Cosmos sub-key **and** their destination-side eth sub-key in the same keyring, and signs both sides in one invocation:
 
 ```bash
 lumerad tx evmigration sign-proof proof.json \
-  --from <my-sub-key> \
+  --from    <my-legacy-sub-key> \
+  --new-key <my-eth-sub-key> \
   --keyring-backend <backend> \
   --chain-id <chain-id> \
   --out my-partial.json
 ```
 
-- `sign-proof` is idempotent: re-running it removes any previous entry for the same signer index and appends a fresh signature. `--out` defaults to the input path if omitted (useful for round-tripping one file through multiple signers in test scenarios).
-- Each co-signer produces their own `<name>-partial.json`. Send all partial files back to the coordinator.
-- `sign-proof` will reject a file whose `payload_hex` doesn't match a canonical reconstruction from the other fields — this catches accidental tampering or field edits between steps.
+- `--from` signs the legacy half; `--new-key` signs the new half. At least one is required; a co-signer who holds only one sub-key passes only that flag.
+- `sign-proof` is idempotent: re-running with the same key replaces that signer's entry on the corresponding side.
+- `sign-proof` rejects a file whose `payload_hex` doesn't match a canonical reconstruction from the other fields — catches accidental tampering between steps.
+
+Each co-signer sends their `*-partial.json` back to the coordinator.
 
 ### Step 3: Coordinator combines the partials
-
-The coordinator collects at least K partial files (where K is the multisig threshold) and merges them:
 
 ```bash
 lumerad tx evmigration combine-proof \
@@ -593,28 +597,17 @@ lumerad tx evmigration combine-proof \
   --out tx.json
 ```
 
-`combine-proof` validates cross-file consistency before merging — it rejects the set if any two partials disagree on `chain_id`, `evm_chain_id`, `legacy_address`, `new_address`, `payload_hex`, proof kind, or the `sub_pub_keys` list. It also verifies each partial signature against its declared sub-pub-key.
-
-Selection behavior after validation:
-
-- Each partial signature is verified under the sub-pub-key it claims; invalid entries are silently skipped (not fatal).
-- Among the verified partials, the first K in ascending signer-index order are included in the assembled proof.
-- If fewer than K partials verify, `combine-proof` errors with `need <K> valid partial signatures, have <N>` and does not write `tx.json`.
-
-Passing *more* than K partials is accepted — extras beyond the threshold are ignored. Passing fewer than K raises the error above.
+`combine-proof` validates cross-file consistency — it rejects the set if any two partials disagree on `chain_id`, `evm_chain_id`, `legacy_address`, `new_address`, `payload_hex`, `kind`, or the per-side `threshold` / `sig_format` / `sub_pub_keys`. It verifies every partial signature cryptographically on **both** sides, drops invalid entries with a stderr warning, and selects the first K valid partials in ascending index order **per side**. If fewer than K verify on either side, it errors with `need <K> valid partial signatures on <side> side, have <N>` and writes nothing.
 
 ### Step 4: Broadcast the assembled transaction
 
-The coordinator broadcasts using the new EVM destination key as the transaction signer:
-
 ```bash
 lumerad tx evmigration submit-proof tx.json \
-  --from <new-eth-key> \
   --chain-id <chain-id> \
-  --keyring-backend <backend> -y
+  --node <rpc-url> -y
 ```
 
-`submit-proof` signs the `new_signature` field with the EVM key, wraps the message in an unsigned Cosmos tx (no fee), and broadcasts. On success, verify the migration record:
+Migration messages declare **zero signers** — authorization is embedded in `legacy_proof` and `new_proof`, fees are waived by the evmigration ante handler, and replay is prevented by the keeper's migration-record check. There is no `--from` and no envelope signature; `submit-proof` loads `tx.json`, runs `ValidateBasic`, simulates gas via the migration-specific estimator, builds an unsigned tx, and broadcasts. On success, verify the migration record:
 
 ```bash
 lumerad query evmigration migration-record <multisig-legacy-address>
@@ -622,7 +615,8 @@ lumerad query evmigration migration-record <multisig-legacy-address>
 
 ### Notes
 
-- **Threshold and members are defined by the on-chain pubkey**, not by the CLI. `generate-proof-payload` reads the K and the N sub-keys from the chain; you don't pass them as flags.
+- **Legacy-side threshold and members** are defined by the on-chain `LegacyAminoPubKey` and read automatically; you don't pass them as flags. **New-side threshold and members** are supplied by `--new-sub-pub-keys` + `--new-threshold` because the destination multisig doesn't exist on-chain yet.
 - **Cold-wallet / nil-pubkey single-sig accounts**: if a *single-key* (non-multisig) legacy account has never signed a transaction, use `generate-proof-payload --legacy-key <local-keyring-key>` to seed the pubkey from a local key. This is distinct from the multisig flow — multisig accounts must have their multisig pubkey already populated on-chain.
+- **Non-EVM-addressable destination.** The new multisig bech32 can perform Cosmos-side operations (staking, supernode, IBC, authz) but cannot originate `MsgEthereumTx`. Operators who want EVM DeFi access for rewards should configure a separate single-EOA withdraw address via `MsgSetWithdrawAddress`.
 - **Supernode operators** have their own step-by-step walkthrough for both the single-sig automatic path and the multisig manual path — see [supernode-migration.md](supernode-migration.md).
 - **After a successful migration** follow the same post-migration steps as for any other account (add the new Lumera EVM chain definition to Keplr, verify balances at the new address, etc.).

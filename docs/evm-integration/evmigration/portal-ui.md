@@ -29,14 +29,14 @@ lumera-evm-migration:lumera-mainnet-1:76857769:validator:lumera1legacy...:lumera
 
 ### 1.2 Message Shape
 
-Both `MsgClaimLegacyAccount` and `MsgMigrateValidator` carry a `legacy_proof` oneof field in place of the former flat `legacy_pub_key` / `legacy_signature` fields:
+Both `MsgClaimLegacyAccount` and `MsgMigrateValidator` carry structured proofs on both sides in place of the former flat `legacy_pub_key` / `legacy_signature` / `new_signature` fields:
 
 | Field | Proto # | Description |
 |-------|---------|-------------|
-| `new_address` | 1 | Destination address (`eth_secp256k1`, coin-type 60) |
+| `new_address` | 1 | Destination address (`eth_secp256k1` single-key, or multisig-of-eth-sub-keys) |
 | `legacy_address` | 2 | Source address (`secp256k1`, coin-type 118) |
-| `legacy_proof` | 3 | Oneof: `single` (SingleKeyProof) or `multisig` (MultisigProof) |
-| `new_signature` | 4 | EVM signature over the migration payload (unchanged) |
+| `legacy_proof` | 3 | `MigrationProof` — oneof: `single` (SingleKeyProof) or `multisig` (MultisigProof) |
+| `new_proof` | 4 | `MigrationProof` — same oneof shape as `legacy_proof`; the mirror-source rule requires it to match the legacy side (single↔single, multisig↔multisig) |
 
 #### SingleKeyProof (field `legacy_proof.single`)
 
@@ -103,19 +103,22 @@ Accepted legacy signature formats:
 
 #### New proof
 
-The chain now recovers the new signer directly from `new_signature` and checks that the recovered address equals `new_address`.
+`new_proof` is a `MigrationProof` with the same oneof shape as `legacy_proof`. The verifier dispatches on the oneof case and enforces the mirror-source rule (legacy-single ↔ new-single, legacy-multisig ↔ new-multisig):
 
-Accepted new signature formats:
+- **Single-key new side** — `new_proof.single.pub_key` holds the destination eth pubkey explicitly; the verifier checks that `sdk.AccAddress(pub_key.Address())` equals `new_address` and verifies the signature against it. `SIG_FORMAT_EIP191` is only valid here (new side, single-key).
+- **Multisig new side** — `new_proof.multisig` mirrors the legacy multisig shape; the verifier reconstructs `kmultisig.NewLegacyAminoPubKey(threshold, sub_pub_keys)` over the eth sub-keys, checks that its derived bech32 equals `new_address`, and verifies each of the K `sub_signatures` under the corresponding `sub_pub_keys` entry.
 
-1. CLI/keyring path:
-   - sign over `Keccak256(payload)`
-2. Wallet path:
+Accepted new-side signature formats:
+
+1. CLI/keyring path (`SIG_FORMAT_CLI`):
+   - sign over `Keccak256(payload)` (eth keyring applies Keccak256 internally)
+2. Wallet path (`SIG_FORMAT_EIP191`, single-key only):
    - Keplr/Leap Ethereum provider `personal_sign`
    - chain verifies against `Keccak256("\x19Ethereum Signed Message:\n" + len(payload) + payload)`
 
 Implementation notes:
 
-- 64-byte and 65-byte ECDSA signatures are both accepted
+- Signatures are 65 bytes (R || S || V); legacy 64-byte pre-v0.6 shape is no longer accepted
 - recovery ID normalization is handled in `verify.go`
 
 ### 1.4 Unsigned Cosmos Tx

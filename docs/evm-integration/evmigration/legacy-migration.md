@@ -103,9 +103,15 @@ Flat K-of-N multisig legacy accounts where every sub-key is `secp256k1`. The ver
 
 ### Consensus invariants
 
-- **Mirror-source rule** — enforced by `types.ValidateProofPair` (called from `MsgClaimLegacyAccount.ValidateBasic` and `MsgMigrateValidator.ValidateBasic`). Both sides must share shape (single↔single or multisig↔multisig); when both multisig, threshold (K) and sub-key count (N) must match. Rejected with `ErrMirrorSourceMismatch` (code 1121).
+The following are enforced by `MsgClaimLegacyAccount.ValidateBasic` and `MsgMigrateValidator.ValidateBasic`; a violation is rejected before any crypto verification runs and before the tx is dispatched to the msg server.
+
+- **Mirror-source shape rule** — `types.ValidateProofPair`. Both sides must share shape (single↔single or multisig↔multisig); when both multisig, threshold (K) and sub-key count (N) must match across sides. Rejected with `ErrMirrorSourceMismatch` (code 1121). A 2-of-3 legacy multisig cannot migrate to a 1-of-1 or 3-of-5 destination.
+- **Matching `signer_indices`** — `types.ValidateProofPair`. When both sides are multisig, `legacy_proof.signer_indices` must equal `new_proof.signer_indices` element-for-element. The same K signer positions must approve both halves — two disjoint K-subsets (e.g. legacy signed by indices `[0,1]`, new signed by `[0,2]`) are rejected with `ErrMirrorSourceMismatch`. This is what makes the docs' claim "each co-signer holds both their legacy Cosmos sub-key AND their destination-side eth sub-key" a chain-enforced invariant rather than an operational convention.
+- **Sub-key uniqueness** — `MultisigProof.validateBasic`. Each side's `sub_pub_keys` list must have pairwise-distinct entries. Rejected with `ErrInvalidMigrationPubKey`. Without this check, a duplicate entry would let one keyholder be counted as two distinct signers against the K-of-N threshold (effective K would silently drop).
 - **Per-side sub-key typing** — `legacy_proof` sub-keys must be Cosmos `secp256k1`; `new_proof` sub-keys must be `eth_secp256k1`. The verifier dispatches on `SubKeyType` at each side.
-- **Zero-signer tx** — migration messages declare no signers. Authorization is embedded in the proof bytes; fees are waived by the evmigration ante handler; replay is prevented by `MigrationRecords.Has(legacyAddr)`.
+- **Zero-signer tx** — migration messages declare no signers. Authorization is embedded in the proof bytes; fees are waived by the evmigration ante handler; replay is prevented by `MigrationRecords.Has(legacyAddr)`. `submit-proof` does **not** take `--from`, `--fees`, `--gas-prices`, or `--sign-mode`.
+
+The CLI `combine-proof` mirrors these invariants so that a tx file it writes will satisfy `ValidateBasic` — it intersects the valid signer-index sets across the two sides before selecting K, rather than picking each side independently. If fewer than K indices have valid signatures on BOTH sides, combine-proof errors out before writing `tx.json`.
 
 ### What is NOT supported
 

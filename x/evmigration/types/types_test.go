@@ -447,6 +447,98 @@ func TestMsgMigrateValidator_ValidateBasic_MirrorSource(t *testing.T) {
 	require.ErrorIs(t, err, types.ErrMirrorSourceMismatch)
 }
 
+// TestMsgClaimLegacyAccount_ValidateBasic_SignerIndicesMismatch confirms the
+// signer_indices rule fires through the full MsgClaimLegacyAccount.ValidateBasic
+// path (not just the ValidateProofPair helper in isolation). Legacy signs at
+// indices [0,1]; new signs at [0,2] — same K, same N, but disjoint K-subsets.
+func TestMsgClaimLegacyAccount_ValidateBasic_SignerIndicesMismatch(t *testing.T) {
+	legacyAddr := validAddr()
+	newAddr := validAddr()
+	legacy := validMultisigProof(2, 3, types.SideLegacy)
+	newSide := validMultisigProof(2, 3, types.SideNew)
+	// Force new-side to claim indices [0,2] instead of [0,1].
+	nm := newSide.GetMultisig()
+	nm.SignerIndices = []uint32{0, 2}
+	nm.SubSignatures = [][]byte{make([]byte, 65), make([]byte, 65)}
+
+	msg := types.MsgClaimLegacyAccount{
+		NewAddress:    newAddr,
+		LegacyAddress: legacyAddr,
+		LegacyProof:   legacy,
+		NewProof:      newSide,
+	}
+	err := msg.ValidateBasic()
+	require.ErrorIs(t, err, types.ErrMirrorSourceMismatch)
+	require.Contains(t, err.Error(), "signer_indices")
+}
+
+// TestMsgMigrateValidator_ValidateBasic_SignerIndicesMismatch mirrors the above
+// for the validator migration message.
+func TestMsgMigrateValidator_ValidateBasic_SignerIndicesMismatch(t *testing.T) {
+	legacyAddr := validAddr()
+	newAddr := validAddr()
+	legacy := validMultisigProof(2, 3, types.SideLegacy)
+	newSide := validMultisigProof(2, 3, types.SideNew)
+	nm := newSide.GetMultisig()
+	nm.SignerIndices = []uint32{0, 2}
+	nm.SubSignatures = [][]byte{make([]byte, 65), make([]byte, 65)}
+
+	msg := types.MsgMigrateValidator{
+		NewAddress:    newAddr,
+		LegacyAddress: legacyAddr,
+		LegacyProof:   legacy,
+		NewProof:      newSide,
+	}
+	err := msg.ValidateBasic()
+	require.ErrorIs(t, err, types.ErrMirrorSourceMismatch)
+	require.Contains(t, err.Error(), "signer_indices")
+}
+
+// TestMsgClaimLegacyAccount_ValidateBasic_DuplicateSubKeys confirms the
+// sub-key uniqueness rule fires through MsgClaimLegacyAccount.ValidateBasic.
+// Without this, one keyholder could be counted as two distinct signers.
+func TestMsgClaimLegacyAccount_ValidateBasic_DuplicateSubKeys(t *testing.T) {
+	legacyAddr := validAddr()
+	newAddr := validAddr()
+	legacy := validMultisigProof(2, 3, types.SideLegacy)
+	// Duplicate the sub-key at position 0 into position 2.
+	lm := legacy.GetMultisig()
+	lm.SubPubKeys[2] = append([]byte(nil), lm.SubPubKeys[0]...)
+	newSide := validMultisigProof(2, 3, types.SideNew)
+
+	msg := types.MsgClaimLegacyAccount{
+		NewAddress:    newAddr,
+		LegacyAddress: legacyAddr,
+		LegacyProof:   legacy,
+		NewProof:      newSide,
+	}
+	err := msg.ValidateBasic()
+	require.ErrorIs(t, err, types.ErrInvalidMigrationPubKey)
+	require.Contains(t, err.Error(), "duplicates sub_pub_keys[0]")
+}
+
+// TestMsgMigrateValidator_ValidateBasic_DuplicateSubKeys mirrors the above,
+// this time putting the duplicate on the new (eth) side to confirm the check
+// fires on both sides.
+func TestMsgMigrateValidator_ValidateBasic_DuplicateSubKeys(t *testing.T) {
+	legacyAddr := validAddr()
+	newAddr := validAddr()
+	legacy := validMultisigProof(2, 3, types.SideLegacy)
+	newSide := validMultisigProof(2, 3, types.SideNew)
+	nm := newSide.GetMultisig()
+	nm.SubPubKeys[1] = append([]byte(nil), nm.SubPubKeys[0]...)
+
+	msg := types.MsgMigrateValidator{
+		NewAddress:    newAddr,
+		LegacyAddress: legacyAddr,
+		LegacyProof:   legacy,
+		NewProof:      newSide,
+	}
+	err := msg.ValidateBasic()
+	require.ErrorIs(t, err, types.ErrInvalidMigrationPubKey)
+	require.Contains(t, err.Error(), "duplicates sub_pub_keys[0]")
+}
+
 func TestParams_MaxMultisigSubKeys(t *testing.T) {
 	p := types.DefaultParams()
 	require.Equal(t, uint32(20), p.MaxMultisigSubKeys)

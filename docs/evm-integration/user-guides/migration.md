@@ -523,6 +523,15 @@ The `max_validator_delegations` parameter (default 2000) limits how many records
 
 Multisig legacy accounts (flat K-of-N `secp256k1`) use an offline, coordinator-driven flow with four commands. The portal wizard does not support multisig — use the CLI.
 
+> **Consensus invariants (multisig).** These are enforced at `ValidateBasic` before the tx reaches the msg server; a violation rejects the transaction on-chain.
+>
+> - **Shape + K/N must mirror.** A K-of-N legacy multisig migrates to a K-of-N `eth_secp256k1` multisig — same K, same N. Different K, different N, or single↔multisig shape mismatch is rejected with `ErrMirrorSourceMismatch` (code 1121).
+> - **Same K signer positions sign both halves.** `legacy_proof.signer_indices` must equal `new_proof.signer_indices`. Co-signers who sign only one side don't count toward the K-of-K threshold on the other.
+> - **Sub-key uniqueness.** Each side's `sub_pub_keys` must have pairwise-distinct entries.
+> - **Zero-signer submit.** `submit-proof` takes no `--from`, no fee flags, no envelope signature — authorization is the proof bytes.
+>
+> Full reference with error codes and helper functions: [legacy-migration.md § Consensus invariants](../evmigration/legacy-migration.md#consensus-invariants).
+
 See [legacy-migration.md](../evmigration/legacy-migration.md#multisig-account-migration) for the architecture and wire-format reference.
 
 ### Overview

@@ -43,7 +43,16 @@ See [legacy-migration.md](legacy-migration.md) for the full module reference.
 
 ## Multisig account migration
 
-When the legacy account is a K-of-N Cosmos multisig (a `LegacyAminoPubKey` recorded on the account's `BaseAccount.PubKey`), the migration target is **also** a K-of-N multisig, but constructed from `eth_secp256k1` sub-keys. This is the **mirror-source rule**, enforced as a **consensus invariant** by [`types.ValidateProofPair`](../../../x/evmigration/types/proof.go) — called from `MsgClaimLegacyAccount.ValidateBasic` and `MsgMigrateValidator.ValidateBasic`. A tx that attempts to migrate a 2-of-3 legacy multisig to a 1-of-1 or 3-of-5 destination is rejected on-chain with `ErrMirrorSourceMismatch` (code 1121) before any crypto verification runs.
+When the legacy account is a K-of-N Cosmos multisig (a `LegacyAminoPubKey` recorded on the account's `BaseAccount.PubKey`), the migration target is **also** a K-of-N multisig, but constructed from `eth_secp256k1` sub-keys.
+
+> **Consensus invariants (multisig).** These are enforced at `ValidateBasic` — before any crypto verification runs, and before the tx reaches the msg server. A violation rejects the transaction on-chain.
+>
+> - **Shape + K/N must mirror.** A K-of-N legacy multisig migrates to a K-of-N `eth_secp256k1` multisig. Different K, different N, or single↔multisig shape mismatch is rejected with `ErrMirrorSourceMismatch` (code 1121).
+> - **Same K signer positions sign both halves.** `legacy_proof.signer_indices` must equal `new_proof.signer_indices`. Two disjoint K-subsets can't each authorize one side; a co-signer who signs only one side doesn't contribute toward the K-of-K threshold on the other.
+> - **Sub-key uniqueness per side.** Each side's `sub_pub_keys` must have pairwise-distinct entries. A duplicate would silently reduce effective K; rejected with `ErrInvalidMigrationPubKey`.
+> - **Zero-signer submit.** `submit-proof` carries no `--from`, no fee, no envelope signature. Authorization is the two proofs themselves; the evmigration ante handler waives fees.
+>
+> The CLI `combine-proof` mirrors these rules — it intersects valid signer-index sets across sides before selecting K, so a tx file it writes always satisfies `ValidateBasic`. Ground truth and error codes: [legacy-migration.md § Consensus invariants](legacy-migration.md#consensus-invariants).
 
 | Legacy shape | New shape |
 | --- | --- |

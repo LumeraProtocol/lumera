@@ -294,6 +294,15 @@ This section only applies if your validator's **operator key** is a K-of-N multi
 
 `lumerad tx evmigration migrate-validator` signs with a single `--from` key. A multisig composite can't single-sign, so the command can't drive the migration. Instead, use the four-step offline proof flow with `--kind validator`. The destination **must** also be a K-of-N multisig of `eth_secp256k1` sub-keys — the mirror-source rule (`types.ValidateProofPair`) is a consensus invariant, so migrating a 2-of-3 legacy operator to a single-EOA or 3-of-5 destination is rejected at `ValidateBasic` with `ErrMirrorSourceMismatch` (code 1121).
 
+> **Consensus invariants (multisig validator).** The chain rejects a multisig validator migration tx at `ValidateBasic` if any of these is violated:
+>
+> - **Shape + K/N mirror.** K-of-N legacy → K-of-N new, same K and same N.
+> - **Matching `signer_indices`.** The same K signer positions approve both halves — a co-signer who signs only one side doesn't count on the other.
+> - **Sub-key uniqueness.** No duplicate entries in either side's `sub_pub_keys` list.
+> - **Zero-signer submit.** `submit-proof` takes no `--from`, no fee flags, no envelope signature.
+>
+> Full reference with error codes and helper functions: [legacy-migration.md § Consensus invariants](../evmigration/legacy-migration.md#consensus-invariants).
+
 ### Flow overview
 
 1. Verify the multisig pubkey is registered on-chain (if never signed a tx, submit a 1-ulume self-send first):

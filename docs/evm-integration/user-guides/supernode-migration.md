@@ -285,6 +285,15 @@ This section only applies if your on-chain supernode operator account is a flat 
 
 The new operator account is **also** a K-of-N multisig, constructed from `eth_secp256k1` sub-keys (see the [mirror-source rule](../evmigration/main.md#multisig-account-migration) in `evmigration/main.md`). The ceremony described below produces that new multisig, builds a dual-side proof, and broadcasts it.
 
+> **Consensus invariants (multisig).** The chain rejects a multisig supernode-operator migration tx at `ValidateBasic` if any of these is violated:
+>
+> - **Shape + K/N mirror.** K-of-N legacy → K-of-N new, same K and same N (`ErrMirrorSourceMismatch`).
+> - **Matching `signer_indices`.** The same K signer positions approve both halves.
+> - **Sub-key uniqueness.** No duplicate entries in either side's `sub_pub_keys` list.
+> - **Zero-signer submit.** `submit-proof` takes no `--from`, no fee flags, no envelope signature.
+>
+> Full reference: [legacy-migration.md § Consensus invariants](../evmigration/legacy-migration.md#consensus-invariants).
+
 ### Why automatic migration is refused
 
 The supernode daemon holds a single signing key and cannot run the K-of-N ceremony required for multisig migration. When it detects `is_multisig=true` from `MigrationEstimate`, it fatals with:

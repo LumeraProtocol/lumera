@@ -364,7 +364,18 @@ The scripts never prompt for a keyring password — that's governed entirely by 
 
 ## Multisig migration
 
-Multisig legacy accounts use a four-step offline ceremony rather than a single command — one coordinator and K co-signers across different machines. The destination is **also** a K-of-N multisig, built from `eth_secp256k1` sub-keys (the "mirror-source rule" — see [evmigration/main.md → Multisig account migration](../evmigration/main.md#multisig-account-migration)). The `scripts/migrate-multisig.sh` wrapper layers the same pre-flight and verification rails onto each step. Before you begin:
+Multisig legacy accounts use a four-step offline ceremony rather than a single command — one coordinator and K co-signers across different machines. The destination is **also** a K-of-N multisig, built from `eth_secp256k1` sub-keys (the "mirror-source rule" — see [evmigration/main.md → Multisig account migration](../evmigration/main.md#multisig-account-migration)). The `scripts/migrate-multisig.sh` wrapper layers the same pre-flight and verification rails onto each step.
+
+> **Consensus invariants (multisig).** The chain rejects a multisig migration tx at `ValidateBasic` if any of these are violated:
+>
+> - **Shape + K/N mirror.** K-of-N legacy → K-of-N new, same K and same N (`ErrMirrorSourceMismatch`).
+> - **Matching `signer_indices`.** The same K signer positions approve both halves — a co-signer who signs only one side doesn't count on the other.
+> - **Sub-key uniqueness.** No duplicate entries in either side's `sub_pub_keys` list.
+> - **Zero-signer submit.** `submit` takes no `--from`, no fee flags, no envelope signature.
+>
+> The wrapper's `combine` step mirrors these rules before writing `tx.json`, so what it produces will pass `ValidateBasic`. Full reference: [legacy-migration.md § Consensus invariants](../evmigration/legacy-migration.md#consensus-invariants).
+
+Before you begin:
 
 - Every co-signer and the coordinator need `lumerad` (post-EVM-upgrade) and `jq` on their machine.
 - The multisig's on-chain pubkey must already be seeded (any prior multisig-signed transaction registers it). If it's nil, submit any multisig-signed tx first — e.g. a 1-`ulume` self-send via `lumerad tx bank send`.

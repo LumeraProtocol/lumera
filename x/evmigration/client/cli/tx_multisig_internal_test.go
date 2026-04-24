@@ -885,3 +885,146 @@ func TestCLI_MultisigToMultisig_EndToEnd(t *testing.T) {
 	}
 	require.NoError(t, msg.ValidateBasic())
 }
+
+// ---------- buildMigrationProofs — cross-side intersection ----------
+
+// multisigTestFixture creates fully-wired legacy (Cosmos secp256k1) and new
+// (eth_secp256k1) 2-of-3 multisig sub-keys along with the canonical payload.
+// Returns builders that can selectively produce signed partials at specific
+// indices — used by the intersection tests below to fabricate asymmetric
+// valid-index sets across the two sides.
+func multisigTestFixture(t *testing.T) (
+	legacySide, newSide *SideSpec,
+	payload []byte,
+	signLegacy func(idx uint32) PartialSignature,
+	signNew func(idx uint32) PartialSignature,
+) {
+	t.Helper()
+	const (
+		chainID    = "lumera-test-1"
+		evmChainID = uint64(76857769)
+		kind       = "claim"
+	)
+
+	legacyPrivs := []*secp256k1.PrivKey{
+		secp256k1.GenPrivKey(), secp256k1.GenPrivKey(), secp256k1.GenPrivKey(),
+	}
+	legacyPubs := make([]cryptotypes.PubKey, 3)
+	legacyB64 := make([]string, 3)
+	for i, p := range legacyPrivs {
+		legacyPubs[i] = p.PubKey()
+		legacyB64[i] = base64.StdEncoding.EncodeToString(p.PubKey().Bytes())
+	}
+	legacyAddr := sdk.AccAddress(kmultisig.NewLegacyAminoPubKey(2, legacyPubs).Address())
+
+	ethPrivs := make([]*ethsecp256k1.PrivKey, 3)
+	newPubs := make([]cryptotypes.PubKey, 3)
+	newB64 := make([]string, 3)
+	for i := range ethPrivs {
+		p, err := ethsecp256k1.GenerateKey()
+		require.NoError(t, err)
+		ethPrivs[i] = p
+		pk := p.PubKey().(*evmcryptotypes.PubKey)
+		newPubs[i] = pk
+		newB64[i] = base64.StdEncoding.EncodeToString(pk.Key)
+	}
+	newAddr := sdk.AccAddress(kmultisig.NewLegacyAminoPubKey(2, newPubs).Address())
+
+	payloadStr := ComputePayload(chainID, evmChainID, kind, legacyAddr.String(), newAddr.String())
+	payload = []byte(payloadStr)
+
+	legacySide = &SideSpec{Threshold: 2, SubPubKeys: legacyB64, SigFormat: "SIG_FORMAT_CLI"}
+	newSide = &SideSpec{Threshold: 2, SubPubKeys: newB64, SigFormat: "SIG_FORMAT_CLI"}
+
+	signLegacy = func(idx uint32) PartialSignature {
+		return PartialSignature{
+			Index:     idx,
+			Signature: base64.StdEncoding.EncodeToString(cosmosSign(t, legacyPrivs[idx], payload)),
+		}
+	}
+	signNew = func(idx uint32) PartialSignature {
+		return PartialSignature{
+			Index:     idx,
+			Signature: base64.StdEncoding.EncodeToString(ethSign(t, ethPrivs[idx], payload)),
+		}
+	}
+	return
+}
+
+// TestBuildMigrationProofs_IntersectsIndicesAcrossSides proves that when
+// co-signers contribute asymmetric valid signatures (legacy at [0,1,2], new
+// at [1,2]), the assembled proofs share the intersected indices [1,2] on BOTH
+// sides rather than each side selecting its own first K valid indices (which
+// would give legacy=[0,1] vs new=[1,2] and fail the consensus mirror-source
+// check). This is what lets operators produce a tx that passes ValidateBasic.
+func TestBuildMigrationProofs_IntersectsIndicesAcrossSides(t *testing.T) {
+	legacySide, newSide, payload, signLegacy, signNew := multisigTestFixture(t)
+	pp := &PartialProof{
+		Version:                 partialProofVersion,
+		Kind:                    migrationProofKindClaim,
+		Legacy:                  legacySide,
+		New:                     newSide,
+		PartialLegacySignatures: []PartialSignature{signLegacy(0), signLegacy(1), signLegacy(2)},
+		PartialNewSignatures:    []PartialSignature{signNew(1), signNew(2)},
+	}
+
+	legacyProof, newProof, err := buildMigrationProofs(io.Discard, pp, payload)
+	require.NoError(t, err)
+	lm := legacyProof.GetMultisig()
+	nm := newProof.GetMultisig()
+	require.NotNil(t, lm)
+	require.NotNil(t, nm)
+	require.Equal(t, []uint32{1, 2}, lm.SignerIndices, "legacy side must use intersected indices")
+	require.Equal(t, []uint32{1, 2}, nm.SignerIndices, "new side must use the SAME intersected indices")
+	require.Len(t, lm.SubSignatures, 2)
+	require.Len(t, nm.SubSignatures, 2)
+
+	// Final sanity: the assembled pair satisfies the consensus mirror-source rule.
+	require.NoError(t, types.ValidateProofPair(&legacyProof, &newProof))
+}
+
+// TestBuildMigrationProofs_IntersectionBelowThreshold proves that if the set
+// of indices with valid signatures on BOTH sides is smaller than K, the
+// dispatcher errors out — rather than silently using different K-subsets
+// per side to produce an invalid tx.
+func TestBuildMigrationProofs_IntersectionBelowThreshold(t *testing.T) {
+	legacySide, newSide, payload, signLegacy, signNew := multisigTestFixture(t)
+	// Legacy signed at [0,1]; new signed at [2]. Intersection is empty.
+	pp := &PartialProof{
+		Version:                 partialProofVersion,
+		Kind:                    migrationProofKindClaim,
+		Legacy:                  legacySide,
+		New:                     newSide,
+		PartialLegacySignatures: []PartialSignature{signLegacy(0), signLegacy(1)},
+		PartialNewSignatures:    []PartialSignature{signNew(2)},
+	}
+
+	_, _, err := buildMigrationProofs(io.Discard, pp, payload)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "signed on BOTH sides at matching indices")
+}
+
+// TestBuildMigrationProofs_RejectsMixedShape covers the final dispatcher
+// branch: a single-key legacy paired with a multisig new (or vice versa) is
+// caught here before reaching ValidateBasic, so combine-proof never writes
+// a tx.json that's guaranteed to fail mirror-source.
+func TestBuildMigrationProofs_RejectsMixedShape(t *testing.T) {
+	legacySide, newSide, payload, signLegacy, _ := multisigTestFixture(t)
+	// Collapse the legacy side to single-key while keeping new as multisig.
+	singleLegacy := &SideSpec{
+		PubKey:    legacySide.SubPubKeys[0],
+		SigFormat: "SIG_FORMAT_CLI",
+	}
+	pp := &PartialProof{
+		Version:                 partialProofVersion,
+		Kind:                    migrationProofKindClaim,
+		Legacy:                  singleLegacy,
+		New:                     newSide,
+		PartialLegacySignatures: []PartialSignature{signLegacy(0)},
+		PartialNewSignatures:    nil,
+	}
+
+	_, _, err := buildMigrationProofs(io.Discard, pp, payload)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "sides must match shape")
+}

@@ -196,6 +196,10 @@ Names were renamed in the v2/MigrationProof refactor; legacy `TestVerifyLegacyPr
 | `TestClaimLegacyAccount_Multisig_WrongThreshold_LegacySide` | Truncated `signer_indices` on the legacy side (K=2 claimed but only 1 entry supplied) rejected via `MultisigProof.validateStructure` with `expected exactly K=... signer_indices`. |
 | `TestClaimLegacyAccount_Multisig_WrongThreshold_NewSide` | Truncated `signer_indices` on the new side (K=2 claimed but only 1 entry supplied) rejected via `MultisigProof.validateStructure`. |
 | `TestClaimLegacyAccount_Multisig_ADR036_BothSides` | ADR-036 sig format accepted on both legacy and new sides for a multisig→multisig migration. |
+| `TestClaimLegacyAccount_Multisig_MirrorSourceMismatch_Shape` | Cross-side shape mismatch (multisig legacy + single-key new) rejected with `ErrMirrorSourceMismatch` via the full `Msg*.ValidateBasic` path — exercises the pair check that production's msg-service-router auto-invokes before dispatch. |
+| `TestClaimLegacyAccount_Multisig_MirrorSourceMismatch_KN` | 2-of-3 legacy → 3-of-5 new — same shape, mismatched K and N — rejected with `ErrMirrorSourceMismatch`. Distinct from `WrongThreshold_*` tests which exercise single-side `signer_indices` truncation. |
+| `TestClaimLegacyAccount_Multisig_SignerIndicesMismatch` | Cross-side disjoint K-subsets (legacy signed at `[0,1]`, new at `[0,2]`) rejected with `ErrMirrorSourceMismatch` carrying `"signer_indices"` in the message. |
+| `TestClaimLegacyAccount_Multisig_DuplicateSubKey_Submit` | Duplicate sub-key (position 0 repeated at position 2 on the legacy side) rejected with `ErrInvalidMigrationPubKey` + `"duplicates sub_pub_keys[0]"` — complements preflight coverage in `TestMigrationEstimate_Multisig_DuplicateSubKey`. |
 | `TestQueryMigrationEstimate_Multisig_Success` | `MigrationEstimate` returns `would_succeed=true` and estimated gas for a supported multisig source. |
 | `TestQueryMigrationEstimate_Multisig_SizeCapped` | `MigrationEstimate` returns `would_succeed=false` when `num_signers > MaxMultisigSubKeys`. |
 | `TestQueryMigrationEstimate_Multisig_NonSecp256k1SubKey` | `MigrationEstimate` returns `would_succeed=false` when any legacy sub-key is not secp256k1. |
@@ -234,17 +238,11 @@ Names were renamed in the v2/MigrationProof refactor; legacy `TestVerifyLegacyPr
 
 ### Known multisig test-coverage gaps
 
-Coverage is strong at unit and preflight layers. The remaining gaps are all at the **integration layer**, where a hand-crafted `MsgClaim` / `MsgMigrateValidator` would exercise a consensus rule through the full ante-handler + msg-server pipeline (not just via the helper function in isolation). Worth adding before mainnet:
+Coverage at unit, preflight, and integration layers is complete for all consensus invariants. One remaining gap, low priority:
 
 | # | Gap | Why it matters |
 | --- | --- | --- |
-| 1 | `TestClaimLegacyAccount_Multisig_MirrorSourceMismatch_Shape` | Cross-side shape mismatch (single legacy + multi new, or vice versa) at the full `Msg*.ValidateBasic` path. Currently only exercised in isolation via `TestValidateProofPair_MirrorSourceRule`. |
-| 2 | `TestClaimLegacyAccount_Multisig_MirrorSourceMismatch_KN` | Cross-side K/N mismatch (e.g. 2-of-3 legacy → 3-of-5 new) through the full msg-server pipeline. Distinct from `WrongThreshold_LegacySide/NewSide`, which test single-side `signer_indices` truncation, not cross-side K/N divergence. |
-| 3 | `TestClaimLegacyAccount_Multisig_SignerIndicesMismatch` | Cross-side disjoint K-subsets (legacy signed at `[0,1]`, new at `[0,2]`) rejected at integration — helper test `TestValidateProofPair_SignerIndicesMustMatch` covers it in isolation. |
-| 4 | `TestClaimLegacyAccount_Multisig_DuplicateSubKey_Submit` | Duplicate sub-key rejected at submit time via `MsgClaim`. Currently covered in preflight (`TestMigrationEstimate_Multisig_DuplicateSubKey`) and at unit level (`TestMultisigProof_ValidateBasic_RejectsDuplicateSubKeys`); no integration-level submit-path test. |
-| 5 | `tests_evmigration -mode=multisig-large-kn` | Devnet mode exercising a larger K/N combination (e.g. 5-of-7). All current devnet modes are 2-of-3; a larger case would stress governance-param interaction and sub-key fixture generation at scale. Low priority — unit `MigrationEstimate_Multisig_TooManySubKeys` already exercises the cap boundary. |
-
-All five are additive regression tests, not design changes — each pins a consensus invariant that's already enforced, at a layer where a subtle regression could slip past unit coverage. Items 1–4 are **Medium** priority; item 5 is **Low**.
+| 1 | `tests_evmigration -mode=multisig-large-kn` | Devnet mode exercising a larger K/N combination (e.g. 5-of-7). All current devnet modes are 2-of-3; a larger case would stress governance-param interaction and sub-key fixture generation at scale. **Low** priority — unit `MigrationEstimate_Multisig_TooManySubKeys` already exercises the cap boundary, and `TestQueryMigrationEstimate_Multisig_SizeCapped` at integration covers the reject-at-21 case. |
 
 ---
 

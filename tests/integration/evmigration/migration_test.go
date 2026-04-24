@@ -1262,6 +1262,156 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_Multisig_ADR036_BothS
 	s.Require().Equal(newMultiPK.Bytes(), newAcc.GetPubKey().Bytes())
 }
 
+// --- Mirror-source rule at full Msg*.ValidateBasic path ---
+//
+// Each of the four tests below exercises a consensus invariant (mirror-source
+// shape, cross-side K/N, matching signer_indices, sub-key uniqueness) via a
+// hand-crafted MsgClaimLegacyAccount. The cross-side pair check
+// (ValidateProofPair) lives in Msg*.ValidateBasic, which in production is
+// auto-invoked by baseapp's msg_service_router before dispatch. These tests
+// call s.msgServer.ClaimLegacyAccount directly (bypassing the router), so
+// they explicitly invoke msg.ValidateBasic() first to mirror production —
+// otherwise the cross-side check wouldn't fire and we'd only exercise the
+// per-proof validation path inside VerifyMigrationProof.
+
+// TestClaimLegacyAccount_Multisig_MirrorSourceMismatch_Shape pairs a multisig
+// legacy proof with a single-key new proof. ValidateProofPair rejects shape
+// mismatches with ErrMirrorSourceMismatch before any crypto work.
+func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_Multisig_MirrorSourceMismatch_Shape() {
+	s.enableMigration()
+
+	coins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 500_000))
+	legacyMultiPK, legacyPrivs, legacyAddr := s.createFundedMultisigAccount(2, 3, coins)
+	newPrivKey, newAddr := createNewEVMAddress(s.T())
+
+	legacyProof := SignMultisigProof(s.T(), integrationTestChainID, "claim",
+		legacyMultiPK, legacyPrivs, []int{0, 2}, legacyAddr, newAddr,
+		types.SigFormat_SIG_FORMAT_CLI)
+	// Pair it with a SINGLE-KEY new proof — shape mismatch.
+	msg := &types.MsgClaimLegacyAccount{
+		LegacyAddress: legacyAddr.String(),
+		NewAddress:    newAddr.String(),
+		LegacyProof:   *legacyProof,
+		NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
+			PubKey:    newPrivKey.PubKey().(*evmcryptotypes.PubKey).Key,
+			Signature: signNewMigration(s.T(), "claim", newPrivKey, legacyAddr, newAddr),
+			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
+		}}},
+	}
+	// Mirror production: msg_service_router calls msg.ValidateBasic() before
+	// dispatch. That's where ValidateProofPair fires.
+	err := msg.ValidateBasic()
+	if err == nil {
+		_, err = s.msgServer.ClaimLegacyAccount(s.ctx, msg)
+	}
+	s.Require().Error(err)
+	s.Require().ErrorIs(err, types.ErrMirrorSourceMismatch)
+	s.Require().ErrorContains(err, "shape")
+}
+
+// TestClaimLegacyAccount_Multisig_MirrorSourceMismatch_KN pairs a 2-of-3
+// legacy with a 3-of-5 new — same shape, different K and N. ValidateProofPair
+// rejects with ErrMirrorSourceMismatch before verifying either proof.
+func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_Multisig_MirrorSourceMismatch_KN() {
+	s.enableMigration()
+
+	coins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 500_000))
+	legacyMultiPK, legacyPrivs, legacyAddr := s.createFundedMultisigAccount(2, 3, coins)
+	newMultiPK, newPrivs, newAddr := BuildMultisigNewAccount(s.T(), 3, 5) // K=3, N=5
+
+	legacyProof := SignMultisigProof(s.T(), integrationTestChainID, "claim",
+		legacyMultiPK, legacyPrivs, []int{0, 2}, legacyAddr, newAddr,
+		types.SigFormat_SIG_FORMAT_CLI)
+	newProof := SignNewMultisigProof(s.T(), integrationTestChainID, "claim",
+		newMultiPK, newPrivs, []int{0, 2, 4}, legacyAddr, newAddr,
+		types.SigFormat_SIG_FORMAT_CLI)
+
+	msg := &types.MsgClaimLegacyAccount{
+		LegacyAddress: legacyAddr.String(),
+		NewAddress:    newAddr.String(),
+		LegacyProof:   *legacyProof,
+		NewProof:      *newProof,
+	}
+	err := msg.ValidateBasic()
+	if err == nil {
+		_, err = s.msgServer.ClaimLegacyAccount(s.ctx, msg)
+	}
+	s.Require().Error(err)
+	s.Require().ErrorIs(err, types.ErrMirrorSourceMismatch)
+	// Either threshold or sub_pub_keys count will be the rejection reason;
+	// both qualify — just pin the rule.
+}
+
+// TestClaimLegacyAccount_Multisig_SignerIndicesMismatch pairs legacy signed
+// at [0,1] with new signed at [0,2] — same shape and K/N, but the two
+// K-subsets are disjoint. ValidateProofPair requires legacy_proof.
+// signer_indices == new_proof.signer_indices.
+func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_Multisig_SignerIndicesMismatch() {
+	s.enableMigration()
+
+	coins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 500_000))
+	legacyMultiPK, legacyPrivs, legacyAddr := s.createFundedMultisigAccount(2, 3, coins)
+	newMultiPK, newPrivs, newAddr := BuildMultisigNewAccount(s.T(), 2, 3)
+
+	// Legacy signs at [0,1]; new signs at [0,2]. Cross-side K-subsets disjoint.
+	legacyProof := SignMultisigProof(s.T(), integrationTestChainID, "claim",
+		legacyMultiPK, legacyPrivs, []int{0, 1}, legacyAddr, newAddr,
+		types.SigFormat_SIG_FORMAT_CLI)
+	newProof := SignNewMultisigProof(s.T(), integrationTestChainID, "claim",
+		newMultiPK, newPrivs, []int{0, 2}, legacyAddr, newAddr,
+		types.SigFormat_SIG_FORMAT_CLI)
+
+	msg := &types.MsgClaimLegacyAccount{
+		LegacyAddress: legacyAddr.String(),
+		NewAddress:    newAddr.String(),
+		LegacyProof:   *legacyProof,
+		NewProof:      *newProof,
+	}
+	err := msg.ValidateBasic()
+	if err == nil {
+		_, err = s.msgServer.ClaimLegacyAccount(s.ctx, msg)
+	}
+	s.Require().Error(err)
+	s.Require().ErrorIs(err, types.ErrMirrorSourceMismatch)
+	s.Require().ErrorContains(err, "signer_indices")
+}
+
+// TestClaimLegacyAccount_Multisig_DuplicateSubKey_Submit builds an otherwise-
+// valid multisig→multisig pair, then mutates the legacy-side sub_pub_keys to
+// duplicate position 0 into position 2. MultisigProof.validateBasic rejects
+// this at Msg*.ValidateBasic with ErrInvalidMigrationPubKey. Complements the
+// preflight coverage in TestMigrationEstimate_Multisig_DuplicateSubKey.
+func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_Multisig_DuplicateSubKey_Submit() {
+	s.enableMigration()
+
+	coins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 500_000))
+	legacyMultiPK, legacyPrivs, legacyAddr := s.createFundedMultisigAccount(2, 3, coins)
+	newMultiPK, newPrivs, newAddr := BuildMultisigNewAccount(s.T(), 2, 3)
+
+	legacyProof := SignMultisigProof(s.T(), integrationTestChainID, "claim",
+		legacyMultiPK, legacyPrivs, []int{0, 2}, legacyAddr, newAddr,
+		types.SigFormat_SIG_FORMAT_CLI)
+	// Duplicate legacy sub-key at position 0 into position 2 after signing —
+	// ValidateBasic runs before VerifyMigrationProof, so we can stay with the
+	// original sub-sigs; the test checks the structural rejection only.
+	lm := legacyProof.GetMultisig()
+	lm.SubPubKeys[2] = append([]byte(nil), lm.SubPubKeys[0]...)
+	newProof := SignNewMultisigProof(s.T(), integrationTestChainID, "claim",
+		newMultiPK, newPrivs, []int{0, 2}, legacyAddr, newAddr,
+		types.SigFormat_SIG_FORMAT_CLI)
+
+	msg := &types.MsgClaimLegacyAccount{
+		LegacyAddress: legacyAddr.String(),
+		NewAddress:    newAddr.String(),
+		LegacyProof:   *legacyProof,
+		NewProof:      *newProof,
+	}
+	_, err := s.msgServer.ClaimLegacyAccount(s.ctx, msg)
+	s.Require().Error(err)
+	s.Require().ErrorIs(err, types.ErrInvalidMigrationPubKey)
+	s.Require().ErrorContains(err, "duplicates sub_pub_keys[0]")
+}
+
 // TestMigrateValidator_RejectsDestinationAlreadyValidator verifies that
 // MigrateValidator rejects a destination address whose ValAddress is already a
 // validator operator. Without the guard, MigrateValidatorRecord.SetValidator

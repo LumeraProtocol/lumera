@@ -1102,9 +1102,15 @@ func cmdCombineProof() *cobra.Command {
 into a migration transaction. Validates all inputs agree on legacy_address,
 new_address, chain_id, evm_chain_id, kind, sig_format (per side), threshold
 (per side), and sub_pub_keys (per side). Verifies each partial signature
-cryptographically; drops invalid ones with a stderr warning and selects the K
-valid partials with lowest ascending indices. Writes an unsigned migration tx
-to --out, with both legacy_proof and new_proof populated.`,
+cryptographically and drops invalid ones with a stderr warning. For multisig-
+multisig migrations, INTERSECTS the valid signer-index sets across the two
+sides and picks the first K indices present on BOTH — this makes the
+resulting legacy_proof.signer_indices equal new_proof.signer_indices, as
+required by the consensus mirror-source rule. A one-sided partial (signed
+only via --from or only via --new-key) contributes toward quorum only when
+another co-signer supplies the other-side signature at the same index.
+Writes an unsigned migration tx to --out, with both legacy_proof and
+new_proof populated.`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clientCtx, err := client.GetClientTxContext(cmd)

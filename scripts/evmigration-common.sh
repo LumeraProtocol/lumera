@@ -808,9 +808,12 @@ read_migration_tx_file() {
 
 # summarize_partials <files...>
 # Reads each partial via read_proof_file, enforces cross-file consistency on
-# BOTH sides (legacy + new), and prints per-side K-of-N entry-presence matrices
-# to stderr. Returns 0 iff distinct-signer counts >= threshold on BOTH sides,
-# non-zero otherwise. The shape-mirror rule implies legacy K==new K and legacy
+# BOTH sides (legacy + new), and prints per-side K-of-N entry-presence
+# matrices plus the cross-side matching-index count to stderr. Returns 0 iff
+# the count of indices signed on BOTH sides meets threshold — per-side
+# thresholds alone are insufficient, because the consensus mirror-source rule
+# requires legacy_proof.signer_indices == new_proof.signer_indices. The
+# shape-mirror rule implies legacy K==new K and legacy
 # N==new N, but we check per side regardless to surface the actual gap.
 summarize_partials() {
   local files=("$@")

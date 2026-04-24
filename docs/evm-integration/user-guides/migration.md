@@ -592,7 +592,7 @@ lumerad tx evmigration sign-proof proof.json \
   --out my-partial.json
 ```
 
-- `--from` signs the legacy half; `--new-key` signs the new half. At least one is required; a co-signer who holds only one sub-key passes only that flag.
+- `--from` signs the legacy half; `--new-key` signs the new half. At least one is required. A co-signer who holds only one sub-key may pass just that flag, but **one-sided partials do not count toward quorum by themselves** — the consensus mirror-source rule requires the same K signer positions to approve both halves, so combine-proof only counts an index that has a valid signature on *both* sides. One-sided partials contribute only when another co-signer supplies the other-side signature at the same index.
 - `sign-proof` is idempotent: re-running with the same key replaces that signer's entry on the corresponding side.
 - `sign-proof` rejects a file whose `payload_hex` doesn't match a canonical reconstruction from the other fields — catches accidental tampering between steps.
 

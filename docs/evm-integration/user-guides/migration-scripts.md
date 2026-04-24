@@ -414,7 +414,7 @@ Each co-signer holds their legacy Cosmos sub-key **and** their destination-side 
   --out alice-partial.json
 ```
 
-`--from` signs the legacy half; `--new-key` signs the new half. At least one is required; a co-signer who holds only one sub-key passes only that flag. The wrapper validates the proof file's `payload_hex` against a canonical reconstruction (catches tampering; exit 9), confirms `--from`'s pubkey is in `legacy.sub_pub_keys`, and `--new-key`'s pubkey is in `new.sub_pub_keys` (catches "wrong signer" mistakes; exit 1). Re-running overwrites the signer's prior entries on both sides (idempotent). Each signer sends their `*-partial.json` back to the coordinator.
+`--from` signs the legacy half; `--new-key` signs the new half. At least one is required. A co-signer who holds only one sub-key may pass just that flag, but **one-sided partials do not count toward quorum by themselves** — the mirror-source rule requires the same K signer positions to approve both halves, so the wrapper's `combine` step only counts an index that has a valid signature on *both* sides. One-sided partials contribute only when another co-signer supplies the other-side signature at the same index. The wrapper validates the proof file's `payload_hex` against a canonical reconstruction (catches tampering; exit 9), confirms `--from`'s pubkey is in `legacy.sub_pub_keys`, and `--new-key`'s pubkey is in `new.sub_pub_keys` (catches "wrong signer" mistakes; exit 1). Re-running overwrites the signer's prior entries on both sides (idempotent). Each signer sends their `*-partial.json` back to the coordinator.
 
 ### Step 3 — Coordinator: combine partials
 

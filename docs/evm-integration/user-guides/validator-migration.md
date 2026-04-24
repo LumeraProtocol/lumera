@@ -381,7 +381,7 @@ This section only applies if your validator's **operator key** is a K-of-N multi
 
 7. **Restart the validator** and verify as in steps 6–7 of the single-sig flow. Note: the queryable operator address is now the new multisig bech32 (`val-msig-new`), not an EOA.
 
-`combine-proof` verifies each partial under its sub-pub-key on **both sides**, skips invalid entries, and selects the first K valid partials per side in signer-index order. If fewer than K verify on either side, it errors with `need <K> valid partial signatures on <side> side, have <N>` and writes nothing.
+`combine-proof` verifies each partial under its sub-pub-key on **both sides**, skips invalid entries, then **intersects** the valid signer-index sets across the two sides and selects the first K indices present on BOTH. This is what makes `legacy_proof.signer_indices == new_proof.signer_indices` (the consensus mirror-source rule). A co-signer who signs only one side (e.g. lost access to their eth sub-key) doesn't contribute toward quorum unless another co-signer supplies the other side's signature at the same index. If the intersection has fewer than K entries, combine-proof errors with `need <K> valid partial signatures signed on BOTH sides at matching indices, have <N>` and writes nothing.
 
 ### Multisig-specific notes
 

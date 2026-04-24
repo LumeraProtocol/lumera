@@ -206,6 +206,22 @@ func validateSideSpec(label string, s *SideSpec) error {
 	case isMulti && int(s.Threshold) > len(s.SubPubKeys):
 		return fmt.Errorf("%s side: threshold=%d exceeds sub_pub_keys count=%d", label, s.Threshold, len(s.SubPubKeys))
 	}
+	// Pairwise-uniqueness guard for multisig sides. MultisigProof.validateBasic
+	// rejects duplicates at consensus (one keyholder would count as two distinct
+	// signers against K-of-N), so surface it here — this catches operators who
+	// run `generate-proof-payload` directly against a legacy multisig that
+	// already has duplicate sub-keys on-chain (SDK construction permits it) AND
+	// any partial file loaded via LoadPartialProof whose authoring tool didn't
+	// check.
+	if isMulti {
+		seen := make(map[string]int, len(s.SubPubKeys))
+		for i, k := range s.SubPubKeys {
+			if prior, dup := seen[k]; dup {
+				return fmt.Errorf("%s side: sub_pub_keys[%d] duplicates sub_pub_keys[%d]; each sub-key must be distinct", label, i, prior)
+			}
+			seen[k] = i
+		}
+	}
 	if s.SigFormat == "" {
 		return fmt.Errorf("%s side: sig_format empty", label)
 	}

@@ -439,7 +439,13 @@ New-side partials (2-of-3 required):
 New threshold satisfied: yes (2 >= 2)
 ```
 
-If either side is short of threshold, it aborts with exit 4 before calling `lumerad`. If `lumerad combine-proof` itself reports fewer than K *cryptographically valid* signatures on either side (wrong key, tampered payload), the wrapper maps that to exit 4 as well.
+The wrapper also computes the **matching-index** count — the size of the intersection between legacy and new signer-index sets — and gates its return on that count meeting K. Per-side thresholds can BOTH report "yes" while the intersection is below K (e.g. legacy signed at `{0,1}`, new signed at `{0,2}` — each side has 2 entries, but only index 0 is signed on both). When the intersection is short, the wrapper prints:
+
+```text
+Matching-index threshold satisfied: no (1 < 2) — one-sided partials do not count
+```
+
+and aborts with exit 4 before calling `lumerad`. If `lumerad combine-proof` itself reports fewer than K *cryptographically valid* signatures signed on both sides at matching indices (wrong key, tampered payload), the wrapper maps that to exit 4 as well. This mirrors the consensus invariant: `legacy_proof.signer_indices == new_proof.signer_indices`.
 
 ### Step 4 — Coordinator: submit
 

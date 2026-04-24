@@ -752,7 +752,7 @@ Frontends should branch on `is_multisig` to select the correct proof-building UX
 - `is_multisig = false` → standard single-key flow (single Keplr `signArbitrary` call)
 - `is_multisig = true` → offline four-step multisig flow (not supported by the portal wizard; direct users to the CLI)
 
-If `is_multisig = true` and `num_signers > MaxMultisigSubKeys` or any sub-key is non-secp256k1, `would_succeed` is `false` and `rejection_reason` describes the unsupported shape.
+If `is_multisig = true` and any of the following holds — `num_signers > MaxMultisigSubKeys`, any sub-key is non-secp256k1, or any two sub-key entries are byte-equal — `would_succeed` is `false` and `rejection_reason` describes the unsupported shape. (The duplicate-sub-key case is flagged at preflight because SDK multisig construction permits duplicates, but the migration verifier `MultisigProof.validateBasic` rejects them at consensus.)
 
 ---
 

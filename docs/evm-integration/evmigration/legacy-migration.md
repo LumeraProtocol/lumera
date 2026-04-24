@@ -175,8 +175,11 @@ Migration of a multisig account uses four offline commands. See [migration.md](.
 
 ### MigrationEstimate preflight
 
-The `MigrationEstimate` query (`lumerad query evmigration migration-estimate <address>`) pre-flight check detects unsupported multisig shapes:
+The `MigrationEstimate` query (`lumerad query evmigration migration-estimate <address>`) pre-flight check detects multisig shapes that would fail at `ValidateBasic`:
 
-- If `is_multisig = true` and the sub-key types are all `secp256k1` and `num_signers <= MaxMultisigSubKeys`, the estimate returns `would_succeed: true`.
-- If any sub-key is not `secp256k1`, or if `num_signers > MaxMultisigSubKeys`, the estimate returns `would_succeed: false` with a descriptive `rejection_reason`.
+- `would_succeed: true` requires all of: `is_multisig = true`, every sub-key is `secp256k1`, no duplicate sub-key entries, and `num_signers <= MaxMultisigSubKeys`.
+- `would_succeed: false` fires with a descriptive `rejection_reason` when any of:
+  - any sub-key is not `secp256k1` (unsupported shape);
+  - any two sub-key entries are byte-equal ("sub_pub_keys[i] duplicates sub_pub_keys[j]" — SDK multisig construction permits duplicates, but `MultisigProof.validateBasic` rejects them at consensus);
+  - `num_signers > MaxMultisigSubKeys` (governance-controlled cap).
 - `is_multisig`, `threshold`, and `num_signers` are included in the response so the portal and CLI can branch on proof shape before prompting users.

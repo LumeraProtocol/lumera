@@ -624,6 +624,38 @@ JSON
   [[ "$output" == *"no"* ]]
 }
 
+@test "summarize_partials fails when per-side quorum is met but matching-index quorum is not" {
+  setup_shim
+  local tmp; tmp=$(mktemp -d)
+  # Build two synthetic partials that together satisfy per-side K=2 on
+  # both legacy and new, but whose intersection is only 1 index — so the
+  # wrapper must fail the matching-index check even though legacy and
+  # new each have two distinct signer indices.
+  #   alice signs legacy[0] + new[0]
+  #   bob-ish signs legacy[1] only
+  #   carol-ish signs new[1] only
+  # Combined: legacy_indices={0,1}, new_indices={0,1} at first glance —
+  # but partial-bob.json and partial-carol.json carry signatures for BOTH
+  # sides, so we synthesize a one-sided variant.
+  jq '.partial_new_signatures = []' "$BATS_TEST_DIRNAME/fixtures/partial-bob.json" \
+    > "$tmp/bob-legacy-only.json"
+  jq '.partial_legacy_signatures = []' "$BATS_TEST_DIRNAME/fixtures/partial-carol.json" \
+    > "$tmp/carol-new-only.json"
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    summarize_partials \
+      '"$BATS_TEST_DIRNAME"'/fixtures/partial-alice.json \
+      '"$tmp"'/bob-legacy-only.json \
+      '"$tmp"'/carol-new-only.json
+  '
+  rm -rf "$tmp"
+  # Per-side matrices both report "yes" (legacy [0,1], new [0,2]) but the
+  # shared-index count is 1 — below K=2. Wrapper returns non-zero.
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Matching-index threshold satisfied: no"* ]]
+  [[ "$output" == *"one-sided partials do not count"* ]]
+}
+
 @test "summarize_partials exits 9 on cross-file chain_id mismatch" {
   setup_shim
   local tmp; tmp=$(mktemp)

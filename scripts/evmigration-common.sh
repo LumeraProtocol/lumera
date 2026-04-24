@@ -933,7 +933,34 @@ summarize_partials() {
     else
       printf 'New threshold satisfied: no (%s < %s)\n' "$new_present" "$first_new_threshold"
     fi
+
+    # Shared-index count is what actually drives combine-proof's
+    # intersection: legacy_proof.signer_indices must equal new_proof.
+    # signer_indices at consensus (mirror-source rule), so only indices
+    # signed on BOTH sides count toward the real quorum. Per-side
+    # thresholds can BOTH say "yes" and this still be short.
+    local shared_count=0
+    local i
+    for (( i=0; i<first_leg_subcount; i++ )); do
+      if [[ -n "${legacy_index_to_file[$i]:-}" && -n "${new_index_to_file[$i]:-}" ]]; then
+        shared_count=$(( shared_count + 1 ))
+      fi
+    done
+    if (( shared_count >= first_leg_threshold )); then
+      printf 'Matching-index threshold satisfied: yes (%s >= %s)\n' "$shared_count" "$first_leg_threshold"
+    else
+      printf 'Matching-index threshold satisfied: no (%s < %s) — one-sided partials do not count\n' "$shared_count" "$first_leg_threshold"
+    fi
   } >&2
 
-  (( leg_present >= first_leg_threshold )) && (( new_present >= first_new_threshold ))
+  # Gate return on the shared-index count, NOT per-side thresholds. This
+  # mirrors what `lumerad combine-proof` enforces.
+  local shared_gate=0
+  local j
+  for (( j=0; j<first_leg_subcount; j++ )); do
+    if [[ -n "${legacy_index_to_file[$j]:-}" && -n "${new_index_to_file[$j]:-}" ]]; then
+      shared_gate=$(( shared_gate + 1 ))
+    fi
+  done
+  (( shared_gate >= first_leg_threshold ))
 }

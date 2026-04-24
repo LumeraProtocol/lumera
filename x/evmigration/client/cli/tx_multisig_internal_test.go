@@ -1026,6 +1026,25 @@ func TestBuildMigrationProofs_IntersectionHasOneButNeedsK(t *testing.T) {
 	require.Contains(t, err.Error(), "have 1")
 }
 
+// TestValidateSideSpec_RejectsDuplicateSubKeys pins the CLI-layer duplicate
+// check. A legacy multisig with duplicate on-chain sub-keys (SDK construction
+// permits this) should be rejected by validateSideSpec before a proof.json is
+// written or loaded — not just at ValidateBasic/submit time, since the
+// documented raw-CLI flow doesn't require MigrationEstimate.
+func TestValidateSideSpec_RejectsDuplicateSubKeys(t *testing.T) {
+	// Positions 0 and 2 share the same base64-encoded sub-key.
+	shared := base64.StdEncoding.EncodeToString(secp256k1.GenPrivKey().PubKey().Bytes())
+	other := base64.StdEncoding.EncodeToString(secp256k1.GenPrivKey().PubKey().Bytes())
+	side := &SideSpec{
+		Threshold:  2,
+		SubPubKeys: []string{shared, other, shared},
+		SigFormat:  "SIG_FORMAT_CLI",
+	}
+	err := validateSideSpec("legacy", side)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "sub_pub_keys[2] duplicates sub_pub_keys[0]")
+}
+
 // TestBuildMigrationProofs_RejectsMixedShape covers the final dispatcher
 // branch: a single-key legacy paired with a multisig new (or vice versa) is
 // caught here before reaching ValidateBasic, so combine-proof never writes

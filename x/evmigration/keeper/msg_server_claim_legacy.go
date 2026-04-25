@@ -59,6 +59,14 @@ func (ms msgServer) ClaimLegacyAccount(goCtx context.Context, msg *types.MsgClai
 	if err := msg.NewProof.ValidateParams(params.MaxMultisigSubKeys); err != nil {
 		return nil, err
 	}
+	// Defense-in-depth: enforce the cross-side mirror-source rule even when a
+	// caller bypasses the SDK msg_service_router (and thus skips
+	// MsgClaimLegacyAccount.ValidateBasic). The router invokes ValidateBasic in
+	// production; this re-check guarantees the same invariant for any direct
+	// keeper-level caller (notably integration tests).
+	if err := types.ValidateProofPair(&msg.LegacyProof, &msg.NewProof); err != nil {
+		return nil, err
+	}
 	if err := VerifyMigrationProof(
 		ctx.ChainID(), lcfg.EVMChainID, migrationPayloadKindClaim,
 		legacyAddr, newAddr, legacyAddr,

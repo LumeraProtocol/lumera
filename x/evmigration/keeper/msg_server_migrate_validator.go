@@ -105,6 +105,14 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 	if err := msg.NewProof.ValidateParams(params.MaxMultisigSubKeys); err != nil {
 		return nil, err
 	}
+	// Defense-in-depth: enforce the cross-side mirror-source rule even when a
+	// caller bypasses the SDK msg_service_router (and thus skips
+	// MsgMigrateValidator.ValidateBasic). The router invokes ValidateBasic in
+	// production; this re-check guarantees the same invariant for any direct
+	// keeper-level caller (notably integration tests).
+	if err := types.ValidateProofPair(&msg.LegacyProof, &msg.NewProof); err != nil {
+		return nil, err
+	}
 	if err := VerifyMigrationProof(
 		ctx.ChainID(), lcfg.EVMChainID, migrationPayloadKindValidator,
 		legacyAddr, newAddr, legacyAddr,

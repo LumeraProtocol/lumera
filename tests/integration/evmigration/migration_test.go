@@ -806,26 +806,29 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_LegacyAccountRemoved(
 
 // --- Multisig integration tests ---
 
-// TestClaimLegacyAccount_Multisig_Success migrates a 2-of-3 multisig legacy
-// account to a single eth EOA.
+// TestClaimLegacyAccount_Multisig_Success migrates a 2-of-3 cosmos-secp256k1
+// multisig legacy account to a 2-of-3 eth-secp256k1 multisig destination.
+// Both sides MUST share shape, K, N, and signer_indices to satisfy the
+// mirror-source rule enforced by ValidateProofPair.
 func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_Multisig_Success() {
 	s.enableMigration()
 
 	coins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 1_000_000))
-	multiPK, privs, legacyAddr := s.createFundedMultisigAccount(2, 3, coins)
-	newPrivKey, newAddr := createNewEVMAddress(s.T())
+	legacyMultiPK, legacyPrivs, legacyAddr := s.createFundedMultisigAccount(2, 3, coins)
+	newMultiPK, newPrivs, newAddr := BuildMultisigNewAccount(s.T(), 2, 3)
 
-	proof := SignMultisigProof(s.T(), integrationTestChainID, "claim", multiPK, privs, []int{0, 2}, legacyAddr, newAddr, types.SigFormat_SIG_FORMAT_CLI)
+	legacyProof := SignMultisigProof(s.T(), integrationTestChainID, "claim",
+		legacyMultiPK, legacyPrivs, []int{0, 2}, legacyAddr, newAddr,
+		types.SigFormat_SIG_FORMAT_CLI)
+	newProof := SignNewMultisigProof(s.T(), integrationTestChainID, "claim",
+		newMultiPK, newPrivs, []int{0, 2}, legacyAddr, newAddr,
+		types.SigFormat_SIG_FORMAT_CLI)
 
 	msg := &types.MsgClaimLegacyAccount{
 		NewAddress:    newAddr.String(),
 		LegacyAddress: legacyAddr.String(),
-		LegacyProof:   *proof,
-		NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
-			PubKey:    newPrivKey.PubKey().(*evmcryptotypes.PubKey).Key,
-			Signature: signNewMigration(s.T(), "claim", newPrivKey, legacyAddr, newAddr),
-			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
-		}}},
+		LegacyProof:   *legacyProof,
+		NewProof:      *newProof,
 	}
 	_, err := s.msgServer.ClaimLegacyAccount(s.ctx, msg)
 	s.Require().NoError(err)
@@ -840,48 +843,56 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_Multisig_Success() {
 	s.Require().Equal(newAddr.String(), rec.NewAddress)
 }
 
-// TestClaimLegacyAccount_Multisig_ADR036 verifies ADR-036 sub-signature format.
+// TestClaimLegacyAccount_Multisig_ADR036 verifies ADR-036 sub-signature format
+// on the legacy (cosmos) side. Pairs a 2-of-3 ADR-036 legacy proof with a
+// 2-of-3 CLI-format new-side multisig proof so the mirror-source rule holds.
+// (The new side is eth-secp256k1, where ADR-036 doesn't apply.)
 func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_Multisig_ADR036() {
 	s.enableMigration()
 
 	coins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 500_000))
-	multiPK, privs, legacyAddr := s.createFundedMultisigAccount(2, 3, coins)
-	newPrivKey, newAddr := createNewEVMAddress(s.T())
+	legacyMultiPK, legacyPrivs, legacyAddr := s.createFundedMultisigAccount(2, 3, coins)
+	newMultiPK, newPrivs, newAddr := BuildMultisigNewAccount(s.T(), 2, 3)
 
-	proof := SignMultisigProof(s.T(), integrationTestChainID, "claim", multiPK, privs, []int{1, 2}, legacyAddr, newAddr, types.SigFormat_SIG_FORMAT_ADR036)
+	legacyProof := SignMultisigProof(s.T(), integrationTestChainID, "claim",
+		legacyMultiPK, legacyPrivs, []int{1, 2}, legacyAddr, newAddr,
+		types.SigFormat_SIG_FORMAT_ADR036)
+	newProof := SignNewMultisigProof(s.T(), integrationTestChainID, "claim",
+		newMultiPK, newPrivs, []int{1, 2}, legacyAddr, newAddr,
+		types.SigFormat_SIG_FORMAT_CLI)
 
 	msg := &types.MsgClaimLegacyAccount{
 		NewAddress:    newAddr.String(),
 		LegacyAddress: legacyAddr.String(),
-		LegacyProof:   *proof,
-		NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
-			PubKey:    newPrivKey.PubKey().(*evmcryptotypes.PubKey).Key,
-			Signature: signNewMigration(s.T(), "claim", newPrivKey, legacyAddr, newAddr),
-			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
-		}}},
+		LegacyProof:   *legacyProof,
+		NewProof:      *newProof,
 	}
 	_, err := s.msgServer.ClaimLegacyAccount(s.ctx, msg)
 	s.Require().NoError(err)
 }
 
-// TestClaimLegacyAccount_Multisig_Replay verifies the replay guard on a migrated multisig.
+// TestClaimLegacyAccount_Multisig_Replay verifies the replay guard on a
+// migrated multisig. Both sides are 2-of-3 multisig with matching signer
+// indices to satisfy the mirror-source rule.
 func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_Multisig_Replay() {
 	s.enableMigration()
 
 	coins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 1_000_000))
-	multiPK, privs, legacyAddr := s.createFundedMultisigAccount(2, 3, coins)
-	newPrivKey, newAddr := createNewEVMAddress(s.T())
+	legacyMultiPK, legacyPrivs, legacyAddr := s.createFundedMultisigAccount(2, 3, coins)
+	newMultiPK, newPrivs, newAddr := BuildMultisigNewAccount(s.T(), 2, 3)
 
-	proof := SignMultisigProof(s.T(), integrationTestChainID, "claim", multiPK, privs, []int{0, 1}, legacyAddr, newAddr, types.SigFormat_SIG_FORMAT_CLI)
+	legacyProof := SignMultisigProof(s.T(), integrationTestChainID, "claim",
+		legacyMultiPK, legacyPrivs, []int{0, 1}, legacyAddr, newAddr,
+		types.SigFormat_SIG_FORMAT_CLI)
+	newProof := SignNewMultisigProof(s.T(), integrationTestChainID, "claim",
+		newMultiPK, newPrivs, []int{0, 1}, legacyAddr, newAddr,
+		types.SigFormat_SIG_FORMAT_CLI)
+
 	msg := &types.MsgClaimLegacyAccount{
 		NewAddress:    newAddr.String(),
 		LegacyAddress: legacyAddr.String(),
-		LegacyProof:   *proof,
-		NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
-			PubKey:    newPrivKey.PubKey().(*evmcryptotypes.PubKey).Key,
-			Signature: signNewMigration(s.T(), "claim", newPrivKey, legacyAddr, newAddr),
-			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
-		}}},
+		LegacyProof:   *legacyProof,
+		NewProof:      *newProof,
 	}
 	_, err := s.msgServer.ClaimLegacyAccount(s.ctx, msg)
 	s.Require().NoError(err)
@@ -892,26 +903,32 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_Multisig_Replay() {
 	s.Require().ErrorContains(err, "has already been migrated")
 }
 
-// TestClaimLegacyAccount_Multisig_CorruptedSubSig verifies sub-sig tampering is rejected.
+// TestClaimLegacyAccount_Multisig_CorruptedSubSig verifies sub-sig tampering
+// on the legacy side is rejected. Both sides are 2-of-3 multisig with matching
+// signer indices, so the message clears ValidateProofPair and reaches the
+// per-side VerifyMigrationProof, which is what catches the corrupted sub-sig.
 func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_Multisig_CorruptedSubSig() {
 	s.enableMigration()
 
 	coins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 1_000_000))
-	multiPK, privs, legacyAddr := s.createFundedMultisigAccount(2, 3, coins)
-	newPrivKey, newAddr := createNewEVMAddress(s.T())
+	legacyMultiPK, legacyPrivs, legacyAddr := s.createFundedMultisigAccount(2, 3, coins)
+	newMultiPK, newPrivs, newAddr := BuildMultisigNewAccount(s.T(), 2, 3)
 
-	proof := SignMultisigProof(s.T(), integrationTestChainID, "claim", multiPK, privs, []int{0, 2}, legacyAddr, newAddr, types.SigFormat_SIG_FORMAT_CLI)
-	// Corrupt the first sub-signature.
-	proof.GetMultisig().SubSignatures[0][0] ^= 0xFF
+	legacyProof := SignMultisigProof(s.T(), integrationTestChainID, "claim",
+		legacyMultiPK, legacyPrivs, []int{0, 2}, legacyAddr, newAddr,
+		types.SigFormat_SIG_FORMAT_CLI)
+	// Corrupt the first sub-signature on the legacy side.
+	legacyProof.GetMultisig().SubSignatures[0][0] ^= 0xFF
+
+	newProof := SignNewMultisigProof(s.T(), integrationTestChainID, "claim",
+		newMultiPK, newPrivs, []int{0, 2}, legacyAddr, newAddr,
+		types.SigFormat_SIG_FORMAT_CLI)
 
 	msg := &types.MsgClaimLegacyAccount{
 		NewAddress:    newAddr.String(),
 		LegacyAddress: legacyAddr.String(),
-		LegacyProof:   *proof,
-		NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
-			Signature: signNewMigration(s.T(), "claim", newPrivKey, legacyAddr, newAddr),
-			SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
-		}}},
+		LegacyProof:   *legacyProof,
+		NewProof:      *newProof,
 	}
 	_, err := s.msgServer.ClaimLegacyAccount(s.ctx, msg)
 	s.Require().Error(err)
@@ -1153,37 +1170,40 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_MultisigVesting_ToMul
 }
 
 // TestClaimLegacyAccount_Multisig_WrongThreshold_LegacySide asserts that a
-// MultisigProof with fewer than K legacy sub-signatures is rejected by
-// ValidateBasic (threshold/signer_indices mismatch).
+// MultisigProof with fewer than K legacy sub-signatures is rejected. The
+// new side is a full 2-of-3 to satisfy the mirror-source shape rule;
+// truncating only the legacy SignerIndices/SubSignatures triggers the
+// length mismatch in ValidateProofPair (signer_indices length: legacy=1
+// new=2). Either ValidateBasic's per-side "expected exactly K signer_indices"
+// or ValidateProofPair's cross-side length check qualifies — both pin the
+// rule that legacy must contribute K signers.
 func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_Multisig_WrongThreshold_LegacySide() {
 	s.enableMigration()
 
 	coins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 500_000))
 	legacyMultiPK, legacyPrivs, legacyAddr := s.createFundedMultisigAccount(2, 3, coins)
-	newPrivKey, newAddr := createNewEVMAddress(s.T())
+	newMultiPK, newPrivs, newAddr := BuildMultisigNewAccount(s.T(), 2, 3)
 
-	// Build a 2-of-3 proof, then truncate to just one sub-sig / signer index
-	// so the proof is under threshold. The MultisigProof's Threshold field is
-	// still 2 (matching legacyMultiPK), but only 1 signer is supplied.
-	proof := SignMultisigProof(s.T(), integrationTestChainID, "claim",
+	// Build a 2-of-3 legacy proof, then truncate to just one sub-sig / signer
+	// index so the proof is under threshold. The MultisigProof's Threshold
+	// field is still 2 (matching legacyMultiPK), but only 1 signer is supplied.
+	legacyProof := SignMultisigProof(s.T(), integrationTestChainID, "claim",
 		legacyMultiPK, legacyPrivs, []int{0, 2}, legacyAddr, newAddr,
 		types.SigFormat_SIG_FORMAT_CLI)
-	proof.GetMultisig().SignerIndices = proof.GetMultisig().SignerIndices[:1]
-	proof.GetMultisig().SubSignatures = proof.GetMultisig().SubSignatures[:1]
+	legacyProof.GetMultisig().SignerIndices = legacyProof.GetMultisig().SignerIndices[:1]
+	legacyProof.GetMultisig().SubSignatures = legacyProof.GetMultisig().SubSignatures[:1]
+	newProof := SignNewMultisigProof(s.T(), integrationTestChainID, "claim",
+		newMultiPK, newPrivs, []int{0, 2}, legacyAddr, newAddr,
+		types.SigFormat_SIG_FORMAT_CLI)
 
 	msg := &types.MsgClaimLegacyAccount{
 		LegacyAddress: legacyAddr.String(),
 		NewAddress:    newAddr.String(),
-		LegacyProof:   *proof,
-		NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
-			PubKey:    newPrivKey.PubKey().(*evmcryptotypes.PubKey).Key,
-			Signature: signNewMigration(s.T(), "claim", newPrivKey, legacyAddr, newAddr),
-			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
-		}}},
+		LegacyProof:   *legacyProof,
+		NewProof:      *newProof,
 	}
 	_, err := s.msgServer.ClaimLegacyAccount(s.ctx, msg)
 	s.Require().Error(err)
-	// ValidateBasic rejects with "expected exactly K=... signer_indices, got ...".
 	s.Require().ErrorContains(err, "signer_indices")
 }
 
@@ -1229,8 +1249,10 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_Multisig_ADR036_BothS
 	legacyMultiPK, legacyPrivs, legacyAddr := s.createFundedMultisigAccount(2, 3, coins)
 	newMultiPK, newPrivs, newAddr := BuildMultisigNewAccount(s.T(), 2, 3)
 
+	// Mirror-source rule requires identical signer_indices on both sides;
+	// pick [1,2] for both (any matching K-subset works).
 	legacyProof := SignMultisigProof(s.T(), integrationTestChainID, "claim",
-		legacyMultiPK, legacyPrivs, []int{0, 1}, legacyAddr, newAddr,
+		legacyMultiPK, legacyPrivs, []int{1, 2}, legacyAddr, newAddr,
 		types.SigFormat_SIG_FORMAT_ADR036)
 	newProof := SignNewMultisigProof(s.T(), integrationTestChainID, "claim",
 		newMultiPK, newPrivs, []int{1, 2}, legacyAddr, newAddr,
@@ -1262,17 +1284,17 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_Multisig_ADR036_BothS
 	s.Require().Equal(newMultiPK.Bytes(), newAcc.GetPubKey().Bytes())
 }
 
-// --- Mirror-source rule at full Msg*.ValidateBasic path ---
+// --- Mirror-source rule at the msg-server boundary ---
 //
-// Each of the four tests below exercises a consensus invariant (mirror-source
-// shape, cross-side K/N, matching signer_indices, sub-key uniqueness) via a
-// hand-crafted MsgClaimLegacyAccount. The cross-side pair check
-// (ValidateProofPair) lives in Msg*.ValidateBasic, which in production is
-// auto-invoked by baseapp's msg_service_router before dispatch. These tests
-// call s.msgServer.ClaimLegacyAccount directly (bypassing the router), so
-// they explicitly invoke msg.ValidateBasic() first to mirror production —
-// otherwise the cross-side check wouldn't fire and we'd only exercise the
-// per-proof validation path inside VerifyMigrationProof.
+// Each test below exercises a consensus invariant (mirror-source shape,
+// cross-side K/N, matching signer_indices, sub-key uniqueness) via a
+// hand-crafted MsgClaimLegacyAccount and a direct s.msgServer call.
+// ValidateProofPair is invoked from two places: inside Msg*.ValidateBasic
+// (auto-called by baseapp's msg_service_router in production) AND
+// defensively from the msg-server handler itself. The defensive in-server
+// call is what these tests pin: they bypass the router and still expect
+// rejection, proving that callers cannot skip the cross-side invariant
+// regardless of how they reach the keeper.
 
 // TestClaimLegacyAccount_Multisig_MirrorSourceMismatch_Shape pairs a multisig
 // legacy proof with a single-key new proof. ValidateProofPair rejects shape
@@ -1298,12 +1320,7 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_Multisig_MirrorSource
 			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
 		}}},
 	}
-	// Mirror production: msg_service_router calls msg.ValidateBasic() before
-	// dispatch. That's where ValidateProofPair fires.
-	err := msg.ValidateBasic()
-	if err == nil {
-		_, err = s.msgServer.ClaimLegacyAccount(s.ctx, msg)
-	}
+	_, err := s.msgServer.ClaimLegacyAccount(s.ctx, msg)
 	s.Require().Error(err)
 	s.Require().ErrorIs(err, types.ErrMirrorSourceMismatch)
 	s.Require().ErrorContains(err, "shape")
@@ -1332,10 +1349,7 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_Multisig_MirrorSource
 		LegacyProof:   *legacyProof,
 		NewProof:      *newProof,
 	}
-	err := msg.ValidateBasic()
-	if err == nil {
-		_, err = s.msgServer.ClaimLegacyAccount(s.ctx, msg)
-	}
+	_, err := s.msgServer.ClaimLegacyAccount(s.ctx, msg)
 	s.Require().Error(err)
 	s.Require().ErrorIs(err, types.ErrMirrorSourceMismatch)
 	// Either threshold or sub_pub_keys count will be the rejection reason;
@@ -1367,10 +1381,7 @@ func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_Multisig_SignerIndice
 		LegacyProof:   *legacyProof,
 		NewProof:      *newProof,
 	}
-	err := msg.ValidateBasic()
-	if err == nil {
-		_, err = s.msgServer.ClaimLegacyAccount(s.ctx, msg)
-	}
+	_, err := s.msgServer.ClaimLegacyAccount(s.ctx, msg)
 	s.Require().Error(err)
 	s.Require().ErrorIs(err, types.ErrMirrorSourceMismatch)
 	s.Require().ErrorContains(err, "signer_indices")

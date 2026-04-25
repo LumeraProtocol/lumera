@@ -1128,6 +1128,113 @@ func (s *MigrationIntegrationSuite) TestMigrateValidator_MultisigToMultisig() {
 	s.Require().Equal("edited-by-multisig-eth", updatedVal.Description.Moniker)
 }
 
+// --- MigrateValidator: defensive ValidateProofPair coverage ---
+//
+// The msg-server defensive pair check at msg_server_migrate_validator.go
+// mirrors the claim-side check; the negative tests below mirror the claim-side
+// MirrorSource* tests (Shape / KN / SignerIndices) for the validator path.
+// A direct s.msgServer.MigrateValidator call must reject a malformed pair
+// even when the SDK msg_service_router is bypassed.
+
+// TestMigrateValidator_Multisig_MirrorSourceMismatch_Shape pairs a multisig
+// legacy validator proof with a single-key new proof — shape mismatch — and
+// verifies the server-level ValidateProofPair rejects with
+// ErrMirrorSourceMismatch before any state mutation.
+func (s *MigrationIntegrationSuite) TestMigrateValidator_Multisig_MirrorSourceMismatch_Shape() {
+	s.enableMigration()
+
+	operatorCoins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 2_000_000))
+	selfBondAmt := sdkmath.NewInt(1_000_000)
+	legacyMultiPK, legacyPrivs, legacyAddr := s.createFundedMultisigAccount(2, 3, operatorCoins)
+	s.createTestValidator(legacyAddr, selfBondAmt)
+
+	newPrivKey, newAddr := createNewEVMAddress(s.T())
+
+	legacyProof := SignMultisigProof(s.T(), integrationTestChainID, "validator",
+		legacyMultiPK, legacyPrivs, []int{0, 2}, legacyAddr, newAddr,
+		types.SigFormat_SIG_FORMAT_CLI)
+
+	msg := &types.MsgMigrateValidator{
+		LegacyAddress: legacyAddr.String(),
+		NewAddress:    newAddr.String(),
+		LegacyProof:   *legacyProof,
+		NewProof: types.MigrationProof{Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
+			PubKey:    newPrivKey.PubKey().(*evmcryptotypes.PubKey).Key,
+			Signature: signNewMigration(s.T(), "validator", newPrivKey, legacyAddr, newAddr),
+			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
+		}}},
+	}
+	_, err := s.msgServer.MigrateValidator(s.ctx, msg)
+	s.Require().Error(err)
+	s.Require().ErrorIs(err, types.ErrMirrorSourceMismatch)
+	s.Require().ErrorContains(err, "shape")
+}
+
+// TestMigrateValidator_Multisig_MirrorSourceMismatch_KN pairs a 2-of-3 legacy
+// validator with a 3-of-5 new — same shape, different K and N. The defensive
+// server check rejects with ErrMirrorSourceMismatch before signature
+// verification.
+func (s *MigrationIntegrationSuite) TestMigrateValidator_Multisig_MirrorSourceMismatch_KN() {
+	s.enableMigration()
+
+	operatorCoins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 2_000_000))
+	selfBondAmt := sdkmath.NewInt(1_000_000)
+	legacyMultiPK, legacyPrivs, legacyAddr := s.createFundedMultisigAccount(2, 3, operatorCoins)
+	s.createTestValidator(legacyAddr, selfBondAmt)
+
+	newMultiPK, newPrivs, newAddr := BuildMultisigNewAccount(s.T(), 3, 5)
+
+	legacyProof := SignMultisigProof(s.T(), integrationTestChainID, "validator",
+		legacyMultiPK, legacyPrivs, []int{0, 2}, legacyAddr, newAddr,
+		types.SigFormat_SIG_FORMAT_CLI)
+	newProof := SignNewMultisigProof(s.T(), integrationTestChainID, "validator",
+		newMultiPK, newPrivs, []int{0, 2, 4}, legacyAddr, newAddr,
+		types.SigFormat_SIG_FORMAT_CLI)
+
+	msg := &types.MsgMigrateValidator{
+		LegacyAddress: legacyAddr.String(),
+		NewAddress:    newAddr.String(),
+		LegacyProof:   *legacyProof,
+		NewProof:      *newProof,
+	}
+	_, err := s.msgServer.MigrateValidator(s.ctx, msg)
+	s.Require().Error(err)
+	s.Require().ErrorIs(err, types.ErrMirrorSourceMismatch)
+}
+
+// TestMigrateValidator_Multisig_SignerIndicesMismatch pairs legacy signed at
+// [0,1] with new signed at [0,2] — same shape and K/N, but disjoint K-subsets.
+// The defensive server check requires legacy.signer_indices == new.signer_indices.
+func (s *MigrationIntegrationSuite) TestMigrateValidator_Multisig_SignerIndicesMismatch() {
+	s.enableMigration()
+
+	operatorCoins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 2_000_000))
+	selfBondAmt := sdkmath.NewInt(1_000_000)
+	legacyMultiPK, legacyPrivs, legacyAddr := s.createFundedMultisigAccount(2, 3, operatorCoins)
+	s.createTestValidator(legacyAddr, selfBondAmt)
+
+	newMultiPK, newPrivs, newAddr := BuildMultisigNewAccount(s.T(), 2, 3)
+
+	// Legacy signs at [0,1]; new signs at [0,2]. Cross-side K-subsets disjoint.
+	legacyProof := SignMultisigProof(s.T(), integrationTestChainID, "validator",
+		legacyMultiPK, legacyPrivs, []int{0, 1}, legacyAddr, newAddr,
+		types.SigFormat_SIG_FORMAT_CLI)
+	newProof := SignNewMultisigProof(s.T(), integrationTestChainID, "validator",
+		newMultiPK, newPrivs, []int{0, 2}, legacyAddr, newAddr,
+		types.SigFormat_SIG_FORMAT_CLI)
+
+	msg := &types.MsgMigrateValidator{
+		LegacyAddress: legacyAddr.String(),
+		NewAddress:    newAddr.String(),
+		LegacyProof:   *legacyProof,
+		NewProof:      *newProof,
+	}
+	_, err := s.msgServer.MigrateValidator(s.ctx, msg)
+	s.Require().Error(err)
+	s.Require().ErrorIs(err, types.ErrMirrorSourceMismatch)
+	s.Require().ErrorContains(err, "signer_indices")
+}
+
 // TestClaimLegacyAccount_MultisigVesting_ToMultisig migrates a 2-of-3 Cosmos
 // multisig legacy account that is wrapped in a ContinuousVestingAccount to a
 // 2-of-3 eth_secp256k1 multisig destination. Asserts that:

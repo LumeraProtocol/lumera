@@ -30,6 +30,11 @@ go test ./x/claim/... -v -run TestClaimRecord
 go test -tags=integration ./tests/integration/... -v -run TestMsgClaim
 cd tests/systemtests && go test -tags=system_test -v . -run 'TestSupernodeMetricsE2E'
 
+# evmigration integration tests REQUIRE -tags='integration test'
+# (without 'test', the cosmos-evm chainConfig guard makes every subtest
+# silently skip). The package's TestMain fails fast when the tag is missing.
+go test -tags='integration test' ./tests/integration/evmigration/... -v
+
 # EVM-specific
 make openrpc                  # Regenerate OpenRPC spec -> docs/openrpc.json + app/openrpc/openrpc.json.gz
 

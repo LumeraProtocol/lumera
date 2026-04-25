@@ -232,17 +232,17 @@ Names were renamed in the v2/MigrationProof refactor; legacy `TestVerifyLegacyPr
 | Suite | Coverage |
 | ----- | -------- |
 | `tests/scripts/common.bats` | 61 tests: logging, flag parsing, keyring flag passthrough, multisig auth-type routing, `auth_pubkey_type`, `assert_secp256k1_key` / `assert_eth_key`, `read_proof_file` happy-path + missing-field + payload-hex-mismatch + single-key-rejection + out-of-range partial, `read_migration_tx_file` for multisig + single-key rejection, `summarize_partials` per-side + **matching-index intersection gate** (fails when legacy `[0,1]` and new `[0,2]` are presented — per-side thresholds both "yes" but shared count below K), cross-file chain-id mismatch. |
-| `tests/scripts/migrate-multisig.bats` | 38 tests: subcommand dispatch; `submit` dry-run / happy path / rejects `--from` as unknown flag / validator-downtime ack / exit 3 on non-multisig tx / exit 4 on estimate flip; `generate` happy path (claim + validator) / exit 8 on nil pubkey / exit 3 on single-sig / exit 6 on kind-validator-on-non-validator / exit 4 on estimate / exit 5 on already-migrated / missing required flags; `sign` happy path / tampered payload / v1-proof-file rejection / key-not-in-sub-key-set / eth-key-as-legacy / exit-1 on no `--from`/`--new-key`; `combine` matching-index matrix output / sub-threshold exit 4 / cross-file consistency exit 9 / lumerad below-threshold mapping / flag wiring. |
+| `tests/scripts/migrate-multisig.bats` | 39 tests: subcommand dispatch; `submit` dry-run / happy path / rejects `--from` as unknown flag / validator-downtime ack / exit 3 on non-multisig tx / exit 4 on estimate flip; `generate` happy path (claim + validator) / exit 8 on nil pubkey / exit 3 on single-sig / exit 6 on kind-validator-on-non-validator / exit 4 on estimate / exit 5 on already-migrated / missing required flags / **propagates duplicate-sub-key rejection from the underlying CLI**; `sign` happy path / tampered payload / v1-proof-file rejection / key-not-in-sub-key-set / eth-key-as-legacy / exit-1 on no `--from`/`--new-key`; `combine` matching-index matrix output / sub-threshold exit 4 / cross-file consistency exit 9 / lumerad below-threshold mapping / flag wiring. |
 
 ---
 
-### Known multisig test-coverage gaps
+### Multisig test-coverage scope
 
-Coverage at unit, preflight, and integration layers is complete for all consensus invariants. One remaining gap, low priority:
+Coverage at unit, preflight, integration, and ante layers is complete for all consensus invariants. One scope decision is recorded here so future reviewers don't re-raise it:
 
-| # | Gap | Why it matters |
+| # | Item | Status |
 | --- | --- | --- |
-| 1 | `tests_evmigration -mode=multisig-large-kn` | Devnet mode exercising a larger K/N combination (e.g. 5-of-7). All current devnet modes are 2-of-3; a larger case would stress governance-param interaction and sub-key fixture generation at scale. **Low** priority — unit `MigrationEstimate_Multisig_TooManySubKeys` already exercises the cap boundary, and `TestQueryMigrationEstimate_Multisig_SizeCapped` at integration covers the reject-at-21 case. |
+| 1 | Larger devnet K/N (e.g. 5-of-7) via `tests_evmigration -mode=multisig-large-kn` | **Out of scope by design.** All devnet modes are 2-of-3; the consensus rule is K/N-agnostic and is exercised at the unit/integration layers. `TestMigrationEstimate_Multisig_TooManySubKeys` (unit) covers the cap boundary, `TestQueryMigrationEstimate_Multisig_SizeCapped` (integration) covers reject-at-21, and `TestValidateProofPair_MirrorSourceRule` covers cross-side K/N mismatch. A 5-of-7 devnet variant would only re-prove the same logic with a larger fixture; not adding it. |
 
 ---
 

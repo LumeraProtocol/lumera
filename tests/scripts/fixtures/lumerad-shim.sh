@@ -142,6 +142,27 @@ ADDR
   "tx evmigration combine-proof --help"*)                printf 'help stub\n' ;;
   "tx evmigration submit-proof --help"*)                 printf 'help stub\n' ;;
   "tx evmigration generate-proof-payload"*)
+    # Mirror the real Go CLI's validateSideSpec duplicate-sub-key rejection
+    # (see TestValidateSideSpec_RejectsDuplicateSubKeys). The wrapper passes
+    # --new-sub-pub-keys through verbatim, so detecting a duplicate here
+    # exercises the wrapper's failure-propagation path end-to-end.
+    args=( "$@" )
+    for ((i = 0; i < ${#args[@]}; i++)); do
+      if [[ "${args[i]}" == "--new-sub-pub-keys" ]]; then
+        IFS=',' read -ra _keys <<< "${args[i+1]:-}"
+        declare -A _seen
+        for j in "${!_keys[@]}"; do
+          k="${_keys[j]}"
+          if [[ -n "${_seen[$k]:-}" ]]; then
+            printf 'sub_pub_keys[%d] duplicates sub_pub_keys[%d]\n' "$j" "${_seen[$k]}" >&2
+            exit 1
+          fi
+          _seen[$k]=$j
+        done
+        unset _seen
+        break
+      fi
+    done
     emit_or_write "${SHIM_PROOF_FIXTURE:-proof-template}" "$@"
     ;;
   "tx evmigration sign-proof"*)

@@ -552,6 +552,35 @@ func (s *MigrationIntegrationSuite) TestQueryMigrationEstimate_Multisig_NonSecp2
 	s.Require().Contains(resp.RejectionReason, "non-secp256k1 sub-key")
 }
 
+// TestQueryMigrationEstimate_Multisig_DuplicateSubKey verifies that a multisig
+// whose on-chain sub_pub_keys contain a duplicate position is rejected by the
+// preflight with the "duplicates sub_pub_keys[N]" reason from query.go:303-304.
+// SDK multisig construction permits a duplicate sub-key but the migration
+// verifier (MultisigProof.validateBasic) rejects it at consensus; without
+// preflight detection, the operator would only learn after the K-of-N signing
+// ceremony. Complements the unit-level coverage of the same rule in
+// TestValidateProofPair_NilInputsReturnErrorNotPanic and the CLI-level
+// TestValidateSideSpec_RejectsDuplicateSubKeys.
+func (s *MigrationIntegrationSuite) TestQueryMigrationEstimate_Multisig_DuplicateSubKey() {
+	s.enableMigration()
+	qs := evmigrationkeeper.NewQueryServerImpl(s.keeper)
+
+	// 2-of-3 where positions 0 and 2 share the same secp256k1 sub-key.
+	multiPK := buildMultisigWithDuplicateSubKey(s.T())
+	legacyAddr := s.registerAndFundMultisigPubKey(multiPK,
+		sdk.NewCoins(sdk.NewInt64Coin("ulume", 1_000)))
+
+	resp, err := qs.MigrationEstimate(s.ctx, &types.QueryMigrationEstimateRequest{
+		LegacyAddress: legacyAddr.String(),
+	})
+	s.Require().NoError(err)
+	s.Require().True(resp.IsMultisig)
+	s.Require().Equal(uint32(2), resp.Threshold)
+	s.Require().Equal(uint32(3), resp.NumSigners)
+	s.Require().False(resp.WouldSucceed, "duplicate sub-key must reject")
+	s.Require().Contains(resp.RejectionReason, "duplicates sub_pub_keys[0]")
+}
+
 // --- MigrateValidator integration tests ---
 
 // createTestValidator creates a bonded validator with a secp256k1 operator key

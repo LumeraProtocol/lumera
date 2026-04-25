@@ -256,6 +256,26 @@ setup() {
   [[ "$output" == *"validator"* ]]
 }
 
+@test "generate rejects duplicate --new-sub-pub-keys (propagates from CLI)" {
+  # The shim mirrors the real Go CLI's validateSideSpec duplicate-sub-key
+  # rejection when --new-sub-pub-keys contains the same entry twice. This
+  # bats test pins that the wrapper propagates the exit code + stderr cleanly,
+  # complementing the unit-level Go coverage in
+  # x/evmigration/client/cli/tx_multisig_internal_test.go::TestValidateSideSpec_RejectsDuplicateSubKeys.
+  run env SHIM_AUTH_TYPE=multisig SHIM_ESTIMATE_FIXTURE=estimate-multisig \
+    "$SCRIPTS_DIR/migrate-multisig.sh" generate \
+    --binary "$SHIM" \
+    --legacy lumera1shimaddr1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
+    --new lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
+    --new-sub-pub-keys k1,k2,k1 \
+    --new-threshold 2 \
+    --kind claim \
+    --chain-id shim-test --node tcp://local:1 \
+    --out /tmp/unused.json
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"sub_pub_keys[2] duplicates sub_pub_keys[0]"* ]]
+}
+
 @test "generate aborts with exit 4 on estimate would_succeed=false" {
   run env SHIM_AUTH_TYPE=multisig SHIM_ESTIMATE_FIXTURE=estimate-multisig-rejected \
     "$SCRIPTS_DIR/migrate-multisig.sh" generate \

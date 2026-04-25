@@ -235,3 +235,15 @@ func buildMultisigWithEthSubKey(t *testing.T, k int) *multisig.LegacyAminoPubKey
 	}
 	return multisig.NewLegacyAminoPubKey(k, subs)
 }
+
+// buildMultisigWithDuplicateSubKey constructs a 2-of-3 multisig where
+// positions 0 and 2 share the same sub-key. SDK multisig construction
+// permits this; the migration verifier rejects it. Used by the
+// duplicate-sub-key rejection branch of QueryMigrationEstimate.
+func buildMultisigWithDuplicateSubKey(t *testing.T) *multisig.LegacyAminoPubKey {
+	t.Helper()
+	shared := secp256k1.GenPrivKey().PubKey()
+	other := secp256k1.GenPrivKey().PubKey()
+	subs := []cryptotypes.PubKey{shared, other, shared}
+	return multisig.NewLegacyAminoPubKey(2, subs)
+}

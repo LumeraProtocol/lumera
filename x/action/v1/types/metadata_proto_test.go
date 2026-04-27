@@ -95,6 +95,8 @@ func TestCascadeMetadataRoundTripWithNewFields(t *testing.T) {
 				PathDirections: []bool{true, false},
 			},
 		},
+		IndexArtifactCount:  32,
+		SymbolArtifactCount: 128,
 	}
 
 	bz, err := proto.Marshal(extended)
@@ -104,4 +106,3 @@ func TestCascadeMetadataRoundTripWithNewFields(t *testing.T) {
 	require.NoError(t, proto.Unmarshal(bz, &decoded))
 	require.Equal(t, extended, &decoded)
 }
-

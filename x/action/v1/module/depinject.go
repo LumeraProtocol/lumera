@@ -82,7 +82,6 @@ func ProvideModule(in ModuleInputs) ModuleOutputs {
 		},
 		in.AuditKeeper,
 		in.IBCKeeperFn,
-		in.SupernodeKeeper,
 	)
 
 	m := NewAppModule(

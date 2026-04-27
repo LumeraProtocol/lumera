@@ -103,18 +103,6 @@ func (m *ActionBankKeeper) GetBalance(ctx context.Context, addr sdk.AccAddress, 
 	return sdk.Coin{}
 }
 
-func (m *ActionBankKeeper) SendCoinsFromModuleToModule(ctx context.Context, senderModule, recipientModule string, amt sdk.Coins) error {
-	if _, ok := m.moduleBalances[senderModule]; ok {
-		m.moduleBalances[senderModule] = m.moduleBalances[senderModule].Sub(amt...)
-	}
-	if m.moduleBalances[recipientModule].IsZero() {
-		m.moduleBalances[recipientModule] = amt
-	} else {
-		m.moduleBalances[recipientModule] = m.moduleBalances[recipientModule].Add(amt...)
-	}
-	return nil
-}
-
 func (m *ActionBankKeeper) GetModuleBalance(module string) sdk.Coins {
 	if coins, ok := m.moduleBalances[module]; ok {
 		return coins
@@ -152,8 +140,9 @@ func (m *MockStakingKeeper) Validator(ctx context.Context, addr sdk.ValAddress) 
 }
 
 type MockAuditKeeper struct {
-	nextEvidenceID uint64
-	CreateCalls    []MockAuditKeeperCreateEvidenceCall
+	nextEvidenceID       uint64
+	CreateCalls          []MockAuditKeeperCreateEvidenceCall
+	TicketArtifactCounts map[string]MockAuditKeeperTicketArtifactCount
 }
 
 type MockAuditKeeperCreateEvidenceCall struct {
@@ -164,8 +153,16 @@ type MockAuditKeeperCreateEvidenceCall struct {
 	MetadataJSON    string
 }
 
+type MockAuditKeeperTicketArtifactCount struct {
+	IndexArtifactCount  uint32
+	SymbolArtifactCount uint32
+}
+
 func NewMockAuditKeeper() *MockAuditKeeper {
-	return &MockAuditKeeper{nextEvidenceID: 1}
+	return &MockAuditKeeper{
+		nextEvidenceID:       1,
+		TicketArtifactCounts: make(map[string]MockAuditKeeperTicketArtifactCount),
+	}
 }
 
 func (m *MockAuditKeeper) CreateEvidence(
@@ -189,6 +186,22 @@ func (m *MockAuditKeeper) CreateEvidence(
 		MetadataJSON:    metadataJSON,
 	})
 	return id, nil
+}
+
+func (m *MockAuditKeeper) SetStorageTruthTicketArtifactCounts(
+	ctx context.Context,
+	ticketID string,
+	indexArtifactCount uint32,
+	symbolArtifactCount uint32,
+) error {
+	if ticketID == "" {
+		return nil
+	}
+	m.TicketArtifactCounts[ticketID] = MockAuditKeeperTicketArtifactCount{
+		IndexArtifactCount:  indexArtifactCount,
+		SymbolArtifactCount: symbolArtifactCount,
+	}
+	return nil
 }
 
 type AccountPair struct {
@@ -222,6 +235,7 @@ func ActionKeeperWithAddress(t testing.TB, ctrl *gomock.Controller, accounts []A
 
 	supernodeKeeper := supernodemocks.NewMockSupernodeKeeper(ctrl)
 	supernodeQueryServer := supernodemocks.NewMockQueryServer(ctrl)
+
 	distributionKeeper := new(MockDistributionKeeper)
 	auditKeeper := NewMockAuditKeeper()
 
@@ -258,7 +272,6 @@ func ActionKeeperWithAddress(t testing.TB, ctrl *gomock.Controller, accounts []A
 		func() *ibckeeper.Keeper {
 			return ibckeeper.NewKeeper(encCfg.Codec, storeService, newMockIbcParams(), mockUpgradeKeeper, authority.String())
 		},
-		nil,
 	)
 
 	// Initialize params

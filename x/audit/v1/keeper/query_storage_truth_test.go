@@ -5,7 +5,10 @@ import (
 
 	"github.com/LumeraProtocol/lumera/x/audit/v1/keeper"
 	"github.com/LumeraProtocol/lumera/x/audit/v1/types"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -46,6 +49,8 @@ func TestReporterReliabilityStateQuery(t *testing.T) {
 		ReporterSupernodeAccount: "lumera1reporter111111111111111111111111lyv93",
 		ReliabilityScore:         -9,
 		LastUpdatedEpoch:         20,
+		TrustBand:                types.ReporterTrustBand_REPORTER_TRUST_BAND_LOW_TRUST,
+		ContradictionCount:       2,
 	}
 	require.NoError(t, f.keeper.SetReporterReliabilityState(f.ctx, state))
 
@@ -61,10 +66,17 @@ func TestTicketDeteriorationStateQuery(t *testing.T) {
 	qs := keeper.NewQueryServerImpl(f.keeper)
 
 	state := types.TicketDeteriorationState{
-		TicketId:            "ticket-query-1",
-		DeteriorationScore:  30,
-		LastUpdatedEpoch:    21,
-		ProbationUntilEpoch: 23,
+		TicketId:                     "ticket-query-1",
+		DeteriorationScore:           30,
+		LastUpdatedEpoch:             21,
+		ProbationUntilEpoch:          23,
+		LastFailureEpoch:             19,
+		RecentFailureEpochCount:      2,
+		ContradictionCount:           1,
+		LastTargetSupernodeAccount:   "lumera1target1111111111111111111111111w4zx",
+		LastReporterSupernodeAccount: "lumera1reporter111111111111111111111111lyv93",
+		LastResultClass:              types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH,
+		LastResultEpoch:              21,
 	}
 	require.NoError(t, f.keeper.SetTicketDeteriorationState(f.ctx, state))
 
@@ -120,4 +132,79 @@ func TestHealOpQueries(t *testing.T) {
 	_, err = qs.HealOpsByStatus(f.ctx, &types.QueryHealOpsByStatusRequest{Status: types.HealOpStatus_HEAL_OP_STATUS_UNSPECIFIED})
 	require.Error(t, err)
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
+}
+
+func TestStorageTruthQueries_ReflectScoredReportIngestion(t *testing.T) {
+	f := initFixture(t)
+	f.ctx = f.ctx.WithBlockHeight(1).WithEventManager(sdk.NewEventManager())
+	qs := keeper.NewQueryServerImpl(f.keeper)
+	ms := keeper.NewMsgServerImpl(f.keeper)
+
+	reporter := "sn-aaa-reporter"
+	target := "sn-bbb-target"
+
+	f.supernodeKeeper.EXPECT().
+		GetSuperNodeByAccount(gomock.Any(), reporter).
+		Return(sntypes.SuperNode{}, true, nil).
+		AnyTimes()
+
+	seedEpochAnchorForReportTest(t, f, 0, []string{reporter, target}, []string{reporter, target})
+
+	portStates := fullOpenPortStates()
+	result := &types.StorageProofResult{
+		TargetSupernodeAccount:     target,
+		ChallengerSupernodeAccount: reporter,
+		TicketId:                   "ticket-query-score-1",
+		BucketType:                 types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT,
+		ArtifactClass:              types.StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_INDEX,
+		ArtifactOrdinal:            1,
+		ArtifactCount:              8,
+		ArtifactKey:                "artifact-key-1",
+		ResultClass:                types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH,
+		TranscriptHash:             "transcript-hash-1",
+		DerivationInputHash:        "derivation-hash-1",
+		ChallengerSignature:        "challenger-signature-1",
+	}
+	seedTicketArtifactCountsForResults(t, f, result)
+	_, err := ms.SubmitEpochReport(f.ctx, &types.MsgSubmitEpochReport{
+		Creator: reporter,
+		EpochId: 0,
+		HostReport: types.HostReport{
+			InboundPortStates: portStates,
+		},
+		StorageChallengeObservations: []*types.StorageChallengeObservation{
+			{
+				TargetSupernodeAccount: target,
+				PortStates:             portStates,
+			},
+		},
+		StorageProofResults: []*types.StorageProofResult{result},
+	})
+	require.NoError(t, err)
+
+	nodeResp, err := qs.NodeSuspicionState(f.ctx, &types.QueryNodeSuspicionStateRequest{SupernodeAccount: target})
+	require.NoError(t, err)
+	// HASH_MISMATCH + INDEX artifact: node=+26 (spec-aligned value)
+	require.Equal(t, int64(26), nodeResp.State.SuspicionScore)
+	require.Equal(t, uint64(0), nodeResp.State.LastUpdatedEpoch)
+
+	reporterResp, err := qs.ReporterReliabilityState(f.ctx, &types.QueryReporterReliabilityStateRequest{
+		ReporterSupernodeAccount: reporter,
+	})
+	require.NoError(t, err)
+	require.Equal(t, int64(1), reporterResp.State.ReliabilityScore)
+	require.Equal(t, uint64(0), reporterResp.State.LastUpdatedEpoch)
+	require.Equal(t, types.ReporterTrustBand_REPORTER_TRUST_BAND_NORMAL, reporterResp.State.TrustBand)
+	require.Equal(t, uint64(0), reporterResp.State.ContradictionCount)
+
+	ticketResp, err := qs.TicketDeteriorationState(f.ctx, &types.QueryTicketDeteriorationStateRequest{
+		TicketId: "ticket-query-score-1",
+	})
+	require.NoError(t, err)
+	require.Equal(t, int64(12), ticketResp.State.DeteriorationScore)
+	require.Equal(t, uint64(0), ticketResp.State.LastUpdatedEpoch)
+	require.Equal(t, target, ticketResp.State.LastTargetSupernodeAccount)
+	require.Equal(t, reporter, ticketResp.State.LastReporterSupernodeAccount)
+	require.Equal(t, types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH, ticketResp.State.LastResultClass)
+	require.Equal(t, uint64(0), ticketResp.State.LastResultEpoch)
 }

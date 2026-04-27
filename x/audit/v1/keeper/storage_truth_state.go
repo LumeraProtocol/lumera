@@ -129,20 +129,53 @@ func (k Keeper) GetAllTicketDeteriorationStates(ctx sdk.Context) ([]types.Ticket
 	return states, nil
 }
 
+func (k Keeper) HasTicketArtifactCountState(ctx sdk.Context, ticketID string) bool {
+	store := k.kvStore(ctx)
+	return store.Has(types.TicketArtifactCountStateKey(ticketID))
+}
+
+func (k Keeper) GetTicketArtifactCountState(ctx sdk.Context, ticketID string) (types.TicketArtifactCountState, bool) {
+	store := k.kvStore(ctx)
+	bz := store.Get(types.TicketArtifactCountStateKey(ticketID))
+	if bz == nil {
+		return types.TicketArtifactCountState{}, false
+	}
+	var state types.TicketArtifactCountState
+	k.cdc.MustUnmarshal(bz, &state)
+	return state, true
+}
+
+func (k Keeper) SetTicketArtifactCountState(ctx sdk.Context, state types.TicketArtifactCountState) error {
+	store := k.kvStore(ctx)
+	bz, err := k.cdc.Marshal(&state)
+	if err != nil {
+		return err
+	}
+	store.Set(types.TicketArtifactCountStateKey(state.TicketId), bz)
+	return nil
+}
+
+func (k Keeper) GetAllTicketArtifactCountStates(ctx sdk.Context) ([]types.TicketArtifactCountState, error) {
+	store := k.kvStore(ctx)
+	it := store.Iterator(types.TicketArtifactCountStatePrefix(), storetypes.PrefixEndBytes(types.TicketArtifactCountStatePrefix()))
+	defer it.Close()
+
+	states := make([]types.TicketArtifactCountState, 0)
+	for ; it.Valid(); it.Next() {
+		var state types.TicketArtifactCountState
+		k.cdc.MustUnmarshal(it.Value(), &state)
+		states = append(states, state)
+	}
+	return states, nil
+}
+
 func (k Keeper) GetNextHealOpID(ctx sdk.Context) uint64 {
 	store := k.kvStore(ctx)
 	bz := store.Get(types.NextHealOpIDKey())
-	// Heal-op IDs start at 1; guard against missing, malformed, or zero values
-	// to avoid panicking in binary.BigEndian.Uint64 on a short slice and to
-	// avoid handing out the reserved 0 ID.
-	if bz == nil || len(bz) != 8 {
+	if bz == nil {
 		return 1
 	}
-	id := binary.BigEndian.Uint64(bz)
-	if id == 0 {
-		return 1
-	}
-	return id
+	return binary.BigEndian.Uint64(bz)
 }
 
 func (k Keeper) SetNextHealOpID(ctx sdk.Context, id uint64) {
@@ -198,4 +231,46 @@ func (k Keeper) GetAllHealOps(ctx sdk.Context) ([]types.HealOp, error) {
 		healOps = append(healOps, healOp)
 	}
 	return healOps, nil
+}
+
+func (k Keeper) HasHealOpVerification(ctx sdk.Context, healOpID uint64, verifierSupernodeAccount string) bool {
+	store := k.kvStore(ctx)
+	return store.Has(types.HealOpVerificationKey(healOpID, verifierSupernodeAccount))
+}
+
+func (k Keeper) SetHealOpVerification(ctx sdk.Context, healOpID uint64, verifierSupernodeAccount string, verified bool) {
+	store := k.kvStore(ctx)
+	value := byte(0)
+	if verified {
+		value = 1
+	}
+	store.Set(types.HealOpVerificationKey(healOpID, verifierSupernodeAccount), []byte{value})
+}
+
+func (k Keeper) GetHealOpVerification(ctx sdk.Context, healOpID uint64, verifierSupernodeAccount string) (bool, bool) {
+	store := k.kvStore(ctx)
+	bz := store.Get(types.HealOpVerificationKey(healOpID, verifierSupernodeAccount))
+	if len(bz) == 0 {
+		return false, false
+	}
+	return bz[0] == 1, true
+}
+
+func (k Keeper) GetAllHealOpVerifications(ctx sdk.Context, healOpID uint64) (map[string]bool, error) {
+	store := k.kvStore(ctx)
+	prefix := types.HealOpVerificationPrefix(healOpID)
+	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
+	defer it.Close()
+
+	verifications := make(map[string]bool)
+	for ; it.Valid(); it.Next() {
+		key := it.Key()
+		if len(key) <= len(prefix) {
+			continue
+		}
+		verifier := string(key[len(prefix):])
+		value := len(it.Value()) != 0 && it.Value()[0] == 1
+		verifications[verifier] = value
+	}
+	return verifications, nil
 }

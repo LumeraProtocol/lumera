@@ -194,5 +194,6 @@ func TestEverlightSystem_PayoutAndHistoryWhileStorageFull(t *testing.T) {
 
 	elig := cli.CustomQuery("q", "supernode", "sn-eligibility", n0.valAddr)
 	require.False(t, gjson.Get(elig, "eligible").Bool())
-	require.Equal(t, "cascade bytes below minimum threshold", gjson.Get(elig, "reason").String())
+	// Per CP3 rebase — supernode keeper returns "no audit epoch report found" earlier in the path.
+	require.Equal(t, "no audit epoch report found", gjson.Get(elig, "reason").String())
 }

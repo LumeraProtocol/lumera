@@ -31,7 +31,6 @@ type BankKeeper interface {
 	GetBalance(ctx context.Context, addr sdk.AccAddress, denom string) sdk.Coin
 	SendCoinsFromModuleToAccount(ctx context.Context, senderModule string, recipientAddr sdk.AccAddress, amt sdk.Coins) error
 	SendCoinsFromAccountToModule(ctx context.Context, senderAddr sdk.AccAddress, recipientModule string, amt sdk.Coins) error
-	SendCoinsFromModuleToModule(ctx context.Context, senderModule, recipientModule string, amt sdk.Coins) error
 }
 
 // StakingKeeper defines the expected staking keeper
@@ -66,11 +65,7 @@ type AuditKeeper interface {
 		evidenceType audittypes.EvidenceType,
 		metadataJSON string,
 	) (uint64, error)
-}
-
-// RewardDistributionKeeper defines the fee-share interface implemented by x/supernode.
-type RewardDistributionKeeper interface {
-	GetRegistrationFeeShareBps(ctx sdk.Context) uint64
+	SetStorageTruthTicketArtifactCounts(ctx context.Context, ticketID string, indexArtifactCount uint32, symbolArtifactCount uint32) error
 }
 
 // ParamSubspace defines the expected Subspace interface for parameters.

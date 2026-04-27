@@ -22,7 +22,7 @@ const (
 	cascadeCommitmentMaxChunkSize = uint32(262144) // 256 KiB — default / ceiling
 	cascadeCommitmentMinChunkSize = uint32(1)      // 1 byte — floor
 	cascadeCommitmentRootSize     = 32
-	cascadeCommitmentMinTotalSize = uint64(4)      // reject trivially tiny files (< 4 bytes)
+	cascadeCommitmentMinTotalSize = uint64(4) // reject trivially tiny files (< 4 bytes)
 )
 
 var cascadeCommitmentHashAlgo = actiontypes.HashAlgo_HASH_ALGO_BLAKE3
@@ -143,6 +143,14 @@ func (h CascadeActionHandler) Process(metadataBytes []byte, msgType common.Messa
 	case common.MsgFinalizeAction:
 		if len(metadata.RqIdsIds) == 0 {
 			return nil, fmt.Errorf("rq_ids_ids field is required for cascade metadata")
+		}
+		// Backward-compatible fallback for finalize payloads that do not yet
+		// provide explicit LEP-6 artifact counts.
+		if metadata.IndexArtifactCount == 0 {
+			metadata.IndexArtifactCount = uint32(len(metadata.RqIdsIds))
+		}
+		if metadata.SymbolArtifactCount == 0 {
+			metadata.SymbolArtifactCount = uint32(len(metadata.RqIdsIds))
 		}
 	default:
 		return nil, fmt.Errorf("unsupported message type: %s", msgType)
@@ -306,15 +314,23 @@ func (h CascadeActionHandler) GetUpdatedMetadata(ctx sdk.Context, existingMetada
 	}
 
 	updatedMetadata := &actiontypes.CascadeMetadata{
-		RqIdsIc:    existingMetadata.GetRqIdsIc(),
-		RqIdsMax:   existingMetadata.GetRqIdsMax(),
-		DataHash:   existingMetadata.GetDataHash(),
-		FileName:   existingMetadata.GetFileName(),
-		Signatures: existingMetadata.GetSignatures(),
-		RqIdsIds:   newMetadata.GetRqIdsIds(),
-		Public:     existingMetadata.GetPublic(),
+		RqIdsIc:                existingMetadata.GetRqIdsIc(),
+		RqIdsMax:               existingMetadata.GetRqIdsMax(),
+		DataHash:               existingMetadata.GetDataHash(),
+		FileName:               existingMetadata.GetFileName(),
+		Signatures:             existingMetadata.GetSignatures(),
+		RqIdsIds:               newMetadata.GetRqIdsIds(),
+		Public:                 existingMetadata.GetPublic(),
 		AvailabilityCommitment: existingMetadata.GetAvailabilityCommitment(),
 		ChunkProofs:            newMetadata.GetChunkProofs(),
+		IndexArtifactCount:     newMetadata.GetIndexArtifactCount(),
+		SymbolArtifactCount:    newMetadata.GetSymbolArtifactCount(),
+	}
+	if updatedMetadata.IndexArtifactCount == 0 {
+		updatedMetadata.IndexArtifactCount = uint32(len(updatedMetadata.RqIdsIds))
+	}
+	if updatedMetadata.SymbolArtifactCount == 0 {
+		updatedMetadata.SymbolArtifactCount = uint32(len(updatedMetadata.RqIdsIds))
 	}
 
 	return gogoproto.Marshal(updatedMetadata)

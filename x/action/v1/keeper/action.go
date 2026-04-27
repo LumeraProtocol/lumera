@@ -13,6 +13,7 @@ import (
 	storetypes "cosmossdk.io/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
+	gogoproto "github.com/cosmos/gogoproto/proto"
 
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
@@ -244,6 +245,21 @@ func (k *Keeper) FinalizeAction(ctx sdk.Context, actionID string, superNodeAccou
 
 	// If the action is now in DONE state, emit an event and distribute fees
 	if existingAction.State == actiontypes.ActionStateDone {
+		if existingAction.ActionType == actiontypes.ActionTypeCascade && k.auditKeeper != nil {
+			var cascadeMeta actiontypes.CascadeMetadata
+			if err := gogoproto.Unmarshal(existingAction.Metadata, &cascadeMeta); err != nil {
+				return errors.Wrap(actiontypes.ErrInvalidMetadata, fmt.Sprintf("failed to unmarshal finalized cascade metadata: %v", err))
+			}
+			if err := k.auditKeeper.SetStorageTruthTicketArtifactCounts(
+				ctx,
+				existingAction.ActionID,
+				cascadeMeta.GetIndexArtifactCount(),
+				cascadeMeta.GetSymbolArtifactCount(),
+			); err != nil {
+				return errors.Wrap(actiontypes.ErrInvalidMetadata, err.Error())
+			}
+		}
+
 		ctx.EventManager().EmitEvent(
 			sdk.NewEvent(
 				actiontypes.EventTypeActionFinalized,
@@ -628,22 +644,6 @@ func (k *Keeper) DistributeFees(ctx sdk.Context, actionID string) error {
 
 	if numSupernodes == 0 {
 		return nil // No supernodes to pay
-	}
-
-	// Route the configured reward-distribution share to the supernode-owned pool.
-	if k.rewardDistributionKeeper != nil {
-		rewardDistributionBps := k.rewardDistributionKeeper.GetRegistrationFeeShareBps(ctx)
-		if rewardDistributionBps > 0 && fee.Amount.GT(math.ZeroInt()) {
-			rewardDistributionAmount := fee.Amount.MulRaw(int64(rewardDistributionBps)).QuoRaw(10000)
-			if rewardDistributionAmount.IsPositive() {
-				rewardDistributionCoin := sdk.NewCoin(fee.Denom, rewardDistributionAmount)
-				err := k.bankKeeper.SendCoinsFromModuleToModule(ctx, actiontypes.ModuleName, sntypes.ModuleName, sdk.NewCoins(rewardDistributionCoin))
-				if err != nil {
-					return errors.Wrap(err, "failed to send reward-distribution fee share")
-				}
-				fee.Amount = fee.Amount.Sub(rewardDistributionAmount)
-			}
-		}
 	}
 
 	params := k.GetParams(ctx)

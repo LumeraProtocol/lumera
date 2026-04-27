@@ -19,6 +19,7 @@ func TestAuditHostRequirements_UsageZeroBypassesMinimums(t *testing.T) {
 	sut.ModifyGenesisJSON(t,
 		setSupernodeParamsForAuditTests(t),
 		setAuditParamsForFastEpochs(t, epochLengthBlocks, 1, 1, 1, []uint32{4444}),
+		setStorageTruthEnforcementModeUnspecified(t),
 		func(genesis []byte) []byte {
 			// Avoid missing-report postponement before/around the tested epoch.
 			state, err := sjson.SetRawBytes(genesis, "app_state.audit.params.consecutive_epochs_to_postpone", []byte("10"))
@@ -39,7 +40,7 @@ func TestAuditHostRequirements_UsageZeroBypassesMinimums(t *testing.T) {
 	epochID, epochStartHeight := nextEpochAfterHeight(originHeight, epochLengthBlocks, currentHeight)
 	enforceHeight := epochStartHeight + int64(epochLengthBlocks)
 
-	awaitAtLeastHeightWithSlackPeerPorts(t, epochStartHeight)
+	awaitAtLeastHeight(t, epochStartHeight)
 
 	// Use the on-chain assignment query so tests track current assignment logic.
 	assigned0 := auditQueryAssignedTargets(t, epochID, true, n0.accAddr)
@@ -84,7 +85,7 @@ func TestAuditHostRequirements_UsageZeroBypassesMinimums(t *testing.T) {
 	require.Len(t, r0.StorageChallengeObservations, 1)
 	require.Equal(t, assigned0.TargetSupernodeAccounts[0], r0.StorageChallengeObservations[0].TargetSupernodeAccount)
 
-	awaitAtLeastHeightWithSlackPeerPorts(t, enforceHeight)
+	awaitAtLeastHeight(t, enforceHeight)
 
 	require.Equal(t, "SUPERNODE_STATE_ACTIVE", querySupernodeLatestState(t, cli, n0.valAddr))
 	require.Equal(t, "SUPERNODE_STATE_ACTIVE", querySupernodeLatestState(t, cli, n1.valAddr))

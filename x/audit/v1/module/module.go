@@ -96,6 +96,10 @@ func NewAppModule(cdc codec.Codec, keeper keeper.Keeper, authKeeper types.AuthKe
 func (am AppModule) RegisterServices(cfg module.Configurator) {
 	types.RegisterMsgServer(cfg.MsgServer(), keeper.NewMsgServerImpl(am.keeper))
 	types.RegisterQueryServer(cfg.QueryServer(), keeper.NewQueryServerImpl(am.keeper))
+	// Per 122-F4 — bump KeepLastEpochEntries to cover OldClassAFaultWindow for safe pruning.
+	if err := cfg.RegisterMigration(types.ModuleName, 1, NewMigrateV1ToV2(am.keeper)); err != nil {
+		panic(fmt.Sprintf("failed to register audit v1->v2 migration: %v", err))
+	}
 }
 
 func (am AppModule) RegisterInvariants(_ sdk.InvariantRegistry) {}

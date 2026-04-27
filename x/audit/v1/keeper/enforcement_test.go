@@ -81,7 +81,7 @@ func TestPeerPortPostponementThresholdPercent(t *testing.T) {
 		makeReports(t, f, epochID, target, peers, peerStates)
 
 		f.supernodeKeeper.EXPECT().
-			GetAllSuperNodes(gomock.AssignableToTypeOf(f.ctx), sntypes.SuperNodeStateActive).
+			GetAllSuperNodes(gomock.AssignableToTypeOf(f.ctx), sntypes.SuperNodeStateActive, sntypes.SuperNodeStateStorageFull).
 			Return([]sntypes.SuperNode{target}, nil).
 			Times(1)
 		f.supernodeKeeper.EXPECT().
@@ -108,7 +108,7 @@ func TestPeerPortPostponementThresholdPercent(t *testing.T) {
 		makeReports(t, f, epochID, target, peers, peerStates)
 
 		f.supernodeKeeper.EXPECT().
-			GetAllSuperNodes(gomock.AssignableToTypeOf(f.ctx), sntypes.SuperNodeStateActive).
+			GetAllSuperNodes(gomock.AssignableToTypeOf(f.ctx), sntypes.SuperNodeStateActive, sntypes.SuperNodeStateStorageFull).
 			Return([]sntypes.SuperNode{target}, nil).
 			Times(1)
 		f.supernodeKeeper.EXPECT().

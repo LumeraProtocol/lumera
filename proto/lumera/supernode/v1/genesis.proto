@@ -14,4 +14,7 @@ message GenesisState {
     (gogoproto.nullable) = false,
     (amino.dont_omitempty) = true
   ];
+
+  // last_distribution_height is the block height of the last distribution.
+  int64 last_distribution_height = 2;
 }

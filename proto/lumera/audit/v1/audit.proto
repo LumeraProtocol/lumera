@@ -22,6 +22,9 @@ message HostReport {
   repeated PortState inbound_port_states = 4;
 
   uint32 failed_actions_count = 5;
+
+  // Cascade Kademlia DB size in bytes (used by Everlight payout weighting).
+  double cascade_kademlia_db_bytes = 6;
 }
 
 // StorageChallengeObservation is a prober's reachability observation about an assigned target.

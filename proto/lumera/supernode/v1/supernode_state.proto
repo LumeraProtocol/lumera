@@ -15,6 +15,7 @@ enum SuperNodeState {
   SUPERNODE_STATE_STOPPED = 3 [(gogoproto.enumvalue_customname) = "SuperNodeStateStopped"];
   SUPERNODE_STATE_PENALIZED = 4 [(gogoproto.enumvalue_customname) = "SuperNodeStatePenalized"];
   SUPERNODE_STATE_POSTPONED = 5 [(gogoproto.enumvalue_customname) = "SuperNodeStatePostponed"];
+  SUPERNODE_STATE_STORAGE_FULL = 6 [(gogoproto.enumvalue_customname) = "SuperNodeStateStorageFull"];
 }
 
 message SuperNodeStateRecord { 

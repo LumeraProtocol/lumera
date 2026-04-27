@@ -24,14 +24,16 @@ func (am AppModule) WeightedOperations(simState module.SimulationState) []simtyp
 	operations := make([]simtypes.WeightedOperation, 0)
 
 	const (
-		opWeightMsgSubmitEvidence                   = "op_weight_msg_submit_evidence"
-		defaultWeightMsgSubmitEvidence          int = 100
-		opWeightMsgSubmitStorageRecheckEvidence     = "op_weight_msg_submit_storage_recheck_evidence"
-		defaultWeightMsgSubmitStorageRecheck    int = 20
-		opWeightMsgClaimHealComplete                = "op_weight_msg_claim_heal_complete"
-		defaultWeightMsgClaimHealComplete       int = 15
-		opWeightMsgSubmitHealVerification           = "op_weight_msg_submit_heal_verification"
-		defaultWeightMsgSubmitHealVerification  int = 15
+		opWeightMsgSubmitEvidence                     = "op_weight_msg_submit_evidence"
+		defaultWeightMsgSubmitEvidence            int = 100
+		opWeightMsgSubmitStorageRecheckEvidence       = "op_weight_msg_submit_storage_recheck_evidence"
+		defaultWeightMsgSubmitStorageRecheck      int = 20
+		opWeightMsgClaimHealComplete                  = "op_weight_msg_claim_heal_complete"
+		defaultWeightMsgClaimHealComplete         int = 15
+		opWeightMsgSubmitHealVerification             = "op_weight_msg_submit_heal_verification"
+		defaultWeightMsgSubmitHealVerification    int = 15
+		opWeightMsgSubmitEpochReportVariance          = "op_weight_msg_submit_epoch_report_variance"
+		defaultWeightMsgSubmitEpochReportVariance int = 100
 	)
 
 	var weightMsgSubmitEvidence int
@@ -72,6 +74,17 @@ func (am AppModule) WeightedOperations(simState module.SimulationState) []simtyp
 			auditsimulation.SimulateMsgSubmitHealVerification(am.authKeeper, am.bankKeeper, am.keeper, simState.TxConfig),
 		),
 	)
+
+	var weightMsgSubmitEpochReportVariance int
+	simState.AppParams.GetOrGenerate(opWeightMsgSubmitEpochReportVariance, &weightMsgSubmitEpochReportVariance, nil,
+		func(_ *rand.Rand) {
+			weightMsgSubmitEpochReportVariance = defaultWeightMsgSubmitEpochReportVariance
+		},
+	)
+	operations = append(operations, simulation.NewWeightedOperation(
+		weightMsgSubmitEpochReportVariance,
+		auditsimulation.SimulateMsgSubmitEpochReportVariance(am.keeper),
+	))
 
 	return operations
 }

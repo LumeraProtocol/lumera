@@ -109,15 +109,14 @@ func TestReportSupernodeMetrics_SingleReportRecoversPostponed(t *testing.T) {
 	require.NotNil(t, resp)
 	require.True(t, resp.Compliant)
 
-	// The supernode should now have recovered from POSTPONED to its last
-	// non-postponed state (ACTIVE) in a single report.
+	// Legacy metrics path no longer applies state transitions.
 	stored, found := k.QuerySuperNode(ctx, valAddr)
 	require.True(t, found)
 	require.NotEmpty(t, stored.States)
-	require.Equal(t, types.SuperNodeStateActive, stored.States[len(stored.States)-1].State)
+	require.Equal(t, types.SuperNodeStatePostponed, stored.States[len(stored.States)-1].State)
 }
 
-func TestReportSupernodeMetrics_ClosedRequiredPortPostpones(t *testing.T) {
+func TestReportSupernodeMetrics_ClosedRequiredPortDoesNotPostpone(t *testing.T) {
 	k, ctx := keepertest.SupernodeKeeper(t)
 	ctx = ctx.WithBlockHeight(100)
 
@@ -190,10 +189,10 @@ func TestReportSupernodeMetrics_ClosedRequiredPortPostpones(t *testing.T) {
 	stored, found := k.QuerySuperNode(ctx, valAddr)
 	require.True(t, found)
 	require.NotEmpty(t, stored.States)
-	require.Equal(t, types.SuperNodeStatePostponed, stored.States[len(stored.States)-1].State)
+	require.Equal(t, types.SuperNodeStateActive, stored.States[len(stored.States)-1].State)
 }
 
-func TestReportSupernodeMetrics_EmptyPortsStillPersistsAndRecovers(t *testing.T) {
+func TestReportSupernodeMetrics_EmptyPortsStillPersistsAndDoesNotRecover(t *testing.T) {
 	k, ctx := keepertest.SupernodeKeeper(t)
 	ctx = ctx.WithBlockHeight(100)
 
@@ -250,9 +249,159 @@ func TestReportSupernodeMetrics_EmptyPortsStillPersistsAndRecovers(t *testing.T)
 
 	stored, found := k.QuerySuperNode(ctx, valAddr)
 	require.True(t, found)
-	require.Equal(t, types.SuperNodeStateActive, stored.States[len(stored.States)-1].State)
+	require.Equal(t, types.SuperNodeStatePostponed, stored.States[len(stored.States)-1].State)
 
 	state, ok := k.GetMetricsState(ctx, valAddr)
 	require.True(t, ok, "report should persist metrics state")
 	require.Equal(t, ctx.BlockHeight(), state.Height)
+}
+
+func TestReportSupernodeMetrics_StorageFullSignalDoesNotTransitionState(t *testing.T) {
+	k, ctx := keepertest.SupernodeKeeper(t)
+	ctx = ctx.WithBlockHeight(100)
+
+	valAddr := sdk.ValAddress("validator1_______________")
+	supernode := types.SuperNode{
+		ValidatorAddress: valAddr.String(),
+		SupernodeAccount: sdk.AccAddress([]byte("supernode1")).String(),
+		States: []*types.SuperNodeStateRecord{
+			{State: types.SuperNodeStateActive, Height: 10},
+			{State: types.SuperNodeStatePostponed, Height: 50},
+		},
+		PrevIpAddresses: []*types.IPAddressHistory{
+			{Address: "127.0.0.1", Height: 10},
+		},
+		P2PPort: "26657",
+	}
+	require.NoError(t, k.SetSuperNode(ctx, supernode))
+
+	params := types.DefaultParams()
+	require.NoError(t, k.SetParams(ctx, params))
+
+	metrics := types.SupernodeMetrics{
+		VersionMajor:           2,
+		VersionMinor:           0,
+		VersionPatch:           0,
+		CpuCoresTotal:          float64(params.MinCpuCores),
+		CpuUsagePercent:        float64(params.MaxCpuUsagePercent - 10),
+		MemTotalGb:             float64(params.MinMemGb),
+		MemUsagePercent:        float64(params.MaxMemUsagePercent - 10),
+		MemFreeGb:              float64(params.MinMemGb) / 2,
+		DiskTotalGb:            float64(params.MinStorageGb),
+		DiskUsagePercent:       float64(params.MaxStorageUsagePercent + 1), // exceeds max → STORAGE_FULL
+		DiskFreeGb:             float64(params.MinStorageGb) * 0.05,
+		UptimeSeconds:          100,
+		PeersCount:             10,
+		CascadeKademliaDbBytes: 2_000,
+	}
+	for _, port := range params.RequiredOpenPorts {
+		metrics.OpenPorts = append(metrics.OpenPorts, types.PortStatus{
+			Port:  port,
+			State: types.PortState_PORT_STATE_OPEN,
+		})
+	}
+
+	ms := keeper.NewMsgServerImpl(k)
+	ctx = ctx.WithBlockHeader(tmproto.Header{Height: ctx.BlockHeight()})
+
+	resp, err := ms.ReportSupernodeMetrics(
+		sdk.WrapSDKContext(ctx),
+		&types.MsgReportSupernodeMetrics{
+			ValidatorAddress: supernode.ValidatorAddress,
+			SupernodeAccount: supernode.SupernodeAccount,
+			Metrics:          metrics,
+		},
+	)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.False(t, resp.Compliant)
+	require.Contains(t, resp.Issues, "disk storage full")
+
+	stored, found := k.QuerySuperNode(ctx, valAddr)
+	require.True(t, found)
+	require.Equal(t, types.SuperNodeStatePostponed, stored.States[len(stored.States)-1].State)
+
+	events := ctx.EventManager().Events()
+	require.False(t, hasEventType(events, types.EventTypeSupernodeStorageFull))
+	require.False(t, hasEventType(events, types.EventTypeSupernodeRecovered))
+}
+
+func TestReportSupernodeMetrics_DoesNotRecoverFromStorageFull(t *testing.T) {
+	k, ctx := keepertest.SupernodeKeeper(t)
+	ctx = ctx.WithBlockHeight(100)
+
+	valAddr := sdk.ValAddress("validator1_______________")
+	supernode := types.SuperNode{
+		ValidatorAddress: valAddr.String(),
+		SupernodeAccount: sdk.AccAddress([]byte("supernode1")).String(),
+		States: []*types.SuperNodeStateRecord{
+			{State: types.SuperNodeStateActive, Height: 10},
+			{State: types.SuperNodeStateStorageFull, Height: 50},
+		},
+		PrevIpAddresses: []*types.IPAddressHistory{
+			{Address: "127.0.0.1", Height: 10},
+		},
+		P2PPort: "26657",
+	}
+	require.NoError(t, k.SetSuperNode(ctx, supernode))
+
+	params := types.DefaultParams()
+	require.NoError(t, k.SetParams(ctx, params))
+
+	// Build fully compliant metrics with disk usage below the threshold.
+	metrics := types.SupernodeMetrics{
+		VersionMajor:           2,
+		VersionMinor:           0,
+		VersionPatch:           0,
+		CpuCoresTotal:          float64(params.MinCpuCores),
+		CpuUsagePercent:        float64(params.MaxCpuUsagePercent - 10),
+		MemTotalGb:             float64(params.MinMemGb),
+		MemUsagePercent:        float64(params.MaxMemUsagePercent - 10),
+		MemFreeGb:              float64(params.MinMemGb) / 2,
+		DiskTotalGb:            float64(params.MinStorageGb),
+		DiskUsagePercent:       float64(params.MaxStorageUsagePercent - 10), // within bounds → recovers
+		DiskFreeGb:             float64(params.MinStorageGb) / 2,
+		UptimeSeconds:          100,
+		PeersCount:             10,
+		CascadeKademliaDbBytes: 5_000,
+	}
+	for _, port := range params.RequiredOpenPorts {
+		metrics.OpenPorts = append(metrics.OpenPorts, types.PortStatus{
+			Port:  port,
+			State: types.PortState_PORT_STATE_OPEN,
+		})
+	}
+
+	ms := keeper.NewMsgServerImpl(k)
+	ctx = ctx.WithBlockHeader(tmproto.Header{Height: ctx.BlockHeight()})
+
+	resp, err := ms.ReportSupernodeMetrics(
+		sdk.WrapSDKContext(ctx),
+		&types.MsgReportSupernodeMetrics{
+			ValidatorAddress: supernode.ValidatorAddress,
+			SupernodeAccount: supernode.SupernodeAccount,
+			Metrics:          metrics,
+		},
+	)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.True(t, resp.Compliant)
+
+	// Legacy metrics path does not recover STORAGE_FULL. State remains unchanged.
+	stored, found := k.QuerySuperNode(ctx, valAddr)
+	require.True(t, found)
+	require.NotEmpty(t, stored.States)
+	require.Equal(t, types.SuperNodeStateStorageFull, stored.States[len(stored.States)-1].State)
+
+	events := ctx.EventManager().Events()
+	require.False(t, hasEventType(events, types.EventTypeSupernodeStorageRecovered))
+}
+
+func hasEventType(events sdk.Events, eventType string) bool {
+	for _, event := range events {
+		if event.Type == eventType {
+			return true
+		}
+	}
+	return false
 }

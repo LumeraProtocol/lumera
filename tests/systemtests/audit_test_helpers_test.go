@@ -90,7 +90,19 @@ func awaitAtLeastHeight(t *testing.T, height int64, timeout ...time.Duration) {
 	if sut.currentHeight >= height {
 		return
 	}
-	sut.AwaitBlockHeight(t, height, timeout...)
+	if len(timeout) > 0 {
+		sut.AwaitBlockHeight(t, height, timeout...)
+		return
+	}
+	// No explicit timeout provided: scale with the target delta and never fall
+	// below 30s. The default in sut.AwaitBlockHeight (delta+3 blocks * blockTime)
+	// is too tight on loaded CI runners where block production can slip.
+	delta := height - sut.currentHeight
+	autoTimeout := time.Duration(delta+15) * sut.blockTime
+	if autoTimeout < 30*time.Second {
+		autoTimeout = 30 * time.Second
+	}
+	sut.AwaitBlockHeight(t, height, autoTimeout)
 }
 
 // pickEpochForStartAtOrAfter returns the first epoch whose start height is >= minStartHeight.

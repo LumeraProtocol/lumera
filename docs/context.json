@@ -1,0 +1,455 @@
+{
+  "schema_version": "context.v1",
+  "updated": "2026-04-10T02:12:01Z",
+  "project": {
+    "name": "lumera",
+    "note": "Multi-repo project. lumera (this) is the knowledge provider. Related repos: supernode, sdk-go, sdk-js."
+  },
+  "feature_status": [
+    {
+      "feature_id": "F01",
+      "name": "Merkle Tree Library",
+      "status": "done",
+      "slice": "S01",
+      "notes": "Implemented in x/action/v1/merkle/ using BLAKE3 (lukechampine.com/blake3) with domain-separated hashing (0x00 leaf prefix, 0x01 internal prefix). Tree construction uses per-level odd-node duplication (spec-compliant). Proof generation and proof verification all use BLAKE3.",
+      "evidence": [
+        "go test ./x/action/v1/merkle/... (exit 0)"
+      ]
+    },
+    {
+      "feature_id": "F02",
+      "name": "Protobuf Schema Extensions",
+      "status": "done",
+      "slice": "S02",
+      "notes": "Added AvailabilityCommitment (with HashAlgo enum, challenge_indices field 7) and ChunkProof messages in metadata.proto; extended CascadeMetadata with availability_commitment (field 8) and chunk_proofs (field 9); extended Params with svc_challenge_count (field 12) and svc_min_chunks_for_challenge (field 13); regenerated Go protobuf code and added protobuf round-trip tests for AT05/AT06.",
+      "evidence": [
+        "buf generate --template proto/buf.gen.gogo.yaml (exit 0)",
+        "go build ./x/action/v1/types/... (exit 0)",
+        "go test ./x/action/v1/types -run 'TestAvailabilityCommitmentAndChunkProofRoundTrip|TestCascadeMetadataBackwardsCompatibleWithoutNewFields|TestCascadeMetadataRoundTripWithNewFields' (exit 0)",
+        "go test ./x/action/v1/types (exit 0)"
+      ]
+    },
+    {
+      "feature_id": "F03",
+      "name": "Challenge Index Generation",
+      "status": "done",
+      "slice": "S03",
+      "notes": "Challenge indices are chosen by the client at registration time and stored in AvailabilityCommitment.challenge_indices (proto field 7). The x/action/v1/challenge/ package was removed — DeriveIndices is now a spec-only reference algorithm (docs/leps/new-feature-lep5.md). The on-chain module validates index uniqueness, range, and count; it does not derive indices.",
+      "evidence": [
+        "go build ./x/action/v1/... (exit 0)",
+        "grep -r 'DeriveIndices' x/action/ returns no hits"
+      ]
+    },
+    {
+      "feature_id": "F04",
+      "name": "Registration Commitment Validation",
+      "status": "done",
+      "slice": "S04",
+      "notes": "Implemented optional AvailabilityCommitment validation in CascadeActionHandler.Process (MsgRequestAction) and RegisterAction. Validates: commitment_type == 'lep5/chunk-merkle/v1', hash_algo == HashAlgo_HASH_ALGO_BLAKE3 (enum), chunk_size == 262144, num_chunks == ceil(total_size/chunk_size), root == 32 bytes. Stores commitment (including client-provided challenge_indices) in on-chain CascadeMetadata.",
+      "evidence": [
+        "go test ./x/action/v1/keeper/... -run TestCascade -count=1 (exit 0)"
+      ]
+    },
+    {
+      "feature_id": "F05",
+      "name": "Finalization Proof Verification",
+      "status": "done",
+      "slice": "S05",
+      "notes": "Implemented keeper VerifyChunkProofs that reads expected challenge indices from the stored AvailabilityCommitment.ChallengeIndices (client-provided at registration). Validates proof count, index match, and BLAKE3 Merkle path verification against committed root. SVC skip for small files. Explicit evidence event emission on verification failure.",
+      "evidence": [
+        "go test ./x/action/v1/keeper/... -run TestFinalize -count=1 (exit 0)",
+        "go test ./x/action/v1/keeper/... -run TestVerifyChunkProofs -count=1 (exit 0)"
+      ]
+    },
+    {
+      "feature_id": "F06",
+      "name": "Module Parameters and Governance",
+      "status": "done",
+      "slice": "S06",
+      "notes": "SVC params are protocol constants, not governance-tunable. Proto fields exist (Params fields 12, 13) for future flexibility. Keeper uses getSVCParamsOrDefault() with hardcoded defaults (challengeCount=8, minChunks=4). No DefaultParams/Validate/ParamSetPairs wiring needed.",
+      "evidence": [
+        "getSVCParamsOrDefault() in x/action/v1/keeper/svc.go",
+        "Proto fields in x/action/v1/types/params.pb.go"
+      ]
+    },
+    {
+      "feature_id": "F07",
+      "name": "Chain Upgrade and Migration (LEP-5)",
+      "status": "done",
+      "slice": "S06",
+      "notes": "Completed outside BRIDGE scope. LEP-5 is fully closed.",
+      "evidence": []
+    },
+    {
+      "feature_id": "F08",
+      "name": "LEP-5 Multi-Category Tests",
+      "status": "done",
+      "slice": "S07",
+      "notes": "LEP-5 tests implemented across all project test categories: (1) Integration: tests/integration/action/lep5_integration_test.go — 3 tests (lifecycle, invalid commitment, invalid proof); (2) System: tests/system/action/lep5_test.go — full ibctesting flow; (3) Simulation: x/action/v1/simulation/lep5_cascade.go — randomized SVC flow; (4) Systemex: tests/systemtests/lep5_action_test.go — CLI params query + register with commitment; (5) Devnet docker E2E: devnet/tests/validator/ — working.",
+      "evidence": [
+        "go test ./tests/integration/action/... -count=1 (exit 0)",
+        "go test ./tests/system/action/... -count=1 (exit 0)",
+        "go build ./x/action/v1/simulation/... (exit 0)",
+        "go test -tags system_test -c ./tests/systemtests/ (exit 0)",
+        "make devnet-tests (exit 0)"
+      ]
+    },
+    {
+      "feature_id": "F09",
+      "name": "Go Toolchain Update",
+      "status": "done",
+      "slice": "S07",
+      "notes": "Reverted go.mod to 1.25.5 to maintain local build compatibility with Ignite. Updated CI/CD (.github/actions/setup-go and release.yml) to use Go 1.25.6 to satisfy 'buf' tool requirements.",
+      "evidence": [
+        "make build (local success with 1.25.5)",
+        "CI configured to use 1.25.6 explicitly"
+      ]
+    },
+    {
+      "feature_id": "F10",
+      "name": "SuperNode Proto Extensions for Everlight",
+      "status": "done",
+      "slice": "S10",
+      "notes": "SUPERNODE_STATE_STORAGE_FULL (=6) added to enum, cascade_kademlia_db_bytes (field 15) to SN metrics. RewardDistribution (field 19) added to SN params. Codegen fixed by adding missing coin.proto import in query.proto. STORAGE_FULL is driven by disk_usage_percent > max_storage_usage_percent.",
+      "evidence": [
+        "make build-proto (exit 0)"
+      ]
+    },
+    {
+      "feature_id": "F11",
+      "name": "Everlight Module Proto Schemas",
+      "status": "done",
+      "slice": "S10",
+      "notes": "Everlight proto surface is now embedded in proto/lumera/supernode/v1. RewardDistribution lives in supernode params, pool state and SN eligibility queries live under supernode routes, and the standalone proto/lumera/everlight tree has been removed.",
+      "evidence": [
+        "make build-proto (exit 0)",
+        "go test ./x/supernode/v1/types -count=1 (exit 0)"
+      ]
+    },
+    {
+      "feature_id": "F12",
+      "name": "STORAGE_FULL SuperNode State",
+      "status": "done",
+      "slice": "S11",
+      "notes": "markStorageFull/recoverFromStorageFull implemented. Cascade-excluded, compute-eligible. Everlight-payout-eligible.",
+      "evidence": [
+        "git:977c835 S11 commit",
+        "git:cddae30 AT31 evidence"
+      ]
+    },
+    {
+      "feature_id": "F13",
+      "name": "Compliance Bifurcation",
+      "status": "done",
+      "slice": "S11",
+      "notes": "evaluateCompliance bifurcated: storage-only → STORAGE_FULL, other → POSTPONED, both → POSTPONED.",
+      "evidence": [
+        "git:977c835 S11 commit"
+      ]
+    },
+    {
+      "feature_id": "F14",
+      "name": "Everlight Module Core",
+      "status": "done",
+      "slice": "S12",
+      "notes": "Everlight core logic now lives inside x/supernode: the dedicated pool account, distribution state, genesis handling, params, and query handlers are owned by the supernode keeper. The standalone x/everlight module has been removed from the app.",
+      "evidence": [
+        "go test ./x/supernode/v1/... -count=1 (exit 0)",
+        "go test ./tests/integration/everlight -count=1 (exit 0)"
+      ]
+    },
+    {
+      "feature_id": "F15",
+      "name": "Periodic Distribution Logic",
+      "status": "done",
+      "slice": "S13",
+      "notes": "x/supernode EndBlocker distributes the Everlight pool balance to eligible SNs every reward_distribution.payment_period_blocks. Smoothing, growth cap, ramp-up, and distribution-state tracking are all executed from the consolidated supernode keeper.",
+      "evidence": [
+        "go test ./x/supernode/v1/keeper -count=1 (exit 0)",
+        "go test ./tests/e2e/everlight -count=1 (exit 0)"
+      ]
+    },
+    {
+      "feature_id": "F16",
+      "name": "Registration Fee Share Routing",
+      "status": "done",
+      "slice": "S14",
+      "notes": "DistributeFees routes the configured registration-fee share to the Everlight pool account managed by x/supernode. The action keeper depends only on the supernode-owned fee-share interface now.",
+      "evidence": [
+        "go test ./x/action/v1/... -count=1 (exit 0)",
+        "go test ./x/supernode/v1/keeper -run TestGetRegistrationFeeShareBps -count=1 (exit 0)"
+      ]
+    },
+    {
+      "feature_id": "F17",
+      "name": "Block Reward Share Routing",
+      "status": "deferred",
+      "slice": "S14",
+      "notes": "Block reward share routing deferred to optional Phase 4. No implementation in this branch — proto field, BeginBlocker, and tests fully removed.",
+      "evidence": [
+        "design:2026-04-08 Phase 1 scope clarification"
+      ]
+    },
+    {
+      "feature_id": "F18",
+      "name": "Chain Upgrade Handler (Everlight)",
+      "status": "done",
+      "slice": "S15",
+      "notes": "v1.12.0 upgrade now aligns with the embedded-supernode design: no standalone everlight store is added, and consolidated supernode genesis/params handle Everlight state.",
+      "evidence": [
+        "go test ./app/upgrades/v1_12_0 -count=1 (exit 0)"
+      ]
+    }
+  ],
+  "handoff": {
+    "stopped_at": "S10-S15 accepted closed by operator after PASS gate and devnet validation review. Everlight Phase 1 remains consolidated in x/supernode; prefixed gate/eval artifacts are current.",
+    "next_immediate": "Handle downstream consumer updates for the embedded supernode Everlight surface and revisit the three skipped devnet checks in a later follow-up slice if needed.",
+    "watch_out": "Three devnet cases were intentionally skipped and are deferred, not executed. Historical docs and older gate artifacts may still mention standalone x/everlight; AT40 remains deferred to Phase 4."
+  },
+  "next_slice": null,
+  "commands_to_run": {
+    "test": "go test ./x/action/v1/... -count=1 && go test ./x/supernode/v1/... -count=1 && go test ./tests/integration/action/... -count=1",
+    "lint": "golangci-lint run ./x/action/v1/... ./x/supernode/v1/...",
+    "typecheck": "go build ./...",
+    "proto": "buf generate --template proto/buf.gen.gogo.yaml",
+    "dev": ""
+  },
+  "build_instructions": {
+    "note": "DO NOT use 'go build ...'; always use 'make' targets instead.",
+    "build": "make build — builds lumerad",
+    "clean_proto": "make clean-proto clean-cache — cleans all protos (mostly used to regenerate correct openapi, includes SDK stuff)",
+    "build_proto": "make build-proto — must run after clean-proto and before make build",
+    "devnet_clean": "make devnet-clean — completely restarts devnet (removes all state)",
+    "devnet_new": "make devnet-new — re-builds devnet infra with binaries (builds lumerad, but supernode binaries must be present in devnet/bin)",
+    "devnet_up": "make devnet-up — starts devnet"
+  },
+  "recent_decisions": [
+    "2026-04-10: Operator accepted S10-S15 as closed after reviewing the 2026-04-09 PASS gate and devnet status. Three devnet checks were skipped intentionally and deferred for later follow-up, but did not block closure.",
+    "2026-04-08: Everlight consolidated into x/supernode — standalone x/everlight module and proto/lumera/everlight/ removed. All Everlight state, keeper logic, queries, and params are embedded in x/supernode. Pool account registered as named sub-account 'everlight' with no permissions.",
+    "2026-04-08: Phase 1 scope clarified — registration-fee routing only; block reward routing (F17/AT40) deferred to optional Phase 4; no x/distribution modification in Phase 1.",
+    "2026-04-08: Cross-repo integration gate added: IAT01-IAT04 run after lumera tag and downstream consumer updates.",
+    "2026-03-05: Everlight Phase 1 scoped for lumera repo. Multi-repo project: lumera provides protos/knowledge, supernode/sdk-go/sdk-js consume.",
+    "2026-03-05: x/epochs not available yet — Phase 1 uses block-height modulus in EndBlocker for distribution periods. Will migrate to x/epochs when available.",
+    "2026-03-05: Everlight features use ID range F10-F18, slices S10-S15, acceptance tests AT30-AT45 to avoid conflicts with LEP-5 IDs.",
+    "2026-03-05: F07 (LEP-5 upgrade) may bundle with F18 (Everlight upgrade) into single chain version.",
+    "2026-02-26: BLAKE3 replaces SHA-256 for all LEP-5 hashing — Lumera already uses BLAKE3 everywhere (lukechampine.com/blake3); it is faster and avoids a second hash dependency. hash_algo field changed from string to HashAlgo enum (HASH_ALGO_BLAKE3 = 1).",
+    "2026-02-26: Challenge indices provided by client at registration, not derived from block hash at finalization — Client picks challenge_indices and stores in AvailabilityCommitment field 7. Keeper reads commitment.ChallengeIndices directly. Removes block-hash derivation timing dependency.",
+    "2026-02-26: F06 marked done — SVC params are protocol constants (not governance-tunable); keeper hardcoded defaults via getSVCParamsOrDefault() are the correct design"
+  ],
+  "blockers": [
+    "AT32 (STORAGE_FULL recovery test) — RESOLVED 2026-04-08, gate passed",
+    "IAT01-IAT04 remain pending until lumera publishes a tagged Everlight release and downstream consumers update",
+    "Three devnet evaluation checks for S10-S15 were skipped by operator and deferred for later follow-up; they are not blocking slice closure"
+  ],
+  "discrepancies": [
+    "F17 fully removed from codebase; deferred to optional Phase 4 with no implementation in this branch"
+  ],
+  "gate_history": [
+    {
+      "date": "2026-04-06",
+      "result": "fail",
+      "features": [
+        "F10",
+        "F11",
+        "F12",
+        "F13",
+        "F14",
+        "F15",
+        "F16",
+        "F18"
+      ],
+      "blocking_issues": 1,
+      "warnings": 2,
+      "coverage": "67.8%",
+      "notes": "AT32 (STORAGE_FULL recovery) missing dedicated test. AT30-AT39, AT41-AT45 verified. AT40 (block reward flow) deferred to Phase 4."
+    },
+    {
+      "date": "2026-04-08",
+      "result": "pass",
+      "features": [
+        "F10",
+        "F11",
+        "F12",
+        "F13",
+        "F14",
+        "F15",
+        "F16",
+        "F18"
+      ],
+      "blocking_issues": 0,
+      "warnings": 2,
+      "coverage": "n/a",
+      "notes": "All AT30-AT39, AT41-AT45 verified. AT32 blocker resolved. AT40 confirmed deferred (no dead code). F17 clean removal verified."
+    },
+    {
+      "date": "2026-04-08",
+      "result": "fail",
+      "features": [
+        "F10",
+        "F11",
+        "F12",
+        "F13",
+        "F14",
+        "F15",
+        "F16",
+        "F18"
+      ],
+      "blocking_issues": 1,
+      "warnings": 2,
+      "coverage": "n/a",
+      "notes": "Embedded Everlight migration verified functionally: tests, typecheck, and make build passed. Gate failed on 22 golangci-lint findings across x/action and x/supernode. govulncheck unavailable."
+    },
+    {
+      "date": "2026-04-08",
+      "result": "fail",
+      "features": [
+        "F10",
+        "F11",
+        "F12",
+        "F13",
+        "F14",
+        "F15",
+        "F16",
+        "F18"
+      ],
+      "blocking_issues": 1,
+      "warnings": 2,
+      "coverage": "n/a",
+      "notes": "Re-run gate with lint waived per operator instruction. Functional tests, Everlight integration/E2E/upgrade coverage, and make build passed. govulncheck found 5 reachable vulnerabilities (Go stdlib and CometBFT), so the gate remains blocked on security remediation."
+    },
+    {
+      "date": "2026-04-08",
+      "result": "pass",
+      "features": [
+        "F10",
+        "F11",
+        "F12",
+        "F13",
+        "F14",
+        "F15",
+        "F16",
+        "F18"
+      ],
+      "blocking_issues": 0,
+      "warnings": 2,
+      "coverage": "n/a",
+      "notes": "Re-run gate after updating Go to 1.25.9 and CometBFT to 0.38.21. Functional tests, Everlight integration/E2E/upgrade coverage, govulncheck, and build all passed. Lint remained explicitly waived per operator instruction."
+    },
+    {
+      "date": "2026-04-08",
+      "result": "pass",
+      "features": [
+        "F10",
+        "F11",
+        "F12",
+        "F13",
+        "F14",
+        "F15",
+        "F16",
+        "F18"
+      ],
+      "blocking_issues": 0,
+      "warnings": 4,
+      "coverage": "n/a",
+      "notes": "Gate kept in PASS state for Everlight scope. Whole-project govulncheck ./... reported 8 reachable vulnerabilities across 6 modules and make lint reported 111 diagnostics, but both were explicitly treated as non-blocking warnings because they fall outside the Everlight slice boundary."
+    },
+    {
+      "date": "2026-04-09",
+      "result": "pass",
+      "features": [
+        "F10",
+        "F11",
+        "F12",
+        "F13",
+        "F14",
+        "F15",
+        "F16",
+        "F18"
+      ],
+      "blocking_issues": 0,
+      "warnings": 2,
+      "coverage": "n/a",
+      "notes": "Re-gate after STORAGE_FULL trigger refactor (disk_usage_percent), cascade_kademlia_db_max_bytes full removal, EnsureModuleAccount fix, EverlightPoolAccountName removal, devnet test rewrite. All unit/integration/E2E/upgrade tests pass. Dead code grep clean. AT30-AT39, AT41-AT45 verified. AT40 deferred. Lint/govulncheck waived per operator."
+    },
+    {
+      "date": "2026-04-09",
+      "result": "pass",
+      "features": [
+        "F10",
+        "F11",
+        "F12",
+        "F13",
+        "F14",
+        "F15",
+        "F16",
+        "F18"
+      ],
+      "blocking_issues": 0,
+      "warnings": 2,
+      "coverage": "n/a",
+      "notes": "Fresh re-gate at commit 4cc12ec. All functional tests pass (unit, integration, E2E, upgrade). go build ./... clean. make build clean. Dead code verified removed (CascadeKademliaDbMaxBytes, cascade_kademlia_db_max_bytes, EverlightPoolAccountName, x/everlight). All 6 design points confirmed in code. AT30-AT39, AT41-AT45 verified. AT40 deferred. Lint/govulncheck waived per operator."
+    }
+  ],
+  "eval_history": [
+    {
+      "date": "2026-04-08",
+      "scenarios_generated": 10,
+      "e2e_tests_generated": 7,
+      "awaiting_feedback": true,
+      "features": ["F10", "F11", "F12", "F13", "F14", "F15", "F16", "F18"],
+      "files": [
+        "docs/gates-evals/S10-S15-eval-scenarios.md",
+        "tests/e2e/everlight/everlight_e2e_test.go"
+      ]
+    },
+    {
+      "date": "2026-04-08",
+      "scenarios_generated": 10,
+      "e2e_tests_generated": 7,
+      "awaiting_feedback": true,
+      "features": ["F10", "F11", "F12", "F13", "F14", "F15", "F16", "F18"],
+      "files": [
+        "docs/gates-evals/S10-S15-eval-scenarios.md",
+        "tests/e2e/everlight/everlight_e2e_test.go"
+      ]
+    },
+    {
+      "date": "2026-04-09",
+      "scenarios_generated": 10,
+      "e2e_tests_generated": 7,
+      "awaiting_feedback": false,
+      "features": ["F10", "F11", "F12", "F13", "F14", "F15", "F16", "F18"],
+      "files": [
+        "docs/gates-evals/S10-S15-eval-scenarios.md",
+        "tests/e2e/everlight/everlight_e2e_test.go"
+      ]
+    }
+  ],
+  "workspace": {
+    "topology": "multi-repo",
+    "control_repo": "../lumera-dev",
+    "repos": [
+      {
+        "repo_id": "lumera-dev",
+        "path": "../lumera-dev",
+        "role": "planning hub"
+      },
+      {
+        "repo_id": "lumera",
+        "path": "."
+      },
+      {
+        "repo_id": "supernode",
+        "path": "../supernode"
+      },
+      {
+        "repo_id": "sdk-go",
+        "path": "../sdk-go"
+      },
+      {
+        "repo_id": "sdk-js",
+        "path": "../sdk-js"
+      }
+    ]
+  }
+}

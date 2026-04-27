@@ -40,6 +40,26 @@ jobs:
       - name: Run unit tests
         run: go test -v ./x/...
 
+  cli-help-smoke:
+    name: cli-help-smoke
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6.0.1
+
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Build lumerad
+        run: go build -o ./build/lumerad ./cmd/lumera
+
+      - name: Smoke test generated CLI help
+        run: bash ./scripts/cli-help-smoke.sh ./build/lumerad
+
   integration-tests:
     name: integration
     runs-on: ubuntu-latest

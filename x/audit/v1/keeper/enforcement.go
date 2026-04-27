@@ -22,7 +22,7 @@ const (
 func (k Keeper) EnforceEpochEnd(ctx sdk.Context, epochID uint64, params types.Params) error {
 	params = params.WithDefaults()
 
-	active, err := k.supernodeKeeper.GetAllSuperNodes(ctx, sntypes.SuperNodeStateActive)
+	active, err := k.supernodeKeeper.GetAllSuperNodes(ctx, sntypes.SuperNodeStateActive, sntypes.SuperNodeStateStorageFull)
 	if err != nil {
 		return err
 	}
@@ -84,7 +84,7 @@ func (k Keeper) EnforceEpochEnd(ctx sdk.Context, epochID uint64, params types.Pa
 			continue
 		}
 
-		if err := k.recoverSupernodeActive(ctx, sn); err != nil {
+		if err := k.recoverSupernodeFromPostponed(ctx, sn, epochID); err != nil {
 			return err
 		}
 		k.clearActionFinalizationPostponedAtEpochID(ctx, sn.SupernodeAccount)
@@ -387,14 +387,12 @@ func (k Keeper) selfHostViolatesMinimums(ctx sdk.Context, supernodeAccount strin
 		return false, nil
 	}
 
-	// If any known metric is below minimum free%, postpone.
+	// If any known non-storage metric is below minimum free%, postpone.
+	// Disk pressure is modeled via STORAGE_FULL transitions, not POSTPONED.
 	if violatesMinFree(r.HostReport.CpuUsagePercent, params.MinCpuFreePercent) {
 		return true, nil
 	}
 	if violatesMinFree(r.HostReport.MemUsagePercent, params.MinMemFreePercent) {
-		return true, nil
-	}
-	if violatesMinFree(r.HostReport.DiskUsagePercent, params.MinDiskFreePercent) {
 		return true, nil
 	}
 
@@ -411,9 +409,6 @@ func (k Keeper) selfHostCompliant(ctx sdk.Context, supernodeAccount string, epoc
 		return false, nil
 	}
 	if !compliesMinFree(r.HostReport.MemUsagePercent, params.MinMemFreePercent) {
-		return false, nil
-	}
-	if !compliesMinFree(r.HostReport.DiskUsagePercent, params.MinDiskFreePercent) {
 		return false, nil
 	}
 
@@ -530,7 +525,7 @@ func (k Keeper) setSupernodePostponed(ctx sdk.Context, sn sntypes.SuperNode, rea
 	return k.supernodeKeeper.SetSuperNodePostponed(ctx, valAddr, reason)
 }
 
-func (k Keeper) recoverSupernodeActive(ctx sdk.Context, sn sntypes.SuperNode) error {
+func (k Keeper) recoverSupernodeFromPostponed(ctx sdk.Context, sn sntypes.SuperNode, epochID uint64) error {
 	if sn.ValidatorAddress == "" {
 		return fmt.Errorf("missing validator address for supernode %q", sn.SupernodeAccount)
 	}
@@ -538,7 +533,32 @@ func (k Keeper) recoverSupernodeActive(ctx sdk.Context, sn sntypes.SuperNode) er
 	if err != nil {
 		return err
 	}
-	return k.supernodeKeeper.RecoverSuperNodeFromPostponed(ctx, valAddr)
+
+	target := sntypes.SuperNodeStateActive
+	if report, found := k.GetReport(ctx, epochID, sn.SupernodeAccount); found {
+		maxStorage := float64(k.supernodeKeeper.GetParams(ctx).MaxStorageUsagePercent)
+		if report.HostReport.DiskUsagePercent > maxStorage {
+			target = sntypes.SuperNodeStateStorageFull
+		}
+	}
+
+	if target == sntypes.SuperNodeStateActive {
+		return k.supernodeKeeper.RecoverSuperNodeFromPostponed(ctx, valAddr)
+	}
+
+	current, found := k.supernodeKeeper.QuerySuperNode(ctx, valAddr)
+	if !found {
+		return fmt.Errorf("supernode not found for validator %q", sn.ValidatorAddress)
+	}
+	if len(current.States) == 0 {
+		return fmt.Errorf("supernode state history missing for validator %q", sn.ValidatorAddress)
+	}
+	if current.States[len(current.States)-1].State != sntypes.SuperNodeStatePostponed {
+		return nil
+	}
+
+	current.States = append(current.States, &sntypes.SuperNodeStateRecord{State: sntypes.SuperNodeStateStorageFull, Height: ctx.BlockHeight()})
+	return k.supernodeKeeper.SetSuperNode(ctx, current)
 }
 
 // storageTruthBand represents a node suspicion severity level.

@@ -20,7 +20,7 @@ func TestWeightedOperationsIncludesSubmitEvidence(t *testing.T) {
 	}
 
 	ops := am.WeightedOperations(simState)
-	require.Len(t, ops, 4)
+	require.Len(t, ops, 5)
 
 	msg, futureOps, err := ops[0].Op()(rand.New(rand.NewSource(1)), nil, sdk.Context{}, []simtypes.Account{}, "testing")
 	require.NoError(t, err)
@@ -38,7 +38,7 @@ func TestWeightedOperationsIncludesStorageTruthOps(t *testing.T) {
 	}
 
 	ops := am.WeightedOperations(simState)
-	require.Len(t, ops, 4)
+	require.Len(t, ops, 5)
 
 	wantRoutes := []string{
 		sdk.MsgTypeURL(&audittypes.MsgSubmitEvidence{}),

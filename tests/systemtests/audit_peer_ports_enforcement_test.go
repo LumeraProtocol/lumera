@@ -4,10 +4,19 @@ package system
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/sjson"
 )
+
+func awaitAtLeastHeightWithSlackPeerPorts(t *testing.T, height int64) {
+	t.Helper()
+	if sut.currentHeight >= height {
+		return
+	}
+	sut.AwaitBlockHeight(t, height, 45*time.Second)
+}
 
 func TestAuditPeerPortsUnanimousClosedPostponesAfterConsecutiveWindows(t *testing.T) {
 	const (
@@ -20,7 +29,7 @@ func TestAuditPeerPortsUnanimousClosedPostponesAfterConsecutiveWindows(t *testin
 		setAuditParamsForFastEpochs(t, epochLengthBlocks, 1, 1, 1, []uint32{4444}),
 		setStorageTruthEnforcementModeUnspecified(t),
 		func(genesis []byte) []byte {
-			state, err := sjson.SetRawBytes(genesis, "app_state.audit.params.consecutive_epochs_to_postpone", []byte("2"))
+			state, err := sjson.SetRawBytes(genesis, "app_state.audit.params.consecutive_epochs_to_postpone", []byte("3"))
 			require.NoError(t, err)
 			return state
 		},
@@ -34,58 +43,64 @@ func TestAuditPeerPortsUnanimousClosedPostponesAfterConsecutiveWindows(t *testin
 	registerSupernode(t, cli, n0, "192.168.1.1")
 	registerSupernode(t, cli, n1, "192.168.1.2")
 
-	currentHeight := sut.AwaitNextBlock(t)
+	currentHeight := sut.AwaitNextBlock(t, 12*time.Second)
 	epochID1, epoch1Start := nextEpochAfterHeight(originHeight, epochLengthBlocks, currentHeight)
 	epochID2 := epochID1 + 1
 	epoch2Start := epoch1Start + int64(epochLengthBlocks)
 	enforce2 := epoch2Start + int64(epochLengthBlocks)
-
-	senders := sortedStrings(n0.accAddr, n1.accAddr)
-	receivers := sortedStrings(n0.accAddr, n1.accAddr)
-	kEpoch := computeKEpoch(1, 1, 1, len(senders), len(receivers))
-	require.Equal(t, uint32(1), kEpoch)
+	epochID3 := epochID2 + 1
+	epoch3Start := epoch2Start + int64(epochLengthBlocks)
+	enforce3 := epoch3Start + int64(epochLengthBlocks)
 
 	hostOpen := auditHostReportJSON([]string{"PORT_STATE_OPEN"})
 
-	// Window 1: node0 reports node1 as CLOSED, node1 reports node0 as OPEN.
-	awaitAtLeastHeight(t, epoch1Start)
-	seed1 := epochSeedAtHeight(t, sut.rpcAddr, epoch1Start, epochID1)
-	targets0e1, ok := assignedTargets(seed1, senders, receivers, kEpoch, n0.accAddr)
-	require.True(t, ok)
-	require.Len(t, targets0e1, 1)
-	targets1e1, ok := assignedTargets(seed1, senders, receivers, kEpoch, n1.accAddr)
-	require.True(t, ok)
-	require.Len(t, targets1e1, 1)
+	buildObs := func(targets []string, closeFor string) []string {
+		obs := make([]string, 0, len(targets))
+		for _, target := range targets {
+			state := []string{"PORT_STATE_OPEN"}
+			if target == closeFor {
+				state = []string{"PORT_STATE_CLOSED"}
+			}
+			obs = append(obs, storageChallengeObservationJSON(target, state))
+		}
+		return obs
+	}
 
-	tx0e1 := submitEpochReport(t, cli, n0.nodeName, epochID1, hostOpen, []string{
-		storageChallengeObservationJSON(targets0e1[0], []string{"PORT_STATE_CLOSED"}),
-	})
+	// Window 1: report using keeper-assigned targets for this epoch.
+	awaitAtLeastHeightWithSlackPeerPorts(t, epoch1Start)
+	assigned0e1 := auditQueryAssignedTargets(t, epochID1, true, n0.accAddr)
+	assigned1e1 := auditQueryAssignedTargets(t, epochID1, true, n1.accAddr)
+
+	tx0e1 := submitEpochReport(t, cli, n0.nodeName, epochID1, hostOpen, buildObs(assigned0e1.TargetSupernodeAccounts, n1.accAddr))
 	RequireTxSuccess(t, tx0e1)
-	tx1e1 := submitEpochReport(t, cli, n1.nodeName, epochID1, hostOpen, []string{
-		storageChallengeObservationJSON(targets1e1[0], []string{"PORT_STATE_OPEN"}),
-	})
+	tx1e1 := submitEpochReport(t, cli, n1.nodeName, epochID1, hostOpen, buildObs(assigned1e1.TargetSupernodeAccounts, ""))
 	RequireTxSuccess(t, tx1e1)
 
-	// Window 2: repeat -> node1 should be POSTPONED at window end due to consecutive unanimous CLOSED.
-	awaitAtLeastHeight(t, epoch2Start)
-	seed2 := epochSeedAtHeight(t, sut.rpcAddr, epoch2Start, epochID2)
-	targets0e2, ok := assignedTargets(seed2, senders, receivers, kEpoch, n0.accAddr)
-	require.True(t, ok)
-	require.Len(t, targets0e2, 1)
-	targets1e2, ok := assignedTargets(seed2, senders, receivers, kEpoch, n1.accAddr)
-	require.True(t, ok)
-	require.Len(t, targets1e2, 1)
+	// Window 2: repeat CLOSED observation, still below the 3-epoch postponement threshold.
+	awaitAtLeastHeightWithSlackPeerPorts(t, epoch2Start)
+	assigned0e2 := auditQueryAssignedTargets(t, epochID2, true, n0.accAddr)
+	assigned1e2 := auditQueryAssignedTargets(t, epochID2, true, n1.accAddr)
 
-	tx0e2 := submitEpochReport(t, cli, n0.nodeName, epochID2, hostOpen, []string{
-		storageChallengeObservationJSON(targets0e2[0], []string{"PORT_STATE_CLOSED"}),
-	})
+	tx0e2 := submitEpochReport(t, cli, n0.nodeName, epochID2, hostOpen, buildObs(assigned0e2.TargetSupernodeAccounts, n1.accAddr))
 	RequireTxSuccess(t, tx0e2)
-	tx1e2 := submitEpochReport(t, cli, n1.nodeName, epochID2, hostOpen, []string{
-		storageChallengeObservationJSON(targets1e2[0], []string{"PORT_STATE_OPEN"}),
-	})
+	tx1e2 := submitEpochReport(t, cli, n1.nodeName, epochID2, hostOpen, buildObs(assigned1e2.TargetSupernodeAccounts, ""))
 	RequireTxSuccess(t, tx1e2)
 
-	awaitAtLeastHeight(t, enforce2)
+	awaitAtLeastHeightWithSlackPeerPorts(t, enforce2)
+	require.Equal(t, "SUPERNODE_STATE_ACTIVE", querySupernodeLatestState(t, cli, n0.valAddr))
+	require.Equal(t, "SUPERNODE_STATE_ACTIVE", querySupernodeLatestState(t, cli, n1.valAddr))
+
+	// Window 3: third consecutive unanimous CLOSED should postpone node1.
+	awaitAtLeastHeightWithSlackPeerPorts(t, epoch3Start)
+	assigned0e3 := auditQueryAssignedTargets(t, epochID3, true, n0.accAddr)
+	assigned1e3 := auditQueryAssignedTargets(t, epochID3, true, n1.accAddr)
+
+	tx0e3 := submitEpochReport(t, cli, n0.nodeName, epochID3, hostOpen, buildObs(assigned0e3.TargetSupernodeAccounts, n1.accAddr))
+	RequireTxSuccess(t, tx0e3)
+	tx1e3 := submitEpochReport(t, cli, n1.nodeName, epochID3, hostOpen, buildObs(assigned1e3.TargetSupernodeAccounts, ""))
+	RequireTxSuccess(t, tx1e3)
+
+	awaitAtLeastHeightWithSlackPeerPorts(t, enforce3)
 
 	require.Equal(t, "SUPERNODE_STATE_ACTIVE", querySupernodeLatestState(t, cli, n0.valAddr))
 	require.Equal(t, "SUPERNODE_STATE_POSTPONED", querySupernodeLatestState(t, cli, n1.valAddr))

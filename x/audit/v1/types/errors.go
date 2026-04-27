@@ -12,6 +12,7 @@ var (
 	ErrInvalidPortStatesLength = errorsmod.Register(ModuleName, 6, "invalid port states length")
 	ErrReporterNotFound        = errorsmod.Register(ModuleName, 7, "reporter supernode not found")
 	ErrInvalidReporterState    = errorsmod.Register(ModuleName, 8, "invalid reporter state")
+	ErrInvalidStorageProofs    = errorsmod.Register(ModuleName, 9, "invalid storage proof results")
 
 	ErrInvalidEvidenceType = errorsmod.Register(ModuleName, 1101, "invalid evidence type")
 	ErrInvalidMetadata     = errorsmod.Register(ModuleName, 1102, "invalid evidence metadata")

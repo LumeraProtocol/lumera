@@ -1,0 +1,47 @@
+package types
+
+// Event types and attributes for storage-truth score updates and enforcement bands.
+const (
+	EventTypeStorageTruthScoreUpdated      = "storage_truth_score_updated"
+	EventTypeHealOpScheduled               = "storage_truth_heal_op_scheduled"
+	EventTypeHealOpExpired                 = "storage_truth_heal_op_expired"
+	EventTypeHealOpHealerReported          = "storage_truth_heal_op_healer_reported"
+	EventTypeHealOpVerified                = "storage_truth_heal_op_verified"
+	EventTypeHealOpFailed                  = "storage_truth_heal_op_failed"
+	EventTypeStorageRecheckEvidence        = "storage_truth_recheck_evidence_submitted"
+	EventTypeStorageTruthBandWatch         = "storage_truth_band_watch"
+	EventTypeStorageTruthBandProbation     = "storage_truth_band_probation"
+	EventTypeStorageTruthBandPostpone       = "storage_truth_band_postpone_candidate"
+	EventTypeStorageTruthBandStrongPostpone = "storage_truth_band_strong_postpone_candidate"
+	EventTypeStorageTruthEnforced           = "storage_truth_enforced"
+	EventTypeStorageTruthRecovered          = "storage_truth_recovered"
+	// Per 122-F2 — legacy 0-count tickets fall back to cascadeMeta length to avoid finalization brick.
+	EventTypeArtifactCountUnanchored = "storage_truth_artifact_count_unanchored"
+	// Per 121-F11 — heal scheduler cannot find sufficient eligible healers.
+	EventTypeHealOpInsufficientHealers = "storage_truth_heal_op_insufficient_healers"
+
+	AttributeKeyEpochID                  = "epoch_id"
+	AttributeKeyReporterSupernodeAccount = "reporter_supernode_account"
+	AttributeKeyTargetSupernodeAccount   = "target_supernode_account"
+	AttributeKeyTicketID                 = "ticket_id"
+	AttributeKeyHealOpID                 = "heal_op_id"
+	AttributeKeyVerifierSupernodeAccount = "verifier_supernode_account"
+	AttributeKeyHealerSupernodeAccount   = "healer_supernode_account"
+	AttributeKeyVerified                 = "verified"
+	AttributeKeyVerificationHash         = "verification_hash"
+	AttributeKeyTranscriptHash           = "transcript_hash"
+	AttributeKeyHealManifestHash         = "heal_manifest_hash"
+	AttributeKeyDeadlineEpochID          = "deadline_epoch_id"
+	AttributeKeyResultClass              = "result_class"
+	AttributeKeyBucketType               = "bucket_type"
+	AttributeKeyNodeSuspicionScore       = "node_suspicion_score"
+	AttributeKeyReporterReliabilityScore = "reporter_reliability_score"
+	AttributeKeyTicketDeteriorationScore = "ticket_deterioration_score"
+	AttributeKeyReporterTrustBand        = "reporter_trust_band"
+	AttributeKeyRepeatedFailureCount     = "repeated_failure_count"
+	AttributeKeyContradictionDetected    = "contradiction_detected"
+	AttributeKeyContradictedReporter     = "contradicted_reporter"
+	AttributeKeyStorageTruthBand         = "storage_truth_band"
+	AttributeKeyEnforcementMode          = "enforcement_mode"
+	AttributeKeyRecheckResultClass       = "recheck_result_class"
+)

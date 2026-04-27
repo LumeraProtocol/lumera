@@ -1,7 +1,8 @@
 package types
 
 const (
-	ConsensusVersion = 1
+	// Per 122-F4 — bump KeepLastEpochEntries to cover OldClassAFaultWindow for safe pruning.
+	ConsensusVersion = 2
 )
 
 func DefaultGenesis() *GenesisState {

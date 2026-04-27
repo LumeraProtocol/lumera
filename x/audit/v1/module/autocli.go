@@ -43,27 +43,27 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 				{
 					RpcMethod:      "EpochAnchor",
 					Use:            "epoch-anchor [epoch-id]",
-					Short:          "Query the persisted anchor for an epoch",
+					Short:          "Query the epoch anchor for a given epoch",
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "epoch_id"}},
 				},
 				{
 					RpcMethod: "CurrentEpochAnchor",
 					Use:       "current-epoch-anchor",
-					Short:     "Query the persisted anchor for the current epoch",
+					Short:     "Query the anchor for the current epoch",
 				},
 				{
 					RpcMethod:      "AssignedTargets",
 					Use:            "assigned-targets [supernode-account]",
-					Short:          "Query the current or filtered target assignments for a reporter",
+					Short:          "Query storage challenge assigned targets for a supernode",
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "supernode_account"}},
 				},
 				{
 					RpcMethod: "EpochReport",
-					Skip:      true, // custom command to avoid AutoCLI aminojson float64 marshal bug
+					Skip:      true,
 				},
 				{
 					RpcMethod: "EpochReportsByReporter",
-					Skip:      true, // custom command to avoid AutoCLI aminojson float64 marshal bug
+					Skip:      true,
 				},
 				{
 					RpcMethod:      "StorageChallengeReports",
@@ -73,7 +73,7 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 				},
 				{
 					RpcMethod: "HostReports",
-					Skip:      true, // custom command to avoid AutoCLI aminojson float64 marshal bug
+					Skip:      true,
 				},
 				{
 					RpcMethod:      "NodeSuspicionState",
@@ -137,19 +137,19 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 				{
 					RpcMethod:      "SubmitStorageRecheckEvidence",
 					Use:            "submit-storage-recheck-evidence [epoch-id] [challenged-supernode-account] [ticket-id]",
-					Short:          "Submit storage-truth recheck evidence (foundation path; behavior implemented in a later PR)",
+					Short:          "Submit storage-truth recheck evidence (reserved for the later LEP-6 recheck milestone)",
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "epoch_id"}, {ProtoField: "challenged_supernode_account"}, {ProtoField: "ticket_id"}},
 				},
 				{
 					RpcMethod:      "ClaimHealComplete",
 					Use:            "claim-heal-complete [heal-op-id] [ticket-id] [heal-manifest-hash]",
-					Short:          "Submit healer completion claim for a storage-truth heal op (implemented in a later PR)",
+					Short:          "Submit healer completion claim for a storage-truth heal op",
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "heal_op_id"}, {ProtoField: "ticket_id"}, {ProtoField: "heal_manifest_hash"}},
 				},
 				{
 					RpcMethod:      "SubmitHealVerification",
 					Use:            "submit-heal-verification [heal-op-id] [verified] [verification-hash]",
-					Short:          "Submit verifier decision for a storage-truth heal op (implemented in a later PR)",
+					Short:          "Submit verifier decision for a storage-truth heal op",
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "heal_op_id"}, {ProtoField: "verified"}, {ProtoField: "verification_hash"}},
 				},
 				// this line is used by ignite scaffolding # autocli/tx

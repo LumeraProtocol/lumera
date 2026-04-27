@@ -149,9 +149,8 @@ func (m *mockAuditKeeper) setReport(epochID uint64, reporter string, height int6
 		SupernodeAccount: reporter,
 		EpochId:          epochID,
 		ReportHeight:     height,
-		HostReport: audittypes.HostReport{
-			CascadeKademliaDbBytes: bytes,
-		},
+		// CascadeKademliaDbBytes removed from HostReport in LEP-6 §12 (audit proto v2).
+		HostReport: audittypes.HostReport{},
 	}
 }
 
@@ -233,10 +232,16 @@ func addSupernode(snKeeper *mockSupernodeKeeper, auditKeeper *mockAuditKeeper, v
 	snKeeper.supernodes = append(snKeeper.supernodes, sn)
 	if snKeeper.keeper != nil {
 		_ = snKeeper.keeper.SetSuperNode(snKeeper.ctx, sn)
+		// Per LEP-6 §12: cascade bytes are now stored in SupernodeMetricsState, not HostReport.
+		if cascadeBytes > 0 {
+			_ = snKeeper.keeper.SetMetricsState(snKeeper.ctx, sntypes.SupernodeMetricsState{
+				ValidatorAddress: valBech32,
+				Metrics:          &sntypes.SupernodeMetrics{CascadeKademliaDbBytes: cascadeBytes},
+				Height:           snKeeper.ctx.BlockHeight(),
+			})
+		}
 	}
-	if auditKeeper != nil {
-		auditKeeper.setReport(auditKeeper.currentEpochID, accBech32, snKeeper.ctx.BlockHeight(), cascadeBytes)
-	}
+	_ = auditKeeper // audit HostReport no longer carries cascade bytes (LEP-6 §12 audit proto v2)
 }
 
 func fundPool(bankKeeper *mockBankKeeper, amount int64) {

@@ -4,6 +4,7 @@ import (
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types/v1beta1"
 
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
+	audittypes "github.com/LumeraProtocol/lumera/x/audit/v1/types"
 	supernodetypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 
 	"github.com/LumeraProtocol/lumera/internal/protobridge"
@@ -18,5 +19,6 @@ func init() {
 	protobridge.RegisterEnum("lumera.action.v1.ActionType", actiontypes.ActionType_value)
 	protobridge.RegisterEnum("lumera.action.v1.ActionState", actiontypes.ActionState_value)
 	protobridge.RegisterEnum("lumera.action.v1.HashAlgo", actiontypes.HashAlgo_value)
+	protobridge.RegisterEnum("lumera.audit.v1.ReporterTrustBand", audittypes.ReporterTrustBand_value)
 	protobridge.RegisterEnum("lumera.supernode.v1.SuperNodeState", supernodetypes.SuperNodeState_value)
 }

@@ -30,4 +30,17 @@ message GenesisState {
 
   // next_heal_op_id is the next id to use for storage-truth heal operations.
   uint64 next_heal_op_id = 8;
+
+  repeated TicketArtifactCountState ticket_artifact_count_states = 9 [(gogoproto.nullable) = false];
+
+  // storage_truth_postponements records active per-supernode postponement markers
+  // exported/imported at genesis. Per 121-F7.
+  repeated StorageTruthPostponement storage_truth_postponements = 10 [(gogoproto.nullable) = false];
+}
+
+// StorageTruthPostponement records a supernode's storage-truth postponement state
+// for genesis export/import. Per 121-F7.
+message StorageTruthPostponement {
+  string supernode_account = 1;
+  uint64 postponed_at_epoch_id = 2;
 }

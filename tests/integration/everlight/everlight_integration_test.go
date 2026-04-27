@@ -234,18 +234,22 @@ func (s *EverlightIntegrationSuite) TestEverlightEndBlockerDistribution() {
 	err := s.app.SupernodeKeeper.SetSuperNode(s.ctx, sn)
 	require.NoError(s.T(), err)
 
-	// 3. Set audit epoch report above minimum threshold (source-of-truth for payout weight).
+	// 3. Set audit epoch report and per-SN metrics (source-of-truth for payout weight).
+	// Per LEP-6 §12: cascade bytes moved from HostReport to SupernodeMetricsState.
 	epochID, _, _, err := s.app.AuditKeeper.GetCurrentEpochInfo(s.ctx)
 	require.NoError(s.T(), err)
 	err = s.app.AuditKeeper.SetReport(s.ctx, audittypes.EpochReport{
 		SupernodeAccount: snAccAddr.String(),
 		EpochId:          epochID,
 		ReportHeight:     s.ctx.BlockHeight(),
-		HostReport: audittypes.HostReport{
-			CascadeKademliaDbBytes: 2_147_483_648, // 2 GB
-		},
+		HostReport:       audittypes.HostReport{},
 	})
 	require.NoError(s.T(), err)
+	require.NoError(s.T(), s.keeperImpl.SetMetricsState(s.ctx, sntypes.SupernodeMetricsState{
+		ValidatorAddress: valAddr.String(),
+		Metrics:          &sntypes.SupernodeMetrics{CascadeKademliaDbBytes: 2_147_483_648}, // 2 GB
+		Height:           s.ctx.BlockHeight(),
+	}))
 
 	// 4. Set params with a very short PaymentPeriodBlocks so we trigger distribution.
 	params := s.keeper.GetParams(s.ctx)

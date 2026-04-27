@@ -52,6 +52,20 @@ var (
 	KeyStorageTruthReporterReliabilityIneligibleThreshold = []byte("StorageTruthReporterReliabilityIneligibleThreshold")
 	KeyStorageTruthTicketDeteriorationHealThreshold       = []byte("StorageTruthTicketDeteriorationHealThreshold")
 	KeyStorageTruthEnforcementMode                        = []byte("StorageTruthEnforcementMode")
+
+	// New LEP-6 spec-alignment keys.
+	KeyStorageTruthReporterReliabilityDegradedThreshold = []byte("StorageTruthReporterReliabilityDegradedThreshold")
+	KeyStorageTruthPatternEscalationWindow              = []byte("StorageTruthPatternEscalationWindow")
+	KeyStorageTruthDivergenceWindowEpochs               = []byte("StorageTruthDivergenceWindowEpochs")
+	KeyStorageTruthReporterMinReportsForDivergence      = []byte("StorageTruthReporterMinReportsForDivergence")
+	KeyStorageTruthNodeSuspicionThresholdStrongPostpone = []byte("StorageTruthNodeSuspicionThresholdStrongPostpone")
+	KeyStorageTruthRecoveryCleanPassCount               = []byte("StorageTruthRecoveryCleanPassCount")
+	KeyStorageTruthClassAFaultWindow                    = []byte("StorageTruthClassAFaultWindow")
+	KeyStorageTruthClassBFaultWindow                    = []byte("StorageTruthClassBFaultWindow")
+	KeyStorageTruthHealDeadlineEpochs                   = []byte("StorageTruthHealDeadlineEpochs")
+	KeyStorageTruthOldClassAFaultWindow                 = []byte("StorageTruthOldClassAFaultWindow")
+	KeyStorageTruthContradictionWindowEpochs            = []byte("StorageTruthContradictionWindowEpochs")
+	KeyStorageTruthReporterIneligibleDurationEpochs     = []byte("StorageTruthReporterIneligibleDurationEpochs")
 )
 
 var (
@@ -110,29 +124,42 @@ var (
 	// A value of 0 means "auto" (implementation-defined default).
 	DefaultScChallengersPerEpoch = uint32(0) // 0 means auto
 
-	// DefaultStorageTruth* are LEP-6 parameters kept behavior-neutral in PR1.
-	DefaultStorageTruthRecentBucketMaxBlocks     = uint64(7200)
-	DefaultStorageTruthOldBucketMinBlocks        = uint64(7201)
+	// DefaultStorageTruth* are LEP-6 parameters.
+	// Recommended bucket defaults are derived from epoch_length_blocks:
+	// - recent_bucket_max_blocks = 3 * epoch_length_blocks
+	// - old_bucket_min_blocks = 30 * epoch_length_blocks
+	DefaultStorageTruthRecentBucketMaxBlocks     = DefaultEpochLengthBlocks * 3
+	DefaultStorageTruthOldBucketMinBlocks        = DefaultEpochLengthBlocks * 30
 	DefaultStorageTruthChallengeTargetDivisor    = uint32(3)
 	DefaultStorageTruthCompoundRangesPerArtifact = uint32(4)
 	DefaultStorageTruthCompoundRangeLenBytes     = uint32(256)
 
 	DefaultStorageTruthMaxSelfHealOpsPerEpoch                 = uint32(5)
 	DefaultStorageTruthProbationEpochs                        = uint32(3)
-	// Exponential decay factors are integer numerators over 1000 (see LEP-6 implementation guide).
-	DefaultStorageTruthNodeSuspicionDecayPerEpoch       = int64(920) // 0.920/epoch
-	DefaultStorageTruthReporterReliabilityDecayPerEpoch = int64(900) // 0.900/epoch
-	DefaultStorageTruthTicketDeteriorationDecayPerEpoch = int64(900) // 0.900/epoch
-	// Node suspicion bands (LEP-6 §17): watch <= probation <= postpone.
-	DefaultStorageTruthNodeSuspicionThresholdWatch     = int64(20)
-	DefaultStorageTruthNodeSuspicionThresholdProbation = int64(50)
-	DefaultStorageTruthNodeSuspicionThresholdPostpone  = int64(90)
-	// Reporter reliability bands (LEP-6 §15.4): non-negative, low_trust <= ineligible.
+	DefaultStorageTruthNodeSuspicionDecayPerEpoch             = int64(920) // 0.920/epoch exponential
+	DefaultStorageTruthReporterReliabilityDecayPerEpoch       = int64(900) // 0.900/epoch exponential
+	DefaultStorageTruthTicketDeteriorationDecayPerEpoch       = int64(900) // 0.900/epoch exponential
+	DefaultStorageTruthNodeSuspicionThresholdWatch            = int64(20)
+	DefaultStorageTruthNodeSuspicionThresholdProbation        = int64(50)
+	DefaultStorageTruthNodeSuspicionThresholdPostpone         = int64(90)
 	DefaultStorageTruthReporterReliabilityLowTrustThreshold   = int64(20)
 	DefaultStorageTruthReporterReliabilityIneligibleThreshold = int64(90)
-	// Ticket deterioration heal threshold (LEP-6 §16): heal-candidate band starts at D >= 50.
-	DefaultStorageTruthTicketDeteriorationHealThreshold = int64(50)
+	DefaultStorageTruthTicketDeteriorationHealThreshold       = int64(50)
 	DefaultStorageTruthEnforcementMode                        = StorageTruthEnforcementMode_STORAGE_TRUTH_ENFORCEMENT_MODE_SHADOW
+
+	// New LEP-6 spec-alignment defaults.
+	DefaultStorageTruthReporterReliabilityDegradedThreshold = int64(50)
+	DefaultStorageTruthPatternEscalationWindow              = uint32(14)
+	DefaultStorageTruthDivergenceWindowEpochs               = uint32(14)
+	DefaultStorageTruthReporterMinReportsForDivergence      = uint32(5)
+	DefaultStorageTruthNodeSuspicionThresholdStrongPostpone = int64(140)
+	DefaultStorageTruthRecoveryCleanPassCount               = uint32(3)
+	DefaultStorageTruthClassAFaultWindow                    = uint32(14)
+	DefaultStorageTruthClassBFaultWindow                    = uint32(7)
+	DefaultStorageTruthHealDeadlineEpochs                   = uint32(3)
+	DefaultStorageTruthOldClassAFaultWindow                 = uint32(21)
+	DefaultStorageTruthContradictionWindowEpochs            = uint32(7)
+	DefaultStorageTruthReporterIneligibleDurationEpochs     = uint32(7)
 )
 
 // Params notes
@@ -153,6 +180,28 @@ var (
 
 func ParamKeyTable() paramtypes.KeyTable {
 	return paramtypes.NewKeyTable().RegisterParamSet(&Params{})
+}
+
+func storageTruthRecentBucketMaxBlocksForEpochSpan(epochLengthBlocks uint64) uint64 {
+	if epochLengthBlocks == 0 {
+		return 0
+	}
+	const multiplier = uint64(3)
+	if epochLengthBlocks > math.MaxUint64/multiplier {
+		return math.MaxUint64
+	}
+	return epochLengthBlocks * multiplier
+}
+
+func storageTruthOldBucketMinBlocksForEpochSpan(epochLengthBlocks uint64) uint64 {
+	if epochLengthBlocks == 0 {
+		return 0
+	}
+	const multiplier = uint64(30)
+	if epochLengthBlocks > math.MaxUint64/multiplier {
+		return math.MaxUint64
+	}
+	return epochLengthBlocks * multiplier
 }
 
 func NewParams(
@@ -193,6 +242,18 @@ func NewParams(
 	storageTruthReporterReliabilityIneligibleThreshold int64,
 	storageTruthTicketDeteriorationHealThreshold int64,
 	storageTruthEnforcementMode StorageTruthEnforcementMode,
+	storageTruthReporterReliabilityDegradedThreshold int64,
+	storageTruthPatternEscalationWindow uint32,
+	storageTruthDivergenceWindowEpochs uint32,
+	storageTruthReporterMinReportsForDivergence uint32,
+	storageTruthNodeSuspicionThresholdStrongPostpone int64,
+	storageTruthRecoveryCleanPassCount uint32,
+	storageTruthClassAFaultWindow uint32,
+	storageTruthClassBFaultWindow uint32,
+	storageTruthHealDeadlineEpochs uint32,
+	storageTruthOldClassAFaultWindow uint32,
+	storageTruthContradictionWindowEpochs uint32,
+	storageTruthReporterIneligibleDurationEpochs uint32,
 ) Params {
 	return Params{
 		EpochLengthBlocks:                epochLengthBlocks,
@@ -236,6 +297,19 @@ func NewParams(
 		StorageTruthReporterReliabilityIneligibleThreshold: storageTruthReporterReliabilityIneligibleThreshold,
 		StorageTruthTicketDeteriorationHealThreshold:       storageTruthTicketDeteriorationHealThreshold,
 		StorageTruthEnforcementMode:                        storageTruthEnforcementMode,
+
+		StorageTruthReporterReliabilityDegradedThreshold: storageTruthReporterReliabilityDegradedThreshold,
+		StorageTruthPatternEscalationWindow:              storageTruthPatternEscalationWindow,
+		StorageTruthDivergenceWindowEpochs:               storageTruthDivergenceWindowEpochs,
+		StorageTruthReporterMinReportsForDivergence:      storageTruthReporterMinReportsForDivergence,
+		StorageTruthNodeSuspicionThresholdStrongPostpone: storageTruthNodeSuspicionThresholdStrongPostpone,
+		StorageTruthRecoveryCleanPassCount:               storageTruthRecoveryCleanPassCount,
+		StorageTruthClassAFaultWindow:                    storageTruthClassAFaultWindow,
+		StorageTruthClassBFaultWindow:                    storageTruthClassBFaultWindow,
+		StorageTruthHealDeadlineEpochs:                   storageTruthHealDeadlineEpochs,
+		StorageTruthOldClassAFaultWindow:                 storageTruthOldClassAFaultWindow,
+		StorageTruthContradictionWindowEpochs:            storageTruthContradictionWindowEpochs,
+		StorageTruthReporterIneligibleDurationEpochs:     storageTruthReporterIneligibleDurationEpochs,
 	}
 }
 
@@ -261,8 +335,8 @@ func DefaultParams() Params {
 		DefaultActionFinalizationRecoveryMaxTotalBadEvidences,
 		DefaultScEnabled,
 		DefaultScChallengersPerEpoch,
-		DefaultStorageTruthRecentBucketMaxBlocks,
-		DefaultStorageTruthOldBucketMinBlocks,
+		storageTruthRecentBucketMaxBlocksForEpochSpan(DefaultEpochLengthBlocks),
+		storageTruthOldBucketMinBlocksForEpochSpan(DefaultEpochLengthBlocks),
 		DefaultStorageTruthChallengeTargetDivisor,
 		DefaultStorageTruthCompoundRangesPerArtifact,
 		DefaultStorageTruthCompoundRangeLenBytes,
@@ -278,6 +352,18 @@ func DefaultParams() Params {
 		DefaultStorageTruthReporterReliabilityIneligibleThreshold,
 		DefaultStorageTruthTicketDeteriorationHealThreshold,
 		DefaultStorageTruthEnforcementMode,
+		DefaultStorageTruthReporterReliabilityDegradedThreshold,
+		DefaultStorageTruthPatternEscalationWindow,
+		DefaultStorageTruthDivergenceWindowEpochs,
+		DefaultStorageTruthReporterMinReportsForDivergence,
+		DefaultStorageTruthNodeSuspicionThresholdStrongPostpone,
+		DefaultStorageTruthRecoveryCleanPassCount,
+		DefaultStorageTruthClassAFaultWindow,
+		DefaultStorageTruthClassBFaultWindow,
+		DefaultStorageTruthHealDeadlineEpochs,
+		DefaultStorageTruthOldClassAFaultWindow,
+		DefaultStorageTruthContradictionWindowEpochs,
+		DefaultStorageTruthReporterIneligibleDurationEpochs,
 	)
 }
 
@@ -328,10 +414,10 @@ func (p Params) WithDefaults() Params {
 		p.ActionFinalizationRecoveryMaxTotalBadEvidences = DefaultActionFinalizationRecoveryMaxTotalBadEvidences
 	}
 	if p.StorageTruthRecentBucketMaxBlocks == 0 {
-		p.StorageTruthRecentBucketMaxBlocks = DefaultStorageTruthRecentBucketMaxBlocks
+		p.StorageTruthRecentBucketMaxBlocks = storageTruthRecentBucketMaxBlocksForEpochSpan(p.EpochLengthBlocks)
 	}
 	if p.StorageTruthOldBucketMinBlocks == 0 {
-		p.StorageTruthOldBucketMinBlocks = DefaultStorageTruthOldBucketMinBlocks
+		p.StorageTruthOldBucketMinBlocks = storageTruthOldBucketMinBlocksForEpochSpan(p.EpochLengthBlocks)
 	}
 	if p.StorageTruthChallengeTargetDivisor == 0 {
 		p.StorageTruthChallengeTargetDivisor = DefaultStorageTruthChallengeTargetDivisor
@@ -375,10 +461,43 @@ func (p Params) WithDefaults() Params {
 	if p.StorageTruthTicketDeteriorationHealThreshold == 0 {
 		p.StorageTruthTicketDeteriorationHealThreshold = DefaultStorageTruthTicketDeteriorationHealThreshold
 	}
-	if p.StorageTruthEnforcementMode == StorageTruthEnforcementMode_STORAGE_TRUTH_ENFORCEMENT_MODE_UNSPECIFIED {
-		p.StorageTruthEnforcementMode = DefaultStorageTruthEnforcementMode
+	if p.StorageTruthReporterReliabilityDegradedThreshold == 0 {
+		p.StorageTruthReporterReliabilityDegradedThreshold = DefaultStorageTruthReporterReliabilityDegradedThreshold
 	}
-
+	if p.StorageTruthPatternEscalationWindow == 0 {
+		p.StorageTruthPatternEscalationWindow = DefaultStorageTruthPatternEscalationWindow
+	}
+	if p.StorageTruthDivergenceWindowEpochs == 0 {
+		p.StorageTruthDivergenceWindowEpochs = DefaultStorageTruthDivergenceWindowEpochs
+	}
+	if p.StorageTruthReporterMinReportsForDivergence == 0 {
+		p.StorageTruthReporterMinReportsForDivergence = DefaultStorageTruthReporterMinReportsForDivergence
+	}
+	if p.StorageTruthNodeSuspicionThresholdStrongPostpone == 0 {
+		p.StorageTruthNodeSuspicionThresholdStrongPostpone = DefaultStorageTruthNodeSuspicionThresholdStrongPostpone
+	}
+	if p.StorageTruthRecoveryCleanPassCount == 0 {
+		p.StorageTruthRecoveryCleanPassCount = DefaultStorageTruthRecoveryCleanPassCount
+	}
+	if p.StorageTruthClassAFaultWindow == 0 {
+		p.StorageTruthClassAFaultWindow = DefaultStorageTruthClassAFaultWindow
+	}
+	if p.StorageTruthClassBFaultWindow == 0 {
+		p.StorageTruthClassBFaultWindow = DefaultStorageTruthClassBFaultWindow
+	}
+	if p.StorageTruthHealDeadlineEpochs == 0 {
+		p.StorageTruthHealDeadlineEpochs = DefaultStorageTruthHealDeadlineEpochs
+	}
+	if p.StorageTruthOldClassAFaultWindow == 0 {
+		p.StorageTruthOldClassAFaultWindow = DefaultStorageTruthOldClassAFaultWindow
+	}
+	if p.StorageTruthContradictionWindowEpochs == 0 {
+		p.StorageTruthContradictionWindowEpochs = DefaultStorageTruthContradictionWindowEpochs
+	}
+	if p.StorageTruthReporterIneligibleDurationEpochs == 0 {
+		p.StorageTruthReporterIneligibleDurationEpochs = DefaultStorageTruthReporterIneligibleDurationEpochs
+	}
+	// UNSPECIFIED is a valid no-op mode; WithDefaults does not promote it to SHADOW.
 	return p
 }
 
@@ -424,6 +543,18 @@ func (p *Params) ParamSetPairs() paramtypes.ParamSetPairs {
 		paramtypes.NewParamSetPair(KeyStorageTruthReporterReliabilityIneligibleThreshold, &p.StorageTruthReporterReliabilityIneligibleThreshold, validateInt64),
 		paramtypes.NewParamSetPair(KeyStorageTruthTicketDeteriorationHealThreshold, &p.StorageTruthTicketDeteriorationHealThreshold, validateInt64),
 		paramtypes.NewParamSetPair(KeyStorageTruthEnforcementMode, &p.StorageTruthEnforcementMode, validateStorageTruthEnforcementMode),
+		paramtypes.NewParamSetPair(KeyStorageTruthReporterReliabilityDegradedThreshold, &p.StorageTruthReporterReliabilityDegradedThreshold, validateInt64),
+		paramtypes.NewParamSetPair(KeyStorageTruthPatternEscalationWindow, &p.StorageTruthPatternEscalationWindow, validateUint32),
+		paramtypes.NewParamSetPair(KeyStorageTruthDivergenceWindowEpochs, &p.StorageTruthDivergenceWindowEpochs, validateUint32),
+		paramtypes.NewParamSetPair(KeyStorageTruthReporterMinReportsForDivergence, &p.StorageTruthReporterMinReportsForDivergence, validateUint32),
+		paramtypes.NewParamSetPair(KeyStorageTruthNodeSuspicionThresholdStrongPostpone, &p.StorageTruthNodeSuspicionThresholdStrongPostpone, validateInt64),
+		paramtypes.NewParamSetPair(KeyStorageTruthRecoveryCleanPassCount, &p.StorageTruthRecoveryCleanPassCount, validateUint32),
+		paramtypes.NewParamSetPair(KeyStorageTruthClassAFaultWindow, &p.StorageTruthClassAFaultWindow, validateUint32),
+		paramtypes.NewParamSetPair(KeyStorageTruthClassBFaultWindow, &p.StorageTruthClassBFaultWindow, validateUint32),
+		paramtypes.NewParamSetPair(KeyStorageTruthHealDeadlineEpochs, &p.StorageTruthHealDeadlineEpochs, validateUint32),
+		paramtypes.NewParamSetPair(KeyStorageTruthOldClassAFaultWindow, &p.StorageTruthOldClassAFaultWindow, validateUint32),
+		paramtypes.NewParamSetPair(KeyStorageTruthContradictionWindowEpochs, &p.StorageTruthContradictionWindowEpochs, validateUint32),
+		paramtypes.NewParamSetPair(KeyStorageTruthReporterIneligibleDurationEpochs, &p.StorageTruthReporterIneligibleDurationEpochs, validateUint32),
 	}
 }
 
@@ -486,6 +617,21 @@ func (p Params) Validate() error {
 		if v := uint64(p.ActionFinalizationRecoveryEpochs); v > requiredHistory {
 			requiredHistory = v
 		}
+		if v := uint64(p.StorageTruthClassAFaultWindow); v > requiredHistory {
+			requiredHistory = v
+		}
+		if v := uint64(p.StorageTruthClassBFaultWindow); v > requiredHistory {
+			requiredHistory = v
+		}
+		if v := uint64(p.StorageTruthOldClassAFaultWindow); v > requiredHistory {
+			requiredHistory = v
+		}
+		if v := uint64(p.StorageTruthPatternEscalationWindow); v > requiredHistory {
+			requiredHistory = v
+		}
+		if v := uint64(p.StorageTruthContradictionWindowEpochs); v > requiredHistory {
+			requiredHistory = v
+		}
 		if requiredHistory > 0 && p.KeepLastEpochEntries < requiredHistory {
 			return fmt.Errorf("keep_last_epoch_entries must be >= max epoch lookback windows (need >= %d)", requiredHistory)
 		}
@@ -541,23 +687,23 @@ func (p Params) Validate() error {
 	if p.StorageTruthNodeSuspicionThresholdProbation > p.StorageTruthNodeSuspicionThresholdPostpone {
 		return fmt.Errorf("storage_truth_node_suspicion_threshold_probation must be <= storage_truth_node_suspicion_threshold_postpone")
 	}
-	// Reporter reliability uses a non-negative penalty score (LEP-6 §15.4): higher = less reliable.
-	// Bands must be non-negative and ordered low_trust <= ineligible.
+	// In the positive-penalty model: all reporter reliability thresholds must be >= 0 and ordered.
 	if p.StorageTruthReporterReliabilityLowTrustThreshold < 0 {
 		return fmt.Errorf("storage_truth_reporter_reliability_low_trust_threshold must be >= 0")
+	}
+	if p.StorageTruthReporterReliabilityDegradedThreshold < 0 {
+		return fmt.Errorf("storage_truth_reporter_reliability_degraded_threshold must be >= 0")
 	}
 	if p.StorageTruthReporterReliabilityIneligibleThreshold < 0 {
 		return fmt.Errorf("storage_truth_reporter_reliability_ineligible_threshold must be >= 0")
 	}
-	if p.StorageTruthReporterReliabilityLowTrustThreshold > p.StorageTruthReporterReliabilityIneligibleThreshold {
-		return fmt.Errorf("storage_truth_reporter_reliability_low_trust_threshold must be <= storage_truth_reporter_reliability_ineligible_threshold")
+	if p.StorageTruthReporterReliabilityLowTrustThreshold > p.StorageTruthReporterReliabilityDegradedThreshold {
+		return fmt.Errorf("storage_truth_reporter_reliability_low_trust_threshold must be <= storage_truth_reporter_reliability_degraded_threshold")
 	}
-	// Ticket deterioration heal threshold must be positive.
-	if p.StorageTruthTicketDeteriorationHealThreshold <= 0 {
-		return fmt.Errorf("storage_truth_ticket_deterioration_heal_threshold must be > 0")
+	if p.StorageTruthReporterReliabilityDegradedThreshold > p.StorageTruthReporterReliabilityIneligibleThreshold {
+		return fmt.Errorf("storage_truth_reporter_reliability_degraded_threshold must be <= storage_truth_reporter_reliability_ineligible_threshold")
 	}
-	// Exponential decay factors are integer numerators over 1000; valid range is [1, 1000].
-	// 0 would be inert per the implementation guide and is rejected to keep configuration unambiguous.
+	// Exponential decay factor must be in range [1, 1000].
 	if p.StorageTruthNodeSuspicionDecayPerEpoch < 1 || p.StorageTruthNodeSuspicionDecayPerEpoch > 1000 {
 		return fmt.Errorf("storage_truth_node_suspicion_decay_per_epoch must be within 1..1000")
 	}
@@ -567,8 +713,48 @@ func (p Params) Validate() error {
 	if p.StorageTruthTicketDeteriorationDecayPerEpoch < 1 || p.StorageTruthTicketDeteriorationDecayPerEpoch > 1000 {
 		return fmt.Errorf("storage_truth_ticket_deterioration_decay_per_epoch must be within 1..1000")
 	}
+	if p.StorageTruthTicketDeteriorationHealThreshold <= 0 {
+		return fmt.Errorf("storage_truth_ticket_deterioration_heal_threshold must be > 0")
+	}
+	if p.StorageTruthNodeSuspicionThresholdPostpone > p.StorageTruthNodeSuspicionThresholdStrongPostpone {
+		return fmt.Errorf("storage_truth_node_suspicion_threshold_postpone must be <= storage_truth_node_suspicion_threshold_strong_postpone")
+	}
+	if p.StorageTruthOldClassAFaultWindow == 0 {
+		return fmt.Errorf("storage_truth_old_class_a_fault_window must be > 0")
+	}
+	if p.StorageTruthOldClassAFaultWindow < p.StorageTruthClassAFaultWindow {
+		return fmt.Errorf("storage_truth_old_class_a_fault_window must be >= storage_truth_class_a_fault_window")
+	}
+	if p.StorageTruthPatternEscalationWindow == 0 {
+		return fmt.Errorf("storage_truth_pattern_escalation_window must be > 0")
+	}
+	if p.StorageTruthDivergenceWindowEpochs == 0 {
+		return fmt.Errorf("storage_truth_divergence_window_epochs must be > 0")
+	}
+	if p.StorageTruthReporterMinReportsForDivergence == 0 {
+		return fmt.Errorf("storage_truth_reporter_min_reports_for_divergence must be > 0")
+	}
+	if p.StorageTruthNodeSuspicionThresholdStrongPostpone <= 0 {
+		return fmt.Errorf("storage_truth_node_suspicion_threshold_strong_postpone must be > 0")
+	}
+	if p.StorageTruthRecoveryCleanPassCount == 0 {
+		return fmt.Errorf("storage_truth_recovery_clean_pass_count must be > 0")
+	}
+	if p.StorageTruthClassBFaultWindow == 0 {
+		return fmt.Errorf("storage_truth_class_b_fault_window must be > 0")
+	}
+	if p.StorageTruthHealDeadlineEpochs == 0 {
+		return fmt.Errorf("storage_truth_heal_deadline_epochs must be > 0")
+	}
+	if p.StorageTruthContradictionWindowEpochs == 0 {
+		return fmt.Errorf("storage_truth_contradiction_window_epochs must be > 0")
+	}
+	if p.StorageTruthReporterIneligibleDurationEpochs == 0 {
+		return fmt.Errorf("storage_truth_reporter_ineligible_duration_epochs must be > 0")
+	}
 	switch p.StorageTruthEnforcementMode {
-	case StorageTruthEnforcementMode_STORAGE_TRUTH_ENFORCEMENT_MODE_SHADOW,
+	case StorageTruthEnforcementMode_STORAGE_TRUTH_ENFORCEMENT_MODE_UNSPECIFIED,
+		StorageTruthEnforcementMode_STORAGE_TRUTH_ENFORCEMENT_MODE_SHADOW,
 		StorageTruthEnforcementMode_STORAGE_TRUTH_ENFORCEMENT_MODE_SOFT,
 		StorageTruthEnforcementMode_STORAGE_TRUTH_ENFORCEMENT_MODE_FULL:
 	default:

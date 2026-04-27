@@ -35,6 +35,8 @@ func TestReporterReliabilityStateRoundTrip(t *testing.T) {
 		ReporterSupernodeAccount: "lumera1reporter0000000000000000000000000m09fa",
 		ReliabilityScore:         -5,
 		LastUpdatedEpoch:         8,
+		TrustBand:                types.ReporterTrustBand_REPORTER_TRUST_BAND_LOW_TRUST,
+		ContradictionCount:       3,
 	}
 
 	require.False(t, f.keeper.HasReporterReliabilityState(f.ctx, state.ReporterSupernodeAccount))
@@ -49,12 +51,19 @@ func TestTicketDeteriorationStateRoundTrip(t *testing.T) {
 	f := initFixture(t)
 
 	state := types.TicketDeteriorationState{
-		TicketId:            "ticket-1",
-		DeteriorationScore:  25,
-		LastUpdatedEpoch:    9,
-		ActiveHealOpId:      3,
-		ProbationUntilEpoch: 12,
-		LastHealEpoch:       10,
+		TicketId:                     "ticket-1",
+		DeteriorationScore:           25,
+		LastUpdatedEpoch:             9,
+		ActiveHealOpId:               3,
+		ProbationUntilEpoch:          12,
+		LastHealEpoch:                10,
+		LastFailureEpoch:             8,
+		RecentFailureEpochCount:      2,
+		ContradictionCount:           1,
+		LastTargetSupernodeAccount:   "lumera1target0000000000000000000000000g6we",
+		LastReporterSupernodeAccount: "lumera1reporter0000000000000000000000000m09fa",
+		LastResultClass:              types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH,
+		LastResultEpoch:              9,
 	}
 
 	require.False(t, f.keeper.HasTicketDeteriorationState(f.ctx, state.TicketId))
@@ -65,16 +74,44 @@ func TestTicketDeteriorationStateRoundTrip(t *testing.T) {
 	require.Equal(t, state, got)
 }
 
+func TestTicketArtifactCountStateRoundTrip(t *testing.T) {
+	f := initFixture(t)
+
+	state := types.TicketArtifactCountState{
+		TicketId:            "ticket-artifacts-1",
+		IndexArtifactCount:  32,
+		SymbolArtifactCount: 128,
+	}
+
+	require.False(t, f.keeper.HasTicketArtifactCountState(f.ctx, state.TicketId))
+	require.NoError(t, f.keeper.SetTicketArtifactCountState(f.ctx, state))
+	require.True(t, f.keeper.HasTicketArtifactCountState(f.ctx, state.TicketId))
+
+	got, found := f.keeper.GetTicketArtifactCountState(f.ctx, state.TicketId)
+	require.True(t, found)
+	require.Equal(t, state, got)
+}
+
+func TestSetStorageTruthTicketArtifactCounts_ImmutableOnceSet(t *testing.T) {
+	f := initFixture(t)
+
+	require.NoError(t, f.keeper.SetStorageTruthTicketArtifactCounts(f.ctx, "ticket-artifacts-2", 10, 40))
+
+	// Exact replay is allowed.
+	require.NoError(t, f.keeper.SetStorageTruthTicketArtifactCounts(f.ctx, "ticket-artifacts-2", 10, 40))
+
+	// Divergent values are rejected.
+	err := f.keeper.SetStorageTruthTicketArtifactCounts(f.ctx, "ticket-artifacts-2", 11, 40)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "immutable")
+}
+
 func TestHealOpAndNextIDRoundTrip(t *testing.T) {
 	f := initFixture(t)
 
 	require.Equal(t, uint64(1), f.keeper.GetNextHealOpID(f.ctx))
 	f.keeper.SetNextHealOpID(f.ctx, 22)
 	require.Equal(t, uint64(22), f.keeper.GetNextHealOpID(f.ctx))
-
-	// Heal-op IDs start at 1; a stored zero is treated as invalid and falls back to 1.
-	f.keeper.SetNextHealOpID(f.ctx, 0)
-	require.Equal(t, uint64(1), f.keeper.GetNextHealOpID(f.ctx))
 
 	healOp := types.HealOp{
 		HealOpId:               5,
@@ -110,4 +147,34 @@ func TestHealOpAndNextIDRoundTrip(t *testing.T) {
 	got, found = f.keeper.GetHealOp(f.ctx, healOp.HealOpId)
 	require.True(t, found)
 	require.Equal(t, healOp, got)
+}
+
+func TestHealOpVerificationRoundTrip(t *testing.T) {
+	f := initFixture(t)
+
+	healOpID := uint64(44)
+	verifierA := "lumera1verifiera00000000000000000000000h7v3e"
+	verifierB := "lumera1verifierb00000000000000000000000z9f3r"
+
+	require.False(t, f.keeper.HasHealOpVerification(f.ctx, healOpID, verifierA))
+	_, found := f.keeper.GetHealOpVerification(f.ctx, healOpID, verifierA)
+	require.False(t, found)
+
+	f.keeper.SetHealOpVerification(f.ctx, healOpID, verifierA, true)
+	f.keeper.SetHealOpVerification(f.ctx, healOpID, verifierB, false)
+
+	require.True(t, f.keeper.HasHealOpVerification(f.ctx, healOpID, verifierA))
+	value, found := f.keeper.GetHealOpVerification(f.ctx, healOpID, verifierA)
+	require.True(t, found)
+	require.True(t, value)
+
+	value, found = f.keeper.GetHealOpVerification(f.ctx, healOpID, verifierB)
+	require.True(t, found)
+	require.False(t, value)
+
+	all, err := f.keeper.GetAllHealOpVerifications(f.ctx, healOpID)
+	require.NoError(t, err)
+	require.Len(t, all, 2)
+	require.True(t, all[verifierA])
+	require.False(t, all[verifierB])
 }

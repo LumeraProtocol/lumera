@@ -26,6 +26,15 @@ func (k Keeper) InitGenesis(ctx context.Context, genState types.GenesisState) er
 		sdkCtx = sdk.UnwrapSDKContext(ctx)
 	}
 
+	// Per 119-F8 / 119-F12 — hard-error on malformed score states at genesis.
+	currentEpoch := uint64(0)
+	if epochInfo, err := deriveEpochAtHeight(sdkCtx.BlockHeight(), params); err == nil {
+		currentEpoch = epochInfo.EpochID
+	}
+	if err := types.ValidateScoreStatesGenesis(genState, currentEpoch); err != nil {
+		return err
+	}
+
 	var nextEvidenceID uint64
 	if genState.NextEvidenceId != 0 {
 		nextEvidenceID = genState.NextEvidenceId
@@ -69,6 +78,11 @@ func (k Keeper) InitGenesis(ctx context.Context, genState types.GenesisState) er
 			return err
 		}
 	}
+	for _, state := range genState.TicketArtifactCountStates {
+		if err := k.SetTicketArtifactCountState(sdkCtx, state); err != nil {
+			return err
+		}
+	}
 	for _, healOp := range genState.HealOps {
 		if err := k.SetHealOp(sdkCtx, healOp); err != nil {
 			return err
@@ -78,6 +92,11 @@ func (k Keeper) InitGenesis(ctx context.Context, genState types.GenesisState) er
 		}
 	}
 	k.SetNextHealOpID(sdkCtx, nextHealOpID)
+
+	// Per 121-F7 — restore storage-truth postponement markers on chain restart.
+	for _, p := range genState.StorageTruthPostponements {
+		k.setStorageTruthPostponedAtEpochID(sdkCtx, p.SupernodeAccount, p.PostponedAtEpochId)
+	}
 
 	return nil
 }
@@ -121,6 +140,12 @@ func (k Keeper) ExportGenesis(ctx context.Context) (*types.GenesisState, error) 
 	}
 	genesis.TicketDeteriorationStates = ticketDeteriorationStates
 
+	ticketArtifactCountStates, err := k.GetAllTicketArtifactCountStates(sdkCtx)
+	if err != nil {
+		return nil, err
+	}
+	genesis.TicketArtifactCountStates = ticketArtifactCountStates
+
 	healOps, err := k.GetAllHealOps(sdkCtx)
 	if err != nil {
 		return nil, err
@@ -130,6 +155,9 @@ func (k Keeper) ExportGenesis(ctx context.Context) (*types.GenesisState, error) 
 	if genesis.NextHealOpId == 0 {
 		return nil, errors.New("invalid next heal op id")
 	}
+
+	// Per 121-F7 — export storage-truth postponement markers.
+	genesis.StorageTruthPostponements = k.GetAllStorageTruthPostponements(sdkCtx)
 
 	return genesis, nil
 }

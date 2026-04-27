@@ -28,15 +28,14 @@ type (
 		Schema collections.Schema
 		Port   collections.Item[string]
 
-		bankKeeper               actiontypes.BankKeeper
-		authKeeper               actiontypes.AuthKeeper
-		stakingKeeper            actiontypes.StakingKeeper
-		distributionKeeper       actiontypes.DistributionKeeper
-		supernodeKeeper          actiontypes.SupernodeKeeper
-		supernodeQueryServer     actiontypes.SupernodeQueryServer
-		auditKeeper              actiontypes.AuditKeeper
-		ibcKeeperFn              func() *ibckeeper.Keeper
-		rewardDistributionKeeper actiontypes.RewardDistributionKeeper
+		bankKeeper           actiontypes.BankKeeper
+		authKeeper           actiontypes.AuthKeeper
+		stakingKeeper        actiontypes.StakingKeeper
+		distributionKeeper   actiontypes.DistributionKeeper
+		supernodeKeeper      actiontypes.SupernodeKeeper
+		supernodeQueryServer actiontypes.SupernodeQueryServer
+		auditKeeper          actiontypes.AuditKeeper
+		ibcKeeperFn          func() *ibckeeper.Keeper
 
 		// Action handling
 		actionRegistry *ActionRegistry
@@ -58,7 +57,6 @@ func NewKeeper(
 	supernodeQueryServer func() sntypes.QueryServer,
 	auditKeeper actiontypes.AuditKeeper,
 	ibcKeeperFn func() *ibckeeper.Keeper,
-	rewardDistributionKeeper actiontypes.RewardDistributionKeeper,
 ) Keeper {
 	if _, err := addressCodec.BytesToString(authority); err != nil {
 		panic(fmt.Sprintf("invalid authority address: %s", authority))
@@ -74,20 +72,19 @@ func NewKeeper(
 
 	// Create the k instance
 	k := Keeper{
-		cdc:                      cdc,
-		addressCodec:             addressCodec,
-		storeService:             storeService,
-		logger:                   logger,
-		authority:                authority,
-		bankKeeper:               bankKeeper,
-		authKeeper:               accountKeeper,
-		stakingKeeper:            stakingKeeper,
-		distributionKeeper:       distributionKeeper,
-		supernodeKeeper:          supernodeKeeper,
-		supernodeQueryServer:     snQueryServer,
-		auditKeeper:              auditKeeper,
-		ibcKeeperFn:              ibcKeeperFn,
-		rewardDistributionKeeper: rewardDistributionKeeper,
+		cdc:                  cdc,
+		addressCodec:         addressCodec,
+		storeService:         storeService,
+		logger:               logger,
+		authority:            authority,
+		bankKeeper:           bankKeeper,
+		authKeeper:           accountKeeper,
+		stakingKeeper:        stakingKeeper,
+		distributionKeeper:   distributionKeeper,
+		supernodeKeeper:      supernodeKeeper,
+		supernodeQueryServer: snQueryServer,
+		auditKeeper:          auditKeeper,
+		ibcKeeperFn:          ibcKeeperFn,
 
 		Port: collections.NewItem(sb, actiontypes.PortKey, "port", collections.StringValue),
 	}
@@ -151,8 +148,4 @@ func (k *Keeper) GetActionRegistry() *ActionRegistry {
 
 func (k *Keeper) GetStakingKeeper() actiontypes.StakingKeeper {
 	return k.stakingKeeper
-}
-
-func (k *Keeper) GetRewardDistributionKeeper() actiontypes.RewardDistributionKeeper {
-	return k.rewardDistributionKeeper
 }

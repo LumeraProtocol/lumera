@@ -5,7 +5,10 @@ go 1.25.5
 replace (
 	// Local development - uncomment these for local testing
 	// Comment lines with github.com/LumeraProtocol/ before releasing
-	// github.com/LumeraProtocol/lumera => ..
+	// Resolve LumeraProtocol/lumera from this repo so devnet tests stay in lockstep
+	// with the local chain code (avoids "module @latest does not contain package" errors
+	// when devnet tests reference packages that only exist on master, e.g. x/action/v1/merkle).
+	github.com/LumeraProtocol/lumera => ..
 	//github.com/LumeraProtocol/sdk-go => ../../sdk-go
 	github.com/envoyproxy/protoc-gen-validate => github.com/bufbuild/protoc-gen-validate v1.3.0
 	github.com/lyft/protoc-gen-validate => github.com/envoyproxy/protoc-gen-validate v1.3.0
@@ -16,7 +19,7 @@ replace (
 require (
 	cosmossdk.io/api v0.9.2
 	cosmossdk.io/math v1.5.3
-	github.com/LumeraProtocol/lumera v1.10.0
+	github.com/LumeraProtocol/lumera v1.11.1
 	github.com/LumeraProtocol/sdk-go v1.0.8
 	github.com/cosmos/cosmos-sdk v0.53.5
 	github.com/cosmos/gogoproto v1.7.2
@@ -60,7 +63,7 @@ require (
 	github.com/cockroachdb/pebble v1.1.5 // indirect
 	github.com/cockroachdb/redact v1.1.6 // indirect
 	github.com/cockroachdb/tokenbucket v0.0.0-20230807174530-cc333fc44b06 // indirect
-	github.com/cometbft/cometbft v0.38.20 // indirect
+	github.com/cometbft/cometbft v0.38.21 // indirect
 	github.com/cometbft/cometbft-db v0.14.1 // indirect
 	github.com/cosmos/btcutil v1.0.5 // indirect
 	github.com/cosmos/cosmos-db v1.1.3 // indirect

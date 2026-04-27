@@ -151,16 +151,37 @@ is_sequence_mismatch() {
 run_tx_with_retry() {
     local service="$1"
     shift
-    local attempt result
+    local attempt result raw_log expected_seq
+    local -a args=("$@")
 
-    for attempt in 1 2 3; do
-        result="$(lumerad_tx_service "$service" "$@")" || true
+    for attempt in 1 2 3 4 5; do
+        result="$(lumerad_tx_service "$service" "${args[@]}")" || true
         if ! is_sequence_mismatch "$result"; then
             echo "$result"
             return 0
         fi
-        echo "    WARN: sequence mismatch on $service tx attempt $attempt, retrying..." >&2
-        sleep 2
+        # Extract the expected sequence from the raw_log so the next attempt
+        # bypasses the stale local sequence cache. Cosmos SDK message format:
+        # "account sequence mismatch, expected N, got M: incorrect account sequence"
+        raw_log="$(echo "$result" | jq -r '.raw_log // empty' 2>/dev/null)"
+        expected_seq="$(echo "$raw_log" | grep -oE 'expected [0-9]+' | head -1 | awk '{print $2}')"
+        echo "    WARN: sequence mismatch on $service tx attempt $attempt (expected=${expected_seq:-?}), retrying..." >&2
+        if [[ -n "$expected_seq" ]] && [[ "$expected_seq" =~ ^[0-9]+$ ]]; then
+            # Drop any prior --sequence flag (with or without =) before re-injecting.
+            local -a filtered=() i=0
+            while (( i < ${#args[@]} )); do
+                if [[ "${args[$i]}" == "--sequence" ]]; then
+                    i=$((i + 2)); continue
+                fi
+                if [[ "${args[$i]}" == --sequence=* ]]; then
+                    i=$((i + 1)); continue
+                fi
+                filtered+=("${args[$i]}")
+                i=$((i + 1))
+            done
+            args=("${filtered[@]}" "--sequence" "$expected_seq")
+        fi
+        sleep 3
     done
 
     echo "$result"

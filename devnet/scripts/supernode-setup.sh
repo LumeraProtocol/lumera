@@ -234,6 +234,17 @@ start_supernode() {
 		}
 		echo "[SN] Starting supernode..."
 		export P2P_USE_EXTERNAL_IP=false
+		# Devnet: when the everlight test targets THIS validator, disable the
+		# supernode's on-chain host_reporter so the test can drive
+		# MsgSubmitEpochReport without losing the account-sequence race
+		# against the SN's own ~5s auto-submit ticker. Other validators keep
+		# host_reporter running so peer reachability observations still flow,
+		# which is what gates ACTIVE eligibility.
+		# Production deployments must NOT set this.
+		if [ "${EVERLIGHT_TEST_TARGET:-0}" = "1" ]; then
+			echo "[SN] EVERLIGHT_TEST_TARGET=1 -> disabling host_reporter"
+			export LUMERA_SUPERNODE_DISABLE_HOST_REPORTER=1
+		fi
 		run ${SN} start -d "$SN_BASEDIR" >"$SN_LOG" 2>&1 &
 		echo "[SN] Supernode started on ${SN_ENDPOINT}, logging to $SN_LOG"
 	fi

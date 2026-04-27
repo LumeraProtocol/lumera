@@ -106,6 +106,15 @@ func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validat
 			env["USE_EXISTING_GENESIS"] = "1"
 		}
 		env["INTEGRATION_TEST"] = "true"
+		// Mark the everlight test's target validator (the one whose supernode
+		// key the test uses to drive MsgSubmitEpochReport). Its on-chain
+		// host_reporter is suppressed at boot so the test wins the
+		// account-sequence race for that key. Keep host_reporter running on
+		// the other validators so peer reachability data still flows, which
+		// is what gates ACTIVE-state eligibility.
+		if validator.Name == "supernova_validator_1" {
+			env["EVERLIGHT_TEST_TARGET"] = "1"
+		}
 
 		service := DockerComposeService{
 			Build:         ".",

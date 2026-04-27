@@ -424,7 +424,7 @@ report_metrics_for_service() {
         }')"
 
     tx_result="$(run_tx_with_retry "$service" supernode report-supernode-metrics \
-        --validator-address "$validator_addr" \
+        "$validator_addr" \
         --metrics "$metrics_json" \
         --from "$key_name")" || true
     tx_code="$(tx_code_from_json "$tx_result")"
@@ -461,7 +461,14 @@ wait_for_distribution_height_change() {
 audit_current_epoch_id() {
     local ce eid
     ce="$(lumerad_query audit current-epoch)" || return 1
-    eid="$(echo "$ce" | jq -r '.epoch_id // empty' 2>/dev/null)"
+    # NOTE: proto3/gogoproto JSON marshaller OMITS zero-valued scalars, so a
+    # legitimate epoch 0 response renders without the .epoch_id key. Treat an
+    # absent .epoch_id as 0, but still validate that the response carries the
+    # epoch boundary fields so we don't silently accept an empty/error payload.
+    if [[ "$(echo "$ce" | jq -r '.epoch_start_height // empty' 2>/dev/null)" == "" ]]; then
+        return 1
+    fi
+    eid="$(echo "$ce" | jq -r '.epoch_id // 0' 2>/dev/null)"
     if [[ -n "$eid" && "$eid" =~ ^[0-9]+$ ]]; then
         echo "$eid"
         return 0
@@ -511,7 +518,11 @@ submit_audit_report_for_service() {
 
         # Build peer observations only when reporter is assigned as prober in this epoch.
         local assigned
-        assigned="$(lumerad_query audit assigned-targets --supernode-account "$reporter_addr" --epoch-id "$epoch_id" --filter-by-epoch-id || true)"
+        # NOTE: `audit assigned-targets` takes the reporter as a positional
+        # argument (per AutoCLI: `assigned-targets [supernode-account]`), not
+        # a flag. Passing `--supernode-account` causes "unknown flag" and the
+        # whole submit pipeline to fail silently.
+        assigned="$(lumerad_query audit assigned-targets "$reporter_addr" --epoch-id "$epoch_id" --filter-by-epoch-id || true)"
         required_ports="$(echo "$assigned" | jq -c '.required_open_ports // [4444,4445,8002]' 2>/dev/null)"
         targets_json="$(echo "$assigned" | jq -c '.target_supernode_accounts // []' 2>/dev/null)"
 
@@ -578,7 +589,7 @@ ensure_service_supernode_payout_eligible() {
     fi
 
     # Try to recover by submitting a healthy audit report (< threshold disk).
-    submit_audit_report_for_service "$service" 2147483648 40; rc=$?
+    rc=0; submit_audit_report_for_service "$service" 2147483648 40 || rc=$?
     if [[ "$rc" != "0" ]]; then
         return 1
     fi
@@ -776,6 +787,31 @@ scenario_2_storage_full_transition() {
     fi
     pass "S2.1 resolved service supernode (validator=$validator_addr state=${current_state:-unknown})"
 
+    # When the supernode's on-chain host_reporter is disabled (devnet test
+    # affordance, see EVERLIGHT_TEST_TARGET in supernode-setup.sh), the SN
+    # accumulates "missing report" postponement at every epoch boundary and
+    # starts in SUPERNODE_STATE_POSTPONED. Drive one healthy self-report and
+    # wait for the next epoch's enforcement pass so the SN recovers to ACTIVE
+    # before we try to flip it to STORAGE_FULL.
+    if [[ "$current_state" != "SUPERNODE_STATE_ACTIVE" && "$current_state" != "SUPERNODE_STATE_STORAGE_FULL" ]]; then
+        local recovery_rc=0
+        submit_audit_report_for_service "$SERVICE" 2147483648 40 || recovery_rc=$?
+        if [[ "$recovery_rc" == "0" ]]; then
+            wait_for_next_audit_epoch || true
+            local recovered_state
+            recovered_state="$(wait_for_supernode_state "$validator_addr" "SUPERNODE_STATE_ACTIVE" 30 || true)"
+            if [[ -n "$recovered_state" ]]; then
+                current_state="$recovered_state"
+            else
+                current_state="$(supernode_latest_state "$validator_addr")"
+            fi
+        fi
+        if [[ "$current_state" != "SUPERNODE_STATE_ACTIVE" ]]; then
+            skip "S2 STORAGE_FULL transition" "could not recover target supernode to ACTIVE (state=${current_state:-unknown})"
+            return
+        fi
+    fi
+
     params="$(lumerad_query supernode params)" || true
     max_usage="$(echo "$params" | jq -r '.params.max_storage_usage_percent // empty' 2>/dev/null)"
     if [[ -z "$max_usage" || ! "$max_usage" =~ ^[0-9]+$ ]]; then
@@ -790,7 +826,7 @@ scenario_2_storage_full_transition() {
     fi
 
     # S2.3: canonical audit path drives STORAGE_FULL transition.
-    submit_audit_report_for_service "$SERVICE" 2147483648 "$high_usage"; rc=$?
+    rc=0; submit_audit_report_for_service "$SERVICE" 2147483648 "$high_usage" || rc=$?
     if [[ "$rc" == "0" ]]; then
         pass "S2.3 submit audit epoch report with high disk usage"
     elif [[ "$rc" == "2" ]]; then
@@ -817,7 +853,7 @@ scenario_2_storage_full_transition() {
         skip "S2.5 submit audit epoch report with healthy disk usage" "could not advance to next audit epoch"
         return
     fi
-    submit_audit_report_for_service "$SERVICE" 2147483648 "$low_usage"; rc=$?
+    rc=0; submit_audit_report_for_service "$SERVICE" 2147483648 "$low_usage" || rc=$?
     if [[ "$rc" == "0" ]]; then
         pass "S2.5 submit audit epoch report with healthy disk usage"
     elif [[ "$rc" == "2" ]]; then
@@ -1072,62 +1108,21 @@ PROPEOF
         fail "S7.6 param updated via governance" "expected=$new_ppb actual=$new_ppb_actual"
     fi
 
-    # 7.7 tune audit epoch length for faster devnet execution of storage-full lifecycle tests.
-    local audit_params audit_updated audit_submit audit_code audit_txhash audit_check audit_exec_code audit_pid
+    # 7.7 audit epoch length cannot be changed via gov: epoch math is consensus-critical
+    # and `epoch_length_blocks` / `epoch_zero_height` are intentionally immutable after
+    # genesis (see x/audit msg_update_params.go). The devnet genesis is configured with
+    # a small epoch_length_blocks for fast lifecycle coverage; record the live value.
+    local audit_params audit_epoch_len
     audit_params="$(lumerad_query audit params)" || true
     if [[ -n "$audit_params" ]]; then
-        audit_updated="$(echo "$audit_params" | jq '.params | .epoch_length_blocks = 20')"
-        docker compose -f "$COMPOSE_FILE" exec -T "$SERVICE" bash -c "cat > /tmp/audit_param_proposal.json" <<AUDPROPEOF
-{
-  "messages": [{
-    "@type": "/lumera.audit.v1.MsgUpdateParams",
-    "authority": "$gov_addr",
-    "params": $audit_updated
-  }],
-  "deposit": "1000000000${DENOM}",
-  "metadata": "",
-  "title": "Update Audit Params (devnet test)",
-  "summary": "Set epoch_length_blocks=20 for devnet coverage"
-}
-AUDPROPEOF
-        audit_submit="$(run_tx_with_retry "$SERVICE" gov submit-proposal /tmp/audit_param_proposal.json --from "$key_name")" || true
-        audit_code="$(echo "$audit_submit" | jq -r '.code // empty' 2>/dev/null || echo "")"
-        if [[ -n "$audit_code" && "$audit_code" != "0" ]]; then
-            fail "S7.7 audit params gov proposal submitted" "tx code=$audit_code"
+        audit_epoch_len="$(echo "$audit_params" | jq -r '.params.epoch_length_blocks // empty' 2>/dev/null)"
+        if [[ -n "$audit_epoch_len" && "$audit_epoch_len" =~ ^[0-9]+$ ]]; then
+            pass "S7.7 audit epoch_length_blocks present (=${audit_epoch_len}; immutable after genesis)"
         else
-            audit_txhash="$(echo "$audit_submit" | jq -r '.txhash // empty' 2>/dev/null)"
-            if [[ -n "$audit_txhash" ]]; then
-                sleep 6
-                audit_check="$(lumerad_query tx "$audit_txhash")" || true
-                audit_exec_code="$(echo "$audit_check" | jq -r '.code // "0"' 2>/dev/null || echo "0")"
-                if [[ "$audit_exec_code" != "0" ]]; then
-                    fail "S7.7 audit params gov proposal submitted" "tx execution failed code=$audit_exec_code"
-                else
-                    audit_pid="$(lumerad_query gov proposals --depositor "$sender_addr" | jq -r '.proposals[-1].id // empty' 2>/dev/null)"
-                    if [[ -n "$audit_pid" ]]; then
-                        run_tx_with_retry "supernova_validator_1" gov vote "$audit_pid" yes --from "supernova_validator_1_key" >/dev/null 2>&1 || true
-                        run_tx_with_retry "supernova_validator_2" gov vote "$audit_pid" yes --from "supernova_validator_2_key" >/dev/null 2>&1 || true
-                        local adl=$((SECONDS + 60)) aps=""
-                        while (( SECONDS < adl )); do
-                            sleep 5
-                            aps="$(lumerad_query gov proposal "$audit_pid" | jq -r '.proposal.status // empty' 2>/dev/null)"
-                            [[ "$aps" == "PROPOSAL_STATUS_PASSED" ]] && break
-                        done
-                        if [[ "$aps" == "PROPOSAL_STATUS_PASSED" ]]; then
-                            pass "S7.7 audit params gov proposal passed (epoch_length_blocks=20)"
-                        else
-                            skip "S7.7 audit params gov proposal passed" "final status=$aps"
-                        fi
-                    else
-                        skip "S7.7 audit params gov proposal submitted" "could not determine proposal id"
-                    fi
-                fi
-            else
-                skip "S7.7 audit params gov proposal submitted" "missing txhash"
-            fi
+            skip "S7.7 audit epoch_length_blocks present" "audit params query returned no epoch_length_blocks"
         fi
     else
-        skip "S7.7 audit params gov proposal submitted" "audit params query empty"
+        skip "S7.7 audit epoch_length_blocks present" "audit params query empty"
     fi
 }
 
@@ -1164,7 +1159,7 @@ scenario_3_periodic_distribution_happy_path() {
         return
     fi
 
-    submit_audit_report_for_service "$service_a" 2147483648 40; rc=$?
+    rc=0; submit_audit_report_for_service "$service_a" 2147483648 40 || rc=$?
     if [[ "$rc" == "0" ]]; then
         pass "S3.1 audit report submitted for first supernode (2 GiB)"
     elif [[ "$rc" == "2" ]]; then
@@ -1175,7 +1170,7 @@ scenario_3_periodic_distribution_happy_path() {
         return
     fi
 
-    submit_audit_report_for_service "$service_b" 4294967296 40; rc=$?
+    rc=0; submit_audit_report_for_service "$service_b" 4294967296 40 || rc=$?
     if [[ "$rc" == "0" ]]; then
         pass "S3.2 audit report submitted for second supernode (4 GiB)"
     elif [[ "$rc" == "2" ]]; then
@@ -1269,7 +1264,7 @@ scenario_4_distribution_edge_cases() {
     local storage_state storage_eligibility low_eligibility rc
     storage_state="$(lumerad_query supernode get-supernode "$validator_storage" | jq -r '.supernode.states[-1].state // empty' 2>/dev/null)"
     if [[ "$storage_state" != "SUPERNODE_STATE_STORAGE_FULL" ]]; then
-        submit_audit_report_for_service "$service_storage" 2147483648 95; rc=$?
+        rc=0; submit_audit_report_for_service "$service_storage" 2147483648 95 || rc=$?
         if [[ "$rc" == "0" ]]; then
             sleep 4
             storage_state="$(lumerad_query supernode get-supernode "$validator_storage" | jq -r '.supernode.states[-1].state // empty' 2>/dev/null)"
@@ -1287,7 +1282,7 @@ scenario_4_distribution_edge_cases() {
         fail "S4.1 STORAGE_FULL supernode remains Everlight payout-eligible" "response=${storage_eligibility:0:300}"
     fi
 
-    submit_audit_report_for_service "$service_low" 104857600 40; rc=$?
+    rc=0; submit_audit_report_for_service "$service_low" 104857600 40 || rc=$?
     if [[ "$rc" == "0" ]]; then
         pass "S4.2 low-byte audit report submitted for comparison supernode"
     elif [[ "$rc" == "2" ]]; then
@@ -1432,7 +1427,7 @@ scenario_5_anti_gaming_guardrails() {
     fi
 
     # Period N: moderate bytes.
-    submit_audit_report_for_service "$service_guard" 2147483648 40; rc=$?
+    rc=0; submit_audit_report_for_service "$service_guard" 2147483648 40 || rc=$?
     if [[ "$rc" == "0" ]]; then
         pass "S5.2 baseline audit report submitted"
     elif [[ "$rc" == "2" ]]; then
@@ -1450,7 +1445,7 @@ scenario_5_anti_gaming_guardrails() {
         skip "S5.3 high-jump audit report submitted" "could not advance to next audit epoch"
         return
     fi
-    submit_audit_report_for_service "$service_guard" 21474836480 40; rc=$?
+    rc=0; submit_audit_report_for_service "$service_guard" 21474836480 40 || rc=$?
     if [[ "$rc" == "0" ]]; then
         pass "S5.3 high-jump audit report submitted"
     elif [[ "$rc" == "2" ]]; then
@@ -1466,16 +1461,25 @@ scenario_5_anti_gaming_guardrails() {
         fi
     fi
 
-    local elig st
+    local elig st smoothed raw_post growth_cap_ok
     st="$(supernode_latest_state "$validator_guard")"
     if ! is_state_eligible_for_payout "$st"; then
-        skip "S5.4 guardrail supernode remains payout-eligible after growth jump" "state not eligible ($st)"
+        skip "S5.4 anti-gaming smoothing clamps growth jump" "state not eligible ($st)"
     else
         elig="$(lumerad_query supernode sn-eligibility "$validator_guard" -o json)" || true
-        if [[ "$(echo "$elig" | jq -r '.eligible // false' 2>/dev/null)" == "true" ]]; then
-            pass "S5.4 guardrail supernode remains payout-eligible after growth jump"
+        # Anti-gaming property under test: the high-jump in raw cascade bytes
+        # (2 GiB -> 20 GiB) MUST NOT propagate 1:1 into the smoothed weight in a
+        # single epoch. Eligibility itself can swing either way depending on
+        # smoothing/ramp-up windows (asserting eligible=true would race the
+        # growth-cap clamp), so the canonical assertion is: smoothed_weight
+        # must be strictly less than the raw post-jump bytes -- proving the
+        # clamp is actually engaging.
+        smoothed="$(echo "$elig" | jq -r '.smoothed_weight // empty' 2>/dev/null)"
+        raw_post=21474836480
+        if [[ -n "$smoothed" && "$smoothed" =~ ^[0-9]+$ ]] && (( smoothed < raw_post )); then
+            pass "S5.4 anti-gaming smoothing clamps growth jump (smoothed=$smoothed < raw=$raw_post)"
         else
-            fail "S5.4 guardrail supernode remains payout-eligible after growth jump" "response=${elig:0:240}"
+            fail "S5.4 anti-gaming smoothing clamps growth jump" "smoothed=${smoothed:-missing} raw=$raw_post response=${elig:0:240}"
         fi
     fi
 

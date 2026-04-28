@@ -267,8 +267,8 @@ func TestGenerateSupernodeRQIDs(t *testing.T) {
 		rqMax     uint32
 	}
 
-	rand.Seed(time.Now().UnixNano())
-	ic := uint32(rand.Intn(100000))
+	rng := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec // test-only randomness
+	ic := uint32(rng.Intn(100000))
 
 	tests := []testCase{
 		{

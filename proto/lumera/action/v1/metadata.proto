@@ -8,8 +8,11 @@ import "gogoproto/gogo.proto";
 // HashAlgo enumerates the supported hash algorithms for availability
 // commitments.
 enum HashAlgo {
+  // HASH_ALGO_UNSPECIFIED is the zero value; rejected by validation.
   HASH_ALGO_UNSPECIFIED = 0;
+  // HASH_ALGO_BLAKE3 selects BLAKE3 as the chunk/leaf hash function.
   HASH_ALGO_BLAKE3      = 1;
+  // HASH_ALGO_SHA256 selects SHA-256 as the chunk/leaf hash function.
   HASH_ALGO_SHA256      = 2;
 }
 

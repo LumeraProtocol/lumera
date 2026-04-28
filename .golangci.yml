@@ -1,73 +1,65 @@
-# golangci-lint configuration for Lumera chain repo.
+# golangci-lint v2 configuration for the Lumera chain repo.
 #
 # Pinned config so CI and local devs converge on the same rule set.
-# Rule set is intentionally conservative — we enable only correctness
-# linters today. Style/complexity linters can be layered in later via
-# separate PRs once the baseline is clean.
+# Conservative on purpose: only correctness linters today. Style/complexity
+# linters can be layered in later via separate PRs once the baseline is clean.
 #
 # Diff-only enforcement is configured in CI (.github/workflows/lint.yml)
-# via reviewdog `filter_mode: added`. Locally, run with:
+# via reviewdog `filter_mode: added`. Locally:
 #
 #   golangci-lint run ./x/action/v1/... ./x/supernode/v1/... ./x/audit/v1/...
-#
-# or scoped to your branch's diff:
-#
 #   golangci-lint run --new-from-rev=origin/master ./...
+#
+# Note on Go version: golangci-lint v1.64.8 is built with Go 1.24 and
+# refuses modules declaring `go 1.25` in go.mod. The Lumera chain is on
+# Go 1.25.9, so we must use golangci-lint v2.x (built with Go 1.25+).
+# v2 ships a breaking config-schema change — this file is the v2 schema.
+
+version: "2"
 
 run:
   timeout: 5m
-  # Don't pin `go:` here. golangci-lint v1.64.8 is itself compiled against
-  # Go 1.24; setting `go: "1.25"` here makes it refuse the config with
-  # `the Go language version (go1.24) used to build golangci-lint is lower
-  # than the targeted Go version (1.25)`. Letting it default to its own
-  # build version is safe: Go 1.24 → 1.25 is syntax-compatible for our
-  # codebase, so analyzers parse fine. Re-pin once we move to golangci-lint
-  # v2.x (which is built with Go 1.25+).
   tests: true
   modules-download-mode: readonly
 
 linters:
-  disable-all: true
+  default: none
   enable:
     - errcheck       # unchecked errors
     - govet          # suspicious constructs
     - ineffassign    # ineffectual assignments
     - staticcheck    # SA* + simple/style checks
     - unused         # dead code (funcs, consts, types, vars)
-    - typecheck      # compile errors
 
-linters-settings:
-  staticcheck:
-    # SA1019 (deprecated API) is noisy in Cosmos SDK v0.50: HasInvariants,
-    # InvariantRegistry, and the migration path is gated on x/crisis removal.
-    # We keep SA1019 enabled but expect per-site //nolint:staticcheck with a
-    # rationale comment. To turn off SA1019 globally instead, list it here:
-    #   checks: ["all", "-SA1019"]
-    checks: ["all"]
-  errcheck:
-    # Don't require checking errors on these high-noise IO calls in tests.
-    exclude-functions:
-      - (io.Closer).Close
-      - (io.ReadCloser).Close
+  settings:
+    staticcheck:
+      # SA1019 (deprecated API) is noisy in Cosmos SDK v0.50: HasInvariants,
+      # InvariantRegistry, sdk.WrapSDKContext, etc. Per-site `//nolint:staticcheck`
+      # with a rationale comment is preferred over a blanket disable.
+      checks: ["all"]
+    errcheck:
+      exclude-functions:
+        - (io.Closer).Close
+        - (io.ReadCloser).Close
+
+  exclusions:
+    # `default` removes some genuinely useful findings; turn it off so we
+    # control the exclude set explicitly.
+    generated: lax
+    rules:
+      # Cosmos SDK v0.50 still ships HasInvariants / InvariantRegistry as the
+      # required interface for AppModule. Module surface files must reference
+      # them; deprecation only resolves when x/crisis is removed.
+      - path: x/.*/v1/module/module\.go
+        linters: [staticcheck]
+        text: "SA1019.*(HasInvariants|InvariantRegistry)"
+
+      # Generated proto code is not ours to lint.
+      - path: \.pb\.go$
+        linters: [errcheck, ineffassign, staticcheck, unused, govet]
+      - path: \.pb\.gw\.go$
+        linters: [errcheck, ineffassign, staticcheck, unused, govet]
 
 issues:
-  # Show all issues (don't cap silently).
   max-issues-per-linter: 0
   max-same-issues: 0
-
-  exclude-rules:
-    # Cosmos SDK v0.50 still ships HasInvariants / InvariantRegistry as the
-    # required interface for AppModule. Module surface files must reference
-    # them; deprecation only resolves when x/crisis is removed.
-    - path: x/.*/v1/module/module\.go
-      linters: [staticcheck]
-      text: "SA1019.*(HasInvariants|InvariantRegistry)"
-
-    # Generated proto code is not ours to lint.
-    - path: \.pb\.go$
-      linters: [errcheck, ineffassign, staticcheck, unused, govet]
-    - path: \.pb\.gw\.go$
-      linters: [errcheck, ineffassign, staticcheck, unused, govet]
-
-  # Default exclusions remove some genuinely useful findings; keep them off.
-  exclude-use-default: false

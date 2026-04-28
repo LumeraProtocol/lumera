@@ -1,0 +1,57 @@
+name: lint
+
+on:
+  pull_request:
+    branches: [master]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - ".gitignore"
+
+permissions:
+  contents: read
+  pull-requests: write   # reviewdog needs this to post inline review comments
+  checks: write          # for the check-run summary
+
+jobs:
+  golangci-lint:
+    name: golangci-lint (diff-only)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6.0.1
+        with:
+          # reviewdog needs the merge-base to compute the PR diff.
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+
+      - name: Install dependencies
+        run: go mod download
+
+      # reviewdog wraps golangci-lint and posts only NEW findings introduced
+      # by the PR diff as inline review comments. Pre-existing baseline
+      # diagnostics are not reported, so this never blocks unrelated PRs on
+      # legacy noise.
+      - name: golangci-lint via reviewdog (PR diff only)
+        uses: reviewdog/action-golangci-lint@v2
+        with:
+          go_version_file: go.mod
+          golangci_lint_version: v1.64.8
+          golangci_lint_flags: "--config=.golangci.yml --timeout=5m"
+          # Scope: BRIDGE-tracked modules first. Expand once stable.
+          workdir: .
+          # Only annotate lines actually changed by the PR.
+          filter_mode: added
+          # Post inline comments on the PR diff.
+          reporter: github-pr-review
+          # Block merge when a NEW error-level finding lands inside the diff.
+          fail_level: error
+          # Surface findings as 'warning' by default; staticcheck/unused/etc
+          # at error level still trip fail_level above.
+          level: warning
+          # Honor the YAML config so we don't double-specify linters here.
+          # Linters and excludes come from .golangci.yml.
+        env:
+          REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -16,7 +16,13 @@
 
 run:
   timeout: 5m
-  go: "1.25"
+  # Don't pin `go:` here. golangci-lint v1.64.8 is itself compiled against
+  # Go 1.24; setting `go: "1.25"` here makes it refuse the config with
+  # `the Go language version (go1.24) used to build golangci-lint is lower
+  # than the targeted Go version (1.25)`. Letting it default to its own
+  # build version is safe: Go 1.24 → 1.25 is syntax-compatible for our
+  # codebase, so analyzers parse fine. Re-pin once we move to golangci-lint
+  # v2.x (which is built with Go 1.25+).
   tests: true
   modules-download-mode: readonly
 

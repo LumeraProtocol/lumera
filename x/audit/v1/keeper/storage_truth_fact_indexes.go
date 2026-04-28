@@ -1,8 +1,11 @@
 package keeper
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
+	"io"
 
 	errorsmod "cosmossdk.io/errors"
 	storetypes "cosmossdk.io/store/types"
@@ -296,8 +299,7 @@ func (k Keeper) hasIndependentReporterPassInWindow(
 	// Per 122-Copilot-3 + 122-F1 — indexed lookup avoids DeliverTx full-table scan.
 	// Scan secondary index: "st/rrs-tt/" + target + "/" + u64be(epoch) + "/"
 	// for each epoch in [startEpoch, endEpoch].
-	startKey := types.ReporterStorageTruthResultByTargetEpochPrefix(targetAccount, startEpoch)
-	endKey := types.ReporterStorageTruthResultByTargetEpochPrefix(targetAccount, endEpoch+1)
+	startKey, endKey := types.ReporterStorageTruthResultByTargetEpochScanRange(targetAccount, startEpoch, endEpoch)
 	it := k.kvStore(ctx).Iterator(startKey, endKey)
 	defer it.Close()
 
@@ -330,9 +332,7 @@ func (k Keeper) hasCleanRecheckInWindow(
 	// Per 122-Copilot-4 + 122-F1 — indexed lookup avoids DeliverTx full-table scan.
 	// Scan secondary index: "st/spt-tbe/" + target + "/" + u32be(RECHECK) + "/" epoch range.
 	recheckBucket := uint32(types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECHECK)
-	bucketPfx := types.TranscriptByTargetBucketEpochScanPrefix(targetAccount, recheckBucket)
-	startKey := binary.BigEndian.AppendUint64(append([]byte(nil), bucketPfx...), startEpoch)
-	endKey := binary.BigEndian.AppendUint64(append([]byte(nil), bucketPfx...), endEpoch+1)
+	startKey, endKey := types.TranscriptByTargetBucketEpochScanRange(targetAccount, recheckBucket, startEpoch, endEpoch)
 	it := k.kvStore(ctx).Iterator(startKey, endKey)
 	defer it.Close()
 
@@ -352,11 +352,15 @@ func (k Keeper) hasCleanRecheckInWindow(
 	return false, nil
 }
 
-func (k Keeper) setStorageTruthFailedHeal(ctx sdk.Context, supernodeAccount string, epochID uint64, ticketID string) {
-	if supernodeAccount == "" || ticketID == "" {
-		return
+func (k Keeper) setStorageTruthFailedHeal(ctx sdk.Context, supernodeAccount string, epochID uint64, ticketID string) error {
+	if supernodeAccount == "" {
+		return fmt.Errorf("storage truth failed heal marker missing healer account for ticket %q at epoch %d", ticketID, epochID)
+	}
+	if ticketID == "" {
+		return fmt.Errorf("storage truth failed heal marker missing ticket id for healer %q at epoch %d", supernodeAccount, epochID)
 	}
 	k.kvStore(ctx).Set(types.StorageTruthFailedHealKey(supernodeAccount, epochID, ticketID), []byte{1})
+	return nil
 }
 
 func (k Keeper) hasStorageTruthFailedHeal(ctx sdk.Context, supernodeAccount string, startEpoch uint64, endEpoch uint64) bool {
@@ -401,8 +405,14 @@ func (k Keeper) GetAllStorageProofTranscriptsForGenesis(ctx sdk.Context) []types
 // st/spt-tbe/ secondary index alongside) so genesis-imported state matches runtime.
 func (k Keeper) importStorageProofTranscriptForGenesis(ctx sdk.Context, hash string, recordJSON []byte) error {
 	var rec storageProofTranscriptRecord
-	if err := json.Unmarshal(recordJSON, &rec); err != nil {
+	dec := json.NewDecoder(bytes.NewReader(recordJSON))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&rec); err != nil {
 		return err
+	}
+	var extra struct{}
+	if err := dec.Decode(&extra); err != io.EOF {
+		return errorsmod.Wrap(types.ErrInvalidStorageProofs, "storage proof transcript genesis record contains trailing JSON data")
 	}
 	return k.setStorageProofTranscriptRecord(ctx, hash, rec)
 }

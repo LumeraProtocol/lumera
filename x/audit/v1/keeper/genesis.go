@@ -130,7 +130,9 @@ func (k Keeper) InitGenesis(ctx context.Context, genState types.GenesisState) er
 		k.importReporterResultFactForGenesis(sdkCtx, f)
 	}
 	for _, m := range genState.FailedHealMarkers {
-		k.setStorageTruthFailedHeal(sdkCtx, m.SupernodeAccount, m.EpochId, m.TicketId)
+		if err := k.setStorageTruthFailedHeal(sdkCtx, m.SupernodeAccount, m.EpochId, m.TicketId); err != nil {
+			return err
+		}
 	}
 	for _, r := range genState.EpochReports {
 		if err := k.SetReportRaw(sdkCtx, r); err != nil {

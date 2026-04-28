@@ -289,6 +289,68 @@ func TestSubmitEpochReport_StorageTruthScoresApplyDecay(t *testing.T) {
 	require.Equal(t, uint64(1), ticketState.LastHealEpoch)
 }
 
+func TestSubmitEpochReport_TimeoutOnIndexArtifactIsClassBAndUnscaled(t *testing.T) {
+	// Per CP-R3 B-F2 — INDEX artifact status alone is not Class A. A timeout
+	// against an INDEX artifact is a liveness/Class-B failure: it uses the +7/+3
+	// deltas without reporter trust scaling and must not increment ClassACountWindow
+	// or reset Class-A recovery gates.
+	f := initFixture(t)
+	f.ctx = f.ctx.WithBlockHeight(1).WithEventManager(sdk.NewEventManager())
+	ms := keeper.NewMsgServerImpl(f.keeper)
+
+	reporter := "sn-aaa-reporter"
+	target := "sn-bbb-target"
+	ticketID := "ticket-timeout-index"
+
+	// If the old INDEX=>Class-A predicate survived, this reporter score would
+	// scale node +7 to floor(7*90/100)=6 and ticket +3 to floor(3*90/100)=2.
+	require.NoError(t, f.keeper.SetReporterReliabilityState(f.ctx, types.ReporterReliabilityState{
+		ReporterSupernodeAccount: reporter,
+		ReliabilityScore:         10,
+		LastUpdatedEpoch:         0,
+	}))
+
+	f.supernodeKeeper.EXPECT().
+		GetSuperNodeByAccount(gomock.Any(), reporter).
+		Return(sntypes.SuperNode{}, true, nil).
+		AnyTimes()
+
+	seedEpochAnchorForReportTest(t, f, 0, []string{reporter, target}, []string{reporter, target})
+	result := baseStorageProofResult(types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_TIMEOUT_OR_NO_RESPONSE)
+	result.TicketId = ticketID
+	result.ArtifactClass = types.StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_INDEX
+	seedTicketArtifactCountsForResults(t, f, result)
+
+	_, err := ms.SubmitEpochReport(f.ctx, &types.MsgSubmitEpochReport{
+		Creator: reporter,
+		EpochId: 0,
+		HostReport: types.HostReport{
+			InboundPortStates: fullOpenPortStates(),
+		},
+		StorageChallengeObservations: []*types.StorageChallengeObservation{
+			{
+				TargetSupernodeAccount: target,
+				PortStates:             fullOpenPortStates(),
+			},
+		},
+		StorageProofResults: []*types.StorageProofResult{result},
+	})
+	require.NoError(t, err)
+
+	nodeState, found := f.keeper.GetNodeSuspicionState(f.ctx, target)
+	require.True(t, found)
+	require.Equal(t, int64(7), nodeState.SuspicionScore)
+	require.Equal(t, uint32(0), nodeState.ClassACountWindow)
+	require.Equal(t, uint32(1), nodeState.ClassBCountWindow)
+	require.Equal(t, uint64(0), nodeState.LastClassAEpoch)
+	require.Equal(t, uint64(0), nodeState.LastClassBEpoch)
+	require.Equal(t, uint64(0), nodeState.LastIndexFailEpoch, "epoch-0 index failure records as zero-value; Class-B counter is the observable predicate")
+
+	ticketState, found := f.keeper.GetTicketDeteriorationState(f.ctx, ticketID)
+	require.True(t, found)
+	require.Equal(t, int64(3), ticketState.DeteriorationScore)
+}
+
 func TestSubmitEpochReport_StorageTruthScoreEventsAreEmitted(t *testing.T) {
 	f := initFixture(t)
 	f.ctx = f.ctx.WithBlockHeight(1).WithEventManager(sdk.NewEventManager())

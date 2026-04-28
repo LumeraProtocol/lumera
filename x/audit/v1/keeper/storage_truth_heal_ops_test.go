@@ -166,3 +166,37 @@ func TestExpireStorageTruthHealOps_AdvancesProbationAndCooldown(t *testing.T) {
 		"probation must be advanced by ProbationEpochs")
 	require.Equal(t, uint64(0), state.ActiveHealOpId)
 }
+
+func TestProcessStorageTruthHealOpsAtEpochEnd_RejectsExpiredHealWithEmptyHealer(t *testing.T) {
+	f := initFixture(t)
+	f.ctx = f.ctx.WithBlockHeight(1600).WithEventManager(sdk.NewEventManager())
+
+	params := f.keeper.GetParams(f.ctx).WithDefaults()
+	params.StorageTruthMaxSelfHealOpsPerEpoch = 0 // expire-only
+	require.NoError(t, f.keeper.SetParams(f.ctx, params))
+
+	const (
+		ticketID = "ticket-empty-healer"
+		healOpID = uint64(801)
+		epochID  = uint64(3)
+	)
+	require.NoError(t, f.keeper.SetHealOp(f.ctx, types.HealOp{
+		HealOpId:         healOpID,
+		TicketId:         ticketID,
+		ScheduledEpochId: 1,
+		// Empty healer account is corrupt scheduler state; do not silently skip st/fh/.
+		HealerSupernodeAccount:    "",
+		VerifierSupernodeAccounts: []string{"lumera1eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeennf6kk"},
+		Status:                    types.HealOpStatus_HEAL_OP_STATUS_HEALER_REPORTED,
+		DeadlineEpochId:           epochID,
+	}))
+	require.NoError(t, f.keeper.SetTicketDeteriorationState(f.ctx, types.TicketDeteriorationState{
+		TicketId:           ticketID,
+		DeteriorationScore: 50,
+		ActiveHealOpId:     healOpID,
+	}))
+
+	err := f.keeper.ProcessStorageTruthHealOpsAtEpochEnd(f.ctx, epochID, params)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "missing healer account")
+}

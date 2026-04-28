@@ -250,7 +250,10 @@ func (k *Keeper) FinalizeAction(ctx sdk.Context, actionID string, superNodeAccou
 			if err := gogoproto.Unmarshal(existingAction.Metadata, &cascadeMeta); err != nil {
 				return errors.Wrap(actiontypes.ErrInvalidMetadata, fmt.Sprintf("failed to unmarshal finalized cascade metadata: %v", err))
 			}
-			indexCount, symbolCount := actiontypes.CascadeArtifactCountsWithFallback(&cascadeMeta)
+			indexCount, symbolCount, err := actiontypes.CascadeArtifactCountsWithFallbackStrict(&cascadeMeta)
+			if err != nil {
+				return errors.Wrap(actiontypes.ErrInvalidMetadata, err.Error())
+			}
 			if err := k.auditKeeper.SetStorageTruthTicketArtifactCounts(
 				ctx,
 				existingAction.ActionID,

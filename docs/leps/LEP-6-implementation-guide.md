@@ -1377,50 +1377,285 @@ Mode semantics:
 
 ---
 
+## LEP-6 Round-2 Review Hardening (Zee R2 — PR #117 review 4184561676)
+
+Behavior deltas applied on top of `LEP-6-foundation` tip `868cbc7c` to close
+24 production-gate findings. Branch `LEP-6-foundation-review-fixes` (squashed
+single commit `0c6f5f0`). Test pyramid green at `0c6f5f0`: unit + module
+simulation + `tests/integration/` + `tests/system/` + `tests/systemtests/`
+(`-tags=system_test`, 25/25 PASS). Compare:
+[`LEP-6-foundation...LEP-6-foundation-review-fixes`](https://github.com/LumeraProtocol/lumera/compare/LEP-6-foundation...LEP-6-foundation-review-fixes).
+
+### HIGH (consensus / state-correctness / money-flow)
+
+- **NEW-C-3 — `RegistrationFeeShareBps` (2%) fee routing restored.**
+  `x/action/v1/keeper/action.go:650-680`. The reward-distribution block
+  removed during LEP-6 consolidation is reinstated; 2% of every cascade fee
+  routes to the supernode reward pool via
+  `bankKeeper.SendCoinsFromModuleToModule(actiontypes → sntypes)`. Test
+  coverage in `x/action/v1/keeper/distribute_fees_test.go`.
+- **NEW-C-1 — `ExportGenesis` round-trip closure for 8 epoch-scoped audit
+  prefix families.** `x/audit/v1/keeper/genesis.go`. Recheck-evidence dedup
+  (`st/rce/`), node-failure facts (`st/nf/`), reporter-result indexes
+  (`st/rrs/`, `st/rrs-tt/`), storage-proof transcripts (`st/spt/`,
+  `st/spt-tbe/`), failed-heal markers (`st/fh/`), reports / report-indexes
+  (`r/`, `ri/`), healer reports (`hr/`), and storage challenges (`sc/`) now
+  export and re-import deterministically. Without this, post-state-sync the
+  postpone/recovery/contradiction predicates would silently return "no
+  evidence" and brick storage-truth enforcement. 8 new `GenesisXxx` proto
+  wrappers + `GetAllXxx` iterators + `InitGenesis` re-emission.
+- **NEW-A-12 / A-17 — `WindowStartEpoch` underflow at scoring window
+  resets.** `x/audit/v1/keeper/storage_truth_scoring.go:256, 332` +
+  `x/audit/v1/types/genesis_validate.go`. Raw `uint64` subtraction replaced
+  with `epochDelta(currentEpoch, state.WindowStartEpoch)` (uint64-safe);
+  genesis validator now rejects `WindowStartEpoch > currentEpoch` for both
+  `NodeSuspicionStates` and `ReporterReliabilityStates`. Spec ref §14, §15.
+- **NEW-B-1 — EXPIRED heal-ops apply §20 cooldown.**
+  `x/audit/v1/keeper/storage_truth_heal_ops.go:36-48`
+  (`expireStorageTruthHealOpsAtEpochEnd`). Mirrors the FAILED branch:
+  `D += 15` (saturated), `ProbationUntilEpoch = epochID +
+  StorageTruthProbationEpochs`, write failed-heal fact. Closes the
+  heal-spam loop where an assigned-but-silent healer would have the same
+  ticket re-scheduled every epoch indefinitely.
+
+### MEDIUM (semantic correctness / sibling-symmetry)
+
+- **NEW-C-2 — FinalizeAction audit-hook artifact-count fallback.**
+  `x/action/v1/keeper/action.go:245-261`. Mirrors the 122-F2 fix inline
+  before calling `auditKeeper.SetStorageTruthTicketArtifactCounts`: zero
+  counts fall back to `len(RqIdsIds)`. Prevents a hard-revert on legacy
+  finalize when cascade metadata lacks explicit counts.
+- **NEW-A-11 residue — bounded prefix scans on hot paths.**
+  `x/audit/v1/keeper/storage_truth_divergence.go:131-153` and
+  `x/audit/v1/keeper/storage_truth_fact_indexes.go:241-266`. Both unbounded
+  scans now bracket on `[startEpoch, endEpoch+1)` via secondary indexes
+  (`NodeStorageTruthFailureByEpochPrefix(account)+u64be(epoch)`,
+  `ReporterStorageTruthResultByEpochPrefix(reporter)+u64be(epoch)`),
+  mirroring the storage-proofs.go:318-350 pattern.
+- **NEW-A-13 — `big.Int` divergence cross-multiply.**
+  `x/audit/v1/keeper/storage_truth_divergence.go:65-67, 89, 92`. Replaces
+  raw `uint64 * uint64` (wrap-around at scale) with `*big.Int` arithmetic
+  in median ordering and outlier predicate.
+- **NEW-A-14 / A-15 — trust-multiplier scope narrowed to Class A.**
+  `x/audit/v1/keeper/storage_truth_scoring.go:73-81, 539-541`. Predicate
+  now requires `(ResultClass == HASH_MISMATCH || ArtifactClass == INDEX)`
+  in addition to the existing `RECHECK_CONFIRMED_FAIL` and
+  `BUCKET_TYPE_RECHECK` exclusions. Spec §15.4.
+- **NEW-A-18 — single PASS reliability delta per epoch.**
+  `x/audit/v1/keeper/storage_truth_scoring.go:444, 450, 456` +
+  `ApplyReporterCleanEpochRecoveryAtEpochEnd`. Per-result PASS / TIMEOUT
+  reliability deltas zeroed; new epoch-end pass applies a single `-4`
+  reliability delta when `(passes_in_epoch >= 5 && no_overturned_fails)`.
+  Spec §15.3.
+- **NEW-B-2 — decay-adjusted healer eligibility.**
+  `x/audit/v1/keeper/storage_truth_heal_ops.go:105-114`. Read uses
+  `decayTowardZero(ss.SuspicionScore, params.StorageTruthNodeSuspicionDecayPerEpoch,
+  epochDelta(epochID, ss.LastUpdatedEpoch))` for sibling-symmetry with
+  `enforcement.go:119`.
+- **NEW-B-8 — verified-heal failure-pattern reset.**
+  `x/audit/v1/keeper/msg_storage_truth.go:395-404`. Verified-branch now
+  zeroes `DistinctHolderFailureCount`, `RecentFailureEpochCount`,
+  `LastIndexFailureEpoch`, `LastFailureEpoch` so the §20 "fresh start"
+  semantic is preserved post-heal.
+- **F121-F12 — distinct strong-postpone reason + recovery param.**
+  `x/audit/v1/keeper/keys.go` + `enforcement.go` + `params.go`. Strong
+  band writes its own marker (`ap/sts/...`); recovery clean-pass count
+  reads from new param `StorageTruthStrongRecoveryCleanPassCount`
+  (default 5, gov-tunable). Recovery clears the strong marker explicitly.
+- **F121-F10 / F119-F3 — ticket-side `ContradictionCount` confirmation
+  guard.** `x/audit/v1/keeper/storage_truth_scoring.go:418-422`. A
+  `contradictionConfirmed` bool now propagates from the reporter-side
+  bookkeeping; the ticket-side bump only fires on `prevFailure &&
+  currentPass && contradictionConfirmed`. Closes sibling-asymmetry with
+  the reporter side.
+
+### LOW (defensive / observability / spec text)
+
+- **NEW-A-16** — median-of-even uses upper pair (was lower pair —
+  removes downward bias).
+- **NEW-B-3** — verifier count promoted to param
+  `StorageTruthHealVerifierCount` (default 2, gov-tunable).
+- **NEW-B-4** — insufficient-verifiers path emits an event
+  (sibling-symmetric with `EventTypeHealOpInsufficientHealers`).
+- **NEW-B-5** — link-recheck single-witness intent documented inline.
+- **NEW-B-6 / B-9** — `InitGenesis` cross-validates audit
+  `StorageTruthPostponements` against supernode `SuperNodeStatePostponed`.
+- **NEW-B-7** — `GetNextHealOpID` panic-guards on malformed counter.
+- **NEW-C-4 / A-19** — `pruneStorageProofTranscripts` logs malformed
+  records instead of silently swallowing.
+- **NF7** — workspace `LEP6.md:171` `pair_rank` wording corrected to the
+  canonical 0x00-framed concatenation (in-repo guide already correct).
+- **F119-F3 residue — cross-holder PASS bonus implemented.**
+  `applyTicketDeteriorationDelta` (where `state.LastTargetSupernodeAccount`
+  is available, NOT in the per-result delta switch). When PASS lands on
+  a ticket whose prior failure was from a DIFFERENT holder, an additional
+  `-3` ticket-deterioration delta is applied. Tests in
+  `storage_truth_cross_holder_pass_test.go` (4 sub-cases: same-holder PASS
+  no-bonus, cross-holder PASS bonus, no-prior-failure PASS no-bonus, FAIL
+  no-bonus).
+
+### New params introduced this round
+
+- `StorageTruthHealVerifierCount` — default 2 (NEW-B-3).
+- `StorageTruthStrongRecoveryCleanPassCount` — default 5 (F121-F12).
+
+Both plumbed through `proto/lumera/audit/v1/params.proto` and
+`x/audit/v1/types/params.go` (default + Validate).
+
+### Why round-1 missed these (process retrospective)
+
+Three production-gate sweeps were not executed before declaring the
+earlier audit GREEN:
+
+1. **Out-of-scope diff sweep** vs `master` would have caught NEW-C-3
+   (silent fee-routing deletion).
+2. **`Set*` ↔ `ExportGenesis` symmetry sweep** (every `Set*` write should
+   round-trip through `ExportGenesis`) would have caught NEW-C-1 (8
+   missing prefix families).
+3. **PARTIAL-fix write-path enumeration** (when a fix is marked partial,
+   enumerate every write site that mirrors the predicate before claiming
+   resolution) would have caught NEW-C-2, F121-F12, F121-F10
+   sibling-symmetry misses.
+
+These three sweeps are now mandatory pre-master items (see checklist
+below) and codified as Skill Pitfall #31 in the
+`lumera-lep6-pr-comment-triage` skill.
+
+---
+
 ## Pre-Release Checklist
 
-Items below are NOT blocked by PR #122 itself — they are operational and
-follow-up tasks that must complete before LEP-6 enforcement can flip from
-`SHADOW` to `SOFT`/`FULL` on a live network.
+This section is the canonical aggregator of every operational, follow-up,
+and process item that must complete **before LEP-6 enforcement can flip
+from `SHADOW` to `SOFT`/`FULL` on a live network**. Items below are NOT
+blocked by the merging PR itself; they are gates for the activation
+governance proposal.
 
-### Implementation follow-ups
+Source-of-truth references: `ACTIVE_WORK.md` (in-flight tracking),
+`.lep6-review-pending-doc-updates/` (per-review queues),
+`docs/leps/LEP-6-implementation-guide.md` (this file — design-of-record).
 
-- [ ] **Class-A state-counter cleanup** — remove the residual zero-events fallback
-  in Postpone/StrongPostpone bands (CP3.5 audit F2, LOW). Auditor confirmed
-  unreachable post-activation with indexed data; safe to defer but should be
-  cleaned up before mainnet rollout.
-- [ ] **Full-app simulation harness for LEP-6 paths** — repo currently lacks
-  `TestFullAppSimulation` exercising decay-then-add ordering, recheck flow,
-  heal-op lifecycle, and postponement+recovery loops over N=1000+ random
-  blocks. Track in a separate task post-LEP-6.
+### A. Migrations & data backfills
 
-### Cross-repo integration
+- [ ] **`KeepLastEpochEntries` v1→v2 migration applied (122-F4).**
+  Handler at `x/audit/v1/module/migrations.go` registered at
+  `module.go:100` (`RegisterMigration(types.ModuleName, 1, NewMigrateV1ToV2)`).
+  On upgrade, bumps `KeepLastEpochEntries` to
+  `max(KeepLastEpochEntries, OldClassAFaultWindow)` (default
+  `OldClassAFaultWindow=21` if zero). `ConsensusVersion=2` at
+  `types/genesis.go:5`. Verify the upgrade handler is wired into
+  `app/upgrades/<vN>/upgrades.go` for the activation release and that
+  post-upgrade state shows `KeepLastEpochEntries >= 21`.
+- [ ] **TicketArtifactCountState backfill** for finalized cascade tickets
+  pre-dating LEP-6 anchoring (see "Mandatory Pre-Activation Data Plan"
+  above). Required: zero unresolved exceptions before flipping to
+  `SHADOW` or above. Backfill source: finalized cascade metadata
+  (`index_artifact_count` / `symbol_artifact_count` when present;
+  deterministic fallback from finalized symbol IDs otherwise — never
+  silently guess).
+- [ ] **Audit report published**: total finalized cascade tickets, total
+  already anchored, total newly backfilled, total
+  unresolved/excluded (must be zero). Attach to the activation
+  governance proposal body.
+- [ ] **New params seeded with defaults** at the upgrade boundary
+  (`StorageTruthHealVerifierCount=2`,
+  `StorageTruthStrongRecoveryCleanPassCount=5`). Confirm proto schema
+  defaults populate on `InitGenesis` of an upgraded chain.
 
-- [ ] **Supernode-side recheck-builder integration** — recheck evidence flow
-  has only been driven by hand-crafted CLI submissions in tests so far.
-  Production correctness depends on the off-chain runtime building these txs
-  with field shapes matching what `validateRecheckEvidence` expects. Track in
-  the supernode repo.
-- [ ] **End-to-end devnet validation runbook** — once supernode integrates the
-  recheck-builder, validate the full flow on a local 5-validator devnet:
-  1. Build `lumerad` from PR #122 → start devnet (`make devnet-up`).
+### B. Implementation follow-ups
+
+- [ ] **Class-A state-counter cleanup** — remove the residual zero-events
+  fallback in Postpone/StrongPostpone bands (CP3.5 audit F2, LOW).
+  Auditor confirmed unreachable post-activation with indexed data; safe
+  to defer but should be cleaned up before mainnet rollout.
+- [ ] **Full-app simulation harness for LEP-6 paths** — repo currently
+  lacks `TestFullAppSimulation` exercising decay-then-add ordering,
+  recheck flow, heal-op lifecycle, and postponement+recovery loops over
+  N=1000+ random blocks. Module-level simulation (`x/audit/v1/simulation`)
+  is green; full-app harness is the missing tier.
+
+### C. Review-process sweeps (mandatory before each release-gate PR merge)
+
+These three sweeps were missed in round 1 and produced the 24 R2
+findings. They are now mandatory pre-master gates per Skill Pitfall #31.
+
+- [ ] **Out-of-scope diff sweep** — `git diff <release-base>..HEAD --stat`
+  filtered to files outside the announced scope; flag any deletion or
+  rewrite touching unrelated modules (especially money-flow paths in
+  `x/action`, `x/bank`, `x/distribution`, `x/supernode`).
+- [ ] **`Set*` ↔ `ExportGenesis` symmetry sweep** — for every keeper
+  `Set*` write, confirm a matching `GetAll*` iterator and an
+  `ExportGenesis` emission round-trip. Run on the audit + supernode
+  modules at minimum.
+- [ ] **PARTIAL-fix write-path enumeration** — for every finding marked
+  PARTIAL in any prior review, enumerate every write/predicate site
+  that mirrors the relevant rule before claiming resolution; check
+  reporter-side ↔ ticket-side ↔ node-side symmetry where applicable.
+
+### D. Cross-repo integration
+
+- [ ] **Supernode-side recheck-builder integration** — recheck evidence
+  flow has only been driven by hand-crafted CLI submissions in tests so
+  far. Production correctness depends on the off-chain runtime building
+  these txs with field shapes matching what `validateRecheckEvidence`
+  expects. Track in the supernode repo.
+- [ ] **End-to-end devnet validation runbook** — once supernode integrates
+  the recheck-builder, validate the full flow on a local 5-validator
+  devnet:
+  1. Build `lumerad` from the activation tag → start devnet
+     (`make devnet-up`).
   2. Build `supernode` runtime from matching branch with new tx shape.
   3. Trigger a real cascade upload via `sn-api-server`.
-  4. Force a fail (corrupt one node's storage); let challenge fire; observe
-     storage proof results land on-chain.
-  5. Trigger recheck path; observe `MsgSubmitStorageRecheckEvidence` build
-     correctly with all fields populated; confirm chain accepts it.
+  4. Force a fail (corrupt one node's storage); let challenge fire;
+     observe storage proof results land on-chain.
+  5. Trigger recheck path; observe `MsgSubmitStorageRecheckEvidence`
+     build correctly with all fields populated; confirm chain accepts
+     it (note: `--gas auto --gas-adjustment 1.3` — see Operator Notes).
   6. Watch `NodeSuspicionState` / `ReporterReliabilityState` /
      `TicketDeteriorationState` evolve via queries.
-  7. Cycle to recovery (clean passes); verify postponement→active transition.
+  7. Cycle to recovery (clean passes); verify postponement→active
+     transition and (for strong postpone) the new
+     `StorageTruthStrongRecoveryCleanPassCount` gate.
+  8. Verify R2 deltas land as designed: a cross-holder PASS produces
+     `D -= 3` extra; per-epoch PASS reward is single `-4` (not
+     per-result); EXPIRED heal-op advances probation and bumps `D`.
 
-### Governance / operations
+### E. Test pyramid re-validation at activation tag
+
+- [ ] `./x/...` unit suite green at activation tag.
+- [ ] `./x/audit/v1/simulation/...` + `./x/audit/v1/module/...`
+  module-simulation green.
+- [ ] `./tests/integration/...` green.
+- [ ] `./tests/system/...` (`-tags=system`) green.
+- [ ] `./tests/systemtests/...` (`-tags=system_test`) green
+  (25/25 last verified at `0c6f5f0`).
+- [ ] Determinism scan clean — `grep -rE 'float|math\.Pow|time\.Now|rand\.|sort\.Float|FormatFloat'`
+  on `x/audit/v1/keeper` returns zero hits in consensus paths; no
+  `range map[]` in scoring/divergence/enforcement consensus paths.
+
+### F. Governance / operations
 
 - [ ] **Mainnet activation governance proposal** — flipping
   `StorageTruthEnforcementMode` from `SHADOW` to `SOFT` or `FULL` is a
   consensus-binding change. Draft a governance proposal with a flag-day
-  epoch boundary; coordinate with all validators on the activation epoch.
-  Cannot be reversed without another governance proposal.
-- [ ] **Validator/supernode operator advisory** — publish the gas-requirements
-  note (above) in operator docs. Include in the SOFT/FULL activation proposal
-  body so all participants see it before voting.
+  epoch boundary; coordinate with all validators on the activation
+  epoch. Cannot be reversed without another governance proposal.
+- [ ] **Validator/supernode operator advisory** — publish the
+  gas-requirements note (above) in operator docs. Include in the
+  SOFT/FULL activation proposal body so all participants see it before
+  voting.
+- [ ] **Operator changelog** — publish the R2 behavior deltas (new params,
+  per-epoch PASS reward semantics, EXPIRED heal-op cooldown, strong-band
+  recovery threshold, cross-holder PASS bonus) in the release notes so
+  operators understand observable score-evolution changes.
+
+### G. Documentation queue close-out
+
+- [ ] `.lep6-review-pending-doc-updates/CP1_TRIAGE.md` and
+  `CP2_SPEC_ALIGNMENT.md` items resolved or explicitly deferred with
+  rationale.
+- [ ] `.lep6-review-pending-doc-updates/r2/` items reflected in this
+  guide (this section) and in `workspace/docs/LEP6.md` where the spec
+  text needed correction (NF7 done; sweep for any further drift).
+- [ ] `docs/agent-context/02_lumera.md` updated with R2 behavior deltas
+  and new params for cross-session continuity.

@@ -402,6 +402,11 @@ func (m msgServer) finalizeHealOp(
 		ticketState.DeteriorationScore = resetScore
 		ticketState.LastHealEpoch = currentEpoch.EpochID
 		ticketState.ProbationUntilEpoch = currentEpoch.EpochID + uint64(params.StorageTruthProbationEpochs)
+		// Per NEW-B-8 — verified heal restores fresh-start semantic on §20 counters.
+		ticketState.DistinctHolderFailureCount = 0
+		ticketState.RecentFailureEpochCount = 0
+		ticketState.LastIndexFailureEpoch = 0
+		ticketState.LastFailureEpoch = 0
 	} else {
 		// Failed heal: D += 15
 		ticketState.DeteriorationScore = addInt64Saturated(ticketState.DeteriorationScore, 15)

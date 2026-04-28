@@ -103,6 +103,18 @@ func (m *ActionBankKeeper) GetBalance(ctx context.Context, addr sdk.AccAddress, 
 	return sdk.Coin{}
 }
 
+func (m *ActionBankKeeper) SendCoinsFromModuleToModule(ctx context.Context, senderModule, recipientModule string, amt sdk.Coins) error {
+	if _, ok := m.moduleBalances[senderModule]; ok {
+		m.moduleBalances[senderModule] = m.moduleBalances[senderModule].Sub(amt...)
+	}
+	if m.moduleBalances[recipientModule].IsZero() {
+		m.moduleBalances[recipientModule] = amt
+	} else {
+		m.moduleBalances[recipientModule] = m.moduleBalances[recipientModule].Add(amt...)
+	}
+	return nil
+}
+
 func (m *ActionBankKeeper) GetModuleBalance(module string) sdk.Coins {
 	if coins, ok := m.moduleBalances[module]; ok {
 		return coins
@@ -213,6 +225,87 @@ func ActionKeeper(t testing.TB, ctrl *gomock.Controller) (keeper.Keeper, sdk.Con
 	return ActionKeeperWithAddress(t, ctrl, nil)
 }
 
+// MockRewardDistributionKeeper is a simple stub that returns a configurable bps value.
+type MockRewardDistributionKeeper struct {
+	Bps uint64
+}
+
+func (m *MockRewardDistributionKeeper) GetRegistrationFeeShareBps(_ sdk.Context) uint64 {
+	return m.Bps
+}
+
+// ActionKeeperWithRewardDistribution returns an action keeper wired with the supplied
+// RewardDistributionKeeper plus the bank-keeper mock so tests can assert module-balance
+// deltas across the reward-share + foundation + supernode payout splits.
+func ActionKeeperWithRewardDistribution(
+	t testing.TB,
+	ctrl *gomock.Controller,
+	accounts []AccountPair,
+	rewardDistKeeper actiontypes.RewardDistributionKeeper,
+) (keeper.Keeper, sdk.Context, *ActionBankKeeper) {
+	storeKey := storetypes.NewKVStoreKey(actiontypes.StoreKey)
+
+	db := dbm.NewMemDB()
+	encCfg := moduletestutil.MakeTestEncodingConfig(actionmodulev1.AppModule{})
+	stateStore := store.NewCommitMultiStore(db, log.NewNopLogger(), metrics.NewNoOpMetrics())
+	stateStore.MountStoreWithDB(storeKey, storetypes.StoreTypeIAVL, db)
+	require.NoError(t, stateStore.LoadLatestVersion())
+
+	registry := codectypes.NewInterfaceRegistry()
+	cdc := codec.NewProtoCodec(registry)
+	authority := authtypes.NewModuleAddress(govtypes.ModuleName)
+
+	bankKeeper := NewActionMockBankKeeper()
+	authKeeper := NewMockAccountKeeper()
+	stakingKeeper := new(MockStakingKeeper)
+	supernodeKeeper := supernodemocks.NewMockSupernodeKeeper(ctrl)
+	supernodeQueryServer := supernodemocks.NewMockQueryServer(ctrl)
+	distributionKeeper := new(MockDistributionKeeper)
+	auditKeeper := NewMockAuditKeeper()
+
+	ctx := sdk.NewContext(stateStore, cmtproto.Header{}, false, log.NewNopLogger())
+	for _, acc := range accounts {
+		account := authKeeper.NewAccountWithAddress(ctx, acc.Address)
+		err := account.SetPubKey(acc.PubKey)
+		require.NoError(t, err)
+		authKeeper.SetAccount(ctx, account)
+		bankKeeper.sentCoins[acc.Address.String()] = sdk.NewCoins(sdk.NewInt64Coin("ulume", TestAccountAmount))
+	}
+
+	mockUpgradeKeeper := newMockUpgradeKeeper()
+
+	storeService := runtime.NewKVStoreService(storeKey)
+	k := keeper.NewKeeper(
+		cdc,
+		authKeeper.AddressCodec(),
+		storeService,
+		log.NewNopLogger(),
+		authority,
+		bankKeeper,
+		authKeeper,
+		stakingKeeper,
+		distributionKeeper,
+		supernodeKeeper,
+		func() sntypes.QueryServer {
+			return supernodeQueryServer
+		},
+		auditKeeper,
+		func() *ibckeeper.Keeper {
+			return ibckeeper.NewKeeper(encCfg.Codec, storeService, newMockIbcParams(), mockUpgradeKeeper, authority.String())
+		},
+		rewardDistKeeper,
+	)
+
+	params := actiontypes.DefaultParams()
+	params.FoundationFeeShare = "0.1"
+	params.SuperNodeFeeShare = "0.9"
+	if err := k.SetParams(ctx, params); err != nil {
+		panic(err)
+	}
+
+	return k, ctx, bankKeeper
+}
+
 func ActionKeeperWithAddress(t testing.TB, ctrl *gomock.Controller, accounts []AccountPair) (keeper.Keeper, sdk.Context) {
 	storeKey := storetypes.NewKVStoreKey(actiontypes.StoreKey)
 
@@ -272,6 +365,7 @@ func ActionKeeperWithAddress(t testing.TB, ctrl *gomock.Controller, accounts []A
 		func() *ibckeeper.Keeper {
 			return ibckeeper.NewKeeper(encCfg.Codec, storeService, newMockIbcParams(), mockUpgradeKeeper, authority.String())
 		},
+		nil,
 	)
 
 	// Initialize params

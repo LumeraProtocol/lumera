@@ -183,6 +183,23 @@ func (k Keeper) markStorageTruthReporterResultRecheck(ctx sdk.Context, reporterA
 	return nil
 }
 
+// linkStorageTruthRecheckTranscript wires a recheck transcript onto the
+// challenged transcript so subsequent reads see the link. Per NEW-B-5 and
+// the LEP-6 implementation guide § Recheck Evidence § Replay protection key:
+//
+//   - The recheck-evidence dedup key (st/rce/<...>) enforces single-witness
+//     uniqueness PER CREATOR. A given recheck observer cannot replay the same
+//     (epoch_id, ticket_id, target_account) tuple twice — that's the per-creator
+//     single-witness invariant enforced at link time.
+//   - Cross-creator quorum (multiple distinct recheck observers reaching the
+//     same conclusion) is enforced LATER in scoring at epoch end, not here.
+//     The link function deliberately does NOT count witnesses; it just records
+//     the wiring.
+//   - 122-F3 collision check below ensures a recheck-transcript hash cannot
+//     be re-bound to a different challenged transcript later.
+//
+// Therefore "single-witness recheck" at this layer is intentional and not
+// a missing-quorum bug.
 func (k Keeper) linkStorageTruthRecheckTranscript(
 	ctx sdk.Context,
 	challengedTranscriptHash string,
@@ -241,16 +258,14 @@ func (k Keeper) linkStorageTruthRecheckTranscript(
 func (k Keeper) distinctNodeFailedTickets(ctx sdk.Context, supernodeAccount string, startEpoch uint64, endEpoch uint64, include func(storageTruthNodeFailureRecord) bool) (map[string]struct{}, uint32, error) {
 	tickets := make(map[string]struct{})
 	var events uint32
-	prefix := types.NodeStorageTruthFailurePrefix(supernodeAccount)
-	it := k.kvStore(ctx).Iterator(prefix, storetypes.PrefixEndBytes(prefix))
+	// Bounded epoch scan per CP-NEW-A-11 residue.
+	start, end := types.NodeStorageTruthFailureEpochScanRange(supernodeAccount, startEpoch, endEpoch)
+	it := k.kvStore(ctx).Iterator(start, end)
 	defer it.Close()
 	for ; it.Valid(); it.Next() {
 		var record storageTruthNodeFailureRecord
 		if err := json.Unmarshal(it.Value(), &record); err != nil {
 			return nil, 0, err
-		}
-		if record.EpochID < startEpoch || record.EpochID > endEpoch {
-			continue
 		}
 		if include != nil && !include(record) {
 			continue
@@ -359,6 +374,186 @@ func (k Keeper) hasStorageTruthFailedHeal(ctx sdk.Context, supernodeAccount stri
 		}
 	}
 	return false
+}
+
+// GetAllStorageProofTranscriptsForGenesis exports all st/spt/ records as raw JSON value bytes.
+// Per NEW-C-1: secondary index st/spt-tbe/ is rebuilt by setStorageProofTranscriptRecord on InitGenesis.
+func (k Keeper) GetAllStorageProofTranscriptsForGenesis(ctx sdk.Context) []types.GenesisStorageProofTranscript {
+	prefix := types.StorageProofTranscriptPrefix()
+	store := k.kvStore(ctx)
+	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
+	defer it.Close()
+
+	out := make([]types.GenesisStorageProofTranscript, 0)
+	for ; it.Valid(); it.Next() {
+		key := it.Key()
+		hash := string(key[len(prefix):])
+		val := append([]byte(nil), it.Value()...)
+		out = append(out, types.GenesisStorageProofTranscript{
+			TranscriptHash: hash,
+			RecordJson:     val,
+		})
+	}
+	return out
+}
+
+// importStorageProofTranscriptForGenesis re-emits a transcript record (writing the
+// st/spt-tbe/ secondary index alongside) so genesis-imported state matches runtime.
+func (k Keeper) importStorageProofTranscriptForGenesis(ctx sdk.Context, hash string, recordJSON []byte) error {
+	var rec storageProofTranscriptRecord
+	if err := json.Unmarshal(recordJSON, &rec); err != nil {
+		return err
+	}
+	return k.setStorageProofTranscriptRecord(ctx, hash, rec)
+}
+
+// GetAllNodeFailureFactsForGenesis exports all st/nf/ records.
+func (k Keeper) GetAllNodeFailureFactsForGenesis(ctx sdk.Context) []types.GenesisNodeFailureFact {
+	prefix := types.NodeStorageTruthFailureRootPrefix()
+	store := k.kvStore(ctx)
+	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
+	defer it.Close()
+
+	out := make([]types.GenesisNodeFailureFact, 0)
+	for ; it.Valid(); it.Next() {
+		key := it.Key()
+		body := key[len(prefix):]
+		// "<supernode>" + '/' + u64be(epoch) + '/' + ticket + 0x00 + reporter
+		// supernode does not contain '/' (bech32) — split at first '/'.
+		slash1 := -1
+		for i := 0; i < len(body); i++ {
+			if body[i] == '/' {
+				slash1 = i
+				break
+			}
+		}
+		if slash1 < 0 || len(body) < slash1+1+8+1 {
+			continue
+		}
+		supernode := string(body[:slash1])
+		epochID := binary.BigEndian.Uint64(body[slash1+1 : slash1+1+8])
+		// next byte is '/'
+		rest := body[slash1+1+8+1:]
+		// rest = ticket + 0x00 + reporter
+		sep := -1
+		for i := 0; i < len(rest); i++ {
+			if rest[i] == 0 {
+				sep = i
+				break
+			}
+		}
+		if sep < 0 {
+			continue
+		}
+		ticket := string(rest[:sep])
+		reporter := string(rest[sep+1:])
+		val := append([]byte(nil), it.Value()...)
+		out = append(out, types.GenesisNodeFailureFact{
+			SupernodeAccount: supernode,
+			EpochId:          epochID,
+			TicketId:         ticket,
+			ReporterAccount:  reporter,
+			RecordJson:       val,
+		})
+	}
+	return out
+}
+
+// importNodeFailureFactForGenesis writes a raw st/nf/ record to its key.
+func (k Keeper) importNodeFailureFactForGenesis(ctx sdk.Context, fact types.GenesisNodeFailureFact) {
+	k.kvStore(ctx).Set(types.NodeStorageTruthFailureKey(fact.SupernodeAccount, fact.EpochId, fact.TicketId, fact.ReporterAccount), fact.RecordJson)
+}
+
+// GetAllReporterResultFactsForGenesis exports all st/rrs/ records.
+// Per NEW-C-1: secondary index st/rrs-tt/ is rebuilt by setStorageTruthReporterResult-equivalent
+// import path on InitGenesis.
+func (k Keeper) GetAllReporterResultFactsForGenesis(ctx sdk.Context) []types.GenesisReporterResultFact {
+	prefix := types.ReporterStorageTruthResultRootPrefix()
+	store := k.kvStore(ctx)
+	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
+	defer it.Close()
+
+	out := make([]types.GenesisReporterResultFact, 0)
+	for ; it.Valid(); it.Next() {
+		key := it.Key()
+		body := key[len(prefix):]
+		// "<reporter>" + '/' + u64be(epoch) + '/' + ticket + 0x00 + target
+		slash1 := -1
+		for i := 0; i < len(body); i++ {
+			if body[i] == '/' {
+				slash1 = i
+				break
+			}
+		}
+		if slash1 < 0 || len(body) < slash1+1+8+1 {
+			continue
+		}
+		reporter := string(body[:slash1])
+		epochID := binary.BigEndian.Uint64(body[slash1+1 : slash1+1+8])
+		rest := body[slash1+1+8+1:]
+		sep := -1
+		for i := 0; i < len(rest); i++ {
+			if rest[i] == 0 {
+				sep = i
+				break
+			}
+		}
+		if sep < 0 {
+			continue
+		}
+		ticket := string(rest[:sep])
+		target := string(rest[sep+1:])
+		val := append([]byte(nil), it.Value()...)
+		out = append(out, types.GenesisReporterResultFact{
+			ReporterAccount: reporter,
+			EpochId:         epochID,
+			TicketId:        ticket,
+			TargetAccount:   target,
+			RecordJson:      val,
+		})
+	}
+	return out
+}
+
+// importReporterResultFactForGenesis writes both the primary and secondary indexes.
+func (k Keeper) importReporterResultFactForGenesis(ctx sdk.Context, f types.GenesisReporterResultFact) {
+	store := k.kvStore(ctx)
+	store.Set(types.ReporterStorageTruthResultKey(f.ReporterAccount, f.EpochId, f.TicketId, f.TargetAccount), f.RecordJson)
+	store.Set(types.ReporterStorageTruthResultByTargetKey(f.TargetAccount, f.EpochId, f.TicketId, f.ReporterAccount), f.RecordJson)
+}
+
+// GetAllFailedHealMarkersForGenesis exports all st/fh/ marker keys.
+func (k Keeper) GetAllFailedHealMarkersForGenesis(ctx sdk.Context) []types.GenesisFailedHealMarker {
+	prefix := types.StorageTruthFailedHealRootPrefix()
+	store := k.kvStore(ctx)
+	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
+	defer it.Close()
+
+	out := make([]types.GenesisFailedHealMarker, 0)
+	for ; it.Valid(); it.Next() {
+		key := it.Key()
+		body := key[len(prefix):]
+		// "<supernode>" + '/' + u64be(epoch) + '/' + ticket
+		slash1 := -1
+		for i := 0; i < len(body); i++ {
+			if body[i] == '/' {
+				slash1 = i
+				break
+			}
+		}
+		if slash1 < 0 || len(body) < slash1+1+8+1 {
+			continue
+		}
+		supernode := string(body[:slash1])
+		epochID := binary.BigEndian.Uint64(body[slash1+1 : slash1+1+8])
+		ticket := string(body[slash1+1+8+1:])
+		out = append(out, types.GenesisFailedHealMarker{
+			SupernodeAccount: supernode,
+			EpochId:          epochID,
+			TicketId:         ticket,
+		})
+	}
+	return out
 }
 
 func isStorageTruthRecheckEligible(class types.StorageProofResultClass) bool {

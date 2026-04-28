@@ -250,11 +250,12 @@ func (k *Keeper) FinalizeAction(ctx sdk.Context, actionID string, superNodeAccou
 			if err := gogoproto.Unmarshal(existingAction.Metadata, &cascadeMeta); err != nil {
 				return errors.Wrap(actiontypes.ErrInvalidMetadata, fmt.Sprintf("failed to unmarshal finalized cascade metadata: %v", err))
 			}
+			indexCount, symbolCount := actiontypes.CascadeArtifactCountsWithFallback(&cascadeMeta)
 			if err := k.auditKeeper.SetStorageTruthTicketArtifactCounts(
 				ctx,
 				existingAction.ActionID,
-				cascadeMeta.GetIndexArtifactCount(),
-				cascadeMeta.GetSymbolArtifactCount(),
+				indexCount,
+				symbolCount,
 			); err != nil {
 				return errors.Wrap(actiontypes.ErrInvalidMetadata, err.Error())
 			}
@@ -644,6 +645,22 @@ func (k *Keeper) DistributeFees(ctx sdk.Context, actionID string) error {
 
 	if numSupernodes == 0 {
 		return nil // No supernodes to pay
+	}
+
+	// Route the configured reward-distribution share to the supernode-owned pool.
+	if k.rewardDistributionKeeper != nil {
+		rewardDistributionBps := k.rewardDistributionKeeper.GetRegistrationFeeShareBps(ctx)
+		if rewardDistributionBps > 0 && fee.Amount.GT(math.ZeroInt()) {
+			rewardDistributionAmount := fee.Amount.MulRaw(int64(rewardDistributionBps)).QuoRaw(10000)
+			if rewardDistributionAmount.IsPositive() {
+				rewardDistributionCoin := sdk.NewCoin(fee.Denom, rewardDistributionAmount)
+				err := k.bankKeeper.SendCoinsFromModuleToModule(ctx, actiontypes.ModuleName, sntypes.ModuleName, sdk.NewCoins(rewardDistributionCoin))
+				if err != nil {
+					return errors.Wrap(err, "failed to send reward-distribution fee share")
+				}
+				fee.Amount = fee.Amount.Sub(rewardDistributionAmount)
+			}
+		}
 	}
 
 	params := k.GetParams(ctx)

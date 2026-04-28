@@ -15,6 +15,7 @@ const (
 	postponeReasonActionFinalizationSignatureFailure = "audit_action_finalization_signature_failure"
 	postponeReasonActionFinalizationNotInTop10       = "audit_action_finalization_not_in_top_10"
 	postponeReasonStorageTruth                       = "audit_storage_truth_suspicion"
+	postponeReasonStorageTruthStrong                 = "audit_storage_truth_strong_suspicion"
 )
 
 // EnforceEpochEnd evaluates the completed epoch and updates supernode states accordingly.
@@ -154,10 +155,18 @@ func (k Keeper) applyStorageTruthBandAtEpochEnd(ctx sdk.Context, sn sntypes.Supe
 		return nil
 	}
 
-	if err := k.setSupernodePostponed(ctx, sn, postponeReasonStorageTruth); err != nil {
+	// Per F121-F12 — strong-suspicion band uses a distinct reason and recovery requirement.
+	reason := postponeReasonStorageTruth
+	if band == storageTruthBandStrongPostpone {
+		reason = postponeReasonStorageTruthStrong
+	}
+	if err := k.setSupernodePostponed(ctx, sn, reason); err != nil {
 		return err
 	}
 	k.setStorageTruthPostponedAtEpochID(ctx, sn.SupernodeAccount, epochID)
+	if band == storageTruthBandStrongPostpone {
+		k.setStorageTruthStrongPostponeMarker(ctx, sn.SupernodeAccount)
+	}
 	k.clearActionFinalizationPostponedAtEpochID(ctx, sn.SupernodeAccount)
 
 	// Per 121-F8 — recovery delta from snapshot, not cumulative.
@@ -604,8 +613,14 @@ func (k Keeper) shouldRecoverFromStorageTruthPostponement(ctx sdk.Context, super
 		return false
 	}
 	// Score is below watch threshold — also require sufficient clean passes.
+	// Per F121-F12 — strong-band postponements require a higher pass count.
 	requiredPasses := params.StorageTruthRecoveryCleanPassCount
-	if requiredPasses == 0 {
+	if k.hasStorageTruthStrongPostponeMarker(ctx, supernodeAccount) {
+		requiredPasses = params.StorageTruthStrongRecoveryCleanPassCount
+		if requiredPasses == 0 {
+			requiredPasses = 5
+		}
+	} else if requiredPasses == 0 {
 		requiredPasses = 3
 	}
 	// Per 121-F8 — recovery delta from snapshot, not cumulative.

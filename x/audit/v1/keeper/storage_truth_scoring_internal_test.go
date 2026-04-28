@@ -20,9 +20,10 @@ func TestStorageTruthScoreDeltasForResult(t *testing.T) {
 				ResultClass: types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS,
 				BucketType:  types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT,
 			},
+			// Per NEW-A-18 — emission moved to end-of-epoch (-4 once on >=5 PASS, no overturned-fail).
 			expect: storageTruthScoreDeltas{
 				nodeSuspicion:       -3,
-				reporterReliability: -4,
+				reporterReliability: 0,
 				ticketDeterioration: -2,
 			},
 		},
@@ -32,9 +33,10 @@ func TestStorageTruthScoreDeltasForResult(t *testing.T) {
 				ResultClass: types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS,
 				BucketType:  types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_OLD,
 			},
+			// Per NEW-A-18 — emission moved to end-of-epoch (-4 once on >=5 PASS, no overturned-fail).
 			expect: storageTruthScoreDeltas{
 				nodeSuspicion:       -2,
-				reporterReliability: -4,
+				reporterReliability: 0,
 				ticketDeterioration: -3,
 			},
 		},
@@ -44,9 +46,10 @@ func TestStorageTruthScoreDeltasForResult(t *testing.T) {
 				ResultClass: types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS,
 				BucketType:  types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECHECK,
 			},
+			// Per NEW-A-18 — emission moved to end-of-epoch (-4 once on >=5 PASS, no overturned-fail).
 			expect: storageTruthScoreDeltas{
 				nodeSuspicion:       -2,
-				reporterReliability: -4,
+				reporterReliability: 0,
 				ticketDeterioration: -2,
 			},
 		},
@@ -91,9 +94,11 @@ func TestStorageTruthScoreDeltasForResult(t *testing.T) {
 			result: &types.StorageProofResult{
 				ResultClass: types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_TIMEOUT_OR_NO_RESPONSE,
 			},
+			// Per NEW-A-18 — TIMEOUT no longer emits per-result reporter delta;
+			// reporter recovery is end-of-epoch only (-4 on >=5 clean PASS).
 			expect: storageTruthScoreDeltas{
 				nodeSuspicion:       7,
-				reporterReliability: -1,
+				reporterReliability: 0,
 				ticketDeterioration: 3,
 			},
 		},

@@ -56,6 +56,12 @@ func (k Keeper) EndBlocker(ctx context.Context) error {
 		return err
 	}
 
+	// Per NEW-A-18 — per-EPOCH reporter clean-recovery (-4 once on >=5 PASS,
+	// no overturned-fail). Per-result PASS/TIMEOUT reporter deltas are 0.
+	if err := k.ApplyReporterCleanEpochRecoveryAtEpochEnd(sdkCtx, epoch.EpochID, params); err != nil {
+		return err
+	}
+
 	if err := k.ProcessStorageTruthHealOpsAtEpochEnd(sdkCtx, epoch.EpochID, params); err != nil {
 		return err
 	}

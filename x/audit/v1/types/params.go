@@ -60,6 +60,8 @@ var (
 	KeyStorageTruthReporterMinReportsForDivergence      = []byte("StorageTruthReporterMinReportsForDivergence")
 	KeyStorageTruthNodeSuspicionThresholdStrongPostpone = []byte("StorageTruthNodeSuspicionThresholdStrongPostpone")
 	KeyStorageTruthRecoveryCleanPassCount               = []byte("StorageTruthRecoveryCleanPassCount")
+	KeyStorageTruthStrongRecoveryCleanPassCount         = []byte("StorageTruthStrongRecoveryCleanPassCount")
+	KeyStorageTruthHealVerifierCount                    = []byte("StorageTruthHealVerifierCount")
 	KeyStorageTruthClassAFaultWindow                    = []byte("StorageTruthClassAFaultWindow")
 	KeyStorageTruthClassBFaultWindow                    = []byte("StorageTruthClassBFaultWindow")
 	KeyStorageTruthHealDeadlineEpochs                   = []byte("StorageTruthHealDeadlineEpochs")
@@ -154,6 +156,8 @@ var (
 	DefaultStorageTruthReporterMinReportsForDivergence      = uint32(5)
 	DefaultStorageTruthNodeSuspicionThresholdStrongPostpone = int64(140)
 	DefaultStorageTruthRecoveryCleanPassCount               = uint32(3)
+	DefaultStorageTruthStrongRecoveryCleanPassCount         = uint32(5)
+	DefaultStorageTruthHealVerifierCount                    = uint32(2)
 	DefaultStorageTruthClassAFaultWindow                    = uint32(14)
 	DefaultStorageTruthClassBFaultWindow                    = uint32(7)
 	DefaultStorageTruthHealDeadlineEpochs                   = uint32(3)
@@ -254,6 +258,8 @@ func NewParams(
 	storageTruthOldClassAFaultWindow uint32,
 	storageTruthContradictionWindowEpochs uint32,
 	storageTruthReporterIneligibleDurationEpochs uint32,
+	storageTruthStrongRecoveryCleanPassCount uint32,
+	storageTruthHealVerifierCount uint32,
 ) Params {
 	return Params{
 		EpochLengthBlocks:                epochLengthBlocks,
@@ -310,6 +316,8 @@ func NewParams(
 		StorageTruthOldClassAFaultWindow:                 storageTruthOldClassAFaultWindow,
 		StorageTruthContradictionWindowEpochs:            storageTruthContradictionWindowEpochs,
 		StorageTruthReporterIneligibleDurationEpochs:     storageTruthReporterIneligibleDurationEpochs,
+		StorageTruthStrongRecoveryCleanPassCount:         storageTruthStrongRecoveryCleanPassCount,
+		StorageTruthHealVerifierCount:                    storageTruthHealVerifierCount,
 	}
 }
 
@@ -364,6 +372,8 @@ func DefaultParams() Params {
 		DefaultStorageTruthOldClassAFaultWindow,
 		DefaultStorageTruthContradictionWindowEpochs,
 		DefaultStorageTruthReporterIneligibleDurationEpochs,
+		DefaultStorageTruthStrongRecoveryCleanPassCount,
+		DefaultStorageTruthHealVerifierCount,
 	)
 }
 
@@ -479,6 +489,12 @@ func (p Params) WithDefaults() Params {
 	if p.StorageTruthRecoveryCleanPassCount == 0 {
 		p.StorageTruthRecoveryCleanPassCount = DefaultStorageTruthRecoveryCleanPassCount
 	}
+	if p.StorageTruthStrongRecoveryCleanPassCount == 0 {
+		p.StorageTruthStrongRecoveryCleanPassCount = DefaultStorageTruthStrongRecoveryCleanPassCount
+	}
+	if p.StorageTruthHealVerifierCount == 0 {
+		p.StorageTruthHealVerifierCount = DefaultStorageTruthHealVerifierCount
+	}
 	if p.StorageTruthClassAFaultWindow == 0 {
 		p.StorageTruthClassAFaultWindow = DefaultStorageTruthClassAFaultWindow
 	}
@@ -549,6 +565,8 @@ func (p *Params) ParamSetPairs() paramtypes.ParamSetPairs {
 		paramtypes.NewParamSetPair(KeyStorageTruthReporterMinReportsForDivergence, &p.StorageTruthReporterMinReportsForDivergence, validateUint32),
 		paramtypes.NewParamSetPair(KeyStorageTruthNodeSuspicionThresholdStrongPostpone, &p.StorageTruthNodeSuspicionThresholdStrongPostpone, validateInt64),
 		paramtypes.NewParamSetPair(KeyStorageTruthRecoveryCleanPassCount, &p.StorageTruthRecoveryCleanPassCount, validateUint32),
+		paramtypes.NewParamSetPair(KeyStorageTruthStrongRecoveryCleanPassCount, &p.StorageTruthStrongRecoveryCleanPassCount, validateUint32),
+		paramtypes.NewParamSetPair(KeyStorageTruthHealVerifierCount, &p.StorageTruthHealVerifierCount, validateUint32),
 		paramtypes.NewParamSetPair(KeyStorageTruthClassAFaultWindow, &p.StorageTruthClassAFaultWindow, validateUint32),
 		paramtypes.NewParamSetPair(KeyStorageTruthClassBFaultWindow, &p.StorageTruthClassBFaultWindow, validateUint32),
 		paramtypes.NewParamSetPair(KeyStorageTruthHealDeadlineEpochs, &p.StorageTruthHealDeadlineEpochs, validateUint32),
@@ -739,6 +757,9 @@ func (p Params) Validate() error {
 	}
 	if p.StorageTruthRecoveryCleanPassCount == 0 {
 		return fmt.Errorf("storage_truth_recovery_clean_pass_count must be > 0")
+	}
+	if p.StorageTruthHealVerifierCount == 0 {
+		return fmt.Errorf("storage_truth_heal_verifier_count must be > 0")
 	}
 	if p.StorageTruthClassBFaultWindow == 0 {
 		return fmt.Errorf("storage_truth_class_b_fault_window must be > 0")

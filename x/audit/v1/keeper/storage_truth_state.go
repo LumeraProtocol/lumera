@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"encoding/binary"
+	"fmt"
 
 	storetypes "cosmossdk.io/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -175,7 +176,18 @@ func (k Keeper) GetNextHealOpID(ctx sdk.Context) uint64 {
 	if bz == nil {
 		return 1
 	}
-	return binary.BigEndian.Uint64(bz)
+	// Per NEW-B-7 — sibling-symmetry with GetNextEvidenceID: panic on malformed
+	// counter rather than silently returning a corrupt value (heal-op IDs gate
+	// SetHealOp/GetHealOp; collisions cause structural confusion downstream).
+	if len(bz) != 8 {
+		panic(fmt.Errorf("audit: malformed next heal-op id (len=%d, want 8)", len(bz)))
+	}
+	id := binary.BigEndian.Uint64(bz)
+	if id == 0 {
+		// Heal-op IDs start at 1; treat 0 as sentinel collision with "not found".
+		panic(fmt.Errorf("audit: invalid next heal-op id (id=0 collides with not-found sentinel)"))
+	}
+	return id
 }
 
 func (k Keeper) SetNextHealOpID(ctx sdk.Context, id uint64) {

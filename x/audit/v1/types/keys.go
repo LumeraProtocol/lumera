@@ -79,6 +79,8 @@ var (
 	// Storage-truth postponement state:
 	// - StorageTruthPostponementKey: "ap/st/" + supernode_account -> 8 bytes u64be(postponed_at_epoch_id)
 	storageTruthPostponementPrefix = []byte("ap/st/")
+	// Per F121-F12 — sibling marker recording strong-postpone reason.
+	storageTruthPostponementStrongPrefix = []byte("ap/sts/")
 
 	// Storage-truth state:
 	// - NodeSuspicionStateKey:          "st/ns/" + supernode_account
@@ -453,6 +455,32 @@ func StorageTruthPostponementPrefix() []byte {
 	return storageTruthPostponementPrefix
 }
 
+// StorageTruthPostponementStrongKey marks a postponement record as strong-band
+// (F121-F12). Presence of this key indicates the supernode was postponed under
+// the strong-postpone band; recovery requires StorageTruthStrongRecoveryCleanPassCount
+// rather than StorageTruthRecoveryCleanPassCount.
+func StorageTruthPostponementStrongKey(supernodeAccount string) []byte {
+	key := make([]byte, 0, len(storageTruthPostponementStrongPrefix)+len(supernodeAccount))
+	key = append(key, storageTruthPostponementStrongPrefix...)
+	key = append(key, supernodeAccount...)
+	return key
+}
+
+// RecheckEvidencePrefix returns the root prefix for all recheck-evidence dedup keys.
+func RecheckEvidencePrefix() []byte {
+	return recheckEvidencePrefix
+}
+
+// NodeStorageTruthFailureRootPrefix returns the root prefix for all node-failure facts.
+func NodeStorageTruthFailureRootPrefix() []byte {
+	return nodeStorageTruthFailurePrefix
+}
+
+// StorageTruthFailedHealRootPrefix returns the root prefix for all failed-heal markers.
+func StorageTruthFailedHealRootPrefix() []byte {
+	return storageTruthFailedHealPrefix
+}
+
 // RecheckEvidenceKey returns the dedup key for a recheck evidence submission.
 // Format: "st/rce/" + u64be(epoch_id) + "/" + ticket_id + 0x00 + creator_account
 func RecheckEvidenceKey(epochID uint64, ticketID string, creatorAccount string) []byte {
@@ -521,6 +549,59 @@ func ReporterStorageTruthResultPrefix(reporterAccount string) []byte {
 
 func ReporterStorageTruthResultRootPrefix() []byte {
 	return reporterStorageTruthResultPrefix
+}
+
+// NodeStorageTruthFailureEpochScanRange returns [start, end) iterator bounds
+// for scanning a supernode's failure facts within the inclusive epoch range
+// [startEpoch, endEpoch]. Key shape unchanged — start/end built from the
+// canonical prefix + u64be(epoch). Per CP-NEW-A-11 residue (bounded scan).
+func NodeStorageTruthFailureEpochScanRange(supernodeAccount string, startEpoch, endEpoch uint64) ([]byte, []byte) {
+	base := NodeStorageTruthFailurePrefix(supernodeAccount)
+	start := make([]byte, 0, len(base)+8)
+	start = append(start, base...)
+	start = binary.BigEndian.AppendUint64(start, startEpoch)
+	end := make([]byte, 0, len(base)+8)
+	end = append(end, base...)
+	// end is exclusive: u64be(endEpoch+1). Wrap-safe: if endEpoch is MaxUint64,
+	// fall back to the unbounded prefix end.
+	if endEpoch == ^uint64(0) {
+		// No upper bound — emit the prefix-end sentinel.
+		return start, prefixEnd(base)
+	}
+	end = binary.BigEndian.AppendUint64(end, endEpoch+1)
+	return start, end
+}
+
+// ReporterStorageTruthResultEpochScanRange returns [start, end) iterator
+// bounds for scanning a reporter's result facts within the inclusive epoch
+// range [startEpoch, endEpoch]. Per CP-NEW-A-11 residue.
+func ReporterStorageTruthResultEpochScanRange(reporterAccount string, startEpoch, endEpoch uint64) ([]byte, []byte) {
+	base := ReporterStorageTruthResultPrefix(reporterAccount)
+	start := make([]byte, 0, len(base)+8)
+	start = append(start, base...)
+	start = binary.BigEndian.AppendUint64(start, startEpoch)
+	end := make([]byte, 0, len(base)+8)
+	end = append(end, base...)
+	if endEpoch == ^uint64(0) {
+		return start, prefixEnd(base)
+	}
+	end = binary.BigEndian.AppendUint64(end, endEpoch+1)
+	return start, end
+}
+
+// prefixEnd computes the exclusive end key of a prefix range — i.e. the
+// smallest byte string that is strictly greater than every key beginning
+// with prefix. Returns nil when prefix is all 0xFF.
+func prefixEnd(prefix []byte) []byte {
+	end := make([]byte, len(prefix))
+	copy(end, prefix)
+	for i := len(end) - 1; i >= 0; i-- {
+		end[i]++
+		if end[i] != 0 {
+			return end[:i+1]
+		}
+	}
+	return nil
 }
 
 func StorageTruthFailedHealKey(supernodeAccount string, epochID uint64, ticketID string) []byte {

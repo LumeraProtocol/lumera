@@ -13,13 +13,13 @@ import (
 )
 
 func (k Keeper) ProcessStorageTruthHealOpsAtEpochEnd(ctx sdk.Context, epochID uint64, params types.Params) error {
-	if err := k.expireStorageTruthHealOpsAtEpochEnd(ctx, epochID); err != nil {
+	if err := k.expireStorageTruthHealOpsAtEpochEnd(ctx, epochID, params); err != nil {
 		return err
 	}
 	return k.scheduleStorageTruthHealOpsAtEpochEnd(ctx, epochID, params)
 }
 
-func (k Keeper) expireStorageTruthHealOpsAtEpochEnd(ctx sdk.Context, epochID uint64) error {
+func (k Keeper) expireStorageTruthHealOpsAtEpochEnd(ctx sdk.Context, epochID uint64, params types.Params) error {
 	healOps, err := k.GetAllHealOps(ctx)
 	if err != nil {
 		return err
@@ -40,11 +40,20 @@ func (k Keeper) expireStorageTruthHealOpsAtEpochEnd(ctx sdk.Context, epochID uin
 		}
 
 		ticketState, found := k.GetTicketDeteriorationState(ctx, healOp.TicketId)
-		if found && ticketState.ActiveHealOpId == healOp.HealOpId {
-			ticketState.ActiveHealOpId = 0
+		if found {
+			// NEW-B-1 — apply §20 no-show cooldown to EXPIRED heal-op (mirror FAILED branch).
+			ticketState.DeteriorationScore = addInt64Saturated(ticketState.DeteriorationScore, 15)
+			cooldownUntil := epochID + uint64(params.StorageTruthProbationEpochs)
+			if ticketState.ProbationUntilEpoch < cooldownUntil {
+				ticketState.ProbationUntilEpoch = cooldownUntil
+			}
+			if ticketState.ActiveHealOpId == healOp.HealOpId {
+				ticketState.ActiveHealOpId = 0
+			}
 			if err := k.SetTicketDeteriorationState(ctx, ticketState); err != nil {
 				return err
 			}
+			k.setStorageTruthFailedHeal(ctx, healOp.HealerSupernodeAccount, epochID, healOp.TicketId)
 		}
 
 		ctx.EventManager().EmitEvent(
@@ -106,7 +115,11 @@ func (k Keeper) scheduleStorageTruthHealOpsAtEpochEnd(ctx sdk.Context, epochID u
 	if probationThreshold > 0 {
 		if suspicionStates, err := k.GetAllNodeSuspicionStates(ctx); err == nil {
 			for _, ss := range suspicionStates {
-				if ss.SuspicionScore >= probationThreshold {
+				// Per NEW-B-2 — sibling-symmetry with enforcement.go decay-adjusted read.
+				score := decayTowardZero(ss.SuspicionScore,
+					params.StorageTruthNodeSuspicionDecayPerEpoch,
+					epochDelta(epochID, ss.LastUpdatedEpoch))
+				if score >= probationThreshold {
 					ineligibleHealers[ss.SupernodeAccount] = struct{}{}
 				}
 			}
@@ -216,8 +229,17 @@ func (k Keeper) scheduleStorageTruthHealOpsAtEpochEnd(ctx sdk.Context, epochID u
 			continue
 		}
 
-		healer, verifiers := assignStorageTruthHealParticipants(eligibleHealers, cand.ticketID, epochID)
+		healer, verifiers := assignStorageTruthHealParticipants(eligibleHealers, cand.ticketID, epochID, params)
 		if len(verifiers) == 0 {
+			// Per NEW-B-4 — sibling-symmetry with InsufficientHealers: emit
+			// observability event when verifier pool is empty so operators can
+			// see why a heal op was not scheduled.
+			ctx.EventManager().EmitEvent(sdk.NewEvent(
+				types.EventTypeHealOpInsufficientVerifiers,
+				sdk.NewAttribute(sdk.AttributeKeyModule, types.ModuleName),
+				sdk.NewAttribute(types.AttributeKeyTicketID, cand.ticketID),
+				sdk.NewAttribute(types.AttributeKeyEpochID, strconv.FormatUint(epochID, 10)),
+			))
 			continue
 		}
 		healOpID := k.GetNextHealOpID(ctx)
@@ -285,7 +307,7 @@ func (k Keeper) storageTruthSchedulerAccounts(ctx sdk.Context, epochID uint64) (
 	return accounts, nil
 }
 
-func assignStorageTruthHealParticipants(activeAccounts []string, ticketID string, epochID uint64) (string, []string) {
+func assignStorageTruthHealParticipants(activeAccounts []string, ticketID string, epochID uint64, params types.Params) (string, []string) {
 	if len(activeAccounts) == 0 {
 		return "", nil
 	}
@@ -297,7 +319,11 @@ func assignStorageTruthHealParticipants(activeAccounts []string, ticketID string
 		return healer, nil
 	}
 
-	verifierCount := 2
+	// Per NEW-B-3 — verifier count is governance-tunable (default 2).
+	verifierCount := int(params.StorageTruthHealVerifierCount)
+	if verifierCount <= 0 {
+		verifierCount = int(types.DefaultStorageTruthHealVerifierCount)
+	}
 	if verifierCount > len(activeAccounts)-1 {
 		verifierCount = len(activeAccounts) - 1
 	}

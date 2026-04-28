@@ -149,4 +149,12 @@ message Params {
 
   // Reporter challenger ineligibility duration in epochs (default 7).
   uint32 storage_truth_reporter_ineligible_duration_epochs = 49;
+
+  // Strong-band recovery clean-pass requirement (F121-F12, default 5).
+  uint32 storage_truth_strong_recovery_clean_pass_count = 50;
+
+  // Number of verifier supernodes assigned per heal-op (NEW-B-3, default 2).
+  // Verifiers cross-check the healer's recovery; making this a Param allows
+  // governance to tune redundancy if heal volume / failure rate shifts.
+  uint32 storage_truth_heal_verifier_count = 51;
 }

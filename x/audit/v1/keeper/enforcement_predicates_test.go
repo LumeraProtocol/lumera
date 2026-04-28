@@ -120,7 +120,7 @@ func TestApplyStorageTruthBandAtEpochEnd_StrongPostponeOnIndexFail(t *testing.T)
 		GetAllSuperNodes(gomock.AssignableToTypeOf(f.ctx), sntypes.SuperNodeStatePostponed).
 		Return([]sntypes.SuperNode{}, nil)
 	f.supernodeKeeper.EXPECT().
-		SetSuperNodePostponed(gomock.AssignableToTypeOf(f.ctx), sdk.ValAddress(valAddr), "audit_storage_truth_suspicion").
+		SetSuperNodePostponed(gomock.AssignableToTypeOf(f.ctx), sdk.ValAddress(valAddr), "audit_storage_truth_strong_suspicion").
 		Return(nil).Times(1)
 
 	require.NoError(t, f.keeper.EnforceEpochEnd(f.ctx, 0, params))
@@ -160,7 +160,9 @@ func TestRecoveryRequiresCleanPasses(t *testing.T) {
 		GetAllSuperNodes(gomock.AssignableToTypeOf(f.ctx), sntypes.SuperNodeStatePostponed).
 		Return([]sntypes.SuperNode{}, nil)
 	f.supernodeKeeper.EXPECT().
-		SetSuperNodePostponed(gomock.AssignableToTypeOf(f.ctx), sdk.ValAddress(valAddr), "audit_storage_truth_suspicion").
+		// Per F121-F12 — strong-suspicion band uses distinct reason
+		// (score=200 == StrongPostpone threshold).
+		SetSuperNodePostponed(gomock.AssignableToTypeOf(f.ctx), sdk.ValAddress(valAddr), "audit_storage_truth_strong_suspicion").
 		Return(nil).Times(1)
 
 	require.NoError(t, f.keeper.EnforceEpochEnd(f.ctx, 0, params))

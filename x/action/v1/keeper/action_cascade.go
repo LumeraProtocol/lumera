@@ -145,13 +145,10 @@ func (h CascadeActionHandler) Process(metadataBytes []byte, msgType common.Messa
 			return nil, fmt.Errorf("rq_ids_ids field is required for cascade metadata")
 		}
 		// Backward-compatible fallback for finalize payloads that do not yet
-		// provide explicit LEP-6 artifact counts.
-		if metadata.IndexArtifactCount == 0 {
-			metadata.IndexArtifactCount = uint32(len(metadata.RqIdsIds))
-		}
-		if metadata.SymbolArtifactCount == 0 {
-			metadata.SymbolArtifactCount = uint32(len(metadata.RqIdsIds))
-		}
+		// provide explicit LEP-6 artifact counts (single-source-of-truth via
+		// CascadeArtifactCountsWithFallback per CP-NEW-C-2 / 122-F2).
+		metadata.IndexArtifactCount, metadata.SymbolArtifactCount =
+			actiontypes.CascadeArtifactCountsWithFallback(&metadata)
 	default:
 		return nil, fmt.Errorf("unsupported message type: %s", msgType)
 	}
@@ -326,12 +323,8 @@ func (h CascadeActionHandler) GetUpdatedMetadata(ctx sdk.Context, existingMetada
 		IndexArtifactCount:     newMetadata.GetIndexArtifactCount(),
 		SymbolArtifactCount:    newMetadata.GetSymbolArtifactCount(),
 	}
-	if updatedMetadata.IndexArtifactCount == 0 {
-		updatedMetadata.IndexArtifactCount = uint32(len(updatedMetadata.RqIdsIds))
-	}
-	if updatedMetadata.SymbolArtifactCount == 0 {
-		updatedMetadata.SymbolArtifactCount = uint32(len(updatedMetadata.RqIdsIds))
-	}
+	updatedMetadata.IndexArtifactCount, updatedMetadata.SymbolArtifactCount =
+		actiontypes.CascadeArtifactCountsWithFallback(updatedMetadata)
 
 	return gogoproto.Marshal(updatedMetadata)
 }

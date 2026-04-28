@@ -3,8 +3,10 @@ package keeper
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/LumeraProtocol/lumera/x/audit/v1/types"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
@@ -94,8 +96,55 @@ func (k Keeper) InitGenesis(ctx context.Context, genState types.GenesisState) er
 	k.SetNextHealOpID(sdkCtx, nextHealOpID)
 
 	// Per 121-F7 — restore storage-truth postponement markers on chain restart.
+	// Per NEW-B-6 / NEW-B-9 — cross-validate against supernode state so genesis
+	// cannot encode a phantom postponement (audit marker but supernode not in
+	// SuperNodeStatePostponed). Supernode genesis runs before audit
+	// (app/app_config.go) so the supernode state is loaded by this point.
 	for _, p := range genState.StorageTruthPostponements {
+		sn, found, err := k.supernodeKeeper.GetSuperNodeByAccount(sdkCtx, p.SupernodeAccount)
+		if err != nil {
+			return fmt.Errorf("audit genesis: failed to look up supernode %q for storage-truth postponement: %w", p.SupernodeAccount, err)
+		}
+		if !found {
+			return fmt.Errorf("audit genesis: storage-truth postponement %q references unknown supernode", p.SupernodeAccount)
+		}
+		if len(sn.States) == 0 || sn.States[len(sn.States)-1].State != sntypes.SuperNodeStatePostponed {
+			return fmt.Errorf("audit genesis: storage-truth postponement %q lacks corresponding supernode-postponed state", p.SupernodeAccount)
+		}
 		k.setStorageTruthPostponedAtEpochID(sdkCtx, p.SupernodeAccount, p.PostponedAtEpochId)
+	}
+
+	// Per NEW-C-1 — restore epoch-scoped audit prefix families.
+	for _, e := range genState.RecheckEvidence {
+		k.SetRecheckEvidence(sdkCtx, e.EpochId, e.TicketId, e.CreatorAccount)
+	}
+	for _, t := range genState.StorageProofTranscripts {
+		if err := k.importStorageProofTranscriptForGenesis(sdkCtx, t.TranscriptHash, t.RecordJson); err != nil {
+			return err
+		}
+	}
+	for _, f := range genState.NodeFailureFacts {
+		k.importNodeFailureFactForGenesis(sdkCtx, f)
+	}
+	for _, f := range genState.ReporterResultFacts {
+		k.importReporterResultFactForGenesis(sdkCtx, f)
+	}
+	for _, m := range genState.FailedHealMarkers {
+		k.setStorageTruthFailedHeal(sdkCtx, m.SupernodeAccount, m.EpochId, m.TicketId)
+	}
+	for _, r := range genState.EpochReports {
+		if err := k.SetReportRaw(sdkCtx, r); err != nil {
+			return err
+		}
+	}
+	for _, idx := range genState.ReportIndices {
+		k.SetReportIndex(sdkCtx, idx.EpochId, idx.ReporterSupernodeAccount)
+	}
+	for _, idx := range genState.HostReportIndices {
+		k.SetHostReportIndex(sdkCtx, idx.EpochId, idx.ReporterSupernodeAccount)
+	}
+	for _, idx := range genState.StorageChallengeIndices {
+		k.SetStorageChallengeReportIndex(sdkCtx, idx.SupernodeAccount, idx.EpochId, idx.ReporterSupernodeAccount)
 	}
 
 	return nil
@@ -158,6 +207,21 @@ func (k Keeper) ExportGenesis(ctx context.Context) (*types.GenesisState, error) 
 
 	// Per 121-F7 — export storage-truth postponement markers.
 	genesis.StorageTruthPostponements = k.GetAllStorageTruthPostponements(sdkCtx)
+
+	// Per NEW-C-1 — export every epoch-scoped audit prefix family.
+	genesis.RecheckEvidence = k.GetAllRecheckEvidenceForGenesis(sdkCtx)
+	genesis.StorageProofTranscripts = k.GetAllStorageProofTranscriptsForGenesis(sdkCtx)
+	genesis.NodeFailureFacts = k.GetAllNodeFailureFactsForGenesis(sdkCtx)
+	genesis.ReporterResultFacts = k.GetAllReporterResultFactsForGenesis(sdkCtx)
+	genesis.FailedHealMarkers = k.GetAllFailedHealMarkersForGenesis(sdkCtx)
+	reports, err := k.GetAllReportsForGenesis(sdkCtx)
+	if err != nil {
+		return nil, err
+	}
+	genesis.EpochReports = reports
+	genesis.ReportIndices = k.GetAllReportIndicesForGenesis(sdkCtx)
+	genesis.HostReportIndices = k.GetAllHostReportIndicesForGenesis(sdkCtx)
+	genesis.StorageChallengeIndices = k.GetAllStorageChallengeIndicesForGenesis(sdkCtx)
 
 	return genesis, nil
 }

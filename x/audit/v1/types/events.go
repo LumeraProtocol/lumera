@@ -18,7 +18,8 @@ const (
 	// Per 122-F2 — legacy 0-count tickets fall back to cascadeMeta length to avoid finalization brick.
 	EventTypeArtifactCountUnanchored = "storage_truth_artifact_count_unanchored"
 	// Per 121-F11 — heal scheduler cannot find sufficient eligible healers.
-	EventTypeHealOpInsufficientHealers = "storage_truth_heal_op_insufficient_healers"
+	EventTypeHealOpInsufficientHealers    = "storage_truth_heal_op_insufficient_healers"
+	EventTypeHealOpInsufficientVerifiers  = "storage_truth_heal_op_insufficient_verifiers"
 
 	AttributeKeyEpochID                  = "epoch_id"
 	AttributeKeyReporterSupernodeAccount = "reporter_supernode_account"

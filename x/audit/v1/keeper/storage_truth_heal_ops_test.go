@@ -118,3 +118,51 @@ func TestProcessStorageTruthHealOpsAtEpochEnd_ExpiresPastDeadline(t *testing.T) 
 	require.True(t, found)
 	require.Equal(t, uint64(0), ticketState.ActiveHealOpId)
 }
+
+// NEW-B-1 — verify expireStorageTruthHealOpsAtEpochEnd applies the §20 no-show
+// cooldown to EXPIRED heal-ops (mirror of FAILED branch): score +=15,
+// probation advanced, st/fh/ marker written.
+func TestExpireStorageTruthHealOps_AdvancesProbationAndCooldown(t *testing.T) {
+	f := initFixture(t)
+	f.ctx = f.ctx.WithBlockHeight(1600).WithEventManager(sdk.NewEventManager())
+
+	params := f.keeper.GetParams(f.ctx).WithDefaults()
+	params.StorageTruthMaxSelfHealOpsPerEpoch = 0 // expire-only
+	params.StorageTruthProbationEpochs = 4
+	require.NoError(t, f.keeper.SetParams(f.ctx, params))
+
+	const (
+		ticketID = "ticket-cooldown"
+		healer   = "lumera1cccccccccccccccccccccccccccccccccc7gqs5y"
+		healOpID = uint64(800)
+		epochID  = uint64(3)
+	)
+
+	require.NoError(t, f.keeper.SetHealOp(f.ctx, types.HealOp{
+		HealOpId:                  healOpID,
+		TicketId:                  ticketID,
+		ScheduledEpochId:          1,
+		HealerSupernodeAccount:    healer,
+		VerifierSupernodeAccounts: []string{"lumera1eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeennf6kk"},
+		Status:                    types.HealOpStatus_HEAL_OP_STATUS_HEALER_REPORTED,
+		DeadlineEpochId:           epochID, // due at this epoch
+	}))
+	require.NoError(t, f.keeper.SetTicketDeteriorationState(f.ctx, types.TicketDeteriorationState{
+		TicketId:           ticketID,
+		DeteriorationScore: 50,
+		ActiveHealOpId:     healOpID,
+	}))
+
+	require.NoError(t, f.keeper.ProcessStorageTruthHealOpsAtEpochEnd(f.ctx, epochID, params))
+
+	expired, found := f.keeper.GetHealOp(f.ctx, healOpID)
+	require.True(t, found)
+	require.Equal(t, types.HealOpStatus_HEAL_OP_STATUS_EXPIRED, expired.Status)
+
+	state, found := f.keeper.GetTicketDeteriorationState(f.ctx, ticketID)
+	require.True(t, found)
+	require.Equal(t, int64(65), state.DeteriorationScore, "deterioration score must bump by 15")
+	require.GreaterOrEqual(t, state.ProbationUntilEpoch, epochID+uint64(params.StorageTruthProbationEpochs),
+		"probation must be advanced by ProbationEpochs")
+	require.Equal(t, uint64(0), state.ActiveHealOpId)
+}

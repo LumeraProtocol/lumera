@@ -54,12 +54,14 @@ func TestSubmitEpochReport_StorageTruthScoresByResultClass(t *testing.T) {
 		expectedTicketID    string
 	}{
 		{
-			// PASS + RECENT: node=-3, reporter=-4 (clamped to 0 from 0), ticket=-2 (clamped to 0)
+			// PASS + RECENT: node=-3, ticket=-2 (clamped to 0).
+			// Per NEW-A-18 — reporter delta moved to end-of-epoch; no per-result
+			// reporter state is created (expectedReporter=nil).
 			name:                "pass recent",
 			class:               types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS,
 			bucket:              types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT,
 			expectedNodeScore:   int64Ptr(0), // clamped at 0
-			expectedReporter:    int64Ptr(0), // clamped at 0 (positive-penalty model)
+			expectedReporter:    nil,         // Per NEW-A-18 — emission moved to end-of-epoch
 			expectedTicketScore: int64Ptr(0), // clamped at 0
 			expectedTicketID:    "ticket-1",
 		},
@@ -74,12 +76,13 @@ func TestSubmitEpochReport_StorageTruthScoresByResultClass(t *testing.T) {
 			expectedTicketID:    "ticket-1",
 		},
 		{
-			// TIMEOUT: node=+7, reporter=-1 clamped to 0, ticket=+3
+			// TIMEOUT: node=+7, ticket=+3.
+			// Per NEW-A-18 — reporter PASS/TIMEOUT delta is 0; no reporter state created.
 			name:                "timeout",
 			class:               types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_TIMEOUT_OR_NO_RESPONSE,
 			bucket:              types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT,
 			expectedNodeScore:   int64Ptr(7),
-			expectedReporter:    int64Ptr(0), // clamped at 0 (was -1 before penalty model flip)
+			expectedReporter:    nil, // Per NEW-A-18 — emission moved to end-of-epoch
 			expectedTicketScore: int64Ptr(3),
 			expectedTicketID:    "ticket-1",
 		},
@@ -340,12 +343,16 @@ func TestSubmitEpochReport_StorageTruthScoreEventsAreEmitted(t *testing.T) {
 		require.Equal(t, target, attrs[types.AttributeKeyTargetSupernodeAccount])
 		require.Equal(t, "ticket-1", attrs[types.AttributeKeyTicketID])
 		require.Equal(t, types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS.String(), attrs[types.AttributeKeyResultClass])
-		require.Equal(t, types.ReporterTrustBand_REPORTER_TRUST_BAND_NORMAL.String(), attrs[types.AttributeKeyReporterTrustBand])
+		// Per NEW-A-18 — PASS no longer creates per-result reporter state, so the
+		// reporter trust band attribute reflects the zero-value (UNSPECIFIED) and
+		// no reporter_reliability_score attribute is emitted.
+		require.Equal(t, types.ReporterTrustBand_REPORTER_TRUST_BAND_UNSPECIFIED.String(), attrs[types.AttributeKeyReporterTrustBand])
 		require.Equal(t, "0", attrs[types.AttributeKeyRepeatedFailureCount])
 		require.Equal(t, "false", attrs[types.AttributeKeyContradictionDetected])
-		// PASS RECENT: node=-3 clamped to 0, reporter=-4 clamped to 0, ticket=-2 clamped to 0
+		// PASS RECENT: node=-3 clamped to 0, ticket=-2 clamped to 0.
 		require.Equal(t, "0", attrs[types.AttributeKeyNodeSuspicionScore])
-		require.Equal(t, "0", attrs[types.AttributeKeyReporterReliabilityScore])
+		_, hasReporter := attrs[types.AttributeKeyReporterReliabilityScore]
+		require.False(t, hasReporter, "Per NEW-A-18 — reporter delta is 0 per-result, no reporter_score attr")
 		require.Equal(t, "0", attrs[types.AttributeKeyTicketDeteriorationScore])
 	}
 	require.True(t, found, "expected storage truth score update event")

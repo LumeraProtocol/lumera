@@ -229,6 +229,9 @@ func TestStorageTruth_RecoveryWhenScoreDecaysBelowWatchThreshold(t *testing.T) {
 	// After ~24 epochs: below 20. Let's use 30 epochs to be safe.
 	params.StorageTruthNodeSuspicionDecayPerEpoch = 920
 	params.StorageTruthRecoveryCleanPassCount = 3
+	// Per F121-F12 — strong-postpone recovery uses StrongRecoveryCleanPassCount.
+	// Score=200 hits the strong band, so the strong-recovery threshold applies.
+	params.StorageTruthStrongRecoveryCleanPassCount = 3
 	params.ConsecutiveEpochsToPostpone = 99
 
 	// Epoch 0: suspicion=200 hits StrongPostpone band (threshold=140).
@@ -252,7 +255,8 @@ func TestStorageTruth_RecoveryWhenScoreDecaysBelowWatchThreshold(t *testing.T) {
 		GetAllSuperNodes(gomock.AssignableToTypeOf(f.ctx), sntypes.SuperNodeStatePostponed).
 		Return([]sntypes.SuperNode{}, nil)
 	f.supernodeKeeper.EXPECT().
-		SetSuperNodePostponed(gomock.AssignableToTypeOf(f.ctx), sdk.ValAddress(valAddr), "audit_storage_truth_suspicion").
+		// Per F121-F12 — score=200 → STRONG (default strongThr=140).
+		SetSuperNodePostponed(gomock.AssignableToTypeOf(f.ctx), sdk.ValAddress(valAddr), "audit_storage_truth_strong_suspicion").
 		Return(nil).Times(1)
 
 	require.NoError(t, f.keeper.EnforceEpochEnd(f.ctx, 0, params))

@@ -15,6 +15,7 @@ import (
 	storetypes "cosmossdk.io/store/types"
 
 	dbm "github.com/cosmos/cosmos-db"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -125,7 +126,7 @@ func TestPruneStorageProofTranscripts(t *testing.T) {
 	// Malformed record — must be preserved (no data loss on parse error).
 	kv.Set(append([]byte{}, append(prefix, "hbad"...)...), []byte("not-json"))
 
-	pruneStorageProofTranscripts(kv, prefix, 5)
+	pruneStorageProofTranscripts(sdk.Context{}, Keeper{logger: log.NewNopLogger()}, kv, prefix, 5)
 
 	it := kv.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
 	defer it.Close()

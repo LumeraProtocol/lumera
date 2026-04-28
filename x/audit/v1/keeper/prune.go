@@ -75,7 +75,7 @@ func (k Keeper) PruneOldEpochs(ctx sdk.Context, currentEpochID uint64, params ty
 	pruneTargetBucketEpoch(store, []byte("st/spt-tbe/"), minKeepEpochID)
 	// Primary transcript store: st/spt/<transcript_hash> -> JSON{epoch_id, ...}.
 	// Records are not epoch-keyed, so decode value to filter.
-	pruneStorageProofTranscripts(store, []byte("st/spt/"), minKeepEpochID)
+	pruneStorageProofTranscripts(ctx, k, store, []byte("st/spt/"), minKeepEpochID)
 
 	// Per 120-F3 — terminal heal-ops pruned to bound chain state growth.
 	if err := k.pruneTerminalHealOps(ctx, currentEpochID, keepLastEpochEntries); err != nil {
@@ -233,7 +233,12 @@ func pruneTargetBucketEpoch(store storetypes.KVStore, prefix []byte, minKeepWind
 // pruneStorageProofTranscripts prunes the primary transcript store st/spt/<hash> -> JSON
 // by decoding the embedded epoch_id field. Records older than minKeepWindowID are deleted.
 // Per roomote 122 review — bounds long-term state growth.
-func pruneStorageProofTranscripts(store storetypes.KVStore, prefix []byte, minKeepWindowID uint64) {
+//
+// Per NEW-C-4 / NEW-A-19 — malformed records that fail to decode are logged at
+// the keeper logger so silent state corruption is observable. Records remain in
+// place (pruning must not lose data on parse error) but the operator gets a
+// signal to investigate.
+func pruneStorageProofTranscripts(ctx sdk.Context, k Keeper, store storetypes.KVStore, prefix []byte, minKeepWindowID uint64) {
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
 	defer it.Close()
 
@@ -247,6 +252,13 @@ func pruneStorageProofTranscripts(store storetypes.KVStore, prefix []byte, minKe
 		var rec epochProbe
 		if err := json.Unmarshal(it.Value(), &rec); err != nil {
 			// Malformed record — leave in place; pruning must not lose data on parse error.
+			// Per NEW-C-4/NEW-A-19 — surface as warning so silent corruption is observable.
+			k.Logger().Error(
+				"audit: pruneStorageProofTranscripts skipped malformed record",
+				"prefix", string(prefix),
+				"key", it.Key(),
+				"err", err,
+			)
 			continue
 		}
 		if rec.EpochID >= minKeepWindowID {

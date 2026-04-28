@@ -28,6 +28,22 @@ func (k Keeper) setStorageTruthPostponedAtEpochID(ctx sdk.Context, supernodeAcco
 func (k Keeper) clearStorageTruthPostponedAtEpochID(ctx sdk.Context, supernodeAccount string) {
 	store := k.kvStore(ctx)
 	store.Delete(types.StorageTruthPostponementKey(supernodeAccount))
+	store.Delete(types.StorageTruthPostponementStrongKey(supernodeAccount))
+}
+
+// hasStorageTruthStrongPostponeMarker reports whether the postponement record
+// at supernodeAccount was created from the strong-suspicion band.
+// Per F121-F12 — distinguishes recovery requirements between bands.
+func (k Keeper) hasStorageTruthStrongPostponeMarker(ctx sdk.Context, supernodeAccount string) bool {
+	store := k.kvStore(ctx)
+	return store.Has(types.StorageTruthPostponementStrongKey(supernodeAccount))
+}
+
+// setStorageTruthStrongPostponeMarker records that the postponement was triggered
+// by the strong-suspicion band. Recovery uses StrongRecoveryCleanPassCount param.
+func (k Keeper) setStorageTruthStrongPostponeMarker(ctx sdk.Context, supernodeAccount string) {
+	store := k.kvStore(ctx)
+	store.Set(types.StorageTruthPostponementStrongKey(supernodeAccount), []byte{1})
 }
 
 // GetAllStorageTruthPostponements returns all active postponement markers.

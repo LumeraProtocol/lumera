@@ -68,9 +68,10 @@ func (k Keeper) applyStorageTruthScores(
 		}
 
 		deltas.reporterReliability = addInt64Saturated(deltas.reporterReliability, bookkeeping.currentReporterPenalty)
-		deltas.nodeSuspicion = addInt64Saturated(deltas.nodeSuspicion, bookkeeping.nodeBonus)
-		deltas.ticketDeterioration = addInt64Saturated(deltas.ticketDeterioration, bookkeeping.ticketBonus)
-		// Trust scaling applies to provisional failure impact only.
+		// Per CP-NEW-A-14/A-15 — trust multiplier scales ONLY the base
+		// Class-A failure delta. Pattern-escalation bonuses (nodeBonus,
+		// ticketBonus) are spec-§14/§16 deterrents added unscaled, so a
+		// degraded reporter cannot under-attribute them.
 		if bookkeeping.applyTrustScaling {
 			if deltas.nodeSuspicion > 0 {
 				deltas.nodeSuspicion = scaleInt64TowardZero(deltas.nodeSuspicion, bookkeeping.reporterTrustMultiplier, 100)
@@ -79,6 +80,8 @@ func (k Keeper) applyStorageTruthScores(
 				deltas.ticketDeterioration = scaleInt64TowardZero(deltas.ticketDeterioration, bookkeeping.reporterTrustMultiplier, 100)
 			}
 		}
+		deltas.nodeSuspicion = addInt64Saturated(deltas.nodeSuspicion, bookkeeping.nodeBonus)
+		deltas.ticketDeterioration = addInt64Saturated(deltas.ticketDeterioration, bookkeeping.ticketBonus)
 
 		// Clamp positive (failure) node and ticket deltas to >= 0 after scaling.
 		if deltas.nodeSuspicion < 0 {
@@ -141,6 +144,7 @@ func (k Keeper) applyStorageTruthScores(
 			result.TicketId,
 			deltas.ticketDeterioration,
 			params.StorageTruthTicketDeteriorationDecayPerEpoch,
+			bookkeeping.contradictionDetected,
 		)
 		if err != nil {
 			return err
@@ -252,8 +256,10 @@ func (k Keeper) updateNodeSuspicionHistoryFields(state *types.NodeSuspicionState
 			state.LastIndexFailEpoch = epochID
 		}
 
-		// Reset window if stale.
-		if epochID-state.WindowStartEpoch >= window {
+		// Reset window if stale. Use epochDelta to avoid uint64 underflow when
+		// WindowStartEpoch > epochID (e.g. genesis-imported future-pointing field).
+		// Per NEW-A-12 / NEW-A-17.
+		if epochDelta(epochID, state.WindowStartEpoch) >= window {
 			state.WindowStartEpoch = epochID
 			state.DistinctTicketFailWindow = 0
 			state.ClassACountWindow = 0
@@ -329,7 +335,7 @@ func (k Keeper) applyReporterReliabilityDelta(
 	if divergenceWindow == 0 {
 		divergenceWindow = 14
 	}
-	if epochID-state.WindowStartEpoch >= divergenceWindow {
+	if epochDelta(epochID, state.WindowStartEpoch) >= divergenceWindow {
 		nextState.WindowStartEpoch = epochID
 		nextState.WindowPositiveCount = 0
 		nextState.WindowNegativeCount = 0
@@ -358,6 +364,7 @@ func (k Keeper) applyTicketDeteriorationDelta(
 	ticketID string,
 	delta int64,
 	decayPerEpoch int64,
+	contradictionConfirmed bool,
 ) (types.TicketDeteriorationState, bool, error) {
 	if ticketID == "" {
 		return types.TicketDeteriorationState{}, false, nil
@@ -372,6 +379,19 @@ func (k Keeper) applyTicketDeteriorationDelta(
 		current = decayTowardZero(state.DeteriorationScore, decayPerEpoch, epochDelta(epochID, state.LastUpdatedEpoch))
 	}
 	next := addInt64Saturated(current, delta)
+	// Per F119-F3 residue — clean-pass-by-different-holder bonus (spec §15.4).
+	// When PASS lands on a ticket whose prior failure was from a DIFFERENT
+	// holder, apply an additional -3 ticket-deterioration delta on top of the
+	// base bucket reduction. This rewards a successful recovery on a fresh
+	// holder distinctly from a clean-pass on the same holder.
+	if result != nil &&
+		result.ResultClass == types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS &&
+		found &&
+		state.LastTargetSupernodeAccount != "" &&
+		state.LastTargetSupernodeAccount != result.TargetSupernodeAccount &&
+		isStorageTruthFailureClass(state.LastResultClass) {
+		next = addInt64Saturated(next, -3)
+	}
 	// Clamp ticket deterioration at >= 0.
 	if next < 0 {
 		next = 0
@@ -415,7 +435,11 @@ func (k Keeper) applyTicketDeteriorationDelta(
 			nextState.LastResultClass = result.ResultClass
 			nextState.LastResultEpoch = epochID
 			// Per Zee 119-F7 — same-epoch contradictions must be counted; <= not <.
-			if state.LastResultEpoch <= epochID &&
+			// Per F121-F10 / F119-F3 — only count ticket-side contradictions when the
+			// reporter-side confirmation predicate held (PASS-after-fail with no
+			// independent reporter PASS in window AND no clean recheck transcript).
+			if contradictionConfirmed &&
+				state.LastResultEpoch <= epochID &&
 				state.LastTargetSupernodeAccount == result.TargetSupernodeAccount &&
 				storageTruthResultsContradict(state.LastResultClass, result.ResultClass) {
 				nextState.ContradictionCount = state.ContradictionCount + 1
@@ -436,24 +460,29 @@ func storageTruthScoreDeltasForResult(result *types.StorageProofResult) storageT
 	}
 	switch result.ResultClass {
 	case types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS:
-		// PASS deltas are REDUCTIONS (negative). Reporter delta is -4 (recovery in positive-penalty model).
+		// PASS deltas are REDUCTIONS (negative). Per CP-NEW-A-18, reporter
+		// reliability recovery is per-EPOCH not per-result; emission moved to
+		// ApplyReporterCleanEpochRecoveryAtEpochEnd. Per-result reporter delta = 0.
+		// F119-F3 residue: cross-holder PASS bonus is applied in
+		// applyTicketDeteriorationDelta (where the prior-holder state is in
+		// scope), not at this per-result delta level.
 		switch result.BucketType {
 		case types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT:
 			return storageTruthScoreDeltas{
 				nodeSuspicion:       -3,
-				reporterReliability: -4,
+				reporterReliability: 0,
 				ticketDeterioration: -2,
 			}
 		case types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_OLD:
 			return storageTruthScoreDeltas{
 				nodeSuspicion:       -2,
-				reporterReliability: -4,
+				reporterReliability: 0,
 				ticketDeterioration: -3,
 			}
 		default:
 			return storageTruthScoreDeltas{
 				nodeSuspicion:       -2,
-				reporterReliability: -4,
+				reporterReliability: 0,
 				ticketDeterioration: -2,
 			}
 		}
@@ -474,9 +503,10 @@ func storageTruthScoreDeltasForResult(result *types.StorageProofResult) storageT
 			}
 		}
 	case types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_TIMEOUT_OR_NO_RESPONSE:
+		// Per CP-NEW-A-18 — TIMEOUT reporter delta moved off per-result.
 		return storageTruthScoreDeltas{
 			nodeSuspicion:       7,
-			reporterReliability: -1,
+			reporterReliability: 0,
 			ticketDeterioration: 3,
 		}
 	case types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_OBSERVER_QUORUM_FAIL:
@@ -536,7 +566,15 @@ func (k Keeper) storageTruthBookkeepingForResult(
 	}
 	bookkeeping.reporterTrustBand = reporterTrustBandForScore(reliabilityScore, params)
 	bookkeeping.reporterTrustMultiplier = reporterTrustMultiplierNumerator(reliabilityScore)
-	bookkeeping.applyTrustScaling = isStorageTruthFailureClass(result.ResultClass) &&
+	// Per CP-NEW-A-14 / spec §15.4 — trust multiplier applies to Class A
+	// failures only (HASH_MISMATCH or INDEX-class). Class B/C failures
+	// (TIMEOUT, OBSERVER_QUORUM_FAIL, INVALID_TRANSCRIPT, etc.) emit
+	// non-scaled deltas. Re-confirmed (RECHECK_CONFIRMED_FAIL) and
+	// recheck-bucket results bypass scaling regardless of class.
+	isClassA := result.ResultClass == types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH ||
+		result.ArtifactClass == types.StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_INDEX
+	bookkeeping.applyTrustScaling = isClassA &&
+		isStorageTruthFailureClass(result.ResultClass) &&
 		result.ResultClass != types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_RECHECK_CONFIRMED_FAIL &&
 		result.BucketType != types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECHECK
 

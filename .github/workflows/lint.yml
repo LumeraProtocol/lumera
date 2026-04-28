@@ -42,10 +42,12 @@ jobs:
         uses: reviewdog/action-golangci-lint@v2.10.0
         with:
           go_version_file: go.mod
-          # golangci-lint v2.x is required because the chain is on Go 1.25
-          # (v1.x is built with Go 1.24 and refuses Go 1.25 modules).
+          # golangci-lint v2.11.4 is built with Go 1.26.1; required because
+          # the chain repo's go.mod declares `go 1.25.9` and golangci-lint
+          # refuses to load configs whose targeted Go version is higher
+          # than the one it was built with. v2.0.2 was built with Go 1.24.
           # Config in .golangci.yml uses the v2 schema.
-          golangci_lint_version: v2.0.2
+          golangci_lint_version: v2.11.4
           golangci_lint_flags: "--config=.golangci.yml --timeout=5m"
           workdir: .
           # Only annotate lines actually changed by the PR.

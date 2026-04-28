@@ -35,7 +35,11 @@ jobs:
       # diagnostics are not reported, so this never blocks unrelated PRs on
       # legacy noise.
       - name: golangci-lint via reviewdog (PR diff only)
-        uses: reviewdog/action-golangci-lint@v2
+        # Pin to v2.10.0 (>=v2.8.0 required for golangci-lint v2 support;
+        # earlier reviewdog releases on the @v2 major tag still default to
+        # downloading golangci-lint v1.x even when a v2.x version is
+        # requested via the input).
+        uses: reviewdog/action-golangci-lint@v2.10.0
         with:
           go_version_file: go.mod
           # golangci-lint v2.x is required because the chain is on Go 1.25

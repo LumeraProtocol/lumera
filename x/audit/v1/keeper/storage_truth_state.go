@@ -2,7 +2,6 @@ package keeper
 
 import (
 	"encoding/binary"
-	"fmt"
 
 	storetypes "cosmossdk.io/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -174,20 +173,38 @@ func (k Keeper) GetNextHealOpID(ctx sdk.Context) uint64 {
 	store := k.kvStore(ctx)
 	bz := store.Get(types.NextHealOpIDKey())
 	if bz == nil {
-		return 1
+		// Match GetNextEvidenceID: missing counter must not risk ID reuse.
+		return k.deriveNextHealOpID(ctx)
 	}
-	// Per NEW-B-7 — sibling-symmetry with GetNextEvidenceID: panic on malformed
-	// counter rather than silently returning a corrupt value (heal-op IDs gate
-	// SetHealOp/GetHealOp; collisions cause structural confusion downstream).
 	if len(bz) != 8 {
-		panic(fmt.Errorf("audit: malformed next heal-op id (len=%d, want 8)", len(bz)))
+		// Per CP-R3 A-F1 — recover from malformed state the same way evidence IDs do.
+		return k.deriveNextHealOpID(ctx)
 	}
 	id := binary.BigEndian.Uint64(bz)
 	if id == 0 {
-		// Heal-op IDs start at 1; treat 0 as sentinel collision with "not found".
-		panic(fmt.Errorf("audit: invalid next heal-op id (id=0 collides with not-found sentinel)"))
+		// Heal-op IDs start at 1; treat 0 as corrupt and derive a safe next ID.
+		return k.deriveNextHealOpID(ctx)
 	}
 	return id
+}
+
+func (k Keeper) deriveNextHealOpID(ctx sdk.Context) uint64 {
+	prefix := types.HealOpPrefix()
+	it := k.kvStore(ctx).Iterator(prefix, storetypes.PrefixEndBytes(prefix))
+	defer it.Close()
+
+	var maxID uint64
+	for ; it.Valid(); it.Next() {
+		key := it.Key()
+		if len(key) != len(prefix)+8 {
+			continue
+		}
+		id := binary.BigEndian.Uint64(key[len(prefix):])
+		if id > maxID {
+			maxID = id
+		}
+	}
+	return maxID + 1
 }
 
 func (k Keeper) SetNextHealOpID(ctx sdk.Context, id uint64) {

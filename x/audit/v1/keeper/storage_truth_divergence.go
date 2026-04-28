@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 
+	storetypes "cosmossdk.io/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/LumeraProtocol/lumera/x/audit/v1/types"
@@ -153,12 +154,30 @@ func (k Keeper) ApplyReporterCleanEpochRecoveryAtEpochEnd(ctx sdk.Context, epoch
 	if err != nil {
 		return err
 	}
-	if len(states) == 0 {
+	reporterSet := make(map[string]struct{}, len(states))
+	for _, state := range states {
+		if state.ReporterSupernodeAccount != "" {
+			reporterSet[state.ReporterSupernodeAccount] = struct{}{}
+		}
+	}
+	epochReporters, err := k.storageTruthReporterAccountsForEpoch(ctx, epochID)
+	if err != nil {
+		return err
+	}
+	for _, reporter := range epochReporters {
+		reporterSet[reporter] = struct{}{}
+	}
+	if len(reporterSet) == 0 {
 		return nil
 	}
+	reporters := make([]string, 0, len(reporterSet))
+	for reporter := range reporterSet {
+		reporters = append(reporters, reporter)
+	}
+	sort.Strings(reporters)
 
-	for _, state := range states {
-		passes, overturned, err := k.storageTruthReporterEpochPassStats(ctx, state.ReporterSupernodeAccount, epochID)
+	for _, reporterAccount := range reporters {
+		passes, overturned, err := k.storageTruthReporterEpochPassStats(ctx, reporterAccount, epochID)
 		if err != nil {
 			return err
 		}
@@ -169,7 +188,7 @@ func (k Keeper) ApplyReporterCleanEpochRecoveryAtEpochEnd(ctx sdk.Context, epoch
 		if _, _, err := k.applyReporterReliabilityDelta(
 			ctx,
 			epochID,
-			state.ReporterSupernodeAccount,
+			reporterAccount,
 			-4,
 			params.StorageTruthReporterReliabilityDecayPerEpoch,
 			0,
@@ -182,12 +201,38 @@ func (k Keeper) ApplyReporterCleanEpochRecoveryAtEpochEnd(ctx sdk.Context, epoch
 			types.EventTypeStorageTruthScoreUpdated,
 			sdk.NewAttribute(sdk.AttributeKeyModule, types.ModuleName),
 			sdk.NewAttribute(types.AttributeKeyEpochID, strconv.FormatUint(epochID, 10)),
-			sdk.NewAttribute(types.AttributeKeyReporterSupernodeAccount, state.ReporterSupernodeAccount),
+			sdk.NewAttribute(types.AttributeKeyReporterSupernodeAccount, reporterAccount),
 			sdk.NewAttribute("clean_epoch_recovery_delta", "-4"),
 			sdk.NewAttribute("epoch_pass_count", strconv.FormatUint(passes, 10)),
 		))
 	}
 	return nil
+}
+
+// storageTruthReporterAccountsForEpoch returns all reporters that have at
+// least one reporter-result fact in epochID, including fresh reporters that do
+// not yet have a ReporterReliabilityState row.
+func (k Keeper) storageTruthReporterAccountsForEpoch(ctx sdk.Context, epochID uint64) ([]string, error) {
+	prefix := types.ReporterStorageTruthResultRootPrefix()
+	it := k.kvStore(ctx).Iterator(prefix, storetypes.PrefixEndBytes(prefix))
+	defer it.Close()
+
+	reporterSet := make(map[string]struct{})
+	for ; it.Valid(); it.Next() {
+		var record storageTruthReporterResultRecord
+		if err := json.Unmarshal(it.Value(), &record); err != nil {
+			return nil, err
+		}
+		if record.EpochID == epochID && record.Reporter != "" {
+			reporterSet[record.Reporter] = struct{}{}
+		}
+	}
+	reporters := make([]string, 0, len(reporterSet))
+	for reporter := range reporterSet {
+		reporters = append(reporters, reporter)
+	}
+	sort.Strings(reporters)
+	return reporters, nil
 }
 
 // storageTruthReporterEpochPassStats counts PASS results for a reporter in a
@@ -198,17 +243,25 @@ func (k Keeper) storageTruthReporterEpochPassStats(ctx sdk.Context, reporterAcco
 	defer it.Close()
 	var passes uint64
 	var overturned bool
+	// Per CP-R3 B-F1 — `OverturnedByRecheck` is written by
+	// markStorageTruthReporterResultRecheck onto the *failure-class* record
+	// (the challenged transcript), never onto a PASS record. The previous
+	// `continue` skipping non-PASS records made the gate structurally
+	// unreachable. Spec §15.3 requires "no overturned fails" to suppress
+	// the −4 reward, so we now scan all classes and check the overturn
+	// flag on failure-class records, while still counting PASSes for the
+	// ≥5 PASS gate.
 	for ; it.Valid(); it.Next() {
 		var record storageTruthReporterResultRecord
 		if err := json.Unmarshal(it.Value(), &record); err != nil {
 			return 0, false, err
 		}
-		if types.StorageProofResultClass(record.ResultClass) != types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS {
-			continue
-		}
-		passes++
-		if record.OverturnedByRecheck {
+		class := types.StorageProofResultClass(record.ResultClass)
+		if record.OverturnedByRecheck && isStorageTruthFailureClass(class) {
 			overturned = true
+		}
+		if class == types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS {
+			passes++
 		}
 	}
 	return passes, overturned, nil

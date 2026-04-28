@@ -108,6 +108,47 @@ func TestApplyTicketDeteriorationDelta_CrossHolderPassBonus(t *testing.T) {
 			"fresh ticket PASS clamps at 0; no cross-holder bonus without prior state")
 	})
 
+	t.Run("PASS by different holder after non-hash failure classes applies extra -3 bonus", func(t *testing.T) {
+		failureClasses := []types.StorageProofResultClass{
+			types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_TIMEOUT_OR_NO_RESPONSE,
+			types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_OBSERVER_QUORUM_FAIL,
+			types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_INVALID_TRANSCRIPT,
+		}
+		for _, priorClass := range failureClasses {
+			t.Run(priorClass.String(), func(t *testing.T) {
+				f := initFixture(t)
+				const epochID = uint64(10)
+				ticketID := "ticket-cross-holder-" + priorClass.String()
+
+				require.NoError(t, f.keeper.SetTicketDeteriorationState(f.ctx, types.TicketDeteriorationState{
+					TicketId:                   ticketID,
+					DeteriorationScore:         50,
+					LastUpdatedEpoch:           epochID,
+					LastTargetSupernodeAccount: "holder-A",
+					LastResultClass:            priorClass,
+					LastResultEpoch:            epochID - 1,
+					LastFailureEpoch:           epochID - 1,
+				}))
+
+				passResult := &types.StorageProofResult{
+					TicketId:               ticketID,
+					TargetSupernodeAccount: "holder-B",
+					ResultClass:            types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS,
+					BucketType:             types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT,
+				}
+				_, _, err := keeper.ApplyTicketDeteriorationDeltaForTest(
+					f.keeper, f.ctx, epochID, "reporter-1", passResult, ticketID, -2, 0, false,
+				)
+				require.NoError(t, err)
+
+				final, found := f.keeper.GetTicketDeteriorationState(f.ctx, ticketID)
+				require.True(t, found)
+				require.Equal(t, int64(45), final.DeteriorationScore,
+					"prior failure class %s should receive base PASS delta plus cross-holder recovery bonus", priorClass)
+			})
+		}
+	})
+
 	t.Run("PASS by different holder but prior was PASS (not failure) — no bonus", func(t *testing.T) {
 		f := initFixture(t)
 		const ticketID = "ticket-prior-pass"

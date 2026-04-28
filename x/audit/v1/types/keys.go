@@ -669,6 +669,28 @@ func TranscriptByTargetBucketEpochKey(targetAccount string, bucketType uint32, e
 	return key
 }
 
+// ReporterStorageTruthResultByTargetEpochScanRange returns [start, end)
+// iterator bounds for scanning a target's reporter-result secondary index in
+// the inclusive epoch range [startEpoch, endEpoch]. It is MaxUint64-safe.
+func ReporterStorageTruthResultByTargetEpochScanRange(targetAccount string, startEpoch, endEpoch uint64) ([]byte, []byte) {
+	base := make([]byte, 0, len(reporterResultByTargetPrefix)+len(targetAccount)+1)
+	base = append(base, reporterResultByTargetPrefix...)
+	base = append(base, targetAccount...)
+	base = append(base, '/')
+
+	start := make([]byte, 0, len(base)+8)
+	start = append(start, base...)
+	start = binary.BigEndian.AppendUint64(start, startEpoch)
+
+	if endEpoch == ^uint64(0) {
+		return start, prefixEnd(base)
+	}
+	end := make([]byte, 0, len(base)+8)
+	end = append(end, base...)
+	end = binary.BigEndian.AppendUint64(end, endEpoch+1)
+	return start, end
+}
+
 // TranscriptByTargetBucketEpochScanPrefix returns the prefix for epoch-range scanning of
 // transcripts for a given (target, bucket). Iterator start/end are derived by callers using
 // the u64be-encoded epoch bounds.
@@ -680,4 +702,22 @@ func TranscriptByTargetBucketEpochScanPrefix(targetAccount string, bucketType ui
 	key = binary.BigEndian.AppendUint32(key, bucketType)
 	key = append(key, '/')
 	return key
+}
+
+// TranscriptByTargetBucketEpochScanRange returns [start, end) iterator bounds
+// for scanning transcript secondary-index records for a target/bucket in the
+// inclusive epoch range [startEpoch, endEpoch]. It is MaxUint64-safe.
+func TranscriptByTargetBucketEpochScanRange(targetAccount string, bucketType uint32, startEpoch, endEpoch uint64) ([]byte, []byte) {
+	base := TranscriptByTargetBucketEpochScanPrefix(targetAccount, bucketType)
+	start := make([]byte, 0, len(base)+8)
+	start = append(start, base...)
+	start = binary.BigEndian.AppendUint64(start, startEpoch)
+
+	if endEpoch == ^uint64(0) {
+		return start, prefixEnd(base)
+	}
+	end := make([]byte, 0, len(base)+8)
+	end = append(end, base...)
+	end = binary.BigEndian.AppendUint64(end, endEpoch+1)
+	return start, end
 }

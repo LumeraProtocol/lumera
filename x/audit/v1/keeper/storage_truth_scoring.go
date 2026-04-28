@@ -269,10 +269,13 @@ func (k Keeper) updateNodeSuspicionHistoryFields(state *types.NodeSuspicionState
 		// Track distinct ticket fail (simplified: increment per failure in window).
 		state.DistinctTicketFailWindow++
 
-		// Class A: HASH_MISMATCH, RECHECK_CONFIRMED_FAIL, and any INDEX artifact failure.
+		// Per CP-R3 B-F2 — Class A is failure-class driven, not artifact-class
+		// driven. HASH_MISMATCH against an INDEX artifact still carries the +26
+		// score delta via storageTruthScoreDeltasForResult, but TIMEOUT-on-INDEX
+		// remains a liveness/Class-B failure and must not reset Class-A recovery
+		// gates or increment ClassACountWindow.
 		isClassA := result.ResultClass == types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH ||
-			result.ResultClass == types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_RECHECK_CONFIRMED_FAIL ||
-			result.ArtifactClass == types.StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_INDEX
+			result.ResultClass == types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_RECHECK_CONFIRMED_FAIL
 		if isClassA {
 			state.ClassACountWindow++
 			state.LastClassAEpoch = epochID
@@ -566,13 +569,13 @@ func (k Keeper) storageTruthBookkeepingForResult(
 	}
 	bookkeeping.reporterTrustBand = reporterTrustBandForScore(reliabilityScore, params)
 	bookkeeping.reporterTrustMultiplier = reporterTrustMultiplierNumerator(reliabilityScore)
-	// Per CP-NEW-A-14 / spec §15.4 — trust multiplier applies to Class A
-	// failures only (HASH_MISMATCH or INDEX-class). Class B/C failures
-	// (TIMEOUT, OBSERVER_QUORUM_FAIL, INVALID_TRANSCRIPT, etc.) emit
-	// non-scaled deltas. Re-confirmed (RECHECK_CONFIRMED_FAIL) and
-	// recheck-bucket results bypass scaling regardless of class.
-	isClassA := result.ResultClass == types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH ||
-		result.ArtifactClass == types.StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_INDEX
+	// Per CP-R3 B-F2 / spec §15.4 — trust multiplier applies to Class A
+	// failures only. INDEX artifact status affects HASH_MISMATCH delta magnitude
+	// (+26 for index vs +18 for symbol), but does not by itself make a liveness
+	// failure Class A. TIMEOUT/OBSERVER_QUORUM_FAIL/INVALID_TRANSCRIPT remain
+	// non-scaled Class B/C failures. Recheck-confirmed failures and recheck-bucket
+	// results bypass scaling regardless of class.
+	isClassA := result.ResultClass == types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH
 	bookkeeping.applyTrustScaling = isClassA &&
 		isStorageTruthFailureClass(result.ResultClass) &&
 		result.ResultClass != types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_RECHECK_CONFIRMED_FAIL &&

@@ -3,6 +3,7 @@ package keeper_test
 import (
 	"testing"
 
+	keeper "github.com/LumeraProtocol/lumera/x/audit/v1/keeper"
 	"github.com/LumeraProtocol/lumera/x/audit/v1/types"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"github.com/stretchr/testify/require"
@@ -71,13 +72,17 @@ func TestGenesis_RoundTripsAllStPrefixes(t *testing.T) {
 	f.keeper.SetRecheckEvidence(f.ctx, 5, "ticket-rce", "lumera1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa5xm4ep")
 
 	// Storage proof transcript via public IndexStorageProofTranscripts.
-	require.NoError(t, f.keeper.IndexStorageProofTranscripts(f.ctx, 5, "lumera1bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbadc7mh", []*types.StorageProofResult{{
+	failureResult := &types.StorageProofResult{
 		TranscriptHash:         "h-abcd",
 		TargetSupernodeAccount: "lumera1cccccccccccccccccccccccccccccccccc7gqs5y",
 		TicketId:               "ticket-spt",
-		ResultClass:            types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS,
+		ResultClass:            types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH,
 		BucketType:             types.StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT,
-	}}))
+		ArtifactClass:          types.StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_SYMBOL,
+	}
+	require.NoError(t, f.keeper.IndexStorageProofTranscripts(f.ctx, 5, "lumera1bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbadc7mh", []*types.StorageProofResult{failureResult}))
+	require.NoError(t, keeper.SetStorageTruthNodeFailureForTest(f.keeper, f.ctx, 5, "lumera1bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbadc7mh", failureResult))
+	require.NoError(t, keeper.SetStorageTruthReporterResultForTest(f.keeper, f.ctx, 5, "lumera1bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbadc7mh", failureResult))
 
 	// Failed-heal marker.
 	require.NoError(t, f.keeper.SetParams(f.ctx, types.DefaultParams()))
@@ -169,6 +174,34 @@ func TestGenesisStorageTruthPostponementRoundTrip(t *testing.T) {
 	}
 	require.Equal(t, uint64(5), byAccount["lumera1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa5xm4ep"])
 	require.Equal(t, uint64(7), byAccount["lumera1bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbadc7mh"])
+}
+
+func TestGenesisRejectsStorageProofTranscriptUnknownFields(t *testing.T) {
+	f := initFixture(t)
+
+	genesisState := types.GenesisState{
+		Params: types.DefaultParams(),
+		StorageProofTranscripts: []types.GenesisStorageProofTranscript{
+			{
+				TranscriptHash: "h-unknown-field",
+				RecordJson: []byte(`{
+					"epoch_id": 1,
+					"reporter_account": "lumera1bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbadc7mh",
+					"target_account": "lumera1cccccccccccccccccccccccccccccccccc7gqs5y",
+					"ticket_id": "ticket-unknown",
+					"result_class": 1,
+					"bucket_type": 1,
+					"artifact_class": 1,
+					"recheck_eligible": true,
+					"unexpected_future_field": "must-not-be-silently-dropped"
+				}`),
+			},
+		},
+	}
+
+	err := f.keeper.InitGenesis(f.ctx, genesisState)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unexpected_future_field")
 }
 
 func TestGenesisRoundTripWithTicketArtifactCountStates(t *testing.T) {

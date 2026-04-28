@@ -53,7 +53,9 @@ func (k Keeper) expireStorageTruthHealOpsAtEpochEnd(ctx sdk.Context, epochID uin
 			if err := k.SetTicketDeteriorationState(ctx, ticketState); err != nil {
 				return err
 			}
-			k.setStorageTruthFailedHeal(ctx, healOp.HealerSupernodeAccount, epochID, healOp.TicketId)
+			if err := k.setStorageTruthFailedHeal(ctx, healOp.HealerSupernodeAccount, epochID, healOp.TicketId); err != nil {
+				return err
+			}
 		}
 
 		ctx.EventManager().EmitEvent(

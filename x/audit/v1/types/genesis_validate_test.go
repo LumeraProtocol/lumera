@@ -53,3 +53,38 @@ func TestValidateScoreStatesGenesis_WindowStartEpochInFuture(t *testing.T) {
 		require.NoError(t, types.ValidateScoreStatesGenesis(g, currentEpoch))
 	})
 }
+
+func TestValidateScoreStatesGenesis_TicketArtifactCountStates(t *testing.T) {
+	const currentEpoch uint64 = 10
+
+	t.Run("empty ticket id rejected", func(t *testing.T) {
+		g := types.GenesisState{
+			TicketArtifactCountStates: []types.TicketArtifactCountState{
+				{IndexArtifactCount: 1, SymbolArtifactCount: 2},
+			},
+		}
+		err := types.ValidateScoreStatesGenesis(g, currentEpoch)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "empty ticket id")
+	})
+
+	t.Run("zero counts rejected", func(t *testing.T) {
+		g := types.GenesisState{
+			TicketArtifactCountStates: []types.TicketArtifactCountState{
+				{TicketId: "ticket-zero"},
+			},
+		}
+		err := types.ValidateScoreStatesGenesis(g, currentEpoch)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "zero index and symbol counts")
+	})
+
+	t.Run("nonzero count accepted", func(t *testing.T) {
+		g := types.GenesisState{
+			TicketArtifactCountStates: []types.TicketArtifactCountState{
+				{TicketId: "ticket-ok", IndexArtifactCount: 1},
+			},
+		}
+		require.NoError(t, types.ValidateScoreStatesGenesis(g, currentEpoch))
+	})
+}

@@ -147,8 +147,11 @@ func (h CascadeActionHandler) Process(metadataBytes []byte, msgType common.Messa
 		// Backward-compatible fallback for finalize payloads that do not yet
 		// provide explicit LEP-6 artifact counts (single-source-of-truth via
 		// CascadeArtifactCountsWithFallback per CP-NEW-C-2 / 122-F2).
-		metadata.IndexArtifactCount, metadata.SymbolArtifactCount =
-			actiontypes.CascadeArtifactCountsWithFallback(&metadata)
+		indexCount, symbolCount, err := actiontypes.CascadeArtifactCountsWithFallbackStrict(&metadata)
+		if err != nil {
+			return nil, err
+		}
+		metadata.IndexArtifactCount, metadata.SymbolArtifactCount = indexCount, symbolCount
 	default:
 		return nil, fmt.Errorf("unsupported message type: %s", msgType)
 	}
@@ -323,8 +326,11 @@ func (h CascadeActionHandler) GetUpdatedMetadata(ctx sdk.Context, existingMetada
 		IndexArtifactCount:     newMetadata.GetIndexArtifactCount(),
 		SymbolArtifactCount:    newMetadata.GetSymbolArtifactCount(),
 	}
-	updatedMetadata.IndexArtifactCount, updatedMetadata.SymbolArtifactCount =
-		actiontypes.CascadeArtifactCountsWithFallback(updatedMetadata)
+	indexCount, symbolCount, err := actiontypes.CascadeArtifactCountsWithFallbackStrict(updatedMetadata)
+	if err != nil {
+		return nil, errors.Wrap(actiontypes.ErrInvalidMetadata, err.Error())
+	}
+	updatedMetadata.IndexArtifactCount, updatedMetadata.SymbolArtifactCount = indexCount, symbolCount
 
 	return gogoproto.Marshal(updatedMetadata)
 }

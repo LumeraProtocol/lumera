@@ -34,5 +34,13 @@ func ValidateScoreStatesGenesis(g GenesisState, currentEpoch uint64) error {
 				s.TicketId, s.LastUpdatedEpoch, currentEpoch)
 		}
 	}
+	for _, s := range g.TicketArtifactCountStates {
+		if s.TicketId == "" {
+			return fmt.Errorf("ticket artifact count state has empty ticket id")
+		}
+		if s.IndexArtifactCount == 0 && s.SymbolArtifactCount == 0 {
+			return fmt.Errorf("ticket artifact count %q has zero index and symbol counts", s.TicketId)
+		}
+	}
 	return nil
 }

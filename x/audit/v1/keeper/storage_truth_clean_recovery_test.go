@@ -39,8 +39,8 @@ func TestApplyReporterCleanEpochRecovery_AppliesMinusFourOnFivePasses(t *testing
 	// Seed prior reliability score 10 so the −4 delta is observable above the 0 floor.
 	require.NoError(t, f.keeper.SetReporterReliabilityState(f.ctx, types.ReporterReliabilityState{
 		ReporterSupernodeAccount: reporter,
-		ReliabilityScore: 10,
-		LastUpdatedEpoch: epochID, // No decay step — isolate the -4 delta
+		ReliabilityScore:         10,
+		LastUpdatedEpoch:         epochID, // No decay step — isolate the -4 delta
 	}))
 
 	// 5 PASS in epoch 7, no overturned-fails.
@@ -63,8 +63,8 @@ func TestApplyReporterCleanEpochRecovery_NoEffectOnFourPasses(t *testing.T) {
 
 	require.NoError(t, f.keeper.SetReporterReliabilityState(f.ctx, types.ReporterReliabilityState{
 		ReporterSupernodeAccount: reporter,
-		ReliabilityScore: 10,
-		LastUpdatedEpoch: epochID, // No decay step — isolate the -4 delta
+		ReliabilityScore:         10,
+		LastUpdatedEpoch:         epochID, // No decay step — isolate the -4 delta
 	}))
 
 	seedReporterPassResultsForEpoch(t, f, reporter, epochID, 4) // below threshold of 5
@@ -87,8 +87,8 @@ func TestApplyReporterCleanEpochRecovery_ScoresFloorAtZero(t *testing.T) {
 	// Score already at 0 — recovery should not push it negative.
 	require.NoError(t, f.keeper.SetReporterReliabilityState(f.ctx, types.ReporterReliabilityState{
 		ReporterSupernodeAccount: reporter,
-		ReliabilityScore: 0,
-		LastUpdatedEpoch: epochID, // No decay step — isolate the -4 delta
+		ReliabilityScore:         0,
+		LastUpdatedEpoch:         epochID, // No decay step — isolate the -4 delta
 	}))
 
 	seedReporterPassResultsForEpoch(t, f, reporter, epochID, 5)
@@ -99,4 +99,25 @@ func TestApplyReporterCleanEpochRecovery_ScoresFloorAtZero(t *testing.T) {
 	final, found := f.keeper.GetReporterReliabilityState(f.ctx, reporter)
 	require.True(t, found)
 	require.GreaterOrEqual(t, final.ReliabilityScore, int64(0), "score must not go negative")
+}
+
+func TestApplyReporterCleanEpochRecovery_CreatesStateForFreshReporter(t *testing.T) {
+	f := initFixture(t)
+	f.ctx = f.ctx.WithBlockHeight(1).WithEventManager(sdk.NewEventManager())
+
+	const epochID = uint64(7)
+	const reporter = "reporter-clean-fresh"
+
+	_, found := f.keeper.GetReporterReliabilityState(f.ctx, reporter)
+	require.False(t, found)
+	seedReporterPassResultsForEpoch(t, f, reporter, epochID, 5)
+
+	params := f.keeper.GetParams(f.ctx).WithDefaults()
+	require.NoError(t, f.keeper.ApplyReporterCleanEpochRecoveryAtEpochEnd(f.ctx, epochID, params))
+
+	final, found := f.keeper.GetReporterReliabilityState(f.ctx, reporter)
+	require.True(t, found, "fresh reporter with clean epoch should get an explicit dashboard state row")
+	require.Equal(t, int64(0), final.ReliabilityScore)
+	require.Equal(t, epochID, final.LastUpdatedEpoch)
+	require.Equal(t, uint32(1), final.WindowPositiveCount)
 }

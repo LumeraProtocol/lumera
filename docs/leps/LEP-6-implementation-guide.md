@@ -4,7 +4,7 @@ This guide documents the `lumera` implementation of LEP-6 storage-truth enforcem
 
 Priority design source: `/home/openclaw/workspace/docs/LEP6.md`
 
-Branch: `LEP-6-consensus-gap-fixes-rebase` @ `5df4206` (rebased onto post-#118 `LEP-6-foundation`)
+Branch: `LEP-6-foundation-review-r3` (R3 hardening branch; 20/20 Zee R3 findings addressed locally, pending push)
 
 ## Reviewer Summary
 
@@ -117,7 +117,7 @@ Business rules:
 
 - Non-empty proof results require `INDEX` or `SYMBOL`.
 - `NO_ELIGIBLE_TICKET` requires `UNSPECIFIED`.
-- Index failures are treated as Class A faults and also satisfy strong-postpone and heal-eligibility predicates.
+- Class A is result-class driven: `HASH_MISMATCH` (with INDEX vs SYMBOL magnitude) and `RECHECK_CONFIRMED_FAIL`. `ArtifactClass == INDEX` alone does **not** make `TIMEOUT_OR_NO_RESPONSE` a Class A fault.
 
 ### Result Enum Values
 
@@ -1383,7 +1383,7 @@ Behavior deltas applied on top of `LEP-6-foundation` tip `868cbc7c` to close
 24 production-gate findings. Branch `LEP-6-foundation-review-fixes` (squashed
 single commit `0c6f5f0`). Test pyramid green at `0c6f5f0`: unit + module
 simulation + `tests/integration/` + `tests/system/` + `tests/systemtests/`
-(`-tags=system_test`, 25/25 PASS). Compare:
+(`-tags=system_test`, 25/25 PASS). Final pushed SHA was `df15913` after docs-only amend. Compare:
 [`LEP-6-foundation...LEP-6-foundation-review-fixes`](https://github.com/LumeraProtocol/lumera/compare/LEP-6-foundation...LEP-6-foundation-review-fixes).
 
 ### HIGH (consensus / state-correctness / money-flow)
@@ -1523,6 +1523,98 @@ below) and codified as Skill Pitfall #31 in the
 
 ---
 
+## LEP-6 Round-3 Review Hardening (Zee R3 — PR #117 review 4188900358)
+
+Behavior deltas applied on top of the post-R2 `LEP-6-foundation` tip `8748065`
+to close 20 additional production-gate findings (3 HIGH / 3 MEDIUM / 14 LOW).
+Branch `LEP-6-foundation-review-r3` is a single-commit delivery branch. Test
+pyramid green before push: targeted R3 tests, `go build ./...`, audit/action/app
+unit packages, `go test ./x/...`, action+audit integration tests,
+`go test -tags=system ./tests/system/...`, and full e2e systemtests
+`go test -tags=system_test -timeout=1800s -v .` with
+`ok github.com/LumeraProtocol/lumera/tests/systemtests 1031.464s`.
+Compare after push:
+[`LEP-6-foundation...LEP-6-foundation-review-r3`](https://github.com/LumeraProtocol/lumera/compare/LEP-6-foundation...LEP-6-foundation-review-r3).
+
+### HIGH (state-correctness / production safety)
+
+- **B-F1 — reporter clean-pass reward scans all result classes.**
+  `storageTruthReporterEpochPassStats` now counts PASS results while detecting
+  overturned failure-class records across the epoch, so a reporter does not earn
+  the per-epoch `-4` reliability reward when any failure was overturned by
+  recheck.
+- **C-F1 — strong-recovery clean-pass param is validated.**
+  `Params.Validate()` rejects `StorageTruthStrongRecoveryCleanPassCount <= 0`
+  and values below `StorageTruthRecoveryCleanPassCount`, preventing impossible
+  strong-postpone recovery semantics.
+- **C-F3 — retention migration covers every LEP-6 lookback window.**
+  `requiredHistory` and the v1→v2 migration include
+  `StorageTruthDivergenceWindowEpochs` and `StorageTruthHealDeadlineEpochs`, so
+  pruning cannot erase evidence still needed by divergence or heal-deadline
+  logic.
+
+### MEDIUM (semantic correctness / sibling symmetry)
+
+- **C-F2 — heal verifier count bounded.**
+  `StorageTruthHealVerifierCount` is constrained to `1..32`, preventing
+  unbounded verifier loops or invalid zero-quorum behavior.
+- **B-F2 — Class-A predicate tightened to result class.**
+  `TIMEOUT_OR_NO_RESPONSE` on an INDEX artifact remains Class B and unscaled;
+  only `HASH_MISMATCH` / `RECHECK_CONFIRMED_FAIL` enter Class-A scoring paths.
+  This corrected the prior R2 approximation that treated `ArtifactClass==INDEX`
+  alone as Class A.
+- **C-F4 — action test fixture exercises reward routing as a no-op.**
+  `ActionKeeperWithAddress` now uses `MockRewardDistributionKeeper{Bps:0}`
+  rather than nil, so tests do not bypass the production fee-routing branch.
+
+### LOW (defensive hardening / genesis closure / review guardrails)
+
+- **C-F5 — postpone thresholds are strictly ordered.** Equality between
+  postpone and strong-postpone thresholds is rejected.
+- **A-F1 — heal-op ID counter recovery matches evidence ID recovery.**
+  Malformed/missing/zero counters no longer panic or risk reuse; the next ID is
+  derived from existing heal ops.
+- **A-F2 / B-F3 — MaxUint64-safe epoch scans.** Named range helpers avoid
+  `endEpoch+1` overflow for reporter-result and transcript scans.
+- **A-F4 — genesis validates `TicketArtifactCountState`.** Empty ticket IDs and
+  all-zero counts are rejected.
+- **A-F5 — transcript genesis import rejects unknown/trailing JSON fields.**
+  Prevents silent import drift.
+- **A-F6 — genesis round-trip now seeds and verifies non-empty node-failure and
+  reporter-result facts.**
+- **B-F4 — failed-heal marker setter errors on empty healer/ticket and callers
+  propagate the error.** No more silent no-op state holes.
+- **B-F5 — clean-epoch recovery creates state for fresh reporters with PASS
+  facts.** Dashboards/reliability state no longer undercount new reporters.
+- **B-F6 — cross-holder PASS bonus coverage spans non-hash prior failures.**
+  TIMEOUT, OBSERVER_QUORUM_FAIL, and INVALID_TRANSCRIPT prior classes are now
+  covered, not just HASH_MISMATCH.
+- **C-F6 — strict artifact-count fallback.** Explicit metadata counts win;
+  legacy metadata falls back to `len(RqIdsIds)`; if both are absent the path
+  returns an error instead of silently anchoring `(0,0)`.
+- **C-F7 — module order pinned by app-level test.** Genesis/begin/end ordering
+  must remain `supernode → audit → action`.
+- **C-F9 — migration-position closure.** Audit consensus version remains `2`;
+  R3 backfills are folded into `NewMigrateV1ToV2` because v2 has not shipped.
+
+### Why R2 missed these (process retrospective)
+
+R3 contained no outright reviewer flip-flops. The misses fell into three buckets:
+(1) **refinements** of R2 approximations (Class-A predicate and heal-op counter
+recovery), (2) **incomplete R2 implementation** where new params or promoted
+rules lacked a validation bound, and (3) **latent sibling-symmetry/genesis
+closure items** discovered by a deeper production-gate pass. Going forward,
+review closure requires not only the R2 sweeps but also MaxUint64 boundary tests,
+genesis unknown-field rejection, strict fallback behavior for legacy metadata,
+and app-level module-order pinning.
+
+### No new params introduced this round
+
+R3 added validation and migration coverage for existing R2/R3 state surfaces but
+introduced no additional governance params or protobuf fields.
+
+---
+
 ## Pre-Release Checklist
 
 This section is the canonical aggregator of every operational, follow-up,
@@ -1577,7 +1669,8 @@ Source-of-truth references: `ACTIVE_WORK.md` (in-flight tracking),
 ### C. Review-process sweeps (mandatory before each release-gate PR merge)
 
 These three sweeps were missed in round 1 and produced the 24 R2
-findings. They are now mandatory pre-master gates per Skill Pitfall #31.
+findings; R3 added sibling-boundary checks for MaxUint64 ranges, strict
+fallbacks, and genesis import hardening. They are mandatory pre-master gates.
 
 - [ ] **Out-of-scope diff sweep** — `git diff <release-base>..HEAD --stat`
   filtered to files outside the announced scope; flag any deletion or
@@ -1616,9 +1709,11 @@ findings. They are now mandatory pre-master gates per Skill Pitfall #31.
   7. Cycle to recovery (clean passes); verify postponement→active
      transition and (for strong postpone) the new
      `StorageTruthStrongRecoveryCleanPassCount` gate.
-  8. Verify R2 deltas land as designed: a cross-holder PASS produces
+  8. Verify R2/R3 deltas land as designed: a cross-holder PASS produces
      `D -= 3` extra; per-epoch PASS reward is single `-4` (not
-     per-result); EXPIRED heal-op advances probation and bumps `D`.
+     per-result); EXPIRED heal-op advances probation and bumps `D`;
+     `TIMEOUT_OR_NO_RESPONSE` on INDEX remains Class B; legacy action metadata
+     with neither explicit counts nor `RqIdsIds` errors instead of anchoring `(0,0)`.
 
 ### E. Test pyramid re-validation at activation tag
 
@@ -1628,7 +1723,7 @@ findings. They are now mandatory pre-master gates per Skill Pitfall #31.
 - [ ] `./tests/integration/...` green.
 - [ ] `./tests/system/...` (`-tags=system`) green.
 - [ ] `./tests/systemtests/...` (`-tags=system_test`) green
-  (25/25 last verified at `0c6f5f0`).
+  (last verified for R3 at `LEP-6-foundation-review-r3`: `ok .../tests/systemtests 1031.464s`).
 - [ ] Determinism scan clean — `grep -rE 'float|math\.Pow|time\.Now|rand\.|sort\.Float|FormatFloat'`
   on `x/audit/v1/keeper` returns zero hits in consensus paths; no
   `range map[]` in scoring/divergence/enforcement consensus paths.
@@ -1644,9 +1739,10 @@ findings. They are now mandatory pre-master gates per Skill Pitfall #31.
   gas-requirements note (above) in operator docs. Include in the
   SOFT/FULL activation proposal body so all participants see it before
   voting.
-- [ ] **Operator changelog** — publish the R2 behavior deltas (new params,
+- [ ] **Operator changelog** — publish the R2/R3 behavior deltas (new params,
   per-epoch PASS reward semantics, EXPIRED heal-op cooldown, strong-band
-  recovery threshold, cross-holder PASS bonus) in the release notes so
+  recovery threshold, cross-holder PASS bonus, Class-A predicate tightening,
+  strict artifact-count fallback) in the release notes so
   operators understand observable score-evolution changes.
 
 ### G. Documentation queue close-out
@@ -1654,8 +1750,8 @@ findings. They are now mandatory pre-master gates per Skill Pitfall #31.
 - [ ] `.lep6-review-pending-doc-updates/CP1_TRIAGE.md` and
   `CP2_SPEC_ALIGNMENT.md` items resolved or explicitly deferred with
   rationale.
-- [ ] `.lep6-review-pending-doc-updates/r2/` items reflected in this
-  guide (this section) and in `workspace/docs/LEP6.md` where the spec
-  text needed correction (NF7 done; sweep for any further drift).
-- [ ] `docs/agent-context/02_lumera.md` updated with R2 behavior deltas
-  and new params for cross-session continuity.
+- [ ] `.lep6-review-pending-doc-updates/r2/` and R3 review items reflected in this
+  guide and in `workspace/docs/LEP6.md` where the spec text needed correction
+  (NF7 done; sweep for any further drift).
+- [ ] `docs/agent-context/02_lumera.md` updated with R2/R3 behavior deltas
+  and new params/validation hardening for cross-session continuity.

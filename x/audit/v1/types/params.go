@@ -650,6 +650,16 @@ func (p Params) Validate() error {
 		if v := uint64(p.StorageTruthContradictionWindowEpochs); v > requiredHistory {
 			requiredHistory = v
 		}
+		// Per CP-R3 C-F3 — divergence window scan reads pruned state if
+		// KeepLastEpochEntries < DivergenceWindowEpochs, silently zeroing
+		// stats and skipping chronic-divergence penalties. Heal-deadline
+		// is also looked back over multi-epoch in fact-index queries.
+		if v := uint64(p.StorageTruthDivergenceWindowEpochs); v > requiredHistory {
+			requiredHistory = v
+		}
+		if v := uint64(p.StorageTruthHealDeadlineEpochs); v > requiredHistory {
+			requiredHistory = v
+		}
 		if requiredHistory > 0 && p.KeepLastEpochEntries < requiredHistory {
 			return fmt.Errorf("keep_last_epoch_entries must be >= max epoch lookback windows (need >= %d)", requiredHistory)
 		}
@@ -734,8 +744,12 @@ func (p Params) Validate() error {
 	if p.StorageTruthTicketDeteriorationHealThreshold <= 0 {
 		return fmt.Errorf("storage_truth_ticket_deterioration_heal_threshold must be > 0")
 	}
-	if p.StorageTruthNodeSuspicionThresholdPostpone > p.StorageTruthNodeSuspicionThresholdStrongPostpone {
-		return fmt.Errorf("storage_truth_node_suspicion_threshold_postpone must be <= storage_truth_node_suspicion_threshold_strong_postpone")
+	if p.StorageTruthNodeSuspicionThresholdPostpone >= p.StorageTruthNodeSuspicionThresholdStrongPostpone {
+		// Per CP-R3 C-F5 — strict < ; equality collapses the strong band
+		// into a no-op (any score crossing Postpone instantly satisfies
+		// StrongPostpone too, so the distinct strong-band predicates and
+		// recovery clean-pass count never apply).
+		return fmt.Errorf("storage_truth_node_suspicion_threshold_postpone must be < storage_truth_node_suspicion_threshold_strong_postpone")
 	}
 	if p.StorageTruthOldClassAFaultWindow == 0 {
 		return fmt.Errorf("storage_truth_old_class_a_fault_window must be > 0")
@@ -758,8 +772,24 @@ func (p Params) Validate() error {
 	if p.StorageTruthRecoveryCleanPassCount == 0 {
 		return fmt.Errorf("storage_truth_recovery_clean_pass_count must be > 0")
 	}
-	if p.StorageTruthHealVerifierCount == 0 {
-		return fmt.Errorf("storage_truth_heal_verifier_count must be > 0")
+	// Per CP-R3 C-F1 — StorageTruthStrongRecoveryCleanPassCount was missing
+	// entirely from Validate(). Without this, governance could pass
+	// MsgUpdateParams with StrongRecovery=1 and Recovery=10, inverting the
+	// strong-band semantics (a strong-postponed node would recover faster
+	// than a normal-postponed one). Strong-band recovery must be at least
+	// as strict as normal-band recovery (spec §17).
+	if p.StorageTruthStrongRecoveryCleanPassCount == 0 {
+		return fmt.Errorf("storage_truth_strong_recovery_clean_pass_count must be > 0")
+	}
+	if p.StorageTruthStrongRecoveryCleanPassCount < p.StorageTruthRecoveryCleanPassCount {
+		return fmt.Errorf("storage_truth_strong_recovery_clean_pass_count must be >= storage_truth_recovery_clean_pass_count")
+	}
+	// Per CP-R3 C-F2 — gov DoS surface: HealVerifierCount with no upper bound
+	// would let a proposal force every heal op to drain the eligible-supernode
+	// pool. 32 is conservative (assignStorageTruthHealParticipants picks N
+	// distinct active accounts; testnets/mainnet active sets are O(10²) at most).
+	if p.StorageTruthHealVerifierCount == 0 || p.StorageTruthHealVerifierCount > 32 {
+		return fmt.Errorf("storage_truth_heal_verifier_count must be within 1..32")
 	}
 	if p.StorageTruthClassBFaultWindow == 0 {
 		return fmt.Errorf("storage_truth_class_b_fault_window must be > 0")

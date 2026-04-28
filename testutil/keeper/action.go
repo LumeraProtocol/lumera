@@ -365,7 +365,7 @@ func ActionKeeperWithAddress(t testing.TB, ctrl *gomock.Controller, accounts []A
 		func() *ibckeeper.Keeper {
 			return ibckeeper.NewKeeper(encCfg.Codec, storeService, newMockIbcParams(), mockUpgradeKeeper, authority.String())
 		},
-		nil,
+		&MockRewardDistributionKeeper{Bps: 0}, // Per CP-R3 C-F4 — exercise reward-routing branch as no-op, not nil short-circuit.
 	)
 
 	// Initialize params

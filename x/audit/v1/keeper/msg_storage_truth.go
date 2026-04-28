@@ -415,7 +415,9 @@ func (m msgServer) finalizeHealOp(
 		if ticketState.ProbationUntilEpoch < cooldownUntil {
 			ticketState.ProbationUntilEpoch = cooldownUntil
 		}
-		m.setStorageTruthFailedHeal(ctx, healOp.HealerSupernodeAccount, currentEpoch.EpochID, healOp.TicketId)
+		if err := m.setStorageTruthFailedHeal(ctx, healOp.HealerSupernodeAccount, currentEpoch.EpochID, healOp.TicketId); err != nil {
+			return err
+		}
 	}
 	return m.SetTicketDeteriorationState(ctx, ticketState)
 }

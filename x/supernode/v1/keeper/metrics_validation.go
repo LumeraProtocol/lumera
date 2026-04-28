@@ -205,17 +205,3 @@ func evaluateCompliance(ctx sdk.Context, params types.Params, m types.SupernodeM
 	return ComplianceResult{Issues: issues, StorageFull: storageFull}
 }
 
-// lastNonDegradedState returns the most recent state that is not POSTPONED
-// or STORAGE_FULL, for use when recovering from a degraded state.
-func lastNonDegradedState(states []*types.SuperNodeStateRecord) types.SuperNodeState {
-	for i := len(states) - 1; i >= 0; i-- {
-		if states[i] == nil {
-			continue
-		}
-		s := states[i].State
-		if s != types.SuperNodeStatePostponed && s != types.SuperNodeStateStorageFull {
-			return s
-		}
-	}
-	return types.SuperNodeStateUnspecified
-}

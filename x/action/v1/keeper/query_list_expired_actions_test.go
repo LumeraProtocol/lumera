@@ -71,9 +71,9 @@ func TestKeeper_ListExpiredActions(t *testing.T) {
 			name: "actions found with EXPIRED state",
 			req:  &types.QueryListExpiredActionsRequest{},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
-				k.SetAction(ctx, &action1)
-				k.SetAction(ctx, &action2)
-				k.SetAction(ctx, &action3)
+				require.NoError(t, k.SetAction(ctx, &action1))
+				require.NoError(t, k.SetAction(ctx, &action2))
+				require.NoError(t, k.SetAction(ctx, &action3))
 			},
 			expectedErr: nil,
 			checkResult: func(t *testing.T, resp *types.QueryListExpiredActionsResponse) {
@@ -87,7 +87,7 @@ func TestKeeper_ListExpiredActions(t *testing.T) {
 			name: "no expired actions",
 			req:  &types.QueryListExpiredActionsRequest{},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
-				k.SetAction(ctx, &action2)
+				require.NoError(t, k.SetAction(ctx, &action2))
 			},
 			expectedErr: nil,
 			checkResult: func(t *testing.T, resp *types.QueryListExpiredActionsResponse) {
@@ -104,9 +104,9 @@ func TestKeeper_ListExpiredActions(t *testing.T) {
 				},
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
-				k.SetAction(ctx, &action1)
-				k.SetAction(ctx, &action2)
-				k.SetAction(ctx, &action3)
+				require.NoError(t, k.SetAction(ctx, &action1))
+				require.NoError(t, k.SetAction(ctx, &action2))
+				require.NoError(t, k.SetAction(ctx, &action3))
 			},
 			expectedErr: nil,
 			checkResult: func(t *testing.T, resp *types.QueryListExpiredActionsResponse) {
@@ -124,9 +124,9 @@ func TestKeeper_ListExpiredActions(t *testing.T) {
 				},
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
-				k.SetAction(ctx, &action1)
-				k.SetAction(ctx, &action2)
-				k.SetAction(ctx, &action3)
+				require.NoError(t, k.SetAction(ctx, &action1))
+				require.NoError(t, k.SetAction(ctx, &action2))
+				require.NoError(t, k.SetAction(ctx, &action3))
 			},
 			expectedErr: nil,
 			checkResult: func(t *testing.T, resp *types.QueryListExpiredActionsResponse) {

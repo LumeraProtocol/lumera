@@ -70,6 +70,16 @@ var (
 	KeyStorageTruthReporterIneligibleDurationEpochs     = []byte("StorageTruthReporterIneligibleDurationEpochs")
 )
 
+const (
+	// Final production-gate defensive bounds: these are intentionally far above
+	// current defaults but prevent governance/genesis from creating unbounded
+	// EndBlock iteration, no-op pruning, or giant challenger selections.
+	MaxProbeTargetsPerEpochLimit = uint32(1024)
+	MaxEpochWindowEntriesLimit   = uint64(10000)
+	maxEpochWindowEntriesLimit32 = uint32(MaxEpochWindowEntriesLimit)
+	MaxScChallengersPerEpoch     = uint32(1024)
+)
+
 var (
 	DefaultEpochLengthBlocks = uint64(400)
 	// DefaultEpochZeroHeight is a placeholder used for genesis-based initialization.
@@ -600,6 +610,9 @@ func (p Params) Validate() error {
 	if p.PeerQuorumReports == 0 {
 		return fmt.Errorf("peer_quorum_reports must be > 0")
 	}
+	if p.MaxProbeTargetsPerEpoch == 0 || p.MaxProbeTargetsPerEpoch > MaxProbeTargetsPerEpochLimit {
+		return fmt.Errorf("max_probe_targets_per_epoch must be within 1..%d", MaxProbeTargetsPerEpochLimit)
+	}
 	if p.MinProbeTargetsPerEpoch > p.MaxProbeTargetsPerEpoch {
 		return fmt.Errorf("min_probe_targets_per_epoch must be <= max_probe_targets_per_epoch")
 	}
@@ -620,6 +633,19 @@ func (p Params) Validate() error {
 	}
 	if p.KeepLastEpochEntries == 0 {
 		return fmt.Errorf("keep_last_epoch_entries must be > 0")
+	}
+	if p.KeepLastEpochEntries > MaxEpochWindowEntriesLimit {
+		return fmt.Errorf("keep_last_epoch_entries must be <= %d", MaxEpochWindowEntriesLimit)
+	}
+	if p.StorageTruthClassAFaultWindow > maxEpochWindowEntriesLimit32 ||
+		p.StorageTruthClassBFaultWindow > maxEpochWindowEntriesLimit32 ||
+		p.StorageTruthOldClassAFaultWindow > maxEpochWindowEntriesLimit32 ||
+		p.StorageTruthPatternEscalationWindow > maxEpochWindowEntriesLimit32 ||
+		p.StorageTruthDivergenceWindowEpochs > maxEpochWindowEntriesLimit32 ||
+		p.StorageTruthContradictionWindowEpochs > maxEpochWindowEntriesLimit32 ||
+		p.StorageTruthHealDeadlineEpochs > maxEpochWindowEntriesLimit32 ||
+		p.StorageTruthReporterIneligibleDurationEpochs > maxEpochWindowEntriesLimit32 {
+		return fmt.Errorf("storage-truth epoch windows must be <= %d", MaxEpochWindowEntriesLimit)
 	}
 	// keep_last_epoch_entries must retain enough history to evaluate epoch-end rules that
 	// look back across multiple epochs. If history is pruned earlier than these lookbacks,
@@ -684,6 +710,11 @@ func (p Params) Validate() error {
 	}
 	if p.ActionFinalizationRecoveryMaxTotalBadEvidences == 0 {
 		return fmt.Errorf("action_finalization_recovery_max_total_bad_evidences must be > 0")
+	}
+	// sc_challengers_per_epoch keeps 0 as the documented "auto" sentinel; any
+	// explicit non-zero value is bounded to avoid giant challenger selections.
+	if p.ScChallengersPerEpoch > MaxScChallengersPerEpoch {
+		return fmt.Errorf("sc_challengers_per_epoch must be 0 or <= %d", MaxScChallengersPerEpoch)
 	}
 	if p.StorageTruthRecentBucketMaxBlocks == 0 {
 		return fmt.Errorf("storage_truth_recent_bucket_max_blocks must be > 0")
@@ -753,6 +784,16 @@ func (p Params) Validate() error {
 	}
 	if p.StorageTruthOldClassAFaultWindow == 0 {
 		return fmt.Errorf("storage_truth_old_class_a_fault_window must be > 0")
+	}
+	if p.StorageTruthClassAFaultWindow > maxEpochWindowEntriesLimit32 ||
+		p.StorageTruthClassBFaultWindow > maxEpochWindowEntriesLimit32 ||
+		p.StorageTruthOldClassAFaultWindow > maxEpochWindowEntriesLimit32 ||
+		p.StorageTruthPatternEscalationWindow > maxEpochWindowEntriesLimit32 ||
+		p.StorageTruthDivergenceWindowEpochs > maxEpochWindowEntriesLimit32 ||
+		p.StorageTruthContradictionWindowEpochs > maxEpochWindowEntriesLimit32 ||
+		p.StorageTruthHealDeadlineEpochs > maxEpochWindowEntriesLimit32 ||
+		p.StorageTruthReporterIneligibleDurationEpochs > maxEpochWindowEntriesLimit32 {
+		return fmt.Errorf("storage-truth epoch windows must be <= %d", MaxEpochWindowEntriesLimit)
 	}
 	if p.StorageTruthOldClassAFaultWindow < p.StorageTruthClassAFaultWindow {
 		return fmt.Errorf("storage_truth_old_class_a_fault_window must be >= storage_truth_class_a_fault_window")

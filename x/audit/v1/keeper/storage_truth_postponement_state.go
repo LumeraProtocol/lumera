@@ -64,8 +64,9 @@ func (k Keeper) GetAllStorageTruthPostponements(ctx sdk.Context) []types.Storage
 		}
 		epochID := binary.BigEndian.Uint64(bz)
 		out = append(out, types.StorageTruthPostponement{
-			SupernodeAccount:    account,
+			SupernodeAccount:   account,
 			PostponedAtEpochId: epochID,
+			StrongPostpone:     k.hasStorageTruthStrongPostponeMarker(ctx, account),
 		})
 	}
 	return out

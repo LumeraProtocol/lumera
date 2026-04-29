@@ -62,6 +62,34 @@ func TestParamsValidateStorageTruthFailures(t *testing.T) {
 	require.ErrorContains(t, p5.Validate(), "storage_truth_old_class_a_fault_window must be >=")
 }
 
+func TestParamsValidateFinalGateDefensiveBounds(t *testing.T) {
+	base := DefaultParams()
+
+	p1 := base
+	p1.MaxProbeTargetsPerEpoch = 0
+	require.ErrorContains(t, p1.Validate(), "max_probe_targets_per_epoch must be within")
+
+	p2 := base
+	p2.MaxProbeTargetsPerEpoch = MaxProbeTargetsPerEpochLimit + 1
+	require.ErrorContains(t, p2.Validate(), "max_probe_targets_per_epoch must be within")
+
+	p3 := base
+	p3.KeepLastEpochEntries = MaxEpochWindowEntriesLimit + 1
+	require.ErrorContains(t, p3.Validate(), "keep_last_epoch_entries must be <=")
+
+	p4 := base
+	p4.ScChallengersPerEpoch = 0
+	require.NoError(t, p4.Validate())
+
+	p5 := base
+	p5.ScChallengersPerEpoch = MaxScChallengersPerEpoch + 1
+	require.ErrorContains(t, p5.Validate(), "sc_challengers_per_epoch must be 0 or <=")
+
+	p6 := base
+	p6.StorageTruthPatternEscalationWindow = uint32(MaxEpochWindowEntriesLimit + 1)
+	require.ErrorContains(t, p6.Validate(), "storage-truth epoch windows must be <=")
+}
+
 func TestParamsWithDefaults_DerivesBucketThresholdsFromEpochLength(t *testing.T) {
 	p := Params{
 		EpochLengthBlocks: 100,

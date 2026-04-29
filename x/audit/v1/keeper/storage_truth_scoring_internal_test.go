@@ -219,6 +219,19 @@ func TestDecayExponentialMultiEpoch(t *testing.T) {
 	require.Equal(t, int64(657), result5, "5-epoch exponential decay")
 }
 
+func TestDecayTowardZeroOverflowSafe(t *testing.T) {
+	// Regression for final-gate F-A1: multiplication must not wrap int64 before division.
+	// math.MaxInt64*999 overflows with native int64 arithmetic; using the shared
+	// big.Int scaling path keeps the result positive and monotonic toward zero.
+	result := decayTowardZero(math.MaxInt64, 999, 1)
+	require.Equal(t, int64(9214148664817921031), result)
+	require.Positive(t, result)
+
+	negativeResult := decayTowardZero(math.MinInt64+1, 999, 1)
+	require.Equal(t, int64(-9214148664817921031), negativeResult)
+	require.Negative(t, negativeResult)
+}
+
 func TestAddInt64Saturated(t *testing.T) {
 	require.Equal(t, int64(math.MaxInt64), addInt64Saturated(math.MaxInt64-1, 10))
 	require.Equal(t, int64(math.MinInt64), addInt64Saturated(math.MinInt64+1, -10))

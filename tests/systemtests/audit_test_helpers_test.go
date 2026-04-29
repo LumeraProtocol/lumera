@@ -393,6 +393,50 @@ func auditQueryAssignedTargets(t *testing.T, epochID uint64, filterByEpochID boo
 	return *resp
 }
 
+func awaitCurrentEpochAnchorWithActiveSupernodes(t *testing.T, minEpochID uint64, expectedAccounts ...string) audittypes.EpochAnchor {
+	t.Helper()
+	qc, _ := newAuditQueryClient(t)
+	deadline := time.Now().Add(2 * time.Minute)
+	var last audittypes.EpochAnchor
+	var lastErr error
+
+	for time.Now().Before(deadline) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		resp, err := qc.CurrentEpochAnchor(ctx, &audittypes.QueryCurrentEpochAnchorRequest{})
+		cancel()
+		if err == nil {
+			last = resp.Anchor
+			if last.EpochId >= minEpochID && containsAllStrings(last.ActiveSupernodeAccounts, expectedAccounts...) && containsAllStrings(last.TargetSupernodeAccounts, expectedAccounts...) {
+				return last
+			}
+		} else {
+			lastErr = err
+		}
+		sut.AwaitNextBlock(t)
+	}
+
+	require.FailNowf(t,
+		"epoch anchor did not include expected supernodes",
+		"min_epoch_id=%d expected=%v last_epoch_id=%d last_active=%v last_targets=%v last_err=%v",
+		minEpochID,
+		expectedAccounts,
+		last.EpochId,
+		last.ActiveSupernodeAccounts,
+		last.TargetSupernodeAccounts,
+		lastErr,
+	)
+	return audittypes.EpochAnchor{}
+}
+
+func containsAllStrings(values []string, needles ...string) bool {
+	for _, needle := range needles {
+		if !containsString(values, needle) {
+			return false
+		}
+	}
+	return true
+}
+
 // setStorageTruthEnforcementModeUnspecified sets enforcement_mode=UNSPECIFIED in genesis.
 // Use this for tests that rely on the k-based peer-assignment formula rather than the
 // storage-truth one-third coverage formula that activates under any non-UNSPECIFIED mode.

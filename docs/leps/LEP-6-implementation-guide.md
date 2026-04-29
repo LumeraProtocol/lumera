@@ -4,7 +4,7 @@ This guide documents the `lumera` implementation of LEP-6 storage-truth enforcem
 
 Priority design source: `/home/openclaw/workspace/docs/LEP6.md`
 
-Branch: `LEP-6-foundation-review-r3` (R3 hardening branch; 20/20 Zee R3 findings addressed locally, pending push)
+Branch: `LEP-6-foundation-final-gate-fixes` (final production-gate hardening branch; 14/17 Zee final-gate findings fixed locally, 3/17 intentionally no-code/info, pending push)
 
 ## Reviewer Summary
 
@@ -1287,10 +1287,11 @@ Focused tests:
 - `tests/system/audit/msg_storage_truth_test.go`
 - `tests/systemtests/audit_storage_truth_activation_test.go`
 - `tests/systemtests/audit_storage_truth_edge_cases_test.go`
+- `tests/systemtests/audit_peer_ports_enforcement_test.go`
 
 ## Verification
 
-Last verified at commit `16a838f` (`LEP-6-consensus-gap-fixes-rebase`) — full test pyramid green: unit + simulation + integration + system + e2e systemtests (25/25 PASS).
+Last complete R3 verification at commit `b5a0bc3` (`LEP-6-foundation-review-r3`) — full test pyramid green: unit + simulation + integration + system + e2e systemtests. Current final-gate branch `LEP-6-foundation-final-gate-fixes` has passed targeted/non-e2e validation through Phase 5 and the isolated e2e fixture regression test; rerun the full final-gate pyramid before push.
 
 ```bash
 /home/openclaw/.local/go/bin/go test ./x/audit/v1/...
@@ -1612,6 +1613,101 @@ and app-level module-order pinning.
 
 R3 added validation and migration coverage for existing R2/R3 state surfaces but
 introduced no additional governance params or protobuf fields.
+
+---
+
+## LEP-6 Final Production-Gate Hardening (Zee final review — PR #117 review 4199025681)
+
+Behavior deltas applied on top of merged R3 foundation tip `ef5991b` on branch
+`LEP-6-foundation-final-gate-fixes`. Current local tally: **14/17 fixed**, **3/17
+intentionally no-code/info**, **0 pushed**. The three no-code items are review
+clarifications / non-blocking follow-ups rather than branch changes; do not treat
+them as silent deferrals in the shipped implementation.
+
+### HIGH / production pre-mainnet hardening
+
+- **F-B1 — strong-postpone markers round-trip through genesis.**
+  `StorageTruthPostponement` now carries `strong_postpone`; export preserves
+  `ap/sts/` markers and import restores both normal and strong postpone state.
+  This prevents state-sync/export-import from collapsing a strong-postponed node
+  into an ordinary postponed node.
+- **F-B2 — action-finalization postponement facts export/import.**
+  `ap/af/` entries now have genesis wrappers and keeper iterators so cascade
+  finalization postponement state survives state sync.
+- **F-B3 — evidence epoch counters are preserved exactly.**
+  `eve/` counters now export/import verbatim instead of being reconstructed from
+  imported evidence rows, preserving exact evidence sequencing across state sync.
+- **F-B4 — heal-op verification votes round-trip.**
+  `st/hov/` heal-op verifier subkeys now export/import so in-flight and
+  terminal heal decisions retain their vote records after state sync.
+- **F-C1 — bounded pruning for ticket-deterioration state growth.**
+  `PruneOldEpochs` now prunes only semantically inert `TicketDeteriorationState`
+  rows where `LastUpdatedEpoch + KeepLastEpochEntries < currentEpoch`,
+  `DeteriorationScore == 0`, and `ActiveHealOpId == 0`. It intentionally does
+  **not** prune canonical `st/tac/` ticket artifact counts, which are immutable
+  ticket facts and still needed for deterministic proof validation.
+- **F-A1 — overflow-safe decay scaling.**
+  `decayTowardZero` now routes multiplication through the same `big.Int`/
+  `scaleInt64TowardZero` path used by trust scaling instead of native `int64`
+  multiplication, preventing overflow at large score magnitudes.
+
+### MEDIUM / parameter and import barriers
+
+- **F-B5 — `Keeper.SetParams` is a real validation barrier.**
+  The keeper applies defaults and then calls `params.Validate()` before storing
+  params. Module migrations and any future direct keeper callers therefore
+  cannot persist invalid audit params by bypassing message-level validation.
+- **F-B6 — probe target count bounded.**
+  `max_probe_targets_per_epoch=0` is rejected and explicit values above `1024`
+  are rejected, preventing invalid no-probe configurations and unbounded loops.
+- **F-B7 — retention and storage-truth windows capped.**
+  `keep_last_epoch_entries` and storage-truth lookback windows are capped at
+  `10000`, preserving bounded scan/prune behavior under governance updates.
+- **F-B8 — storage-challenge challenger sentinel preserved and explicit values
+  capped.** `sc_challengers_per_epoch=0` remains the documented auto sentinel;
+  non-zero explicit values above `1024` are rejected.
+- **F-C3 — negative action decimal fee shares rejected.**
+  Action genesis/param validation now rejects negative decimal fee-share values
+  before they can reach fee distribution logic.
+- **F-B10 — transcript genesis import is raw-bytes compatible.**
+  Import decodes only the fields needed to rebuild transcript-by-ticket indexes
+  while preserving raw transcript JSON bytes exactly. This keeps old/new
+  transcript encodings state-sync compatible without weakening index rebuilds.
+- **F-B11 / F-B12 — duplicate imported audit IDs rejected.**
+  Genesis validation rejects duplicate `Evidence.EvidenceId` and duplicate
+  `HealOp.HealOpId`, closing import ambiguity before state is written.
+
+### Validation and e2e fixture hardening
+
+The final validation sweep passed all non-e2e layers and initially exposed one
+isolated `tests/systemtests` fixture failure in
+`TestAuditPeerPortsUnanimousClosedPostponesAfterConsecutiveWindows`:
+
+```text
+reporter not eligible for storage challenge observations in this epoch: invalid reporter state
+```
+
+Root cause was not keeper logic. The test derived epoch/seed data locally from
+`originHeight=1` and assumed both registered supernodes were active/eligible,
+while `MsgSubmitEpochReport` correctly validates storage-challenge observations
+against the persisted on-chain epoch anchor. The fixture now waits for a
+chain-authoritative current epoch anchor that includes both registered accounts in
+`ActiveSupernodeAccounts` and `TargetSupernodeAccounts`, then uses on-chain
+`AssignedTargets` for the exact keeper-validated targets.
+
+Targeted follow-up validation passed:
+
+```bash
+cd tests/systemtests
+go test -tags=system_test -timeout=1800s -v . -run TestAuditPeerPortsUnanimousClosedPostponesAfterConsecutiveWindows
+# --- PASS: TestAuditPeerPortsUnanimousClosedPostponesAfterConsecutiveWindows (40.32s)
+# PASS
+# ok github.com/LumeraProtocol/lumera/tests/systemtests 40.914s
+```
+
+Full final-gate validation should be rerun before push after docs are amended;
+last full final-validation log before the fixture fix is
+`/tmp/lep6-final-validation-20260429-183438.log`.
 
 ---
 

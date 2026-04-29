@@ -112,6 +112,21 @@ func (k Keeper) InitGenesis(ctx context.Context, genState types.GenesisState) er
 			return fmt.Errorf("audit genesis: storage-truth postponement %q lacks corresponding supernode-postponed state", p.SupernodeAccount)
 		}
 		k.setStorageTruthPostponedAtEpochID(sdkCtx, p.SupernodeAccount, p.PostponedAtEpochId)
+		if p.StrongPostpone {
+			k.setStorageTruthStrongPostponeMarker(sdkCtx, p.SupernodeAccount)
+		}
+	}
+
+	// Per final-gate F-B2/F-B3/F-B4 — restore genesis-covered
+	// action-finalization markers, evidence aggregates, and heal-op votes.
+	for _, p := range genState.ActionFinalizationPostponements {
+		k.setActionFinalizationPostponedAtEpochID(sdkCtx, p.SupernodeAccount, p.PostponedAtEpochId)
+	}
+	for _, c := range genState.EvidenceEpochCounts {
+		k.setEvidenceEpochCount(sdkCtx, c.EpochId, c.SubjectAddress, c.EvidenceType, c.Count)
+	}
+	for _, v := range genState.HealOpVerifications {
+		k.SetHealOpVerification(sdkCtx, v.HealOpId, v.VerifierSupernodeAccount, v.Verified)
 	}
 
 	// Per NEW-C-1 — restore epoch-scoped audit prefix families.
@@ -209,6 +224,12 @@ func (k Keeper) ExportGenesis(ctx context.Context) (*types.GenesisState, error) 
 
 	// Per 121-F7 — export storage-truth postponement markers.
 	genesis.StorageTruthPostponements = k.GetAllStorageTruthPostponements(sdkCtx)
+
+	// Per final-gate F-B2/F-B3/F-B4 — export additional genesis-covered
+	// action-finalization markers, evidence aggregates, and heal-op votes.
+	genesis.ActionFinalizationPostponements = k.GetAllActionFinalizationPostponements(sdkCtx)
+	genesis.EvidenceEpochCounts = k.GetAllEvidenceEpochCountsForGenesis(sdkCtx)
+	genesis.HealOpVerifications = k.GetAllHealOpVerificationsForGenesis(sdkCtx)
 
 	// Per NEW-C-1 — export every epoch-scoped audit prefix family.
 	genesis.RecheckEvidence = k.GetAllRecheckEvidenceForGenesis(sdkCtx)

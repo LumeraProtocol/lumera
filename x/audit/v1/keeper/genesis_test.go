@@ -157,7 +157,7 @@ func TestGenesisStorageTruthPostponementRoundTrip(t *testing.T) {
 		Params: types.DefaultParams(),
 		StorageTruthPostponements: []types.StorageTruthPostponement{
 			{SupernodeAccount: snA.SupernodeAccount, PostponedAtEpochId: 5},
-			{SupernodeAccount: snB.SupernodeAccount, PostponedAtEpochId: 7},
+			{SupernodeAccount: snB.SupernodeAccount, PostponedAtEpochId: 7, StrongPostpone: true},
 		},
 	}
 
@@ -168,40 +168,165 @@ func TestGenesisStorageTruthPostponementRoundTrip(t *testing.T) {
 	require.Len(t, got.StorageTruthPostponements, 2)
 
 	// Validate round-trip: all entries are recovered (order may vary).
-	byAccount := make(map[string]uint64, len(got.StorageTruthPostponements))
+	byAccount := make(map[string]types.StorageTruthPostponement, len(got.StorageTruthPostponements))
 	for _, p := range got.StorageTruthPostponements {
-		byAccount[p.SupernodeAccount] = p.PostponedAtEpochId
+		byAccount[p.SupernodeAccount] = p
 	}
-	require.Equal(t, uint64(5), byAccount["lumera1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa5xm4ep"])
-	require.Equal(t, uint64(7), byAccount["lumera1bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbadc7mh"])
+	require.Equal(t, uint64(5), byAccount["lumera1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa5xm4ep"].PostponedAtEpochId)
+	require.False(t, byAccount["lumera1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa5xm4ep"].StrongPostpone)
+	require.Equal(t, uint64(7), byAccount["lumera1bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbadc7mh"].PostponedAtEpochId)
+	require.True(t, byAccount["lumera1bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbadc7mh"].StrongPostpone)
 }
 
-func TestGenesisRejectsStorageProofTranscriptUnknownFields(t *testing.T) {
+func TestGenesisStorageProofTranscriptRawImportCompatibility(t *testing.T) {
+	const (
+		target = "lumera1cccccccccccccccccccccccccccccccccc7gqs5y"
+		ticket = "ticket-fb10"
+	)
+
+	t.Run("preserves unknown fields while rebuilding secondary index", func(t *testing.T) {
+		f := initFixture(t)
+		recordJSON := []byte(`{
+			"epoch_id": 11,
+			"reporter_account": "lumera1bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbadc7mh",
+			"target_account": "lumera1cccccccccccccccccccccccccccccccccc7gqs5y",
+			"ticket_id": "ticket-fb10",
+			"result_class": 1,
+			"bucket_type": 4,
+			"artifact_class": 1,
+			"recheck_eligible": false,
+			"unexpected_future_field": {"preserve": true}
+		}`)
+
+		genesisState := types.GenesisState{
+			Params: types.DefaultParams(),
+			StorageProofTranscripts: []types.GenesisStorageProofTranscript{
+				{TranscriptHash: "h-fb10-unknown", RecordJson: recordJSON},
+			},
+		}
+
+		require.NoError(t, f.keeper.InitGenesis(f.ctx, genesisState))
+
+		exported, err := f.keeper.ExportGenesis(f.ctx)
+		require.NoError(t, err)
+		require.Len(t, exported.StorageProofTranscripts, 1)
+		require.Equal(t, "h-fb10-unknown", exported.StorageProofTranscripts[0].TranscriptHash)
+		require.Equal(t, recordJSON, exported.StorageProofTranscripts[0].RecordJson)
+
+		found, err := keeper.HasCleanRecheckInWindowForTest(f.keeper, f.ctx, ticket, target, 10, 11)
+		require.NoError(t, err)
+		require.True(t, found, "InitGenesis must rebuild st/spt-tbe/ secondary index from decoded index fields")
+	})
+
+	t.Run("invalid json rejected", func(t *testing.T) {
+		f := initFixture(t)
+		genesisState := types.GenesisState{
+			Params: types.DefaultParams(),
+			StorageProofTranscripts: []types.GenesisStorageProofTranscript{
+				{TranscriptHash: "h-fb10-invalid", RecordJson: []byte(`{"epoch_id":`)},
+			},
+		}
+
+		require.Error(t, f.keeper.InitGenesis(f.ctx, genesisState))
+	})
+
+	t.Run("trailing json rejected", func(t *testing.T) {
+		f := initFixture(t)
+		genesisState := types.GenesisState{
+			Params: types.DefaultParams(),
+			StorageProofTranscripts: []types.GenesisStorageProofTranscript{
+				{TranscriptHash: "h-fb10-trailing", RecordJson: []byte(`{"epoch_id":11,"target_account":"` + target + `","ticket_id":"` + ticket + `","result_class":1,"bucket_type":4} {}`)},
+			},
+		}
+
+		err := f.keeper.InitGenesis(f.ctx, genesisState)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "trailing JSON data")
+	})
+
+	t.Run("empty target preserves primary without rebuilding target secondary index", func(t *testing.T) {
+		f := initFixture(t)
+		recordJSON := []byte(`{
+			"epoch_id": 11,
+			"reporter_account": "lumera1bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbadc7mh",
+			"target_account": "",
+			"ticket_id": "ticket-fb10",
+			"result_class": 1,
+			"bucket_type": 4,
+			"artifact_class": 1,
+			"recheck_eligible": false,
+			"unexpected_future_field": "preserved"
+		}`)
+		genesisState := types.GenesisState{
+			Params: types.DefaultParams(),
+			StorageProofTranscripts: []types.GenesisStorageProofTranscript{
+				{TranscriptHash: "h-fb10-primary-only", RecordJson: recordJSON},
+			},
+		}
+
+		require.NoError(t, f.keeper.InitGenesis(f.ctx, genesisState))
+		exported, err := f.keeper.ExportGenesis(f.ctx)
+		require.NoError(t, err)
+		require.Len(t, exported.StorageProofTranscripts, 1)
+		require.Equal(t, recordJSON, exported.StorageProofTranscripts[0].RecordJson)
+
+		found, err := keeper.HasCleanRecheckInWindowForTest(f.keeper, f.ctx, ticket, target, 10, 11)
+		require.NoError(t, err)
+		require.False(t, found, "empty target_account must not create a malformed target secondary-index entry")
+	})
+}
+
+func TestGenesisFinalGateStateRoundTrip(t *testing.T) {
 	f := initFixture(t)
 
 	genesisState := types.GenesisState{
 		Params: types.DefaultParams(),
-		StorageProofTranscripts: []types.GenesisStorageProofTranscript{
+		HealOps: []types.HealOp{
 			{
-				TranscriptHash: "h-unknown-field",
-				RecordJson: []byte(`{
-					"epoch_id": 1,
-					"reporter_account": "lumera1bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbadc7mh",
-					"target_account": "lumera1cccccccccccccccccccccccccccccccccc7gqs5y",
-					"ticket_id": "ticket-unknown",
-					"result_class": 1,
-					"bucket_type": 1,
-					"artifact_class": 1,
-					"recheck_eligible": true,
-					"unexpected_future_field": "must-not-be-silently-dropped"
-				}`),
+				HealOpId:                  11,
+				TicketId:                  "ticket-heal-11",
+				ScheduledEpochId:          3,
+				HealerSupernodeAccount:    "lumera1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa5xm4ep",
+				VerifierSupernodeAccounts: []string{"lumera1bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbadc7mh", "lumera1cccccccccccccccccccccccccccccccccc7gqs5y"},
+				Status:                    types.HealOpStatus_HEAL_OP_STATUS_HEALER_REPORTED,
+				CreatedHeight:             10,
+				UpdatedHeight:             12,
+				DeadlineEpochId:           6,
+				ResultHash:                "heal-result-hash",
 			},
+		},
+		ActionFinalizationPostponements: []types.GenesisActionFinalizationPostponement{
+			{SupernodeAccount: "lumera1ddddddddddddddddddddddddddddddddddx2nrmt", PostponedAtEpochId: 13},
+		},
+		EvidenceEpochCounts: []types.GenesisEvidenceEpochCount{
+			{
+				EpochId:        13,
+				SubjectAddress: "lumera1eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeennf6kk",
+				EvidenceType:   types.EvidenceType_EVIDENCE_TYPE_ACTION_EXPIRED,
+				Count:          2,
+			},
+		},
+		HealOpVerifications: []types.GenesisHealOpVerification{
+			{HealOpId: 11, VerifierSupernodeAccount: "lumera1bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbadc7mh", Verified: true},
+			{HealOpId: 11, VerifierSupernodeAccount: "lumera1cccccccccccccccccccccccccccccccccc7gqs5y", Verified: false},
 		},
 	}
 
-	err := f.keeper.InitGenesis(f.ctx, genesisState)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "unexpected_future_field")
+	require.NoError(t, f.keeper.InitGenesis(f.ctx, genesisState))
+
+	got, err := f.keeper.ExportGenesis(f.ctx)
+	require.NoError(t, err)
+	require.ElementsMatch(t, genesisState.ActionFinalizationPostponements, got.ActionFinalizationPostponements)
+	require.ElementsMatch(t, genesisState.EvidenceEpochCounts, got.EvidenceEpochCounts)
+	require.ElementsMatch(t, genesisState.HealOpVerifications, got.HealOpVerifications)
+
+	f2 := initFixture(t)
+	require.NoError(t, f2.keeper.InitGenesis(f2.ctx, *got))
+	roundTripped, err := f2.keeper.ExportGenesis(f2.ctx)
+	require.NoError(t, err)
+	require.ElementsMatch(t, got.ActionFinalizationPostponements, roundTripped.ActionFinalizationPostponements)
+	require.ElementsMatch(t, got.EvidenceEpochCounts, roundTripped.EvidenceEpochCounts)
+	require.ElementsMatch(t, got.HealOpVerifications, roundTripped.HealOpVerifications)
 }
 
 func TestGenesisRoundTripWithTicketArtifactCountStates(t *testing.T) {

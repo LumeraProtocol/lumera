@@ -853,16 +853,9 @@ func decayTowardZero(score, factorNumerator int64, elapsedEpochs uint64) int64 {
 
 	result := score
 	for i := uint64(0); i < iterations; i++ {
-		if result > 0 {
-			result = (result * factorNumerator) / 1000
-			if result <= 0 {
-				return 0
-			}
-		} else {
-			result = (result * factorNumerator) / 1000
-			if result >= 0 {
-				return 0
-			}
+		result = scaleInt64TowardZero(result, factorNumerator, 1000)
+		if result == 0 {
+			return 0
 		}
 	}
 

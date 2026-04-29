@@ -134,11 +134,11 @@ matching test ID(s) so an operator can skip script-covered items at a glance.
 5. Verify embedded design: `lumerad query --help` does not list `everlight`, and (best-effort) `lumerad export` shows no `app_state.everlight` and a non-empty `app_state.supernode`. **[AUTO: S1.5, S1.5b, S1.5c — S1.5b/c skip when export is unavailable on a running node]**
 
 ### Checklist
-- [ ] `reward_distribution` is exposed through supernode params *(scripted — S1.1*)*
-- [ ] `pool-state` returns valid values *(scripted — S1.2*)*
-- [ ] Supernode pool module account exists with embedded-pool permissions *(scripted — S1.3, S1.3c)*
-- [ ] Pool funding via `MsgSend` succeeds *(scripted — S1.3a/b)*
-- [ ] Embedded-supernode design verified at runtime / in export *(scripted — S1.5, S1.5b/c)*
+- [x] `reward_distribution` is exposed through supernode params *(scripted — S1.1*)*
+- [x] `pool-state` returns valid values *(scripted — S1.2*)*
+- [x] Supernode pool module account exists with embedded-pool permissions *(scripted — S1.3, S1.3c)*
+- [x] Pool funding via `MsgSend` succeeds *(scripted — S1.3a/b)*
+- [x] Embedded-supernode design verified at runtime / in export *(scripted — S1.5, S1.5b/c)*
 
 ---
 
@@ -157,11 +157,11 @@ matching test ID(s) so an operator can skip script-covered items at a glance.
 6. Submit legacy `report-supernode-metrics` with high disk usage -> Expected: legacy metrics path does not mutate state. **[AUTO: S2.7, S2.8]**
 
 ### Checklist
-- [ ] Storage-only audit violation produces `STORAGE_FULL` *(scripted — S2.3/4)*
-- [ ] Recovery to `ACTIVE` works *(scripted — S2.5/6)*
+- [x] Storage-only audit violation produces `STORAGE_FULL` *(scripted — S2.3/4)*
+- [x] Recovery to `ACTIVE` works *(scripted — S2.5/6)*
 - [x] Mixed-violation invariant: POSTPONED stays out of STORAGE_FULL *(Go tests in `x/audit/v1/keeper/enforcement_storagefull_transition_test.go` and `msg_submit_epoch_report_storagefull_test.go` PASS; devnet S11.2 is best-effort and may skip as inconclusive)*
-- [ ] Legacy metrics path does not mutate state *(scripted — S2.7/8)*
-- [ ] State transitions are queryable and observable *(scripted — S2.1, S2.4)*
+- [x] Legacy metrics path does not mutate state *(scripted — S2.7/8)*
+- [x] State transitions are queryable and observable *(scripted — S2.1, S2.4)*
 
 ---
 
@@ -180,11 +180,11 @@ matching test ID(s) so an operator can skip script-covered items at a glance.
 6. Query pool state -> Expected: pool balance decreases by the distributed amount, allowing dust. **[AUTO: S3.6c]**
 
 ### Checklist
-- [ ] Distribution triggers at the configured period *(scripted — S3.4)*
-- [ ] Payout ratios follow storage weight *(scripted — S3.7)*
-- [ ] Pool drains as expected *(scripted — S3.6c)*
-- [ ] `last_distribution_height` updates *(scripted — S3.4)*
-- [ ] No unexpected errors or panics occur *(scripted — implicit in absence of FAIL across S3.x)*
+- [x] Distribution triggers at the configured period *(scripted — S3.4)*
+- [x] Payout ratios follow storage weight *(scripted — S3.7)*
+- [x] Pool drains as expected *(scripted — S3.6c)*
+- [x] `last_distribution_height` updates *(scripted — S3.4)*
+- [x] No unexpected errors or panics occur *(scripted — implicit in absence of FAIL across S3.x)*
 
 ---
 
@@ -204,9 +204,9 @@ matching test ID(s) so an operator can skip script-covered items at a glance.
 ### Checklist
 - [x] Zero pool behaves safely *(`x/supernode/v1/keeper/distribution_test.go` PASS)*
 - [x] No eligible nodes behaves safely *(`x/supernode/v1/keeper/distribution_test.go`, `tests/integration/everlight` PASS)*
-- [ ] Below-threshold nodes are excluded *(scripted — S4.2/3)*
-- [ ] `STORAGE_FULL` nodes remain payout-eligible *(scripted — S4.1)*
-- [ ] Below-threshold node receives no payout in mixed run *(scripted — S4.4)*
+- [x] Below-threshold nodes are excluded *(scripted — S4.2/3)*
+- [x] `STORAGE_FULL` nodes remain payout-eligible *(scripted — S4.1)*
+- [x] Below-threshold node receives no payout in mixed run *(scripted — S4.4)*
 - [x] Behavior matches `tests/e2e/everlight` *(`go test ./tests/e2e/everlight` PASS)*
 
 ---
@@ -227,10 +227,10 @@ Additional script assertion: **S5.5** — `smoothed_weight` field is exposed via
 
 ### Checklist
 - [x] Ramp-up reduces early payouts *(`x/supernode/v1/keeper/distribution_test.go`, `tests/e2e/everlight` PASS)*
-- [ ] Growth cap limits sudden weight jumps *(scripted — S5.4)*
+- [x] Growth cap limits sudden weight jumps *(scripted — S5.4)*
 - [x] Smoothing dampens noisy reports *(`x/supernode/v1/keeper/distribution_test.go` PASS)*
 - [ ] Behavior is stable across multiple periods *(manual — long-window observation)*
-- [ ] `smoothed_weight` exposed via eligibility query *(scripted — S5.5)*
+- [x] `smoothed_weight` exposed via eligibility query *(scripted — S5.5)*
 
 ---
 
@@ -249,7 +249,7 @@ Additional script assertion: **S5.5** — `smoothed_weight` field is exposed via
 6. Repeat with a high configured share -> Expected: pool increase follows configured basis points. **[MANUAL — depends on step 3]**
 
 ### Checklist
-- [ ] Configured fee share parameter is present *(scripted — S6.1/2)*
+- [x] Configured fee share parameter is present *(scripted — S6.1/2)*
 - [x] Configured fee share reaches the pool *(`x/supernode/v1/keeper/fee_routing_test.go`, `tests/integration/action` PASS)*
 - [x] `0` bps disables routing *(`x/supernode/v1/keeper/fee_routing_test.go` PASS)*
 - [x] Higher bps increases routed share *(`x/supernode/v1/keeper/fee_routing_test.go` PASS)*
@@ -271,10 +271,10 @@ Additional script assertion: **S5.5** — `smoothed_weight` field is exposed via
 5. Submit invalid values -> Expected: validation rejects the update. **[AUTO: S7.8 — proposal sets `registration_fee_share_bps=20000` (> 10000 max), which fails `Validate()` at execution and lands the proposal in `PROPOSAL_STATUS_FAILED`/`REJECTED`. Note: `payment_period_blocks=0` cannot be tested directly because `WithDefaults()` rewrites a literal 0 to the default before `Validate()` runs.]**
 
 ### Checklist
-- [ ] Governance can update Everlight params *(scripted — S7.2/4/5/6)*
-- [ ] Updated values are queryable *(scripted — S7.6)*
-- [ ] Unauthorized senders are rejected *(scripted — S7.9)*
-- [ ] Invalid values are rejected *(scripted — S7.8)*
+- [x] Governance can update Everlight params *(scripted — S7.2/4/5/6)*
+- [x] Updated values are queryable *(scripted — S7.6)*
+- [x] Unauthorized senders are rejected *(scripted — S7.9)*
+- [x] Invalid values are rejected *(scripted — S7.8)*
 
 ---
 
@@ -292,10 +292,10 @@ Additional script assertion: **S5.5** — `smoothed_weight` field is exposed via
 5. Export genesis -> Expected: embedded Everlight params/state live under `app_state.supernode`. **[AUTO: S8.3 (runtime check via `lumerad query --help`); also S1.5b/c (best-effort export check)]**
 
 ### Checklist
-- [ ] `STORAGE_FULL` is visible through supernode API *(scripted — S2.4)*
-- [ ] `cascade_kademlia_db_bytes` is visible in expected query surfaces *(scripted — S8.1c)*
-- [ ] `SUPERNODE_STATE_*` names remain stable for downstream consumers *(scripted — S8.2/2a)*
-- [ ] Embedded Everlight state exports under `app_state.supernode` *(scripted — S8.3, S1.5b/c)*
+- [x] `STORAGE_FULL` is visible through supernode API *(scripted — S2.4)*
+- [x] `cascade_kademlia_db_bytes` is visible in expected query surfaces *(scripted — S8.1c)*
+- [x] `SUPERNODE_STATE_*` names remain stable for downstream consumers *(scripted — S8.2/2a)*
+- [x] Embedded Everlight state exports under `app_state.supernode` *(scripted — S8.3, S1.5b/c)*
 
 ---
 
@@ -322,7 +322,7 @@ Additional script assertion: **S5.5** — `smoothed_weight` field is exposed via
 - [x] Existing SuperNode states survive upgrade *(`go test ./app/upgrades/v1_12_0` PASS)*
 - [x] Existing actions survive upgrade *(`go test ./app/upgrades/v1_12_0` PASS)*
 - [x] Embedded Everlight defaults are initialized *(`go test ./app/upgrades/v1_12_0` PASS)*
-- [ ] Upgraded chain exposes the consolidated query surface *(scripted on post-upgrade chain — S1.5, S8.3)*
+- [x] Upgraded chain exposes the consolidated query surface *(scripted on post-upgrade chain — S1.5, S8.3)*
 
 ---
 
@@ -351,11 +351,11 @@ Additional script assertion: **S5.5** — `smoothed_weight` field is exposed via
 8. Lower one node below `min_cascade_bytes_for_payment` and trigger the next period -> Expected: that node stops receiving payouts. **[AUTO: S4.2, S4.3, S4.4]**
 
 ### Checklist
-- [ ] Foundation funding works *(scripted — S1.3a/b)*
+- [x] Foundation funding works *(scripted — S1.3a/b)*
 - [x] Registration fee share augments the pool *(`x/supernode/v1/keeper/fee_routing_test.go`, `tests/integration/action` PASS)*
-- [ ] `STORAGE_FULL` nodes stay payout-eligible *(scripted — S4.1)*
-- [ ] Below-threshold nodes become payout-ineligible *(scripted — S4.3, S4.4)*
-- [ ] Multi-period lifecycle behaves consistently *(scripted — composition of S1–S8)*
+- [x] `STORAGE_FULL` nodes stay payout-eligible *(scripted — S4.1)*
+- [x] Below-threshold nodes become payout-ineligible *(scripted — S4.3, S4.4)*
+- [x] Multi-period lifecycle behaves consistently *(scripted — composition of S1–S8)*
 
 ---
 

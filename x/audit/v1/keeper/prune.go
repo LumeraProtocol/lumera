@@ -77,11 +77,56 @@ func (k Keeper) PruneOldEpochs(ctx sdk.Context, currentEpochID uint64, params ty
 	// Records are not epoch-keyed, so decode value to filter.
 	pruneStorageProofTranscripts(ctx, k, store, []byte("st/spt/"), minKeepEpochID)
 
+	// F-C1 — TicketDeteriorationState is keyed by ticket_id (not epoch),
+	// but is scanned at every epoch end for heal scheduling. Prune only
+	// semantically inert rows: old, zero-score, and without an active heal-op.
+	if err := k.pruneInactiveTicketDeteriorationStates(ctx, currentEpochID, keepLastEpochEntries); err != nil {
+		return err
+	}
+
 	// Per 120-F3 — terminal heal-ops pruned to bound chain state growth.
 	if err := k.pruneTerminalHealOps(ctx, currentEpochID, keepLastEpochEntries); err != nil {
 		return err
 	}
 
+	return nil
+}
+
+func (k Keeper) pruneInactiveTicketDeteriorationStates(ctx sdk.Context, currentEpochID, keepLastEpochEntries uint64) error {
+	if keepLastEpochEntries == 0 || currentEpochID <= keepLastEpochEntries {
+		return nil
+	}
+	pruneBeforeEpoch := currentEpochID - keepLastEpochEntries
+
+	store := k.kvStore(ctx)
+	prefix := types.TicketDeteriorationStatePrefix()
+	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
+	defer it.Close()
+
+	var toDelete [][]byte
+	for ; it.Valid(); it.Next() {
+		var state types.TicketDeteriorationState
+		k.cdc.MustUnmarshal(it.Value(), &state)
+
+		// Strictly match Zee's final-gate criterion:
+		// LastUpdatedEpoch + KeepLastEpochEntries < currentEpochID.
+		// Written as LastUpdatedEpoch < currentEpochID-KeepLastEpochEntries
+		// to avoid uint64 overflow.
+		if state.LastUpdatedEpoch >= pruneBeforeEpoch {
+			continue
+		}
+		if state.DeteriorationScore != 0 || state.ActiveHealOpId != 0 {
+			continue
+		}
+
+		kc := make([]byte, len(it.Key()))
+		copy(kc, it.Key())
+		toDelete = append(toDelete, kc)
+	}
+
+	for _, key := range toDelete {
+		store.Delete(key)
+	}
 	return nil
 }
 

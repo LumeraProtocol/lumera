@@ -88,3 +88,49 @@ func TestValidateScoreStatesGenesis_TicketArtifactCountStates(t *testing.T) {
 		require.NoError(t, types.ValidateScoreStatesGenesis(g, currentEpoch))
 	})
 }
+
+func TestGenesisStateValidate_DuplicateEvidenceAndHealOpIDs(t *testing.T) {
+	t.Run("duplicate evidence id rejected", func(t *testing.T) {
+		g := types.GenesisState{
+			Params: types.DefaultParams(),
+			Evidence: []types.Evidence{
+				{EvidenceId: 7},
+				{EvidenceId: 7},
+			},
+		}
+
+		err := g.Validate()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "duplicate evidence_id 7")
+	})
+
+	t.Run("duplicate heal op id rejected", func(t *testing.T) {
+		g := types.GenesisState{
+			Params: types.DefaultParams(),
+			HealOps: []types.HealOp{
+				{HealOpId: 9},
+				{HealOpId: 9},
+			},
+		}
+
+		err := g.Validate()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "duplicate heal_op_id 9")
+	})
+
+	t.Run("unique ids accepted", func(t *testing.T) {
+		g := types.GenesisState{
+			Params: types.DefaultParams(),
+			Evidence: []types.Evidence{
+				{EvidenceId: 7},
+				{EvidenceId: 8},
+			},
+			HealOps: []types.HealOp{
+				{HealOpId: 9},
+				{HealOpId: 10},
+			},
+		}
+
+		require.NoError(t, g.Validate())
+	})
+}

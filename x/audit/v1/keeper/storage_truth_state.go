@@ -303,3 +303,32 @@ func (k Keeper) GetAllHealOpVerifications(ctx sdk.Context, healOpID uint64) (map
 	}
 	return verifications, nil
 }
+
+// GetAllHealOpVerificationsForGenesis returns all st/hov/ per-verifier heal-op
+// votes for genesis export. Per final-gate F-B4.
+func (k Keeper) GetAllHealOpVerificationsForGenesis(ctx sdk.Context) []types.GenesisHealOpVerification {
+	store := k.kvStore(ctx)
+	prefix := types.HealOpVerificationRootPrefix()
+	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
+	defer it.Close()
+
+	var out []types.GenesisHealOpVerification
+	for ; it.Valid(); it.Next() {
+		key := it.Key()
+		bz := it.Value()
+		if len(key) <= len(prefix)+8+1 || len(bz) == 0 {
+			continue
+		}
+		rest := key[len(prefix):]
+		healOpID := binary.BigEndian.Uint64(rest[:8])
+		if rest[8] != '/' || len(rest[9:]) == 0 {
+			continue
+		}
+		out = append(out, types.GenesisHealOpVerification{
+			HealOpId:                 healOpID,
+			VerifierSupernodeAccount: string(rest[9:]),
+			Verified:                 bz[0] == 1,
+		})
+	}
+	return out
+}

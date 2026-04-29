@@ -92,13 +92,17 @@ func (k Keeper) setStorageProofTranscriptRecord(ctx sdk.Context, transcriptHash 
 	if err != nil {
 		return err
 	}
-	store := k.kvStore(ctx)
-	store.Set(types.StorageProofTranscriptKey(transcriptHash), bz)
-	// Per 122-Copilot-4/5 + 122-F1 — indexed lookup avoids DeliverTx full-table scan.
-	if record.TargetAccount != "" {
-		store.Set(types.TranscriptByTargetBucketEpochKey(record.TargetAccount, uint32(record.BucketType), record.EpochID, transcriptHash), bz)
-	}
+	k.setStorageProofTranscriptRaw(ctx, transcriptHash, record.TargetAccount, uint32(record.BucketType), record.EpochID, bz)
 	return nil
+}
+
+func (k Keeper) setStorageProofTranscriptRaw(ctx sdk.Context, transcriptHash string, targetAccount string, bucketType uint32, epochID uint64, recordJSON []byte) {
+	store := k.kvStore(ctx)
+	store.Set(types.StorageProofTranscriptKey(transcriptHash), recordJSON)
+	// Per 122-Copilot-4/5 + 122-F1 — indexed lookup avoids DeliverTx full-table scan.
+	if targetAccount != "" {
+		store.Set(types.TranscriptByTargetBucketEpochKey(targetAccount, bucketType, epochID, transcriptHash), recordJSON)
+	}
 }
 
 func (k Keeper) getStorageProofTranscriptRecord(ctx sdk.Context, transcriptHash string) (storageProofTranscriptRecord, bool, error) {
@@ -401,20 +405,26 @@ func (k Keeper) GetAllStorageProofTranscriptsForGenesis(ctx sdk.Context) []types
 	return out
 }
 
-// importStorageProofTranscriptForGenesis re-emits a transcript record (writing the
+// importStorageProofTranscriptForGenesis re-emits raw transcript JSON bytes (writing the
 // st/spt-tbe/ secondary index alongside) so genesis-imported state matches runtime.
+// Per final-gate F-B10, decode only the index fields and preserve unknown future
+// JSON fields byte-for-byte for cross-version genesis import compatibility.
 func (k Keeper) importStorageProofTranscriptForGenesis(ctx sdk.Context, hash string, recordJSON []byte) error {
-	var rec storageProofTranscriptRecord
+	var indexFields struct {
+		EpochID       uint64 `json:"epoch_id"`
+		TargetAccount string `json:"target_account"`
+		BucketType    int32  `json:"bucket_type"`
+	}
 	dec := json.NewDecoder(bytes.NewReader(recordJSON))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&rec); err != nil {
+	if err := dec.Decode(&indexFields); err != nil {
 		return err
 	}
 	var extra struct{}
 	if err := dec.Decode(&extra); err != io.EOF {
 		return errorsmod.Wrap(types.ErrInvalidStorageProofs, "storage proof transcript genesis record contains trailing JSON data")
 	}
-	return k.setStorageProofTranscriptRecord(ctx, hash, rec)
+	k.setStorageProofTranscriptRaw(ctx, hash, indexFields.TargetAccount, uint32(indexFields.BucketType), indexFields.EpochID, append([]byte(nil), recordJSON...))
+	return nil
 }
 
 // GetAllNodeFailureFactsForGenesis exports all st/nf/ records.

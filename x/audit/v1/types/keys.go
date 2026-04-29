@@ -444,6 +444,10 @@ func HealOpVerificationPrefix(healOpID uint64) []byte {
 	return key
 }
 
+func HealOpVerificationRootPrefix() []byte {
+	return healOpVerificationPrefix
+}
+
 func StorageTruthPostponementKey(supernodeAccount string) []byte {
 	key := make([]byte, 0, len(storageTruthPostponementPrefix)+len(supernodeAccount))
 	key = append(key, storageTruthPostponementPrefix...)

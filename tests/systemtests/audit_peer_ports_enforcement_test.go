@@ -10,10 +10,7 @@ import (
 )
 
 func TestAuditPeerPortsUnanimousClosedPostponesAfterConsecutiveWindows(t *testing.T) {
-	const (
-		epochLengthBlocks = uint64(10)
-	)
-	const originHeight = int64(1)
+	const epochLengthBlocks = uint64(10)
 
 	sut.ModifyGenesisJSON(t,
 		setSupernodeParamsForAuditTests(t),
@@ -34,58 +31,43 @@ func TestAuditPeerPortsUnanimousClosedPostponesAfterConsecutiveWindows(t *testin
 	registerSupernode(t, cli, n0, "192.168.1.1")
 	registerSupernode(t, cli, n1, "192.168.1.2")
 
-	currentHeight := sut.AwaitNextBlock(t)
-	epochID1, epoch1Start := nextEpochAfterHeight(originHeight, epochLengthBlocks, currentHeight)
-	epochID2 := epochID1 + 1
-	epoch2Start := epoch1Start + int64(epochLengthBlocks)
-	enforce2 := epoch2Start + int64(epochLengthBlocks)
-
-	senders := sortedStrings(n0.accAddr, n1.accAddr)
-	receivers := sortedStrings(n0.accAddr, n1.accAddr)
-	kEpoch := computeKEpoch(1, 1, 1, len(senders), len(receivers))
-	require.Equal(t, uint32(1), kEpoch)
-
 	hostOpen := auditHostReportJSON([]string{"PORT_STATE_OPEN"})
 
-	// Window 1: node0 reports node1 as CLOSED, node1 reports node0 as OPEN.
-	awaitAtLeastHeight(t, epoch1Start)
-	seed1 := epochSeedAtHeight(t, sut.rpcAddr, epoch1Start, epochID1)
-	targets0e1, ok := assignedTargets(seed1, senders, receivers, kEpoch, n0.accAddr)
-	require.True(t, ok)
-	require.Len(t, targets0e1, 1)
-	targets1e1, ok := assignedTargets(seed1, senders, receivers, kEpoch, n1.accAddr)
-	require.True(t, ok)
-	require.Len(t, targets1e1, 1)
+	// Window 1: wait for the real persisted anchor to include both registered reporters,
+	// then use the on-chain assignment query instead of locally guessing epoch membership.
+	anchor1 := awaitCurrentEpochAnchorWithActiveSupernodes(t, 0, n0.accAddr, n1.accAddr)
+	assigned0e1 := auditQueryAssignedTargets(t, anchor1.EpochId, true, n0.accAddr)
+	require.Len(t, assigned0e1.TargetSupernodeAccounts, 1)
+	assigned1e1 := auditQueryAssignedTargets(t, anchor1.EpochId, true, n1.accAddr)
+	require.Len(t, assigned1e1.TargetSupernodeAccounts, 1)
 
-	tx0e1 := submitEpochReport(t, cli, n0.nodeName, epochID1, hostOpen, []string{
-		storageChallengeObservationJSON(targets0e1[0], []string{"PORT_STATE_CLOSED"}),
+	tx0e1 := submitEpochReport(t, cli, n0.nodeName, anchor1.EpochId, hostOpen, []string{
+		storageChallengeObservationJSON(assigned0e1.TargetSupernodeAccounts[0], []string{"PORT_STATE_CLOSED"}),
 	})
 	RequireTxSuccess(t, tx0e1)
-	tx1e1 := submitEpochReport(t, cli, n1.nodeName, epochID1, hostOpen, []string{
-		storageChallengeObservationJSON(targets1e1[0], []string{"PORT_STATE_OPEN"}),
+	tx1e1 := submitEpochReport(t, cli, n1.nodeName, anchor1.EpochId, hostOpen, []string{
+		storageChallengeObservationJSON(assigned1e1.TargetSupernodeAccounts[0], []string{"PORT_STATE_OPEN"}),
 	})
 	RequireTxSuccess(t, tx1e1)
 
-	// Window 2: repeat -> node1 should be POSTPONED at window end due to consecutive unanimous CLOSED.
-	awaitAtLeastHeight(t, epoch2Start)
-	seed2 := epochSeedAtHeight(t, sut.rpcAddr, epoch2Start, epochID2)
-	targets0e2, ok := assignedTargets(seed2, senders, receivers, kEpoch, n0.accAddr)
-	require.True(t, ok)
-	require.Len(t, targets0e2, 1)
-	targets1e2, ok := assignedTargets(seed2, senders, receivers, kEpoch, n1.accAddr)
-	require.True(t, ok)
-	require.Len(t, targets1e2, 1)
+	// Window 2: repeat in the next anchored epoch. The target should be POSTPONED
+	// at epoch end due to consecutive unanimous CLOSED observations.
+	anchor2 := awaitCurrentEpochAnchorWithActiveSupernodes(t, anchor1.EpochId+1, n0.accAddr, n1.accAddr)
+	assigned0e2 := auditQueryAssignedTargets(t, anchor2.EpochId, true, n0.accAddr)
+	require.Len(t, assigned0e2.TargetSupernodeAccounts, 1)
+	assigned1e2 := auditQueryAssignedTargets(t, anchor2.EpochId, true, n1.accAddr)
+	require.Len(t, assigned1e2.TargetSupernodeAccounts, 1)
 
-	tx0e2 := submitEpochReport(t, cli, n0.nodeName, epochID2, hostOpen, []string{
-		storageChallengeObservationJSON(targets0e2[0], []string{"PORT_STATE_CLOSED"}),
+	tx0e2 := submitEpochReport(t, cli, n0.nodeName, anchor2.EpochId, hostOpen, []string{
+		storageChallengeObservationJSON(assigned0e2.TargetSupernodeAccounts[0], []string{"PORT_STATE_CLOSED"}),
 	})
 	RequireTxSuccess(t, tx0e2)
-	tx1e2 := submitEpochReport(t, cli, n1.nodeName, epochID2, hostOpen, []string{
-		storageChallengeObservationJSON(targets1e2[0], []string{"PORT_STATE_OPEN"}),
+	tx1e2 := submitEpochReport(t, cli, n1.nodeName, anchor2.EpochId, hostOpen, []string{
+		storageChallengeObservationJSON(assigned1e2.TargetSupernodeAccounts[0], []string{"PORT_STATE_OPEN"}),
 	})
 	RequireTxSuccess(t, tx1e2)
 
-	awaitAtLeastHeight(t, enforce2)
+	awaitAtLeastHeight(t, anchor2.EpochEndHeight+1)
 
 	require.Equal(t, "SUPERNODE_STATE_ACTIVE", querySupernodeLatestState(t, cli, n0.valAddr))
 	require.Equal(t, "SUPERNODE_STATE_POSTPONED", querySupernodeLatestState(t, cli, n1.valAddr))

@@ -132,6 +132,213 @@ func TestSubmitEpochReport_ValidatesInboundPortStatesLength(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestSubmitEpochReport_AcceptsPartialStorageChallengeObservationsAndPenalizesReporter(t *testing.T) {
+	f := initFixture(t)
+	f.ctx = f.ctx.WithBlockHeight(1).WithEventManager(sdk.NewEventManager())
+
+	params := types.DefaultParams().WithDefaults()
+	params.StorageTruthEnforcementMode = types.StorageTruthEnforcementMode_STORAGE_TRUTH_ENFORCEMENT_MODE_UNSPECIFIED
+	require.NoError(t, f.keeper.SetParams(f.ctx, params))
+
+	ms := keeper.NewMsgServerImpl(f.keeper)
+
+	reporter := "sn-aaa-reporter"
+	target1 := "sn-bbb-target"
+	target2 := "sn-ccc-target"
+	target3 := "sn-ddd-target"
+	activeAndTargets := []string{reporter, target1, target2, target3}
+
+	f.supernodeKeeper.EXPECT().
+		GetSuperNodeByAccount(gomock.Any(), reporter).
+		Return(sntypes.SuperNode{}, true, nil).
+		AnyTimes()
+
+	seedEpochAnchorForReportTest(t, f, 0, activeAndTargets, activeAndTargets)
+
+	portStates := make([]types.PortState, len(types.DefaultRequiredOpenPorts))
+	for i := range portStates {
+		portStates[i] = types.PortState_PORT_STATE_OPEN
+	}
+
+	_, err := ms.SubmitEpochReport(f.ctx, &types.MsgSubmitEpochReport{
+		Creator: reporter,
+		EpochId: 0,
+		HostReport: types.HostReport{
+			InboundPortStates: portStates,
+		},
+		StorageChallengeObservations: []*types.StorageChallengeObservation{
+			{TargetSupernodeAccount: target1, PortStates: portStates},
+			{TargetSupernodeAccount: target2, PortStates: portStates},
+		},
+	})
+	require.NoError(t, err)
+
+	report, found := f.keeper.GetReport(f.ctx, 0, reporter)
+	require.True(t, found)
+	require.Len(t, report.StorageChallengeObservations, 2)
+
+	state, found := f.keeper.GetReporterReliabilityState(f.ctx, reporter)
+	require.True(t, found)
+	require.Equal(t, int64(8), state.ReliabilityScore)
+	require.Equal(t, uint64(0), state.LastUpdatedEpoch)
+	require.Equal(t, types.ReporterTrustBand_REPORTER_TRUST_BAND_NORMAL, state.TrustBand)
+
+	var foundReason bool
+	for _, event := range f.ctx.EventManager().Events() {
+		if event.Type != types.EventTypeStorageTruthScoreUpdated {
+			continue
+		}
+		attrs := make(map[string]string, len(event.Attributes))
+		for _, attr := range event.Attributes {
+			attrs[string(attr.Key)] = string(attr.Value)
+		}
+		if attrs["reason"] == "INCOMPLETE_REPORT" {
+			foundReason = true
+			require.Equal(t, reporter, attrs[types.AttributeKeyReporterSupernodeAccount])
+			require.Equal(t, "8", attrs[types.AttributeKeyReporterReliabilityScore])
+		}
+	}
+	require.True(t, foundReason, "expected INCOMPLETE_REPORT scoring event")
+}
+
+func TestSubmitEpochReport_FullStorageChallengeCoverageDoesNotPenalizeReporter(t *testing.T) {
+	f := initFixture(t)
+	f.ctx = f.ctx.WithBlockHeight(1).WithEventManager(sdk.NewEventManager())
+
+	params := types.DefaultParams().WithDefaults()
+	params.StorageTruthEnforcementMode = types.StorageTruthEnforcementMode_STORAGE_TRUTH_ENFORCEMENT_MODE_UNSPECIFIED
+	require.NoError(t, f.keeper.SetParams(f.ctx, params))
+
+	ms := keeper.NewMsgServerImpl(f.keeper)
+
+	reporter := "sn-aaa-reporter"
+	target1 := "sn-bbb-target"
+	target2 := "sn-ccc-target"
+	target3 := "sn-ddd-target"
+	activeAndTargets := []string{reporter, target1, target2, target3}
+
+	f.supernodeKeeper.EXPECT().
+		GetSuperNodeByAccount(gomock.Any(), reporter).
+		Return(sntypes.SuperNode{}, true, nil).
+		AnyTimes()
+
+	seedEpochAnchorForReportTest(t, f, 0, activeAndTargets, activeAndTargets)
+
+	portStates := make([]types.PortState, len(types.DefaultRequiredOpenPorts))
+	for i := range portStates {
+		portStates[i] = types.PortState_PORT_STATE_OPEN
+	}
+
+	_, err := ms.SubmitEpochReport(f.ctx, &types.MsgSubmitEpochReport{
+		Creator: reporter,
+		EpochId: 0,
+		HostReport: types.HostReport{
+			InboundPortStates: portStates,
+		},
+		StorageChallengeObservations: []*types.StorageChallengeObservation{
+			{TargetSupernodeAccount: target1, PortStates: portStates},
+			{TargetSupernodeAccount: target2, PortStates: portStates},
+			{TargetSupernodeAccount: target3, PortStates: portStates},
+		},
+	})
+	require.NoError(t, err)
+
+	_, found := f.keeper.GetReporterReliabilityState(f.ctx, reporter)
+	require.False(t, found, "complete peer-observation coverage must not create reporter reliability penalty state")
+	for _, event := range f.ctx.EventManager().Events() {
+		if event.Type != types.EventTypeStorageTruthScoreUpdated {
+			continue
+		}
+		for _, attr := range event.Attributes {
+			require.NotEqual(t, "INCOMPLETE_REPORT", string(attr.Value))
+		}
+	}
+}
+
+func TestSubmitEpochReport_StillRejectsInvalidStorageChallengeObservations(t *testing.T) {
+	testCases := []struct {
+		name          string
+		observations  func(portStates []types.PortState) []*types.StorageChallengeObservation
+		wantErr       error
+		wantSubstring string
+	}{
+		{
+			name: "nil observation",
+			observations: func(_ []types.PortState) []*types.StorageChallengeObservation {
+				return []*types.StorageChallengeObservation{nil}
+			},
+			wantErr:       types.ErrInvalidPeerObservations,
+			wantSubstring: "nil storage challenge observation",
+		},
+		{
+			name: "unassigned target",
+			observations: func(portStates []types.PortState) []*types.StorageChallengeObservation {
+				return []*types.StorageChallengeObservation{{TargetSupernodeAccount: "sn-zzz-unassigned", PortStates: portStates}}
+			},
+			wantErr:       types.ErrInvalidPeerObservations,
+			wantSubstring: "is not assigned to reporter",
+		},
+		{
+			name: "duplicate target",
+			observations: func(portStates []types.PortState) []*types.StorageChallengeObservation {
+				return []*types.StorageChallengeObservation{
+					{TargetSupernodeAccount: "sn-bbb-target", PortStates: portStates},
+					{TargetSupernodeAccount: "sn-bbb-target", PortStates: portStates},
+				}
+			},
+			wantErr:       types.ErrInvalidPeerObservations,
+			wantSubstring: "duplicate storage challenge observation",
+		},
+		{
+			name: "wrong port-state length",
+			observations: func(_ []types.PortState) []*types.StorageChallengeObservation {
+				return []*types.StorageChallengeObservation{{TargetSupernodeAccount: "sn-bbb-target", PortStates: []types.PortState{types.PortState_PORT_STATE_OPEN}}}
+			},
+			wantErr:       types.ErrInvalidPortStatesLength,
+			wantSubstring: "port_states length",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			f := initFixture(t)
+			f.ctx = f.ctx.WithBlockHeight(1)
+
+			params := types.DefaultParams().WithDefaults()
+			params.StorageTruthEnforcementMode = types.StorageTruthEnforcementMode_STORAGE_TRUTH_ENFORCEMENT_MODE_UNSPECIFIED
+			require.NoError(t, f.keeper.SetParams(f.ctx, params))
+
+			ms := keeper.NewMsgServerImpl(f.keeper)
+			reporter := "sn-aaa-reporter"
+			activeAndTargets := []string{reporter, "sn-bbb-target", "sn-ccc-target", "sn-ddd-target"}
+
+			f.supernodeKeeper.EXPECT().
+				GetSuperNodeByAccount(gomock.Any(), reporter).
+				Return(sntypes.SuperNode{}, true, nil).
+				AnyTimes()
+
+			seedEpochAnchorForReportTest(t, f, 0, activeAndTargets, activeAndTargets)
+
+			portStates := make([]types.PortState, len(types.DefaultRequiredOpenPorts))
+			for i := range portStates {
+				portStates[i] = types.PortState_PORT_STATE_OPEN
+			}
+
+			_, err := ms.SubmitEpochReport(f.ctx, &types.MsgSubmitEpochReport{
+				Creator: reporter,
+				EpochId: 0,
+				HostReport: types.HostReport{
+					InboundPortStates: portStates,
+				},
+				StorageChallengeObservations: tc.observations(portStates),
+			})
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tc.wantErr.Error())
+			require.Contains(t, err.Error(), tc.wantSubstring)
+		})
+	}
+}
+
 func TestSubmitEpochReport_PersistsStorageProofResults(t *testing.T) {
 	f := initFixture(t)
 	f.ctx = f.ctx.WithBlockHeight(1)

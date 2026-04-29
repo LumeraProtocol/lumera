@@ -379,6 +379,18 @@ func auditQueryReport(t *testing.T, epochID uint64, reporterSupernodeAccount str
 	return resp.Report
 }
 
+func auditQueryReporterReliabilityState(t *testing.T, reporterSupernodeAccount string) audittypes.ReporterReliabilityState {
+	t.Helper()
+	qc, _ := newAuditQueryClient(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	resp, err := qc.ReporterReliabilityState(ctx, &audittypes.QueryReporterReliabilityStateRequest{
+		ReporterSupernodeAccount: reporterSupernodeAccount,
+	})
+	require.NoError(t, err)
+	return resp.State
+}
+
 func auditQueryAssignedTargets(t *testing.T, epochID uint64, filterByEpochID bool, proberSupernodeAccount string) audittypes.QueryAssignedTargetsResponse {
 	t.Helper()
 	qc, _ := newAuditQueryClient(t)

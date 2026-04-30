@@ -30,7 +30,36 @@ type GenesisState struct {
 	// evidence defines the initial evidence records (optional).
 	Evidence []Evidence `protobuf:"bytes,2,rep,name=evidence,proto3" json:"evidence"`
 	// next_evidence_id is the next id to use for chain-assigned ids.
-	NextEvidenceId uint64 `protobuf:"varint,3,opt,name=next_evidence_id,json=nextEvidenceId,proto3" json:"next_evidence_id,omitempty"`
+	NextEvidenceId            uint64                     `protobuf:"varint,3,opt,name=next_evidence_id,json=nextEvidenceId,proto3" json:"next_evidence_id,omitempty"`
+	NodeSuspicionStates       []NodeSuspicionState       `protobuf:"bytes,4,rep,name=node_suspicion_states,json=nodeSuspicionStates,proto3" json:"node_suspicion_states"`
+	ReporterReliabilityStates []ReporterReliabilityState `protobuf:"bytes,5,rep,name=reporter_reliability_states,json=reporterReliabilityStates,proto3" json:"reporter_reliability_states"`
+	TicketDeteriorationStates []TicketDeteriorationState `protobuf:"bytes,6,rep,name=ticket_deterioration_states,json=ticketDeteriorationStates,proto3" json:"ticket_deterioration_states"`
+	HealOps                   []HealOp                   `protobuf:"bytes,7,rep,name=heal_ops,json=healOps,proto3" json:"heal_ops"`
+	// next_heal_op_id is the next id to use for storage-truth heal operations.
+	NextHealOpId              uint64                     `protobuf:"varint,8,opt,name=next_heal_op_id,json=nextHealOpId,proto3" json:"next_heal_op_id,omitempty"`
+	TicketArtifactCountStates []TicketArtifactCountState `protobuf:"bytes,9,rep,name=ticket_artifact_count_states,json=ticketArtifactCountStates,proto3" json:"ticket_artifact_count_states"`
+	// storage_truth_postponements records active per-supernode postponement markers
+	// exported/imported at genesis. Per 121-F7.
+	StorageTruthPostponements []StorageTruthPostponement `protobuf:"bytes,10,rep,name=storage_truth_postponements,json=storageTruthPostponements,proto3" json:"storage_truth_postponements"`
+	// Per NEW-C-1: round-trip every epoch-scoped audit prefix.
+	RecheckEvidence         []GenesisRecheckEvidence        `protobuf:"bytes,11,rep,name=recheck_evidence,json=recheckEvidence,proto3" json:"recheck_evidence"`
+	StorageProofTranscripts []GenesisStorageProofTranscript `protobuf:"bytes,12,rep,name=storage_proof_transcripts,json=storageProofTranscripts,proto3" json:"storage_proof_transcripts"`
+	NodeFailureFacts        []GenesisNodeFailureFact        `protobuf:"bytes,13,rep,name=node_failure_facts,json=nodeFailureFacts,proto3" json:"node_failure_facts"`
+	ReporterResultFacts     []GenesisReporterResultFact     `protobuf:"bytes,14,rep,name=reporter_result_facts,json=reporterResultFacts,proto3" json:"reporter_result_facts"`
+	FailedHealMarkers       []GenesisFailedHealMarker       `protobuf:"bytes,15,rep,name=failed_heal_markers,json=failedHealMarkers,proto3" json:"failed_heal_markers"`
+	EpochReports            []EpochReport                   `protobuf:"bytes,16,rep,name=epoch_reports,json=epochReports,proto3" json:"epoch_reports"`
+	ReportIndices           []GenesisReportIndex            `protobuf:"bytes,17,rep,name=report_indices,json=reportIndices,proto3" json:"report_indices"`
+	HostReportIndices       []GenesisHostReportIndex        `protobuf:"bytes,18,rep,name=host_report_indices,json=hostReportIndices,proto3" json:"host_report_indices"`
+	StorageChallengeIndices []GenesisStorageChallengeIndex  `protobuf:"bytes,19,rep,name=storage_challenge_indices,json=storageChallengeIndices,proto3" json:"storage_challenge_indices"`
+	// Per final-gate F-B2 — action-finalization postponement markers must
+	// survive export/import workflows.
+	ActionFinalizationPostponements []GenesisActionFinalizationPostponement `protobuf:"bytes,20,rep,name=action_finalization_postponements,json=actionFinalizationPostponements,proto3" json:"action_finalization_postponements"`
+	// Per final-gate F-B3 — evidence per-epoch aggregate counters must
+	// survive export/import workflows.
+	EvidenceEpochCounts []GenesisEvidenceEpochCount `protobuf:"bytes,21,rep,name=evidence_epoch_counts,json=evidenceEpochCounts,proto3" json:"evidence_epoch_counts"`
+	// Per final-gate F-B4 — per-verifier heal-op votes must survive
+	// export/import workflows.
+	HealOpVerifications []GenesisHealOpVerification `protobuf:"bytes,22,rep,name=heal_op_verifications,json=healOpVerifications,proto3" json:"heal_op_verifications"`
 }
 
 func (m *GenesisState) Reset()         { *m = GenesisState{} }
@@ -87,31 +116,985 @@ func (m *GenesisState) GetNextEvidenceId() uint64 {
 	return 0
 }
 
+func (m *GenesisState) GetNodeSuspicionStates() []NodeSuspicionState {
+	if m != nil {
+		return m.NodeSuspicionStates
+	}
+	return nil
+}
+
+func (m *GenesisState) GetReporterReliabilityStates() []ReporterReliabilityState {
+	if m != nil {
+		return m.ReporterReliabilityStates
+	}
+	return nil
+}
+
+func (m *GenesisState) GetTicketDeteriorationStates() []TicketDeteriorationState {
+	if m != nil {
+		return m.TicketDeteriorationStates
+	}
+	return nil
+}
+
+func (m *GenesisState) GetHealOps() []HealOp {
+	if m != nil {
+		return m.HealOps
+	}
+	return nil
+}
+
+func (m *GenesisState) GetNextHealOpId() uint64 {
+	if m != nil {
+		return m.NextHealOpId
+	}
+	return 0
+}
+
+func (m *GenesisState) GetTicketArtifactCountStates() []TicketArtifactCountState {
+	if m != nil {
+		return m.TicketArtifactCountStates
+	}
+	return nil
+}
+
+func (m *GenesisState) GetStorageTruthPostponements() []StorageTruthPostponement {
+	if m != nil {
+		return m.StorageTruthPostponements
+	}
+	return nil
+}
+
+func (m *GenesisState) GetRecheckEvidence() []GenesisRecheckEvidence {
+	if m != nil {
+		return m.RecheckEvidence
+	}
+	return nil
+}
+
+func (m *GenesisState) GetStorageProofTranscripts() []GenesisStorageProofTranscript {
+	if m != nil {
+		return m.StorageProofTranscripts
+	}
+	return nil
+}
+
+func (m *GenesisState) GetNodeFailureFacts() []GenesisNodeFailureFact {
+	if m != nil {
+		return m.NodeFailureFacts
+	}
+	return nil
+}
+
+func (m *GenesisState) GetReporterResultFacts() []GenesisReporterResultFact {
+	if m != nil {
+		return m.ReporterResultFacts
+	}
+	return nil
+}
+
+func (m *GenesisState) GetFailedHealMarkers() []GenesisFailedHealMarker {
+	if m != nil {
+		return m.FailedHealMarkers
+	}
+	return nil
+}
+
+func (m *GenesisState) GetEpochReports() []EpochReport {
+	if m != nil {
+		return m.EpochReports
+	}
+	return nil
+}
+
+func (m *GenesisState) GetReportIndices() []GenesisReportIndex {
+	if m != nil {
+		return m.ReportIndices
+	}
+	return nil
+}
+
+func (m *GenesisState) GetHostReportIndices() []GenesisHostReportIndex {
+	if m != nil {
+		return m.HostReportIndices
+	}
+	return nil
+}
+
+func (m *GenesisState) GetStorageChallengeIndices() []GenesisStorageChallengeIndex {
+	if m != nil {
+		return m.StorageChallengeIndices
+	}
+	return nil
+}
+
+func (m *GenesisState) GetActionFinalizationPostponements() []GenesisActionFinalizationPostponement {
+	if m != nil {
+		return m.ActionFinalizationPostponements
+	}
+	return nil
+}
+
+func (m *GenesisState) GetEvidenceEpochCounts() []GenesisEvidenceEpochCount {
+	if m != nil {
+		return m.EvidenceEpochCounts
+	}
+	return nil
+}
+
+func (m *GenesisState) GetHealOpVerifications() []GenesisHealOpVerification {
+	if m != nil {
+		return m.HealOpVerifications
+	}
+	return nil
+}
+
+// StorageTruthPostponement records a supernode's storage-truth postponement state
+// for genesis export/import. Per 121-F7.
+type StorageTruthPostponement struct {
+	SupernodeAccount   string `protobuf:"bytes,1,opt,name=supernode_account,json=supernodeAccount,proto3" json:"supernode_account,omitempty"`
+	PostponedAtEpochId uint64 `protobuf:"varint,2,opt,name=postponed_at_epoch_id,json=postponedAtEpochId,proto3" json:"postponed_at_epoch_id,omitempty"`
+	// strong_postpone preserves the companion ap/sts/ marker (final-gate F-B1).
+	StrongPostpone bool `protobuf:"varint,3,opt,name=strong_postpone,json=strongPostpone,proto3" json:"strong_postpone,omitempty"`
+}
+
+func (m *StorageTruthPostponement) Reset()         { *m = StorageTruthPostponement{} }
+func (m *StorageTruthPostponement) String() string { return proto.CompactTextString(m) }
+func (*StorageTruthPostponement) ProtoMessage()    {}
+func (*StorageTruthPostponement) Descriptor() ([]byte, []int) {
+	return fileDescriptor_a433cb4f206fdbad, []int{1}
+}
+func (m *StorageTruthPostponement) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *StorageTruthPostponement) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_StorageTruthPostponement.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *StorageTruthPostponement) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_StorageTruthPostponement.Merge(m, src)
+}
+func (m *StorageTruthPostponement) XXX_Size() int {
+	return m.Size()
+}
+func (m *StorageTruthPostponement) XXX_DiscardUnknown() {
+	xxx_messageInfo_StorageTruthPostponement.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_StorageTruthPostponement proto.InternalMessageInfo
+
+func (m *StorageTruthPostponement) GetSupernodeAccount() string {
+	if m != nil {
+		return m.SupernodeAccount
+	}
+	return ""
+}
+
+func (m *StorageTruthPostponement) GetPostponedAtEpochId() uint64 {
+	if m != nil {
+		return m.PostponedAtEpochId
+	}
+	return 0
+}
+
+func (m *StorageTruthPostponement) GetStrongPostpone() bool {
+	if m != nil {
+		return m.StrongPostpone
+	}
+	return false
+}
+
+// GenesisActionFinalizationPostponement — ap/af/ marker.
+type GenesisActionFinalizationPostponement struct {
+	SupernodeAccount   string `protobuf:"bytes,1,opt,name=supernode_account,json=supernodeAccount,proto3" json:"supernode_account,omitempty"`
+	PostponedAtEpochId uint64 `protobuf:"varint,2,opt,name=postponed_at_epoch_id,json=postponedAtEpochId,proto3" json:"postponed_at_epoch_id,omitempty"`
+}
+
+func (m *GenesisActionFinalizationPostponement) Reset()         { *m = GenesisActionFinalizationPostponement{} }
+func (m *GenesisActionFinalizationPostponement) String() string { return proto.CompactTextString(m) }
+func (*GenesisActionFinalizationPostponement) ProtoMessage()    {}
+func (*GenesisActionFinalizationPostponement) Descriptor() ([]byte, []int) {
+	return fileDescriptor_a433cb4f206fdbad, []int{2}
+}
+func (m *GenesisActionFinalizationPostponement) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *GenesisActionFinalizationPostponement) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_GenesisActionFinalizationPostponement.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *GenesisActionFinalizationPostponement) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GenesisActionFinalizationPostponement.Merge(m, src)
+}
+func (m *GenesisActionFinalizationPostponement) XXX_Size() int {
+	return m.Size()
+}
+func (m *GenesisActionFinalizationPostponement) XXX_DiscardUnknown() {
+	xxx_messageInfo_GenesisActionFinalizationPostponement.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_GenesisActionFinalizationPostponement proto.InternalMessageInfo
+
+func (m *GenesisActionFinalizationPostponement) GetSupernodeAccount() string {
+	if m != nil {
+		return m.SupernodeAccount
+	}
+	return ""
+}
+
+func (m *GenesisActionFinalizationPostponement) GetPostponedAtEpochId() uint64 {
+	if m != nil {
+		return m.PostponedAtEpochId
+	}
+	return 0
+}
+
+// GenesisEvidenceEpochCount — eve/ aggregate count.
+type GenesisEvidenceEpochCount struct {
+	EpochId        uint64       `protobuf:"varint,1,opt,name=epoch_id,json=epochId,proto3" json:"epoch_id,omitempty"`
+	SubjectAddress string       `protobuf:"bytes,2,opt,name=subject_address,json=subjectAddress,proto3" json:"subject_address,omitempty"`
+	EvidenceType   EvidenceType `protobuf:"varint,3,opt,name=evidence_type,json=evidenceType,proto3,enum=lumera.audit.v1.EvidenceType" json:"evidence_type,omitempty"`
+	Count          uint64       `protobuf:"varint,4,opt,name=count,proto3" json:"count,omitempty"`
+}
+
+func (m *GenesisEvidenceEpochCount) Reset()         { *m = GenesisEvidenceEpochCount{} }
+func (m *GenesisEvidenceEpochCount) String() string { return proto.CompactTextString(m) }
+func (*GenesisEvidenceEpochCount) ProtoMessage()    {}
+func (*GenesisEvidenceEpochCount) Descriptor() ([]byte, []int) {
+	return fileDescriptor_a433cb4f206fdbad, []int{3}
+}
+func (m *GenesisEvidenceEpochCount) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *GenesisEvidenceEpochCount) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_GenesisEvidenceEpochCount.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *GenesisEvidenceEpochCount) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GenesisEvidenceEpochCount.Merge(m, src)
+}
+func (m *GenesisEvidenceEpochCount) XXX_Size() int {
+	return m.Size()
+}
+func (m *GenesisEvidenceEpochCount) XXX_DiscardUnknown() {
+	xxx_messageInfo_GenesisEvidenceEpochCount.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_GenesisEvidenceEpochCount proto.InternalMessageInfo
+
+func (m *GenesisEvidenceEpochCount) GetEpochId() uint64 {
+	if m != nil {
+		return m.EpochId
+	}
+	return 0
+}
+
+func (m *GenesisEvidenceEpochCount) GetSubjectAddress() string {
+	if m != nil {
+		return m.SubjectAddress
+	}
+	return ""
+}
+
+func (m *GenesisEvidenceEpochCount) GetEvidenceType() EvidenceType {
+	if m != nil {
+		return m.EvidenceType
+	}
+	return EvidenceType_EVIDENCE_TYPE_UNSPECIFIED
+}
+
+func (m *GenesisEvidenceEpochCount) GetCount() uint64 {
+	if m != nil {
+		return m.Count
+	}
+	return 0
+}
+
+// GenesisHealOpVerification — st/hov/ per-verifier vote.
+type GenesisHealOpVerification struct {
+	HealOpId                 uint64 `protobuf:"varint,1,opt,name=heal_op_id,json=healOpId,proto3" json:"heal_op_id,omitempty"`
+	VerifierSupernodeAccount string `protobuf:"bytes,2,opt,name=verifier_supernode_account,json=verifierSupernodeAccount,proto3" json:"verifier_supernode_account,omitempty"`
+	Verified                 bool   `protobuf:"varint,3,opt,name=verified,proto3" json:"verified,omitempty"`
+}
+
+func (m *GenesisHealOpVerification) Reset()         { *m = GenesisHealOpVerification{} }
+func (m *GenesisHealOpVerification) String() string { return proto.CompactTextString(m) }
+func (*GenesisHealOpVerification) ProtoMessage()    {}
+func (*GenesisHealOpVerification) Descriptor() ([]byte, []int) {
+	return fileDescriptor_a433cb4f206fdbad, []int{4}
+}
+func (m *GenesisHealOpVerification) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *GenesisHealOpVerification) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_GenesisHealOpVerification.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *GenesisHealOpVerification) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GenesisHealOpVerification.Merge(m, src)
+}
+func (m *GenesisHealOpVerification) XXX_Size() int {
+	return m.Size()
+}
+func (m *GenesisHealOpVerification) XXX_DiscardUnknown() {
+	xxx_messageInfo_GenesisHealOpVerification.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_GenesisHealOpVerification proto.InternalMessageInfo
+
+func (m *GenesisHealOpVerification) GetHealOpId() uint64 {
+	if m != nil {
+		return m.HealOpId
+	}
+	return 0
+}
+
+func (m *GenesisHealOpVerification) GetVerifierSupernodeAccount() string {
+	if m != nil {
+		return m.VerifierSupernodeAccount
+	}
+	return ""
+}
+
+func (m *GenesisHealOpVerification) GetVerified() bool {
+	if m != nil {
+		return m.Verified
+	}
+	return false
+}
+
+// GenesisRecheckEvidence — st/rce/ replay-protection key.
+type GenesisRecheckEvidence struct {
+	EpochId        uint64 `protobuf:"varint,1,opt,name=epoch_id,json=epochId,proto3" json:"epoch_id,omitempty"`
+	TicketId       string `protobuf:"bytes,2,opt,name=ticket_id,json=ticketId,proto3" json:"ticket_id,omitempty"`
+	CreatorAccount string `protobuf:"bytes,3,opt,name=creator_account,json=creatorAccount,proto3" json:"creator_account,omitempty"`
+}
+
+func (m *GenesisRecheckEvidence) Reset()         { *m = GenesisRecheckEvidence{} }
+func (m *GenesisRecheckEvidence) String() string { return proto.CompactTextString(m) }
+func (*GenesisRecheckEvidence) ProtoMessage()    {}
+func (*GenesisRecheckEvidence) Descriptor() ([]byte, []int) {
+	return fileDescriptor_a433cb4f206fdbad, []int{5}
+}
+func (m *GenesisRecheckEvidence) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *GenesisRecheckEvidence) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_GenesisRecheckEvidence.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *GenesisRecheckEvidence) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GenesisRecheckEvidence.Merge(m, src)
+}
+func (m *GenesisRecheckEvidence) XXX_Size() int {
+	return m.Size()
+}
+func (m *GenesisRecheckEvidence) XXX_DiscardUnknown() {
+	xxx_messageInfo_GenesisRecheckEvidence.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_GenesisRecheckEvidence proto.InternalMessageInfo
+
+func (m *GenesisRecheckEvidence) GetEpochId() uint64 {
+	if m != nil {
+		return m.EpochId
+	}
+	return 0
+}
+
+func (m *GenesisRecheckEvidence) GetTicketId() string {
+	if m != nil {
+		return m.TicketId
+	}
+	return ""
+}
+
+func (m *GenesisRecheckEvidence) GetCreatorAccount() string {
+	if m != nil {
+		return m.CreatorAccount
+	}
+	return ""
+}
+
+// GenesisStorageProofTranscript — st/spt/ value (JSON-encoded record).
+// The opaque record_json blob is the keeper's storageProofTranscriptRecord
+// JSON marshaling. InitGenesis re-writes via the existing setter so the
+// st/spt-tbe/ secondary index is rebuilt deterministically.
+type GenesisStorageProofTranscript struct {
+	TranscriptHash string `protobuf:"bytes,1,opt,name=transcript_hash,json=transcriptHash,proto3" json:"transcript_hash,omitempty"`
+	RecordJson     []byte `protobuf:"bytes,2,opt,name=record_json,json=recordJson,proto3" json:"record_json,omitempty"`
+}
+
+func (m *GenesisStorageProofTranscript) Reset()         { *m = GenesisStorageProofTranscript{} }
+func (m *GenesisStorageProofTranscript) String() string { return proto.CompactTextString(m) }
+func (*GenesisStorageProofTranscript) ProtoMessage()    {}
+func (*GenesisStorageProofTranscript) Descriptor() ([]byte, []int) {
+	return fileDescriptor_a433cb4f206fdbad, []int{6}
+}
+func (m *GenesisStorageProofTranscript) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *GenesisStorageProofTranscript) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_GenesisStorageProofTranscript.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *GenesisStorageProofTranscript) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GenesisStorageProofTranscript.Merge(m, src)
+}
+func (m *GenesisStorageProofTranscript) XXX_Size() int {
+	return m.Size()
+}
+func (m *GenesisStorageProofTranscript) XXX_DiscardUnknown() {
+	xxx_messageInfo_GenesisStorageProofTranscript.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_GenesisStorageProofTranscript proto.InternalMessageInfo
+
+func (m *GenesisStorageProofTranscript) GetTranscriptHash() string {
+	if m != nil {
+		return m.TranscriptHash
+	}
+	return ""
+}
+
+func (m *GenesisStorageProofTranscript) GetRecordJson() []byte {
+	if m != nil {
+		return m.RecordJson
+	}
+	return nil
+}
+
+// GenesisNodeFailureFact — st/nf/ entry (JSON-encoded record).
+type GenesisNodeFailureFact struct {
+	SupernodeAccount string `protobuf:"bytes,1,opt,name=supernode_account,json=supernodeAccount,proto3" json:"supernode_account,omitempty"`
+	EpochId          uint64 `protobuf:"varint,2,opt,name=epoch_id,json=epochId,proto3" json:"epoch_id,omitempty"`
+	TicketId         string `protobuf:"bytes,3,opt,name=ticket_id,json=ticketId,proto3" json:"ticket_id,omitempty"`
+	ReporterAccount  string `protobuf:"bytes,4,opt,name=reporter_account,json=reporterAccount,proto3" json:"reporter_account,omitempty"`
+	RecordJson       []byte `protobuf:"bytes,5,opt,name=record_json,json=recordJson,proto3" json:"record_json,omitempty"`
+}
+
+func (m *GenesisNodeFailureFact) Reset()         { *m = GenesisNodeFailureFact{} }
+func (m *GenesisNodeFailureFact) String() string { return proto.CompactTextString(m) }
+func (*GenesisNodeFailureFact) ProtoMessage()    {}
+func (*GenesisNodeFailureFact) Descriptor() ([]byte, []int) {
+	return fileDescriptor_a433cb4f206fdbad, []int{7}
+}
+func (m *GenesisNodeFailureFact) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *GenesisNodeFailureFact) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_GenesisNodeFailureFact.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *GenesisNodeFailureFact) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GenesisNodeFailureFact.Merge(m, src)
+}
+func (m *GenesisNodeFailureFact) XXX_Size() int {
+	return m.Size()
+}
+func (m *GenesisNodeFailureFact) XXX_DiscardUnknown() {
+	xxx_messageInfo_GenesisNodeFailureFact.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_GenesisNodeFailureFact proto.InternalMessageInfo
+
+func (m *GenesisNodeFailureFact) GetSupernodeAccount() string {
+	if m != nil {
+		return m.SupernodeAccount
+	}
+	return ""
+}
+
+func (m *GenesisNodeFailureFact) GetEpochId() uint64 {
+	if m != nil {
+		return m.EpochId
+	}
+	return 0
+}
+
+func (m *GenesisNodeFailureFact) GetTicketId() string {
+	if m != nil {
+		return m.TicketId
+	}
+	return ""
+}
+
+func (m *GenesisNodeFailureFact) GetReporterAccount() string {
+	if m != nil {
+		return m.ReporterAccount
+	}
+	return ""
+}
+
+func (m *GenesisNodeFailureFact) GetRecordJson() []byte {
+	if m != nil {
+		return m.RecordJson
+	}
+	return nil
+}
+
+// GenesisReporterResultFact — st/rrs/ entry (JSON-encoded record).
+// The st/rrs-tt/ secondary index is rebuilt by the existing setter.
+type GenesisReporterResultFact struct {
+	ReporterAccount string `protobuf:"bytes,1,opt,name=reporter_account,json=reporterAccount,proto3" json:"reporter_account,omitempty"`
+	EpochId         uint64 `protobuf:"varint,2,opt,name=epoch_id,json=epochId,proto3" json:"epoch_id,omitempty"`
+	TicketId        string `protobuf:"bytes,3,opt,name=ticket_id,json=ticketId,proto3" json:"ticket_id,omitempty"`
+	TargetAccount   string `protobuf:"bytes,4,opt,name=target_account,json=targetAccount,proto3" json:"target_account,omitempty"`
+	RecordJson      []byte `protobuf:"bytes,5,opt,name=record_json,json=recordJson,proto3" json:"record_json,omitempty"`
+}
+
+func (m *GenesisReporterResultFact) Reset()         { *m = GenesisReporterResultFact{} }
+func (m *GenesisReporterResultFact) String() string { return proto.CompactTextString(m) }
+func (*GenesisReporterResultFact) ProtoMessage()    {}
+func (*GenesisReporterResultFact) Descriptor() ([]byte, []int) {
+	return fileDescriptor_a433cb4f206fdbad, []int{8}
+}
+func (m *GenesisReporterResultFact) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *GenesisReporterResultFact) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_GenesisReporterResultFact.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *GenesisReporterResultFact) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GenesisReporterResultFact.Merge(m, src)
+}
+func (m *GenesisReporterResultFact) XXX_Size() int {
+	return m.Size()
+}
+func (m *GenesisReporterResultFact) XXX_DiscardUnknown() {
+	xxx_messageInfo_GenesisReporterResultFact.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_GenesisReporterResultFact proto.InternalMessageInfo
+
+func (m *GenesisReporterResultFact) GetReporterAccount() string {
+	if m != nil {
+		return m.ReporterAccount
+	}
+	return ""
+}
+
+func (m *GenesisReporterResultFact) GetEpochId() uint64 {
+	if m != nil {
+		return m.EpochId
+	}
+	return 0
+}
+
+func (m *GenesisReporterResultFact) GetTicketId() string {
+	if m != nil {
+		return m.TicketId
+	}
+	return ""
+}
+
+func (m *GenesisReporterResultFact) GetTargetAccount() string {
+	if m != nil {
+		return m.TargetAccount
+	}
+	return ""
+}
+
+func (m *GenesisReporterResultFact) GetRecordJson() []byte {
+	if m != nil {
+		return m.RecordJson
+	}
+	return nil
+}
+
+// GenesisFailedHealMarker — st/fh/ marker.
+type GenesisFailedHealMarker struct {
+	SupernodeAccount string `protobuf:"bytes,1,opt,name=supernode_account,json=supernodeAccount,proto3" json:"supernode_account,omitempty"`
+	EpochId          uint64 `protobuf:"varint,2,opt,name=epoch_id,json=epochId,proto3" json:"epoch_id,omitempty"`
+	TicketId         string `protobuf:"bytes,3,opt,name=ticket_id,json=ticketId,proto3" json:"ticket_id,omitempty"`
+}
+
+func (m *GenesisFailedHealMarker) Reset()         { *m = GenesisFailedHealMarker{} }
+func (m *GenesisFailedHealMarker) String() string { return proto.CompactTextString(m) }
+func (*GenesisFailedHealMarker) ProtoMessage()    {}
+func (*GenesisFailedHealMarker) Descriptor() ([]byte, []int) {
+	return fileDescriptor_a433cb4f206fdbad, []int{9}
+}
+func (m *GenesisFailedHealMarker) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *GenesisFailedHealMarker) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_GenesisFailedHealMarker.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *GenesisFailedHealMarker) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GenesisFailedHealMarker.Merge(m, src)
+}
+func (m *GenesisFailedHealMarker) XXX_Size() int {
+	return m.Size()
+}
+func (m *GenesisFailedHealMarker) XXX_DiscardUnknown() {
+	xxx_messageInfo_GenesisFailedHealMarker.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_GenesisFailedHealMarker proto.InternalMessageInfo
+
+func (m *GenesisFailedHealMarker) GetSupernodeAccount() string {
+	if m != nil {
+		return m.SupernodeAccount
+	}
+	return ""
+}
+
+func (m *GenesisFailedHealMarker) GetEpochId() uint64 {
+	if m != nil {
+		return m.EpochId
+	}
+	return 0
+}
+
+func (m *GenesisFailedHealMarker) GetTicketId() string {
+	if m != nil {
+		return m.TicketId
+	}
+	return ""
+}
+
+// GenesisReportIndex — ri/ index entry.
+type GenesisReportIndex struct {
+	ReporterSupernodeAccount string `protobuf:"bytes,1,opt,name=reporter_supernode_account,json=reporterSupernodeAccount,proto3" json:"reporter_supernode_account,omitempty"`
+	EpochId                  uint64 `protobuf:"varint,2,opt,name=epoch_id,json=epochId,proto3" json:"epoch_id,omitempty"`
+}
+
+func (m *GenesisReportIndex) Reset()         { *m = GenesisReportIndex{} }
+func (m *GenesisReportIndex) String() string { return proto.CompactTextString(m) }
+func (*GenesisReportIndex) ProtoMessage()    {}
+func (*GenesisReportIndex) Descriptor() ([]byte, []int) {
+	return fileDescriptor_a433cb4f206fdbad, []int{10}
+}
+func (m *GenesisReportIndex) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *GenesisReportIndex) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_GenesisReportIndex.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *GenesisReportIndex) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GenesisReportIndex.Merge(m, src)
+}
+func (m *GenesisReportIndex) XXX_Size() int {
+	return m.Size()
+}
+func (m *GenesisReportIndex) XXX_DiscardUnknown() {
+	xxx_messageInfo_GenesisReportIndex.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_GenesisReportIndex proto.InternalMessageInfo
+
+func (m *GenesisReportIndex) GetReporterSupernodeAccount() string {
+	if m != nil {
+		return m.ReporterSupernodeAccount
+	}
+	return ""
+}
+
+func (m *GenesisReportIndex) GetEpochId() uint64 {
+	if m != nil {
+		return m.EpochId
+	}
+	return 0
+}
+
+// GenesisHostReportIndex — hr/ index entry.
+type GenesisHostReportIndex struct {
+	ReporterSupernodeAccount string `protobuf:"bytes,1,opt,name=reporter_supernode_account,json=reporterSupernodeAccount,proto3" json:"reporter_supernode_account,omitempty"`
+	EpochId                  uint64 `protobuf:"varint,2,opt,name=epoch_id,json=epochId,proto3" json:"epoch_id,omitempty"`
+}
+
+func (m *GenesisHostReportIndex) Reset()         { *m = GenesisHostReportIndex{} }
+func (m *GenesisHostReportIndex) String() string { return proto.CompactTextString(m) }
+func (*GenesisHostReportIndex) ProtoMessage()    {}
+func (*GenesisHostReportIndex) Descriptor() ([]byte, []int) {
+	return fileDescriptor_a433cb4f206fdbad, []int{11}
+}
+func (m *GenesisHostReportIndex) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *GenesisHostReportIndex) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_GenesisHostReportIndex.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *GenesisHostReportIndex) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GenesisHostReportIndex.Merge(m, src)
+}
+func (m *GenesisHostReportIndex) XXX_Size() int {
+	return m.Size()
+}
+func (m *GenesisHostReportIndex) XXX_DiscardUnknown() {
+	xxx_messageInfo_GenesisHostReportIndex.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_GenesisHostReportIndex proto.InternalMessageInfo
+
+func (m *GenesisHostReportIndex) GetReporterSupernodeAccount() string {
+	if m != nil {
+		return m.ReporterSupernodeAccount
+	}
+	return ""
+}
+
+func (m *GenesisHostReportIndex) GetEpochId() uint64 {
+	if m != nil {
+		return m.EpochId
+	}
+	return 0
+}
+
+// GenesisStorageChallengeIndex — sc/ index entry.
+type GenesisStorageChallengeIndex struct {
+	SupernodeAccount         string `protobuf:"bytes,1,opt,name=supernode_account,json=supernodeAccount,proto3" json:"supernode_account,omitempty"`
+	EpochId                  uint64 `protobuf:"varint,2,opt,name=epoch_id,json=epochId,proto3" json:"epoch_id,omitempty"`
+	ReporterSupernodeAccount string `protobuf:"bytes,3,opt,name=reporter_supernode_account,json=reporterSupernodeAccount,proto3" json:"reporter_supernode_account,omitempty"`
+}
+
+func (m *GenesisStorageChallengeIndex) Reset()         { *m = GenesisStorageChallengeIndex{} }
+func (m *GenesisStorageChallengeIndex) String() string { return proto.CompactTextString(m) }
+func (*GenesisStorageChallengeIndex) ProtoMessage()    {}
+func (*GenesisStorageChallengeIndex) Descriptor() ([]byte, []int) {
+	return fileDescriptor_a433cb4f206fdbad, []int{12}
+}
+func (m *GenesisStorageChallengeIndex) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *GenesisStorageChallengeIndex) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_GenesisStorageChallengeIndex.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *GenesisStorageChallengeIndex) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GenesisStorageChallengeIndex.Merge(m, src)
+}
+func (m *GenesisStorageChallengeIndex) XXX_Size() int {
+	return m.Size()
+}
+func (m *GenesisStorageChallengeIndex) XXX_DiscardUnknown() {
+	xxx_messageInfo_GenesisStorageChallengeIndex.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_GenesisStorageChallengeIndex proto.InternalMessageInfo
+
+func (m *GenesisStorageChallengeIndex) GetSupernodeAccount() string {
+	if m != nil {
+		return m.SupernodeAccount
+	}
+	return ""
+}
+
+func (m *GenesisStorageChallengeIndex) GetEpochId() uint64 {
+	if m != nil {
+		return m.EpochId
+	}
+	return 0
+}
+
+func (m *GenesisStorageChallengeIndex) GetReporterSupernodeAccount() string {
+	if m != nil {
+		return m.ReporterSupernodeAccount
+	}
+	return ""
+}
+
 func init() {
 	proto.RegisterType((*GenesisState)(nil), "lumera.audit.v1.GenesisState")
+	proto.RegisterType((*StorageTruthPostponement)(nil), "lumera.audit.v1.StorageTruthPostponement")
+	proto.RegisterType((*GenesisActionFinalizationPostponement)(nil), "lumera.audit.v1.GenesisActionFinalizationPostponement")
+	proto.RegisterType((*GenesisEvidenceEpochCount)(nil), "lumera.audit.v1.GenesisEvidenceEpochCount")
+	proto.RegisterType((*GenesisHealOpVerification)(nil), "lumera.audit.v1.GenesisHealOpVerification")
+	proto.RegisterType((*GenesisRecheckEvidence)(nil), "lumera.audit.v1.GenesisRecheckEvidence")
+	proto.RegisterType((*GenesisStorageProofTranscript)(nil), "lumera.audit.v1.GenesisStorageProofTranscript")
+	proto.RegisterType((*GenesisNodeFailureFact)(nil), "lumera.audit.v1.GenesisNodeFailureFact")
+	proto.RegisterType((*GenesisReporterResultFact)(nil), "lumera.audit.v1.GenesisReporterResultFact")
+	proto.RegisterType((*GenesisFailedHealMarker)(nil), "lumera.audit.v1.GenesisFailedHealMarker")
+	proto.RegisterType((*GenesisReportIndex)(nil), "lumera.audit.v1.GenesisReportIndex")
+	proto.RegisterType((*GenesisHostReportIndex)(nil), "lumera.audit.v1.GenesisHostReportIndex")
+	proto.RegisterType((*GenesisStorageChallengeIndex)(nil), "lumera.audit.v1.GenesisStorageChallengeIndex")
 }
 
 func init() { proto.RegisterFile("lumera/audit/v1/genesis.proto", fileDescriptor_a433cb4f206fdbad) }
 
 var fileDescriptor_a433cb4f206fdbad = []byte{
-	// 259 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0x92, 0xcd, 0x29, 0xcd, 0x4d,
-	0x2d, 0x4a, 0xd4, 0x4f, 0x2c, 0x4d, 0xc9, 0x2c, 0xd1, 0x2f, 0x33, 0xd4, 0x4f, 0x4f, 0xcd, 0x4b,
-	0x2d, 0xce, 0x2c, 0xd6, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0xe2, 0x87, 0x48, 0xeb, 0x81, 0xa5,
-	0xf5, 0xca, 0x0c, 0xa5, 0x04, 0x13, 0x73, 0x33, 0xf3, 0xf2, 0xf5, 0xc1, 0x24, 0x44, 0x8d, 0x94,
-	0x48, 0x7a, 0x7e, 0x7a, 0x3e, 0x98, 0xa9, 0x0f, 0x62, 0x41, 0x45, 0x65, 0xd0, 0x0d, 0x2e, 0x48,
-	0x2c, 0x4a, 0xcc, 0x85, 0x9a, 0x2b, 0x25, 0x87, 0x2e, 0x9b, 0x5a, 0x96, 0x99, 0x92, 0x9a, 0x97,
-	0x9c, 0x0a, 0x91, 0x57, 0xda, 0xc8, 0xc8, 0xc5, 0xe3, 0x0e, 0x71, 0x49, 0x70, 0x49, 0x62, 0x49,
-	0xaa, 0x90, 0x15, 0x17, 0x1b, 0xc4, 0x00, 0x09, 0x46, 0x05, 0x46, 0x0d, 0x6e, 0x23, 0x71, 0x3d,
-	0x34, 0x97, 0xe9, 0x05, 0x80, 0xa5, 0x9d, 0x38, 0x4f, 0xdc, 0x93, 0x67, 0x58, 0xf1, 0x7c, 0x83,
-	0x16, 0x63, 0x10, 0x54, 0x87, 0x90, 0x35, 0x17, 0x07, 0xcc, 0x78, 0x09, 0x26, 0x05, 0x66, 0x0d,
-	0x6e, 0x23, 0x49, 0x0c, 0xdd, 0xae, 0x50, 0x05, 0x4e, 0x2c, 0x20, 0xfd, 0x41, 0x70, 0x0d, 0x42,
-	0x1a, 0x5c, 0x02, 0x79, 0xa9, 0x15, 0x25, 0xf1, 0x30, 0x81, 0xf8, 0xcc, 0x14, 0x09, 0x66, 0x05,
-	0x46, 0x0d, 0x96, 0x20, 0x3e, 0x90, 0x38, 0x4c, 0x9f, 0x67, 0x8a, 0x93, 0xd6, 0x89, 0x47, 0x72,
-	0x8c, 0x17, 0x1e, 0xc9, 0x31, 0x3e, 0x78, 0x24, 0xc7, 0x38, 0xe1, 0xb1, 0x1c, 0xc3, 0x85, 0xc7,
-	0x72, 0x0c, 0x37, 0x1e, 0xcb, 0x31, 0x44, 0x09, 0x54, 0x20, 0x3c, 0x5a, 0x52, 0x59, 0x90, 0x5a,
-	0x9c, 0xc4, 0x06, 0xf6, 0xa6, 0x31, 0x20, 0x00, 0x00, 0xff, 0xff, 0x48, 0x1f, 0xa4, 0xca, 0x7f,
-	0x01, 0x00, 0x00,
+	// 1269 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xbc, 0x57, 0x4f, 0x4f, 0x24, 0x45,
+	0x14, 0xa7, 0x17, 0x76, 0x99, 0x29, 0x86, 0x99, 0xa1, 0x80, 0xa5, 0xf9, 0x37, 0xe0, 0x18, 0xb2,
+	0x2c, 0xc6, 0x21, 0x60, 0x62, 0x8c, 0x7a, 0x81, 0x55, 0x16, 0x4c, 0x54, 0xd2, 0x10, 0x63, 0x34,
+	0x6b, 0xa7, 0xe8, 0xae, 0x99, 0xee, 0x65, 0xa6, 0xab, 0xad, 0xaa, 0x21, 0xe0, 0xc1, 0xab, 0x1e,
+	0x4d, 0xfc, 0x08, 0x7a, 0xf0, 0xe8, 0xd5, 0x2f, 0x60, 0xd6, 0xdb, 0x1e, 0x3d, 0x19, 0x03, 0x87,
+	0xfd, 0x1a, 0xa6, 0xeb, 0x4f, 0x4f, 0x4f, 0xf7, 0x74, 0x8b, 0xc6, 0xf5, 0x02, 0xd3, 0xef, 0xd5,
+	0xef, 0xfd, 0xde, 0xbf, 0x7a, 0xaf, 0x1b, 0xac, 0x76, 0xfb, 0x3d, 0x4c, 0xd1, 0x36, 0xea, 0xbb,
+	0x3e, 0xdf, 0xbe, 0xd8, 0xd9, 0xee, 0xe0, 0x00, 0x33, 0x9f, 0xb5, 0x42, 0x4a, 0x38, 0x81, 0x35,
+	0xa9, 0x6e, 0x09, 0x75, 0xeb, 0x62, 0x67, 0x69, 0x06, 0xf5, 0xfc, 0x80, 0x6c, 0x8b, 0xbf, 0xf2,
+	0xcc, 0xd2, 0x5c, 0x87, 0x74, 0x88, 0xf8, 0xb9, 0x1d, 0xfd, 0x52, 0xd2, 0x95, 0xb4, 0xe1, 0x10,
+	0x51, 0xd4, 0x53, 0x76, 0x97, 0x1a, 0x69, 0x2d, 0xbe, 0xf0, 0x5d, 0x1c, 0x38, 0x58, 0xe9, 0x97,
+	0xd3, 0x7a, 0xe9, 0x80, 0x50, 0x36, 0x5f, 0xd4, 0x40, 0xe5, 0xb1, 0x74, 0xf3, 0x84, 0x23, 0x8e,
+	0xe1, 0xdb, 0xe0, 0x9e, 0xb4, 0x6e, 0x1a, 0xeb, 0xc6, 0xe6, 0xd4, 0xee, 0x42, 0x2b, 0xe5, 0x76,
+	0xeb, 0x58, 0xa8, 0xf7, 0xcb, 0xcf, 0xfe, 0x58, 0x1b, 0xfb, 0xe9, 0xc5, 0xcf, 0x5b, 0x86, 0xa5,
+	0x10, 0xf0, 0x1d, 0x50, 0xd2, 0xdc, 0xe6, 0x9d, 0xf5, 0xf1, 0xcd, 0xa9, 0xdd, 0xc5, 0x0c, 0xfa,
+	0x7d, 0x75, 0x60, 0x7f, 0x22, 0xc2, 0x5b, 0x31, 0x00, 0x6e, 0x82, 0x7a, 0x80, 0x2f, 0xb9, 0xad,
+	0x05, 0xb6, 0xef, 0x9a, 0xe3, 0xeb, 0xc6, 0xe6, 0x84, 0x55, 0x8d, 0xe4, 0x1a, 0x77, 0xe4, 0xc2,
+	0x27, 0x60, 0x3e, 0x20, 0x2e, 0xb6, 0x59, 0x9f, 0x85, 0xbe, 0xe3, 0x93, 0xc0, 0x66, 0x91, 0xeb,
+	0xcc, 0x9c, 0x10, 0x9c, 0xaf, 0x66, 0x38, 0x3f, 0x22, 0x2e, 0x3e, 0xd1, 0x87, 0x45, 0x98, 0x8a,
+	0x7d, 0x36, 0xc8, 0x68, 0x18, 0x24, 0x60, 0x99, 0xe2, 0x90, 0x50, 0x8e, 0xa9, 0x4d, 0x71, 0xd7,
+	0x47, 0x67, 0x7e, 0xd7, 0xe7, 0x57, 0x9a, 0xe4, 0xae, 0x20, 0x79, 0x98, 0x21, 0xb1, 0x14, 0xc6,
+	0x1a, 0x40, 0x92, 0x54, 0x8b, 0x34, 0x47, 0x2f, 0x08, 0xb9, 0xef, 0x9c, 0x63, 0x6e, 0xbb, 0x98,
+	0x63, 0xea, 0x13, 0x8a, 0x78, 0x22, 0xaa, 0x7b, 0x39, 0x84, 0xa7, 0x02, 0xf3, 0x5e, 0x12, 0x32,
+	0x44, 0xc8, 0x73, 0xf4, 0x0c, 0xbe, 0x05, 0x4a, 0x1e, 0x46, 0x5d, 0x9b, 0x84, 0xcc, 0x9c, 0x14,
+	0xd6, 0xb3, 0x55, 0x3e, 0xc4, 0xa8, 0xfb, 0x71, 0xa8, 0x6c, 0x4d, 0x7a, 0xe2, 0x89, 0xc1, 0x0d,
+	0x50, 0x13, 0x45, 0x52, 0xf0, 0xa8, 0x46, 0x25, 0x51, 0xa3, 0x4a, 0x24, 0x96, 0x98, 0x23, 0x17,
+	0x86, 0x60, 0x45, 0x45, 0x84, 0x28, 0xf7, 0xdb, 0xc8, 0xe1, 0xb6, 0x43, 0xfa, 0x01, 0xd7, 0x21,
+	0x95, 0x0b, 0x43, 0xda, 0x53, 0x98, 0x47, 0x11, 0x64, 0x44, 0x48, 0x59, 0xbd, 0xc8, 0x21, 0xe3,
+	0x84, 0xa2, 0x0e, 0xb6, 0x39, 0xed, 0x73, 0xcf, 0x0e, 0x09, 0xe3, 0x21, 0x09, 0x70, 0x0f, 0x07,
+	0x9c, 0x99, 0x20, 0x87, 0xf0, 0x44, 0x62, 0x4e, 0x23, 0xc8, 0x71, 0x02, 0xa1, 0x09, 0x59, 0x8e,
+	0x9e, 0xc1, 0x4f, 0x41, 0x9d, 0x62, 0xc7, 0xc3, 0xce, 0x79, 0xdc, 0xb1, 0xe6, 0x94, 0x60, 0x79,
+	0x90, 0x61, 0x51, 0x17, 0xcc, 0x92, 0xe7, 0x53, 0x37, 0xa0, 0x46, 0x87, 0xc5, 0x30, 0x04, 0x9a,
+	0xd6, 0x0e, 0x29, 0x21, 0x6d, 0x9b, 0x53, 0x14, 0x30, 0x87, 0xfa, 0x21, 0x67, 0x66, 0x45, 0x50,
+	0xb4, 0xf2, 0x28, 0x54, 0x3c, 0xc7, 0x11, 0xee, 0x34, 0x86, 0x29, 0xa6, 0x05, 0x36, 0x52, 0xcb,
+	0xe0, 0xe7, 0x00, 0x8a, 0x0b, 0xd5, 0x46, 0x7e, 0xb7, 0x4f, 0xa3, 0xff, 0x0e, 0x67, 0xe6, 0x74,
+	0x71, 0x34, 0xd1, 0xa5, 0x3a, 0x90, 0x80, 0x03, 0xe4, 0x68, 0x8e, 0x7a, 0x30, 0x2c, 0x66, 0xd0,
+	0x05, 0xf3, 0x89, 0xeb, 0xc4, 0xfa, 0x5d, 0xae, 0xec, 0x57, 0x85, 0xfd, 0xad, 0xfc, 0x6c, 0xe9,
+	0xfb, 0x12, 0x61, 0x12, 0x14, 0xb3, 0x34, 0xa3, 0x61, 0xf0, 0x0b, 0x30, 0x1b, 0x79, 0x8f, 0x5d,
+	0xd9, 0x9a, 0x3d, 0x44, 0xcf, 0x31, 0x65, 0x66, 0x4d, 0x70, 0x6c, 0xe6, 0x71, 0x1c, 0x08, 0x48,
+	0xd4, 0xb6, 0x1f, 0x0a, 0x80, 0x62, 0x98, 0x69, 0xa7, 0xe4, 0x0c, 0x3e, 0x06, 0xd3, 0x38, 0x24,
+	0x8e, 0x67, 0x4b, 0x72, 0x66, 0xd6, 0x85, 0xe5, 0x95, 0xec, 0x7c, 0x8b, 0x4e, 0x49, 0xdf, 0x95,
+	0xb5, 0x0a, 0x1e, 0x88, 0x18, 0x3c, 0x06, 0x55, 0x69, 0xc2, 0xf6, 0x03, 0xd7, 0x77, 0x30, 0x33,
+	0x67, 0x72, 0xa6, 0xd6, 0x50, 0x1e, 0x8e, 0x02, 0x17, 0x5f, 0x2a, 0x83, 0xd3, 0x54, 0x8b, 0x22,
+	0x3c, 0x7c, 0x02, 0x66, 0x3d, 0xc2, 0xb8, 0x9d, 0x32, 0x0b, 0x8b, 0xcb, 0x77, 0x48, 0x18, 0xcf,
+	0x9a, 0x9e, 0xf1, 0x92, 0x62, 0x61, 0x9e, 0x0c, 0xda, 0xd1, 0xf1, 0x50, 0xb7, 0x8b, 0x83, 0x0e,
+	0x8e, 0x49, 0x66, 0x05, 0xc9, 0xeb, 0x7f, 0xd3, 0x8e, 0x8f, 0x34, 0x2e, 0x49, 0xa5, 0xbb, 0x31,
+	0xa9, 0x14, 0x84, 0xdf, 0x1a, 0xe0, 0x15, 0xe4, 0x88, 0x09, 0xd8, 0xf6, 0x03, 0xd4, 0xf5, 0xbf,
+	0x92, 0xe3, 0x70, 0xf8, 0x46, 0xcf, 0x09, 0xe6, 0x37, 0xf3, 0x98, 0xf7, 0x84, 0x81, 0x83, 0x04,
+	0x7e, 0xc4, 0xf5, 0x5e, 0x43, 0x85, 0xa7, 0x44, 0xef, 0xc6, 0xeb, 0x48, 0x96, 0x5f, 0x8c, 0x31,
+	0x66, 0xce, 0x17, 0xf7, 0xae, 0xbe, 0xcb, 0xa2, 0x19, 0xc4, 0x98, 0xd2, 0xbd, 0x8b, 0x33, 0x1a,
+	0xc1, 0xa2, 0xe7, 0xe9, 0x05, 0xa6, 0x7e, 0xdb, 0x77, 0x84, 0x2b, 0xcc, 0xbc, 0x5f, 0xcc, 0x22,
+	0xc7, 0xed, 0x27, 0x09, 0x88, 0x66, 0xf1, 0x32, 0x1a, 0xd6, 0xfc, 0xc1, 0x00, 0x66, 0xde, 0xb8,
+	0x83, 0xaf, 0x81, 0x19, 0xd6, 0x0f, 0x31, 0x15, 0x63, 0x00, 0x39, 0x22, 0x4a, 0xf1, 0x02, 0x50,
+	0xb6, 0xea, 0xb1, 0x62, 0x4f, 0xca, 0xe1, 0x0e, 0x98, 0xd7, 0xb5, 0x70, 0x6d, 0xc4, 0x55, 0x66,
+	0x7c, 0xd7, 0xbc, 0x23, 0x56, 0x01, 0x8c, 0x95, 0x7b, 0x5c, 0x84, 0x79, 0xe4, 0xc2, 0x07, 0xa0,
+	0xc6, 0x38, 0x25, 0x41, 0x27, 0xae, 0xa2, 0xd8, 0xed, 0x25, 0xab, 0x2a, 0xc5, 0xda, 0x99, 0xe6,
+	0x37, 0x06, 0xd8, 0xb8, 0x55, 0x09, 0x5f, 0xb6, 0xcb, 0xcd, 0x5f, 0x0c, 0xb0, 0x98, 0x5b, 0x4e,
+	0xb8, 0x08, 0x4a, 0xb1, 0x0d, 0x43, 0xd8, 0x98, 0xc4, 0x89, 0x58, 0xfb, 0x67, 0x4f, 0xb1, 0xc3,
+	0x6d, 0xe4, 0xba, 0x14, 0x33, 0x26, 0x58, 0xca, 0x56, 0x55, 0x89, 0xf7, 0xa4, 0x14, 0xee, 0x83,
+	0xe9, 0xb8, 0xbb, 0xf8, 0x55, 0x28, 0x53, 0x52, 0xdd, 0x5d, 0xcd, 0x7d, 0x67, 0x3a, 0xbd, 0x0a,
+	0xb1, 0x55, 0xc1, 0x89, 0x27, 0x38, 0x07, 0xee, 0xca, 0xc8, 0x27, 0x84, 0x13, 0xf2, 0xa1, 0xf9,
+	0xfd, 0xc0, 0xf7, 0x6c, 0x93, 0xc0, 0x15, 0x00, 0x12, 0xfb, 0x5b, 0x7a, 0x5f, 0xf2, 0xf4, 0xee,
+	0x7e, 0x17, 0x2c, 0xc9, 0x2e, 0xc4, 0xd4, 0xce, 0x26, 0x58, 0x46, 0x62, 0xea, 0x13, 0x27, 0xe9,
+	0x44, 0x2f, 0x81, 0x92, 0xd2, 0xb9, 0xaa, 0xc2, 0xf1, 0x73, 0xf3, 0x0a, 0xdc, 0x1f, 0xbd, 0x09,
+	0x8b, 0xb2, 0xb9, 0x0c, 0xca, 0xea, 0x55, 0x42, 0x55, 0xab, 0x6c, 0x95, 0xa4, 0x40, 0xa6, 0xda,
+	0xa1, 0x18, 0x71, 0x42, 0x63, 0x07, 0xc7, 0x65, 0xaa, 0x95, 0x58, 0xb9, 0xd5, 0xf4, 0xc1, 0x6a,
+	0xe1, 0x86, 0x8c, 0x2c, 0x0d, 0xd6, 0xac, 0xed, 0x21, 0xe6, 0xa9, 0x5e, 0xaa, 0x0e, 0xc4, 0x87,
+	0x88, 0x79, 0x70, 0x0d, 0x4c, 0x51, 0xec, 0x10, 0xea, 0xda, 0x4f, 0x19, 0x09, 0x84, 0x47, 0x15,
+	0x0b, 0x48, 0xd1, 0x07, 0x8c, 0x04, 0xcd, 0xdf, 0x8c, 0x38, 0xcc, 0xd4, 0x8a, 0xfc, 0x67, 0x2d,
+	0x9b, 0xcc, 0xc9, 0x9d, 0x82, 0x9c, 0x8c, 0xa7, 0x72, 0xf2, 0x30, 0x7a, 0x31, 0x51, 0xfb, 0x56,
+	0x73, 0x4c, 0x88, 0x33, 0x35, 0x2d, 0xd7, 0x14, 0xa9, 0x58, 0xee, 0x66, 0x62, 0xf9, 0x75, 0xd0,
+	0x47, 0xd9, 0x75, 0x3c, 0x92, 0xc9, 0x18, 0xcd, 0xf4, 0x6f, 0x83, 0xd9, 0x00, 0x55, 0x8e, 0x68,
+	0x27, 0x7a, 0x91, 0x1c, 0x0a, 0x65, 0x5a, 0x4a, 0x6f, 0x1d, 0xc8, 0xd7, 0x60, 0x21, 0x67, 0xe5,
+	0xff, 0x2f, 0x45, 0x69, 0xf6, 0x00, 0xcc, 0xae, 0xf3, 0xe8, 0xaa, 0xc5, 0x09, 0xcc, 0xf3, 0xc1,
+	0xd4, 0x27, 0x4e, 0x6e, 0xef, 0x4b, 0xf3, 0xcb, 0xb8, 0x05, 0x53, 0x6b, 0xfe, 0xe5, 0x51, 0xfe,
+	0x68, 0x80, 0x95, 0xa2, 0xad, 0xff, 0x9f, 0xe5, 0xb9, 0x38, 0x82, 0xf1, 0xe2, 0x08, 0xf6, 0xb7,
+	0x9e, 0x5d, 0x37, 0x8c, 0xe7, 0xd7, 0x0d, 0xe3, 0xcf, 0xeb, 0x86, 0xf1, 0xdd, 0x4d, 0x63, 0xec,
+	0xf9, 0x4d, 0x63, 0xec, 0xf7, 0x9b, 0xc6, 0xd8, 0x67, 0xf5, 0xcb, 0xc1, 0x17, 0x72, 0x34, 0x8d,
+	0xd9, 0xd9, 0x3d, 0xf1, 0x89, 0xfc, 0xc6, 0x5f, 0x01, 0x00, 0x00, 0xff, 0xff, 0x77, 0x2c, 0x92,
+	0x60, 0xd8, 0x0f, 0x00, 0x00,
 }
 
 func (m *GenesisState) Marshal() (dAtA []byte, err error) {
@@ -134,6 +1117,277 @@ func (m *GenesisState) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.HealOpVerifications) > 0 {
+		for iNdEx := len(m.HealOpVerifications) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.HealOpVerifications[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenesis(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x1
+			i--
+			dAtA[i] = 0xb2
+		}
+	}
+	if len(m.EvidenceEpochCounts) > 0 {
+		for iNdEx := len(m.EvidenceEpochCounts) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.EvidenceEpochCounts[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenesis(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x1
+			i--
+			dAtA[i] = 0xaa
+		}
+	}
+	if len(m.ActionFinalizationPostponements) > 0 {
+		for iNdEx := len(m.ActionFinalizationPostponements) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.ActionFinalizationPostponements[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenesis(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x1
+			i--
+			dAtA[i] = 0xa2
+		}
+	}
+	if len(m.StorageChallengeIndices) > 0 {
+		for iNdEx := len(m.StorageChallengeIndices) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.StorageChallengeIndices[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenesis(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x1
+			i--
+			dAtA[i] = 0x9a
+		}
+	}
+	if len(m.HostReportIndices) > 0 {
+		for iNdEx := len(m.HostReportIndices) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.HostReportIndices[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenesis(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x1
+			i--
+			dAtA[i] = 0x92
+		}
+	}
+	if len(m.ReportIndices) > 0 {
+		for iNdEx := len(m.ReportIndices) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.ReportIndices[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenesis(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x1
+			i--
+			dAtA[i] = 0x8a
+		}
+	}
+	if len(m.EpochReports) > 0 {
+		for iNdEx := len(m.EpochReports) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.EpochReports[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenesis(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x1
+			i--
+			dAtA[i] = 0x82
+		}
+	}
+	if len(m.FailedHealMarkers) > 0 {
+		for iNdEx := len(m.FailedHealMarkers) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.FailedHealMarkers[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenesis(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x7a
+		}
+	}
+	if len(m.ReporterResultFacts) > 0 {
+		for iNdEx := len(m.ReporterResultFacts) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.ReporterResultFacts[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenesis(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x72
+		}
+	}
+	if len(m.NodeFailureFacts) > 0 {
+		for iNdEx := len(m.NodeFailureFacts) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.NodeFailureFacts[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenesis(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x6a
+		}
+	}
+	if len(m.StorageProofTranscripts) > 0 {
+		for iNdEx := len(m.StorageProofTranscripts) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.StorageProofTranscripts[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenesis(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x62
+		}
+	}
+	if len(m.RecheckEvidence) > 0 {
+		for iNdEx := len(m.RecheckEvidence) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.RecheckEvidence[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenesis(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x5a
+		}
+	}
+	if len(m.StorageTruthPostponements) > 0 {
+		for iNdEx := len(m.StorageTruthPostponements) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.StorageTruthPostponements[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenesis(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x52
+		}
+	}
+	if len(m.TicketArtifactCountStates) > 0 {
+		for iNdEx := len(m.TicketArtifactCountStates) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.TicketArtifactCountStates[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenesis(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x4a
+		}
+	}
+	if m.NextHealOpId != 0 {
+		i = encodeVarintGenesis(dAtA, i, uint64(m.NextHealOpId))
+		i--
+		dAtA[i] = 0x40
+	}
+	if len(m.HealOps) > 0 {
+		for iNdEx := len(m.HealOps) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.HealOps[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenesis(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x3a
+		}
+	}
+	if len(m.TicketDeteriorationStates) > 0 {
+		for iNdEx := len(m.TicketDeteriorationStates) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.TicketDeteriorationStates[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenesis(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x32
+		}
+	}
+	if len(m.ReporterReliabilityStates) > 0 {
+		for iNdEx := len(m.ReporterReliabilityStates) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.ReporterReliabilityStates[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenesis(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x2a
+		}
+	}
+	if len(m.NodeSuspicionStates) > 0 {
+		for iNdEx := len(m.NodeSuspicionStates) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.NodeSuspicionStates[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenesis(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x22
+		}
+	}
 	if m.NextEvidenceId != 0 {
 		i = encodeVarintGenesis(dAtA, i, uint64(m.NextEvidenceId))
 		i--
@@ -166,6 +1420,521 @@ func (m *GenesisState) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+func (m *StorageTruthPostponement) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *StorageTruthPostponement) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *StorageTruthPostponement) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.StrongPostpone {
+		i--
+		if m.StrongPostpone {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x18
+	}
+	if m.PostponedAtEpochId != 0 {
+		i = encodeVarintGenesis(dAtA, i, uint64(m.PostponedAtEpochId))
+		i--
+		dAtA[i] = 0x10
+	}
+	if len(m.SupernodeAccount) > 0 {
+		i -= len(m.SupernodeAccount)
+		copy(dAtA[i:], m.SupernodeAccount)
+		i = encodeVarintGenesis(dAtA, i, uint64(len(m.SupernodeAccount)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *GenesisActionFinalizationPostponement) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *GenesisActionFinalizationPostponement) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *GenesisActionFinalizationPostponement) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.PostponedAtEpochId != 0 {
+		i = encodeVarintGenesis(dAtA, i, uint64(m.PostponedAtEpochId))
+		i--
+		dAtA[i] = 0x10
+	}
+	if len(m.SupernodeAccount) > 0 {
+		i -= len(m.SupernodeAccount)
+		copy(dAtA[i:], m.SupernodeAccount)
+		i = encodeVarintGenesis(dAtA, i, uint64(len(m.SupernodeAccount)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *GenesisEvidenceEpochCount) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *GenesisEvidenceEpochCount) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *GenesisEvidenceEpochCount) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.Count != 0 {
+		i = encodeVarintGenesis(dAtA, i, uint64(m.Count))
+		i--
+		dAtA[i] = 0x20
+	}
+	if m.EvidenceType != 0 {
+		i = encodeVarintGenesis(dAtA, i, uint64(m.EvidenceType))
+		i--
+		dAtA[i] = 0x18
+	}
+	if len(m.SubjectAddress) > 0 {
+		i -= len(m.SubjectAddress)
+		copy(dAtA[i:], m.SubjectAddress)
+		i = encodeVarintGenesis(dAtA, i, uint64(len(m.SubjectAddress)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if m.EpochId != 0 {
+		i = encodeVarintGenesis(dAtA, i, uint64(m.EpochId))
+		i--
+		dAtA[i] = 0x8
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *GenesisHealOpVerification) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *GenesisHealOpVerification) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *GenesisHealOpVerification) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.Verified {
+		i--
+		if m.Verified {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x18
+	}
+	if len(m.VerifierSupernodeAccount) > 0 {
+		i -= len(m.VerifierSupernodeAccount)
+		copy(dAtA[i:], m.VerifierSupernodeAccount)
+		i = encodeVarintGenesis(dAtA, i, uint64(len(m.VerifierSupernodeAccount)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if m.HealOpId != 0 {
+		i = encodeVarintGenesis(dAtA, i, uint64(m.HealOpId))
+		i--
+		dAtA[i] = 0x8
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *GenesisRecheckEvidence) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *GenesisRecheckEvidence) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *GenesisRecheckEvidence) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.CreatorAccount) > 0 {
+		i -= len(m.CreatorAccount)
+		copy(dAtA[i:], m.CreatorAccount)
+		i = encodeVarintGenesis(dAtA, i, uint64(len(m.CreatorAccount)))
+		i--
+		dAtA[i] = 0x1a
+	}
+	if len(m.TicketId) > 0 {
+		i -= len(m.TicketId)
+		copy(dAtA[i:], m.TicketId)
+		i = encodeVarintGenesis(dAtA, i, uint64(len(m.TicketId)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if m.EpochId != 0 {
+		i = encodeVarintGenesis(dAtA, i, uint64(m.EpochId))
+		i--
+		dAtA[i] = 0x8
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *GenesisStorageProofTranscript) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *GenesisStorageProofTranscript) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *GenesisStorageProofTranscript) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.RecordJson) > 0 {
+		i -= len(m.RecordJson)
+		copy(dAtA[i:], m.RecordJson)
+		i = encodeVarintGenesis(dAtA, i, uint64(len(m.RecordJson)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if len(m.TranscriptHash) > 0 {
+		i -= len(m.TranscriptHash)
+		copy(dAtA[i:], m.TranscriptHash)
+		i = encodeVarintGenesis(dAtA, i, uint64(len(m.TranscriptHash)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *GenesisNodeFailureFact) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *GenesisNodeFailureFact) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *GenesisNodeFailureFact) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.RecordJson) > 0 {
+		i -= len(m.RecordJson)
+		copy(dAtA[i:], m.RecordJson)
+		i = encodeVarintGenesis(dAtA, i, uint64(len(m.RecordJson)))
+		i--
+		dAtA[i] = 0x2a
+	}
+	if len(m.ReporterAccount) > 0 {
+		i -= len(m.ReporterAccount)
+		copy(dAtA[i:], m.ReporterAccount)
+		i = encodeVarintGenesis(dAtA, i, uint64(len(m.ReporterAccount)))
+		i--
+		dAtA[i] = 0x22
+	}
+	if len(m.TicketId) > 0 {
+		i -= len(m.TicketId)
+		copy(dAtA[i:], m.TicketId)
+		i = encodeVarintGenesis(dAtA, i, uint64(len(m.TicketId)))
+		i--
+		dAtA[i] = 0x1a
+	}
+	if m.EpochId != 0 {
+		i = encodeVarintGenesis(dAtA, i, uint64(m.EpochId))
+		i--
+		dAtA[i] = 0x10
+	}
+	if len(m.SupernodeAccount) > 0 {
+		i -= len(m.SupernodeAccount)
+		copy(dAtA[i:], m.SupernodeAccount)
+		i = encodeVarintGenesis(dAtA, i, uint64(len(m.SupernodeAccount)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *GenesisReporterResultFact) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *GenesisReporterResultFact) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *GenesisReporterResultFact) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.RecordJson) > 0 {
+		i -= len(m.RecordJson)
+		copy(dAtA[i:], m.RecordJson)
+		i = encodeVarintGenesis(dAtA, i, uint64(len(m.RecordJson)))
+		i--
+		dAtA[i] = 0x2a
+	}
+	if len(m.TargetAccount) > 0 {
+		i -= len(m.TargetAccount)
+		copy(dAtA[i:], m.TargetAccount)
+		i = encodeVarintGenesis(dAtA, i, uint64(len(m.TargetAccount)))
+		i--
+		dAtA[i] = 0x22
+	}
+	if len(m.TicketId) > 0 {
+		i -= len(m.TicketId)
+		copy(dAtA[i:], m.TicketId)
+		i = encodeVarintGenesis(dAtA, i, uint64(len(m.TicketId)))
+		i--
+		dAtA[i] = 0x1a
+	}
+	if m.EpochId != 0 {
+		i = encodeVarintGenesis(dAtA, i, uint64(m.EpochId))
+		i--
+		dAtA[i] = 0x10
+	}
+	if len(m.ReporterAccount) > 0 {
+		i -= len(m.ReporterAccount)
+		copy(dAtA[i:], m.ReporterAccount)
+		i = encodeVarintGenesis(dAtA, i, uint64(len(m.ReporterAccount)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *GenesisFailedHealMarker) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *GenesisFailedHealMarker) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *GenesisFailedHealMarker) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.TicketId) > 0 {
+		i -= len(m.TicketId)
+		copy(dAtA[i:], m.TicketId)
+		i = encodeVarintGenesis(dAtA, i, uint64(len(m.TicketId)))
+		i--
+		dAtA[i] = 0x1a
+	}
+	if m.EpochId != 0 {
+		i = encodeVarintGenesis(dAtA, i, uint64(m.EpochId))
+		i--
+		dAtA[i] = 0x10
+	}
+	if len(m.SupernodeAccount) > 0 {
+		i -= len(m.SupernodeAccount)
+		copy(dAtA[i:], m.SupernodeAccount)
+		i = encodeVarintGenesis(dAtA, i, uint64(len(m.SupernodeAccount)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *GenesisReportIndex) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *GenesisReportIndex) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *GenesisReportIndex) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.EpochId != 0 {
+		i = encodeVarintGenesis(dAtA, i, uint64(m.EpochId))
+		i--
+		dAtA[i] = 0x10
+	}
+	if len(m.ReporterSupernodeAccount) > 0 {
+		i -= len(m.ReporterSupernodeAccount)
+		copy(dAtA[i:], m.ReporterSupernodeAccount)
+		i = encodeVarintGenesis(dAtA, i, uint64(len(m.ReporterSupernodeAccount)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *GenesisHostReportIndex) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *GenesisHostReportIndex) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *GenesisHostReportIndex) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.EpochId != 0 {
+		i = encodeVarintGenesis(dAtA, i, uint64(m.EpochId))
+		i--
+		dAtA[i] = 0x10
+	}
+	if len(m.ReporterSupernodeAccount) > 0 {
+		i -= len(m.ReporterSupernodeAccount)
+		copy(dAtA[i:], m.ReporterSupernodeAccount)
+		i = encodeVarintGenesis(dAtA, i, uint64(len(m.ReporterSupernodeAccount)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *GenesisStorageChallengeIndex) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *GenesisStorageChallengeIndex) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *GenesisStorageChallengeIndex) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.ReporterSupernodeAccount) > 0 {
+		i -= len(m.ReporterSupernodeAccount)
+		copy(dAtA[i:], m.ReporterSupernodeAccount)
+		i = encodeVarintGenesis(dAtA, i, uint64(len(m.ReporterSupernodeAccount)))
+		i--
+		dAtA[i] = 0x1a
+	}
+	if m.EpochId != 0 {
+		i = encodeVarintGenesis(dAtA, i, uint64(m.EpochId))
+		i--
+		dAtA[i] = 0x10
+	}
+	if len(m.SupernodeAccount) > 0 {
+		i -= len(m.SupernodeAccount)
+		copy(dAtA[i:], m.SupernodeAccount)
+		i = encodeVarintGenesis(dAtA, i, uint64(len(m.SupernodeAccount)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
 func encodeVarintGenesis(dAtA []byte, offset int, v uint64) int {
 	offset -= sovGenesis(v)
 	base := offset
@@ -193,6 +1962,358 @@ func (m *GenesisState) Size() (n int) {
 	}
 	if m.NextEvidenceId != 0 {
 		n += 1 + sovGenesis(uint64(m.NextEvidenceId))
+	}
+	if len(m.NodeSuspicionStates) > 0 {
+		for _, e := range m.NodeSuspicionStates {
+			l = e.Size()
+			n += 1 + l + sovGenesis(uint64(l))
+		}
+	}
+	if len(m.ReporterReliabilityStates) > 0 {
+		for _, e := range m.ReporterReliabilityStates {
+			l = e.Size()
+			n += 1 + l + sovGenesis(uint64(l))
+		}
+	}
+	if len(m.TicketDeteriorationStates) > 0 {
+		for _, e := range m.TicketDeteriorationStates {
+			l = e.Size()
+			n += 1 + l + sovGenesis(uint64(l))
+		}
+	}
+	if len(m.HealOps) > 0 {
+		for _, e := range m.HealOps {
+			l = e.Size()
+			n += 1 + l + sovGenesis(uint64(l))
+		}
+	}
+	if m.NextHealOpId != 0 {
+		n += 1 + sovGenesis(uint64(m.NextHealOpId))
+	}
+	if len(m.TicketArtifactCountStates) > 0 {
+		for _, e := range m.TicketArtifactCountStates {
+			l = e.Size()
+			n += 1 + l + sovGenesis(uint64(l))
+		}
+	}
+	if len(m.StorageTruthPostponements) > 0 {
+		for _, e := range m.StorageTruthPostponements {
+			l = e.Size()
+			n += 1 + l + sovGenesis(uint64(l))
+		}
+	}
+	if len(m.RecheckEvidence) > 0 {
+		for _, e := range m.RecheckEvidence {
+			l = e.Size()
+			n += 1 + l + sovGenesis(uint64(l))
+		}
+	}
+	if len(m.StorageProofTranscripts) > 0 {
+		for _, e := range m.StorageProofTranscripts {
+			l = e.Size()
+			n += 1 + l + sovGenesis(uint64(l))
+		}
+	}
+	if len(m.NodeFailureFacts) > 0 {
+		for _, e := range m.NodeFailureFacts {
+			l = e.Size()
+			n += 1 + l + sovGenesis(uint64(l))
+		}
+	}
+	if len(m.ReporterResultFacts) > 0 {
+		for _, e := range m.ReporterResultFacts {
+			l = e.Size()
+			n += 1 + l + sovGenesis(uint64(l))
+		}
+	}
+	if len(m.FailedHealMarkers) > 0 {
+		for _, e := range m.FailedHealMarkers {
+			l = e.Size()
+			n += 1 + l + sovGenesis(uint64(l))
+		}
+	}
+	if len(m.EpochReports) > 0 {
+		for _, e := range m.EpochReports {
+			l = e.Size()
+			n += 2 + l + sovGenesis(uint64(l))
+		}
+	}
+	if len(m.ReportIndices) > 0 {
+		for _, e := range m.ReportIndices {
+			l = e.Size()
+			n += 2 + l + sovGenesis(uint64(l))
+		}
+	}
+	if len(m.HostReportIndices) > 0 {
+		for _, e := range m.HostReportIndices {
+			l = e.Size()
+			n += 2 + l + sovGenesis(uint64(l))
+		}
+	}
+	if len(m.StorageChallengeIndices) > 0 {
+		for _, e := range m.StorageChallengeIndices {
+			l = e.Size()
+			n += 2 + l + sovGenesis(uint64(l))
+		}
+	}
+	if len(m.ActionFinalizationPostponements) > 0 {
+		for _, e := range m.ActionFinalizationPostponements {
+			l = e.Size()
+			n += 2 + l + sovGenesis(uint64(l))
+		}
+	}
+	if len(m.EvidenceEpochCounts) > 0 {
+		for _, e := range m.EvidenceEpochCounts {
+			l = e.Size()
+			n += 2 + l + sovGenesis(uint64(l))
+		}
+	}
+	if len(m.HealOpVerifications) > 0 {
+		for _, e := range m.HealOpVerifications {
+			l = e.Size()
+			n += 2 + l + sovGenesis(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *StorageTruthPostponement) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.SupernodeAccount)
+	if l > 0 {
+		n += 1 + l + sovGenesis(uint64(l))
+	}
+	if m.PostponedAtEpochId != 0 {
+		n += 1 + sovGenesis(uint64(m.PostponedAtEpochId))
+	}
+	if m.StrongPostpone {
+		n += 2
+	}
+	return n
+}
+
+func (m *GenesisActionFinalizationPostponement) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.SupernodeAccount)
+	if l > 0 {
+		n += 1 + l + sovGenesis(uint64(l))
+	}
+	if m.PostponedAtEpochId != 0 {
+		n += 1 + sovGenesis(uint64(m.PostponedAtEpochId))
+	}
+	return n
+}
+
+func (m *GenesisEvidenceEpochCount) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.EpochId != 0 {
+		n += 1 + sovGenesis(uint64(m.EpochId))
+	}
+	l = len(m.SubjectAddress)
+	if l > 0 {
+		n += 1 + l + sovGenesis(uint64(l))
+	}
+	if m.EvidenceType != 0 {
+		n += 1 + sovGenesis(uint64(m.EvidenceType))
+	}
+	if m.Count != 0 {
+		n += 1 + sovGenesis(uint64(m.Count))
+	}
+	return n
+}
+
+func (m *GenesisHealOpVerification) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.HealOpId != 0 {
+		n += 1 + sovGenesis(uint64(m.HealOpId))
+	}
+	l = len(m.VerifierSupernodeAccount)
+	if l > 0 {
+		n += 1 + l + sovGenesis(uint64(l))
+	}
+	if m.Verified {
+		n += 2
+	}
+	return n
+}
+
+func (m *GenesisRecheckEvidence) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.EpochId != 0 {
+		n += 1 + sovGenesis(uint64(m.EpochId))
+	}
+	l = len(m.TicketId)
+	if l > 0 {
+		n += 1 + l + sovGenesis(uint64(l))
+	}
+	l = len(m.CreatorAccount)
+	if l > 0 {
+		n += 1 + l + sovGenesis(uint64(l))
+	}
+	return n
+}
+
+func (m *GenesisStorageProofTranscript) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.TranscriptHash)
+	if l > 0 {
+		n += 1 + l + sovGenesis(uint64(l))
+	}
+	l = len(m.RecordJson)
+	if l > 0 {
+		n += 1 + l + sovGenesis(uint64(l))
+	}
+	return n
+}
+
+func (m *GenesisNodeFailureFact) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.SupernodeAccount)
+	if l > 0 {
+		n += 1 + l + sovGenesis(uint64(l))
+	}
+	if m.EpochId != 0 {
+		n += 1 + sovGenesis(uint64(m.EpochId))
+	}
+	l = len(m.TicketId)
+	if l > 0 {
+		n += 1 + l + sovGenesis(uint64(l))
+	}
+	l = len(m.ReporterAccount)
+	if l > 0 {
+		n += 1 + l + sovGenesis(uint64(l))
+	}
+	l = len(m.RecordJson)
+	if l > 0 {
+		n += 1 + l + sovGenesis(uint64(l))
+	}
+	return n
+}
+
+func (m *GenesisReporterResultFact) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.ReporterAccount)
+	if l > 0 {
+		n += 1 + l + sovGenesis(uint64(l))
+	}
+	if m.EpochId != 0 {
+		n += 1 + sovGenesis(uint64(m.EpochId))
+	}
+	l = len(m.TicketId)
+	if l > 0 {
+		n += 1 + l + sovGenesis(uint64(l))
+	}
+	l = len(m.TargetAccount)
+	if l > 0 {
+		n += 1 + l + sovGenesis(uint64(l))
+	}
+	l = len(m.RecordJson)
+	if l > 0 {
+		n += 1 + l + sovGenesis(uint64(l))
+	}
+	return n
+}
+
+func (m *GenesisFailedHealMarker) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.SupernodeAccount)
+	if l > 0 {
+		n += 1 + l + sovGenesis(uint64(l))
+	}
+	if m.EpochId != 0 {
+		n += 1 + sovGenesis(uint64(m.EpochId))
+	}
+	l = len(m.TicketId)
+	if l > 0 {
+		n += 1 + l + sovGenesis(uint64(l))
+	}
+	return n
+}
+
+func (m *GenesisReportIndex) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.ReporterSupernodeAccount)
+	if l > 0 {
+		n += 1 + l + sovGenesis(uint64(l))
+	}
+	if m.EpochId != 0 {
+		n += 1 + sovGenesis(uint64(m.EpochId))
+	}
+	return n
+}
+
+func (m *GenesisHostReportIndex) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.ReporterSupernodeAccount)
+	if l > 0 {
+		n += 1 + l + sovGenesis(uint64(l))
+	}
+	if m.EpochId != 0 {
+		n += 1 + sovGenesis(uint64(m.EpochId))
+	}
+	return n
+}
+
+func (m *GenesisStorageChallengeIndex) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.SupernodeAccount)
+	if l > 0 {
+		n += 1 + l + sovGenesis(uint64(l))
+	}
+	if m.EpochId != 0 {
+		n += 1 + sovGenesis(uint64(m.EpochId))
+	}
+	l = len(m.ReporterSupernodeAccount)
+	if l > 0 {
+		n += 1 + l + sovGenesis(uint64(l))
 	}
 	return n
 }
@@ -318,6 +2439,2234 @@ func (m *GenesisState) Unmarshal(dAtA []byte) error {
 					break
 				}
 			}
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field NodeSuspicionStates", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.NodeSuspicionStates = append(m.NodeSuspicionStates, NodeSuspicionState{})
+			if err := m.NodeSuspicionStates[len(m.NodeSuspicionStates)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ReporterReliabilityStates", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ReporterReliabilityStates = append(m.ReporterReliabilityStates, ReporterReliabilityState{})
+			if err := m.ReporterReliabilityStates[len(m.ReporterReliabilityStates)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TicketDeteriorationStates", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.TicketDeteriorationStates = append(m.TicketDeteriorationStates, TicketDeteriorationState{})
+			if err := m.TicketDeteriorationStates[len(m.TicketDeteriorationStates)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 7:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field HealOps", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.HealOps = append(m.HealOps, HealOp{})
+			if err := m.HealOps[len(m.HealOps)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 8:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field NextHealOpId", wireType)
+			}
+			m.NextHealOpId = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.NextHealOpId |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 9:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TicketArtifactCountStates", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.TicketArtifactCountStates = append(m.TicketArtifactCountStates, TicketArtifactCountState{})
+			if err := m.TicketArtifactCountStates[len(m.TicketArtifactCountStates)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 10:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageTruthPostponements", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.StorageTruthPostponements = append(m.StorageTruthPostponements, StorageTruthPostponement{})
+			if err := m.StorageTruthPostponements[len(m.StorageTruthPostponements)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 11:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RecheckEvidence", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.RecheckEvidence = append(m.RecheckEvidence, GenesisRecheckEvidence{})
+			if err := m.RecheckEvidence[len(m.RecheckEvidence)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 12:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageProofTranscripts", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.StorageProofTranscripts = append(m.StorageProofTranscripts, GenesisStorageProofTranscript{})
+			if err := m.StorageProofTranscripts[len(m.StorageProofTranscripts)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 13:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field NodeFailureFacts", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.NodeFailureFacts = append(m.NodeFailureFacts, GenesisNodeFailureFact{})
+			if err := m.NodeFailureFacts[len(m.NodeFailureFacts)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 14:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ReporterResultFacts", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ReporterResultFacts = append(m.ReporterResultFacts, GenesisReporterResultFact{})
+			if err := m.ReporterResultFacts[len(m.ReporterResultFacts)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 15:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FailedHealMarkers", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.FailedHealMarkers = append(m.FailedHealMarkers, GenesisFailedHealMarker{})
+			if err := m.FailedHealMarkers[len(m.FailedHealMarkers)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 16:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field EpochReports", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.EpochReports = append(m.EpochReports, EpochReport{})
+			if err := m.EpochReports[len(m.EpochReports)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 17:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ReportIndices", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ReportIndices = append(m.ReportIndices, GenesisReportIndex{})
+			if err := m.ReportIndices[len(m.ReportIndices)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 18:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field HostReportIndices", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.HostReportIndices = append(m.HostReportIndices, GenesisHostReportIndex{})
+			if err := m.HostReportIndices[len(m.HostReportIndices)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 19:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageChallengeIndices", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.StorageChallengeIndices = append(m.StorageChallengeIndices, GenesisStorageChallengeIndex{})
+			if err := m.StorageChallengeIndices[len(m.StorageChallengeIndices)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 20:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ActionFinalizationPostponements", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ActionFinalizationPostponements = append(m.ActionFinalizationPostponements, GenesisActionFinalizationPostponement{})
+			if err := m.ActionFinalizationPostponements[len(m.ActionFinalizationPostponements)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 21:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field EvidenceEpochCounts", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.EvidenceEpochCounts = append(m.EvidenceEpochCounts, GenesisEvidenceEpochCount{})
+			if err := m.EvidenceEpochCounts[len(m.EvidenceEpochCounts)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 22:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field HealOpVerifications", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.HealOpVerifications = append(m.HealOpVerifications, GenesisHealOpVerification{})
+			if err := m.HealOpVerifications[len(m.HealOpVerifications)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenesis(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *StorageTruthPostponement) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenesis
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: StorageTruthPostponement: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: StorageTruthPostponement: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SupernodeAccount", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SupernodeAccount = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PostponedAtEpochId", wireType)
+			}
+			m.PostponedAtEpochId = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.PostponedAtEpochId |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StrongPostpone", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.StrongPostpone = bool(v != 0)
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenesis(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *GenesisActionFinalizationPostponement) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenesis
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: GenesisActionFinalizationPostponement: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: GenesisActionFinalizationPostponement: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SupernodeAccount", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SupernodeAccount = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PostponedAtEpochId", wireType)
+			}
+			m.PostponedAtEpochId = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.PostponedAtEpochId |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenesis(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *GenesisEvidenceEpochCount) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenesis
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: GenesisEvidenceEpochCount: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: GenesisEvidenceEpochCount: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field EpochId", wireType)
+			}
+			m.EpochId = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.EpochId |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SubjectAddress", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SubjectAddress = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field EvidenceType", wireType)
+			}
+			m.EvidenceType = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.EvidenceType |= EvidenceType(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Count", wireType)
+			}
+			m.Count = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Count |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenesis(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *GenesisHealOpVerification) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenesis
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: GenesisHealOpVerification: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: GenesisHealOpVerification: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field HealOpId", wireType)
+			}
+			m.HealOpId = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.HealOpId |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field VerifierSupernodeAccount", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.VerifierSupernodeAccount = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Verified", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Verified = bool(v != 0)
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenesis(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *GenesisRecheckEvidence) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenesis
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: GenesisRecheckEvidence: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: GenesisRecheckEvidence: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field EpochId", wireType)
+			}
+			m.EpochId = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.EpochId |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TicketId", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.TicketId = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CreatorAccount", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.CreatorAccount = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenesis(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *GenesisStorageProofTranscript) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenesis
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: GenesisStorageProofTranscript: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: GenesisStorageProofTranscript: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TranscriptHash", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.TranscriptHash = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RecordJson", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.RecordJson = append(m.RecordJson[:0], dAtA[iNdEx:postIndex]...)
+			if m.RecordJson == nil {
+				m.RecordJson = []byte{}
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenesis(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *GenesisNodeFailureFact) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenesis
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: GenesisNodeFailureFact: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: GenesisNodeFailureFact: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SupernodeAccount", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SupernodeAccount = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field EpochId", wireType)
+			}
+			m.EpochId = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.EpochId |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TicketId", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.TicketId = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ReporterAccount", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ReporterAccount = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RecordJson", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.RecordJson = append(m.RecordJson[:0], dAtA[iNdEx:postIndex]...)
+			if m.RecordJson == nil {
+				m.RecordJson = []byte{}
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenesis(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *GenesisReporterResultFact) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenesis
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: GenesisReporterResultFact: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: GenesisReporterResultFact: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ReporterAccount", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ReporterAccount = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field EpochId", wireType)
+			}
+			m.EpochId = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.EpochId |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TicketId", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.TicketId = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TargetAccount", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.TargetAccount = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RecordJson", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.RecordJson = append(m.RecordJson[:0], dAtA[iNdEx:postIndex]...)
+			if m.RecordJson == nil {
+				m.RecordJson = []byte{}
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenesis(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *GenesisFailedHealMarker) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenesis
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: GenesisFailedHealMarker: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: GenesisFailedHealMarker: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SupernodeAccount", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SupernodeAccount = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field EpochId", wireType)
+			}
+			m.EpochId = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.EpochId |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TicketId", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.TicketId = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenesis(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *GenesisReportIndex) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenesis
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: GenesisReportIndex: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: GenesisReportIndex: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ReporterSupernodeAccount", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ReporterSupernodeAccount = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field EpochId", wireType)
+			}
+			m.EpochId = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.EpochId |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenesis(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *GenesisHostReportIndex) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenesis
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: GenesisHostReportIndex: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: GenesisHostReportIndex: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ReporterSupernodeAccount", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ReporterSupernodeAccount = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field EpochId", wireType)
+			}
+			m.EpochId = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.EpochId |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenesis(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *GenesisStorageChallengeIndex) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenesis
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: GenesisStorageChallengeIndex: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: GenesisStorageChallengeIndex: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SupernodeAccount", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SupernodeAccount = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field EpochId", wireType)
+			}
+			m.EpochId = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.EpochId |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ReporterSupernodeAccount", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ReporterSupernodeAccount = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenesis(dAtA[iNdEx:])

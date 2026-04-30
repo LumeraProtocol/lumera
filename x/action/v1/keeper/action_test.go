@@ -192,7 +192,11 @@ func (suite *KeeperTestSuite) TestFinalizeAction() {
 			suite.Require().NoError(err)
 			badIDs = append(badIDs, id)
 		}
-		meta := &actiontypes.CascadeMetadata{RqIdsIds: badIDs}
+		meta := &actiontypes.CascadeMetadata{
+			RqIdsIds:            badIDs,
+			IndexArtifactCount:  uint32(len(badIDs)),
+			SymbolArtifactCount: uint32(len(badIDs)),
+		}
 		bz, err := suite.keeper.GetCodec().Marshal(meta)
 		suite.Require().NoError(err)
 		return bz
@@ -305,6 +309,10 @@ func (suite *KeeperTestSuite) TestFinalizeAction() {
 					suite.Equal(err, nil)
 
 					assert.NotZero(suite.T(), len(cascadeMetadata.RqIdsIds))
+					anchored, ok := suite.mockAuditKeeper.TicketArtifactCounts[updated.ActionID]
+					suite.True(ok)
+					suite.Equal(cascadeMetadata.GetIndexArtifactCount(), anchored.IndexArtifactCount)
+					suite.Equal(cascadeMetadata.GetSymbolArtifactCount(), anchored.SymbolArtifactCount)
 				}
 
 				if tc.expectEvidence {

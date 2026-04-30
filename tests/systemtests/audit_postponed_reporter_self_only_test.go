@@ -60,7 +60,7 @@ func TestAuditSubmitReport_PostponedReporterSelfOnly(t *testing.T) {
 	txBad := submitEpochReport(t, cli, n1.nodeName, epochID2, host, []string{
 		storageChallengeObservationJSON(n0.accAddr, []string{"PORT_STATE_OPEN"}),
 	})
-	RequireTxFailure(t, txBad, "reporter is not assigned as epoch prober")
+	RequireTxFailure(t, txBad, "reporter not eligible for storage challenge observations in this epoch")
 
 	// POSTPONED reporter can submit a host report only.
 	txOK := submitEpochReport(t, cli, n1.nodeName, epochID2, host, nil)

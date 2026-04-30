@@ -34,7 +34,6 @@ func SimulateMsgSubmitEpochReportVariance(k keeper.Keeper) simtypes.Operation {
 			MemUsagePercent:        10 + r.Float64()*20,
 			DiskUsagePercent:       70 + r.Float64()*35, // exercises both sides of 90% threshold
 			FailedActionsCount:     uint32(r.Intn(3)),
-			CascadeKademliaDbBytes: float64(1_000_000 + r.Intn(10_000_000)),
 		}
 		msg := &types.MsgSubmitEpochReport{
 			Creator:                      sn.SupernodeAccount,

@@ -52,8 +52,9 @@ func TestEnforceEpochEnd_EmptyActiveSet_PostponedCannotRecover(t *testing.T) {
 	// (empty active set means no probers were assigned).
 
 	// Mock: no ACTIVE supernodes, two POSTPONED.
+	// Per LEP-6 §17: audit EnforceEpochEnd only queries Active nodes (not StorageFull).
 	f.supernodeKeeper.EXPECT().
-		GetAllSuperNodes(gomock.AssignableToTypeOf(f.ctx), sntypes.SuperNodeStateActive, sntypes.SuperNodeStateStorageFull).
+		GetAllSuperNodes(gomock.AssignableToTypeOf(f.ctx), sntypes.SuperNodeStateActive).
 		Return([]sntypes.SuperNode{}, nil).
 		Times(1)
 	f.supernodeKeeper.EXPECT().
@@ -116,8 +117,9 @@ func TestEnforceEpochEnd_LegacyRecoveredSN_SurvivesWithReport(t *testing.T) {
 
 	// Simulate: both were recovered to ACTIVE mid-epoch via legacy metrics.
 	// At epoch end, the audit enforcement sees them as ACTIVE.
+	// Per LEP-6 §17: audit EnforceEpochEnd only queries Active nodes (not StorageFull).
 	f.supernodeKeeper.EXPECT().
-		GetAllSuperNodes(gomock.AssignableToTypeOf(f.ctx), sntypes.SuperNodeStateActive, sntypes.SuperNodeStateStorageFull).
+		GetAllSuperNodes(gomock.AssignableToTypeOf(f.ctx), sntypes.SuperNodeStateActive).
 		Return([]sntypes.SuperNode{sn0, sn1}, nil).
 		Times(1)
 	f.supernodeKeeper.EXPECT().

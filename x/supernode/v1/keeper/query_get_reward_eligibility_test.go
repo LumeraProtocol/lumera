@@ -41,16 +41,14 @@ func TestQuerySNEligibility_RejectsStaleAuditReport(t *testing.T) {
 	params.RewardDistribution.MinCascadeBytesForPayment = 1_000
 	require.NoError(t, k.SetParams(ctx, params))
 
-	ctx = ctx.WithBlockHeight(100)
-	snKeeper.ctx = ctx
+	// Add supernode at block height 1 (initial ctx height) so MetricsState.Height = 1.
+	// Then query at height 100 → staleness = 99 > MetricsFreshnessMaxBlocks(5) → stale.
 	val := makeValAddr(2)
 	acc := makeAccAddr(2)
 	addSupernode(snKeeper, auditKeeper, val, acc, sntypes.SuperNodeStateActive, 5_000)
 
-	accBech32, err := sdk.Bech32ifyAddressBytes(lcfg.AccountAddressPrefix, acc)
-	require.NoError(t, err)
-	// make report stale explicitly
-	auditKeeper.setReport(auditKeeper.currentEpochID, accBech32, 80, 5_000)
+	ctx = ctx.WithBlockHeight(100)
+	snKeeper.ctx = ctx
 
 	valBech32, err := sdk.Bech32ifyAddressBytes(lcfg.ValidatorAddressPrefix, val)
 	require.NoError(t, err)

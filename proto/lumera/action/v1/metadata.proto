@@ -95,4 +95,9 @@ message CascadeMetadata {
   // LEP-5 fields
   AvailabilityCommitment availability_commitment = 8 [json_name = "availability_commitment"];
   repeated ChunkProof chunk_proofs = 9 [json_name = "chunk_proofs"];
+
+  // LEP-6 canonical artifact counts committed at finalization.
+  // These values anchor deterministic artifact ordinal selection on-chain.
+  uint32 index_artifact_count = 10 [json_name = "index_artifact_count"];
+  uint32 symbol_artifact_count = 11 [json_name = "symbol_artifact_count"];
 }

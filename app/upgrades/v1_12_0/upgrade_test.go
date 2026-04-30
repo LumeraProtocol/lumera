@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	appParams "github.com/LumeraProtocol/lumera/app/upgrades/params"
+	audittypes "github.com/LumeraProtocol/lumera/x/audit/v1/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -72,4 +73,18 @@ func TestCreateUpgradeHandlerReturnsNonNil(t *testing.T) {
 	handler := CreateUpgradeHandler(appParams.AppUpgradeParams{})
 	require.NotNil(t, handler,
 		"CreateUpgradeHandler should return a non-nil upgrade handler function")
+}
+
+// ---------------------------------------------------------------------------
+// Activation policy constants — pin so future changes are intentional and
+// surface in code review.
+// ---------------------------------------------------------------------------
+
+func TestActivationPolicyConstants(t *testing.T) {
+	require.True(t, everlightEnabled,
+		"everlightEnabled must be true at activation; Everlight defaults are persisted")
+	require.Equal(t,
+		audittypes.StorageTruthEnforcementMode_STORAGE_TRUTH_ENFORCEMENT_MODE_SHADOW,
+		storageTruthEnforcementMode,
+		"LEP-6 enforcement mode at activation must be SHADOW")
 }

@@ -49,6 +49,7 @@ type SupernodeKeeper interface {
 	GetRegistrationFeeShareBps(ctx sdk.Context) uint64
 	CountEligibleSNs(ctx sdk.Context) uint64
 	GetLatestCascadeBytesForPayout(ctx sdk.Context, supernodeAccount string) (float64, int64, bool)
+	EnsureModuleAccount(ctx sdk.Context)
 }
 
 // StakingKeeper defines the expected interface for the Staking module.

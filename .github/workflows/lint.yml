@@ -57,3 +57,23 @@ jobs:
           level: warning
         env:
           REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  govulncheck:
+    name: govulncheck (Go vulnerability scan)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6.0.1
+
+      # govulncheck-action installs its own Go toolchain via `go-version-file`.
+      # We point it at go.mod so the scan tracks the same toolchain the rest
+      # of CI uses (currently go 1.25.9). The action exits non-zero on any
+      # finding affecting the called code, which fails the job and blocks
+      # the PR — exactly what we want for a security gate.
+      - name: Run govulncheck
+        uses: golang/govulncheck-action@v1.0.4
+        with:
+          go-version-file: go.mod
+          # Default scan target is `./...`, which is the full module —
+          # matches the standard `govulncheck ./...` invocation.
+          go-package: ./...

@@ -104,7 +104,7 @@ At registration, the user pays:
 
 ### Move 4 — Audit Hardening (LEP-6 — Final Operational Phase)
 
-Once the basic payout rails are stable, graduated audit mechanisms ensure payouts reflect actual Cascade data retention. **LEP-6 (Storage-Truth Enforcement)** is the primary vehicle — see `docs/plans/LEP-6 Storage-Truth Enforcement-draft.md`:
+Once the basic payout rails are stable, graduated audit mechanisms ensure payouts reflect actual Cascade data retention. **LEP-6 (Storage-Truth Enforcement)** is the primary vehicle — see `docs/leps/LEP-6 Storage-Truth Enforcement-draft.md`:
 
 - **LEP-6 compound storage challenges** replace the current fixed-byte checks with deterministic multi-range byte-subset hashing, recent + old ticket subchallenges, node suspicion scoring, reporter reliability scoring, and ticket-deterioration-driven self-healing
 - **Challenge-response proofs** (as specified in LEP-5) gate full payout eligibility
@@ -192,7 +192,7 @@ If funding falls below aggregate storage costs, governance can adjust parameters
 
 ### Phase 2 — Audit Hardening & Anti-Gaming (LEP-6)
 **Goal:** Ensure payouts reflect actual data retention; close gaming vectors.
-**Requires:** Chain upgrade. Developed outside this project — see `docs/plans/LEP-6 Storage-Truth Enforcement-draft.md`.
+**Requires:** Chain upgrade. Developed outside this project — see `docs/leps/LEP-6 Storage-Truth Enforcement-draft.md`.
 
 - **LEP-6 Storage-Truth Enforcement:** Compound storage challenges (recent + old ticket subchallenges) with deterministic one-third-of-nodes-per-epoch target selection, node suspicion scoring, reporter reliability/divergence scoring, and ticket deterioration scoring for self-healing
 - LEP-5 challenge-response proofs gate full payout eligibility (partial payouts for unaudited SNs)

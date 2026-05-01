@@ -369,7 +369,7 @@ For each distribution period, an SN is eligible for payouts if:
 
 ### Phase 2 — Audit Hardening & Anti-Gaming (LEP-6)
 
-**Summary:** Close gaming vectors via LEP-6 storage-truth enforcement; integrate snscope as cross-validation oracle. **Developed outside this project** — see `docs/plans/LEP-6 Storage-Truth Enforcement-draft.md` for full design.
+**Summary:** Close gaming vectors via LEP-6 storage-truth enforcement; integrate snscope as cross-validation oracle. **Developed outside this project** — see `docs/leps/LEP-6 Storage-Truth Enforcement-draft.md` for full design.
 
 **LEP-6 introduces:**
 - **Compound storage challenges:** Each challenged node receives one recent-ticket + one old-ticket subchallenge per epoch, with deterministic multi-range byte-subset hashing (replacing fixed first-KB checks)

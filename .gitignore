@@ -27,6 +27,12 @@ build/
 # is a Go `package main` (tests_evmigration devnet tool), so a bare
 # `go build` in that dir writes a binary at this path. Keep it out.
 devnet/tests/evmigration/evmigration
+
+# Build-time mirror of repo-root scripts/{evmigration-common,migrate-*}.sh.
+# Populated by Makefile.devnet::_devnet-stage-migration-scripts so the
+# devnet docker build context can COPY them; canonical sources live at
+# /scripts/, not here.
+devnet/scripts/migration/
 .claude/
 *.swagger.json
 /openrpcgen

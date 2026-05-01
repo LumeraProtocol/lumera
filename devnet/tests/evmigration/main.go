@@ -197,6 +197,20 @@ var (
 		"",
 		"validator key name to migrate (default: auto-detect from keyring+staking, requires exactly one local candidate)",
 	)
+	flagActionLockFile = flag.String(
+		"action-lock-file",
+		"",
+		"path to a shared lock file (typically on a /shared mount) used to serialize "+
+			"cascade action creation across parallel containers via flock(2). When empty, "+
+			"no cross-process serialization happens (safe single-container default). "+
+			"When set, each createPendingAction/createDoneAction/createApprovedAction "+
+			"call blocks on an exclusive flock on this file until the action's tx has "+
+			"been observed in a committed block — preventing N validator containers "+
+			"from submitting MsgRequestAction in the same block, which exposes a known "+
+			"supernode race where concurrent MsgFinalizeAction txs from one supernode "+
+			"account collide on auth account_sequence. Temporary mitigation; the proper "+
+			"fix lives in the supernode's tx-pipelining logic.",
+	)
 )
 
 // main parses flags, detects the runtime coin type, and dispatches to the selected mode.

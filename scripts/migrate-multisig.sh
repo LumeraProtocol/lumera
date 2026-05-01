@@ -23,11 +23,12 @@ Subcommands:
   submit     Coordinator: broadcast + verify (wraps submit-proof)
 
 Run `migrate-multisig.sh <subcommand> --help` for subcommand-specific flags.
+Mainnet RPC example: https://rpc.lumera.io:443
 USAGE
 }
 
 _mms_generate() {
-  local legacy="" new="" kind="" chain_id="" node="" out=""
+  local legacy="" new="" kind="" chain_id="" node="${LUMERA_NODE:-tcp://localhost:26657}" out=""
   local sig_format="" binary="lumerad"
   local new_sub_pub_keys="" new_threshold="" legacy_key=""
   local keyring_backend="test" keyring_dir="" home_dir=""
@@ -51,8 +52,10 @@ _mms_generate() {
         cat >&2 <<'G_USAGE'
 Usage: migrate-multisig.sh generate --legacy <multisig-addr> \
   --new-sub-pub-keys <k1,k2,...> --new-threshold <K> --kind claim|validator \
-  --chain-id <id> --node <url> --out <path> \
+  --chain-id <id> --out <path> \
   [--new <new-multisig-addr>]         Cross-checks the address derived from new-sub-pub-keys
+  [--node <url>]                      RPC endpoint (default $LUMERA_NODE or tcp://localhost:26657;
+                                      mainnet example: https://rpc.lumera.io:443)
   [--sig-format SIG_FORMAT_CLI|SIG_FORMAT_ADR036]
   [--keyring-backend <b>] [--keyring-dir <dir>] [--home <dir>]
   [--binary <path>]
@@ -70,7 +73,7 @@ G_USAGE
 
   # Required-flag validation. --new is optional (cross-check only).
   local f
-  for f in legacy kind chain_id node out new_sub_pub_keys new_threshold; do
+  for f in legacy kind chain_id out new_sub_pub_keys new_threshold; do
     if [[ -z "${!f}" ]]; then
       log_error "generate: --${f//_/-} is required"
       exit 1
@@ -97,6 +100,7 @@ G_USAGE
 
   require_multisig_binary
   require_jq
+  resolve_chain_id
 
   # Check on-chain pubkey BEFORE estimate so a nil-pubkey multisig gets
   # the exit-8 "seed the pubkey first" remediation, not a confusing
@@ -105,14 +109,14 @@ G_USAGE
   pk_type=$(auth_pubkey_type "$legacy")
   case "$pk_type" in
     none)
-      log_error "multisig pubkey is not seeded on-chain for $legacy"
+      log_error "multisig pubkey is not seeded on-chain for $(legacy_value "$legacy")"
       log_error "submit any transaction from the multisig account first, then retry"
       exit 8 ;;
     single-sig)
-      log_error "legacy account $legacy is single-sig; use migrate-account.sh or migrate-validator.sh"
+      log_error "legacy account $(legacy_value "$legacy") is single-sig; use migrate-account.sh or migrate-validator.sh"
       exit 3 ;;
     multisig) ;;
-    *) log_error "unexpected pubkey type for $legacy: $pk_type"; exit 2 ;;
+    *) log_error "unexpected pubkey type for $(legacy_value "$legacy"): $pk_type"; exit 2 ;;
   esac
 
   # Pull estimate — provides is_validator, would_succeed, is_multisig confirmation.
@@ -121,17 +125,18 @@ G_USAGE
   assert_multisig "$estimate"
 
   if [[ "$kind" == "validator" && "$(jq -r '.is_validator' <<<"$estimate")" != "true" ]]; then
-    log_error "--kind validator specified but $legacy is not a validator operator"
+    log_error "--kind validator specified but $(legacy_value "$legacy") is not a validator operator"
     exit 6
   fi
 
   # Design §3.1: catch already-migrated / already-used destinations
   # and doomed ceremonies BEFORE co-signers spend time on partials.
   # --new is optional (the CLI derives and returns it from --new-sub-pub-keys);
-  # only probe the unused-destination check when the operator supplied it.
-  assert_not_migrated "$legacy"
+  # only probe the destination-side checks when the operator supplied it.
+  assert_not_migrated "$legacy" "${new:-}"
   if [[ -n "$new" ]]; then
     assert_new_address_unused "$new"
+    assert_destination_fresh "$new"
   fi
   assert_estimate_succeeds "$estimate"
 
@@ -154,6 +159,8 @@ G_USAGE
   args+=(--node "$node" --chain-id "$chain_id" --output json)
 
   log_info "generating proof template at $out"
+  log_info "  legacy: $(legacy_value "$legacy")"
+  [[ -n "$new" ]] && log_info "  new:    $(new_value "$new")"
   "$BIN" "${args[@]}"
   log_info "done — distribute $out to the K co-signers"
 }
@@ -221,6 +228,7 @@ S_USAGE
 
   require_multisig_binary
   require_jq
+  resolve_chain_id
 
   # Parse + validate the input proof/partial. read_proof_file rejects
   # single-key-on-either-side (exit 3), bad payload_hex (exit 9), missing
@@ -234,7 +242,7 @@ S_USAGE
     from_pubkey=$(key_pubkey_b64 "$from")
     listed=$(jq -r '.legacy.sub_pub_keys[]' <<<"$pjson")
     if ! grep -qFx "$from_pubkey" <<<"$listed"; then
-      log_error "--from '$from' pubkey is not among legacy.sub_pub_keys in $input"
+      log_error "--from '$(legacy_value "$from")' pubkey is not among legacy.sub_pub_keys in $input"
       exit 1
     fi
   fi
@@ -244,7 +252,7 @@ S_USAGE
     new_pubkey=$(key_pubkey_b64 "$new_key")
     listed_new=$(jq -r '.new.sub_pub_keys[]' <<<"$pjson")
     if ! grep -qFx "$new_pubkey" <<<"$listed_new"; then
-      log_error "--new-key '$new_key' pubkey is not among new.sub_pub_keys in $input"
+      log_error "--new-key '$(new_value "$new_key")' pubkey is not among new.sub_pub_keys in $input"
       exit 1
     fi
   fi
@@ -261,8 +269,8 @@ S_USAGE
   [[ -n "$home_dir"    ]] && args+=(--home "$home_dir")
 
   local sides=()
-  [[ -n "$from"    ]] && sides+=("legacy(${from})")
-  [[ -n "$new_key" ]] && sides+=("new(${new_key})")
+  [[ -n "$from"    ]] && sides+=("legacy($(legacy_value "$from"))")
+  [[ -n "$new_key" ]] && sides+=("new($(new_value "$new_key"))")
   log_info "signing $input: ${sides[*]}"
   "$BIN" "${args[@]}"
   log_info "partial written to $out"
@@ -298,6 +306,7 @@ C_USAGE
 
   require_multisig_binary
   require_jq
+  resolve_chain_id
 
   # Per-file + cross-file consistency check. summarize_partials prints the
   # K-of-N entry-presence matrix to stderr and exits 9 on cross-file
@@ -323,7 +332,7 @@ C_USAGE
   log_info "combined tx written to $out"
 }
 _mms_submit() {
-  local input="" chain_id="" node="" binary="lumerad"
+  local input="" chain_id="" node="${LUMERA_NODE:-tcp://localhost:26657}" binary="lumerad"
   local keyring_backend="test" keyring_dir="" home_dir=""
   local yes=0 dry_run=0 node_stopped=0
   local positional=()
@@ -341,9 +350,12 @@ _mms_submit() {
       -h|--help)
         cat >&2 <<'SU_USAGE'
 Usage: migrate-multisig.sh submit <tx.json> \
-  --chain-id <id> --node <url> \
+  --chain-id <id> \
+  [--node <url>] \
   [--keyring-backend <b>] [--keyring-dir <dir>] [--home <dir>] \
   [--yes] [--dry-run] [--i-have-stopped-the-node] [--binary <path>]
+
+Mainnet RPC example: https://rpc.lumera.io:443
 
 submit-proof does not sign at the Cosmos tx layer — migration messages
 declare zero signers and fees are waived by the evmigration ante handler.
@@ -361,13 +373,10 @@ SU_USAGE
   fi
   input="${positional[0]}"
 
-  local f
-  for f in chain_id node; do
-    if [[ -z "${!f}" ]]; then
-      log_error "submit: --${f//_/-} is required"
-      exit 1
-    fi
-  done
+  if [[ -z "$chain_id" ]]; then
+    log_error "submit: --chain-id is required"
+    exit 1
+  fi
 
   # shellcheck disable=SC2034
   BIN="$binary"
@@ -388,6 +397,7 @@ SU_USAGE
 
   require_multisig_binary
   require_jq
+  resolve_chain_id
 
   # Parse + validate tx.json. Rejects non-multisig→multisig (exit 3),
   # missing fields / malformed (exit 9). Emits compact summary JSON.
@@ -402,8 +412,9 @@ SU_USAGE
   new_threshold=$(jq -r '.new_threshold' <<<"$tx_meta")
   new_num_signers=$(jq -r '.new_num_signers' <<<"$tx_meta")
 
-  assert_not_migrated "$legacy"
+  assert_not_migrated "$legacy" "$new"
   assert_new_address_unused "$new"
+  assert_destination_fresh "$new"
 
   # Fresh estimate — catches ceremony-duration chain-state drift.
   local estimate
@@ -420,8 +431,8 @@ SU_USAGE
     printf '  Kind:        %s\n' "$kind"
     printf '  Legacy msig: %s-of-%s\n' "$threshold" "$num_signers"
     printf '  New msig:    %s-of-%s (eth sub-keys)\n' "$new_threshold" "$new_num_signers"
-    printf '  Legacy:      %s\n' "$legacy"
-    printf '  New:         %s\n' "$new"
+    printf '  Legacy:      %s\n' "$(legacy_value "$legacy")"
+    printf '  New:         %s\n' "$(new_value "$new")"
     printf '===================================\n\n'
   } >&2
 
@@ -450,12 +461,12 @@ BANNER
     fi
   fi
 
-  confirm "Proceed with broadcast?"
-
+  # Skip the interactive prompt in --dry-run; nothing destructive will happen.
   if (( DRY_RUN == 1 )); then
     log_info "--dry-run: stopping before broadcast"
     return 0
   fi
+  confirm "Proceed with broadcast?"
 
   # submit-proof does not take --from; authorization is in the proof bytes.
   # We still pass keyring flags so the SDK's NewFactoryCLI can construct a
@@ -471,19 +482,22 @@ BANNER
 
   local broadcast_json tx_hash
   broadcast_json=$("$BIN" "${args[@]}")
-  tx_hash=$(jq -r '.txhash' <<<"$broadcast_json" 2>/dev/null || printf '')
-  if [[ -z "$tx_hash" || "$tx_hash" == "null" ]]; then
-    log_error "broadcast returned no txhash: $broadcast_json"
-    exit 2
-  fi
+  tx_hash=$(assert_broadcast_accepted "$broadcast_json")
 
   log_info "broadcast tx $tx_hash; waiting for inclusion..."
-  wait_for_tx "$tx_hash"
+  # rc=2 means indexation timeout (tx may still land); fall through to
+  # verify_migration which checks authoritative chain state. Only fatal on rc=1.
+  local wait_rc=0
+  wait_for_tx "$tx_hash" || wait_rc=$?
+  if (( wait_rc == 1 )); then
+    exit 1
+  fi
   verify_migration "$legacy" "$new" "$snap"
+  show_migration_summary "$legacy" "$new"
 
   log_info "migration complete"
-  log_info "  legacy: $legacy"
-  log_info "  new:    $new"
+  log_info "  legacy: $(legacy_value "$legacy")"
+  log_info "  new:    $(new_value "$new")"
   log_info "  tx:     $tx_hash"
 }
 

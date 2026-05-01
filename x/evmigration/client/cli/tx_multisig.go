@@ -1090,6 +1090,7 @@ index's entry in place rather than duplicating it.`,
 		},
 	}
 	flags.AddTxFlagsToCmd(cmd)
+	cmd.Flags().String(flagNewKey, "", "Local keyring key name of the destination-side sub-key (must be eth_secp256k1). Sign the new half. At least one of --from or --new-key must be supplied.")
 	cmd.Flags().String(flagOut, "", "Write to this path instead of overwriting the input file")
 	return cmd
 }

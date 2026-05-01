@@ -53,6 +53,25 @@ COPY --chmod=0755 \
     ${SCRIPTS_SRC_DIR}/lumera-uploader-setup.sh \
     ${SCRIPTS_DEST_DIR}/
 
+# Migration helper scripts (mirrored from repo-root scripts/ into
+# devnet/scripts/migration/ at build time by Makefile.devnet's
+# _devnet-stage-migration-scripts target). These are the same end-user-
+# facing scripts shipped in the release tarball; bundling them in the devnet
+# image lets validators run them directly inside containers for testing.
+COPY --chmod=0755 \
+    ${SCRIPTS_SRC_DIR}/migration/ \
+    ${SCRIPTS_DEST_DIR}/migration/
+
+# Add the migration directory to PATH so `migrate-account.sh` etc. can be
+# invoked by name from any cwd inside the container.
+ENV PATH="${SCRIPTS_DEST_DIR}/migration:${PATH}"
+
+# Bake the devnet chain ID in so the migration scripts have a working default
+# (matches devnet/config/config.json::chain.id). Resolution order in the scripts
+# is: --chain-id flag > $LUMERA_CHAIN_ID > $CHAIN_ID. Users can still override
+# at invocation time via either the env var or the flag.
+ENV CHAIN_ID=lumera-devnet-1
+
 # Expose necessary ports
 EXPOSE 26656 26657 1317 9090 4444 8002 50051 8080 8088
 

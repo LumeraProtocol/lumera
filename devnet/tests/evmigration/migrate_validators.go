@@ -469,16 +469,30 @@ func verifyPostMigrationBalances(newAddr string, preBalance int64) error {
 		return fmt.Errorf("evm balance-bank mismatch: bank=%d evm-balance-bank=%d", postBalance, evmBankBalance)
 	}
 
-	// 3. EVM account balance (18-decimal) must equal bank balance * 10^12.
+	// 3. EVM account balance (18-decimal) must equal SPENDABLE balance * 10^12.
+	//
+	// For non-vesting accounts, spendable == total, so this is the same as the
+	// previous bank-total comparison. For vesting accounts (PermanentLocked,
+	// ContinuousVesting, etc.) the locked portion is excluded from EVM
+	// precisebank because it can't be transferred via Ethereum-style txs —
+	// only via cosmos-sdk vesting unlock semantics. See migration of val_2's
+	// PermanentLocked composite, where bank shows 1T+ but EVM precisebank
+	// correctly tracks only the spendable delta.
 	evmAccountBal, err := queryEVMAccountBalance(hexAddr)
 	if err != nil {
 		return fmt.Errorf("evm account: %w", err)
 	}
-	expectedEVM := fmt.Sprintf("%d000000000000", postBalance) // ulume * 10^12
-	if evmAccountBal != expectedEVM {
-		return fmt.Errorf("evm account balance mismatch: expected %s got %s", expectedEVM, evmAccountBal)
+	spendableBalance, err := querySpendableBalance(newAddr)
+	if err != nil {
+		return fmt.Errorf("query spendable balance: %w", err)
 	}
-	log.Printf("  EVM balance verified: bank=%d ulume, evm-balance-bank=%d ulume, evm-account=%s alume", postBalance, evmBankBalance, evmAccountBal)
+	expectedEVM := fmt.Sprintf("%d000000000000", spendableBalance) // ulume * 10^12
+	if evmAccountBal != expectedEVM {
+		return fmt.Errorf("evm account balance mismatch: expected %s got %s (bank=%d, spendable=%d)",
+			expectedEVM, evmAccountBal, postBalance, spendableBalance)
+	}
+	log.Printf("  EVM balance verified: bank=%d ulume, spendable=%d ulume, evm-balance-bank=%d ulume, evm-account=%s alume",
+		postBalance, spendableBalance, evmBankBalance, evmAccountBal)
 	return nil
 }
 

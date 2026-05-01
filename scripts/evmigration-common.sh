@@ -19,7 +19,13 @@ readonly __EVMIGRATION_COMMON_LOADED=1
 # shellcheck disable=SC2034
 NODE=""
 # shellcheck disable=SC2034
-CHAIN_ID=""
+# Preserve any pre-existing CHAIN_ID — it may have been set by:
+#   • a parent shell that exported CHAIN_ID
+#   • a docker container ENV (e.g. devnet's "ENV CHAIN_ID=lumera-devnet-1")
+#   • a wrapper script that sourced this file after assigning CHAIN_ID
+# The default-resolution order in parse_common_flags is:
+#   --chain-id flag  >  $LUMERA_CHAIN_ID env  >  preset $CHAIN_ID  >  error
+CHAIN_ID="${CHAIN_ID:-}"
 # shellcheck disable=SC2034
 KEYRING_BACKEND="test"
 # shellcheck disable=SC2034
@@ -43,13 +49,26 @@ NEW_KEY=""
 
 # Colors are emitted only when stderr is a TTY. Set NO_COLOR=1 to force off.
 _color_init() {
-  if [[ -t 2 && -z "${NO_COLOR:-}" ]]; then
+  local supports_color=0 colors=""
+  if [[ -t 2 && -z "${NO_COLOR:-}" && -n "${TERM:-}" && "${TERM:-}" != "dumb" ]]; then
+    supports_color=1
+    if command -v tput >/dev/null 2>&1; then
+      colors=$(tput colors 2>/dev/null || true)
+      if [[ -n "$colors" && "$colors" -lt 8 ]]; then
+        supports_color=0
+      fi
+    fi
+  fi
+
+  if (( supports_color == 1 )); then
     _C_INFO=$'\033[36m'   # cyan
     _C_WARN=$'\033[33m'   # yellow
     _C_ERR=$'\033[31m'    # red
+    _C_LEGACY=$'\033[34m' # blue
+    _C_NEW=$'\033[32m'    # green
     _C_RESET=$'\033[0m'
   else
-    _C_INFO="" _C_WARN="" _C_ERR="" _C_RESET=""
+    _C_INFO="" _C_WARN="" _C_ERR="" _C_LEGACY="" _C_NEW="" _C_RESET=""
   fi
 }
 _color_init
@@ -57,6 +76,10 @@ _color_init
 log_info()  { printf '%sINFO%s  %s\n' "$_C_INFO" "$_C_RESET" "$*" >&2; }
 log_warn()  { printf '%sWARN%s  %s\n' "$_C_WARN" "$_C_RESET" "$*" >&2; }
 log_error() { printf '%sERROR%s %s\n' "$_C_ERR"  "$_C_RESET" "$*" >&2; }
+
+_role_color() { printf '%s%s%s' "$1" "$2" "$_C_RESET"; }
+legacy_value() { _role_color "$_C_LEGACY" "$1"; }
+new_value() { _role_color "$_C_NEW" "$1"; }
 
 # ---- Flag parsing -----------------------------------------------------------
 
@@ -92,6 +115,16 @@ _usage() {
   # the script the user invoked, not to this library). Callers may override
   # explicitly, e.g. _usage migrate-validator.sh, for synthetic contexts.
   local script_name="${1:-$(basename "$0")}"
+  # Compute the actual default that --chain-id will resolve to so the help
+  # message tells the user what they'd get without passing the flag, instead
+  # of pointing at an env var name they may or may not have set.
+  local _resolved_chain_id="${LUMERA_CHAIN_ID:-${CHAIN_ID:-}}"
+  local _chain_id_help
+  if [[ -n "${_resolved_chain_id}" ]]; then
+    _chain_id_help="default ${_resolved_chain_id}"
+  else
+    _chain_id_help="required, or set \$LUMERA_CHAIN_ID / \$CHAIN_ID"
+  fi
   cat >&2 <<USAGE
 Usage: $script_name <legacy-key> <new-key> [flags]
 USAGE
@@ -102,7 +135,8 @@ USAGE
 
 Flags:
   --node <url>              RPC endpoint (default \$LUMERA_NODE or tcp://localhost:26657)
-  --chain-id <id>           Chain ID (default \$LUMERA_CHAIN_ID; required)
+                            Mainnet RPC example: https://rpc.lumera.io:443
+  --chain-id <id>           Chain ID (${_chain_id_help})
   --keyring-backend <b>     test|file|os (default test)
   --keyring-dir <dir>       Keyring directory (overrides --home for keys)
   --home <dir>              lumerad home directory
@@ -123,7 +157,13 @@ parse_common_flags() {
   # Reset in case of double-invocation in tests.
   # shellcheck disable=SC2034  # globals consumed by entry scripts
   NODE="${LUMERA_NODE:-tcp://localhost:26657}"
-  CHAIN_ID="${LUMERA_CHAIN_ID:-}"
+  # CHAIN_ID resolution order:
+  #   1. $LUMERA_CHAIN_ID — explicit user override (env var)
+  #   2. $CHAIN_ID         — preset by container ENV / wrapper script
+  #   3. ""                — falls through to the --chain-id flag check, and
+  #                          if still empty by then, errors at line ~225.
+  # The --chain-id flag (parsed below) overrides whichever default applies.
+  CHAIN_ID="${LUMERA_CHAIN_ID:-${CHAIN_ID:-}}"
   KEYRING_BACKEND="test"
   KEYRING_DIR=""
   HOME_DIR=""
@@ -179,6 +219,12 @@ require_binary() {
     log_error "lumerad binary not found: $BIN"
     exit 2
   fi
+  # Entry scripts set `IFS=$'\n\t'` to harden against paths with spaces, but
+  # that disables exactly the space-based word-splitting we rely on below to
+  # turn each "$probe" into multiple args (e.g., "query evmigration" → two
+  # tokens). Restore default IFS just within this function so `$probe`
+  # expands across spaces; it reverts on return.
+  local IFS=$' \t\n'
   local probe
   for probe in \
     "query evmigration" \
@@ -206,6 +252,33 @@ _read_keyring_flags() {
   mapfile -t _KRF < <(_keyring_flags)
 }
 
+# resolve_chain_id
+# Pin down the effective chain ID and log it for the user. Resolution order:
+#   1. $CHAIN_ID already set by parse_common_flags (from --chain-id flag,
+#      $LUMERA_CHAIN_ID, or a preset $CHAIN_ID env)
+#   2. Auto-detect from `lumerad status` (.node_info.network)
+#
+# Always logs the final chain ID so the user knows which chain they're
+# migrating against — small but important: a wrong chain ID would broadcast
+# a tx the chain rejects, costing gas. Showing it up front lets the user
+# abort if it's wrong, before the confirm prompt.
+resolve_chain_id() {
+  if [[ -z "${CHAIN_ID:-}" ]]; then
+    local status_json detected
+    if status_json=$("$BIN" status --node "$NODE" 2>/dev/null); then
+      # Cosmos SDK exposes the field as .node_info.network in JSON; fall back
+      # to .NodeInfo.Network for older binaries that emit Pascal-cased keys.
+      detected=$(jq -r '(.node_info.network // .NodeInfo.Network) // empty' <<<"$status_json" 2>/dev/null)
+      if [[ -n "$detected" && "$detected" != "null" ]]; then
+        CHAIN_ID="$detected"
+        log_info "auto-detected chain ID from $NODE: $CHAIN_ID"
+      fi
+    fi
+  else
+    log_info "chain ID: $CHAIN_ID"
+  fi
+}
+
 lumerad_q() {
   _read_keyring_flags
   "$BIN" query "$@" --node "$NODE" "${_KRF[@]}" --output json
@@ -213,7 +286,7 @@ lumerad_q() {
 
 lumerad_tx() {
   if [[ -z "${CHAIN_ID:-}" ]]; then
-    log_error "--chain-id (or \$LUMERA_CHAIN_ID) is required for tx commands"
+    log_error "chain ID is required for tx commands; pass --chain-id or set \$LUMERA_CHAIN_ID / \$CHAIN_ID"
     exit 1
   fi
   _read_keyring_flags
@@ -227,6 +300,51 @@ lumerad_tx() {
 lumerad_keys() {
   _read_keyring_flags
   "$BIN" keys "$@" "${_KRF[@]}"
+}
+
+# preview_tx_body <evmigration-subcommand> <args...>
+# Constructs the unsigned tx via `--generate-only` and prints a human summary
+# of the message body to stderr (so it appears immediately above the confirm
+# prompt). Shows the message type plus any addresses encoded in the message.
+# Falls back to a raw JSON dump if the structured pretty-print fails.
+#
+# Called before broadcasting so the user can see exactly what will be signed
+# and submitted before consenting. Read-only — does not broadcast.
+preview_tx_body() {
+  if [[ -z "${CHAIN_ID:-}" ]]; then
+    log_error "chain ID is required to generate tx body"
+    return 1
+  fi
+  _read_keyring_flags
+  local generated
+  if ! generated=$("$BIN" tx "$@" \
+        --node "$NODE" \
+        --chain-id "$CHAIN_ID" \
+        "${_KRF[@]}" \
+        --generate-only \
+        --output json 2>/dev/null); then
+    log_warn "  could not generate tx body for preview (continuing anyway)"
+    return 0
+  fi
+  {
+    echo ""
+    echo "Tx body to broadcast:"
+    if ! jq -er --arg legacy_c "$_C_LEGACY" --arg new_c "$_C_NEW" --arg reset "$_C_RESET" '
+      .body.messages[] |
+      "  Type:           " + (."@type" // "<unknown>"),
+      (if .legacy_address then "  Legacy address: \($legacy_c)\(.legacy_address)\($reset)" else empty end),
+      (if .new_address    then "  New address:    \($new_c)\(.new_address)\($reset)"    else empty end)
+    ' <<<"$generated" 2>/dev/null; then
+      # Structured pretty-print failed (unexpected schema) — fall back to raw.
+      echo "$generated" | jq -C '.body.messages' 2>/dev/null || echo "$generated"
+    fi
+    local fee gas
+    fee=$(jq -r '.auth_info.fee.amount[0] // empty | "\(.amount)\(.denom)"' <<<"$generated" 2>/dev/null)
+    gas=$(jq -r '.auth_info.fee.gas_limit // empty' <<<"$generated" 2>/dev/null)
+    [[ -n "$gas" && "$gas" != "null" ]] && echo "  Gas limit:      $gas"
+    [[ -n "$fee" && "$fee" != "null" ]] && [[ "$fee" != "null0" ]] && echo "  Fee:            $fee"
+    echo ""
+  } >&2
 }
 
 # ---- Address helpers -------------------------------------------------------
@@ -269,25 +387,27 @@ preflight_estimate() {
   # Human summary to stderr.
   local balance delegations unbonding redelegations authz feegrants supernode would
   local actions is_validator is_multisig threshold num_signers val_dels val_unb val_red
-  balance=$(jq -r '.balance_summary' <<<"$json")
-  delegations=$(jq -r '.delegation_count' <<<"$json")
-  unbonding=$(jq -r '.unbonding_count' <<<"$json")
-  redelegations=$(jq -r '.redelegation_count' <<<"$json")
-  authz=$(jq -r '.authz_grant_count' <<<"$json")
-  feegrants=$(jq -r '.feegrant_count' <<<"$json")
+  # `// "none"` substitutes when the field is missing or null in the response,
+  # so empty collections render as "none" instead of the JSON-literal "null".
+  balance=$(jq -r '.balance_summary // "none"' <<<"$json")
+  delegations=$(jq -r '.delegation_count // "none"' <<<"$json")
+  unbonding=$(jq -r '.unbonding_count // "none"' <<<"$json")
+  redelegations=$(jq -r '.redelegation_count // "none"' <<<"$json")
+  authz=$(jq -r '.authz_grant_count // "none"' <<<"$json")
+  feegrants=$(jq -r '.feegrant_count // "none"' <<<"$json")
   supernode=$(jq -r 'if .has_supernode then "yes" else "no" end' <<<"$json")
   would=$(jq -r 'if .would_succeed then "yes" else "no" end' <<<"$json")
-  actions=$(jq -r '.action_count' <<<"$json")
+  actions=$(jq -r '.action_count // "none"' <<<"$json")
   is_validator=$(jq -r 'if .is_validator then "yes" else "no" end' <<<"$json")
   is_multisig=$(jq -r 'if .is_multisig then "yes" else "no" end' <<<"$json")
-  threshold=$(jq -r '.threshold' <<<"$json")
-  num_signers=$(jq -r '.num_signers' <<<"$json")
-  val_dels=$(jq -r '.val_delegation_count' <<<"$json")
-  val_unb=$(jq -r '.val_unbonding_count' <<<"$json")
-  val_red=$(jq -r '.val_redelegation_count' <<<"$json")
+  threshold=$(jq -r '.threshold // "none"' <<<"$json")
+  num_signers=$(jq -r '.num_signers // "none"' <<<"$json")
+  val_dels=$(jq -r '.val_delegation_count // "none"' <<<"$json")
+  val_unb=$(jq -r '.val_unbonding_count // "none"' <<<"$json")
+  val_red=$(jq -r '.val_redelegation_count // "none"' <<<"$json")
 
   {
-    printf 'Migration preview for %s:\n' "$addr"
+    printf 'Migration preview for legacy account %s (coin-type 118, secp256k1):\n' "$(legacy_value "$addr")"
     printf '  Validator:         %s\n' "$is_validator"
     if [[ "$is_validator" == "yes" ]]; then
       printf '  Val delegations:   %s (to validator)\n' "$val_dels"
@@ -349,24 +469,99 @@ _record_present() {
   [[ "$(jq -r '.record.legacy_address // empty' <<<"$json")" != "" ]]
 }
 
+# assert_not_migrated <legacy-addr> [<expected-new-addr>]
+# Aborts (exit 5) if the legacy address already has a migration record.
+# When the optional <expected-new-addr> is supplied, the error message
+# distinguishes the two outcomes:
+#   - record's new_address == expected: "already migrated to the specified
+#     destination (no-op)" + show height
+#   - record's new_address != expected: "already migrated to a DIFFERENT
+#     destination" + show both addresses
+# Both cases exit 5 — the script can't proceed in either, but a user re-running
+# after a successful migration sees the friendly version, while a user with
+# the wrong destination key sees a precise mismatch.
 assert_not_migrated() {
-  local addr="$1"
-  if _record_present migration-record "$addr"; then
-    log_error "legacy address $addr has already been migrated"
-    exit 5
+  local addr="$1" expected_new="${2:-}"
+  local json
+  if ! json=$(lumerad_q evmigration migration-record "$addr" 2>/dev/null); then
+    log_error "could not query migration-record for $addr"
+    exit 2
   fi
+  local rec_legacy rec_new rec_height
+  rec_legacy=$(jq -r '.record.legacy_address // empty' <<<"$json")
+  if [[ -z "$rec_legacy" ]]; then
+    log_info "check OK: no migration record found for legacy address $(legacy_value "$addr")"
+    return 0  # no record — clean to migrate
+  fi
+  rec_new=$(jq -r '.record.new_address // "<missing>"' <<<"$json")
+  rec_height=$(jq -r '.record.migration_height // "<unknown>"' <<<"$json")
+  if [[ -n "$expected_new" && "$rec_new" == "$expected_new" ]]; then
+    log_error "legacy address $(legacy_value "$addr") is already migrated to the specified destination $(new_value "$rec_new") at height $rec_height (no-op; nothing to do)"
+  else
+    log_error "legacy address $(legacy_value "$addr") is already migrated, but to a DIFFERENT destination:"
+    log_error "  on-chain destination:  $(new_value "$rec_new") (migrated at height $rec_height)"
+    if [[ -n "$expected_new" ]]; then
+      log_error "  destination you asked: $(new_value "$expected_new")"
+      log_error "  → either re-run with --new-key matching the on-chain destination, or use that address directly"
+    fi
+  fi
+  exit 5
 }
 
+# assert_new_address_unused <new-addr>
+# Aborts (exit 5) if the destination address already participated in any
+# prior migration — either as the legacy side of an older migration, or as
+# the new-side destination of someone else's migration. Uses two distinct
+# chain queries: migration-record (keyed by legacy) and
+# migration-record-by-new-address (keyed by new).
 assert_new_address_unused() {
   local addr="$1"
   if _record_present migration-record "$addr"; then
-    log_error "new address $addr was previously migrated as a legacy address"
+    log_error "new address $(new_value "$addr") was previously migrated as a legacy address — pick a fresh destination key"
     exit 5
   fi
+  log_info "check OK: destination address $(new_value "$addr") has no migration record as a legacy address"
+
   if _record_present migration-record-by-new-address "$addr"; then
-    log_error "new address $addr is already a migration destination"
+    log_error "new address $(new_value "$addr") is already a migration destination — pick a fresh destination key"
     exit 5
   fi
+  log_info "check OK: no migration record found by new address $(new_value "$addr")"
+}
+
+# assert_destination_fresh <new-addr>
+# Aborts (exit 5) if the destination address already has an on-chain auth
+# account or any bank balance. The migration creates the destination as part
+# of message handling; reusing an address that already has state would mix
+# the migrated state with whatever's already there, and the chain would
+# reject the migration as a result. Users get a clear "pick a fresh key"
+# message rather than a chain-level rejection at broadcast time.
+assert_destination_fresh() {
+  local addr="$1"
+  local auth_json bal_json bal_amount
+  # Query auth account. If the account doesn't exist, the CLI returns a
+  # non-zero exit AND/OR an error printed to stderr. Either way, treat the
+  # absence of a recognizable account in the response as "fresh".
+  auth_json=$(lumerad_q auth account "$addr" 2>/dev/null || true)
+  if [[ -z "$auth_json" ]] || [[ "$(jq -r '.account // empty' <<<"$auth_json" 2>/dev/null)" == "" ]]; then
+    log_info "check OK: destination address $(new_value "$addr") does not exist on-chain"
+    return 0
+  fi
+
+  # Account exists. Surface its balance so the user can see what they'd
+  # collide with, then abort.
+  bal_json=$(lumerad_q bank balances "$addr" 2>/dev/null || printf '{"balances":[]}')
+  bal_amount=$(jq -r '
+    if (.balances | length) == 0 then
+      "(empty)"
+    else
+      .balances | map(.amount + .denom) | join(", ")
+    end
+  ' <<<"$bal_json" 2>/dev/null || printf '<unknown>')
+  log_error "new address $(new_value "$addr") already exists on-chain — cannot be used as a migration destination"
+  log_error "  current balance: $bal_amount"
+  log_error "  pick a fresh key whose address has never received any chain activity"
+  exit 5
 }
 
 # ---- Bank snapshot, tx polling, verification --------------------------------
@@ -377,28 +572,97 @@ snapshot_bank_balances() {
 }
 
 # wait_for_tx <hash>
-# Polls `query tx <hash>` every second for up to 30s. Exits non-zero on
-# timeout or if the final response reports a non-zero code.
+# Waits for the tx to commit using two paths in order:
+#   1. Fast path — `query tx <hash>`. Catches the case where the tx was
+#      already committed by the time we got here.
+#   2. Slow path — `query wait-tx <hash> --timeout`. Subscribes to the
+#      CometBFT WebSocket and waits for the commit event.
+#
+# Important: the slow-path call goes DIRECTLY to $BIN, NOT through lumerad_q.
+# Cosmos SDK's wait-tx accepts --keyring-backend without warning but then
+# silently exits non-zero in ~200ms instead of waiting — passing it the
+# keyring flags that lumerad_q appends for queries breaks the command. wait-tx
+# is read-only and shouldn't need keyring flags anyway. This was confirmed
+# experimentally by bisecting flag combinations.
+#
+# Returns:
+#   0 — tx confirmed with code 0 (success). Logs "tx included at height X".
+#   1 — tx confirmed with non-zero code (chain rejected the tx). Logs the
+#       failure code + raw_log so the caller can just exit; no duplicate logging needed.
+#   2 — neither path saw the tx within the timeout (may still land later).
+#
+# Default timeout is 90s. Override via $LUMERA_TX_WAIT_TIMEOUT (seconds).
 wait_for_tx() {
   local hash="$1"
-  local deadline=$(( SECONDS + 30 ))
-  local code=""
-  while (( SECONDS < deadline )); do
-    local json
-    if json=$(lumerad_q tx "$hash" 2>/dev/null); then
-      code=$(jq -r '.code // empty' <<<"$json")
-      if [[ -n "$code" ]]; then
-        if (( code == 0 )); then
-          return 0
-        fi
-        log_error "tx $hash failed with code $code: $(jq -r '.raw_log' <<<"$json")"
-        return 1
-      fi
+  local timeout="${LUMERA_TX_WAIT_TIMEOUT:-90}"
+  local json code height
+  local started=$SECONDS
+
+  # Fast path: tx may already be committed.
+  # NOTE: `lumerad q tx <missing>` exits 0 with empty stdout (error goes to
+  # stderr). So a "found" check is "stdout is non-empty AND parseable JSON",
+  # not just "exit 0". Empty json → both nested ifs are false → fall through.
+  if json=$(lumerad_q tx "$hash" 2>/dev/null) && [[ -n "$json" ]]; then
+    code=$(jq -r '.code // empty' <<<"$json" 2>/dev/null)
+    if [[ "$code" == "0" ]]; then
+      height=$(jq -r '.height // "<unknown>"' <<<"$json" 2>/dev/null)
+      log_info "tx included at height $height (waited $(( SECONDS - started ))s)"
+      return 0
     fi
-    sleep 1
-  done
-  log_error "timed out waiting for tx $hash to be indexed"
-  return 1
+    if [[ -n "$code" ]]; then
+      log_error "tx $hash failed with code $code: $(jq -r '.raw_log // "<no raw_log>"' <<<"$json")"
+      return 1
+    fi
+  fi
+
+  # Slow path: subscribe and wait. Bypass lumerad_q so we don't pass
+  # --keyring-backend, which silently breaks wait-tx (see header comment).
+  if json=$("$BIN" query wait-tx "$hash" --node "$NODE" --output json --timeout "${timeout}s" 2>/dev/null) && [[ -n "$json" ]]; then
+    code=$(jq -r '.code // empty' <<<"$json" 2>/dev/null)
+    if [[ "$code" == "0" ]]; then
+      height=$(jq -r '.height // "<unknown>"' <<<"$json" 2>/dev/null)
+      log_info "tx included at height $height (waited $(( SECONDS - started ))s)"
+      return 0
+    fi
+    if [[ -n "$code" ]]; then
+      log_error "tx $hash failed with code $code: $(jq -r '.raw_log // "<no raw_log>"' <<<"$json")"
+      return 1
+    fi
+  fi
+  local elapsed=$(( SECONDS - started ))
+
+  log_warn "tx $hash not indexed after ${elapsed}s (timeout was ${timeout}s); it may still land on chain"
+  log_warn "  check status manually: $BIN q tx $hash"
+  log_warn "  to wait longer on slow networks, re-run with: LUMERA_TX_WAIT_TIMEOUT=300 $(basename "$0") ..."
+  log_warn "  proceeding to on-chain verification — if the migration record/balances are present, the migration succeeded"
+  return 2
+}
+
+# assert_broadcast_accepted <broadcast-response-json>
+# Validates the JSON response from `lumerad tx ...` (broadcast-mode=sync, the
+# default). Exits non-zero on CheckTx rejection (code != 0) or missing txhash;
+# returns the txhash on success via stdout so callers can capture it cleanly.
+#
+# Why a separate step: a tx that fails CheckTx still returns a valid JSON
+# with a txhash field — but it's not in any mempool and will never land. The
+# previous flow only checked for missing txhash, so a CheckTx rejection would
+# slip through and only manifest as a wait_for_tx timeout 90s later. This
+# catches it immediately with the right error context.
+assert_broadcast_accepted() {
+  local broadcast_json="$1"
+  local code raw_log tx_hash
+  tx_hash=$(jq -r '.txhash // empty' <<<"$broadcast_json" 2>/dev/null)
+  if [[ -z "$tx_hash" || "$tx_hash" == "null" ]]; then
+    log_error "broadcast returned no txhash: $broadcast_json"
+    exit 2
+  fi
+  code=$(jq -r '.code // 0' <<<"$broadcast_json" 2>/dev/null)
+  if [[ -n "$code" && "$code" != "0" ]]; then
+    raw_log=$(jq -r '.raw_log // "<no raw_log>"' <<<"$broadcast_json" 2>/dev/null)
+    log_error "broadcast rejected at CheckTx: code=$code raw_log=$raw_log (txhash=$tx_hash, never landed in a block)"
+    exit 2
+  fi
+  printf '%s\n' "$tx_hash"
 }
 
 # verify_migration <legacy> <new> <pre-broadcast-legacy-balances-json>
@@ -408,30 +672,30 @@ verify_migration() {
   # 1. Migration record must exist and point to <new>.
   local rec_json rec_new
   if ! rec_json=$(lumerad_q evmigration migration-record "$legacy" 2>/dev/null); then
-    log_error "post-check: could not query migration-record for $legacy — verify manually"
+    log_error "post-check: could not query migration-record for $(legacy_value "$legacy") — verify manually"
     exit 7
   fi
   rec_new=$(jq -r '.record.new_address // empty' <<<"$rec_json")
   if [[ "$rec_new" != "$new" ]]; then
-    log_error "post-check: migration record for $legacy does not point to $new (got: '$rec_new')"
+    log_error "post-check: migration record for $(legacy_value "$legacy") does not point to $(new_value "$new") (got: '$(new_value "$rec_new")')"
     exit 7
   fi
 
   # 2. Legacy balances must be all zero (account removed or empty).
   local legacy_after
   if ! legacy_after=$(lumerad_q bank balances "$legacy" 2>/dev/null); then
-    log_error "post-check: could not query legacy bank balances for $legacy — verify manually"
+    log_error "post-check: could not query legacy bank balances for $(legacy_value "$legacy") — verify manually"
     exit 7
   fi
   if [[ "$(jq -r '[.balances[].amount | tonumber] | add // 0' <<<"$legacy_after")" != "0" ]]; then
-    log_error "post-check: legacy address $legacy still has non-zero balance"
+    log_error "post-check: legacy address $(legacy_value "$legacy") still has non-zero balance"
     exit 7
   fi
 
   # 3. For every {denom,amount} in snap_json, new balances must be >= amount.
   local new_after
   if ! new_after=$(lumerad_q bank balances "$new" 2>/dev/null); then
-    log_error "post-check: could not query new bank balances for $new — verify manually"
+    log_error "post-check: could not query new bank balances for $(new_value "$new") — verify manually"
     exit 7
   fi
   local diff
@@ -445,6 +709,55 @@ verify_migration() {
     log_error "post-check: new balances fall short of pre-broadcast snapshot: $diff"
     exit 7
   fi
+}
+
+# show_migration_summary <legacy> <new>
+# Pretty-prints the on-chain migration record and the new account's balance.
+# Called after verify_migration succeeds so the user sees authoritative
+# chain state confirming the migration. Failures here are non-fatal (the
+# verify_migration assertions already passed); we just log a warning if a
+# query fails and continue.
+show_migration_summary() {
+  local legacy="$1" new="$2"
+  local rec_json balances_json
+
+  echo "" >&2
+  echo "Migration record (chain state):" >&2
+  if rec_json=$(lumerad_q evmigration migration-record "$legacy" 2>/dev/null); then
+    # Pretty-print known fields; gracefully tolerate schema additions/renames.
+    jq -r --arg legacy_c "$_C_LEGACY" --arg new_c "$_C_NEW" --arg reset "$_C_RESET" '.record |
+      "  legacy address: \($legacy_c)\(.legacy_address // "<missing>")\($reset)\n" +
+      "  new address:    \($new_c)\(.new_address // "<missing>")\($reset)\n" +
+      "  height:         \(.migration_height // "<missing>")\n" +
+      "  unix time:      \(.migration_time // "<missing>")"
+    ' <<<"$rec_json" >&2 2>/dev/null || {
+      log_warn "  could not parse migration-record JSON; raw output follows"
+      echo "$rec_json" >&2
+    }
+  else
+    log_warn "  could not query migration-record for $(legacy_value "$legacy")"
+  fi
+
+  echo "" >&2
+  printf 'New account balance (%s):\n' "$(new_value "$new")" >&2
+  if balances_json=$(lumerad_q bank balances "$new" 2>/dev/null); then
+    local pretty
+    pretty=$(jq -r '
+      if (.balances | length) == 0 then
+        "  (empty)"
+      else
+        .balances | map("  " + .amount + .denom) | join("\n")
+      end
+    ' <<<"$balances_json" 2>/dev/null)
+    if [[ -n "$pretty" ]]; then
+      echo "$pretty" >&2
+    else
+      echo "  (could not parse balance response)" >&2
+    fi
+  else
+    log_warn "  could not query bank balances for $(new_value "$new")"
+  fi
+  echo "" >&2
 }
 
 # ---- Confirmation -----------------------------------------------------------
@@ -478,6 +791,65 @@ cleanup_mnemonic_keys() {
   done
 }
 
+_mnemonic_key_address() {
+  local name="$1"
+  lumerad_keys show "$name" -a 2>/dev/null
+}
+
+_mnemonic_import_one_key() {
+  local mnemonic="$1" name="$2" coin_type="$3" algo="$4" role="$5"
+  local existing_addr="" temp_name="" temp_addr="" created_temp=0
+
+  if existing_addr=$(_mnemonic_key_address "$name"); then
+    if [[ "$role" == "new" ]]; then
+      temp_name="__evmig_check_ekey_${name}_$$_${RANDOM}"
+    else
+      temp_name="__evmig_check_legacy_${name}_$$_${RANDOM}"
+    fi
+
+    printf '%s\n' "$mnemonic" | lumerad_keys add "$temp_name" \
+      --recover --coin-type "$coin_type" --algo "$algo" >/dev/null
+    created_temp=1
+    temp_addr=$(_mnemonic_key_address "$temp_name")
+    lumerad_keys delete "$temp_name" --yes >/dev/null 2>&1 || true
+    created_temp=0
+
+    if [[ "$existing_addr" != "$temp_addr" ]]; then
+      if [[ "$role" == "new" ]]; then
+        log_error "new EVM key '$(new_value "$name")' already exists in keyring but does not match the mnemonic"
+        log_error "  existing address: $(new_value "$existing_addr")"
+        log_error "  mnemonic address: $(new_value "$temp_addr")"
+      else
+        log_error "legacy key '$(legacy_value "$name")' already exists in keyring but does not match the mnemonic"
+        log_error "  existing address: $(legacy_value "$existing_addr")"
+        log_error "  mnemonic address: $(legacy_value "$temp_addr")"
+      fi
+      exit 1
+    fi
+
+    if [[ "$role" == "new" ]]; then
+      log_info "new EVM key $(new_value "$name") already exists in keyring and matches mnemonic; reusing it"
+    else
+      log_info "legacy key $(legacy_value "$name") already exists in keyring and matches mnemonic; reusing it"
+    fi
+    return 0
+  fi
+
+  if (( created_temp == 1 )); then
+    lumerad_keys delete "$temp_name" --yes >/dev/null 2>&1 || true
+  fi
+
+  printf '%s\n' "$mnemonic" | lumerad_keys add "$name" \
+    --recover --coin-type "$coin_type" --algo "$algo" >/dev/null
+  _MNEMONIC_CLEANUP_KEYS+=("$name")
+
+  if [[ "$role" == "new" ]]; then
+    log_info "imported new EVM key $(new_value "$name") from mnemonic for this run"
+  else
+    log_info "imported legacy key $(legacy_value "$name") from mnemonic for this run"
+  fi
+}
+
 import_from_mnemonic() {
   local mfile="$1" legacy_name="$2" new_name="$3"
 
@@ -498,28 +870,18 @@ import_from_mnemonic() {
     exit 1
   fi
 
-  # Abort if either key name already exists in the keyring.
-  if lumerad_keys show "$legacy_name" -a >/dev/null 2>&1; then
-    log_error "key '$legacy_name' already exists in keyring"
-    exit 1
-  fi
-  if lumerad_keys show "$new_name" -a >/dev/null 2>&1; then
-    log_error "key '$new_name' already exists in keyring"
-    exit 1
-  fi
-
   local mnemonic
   mnemonic=$(< "$mfile")
 
-  # Register cleanup before doing anything else that might fail.
-  _MNEMONIC_CLEANUP_KEYS=("$legacy_name" "$new_name")
+  # Register cleanup before doing anything else that might fail. Only keys
+  # created by this function are added to _MNEMONIC_CLEANUP_KEYS; pre-existing
+  # matching keys are reused and never deleted by the trap.
+  _MNEMONIC_CLEANUP_KEYS=()
   # shellcheck disable=SC2154  # rc is captured at trap runtime
   trap 'rc=$?; cleanup_mnemonic_keys; exit "$rc"' EXIT
 
-  printf '%s\n' "$mnemonic" | lumerad_keys add "$legacy_name" \
-    --recover --coin-type 118 --algo secp256k1
-  printf '%s\n' "$mnemonic" | lumerad_keys add "$new_name" \
-    --recover --coin-type 60 --algo eth_secp256k1
+  _mnemonic_import_one_key "$mnemonic" "$legacy_name" 118 secp256k1 legacy
+  _mnemonic_import_one_key "$mnemonic" "$new_name" 60 eth_secp256k1 new
 
   unset mnemonic
 }
@@ -540,6 +902,10 @@ assert_multisig() {
 # Extends require_binary by probing all four multisig tx subcommands.
 require_multisig_binary() {
   require_binary
+  # Same IFS caveat as require_binary: entry scripts use a strict IFS that
+  # would prevent the intentional space-splitting on $probe below. Restore
+  # default IFS locally for this function.
+  local IFS=$' \t\n'
   local probe
   for probe in \
     "tx evmigration generate-proof-payload" \
@@ -625,12 +991,12 @@ assert_secp256k1_key() {
   local key_name="$1"
   local info pk_type
   if ! info=$(lumerad_keys show "$key_name" --output json 2>/dev/null); then
-    log_error "key not found in keyring: $key_name"
+    log_error "legacy key not found in keyring: $(legacy_value "$key_name")"
     exit 1
   fi
   pk_type=$(jq -r '(.pubkey | if type == "string" then fromjson else . end | ."@type") // "unknown"' <<<"$info" 2>/dev/null || printf 'unknown')
   if [[ "$pk_type" != "/cosmos.crypto.secp256k1.PubKey" ]]; then
-    log_error "key '$key_name' is not secp256k1 (got $pk_type) — legacy migration requires a coin-type 118 secp256k1 key"
+    log_error "legacy key '$(legacy_value "$key_name")' is not secp256k1 (got $pk_type) — legacy migration requires a coin-type 118 secp256k1 key"
     exit 1
   fi
 }
@@ -641,7 +1007,7 @@ assert_eth_key() {
   local key_name="$1"
   local info pk_type
   if ! info=$(lumerad_keys show "$key_name" --output json 2>/dev/null); then
-    log_error "key not found in keyring: $key_name"
+    log_error "new EVM key not found in keyring: $(new_value "$key_name")"
     exit 1
   fi
   pk_type=$(jq -r '(.pubkey | if type == "string" then fromjson else . end | ."@type") // "unknown"' <<<"$info" 2>/dev/null || printf 'unknown')
@@ -650,7 +1016,7 @@ assert_eth_key() {
     /ethermint.crypto.v1.ethsecp256k1.PubKey|\
     /cosmos.evm.crypto.v1.ethsecp256k1.PubKey) ;;
     *)
-      log_error "key '$key_name' is not eth_secp256k1 (got $pk_type) — submit requires the new EVM destination key"
+      log_error "new EVM key '$(new_value "$key_name")' is not eth_secp256k1 (got $pk_type) — submit requires the new EVM destination key"
       exit 1 ;;
   esac
 }

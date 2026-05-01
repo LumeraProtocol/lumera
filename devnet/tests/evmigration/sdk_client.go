@@ -11,6 +11,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	txtypes "cosmossdk.io/api/cosmos/tx/v1beta1"
@@ -25,6 +26,47 @@ import (
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"go.uber.org/zap"
 )
+
+// withCrossProcessActionLock holds an exclusive flock on -action-lock-file
+// for the duration of fn, then waits one block past the chain height observed
+// at lock acquisition before releasing. This serializes cascade-action
+// creation across parallel validator containers (each running its own
+// tests_evmigration process), preventing the supernode-side
+// MsgFinalizeAction sequence race that fires when multiple actions land in
+// one block.
+//
+// When the flag is empty (default), this is a pure no-op — fn runs unwrapped.
+// The post-action one-block wait covers PENDING actions (which don't trigger
+// supernode upload). For DONE/APPROVED, fn itself blocks on Cascade.Upload
+// which already waits for finalization, so the post-fn wait is redundant
+// but cheap.
+//
+// This is a temporary mitigation for a supernode bug — remove the flag once
+// supernode handles concurrent registrations correctly. See the cross-runtime
+// account_sequence diagnosis in the chat thread of 2026-04-28.
+func withCrossProcessActionLock(fn func() error) error {
+	if *flagActionLockFile == "" {
+		return fn()
+	}
+	f, err := os.OpenFile(*flagActionLockFile, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return fmt.Errorf("open action lock file %s: %w", *flagActionLockFile, err)
+	}
+	defer f.Close()
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+		return fmt.Errorf("flock %s: %w", *flagActionLockFile, err)
+	}
+	defer func() {
+		// Wait one block before releasing so the next process's tx lands in
+		// a strictly later block. Errors here aren't fatal — releasing the
+		// lock immediately is the worst case (slightly weaker serialization).
+		if waitErr := waitForNextBlock(20 * time.Second); waitErr != nil {
+			log.Printf("  WARN: waitForNextBlock after action creation: %v", waitErr)
+		}
+		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+	}()
+	return fn()
+}
 
 var (
 	sdkClientConfigLogOnce        sync.Once
@@ -309,21 +351,27 @@ func createActionsWithSDK(
 		switch targetState {
 		case "PENDING":
 			// Register action on-chain only — no upload.
-			if err := createPendingAction(ctx, rec, idx); err != nil {
+			if err := withCrossProcessActionLock(func() error {
+				return createPendingAction(ctx, rec, idx)
+			}); err != nil {
 				log.Printf("  WARN: sdk pending action %s #%d: %v", rec.Name, idx, err)
 				continue
 			}
 
 		case "DONE":
 			// Register + upload to supernodes (auto-finalized → DONE).
-			if err := createDoneAction(ctx, rec, idx); err != nil {
+			if err := withCrossProcessActionLock(func() error {
+				return createDoneAction(ctx, rec, idx)
+			}); err != nil {
 				log.Printf("  WARN: sdk done action %s #%d: %v", rec.Name, idx, err)
 				continue
 			}
 
 		case "APPROVED":
 			// Register + upload + approve.
-			if err := createApprovedAction(ctx, rec, idx); err != nil {
+			if err := withCrossProcessActionLock(func() error {
+				return createApprovedAction(ctx, rec, idx)
+			}); err != nil {
 				log.Printf("  WARN: sdk approved action %s #%d: %v", rec.Name, idx, err)
 				continue
 			}

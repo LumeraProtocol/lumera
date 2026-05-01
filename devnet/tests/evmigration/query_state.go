@@ -283,6 +283,66 @@ func queryBalance(addr string) (int64, error) {
 	return amt, nil
 }
 
+// querySpendableBalance returns the ulume spendable balance for an address —
+// total bank balance minus any locked vesting amount. For non-vesting accounts
+// this equals queryBalance; for vesting accounts (e.g. PermanentLockedAccount)
+// it can be much smaller.
+//
+// Used by post-migration verification: EVM precisebank tracks only spendable
+// balance (locked vesting tokens are non-transferable in the EVM execution
+// environment), so the EVM-account check must compare against spendable, not
+// total. See verifyPostMigrationBalances in migrate_validators.go.
+//
+// Asymmetric CLI surface to be aware of: `bank balances` accepts --denom for
+// single-denom filter, but `bank spendable-balances` does NOT. Use the
+// singular `spendable-balance` (positional denom) for single-denom queries —
+// the API mirror of `bank balance`.
+func querySpendableBalance(addr string) (int64, error) {
+	out, err := run("query", "bank", "spendable-balance", addr, "ulume")
+	if err != nil {
+		// Fall back to the plural form (returns all balances) for older SDK
+		// versions that may not have the singular subcommand. We still
+		// extract just the ulume entry from the result.
+		out, err = run("query", "bank", "spendable-balances", addr)
+		if err != nil {
+			return 0, fmt.Errorf("query spendable balance: %s\n%w", truncate(out, 300), err)
+		}
+	}
+	var resp struct {
+		Balance *struct {
+			Amount string `json:"amount"`
+		} `json:"balance"`
+		Amount   string `json:"amount"`
+		Balances []struct {
+			Denom  string `json:"denom"`
+			Amount string `json:"amount"`
+		} `json:"balances"`
+	}
+	if err := json.Unmarshal([]byte(out), &resp); err != nil {
+		return 0, fmt.Errorf("parse spendable balance: %s\n%w", truncate(out, 300), err)
+	}
+	amtStr := resp.Amount
+	if resp.Balance != nil && resp.Balance.Amount != "" {
+		amtStr = resp.Balance.Amount
+	}
+	if amtStr == "" && len(resp.Balances) > 0 {
+		for _, b := range resp.Balances {
+			if b.Denom == "ulume" {
+				amtStr = b.Amount
+				break
+			}
+		}
+	}
+	if amtStr == "" {
+		return 0, nil
+	}
+	amt, err := strconv.ParseInt(amtStr, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("parse spendable amount %q: %w", amtStr, err)
+	}
+	return amt, nil
+}
+
 // queryBech32ToHex converts a bech32 address to 0x hex via lumerad.
 func queryBech32ToHex(bech32Addr string) (string, error) {
 	out, err := run("query", "evm", "bech32-to-0x", bech32Addr)

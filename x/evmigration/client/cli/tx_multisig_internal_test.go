@@ -1069,3 +1069,22 @@ func TestBuildMigrationProofs_RejectsMixedShape(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "sides must match shape")
 }
+
+// TestCmdSignProof_RegistersNewKeyFlag is a regression test for a bug where
+// cmdSignProof read --new-key from the flag set but never registered it. The
+// command's body referenced flagNewKey at parse time and in two error
+// messages, so the flag *looked* supported, but cobra would reject any
+// invocation as "unknown flag: --new-key" before the body ever ran. The
+// failure surfaced in devnet as:
+//
+//	sign-proof --from <legacy-sub> --new-key <new-sub>: unknown flag: --new-key
+//
+// Asserting that every flag the command reads is also registered keeps this
+// class of bug from recurring silently.
+func TestCmdSignProof_RegistersNewKeyFlag(t *testing.T) {
+	cmd := cmdSignProof()
+	for _, name := range []string{flagNewKey, flagOut} {
+		require.NotNilf(t, cmd.Flags().Lookup(name),
+			"flag --%s is read by cmdSignProof but never registered", name)
+	}
+}

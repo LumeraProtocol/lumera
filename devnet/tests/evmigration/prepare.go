@@ -1280,7 +1280,12 @@ func infrastructureLegacyKeyCandidates() []string {
 		"sncli-account",
 	}
 	if compositeName, _, err := findLocalMultisigValidator(); err == nil {
-		candidates = append(candidates, "prepare-funder-"+compositeName)
+		// The prepare-funder is provisioned at devnet genesis with key name
+		// "prepare-funder-${MONIKER}" (see validator-setup.sh::ensure_prepare_funder_key).
+		// MONIKER is the composite-key name with the trailing "_key" stripped.
+		if moniker, ok := strings.CutSuffix(compositeName, "_key"); ok {
+			candidates = append(candidates, "prepare-funder-"+moniker)
+		}
 	}
 	return candidates
 }
@@ -1363,21 +1368,25 @@ func recordInfrastructureLegacyAccounts(af *AccountsFile, existingByName map[str
 	}
 }
 
-// bootstrapMultisigFunder seeds a dedicated single-sig prepare funder on a
-// multisig-validator host by transferring genesis balance from the local
-// multisig composite via a one-time 2-of-N bank-send. Returns the funder's
-// keyring name so the tag regex (`validator[_-]?(\d+)`) still fires on it.
+// bootstrapMultisigFunder resolves the per-host single-sig prepare-funder key
+// on a multisig-validator host. The key is provisioned at devnet-genesis time
+// by validator-setup.sh::ensure_prepare_funder_key — it lives in the local
+// keyring under name "prepare-funder-<MONIKER>" (e.g. "prepare-funder-supernova_validator_2"),
+// recovered from genesis-account-mnemonics[VAL_INDEX], and has its own liquid
+// genesis balance.
 //
-// The funder key name is prepare-funder-<composite-key-name>, so a composite
-// named "supernova_validator_2_key" produces tag "val2" as usual. Idempotent
-// across reruns: existing keys are reused, and the multisig send is skipped
-// if the funder balance is already above bootstrapMultisigFunderMinBalance.
+// We do NOT fund this key from the multisig composite: PermanentLockedAccount
+// composites (the test subject for vesting-multisig migration) have zero
+// spendable balance, so any bank-send from them is rejected at CheckTx. The
+// composite is the thing being tested; the prepare-funder is a separate
+// genesis account that exists specifically to seed test fixtures.
+//
+// Errors (non-existent key, missing balance) are fatal — they indicate a
+// genesis provisioning bug, not something prepare can recover from.
 const (
-	// Composite on devnet starts with ~1T liquid (account_balance − validator_stake),
-	// minus a few tens of thousands in gentx/setup fees. 800B leaves generous
-	// headroom for that delta while still dwarfing what prepare actually needs
-	// (~500M for all 17 accounts + fixtures).
-	bootstrapMultisigFunderSeedAmount = "800000000000ulume"
+	// Floor balance the prepare-funder must hold to seed test fixtures. Far
+	// below the 1T provisioned at genesis; the gap is headroom for partial
+	// reruns where the funder has already paid out some fixtures.
 	bootstrapMultisigFunderMinBalance = int64(500_000_000_000)
 )
 
@@ -1388,29 +1397,15 @@ func bootstrapMultisigFunder() (string, error) {
 	}
 	log.Printf("bootstrap: local multisig validator = %s (%s)", compositeName, compositeAddr)
 
-	members := derivedMultisigMemberKeys(compositeName, defaultMultisigSigners)
-	for _, m := range members {
-		if !keyExists(m) {
-			return "", fmt.Errorf("multisig member key %s missing from keyring", m)
-		}
+	moniker, ok := strings.CutSuffix(compositeName, "_key")
+	if !ok {
+		return "", fmt.Errorf("composite key name %q does not end in _key; cannot derive moniker", compositeName)
 	}
-
-	funderName := "prepare-funder-" + compositeName
+	funderName := "prepare-funder-" + moniker
 	if !keyExists(funderName) {
-		rec, genErr := generateAccount(funderName, true /* legacy coin-type 118 */)
-		if genErr != nil {
-			return "", fmt.Errorf("generate bootstrap funder key %s: %w", funderName, genErr)
-		}
-		if impErr := importKey(funderName, rec.Mnemonic, true); impErr != nil {
-			return "", fmt.Errorf("import bootstrap funder key %s: %w", funderName, impErr)
-		}
-		// Persist the mnemonic into the shared status registry so the
-		// infrastructure-account recording pass (and later migrate-all) can
-		// derive the coin-type 60 destination key from the same seed.
-		appendStatusRegistryAccount(funderName, rec.Address, rec.Mnemonic)
-		log.Printf("bootstrap: created funder key %s (%s)", funderName, rec.Address)
-	} else {
-		log.Printf("bootstrap: reusing funder key %s", funderName)
+		return "", fmt.Errorf("genesis-provisioned funder key %s missing from keyring "+
+			"(expected validator-setup.sh::ensure_prepare_funder_key to recover it from "+
+			"genesis-account-mnemonics)", funderName)
 	}
 	funderAddr, err := getAddress(funderName)
 	if err != nil {
@@ -1418,24 +1413,19 @@ func bootstrapMultisigFunder() (string, error) {
 	}
 
 	bal, balErr := queryBalance(funderAddr)
-	if balErr != nil && !isAccountNotFoundErr(balErr) {
-		return "", fmt.Errorf("query funder balance: %w", balErr)
+	if balErr != nil {
+		if isAccountNotFoundErr(balErr) {
+			return "", fmt.Errorf("genesis-provisioned funder %s (%s) has no on-chain account; "+
+				"genesis bug: prepare-funder address was not collected into final genesis", funderName, funderAddr)
+		}
+		return "", fmt.Errorf("query funder balance for %s: %w", funderName, balErr)
 	}
-	if bal >= bootstrapMultisigFunderMinBalance {
-		log.Printf("bootstrap: funder %s already has sufficient balance (%d ulume)", funderName, bal)
-		return funderName, nil
+	if bal < bootstrapMultisigFunderMinBalance {
+		return "", fmt.Errorf("prepare-funder %s (%s) has %d ulume, below floor %d — "+
+			"either it was drained by a partial prepare run or genesis under-provisioned it",
+			funderName, funderAddr, bal, bootstrapMultisigFunderMinBalance)
 	}
-	log.Printf("bootstrap: funding %s from multisig composite (amount=%s)", funderName, bootstrapMultisigFunderSeedAmount)
-
-	unsignedFile := tmpFile("bootstrap-fund-unsigned-*.json")
-	defer os.Remove(unsignedFile)
-	if err := buildUnsignedMultisigBankSendTx(compositeName, compositeAddr, funderAddr, bootstrapMultisigFunderSeedAmount, unsignedFile); err != nil {
-		return "", fmt.Errorf("build bootstrap fund tx: %w", err)
-	}
-	if err := signAndBroadcastMultisigTx(unsignedFile, compositeName, compositeAddr, members); err != nil {
-		return "", fmt.Errorf("sign/broadcast bootstrap fund tx: %w", err)
-	}
-	log.Printf("bootstrap: funder %s seeded successfully", funderName)
+	log.Printf("bootstrap: using genesis-funded prepare-funder %s (%s, balance=%d ulume)", funderName, funderAddr, bal)
 	return funderName, nil
 }
 

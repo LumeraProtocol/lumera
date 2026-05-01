@@ -221,6 +221,7 @@ setup_shim() {
     assert_not_migrated lumera1anything
   '
   [ "$status" -eq 0 ]
+  [[ "$output" == *"no migration record found for legacy address lumera1anything"* ]]
 }
 
 @test "assert_not_migrated exits 5 when record exists" {
@@ -241,6 +242,30 @@ setup_shim() {
     assert_new_address_unused lumera1newxxxxxx
   '
   [ "$status" -eq 0 ]
+  [[ "$output" == *"has no migration record as a legacy address"* ]]
+  [[ "$output" == *"no migration record found by new address lumera1newxxxxxx"* ]]
+}
+
+@test "assert_destination_fresh passes when destination address does not exist" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'; NODE=tcp://local:1
+    assert_destination_fresh lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"destination address lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx does not exist on-chain"* ]]
+}
+
+@test "assert_destination_fresh exits 5 when destination address exists" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'; NODE=tcp://local:1
+    SHIM_AUTH_NEW_FIXTURE=auth-account assert_destination_fresh lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  '
+  [ "$status" -eq 5 ]
+  [[ "$output" == *"already exists on-chain"* ]]
 }
 
 @test "assert_new_address_unused exits 5 when new-address lookup returns record" {
@@ -328,6 +353,36 @@ setup_shim() {
   '
   [ "$status" -eq 1 ]
   [[ "$output" == *"mode 0600"* ]]
+}
+
+@test "import_from_mnemonic reuses existing matching mnemonic keys" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'
+    mf=$(mktemp); echo "test mnemonic" > "$mf"; chmod 0600 "$mf"
+    import_from_mnemonic "$mf" alice new-eth-key
+    rm -f "$mf"
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"legacy key alice already exists in keyring and matches mnemonic; reusing it"* ]]
+  [[ "$output" == *"new EVM key new-eth-key already exists in keyring and matches mnemonic; reusing it"* ]]
+}
+
+@test "import_from_mnemonic imports missing keys for this run" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'
+    SHIM_KEYS_MISSING=alice,new-eth-key
+    export SHIM_KEYS_MISSING
+    mf=$(mktemp); echo "test mnemonic" > "$mf"; chmod 0600 "$mf"
+    import_from_mnemonic "$mf" alice new-eth-key
+    rm -f "$mf"
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"imported legacy key alice from mnemonic for this run"* ]]
+  [[ "$output" == *"imported new EVM key new-eth-key from mnemonic for this run"* ]]
 }
 
 @test "shim generate-proof-payload writes to --out path" {

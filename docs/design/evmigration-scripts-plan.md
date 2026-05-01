@@ -2,7 +2,7 @@
 
 > **For agentic workers:** Implement this plan task-by-task and update the checkbox (`- [ ]`) status as each step completes.
 
-**Goal:** Ship three bash scripts in [scripts/](../../scripts/) — a shared library (`evmigration-common.sh`) and two entry-point scripts (`migrate-account.sh`, `migrate-validator.sh`) — that wrap the `lumerad tx evmigration claim-legacy-account` and `lumerad tx evmigration migrate-validator` commands with multisig rejection, pre-flight checks, and post-migration verification for single-signature legacy accounts.
+**Goal:** Ship three bash scripts in [scripts/](../../scripts/) — a shared library (`evmigration-common.sh`) and two entry-point scripts (`migrate-account.sh`, `migrate-validator.sh`) — that wrap the `lumerad tx evmigration claim-legacy-account` and `lumerad tx evmigration migrate-validator` commands with multisig rejection, pre-flight checks, and post-migration verification for legacy accounts (coin-type 118, secp256k1).
 
 **Architecture:** The two entry-point scripts share a sourced library that provides flag parsing, logging, lumerad wrappers, multisig detection (via `migration-estimate.is_multisig`), a pre-broadcast bank snapshot, and a post-broadcast verification step. The entry-point scripts handle their own script-specific flags (stripping them before calling `parse_common_flags`) and per-flow business logic (validator cap check, downtime banner for the validator path, validator vs. account routing).
 
@@ -102,7 +102,7 @@ File `scripts/migrate-account.sh`:
 ```bash
 #!/usr/bin/env bash
 #
-# Migrate a single-signature legacy account to its EVM-compatible counterpart.
+# Migrate a legacy account (coin-type 118, secp256k1) to its EVM-compatible counterpart.
 # See docs/design/evmigration-scripts-design.md and
 # docs/evm-integration/user-guides/migration.md.
 

@@ -100,19 +100,45 @@ func queryAccountNumberAndSequence(addr string) (accountNumber uint64, sequence 
 	if err != nil {
 		return 0, 0, fmt.Errorf("query auth account: %s\n%w", out, err)
 	}
+	return parseAuthAccountNumberAndSequence(out)
+}
 
+// parseAuthAccountNumberAndSequence parses the JSON returned by
+// `lumerad query auth account` and extracts (account_number, sequence). It
+// tolerates the several response shapes the SDK emits across account types and
+// output modes:
+//
+//   - BaseAccount, proto-JSON:   account.{account_number, sequence}
+//   - BaseAccount, amino-JSON:   account.value.{account_number, sequence}
+//   - ModuleAccount:             account.base_account.{account_number, sequence}
+//   - Vesting, proto-JSON:       account.base_vesting_account.base_account.{...}
+//   - Vesting, amino-JSON:       account.value.base_vesting_account.base_account.{...}
+//
+// The vesting paths matter for legacy multisig accounts wrapped in
+// PermanentLockedAccount / ContinuousVestingAccount / etc.
+func parseAuthAccountNumberAndSequence(out string) (uint64, uint64, error) {
+	type baseAcc struct {
+		AccountNumber string `json:"account_number"`
+		Sequence      string `json:"sequence"`
+	}
+	type vestingWrap struct {
+		BaseAccount *baseAcc `json:"base_account"`
+	}
 	var resp struct {
 		Account struct {
+			// BaseAccount (proto-JSON) — fields directly on `account`.
 			AccountNumber string `json:"account_number"`
 			Sequence      string `json:"sequence"`
-			Value         *struct {
-				AccountNumber string `json:"account_number"`
-				Sequence      string `json:"sequence"`
+			// Amino-JSON envelope — `account.value.*`.
+			Value *struct {
+				AccountNumber      string       `json:"account_number"`
+				Sequence           string       `json:"sequence"`
+				BaseVestingAccount *vestingWrap `json:"base_vesting_account"`
 			} `json:"value"`
-			BaseAccount *struct {
-				AccountNumber string `json:"account_number"`
-				Sequence      string `json:"sequence"`
-			} `json:"base_account"`
+			// ModuleAccount-style nested BaseAccount.
+			BaseAccount *baseAcc `json:"base_account"`
+			// Vesting (proto-JSON) — base_vesting_account directly on `account`.
+			BaseVestingAccount *vestingWrap `json:"base_vesting_account"`
 		} `json:"account"`
 	}
 	if err := json.Unmarshal([]byte(out), &resp); err != nil {
@@ -121,22 +147,27 @@ func queryAccountNumberAndSequence(addr string) (accountNumber uint64, sequence 
 
 	accNumStr := resp.Account.AccountNumber
 	seqStr := resp.Account.Sequence
-	if resp.Account.Value != nil {
-		if resp.Account.Value.AccountNumber != "" {
-			accNumStr = resp.Account.Value.AccountNumber
+	pick := func(num, seq string) {
+		if num != "" {
+			accNumStr = num
 		}
-		if resp.Account.Value.Sequence != "" {
-			seqStr = resp.Account.Value.Sequence
-		}
-	}
-	if resp.Account.BaseAccount != nil {
-		if resp.Account.BaseAccount.AccountNumber != "" {
-			accNumStr = resp.Account.BaseAccount.AccountNumber
-		}
-		if resp.Account.BaseAccount.Sequence != "" {
-			seqStr = resp.Account.BaseAccount.Sequence
+		if seq != "" {
+			seqStr = seq
 		}
 	}
+	if v := resp.Account.Value; v != nil {
+		pick(v.AccountNumber, v.Sequence)
+		if v.BaseVestingAccount != nil && v.BaseVestingAccount.BaseAccount != nil {
+			pick(v.BaseVestingAccount.BaseAccount.AccountNumber, v.BaseVestingAccount.BaseAccount.Sequence)
+		}
+	}
+	if b := resp.Account.BaseAccount; b != nil {
+		pick(b.AccountNumber, b.Sequence)
+	}
+	if vba := resp.Account.BaseVestingAccount; vba != nil && vba.BaseAccount != nil {
+		pick(vba.BaseAccount.AccountNumber, vba.BaseAccount.Sequence)
+	}
+
 	// Cosmos SDK omits `sequence` from JSON when it's 0 (fresh accounts that
 	// haven't sent any tx yet). Treat missing sequence as 0; only reject when
 	// the account itself is absent from the response.
@@ -147,11 +178,11 @@ func queryAccountNumberAndSequence(addr string) (accountNumber uint64, sequence 
 		seqStr = "0"
 	}
 
-	accountNumber, err = strconv.ParseUint(accNumStr, 10, 64)
+	accountNumber, err := strconv.ParseUint(accNumStr, 10, 64)
 	if err != nil {
 		return 0, 0, fmt.Errorf("parse account_number %q: %w", accNumStr, err)
 	}
-	sequence, err = strconv.ParseUint(seqStr, 10, 64)
+	sequence, err := strconv.ParseUint(seqStr, 10, 64)
 	if err != nil {
 		return 0, 0, fmt.Errorf("parse sequence %q: %w", seqStr, err)
 	}

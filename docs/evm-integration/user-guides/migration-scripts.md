@@ -1,35 +1,66 @@
-# EVM Migration Helper Scripts — User Guide
+# EVM Migration Helper Scripts - User Guide
 
-**Applies to**: Lumera chain with the `x/evmigration` module enabled (post-EVM upgrade).
-**Audience**: Terminal users — regular account holders, validator operators, and supernode operators running `lumerad` from a shell.
+**Applies to**: Lumera chains with the `x/evmigration` module enabled after the EVM upgrade.
+**Audience**: Terminal users running `lumerad`: regular account holders, validator operators, supernode operators, and multisig coordinators.
 
 ---
 
-## What these scripts do
+## Start Here
 
-The Lumera release ships two bash wrappers that automate the end-to-end migration of a **single-signature** legacy (coin-type 118) account or validator operator to its EVM-compatible (coin-type 60) counterpart:
+Use the script that matches the account you are migrating:
 
-| Script | Wraps | Use for |
-|---|---|---|
-| `scripts/migrate-account.sh` | `lumerad tx evmigration claim-legacy-account` | Regular accounts, including supernode operator accounts that are not also validators |
-| `scripts/migrate-validator.sh` | `lumerad tx evmigration migrate-validator` | Validator operator accounts |
+| Situation                                       | Script                           | What it does                                                                                                                      |
+| ----------------------------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Regular single-key account                      | `scripts/migrate-account.sh`   | Migrates a legacy coin-type 118 `secp256k1` account to a coin-type 60 `eth_secp256k1` account.                                |
+| Single-key validator operator                   | `scripts/migrate-validator.sh` | Migrates the validator operator account and re-keys validator-related state. The validator node must be stopped before broadcast. |
+| Multisig account or multisig validator operator | `scripts/migrate-multisig.sh`  | Runs a 4-step coordinator/co-signer ceremony: `generate`, `sign`, `combine`, `submit`.                                    |
 
-Compared to calling `lumerad` directly (see [migration.md Method 3](migration.md#method-3-lumera-cli)), each script adds:
+Most users should do this first:
 
-- **Multisig detection** — classifies the legacy account via `migration-estimate.is_multisig` and refuses to proceed, pointing you at the offline 4-step flow instead.
-- **Pre-flight preview** — runs `migration-estimate` before broadcast and prints a summary (balance, delegations, unbondings, authz grants, fee grants, supernode, whether the account is a validator). Aborts if the keeper says the migration would not succeed.
-- **Wrong-script guard** — `migrate-account.sh` refuses validator operators; `migrate-validator.sh` refuses non-validators. Both use `migration-estimate.is_validator` to decide.
-- **Delegation-cap check** — `migrate-validator.sh` computes `val_delegation_count + val_unbonding_count + val_redelegation_count` and compares against the chain's `max_validator_delegations` parameter, aborting if the cap would be exceeded.
-- **Downtime acknowledgement** — `migrate-validator.sh` prints a warning banner and requires an explicit confirmation (either `--i-have-stopped-the-node` or typing the full word `yes`) before broadcasting. `--yes` does not satisfy this check.
-- **Atomic pre/post balance snapshot** — captures the legacy address's per-denom balances *before* broadcast, and verifies after inclusion that the new address holds at least the snapshotted amounts per denom while the legacy address is zero.
-- **Already-migrated guard** — aborts if the legacy address already has a migration record, or if the new address was previously used as a migration destination.
-- **Dry-run mode** — `--dry-run` runs every pre-flight check and prints the preview, then exits 0 before broadcasting.
+```bash
+./scripts/migrate-account.sh <legacy-key> <new-evm-key> \
+  --dry-run
+```
 
-## When not to use these scripts
+If the dry-run succeeds, remove `--dry-run` and run the same command to broadcast.
 
-- **Multisig accounts** — the scripts refuse them by design. Use the offline 4-step flow documented at [legacy-migration.md](../evmigration/legacy-migration.md#multisig-account-migration).
-- **Supernode daemon auto-migration** — if you run a supernode with `evm_key_name` set in `config.yml`, the supernode daemon performs migration for you on restart. See [supernode-migration.md](supernode-migration.md). The scripts are an alternative for operators who prefer to handle migration via `lumerad` directly before starting the supernode.
-- **Keplr/Portal users** — use [migration.md Method 1](migration.md#method-1-portal--keplr-recommended). The scripts are terminal-only.
+Important rules:
+
+- The **legacy key** is the old Lumera key: coin type 118, `secp256k1`.
+- The **new key** is the EVM-compatible key: coin type 60, `eth_secp256k1`.
+- For mnemonic-based migrations, both keys normally come from the **same mnemonic** with different coin types.
+- The destination address must be **fresh**. It must not already exist on-chain, must not have bank balance, and must not appear in any migration record.
+- Run `--dry-run` first. It performs the same safety checks and stops before broadcast.
+- Do not use `migrate-account.sh` for validators. Use `migrate-validator.sh`.
+- Do not use the single-key scripts for multisig. They will detect multisig accounts and point you to `migrate-multisig.sh`.
+
+During pre-flight, the scripts now print the important successful checks explicitly:
+
+```text
+INFO  check OK: no migration record found for legacy address lumera1...
+INFO  check OK: destination address lumera1... has no migration record as a legacy address
+INFO  check OK: no migration record found by new address lumera1...
+INFO  check OK: destination address lumera1... does not exist on-chain
+```
+
+If any of these checks fails, stop and read the error. Reusing an already-used destination address is unsafe and the chain will reject it.
+
+---
+
+## What The Scripts Add
+
+Compared with raw `lumerad tx evmigration ...`, the scripts add:
+
+- **Key type checks**: legacy key must be `secp256k1`; new key must be `eth_secp256k1`.
+- **Migration record checks**: the legacy address must not already be migrated.
+- **Destination checks**: the new address must not be an old legacy address, must not already be a migration destination, and must not already exist as an auth account.
+- **Pre-flight estimate**: the script queries `migration-estimate`, prints what would move, and aborts if the keeper says the migration would fail.
+- **Wrong-script guards**: account script rejects validators; validator script rejects non-validators; single-key scripts reject multisig.
+- **Validator cap checks**: validator migration checks `max_validator_delegations`.
+- **Validator downtime acknowledgement**: validator migration requires explicit acknowledgement that the node is stopped.
+- **Broadcast validation**: the scripts reject CheckTx failures immediately.
+- **Post-migration verification**: after broadcast, the scripts verify the migration record and balances.
+- **Dry-run mode**: runs safety checks and preview without broadcasting.
 
 ---
 
@@ -37,28 +68,25 @@ Compared to calling `lumerad` directly (see [migration.md Method 3](migration.md
 
 On the machine where you run the scripts:
 
-- `lumerad` binary built from a post-EVM-upgrade commit (required). Pre-EVM binaries don't have the `evmigration` subcommands — the scripts detect this and abort with exit 2.
-- `bash` 4.4 or newer (uses `mapfile` and `${var,,}` semantics).
-- `jq` on `$PATH`.
-- Access to a running Lumera RPC endpoint (`--node tcp://host:26657`).
-- The **same mnemonic** (recovery phrase) that controls the legacy address. Both the coin-type 118 and coin-type 60 keys must be derivable from it.
+- `lumerad` built from a post-EVM-upgrade commit.
+- `bash` 4.4 or newer.
+- `jq` on `PATH`.
+- Access to a Lumera RPC endpoint. By default, the scripts use local CometBFT RPC at `tcp://localhost:26657`.
+- The legacy key and new EVM key in the keyring, or a mnemonic file for one-shot import.
 
-Verify the binary version:
+Verify your binary supports the migration module:
 
 ```bash
 lumerad query evmigration --help
-# should list: legacy-accounts, migrated-accounts, migration-estimate,
-# migration-record, migration-record-by-new-address, migration-records,
-# migration-stats, params
 ```
 
-## Getting the scripts
+The help output should include commands such as `migration-estimate`, `migration-record`, and `migration-record-by-new-address`.
 
-Two sources — pick whichever matches how you installed `lumerad`:
+---
 
-### From a release tarball
+## Getting The Scripts
 
-Every `lumerad_${GOOS}_${GOARCH}.tar.gz` on the [releases page](https://github.com/LumeraProtocol/lumera/releases) ships the three scripts alongside the binary:
+Release tarballs include:
 
 ```text
 lumerad
@@ -66,11 +94,12 @@ scripts/
   evmigration-common.sh
   migrate-account.sh
   migrate-validator.sh
+  migrate-multisig.sh
 ```
 
-Extract and invoke with `./scripts/migrate-account.sh …` from the extraction directory. The scripts resolve their shared library via `$(dirname "${BASH_SOURCE[0]}")`, so they work as long as all three files stay in the same directory.
+Keep the scripts together in the same `scripts/` directory. They source `evmigration-common.sh` relative to their own path.
 
-### From a source checkout
+From a source checkout:
 
 ```bash
 git clone https://github.com/LumeraProtocol/lumera.git
@@ -80,412 +109,666 @@ cd lumera
 
 ---
 
-## Common flags
+## Single-Key Common Flags
 
-Both scripts accept the same flags. Positional arguments are always `<legacy-key-name> <new-key-name>`.
+`migrate-account.sh` and `migrate-validator.sh` take positional arguments:
 
-| Flag | Default | Description |
-|---|---|---|
-| `--node <url>` | `$LUMERA_NODE` or `tcp://localhost:26657` | RPC endpoint |
-| `--chain-id <id>` | `$LUMERA_CHAIN_ID` | Chain ID (required; aborts with exit 1 if unset) |
-| `--keyring-backend <b>` | `test` | `test`, `file`, or `os` — same values as `lumerad keys` |
-| `--keyring-dir <dir>` | *(unset)* | Point keyring at a directory independent of `--home` |
-| `--home <dir>` | `lumerad`'s default (`~/.lumera`) | Passed through to `lumerad` |
-| `--mnemonic-file <path>` | *(unset)* | One-shot import: read mnemonic from file (mode `0600`), derive both keys, clean up after |
-| `--yes`, `-y` | off | Skip the standard "Proceed with migration?" prompt |
-| `--dry-run` | off | Run preview and pre-flight checks, do not broadcast |
-| `--binary <path>` | `lumerad` from `$PATH` | Override which `lumerad` executable to invoke |
+```text
+<legacy-key-name> <new-key-name>
+```
 
-Environment variable fallbacks: `LUMERA_NODE`, `LUMERA_CHAIN_ID`.
+They accept these common flags:
+
+| Flag                       | Default                                               | Description                                                          |
+| -------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------- |
+| `--node <url>`           | `$LUMERA_NODE` or `tcp://localhost:26657`         | RPC endpoint.                                                        |
+| `--chain-id <id>`        | `$LUMERA_CHAIN_ID`, `$CHAIN_ID`, or auto-detected | Chain ID used for tx generation and broadcast.                       |
+| `--keyring-backend <b>`  | `test`                                              | `test`, `file`, or `os`.                                       |
+| `--keyring-dir <dir>`    | unset                                                 | Keyring directory independent of `--home`.                         |
+| `--home <dir>`           | `lumerad` default                                   | Passed through to `lumerad`.                                       |
+| `--mnemonic-file <path>` | unset                                                 | One-shot import from a mnemonic file with mode `0600` or stricter. |
+| `--yes`, `-y`          | off                                                   | Skip the normal broadcast confirmation prompt.                       |
+| `--dry-run`              | off                                                   | Run checks and preview, then stop before broadcast.                  |
+| `--binary <path>`        | `lumerad` from `PATH`                             | Use a specific `lumerad` binary.                                   |
+
+### Chain ID Resolution
+
+For the single-key scripts, `--chain-id` is optional. The script resolves the chain ID in this order:
+
+1. `--chain-id <id>`
+2. `$LUMERA_CHAIN_ID`
+3. `$CHAIN_ID`
+4. Auto-detection from `lumerad status --node <node>` using `.node_info.network`
+
+The resolved chain ID is logged at the top of the run:
+
+```text
+INFO  chain ID: lumera-mainnet-1
+```
+
+or:
+
+```text
+INFO  auto-detected chain ID from tcp://localhost:26657: lumera-mainnet-1
+```
+
+For `migrate-multisig.sh`, follow each subcommand's help. `generate`, `sign`, and `submit` currently require `--chain-id` explicitly.
+
+### RPC Endpoint Setup
+
+Most examples below omit `--node` for readability. They work when `lumerad` can reach a local node at the default `tcp://localhost:26657`.
+
+If you are not running a local node, or your local CLI/RPC setup points at the wrong network, set a mainnet RPC endpoint explicitly before running the scripts:
+
+```bash
+export LUMERA_NODE=https://rpc.lumera.io:443
+```
+
+or pass it per command:
+
+```bash
+./scripts/migrate-account.sh <legacy-key> <new-evm-key> \
+  --node https://rpc.lumera.io:443
+```
+
+Lumera mainnet CometBFT RPC endpoint:
+
+| Provider | RPC endpoint |
+| --- | --- |
+| Lumera mainnet | `https://rpc.lumera.io:443` |
+
+Public endpoints can be rate-limited or temporarily unavailable. For production operations, prefer your own node or a provider endpoint with an SLA/API key.
+
+### Environment Variables
+
+- `LUMERA_NODE`: default RPC endpoint.
+- `LUMERA_CHAIN_ID`: preferred chain ID default.
+- `CHAIN_ID`: secondary chain ID default.
+- `LUMERA_TX_WAIT_TIMEOUT`: tx inclusion wait timeout in seconds. Default is `90`.
+
+Example for slow networks:
+
+```bash
+LUMERA_TX_WAIT_TIMEOUT=300 ./scripts/migrate-account.sh legacy new
+```
 
 ---
 
-## Account migration walkthrough
+## Account Migration
 
-### 1. Import both keys
+Use this for regular single-key accounts and non-validator supernode operator accounts.
+
+### 1. Import Or Create Both Keys
+
+Import the legacy key:
 
 ```bash
-# Legacy key (coin-type 118)
-lumerad keys add legacy-key \
-  --recover --coin-type 118 --algo secp256k1 \
+lumerad keys add <legacy-key> \
+  --recover \
+  --coin-type 118 \
+  --algo secp256k1 \
   --keyring-backend test
+```
 
-# New EVM key (coin-type 60)
-lumerad keys add new-key \
-  --recover --coin-type 60 --algo eth_secp256k1 \
+Import the new EVM-compatible key:
+
+```bash
+lumerad keys add <new-evm-key> \
+  --recover \
+  --coin-type 60 \
+  --algo eth_secp256k1 \
   --keyring-backend test
 ```
 
-Enter the **same mnemonic** for both. Confirm the legacy address matches your pre-EVM address on chain.
+Enter the same mnemonic for both if you are migrating a normal mnemonic-derived account.
 
-### 2. Preview with `--dry-run`
-
-```bash
-./scripts/migrate-account.sh legacy-key new-key \
-  --chain-id lumera-mainnet-1 \
-  --node tcp://rpc.lumera:26657 \
-  --dry-run --yes
-```
-
-The preview block shows what will move (balance, delegations, unbondings, authz grants, fee grants, supernode, validator/multisig flags, whether migration would succeed). Exits 0 if pre-flight is clean.
-
-### 3. Run the migration
-
-Remove `--dry-run` to broadcast. Keep `--yes` to skip the interactive confirmation, or drop it for a y/N prompt:
+Check addresses before proceeding:
 
 ```bash
-./scripts/migrate-account.sh legacy-key new-key \
-  --chain-id lumera-mainnet-1 \
-  --node tcp://rpc.lumera:26657
+lumerad keys show <legacy-key> -a --keyring-backend test
+lumerad keys show <new-evm-key> -a --keyring-backend test
 ```
 
-The script broadcasts, waits up to 30 seconds for inclusion, verifies the migration record points at the new address, confirms the legacy balance is zero, and confirms the new address holds at least the pre-broadcast snapshot per denom. On success you'll see:
+The legacy address must match your pre-EVM Lumera address. The new address must be a fresh destination.
+
+### 2. Dry-Run
+
+```bash
+./scripts/migrate-account.sh <legacy-key> <new-evm-key> \
+  --dry-run
+```
+
+Dry-run performs:
+
+- legacy key type check
+- new key type check
+- legacy migration record lookup
+- destination migration record lookup by legacy address
+- destination migration record lookup by new address
+- destination auth-account existence check
+- `migration-estimate`
+- multisig and validator rejection
+- balance snapshot
+
+It exits before the confirmation prompt and before broadcast.
+
+### 3. Broadcast
+
+```bash
+./scripts/migrate-account.sh <legacy-key> <new-evm-key>
+```
+
+Use `--yes` only if you want to skip the final confirmation prompt:
+
+```bash
+./scripts/migrate-account.sh <legacy-key> <new-evm-key> \
+  --yes
+```
+
+Before broadcast, the script prints a tx-body preview. After broadcast, it waits for inclusion and verifies chain state.
+
+### 4. Example Successful Output
+
+This example uses sample key names:
+
+- legacy key: `alice-legacy`
+- new EVM key: `alice-evm`
+
+Your addresses, balance, height, time, gas estimate, and tx hash will be different.
+
+```text
+$ ./scripts/migrate-account.sh alice-legacy alice-evm
+INFO  chain ID: lumera-devnet-1
+INFO  legacy key alice-legacy -> address lumera1pz9mzf725dx62yatk8dtaqu44746t5j63qc7v2
+INFO  new EVM key alice-evm -> address lumera1ck5p50xqgtstastxlxfvzejr6q03xapqmk3x0v
+INFO  check OK: no migration record found for legacy address lumera1pz9mzf725dx62yatk8dtaqu44746t5j63qc7v2
+INFO  check OK: destination address lumera1ck5p50xqgtstastxlxfvzejr6q03xapqmk3x0v has no migration record as a legacy address
+INFO  check OK: no migration record found by new address lumera1ck5p50xqgtstastxlxfvzejr6q03xapqmk3x0v
+INFO  check OK: destination address lumera1ck5p50xqgtstastxlxfvzejr6q03xapqmk3x0v does not exist on-chain
+Migration preview for legacy account lumera1pz9mzf725dx62yatk8dtaqu44746t5j63qc7v2 (coin-type 118, secp256k1):
+  Validator:         no
+  Multisig:          no
+  Balance:           10000ulume
+  Delegations:       none
+  Unbonding:         none
+  Redelegations:     none
+  Authz grants:      none
+  Feegrants:         none
+  Actions:           none
+  Supernode:         no
+  Would succeed:     yes
+INFO  migrating legacy account lumera1pz9mzf725dx62yatk8dtaqu44746t5j63qc7v2 -> EVM-compatible lumera1ck5p50xqgtstastxlxfvzejr6q03xapqmk3x0v
+
+Tx body to broadcast:
+  Type:           /lumera.evmigration.MsgClaimLegacyAccount
+  Legacy address: lumera1pz9mzf725dx62yatk8dtaqu44746t5j63qc7v2
+  New address:    lumera1ck5p50xqgtstastxlxfvzejr6q03xapqmk3x0v
+  Gas limit:      200000
+
+Proceed with migration? [y/N] y
+gas estimate: 672811
+INFO  broadcast tx FFD7FEB173B8C0D5493F6F2A2EA1894BA0AD4D909EA2A09448E92DDEBF7E68AC; waiting for inclusion...
+INFO  tx included at height 985 (waited 0s)
+
+Migration record (chain state):
+  legacy address: lumera1pz9mzf725dx62yatk8dtaqu44746t5j63qc7v2
+  new address:    lumera1ck5p50xqgtstastxlxfvzejr6q03xapqmk3x0v
+  height:         985
+  unix time:      1777582779
+
+New account balance (lumera1ck5p50xqgtstastxlxfvzejr6q03xapqmk3x0v):
+  10000ulume
+
+INFO  migration complete
+INFO    legacy: lumera1pz9mzf725dx62yatk8dtaqu44746t5j63qc7v2
+INFO    new:    lumera1ck5p50xqgtstastxlxfvzejr6q03xapqmk3x0v
+INFO    tx:     FFD7FEB173B8C0D5493F6F2A2EA1894BA0AD4D909EA2A09448E92DDEBF7E68AC
+```
+
+The important things to confirm in this output are:
+
+- `Would succeed: yes`
+- all four `check OK` lines are present
+- the tx is included in a block
+- the migration record maps the legacy address to the expected new address
+- the new account balance contains the migrated funds
+
+After the sample run succeeds, the final summary is:
 
 ```text
 INFO  migration complete
-INFO    legacy: lumera1…
-INFO    new:    lumera1…
-INFO    tx:     DEADBEEF…
+INFO    legacy: lumera1...
+INFO    new:    lumera1...
+INFO    tx:     ...
 ```
 
-### 4. (Optional) Clean up the legacy key
+It also prints the final migration record and new account balance.
+
+### 5. Optional Cleanup
+
+After you verify the migration, delete the old key if your operational policy allows it:
 
 ```bash
-lumerad keys delete legacy-key --keyring-backend test
+lumerad keys delete <legacy-key> --keyring-backend test
 ```
-
-### One-shot mnemonic flow
-
-If you'd rather not touch the keyring yourself:
-
-```bash
-chmod 0600 /secure/tmp/mnemonic.txt   # must be mode 0600 or stricter
-./scripts/migrate-account.sh legacy-key new-key \
-  --chain-id lumera-mainnet-1 \
-  --node tcp://rpc.lumera:26657 \
-  --mnemonic-file /secure/tmp/mnemonic.txt --yes
-```
-
-The script imports both keys into your chosen keyring under the given names, runs the migration, and deletes both keys from the keyring on exit (success or failure) via a cleanup trap. The mnemonic file itself is never modified. Both key names must not already exist in the keyring — the script refuses to overwrite.
 
 ---
 
-## Validator migration walkthrough
+## One-Shot Mnemonic File Flow
 
-Validator migration has an additional risk: the node is stopped throughout the migration window, so it misses blocks and can be jailed if you don't restart promptly.
+Use this when you do not want to manually import keys first.
 
-### 1. Plan the maintenance window
-
-The re-keying operation touches every delegation, unbonding, and redelegation that references your validator. Most migrations complete in one block; allocate a downtime budget that accounts for your `signed_blocks_window` / `min_signed_per_window` parameters plus a margin for the restart.
-
-### 2. Preview
+Create a file containing the mnemonic and lock down permissions:
 
 ```bash
-./scripts/migrate-validator.sh legacy-op-key new-evm-key \
-  --chain-id lumera-mainnet-1 \
-  --node tcp://rpc.lumera:26657 \
-  --i-have-stopped-the-node --yes --dry-run
+chmod 0600 /secure/tmp/mnemonic.txt
 ```
 
-The preview adds **Validator delegations / unbondings / redelegations (to validator)** counts alongside the per-operator figures. If the sum is within 10% of `max_validator_delegations`, the script logs a warning; if it exceeds the cap, it aborts with exit 6 (governance needs to raise the cap, or some delegators need to redelegate first).
-
-### 3. Stop the validator node
-
-Stop the node however your setup requires (`systemctl stop lumerad`, `docker compose stop lumerad`, etc.). The scripts do not touch service managers.
-
-### 4. Run the migration
+Run:
 
 ```bash
-./scripts/migrate-validator.sh legacy-op-key new-evm-key \
-  --chain-id lumera-mainnet-1 \
-  --node tcp://rpc.lumera:26657 \
+./scripts/migrate-account.sh <legacy-key-name> <new-key-name> \
+  --mnemonic-file /secure/tmp/mnemonic.txt \
+  --yes
+```
+
+The script imports both keys, runs the migration, and deletes those keyring entries on exit. The mnemonic file itself is not modified.
+
+Both key names must be unused. The script refuses to overwrite existing keys.
+
+---
+
+## Validator Migration
+
+Use this for a single-key validator operator account.
+
+The validator node must be stopped before broadcasting. The migration re-keys validator operator state and related staking references. Your consensus key (`priv_validator_key.json`) is not changed.
+
+### 1. Plan Downtime
+
+Most migrations complete quickly, but the validator can miss blocks while stopped. Plan a maintenance window using your chain's slashing parameters (`signed_blocks_window`, `min_signed_per_window`) and leave margin for restart.
+
+### 2. Dry-Run
+
+```bash
+./scripts/migrate-validator.sh <legacy-op-key> <new-evm-op-key> \
+  --i-have-stopped-the-node \
+  --dry-run
+```
+
+`--i-have-stopped-the-node` is still required in dry-run. It is an explicit acknowledgement gate for validator migration. `--yes` does not satisfy this gate.
+
+Dry-run checks the same destination safety rules as account migration, then checks:
+
+- the legacy account is not multisig
+- the legacy account is a validator operator
+- validator delegation, unbonding, and redelegation counts are within `max_validator_delegations`
+- `migration-estimate.would_succeed` is true
+
+### 3. Stop The Validator Node
+
+Examples:
+
+```bash
+systemctl stop lumerad
+```
+
+or:
+
+```bash
+docker compose stop lumerad
+```
+
+The scripts do not manage your service process. You must stop and restart it yourself.
+
+### 4. Broadcast
+
+```bash
+./scripts/migrate-validator.sh <legacy-op-key> <new-evm-op-key> \
   --i-have-stopped-the-node
 ```
 
-`--i-have-stopped-the-node` satisfies the downtime acknowledgement non-interactively. Omit it to get an interactive prompt that requires the full word `yes` (not `y`). `--yes` does **not** satisfy this check — that's deliberate. Non-interactive runs without the flag abort with exit 10 instead of hanging.
+For non-interactive automation:
 
-On success the script prints:
+```bash
+./scripts/migrate-validator.sh <legacy-op-key> <new-evm-op-key> \
+  --yes \
+  --i-have-stopped-the-node
+```
+
+The script prints a warning banner, previews the tx body, broadcasts, waits for inclusion, and verifies the migration.
+
+On success, it prints a checklist:
 
 ```text
-INFO  validator migration complete — post-migration checklist:
+INFO  validator migration complete - post-migration checklist:
 INFO    1. Import <new-key> into the production keyring (correct --keyring-backend)
 INFO    2. Restart lumerad
 INFO    3. Verify new operator via: lumerad query staking validator <new-valoper>
 INFO    4. Monitor missed-block counters for the next few blocks
 ```
 
-### 5. Restart the validator
+### 5. Restart The Validator
 
-Import the new EVM key into the node's production keyring if it isn't already there, then start the binary:
+Make sure the new operator key is available in the production keyring, then restart:
 
 ```bash
-lumerad keys add new-operator-key \
-  --recover --coin-type 60 --algo eth_secp256k1 \
+lumerad keys add <new-evm-op-key> \
+  --recover \
+  --coin-type 60 \
+  --algo eth_secp256k1 \
   --keyring-backend file
 
-systemctl start lumerad   # or your platform's equivalent
+systemctl start lumerad
 ```
 
-The consensus key (`priv_validator_key.json`, ed25519) is **not affected** by this migration — only the operator key.
+Verify:
+
+```bash
+lumerad query staking validator <new-valoper>
+lumerad query evmigration migration-record <legacy-op-address>
+```
 
 ---
 
-## Exit codes
+## Multisig Migration
 
-The scripts use a stable exit-code scheme so you can wrap them in higher-level automation.
+Use `migrate-multisig.sh` for multisig accounts and multisig validator operators.
 
-| Code | Meaning | Typical cause |
-|---|---|---|
-| `0` | Success, or dry-run completed cleanly | — |
-| `1` | Usage error | Wrong number of positional args; unknown flag; flag-shaped value (e.g. `--node --chain-id …`); mnemonic file missing or mode > `0600`; key name collision in the keyring |
-| `2` | Environment error | `lumerad` missing, wrong version, or missing required subcommands; `jq` missing; RPC endpoint unreachable; migration-record / bank-balances query failed |
-| `3` | Multisig rejected | Legacy account's `is_multisig` flag is true — use the offline 4-step flow |
-| `4` | Pre-flight estimate failed | Keeper returned `would_succeed=false`; `rejection_reason` is printed |
-| `5` | Already migrated | Legacy address already has a migration record, or the new address was previously used as a destination |
-| `6` | Wrong-script or cap error | `migrate-account.sh` invoked on a validator, `migrate-validator.sh` invoked on a non-validator, or validator's `val_*_count` total exceeds `max_validator_delegations` |
-| `7` | Post-verification failed | Broadcast succeeded but the post-migration checks didn't pass: record missing / wrong new address / non-zero legacy balance / new balance below pre-broadcast snapshot. The transaction is already on-chain; investigate manually |
-| `10` | User aborted | User declined a confirmation prompt, or the validator downtime acknowledgement was not satisfied |
+A multisig migration is a K-of-N signing ceremony:
 
-## Troubleshooting
+1. Coordinator creates `proof.json`.
+2. Co-signers sign the proof and return `partial-*.json`.
+3. Coordinator combines partials into`tx.json`.
+4. Coordinator submits`tx.json`.
 
-Keyed by symptom / exit code.
+The coordinator does not need signing keys. Co-signers sign locally.
 
-### Exit 1: `expected exactly two positional arguments`
+### Multisig Requirements
 
-You're missing one of the key names. Both are required even with `--mnemonic-file`: the script uses them as the names for the imported keys.
+- The legacy multisig pubkey must already be seeded on-chain. If it has never signed a transaction, submit any multisig-signed tx first, such as a tiny self-send.
+- The destination is also a multisig built from `eth_secp256k1` sub-keys.
+- Legacy and new multisigs must mirror each other: same K, same N, and matching signer indices.
+- The new multisig destination address must be fresh.
+- For multisig validators, stop the validator node before `submit`.
 
-### Exit 1: `--foo requires a value`
-
-A flag was followed by another flag instead of a value. Common example:
-
-```bash
-# Wrong — --chain-id is consumed as the value of --node
-./scripts/migrate-account.sh legacy new --node --chain-id lumera-mainnet-1
-```
-
-Fix: put flags and values in order, or quote if the value genuinely starts with `--` (rare).
-
-### Exit 1: `mnemonic file … must be mode 0600`
-
-The mnemonic file is group- or world-readable. Fix permissions:
-
-```bash
-chmod 0600 /path/to/mnemonic
-```
-
-The scripts also refuse to run if either key name already exists in the keyring — pick unused names or delete the existing keys first.
-
-### Exit 2: `lumerad binary not found` or `does not support 'tx evmigration …'`
-
-Either `$BIN` (default `lumerad`) isn't on `$PATH`, or the binary is pre-EVM-upgrade. Build from master or the upgrade tag and point `--binary /path/to/lumerad` at the new build.
-
-### Exit 2: `could not query migration-record … verify manually`
-
-The `migration-record` query failed — node is unreachable, the RPC endpoint is wrong, or the node's tx indexer is still catching up. Confirm with:
-
-```bash
-lumerad status --node <your-endpoint>
-lumerad query evmigration params --node <your-endpoint>
-```
-
-Then re-run.
-
-### Exit 3: `legacy account is a K-of-N multisig`
-
-The scripts only handle single-sig accounts. Multisig migration uses an offline coordinator-driven ceremony — see [legacy-migration.md](../evmigration/legacy-migration.md#multisig-account-migration).
-
-### Exit 4: `pre-flight: migration would fail: …`
-
-The keeper's `migration-estimate` returned `would_succeed=false`. The `rejection_reason` printed alongside explains why. Common reasons:
-
-- `legacy account not found` — the address has never held any state on-chain.
-- `validator is not in bonded status` — used for validator migration of an unbonding/unbonded validator.
-- Migration is disabled via governance (`enable_migration=false`) or past `migration_end_time`.
-
-### Exit 5: `… has already been migrated` or `new address … is already a migration destination`
-
-Idempotency guard. The target address pair has already been used. Check the existing record:
-
-```bash
-lumerad query evmigration migration-record <legacy-addr>
-lumerad query evmigration migration-record-by-new-address <new-addr>
-```
-
-### Exit 6: `account is a validator — use scripts/migrate-validator.sh instead`
-
-You invoked `migrate-account.sh` on a validator operator address. Validators require the `migrate-validator` tx variant (which re-keys all delegations pointing to the validator, not just the operator's own state). Run:
-
-```bash
-./scripts/migrate-validator.sh <legacy-op-key> <new-evm-key> …
-```
-
-### Exit 6: `exceeds max_validator_delegations=<cap>`
-
-Your validator has more delegation/unbonding/redelegation records referencing it than the per-tx safety cap allows. Options: governance raises `max_validator_delegations`, or delegators redelegate to other validators until the count drops below the cap.
-
-### Exit 7: post-migration verification failed
-
-The broadcast succeeded — the on-chain state has already been moved — but one of the three post-checks failed. The script prints the specific check that failed. Verify manually:
-
-```bash
-lumerad query evmigration migration-record <legacy-addr>
-lumerad query bank balances <legacy-addr>
-lumerad query bank balances <new-addr>
-```
-
-If the record exists and the new balances look correct, the verification failed due to transient RPC issues and your migration is actually fine. If not, contact the release maintainers with the transaction hash.
-
-### Exit 10: `validator downtime not acknowledged`
-
-You invoked `migrate-validator.sh` without `--i-have-stopped-the-node` in a non-interactive context (systemd, CI, SSH without `-t`). The script requires either the flag or an interactive `yes` prompt. `--yes` alone does not satisfy this check — that's intentional to force explicit acknowledgement.
-
-### Script hangs at `Type "yes" to confirm the node is stopped`
-
-You're running interactively and need to type the literal word `yes` (not `y`). For non-interactive automation use `--i-have-stopped-the-node` instead.
-
----
-
-## Non-interactive usage
-
-All confirmation prompts except the validator downtime prompt are skipped with `-y` / `--yes`. The validator downtime prompt is controlled separately by `--i-have-stopped-the-node`. Non-interactive runs with `--yes` but without `--i-have-stopped-the-node` fail fast with exit 10 instead of hanging.
-
-For scripted automation (CI jobs, runbooks, etc.):
-
-```bash
-./scripts/migrate-validator.sh legacy-op new-evm \
-  --chain-id lumera-mainnet-1 \
-  --node tcp://rpc.lumera:26657 \
-  --yes --i-have-stopped-the-node
-```
-
-The scripts never prompt for a keyring password — that's governed entirely by `--keyring-backend`. Use `test` for automation (no password), `file` if you want password-protected keyrings (interactive once at load), or `os` for the OS keychain.
-
----
-
-## Multisig migration
-
-Multisig legacy accounts use a four-step offline ceremony rather than a single command — one coordinator and K co-signers across different machines. The destination is **also** a K-of-N multisig, built from `eth_secp256k1` sub-keys (the "mirror-source rule" — see [evmigration/main.md → Multisig account migration](../evmigration/main.md#multisig-account-migration)). The `scripts/migrate-multisig.sh` wrapper layers the same pre-flight and verification rails onto each step.
-
-> **Consensus invariants (multisig).** The chain rejects a multisig migration tx at `ValidateBasic` if any of these are violated:
->
-> - **Shape + K/N mirror.** K-of-N legacy → K-of-N new, same K and same N (`ErrMirrorSourceMismatch`).
-> - **Matching `signer_indices`.** The same K signer positions approve both halves — a co-signer who signs only one side doesn't count on the other.
-> - **Sub-key uniqueness.** No duplicate entries in either side's `sub_pub_keys` list.
-> - **Zero-signer submit.** `submit` takes no `--from`, no fee flags, no envelope signature.
->
-> The wrapper's `combine` step mirrors these rules before writing `tx.json`, so what it produces will pass `ValidateBasic`. Full reference: [legacy-migration.md § Consensus invariants](../evmigration/legacy-migration.md#consensus-invariants).
-
-Before you begin:
-
-- Every co-signer and the coordinator need `lumerad` (post-EVM-upgrade) and `jq` on their machine.
-- The multisig's on-chain pubkey must already be seeded (any prior multisig-signed transaction registers it). If it's nil, submit any multisig-signed tx first — e.g. a 1-`ulume` self-send via `lumerad tx bank send`.
-- Each co-signer generates a fresh `eth_secp256k1` sub-key in their own keyring (`lumerad keys add <name>-eth --key-type eth_secp256k1`). The coordinator collects the N eth pubkeys (or local key-names, if signers share a keyring) and derives the new multisig address with `lumerad keys add --multisig ... --multisig-threshold K`.
-
-### Step 1 — Coordinator: generate the proof template
+### 1. Coordinator: Generate
 
 ```bash
 ./scripts/migrate-multisig.sh generate \
-  --legacy lumera1<multisig-bech32> \
-  --new-sub-pub-keys <k1>,<k2>,<k3> \
-  --new-threshold    2 \
-  --kind   claim \
+  --legacy lumera1<legacy-multisig-address> \
+  --new lumera1<new-multisig-address> \
+  --new-sub-pub-keys <eth-pubkey-or-key-name-1>,<eth-pubkey-or-key-name-2>,<eth-pubkey-or-key-name-3> \
+  --new-threshold 2 \
+  --kind claim \
   --chain-id lumera-mainnet-1 \
-  --node tcp://rpc.lumera:26657 \
-  --keyring-backend file \
-  --out  proof.json
+  --out proof.json
 ```
 
-`--new-sub-pub-keys` entries may be local keyring key names (if the coordinator imported each co-signer's eth pubkey) **or** base64-encoded 33-byte compressed `eth_secp256k1` pubkeys — mix freely. `--new` is optional; if supplied, the CLI cross-checks it against the address derived from `--new-sub-pub-keys` and `--new-threshold`. `--sig-format` applies to the legacy side (default `SIG_FORMAT_CLI`); the new side defaults to the same for multisig.
+Use `--kind validator` for a multisig validator operator.
 
-Use `--kind validator` if the multisig holds a validator operator. The wrapper checks `is_multisig` and `is_validator` against the pre-flight estimate and aborts with exit 3 (not multisig) or exit 6 (validator flag on non-validator) before calling `lumerad`. If the on-chain pubkey is nil, it exits 8 with the remediation printed. If the migration-estimate already says `would_succeed=false` (governance disabled migration, deadline passed, validator over cap), it exits 4 before wasting co-signer time on a doomed ceremony.
+`--new` is optional in the script, but strongly recommended. When supplied, the script can perform all destination safety checks before co-signers spend time signing.
 
-Distribute `proof.json` to all co-signers.
+`--new-sub-pub-keys` entries may be local keyring key names or base64-encoded compressed 33-byte `eth_secp256k1` pubkeys.
 
-### Step 2 — Each co-signer: append partial signatures (both sides)
+The generate step checks:
 
-Each co-signer holds their legacy Cosmos sub-key **and** their destination-side eth sub-key in the same keyring, and signs both sides in one invocation:
+- legacy account has an on-chain multisig pubkey
+- legacy account is multisig
+- `--kind validator` matches validator status
+- legacy address has no migration record
+- if `--new` is supplied, destination has no migration records and does not exist on-chain
+- `migration-estimate.would_succeed` is true
+
+Distribute `proof.json` to co-signers.
+
+### 2. Co-Signers: Sign
+
+Signer with both legacy and new sub-keys:
 
 ```bash
 ./scripts/migrate-multisig.sh sign proof.json \
-  --from    alice-legacy-sub \
-  --new-key alice-eth-sub \
+  --from <my-legacy-sub-key> \
+  --new-key <my-new-eth-sub-key> \
   --chain-id lumera-mainnet-1 \
-  --keyring-backend file \
-  --out alice-partial.json
+  --out partial-alice.json
 ```
 
-`--from` signs the legacy half; `--new-key` signs the new half. At least one is required. A co-signer who holds only one sub-key may pass just that flag, but **one-sided partials do not count toward quorum by themselves** — the mirror-source rule requires the same K signer positions to approve both halves, so the wrapper's `combine` step only counts an index that has a valid signature on *both* sides. One-sided partials contribute only when another co-signer supplies the other-side signature at the same index. The wrapper validates the proof file's `payload_hex` against a canonical reconstruction (catches tampering; exit 9), confirms `--from`'s pubkey is in `legacy.sub_pub_keys`, and `--new-key`'s pubkey is in `new.sub_pub_keys` (catches "wrong signer" mistakes; exit 1). Re-running overwrites the signer's prior entries on both sides (idempotent). Each signer sends their `*-partial.json` back to the coordinator.
+Signer with only the legacy sub-key:
 
-### Step 3 — Coordinator: combine partials
+```bash
+./scripts/migrate-multisig.sh sign proof.json \
+  --from <my-legacy-sub-key> \
+  --chain-id lumera-mainnet-1 \
+  --out partial-legacy-alice.json
+```
+
+Signer with only the new sub-key:
+
+```bash
+./scripts/migrate-multisig.sh sign proof.json \
+  --new-key <my-new-eth-sub-key> \
+  --chain-id lumera-mainnet-1 \
+  --out partial-new-alice.json
+```
+
+At least one of `--from` or `--new-key` is required. A signer who has both should pass both.
+
+One-sided partials are allowed, but they do not satisfy quorum by themselves. The final combined proof must have the same K signer indices on both legacy and new sides.
+
+Return the `partial-*.json` files to the coordinator.
+
+### 3. Coordinator: Combine
 
 ```bash
 ./scripts/migrate-multisig.sh combine \
-  alice-partial.json bob-partial.json \
+  partial-alice.json partial-bob.json partial-carol.json \
   --out tx.json
 ```
 
-The wrapper cross-checks that every partial agrees on `chain_id`, `legacy_address`, `new_address`, `payload_hex`, `kind`, and the per-side `threshold`, `sig_format`, and `sub_pub_keys` lists (exit 9 on disagreement). It prints **two** K-of-N entry-presence matrices — one per side:
+The combine step verifies:
 
-```text
-Legacy-side partials (2-of-3 required):
-  [X] signer 0  alice-partial.json
-  [X] signer 1  bob-partial.json
-  [ ] signer 2  (missing)
-Legacy threshold satisfied: yes (2 >= 2)
-New-side partials (2-of-3 required):
-  [X] signer 0  alice-partial.json
-  [X] signer 1  bob-partial.json
-  [ ] signer 2  (missing)
-New threshold satisfied: yes (2 >= 2)
+- all partial files agree on chain ID, legacy address, new address, kind, payload, thresholds, signature format, and sub-pub-key lists
+- each side has at least K signatures
+- the matching-index intersection also has at least K signatures
+- `lumerad tx evmigration combine-proof` accepts the partial signatures
+
+If per-side quorum is met but matching-index quorum is not, the script exits 4. Example: legacy signed by indices `{0,1}` and new signed by `{0,2}` is not enough for 2-of-3, because only index `0` signed both sides.
+
+### 4. Coordinator: Submit
+
+```bash
+./scripts/migrate-multisig.sh submit tx.json \
+  --chain-id lumera-mainnet-1
 ```
 
-The wrapper also computes the **matching-index** count — the size of the intersection between legacy and new signer-index sets — and gates its return on that count meeting K. Per-side thresholds can BOTH report "yes" while the intersection is below K (e.g. legacy signed at `{0,1}`, new signed at `{0,2}` — each side has 2 entries, but only index 0 is signed on both). When the intersection is short, the wrapper prints:
-
-```text
-Matching-index threshold satisfied: no (1 < 2) — one-sided partials do not count
-```
-
-and aborts with exit 4 before calling `lumerad`. If `lumerad combine-proof` itself reports fewer than K *cryptographically valid* signatures signed on both sides at matching indices (wrong key, tampered payload), the wrapper maps that to exit 4 as well. This mirrors the consensus invariant: `legacy_proof.signer_indices == new_proof.signer_indices`.
-
-### Step 4 — Coordinator: submit
+For multisig validator migration:
 
 ```bash
 ./scripts/migrate-multisig.sh submit tx.json \
   --chain-id lumera-mainnet-1 \
-  --node tcp://rpc.lumera:26657
+  --i-have-stopped-the-node
 ```
 
-`submit-proof` does **not** sign at the Cosmos tx layer — migration messages declare zero signers (authorization is embedded in the proof bytes), fees are waived by the evmigration ante handler, and replay is prevented by the keeper's migration record. There is no `--from`; `--keyring-backend` / `--keyring-dir` / `--home` are accepted for SDK-context plumbing only.
+`submit-proof` does not take `--from`, fee flags, or gas-price flags. Authorization is in the proof bytes, and fees are waived by the migration ante handler.
 
-Pre-flight checks (in order): reject non-multisig→multisig tx JSON (exit 3); the legacy address has no migration record yet; the new address isn't already a migration destination; a fresh `migration-estimate` still reports `would_succeed: true` (catches state drift during a multi-hour or multi-day ceremony — governance could have disabled migration, a validator could have exceeded `max_validator_delegations`). After broadcast it waits for inclusion and verifies the migration record matches.
+The submit step checks:
 
-For `--kind validator` tx files, the submit step prints the same downtime banner as `migrate-validator.sh` and requires either `--i-have-stopped-the-node` or a typed `yes` response. `--yes` does not satisfy this check.
+- `tx.json` is a multisig-to-multisig migration tx
+- legacy address has no migration record
+- new address has no migration records
+- new address does not exist on-chain
+- fresh `migration-estimate` still succeeds
+- after broadcast, migration record and balances verify
 
-### Multisig-specific exit codes
-
-In addition to the codes shared with single-sig scripts ([Exit codes](#exit-codes) above):
-
-| Code | Meaning |
-|---|---|
-| `8` | Multisig pubkey not seeded on-chain; submit any multisig-signed tx first |
-| `9` | Input file integrity check failed (JSON parse, missing field, payload_hex mismatch, cross-file disagreement, unsupported version) |
-
-### Multisig troubleshooting
-
-- **Exit 8 on `generate`**: the multisig has never signed a tx. Run any transaction from the multisig account first (smallest: `lumerad tx bank send <multisig-addr> <multisig-addr> 1ulume --from <sub-key>` in the usual multisig coordinator flow). Then retry.
-- **Exit 9 on `sign` with "payload_hex mismatch"**: someone edited a field in the proof after generation. Regenerate from the coordinator and redistribute.
-- **Exit 9 on `sign` with "unsupported version"**: the proof file was produced by an older `lumerad` with the v1 schema. Regenerate with a post-upgrade binary; v1 files are not migratable in place.
-- **Exit 1 on `sign` with "not among legacy.sub_pub_keys"**: the `--from` key's pubkey isn't listed in the template's `legacy.sub_pub_keys`. Confirm you imported the correct Cosmos sub-key (wrong key name, wrong mnemonic, wrong HD path — coin-type must be 118 for legacy sub-keys).
-- **Exit 1 on `sign` with "not among new.sub_pub_keys"**: the `--new-key` pubkey isn't in the template's new-side sub-keys — most commonly because the coordinator built `--new-sub-pub-keys` from a different set of eth keys than the co-signers now hold.
-- **Exit 4 on `combine`**: either you passed partials short of K on either side, or one or more partials had invalid signatures. The wrapper prints per-side entry-presence summaries before invoking `lumerad`; if entries look fine but `lumerad` reports below-threshold valid sigs, the bad signer needs to re-sign.
-- **Exit 4 on `submit`**: chain state changed during the ceremony (governance disabled migration, deadline passed, validator over cap). The `rejection_reason` from the fresh estimate is printed.
+`--dry-run` works on `submit`: it performs checks and stops before broadcast. `--yes` skips the ordinary confirmation prompt, but it does not replace `--i-have-stopped-the-node` for validator migrations.
 
 ---
 
-## Related documentation
+## Safety Checks You Will See
 
-- [migration.md](migration.md) — top-level migration methods (Portal, scripts, raw CLI)
-- [validator-migration.md](validator-migration.md) — full validator-specific walkthrough with maintenance-window planning
-- [supernode-migration.md](supernode-migration.md) — supernode operators and daemon-driven migration
-- [legacy-migration.md](../evmigration/legacy-migration.md) — architectural reference, including the multisig offline flow
-- [evmigration-scripts-design.md](../../design/evmigration-scripts-design.md) — design doc for the scripts themselves
+The scripts perform these checks before broadcast:
+
+| Check                                                          | Query or source                                       | Failure meaning                                                            |
+| -------------------------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------- |
+| Legacy address has no migration record                         | `evmigration migration-record <legacy>`             | The source was already migrated. Do not broadcast again.                   |
+| Destination was not previously a legacy migration source       | `evmigration migration-record <new>`                | The destination address was already migrated from; choose another new key. |
+| Destination was not previously used as a migration destination | `evmigration migration-record-by-new-address <new>` | Another migration already points to this new address.                      |
+| Destination does not exist on-chain                            | `auth account <new>`                                | The new address already has account state. Choose a fresh key.             |
+| Migration would succeed                                        | `evmigration migration-estimate <legacy>`           | Keeper says the migration will fail; read `rejection_reason`.            |
+
+Successful checks are logged as `INFO check OK: ...` so users can see exactly what was verified.
+
+After broadcast, the scripts verify:
+
+- migration record exists for the legacy address
+- migration record points to the expected new address
+- legacy bank balances are zero
+- new bank balances are at least the pre-broadcast legacy balance snapshot
+
+---
+
+## Exit Codes
+
+| Code   | Meaning                                      | Typical cause                                                                                                      |
+| ------ | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `0`  | Success or clean dry-run                     | No broadcast in dry-run; migration verified in normal mode.                                                        |
+| `1`  | Usage error                                  | Bad arguments, missing required flag, bad mnemonic-file permissions, key name collision.                           |
+| `2`  | Environment or query error                   | Missing binary, old binary, missing `jq`, RPC/query failure.                                                     |
+| `3`  | Single-key vs multisig mismatch              | Single-key script saw multisig, or multisig script saw single-sig.                                                 |
+| `4`  | Pre-flight or quorum failure                 | `migration-estimate.would_succeed=false`, or multisig combine lacks valid quorum.                                |
+| `5`  | Already migrated or destination already used | Migration record exists, destination used, or destination account exists.                                          |
+| `6`  | Wrong script or validator cap error          | Account script used for validator, validator script used for non-validator, or validator record count exceeds cap. |
+| `7`  | Post-verification failed                     | Broadcast happened, but record or balance checks did not pass. Investigate chain state manually.                   |
+| `8`  | Multisig pubkey not seeded                   | Legacy multisig has no on-chain pubkey. Submit any multisig-signed tx first.                                       |
+| `9`  | Multisig file integrity error                | Bad JSON, unsupported proof version, payload mismatch, or cross-file disagreement.                                 |
+| `10` | User aborted or downtime not acknowledged    | Prompt declined, no TTY for required prompt, or missing `--i-have-stopped-the-node`.                             |
+
+---
+
+## Troubleshooting
+
+### `new address ... already exists on-chain`
+
+The destination address is not fresh. Do not use it for migration. Create or derive another coin-type 60 `eth_secp256k1` key and retry dry-run.
+
+Check manually:
+
+```bash
+lumerad query auth account <new-address> --node <node>
+lumerad query bank balances <new-address> --node <node>
+```
+
+### `legacy address ... is already migrated`
+
+The migration record already exists. Check it:
+
+```bash
+lumerad query evmigration migration-record <legacy-address> --node <node>
+```
+
+If it points to the expected new address, the migration already completed. Use the new address going forward.
+
+If it points to a different address, stop and investigate which key/mnemonic produced that destination.
+
+### `new address ... is already a migration destination`
+
+Another migration already used this destination address. Check:
+
+```bash
+lumerad query evmigration migration-record-by-new-address <new-address> --node <node>
+```
+
+Use a fresh destination key.
+
+### `pre-flight: migration would fail: ...`
+
+The chain's `migration-estimate` rejected the migration. Common reasons:
+
+- legacy account not found
+- migration disabled by governance
+- migration window ended
+- validator is not bonded
+- validator migration exceeds `max_validator_delegations`
+- account state is not supported for migration
+
+Read the printed `rejection_reason` and fix that condition before retrying.
+
+### `legacy account is a K-of-N multisig`
+
+Use `migrate-multisig.sh`. The single-key scripts cannot migrate multisig accounts.
+
+### `account ... is a validator`
+
+Use `migrate-validator.sh` for single-key validators, or `migrate-multisig.sh --kind validator` for multisig validators.
+
+### `validator downtime not acknowledged`
+
+Pass the explicit flag after stopping the node:
+
+```bash
+--i-have-stopped-the-node
+```
+
+`--yes` does not satisfy this check.
+
+### Multisig `pubkey is not seeded on-chain`
+
+The legacy multisig has never published its `LegacyAminoPubKey` on-chain. Submit any multisig-signed transaction first, then retry `generate`.
+
+### Multisig `payload_hex mismatch`
+
+The proof file was edited or came from incompatible inputs. Regenerate `proof.json` and redistribute it to co-signers.
+
+### Post-verification failed
+
+The tx may already be on-chain. Verify manually:
+
+```bash
+lumerad query evmigration migration-record <legacy-address> --node <node>
+lumerad query bank balances <legacy-address> --node <node>
+lumerad query bank balances <new-address> --node <node>
+```
+
+If the record exists and balances are correct, the failure may have been transient RPC/indexer lag. If not, keep the tx hash and contact release maintainers.
+
+---
+
+## Non-Interactive Usage
+
+For account migration:
+
+```bash
+./scripts/migrate-account.sh <legacy-key> <new-evm-key> \
+  --yes
+```
+
+For validator migration:
+
+```bash
+./scripts/migrate-validator.sh <legacy-op-key> <new-evm-op-key> \
+  --yes \
+  --i-have-stopped-the-node
+```
+
+For multisig submit:
+
+```bash
+./scripts/migrate-multisig.sh submit tx.json \
+  --chain-id lumera-mainnet-1 \
+  --yes
+```
+
+For multisig validator submit, also pass `--i-have-stopped-the-node`.
+
+The scripts never handle keyring passwords directly. Password prompts depend on `--keyring-backend`.
+
+---
+
+## Related Documentation
+
+- [migration.md](migration.md) - top-level migration methods.
+- [validator-migration.md](validator-migration.md) - validator-specific operational guide.
+- [supernode-migration.md](supernode-migration.md) - supernode migration and daemon-driven cleanup.
+- [legacy-migration.md](../evmigration/legacy-migration.md) - architecture and keeper behavior.
+- [evmigration-scripts-design.md](../../design/evmigration-scripts-design.md) - script design notes.

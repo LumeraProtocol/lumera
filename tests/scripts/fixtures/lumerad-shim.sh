@@ -9,7 +9,7 @@
 #
 # Per-command overrides let a single test change just one endpoint:
 #   SHIM_ESTIMATE_FIXTURE, SHIM_RECORD_FIXTURE, SHIM_PARAMS_FIXTURE,
-#   SHIM_AUTH_FIXTURE, SHIM_BANK_FIXTURE, SHIM_TX_FIXTURE
+#   SHIM_AUTH_FIXTURE, SHIM_AUTH_NEW_FIXTURE, SHIM_BANK_FIXTURE, SHIM_TX_FIXTURE
 #
 # State-machine support (for verify_migration end-to-end tests):
 #   SHIM_STATE_FILE=<path>           — when set, tx evmigration touches this file,
@@ -78,6 +78,9 @@ case "$*" in
     ;;
   "query evmigration migration-record-by-new-address "*)  emit "${SHIM_RECORD_FIXTURE:-record-not-found}" ;;
   "query evmigration params"*)                            emit "${SHIM_PARAMS_FIXTURE:-params}" ;;
+  "query auth account lumera1newshim"*)
+    emit "${SHIM_AUTH_NEW_FIXTURE:-auth-account-not-found}"
+    ;;
   "query auth account "*)
     case "${SHIM_AUTH_TYPE:-single}" in
       multisig)         emit auth-account-multisig ;;
@@ -110,6 +113,9 @@ case "$*" in
       [[ "$__arg" == "--output" ]] && __has_json=1
       [[ "$__arg" == "json" ]] && __has_json=$(( __has_json == 1 ? 2 : __has_json ))
     done
+    case ",${SHIM_KEYS_MISSING:-}," in
+      *,"$__key_name",*) printf 'key not found: %s\n' "$__key_name" >&2; exit 1 ;;
+    esac
     if (( __has_json >= 2 )); then
       __fixture="keys-show-$__key_name"
       if [[ -f "$fixtures_dir/$__fixture.json" ]]; then
@@ -125,6 +131,8 @@ case "$*" in
       esac
     fi
     ;;
+  "keys add "*)                                            printf 'added key\n' ;;
+  "keys delete "*)                                         printf 'deleted key\n' ;;
   "debug addr "*)
     cat <<'ADDR'
 Address: [1 2 3]

@@ -377,14 +377,80 @@ ensure_validator_multisig_keys() {
 	addr="$(printf '%s' "${addr}" | tr -d '\r\n')"
 	if [[ -z "${addr}" ]]; then
 		joined_members="$(IFS=,; printf '%s' "${MULTISIG_MEMBER_KEYS[*]}")"
+		# --nosort preserves caller-supplied member order (signer-1, signer-2,
+		# signer-3). Without it Cosmos SDK sorts the LegacyAminoPubKey's sub-keys
+		# by raw pubkey bytes, which makes the legacy (cosmos secp256k1) and
+		# new-side (eth_secp256k1) sub-key indices disagree at migration time
+		# even when names mirror, breaking ValidateProofPair's mirror-source rule
+		# (legacy_proof.signer_indices == new_proof.signer_indices). The test
+		# binary's ensureMultisigCompositeKey applies the same flag for the new
+		# side; both must agree, otherwise the migration combine-proof fails with
+		# "need K valid partial signatures signed on BOTH sides at matching indices".
 		run ${DAEMON} keys add "${KEY_NAME}" \
 			--multisig "${joined_members}" \
 			--multisig-threshold "${MULTISIG_THRESHOLD}" \
+			--nosort \
 			--keyring-backend "${KEYRING_BACKEND}" >/dev/null
 		addr="$(run_capture ${DAEMON} keys show "${KEY_NAME}" -a --keyring-backend "${KEYRING_BACKEND}")"
 		addr="$(printf '%s' "${addr}" | tr -d '\r\n')"
 	fi
 	accounts_registry_upsert "${KEY_NAME}" "${addr}" "" "multisig" "" "" ""
+}
+
+# Default genesis funding for the per-host single-sig prepare-funder key on
+# multisig validators. Big enough to seed prepare-mode test fixtures (the legacy
+# bootstrap target was 800B ulume; pad to 1T for headroom).
+PREPARE_FUNDER_GENESIS_AMOUNT_BASE="${PREPARE_FUNDER_GENESIS_AMOUNT_BASE:-1000000000000}"
+PREPARE_FUNDER_GENESIS_AMOUNT_DENOM="${PREPARE_FUNDER_GENESIS_AMOUNT_DENOM:-${DENOM}}"
+
+# Provision a dedicated single-sig "prepare-funder-${MONIKER}" key on multisig
+# hosts, recovered deterministically from genesis-account-mnemonics[VAL_INDEX]
+# (which is otherwise unused for multisig validators because their KEY_NAME is
+# built from sub-signer keys). The matching genesis account is added to the
+# local genesis here and to the primary's genesis via collect_secondary_genesis_accounts.
+#
+# This exists because multisig-vesting validators (e.g. PermanentLockedAccount)
+# have zero spendable balance by construction, so the validator's own composite
+# cannot fund prepare-mode test fixtures. The prepare-funder is a regular
+# BaseAccount with liquid genesis balance that lives in the same keyring.
+#
+# No-op for single-sig validators (their own validator key is already the funder).
+ensure_prepare_funder_key() {
+	if ! validator_is_multisig; then
+		return 0
+	fi
+	if [ -z "${GENESIS_ACCOUNT_MNEMONIC}" ]; then
+		echo "[SETUP] ERROR: ensure_prepare_funder_key needs genesis-account-mnemonics[${VAL_INDEX}] for ${MONIKER}" >&2
+		return 1
+	fi
+
+	local pf_key="prepare-funder-${MONIKER}"
+	local pf_addr
+	if ! ${DAEMON} keys show "${pf_key}" --keyring-backend "${KEYRING_BACKEND}" >/dev/null 2>&1; then
+		recover_key_from_mnemonic "${pf_key}" "${GENESIS_ACCOUNT_MNEMONIC}"
+		echo "[SETUP] Recovered prepare-funder key ${pf_key} from genesis-account-mnemonics[${VAL_INDEX}]"
+	fi
+	pf_addr="$(run_capture ${DAEMON} keys show "${pf_key}" -a --keyring-backend "${KEYRING_BACKEND}" 2>/dev/null || true)"
+	pf_addr="$(printf '%s' "${pf_addr}" | tr -d '\r\n')"
+	if [ -z "${pf_addr}" ]; then
+		echo "[SETUP] ERROR: could not resolve address for ${pf_key}" >&2
+		return 1
+	fi
+
+	# Add to LOCAL genesis. On the primary this lands directly in the genesis
+	# being assembled. On secondaries this keeps the local copy consistent for
+	# gentx validation; the primary later re-adds it from accounts.json.
+	run ${DAEMON} genesis add-genesis-account "${pf_addr}" "${PREPARE_FUNDER_GENESIS_AMOUNT_BASE}${PREPARE_FUNDER_GENESIS_AMOUNT_DENOM}"
+
+	accounts_registry_upsert \
+		"${pf_key}" \
+		"${pf_addr}" \
+		"${GENESIS_ACCOUNT_MNEMONIC}" \
+		"cosmos" \
+		"${PREPARE_FUNDER_GENESIS_AMOUNT_BASE}${PREPARE_FUNDER_GENESIS_AMOUNT_DENOM}" \
+		"genesis" \
+		""
+	echo "[SETUP] Added genesis account for ${pf_key} (${pf_addr}) with ${PREPARE_FUNDER_GENESIS_AMOUNT_BASE}${PREPARE_FUNDER_GENESIS_AMOUNT_DENOM}"
 }
 
 build_multisig_gentx() {
@@ -432,6 +498,7 @@ build_multisig_gentx() {
 
 collect_secondary_genesis_accounts() {
 	local other od registry key_name addr funded_base funded_denom
+	local pf_key pf_addr pf_base pf_denom
 
 	while IFS= read -r other; do
 		[ "${other}" = "${MONIKER}" ] && continue
@@ -452,6 +519,29 @@ collect_secondary_genesis_accounts() {
 			if [[ -n "${addr}" && -n "${funded_base}" && "${funded_base}" != "null" ]]; then
 				[[ -z "${funded_denom}" || "${funded_denom}" == "null" ]] && funded_denom="${DENOM}"
 				run ${DAEMON} genesis add-genesis-account "${addr}" "${funded_base}${funded_denom}"
+
+				# Multisig validators publish a sibling "prepare-funder-${MONIKER}"
+				# entry that's a single-sig key with liquid genesis balance — used
+				# by prepare mode to seed test fixtures (the multisig composite is
+				# itself the test subject and has zero spendable balance when
+				# wrapped as a vesting account).
+				pf_key="prepare-funder-${other}"
+				pf_addr="$(jq -r --arg name "${pf_key}" \
+					'(map(select(.name == $name)) | first | .address) // empty' \
+					"${registry}" 2>/dev/null || true)"
+				if [ -n "${pf_addr}" ]; then
+					pf_base="$(jq -r --arg name "${pf_key}" \
+						'(map(select(.name == $name)) | first | .funded.base_amount) // empty' \
+						"${registry}" 2>/dev/null || true)"
+					pf_denom="$(jq -r --arg name "${pf_key}" \
+						'(map(select(.name == $name)) | first | .funded.base_denom) // empty' \
+						"${registry}" 2>/dev/null || true)"
+					if [[ -n "${pf_base}" && "${pf_base}" != "null" ]]; then
+						[[ -z "${pf_denom}" || "${pf_denom}" == "null" ]] && pf_denom="${DENOM}"
+						run ${DAEMON} genesis add-genesis-account "${pf_addr}" "${pf_base}${pf_denom}"
+						echo "[SETUP] Added secondary's prepare-funder ${pf_key} (${pf_addr}) → ${pf_base}${pf_denom}"
+					fi
+				fi
 				continue
 			fi
 		fi
@@ -777,6 +867,7 @@ primary_validator_setup() {
 	else
 		accounts_registry_upsert "${KEY_NAME}" "${addr}" "$(accounts_registry_get_field "${KEY_NAME}" "mnemonic")" "cosmos" "${ACCOUNT_BAL}" "genesis" ""
 	fi
+	ensure_prepare_funder_key
 
 	# Create a governance key — used to submit upgrade proposals and vote.
 	# Gets a large genesis balance (1T ulume) so it can cover proposal deposits.
@@ -937,6 +1028,7 @@ secondary_validator_setup() {
 		exit 1
 	fi
 	run ${DAEMON} genesis add-genesis-account "${addr}" "${ACCOUNT_BAL}"
+	ensure_prepare_funder_key
 	ensure_hermes_relayer_account
 
 	mkdir -p "${GENTX_LOCAL_DIR}" "${GENTX_DIR}"

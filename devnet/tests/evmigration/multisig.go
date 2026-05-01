@@ -262,10 +262,20 @@ func ensureMultisigCompositeKey(multisigKeyName string, members []string, thresh
 
 	// `keys add` is a pure keyring operation; it rejects --node, so skip
 	// buildLumeraArgs here and only append --home when set.
+	//
+	// --nosort keeps members in caller-supplied order. Without it Cosmos SDK
+	// sorts the LegacyAminoPubKey's sub-keys by raw pubkey bytes, which makes
+	// the legacy (cosmos secp256k1) and new (eth_secp256k1) sides land on
+	// different orderings even for matching logical signers (signer-N <->
+	// new-signer-N). That breaks ValidateProofPair's mirror-source rule
+	// (legacy_proof.signer_indices == new_proof.signer_indices) at combine-proof
+	// time. With --nosort on both sides, signer-N consistently lives at
+	// index N-1 on both legacy and new.
 	args := []string{
 		"keys", "add", multisigKeyName,
 		"--multisig", strings.Join(members, ","),
 		"--multisig-threshold", fmt.Sprintf("%d", threshold),
+		"--nosort",
 		"--keyring-backend", "test",
 	}
 	if *flagHome != "" {
@@ -593,6 +603,7 @@ func createOrReuseFreshEVMKey(keyName string) (AccountRecord, error) {
 	rec.Address = addr
 	rec.Name = keyName
 	rec.IsLegacy = false
+	log.Printf("  created new EVM key %s (%s)", keyName, addr)
 	return rec, nil
 }
 

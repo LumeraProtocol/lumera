@@ -110,7 +110,11 @@ shopt -s nullglob
 copied=0
 for file in "${BINARIES_DIR}"/*; do
 	if [[ -f "${file}" ]]; then
-		cp -Sf "${file}" "${RELEASE_DIR}/"
+		# Plain force-overwrite. The previous form was `cp -Sf` which GNU cp
+		# parses as `--suffix=f` and (counter-intuitively) implicitly enables
+		# --backup=simple, leaving stale `<name>f` backup files in RELEASE_DIR
+		# after every upgrade — unwanted disk usage and ambiguous filenames.
+		cp -f "${file}" "${RELEASE_DIR}/"
 		copied=1
 	fi
 done

@@ -5,7 +5,6 @@ import (
 
 	sdkmath "cosmossdk.io/math"
 	lcfg "github.com/LumeraProtocol/lumera/config"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/stretchr/testify/require"
 
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
@@ -20,19 +19,17 @@ func TestDistributePool_SkipsStaleAuditReports(t *testing.T) {
 	params.MetricsFreshnessMaxBlocks = 5
 	require.NoError(t, k.SetParams(ctx, params))
 
-	ctx = ctx.WithBlockHeight(100)
-	snKeeper.ctx = ctx
-
+	// Add supernode at the initial ctx height so MetricsState.Height pins low,
+	// then run distributePool at height 100 — staleness 99 > MetricsFreshnessMaxBlocks(5).
 	val := makeValAddr(1)
 	acc := makeAccAddr(1)
 	addSupernode(snKeeper, auditKeeper, val, acc, sntypes.SuperNodeStateActive, 10_000)
 
-	accBech32, err := sdk.Bech32ifyAddressBytes(lcfg.Bech32AccountAddressPrefix, acc)
-	require.NoError(t, err)
-	auditKeeper.setReport(auditKeeper.currentEpochID, accBech32, 90, 10_000) // stale by 10 blocks
+	ctx = ctx.WithBlockHeight(100)
+	snKeeper.ctx = ctx
 
 	fundPool(bankKeeper, 1_000_000)
-	err = k.distributePool(ctx)
+	err := k.distributePool(ctx)
 	require.NoError(t, err)
 
 	paid := sdkmath.ZeroInt()

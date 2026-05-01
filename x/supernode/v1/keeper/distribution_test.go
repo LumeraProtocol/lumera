@@ -144,16 +144,6 @@ func (m *mockAuditKeeper) GetReport(_ sdk.Context, epochID uint64, reporterSuper
 	return r, ok
 }
 
-func (m *mockAuditKeeper) setReport(epochID uint64, reporter string, height int64, bytes float64) {
-	m.reports[reportKey(epochID, reporter)] = audittypes.EpochReport{
-		SupernodeAccount: reporter,
-		EpochId:          epochID,
-		ReportHeight:     height,
-		// CascadeKademliaDbBytes removed from HostReport in LEP-6 §12 (audit proto v2).
-		HostReport: audittypes.HostReport{},
-	}
-}
-
 // --- Test helpers ---
 
 func setupTestKeeper(t *testing.T) (Keeper, sdk.Context, *mockBankKeeper, *mockSupernodeKeeper, *mockAuditKeeper) {

@@ -5,6 +5,9 @@ go 1.26.2
 replace (
 	// Local development - uncomment these for local testing
 	// Comment lines with github.com/LumeraProtocol/ before releasing
+	// Resolve LumeraProtocol/lumera from this repo so devnet tests stay in lockstep
+	// with the local chain code (avoids "module @latest does not contain package" errors
+	// when devnet tests reference packages that only exist on master, e.g. x/action/v1/merkle).
 	github.com/LumeraProtocol/lumera => ..
 	github.com/LumeraProtocol/sdk-go => ../../sdk-go
 	github.com/envoyproxy/protoc-gen-validate => github.com/bufbuild/protoc-gen-validate v1.3.0
@@ -18,7 +21,7 @@ replace (
 require (
 	cosmossdk.io/api v0.9.2
 	cosmossdk.io/math v1.5.3
-	github.com/LumeraProtocol/lumera v1.11.0
+	github.com/LumeraProtocol/lumera v1.11.1
 	github.com/LumeraProtocol/sdk-go v1.0.9
 	github.com/cosmos/cosmos-sdk v0.53.6
 	github.com/cosmos/gogoproto v1.7.2

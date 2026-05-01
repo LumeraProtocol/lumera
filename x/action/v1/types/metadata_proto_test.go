@@ -95,6 +95,8 @@ func TestCascadeMetadataRoundTripWithNewFields(t *testing.T) {
 				PathDirections: []bool{true, false},
 			},
 		},
+		IndexArtifactCount:  32,
+		SymbolArtifactCount: 128,
 	}
 
 	bz, err := proto.Marshal(extended)
@@ -103,4 +105,22 @@ func TestCascadeMetadataRoundTripWithNewFields(t *testing.T) {
 	var decoded CascadeMetadata
 	require.NoError(t, proto.Unmarshal(bz, &decoded))
 	require.Equal(t, extended, &decoded)
+}
+
+func TestCascadeArtifactCountsWithFallbackStrictRejectsEmptyFallbackUniverse(t *testing.T) {
+	idx, sym, err := CascadeArtifactCountsWithFallbackStrict(&CascadeMetadata{})
+	require.Error(t, err)
+	require.Zero(t, idx)
+	require.Zero(t, sym)
+	require.Contains(t, err.Error(), "rq_ids_ids empty")
+
+	idx, sym, err = CascadeArtifactCountsWithFallbackStrict(&CascadeMetadata{RqIdsIds: []string{"rq-1", "rq-2"}})
+	require.NoError(t, err)
+	require.Equal(t, uint32(2), idx)
+	require.Equal(t, uint32(2), sym)
+
+	idx, sym, err = CascadeArtifactCountsWithFallbackStrict(&CascadeMetadata{IndexArtifactCount: 4, SymbolArtifactCount: 9})
+	require.NoError(t, err)
+	require.Equal(t, uint32(4), idx)
+	require.Equal(t, uint32(9), sym)
 }

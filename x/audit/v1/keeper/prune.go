@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"encoding/binary"
+	"encoding/json"
 
 	storetypes "cosmossdk.io/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -53,6 +54,79 @@ func (k Keeper) PruneOldEpochs(ctx sdk.Context, currentEpochID uint64, params ty
 		return err
 	}
 
+	// Recheck evidence dedup: st/rce/<u64be(epoch_id)>/... (epoch-leading, 121-F6)
+	if err := prunePrefixByWindowIDLeadingU64(store, []byte("st/rce/"), minKeepEpochID); err != nil {
+		return err
+	}
+
+	// Storage-truth fact indexes (121-F6): all keyed as <prefix><account>/<u64be(epoch_id)>/...
+	// Node failure records: st/nf/<supernode_account>/<u64be(epoch_id)>/...
+	pruneSupernodeWindowReporter(store, []byte("st/nf/"), minKeepEpochID)
+	// Reporter result records: st/rrs/<reporter_account>/<u64be(epoch_id)>/...
+	pruneSupernodeWindowReporter(store, []byte("st/rrs/"), minKeepEpochID)
+	// Failed heal records: st/fh/<supernode_account>/<u64be(epoch_id)>/...
+	pruneSupernodeWindowReporter(store, []byte("st/fh/"), minKeepEpochID)
+
+	// CP3.5 secondary indexes for indexed contradiction-check lookups.
+	// Reporter result by target index: st/rrs-tt/<target>/<u64be(epoch_id)>/<ticket_id>0x00<reporter>
+	// Same shape as st/rrs/ (account-then-epoch), reuse helper.
+	pruneSupernodeWindowReporter(store, []byte("st/rrs-tt/"), minKeepEpochID)
+	// Transcript by target/bucket/epoch index: st/spt-tbe/<target>/<u32be(bucket)>/<u64be(epoch_id)>/<transcript_hash>
+	pruneTargetBucketEpoch(store, []byte("st/spt-tbe/"), minKeepEpochID)
+	// Primary transcript store: st/spt/<transcript_hash> -> JSON{epoch_id, ...}.
+	// Records are not epoch-keyed, so decode value to filter.
+	pruneStorageProofTranscripts(ctx, k, store, []byte("st/spt/"), minKeepEpochID)
+
+	// F-C1 — TicketDeteriorationState is keyed by ticket_id (not epoch),
+	// but is scanned at every epoch end for heal scheduling. Prune only
+	// semantically inert rows: old, zero-score, and without an active heal-op.
+	if err := k.pruneInactiveTicketDeteriorationStates(ctx, currentEpochID, keepLastEpochEntries); err != nil {
+		return err
+	}
+
+	// Per 120-F3 — terminal heal-ops pruned to bound chain state growth.
+	if err := k.pruneTerminalHealOps(ctx, currentEpochID, keepLastEpochEntries); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (k Keeper) pruneInactiveTicketDeteriorationStates(ctx sdk.Context, currentEpochID, keepLastEpochEntries uint64) error {
+	if keepLastEpochEntries == 0 || currentEpochID <= keepLastEpochEntries {
+		return nil
+	}
+	pruneBeforeEpoch := currentEpochID - keepLastEpochEntries
+
+	store := k.kvStore(ctx)
+	prefix := types.TicketDeteriorationStatePrefix()
+	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
+	defer func() { _ = it.Close() }()
+
+	var toDelete [][]byte
+	for ; it.Valid(); it.Next() {
+		var state types.TicketDeteriorationState
+		k.cdc.MustUnmarshal(it.Value(), &state)
+
+		// Strictly match Zee's final-gate criterion:
+		// LastUpdatedEpoch + KeepLastEpochEntries < currentEpochID.
+		// Written as LastUpdatedEpoch < currentEpochID-KeepLastEpochEntries
+		// to avoid uint64 overflow.
+		if state.LastUpdatedEpoch >= pruneBeforeEpoch {
+			continue
+		}
+		if state.DeteriorationScore != 0 || state.ActiveHealOpId != 0 {
+			continue
+		}
+
+		kc := make([]byte, len(it.Key()))
+		copy(kc, it.Key())
+		toDelete = append(toDelete, kc)
+	}
+
+	for _, key := range toDelete {
+		store.Delete(key)
+	}
 	return nil
 }
 
@@ -160,4 +234,133 @@ func bytesIndexByte(b []byte, c byte) int {
 		}
 	}
 	return -1
+}
+
+// pruneTargetBucketEpoch prunes keys shaped like:
+//
+//	<prefix><target>"/"<u32be(bucket)>"/"<u64be(epoch_id)>"/"<transcript_hash>
+//
+// The 8-byte epoch sits after target + '/' + 4-byte bucket + '/'.
+func pruneTargetBucketEpoch(store storetypes.KVStore, prefix []byte, minKeepWindowID uint64) {
+	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
+	defer func() { _ = it.Close() }()
+
+	var toDelete [][]byte
+
+	for ; it.Valid(); it.Next() {
+		key := it.Key()
+		rest := key[len(prefix):]
+		// rest = <target> '/' <u32be bucket> '/' <u64be epoch> '/' <hash>
+		sep := bytesIndexByte(rest, '/')
+		if sep <= 0 {
+			continue
+		}
+		// after first '/': 4-byte bucket + '/' + 8-byte epoch + '/' + hash >= 14
+		if len(rest) < sep+1+4+1+8+1 {
+			continue
+		}
+		epochStart := sep + 1 + 4 + 1
+		epochEnd := epochStart + 8
+		epochID := binary.BigEndian.Uint64(rest[epochStart:epochEnd])
+		if epochID >= minKeepWindowID {
+			continue
+		}
+		kc := make([]byte, len(key))
+		copy(kc, key)
+		toDelete = append(toDelete, kc)
+	}
+
+	for _, k := range toDelete {
+		store.Delete(k)
+	}
+}
+
+// pruneStorageProofTranscripts prunes the primary transcript store st/spt/<hash> -> JSON
+// by decoding the embedded epoch_id field. Records older than minKeepWindowID are deleted.
+// Per roomote 122 review — bounds long-term state growth.
+//
+// Per NEW-C-4 / NEW-A-19 — malformed records that fail to decode are logged at
+// the keeper logger so silent state corruption is observable. Records remain in
+// place (pruning must not lose data on parse error) but the operator gets a
+// signal to investigate.
+func pruneStorageProofTranscripts(ctx sdk.Context, k Keeper, store storetypes.KVStore, prefix []byte, minKeepWindowID uint64) {
+	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
+	defer func() { _ = it.Close() }()
+
+	// Minimal struct to decode just the epoch_id field; tolerant of unknown fields.
+	type epochProbe struct {
+		EpochID uint64 `json:"epoch_id"`
+	}
+
+	var toDelete [][]byte
+	for ; it.Valid(); it.Next() {
+		var rec epochProbe
+		if err := json.Unmarshal(it.Value(), &rec); err != nil {
+			// Malformed record — leave in place; pruning must not lose data on parse error.
+			// Per NEW-C-4/NEW-A-19 — surface as warning so silent corruption is observable.
+			k.Logger().Error(
+				"audit: pruneStorageProofTranscripts skipped malformed record",
+				"prefix", string(prefix),
+				"key", it.Key(),
+				"err", err,
+			)
+			continue
+		}
+		if rec.EpochID >= minKeepWindowID {
+			continue
+		}
+		kc := make([]byte, len(it.Key()))
+		copy(kc, it.Key())
+		toDelete = append(toDelete, kc)
+	}
+
+	for _, k := range toDelete {
+		store.Delete(k)
+	}
+}
+
+// pruneTerminalHealOps deletes heal-ops that have reached a terminal status
+// (VERIFIED, FAILED, EXPIRED) and whose scheduled epoch is old enough to be
+// outside the keep window. All associated index entries are also removed.
+// Per 120-F3 — terminal heal-ops pruned to bound chain state growth.
+func (k Keeper) pruneTerminalHealOps(ctx sdk.Context, currentEpochID, keepLastEpochEntries uint64) error {
+	store := k.kvStore(ctx)
+	prefix := types.HealOpPrefix()
+	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
+	defer func() { _ = it.Close() }()
+
+	var toDelete []types.HealOp
+	for ; it.Valid(); it.Next() {
+		var healOp types.HealOp
+		k.cdc.MustUnmarshal(it.Value(), &healOp)
+		if !isHealOpFinalStatus(healOp.Status) {
+			continue
+		}
+		cutoffEpoch := healOp.ScheduledEpochId + keepLastEpochEntries
+		if cutoffEpoch >= currentEpochID {
+			continue
+		}
+		toDelete = append(toDelete, healOp)
+	}
+
+	for _, healOp := range toDelete {
+		store.Delete(types.HealOpKey(healOp.HealOpId))
+		store.Delete(types.HealOpByTicketIndexKey(healOp.TicketId, healOp.HealOpId))
+		store.Delete(types.HealOpByStatusIndexKey(healOp.Status, healOp.HealOpId))
+
+		// Remove all verification sub-keys for this heal op.
+		verPrefix := types.HealOpVerificationPrefix(healOp.HealOpId)
+		vit := store.Iterator(verPrefix, storetypes.PrefixEndBytes(verPrefix))
+		var verKeys [][]byte
+		for ; vit.Valid(); vit.Next() {
+			kc := make([]byte, len(vit.Key()))
+			copy(kc, vit.Key())
+			verKeys = append(verKeys, kc)
+		}
+		_ = vit.Close()
+		for _, vk := range verKeys {
+			store.Delete(vk)
+		}
+	}
+	return nil
 }

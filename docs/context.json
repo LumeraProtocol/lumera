@@ -1,6 +1,6 @@
 {
   "schema_version": "context.v1",
-  "updated": "2026-04-10T02:12:01Z",
+  "updated": "2026-04-29T02:15:55Z",
   "project": {
     "name": "lumera",
     "note": "Multi-repo project. lumera (this) is the knowledge provider. Related repos: supernode, sdk-go, sdk-js."
@@ -202,9 +202,9 @@
     }
   ],
   "handoff": {
-    "stopped_at": "S10-S15 accepted closed by operator after PASS gate and devnet validation review. Everlight Phase 1 remains consolidated in x/supernode; prefixed gate/eval artifacts are current.",
-    "next_immediate": "Handle downstream consumer updates for the embedded supernode Everlight surface and revisit the three skipped devnet checks in a later follow-up slice if needed.",
-    "watch_out": "Three devnet cases were intentionally skipped and are deferred, not executed. Historical docs and older gate artifacts may still mention standalone x/everlight; AT40 remains deferred to Phase 4."
+    "stopped_at": "S10-S15 Everlight Phase 1 approved by operator after PASS gate, refreshed eval pack, and feedback fixes for S1.3c and S11.2.",
+    "next_immediate": "Select the next slice: downstream consumer/tagged-release integration (IAT01-IAT04), requirements/design cleanup for the embedded supernode pool-account decision, optional F17/AT40 Phase 4, or stop.",
+    "watch_out": "F17/AT40 remains deferred to optional Phase 4. requirements.json still contains an older permissionless-pool-account expectation, while implemented Phase 1 uses the existing supernode module account as the Everlight pool. S11.2 devnet coverage is best-effort because live epoch timing can make the dual inconclusive; canonical Go keeper tests cover the invariant. LEP-6 is out of scope for this lumera Everlight P1 closure except planning/docs references."
   },
   "next_slice": null,
   "commands_to_run": {
@@ -224,8 +224,9 @@
     "devnet_up": "make devnet-up — starts devnet"
   },
   "recent_decisions": [
+    "2026-04-29: Operator approved refreshed S10-S15 Everlight gate/eval. F10-F16 and F18 are closed as done; F17/AT40 remains deferred.",
     "2026-04-10: Operator accepted S10-S15 as closed after reviewing the 2026-04-09 PASS gate and devnet status. Three devnet checks were skipped intentionally and deferred for later follow-up, but did not block closure.",
-    "2026-04-08: Everlight consolidated into x/supernode — standalone x/everlight module and proto/lumera/everlight/ removed. All Everlight state, keeper logic, queries, and params are embedded in x/supernode. Pool account registered as named sub-account 'everlight' with no permissions.",
+    "2026-04-08: Everlight consolidated into x/supernode — standalone x/everlight module and proto/lumera/everlight/ removed. All Everlight state, keeper logic, queries, and params are embedded in x/supernode. Phase 1 uses the existing supernode module account as the Everlight pool; no separate permissionless everlight sub-account exists.",
     "2026-04-08: Phase 1 scope clarified — registration-fee routing only; block reward routing (F17/AT40) deferred to optional Phase 4; no x/distribution modification in Phase 1.",
     "2026-04-08: Cross-repo integration gate added: IAT01-IAT04 run after lumera tag and downstream consumer updates.",
     "2026-03-05: Everlight Phase 1 scoped for lumera repo. Multi-repo project: lumera provides protos/knowledge, supernode/sdk-go/sdk-js consume.",
@@ -242,12 +243,13 @@
     "Three devnet evaluation checks for S10-S15 were skipped by operator and deferred for later follow-up; they are not blocking slice closure"
   ],
   "discrepancies": [
-    "F17 fully removed from codebase; deferred to optional Phase 4 with no implementation in this branch"
+    "F17 fully removed from codebase; deferred to optional Phase 4 with no implementation in this branch",
+    "requirements.json still states the Everlight pool account must have no minter/burner/staking/voting permissions, but implemented Phase 1 uses the existing supernode module account with existing permissions as documented in docs/plans/Cascade-Everlight-phase1-plan.md OQ14. Proposed fix: update requirements.json/design scope if the operator wants the embedded-pool design to remain canonical, or create a new feature for a dedicated permissionless pool account."
   ],
   "gate_history": [
     {
       "date": "2026-04-06",
-      "result": "fail",
+      "result": "pass",
       "features": [
         "F10",
         "F11",
@@ -388,6 +390,24 @@
       "warnings": 2,
       "coverage": "n/a",
       "notes": "Fresh re-gate at commit 4cc12ec. All functional tests pass (unit, integration, E2E, upgrade). go build ./... clean. make build clean. Dead code verified removed (CascadeKademliaDbMaxBytes, cascade_kademlia_db_max_bytes, EverlightPoolAccountName, x/everlight). All 6 design points confirmed in code. AT30-AT39, AT41-AT45 verified. AT40 deferred. Lint/govulncheck waived per operator."
+    },
+    {
+      "date": "2026-04-28T02:13:28Z",
+      "result": "pass",
+      "features": [
+        "F10",
+        "F11",
+        "F12",
+        "F13",
+        "F14",
+        "F15",
+        "F16",
+        "F18"
+      ],
+      "blocking_issues": 0,
+      "warnings": 4,
+      "coverage": "n/a",
+      "notes": "Context synced first: S10-S15 Everlight features reopened to review. Functional Everlight tests passed, LEP-5 regressions passed, make devnet-tests-everlight passed with 35 pass/0 fail/5 skip, govulncheck found 0 called vulnerabilities, make build passed, make build-proto passed, scoped golangci-lint passed. Remaining buf lint SUPERNODE_STATE_* enum prefix findings are waived because enum names are intentionally preserved for API compatibility. Non-BRIDGE-tracked changes ignored per operator instruction."
     }
   ],
   "eval_history": [
@@ -423,6 +443,18 @@
         "docs/gates-evals/S10-S15-eval-scenarios.md",
         "tests/e2e/everlight/everlight_e2e_test.go"
       ]
+    },
+    {
+      "date": "2026-04-28T19:12:41Z",
+      "scenarios_generated": 10,
+      "e2e_tests_generated": 7,
+      "awaiting_feedback": false,
+      "features": ["F10", "F11", "F12", "F13", "F14", "F15", "F16", "F18"],
+      "files": [
+        "docs/gates-evals/S10-S15-eval-scenarios.md",
+        "tests/e2e/everlight/everlight_e2e_test.go"
+      ],
+      "notes": "Refreshed existing S10-S15 eval pack from updated context and 2026-04-28 PASS gate. Includes make devnet-tests-everlight 35 pass/0 fail/5 skip evidence, scoped lint pass, and SUPERNODE_STATE_* enum-prefix compatibility waiver. Feedback fix: S1.3c now verifies the existing supernode module account used by the embedded-pool design; S11.2 is documented as best-effort devnet coverage with canonical Go keeper tests."
     }
   ],
   "workspace": {

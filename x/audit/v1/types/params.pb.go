@@ -24,6 +24,37 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
+type StorageTruthEnforcementMode int32
+
+const (
+	StorageTruthEnforcementMode_STORAGE_TRUTH_ENFORCEMENT_MODE_UNSPECIFIED StorageTruthEnforcementMode = 0
+	StorageTruthEnforcementMode_STORAGE_TRUTH_ENFORCEMENT_MODE_SHADOW      StorageTruthEnforcementMode = 1
+	StorageTruthEnforcementMode_STORAGE_TRUTH_ENFORCEMENT_MODE_SOFT        StorageTruthEnforcementMode = 2
+	StorageTruthEnforcementMode_STORAGE_TRUTH_ENFORCEMENT_MODE_FULL        StorageTruthEnforcementMode = 3
+)
+
+var StorageTruthEnforcementMode_name = map[int32]string{
+	0: "STORAGE_TRUTH_ENFORCEMENT_MODE_UNSPECIFIED",
+	1: "STORAGE_TRUTH_ENFORCEMENT_MODE_SHADOW",
+	2: "STORAGE_TRUTH_ENFORCEMENT_MODE_SOFT",
+	3: "STORAGE_TRUTH_ENFORCEMENT_MODE_FULL",
+}
+
+var StorageTruthEnforcementMode_value = map[string]int32{
+	"STORAGE_TRUTH_ENFORCEMENT_MODE_UNSPECIFIED": 0,
+	"STORAGE_TRUTH_ENFORCEMENT_MODE_SHADOW":      1,
+	"STORAGE_TRUTH_ENFORCEMENT_MODE_SOFT":        2,
+	"STORAGE_TRUTH_ENFORCEMENT_MODE_FULL":        3,
+}
+
+func (x StorageTruthEnforcementMode) String() string {
+	return proto.EnumName(StorageTruthEnforcementMode_name, int32(x))
+}
+
+func (StorageTruthEnforcementMode) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor_3788ca0fc7eb9d86, []int{0}
+}
+
 // Params defines the parameters for the audit module.
 type Params struct {
 	EpochLengthBlocks uint64 `protobuf:"varint,1,opt,name=epoch_length_blocks,json=epochLengthBlocks,proto3" json:"epoch_length_blocks,omitempty"`
@@ -73,6 +104,55 @@ type Params struct {
 	// Storage Challenge (SC) params.
 	ScEnabled             bool   `protobuf:"varint,19,opt,name=sc_enabled,json=scEnabled,proto3" json:"sc_enabled,omitempty"`
 	ScChallengersPerEpoch uint32 `protobuf:"varint,20,opt,name=sc_challengers_per_epoch,json=scChallengersPerEpoch,proto3" json:"sc_challengers_per_epoch,omitempty"`
+	// Storage-truth challenge shape params.
+	StorageTruthRecentBucketMaxBlocks     uint64 `protobuf:"varint,21,opt,name=storage_truth_recent_bucket_max_blocks,json=storageTruthRecentBucketMaxBlocks,proto3" json:"storage_truth_recent_bucket_max_blocks,omitempty"`
+	StorageTruthOldBucketMinBlocks        uint64 `protobuf:"varint,22,opt,name=storage_truth_old_bucket_min_blocks,json=storageTruthOldBucketMinBlocks,proto3" json:"storage_truth_old_bucket_min_blocks,omitempty"`
+	StorageTruthChallengeTargetDivisor    uint32 `protobuf:"varint,23,opt,name=storage_truth_challenge_target_divisor,json=storageTruthChallengeTargetDivisor,proto3" json:"storage_truth_challenge_target_divisor,omitempty"`
+	StorageTruthCompoundRangesPerArtifact uint32 `protobuf:"varint,24,opt,name=storage_truth_compound_ranges_per_artifact,json=storageTruthCompoundRangesPerArtifact,proto3" json:"storage_truth_compound_ranges_per_artifact,omitempty"`
+	StorageTruthCompoundRangeLenBytes     uint32 `protobuf:"varint,25,opt,name=storage_truth_compound_range_len_bytes,json=storageTruthCompoundRangeLenBytes,proto3" json:"storage_truth_compound_range_len_bytes,omitempty"`
+	// Storage-truth scoring and healing params.
+	StorageTruthMaxSelfHealOpsPerEpoch                 uint32 `protobuf:"varint,26,opt,name=storage_truth_max_self_heal_ops_per_epoch,json=storageTruthMaxSelfHealOpsPerEpoch,proto3" json:"storage_truth_max_self_heal_ops_per_epoch,omitempty"`
+	StorageTruthProbationEpochs                        uint32 `protobuf:"varint,27,opt,name=storage_truth_probation_epochs,json=storageTruthProbationEpochs,proto3" json:"storage_truth_probation_epochs,omitempty"`
+	StorageTruthNodeSuspicionDecayPerEpoch             int64  `protobuf:"varint,28,opt,name=storage_truth_node_suspicion_decay_per_epoch,json=storageTruthNodeSuspicionDecayPerEpoch,proto3" json:"storage_truth_node_suspicion_decay_per_epoch,omitempty"`
+	StorageTruthReporterReliabilityDecayPerEpoch       int64  `protobuf:"varint,29,opt,name=storage_truth_reporter_reliability_decay_per_epoch,json=storageTruthReporterReliabilityDecayPerEpoch,proto3" json:"storage_truth_reporter_reliability_decay_per_epoch,omitempty"`
+	StorageTruthTicketDeteriorationDecayPerEpoch       int64  `protobuf:"varint,30,opt,name=storage_truth_ticket_deterioration_decay_per_epoch,json=storageTruthTicketDeteriorationDecayPerEpoch,proto3" json:"storage_truth_ticket_deterioration_decay_per_epoch,omitempty"`
+	StorageTruthNodeSuspicionThresholdWatch            int64  `protobuf:"varint,31,opt,name=storage_truth_node_suspicion_threshold_watch,json=storageTruthNodeSuspicionThresholdWatch,proto3" json:"storage_truth_node_suspicion_threshold_watch,omitempty"`
+	StorageTruthNodeSuspicionThresholdProbation        int64  `protobuf:"varint,32,opt,name=storage_truth_node_suspicion_threshold_probation,json=storageTruthNodeSuspicionThresholdProbation,proto3" json:"storage_truth_node_suspicion_threshold_probation,omitempty"`
+	StorageTruthNodeSuspicionThresholdPostpone         int64  `protobuf:"varint,33,opt,name=storage_truth_node_suspicion_threshold_postpone,json=storageTruthNodeSuspicionThresholdPostpone,proto3" json:"storage_truth_node_suspicion_threshold_postpone,omitempty"`
+	StorageTruthReporterReliabilityLowTrustThreshold   int64  `protobuf:"varint,34,opt,name=storage_truth_reporter_reliability_low_trust_threshold,json=storageTruthReporterReliabilityLowTrustThreshold,proto3" json:"storage_truth_reporter_reliability_low_trust_threshold,omitempty"`
+	StorageTruthReporterReliabilityIneligibleThreshold int64  `protobuf:"varint,35,opt,name=storage_truth_reporter_reliability_ineligible_threshold,json=storageTruthReporterReliabilityIneligibleThreshold,proto3" json:"storage_truth_reporter_reliability_ineligible_threshold,omitempty"`
+	StorageTruthTicketDeteriorationHealThreshold       int64  `protobuf:"varint,36,opt,name=storage_truth_ticket_deterioration_heal_threshold,json=storageTruthTicketDeteriorationHealThreshold,proto3" json:"storage_truth_ticket_deterioration_heal_threshold,omitempty"`
+	// Storage-truth rollout gate.
+	StorageTruthEnforcementMode StorageTruthEnforcementMode `protobuf:"varint,37,opt,name=storage_truth_enforcement_mode,json=storageTruthEnforcementMode,proto3,enum=lumera.audit.v1.StorageTruthEnforcementMode" json:"storage_truth_enforcement_mode,omitempty"`
+	// New LEP-6 spec-alignment params.
+	// Reporter reliability degraded threshold (positive-penalty model).
+	StorageTruthReporterReliabilityDegradedThreshold int64 `protobuf:"varint,38,opt,name=storage_truth_reporter_reliability_degraded_threshold,json=storageTruthReporterReliabilityDegradedThreshold,proto3" json:"storage_truth_reporter_reliability_degraded_threshold,omitempty"`
+	// Pattern escalation window in epochs (default 14).
+	StorageTruthPatternEscalationWindow uint32 `protobuf:"varint,39,opt,name=storage_truth_pattern_escalation_window,json=storageTruthPatternEscalationWindow,proto3" json:"storage_truth_pattern_escalation_window,omitempty"`
+	// Statistical divergence scoring params.
+	StorageTruthDivergenceWindowEpochs          uint32 `protobuf:"varint,40,opt,name=storage_truth_divergence_window_epochs,json=storageTruthDivergenceWindowEpochs,proto3" json:"storage_truth_divergence_window_epochs,omitempty"`
+	StorageTruthReporterMinReportsForDivergence uint32 `protobuf:"varint,41,opt,name=storage_truth_reporter_min_reports_for_divergence,json=storageTruthReporterMinReportsForDivergence,proto3" json:"storage_truth_reporter_min_reports_for_divergence,omitempty"`
+	// Strong-postpone threshold (default 140).
+	StorageTruthNodeSuspicionThresholdStrongPostpone int64 `protobuf:"varint,42,opt,name=storage_truth_node_suspicion_threshold_strong_postpone,json=storageTruthNodeSuspicionThresholdStrongPostpone,proto3" json:"storage_truth_node_suspicion_threshold_strong_postpone,omitempty"`
+	// Recovery requires this many clean passes (default 3).
+	StorageTruthRecoveryCleanPassCount uint32 `protobuf:"varint,43,opt,name=storage_truth_recovery_clean_pass_count,json=storageTruthRecoveryCleanPassCount,proto3" json:"storage_truth_recovery_clean_pass_count,omitempty"`
+	// Class A and B fault windows.
+	StorageTruthClassAFaultWindow uint32 `protobuf:"varint,44,opt,name=storage_truth_class_a_fault_window,json=storageTruthClassAFaultWindow,proto3" json:"storage_truth_class_a_fault_window,omitempty"`
+	StorageTruthClassBFaultWindow uint32 `protobuf:"varint,45,opt,name=storage_truth_class_b_fault_window,json=storageTruthClassBFaultWindow,proto3" json:"storage_truth_class_b_fault_window,omitempty"`
+	// Heal deadline in epochs (default 3).
+	StorageTruthHealDeadlineEpochs uint32 `protobuf:"varint,46,opt,name=storage_truth_heal_deadline_epochs,json=storageTruthHealDeadlineEpochs,proto3" json:"storage_truth_heal_deadline_epochs,omitempty"`
+	// OLD Class-A distinct-ticket window in epochs (default 21).
+	StorageTruthOldClassAFaultWindow uint32 `protobuf:"varint,47,opt,name=storage_truth_old_class_a_fault_window,json=storageTruthOldClassAFaultWindow,proto3" json:"storage_truth_old_class_a_fault_window,omitempty"`
+	// Contradiction confirmation window in epochs (default 7).
+	StorageTruthContradictionWindowEpochs uint32 `protobuf:"varint,48,opt,name=storage_truth_contradiction_window_epochs,json=storageTruthContradictionWindowEpochs,proto3" json:"storage_truth_contradiction_window_epochs,omitempty"`
+	// Reporter challenger ineligibility duration in epochs (default 7).
+	StorageTruthReporterIneligibleDurationEpochs uint32 `protobuf:"varint,49,opt,name=storage_truth_reporter_ineligible_duration_epochs,json=storageTruthReporterIneligibleDurationEpochs,proto3" json:"storage_truth_reporter_ineligible_duration_epochs,omitempty"`
+	// Strong-band recovery clean-pass requirement (F121-F12, default 5).
+	StorageTruthStrongRecoveryCleanPassCount uint32 `protobuf:"varint,50,opt,name=storage_truth_strong_recovery_clean_pass_count,json=storageTruthStrongRecoveryCleanPassCount,proto3" json:"storage_truth_strong_recovery_clean_pass_count,omitempty"`
+	// Number of verifier supernodes assigned per heal-op (NEW-B-3, default 2).
+	// Verifiers cross-check the healer's recovery; making this a Param allows
+	// governance to tune redundancy if heal volume / failure rate shifts.
+	StorageTruthHealVerifierCount uint32 `protobuf:"varint,51,opt,name=storage_truth_heal_verifier_count,json=storageTruthHealVerifierCount,proto3" json:"storage_truth_heal_verifier_count,omitempty"`
 }
 
 func (m *Params) Reset()         { *m = Params{} }
@@ -248,59 +328,334 @@ func (m *Params) GetScChallengersPerEpoch() uint32 {
 	return 0
 }
 
+func (m *Params) GetStorageTruthRecentBucketMaxBlocks() uint64 {
+	if m != nil {
+		return m.StorageTruthRecentBucketMaxBlocks
+	}
+	return 0
+}
+
+func (m *Params) GetStorageTruthOldBucketMinBlocks() uint64 {
+	if m != nil {
+		return m.StorageTruthOldBucketMinBlocks
+	}
+	return 0
+}
+
+func (m *Params) GetStorageTruthChallengeTargetDivisor() uint32 {
+	if m != nil {
+		return m.StorageTruthChallengeTargetDivisor
+	}
+	return 0
+}
+
+func (m *Params) GetStorageTruthCompoundRangesPerArtifact() uint32 {
+	if m != nil {
+		return m.StorageTruthCompoundRangesPerArtifact
+	}
+	return 0
+}
+
+func (m *Params) GetStorageTruthCompoundRangeLenBytes() uint32 {
+	if m != nil {
+		return m.StorageTruthCompoundRangeLenBytes
+	}
+	return 0
+}
+
+func (m *Params) GetStorageTruthMaxSelfHealOpsPerEpoch() uint32 {
+	if m != nil {
+		return m.StorageTruthMaxSelfHealOpsPerEpoch
+	}
+	return 0
+}
+
+func (m *Params) GetStorageTruthProbationEpochs() uint32 {
+	if m != nil {
+		return m.StorageTruthProbationEpochs
+	}
+	return 0
+}
+
+func (m *Params) GetStorageTruthNodeSuspicionDecayPerEpoch() int64 {
+	if m != nil {
+		return m.StorageTruthNodeSuspicionDecayPerEpoch
+	}
+	return 0
+}
+
+func (m *Params) GetStorageTruthReporterReliabilityDecayPerEpoch() int64 {
+	if m != nil {
+		return m.StorageTruthReporterReliabilityDecayPerEpoch
+	}
+	return 0
+}
+
+func (m *Params) GetStorageTruthTicketDeteriorationDecayPerEpoch() int64 {
+	if m != nil {
+		return m.StorageTruthTicketDeteriorationDecayPerEpoch
+	}
+	return 0
+}
+
+func (m *Params) GetStorageTruthNodeSuspicionThresholdWatch() int64 {
+	if m != nil {
+		return m.StorageTruthNodeSuspicionThresholdWatch
+	}
+	return 0
+}
+
+func (m *Params) GetStorageTruthNodeSuspicionThresholdProbation() int64 {
+	if m != nil {
+		return m.StorageTruthNodeSuspicionThresholdProbation
+	}
+	return 0
+}
+
+func (m *Params) GetStorageTruthNodeSuspicionThresholdPostpone() int64 {
+	if m != nil {
+		return m.StorageTruthNodeSuspicionThresholdPostpone
+	}
+	return 0
+}
+
+func (m *Params) GetStorageTruthReporterReliabilityLowTrustThreshold() int64 {
+	if m != nil {
+		return m.StorageTruthReporterReliabilityLowTrustThreshold
+	}
+	return 0
+}
+
+func (m *Params) GetStorageTruthReporterReliabilityIneligibleThreshold() int64 {
+	if m != nil {
+		return m.StorageTruthReporterReliabilityIneligibleThreshold
+	}
+	return 0
+}
+
+func (m *Params) GetStorageTruthTicketDeteriorationHealThreshold() int64 {
+	if m != nil {
+		return m.StorageTruthTicketDeteriorationHealThreshold
+	}
+	return 0
+}
+
+func (m *Params) GetStorageTruthEnforcementMode() StorageTruthEnforcementMode {
+	if m != nil {
+		return m.StorageTruthEnforcementMode
+	}
+	return StorageTruthEnforcementMode_STORAGE_TRUTH_ENFORCEMENT_MODE_UNSPECIFIED
+}
+
+func (m *Params) GetStorageTruthReporterReliabilityDegradedThreshold() int64 {
+	if m != nil {
+		return m.StorageTruthReporterReliabilityDegradedThreshold
+	}
+	return 0
+}
+
+func (m *Params) GetStorageTruthPatternEscalationWindow() uint32 {
+	if m != nil {
+		return m.StorageTruthPatternEscalationWindow
+	}
+	return 0
+}
+
+func (m *Params) GetStorageTruthDivergenceWindowEpochs() uint32 {
+	if m != nil {
+		return m.StorageTruthDivergenceWindowEpochs
+	}
+	return 0
+}
+
+func (m *Params) GetStorageTruthReporterMinReportsForDivergence() uint32 {
+	if m != nil {
+		return m.StorageTruthReporterMinReportsForDivergence
+	}
+	return 0
+}
+
+func (m *Params) GetStorageTruthNodeSuspicionThresholdStrongPostpone() int64 {
+	if m != nil {
+		return m.StorageTruthNodeSuspicionThresholdStrongPostpone
+	}
+	return 0
+}
+
+func (m *Params) GetStorageTruthRecoveryCleanPassCount() uint32 {
+	if m != nil {
+		return m.StorageTruthRecoveryCleanPassCount
+	}
+	return 0
+}
+
+func (m *Params) GetStorageTruthClassAFaultWindow() uint32 {
+	if m != nil {
+		return m.StorageTruthClassAFaultWindow
+	}
+	return 0
+}
+
+func (m *Params) GetStorageTruthClassBFaultWindow() uint32 {
+	if m != nil {
+		return m.StorageTruthClassBFaultWindow
+	}
+	return 0
+}
+
+func (m *Params) GetStorageTruthHealDeadlineEpochs() uint32 {
+	if m != nil {
+		return m.StorageTruthHealDeadlineEpochs
+	}
+	return 0
+}
+
+func (m *Params) GetStorageTruthOldClassAFaultWindow() uint32 {
+	if m != nil {
+		return m.StorageTruthOldClassAFaultWindow
+	}
+	return 0
+}
+
+func (m *Params) GetStorageTruthContradictionWindowEpochs() uint32 {
+	if m != nil {
+		return m.StorageTruthContradictionWindowEpochs
+	}
+	return 0
+}
+
+func (m *Params) GetStorageTruthReporterIneligibleDurationEpochs() uint32 {
+	if m != nil {
+		return m.StorageTruthReporterIneligibleDurationEpochs
+	}
+	return 0
+}
+
+func (m *Params) GetStorageTruthStrongRecoveryCleanPassCount() uint32 {
+	if m != nil {
+		return m.StorageTruthStrongRecoveryCleanPassCount
+	}
+	return 0
+}
+
+func (m *Params) GetStorageTruthHealVerifierCount() uint32 {
+	if m != nil {
+		return m.StorageTruthHealVerifierCount
+	}
+	return 0
+}
+
 func init() {
+	proto.RegisterEnum("lumera.audit.v1.StorageTruthEnforcementMode", StorageTruthEnforcementMode_name, StorageTruthEnforcementMode_value)
 	proto.RegisterType((*Params)(nil), "lumera.audit.v1.Params")
 }
 
 func init() { proto.RegisterFile("lumera/audit/v1/params.proto", fileDescriptor_3788ca0fc7eb9d86) }
 
 var fileDescriptor_3788ca0fc7eb9d86 = []byte{
-	// 715 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x8c, 0x94, 0x4f, 0x4f, 0x13, 0x41,
-	0x18, 0xc6, 0x59, 0x41, 0x84, 0x41, 0x84, 0x2e, 0x25, 0x6c, 0x40, 0x6b, 0xa3, 0x1e, 0x08, 0x89,
-	0xad, 0x0d, 0x1a, 0xff, 0xc4, 0x13, 0xb5, 0x44, 0x13, 0xc0, 0x5a, 0x7b, 0xe2, 0x32, 0x99, 0xee,
-	0xbe, 0xb4, 0x63, 0x77, 0x67, 0x86, 0x99, 0xd9, 0xa6, 0x70, 0xf6, 0x03, 0xf8, 0x11, 0xfc, 0x38,
-	0x1e, 0x39, 0x7a, 0x34, 0x70, 0xf1, 0x63, 0x98, 0x99, 0xe9, 0x96, 0x62, 0x4b, 0xe0, 0xd2, 0xee,
-	0xce, 0xf3, 0xfe, 0x9e, 0x67, 0xde, 0x77, 0x36, 0x83, 0x1e, 0xc6, 0x69, 0x02, 0x92, 0x94, 0x49,
-	0x1a, 0x51, 0x5d, 0xee, 0x55, 0xca, 0x82, 0x48, 0x92, 0xa8, 0x92, 0x90, 0x5c, 0x73, 0x7f, 0xc9,
-	0xa9, 0x25, 0xab, 0x96, 0x7a, 0x95, 0xf5, 0x1c, 0x49, 0x28, 0xe3, 0x65, 0xfb, 0xeb, 0x6a, 0xd6,
-	0xf3, 0x6d, 0xde, 0xe6, 0xf6, 0xb1, 0x6c, 0x9e, 0xdc, 0xea, 0x93, 0xef, 0x0b, 0x68, 0xb6, 0x6e,
-	0xad, 0xfc, 0x12, 0x5a, 0x01, 0xc1, 0xc3, 0x0e, 0x8e, 0x81, 0xb5, 0x75, 0x07, 0xb7, 0x62, 0x1e,
-	0x76, 0x55, 0xe0, 0x15, 0xbd, 0xcd, 0x99, 0x46, 0xce, 0x4a, 0x7b, 0x56, 0xd9, 0xb1, 0x82, 0xbf,
-	0x85, 0xdc, 0x22, 0x3e, 0x05, 0xc9, 0x71, 0x07, 0x68, 0xbb, 0xa3, 0x83, 0x3b, 0xb6, 0x7a, 0xc9,
-	0x0a, 0x87, 0x20, 0xf9, 0x47, 0xbb, 0x6c, 0xbc, 0x05, 0x80, 0xc4, 0xc7, 0x29, 0x97, 0x69, 0x82,
-	0x25, 0x08, 0x2e, 0xb5, 0x0a, 0xa6, 0x8b, 0xde, 0xe6, 0x62, 0x23, 0x67, 0xa4, 0x2f, 0x56, 0x69,
-	0x38, 0xc1, 0x7f, 0x8f, 0x36, 0x12, 0xca, 0xb0, 0x90, 0xbc, 0x05, 0x58, 0x13, 0xd9, 0x06, 0xad,
-	0xb0, 0x00, 0x89, 0xad, 0x71, 0x30, 0x63, 0xb9, 0xb5, 0x84, 0xb2, 0xba, 0xa9, 0x68, 0xba, 0x82,
-	0x3a, 0xc8, 0x9a, 0x91, 0x2d, 0x4d, 0xfa, 0xd7, 0xd2, 0x77, 0x07, 0x34, 0xe9, 0x4f, 0xa4, 0x4b,
-	0x68, 0x45, 0xc2, 0x71, 0x4a, 0x25, 0x44, 0x98, 0x0b, 0x60, 0xd8, 0xed, 0x75, 0xb6, 0x38, 0x6d,
-	0xf6, 0x9a, 0x49, 0x9f, 0x05, 0xb0, 0xba, 0xdd, 0x6b, 0x19, 0xe5, 0xcd, 0x5e, 0x43, 0x91, 0xe2,
-	0x23, 0x09, 0x60, 0x82, 0x42, 0x60, 0x3a, 0xb8, 0xe7, 0x9a, 0x4b, 0x28, 0xab, 0x8a, 0x74, 0x57,
-	0x02, 0xd4, 0x9d, 0x90, 0x01, 0x09, 0x24, 0x57, 0x81, 0xb9, 0x21, 0xb0, 0x0f, 0xc9, 0x28, 0x50,
-	0x41, 0xab, 0x06, 0x88, 0xa8, 0xea, 0x5e, 0x25, 0xe6, 0x2d, 0xe1, 0x27, 0x94, 0x7d, 0xa0, 0xaa,
-	0x3b, 0x8a, 0x54, 0x51, 0x21, 0xe4, 0x4c, 0x41, 0x98, 0x6a, 0xda, 0x03, 0xd7, 0xb8, 0xc2, 0x9a,
-	0x63, 0xc1, 0x95, 0x16, 0x9c, 0x41, 0x80, 0x2c, 0xbb, 0x31, 0x52, 0x65, 0xdb, 0x57, 0x4d, 0x5e,
-	0x1f, 0x94, 0xf8, 0xaf, 0xd0, 0x5a, 0x17, 0x40, 0xe0, 0x98, 0x28, 0xed, 0x2c, 0x30, 0x30, 0x2d,
-	0x29, 0xa8, 0x60, 0xc1, 0x9e, 0x73, 0xde, 0xc8, 0x7b, 0x44, 0x69, 0x8b, 0xd6, 0x9c, 0xe6, 0x1f,
-	0xa0, 0x67, 0xf6, 0xb0, 0xcd, 0xdc, 0x86, 0x79, 0x58, 0x77, 0x24, 0xa8, 0x0e, 0x8f, 0xa3, 0xe1,
-	0xee, 0xef, 0xdb, 0x1d, 0x14, 0x4d, 0xad, 0x99, 0x64, 0x16, 0xdb, 0xcc, 0x0a, 0xb3, 0x5e, 0x7a,
-	0xe8, 0x2d, 0x09, 0x35, 0xe5, 0x0c, 0x1f, 0x51, 0x46, 0x62, 0x7a, 0x4a, 0xec, 0x8b, 0xa2, 0x6d,
-	0x46, 0x74, 0x2a, 0x01, 0x1f, 0x11, 0x1a, 0x9b, 0x7f, 0xe8, 0xd1, 0x08, 0x58, 0x08, 0xa3, 0x87,
-	0xbd, 0x68, 0x43, 0xb6, 0x9d, 0xc1, 0xee, 0x08, 0xff, 0x35, 0xc3, 0x77, 0x1d, 0x5d, 0xcb, 0xe0,
-	0xe1, 0x87, 0x90, 0xa2, 0x37, 0xb7, 0xcb, 0x1d, 0x9f, 0x74, 0xf0, 0xe0, 0xb6, 0xb1, 0xd5, 0xff,
-	0xe7, 0xef, 0x77, 0xd1, 0xcb, 0x49, 0xb1, 0x8c, 0x6b, 0x4c, 0x19, 0xd6, 0x5c, 0x54, 0x5e, 0x4c,
-	0xec, 0x74, 0xc9, 0x46, 0x3e, 0x1f, 0x8f, 0x3c, 0xe0, 0xfa, 0x13, 0x6b, 0x1a, 0x6e, 0xbc, 0xc7,
-	0x6f, 0x68, 0xfb, 0xc6, 0xb0, 0x09, 0xed, 0x2d, 0xdf, 0x9c, 0x35, 0xde, 0xd8, 0x3e, 0x7a, 0x3a,
-	0x29, 0x4b, 0x42, 0xc8, 0x7b, 0x20, 0x4f, 0x32, 0xef, 0x9c, 0xfb, 0x2c, 0xc6, 0xbd, 0x1b, 0x83,
-	0xc2, 0x81, 0x5d, 0x3c, 0x79, 0x4e, 0x43, 0x3b, 0x73, 0x05, 0x68, 0xae, 0x49, 0x8c, 0x5b, 0x24,
-	0xba, 0x9c, 0x58, 0xe0, 0x5b, 0xff, 0xd2, 0xf5, 0xfe, 0xfb, 0xa4, 0xdf, 0x34, 0xdc, 0x0e, 0x89,
-	0x86, 0x03, 0xf3, 0x1f, 0x21, 0xa4, 0x42, 0x0c, 0x8c, 0xb4, 0x62, 0x88, 0x82, 0x95, 0xa2, 0xb7,
-	0x39, 0xd7, 0x98, 0x57, 0x61, 0xcd, 0x2d, 0xf8, 0xaf, 0x51, 0xa0, 0x42, 0x1c, 0x76, 0x48, 0x6c,
-	0x6e, 0x4f, 0x90, 0xa3, 0x07, 0x93, 0xb7, 0x81, 0xab, 0x2a, 0xac, 0x5e, 0xca, 0xd9, 0x01, 0xbc,
-	0x9b, 0xf9, 0xfb, 0xf3, 0xb1, 0xb7, 0xb3, 0xf5, 0xeb, 0xbc, 0xe0, 0x9d, 0x9d, 0x17, 0xbc, 0x3f,
-	0xe7, 0x05, 0xef, 0xc7, 0x45, 0x61, 0xea, 0xec, 0xa2, 0x30, 0xf5, 0xfb, 0xa2, 0x30, 0x75, 0xb8,
-	0xdc, 0xbf, 0xbc, 0xf3, 0xf5, 0x89, 0x00, 0xd5, 0x9a, 0xb5, 0x37, 0xf7, 0xf6, 0xbf, 0x00, 0x00,
-	0x00, 0xff, 0xff, 0xf4, 0x64, 0xdc, 0x58, 0x13, 0x06, 0x00, 0x00,
+	// 1620 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x8c, 0x58, 0x5b, 0x77, 0x1b, 0x39,
+	0x1d, 0xaf, 0xb7, 0xa5, 0xec, 0x0a, 0x76, 0x9b, 0x4e, 0x5b, 0x3a, 0xb4, 0x5b, 0xaf, 0xd3, 0x6c,
+	0xdb, 0x34, 0xed, 0xda, 0xb9, 0xb0, 0x2c, 0x70, 0x78, 0x49, 0x7c, 0x21, 0x81, 0x38, 0xf6, 0xda,
+	0x0e, 0x85, 0x3d, 0x70, 0x84, 0x3c, 0xf3, 0xb7, 0x2d, 0x32, 0x96, 0xa6, 0x92, 0xc6, 0x49, 0xf6,
+	0x53, 0xf0, 0x11, 0xf8, 0x38, 0x1c, 0x5e, 0xe8, 0x23, 0x8f, 0x9c, 0xf6, 0x85, 0x8f, 0xc1, 0x91,
+	0xe6, 0xe2, 0xb9, 0xd8, 0xd8, 0x2f, 0x6d, 0xe2, 0xff, 0xef, 0x22, 0xe9, 0x7f, 0x91, 0x62, 0xf4,
+	0xb9, 0x17, 0x4c, 0x41, 0x90, 0x1a, 0x09, 0x5c, 0xaa, 0x6a, 0xb3, 0xbd, 0x9a, 0x4f, 0x04, 0x99,
+	0xca, 0xaa, 0x2f, 0xb8, 0xe2, 0xd6, 0x9d, 0x30, 0x5a, 0x35, 0xd1, 0xea, 0x6c, 0xef, 0xd1, 0x5d,
+	0x32, 0xa5, 0x8c, 0xd7, 0xcc, 0xbf, 0x21, 0xe6, 0xd1, 0xfd, 0x31, 0x1f, 0x73, 0xf3, 0x63, 0x4d,
+	0xff, 0x14, 0x7e, 0xfa, 0xf4, 0x5f, 0x9b, 0xe8, 0x76, 0xd7, 0x48, 0x59, 0x55, 0x74, 0x0f, 0x7c,
+	0xee, 0x4c, 0xb0, 0x07, 0x6c, 0xac, 0x26, 0x78, 0xe8, 0x71, 0xe7, 0x42, 0xda, 0xa5, 0x4a, 0x69,
+	0xfb, 0x56, 0xef, 0xae, 0x09, 0x9d, 0x9a, 0xc8, 0x91, 0x09, 0x58, 0x3b, 0x28, 0xfc, 0x10, 0x7f,
+	0x0f, 0x82, 0xe3, 0x09, 0xd0, 0xf1, 0x44, 0xd9, 0x1f, 0x19, 0xf4, 0x1d, 0x13, 0xf8, 0x0e, 0x04,
+	0x3f, 0x36, 0x1f, 0x6b, 0x6d, 0x1f, 0x40, 0xe0, 0xb7, 0x01, 0x17, 0xc1, 0x14, 0x0b, 0xf0, 0xb9,
+	0x50, 0xd2, 0xbe, 0x59, 0x29, 0x6d, 0x7f, 0xda, 0xbb, 0xab, 0x43, 0xdf, 0x9a, 0x48, 0x2f, 0x0c,
+	0x58, 0xbf, 0x46, 0x8f, 0xa7, 0x94, 0x61, 0x5f, 0xf0, 0x21, 0x60, 0x45, 0xc4, 0x18, 0x94, 0xc4,
+	0x3e, 0x08, 0x6c, 0x84, 0xed, 0x5b, 0x86, 0xf7, 0x70, 0x4a, 0x59, 0x57, 0x23, 0x06, 0x21, 0xa0,
+	0x0b, 0xa2, 0xa9, 0xc3, 0x86, 0x4d, 0xae, 0x96, 0xb2, 0x7f, 0x10, 0xb1, 0xc9, 0xd5, 0x42, 0x76,
+	0x15, 0xdd, 0x13, 0xf0, 0x36, 0xa0, 0x02, 0x5c, 0xcc, 0x7d, 0x60, 0x38, 0x5c, 0xeb, 0xed, 0xca,
+	0x4d, 0xbd, 0xd6, 0x38, 0xd4, 0xf1, 0x81, 0x75, 0xcd, 0x5a, 0x6b, 0xe8, 0xbe, 0x5e, 0xab, 0xe3,
+	0x07, 0x78, 0x24, 0x00, 0xb4, 0x91, 0x03, 0x4c, 0xd9, 0x3f, 0x0c, 0x37, 0x37, 0xa5, 0xac, 0xee,
+	0x07, 0x2d, 0x01, 0xd0, 0x0d, 0x03, 0x31, 0x61, 0x0a, 0xd3, 0x2c, 0xe1, 0xe3, 0x84, 0xd0, 0x86,
+	0x69, 0x9a, 0xb0, 0x87, 0x1e, 0x68, 0x82, 0x4b, 0xe5, 0x45, 0x96, 0xf1, 0x89, 0x61, 0x58, 0x53,
+	0xca, 0x1a, 0x54, 0x5e, 0xa4, 0x29, 0x75, 0x54, 0x76, 0x38, 0x93, 0xe0, 0x04, 0x8a, 0xce, 0x20,
+	0xdc, 0xb8, 0xc4, 0x8a, 0x63, 0x9f, 0x4b, 0xe5, 0x73, 0x06, 0x36, 0x32, 0xdc, 0xc7, 0x29, 0x94,
+	0xd9, 0xbe, 0x1c, 0xf0, 0x6e, 0x04, 0xb1, 0xbe, 0x46, 0x0f, 0x2f, 0x00, 0x7c, 0xec, 0x11, 0xa9,
+	0x42, 0x09, 0x0c, 0x4c, 0x09, 0x0a, 0xd2, 0xfe, 0x91, 0xc9, 0xf3, 0x7d, 0x1d, 0x3e, 0x25, 0x52,
+	0x19, 0x6a, 0x33, 0x8c, 0x59, 0x67, 0xe8, 0x4b, 0x93, 0x6c, 0x7d, 0x6e, 0x89, 0x1f, 0x56, 0x13,
+	0x01, 0x72, 0xc2, 0x3d, 0x37, 0x59, 0xfd, 0x8f, 0xcd, 0x0a, 0x2a, 0x1a, 0xab, 0x4f, 0x32, 0xb6,
+	0x1d, 0xc4, 0xc0, 0x78, 0x2f, 0x33, 0xf4, 0x4b, 0xe2, 0x28, 0xca, 0x19, 0x1e, 0x51, 0x46, 0x3c,
+	0xfa, 0x3d, 0x31, 0xbf, 0x48, 0x3a, 0x66, 0x44, 0x05, 0x02, 0xf0, 0x88, 0x50, 0x4f, 0xff, 0x0f,
+	0x33, 0xea, 0x02, 0x73, 0x20, 0x9d, 0xec, 0x4f, 0x8d, 0xc9, 0x41, 0x28, 0xd0, 0x4a, 0xf1, 0xfb,
+	0x31, 0xbd, 0x15, 0xb2, 0x9b, 0x31, 0x39, 0x29, 0x84, 0x00, 0xfd, 0x62, 0x3d, 0xdf, 0xe2, 0x49,
+	0xdb, 0x9f, 0xad, 0x6b, 0x5b, 0xcf, 0x9f, 0xbf, 0x75, 0x81, 0x7e, 0xb6, 0xc8, 0x96, 0x71, 0x85,
+	0x29, 0xc3, 0x8a, 0xfb, 0x7b, 0xbb, 0x0b, 0x77, 0x7a, 0xc7, 0x58, 0x7e, 0x55, 0xb4, 0x3c, 0xe3,
+	0xea, 0x84, 0x0d, 0x34, 0xaf, 0xb8, 0xc7, 0xbf, 0xa2, 0x83, 0x95, 0x66, 0x0b, 0xb6, 0xb7, 0xb1,
+	0xda, 0xab, 0xb8, 0xb1, 0x36, 0xda, 0x5a, 0xe4, 0x25, 0xc0, 0xe1, 0x33, 0x10, 0xd7, 0xb1, 0xf6,
+	0xdd, 0xb0, 0x2c, 0x8a, 0xda, 0xbd, 0x08, 0x18, 0xc9, 0x79, 0x8b, 0xcf, 0x29, 0x91, 0xd3, 0x23,
+	0x40, 0x71, 0x45, 0x3c, 0x3c, 0x24, 0xee, 0xfc, 0xc4, 0x6c, 0xcb, 0xe8, 0x57, 0x97, 0xeb, 0xb7,
+	0xc9, 0xd5, 0x40, 0xf3, 0x8e, 0x88, 0x9b, 0x1c, 0x98, 0xf5, 0x04, 0x21, 0xe9, 0x60, 0x60, 0x64,
+	0xe8, 0x81, 0x6b, 0xdf, 0xab, 0x94, 0xb6, 0x3f, 0xee, 0x7d, 0x22, 0x9d, 0x66, 0xf8, 0x81, 0xf5,
+	0x0d, 0xb2, 0xa5, 0x83, 0x9d, 0x09, 0xf1, 0xf4, 0xf4, 0x04, 0x91, 0x4e, 0xcc, 0x7d, 0x63, 0xf8,
+	0x40, 0x3a, 0xf5, 0x79, 0x38, 0x49, 0xc0, 0xb7, 0xe8, 0xb9, 0x54, 0x5c, 0x90, 0x31, 0x60, 0x25,
+	0x02, 0x35, 0xd1, 0xeb, 0x07, 0xa6, 0xf0, 0x30, 0x70, 0x2e, 0x40, 0x99, 0x4d, 0x44, 0x83, 0xf8,
+	0x81, 0x69, 0xb9, 0xcd, 0x08, 0x3d, 0xd0, 0xe0, 0x9e, 0xc1, 0x1e, 0x19, 0x68, 0x9b, 0x5c, 0x45,
+	0x83, 0xf9, 0x77, 0x68, 0x2b, 0x2b, 0xa9, 0x9b, 0x2e, 0xd6, 0xa3, 0x2c, 0xd6, 0xfb, 0x89, 0xd1,
+	0x2b, 0xa7, 0xf5, 0x3a, 0x9e, 0x1b, 0x89, 0x51, 0x16, 0x89, 0xf5, 0xf2, 0xeb, 0x4b, 0xf6, 0x18,
+	0x4d, 0x56, 0xec, 0xd2, 0x19, 0x95, 0x5c, 0xd8, 0x0f, 0xcd, 0x36, 0x9f, 0xa6, 0xf5, 0x92, 0x0d,
+	0x87, 0x33, 0xb6, 0x11, 0x22, 0xad, 0x3f, 0xa2, 0x9d, 0x9c, 0x26, 0x9f, 0xfa, 0x3c, 0x60, 0x2e,
+	0x16, 0x84, 0x8d, 0xa3, 0xa2, 0x26, 0x42, 0xd1, 0x11, 0x71, 0x94, 0x6d, 0x1b, 0xdd, 0x67, 0x19,
+	0xdd, 0x08, 0xdf, 0x33, 0xf0, 0x2e, 0x88, 0xc3, 0x08, 0x5c, 0x3c, 0xce, 0xac, 0xb4, 0xbe, 0xdb,
+	0xf0, 0xf0, 0x5a, 0x81, 0xb4, 0x7f, 0x6a, 0x64, 0x37, 0x97, 0xca, 0x9e, 0x02, 0x3b, 0xd2, 0x40,
+	0xeb, 0x1c, 0xbd, 0xcc, 0x4a, 0xea, 0x9c, 0x48, 0xf0, 0x46, 0x78, 0x02, 0xc4, 0xc3, 0xdc, 0x4f,
+	0xe7, 0xfa, 0x51, 0xf1, 0x10, 0xda, 0xe4, 0xaa, 0x0f, 0xde, 0xe8, 0x18, 0x88, 0xd7, 0xf1, 0xe7,
+	0x89, 0xaf, 0xa3, 0x72, 0x56, 0x56, 0x5f, 0x57, 0x61, 0x09, 0x47, 0x8d, 0xf0, 0x38, 0x9c, 0xd0,
+	0x69, 0xad, 0x6e, 0x8c, 0x89, 0x7a, 0xe0, 0x4f, 0xe8, 0x75, 0x56, 0x84, 0x71, 0x17, 0xb0, 0x0c,
+	0xa4, 0x4f, 0x1d, 0xad, 0xe4, 0x82, 0x43, 0xae, 0x53, 0xcb, 0xfb, 0xbc, 0x52, 0xda, 0xbe, 0xd9,
+	0x7b, 0x9e, 0x96, 0x3c, 0xe3, 0x2e, 0xf4, 0x63, 0x42, 0x43, 0xe3, 0x93, 0x25, 0x4e, 0xd0, 0x7e,
+	0xbe, 0x36, 0xf5, 0x4c, 0x07, 0x81, 0x05, 0x78, 0x94, 0x0c, 0xa9, 0x47, 0xd5, 0x75, 0xc1, 0xe3,
+	0x89, 0xf1, 0x78, 0x9d, 0xad, 0xd3, 0x90, 0xd7, 0x9b, 0xd3, 0x56, 0x38, 0x29, 0x6a, 0xca, 0xd5,
+	0x05, 0x05, 0x82, 0x72, 0x11, 0x9e, 0x4b, 0xde, 0xa9, 0x5c, 0x74, 0x1a, 0x18, 0x5e, 0x23, 0x4d,
+	0xcb, 0x3a, 0xfd, 0x79, 0xc5, 0x89, 0xcd, 0xaf, 0xa9, 0x4b, 0xa2, 0x9c, 0x89, 0xfd, 0x85, 0xf1,
+	0x78, 0xb1, 0xf4, 0xc4, 0x92, 0xdb, 0xea, 0x8d, 0x86, 0x5b, 0x80, 0x76, 0xd7, 0x94, 0x4f, 0xd2,
+	0x6d, 0x57, 0x8c, 0xc5, 0xab, 0xd5, 0x16, 0x49, 0xf6, 0x2d, 0x07, 0xd5, 0xd6, 0xb5, 0x89, 0xef,
+	0xfb, 0x4d, 0xe3, 0xb2, 0xb3, 0x86, 0x4b, 0x7c, 0xfd, 0xfb, 0xe8, 0xe7, 0x6b, 0xa4, 0xdf, 0xe3,
+	0x97, 0x3a, 0x2c, 0xd5, 0xdc, 0xd4, 0x7e, 0x6a, 0xbc, 0x76, 0x57, 0x94, 0xc0, 0x29, 0xbf, 0x1c,
+	0x68, 0x62, 0xe2, 0x6c, 0x49, 0xf4, 0xcd, 0x1a, 0x8e, 0x94, 0x81, 0x47, 0xc7, 0x74, 0xe8, 0xa5,
+	0x1e, 0x15, 0xf6, 0x96, 0xb1, 0xdc, 0x5f, 0x61, 0x79, 0x92, 0x50, 0xe7, 0xa6, 0x63, 0xb4, 0xb7,
+	0x46, 0xed, 0x99, 0x5e, 0x9f, 0xdb, 0x7d, 0xb9, 0x56, 0xe9, 0xe9, 0x9e, 0x9f, 0x1b, 0xbd, 0xcd,
+	0x77, 0x3c, 0xb0, 0x11, 0x17, 0x0e, 0x4c, 0xf5, 0xbc, 0x9f, 0x72, 0x17, 0xec, 0x67, 0x95, 0xd2,
+	0xf6, 0x67, 0xfb, 0xaf, 0xab, 0xb9, 0xe7, 0x7c, 0xb5, 0x9f, 0xb2, 0x69, 0xce, 0x49, 0x6d, 0xee,
+	0x42, 0x76, 0x3e, 0xe4, 0x82, 0x16, 0x47, 0x5f, 0xaf, 0xd5, 0xc1, 0x63, 0x41, 0x5c, 0x70, 0x53,
+	0xfb, 0x7b, 0xbe, 0x56, 0x06, 0x1b, 0x11, 0x71, 0xbe, 0xc7, 0x01, 0x7a, 0x91, 0x9b, 0x6a, 0x44,
+	0x29, 0x10, 0x0c, 0x83, 0x74, 0x88, 0x17, 0x1e, 0xe5, 0x25, 0x65, 0x2e, 0xbf, 0xb4, 0x5f, 0x98,
+	0xf1, 0xb6, 0x95, 0x19, 0x6f, 0x21, 0xb8, 0x99, 0x60, 0xdf, 0x18, 0x68, 0xf1, 0x12, 0x72, 0xe9,
+	0x0c, 0xc4, 0x58, 0xdf, 0xcc, 0x91, 0x5a, 0x3c, 0x33, 0xb7, 0x8b, 0xf3, 0xb7, 0x91, 0x60, 0x43,
+	0xb5, 0x68, 0x74, 0x8e, 0xf2, 0x69, 0x4f, 0x8e, 0x46, 0xdf, 0x91, 0xd1, 0x5f, 0x28, 0x78, 0xc4,
+	0x45, 0xca, 0xcc, 0x7e, 0x69, 0xe4, 0x5f, 0x2d, 0x3a, 0x96, 0x36, 0x65, 0xd1, 0x5f, 0x2f, 0x2d,
+	0x2e, 0xe6, 0x9e, 0xc5, 0x2e, 0x5a, 0xda, 0xaa, 0x52, 0x09, 0xce, 0xc6, 0xf3, 0x8e, 0xdd, 0x29,
+	0xe6, 0x60, 0x71, 0xc7, 0xf6, 0x0d, 0x31, 0xe9, 0xdb, 0x7e, 0x3e, 0x07, 0xc9, 0x93, 0xc8, 0xf1,
+	0x80, 0x30, 0xec, 0x13, 0x29, 0xb1, 0xc3, 0x03, 0xa6, 0xec, 0x57, 0xc5, 0xe3, 0x8a, 0x5f, 0x41,
+	0x75, 0x8d, 0xed, 0x12, 0x29, 0xeb, 0x1a, 0x69, 0x9d, 0xa0, 0xa7, 0xb9, 0x8b, 0xd5, 0xd3, 0x32,
+	0x04, 0x8f, 0x48, 0xe0, 0xa9, 0x38, 0xa7, 0xaf, 0x8d, 0xde, 0x93, 0xcc, 0xa5, 0xaa, 0x71, 0x87,
+	0x2d, 0x8d, 0x8a, 0xb2, 0xb9, 0x44, 0x6a, 0x98, 0x95, 0xfa, 0x6a, 0x89, 0xd4, 0x51, 0x5a, 0xea,
+	0xb7, 0x79, 0x29, 0xd3, 0xa6, 0x2e, 0x10, 0xd7, 0xa3, 0x2c, 0x79, 0xad, 0x56, 0x8d, 0x54, 0xe6,
+	0xa5, 0xa3, 0x3b, 0xb3, 0x11, 0xc1, 0xa2, 0x82, 0xe8, 0xe6, 0x8b, 0x4c, 0xe7, 0x64, 0xe1, 0x2e,
+	0x6b, 0xe1, 0x0b, 0x35, 0xf7, 0x72, 0x2a, 0x6e, 0xf4, 0x0f, 0xf9, 0x97, 0x83, 0xc3, 0x99, 0x12,
+	0xc4, 0xa5, 0x4e, 0xaa, 0x0f, 0xe2, 0x45, 0xee, 0x2e, 0x7a, 0xe6, 0xa4, 0xe0, 0x99, 0xe2, 0x1d,
+	0x2f, 0x2d, 0xde, 0xd4, 0x70, 0x74, 0x03, 0x91, 0x79, 0x4f, 0xec, 0x19, 0x87, 0x85, 0x17, 0xf3,
+	0x7c, 0x2e, 0x36, 0x22, 0x52, 0x64, 0xf4, 0x17, 0x54, 0xcd, 0x1a, 0x45, 0x45, 0xba, 0xbc, 0xa4,
+	0xf6, 0x8d, 0xcb, 0x76, 0xda, 0x25, 0xac, 0xcf, 0x25, 0x85, 0x75, 0x8c, 0x36, 0x17, 0xa4, 0x70,
+	0x06, 0x82, 0x8e, 0x28, 0x88, 0x48, 0xf4, 0xa0, 0x58, 0x0c, 0x3a, 0x83, 0xbf, 0x8f, 0x50, 0x46,
+	0xe9, 0x57, 0xb7, 0xfe, 0xfb, 0xf7, 0x2f, 0x4a, 0x3b, 0xff, 0x2c, 0xa1, 0xc7, 0xff, 0x67, 0x5e,
+	0x5a, 0x55, 0xb4, 0xd3, 0x1f, 0x74, 0x7a, 0x87, 0xbf, 0x69, 0xe2, 0x41, 0xef, 0x7c, 0x70, 0x8c,
+	0x9b, 0x67, 0xad, 0x4e, 0xaf, 0xde, 0x6c, 0x37, 0xcf, 0x06, 0xb8, 0xdd, 0x69, 0x34, 0xf1, 0xf9,
+	0x59, 0xbf, 0xdb, 0xac, 0x9f, 0xb4, 0x4e, 0x9a, 0x8d, 0x8d, 0x1b, 0xd6, 0x4b, 0xf4, 0x6c, 0x05,
+	0xbe, 0x7f, 0x7c, 0xd8, 0xe8, 0xbc, 0xd9, 0x28, 0x59, 0x2f, 0xd0, 0xd6, 0x2a, 0x68, 0xa7, 0x35,
+	0xd8, 0xf8, 0x68, 0x0d, 0x60, 0xeb, 0xfc, 0xf4, 0x74, 0xe3, 0xe6, 0xd1, 0xce, 0x3f, 0xde, 0x97,
+	0x4b, 0xef, 0xde, 0x97, 0x4b, 0xff, 0x79, 0x5f, 0x2e, 0xfd, 0xed, 0x43, 0xf9, 0xc6, 0xbb, 0x0f,
+	0xe5, 0x1b, 0xff, 0xfe, 0x50, 0xbe, 0xf1, 0xdd, 0xc6, 0xd5, 0xfc, 0xbb, 0x20, 0x75, 0xed, 0x83,
+	0x1c, 0xde, 0x36, 0xdf, 0xe8, 0x1c, 0xfc, 0x2f, 0x00, 0x00, 0xff, 0xff, 0xe7, 0xf8, 0xb5, 0x55,
+	0x2b, 0x12, 0x00, 0x00,
 }
 
 func (this *Params) Equal(that interface{}) bool {
@@ -387,6 +742,99 @@ func (this *Params) Equal(that interface{}) bool {
 	if this.ScChallengersPerEpoch != that1.ScChallengersPerEpoch {
 		return false
 	}
+	if this.StorageTruthRecentBucketMaxBlocks != that1.StorageTruthRecentBucketMaxBlocks {
+		return false
+	}
+	if this.StorageTruthOldBucketMinBlocks != that1.StorageTruthOldBucketMinBlocks {
+		return false
+	}
+	if this.StorageTruthChallengeTargetDivisor != that1.StorageTruthChallengeTargetDivisor {
+		return false
+	}
+	if this.StorageTruthCompoundRangesPerArtifact != that1.StorageTruthCompoundRangesPerArtifact {
+		return false
+	}
+	if this.StorageTruthCompoundRangeLenBytes != that1.StorageTruthCompoundRangeLenBytes {
+		return false
+	}
+	if this.StorageTruthMaxSelfHealOpsPerEpoch != that1.StorageTruthMaxSelfHealOpsPerEpoch {
+		return false
+	}
+	if this.StorageTruthProbationEpochs != that1.StorageTruthProbationEpochs {
+		return false
+	}
+	if this.StorageTruthNodeSuspicionDecayPerEpoch != that1.StorageTruthNodeSuspicionDecayPerEpoch {
+		return false
+	}
+	if this.StorageTruthReporterReliabilityDecayPerEpoch != that1.StorageTruthReporterReliabilityDecayPerEpoch {
+		return false
+	}
+	if this.StorageTruthTicketDeteriorationDecayPerEpoch != that1.StorageTruthTicketDeteriorationDecayPerEpoch {
+		return false
+	}
+	if this.StorageTruthNodeSuspicionThresholdWatch != that1.StorageTruthNodeSuspicionThresholdWatch {
+		return false
+	}
+	if this.StorageTruthNodeSuspicionThresholdProbation != that1.StorageTruthNodeSuspicionThresholdProbation {
+		return false
+	}
+	if this.StorageTruthNodeSuspicionThresholdPostpone != that1.StorageTruthNodeSuspicionThresholdPostpone {
+		return false
+	}
+	if this.StorageTruthReporterReliabilityLowTrustThreshold != that1.StorageTruthReporterReliabilityLowTrustThreshold {
+		return false
+	}
+	if this.StorageTruthReporterReliabilityIneligibleThreshold != that1.StorageTruthReporterReliabilityIneligibleThreshold {
+		return false
+	}
+	if this.StorageTruthTicketDeteriorationHealThreshold != that1.StorageTruthTicketDeteriorationHealThreshold {
+		return false
+	}
+	if this.StorageTruthEnforcementMode != that1.StorageTruthEnforcementMode {
+		return false
+	}
+	if this.StorageTruthReporterReliabilityDegradedThreshold != that1.StorageTruthReporterReliabilityDegradedThreshold {
+		return false
+	}
+	if this.StorageTruthPatternEscalationWindow != that1.StorageTruthPatternEscalationWindow {
+		return false
+	}
+	if this.StorageTruthDivergenceWindowEpochs != that1.StorageTruthDivergenceWindowEpochs {
+		return false
+	}
+	if this.StorageTruthReporterMinReportsForDivergence != that1.StorageTruthReporterMinReportsForDivergence {
+		return false
+	}
+	if this.StorageTruthNodeSuspicionThresholdStrongPostpone != that1.StorageTruthNodeSuspicionThresholdStrongPostpone {
+		return false
+	}
+	if this.StorageTruthRecoveryCleanPassCount != that1.StorageTruthRecoveryCleanPassCount {
+		return false
+	}
+	if this.StorageTruthClassAFaultWindow != that1.StorageTruthClassAFaultWindow {
+		return false
+	}
+	if this.StorageTruthClassBFaultWindow != that1.StorageTruthClassBFaultWindow {
+		return false
+	}
+	if this.StorageTruthHealDeadlineEpochs != that1.StorageTruthHealDeadlineEpochs {
+		return false
+	}
+	if this.StorageTruthOldClassAFaultWindow != that1.StorageTruthOldClassAFaultWindow {
+		return false
+	}
+	if this.StorageTruthContradictionWindowEpochs != that1.StorageTruthContradictionWindowEpochs {
+		return false
+	}
+	if this.StorageTruthReporterIneligibleDurationEpochs != that1.StorageTruthReporterIneligibleDurationEpochs {
+		return false
+	}
+	if this.StorageTruthStrongRecoveryCleanPassCount != that1.StorageTruthStrongRecoveryCleanPassCount {
+		return false
+	}
+	if this.StorageTruthHealVerifierCount != that1.StorageTruthHealVerifierCount {
+		return false
+	}
 	return true
 }
 func (m *Params) Marshal() (dAtA []byte, err error) {
@@ -409,6 +857,223 @@ func (m *Params) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.StorageTruthHealVerifierCount != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.StorageTruthHealVerifierCount))
+		i--
+		dAtA[i] = 0x3
+		i--
+		dAtA[i] = 0x98
+	}
+	if m.StorageTruthStrongRecoveryCleanPassCount != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.StorageTruthStrongRecoveryCleanPassCount))
+		i--
+		dAtA[i] = 0x3
+		i--
+		dAtA[i] = 0x90
+	}
+	if m.StorageTruthReporterIneligibleDurationEpochs != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.StorageTruthReporterIneligibleDurationEpochs))
+		i--
+		dAtA[i] = 0x3
+		i--
+		dAtA[i] = 0x88
+	}
+	if m.StorageTruthContradictionWindowEpochs != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.StorageTruthContradictionWindowEpochs))
+		i--
+		dAtA[i] = 0x3
+		i--
+		dAtA[i] = 0x80
+	}
+	if m.StorageTruthOldClassAFaultWindow != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.StorageTruthOldClassAFaultWindow))
+		i--
+		dAtA[i] = 0x2
+		i--
+		dAtA[i] = 0xf8
+	}
+	if m.StorageTruthHealDeadlineEpochs != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.StorageTruthHealDeadlineEpochs))
+		i--
+		dAtA[i] = 0x2
+		i--
+		dAtA[i] = 0xf0
+	}
+	if m.StorageTruthClassBFaultWindow != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.StorageTruthClassBFaultWindow))
+		i--
+		dAtA[i] = 0x2
+		i--
+		dAtA[i] = 0xe8
+	}
+	if m.StorageTruthClassAFaultWindow != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.StorageTruthClassAFaultWindow))
+		i--
+		dAtA[i] = 0x2
+		i--
+		dAtA[i] = 0xe0
+	}
+	if m.StorageTruthRecoveryCleanPassCount != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.StorageTruthRecoveryCleanPassCount))
+		i--
+		dAtA[i] = 0x2
+		i--
+		dAtA[i] = 0xd8
+	}
+	if m.StorageTruthNodeSuspicionThresholdStrongPostpone != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.StorageTruthNodeSuspicionThresholdStrongPostpone))
+		i--
+		dAtA[i] = 0x2
+		i--
+		dAtA[i] = 0xd0
+	}
+	if m.StorageTruthReporterMinReportsForDivergence != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.StorageTruthReporterMinReportsForDivergence))
+		i--
+		dAtA[i] = 0x2
+		i--
+		dAtA[i] = 0xc8
+	}
+	if m.StorageTruthDivergenceWindowEpochs != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.StorageTruthDivergenceWindowEpochs))
+		i--
+		dAtA[i] = 0x2
+		i--
+		dAtA[i] = 0xc0
+	}
+	if m.StorageTruthPatternEscalationWindow != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.StorageTruthPatternEscalationWindow))
+		i--
+		dAtA[i] = 0x2
+		i--
+		dAtA[i] = 0xb8
+	}
+	if m.StorageTruthReporterReliabilityDegradedThreshold != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.StorageTruthReporterReliabilityDegradedThreshold))
+		i--
+		dAtA[i] = 0x2
+		i--
+		dAtA[i] = 0xb0
+	}
+	if m.StorageTruthEnforcementMode != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.StorageTruthEnforcementMode))
+		i--
+		dAtA[i] = 0x2
+		i--
+		dAtA[i] = 0xa8
+	}
+	if m.StorageTruthTicketDeteriorationHealThreshold != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.StorageTruthTicketDeteriorationHealThreshold))
+		i--
+		dAtA[i] = 0x2
+		i--
+		dAtA[i] = 0xa0
+	}
+	if m.StorageTruthReporterReliabilityIneligibleThreshold != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.StorageTruthReporterReliabilityIneligibleThreshold))
+		i--
+		dAtA[i] = 0x2
+		i--
+		dAtA[i] = 0x98
+	}
+	if m.StorageTruthReporterReliabilityLowTrustThreshold != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.StorageTruthReporterReliabilityLowTrustThreshold))
+		i--
+		dAtA[i] = 0x2
+		i--
+		dAtA[i] = 0x90
+	}
+	if m.StorageTruthNodeSuspicionThresholdPostpone != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.StorageTruthNodeSuspicionThresholdPostpone))
+		i--
+		dAtA[i] = 0x2
+		i--
+		dAtA[i] = 0x88
+	}
+	if m.StorageTruthNodeSuspicionThresholdProbation != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.StorageTruthNodeSuspicionThresholdProbation))
+		i--
+		dAtA[i] = 0x2
+		i--
+		dAtA[i] = 0x80
+	}
+	if m.StorageTruthNodeSuspicionThresholdWatch != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.StorageTruthNodeSuspicionThresholdWatch))
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0xf8
+	}
+	if m.StorageTruthTicketDeteriorationDecayPerEpoch != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.StorageTruthTicketDeteriorationDecayPerEpoch))
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0xf0
+	}
+	if m.StorageTruthReporterReliabilityDecayPerEpoch != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.StorageTruthReporterReliabilityDecayPerEpoch))
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0xe8
+	}
+	if m.StorageTruthNodeSuspicionDecayPerEpoch != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.StorageTruthNodeSuspicionDecayPerEpoch))
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0xe0
+	}
+	if m.StorageTruthProbationEpochs != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.StorageTruthProbationEpochs))
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0xd8
+	}
+	if m.StorageTruthMaxSelfHealOpsPerEpoch != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.StorageTruthMaxSelfHealOpsPerEpoch))
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0xd0
+	}
+	if m.StorageTruthCompoundRangeLenBytes != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.StorageTruthCompoundRangeLenBytes))
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0xc8
+	}
+	if m.StorageTruthCompoundRangesPerArtifact != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.StorageTruthCompoundRangesPerArtifact))
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0xc0
+	}
+	if m.StorageTruthChallengeTargetDivisor != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.StorageTruthChallengeTargetDivisor))
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0xb8
+	}
+	if m.StorageTruthOldBucketMinBlocks != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.StorageTruthOldBucketMinBlocks))
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0xb0
+	}
+	if m.StorageTruthRecentBucketMaxBlocks != 0 {
+		i = encodeVarintParams(dAtA, i, uint64(m.StorageTruthRecentBucketMaxBlocks))
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0xa8
+	}
 	if m.ScChallengersPerEpoch != 0 {
 		i = encodeVarintParams(dAtA, i, uint64(m.ScChallengersPerEpoch))
 		i--
@@ -620,6 +1285,99 @@ func (m *Params) Size() (n int) {
 	}
 	if m.ScChallengersPerEpoch != 0 {
 		n += 2 + sovParams(uint64(m.ScChallengersPerEpoch))
+	}
+	if m.StorageTruthRecentBucketMaxBlocks != 0 {
+		n += 2 + sovParams(uint64(m.StorageTruthRecentBucketMaxBlocks))
+	}
+	if m.StorageTruthOldBucketMinBlocks != 0 {
+		n += 2 + sovParams(uint64(m.StorageTruthOldBucketMinBlocks))
+	}
+	if m.StorageTruthChallengeTargetDivisor != 0 {
+		n += 2 + sovParams(uint64(m.StorageTruthChallengeTargetDivisor))
+	}
+	if m.StorageTruthCompoundRangesPerArtifact != 0 {
+		n += 2 + sovParams(uint64(m.StorageTruthCompoundRangesPerArtifact))
+	}
+	if m.StorageTruthCompoundRangeLenBytes != 0 {
+		n += 2 + sovParams(uint64(m.StorageTruthCompoundRangeLenBytes))
+	}
+	if m.StorageTruthMaxSelfHealOpsPerEpoch != 0 {
+		n += 2 + sovParams(uint64(m.StorageTruthMaxSelfHealOpsPerEpoch))
+	}
+	if m.StorageTruthProbationEpochs != 0 {
+		n += 2 + sovParams(uint64(m.StorageTruthProbationEpochs))
+	}
+	if m.StorageTruthNodeSuspicionDecayPerEpoch != 0 {
+		n += 2 + sovParams(uint64(m.StorageTruthNodeSuspicionDecayPerEpoch))
+	}
+	if m.StorageTruthReporterReliabilityDecayPerEpoch != 0 {
+		n += 2 + sovParams(uint64(m.StorageTruthReporterReliabilityDecayPerEpoch))
+	}
+	if m.StorageTruthTicketDeteriorationDecayPerEpoch != 0 {
+		n += 2 + sovParams(uint64(m.StorageTruthTicketDeteriorationDecayPerEpoch))
+	}
+	if m.StorageTruthNodeSuspicionThresholdWatch != 0 {
+		n += 2 + sovParams(uint64(m.StorageTruthNodeSuspicionThresholdWatch))
+	}
+	if m.StorageTruthNodeSuspicionThresholdProbation != 0 {
+		n += 2 + sovParams(uint64(m.StorageTruthNodeSuspicionThresholdProbation))
+	}
+	if m.StorageTruthNodeSuspicionThresholdPostpone != 0 {
+		n += 2 + sovParams(uint64(m.StorageTruthNodeSuspicionThresholdPostpone))
+	}
+	if m.StorageTruthReporterReliabilityLowTrustThreshold != 0 {
+		n += 2 + sovParams(uint64(m.StorageTruthReporterReliabilityLowTrustThreshold))
+	}
+	if m.StorageTruthReporterReliabilityIneligibleThreshold != 0 {
+		n += 2 + sovParams(uint64(m.StorageTruthReporterReliabilityIneligibleThreshold))
+	}
+	if m.StorageTruthTicketDeteriorationHealThreshold != 0 {
+		n += 2 + sovParams(uint64(m.StorageTruthTicketDeteriorationHealThreshold))
+	}
+	if m.StorageTruthEnforcementMode != 0 {
+		n += 2 + sovParams(uint64(m.StorageTruthEnforcementMode))
+	}
+	if m.StorageTruthReporterReliabilityDegradedThreshold != 0 {
+		n += 2 + sovParams(uint64(m.StorageTruthReporterReliabilityDegradedThreshold))
+	}
+	if m.StorageTruthPatternEscalationWindow != 0 {
+		n += 2 + sovParams(uint64(m.StorageTruthPatternEscalationWindow))
+	}
+	if m.StorageTruthDivergenceWindowEpochs != 0 {
+		n += 2 + sovParams(uint64(m.StorageTruthDivergenceWindowEpochs))
+	}
+	if m.StorageTruthReporterMinReportsForDivergence != 0 {
+		n += 2 + sovParams(uint64(m.StorageTruthReporterMinReportsForDivergence))
+	}
+	if m.StorageTruthNodeSuspicionThresholdStrongPostpone != 0 {
+		n += 2 + sovParams(uint64(m.StorageTruthNodeSuspicionThresholdStrongPostpone))
+	}
+	if m.StorageTruthRecoveryCleanPassCount != 0 {
+		n += 2 + sovParams(uint64(m.StorageTruthRecoveryCleanPassCount))
+	}
+	if m.StorageTruthClassAFaultWindow != 0 {
+		n += 2 + sovParams(uint64(m.StorageTruthClassAFaultWindow))
+	}
+	if m.StorageTruthClassBFaultWindow != 0 {
+		n += 2 + sovParams(uint64(m.StorageTruthClassBFaultWindow))
+	}
+	if m.StorageTruthHealDeadlineEpochs != 0 {
+		n += 2 + sovParams(uint64(m.StorageTruthHealDeadlineEpochs))
+	}
+	if m.StorageTruthOldClassAFaultWindow != 0 {
+		n += 2 + sovParams(uint64(m.StorageTruthOldClassAFaultWindow))
+	}
+	if m.StorageTruthContradictionWindowEpochs != 0 {
+		n += 2 + sovParams(uint64(m.StorageTruthContradictionWindowEpochs))
+	}
+	if m.StorageTruthReporterIneligibleDurationEpochs != 0 {
+		n += 2 + sovParams(uint64(m.StorageTruthReporterIneligibleDurationEpochs))
+	}
+	if m.StorageTruthStrongRecoveryCleanPassCount != 0 {
+		n += 2 + sovParams(uint64(m.StorageTruthStrongRecoveryCleanPassCount))
+	}
+	if m.StorageTruthHealVerifierCount != 0 {
+		n += 2 + sovParams(uint64(m.StorageTruthHealVerifierCount))
 	}
 	return n
 }
@@ -1093,6 +1851,595 @@ func (m *Params) Unmarshal(dAtA []byte) error {
 				b := dAtA[iNdEx]
 				iNdEx++
 				m.ScChallengersPerEpoch |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 21:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageTruthRecentBucketMaxBlocks", wireType)
+			}
+			m.StorageTruthRecentBucketMaxBlocks = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StorageTruthRecentBucketMaxBlocks |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 22:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageTruthOldBucketMinBlocks", wireType)
+			}
+			m.StorageTruthOldBucketMinBlocks = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StorageTruthOldBucketMinBlocks |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 23:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageTruthChallengeTargetDivisor", wireType)
+			}
+			m.StorageTruthChallengeTargetDivisor = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StorageTruthChallengeTargetDivisor |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 24:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageTruthCompoundRangesPerArtifact", wireType)
+			}
+			m.StorageTruthCompoundRangesPerArtifact = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StorageTruthCompoundRangesPerArtifact |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 25:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageTruthCompoundRangeLenBytes", wireType)
+			}
+			m.StorageTruthCompoundRangeLenBytes = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StorageTruthCompoundRangeLenBytes |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 26:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageTruthMaxSelfHealOpsPerEpoch", wireType)
+			}
+			m.StorageTruthMaxSelfHealOpsPerEpoch = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StorageTruthMaxSelfHealOpsPerEpoch |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 27:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageTruthProbationEpochs", wireType)
+			}
+			m.StorageTruthProbationEpochs = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StorageTruthProbationEpochs |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 28:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageTruthNodeSuspicionDecayPerEpoch", wireType)
+			}
+			m.StorageTruthNodeSuspicionDecayPerEpoch = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StorageTruthNodeSuspicionDecayPerEpoch |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 29:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageTruthReporterReliabilityDecayPerEpoch", wireType)
+			}
+			m.StorageTruthReporterReliabilityDecayPerEpoch = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StorageTruthReporterReliabilityDecayPerEpoch |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 30:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageTruthTicketDeteriorationDecayPerEpoch", wireType)
+			}
+			m.StorageTruthTicketDeteriorationDecayPerEpoch = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StorageTruthTicketDeteriorationDecayPerEpoch |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 31:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageTruthNodeSuspicionThresholdWatch", wireType)
+			}
+			m.StorageTruthNodeSuspicionThresholdWatch = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StorageTruthNodeSuspicionThresholdWatch |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 32:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageTruthNodeSuspicionThresholdProbation", wireType)
+			}
+			m.StorageTruthNodeSuspicionThresholdProbation = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StorageTruthNodeSuspicionThresholdProbation |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 33:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageTruthNodeSuspicionThresholdPostpone", wireType)
+			}
+			m.StorageTruthNodeSuspicionThresholdPostpone = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StorageTruthNodeSuspicionThresholdPostpone |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 34:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageTruthReporterReliabilityLowTrustThreshold", wireType)
+			}
+			m.StorageTruthReporterReliabilityLowTrustThreshold = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StorageTruthReporterReliabilityLowTrustThreshold |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 35:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageTruthReporterReliabilityIneligibleThreshold", wireType)
+			}
+			m.StorageTruthReporterReliabilityIneligibleThreshold = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StorageTruthReporterReliabilityIneligibleThreshold |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 36:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageTruthTicketDeteriorationHealThreshold", wireType)
+			}
+			m.StorageTruthTicketDeteriorationHealThreshold = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StorageTruthTicketDeteriorationHealThreshold |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 37:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageTruthEnforcementMode", wireType)
+			}
+			m.StorageTruthEnforcementMode = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StorageTruthEnforcementMode |= StorageTruthEnforcementMode(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 38:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageTruthReporterReliabilityDegradedThreshold", wireType)
+			}
+			m.StorageTruthReporterReliabilityDegradedThreshold = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StorageTruthReporterReliabilityDegradedThreshold |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 39:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageTruthPatternEscalationWindow", wireType)
+			}
+			m.StorageTruthPatternEscalationWindow = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StorageTruthPatternEscalationWindow |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 40:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageTruthDivergenceWindowEpochs", wireType)
+			}
+			m.StorageTruthDivergenceWindowEpochs = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StorageTruthDivergenceWindowEpochs |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 41:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageTruthReporterMinReportsForDivergence", wireType)
+			}
+			m.StorageTruthReporterMinReportsForDivergence = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StorageTruthReporterMinReportsForDivergence |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 42:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageTruthNodeSuspicionThresholdStrongPostpone", wireType)
+			}
+			m.StorageTruthNodeSuspicionThresholdStrongPostpone = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StorageTruthNodeSuspicionThresholdStrongPostpone |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 43:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageTruthRecoveryCleanPassCount", wireType)
+			}
+			m.StorageTruthRecoveryCleanPassCount = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StorageTruthRecoveryCleanPassCount |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 44:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageTruthClassAFaultWindow", wireType)
+			}
+			m.StorageTruthClassAFaultWindow = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StorageTruthClassAFaultWindow |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 45:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageTruthClassBFaultWindow", wireType)
+			}
+			m.StorageTruthClassBFaultWindow = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StorageTruthClassBFaultWindow |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 46:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageTruthHealDeadlineEpochs", wireType)
+			}
+			m.StorageTruthHealDeadlineEpochs = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StorageTruthHealDeadlineEpochs |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 47:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageTruthOldClassAFaultWindow", wireType)
+			}
+			m.StorageTruthOldClassAFaultWindow = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StorageTruthOldClassAFaultWindow |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 48:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageTruthContradictionWindowEpochs", wireType)
+			}
+			m.StorageTruthContradictionWindowEpochs = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StorageTruthContradictionWindowEpochs |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 49:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageTruthReporterIneligibleDurationEpochs", wireType)
+			}
+			m.StorageTruthReporterIneligibleDurationEpochs = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StorageTruthReporterIneligibleDurationEpochs |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 50:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageTruthStrongRecoveryCleanPassCount", wireType)
+			}
+			m.StorageTruthStrongRecoveryCleanPassCount = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StorageTruthStrongRecoveryCleanPassCount |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 51:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageTruthHealVerifierCount", wireType)
+			}
+			m.StorageTruthHealVerifierCount = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowParams
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StorageTruthHealVerifierCount |= uint32(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}

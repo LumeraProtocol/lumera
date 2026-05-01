@@ -13,6 +13,7 @@ import (
 	storetypes "cosmossdk.io/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
+	gogoproto "github.com/cosmos/gogoproto/proto"
 
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
@@ -244,6 +245,25 @@ func (k *Keeper) FinalizeAction(ctx sdk.Context, actionID string, superNodeAccou
 
 	// If the action is now in DONE state, emit an event and distribute fees
 	if existingAction.State == actiontypes.ActionStateDone {
+		if existingAction.ActionType == actiontypes.ActionTypeCascade && k.auditKeeper != nil {
+			var cascadeMeta actiontypes.CascadeMetadata
+			if err := gogoproto.Unmarshal(existingAction.Metadata, &cascadeMeta); err != nil {
+				return errors.Wrap(actiontypes.ErrInvalidMetadata, fmt.Sprintf("failed to unmarshal finalized cascade metadata: %v", err))
+			}
+			indexCount, symbolCount, err := actiontypes.CascadeArtifactCountsWithFallbackStrict(&cascadeMeta)
+			if err != nil {
+				return errors.Wrap(actiontypes.ErrInvalidMetadata, err.Error())
+			}
+			if err := k.auditKeeper.SetStorageTruthTicketArtifactCounts(
+				ctx,
+				existingAction.ActionID,
+				indexCount,
+				symbolCount,
+			); err != nil {
+				return errors.Wrap(actiontypes.ErrInvalidMetadata, err.Error())
+			}
+		}
+
 		ctx.EventManager().EmitEvent(
 			sdk.NewEvent(
 				actiontypes.EventTypeActionFinalized,

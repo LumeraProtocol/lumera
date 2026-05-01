@@ -22,9 +22,6 @@ message HostReport {
   repeated PortState inbound_port_states = 4;
 
   uint32 failed_actions_count = 5;
-
-  // Cascade Kademlia DB size in bytes (used by Everlight payout weighting).
-  double cascade_kademlia_db_bytes = 6;
 }
 
 // StorageChallengeObservation is a prober's reachability observation about an assigned target.
@@ -35,6 +32,166 @@ message StorageChallengeObservation {
   repeated PortState port_states = 2;
 }
 
+enum StorageProofBucketType {
+  STORAGE_PROOF_BUCKET_TYPE_UNSPECIFIED = 0;
+  STORAGE_PROOF_BUCKET_TYPE_RECENT      = 1;
+  STORAGE_PROOF_BUCKET_TYPE_OLD         = 2;
+  STORAGE_PROOF_BUCKET_TYPE_PROBATION   = 3;
+  STORAGE_PROOF_BUCKET_TYPE_RECHECK     = 4;
+}
+
+enum StorageProofArtifactClass {
+  STORAGE_PROOF_ARTIFACT_CLASS_UNSPECIFIED = 0;
+  STORAGE_PROOF_ARTIFACT_CLASS_INDEX       = 1;
+  STORAGE_PROOF_ARTIFACT_CLASS_SYMBOL      = 2;
+}
+
+enum StorageProofResultClass {
+  STORAGE_PROOF_RESULT_CLASS_UNSPECIFIED              = 0;
+  STORAGE_PROOF_RESULT_CLASS_PASS                     = 1;
+  STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH            = 2;
+  STORAGE_PROOF_RESULT_CLASS_TIMEOUT_OR_NO_RESPONSE   = 3;
+  STORAGE_PROOF_RESULT_CLASS_OBSERVER_QUORUM_FAIL     = 4;
+  STORAGE_PROOF_RESULT_CLASS_NO_ELIGIBLE_TICKET       = 5;
+  STORAGE_PROOF_RESULT_CLASS_INVALID_TRANSCRIPT       = 6;
+  STORAGE_PROOF_RESULT_CLASS_RECHECK_CONFIRMED_FAIL   = 7;
+}
+
+// StorageProofResult captures one storage-truth storage-proof check outcome.
+//
+// NOTE: StorageProofResult stores transcript_hash plus a compact deterministic
+// derivation/signature envelope so transcript disagreements become explicit on-chain.
+message StorageProofResult {
+  string target_supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  string challenger_supernode_account = 2 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+
+  // ticket_id identifies the ticket selected by deterministic bucket logic.
+  string ticket_id = 3;
+
+  StorageProofBucketType bucket_type = 4;
+  StorageProofArtifactClass artifact_class = 5;
+
+  // artifact_ordinal is the deterministic ordinal selected inside the artifact class.
+  uint32 artifact_ordinal = 6;
+  string artifact_key = 7;
+
+  StorageProofResultClass result_class = 8;
+  string transcript_hash = 9;
+
+  // details is an optional short diagnostic summary for non-pass outcomes.
+  string details = 10;
+
+  // artifact_count is the class-specific denominator used for deterministic
+  // ordinal selection: artifact_ordinal = H(...) mod artifact_count.
+  uint32 artifact_count = 11;
+
+  // derivation_input_hash commits deterministic derivation inputs (seed, range
+  // selection inputs, and resolver inputs) used off-chain for transcript build.
+  string derivation_input_hash = 12;
+
+  // challenger_signature is the challenger's signature over transcript commitment.
+  string challenger_signature = 13;
+
+  // observer_attestation_signatures carries observer attestations for the
+  // transcript commitment when available.
+  repeated string observer_attestation_signatures = 14;
+}
+
+// NodeSuspicionState is the persisted storage-truth node-level suspicion snapshot.
+message NodeSuspicionState {
+  string supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  int64 suspicion_score = 2;
+  uint64 last_updated_epoch = 3;
+  uint64 last_recent_fail_epoch = 4;
+  uint64 last_old_fail_epoch = 5;
+  uint32 distinct_ticket_fail_window = 6;
+  uint64 window_start_epoch = 7;
+  uint32 class_a_count_window = 8;
+  uint64 last_class_a_epoch = 9;
+  uint32 class_b_count_window = 10;
+  uint64 last_class_b_epoch = 11;
+  uint32 clean_pass_count = 12;
+  uint64 last_clean_pass_epoch = 13;
+  uint64 last_index_fail_epoch = 14;
+  // Per 121-F8 — recovery delta from snapshot, not cumulative.
+  uint32 clean_pass_count_at_postpone = 15;
+}
+
+enum ReporterTrustBand {
+  REPORTER_TRUST_BAND_UNSPECIFIED           = 0;
+  REPORTER_TRUST_BAND_NORMAL                = 1;
+  REPORTER_TRUST_BAND_LOW_TRUST             = 2;
+  REPORTER_TRUST_BAND_CHALLENGER_INELIGIBLE = 3;
+  REPORTER_TRUST_BAND_DEGRADED              = 4;
+}
+
+// ReporterReliabilityState is the persisted storage-truth reporter reliability snapshot.
+message ReporterReliabilityState {
+  string reporter_supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  int64 reliability_score = 2;
+  uint64 last_updated_epoch = 3;
+  ReporterTrustBand trust_band = 4;
+  uint64 contradiction_count = 5;
+  uint64 ineligible_until_epoch = 6;
+  uint32 window_positive_count = 7;
+  uint32 window_negative_count = 8;
+  uint64 window_start_epoch = 9;
+}
+
+// TicketDeteriorationState is the persisted storage-truth ticket deterioration snapshot.
+message TicketDeteriorationState {
+  string ticket_id = 1;
+  int64 deterioration_score = 2;
+  uint64 last_updated_epoch = 3;
+  uint64 active_heal_op_id = 4;
+  uint64 probation_until_epoch = 5;
+  uint64 last_heal_epoch = 6;
+  uint64 last_failure_epoch = 7;
+  uint32 recent_failure_epoch_count = 8;
+  uint64 contradiction_count = 9;
+  string last_target_supernode_account = 10 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  string last_reporter_supernode_account = 11 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  StorageProofResultClass last_result_class = 12;
+  uint64 last_result_epoch = 13;
+  uint32 distinct_holder_failure_count = 14;
+  uint64 last_index_failure_epoch = 15;
+  uint64 recent_bucket_failure_epoch = 16;
+  uint64 old_bucket_failure_epoch = 17;
+}
+
+// TicketArtifactCountState stores canonical per-ticket artifact counts used to
+// validate deterministic ordinal selection inputs.
+message TicketArtifactCountState {
+  string ticket_id = 1;
+  uint32 index_artifact_count = 2;
+  uint32 symbol_artifact_count = 3;
+}
+
+enum HealOpStatus {
+  HEAL_OP_STATUS_UNSPECIFIED      = 0;
+  HEAL_OP_STATUS_SCHEDULED        = 1;
+  HEAL_OP_STATUS_IN_PROGRESS      = 2;
+  HEAL_OP_STATUS_HEALER_REPORTED  = 3;
+  HEAL_OP_STATUS_VERIFIED         = 4;
+  HEAL_OP_STATUS_FAILED           = 5;
+  HEAL_OP_STATUS_EXPIRED          = 6;
+}
+
+// HealOp is the chain-tracked storage-truth healing operation state.
+message HealOp {
+  uint64 heal_op_id = 1;
+  string ticket_id = 2;
+  uint64 scheduled_epoch_id = 3;
+  string healer_supernode_account = 4 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  repeated string verifier_supernode_accounts = 5 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+  HealOpStatus status = 6;
+  uint64 created_height = 7;
+  uint64 updated_height = 8;
+  uint64 deadline_epoch_id = 9;
+  string result_hash = 10;
+  string notes = 11;
+}
+
 // EpochReport is a single per-epoch report submitted by a Supernode.
 message EpochReport {
   string supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
@@ -43,4 +200,5 @@ message EpochReport {
 
   HostReport host_report = 4 [(gogoproto.nullable) = false];
   repeated StorageChallengeObservation storage_challenge_observations = 5;
+  repeated StorageProofResult storage_proof_results = 6;
 }

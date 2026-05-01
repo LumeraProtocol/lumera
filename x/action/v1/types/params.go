@@ -251,9 +251,12 @@ func validateDecString(v interface{}) error {
 		return fmt.Errorf("invalid parameter type: %T", v)
 	}
 
-	_, err := math.LegacyNewDecFromStr(str)
+	dec, err := math.LegacyNewDecFromStr(str)
 	if err != nil {
 		return fmt.Errorf("invalid decimal string: %s", err)
+	}
+	if dec.IsNegative() {
+		return fmt.Errorf("decimal string must be non-negative")
 	}
 
 	return nil

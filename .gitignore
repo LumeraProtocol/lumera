@@ -48,7 +48,7 @@ docs/human-playbook.md
 docs/new-feature*
 plans/
 CLAUDE.md
-.claude/
 .codex
 .agents
 AGENTS.md
+.bridge-version

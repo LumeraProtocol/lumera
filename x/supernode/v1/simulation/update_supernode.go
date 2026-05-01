@@ -81,10 +81,7 @@ func SimulateMsgUpdateSupernode(
 					break
 				}
 			}
-			// If no free account found, skip updating the supernode account.
-			if supernodeAccount == "" {
-				updateAccount = false //nolint:ineffassign // intentional clarity: marks that supernodeAccount update was skipped
-			}
+			// If no free account found, supernodeAccount stays empty and is skipped.
 		}
 
 		if updateVersion {

@@ -66,6 +66,7 @@ type AuditKeeper interface {
 		evidenceType audittypes.EvidenceType,
 		metadataJSON string,
 	) (uint64, error)
+	SetStorageTruthTicketArtifactCounts(ctx context.Context, ticketID string, indexArtifactCount uint32, symbolArtifactCount uint32) error
 }
 
 // RewardDistributionKeeper defines the fee-share interface implemented by x/supernode.

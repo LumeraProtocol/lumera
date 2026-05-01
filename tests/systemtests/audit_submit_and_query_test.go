@@ -25,6 +25,7 @@ func TestAuditSubmitReportAndQuery(t *testing.T) {
 	sut.ModifyGenesisJSON(t,
 		setSupernodeParamsForAuditTests(t),
 		setAuditParamsForFastEpochs(t, epochLengthBlocks, 1, 1, 1, []uint32{4444}),
+		setStorageTruthEnforcementModeUnspecified(t),
 	)
 	sut.StartChain(t)
 

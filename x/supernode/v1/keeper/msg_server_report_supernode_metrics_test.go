@@ -98,7 +98,7 @@ func TestReportSupernodeMetrics_SingleReportRecoversPostponed(t *testing.T) {
 	ctx = ctx.WithBlockHeader(header)
 
 	resp, err := ms.ReportSupernodeMetrics(
-		sdk.WrapSDKContext(ctx),
+		ctx,
 		&types.MsgReportSupernodeMetrics{
 			ValidatorAddress: supernode.ValidatorAddress,
 			SupernodeAccount: supernode.SupernodeAccount,
@@ -174,7 +174,7 @@ func TestReportSupernodeMetrics_ClosedRequiredPortDoesNotPostpone(t *testing.T) 
 	ctx = ctx.WithBlockHeader(header)
 
 	resp, err := ms.ReportSupernodeMetrics(
-		sdk.WrapSDKContext(ctx),
+		ctx,
 		&types.MsgReportSupernodeMetrics{
 			ValidatorAddress: supernode.ValidatorAddress,
 			SupernodeAccount: supernode.SupernodeAccount,
@@ -236,7 +236,7 @@ func TestReportSupernodeMetrics_EmptyPortsStillPersistsAndDoesNotRecover(t *test
 	ctx = ctx.WithBlockHeader(header)
 
 	resp, err := ms.ReportSupernodeMetrics(
-		sdk.WrapSDKContext(ctx),
+		ctx,
 		&types.MsgReportSupernodeMetrics{
 			ValidatorAddress: supernode.ValidatorAddress,
 			SupernodeAccount: supernode.SupernodeAccount,
@@ -305,7 +305,7 @@ func TestReportSupernodeMetrics_StorageFullSignalDoesNotTransitionState(t *testi
 	ctx = ctx.WithBlockHeader(tmproto.Header{Height: ctx.BlockHeight()})
 
 	resp, err := ms.ReportSupernodeMetrics(
-		sdk.WrapSDKContext(ctx),
+		ctx,
 		&types.MsgReportSupernodeMetrics{
 			ValidatorAddress: supernode.ValidatorAddress,
 			SupernodeAccount: supernode.SupernodeAccount,
@@ -376,7 +376,7 @@ func TestReportSupernodeMetrics_DoesNotRecoverFromStorageFull(t *testing.T) {
 	ctx = ctx.WithBlockHeader(tmproto.Header{Height: ctx.BlockHeight()})
 
 	resp, err := ms.ReportSupernodeMetrics(
-		sdk.WrapSDKContext(ctx),
+		ctx,
 		&types.MsgReportSupernodeMetrics{
 			ValidatorAddress: supernode.ValidatorAddress,
 			SupernodeAccount: supernode.SupernodeAccount,

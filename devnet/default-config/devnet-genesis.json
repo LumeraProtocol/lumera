@@ -31,7 +31,7 @@
     },
     "audit": {
       "params": {
-        "epoch_length_blocks": "400",
+        "epoch_length_blocks": "20",
         "epoch_zero_height": "1",
         "peer_quorum_reports": 3,
         "min_probe_targets_per_epoch": 3,

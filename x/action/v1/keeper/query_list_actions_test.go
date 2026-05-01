@@ -74,9 +74,9 @@ func TestKeeper_ListActions(t *testing.T) {
 				ActionState: types.ActionStateProcessing,
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
-				k.SetAction(ctx, &action1)
-				k.SetAction(ctx, &action2)
-				k.SetAction(ctx, &action3)
+				require.NoError(t, k.SetAction(ctx, &action1))
+				require.NoError(t, k.SetAction(ctx, &action2))
+				require.NoError(t, k.SetAction(ctx, &action3))
 			},
 			expectedErr: nil,
 			checkResult: func(t *testing.T, resp *types.QueryListActionsResponse) {
@@ -91,9 +91,9 @@ func TestKeeper_ListActions(t *testing.T) {
 				ActionType: types.ActionTypeCascade,
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
-				k.SetAction(ctx, &action1)
-				k.SetAction(ctx, &action2)
-				k.SetAction(ctx, &action3)
+				require.NoError(t, k.SetAction(ctx, &action1))
+				require.NoError(t, k.SetAction(ctx, &action2))
+				require.NoError(t, k.SetAction(ctx, &action3))
 			},
 			expectedErr: nil,
 			checkResult: func(t *testing.T, resp *types.QueryListActionsResponse) {
@@ -111,9 +111,9 @@ func TestKeeper_ListActions(t *testing.T) {
 				},
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
-				k.SetAction(ctx, &action1)
-				k.SetAction(ctx, &action2)
-				k.SetAction(ctx, &action3)
+				require.NoError(t, k.SetAction(ctx, &action1))
+				require.NoError(t, k.SetAction(ctx, &action2))
+				require.NoError(t, k.SetAction(ctx, &action3))
 			},
 			expectedErr: nil,
 			checkResult: func(t *testing.T, resp *types.QueryListActionsResponse) {
@@ -131,9 +131,9 @@ func TestKeeper_ListActions(t *testing.T) {
 				},
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
-				k.SetAction(ctx, &action1)
-				k.SetAction(ctx, &action2)
-				k.SetAction(ctx, &action3)
+				require.NoError(t, k.SetAction(ctx, &action1))
+				require.NoError(t, k.SetAction(ctx, &action2))
+				require.NoError(t, k.SetAction(ctx, &action3))
 			},
 			expectedErr: nil,
 			checkResult: func(t *testing.T, resp *types.QueryListActionsResponse) {

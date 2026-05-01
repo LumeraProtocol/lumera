@@ -89,7 +89,7 @@ func TestMsgServer_DeRegisterSupernode(t *testing.T) {
 			k, ctx := setupKeeperForTest(t, stakingKeeper, slashingKeeper, bankKeeper)
 			if tc.expectedError != sdkerrors.ErrNotFound {
 
-				k.SetSuperNode(ctx, types.SuperNode{
+				require.NoError(t, k.SetSuperNode(ctx, types.SuperNode{
 					SupernodeAccount: creatorAddr.String(),
 					ValidatorAddress: valAddr.String(),
 					Note:             "1.0.0",
@@ -111,7 +111,7 @@ func TestMsgServer_DeRegisterSupernode(t *testing.T) {
 						},
 					},
 					P2PPort: "26657",
-				})
+				}))
 			}
 
 			msgServer := keeper.NewMsgServerImpl(k)

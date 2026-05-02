@@ -509,15 +509,13 @@ submit_audit_report_for_service() {
     reporter_addr="$(service_supernode_account_address_for_service "$service")" || return 1
 
     host_json="$(jq -cn \
-        --argjson bytes "$cascade_bytes" \
         --argjson usage "$disk_usage" \
         '{
             cpu_usage_percent: 25,
             mem_usage_percent: 40,
             disk_usage_percent: $usage,
             inbound_port_states: [],
-            failed_actions_count: 0,
-            cascade_kademlia_db_bytes: $bytes
+            failed_actions_count: 0
         }')"
 
     # Robust submit loop for one-report-per-epoch race windows.
@@ -575,6 +573,14 @@ submit_audit_report_for_service() {
         # Duplicate report => wait for next epoch and retry.
         if echo "$raw_log" | grep -qi "report already submitted for this epoch"; then
             wait_for_next_audit_epoch || return 1
+            attempts=$((attempts + 1))
+            continue
+        fi
+        # Broadcast can pass just before an epoch boundary and execute in the
+        # next block with the previous epoch_id. Re-read the current epoch and
+        # retry instead of failing the scenario on timing.
+        if echo "$raw_log" | grep -Eqi "invalid epoch id|epoch_id .* not accepted at height"; then
+            sleep 2
             attempts=$((attempts + 1))
             continue
         fi
@@ -1407,6 +1413,12 @@ scenario_3_periodic_distribution_happy_path() {
         return
     fi
 
+    if ! report_metrics_for_service "$service_a" "$validator_a" 2147483648 40; then
+        fail "S3.1a metrics report submitted for first supernode (2 GiB)" "metrics tx failed for $validator_a"
+        return
+    fi
+    pass "S3.1a metrics report submitted for first supernode (2 GiB)"
+
     rc=0; submit_audit_report_for_service "$service_a" 2147483648 40 || rc=$?
     if [[ "$rc" == "0" ]]; then
         pass "S3.1 audit report submitted for first supernode (2 GiB)"
@@ -1417,6 +1429,12 @@ scenario_3_periodic_distribution_happy_path() {
         fail "S3.1 audit report submitted for first supernode" "audit report tx failed for $validator_a"
         return
     fi
+
+    if ! report_metrics_for_service "$service_b" "$validator_b" 4294967296 40; then
+        fail "S3.2a metrics report submitted for second supernode (4 GiB)" "metrics tx failed for $validator_b"
+        return
+    fi
+    pass "S3.2a metrics report submitted for second supernode (4 GiB)"
 
     rc=0; submit_audit_report_for_service "$service_b" 4294967296 40 || rc=$?
     if [[ "$rc" == "0" ]]; then
@@ -1541,6 +1559,10 @@ scenario_4_distribution_edge_cases() {
         skip "S4 distribution edge cases" "could not establish STORAGE_FULL precondition"
         return
     fi
+    if ! report_metrics_for_service "$service_storage" "$validator_storage" 2147483648 95; then
+        fail "S4.0 metrics report submitted for STORAGE_FULL supernode" "metrics tx failed for $validator_storage"
+        return
+    fi
 
     storage_eligibility="$(lumerad_query supernode sn-eligibility "$validator_storage" -o json)" || true
     if [[ "$(echo "$storage_eligibility" | jq -r '.eligible // false' 2>/dev/null)" == "true" ]]; then
@@ -1559,6 +1581,12 @@ scenario_4_distribution_edge_cases() {
         fail "S4.2 low-byte audit report submitted for comparison supernode" "audit report tx failed for $validator_low"
         return
     fi
+
+    if ! report_metrics_for_service "$service_low" "$validator_low" 104857600 40; then
+        fail "S4.2a low-byte metrics report submitted for comparison supernode" "metrics tx failed for $validator_low"
+        return
+    fi
+    pass "S4.2a low-byte metrics report submitted for comparison supernode"
 
     low_eligibility="$(lumerad_query supernode sn-eligibility "$validator_low" -o json)" || true
     if [[ "$(echo "$low_eligibility" | jq -r '.eligible // false' 2>/dev/null)" == "false" ]] &&
@@ -1776,8 +1804,18 @@ scenario_5_anti_gaming_guardrails() {
         fail "S5.1 anti-gaming params configured" "rgc=$rgc smooth=$smooth ramp=$ramp"
         return
     fi
+    if ! ensure_service_supernode_payout_eligible "$service_guard"; then
+        skip "S5 anti-gaming guardrails" "could not precondition guardrail supernode into payout-eligible state"
+        return
+    fi
 
     # Period N: moderate bytes.
+    if ! report_metrics_for_service "$service_guard" "$validator_guard" 2147483648 40; then
+        fail "S5.2a baseline metrics report submitted" "metrics tx failed for $validator_guard"
+        return
+    fi
+    pass "S5.2a baseline metrics report submitted"
+
     rc=0; submit_audit_report_for_service "$service_guard" 2147483648 40 || rc=$?
     if [[ "$rc" == "0" ]]; then
         pass "S5.2 baseline audit report submitted"
@@ -1796,6 +1834,12 @@ scenario_5_anti_gaming_guardrails() {
         skip "S5.3 high-jump audit report submitted" "could not advance to next audit epoch"
         return
     fi
+    if ! report_metrics_for_service "$service_guard" "$validator_guard" 21474836480 40; then
+        fail "S5.3a high-jump metrics report submitted" "metrics tx failed for $validator_guard"
+        return
+    fi
+    pass "S5.3a high-jump metrics report submitted"
+
     rc=0; submit_audit_report_for_service "$service_guard" 21474836480 40 || rc=$?
     if [[ "$rc" == "0" ]]; then
         pass "S5.3 high-jump audit report submitted"
@@ -1804,7 +1848,9 @@ scenario_5_anti_gaming_guardrails() {
         return
     else
         # One retry in case of transient epoch boundary race.
-        if wait_for_next_audit_epoch && submit_audit_report_for_service "$service_guard" 21474836480 40; then
+        if wait_for_next_audit_epoch &&
+            report_metrics_for_service "$service_guard" "$validator_guard" 21474836480 40 &&
+            submit_audit_report_for_service "$service_guard" 21474836480 40; then
             pass "S5.3 high-jump audit report submitted (retry)"
         else
             skip "S5.3 high-jump audit report submitted" "audit report tx failed after retry"

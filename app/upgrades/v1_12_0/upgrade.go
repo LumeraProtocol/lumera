@@ -73,8 +73,8 @@ func CreateUpgradeHandler(p appParams.AppUpgradeParams) upgradetypes.UpgradeHand
 		}
 		p.Logger.Info("Module migrations completed.")
 
-		// All four keepers are required by this handler. Fail loudly on any
-		// wiring regression rather than nil-deref mid-upgrade.
+		// The action, supernode, and audit keepers are required by this handler.
+		// Fail loudly on any wiring regression rather than nil-deref mid-upgrade.
 		if p.ActionKeeper == nil {
 			return nil, fmt.Errorf("%s upgrade requires action keeper to be wired", UpgradeName)
 		}

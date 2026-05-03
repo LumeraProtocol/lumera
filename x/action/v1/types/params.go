@@ -102,6 +102,25 @@ func DefaultParams() Params {
 	)
 }
 
+// WithDefaults returns a copy of the params with any zero-value fields populated
+// from module defaults. Older genesis blobs and on-chain params written before
+// new fields existed (e.g. LEP-5 SVC params) read back as zero; reading via
+// WithDefaults keeps behaviour consistent without requiring a ConsensusVersion
+// bump for purely additive params with safe defaults.
+//
+// Note: WithDefaults does NOT call Validate. Callers that want strict
+// 0-as-unset semantics (genesis init, MsgUpdateParams) should apply
+// WithDefaults() before Validate().
+func (p Params) WithDefaults() Params {
+	if p.SvcChallengeCount == 0 {
+		p.SvcChallengeCount = DefaultSVCChallengeCount
+	}
+	if p.SvcMinChunksForChallenge == 0 {
+		p.SvcMinChunksForChallenge = DefaultSVCMinChunksForChallenge
+	}
+	return p
+}
+
 // ParamSetPairs get the params.ParamSet
 func (p *Params) ParamSetPairs() paramtypes.ParamSetPairs {
 	return paramtypes.ParamSetPairs{

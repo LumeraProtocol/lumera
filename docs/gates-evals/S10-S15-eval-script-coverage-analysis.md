@@ -12,12 +12,12 @@ close in the script. Two edits were planned and **landed**:
    AUTO-NEW assertions.
 
 **Subsequent purpose** (this revision): durable reference describing what the
-script does cover, what it does not, and **why** every uncovered eval step is
-left out.
+script does cover, what it does not, and **why** every uncovered or skipped eval
+step is left out.
 
 ---
 
-## 0. Status (2026-04-26)
+## 0. Status (2026-05-01)
 
 ### Script changes landed
 
@@ -35,7 +35,21 @@ All AUTO+ and AUTO-NEW additions from §4 have been merged into
 | S7.9 (bogus authority rejected) | ✅ scripted |
 | S8.2 / S8.2a (SUPERNODE_STATE_* enum literals) | ✅ scripted |
 | S8.3 (runtime no-x/everlight check) | ✅ scripted |
-| S11.0–S11.2 (F13 mixed-violation invariant — best-effort devnet dual) | ✅ scripted; may skip as inconclusive |
+| S11.0–S11.2 (F13 mixed-violation invariant — best-effort devnet dual) | ✅ scripted; latest run passed |
+
+### 2026-05-01 script correction
+
+LEP-6 moved `cascade_kademlia_db_bytes` out of audit `HostReport` and into the
+supernode metrics surface. `devnet/tests/everlight/everlight_test.sh` was
+updated accordingly:
+
+- `submit_audit_report_for_service` now submits only audit host fields
+  (`cpu_usage_percent`, `mem_usage_percent`, `disk_usage_percent`,
+  `inbound_port_states`, `failed_actions_count`).
+- Scenarios 3/4/5 now call `report-supernode-metrics` when they need Cascade
+  byte weights for payout or anti-gaming checks.
+- Audit report submission now retries epoch-boundary execution failures such as
+  `invalid epoch id`, matching the existing duplicate-report retry behavior.
 
 > **Note on eval Scenario 2 step 5** (mixed → POSTPONED): not directly
 > exercisable on devnet because (a) host-metric thresholds
@@ -67,7 +81,13 @@ COVERED-ELSEWHERE item in this analysis is verified by a green Go test run:
 | S9 (upgrade idempotency) | `app/upgrades/v1_12_0/upgrade_test.go` | ✅ PASS |
 
 Devnet smoke / E2E:
-- `make devnet-tests-everlight` last recorded: 35 PASS / 0 FAIL / 5 SKIP; a later eval run found the old S1.3c permissionless-account assertion stale because Phase 1 uses the existing `supernode` module account
+- `make devnet-tests-everlight` latest recorded after the script correction:
+  **38 PASS / 0 FAIL / 7 SKIP**.
+- S11.1/S11.2 now pass on the recorded run:
+  - `S11.1 high-disk audit report submitted from POSTPONED supernode`
+  - `S11.2 POSTPONED supernode does NOT transition to STORAGE_FULL`
+- Remaining skips are accepted for now by operator decision and are tracked as
+  devnet-state/precondition gaps, not script failures.
 - `tests/e2e/everlight/everlight_e2e_test.go` — ✅ PASS
 
 The eval-doc checklists have been updated so that items with exclusive
@@ -94,27 +114,27 @@ unchecked until the operator runs `make devnet-tests-everlight`.
 | Eval step | Script function/labels | Tag |
 |---|---|---|
 | 1. supernode params shows reward_distribution | `S1.1`, `S1.1a`, `S1.1b`, `S1.4` | AUTO |
-| 2. pool-state returns balance/last_distribution_height/total_distributed/eligible_sn_count | `S1.2` (asserts non-empty; doesn't assert each subfield) | AUTO+ — tighten S1.2 to `jq` each subfield |
+| 2. pool-state returns balance/last_distribution_height/total_distributed/eligible_sn_count | `S1.2`, `S1.2a`–`S1.2d` | AUTO |
 | 3. auth module-account for embedded pool | `S1.3` queries `module-account supernode` because the embedded pool lives in the existing supernode module account | AUTO — assert account name/permissions shape matches the Phase 1 embedded-pool design; do not require a permissionless account |
 | 4. send funds → pool balance increases | `S1.3a`, `S1.3b` | AUTO |
-| 5. export genesis → state under `app_state.supernode`, not `app_state.everlight` | none | AUTO-NEW (`lumerad export` + jq `app_state | has("everlight")` == false) |
+| 5. export/runtime embedded-state check | `S1.5`, `S1.5b`, `S1.5c` best-effort; export may skip on running-node lock | AUTO / SKIP acceptable |
 
 ### Scenario 2 — STORAGE_FULL transitions (F12, F13)
 
 | Eval step | Script function/labels | Tag |
 |---|---|---|
 | 1. params shows max_storage_usage_percent | `S2.2` (also S1.4) | AUTO |
-| 2. high-disk audit report → STORAGE_FULL | `S2.3`, `S2.4` | AUTO |
-| 3. query node → STORAGE_FULL | implicit in `wait_for_supernode_state` for S2.4 | AUTO |
-| 4. healthy report → recovers to ACTIVE | `S2.5`, `S2.6` | AUTO |
-| 5. high-disk + other compliance violation → POSTPONED | none — script never injects a non-storage violation | AUTO-NEW (submit report with both `disk_usage_percent > max` AND `failed_actions_count > 0`; assert state == `SUPERNODE_STATE_POSTPONED`) |
+| 2. high-disk audit report → STORAGE_FULL | `S2.3`, `S2.4` | AUTO when target SN can be recovered to ACTIVE; latest run skipped because target stayed POSTPONED |
+| 3. query node → STORAGE_FULL | implicit in `wait_for_supernode_state` for S2.4 | AUTO when S2 precondition is available |
+| 4. healthy report → recovers to ACTIVE | `S2.5`, `S2.6` | AUTO when epoch/state timing permits recovery |
+| 5. high-disk + other compliance violation → POSTPONED | S11.0-S11.2 best-effort dual verifies a POSTPONED SN does not become STORAGE_FULL after a high-disk report | AUTO best-effort; original mixed-violation direction covered by Go tests |
 | 6. legacy report-supernode-metrics with high disk does not mutate state | `S2.7`, `S2.8` | AUTO |
 
 ### Scenario 3 — Periodic Distribution Happy Path (F15)
 
 | Eval step | Script function/labels | Tag |
 |---|---|---|
-| 1. ≥2 SNs with different cascade_kademlia_db_bytes | `S3.0`, `S3.1`, `S3.2` (2 GiB / 4 GiB) | AUTO |
+| 1. ≥2 SNs with different cascade_kademlia_db_bytes | `S3.1a`, `S3.2a` submit `report-supernode-metrics` with 2 GiB / 4 GiB; `S3.1`, `S3.2` submit audit reports for liveness | AUTO when selected SNs can be preconditioned into payout-eligible state; latest run skipped this scenario because all candidates were POSTPONED |
 | 2. set short payment_period_blocks via gov | done by Scenario 7 prior to S3 (proposal sets `payment_period_blocks=2`) | AUTO (cross-scenario dependency) — annotate this in eval doc |
 | 3. fund pool | `S3.3` | AUTO |
 | 4. last_distribution_height advances | `S3.4` (`wait_for_distribution_height_change`) | AUTO |
@@ -127,16 +147,16 @@ unchecked until the operator runs `make devnet-tests-everlight`.
 |---|---|---|
 | 1. zero pool, period triggers, no payout/panic | none | AUTO-NEW — Tricky: pool is auto-funded by Scenario 1 + 3. Either run Scenario 4 first on a fresh devnet, or wait for distribution to drain pool, then advance N blocks and assert no panic + `last_distribution_height` either stays put or advances cleanly. NEEDS-FIXTURE if drain is unreliable |
 | 2. funded pool, no eligible SNs | none — all 5 devnet SNs are kept eligible to support S3 | NEEDS-FIXTURE — would require briefly forcing all SNs to POSTPONED (e.g., skipping every report for one full epoch). High flake risk; recommend leaving as MANUAL or asserting via Go integration tests in `tests/integration/everlight` |
-| 3. node below `min_cascade_bytes_for_payment` excluded | `S4.3` | AUTO |
-| 4. mixed eligible/ineligible | partial: S3 (eligible payout) + S4.3 (ineligible exclusion) — not in same run | AUTO+ — at end of S3, after distribution, assert below-threshold SN's balance unchanged |
-| 5. STORAGE_FULL remains payout-eligible | `S4.1` | AUTO |
+| 3. node below `min_cascade_bytes_for_payment` excluded | `S4.2a` submits low-byte metrics; `S4.3` checks eligibility reason | AUTO when STORAGE_FULL/eligibility preconditions are available; latest run skipped because STORAGE_FULL precondition could not be established |
+| 4. mixed eligible/ineligible | partial: S3 (eligible payout) + S4.3/S4.4 (ineligible no-payout) | AUTO when S3/S4 preconditions are available; latest run skipped with accepted precondition gap |
+| 5. STORAGE_FULL remains payout-eligible | `S4.0` metrics report + `S4.1` eligibility check | AUTO when STORAGE_FULL precondition is available; latest run skipped with accepted precondition gap |
 
 ### Scenario 5 — Anti-Gaming Guardrails (F15)
 
 | Eval step | Script function/labels | Tag |
 |---|---|---|
 | 1. ramp-up reduces early payouts | none — SNs are registered at devnet start, ramp window already past; `new_sn_ramp_up_periods=1` after S7 anyway | NEEDS-FIXTURE — would need to register a new SN mid-script, force `new_sn_ramp_up_periods≥3`, and observe partial weight over ≥2 distribution periods. Doable but adds 1–2 minutes; risky on flake. Recommend: cover via Go E2E (`tests/e2e/everlight`) and keep manual eval pointer |
-| 2. growth cap clamps sudden weight jump | `S5.4` (smoothed < raw) | AUTO |
+| 2. growth cap clamps sudden weight jump | `S5.2a` baseline metrics, `S5.3a` high-jump metrics, `S5.4` smoothed < raw | AUTO when guardrail SN can be preconditioned into payout-eligible state; latest run skipped after S5.1 because candidate stayed POSTPONED |
 | 3. smoothing dampens oscillation across 4-period window | partial: 2-point bump only (S5.2 / S5.3); doesn't oscillate | AUTO+ if we keep `measurement_smoothing_periods=1` we cannot show smoothing dampening — the param is set to 1 in S7. To show real smoothing we'd need to gov-set it to ≥3, then submit 3+ alternating reports. Adds ~30s per epoch × 3 epochs. NEEDS-FIXTURE if we don't want to extend devnet runtime |
 | 4. cross-check vs keeper/E2E | n/a | COVERED-ELSEWHERE — `go test ./x/supernode/v1/keeper/distribution_test.go` |
 
@@ -160,15 +180,15 @@ unchecked until the operator runs `make devnet-tests-everlight`.
 | 1. submit gov proposal updating reward_distribution | `S7.2` | AUTO |
 | 2. validators vote, proposal passes | `S7.4`, `S7.5` | AUTO |
 | 3. updated value visible | `S7.6` | AUTO |
-| 4. unauthorized direct update rejected | none | AUTO-NEW — `lumerad tx supernode update-params --from <non-gov-key>` and assert tx fails with "unauthorized" |
-| 5. invalid value (e.g. payment_period_blocks=0) rejected | none | AUTO-NEW — submit proposal with invalid value, vote yes, assert either submission fails at validate-basic OR proposal status ends as FAILED with execution error |
+| 4. unauthorized authority rejected | `S7.9` submits MsgUpdateParams with bogus authority and expects rejected/failed status | AUTO |
+| 5. invalid value rejected | `S7.8` submits `registration_fee_share_bps=20000` and expects rejected/failed status | AUTO |
 
 ### Scenario 8 — Proto / API Compatibility (F10, F11)
 
 | Eval step | Script function/labels | Tag |
 |---|---|---|
 | 1. SUPERNODE_STATE_STORAGE_FULL appears for storage-full SN | implicitly covered by S2.4 (`wait_for_supernode_state ... SUPERNODE_STATE_STORAGE_FULL`) | AUTO |
-| 2. cascade_kademlia_db_bytes in reward eligibility query | `S8.1c` | AUTO |
+| 2. cascade_kademlia_db_bytes in reward eligibility query | `S8.1c` | AUTO — latest run passed |
 | 3. cascade_kademlia_db_bytes in metrics query | `S8.1c` legacy fallback path | AUTO |
 | 4. SUPERNODE_STATE_* enum names preserved (no rename) | none — the script never asserts the canonical literals are present in any output | AUTO-NEW — `lumerad query supernode list-supernodes -o json` and assert at least one state literal matches `^SUPERNODE_STATE_[A-Z_]+$` (cheap regex check); also explicitly grep for `SUPERNODE_STATE_ACTIVE` / `SUPERNODE_STATE_STORAGE_FULL` |
 | 5. embedded Everlight state under `app_state.supernode` on export | none | AUTO-NEW — same `lumerad export` we add for S1.5 |
@@ -211,9 +231,11 @@ its NEEDS-FIXTURE status from one of these.
 | **S6 step 3** — submit + finalize a Cascade action with a known fee | Requires the supernode service to actually serve Cascade requests. `devnet/bin/supernode` is operator-supplied; script cannot assume its presence. | `tests/integration/action/lep5_integration_test.go`, `x/supernode/v1/keeper/fee_routing_test.go` ✅ |
 | **S10 step 3** — finalize Cascade action so registration fee share routes to the pool | Same as S6 step 3. | Same as above ✅ |
 | **S9 steps 1–4** — pre-Everlight chain → upgrade → state preserved | Requires multi-binary upgrade rehearsal (v1.7.2 → … → v1.10.1 → v1.12.0). Existing Make targets (`devnet-upgrade-1101`) drive this externally; composing them inside `everlight_test.sh` is brittle. | `app/upgrades/v1_12_0/upgrade_test.go` ✅ |
+| **S3 live proportional payout** — selected SNs must be payout-eligible | On the 2026-05-01 devnet snapshot, all candidate SNs were POSTPONED and S3 skipped at the precondition stage. This is accepted for now. | `x/supernode/v1/keeper/distribution_test.go`, `tests/integration/everlight`, `tests/e2e/everlight` ✅ |
 | **S4 step 1** — zero-pool distribution, no panic | Devnet pool is auto-funded by Scenarios 1 + 3 + 4. A deterministic zero-pool window is not stable to script. | `x/supernode/v1/keeper/distribution_test.go` ✅ |
-| **S4 step 2** — funded pool with no eligible SNs | Forcing all 5 devnet SNs into POSTPONED simultaneously is a flake source. | `x/supernode/v1/keeper/distribution_test.go`, `tests/integration/everlight` ✅ |
+| **S4 step 2** — funded pool with no eligible SNs | Forcing all 5 devnet SNs into POSTPONED simultaneously is a flake source. Latest run had POSTPONED candidates but could not establish the STORAGE_FULL precondition for S4. | `x/supernode/v1/keeper/distribution_test.go`, `tests/integration/everlight` ✅ |
 | **S5 step 1** — new-SN ramp-up reduces early payouts | Requires mid-script SN registration and ≥2 distribution periods of timing-sensitive observation. High flake risk. | `x/supernode/v1/keeper/distribution_test.go`, `tests/e2e/everlight` ✅ |
+| **S5 live anti-gaming weight assertion** — guardrail SN must be payout-eligible | Latest run passed S5.1 params but skipped S5.2-S5.5 because the candidate could not be preconditioned into payout-eligible state. Accepted for now. | `x/supernode/v1/keeper/distribution_test.go`, `tests/e2e/everlight` ✅ |
 | **S5 step 3** — smoothing dampens oscillation across 4-period window | Would require a second gov proposal to set `measurement_smoothing_periods≥3` and 3+ alternating reports across 3 epochs. Operator deferred to keep script runtime bounded. | `x/supernode/v1/keeper/distribution_test.go` ✅ |
 | **S2 step 5** — single audit report with mixed violations → POSTPONED | Devnet genesis has all `min_*_free_percent = 0` (host-metric thresholds disabled), and audit ignores `failed_actions_count`. No single report can produce a non-storage compliance violation. | `x/audit/v1/keeper/enforcement_storagefull_transition_test.go`, `msg_submit_epoch_report_storagefull_test.go` ✅ — script attempts a best-effort dual via S11.2 and skips if live epoch timing makes it inconclusive |
 
@@ -246,11 +268,15 @@ their parent.
 
 ### 2D. Summary — what coverage gaps actually remain after this round
 
-After landing the AUTO+ / AUTO-NEW set and accepting Go-test coverage as
-authoritative for the categories above:
+After landing the AUTO+ / AUTO-NEW set, applying the 2026-05-01 HostReport /
+metrics split fix, and accepting Go-test coverage as authoritative for the
+categories above:
 
 - **Zero true gaps in chain-logic verification.** Every F-feature behavior has
   either script coverage on devnet or Go-test coverage in PASS state.
+- **Latest devnet result has zero failures:** 38 PASS / 0 FAIL / 7 SKIP.
+  Remaining skips are accepted for now and are precondition/devnet-shape issues:
+  S1.5b, S2 transition, S3, S4, S5, S9, S10.
 - **The only operator-attended verifications** are the S6/S10 Cascade-fee
   routing steps (manual when the supernode service is available) and the S9
   pre-upgrade rehearsal (already supported by `make devnet-upgrade-1101`).
@@ -274,7 +300,7 @@ And for additions:
 
 ```
 5. Export genesis -> Expected: Everlight state lives under `app_state.supernode`,
-   not `app_state.everlight`. **[AUTO-NEW: planned addition S1.5]**
+   not `app_state.everlight`. **[AUTO: S1.5b/S1.5c best-effort export check]**
 ```
 
 Manual-only items get **[MANUAL]** with a one-line reason.
@@ -284,9 +310,12 @@ list the assertions covered today + the assertions added in this round.
 
 ---
 
-## 4. Concrete script additions proposed (cheap set)
+## 4. Concrete script additions proposed (cheap set) — historical / landed
 
-In priority order. All use lumerad CLI only, no new binaries.
+This section is retained as historical context for why the current script has
+the assertions it has. The approved cheap set landed before the current
+2026-05-01 run, and the HostReport/metrics split fix landed afterward. Do not
+read this as a pending implementation list.
 
 | New | Where | What | LOC est. |
 |---|---|---|---|
@@ -296,8 +325,8 @@ In priority order. All use lumerad CLI only, no new binaries.
 | **S2.5b** | `scenario_2_storage_full_transition` after S2.6 | submit audit report with disk_usage>max AND failed_actions_count>0; assert state → POSTPONED | ~30 |
 | **S3.6c** | end of `scenario_3_periodic_distribution_happy_path` | capture pool_balance before S3.3 funding, after S3.4; assert distribution drained the funded amount minus dust (and minus any concurrent fee-share inflow) | ~20 |
 | **S4.4** | `scenario_4_distribution_edge_cases` | assert below-threshold SN's bank balance unchanged after one full distribution period | ~20 |
-| **S7.8** | `scenario_7_governance` after S7.6 | submit a proposal with `payment_period_blocks=0`; assert it either fails validation or executes with FAILED status | ~40 |
-| **S7.9** | `scenario_7_governance` end | direct `tx supernode update-params --from <non-gov-key>`; assert tx code != 0 with "unauthorized" in raw_log | ~20 |
+| **S7.8** | `scenario_7_governance` after S7.6 | submit invalid `registration_fee_share_bps=20000`; assert rejected/failed status | ~40 |
+| **S7.9** | `scenario_7_governance` end | submit MsgUpdateParams with a non-gov authority; assert rejected/failed status | ~20 |
 | **S8.2** | `scenario_8_proto_compatibility` end | assert at least one `SUPERNODE_STATE_*` literal present in `list-supernodes` JSON; explicitly grep for `SUPERNODE_STATE_ACTIVE`/`STORAGE_FULL` | ~15 |
 | **S8.3** | inside S8 (reuse S1.5 export) | call `lumerad export` once at the end; assert no `app_state.everlight` and yes `app_state.supernode` | ~10 (shares logic with S1.5) |
 
@@ -321,22 +350,29 @@ existing helpers).
 
 ---
 
-## 5. Eval-doc edits planned (after approval)
+## 5. Eval-doc edits planned (after approval) — superseded
+
+This section is superseded by the current eval pack and this coverage-analysis
+refresh. It is kept only to preserve the original review trail.
 
 1. **Header** (line 7+): refresh "Latest recorded devnet run" once we know the new pass/skip counts after script extensions land.
 2. **"Scripted Coverage" block** (lines 41–57): rewrite to itemize each assertion the script makes by ID (S1.1 … S8.3), grouped by scenario.
 3. **Each scenario's Steps list**: add inline `**[AUTO: …]**`, `**[AUTO-NEW: …]**`, `**[MANUAL: …]**`, `**[COVERED-ELSEWHERE: …]**` tag at the end of each numbered step.
 4. **Each scenario's Checklist**: add a leading `(scripted)` or `(manual)` marker per item so the operator can skip checked-by-script items confidently.
-5. **Scenario 1 step 3** wording: change "module-account everlight" → "supernode pool module account (embedded Everlight)" since the standalone `everlight` module account no longer exists.
+5. **Scenario 1 step 3** wording: change legacy module-account wording to "supernode pool module account (embedded Everlight)" since the standalone `everlight` module account no longer exists.
 6. **Scenario 9 / Scenario 10**: add a "Scripted Coverage Note" explaining why these are skipped in `everlight_test.sh` and where they're covered (`app/upgrades/v1_12_0/upgrade_test.go`, plus sequential execution of S1+S3+S4+S5).
 
 ---
 
-## 6. Open questions for the operator
+## 6. Open questions for the operator — superseded / deferred
 
-1. **OK to drop the `everlight` module-account references** in Scenario 1 (eval doc step 3)? Code reality is the embedded `supernode` module account holds the pool funds — see `x/supernode/v1/types/keys.go` and `recent_decisions[2026-04-08]`. The eval doc currently says "auth module-account everlight" which would fail today.
-2. **Do we want the smoothing-window oscillation test (S5.5b)?** It costs ~1–2 minutes runtime but is the only way to demonstrate `measurement_smoothing_periods > 1` behavior live.
-3. **Do we want a Cascade-action gated test (S6.3)?** Even gated behind a clean `skip` when supernode service is absent, it adds maintenance. Alternative: keep S6 as a params-only check and rely on `tests/integration/action` for the fee-routing path.
-4. **Confirm Scenario 9 stays a stub.** The Go upgrade test is in gate evidence; running a live devnet upgrade chain inside `everlight_test.sh` is out of scope.
+Resolved for the current gate/eval pass:
 
-After your answers I'll make the two edits (eval doc + script) in that order.
+1. `everlight` module-account references were replaced by the embedded
+   `supernode` module-account design.
+2. Smoothing-window oscillation remains deferred; keeper/E2E tests are the
+   canonical evidence for now.
+3. Cascade-action gated devnet coverage remains deferred; integration tests are
+   the canonical evidence for now.
+4. Scenario 9 remains a stub in `everlight_test.sh`; upgrade evidence stays in
+   `app/upgrades/v1_12_0`.

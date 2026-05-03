@@ -20,10 +20,11 @@ import (
 	address "cosmossdk.io/core/address"
 	log "cosmossdk.io/log"
 	math "cosmossdk.io/math"
-	types "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
-	types0 "github.com/cosmos/cosmos-sdk/types"
+	types "github.com/LumeraProtocol/lumera/x/audit/v1/types"
+	types0 "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+	types1 "github.com/cosmos/cosmos-sdk/types"
 	query "github.com/cosmos/cosmos-sdk/types/query"
-	types1 "github.com/cosmos/cosmos-sdk/x/staking/types"
+	types2 "github.com/cosmos/cosmos-sdk/x/staking/types"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -52,7 +53,7 @@ func (m *MockSupernodeKeeper) EXPECT() *MockSupernodeKeeperMockRecorder {
 }
 
 // CheckValidatorSupernodeEligibility mocks base method.
-func (m *MockSupernodeKeeper) CheckValidatorSupernodeEligibility(ctx types0.Context, validator types1.ValidatorI, valAddr, supernodeAccount string) error {
+func (m *MockSupernodeKeeper) CheckValidatorSupernodeEligibility(ctx types1.Context, validator types2.ValidatorI, valAddr, supernodeAccount string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CheckValidatorSupernodeEligibility", ctx, validator, valAddr, supernodeAccount)
 	ret0, _ := ret[0].(error)
@@ -65,8 +66,22 @@ func (mr *MockSupernodeKeeperMockRecorder) CheckValidatorSupernodeEligibility(ct
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CheckValidatorSupernodeEligibility", reflect.TypeOf((*MockSupernodeKeeper)(nil).CheckValidatorSupernodeEligibility), ctx, validator, valAddr, supernodeAccount)
 }
 
+// CountEligibleSNs mocks base method.
+func (m *MockSupernodeKeeper) CountEligibleSNs(ctx types1.Context) uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CountEligibleSNs", ctx)
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// CountEligibleSNs indicates an expected call of CountEligibleSNs.
+func (mr *MockSupernodeKeeperMockRecorder) CountEligibleSNs(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountEligibleSNs", reflect.TypeOf((*MockSupernodeKeeper)(nil).CountEligibleSNs), ctx)
+}
+
 // DeleteMetricsState mocks base method.
-func (m *MockSupernodeKeeper) DeleteMetricsState(ctx types0.Context, valAddr types0.ValAddress) {
+func (m *MockSupernodeKeeper) DeleteMetricsState(ctx types1.Context, valAddr types1.ValAddress) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "DeleteMetricsState", ctx, valAddr)
 }
@@ -78,7 +93,7 @@ func (mr *MockSupernodeKeeperMockRecorder) DeleteMetricsState(ctx, valAddr any) 
 }
 
 // DeleteSuperNode mocks base method.
-func (m *MockSupernodeKeeper) DeleteSuperNode(ctx types0.Context, valAddr types0.ValAddress) {
+func (m *MockSupernodeKeeper) DeleteSuperNode(ctx types1.Context, valAddr types1.ValAddress) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "DeleteSuperNode", ctx, valAddr)
 }
@@ -89,15 +104,27 @@ func (mr *MockSupernodeKeeperMockRecorder) DeleteSuperNode(ctx, valAddr any) *go
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSuperNode", reflect.TypeOf((*MockSupernodeKeeper)(nil).DeleteSuperNode), ctx, valAddr)
 }
 
+// EnsureModuleAccount mocks base method.
+func (m *MockSupernodeKeeper) EnsureModuleAccount(ctx types1.Context) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "EnsureModuleAccount", ctx)
+}
+
+// EnsureModuleAccount indicates an expected call of EnsureModuleAccount.
+func (mr *MockSupernodeKeeperMockRecorder) EnsureModuleAccount(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureModuleAccount", reflect.TypeOf((*MockSupernodeKeeper)(nil).EnsureModuleAccount), ctx)
+}
+
 // GetAllSuperNodes mocks base method.
-func (m *MockSupernodeKeeper) GetAllSuperNodes(ctx types0.Context, stateFilters ...types.SuperNodeState) ([]types.SuperNode, error) {
+func (m *MockSupernodeKeeper) GetAllSuperNodes(ctx types1.Context, stateFilters ...types0.SuperNodeState) ([]types0.SuperNode, error) {
 	m.ctrl.T.Helper()
 	varargs := []any{ctx}
 	for _, a := range stateFilters {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "GetAllSuperNodes", varargs...)
-	ret0, _ := ret[0].([]types.SuperNode)
+	ret0, _ := ret[0].([]types0.SuperNode)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -124,7 +151,7 @@ func (mr *MockSupernodeKeeperMockRecorder) GetAuthority() *gomock.Call {
 }
 
 // GetBlockHashForHeight mocks base method.
-func (m *MockSupernodeKeeper) GetBlockHashForHeight(ctx types0.Context, height int64) ([]byte, error) {
+func (m *MockSupernodeKeeper) GetBlockHashForHeight(ctx types1.Context, height int64) ([]byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetBlockHashForHeight", ctx, height)
 	ret0, _ := ret[0].([]byte)
@@ -138,11 +165,41 @@ func (mr *MockSupernodeKeeperMockRecorder) GetBlockHashForHeight(ctx, height any
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockHashForHeight", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetBlockHashForHeight), ctx, height)
 }
 
+// GetLastDistributionHeight mocks base method.
+func (m *MockSupernodeKeeper) GetLastDistributionHeight(ctx types1.Context) int64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLastDistributionHeight", ctx)
+	ret0, _ := ret[0].(int64)
+	return ret0
+}
+
+// GetLastDistributionHeight indicates an expected call of GetLastDistributionHeight.
+func (mr *MockSupernodeKeeperMockRecorder) GetLastDistributionHeight(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastDistributionHeight", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetLastDistributionHeight), ctx)
+}
+
+// GetLatestCascadeBytesForPayout mocks base method.
+func (m *MockSupernodeKeeper) GetLatestCascadeBytesForPayout(ctx types1.Context, supernodeAccount string) (float64, int64, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLatestCascadeBytesForPayout", ctx, supernodeAccount)
+	ret0, _ := ret[0].(float64)
+	ret1, _ := ret[1].(int64)
+	ret2, _ := ret[2].(bool)
+	return ret0, ret1, ret2
+}
+
+// GetLatestCascadeBytesForPayout indicates an expected call of GetLatestCascadeBytesForPayout.
+func (mr *MockSupernodeKeeperMockRecorder) GetLatestCascadeBytesForPayout(ctx, supernodeAccount any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLatestCascadeBytesForPayout", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetLatestCascadeBytesForPayout), ctx, supernodeAccount)
+}
+
 // GetMetricsState mocks base method.
-func (m *MockSupernodeKeeper) GetMetricsState(ctx types0.Context, valAddr types0.ValAddress) (types.SupernodeMetricsState, bool) {
+func (m *MockSupernodeKeeper) GetMetricsState(ctx types1.Context, valAddr types1.ValAddress) (types0.SupernodeMetricsState, bool) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetMetricsState", ctx, valAddr)
-	ret0, _ := ret[0].(types.SupernodeMetricsState)
+	ret0, _ := ret[0].(types0.SupernodeMetricsState)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }
@@ -154,10 +211,10 @@ func (mr *MockSupernodeKeeperMockRecorder) GetMetricsState(ctx, valAddr any) *go
 }
 
 // GetParams mocks base method.
-func (m *MockSupernodeKeeper) GetParams(ctx types0.Context) types.Params {
+func (m *MockSupernodeKeeper) GetParams(ctx types1.Context) types0.Params {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetParams", ctx)
-	ret0, _ := ret[0].(types.Params)
+	ret0, _ := ret[0].(types0.Params)
 	return ret0
 }
 
@@ -167,11 +224,54 @@ func (mr *MockSupernodeKeeperMockRecorder) GetParams(ctx any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetParams", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetParams), ctx)
 }
 
+// GetPoolBalance mocks base method.
+func (m *MockSupernodeKeeper) GetPoolBalance(ctx types1.Context) types1.Coins {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPoolBalance", ctx)
+	ret0, _ := ret[0].(types1.Coins)
+	return ret0
+}
+
+// GetPoolBalance indicates an expected call of GetPoolBalance.
+func (mr *MockSupernodeKeeperMockRecorder) GetPoolBalance(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPoolBalance", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetPoolBalance), ctx)
+}
+
+// GetRegistrationFeeShareBps mocks base method.
+func (m *MockSupernodeKeeper) GetRegistrationFeeShareBps(ctx types1.Context) uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRegistrationFeeShareBps", ctx)
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// GetRegistrationFeeShareBps indicates an expected call of GetRegistrationFeeShareBps.
+func (mr *MockSupernodeKeeperMockRecorder) GetRegistrationFeeShareBps(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRegistrationFeeShareBps", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetRegistrationFeeShareBps), ctx)
+}
+
+// GetSNDistState mocks base method.
+func (m *MockSupernodeKeeper) GetSNDistState(ctx types1.Context, valAddr string) (types0.SNDistState, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSNDistState", ctx, valAddr)
+	ret0, _ := ret[0].(types0.SNDistState)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetSNDistState indicates an expected call of GetSNDistState.
+func (mr *MockSupernodeKeeperMockRecorder) GetSNDistState(ctx, valAddr any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSNDistState", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetSNDistState), ctx, valAddr)
+}
+
 // GetStakingKeeper mocks base method.
-func (m *MockSupernodeKeeper) GetStakingKeeper() types.StakingKeeper {
+func (m *MockSupernodeKeeper) GetStakingKeeper() types0.StakingKeeper {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetStakingKeeper")
-	ret0, _ := ret[0].(types.StakingKeeper)
+	ret0, _ := ret[0].(types0.StakingKeeper)
 	return ret0
 }
 
@@ -182,10 +282,10 @@ func (mr *MockSupernodeKeeperMockRecorder) GetStakingKeeper() *gomock.Call {
 }
 
 // GetSuperNodeByAccount mocks base method.
-func (m *MockSupernodeKeeper) GetSuperNodeByAccount(ctx types0.Context, supernodeAccount string) (types.SuperNode, bool, error) {
+func (m *MockSupernodeKeeper) GetSuperNodeByAccount(ctx types1.Context, supernodeAccount string) (types0.SuperNode, bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetSuperNodeByAccount", ctx, supernodeAccount)
-	ret0, _ := ret[0].(types.SuperNode)
+	ret0, _ := ret[0].(types0.SuperNode)
 	ret1, _ := ret[1].(bool)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
@@ -198,14 +298,14 @@ func (mr *MockSupernodeKeeperMockRecorder) GetSuperNodeByAccount(ctx, supernodeA
 }
 
 // GetSuperNodesPaginated mocks base method.
-func (m *MockSupernodeKeeper) GetSuperNodesPaginated(ctx types0.Context, pagination *query.PageRequest, stateFilters ...types.SuperNodeState) ([]*types.SuperNode, *query.PageResponse, error) {
+func (m *MockSupernodeKeeper) GetSuperNodesPaginated(ctx types1.Context, pagination *query.PageRequest, stateFilters ...types0.SuperNodeState) ([]*types0.SuperNode, *query.PageResponse, error) {
 	m.ctrl.T.Helper()
 	varargs := []any{ctx, pagination}
 	for _, a := range stateFilters {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "GetSuperNodesPaginated", varargs...)
-	ret0, _ := ret[0].([]*types.SuperNode)
+	ret0, _ := ret[0].([]*types0.SuperNode)
 	ret1, _ := ret[1].(*query.PageResponse)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
@@ -218,8 +318,22 @@ func (mr *MockSupernodeKeeperMockRecorder) GetSuperNodesPaginated(ctx, paginatio
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSuperNodesPaginated", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetSuperNodesPaginated), varargs...)
 }
 
+// GetTotalDistributed mocks base method.
+func (m *MockSupernodeKeeper) GetTotalDistributed(ctx types1.Context) types1.Coins {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetTotalDistributed", ctx)
+	ret0, _ := ret[0].(types1.Coins)
+	return ret0
+}
+
+// GetTotalDistributed indicates an expected call of GetTotalDistributed.
+func (mr *MockSupernodeKeeperMockRecorder) GetTotalDistributed(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTotalDistributed", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetTotalDistributed), ctx)
+}
+
 // IsEligibleAndNotJailedValidator mocks base method.
-func (m *MockSupernodeKeeper) IsEligibleAndNotJailedValidator(ctx types0.Context, valAddr types0.ValAddress) bool {
+func (m *MockSupernodeKeeper) IsEligibleAndNotJailedValidator(ctx types1.Context, valAddr types1.ValAddress) bool {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "IsEligibleAndNotJailedValidator", ctx, valAddr)
 	ret0, _ := ret[0].(bool)
@@ -233,7 +347,7 @@ func (mr *MockSupernodeKeeperMockRecorder) IsEligibleAndNotJailedValidator(ctx, 
 }
 
 // IsSuperNodeActive mocks base method.
-func (m *MockSupernodeKeeper) IsSuperNodeActive(ctx types0.Context, valAddr types0.ValAddress) bool {
+func (m *MockSupernodeKeeper) IsSuperNodeActive(ctx types1.Context, valAddr types1.ValAddress) bool {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "IsSuperNodeActive", ctx, valAddr)
 	ret0, _ := ret[0].(bool)
@@ -261,10 +375,10 @@ func (mr *MockSupernodeKeeperMockRecorder) Logger() *gomock.Call {
 }
 
 // QuerySuperNode mocks base method.
-func (m *MockSupernodeKeeper) QuerySuperNode(ctx types0.Context, valOperAddr types0.ValAddress) (types.SuperNode, bool) {
+func (m *MockSupernodeKeeper) QuerySuperNode(ctx types1.Context, valOperAddr types1.ValAddress) (types0.SuperNode, bool) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "QuerySuperNode", ctx, valOperAddr)
-	ret0, _ := ret[0].(types.SuperNode)
+	ret0, _ := ret[0].(types0.SuperNode)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }
@@ -276,10 +390,10 @@ func (mr *MockSupernodeKeeperMockRecorder) QuerySuperNode(ctx, valOperAddr any) 
 }
 
 // RankSuperNodesByDistance mocks base method.
-func (m *MockSupernodeKeeper) RankSuperNodesByDistance(blockHash []byte, supernodes []types.SuperNode, topN int) []types.SuperNode {
+func (m *MockSupernodeKeeper) RankSuperNodesByDistance(blockHash []byte, supernodes []types0.SuperNode, topN int) []types0.SuperNode {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RankSuperNodesByDistance", blockHash, supernodes, topN)
-	ret0, _ := ret[0].([]types.SuperNode)
+	ret0, _ := ret[0].([]types0.SuperNode)
 	return ret0
 }
 
@@ -290,7 +404,7 @@ func (mr *MockSupernodeKeeperMockRecorder) RankSuperNodesByDistance(blockHash, s
 }
 
 // RecoverSuperNodeFromPostponed mocks base method.
-func (m *MockSupernodeKeeper) RecoverSuperNodeFromPostponed(ctx types0.Context, valAddr types0.ValAddress) error {
+func (m *MockSupernodeKeeper) RecoverSuperNodeFromPostponed(ctx types1.Context, valAddr types1.ValAddress) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RecoverSuperNodeFromPostponed", ctx, valAddr)
 	ret0, _ := ret[0].(error)
@@ -303,8 +417,20 @@ func (mr *MockSupernodeKeeperMockRecorder) RecoverSuperNodeFromPostponed(ctx, va
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecoverSuperNodeFromPostponed", reflect.TypeOf((*MockSupernodeKeeper)(nil).RecoverSuperNodeFromPostponed), ctx, valAddr)
 }
 
+// SetLastDistributionHeight mocks base method.
+func (m *MockSupernodeKeeper) SetLastDistributionHeight(ctx types1.Context, height int64) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetLastDistributionHeight", ctx, height)
+}
+
+// SetLastDistributionHeight indicates an expected call of SetLastDistributionHeight.
+func (mr *MockSupernodeKeeperMockRecorder) SetLastDistributionHeight(ctx, height any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastDistributionHeight", reflect.TypeOf((*MockSupernodeKeeper)(nil).SetLastDistributionHeight), ctx, height)
+}
+
 // SetMetricsState mocks base method.
-func (m *MockSupernodeKeeper) SetMetricsState(ctx types0.Context, state types.SupernodeMetricsState) error {
+func (m *MockSupernodeKeeper) SetMetricsState(ctx types1.Context, state types0.SupernodeMetricsState) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SetMetricsState", ctx, state)
 	ret0, _ := ret[0].(error)
@@ -318,7 +444,7 @@ func (mr *MockSupernodeKeeperMockRecorder) SetMetricsState(ctx, state any) *gomo
 }
 
 // SetParams mocks base method.
-func (m *MockSupernodeKeeper) SetParams(ctx types0.Context, params types.Params) error {
+func (m *MockSupernodeKeeper) SetParams(ctx types1.Context, params types0.Params) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SetParams", ctx, params)
 	ret0, _ := ret[0].(error)
@@ -332,7 +458,7 @@ func (mr *MockSupernodeKeeperMockRecorder) SetParams(ctx, params any) *gomock.Ca
 }
 
 // SetSuperNode mocks base method.
-func (m *MockSupernodeKeeper) SetSuperNode(ctx types0.Context, supernode types.SuperNode) error {
+func (m *MockSupernodeKeeper) SetSuperNode(ctx types1.Context, supernode types0.SuperNode) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SetSuperNode", ctx, supernode)
 	ret0, _ := ret[0].(error)
@@ -346,7 +472,7 @@ func (mr *MockSupernodeKeeperMockRecorder) SetSuperNode(ctx, supernode any) *gom
 }
 
 // SetSuperNodeActive mocks base method.
-func (m *MockSupernodeKeeper) SetSuperNodeActive(ctx types0.Context, valAddr types0.ValAddress, reason string) error {
+func (m *MockSupernodeKeeper) SetSuperNodeActive(ctx types1.Context, valAddr types1.ValAddress, reason string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SetSuperNodeActive", ctx, valAddr, reason)
 	ret0, _ := ret[0].(error)
@@ -360,7 +486,7 @@ func (mr *MockSupernodeKeeperMockRecorder) SetSuperNodeActive(ctx, valAddr, reas
 }
 
 // SetSuperNodePostponed mocks base method.
-func (m *MockSupernodeKeeper) SetSuperNodePostponed(ctx types0.Context, valAddr types0.ValAddress, reason string) error {
+func (m *MockSupernodeKeeper) SetSuperNodePostponed(ctx types1.Context, valAddr types1.ValAddress, reason string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SetSuperNodePostponed", ctx, valAddr, reason)
 	ret0, _ := ret[0].(error)
@@ -374,7 +500,7 @@ func (mr *MockSupernodeKeeperMockRecorder) SetSuperNodePostponed(ctx, valAddr, r
 }
 
 // SetSuperNodeStopped mocks base method.
-func (m *MockSupernodeKeeper) SetSuperNodeStopped(ctx types0.Context, valAddr types0.ValAddress, reason string) error {
+func (m *MockSupernodeKeeper) SetSuperNodeStopped(ctx types1.Context, valAddr types1.ValAddress, reason string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SetSuperNodeStopped", ctx, valAddr, reason)
 	ret0, _ := ret[0].(error)
@@ -426,10 +552,10 @@ func (mr *MockStakingKeeperMockRecorder) ConsensusAddressCodec() *gomock.Call {
 }
 
 // Delegation mocks base method.
-func (m *MockStakingKeeper) Delegation(ctx context.Context, delAddr types0.AccAddress, valAddr types0.ValAddress) (types1.DelegationI, error) {
+func (m *MockStakingKeeper) Delegation(ctx context.Context, delAddr types1.AccAddress, valAddr types1.ValAddress) (types2.DelegationI, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Delegation", ctx, delAddr, valAddr)
-	ret0, _ := ret[0].(types1.DelegationI)
+	ret0, _ := ret[0].(types2.DelegationI)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -441,10 +567,10 @@ func (mr *MockStakingKeeperMockRecorder) Delegation(ctx, delAddr, valAddr any) *
 }
 
 // Validator mocks base method.
-func (m *MockStakingKeeper) Validator(arg0 context.Context, arg1 types0.ValAddress) (types1.ValidatorI, error) {
+func (m *MockStakingKeeper) Validator(arg0 context.Context, arg1 types1.ValAddress) (types2.ValidatorI, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Validator", arg0, arg1)
-	ret0, _ := ret[0].(types1.ValidatorI)
+	ret0, _ := ret[0].(types2.ValidatorI)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -456,10 +582,10 @@ func (mr *MockStakingKeeperMockRecorder) Validator(arg0, arg1 any) *gomock.Call 
 }
 
 // ValidatorByConsAddr mocks base method.
-func (m *MockStakingKeeper) ValidatorByConsAddr(arg0 context.Context, arg1 types0.ConsAddress) (types1.ValidatorI, error) {
+func (m *MockStakingKeeper) ValidatorByConsAddr(arg0 context.Context, arg1 types1.ConsAddress) (types2.ValidatorI, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ValidatorByConsAddr", arg0, arg1)
-	ret0, _ := ret[0].(types1.ValidatorI)
+	ret0, _ := ret[0].(types2.ValidatorI)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -468,6 +594,62 @@ func (m *MockStakingKeeper) ValidatorByConsAddr(arg0 context.Context, arg1 types
 func (mr *MockStakingKeeperMockRecorder) ValidatorByConsAddr(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ValidatorByConsAddr", reflect.TypeOf((*MockStakingKeeper)(nil).ValidatorByConsAddr), arg0, arg1)
+}
+
+// MockAuditKeeper is a mock of AuditKeeper interface.
+type MockAuditKeeper struct {
+	ctrl     *gomock.Controller
+	recorder *MockAuditKeeperMockRecorder
+	isgomock struct{}
+}
+
+// MockAuditKeeperMockRecorder is the mock recorder for MockAuditKeeper.
+type MockAuditKeeperMockRecorder struct {
+	mock *MockAuditKeeper
+}
+
+// NewMockAuditKeeper creates a new mock instance.
+func NewMockAuditKeeper(ctrl *gomock.Controller) *MockAuditKeeper {
+	mock := &MockAuditKeeper{ctrl: ctrl}
+	mock.recorder = &MockAuditKeeperMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockAuditKeeper) EXPECT() *MockAuditKeeperMockRecorder {
+	return m.recorder
+}
+
+// GetCurrentEpochInfo mocks base method.
+func (m *MockAuditKeeper) GetCurrentEpochInfo(ctx types1.Context) (uint64, int64, int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCurrentEpochInfo", ctx)
+	ret0, _ := ret[0].(uint64)
+	ret1, _ := ret[1].(int64)
+	ret2, _ := ret[2].(int64)
+	ret3, _ := ret[3].(error)
+	return ret0, ret1, ret2, ret3
+}
+
+// GetCurrentEpochInfo indicates an expected call of GetCurrentEpochInfo.
+func (mr *MockAuditKeeperMockRecorder) GetCurrentEpochInfo(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentEpochInfo", reflect.TypeOf((*MockAuditKeeper)(nil).GetCurrentEpochInfo), ctx)
+}
+
+// GetReport mocks base method.
+func (m *MockAuditKeeper) GetReport(ctx types1.Context, epochID uint64, reporterSupernodeAccount string) (types.EpochReport, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetReport", ctx, epochID, reporterSupernodeAccount)
+	ret0, _ := ret[0].(types.EpochReport)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetReport indicates an expected call of GetReport.
+func (mr *MockAuditKeeperMockRecorder) GetReport(ctx, epochID, reporterSupernodeAccount any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetReport", reflect.TypeOf((*MockAuditKeeper)(nil).GetReport), ctx, epochID, reporterSupernodeAccount)
 }
 
 // MockSlashingKeeper is a mock of SlashingKeeper interface.
@@ -495,7 +677,7 @@ func (m *MockSlashingKeeper) EXPECT() *MockSlashingKeeperMockRecorder {
 }
 
 // IsTombstoned mocks base method.
-func (m *MockSlashingKeeper) IsTombstoned(arg0 context.Context, arg1 types0.ConsAddress) bool {
+func (m *MockSlashingKeeper) IsTombstoned(arg0 context.Context, arg1 types1.ConsAddress) bool {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "IsTombstoned", arg0, arg1)
 	ret0, _ := ret[0].(bool)
@@ -509,7 +691,7 @@ func (mr *MockSlashingKeeperMockRecorder) IsTombstoned(arg0, arg1 any) *gomock.C
 }
 
 // Jail mocks base method.
-func (m *MockSlashingKeeper) Jail(arg0 context.Context, arg1 types0.ConsAddress) error {
+func (m *MockSlashingKeeper) Jail(arg0 context.Context, arg1 types1.ConsAddress) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Jail", arg0, arg1)
 	ret0, _ := ret[0].(error)
@@ -523,7 +705,7 @@ func (mr *MockSlashingKeeperMockRecorder) Jail(arg0, arg1 any) *gomock.Call {
 }
 
 // JailUntil mocks base method.
-func (m *MockSlashingKeeper) JailUntil(arg0 context.Context, arg1 types0.ConsAddress, arg2 time.Time) error {
+func (m *MockSlashingKeeper) JailUntil(arg0 context.Context, arg1 types1.ConsAddress, arg2 time.Time) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "JailUntil", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -537,7 +719,7 @@ func (mr *MockSlashingKeeperMockRecorder) JailUntil(arg0, arg1, arg2 any) *gomoc
 }
 
 // Slash mocks base method.
-func (m *MockSlashingKeeper) Slash(ctx context.Context, consAddr types0.ConsAddress, fraction math.LegacyDec, power, distributionHeight int64) error {
+func (m *MockSlashingKeeper) Slash(ctx context.Context, consAddr types1.ConsAddress, fraction math.LegacyDec, power, distributionHeight int64) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Slash", ctx, consAddr, fraction, power, distributionHeight)
 	ret0, _ := ret[0].(error)
@@ -575,10 +757,10 @@ func (m *MockAccountKeeper) EXPECT() *MockAccountKeeperMockRecorder {
 }
 
 // GetAccount mocks base method.
-func (m *MockAccountKeeper) GetAccount(arg0 context.Context, arg1 types0.AccAddress) types0.AccountI {
+func (m *MockAccountKeeper) GetAccount(arg0 context.Context, arg1 types1.AccAddress) types1.AccountI {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAccount", arg0, arg1)
-	ret0, _ := ret[0].(types0.AccountI)
+	ret0, _ := ret[0].(types1.AccountI)
 	return ret0
 }
 
@@ -586,6 +768,34 @@ func (m *MockAccountKeeper) GetAccount(arg0 context.Context, arg1 types0.AccAddr
 func (mr *MockAccountKeeperMockRecorder) GetAccount(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAccount", reflect.TypeOf((*MockAccountKeeper)(nil).GetAccount), arg0, arg1)
+}
+
+// GetModuleAccount mocks base method.
+func (m *MockAccountKeeper) GetModuleAccount(ctx context.Context, moduleName string) types1.ModuleAccountI {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetModuleAccount", ctx, moduleName)
+	ret0, _ := ret[0].(types1.ModuleAccountI)
+	return ret0
+}
+
+// GetModuleAccount indicates an expected call of GetModuleAccount.
+func (mr *MockAccountKeeperMockRecorder) GetModuleAccount(ctx, moduleName any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetModuleAccount", reflect.TypeOf((*MockAccountKeeper)(nil).GetModuleAccount), ctx, moduleName)
+}
+
+// GetModuleAddress mocks base method.
+func (m *MockAccountKeeper) GetModuleAddress(moduleName string) types1.AccAddress {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetModuleAddress", moduleName)
+	ret0, _ := ret[0].(types1.AccAddress)
+	return ret0
+}
+
+// GetModuleAddress indicates an expected call of GetModuleAddress.
+func (mr *MockAccountKeeperMockRecorder) GetModuleAddress(moduleName any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetModuleAddress", reflect.TypeOf((*MockAccountKeeper)(nil).GetModuleAddress), moduleName)
 }
 
 // MockBankKeeper is a mock of BankKeeper interface.
@@ -612,25 +822,11 @@ func (m *MockBankKeeper) EXPECT() *MockBankKeeperMockRecorder {
 	return m.recorder
 }
 
-// GetBalance mocks base method.
-func (m *MockBankKeeper) GetBalance(ctx context.Context, addr types0.AccAddress, denom string) types0.Coin {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetBalance", ctx, addr, denom)
-	ret0, _ := ret[0].(types0.Coin)
-	return ret0
-}
-
-// GetBalance indicates an expected call of GetBalance.
-func (mr *MockBankKeeperMockRecorder) GetBalance(ctx, addr, denom any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBalance", reflect.TypeOf((*MockBankKeeper)(nil).GetBalance), ctx, addr, denom)
-}
-
 // GetAllBalances mocks base method.
-func (m *MockBankKeeper) GetAllBalances(ctx context.Context, addr types0.AccAddress) types0.Coins {
+func (m *MockBankKeeper) GetAllBalances(ctx context.Context, addr types1.AccAddress) types1.Coins {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAllBalances", ctx, addr)
-	ret0, _ := ret[0].(types0.Coins)
+	ret0, _ := ret[0].(types1.Coins)
 	return ret0
 }
 
@@ -640,8 +836,22 @@ func (mr *MockBankKeeperMockRecorder) GetAllBalances(ctx, addr any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAllBalances", reflect.TypeOf((*MockBankKeeper)(nil).GetAllBalances), ctx, addr)
 }
 
+// GetBalance mocks base method.
+func (m *MockBankKeeper) GetBalance(ctx context.Context, addr types1.AccAddress, denom string) types1.Coin {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBalance", ctx, addr, denom)
+	ret0, _ := ret[0].(types1.Coin)
+	return ret0
+}
+
+// GetBalance indicates an expected call of GetBalance.
+func (mr *MockBankKeeperMockRecorder) GetBalance(ctx, addr, denom any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBalance", reflect.TypeOf((*MockBankKeeper)(nil).GetBalance), ctx, addr, denom)
+}
+
 // SendCoinsFromModuleToAccount mocks base method.
-func (m *MockBankKeeper) SendCoinsFromModuleToAccount(ctx context.Context, senderModule string, recipientAddr types0.AccAddress, amt types0.Coins) error {
+func (m *MockBankKeeper) SendCoinsFromModuleToAccount(ctx context.Context, senderModule string, recipientAddr types1.AccAddress, amt types1.Coins) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SendCoinsFromModuleToAccount", ctx, senderModule, recipientAddr, amt)
 	ret0, _ := ret[0].(error)
@@ -655,10 +865,10 @@ func (mr *MockBankKeeperMockRecorder) SendCoinsFromModuleToAccount(ctx, senderMo
 }
 
 // SpendableCoins mocks base method.
-func (m *MockBankKeeper) SpendableCoins(arg0 context.Context, arg1 types0.AccAddress) types0.Coins {
+func (m *MockBankKeeper) SpendableCoins(arg0 context.Context, arg1 types1.AccAddress) types1.Coins {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SpendableCoins", arg0, arg1)
-	ret0, _ := ret[0].(types0.Coins)
+	ret0, _ := ret[0].(types1.Coins)
 	return ret0
 }
 
@@ -693,7 +903,7 @@ func (m *MockStakingHooks) EXPECT() *MockStakingHooksMockRecorder {
 }
 
 // AfterDelegationModified mocks base method.
-func (m *MockStakingHooks) AfterDelegationModified(ctx context.Context, delAddr types0.AccAddress, valAddr types0.ValAddress) error {
+func (m *MockStakingHooks) AfterDelegationModified(ctx context.Context, delAddr types1.AccAddress, valAddr types1.ValAddress) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AfterDelegationModified", ctx, delAddr, valAddr)
 	ret0, _ := ret[0].(error)
@@ -707,7 +917,7 @@ func (mr *MockStakingHooksMockRecorder) AfterDelegationModified(ctx, delAddr, va
 }
 
 // AfterValidatorBeginUnbonding mocks base method.
-func (m *MockStakingHooks) AfterValidatorBeginUnbonding(ctx context.Context, consAddr types0.ConsAddress, valAddr types0.ValAddress) error {
+func (m *MockStakingHooks) AfterValidatorBeginUnbonding(ctx context.Context, consAddr types1.ConsAddress, valAddr types1.ValAddress) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AfterValidatorBeginUnbonding", ctx, consAddr, valAddr)
 	ret0, _ := ret[0].(error)
@@ -721,7 +931,7 @@ func (mr *MockStakingHooksMockRecorder) AfterValidatorBeginUnbonding(ctx, consAd
 }
 
 // AfterValidatorBonded mocks base method.
-func (m *MockStakingHooks) AfterValidatorBonded(ctx context.Context, consAddr types0.ConsAddress, valAddr types0.ValAddress) error {
+func (m *MockStakingHooks) AfterValidatorBonded(ctx context.Context, consAddr types1.ConsAddress, valAddr types1.ValAddress) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AfterValidatorBonded", ctx, consAddr, valAddr)
 	ret0, _ := ret[0].(error)
@@ -735,7 +945,7 @@ func (mr *MockStakingHooksMockRecorder) AfterValidatorBonded(ctx, consAddr, valA
 }
 
 // AfterValidatorCreated mocks base method.
-func (m *MockStakingHooks) AfterValidatorCreated(ctx context.Context, valAddr types0.ValAddress) error {
+func (m *MockStakingHooks) AfterValidatorCreated(ctx context.Context, valAddr types1.ValAddress) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AfterValidatorCreated", ctx, valAddr)
 	ret0, _ := ret[0].(error)
@@ -749,7 +959,7 @@ func (mr *MockStakingHooksMockRecorder) AfterValidatorCreated(ctx, valAddr any) 
 }
 
 // AfterValidatorRemoved mocks base method.
-func (m *MockStakingHooks) AfterValidatorRemoved(ctx context.Context, consAddr types0.ConsAddress, valAddr types0.ValAddress) error {
+func (m *MockStakingHooks) AfterValidatorRemoved(ctx context.Context, consAddr types1.ConsAddress, valAddr types1.ValAddress) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AfterValidatorRemoved", ctx, consAddr, valAddr)
 	ret0, _ := ret[0].(error)
@@ -763,7 +973,7 @@ func (mr *MockStakingHooksMockRecorder) AfterValidatorRemoved(ctx, consAddr, val
 }
 
 // BeforeDelegationCreated mocks base method.
-func (m *MockStakingHooks) BeforeDelegationCreated(ctx context.Context, delAddr types0.AccAddress, valAddr types0.ValAddress) error {
+func (m *MockStakingHooks) BeforeDelegationCreated(ctx context.Context, delAddr types1.AccAddress, valAddr types1.ValAddress) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "BeforeDelegationCreated", ctx, delAddr, valAddr)
 	ret0, _ := ret[0].(error)
@@ -777,7 +987,7 @@ func (mr *MockStakingHooksMockRecorder) BeforeDelegationCreated(ctx, delAddr, va
 }
 
 // BeforeDelegationRemoved mocks base method.
-func (m *MockStakingHooks) BeforeDelegationRemoved(ctx context.Context, delAddr types0.AccAddress, valAddr types0.ValAddress) error {
+func (m *MockStakingHooks) BeforeDelegationRemoved(ctx context.Context, delAddr types1.AccAddress, valAddr types1.ValAddress) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "BeforeDelegationRemoved", ctx, delAddr, valAddr)
 	ret0, _ := ret[0].(error)
@@ -791,7 +1001,7 @@ func (mr *MockStakingHooksMockRecorder) BeforeDelegationRemoved(ctx, delAddr, va
 }
 
 // BeforeDelegationSharesModified mocks base method.
-func (m *MockStakingHooks) BeforeDelegationSharesModified(ctx context.Context, delAddr types0.AccAddress, valAddr types0.ValAddress) error {
+func (m *MockStakingHooks) BeforeDelegationSharesModified(ctx context.Context, delAddr types1.AccAddress, valAddr types1.ValAddress) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "BeforeDelegationSharesModified", ctx, delAddr, valAddr)
 	ret0, _ := ret[0].(error)
@@ -805,7 +1015,7 @@ func (mr *MockStakingHooksMockRecorder) BeforeDelegationSharesModified(ctx, delA
 }
 
 // BeforeValidatorModified mocks base method.
-func (m *MockStakingHooks) BeforeValidatorModified(ctx context.Context, valAddr types0.ValAddress) error {
+func (m *MockStakingHooks) BeforeValidatorModified(ctx context.Context, valAddr types1.ValAddress) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "BeforeValidatorModified", ctx, valAddr)
 	ret0, _ := ret[0].(error)
@@ -819,7 +1029,7 @@ func (mr *MockStakingHooksMockRecorder) BeforeValidatorModified(ctx, valAddr any
 }
 
 // BeforeValidatorSlashed mocks base method.
-func (m *MockStakingHooks) BeforeValidatorSlashed(ctx context.Context, valAddr types0.ValAddress, fraction math.LegacyDec) error {
+func (m *MockStakingHooks) BeforeValidatorSlashed(ctx context.Context, valAddr types1.ValAddress, fraction math.LegacyDec) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "BeforeValidatorSlashed", ctx, valAddr, fraction)
 	ret0, _ := ret[0].(error)
@@ -830,117 +1040,4 @@ func (m *MockStakingHooks) BeforeValidatorSlashed(ctx context.Context, valAddr t
 func (mr *MockStakingHooksMockRecorder) BeforeValidatorSlashed(ctx, valAddr, fraction any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BeforeValidatorSlashed", reflect.TypeOf((*MockStakingHooks)(nil).BeforeValidatorSlashed), ctx, valAddr, fraction)
-}
-
-// CountEligibleSNs mocks base method.
-func (m *MockSupernodeKeeper) CountEligibleSNs(ctx types0.Context) uint64 {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CountEligibleSNs", ctx)
-	ret0, _ := ret[0].(uint64)
-	return ret0
-}
-
-// CountEligibleSNs indicates an expected call of CountEligibleSNs.
-func (mr *MockSupernodeKeeperMockRecorder) CountEligibleSNs(ctx any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountEligibleSNs", reflect.TypeOf((*MockSupernodeKeeper)(nil).CountEligibleSNs), ctx)
-}
-
-// GetLastDistributionHeight mocks base method.
-func (m *MockSupernodeKeeper) GetLastDistributionHeight(ctx types0.Context) int64 {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetLastDistributionHeight", ctx)
-	ret0, _ := ret[0].(int64)
-	return ret0
-}
-
-// GetLastDistributionHeight indicates an expected call of GetLastDistributionHeight.
-func (mr *MockSupernodeKeeperMockRecorder) GetLastDistributionHeight(ctx any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastDistributionHeight", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetLastDistributionHeight), ctx)
-}
-
-// GetLatestCascadeBytesForPayout mocks base method.
-func (m *MockSupernodeKeeper) GetLatestCascadeBytesForPayout(ctx types0.Context, supernodeAccount string) (float64, int64, bool) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetLatestCascadeBytesForPayout", ctx, supernodeAccount)
-	ret0, _ := ret[0].(float64)
-	ret1, _ := ret[1].(int64)
-	ret2, _ := ret[2].(bool)
-	return ret0, ret1, ret2
-}
-
-// GetLatestCascadeBytesForPayout indicates an expected call of GetLatestCascadeBytesForPayout.
-func (mr *MockSupernodeKeeperMockRecorder) GetLatestCascadeBytesForPayout(ctx, supernodeAccount any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLatestCascadeBytesForPayout", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetLatestCascadeBytesForPayout), ctx, supernodeAccount)
-}
-
-// GetPoolBalance mocks base method.
-func (m *MockSupernodeKeeper) GetPoolBalance(ctx types0.Context) types0.Coins {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetPoolBalance", ctx)
-	ret0, _ := ret[0].(types0.Coins)
-	return ret0
-}
-
-// GetPoolBalance indicates an expected call of GetPoolBalance.
-func (mr *MockSupernodeKeeperMockRecorder) GetPoolBalance(ctx any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPoolBalance", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetPoolBalance), ctx)
-}
-
-// GetTotalDistributed mocks base method.
-func (m *MockSupernodeKeeper) GetTotalDistributed(ctx types0.Context) types0.Coins {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetTotalDistributed", ctx)
-	ret0, _ := ret[0].(types0.Coins)
-	return ret0
-}
-
-// GetTotalDistributed indicates an expected call of GetTotalDistributed.
-func (mr *MockSupernodeKeeperMockRecorder) GetTotalDistributed(ctx any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTotalDistributed", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetTotalDistributed), ctx)
-}
-
-// GetSNDistState mocks base method.
-func (m *MockSupernodeKeeper) GetSNDistState(ctx types0.Context, valAddr string) (types.SNDistState, bool) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetSNDistState", ctx, valAddr)
-	ret0, _ := ret[0].(types.SNDistState)
-	ret1, _ := ret[1].(bool)
-	return ret0, ret1
-}
-
-// GetSNDistState indicates an expected call of GetSNDistState.
-func (mr *MockSupernodeKeeperMockRecorder) GetSNDistState(ctx, valAddr any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSNDistState", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetSNDistState), ctx, valAddr)
-}
-
-// GetRegistrationFeeShareBps mocks base method.
-func (m *MockSupernodeKeeper) GetRegistrationFeeShareBps(ctx types0.Context) uint64 {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetRegistrationFeeShareBps", ctx)
-	ret0, _ := ret[0].(uint64)
-	return ret0
-}
-
-// GetRegistrationFeeShareBps indicates an expected call of GetRegistrationFeeShareBps.
-func (mr *MockSupernodeKeeperMockRecorder) GetRegistrationFeeShareBps(ctx any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRegistrationFeeShareBps", reflect.TypeOf((*MockSupernodeKeeper)(nil).GetRegistrationFeeShareBps), ctx)
-}
-
-// SetLastDistributionHeight mocks base method.
-func (m *MockSupernodeKeeper) SetLastDistributionHeight(ctx types0.Context, height int64) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetLastDistributionHeight", ctx, height)
-}
-
-// SetLastDistributionHeight indicates an expected call of SetLastDistributionHeight.
-func (mr *MockSupernodeKeeperMockRecorder) SetLastDistributionHeight(ctx, height any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastDistributionHeight", reflect.TypeOf((*MockSupernodeKeeper)(nil).SetLastDistributionHeight), ctx, height)
 }

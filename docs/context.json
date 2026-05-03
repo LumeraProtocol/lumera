@@ -408,6 +408,24 @@
       "warnings": 4,
       "coverage": "n/a",
       "notes": "Context synced first: S10-S15 Everlight features reopened to review. Functional Everlight tests passed, LEP-5 regressions passed, make devnet-tests-everlight passed with 35 pass/0 fail/5 skip, govulncheck found 0 called vulnerabilities, make build passed, make build-proto passed, scoped golangci-lint passed. Remaining buf lint SUPERNODE_STATE_* enum prefix findings are waived because enum names are intentionally preserved for API compatibility. Non-BRIDGE-tracked changes ignored per operator instruction."
+    },
+    {
+      "date": "2026-05-01T02:29:00Z",
+      "result": "fail",
+      "features": [
+        "F10",
+        "F11",
+        "F12",
+        "F13",
+        "F14",
+        "F15",
+        "F16",
+        "F18"
+      ],
+      "blocking_issues": 1,
+      "warnings": 5,
+      "coverage": "n/a",
+      "notes": "Re-gate at commit 451f8a8 after PR updates. make build-proto, scoped action/supernode tests, integration/action, integration/everlight, e2e/everlight, app/upgrades/v1_12_0, govulncheck, and make build passed. Operator waived 3 scoped golangci-lint unused-symbol findings in x/supernode/v1/keeper on 2026-05-01. Gate remains failed because local devnet was unavailable for make devnet-tests-everlight. buf lint proto/ still reports broad repository findings; S10-S15 SUPERNODE_STATE_* enum-prefix findings remain compatibility-waived, LEP-6/audit findings are outside this Everlight P1 gate."
     }
   ],
   "eval_history": [

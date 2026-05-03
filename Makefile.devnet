@@ -1,6 +1,6 @@
 .PHONY: devnet-build devnet-tests-build devnet-up devnet-reset devnet-up-detach devnet-down devnet-stop devnet-clean devnet-deploy-tar devnet-upgrade devnet-new devnet-start
 .PHONY: devnet-build-default _check-devnet-default-cfg devnet-upgrade-binaries devnet-upgrade-binaries-default devnet-update-scripts
-.PHONY: devnet-tests-everlight devnet-new-no-hermes
+.PHONY: devnet-tests-everlight devnet-tests-lep6 devnet-new-no-hermes
 
 ##### Devnet Makefile ########################################
 #
@@ -366,6 +366,12 @@ devnet-deploy-tar:
 devnet-tests-everlight:
 	@echo "Running Everlight devnet tests..."
 	@bash devnet/tests/everlight/everlight_test.sh
+
+devnet-tests-lep6:
+	@echo "Running LEP-6 storage-truth devnet tests..."
+	@COMPOSE_FILE="$${COMPOSE_FILE:-devnet/docker-compose.yml}" \
+		CHAIN_ID="$${CHAIN_ID:-lumera-devnet-1}" \
+		bash devnet/tests/lep6/lep6_test.sh
 
 devnet-new-no-hermes:
 	$(MAKE) devnet-down

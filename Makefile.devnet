@@ -5,7 +5,7 @@
 .PHONY: devnet-download-binaries
 .PHONY: devnet-evmigration-sync-bin devnet-evmigration-prepare devnet-evmigration-estimate devnet-evmigration-migrate devnet-evmigration-migrate-validator devnet-evmigration-cleanup
 .PHONY: devnet-evmigrationp-prepare devnet-evmigrationp-estimate devnet-evmigrationp-migrate devnet-evmigrationp-migrate-validator devnet-evmigrationp-migrate-all devnet-evmigrationp-cleanup
-.PHONY: devnet-tests-everlight devnet-new-no-hermes
+.PHONY: devnet-tests-everlight devnet-tests-lep6 devnet-new-no-hermes
 
 ##### Devnet Makefile ########################################
 #
@@ -81,7 +81,7 @@ DEFAULT_GENESIS_FILE := devnet/default-config/devnet-genesis.json
 DEFAULT_GENESIS_EVM_FILE := devnet/default-config/devnet-genesis-evm.json
 DEFAULT_CLAIMS_FILE := devnet/default-config/claims.csv
 ORIG_GENESIS_FILE := devnet/default-config/devnet-genesis-orig.json
-EVM_CUTOVER_VERSION ?= v1.20.0
+EVM_CUTOVER_VERSION ?= v1.12.0
 DEVNET_UPGRADE_RELEASE ?= auto
 
 devnet-tests-build:
@@ -821,6 +821,12 @@ devnet-evmigrationp-cleanup: devnet-evmigration-sync-bin
 devnet-tests-everlight:
 	@echo "Running Everlight devnet tests..."
 	@bash devnet/tests/everlight/everlight_test.sh
+
+devnet-tests-lep6:
+	@echo "Running LEP-6 storage-truth devnet tests..."
+	@COMPOSE_FILE="$${COMPOSE_FILE:-devnet/docker-compose.yml}" \
+		CHAIN_ID="$${CHAIN_ID:-lumera-devnet-1}" \
+		bash devnet/tests/lep6/lep6_test.sh
 
 devnet-new-no-hermes:
 	$(MAKE) devnet-down

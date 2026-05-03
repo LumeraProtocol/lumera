@@ -57,7 +57,7 @@
         "sc_challengers_per_epoch": 0,
         "storage_truth_recent_bucket_max_blocks": "60",
         "storage_truth_old_bucket_min_blocks": "600",
-        "storage_truth_challenge_target_divisor": 3,
+        "storage_truth_challenge_target_divisor": 1,
         "storage_truth_compound_ranges_per_artifact": 4,
         "storage_truth_compound_range_len_bytes": 256,
         "storage_truth_max_self_heal_ops_per_epoch": 5,
@@ -70,7 +70,7 @@
         "storage_truth_node_suspicion_threshold_postpone": "90",
         "storage_truth_reporter_reliability_low_trust_threshold": "20",
         "storage_truth_reporter_reliability_ineligible_threshold": "90",
-        "storage_truth_ticket_deterioration_heal_threshold": "50",
+        "storage_truth_ticket_deterioration_heal_threshold": "8",
         "storage_truth_enforcement_mode": "STORAGE_TRUTH_ENFORCEMENT_MODE_SHADOW",
         "storage_truth_reporter_reliability_degraded_threshold": "50",
         "storage_truth_pattern_escalation_window": 14,
@@ -250,7 +250,8 @@
       "params": {
         "enable_migration": true,
         "max_migrations_per_block": "50",
-        "max_validator_delegations": "2000"
+        "max_validator_delegations": "2000",
+        "max_multisig_sub_keys": 20
       },
       "migration_records": [],
       "total_migrated": "0",

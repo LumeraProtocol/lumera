@@ -41,7 +41,10 @@ func NewLumeradCLI(t *testing.T, sut *SystemUnderTest, verbose bool) *LumeradCli
 		sut.AwaitNextBlock,
 		sut.nodesCount,
 		filepath.Join(WorkDir, sut.outputDir),
-		"500"+lcfg.ChainDenom,
+		// Default fee carries enough headroom over the EVM feemarket base fee
+		// (~0.001ulume * 500_000 gas ≈ 500ulume floor) so dynamic bumps under
+		// load don't fail txs with "insufficient fee".
+		"5000"+lcfg.ChainDenom,
 		verbose,
 		assert.NoError,
 		true,

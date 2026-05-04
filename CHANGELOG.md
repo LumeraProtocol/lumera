@@ -40,13 +40,35 @@ Full EVM integration documentation: [docs/evm-integration/main.md](docs/evm-inte
 
 ---
 
+## 1.12.0
+
+Changes included since `v1.11.1` (range: `v1.11.1..v1.12.0`).
+
+- Added LEP-5 Cascade availability commitments: BLAKE3 Merkle commitments, chunk proofs, commitment validation, SVC proof verification, and integration/system/devnet coverage.
+- Added Everlight Phase 1 in `x/supernode`: `STORAGE_FULL` state, reward distribution params/state/queries, periodic pool distribution, registration-fee routing, and v1.12.0 upgrade initialization.
+- Added LEP-6 storage-truth foundation scaffolding in `x/audit/v1`, including storage-truth messages, scoring/state, query support, pruning, and broad keeper/system coverage.
+- Replaced consensus-sensitive protobuf maps with deterministic concrete structures and added consensus-determinism CI coverage.
+- Fixed audit/supernode AutoCLI query marshalling issues, including float64 query args and `get-metrics` wiring.
+- Improved Everlight devnet tests, genesis defaults, epoch-boundary handling, and upgrade-handler completeness for post-1.11.1 defaults.
+- Added Ledger build support and pinned release builds to Ubuntu 22.04 for glibc compatibility.
+
+---
+
+## 1.11.1-hotfix
+
+Changes included since `v1.11.1` (range: `v1.11.1..v1.11.1-hotfix`).
+
+- Fixed bad `EVIDENCE_TYPE_CASCADE_CLIENT_FAILURE` handling in audit evidence submission and regenerated affected protobuf/OpenAPI outputs.
+- Included Ledger build support and build-tag workflow updates from the release branch.
+
+---
+
 ## 1.11.1
 
 Changes included since `v1.11.0` (range: `v1.11.0..v1.11.1`).
 
-- Added v1.11.1 upgrade handler that supports both direct upgrades from pre-audit binaries (e.g. v1.10.1→v1.11.1) and incremental upgrades from v1.11.0 by conditionally initializing the audit module.
-- Enforced a minimum floor of 15% for `audit.params.min_disk_free_percent` during upgrade.
-- Added conditional audit store loader so the audit store key is added only when upgrading from a version that lacks it.
+- Added the v1.11.1 audit upgrade handler to enforce a `min_disk_free_percent` floor and repair missing audit params during upgrade.
+- Added audit store-loader selection and tests for safe v1.11.1 upgrade startup.
 
 ---
 

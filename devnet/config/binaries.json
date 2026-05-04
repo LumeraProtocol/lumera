@@ -86,7 +86,7 @@
         "v1.12.0": {
             "bin_dir": "bin-v1.12.0",
             "lumera": {
-                "tag": "v1.12.0-rc"
+                "tag": "v1.12.0"
             },
             "supernode": {
                 "tag": "v2.4.72"

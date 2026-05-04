@@ -19,16 +19,24 @@ usage() {
 Usage:
   lumera-helper.sh new-account AMOUNT
   lumera-helper.sh list-accounts
+  lumera-helper.sh generate-evm-accounts
 
 Commands:
-  new-account AMOUNT  Create a new keyring account, fund it from this node's
-                      genesis account, and print the mnemonic + address.
-                      AMOUNT can be either:
-                        - a bare number, interpreted as display units (LUME)
-                          e.g. "5" → 5 LUME
-                        - a number with the chain base denom suffix
-                          e.g. "10000ulume" → 10000ulume (base units)
-  list-accounts       List generated user accounts as "key: address".
+  new-account AMOUNT       Create a new keyring account, fund it from this node's
+                           genesis account, and print the mnemonic + address.
+                           AMOUNT can be either:
+                             - a bare number, interpreted as display units (LUME)
+                               e.g. "5" → 5 LUME
+                             - a number with the chain base denom suffix
+                               e.g. "10000ulume" → 10000ulume (base units)
+  list-accounts            List generated user accounts as "key: address".
+  generate-evm-accounts    For every cosmos account in user-accounts.json,
+                           import the same mnemonic under coin-type 60 /
+                           eth_secp256k1 as "user-account-evm-val<N>-<NNN>",
+                           rewrite the JSON entry so "address" holds the new
+                           EVM address, the legacy bech32 moves to
+                           "legacy_address", "name" tracks the new key, and
+                           "type" becomes "evm". Requires an EVM-migrated chain.
 EOF
 }
 
@@ -235,21 +243,45 @@ next_account_name() {
 }
 
 cmd_list_accounts() {
-	local prefix names name address
+	local accounts_count idx
+	local name address acct_type legacy_address legacy_key
 
 	load_config
-	prefix="$(account_name_prefix)"
-	names="$("${DAEMON}" --home "${DAEMON_HOME}" keys list --keyring-backend "${KEYRING_BACKEND}" --output json 2>/dev/null | jq -r '.[].name // empty' || true)"
 
-	while IFS= read -r name; do
-		[ -z "${name}" ] && continue
-		case "${name}" in
-		"${prefix}"-*)
-			address="$(trim "$("${DAEMON}" --home "${DAEMON_HOME}" keys show "${name}" -a --keyring-backend "${KEYRING_BACKEND}" 2>/dev/null || true)")"
-			[ -n "${address}" ] && printf '%s: %s\n' "${name}" "${address}"
-			;;
-		esac
-	done <<<"${names}"
+	# Source of truth is user-accounts.json (per-validator, written by
+	# new-account / generate-evm-accounts). Iterating the keyring directly
+	# would lose the legacy↔EVM pairing recorded only in JSON.
+	if [ ! -f "${USER_ACCOUNTS_FILE}" ]; then
+		return 0
+	fi
+
+	accounts_count="$(jq 'length' "${USER_ACCOUNTS_FILE}" 2>/dev/null || echo 0)"
+	if [ -z "${accounts_count}" ] || [ "${accounts_count}" = "0" ]; then
+		return 0
+	fi
+
+	for ((idx = 0; idx < accounts_count; idx++)); do
+		name="$(jq -r --argjson i "${idx}" '.[$i].name // empty' "${USER_ACCOUNTS_FILE}")"
+		address="$(jq -r --argjson i "${idx}" '.[$i].address // empty' "${USER_ACCOUNTS_FILE}")"
+		acct_type="$(jq -r --argjson i "${idx}" '.[$i].type // "cosmos"' "${USER_ACCOUNTS_FILE}")"
+		legacy_address="$(jq -r --argjson i "${idx}" '.[$i].legacy_address // empty' "${USER_ACCOUNTS_FILE}")"
+		legacy_key="$(jq -r --argjson i "${idx}" '.[$i].legacy_key // empty' "${USER_ACCOUNTS_FILE}")"
+
+		if [ -z "${name}" ] || [ -z "${address}" ]; then
+			continue
+		fi
+
+		# Migrated entry: print a paired view so the user can see both
+		# the original cosmos key/address and the post-migration EVM
+		# key/address that share the same mnemonic.
+		if [ -n "${legacy_address}" ] && [ -n "${legacy_key}" ]; then
+			printf '%s(cosmos): %s\n' "${legacy_key}" "${legacy_address}"
+			printf '%s(evm): %s\n' "${name}" "${address}"
+			continue
+		fi
+
+		printf '%s(%s): %s\n' "${name}" "${acct_type}" "${address}"
+	done
 }
 
 key_exists() {
@@ -422,6 +454,191 @@ write_user_account_record() {
 	chmod 644 "${USER_ACCOUNTS_FILE}"
 }
 
+assert_evm_chain_ready() {
+	require_cmd "${DAEMON}"
+
+	if ! curl -sf "${NODE_ADDR}/status" >/dev/null 2>&1; then
+		echo "ERROR: lumerad RPC is not reachable at ${NODE_ADDR}" >&2
+		exit 1
+	fi
+
+	if ! "${DAEMON}" status --node "${NODE_ADDR}" >/dev/null 2>&1; then
+		echo "ERROR: ${DAEMON} cannot query node status via ${NODE_ADDR}" >&2
+		exit 1
+	fi
+
+	# `q evm params` only succeeds on a chain where the cosmos-evm module
+	# (Go-side: x/vm; CLI-side: "evm") is live — i.e. one that has already
+	# gone through the EVM upgrade. A pre-upgrade chain rejects the query,
+	# and a pre-upgrade binary doesn't even register the subcommand. Either
+	# failure means we cannot derive eth_secp256k1 accounts that match what
+	# users will see on chain.
+	if ! "${DAEMON}" q evm params --node "${NODE_ADDR}" --output json >/dev/null 2>&1; then
+		echo "ERROR: chain at ${NODE_ADDR} is not EVM-migrated (lumerad q evm params failed)" >&2
+		exit 1
+	fi
+}
+
+evm_account_name_for() {
+	local cosmos_name="$1"
+
+	# Insert "evm-" between the "user-account-" prefix and the validator
+	# suffix so e.g. "user-account-val4-001" becomes
+	# "user-account-evm-val4-001". For names that don't follow the standard
+	# devnet pattern, fall back to a leading "evm-" tag so they're still
+	# distinguishable from their legacy counterpart in the keyring.
+	case "${cosmos_name}" in
+	user-account-val*)
+		printf 'user-account-evm-%s' "${cosmos_name#user-account-}"
+		;;
+	*)
+		printf 'evm-%s' "${cosmos_name}"
+		;;
+	esac
+}
+
+import_evm_key_from_mnemonic() {
+	local key_name="$1"
+	local mnemonic="$2"
+
+	# `--recover` makes lumerad consume the mnemonic from stdin (one line).
+	# Coin-type 60 / eth_secp256k1 are EVM-account defaults, but we pass
+	# them explicitly so the call stays correct on chains where the binary
+	# default has not yet flipped or has been overridden via config.
+	printf '%s\n' "${mnemonic}" | "${DAEMON}" --home "${DAEMON_HOME}" \
+		keys add "${key_name}" \
+		--recover \
+		--coin-type 60 \
+		--algo eth_secp256k1 \
+		--keyring-backend "${KEYRING_BACKEND}" \
+		--output json
+}
+
+update_account_to_evm() {
+	local idx="$1"
+	local new_name="$2"
+	local new_address="$3"
+	local legacy_address="$4"
+	local legacy_key="$5"
+	local tmp_file
+
+	tmp_file="$(mktemp)"
+	jq \
+		--argjson i "${idx}" \
+		--arg new_name "${new_name}" \
+		--arg new_address "${new_address}" \
+		--arg legacy_address "${legacy_address}" \
+		--arg legacy_key "${legacy_key}" \
+		'
+		.[$i] |= (
+			.name = $new_name
+			| .address = $new_address
+			| .legacy_address = $legacy_address
+			| .legacy_key = $legacy_key
+			| .type = "evm"
+		)
+		' "${USER_ACCOUNTS_FILE}" >"${tmp_file}"
+	chmod 644 "${tmp_file}"
+	mv "${tmp_file}" "${USER_ACCOUNTS_FILE}"
+	chmod 644 "${USER_ACCOUNTS_FILE}"
+}
+
+cmd_generate_evm_accounts() {
+	local accounts_count idx
+	local processed=0 imported=0 reused=0 skipped_evm=0 skipped_other=0
+
+	load_config
+	assert_evm_chain_ready
+
+	if [ ! -f "${USER_ACCOUNTS_FILE}" ]; then
+		echo "ERROR: user accounts file not found: ${USER_ACCOUNTS_FILE}" >&2
+		exit 1
+	fi
+
+	accounts_count="$(jq 'length' "${USER_ACCOUNTS_FILE}" 2>/dev/null || echo 0)"
+	if [ -z "${accounts_count}" ] || [ "${accounts_count}" = "0" ]; then
+		echo "No accounts in ${USER_ACCOUNTS_FILE}; nothing to do."
+		return 0
+	fi
+
+	for ((idx = 0; idx < accounts_count; idx++)); do
+		local cosmos_name cosmos_address mnemonic acct_type existing_legacy
+		local evm_name new_address key_json
+
+		cosmos_name="$(jq -r --argjson i "${idx}" '.[$i].name // empty' "${USER_ACCOUNTS_FILE}")"
+		cosmos_address="$(jq -r --argjson i "${idx}" '.[$i].address // empty' "${USER_ACCOUNTS_FILE}")"
+		mnemonic="$(jq -r --argjson i "${idx}" '.[$i].mnemonic // empty' "${USER_ACCOUNTS_FILE}")"
+		acct_type="$(jq -r --argjson i "${idx}" '.[$i].type // "cosmos"' "${USER_ACCOUNTS_FILE}")"
+		existing_legacy="$(jq -r --argjson i "${idx}" '.[$i].legacy_address // empty' "${USER_ACCOUNTS_FILE}")"
+
+		if [ -z "${cosmos_name}" ] || [ -z "${cosmos_address}" ]; then
+			echo "Skipping entry #${idx}: missing name/address" >&2
+			skipped_other=$((skipped_other + 1))
+			continue
+		fi
+
+		if [ "${acct_type}" = "evm" ]; then
+			if [ -n "${existing_legacy}" ]; then
+				echo "Skipping ${cosmos_name}: already EVM (legacy=${existing_legacy})"
+			else
+				echo "Skipping ${cosmos_name}: already EVM (no legacy address to record)"
+			fi
+			skipped_evm=$((skipped_evm + 1))
+			continue
+		fi
+
+		if [ -z "${mnemonic}" ]; then
+			echo "Skipping ${cosmos_name}: no mnemonic recorded" >&2
+			skipped_other=$((skipped_other + 1))
+			continue
+		fi
+
+		evm_name="$(evm_account_name_for "${cosmos_name}")"
+
+		# When the EVM key is already in the keyring (re-run scenario), trust
+		# the keyring as the source of truth for the address rather than
+		# re-importing — re-importing would only succeed if it would derive
+		# the same address anyway, and skipping the call avoids a useless
+		# "key already exists" prompt.
+		if key_exists "${evm_name}"; then
+			new_address="$(trim "$("${DAEMON}" --home "${DAEMON_HOME}" keys show "${evm_name}" -a --keyring-backend "${KEYRING_BACKEND}" 2>/dev/null || true)")"
+			if [ -z "${new_address}" ]; then
+				echo "ERROR: ${evm_name} exists in keyring but its address could not be read" >&2
+				exit 1
+			fi
+			echo "Reusing existing EVM key ${evm_name}: ${new_address}"
+			reused=$((reused + 1))
+		else
+			if ! key_json="$(import_evm_key_from_mnemonic "${evm_name}" "${mnemonic}")"; then
+				echo "ERROR: failed to import ${evm_name} from mnemonic of ${cosmos_name}" >&2
+				exit 1
+			fi
+			new_address="$(trim "$(printf '%s' "${key_json}" | jq -r '.address // empty')")"
+			if [ -z "${new_address}" ]; then
+				echo "ERROR: failed to read new EVM address for ${evm_name}" >&2
+				exit 1
+			fi
+			echo "Imported EVM key ${evm_name}: ${new_address} (legacy ${cosmos_address})"
+			imported=$((imported + 1))
+		fi
+
+		update_account_to_evm "${idx}" "${evm_name}" "${new_address}" "${cosmos_address}" "${cosmos_name}"
+		processed=$((processed + 1))
+	done
+
+	cat <<EOF
+
+Summary:
+  Total entries:          ${accounts_count}
+  Updated to EVM:         ${processed}
+    Newly imported keys:  ${imported}
+    Reused existing keys: ${reused}
+  Skipped (already EVM):  ${skipped_evm}
+  Skipped (other):        ${skipped_other}
+  Registry:               ${USER_ACCOUNTS_FILE}
+EOF
+}
+
 cmd_new_account() {
 	local amount_arg="$1"
 	local amount_base amount_display key_name account_type
@@ -505,6 +722,14 @@ main() {
 			exit 1
 		}
 		cmd_list_accounts
+		;;
+	generate-evm-accounts)
+		[ $# -eq 1 ] || {
+			echo "ERROR: generate-evm-accounts does not accept arguments" >&2
+			usage
+			exit 1
+		}
+		cmd_generate_evm_accounts
 		;;
 	-h | --help | help)
 		usage

@@ -796,33 +796,64 @@ _mnemonic_key_address() {
   lumerad_keys show "$name" -a 2>/dev/null
 }
 
+# _derive_address_from_mnemonic <mnemonic> <coin-type> <algo>
+# Re-derives the bech32 address that <mnemonic> produces under <coin-type> /
+# <algo>, WITHOUT touching the user's keyring.
+#
+# The verify-existing-key branch can't probe against the user's main keyring:
+#   1. Adding the key for real collides on cosmos-sdk's address-uniqueness
+#      check ("duplicated address created") — the duplicate is the entire
+#      point of the comparison, so an in-keyring probe fails in exactly the
+#      matching-mnemonic case.
+#   2. `keys add --dry-run` does not collide on uniqueness, but it bypasses
+#      the chain's keyring-algo registration and rejects eth_secp256k1 with
+#      "unsupported signing algo" — so it works for the legacy side only.
+#
+# The reliable path is to spin up a throwaway test keyring in a tempdir,
+# perform a normal `keys add`, capture the JSON output (which carries the
+# derived bech32), and rm -rf the dir. Test backend = no password prompts;
+# fresh dir = no collision with anything the user has.
+_derive_address_from_mnemonic() {
+  local mnemonic="$1" coin_type="$2" algo="$3"
+  local temp_dir="" derive_json="" derived=""
+
+  temp_dir=$(mktemp -d -t evmig-derive-XXXXXX) || return 1
+
+  derive_json=$(printf '%s\n' "$mnemonic" | "$BIN" keys add __evmig_derive \
+    --recover --coin-type "$coin_type" --algo "$algo" \
+    --keyring-backend test --keyring-dir "$temp_dir" \
+    --output json 2>/dev/null) || true
+  rm -rf "$temp_dir"
+
+  if [[ -z "$derive_json" ]]; then
+    return 1
+  fi
+  derived=$(jq -r '.address // empty' <<<"$derive_json" 2>/dev/null)
+  if [[ -z "$derived" ]]; then
+    return 1
+  fi
+  printf '%s\n' "$derived"
+}
+
 _mnemonic_import_one_key() {
   local mnemonic="$1" name="$2" coin_type="$3" algo="$4" role="$5"
-  local existing_addr="" temp_name="" temp_addr="" created_temp=0
+  local existing_addr="" derived_addr=""
 
   if existing_addr=$(_mnemonic_key_address "$name"); then
-    if [[ "$role" == "new" ]]; then
-      temp_name="__evmig_check_ekey_${name}_$$_${RANDOM}"
-    else
-      temp_name="__evmig_check_legacy_${name}_$$_${RANDOM}"
+    if ! derived_addr=$(_derive_address_from_mnemonic "$mnemonic" "$coin_type" "$algo"); then
+      log_error "could not derive $role address from mnemonic to verify '$name'"
+      exit 1
     fi
 
-    printf '%s\n' "$mnemonic" | lumerad_keys add "$temp_name" \
-      --recover --coin-type "$coin_type" --algo "$algo" >/dev/null
-    created_temp=1
-    temp_addr=$(_mnemonic_key_address "$temp_name")
-    lumerad_keys delete "$temp_name" --yes >/dev/null 2>&1 || true
-    created_temp=0
-
-    if [[ "$existing_addr" != "$temp_addr" ]]; then
+    if [[ "$existing_addr" != "$derived_addr" ]]; then
       if [[ "$role" == "new" ]]; then
         log_error "new EVM key '$(new_value "$name")' already exists in keyring but does not match the mnemonic"
         log_error "  existing address: $(new_value "$existing_addr")"
-        log_error "  mnemonic address: $(new_value "$temp_addr")"
+        log_error "  mnemonic address: $(new_value "$derived_addr")"
       else
         log_error "legacy key '$(legacy_value "$name")' already exists in keyring but does not match the mnemonic"
         log_error "  existing address: $(legacy_value "$existing_addr")"
-        log_error "  mnemonic address: $(legacy_value "$temp_addr")"
+        log_error "  mnemonic address: $(legacy_value "$derived_addr")"
       fi
       exit 1
     fi
@@ -833,10 +864,6 @@ _mnemonic_import_one_key() {
       log_info "legacy key $(legacy_value "$name") already exists in keyring and matches mnemonic; reusing it"
     fi
     return 0
-  fi
-
-  if (( created_temp == 1 )); then
-    lumerad_keys delete "$temp_name" --yes >/dev/null 2>&1 || true
   fi
 
   printf '%s\n' "$mnemonic" | lumerad_keys add "$name" \

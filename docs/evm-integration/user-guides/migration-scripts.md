@@ -372,9 +372,65 @@ Run:
   --yes
 ```
 
-The script imports both keys, runs the migration, and deletes those keyring entries on exit. The mnemonic file itself is not modified.
+The script imports missing keys, runs the migration, and deletes only the keyring entries it created for this run. The mnemonic file itself is not modified.
 
-Both key names must be unused. The script refuses to overwrite existing keys.
+If a key name already exists, the script derives the same role from the mnemonic and compares addresses:
+
+- if the existing key matches the mnemonic-derived address, the script reuses it
+- if the existing key points to a different address, the script stops before migration
+
+Example with the legacy key already present and the new EVM key imported from the mnemonic:
+
+```text
+$ ./scripts/migrate-account.sh bob-legacy bob-evm --mnemonic-file /secure/tmp/mnemonic.txt
+INFO  chain ID: lumera-devnet-1
+INFO  legacy key bob-legacy already exists in keyring and matches mnemonic; reusing it
+INFO  imported new EVM key bob-evm from mnemonic for this run
+INFO  legacy key bob-legacy -> address lumera1e82483sre0qcm2x2ajqgyzj4evxzy3cz8xsrq0
+INFO  new EVM key bob-evm -> address lumera1hlauuqfmnhdn8m9x0p9g3hjfrzlsg92a6u8cd0
+INFO  check OK: no migration record found for legacy address lumera1e82483sre0qcm2x2ajqgyzj4evxzy3cz8xsrq0
+INFO  check OK: destination address lumera1hlauuqfmnhdn8m9x0p9g3hjfrzlsg92a6u8cd0 has no migration record as a legacy address
+INFO  check OK: no migration record found by new address lumera1hlauuqfmnhdn8m9x0p9g3hjfrzlsg92a6u8cd0
+INFO  check OK: destination address lumera1hlauuqfmnhdn8m9x0p9g3hjfrzlsg92a6u8cd0 does not exist on-chain
+Migration preview for legacy account lumera1e82483sre0qcm2x2ajqgyzj4evxzy3cz8xsrq0 (coin-type 118, secp256k1):
+  Validator:         no
+  Multisig:          no
+  Balance:           25000ulume
+  Delegations:       none
+  Unbonding:         none
+  Redelegations:     none
+  Authz grants:      none
+  Feegrants:         none
+  Actions:           none
+  Supernode:         no
+  Would succeed:     yes
+INFO  migrating legacy account lumera1e82483sre0qcm2x2ajqgyzj4evxzy3cz8xsrq0 -> EVM-compatible lumera1hlauuqfmnhdn8m9x0p9g3hjfrzlsg92a6u8cd0
+
+Tx body to broadcast:
+  Type:           /lumera.evmigration.MsgClaimLegacyAccount
+  Legacy address: lumera1e82483sre0qcm2x2ajqgyzj4evxzy3cz8xsrq0
+  New address:    lumera1hlauuqfmnhdn8m9x0p9g3hjfrzlsg92a6u8cd0
+  Gas limit:      200000
+
+Proceed with migration? [y/N] y
+gas estimate: 668329
+INFO  broadcast tx 7F6CB7EF6DB1BAD888FA8D1371D6794A96171875A47AAE7579565A17BE7E07CF; waiting for inclusion...
+INFO  tx included at height 13496 (waited 1s)
+
+Migration record (chain state):
+  legacy address: lumera1e82483sre0qcm2x2ajqgyzj4evxzy3cz8xsrq0
+  new address:    lumera1hlauuqfmnhdn8m9x0p9g3hjfrzlsg92a6u8cd0
+  height:         13496
+  unix time:      1777910386
+
+New account balance (lumera1hlauuqfmnhdn8m9x0p9g3hjfrzlsg92a6u8cd0):
+  25000ulume
+
+INFO  migration complete
+INFO    legacy: lumera1e82483sre0qcm2x2ajqgyzj4evxzy3cz8xsrq0
+INFO    new:    lumera1hlauuqfmnhdn8m9x0p9g3hjfrzlsg92a6u8cd0
+INFO    tx:     7F6CB7EF6DB1BAD888FA8D1371D6794A96171875A47AAE7579565A17BE7E07CF
+```
 
 ---
 

@@ -12,7 +12,7 @@ Changes included since `v1.11.1` (range: `v1.11.1..v1.12.0`).
 - Replaced consensus-sensitive protobuf maps with deterministic concrete structures and added consensus-determinism CI coverage.
 - Fixed audit/supernode AutoCLI query marshalling issues, including float64 query args and `get-metrics` wiring.
 - Improved Everlight devnet tests, genesis defaults, epoch-boundary handling, and upgrade-handler completeness for post-1.11.1 defaults.
-- Added Ledger build support and generalized build tags in the Makefile/release workflows.
+- Added Ledger build support and pinned release builds to Ubuntu 22.04 for glibc compatibility.
 
 ---
 

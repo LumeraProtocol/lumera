@@ -34,7 +34,7 @@
       "name": "Challenge Index Generation",
       "status": "done",
       "slice": "S03",
-      "notes": "Challenge indices are chosen by the client at registration time and stored in AvailabilityCommitment.challenge_indices (proto field 7). The x/action/v1/challenge/ package was removed — DeriveIndices is now a spec-only reference algorithm (docs/leps/new-feature-lep5.md). The on-chain module validates index uniqueness, range, and count; it does not derive indices.",
+      "notes": "Challenge indices are chosen by the client at registration time and stored in AvailabilityCommitment.challenge_indices (proto field 7). The x/action/v1/challenge/ package was removed — DeriveIndices is now a spec-only reference algorithm (docs/leps/LEP5 - Cascade Availability Commitment.md). The on-chain module validates index uniqueness, range, and count; it does not derive indices.",
       "evidence": [
         "go build ./x/action/v1/... (exit 0)",
         "grep -r 'DeriveIndices' x/action/ returns no hits"
@@ -45,7 +45,7 @@
       "name": "Registration Commitment Validation",
       "status": "done",
       "slice": "S04",
-      "notes": "Implemented optional AvailabilityCommitment validation in CascadeActionHandler.Process (MsgRequestAction) and RegisterAction. Validates: commitment_type == 'lep5/chunk-merkle/v1', hash_algo == HashAlgo_HASH_ALGO_BLAKE3 (enum), chunk_size == 262144, num_chunks == ceil(total_size/chunk_size), root == 32 bytes. Stores commitment (including client-provided challenge_indices) in on-chain CascadeMetadata.",
+      "notes": "Implemented optional AvailabilityCommitment validation in RegisterAction. Validates: commitment_type == 'lep5/chunk-merkle/v1', hash_algo == HashAlgo_HASH_ALGO_BLAKE3 (enum), chunk_size is a power of 2 in [1, 262144], total_size >= 4 bytes, num_chunks == ceil(total_size/chunk_size), num_chunks >= svc_min_chunks_for_challenge, root == 32 bytes, and challenge_indices are unique/in-range with the expected count. Stores commitment (including client-provided challenge_indices) in on-chain CascadeMetadata.",
       "evidence": [
         "go test ./x/action/v1/keeper/... -run TestCascade -count=1 (exit 0)"
       ]

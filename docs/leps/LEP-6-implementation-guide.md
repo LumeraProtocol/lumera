@@ -2,6 +2,8 @@
 
 This guide documents the `lumera` implementation of LEP-6 storage-truth enforcement and ticket-driven self-healing.
 
+Related protocol proposal: [LEP6-protocol-proposal.md](LEP6-protocol-proposal.md).
+
 Priority design source: `/home/openclaw/workspace/docs/LEP6.md`
 
 Branch: `LEP-6-foundation-final-gate-fixes` (final production-gate hardening branch; 14/17 Zee final-gate findings fixed locally, 3/17 intentionally no-code/info, pending push)

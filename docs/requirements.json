@@ -23,7 +23,7 @@
       "LEP-5: Client-provided challenge index storage and validation",
       "LEP-5: Registration-time commitment validation in CascadeActionHandler",
       "LEP-5: Finalization-time proof verification in keeper against stored commitment and indices",
-      "LEP-5: Module parameter governance for SVC settings",
+      "LEP-5: Module parameter defaults for SVC settings",
       "LEP-5: Chain upgrade handler for new params and soft-launch",
       "Everlight P1: STORAGE_FULL SuperNode state with service-aware eligibility",
       "Everlight P1: cascade_kademlia_db_bytes LEP-4 metric addition",
@@ -115,7 +115,7 @@
       "Registration: client includes AvailabilityCommitment with challenge_indices in CascadeMetadata",
       "Finalization: SuperNode provides ChunkProof array for the stored challenge_indices; keeper verifies against stored root",
       "Verification skip: if num_chunks < svc_min_chunks_for_challenge, SVC is bypassed",
-      "Soft-launch: SVC fields accepted but not required until enforcement height",
+      "Compatibility: SVC fields accepted when present; actions without commitments remain backward-compatible",
       "STORAGE_FULL transition: only if disk_usage_percent > max_storage_usage_percent AND no other compliance violations",
       "STORAGE_FULL recovery: when disk_usage_percent drops below max_storage_usage_percent",
       "STORAGE_FULL + other violations: transitions to POSTPONED (more restrictive wins)",
@@ -158,7 +158,7 @@
     {
       "id": "F04",
       "name": "Registration Commitment Validation",
-      "description": "Extend CascadeActionHandler.Process (MsgRequestAction path) and RegisterAction to validate AvailabilityCommitment fields when present: commitment_type must be 'lep5/chunk-merkle/v1', hash_algo must be HASH_ALGO_BLAKE3 (enum), chunk_size must be a power of 2 in [1024, 262144], num_chunks must equal ceil(total_size / chunk_size), root must be exactly 32 bytes. For files >= svc_min_chunks_for_challenge x 1024 bytes, num_chunks must be >= svc_min_chunks_for_challenge (client must reduce chunk_size for small files). Store commitment (including challenge_indices) in on-chain CascadeMetadata.",
+      "description": "Extend RegisterAction to validate AvailabilityCommitment fields when present: commitment_type must be 'lep5/chunk-merkle/v1', hash_algo must be HASH_ALGO_BLAKE3 (enum), chunk_size must be a power of 2 in [1, 262144], num_chunks must equal ceil(total_size / chunk_size), root must be exactly 32 bytes. Files must be at least 4 bytes and must produce at least svc_min_chunks_for_challenge chunks (client must reduce chunk_size for small files). Store commitment (including challenge_indices) in on-chain CascadeMetadata.",
       "acceptance_tests": [
         "AT09",
         "AT10",
@@ -192,7 +192,7 @@
     {
       "id": "F07",
       "name": "Chain Upgrade and Migration (LEP-5)",
-      "description": "Create upgrade handler for the version introducing LEP-5. Initialize new params with defaults, including governance-controlled lep5_enabled_height for soft-launch/enforcement transition. Existing finalized actions are unaffected. New Cascade registrations after activation must include AvailabilityCommitment.",
+      "description": "Create upgrade handler for the version introducing LEP-5. Persist SVC params with defaults. Existing finalized actions are unaffected. Cascade registrations with AvailabilityCommitment are validated and must finalize with valid proofs; actions without commitments remain backward-compatible.",
       "acceptance_tests": [
         "AT19",
         "AT20"
@@ -495,7 +495,7 @@
       "id": "UF01",
       "name": "Cascade Registration with Commitment",
       "steps": [
-        "Client chunks file into 256 KiB pieces",
+        "Client chunks file into power-of-two pieces up to 256 KiB",
         "Client computes BLAKE3 domain-separated leaf hashes and builds Merkle tree",
         "Client generates challenge indices (using DeriveIndices reference algorithm or custom logic)",
         "Client creates AvailabilityCommitment with root, total_size, num_chunks, chunk_size, hash_algo=HASH_ALGO_BLAKE3, and challenge_indices",
@@ -713,7 +713,7 @@
           "AT19",
           "AT20"
         ],
-        "goal": "Add SVC params to module, create upgrade handler, test genesis import/export and governance updates.",
+        "goal": "Add SVC params to module, create upgrade handler, test genesis import/export and default persistence.",
         "status": "done",
         "notes": "F06 done (protocol constants). F07 done (completed outside BRIDGE scope)."
       },
@@ -835,7 +835,7 @@
       {
         "id": "R02",
         "description": "Client-provided challenge indices could theoretically be biased toward chunks the client knows the SuperNode has",
-        "mitigation": "Governance-enforced minimum challenge count (svc_challenge_count); indices must be unique and within valid range; future enhancement could add server-side randomness mixing"
+        "mitigation": "Protocol-enforced minimum challenge count (svc_challenge_count); indices must be unique and within valid range; future enhancement could add server-side randomness mixing"
       },
       {
         "id": "R03",

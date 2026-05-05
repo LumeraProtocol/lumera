@@ -1,6 +1,6 @@
 # LEP-5 — Cascade Availability Commitment (Testing Guide)
 
-> **Full design:** [LEP-5 Technical Specification](../new-feature-lep5.md)
+> **Full design:** [LEP-5 Technical Specification](<LEP5 - Cascade Availability Commitment.md>)
 
 LEP-5 introduces a **Cascade Availability Commitment** system that requires a finalizing SuperNode to prove possession of actual file data via BLAKE3-based Merkle proofs, closing the vulnerability where a malicious SuperNode could finalize actions and collect fees without ever storing anything.
 

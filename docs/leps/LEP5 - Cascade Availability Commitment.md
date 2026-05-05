@@ -1,9 +1,14 @@
 # LEP-5 — Cascade Availability Commitment (Merkle Proof Challenge)
 
-## Status: Draft
+## Status: Implemented
 ## Author: Lumera Protocol Team
 ## Created: 2025-02-08
 ## Requires: LEP1 (Minimizing Cascade Metadata Size)
+
+> This file is the canonical LEP-5 specification for the `lumera` implementation.
+> It incorporates implementation-stage drift from the original proposal, including
+> BLAKE3 hashing, client-provided `challenge_indices`, and per-level odd-node
+> duplication in the Merkle tree.
 
 ---
 
@@ -547,7 +552,7 @@ With m=8 (recommended default), storing less than half the file has <0.4% chance
 
 **Risk:** A malicious client could collude with a SuperNode to choose "easy" challenge indices (e.g., indices for chunks the SuperNode already has from a partial transfer).
 
-**Defense:** The governance-enforced `svc_challenge_count` (m) ensures a minimum number of challenged chunks. The indices must be unique and within `[0, num_chunks)`. Since the client's goal is to have its data stored, collusion against its own interest is economically irrational. A future enhancement could mix server-side randomness into the index generation to further harden against this vector.
+**Defense:** The protocol-enforced `svc_challenge_count` (m) ensures a minimum number of challenged chunks. The indices must be unique and within `[0, num_chunks)`. Since the client's goal is to have its data stored, collusion against its own interest is economically irrational. A future enhancement could mix server-side randomness into the index generation to further harden against this vector.
 
 ### 5.5 Attack: Merkle Root Forgery (Collision)
 
@@ -560,7 +565,7 @@ With m=8 (recommended default), storing less than half the file has <0.4% chance
 | **Commitment Binding** | BLAKE3 collision resistance | 2^128 security |
 | **Challenge Commitment** | Indices stored on-chain at registration | Immutable once committed |
 | **Proof Soundness** | Merkle tree structure | Information-theoretic |
-| **Collusion Resistance** | Client incentive alignment + governance minimum m | Economic (client pays for storage) |
+| **Collusion Resistance** | Client incentive alignment + protocol minimum m | Economic (client pays for storage) |
 
 ---
 
@@ -901,21 +906,21 @@ func (k Keeper) VerifyChunkProofs(
 
 ### 7.1 Upgrade Strategy
 
-**Phase 1: Soft Launch** (activation height to activation + ~50,000 blocks)
-- SVC fields accepted but not required
-- SuperNodes and clients upgraded to support SVC
-- Monitoring for issues, parameter tuning
+The implemented `lumera` upgrade persists the LEP-5 SVC parameter defaults at
+chain upgrade time. `AvailabilityCommitment` remains backward compatible:
 
-**Phase 2: Enforcement** (after soft launch period)
-- SVC required for all new Cascade actions
-- Actions without `AvailabilityCommitment` rejected
-- Full protection enabled
+- Pre-LEP-5 actions without commitments continue to finalize through existing rules.
+- New Cascade actions may include `AvailabilityCommitment`; when present, it is validated at registration.
+- Finalization verifies `chunk_proofs` only for actions that stored a commitment with `challenge_indices`.
+- SVC params are protocol defaults (`svc_challenge_count=8`, `svc_min_chunks_for_challenge=4`) with proto fields retained for future flexibility.
 
 ### 7.2 Activation
 
-Add chain parameter: `lep5_enabled_height`
-- Before activation: existing finalization rules apply
-- After activation: `MsgRequestAction` for Cascade must include `AvailabilityCommitment` (with `challenge_indices`); `MsgFinalizeAction` must include valid `chunk_proofs`
+No `lep5_enabled_height` parameter exists in the implementation. Activation is
+the chain upgrade that introduces the new protobuf fields, default params, and
+verification path. Enforcement is commitment-scoped: actions with commitments
+must finalize with valid proofs; actions without commitments remain
+backward-compatible.
 
 ### 7.3 Backward Compatibility
 
@@ -925,7 +930,7 @@ Add chain parameter: `lep5_enabled_height`
 | SuperNode software | Must upgrade | Proof generation in finalize path |
 | Client JS SDK | Must upgrade | Add `computeCommitment()` + challenge index generation |
 | rq-library (WASM) | **No changes** | Chunk commitment is pre-RQ |
-| Action Module | New validation | Chain upgrade required |
+| Action Module | Commitment-scoped validation | Chain upgrade required |
 
 ---
 
@@ -1054,10 +1059,10 @@ Verification (BLAKE3):
 | 0.2 | 2026-02-08 | Combined proposal: chunk-based commitment, single-SN Merkle proof finalization |
 | 0.3 | 2026-02-08 | Removed quorum/attestation layer; finalization relies solely on SuperNode-produced Merkle proofs |
 | 0.4 | 2026-02-26 | BLAKE3 replaces SHA-256 for all hashing; hash_algo changed to HashAlgo enum; challenge indices now client-provided at registration (stored in AvailabilityCommitment.challenge_indices) instead of derived from block hash at finalization |
-| 0.5 | 2026-02-26 | Variable chunk_size: chunk_size is now client-chosen power-of-2 in [1024, 262144]; chain enforces num_chunks >= svc_min_chunks_for_challenge for files >= 4 KiB, reducing SVC skip threshold from < 1 MiB to < 4 KiB |
+| 0.5 | 2026-02-26 | Variable chunk_size: chunk_size is now client-chosen power-of-2 in [1, 262144]; chain enforces num_chunks >= svc_min_chunks_for_challenge for files >= 4 bytes, reducing SVC skip threshold from < 1 MiB to < 4 bytes |
 | 0.6 | 2026-02-27 | Strict chunking boundaries: min file size 4 bytes; unconditional min 4 chunks; min 4 / max 8 challenge indices; max chunk size 256 KiB |
 | 0.7 | 2026-02-27 | Min chunk size lowered from 1 KiB to 1 byte to allow 4-byte files to produce 4 chunks with chunk_size=1 |
 
 ---
 
-**Document Status:** Draft — Pending Review
+**Document Status:** Implemented — synced to current `lumera` code and BRIDGE docs

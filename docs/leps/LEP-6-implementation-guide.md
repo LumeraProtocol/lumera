@@ -2,7 +2,7 @@
 
 This guide documents the `lumera` implementation of LEP-6 storage-truth enforcement and ticket-driven self-healing.
 
-Related protocol proposal: [LEP6-protocol-proposal.md](LEP6-protocol-proposal.md).
+Related protocol proposal: [LEP6 - Storage-Truth Enforcement and Ticket-Driven Self-Healing.md](<LEP6 - Storage-Truth Enforcement and Ticket-Driven Self-Healing.md>).
 
 Priority design source: `/home/openclaw/workspace/docs/LEP6.md`
 

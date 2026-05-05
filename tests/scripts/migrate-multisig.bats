@@ -138,9 +138,10 @@ setup() {
 }
 
 # --- generate -------------------------------------------------------------
-# generate now requires --new-sub-pub-keys + --new-threshold (multisig-only
-# wrapper). Keyring flags are now accepted (the CLI needs keyring access to
-# resolve key-names passed in --new-sub-pub-keys).
+# generate requires destination --new-sub-pub-keys (multisig-only wrapper).
+# --new-threshold defaults from the on-chain legacy multisig threshold. Keyring
+# flags are accepted because the CLI needs keyring access to resolve key-names
+# passed in --new-sub-pub-keys.
 @test "generate writes proof.json on happy path (multisig, claim)" {
   local tmp; tmp=$(mktemp -d)
   run env SHIM_AUTH_TYPE=multisig SHIM_ESTIMATE_FIXTURE=estimate-multisig \
@@ -150,11 +151,11 @@ setup() {
     --new    lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
     --new-sub-pub-keys k1,k2,k3 \
     --new-threshold 2 \
-    --kind   claim \
     --chain-id shim-test \
     --node tcp://local:1 \
     --out "$tmp/proof.json"
   [ "$status" -eq 0 ]
+  [[ "$output" == *"auto-detected multisig migration kind: claim"* ]]
   [ -f "$tmp/proof.json" ]
   run jq -r '.kind' "$tmp/proof.json"
   [ "$output" = "claim" ]
@@ -170,20 +171,63 @@ setup() {
     --new    lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
     --new-sub-pub-keys k1,k2,k3 \
     --new-threshold 2 \
-    --kind   validator \
     --chain-id shim-test \
     --node tcp://local:1 \
     --out "$tmp/proof.json"
   [ "$status" -eq 0 ]
+  [[ "$output" == *"auto-detected multisig migration kind: validator"* ]]
+  [ -f "$tmp/proof.json" ]
+  rm -rf "$tmp"
+}
+
+@test "generate reads destination pubkeys from local EVM multisig key" {
+  local tmp; tmp=$(mktemp -d)
+  run env SHIM_AUTH_TYPE=multisig SHIM_ESTIMATE_FIXTURE=estimate-multisig \
+    "$SCRIPTS_DIR/migrate-multisig.sh" generate \
+    --binary "$SHIM" \
+    --legacy lumera1shimaddr1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
+    --new-key new-msig \
+    --chain-id shim-test \
+    --node tcp://local:1 \
+    --out "$tmp/proof.json"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"using destination EVM multisig key new-msig"* ]]
+  [ -f "$tmp/proof.json" ]
+  rm -rf "$tmp"
+}
+
+@test "generate resolves legacy key name before chain checks and proof generation" {
+  local tmp; tmp=$(mktemp -d)
+  run env SHIM_AUTH_TYPE=multisig SHIM_ESTIMATE_FIXTURE=estimate-multisig \
+    "$SCRIPTS_DIR/migrate-multisig.sh" generate \
+    --binary "$SHIM" \
+    --legacy legacy-msig \
+    --new-key new-msig \
+    --chain-id shim-test \
+    --node tcp://local:1 \
+    --out "$tmp/proof.json"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"legacy multisig key legacy-msig -> address lumera1shimaddr1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"* ]]
+  [ -f "$tmp/proof.json" ]
+  rm -rf "$tmp"
+}
+
+@test "generate auto-detects chain-id and defaults out to proof.json" {
+  local tmp; tmp=$(mktemp -d)
+  run env SHIM_AUTH_TYPE=multisig SHIM_ESTIMATE_FIXTURE=estimate-multisig \
+    bash -c 'cd "$1" && "$2" generate --binary "$3" --legacy lumera1shimaddr1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx --new lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx --new-sub-pub-keys k1,k2,k3 --new-threshold 2 --node tcp://local:1' \
+    _ "$tmp" "$SCRIPTS_DIR/migrate-multisig.sh" "$SHIM"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"auto-detected chain ID from tcp://local:1: shim-test"* ]]
   [ -f "$tmp/proof.json" ]
   rm -rf "$tmp"
 }
 
 @test "generate aborts when chain-id is missing (exit 1)" {
-  run "$SCRIPTS_DIR/migrate-multisig.sh" generate \
+  run env SHIM_STATUS_EXIT=1 "$SCRIPTS_DIR/migrate-multisig.sh" generate \
     --binary "$SHIM" \
     --legacy lumera1x --new lumera1y \
-    --new-sub-pub-keys k1,k2,k3 --new-threshold 2 --kind claim \
+    --new-sub-pub-keys k1,k2,k3 --new-threshold 2 \
     --node tcp://local:1 --out /tmp/unused.json
   [ "$status" -eq 1 ]
   [[ "$output" == *"chain-id"* ]]
@@ -192,7 +236,7 @@ setup() {
 @test "generate aborts when any required flag is missing (exit 1)" {
   run "$SCRIPTS_DIR/migrate-multisig.sh" generate \
     --binary "$SHIM" \
-    --kind claim --chain-id shim --node tcp://local:1 --out /tmp/unused.json
+    --chain-id shim --node tcp://local:1 --out /tmp/unused.json
   [ "$status" -eq 1 ]
   [[ "$output" == *"required"* ]]
 }
@@ -201,20 +245,26 @@ setup() {
   run "$SCRIPTS_DIR/migrate-multisig.sh" generate \
     --binary "$SHIM" \
     --legacy lumera1x --new lumera1y \
-    --new-threshold 2 --kind claim \
+    --new-threshold 2 \
     --chain-id shim --node tcp://local:1 --out /tmp/unused.json
   [ "$status" -eq 1 ]
+  [[ "$output" == *"--new-key"* ]]
   [[ "$output" == *"new-sub-pub-keys"* ]]
 }
 
-@test "generate aborts when --new-threshold is missing (exit 1)" {
-  run "$SCRIPTS_DIR/migrate-multisig.sh" generate \
+@test "generate defaults --new-threshold from on-chain legacy multisig" {
+  local tmp; tmp=$(mktemp -d)
+  run env SHIM_AUTH_TYPE=multisig SHIM_ESTIMATE_FIXTURE=estimate-multisig \
+    "$SCRIPTS_DIR/migrate-multisig.sh" generate \
     --binary "$SHIM" \
-    --legacy lumera1x --new lumera1y \
-    --new-sub-pub-keys k1,k2,k3 --kind claim \
-    --chain-id shim --node tcp://local:1 --out /tmp/unused.json
-  [ "$status" -eq 1 ]
-  [[ "$output" == *"new-threshold"* ]]
+    --legacy lumera1x --new lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
+    --new-sub-pub-keys k1,k2,k3 \
+    --chain-id shim --node tcp://local:1 --out "$tmp/proof.json"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"using on-chain legacy multisig threshold"* ]]
+  [[ "$output" == *"auto-detected multisig migration kind: claim"* ]]
+  [ -f "$tmp/proof.json" ]
+  rm -rf "$tmp"
 }
 
 @test "generate exits 8 when multisig pubkey is nil on-chain" {
@@ -224,7 +274,7 @@ setup() {
     --legacy lumera1nilpubkey1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
     --new lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
     --new-sub-pub-keys k1,k2,k3 --new-threshold 2 \
-    --kind claim --chain-id shim-test --node tcp://local:1 \
+    --chain-id shim-test --node tcp://local:1 \
     --out /tmp/unused.json
   [ "$status" -eq 8 ]
   [[ "$output" == *"seed"* ]]
@@ -235,14 +285,14 @@ setup() {
     "$SCRIPTS_DIR/migrate-multisig.sh" generate \
     --binary "$SHIM" \
     --legacy lumera1x --new lumera1y \
-    --new-sub-pub-keys k1,k2,k3 --new-threshold 2 --kind claim \
+    --new-sub-pub-keys k1,k2,k3 --new-threshold 2 \
     --chain-id shim-test --node tcp://local:1 \
     --out /tmp/unused.json
   [ "$status" -eq 3 ]
   [[ "$output" == *"single-sig"* ]]
 }
 
-@test "generate --kind validator aborts on non-validator multisig (exit 6)" {
+@test "generate rejects removed --kind flag" {
   run env SHIM_AUTH_TYPE=multisig SHIM_ESTIMATE_FIXTURE=estimate-multisig \
     "$SCRIPTS_DIR/migrate-multisig.sh" generate \
     --binary "$SHIM" \
@@ -252,8 +302,8 @@ setup() {
     --kind validator \
     --chain-id shim-test --node tcp://local:1 \
     --out /tmp/unused.json
-  [ "$status" -eq 6 ]
-  [[ "$output" == *"validator"* ]]
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"no longer supported"* ]]
 }
 
 @test "generate rejects duplicate --new-sub-pub-keys (propagates from CLI)" {
@@ -269,7 +319,6 @@ setup() {
     --new lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
     --new-sub-pub-keys k1,k2,k1 \
     --new-threshold 2 \
-    --kind claim \
     --chain-id shim-test --node tcp://local:1 \
     --out /tmp/unused.json
   [ "$status" -ne 0 ]
@@ -283,7 +332,7 @@ setup() {
     --legacy lumera1shimaddr1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
     --new lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
     --new-sub-pub-keys k1,k2,k3 --new-threshold 2 \
-    --kind claim --chain-id shim-test --node tcp://local:1 \
+    --chain-id shim-test --node tcp://local:1 \
     --out /tmp/unused.json
   [ "$status" -eq 4 ]
 }
@@ -296,7 +345,7 @@ setup() {
     --legacy lumera1shimaddr1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
     --new lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
     --new-sub-pub-keys k1,k2,k3 --new-threshold 2 \
-    --kind claim --chain-id shim-test --node tcp://local:1 \
+    --chain-id shim-test --node tcp://local:1 \
     --out /tmp/unused.json
   [ "$status" -eq 5 ]
 }

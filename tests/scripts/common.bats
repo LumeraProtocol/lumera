@@ -312,6 +312,26 @@ setup_shim() {
   [ "$status" -eq 0 ]
 }
 
+@test "assert_broadcast_accepted accepts concatenated successful broadcast JSON" {
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    json=$'"'"'{"height":"0","txhash":"FIRST","code":0,"raw_log":""}\n{"height":"0","txhash":"SECOND","code":"0","raw_log":""}'"'"'
+    assert_broadcast_accepted "$json"
+  '
+  [ "$status" -eq 0 ]
+  [ "$output" = "SECOND" ]
+}
+
+@test "assert_broadcast_accepted rejects non-zero CheckTx code" {
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    json=$'"'"'{"height":"0","txhash":"BAD","code":12,"raw_log":"bad tx"}'"'"'
+    assert_broadcast_accepted "$json"
+  '
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"code=12"* ]]
+  [[ "$output" == *"bad tx"* ]]
+}
 
 # ---- Confirmation and mnemonic flow -----------------------------------------
 
@@ -458,6 +478,63 @@ setup_shim() {
   [ "$output" = "multisig" ]
 }
 
+@test "auth_pubkey_type identifies multisig with type_url pubkey" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'; NODE=tcp://local:1
+    SHIM_AUTH_TYPE=multisig-type-url auth_pubkey_type lumera1x
+  '
+  [ "$status" -eq 0 ]
+  [ "$output" = "multisig" ]
+}
+
+@test "auth_pubkey_type identifies legacy amino multisig account response" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'; NODE=tcp://local:1
+    SHIM_AUTH_TYPE=multisig-amino auth_pubkey_type lumera1x
+  '
+  [ "$status" -eq 0 ]
+  [ "$output" = "multisig" ]
+}
+
+@test "auth_multisig_threshold reads seeded on-chain threshold" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'; NODE=tcp://local:1
+    SHIM_AUTH_TYPE=multisig auth_multisig_threshold lumera1x
+  '
+  [ "$status" -eq 0 ]
+  [ "$output" = "2" ]
+}
+
+@test "auth_multisig helpers normalize legacy amino multisig account response" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'; NODE=tcp://local:1
+    export SHIM_AUTH_TYPE=multisig-amino
+    printf "%s\n" "$(auth_multisig_threshold lumera1x)" "$(auth_multisig_subkey_count lumera1x)"
+  '
+  [ "$status" -eq 0 ]
+  [ "${lines[0]}" = "2" ]
+  [ "${lines[1]}" = "3" ]
+}
+
+@test "auth_multisig_subkey_count reads seeded on-chain signer count" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'; NODE=tcp://local:1
+    SHIM_AUTH_TYPE=multisig auth_multisig_subkey_count lumera1x
+  '
+  [ "$status" -eq 0 ]
+  [ "$output" = "3" ]
+}
+
 @test "auth_pubkey_type identifies multisig (nested base_account)" {
   setup_shim
   run bash -c '
@@ -526,6 +603,17 @@ JSON
   rm -rf "$tmp"
   [ "$status" -eq 0 ]
   [ "$output" = "A4444444444444444444444444444444444444444444" ]
+}
+
+@test "key_multisig helpers read local EVM multisig key" {
+  setup_shim
+  run bash -c '
+    source '"$SCRIPTS_DIR"'/evmigration-common.sh
+    BIN='"$SHIM_BIN"'; KEYRING_BACKEND=test
+    printf "%s\n" "$(key_multisig_threshold new-msig)" "$(key_multisig_sub_pub_keys_csv new-msig)"
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == $'2\nB1111111111111111111111111111111111111111111,B2222222222222222222222222222222222222222222,B3333333333333333333333333333333333333333333' ]]
 }
 
 @test "assert_secp256k1_key passes for alice-sub" {

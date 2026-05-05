@@ -44,6 +44,12 @@
       "signer_count": 3,
       "vesting_type": "PermanentLocked"
     },
+    "test_accounts": {
+      "count": 5,
+      "balance_base": "20000ulume",
+      "balance_increment": "10000ulume",
+      "multisig": true
+    },
     "initial_distribution": {
       "account_balance": "2000000000000ulume",
       "validator_stake": "1000000000000ulume"
@@ -98,7 +104,7 @@
       "validator_stake": "1000000000000ulume"
     },
     "test_accounts": {
-      "count": 10,
+      "count": 5,
       "balance_base": "10000ulume",
       "balance_increment": "5000ulume"
     }

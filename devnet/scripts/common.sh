@@ -283,9 +283,10 @@ multisig_sign_unsigned() {
 	local signer2="$5"
 	local acc_num="$6"
 	local seq="$7"
-	local sig1 sig2 rc
+	local sig1 sig2 rc home_args=()
 	sig1="$(mktemp /tmp/multisig-sig1.XXXXXX.json)"
 	sig2="$(mktemp /tmp/multisig-sig2.XXXXXX.json)"
+	[ -n "${DAEMON_HOME:-}" ] && home_args=(--home "${DAEMON_HOME}")
 
 	# --offline is required so `tx sign` trusts the caller-supplied
 	# --account-number and --sequence instead of reaching out to the chain
@@ -294,24 +295,27 @@ multisig_sign_unsigned() {
 	# with values fetched from a full node.
 	rc=0
 	{
-		run_capture ${DAEMON} tx sign "${unsigned_file}" \
+		run_capture "${DAEMON}" tx sign "${unsigned_file}" \
 			--from "${signer1}" \
 			--multisig "${multisig_addr}" \
+			"${home_args[@]}" \
 			--keyring-backend "${KEYRING_BACKEND}" \
 			--chain-id "${CHAIN_ID}" \
 			--account-number "${acc_num}" --sequence "${seq}" \
 			--sign-mode amino-json --offline \
 			--output json >"${sig1}" &&
-		run_capture ${DAEMON} tx sign "${unsigned_file}" \
+		run_capture "${DAEMON}" tx sign "${unsigned_file}" \
 			--from "${signer2}" \
 			--multisig "${multisig_addr}" \
+			"${home_args[@]}" \
 			--keyring-backend "${KEYRING_BACKEND}" \
 			--chain-id "${CHAIN_ID}" \
 			--account-number "${acc_num}" --sequence "${seq}" \
 			--sign-mode amino-json --offline \
 			--output json >"${sig2}" &&
-		run_capture ${DAEMON} tx multisign "${unsigned_file}" "${multisig_key}" \
+		run_capture "${DAEMON}" tx multisign "${unsigned_file}" "${multisig_key}" \
 			"${sig1}" "${sig2}" \
+			"${home_args[@]}" \
 			--keyring-backend "${KEYRING_BACKEND}" \
 			--chain-id "${CHAIN_ID}" \
 			--offline --account-number "${acc_num}" --sequence "${seq}" \

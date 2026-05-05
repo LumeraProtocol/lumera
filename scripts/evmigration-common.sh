@@ -650,15 +650,20 @@ wait_for_tx() {
 # catches it immediately with the right error context.
 assert_broadcast_accepted() {
   local broadcast_json="$1"
-  local code raw_log tx_hash
-  tx_hash=$(jq -r '.txhash // empty' <<<"$broadcast_json" 2>/dev/null)
+  local code raw_log tx_hash broadcast_doc
+  broadcast_doc=$(jq -sc 'map(select(type == "object")) | last // empty' <<<"$broadcast_json" 2>/dev/null || true)
+  if [[ -z "$broadcast_doc" || "$broadcast_doc" == "null" ]]; then
+    log_error "broadcast returned invalid JSON: $broadcast_json"
+    exit 2
+  fi
+  tx_hash=$(jq -r '.txhash // empty' <<<"$broadcast_doc" 2>/dev/null)
   if [[ -z "$tx_hash" || "$tx_hash" == "null" ]]; then
     log_error "broadcast returned no txhash: $broadcast_json"
     exit 2
   fi
-  code=$(jq -r '.code // 0' <<<"$broadcast_json" 2>/dev/null)
+  code=$(jq -r '(.code // 0) | tostring' <<<"$broadcast_doc" 2>/dev/null)
   if [[ -n "$code" && "$code" != "0" ]]; then
-    raw_log=$(jq -r '.raw_log // "<no raw_log>"' <<<"$broadcast_json" 2>/dev/null)
+    raw_log=$(jq -r '.raw_log // "<no raw_log>"' <<<"$broadcast_doc" 2>/dev/null)
     log_error "broadcast rejected at CheckTx: code=$code raw_log=$raw_log (txhash=$tx_hash, never landed in a block)"
     exit 2
   fi
@@ -969,13 +974,20 @@ auth_pubkey_type() {
   # Try several known locations in priority order.
   pk_type=$(jq -r '
     [
-      .account.pub_key,
-      .account.base_account.pub_key,
-      .account.base_vesting_account.base_account.pub_key
+      .account.pub_key?,
+      .account.base_account.pub_key?,
+      .account.base_vesting_account.base_account.pub_key?,
+      .account.value.public_key?,
+      (.account? | objects | select(has("pubkey")) | .pubkey),
+      (.. | objects | select(has("pub_key") or has("pubkey") or has("public_key")) | (.pub_key // .pubkey // .public_key))
     ]
     | map(select(. != null))
     | (.[0] // null)
-    | if . == null then "null" else (."@type" // "unknown") end
+    | if . == null then "null"
+      else
+        (if type == "string" then (fromjson? // {}) else . end)
+        | (."@type" // .type_url // .type // "unknown")
+      end
   ' <<<"$json")
   case "$pk_type" in
     null)                                                 printf 'none\n' ;;
@@ -986,6 +998,111 @@ auth_pubkey_type() {
     /cosmos.evm.crypto.v1.ethsecp256k1.PubKey)            printf 'single-sig\n' ;;
     *)                                                    printf 'unknown\n' ;;
   esac
+}
+
+auth_multisig_pubkey_json() {
+  local addr="$1"
+  local json pk pk_type
+  json=$(auth_account_json "$addr")
+  pk=$(jq -c '
+    def normalize_pubkey:
+      if type == "string" then (fromjson? // null)
+      elif has("@type") or has("type_url") then .
+      elif has("type") and has("value") then
+        {
+          "@type": .type,
+          "threshold": (.value.threshold // empty),
+          "public_keys": [
+            .value.pubkeys[]? |
+            if has("@type") or has("type_url") then .
+            elif has("type") and has("value") then {"@type": .type, "key": .value}
+            else .
+            end
+          ]
+        }
+      else .
+      end;
+    [
+      .account.pub_key?,
+      .account.base_account.pub_key?,
+      .account.base_vesting_account.base_account.pub_key?,
+      .account.value.public_key?,
+      (.account? | objects | select(has("pubkey")) | .pubkey),
+      (.. | objects | select(has("pub_key") or has("pubkey") or has("public_key")) | (.pub_key // .pubkey // .public_key))
+    ]
+    | map(select(. != null))
+    | (.[0] // null)
+    | normalize_pubkey
+  ' <<<"$json")
+  if [[ -z "$pk" || "$pk" == "null" ]]; then
+    log_error "multisig pubkey is not seeded on-chain for $(legacy_value "$addr")"
+    exit 8
+  fi
+  pk_type=$(jq -r '."@type" // .type_url // .type // empty' <<<"$pk")
+  if [[ "$pk_type" != "/cosmos.crypto.multisig.LegacyAminoPubKey" ]]; then
+    log_error "account $(legacy_value "$addr") does not have an on-chain multisig pubkey"
+    exit 3
+  fi
+  printf '%s\n' "$pk"
+}
+
+auth_multisig_threshold() {
+  local addr="$1"
+  auth_multisig_pubkey_json "$addr" | jq -r '.threshold // empty'
+}
+
+auth_multisig_subkey_count() {
+  local addr="$1"
+  auth_multisig_pubkey_json "$addr" | jq -r '.public_keys | length'
+}
+
+key_multisig_pubkey_json() {
+  local key_name="$1"
+  local info pk
+  if ! info=$(lumerad_keys show "$key_name" --output json 2>/dev/null); then
+    log_error "multisig key not found in keyring: $(new_value "$key_name")"
+    exit 1
+  fi
+  pk=$(jq -c '.pubkey | if type == "string" then fromjson else . end' <<<"$info" 2>/dev/null || printf '')
+  if [[ -z "$pk" || "$pk" == "null" ]]; then
+    log_error "key '$(new_value "$key_name")' has no pubkey field"
+    exit 1
+  fi
+  if [[ "$(jq -r '."@type" // empty' <<<"$pk")" != "/cosmos.crypto.multisig.LegacyAminoPubKey" ]]; then
+    log_error "key '$(new_value "$key_name")' is not a multisig key"
+    exit 1
+  fi
+  printf '%s\n' "$pk"
+}
+
+key_multisig_threshold() {
+  local key_name="$1"
+  key_multisig_pubkey_json "$key_name" | jq -r '.threshold // empty'
+}
+
+key_multisig_sub_pub_keys_csv() {
+  local key_name="$1"
+  local pk bad_type keys_csv
+  pk=$(key_multisig_pubkey_json "$key_name")
+  bad_type=$(jq -r '
+    .public_keys[]?
+    | select(
+        (."@type" != "/cosmos.crypto.ethsecp256k1.PubKey")
+        and (."@type" != "/ethermint.crypto.v1.ethsecp256k1.PubKey")
+        and (."@type" != "/cosmos.evm.crypto.v1.ethsecp256k1.PubKey")
+      )
+    | ."@type"
+  ' <<<"$pk" | head -n1)
+  if [[ -n "$bad_type" ]]; then
+    log_error "key '$(new_value "$key_name")' contains non-EVM multisig signer pubkey type: $bad_type"
+    exit 1
+  fi
+  keys_csv=$(jq -r '[.public_keys[]?.key] | join(",")' <<<"$pk")
+  if [[ -z "$keys_csv" ]]; then
+    log_error "key '$(new_value "$key_name")' has no multisig signer pubkeys"
+    exit 1
+  fi
+  printf '%s\n' "$keys_csv"
 }
 
 # key_pubkey_b64 <key-name>

@@ -84,6 +84,8 @@ case "$*" in
   "query auth account "*)
     case "${SHIM_AUTH_TYPE:-single}" in
       multisig)         emit auth-account-multisig ;;
+      multisig-type-url) emit auth-account-multisig-type-url ;;
+      multisig-amino)   emit auth-account-multisig-amino ;;
       multisig-nested)  emit auth-account-multisig-nested ;;
       nilpubkey)        emit auth-account-nilpubkey ;;
       *)                emit "${SHIM_AUTH_FIXTURE:-auth-account}" ;;
@@ -126,12 +128,21 @@ case "$*" in
       fi
     else
       case "$*" in
-        *"newkey"*|*"new-eth-key"*|*"ekey"*) printf 'lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n' ;;
+        *"newkey"*|*"new-eth-key"*|*"new-msig"*|*"evm"*|*"ekey"*) printf 'lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n' ;;
         *)                          printf 'lumera1shimaddr1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n' ;;
       esac
     fi
     ;;
-  "keys add "*)                                            printf 'added key\n' ;;
+  "keys add "*)
+    if [[ "$*" == *"--output json"* ]]; then
+      case "$*" in
+        *"eth_secp256k1"*) printf '{"name":"__shim","address":"lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx","mnemonic":"test mnemonic"}\n' ;;
+        *)                 printf '{"name":"__shim","address":"lumera1shimaddr1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx","mnemonic":"test mnemonic"}\n' ;;
+      esac
+    else
+      printf 'added key\n'
+    fi
+    ;;
   "keys delete "*)                                         printf 'deleted key\n' ;;
   "debug addr "*)
     cat <<'ADDR'
@@ -191,6 +202,12 @@ ADDR
       touch "$SHIM_STATE_FILE"
     fi
     emit broadcast-success ;;
+  "status"*)
+    if [[ -n "${SHIM_STATUS_EXIT:-}" ]]; then
+      exit "$SHIM_STATUS_EXIT"
+    fi
+    printf '{"node_info":{"network":"shim-test"}}\n'
+    ;;
   "version"*)                                             printf 'v0.0.0-shim\n' ;;
   *) printf 'shim: unhandled args: %s\n' "$*" >&2; exit 1 ;;
 esac

@@ -28,19 +28,21 @@ USAGE
 }
 
 _mms_generate() {
-  local legacy="" new="" kind="" chain_id="" node="${LUMERA_NODE:-tcp://localhost:26657}" out=""
+  local legacy="" new="" kind="" chain_id="${LUMERA_CHAIN_ID:-${CHAIN_ID:-}}" node="${LUMERA_NODE:-tcp://localhost:26657}" out="proof.json"
   local sig_format="" binary="lumerad"
   local new_sub_pub_keys="" new_threshold="" legacy_key=""
+  local new_key=""
   local keyring_backend="test" keyring_dir="" home_dir=""
   while (( $# > 0 )); do
     case "$1" in
       --legacy)           _require_value "$1" "$#" "${2-}"; legacy="$2"; shift 2 ;;
       --new)              _require_value "$1" "$#" "${2-}"; new="$2"; shift 2 ;;
-      --kind)             _require_value "$1" "$#" "${2-}"; kind="$2"; shift 2 ;;
+      --kind)             log_error "generate: --kind is no longer supported; the script infers claim vs validator from chain state"; exit 1 ;;
       --chain-id)         _require_value "$1" "$#" "${2-}"; chain_id="$2"; shift 2 ;;
       --node)             _require_value "$1" "$#" "${2-}"; node="$2"; shift 2 ;;
       --out)              _require_value "$1" "$#" "${2-}"; out="$2"; shift 2 ;;
       --sig-format)       _require_value "$1" "$#" "${2-}"; sig_format="$2"; shift 2 ;;
+      --new-key)          _require_value "$1" "$#" "${2-}"; new_key="$2"; shift 2 ;;
       --new-sub-pub-keys) _require_value "$1" "$#" "${2-}"; new_sub_pub_keys="$2"; shift 2 ;;
       --new-threshold)    _require_value "$1" "$#" "${2-}"; new_threshold="$2"; shift 2 ;;
       --legacy-key)       _require_value "$1" "$#" "${2-}"; legacy_key="$2"; shift 2 ;;
@@ -50,18 +52,30 @@ _mms_generate() {
       --home)             _require_value "$1" "$#" "${2-}"; home_dir="$2"; shift 2 ;;
       -h|--help)
         cat >&2 <<'G_USAGE'
-Usage: migrate-multisig.sh generate --legacy <multisig-addr> \
-  --new-sub-pub-keys <k1,k2,...> --new-threshold <K> --kind claim|validator \
-  --chain-id <id> --out <path> \
-  [--new <new-multisig-addr>]         Cross-checks the address derived from new-sub-pub-keys
+Usage: migrate-multisig.sh generate --legacy <multisig-key-or-addr> \
+  (--new-key <evm-multisig-key> | --new-sub-pub-keys <k1,k2,...>) \
+  [--chain-id <id>] [--out <path>] \
+  [--new-threshold <K>]              Defaults to the on-chain legacy multisig threshold
+  [--new <new-multisig-addr>]         Cross-checks the address derived from destination key material
   [--node <url>]                      RPC endpoint (default $LUMERA_NODE or tcp://localhost:26657;
                                       mainnet example: https://rpc.lumera.io:443)
   [--sig-format SIG_FORMAT_CLI|SIG_FORMAT_ADR036]
   [--keyring-backend <b>] [--keyring-dir <dir>] [--home <dir>]
   [--binary <path>]
 
---new-sub-pub-keys entries may be either local keyring key names (eth_secp256k1)
-or base64-encoded compressed 33-byte eth_secp256k1 pubkeys. Mix freely.
+--new-key is the easiest path when you already created the destination EVM
+multisig key locally; the script reads its embedded eth_secp256k1 signer pubkeys.
+That means --new-sub-pub-keys is inferred from the local keyring when --new-key
+exists there.
+--new-sub-pub-keys remains available for explicit key names or base64 compressed
+33-byte eth_secp256k1 pubkeys. The chain exposes legacy multisig signers, but a
+fresh destination address has no on-chain account record, so destination EVM
+signer pubkeys must come from local keyring material or explicit pubkeys.
+--out defaults to proof.json.
+--chain-id is optional when $LUMERA_CHAIN_ID or $CHAIN_ID is set, or when it can
+be auto-detected from the RPC endpoint.
+The migration kind is always inferred from chain state: validator accounts use
+validator migration, all other multisig accounts use claim migration.
 
 The EVM chain ID is fixed by the binary (lcfg.EVMChainID) and not
 user-configurable — the keeper always verifies against that constant.
@@ -72,18 +86,19 @@ G_USAGE
   done
 
   # Required-flag validation. --new is optional (cross-check only).
-  local f
-  for f in legacy kind chain_id out new_sub_pub_keys new_threshold; do
-    if [[ -z "${!f}" ]]; then
-      log_error "generate: --${f//_/-} is required"
-      exit 1
-    fi
-  done
-  if [[ "$kind" != "claim" && "$kind" != "validator" ]]; then
-    log_error "generate: --kind must be 'claim' or 'validator'"
+  if [[ -z "$legacy" ]]; then
+    log_error "generate: --legacy is required"
     exit 1
   fi
-
+  if [[ -n "$new_key" && -n "$new_sub_pub_keys" ]]; then
+    log_error "generate: --new-key and --new-sub-pub-keys are mutually exclusive"
+    exit 1
+  fi
+  if [[ -z "$new_key" && -z "$new_sub_pub_keys" ]]; then
+    log_error "generate: pass --new-key <evm-multisig-key> or --new-sub-pub-keys <k1,k2,...>"
+    log_error "the chain only stores legacy multisig pubkeys; a fresh destination has no on-chain EVM signer pubkeys"
+    exit 1
+  fi
   # Wire up globals used by common helpers
   # shellcheck disable=SC2034  # consumed by lumerad_q and auth_pubkey_type helpers
   BIN="$binary"
@@ -101,6 +116,39 @@ G_USAGE
   require_multisig_binary
   require_jq
   resolve_chain_id
+  chain_id="$CHAIN_ID"
+  if [[ -z "$chain_id" ]]; then
+    log_error "generate: chain ID is required; pass --chain-id, set \$LUMERA_CHAIN_ID / \$CHAIN_ID, or use a reachable RPC endpoint for auto-detection"
+    exit 1
+  fi
+
+  local legacy_input="$legacy"
+  if [[ "$legacy" != lumera1* ]]; then
+    legacy=$(resolve_address "$legacy_input")
+    log_info "legacy multisig key $(legacy_value "$legacy_input") -> address $(legacy_value "$legacy")"
+  fi
+
+  if [[ -n "$new_key" ]]; then
+    local key_threshold key_addr
+    key_threshold=$(key_multisig_threshold "$new_key")
+    if [[ -z "$key_threshold" || ! "$key_threshold" =~ ^[0-9]+$ || "$key_threshold" == "0" ]]; then
+      log_error "could not read multisig threshold from destination key $(new_value "$new_key")"
+      exit 1
+    fi
+    if [[ -n "$new_threshold" && "$new_threshold" != "$key_threshold" ]]; then
+      log_error "--new-threshold=$new_threshold does not match destination key $(new_value "$new_key") threshold=$key_threshold"
+      exit 1
+    fi
+    new_threshold="$key_threshold"
+    new_sub_pub_keys=$(key_multisig_sub_pub_keys_csv "$new_key")
+    key_addr=$(resolve_address "$new_key")
+    if [[ -n "$new" && "$new" != "$key_addr" ]]; then
+      log_error "--new $(new_value "$new") does not match destination key $(new_value "$new_key") address $(new_value "$key_addr")"
+      exit 1
+    fi
+    new="$key_addr"
+    log_info "using destination EVM multisig key $(new_value "$new_key") -> address $(new_value "$new")"
+  fi
 
   # Check on-chain pubkey BEFORE estimate so a nil-pubkey multisig gets
   # the exit-8 "seed the pubkey first" remediation, not a confusing
@@ -118,15 +166,36 @@ G_USAGE
     multisig) ;;
     *) log_error "unexpected pubkey type for $(legacy_value "$legacy"): $pk_type"; exit 2 ;;
   esac
+  local legacy_threshold legacy_subkey_count
+  legacy_threshold=$(auth_multisig_threshold "$legacy")
+  legacy_subkey_count=$(auth_multisig_subkey_count "$legacy")
+  if [[ -z "$legacy_threshold" || ! "$legacy_threshold" =~ ^[0-9]+$ || "$legacy_threshold" == "0" ]]; then
+    log_error "could not read legacy multisig threshold from chain for $(legacy_value "$legacy")"
+    exit 2
+  fi
+  if [[ -z "$legacy_subkey_count" || ! "$legacy_subkey_count" =~ ^[0-9]+$ || "$legacy_subkey_count" == "0" ]]; then
+    log_error "could not read legacy multisig signer pubkeys from chain for $(legacy_value "$legacy")"
+    exit 2
+  fi
+  if [[ -z "$new_threshold" ]]; then
+    new_threshold="$legacy_threshold"
+    log_info "using on-chain legacy multisig threshold for new multisig: ${new_threshold}-of-${legacy_subkey_count}"
+  fi
 
   # Pull estimate — provides is_validator, would_succeed, is_multisig confirmation.
   local estimate
   estimate=$(preflight_estimate "$legacy")
   assert_multisig "$estimate"
 
-  if [[ "$kind" == "validator" && "$(jq -r '.is_validator' <<<"$estimate")" != "true" ]]; then
-    log_error "--kind validator specified but $(legacy_value "$legacy") is not a validator operator"
-    exit 6
+  local detected_kind
+  if [[ "$(jq -r '.is_validator' <<<"$estimate")" == "true" ]]; then
+    detected_kind="validator"
+  else
+    detected_kind="claim"
+  fi
+  if [[ -z "$kind" ]]; then
+    kind="$detected_kind"
+    log_info "auto-detected multisig migration kind: $kind"
   fi
 
   # Design §3.1: catch already-migrated / already-used destinations
@@ -165,14 +234,15 @@ G_USAGE
   log_info "done — distribute $out to the K co-signers"
 }
 _mms_sign() {
-  local input="" from="" new_key="" chain_id="" out="" binary="lumerad"
-  local keyring_backend="test" keyring_dir="" home_dir=""
+  local input="" from="" new_key="" chain_id="${LUMERA_CHAIN_ID:-${CHAIN_ID:-}}" out="" binary="lumerad"
+  local node="${LUMERA_NODE:-tcp://localhost:26657}" keyring_backend="test" keyring_dir="" home_dir=""
   local positional=()
   while (( $# > 0 )); do
     case "$1" in
       --from)             _require_value "$1" "$#" "${2-}"; from="$2"; shift 2 ;;
       --new-key)          _require_value "$1" "$#" "${2-}"; new_key="$2"; shift 2 ;;
       --chain-id)         _require_value "$1" "$#" "${2-}"; chain_id="$2"; shift 2 ;;
+      --node)             _require_value "$1" "$#" "${2-}"; node="$2"; shift 2 ;;
       --out)              _require_value "$1" "$#" "${2-}"; out="$2"; shift 2 ;;
       --binary)           _require_value "$1" "$#" "${2-}"; binary="$2"; shift 2 ;;
       --keyring-backend)  _require_value "$1" "$#" "${2-}"; keyring_backend="$2"; shift 2 ;;
@@ -182,14 +252,38 @@ _mms_sign() {
         cat >&2 <<'S_USAGE'
 Usage: migrate-multisig.sh sign <proof-or-partial.json> \
   [--from <my-legacy-sub-key>] [--new-key <my-eth-sub-key>] \
-  --chain-id <id> --out <partial.json> \
-  [--keyring-backend <b>] [--keyring-dir <dir>] [--home <dir>] [--binary <path>]
+  [--chain-id <id>] --out <partial.json> \
+  [--node <url>] [--keyring-backend <b>] [--keyring-dir <dir>] [--home <dir>] [--binary <path>]
+
+Purpose:
+  A co-signer reads proof.json, signs the side(s) for keys they control, and
+  writes a partial JSON file to return to the coordinator.
+
+Required:
+  <proof-or-partial.json>       Proof template or an existing partial file.
+  --out <partial.json>          Output file for this signer.
+  --from <legacy-sub-key>       Legacy Cosmos secp256k1 sub-key to sign the
+                                legacy side.
+  --new-key <eth-sub-key>       New eth_secp256k1 sub-key to sign the EVM side.
 
 At least one of --from (Cosmos secp256k1 sub-key for the legacy side) or
 --new-key (eth_secp256k1 sub-key for the new side) must be supplied. A
 co-signer who holds both sub-keys passes both flags to sign both sides in
 one invocation; re-running is idempotent (replaces the prior entry at the
 same index).
+
+Validation before signing:
+  - input file is a multisig proof/partial and has a valid payload hash
+  - --from is a Cosmos secp256k1 key listed in legacy.sub_pub_keys
+  - --new-key is an eth_secp256k1 key listed in new.sub_pub_keys
+
+--chain-id is optional when $LUMERA_CHAIN_ID or $CHAIN_ID is set, or when it can
+be auto-detected from the RPC endpoint.
+
+Examples:
+  migrate-multisig.sh sign proof.json --from alice-legacy --new-key alice-evm --out partial-alice.json
+  migrate-multisig.sh sign proof.json --from alice-legacy --out partial-legacy-alice.json
+  migrate-multisig.sh sign proof.json --new-key alice-evm --out partial-new-alice.json
 S_USAGE
         exit 0 ;;
       --*) log_error "unknown flag: $1"; exit 1 ;;
@@ -207,16 +301,15 @@ S_USAGE
     log_error "sign: at least one of --from or --new-key is required"
     exit 1
   fi
-  local f
-  for f in chain_id out; do
-    if [[ -z "${!f}" ]]; then
-      log_error "sign: --${f//_/-} is required"
-      exit 1
-    fi
-  done
+  if [[ -z "$out" ]]; then
+    log_error "sign: --out is required"
+    exit 1
+  fi
 
   # shellcheck disable=SC2034
   BIN="$binary"
+  # shellcheck disable=SC2034
+  NODE="$node"
   # shellcheck disable=SC2034
   CHAIN_ID="$chain_id"
   # shellcheck disable=SC2034
@@ -229,6 +322,11 @@ S_USAGE
   require_multisig_binary
   require_jq
   resolve_chain_id
+  chain_id="$CHAIN_ID"
+  if [[ -z "$chain_id" ]]; then
+    log_error "sign: chain ID is required; pass --chain-id or set \$LUMERA_CHAIN_ID / \$CHAIN_ID"
+    exit 1
+  fi
 
   # Parse + validate the input proof/partial. read_proof_file rejects
   # single-key-on-either-side (exit 3), bad payload_hex (exit 9), missing
@@ -285,6 +383,29 @@ _mms_combine() {
       -h|--help)
         cat >&2 <<'C_USAGE'
 Usage: migrate-multisig.sh combine <partial1.json> <partial2.json> [...] --out <tx.json> [--binary <path>]
+
+Purpose:
+  The coordinator merges co-signer partial JSON files into a final tx.json
+  that can be submitted with `migrate-multisig.sh submit`.
+
+Required:
+  <partial*.json>       One or more partial files returned by co-signers.
+  --out <tx.json>       Output transaction file.
+
+Validation before combine:
+  - all partials are valid multisig proof/partial files
+  - all partials agree on chain ID, legacy address, new address, kind,
+    payload, thresholds, signature format, and sub-pub-key lists
+  - each side has at least K valid signer entries
+  - the same signer indices meet quorum on both legacy and new sides
+  - `lumerad tx evmigration combine-proof` accepts the partial signatures
+
+Exit codes:
+  4   quorum is not met, or quorum exists per-side but not by matching signer index
+  9   partial files are malformed or disagree on immutable proof fields
+
+Example:
+  migrate-multisig.sh combine partial-alice.json partial-bob.json --out tx.json
 C_USAGE
         exit 0 ;;
       --*) log_error "unknown flag: $1"; exit 1 ;;
@@ -332,7 +453,7 @@ C_USAGE
   log_info "combined tx written to $out"
 }
 _mms_submit() {
-  local input="" chain_id="" node="${LUMERA_NODE:-tcp://localhost:26657}" binary="lumerad"
+  local input="" chain_id="${LUMERA_CHAIN_ID:-${CHAIN_ID:-}}" node="${LUMERA_NODE:-tcp://localhost:26657}" binary="lumerad"
   local keyring_backend="test" keyring_dir="" home_dir=""
   local yes=0 dry_run=0 node_stopped=0
   local positional=()
@@ -350,16 +471,44 @@ _mms_submit() {
       -h|--help)
         cat >&2 <<'SU_USAGE'
 Usage: migrate-multisig.sh submit <tx.json> \
-  --chain-id <id> \
+  [--chain-id <id>] \
   [--node <url>] \
   [--keyring-backend <b>] [--keyring-dir <dir>] [--home <dir>] \
   [--yes] [--dry-run] [--i-have-stopped-the-node] [--binary <path>]
 
+Purpose:
+  The coordinator broadcasts the combined multisig migration tx and verifies
+  chain state after inclusion.
+
+Required:
+  <tx.json>                         Transaction file produced by combine.
+  --i-have-stopped-the-node          Required for validator migrations in
+                                    non-interactive runs; confirms the
+                                    validator node is stopped before broadcast.
+
+Safety checks before broadcast:
+  - tx.json is a multisig-to-multisig migration tx
+  - legacy address has no migration record
+  - new address has no migration records
+  - new address does not already exist on-chain
+  - fresh migration-estimate still succeeds
+
 Mainnet RPC example: https://rpc.lumera.io:443
+--chain-id is optional when $LUMERA_CHAIN_ID or $CHAIN_ID is set, or when it can
+be auto-detected from the RPC endpoint.
 
 submit-proof does not sign at the Cosmos tx layer — migration messages
 declare zero signers and fees are waived by the evmigration ante handler.
 There is no --from / --fee / --gas-prices.
+
+--dry-run performs all checks and stops before broadcast.
+--yes skips the final broadcast prompt, but does not replace
+--i-have-stopped-the-node for validator migrations.
+
+Examples:
+  migrate-multisig.sh submit tx.json
+  migrate-multisig.sh submit tx.json --yes
+  migrate-multisig.sh submit tx.json --i-have-stopped-the-node
 SU_USAGE
         exit 0 ;;
       --*) log_error "unknown flag: $1"; exit 1 ;;
@@ -372,11 +521,6 @@ SU_USAGE
     exit 1
   fi
   input="${positional[0]}"
-
-  if [[ -z "$chain_id" ]]; then
-    log_error "submit: --chain-id is required"
-    exit 1
-  fi
 
   # shellcheck disable=SC2034
   BIN="$binary"
@@ -398,6 +542,11 @@ SU_USAGE
   require_multisig_binary
   require_jq
   resolve_chain_id
+  chain_id="$CHAIN_ID"
+  if [[ -z "$chain_id" ]]; then
+    log_error "submit: chain ID is required; pass --chain-id, set \$LUMERA_CHAIN_ID / \$CHAIN_ID, or use a reachable RPC endpoint for auto-detection"
+    exit 1
+  fi
 
   # Parse + validate tx.json. Rejects non-multisig→multisig (exit 3),
   # missing fields / malformed (exit 9). Emits compact summary JSON.

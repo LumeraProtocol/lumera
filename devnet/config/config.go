@@ -108,6 +108,7 @@ type Validator struct {
 		Count            int    `json:"count,omitempty"`
 		BalanceBase      string `json:"balance_base,omitempty"`
 		BalanceIncrement string `json:"balance_increment,omitempty"`
+		Multisig         bool   `json:"multisig,omitempty"`
 	} `json:"test_accounts,omitempty"`
 }
 

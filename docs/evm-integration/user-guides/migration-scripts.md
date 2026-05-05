@@ -133,7 +133,7 @@ They accept these common flags:
 
 ### Chain ID Resolution
 
-For the single-key scripts, `--chain-id` is optional. The script resolves the chain ID in this order:
+For the migration scripts, `--chain-id` is optional. The scripts resolve the chain ID in this order:
 
 1. `--chain-id <id>`
 2. `$LUMERA_CHAIN_ID`
@@ -152,7 +152,7 @@ or:
 INFO  auto-detected chain ID from tcp://localhost:26657: lumera-mainnet-1
 ```
 
-For `migrate-multisig.sh`, follow each subcommand's help. `generate`, `sign`, and `submit` currently require `--chain-id` explicitly.
+`migrate-multisig.sh generate`, `sign`, and `submit` use the same chain ID resolution. `generate` and `submit` can auto-detect it from the RPC endpoint. `sign` can auto-detect it too when `--node` points at a reachable RPC endpoint.
 
 ### RPC Endpoint Setup
 
@@ -552,26 +552,36 @@ The coordinator does not need signing keys. Co-signers sign locally.
 
 ```bash
 ./scripts/migrate-multisig.sh generate \
-  --legacy lumera1<legacy-multisig-address> \
-  --new lumera1<new-multisig-address> \
-  --new-sub-pub-keys <eth-pubkey-or-key-name-1>,<eth-pubkey-or-key-name-2>,<eth-pubkey-or-key-name-3> \
-  --new-threshold 2 \
-  --kind claim \
-  --chain-id lumera-mainnet-1 \
-  --out proof.json
+  --legacy <legacy-multisig-key-or-address> \
+  --new-key <new-evm-multisig-key>
 ```
 
-Use `--kind validator` for a multisig validator operator.
+If you already created the destination EVM multisig key locally, use `--new-key`. The script reads the keyring entry, extracts its `eth_secp256k1` signer pubkeys, derives the destination address, and infers `--new-sub-pub-keys` for you.
 
-`--new` is optional in the script, but strongly recommended. When supplied, the script can perform all destination safety checks before co-signers spend time signing.
+If you do not have a local destination multisig key, pass the signer pubkeys explicitly:
 
-`--new-sub-pub-keys` entries may be local keyring key names or base64-encoded compressed 33-byte `eth_secp256k1` pubkeys.
+```bash
+./scripts/migrate-multisig.sh generate \
+  --legacy <legacy-multisig-key-or-address> \
+  --new lumera1<new-multisig-address> \
+  --new-sub-pub-keys <eth-pubkey-or-key-name-1>,<eth-pubkey-or-key-name-2>,<eth-pubkey-or-key-name-3>
+```
+
+The script infers whether this is a regular claim or validator migration from chain state. You do not pass a kind.
+
+`--legacy` can be either the legacy multisig account address or a local multisig key name. If you pass a key name, the script resolves it to the account address before querying chain state and generating the proof.
+
+`--out` defaults to `proof.json`. `--chain-id` is optional when `LUMERA_CHAIN_ID` or `CHAIN_ID` is set, or when the script can auto-detect the chain ID from the RPC endpoint. If your local `lumerad` is not configured to use the correct RPC endpoint, pass `--node https://rpc.lumera.io:443` for Lumera mainnet.
+
+`--new` is optional when using `--new-sub-pub-keys`, but strongly recommended. When supplied, the script can perform all destination safety checks before co-signers spend time signing. When using `--new-key`, the script resolves `--new` from the local key automatically.
+
+`--new-sub-pub-keys` entries may be local keyring key names or base64-encoded compressed 33-byte `eth_secp256k1` pubkeys. `--new-threshold` is optional; if omitted, it defaults to the on-chain legacy multisig threshold.
 
 The generate step checks:
 
 - legacy account has an on-chain multisig pubkey
 - legacy account is multisig
-- `--kind validator` matches validator status
+- migration kind can be inferred from chain state
 - legacy address has no migration record
 - if `--new` is supplied, destination has no migration records and does not exist on-chain
 - `migration-estimate.would_succeed` is true
@@ -586,7 +596,6 @@ Signer with both legacy and new sub-keys:
 ./scripts/migrate-multisig.sh sign proof.json \
   --from <my-legacy-sub-key> \
   --new-key <my-new-eth-sub-key> \
-  --chain-id lumera-mainnet-1 \
   --out partial-alice.json
 ```
 
@@ -595,7 +604,6 @@ Signer with only the legacy sub-key:
 ```bash
 ./scripts/migrate-multisig.sh sign proof.json \
   --from <my-legacy-sub-key> \
-  --chain-id lumera-mainnet-1 \
   --out partial-legacy-alice.json
 ```
 
@@ -604,7 +612,6 @@ Signer with only the new sub-key:
 ```bash
 ./scripts/migrate-multisig.sh sign proof.json \
   --new-key <my-new-eth-sub-key> \
-  --chain-id lumera-mainnet-1 \
   --out partial-new-alice.json
 ```
 
@@ -634,15 +641,13 @@ If per-side quorum is met but matching-index quorum is not, the script exits 4. 
 ### 4. Coordinator: Submit
 
 ```bash
-./scripts/migrate-multisig.sh submit tx.json \
-  --chain-id lumera-mainnet-1
+./scripts/migrate-multisig.sh submit tx.json
 ```
 
 For multisig validator migration:
 
 ```bash
 ./scripts/migrate-multisig.sh submit tx.json \
-  --chain-id lumera-mainnet-1 \
   --i-have-stopped-the-node
 ```
 
@@ -756,7 +761,7 @@ Use `migrate-multisig.sh`. The single-key scripts cannot migrate multisig accoun
 
 ### `account ... is a validator`
 
-Use `migrate-validator.sh` for single-key validators, or `migrate-multisig.sh --kind validator` for multisig validators.
+Use `migrate-validator.sh` for single-key validators. Use `migrate-multisig.sh generate` for multisig validators; the script infers validator migration from chain state.
 
 ### `validator downtime not acknowledged`
 
@@ -811,7 +816,6 @@ For multisig submit:
 
 ```bash
 ./scripts/migrate-multisig.sh submit tx.json \
-  --chain-id lumera-mainnet-1 \
   --yes
 ```
 

@@ -10,7 +10,8 @@
 #   "test_accounts": {
 #     "count": 10,
 #     "balance_base": "10000ulume",
-#     "balance_increment": "5000ulume"
+#     "balance_increment": "5000ulume",
+#     "multisig": true   # optional, default false; if true, creates 2-of-3 multisig accounts instead of single-sig
 #   }
 #
 # Behavior:
@@ -19,6 +20,8 @@
 #   - Funds account i with balance_base + i * balance_increment, passing the
 #     amount straight to lumera-helper.sh (so the units come from config,
 #     unmodified — e.g. "10000ulume", "15000ulume", "20000ulume", ...).
+#   - If test_accounts.multisig is true, creates 2-of-3 multisig accounts
+#     instead of single-sig accounts.
 #
 # Runs idempotently: lumera-helper.sh skips already-provisioned accounts.
 
@@ -61,6 +64,7 @@ fi
 TA_COUNT="$(printf '%s' "${VAL_REC_JSON}" | jq -r 'try .test_accounts.count // 0')"
 TA_BASE="$(printf '%s' "${VAL_REC_JSON}" | jq -r 'try .test_accounts.balance_base // ""')"
 TA_INCR="$(printf '%s' "${VAL_REC_JSON}" | jq -r 'try .test_accounts.balance_increment // "0"')"
+TA_MULTISIG="$(printf '%s' "${VAL_REC_JSON}" | jq -r 'try .test_accounts.multisig // false')"
 
 if ! [[ "${TA_COUNT}" =~ ^[0-9]+$ ]] || [ "${TA_COUNT}" -eq 0 ]; then
 	log "No test_accounts.count configured for ${MONIKER}; skipping."
@@ -157,6 +161,16 @@ DAEMON_DIR="$(jq -r '.paths.directories.daemon' "${CFG_CHAIN}")"
 DAEMON_HOME="${DAEMON_HOME_BASE}/${DAEMON_DIR}"
 MIN_GAS_PRICE="$(jq -r '.chain.denom.minimum_gas_price // "0.025ulume"' "${CFG_CHAIN}")"
 VAL_KEY_NAME="$(printf '%s' "${VAL_REC_JSON}" | jq -r '.key_name')"
+VALIDATOR_MULTISIG_ENABLED="$(printf '%s' "${VAL_REC_JSON}" | jq -r 'try .multisig.enabled // false')"
+if [ "${VALIDATOR_MULTISIG_ENABLED}" = "true" ]; then
+	VAL_KEY_NAME="prepare-funder-${MONIKER}"
+	log "Validator key is multisig; using single-sig prepare funder ${VAL_KEY_NAME} to bootstrap test accounts."
+	if ! "${DAEMON}" --home "${DAEMON_HOME}" keys show "${VAL_KEY_NAME}" \
+		--keyring-backend "${KEYRING_BACKEND}" >/dev/null 2>&1; then
+		log "ERROR: ${VAL_KEY_NAME} not found in keyring. validator-setup.sh must create it before test account provisioning."
+		exit 1
+	fi
+fi
 
 # Bind the shared /shared/status/<moniker>/accounts.json registry so we can
 # persist the temp funder alongside other validator-local accounts (survives
@@ -170,6 +184,11 @@ accounts_registry_init "${NODE_STATUS_DIR}" "${CFG_CHAIN}"
 # 0.03ulume/gas; 10k × count is a comfortable margin).
 TA_TOTAL=$((TA_COUNT * BASE_NUM + INCR_NUM * TA_COUNT * (TA_COUNT - 1) / 2))
 TA_GAS_HEADROOM=$((TA_COUNT * 10000))
+if [ "${TA_MULTISIG}" = "true" ]; then
+	# Multisig accounts perform an extra signed self-send to publish the
+	# composite pubkey, then get topped back up to the target balance.
+	TA_GAS_HEADROOM=$((TA_COUNT * 30000))
+fi
 TA_FUNDER_AMOUNT=$((TA_TOTAL + TA_GAS_HEADROOM))
 TA_FUNDER_KEY="ta-funder-${MONIKER}"
 
@@ -257,7 +276,11 @@ log "Registered ${TA_FUNDER_KEY} in ${NODE_STATUS_DIR}/accounts.json"
 # temp funder so no further tx hits the validator genesis sequence.
 export FUNDER_KEY_NAME="${TA_FUNDER_KEY}"
 
-log "Provisioning ${TA_COUNT} test account(s): base=${TA_BASE}, incr=${TA_INCR}"
+if [ "${TA_MULTISIG}" = "true" ]; then
+	log "Provisioning ${TA_COUNT} multisig test account(s): base=${TA_BASE}, incr=${TA_INCR}"
+else
+	log "Provisioning ${TA_COUNT} test account(s): base=${TA_BASE}, incr=${TA_INCR}"
+fi
 
 HELPER="${SCRIPT_DIR}/lumera-helper.sh"
 if [ ! -x "${HELPER}" ]; then
@@ -268,6 +291,15 @@ fi
 for i in $(seq 0 $((TA_COUNT - 1))); do
 	amount_num=$((BASE_NUM + i * INCR_NUM))
 	amount_arg="${amount_num}${DENOM_SFX}"
+
+	if [ "${TA_MULTISIG}" = "true" ]; then
+		log "[$((i + 1))/${TA_COUNT}] Creating 2-of-3 multisig account funded with ${amount_arg}..."
+		if ! "${HELPER}" new-account --multisig "${amount_arg}"; then
+			log "ERROR: failed to create/fund multisig test account #$((i + 1)) with ${amount_arg}."
+			exit 1
+		fi
+		continue
+	fi
 
 	log "[$((i + 1))/${TA_COUNT}] Creating account funded with ${amount_arg}..."
 	if ! "${HELPER}" new-account "${amount_arg}"; then

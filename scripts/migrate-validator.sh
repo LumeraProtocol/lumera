@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+###################################################################################
+# Copyright 2026 The Lumera Protocol
+#
+# Migration shell script for legacy validator accounts.
 #
 # Migrate a single-signature validator operator from legacy to EVM-compatible keys.
 # See docs/design/evmigration-scripts-design.md and
@@ -81,7 +85,14 @@ main() {
 
   local cap total
   cap=$(lumerad_q evmigration params | jq -r '.params.max_validator_delegations | tonumber')
-  total=$(jq -r '.val_delegation_count + .val_unbonding_count + .val_redelegation_count' <<<"$estimate")
+  # The three counts are uint64 in proto, which Cosmos JSON renders as strings.
+  # jq's `+` would concatenate them ("35"+"5"+"16" -> "35516") instead of adding,
+  # so explicitly cast each to a number before summing.
+  total=$(jq -r '
+      ((.val_delegation_count   // 0) | tonumber)
+    + ((.val_unbonding_count    // 0) | tonumber)
+    + ((.val_redelegation_count // 0) | tonumber)
+  ' <<<"$estimate")
   if (( total > cap )); then
     log_error "validator has $total delegation/unbonding/redelegation records; exceeds max_validator_delegations=$cap"
     exit 6

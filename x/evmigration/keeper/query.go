@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"cosmossdk.io/collections"
 	"cosmossdk.io/x/feegrant"
@@ -189,15 +190,35 @@ func (qs queryServer) MigrationEstimate(goCtx context.Context, req *types.QueryM
 		})
 		resp.ValRedelegationCount = redCount
 
-		// Check would_succeed.
+		// Surface the validator's BondStatus + Jailed flag so callers can
+		// display the actionable cause when WouldSucceed is false. Jailed
+		// implies Status ∈ {Unbonding, Unbonded} but the reverse isn't
+		// true (a validator can voluntarily unbond without being jailed),
+		// hence both fields are returned.
+		resp.ValidatorStatus = val.Status.String()
+		resp.ValidatorJailed = val.Jailed
+
+		// Check would_succeed. The rejection_reason is callable-readable
+		// English; consumers should rely on validator_jailed /
+		// validator_status for programmatic dispatch.
 		totalRecords := resp.ValDelegationCount + resp.ValUnbondingCount + resp.ValRedelegationCount
-		if totalRecords > params.MaxValidatorDelegations {
+		switch {
+		case totalRecords > params.MaxValidatorDelegations:
 			resp.WouldSucceed = false
 			resp.RejectionReason = "too many delegators"
-		} else if val.Status == stakingtypes.Unbonding || val.Status == stakingtypes.Unbonded {
+		case val.Jailed:
 			resp.WouldSucceed = false
-			resp.RejectionReason = "validator is unbonding or unbonded"
-		} else {
+			resp.RejectionReason = fmt.Sprintf(
+				"validator is jailed (status: %s); restart the node, wait for catch-up, then `lumerad tx slashing unjail`",
+				strings.ToLower(strings.TrimPrefix(val.Status.String(), "BOND_STATUS_")),
+			)
+		case val.Status == stakingtypes.Unbonding || val.Status == stakingtypes.Unbonded:
+			resp.WouldSucceed = false
+			resp.RejectionReason = fmt.Sprintf(
+				"validator status is %s (not bonded); migration requires the validator to be in the active set",
+				strings.ToLower(strings.TrimPrefix(val.Status.String(), "BOND_STATUS_")),
+			)
+		default:
 			resp.WouldSucceed = true
 		}
 	} else {

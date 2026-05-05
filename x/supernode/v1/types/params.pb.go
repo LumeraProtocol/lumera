@@ -25,6 +25,9 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
+// RewardDistribution governs the Everlight reward pool's payout cadence,
+// eligibility floor, ramp-up, smoothing window and growth cap. All fields
+// are governance-mutable via supernode MsgUpdateParams.
 type RewardDistribution struct {
 	// Distribution period in blocks. Pool balance distributed every this many blocks.
 	PaymentPeriodBlocks uint64 `protobuf:"varint,1,opt,name=payment_period_blocks,json=paymentPeriodBlocks,proto3" json:"payment_period_blocks,omitempty" yaml:"payment_period_blocks"`

@@ -18,8 +18,7 @@ Use the script that matches the account you are migrating:
 Most users should do this first:
 
 ```bash
-./scripts/migrate-account.sh <legacy-key> <new-evm-key> \
-  --dry-run
+./scripts/migrate-account.sh <legacy-key> <new-evm-key> --dry-run
 ```
 
 If the dry-run succeeds, remove `--dry-run` and run the same command to broadcast.
@@ -118,17 +117,17 @@ cd lumera
 
 They accept these common flags:
 
-| Flag                       | Default                                               | Description                                                          |
-| -------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------- |
-| `--node <url>`           | `$LUMERA_NODE` or `tcp://localhost:26657`         | RPC endpoint.                                                        |
-| `--chain-id <id>`        | `$LUMERA_CHAIN_ID`, `$CHAIN_ID`, or auto-detected | Chain ID used for tx generation and broadcast.                       |
-| `--keyring-backend <b>`  | `test`                                              | `test`, `file`, or `os`.                                       |
-| `--keyring-dir <dir>`    | unset                                                 | Keyring directory independent of `--home`.                         |
-| `--home <dir>`           | `lumerad` default                                   | Passed through to `lumerad`.                                       |
-| `--mnemonic-file <path>` | unset                                                 | One-shot import from a mnemonic file with mode `0600` or stricter. |
-| `--yes`, `-y`          | off                                                   | Skip the normal broadcast confirmation prompt.                       |
-| `--dry-run`              | off                                                   | Run checks and preview, then stop before broadcast.                  |
-| `--binary <path>`        | `lumerad` from `PATH`                             | Use a specific `lumerad` binary.                                   |
+| Flag                          | Default                                               | Description                                                          |
+| ----------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------- |
+| `--node <url>`              | `$LUMERA_NODE` or `tcp://localhost:26657`         | RPC endpoint.                                                        |
+| `--chain-id <id>`           | `$LUMERA_CHAIN_ID`, `$CHAIN_ID`, or auto-detected | Chain ID used for tx generation and broadcast.                       |
+| `--keyring-backend <b>    ` | `test`                                              | `test`, `file`, or `os`.                                       |
+| `--keyring-dir <dir>`       | unset                                                 | Keyring directory independent of `--home`.                         |
+| `--home <dir>`              | `lumerad` default                                   | Passed through to `lumerad`.                                       |
+| `--mnemonic-file <path>`    | unset                                                 | One-shot import from a mnemonic file with mode `0600` or stricter. |
+| `--yes`, `-y`             | off                                                   | Skip the normal broadcast confirmation prompt.                       |
+| `--dry-run`                 | off                                                   | Run checks and preview, then stop before broadcast.                  |
+| `--binary <path>`           | `lumerad` from `PATH`                             | Use a specific `lumerad` binary.                                   |
 
 ### Chain ID Resolution
 
@@ -166,8 +165,7 @@ export LUMERA_NODE=https://rpc.lumera.io:443
 or pass it per command:
 
 ```bash
-./scripts/migrate-account.sh <legacy-key> <new-evm-key> \
-  --node https://rpc.lumera.io:443
+./scripts/migrate-account.sh <legacy-key> <new-evm-key> --node https://rpc.lumera.io:443
 ```
 
 Lumera mainnet CometBFT RPC endpoint:
@@ -202,21 +200,13 @@ Use this for regular single-key accounts and non-validator supernode operator ac
 Import the legacy key:
 
 ```bash
-lumerad keys add <legacy-key> \
-  --recover \
-  --coin-type 118 \
-  --algo secp256k1 \
-  --keyring-backend test
+lumerad keys add <legacy-key> --recover --coin-type 118 --algo secp256k1 --keyring-backend test
 ```
 
 Import the new EVM-compatible key:
 
 ```bash
-lumerad keys add <new-evm-key> \
-  --recover \
-  --coin-type 60 \
-  --algo eth_secp256k1 \
-  --keyring-backend test
+lumerad keys add <new-evm-key> --recover --coin-type 60 --algo eth_secp256k1 --keyring-backend test
 ```
 
 Enter the same mnemonic for both if you are migrating a normal mnemonic-derived account.
@@ -233,8 +223,7 @@ The legacy address must match your pre-EVM Lumera address. The new address must 
 ### 2. Dry-Run
 
 ```bash
-./scripts/migrate-account.sh <legacy-key> <new-evm-key> \
-  --dry-run
+./scripts/migrate-account.sh <legacy-key> <new-evm-key> --dry-run
 ```
 
 Dry-run performs:

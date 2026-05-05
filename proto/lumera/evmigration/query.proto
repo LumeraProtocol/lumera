@@ -157,6 +157,18 @@ message QueryMigrationEstimateResponse {
   uint32 threshold   = 17;
   // num_signers is N for K-of-N multisig (0 when !is_multisig).
   uint32 num_signers = 18;
+  // validator_status is the staking BondStatus of the validator entity, as
+  // a stable enum string ("BOND_STATUS_BONDED" | "BOND_STATUS_UNBONDING" |
+  // "BOND_STATUS_UNBONDED" | "BOND_STATUS_UNSPECIFIED"). Populated only when
+  // is_validator is true; empty otherwise. Surfaced so callers can show why
+  // would_succeed is false without a separate staking query.
+  string validator_status = 19;
+  // validator_jailed is the staking jailed flag of the validator entity.
+  // Populated only when is_validator is true. A jailed validator is always
+  // also Unbonding or Unbonded; surfacing both fields lets callers
+  // distinguish "jailed for downtime/equivocation" (actionable: unjail
+  // after slashing window) from "voluntarily unbonded" (not actionable).
+  bool validator_jailed = 20;
 }
 
 // QueryMigrationStatsRequest is the request type for the Query/MigrationStats RPC method.

@@ -216,9 +216,20 @@ fi
 # PROCESS LIFECYCLE
 # ═════════════════════════════════════════════════════════════════════════════
 
+# Match a process by binary basename. Uses pgrep/pkill -f with an anchored
+# pattern instead of -x because the kernel truncates `comm` to 15 chars
+# (TASK_COMM_LEN), so -x silently fails for longer names.
+_ul_proc_running() {
+	pgrep -f "(^|/)${1}( |$)" >/dev/null 2>&1
+}
+
+_ul_proc_kill() {
+	pkill -f "(^|/)${1}( |$)" || true
+}
+
 # Start uploader as a background process (idempotent)
 start_uploader() {
-	if pgrep -x ${NM} >/dev/null 2>&1; then
+	if _ul_proc_running "${NM}"; then
 		echo "[UL] ${NM} already running; skipping start."
 	else
 		echo "[UL] Starting ${NM}…"
@@ -232,9 +243,9 @@ stop_uploader_if_running() {
 	# Stop whichever name is running (handles upgrades across the rename)
 	local stopped=0
 	for name in "lumera-uploader" "network-maker"; do
-		if pgrep -x "${name}" >/dev/null 2>&1; then
+		if _ul_proc_running "${name}"; then
 			echo "[UL] Stopping ${name}…"
-			pkill -x "${name}"
+			_ul_proc_kill "${name}"
 			echo "[UL] ${name} stopped."
 			stopped=1
 		fi
@@ -425,8 +436,9 @@ wait_for_supernode() {
 	esac
 
 	for i in $(seq 1 "$timeout"); do
-		# If local endpoint, also accept presence of the process
-		if [ "$is_local" -eq 1 ] && pgrep -x supernode >/dev/null 2>&1; then
+		# If local endpoint, also accept presence of the process. Check both
+		# the legacy "supernode" name and the release artifact name.
+		if [ "$is_local" -eq 1 ] && { _ul_proc_running supernode || _ul_proc_running supernode-linux-amd64; }; then
 			echo "[UL] supernode process detected."
 			return 0
 		fi

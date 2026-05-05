@@ -47,11 +47,13 @@ The consensus key, voting power at block height, and validator jailing/slashing 
    Check for:
    - `would_succeed: true` — the migration can proceed.
    - `is_validator: true` — the chain recognizes this address as a validator operator.
-   - `val_delegation_count` at or below `max_validator_delegations` (default `2000`). If exceeded, governance must raise the limit or delegators must redelegate out before migration.
-   - `rejection_reason` empty. Common non-empty values: validator is in `Unbonding` or `Unbonded` state (must be `Bonded`), migration is disabled by param, deadline has passed.
+   - `validator_status: "BOND_STATUS_BONDED"` and `validator_jailed: false` — the validator is in the active set and not jailed. If either fails, see [Step 3a](#step-3a--recovering-from-a-jailed-or-non-bonded-validator) before proceeding.
+   - `val_delegation_count + val_unbonding_count + val_redelegation_count` at or below `max_validator_delegations` (default `2000`). If exceeded, governance must raise the limit or delegators must redelegate out before migration.
+   - `rejection_reason` empty. Common non-empty values: validator is jailed (recoverable via `unjail`), validator is voluntarily unbonded (recoverable by re-staking), migration is disabled by param, deadline has passed.
 
 3. **Prepare both keys.** You need the legacy `secp256k1` key (coin-type 118) and a new `eth_secp256k1` key (coin-type 60) derived from the **same mnemonic**. See step 2 below.
 4. **Pick a trusted external RPC.** Your own node will be stopped during the migration broadcast, so route the migration tx through a trusted peer.
+5. **Confirm the validator is healthy *now*.** Sample the active validator set (`lumerad query staking validators --output json | jq '.validators[] | select(.operator_address == "<your-valoper>") | {status, jailed, tokens}'`) and confirm `BOND_STATUS_BONDED` + `jailed: false` immediately before the maintenance window. A jail event between checklist completion and migration start is the most common preventable cause of a failed migration window — keep the gap short, and re-run pre-flight just before Step 4.
 
 ---
 
@@ -110,11 +112,78 @@ lumerad query evmigration migration-estimate <legacy-validator-address>
   "val_delegation_count": "1",
   "balance_summary": "1000000ulume",
   "has_supernode": true,
-  "is_multisig": false
+  "is_multisig": false,
+  "validator_status": "BOND_STATUS_BONDED",
+  "validator_jailed": false
 }
 ```
 
-`would_succeed: true` with `is_validator: true` and `val_delegation_count <= max_validator_delegations` means you're clear to proceed.
+`would_succeed: true` with `is_validator: true`, `validator_status: BOND_STATUS_BONDED`, `validator_jailed: false`, and `val_delegation_count + val_unbonding_count + val_redelegation_count <= max_validator_delegations` means you're clear to proceed.
+
+The chain checks the validator's bond status and jailed flag and rejects migration when either disqualifies the validator. Two failure shapes you may see:
+
+- `validator_status` is `BOND_STATUS_UNBONDING` or `BOND_STATUS_UNBONDED` with `validator_jailed: true` → the validator was jailed (typically for downtime). Recoverable: see [Step 3a](#step-3a--recovering-from-a-jailed-or-non-bonded-validator).
+- `validator_status` is `BOND_STATUS_UNBONDING` or `BOND_STATUS_UNBONDED` with `validator_jailed: false` → the validator voluntarily exited the active set (self-unbonded). Less common; recoverable by re-delegating self-stake until back in the active set, then re-running pre-flight.
+
+> **Why both fields exist.** A jailed validator is *always* `Unbonding` or `Unbonded` (jailing transitions out of the active set). But the reverse isn't true — voluntary unbonding doesn't set the jailed flag. Surfacing both lets you distinguish "needs `unjail`" from "needs `delegate`".
+
+## Step 3a — Recovering from a jailed or non-bonded validator
+
+Skip this section if Step 3 returned `would_succeed: true`.
+
+If the pre-flight reported `validator_jailed: true`, your validator was kicked out of the active set for a slashable offense (almost always downtime — your node was offline long enough to miss `min_signed_per_window` × `signed_blocks_window` blocks). Migration is gated until you bring the validator back to `BOND_STATUS_BONDED` with `jailed: false`.
+
+### The timing trap
+
+`unjail` is a **transaction signed by the validator's operator key** (the same key you're trying to migrate). It requires the node to be **running, synced, and able to broadcast**. But migrate-validator requires the node to be **stopped before broadcast** to avoid double-signing risk. So the recovery sequence intentionally restarts the node, runs `unjail`, waits for re-bonding, then stops again before the migration:
+
+```bash
+# 1. Make sure the validator is running.
+systemctl start lumerad
+
+# 2. Wait for it to catch up to the tip. Repeat until catching_up = false.
+lumerad status | jq '.sync_info | {catching_up, latest_block_height}'
+
+# 3. Submit the unjail transaction (signed with the validator's operator key).
+lumerad tx slashing unjail \
+  --from <validator-key> \
+  --chain-id <chain-id> \
+  --keyring-backend <backend> \
+  --gas auto --gas-adjustment 1.3 --fees <fee>ulume \
+  --yes
+
+# 4. Wait one block, then verify status.
+VALOPER=$(lumerad debug addr <legacy-validator-address> | awk -F': ' '/^Bech32 Val: /{print $2; exit}')
+lumerad query staking validator "$VALOPER" --output json \
+  | jq '.validator | {status, jailed, tokens, delegator_shares}'
+# Expect: status = BOND_STATUS_BONDED, jailed = false.
+
+# 5. Re-run the pre-flight estimate to confirm migration is now unblocked.
+lumerad query evmigration migration-estimate <legacy-validator-address>
+# Expect: would_succeed = true.
+
+# 6. Stop the node again before broadcasting the migration (Step 4).
+systemctl stop lumerad
+```
+
+### Common failure modes when unjailing
+
+- **`validator still jailed; cannot be unjailed`** — the slashing window hasn't fully elapsed. Wait ~30 s and retry. (The window is `signed_blocks_window` blocks, which on Lumera is parameterized via `slashing` module params; query `lumerad query slashing params` to see the current value.)
+- **`validator missing self-delegation`** — your validator's self-stake fell below `min_self_delegation`. Self-delegate first (`lumerad tx staking delegate <valoper> <amount>`), then retry unjail.
+- **`unauthorized: account does not exist`** — the operator key you're signing with isn't the validator's operator. Confirm `lumerad keys show <validator-key> -a` matches the legacy address you're migrating.
+
+### What if the validator is `Unbonded` with `jailed: false`?
+
+This is the voluntary-exit case (no slashing event, just `MsgUndelegate`'d below the threshold). `unjail` doesn't apply — there's nothing to un-jail. Instead, re-stake until you're back in the active set:
+
+```bash
+lumerad tx staking delegate <valoper> <amount>ulume \
+  --from <validator-key> --chain-id <chain-id>
+# Wait for the next end-block; the validator will rebond if its
+# new stake puts it in the top max_validators slots.
+```
+
+Then re-run pre-flight as in step 5 above, and proceed.
 
 ## Step 4 — Stop the validator
 
@@ -257,9 +326,33 @@ lumerad query supernode get-supernode <new-address>
 
 ## Troubleshooting
 
-### `would_succeed: false`, `rejection_reason: validator is not in bonded status`
+### `would_succeed: false`, `rejection_reason: validator is jailed (status: ...)`
 
-Your validator is `Unbonding` or `Unbonded`. Migration only runs on `Bonded` validators to avoid breaking state machines mid-transition. Either wait for the validator to re-bond or complete unbonding first, then migrate as a regular account with `MsgClaimLegacyAccount`.
+Your validator was kicked out of the active set for a slashable offense (almost always downtime). The pre-flight response will also show `validator_jailed: true` and `validator_status` ∈ {`BOND_STATUS_UNBONDING`, `BOND_STATUS_UNBONDED`}. The full recovery flow — restart node → wait for catch-up → `unjail` → confirm `BOND_STATUS_BONDED` → stop node → retry migration — is documented in [Step 3a](#step-3a--recovering-from-a-jailed-or-non-bonded-validator).
+
+The minimum command, assuming the node is up and synced:
+
+```bash
+lumerad tx slashing unjail \
+  --from <validator-key> \
+  --chain-id <chain-id> \
+  --gas auto --gas-adjustment 1.3 --fees <fee>ulume --yes
+```
+
+If unjail itself fails with `validator still jailed; cannot be unjailed`, the slashing window hasn't fully elapsed. Wait, then retry.
+
+### `would_succeed: false`, `rejection_reason: validator status is unbonded (not bonded)` (no jail)
+
+The pre-flight response shows `validator_jailed: false` and `validator_status: BOND_STATUS_UNBONDING` (or `UNBONDED`). This is the voluntary-exit case: the validator self-unbonded (or fell out of the top `max_validators` slots) without ever being jailed, so `unjail` does nothing. Re-stake to re-enter the active set:
+
+```bash
+lumerad tx staking delegate <valoper> <amount>ulume \
+  --from <validator-key> --chain-id <chain-id>
+```
+
+Then wait for the next end-block, re-run pre-flight, and proceed once `validator_status` is `BOND_STATUS_BONDED`. See [Step 3a — voluntary-exit case](#what-if-the-validator-is-unbonded-with-jailed-false) for the longer treatment.
+
+> **Older versions of this doc / chain referenced `rejection_reason: validator is not in bonded status`.** The current chain produces the more specific messages above. If you see the old text, you're talking to a node running pre-jailed-field code; the underlying condition is the same.
 
 ### `would_succeed: false`, `rejection_reason: validator exceeds max_validator_delegations`
 

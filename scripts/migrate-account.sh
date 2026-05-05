@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
+###################################################################################
+# Copyright 2026 The Lumera Protocol
 #
+# Migration shell script for regular legacy accounts (single signature).
+# 
 # Migrate a legacy account (coin-type 118, secp256k1) to its EVM-compatible counterpart.
 # See docs/design/evmigration-scripts-design.md and
 # docs/evm-integration/user-guides/migration.md.

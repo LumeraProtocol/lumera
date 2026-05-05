@@ -30,6 +30,14 @@ log() {
 	echo "[RESTART] $*"
 }
 
+# Match a process by binary basename. Uses pgrep -f with an anchored pattern
+# instead of -x because the kernel truncates `comm` to 15 chars
+# (TASK_COMM_LEN), which makes -x emit a warning and return no matches for
+# longer names like "supernode-linux-amd64".
+proc_running() {
+	pgrep -f "(^|/)${1}( |$)" >/dev/null 2>&1
+}
+
 run_stop() {
 	if [ ! -f "${STOP_SCRIPT}" ]; then
 		log "stop.sh not found at ${STOP_SCRIPT}"
@@ -65,7 +73,7 @@ archive_log_file() {
 start_lumera() {
 	local pattern="${DAEMON} start --home ${DAEMON_HOME}"
 
-	if pgrep -f "${pattern}" >/dev/null 2>&1 || pgrep -x "${DAEMON}" >/dev/null 2>&1; then
+	if pgrep -f "${pattern}" >/dev/null 2>&1 || proc_running "${DAEMON}"; then
 		log "${DAEMON} already running."
 		return 0
 	fi
@@ -95,7 +103,7 @@ start_supernode() {
 	local running=0
 
 	for name in "${names[@]}"; do
-		if pgrep -x "${name}" >/dev/null 2>&1; then
+		if proc_running "${name}"; then
 			running=1
 			break
 		fi
@@ -132,7 +140,7 @@ start_uploader() {
 	# Try lumera-uploader first, fall back to network-maker
 	local name=""
 	for candidate in "lumera-uploader" "network-maker"; do
-		if pgrep -x "${candidate}" >/dev/null 2>&1; then
+		if proc_running "${candidate}"; then
 			log "${candidate} already running."
 			return 0
 		fi
@@ -156,7 +164,7 @@ start_uploader() {
 }
 
 start_nginx() {
-	if pgrep -x nginx >/dev/null 2>&1; then
+	if proc_running nginx; then
 		log "nginx already running."
 		return 0
 	fi

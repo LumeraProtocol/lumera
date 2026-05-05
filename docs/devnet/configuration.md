@@ -171,12 +171,26 @@ Array of validator specifications. Each entry defines one validator container wi
         "grpc_port": 50051,
         "http_port": 8080
     },
+    "multisig": {
+        "enabled": true,
+        "threshold": 2,
+        "signer_count": 3,
+        "vesting_type": "PermanentLocked"
+    },
+    "test_accounts": {
+        "count": 5,
+        "balance_base": "20000ulume",
+        "balance_increment": "10000ulume",
+        "multisig": true
+    },
     "initial_distribution": {
         "account_balance": "2000000000000ulume",
         "validator_stake": "1000000000000ulume"
     }
 }
 ```
+
+> **Note:** All sub-objects except `initial_distribution` are optional and use `omitempty`. Real validators rarely set every block — see `devnet/config/validators.json` for the canonical examples (V2 carries `multisig` + multisig-flagged `test_accounts`; V3 carries `lumera-uploader`; V4 carries single-sig `test_accounts`).
 
 ### Field reference
 
@@ -216,6 +230,30 @@ Array of validator specifications. Each entry defines one validator container wi
 
 > **Note:** For Lumera < v1.11.0, use `"network-maker"` as the key name. Scripts accept both.
 
+#### `multisig` (optional)
+
+Wraps this validator's genesis account as a multisig account at chain-init time. When `enabled: true`, the validator's `key_name` is registered as a multisig key composed of `signer_count` deterministically-generated signer keys with the given `threshold`. Used by the EVM-migration test suites (`tests_evmigration -mode=multisig*`) and end-user multisig migration walkthroughs.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `enabled` | bool | Activate multisig wrapping for this validator. |
+| `threshold` | int | Minimum number of signers required to authorize a transaction (`k` in `k-of-n`). |
+| `signer_count` | int | Total number of signer keys generated (`n` in `k-of-n`). Must satisfy `threshold ≤ signer_count`. |
+| `vesting_type` | string | Optional. If set, the validator's genesis account is post-processed into a vesting account variant. Currently only `"PermanentLocked"` is implemented (rewrites the BaseAccount into a [`/cosmos.vesting.v1beta1.PermanentLockedAccount`](../../scripts/migrate-multisig.sh)); any other value aborts setup with an "unsupported multisig.vesting_type" error. Omit for a plain multisig BaseAccount. |
+
+> **Why a vesting wrapper?** The Cosmos SDK CLI's `add-genesis-account` can only emit `Delayed`/`ContinuousVesting` (which require `end_time > 0`). `PermanentLocked` requires `end_time == 0`, so the devnet rewrites the genesis JSON directly after account creation. See [`devnet/scripts/validator-setup.sh`](../../devnet/scripts/validator-setup.sh) (`Wrapping multisig validator … as PermanentLockedAccount`).
+
+#### `test_accounts` (optional)
+
+Creates `count` extra funded accounts on this validator beyond the standard genesis account. Used to give migration tests, EVM tests, and the lumera-uploader fixture multiple sender keys without polluting the global mnemonic list.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `count` | int | Number of test accounts to create. Set to `0` or omit to disable. |
+| `balance_base` | string | Funding amount for the first account (e.g. `"20000ulume"`). |
+| `balance_increment` | string | Per-account increment added to `balance_base` for subsequent accounts. The N-th account (1-indexed) gets `balance_base + (N-1) * balance_increment`. Useful for distinguishing accounts in test assertions by balance fingerprint. |
+| `multisig` | bool | If `true`, generate the test accounts as multisig accounts (uses the parent validator's `multisig.threshold` / `signer_count`). Requires `multisig.enabled = true` on the same validator. Default: `false` (single-sig test accounts). |
+
 #### `initial_distribution`
 
 | Field | Type | Description |
@@ -223,14 +261,47 @@ Array of validator specifications. Each entry defines one validator container wi
 | `account_balance` | string | Total tokens allocated to this validator's genesis account |
 | `validator_stake` | string | Tokens self-delegated at genesis |
 
-### Port assignment conventions
+### Validator network matrix (default `devnet/config/validators.json`)
 
-- **Primary validator**: Uses standard CometBFT ports (26656, 26657, 1317, 9090)
-- **Secondary validators**: Increment ports to avoid host conflicts
-  - P2P: +10 per validator (26666, 26676, ...)
-  - RPC: +10 per validator (26667, 26677, ...)
-  - REST: +10 per validator (1327, 1337, ...)
-  - gRPC: +1 per validator (9091, 9092, ...)
+The devnet runs five validators plus a Hermes IBC relayer on a private Docker bridge (`172.28.0.0/24`, network name `lumera-network`). Each container exposes the **same set of internal ports** — only the host-side mapping differs per validator. From inside any container, reach a peer via `<service-name>:<internal-port>` (e.g. `http://supernova_validator_1:26657`); from your host machine, use `localhost:<host-port>`.
+
+#### Internal ports (constant across all validator containers)
+
+| Service | Internal port | Protocol details |
+| --- | --- | --- |
+| CometBFT P2P | `26656` | See [lumera-ports.md → P2P](../lumera-ports.md#1-p2p-listener-peer-gossip) |
+| CometBFT RPC | `26657` | See [lumera-ports.md → RPC](../lumera-ports.md#2-cometbft-rpc-listener) |
+| Cosmos REST API | `1317` | See [lumera-ports.md → REST](../lumera-ports.md#4-cosmos-sdk-rest-api) |
+| Cosmos gRPC | `9090` | See [lumera-ports.md → gRPC](../lumera-ports.md#5-cosmos-sdk-grpc-api) |
+| EVM JSON-RPC HTTP | `8545` | See [lumera-ports.md → JSON-RPC HTTP](../lumera-ports.md#7-evm-json-rpc-http) |
+| EVM JSON-RPC WS | `8546` | See [lumera-ports.md → JSON-RPC WS](../lumera-ports.md#8-evm-json-rpc-websocket) |
+| Supernode gRPC | `4444` | Action processing service |
+| Supernode P2P | `4445` | Supernode-to-supernode gossip |
+| Supernode HTTP gateway | `8002` | Supernode REST gateway |
+| Lumera-uploader gRPC | `50051` | Only when `lumera-uploader.enabled = true` |
+| Lumera-uploader HTTP | `8080` | Only when `lumera-uploader.enabled = true` |
+| Delve debugger | `40000` | Only when the binary is built in debug mode |
+
+#### Per-validator host ports + container DNS / IP
+
+| # | Container DNS / `name` | Static IP | P2P (host) | RPC | REST | gRPC | EVM HTTP | EVM WS | SN gRPC | SN P2P | SN GW | Debug | Uploader |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | `supernova_validator_1` | `172.28.0.11` | 26666 | 26667 | 1327 | 9091 | 8545 | 8546 | 7441 | 7442 | 18001 | 40000 | — |
+| 2 | `supernova_validator_2` | `172.28.0.12` | 26676 | 26677 | 1337 | 9092 | 8555 | 8556 | 7443 | 7444 | 18002 | 40001 | — |
+| 3 | `supernova_validator_3` | `172.28.0.13` | 26686 | 26687 | 1347 | 9093 | 8565 | 8566 | 7445 | 7446 | 18003 | 40002 | 50051 / 8080 |
+| 4 | `supernova_validator_4` | `172.28.0.14` | 26696 | 26697 | 1357 | 9094 | 8575 | 8576 | 7447 | 7448 | 18004 | 40003 | — |
+| 5 | `supernova_validator_5` | `172.28.0.15` | 26606 | 26607 | 1367 | 9095 | 8585 | 8586 | 7449 | 7450 | 18005 | 40004 | — |
+| — | `hermes` | `172.28.0.10` | 36656 | 36657 | 31317 | 39090 / 39091 | — | — | — | — | — | — | — |
+
+> **Reading the table:** the **Host** column gives the port published on `localhost` (i.e. the port your laptop talks to). All in-container traffic uses the **internal** port from the previous table — e.g. validator 4's CometBFT RPC is reached as `http://localhost:26697` from your host but `http://supernova_validator_1:26657` from another container.
+
+#### Port assignment conventions
+
+- **Per-validator host-port stride.** P2P / RPC / REST / EVM-HTTP / EVM-WS step by **+10** per validator slot (`26666 → 26676 → 26686 → 26696 → 26606`). Validator 5 wraps around because the +40 offset would collide with V1's debug span; the script intentionally keeps each validator's host-port block in its own decade.
+- **gRPC** steps by **+1** (`9091..9095`) — gRPC traffic is rarely diagnosed on the host so the dense packing is fine.
+- **Supernode** ports come in a `(gRPC, P2P, gateway)` triple per validator: `(7441, 7442, 18001) … (7449, 7450, 18005)`.
+- **Debug (delve)** is `40000 + (i-1)` where `i` is the validator slot.
+- **Hermes** uses a `+10000` offset on the standard CometBFT/REST ports so it can run an independent `simd` chain alongside `lumerad` validators without conflict.
 
 ---
 

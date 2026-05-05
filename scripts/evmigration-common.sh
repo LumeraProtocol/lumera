@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+###################################################################################
+# Copyright 2026 The Lumera Protocol
 #
 # Shared library for scripts/migrate-account.sh and scripts/migrate-validator.sh.
 # Do not execute directly — source it.
@@ -284,6 +286,48 @@ lumerad_q() {
   "$BIN" query "$@" --node "$NODE" "${_KRF[@]}" --output json
 }
 
+# Path used by lumerad_q_capture to stash stderr from queries run inside
+# $(...). The file is in TMPDIR so the kernel cleans it up across reboots;
+# cleanup_mnemonic_keys also rm's it on script exit.
+_LUMERAD_ERR_FILE="${TMPDIR:-/tmp}/evmig-lumerad-err.$$"
+
+# Wrapper around lumerad_q that captures stderr into _LUMERAD_ERR_FILE while
+# passing stdout through. Use this when you want to print the underlying CLI
+# or RPC error (e.g. "post failed: dial tcp [::1]:26657: connect: connection
+# refused") alongside the script's own "could not query …" message.
+#
+# Why a file instead of a variable: command substitution $(...) runs in a
+# subshell, so variables assigned inside it don't survive. The file path is
+# inherited by the subshell from this parent scope, the subshell writes the
+# error into the file, and the parent reads it back after the substitution
+# completes.
+#
+# Usage:
+#   if ! json=$(lumerad_q_capture evmigration migration-record "$addr"); then
+#       log_error "could not query migration-record for $addr"
+#       log_lumerad_err
+#       exit 2
+#   fi
+lumerad_q_capture() {
+  : >"$_LUMERAD_ERR_FILE"
+  lumerad_q "$@" 2>"$_LUMERAD_ERR_FILE"
+}
+
+# Re-emit the most recently captured lumerad stderr (from lumerad_q_capture)
+# at the given log level (error|warn|info; default error). Each line is
+# indented two spaces so it visually attaches to the preceding log_error /
+# log_warn line. No-op if nothing was captured.
+log_lumerad_err() {
+  local level="${1:-error}"
+  [[ -s "${_LUMERAD_ERR_FILE:-}" ]] || return 0
+  local logger="log_${level}"
+  local line
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    "$logger" "  ${line}"
+  done <"$_LUMERAD_ERR_FILE"
+}
+
 lumerad_tx() {
   if [[ -z "${CHAIN_ID:-}" ]]; then
     log_error "chain ID is required for tx commands; pass --chain-id or set \$LUMERA_CHAIN_ID / \$CHAIN_ID"
@@ -406,6 +450,26 @@ preflight_estimate() {
   val_unb=$(jq -r '.val_unbonding_count // "none"' <<<"$json")
   val_red=$(jq -r '.val_redelegation_count // "none"' <<<"$json")
 
+  # validator_status / validator_jailed are populated by the chain's
+  # MigrationEstimate query (see x/evmigration/keeper/query.go) when
+  # is_validator is true. Surfacing them in the preview makes it obvious
+  # why would_succeed is false in the jailed/unbonded cases — the
+  # rejection_reason names the symptom, these fields name the actionable
+  # state.
+  local val_status="" val_jailed=""
+  if [[ "$is_validator" == "yes" ]]; then
+    local _raw
+    _raw=$(jq -r '.validator_status // empty' <<<"$json")
+    if [[ -n "$_raw" ]]; then
+      # gogoproto enum: "BOND_STATUS_BONDED" -> "Bonded".
+      _raw="${_raw#BOND_STATUS_}"
+      val_status="${_raw:0:1}$(printf '%s' "${_raw:1}" | tr '[:upper:]' '[:lower:]')"
+    else
+      val_status="<unknown>"
+    fi
+    val_jailed=$(jq -r 'if .validator_jailed then "yes" else "no" end' <<<"$json")
+  fi
+
   {
     printf 'Migration preview for legacy account %s (coin-type 118, secp256k1):\n' "$(legacy_value "$addr")"
     printf '  Validator:         %s\n' "$is_validator"
@@ -413,6 +477,24 @@ preflight_estimate() {
       printf '  Val delegations:   %s (to validator)\n' "$val_dels"
       printf '  Val unbondings:    %s (to validator)\n' "$val_unb"
       printf '  Val redelegations: %s (src or dst)\n' "$val_red"
+      # Color non-Bonded statuses red so the rejection cause is visible at a
+      # glance — Bonded + jailed=no is the only state migrate-validator
+      # accepts. Jailed gets its own line with the actionable hint.
+      case "$val_status" in
+        Unbonding|Unbonded)
+          printf '  Validator status:  %s%s%s (chain rejects migration in this state)\n' \
+            "$_C_ERR" "$val_status" "$_C_RESET"
+          ;;
+        *)
+          printf '  Validator status:  %s\n' "$val_status"
+          ;;
+      esac
+      if [[ "$val_jailed" == "yes" ]]; then
+        printf '  Jailed:            %syes%s (run: lumerad tx slashing unjail --from <validator-key>, then retry)\n' \
+          "$_C_ERR" "$_C_RESET"
+      else
+        printf '  Jailed:            no\n'
+      fi
     fi
     printf '  Multisig:          %s' "$is_multisig"
     if [[ "$is_multisig" == "yes" ]]; then
@@ -462,8 +544,9 @@ assert_estimate_succeeds() {
 _record_present() {
   local subcmd="$1" addr="$2"
   local json
-  if ! json=$(lumerad_q evmigration "$subcmd" "$addr" 2>/dev/null); then
+  if ! json=$(lumerad_q_capture evmigration "$subcmd" "$addr"); then
     log_error "could not query evmigration $subcmd for $addr"
+    log_lumerad_err
     exit 2
   fi
   [[ "$(jq -r '.record.legacy_address // empty' <<<"$json")" != "" ]]
@@ -483,8 +566,9 @@ _record_present() {
 assert_not_migrated() {
   local addr="$1" expected_new="${2:-}"
   local json
-  if ! json=$(lumerad_q evmigration migration-record "$addr" 2>/dev/null); then
+  if ! json=$(lumerad_q_capture evmigration migration-record "$addr"); then
     log_error "could not query migration-record for $addr"
+    log_lumerad_err
     exit 2
   fi
   local rec_legacy rec_new rec_height
@@ -676,8 +760,9 @@ verify_migration() {
 
   # 1. Migration record must exist and point to <new>.
   local rec_json rec_new
-  if ! rec_json=$(lumerad_q evmigration migration-record "$legacy" 2>/dev/null); then
+  if ! rec_json=$(lumerad_q_capture evmigration migration-record "$legacy"); then
     log_error "post-check: could not query migration-record for $(legacy_value "$legacy") — verify manually"
+    log_lumerad_err
     exit 7
   fi
   rec_new=$(jq -r '.record.new_address // empty' <<<"$rec_json")
@@ -688,8 +773,9 @@ verify_migration() {
 
   # 2. Legacy balances must be all zero (account removed or empty).
   local legacy_after
-  if ! legacy_after=$(lumerad_q bank balances "$legacy" 2>/dev/null); then
+  if ! legacy_after=$(lumerad_q_capture bank balances "$legacy"); then
     log_error "post-check: could not query legacy bank balances for $(legacy_value "$legacy") — verify manually"
+    log_lumerad_err
     exit 7
   fi
   if [[ "$(jq -r '[.balances[].amount | tonumber] | add // 0' <<<"$legacy_after")" != "0" ]]; then
@@ -699,8 +785,9 @@ verify_migration() {
 
   # 3. For every {denom,amount} in snap_json, new balances must be >= amount.
   local new_after
-  if ! new_after=$(lumerad_q bank balances "$new" 2>/dev/null); then
+  if ! new_after=$(lumerad_q_capture bank balances "$new"); then
     log_error "post-check: could not query new bank balances for $(new_value "$new") — verify manually"
+    log_lumerad_err
     exit 7
   fi
   local diff
@@ -728,7 +815,7 @@ show_migration_summary() {
 
   echo "" >&2
   echo "Migration record (chain state):" >&2
-  if rec_json=$(lumerad_q evmigration migration-record "$legacy" 2>/dev/null); then
+  if rec_json=$(lumerad_q_capture evmigration migration-record "$legacy"); then
     # Pretty-print known fields; gracefully tolerate schema additions/renames.
     jq -r --arg legacy_c "$_C_LEGACY" --arg new_c "$_C_NEW" --arg reset "$_C_RESET" '.record |
       "  legacy address: \($legacy_c)\(.legacy_address // "<missing>")\($reset)\n" +
@@ -741,11 +828,12 @@ show_migration_summary() {
     }
   else
     log_warn "  could not query migration-record for $(legacy_value "$legacy")"
+    log_lumerad_err warn
   fi
 
   echo "" >&2
   printf 'New account balance (%s):\n' "$(new_value "$new")" >&2
-  if balances_json=$(lumerad_q bank balances "$new" 2>/dev/null); then
+  if balances_json=$(lumerad_q_capture bank balances "$new"); then
     local pretty
     pretty=$(jq -r '
       if (.balances | length) == 0 then
@@ -761,6 +849,7 @@ show_migration_summary() {
     fi
   else
     log_warn "  could not query bank balances for $(new_value "$new")"
+    log_lumerad_err warn
   fi
   echo "" >&2
 }
@@ -794,7 +883,18 @@ cleanup_mnemonic_keys() {
     [[ -z "$k" ]] && continue
     lumerad_keys delete "$k" --yes >/dev/null 2>&1 || true
   done
+  # Also clean up the lumerad_q_capture stderr scratch file. Both cleanups
+  # are idempotent, so chaining them lets a single EXIT trap cover both.
+  rm -f "${_LUMERAD_ERR_FILE:-}"
 }
+
+# Install the master EXIT trap at source time so cleanup runs in every
+# script that sources this file, even if it never calls import_from_mnemonic
+# (which used to set its own trap and is the only producer of mnemonic-keys
+# state). cleanup_mnemonic_keys is idempotent and a no-op when no mnemonic
+# keys were imported.
+# shellcheck disable=SC2154  # rc is captured at trap runtime
+trap 'rc=$?; cleanup_mnemonic_keys; exit "$rc"' EXIT
 
 _mnemonic_key_address() {
   local name="$1"
@@ -905,12 +1005,11 @@ import_from_mnemonic() {
   local mnemonic
   mnemonic=$(< "$mfile")
 
-  # Register cleanup before doing anything else that might fail. Only keys
-  # created by this function are added to _MNEMONIC_CLEANUP_KEYS; pre-existing
-  # matching keys are reused and never deleted by the trap.
+  # Reset the cleanup list. Only keys created by this function are added to
+  # _MNEMONIC_CLEANUP_KEYS; pre-existing matching keys are reused and never
+  # deleted. The EXIT trap is already installed at source time, so we don't
+  # re-install it here.
   _MNEMONIC_CLEANUP_KEYS=()
-  # shellcheck disable=SC2154  # rc is captured at trap runtime
-  trap 'rc=$?; cleanup_mnemonic_keys; exit "$rc"' EXIT
 
   _mnemonic_import_one_key "$mnemonic" "$legacy_name" 118 secp256k1 legacy
   _mnemonic_import_one_key "$mnemonic" "$new_name" 60 eth_secp256k1 new
@@ -957,8 +1056,9 @@ require_multisig_binary() {
 auth_account_json() {
   local addr="$1"
   local json
-  if ! json=$(lumerad_q auth account "$addr" 2>/dev/null); then
+  if ! json=$(lumerad_q_capture auth account "$addr"); then
     log_error "could not query auth account for $addr"
+    log_lumerad_err
     exit 2
   fi
   printf '%s\n' "$json"

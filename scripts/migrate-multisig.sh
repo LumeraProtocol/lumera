@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+###################################################################################
+# Copyright 2026 The Lumera Protocol
+#
+# Migration shell script for multisig legacy accounts (regular and validator).
 #
 # Multisig migration helper. Dispatches on the first positional argument to
 # one of four subcommand functions wrapping lumerad tx evmigration

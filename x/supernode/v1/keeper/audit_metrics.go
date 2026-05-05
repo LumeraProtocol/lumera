@@ -2,9 +2,6 @@ package keeper
 
 import sdk "github.com/cosmos/cosmos-sdk/types"
 
-//nolint:unused // reserved for audit-epoch lookback wiring landing in a follow-up.
-const maxAuditEpochLookback uint64 = 16
-
 // getLatestCascadeBytesFromAudit returns the latest available cascade bytes and report height
 // for the given supernode account. In LEP-6 §12, CascadeKademliaDbBytes was removed from the
 // audit module's HostReport; this function now reads from the supernode's own stored metrics.

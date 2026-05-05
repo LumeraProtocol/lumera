@@ -213,25 +213,17 @@ func (k Keeper) ApplyReporterCleanEpochRecoveryAtEpochEnd(ctx sdk.Context, epoch
 // least one reporter-result fact in epochID, including fresh reporters that do
 // not yet have a ReporterReliabilityState row.
 func (k Keeper) storageTruthReporterAccountsForEpoch(ctx sdk.Context, epochID uint64) ([]string, error) {
-	prefix := types.ReporterStorageTruthResultRootPrefix()
+	prefix := types.ReporterStorageTruthResultByEpochPrefix(epochID)
 	it := k.kvStore(ctx).Iterator(prefix, storetypes.PrefixEndBytes(prefix))
 	defer func() { _ = it.Close() }()
 
-	reporterSet := make(map[string]struct{})
+	reporters := make([]string, 0)
 	for ; it.Valid(); it.Next() {
-		var record storageTruthReporterResultRecord
-		if err := json.Unmarshal(it.Value(), &record); err != nil {
-			return nil, err
-		}
-		if record.EpochID == epochID && record.Reporter != "" {
-			reporterSet[record.Reporter] = struct{}{}
+		reporter := string(it.Key()[len(prefix):])
+		if reporter != "" {
+			reporters = append(reporters, reporter)
 		}
 	}
-	reporters := make([]string, 0, len(reporterSet))
-	for reporter := range reporterSet {
-		reporters = append(reporters, reporter)
-	}
-	sort.Strings(reporters)
 	return reporters, nil
 }
 

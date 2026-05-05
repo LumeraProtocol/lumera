@@ -118,7 +118,7 @@ message GenesisNodeFailureFact {
 }
 
 // GenesisReporterResultFact — st/rrs/ entry (JSON-encoded record).
-// The st/rrs-tt/ secondary index is rebuilt by the existing setter.
+// Secondary indexes are rebuilt by the existing setter.
 message GenesisReporterResultFact {
   string reporter_account = 1;
   uint64 epoch_id = 2;

@@ -67,6 +67,30 @@ func TestPruneSupernodeWindowReporter_RrsTt(t *testing.T) {
 	require.ElementsMatch(t, []uint64{5, 10}, kept)
 }
 
+func TestPrunePrefixByWindowIDLeadingU64_RrsEpochReporter(t *testing.T) {
+	kv := newTestKVStore(t)
+	prefix := []byte("st/rrs-e/")
+
+	for _, epoch := range []uint64{1, 5, 10} {
+		key := append([]byte{}, prefix...)
+		key = binary.BigEndian.AppendUint64(key, epoch)
+		key = append(key, '/')
+		key = append(key, "rep1"...)
+		kv.Set(key, []byte{})
+	}
+
+	require.NoError(t, prunePrefixByWindowIDLeadingU64(kv, prefix, 5)) // keep epochs >= 5
+
+	it := kv.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
+	defer func() { _ = it.Close() }()
+	var kept []uint64
+	for ; it.Valid(); it.Next() {
+		key := it.Key()
+		kept = append(kept, binary.BigEndian.Uint64(key[len(prefix):len(prefix)+8]))
+	}
+	require.ElementsMatch(t, []uint64{5, 10}, kept)
+}
+
 // Test pruneTargetBucketEpoch on st/spt-tbe shape:
 // "st/spt-tbe/" + target + "/" + u32be(bucket) + "/" + u64be(epoch) + "/" + hash
 func TestPruneTargetBucketEpoch(t *testing.T) {

@@ -157,6 +157,7 @@ func (k Keeper) setStorageTruthReporterResult(ctx sdk.Context, epochID uint64, r
 	store.Set(types.ReporterStorageTruthResultKey(reporterAccount, epochID, result.TicketId, result.TargetSupernodeAccount), bz)
 	// Per 122-Copilot-3 + 122-F1 — indexed lookup avoids DeliverTx full-table scan.
 	store.Set(types.ReporterStorageTruthResultByTargetKey(result.TargetSupernodeAccount, epochID, result.TicketId, reporterAccount), bz)
+	store.Set(types.ReporterStorageTruthResultByEpochReporterKey(epochID, reporterAccount), []byte{})
 	return nil
 }
 
@@ -485,8 +486,7 @@ func (k Keeper) importNodeFailureFactForGenesis(ctx sdk.Context, fact types.Gene
 }
 
 // GetAllReporterResultFactsForGenesis exports all st/rrs/ records.
-// Per NEW-C-1: secondary index st/rrs-tt/ is rebuilt by setStorageTruthReporterResult-equivalent
-// import path on InitGenesis.
+// Per NEW-C-1: secondary indexes are rebuilt by the import path on InitGenesis.
 func (k Keeper) GetAllReporterResultFactsForGenesis(ctx sdk.Context) []types.GenesisReporterResultFact {
 	prefix := types.ReporterStorageTruthResultRootPrefix()
 	store := k.kvStore(ctx)
@@ -535,11 +535,12 @@ func (k Keeper) GetAllReporterResultFactsForGenesis(ctx sdk.Context) []types.Gen
 	return out
 }
 
-// importReporterResultFactForGenesis writes both the primary and secondary indexes.
+// importReporterResultFactForGenesis writes the primary and secondary indexes.
 func (k Keeper) importReporterResultFactForGenesis(ctx sdk.Context, f types.GenesisReporterResultFact) {
 	store := k.kvStore(ctx)
 	store.Set(types.ReporterStorageTruthResultKey(f.ReporterAccount, f.EpochId, f.TicketId, f.TargetAccount), f.RecordJson)
 	store.Set(types.ReporterStorageTruthResultByTargetKey(f.TargetAccount, f.EpochId, f.TicketId, f.ReporterAccount), f.RecordJson)
+	store.Set(types.ReporterStorageTruthResultByEpochReporterKey(f.EpochId, f.ReporterAccount), []byte{})
 }
 
 // GetAllFailedHealMarkersForGenesis exports all st/fh/ marker keys.

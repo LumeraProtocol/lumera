@@ -690,7 +690,7 @@ func (m *GenesisNodeFailureFact) GetRecordJson() []byte {
 }
 
 // GenesisReporterResultFact — st/rrs/ entry (JSON-encoded record).
-// The st/rrs-tt/ secondary index is rebuilt by the existing setter.
+// Secondary indexes are rebuilt by the existing setter.
 type GenesisReporterResultFact struct {
 	ReporterAccount string `protobuf:"bytes,1,opt,name=reporter_account,json=reporterAccount,proto3" json:"reporter_account,omitempty"`
 	EpochId         uint64 `protobuf:"varint,2,opt,name=epoch_id,json=epochId,proto3" json:"epoch_id,omitempty"`

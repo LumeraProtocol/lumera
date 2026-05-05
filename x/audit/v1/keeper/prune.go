@@ -71,6 +71,10 @@ func (k Keeper) PruneOldEpochs(ctx sdk.Context, currentEpochID uint64, params ty
 	// Reporter result by target index: st/rrs-tt/<target>/<u64be(epoch_id)>/<ticket_id>0x00<reporter>
 	// Same shape as st/rrs/ (account-then-epoch), reuse helper.
 	pruneSupernodeWindowReporter(store, []byte("st/rrs-tt/"), minKeepEpochID)
+	// Reporter result by epoch index: st/rrs-e/<u64be(epoch_id)>/<reporter>
+	if err := prunePrefixByWindowIDLeadingU64(store, types.ReporterStorageTruthResultByEpochRootPrefix(), minKeepEpochID); err != nil {
+		return err
+	}
 	// Transcript by target/bucket/epoch index: st/spt-tbe/<target>/<u32be(bucket)>/<u64be(epoch_id)>/<transcript_hash>
 	pruneTargetBucketEpoch(store, []byte("st/spt-tbe/"), minKeepEpochID)
 	// Primary transcript store: st/spt/<transcript_hash> -> JSON{epoch_id, ...}.

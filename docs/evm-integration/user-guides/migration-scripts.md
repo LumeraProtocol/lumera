@@ -652,6 +652,138 @@ The submit step checks:
 
 `--dry-run` works on `submit`: it performs checks and stops before broadcast. `--yes` skips the ordinary confirmation prompt, but it does not replace `--i-have-stopped-the-node` for validator migrations.
 
+### Worked Example: Regular 2-of-3 Multisig Account
+
+This example is from the full sample session in [`multisig-migration.txt`](../../../multisig-migration.txt). It migrates a regular, non-validator 2-of-3 multisig account:
+
+- Legacy multisig key: `user-account-val2-001`
+- New EVM multisig key: `user-account-evm-val2-001`
+- Legacy address: `lumera177uu8fdpr5pq3vvg2amx7e8rfz9gh7evfjuwqs`
+- New address: `lumera1fy6uqn8lhhv3dexap39h7a6dv297fcdy80xs3t`
+
+Generate the proof template:
+
+```bash
+./scripts/migrate-multisig.sh generate \
+  --legacy user-account-val2-001 \
+  --new-key user-account-evm-val2-001
+```
+
+The script resolves both multisig key names, previews the migration, infers this is a regular account claim, and writes `proof.json`:
+
+```text
+INFO  legacy multisig key user-account-val2-001 -> address lumera177uu8fdpr5pq3vvg2amx7e8rfz9gh7evfjuwqs
+INFO  using destination EVM multisig key user-account-evm-val2-001 -> address lumera1fy6uqn8lhhv3dexap39h7a6dv297fcdy80xs3t
+Migration preview for legacy account lumera177uu8fdpr5pq3vvg2amx7e8rfz9gh7evfjuwqs (coin-type 118, secp256k1):
+  Validator:         no
+  Multisig:          yes (2-of-3)
+  Balance:           20000ulume
+  Would succeed:     yes
+INFO  auto-detected multisig migration kind: claim
+INFO  generating proof template at proof.json
+INFO  done - distribute proof.json to the K co-signers
+```
+
+The generated proof uses `version: 2`, `kind: "claim"`, and matching 2-of-3 side specs. The legacy side contains Cosmos `secp256k1` sub-pubkeys; the new side contains `eth_secp256k1` sub-pubkeys.
+
+Each signer signs locally. In the sample, signer 0 signs both sides into `partial1.json`; signer 1 repeats the same command with their own keys to create `partial2.json`:
+
+```bash
+./scripts/migrate-multisig.sh sign proof.json \
+  --from user-account-val2-001-signer-1 \
+  --new-key user-account-evm-val2-001-signer-1 \
+  --out partial1.json
+```
+
+The partial file contains one legacy signature and one new-side signature at the same signer index:
+
+```json
+{
+  "partial_legacy_signatures": [
+    {
+      "index": 0,
+      "signature": "..."
+    }
+  ],
+  "partial_new_signatures": [
+    {
+      "index": 0,
+      "signature": "..."
+    }
+  ]
+}
+```
+
+After collecting two matching signer partials, combine them:
+
+```bash
+./scripts/migrate-multisig.sh combine partial1.json partial2.json --out tx.json
+```
+
+The combine step shows which signer indices are present and confirms all quorum checks:
+
+```text
+Legacy-side partials (2-of-3 required):
+  [X] signer 0  partial1.json
+  [X] signer 1  partial2.json
+  [ ] signer 2  (missing)
+Legacy threshold satisfied: yes (2 >= 2)
+New-side partials (2-of-3 required):
+  [X] signer 0  partial1.json
+  [X] signer 1  partial2.json
+  [ ] signer 2  (missing)
+New threshold satisfied: yes (2 >= 2)
+Matching-index threshold satisfied: yes (2 >= 2)
+
+INFO  combined tx written to tx.json
+```
+
+Dry-run the submit before broadcasting:
+
+```bash
+./scripts/migrate-multisig.sh submit tx.json --dry-run
+```
+
+For a regular multisig account, the submit summary has `Kind: claim` and does not require the validator downtime flag:
+
+```text
+==== Multisig migration submit ====
+  Kind:        claim
+  Legacy msig: 2-of-3
+  New msig:    2-of-3 (eth sub-keys)
+  Legacy:      lumera177uu8fdpr5pq3vvg2amx7e8rfz9gh7evfjuwqs
+  New:         lumera1fy6uqn8lhhv3dexap39h7a6dv297fcdy80xs3t
+===================================
+
+INFO  --dry-run: stopping before broadcast
+```
+
+Broadcast when the dry-run is clean:
+
+```bash
+./scripts/migrate-multisig.sh submit tx.json
+```
+
+The sample broadcast was included at height `867` and verified the migration record plus the new multisig balance:
+
+```text
+INFO  broadcast tx EF0E66C6FDB70FD1DD9BE46CB658F4090EC70112F5EF4D22EF9AC678690B51CB; waiting for inclusion...
+INFO  tx included at height 867 (waited 1s)
+
+Migration record (chain state):
+  legacy address: lumera177uu8fdpr5pq3vvg2amx7e8rfz9gh7evfjuwqs
+  new address:    lumera1fy6uqn8lhhv3dexap39h7a6dv297fcdy80xs3t
+  height:         867
+  unix time:      1777957413
+
+New account balance (lumera1fy6uqn8lhhv3dexap39h7a6dv297fcdy80xs3t):
+  30000ulume
+
+INFO  migration complete
+```
+
+The sample balance is `20000ulume` during `generate` and `30000ulume` at final submit because the account received more funds before broadcast. This is safe: `submit` re-runs the pre-flight checks and migration estimate against current chain state.
+
 ---
 
 ## Safety Checks You Will See

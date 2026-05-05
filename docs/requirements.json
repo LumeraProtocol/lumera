@@ -43,8 +43,8 @@
       "Everlight Phase 2: LEP-5 challenge-response proof gating for payouts",
       "Everlight Phase 2: snscope cross-validation oracle integration",
       "Everlight Phase 3: x/endowment module and per-registration endowments",
-      "Everlight Phase 4 (optional): Block reward share routing via x/distribution AllocateTokens modification",
-      "Everlight Phase 4 (optional): x/epochs migration for distribution trigger",
+      "Everlight block reward share routing via x/distribution AllocateTokens modification — removed from this project",
+      "Future x/epochs migration for distribution trigger",
       "x/epochs module integration (not available yet — Phase 1 uses block-height EndBlocker)"
     ],
     "non_goals": [
@@ -53,7 +53,7 @@
       "Unconditional forever storage marketing promises",
       "Per-file endowment health tracking (Phase 3)",
       "Fully trustless byte-accurate storage accounting (Phase 2+)",
-      "Modifying x/distribution AllocateTokens (Phase 4)"
+      "Modifying x/distribution AllocateTokens for Everlight block reward routing"
     ],
     "assumptions": [
       "BLAKE3 is available via lukechampine.com/blake3, already used throughout Lumera codebase",
@@ -63,7 +63,7 @@
       "Existing CascadeMetadata can be extended with new fields without breaking existing actions",
       "SuperNode processes already collect Kademlia DB size internally — cascade_kademlia_db_bytes is a reporting addition only",
       "x/epochs module is not yet available; Phase 1 uses block-height modulus for distribution periods",
-      "Foundation can pre-fund the Everlight pool account (named 'everlight', managed by x/supernode) via MsgSend before chain upgrade",
+      "Foundation can pre-fund the Everlight pool, held by the existing supernode module account and managed by x/supernode, via MsgSend before chain upgrade",
       "Phase 1 funding: Foundation transfers + registration fee share + Community Pool governance transfers (no block reward routing)",
       "Multi-repo project: lumera is the knowledge provider; supernode, sdk-go, sdk-js consume chain types"
     ]
@@ -94,7 +94,7 @@
       "Second-preimage attack prevention via domain-separated hashing",
       "Challenge indices committed upfront by client; SuperNode must prove possession of those exact chunks",
       "All on-chain verification must be deterministic across validators",
-      "Everlight pool account must not have minter/burner/staking/voting permissions",
+      "Everlight Phase 1 pool uses the existing supernode module account as the code-canonical pool; no separate permissionless everlight module account is required in Phase 1",
       "Anti-gaming guardrails required from day one (growth cap, smoothing, ramp-up)"
     ]
   },
@@ -251,7 +251,7 @@
     {
       "id": "F14",
       "name": "Everlight Module Core",
-      "description": "Embed Everlight state and keeper logic into x/supernode with a dedicated Everlight pool account, KV state for distribution tracking, genesis import/export, governance params via MsgUpdateParams, and query endpoints for pool state and SN eligibility. Register the pool account in app_config.go and remove the standalone x/everlight module.",
+      "description": "Embed Everlight state and keeper logic into x/supernode with Everlight pool funds held by the existing supernode module account, KV state for distribution tracking, genesis import/export, governance params via MsgUpdateParams, and query endpoints for pool state and SN eligibility. Materialize the supernode module account and remove the standalone x/everlight module.",
       "acceptance_tests": [
         "AT34",
         "AT41",
@@ -286,11 +286,11 @@
     {
       "id": "F17",
       "name": "Block Reward Share Routing",
-      "description": "Optional Phase 4: route a configured bps share of block rewards to the Everlight pool via x/distribution integration. Not part of Phase 1.",
+      "description": "Removed: block reward share routing was fully removed from this project. Everlight funding is Foundation transfers, registration fee share, and Community Pool governance transfers; no x/distribution AllocateTokens integration is planned here.",
       "acceptance_tests": [
         "AT40"
       ],
-      "status": "deferred"
+      "status": "removed"
     },
     {
       "id": "F18",
@@ -462,7 +462,7 @@
     {
       "id": "AT40",
       "feature": "F17",
-      "description": "Phase 4 only: block reward share flows to Everlight pool"
+      "description": "Removed: block reward share routing is not implemented or planned in this project"
     },
     {
       "id": "AT41",
@@ -548,7 +548,7 @@
       "id": "UF05",
       "name": "Foundation Pre-Funding",
       "steps": [
-        "Foundation wallet sends LUME to Everlight pool account (named 'everlight', managed by x/supernode) via MsgSend",
+        "Foundation wallet sends LUME to the Everlight pool held by the existing supernode module account, managed by x/supernode, via MsgSend",
         "Pool account balance increases",
         "Next distribution cycle includes these funds",
         "No chain upgrade required for this flow"
@@ -573,7 +573,7 @@
       "Challenge indices committed upfront by client; SuperNode cannot predict which chunks it needs before seeing the on-chain commitment",
       "m=8 gives <0.4% evasion probability for storing <50% of file",
       "BLAKE3 collision resistance: ~2^128 security",
-      "Everlight pool account must not have governance voting rights",
+      "Everlight Phase 1 pool is the existing supernode module account; no separate governance-voting Everlight account exists in Phase 1",
       "Anti-gaming guardrails active from Phase 1 (growth cap, smoothing, ramp-up)"
     ],
     "observability": [
@@ -859,8 +859,8 @@
       },
       {
         "id": "R13",
-        "description": "New module account security — could accumulate significant funds",
-        "mitigation": "Everlight pool account (named 'everlight' in x/supernode): receive + distribute only, no Minter/Burner/Staking permissions, no voting rights."
+        "description": "Supernode module account security — Everlight Phase 1 retention funds accumulate in the existing supernode module account",
+        "mitigation": "No standalone everlight module account is introduced in Phase 1. Funding is held by the existing supernode module account and distributed only through x/supernode keeper logic; dedicated permissionless account separation can be scoped as a future feature if needed."
       },
       {
         "id": "R14",

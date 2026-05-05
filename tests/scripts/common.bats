@@ -616,48 +616,6 @@ JSON
   [[ "$output" == $'2\nB1111111111111111111111111111111111111111111,B2222222222222222222222222222222222222222222,B3333333333333333333333333333333333333333333' ]]
 }
 
-@test "assert_secp256k1_key passes for alice-sub" {
-  setup_shim
-  run bash -c '
-    source '"$SCRIPTS_DIR"'/evmigration-common.sh
-    BIN='"$SHIM_BIN"'
-    assert_secp256k1_key alice-sub
-  '
-  [ "$status" -eq 0 ]
-}
-
-@test "assert_secp256k1_key rejects new-eth-key (exit 1)" {
-  setup_shim
-  run bash -c '
-    source '"$SCRIPTS_DIR"'/evmigration-common.sh
-    BIN='"$SHIM_BIN"'
-    assert_secp256k1_key new-eth-key
-  '
-  [ "$status" -eq 1 ]
-  [[ "$output" == *"secp256k1"* ]]
-}
-
-@test "assert_eth_key passes for new-eth-key" {
-  setup_shim
-  run bash -c '
-    source '"$SCRIPTS_DIR"'/evmigration-common.sh
-    BIN='"$SHIM_BIN"'
-    assert_eth_key new-eth-key
-  '
-  [ "$status" -eq 0 ]
-}
-
-@test "assert_eth_key rejects wrong-algo (exit 1)" {
-  setup_shim
-  run bash -c '
-    source '"$SCRIPTS_DIR"'/evmigration-common.sh
-    BIN='"$SHIM_BIN"'
-    assert_eth_key wrong-algo
-  '
-  [ "$status" -eq 1 ]
-  [[ "$output" == *"eth_secp256k1"* ]]
-}
-
 @test "read_proof_file validates proof-template.json and emits JSON" {
   setup_shim
   run bash -c '

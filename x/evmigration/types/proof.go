@@ -3,7 +3,11 @@ package types
 import (
 	errorsmod "cosmossdk.io/errors"
 
+	kmultisig "github.com/cosmos/cosmos-sdk/crypto/keys/multisig"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	ethsecp256k1 "github.com/cosmos/evm/crypto/ethsecp256k1"
 )
 
 // Side identifies which half of a migration a proof is proving.
@@ -43,6 +47,80 @@ func (p *MigrationProof) ValidateParams(maxSubKeys uint32) error {
 		return MultisigProofValidateParams(m.Multisig, maxSubKeys)
 	}
 	return nil
+}
+
+// ValidateAddressBinding checks that a proof's public key material derives to
+// the claimed address under the expected side-specific account rules:
+// legacy uses Cosmos secp256k1 address derivation, while new uses
+// eth_secp256k1 address derivation. BIP44 coin type itself is a wallet-local
+// derivation-path property and is not present on chain; this is the consensus
+// checkable equivalent.
+func (p *MigrationProof) ValidateAddressBinding(side Side, expected sdk.AccAddress) error {
+	derived, err := p.DerivedAddress(side)
+	if err != nil {
+		return err
+	}
+	if !derived.Equals(expected) {
+		return ErrPubKeyAddressMismatch.Wrapf("%s proof public key derives to %s, expected %s",
+			sideLabel(side), derived.String(), expected.String())
+	}
+	return nil
+}
+
+// DerivedAddress returns the address derived from a proof's public key material
+// using the account-key type required by side.
+func (p *MigrationProof) DerivedAddress(side Side) (sdk.AccAddress, error) {
+	if err := p.ValidateBasic(side); err != nil {
+		return nil, err
+	}
+	switch inner := p.Proof.(type) {
+	case *MigrationProof_Single:
+		return deriveSingleAddress(side, inner.Single)
+	case *MigrationProof_Multisig:
+		return deriveMultisigAddress(side, inner.Multisig)
+	default:
+		return nil, ErrInvalidMigrationProof.Wrap("migration_proof oneof not set")
+	}
+}
+
+func deriveSingleAddress(side Side, s *SingleKeyProof) (sdk.AccAddress, error) {
+	switch side {
+	case SideLegacy:
+		pk := &secp256k1.PubKey{Key: s.PubKey}
+		return sdk.AccAddress(pk.Address()), nil
+	case SideNew:
+		pk := &ethsecp256k1.PubKey{Key: s.PubKey}
+		return sdk.AccAddress(pk.Address()), nil
+	default:
+		return nil, ErrInvalidMigrationProof.Wrap("unknown migration proof side")
+	}
+}
+
+func deriveMultisigAddress(side Side, m *MultisigProof) (sdk.AccAddress, error) {
+	subPubKeys := make([]cryptotypes.PubKey, len(m.SubPubKeys))
+	for i, raw := range m.SubPubKeys {
+		switch side {
+		case SideLegacy:
+			subPubKeys[i] = &secp256k1.PubKey{Key: raw}
+		case SideNew:
+			subPubKeys[i] = &ethsecp256k1.PubKey{Key: raw}
+		default:
+			return nil, ErrInvalidMigrationProof.Wrap("unknown migration proof side")
+		}
+	}
+	multiPK := kmultisig.NewLegacyAminoPubKey(int(m.Threshold), subPubKeys)
+	return sdk.AccAddress(multiPK.Address()), nil
+}
+
+func sideLabel(side Side) string {
+	switch side {
+	case SideLegacy:
+		return "legacy Cosmos secp256k1"
+	case SideNew:
+		return "new eth_secp256k1"
+	default:
+		return "unknown"
+	}
 }
 
 func (s *SingleKeyProof) validateBasic(side Side) error {

@@ -58,9 +58,6 @@ main() {
     import_from_mnemonic "$MNEMONIC_FILE" "$LEGACY_KEY" "$NEW_KEY"
   fi
 
-  assert_secp256k1_key "$LEGACY_KEY"
-  assert_eth_key "$NEW_KEY"
-
   local legacy_addr new_addr
   legacy_addr=$(resolve_address "$LEGACY_KEY")
   new_addr=$(resolve_address "$NEW_KEY")

@@ -21,10 +21,12 @@ func (msg *MsgUpdateParams) ValidateBasic() error {
 }
 
 func (msg *MsgClaimLegacyAccount) ValidateBasic() error {
-	if _, err := sdk.AccAddressFromBech32(msg.NewAddress); err != nil {
+	newAddr, err := sdk.AccAddressFromBech32(msg.NewAddress)
+	if err != nil {
 		return errorsmod.Wrapf(sdkerrors.ErrInvalidAddress, "invalid new_address (%s)", err)
 	}
-	if _, err := sdk.AccAddressFromBech32(msg.LegacyAddress); err != nil {
+	legacyAddr, err := sdk.AccAddressFromBech32(msg.LegacyAddress)
+	if err != nil {
 		return errorsmod.Wrapf(sdkerrors.ErrInvalidAddress, "invalid legacy_address (%s)", err)
 	}
 	if msg.NewAddress == msg.LegacyAddress {
@@ -34,6 +36,12 @@ func (msg *MsgClaimLegacyAccount) ValidateBasic() error {
 		return err
 	}
 	if err := msg.NewProof.ValidateBasic(SideNew); err != nil {
+		return err
+	}
+	if err := msg.LegacyProof.ValidateAddressBinding(SideLegacy, legacyAddr); err != nil {
+		return err
+	}
+	if err := msg.NewProof.ValidateAddressBinding(SideNew, newAddr); err != nil {
 		return err
 	}
 	return ValidateProofPair(&msg.LegacyProof, &msg.NewProof)
@@ -46,10 +54,12 @@ func (msg *MsgClaimLegacyAccount) MigrationNewAddress() string { return msg.NewA
 func (msg *MsgClaimLegacyAccount) MigrationLegacyAddress() string { return msg.LegacyAddress }
 
 func (msg *MsgMigrateValidator) ValidateBasic() error {
-	if _, err := sdk.AccAddressFromBech32(msg.NewAddress); err != nil {
+	newAddr, err := sdk.AccAddressFromBech32(msg.NewAddress)
+	if err != nil {
 		return errorsmod.Wrapf(sdkerrors.ErrInvalidAddress, "invalid new_address (%s)", err)
 	}
-	if _, err := sdk.AccAddressFromBech32(msg.LegacyAddress); err != nil {
+	legacyAddr, err := sdk.AccAddressFromBech32(msg.LegacyAddress)
+	if err != nil {
 		return errorsmod.Wrapf(sdkerrors.ErrInvalidAddress, "invalid legacy_address (%s)", err)
 	}
 	if msg.NewAddress == msg.LegacyAddress {
@@ -59,6 +69,12 @@ func (msg *MsgMigrateValidator) ValidateBasic() error {
 		return err
 	}
 	if err := msg.NewProof.ValidateBasic(SideNew); err != nil {
+		return err
+	}
+	if err := msg.LegacyProof.ValidateAddressBinding(SideLegacy, legacyAddr); err != nil {
+		return err
+	}
+	if err := msg.NewProof.ValidateAddressBinding(SideNew, newAddr); err != nil {
 		return err
 	}
 	return ValidateProofPair(&msg.LegacyProof, &msg.NewProof)

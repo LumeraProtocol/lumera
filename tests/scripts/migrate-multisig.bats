@@ -418,19 +418,6 @@ EOF
   rm -rf "$tmp"
 }
 
-@test "sign rejects eth_secp256k1 key as --from (exit 1)" {
-  local tmp; tmp=$(mktemp -d)
-  cp "$FIX_DIR/proof-template.json" "$tmp/proof.json"
-  run "$SCRIPTS_DIR/migrate-multisig.sh" sign "$tmp/proof.json" \
-      --binary "$SHIM" \
-      --from new-eth-key \
-      --chain-id shim-test \
-      --out "$tmp/out.json"
-  [ "$status" -eq 1 ]
-  [[ "$output" == *"secp256k1"* ]]
-  rm -rf "$tmp"
-}
-
 @test "sign exits 1 when neither --from nor --new-key is set" {
   run "$SCRIPTS_DIR/migrate-multisig.sh" sign "$FIX_DIR/proof-template.json" \
     --binary "$SHIM" --chain-id shim --out /tmp/unused.json

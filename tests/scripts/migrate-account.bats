@@ -25,22 +25,6 @@ setup() {
   [[ "$output" == *"multisig"* ]]
 }
 
-@test "migrate-account.sh rejects non-secp256k1 legacy key before preflight" {
-  run "$SCRIPTS_DIR/migrate-account.sh" \
-    --binary "$SHIM" --chain-id shim-test --yes --dry-run \
-    legacy-eth newkey
-  [ "$status" -eq 1 ]
-  [[ "$output" == *"coin-type 118"* ]]
-}
-
-@test "migrate-account.sh rejects non-eth new key before preflight" {
-  run "$SCRIPTS_DIR/migrate-account.sh" \
-    --binary "$SHIM" --chain-id shim-test --yes --dry-run \
-    legacykey wrong-algo
-  [ "$status" -eq 1 ]
-  [[ "$output" == *"eth_secp256k1"* ]]
-}
-
 @test "migrate-account.sh errors usage when given one positional arg" {
   run "$SCRIPTS_DIR/migrate-account.sh" --chain-id x onlyone
   [ "$status" -eq 1 ]

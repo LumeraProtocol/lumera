@@ -128,7 +128,6 @@ No `--node` or `--chain-id` — `combine` is pure local file assembly.
 
 ```text
 ./scripts/migrate-multisig.sh submit <tx.json> \
-  --from <new-eth-key> \
   --chain-id <id> \
   --node <url> \
   [--keyring-backend <b>] [--keyring-dir <dir>] [--home <dir>] [--binary <path>]
@@ -138,8 +137,6 @@ No `--node` or `--chain-id` — `combine` is pure local file assembly.
 **Pre-flight (identical in spirit to `migrate-account.sh`'s happy path):**
 
 - `<tx.json>` exists and parses. Extract `legacy_address`, `new_address`, kind, and multisig metadata from `body.messages[0]` in the unsigned tx JSON, accepting only `/lumera.evmigration.MsgClaimLegacyAccount` and `/lumera.evmigration.MsgMigrateValidator` with `legacy_proof.multisig` set. Reject single-key tx JSON with exit 3 and a pointer to the single-sig scripts.
-- Resolve `--from`'s address and verify it matches `new_address` (operators running submit with the wrong destination key is a common failure mode).
-- Verify `--from` is `eth_secp256k1` — reject other algorithms with exit 1 and a clear message.
 - Run `assert_not_migrated <legacy>` and `assert_new_address_unused <new>` (shared with single-sig flow).
 - **Re-run `assert_estimate_succeeds` against a fresh `migration-estimate <legacy>` query.** The ceremony between `generate` and `submit` may span hours or days; chain state can shift under it (governance disables migration via `enable_migration=false`, `migration_end_time` passes, validator accumulates delegations past `max_validator_delegations`). Re-checking catches those cases before burning a broadcast attempt. Exits 4 with the current `rejection_reason` if the estimate no longer succeeds.
 - `snapshot_bank_balances <legacy>`.
@@ -163,8 +160,6 @@ New functions added to `scripts/evmigration-common.sh`:
 | `auth_account_json <addr>` | Cached `lumerad_q auth account <addr>` wrapper returning JSON |
 | `auth_pubkey_type <addr>` | Returns one of `none` (nil), `single-sig`, `multisig`, or `unknown`. Must search both `.account.pub_key` and nested base-account shapes such as `.account.base_account.pub_key`, because vesting/account wrapper responses do not always put the pubkey at the top level |
 | `key_pubkey_b64 <key-name>` | Reads `lumerad keys show <key-name> --output json` and returns the base64 public key bytes for local membership checks |
-| `assert_secp256k1_key <key-name>` | Confirms the given key in the keyring is legacy Cosmos `secp256k1`, used by `sign` before comparing against `multisig.sub_pub_keys_b64` |
-| `assert_eth_key <key-name>` | Confirms the given key in the keyring is `eth_secp256k1`, used by `submit` |
 | `read_proof_file <path>` | Reads and validates a multisig proof or partial JSON file. Validates required fields (`kind`, `legacy_address`, `new_address`, `chain_id`, `evm_chain_id`, `payload_hex`, `multisig.threshold`, `multisig.sub_pub_keys_b64`, `multisig.sig_format`, `partial_signatures`), rejects `single` proof files, verifies `payload_hex` matches canonical reconstruction from the other fields, validates base64 fields, enforces partial-signature indices are in range, and confirms `1 <= threshold <= len(sub_pub_keys_b64)`. Emits the JSON on stdout, human summary on stderr. Fails exit 9 on any violation |
 | `read_migration_tx_file <path>` | Reads the unsigned tx JSON from `combine`, verifies exactly one supported evmigration message with `legacy_proof.multisig` set, rejects single-key proof txs with exit 3, and emits a compact JSON object with `legacy_address`, `new_address`, `kind`, `threshold`, and `num_signers` for submit preflight |
 | `summarize_partials <files...>` | Parses all inputs, enforces cross-file consistency, prints the K-of-N entry-presence matrix shown in §3.3, returns 0 if at least K distinct signer indices are present, non-zero otherwise |

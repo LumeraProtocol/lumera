@@ -335,7 +335,6 @@ S_USAGE
   pjson=$(read_proof_file "$input")
 
   if [[ -n "$from" ]]; then
-    assert_secp256k1_key "$from"
     local from_pubkey listed
     from_pubkey=$(key_pubkey_b64 "$from")
     listed=$(jq -r '.legacy.sub_pub_keys[]' <<<"$pjson")
@@ -345,7 +344,6 @@ S_USAGE
     fi
   fi
   if [[ -n "$new_key" ]]; then
-    assert_eth_key "$new_key"
     local new_pubkey listed_new
     new_pubkey=$(key_pubkey_b64 "$new_key")
     listed_new=$(jq -r '.new.sub_pub_keys[]' <<<"$pjson")

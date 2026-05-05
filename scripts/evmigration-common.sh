@@ -1129,42 +1129,6 @@ key_pubkey_b64() {
   printf '%s\n' "$pk_key"
 }
 
-# assert_secp256k1_key <key-name>
-# Confirms the key is a legacy Cosmos /cosmos.crypto.secp256k1.PubKey.
-assert_secp256k1_key() {
-  local key_name="$1"
-  local info pk_type
-  if ! info=$(lumerad_keys show "$key_name" --output json 2>/dev/null); then
-    log_error "legacy key not found in keyring: $(legacy_value "$key_name")"
-    exit 1
-  fi
-  pk_type=$(jq -r '(.pubkey | if type == "string" then fromjson else . end | ."@type") // "unknown"' <<<"$info" 2>/dev/null || printf 'unknown')
-  if [[ "$pk_type" != "/cosmos.crypto.secp256k1.PubKey" ]]; then
-    log_error "legacy key '$(legacy_value "$key_name")' is not secp256k1 (got $pk_type) — legacy migration requires a coin-type 118 secp256k1 key"
-    exit 1
-  fi
-}
-
-# assert_eth_key <key-name>
-# For submit. Confirms the key is an eth_secp256k1 variant.
-assert_eth_key() {
-  local key_name="$1"
-  local info pk_type
-  if ! info=$(lumerad_keys show "$key_name" --output json 2>/dev/null); then
-    log_error "new EVM key not found in keyring: $(new_value "$key_name")"
-    exit 1
-  fi
-  pk_type=$(jq -r '(.pubkey | if type == "string" then fromjson else . end | ."@type") // "unknown"' <<<"$info" 2>/dev/null || printf 'unknown')
-  case "$pk_type" in
-    /cosmos.crypto.ethsecp256k1.PubKey|\
-    /ethermint.crypto.v1.ethsecp256k1.PubKey|\
-    /cosmos.evm.crypto.v1.ethsecp256k1.PubKey) ;;
-    *)
-      log_error "new EVM key '$(new_value "$key_name")' is not eth_secp256k1 (got $pk_type) — submit requires the new EVM destination key"
-      exit 1 ;;
-  esac
-}
-
 _payload_hex() {
   printf '%s' "$1" | od -An -tx1 -v | tr -d ' \n'
 }

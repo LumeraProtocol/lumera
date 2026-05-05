@@ -6,6 +6,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
+	ethsecp256k1 "github.com/cosmos/evm/crypto/ethsecp256k1"
 	"github.com/stretchr/testify/require"
 
 	"github.com/LumeraProtocol/lumera/x/evmigration/types"
@@ -29,14 +30,25 @@ func validSingleProof(pub *secp256k1.PubKey) types.MigrationProof {
 
 // validNewProof returns a MigrationProof with a well-formed new-side SingleKeyProof
 // (eth_secp256k1, 65-byte R||S||V signature, EIP-191 format).
-func validNewProof() types.MigrationProof {
-	return types.MigrationProof{
+func validNewProof(t *testing.T) (string, types.MigrationProof) {
+	t.Helper()
+	priv, err := ethsecp256k1.GenerateKey()
+	require.NoError(t, err)
+	pub := priv.PubKey().(*ethsecp256k1.PubKey)
+	return sdk.AccAddress(pub.Address()).String(), types.MigrationProof{
 		Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
-			PubKey:    make([]byte, 33),
+			PubKey:    pub.Key,
 			Signature: make([]byte, 65),
 			SigFormat: types.SigFormat_SIG_FORMAT_EIP191,
 		}},
 	}
+}
+
+func proofAddr(t *testing.T, proof types.MigrationProof, side types.Side) string {
+	t.Helper()
+	addr, err := proof.DerivedAddress(side)
+	require.NoError(t, err)
+	return addr.String()
 }
 
 func TestMsgUpdateParams_ValidateBasic(t *testing.T) {
@@ -91,11 +103,9 @@ func TestMsgClaimLegacyAccount_ValidateBasic(t *testing.T) {
 	legacyKey := secp256k1.GenPrivKey()
 	legacyPub := legacyKey.PubKey().(*secp256k1.PubKey)
 	legacyAddr := sdk.AccAddress(legacyPub.Address()).String()
-	newAddr := validAddr()
 
 	goodProof := validSingleProof(legacyPub)
-
-	goodNewProof := validNewProof()
+	newAddr, goodNewProof := validNewProof(t)
 
 	tests := []struct {
 		name    string
@@ -200,11 +210,9 @@ func TestMsgMigrateValidator_ValidateBasic(t *testing.T) {
 	legacyKey := secp256k1.GenPrivKey()
 	legacyPub := legacyKey.PubKey().(*secp256k1.PubKey)
 	legacyAddr := sdk.AccAddress(legacyPub.Address()).String()
-	newAddr := validAddr()
 
 	goodProof := validSingleProof(legacyPub)
-
-	goodNewProof := validNewProof()
+	newAddr, goodNewProof := validNewProof(t)
 
 	tests := []struct {
 		name    string
@@ -263,6 +271,85 @@ func TestMsgMigrateValidator_ValidateBasic(t *testing.T) {
 	}
 }
 
+func TestMigrationMessages_ValidateBasic_AddressKeyFamilyBinding(t *testing.T) {
+	legacyKey := secp256k1.GenPrivKey()
+	legacyPub := legacyKey.PubKey().(*secp256k1.PubKey)
+	legacyAddr := sdk.AccAddress(legacyPub.Address()).String()
+	legacyProof := validSingleProof(legacyPub)
+	newAddr, newProof := validNewProof(t)
+
+	ethLegacyKey, err := ethsecp256k1.GenerateKey()
+	require.NoError(t, err)
+	ethLegacyPub := ethLegacyKey.PubKey().(*ethsecp256k1.PubKey)
+	ethDerivedLegacyAddr := sdk.AccAddress(ethLegacyPub.Address()).String()
+	legacyProofWithEthAddress := types.MigrationProof{
+		Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
+			PubKey:    ethLegacyPub.Key,
+			Signature: make([]byte, 64),
+			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
+		}},
+	}
+
+	cosmosNewKey := secp256k1.GenPrivKey()
+	cosmosNewPub := cosmosNewKey.PubKey().(*secp256k1.PubKey)
+	cosmosDerivedNewAddr := sdk.AccAddress(cosmosNewPub.Address()).String()
+	newProofWithCosmosAddress := types.MigrationProof{
+		Proof: &types.MigrationProof_Single{Single: &types.SingleKeyProof{
+			PubKey:    cosmosNewPub.Key,
+			Signature: make([]byte, 65),
+			SigFormat: types.SigFormat_SIG_FORMAT_CLI,
+		}},
+	}
+
+	tests := []struct {
+		name string
+		msg  sdk.Msg
+	}{
+		{
+			name: "claim rejects legacy address derived with eth_secp256k1 rules",
+			msg: &types.MsgClaimLegacyAccount{
+				LegacyAddress: ethDerivedLegacyAddr,
+				NewAddress:    newAddr,
+				LegacyProof:   legacyProofWithEthAddress,
+				NewProof:      newProof,
+			},
+		},
+		{
+			name: "claim rejects new address derived with Cosmos secp256k1 rules",
+			msg: &types.MsgClaimLegacyAccount{
+				LegacyAddress: legacyAddr,
+				NewAddress:    cosmosDerivedNewAddr,
+				LegacyProof:   legacyProof,
+				NewProof:      newProofWithCosmosAddress,
+			},
+		},
+		{
+			name: "validator rejects legacy address derived with eth_secp256k1 rules",
+			msg: &types.MsgMigrateValidator{
+				LegacyAddress: ethDerivedLegacyAddr,
+				NewAddress:    newAddr,
+				LegacyProof:   legacyProofWithEthAddress,
+				NewProof:      newProof,
+			},
+		},
+		{
+			name: "validator rejects new address derived with Cosmos secp256k1 rules",
+			msg: &types.MsgMigrateValidator{
+				LegacyAddress: legacyAddr,
+				NewAddress:    cosmosDerivedNewAddr,
+				LegacyProof:   legacyProof,
+				NewProof:      newProofWithCosmosAddress,
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.msg.(sdk.HasValidateBasic).ValidateBasic()
+			require.ErrorIs(t, err, types.ErrPubKeyAddressMismatch)
+		})
+	}
+}
+
 // validMultisigProof returns a MigrationProof carrying a well-formed K-of-N
 // MultisigProof on the requested side. All sub-keys are random secp256k1
 // pubkeys; signatures are zero-filled at the per-side expected length.
@@ -299,7 +386,7 @@ func validMultisigProof(threshold, n int, side types.Side) types.MigrationProof 
 //     between two multisig sides must fail with ErrMirrorSourceMismatch.
 func TestValidateProofPair_MirrorSourceRule(t *testing.T) {
 	legacySingle := validSingleProof(secp256k1.GenPrivKey().PubKey().(*secp256k1.PubKey))
-	newSingle := validNewProof()
+	_, newSingle := validNewProof(t)
 	legacyMulti2of3 := validMultisigProof(2, 3, types.SideLegacy)
 	newMulti2of3 := validMultisigProof(2, 3, types.SideNew)
 	newMulti1of1 := validMultisigProof(1, 1, types.SideNew)
@@ -409,14 +496,11 @@ func TestValidateProofPair_NilInputsReturnErrorNotPanic(t *testing.T) {
 // TestMsgClaimLegacyAccount_ValidateBasic_MirrorSource confirms the consensus
 // check fires through the full ValidateBasic path (not just the helper).
 func TestMsgClaimLegacyAccount_ValidateBasic_MirrorSource(t *testing.T) {
-	legacyKey := secp256k1.GenPrivKey()
-	legacyPub := legacyKey.PubKey().(*secp256k1.PubKey)
-	legacyAddr := sdk.AccAddress(legacyPub.Address()).String()
-	newAddr := validAddr()
-
 	// 2-of-3 legacy → 1-of-1 new: shape and K/N both diverge.
 	legMulti := validMultisigProof(2, 3, types.SideLegacy)
 	newMulti1of1 := validMultisigProof(1, 1, types.SideNew)
+	legacyAddr := proofAddr(t, legMulti, types.SideLegacy)
+	newAddr := proofAddr(t, newMulti1of1, types.SideNew)
 	msg := types.MsgClaimLegacyAccount{
 		NewAddress:    newAddr,
 		LegacyAddress: legacyAddr,
@@ -433,10 +517,10 @@ func TestMsgMigrateValidator_ValidateBasic_MirrorSource(t *testing.T) {
 	legacyKey := secp256k1.GenPrivKey()
 	legacyPub := legacyKey.PubKey().(*secp256k1.PubKey)
 	legacyAddr := sdk.AccAddress(legacyPub.Address()).String()
-	newAddr := validAddr()
 
 	legSingle := validSingleProof(legacyPub)
 	newMulti := validMultisigProof(2, 3, types.SideNew)
+	newAddr := proofAddr(t, newMulti, types.SideNew)
 	msg := types.MsgMigrateValidator{
 		NewAddress:    newAddr,
 		LegacyAddress: legacyAddr,
@@ -452,14 +536,14 @@ func TestMsgMigrateValidator_ValidateBasic_MirrorSource(t *testing.T) {
 // path (not just the ValidateProofPair helper in isolation). Legacy signs at
 // indices [0,1]; new signs at [0,2] — same K, same N, but disjoint K-subsets.
 func TestMsgClaimLegacyAccount_ValidateBasic_SignerIndicesMismatch(t *testing.T) {
-	legacyAddr := validAddr()
-	newAddr := validAddr()
 	legacy := validMultisigProof(2, 3, types.SideLegacy)
 	newSide := validMultisigProof(2, 3, types.SideNew)
 	// Force new-side to claim indices [0,2] instead of [0,1].
 	nm := newSide.GetMultisig()
 	nm.SignerIndices = []uint32{0, 2}
 	nm.SubSignatures = [][]byte{make([]byte, 65), make([]byte, 65)}
+	legacyAddr := proofAddr(t, legacy, types.SideLegacy)
+	newAddr := proofAddr(t, newSide, types.SideNew)
 
 	msg := types.MsgClaimLegacyAccount{
 		NewAddress:    newAddr,
@@ -475,13 +559,13 @@ func TestMsgClaimLegacyAccount_ValidateBasic_SignerIndicesMismatch(t *testing.T)
 // TestMsgMigrateValidator_ValidateBasic_SignerIndicesMismatch mirrors the above
 // for the validator migration message.
 func TestMsgMigrateValidator_ValidateBasic_SignerIndicesMismatch(t *testing.T) {
-	legacyAddr := validAddr()
-	newAddr := validAddr()
 	legacy := validMultisigProof(2, 3, types.SideLegacy)
 	newSide := validMultisigProof(2, 3, types.SideNew)
 	nm := newSide.GetMultisig()
 	nm.SignerIndices = []uint32{0, 2}
 	nm.SubSignatures = [][]byte{make([]byte, 65), make([]byte, 65)}
+	legacyAddr := proofAddr(t, legacy, types.SideLegacy)
+	newAddr := proofAddr(t, newSide, types.SideNew)
 
 	msg := types.MsgMigrateValidator{
 		NewAddress:    newAddr,
@@ -498,13 +582,13 @@ func TestMsgMigrateValidator_ValidateBasic_SignerIndicesMismatch(t *testing.T) {
 // sub-key uniqueness rule fires through MsgClaimLegacyAccount.ValidateBasic.
 // Without this, one keyholder could be counted as two distinct signers.
 func TestMsgClaimLegacyAccount_ValidateBasic_DuplicateSubKeys(t *testing.T) {
-	legacyAddr := validAddr()
-	newAddr := validAddr()
 	legacy := validMultisigProof(2, 3, types.SideLegacy)
 	// Duplicate the sub-key at position 0 into position 2.
 	lm := legacy.GetMultisig()
 	lm.SubPubKeys[2] = append([]byte(nil), lm.SubPubKeys[0]...)
 	newSide := validMultisigProof(2, 3, types.SideNew)
+	legacyAddr := validAddr()
+	newAddr := proofAddr(t, newSide, types.SideNew)
 
 	msg := types.MsgClaimLegacyAccount{
 		NewAddress:    newAddr,
@@ -521,12 +605,12 @@ func TestMsgClaimLegacyAccount_ValidateBasic_DuplicateSubKeys(t *testing.T) {
 // this time putting the duplicate on the new (eth) side to confirm the check
 // fires on both sides.
 func TestMsgMigrateValidator_ValidateBasic_DuplicateSubKeys(t *testing.T) {
-	legacyAddr := validAddr()
-	newAddr := validAddr()
 	legacy := validMultisigProof(2, 3, types.SideLegacy)
 	newSide := validMultisigProof(2, 3, types.SideNew)
 	nm := newSide.GetMultisig()
 	nm.SubPubKeys[1] = append([]byte(nil), nm.SubPubKeys[0]...)
+	legacyAddr := proofAddr(t, legacy, types.SideLegacy)
+	newAddr := validAddr()
 
 	msg := types.MsgMigrateValidator{
 		NewAddress:    newAddr,

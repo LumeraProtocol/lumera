@@ -25,6 +25,13 @@ func TestConcurrentMixedEVMOperations(t *testing.T) {
 	node.StartAndWaitRPC()
 	defer node.Stop()
 
+	// Wait until at least one block has been committed so the EVM mempool's
+	// blockchain head is primed (otherwise CurrentBlock() returns the zero
+	// header with GasLimit=0 and every tx is rejected with "exceeds block
+	// gas limit"). Other tests in this package go through suite_test.go's
+	// run-wrapper which performs the same wait before each subtest.
+	node.WaitForBlockNumberAtLeast(t, 2, 20*time.Second)
+
 	fromAddr := testaccounts.MustAccountAddressFromTestKeyInfo(t, node.KeyInfo())
 	privateKey := evmtest.MustDerivePrivateKey(t, node.KeyInfo().Mnemonic)
 	gasPrice := node.MustGetGasPriceWithRetry(t, 20*time.Second)

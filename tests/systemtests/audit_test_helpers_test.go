@@ -639,6 +639,27 @@ func seedProofTranscripts(
 	seeds []transcriptSeed,
 	fullMode bool,
 ) testNodeIdentity {
+	return seedProofTranscriptsWithClass(t, cli, epochID, candidates, targetAcct, seeds, fullMode,
+		"STORAGE_PROOF_RESULT_CLASS_INVALID_TRANSCRIPT")
+}
+
+// seedProofTranscriptsWithClass is identical to seedProofTranscripts but emits seed
+// proof results carrying an explicit result class. Callers that need the seed to
+// count as a Class A failure under postpone predicates pass HASH_MISMATCH; callers
+// that only need a recheck-eligible record can stick with the INVALID_TRANSCRIPT
+// default exposed via seedProofTranscripts. Class A semantics are now failure-class
+// driven (see storageTruthIsClassAFault), so an INDEX-artifact alone no longer
+// promotes a non-class-A result to Class A.
+func seedProofTranscriptsWithClass(
+	t *testing.T,
+	cli *LumeradCli,
+	epochID uint64,
+	candidates []testNodeIdentity,
+	targetAcct string,
+	seeds []transcriptSeed,
+	fullMode bool,
+	resultClass string,
+) testNodeIdentity {
 	t.Helper()
 
 	var prober, rechecker testNodeIdentity
@@ -682,15 +703,17 @@ func seedProofTranscripts(
 
 	var proofResults []string
 	for _, s := range seeds {
-		proofResults = append(proofResults, buildStorageProofResultJSON(
+		proofResults = append(proofResults, buildStorageProofResultJSONWithClass(
 			prober.accAddr, targetAcct, s.ticketID, s.transcriptHash,
 			"STORAGE_PROOF_BUCKET_TYPE_RECENT",
+			resultClass,
 		))
 		if fullMode {
 			// FULL mode requires both RECENT and OLD results for every assigned target.
-			proofResults = append(proofResults, buildStorageProofResultJSON(
+			proofResults = append(proofResults, buildStorageProofResultJSONWithClass(
 				prober.accAddr, targetAcct, s.ticketID, s.transcriptHash+"-old-seed",
 				"STORAGE_PROOF_BUCKET_TYPE_OLD",
+				resultClass,
 			))
 		}
 	}

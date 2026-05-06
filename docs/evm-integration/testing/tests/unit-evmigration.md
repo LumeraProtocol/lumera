@@ -79,6 +79,7 @@ Files: `x/evmigration/keeper/verify_test.go`, `x/evmigration/keeper/migrate_test
 | `TestClaimLegacyAccount_MigratedThirdPartyWithdrawAddress` | End-to-end message-server test: third-party withdraw addr resolved to migrated destination (bug #16). |
 | `TestMigrateValidator_NotValidator` | Verifies rejection when legacy address is not a validator operator. |
 | `TestMigrateValidator_UnbondingValidator` | Verifies rejection when validator is unbonding or unbonded. |
+| `TestMigrateValidator_JailedValidator` | Verifies jailed validators are rejected before any validator migration mutation path. |
 | `TestMigrateValidator_TooManyDelegators` | Verifies rejection when delegation records exceed MaxValidatorDelegations. |
 | `TestMigrateValidator_Success` | Verifies full validator migration: commission, record, delegations, distribution, supernode, account. |
 | `TestMigrateValidator_ThirdPartyWithdrawAddrPreserved` | Verifies temporary redirect->withdraw->restore for delegators with already-migrated third-party withdraw addresses (bug #18). |

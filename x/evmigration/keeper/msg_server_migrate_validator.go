@@ -47,6 +47,12 @@ func (ms msgServer) MigrateValidator(goCtx context.Context, msg *types.MsgMigrat
 		return nil, fmt.Errorf("lookup source validator: %w", err)
 	}
 
+	// Reject jailed validators explicitly so direct MsgMigrateValidator callers
+	// see the same actionable cause surfaced by MigrationEstimate.
+	if val.Jailed {
+		return nil, types.ErrValidatorUnbonding.Wrapf("validator is jailed (status: %s); unjail before migration", val.Status.String())
+	}
+
 	// Reject if validator is unbonding or unbonded.
 	if val.Status == stakingtypes.Unbonding || val.Status == stakingtypes.Unbonded {
 		return nil, types.ErrValidatorUnbonding

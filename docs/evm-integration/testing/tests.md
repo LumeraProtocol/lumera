@@ -25,7 +25,7 @@ Lumera's suite goes beyond any of these baselines **before** mainnet:
 | Precisebank (6↔18 decimal bridge)                                               | 39 unit + 6 integration                 | Not applicable (novel to Lumera)          |
 | Feemarket (EIP-1559)                                                             | 9 unit + 8 integration                  | Inherited from upstream, rarely augmented |
 | Precompile coverage (11 precompiles + gas metering + action + supernode + wasm)   | 42+ integration                         | Smoke-level                               |
-| Account migration (coin-type 118→60)                                            | 116 unit + 14 integration + devnet tool | Not applicable (novel to Lumera)          |
+| Account migration (coin-type 118→60)                                            | 117 unit + 15 integration + devnet tool | Not applicable (novel to Lumera)          |
 | OpenRPC discovery + spec sync                                                    | 15 unit + 2 integration                 | No chain has this                         |
 | WebSocket subscriptions (newHeads, logs, pending)                                | 4 integration                           | Untested or manual                        |
 | Cross-runtime bridge (CosmWasm ↔ EVM)                                           | 12 integration + 31 unit + 15 crossruntime unit | No chain has this              |
@@ -51,7 +51,7 @@ All three previously identified critical test gaps (mempool capacity pressure, b
 | **Unit**        | OpenRPC / generator                  | 15    | High — [details](tests/unit-openrpc.md) |
 | **Unit**        | JSON-RPC rate limiting               | 25    | High — right-to-left XFF parsing, trusted-hop skipping, CIDR parsing |
 | **Unit**        | ERC20 policy                         | 14    | High — 3 modes, base denom + exact ibc/ allowlist CRUD |
-| **Unit**        | EVMigration keeper                   | 116+  | Excellent — [details](tests/unit-evmigration.md) |
+| **Unit**        | EVMigration keeper                   | 117+  | Excellent — [details](tests/unit-evmigration.md) |
 | **Unit**        | EVMigration types (proof)            | 6     | High — `TestMultisigProof_ValidateBasic`, `TestMultisigProof_ValidateParams_SizeCap`, `TestLegacyProof_ValidateBasic_Dispatch`, `TestSingleKeyProof_ValidateBasic` and variants |
 | **Unit**        | EVMigration CLI                      | 26    | High — [details](tests/unit-evmigration-cli.md) |
 | **Unit**        | Cross-runtime bridge (plugin helpers + crossruntime) | 46 | High — [details](tests/integration-precompiles.md#cosmwasm---evm-plugin-unit-tests) |
@@ -65,12 +65,12 @@ All three previously identified critical test gaps (mempool capacity pressure, b
 | **Integration** | Precisebank                          | 6     | High — [details](tests/integration-precisebank.md) |
 | **Integration** | Precompiles (standard + custom + wasm) | 42   | High — [details](tests/integration-precompiles.md) |
 | **Integration** | VM queries / state                   | 12    | High — [details](tests/integration-vm.md) |
-| **Integration** | EVMigration                          | 14+   | High — [details](tests/integration-evmigration.md) |
+| **Integration** | EVMigration                          | 15+   | High — [details](tests/integration-evmigration.md) |
 |                 |                                      |       |                  |
 | **Devnet**      | EVM / fee market / cross-peer / IBC  | 12+   | High — [details](tests/devnet.md) |
 | **Devnet**      | EVMigration tool                     | 7 modes | High — [details](tests/devnet.md#evm-migration-devnet-tests) |
 |                 |                                      |       |                  |
-|                 | **Totals**                           | **Unit: ~397 · Integration: ~146 · Devnet: 12+ · Total: ~555** | |
+|                 | **Totals**                           | **Unit: ~398 · Integration: ~147 · Devnet: 12+ · Total: ~557** | |
 
 ### Gaps and next steps
 
@@ -115,7 +115,7 @@ Each area has its own detailed file with per-test descriptions:
 | Fee market (EIP-1559) | [unit-feemarket.md](tests/unit-feemarket.md) | 9 |
 | Precisebank (6↔18 bridge) | [unit-precisebank.md](tests/unit-precisebank.md) | 39 |
 | OpenRPC & generator | [unit-openrpc.md](tests/unit-openrpc.md) | 15 |
-| EVMigration keeper | [unit-evmigration.md](tests/unit-evmigration.md) | 116+ |
+| EVMigration keeper | [unit-evmigration.md](tests/unit-evmigration.md) | 117+ |
 | EVMigration types (proof) | `x/evmigration/types/proof_test.go` | 6 |
 | EVMigration CLI | [unit-evmigration-cli.md](tests/unit-evmigration-cli.md) | 26 |
 
@@ -132,7 +132,7 @@ Each area has its own detailed file with per-test descriptions:
 | Precisebank | [integration-precisebank.md](tests/integration-precisebank.md) | 6 |
 | Precompiles (standard + custom + wasm + crossruntime) | [integration-precompiles.md](tests/integration-precompiles.md) | 42 |
 | VM queries / state | [integration-vm.md](tests/integration-vm.md) | 12 |
-| EVMigration | [integration-evmigration.md](tests/integration-evmigration.md) | 14+ |
+| EVMigration | [integration-evmigration.md](tests/integration-evmigration.md) | 15+ |
 
 ### Devnet Tests
 

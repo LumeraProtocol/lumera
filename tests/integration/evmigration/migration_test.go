@@ -811,6 +811,40 @@ func (s *MigrationIntegrationSuite) TestMigrateValidator_NotValidator() {
 	s.Require().ErrorIs(err, types.ErrNotValidator)
 }
 
+// TestMigrateValidator_JailedValidator verifies the direct message handler
+// rejects jailed validators in real keeper state before any migration record is
+// written.
+func (s *MigrationIntegrationSuite) TestMigrateValidator_JailedValidator() {
+	s.enableMigration()
+
+	selfBondAmt := sdkmath.NewInt(1_000_000)
+	operatorCoins := sdk.NewCoins(sdk.NewInt64Coin("ulume", 2_000_000))
+	legacyPrivKey, legacyAddr := s.createFundedLegacyAccount(operatorCoins)
+	oldValAddr, _ := s.createTestValidator(legacyAddr, selfBondAmt)
+
+	val, err := s.app.StakingKeeper.GetValidator(s.ctx, oldValAddr)
+	s.Require().NoError(err)
+	val.Jailed = true
+	val.Status = stakingtypes.Unbonding
+	s.Require().NoError(s.app.StakingKeeper.SetValidator(s.ctx, val))
+
+	newPrivKey, newAddr := createNewEVMAddress(s.T())
+	msg := newValidatorMsg(s.T(), legacyPrivKey, legacyAddr, newPrivKey, newAddr)
+
+	_, err = s.msgServer.MigrateValidator(s.ctx, msg)
+	s.Require().ErrorIs(err, types.ErrValidatorUnbonding)
+	s.Require().Contains(err.Error(), "jailed")
+
+	_, err = s.keeper.MigrationRecords.Get(s.ctx, legacyAddr.String())
+	s.Require().Error(err, "jailed validator migration must not write a migration record")
+
+	_, err = s.app.StakingKeeper.GetValidator(s.ctx, oldValAddr)
+	s.Require().NoError(err, "source validator must remain under the legacy operator")
+
+	_, err = s.app.StakingKeeper.GetValidator(s.ctx, sdk.ValAddress(newAddr))
+	s.Require().Error(err, "destination validator must not be created")
+}
+
 // TestClaimLegacyAccount_LegacyAccountRemoved verifies that the legacy auth
 // account is removed after migration and the new account exists.
 func (s *MigrationIntegrationSuite) TestClaimLegacyAccount_LegacyAccountRemoved() {

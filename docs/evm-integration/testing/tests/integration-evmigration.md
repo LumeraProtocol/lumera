@@ -17,5 +17,6 @@ Run: `go test -tags=test ./tests/integration/evmigration/... -v`
 | `TestClaimLegacyAccount_AfterValidatorMigration` | Fresh-state validator-first flow: migrate validator first, then migrate a legacy delegator account. |
 | `TestMigrateValidator_Success` | End-to-end validator migration: bonded validator with self-delegation + external delegator. |
 | `TestMigrateValidator_NotValidator` | Rejection when legacy address is not a validator operator with real staking state. |
+| `TestMigrateValidator_JailedValidator` | Rejection when validator is jailed with real staking/auth state; asserts no migration record or destination validator is created. |
 | `TestQueryMigrationRecord_Integration` | Query server returns record after real migration, nil before. |
 | `TestQueryMigrationEstimate_Integration` | Estimate query with real staking state reports correct values. |

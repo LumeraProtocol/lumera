@@ -69,6 +69,34 @@ func TestMigrateValidator_UnbondingValidator(t *testing.T) {
 	require.ErrorIs(t, err, types.ErrValidatorUnbonding)
 }
 
+// TestMigrateValidator_JailedValidator verifies jailed validators are rejected
+// before the migration handler reaches any mutation path.
+func TestMigrateValidator_JailedValidator(t *testing.T) {
+	f := initMsgServerFixture(t)
+
+	privKey := secp256k1.GenPrivKey()
+	legacyAddr := sdk.AccAddress(privKey.PubKey().Address())
+	newPrivKey, newAddr := testNewMigrationAccount(t)
+
+	baseAcc := authtypes.NewBaseAccountWithAddress(legacyAddr)
+	f.accountKeeper.EXPECT().GetAccount(gomock.Any(), legacyAddr).Return(baseAcc)
+
+	oldValAddr := sdk.ValAddress(legacyAddr)
+	f.stakingKeeper.EXPECT().GetValidator(gomock.Any(), oldValAddr).Return(
+		stakingtypes.Validator{
+			OperatorAddress: legacyAddr.String(),
+			Jailed:          true,
+			Status:          stakingtypes.Bonded,
+		}, nil,
+	)
+
+	msg := newValidatorMigrationMsg(t, privKey, legacyAddr, newPrivKey, newAddr)
+
+	_, err := f.msgServer.MigrateValidator(f.ctx, msg)
+	require.ErrorIs(t, err, types.ErrValidatorUnbonding)
+	require.Contains(t, err.Error(), "jailed")
+}
+
 // TestMigrateValidator_TooManyDelegators verifies rejection when total delegation
 // records exceed MaxValidatorDelegations.
 func TestMigrateValidator_TooManyDelegators(t *testing.T) {

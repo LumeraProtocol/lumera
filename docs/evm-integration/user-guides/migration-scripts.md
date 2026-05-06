@@ -656,10 +656,10 @@ The submit step checks:
 
 This example is from the full sample session in [`multisig-migration.txt`](../../../multisig-migration.txt). It migrates a regular, non-validator 2-of-3 multisig account:
 
-- Legacy multisig key: `user-account-val2-001`
-- New EVM multisig key: `user-account-evm-val2-001`
-- Legacy address: `lumera177uu8fdpr5pq3vvg2amx7e8rfz9gh7evfjuwqs`
-- New address: `lumera1fy6uqn8lhhv3dexap39h7a6dv297fcdy80xs3t`
+- Legacy multisig key:`user-account-val2-001`
+- New EVM multisig key:`user-account-evm-val2-001`
+- Legacy address:`lumera177uu8fdpr5pq3vvg2amx7e8rfz9gh7evfjuwqs`
+- New address:`lumera1fy6uqn8lhhv3dexap39h7a6dv297fcdy80xs3t`
 
 Generate the proof template:
 

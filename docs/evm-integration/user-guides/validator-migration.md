@@ -37,7 +37,7 @@ The consensus key, voting power at block height, and validator jailing/slashing 
 
 ## Pre-migration checklist
 
-1. **Plan a maintenance window.** Your validator will miss blocks between stopping the node and restarting it after migration. Target a low-activity window and pre-arrange with delegators if needed.
+1. **Plan a maintenance window.** Your validator will miss blocks between stopping the node and restarting it after migration. Target a low-activity window and pre-arrange with delegators if needed. Mainnet genesis sets `app_state.slashing.params.downtime_jail_duration` to `3600s` (1 hour). Keep the full account migration downtime, from stopping `lumerad` through the post-migration restart and catch-up, comfortably below this limit. If the window approaches 1 hour, restart the node, catch up, and recover/unjail before retrying the migration.
 2. **Verify eligibility.** Run the pre-flight estimate:
 
    ```bash
@@ -193,6 +193,8 @@ systemctl stop lumerad
 
 Stopping before broadcast avoids double-signing risk and prevents the node from producing blocks with the legacy key while migration is in flight.
 
+> **Downtime warning:** mainnet genesis sets `downtime_jail_duration` to `3600s` (1 hour). Do not let the stop-to-restart migration window exceed this time; if the window approaches 1 hour, restart and catch up before retrying the migration.
+
 ## Step 5 — Broadcast the validator migration
 
 Route the transaction through a trusted external RPC since your own node is down:
@@ -215,6 +217,43 @@ lumerad tx evmigration migrate-validator val-legacy val-new \
 > ```
 >
 > `--i-have-stopped-the-node` acknowledges the jailing risk non-interactively (required for systemd / CI / non-TTY runs; omitting it makes the script prompt for the literal word `yes`). `--yes` alone does **not** satisfy this check. See [migration-scripts.md](migration-scripts.md) for full flag reference, exit codes, and troubleshooting.
+
+Example interactive helper run:
+
+```text
+$ ./scripts/migrate-validator.sh validator-legacy validator-evm --node http://172.28.0.11:26657
+INFO  chain ID: lumera-devnet-1
+INFO  legacy key validator-legacy -> address lumera1k0aj0fp28trnnfsn7u2recq7yfnujk7wqj9j4y
+INFO  new EVM key validator-evm -> address lumera1ay0lsu8uw0unswqakvx7ytmdelslkm4vt5nnht
+INFO  check OK: no migration record found for legacy address lumera1k0aj0fp28trnnfsn7u2recq7yfnujk7wqj9j4y
+INFO  check OK: destination address lumera1ay0lsu8uw0unswqakvx7ytmdelslkm4vt5nnht has no migration record as a legacy address
+INFO  check OK: no migration record found by new address lumera1ay0lsu8uw0unswqakvx7ytmdelslkm4vt5nnht
+INFO  check OK: destination address lumera1ay0lsu8uw0unswqakvx7ytmdelslkm4vt5nnht does not exist on-chain
+Migration preview for legacy account lumera1k0aj0fp28trnnfsn7u2recq7yfnujk7wqj9j4y (coin-type 118, secp256k1):
+  Validator:         yes
+  Val delegations:   38 (to validator)
+  Val unbondings:    8 (to validator)
+  Val redelegations: 16 (src or dst)
+  Validator status:  Bonded
+  Jailed:            no
+  Multisig:          no
+  Balance:           999740294121ulume
+  Delegations:       1
+  Unbonding:         none
+  Redelegations:     none
+  Authz grants:      none
+  Feegrants:         none
+  Actions:           none
+  Supernode:         yes
+  Would succeed:     yes
+================================================================
+WARNING - VALIDATOR MIGRATION
+Your validator will miss blocks and may be jailed during
+migration. The node MUST be stopped before broadcasting this tx.
+================================================================
+Type "yes" to confirm the node is stopped: yes
+INFO  migrating legacy validator lumera1k0aj0fp28trnnfsn7u2recq7yfnujk7wqj9j4y -> EVM-compatible lumera1ay0lsu8uw0unswqakvx7ytmdelslkm4vt5nnht
+```
 
 The CLI:
 
@@ -491,7 +530,7 @@ This section only applies if your validator's **operator key** is a K-of-N multi
 No. `MsgMigrateValidator` re-keys every delegation, unbonding, and redelegation record pointing at your validator atomically. Delegators see their delegation show up under the new valoper automatically.
 
 **Q: Will my validator be jailed for downtime during migration?**
-Short maintenance windows (single-digit minutes) are typically well within the `SignedBlocksWindow` × `MinSignedPerWindow` tolerance on mainnet-class chains. Plan for a normal-day restart and you're fine. Prolonged outages (hours) risk jailing — the migration itself only takes one block; most of the window is your own node restart latency.
+Short maintenance windows (single-digit minutes) are typically well within the `SignedBlocksWindow` × `MinSignedPerWindow` tolerance on mainnet-class chains. Mainnet genesis sets `downtime_jail_duration` to `3600s` (1 hour), so do not let the account migration downtime exceed that time. The migration itself only takes one block; most of the window is your own node restart latency.
 
 **Q: Does my consensus key change?**
 No. `priv_validator_key.json` (ed25519) is untouched. Only the operator key (`secp256k1` → `eth_secp256k1`) changes.

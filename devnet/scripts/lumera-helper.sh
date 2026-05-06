@@ -24,6 +24,7 @@ Usage:
   lumera-helper.sh new-account [--multisig] AMOUNT
   lumera-helper.sh list-accounts
   lumera-helper.sh generate-evm-accounts [--count N]
+  lumera-helper.sh unjail-validator [--from KEY] [--timeout SECONDS]
 
 Commands:
   new-account [--multisig] AMOUNT
@@ -50,6 +51,12 @@ Commands:
                            new 2-of-3 EVM multisig composite. Requires an
                            EVM-migrated chain. --count limits processing to
                            the first N user-accounts.json entries.
+  unjail-validator [--from KEY] [--timeout SECONDS]
+                           Ensure the local lumerad node is running, wait until
+                           it is caught up, submit a slashing unjail tx from the
+                           validator key, wait one block, and verify the
+                           validator is no longer jailed. Defaults --from to
+                           this validator's configured key.
 EOF
 }
 
@@ -91,11 +98,13 @@ load_config() {
 		exit 1
 	fi
 
+	VALIDATOR_KEY_NAME="$(printf '%s' "${VAL_REC_JSON}" | jq -r '.key_name')"
+
 	# Honor a caller-supplied FUNDER_KEY_NAME (e.g. test-accounts-setup routes
 	# funding through a dedicated temp key to avoid sequence races on the
 	# shared validator genesis key). Default to the validator's own key.
 	if [ -z "${FUNDER_KEY_NAME:-}" ]; then
-		FUNDER_KEY_NAME="$(printf '%s' "${VAL_REC_JSON}" | jq -r '.key_name')"
+		FUNDER_KEY_NAME="${VALIDATOR_KEY_NAME}"
 	fi
 	DAEMON_HOME="${DAEMON_HOME_BASE}/${DAEMON_DIR}"
 	GENESIS_LOCAL="${DAEMON_HOME}/config/genesis.json"
@@ -103,6 +112,9 @@ load_config() {
 	NODE_ADDR="http://127.0.0.1:${RPC_PORT}"
 	NODE_STATUS_DIR="${SHARED_DIR}/status/${MONIKER}"
 	USER_ACCOUNTS_FILE="${NODE_STATUS_DIR}/user-accounts.json"
+	LOGS_DIR="${LOGS_DIR:-/root/logs}"
+	OLD_LOGS_DIR="${OLD_LOGS_DIR:-${LOGS_DIR}/old}"
+	VALIDATOR_LOG="${VALIDATOR_LOG:-${LOGS_DIR}/validator.log}"
 
 	DISPLAY_DENOM="lume"
 	DISPLAY_EXPONENT="6"
@@ -131,6 +143,131 @@ load_config() {
 	mkdir -p "${NODE_STATUS_DIR}"
 }
 
+proc_running() {
+	local name="$1"
+	pgrep -f "(^|/)${name}( |$)" >/dev/null 2>&1
+}
+
+archive_log_file() {
+	local log_file="$1"
+	local ts base target suffix=1
+
+	[ -f "${log_file}" ] || return 0
+	[ -s "${log_file}" ] || return 0
+
+	mkdir -p "${OLD_LOGS_DIR}"
+	ts="$(date '+%Y%m%d_%H_%M')"
+	base="$(basename "${log_file}")"
+	target="${OLD_LOGS_DIR}/${ts}.${base}"
+	while [ -e "${target}" ]; do
+		target="${OLD_LOGS_DIR}/${ts}.${suffix}.${base}"
+		suffix=$((suffix + 1))
+	done
+	mv "${log_file}" "${target}"
+}
+
+local_node_rpc_ready() {
+	curl -sf "${NODE_ADDR}/status" >/dev/null 2>&1 &&
+		"${DAEMON}" status --node "${NODE_ADDR}" >/dev/null 2>&1
+}
+
+start_local_lumera_if_needed() {
+	local extra_start_flags="" claims_local
+
+	require_cmd "${DAEMON}"
+
+	if local_node_rpc_ready; then
+		echo "INFO: lumerad RPC is already reachable at ${NODE_ADDR}"
+		return 0
+	fi
+
+	if proc_running "$(basename "${DAEMON}")"; then
+		echo "INFO: ${DAEMON} process is running; waiting for RPC at ${NODE_ADDR}"
+		return 0
+	fi
+
+	mkdir -p "${LOGS_DIR}" "${OLD_LOGS_DIR}" "${DAEMON_HOME}/config"
+	archive_log_file "${VALIDATOR_LOG}"
+
+	claims_local="${DAEMON_HOME}/config/claims.csv"
+	if [ -f "${claims_local}" ] &&
+		"${DAEMON}" start --help 2>&1 | grep -q 'skip-claims-check' &&
+		"${DAEMON}" start --help 2>&1 | grep -q 'claims-path'; then
+		extra_start_flags="--skip-claims-check=false --claims-path=${claims_local}"
+	fi
+
+	echo "INFO: starting ${DAEMON}; logging to ${VALIDATOR_LOG}"
+	# shellcheck disable=SC2086
+	"${DAEMON}" start --home "${DAEMON_HOME}" ${extra_start_flags} >"${VALIDATOR_LOG}" 2>&1 &
+}
+
+status_sync_info() {
+	curl -sf "${NODE_ADDR}/status" 2>/dev/null | jq -c '
+		(.result.sync_info // .sync_info // {}) as $s
+		| {
+			height: (($s.latest_block_height // "0") | tostring),
+			catching_up: (($s.catching_up // false) | tostring)
+		}
+	'
+}
+
+current_block_height() {
+	local info
+	info="$(status_sync_info 2>/dev/null || true)"
+	jq -r '.height // "0"' <<<"${info:-{}}" 2>/dev/null || echo "0"
+}
+
+wait_for_local_node_caught_up() {
+	local timeout="${1:-180}"
+	local deadline=$((SECONDS + timeout))
+	local info height catching last_log=0
+
+	while ((SECONDS < deadline)); do
+		if info="$(status_sync_info 2>/dev/null)" && jq -e . >/dev/null 2>&1 <<<"${info}"; then
+			height="$(jq -r '.height // "0"' <<<"${info}")"
+			catching="$(jq -r '.catching_up // "false"' <<<"${info}")"
+			if [ "${catching}" = "false" ] && [[ "${height}" =~ ^[0-9]+$ ]] && ((height > 0)); then
+				echo "INFO: node caught up at height ${height}"
+				return 0
+			fi
+			if ((SECONDS - last_log >= 5)); then
+				echo "INFO: waiting for node catch-up: height=${height:-0} catching_up=${catching:-unknown}"
+				last_log="${SECONDS}"
+			fi
+		elif ((SECONDS - last_log >= 5)); then
+			echo "INFO: waiting for lumerad RPC at ${NODE_ADDR}"
+			last_log="${SECONDS}"
+		fi
+		sleep 2
+	done
+
+	echo "ERROR: node did not catch up within ${timeout}s" >&2
+	exit 1
+}
+
+wait_for_next_block() {
+	local start_height="$1"
+	local timeout="${2:-60}"
+	local deadline=$((SECONDS + timeout))
+	local height
+
+	if ! [[ "${start_height}" =~ ^[0-9]+$ ]]; then
+		start_height=0
+	fi
+
+	while ((SECONDS < deadline)); do
+		height="$(current_block_height)"
+		if [[ "${height}" =~ ^[0-9]+$ ]] && ((height > start_height)); then
+			echo "INFO: observed block ${height}"
+			return 0
+		fi
+		sleep 2
+	done
+
+	echo "ERROR: no new block observed within ${timeout}s after height ${start_height}" >&2
+	exit 1
+}
+
 assert_chain_ready() {
 	require_cmd "${DAEMON}"
 
@@ -148,22 +285,10 @@ assert_chain_ready() {
 wait_for_tx_confirmation() {
 	local txhash="$1"
 	local timeout="${2:-90}"
-	local out code height deadline raw_log codespace
+	local out code height deadline raw_log codespace last_log=0
 
 	if [ -z "${txhash}" ]; then
 		echo "ERROR: missing tx hash for confirmation" >&2
-		exit 1
-	fi
-
-	if out="$("${DAEMON}" q wait-tx "${txhash}" --node "${NODE_ADDR}" --output json --timeout "${timeout}s" 2>/dev/null)"; then
-		code="$(printf '%s' "${out}" | jq -r 'try .code // "0"')"
-		if [ "${code}" = "0" ] || [ "${code}" = "null" ]; then
-			return 0
-		fi
-		raw_log="$(printf '%s' "${out}" | jq -r 'try .raw_log // try .log // empty')"
-		codespace="$(printf '%s' "${out}" | jq -r 'try .codespace // empty')"
-		echo "ERROR: tx ${txhash} failed during confirmation wait: code=${code} codespace=${codespace:-N/A}" >&2
-		[ -n "${raw_log}" ] && echo "ERROR: raw_log: ${raw_log}" >&2
 		exit 1
 	fi
 
@@ -171,18 +296,23 @@ wait_for_tx_confirmation() {
 	while ((SECONDS < deadline)); do
 		out="$("${DAEMON}" q tx "${txhash}" --node "${NODE_ADDR}" --output json 2>/dev/null || true)"
 		if jq -e . >/dev/null 2>&1 <<<"${out}"; then
-			code="$(printf '%s' "${out}" | jq -r 'try .code // "0"')"
-			height="$(printf '%s' "${out}" | jq -r 'try .height // "0"')"
+			code="$(printf '%s' "${out}" | jq -r '((.tx_response.code // .code // 0) | tostring)')"
+			height="$(printf '%s' "${out}" | jq -r '((.tx_response.height // .height // "0") | tostring)')"
 			if [ "${height}" != "0" ] && [ "${code}" = "0" ]; then
+				echo "INFO: tx ${txhash} included at height ${height}"
 				return 0
 			fi
 			if [ "${height}" != "0" ] && [ "${code}" != "0" ]; then
-				raw_log="$(printf '%s' "${out}" | jq -r 'try .raw_log // try .log // empty')"
-				codespace="$(printf '%s' "${out}" | jq -r 'try .codespace // empty')"
+				raw_log="$(printf '%s' "${out}" | jq -r '.tx_response.raw_log // .raw_log // .log // empty')"
+				codespace="$(printf '%s' "${out}" | jq -r '.tx_response.codespace // .codespace // empty')"
 				echo "ERROR: tx ${txhash} failed after broadcast: code=${code} codespace=${codespace:-N/A}" >&2
 				[ -n "${raw_log}" ] && echo "ERROR: raw_log: ${raw_log}" >&2
 				exit 1
 			fi
+		fi
+		if ((SECONDS - last_log >= 5)); then
+			echo "INFO: waiting for tx ${txhash} inclusion..."
+			last_log="${SECONDS}"
 		fi
 		sleep 3
 	done
@@ -1066,6 +1196,170 @@ Summary:
 EOF
 }
 
+query_validator_json() {
+	local valoper="$1"
+	"${DAEMON}" q staking validator "${valoper}" --node "${NODE_ADDR}" --output json 2>/dev/null
+}
+
+validator_status_field() {
+	local validator_json="$1"
+	local field="$2"
+	jq -r --arg field "${field}" '
+		(.validator // .) as $v
+		| $v[$field] // empty
+	' <<<"${validator_json}"
+}
+
+verify_validator_unjailed() {
+	local valoper="$1"
+	local timeout="${2:-60}"
+	local deadline=$((SECONDS + timeout))
+	local out jailed status
+
+	while ((SECONDS < deadline)); do
+		out="$(query_validator_json "${valoper}" || true)"
+		if jq -e . >/dev/null 2>&1 <<<"${out}"; then
+			jailed="$(validator_status_field "${out}" "jailed")"
+			status="$(validator_status_field "${out}" "status")"
+			if [ "${jailed}" = "false" ] || { [ -z "${jailed}" ] && [ "${status}" = "BOND_STATUS_BONDED" ]; }; then
+				echo "INFO: validator ${valoper} is unjailed; status=${status:-unknown}"
+				if [ "${status}" != "BOND_STATUS_BONDED" ]; then
+					echo "WARN: validator is unjailed but not bonded yet; status=${status:-unknown}" >&2
+				fi
+				return 0
+			fi
+		fi
+		sleep 2
+	done
+
+	echo "ERROR: validator ${valoper} is still jailed after ${timeout}s" >&2
+	if [ -n "${out:-}" ]; then
+		echo "ERROR: latest validator response:" >&2
+		jq -c . <<<"${out}" >&2 || printf '%s\n' "${out}" >&2
+	fi
+	exit 1
+}
+
+cmd_unjail_validator() {
+	local from_key="" timeout=180
+	local valoper out jailed status start_height tx_json code raw_log txhash
+
+	while (( $# > 0 )); do
+		case "$1" in
+		--from)
+			if (( $# < 2 )) || [[ "${2:-}" == --* ]]; then
+				echo "ERROR: --from requires a validator key name" >&2
+				exit 1
+			fi
+			from_key="$2"
+			shift 2
+			;;
+		--timeout)
+			if (( $# < 2 )) || [[ "${2:-}" == --* ]] || ! [[ "${2:-}" =~ ^[0-9]+$ ]] || ((10#${2:-0} == 0)); then
+				echo "ERROR: --timeout requires a positive integer number of seconds" >&2
+				exit 1
+			fi
+			timeout="$2"
+			shift 2
+			;;
+		*)
+			echo "ERROR: unknown unjail-validator flag: $1" >&2
+			usage
+			exit 1
+			;;
+		esac
+	done
+
+	load_config
+	require_cmd jq
+	require_cmd curl
+	require_cmd "${DAEMON}"
+
+	if [ -z "${from_key}" ]; then
+		from_key="${VALIDATOR_KEY_NAME}"
+	fi
+	if [ -z "${from_key}" ] || [ "${from_key}" = "null" ]; then
+		echo "ERROR: validator key name is not configured; pass --from KEY" >&2
+		exit 1
+	fi
+	if ! key_exists "${from_key}"; then
+		echo "ERROR: key not found in local keyring: ${from_key}" >&2
+		exit 1
+	fi
+
+	start_local_lumera_if_needed
+	wait_for_local_node_caught_up "${timeout}"
+
+	valoper="$(trim "$("${DAEMON}" --home "${DAEMON_HOME}" keys show "${from_key}" --bech val -a --keyring-backend "${KEYRING_BACKEND}" 2>/dev/null || true)")"
+	if [ -z "${valoper}" ]; then
+		echo "ERROR: failed to derive valoper address from key ${from_key}" >&2
+		exit 1
+	fi
+
+	out="$(query_validator_json "${valoper}" || true)"
+	if ! jq -e . >/dev/null 2>&1 <<<"${out}"; then
+		echo "ERROR: failed to query validator ${valoper}" >&2
+		[ -n "${out}" ] && echo "ERROR: query output: ${out}" >&2
+		exit 1
+	fi
+
+	jailed="$(validator_status_field "${out}" "jailed")"
+	status="$(validator_status_field "${out}" "status")"
+	echo "INFO: validator ${valoper} status=${status:-unknown} jailed=${jailed:-unknown}"
+	if [ "${jailed}" = "false" ] || { [ -z "${jailed}" ] && [ "${status}" = "BOND_STATUS_BONDED" ]; }; then
+		echo "INFO: validator is already unjailed; nothing to submit"
+		return 0
+	fi
+
+	echo "INFO: submitting unjail tx from ${from_key}"
+	start_height="$(current_block_height)"
+	tx_json="$("${DAEMON}" tx slashing unjail \
+		--from "${from_key}" \
+		--home "${DAEMON_HOME}" \
+		--chain-id "${CHAIN_ID}" \
+		--node "${NODE_ADDR}" \
+		--keyring-backend "${KEYRING_BACKEND}" \
+		--gas auto \
+		--gas-adjustment 2.0 \
+		--gas-prices "${MIN_GAS_PRICE}" \
+		--broadcast-mode sync \
+		--output json \
+		--yes 2>&1)" || true
+
+	if ! jq -e . >/dev/null 2>&1 <<<"${tx_json}"; then
+		if grep -qi 'validator not jailed' <<<"${tx_json}"; then
+			echo "INFO: validator is already unjailed; tx not needed"
+			verify_validator_unjailed "${valoper}" "${timeout}"
+			return 0
+		fi
+		echo "ERROR: unjail tx failed before returning JSON: ${tx_json}" >&2
+		exit 1
+	fi
+
+	code="$(printf '%s' "${tx_json}" | jq -r '.code // 0')"
+	raw_log="$(printf '%s' "${tx_json}" | jq -r '.raw_log // empty')"
+	txhash="$(printf '%s' "${tx_json}" | jq -r '.txhash // empty')"
+	if [ "${code}" != "0" ]; then
+		if grep -qi 'validator not jailed' <<<"${raw_log}"; then
+			echo "INFO: validator is already unjailed; tx not needed"
+			verify_validator_unjailed "${valoper}" "${timeout}"
+			return 0
+		fi
+		echo "ERROR: unjail tx failed in CheckTx (code=${code}): ${raw_log}" >&2
+		exit 1
+	fi
+	if [ -z "${txhash}" ]; then
+		echo "ERROR: unjail broadcast returned no tx hash" >&2
+		printf '%s\n' "${tx_json}" >&2
+		exit 1
+	fi
+
+	echo "INFO: unjail tx ${txhash} broadcast; waiting for inclusion"
+	wait_for_tx_confirmation "${txhash}" "${timeout}"
+	wait_for_next_block "${start_height}" "${timeout}"
+	verify_validator_unjailed "${valoper}" "${timeout}"
+}
+
 cmd_new_account() {
 	local amount_arg="$1"
 	local create_multisig=0
@@ -1187,6 +1481,10 @@ main() {
 	generate-evm-accounts)
 		shift
 		cmd_generate_evm_accounts "$@"
+		;;
+	unjail-validator)
+		shift
+		cmd_unjail_validator "$@"
 		;;
 	-h | --help | help)
 		usage

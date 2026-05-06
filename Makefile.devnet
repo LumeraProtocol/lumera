@@ -489,7 +489,7 @@ devnet-update-scripts:
 	fi
 
 .PHONY: devnet-new-1111 devnet-new-1120
-.PHONY: devnet-upgrade-1111 devnet-upgrade-1120 devnet-upgrade-1200
+.PHONY: devnet-upgrade-1110 devnet-upgrade-1111 devnet-upgrade-1120 devnet-upgrade-1200
 .PHONY: devnet-evm-upgrade
 
 # Upgrade a running devnet to a pre-downloaded lumera version.
@@ -512,6 +512,9 @@ devnet-new-version:
 	$(MAKE) devnet-build-version VERSION=$(VERSION)
 	sleep 10
 	$(MAKE) devnet-up
+
+devnet-upgrade-1110:
+	@$(MAKE) devnet-upgrade-version VERSION=v1.11.0
 
 devnet-upgrade-1111:
 	@$(MAKE) devnet-upgrade-version VERSION=v1.11.1

@@ -1,6 +1,6 @@
 {
   "schema_version": "context.v1",
-  "updated": "2026-04-29T02:15:55Z",
+  "updated": "2026-05-05T00:00:00Z",
   "project": {
     "name": "lumera",
     "note": "Multi-repo project. lumera (this) is the knowledge provider. Related repos: supernode, sdk-go, sdk-js."
@@ -34,7 +34,7 @@
       "name": "Challenge Index Generation",
       "status": "done",
       "slice": "S03",
-      "notes": "Challenge indices are chosen by the client at registration time and stored in AvailabilityCommitment.challenge_indices (proto field 7). The x/action/v1/challenge/ package was removed — DeriveIndices is now a spec-only reference algorithm (docs/leps/new-feature-lep5.md). The on-chain module validates index uniqueness, range, and count; it does not derive indices.",
+      "notes": "Challenge indices are chosen by the client at registration time and stored in AvailabilityCommitment.challenge_indices (proto field 7). The x/action/v1/challenge/ package was removed — DeriveIndices is now a spec-only reference algorithm (docs/leps/LEP5 - Cascade Availability Commitment.md). The on-chain module validates index uniqueness, range, and count; it does not derive indices.",
       "evidence": [
         "go build ./x/action/v1/... (exit 0)",
         "grep -r 'DeriveIndices' x/action/ returns no hits"
@@ -45,7 +45,7 @@
       "name": "Registration Commitment Validation",
       "status": "done",
       "slice": "S04",
-      "notes": "Implemented optional AvailabilityCommitment validation in CascadeActionHandler.Process (MsgRequestAction) and RegisterAction. Validates: commitment_type == 'lep5/chunk-merkle/v1', hash_algo == HashAlgo_HASH_ALGO_BLAKE3 (enum), chunk_size == 262144, num_chunks == ceil(total_size/chunk_size), root == 32 bytes. Stores commitment (including client-provided challenge_indices) in on-chain CascadeMetadata.",
+      "notes": "Implemented optional AvailabilityCommitment validation in RegisterAction. Validates: commitment_type == 'lep5/chunk-merkle/v1', hash_algo == HashAlgo_HASH_ALGO_BLAKE3 (enum), chunk_size is a power of 2 in [1, 262144], total_size >= 4 bytes, num_chunks == ceil(total_size/chunk_size), num_chunks >= svc_min_chunks_for_challenge, root == 32 bytes, and challenge_indices are unique/in-range with the expected count. Stores commitment (including client-provided challenge_indices) in on-chain CascadeMetadata.",
       "evidence": [
         "go test ./x/action/v1/keeper/... -run TestCascade -count=1 (exit 0)"
       ]
@@ -152,7 +152,7 @@
       "name": "Everlight Module Core",
       "status": "done",
       "slice": "S12",
-      "notes": "Everlight core logic now lives inside x/supernode: the dedicated pool account, distribution state, genesis handling, params, and query handlers are owned by the supernode keeper. The standalone x/everlight module has been removed from the app.",
+      "notes": "Everlight core logic now lives inside x/supernode: pool funds are held by the existing supernode module account, while distribution state, genesis handling, params, and query handlers are owned by the supernode keeper. The standalone x/everlight module has been removed from the app.",
       "evidence": [
         "go test ./x/supernode/v1/... -count=1 (exit 0)",
         "go test ./tests/integration/everlight -count=1 (exit 0)"
@@ -183,10 +183,11 @@
     {
       "feature_id": "F17",
       "name": "Block Reward Share Routing",
-      "status": "deferred",
+      "status": "removed",
       "slice": "S14",
-      "notes": "Block reward share routing deferred to optional Phase 4. No implementation in this branch — proto field, BeginBlocker, and tests fully removed.",
+      "notes": "Block reward share routing was removed completely from this project. No implementation is planned here — proto field, BeginBlocker, x/distribution integration, and tests were fully removed.",
       "evidence": [
+        "operator:2026-05-05 confirmed block reward split was removed completely",
         "design:2026-04-08 Phase 1 scope clarification"
       ]
     },
@@ -203,8 +204,8 @@
   ],
   "handoff": {
     "stopped_at": "S10-S15 Everlight Phase 1 approved by operator after PASS gate, refreshed eval pack, and feedback fixes for S1.3c and S11.2.",
-    "next_immediate": "Select the next slice: downstream consumer/tagged-release integration (IAT01-IAT04), requirements/design cleanup for the embedded supernode pool-account decision, optional F17/AT40 Phase 4, or stop.",
-    "watch_out": "F17/AT40 remains deferred to optional Phase 4. requirements.json still contains an older permissionless-pool-account expectation, while implemented Phase 1 uses the existing supernode module account as the Everlight pool. S11.2 devnet coverage is best-effort because live epoch timing can make the dual inconclusive; canonical Go keeper tests cover the invariant. LEP-6 is out of scope for this lumera Everlight P1 closure except planning/docs references."
+    "next_immediate": "Select the next slice: downstream consumer/tagged-release integration (IAT01-IAT04), LEP-6 scoping, or stop.",
+    "watch_out": "F17/AT40 block reward share routing was removed completely and is not a future candidate in this project. Everlight Phase 1 uses the existing supernode module account as the Everlight pool; requirements.json was reconciled to match the implemented code-canonical design on 2026-05-05. S11.2 devnet coverage is best-effort because live epoch timing can make the dual inconclusive; canonical Go keeper tests cover the invariant. LEP-6 is out of scope for this lumera Everlight P1 closure except planning/docs references."
   },
   "next_slice": null,
   "commands_to_run": {
@@ -224,10 +225,13 @@
     "devnet_up": "make devnet-up — starts devnet"
   },
   "recent_decisions": [
-    "2026-04-29: Operator approved refreshed S10-S15 Everlight gate/eval. F10-F16 and F18 are closed as done; F17/AT40 remains deferred.",
+    "2026-05-05: Operator confirmed local make devnet-tests-everlight was green; S10-S15 2026-05-01 gate status updated from FAIL to PASS with devnet evidence satisfied by operator report.",
+    "2026-05-05: Code is canonical for Everlight Phase 1 pool-account design. The Everlight pool is the existing supernode module account (x/supernode, sntypes.ModuleName); no separate permissionless everlight module account is required for Phase 1.",
+    "2026-05-05: Operator confirmed F17/AT40 block reward share routing was removed completely; it is not deferred as future work.",
+    "2026-04-29: Operator approved refreshed S10-S15 Everlight gate/eval. F10-F16 and F18 are closed as done; F17/AT40 remains removed.",
     "2026-04-10: Operator accepted S10-S15 as closed after reviewing the 2026-04-09 PASS gate and devnet status. Three devnet checks were skipped intentionally and deferred for later follow-up, but did not block closure.",
     "2026-04-08: Everlight consolidated into x/supernode — standalone x/everlight module and proto/lumera/everlight/ removed. All Everlight state, keeper logic, queries, and params are embedded in x/supernode. Phase 1 uses the existing supernode module account as the Everlight pool; no separate permissionless everlight sub-account exists.",
-    "2026-04-08: Phase 1 scope clarified — registration-fee routing only; block reward routing (F17/AT40) deferred to optional Phase 4; no x/distribution modification in Phase 1.",
+    "2026-04-08: Phase 1 scope clarified — registration-fee routing only; block reward routing (F17/AT40) removed; no x/distribution modification in Phase 1.",
     "2026-04-08: Cross-repo integration gate added: IAT01-IAT04 run after lumera tag and downstream consumer updates.",
     "2026-03-05: Everlight Phase 1 scoped for lumera repo. Multi-repo project: lumera provides protos/knowledge, supernode/sdk-go/sdk-js consume.",
     "2026-03-05: x/epochs not available yet — Phase 1 uses block-height modulus in EndBlocker for distribution periods. Will migrate to x/epochs when available.",
@@ -240,16 +244,14 @@
   "blockers": [
     "AT32 (STORAGE_FULL recovery test) — RESOLVED 2026-04-08, gate passed",
     "IAT01-IAT04 remain pending until lumera publishes a tagged Everlight release and downstream consumers update",
+    "2026-05-01 devnet gate blocker — RESOLVED 2026-05-05 by operator-confirmed green make devnet-tests-everlight run",
     "Three devnet evaluation checks for S10-S15 were skipped by operator and deferred for later follow-up; they are not blocking slice closure"
   ],
-  "discrepancies": [
-    "F17 fully removed from codebase; deferred to optional Phase 4 with no implementation in this branch",
-    "requirements.json still states the Everlight pool account must have no minter/burner/staking/voting permissions, but implemented Phase 1 uses the existing supernode module account with existing permissions as documented in docs/plans/Cascade-Everlight-phase1-plan.md OQ14. Proposed fix: update requirements.json/design scope if the operator wants the embedded-pool design to remain canonical, or create a new feature for a dedicated permissionless pool account."
-  ],
+  "discrepancies": [],
   "gate_history": [
     {
       "date": "2026-04-06",
-      "result": "pass",
+      "result": "fail",
       "features": [
         "F10",
         "F11",
@@ -263,7 +265,7 @@
       "blocking_issues": 1,
       "warnings": 2,
       "coverage": "67.8%",
-      "notes": "AT32 (STORAGE_FULL recovery) missing dedicated test. AT30-AT39, AT41-AT45 verified. AT40 (block reward flow) deferred to Phase 4."
+      "notes": "AT32 (STORAGE_FULL recovery) missing dedicated test. AT30-AT39, AT41-AT45 verified. AT40 block reward flow removed from project scope."
     },
     {
       "date": "2026-04-08",
@@ -281,7 +283,7 @@
       "blocking_issues": 0,
       "warnings": 2,
       "coverage": "n/a",
-      "notes": "All AT30-AT39, AT41-AT45 verified. AT32 blocker resolved. AT40 confirmed deferred (no dead code). F17 clean removal verified."
+      "notes": "All AT30-AT39, AT41-AT45 verified. AT32 blocker resolved. AT40 confirmed removed (no dead code). F17 clean removal verified."
     },
     {
       "date": "2026-04-08",
@@ -371,7 +373,7 @@
       "blocking_issues": 0,
       "warnings": 2,
       "coverage": "n/a",
-      "notes": "Re-gate after STORAGE_FULL trigger refactor (disk_usage_percent), cascade_kademlia_db_max_bytes full removal, EnsureModuleAccount fix, EverlightPoolAccountName removal, devnet test rewrite. All unit/integration/E2E/upgrade tests pass. Dead code grep clean. AT30-AT39, AT41-AT45 verified. AT40 deferred. Lint/govulncheck waived per operator."
+      "notes": "Re-gate after STORAGE_FULL trigger refactor (disk_usage_percent), cascade_kademlia_db_max_bytes full removal, EnsureModuleAccount fix, EverlightPoolAccountName removal, devnet test rewrite. All unit/integration/E2E/upgrade tests pass. Dead code grep clean. AT30-AT39, AT41-AT45 verified. AT40 removed. Lint/govulncheck waived per operator."
     },
     {
       "date": "2026-04-09",
@@ -389,7 +391,7 @@
       "blocking_issues": 0,
       "warnings": 2,
       "coverage": "n/a",
-      "notes": "Fresh re-gate at commit 4cc12ec. All functional tests pass (unit, integration, E2E, upgrade). go build ./... clean. make build clean. Dead code verified removed (CascadeKademliaDbMaxBytes, cascade_kademlia_db_max_bytes, EverlightPoolAccountName, x/everlight). All 6 design points confirmed in code. AT30-AT39, AT41-AT45 verified. AT40 deferred. Lint/govulncheck waived per operator."
+      "notes": "Fresh re-gate at commit 4cc12ec. All functional tests pass (unit, integration, E2E, upgrade). go build ./... clean. make build clean. Dead code verified removed (CascadeKademliaDbMaxBytes, cascade_kademlia_db_max_bytes, EverlightPoolAccountName, x/everlight). All 6 design points confirmed in code. AT30-AT39, AT41-AT45 verified. AT40 removed. Lint/govulncheck waived per operator."
     },
     {
       "date": "2026-04-28T02:13:28Z",
@@ -411,7 +413,7 @@
     },
     {
       "date": "2026-05-01T02:29:00Z",
-      "result": "fail",
+      "result": "pass",
       "features": [
         "F10",
         "F11",
@@ -422,10 +424,10 @@
         "F16",
         "F18"
       ],
-      "blocking_issues": 1,
+      "blocking_issues": 0,
       "warnings": 5,
       "coverage": "n/a",
-      "notes": "Re-gate at commit 451f8a8 after PR updates. make build-proto, scoped action/supernode tests, integration/action, integration/everlight, e2e/everlight, app/upgrades/v1_12_0, govulncheck, and make build passed. Operator waived 3 scoped golangci-lint unused-symbol findings in x/supernode/v1/keeper on 2026-05-01. Gate remains failed because local devnet was unavailable for make devnet-tests-everlight. buf lint proto/ still reports broad repository findings; S10-S15 SUPERNODE_STATE_* enum-prefix findings remain compatibility-waived, LEP-6/audit findings are outside this Everlight P1 gate."
+      "notes": "Re-gate at commit 451f8a8 after PR updates. make build-proto, scoped action/supernode tests, integration/action, integration/everlight, e2e/everlight, app/upgrades/v1_12_0, govulncheck, and make build passed. Operator waived 3 scoped golangci-lint unused-symbol findings in x/supernode/v1/keeper on 2026-05-01. Local make devnet-tests-everlight was later confirmed green by operator on 2026-05-05, clearing the only blocker. buf lint proto/ still reports broad repository findings; S10-S15 SUPERNODE_STATE_* enum-prefix findings remain compatibility-waived, LEP-6/audit findings are outside this Everlight P1 gate."
     }
   ],
   "eval_history": [

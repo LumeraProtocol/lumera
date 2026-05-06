@@ -162,6 +162,8 @@ In Phase 1, Everlight uses the existing `x/supernode` module account as the pool
 
 The supernode module account accepts `MsgSend` transfers from any address, including the Foundation wallet. This is how Foundation pre-funding works prior to the upgrade and as ongoing supplemental funding.
 
+**Phase 3 will split the pool into a dedicated constrained sub-account.** Once endowment principal starts accumulating in Phase 3, the Everlight pool is split out of the shared `x/supernode` module account into its own named module account holding only what is needed for storage payouts and endowment principal management. The dedicated sub-account is registered with the minimal permission set required for its role and explicitly without `Minter`/`Burner`. This isolates the high-value retention vault from the broader supernode module surface and aligns with the original "no minter/burner/staking/voting on the pool" intent.
+
 ### 6.3 On-Chain State
 
 #### EverlightPoolState (Global - stored in supernode KVStore)

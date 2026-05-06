@@ -152,6 +152,31 @@ Changes:
 
 ---
 
+doc## ⚠️ Known Tech Debt - MUST FIX BEFORE PHASE 3
+
+**The Phase 1 pool reuses the existing `x/supernode` module account, which carries `Minter`, `Burner`, and `Staking` permissions** (`app/app_config.go:198`). This was inherited from the original supernode module scaffolding, not a deliberate Everlight design choice, and it directly contradicts the original requirements.json constraint that the Everlight pool account must not have minter/burner/staking/voting permissions.
+
+In Phase 1 this is tolerable because:
+- The supernode keeper does not actually call `MintCoins` or `BurnCoins` anywhere (verified: `grep -rn 'MintCoins\|BurnCoins' x/supernode/` returns zero hits).
+- Pool balances are small in the bootstrap period.
+- `Staking` permission is harmless until endowment principal starts accumulating.
+
+In Phase 3 this becomes unacceptable because:
+- The pool will hold significant endowment principal, making `Minter`/`Burner` a much larger blast radius for any future code path or governance action that touches the supernode module account.
+- A dedicated constrained Everlight sub-account is part of the Phase 3 design (see Feature Proposal section 6.2).
+
+### Required cleanup before / during Phase 3
+
+1. **Drop `Minter` and `Burner` permissions from the Everlight pool account.** Either:
+   - (a) split the pool into a separate constrained module account with permissions = `[]` (or `Staking` only, if needed for principal delegation), or
+   - (b) trim `Minter`/`Burner` from the supernode module account itself in `app/app_config.go` if the supernode keeper still does not need them.
+2. **Audit `Staking` use.** If Phase 3 endowment delegation flows through this account, keep `Staking`; otherwise drop it too.
+3. **Update requirements.json** to reflect whichever route is chosen, removing the discrepancy currently noted in `context.json.discrepancies`.
+
+This is tracked separately in the "Lumera dev tracker" Notion database; do not let Phase 3 ship without resolving it.
+
+---
+
 ## Supernode-side integration knowledge (authoritative implementation notes)
 
 This section is maintained as the durable integration contract for supernode team implementation.

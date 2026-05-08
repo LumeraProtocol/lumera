@@ -46,8 +46,8 @@
     },
     "test_accounts": {
       "count": 5,
-      "balance_base": "20000ulume",
-      "balance_increment": "10000ulume",
+      "balance_base": "1000lume",
+      "balance_increment": "500lume",
       "multisig": true
     },
     "initial_distribution": {
@@ -104,9 +104,9 @@
       "validator_stake": "1000000000000ulume"
     },
     "test_accounts": {
-      "count": 5,
-      "balance_base": "10000ulume",
-      "balance_increment": "5000ulume"
+      "count": 10,
+      "balance_base": "1000lume",
+      "balance_increment": "500lume"
     }
   },
   {

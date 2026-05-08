@@ -9,17 +9,21 @@
 #
 #   "test_accounts": {
 #     "count": 10,
-#     "balance_base": "10000ulume",
-#     "balance_increment": "5000ulume",
+#     "balance_base": "10000ulume",      # or "1lume" — display denom auto-
+#     "balance_increment": "5000ulume",  # converted; both fields must agree
 #     "multisig": true   # optional, default false; if true, creates 2-of-3 multisig accounts instead of single-sig
 #   }
+#
+# Supported denoms: "ulume" (bond/base denom, used verbatim) and "lume"
+# (display denom, multiplied by 10^6 up front and passed downstream as
+# ulume). Mixing denoms across balance_base/balance_increment is rejected.
 #
 # Behavior:
 #   - Exits 0 (no-op) if the block is missing or count <= 0.
 #   - Waits for lumerad RPC to be reachable before provisioning.
-#   - Funds account i with balance_base + i * balance_increment, passing the
-#     amount straight to lumera-helper.sh (so the units come from config,
-#     unmodified — e.g. "10000ulume", "15000ulume", "20000ulume", ...).
+#   - Funds account i with balance_base + i * balance_increment, normalizing
+#     lume → ulume up front so funder budgeting and helper invocation both
+#     operate in base units (e.g. "10000ulume", "15000ulume", ...).
 #   - If test_accounts.multisig is true, creates 2-of-3 multisig accounts
 #     instead of single-sig accounts.
 #
@@ -102,12 +106,44 @@ IFS=$'\t' read -r INCR_NUM INCR_DENOM_SFX < <(split_amount "${TA_INCR}") || {
 }
 
 # If both sides carry a denom, they must agree. If one side omits it, inherit
-# from the other. Callers typically specify both as "Nulume".
+# from the other. Callers typically specify both as "Nulume" or "Nlume".
 if [ -n "${BASE_DENOM_SFX}" ] && [ -n "${INCR_DENOM_SFX}" ] && [ "${BASE_DENOM_SFX}" != "${INCR_DENOM_SFX}" ]; then
 	log "ERROR: balance_base denom (${BASE_DENOM_SFX}) != balance_increment denom (${INCR_DENOM_SFX})."
 	exit 1
 fi
 DENOM_SFX="${BASE_DENOM_SFX:-${INCR_DENOM_SFX}}"
+
+# Normalize the denom up front so funder budgeting and helper invocation
+# both operate in the chain's base denom (ulume). Lumera's display denom is
+# `lume` with exponent 6 (1 lume = 10^6 ulume); these values match
+# lumera-helper.sh's load_config() fallback when bank.denom_metadata is not
+# yet available. If Lumera's display denom ever changes, update both this
+# script and lumera-helper.sh.
+TA_BASE_DENOM="ulume"
+TA_DISPLAY_DENOM="lume"
+TA_DISPLAY_EXPONENT=6
+
+case "${DENOM_SFX}" in
+"${TA_BASE_DENOM}" | "")
+	# Already in base units. Empty falls here too — happens when both base
+	# and increment are bare numbers (e.g. balance_increment defaults to "0"
+	# without a suffix); downstream math then runs in ulume by convention.
+	:
+	;;
+"${TA_DISPLAY_DENOM}")
+	# 1 lume = 10^TA_DISPLAY_EXPONENT ulume. Bash arithmetic supports `**`
+	# directly. Even tens of millions of lume per account stay well inside
+	# 64-bit signed int range.
+	mult=$((10 ** TA_DISPLAY_EXPONENT))
+	BASE_NUM=$((BASE_NUM * mult))
+	INCR_NUM=$((INCR_NUM * mult))
+	DENOM_SFX="${TA_BASE_DENOM}"
+	;;
+*)
+	log "ERROR: unsupported denom '${DENOM_SFX}' in test_accounts; expected ${TA_BASE_DENOM} or ${TA_DISPLAY_DENOM}."
+	exit 1
+	;;
+esac
 
 wait_for_lumera() {
 	log "Waiting for lumerad RPC at ${LUMERA_RPC_ADDR}..."

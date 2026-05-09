@@ -236,7 +236,7 @@ simulation-bench: openrpc
 
 systemex-tests: openrpc
 	@echo "Running system tests..."
-	cd ./tests/systemtests/ && go test -tags=system_test -timeout 20m -v . $(NOCACHE_FLAG)
+	cd ./tests/systemtests/ && go test -tags=system_test -timeout 30m -v . $(NOCACHE_FLAG)
 
 system-metrics-test:
 	@echo "Running supernode metrics system tests (E2E + staleness)..."

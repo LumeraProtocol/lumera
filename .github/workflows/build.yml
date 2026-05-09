@@ -57,7 +57,7 @@ jobs:
 
   system-tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6.0.1

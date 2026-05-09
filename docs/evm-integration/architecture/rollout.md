@@ -60,6 +60,10 @@ This means rollout work is now primarily operational: release qualification, sta
 
 ## Supporting Guides
 
+- [EVM Migration User Guide](../user-guides/migration.md) — end-user migration walkthrough covering Portal+Keplr, shell scripts, and raw CLI; includes the multisig four-step offline ceremony
+- [EVM Migration Helper Scripts Guide](../user-guides/migration-scripts.md) — `scripts/migrate-account.sh`, `scripts/migrate-validator.sh`, and `scripts/migrate-multisig.sh` reference (flags, exit codes, dry-run, mnemonic-file flow)
+- [Validator Operator EVM Migration Guide](../user-guides/validator-migration.md) — validator-specific migration including jailing recovery and the multisig validator variant
+- [Supernode Operator EVM Migration Guide](../user-guides/supernode-migration.md) — daemon-driven Path A and Portal/CLI-first Path B, plus the multisig manual ceremony
 - [OpenRPC Discovery and Playground Guide](../guides/openrpc-playground.md) — OpenRPC discovery and interactive method testing
 - [Testing Smart Contracts on Lumera with Remix IDE](../guides/remix-guide.md) — deploy and test a simple Solidity contract through MetaMask
 - [Node Operator EVM Configuration Guide](../user-guides/node-evm-config-guide.md) — validator and RPC-node configuration checks
@@ -195,6 +199,8 @@ Before touching any live network, cut an RC for `v1.20.0` and re-run the full va
 - verify `app.toml` migration for pre-EVM nodes
 - verify JSON-RPC, OpenRPC, and indexer defaults on the RC binary using the [OpenRPC Discovery and Playground Guide](../guides/openrpc-playground.md)
 - verify migration portal / CLI flows against the RC
+- verify the bundled migration shell scripts (`migrate-account.sh`, `migrate-validator.sh`, `migrate-multisig.sh`) against the RC, including dry-run mode, the one-shot mnemonic-file path, and structured exit-code handling
+- rehearse the **multisig coordinator ceremony** end-to-end against the RC: `generate-proof-payload` → `sign-proof` (each co-signer signs both sides) → `combine-proof` (matching-index quorum check) → `submit-proof` (zero-signer broadcast). Cover both `--kind claim` and `--kind validator` and confirm `ErrMirrorSourceMismatch` (code 1121) rejection paths
 - verify MetaMask connectivity and transaction flows against the RC
 - verify Keplr-based migration flows against the RC
 - deploy and test a simple Solidity contract against the RC using the [Remix guide](../guides/remix-guide.md)
@@ -320,6 +326,11 @@ Validate the full migration lifecycle on an already upgraded live network and us
 - run `estimate` across all prepared legacy accounts
 - run `migrate-validator` for validator operators first
 - run `migrate` for regular accounts
+- exercise all three supported user-facing migration paths against the same prepared legacy state so they can be cross-checked:
+  - Portal + Keplr wizard (single-sig)
+  - bundled shell scripts: `scripts/migrate-account.sh`, `scripts/migrate-validator.sh`, `scripts/migrate-multisig.sh` (including a dry-run pass for each)
+  - raw `lumerad` CLI (`tx evmigration claim-legacy-account` / `migrate-validator`, plus the four-step `generate-proof-payload` / `sign-proof` / `combine-proof` / `submit-proof` ceremony for multisig)
+- include at least one **multisig migration rehearsal** per cycle: a 2-of-3 regular multisig, plus one multisig validator operator (`--kind validator`) where applicable. Verify the mirror-source rule (K-of-N legacy → K-of-N `eth_secp256k1` destination) and the matching-index quorum behavior of `combine-proof` (one-sided partials must not satisfy quorum)
 - run `verify` to ensure legacy references are gone from migrated state
 - repeat the cycle with additional edge cases if needed:
   - vesting accounts
@@ -327,6 +338,7 @@ Validate the full migration lifecycle on an already upgraded live network and us
   - authz + feegrant overlaps
   - redelegation-heavy accounts
   - validator-supernode combinations
+  - multisig accounts at K-of-N thresholds other than 2-of-3 (e.g. 3-of-5) to exercise threshold scaling
 
 ### Devnet Migration Soak Focus
 
@@ -335,19 +347,24 @@ Validate the full migration lifecycle on an already upgraded live network and us
 - wallet UX for deriving the new address and signing both sides of the migration
 - MetaMask UX for the new EVM account after migration
 - Keplr UX for selecting the legacy account and completing migration through the portal
-- portal / CLI clarity
+- portal / CLI / shell-script clarity, including whether structured exit codes from the shell helpers are useful in non-interactive / CI scripted migrations
+- multisig coordinator burden: distributing `proof.json`, collecting `*-partial.json` from co-signers, recovering from one-sided partials and matching-index quorum failures, and the "submit-proof takes no `--from`, no fee flags" footgun
 - support burden from common user confusion:
   - "my funds disappeared"
   - "why is my new address empty"
   - "which wallet path should I use now"
+  - "the multisig wizard says my legacy pubkey isn't on-chain" (precondition: any prior tx from the multisig)
+  - "combine-proof says I have signatures but quorum isn't met" (matching-index rule)
 
 ### Devnet Migration Exit Criteria
 
 - validator migration works cleanly on live upgraded devnet
 - regular account migration works at scale
+- multisig migration (regular and validator) completes successfully through the four-step offline ceremony, with at least one rehearsal driven by the bundled `scripts/migrate-multisig.sh` wrapper
+- shell-script paths (`migrate-account.sh`, `migrate-validator.sh`, `migrate-multisig.sh`) match the raw-CLI behavior on identical legacy state and surface the correct structured exit codes for the failure modes exercised
 - migration traffic coexists with normal Cosmos and EVM activity without obvious block-time or proposer instability
 - verification shows no stale legacy references except legitimate historical records
-- docs are updated for any confusing or error-prone step
+- docs are updated for any confusing or error-prone step (including any newly observed multisig coordinator pitfalls)
 - migration params are confirmed or adjusted for testnet
 
 ### Devnet Migration Communication
@@ -393,7 +410,7 @@ Validate the upgrade and migration flow on a public network with external valida
   - republish the timeline
   - resubmit a new proposal
 - publish validator upgrade guide with links to the [Node Operator EVM Configuration Guide](../user-guides/node-evm-config-guide.md) and [Mainnet Parameter Tuning Guide](../user-guides/tune-guide.md)
-- publish user migration guide and portal/CLI instructions
+- publish user migration guide and portal/CLI/shell-script instructions, including the bundled migration helper scripts (`migrate-account.sh`, `migrate-validator.sh`, `migrate-multisig.sh`) and the multisig coordinator runbook
 - confirm how external testers will obtain testnet funds:
   - preferred path: EVM-compatible faucet for the upgraded testnet
   - fallback path: documented manual distribution or partner pre-funding process
@@ -420,8 +437,9 @@ Validate the upgrade and migration flow on a public network with external valida
 
 `7-10 days after upgrade`
 
-- validator operators perform `MsgMigrateValidator`
-- selected users and internal QA migrate legacy accounts
+- validator operators perform `MsgMigrateValidator` (single-sig via raw CLI or `migrate-validator.sh`; multisig via the four-step offline ceremony with `--kind validator`)
+- selected users and internal QA migrate legacy accounts via all three supported paths (Portal+Keplr, shell scripts, raw CLI), including at least one batched run of `migrate-account.sh` to validate non-interactive use under realistic latency
+- exercise multisig migration on testnet with at least one external co-signer set, so the coordinator/co-signer file-handoff workflow is tested across machines rather than only locally
 - test MetaMask end-to-end:
   - add the upgraded testnet network
   - verify RPC connectivity, chain ID, balances, and EIP-1559 txs
@@ -493,8 +511,10 @@ Convert successful testnet results into a production-ready mainnet release packa
 
 - final `v1.20.0` release artifacts and checksums
 - final upgrade guide for validators
-- final migration guide for users
+- final migration guide for users (covering all three paths: Portal+Keplr, bundled shell scripts, raw CLI)
 - final validator / supernode migration runbook
+- final **multisig coordinator runbook** covering the four-step offline ceremony (`generate-proof-payload` → `sign-proof` → `combine-proof` → `submit-proof`), the consensus invariants enforced at `ValidateBasic` (mirror-source K/N, matching `signer_indices`, sub-key uniqueness, zero-signer submit), the "multisig pubkey must be on-chain" precondition, and the operational guidance that the destination multisig is Cosmos-side only (cannot originate `MsgEthereumTx`; configure a separate single-EOA `MsgSetWithdrawAddress` if EVM DeFi access is needed)
+- final migration shell-script reference (flags, exit codes, dry-run behavior, mnemonic-file flow) reflecting any updates from devnet/testnet rehearsals
 - final MetaMask and Keplr test checklist
 - final OpenRPC playground test checklist
 - final simple-contract deployment checklist based on the [Remix guide](../guides/remix-guide.md)
@@ -528,7 +548,7 @@ Convert successful testnet results into a production-ready mainnet release packa
 - testnet soak completed without blocker issues
 - all high-severity findings closed
 - major validators have acknowledged readiness
-- migration portal / CLI are ready
+- migration portal, CLI, and shell-script paths are all production-ready, with the multisig coordinator runbook signed off and at least one external multisig migration validated on testnet
 - fee market monitoring runbook is finalized and owned
 - disaster recovery procedure is finalized and has been rehearsed at least once
 - load-testing results are accepted as sufficient for rollout
@@ -598,8 +618,9 @@ This keeps validator identity and ecosystem infrastructure stable before broad u
 
 During the migration window:
 
-- users migrate with portal or CLI
-- validators use `MsgMigrateValidator` where applicable
+- users migrate via any of the three supported paths: the Lumera Portal + Keplr wizard, the bundled shell helpers (`scripts/migrate-account.sh`, `scripts/migrate-validator.sh`, `scripts/migrate-multisig.sh`), or the raw `lumerad` CLI
+- validators use `MsgMigrateValidator` where applicable (single-sig via CLI or `migrate-validator.sh`; multisig validators use the four-step offline ceremony with `--kind validator`)
+- multisig accounts (regular and validator) migrate through the offline coordinator ceremony — the Portal wizard does not support multisig and the daemon paths refuse them by design; treat multisig migrations as scheduled, coordinator-driven events with their own announcement window rather than ad-hoc user actions
 - the Portal serves the new mainnet chain definition from its local JSON file rather than relying on the public chain registry entry
 - block explorer rollout proceeds in a staged way using the [External Block Explorer Integration Plan](../guides/block-explorer.md); explorer launch can trail the chain upgrade if needed without blocking migration
 - if the current migration proof format remains without expiry, operate with a finite `migration_end_time` and treat any migration-window extension as an explicit governance and security decision
@@ -697,8 +718,10 @@ What users should expect after mainnet upgrade:
 
 | Audience               | What we must tell them                                                                                                         | What they should expect                                                                              |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
-| Validators             | Upgrade height, binary version, restart steps, snapshot requirement, validator migration runbook                               | short halt at upgrade height, immediate restart work, validator migration if still on legacy account |
-| Supernode operators    | Whether they need validator migration or account migration, config updates, restart order                                      | config changes after migration, possible validator-first coordination                                |
+| Validators             | Upgrade height, binary version, restart steps, snapshot requirement, validator migration runbook (single-sig CLI/script and multisig four-step ceremony)                       | short halt at upgrade height, immediate restart work, validator migration if still on legacy account; multisig validator operators run the offline ceremony rather than the single-command path |
+| Supernode operators    | Whether they need validator migration or account migration, config updates, restart order; daemon Path A vs Portal/CLI-first Path B; multisig refusal behavior                  | config changes after migration, possible validator-first coordination; multisig supernode operators must use the offline `lumerad` ceremony and restart the daemon for local cleanup |
+| Multisig coordinators  | Four-step offline ceremony (`generate-proof-payload` → `sign-proof` → `combine-proof` → `submit-proof`), consensus invariants (K/N mirror, matching `signer_indices`, sub-key uniqueness, zero-signer submit), the on-chain pubkey precondition, and the destination's Cosmos-side-only nature | scheduled coordinator-driven event; coordinator distributes `proof.json` and assembles partials but holds no signing keys; each co-signer signs both legacy and new sides locally before returning their `*-partial.json` |
+| Operators batching many accounts | Bundled migration shell scripts (`migrate-account.sh`, `migrate-validator.sh`, `migrate-multisig.sh`), structured exit codes, dry-run mode, one-shot mnemonic-file flow                   | non-interactive / CI-friendly migration with auditable pre/post snapshots; safer than raw CLI loops because the helpers refuse multisig from single-key scripts and gate validator migrations behind `--i-have-stopped-the-node` |
 | Wallets                | coin type 60 default, `eth_secp256k1` support, Bech32 and `0x` dual encoding expectations                                  | same mnemonic derives different default account than before                                          |
 | Portal                 | temporary local JSON chain definition during migration window, migration UX, wallet connection behavior for MetaMask and Keplr | Portal may lead chain-definition changes before public chain registry updates                        |
 | Explorers / indexers   | EVM RPC, receipts/logs, ERC20 views, dual address presentation, migration-state visibility                                     | post-upgrade reindexing / catch-up work                                                              |

@@ -89,7 +89,7 @@ x/evmigration/
 | 4     | Lumera Module Migrations        | Complete    |
 | 5     | Validator Migration             | Complete    |
 | 6     | Queries + Genesis               | Complete    |
-| 7     | Testing                         | In Progress |
+| 7     | Testing                         | Complete    |
 
 ---
 

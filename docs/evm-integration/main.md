@@ -34,17 +34,11 @@ Lumera's EVM integration is designed as a deeply integrated, production-ready la
 
 ### User Guides
 
-- [migration.md](user-guides/migration.md) — Step-by-step legacy-account migration guide for end users (Portal + Keplr, CLI, and multisig offline flow)
-- [validator-migration.md](user-guides/validator-migration.md) — Validator operator migration guide (maintenance window, `max_validator_delegations`, consensus-key safety, supernode interactions, multisig variant)
-- [supernode-migration.md](user-guides/supernode-migration.md) — Supernode operator migration guide (single-sig automatic path and multisig manual `lumerad` CLI path)
-- [node-evm-config-guide.md](user-guides/node-evm-config-guide.md) — Node operator EVM configuration guide (app.toml tuning, RPC exposure, tracer config)
-- [tune-guide.md](user-guides/tune-guide.md) — Mainnet parameter tuning guide: fee market, gas limits, mempool, RPC limits, and peer-chain comparisons
+- [user-guides/main.md](user-guides/main.md) — Operator and end-user guide hub: migration (Portal + Keplr, shell scripts, raw CLI, multisig), validator and supernode operator walkthroughs, node `app.toml` reference, and the mainnet parameter tuning review
 
 ### Developer Guides
 
-- [openrpc-playground.md](guides/openrpc-playground.md) — OpenRPC discovery and playground guide (access methods, devnet ports, CORS, interactive explorer)
-- [remix-guide.md](guides/remix-guide.md) — Testing smart contracts on Lumera with Remix IDE and MetaMask
-- [block-explorer.md](guides/block-explorer.md) — External block explorer (Blockscout) integration plan and deployment steps
+- [guides/main.md](guides/main.md) — Developer guide hub: OpenRPC discovery and the JSON-RPC catalog, smart contracts via Remix + MetaMask, and Blockscout block explorer integration
 
 ## Operational Outcomes
 

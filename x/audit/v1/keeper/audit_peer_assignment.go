@@ -119,7 +119,11 @@ func computeStorageTruthTargetsForReporter(params paramsLike, activeSorted []str
 	}
 
 	active := sortedUniqueStrings(activeSorted)
-	targetCandidates := intersectionInOrder(sortedUniqueStrings(targetsSorted), active)
+	// Active supernodes are the only eligible challengers, but storage-truth targets
+	// must include the epoch target set captured by the anchor. That target set
+	// intentionally includes POSTPONED supernodes so active peers can continue
+	// submitting clean PASS proofs needed for storage-truth recovery.
+	targetCandidates := sortedUniqueStrings(targetsSorted)
 	if len(targetCandidates) == 0 {
 		targetCandidates = active
 	}
@@ -256,20 +260,6 @@ func sortedUniqueStrings(in []string) []string {
 		out = append(out, value)
 	}
 	sort.Strings(out)
-	return out
-}
-
-func intersectionInOrder(values []string, allowed []string) []string {
-	allowedSet := make(map[string]struct{}, len(allowed))
-	for _, value := range allowed {
-		allowedSet[value] = struct{}{}
-	}
-	out := make([]string, 0, len(values))
-	for _, value := range values {
-		if _, ok := allowedSet[value]; ok {
-			out = append(out, value)
-		}
-	}
 	return out
 }
 

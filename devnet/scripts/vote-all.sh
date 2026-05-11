@@ -14,9 +14,74 @@ SERVICE_NAME="supernova_validator_1"
 LUMERA_SHARED="/tmp/lumera-devnet/shared"
 COMPOSE_FILE="../docker-compose.yml"
 FEES="5000ulume"
-# Gas configuration
+# Gas configuration — multisig path requires a fixed gas amount because
+# `tx multisign` can't run `--gas auto` (simulation needs a signed tx).
 USE_GAS_AUTO="true" # "true" to use --gas auto with --gas-adjustment 1.3
-GAS_AMOUNT="120000" # Used when USE_GAS_AUTO="false"
+GAS_AMOUNT="120000" # Used when USE_GAS_AUTO="false" and for multisig votes.
+
+# is_multisig_validator reads /shared/config/validators.json inside the target
+# container to decide whether the validator's --from key is a multisig
+# composite. Falls back to single-sig if the config is missing/malformed.
+is_multisig_validator() {
+	local svc="$1"
+	local enabled
+	enabled=$(docker compose -f "$COMPOSE_FILE" exec -T "$svc" \
+		jq -r --arg m "$svc" '.[] | select(.moniker==$m) | .multisig.enabled // false' \
+		/shared/config/validators.json 2>/dev/null | tr -d '\r\n')
+	[[ "$enabled" == "true" ]]
+}
+
+# cast_vote_multisig runs the offline 2-of-N flow inside the target container:
+# generate unsigned tx → sign with threshold signers → multisign → broadcast.
+# Echoes a broadcast-response-shaped JSON on stdout (matches the single-sig
+# path so the caller can parse txhash/code uniformly).
+cast_vote_multisig() {
+	local svc="$1" proposal="$2"
+	local key_name="${svc}_key"
+	docker compose -f "$COMPOSE_FILE" exec -T "$svc" bash -s -- \
+		"$key_name" "$proposal" "$CHAIN_ID" "$KEYRING_BACKEND" "$GAS_AMOUNT" "$FEES" <<'CONTAINER_SCRIPT'
+set -euo pipefail
+KEY_NAME="$1"
+PROPOSAL="$2"
+CHAIN_ID="$3"
+KEYRING_BACKEND="$4"
+GAS_AMOUNT="$5"
+FEES="$6"
+
+# multisig_sign_unsigned reads ${DAEMON}, ${KEYRING_BACKEND}, ${CHAIN_ID} from
+# the ambient shell; vote-all.sh isn't one of the setup scripts that normally
+# exports these, so set them here before sourcing common.sh.
+DAEMON="lumerad"
+export DAEMON KEYRING_BACKEND CHAIN_ID
+
+source /root/scripts/common.sh
+
+MULTISIG_ADDR="$(lumerad keys show "$KEY_NAME" -a --keyring-backend "$KEYRING_BACKEND" | tr -d '\r\n')"
+ACCT_JSON="$(lumerad q auth account "$MULTISIG_ADDR" --output json 2>/dev/null)"
+ACC_NUM="$(printf '%s' "$ACCT_JSON" | jq -r '.. | objects | select(has("account_number")) | .account_number' | head -n1)"
+SEQ="$(printf '%s' "$ACCT_JSON" | jq -r '.. | objects | select(has("account_number")) | (.sequence // "0")' | head -n1)"
+SEQ="${SEQ:-0}"
+
+UNSIGNED="$(mktemp /tmp/vote-unsigned.XXXXXX.json)"
+SIGNED="$(mktemp /tmp/vote-signed.XXXXXX.json)"
+trap 'rm -f "$UNSIGNED" "$SIGNED"' EXIT
+
+lumerad tx gov vote "$PROPOSAL" yes \
+	--from "$MULTISIG_ADDR" \
+	--chain-id "$CHAIN_ID" \
+	--keyring-backend "$KEYRING_BACKEND" \
+	--gas "$GAS_AMOUNT" \
+	--fees "$FEES" \
+	--account-number "$ACC_NUM" --sequence "$SEQ" \
+	--generate-only --output json >"$UNSIGNED"
+
+multisig_sign_unsigned "$UNSIGNED" "$KEY_NAME" "$MULTISIG_ADDR" \
+	"${KEY_NAME}-signer-1" "${KEY_NAME}-signer-2" \
+	"$ACC_NUM" "$SEQ" >"$SIGNED"
+
+lumerad tx broadcast "$SIGNED" --broadcast-mode sync --output json
+CONTAINER_SCRIPT
+}
 
 # Checking the votes with:
 #    lumerad query gov votes <proposal_id> --output json | jq
@@ -69,22 +134,27 @@ vote_all() {
 
 		echo "🗳️  Voting YES on behalf of $SERVICE (address: $VOTER_ADDRESS)..."
 
-		if [ "$USE_GAS_AUTO" = "true" ]; then
-			GAS_FLAGS=(--gas auto --gas-adjustment 1.3)
+		if is_multisig_validator "$SERVICE"; then
+			echo "  ($SERVICE is multisig; using offline 2-of-N signing flow)"
+			VOTE_JSON=$(cast_vote_multisig "$SERVICE" "$PROPOSAL_ID")
 		else
-			GAS_FLAGS=(--gas "$GAS_AMOUNT")
-		fi
+			if [ "$USE_GAS_AUTO" = "true" ]; then
+				GAS_FLAGS=(--gas auto --gas-adjustment 1.3)
+			else
+				GAS_FLAGS=(--gas "$GAS_AMOUNT")
+			fi
 
-		VOTE_JSON=$(docker compose -f "$COMPOSE_FILE" exec "$SERVICE" \
-			lumerad tx gov vote "$PROPOSAL_ID" yes \
-			--from $VOTER_ADDRESS \
-			--chain-id "$CHAIN_ID" \
-			--keyring-backend "$KEYRING_BACKEND" \
-			"${GAS_FLAGS[@]}" \
-			--fees "$FEES" \
-			--output json \
-			--broadcast-mode sync \
-			--yes)
+			VOTE_JSON=$(docker compose -f "$COMPOSE_FILE" exec "$SERVICE" \
+				lumerad tx gov vote "$PROPOSAL_ID" yes \
+				--from $VOTER_ADDRESS \
+				--chain-id "$CHAIN_ID" \
+				--keyring-backend "$KEYRING_BACKEND" \
+				"${GAS_FLAGS[@]}" \
+				--fees "$FEES" \
+				--output json \
+				--broadcast-mode sync \
+				--yes)
+		fi
 
 		if [ -z "$VOTE_JSON" ]; then
 			echo "❌ No JSON response received. The transaction command may have failed to execute."

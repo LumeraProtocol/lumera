@@ -14,7 +14,9 @@ import (
 	"cosmossdk.io/depinject"
 	"cosmossdk.io/log"
 
+	appevm "github.com/LumeraProtocol/lumera/app/evm"
 	lcfg "github.com/LumeraProtocol/lumera/config"
+	evmigrationmodule "github.com/LumeraProtocol/lumera/x/evmigration/module"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/runtime"
 	"github.com/cosmos/cosmos-sdk/testutil/configurator"
@@ -68,7 +70,7 @@ func lumeraAuthModule() configurator.ModuleOption {
 		cfg.ModuleConfigs[authtypes.ModuleName] = &appv1alpha1.ModuleConfig{
 			Name: authtypes.ModuleName,
 			Config: appconfig.WrapAny(&authmodulev1.Module{
-				Bech32Prefix: lcfg.AccountAddressPrefix,
+				Bech32Prefix: lcfg.Bech32AccountAddressPrefix,
 				ModuleAccountPermissions: []*authmodulev1.ModuleAccountPermission{
 					{Account: authtypes.FeeCollectorName},
 					{Account: disttypes.ModuleName},
@@ -90,6 +92,8 @@ func TestImportExportQueues(t *testing.T) {
 		depinject.Configs(
 			appConfig,
 			depinject.Supply(log.NewNopLogger()),
+			depinject.Provide(appevm.ProvideCustomGetSigners),
+			depinject.Provide(evmigrationmodule.ProvideCustomGetSigners),
 		),
 		simtestutil.DefaultStartUpConfig(),
 		&s1.AccountKeeper, &s1.BankKeeper, &s1.DistrKeeper, &s1.GovKeeper, &s1.StakingKeeper, &s1.cdc, &s1.appBuilder,
@@ -153,6 +157,8 @@ func TestImportExportQueues(t *testing.T) {
 		depinject.Configs(
 			appConfig,
 			depinject.Supply(log.NewNopLogger()),
+			depinject.Provide(appevm.ProvideCustomGetSigners),
+			depinject.Provide(evmigrationmodule.ProvideCustomGetSigners),
 		),
 		conf2,
 		&s2.AccountKeeper, &s2.BankKeeper, &s2.DistrKeeper, &s2.GovKeeper, &s2.StakingKeeper, &s2.cdc, &s2.appBuilder,

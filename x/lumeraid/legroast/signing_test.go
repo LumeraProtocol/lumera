@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
-	"go.uber.org/mock/gomock"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/LumeraProtocol/lumera/testutil/accounts"
 	. "github.com/LumeraProtocol/lumera/x/lumeraid/legroast"

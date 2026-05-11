@@ -34,9 +34,9 @@ func TestChangeValSet(t *testing.T) {
 	require.NoError(t, err)
 
 	// delegate the amounts to two different validators, likely modifying their power in the validator set.
-	chainA.GetLumeraApp().StakingKeeper.Delegate(chainA.GetContext(), chainA.SenderAccounts[1].SenderAccount.GetAddress(), //nolint:errcheck // ignore error for test
+	chainA.GetLumeraApp().StakingKeeper.Delegate(chainA.GetContext(), chainA.SenderAccounts[1].SenderAccount.GetAddress(),
 		amount, types.Unbonded, val[1], true)
-	chainA.GetLumeraApp().StakingKeeper.Delegate(chainA.GetContext(), chainA.SenderAccounts[3].SenderAccount.GetAddress(), //nolint:errcheck // ignore error for test
+	chainA.GetLumeraApp().StakingKeeper.Delegate(chainA.GetContext(), chainA.SenderAccounts[3].SenderAccount.GetAddress(),
 		amount2, types.Unbonded, val[3], true)
 
 	coord.CommitBlock(chainA)
@@ -48,7 +48,7 @@ func TestChangeValSet(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestJailProposerValidator tests how the system behaves when a proposer validator 
+// TestJailProposerValidator tests how the system behaves when a proposer validator
 // (the one selected to propose a block) is jailed. Checks if:
 // 1. The validator is actually removed from the active validator set.
 // 2. The next block is proposed by a different validator (new proposer).

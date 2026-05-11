@@ -15,14 +15,15 @@ import (
 
 	gogoproto "github.com/cosmos/gogoproto/proto"
 
-	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
+	"github.com/LumeraProtocol/lumera/testutil/crypto"
 	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	"github.com/LumeraProtocol/lumera/x/action/v1/types"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 )
 
-// registerSenseAction creates a new SENSE action in PENDING state for the simulation
+// registerSenseAction creates a new SENSE action in PENDING state for the simulation.
+// Returns empty actionId and nil msg when no account has sufficient funds.
 func registerSenseAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, bk types.BankKeeper, k keeper.Keeper, ak types.AuthKeeper) (string, *types.MsgRequestAction) {
 	params := k.GetParams(ctx)
 
@@ -30,7 +31,10 @@ func registerSenseAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account,
 	feeAmount := generateRandomFee(r, ctx, params.BaseActionFee.Add(params.FeePerKbyte))
 
 	// 2. Select random account with enough spendable balance for the fee
-	simAccount := selectRandomAccountWithSufficientFunds(r, ctx, accs, bk, ak, feeAmount, []string{""})
+	simAccount, ok := selectRandomAccountWithSufficientFunds(r, ctx, accs, bk, ak, feeAmount, []string{""})
+	if !ok {
+		return "", nil
+	}
 
 	// 3. Generate random valid SENSE metadata
 	dataHash := generateRandomHash(r)
@@ -61,7 +65,8 @@ func registerSenseAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account,
 	return result.ActionId, msg
 }
 
-// registerCascadeAction creates a new CASCADE action in PENDING state for the simulation
+// registerCascadeAction creates a new CASCADE action in PENDING state for the simulation.
+// Returns empty actionId and nil msg when no account has sufficient funds.
 func registerCascadeAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, bk types.BankKeeper, k keeper.Keeper, ak types.AuthKeeper) (string, *types.MsgRequestAction) {
 	params := k.GetParams(ctx)
 
@@ -69,7 +74,10 @@ func registerCascadeAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Accoun
 	feeAmount := generateRandomFee(r, ctx, params.BaseActionFee.Add(params.FeePerKbyte))
 
 	// 2. Select random account with enough spendable balance for the fee
-	simAccount := selectRandomAccountWithSufficientFunds(r, ctx, accs, bk, ak, feeAmount, []string{""})
+	simAccount, ok := selectRandomAccountWithSufficientFunds(r, ctx, accs, bk, ak, feeAmount, []string{""})
+	if !ok {
+		return "", nil
+	}
 
 	// 3. Generate random valid CASCADE metadata
 	dataHash := generateRandomHash(r)
@@ -191,7 +199,8 @@ func finalizeCascadeAction(ctx sdk.Context, k keeper.Keeper, actionID string, su
 	return msg
 }
 
-// registerSenseOrCascadeAction finds an existing action in PENDING state or creates a new one
+// registerSenseOrCascadeAction finds an existing action in PENDING state or creates a new one.
+// Returns ("", nil) when no account has sufficient funds.
 func registerSenseOrCascadeAction(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, k keeper.Keeper, bk types.BankKeeper, ak types.AuthKeeper) (string, *types.Action) {
 	// Randomly choose between SENSE and CASCADE
 	var actionID string
@@ -199,6 +208,10 @@ func registerSenseOrCascadeAction(r *rand.Rand, ctx sdk.Context, accs []simtypes
 		actionID, _ = registerSenseAction(r, ctx, accs, bk, k, ak)
 	} else {
 		actionID, _ = registerCascadeAction(r, ctx, accs, bk, k, ak)
+	}
+
+	if actionID == "" {
+		return "", nil
 	}
 
 	action, found := k.GetActionByID(ctx, actionID)
@@ -249,10 +262,11 @@ func addPubKeyToAccount(ctx sdk.Context, simAccount simtypes.Account, ak types.A
 	return fmt.Errorf("failed to set pubkey for account %s: account not found in account keeper", simAccount.Address)
 }
 
-// selectRandomAccountWithSufficientFunds selects a random account that has enough balance to cover the specified fee amount
-func selectRandomAccountWithSufficientFunds(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, bk types.BankKeeper, ak types.AuthKeeper, minFee sdk.Coin, skipAddresses []string) simtypes.Account {
+// selectRandomAccountWithSufficientFunds selects a random account that has enough balance to cover the specified fee amount.
+// Returns the account and true if found, or a zero-value account and false if no account has sufficient funds.
+func selectRandomAccountWithSufficientFunds(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, bk types.BankKeeper, ak types.AuthKeeper, minFee sdk.Coin, skipAddresses []string) (simtypes.Account, bool) {
 	if len(accs) == 0 {
-		panic("no accounts available to select")
+		return simtypes.Account{}, false
 	}
 
 	skip := make(map[string]struct{}, len(skipAddresses))
@@ -273,13 +287,13 @@ func selectRandomAccountWithSufficientFunds(r *rand.Rand, ctx sdk.Context, accs 
 		}
 
 		if err := addPubKeyToAccount(ctx, simAccount, ak); err != nil {
-			panic(err)
+			return simtypes.Account{}, false
 		}
 
-		return simAccount
+		return simAccount, true
 	}
 
-	panic("no account with sufficient funds found during simulation")
+	return simtypes.Account{}, false
 }
 
 // selectRandomAccountWithInsufficientFunds selects a random account that doesn't have enough balance to cover the specified fee amount
@@ -649,6 +663,9 @@ func generateNonExistentActionID(r *rand.Rand, ctx sdk.Context, k keeper.Keeper)
 func findOrCreateDoneActionWithCreator(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, k keeper.Keeper, bk types.BankKeeper, ak types.AuthKeeper) (string, *types.Action, simtypes.Account, error) {
 	// Create a PENDING action
 	actionID, _ := registerCascadeAction(r, ctx, accs, bk, k, ak)
+	if actionID == "" {
+		return "", nil, simtypes.Account{}, fmt.Errorf("no account with sufficient funds")
+	}
 
 	// Select three random supernode accounts
 	supernodes, err := getRandomActiveSupernodes(r, ctx, 1, ak, k, accs)
@@ -680,10 +697,14 @@ func findOrCreateDoneActionWithCreator(r *rand.Rand, ctx sdk.Context, accs []sim
 }
 
 // findOrCreateActionNotInDoneState finds an action that is NOT in DONE state or creates one
-// Returns the action ID, the action object, and the creator account
+// Returns the action ID, the action object, and the creator account.
+// Returns ("", nil, simtypes.Account{}) when no account has sufficient funds.
 func findOrCreateActionNotInDoneState(r *rand.Rand, ctx sdk.Context, accs []simtypes.Account, k keeper.Keeper, bk types.BankKeeper, ak types.AuthKeeper) (string, *types.Action, simtypes.Account) {
 	// Create a PENDING action
 	actionID, _ := registerSenseAction(r, ctx, accs, bk, k, ak)
+	if actionID == "" {
+		return "", nil, simtypes.Account{}
+	}
 
 	// Get the created action
 	action, found := k.GetActionByID(ctx, actionID)

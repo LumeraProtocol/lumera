@@ -1,11 +1,11 @@
 package mock
 
 import (
-	"strings"
-	"errors"
 	"bytes"
-	"reflect"
+	"errors"
 	"fmt"
+	"reflect"
+	"strings"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	channeltypes "github.com/cosmos/ibc-go/v10/modules/core/04-channel/types"
@@ -15,8 +15,8 @@ import (
 
 const (
 	ModuleName = "mock"
-	PortID = ModuleName
-	Version = "mock-version"
+	PortID     = ModuleName
+	Version    = "mock-version"
 )
 
 var (
@@ -30,10 +30,10 @@ var (
 	// test that this error was returned using ErrorIs.
 	MockApplicationCallbackError error = &applicationCallbackError{}
 
-	_ porttypes.IBCModule = &MockIBCModule{}
+	_ porttypes.IBCModule             = &MockIBCModule{}
 	_ porttypes.PacketDataUnmarshaler = &MockIBCModule{}
-	_ ibcexported.Path = KeyPath{}
-	_ ibcexported.Height = Height{}
+	_ ibcexported.Path                = KeyPath{}
+	_ ibcexported.Height              = Height{}
 )
 
 // MockIBCModule adapts a gomock.MockIBCAppInterface to an IBCModule.

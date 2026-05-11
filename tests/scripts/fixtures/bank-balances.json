@@ -1,0 +1,4 @@
+{
+  "balances": [{"denom": "ulume", "amount": "1000000"}],
+  "pagination": {"next_key": null, "total": "1"}
+}

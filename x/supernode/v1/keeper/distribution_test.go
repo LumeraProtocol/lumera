@@ -144,16 +144,6 @@ func (m *mockAuditKeeper) GetReport(_ sdk.Context, epochID uint64, reporterSuper
 	return r, ok
 }
 
-func (m *mockAuditKeeper) setReport(epochID uint64, reporter string, height int64, bytes float64) {
-	m.reports[reportKey(epochID, reporter)] = audittypes.EpochReport{
-		SupernodeAccount: reporter,
-		EpochId:          epochID,
-		ReportHeight:     height,
-		// CascadeKademliaDbBytes removed from HostReport in LEP-6 §12 (audit proto v2).
-		HostReport: audittypes.HostReport{},
-	}
-}
-
 // --- Test helpers ---
 
 func setupTestKeeper(t *testing.T) (Keeper, sdk.Context, *mockBankKeeper, *mockSupernodeKeeper, *mockAuditKeeper) {
@@ -210,11 +200,11 @@ func makeAccAddr(i int) sdk.AccAddress {
 }
 
 func addSupernode(snKeeper *mockSupernodeKeeper, auditKeeper *mockAuditKeeper, valAddr sdk.ValAddress, accAddr sdk.AccAddress, state sntypes.SuperNodeState, cascadeBytes float64) {
-	valBech32, err := sdk.Bech32ifyAddressBytes(lcfg.ValidatorAddressPrefix, valAddr)
+	valBech32, err := sdk.Bech32ifyAddressBytes(lcfg.Bech32ValidatorAddressPrefix, valAddr)
 	if err != nil {
 		panic(err)
 	}
-	accBech32, err := sdk.Bech32ifyAddressBytes(lcfg.AccountAddressPrefix, accAddr)
+	accBech32, err := sdk.Bech32ifyAddressBytes(lcfg.Bech32AccountAddressPrefix, accAddr)
 	if err != nil {
 		panic(err)
 	}

@@ -1,0 +1,99 @@
+{
+    "_comment": "Devnet binary versions. Each entry maps a lumera version to its bin folder and download sources.",
+    "github_org": "LumeraProtocol",
+    "versions": {
+        "v1.7.0": {
+            "bin_dir": "bin-v1.7.0",
+            "lumera": {
+                "tag": "v1.7.0"
+            }
+        },
+        "v1.7.2": {
+            "bin_dir": "bin-v1.7.2",
+            "lumera": {
+                "tag": "v1.7.2"
+            },
+            "supernode": {
+                "tag": "v2.4.0"
+            },
+            "network_maker": {
+                "tag": "v1.0.1"
+            }
+        },
+        "v1.8.0": {
+            "bin_dir": "bin-v1.8.0",
+            "lumera": {
+                "tag": "v1.8.0"
+            },
+            "supernode": {
+                "tag": "v2.4.0"
+            }
+        },
+        "v1.8.4": {
+            "bin_dir": "bin-v1.8.4",
+            "lumera": {
+                "tag": "v1.8.4"
+            }
+        },
+        "v1.8.5": {
+            "bin_dir": "bin-v1.8.5",
+            "lumera": {
+                "tag": "v1.8.5"
+            }
+        },
+        "v1.9.1": {
+            "bin_dir": "bin-v1.9.1",
+            "lumera": {
+                "tag": "v1.9.1"
+            },
+            "supernode": {
+                "tag": "v2.4.27"
+            },
+            "network_maker": {
+                "tag": "v1.0.7"
+            }
+        },
+        "v1.10.0": {
+            "bin_dir": "bin-v1.10.0",
+            "lumera": {
+                "tag": "v1.10.0"
+            }
+        },
+        "v1.11.0": {
+            "bin_dir": "bin-v1.11.0",
+            "lumera": {
+                "tag": "v1.11.0"
+            },
+            "supernode": {
+                "tag": "v2.4.71"
+            },
+            "lumera_uploader": {
+                "tag": ""
+            }
+        },
+        "v1.11.1": {
+            "bin_dir": "bin-v1.11.1",
+            "lumera": {
+                "tag": "v1.11.1-hotfix"
+            },
+            "supernode": {
+                "tag": "v2.4.72"
+            },
+            "lumera_uploader": {
+                "tag": ""
+            }
+        },
+        "v1.12.0": {
+            "bin_dir": "bin-v1.12.0",
+            "lumera": {
+                "tag": "v1.12.0"
+            },
+            "supernode": {
+                "tag": "v2.4.72"
+            },
+            "lumera_uploader": {
+                "tag": ""
+            }
+        }
+    }
+}

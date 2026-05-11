@@ -23,7 +23,7 @@ func TestQuerySNEligibility_UsesAuditReportAndStateGate(t *testing.T) {
 	acc := makeAccAddr(1)
 	addSupernode(snKeeper, auditKeeper, val, acc, sntypes.SuperNodeStateActive, 2_000)
 
-	valBech32, err := sdk.Bech32ifyAddressBytes(lcfg.ValidatorAddressPrefix, val)
+	valBech32, err := sdk.Bech32ifyAddressBytes(lcfg.Bech32ValidatorAddressPrefix, val)
 	require.NoError(t, err)
 
 	resp, err := q.SNEligibility(ctx, &sntypes.QuerySNEligibilityRequest{ValidatorAddress: valBech32})
@@ -41,8 +41,8 @@ func TestQuerySNEligibility_RejectsStaleAuditReport(t *testing.T) {
 	params.RewardDistribution.MinCascadeBytesForPayment = 1_000
 	require.NoError(t, k.SetParams(ctx, params))
 
-	// Add supernode at block height 1 (initial ctx height) so MetricsState.Height = 1.
-	// Then query at height 100 → staleness = 99 > MetricsFreshnessMaxBlocks(5) → stale.
+	// Add supernode at the initial ctx height so MetricsState.Height pins low,
+	// then query at height 100 — staleness 99 > MetricsFreshnessMaxBlocks(5) → stale.
 	val := makeValAddr(2)
 	acc := makeAccAddr(2)
 	addSupernode(snKeeper, auditKeeper, val, acc, sntypes.SuperNodeStateActive, 5_000)
@@ -50,7 +50,7 @@ func TestQuerySNEligibility_RejectsStaleAuditReport(t *testing.T) {
 	ctx = ctx.WithBlockHeight(100)
 	snKeeper.ctx = ctx
 
-	valBech32, err := sdk.Bech32ifyAddressBytes(lcfg.ValidatorAddressPrefix, val)
+	valBech32, err := sdk.Bech32ifyAddressBytes(lcfg.Bech32ValidatorAddressPrefix, val)
 	require.NoError(t, err)
 
 	resp, err := q.SNEligibility(ctx, &sntypes.QuerySNEligibilityRequest{ValidatorAddress: valBech32})
@@ -72,7 +72,7 @@ func TestQuerySNEligibility_RejectsPostponedState(t *testing.T) {
 	acc := makeAccAddr(3)
 	addSupernode(snKeeper, auditKeeper, val, acc, sntypes.SuperNodeStatePostponed, 9_000)
 
-	valBech32, err := sdk.Bech32ifyAddressBytes(lcfg.ValidatorAddressPrefix, val)
+	valBech32, err := sdk.Bech32ifyAddressBytes(lcfg.Bech32ValidatorAddressPrefix, val)
 	require.NoError(t, err)
 
 	resp, err := q.SNEligibility(ctx, &sntypes.QuerySNEligibilityRequest{ValidatorAddress: valBech32})

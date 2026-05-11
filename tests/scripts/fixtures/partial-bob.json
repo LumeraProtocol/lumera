@@ -1,0 +1,33 @@
+{
+  "version": 2,
+  "kind": "claim",
+  "legacy_address": "lumera1shimaddr1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "new_address": "lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "chain_id": "shim-test",
+  "evm_chain_id": 76857769,
+  "payload_hex": "6c756d6572612d65766d2d6d6967726174696f6e3a7368696d2d746573743a37363835373736393a636c61696d3a6c756d657261317368696d6164647231717878787878787878787878787878787878787878787878787878787878787878787878783a6c756d657261316e65777368696d6164647278787878787878787878787878787878787878787878787878787878",
+  "legacy": {
+    "threshold": 2,
+    "sub_pub_keys": [
+      "A1111111111111111111111111111111111111111111",
+      "A2222222222222222222222222222222222222222222",
+      "A3333333333333333333333333333333333333333333"
+    ],
+    "sig_format": "SIG_FORMAT_CLI"
+  },
+  "new": {
+    "threshold": 2,
+    "sub_pub_keys": [
+      "B1111111111111111111111111111111111111111111",
+      "B2222222222222222222222222222222222222222222",
+      "B3333333333333333333333333333333333333333333"
+    ],
+    "sig_format": "SIG_FORMAT_CLI"
+  },
+  "partial_legacy_signatures": [
+    {"index": 1, "signature": "Ym9icy1z"}
+  ],
+  "partial_new_signatures": [
+    {"index": 1, "signature": "Qk9CU1NJRw=="}
+  ]
+}

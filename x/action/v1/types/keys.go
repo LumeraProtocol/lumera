@@ -1,8 +1,8 @@
 package types
 
 import (
-	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"cosmossdk.io/collections"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 )
 
 const (

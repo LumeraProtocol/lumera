@@ -1,0 +1,33 @@
+syntax = "proto3";
+package lumera.evmigration;
+
+option go_package = "x/evmigration/types"; // matches existing evmigration protos; do NOT use the full github.com path — buf generates files at module root from this relative form
+
+// SigFormat enumerates accepted signing envelopes for migration proofs.
+enum SigFormat {
+  SIG_FORMAT_UNSPECIFIED = 0;
+  SIG_FORMAT_CLI         = 1; // Sign(SHA256(payload)) via Cosmos keyring; Sign(payload → Keccak256) for eth keyring
+  SIG_FORMAT_ADR036      = 2; // ADR-036 signArbitrary canonical JSON
+  SIG_FORMAT_EIP191      = 3; // Eth "\x19Ethereum Signed Message:\n…" envelope — new-side single-key proofs only
+}
+
+message MigrationProof {
+  oneof proof {
+    SingleKeyProof single   = 1;
+    MultisigProof  multisig = 2;
+  }
+}
+
+message SingleKeyProof {
+  bytes pub_key        = 1;
+  bytes signature      = 2;
+  SigFormat sig_format = 3;
+}
+
+message MultisigProof {
+  uint32 threshold               = 1;
+  repeated bytes sub_pub_keys    = 2;
+  repeated uint32 signer_indices = 3;
+  repeated bytes sub_signatures  = 4;
+  SigFormat sig_format           = 5;
+}

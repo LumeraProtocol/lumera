@@ -1,0 +1,30 @@
+{
+  "account": {
+    "type": "/cosmos.auth.v1beta1.BaseAccount",
+    "value": {
+      "address": "lumera1shimaddr1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "public_key": {
+        "type": "/cosmos.crypto.multisig.LegacyAminoPubKey",
+        "value": {
+          "pubkeys": [
+            {
+              "type": "/cosmos.crypto.secp256k1.PubKey",
+              "value": "A1111111111111111111111111111111111111111111"
+            },
+            {
+              "type": "/cosmos.crypto.secp256k1.PubKey",
+              "value": "A2222222222222222222222222222222222222222222"
+            },
+            {
+              "type": "/cosmos.crypto.secp256k1.PubKey",
+              "value": "A3333333333333333333333333333333333333333333"
+            }
+          ],
+          "threshold": "2"
+        }
+      },
+      "account_number": "23",
+      "sequence": "1"
+    }
+  }
+}

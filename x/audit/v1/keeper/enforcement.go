@@ -516,7 +516,7 @@ func (k Keeper) peerReportersForTargetEpoch(ctx sdk.Context, target string, epoc
 	prefix := types.StorageChallengeReportIndexEpochPrefix(target, epochID)
 
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	reporters := make([]string, 0, 8)
 	for ; it.Valid(); it.Next() {
@@ -727,11 +727,8 @@ func (k Keeper) storageTruthPostponePredicatesMet(ctx sdk.Context, supernodeAcco
 
 func storageTruthIsClassAFault(record storageTruthNodeFailureRecord) bool {
 	class := types.StorageProofResultClass(record.ResultClass)
-	if class == types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH ||
-		class == types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_RECHECK_CONFIRMED_FAIL {
-		return true
-	}
-	return types.StorageProofArtifactClass(record.ArtifactClass) == types.StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_INDEX
+	return class == types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH ||
+		class == types.StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_RECHECK_CONFIRMED_FAIL
 }
 
 func storageTruthIsClassBFault(record storageTruthNodeFailureRecord) bool {

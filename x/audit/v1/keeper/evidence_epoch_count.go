@@ -46,7 +46,7 @@ func (k Keeper) GetAllEvidenceEpochCountsForGenesis(ctx sdk.Context) []types.Gen
 	store := k.kvStore(ctx)
 	prefix := types.EvidenceEpochCountPrefix()
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	var out []types.GenesisEvidenceEpochCount
 	for ; it.Valid(); it.Next() {

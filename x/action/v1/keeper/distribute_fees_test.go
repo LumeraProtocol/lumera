@@ -17,12 +17,12 @@ import (
 // RewardDistributionKeeper (bps) and registers a Done cascade action whose
 // price is the given fee amount of ulume distributed to a single supernode.
 type distributeFeesFixture struct {
-	actionID    string
-	supernode   string
-	fee         sdk.Coin
-	bankKeeper  *keepertest.ActionBankKeeper
-	keeperCtx   sdk.Context
-	keeper      interface {
+	actionID   string
+	supernode  string
+	fee        sdk.Coin
+	bankKeeper *keepertest.ActionBankKeeper
+	keeperCtx  sdk.Context
+	keeper     interface {
 		SetAction(ctx sdk.Context, action *actiontypes.Action) error
 		DistributeFees(ctx sdk.Context, actionID string) error
 	}

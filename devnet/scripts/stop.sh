@@ -2,7 +2,7 @@
 # stop.sh — stop devnet services inside a validator container
 # Usage:
 #   ./stop.sh                    # stop all known services
-#   ./stop.sh nm|sn|lumera|nginx
+#   ./stop.sh uploader|sn|lumera|nginx
 set -euo pipefail
 
 DAEMON="${DAEMON:-lumerad}"
@@ -13,15 +13,31 @@ log() {
 	echo "[STOP] $*"
 }
 
-stop_nm() {
-	local name="network-maker"
+# Match a process by binary basename. Uses pgrep/pkill -f with an anchored
+# pattern instead of -x because the kernel truncates `comm` to 15 chars
+# (TASK_COMM_LEN), which makes -x emit a warning and return no matches for
+# longer names like "supernode-linux-amd64".
+proc_running() {
+	pgrep -f "(^|/)${1}( |$)" >/dev/null 2>&1
+}
 
-	if pgrep -x "${name}" >/dev/null 2>&1; then
-		log "Stopping network-maker..."
-		pkill -x "${name}" || true
-		log "network-maker stop requested."
-	else
-		log "network-maker is not running."
+proc_kill() {
+	pkill -f "(^|/)${1}( |$)" || true
+}
+
+stop_uploader() {
+	local stopped=0
+	# Handle both new (lumera-uploader) and old (network-maker) binary names
+	for name in "lumera-uploader" "network-maker"; do
+		if proc_running "${name}"; then
+			log "Stopping ${name}..."
+			proc_kill "${name}"
+			log "${name} stop requested."
+			stopped=1
+		fi
+	done
+	if ((stopped == 0)); then
+		log "lumera-uploader is not running."
 	fi
 }
 
@@ -30,13 +46,13 @@ stop_sn() {
 	local names=("supernode-linux-amd64" "supernode")
 
 	for name in "${names[@]}"; do
-		if pgrep -x "${name}" >/dev/null 2>&1; then
+		if proc_running "${name}"; then
 			stopped=1
 			log "Stopping supernode (${name})..."
 			if command -v "${name}" >/dev/null 2>&1; then
-				"${name}" stop -d "${SN_BASEDIR}" >/dev/null 2>&1 || pkill -x "${name}" || true
+				"${name}" stop -d "${SN_BASEDIR}" >/dev/null 2>&1 || proc_kill "${name}"
 			else
-				pkill -x "${name}" || true
+				proc_kill "${name}"
 			fi
 		fi
 	done
@@ -49,12 +65,12 @@ stop_sn() {
 }
 
 stop_nginx() {
-	if pgrep -x nginx >/dev/null 2>&1; then
+	if proc_running nginx; then
 		log "Stopping nginx..."
 		if command -v nginx >/dev/null 2>&1; then
-			nginx -s quit >/dev/null 2>&1 || nginx -s stop >/dev/null 2>&1 || pkill -x nginx || true
+			nginx -s quit >/dev/null 2>&1 || nginx -s stop >/dev/null 2>&1 || proc_kill nginx
 		else
-			pkill -x nginx || true
+			proc_kill nginx
 		fi
 		log "nginx stop requested."
 	else
@@ -72,9 +88,9 @@ stop_lumera() {
 		return
 	fi
 
-	if pgrep -x "${DAEMON}" >/dev/null 2>&1; then
+	if proc_running "${DAEMON}"; then
 		log "Stopping ${DAEMON}..."
-		pkill -x "${DAEMON}" || true
+		proc_kill "${DAEMON}"
 		log "${DAEMON} stop requested."
 	else
 		log "${DAEMON} is not running."
@@ -82,21 +98,21 @@ stop_lumera() {
 }
 
 stop_all() {
-	stop_nm
+	stop_uploader
 	stop_sn
 	stop_nginx
 	stop_lumera
 }
 
 usage() {
-	echo "Usage: $0 [nm|sn|lumera|nginx|all]" >&2
+	echo "Usage: $0 [uploader|sn|lumera|nginx|all]" >&2
 	exit 1
 }
 
 target="${1:-all}"
 case "${target}" in
-nm | network-maker)
-	stop_nm
+uploader | nm | network-maker | lumera-uploader | ul)
+	stop_uploader
 	;;
 sn | supernode)
 	stop_sn

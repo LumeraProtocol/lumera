@@ -74,7 +74,7 @@ func (q queryServer) collectActionsFromIDIndexStore(
 ) ([]*types.Action, error) {
 	actions := make([]*types.Action, 0)
 	iter := indexStore.Iterator(nil, nil)
-	defer iter.Close()
+	defer func() { _ = iter.Close() }()
 
 	for ; iter.Valid(); iter.Next() {
 		actionID := string(iter.Key())
@@ -96,7 +96,7 @@ func (q queryServer) collectActionsFromIDIndexStore(
 func (q queryServer) collectActionsFromPrimaryStore(actionStore prefix.Store) ([]*types.Action, error) {
 	actions := make([]*types.Action, 0)
 	iter := actionStore.Iterator(nil, nil)
-	defer iter.Close()
+	defer func() { _ = iter.Close() }()
 
 	for ; iter.Valid(); iter.Next() {
 		var act actiontypes.Action

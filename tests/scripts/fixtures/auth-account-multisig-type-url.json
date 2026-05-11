@@ -1,0 +1,26 @@
+{
+  "account": {
+    "@type": "/cosmos.auth.v1beta1.BaseAccount",
+    "address": "lumera1shimaddr1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "pub_key": {
+      "type_url": "/cosmos.crypto.multisig.LegacyAminoPubKey",
+      "threshold": 2,
+      "public_keys": [
+        {
+          "@type": "/cosmos.crypto.secp256k1.PubKey",
+          "key": "A1111111111111111111111111111111111111111111"
+        },
+        {
+          "@type": "/cosmos.crypto.secp256k1.PubKey",
+          "key": "A2222222222222222222222222222222222222222222"
+        },
+        {
+          "@type": "/cosmos.crypto.secp256k1.PubKey",
+          "key": "A3333333333333333333333333333333333333333333"
+        }
+      ]
+    },
+    "account_number": "7",
+    "sequence": "0"
+  }
+}

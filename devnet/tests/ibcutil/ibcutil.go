@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"os"
 	"os/exec"
 	"strconv"
@@ -198,20 +199,33 @@ func SendIBCTransfer(bin, rpc, home, fromKey, portID, channelID, recipient, amou
 		"--chain-id", chainID,
 		"--keyring-backend", keyring,
 		"--gas", "auto",
-		"--gas-adjustment", "1.3",
+		"--gas-adjustment", "1.5",
 		"--broadcast-mode", "sync",
 		"--yes",
 		"--packet-timeout-height", "0-0",
 		"--packet-timeout-timestamp", "600000000000", // 10 minutes
+		"--output", "json",
 	)
 	if gasPrices != "" {
 		args = append(args, "--gas-prices", gasPrices)
 	}
 	args = append(args, nodeArgs(rpc)...)
-	_, err := runWithTimeout(longTimeout, bin, args...)
+	out, err := runWithTimeout(longTimeout, bin, args...)
 	if err != nil {
 		return fmt.Errorf("send ibc transfer: %w", err)
 	}
+
+	// The CLI exits 0 even when CheckTx rejects the TX (e.g. out-of-gas).
+	// Parse the JSON response to surface the actual error.
+	var resp map[string]any
+	if jsonErr := json.Unmarshal(out, &resp); jsonErr == nil {
+		code := getStringFromAny(resp["code"])
+		if code != "" && code != "0" {
+			rawLog := getStringFromAny(resp["raw_log"])
+			return fmt.Errorf("ibc transfer tx rejected: code=%s log=%s", code, rawLog)
+		}
+	}
+
 	return nil
 }
 
@@ -238,6 +252,38 @@ func QueryBalanceREST(restAddr, address, denom string) (int64, error) {
 	if restAddr == "" {
 		return 0, fmt.Errorf("rest address is required")
 	}
+
+	// Prefer denom-specific query to avoid pagination blind spots when the
+	// account has many balance entries.
+	if denom != "" {
+		byDenomURL := strings.TrimSuffix(restAddr, "/") + "/cosmos/bank/v1beta1/balances/" + address + "/by_denom?denom=" + neturl.QueryEscape(denom)
+		client := &http.Client{Timeout: 10 * time.Second}
+		resp, err := client.Get(byDenomURL)
+		if err == nil {
+			defer resp.Body.Close()
+			body, readErr := io.ReadAll(resp.Body)
+			if readErr != nil {
+				return 0, fmt.Errorf("read balance-by-denom response: %w", readErr)
+			}
+
+			var payload map[string]any
+			if err := json.Unmarshal(body, &payload); err != nil {
+				return 0, fmt.Errorf("parse balance-by-denom response: %w", err)
+			}
+			if code, ok := payload["code"]; ok && getStringFromAny(code) != "" {
+				return 0, nil
+			}
+
+			balance, ok := payload["balance"].(map[string]any)
+			if !ok {
+				return 0, nil
+			}
+			amtStr := getStringFromAny(balance["amount"])
+			amt, _ := strconv.ParseInt(amtStr, 10, 64)
+			return amt, nil
+		}
+	}
+
 	url := strings.TrimSuffix(restAddr, "/") + "/cosmos/bank/v1beta1/balances/" + address
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Get(url)
@@ -287,7 +333,7 @@ func WaitForBalanceIncreaseREST(restAddr, address, denom string, baseline int64,
 		}
 		time.Sleep(delay)
 	}
-	return 0, fmt.Errorf("balance for %s did not increase after %d retries", address, retries)
+	return 0, fmt.Errorf("balance for %s denom %s did not increase after %d retries", address, denom, retries)
 }
 
 func ReadAddress(path string) (string, error) {

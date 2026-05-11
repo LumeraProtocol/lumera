@@ -21,9 +21,17 @@ func MakeEncodingConfig(t testing.TB) params.EncodingConfig {
 		flags.FlagHome:  t.TempDir(),
 		FlagWasmHomeDir: t.TempDir(),
 	}
-	tempApp := New(log.NewNopLogger(), dbm.NewMemDB(), nil, true,
-		appOpts,
-		GetDefaultWasmOptions())
+	var tempApp *App
+	runOrSkipEVMTestTag(t, func() {
+		tempApp = New(log.NewNopLogger(), dbm.NewMemDB(), nil, true,
+			appOpts,
+			GetDefaultWasmOptions())
+	})
+
+	if tempApp == nil {
+		return params.EncodingConfig{}
+	}
+
 	return makeEncodingConfig(tempApp)
 }
 

@@ -38,7 +38,7 @@ func (k Keeper) SetNodeSuspicionState(ctx sdk.Context, state types.NodeSuspicion
 func (k Keeper) GetAllNodeSuspicionStates(ctx sdk.Context) ([]types.NodeSuspicionState, error) {
 	store := k.kvStore(ctx)
 	it := store.Iterator(types.NodeSuspicionStatePrefix(), storetypes.PrefixEndBytes(types.NodeSuspicionStatePrefix()))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	states := make([]types.NodeSuspicionState, 0)
 	for ; it.Valid(); it.Next() {
@@ -78,7 +78,7 @@ func (k Keeper) SetReporterReliabilityState(ctx sdk.Context, state types.Reporte
 func (k Keeper) GetAllReporterReliabilityStates(ctx sdk.Context) ([]types.ReporterReliabilityState, error) {
 	store := k.kvStore(ctx)
 	it := store.Iterator(types.ReporterReliabilityStatePrefix(), storetypes.PrefixEndBytes(types.ReporterReliabilityStatePrefix()))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	states := make([]types.ReporterReliabilityState, 0)
 	for ; it.Valid(); it.Next() {
@@ -118,7 +118,7 @@ func (k Keeper) SetTicketDeteriorationState(ctx sdk.Context, state types.TicketD
 func (k Keeper) GetAllTicketDeteriorationStates(ctx sdk.Context) ([]types.TicketDeteriorationState, error) {
 	store := k.kvStore(ctx)
 	it := store.Iterator(types.TicketDeteriorationStatePrefix(), storetypes.PrefixEndBytes(types.TicketDeteriorationStatePrefix()))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	states := make([]types.TicketDeteriorationState, 0)
 	for ; it.Valid(); it.Next() {
@@ -158,7 +158,7 @@ func (k Keeper) SetTicketArtifactCountState(ctx sdk.Context, state types.TicketA
 func (k Keeper) GetAllTicketArtifactCountStates(ctx sdk.Context) ([]types.TicketArtifactCountState, error) {
 	store := k.kvStore(ctx)
 	it := store.Iterator(types.TicketArtifactCountStatePrefix(), storetypes.PrefixEndBytes(types.TicketArtifactCountStatePrefix()))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	states := make([]types.TicketArtifactCountState, 0)
 	for ; it.Valid(); it.Next() {
@@ -191,7 +191,7 @@ func (k Keeper) GetNextHealOpID(ctx sdk.Context) uint64 {
 func (k Keeper) deriveNextHealOpID(ctx sdk.Context) uint64 {
 	prefix := types.HealOpPrefix()
 	it := k.kvStore(ctx).Iterator(prefix, storetypes.PrefixEndBytes(prefix))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	var maxID uint64
 	for ; it.Valid(); it.Next() {
@@ -251,7 +251,7 @@ func (k Keeper) SetHealOp(ctx sdk.Context, healOp types.HealOp) error {
 func (k Keeper) GetAllHealOps(ctx sdk.Context) ([]types.HealOp, error) {
 	store := k.kvStore(ctx)
 	it := store.Iterator(types.HealOpPrefix(), storetypes.PrefixEndBytes(types.HealOpPrefix()))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	healOps := make([]types.HealOp, 0)
 	for ; it.Valid(); it.Next() {
@@ -289,7 +289,7 @@ func (k Keeper) GetAllHealOpVerifications(ctx sdk.Context, healOpID uint64) (map
 	store := k.kvStore(ctx)
 	prefix := types.HealOpVerificationPrefix(healOpID)
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	verifications := make(map[string]bool)
 	for ; it.Valid(); it.Next() {
@@ -310,7 +310,7 @@ func (k Keeper) GetAllHealOpVerificationsForGenesis(ctx sdk.Context) []types.Gen
 	store := k.kvStore(ctx)
 	prefix := types.HealOpVerificationRootPrefix()
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	var out []types.GenesisHealOpVerification
 	for ; it.Valid(); it.Next() {

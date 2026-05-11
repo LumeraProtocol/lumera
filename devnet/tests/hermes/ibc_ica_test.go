@@ -10,9 +10,10 @@ import (
 	"strings"
 	"time"
 
+	"gen/tests/ibcutil"
+
 	txtypes "cosmossdk.io/api/cosmos/tx/v1beta1"
 	sdkmath "cosmossdk.io/math"
-	"gen/tests/ibcutil"
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 	"github.com/LumeraProtocol/sdk-go/blockchain"
 	"github.com/LumeraProtocol/sdk-go/blockchain/base"
@@ -37,20 +38,20 @@ const (
 // - Upload test files over ICA and collect action IDs from acknowledgements.
 // - Download each action payload and verify content matches the source.
 // - Approve each action over ICA and wait until the host chain marks them approved.
-func (s *ibcSimdSuite) TestICACascadeFlow() {
+func (s *lumeraHermesSuite) TestICACascadeFlow() {
 	ctx, cancel := context.WithTimeout(context.Background(), icaTestTimeout)
 	defer cancel()
 
 	// Load key material used to sign Lumera-side transactions.
 	s.logInfo("ica: load lumera keyring")
-	kr, _, lumeraAddr, err := sdkcrypto.LoadKeyringFromMnemonic(s.lumera.KeyName, s.lumera.MnemonicFile)
+	kr, _, lumeraAddr, err := sdkcrypto.LoadKeyring(s.lumera.KeyName, s.lumera.MnemonicFile, s.lumeraKeyType())
 	s.Require().NoError(err, "load lumera keyring")
 	s.Require().NotEmpty(lumeraAddr, "lumera address is empty")
 	s.logInfof("ica: lumera address=%s", lumeraAddr)
 
 	// Load the simd key to derive the app pubkey for ICA requests.
 	s.logInfo("ica: load simd key for app pubkey")
-	simdPubkey, simdAddr, err := sdkcrypto.ImportKeyFromMnemonic(kr, s.simd.KeyName, s.simd.MnemonicFile, simdOwnerHRP)
+	simdPubkey, simdAddr, err := sdkcrypto.ImportKey(kr, s.simd.KeyName, s.simd.MnemonicFile, simdOwnerHRP, sdkcrypto.KeyTypeCosmos)
 	s.Require().NoError(err, "load simd key")
 	s.logInfof("ica: simd key address=%s app_pubkey_len=%d", simdAddr, len(simdPubkey))
 
@@ -219,7 +220,7 @@ func createICATestFiles(dir string) ([]icaTestFile, error) {
 }
 
 // ensureICAFunded tops up the ICA account if the balance is below the target.
-func (s *ibcSimdSuite) ensureICAFunded(ctx context.Context, client *blockchain.Client, fromAddr, icaAddr string) error {
+func (s *lumeraHermesSuite) ensureICAFunded(ctx context.Context, client *blockchain.Client, fromAddr, icaAddr string) error {
 	if client == nil {
 		return fmt.Errorf("lumera client is nil")
 	}
@@ -310,7 +311,7 @@ func (s *ibcSimdSuite) ensureICAFunded(ctx context.Context, client *blockchain.C
 	return nil
 }
 
-func (s *ibcSimdSuite) newICAController(ctx context.Context, kr keyring.Keyring, keyName string) (*ica.Controller, error) {
+func (s *lumeraHermesSuite) newICAController(ctx context.Context, kr keyring.Keyring, keyName string) (*ica.Controller, error) {
 	if kr == nil {
 		return nil, fmt.Errorf("keyring is nil")
 	}

@@ -91,7 +91,7 @@ func (k Keeper) GetAllReportsForGenesis(ctx sdk.Context) ([]types.EpochReport, e
 	prefix := types.ReportPrefix()
 	store := k.kvStore(ctx)
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	out := make([]types.EpochReport, 0)
 	for ; it.Valid(); it.Next() {
@@ -121,7 +121,7 @@ func (k Keeper) GetAllReportIndicesForGenesis(ctx sdk.Context) []types.GenesisRe
 	prefix := types.ReportIndexRootPrefix()
 	store := k.kvStore(ctx)
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	out := make([]types.GenesisReportIndex, 0)
 	for ; it.Valid(); it.Next() {
@@ -152,7 +152,7 @@ func (k Keeper) GetAllHostReportIndicesForGenesis(ctx sdk.Context) []types.Genes
 	prefix := types.HostReportIndexRootPrefix()
 	store := k.kvStore(ctx)
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	out := make([]types.GenesisHostReportIndex, 0)
 	for ; it.Valid(); it.Next() {
@@ -177,7 +177,7 @@ func (k Keeper) GetAllStorageChallengeIndicesForGenesis(ctx sdk.Context) []types
 	prefix := types.StorageChallengeReportIndexRootPrefix()
 	store := k.kvStore(ctx)
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	out := make([]types.GenesisStorageChallengeIndex, 0)
 	for ; it.Valid(); it.Next() {

@@ -27,12 +27,3 @@ func TestLEP6ModuleOrderingPinsSupernodeAuditAction(t *testing.T) {
 	assertOrdered(t, "beginBlockers", beginBlockers)
 	assertOrdered(t, "endBlockers", endBlockers)
 }
-
-func indexOfModule(modules []string, target string) int {
-	for i, module := range modules {
-		if module == target {
-			return i
-		}
-	}
-	return -1
-}

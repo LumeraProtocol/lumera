@@ -1,0 +1,8 @@
+{
+  "params": {
+    "enable_migration": true,
+    "migration_end_time": "0",
+    "max_migrations_per_block": "50",
+    "max_validator_delegations": "2000"
+  }
+}

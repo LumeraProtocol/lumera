@@ -35,7 +35,7 @@ func (k Keeper) GetAllActionFinalizationPostponements(ctx sdk.Context) []types.G
 	store := k.kvStore(ctx)
 	prefix := types.ActionFinalizationPostponementPrefix()
 	it := store.Iterator(prefix, storetypes.PrefixEndBytes(prefix))
-	defer it.Close()
+	defer func() { _ = it.Close() }()
 
 	var out []types.GenesisActionFinalizationPostponement
 	for ; it.Valid(); it.Next() {

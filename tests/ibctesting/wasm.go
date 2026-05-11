@@ -1,21 +1,21 @@
 package ibctesting
 
 import (
-	"fmt"
-	"context"
-	"strings"
 	"bytes"
-	"os"
-	"time"
 	"compress/gzip"
+	"context"
 	"encoding/json"
+	"fmt"
+	"os"
+	"strings"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
 	sdkmath "cosmossdk.io/math"
+	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
-	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 
 	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/cometbft/cometbft/libs/rand"
@@ -25,14 +25,14 @@ import (
 	host "github.com/cosmos/ibc-go/v10/modules/core/24-host"
 	hostv2 "github.com/cosmos/ibc-go/v10/modules/core/24-host/v2"
 	ibctst "github.com/cosmos/ibc-go/v10/testing"
-	
+
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 	gogoproto "github.com/cosmos/gogoproto/proto"
 
 	lcfg "github.com/LumeraProtocol/lumera/config"
 )
 
-var wasmIdent       = []byte("\x00\x61\x73\x6D")
+var wasmIdent = []byte("\x00\x61\x73\x6D")
 
 type PendingAckPacketV2 struct {
 	channeltypesv2.Packet

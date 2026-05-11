@@ -59,9 +59,9 @@ func TestApplyReporterDivergenceAtEpochEnd_PenalizesChronic(t *testing.T) {
 	}))
 
 	// Populate real per-record stats (required after 121-F15 removed the window fallback).
-	addDivergenceRecords(t, f, "reporter-a", 2, 8)  // 2 neg / 10 total = 20%
-	addDivergenceRecords(t, f, "reporter-b", 2, 8)  // 2 neg / 10 total = 20%
-	addDivergenceRecords(t, f, "reporter-c", 9, 1)  // 9 neg / 10 total = 90%
+	addDivergenceRecords(t, f, "reporter-a", 2, 8) // 2 neg / 10 total = 20%
+	addDivergenceRecords(t, f, "reporter-b", 2, 8) // 2 neg / 10 total = 20%
+	addDivergenceRecords(t, f, "reporter-c", 9, 1) // 9 neg / 10 total = 90%
 
 	require.NoError(t, f.keeper.ApplyReporterDivergenceAtEpochEnd(f.ctx, 1, params))
 

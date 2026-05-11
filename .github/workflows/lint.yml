@@ -34,7 +34,17 @@ jobs:
       # by the PR diff as inline review comments. Pre-existing baseline
       # diagnostics are not reported, so this never blocks unrelated PRs on
       # legacy noise.
-      - name: golangci-lint via reviewdog (PR diff only)
+      #
+      # Forked PRs receive a read-only GITHUB_TOKEN regardless of the
+      # workflow-level permissions block, so reviewdog cannot post inline
+      # review comments and would fail the job. We branch on the head-repo
+      # owner: same-repo PRs use the `github-pr-review` reporter (inline
+      # comments + failing check), fork PRs fall back to `github-pr-check`
+      # which only emits a check-run annotation (no comment posting, no
+      # write scope required). The lint gate still blocks merges in both
+      # paths via `fail_level: error`.
+      - name: golangci-lint via reviewdog (same-repo PR — inline comments)
+        if: github.event.pull_request.head.repo.full_name == github.repository
         # Pin to v2.10.0 (>=v2.8.0 required for golangci-lint v2 support;
         # earlier reviewdog releases on the @v2 major tag still default to
         # downloading golangci-lint v1.x even when a v2.x version is
@@ -53,8 +63,34 @@ jobs:
           # Only annotate lines actually changed by the PR.
           filter_mode: added
           reporter: github-pr-review
+          # `fail_level: error` blocks the job on any new error-severity
+          # finding in the diff. We deliberately do NOT set `level` here:
+          # reviewdog uses each finding's native severity, so error-level
+          # diagnostics (e.g. govet, staticcheck SA*) actually trip
+          # `fail_level: error`. Setting `level: warning` would downgrade
+          # every result to warning and silently neuter the gate.
           fail_level: error
-          level: warning
+        env:
+          REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: golangci-lint via reviewdog (fork PR — local reporter)
+        if: github.event.pull_request.head.repo.full_name != github.repository
+        uses: reviewdog/action-golangci-lint@v2.10.0
+        with:
+          go_version_file: go.mod
+          golangci_lint_version: v2.11.4
+          golangci_lint_flags: "--config=.golangci.yml --timeout=5m"
+          workdir: .
+          filter_mode: added
+          # Fork PRs receive a strictly read-only GITHUB_TOKEN — neither
+          # `github-pr-review` (needs pull-requests: write) nor
+          # `github-pr-check` (needs checks: write) can post results.
+          # `local` writes findings to the job log only; `fail_level: error`
+          # still makes new error-level diagnostics fail the job, which
+          # registers as a failing required-check on the PR and blocks
+          # merge. Contributors can read the findings in the workflow log.
+          reporter: local
+          fail_level: error
         env:
           REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

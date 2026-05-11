@@ -258,6 +258,17 @@ func (k Keeper) shouldRecoverAtEpochEnd(ctx sdk.Context, supernodeAccount string
 		return false, err
 	}
 
+	// Bootstrap exception: when the epoch's anchored active set is empty, no
+	// probers exist by construction, so the peer-port recovery rule below is
+	// unsatisfiable and would deadlock the chain (all SNs POSTPONED → 0
+	// probers → 0 peer reports → no SN can ever recover). The peer-port gate
+	// is meaningless when there is nobody to attest, so accept a compliant
+	// self host-report alone as sufficient. The self-compliance check above
+	// still gates this branch — a misbehaving SN cannot self-recover.
+	if anchor, found := k.GetEpochAnchor(ctx, epochID); found && len(anchor.ActiveSupernodeAccounts) == 0 {
+		return true, nil
+	}
+
 	// Need at least one compliant peer report that shows all required ports OPEN.
 	requiredPortsLen := len(params.RequiredOpenPorts)
 	if requiredPortsLen == 0 {

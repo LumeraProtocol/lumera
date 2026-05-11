@@ -66,6 +66,23 @@ func setAuditParamsForFastEpochs(t *testing.T, epochLengthBlocks uint64, peerQuo
 	}
 }
 
+// setAuditParamsForFastEpochsWithMinDiskFree is setAuditParamsForFastEpochs
+// plus an explicit MinDiskFreePercent override. Used by tests that need to
+// exercise the self-compliance gate against the host report's disk-usage
+// field (e.g. the empty-active-set bootstrap exception's self-compliance
+// guard).
+func setAuditParamsForFastEpochsWithMinDiskFree(t *testing.T, epochLengthBlocks uint64, peerQuorumReports, minTargets, maxTargets uint32, requiredOpenPorts []uint32, minDiskFreePercent uint32) GenesisMutator {
+	base := setAuditParamsForFastEpochs(t, epochLengthBlocks, peerQuorumReports, minTargets, maxTargets, requiredOpenPorts)
+	return func(genesis []byte) []byte {
+		t.Helper()
+		state := base(genesis)
+		var err error
+		state, err = sjson.SetRawBytes(state, "app_state.audit.params.min_disk_free_percent", []byte(strconv.FormatUint(uint64(minDiskFreePercent), 10)))
+		require.NoError(t, err)
+		return state
+	}
+}
+
 // setSupernodeParamsForAuditTests keeps supernode registration permissive for test environments.
 //
 // These tests register supernodes and then submit audit reports "on their behalf" using node keys.
@@ -286,6 +303,20 @@ func auditHostReportJSON(inboundPortStates []string) string {
 		"cpu_usage_percent":    1.0,
 		"mem_usage_percent":    1.0,
 		"disk_usage_percent":   1.0,
+		"inbound_port_states":  inboundPortStates,
+		"failed_actions_count": 0,
+	})
+	return string(bz)
+}
+
+// auditHostReportWithDiskUsageJSON is like auditHostReportJSON but lets the
+// caller pin disk_usage_percent. Used by tests that exercise the
+// self-compliance gate (e.g. min-free thresholds).
+func auditHostReportWithDiskUsageJSON(inboundPortStates []string, diskUsagePercent float64) string {
+	bz, _ := json.Marshal(map[string]any{
+		"cpu_usage_percent":    1.0,
+		"mem_usage_percent":    1.0,
+		"disk_usage_percent":   diskUsagePercent,
 		"inbound_port_states":  inboundPortStates,
 		"failed_actions_count": 0,
 	})

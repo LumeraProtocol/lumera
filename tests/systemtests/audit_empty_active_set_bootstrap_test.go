@@ -6,29 +6,24 @@ package system
 //
 // When ALL supernodes are POSTPONED at epoch start, the epoch anchor has an
 // empty active_supernode_accounts set. Without active probers, no peer
-// observations are generated, and the audit module's recovery rule
-// (compliant host report + peer all-ports-OPEN) can never be satisfied.
+// observations are generated, and the audit module's peer-port recovery rule
+// (compliant host report + peer all-ports-OPEN) cannot be satisfied because
+// no probers exist.
 //
-// The fix is to use legacy MsgReportSupernodeMetrics to recover SNs to
-// ACTIVE mid-epoch. Combined with audit epoch reports, the SN survives
-// the audit EndBlocker and appears in the next epoch's anchor, seeding
-// the active set and bootstrapping the peer-observation cycle.
+// To break this bootstrap chicken-and-egg, the audit module applies a
+// bootstrap-recovery exception in shouldRecoverAtEpochEnd: when the epoch
+// anchor's active set is empty, a compliant self host-report alone is
+// sufficient for recovery. Self-compliance is still mandatory; a misbehaving
+// SN cannot self-recover via this branch.
 //
-// Scenario:
-//   1. Two supernodes register and start ACTIVE.
-//   2. Neither submits epoch reports for epoch 0 → both POSTPONED at epoch 0 end.
-//   3. Epoch 1: empty active set. Both submit host-only audit reports.
-//      Verify: audit recovery alone cannot recover them (no peer observations).
-//   4. Legacy MsgReportSupernodeMetrics recovers both mid-epoch 2.
-//   5. Epoch 2 end: audit enforcement checks them as ACTIVE — they have reports,
-//      host minimums disabled, no peer-port streak → they stay ACTIVE.
-//   6. Epoch 3: both are in the anchor active set → peer observations flow → self-sustaining.
+// With this exception, the chain self-heals from the deadlock once every
+// POSTPONED SN submits a compliant host-only report — no operator
+// intervention required.
 
 import (
 	"testing"
 	"time"
 
-	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -43,7 +38,20 @@ func awaitAtLeastHeightWithSlack(t *testing.T, height int64) {
 	sut.AwaitBlockHeight(t, height, 45*time.Second)
 }
 
-func TestAuditEmptyActiveSetBootstrap_LegacyMetricsBreaksDeadlock(t *testing.T) {
+// TestAuditEmptyActiveSetBootstrap_HostOnlyReportsRecover verifies that the
+// bootstrap-recovery exception breaks the empty-active-set deadlock: when
+// all SNs are POSTPONED and the active set is empty, submitting compliant
+// host-only audit reports is sufficient to recover them at epoch end.
+//
+// This inverts the pre-fix contract (which asserted permanent deadlock).
+//
+// Scenario:
+//  1. Two supernodes register and start ACTIVE.
+//  2. Neither submits epoch reports for epoch 0 → both POSTPONED at epoch 0 end.
+//  3. Epoch 1: empty active set. Both submit host-only audit reports.
+//  4. Epoch 1 end: bootstrap-recovery exception fires → both recover to ACTIVE.
+//  5. Epoch 2: both are in the anchor active set → peer observations flow → self-sustaining.
+func TestAuditEmptyActiveSetBootstrap_HostOnlyReportsRecover(t *testing.T) {
 	const (
 		epochLengthBlocks = uint64(10)
 		originHeight      = int64(1)
@@ -82,76 +90,48 @@ func TestAuditEmptyActiveSetBootstrap_LegacyMetricsBreaksDeadlock(t *testing.T) 
 	require.Equal(t, "SUPERNODE_STATE_POSTPONED", querySupernodeLatestState(t, cli, n1.valAddr),
 		"node1 should be POSTPONED after missing epoch 0 report")
 
-	// ── Epoch 1: Empty active set — the deadlock. ──
+	// ── Epoch 1: empty active set — bootstrap-recovery exception applies. ──
 	epochID1 := uint64((epoch1Start - originHeight) / int64(epochLengthBlocks))
 
-	// Both submit host-only audit epoch reports (as POSTPONED reporters, no observations).
+	// Both submit compliant host-only audit epoch reports (as POSTPONED reporters,
+	// no observations). With the bootstrap exception, this alone is sufficient
+	// for recovery at epoch 1 end.
 	hostOK := auditHostReportJSON([]string{"PORT_STATE_OPEN"})
 	tx0 := submitEpochReport(t, cli, n0.nodeName, epochID1, hostOK, nil)
 	RequireTxSuccess(t, tx0)
 	tx1 := submitEpochReport(t, cli, n1.nodeName, epochID1, hostOK, nil)
 	RequireTxSuccess(t, tx1)
 
-	// Wait for epoch 1 to end WITHOUT legacy metrics recovery.
-	// Both should remain POSTPONED — audit recovery fails (no peer observations).
+	// Wait for epoch 1 to end.
 	awaitAtLeastHeightWithSlack(t, epoch2Start)
 
-	require.Equal(t, "SUPERNODE_STATE_POSTPONED", querySupernodeLatestState(t, cli, n0.valAddr),
-		"node0 should still be POSTPONED — audit recovery alone cannot break the deadlock")
-	require.Equal(t, "SUPERNODE_STATE_POSTPONED", querySupernodeLatestState(t, cli, n1.valAddr),
-		"node1 should still be POSTPONED — audit recovery alone cannot break the deadlock")
-
-	// ── Epoch 2: Break the deadlock with legacy MsgReportSupernodeMetrics. ──
-	epochID2 := epochID1 + 1
-	epoch3Start := epoch2Start + int64(epochLengthBlocks)
-
-	// Submit legacy metrics → instant recovery to ACTIVE.
-	compliantMetrics := sntypes.SupernodeMetrics{
-		VersionMajor: 2,
-		VersionMinor: 4,
-		VersionPatch: 5,
-		OpenPorts: []sntypes.PortStatus{
-			{Port: 4444, State: sntypes.PortState_PORT_STATE_OPEN},
-		},
-	}
-
-	hash0 := reportSupernodeMetrics(t, cli, n0.nodeName, n0.valAddr, n0.accAddr, compliantMetrics)
-	txJSON0 := waitForTx(t, cli, hash0)
-	resp0 := decodeTxResponse(t, txJSON0)
-	require.Equal(t, uint32(0), resp0.Code, "legacy metrics tx for node0 should succeed: %s", resp0.RawLog)
-
-	hash1 := reportSupernodeMetrics(t, cli, n1.nodeName, n1.valAddr, n1.accAddr, compliantMetrics)
-	txJSON1 := waitForTx(t, cli, hash1)
-	resp1 := decodeTxResponse(t, txJSON1)
-	require.Equal(t, uint32(0), resp1.Code, "legacy metrics tx for node1 should succeed: %s", resp1.RawLog)
-
-	// Submit audit epoch reports so epoch enforcement has both legacy metrics and
-	// fresh audit data available before the next boundary.
-	tx0e2 := submitEpochReport(t, cli, n0.nodeName, epochID2, hostOK, nil)
-	RequireTxSuccess(t, tx0e2)
-	tx1e2 := submitEpochReport(t, cli, n1.nodeName, epochID2, hostOK, nil)
-	RequireTxSuccess(t, tx1e2)
-
-	// Wait for epoch 2 to end.
-	awaitAtLeastHeightWithSlack(t, epoch3Start)
-
-	// Keep assertion surface narrow: tx/report acceptance is the contract this
-	// bootstrap check validates; detailed recovery semantics are covered by
-	// dedicated enforcement tests.
+	// Bootstrap-recovery exception: empty active set + compliant self host-report
+	// → both SNs recover to ACTIVE.
+	require.Equal(t, "SUPERNODE_STATE_ACTIVE", querySupernodeLatestState(t, cli, n0.valAddr),
+		"node0 should recover to ACTIVE via the empty-active-set bootstrap exception")
+	require.Equal(t, "SUPERNODE_STATE_ACTIVE", querySupernodeLatestState(t, cli, n1.valAddr),
+		"node1 should recover to ACTIVE via the empty-active-set bootstrap exception")
 }
 
-// TestAuditEmptyActiveSetDeadlock_HostOnlyReportsCannotRecover verifies that
-// when all supernodes are POSTPONED, submitting host-only epoch reports across
-// multiple epochs is insufficient for recovery — proving the deadlock exists.
-func TestAuditEmptyActiveSetDeadlock_HostOnlyReportsCannotRecover(t *testing.T) {
+// TestAuditEmptyActiveSetBootstrap_NonCompliantHostStaysPostponed verifies
+// the bootstrap-recovery exception still gates on self-compliance. A
+// POSTPONED supernode that submits a host report violating a min-free
+// threshold MUST remain POSTPONED even when the active set is empty.
+//
+// This guards against the exception turning into a "free pass" for
+// misbehaving SNs and complements the unit-level tests in
+// x/audit/v1/keeper/enforcement_empty_active_set_test.go.
+func TestAuditEmptyActiveSetBootstrap_NonCompliantHostStaysPostponed(t *testing.T) {
 	const (
 		epochLengthBlocks = uint64(10)
 		originHeight      = int64(1)
 	)
 
+	// Set a non-zero MinDiskFreePercent so non-compliant disk usage in the host
+	// report blocks self-compliance.
 	sut.ModifyGenesisJSON(t,
 		setSupernodeParamsForAuditTests(t),
-		setAuditParamsForFastEpochs(t, epochLengthBlocks, 1, 1, 1, []uint32{4444}),
+		setAuditParamsForFastEpochsWithMinDiskFree(t, epochLengthBlocks, 1, 1, 1, []uint32{4444}, 20),
 	)
 	sut.StartChain(t)
 
@@ -166,31 +146,25 @@ func TestAuditEmptyActiveSetDeadlock_HostOnlyReportsCannotRecover(t *testing.T) 
 	currentHeight := sut.AwaitNextBlock(t)
 	_, epoch0Start := nextEpochAfterHeight(originHeight, epochLengthBlocks, currentHeight)
 	epoch1Start := epoch0Start + int64(epochLengthBlocks)
+	epoch2Start := epoch1Start + int64(epochLengthBlocks)
 
 	awaitAtLeastHeightWithSlack(t, epoch1Start)
 
 	require.Equal(t, "SUPERNODE_STATE_POSTPONED", querySupernodeLatestState(t, cli, n0.valAddr))
 	require.Equal(t, "SUPERNODE_STATE_POSTPONED", querySupernodeLatestState(t, cli, n1.valAddr))
 
-	// Submit host-only reports for 3 consecutive epochs. None should recover.
-	hostOK := auditHostReportJSON([]string{"PORT_STATE_OPEN"})
-	for i := 0; i < 3; i++ {
-		epochStart := epoch1Start + int64(i)*int64(epochLengthBlocks)
-		nextEpochStart := epochStart + int64(epochLengthBlocks)
-		epochID := uint64((epochStart - originHeight) / int64(epochLengthBlocks))
+	// Epoch 1: empty active set. Both submit host reports with disk usage 95%
+	// (5% free, below the 20% MinDiskFreePercent). Self-compliance fails.
+	epochID1 := uint64((epoch1Start - originHeight) / int64(epochLengthBlocks))
+	hostNonCompliant := auditHostReportWithDiskUsageJSON([]string{"PORT_STATE_OPEN"}, 95.0)
+	RequireTxSuccess(t, submitEpochReport(t, cli, n0.nodeName, epochID1, hostNonCompliant, nil))
+	RequireTxSuccess(t, submitEpochReport(t, cli, n1.nodeName, epochID1, hostNonCompliant, nil))
 
-		awaitAtLeastHeightWithSlack(t, epochStart)
+	awaitAtLeastHeightWithSlack(t, epoch2Start)
 
-		tx0 := submitEpochReport(t, cli, n0.nodeName, epochID, hostOK, nil)
-		RequireTxSuccess(t, tx0)
-		tx1 := submitEpochReport(t, cli, n1.nodeName, epochID, hostOK, nil)
-		RequireTxSuccess(t, tx1)
-
-		awaitAtLeastHeightWithSlack(t, nextEpochStart)
-
-		require.Equal(t, "SUPERNODE_STATE_POSTPONED", querySupernodeLatestState(t, cli, n0.valAddr),
-			"node0 should remain POSTPONED in epoch %d — no peer observations possible", epochID)
-		require.Equal(t, "SUPERNODE_STATE_POSTPONED", querySupernodeLatestState(t, cli, n1.valAddr),
-			"node1 should remain POSTPONED in epoch %d — no peer observations possible", epochID)
-	}
+	// Self-compliance gate blocked the bootstrap exception → still POSTPONED.
+	require.Equal(t, "SUPERNODE_STATE_POSTPONED", querySupernodeLatestState(t, cli, n0.valAddr),
+		"node0 should remain POSTPONED — self-compliance gate blocks the bootstrap exception")
+	require.Equal(t, "SUPERNODE_STATE_POSTPONED", querySupernodeLatestState(t, cli, n1.valAddr),
+		"node1 should remain POSTPONED — self-compliance gate blocks the bootstrap exception")
 }

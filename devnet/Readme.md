@@ -443,5 +443,7 @@ Targets declared in `Makefile.devnet` (and exposed through the root `Makefile`) 
 | `make devnet-upgrade-binaries` | Copy freshly built `lumerad` and `libwasmvm` into running containers through `devnet/scripts/upgrade-binaries.sh`. |
 | `make devnet-upgrade-180` | Execute `devnet/scripts/upgrade.sh` for the v1.8.0 release bundle. |
 | `make devnet-upgrade-184` | Execute `devnet/scripts/upgrade.sh` for the v1.8.4 release bundle. |
+| `make devnet-tests-everlight` | Run the Everlight (`x/supernode`) devnet smoke test against the running stack. |
+| `make devnet-tests-lep6` | Run the LEP-6 storage-truth chain-side e2e tests (params, epoch report, recheck-evidence score updates, negative auth/state rejection cases, heal-op claim/verify) against the running stack. The default devnet genesis uses short epochs and a test-mode heal threshold of `8`, while the test still drives the chain's full heal-op scheduling eligibility predicate (threshold plus repeated failures/holder diversity or index-failure eligibility) before expecting `HEAL_OP_STATUS_VERIFIED`. Requires `make devnet-up-detach` first; ≥3 supernodes must be registered. |
 | `make devnet-update-scripts` | Copy updated `start.sh`, `validator-setup.sh`, `supernode-setup.sh`, and `network-maker-setup.sh` (plus Hermes scripts) into running containers. |
 | `make devnet-deploy-tar` | Package dockerfile, compose file, binaries, configs, claims, and optional genesis into `devnet-deploy.tar.gz` for distribution. |

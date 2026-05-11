@@ -77,3 +77,12 @@ jobs:
           # Default scan target is `./...`, which is the full module —
           # matches the standard `govulncheck ./...` invocation.
           go-package: ./...
+          # We already checked out the repo in the preceding step. The
+          # action's default `repo-checkout: true` runs a second
+          # actions/checkout, which sets a duplicate `Authorization`
+          # http.extraheader on the local git config and causes the
+          # subsequent fetch to fail with:
+          #   remote: Duplicate header: "Authorization"
+          #   fatal: ... The requested URL returned error: 400
+          # Disable the internal checkout to avoid the conflict.
+          repo-checkout: false

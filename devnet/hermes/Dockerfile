@@ -1,10 +1,10 @@
-FROM golang:1.24.7-bookworm AS builder
+FROM golang:1.25.5-bookworm AS builder
 
 ARG HERMES_VERSION=v1.13.3
 ARG HERMES_TARGET=x86_64-unknown-linux-gnu
 ARG HERMES_DIST=hermes-${HERMES_VERSION}-${HERMES_TARGET}.tar.gz
 ARG HERMES_DIR=hermes-${HERMES_VERSION}-${HERMES_TARGET}
-ARG IBCGO_VERSION=v10.3.0
+ARG IBCGO_VERSION=v10.5.0
 
 RUN apt-get -o Acquire::Check-Date=false -o Acquire::Check-Valid-Until=false update \
     && apt-get install -y --no-install-recommends ca-certificates curl git build-essential \

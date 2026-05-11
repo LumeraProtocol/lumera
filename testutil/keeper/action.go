@@ -152,8 +152,9 @@ func (m *MockStakingKeeper) Validator(ctx context.Context, addr sdk.ValAddress) 
 }
 
 type MockAuditKeeper struct {
-	nextEvidenceID uint64
-	CreateCalls    []MockAuditKeeperCreateEvidenceCall
+	nextEvidenceID       uint64
+	CreateCalls          []MockAuditKeeperCreateEvidenceCall
+	TicketArtifactCounts map[string]MockAuditKeeperTicketArtifactCount
 }
 
 type MockAuditKeeperCreateEvidenceCall struct {
@@ -164,8 +165,16 @@ type MockAuditKeeperCreateEvidenceCall struct {
 	MetadataJSON    string
 }
 
+type MockAuditKeeperTicketArtifactCount struct {
+	IndexArtifactCount  uint32
+	SymbolArtifactCount uint32
+}
+
 func NewMockAuditKeeper() *MockAuditKeeper {
-	return &MockAuditKeeper{nextEvidenceID: 1}
+	return &MockAuditKeeper{
+		nextEvidenceID:       1,
+		TicketArtifactCounts: make(map[string]MockAuditKeeperTicketArtifactCount),
+	}
 }
 
 func (m *MockAuditKeeper) CreateEvidence(
@@ -191,6 +200,22 @@ func (m *MockAuditKeeper) CreateEvidence(
 	return id, nil
 }
 
+func (m *MockAuditKeeper) SetStorageTruthTicketArtifactCounts(
+	ctx context.Context,
+	ticketID string,
+	indexArtifactCount uint32,
+	symbolArtifactCount uint32,
+) error {
+	if ticketID == "" {
+		return nil
+	}
+	m.TicketArtifactCounts[ticketID] = MockAuditKeeperTicketArtifactCount{
+		IndexArtifactCount:  indexArtifactCount,
+		SymbolArtifactCount: symbolArtifactCount,
+	}
+	return nil
+}
+
 type AccountPair struct {
 	Address sdk.AccAddress
 	PubKey  cryptotypes.PubKey
@@ -198,6 +223,87 @@ type AccountPair struct {
 
 func ActionKeeper(t testing.TB, ctrl *gomock.Controller) (keeper.Keeper, sdk.Context) {
 	return ActionKeeperWithAddress(t, ctrl, nil)
+}
+
+// MockRewardDistributionKeeper is a simple stub that returns a configurable bps value.
+type MockRewardDistributionKeeper struct {
+	Bps uint64
+}
+
+func (m *MockRewardDistributionKeeper) GetRegistrationFeeShareBps(_ sdk.Context) uint64 {
+	return m.Bps
+}
+
+// ActionKeeperWithRewardDistribution returns an action keeper wired with the supplied
+// RewardDistributionKeeper plus the bank-keeper mock so tests can assert module-balance
+// deltas across the reward-share + foundation + supernode payout splits.
+func ActionKeeperWithRewardDistribution(
+	t testing.TB,
+	ctrl *gomock.Controller,
+	accounts []AccountPair,
+	rewardDistKeeper actiontypes.RewardDistributionKeeper,
+) (keeper.Keeper, sdk.Context, *ActionBankKeeper) {
+	storeKey := storetypes.NewKVStoreKey(actiontypes.StoreKey)
+
+	db := dbm.NewMemDB()
+	encCfg := moduletestutil.MakeTestEncodingConfig(actionmodulev1.AppModule{})
+	stateStore := store.NewCommitMultiStore(db, log.NewNopLogger(), metrics.NewNoOpMetrics())
+	stateStore.MountStoreWithDB(storeKey, storetypes.StoreTypeIAVL, db)
+	require.NoError(t, stateStore.LoadLatestVersion())
+
+	registry := codectypes.NewInterfaceRegistry()
+	cdc := codec.NewProtoCodec(registry)
+	authority := authtypes.NewModuleAddress(govtypes.ModuleName)
+
+	bankKeeper := NewActionMockBankKeeper()
+	authKeeper := NewMockAccountKeeper()
+	stakingKeeper := new(MockStakingKeeper)
+	supernodeKeeper := supernodemocks.NewMockSupernodeKeeper(ctrl)
+	supernodeQueryServer := supernodemocks.NewMockQueryServer(ctrl)
+	distributionKeeper := new(MockDistributionKeeper)
+	auditKeeper := NewMockAuditKeeper()
+
+	ctx := sdk.NewContext(stateStore, cmtproto.Header{}, false, log.NewNopLogger())
+	for _, acc := range accounts {
+		account := authKeeper.NewAccountWithAddress(ctx, acc.Address)
+		err := account.SetPubKey(acc.PubKey)
+		require.NoError(t, err)
+		authKeeper.SetAccount(ctx, account)
+		bankKeeper.sentCoins[acc.Address.String()] = sdk.NewCoins(sdk.NewInt64Coin("ulume", TestAccountAmount))
+	}
+
+	mockUpgradeKeeper := newMockUpgradeKeeper()
+
+	storeService := runtime.NewKVStoreService(storeKey)
+	k := keeper.NewKeeper(
+		cdc,
+		authKeeper.AddressCodec(),
+		storeService,
+		log.NewNopLogger(),
+		authority,
+		bankKeeper,
+		authKeeper,
+		stakingKeeper,
+		distributionKeeper,
+		supernodeKeeper,
+		func() sntypes.QueryServer {
+			return supernodeQueryServer
+		},
+		auditKeeper,
+		func() *ibckeeper.Keeper {
+			return ibckeeper.NewKeeper(encCfg.Codec, storeService, newMockIbcParams(), mockUpgradeKeeper, authority.String())
+		},
+		rewardDistKeeper,
+	)
+
+	params := actiontypes.DefaultParams()
+	params.FoundationFeeShare = "0.1"
+	params.SuperNodeFeeShare = "0.9"
+	if err := k.SetParams(ctx, params); err != nil {
+		panic(err)
+	}
+
+	return k, ctx, bankKeeper
 }
 
 func ActionKeeperWithAddress(t testing.TB, ctrl *gomock.Controller, accounts []AccountPair) (keeper.Keeper, sdk.Context) {
@@ -222,12 +328,13 @@ func ActionKeeperWithAddress(t testing.TB, ctrl *gomock.Controller, accounts []A
 
 	supernodeKeeper := supernodemocks.NewMockSupernodeKeeper(ctrl)
 	supernodeQueryServer := supernodemocks.NewMockQueryServer(ctrl)
+
 	distributionKeeper := new(MockDistributionKeeper)
 	auditKeeper := NewMockAuditKeeper()
 
 	// Set up the context
 	ctx := sdk.NewContext(stateStore, cmtproto.Header{}, false, log.NewNopLogger())
-	if accounts != nil && len(accounts) > 0 {
+	if len(accounts) > 0 {
 		for _, acc := range accounts {
 			account := authKeeper.NewAccountWithAddress(ctx, acc.Address)
 			err := account.SetPubKey(acc.PubKey)
@@ -258,7 +365,7 @@ func ActionKeeperWithAddress(t testing.TB, ctrl *gomock.Controller, accounts []A
 		func() *ibckeeper.Keeper {
 			return ibckeeper.NewKeeper(encCfg.Codec, storeService, newMockIbcParams(), mockUpgradeKeeper, authority.String())
 		},
-		nil,
+		&MockRewardDistributionKeeper{Bps: 0}, // Per CP-R3 C-F4 — exercise reward-routing branch as no-op, not nil short-circuit.
 	)
 
 	// Initialize params

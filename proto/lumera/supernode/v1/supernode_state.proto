@@ -5,22 +5,36 @@ option go_package = "x/supernode/v1/types";
 
 import "gogoproto/gogo.proto";
 
+// SuperNodeState is the lifecycle state of a SuperNode. Transitions are
+// governed by the supernode and audit modules; see x/supernode/v1/keeper
+// and x/audit/v1/keeper for the authoritative state machine.
 enum SuperNodeState {
   option (gogoproto.goproto_enum_prefix) = false;
   option (gogoproto.goproto_enum_stringer) = true;
 
+  // SUPERNODE_STATE_UNSPECIFIED is the proto3 zero value; never persisted.
   SUPERNODE_STATE_UNSPECIFIED = 0 [(gogoproto.enumvalue_customname) = "SuperNodeStateUnspecified"];
+  // SUPERNODE_STATE_ACTIVE: SuperNode is healthy and eligible for all duties.
   SUPERNODE_STATE_ACTIVE = 1 [(gogoproto.enumvalue_customname) = "SuperNodeStateActive"];
+  // SUPERNODE_STATE_DISABLED: operator-disabled (deregistered) SuperNode.
   SUPERNODE_STATE_DISABLED = 2 [(gogoproto.enumvalue_customname) = "SuperNodeStateDisabled"];
+  // SUPERNODE_STATE_STOPPED: operator-stopped SuperNode (recoverable).
   SUPERNODE_STATE_STOPPED = 3 [(gogoproto.enumvalue_customname) = "SuperNodeStateStopped"];
+  // SUPERNODE_STATE_PENALIZED: penalized by chain enforcement (e.g. slashing).
   SUPERNODE_STATE_PENALIZED = 4 [(gogoproto.enumvalue_customname) = "SuperNodeStatePenalized"];
+  // SUPERNODE_STATE_POSTPONED: temporarily ineligible due to missing/overdue
+  // metrics or compliance violations; recovers on the next healthy report.
   SUPERNODE_STATE_POSTPONED = 5 [(gogoproto.enumvalue_customname) = "SuperNodeStatePostponed"];
+  // SUPERNODE_STATE_STORAGE_FULL: storage usage above max threshold;
+  // excluded from Cascade duties but still eligible for Sense/Agents.
   SUPERNODE_STATE_STORAGE_FULL = 6 [(gogoproto.enumvalue_customname) = "SuperNodeStateStorageFull"];
 }
 
-message SuperNodeStateRecord { 
+// SuperNodeStateRecord is one entry in the append-only state history of a
+// SuperNode. The latest entry is the current state.
+message SuperNodeStateRecord {
   SuperNodeState state = 1 [(gogoproto.moretags) = "yaml:\"state\""];
-  int64 height = 2; 
+  int64 height = 2;
   // reason is an optional string describing why the state transition occurred.
   // It is currently set only for transitions into POSTPONED.
   string reason = 3 [(gogoproto.moretags) = "yaml:\"reason\""];

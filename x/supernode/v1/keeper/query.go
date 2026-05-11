@@ -6,7 +6,7 @@ import (
 
 type queryServer struct {
 	types.UnimplementedQueryServer
-	
+
 	k types.SupernodeKeeper
 }
 
@@ -17,6 +17,6 @@ var _ types.QueryServer = queryServer{}
 func NewQueryServerImpl(k types.SupernodeKeeper) types.QueryServer {
 	return queryServer{
 		UnimplementedQueryServer: types.UnimplementedQueryServer{},
-		k: k,
+		k:                        k,
 	}
 }

@@ -1,0 +1,6 @@
+{
+  "name": "new-msig",
+  "type": "multi",
+  "address": "lumera1newshimaddrxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "pubkey": "{\"@type\":\"/cosmos.crypto.multisig.LegacyAminoPubKey\",\"threshold\":2,\"public_keys\":[{\"@type\":\"/cosmos.evm.crypto.v1.ethsecp256k1.PubKey\",\"key\":\"B1111111111111111111111111111111111111111111\"},{\"@type\":\"/cosmos.evm.crypto.v1.ethsecp256k1.PubKey\",\"key\":\"B2222222222222222222222222222222222222222222\"},{\"@type\":\"/cosmos.evm.crypto.v1.ethsecp256k1.PubKey\",\"key\":\"B3333333333333333333333333333333333333333333\"}]}"
+}

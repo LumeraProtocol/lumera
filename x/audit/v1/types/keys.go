@@ -7,6 +7,10 @@ const (
 
 	StoreKey    = ModuleName
 	MemStoreKey = "mem_audit"
+
+	// MaxStorageProofResultsPerReport caps the number of storage proof results
+	// a reporter may submit in a single epoch report. Per PR #118 / Zee F2.
+	MaxStorageProofResultsPerReport = 16
 )
 
 var (
@@ -40,7 +44,7 @@ var (
 	// epochParamsSnapshotPrefix stores a per-epoch snapshot of assignment/gating-related params.
 	// Format: "eps/" + u64be(epoch_id)
 	epochParamsSnapshotPrefix = []byte("eps/")
-	reportPrefix      = []byte("r/")
+	reportPrefix              = []byte("r/")
 
 	reportIndexPrefix = []byte("ri/")
 
@@ -71,6 +75,60 @@ var (
 	evidenceEpochCountPrefix = []byte("eve/")
 
 	actionFinalizationPostponementPrefix = []byte("ap/af/")
+
+	// Storage-truth postponement state:
+	// - StorageTruthPostponementKey: "ap/st/" + supernode_account -> 8 bytes u64be(postponed_at_epoch_id)
+	storageTruthPostponementPrefix = []byte("ap/st/")
+	// Per F121-F12 — sibling marker recording strong-postpone reason.
+	storageTruthPostponementStrongPrefix = []byte("ap/sts/")
+
+	// Storage-truth state:
+	// - NodeSuspicionStateKey:          "st/ns/" + supernode_account
+	// - ReporterReliabilityStateKey:    "st/rr/" + reporter_supernode_account
+	// - TicketDeteriorationStateKey:    "st/td/" + ticket_id
+	// - TicketArtifactCountStateKey:    "st/tac/" + ticket_id
+	// - HealOpKey:                      "st/ho/" + u64be(heal_op_id)
+	// - HealOpByTicketIndexKey:         "st/hot/" + ticket_id + 0x00 + u64be(heal_op_id)
+	// - HealOpByStatusIndexKey:         "st/hos/" + u32be(status) + u64be(heal_op_id)
+	// - HealOpVerificationKey:          "st/hov/" + u64be(heal_op_id) + "/" + verifier_supernode_account
+	// - NextHealOpIDKey:                "st/next_ho_id"
+	nodeSuspicionStatePrefix       = []byte("st/ns/")
+	reporterReliabilityStatePrefix = []byte("st/rr/")
+	ticketDeteriorationStatePrefix = []byte("st/td/")
+	ticketArtifactCountStatePrefix = []byte("st/tac/")
+	healOpPrefix                   = []byte("st/ho/")
+	healOpByTicketIndexPrefix      = []byte("st/hot/")
+	healOpByStatusIndexPrefix      = []byte("st/hos/")
+	healOpVerificationPrefix       = []byte("st/hov/")
+	nextHealOpIDKey                = []byte("st/next_ho_id")
+
+	// Recheck evidence dedup:
+	// - RecheckEvidenceKey: "st/rce/" + u64be(epoch_id) + "/" + ticket_id + 0x00 + creator_account
+	recheckEvidencePrefix = []byte("st/rce/")
+
+	// Storage-truth fact indexes:
+	// - StorageProofTranscriptKey:      "st/spt/" + transcript_hash -> storageProofTranscriptRecord JSON
+	// - NodeStorageTruthFailureKey:     "st/nf/" + supernode_account + "/" + u64be(epoch_id) + "/" + ticket_id + 0x00 + reporter_account -> storageTruthNodeFailureRecord JSON
+	// - ReporterStorageTruthResultKey:  "st/rrs/" + reporter_account + "/" + u64be(epoch_id) + "/" + ticket_id + 0x00 + target_account -> storageTruthReporterResultRecord JSON
+	// - StorageTruthFailedHealKey:      "st/fh/" + supernode_account + "/" + u64be(epoch_id) + "/" + ticket_id -> empty
+	storageProofTranscriptPrefix     = []byte("st/spt/")
+	nodeStorageTruthFailurePrefix    = []byte("st/nf/")
+	reporterStorageTruthResultPrefix = []byte("st/rrs/")
+	storageTruthFailedHealPrefix     = []byte("st/fh/")
+
+	// Per 122-Copilot-3/4/5 + 122-F1 — indexed lookup avoids DeliverTx full-table scan.
+	//
+	// Secondary index: reporter result keyed by (target, epoch, ticketID, reporter).
+	// Format: "st/rrs-tt/" + target + "/" + u64be(epoch) + "/" + ticketID + 0x00 + reporter
+	reporterResultByTargetPrefix = []byte("st/rrs-tt/")
+
+	// Secondary index: reporter activity keyed by (epoch, reporter).
+	// Format: "st/rrs-e/" + u64be(epoch) + "/" + reporter_account -> empty
+	reporterResultByEpochPrefix = []byte("st/rrs-e/")
+
+	// Secondary index: transcript keyed by (target, bucket, epoch, transcriptHash).
+	// Format: "st/spt-tbe/" + target + "/" + u32be(bucket) + "/" + u64be(epoch) + "/" + transcriptHash
+	transcriptByTargetBucketEpochPrefix = []byte("st/spt-tbe/")
 )
 
 // EpochAnchorKey returns the store key for the EpochAnchor identified by epochID.
@@ -280,4 +338,420 @@ func ActionFinalizationPostponementKey(supernodeAccount string) []byte {
 
 func ActionFinalizationPostponementPrefix() []byte {
 	return actionFinalizationPostponementPrefix
+}
+
+func NodeSuspicionStateKey(supernodeAccount string) []byte {
+	key := make([]byte, 0, len(nodeSuspicionStatePrefix)+len(supernodeAccount))
+	key = append(key, nodeSuspicionStatePrefix...)
+	key = append(key, supernodeAccount...)
+	return key
+}
+
+func NodeSuspicionStatePrefix() []byte {
+	return nodeSuspicionStatePrefix
+}
+
+func ReporterReliabilityStateKey(reporterSupernodeAccount string) []byte {
+	key := make([]byte, 0, len(reporterReliabilityStatePrefix)+len(reporterSupernodeAccount))
+	key = append(key, reporterReliabilityStatePrefix...)
+	key = append(key, reporterSupernodeAccount...)
+	return key
+}
+
+func ReporterReliabilityStatePrefix() []byte {
+	return reporterReliabilityStatePrefix
+}
+
+func TicketDeteriorationStateKey(ticketID string) []byte {
+	key := make([]byte, 0, len(ticketDeteriorationStatePrefix)+len(ticketID))
+	key = append(key, ticketDeteriorationStatePrefix...)
+	key = append(key, ticketID...)
+	return key
+}
+
+func TicketDeteriorationStatePrefix() []byte {
+	return ticketDeteriorationStatePrefix
+}
+
+func TicketArtifactCountStateKey(ticketID string) []byte {
+	key := make([]byte, 0, len(ticketArtifactCountStatePrefix)+len(ticketID))
+	key = append(key, ticketArtifactCountStatePrefix...)
+	key = append(key, ticketID...)
+	return key
+}
+
+func TicketArtifactCountStatePrefix() []byte {
+	return ticketArtifactCountStatePrefix
+}
+
+func HealOpKey(healOpID uint64) []byte {
+	key := make([]byte, 0, len(healOpPrefix)+8)
+	key = append(key, healOpPrefix...)
+	key = binary.BigEndian.AppendUint64(key, healOpID)
+	return key
+}
+
+func HealOpPrefix() []byte {
+	return healOpPrefix
+}
+
+func HealOpByTicketIndexKey(ticketID string, healOpID uint64) []byte {
+	key := make([]byte, 0, len(healOpByTicketIndexPrefix)+len(ticketID)+1+8) // "st/hot/" + ticket + 0x00 + u64be(heal_op_id)
+	key = append(key, healOpByTicketIndexPrefix...)
+	key = append(key, ticketID...)
+	key = append(key, 0)
+	key = binary.BigEndian.AppendUint64(key, healOpID)
+	return key
+}
+
+func HealOpByTicketIndexPrefix(ticketID string) []byte {
+	key := make([]byte, 0, len(healOpByTicketIndexPrefix)+len(ticketID)+1) // "st/hot/" + ticket + 0x00
+	key = append(key, healOpByTicketIndexPrefix...)
+	key = append(key, ticketID...)
+	key = append(key, 0)
+	return key
+}
+
+func HealOpByStatusIndexKey(status HealOpStatus, healOpID uint64) []byte {
+	key := make([]byte, 0, len(healOpByStatusIndexPrefix)+4+8) // "st/hos/" + u32be(status) + u64be(heal_op_id)
+	key = append(key, healOpByStatusIndexPrefix...)
+	key = binary.BigEndian.AppendUint32(key, uint32(status))
+	key = binary.BigEndian.AppendUint64(key, healOpID)
+	return key
+}
+
+func HealOpByStatusIndexPrefix(status HealOpStatus) []byte {
+	key := make([]byte, 0, len(healOpByStatusIndexPrefix)+4) // "st/hos/" + u32be(status)
+	key = append(key, healOpByStatusIndexPrefix...)
+	key = binary.BigEndian.AppendUint32(key, uint32(status))
+	return key
+}
+
+func NextHealOpIDKey() []byte {
+	return nextHealOpIDKey
+}
+
+func HealOpVerificationKey(healOpID uint64, verifierSupernodeAccount string) []byte {
+	key := make([]byte, 0, len(healOpVerificationPrefix)+8+1+len(verifierSupernodeAccount)) // "st/hov/" + u64be(heal_op_id) + "/" + verifier
+	key = append(key, healOpVerificationPrefix...)
+	key = binary.BigEndian.AppendUint64(key, healOpID)
+	key = append(key, '/')
+	key = append(key, verifierSupernodeAccount...)
+	return key
+}
+
+func HealOpVerificationPrefix(healOpID uint64) []byte {
+	key := make([]byte, 0, len(healOpVerificationPrefix)+8+1) // "st/hov/" + u64be(heal_op_id) + "/"
+	key = append(key, healOpVerificationPrefix...)
+	key = binary.BigEndian.AppendUint64(key, healOpID)
+	key = append(key, '/')
+	return key
+}
+
+func HealOpVerificationRootPrefix() []byte {
+	return healOpVerificationPrefix
+}
+
+func StorageTruthPostponementKey(supernodeAccount string) []byte {
+	key := make([]byte, 0, len(storageTruthPostponementPrefix)+len(supernodeAccount))
+	key = append(key, storageTruthPostponementPrefix...)
+	key = append(key, supernodeAccount...)
+	return key
+}
+
+func StorageTruthPostponementPrefix() []byte {
+	return storageTruthPostponementPrefix
+}
+
+// StorageTruthPostponementStrongKey marks a postponement record as strong-band
+// (F121-F12). Presence of this key indicates the supernode was postponed under
+// the strong-postpone band; recovery requires StorageTruthStrongRecoveryCleanPassCount
+// rather than StorageTruthRecoveryCleanPassCount.
+func StorageTruthPostponementStrongKey(supernodeAccount string) []byte {
+	key := make([]byte, 0, len(storageTruthPostponementStrongPrefix)+len(supernodeAccount))
+	key = append(key, storageTruthPostponementStrongPrefix...)
+	key = append(key, supernodeAccount...)
+	return key
+}
+
+// RecheckEvidencePrefix returns the root prefix for all recheck-evidence dedup keys.
+func RecheckEvidencePrefix() []byte {
+	return recheckEvidencePrefix
+}
+
+// NodeStorageTruthFailureRootPrefix returns the root prefix for all node-failure facts.
+func NodeStorageTruthFailureRootPrefix() []byte {
+	return nodeStorageTruthFailurePrefix
+}
+
+// StorageTruthFailedHealRootPrefix returns the root prefix for all failed-heal markers.
+func StorageTruthFailedHealRootPrefix() []byte {
+	return storageTruthFailedHealPrefix
+}
+
+// RecheckEvidenceKey returns the dedup key for a recheck evidence submission.
+// Format: "st/rce/" + u64be(epoch_id) + "/" + ticket_id + 0x00 + creator_account
+func RecheckEvidenceKey(epochID uint64, ticketID string, creatorAccount string) []byte {
+	key := make([]byte, 0, len(recheckEvidencePrefix)+8+1+len(ticketID)+1+len(creatorAccount))
+	key = append(key, recheckEvidencePrefix...)
+	key = binary.BigEndian.AppendUint64(key, epochID)
+	key = append(key, '/')
+	key = append(key, ticketID...)
+	key = append(key, 0) // delimiter allows ticket_id to contain '/'
+	key = append(key, creatorAccount...)
+	return key
+}
+
+func StorageProofTranscriptKey(transcriptHash string) []byte {
+	key := make([]byte, 0, len(storageProofTranscriptPrefix)+len(transcriptHash))
+	key = append(key, storageProofTranscriptPrefix...)
+	key = append(key, transcriptHash...)
+	return key
+}
+
+func StorageProofTranscriptPrefix() []byte {
+	return storageProofTranscriptPrefix
+}
+
+func NodeStorageTruthFailureKey(supernodeAccount string, epochID uint64, ticketID string, reporterAccount string) []byte {
+	key := make([]byte, 0, len(nodeStorageTruthFailurePrefix)+len(supernodeAccount)+1+8+1+len(ticketID)+1+len(reporterAccount))
+	key = append(key, nodeStorageTruthFailurePrefix...)
+	key = append(key, supernodeAccount...)
+	key = append(key, '/')
+	key = binary.BigEndian.AppendUint64(key, epochID)
+	key = append(key, '/')
+	key = append(key, ticketID...)
+	key = append(key, 0)
+	key = append(key, reporterAccount...)
+	return key
+}
+
+func NodeStorageTruthFailurePrefix(supernodeAccount string) []byte {
+	key := make([]byte, 0, len(nodeStorageTruthFailurePrefix)+len(supernodeAccount)+1)
+	key = append(key, nodeStorageTruthFailurePrefix...)
+	key = append(key, supernodeAccount...)
+	key = append(key, '/')
+	return key
+}
+
+func ReporterStorageTruthResultKey(reporterAccount string, epochID uint64, ticketID string, targetAccount string) []byte {
+	key := make([]byte, 0, len(reporterStorageTruthResultPrefix)+len(reporterAccount)+1+8+1+len(ticketID)+1+len(targetAccount))
+	key = append(key, reporterStorageTruthResultPrefix...)
+	key = append(key, reporterAccount...)
+	key = append(key, '/')
+	key = binary.BigEndian.AppendUint64(key, epochID)
+	key = append(key, '/')
+	key = append(key, ticketID...)
+	key = append(key, 0)
+	key = append(key, targetAccount...)
+	return key
+}
+
+func ReporterStorageTruthResultPrefix(reporterAccount string) []byte {
+	key := make([]byte, 0, len(reporterStorageTruthResultPrefix)+len(reporterAccount)+1)
+	key = append(key, reporterStorageTruthResultPrefix...)
+	key = append(key, reporterAccount...)
+	key = append(key, '/')
+	return key
+}
+
+func ReporterStorageTruthResultRootPrefix() []byte {
+	return reporterStorageTruthResultPrefix
+}
+
+func ReporterStorageTruthResultByEpochRootPrefix() []byte {
+	return reporterResultByEpochPrefix
+}
+
+// NodeStorageTruthFailureEpochScanRange returns [start, end) iterator bounds
+// for scanning a supernode's failure facts within the inclusive epoch range
+// [startEpoch, endEpoch]. Key shape unchanged — start/end built from the
+// canonical prefix + u64be(epoch). Per CP-NEW-A-11 residue (bounded scan).
+func NodeStorageTruthFailureEpochScanRange(supernodeAccount string, startEpoch, endEpoch uint64) ([]byte, []byte) {
+	base := NodeStorageTruthFailurePrefix(supernodeAccount)
+	start := make([]byte, 0, len(base)+8)
+	start = append(start, base...)
+	start = binary.BigEndian.AppendUint64(start, startEpoch)
+	end := make([]byte, 0, len(base)+8)
+	end = append(end, base...)
+	// end is exclusive: u64be(endEpoch+1). Wrap-safe: if endEpoch is MaxUint64,
+	// fall back to the unbounded prefix end.
+	if endEpoch == ^uint64(0) {
+		// No upper bound — emit the prefix-end sentinel.
+		return start, prefixEnd(base)
+	}
+	end = binary.BigEndian.AppendUint64(end, endEpoch+1)
+	return start, end
+}
+
+// ReporterStorageTruthResultEpochScanRange returns [start, end) iterator
+// bounds for scanning a reporter's result facts within the inclusive epoch
+// range [startEpoch, endEpoch]. Per CP-NEW-A-11 residue.
+func ReporterStorageTruthResultEpochScanRange(reporterAccount string, startEpoch, endEpoch uint64) ([]byte, []byte) {
+	base := ReporterStorageTruthResultPrefix(reporterAccount)
+	start := make([]byte, 0, len(base)+8)
+	start = append(start, base...)
+	start = binary.BigEndian.AppendUint64(start, startEpoch)
+	end := make([]byte, 0, len(base)+8)
+	end = append(end, base...)
+	if endEpoch == ^uint64(0) {
+		return start, prefixEnd(base)
+	}
+	end = binary.BigEndian.AppendUint64(end, endEpoch+1)
+	return start, end
+}
+
+// prefixEnd computes the exclusive end key of a prefix range — i.e. the
+// smallest byte string that is strictly greater than every key beginning
+// with prefix. Returns nil when prefix is all 0xFF.
+func prefixEnd(prefix []byte) []byte {
+	end := make([]byte, len(prefix))
+	copy(end, prefix)
+	for i := len(end) - 1; i >= 0; i-- {
+		end[i]++
+		if end[i] != 0 {
+			return end[:i+1]
+		}
+	}
+	return nil
+}
+
+func StorageTruthFailedHealKey(supernodeAccount string, epochID uint64, ticketID string) []byte {
+	key := make([]byte, 0, len(storageTruthFailedHealPrefix)+len(supernodeAccount)+1+8+1+len(ticketID))
+	key = append(key, storageTruthFailedHealPrefix...)
+	key = append(key, supernodeAccount...)
+	key = append(key, '/')
+	key = binary.BigEndian.AppendUint64(key, epochID)
+	key = append(key, '/')
+	key = append(key, ticketID...)
+	return key
+}
+
+func StorageTruthFailedHealPrefix(supernodeAccount string) []byte {
+	key := make([]byte, 0, len(storageTruthFailedHealPrefix)+len(supernodeAccount)+1)
+	key = append(key, storageTruthFailedHealPrefix...)
+	key = append(key, supernodeAccount...)
+	key = append(key, '/')
+	return key
+}
+
+// Per 122-Copilot-3/4/5 + 122-F1 — indexed lookup avoids DeliverTx full-table scan.
+
+// ReporterStorageTruthResultByTargetKey returns the secondary-index key for a reporter result
+// keyed by (target, epoch, ticketID, reporter).
+// Format: "st/rrs-tt/" + target + "/" + u64be(epoch) + "/" + ticketID + 0x00 + reporter
+func ReporterStorageTruthResultByTargetKey(targetAccount string, epochID uint64, ticketID string, reporterAccount string) []byte {
+	key := make([]byte, 0, len(reporterResultByTargetPrefix)+len(targetAccount)+1+8+1+len(ticketID)+1+len(reporterAccount))
+	key = append(key, reporterResultByTargetPrefix...)
+	key = append(key, targetAccount...)
+	key = append(key, '/')
+	key = binary.BigEndian.AppendUint64(key, epochID)
+	key = append(key, '/')
+	key = append(key, ticketID...)
+	key = append(key, 0)
+	key = append(key, reporterAccount...)
+	return key
+}
+
+// ReporterStorageTruthResultByTargetEpochPrefix returns the prefix for scanning all reporter
+// results for a given (target, epoch).
+func ReporterStorageTruthResultByTargetEpochPrefix(targetAccount string, epochID uint64) []byte {
+	key := make([]byte, 0, len(reporterResultByTargetPrefix)+len(targetAccount)+1+8+1)
+	key = append(key, reporterResultByTargetPrefix...)
+	key = append(key, targetAccount...)
+	key = append(key, '/')
+	key = binary.BigEndian.AppendUint64(key, epochID)
+	key = append(key, '/')
+	return key
+}
+
+// ReporterStorageTruthResultByEpochReporterKey returns the secondary-index key
+// marking that reporterAccount has at least one reporter-result fact in epochID.
+// Format: "st/rrs-e/" + u64be(epoch) + "/" + reporter_account
+func ReporterStorageTruthResultByEpochReporterKey(epochID uint64, reporterAccount string) []byte {
+	key := make([]byte, 0, len(reporterResultByEpochPrefix)+8+1+len(reporterAccount))
+	key = append(key, reporterResultByEpochPrefix...)
+	key = binary.BigEndian.AppendUint64(key, epochID)
+	key = append(key, '/')
+	key = append(key, reporterAccount...)
+	return key
+}
+
+// ReporterStorageTruthResultByEpochPrefix returns the prefix for scanning
+// reporter accounts that have at least one reporter-result fact in epochID.
+func ReporterStorageTruthResultByEpochPrefix(epochID uint64) []byte {
+	key := make([]byte, 0, len(reporterResultByEpochPrefix)+8+1)
+	key = append(key, reporterResultByEpochPrefix...)
+	key = binary.BigEndian.AppendUint64(key, epochID)
+	key = append(key, '/')
+	return key
+}
+
+// TranscriptByTargetBucketEpochKey returns the secondary-index key for a transcript
+// keyed by (target, bucket, epoch, transcriptHash).
+// Format: "st/spt-tbe/" + target + "/" + u32be(bucket) + "/" + u64be(epoch) + "/" + transcriptHash
+func TranscriptByTargetBucketEpochKey(targetAccount string, bucketType uint32, epochID uint64, transcriptHash string) []byte {
+	key := make([]byte, 0, len(transcriptByTargetBucketEpochPrefix)+len(targetAccount)+1+4+1+8+1+len(transcriptHash))
+	key = append(key, transcriptByTargetBucketEpochPrefix...)
+	key = append(key, targetAccount...)
+	key = append(key, '/')
+	key = binary.BigEndian.AppendUint32(key, bucketType)
+	key = append(key, '/')
+	key = binary.BigEndian.AppendUint64(key, epochID)
+	key = append(key, '/')
+	key = append(key, transcriptHash...)
+	return key
+}
+
+// ReporterStorageTruthResultByTargetEpochScanRange returns [start, end)
+// iterator bounds for scanning a target's reporter-result secondary index in
+// the inclusive epoch range [startEpoch, endEpoch]. It is MaxUint64-safe.
+func ReporterStorageTruthResultByTargetEpochScanRange(targetAccount string, startEpoch, endEpoch uint64) ([]byte, []byte) {
+	base := make([]byte, 0, len(reporterResultByTargetPrefix)+len(targetAccount)+1)
+	base = append(base, reporterResultByTargetPrefix...)
+	base = append(base, targetAccount...)
+	base = append(base, '/')
+
+	start := make([]byte, 0, len(base)+8)
+	start = append(start, base...)
+	start = binary.BigEndian.AppendUint64(start, startEpoch)
+
+	if endEpoch == ^uint64(0) {
+		return start, prefixEnd(base)
+	}
+	end := make([]byte, 0, len(base)+8)
+	end = append(end, base...)
+	end = binary.BigEndian.AppendUint64(end, endEpoch+1)
+	return start, end
+}
+
+// TranscriptByTargetBucketEpochScanPrefix returns the prefix for epoch-range scanning of
+// transcripts for a given (target, bucket). Iterator start/end are derived by callers using
+// the u64be-encoded epoch bounds.
+func TranscriptByTargetBucketEpochScanPrefix(targetAccount string, bucketType uint32) []byte {
+	key := make([]byte, 0, len(transcriptByTargetBucketEpochPrefix)+len(targetAccount)+1+4+1)
+	key = append(key, transcriptByTargetBucketEpochPrefix...)
+	key = append(key, targetAccount...)
+	key = append(key, '/')
+	key = binary.BigEndian.AppendUint32(key, bucketType)
+	key = append(key, '/')
+	return key
+}
+
+// TranscriptByTargetBucketEpochScanRange returns [start, end) iterator bounds
+// for scanning transcript secondary-index records for a target/bucket in the
+// inclusive epoch range [startEpoch, endEpoch]. It is MaxUint64-safe.
+func TranscriptByTargetBucketEpochScanRange(targetAccount string, bucketType uint32, startEpoch, endEpoch uint64) ([]byte, []byte) {
+	base := TranscriptByTargetBucketEpochScanPrefix(targetAccount, bucketType)
+	start := make([]byte, 0, len(base)+8)
+	start = append(start, base...)
+	start = binary.BigEndian.AppendUint64(start, startEpoch)
+
+	if endEpoch == ^uint64(0) {
+		return start, prefixEnd(base)
+	}
+	end := make([]byte, 0, len(base)+8)
+	end = append(end, base...)
+	end = binary.BigEndian.AppendUint64(end, endEpoch+1)
+	return start, end
 }

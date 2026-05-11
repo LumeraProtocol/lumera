@@ -1,0 +1,6 @@
+{
+  "name": "legacy-eth",
+  "type": "local",
+  "address": "lumera1shimaddr1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "pubkey": "{\"@type\":\"/cosmos.evm.crypto.v1.ethsecp256k1.PubKey\",\"key\":\"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\"}"
+}

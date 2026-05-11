@@ -1,0 +1,22 @@
+{
+  "account": {
+    "@type": "/cosmos.vesting.v1beta1.ContinuousVestingAccount",
+    "base_vesting_account": {
+      "base_account": {
+        "@type": "/cosmos.auth.v1beta1.BaseAccount",
+        "address": "lumera1nested1qxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "pub_key": {
+          "@type": "/cosmos.crypto.multisig.LegacyAminoPubKey",
+          "threshold": 2,
+          "public_keys": [
+            {"@type": "/cosmos.crypto.secp256k1.PubKey", "key": "A1111111111111111111111111111111111111111111"},
+            {"@type": "/cosmos.crypto.secp256k1.PubKey", "key": "A2222222222222222222222222222222222222222222"},
+            {"@type": "/cosmos.crypto.secp256k1.PubKey", "key": "A3333333333333333333333333333333333333333333"}
+          ]
+        },
+        "account_number": "42",
+        "sequence": "0"
+      }
+    }
+  }
+}

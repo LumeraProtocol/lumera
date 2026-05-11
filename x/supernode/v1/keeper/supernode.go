@@ -77,6 +77,20 @@ func (k Keeper) SetSuperNode(ctx sdk.Context, supernode types.SuperNode) error {
 	return nil
 }
 
+// DeleteSuperNode removes a supernode record and its account index entry.
+func (k Keeper) DeleteSuperNode(ctx sdk.Context, valOperAddr sdk.ValAddress) {
+	storeAdapter := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
+	store := prefix.NewStore(storeAdapter, []byte(types.SuperNodeKey))
+	accountIndexStore := prefix.NewStore(storeAdapter, types.SuperNodeByAccountKey)
+
+	existing, exists := k.QuerySuperNode(ctx, valOperAddr)
+	if exists && existing.SupernodeAccount != "" {
+		accountIndexStore.Delete([]byte(existing.SupernodeAccount))
+	}
+
+	store.Delete(valOperAddr)
+}
+
 // QuerySuperNode returns the supernode record for a given validator address
 func (k Keeper) QuerySuperNode(ctx sdk.Context, valOperAddr sdk.ValAddress) (sn types.SuperNode, exists bool) {
 	storeAdapter := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
@@ -101,7 +115,7 @@ func (k Keeper) GetAllSuperNodes(ctx sdk.Context, stateFilters ...types.SuperNod
 	store := prefix.NewStore(storeAdapter, []byte(types.SuperNodeKey))
 
 	iterator := store.Iterator(nil, nil)
-	defer iterator.Close()
+	defer func() { _ = iterator.Close() }()
 
 	var supernodes []types.SuperNode
 	filtering := shouldFilter(stateFilters...)

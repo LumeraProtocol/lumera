@@ -207,6 +207,8 @@ func evaluateCompliance(ctx sdk.Context, params types.Params, m types.SupernodeM
 
 // lastNonDegradedState returns the most recent state that is not POSTPONED
 // or STORAGE_FULL, for use when recovering from a degraded state.
+//
+//nolint:unused // used by audit enforcement wiring landing in a follow-up.
 func lastNonDegradedState(states []*types.SuperNodeStateRecord) types.SuperNodeState {
 	for i := len(states) - 1; i >= 0; i-- {
 		if states[i] == nil {

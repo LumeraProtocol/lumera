@@ -24,8 +24,13 @@ func (k Keeper) GetParams(ctx context.Context) (params types.Params) {
 
 func (k Keeper) SetParams(ctx context.Context, params types.Params) error {
 	// Always store params with defaults applied, so zero values in state never imply "unset".
+	// Per final-gate F-B5, validate here as the single write barrier so migration
+	// handlers and any future direct callers cannot persist invalid params.
 	store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
 	params = params.WithDefaults()
+	if err := params.Validate(); err != nil {
+		return err
+	}
 
 	bz, err := k.cdc.Marshal(&params)
 	if err != nil {

@@ -10,8 +10,8 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/query"
 	gogoproto "github.com/cosmos/gogoproto/proto"
-	"go.uber.org/mock/gomock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -132,10 +132,10 @@ func TestQueryActionByMetadata(t *testing.T) {
 				MetadataQuery: "collection_id=collection1",
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
-				k.SetAction(ctx, &action1)
-				k.SetAction(ctx, &action2)
-				k.SetAction(ctx, &action3)
-				k.SetAction(ctx, &action4)
+				require.NoError(t, k.SetAction(ctx, &action1))
+				require.NoError(t, k.SetAction(ctx, &action2))
+				require.NoError(t, k.SetAction(ctx, &action3))
+				require.NoError(t, k.SetAction(ctx, &action4))
 			},
 			expectedErr: nil,
 			checkResult: func(t *testing.T, resp *types.QueryActionByMetadataResponse) {
@@ -152,9 +152,9 @@ func TestQueryActionByMetadata(t *testing.T) {
 				MetadataQuery: "collection_id=collection3",
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
-				k.SetAction(ctx, &action1)
-				k.SetAction(ctx, &action2)
-				k.SetAction(ctx, &action3)
+				require.NoError(t, k.SetAction(ctx, &action1))
+				require.NoError(t, k.SetAction(ctx, &action2))
+				require.NoError(t, k.SetAction(ctx, &action3))
 			},
 			expectedErr: nil,
 			checkResult: func(t *testing.T, resp *types.QueryActionByMetadataResponse) {
@@ -173,10 +173,10 @@ func TestQueryActionByMetadata(t *testing.T) {
 				},
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
-				k.SetAction(ctx, &action1)
-				k.SetAction(ctx, &action2)
-				k.SetAction(ctx, &action3)
-				k.SetAction(ctx, &action4)
+				require.NoError(t, k.SetAction(ctx, &action1))
+				require.NoError(t, k.SetAction(ctx, &action2))
+				require.NoError(t, k.SetAction(ctx, &action3))
+				require.NoError(t, k.SetAction(ctx, &action4))
 			},
 			expectedErr: nil,
 			checkResult: func(t *testing.T, resp *types.QueryActionByMetadataResponse) {

@@ -6,8 +6,8 @@ import (
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"go.uber.org/mock/gomock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/LumeraProtocol/lumera/x/supernode/v1/keeper"
 	supernodemocks "github.com/LumeraProtocol/lumera/x/supernode/v1/mocks"
@@ -89,7 +89,7 @@ func TestMsgServer_DeRegisterSupernode(t *testing.T) {
 			k, ctx := setupKeeperForTest(t, stakingKeeper, slashingKeeper, bankKeeper)
 			if tc.expectedError != sdkerrors.ErrNotFound {
 
-				k.SetSuperNode(ctx, types.SuperNode{
+				require.NoError(t, k.SetSuperNode(ctx, types.SuperNode{
 					SupernodeAccount: creatorAddr.String(),
 					ValidatorAddress: valAddr.String(),
 					Note:             "1.0.0",
@@ -111,7 +111,7 @@ func TestMsgServer_DeRegisterSupernode(t *testing.T) {
 						},
 					},
 					P2PPort: "26657",
-				})
+				}))
 			}
 
 			msgServer := keeper.NewMsgServerImpl(k)

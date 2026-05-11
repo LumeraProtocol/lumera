@@ -22,6 +22,9 @@ func SimulateMsgRequestActionSuccessSense(
 
 		// 1. Register Action
 		actionId, msg := registerSenseAction(r, ctx, accs, bk, k, ak)
+		if msg == nil {
+			return simtypes.NoOpMsg(types.ModuleName, "MsgRequestAction", "no account with sufficient funds"), nil, nil
+		}
 
 		// 2. Verify results: action created, funds deducted, proper state
 		action, found := k.GetActionByID(ctx, actionId)
@@ -49,6 +52,9 @@ func SimulateMsgRequestActionSuccessCascade(
 	) (simtypes.OperationMsg, []simtypes.FutureOperation, error) {
 		// 1. Register Action
 		actionId, msg := registerCascadeAction(r, ctx, accs, bk, k, ak)
+		if msg == nil {
+			return simtypes.NoOpMsg(types.ModuleName, "MsgRequestAction", "no account with sufficient funds"), nil, nil
+		}
 
 		// 8. Verify results: action created, funds deducted, proper state
 		action, found := k.GetActionByID(ctx, actionId)
@@ -80,7 +86,10 @@ func SimulateMsgRequestActionInvalidMetadata(
 		feeAmount := generateRandomFee(r, ctx, params.BaseActionFee)
 
 		// 2. Select random account with enough spendable balance
-		simAccount := selectRandomAccountWithSufficientFunds(r, ctx, accs, bk, ak, feeAmount, []string{""})
+		simAccount, ok := selectRandomAccountWithSufficientFunds(r, ctx, accs, bk, ak, feeAmount, []string{""})
+		if !ok {
+			return simtypes.NoOpMsg(types.ModuleName, "MsgRequestAction", "no account with sufficient funds"), nil, nil
+		}
 
 		// 3. Get initial balance
 		denom := params.BaseActionFee.Denom

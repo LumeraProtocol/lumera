@@ -14,11 +14,11 @@ import (
 
 	"github.com/cosmos/btcutil/base58"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
-	"go.uber.org/mock/gomock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	"lukechampine.com/blake3"
 
-	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
+	"github.com/LumeraProtocol/lumera/testutil/crypto"
 	keepertest "github.com/LumeraProtocol/lumera/testutil/keeper"
 	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 )
@@ -267,8 +267,8 @@ func TestGenerateSupernodeRQIDs(t *testing.T) {
 		rqMax     uint32
 	}
 
-	rand.Seed(time.Now().UnixNano())
-	ic := uint32(rand.Intn(100000))
+	rng := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec // test-only randomness
+	ic := uint32(rng.Intn(100000))
 
 	tests := []testCase{
 		{

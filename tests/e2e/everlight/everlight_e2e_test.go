@@ -99,9 +99,13 @@ func (s *EverlightE2ESuite) createSuperNode(dbBytes float64, state sntypes.Super
 		SupernodeAccount: addr.String(),
 		EpochId:          epochID,
 		ReportHeight:     s.ctx.BlockHeight(),
-		HostReport: audittypes.HostReport{
-			CascadeKademliaDbBytes: dbBytes,
-		},
+		HostReport:       audittypes.HostReport{},
+	}))
+	// Per LEP-6 §12: cascade bytes moved from HostReport to SupernodeMetricsState.
+	require.NoError(s.T(), s.keeperImpl.SetMetricsState(s.ctx, sntypes.SupernodeMetricsState{
+		ValidatorAddress: valAddr.String(),
+		Metrics:          &sntypes.SupernodeMetrics{CascadeKademliaDbBytes: dbBytes},
+		Height:           s.ctx.BlockHeight(),
 	}))
 
 	return addr, valAddr

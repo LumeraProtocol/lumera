@@ -1,0 +1,19 @@
+# openapigen configuration — controls which swagger files are merged and in what order.
+# Directories are searched in the order listed; within each directory, files are sorted
+# alphabetically. First match wins for duplicate paths.
+
+[info]
+title = "Lumera REST API"
+description = "Chain github.com/LumeraProtocol/lumera REST API"
+
+# Swagger source directories, searched in order.
+# Lumera custom modules first, then vendor modules (cosmos/evm, ibc, etc.).
+
+[[sources]]
+dir = "proto/lumera"
+pattern = "*.swagger.json"
+
+# Cosmos EVM modules (erc20, feemarket, vm, precisebank) — generated from vendor protos.
+[[sources]]
+dir = "proto/vendor-swagger"
+pattern = "*.swagger.json"

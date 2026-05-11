@@ -17,6 +17,7 @@ import (
 	"time"
 
 	sdkmath "cosmossdk.io/math"
+	textutil "github.com/LumeraProtocol/lumera/pkg/text"
 	"github.com/LumeraProtocol/lumera/x/action/v1/keeper"
 	"github.com/LumeraProtocol/lumera/x/action/v1/merkle"
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
@@ -96,9 +97,9 @@ func runCascadeCommitmentTest(t *testing.T, fileSize uint64, chunkSize uint32) {
 		rpcAddr = resolvedRPC
 	}
 
-	grpcAddr := lep5ResolveReachableGRPC(lep5NormalizeGRPCAddr(getenv("LUMERA_GRPC_ADDR", lep5DefaultLumeraGRPC)))
-	chainID := getenv("LUMERA_CHAIN_ID", defaultLumeraChainID)
-	denom := getenv("LUMERA_DENOM", defaultLumeraDenom)
+	grpcAddr := lep5ResolveReachableGRPC(lep5NormalizeGRPCAddr(textutil.EnvOrDefault("LUMERA_GRPC_ADDR", lep5DefaultLumeraGRPC)))
+	chainID := textutil.EnvOrDefault("LUMERA_CHAIN_ID", defaultLumeraChainID)
+	denom := textutil.EnvOrDefault("LUMERA_DENOM", defaultLumeraDenom)
 	moniker := detectValidatorMoniker()
 
 	if _, _, err := lep5NextFinalizeSeed(ctx, rpcAddr); err != nil {
@@ -335,9 +336,9 @@ func TestLEP5CascadeAvailabilityCommitmentFailure(t *testing.T) {
 		rpcAddr = resolvedRPC
 	}
 
-	grpcAddr := lep5ResolveReachableGRPC(lep5NormalizeGRPCAddr(getenv("LUMERA_GRPC_ADDR", lep5DefaultLumeraGRPC)))
-	chainID := getenv("LUMERA_CHAIN_ID", defaultLumeraChainID)
-	denom := getenv("LUMERA_DENOM", defaultLumeraDenom)
+	grpcAddr := lep5ResolveReachableGRPC(lep5NormalizeGRPCAddr(textutil.EnvOrDefault("LUMERA_GRPC_ADDR", lep5DefaultLumeraGRPC)))
+	chainID := textutil.EnvOrDefault("LUMERA_CHAIN_ID", defaultLumeraChainID)
+	denom := textutil.EnvOrDefault("LUMERA_DENOM", defaultLumeraDenom)
 	moniker := detectValidatorMoniker()
 
 	if _, _, err := lep5NextFinalizeSeed(ctx, rpcAddr); err != nil {
@@ -567,8 +568,8 @@ func lep5LoadSignerKey(ctx context.Context, chainID, moniker, rpcAddr, grpcAddr 
 		return kr, keyName, addr, nil
 	}
 
-	backend := getenv("LUMERA_KEYRING_BACKEND", "test")
-	app := getenv("LUMERA_KEYRING_APP", "lumera")
+	backend := textutil.EnvOrDefault("LUMERA_KEYRING_BACKEND", "test")
+	app := textutil.EnvOrDefault("LUMERA_KEYRING_APP", "lumera")
 
 	for _, home := range lep5KeyringHomeCandidates(chainID) {
 		kr, openErr := sdkcrypto.NewKeyring(sdkcrypto.KeyringParams{
@@ -671,14 +672,19 @@ func lep5QueryActiveSupernodeAccounts(ctx context.Context, rpcAddr, grpcAddr str
 }
 
 func lep5LoadSignerFromMnemonicCandidates(chainID, moniker string, activeSupernodes map[string]struct{}) (keyring.Keyring, string, string, bool) {
+	// Try both EVM and Cosmos key types — the active supernode address
+	// depends on whether the chain has been upgraded to EVM.
+	keyTypes := []sdkcrypto.KeyType{sdkcrypto.KeyTypeEVM, sdkcrypto.KeyTypeCosmos}
 	for _, mnemonicPath := range lep5MnemonicPathCandidates(chainID, moniker) {
 		for _, keyName := range lep5SignerKeyNameCandidates(moniker) {
-			kr, _, addr, err := sdkcrypto.LoadKeyringFromMnemonic(keyName, mnemonicPath)
-			if err != nil {
-				continue
-			}
-			if _, ok := activeSupernodes[addr]; ok {
-				return kr, keyName, addr, true
+			for _, kt := range keyTypes {
+				kr, _, addr, err := sdkcrypto.LoadKeyring(keyName, mnemonicPath, kt)
+				if err != nil {
+					continue
+				}
+				if _, ok := activeSupernodes[addr]; ok {
+					return kr, keyName, addr, true
+				}
 			}
 		}
 	}
@@ -755,7 +761,7 @@ func lep5SignerKeyNameCandidates(moniker string) []string {
 		}
 	}
 
-	for _, validatorCfgPath := range lep5ValidatorConfigCandidates(getenv("LUMERA_CHAIN_ID", defaultLumeraChainID)) {
+	for _, validatorCfgPath := range lep5ValidatorConfigCandidates(textutil.EnvOrDefault("LUMERA_CHAIN_ID", defaultLumeraChainID)) {
 		data, err := os.ReadFile(validatorCfgPath)
 		if err != nil {
 			continue
@@ -855,7 +861,7 @@ func lep5ValidatorConfigCandidates(chainID string) []string {
 		candidates = append(candidates, path)
 	}
 
-	add(getenv("LUMERA_VALIDATORS_FILE", defaultValidatorsFile))
+	add(textutil.EnvOrDefault("LUMERA_VALIDATORS_FILE", defaultValidatorsFile))
 	add("/shared/config/validators.json")
 	add(fmt.Sprintf("/tmp/%s/shared/config/validators.json", chainID))
 	add("/tmp/lumera-devnet/shared/config/validators.json")
@@ -1271,7 +1277,7 @@ func TestLEP5QueryActionMetadata(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	grpcAddr := lep5ResolveReachableGRPC(lep5NormalizeGRPCAddr(getenv("LUMERA_GRPC_ADDR", lep5DefaultLumeraGRPC)))
+	grpcAddr := lep5ResolveReachableGRPC(lep5NormalizeGRPCAddr(textutil.EnvOrDefault("LUMERA_GRPC_ADDR", lep5DefaultLumeraGRPC)))
 
 	if !lep5CanDialTCP(grpcAddr) {
 		t.Skipf("skipping: cannot reach gRPC at %s", grpcAddr)
@@ -1289,7 +1295,7 @@ func TestLEP5QueryActionMetadata(t *testing.T) {
 	require.NoError(t, err, "dial gRPC %s", grpcAddr)
 	defer conn.Close()
 
-	actionID := getenv("LUMERA_ACTION_ID", "1")
+	actionID := textutil.EnvOrDefault("LUMERA_ACTION_ID", "1")
 	t.Logf("Querying action ID: %s (set LUMERA_ACTION_ID to override)", actionID)
 
 	queryClient := actiontypes.NewQueryClient(conn)

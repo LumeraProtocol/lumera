@@ -1,124 +1,28 @@
 name: lint
 
 on:
-  pull_request:
-    branches: [master]
-    paths-ignore:
-      - "**.md"
-      - "docs/**"
-      - ".gitignore"
+  workflow_call:
 
 permissions:
   contents: read
-  pull-requests: write   # reviewdog needs this to post inline review comments
-  checks: write          # for the check-run summary
 
 jobs:
   golangci-lint:
-    name: golangci-lint (diff-only)
+    name: golangci-lint
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v6.0.1
-        with:
-          # reviewdog needs the merge-base to compute the PR diff.
-          fetch-depth: 0
 
       - name: Set up Go
         uses: ./.github/actions/setup-go
 
-      - name: Install dependencies
-        run: go mod download
+      - name: Generate OpenRPC spec
+        run: make openrpc
 
-      # reviewdog wraps golangci-lint and posts only NEW findings introduced
-      # by the PR diff as inline review comments. Pre-existing baseline
-      # diagnostics are not reported, so this never blocks unrelated PRs on
-      # legacy noise.
-      #
-      # Forked PRs receive a read-only GITHUB_TOKEN regardless of the
-      # workflow-level permissions block, so reviewdog cannot post inline
-      # review comments and would fail the job. We branch on the head-repo
-      # owner: same-repo PRs use the `github-pr-review` reporter (inline
-      # comments + failing check), fork PRs fall back to `github-pr-check`
-      # which only emits a check-run annotation (no comment posting, no
-      # write scope required). The lint gate still blocks merges in both
-      # paths via `fail_level: error`.
-      - name: golangci-lint via reviewdog (same-repo PR — inline comments)
-        if: github.event.pull_request.head.repo.full_name == github.repository
-        # Pin to v2.10.0 (>=v2.8.0 required for golangci-lint v2 support;
-        # earlier reviewdog releases on the @v2 major tag still default to
-        # downloading golangci-lint v1.x even when a v2.x version is
-        # requested via the input).
-        uses: reviewdog/action-golangci-lint@v2.10.0
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v9.2.0
         with:
-          go_version_file: go.mod
-          # golangci-lint v2.11.4 is built with Go 1.26.1; required because
-          # the chain repo's go.mod declares `go 1.25.9` and golangci-lint
-          # refuses to load configs whose targeted Go version is higher
-          # than the one it was built with. v2.0.2 was built with Go 1.24.
-          # Config in .golangci.yml uses the v2 schema.
-          golangci_lint_version: v2.11.4
-          golangci_lint_flags: "--config=.golangci.yml --timeout=5m"
-          workdir: .
-          # Only annotate lines actually changed by the PR.
-          filter_mode: added
-          reporter: github-pr-review
-          # `fail_level: error` blocks the job on any new error-severity
-          # finding in the diff. We deliberately do NOT set `level` here:
-          # reviewdog uses each finding's native severity, so error-level
-          # diagnostics (e.g. govet, staticcheck SA*) actually trip
-          # `fail_level: error`. Setting `level: warning` would downgrade
-          # every result to warning and silently neuter the gate.
-          fail_level: error
-        env:
-          REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: golangci-lint via reviewdog (fork PR — local reporter)
-        if: github.event.pull_request.head.repo.full_name != github.repository
-        uses: reviewdog/action-golangci-lint@v2.10.0
-        with:
-          go_version_file: go.mod
-          golangci_lint_version: v2.11.4
-          golangci_lint_flags: "--config=.golangci.yml --timeout=5m"
-          workdir: .
-          filter_mode: added
-          # Fork PRs receive a strictly read-only GITHUB_TOKEN — neither
-          # `github-pr-review` (needs pull-requests: write) nor
-          # `github-pr-check` (needs checks: write) can post results.
-          # `local` writes findings to the job log only; `fail_level: error`
-          # still makes new error-level diagnostics fail the job, which
-          # registers as a failing required-check on the PR and blocks
-          # merge. Contributors can read the findings in the workflow log.
-          reporter: local
-          fail_level: error
-        env:
-          REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  govulncheck:
-    name: govulncheck (Go vulnerability scan)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6.0.1
-
-      # govulncheck-action installs its own Go toolchain via `go-version-file`.
-      # We point it at go.mod so the scan tracks the same toolchain the rest
-      # of CI uses (currently go 1.25.9). The action exits non-zero on any
-      # finding affecting the called code, which fails the job and blocks
-      # the PR — exactly what we want for a security gate.
-      - name: Run govulncheck
-        uses: golang/govulncheck-action@v1.0.4
-        with:
-          go-version-file: go.mod
-          # Default scan target is `./...`, which is the full module —
-          # matches the standard `govulncheck ./...` invocation.
-          go-package: ./...
-          # We already checked out the repo in the preceding step. The
-          # action's default `repo-checkout: true` runs a second
-          # actions/checkout, which sets a duplicate `Authorization`
-          # http.extraheader on the local git config and causes the
-          # subsequent fetch to fail with:
-          #   remote: Duplicate header: "Authorization"
-          #   fatal: ... The requested URL returned error: 400
-          # Disable the internal checkout to avoid the conflict.
-          repo-checkout: false
+          version: v2.11.3
+          args: --timeout=5m

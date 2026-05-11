@@ -9,8 +9,8 @@ import (
 	actiontypes "github.com/LumeraProtocol/lumera/x/action/v1/types"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"go.uber.org/mock/gomock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -60,7 +60,7 @@ func TestKeeper_GetAction(t *testing.T) {
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
 				action.Price = price.String()
-				k.SetAction(ctx, &action)
+				require.NoError(t, k.SetAction(ctx, &action))
 			},
 			expectedErr: nil,
 			checkResult: func(t *testing.T, resp *types.QueryGetActionResponse) {

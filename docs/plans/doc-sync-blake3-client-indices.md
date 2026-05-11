@@ -71,7 +71,7 @@ Currently empty body. Add two decision entries in reverse chronological order:
 **nfr.security:**
 - Replace "SHA-256 collision resistance: ~2^128 security" with "BLAKE3 collision resistance: ~2^128 security"
 
-### 4. `docs/new-feature-lep5.md`
+### 4. `docs/leps/LEP5 - Cascade Availability Commitment.md`
 
 This is the largest file with ~60 references to SHA-256 and block-hash challenge derivation.
 
@@ -115,5 +115,5 @@ This is the largest file with ~60 references to SHA-256 and block-hash challenge
 1. `docs/decisions.md` — smallest, independent
 2. `docs/context.json` — feature notes + build instructions
 3. `docs/requirements.json` — scope/features/flows
-4. `docs/new-feature-lep5.md` — largest, most references
+4. `docs/leps/LEP5 - Cascade Availability Commitment.md` — largest, most references
 5. Signal completion

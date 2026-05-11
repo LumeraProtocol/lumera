@@ -1,8 +1,8 @@
 package keeper
 
 import (
-	"context"
 	"bytes"
+	"context"
 
 	errorsmod "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -22,7 +22,7 @@ func (k msgServer) UpdateParams(goCtx context.Context, req *types.MsgUpdateParam
 			return nil, errorsmod.Wrapf(types.ErrInvalidSigner, "unable to decode expected authority")
 		}
 
-		return nil, errorsmod.Wrapf(types.ErrInvalidSigner, "invalid authority; expected %s, got %s", 
+		return nil, errorsmod.Wrapf(types.ErrInvalidSigner, "invalid authority; expected %s, got %s",
 			expectedAuthority, req.Authority)
 	}
 

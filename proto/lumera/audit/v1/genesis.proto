@@ -8,6 +8,7 @@ import "gogoproto/gogo.proto";
 
 import "lumera/audit/v1/params.proto";
 import "lumera/audit/v1/evidence.proto";
+import "lumera/audit/v1/audit.proto";
 
 // GenesisState defines the audit module's genesis state.
 message GenesisState {
@@ -21,4 +22,133 @@ message GenesisState {
 
   // next_evidence_id is the next id to use for chain-assigned ids.
   uint64 next_evidence_id = 3;
+
+  repeated NodeSuspicionState node_suspicion_states = 4 [(gogoproto.nullable) = false];
+  repeated ReporterReliabilityState reporter_reliability_states = 5 [(gogoproto.nullable) = false];
+  repeated TicketDeteriorationState ticket_deterioration_states = 6 [(gogoproto.nullable) = false];
+  repeated HealOp heal_ops = 7 [(gogoproto.nullable) = false];
+
+  // next_heal_op_id is the next id to use for storage-truth heal operations.
+  uint64 next_heal_op_id = 8;
+
+  repeated TicketArtifactCountState ticket_artifact_count_states = 9 [(gogoproto.nullable) = false];
+
+  // storage_truth_postponements records active per-supernode postponement markers
+  // exported/imported at genesis. Per 121-F7.
+  repeated StorageTruthPostponement storage_truth_postponements = 10 [(gogoproto.nullable) = false];
+
+  // Per NEW-C-1: round-trip every epoch-scoped audit prefix.
+  repeated GenesisRecheckEvidence recheck_evidence = 11 [(gogoproto.nullable) = false];
+  repeated GenesisStorageProofTranscript storage_proof_transcripts = 12 [(gogoproto.nullable) = false];
+  repeated GenesisNodeFailureFact node_failure_facts = 13 [(gogoproto.nullable) = false];
+  repeated GenesisReporterResultFact reporter_result_facts = 14 [(gogoproto.nullable) = false];
+  repeated GenesisFailedHealMarker failed_heal_markers = 15 [(gogoproto.nullable) = false];
+  repeated EpochReport epoch_reports = 16 [(gogoproto.nullable) = false];
+  repeated GenesisReportIndex report_indices = 17 [(gogoproto.nullable) = false];
+  repeated GenesisHostReportIndex host_report_indices = 18 [(gogoproto.nullable) = false];
+  repeated GenesisStorageChallengeIndex storage_challenge_indices = 19 [(gogoproto.nullable) = false];
+
+  // Per final-gate F-B2 — action-finalization postponement markers must
+  // survive export/import workflows.
+  repeated GenesisActionFinalizationPostponement action_finalization_postponements = 20 [(gogoproto.nullable) = false];
+
+  // Per final-gate F-B3 — evidence per-epoch aggregate counters must
+  // survive export/import workflows.
+  repeated GenesisEvidenceEpochCount evidence_epoch_counts = 21 [(gogoproto.nullable) = false];
+
+  // Per final-gate F-B4 — per-verifier heal-op votes must survive
+  // export/import workflows.
+  repeated GenesisHealOpVerification heal_op_verifications = 22 [(gogoproto.nullable) = false];
+}
+
+// StorageTruthPostponement records a supernode's storage-truth postponement state
+// for genesis export/import. Per 121-F7.
+message StorageTruthPostponement {
+  string supernode_account = 1;
+  uint64 postponed_at_epoch_id = 2;
+
+  // strong_postpone preserves the companion ap/sts/ marker (final-gate F-B1).
+  bool strong_postpone = 3;
+}
+
+// GenesisActionFinalizationPostponement — ap/af/ marker.
+message GenesisActionFinalizationPostponement {
+  string supernode_account = 1;
+  uint64 postponed_at_epoch_id = 2;
+}
+
+// GenesisEvidenceEpochCount — eve/ aggregate count.
+message GenesisEvidenceEpochCount {
+  uint64 epoch_id = 1;
+  string subject_address = 2;
+  EvidenceType evidence_type = 3;
+  uint64 count = 4;
+}
+
+// GenesisHealOpVerification — st/hov/ per-verifier vote.
+message GenesisHealOpVerification {
+  uint64 heal_op_id = 1;
+  string verifier_supernode_account = 2;
+  bool verified = 3;
+}
+
+// GenesisRecheckEvidence — st/rce/ replay-protection key.
+message GenesisRecheckEvidence {
+  uint64 epoch_id = 1;
+  string ticket_id = 2;
+  string creator_account = 3;
+}
+
+// GenesisStorageProofTranscript — st/spt/ value (JSON-encoded record).
+// The opaque record_json blob is the keeper's storageProofTranscriptRecord
+// JSON marshaling. InitGenesis re-writes via the existing setter so the
+// st/spt-tbe/ secondary index is rebuilt deterministically.
+message GenesisStorageProofTranscript {
+  string transcript_hash = 1;
+  bytes record_json = 2;
+}
+
+// GenesisNodeFailureFact — st/nf/ entry (JSON-encoded record).
+message GenesisNodeFailureFact {
+  string supernode_account = 1;
+  uint64 epoch_id = 2;
+  string ticket_id = 3;
+  string reporter_account = 4;
+  bytes record_json = 5;
+}
+
+// GenesisReporterResultFact — st/rrs/ entry (JSON-encoded record).
+// Secondary indexes are rebuilt by the existing setter.
+message GenesisReporterResultFact {
+  string reporter_account = 1;
+  uint64 epoch_id = 2;
+  string ticket_id = 3;
+  string target_account = 4;
+  bytes record_json = 5;
+}
+
+// GenesisFailedHealMarker — st/fh/ marker.
+message GenesisFailedHealMarker {
+  string supernode_account = 1;
+  uint64 epoch_id = 2;
+  string ticket_id = 3;
+}
+
+// GenesisReportIndex — ri/ index entry.
+message GenesisReportIndex {
+  string reporter_supernode_account = 1;
+  uint64 epoch_id = 2;
+}
+
+// GenesisHostReportIndex — hr/ index entry.
+message GenesisHostReportIndex {
+  string reporter_supernode_account = 1;
+  uint64 epoch_id = 2;
+}
+
+// GenesisStorageChallengeIndex — sc/ index entry.
+message GenesisStorageChallengeIndex {
+  string supernode_account = 1;
+  uint64 epoch_id = 2;
+  string reporter_supernode_account = 3;
 }

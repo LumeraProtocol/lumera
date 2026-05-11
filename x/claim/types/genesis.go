@@ -3,7 +3,10 @@ package types
 // DefaultIndex is the default global index
 const DefaultIndex uint64 = 1
 
-const DefaultClaimableAmountConst = 18_749_999_991_853
+// DefaultClaimableAmountConst is zero because the claiming period ended on
+// 2025-01-01. A non-zero value requires a claims.csv file at genesis init;
+// keeping the default at zero lets new chains start without one.
+const DefaultClaimableAmountConst = 0
 
 // DefaultGenesis returns the default genesis state
 func DefaultGenesis() *GenesisState {

@@ -1,0 +1,20 @@
+{
+  "name": "@lumera/precompile-examples",
+  "version": "0.1.0",
+  "description": "Solidity interfaces and example contracts for Lumera's custom EVM precompiles",
+  "private": true,
+  "scripts": {
+    "compile": "hardhat compile",
+    "clean": "hardhat clean",
+    "test": "hardhat test",
+    "deploy:devnet": "hardhat run scripts/deploy.ts --network devnet",
+    "interact:devnet": "hardhat run scripts/interact.ts --network devnet"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "hardhat": "^2.22.0",
+    "typescript": "^5.4.0",
+    "ts-node": "^10.9.0",
+    "@types/node": "^20.0.0"
+  }
+}

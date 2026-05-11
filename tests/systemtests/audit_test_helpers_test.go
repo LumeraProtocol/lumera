@@ -13,6 +13,7 @@ package system
 //   - query results reliably (gRPC where CLI JSON marshalling is known to break).
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"encoding/json"
@@ -29,6 +30,7 @@ import (
 	"github.com/tidwall/sjson"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"lukechampine.com/blake3"
 
 	lcfg "github.com/LumeraProtocol/lumera/config"
 	audittypes "github.com/LumeraProtocol/lumera/x/audit/v1/types"
@@ -64,6 +66,23 @@ func setAuditParamsForFastEpochs(t *testing.T, epochLengthBlocks uint64, peerQuo
 	}
 }
 
+// setAuditParamsForFastEpochsWithMinDiskFree is setAuditParamsForFastEpochs
+// plus an explicit MinDiskFreePercent override. Used by tests that need to
+// exercise the self-compliance gate against the host report's disk-usage
+// field (e.g. the empty-active-set bootstrap exception's self-compliance
+// guard).
+func setAuditParamsForFastEpochsWithMinDiskFree(t *testing.T, epochLengthBlocks uint64, peerQuorumReports, minTargets, maxTargets uint32, requiredOpenPorts []uint32, minDiskFreePercent uint32) GenesisMutator {
+	base := setAuditParamsForFastEpochs(t, epochLengthBlocks, peerQuorumReports, minTargets, maxTargets, requiredOpenPorts)
+	return func(genesis []byte) []byte {
+		t.Helper()
+		state := base(genesis)
+		var err error
+		state, err = sjson.SetRawBytes(state, "app_state.audit.params.min_disk_free_percent", []byte(strconv.FormatUint(uint64(minDiskFreePercent), 10)))
+		require.NoError(t, err)
+		return state
+	}
+}
+
 // setSupernodeParamsForAuditTests keeps supernode registration permissive for test environments.
 //
 // These tests register supernodes and then submit audit reports "on their behalf" using node keys.
@@ -83,21 +102,12 @@ func setSupernodeParamsForAuditTests(t *testing.T) GenesisMutator {
 	}
 }
 
-func awaitAtLeastHeight(t *testing.T, height int64) {
+func awaitAtLeastHeight(t *testing.T, height int64, timeout ...time.Duration) {
 	t.Helper()
 	if sut.currentHeight >= height {
 		return
 	}
-	// Use a generous timeout that scales with the target delta and never falls
-	// below 30s. The default in sut.AwaitBlockHeight (delta+3 blocks * blockTime)
-	// is too tight on loaded CI runners where block production can slip, and
-	// caused intermittent "block N not reached within Xs" flakes.
-	delta := height - sut.currentHeight
-	timeout := time.Duration(delta+15) * sut.blockTime
-	if timeout < 30*time.Second {
-		timeout = 30 * time.Second
-	}
-	sut.AwaitBlockHeight(t, height, timeout)
+	sut.AwaitBlockHeight(t, height, timeout...)
 }
 
 // pickEpochForStartAtOrAfter returns the first epoch whose start height is >= minStartHeight.
@@ -182,6 +192,24 @@ func headerHashAtHeight(t *testing.T, rpcAddr string, height int64) []byte {
 	hash := res.Block.Header.Hash()
 	require.True(t, len(hash) >= 8, "expected header hash >= 8 bytes")
 	return []byte(hash)
+}
+
+func epochSeedAtHeight(t *testing.T, rpcAddr string, height int64, epochID uint64) []byte {
+	t.Helper()
+
+	raw := headerHashAtHeight(t, rpcAddr, height)
+	epochBz := make([]byte, 8)
+	binary.BigEndian.PutUint64(epochBz, epochID)
+
+	var msg bytes.Buffer
+	msg.WriteString("lumera:epoch-seed")
+	msg.Write(raw)
+	msg.Write(epochBz)
+
+	sum := blake3.Sum256(msg.Bytes())
+	out := make([]byte, len(sum))
+	copy(out, sum[:])
+	return out
 }
 
 // computeKEpoch replicates x/audit/v1/keeper.computeKWindow to keep tests deterministic and black-box.
@@ -281,6 +309,20 @@ func auditHostReportJSON(inboundPortStates []string) string {
 	return string(bz)
 }
 
+// auditHostReportWithDiskUsageJSON is like auditHostReportJSON but lets the
+// caller pin disk_usage_percent. Used by tests that exercise the
+// self-compliance gate (e.g. min-free thresholds).
+func auditHostReportWithDiskUsageJSON(inboundPortStates []string, diskUsagePercent float64) string {
+	bz, _ := json.Marshal(map[string]any{
+		"cpu_usage_percent":    1.0,
+		"mem_usage_percent":    1.0,
+		"disk_usage_percent":   diskUsagePercent,
+		"inbound_port_states":  inboundPortStates,
+		"failed_actions_count": 0,
+	})
+	return string(bz)
+}
+
 // storageChallengeObservationJSON builds the JSON payload for --storage-challenge-observations flag.
 func storageChallengeObservationJSON(targetSupernodeAccount string, portStates []string) string {
 	bz, _ := json.Marshal(map[string]any{
@@ -368,6 +410,18 @@ func auditQueryReport(t *testing.T, epochID uint64, reporterSupernodeAccount str
 	return resp.Report
 }
 
+func auditQueryReporterReliabilityState(t *testing.T, reporterSupernodeAccount string) audittypes.ReporterReliabilityState {
+	t.Helper()
+	qc, _ := newAuditQueryClient(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	resp, err := qc.ReporterReliabilityState(ctx, &audittypes.QueryReporterReliabilityStateRequest{
+		ReporterSupernodeAccount: reporterSupernodeAccount,
+	})
+	require.NoError(t, err)
+	return resp.State
+}
+
 func auditQueryAssignedTargets(t *testing.T, epochID uint64, filterByEpochID bool, proberSupernodeAccount string) audittypes.QueryAssignedTargetsResponse {
 	t.Helper()
 	qc, _ := newAuditQueryClient(t)
@@ -380,4 +434,338 @@ func auditQueryAssignedTargets(t *testing.T, epochID uint64, filterByEpochID boo
 	})
 	require.NoError(t, err)
 	return *resp
+}
+
+func awaitCurrentEpochAnchorWithActiveSupernodes(t *testing.T, minEpochID uint64, expectedAccounts ...string) audittypes.EpochAnchor {
+	t.Helper()
+	qc, _ := newAuditQueryClient(t)
+	deadline := time.Now().Add(2 * time.Minute)
+	var last audittypes.EpochAnchor
+	var lastErr error
+
+	for time.Now().Before(deadline) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		resp, err := qc.CurrentEpochAnchor(ctx, &audittypes.QueryCurrentEpochAnchorRequest{})
+		cancel()
+		if err == nil {
+			last = resp.Anchor
+			if last.EpochId >= minEpochID && containsAllStrings(last.ActiveSupernodeAccounts, expectedAccounts...) && containsAllStrings(last.TargetSupernodeAccounts, expectedAccounts...) {
+				return last
+			}
+		} else {
+			lastErr = err
+		}
+		sut.AwaitNextBlock(t)
+	}
+
+	require.FailNowf(t,
+		"epoch anchor did not include expected supernodes",
+		"min_epoch_id=%d expected=%v last_epoch_id=%d last_active=%v last_targets=%v last_err=%v",
+		minEpochID,
+		expectedAccounts,
+		last.EpochId,
+		last.ActiveSupernodeAccounts,
+		last.TargetSupernodeAccounts,
+		lastErr,
+	)
+	return audittypes.EpochAnchor{}
+}
+
+func containsAllStrings(values []string, needles ...string) bool {
+	for _, needle := range needles {
+		if !containsString(values, needle) {
+			return false
+		}
+	}
+	return true
+}
+
+// setStorageTruthEnforcementModeUnspecified sets enforcement_mode=UNSPECIFIED in genesis.
+// Use this for tests that rely on the k-based peer-assignment formula rather than the
+// storage-truth one-third coverage formula that activates under any non-UNSPECIFIED mode.
+func setStorageTruthEnforcementModeUnspecified(t *testing.T) GenesisMutator {
+	return func(genesis []byte) []byte {
+		t.Helper()
+		state, err := sjson.SetRawBytes(genesis,
+			"app_state.audit.params.storage_truth_enforcement_mode",
+			[]byte(`"STORAGE_TRUTH_ENFORCEMENT_MODE_UNSPECIFIED"`))
+		require.NoError(t, err)
+		return state
+	}
+}
+
+func seedStorageTruthSyntheticTicketCounts(t *testing.T, genesis []byte) []byte {
+	t.Helper()
+
+	ticketIDs := []string{
+		"sys-test-ticket-recheck-1",
+		"sys-test-ticket-soft-postpone",
+		"sys-test-ticket-shadow-nopostpone",
+		"sys-test-ticket-heal-lifecycle-1",
+		"edge-ticket-full-mode-recent",
+		"edge-ticket-full-mode-old",
+		"edge-ticket-unspecified",
+		"edge-ticket-failed-heal",
+		"edge-ticket-replay",
+	}
+	for i := 0; i < 3; i++ {
+		ticketIDs = append(ticketIDs, fmt.Sprintf("edge-ticket-decay-%d", i))
+	}
+	for i := 0; i < 4; i++ {
+		ticketIDs = append(ticketIDs, fmt.Sprintf("multi-ticket-%d", i))
+	}
+
+	states := make([]map[string]any, 0, len(ticketIDs))
+	for _, ticketID := range ticketIDs {
+		states = append(states, map[string]any{
+			"ticket_id":             ticketID,
+			"index_artifact_count":  8,
+			"symbol_artifact_count": 8,
+		})
+	}
+	bz, err := json.Marshal(states)
+	require.NoError(t, err)
+
+	state, err := sjson.SetRawBytes(genesis, "app_state.audit.ticket_artifact_count_states", bz)
+	require.NoError(t, err)
+	return state
+}
+
+// buildStorageProofResultJSON builds a single StorageProofResult JSON object for the
+// --storage-proof-results CLI flag.
+//
+// Uses INVALID_TRANSCRIPT result class: score-neutral (nodeSuspicion=0, ticketDeterioration=0)
+// but recheck-eligible, so it seeds the on-chain transcript KV store without corrupting
+// any node-suspicion or ticket-deterioration score assertions in the test.
+func buildStorageProofResultJSONWithClass(challengerAcct, targetAcct, ticketID, transcriptHash, bucketType, resultClass string) string {
+	bz, _ := json.Marshal(map[string]any{
+		"target_supernode_account":     targetAcct,
+		"challenger_supernode_account": challengerAcct,
+		"ticket_id":                    ticketID,
+		"transcript_hash":              transcriptHash,
+		"bucket_type":                  bucketType,
+		"result_class":                 resultClass,
+		"artifact_class":               "STORAGE_PROOF_ARTIFACT_CLASS_INDEX",
+		"artifact_key":                 "seed-artifact-key",
+		"artifact_ordinal":             0,
+		"artifact_count":               8,
+		"derivation_input_hash":        "seed-derivation-hash",
+		"challenger_signature":         "seed-challenger-signature",
+	})
+	return string(bz)
+}
+
+func buildStorageProofResultJSON(challengerAcct, targetAcct, ticketID, transcriptHash, bucketType string) string {
+	return buildStorageProofResultJSONWithClass(
+		challengerAcct,
+		targetAcct,
+		ticketID,
+		transcriptHash,
+		bucketType,
+		"STORAGE_PROOF_RESULT_CLASS_INVALID_TRANSCRIPT",
+	)
+}
+
+// submitEpochReportWithProofResults submits an epoch report that includes storage proof results
+// via the AutoCLI --storage-proof-results flag. Uses an empty host report (no port measurements).
+func submitEpochReportWithProofResults(t *testing.T, cli *LumeradCli, fromNode string, epochID uint64, proofResultJSONs []string) string {
+	t.Helper()
+	args := []string{
+		"tx", "audit", "submit-epoch-report",
+		strconv.FormatUint(epochID, 10),
+		auditHostReportJSON([]string{}),
+		"--from", fromNode,
+	}
+	for _, pr := range proofResultJSONs {
+		args = append(args, "--storage-proof-results", pr)
+	}
+	return cli.CustomCommand(args...)
+}
+
+type transcriptSeed struct {
+	ticketID       string
+	transcriptHash string
+}
+
+func containsString(values []string, needle string) bool {
+	for _, value := range values {
+		if value == needle {
+			return true
+		}
+	}
+	return false
+}
+
+func findAssignedProberForTarget(
+	t *testing.T,
+	epochID uint64,
+	candidates []testNodeIdentity,
+	targetAcct string,
+) (audittypes.QueryAssignedTargetsResponse, testNodeIdentity) {
+	t.Helper()
+
+	var fallbackResp audittypes.QueryAssignedTargetsResponse
+	var fallbackProber testNodeIdentity
+	for _, candidate := range candidates {
+		resp := auditQueryAssignedTargets(t, epochID, true, candidate.accAddr)
+		if !containsString(resp.TargetSupernodeAccounts, targetAcct) {
+			continue
+		}
+		if candidate.accAddr != targetAcct {
+			return resp, candidate
+		}
+		fallbackResp = resp
+		fallbackProber = candidate
+	}
+	if fallbackProber.accAddr != "" {
+		return fallbackResp, fallbackProber
+	}
+
+	require.FailNowf(t, "no assigned prober", "no candidate assigned to target %q in epoch %d", targetAcct, epochID)
+	return audittypes.QueryAssignedTargetsResponse{}, testNodeIdentity{}
+}
+
+func findAssignedProberAndTarget(
+	t *testing.T,
+	epochID uint64,
+	candidates []testNodeIdentity,
+) (audittypes.QueryAssignedTargetsResponse, testNodeIdentity, testNodeIdentity) {
+	t.Helper()
+
+	byAccount := make(map[string]testNodeIdentity, len(candidates))
+	for _, candidate := range candidates {
+		byAccount[candidate.accAddr] = candidate
+	}
+
+	for _, candidate := range candidates {
+		resp := auditQueryAssignedTargets(t, epochID, true, candidate.accAddr)
+		for _, targetAcct := range resp.TargetSupernodeAccounts {
+			target, ok := byAccount[targetAcct]
+			if ok && target.accAddr != candidate.accAddr {
+				return resp, candidate, target
+			}
+		}
+	}
+
+	require.FailNowf(t, "no assigned prober/target pair", "no candidate had an assigned registered target in epoch %d", epochID)
+	return audittypes.QueryAssignedTargetsResponse{}, testNodeIdentity{}, testNodeIdentity{}
+}
+
+// seedProofTranscripts seeds on-chain transcript records so that subsequent
+// SubmitStorageRecheckEvidence calls can reference a valid challenged_result_transcript_hash.
+//
+// It queries assignments to find which node in candidates is assigned targetAcct,
+// submits an epoch report with INVALID_TRANSCRIPT results from that prober, then
+// returns the rechecker node (any candidate ≠ prober).
+//
+// For fullMode=true (FULL enforcement), exactly one seed is expected and both RECENT and OLD
+// results are included to satisfy compound-coverage validation. For fullMode=false, one
+// RECENT result is generated per seed.
+func seedProofTranscripts(
+	t *testing.T,
+	cli *LumeradCli,
+	epochID uint64,
+	candidates []testNodeIdentity,
+	targetAcct string,
+	seeds []transcriptSeed,
+	fullMode bool,
+) testNodeIdentity {
+	return seedProofTranscriptsWithClass(t, cli, epochID, candidates, targetAcct, seeds, fullMode,
+		"STORAGE_PROOF_RESULT_CLASS_INVALID_TRANSCRIPT")
+}
+
+// seedProofTranscriptsWithClass is identical to seedProofTranscripts but emits seed
+// proof results carrying an explicit result class. Callers that need the seed to
+// count as a Class A failure under postpone predicates pass HASH_MISMATCH; callers
+// that only need a recheck-eligible record can stick with the INVALID_TRANSCRIPT
+// default exposed via seedProofTranscripts. Class A semantics are now failure-class
+// driven (see storageTruthIsClassAFault), so an INDEX-artifact alone no longer
+// promotes a non-class-A result to Class A.
+func seedProofTranscriptsWithClass(
+	t *testing.T,
+	cli *LumeradCli,
+	epochID uint64,
+	candidates []testNodeIdentity,
+	targetAcct string,
+	seeds []transcriptSeed,
+	fullMode bool,
+	resultClass string,
+) testNodeIdentity {
+	t.Helper()
+
+	var prober, rechecker testNodeIdentity
+	proberIdx := -1
+	var proberResp audittypes.QueryAssignedTargetsResponse
+	for i, c := range candidates {
+		resp := auditQueryAssignedTargets(t, epochID, true, c.accAddr)
+		for _, a := range resp.TargetSupernodeAccounts {
+			if a == targetAcct {
+				prober = c
+				proberIdx = i
+				proberResp = resp
+				break
+			}
+		}
+		if proberIdx >= 0 {
+			break
+		}
+	}
+	require.GreaterOrEqual(t, proberIdx, 0,
+		"no candidate assigned to %q in epoch %d — check challenge_target_divisor=1 in genesis", targetAcct, epochID)
+	for i, c := range candidates {
+		if i != proberIdx && c.accAddr != targetAcct {
+			rechecker = c
+			break
+		}
+	}
+	require.NotEmpty(t, rechecker.accAddr, "no rechecker available — candidates must include a node distinct from prober and target")
+
+	// Build port states sized to required_open_ports (chain rejects mismatched lengths).
+	portStates := make([]string, len(proberResp.RequiredOpenPorts))
+	for j := range portStates {
+		portStates[j] = "PORT_STATE_OPEN"
+	}
+
+	// Probers must include peer observations for ALL assigned targets.
+	var observations []string
+	for _, tgt := range proberResp.TargetSupernodeAccounts {
+		observations = append(observations, storageChallengeObservationJSON(tgt, portStates))
+	}
+
+	var proofResults []string
+	for _, s := range seeds {
+		proofResults = append(proofResults, buildStorageProofResultJSONWithClass(
+			prober.accAddr, targetAcct, s.ticketID, s.transcriptHash,
+			"STORAGE_PROOF_BUCKET_TYPE_RECENT",
+			resultClass,
+		))
+		if fullMode {
+			// FULL mode requires both RECENT and OLD results for every assigned target.
+			proofResults = append(proofResults, buildStorageProofResultJSONWithClass(
+				prober.accAddr, targetAcct, s.ticketID, s.transcriptHash+"-old-seed",
+				"STORAGE_PROOF_BUCKET_TYPE_OLD",
+				resultClass,
+			))
+		}
+	}
+
+	// Submit full epoch report: host report + peer observations + proof results.
+	args := []string{
+		"tx", "audit", "submit-epoch-report",
+		strconv.FormatUint(epochID, 10),
+		auditHostReportJSON(portStates),
+		"--from", prober.nodeName,
+		"--gas", "500000",
+	}
+	for _, obs := range observations {
+		args = append(args, "--storage-challenge-observations", obs)
+	}
+	for _, pr := range proofResults {
+		args = append(args, "--storage-proof-results", pr)
+	}
+	seedResp := cli.CustomCommand(args...)
+	RequireTxSuccess(t, seedResp)
+	sut.AwaitNextBlock(t)
+
+	return rechecker
 }

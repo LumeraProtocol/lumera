@@ -77,8 +77,6 @@ func TestLEP5CascadeRegisterWithCommitment(t *testing.T) {
 	// Build a valid signature: base64(data).base64(sig).
 	sigData := base64.StdEncoding.EncodeToString([]byte("rqid-1"))
 
-	// Keep this comfortably beyond chain min expiration_duration (24h default)
-	// so the tx path stays stable across CI timing/jitter.
 	expirationTime := fmt.Sprintf("%d", time.Now().Add(25*time.Hour).Unix())
 
 	metadata := fmt.Sprintf(

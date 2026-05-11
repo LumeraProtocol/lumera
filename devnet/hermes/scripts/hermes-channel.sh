@@ -11,6 +11,7 @@ set -euo pipefail
 : "${LUMERA_REST_ADDR:=}"
 : "${SIMD_REST_ADDR:=}"
 : "${HERMES_STATUS_DIR:=/shared/status/hermes}"
+: "${LUMERA_KEY_STYLE:=}"
 
 ENTRY_LOG_FILE="${ENTRY_LOG_FILE:-/root/logs/entrypoint.log}"
 LOG_PREFIX="[channel-setup]"
@@ -380,11 +381,18 @@ if [ ! -s "${SIMD_MNEMONIC_FILE}" ]; then
 	exit 1
 fi
 
-if ! OUT="$(run_capture hermes keys add \
-	--chain "${LUMERA_CHAIN_ID}" \
-	--key-name "${HERMES_KEY_NAME}" \
-	--mnemonic-file "${LUMERA_MNEMONIC_FILE}" \
-	--overwrite 2>&1)"; then
+lumera_keys_add_cmd=(
+	hermes keys add
+	--chain "${LUMERA_CHAIN_ID}"
+	--key-name "${HERMES_KEY_NAME}"
+	--mnemonic-file "${LUMERA_MNEMONIC_FILE}"
+	--overwrite
+)
+if [ "${LUMERA_KEY_STYLE}" = "evm" ]; then
+	lumera_keys_add_cmd+=(--hd-path "m/44'/60'/0'/0/0")
+fi
+
+if ! OUT="$(run_capture "${lumera_keys_add_cmd[@]}" 2>&1)"; then
 	log "Failed to import Lumera key: ${OUT}"
 	exit 1
 fi

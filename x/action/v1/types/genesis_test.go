@@ -39,3 +39,12 @@ func TestGenesisState_Validate(t *testing.T) {
 		})
 	}
 }
+
+func TestGenesisStateValidateRejectsNegativeFeeShares(t *testing.T) {
+	params := types.DefaultParams()
+	params.SuperNodeFeeShare = "2.000000000000000000"
+	params.FoundationFeeShare = "-1.000000000000000000"
+
+	err := (&types.GenesisState{Params: params}).Validate()
+	require.ErrorContains(t, err, "decimal string must be non-negative")
+}

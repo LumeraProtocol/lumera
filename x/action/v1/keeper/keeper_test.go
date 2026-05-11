@@ -6,7 +6,7 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 
-	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
+	"github.com/LumeraProtocol/lumera/testutil/crypto"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
@@ -241,7 +241,9 @@ func (suite *KeeperTestSuite) generateCascadeFinalizationMetadata(missing Metada
 	}
 
 	senseMetadata := &actiontypes.CascadeMetadata{
-		RqIdsIds: validIDs,
+		RqIdsIds:            validIDs,
+		IndexArtifactCount:  uint32(len(validIDs)),
+		SymbolArtifactCount: uint32(len(validIDs)),
 	}
 
 	// Marshal metadata to bytes

@@ -144,17 +144,6 @@ func (m *mockAuditKeeper) GetReport(_ sdk.Context, epochID uint64, reporterSuper
 	return r, ok
 }
 
-func (m *mockAuditKeeper) setReport(epochID uint64, reporter string, height int64, bytes float64) {
-	m.reports[reportKey(epochID, reporter)] = audittypes.EpochReport{
-		SupernodeAccount: reporter,
-		EpochId:          epochID,
-		ReportHeight:     height,
-		HostReport: audittypes.HostReport{
-			CascadeKademliaDbBytes: bytes,
-		},
-	}
-}
-
 // --- Test helpers ---
 
 func setupTestKeeper(t *testing.T) (Keeper, sdk.Context, *mockBankKeeper, *mockSupernodeKeeper, *mockAuditKeeper) {
@@ -211,11 +200,11 @@ func makeAccAddr(i int) sdk.AccAddress {
 }
 
 func addSupernode(snKeeper *mockSupernodeKeeper, auditKeeper *mockAuditKeeper, valAddr sdk.ValAddress, accAddr sdk.AccAddress, state sntypes.SuperNodeState, cascadeBytes float64) {
-	valBech32, err := sdk.Bech32ifyAddressBytes(lcfg.ValidatorAddressPrefix, valAddr)
+	valBech32, err := sdk.Bech32ifyAddressBytes(lcfg.Bech32ValidatorAddressPrefix, valAddr)
 	if err != nil {
 		panic(err)
 	}
-	accBech32, err := sdk.Bech32ifyAddressBytes(lcfg.AccountAddressPrefix, accAddr)
+	accBech32, err := sdk.Bech32ifyAddressBytes(lcfg.Bech32AccountAddressPrefix, accAddr)
 	if err != nil {
 		panic(err)
 	}
@@ -233,10 +222,16 @@ func addSupernode(snKeeper *mockSupernodeKeeper, auditKeeper *mockAuditKeeper, v
 	snKeeper.supernodes = append(snKeeper.supernodes, sn)
 	if snKeeper.keeper != nil {
 		_ = snKeeper.keeper.SetSuperNode(snKeeper.ctx, sn)
+		// Per LEP-6 §12: cascade bytes are now stored in SupernodeMetricsState, not HostReport.
+		if cascadeBytes > 0 {
+			_ = snKeeper.keeper.SetMetricsState(snKeeper.ctx, sntypes.SupernodeMetricsState{
+				ValidatorAddress: valBech32,
+				Metrics:          &sntypes.SupernodeMetrics{CascadeKademliaDbBytes: cascadeBytes},
+				Height:           snKeeper.ctx.BlockHeight(),
+			})
+		}
 	}
-	if auditKeeper != nil {
-		auditKeeper.setReport(auditKeeper.currentEpochID, accBech32, snKeeper.ctx.BlockHeight(), cascadeBytes)
-	}
+	_ = auditKeeper // audit HostReport no longer carries cascade bytes (LEP-6 §12 audit proto v2)
 }
 
 func fundPool(bankKeeper *mockBankKeeper, amount int64) {

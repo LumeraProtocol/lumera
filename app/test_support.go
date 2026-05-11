@@ -1,11 +1,11 @@
 package app
 
 import (
+	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
 	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
-	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	ibcporttypes "github.com/cosmos/ibc-go/v10/modules/core/05-port/types"
 )
 

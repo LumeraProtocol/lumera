@@ -7,12 +7,13 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/LumeraProtocol/lumera/config"
 	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
-	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
 	"github.com/cosmos/cosmos-sdk/crypto/hd"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
+	evmhd "github.com/cosmos/evm/crypto/hd"
 	"github.com/cosmos/go-bip39"
 )
 
@@ -44,11 +45,11 @@ func CreateTestKeyring() keyring.Keyring {
 	// Create a codec using the modern protobuf-based codec
 	interfaceRegistry := codectypes.NewInterfaceRegistry()
 	protoCodec := codec.NewProtoCodec(interfaceRegistry)
-	// Register public and private key implementations
-	cryptocodec.RegisterInterfaces(interfaceRegistry)
+	// Register public and private key implementations (both standard Cosmos and EVM)
+	config.RegisterExtraInterfaces(interfaceRegistry)
 
-	// Create an in-memory keyring
-	kr := keyring.NewInMemory(protoCodec)
+	// Create an in-memory keyring with EVM support
+	kr := keyring.NewInMemory(protoCodec, evmhd.EthSecp256k1Option())
 
 	return kr
 }
@@ -59,11 +60,11 @@ func addTestAccountToKeyring(kr keyring.Keyring, accountName string) error {
 		return err
 	}
 	algoList, _ := kr.SupportedAlgorithms()
-	signingAlgo, err := keyring.NewSigningAlgoFromString("secp256k1", algoList)
+	signingAlgo, err := keyring.NewSigningAlgoFromString("eth_secp256k1", algoList)
 	if err != nil {
 		return err
 	}
-	hdPath := hd.CreateHDPath(118, 0, 0).String() // "118" is Cosmos coin type
+	hdPath := hd.CreateHDPath(evmhd.Bip44CoinType, 0, 0).String() // Use Ethereum coin type (60)
 
 	_, err = kr.NewAccount(accountName, mnemonic, "", hdPath, signingAlgo)
 	if err != nil {

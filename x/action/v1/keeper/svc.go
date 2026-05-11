@@ -138,7 +138,6 @@ func (k *Keeper) VerifyChunkProofs(
 	return nil
 }
 
-
 func chunkProofToMerkleProof(proof *actiontypes.ChunkProof) (*merkle.Proof, error) {
 	if len(proof.PathHashes) != len(proof.PathDirections) {
 		return nil, fmt.Errorf("path_hashes/path_directions length mismatch: %d/%d", len(proof.PathHashes), len(proof.PathDirections))

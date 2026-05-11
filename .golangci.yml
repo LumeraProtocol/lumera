@@ -1,79 +1,99 @@
-# golangci-lint v2 configuration for the Lumera chain repo.
-#
-# Pinned config so CI and local devs converge on the same rule set.
-# Conservative on purpose: only correctness linters today. Style/complexity
-# linters can be layered in later via separate PRs once the baseline is clean.
-#
-# Diff-only enforcement is configured in CI (.github/workflows/lint.yml)
-# via reviewdog `filter_mode: added`. Locally:
-#
-#   golangci-lint run ./x/action/v1/... ./x/supernode/v1/... ./x/audit/v1/...
-#   golangci-lint run --new-from-rev=origin/master ./...
-#
-# Note on Go version: golangci-lint v1.64.8 is built with Go 1.24 and
-# refuses modules declaring `go 1.25` in go.mod. The Lumera chain is on
-# Go 1.25.9, so we must use golangci-lint v2.x (built with Go 1.25+).
-# v2 ships a breaking config-schema change — this file is the v2 schema.
-#
-# IMPORTANT for local dev: `go.mod` still pins
-# `github.com/golangci/golangci-lint v1.64.8` as an indirect tool dep
-# (legacy `tool` directive). `make install-tools` and any plain
-# `go install github.com/golangci/golangci-lint/cmd/golangci-lint@...`
-# resolved against this module's go.mod will install v1.x, which CANNOT
-# parse the `version: "2"` schema below ("unsupported version of the
-# configuration"). Install the same v2.x binary CI uses, out of band:
-#
-#   go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4
-#
-# or download the prebuilt tarball matching that tag. The full go.mod
-# migration to the v2 module path is tracked separately so this PR
-# stays scoped to CI plumbing.
-
 version: "2"
-
-run:
-  timeout: 5m
-  tests: true
-  modules-download-mode: readonly
 
 linters:
   default: none
   enable:
-    - errcheck       # unchecked errors
-    - govet          # suspicious constructs
-    - ineffassign    # ineffectual assignments
-    - staticcheck    # SA* + simple/style checks
-    - unused         # dead code (funcs, consts, types, vars)
-
-  settings:
-    staticcheck:
-      # SA1019 (deprecated API) is noisy in Cosmos SDK v0.50: HasInvariants,
-      # InvariantRegistry, sdk.WrapSDKContext, etc. Per-site `//nolint:staticcheck`
-      # with a rationale comment is preferred over a blanket disable.
-      checks: ["all"]
-    errcheck:
-      exclude-functions:
-        - (io.Closer).Close
-        - (io.ReadCloser).Close
+    - errcheck
+    - staticcheck
+    - unused
+    - ineffassign
+    - govet
+    - nolintlint
 
   exclusions:
-    # `default` removes some genuinely useful findings; turn it off so we
-    # control the exclude set explicitly.
-    generated: lax
+    generated: strict
     rules:
-      # Cosmos SDK v0.50 still ships HasInvariants / InvariantRegistry as the
-      # required interface for AppModule. Module surface files must reference
-      # them; deprecation only resolves when x/crisis is removed.
-      - path: x/.*/v1/module/module\.go
-        linters: [staticcheck]
-        text: "SA1019.*(HasInvariants|InvariantRegistry)"
+      # Test files: SDK keeper methods (SetValidator, SetParams, SetDelegation, etc.)
+      # return errors that are safe to ignore in test setup code.
+      - path: _test\.go
+        linters:
+          - errcheck
 
-      # Generated proto code is not ours to lint.
-      - path: \.pb\.go$
-        linters: [errcheck, ineffassign, staticcheck, unused, govet]
-      - path: \.pb\.gw\.go$
-        linters: [errcheck, ineffassign, staticcheck, unused, govet]
+      # Wasm integration tests adapted from wasmd — not our code to fix.
+      - path: tests/(integration|system)/wasm/
+        linters:
+          - errcheck
+          - unused
 
-issues:
-  max-issues-per-linter: 0
-  max-same-issues: 0
+      # Action simulation helpers — scaffolded by Ignite, constants may be
+      # used by external repos.
+      - path: x/action/v1/module/simulation\.go
+        linters:
+          - unused
+
+      # Simulation helpers — kept for future use.
+      - path: x/action/v1/simulation/
+        linters:
+          - unused
+          - staticcheck
+
+      # LumeraID mocks — generated/scaffolded test helpers.
+      - path: x/lumeraid/mocks/
+        linters:
+          - unused
+
+      # Staking integration test helpers — kept for future test expansion.
+      - path: tests/integration/staking/
+        linters:
+          - unused
+
+      # SDK deprecated APIs (paramskeeper, WrapSDKContext) — can't remove
+      # until upstream drops them.
+      - linters:
+          - staticcheck
+        text: "SA1019"
+
+      # Cosmetic suggestions (QF1003, QF1007, QF1008) — optional refactors.
+      - linters:
+          - staticcheck
+        text: "QF10(0[378]|11)"
+
+      # S1001 (use copy), S1009 (nil check before len), S1011 (use append),
+      # S1021 (merge var) — cosmetic, not correctness issues.
+      - linters:
+          - staticcheck
+        text: "S100[19]|S101[1]|S1021"
+
+      # ST1005 (error string capitalization), ST1019 (duplicate import),
+      # ST1023 (omit type from declaration) — style, not correctness.
+      - linters:
+          - staticcheck
+        text: "ST10(05|19|23)"
+
+      # SA4031 (nil check on make result), SA9003 (empty branch) —
+      # intentional patterns in existing code.
+      - linters:
+          - staticcheck
+        text: "SA(4031|9003)"
+
+      # SA1029 (built-in type as context key) — existing pattern.
+      - linters:
+          - staticcheck
+        text: "SA1029"
+
+      # SA4010 (unused append result) — false positive in test setup code.
+      - path: _test\.go
+        linters:
+          - staticcheck
+        text: "SA4010"
+
+      # Deprecated proto import — required for compatibility with gogoproto.
+      - path: app/proto_bridge_test\.go
+        linters:
+          - staticcheck
+
+formatters:
+  enable:
+    - gofmt
+  exclusions:
+    generated: strict

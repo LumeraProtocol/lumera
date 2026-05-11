@@ -5,6 +5,7 @@ package system
 import (
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
@@ -16,6 +17,8 @@ func TestAuditCLIQueriesE2E(t *testing.T) {
 	sut.ModifyGenesisJSON(t,
 		setSupernodeParamsForAuditTests(t),
 		setAuditParamsForFastEpochs(t, epochLengthBlocks, 1, 1, 1, []uint32{4444}),
+		// Per CP3 — k-based peer-assignment requires UNSPECIFIED enforcement mode (SHADOW activates one-third formula).
+		setStorageTruthEnforcementModeUnspecified(t),
 	)
 	sut.StartChain(t)
 
@@ -31,7 +34,8 @@ func TestAuditCLIQueriesE2E(t *testing.T) {
 	RequireTxSuccess(t, submitEpochReport(t, cli, n0.nodeName, ws0.EpochId, host, nil))
 	RequireTxSuccess(t, submitEpochReport(t, cli, n1.nodeName, ws0.EpochId, host, nil))
 
-	awaitAtLeastHeightWithSlackPeerPorts(t, ws0.EpochStartHeight+int64(epochLengthBlocks))
+	// awaitAtLeastHeightWithSlackPeerPorts unified into awaitAtLeastHeight during PR #122 rebase.
+	awaitAtLeastHeight(t, ws0.EpochStartHeight+int64(epochLengthBlocks), 45*time.Second)
 
 	assignedRaw := cli.CustomQuery("q", "audit", "assigned-targets", n0.accAddr, "--epoch-id", strconv.FormatUint(ws0.EpochId+1, 10), "--filter-by-epoch-id")
 	assignedEpochID := gjsonUint64(gjson.Get(assignedRaw, "epoch_id"))

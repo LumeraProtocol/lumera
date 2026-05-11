@@ -7,15 +7,14 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/LumeraProtocol/lumera/app"
 	cmtconfig "github.com/cometbft/cometbft/config"
+	cmttypes "github.com/cometbft/cometbft/types"
 	cmttime "github.com/cometbft/cometbft/types/time"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 
 	"cosmossdk.io/math"
 	"cosmossdk.io/math/unsafe"
@@ -23,7 +22,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/cosmos/cosmos-sdk/client/tx"
-	"github.com/cosmos/cosmos-sdk/crypto/hd"
+	sdkhd "github.com/cosmos/cosmos-sdk/crypto/hd"
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/cosmos/cosmos-sdk/runtime"
@@ -42,6 +41,7 @@ import (
 	govv1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
+	evmhd "github.com/cosmos/evm/crypto/hd"
 
 	lcfg "github.com/LumeraProtocol/lumera/config"
 	claimtestutils "github.com/LumeraProtocol/lumera/x/claim/testutils"
@@ -98,7 +98,7 @@ func addTestnetFlagsToCmd(cmd *cobra.Command) {
 	cmd.Flags().StringP(flagOutputDir, "o", "./.testnets", "Directory to store initialization data for the testnet")
 	cmd.Flags().String(flags.FlagChainID, "", "genesis file chain-id, if left blank will be randomly created")
 	cmd.Flags().String(server.FlagMinGasPrices, fmt.Sprintf("0.000006%s", lcfg.ChainDenom), "Minimum gas prices to accept for transactions; All fees in a tx must meet this minimum (e.g. 0.01photino,0.001stake)")
-	cmd.Flags().String(flags.FlagKeyType, string(hd.Secp256k1Type), "Key signing algorithm to generate keys for")
+	cmd.Flags().String(flags.FlagKeyType, string(sdkhd.Secp256k1Type), "Key signing algorithm to generate keys for")
 
 	// support old flags name for backwards compatibility
 	cmd.Flags().SetNormalizeFunc(func(f *pflag.FlagSet, name string) pflag.NormalizedName {
@@ -151,8 +151,6 @@ Example:
 
 			serverCtx := server.GetServerContextFromCmd(cmd)
 			config := serverCtx.Config
-
-			viper.Set(claimtypes.FlagSkipClaimsCheck, true)
 
 			args := initArgs{}
 			args.outputDir, _ = cmd.Flags().GetString(flagOutputDir)
@@ -249,7 +247,9 @@ func initTestnetFiles(
 	nodeConfig.StateSync.TrustHeight = 0
 	nodeConfig.StateSync.TrustHash = ""
 
-	appConfig := srvconfig.DefaultConfig()
+	customAppTemplate, customAppConfigIface := initAppConfig()
+	appCfgVal := customAppConfigIface.(CustomAppConfig)
+	appConfig := &appCfgVal
 	appConfig.MinGasPrices = args.minGasPrices
 	appConfig.API.Enable = true
 	appConfig.Telemetry.Enabled = true
@@ -264,9 +264,14 @@ func initTestnetFiles(
 		isSucceeded bool = false
 	)
 	const (
-		rpcPort  = 26657
-		apiPort  = 1317
-		grpcPort = 9090
+		rpcPort         = 26657
+		apiPort         = 1317
+		grpcPort        = 9090
+		pprofPort       = 6060
+		jsonRPCPort     = 8545
+		jsonRPCWsPort   = 8546
+		jsonRPCMetrics  = 6065
+		gethMetricsPort = 8100
 	)
 	p2pPortStart := 26656
 
@@ -290,10 +295,18 @@ func initTestnetFiles(
 		nodeConfig.SetRoot(nodeDir)
 		nodeConfig.Moniker = nodeDirName
 		nodeConfig.RPC.ListenAddress = "tcp://0.0.0.0:26657"
+		nodeConfig.RPC.PprofListenAddress = fmt.Sprintf("localhost:%d", pprofPort+portOffset)
 
 		appConfig.API.Address = fmt.Sprintf("tcp://0.0.0.0:%d", apiPort+portOffset)
 		appConfig.GRPC.Address = fmt.Sprintf("0.0.0.0:%d", grpcPort+portOffset)
 		appConfig.GRPCWeb.Enable = true
+		// EVM ports need a larger stride because JSON-RPC (8545) and WS (8546)
+		// are adjacent; a +1 offset would collide (node1 JSON-RPC = node0 WS).
+		evmPortOffset := portOffset * 100
+		appConfig.JSONRPC.Address = fmt.Sprintf("127.0.0.1:%d", jsonRPCPort+evmPortOffset)
+		appConfig.JSONRPC.WsAddress = fmt.Sprintf("127.0.0.1:%d", jsonRPCWsPort+evmPortOffset)
+		appConfig.JSONRPC.MetricsAddress = fmt.Sprintf("127.0.0.1:%d", jsonRPCMetrics+evmPortOffset)
+		appConfig.EVM.GethMetricsAddress = fmt.Sprintf("127.0.0.1:%d", gethMetricsPort+evmPortOffset)
 
 		// cleanup output directory if node initialization fails
 		defer func() {
@@ -352,7 +365,7 @@ func initTestnetFiles(
 		memo := fmt.Sprintf("%s@%s:%d", nodeIDs[i], ip, p2pPortStart+portOffset)
 		genFiles = append(genFiles, nodeConfig.GenesisFile())
 
-		kb, err := keyring.New(sdk.KeyringServiceName(), args.keyringBackend, nodeDir, inBuf, clientCtx.Codec)
+		kb, err := keyring.New(sdk.KeyringServiceName(), args.keyringBackend, nodeDir, inBuf, clientCtx.Codec, evmhd.EthSecp256k1Option())
 		if err != nil {
 			return err
 		}
@@ -429,7 +442,7 @@ func initTestnetFiles(
 			return err
 		}
 
-		srvconfig.SetConfigTemplate(srvconfig.DefaultConfigTemplate)
+		srvconfig.SetConfigTemplate(customAppTemplate)
 		srvconfig.WriteConfigFile(filepath.Join(nodeDir, "config", "app.toml"), appConfig)
 		cmd.Printf("Initialized node #%d with ID %s and public key %s\n", i+1, nodeIDs[i], valPubKeys[i].String())
 	}
@@ -514,28 +527,7 @@ func initGenFiles(
 	}
 
 	// ensure denom metadata describes the chain denom for clients
-	displayDenom := strings.TrimPrefix(lcfg.ChainDenom, "u")
-	metadata := banktypes.Metadata{
-		Description: "The native token of the Lumera network.",
-		DenomUnits: []*banktypes.DenomUnit{
-			{Denom: lcfg.ChainDenom, Exponent: 0},
-			{Denom: displayDenom, Exponent: 6},
-		},
-		Base:    lcfg.ChainDenom,
-		Display: displayDenom,
-		Name:    strings.ToUpper(displayDenom),
-		Symbol:  strings.ToUpper(displayDenom),
-	}
-	metadataUpdated := false
-	for i, md := range bankGenState.DenomMetadata {
-		if md.Base == lcfg.ChainDenom || md.Base == sdk.DefaultBondDenom {
-			bankGenState.DenomMetadata[i] = metadata
-			metadataUpdated = true
-		}
-	}
-	if !metadataUpdated {
-		bankGenState.DenomMetadata = append(bankGenState.DenomMetadata, metadata)
-	}
+	bankGenState.DenomMetadata = lcfg.UpsertChainBankMetadata(bankGenState.DenomMetadata)
 	appGenState[banktypes.ModuleName] = clientCtx.Codec.MustMarshalJSON(&bankGenState)
 
 	appGenStateJSON, err := json.MarshalIndent(appGenState, "", "  ")
@@ -544,6 +536,14 @@ func initGenFiles(
 	}
 
 	appGenesis := genutiltypes.NewAppGenesisWithVersion(chainID, appGenStateJSON)
+	if appGenesis.Consensus == nil {
+		appGenesis.Consensus = &genutiltypes.ConsensusGenesis{}
+	}
+	if appGenesis.Consensus.Params == nil {
+		appGenesis.Consensus.Params = cmttypes.DefaultConsensusParams()
+	}
+	appGenesis.Consensus.Params.Block.MaxGas = lcfg.ChainDefaultConsensusMaxGas
+
 	// generate empty genesis files for each validator and save
 	for i := 0; i < numValidators; i++ {
 		if err := appGenesis.SaveAs(genFiles[i]); err != nil {
@@ -599,8 +599,21 @@ func collectGenFiles(
 
 		genFile := nodeConfig.GenesisFile()
 
-		// overwrite each validator's genesis file to have a canonical genesis time
-		if err := genutil.ExportGenesisFileWithTime(genFile, chainID, nil, appState, genTime); err != nil {
+		// overwrite each validator's genesis file to have canonical app state and
+		// genesis time while preserving customized consensus params (max_gas).
+		appGenesis.ChainID = chainID
+		appGenesis.AppState = appState
+		appGenesis.GenesisTime = genTime
+		if appGenesis.Consensus == nil {
+			appGenesis.Consensus = &genutiltypes.ConsensusGenesis{}
+		}
+		if appGenesis.Consensus.Params == nil {
+			appGenesis.Consensus.Params = cmttypes.DefaultConsensusParams()
+		}
+		appGenesis.Consensus.Params.Block.MaxGas = lcfg.ChainDefaultConsensusMaxGas
+		appGenesis.Consensus.Validators = nil
+
+		if err := genutil.ExportGenesisFile(appGenesis, genFile); err != nil {
 			return err
 		}
 	}
@@ -656,6 +669,7 @@ func startTestnet(cmd *cobra.Command, args startArgs) error {
 		networkConfig.ChainID = args.chainID
 	}
 	networkConfig.SigningAlgo = args.algo
+	networkConfig.KeyringOptions = []keyring.Option{evmhd.EthSecp256k1Option()}
 	networkConfig.MinGasPrices = args.minGasPrices
 	networkConfig.NumValidators = args.numValidators
 	networkConfig.EnableLogging = args.enableLogging

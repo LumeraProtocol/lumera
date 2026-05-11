@@ -78,7 +78,7 @@ func mulAddModP(out, a, b *uint128.Uint128) {
 func legendreSymbolCT(a *uint128.Uint128) byte {
 	out := *a
 	temp := uint128.Uint128{}
-	temp2 := uint128.Uint128{}
+	var temp2 uint128.Uint128
 
 	// Initial sequence of squarings and multiplications
 	squareModP(&temp, &out)

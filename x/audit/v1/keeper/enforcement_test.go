@@ -3,10 +3,11 @@ package keeper_test
 import (
 	"testing"
 
-	"github.com/LumeraProtocol/lumera/testutil/cryptotestutils"
+	"github.com/LumeraProtocol/lumera/testutil/crypto"
 	"github.com/LumeraProtocol/lumera/x/audit/v1/types"
 	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
 
@@ -80,7 +81,7 @@ func TestPeerPortPostponementThresholdPercent(t *testing.T) {
 		makeReports(t, f, epochID, target, peers, peerStates)
 
 		f.supernodeKeeper.EXPECT().
-			GetAllSuperNodes(gomock.AssignableToTypeOf(f.ctx), sntypes.SuperNodeStateActive, sntypes.SuperNodeStateStorageFull).
+			GetAllSuperNodes(gomock.AssignableToTypeOf(f.ctx), sntypes.SuperNodeStateActive).
 			Return([]sntypes.SuperNode{target}, nil).
 			Times(1)
 		f.supernodeKeeper.EXPECT().
@@ -107,7 +108,7 @@ func TestPeerPortPostponementThresholdPercent(t *testing.T) {
 		makeReports(t, f, epochID, target, peers, peerStates)
 
 		f.supernodeKeeper.EXPECT().
-			GetAllSuperNodes(gomock.AssignableToTypeOf(f.ctx), sntypes.SuperNodeStateActive, sntypes.SuperNodeStateStorageFull).
+			GetAllSuperNodes(gomock.AssignableToTypeOf(f.ctx), sntypes.SuperNodeStateActive).
 			Return([]sntypes.SuperNode{target}, nil).
 			Times(1)
 		f.supernodeKeeper.EXPECT().
@@ -123,4 +124,75 @@ func TestPeerPortPostponementThresholdPercent(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
+}
+
+func TestEnforceEpochEnd_EmitsStorageTruthRecoveredEvent(t *testing.T) {
+	f := initFixture(t)
+	f.ctx = f.ctx.WithBlockHeight(1).WithEventManager(sdk.NewEventManager())
+
+	_, postponedAcc, postponedVal := cryptotestutils.SupernodeAddresses()
+	postponed := sntypes.SuperNode{
+		SupernodeAccount: postponedAcc.String(),
+		ValidatorAddress: sdk.ValAddress(postponedVal).String(),
+	}
+
+	params := types.DefaultParams().WithDefaults()
+	params.StorageTruthEnforcementMode = types.StorageTruthEnforcementMode_STORAGE_TRUTH_ENFORCEMENT_MODE_FULL
+
+	// First epoch-end call: force storage-truth postpone and set postponed marker.
+	require.NoError(t, f.keeper.SetNodeSuspicionState(f.ctx, types.NodeSuspicionState{
+		SupernodeAccount:  postponed.SupernodeAccount,
+		SuspicionScore:    200,
+		LastUpdatedEpoch:  5,
+		ClassACountWindow: 2,
+	}))
+
+	f.supernodeKeeper.EXPECT().
+		GetAllSuperNodes(gomock.AssignableToTypeOf(f.ctx), sntypes.SuperNodeStateActive).
+		Return([]sntypes.SuperNode{postponed}, nil).
+		Times(1)
+	f.supernodeKeeper.EXPECT().
+		GetAllSuperNodes(gomock.AssignableToTypeOf(f.ctx), sntypes.SuperNodeStatePostponed).
+		Return([]sntypes.SuperNode{}, nil).
+		Times(1)
+	f.supernodeKeeper.EXPECT().
+		// Per F121-F12 — strong-suspicion band uses distinct reason (score=200, strongThr=140).
+		SetSuperNodePostponed(gomock.AssignableToTypeOf(f.ctx), sdk.ValAddress(postponedVal), "audit_storage_truth_strong_suspicion").
+		Return(nil).
+		Times(1)
+
+	require.NoError(t, f.keeper.EnforceEpochEnd(f.ctx, 5, params))
+
+	// Second epoch-end call: score decayed below watch + clean passes => recover.
+	require.NoError(t, f.keeper.SetNodeSuspicionState(f.ctx, types.NodeSuspicionState{
+		SupernodeAccount: postponed.SupernodeAccount,
+		SuspicionScore:   1,
+		LastUpdatedEpoch: 6,
+		CleanPassCount:   params.StorageTruthStrongRecoveryCleanPassCount, // Per F121-F12 — strong postpone uses StrongRecoveryCleanPassCount.
+	}))
+
+	f.supernodeKeeper.EXPECT().
+		GetAllSuperNodes(gomock.AssignableToTypeOf(f.ctx), sntypes.SuperNodeStateActive).
+		Return([]sntypes.SuperNode{}, nil).
+		Times(1)
+	f.supernodeKeeper.EXPECT().
+		GetAllSuperNodes(gomock.AssignableToTypeOf(f.ctx), sntypes.SuperNodeStatePostponed).
+		Return([]sntypes.SuperNode{postponed}, nil).
+		Times(1)
+	f.supernodeKeeper.EXPECT().
+		RecoverSuperNodeFromPostponed(gomock.AssignableToTypeOf(f.ctx), sdk.ValAddress(postponedVal)).
+		Return(nil).
+		Times(1)
+
+	require.NoError(t, f.keeper.EnforceEpochEnd(f.ctx, 6, params))
+
+	events := f.ctx.EventManager().Events()
+	found := false
+	for _, event := range events {
+		if event.Type == types.EventTypeStorageTruthRecovered {
+			found = true
+			break
+		}
+	}
+	require.True(t, found, "expected storage_truth_recovered event")
 }

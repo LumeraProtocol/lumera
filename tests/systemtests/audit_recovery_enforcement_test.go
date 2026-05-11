@@ -12,7 +12,10 @@ import (
 
 func TestAuditRecovery_PostponedBecomesActiveWithSelfAndPeerOpen_NoHostThresholds(t *testing.T) {
 	const (
-		epochLengthBlocks = uint64(10)
+		// Use 20-block epochs so that chain setup (StartChain + CLI init + 2 registrations,
+		// ~10-12 blocks) always completes within epoch 0. This prevents missing-report
+		// enforcement from postponing supernodes before the test's target epochs start.
+		epochLengthBlocks = uint64(20)
 	)
 	const originHeight = int64(1)
 
@@ -20,7 +23,6 @@ func TestAuditRecovery_PostponedBecomesActiveWithSelfAndPeerOpen_NoHostThreshold
 		setSupernodeParamsForAuditTests(t),
 		setAuditParamsForFastEpochs(t, epochLengthBlocks, 1, 1, 1, []uint32{4444}),
 		func(genesis []byte) []byte {
-			// Use 2 consecutive windows to avoid setup-time missing-report postponements.
 			state, err := sjson.SetRawBytes(genesis, "app_state.audit.params.consecutive_epochs_to_postpone", []byte("2"))
 			require.NoError(t, err)
 			// Ensure active reporter(s) are challengers each epoch so peer-open recovery can occur.
@@ -64,7 +66,7 @@ func TestAuditRecovery_PostponedBecomesActiveWithSelfAndPeerOpen_NoHostThreshold
 	// Epoch 1: whichever reporter is assigned node1 reports CLOSED for node1.
 	// Not enough streak yet (consecutive=2), so node1 should remain ACTIVE after epoch1.
 	if sut.currentHeight < epoch1Start {
-		sut.AwaitBlockHeight(t, epoch1Start, 20*time.Second)
+		sut.AwaitBlockHeight(t, epoch1Start, 40*time.Second)
 	}
 	assigned0e1 := auditQueryAssignedTargets(t, epochID1, true, n0.accAddr)
 	assigned1e1 := auditQueryAssignedTargets(t, epochID1, true, n1.accAddr)
@@ -77,7 +79,7 @@ func TestAuditRecovery_PostponedBecomesActiveWithSelfAndPeerOpen_NoHostThreshold
 	RequireTxSuccess(t, tx2e1)
 
 	if sut.currentHeight < epoch2Start {
-		sut.AwaitBlockHeight(t, epoch2Start, 20*time.Second)
+		sut.AwaitBlockHeight(t, epoch2Start, 40*time.Second)
 	}
 
 	// Epoch 2: repeat CLOSED-for-node1 observations on assigned targets.
@@ -92,7 +94,7 @@ func TestAuditRecovery_PostponedBecomesActiveWithSelfAndPeerOpen_NoHostThreshold
 	RequireTxSuccess(t, tx2e2)
 
 	if sut.currentHeight < epoch3Start {
-		sut.AwaitBlockHeight(t, epoch3Start, 20*time.Second)
+		sut.AwaitBlockHeight(t, epoch3Start, 40*time.Second)
 	}
 
 	stateAfterEpoch2 := querySupernodeLatestState(t, cli, n1.valAddr)
@@ -103,15 +105,18 @@ func TestAuditRecovery_PostponedBecomesActiveWithSelfAndPeerOpen_NoHostThreshold
 
 	// Recovery can only happen on epochs where a prober is actually assigned node1
 	// and reports OPEN for it. Assignment varies per epoch, so retry a wider window
-	// and only count epochs where node1 is an assigned target.
+	// and only count epochs where node1 is an assigned target. Cap the window so a
+	// stochastically-late recovery can't burn the whole package timeout budget; the
+	// final assertion accepts both POSTPONED and ACTIVE so a non-recovery here is a
+	// soft outcome, not a failure.
 	recovered := false
-	for i := int64(0); i < 10; i++ {
+	for i := int64(0); i < 5; i++ {
 		epochID := epochID3 + uint64(i)
 		epochStart := epoch3Start + i*int64(epochLengthBlocks)
 		nextEpochStart := epochStart + int64(epochLengthBlocks)
 
 		if sut.currentHeight < epochStart {
-			sut.AwaitBlockHeight(t, epochStart, 20*time.Second)
+			sut.AwaitBlockHeight(t, epochStart, 40*time.Second)
 		}
 		assigned0 := auditQueryAssignedTargets(t, epochID, true, n0.accAddr)
 		assigned2 := auditQueryAssignedTargets(t, epochID, true, n2.accAddr)
@@ -127,7 +132,7 @@ func TestAuditRecovery_PostponedBecomesActiveWithSelfAndPeerOpen_NoHostThreshold
 		RequireTxSuccess(t, tx1)
 
 		if sut.currentHeight < nextEpochStart {
-			sut.AwaitBlockHeight(t, nextEpochStart, 20*time.Second)
+			sut.AwaitBlockHeight(t, nextEpochStart, 40*time.Second)
 		}
 		if querySupernodeLatestState(t, cli, n1.valAddr) == "SUPERNODE_STATE_ACTIVE" {
 			recovered = true

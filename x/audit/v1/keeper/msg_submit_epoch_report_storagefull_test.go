@@ -43,6 +43,14 @@ func TestSubmitEpochReport_TransitionsReporterToStorageFullFromHostReport(t *tes
 			return nil
 		}).
 		Times(1)
+	f.supernodeKeeper.EXPECT().
+		GetMetricsState(gomock.Any(), gomock.Any()).
+		Return(sntypes.SupernodeMetricsState{}, false).
+		AnyTimes()
+	f.supernodeKeeper.EXPECT().
+		SetMetricsState(gomock.Any(), gomock.Any()).
+		Return(nil).
+		AnyTimes()
 
 	err := f.keeper.SetEpochAnchor(f.ctx, types.EpochAnchor{
 		EpochId:                 0,
@@ -96,6 +104,14 @@ func TestSubmitEpochReport_DoesNotTransitionPostponedReporterToStorageFull(t *te
 	f.supernodeKeeper.EXPECT().
 		SetSuperNode(gomock.Any(), gomock.Any()).
 		Times(0)
+	f.supernodeKeeper.EXPECT().
+		GetMetricsState(gomock.Any(), gomock.Any()).
+		Return(sntypes.SupernodeMetricsState{}, false).
+		AnyTimes()
+	f.supernodeKeeper.EXPECT().
+		SetMetricsState(gomock.Any(), gomock.Any()).
+		Return(nil).
+		AnyTimes()
 
 	err := f.keeper.SetEpochAnchor(f.ctx, types.EpochAnchor{
 		EpochId:                 0,

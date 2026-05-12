@@ -81,7 +81,7 @@ DEFAULT_GENESIS_FILE := devnet/default-config/devnet-genesis.json
 DEFAULT_GENESIS_EVM_FILE := devnet/default-config/devnet-genesis-evm.json
 DEFAULT_CLAIMS_FILE := devnet/default-config/claims.csv
 ORIG_GENESIS_FILE := devnet/default-config/devnet-genesis-orig.json
-EVM_CUTOVER_VERSION ?= v1.12.0
+EVM_CUTOVER_VERSION ?= v1.20.0
 DEVNET_UPGRADE_RELEASE ?= auto
 
 devnet-tests-build:

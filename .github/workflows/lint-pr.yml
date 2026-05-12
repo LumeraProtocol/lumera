@@ -113,15 +113,23 @@ jobs:
     name: govulncheck (Go vulnerability scan)
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # ADVISORY-ONLY: govulncheck surfaces vulnerabilities in our dependency
+    # tree, but several findings are in pinned cosmos modules (cosmos-sdk,
+    # cosmos/evm) where no upstream fix is yet released. Bumping those
+    # majors is a deliberate, batched effort — not something a PR author
+    # should be blocked on. Annotations and the check-run summary still
+    # appear (so we never lose visibility), but the job is non-blocking
+    # via `continue-on-error: true`. Reassess once upstream fixes ship.
+    continue-on-error: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v6.0.1
 
       # govulncheck-action installs its own Go toolchain via `go-version-file`.
       # We point it at go.mod so the scan tracks the same toolchain the rest
-      # of CI uses (currently go 1.25.9). The action exits non-zero on any
-      # finding affecting the called code, which fails the job and blocks
-      # the PR — exactly what we want for a security gate.
+      # of CI uses. The action exits non-zero on any finding affecting the
+      # called code; combined with the job-level `continue-on-error: true`
+      # above, that surfaces as a yellow advisory rather than a red gate.
       - name: Run govulncheck
         uses: golang/govulncheck-action@v1.0.4
         with:

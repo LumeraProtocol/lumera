@@ -41,9 +41,6 @@
           4445,
           8002
         ],
-        "min_cpu_free_percent": 0,
-        "min_mem_free_percent": 0,
-        "min_disk_free_percent": 0,
         "consecutive_epochs_to_postpone": 1,
         "keep_last_epoch_entries": "200",
         "peer_port_postpone_threshold_percent": 100,

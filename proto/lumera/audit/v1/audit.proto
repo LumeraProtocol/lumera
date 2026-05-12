@@ -22,6 +22,15 @@ message HostReport {
   repeated PortState inbound_port_states = 4;
 
   uint32 failed_actions_count = 5;
+
+  // Cascade Kademlia DB size in bytes, self-reported by the SuperNode.
+  // Carried on HostReport purely as a metric-courier on the audit epoch report
+  // channel — the audit module does NOT consume this value for its own
+  // consensus logic (LEP-6 §12). On successful epoch-report acceptance the
+  // audit handler bridges this value into x/supernode SupernodeMetricsState,
+  // which is the sole source consulted by Everlight payout / eligibility.
+  // MUST be finite and non-negative; zero is valid (empty Kademlia store).
+  double cascade_kademlia_db_bytes = 6;
 }
 
 // StorageChallengeObservation is a prober's reachability observation about an assigned target.

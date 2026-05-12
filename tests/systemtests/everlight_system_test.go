@@ -194,6 +194,12 @@ func TestEverlightSystem_PayoutAndHistoryWhileStorageFull(t *testing.T) {
 
 	elig := cli.CustomQuery("q", "supernode", "sn-eligibility", n0.valAddr)
 	require.False(t, gjson.Get(elig, "eligible").Bool())
-	// Per CP3 rebase — supernode keeper returns "no audit epoch report found" earlier in the path.
-	require.Equal(t, "no audit epoch report found", gjson.Get(elig, "reason").String())
+	// With the audit→supernode metrics bridge live, every accepted epoch report
+	// writes SupernodeMetricsState.CascadeKademliaDbBytes (0 here, since the
+	// host_report payload above carries no cascade_kademlia_db_bytes field).
+	// Eligibility therefore reaches the threshold check and rejects with
+	// "cascade bytes below minimum threshold" instead of the pre-bridge
+	// "no audit epoch report found". Substantive outcome (ineligible, no
+	// payout) is unchanged — only the rejection reason advances by one step.
+	require.Equal(t, "cascade bytes below minimum threshold", gjson.Get(elig, "reason").String())
 }

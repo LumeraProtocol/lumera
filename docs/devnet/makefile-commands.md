@@ -12,6 +12,7 @@ All targets are declared in `Makefile.devnet` and exposed through the root `Make
 | `make devnet-build-191` | Build using the `devnet/bin-v1.9.1` bundle. |
 | `make devnet-build-1111` | Build using the `devnet/bin-v1.11.1` bundle. |
 | `make devnet-tests-build` | Build devnet test binaries (`tests_validator`, `tests_hermes`, `tests_evmigration`) into `devnet/bin/`. |
+| `make devnet-tests-lep6` | Run the LEP-6 storage-truth chain-side e2e tests against a running devnet. Requires `make devnet-up-detach`; uses existing registered supernodes or bootstraps validator-owned supernodes from key-resolvable devnet validator accounts when fewer than three are registered. |
 
 ## Lifecycle targets
 

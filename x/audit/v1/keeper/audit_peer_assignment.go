@@ -119,7 +119,11 @@ func computeStorageTruthTargetsForReporter(params paramsLike, activeSorted []str
 	}
 
 	active := sortedUniqueStrings(activeSorted)
-	targetCandidates := intersectionInOrder(sortedUniqueStrings(targetsSorted), active)
+	// Active supernodes are the only eligible challengers, but storage-truth targets
+	// must include the epoch target set captured by the anchor. That target set
+	// intentionally includes POSTPONED supernodes so active peers can continue
+	// submitting clean PASS proofs needed for storage-truth recovery.
+	targetCandidates := sortedUniqueStrings(targetsSorted)
 	if len(targetCandidates) == 0 {
 		targetCandidates = active
 	}

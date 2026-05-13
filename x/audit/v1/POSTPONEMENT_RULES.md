@@ -5,8 +5,8 @@ This document describes the on-chain rules implemented by the audit module (v1) 
 ## Definitions
 
 - **Epoch**: a contiguous block-height interval `[epoch_start_height, epoch_end_height]` derived from `epoch_zero_height` and `epoch_length_blocks`.
-- **Probers**: supernodes that are `ACTIVE` at epoch start (i.e., present in `EpochAnchor.active_supernode_accounts`).
-- **Targets**: supernodes that are `ACTIVE` or `POSTPONED` at epoch start (i.e., present in `EpochAnchor.target_supernode_accounts`).
+- **Probers**: supernodes that are `ACTIVE` or `STORAGE_FULL` at epoch start (i.e., present in `EpochAnchor.active_supernode_accounts`).
+- **Targets**: supernodes that are `ACTIVE`, `STORAGE_FULL`, or `POSTPONED` at epoch start (i.e., present in `EpochAnchor.target_supernode_accounts`).
 - **Report**: `MsgSubmitEpochReport` stored under `(epoch_id, reporter_supernode_account)`, where the reporter is the tx signer (`creator`).
 
 ## Enforcement timing

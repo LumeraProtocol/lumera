@@ -44,7 +44,8 @@ TOOLS := \
 	github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2@$(GRPC_GATEWAY_V2_VERSION) \
 	golang.org/x/tools/cmd/goimports@$(GO_TOOLS_VERSION) \
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc@$(GRPC_VERSION) \
-	google.golang.org/protobuf/cmd/protoc-gen-go@$(PROTOBUF_VERSION)
+	google.golang.org/protobuf/cmd/protoc-gen-go@$(PROTOBUF_VERSION) \
+	golang.org/x/vuln/cmd/govulncheck@latest
 
 -include Makefile.devnet
 
@@ -125,13 +126,17 @@ release:
 ###################################################
 ###              Tests and Simulation           ###
 ###################################################
-.PHONY: unit-tests integration-tests system-tests simulation-tests all-tests lint system-metrics-test
+.PHONY: unit-tests integration-tests system-tests simulation-tests all-tests lint vulncheck system-metrics-test
 
 all-tests: unit-tests integration-tests system-tests simulation-tests
 
 lint:
 	@echo "Running linters..."
 	@${GOLANGCI_LINT} run ./... --timeout=5m
+
+vulncheck:
+	@echo "Running govulncheck..."
+	@govulncheck ./...
 
 unit-tests:
 	@echo "Running unit tests in x/..."

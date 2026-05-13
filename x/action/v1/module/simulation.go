@@ -23,19 +23,8 @@ var (
 )
 
 const (
-	opWeightMsgRequestAction = "op_weight_msg_request_action"
-	// TODO: Determine the simulation weight value
-	defaultWeightMsgRequestAction int = 100
-
-	opWeightMsgFinalizeAction = "op_weight_msg_finalize_action"
-	// TODO: Determine the simulation weight value
-	defaultWeightMsgFinalizeAction int = 100
-
-	opWeightMsgApproveAction = "op_weight_msg_approve_action"
-	// TODO: Determine the simulation weight value
-	defaultWeightMsgApproveAction int = 100
-
 	// this line is used by starport scaffolding # simapp/module/const
+	_ = "" // placeholder to keep starport scaffolding line stable
 )
 
 // GenerateGenesisState creates a randomized GenState of the module.

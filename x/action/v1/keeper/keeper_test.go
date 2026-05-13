@@ -241,7 +241,9 @@ func (suite *KeeperTestSuite) generateCascadeFinalizationMetadata(missing Metada
 	}
 
 	senseMetadata := &actiontypes.CascadeMetadata{
-		RqIdsIds: validIDs,
+		RqIdsIds:            validIDs,
+		IndexArtifactCount:  uint32(len(validIDs)),
+		SymbolArtifactCount: uint32(len(validIDs)),
 	}
 
 	// Marshal metadata to bytes

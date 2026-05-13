@@ -19,6 +19,7 @@ func TestAuditHostRequirements_UsageZeroBypassesMinimums(t *testing.T) {
 	sut.ModifyGenesisJSON(t,
 		setSupernodeParamsForAuditTests(t),
 		setAuditParamsForFastEpochs(t, epochLengthBlocks, 1, 1, 1, []uint32{4444}),
+		setStorageTruthEnforcementModeUnspecified(t),
 		func(genesis []byte) []byte {
 			// Avoid missing-report postponement before/around the tested epoch.
 			state, err := sjson.SetRawBytes(genesis, "app_state.audit.params.consecutive_epochs_to_postpone", []byte("10"))

@@ -17,6 +17,90 @@ import (
 	gogoproto "github.com/cosmos/gogoproto/proto"
 )
 
+const (
+	cascadeCommitmentType         = "lep5/chunk-merkle/v1"
+	cascadeCommitmentMaxChunkSize = uint32(262144) // 256 KiB — default / ceiling
+	cascadeCommitmentMinChunkSize = uint32(1)      // 1 byte — floor
+	cascadeCommitmentRootSize     = 32
+	cascadeCommitmentMinTotalSize = uint64(4) // reject trivially tiny files (< 4 bytes)
+)
+
+var cascadeCommitmentHashAlgo = actiontypes.HashAlgo_HASH_ALGO_BLAKE3
+
+// isPowerOf2 returns true if v is a positive power of two.
+func isPowerOf2(v uint32) bool {
+	return v > 0 && (v&(v-1)) == 0
+}
+
+func validateAvailabilityCommitment(commitment *actiontypes.AvailabilityCommitment, challengeCount, minChunks uint32) error {
+	if commitment == nil {
+		return nil
+	}
+
+	if commitment.CommitmentType != cascadeCommitmentType {
+		return fmt.Errorf("availability_commitment.commitment_type must be %q", cascadeCommitmentType)
+	}
+	if commitment.HashAlgo != cascadeCommitmentHashAlgo {
+		return fmt.Errorf("availability_commitment.hash_algo must be %q", cascadeCommitmentHashAlgo)
+	}
+
+	// Reject trivially tiny files.
+	if commitment.TotalSize < cascadeCommitmentMinTotalSize {
+		return fmt.Errorf("availability_commitment.total_size must be >= %d bytes, got %d",
+			cascadeCommitmentMinTotalSize, commitment.TotalSize)
+	}
+
+	// chunk_size must be a power of 2 in [minChunkSize, maxChunkSize].
+	if !isPowerOf2(commitment.ChunkSize) {
+		return fmt.Errorf("availability_commitment.chunk_size must be a power of 2, got %d", commitment.ChunkSize)
+	}
+	if commitment.ChunkSize < cascadeCommitmentMinChunkSize || commitment.ChunkSize > cascadeCommitmentMaxChunkSize {
+		return fmt.Errorf("availability_commitment.chunk_size must be in [%d, %d], got %d",
+			cascadeCommitmentMinChunkSize, cascadeCommitmentMaxChunkSize, commitment.ChunkSize)
+	}
+
+	expectedNumChunks := uint32((commitment.TotalSize + uint64(commitment.ChunkSize) - 1) / uint64(commitment.ChunkSize))
+	if commitment.NumChunks != expectedNumChunks {
+		return fmt.Errorf("availability_commitment.num_chunks must be %d for total_size %d and chunk_size %d", expectedNumChunks, commitment.TotalSize, commitment.ChunkSize)
+	}
+
+	// Unconditionally enforce minimum chunk count. The client MUST pick a
+	// chunk_size that yields >= minChunks chunks (default 4).
+	if commitment.NumChunks < minChunks {
+		return fmt.Errorf("availability_commitment.num_chunks %d is below minimum %d: file of %d bytes must produce at least %d chunks (reduce chunk_size)",
+			commitment.NumChunks, minChunks, commitment.TotalSize, minChunks)
+	}
+
+	if len(commitment.Root) != cascadeCommitmentRootSize {
+		return fmt.Errorf("availability_commitment.root must be %d bytes", cascadeCommitmentRootSize)
+	}
+
+	// Validate challenge indices when the file is large enough for SVC.
+	if commitment.NumChunks >= minChunks {
+		expectedIndices := challengeCount
+		if expectedIndices > commitment.NumChunks {
+			expectedIndices = commitment.NumChunks
+		}
+		if uint32(len(commitment.ChallengeIndices)) != expectedIndices {
+			return fmt.Errorf("availability_commitment.challenge_indices must have %d entries, got %d",
+				expectedIndices, len(commitment.ChallengeIndices))
+		}
+		seen := make(map[uint32]bool, len(commitment.ChallengeIndices))
+		for i, idx := range commitment.ChallengeIndices {
+			if idx >= commitment.NumChunks {
+				return fmt.Errorf("availability_commitment.challenge_indices[%d] = %d is out of range [0, %d)",
+					i, idx, commitment.NumChunks)
+			}
+			if seen[idx] {
+				return fmt.Errorf("availability_commitment.challenge_indices[%d] = %d is a duplicate", i, idx)
+			}
+			seen[idx] = true
+		}
+	}
+
+	return nil
+}
+
 // CascadeActionHandler implements the ActionHandler interface for Cascade actions
 type CascadeActionHandler struct {
 	keeper *Keeper // Reference to the keeper for logger and other services
@@ -60,6 +144,14 @@ func (h CascadeActionHandler) Process(metadataBytes []byte, msgType common.Messa
 		if len(metadata.RqIdsIds) == 0 {
 			return nil, fmt.Errorf("rq_ids_ids field is required for cascade metadata")
 		}
+		// Backward-compatible fallback for finalize payloads that do not yet
+		// provide explicit LEP-6 artifact counts (single-source-of-truth via
+		// CascadeArtifactCountsWithFallback per CP-NEW-C-2 / 122-F2).
+		indexCount, symbolCount, err := actiontypes.CascadeArtifactCountsWithFallbackStrict(&metadata)
+		if err != nil {
+			return nil, err
+		}
+		metadata.IndexArtifactCount, metadata.SymbolArtifactCount = indexCount, symbolCount
 	default:
 		return nil, fmt.Errorf("unsupported message type: %s", msgType)
 	}
@@ -113,6 +205,11 @@ func (h CascadeActionHandler) RegisterAction(ctx sdk.Context, action *actiontype
 	var cascadeMeta actiontypes.CascadeMetadata
 	if err := gogoproto.Unmarshal(action.Metadata, &cascadeMeta); err != nil {
 		return errors.Wrap(actiontypes.ErrInvalidMetadata, fmt.Sprintf("failed to unmarshal cascade metadata: %v", err))
+	}
+	params := h.keeper.GetParams(ctx)
+	challengeCount, minChunks := GetSVCParams(params)
+	if err := validateAvailabilityCommitment(cascadeMeta.AvailabilityCommitment, challengeCount, minChunks); err != nil {
+		return errors.Wrap(actiontypes.ErrInvalidMetadata, err.Error())
 	}
 
 	// Validate Signature. Signature field contains: `Base64(rq_ids).creators_signature`
@@ -186,6 +283,10 @@ func (h CascadeActionHandler) FinalizeAction(ctx sdk.Context, action *actiontype
 		return actiontypes.ActionStateUnspecified, nil
 	}
 
+	if err := h.keeper.VerifyChunkProofs(ctx, action, superNodeAccount, newCascadeMeta.GetChunkProofs()); err != nil {
+		return actiontypes.ActionStateUnspecified, err
+	}
+
 	// Cascade actions are finalized with a single supernode
 	// Return DONE state since all validations passed
 	return actiontypes.ActionStateDone, nil
@@ -213,14 +314,23 @@ func (h CascadeActionHandler) GetUpdatedMetadata(ctx sdk.Context, existingMetada
 	}
 
 	updatedMetadata := &actiontypes.CascadeMetadata{
-		RqIdsIc:    existingMetadata.GetRqIdsIc(),
-		RqIdsMax:   existingMetadata.GetRqIdsMax(),
-		DataHash:   existingMetadata.GetDataHash(),
-		FileName:   existingMetadata.GetFileName(),
-		Signatures: existingMetadata.GetSignatures(),
-		RqIdsIds:   newMetadata.GetRqIdsIds(),
-		Public:     existingMetadata.GetPublic(),
+		RqIdsIc:                existingMetadata.GetRqIdsIc(),
+		RqIdsMax:               existingMetadata.GetRqIdsMax(),
+		DataHash:               existingMetadata.GetDataHash(),
+		FileName:               existingMetadata.GetFileName(),
+		Signatures:             existingMetadata.GetSignatures(),
+		RqIdsIds:               newMetadata.GetRqIdsIds(),
+		Public:                 existingMetadata.GetPublic(),
+		AvailabilityCommitment: existingMetadata.GetAvailabilityCommitment(),
+		ChunkProofs:            newMetadata.GetChunkProofs(),
+		IndexArtifactCount:     newMetadata.GetIndexArtifactCount(),
+		SymbolArtifactCount:    newMetadata.GetSymbolArtifactCount(),
 	}
+	indexCount, symbolCount, err := actiontypes.CascadeArtifactCountsWithFallbackStrict(updatedMetadata)
+	if err != nil {
+		return nil, errors.Wrap(actiontypes.ErrInvalidMetadata, err.Error())
+	}
+	updatedMetadata.IndexArtifactCount, updatedMetadata.SymbolArtifactCount = indexCount, symbolCount
 
 	return gogoproto.Marshal(updatedMetadata)
 }

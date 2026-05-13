@@ -56,14 +56,37 @@ enum CascadeClientFailureReporterComponent {
   CASCADE_CLIENT_FAILURE_REPORTER_COMPONENT_SDK_JS = 3;
 }
 
+message CascadeClientFailureDetails {
+  // operation is the SDK operation that failed (e.g. register, download).
+  string operation = 1;
+
+  // iteration is the retry attempt index represented by the client.
+  string iteration = 2;
+
+  // supernode_endpoint is the implicated supernode endpoint.
+  string supernode_endpoint = 3;
+
+  // supernode_account is the implicated supernode account.
+  string supernode_account = 4 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+
+  // task_id is the client task identifier.
+  string task_id = 5;
+
+  // error is the failure message observed by the client.
+  string error = 6;
+
+  // action_id is the action id tracked by the client.
+  string action_id = 7;
+}
+
 // CascadeClientFailureEvidenceMetadata is metadata for client-observed failures.
 message CascadeClientFailureEvidenceMetadata {
   // reporter_component identifies the emitting component.
   CascadeClientFailureReporterComponent reporter_component = 1;
 
-  // target_supernode_accounts are implicated supernode accounts
+  // target_supernode_accounts are implicated supernode accounts.
   repeated string target_supernode_accounts = 2;
 
-  // details contains free-form diagnostic attributes (e.g. trace, endpoint, error).
-  map<string, string> details = 3;
+  // details is the structured failure payload reported by clients.
+  CascadeClientFailureDetails details = 3;
 }

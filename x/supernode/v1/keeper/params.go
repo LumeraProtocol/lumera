@@ -32,3 +32,13 @@ func (k Keeper) SetParams(ctx sdk.Context, params types.Params) error {
 
 	return nil
 }
+
+// GetRegistrationFeeShareBps returns the nested Everlight registration-fee
+// share configured within the supernode module params.
+func (k Keeper) GetRegistrationFeeShareBps(ctx sdk.Context) uint64 {
+	params := k.GetParams(ctx)
+	if params.RewardDistribution == nil {
+		return 0
+	}
+	return params.RewardDistribution.RegistrationFeeShareBps
+}

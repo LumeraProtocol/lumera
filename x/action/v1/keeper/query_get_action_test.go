@@ -60,7 +60,7 @@ func TestKeeper_GetAction(t *testing.T) {
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
 				action.Price = price.String()
-				k.SetAction(ctx, &action)
+				require.NoError(t, k.SetAction(ctx, &action))
 			},
 			expectedErr: nil,
 			checkResult: func(t *testing.T, resp *types.QueryGetActionResponse) {

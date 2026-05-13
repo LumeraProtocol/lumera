@@ -91,8 +91,8 @@ func TestKeeper_ListActionsBySuperNode(t *testing.T) {
 				SuperNodeAddress: superNodeAddr,
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
-				k.SetAction(ctx, &action1)
-				k.SetAction(ctx, &action2)
+				require.NoError(t, k.SetAction(ctx, &action1))
+				require.NoError(t, k.SetAction(ctx, &action2))
 			},
 			expectedErr: nil,
 			checkResult: func(t *testing.T, resp *types.QueryListActionsBySuperNodeResponse) {
@@ -108,9 +108,9 @@ func TestKeeper_ListActionsBySuperNode(t *testing.T) {
 				SuperNodeAddress: superNodeAddr,
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
-				k.SetAction(ctx, &action1)
-				k.SetAction(ctx, &action2)
-				k.SetAction(ctx, &action3)
+				require.NoError(t, k.SetAction(ctx, &action1))
+				require.NoError(t, k.SetAction(ctx, &action2))
+				require.NoError(t, k.SetAction(ctx, &action3))
 			},
 			expectedErr: nil,
 			checkResult: func(t *testing.T, resp *types.QueryListActionsBySuperNodeResponse) {
@@ -129,8 +129,8 @@ func TestKeeper_ListActionsBySuperNode(t *testing.T) {
 				},
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
-				k.SetAction(ctx, &action1)
-				k.SetAction(ctx, &action2)
+				require.NoError(t, k.SetAction(ctx, &action1))
+				require.NoError(t, k.SetAction(ctx, &action2))
 			},
 			expectedErr: nil,
 			checkResult: func(t *testing.T, resp *types.QueryListActionsBySuperNodeResponse) {

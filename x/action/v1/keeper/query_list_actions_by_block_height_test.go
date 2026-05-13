@@ -93,8 +93,8 @@ func TestKeeper_ListActionsByBlockHeight(t *testing.T) {
 				BlockHeight: blockHeight,
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
-				k.SetAction(ctx, &action1)
-				k.SetAction(ctx, &action2)
+				require.NoError(t, k.SetAction(ctx, &action1))
+				require.NoError(t, k.SetAction(ctx, &action2))
 			},
 			expectedErr: nil,
 			checkResult: func(t *testing.T, resp *types.QueryListActionsByBlockHeightResponse) {
@@ -110,9 +110,9 @@ func TestKeeper_ListActionsByBlockHeight(t *testing.T) {
 				BlockHeight: blockHeight,
 			},
 			setupState: func(k keeper.Keeper, ctx sdk.Context) {
-				k.SetAction(ctx, &action1)
-				k.SetAction(ctx, &action2)
-				k.SetAction(ctx, &action3)
+				require.NoError(t, k.SetAction(ctx, &action1))
+				require.NoError(t, k.SetAction(ctx, &action2))
+				require.NoError(t, k.SetAction(ctx, &action3))
 			},
 			expectedErr: nil,
 			checkResult: func(t *testing.T, resp *types.QueryListActionsByBlockHeightResponse) {

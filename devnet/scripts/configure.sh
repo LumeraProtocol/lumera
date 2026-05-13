@@ -170,7 +170,9 @@ install_ibc_tests() {
 }
 
 mkdir -p "${CFG_DIR}" "${RELEASE_DIR}"
-cp -f "${CONFIG_JSON}" "${VALIDATORS_JSON}" "${CFG_DIR}/"
+# Always copy as config.json / validators.json so start.sh finds them by expected name
+cp -f "${CONFIG_JSON}" "${CFG_DIR}/config.json"
+cp -f "${VALIDATORS_JSON}" "${CFG_DIR}/validators.json"
 echo "[CONFIGURE] Configuration files copied to ${CFG_DIR}"
 
 install_supernode

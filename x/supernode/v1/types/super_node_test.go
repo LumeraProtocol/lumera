@@ -28,7 +28,7 @@ func TestSuperNodeValidation(t *testing.T) {
 				Evidence:         []*types.Evidence{},
 				Note:             "1.0.0",
 				Metrics: &types.MetricsAggregate{
-					Metrics:     make(map[string]float64),
+					Metrics:     []*types.MetricValue{},
 					ReportCount: 0,
 				},
 				States: []*types.SuperNodeStateRecord{
@@ -111,7 +111,7 @@ func TestSuperNodeValidation(t *testing.T) {
 				Evidence:         []*types.Evidence{},
 				Note:             "1.0.0",
 				Metrics: &types.MetricsAggregate{
-					Metrics:     make(map[string]float64),
+					Metrics:     []*types.MetricValue{},
 					ReportCount: 0,
 				},
 				States: []*types.SuperNodeStateRecord{

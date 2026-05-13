@@ -22,7 +22,8 @@ Flags:
 func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 	return &autocliv1.ModuleOptions{
 		Query: &autocliv1.ServiceCommandDescriptor{
-			Service: types.Query_serviceDesc.ServiceName,
+			Service:              types.Query_serviceDesc.ServiceName,
+			EnhanceCustomCommand: true,
 			RpcCommandOptions: []*autocliv1.RpcCommandOptions{
 				{
 					RpcMethod: "Params",
@@ -47,6 +48,7 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 					Short:          "Query list-supernodes",
 					PositionalArgs: []*autocliv1.PositionalArgDescriptor{},
 				},
+
 				{
 					RpcMethod: "GetTopSuperNodesForBlock",
 					Use:       "get-top-supernodes-for-block [block-height]",
@@ -67,6 +69,27 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 							DefaultValue: "SUPERNODE_STATE_ACTIVE",
 						},
 					},
+				},
+				{
+					RpcMethod: "PoolState",
+					Use:       "pool-state",
+					Short:     "Query the everlight pool state (balance, distribution info)",
+				},
+				{
+					RpcMethod:      "SNEligibility",
+					Use:            "sn-eligibility [validator-address]",
+					Short:          "Query whether a supernode is eligible for everlight payouts",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validator_address"}},
+				},
+				{
+					RpcMethod:      "PayoutHistory",
+					Use:            "payout-history [validator-address]",
+					Short:          "Query payout history for a supernode validator",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validator_address"}},
+				},
+				{
+					RpcMethod: "GetMetrics",
+					Skip:      true, // custom command to avoid AutoCLI aminojson float64 marshal bug
 				},
 
 				// this line is used by ignite scaffolding # autocli/query
@@ -127,6 +150,12 @@ func (am AppModule) AutoCLIOptions() *autocliv1.ModuleOptions {
 							DefaultValue: types.DefaultP2PPort,
 						},
 					},
+				},
+				{
+					RpcMethod:      "ReportSupernodeMetrics",
+					Use:            "report-supernode-metrics [validator-address]",
+					Short:          "Report structured metrics for a supernode",
+					PositionalArgs: []*autocliv1.PositionalArgDescriptor{{ProtoField: "validator_address"}},
 				},
 				// this line is used by ignite scaffolding # autocli/tx
 			},

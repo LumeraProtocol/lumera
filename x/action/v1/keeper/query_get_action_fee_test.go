@@ -40,7 +40,7 @@ func TestKeeper_GetActionFee(t *testing.T) {
 				params := types.DefaultParams()
 				params.BaseActionFee = sdk.NewCoin("ulume", math.NewInt(10000))
 				params.FeePerKbyte = sdk.NewCoin("ulume", math.NewInt(100))
-				k.SetParams(ctx, params)
+				require.NoError(t, k.SetParams(ctx, params))
 			},
 			expectedFee: "10000",
 		},
@@ -51,7 +51,7 @@ func TestKeeper_GetActionFee(t *testing.T) {
 				params := types.DefaultParams()
 				params.BaseActionFee = sdk.NewCoin("ulume", math.NewInt(10000))
 				params.FeePerKbyte = sdk.NewCoin("ulume", math.NewInt(100))
-				k.SetParams(ctx, params)
+				require.NoError(t, k.SetParams(ctx, params))
 			},
 			expectedFee: "30000", // 100 * 200 + 10000
 		},

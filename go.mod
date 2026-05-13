@@ -1,6 +1,6 @@
 module github.com/LumeraProtocol/lumera
 
-go 1.25.5
+go 1.25.9
 
 replace (
 	github.com/envoyproxy/protoc-gen-validate => github.com/bufbuild/protoc-gen-validate v1.3.0
@@ -31,7 +31,7 @@ require (
 	github.com/DataDog/zstd v1.5.7
 	github.com/Masterminds/semver/v3 v3.3.1
 	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce
-	github.com/cometbft/cometbft v0.38.20
+	github.com/cometbft/cometbft v0.38.21
 	github.com/cosmos/btcutil v1.0.5
 	github.com/cosmos/cosmos-db v1.1.3
 	github.com/cosmos/cosmos-proto v1.0.0-beta.5

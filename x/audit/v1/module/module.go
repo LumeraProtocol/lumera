@@ -12,7 +12,9 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
+	"github.com/spf13/cobra"
 
+	"github.com/LumeraProtocol/lumera/x/audit/v1/client/cli"
 	"github.com/LumeraProtocol/lumera/x/audit/v1/keeper"
 	"github.com/LumeraProtocol/lumera/x/audit/v1/types"
 )
@@ -65,12 +67,21 @@ func (AppModuleBasic) RegisterGRPCGatewayRoutes(clientCtx client.Context, mux *r
 	}
 }
 
+// GetQueryCmd returns custom query commands for the audit module.
+func (AppModuleBasic) GetQueryCmd() *cobra.Command {
+	return cli.GetCustomQueryCmd()
+}
+
 type AppModule struct {
 	AppModuleBasic
 
 	keeper     keeper.Keeper
 	authKeeper types.AuthKeeper
 	bankKeeper types.BankKeeper
+}
+
+func (am AppModule) HasCustomQueryCommand() bool {
+	return true
 }
 
 func NewAppModule(cdc codec.Codec, keeper keeper.Keeper, authKeeper types.AuthKeeper, bankKeeper types.BankKeeper) AppModule {
@@ -85,6 +96,10 @@ func NewAppModule(cdc codec.Codec, keeper keeper.Keeper, authKeeper types.AuthKe
 func (am AppModule) RegisterServices(cfg module.Configurator) {
 	types.RegisterMsgServer(cfg.MsgServer(), keeper.NewMsgServerImpl(am.keeper))
 	types.RegisterQueryServer(cfg.QueryServer(), keeper.NewQueryServerImpl(am.keeper))
+	// Per 122-F4 — bump KeepLastEpochEntries to cover OldClassAFaultWindow for safe pruning.
+	if err := cfg.RegisterMigration(types.ModuleName, 1, NewMigrateV1ToV2(am.keeper)); err != nil {
+		panic(fmt.Sprintf("failed to register audit v1->v2 migration: %v", err))
+	}
 }
 
 func (am AppModule) RegisterInvariants(_ sdk.InvariantRegistry) {}

@@ -25,17 +25,69 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
+type MetricValue struct {
+	Name  string  `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Value float64 `protobuf:"fixed64,2,opt,name=value,proto3" json:"value,omitempty"`
+}
+
+func (m *MetricValue) Reset()         { *m = MetricValue{} }
+func (m *MetricValue) String() string { return proto.CompactTextString(m) }
+func (*MetricValue) ProtoMessage()    {}
+func (*MetricValue) Descriptor() ([]byte, []int) {
+	return fileDescriptor_a299e6581f75805c, []int{0}
+}
+func (m *MetricValue) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *MetricValue) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_MetricValue.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *MetricValue) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MetricValue.Merge(m, src)
+}
+func (m *MetricValue) XXX_Size() int {
+	return m.Size()
+}
+func (m *MetricValue) XXX_DiscardUnknown() {
+	xxx_messageInfo_MetricValue.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_MetricValue proto.InternalMessageInfo
+
+func (m *MetricValue) GetName() string {
+	if m != nil {
+		return m.Name
+	}
+	return ""
+}
+
+func (m *MetricValue) GetValue() float64 {
+	if m != nil {
+		return m.Value
+	}
+	return 0
+}
+
 type MetricsAggregate struct {
-	Metrics     map[string]float64 `protobuf:"bytes,1,rep,name=metrics,proto3" json:"metrics,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"fixed64,2,opt,name=value,proto3"`
-	ReportCount uint64             `protobuf:"varint,2,opt,name=report_count,json=reportCount,proto3" json:"report_count,omitempty"`
-	Height      int64              `protobuf:"varint,3,opt,name=height,proto3" json:"height,omitempty"`
+	Metrics     []*MetricValue `protobuf:"bytes,1,rep,name=metrics,proto3" json:"metrics,omitempty"`
+	ReportCount uint64         `protobuf:"varint,2,opt,name=report_count,json=reportCount,proto3" json:"report_count,omitempty"`
+	Height      int64          `protobuf:"varint,3,opt,name=height,proto3" json:"height,omitempty"`
 }
 
 func (m *MetricsAggregate) Reset()         { *m = MetricsAggregate{} }
 func (m *MetricsAggregate) String() string { return proto.CompactTextString(m) }
 func (*MetricsAggregate) ProtoMessage()    {}
 func (*MetricsAggregate) Descriptor() ([]byte, []int) {
-	return fileDescriptor_a299e6581f75805c, []int{0}
+	return fileDescriptor_a299e6581f75805c, []int{1}
 }
 func (m *MetricsAggregate) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -64,7 +116,7 @@ func (m *MetricsAggregate) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_MetricsAggregate proto.InternalMessageInfo
 
-func (m *MetricsAggregate) GetMetrics() map[string]float64 {
+func (m *MetricsAggregate) GetMetrics() []*MetricValue {
 	if m != nil {
 		return m.Metrics
 	}
@@ -86,8 +138,8 @@ func (m *MetricsAggregate) GetHeight() int64 {
 }
 
 func init() {
+	proto.RegisterType((*MetricValue)(nil), "lumera.supernode.v1.MetricValue")
 	proto.RegisterType((*MetricsAggregate)(nil), "lumera.supernode.v1.MetricsAggregate")
-	proto.RegisterMapType((map[string]float64)(nil), "lumera.supernode.v1.MetricsAggregate.MetricsEntry")
 }
 
 func init() {
@@ -95,25 +147,61 @@ func init() {
 }
 
 var fileDescriptor_a299e6581f75805c = []byte{
-	// 287 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x6c, 0x90, 0x31, 0x4b, 0xc3, 0x40,
-	0x1c, 0xc5, 0x7b, 0x8d, 0x56, 0xbc, 0x76, 0x28, 0x67, 0x90, 0x90, 0xe1, 0x8c, 0x4e, 0x01, 0xe1,
-	0x8e, 0xd6, 0x45, 0xba, 0xa9, 0xb8, 0xe9, 0x92, 0xd1, 0xa5, 0xa4, 0xf5, 0xef, 0x35, 0x98, 0xe4,
-	0xc2, 0xe5, 0x12, 0xcc, 0xb7, 0xf0, 0x63, 0x39, 0x76, 0xd3, 0x51, 0x92, 0x2f, 0x22, 0xc9, 0x35,
-	0xa2, 0xe2, 0xf6, 0xfe, 0x8f, 0xf7, 0x7f, 0x3f, 0x78, 0xf8, 0x3c, 0x2e, 0x12, 0x50, 0x21, 0xcf,
-	0x8b, 0x0c, 0x54, 0x2a, 0x1f, 0x81, 0x97, 0x33, 0x9e, 0x80, 0x56, 0xd1, 0x3a, 0x5f, 0x86, 0x42,
-	0x28, 0x10, 0xa1, 0x06, 0x96, 0x29, 0xa9, 0x25, 0x39, 0x32, 0x61, 0xf6, 0x1d, 0x66, 0xe5, 0xcc,
-	0x3d, 0x11, 0x52, 0x8a, 0x18, 0x78, 0x17, 0x59, 0x15, 0x4f, 0x5c, 0x47, 0x09, 0xe4, 0x3a, 0x4c,
-	0x32, 0xf3, 0xe5, 0xda, 0x42, 0x0a, 0xd9, 0x49, 0xde, 0x2a, 0xe3, 0x9e, 0xbd, 0x23, 0x3c, 0xbd,
-	0x37, 0x9c, 0xab, 0x1e, 0x43, 0xee, 0xf0, 0xc1, 0x8e, 0xed, 0x20, 0xcf, 0xf2, 0xc7, 0xf3, 0x39,
-	0xfb, 0x07, 0xc9, 0xfe, 0xfe, 0xf5, 0xc6, 0x6d, 0xaa, 0x55, 0x15, 0xf4, 0x15, 0xe4, 0x14, 0x4f,
-	0x14, 0x64, 0x52, 0xe9, 0xe5, 0x5a, 0x16, 0xa9, 0x76, 0x86, 0x1e, 0xf2, 0xf7, 0x82, 0xb1, 0xf1,
-	0x6e, 0x5a, 0x8b, 0x1c, 0xe3, 0xd1, 0x06, 0x22, 0xb1, 0xd1, 0x8e, 0xe5, 0x21, 0xdf, 0x0a, 0x76,
-	0x97, 0xbb, 0xc0, 0x93, 0x9f, 0x9d, 0x64, 0x8a, 0xad, 0x67, 0xa8, 0x1c, 0xe4, 0x21, 0xff, 0x30,
-	0x68, 0x25, 0xb1, 0xf1, 0x7e, 0x19, 0xc6, 0x05, 0x74, 0xad, 0x28, 0x30, 0xc7, 0x62, 0x78, 0x89,
-	0xae, 0xd9, 0x5b, 0x4d, 0xd1, 0xb6, 0xa6, 0xe8, 0xb3, 0xa6, 0xe8, 0xb5, 0xa1, 0x83, 0x6d, 0x43,
-	0x07, 0x1f, 0x0d, 0x1d, 0x3c, 0xd8, 0x2f, 0xbf, 0x77, 0xd6, 0x55, 0x06, 0xf9, 0x6a, 0xd4, 0x0d,
-	0x72, 0xf1, 0x15, 0x00, 0x00, 0xff, 0xff, 0x5c, 0x09, 0xd7, 0xeb, 0x8b, 0x01, 0x00, 0x00,
+	// 281 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x6c, 0x50, 0xb1, 0x4e, 0xc3, 0x30,
+	0x14, 0x8c, 0x49, 0x29, 0xc2, 0x61, 0x40, 0x26, 0x42, 0x51, 0x07, 0x13, 0x3a, 0x45, 0x42, 0xb2,
+	0x55, 0x18, 0x90, 0xd8, 0x80, 0x99, 0x25, 0x03, 0x03, 0x4b, 0xe5, 0x96, 0x87, 0x1b, 0x29, 0x89,
+	0x23, 0xc7, 0x89, 0xe0, 0x13, 0xd8, 0xf8, 0x2c, 0xc6, 0x8e, 0x8c, 0x28, 0xf9, 0x11, 0x14, 0xbb,
+	0x45, 0x20, 0x75, 0xbb, 0x3b, 0xdf, 0xe9, 0xce, 0x0f, 0x5f, 0xe4, 0x4d, 0x01, 0x5a, 0xf0, 0xba,
+	0xa9, 0x40, 0x97, 0xea, 0x19, 0x78, 0x3b, 0xe3, 0x05, 0x18, 0x9d, 0x2d, 0xeb, 0xb9, 0x90, 0x52,
+	0x83, 0x14, 0x06, 0x58, 0xa5, 0x95, 0x51, 0xe4, 0xc4, 0x99, 0xd9, 0xaf, 0x99, 0xb5, 0xb3, 0xc9,
+	0x99, 0x54, 0x4a, 0xe6, 0xc0, 0xad, 0x65, 0xd1, 0xbc, 0x70, 0x93, 0x15, 0x50, 0x1b, 0x51, 0x54,
+	0x2e, 0x35, 0x09, 0xa5, 0x92, 0xca, 0x42, 0x3e, 0x20, 0xa7, 0x4e, 0xaf, 0x71, 0xf0, 0x60, 0x6b,
+	0x1e, 0x45, 0xde, 0x00, 0x21, 0x78, 0x54, 0x8a, 0x02, 0x22, 0x14, 0xa3, 0xe4, 0x30, 0xb5, 0x98,
+	0x84, 0x78, 0xbf, 0x1d, 0x1e, 0xa3, 0xbd, 0x18, 0x25, 0x28, 0x75, 0x64, 0xfa, 0x8e, 0xf0, 0xb1,
+	0x4b, 0xd6, 0xb7, 0xdb, 0x7d, 0xe4, 0x06, 0x1f, 0x6c, 0x46, 0x47, 0x28, 0xf6, 0x93, 0xe0, 0x32,
+	0x66, 0x3b, 0xb6, 0xb2, 0x3f, 0x8d, 0xe9, 0x36, 0x40, 0xce, 0xf1, 0x91, 0x86, 0x4a, 0x69, 0x33,
+	0x5f, 0xaa, 0xa6, 0x34, 0xb6, 0x6d, 0x94, 0x06, 0x4e, 0xbb, 0x1f, 0x24, 0x72, 0x8a, 0xc7, 0x2b,
+	0xc8, 0xe4, 0xca, 0x44, 0x7e, 0x8c, 0x12, 0x3f, 0xdd, 0xb0, 0x3b, 0xf6, 0xd9, 0x51, 0xb4, 0xee,
+	0x28, 0xfa, 0xee, 0x28, 0xfa, 0xe8, 0xa9, 0xb7, 0xee, 0xa9, 0xf7, 0xd5, 0x53, 0xef, 0x29, 0x7c,
+	0xfd, 0x7f, 0x52, 0xf3, 0x56, 0x41, 0xbd, 0x18, 0xdb, 0xbf, 0x5f, 0xfd, 0x04, 0x00, 0x00, 0xff,
+	0xff, 0xdf, 0x83, 0xc5, 0xba, 0x76, 0x01, 0x00, 0x00,
+}
+
+func (m *MetricValue) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *MetricValue) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *MetricValue) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.Value != 0 {
+		i -= 8
+		encoding_binary.LittleEndian.PutUint64(dAtA[i:], uint64(math.Float64bits(float64(m.Value))))
+		i--
+		dAtA[i] = 0x11
+	}
+	if len(m.Name) > 0 {
+		i -= len(m.Name)
+		copy(dAtA[i:], m.Name)
+		i = encodeVarintMetricsAggregate(dAtA, i, uint64(len(m.Name)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
 }
 
 func (m *MetricsAggregate) Marshal() (dAtA []byte, err error) {
@@ -147,19 +235,15 @@ func (m *MetricsAggregate) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		dAtA[i] = 0x10
 	}
 	if len(m.Metrics) > 0 {
-		for k := range m.Metrics {
-			v := m.Metrics[k]
-			baseI := i
-			i -= 8
-			encoding_binary.LittleEndian.PutUint64(dAtA[i:], uint64(math.Float64bits(float64(v))))
-			i--
-			dAtA[i] = 0x11
-			i -= len(k)
-			copy(dAtA[i:], k)
-			i = encodeVarintMetricsAggregate(dAtA, i, uint64(len(k)))
-			i--
-			dAtA[i] = 0xa
-			i = encodeVarintMetricsAggregate(dAtA, i, uint64(baseI-i))
+		for iNdEx := len(m.Metrics) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Metrics[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintMetricsAggregate(dAtA, i, uint64(size))
+			}
 			i--
 			dAtA[i] = 0xa
 		}
@@ -178,6 +262,22 @@ func encodeVarintMetricsAggregate(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
+func (m *MetricValue) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Name)
+	if l > 0 {
+		n += 1 + l + sovMetricsAggregate(uint64(l))
+	}
+	if m.Value != 0 {
+		n += 9
+	}
+	return n
+}
+
 func (m *MetricsAggregate) Size() (n int) {
 	if m == nil {
 		return 0
@@ -185,11 +285,9 @@ func (m *MetricsAggregate) Size() (n int) {
 	var l int
 	_ = l
 	if len(m.Metrics) > 0 {
-		for k, v := range m.Metrics {
-			_ = k
-			_ = v
-			mapEntrySize := 1 + len(k) + sovMetricsAggregate(uint64(len(k))) + 1 + 8
-			n += mapEntrySize + 1 + sovMetricsAggregate(uint64(mapEntrySize))
+		for _, e := range m.Metrics {
+			l = e.Size()
+			n += 1 + l + sovMetricsAggregate(uint64(l))
 		}
 	}
 	if m.ReportCount != 0 {
@@ -206,6 +304,99 @@ func sovMetricsAggregate(x uint64) (n int) {
 }
 func sozMetricsAggregate(x uint64) (n int) {
 	return sovMetricsAggregate(uint64((x << 1) ^ uint64((int64(x) >> 63))))
+}
+func (m *MetricValue) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMetricsAggregate
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MetricValue: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MetricValue: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMetricsAggregate
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthMetricsAggregate
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthMetricsAggregate
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 1 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Value", wireType)
+			}
+			var v uint64
+			if (iNdEx + 8) > l {
+				return io.ErrUnexpectedEOF
+			}
+			v = uint64(encoding_binary.LittleEndian.Uint64(dAtA[iNdEx:]))
+			iNdEx += 8
+			m.Value = float64(math.Float64frombits(v))
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMetricsAggregate(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthMetricsAggregate
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
 }
 func (m *MetricsAggregate) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
@@ -265,82 +456,10 @@ func (m *MetricsAggregate) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if m.Metrics == nil {
-				m.Metrics = make(map[string]float64)
+			m.Metrics = append(m.Metrics, &MetricValue{})
+			if err := m.Metrics[len(m.Metrics)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
 			}
-			var mapkey string
-			var mapvalue float64
-			for iNdEx < postIndex {
-				entryPreIndex := iNdEx
-				var wire uint64
-				for shift := uint(0); ; shift += 7 {
-					if shift >= 64 {
-						return ErrIntOverflowMetricsAggregate
-					}
-					if iNdEx >= l {
-						return io.ErrUnexpectedEOF
-					}
-					b := dAtA[iNdEx]
-					iNdEx++
-					wire |= uint64(b&0x7F) << shift
-					if b < 0x80 {
-						break
-					}
-				}
-				fieldNum := int32(wire >> 3)
-				if fieldNum == 1 {
-					var stringLenmapkey uint64
-					for shift := uint(0); ; shift += 7 {
-						if shift >= 64 {
-							return ErrIntOverflowMetricsAggregate
-						}
-						if iNdEx >= l {
-							return io.ErrUnexpectedEOF
-						}
-						b := dAtA[iNdEx]
-						iNdEx++
-						stringLenmapkey |= uint64(b&0x7F) << shift
-						if b < 0x80 {
-							break
-						}
-					}
-					intStringLenmapkey := int(stringLenmapkey)
-					if intStringLenmapkey < 0 {
-						return ErrInvalidLengthMetricsAggregate
-					}
-					postStringIndexmapkey := iNdEx + intStringLenmapkey
-					if postStringIndexmapkey < 0 {
-						return ErrInvalidLengthMetricsAggregate
-					}
-					if postStringIndexmapkey > l {
-						return io.ErrUnexpectedEOF
-					}
-					mapkey = string(dAtA[iNdEx:postStringIndexmapkey])
-					iNdEx = postStringIndexmapkey
-				} else if fieldNum == 2 {
-					var mapvaluetemp uint64
-					if (iNdEx + 8) > l {
-						return io.ErrUnexpectedEOF
-					}
-					mapvaluetemp = uint64(encoding_binary.LittleEndian.Uint64(dAtA[iNdEx:]))
-					iNdEx += 8
-					mapvalue = math.Float64frombits(mapvaluetemp)
-				} else {
-					iNdEx = entryPreIndex
-					skippy, err := skipMetricsAggregate(dAtA[iNdEx:])
-					if err != nil {
-						return err
-					}
-					if (skippy < 0) || (iNdEx+skippy) < 0 {
-						return ErrInvalidLengthMetricsAggregate
-					}
-					if (iNdEx + skippy) > postIndex {
-						return io.ErrUnexpectedEOF
-					}
-					iNdEx += skippy
-				}
-			}
-			m.Metrics[mapkey] = mapvalue
 			iNdEx = postIndex
 		case 2:
 			if wireType != 0 {

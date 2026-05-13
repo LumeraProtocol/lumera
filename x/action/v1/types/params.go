@@ -13,32 +13,36 @@ var _ paramtypes.ParamSet = (*Params)(nil)
 
 // Parameter keys
 var (
-	KeyBaseActionFee        = []byte("BaseActionFee")
-	KeyFeePerKbyte          = []byte("FeePerKbyte")
-	KeyMaxActionsPerBlock   = []byte("MaxActionsPerBlock")
-	KeyMinSuperNodes        = []byte("MinSuperNodes")
-	KeyMaxDdAndFingerprints = []byte("MaxDdAndFingerprints")
-	KeyMaxRaptorQSymbols    = []byte("MaxRaptorQSymbols")
-	KeyExpirationDuration   = []byte("ExpirationDuration")
-	KeyMinProcessingTime    = []byte("MinProcessingTime")
-	KeyMaxProcessingTime    = []byte("MaxProcessingTime")
-	KeySuperNodeFeeShare    = []byte("SuperNodeFeeShare")
-	KeyFoundationFeeShare   = []byte("FoundationFeeShare")
+	KeyBaseActionFee            = []byte("BaseActionFee")
+	KeyFeePerKbyte              = []byte("FeePerKbyte")
+	KeyMaxActionsPerBlock       = []byte("MaxActionsPerBlock")
+	KeyMinSuperNodes            = []byte("MinSuperNodes")
+	KeyMaxDdAndFingerprints     = []byte("MaxDdAndFingerprints")
+	KeyMaxRaptorQSymbols        = []byte("MaxRaptorQSymbols")
+	KeyExpirationDuration       = []byte("ExpirationDuration")
+	KeyMinProcessingTime        = []byte("MinProcessingTime")
+	KeyMaxProcessingTime        = []byte("MaxProcessingTime")
+	KeySuperNodeFeeShare        = []byte("SuperNodeFeeShare")
+	KeyFoundationFeeShare       = []byte("FoundationFeeShare")
+	KeySVCChallengeCount        = []byte("SVCChallengeCount")
+	KeySVCMinChunksForChallenge = []byte("SVCMinChunksForChallenge")
 )
 
 // Default parameter values
 var (
-	DefaultBaseActionFee        = sdk.NewCoin("ulume", math.NewInt(10000)) // 0.01 LUME
-	DefaultFeePerKbyte          = sdk.NewCoin("ulume", math.NewInt(10))    // 0.00001 LUME per kbyte
-	DefaultMaxActionsPerBlock   = uint64(10)                               // 100 actions per block
-	DefaultMinSuperNodes        = uint64(3)                                // Minimum 3 super nodes
-	DefaultMaxDdAndFingerprints = uint64(50)                               // Maximum 1000 DDs and fingerprints
-	DefaultMaxRaptorQSymbols    = uint64(50)                               // Maximum 10000 RaptorQ symbols
-	DefaultExpirationDuration   = 24 * time.Hour                           // 24 hour expiration
-	DefaultMinProcessingTime    = 1 * time.Minute                          // 1 minute minimum processing time
-	DefaultMaxProcessingTime    = 1 * time.Hour                            // 1 hour maximum processing time
-	DefaultSuperNodeFeeShare    = "1.000000000000000000"                   // 1.0 (100%)
-	DefaultFoundationFeeShare   = "0.000000000000000000"                   // 0.0 (0%)
+	DefaultBaseActionFee            = sdk.NewCoin("ulume", math.NewInt(10000)) // 0.01 LUME
+	DefaultFeePerKbyte              = sdk.NewCoin("ulume", math.NewInt(10))    // 0.00001 LUME per kbyte
+	DefaultMaxActionsPerBlock       = uint64(10)                               // 100 actions per block
+	DefaultMinSuperNodes            = uint64(3)                                // Minimum 3 super nodes
+	DefaultMaxDdAndFingerprints     = uint64(50)                               // Maximum 1000 DDs and fingerprints
+	DefaultMaxRaptorQSymbols        = uint64(50)                               // Maximum 10000 RaptorQ symbols
+	DefaultExpirationDuration       = 24 * time.Hour                           // 24 hour expiration
+	DefaultMinProcessingTime        = 1 * time.Minute                          // 1 minute minimum processing time
+	DefaultMaxProcessingTime        = 1 * time.Hour                            // 1 hour maximum processing time
+	DefaultSuperNodeFeeShare        = "1.000000000000000000"                   // 1.0 (100%)
+	DefaultFoundationFeeShare       = "0.000000000000000000"                   // 0.0 (0%)
+	DefaultSVCChallengeCount        = uint32(8)                                // LEP-5: number of chunks to challenge
+	DefaultSVCMinChunksForChallenge = uint32(4)                                // LEP-5: minimum chunks required for SVC
 )
 
 // ParamKeyTable the param key table for launch module
@@ -59,19 +63,23 @@ func NewParams(
 	maxProcessingTime time.Duration,
 	superNodeFeeShare string,
 	foundationFeeShare string,
+	svcChallengeCount uint32,
+	svcMinChunksForChallenge uint32,
 ) Params {
 	return Params{
-		BaseActionFee:        baseActionFee,
-		FeePerKbyte:          feePerKbyte,
-		MaxActionsPerBlock:   maxActionsPerBlock,
-		MinSuperNodes:        minSuperNodes,
-		MaxDdAndFingerprints: maxDdAndFingerprints,
-		MaxRaptorQSymbols:    maxRaptorQSymbols,
-		ExpirationDuration:   expirationDuration,
-		MinProcessingTime:    minProcessingTime,
-		MaxProcessingTime:    maxProcessingTime,
-		SuperNodeFeeShare:    superNodeFeeShare,
-		FoundationFeeShare:   foundationFeeShare,
+		BaseActionFee:            baseActionFee,
+		FeePerKbyte:              feePerKbyte,
+		MaxActionsPerBlock:       maxActionsPerBlock,
+		MinSuperNodes:            minSuperNodes,
+		MaxDdAndFingerprints:     maxDdAndFingerprints,
+		MaxRaptorQSymbols:        maxRaptorQSymbols,
+		ExpirationDuration:       expirationDuration,
+		MinProcessingTime:        minProcessingTime,
+		MaxProcessingTime:        maxProcessingTime,
+		SuperNodeFeeShare:        superNodeFeeShare,
+		FoundationFeeShare:       foundationFeeShare,
+		SvcChallengeCount:        svcChallengeCount,
+		SvcMinChunksForChallenge: svcMinChunksForChallenge,
 	}
 }
 
@@ -89,7 +97,28 @@ func DefaultParams() Params {
 		DefaultMaxProcessingTime,
 		DefaultSuperNodeFeeShare,
 		DefaultFoundationFeeShare,
+		DefaultSVCChallengeCount,
+		DefaultSVCMinChunksForChallenge,
 	)
+}
+
+// WithDefaults returns a copy of the params with any zero-value fields populated
+// from module defaults. Older genesis blobs and on-chain params written before
+// new fields existed (e.g. LEP-5 SVC params) read back as zero; reading via
+// WithDefaults keeps behaviour consistent without requiring a ConsensusVersion
+// bump for purely additive params with safe defaults.
+//
+// Note: WithDefaults does NOT call Validate. Callers that want strict
+// 0-as-unset semantics (genesis init, MsgUpdateParams) should apply
+// WithDefaults() before Validate().
+func (p Params) WithDefaults() Params {
+	if p.SvcChallengeCount == 0 {
+		p.SvcChallengeCount = DefaultSVCChallengeCount
+	}
+	if p.SvcMinChunksForChallenge == 0 {
+		p.SvcMinChunksForChallenge = DefaultSVCMinChunksForChallenge
+	}
+	return p
 }
 
 // ParamSetPairs get the params.ParamSet
@@ -106,6 +135,8 @@ func (p *Params) ParamSetPairs() paramtypes.ParamSetPairs {
 		paramtypes.NewParamSetPair(KeyMaxProcessingTime, &p.MaxProcessingTime, validateDuration),
 		paramtypes.NewParamSetPair(KeySuperNodeFeeShare, &p.SuperNodeFeeShare, validateDecString),
 		paramtypes.NewParamSetPair(KeyFoundationFeeShare, &p.FoundationFeeShare, validateDecString),
+		paramtypes.NewParamSetPair(KeySVCChallengeCount, &p.SvcChallengeCount, validateUint32),
+		paramtypes.NewParamSetPair(KeySVCMinChunksForChallenge, &p.SvcMinChunksForChallenge, validateUint32),
 	}
 }
 
@@ -152,6 +183,14 @@ func (p Params) Validate() error {
 	}
 
 	if err := validateDecString(p.FoundationFeeShare); err != nil {
+		return err
+	}
+
+	if err := validateUint32(p.SvcChallengeCount); err != nil {
+		return err
+	}
+
+	if err := validateUint32(p.SvcMinChunksForChallenge); err != nil {
 		return err
 	}
 
@@ -203,6 +242,15 @@ func validateUint64(v interface{}) error {
 	return nil
 }
 
+func validateUint32(v interface{}) error {
+	_, ok := v.(uint32)
+	if !ok {
+		return fmt.Errorf("invalid parameter type: %T", v)
+	}
+
+	return nil
+}
+
 func validateDuration(v interface{}) error {
 	duration, ok := v.(time.Duration)
 	if !ok {
@@ -222,9 +270,12 @@ func validateDecString(v interface{}) error {
 		return fmt.Errorf("invalid parameter type: %T", v)
 	}
 
-	_, err := math.LegacyNewDecFromStr(str)
+	dec, err := math.LegacyNewDecFromStr(str)
 	if err != nil {
 		return fmt.Errorf("invalid decimal string: %s", err)
+	}
+	if dec.IsNegative() {
+		return fmt.Errorf("decimal string must be non-negative")
 	}
 
 	return nil

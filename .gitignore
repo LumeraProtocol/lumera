@@ -28,3 +28,9 @@ build/
 
 *.swagger.json
 
+.agents/
+.codex/
+.claude/
+AGENTS.md
+CLAUDE.md
+.bridge-version

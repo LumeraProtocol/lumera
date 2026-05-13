@@ -2,11 +2,19 @@ package keeper
 
 import (
 	"context"
+	"math"
+	"strconv"
 
 	errorsmod "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/LumeraProtocol/lumera/x/audit/v1/types"
+	sntypes "github.com/LumeraProtocol/lumera/x/supernode/v1/types"
+)
+
+const (
+	incompleteReportReason                     = "INCOMPLETE_REPORT"
+	incompleteReportReporterReliabilityPenalty = int64(8)
 )
 
 func (m msgServer) SubmitEpochReport(ctx context.Context, req *types.MsgSubmitEpochReport) (*types.MsgSubmitEpochReportResponse, error) {
@@ -32,12 +40,20 @@ func (m msgServer) SubmitEpochReport(ctx context.Context, req *types.MsgSubmitEp
 		return nil, errorsmod.Wrapf(types.ErrInvalidEpochID, "epoch_id not accepted at height %d", sdkCtx.BlockHeight())
 	}
 
-	_, found, err := m.supernodeKeeper.GetSuperNodeByAccount(sdkCtx, req.Creator)
+	sn, found, err := m.supernodeKeeper.GetSuperNodeByAccount(sdkCtx, req.Creator)
 	if err != nil {
 		return nil, err
 	}
 	if !found {
 		return nil, errorsmod.Wrap(types.ErrReporterNotFound, "creator is not a registered supernode")
+	}
+
+	// Validate self-reported HostReport host-metric fields. LEP-6 §12 left this
+	// field as a metric-courier (no audit-side consensus meaning); the audit
+	// handler still rejects malformed values defensively before bridging them
+	// into x/supernode metrics state.
+	if err := validateHostMetricFields(req.HostReport); err != nil {
+		return nil, err
 	}
 
 	anchor, found := m.GetEpochAnchor(sdkCtx, req.EpochId)
@@ -54,7 +70,8 @@ func (m msgServer) SubmitEpochReport(ctx context.Context, req *types.MsgSubmitEp
 		assignParams = snap.WithDefaults()
 	}
 
-	allowedTargetsList, isProber, err := computeAuditPeerTargetsForReporter(&assignParams, anchor.ActiveSupernodeAccounts, anchor.TargetSupernodeAccounts, anchor.Seed, reporterAccount)
+	eligibleChallengers := m.storageTruthEligibleChallengers(sdkCtx, anchor.ActiveSupernodeAccounts, req.EpochId, assignParams)
+	allowedTargetsList, isProber, err := computeAuditPeerTargetsForReporter(&assignParams, eligibleChallengers, anchor.TargetSupernodeAccounts, anchor.Seed, reporterAccount)
 	if err != nil {
 		return nil, err
 	}
@@ -82,17 +99,15 @@ func (m msgServer) SubmitEpochReport(ctx context.Context, req *types.MsgSubmitEp
 			len(req.HostReport.InboundPortStates), requiredPortsLen,
 		)
 	}
+	incompleteReport := false
 	if !isProber {
 		// Not a prober for this epoch (e.g. POSTPONED). Peer observations are not accepted.
 		if len(req.StorageChallengeObservations) > 0 {
 			return nil, errorsmod.Wrap(types.ErrInvalidReporterState, "reporter not eligible for storage challenge observations in this epoch")
 		}
 	} else {
-		// Probers must submit peer observations for all assigned targets for the epoch.
-		if len(req.StorageChallengeObservations) != len(allowedTargets) {
-			return nil, errorsmod.Wrapf(types.ErrInvalidPeerObservations, "expected storage challenge observations for %d assigned targets; got %d", len(allowedTargets), len(req.StorageChallengeObservations))
-		}
-
+		// Probers may submit a subset of assigned peer observations; missing
+		// assigned targets are accepted but penalize the reporter once per epoch.
 		seenTargets := make(map[string]struct{}, len(req.StorageChallengeObservations))
 		for _, obs := range req.StorageChallengeObservations {
 			if obs == nil {
@@ -117,9 +132,20 @@ func (m msgServer) SubmitEpochReport(ctx context.Context, req *types.MsgSubmitEp
 				return nil, errorsmod.Wrapf(types.ErrInvalidPortStatesLength, "port_states length %d does not match required_open_ports length %d", len(obs.PortStates), requiredPortsLen)
 			}
 		}
-		if len(seenTargets) != len(allowedTargets) {
-			return nil, errorsmod.Wrap(types.ErrInvalidPeerObservations, "peer observations do not cover all assigned targets")
-		}
+		incompleteReport = len(seenTargets) < len(allowedTargets)
+	}
+	// Per PR #118 / Zee F2 — cap storage proof results to bound processing cost.
+	if len(req.StorageProofResults) > types.MaxStorageProofResultsPerReport {
+		return nil, errorsmod.Wrapf(types.ErrInvalidStorageProofs,
+			"too many storage proof results: got %d, max %d",
+			len(req.StorageProofResults), types.MaxStorageProofResultsPerReport)
+	}
+	enforceCompoundStorageProofs := assignParams.StorageTruthEnforcementMode == types.StorageTruthEnforcementMode_STORAGE_TRUTH_ENFORCEMENT_MODE_FULL
+	if err := validateStorageProofResults(reporterAccount, allowedTargets, isProber, enforceCompoundStorageProofs, req.StorageProofResults); err != nil {
+		return nil, err
+	}
+	if err := m.validateStorageProofArtifactCounts(sdkCtx, req.EpochId, assignParams, req.StorageProofResults); err != nil {
+		return nil, err
 	}
 
 	if m.HasReport(sdkCtx, req.EpochId, reporterAccount) {
@@ -132,6 +158,7 @@ func (m msgServer) SubmitEpochReport(ctx context.Context, req *types.MsgSubmitEp
 		ReportHeight:                 sdkCtx.BlockHeight(),
 		HostReport:                   req.HostReport,
 		StorageChallengeObservations: req.StorageChallengeObservations,
+		StorageProofResults:          req.StorageProofResults,
 	}
 
 	if err := m.SetReport(sdkCtx, report); err != nil {
@@ -139,6 +166,16 @@ func (m msgServer) SubmitEpochReport(ctx context.Context, req *types.MsgSubmitEp
 	}
 	m.SetReportIndex(sdkCtx, req.EpochId, reporterAccount)
 	m.SetHostReportIndex(sdkCtx, req.EpochId, reporterAccount)
+
+	// Bridge cascade_kademlia_db_bytes from the audit HostReport into the
+	// x/supernode SupernodeMetricsState. Post LEP-6 §12, this is the SOLE
+	// writer of that field for Everlight payout / eligibility reads via
+	// getLatestCascadeBytesFromAudit. The bridge is read-modify-write so
+	// fields owned by the (now operationally dead) legacy
+	// MsgReportSupernodeMetrics handler are preserved if previously present.
+	if err := m.bridgeCascadeBytesToSupernodeMetrics(sdkCtx, sn, req.HostReport.CascadeKademliaDbBytes); err != nil {
+		return nil, err
+	}
 
 	seenSupernodes := make(map[string]struct{}, len(req.StorageChallengeObservations))
 	for _, obs := range req.StorageChallengeObservations {
@@ -156,5 +193,115 @@ func (m msgServer) SubmitEpochReport(ctx context.Context, req *types.MsgSubmitEp
 		m.SetStorageChallengeReportIndex(sdkCtx, supernodeAccount, req.EpochId, reporterAccount)
 	}
 
+	if err := m.indexStorageProofTranscripts(sdkCtx, req.EpochId, reporterAccount, req.StorageProofResults); err != nil {
+		return nil, err
+	}
+
+	if err := m.applyStorageTruthScores(sdkCtx, req.EpochId, reporterAccount, req.StorageProofResults); err != nil {
+		return nil, err
+	}
+	if incompleteReport {
+		if err := m.applyIncompleteReportPenalty(sdkCtx, req.EpochId, reporterAccount, assignParams); err != nil {
+			return nil, err
+		}
+	}
+
 	return &types.MsgSubmitEpochReportResponse{}, nil
+}
+
+func (k Keeper) applyIncompleteReportPenalty(ctx sdk.Context, epochID uint64, reporterAccount string, params types.Params) error {
+	state, updated, err := k.applyReporterReliabilityDelta(
+		ctx,
+		epochID,
+		reporterAccount,
+		incompleteReportReporterReliabilityPenalty,
+		params.StorageTruthReporterReliabilityDecayPerEpoch,
+		0,
+		params,
+	)
+	if err != nil {
+		return err
+	}
+	if !updated {
+		return nil
+	}
+
+	ctx.EventManager().EmitEvent(sdk.NewEvent(
+		types.EventTypeStorageTruthScoreUpdated,
+		sdk.NewAttribute(sdk.AttributeKeyModule, types.ModuleName),
+		sdk.NewAttribute(types.AttributeKeyEpochID, strconv.FormatUint(epochID, 10)),
+		sdk.NewAttribute(types.AttributeKeyReporterSupernodeAccount, reporterAccount),
+		sdk.NewAttribute(types.AttributeKeyReporterReliabilityScore, strconv.FormatInt(state.ReliabilityScore, 10)),
+		sdk.NewAttribute(types.AttributeKeyReporterTrustBand, state.TrustBand.String()),
+		sdk.NewAttribute("reason", incompleteReportReason),
+	))
+	return nil
+}
+
+// validateHostMetricFields rejects malformed host-metric values that the audit
+// handler accepts purely as metric-couriers (no audit-side consensus meaning).
+// This is the single enforcement point for HostReport host-metric invariants
+// (LEP-6 §12 — see proto/lumera/audit/v1/audit.proto::HostReport).
+func validateHostMetricFields(h types.HostReport) error {
+	if math.IsNaN(h.CascadeKademliaDbBytes) || math.IsInf(h.CascadeKademliaDbBytes, 0) {
+		return errorsmod.Wrap(types.ErrInvalidHostMetric, "cascade_kademlia_db_bytes must be a finite number")
+	}
+	if h.CascadeKademliaDbBytes < 0 {
+		return errorsmod.Wrapf(types.ErrInvalidHostMetric, "cascade_kademlia_db_bytes must be >= 0, got %v", h.CascadeKademliaDbBytes)
+	}
+	return nil
+}
+
+// bridgeCascadeBytesToSupernodeMetrics writes the cascade_kademlia_db_bytes
+// metric reported on the audit HostReport into x/supernode SupernodeMetricsState.
+// Read-modify-write semantics: any other Metrics fields previously persisted
+// (e.g. by the legacy MsgReportSupernodeMetrics handler) are preserved.
+// Height is updated to the current block; ReportCount is incremented.
+//
+// Post LEP-6 §12, this is the SOLE writer of SupernodeMetricsState.Metrics.
+// CascadeKademliaDbBytes used by Everlight payout / eligibility reads via
+// getLatestCascadeBytesFromAudit.
+//
+// The bridge is defensively a no-op (with an event for observability) if the
+// SuperNode record has an empty/invalid ValidatorAddress. That is a pre-existing
+// x/supernode invariant violation (chain registration enforces non-empty),
+// outside the audit module's scope; the bridge surfaces it via an event but
+// does not fail the epoch report on someone else's data corruption.
+func (k Keeper) bridgeCascadeBytesToSupernodeMetrics(ctx sdk.Context, sn sntypes.SuperNode, cascadeBytes float64) error {
+	if sn.ValidatorAddress == "" {
+		ctx.EventManager().EmitEvent(sdk.NewEvent(
+			"audit_cascade_bytes_bridge_skipped",
+			sdk.NewAttribute(sdk.AttributeKeyModule, types.ModuleName),
+			sdk.NewAttribute("supernode_account", sn.SupernodeAccount),
+			sdk.NewAttribute("reason", "empty_validator_address"),
+		))
+		return nil
+	}
+	valAddr, err := sdk.ValAddressFromBech32(sn.ValidatorAddress)
+	if err != nil {
+		ctx.EventManager().EmitEvent(sdk.NewEvent(
+			"audit_cascade_bytes_bridge_skipped",
+			sdk.NewAttribute(sdk.AttributeKeyModule, types.ModuleName),
+			sdk.NewAttribute("supernode_account", sn.SupernodeAccount),
+			sdk.NewAttribute("validator_address", sn.ValidatorAddress),
+			sdk.NewAttribute("reason", "invalid_validator_address"),
+			sdk.NewAttribute("error", err.Error()),
+		))
+		return nil
+	}
+
+	state, ok := k.supernodeKeeper.GetMetricsState(ctx, valAddr)
+	if !ok {
+		state = sntypes.SupernodeMetricsState{
+			ValidatorAddress: sn.ValidatorAddress,
+		}
+	}
+	if state.Metrics == nil {
+		state.Metrics = &sntypes.SupernodeMetrics{}
+	}
+	state.Metrics.CascadeKademliaDbBytes = cascadeBytes
+	state.Height = ctx.BlockHeight()
+	state.ReportCount++
+
+	return k.supernodeKeeper.SetMetricsState(ctx, state)
 }

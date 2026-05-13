@@ -76,6 +76,36 @@ service Query {
   rpc HostReports(QueryHostReportsRequest) returns (QueryHostReportsResponse) {
     option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/host_reports/{supernode_account}";
   }
+
+  // NodeSuspicionState returns storage-truth node suspicion state for a supernode account.
+  rpc NodeSuspicionState(QueryNodeSuspicionStateRequest) returns (QueryNodeSuspicionStateResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/node_suspicion_state/{supernode_account}";
+  }
+
+  // ReporterReliabilityState returns storage-truth reporter reliability state for a reporter account.
+  rpc ReporterReliabilityState(QueryReporterReliabilityStateRequest) returns (QueryReporterReliabilityStateResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/reporter_reliability_state/{reporter_supernode_account}";
+  }
+
+  // TicketDeteriorationState returns storage-truth ticket deterioration state for a ticket id.
+  rpc TicketDeteriorationState(QueryTicketDeteriorationStateRequest) returns (QueryTicketDeteriorationStateResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/ticket_deterioration_state/{ticket_id}";
+  }
+
+  // HealOp returns a single storage-truth heal operation by id.
+  rpc HealOp(QueryHealOpRequest) returns (QueryHealOpResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/heal_op/{heal_op_id}";
+  }
+
+  // HealOpsByTicket returns storage-truth heal operations for a ticket id.
+  rpc HealOpsByTicket(QueryHealOpsByTicketRequest) returns (QueryHealOpsByTicketResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/heal_ops/by_ticket/{ticket_id}";
+  }
+
+  // HealOpsByStatus returns storage-truth heal operations filtered by status.
+  rpc HealOpsByStatus(QueryHealOpsByStatusRequest) returns (QueryHealOpsByStatusResponse) {
+    option (google.api.http).get = "/LumeraProtocol/lumera/audit/v1/heal_ops/by_status/{status}";
+  }
 }
 
 message QueryParamsRequest {}
@@ -202,5 +232,57 @@ message HostReportEntry {
 
 message QueryHostReportsResponse {
   repeated HostReportEntry reports = 1 [(gogoproto.nullable) = false];
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+message QueryNodeSuspicionStateRequest {
+  string supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+}
+
+message QueryNodeSuspicionStateResponse {
+  NodeSuspicionState state = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryReporterReliabilityStateRequest {
+  string reporter_supernode_account = 1 [(cosmos_proto.scalar) = "cosmos.AccAddressString"];
+}
+
+message QueryReporterReliabilityStateResponse {
+  ReporterReliabilityState state = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryTicketDeteriorationStateRequest {
+  string ticket_id = 1;
+}
+
+message QueryTicketDeteriorationStateResponse {
+  TicketDeteriorationState state = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryHealOpRequest {
+  uint64 heal_op_id = 1;
+}
+
+message QueryHealOpResponse {
+  HealOp heal_op = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryHealOpsByTicketRequest {
+  string ticket_id = 1;
+  cosmos.base.query.v1beta1.PageRequest pagination = 2;
+}
+
+message QueryHealOpsByTicketResponse {
+  repeated HealOp heal_ops = 1 [(gogoproto.nullable) = false];
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+message QueryHealOpsByStatusRequest {
+  HealOpStatus status = 1;
+  cosmos.base.query.v1beta1.PageRequest pagination = 2;
+}
+
+message QueryHealOpsByStatusResponse {
+  repeated HealOp heal_ops = 1 [(gogoproto.nullable) = false];
   cosmos.base.query.v1beta1.PageResponse pagination = 2;
 }

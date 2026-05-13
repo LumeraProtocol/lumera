@@ -11,6 +11,9 @@ func RegisterInterfaces(registry cdctypes.InterfaceRegistry) {
 		&MsgUpdateParams{},
 		&MsgSubmitEpochReport{},
 		&MsgSubmitEvidence{},
+		&MsgSubmitStorageRecheckEvidence{},
+		&MsgClaimHealComplete{},
+		&MsgSubmitHealVerification{},
 	)
 
 	msgservice.RegisterMsgServiceDesc(registry, &Msg_serviceDesc)

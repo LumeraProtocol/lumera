@@ -10,8 +10,9 @@ import (
 	"github.com/tidwall/sjson"
 )
 
-// This test validates that ACTIVE probers must submit storage challenge observations for all assigned targets.
-func TestAuditSubmitReport_ProberRequiresAllPeerObservations(t *testing.T) {
+// This test validates that incomplete peer observations are accepted, persisted, and
+// penalize the reporter once without immediate supernode postponement.
+func TestAuditSubmitReport_IncompletePeerObservationsAcceptedWithReporterPenalty(t *testing.T) {
 	const (
 		// Keep epochs long enough in real time to avoid end-blocker enforcement during the test.
 		epochLengthBlocks = uint64(20)
@@ -42,6 +43,16 @@ func TestAuditSubmitReport_ProberRequiresAllPeerObservations(t *testing.T) {
 	awaitAtLeastHeight(t, epochStartHeight)
 
 	host := auditHostReportJSON([]string{"PORT_STATE_OPEN"})
-	txResp := submitEpochReport(t, cli, n0.nodeName, epochID, host, nil)
-	RequireTxFailure(t, txResp, "expected storage challenge observations")
+	_, prober, _ := findAssignedProberAndTarget(t, epochID, []testNodeIdentity{n0, n1})
+	txResp := submitEpochReport(t, cli, prober.nodeName, epochID, host, nil)
+	RequireTxSuccess(t, txResp)
+
+	report := auditQueryReport(t, epochID, prober.accAddr)
+	require.Len(t, report.StorageChallengeObservations, 0)
+
+	reliability := auditQueryReporterReliabilityState(t, prober.accAddr)
+	require.Equal(t, int64(8), reliability.ReliabilityScore)
+	require.Equal(t, epochID, reliability.LastUpdatedEpoch)
+	require.Equal(t, "REPORTER_TRUST_BAND_NORMAL", reliability.TrustBand.String())
+	require.Equal(t, "SUPERNODE_STATE_ACTIVE", querySupernodeLatestState(t, cli, prober.valAddr))
 }

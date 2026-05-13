@@ -385,11 +385,6 @@ func selectRandomActionType(r *rand.Rand) string {
 	return actionTypes[r.Intn(len(actionTypes))]
 }
 
-// generateRandomOtiValues generates n random bytes as OTI value for CASCADE metadata
-func generateRandomOtiValues(n int) []byte {
-	return make([]byte, n)
-}
-
 // getRandomActiveSupernodes simulates getting a list of active supernodes from the system
 func getRandomActiveSupernodes(r *rand.Rand, ctx sdk.Context, numSupernodes int, ak types.AuthKeeper, k keeper.Keeper, accs []simtypes.Account) ([]simtypes.Account, error) {
 	top10 := getTop10Supernodes(ctx, k)
@@ -1042,7 +1037,7 @@ func registerSupernode(r *rand.Rand, ctx sdk.Context, k keeper.Keeper, accs []si
 		Evidence:         []*sntypes.Evidence{},
 		Note:             version,
 		Metrics: &sntypes.MetricsAggregate{
-			Metrics:     make(map[string]float64),
+			Metrics:     []*sntypes.MetricValue{},
 			ReportCount: 0,
 		},
 		States: []*sntypes.SuperNodeStateRecord{

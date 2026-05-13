@@ -54,6 +54,185 @@ func (PortState) EnumDescriptor() ([]byte, []int) {
 	return fileDescriptor_0613fff850c07858, []int{0}
 }
 
+type StorageProofBucketType int32
+
+const (
+	StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_UNSPECIFIED StorageProofBucketType = 0
+	StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECENT      StorageProofBucketType = 1
+	StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_OLD         StorageProofBucketType = 2
+	StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_PROBATION   StorageProofBucketType = 3
+	StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_RECHECK     StorageProofBucketType = 4
+)
+
+var StorageProofBucketType_name = map[int32]string{
+	0: "STORAGE_PROOF_BUCKET_TYPE_UNSPECIFIED",
+	1: "STORAGE_PROOF_BUCKET_TYPE_RECENT",
+	2: "STORAGE_PROOF_BUCKET_TYPE_OLD",
+	3: "STORAGE_PROOF_BUCKET_TYPE_PROBATION",
+	4: "STORAGE_PROOF_BUCKET_TYPE_RECHECK",
+}
+
+var StorageProofBucketType_value = map[string]int32{
+	"STORAGE_PROOF_BUCKET_TYPE_UNSPECIFIED": 0,
+	"STORAGE_PROOF_BUCKET_TYPE_RECENT":      1,
+	"STORAGE_PROOF_BUCKET_TYPE_OLD":         2,
+	"STORAGE_PROOF_BUCKET_TYPE_PROBATION":   3,
+	"STORAGE_PROOF_BUCKET_TYPE_RECHECK":     4,
+}
+
+func (x StorageProofBucketType) String() string {
+	return proto.EnumName(StorageProofBucketType_name, int32(x))
+}
+
+func (StorageProofBucketType) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor_0613fff850c07858, []int{1}
+}
+
+type StorageProofArtifactClass int32
+
+const (
+	StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_UNSPECIFIED StorageProofArtifactClass = 0
+	StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_INDEX       StorageProofArtifactClass = 1
+	StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_SYMBOL      StorageProofArtifactClass = 2
+)
+
+var StorageProofArtifactClass_name = map[int32]string{
+	0: "STORAGE_PROOF_ARTIFACT_CLASS_UNSPECIFIED",
+	1: "STORAGE_PROOF_ARTIFACT_CLASS_INDEX",
+	2: "STORAGE_PROOF_ARTIFACT_CLASS_SYMBOL",
+}
+
+var StorageProofArtifactClass_value = map[string]int32{
+	"STORAGE_PROOF_ARTIFACT_CLASS_UNSPECIFIED": 0,
+	"STORAGE_PROOF_ARTIFACT_CLASS_INDEX":       1,
+	"STORAGE_PROOF_ARTIFACT_CLASS_SYMBOL":      2,
+}
+
+func (x StorageProofArtifactClass) String() string {
+	return proto.EnumName(StorageProofArtifactClass_name, int32(x))
+}
+
+func (StorageProofArtifactClass) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor_0613fff850c07858, []int{2}
+}
+
+type StorageProofResultClass int32
+
+const (
+	StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_UNSPECIFIED            StorageProofResultClass = 0
+	StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_PASS                   StorageProofResultClass = 1
+	StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH          StorageProofResultClass = 2
+	StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_TIMEOUT_OR_NO_RESPONSE StorageProofResultClass = 3
+	StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_OBSERVER_QUORUM_FAIL   StorageProofResultClass = 4
+	StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_NO_ELIGIBLE_TICKET     StorageProofResultClass = 5
+	StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_INVALID_TRANSCRIPT     StorageProofResultClass = 6
+	StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_RECHECK_CONFIRMED_FAIL StorageProofResultClass = 7
+)
+
+var StorageProofResultClass_name = map[int32]string{
+	0: "STORAGE_PROOF_RESULT_CLASS_UNSPECIFIED",
+	1: "STORAGE_PROOF_RESULT_CLASS_PASS",
+	2: "STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH",
+	3: "STORAGE_PROOF_RESULT_CLASS_TIMEOUT_OR_NO_RESPONSE",
+	4: "STORAGE_PROOF_RESULT_CLASS_OBSERVER_QUORUM_FAIL",
+	5: "STORAGE_PROOF_RESULT_CLASS_NO_ELIGIBLE_TICKET",
+	6: "STORAGE_PROOF_RESULT_CLASS_INVALID_TRANSCRIPT",
+	7: "STORAGE_PROOF_RESULT_CLASS_RECHECK_CONFIRMED_FAIL",
+}
+
+var StorageProofResultClass_value = map[string]int32{
+	"STORAGE_PROOF_RESULT_CLASS_UNSPECIFIED":            0,
+	"STORAGE_PROOF_RESULT_CLASS_PASS":                   1,
+	"STORAGE_PROOF_RESULT_CLASS_HASH_MISMATCH":          2,
+	"STORAGE_PROOF_RESULT_CLASS_TIMEOUT_OR_NO_RESPONSE": 3,
+	"STORAGE_PROOF_RESULT_CLASS_OBSERVER_QUORUM_FAIL":   4,
+	"STORAGE_PROOF_RESULT_CLASS_NO_ELIGIBLE_TICKET":     5,
+	"STORAGE_PROOF_RESULT_CLASS_INVALID_TRANSCRIPT":     6,
+	"STORAGE_PROOF_RESULT_CLASS_RECHECK_CONFIRMED_FAIL": 7,
+}
+
+func (x StorageProofResultClass) String() string {
+	return proto.EnumName(StorageProofResultClass_name, int32(x))
+}
+
+func (StorageProofResultClass) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor_0613fff850c07858, []int{3}
+}
+
+type ReporterTrustBand int32
+
+const (
+	ReporterTrustBand_REPORTER_TRUST_BAND_UNSPECIFIED           ReporterTrustBand = 0
+	ReporterTrustBand_REPORTER_TRUST_BAND_NORMAL                ReporterTrustBand = 1
+	ReporterTrustBand_REPORTER_TRUST_BAND_LOW_TRUST             ReporterTrustBand = 2
+	ReporterTrustBand_REPORTER_TRUST_BAND_CHALLENGER_INELIGIBLE ReporterTrustBand = 3
+	ReporterTrustBand_REPORTER_TRUST_BAND_DEGRADED              ReporterTrustBand = 4
+)
+
+var ReporterTrustBand_name = map[int32]string{
+	0: "REPORTER_TRUST_BAND_UNSPECIFIED",
+	1: "REPORTER_TRUST_BAND_NORMAL",
+	2: "REPORTER_TRUST_BAND_LOW_TRUST",
+	3: "REPORTER_TRUST_BAND_CHALLENGER_INELIGIBLE",
+	4: "REPORTER_TRUST_BAND_DEGRADED",
+}
+
+var ReporterTrustBand_value = map[string]int32{
+	"REPORTER_TRUST_BAND_UNSPECIFIED":           0,
+	"REPORTER_TRUST_BAND_NORMAL":                1,
+	"REPORTER_TRUST_BAND_LOW_TRUST":             2,
+	"REPORTER_TRUST_BAND_CHALLENGER_INELIGIBLE": 3,
+	"REPORTER_TRUST_BAND_DEGRADED":              4,
+}
+
+func (x ReporterTrustBand) String() string {
+	return proto.EnumName(ReporterTrustBand_name, int32(x))
+}
+
+func (ReporterTrustBand) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor_0613fff850c07858, []int{4}
+}
+
+type HealOpStatus int32
+
+const (
+	HealOpStatus_HEAL_OP_STATUS_UNSPECIFIED     HealOpStatus = 0
+	HealOpStatus_HEAL_OP_STATUS_SCHEDULED       HealOpStatus = 1
+	HealOpStatus_HEAL_OP_STATUS_IN_PROGRESS     HealOpStatus = 2
+	HealOpStatus_HEAL_OP_STATUS_HEALER_REPORTED HealOpStatus = 3
+	HealOpStatus_HEAL_OP_STATUS_VERIFIED        HealOpStatus = 4
+	HealOpStatus_HEAL_OP_STATUS_FAILED          HealOpStatus = 5
+	HealOpStatus_HEAL_OP_STATUS_EXPIRED         HealOpStatus = 6
+)
+
+var HealOpStatus_name = map[int32]string{
+	0: "HEAL_OP_STATUS_UNSPECIFIED",
+	1: "HEAL_OP_STATUS_SCHEDULED",
+	2: "HEAL_OP_STATUS_IN_PROGRESS",
+	3: "HEAL_OP_STATUS_HEALER_REPORTED",
+	4: "HEAL_OP_STATUS_VERIFIED",
+	5: "HEAL_OP_STATUS_FAILED",
+	6: "HEAL_OP_STATUS_EXPIRED",
+}
+
+var HealOpStatus_value = map[string]int32{
+	"HEAL_OP_STATUS_UNSPECIFIED":     0,
+	"HEAL_OP_STATUS_SCHEDULED":       1,
+	"HEAL_OP_STATUS_IN_PROGRESS":     2,
+	"HEAL_OP_STATUS_HEALER_REPORTED": 3,
+	"HEAL_OP_STATUS_VERIFIED":        4,
+	"HEAL_OP_STATUS_FAILED":          5,
+	"HEAL_OP_STATUS_EXPIRED":         6,
+}
+
+func (x HealOpStatus) String() string {
+	return proto.EnumName(HealOpStatus_name, int32(x))
+}
+
+func (HealOpStatus) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor_0613fff850c07858, []int{5}
+}
+
 // HostReport is the Supernode's self-reported host metrics and counters for an epoch.
 type HostReport struct {
 	CpuUsagePercent    float64     `protobuf:"fixed64,1,opt,name=cpu_usage_percent,json=cpuUsagePercent,proto3" json:"cpu_usage_percent,omitempty"`
@@ -61,6 +240,14 @@ type HostReport struct {
 	DiskUsagePercent   float64     `protobuf:"fixed64,3,opt,name=disk_usage_percent,json=diskUsagePercent,proto3" json:"disk_usage_percent,omitempty"`
 	InboundPortStates  []PortState `protobuf:"varint,4,rep,packed,name=inbound_port_states,json=inboundPortStates,proto3,enum=lumera.audit.v1.PortState" json:"inbound_port_states,omitempty"`
 	FailedActionsCount uint32      `protobuf:"varint,5,opt,name=failed_actions_count,json=failedActionsCount,proto3" json:"failed_actions_count,omitempty"`
+	// Cascade Kademlia DB size in bytes, self-reported by the SuperNode.
+	// Carried on HostReport purely as a metric-courier on the audit epoch report
+	// channel — the audit module does NOT consume this value for its own
+	// consensus logic (LEP-6 §12). On successful epoch-report acceptance the
+	// audit handler bridges this value into x/supernode SupernodeMetricsState,
+	// which is the sole source consulted by Everlight payout / eligibility.
+	// MUST be finite and non-negative; zero is valid (empty Kademlia store).
+	CascadeKademliaDbBytes float64 `protobuf:"fixed64,6,opt,name=cascade_kademlia_db_bytes,json=cascadeKademliaDbBytes,proto3" json:"cascade_kademlia_db_bytes,omitempty"`
 }
 
 func (m *HostReport) Reset()         { *m = HostReport{} }
@@ -131,6 +318,13 @@ func (m *HostReport) GetFailedActionsCount() uint32 {
 	return 0
 }
 
+func (m *HostReport) GetCascadeKademliaDbBytes() float64 {
+	if m != nil {
+		return m.CascadeKademliaDbBytes
+	}
+	return 0
+}
+
 // StorageChallengeObservation is a prober's reachability observation about an assigned target.
 type StorageChallengeObservation struct {
 	TargetSupernodeAccount string `protobuf:"bytes,1,opt,name=target_supernode_account,json=targetSupernodeAccount,proto3" json:"target_supernode_account,omitempty"`
@@ -185,6 +379,795 @@ func (m *StorageChallengeObservation) GetPortStates() []PortState {
 	return nil
 }
 
+// StorageProofResult captures one storage-truth storage-proof check outcome.
+//
+// NOTE: StorageProofResult stores transcript_hash plus a compact deterministic
+// derivation/signature envelope so transcript disagreements become explicit on-chain.
+type StorageProofResult struct {
+	TargetSupernodeAccount     string `protobuf:"bytes,1,opt,name=target_supernode_account,json=targetSupernodeAccount,proto3" json:"target_supernode_account,omitempty"`
+	ChallengerSupernodeAccount string `protobuf:"bytes,2,opt,name=challenger_supernode_account,json=challengerSupernodeAccount,proto3" json:"challenger_supernode_account,omitempty"`
+	// ticket_id identifies the ticket selected by deterministic bucket logic.
+	TicketId      string                    `protobuf:"bytes,3,opt,name=ticket_id,json=ticketId,proto3" json:"ticket_id,omitempty"`
+	BucketType    StorageProofBucketType    `protobuf:"varint,4,opt,name=bucket_type,json=bucketType,proto3,enum=lumera.audit.v1.StorageProofBucketType" json:"bucket_type,omitempty"`
+	ArtifactClass StorageProofArtifactClass `protobuf:"varint,5,opt,name=artifact_class,json=artifactClass,proto3,enum=lumera.audit.v1.StorageProofArtifactClass" json:"artifact_class,omitempty"`
+	// artifact_ordinal is the deterministic ordinal selected inside the artifact class.
+	ArtifactOrdinal uint32                  `protobuf:"varint,6,opt,name=artifact_ordinal,json=artifactOrdinal,proto3" json:"artifact_ordinal,omitempty"`
+	ArtifactKey     string                  `protobuf:"bytes,7,opt,name=artifact_key,json=artifactKey,proto3" json:"artifact_key,omitempty"`
+	ResultClass     StorageProofResultClass `protobuf:"varint,8,opt,name=result_class,json=resultClass,proto3,enum=lumera.audit.v1.StorageProofResultClass" json:"result_class,omitempty"`
+	TranscriptHash  string                  `protobuf:"bytes,9,opt,name=transcript_hash,json=transcriptHash,proto3" json:"transcript_hash,omitempty"`
+	// details is an optional short diagnostic summary for non-pass outcomes.
+	Details string `protobuf:"bytes,10,opt,name=details,proto3" json:"details,omitempty"`
+	// artifact_count is the class-specific denominator used for deterministic
+	// ordinal selection: artifact_ordinal = H(...) mod artifact_count.
+	ArtifactCount uint32 `protobuf:"varint,11,opt,name=artifact_count,json=artifactCount,proto3" json:"artifact_count,omitempty"`
+	// derivation_input_hash commits deterministic derivation inputs (seed, range
+	// selection inputs, and resolver inputs) used off-chain for transcript build.
+	DerivationInputHash string `protobuf:"bytes,12,opt,name=derivation_input_hash,json=derivationInputHash,proto3" json:"derivation_input_hash,omitempty"`
+	// challenger_signature is the challenger's signature over transcript commitment.
+	ChallengerSignature string `protobuf:"bytes,13,opt,name=challenger_signature,json=challengerSignature,proto3" json:"challenger_signature,omitempty"`
+	// observer_attestation_signatures carries observer attestations for the
+	// transcript commitment when available.
+	ObserverAttestationSignatures []string `protobuf:"bytes,14,rep,name=observer_attestation_signatures,json=observerAttestationSignatures,proto3" json:"observer_attestation_signatures,omitempty"`
+}
+
+func (m *StorageProofResult) Reset()         { *m = StorageProofResult{} }
+func (m *StorageProofResult) String() string { return proto.CompactTextString(m) }
+func (*StorageProofResult) ProtoMessage()    {}
+func (*StorageProofResult) Descriptor() ([]byte, []int) {
+	return fileDescriptor_0613fff850c07858, []int{2}
+}
+func (m *StorageProofResult) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *StorageProofResult) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_StorageProofResult.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *StorageProofResult) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_StorageProofResult.Merge(m, src)
+}
+func (m *StorageProofResult) XXX_Size() int {
+	return m.Size()
+}
+func (m *StorageProofResult) XXX_DiscardUnknown() {
+	xxx_messageInfo_StorageProofResult.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_StorageProofResult proto.InternalMessageInfo
+
+func (m *StorageProofResult) GetTargetSupernodeAccount() string {
+	if m != nil {
+		return m.TargetSupernodeAccount
+	}
+	return ""
+}
+
+func (m *StorageProofResult) GetChallengerSupernodeAccount() string {
+	if m != nil {
+		return m.ChallengerSupernodeAccount
+	}
+	return ""
+}
+
+func (m *StorageProofResult) GetTicketId() string {
+	if m != nil {
+		return m.TicketId
+	}
+	return ""
+}
+
+func (m *StorageProofResult) GetBucketType() StorageProofBucketType {
+	if m != nil {
+		return m.BucketType
+	}
+	return StorageProofBucketType_STORAGE_PROOF_BUCKET_TYPE_UNSPECIFIED
+}
+
+func (m *StorageProofResult) GetArtifactClass() StorageProofArtifactClass {
+	if m != nil {
+		return m.ArtifactClass
+	}
+	return StorageProofArtifactClass_STORAGE_PROOF_ARTIFACT_CLASS_UNSPECIFIED
+}
+
+func (m *StorageProofResult) GetArtifactOrdinal() uint32 {
+	if m != nil {
+		return m.ArtifactOrdinal
+	}
+	return 0
+}
+
+func (m *StorageProofResult) GetArtifactKey() string {
+	if m != nil {
+		return m.ArtifactKey
+	}
+	return ""
+}
+
+func (m *StorageProofResult) GetResultClass() StorageProofResultClass {
+	if m != nil {
+		return m.ResultClass
+	}
+	return StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_UNSPECIFIED
+}
+
+func (m *StorageProofResult) GetTranscriptHash() string {
+	if m != nil {
+		return m.TranscriptHash
+	}
+	return ""
+}
+
+func (m *StorageProofResult) GetDetails() string {
+	if m != nil {
+		return m.Details
+	}
+	return ""
+}
+
+func (m *StorageProofResult) GetArtifactCount() uint32 {
+	if m != nil {
+		return m.ArtifactCount
+	}
+	return 0
+}
+
+func (m *StorageProofResult) GetDerivationInputHash() string {
+	if m != nil {
+		return m.DerivationInputHash
+	}
+	return ""
+}
+
+func (m *StorageProofResult) GetChallengerSignature() string {
+	if m != nil {
+		return m.ChallengerSignature
+	}
+	return ""
+}
+
+func (m *StorageProofResult) GetObserverAttestationSignatures() []string {
+	if m != nil {
+		return m.ObserverAttestationSignatures
+	}
+	return nil
+}
+
+// NodeSuspicionState is the persisted storage-truth node-level suspicion snapshot.
+type NodeSuspicionState struct {
+	SupernodeAccount         string `protobuf:"bytes,1,opt,name=supernode_account,json=supernodeAccount,proto3" json:"supernode_account,omitempty"`
+	SuspicionScore           int64  `protobuf:"varint,2,opt,name=suspicion_score,json=suspicionScore,proto3" json:"suspicion_score,omitempty"`
+	LastUpdatedEpoch         uint64 `protobuf:"varint,3,opt,name=last_updated_epoch,json=lastUpdatedEpoch,proto3" json:"last_updated_epoch,omitempty"`
+	LastRecentFailEpoch      uint64 `protobuf:"varint,4,opt,name=last_recent_fail_epoch,json=lastRecentFailEpoch,proto3" json:"last_recent_fail_epoch,omitempty"`
+	LastOldFailEpoch         uint64 `protobuf:"varint,5,opt,name=last_old_fail_epoch,json=lastOldFailEpoch,proto3" json:"last_old_fail_epoch,omitempty"`
+	DistinctTicketFailWindow uint32 `protobuf:"varint,6,opt,name=distinct_ticket_fail_window,json=distinctTicketFailWindow,proto3" json:"distinct_ticket_fail_window,omitempty"`
+	WindowStartEpoch         uint64 `protobuf:"varint,7,opt,name=window_start_epoch,json=windowStartEpoch,proto3" json:"window_start_epoch,omitempty"`
+	ClassACountWindow        uint32 `protobuf:"varint,8,opt,name=class_a_count_window,json=classACountWindow,proto3" json:"class_a_count_window,omitempty"`
+	LastClassAEpoch          uint64 `protobuf:"varint,9,opt,name=last_class_a_epoch,json=lastClassAEpoch,proto3" json:"last_class_a_epoch,omitempty"`
+	ClassBCountWindow        uint32 `protobuf:"varint,10,opt,name=class_b_count_window,json=classBCountWindow,proto3" json:"class_b_count_window,omitempty"`
+	LastClassBEpoch          uint64 `protobuf:"varint,11,opt,name=last_class_b_epoch,json=lastClassBEpoch,proto3" json:"last_class_b_epoch,omitempty"`
+	CleanPassCount           uint32 `protobuf:"varint,12,opt,name=clean_pass_count,json=cleanPassCount,proto3" json:"clean_pass_count,omitempty"`
+	LastCleanPassEpoch       uint64 `protobuf:"varint,13,opt,name=last_clean_pass_epoch,json=lastCleanPassEpoch,proto3" json:"last_clean_pass_epoch,omitempty"`
+	LastIndexFailEpoch       uint64 `protobuf:"varint,14,opt,name=last_index_fail_epoch,json=lastIndexFailEpoch,proto3" json:"last_index_fail_epoch,omitempty"`
+	// Per 121-F8 — recovery delta from snapshot, not cumulative.
+	CleanPassCountAtPostpone uint32 `protobuf:"varint,15,opt,name=clean_pass_count_at_postpone,json=cleanPassCountAtPostpone,proto3" json:"clean_pass_count_at_postpone,omitempty"`
+}
+
+func (m *NodeSuspicionState) Reset()         { *m = NodeSuspicionState{} }
+func (m *NodeSuspicionState) String() string { return proto.CompactTextString(m) }
+func (*NodeSuspicionState) ProtoMessage()    {}
+func (*NodeSuspicionState) Descriptor() ([]byte, []int) {
+	return fileDescriptor_0613fff850c07858, []int{3}
+}
+func (m *NodeSuspicionState) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *NodeSuspicionState) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_NodeSuspicionState.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *NodeSuspicionState) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NodeSuspicionState.Merge(m, src)
+}
+func (m *NodeSuspicionState) XXX_Size() int {
+	return m.Size()
+}
+func (m *NodeSuspicionState) XXX_DiscardUnknown() {
+	xxx_messageInfo_NodeSuspicionState.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_NodeSuspicionState proto.InternalMessageInfo
+
+func (m *NodeSuspicionState) GetSupernodeAccount() string {
+	if m != nil {
+		return m.SupernodeAccount
+	}
+	return ""
+}
+
+func (m *NodeSuspicionState) GetSuspicionScore() int64 {
+	if m != nil {
+		return m.SuspicionScore
+	}
+	return 0
+}
+
+func (m *NodeSuspicionState) GetLastUpdatedEpoch() uint64 {
+	if m != nil {
+		return m.LastUpdatedEpoch
+	}
+	return 0
+}
+
+func (m *NodeSuspicionState) GetLastRecentFailEpoch() uint64 {
+	if m != nil {
+		return m.LastRecentFailEpoch
+	}
+	return 0
+}
+
+func (m *NodeSuspicionState) GetLastOldFailEpoch() uint64 {
+	if m != nil {
+		return m.LastOldFailEpoch
+	}
+	return 0
+}
+
+func (m *NodeSuspicionState) GetDistinctTicketFailWindow() uint32 {
+	if m != nil {
+		return m.DistinctTicketFailWindow
+	}
+	return 0
+}
+
+func (m *NodeSuspicionState) GetWindowStartEpoch() uint64 {
+	if m != nil {
+		return m.WindowStartEpoch
+	}
+	return 0
+}
+
+func (m *NodeSuspicionState) GetClassACountWindow() uint32 {
+	if m != nil {
+		return m.ClassACountWindow
+	}
+	return 0
+}
+
+func (m *NodeSuspicionState) GetLastClassAEpoch() uint64 {
+	if m != nil {
+		return m.LastClassAEpoch
+	}
+	return 0
+}
+
+func (m *NodeSuspicionState) GetClassBCountWindow() uint32 {
+	if m != nil {
+		return m.ClassBCountWindow
+	}
+	return 0
+}
+
+func (m *NodeSuspicionState) GetLastClassBEpoch() uint64 {
+	if m != nil {
+		return m.LastClassBEpoch
+	}
+	return 0
+}
+
+func (m *NodeSuspicionState) GetCleanPassCount() uint32 {
+	if m != nil {
+		return m.CleanPassCount
+	}
+	return 0
+}
+
+func (m *NodeSuspicionState) GetLastCleanPassEpoch() uint64 {
+	if m != nil {
+		return m.LastCleanPassEpoch
+	}
+	return 0
+}
+
+func (m *NodeSuspicionState) GetLastIndexFailEpoch() uint64 {
+	if m != nil {
+		return m.LastIndexFailEpoch
+	}
+	return 0
+}
+
+func (m *NodeSuspicionState) GetCleanPassCountAtPostpone() uint32 {
+	if m != nil {
+		return m.CleanPassCountAtPostpone
+	}
+	return 0
+}
+
+// ReporterReliabilityState is the persisted storage-truth reporter reliability snapshot.
+type ReporterReliabilityState struct {
+	ReporterSupernodeAccount string            `protobuf:"bytes,1,opt,name=reporter_supernode_account,json=reporterSupernodeAccount,proto3" json:"reporter_supernode_account,omitempty"`
+	ReliabilityScore         int64             `protobuf:"varint,2,opt,name=reliability_score,json=reliabilityScore,proto3" json:"reliability_score,omitempty"`
+	LastUpdatedEpoch         uint64            `protobuf:"varint,3,opt,name=last_updated_epoch,json=lastUpdatedEpoch,proto3" json:"last_updated_epoch,omitempty"`
+	TrustBand                ReporterTrustBand `protobuf:"varint,4,opt,name=trust_band,json=trustBand,proto3,enum=lumera.audit.v1.ReporterTrustBand" json:"trust_band,omitempty"`
+	ContradictionCount       uint64            `protobuf:"varint,5,opt,name=contradiction_count,json=contradictionCount,proto3" json:"contradiction_count,omitempty"`
+	IneligibleUntilEpoch     uint64            `protobuf:"varint,6,opt,name=ineligible_until_epoch,json=ineligibleUntilEpoch,proto3" json:"ineligible_until_epoch,omitempty"`
+	WindowPositiveCount      uint32            `protobuf:"varint,7,opt,name=window_positive_count,json=windowPositiveCount,proto3" json:"window_positive_count,omitempty"`
+	WindowNegativeCount      uint32            `protobuf:"varint,8,opt,name=window_negative_count,json=windowNegativeCount,proto3" json:"window_negative_count,omitempty"`
+	WindowStartEpoch         uint64            `protobuf:"varint,9,opt,name=window_start_epoch,json=windowStartEpoch,proto3" json:"window_start_epoch,omitempty"`
+}
+
+func (m *ReporterReliabilityState) Reset()         { *m = ReporterReliabilityState{} }
+func (m *ReporterReliabilityState) String() string { return proto.CompactTextString(m) }
+func (*ReporterReliabilityState) ProtoMessage()    {}
+func (*ReporterReliabilityState) Descriptor() ([]byte, []int) {
+	return fileDescriptor_0613fff850c07858, []int{4}
+}
+func (m *ReporterReliabilityState) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *ReporterReliabilityState) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_ReporterReliabilityState.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *ReporterReliabilityState) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ReporterReliabilityState.Merge(m, src)
+}
+func (m *ReporterReliabilityState) XXX_Size() int {
+	return m.Size()
+}
+func (m *ReporterReliabilityState) XXX_DiscardUnknown() {
+	xxx_messageInfo_ReporterReliabilityState.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ReporterReliabilityState proto.InternalMessageInfo
+
+func (m *ReporterReliabilityState) GetReporterSupernodeAccount() string {
+	if m != nil {
+		return m.ReporterSupernodeAccount
+	}
+	return ""
+}
+
+func (m *ReporterReliabilityState) GetReliabilityScore() int64 {
+	if m != nil {
+		return m.ReliabilityScore
+	}
+	return 0
+}
+
+func (m *ReporterReliabilityState) GetLastUpdatedEpoch() uint64 {
+	if m != nil {
+		return m.LastUpdatedEpoch
+	}
+	return 0
+}
+
+func (m *ReporterReliabilityState) GetTrustBand() ReporterTrustBand {
+	if m != nil {
+		return m.TrustBand
+	}
+	return ReporterTrustBand_REPORTER_TRUST_BAND_UNSPECIFIED
+}
+
+func (m *ReporterReliabilityState) GetContradictionCount() uint64 {
+	if m != nil {
+		return m.ContradictionCount
+	}
+	return 0
+}
+
+func (m *ReporterReliabilityState) GetIneligibleUntilEpoch() uint64 {
+	if m != nil {
+		return m.IneligibleUntilEpoch
+	}
+	return 0
+}
+
+func (m *ReporterReliabilityState) GetWindowPositiveCount() uint32 {
+	if m != nil {
+		return m.WindowPositiveCount
+	}
+	return 0
+}
+
+func (m *ReporterReliabilityState) GetWindowNegativeCount() uint32 {
+	if m != nil {
+		return m.WindowNegativeCount
+	}
+	return 0
+}
+
+func (m *ReporterReliabilityState) GetWindowStartEpoch() uint64 {
+	if m != nil {
+		return m.WindowStartEpoch
+	}
+	return 0
+}
+
+// TicketDeteriorationState is the persisted storage-truth ticket deterioration snapshot.
+type TicketDeteriorationState struct {
+	TicketId                     string                  `protobuf:"bytes,1,opt,name=ticket_id,json=ticketId,proto3" json:"ticket_id,omitempty"`
+	DeteriorationScore           int64                   `protobuf:"varint,2,opt,name=deterioration_score,json=deteriorationScore,proto3" json:"deterioration_score,omitempty"`
+	LastUpdatedEpoch             uint64                  `protobuf:"varint,3,opt,name=last_updated_epoch,json=lastUpdatedEpoch,proto3" json:"last_updated_epoch,omitempty"`
+	ActiveHealOpId               uint64                  `protobuf:"varint,4,opt,name=active_heal_op_id,json=activeHealOpId,proto3" json:"active_heal_op_id,omitempty"`
+	ProbationUntilEpoch          uint64                  `protobuf:"varint,5,opt,name=probation_until_epoch,json=probationUntilEpoch,proto3" json:"probation_until_epoch,omitempty"`
+	LastHealEpoch                uint64                  `protobuf:"varint,6,opt,name=last_heal_epoch,json=lastHealEpoch,proto3" json:"last_heal_epoch,omitempty"`
+	LastFailureEpoch             uint64                  `protobuf:"varint,7,opt,name=last_failure_epoch,json=lastFailureEpoch,proto3" json:"last_failure_epoch,omitempty"`
+	RecentFailureEpochCount      uint32                  `protobuf:"varint,8,opt,name=recent_failure_epoch_count,json=recentFailureEpochCount,proto3" json:"recent_failure_epoch_count,omitempty"`
+	ContradictionCount           uint64                  `protobuf:"varint,9,opt,name=contradiction_count,json=contradictionCount,proto3" json:"contradiction_count,omitempty"`
+	LastTargetSupernodeAccount   string                  `protobuf:"bytes,10,opt,name=last_target_supernode_account,json=lastTargetSupernodeAccount,proto3" json:"last_target_supernode_account,omitempty"`
+	LastReporterSupernodeAccount string                  `protobuf:"bytes,11,opt,name=last_reporter_supernode_account,json=lastReporterSupernodeAccount,proto3" json:"last_reporter_supernode_account,omitempty"`
+	LastResultClass              StorageProofResultClass `protobuf:"varint,12,opt,name=last_result_class,json=lastResultClass,proto3,enum=lumera.audit.v1.StorageProofResultClass" json:"last_result_class,omitempty"`
+	LastResultEpoch              uint64                  `protobuf:"varint,13,opt,name=last_result_epoch,json=lastResultEpoch,proto3" json:"last_result_epoch,omitempty"`
+	DistinctHolderFailureCount   uint32                  `protobuf:"varint,14,opt,name=distinct_holder_failure_count,json=distinctHolderFailureCount,proto3" json:"distinct_holder_failure_count,omitempty"`
+	LastIndexFailureEpoch        uint64                  `protobuf:"varint,15,opt,name=last_index_failure_epoch,json=lastIndexFailureEpoch,proto3" json:"last_index_failure_epoch,omitempty"`
+	RecentBucketFailureEpoch     uint64                  `protobuf:"varint,16,opt,name=recent_bucket_failure_epoch,json=recentBucketFailureEpoch,proto3" json:"recent_bucket_failure_epoch,omitempty"`
+	OldBucketFailureEpoch        uint64                  `protobuf:"varint,17,opt,name=old_bucket_failure_epoch,json=oldBucketFailureEpoch,proto3" json:"old_bucket_failure_epoch,omitempty"`
+}
+
+func (m *TicketDeteriorationState) Reset()         { *m = TicketDeteriorationState{} }
+func (m *TicketDeteriorationState) String() string { return proto.CompactTextString(m) }
+func (*TicketDeteriorationState) ProtoMessage()    {}
+func (*TicketDeteriorationState) Descriptor() ([]byte, []int) {
+	return fileDescriptor_0613fff850c07858, []int{5}
+}
+func (m *TicketDeteriorationState) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *TicketDeteriorationState) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_TicketDeteriorationState.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *TicketDeteriorationState) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_TicketDeteriorationState.Merge(m, src)
+}
+func (m *TicketDeteriorationState) XXX_Size() int {
+	return m.Size()
+}
+func (m *TicketDeteriorationState) XXX_DiscardUnknown() {
+	xxx_messageInfo_TicketDeteriorationState.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_TicketDeteriorationState proto.InternalMessageInfo
+
+func (m *TicketDeteriorationState) GetTicketId() string {
+	if m != nil {
+		return m.TicketId
+	}
+	return ""
+}
+
+func (m *TicketDeteriorationState) GetDeteriorationScore() int64 {
+	if m != nil {
+		return m.DeteriorationScore
+	}
+	return 0
+}
+
+func (m *TicketDeteriorationState) GetLastUpdatedEpoch() uint64 {
+	if m != nil {
+		return m.LastUpdatedEpoch
+	}
+	return 0
+}
+
+func (m *TicketDeteriorationState) GetActiveHealOpId() uint64 {
+	if m != nil {
+		return m.ActiveHealOpId
+	}
+	return 0
+}
+
+func (m *TicketDeteriorationState) GetProbationUntilEpoch() uint64 {
+	if m != nil {
+		return m.ProbationUntilEpoch
+	}
+	return 0
+}
+
+func (m *TicketDeteriorationState) GetLastHealEpoch() uint64 {
+	if m != nil {
+		return m.LastHealEpoch
+	}
+	return 0
+}
+
+func (m *TicketDeteriorationState) GetLastFailureEpoch() uint64 {
+	if m != nil {
+		return m.LastFailureEpoch
+	}
+	return 0
+}
+
+func (m *TicketDeteriorationState) GetRecentFailureEpochCount() uint32 {
+	if m != nil {
+		return m.RecentFailureEpochCount
+	}
+	return 0
+}
+
+func (m *TicketDeteriorationState) GetContradictionCount() uint64 {
+	if m != nil {
+		return m.ContradictionCount
+	}
+	return 0
+}
+
+func (m *TicketDeteriorationState) GetLastTargetSupernodeAccount() string {
+	if m != nil {
+		return m.LastTargetSupernodeAccount
+	}
+	return ""
+}
+
+func (m *TicketDeteriorationState) GetLastReporterSupernodeAccount() string {
+	if m != nil {
+		return m.LastReporterSupernodeAccount
+	}
+	return ""
+}
+
+func (m *TicketDeteriorationState) GetLastResultClass() StorageProofResultClass {
+	if m != nil {
+		return m.LastResultClass
+	}
+	return StorageProofResultClass_STORAGE_PROOF_RESULT_CLASS_UNSPECIFIED
+}
+
+func (m *TicketDeteriorationState) GetLastResultEpoch() uint64 {
+	if m != nil {
+		return m.LastResultEpoch
+	}
+	return 0
+}
+
+func (m *TicketDeteriorationState) GetDistinctHolderFailureCount() uint32 {
+	if m != nil {
+		return m.DistinctHolderFailureCount
+	}
+	return 0
+}
+
+func (m *TicketDeteriorationState) GetLastIndexFailureEpoch() uint64 {
+	if m != nil {
+		return m.LastIndexFailureEpoch
+	}
+	return 0
+}
+
+func (m *TicketDeteriorationState) GetRecentBucketFailureEpoch() uint64 {
+	if m != nil {
+		return m.RecentBucketFailureEpoch
+	}
+	return 0
+}
+
+func (m *TicketDeteriorationState) GetOldBucketFailureEpoch() uint64 {
+	if m != nil {
+		return m.OldBucketFailureEpoch
+	}
+	return 0
+}
+
+// TicketArtifactCountState stores canonical per-ticket artifact counts used to
+// validate deterministic ordinal selection inputs.
+type TicketArtifactCountState struct {
+	TicketId            string `protobuf:"bytes,1,opt,name=ticket_id,json=ticketId,proto3" json:"ticket_id,omitempty"`
+	IndexArtifactCount  uint32 `protobuf:"varint,2,opt,name=index_artifact_count,json=indexArtifactCount,proto3" json:"index_artifact_count,omitempty"`
+	SymbolArtifactCount uint32 `protobuf:"varint,3,opt,name=symbol_artifact_count,json=symbolArtifactCount,proto3" json:"symbol_artifact_count,omitempty"`
+}
+
+func (m *TicketArtifactCountState) Reset()         { *m = TicketArtifactCountState{} }
+func (m *TicketArtifactCountState) String() string { return proto.CompactTextString(m) }
+func (*TicketArtifactCountState) ProtoMessage()    {}
+func (*TicketArtifactCountState) Descriptor() ([]byte, []int) {
+	return fileDescriptor_0613fff850c07858, []int{6}
+}
+func (m *TicketArtifactCountState) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *TicketArtifactCountState) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_TicketArtifactCountState.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *TicketArtifactCountState) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_TicketArtifactCountState.Merge(m, src)
+}
+func (m *TicketArtifactCountState) XXX_Size() int {
+	return m.Size()
+}
+func (m *TicketArtifactCountState) XXX_DiscardUnknown() {
+	xxx_messageInfo_TicketArtifactCountState.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_TicketArtifactCountState proto.InternalMessageInfo
+
+func (m *TicketArtifactCountState) GetTicketId() string {
+	if m != nil {
+		return m.TicketId
+	}
+	return ""
+}
+
+func (m *TicketArtifactCountState) GetIndexArtifactCount() uint32 {
+	if m != nil {
+		return m.IndexArtifactCount
+	}
+	return 0
+}
+
+func (m *TicketArtifactCountState) GetSymbolArtifactCount() uint32 {
+	if m != nil {
+		return m.SymbolArtifactCount
+	}
+	return 0
+}
+
+// HealOp is the chain-tracked storage-truth healing operation state.
+type HealOp struct {
+	HealOpId                  uint64       `protobuf:"varint,1,opt,name=heal_op_id,json=healOpId,proto3" json:"heal_op_id,omitempty"`
+	TicketId                  string       `protobuf:"bytes,2,opt,name=ticket_id,json=ticketId,proto3" json:"ticket_id,omitempty"`
+	ScheduledEpochId          uint64       `protobuf:"varint,3,opt,name=scheduled_epoch_id,json=scheduledEpochId,proto3" json:"scheduled_epoch_id,omitempty"`
+	HealerSupernodeAccount    string       `protobuf:"bytes,4,opt,name=healer_supernode_account,json=healerSupernodeAccount,proto3" json:"healer_supernode_account,omitempty"`
+	VerifierSupernodeAccounts []string     `protobuf:"bytes,5,rep,name=verifier_supernode_accounts,json=verifierSupernodeAccounts,proto3" json:"verifier_supernode_accounts,omitempty"`
+	Status                    HealOpStatus `protobuf:"varint,6,opt,name=status,proto3,enum=lumera.audit.v1.HealOpStatus" json:"status,omitempty"`
+	CreatedHeight             uint64       `protobuf:"varint,7,opt,name=created_height,json=createdHeight,proto3" json:"created_height,omitempty"`
+	UpdatedHeight             uint64       `protobuf:"varint,8,opt,name=updated_height,json=updatedHeight,proto3" json:"updated_height,omitempty"`
+	DeadlineEpochId           uint64       `protobuf:"varint,9,opt,name=deadline_epoch_id,json=deadlineEpochId,proto3" json:"deadline_epoch_id,omitempty"`
+	ResultHash                string       `protobuf:"bytes,10,opt,name=result_hash,json=resultHash,proto3" json:"result_hash,omitempty"`
+	Notes                     string       `protobuf:"bytes,11,opt,name=notes,proto3" json:"notes,omitempty"`
+}
+
+func (m *HealOp) Reset()         { *m = HealOp{} }
+func (m *HealOp) String() string { return proto.CompactTextString(m) }
+func (*HealOp) ProtoMessage()    {}
+func (*HealOp) Descriptor() ([]byte, []int) {
+	return fileDescriptor_0613fff850c07858, []int{7}
+}
+func (m *HealOp) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *HealOp) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_HealOp.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *HealOp) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_HealOp.Merge(m, src)
+}
+func (m *HealOp) XXX_Size() int {
+	return m.Size()
+}
+func (m *HealOp) XXX_DiscardUnknown() {
+	xxx_messageInfo_HealOp.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_HealOp proto.InternalMessageInfo
+
+func (m *HealOp) GetHealOpId() uint64 {
+	if m != nil {
+		return m.HealOpId
+	}
+	return 0
+}
+
+func (m *HealOp) GetTicketId() string {
+	if m != nil {
+		return m.TicketId
+	}
+	return ""
+}
+
+func (m *HealOp) GetScheduledEpochId() uint64 {
+	if m != nil {
+		return m.ScheduledEpochId
+	}
+	return 0
+}
+
+func (m *HealOp) GetHealerSupernodeAccount() string {
+	if m != nil {
+		return m.HealerSupernodeAccount
+	}
+	return ""
+}
+
+func (m *HealOp) GetVerifierSupernodeAccounts() []string {
+	if m != nil {
+		return m.VerifierSupernodeAccounts
+	}
+	return nil
+}
+
+func (m *HealOp) GetStatus() HealOpStatus {
+	if m != nil {
+		return m.Status
+	}
+	return HealOpStatus_HEAL_OP_STATUS_UNSPECIFIED
+}
+
+func (m *HealOp) GetCreatedHeight() uint64 {
+	if m != nil {
+		return m.CreatedHeight
+	}
+	return 0
+}
+
+func (m *HealOp) GetUpdatedHeight() uint64 {
+	if m != nil {
+		return m.UpdatedHeight
+	}
+	return 0
+}
+
+func (m *HealOp) GetDeadlineEpochId() uint64 {
+	if m != nil {
+		return m.DeadlineEpochId
+	}
+	return 0
+}
+
+func (m *HealOp) GetResultHash() string {
+	if m != nil {
+		return m.ResultHash
+	}
+	return ""
+}
+
+func (m *HealOp) GetNotes() string {
+	if m != nil {
+		return m.Notes
+	}
+	return ""
+}
+
 // EpochReport is a single per-epoch report submitted by a Supernode.
 type EpochReport struct {
 	SupernodeAccount             string                         `protobuf:"bytes,1,opt,name=supernode_account,json=supernodeAccount,proto3" json:"supernode_account,omitempty"`
@@ -192,13 +1175,14 @@ type EpochReport struct {
 	ReportHeight                 int64                          `protobuf:"varint,3,opt,name=report_height,json=reportHeight,proto3" json:"report_height,omitempty"`
 	HostReport                   HostReport                     `protobuf:"bytes,4,opt,name=host_report,json=hostReport,proto3" json:"host_report"`
 	StorageChallengeObservations []*StorageChallengeObservation `protobuf:"bytes,5,rep,name=storage_challenge_observations,json=storageChallengeObservations,proto3" json:"storage_challenge_observations,omitempty"`
+	StorageProofResults          []*StorageProofResult          `protobuf:"bytes,6,rep,name=storage_proof_results,json=storageProofResults,proto3" json:"storage_proof_results,omitempty"`
 }
 
 func (m *EpochReport) Reset()         { *m = EpochReport{} }
 func (m *EpochReport) String() string { return proto.CompactTextString(m) }
 func (*EpochReport) ProtoMessage()    {}
 func (*EpochReport) Descriptor() ([]byte, []int) {
-	return fileDescriptor_0613fff850c07858, []int{2}
+	return fileDescriptor_0613fff850c07858, []int{8}
 }
 func (m *EpochReport) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -262,53 +1246,182 @@ func (m *EpochReport) GetStorageChallengeObservations() []*StorageChallengeObser
 	return nil
 }
 
+func (m *EpochReport) GetStorageProofResults() []*StorageProofResult {
+	if m != nil {
+		return m.StorageProofResults
+	}
+	return nil
+}
+
 func init() {
 	proto.RegisterEnum("lumera.audit.v1.PortState", PortState_name, PortState_value)
+	proto.RegisterEnum("lumera.audit.v1.StorageProofBucketType", StorageProofBucketType_name, StorageProofBucketType_value)
+	proto.RegisterEnum("lumera.audit.v1.StorageProofArtifactClass", StorageProofArtifactClass_name, StorageProofArtifactClass_value)
+	proto.RegisterEnum("lumera.audit.v1.StorageProofResultClass", StorageProofResultClass_name, StorageProofResultClass_value)
+	proto.RegisterEnum("lumera.audit.v1.ReporterTrustBand", ReporterTrustBand_name, ReporterTrustBand_value)
+	proto.RegisterEnum("lumera.audit.v1.HealOpStatus", HealOpStatus_name, HealOpStatus_value)
 	proto.RegisterType((*HostReport)(nil), "lumera.audit.v1.HostReport")
 	proto.RegisterType((*StorageChallengeObservation)(nil), "lumera.audit.v1.StorageChallengeObservation")
+	proto.RegisterType((*StorageProofResult)(nil), "lumera.audit.v1.StorageProofResult")
+	proto.RegisterType((*NodeSuspicionState)(nil), "lumera.audit.v1.NodeSuspicionState")
+	proto.RegisterType((*ReporterReliabilityState)(nil), "lumera.audit.v1.ReporterReliabilityState")
+	proto.RegisterType((*TicketDeteriorationState)(nil), "lumera.audit.v1.TicketDeteriorationState")
+	proto.RegisterType((*TicketArtifactCountState)(nil), "lumera.audit.v1.TicketArtifactCountState")
+	proto.RegisterType((*HealOp)(nil), "lumera.audit.v1.HealOp")
 	proto.RegisterType((*EpochReport)(nil), "lumera.audit.v1.EpochReport")
 }
 
 func init() { proto.RegisterFile("lumera/audit/v1/audit.proto", fileDescriptor_0613fff850c07858) }
 
 var fileDescriptor_0613fff850c07858 = []byte{
-	// 569 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x53, 0xdd, 0x8e, 0xd2, 0x40,
-	0x14, 0xa6, 0xc0, 0xaa, 0x3b, 0xb8, 0x52, 0x66, 0xd7, 0xb5, 0x0b, 0xa6, 0x12, 0xbc, 0x21, 0x64,
-	0x05, 0x17, 0x2f, 0xbd, 0x02, 0x24, 0xc1, 0x9f, 0x50, 0xd2, 0x42, 0x4c, 0xbc, 0x99, 0x0c, 0xed,
-	0xd8, 0x36, 0xd2, 0x4e, 0x33, 0x33, 0x25, 0xfa, 0x16, 0xfb, 0x2a, 0x26, 0x3e, 0xc4, 0xde, 0xb9,
-	0xf1, 0xca, 0x2b, 0x63, 0xe0, 0x45, 0x4c, 0x3b, 0x2c, 0xb0, 0x6c, 0xd4, 0x64, 0x6f, 0x9a, 0x39,
-	0xdf, 0xf7, 0x9d, 0xd3, 0x73, 0xce, 0x37, 0x03, 0x2a, 0xb3, 0x38, 0x20, 0x0c, 0xb7, 0x70, 0xec,
-	0xf8, 0xa2, 0x35, 0x3f, 0x93, 0x87, 0x66, 0xc4, 0xa8, 0xa0, 0xb0, 0x28, 0xc9, 0xa6, 0xc4, 0xe6,
-	0x67, 0xe5, 0x12, 0x0e, 0xfc, 0x90, 0xb6, 0xd2, 0xaf, 0xd4, 0x94, 0x4f, 0x6c, 0xca, 0x03, 0xca,
-	0x51, 0x1a, 0xb5, 0x64, 0xb0, 0xa2, 0x8e, 0x5c, 0xea, 0x52, 0x89, 0x27, 0x27, 0x89, 0xd6, 0xce,
-	0xb3, 0x00, 0x0c, 0x28, 0x17, 0x26, 0x89, 0x28, 0x13, 0xb0, 0x01, 0x4a, 0x76, 0x14, 0xa3, 0x98,
-	0x63, 0x97, 0xa0, 0x88, 0x30, 0x9b, 0x84, 0x42, 0x53, 0xaa, 0x4a, 0x5d, 0x31, 0x8b, 0x76, 0x14,
-	0x4f, 0x12, 0x7c, 0x24, 0xe1, 0x44, 0x1b, 0x90, 0x60, 0x47, 0x9b, 0x95, 0xda, 0x80, 0x04, 0xd7,
-	0xb4, 0xa7, 0x00, 0x3a, 0x3e, 0xff, 0xb4, 0x23, 0xce, 0xa5, 0x62, 0x35, 0x61, 0xae, 0xa9, 0xdf,
-	0x80, 0x43, 0x3f, 0x9c, 0xd2, 0x38, 0x74, 0x50, 0xd2, 0x15, 0xe2, 0x02, 0x0b, 0xc2, 0xb5, 0x7c,
-	0x35, 0x57, 0x7f, 0xd0, 0x2e, 0x37, 0x77, 0xf6, 0xd0, 0x1c, 0x51, 0x26, 0xac, 0x44, 0x62, 0x96,
-	0x56, 0x69, 0x6b, 0x84, 0xc3, 0xe7, 0xe0, 0xe8, 0x23, 0xf6, 0x67, 0xc4, 0x41, 0xd8, 0x16, 0x3e,
-	0x0d, 0x39, 0xb2, 0x69, 0x1c, 0x0a, 0x6d, 0xaf, 0xaa, 0xd4, 0x0f, 0x4c, 0x28, 0xb9, 0x8e, 0xa4,
-	0x7a, 0x09, 0x53, 0xfb, 0xaa, 0x80, 0x8a, 0x25, 0x28, 0xc3, 0x2e, 0xe9, 0x79, 0x78, 0x36, 0x23,
-	0xa1, 0x4b, 0x8c, 0x29, 0x27, 0x6c, 0x8e, 0x13, 0x15, 0x9c, 0x00, 0x4d, 0x60, 0xe6, 0x12, 0x81,
-	0x78, 0x1c, 0x11, 0x16, 0x52, 0x87, 0x20, 0x6c, 0xcb, 0xaa, 0xc9, 0xaa, 0xf6, 0xbb, 0x95, 0x1f,
-	0xdf, 0x9e, 0x3d, 0x5a, 0x2d, 0xbf, 0x63, 0xdb, 0x1d, 0xc7, 0x61, 0x84, 0x73, 0x4b, 0x30, 0x3f,
-	0x74, 0xcd, 0x63, 0x99, 0x6c, 0x5d, 0xe5, 0x76, 0x64, 0x2a, 0x7c, 0x09, 0x0a, 0xdb, 0xc3, 0x66,
-	0xff, 0x3b, 0x2c, 0x88, 0xd6, 0x53, 0xd6, 0xbe, 0x67, 0x41, 0xa1, 0x1f, 0x51, 0xdb, 0x5b, 0xf9,
-	0x38, 0x00, 0xa5, 0x5b, 0x35, 0xa7, 0xf2, 0xdd, 0xb6, 0x4e, 0xc0, 0x3d, 0x92, 0x14, 0x46, 0xbe,
-	0x93, 0x9a, 0x9b, 0x37, 0xef, 0xa6, 0xf1, 0x6b, 0x07, 0x3e, 0x05, 0x07, 0x2c, 0xfd, 0x1d, 0xf2,
-	0x88, 0xef, 0x7a, 0xd2, 0xcf, 0x9c, 0x79, 0x5f, 0x82, 0x83, 0x14, 0x83, 0x5d, 0x50, 0xf0, 0x28,
-	0x17, 0x48, 0x82, 0x5a, 0xbe, 0xaa, 0xd4, 0x0b, 0xed, 0xca, 0x8d, 0xb1, 0x36, 0x77, 0xb0, 0x9b,
-	0xbf, 0xf8, 0xf5, 0x24, 0x63, 0x02, 0x6f, 0x73, 0x2b, 0x19, 0xd0, 0xb9, 0x34, 0x04, 0xd9, 0x57,
-	0x8e, 0x20, 0xba, 0xb1, 0x84, 0x6b, 0x7b, 0xd5, 0x5c, 0xbd, 0xd0, 0x3e, 0xbd, 0x51, 0xf6, 0x1f,
-	0x3e, 0x9a, 0x8f, 0xf9, 0xdf, 0x49, 0xde, 0x30, 0xc0, 0xfe, 0x7a, 0xd5, 0xf0, 0x18, 0xc0, 0x91,
-	0x61, 0x8e, 0x91, 0x35, 0xee, 0x8c, 0xfb, 0x68, 0x32, 0x7c, 0x3b, 0x34, 0xde, 0x0f, 0xd5, 0x0c,
-	0x3c, 0x04, 0xc5, 0x2d, 0xdc, 0x18, 0xf5, 0x87, 0xaa, 0x02, 0x1f, 0x82, 0xd2, 0x16, 0xd8, 0x7b,
-	0x67, 0x58, 0xfd, 0x57, 0x6a, 0xb6, 0xdb, 0xb8, 0x58, 0xe8, 0xca, 0xe5, 0x42, 0x57, 0x7e, 0x2f,
-	0x74, 0xe5, 0x7c, 0xa9, 0x67, 0x2e, 0x97, 0x7a, 0xe6, 0xe7, 0x52, 0xcf, 0x7c, 0x50, 0x3f, 0x6f,
-	0x1e, 0xbc, 0xf8, 0x12, 0x11, 0x3e, 0xbd, 0x93, 0x3e, 0xce, 0x17, 0x7f, 0x02, 0x00, 0x00, 0xff,
-	0xff, 0x2e, 0xff, 0x1c, 0xe8, 0x10, 0x04, 0x00, 0x00,
+	// 2341 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xb4, 0x59, 0xdb, 0x6e, 0xdb, 0xc8,
+	0xf9, 0xb7, 0x0e, 0xf1, 0xe1, 0xb3, 0x2d, 0x53, 0xe3, 0x43, 0xe4, 0x43, 0x1c, 0xaf, 0xf2, 0xdf,
+	0x8d, 0xa3, 0x4d, 0xe2, 0xb5, 0xf7, 0xbf, 0x58, 0x14, 0x8b, 0x2d, 0x40, 0x49, 0x74, 0xa4, 0x5a,
+	0x16, 0xb5, 0x43, 0x29, 0xd9, 0xb4, 0x68, 0x07, 0x14, 0x39, 0xb1, 0x88, 0xd0, 0xa4, 0x40, 0x52,
+	0xde, 0xf5, 0x43, 0x14, 0x58, 0xf4, 0xb2, 0x40, 0x2f, 0x7a, 0xd7, 0xdb, 0x02, 0xbd, 0xe8, 0x23,
+	0x2c, 0xd0, 0x5e, 0x2c, 0x7a, 0xd5, 0x8b, 0xa2, 0x28, 0x92, 0xbe, 0x41, 0x5f, 0xa0, 0x98, 0x19,
+	0x92, 0xa2, 0x4e, 0x76, 0x1a, 0xb4, 0x37, 0x86, 0xf8, 0xfd, 0x7e, 0xdf, 0x61, 0xe6, 0x3b, 0x70,
+	0x86, 0x86, 0x5d, 0x7b, 0x70, 0x49, 0x3d, 0xfd, 0x48, 0x1f, 0x98, 0x56, 0x70, 0x74, 0x75, 0x2c,
+	0x7e, 0x3c, 0xed, 0x7b, 0x6e, 0xe0, 0xa2, 0x35, 0x01, 0x3e, 0x15, 0xb2, 0xab, 0xe3, 0x9d, 0xbc,
+	0x7e, 0x69, 0x39, 0xee, 0x11, 0xff, 0x2b, 0x38, 0x3b, 0xdb, 0x86, 0xeb, 0x5f, 0xba, 0x3e, 0xe1,
+	0x4f, 0x47, 0xe2, 0x21, 0x84, 0x36, 0x2e, 0xdc, 0x0b, 0x57, 0xc8, 0xd9, 0x2f, 0x21, 0x2d, 0xfe,
+	0x29, 0x0d, 0x50, 0x73, 0xfd, 0x00, 0xd3, 0xbe, 0xeb, 0x05, 0xa8, 0x04, 0x79, 0xa3, 0x3f, 0x20,
+	0x03, 0x5f, 0xbf, 0xa0, 0xa4, 0x4f, 0x3d, 0x83, 0x3a, 0x41, 0x21, 0x75, 0x90, 0x3a, 0x4c, 0xe1,
+	0x35, 0xa3, 0x3f, 0xe8, 0x30, 0x79, 0x4b, 0x88, 0x19, 0xf7, 0x92, 0x5e, 0x8e, 0x71, 0xd3, 0x82,
+	0x7b, 0x49, 0x2f, 0x47, 0xb8, 0x8f, 0x01, 0x99, 0x96, 0xff, 0x7a, 0x8c, 0x9c, 0xe1, 0x64, 0x89,
+	0x21, 0x23, 0xec, 0x9f, 0xc0, 0xba, 0xe5, 0x74, 0xdd, 0x81, 0x63, 0x12, 0x16, 0x15, 0xf1, 0x03,
+	0x3d, 0xa0, 0x7e, 0x21, 0x7b, 0x90, 0x39, 0xcc, 0x9d, 0xec, 0x3c, 0x1d, 0xdb, 0x87, 0xa7, 0x2d,
+	0xd7, 0x0b, 0x34, 0x46, 0xc1, 0xf9, 0x50, 0x2d, 0x96, 0xf8, 0xe8, 0x13, 0xd8, 0x78, 0xa5, 0x5b,
+	0x36, 0x35, 0x89, 0x6e, 0x04, 0x96, 0xeb, 0xf8, 0xc4, 0x70, 0x07, 0x4e, 0x50, 0xb8, 0x73, 0x90,
+	0x3a, 0x5c, 0xc5, 0x48, 0x60, 0xb2, 0x80, 0x2a, 0x0c, 0x41, 0x3f, 0x82, 0x6d, 0x43, 0xf7, 0x0d,
+	0xdd, 0xa4, 0xe4, 0xb5, 0x6e, 0xd2, 0x4b, 0xdb, 0xd2, 0x89, 0xd9, 0x25, 0xdd, 0x6b, 0x16, 0xc3,
+	0x3c, 0x0f, 0x79, 0x2b, 0x24, 0x9c, 0x85, 0x78, 0xb5, 0x5b, 0x66, 0x68, 0xf1, 0xf7, 0x29, 0xd8,
+	0xd5, 0x02, 0xd7, 0xd3, 0x2f, 0x68, 0xa5, 0xa7, 0xdb, 0x36, 0x75, 0x2e, 0xa8, 0xda, 0xf5, 0xa9,
+	0x77, 0xa5, 0x33, 0x07, 0xa8, 0x03, 0x85, 0x40, 0xf7, 0x2e, 0x68, 0x40, 0xfc, 0x41, 0x9f, 0x7a,
+	0x8e, 0x6b, 0x52, 0xa2, 0x1b, 0x22, 0x20, 0xb6, 0xcb, 0x4b, 0xe5, 0xdd, 0xbf, 0xfc, 0xe1, 0xc9,
+	0xdd, 0x30, 0x6f, 0xb2, 0x61, 0xc8, 0xa6, 0xe9, 0x51, 0xdf, 0xd7, 0x02, 0xcf, 0x72, 0x2e, 0xf0,
+	0x96, 0x50, 0xd6, 0x22, 0x5d, 0x59, 0xa8, 0xa2, 0x2f, 0x60, 0x39, 0xb9, 0x4f, 0xe9, 0x5b, 0xf7,
+	0x09, 0xfa, 0xf1, 0x06, 0x15, 0xff, 0x38, 0x0f, 0x28, 0x8c, 0xb9, 0xe5, 0xb9, 0xee, 0x2b, 0x4c,
+	0xfd, 0x81, 0x1d, 0xfc, 0xaf, 0x42, 0xfd, 0x39, 0xec, 0x19, 0xd1, 0xce, 0x78, 0x53, 0x4c, 0xa7,
+	0x6f, 0x37, 0xbd, 0x33, 0x34, 0x30, 0x61, 0x7e, 0x17, 0x96, 0x02, 0xcb, 0x78, 0x4d, 0x03, 0x62,
+	0x99, 0xbc, 0xbc, 0x96, 0xf0, 0xa2, 0x10, 0xd4, 0x4d, 0x54, 0x83, 0xe5, 0xee, 0x80, 0x83, 0xc1,
+	0x75, 0x9f, 0x16, 0xb2, 0x07, 0xa9, 0xc3, 0xdc, 0xc9, 0xc3, 0x89, 0x6d, 0x4a, 0x6e, 0x46, 0x99,
+	0xf3, 0xdb, 0xd7, 0x7d, 0x8a, 0xa1, 0x1b, 0xff, 0x46, 0x5f, 0x41, 0x4e, 0xf7, 0x02, 0xeb, 0x95,
+	0x6e, 0x04, 0xc4, 0xb0, 0x75, 0xdf, 0xe7, 0xe5, 0x94, 0x3b, 0x29, 0xdd, 0x68, 0x4c, 0x0e, 0x55,
+	0x2a, 0x4c, 0x03, 0xaf, 0xea, 0xc9, 0x47, 0xf4, 0x08, 0xa4, 0xd8, 0xa4, 0xeb, 0x99, 0x96, 0xa3,
+	0xdb, 0xbc, 0xd8, 0x56, 0xf1, 0x5a, 0x24, 0x57, 0x85, 0x18, 0x7d, 0x00, 0x2b, 0x31, 0xf5, 0x35,
+	0xbd, 0x2e, 0x2c, 0xf0, 0x75, 0x2e, 0x47, 0xb2, 0x33, 0x7a, 0x8d, 0xce, 0x60, 0xc5, 0xe3, 0x79,
+	0x0c, 0xc3, 0x5b, 0xe4, 0xe1, 0x1d, 0xde, 0x18, 0x9e, 0x48, 0xbc, 0x08, 0x6e, 0xd9, 0x1b, 0x3e,
+	0xa0, 0x87, 0xb0, 0x16, 0x78, 0xba, 0xe3, 0x1b, 0x9e, 0xd5, 0x0f, 0x48, 0x4f, 0xf7, 0x7b, 0x85,
+	0x25, 0xee, 0x32, 0x37, 0x14, 0xd7, 0x74, 0xbf, 0x87, 0x0a, 0xb0, 0x60, 0xd2, 0x40, 0xb7, 0x6c,
+	0xbf, 0x00, 0x9c, 0x10, 0x3d, 0xa2, 0x0f, 0x93, 0x1b, 0xc6, 0x13, 0xbd, 0xcc, 0xd7, 0x36, 0xdc,
+	0x04, 0x9e, 0xbe, 0x13, 0xd8, 0x34, 0xa9, 0x67, 0x89, 0x6e, 0x21, 0x96, 0xd3, 0x1f, 0x84, 0xfe,
+	0x56, 0xb8, 0xb9, 0xf5, 0x21, 0x58, 0x67, 0x18, 0x77, 0x7a, 0x0c, 0x1b, 0xc9, 0x8a, 0xb2, 0x2e,
+	0x1c, 0x3d, 0x18, 0x78, 0xb4, 0xb0, 0x2a, 0x54, 0x12, 0xc5, 0x12, 0x41, 0xe8, 0x14, 0xee, 0xbb,
+	0xbc, 0x2b, 0xa9, 0x47, 0xf4, 0x20, 0xa0, 0xac, 0x6f, 0x98, 0xc3, 0x58, 0xd9, 0x2f, 0xe4, 0x0e,
+	0x32, 0x87, 0x4b, 0xf8, 0x5e, 0x44, 0x93, 0x87, 0xac, 0xd8, 0x8c, 0x5f, 0xfc, 0xd5, 0x3c, 0xa0,
+	0xa6, 0x6b, 0x52, 0x6d, 0xe0, 0xf7, 0x2d, 0x83, 0x61, 0xac, 0xa5, 0x50, 0x0d, 0xf2, 0xef, 0xd5,
+	0x33, 0x92, 0x3f, 0x5e, 0xce, 0x0f, 0x61, 0xcd, 0x8f, 0x6c, 0x13, 0xdf, 0x70, 0x3d, 0xca, 0x1b,
+	0x24, 0x83, 0x73, 0xb1, 0x58, 0x63, 0x52, 0x36, 0x5f, 0x6d, 0xdd, 0x0f, 0xc8, 0xa0, 0x6f, 0xea,
+	0x01, 0x35, 0x09, 0xed, 0xbb, 0x46, 0x8f, 0x37, 0x40, 0x16, 0x4b, 0x0c, 0xe9, 0x08, 0x40, 0x61,
+	0x72, 0xf4, 0x29, 0x6c, 0x71, 0xb6, 0x47, 0xd9, 0xb8, 0x25, 0x6c, 0x06, 0x86, 0x1a, 0x59, 0xae,
+	0xb1, 0xce, 0x50, 0xcc, 0xc1, 0x53, 0xdd, 0xb2, 0x85, 0xd2, 0x13, 0xe0, 0x62, 0xe2, 0xda, 0x66,
+	0x52, 0xe3, 0xce, 0xd0, 0x87, 0x6a, 0x9b, 0x43, 0xfa, 0x97, 0xb0, 0x6b, 0x5a, 0x7e, 0x60, 0x39,
+	0x46, 0x40, 0xc2, 0x96, 0xe4, 0x5a, 0xdf, 0x58, 0x8e, 0xe9, 0x7e, 0x13, 0x96, 0x76, 0x21, 0xa2,
+	0xb4, 0x39, 0x83, 0x69, 0xbf, 0xe0, 0x38, 0x5b, 0x90, 0x60, 0xb2, 0xa1, 0xe6, 0x05, 0xa1, 0xb3,
+	0x05, 0xe1, 0x4c, 0x20, 0x1a, 0x03, 0x84, 0xb3, 0x23, 0xd8, 0xe0, 0x75, 0x4e, 0x74, 0x51, 0x5d,
+	0x91, 0x97, 0x45, 0xee, 0x25, 0xcf, 0x31, 0x99, 0x97, 0x58, 0x68, 0xfe, 0xe3, 0x70, 0xbf, 0x22,
+	0x2d, 0x61, 0x7e, 0x89, 0x9b, 0x5f, 0x63, 0x08, 0xaf, 0x7c, 0x79, 0xcc, 0x7a, 0x77, 0xd4, 0x3a,
+	0x24, 0xac, 0x97, 0x67, 0x5b, 0xef, 0x86, 0xd6, 0x97, 0xc7, 0xac, 0x97, 0x85, 0xf5, 0x43, 0x90,
+	0x0c, 0x9b, 0xea, 0x0e, 0xe9, 0x33, 0xb2, 0x28, 0x96, 0x15, 0x6e, 0x39, 0xc7, 0xe5, 0x2d, 0xdd,
+	0x0f, 0x5f, 0x4c, 0xc7, 0xb0, 0x19, 0x9a, 0x8d, 0xe9, 0xc2, 0xf2, 0x2a, 0xb7, 0x8c, 0x84, 0xe5,
+	0x50, 0x45, 0x18, 0x8f, 0x54, 0x2c, 0xc7, 0xa4, 0xdf, 0x26, 0xd3, 0x96, 0x1b, 0xaa, 0xd4, 0x19,
+	0x36, 0x4c, 0xdc, 0x8f, 0x61, 0x6f, 0x3c, 0x1e, 0xa2, 0x07, 0xa4, 0xef, 0xfa, 0x41, 0xdf, 0x75,
+	0x68, 0x61, 0x4d, 0x64, 0x6e, 0x34, 0x36, 0x39, 0x68, 0x85, 0x78, 0xf1, 0xbb, 0x2c, 0x14, 0xc4,
+	0x69, 0x82, 0x7a, 0x98, 0xda, 0x96, 0xde, 0xb5, 0x6c, 0x2b, 0xb8, 0x16, 0xad, 0xf1, 0x12, 0x76,
+	0xbc, 0x10, 0x7b, 0xbf, 0xf7, 0x4a, 0x21, 0x52, 0x9f, 0x18, 0xfd, 0x1f, 0x43, 0xde, 0x1b, 0xba,
+	0x1b, 0xe9, 0x16, 0x29, 0x01, 0xbc, 0x4f, 0xbf, 0xc8, 0x00, 0x81, 0x37, 0xf0, 0x03, 0xd2, 0xd5,
+	0x1d, 0x33, 0x7c, 0x6f, 0x14, 0x27, 0x66, 0x69, 0xb4, 0xe8, 0x36, 0xa3, 0x96, 0x75, 0xc7, 0xc4,
+	0x4b, 0x41, 0xf4, 0x13, 0x1d, 0xc1, 0xba, 0xe1, 0x3a, 0x81, 0xa7, 0x9b, 0x16, 0x3f, 0x6b, 0x24,
+	0x4e, 0x21, 0x59, 0x8c, 0x46, 0x20, 0x91, 0xec, 0xff, 0x87, 0x2d, 0xcb, 0xa1, 0xb6, 0x75, 0x61,
+	0x75, 0x6d, 0x4a, 0x06, 0x4e, 0x10, 0xa7, 0x6e, 0x9e, 0xeb, 0x6c, 0x0c, 0xd1, 0x0e, 0x03, 0x45,
+	0xa4, 0x27, 0xb0, 0x19, 0xb6, 0x4d, 0xdf, 0xf5, 0xad, 0xc0, 0xba, 0xa2, 0xa1, 0xa3, 0x05, 0x9e,
+	0xb5, 0x75, 0x01, 0xb6, 0x42, 0x2c, 0x1e, 0xba, 0xa1, 0x8e, 0x43, 0x2f, 0xf4, 0x84, 0xce, 0x62,
+	0x52, 0xa7, 0x19, 0x62, 0x42, 0x67, 0x7a, 0x7b, 0x2e, 0x4d, 0x6f, 0xcf, 0xe2, 0xbf, 0x16, 0xa0,
+	0x20, 0x3a, 0xbc, 0x4a, 0x03, 0xea, 0x59, 0xae, 0x27, 0x26, 0x29, 0x2f, 0x89, 0x91, 0x57, 0x76,
+	0x6a, 0xec, 0x95, 0x7d, 0x04, 0xeb, 0x66, 0x52, 0x65, 0x24, 0xad, 0x68, 0x04, 0x7a, 0x9f, 0xc4,
+	0x3e, 0x82, 0x3c, 0x3b, 0x15, 0x5e, 0x51, 0xd2, 0xa3, 0xba, 0x4d, 0xdc, 0x3e, 0x8b, 0x41, 0xcc,
+	0xc0, 0x9c, 0x00, 0x6a, 0x54, 0xb7, 0xd5, 0x7e, 0xdd, 0x64, 0xbb, 0xd4, 0xf7, 0xdc, 0xae, 0x88,
+	0x22, 0x99, 0x0e, 0x91, 0xc2, 0xf5, 0x18, 0x4c, 0x64, 0xe3, 0x23, 0xe0, 0xdd, 0x2e, 0x8c, 0x27,
+	0x93, 0xb7, 0xca, 0xc4, 0xcc, 0xb4, 0xe0, 0x45, 0x41, 0xb3, 0xfe, 0x1c, 0x78, 0x74, 0x74, 0xd8,
+	0x31, 0xe4, 0x54, 0x00, 0x82, 0xfd, 0x05, 0xeb, 0xa1, 0x78, 0x70, 0xc7, 0xfc, 0x91, 0xa4, 0xdd,
+	0xf5, 0xe2, 0xe9, 0x1d, 0xe9, 0x89, 0xc4, 0xcd, 0xa8, 0xc3, 0xa5, 0x99, 0x75, 0xf8, 0x0b, 0xb8,
+	0xc7, 0x63, 0x9b, 0x79, 0x18, 0x84, 0x77, 0x38, 0xb1, 0x31, 0x0b, 0xed, 0xe9, 0x07, 0xc2, 0x2e,
+	0xdc, 0x0f, 0xdf, 0x45, 0x33, 0xc7, 0xc2, 0xf2, 0xed, 0x1e, 0xf6, 0xc4, 0x1b, 0x6b, 0xc6, 0x68,
+	0x68, 0x43, 0x3e, 0xf4, 0x91, 0x38, 0x12, 0xad, 0xfc, 0x87, 0x47, 0xa2, 0x35, 0xe1, 0x62, 0x78,
+	0x2c, 0x2a, 0x8d, 0x5a, 0x4d, 0x8e, 0xe2, 0x04, 0x37, 0x9a, 0x20, 0xf7, 0xe2, 0xb7, 0x61, 0xcf,
+	0xb5, 0x4d, 0xea, 0xc5, 0xc9, 0x13, 0x6b, 0xcc, 0xf1, 0xb4, 0xed, 0x44, 0xa4, 0x1a, 0xe7, 0x84,
+	0xe9, 0x13, 0x89, 0xf8, 0x1c, 0x0a, 0x63, 0xa3, 0x7c, 0x58, 0x2a, 0x6b, 0xdc, 0xeb, 0xe6, 0xc8,
+	0x34, 0x8f, 0xeb, 0xe5, 0x4b, 0xd8, 0x0d, 0xeb, 0x25, 0x3c, 0xfd, 0x8e, 0xea, 0x4a, 0x5c, 0xb7,
+	0x20, 0x28, 0xe2, 0xbc, 0x3b, 0xa2, 0xfe, 0x39, 0x14, 0xd8, 0x2b, 0x7f, 0xaa, 0x6e, 0x5e, 0xf8,
+	0x75, 0x6d, 0x73, 0x52, 0xb1, 0xf8, 0x9b, 0x54, 0xd4, 0xf5, 0x72, 0xf2, 0x90, 0xf7, 0x0e, 0x5d,
+	0xff, 0x09, 0x6c, 0x88, 0x55, 0x8e, 0x9d, 0x19, 0xd3, 0xe2, 0xce, 0xc6, 0x31, 0x79, 0xfc, 0xe0,
+	0xe8, 0x5f, 0x5f, 0x76, 0x5d, 0x7b, 0x5c, 0x25, 0x23, 0x66, 0x98, 0x00, 0x47, 0x74, 0x8a, 0xbf,
+	0xcc, 0xc2, 0xbc, 0x68, 0x6f, 0xb4, 0x07, 0x90, 0x18, 0x00, 0x29, 0xbe, 0xaa, 0xc5, 0x5e, 0xd4,
+	0xfa, 0x23, 0xb1, 0xa6, 0xc7, 0x62, 0x7d, 0x0c, 0xc8, 0x37, 0x7a, 0xd4, 0x1c, 0xd8, 0xd1, 0xb4,
+	0x89, 0xae, 0x1e, 0x59, 0x2c, 0xc5, 0x08, 0xdf, 0x91, 0xba, 0xc9, 0x6e, 0x55, 0xcc, 0xec, 0xd4,
+	0x32, 0xcf, 0xbe, 0xc3, 0xad, 0x4a, 0x28, 0x4f, 0x14, 0xf8, 0xcf, 0x60, 0xf7, 0x8a, 0x7a, 0xd6,
+	0x2b, 0x6b, 0x9a, 0x61, 0x76, 0x39, 0xc9, 0xdc, 0x66, 0x79, 0x3b, 0xd2, 0x1f, 0xb7, 0xed, 0xa3,
+	0xcf, 0x60, 0x9e, 0x1d, 0x7d, 0x07, 0xe2, 0xf2, 0x9b, 0x3b, 0xb9, 0x37, 0xd1, 0x32, 0x62, 0x17,
+	0x35, 0x4e, 0xc2, 0x21, 0x99, 0x1d, 0xf9, 0x0d, 0x8f, 0xf2, 0x21, 0xdc, 0xa3, 0xd6, 0x45, 0x2f,
+	0x08, 0x07, 0xda, 0x6a, 0x28, 0xad, 0x71, 0x21, 0xa3, 0x45, 0xb3, 0x3a, 0xa4, 0x2d, 0x0a, 0x5a,
+	0x28, 0x0d, 0x69, 0x25, 0xc8, 0x9b, 0x54, 0x37, 0x6d, 0xcb, 0xa1, 0xc3, 0x5d, 0x0e, 0xcf, 0x6b,
+	0x11, 0x10, 0x6d, 0xf2, 0x7d, 0x08, 0xaf, 0x2f, 0xe2, 0xee, 0x20, 0xae, 0x22, 0x20, 0x44, 0xfc,
+	0xca, 0xb0, 0x01, 0x77, 0x1c, 0x97, 0xdd, 0x94, 0xf9, 0x64, 0xc1, 0xe2, 0xa1, 0xf8, 0xbb, 0x0c,
+	0x2c, 0x73, 0x13, 0xe1, 0xb7, 0x90, 0xff, 0xde, 0x31, 0x7e, 0x1b, 0x16, 0xe3, 0x98, 0xd3, 0x3c,
+	0xe6, 0x05, 0x1a, 0xc6, 0xfa, 0x00, 0x56, 0xc5, 0xe4, 0x8b, 0x56, 0x9f, 0xe1, 0xaf, 0xb6, 0x15,
+	0x21, 0x0c, 0x17, 0x5f, 0x86, 0xe5, 0x9e, 0x1b, 0xcf, 0x48, 0x5e, 0x28, 0xcb, 0x27, 0xbb, 0x93,
+	0x69, 0x88, 0xbf, 0xe3, 0x94, 0xb3, 0xdf, 0xff, 0xfd, 0xfe, 0x1c, 0x86, 0xde, 0xf0, 0xcb, 0x8e,
+	0x07, 0xfb, 0xbe, 0x98, 0x6c, 0x24, 0xbe, 0x12, 0x11, 0x77, 0xf8, 0x6d, 0x42, 0x54, 0xc9, 0xf2,
+	0xc9, 0xe3, 0x59, 0x03, 0x71, 0xda, 0x07, 0x0d, 0xbc, 0xe7, 0xcf, 0x06, 0x7d, 0xf4, 0x02, 0x36,
+	0x23, 0x9f, 0x7d, 0x36, 0x4e, 0xc3, 0x51, 0xc9, 0x0a, 0x89, 0xb9, 0x7a, 0xf0, 0x0e, 0xb3, 0x17,
+	0xaf, 0xfb, 0x13, 0x32, 0xbf, 0xa4, 0xc2, 0x52, 0xfc, 0x31, 0x03, 0x6d, 0x01, 0x6a, 0xa9, 0xb8,
+	0x4d, 0xb4, 0xb6, 0xdc, 0x56, 0x48, 0xa7, 0x79, 0xd6, 0x54, 0x5f, 0x34, 0xa5, 0x39, 0xb4, 0x0e,
+	0x6b, 0x09, 0xb9, 0xda, 0x52, 0x9a, 0x52, 0x0a, 0x6d, 0x42, 0x3e, 0x21, 0xac, 0x34, 0x54, 0x4d,
+	0xa9, 0x4a, 0xe9, 0xd2, 0xdf, 0x52, 0xb0, 0x35, 0xfd, 0xde, 0x8f, 0x1e, 0xc1, 0x87, 0x5a, 0x5b,
+	0xc5, 0xf2, 0x33, 0x85, 0xb4, 0xb0, 0xaa, 0x9e, 0x92, 0x72, 0xa7, 0x72, 0xa6, 0xb4, 0x49, 0xfb,
+	0x65, 0x8b, 0x79, 0xd3, 0x5a, 0x4a, 0xa5, 0x7e, 0x5a, 0x57, 0xaa, 0xd2, 0x1c, 0xfa, 0x3f, 0x38,
+	0x98, 0x4d, 0xc5, 0x4a, 0x45, 0x69, 0xb6, 0xa5, 0x14, 0xfa, 0x00, 0xee, 0xcd, 0x66, 0xa9, 0x8d,
+	0xaa, 0x94, 0x46, 0x0f, 0xe1, 0xc1, 0x6c, 0x4a, 0x0b, 0xab, 0x65, 0xb9, 0x5d, 0x57, 0x9b, 0x52,
+	0x06, 0x7d, 0x08, 0x1f, 0xdc, 0xe8, 0xb1, 0xa6, 0x54, 0xce, 0xa4, 0x6c, 0xe9, 0xd7, 0x29, 0xd8,
+	0x9e, 0xf9, 0x25, 0x02, 0x3d, 0x86, 0xc3, 0x51, 0x23, 0x32, 0x6e, 0xd7, 0x4f, 0xe5, 0x4a, 0x9b,
+	0x54, 0x1a, 0xb2, 0xa6, 0x8d, 0x2d, 0xf2, 0x23, 0x28, 0xde, 0xc8, 0xae, 0x37, 0xab, 0xca, 0xd7,
+	0x52, 0x6a, 0x72, 0x0d, 0x63, 0x3c, 0xed, 0xe5, 0x79, 0x59, 0x6d, 0x48, 0xe9, 0xd2, 0x6f, 0x33,
+	0x70, 0x77, 0xc6, 0x4b, 0x17, 0x95, 0xe0, 0xa3, 0x51, 0x23, 0x58, 0xd1, 0x3a, 0x8d, 0xe9, 0x81,
+	0x3d, 0x80, 0xfb, 0x37, 0x70, 0x5b, 0xb2, 0xa6, 0x49, 0xa9, 0xc9, 0xb5, 0x8e, 0x90, 0x6a, 0xb2,
+	0x56, 0x23, 0xe7, 0x75, 0xed, 0x5c, 0x6e, 0x57, 0x6a, 0x52, 0x1a, 0x7d, 0x06, 0xc7, 0x37, 0xb0,
+	0xdb, 0xf5, 0x73, 0x45, 0xed, 0xb4, 0x89, 0x8a, 0x49, 0x53, 0x65, 0x50, 0x4b, 0x6d, 0x6a, 0x8a,
+	0x94, 0x41, 0x9f, 0xc2, 0xd1, 0x0d, 0x6a, 0x6a, 0x59, 0x53, 0xf0, 0x73, 0x05, 0x93, 0xaf, 0x3a,
+	0x2a, 0xee, 0x9c, 0x93, 0x53, 0xb9, 0xde, 0x90, 0xb2, 0xe8, 0x18, 0x9e, 0xdc, 0xa0, 0xd4, 0x54,
+	0x89, 0xd2, 0xa8, 0x3f, 0xab, 0x97, 0x1b, 0x0a, 0x69, 0xd7, 0x59, 0x8e, 0xa5, 0x3b, 0xb7, 0xa8,
+	0xd4, 0x9b, 0xcf, 0xe5, 0x46, 0xbd, 0x4a, 0xda, 0x58, 0x6e, 0x6a, 0x15, 0x5c, 0x6f, 0xb5, 0xa5,
+	0xf9, 0x5b, 0x56, 0x14, 0x56, 0x0c, 0xa9, 0xa8, 0xcd, 0xd3, 0x3a, 0x3e, 0x57, 0xaa, 0x22, 0xb8,
+	0x85, 0xd2, 0x9f, 0x53, 0x90, 0x9f, 0xb8, 0xdf, 0xb0, 0x1d, 0xc7, 0x0a, 0x6b, 0x27, 0x05, 0x93,
+	0x36, 0xee, 0x68, 0x6d, 0x52, 0x96, 0x9b, 0xd5, 0xb1, 0xb4, 0xec, 0xc3, 0xce, 0x34, 0x52, 0x53,
+	0xc5, 0xe7, 0x72, 0x43, 0xb4, 0xc3, 0x34, 0xbc, 0xa1, 0xbe, 0x10, 0x8f, 0x52, 0x1a, 0x3d, 0x81,
+	0x47, 0xd3, 0x28, 0x95, 0x9a, 0xdc, 0x68, 0x28, 0xcd, 0x67, 0x0a, 0x26, 0xf5, 0x66, 0xb4, 0x3b,
+	0x52, 0x06, 0x1d, 0xc0, 0xde, 0x34, 0x7a, 0x55, 0x79, 0x86, 0xe5, 0xaa, 0x52, 0x95, 0xb2, 0xa5,
+	0x7f, 0xa6, 0x60, 0x25, 0xf9, 0xd2, 0x62, 0x41, 0xd6, 0x14, 0xb9, 0x41, 0xd4, 0x16, 0x9f, 0x0c,
+	0x9d, 0xf1, 0xda, 0xda, 0x83, 0xc2, 0x18, 0xae, 0x55, 0x6a, 0x4a, 0xb5, 0xd3, 0x50, 0xaa, 0x52,
+	0x6a, 0x8a, 0x76, 0xbd, 0xc9, 0xb6, 0xf7, 0x19, 0x56, 0x34, 0x4d, 0x4a, 0xa3, 0x22, 0xec, 0x8f,
+	0xe1, 0xec, 0x51, 0xc1, 0x24, 0x0c, 0xb3, 0x2a, 0x65, 0xd0, 0x2e, 0xdc, 0x1d, 0xe3, 0x3c, 0x57,
+	0xb0, 0x70, 0x9f, 0x45, 0xdb, 0xb0, 0x39, 0x06, 0xb2, 0xbc, 0x28, 0x55, 0xe9, 0x0e, 0xda, 0x81,
+	0xad, 0x31, 0x48, 0xf9, 0xba, 0x55, 0xc7, 0x4a, 0x55, 0x9a, 0x2f, 0x97, 0xbe, 0x7f, 0xb3, 0x9f,
+	0xfa, 0xe1, 0xcd, 0x7e, 0xea, 0x1f, 0x6f, 0xf6, 0x53, 0xdf, 0xbd, 0xdd, 0x9f, 0xfb, 0xe1, 0xed,
+	0xfe, 0xdc, 0x5f, 0xdf, 0xee, 0xcf, 0xfd, 0x54, 0xfa, 0x76, 0xf8, 0x3f, 0x86, 0xe0, 0xba, 0x4f,
+	0xfd, 0xee, 0x3c, 0xff, 0x7f, 0xc0, 0xa7, 0xff, 0x0e, 0x00, 0x00, 0xff, 0xff, 0xc6, 0x0d, 0x4d,
+	0x25, 0x83, 0x18, 0x00, 0x00,
 }
 
 func (m *HostReport) Marshal() (dAtA []byte, err error) {
@@ -331,6 +1444,12 @@ func (m *HostReport) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.CascadeKademliaDbBytes != 0 {
+		i -= 8
+		encoding_binary.LittleEndian.PutUint64(dAtA[i:], uint64(math.Float64bits(float64(m.CascadeKademliaDbBytes))))
+		i--
+		dAtA[i] = 0x31
+	}
 	if m.FailedActionsCount != 0 {
 		i = encodeVarintAudit(dAtA, i, uint64(m.FailedActionsCount))
 		i--
@@ -423,6 +1542,537 @@ func (m *StorageChallengeObservation) MarshalToSizedBuffer(dAtA []byte) (int, er
 	return len(dAtA) - i, nil
 }
 
+func (m *StorageProofResult) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *StorageProofResult) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *StorageProofResult) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.ObserverAttestationSignatures) > 0 {
+		for iNdEx := len(m.ObserverAttestationSignatures) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.ObserverAttestationSignatures[iNdEx])
+			copy(dAtA[i:], m.ObserverAttestationSignatures[iNdEx])
+			i = encodeVarintAudit(dAtA, i, uint64(len(m.ObserverAttestationSignatures[iNdEx])))
+			i--
+			dAtA[i] = 0x72
+		}
+	}
+	if len(m.ChallengerSignature) > 0 {
+		i -= len(m.ChallengerSignature)
+		copy(dAtA[i:], m.ChallengerSignature)
+		i = encodeVarintAudit(dAtA, i, uint64(len(m.ChallengerSignature)))
+		i--
+		dAtA[i] = 0x6a
+	}
+	if len(m.DerivationInputHash) > 0 {
+		i -= len(m.DerivationInputHash)
+		copy(dAtA[i:], m.DerivationInputHash)
+		i = encodeVarintAudit(dAtA, i, uint64(len(m.DerivationInputHash)))
+		i--
+		dAtA[i] = 0x62
+	}
+	if m.ArtifactCount != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.ArtifactCount))
+		i--
+		dAtA[i] = 0x58
+	}
+	if len(m.Details) > 0 {
+		i -= len(m.Details)
+		copy(dAtA[i:], m.Details)
+		i = encodeVarintAudit(dAtA, i, uint64(len(m.Details)))
+		i--
+		dAtA[i] = 0x52
+	}
+	if len(m.TranscriptHash) > 0 {
+		i -= len(m.TranscriptHash)
+		copy(dAtA[i:], m.TranscriptHash)
+		i = encodeVarintAudit(dAtA, i, uint64(len(m.TranscriptHash)))
+		i--
+		dAtA[i] = 0x4a
+	}
+	if m.ResultClass != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.ResultClass))
+		i--
+		dAtA[i] = 0x40
+	}
+	if len(m.ArtifactKey) > 0 {
+		i -= len(m.ArtifactKey)
+		copy(dAtA[i:], m.ArtifactKey)
+		i = encodeVarintAudit(dAtA, i, uint64(len(m.ArtifactKey)))
+		i--
+		dAtA[i] = 0x3a
+	}
+	if m.ArtifactOrdinal != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.ArtifactOrdinal))
+		i--
+		dAtA[i] = 0x30
+	}
+	if m.ArtifactClass != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.ArtifactClass))
+		i--
+		dAtA[i] = 0x28
+	}
+	if m.BucketType != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.BucketType))
+		i--
+		dAtA[i] = 0x20
+	}
+	if len(m.TicketId) > 0 {
+		i -= len(m.TicketId)
+		copy(dAtA[i:], m.TicketId)
+		i = encodeVarintAudit(dAtA, i, uint64(len(m.TicketId)))
+		i--
+		dAtA[i] = 0x1a
+	}
+	if len(m.ChallengerSupernodeAccount) > 0 {
+		i -= len(m.ChallengerSupernodeAccount)
+		copy(dAtA[i:], m.ChallengerSupernodeAccount)
+		i = encodeVarintAudit(dAtA, i, uint64(len(m.ChallengerSupernodeAccount)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if len(m.TargetSupernodeAccount) > 0 {
+		i -= len(m.TargetSupernodeAccount)
+		copy(dAtA[i:], m.TargetSupernodeAccount)
+		i = encodeVarintAudit(dAtA, i, uint64(len(m.TargetSupernodeAccount)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *NodeSuspicionState) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *NodeSuspicionState) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *NodeSuspicionState) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.CleanPassCountAtPostpone != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.CleanPassCountAtPostpone))
+		i--
+		dAtA[i] = 0x78
+	}
+	if m.LastIndexFailEpoch != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.LastIndexFailEpoch))
+		i--
+		dAtA[i] = 0x70
+	}
+	if m.LastCleanPassEpoch != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.LastCleanPassEpoch))
+		i--
+		dAtA[i] = 0x68
+	}
+	if m.CleanPassCount != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.CleanPassCount))
+		i--
+		dAtA[i] = 0x60
+	}
+	if m.LastClassBEpoch != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.LastClassBEpoch))
+		i--
+		dAtA[i] = 0x58
+	}
+	if m.ClassBCountWindow != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.ClassBCountWindow))
+		i--
+		dAtA[i] = 0x50
+	}
+	if m.LastClassAEpoch != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.LastClassAEpoch))
+		i--
+		dAtA[i] = 0x48
+	}
+	if m.ClassACountWindow != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.ClassACountWindow))
+		i--
+		dAtA[i] = 0x40
+	}
+	if m.WindowStartEpoch != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.WindowStartEpoch))
+		i--
+		dAtA[i] = 0x38
+	}
+	if m.DistinctTicketFailWindow != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.DistinctTicketFailWindow))
+		i--
+		dAtA[i] = 0x30
+	}
+	if m.LastOldFailEpoch != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.LastOldFailEpoch))
+		i--
+		dAtA[i] = 0x28
+	}
+	if m.LastRecentFailEpoch != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.LastRecentFailEpoch))
+		i--
+		dAtA[i] = 0x20
+	}
+	if m.LastUpdatedEpoch != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.LastUpdatedEpoch))
+		i--
+		dAtA[i] = 0x18
+	}
+	if m.SuspicionScore != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.SuspicionScore))
+		i--
+		dAtA[i] = 0x10
+	}
+	if len(m.SupernodeAccount) > 0 {
+		i -= len(m.SupernodeAccount)
+		copy(dAtA[i:], m.SupernodeAccount)
+		i = encodeVarintAudit(dAtA, i, uint64(len(m.SupernodeAccount)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *ReporterReliabilityState) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ReporterReliabilityState) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ReporterReliabilityState) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.WindowStartEpoch != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.WindowStartEpoch))
+		i--
+		dAtA[i] = 0x48
+	}
+	if m.WindowNegativeCount != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.WindowNegativeCount))
+		i--
+		dAtA[i] = 0x40
+	}
+	if m.WindowPositiveCount != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.WindowPositiveCount))
+		i--
+		dAtA[i] = 0x38
+	}
+	if m.IneligibleUntilEpoch != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.IneligibleUntilEpoch))
+		i--
+		dAtA[i] = 0x30
+	}
+	if m.ContradictionCount != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.ContradictionCount))
+		i--
+		dAtA[i] = 0x28
+	}
+	if m.TrustBand != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.TrustBand))
+		i--
+		dAtA[i] = 0x20
+	}
+	if m.LastUpdatedEpoch != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.LastUpdatedEpoch))
+		i--
+		dAtA[i] = 0x18
+	}
+	if m.ReliabilityScore != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.ReliabilityScore))
+		i--
+		dAtA[i] = 0x10
+	}
+	if len(m.ReporterSupernodeAccount) > 0 {
+		i -= len(m.ReporterSupernodeAccount)
+		copy(dAtA[i:], m.ReporterSupernodeAccount)
+		i = encodeVarintAudit(dAtA, i, uint64(len(m.ReporterSupernodeAccount)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *TicketDeteriorationState) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *TicketDeteriorationState) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *TicketDeteriorationState) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.OldBucketFailureEpoch != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.OldBucketFailureEpoch))
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0x88
+	}
+	if m.RecentBucketFailureEpoch != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.RecentBucketFailureEpoch))
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0x80
+	}
+	if m.LastIndexFailureEpoch != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.LastIndexFailureEpoch))
+		i--
+		dAtA[i] = 0x78
+	}
+	if m.DistinctHolderFailureCount != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.DistinctHolderFailureCount))
+		i--
+		dAtA[i] = 0x70
+	}
+	if m.LastResultEpoch != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.LastResultEpoch))
+		i--
+		dAtA[i] = 0x68
+	}
+	if m.LastResultClass != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.LastResultClass))
+		i--
+		dAtA[i] = 0x60
+	}
+	if len(m.LastReporterSupernodeAccount) > 0 {
+		i -= len(m.LastReporterSupernodeAccount)
+		copy(dAtA[i:], m.LastReporterSupernodeAccount)
+		i = encodeVarintAudit(dAtA, i, uint64(len(m.LastReporterSupernodeAccount)))
+		i--
+		dAtA[i] = 0x5a
+	}
+	if len(m.LastTargetSupernodeAccount) > 0 {
+		i -= len(m.LastTargetSupernodeAccount)
+		copy(dAtA[i:], m.LastTargetSupernodeAccount)
+		i = encodeVarintAudit(dAtA, i, uint64(len(m.LastTargetSupernodeAccount)))
+		i--
+		dAtA[i] = 0x52
+	}
+	if m.ContradictionCount != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.ContradictionCount))
+		i--
+		dAtA[i] = 0x48
+	}
+	if m.RecentFailureEpochCount != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.RecentFailureEpochCount))
+		i--
+		dAtA[i] = 0x40
+	}
+	if m.LastFailureEpoch != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.LastFailureEpoch))
+		i--
+		dAtA[i] = 0x38
+	}
+	if m.LastHealEpoch != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.LastHealEpoch))
+		i--
+		dAtA[i] = 0x30
+	}
+	if m.ProbationUntilEpoch != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.ProbationUntilEpoch))
+		i--
+		dAtA[i] = 0x28
+	}
+	if m.ActiveHealOpId != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.ActiveHealOpId))
+		i--
+		dAtA[i] = 0x20
+	}
+	if m.LastUpdatedEpoch != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.LastUpdatedEpoch))
+		i--
+		dAtA[i] = 0x18
+	}
+	if m.DeteriorationScore != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.DeteriorationScore))
+		i--
+		dAtA[i] = 0x10
+	}
+	if len(m.TicketId) > 0 {
+		i -= len(m.TicketId)
+		copy(dAtA[i:], m.TicketId)
+		i = encodeVarintAudit(dAtA, i, uint64(len(m.TicketId)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *TicketArtifactCountState) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *TicketArtifactCountState) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *TicketArtifactCountState) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.SymbolArtifactCount != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.SymbolArtifactCount))
+		i--
+		dAtA[i] = 0x18
+	}
+	if m.IndexArtifactCount != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.IndexArtifactCount))
+		i--
+		dAtA[i] = 0x10
+	}
+	if len(m.TicketId) > 0 {
+		i -= len(m.TicketId)
+		copy(dAtA[i:], m.TicketId)
+		i = encodeVarintAudit(dAtA, i, uint64(len(m.TicketId)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *HealOp) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *HealOp) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *HealOp) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Notes) > 0 {
+		i -= len(m.Notes)
+		copy(dAtA[i:], m.Notes)
+		i = encodeVarintAudit(dAtA, i, uint64(len(m.Notes)))
+		i--
+		dAtA[i] = 0x5a
+	}
+	if len(m.ResultHash) > 0 {
+		i -= len(m.ResultHash)
+		copy(dAtA[i:], m.ResultHash)
+		i = encodeVarintAudit(dAtA, i, uint64(len(m.ResultHash)))
+		i--
+		dAtA[i] = 0x52
+	}
+	if m.DeadlineEpochId != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.DeadlineEpochId))
+		i--
+		dAtA[i] = 0x48
+	}
+	if m.UpdatedHeight != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.UpdatedHeight))
+		i--
+		dAtA[i] = 0x40
+	}
+	if m.CreatedHeight != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.CreatedHeight))
+		i--
+		dAtA[i] = 0x38
+	}
+	if m.Status != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.Status))
+		i--
+		dAtA[i] = 0x30
+	}
+	if len(m.VerifierSupernodeAccounts) > 0 {
+		for iNdEx := len(m.VerifierSupernodeAccounts) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.VerifierSupernodeAccounts[iNdEx])
+			copy(dAtA[i:], m.VerifierSupernodeAccounts[iNdEx])
+			i = encodeVarintAudit(dAtA, i, uint64(len(m.VerifierSupernodeAccounts[iNdEx])))
+			i--
+			dAtA[i] = 0x2a
+		}
+	}
+	if len(m.HealerSupernodeAccount) > 0 {
+		i -= len(m.HealerSupernodeAccount)
+		copy(dAtA[i:], m.HealerSupernodeAccount)
+		i = encodeVarintAudit(dAtA, i, uint64(len(m.HealerSupernodeAccount)))
+		i--
+		dAtA[i] = 0x22
+	}
+	if m.ScheduledEpochId != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.ScheduledEpochId))
+		i--
+		dAtA[i] = 0x18
+	}
+	if len(m.TicketId) > 0 {
+		i -= len(m.TicketId)
+		copy(dAtA[i:], m.TicketId)
+		i = encodeVarintAudit(dAtA, i, uint64(len(m.TicketId)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if m.HealOpId != 0 {
+		i = encodeVarintAudit(dAtA, i, uint64(m.HealOpId))
+		i--
+		dAtA[i] = 0x8
+	}
+	return len(dAtA) - i, nil
+}
+
 func (m *EpochReport) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -443,6 +2093,20 @@ func (m *EpochReport) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.StorageProofResults) > 0 {
+		for iNdEx := len(m.StorageProofResults) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.StorageProofResults[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintAudit(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x32
+		}
+	}
 	if len(m.StorageChallengeObservations) > 0 {
 		for iNdEx := len(m.StorageChallengeObservations) - 1; iNdEx >= 0; iNdEx-- {
 			{
@@ -523,6 +2187,9 @@ func (m *HostReport) Size() (n int) {
 	if m.FailedActionsCount != 0 {
 		n += 1 + sovAudit(uint64(m.FailedActionsCount))
 	}
+	if m.CascadeKademliaDbBytes != 0 {
+		n += 9
+	}
 	return n
 }
 
@@ -542,6 +2209,291 @@ func (m *StorageChallengeObservation) Size() (n int) {
 			l += sovAudit(uint64(e))
 		}
 		n += 1 + sovAudit(uint64(l)) + l
+	}
+	return n
+}
+
+func (m *StorageProofResult) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.TargetSupernodeAccount)
+	if l > 0 {
+		n += 1 + l + sovAudit(uint64(l))
+	}
+	l = len(m.ChallengerSupernodeAccount)
+	if l > 0 {
+		n += 1 + l + sovAudit(uint64(l))
+	}
+	l = len(m.TicketId)
+	if l > 0 {
+		n += 1 + l + sovAudit(uint64(l))
+	}
+	if m.BucketType != 0 {
+		n += 1 + sovAudit(uint64(m.BucketType))
+	}
+	if m.ArtifactClass != 0 {
+		n += 1 + sovAudit(uint64(m.ArtifactClass))
+	}
+	if m.ArtifactOrdinal != 0 {
+		n += 1 + sovAudit(uint64(m.ArtifactOrdinal))
+	}
+	l = len(m.ArtifactKey)
+	if l > 0 {
+		n += 1 + l + sovAudit(uint64(l))
+	}
+	if m.ResultClass != 0 {
+		n += 1 + sovAudit(uint64(m.ResultClass))
+	}
+	l = len(m.TranscriptHash)
+	if l > 0 {
+		n += 1 + l + sovAudit(uint64(l))
+	}
+	l = len(m.Details)
+	if l > 0 {
+		n += 1 + l + sovAudit(uint64(l))
+	}
+	if m.ArtifactCount != 0 {
+		n += 1 + sovAudit(uint64(m.ArtifactCount))
+	}
+	l = len(m.DerivationInputHash)
+	if l > 0 {
+		n += 1 + l + sovAudit(uint64(l))
+	}
+	l = len(m.ChallengerSignature)
+	if l > 0 {
+		n += 1 + l + sovAudit(uint64(l))
+	}
+	if len(m.ObserverAttestationSignatures) > 0 {
+		for _, s := range m.ObserverAttestationSignatures {
+			l = len(s)
+			n += 1 + l + sovAudit(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *NodeSuspicionState) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.SupernodeAccount)
+	if l > 0 {
+		n += 1 + l + sovAudit(uint64(l))
+	}
+	if m.SuspicionScore != 0 {
+		n += 1 + sovAudit(uint64(m.SuspicionScore))
+	}
+	if m.LastUpdatedEpoch != 0 {
+		n += 1 + sovAudit(uint64(m.LastUpdatedEpoch))
+	}
+	if m.LastRecentFailEpoch != 0 {
+		n += 1 + sovAudit(uint64(m.LastRecentFailEpoch))
+	}
+	if m.LastOldFailEpoch != 0 {
+		n += 1 + sovAudit(uint64(m.LastOldFailEpoch))
+	}
+	if m.DistinctTicketFailWindow != 0 {
+		n += 1 + sovAudit(uint64(m.DistinctTicketFailWindow))
+	}
+	if m.WindowStartEpoch != 0 {
+		n += 1 + sovAudit(uint64(m.WindowStartEpoch))
+	}
+	if m.ClassACountWindow != 0 {
+		n += 1 + sovAudit(uint64(m.ClassACountWindow))
+	}
+	if m.LastClassAEpoch != 0 {
+		n += 1 + sovAudit(uint64(m.LastClassAEpoch))
+	}
+	if m.ClassBCountWindow != 0 {
+		n += 1 + sovAudit(uint64(m.ClassBCountWindow))
+	}
+	if m.LastClassBEpoch != 0 {
+		n += 1 + sovAudit(uint64(m.LastClassBEpoch))
+	}
+	if m.CleanPassCount != 0 {
+		n += 1 + sovAudit(uint64(m.CleanPassCount))
+	}
+	if m.LastCleanPassEpoch != 0 {
+		n += 1 + sovAudit(uint64(m.LastCleanPassEpoch))
+	}
+	if m.LastIndexFailEpoch != 0 {
+		n += 1 + sovAudit(uint64(m.LastIndexFailEpoch))
+	}
+	if m.CleanPassCountAtPostpone != 0 {
+		n += 1 + sovAudit(uint64(m.CleanPassCountAtPostpone))
+	}
+	return n
+}
+
+func (m *ReporterReliabilityState) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.ReporterSupernodeAccount)
+	if l > 0 {
+		n += 1 + l + sovAudit(uint64(l))
+	}
+	if m.ReliabilityScore != 0 {
+		n += 1 + sovAudit(uint64(m.ReliabilityScore))
+	}
+	if m.LastUpdatedEpoch != 0 {
+		n += 1 + sovAudit(uint64(m.LastUpdatedEpoch))
+	}
+	if m.TrustBand != 0 {
+		n += 1 + sovAudit(uint64(m.TrustBand))
+	}
+	if m.ContradictionCount != 0 {
+		n += 1 + sovAudit(uint64(m.ContradictionCount))
+	}
+	if m.IneligibleUntilEpoch != 0 {
+		n += 1 + sovAudit(uint64(m.IneligibleUntilEpoch))
+	}
+	if m.WindowPositiveCount != 0 {
+		n += 1 + sovAudit(uint64(m.WindowPositiveCount))
+	}
+	if m.WindowNegativeCount != 0 {
+		n += 1 + sovAudit(uint64(m.WindowNegativeCount))
+	}
+	if m.WindowStartEpoch != 0 {
+		n += 1 + sovAudit(uint64(m.WindowStartEpoch))
+	}
+	return n
+}
+
+func (m *TicketDeteriorationState) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.TicketId)
+	if l > 0 {
+		n += 1 + l + sovAudit(uint64(l))
+	}
+	if m.DeteriorationScore != 0 {
+		n += 1 + sovAudit(uint64(m.DeteriorationScore))
+	}
+	if m.LastUpdatedEpoch != 0 {
+		n += 1 + sovAudit(uint64(m.LastUpdatedEpoch))
+	}
+	if m.ActiveHealOpId != 0 {
+		n += 1 + sovAudit(uint64(m.ActiveHealOpId))
+	}
+	if m.ProbationUntilEpoch != 0 {
+		n += 1 + sovAudit(uint64(m.ProbationUntilEpoch))
+	}
+	if m.LastHealEpoch != 0 {
+		n += 1 + sovAudit(uint64(m.LastHealEpoch))
+	}
+	if m.LastFailureEpoch != 0 {
+		n += 1 + sovAudit(uint64(m.LastFailureEpoch))
+	}
+	if m.RecentFailureEpochCount != 0 {
+		n += 1 + sovAudit(uint64(m.RecentFailureEpochCount))
+	}
+	if m.ContradictionCount != 0 {
+		n += 1 + sovAudit(uint64(m.ContradictionCount))
+	}
+	l = len(m.LastTargetSupernodeAccount)
+	if l > 0 {
+		n += 1 + l + sovAudit(uint64(l))
+	}
+	l = len(m.LastReporterSupernodeAccount)
+	if l > 0 {
+		n += 1 + l + sovAudit(uint64(l))
+	}
+	if m.LastResultClass != 0 {
+		n += 1 + sovAudit(uint64(m.LastResultClass))
+	}
+	if m.LastResultEpoch != 0 {
+		n += 1 + sovAudit(uint64(m.LastResultEpoch))
+	}
+	if m.DistinctHolderFailureCount != 0 {
+		n += 1 + sovAudit(uint64(m.DistinctHolderFailureCount))
+	}
+	if m.LastIndexFailureEpoch != 0 {
+		n += 1 + sovAudit(uint64(m.LastIndexFailureEpoch))
+	}
+	if m.RecentBucketFailureEpoch != 0 {
+		n += 2 + sovAudit(uint64(m.RecentBucketFailureEpoch))
+	}
+	if m.OldBucketFailureEpoch != 0 {
+		n += 2 + sovAudit(uint64(m.OldBucketFailureEpoch))
+	}
+	return n
+}
+
+func (m *TicketArtifactCountState) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.TicketId)
+	if l > 0 {
+		n += 1 + l + sovAudit(uint64(l))
+	}
+	if m.IndexArtifactCount != 0 {
+		n += 1 + sovAudit(uint64(m.IndexArtifactCount))
+	}
+	if m.SymbolArtifactCount != 0 {
+		n += 1 + sovAudit(uint64(m.SymbolArtifactCount))
+	}
+	return n
+}
+
+func (m *HealOp) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.HealOpId != 0 {
+		n += 1 + sovAudit(uint64(m.HealOpId))
+	}
+	l = len(m.TicketId)
+	if l > 0 {
+		n += 1 + l + sovAudit(uint64(l))
+	}
+	if m.ScheduledEpochId != 0 {
+		n += 1 + sovAudit(uint64(m.ScheduledEpochId))
+	}
+	l = len(m.HealerSupernodeAccount)
+	if l > 0 {
+		n += 1 + l + sovAudit(uint64(l))
+	}
+	if len(m.VerifierSupernodeAccounts) > 0 {
+		for _, s := range m.VerifierSupernodeAccounts {
+			l = len(s)
+			n += 1 + l + sovAudit(uint64(l))
+		}
+	}
+	if m.Status != 0 {
+		n += 1 + sovAudit(uint64(m.Status))
+	}
+	if m.CreatedHeight != 0 {
+		n += 1 + sovAudit(uint64(m.CreatedHeight))
+	}
+	if m.UpdatedHeight != 0 {
+		n += 1 + sovAudit(uint64(m.UpdatedHeight))
+	}
+	if m.DeadlineEpochId != 0 {
+		n += 1 + sovAudit(uint64(m.DeadlineEpochId))
+	}
+	l = len(m.ResultHash)
+	if l > 0 {
+		n += 1 + l + sovAudit(uint64(l))
+	}
+	l = len(m.Notes)
+	if l > 0 {
+		n += 1 + l + sovAudit(uint64(l))
 	}
 	return n
 }
@@ -566,6 +2518,12 @@ func (m *EpochReport) Size() (n int) {
 	n += 1 + l + sovAudit(uint64(l))
 	if len(m.StorageChallengeObservations) > 0 {
 		for _, e := range m.StorageChallengeObservations {
+			l = e.Size()
+			n += 1 + l + sovAudit(uint64(l))
+		}
+	}
+	if len(m.StorageProofResults) > 0 {
+		for _, e := range m.StorageProofResults {
 			l = e.Size()
 			n += 1 + l + sovAudit(uint64(l))
 		}
@@ -729,6 +2687,17 @@ func (m *HostReport) Unmarshal(dAtA []byte) error {
 					break
 				}
 			}
+		case 6:
+			if wireType != 1 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CascadeKademliaDbBytes", wireType)
+			}
+			var v uint64
+			if (iNdEx + 8) > l {
+				return io.ErrUnexpectedEOF
+			}
+			v = uint64(encoding_binary.LittleEndian.Uint64(dAtA[iNdEx:]))
+			iNdEx += 8
+			m.CascadeKademliaDbBytes = float64(math.Float64frombits(v))
 		default:
 			iNdEx = preIndex
 			skippy, err := skipAudit(dAtA[iNdEx:])
@@ -880,6 +2849,1877 @@ func (m *StorageChallengeObservation) Unmarshal(dAtA []byte) error {
 			} else {
 				return fmt.Errorf("proto: wrong wireType = %d for field PortStates", wireType)
 			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipAudit(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthAudit
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *StorageProofResult) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowAudit
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: StorageProofResult: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: StorageProofResult: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TargetSupernodeAccount", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthAudit
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthAudit
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.TargetSupernodeAccount = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ChallengerSupernodeAccount", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthAudit
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthAudit
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ChallengerSupernodeAccount = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TicketId", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthAudit
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthAudit
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.TicketId = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field BucketType", wireType)
+			}
+			m.BucketType = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.BucketType |= StorageProofBucketType(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ArtifactClass", wireType)
+			}
+			m.ArtifactClass = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ArtifactClass |= StorageProofArtifactClass(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 6:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ArtifactOrdinal", wireType)
+			}
+			m.ArtifactOrdinal = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ArtifactOrdinal |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 7:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ArtifactKey", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthAudit
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthAudit
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ArtifactKey = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 8:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ResultClass", wireType)
+			}
+			m.ResultClass = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ResultClass |= StorageProofResultClass(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 9:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TranscriptHash", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthAudit
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthAudit
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.TranscriptHash = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 10:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Details", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthAudit
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthAudit
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Details = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 11:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ArtifactCount", wireType)
+			}
+			m.ArtifactCount = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ArtifactCount |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 12:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DerivationInputHash", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthAudit
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthAudit
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.DerivationInputHash = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 13:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ChallengerSignature", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthAudit
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthAudit
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ChallengerSignature = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 14:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ObserverAttestationSignatures", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthAudit
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthAudit
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ObserverAttestationSignatures = append(m.ObserverAttestationSignatures, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipAudit(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthAudit
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *NodeSuspicionState) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowAudit
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: NodeSuspicionState: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: NodeSuspicionState: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SupernodeAccount", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthAudit
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthAudit
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SupernodeAccount = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SuspicionScore", wireType)
+			}
+			m.SuspicionScore = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.SuspicionScore |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LastUpdatedEpoch", wireType)
+			}
+			m.LastUpdatedEpoch = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.LastUpdatedEpoch |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LastRecentFailEpoch", wireType)
+			}
+			m.LastRecentFailEpoch = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.LastRecentFailEpoch |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LastOldFailEpoch", wireType)
+			}
+			m.LastOldFailEpoch = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.LastOldFailEpoch |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 6:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DistinctTicketFailWindow", wireType)
+			}
+			m.DistinctTicketFailWindow = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.DistinctTicketFailWindow |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 7:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field WindowStartEpoch", wireType)
+			}
+			m.WindowStartEpoch = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.WindowStartEpoch |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 8:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ClassACountWindow", wireType)
+			}
+			m.ClassACountWindow = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ClassACountWindow |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 9:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LastClassAEpoch", wireType)
+			}
+			m.LastClassAEpoch = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.LastClassAEpoch |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 10:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ClassBCountWindow", wireType)
+			}
+			m.ClassBCountWindow = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ClassBCountWindow |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 11:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LastClassBEpoch", wireType)
+			}
+			m.LastClassBEpoch = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.LastClassBEpoch |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 12:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CleanPassCount", wireType)
+			}
+			m.CleanPassCount = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.CleanPassCount |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 13:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LastCleanPassEpoch", wireType)
+			}
+			m.LastCleanPassEpoch = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.LastCleanPassEpoch |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 14:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LastIndexFailEpoch", wireType)
+			}
+			m.LastIndexFailEpoch = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.LastIndexFailEpoch |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 15:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CleanPassCountAtPostpone", wireType)
+			}
+			m.CleanPassCountAtPostpone = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.CleanPassCountAtPostpone |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipAudit(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthAudit
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ReporterReliabilityState) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowAudit
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ReporterReliabilityState: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ReporterReliabilityState: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ReporterSupernodeAccount", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthAudit
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthAudit
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ReporterSupernodeAccount = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ReliabilityScore", wireType)
+			}
+			m.ReliabilityScore = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ReliabilityScore |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LastUpdatedEpoch", wireType)
+			}
+			m.LastUpdatedEpoch = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.LastUpdatedEpoch |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TrustBand", wireType)
+			}
+			m.TrustBand = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.TrustBand |= ReporterTrustBand(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ContradictionCount", wireType)
+			}
+			m.ContradictionCount = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ContradictionCount |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 6:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field IneligibleUntilEpoch", wireType)
+			}
+			m.IneligibleUntilEpoch = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.IneligibleUntilEpoch |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 7:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field WindowPositiveCount", wireType)
+			}
+			m.WindowPositiveCount = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.WindowPositiveCount |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 8:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field WindowNegativeCount", wireType)
+			}
+			m.WindowNegativeCount = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.WindowNegativeCount |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 9:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field WindowStartEpoch", wireType)
+			}
+			m.WindowStartEpoch = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.WindowStartEpoch |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipAudit(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthAudit
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *TicketDeteriorationState) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowAudit
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: TicketDeteriorationState: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: TicketDeteriorationState: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TicketId", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthAudit
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthAudit
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.TicketId = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DeteriorationScore", wireType)
+			}
+			m.DeteriorationScore = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.DeteriorationScore |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LastUpdatedEpoch", wireType)
+			}
+			m.LastUpdatedEpoch = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.LastUpdatedEpoch |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ActiveHealOpId", wireType)
+			}
+			m.ActiveHealOpId = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ActiveHealOpId |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ProbationUntilEpoch", wireType)
+			}
+			m.ProbationUntilEpoch = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ProbationUntilEpoch |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 6:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LastHealEpoch", wireType)
+			}
+			m.LastHealEpoch = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.LastHealEpoch |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 7:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LastFailureEpoch", wireType)
+			}
+			m.LastFailureEpoch = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.LastFailureEpoch |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 8:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RecentFailureEpochCount", wireType)
+			}
+			m.RecentFailureEpochCount = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.RecentFailureEpochCount |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 9:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ContradictionCount", wireType)
+			}
+			m.ContradictionCount = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ContradictionCount |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 10:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LastTargetSupernodeAccount", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthAudit
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthAudit
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.LastTargetSupernodeAccount = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 11:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LastReporterSupernodeAccount", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthAudit
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthAudit
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.LastReporterSupernodeAccount = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 12:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LastResultClass", wireType)
+			}
+			m.LastResultClass = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.LastResultClass |= StorageProofResultClass(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 13:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LastResultEpoch", wireType)
+			}
+			m.LastResultEpoch = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.LastResultEpoch |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 14:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DistinctHolderFailureCount", wireType)
+			}
+			m.DistinctHolderFailureCount = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.DistinctHolderFailureCount |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 15:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LastIndexFailureEpoch", wireType)
+			}
+			m.LastIndexFailureEpoch = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.LastIndexFailureEpoch |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 16:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RecentBucketFailureEpoch", wireType)
+			}
+			m.RecentBucketFailureEpoch = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.RecentBucketFailureEpoch |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 17:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field OldBucketFailureEpoch", wireType)
+			}
+			m.OldBucketFailureEpoch = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.OldBucketFailureEpoch |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipAudit(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthAudit
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *TicketArtifactCountState) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowAudit
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: TicketArtifactCountState: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: TicketArtifactCountState: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TicketId", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthAudit
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthAudit
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.TicketId = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field IndexArtifactCount", wireType)
+			}
+			m.IndexArtifactCount = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.IndexArtifactCount |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SymbolArtifactCount", wireType)
+			}
+			m.SymbolArtifactCount = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.SymbolArtifactCount |= uint32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipAudit(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthAudit
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *HealOp) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowAudit
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: HealOp: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: HealOp: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field HealOpId", wireType)
+			}
+			m.HealOpId = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.HealOpId |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TicketId", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthAudit
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthAudit
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.TicketId = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ScheduledEpochId", wireType)
+			}
+			m.ScheduledEpochId = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ScheduledEpochId |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field HealerSupernodeAccount", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthAudit
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthAudit
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.HealerSupernodeAccount = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field VerifierSupernodeAccounts", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthAudit
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthAudit
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.VerifierSupernodeAccounts = append(m.VerifierSupernodeAccounts, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
+		case 6:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Status", wireType)
+			}
+			m.Status = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Status |= HealOpStatus(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 7:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CreatedHeight", wireType)
+			}
+			m.CreatedHeight = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.CreatedHeight |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 8:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field UpdatedHeight", wireType)
+			}
+			m.UpdatedHeight = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.UpdatedHeight |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 9:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DeadlineEpochId", wireType)
+			}
+			m.DeadlineEpochId = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.DeadlineEpochId |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 10:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ResultHash", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthAudit
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthAudit
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ResultHash = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 11:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Notes", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthAudit
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthAudit
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Notes = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipAudit(dAtA[iNdEx:])
@@ -1064,6 +4904,40 @@ func (m *EpochReport) Unmarshal(dAtA []byte) error {
 			}
 			m.StorageChallengeObservations = append(m.StorageChallengeObservations, &StorageChallengeObservation{})
 			if err := m.StorageChallengeObservations[len(m.StorageChallengeObservations)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StorageProofResults", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowAudit
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthAudit
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthAudit
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.StorageProofResults = append(m.StorageProofResults, &StorageProofResult{})
+			if err := m.StorageProofResults[len(m.StorageProofResults)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex

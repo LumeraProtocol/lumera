@@ -1,5 +1,7 @@
 package types
 
+import "fmt"
+
 // this line is used by starport scaffolding # genesis/types/import
 
 // DefaultIndex is the default global index
@@ -17,6 +19,9 @@ func DefaultGenesis() *GenesisState {
 // failure.
 func (gs *GenesisState) Validate() error {
 	// this line is used by starport scaffolding # genesis/types/validate
+	if gs.LastDistributionHeight < 0 {
+		return fmt.Errorf("last_distribution_height must be >= 0")
+	}
 
 	return gs.Params.Validate()
 }

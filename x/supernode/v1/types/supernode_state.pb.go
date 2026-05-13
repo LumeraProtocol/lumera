@@ -23,15 +23,27 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
+// SuperNodeState is the lifecycle state of a SuperNode. Transitions are
+// governed by the supernode and audit modules; see x/supernode/v1/keeper
+// and x/audit/v1/keeper for the authoritative state machine.
 type SuperNodeState int32
 
 const (
+	// SUPERNODE_STATE_UNSPECIFIED is the proto3 zero value; never persisted.
 	SuperNodeStateUnspecified SuperNodeState = 0
-	SuperNodeStateActive      SuperNodeState = 1
-	SuperNodeStateDisabled    SuperNodeState = 2
-	SuperNodeStateStopped     SuperNodeState = 3
-	SuperNodeStatePenalized   SuperNodeState = 4
-	SuperNodeStatePostponed   SuperNodeState = 5
+	// SUPERNODE_STATE_ACTIVE: SuperNode is healthy and eligible for all duties.
+	SuperNodeStateActive SuperNodeState = 1
+	// SUPERNODE_STATE_DISABLED: operator-disabled (deregistered) SuperNode.
+	SuperNodeStateDisabled SuperNodeState = 2
+	// SUPERNODE_STATE_STOPPED: operator-stopped SuperNode (recoverable).
+	SuperNodeStateStopped SuperNodeState = 3
+	// SUPERNODE_STATE_PENALIZED: penalized by chain enforcement (e.g. slashing).
+	SuperNodeStatePenalized SuperNodeState = 4
+	// SUPERNODE_STATE_POSTPONED: temporarily ineligible due to missing/overdue
+	// metrics or compliance violations; recovers on the next healthy report.
+	SuperNodeStatePostponed SuperNodeState = 5
+	// SUPERNODE_STATE_STORAGE_FULL: storage usage above max threshold;
+	// excluded from Cascade duties but still eligible for Sense/Agents.
 	SuperNodeStateStorageFull SuperNodeState = 6
 )
 
@@ -63,6 +75,8 @@ func (SuperNodeState) EnumDescriptor() ([]byte, []int) {
 	return fileDescriptor_bb8b41f035e29780, []int{0}
 }
 
+// SuperNodeStateRecord is one entry in the append-only state history of a
+// SuperNode. The latest entry is the current state.
 type SuperNodeStateRecord struct {
 	State  SuperNodeState `protobuf:"varint,1,opt,name=state,proto3,enum=lumera.supernode.v1.SuperNodeState" json:"state,omitempty" yaml:"state"`
 	Height int64          `protobuf:"varint,2,opt,name=height,proto3" json:"height,omitempty"`

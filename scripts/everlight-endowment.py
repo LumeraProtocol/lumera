@@ -26,7 +26,6 @@ def compute_endowment(hw_rate, storage_apr, p_lume, n_sn, b_sn_gib,
                       period_blocks, block_time_sec,
                       p_lume_at_sizing=None):
     """Return a dict with annual outflow and principal sizing."""
-    weeks_per_month = (365.25 / 12) / 7
     p_lume_sizing = p_lume_at_sizing if p_lume_at_sizing is not None else p_lume
 
     per_byte_monthly_usd = hw_rate * (1 + storage_apr)
@@ -88,7 +87,7 @@ def main():
                    help="Validator staking APR (LUME yield earned by principal)")
     p.add_argument("--risk-buffer-bps", type=int, default=0,
                    help="Slashing risk buffer in basis points (e.g., 500 = 5%%)")
-    p.add_argument("--period-blocks", type=int, default=100800,
+    p.add_argument("--period-blocks", type=int, default=432000,
                    help="payment_period_blocks")
     p.add_argument("--block-time-sec", type=float, default=6.0,
                    help="Average block time in seconds")

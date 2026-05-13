@@ -16,7 +16,7 @@ The core Everlight idea is simple: **registration fees are one-time action reven
 
 The doc is split into two parts:
 
-- **Part 1 (sections 2-8)** covers Phase 1 manual pool funding. It shows how large the extra weekly SN retention payout pool should be, what per-byte storage economics that implies, and how the Foundation tops up the pool until protocol-native funding grows.
+- **Part 1 (sections 2-8)** covers Phase 1 manual pool funding. It shows how large the extra monthly SN retention payout pool should be, what per-byte storage economics that implies, and how the Foundation tops up the pool until protocol-native funding grows.
 - **Part 2 (sections 9-14)** covers Phase 3 endowment self-sufficiency. It shows how big a permanently-staked principal has to be so the extra recurring SN payouts can run from staking yield, ending the Foundation's ongoing top-up obligation. It also explains how the endowment behaves when LUME price moves.
 
 Part 1 is needed to ship the upgrade. Part 2 is needed to plan toward exiting Foundation funding. Both share the same input set in section 2.
@@ -29,18 +29,18 @@ Part 1 is needed to ship the upgrade. Part 2 is needed to plan toward exiting Fo
 
 The model is anchored to per-byte hardware cost and a target storage APR, instead of a per-SN dollar target. This makes it explicit that operators receive **ongoing payments beyond registration fees** in proportion to the storage they actually provide, with the protocol acting like a yield product on top of the operator's hardware investment.
 
-| # | Variable | Symbol | Placeholder | Notes |
-|---|---|---|---|---|
-| 1 | Hardware cost per GiB per month, USD | `HW_rate` | $0.04/GiB/month | Hetzner reference: AX42 + extra 2TB drive = $81/month for ~2048 GiB usable -> $0.0395/GiB/month, rounded to $0.04. Per-byte hardware cost stays roughly constant or drops slightly across larger Hetzner tiers (AX52 / AX102 / AX162), so this single number works for the whole fleet at first approximation. |
+| # | Variable | Symbol | Placeholder | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+|---|---|---|---|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1 | Hardware cost per GiB per month, USD | `HW_rate` | $0.04/GiB/month | Hetzner reference: AX42 + extra 2TB drive = $81/month for ~2048 GiB usable -> $0.0395/GiB/month, rounded to $0.04. Per-byte hardware cost stays roughly constant or drops slightly across larger Hetzner tiers (AX52 / AX102 / AX162), so this single number works for the whole fleet at first approximation.                                                                                                                                                 |
 | 2 | Target storage APR (annualized return paid TO operators on top of hardware cost) | `storage_APR` | 20% | The protocol pays operators their hardware cost plus this APR on top. 20% APR means a 2 TB SN earns ~$97/month vs ~$81 hardware = ~$16 margin (~20% over cost). Cross-tier check: per-byte payout = `HW_rate * (1 + storage_APR)` is uniform across storage tiers, so whales earn proportionally more in absolute terms but the same percentage margin against the chain-wide reference. Tune higher to attract operators, lower to compress the program cost. |
-| 3 | LUME spot price in USD | `P_lume` | $0.30 | Update at sizing review. Used only to convert USD targets to LUME. |
-| 4 | Active eligible SuperNode count | `N_sn` | 30 | Current fleet is 28 active SNs; using 30 as the planning number. Steady-state expectation, after STORAGE_FULL gating and `min_cascade_bytes_for_payment` floor. |
-| 5 | Average per-SN cascade_kademlia_db_bytes | `B_sn` | 3 TiB | **Target fleet average, not current devnet reality.** Network design targets BIG storage: regular SNs at 2 TB+, whales at 10 TB+. With a mix of regulars and whales, ~3 TiB is the steady-state planning number. Early devnet / early mainnet will be much lower (10-200 GiB per SN) until ingest accumulates. |
-| 6 | `payment_period_blocks` | `T_period` | 100800 | ~7 days at 6s blocks. Governance param, default in `params.go:85`. |
-| 7 | Periods per year | `K_year` | ~52.18 | `T_year_blocks / T_period`. With 6s blocks: 5,256,000 / 100,800. |
-| 8 | LUME staking APR (validator yield) | `staking_APR` | 10% | **Different from storage_APR.** Used in Part 2 only, for sizing endowment principal. This is the yield earned BY the staked principal, not the yield paid TO operators. |
-| 9 | Registration fee inflow per period | `F_reg_period` | TBD | `2% * (sum of action fees in last T_period blocks)`. Currently dependent on adoption; treat as 0 at devnet launch. |
-| 10 | Community Pool transfer cadence | `F_cp_period` | 0 | Governance-driven; episodic, not steady-state. |
+| 3 | LUME spot price in USD | `P_lume` | $0.30 | Update at sizing review. Used only to convert USD targets to LUME.                                                                                                                                                                                                                                                                                                                                                                                             |
+| 4 | Active eligible SuperNode count | `N_sn` | 30 | Current fleet is 28 active SNs; using 30 as the planning number. Steady-state expectation, after STORAGE_FULL gating and `min_cascade_bytes_for_payment` floor.                                                                                                                                                                                                                                                                                                |
+| 5 | Average per-SN cascade_kademlia_db_bytes | `B_sn` | 3 TiB | **Target fleet average, not current devnet reality.** Network design targets BIG storage: regular SNs at 2 TB+, whales at 10 TB+. With a mix of regulars and whales, ~3 TiB is the steady-state planning number. Early devnet / early mainnet will be much lower (10-200 GiB per SN) until ingest accumulates.                                                                                                                                                 |
+| 6 | `payment_period_blocks` | `T_period` | 432000 | ~30 days at 6s blocks. Governance param, default in `params.go:85`.                                                                                                                                                                                                                                                                                                                                                                                            |
+| 7 | Periods per year | `K_year` | ~12.17 | `T_year_blocks / T_period`. With 6s blocks: 5,256,000 / 432,000. Calendar-month math elsewhere in the doc rounds this to 12.                                                                                                                                                                                                                                                                                                                                  |
+| 8 | LUME staking APR (validator yield) | `staking_APR` | 10% | **Different from storage_APR.** Used in Part 2 only, for sizing endowment principal. This is the yield earned BY the staked principal, not the yield paid TO operators.                                                                                                                                                                                                                                                                                        |
+| 9 | Registration fee inflow per period | `F_reg_period` | TBD | `2% * (sum of action fees in last T_period blocks)`. Currently dependent on adoption; treat as 0 at devnet launch.                                                                                                                                                                                                                                                                                                                                             |
+| 10 | Community Pool transfer cadence | `F_cp_period` | 0 | Governance-driven; episodic, not steady-state.                                                                                                                                                                                                                                                                                                                                                                                                                 |
 
 #### Hardware cost reference (per Hetzner pricing)
 
@@ -61,17 +61,18 @@ The Everlight pool is a module account that accumulates LUME from various fundin
 
 ### 3.1 Cadence: every `payment_period_blocks` blocks
 
-Distribution is triggered automatically by the supernode keeper's `EndBlocker`, not by any external transaction or off-chain script. On every block the keeper compares the current block height to the last recorded distribution height. When the difference reaches `payment_period_blocks` (governance parameter, default `100800`), a distribution runs at the end of that block.
+Distribution is triggered automatically by the supernode keeper's `EndBlocker`, not by any external transaction or off-chain script. On every block the keeper compares the current block height to the last recorded distribution height. When the difference reaches `payment_period_blocks` (governance parameter, default `432000`), a distribution runs at the end of that block.
 
 At Lumera's ~6-second block time, the default works out to:
 
 ```
-100800 blocks * 6 s = 604,800 s = 7 days
+100800 blocks * 6 s =   604,800 s =  7 days
+432000 blocks * 6 s = 2,592,000 s = 30 days
 ```
 
-So at default settings, **one distribution per week**. The cadence is governance-tunable via supernode `MsgUpdateParams`. Faster cadence (smaller `payment_period_blocks`) means more frequent but smaller payouts; slower cadence means lumpier ones. The weekly default was chosen as a compromise between operator pay-frequency expectations and the per-block overhead of running per-SN bank sends.
+So at default settings, **one distribution per month**. The cadence is governance-tunable via supernode `MsgUpdateParams`. Faster cadence (smaller `payment_period_blocks`) means more frequent but smaller payouts; slower cadence means lumpier ones. The monthly default was chosen as a compromise between operator pay-frequency expectations and the per-block overhead of running per-SN bank sends.
 
-Throughout this document, "period" and "week" are used interchangeably. If the chain ever changes `payment_period_blocks`, all "weekly" numbers below scale accordingly.
+Throughout this document, "period" and "month" are used interchangeably. If the chain ever changes `payment_period_blocks`, all "monthly" numbers below scale accordingly.
 
 ### 3.2 Payout: the entire pool balance, every period
 
@@ -100,39 +101,41 @@ These are the cases where the period boundary fires but no payout actually occur
 The all-pool-at-once behavior is the central operational fact behind the rest of this document:
 
 - Whatever LUME enters the pool by the period boundary leaves the pool at that boundary.
-- To pay SNs `X` LUME this week, the pool must contain `X` LUME at week's end.
-- Funding cadence and amount can be irregular intra-period (transfer once, transfer multiple times, top up Tuesday morning, etc.); only the cumulative balance at the boundary matters.
-- Forgetting a top-up is a missed week of pay, not a deferred payment. Operators should expect weekly payouts and the funder should expect to top up weekly.
+- To pay SNs `X` LUME this period, the pool must contain `X` LUME at period's end.
+- Funding cadence and amount can be irregular intra-period (transfer once, transfer multiple times, top up mid-month, etc.); only the cumulative balance at the boundary matters.
+- Forgetting a top-up is a missed period of pay, not a deferred payment. Operators should expect monthly payouts and the funder should expect to top up monthly.
 
 The rest of Part 1 is the math for choosing the right top-up amount.
 
 ---
 
-## 4. Target weekly pool budget
+## 4. Target monthly pool budget
 
 ### 4.1 In LUME (aggregate pool budget)
 
-The funding policy targets a flat per-byte retention payout. Multiply total eligible fleet bytes by the target per-byte storage payout and convert to LUME per period:
+The funding policy targets a flat per-byte retention payout. Multiply total eligible fleet bytes by the target per-byte storage payout and convert to LUME per period. At the default `payment_period_blocks = 432000` (~30 days), one period ≈ one calendar month, so per-period equals per-month:
 
 ```
 per_byte_payout_monthly_usd = HW_rate * (1 + storage_APR)
 pool_monthly_usd            = N_sn * B_sn_gib * per_byte_payout_monthly_usd
-pool_period_usd             = pool_monthly_usd / 4.3482
+pool_period_usd             = pool_monthly_usd                    # 1 period ≈ 1 month at default
 pool_period_lume            = pool_period_usd / P_lume
 ```
+
+If `payment_period_blocks` is governance-tuned to a different cadence, scale per-period by `(T_period_seconds / seconds_per_month)`.
 
 `B_sn_gib` is `B_sn` expressed in GiB (3 TiB = 3072 GiB).
 
 With placeholder inputs (`HW_rate` = $0.04/GiB/month, `storage_APR` = 20%, `N_sn` = 30, `B_sn` = 3 TiB, `P_lume` = $0.30):
 
 ```
-per_byte_payout_monthly = 0.04 * 1.20            = $0.048/GiB/month
-pool_monthly_usd        = 30 * 3072 * 0.048       = $4,423.68/month
-pool_period_usd         = 4,423.68 / 4.3482       = ~$1,017.36/period
-pool_period_lume        = 1,017.36 / 0.30         = ~3,391 LUME/period
+per_byte_payout_monthly = 0.04 * 1.20             = $0.048/GiB/month
+pool_monthly_usd        = 30 * 3072 * 0.048        = $4,423.68/month
+pool_period_usd         = pool_monthly_usd         = ~$4,423.68/period
+pool_period_lume        = 4,423.68 / 0.30          = ~14,746 LUME/period
 ```
 
-So at placeholder settings, the pool needs **~3.4k LUME paid out per week** in aggregate as extra recurring SN retention compensation, totaling **~177k LUME per year**, equivalent to ~$1,017/week or ~$53k/year for the entire fleet of 30 SNs holding 3 TiB each (90 TiB total).
+So at placeholder settings, the pool needs **~14.7k LUME paid out per month** in aggregate as extra recurring SN retention compensation, totaling **~177k LUME per year**, equivalent to ~$4,424/month or ~$53k/year for the entire fleet of 30 SNs holding 3 TiB each (90 TiB total).
 
 These numbers come from `scripts/everlight-budget.py`; rerun it whenever the inputs change.
 
@@ -149,10 +152,10 @@ In Phase 1 with no significant registration-fee inflow or endowment yield:
 
 ```
 F_foundation_period_required = pool_period_lume - F_reg_period - F_cp_period
-                             ~= 3,391 LUME per period
+                             ~= 14,746 LUME per period
 ```
 
-This is the weekly Foundation top-up size at placeholder inputs.
+This is the monthly Foundation top-up size at placeholder inputs.
 
 ### 4.3 What each SN actually receives
 
@@ -172,17 +175,17 @@ payout_i = pool_balance * (bytes_i / total_bytes)
 
 Use `scripts/everlight-sn-reward.py --sn-storage-gib X` to compute the reward for any given SN size.
 
-#### Worked example (30 SNs, ~3.4k LUME/wk retention pool, 20% storage_APR, $0.04/GiB/month HW reference)
+#### Worked example (30 SNs, ~14.7k LUME/month retention pool, 20% storage_APR, $0.04/GiB/month HW reference)
 
 Per-byte retention payout: `$0.048/GiB/month`, paid on top of the normal one-time action economics. Hardware cost per GiB drops as the SN gets bigger; the per-byte payout stays the same; the per-byte margin therefore *grows* with capacity. That matches the design intent: whales hold more bytes and are rewarded with the highest absolute margin.
 
-| SN profile | Stored bytes | Per-month USD payout | Per-week LUME payout | Approx hardware cost | Margin (USD) | Margin (% over cost) |
+| SN profile | Stored bytes | Per-month USD payout | Per-month LUME payout | Approx hardware cost | Margin (USD) | Margin (% over cost) |
 |---|---|---|---|---|---|---|
-| Regular SN (2 TB target) | 2 TiB = 2048 GiB | ~$98 | ~75 LUME | ~$81 | ~$17 | ~21% |
-| Average SN (3 TB) | 3 TiB = 3072 GiB | ~$147 | ~113 LUME | ~$120 (~AX52 estimate) | ~$27 | ~22% |
-| Heavy SN (5 TB) | 5 TiB = 5120 GiB | ~$246 | ~189 LUME | ~$150 | ~$96 | ~64% |
-| Whale SN (10 TB target) | 10 TiB = 10240 GiB | ~$492 | ~377 LUME | ~$200-250 | ~$240-290 | ~95-145% |
-| Mega-whale (20 TB+) | 20 TiB = 20480 GiB | ~$983 | ~754 LUME | ~$300-400 | ~$580-680 | ~145-225% |
+| Regular SN (2 TB target) | 2 TiB = 2048 GiB | ~$98 | ~328 LUME | ~$81 | ~$17 | ~21% |
+| Average SN (3 TB) | 3 TiB = 3072 GiB | ~$147 | ~491 LUME | ~$120 (~AX52 estimate) | ~$27 | ~22% |
+| Heavy SN (5 TB) | 5 TiB = 5120 GiB | ~$246 | ~819 LUME | ~$150 | ~$96 | ~64% |
+| Whale SN (10 TB target) | 10 TiB = 10240 GiB | ~$492 | ~1,638 LUME | ~$200-250 | ~$240-290 | ~95-145% |
+| Mega-whale (20 TB+) | 20 TiB = 20480 GiB | ~$983 | ~3,277 LUME | ~$300-400 | ~$580-680 | ~145-225% |
 | Below floor | 500 MiB | excluded (under 1 GiB) | 0 | n/a | n/a | n/a |
 
 The margin percentages grow with size because per-byte hardware cost falls with bigger machines, while the protocol pays a flat per-byte rate. That is the explicit incentive for whales to bring big storage online: the more bytes they hold, the better their unit economics.
@@ -214,7 +217,7 @@ Importantly, the 2% registration fee share is only a contribution into the recur
 
 ### 5.1 The Foundation's funding model in plain terms
 
-The Foundation's mechanical role in Phase 1 is identical to what `x/endowment` will do automatically in Phase 3: **the Foundation parks principal in its own wallet, claims rewards weekly, sends them to the pool**. Section 7 describes the runbook in detail.
+The Foundation's mechanical role in Phase 1 is identical to what `x/endowment` will do automatically in Phase 3: **the Foundation parks principal in its own wallet, claims rewards monthly, sends them to the pool**. Section 7 describes the runbook in detail.
 
 This means Phase 1 is effectively a "manual Phase 3" with the Foundation acting as a temporary endowment. Once `x/endowment` ships, it replaces the *source* of principal (per-registration endowment fees paid by users, instead of Foundation grant) but keeps the mechanism identical. The Foundation can then recover its principal and the program continues to run on yield generated by user-paid endowments.
 
@@ -232,12 +235,12 @@ Holding `HW_rate = $0.04`, `B_sn = 3 TiB`, `P_lume = $0.30`. The bolded column (
 
 | `storage_APR` \ `N_sn` | 10 | 20 | **30** | 50 | 100 |
 |---|---|---|---|---|---|
-| 0% (covers HW only, zero margin) | 942 LUME/wk | 1,884 | **2,826** | 4,710 | 9,420 |
-| 10% (regular ~$10 margin) | 1,036 | 2,073 | **3,108** | 5,181 | 10,362 |
-| 20% (placeholder, regular ~$17 margin) | 1,130 | 2,261 | **3,391** | 5,652 | 11,304 |
-| 30% (regular ~$24 margin) | 1,225 | 2,449 | **3,674** | 6,123 | 12,246 |
-| 50% (regular ~$40 margin) | 1,413 | 2,826 | **4,239** | 7,065 | 14,130 |
-| 100% (regular ~$80 margin) | 1,884 | 3,768 | **5,652** | 9,420 | 18,840 |
+| 0% (covers HW only, zero margin) | 4,096 LUME/mo | 8,192 | **12,288** | 20,480 | 40,960 |
+| 10% (regular ~$10 margin) | 4,506 | 9,011 | **13,517** | 22,528 | 45,056 |
+| 20% (placeholder, regular ~$17 margin) | 4,915 | 9,830 | **14,746** | 24,576 | 49,152 |
+| 30% (regular ~$24 margin) | 5,325 | 10,650 | **15,974** | 26,624 | 53,248 |
+| 50% (regular ~$40 margin) | 6,144 | 12,288 | **18,432** | 30,720 | 61,440 |
+| 100% (regular ~$80 margin) | 8,192 | 16,384 | **24,576** | 40,960 | 81,920 |
 
 ### 6.2 Pool budget vs. fleet storage
 
@@ -245,23 +248,23 @@ Holding `HW_rate = $0.04`, `storage_APR = 20%`, `P_lume = $0.30`. As the fleet's
 
 #### At N_sn = 30 (current fleet size)
 
-| `B_sn` (avg per SN) | Total fleet bytes | LUME / week | USD / week | LUME / year |
+| `B_sn` (avg per SN) | Total fleet bytes | LUME / month | USD / month | LUME / year |
 |---|---|---|---|---|
-| 1 TiB | 30 TiB | ~1,130 | ~$339 | ~58,982 |
-| 2 TiB | 60 TiB | ~2,261 | ~$678 | ~117,965 |
-| **3 TiB** (placeholder) | **90 TiB** | **~3,391** | **~$1,017** | **~176,947** |
-| 5 TiB | 150 TiB | ~5,652 | ~$1,696 | ~294,912 |
-| 10 TiB | 300 TiB | ~11,304 | ~$3,391 | ~589,824 |
+| 1 TiB | 30 TiB | ~4,915 | ~$1,475 | ~58,982 |
+| 2 TiB | 60 TiB | ~9,830 | ~$2,949 | ~117,965 |
+| **3 TiB** (placeholder) | **90 TiB** | **~14,746** | **~$4,424** | **~176,947** |
+| 5 TiB | 150 TiB | ~24,576 | ~$7,373 | ~294,912 |
+| 10 TiB | 300 TiB | ~49,152 | ~$14,746 | ~589,824 |
 
 #### At N_sn = 100 (mainnet growth target)
 
-| `B_sn` (avg per SN) | Total fleet bytes | LUME / week | USD / week | LUME / year |
+| `B_sn` (avg per SN) | Total fleet bytes | LUME / month | USD / month | LUME / year |
 |---|---|---|---|---|
-| 1 TiB | 100 TiB | ~3,768 | ~$1,130 | ~196,608 |
-| 2 TiB | 200 TiB | ~7,536 | ~$2,261 | ~393,216 |
-| 3 TiB | 300 TiB | ~11,304 | ~$3,391 | ~589,824 |
-| 5 TiB | 500 TiB | ~18,840 | ~$5,652 | ~983,040 |
-| 10 TiB | 1 PiB | ~37,680 | ~$11,304 | ~1,966,080 |
+| 1 TiB | 100 TiB | ~16,384 | ~$4,915 | ~196,608 |
+| 2 TiB | 200 TiB | ~32,768 | ~$9,830 | ~393,216 |
+| 3 TiB | 300 TiB | ~49,152 | ~$14,746 | ~589,824 |
+| 5 TiB | 500 TiB | ~81,920 | ~$24,576 | ~983,040 |
+| 10 TiB | 1 PiB | ~163,840 | ~$49,152 | ~1,966,080 |
 
 A 100-SN fleet at 3 TiB average is ~3.3x the 30-SN placeholder budget; same fleet at 10 TiB average is ~11x. Plan principal accordingly if Cascade adoption accelerates.
 
@@ -269,7 +272,7 @@ A 100-SN fleet at 3 TiB average is ~3.3x the 30-SN placeholder budget; same flee
 
 The formulas use `P_lume` only to convert USD targets to LUME. If LUME doubles, all LUME requirements halve (more LUME-denominated funding power per dollar). Foundation top-up budgets and endowment principal are therefore best set in USD-equivalent terms, with periodic re-pegging.
 
-The asymmetry between this Phase 1 elasticity (Foundation can adjust its weekly LUME transfer freely) and the Phase 3 endowment elasticity (yield is fixed in LUME, USD purchasing power floats) is discussed in section 12.
+The asymmetry between this Phase 1 elasticity (Foundation can adjust its monthly LUME transfer freely) and the Phase 3 endowment elasticity (yield is fixed in LUME, USD purchasing power floats) is discussed in section 12.
 
 ---
 
@@ -281,7 +284,7 @@ The asymmetry between this Phase 1 elasticity (Foundation can adjust its weekly 
 2. Foundation delegates that principal across one or more validators per `MsgDelegate`. Diversify to bound slashing exposure.
 3. Foundation records the supernode module account address (deterministic, derivable from module name) in its operator runbook. This is the Everlight pool address until Phase 3 splits it out.
 
-### 7.2 Weekly top-up (cron)
+### 7.2 Monthly top-up (cron)
 
 Runs once per `T_period`, ideally a few hours before the period boundary so funds land in the pool before distribution:
 
@@ -294,7 +297,7 @@ A simple shell script wrapping these three commands plus a `cron` entry suffices
 
 ### 7.3 Adjustment triggers
 
-Recompute and adjust the weekly target whenever any of these change materially:
+Recompute and adjust the monthly target whenever any of these change materially:
 
 - LUME price moves more than ~30% from the last sizing.
 - `N_sn` (eligible) changes by more than ~25% (new operators onboarding, or attrition).
@@ -320,16 +323,16 @@ If budget pressure exceeds Foundation tolerance, options are:
 
 Devnet launches with placeholder values that produce small absolute LUME flows. The goal is to exercise the distribution mechanism, not to compensate operators commensurate with real costs.
 
-| Variable | Devnet | Mainnet (initial) |
-|---|---|---|
-| `storage_APR` | symbolic (e.g., 1%) | 20% (start; tune from operator feedback) |
-| `HW_rate` | symbolic (e.g., $0.001/GiB) | $0.04/GiB/month (Hetzner AX42 reference) |
+| Variable | Devnet | Mainnet (initial)                                           |
+|---|---|-------------------------------------------------------------|
+| `storage_APR` | symbolic (e.g., 1%) | 20% (start; tune from operator feedback)                    |
+| `HW_rate` | symbolic (e.g., $0.001/GiB) | $0.04/GiB/month (Hetzner AX42 reference)                    |
 | `N_sn` | 3-5 | 30 (current fleet); plan to handle 50-100 as adoption grows |
-| `B_sn` (target) | n/a (small, however much actually accumulates) | 3 TiB average (regulars 2 TB+, whales 10 TB+) |
-| `payment_period_blocks` | 1000-5000 (faster cadence for visibility) | 100800 (~1 week) |
-| `P_lume` | n/a (set in genesis or test env) | $0.30 (current placeholder) |
-| Foundation principal | small fixed grant | sized per Part 2 |
-| Endowment | not active | not active until Phase 3 |
+| `B_sn` (target) | n/a (small, however much actually accumulates) | 3 TiB average (regulars 2 TB+, whales 10 TB+)               |
+| `payment_period_blocks` | 1000-5000 (faster cadence for visibility) | 432000 (~1 month)                                          |
+| `P_lume` | n/a (set in genesis or test env) | $0.30 (current placeholder)                                 |
+| Foundation principal | small fixed grant | sized per Part 2                                            |
+| Endowment | not active | not active until Phase 3                                    |
 
 For devnet, the operationally simplest thing is a single one-shot Foundation transfer of, e.g., 10k LUME, then observe distribution events for several periods. No cron needed at devnet scale.
 
@@ -384,10 +387,10 @@ P_endow_required   = R_annual_lume / staking_APR
 
 Note: `staking_APR` here is the *validator yield* on bonded LUME (placeholder 10%), not the *storage APR* paid to operators (placeholder 20%). The two are unrelated and tuned separately.
 
-With placeholders (carrying `pool_period_lume` ≈ 3,391 from section 4.1, `staking_APR` = 10%):
+With placeholders (carrying `pool_period_lume` ≈ 14,746 from section 4.1, `staking_APR` = 10%):
 
 ```
-R_annual_lume      = 3,391 * 52.18    ~= 176,947 LUME / year
+R_annual_lume      = 14,746 * 12      ~= 176,947 LUME / year
 P_endow_required   = 176,947 / 0.10   ~= 1,769,472 LUME staked permanently
 ```
 
@@ -395,7 +398,7 @@ P_endow_required   = 176,947 / 0.10   ~= 1,769,472 LUME staked permanently
 
 That can be:
 - **Phase 3 protocol path:** total endowment principal accumulated from per-registration endowment fees, delegated by `x/endowment` across whitelisted validators, yield routed to pool.
-- **Pre-Phase 3 manual path:** Foundation parks principal in its own wallet, claims rewards weekly, sends to pool. Functionally identical, just operationally manual.
+- **Pre-Phase 3 manual path:** Foundation parks principal in its own wallet, claims rewards monthly, sends to pool. Functionally identical, just operationally manual.
 
 These numbers come from `scripts/everlight-endowment.py`; rerun it whenever the inputs change.
 
@@ -452,7 +455,7 @@ That number does not change when LUME price moves. What moves is its USD purchas
 The pool target, by contrast, is anchored in USD:
 
 ```
-pool_period_usd        = N_sn * B_sn_gib * HW_rate * (1 + storage_APR) / 4.3482
+pool_period_usd        = N_sn * B_sn_gib * HW_rate * (1 + storage_APR)   # 1 period ≈ 1 month at default
 pool_period_lume_target = pool_period_usd / P_lume
 ```
 
@@ -482,7 +485,7 @@ Two practical mitigations during Phase 3 design:
 - **Size principal conservatively.** Pick a `P_lume_at_sizing` lower than current price (eg current price * 0.7) so a typical price drawdown leaves the program at parity rather than at deficit.
 - **Keep Foundation as backstop.** Even after Phase 3 ships, keep a Foundation top-up channel ready for material LUME drawdowns. The endowment automates the steady state; the Foundation handles tail risk.
 
-In Phase 1 (manual funding) this issue is much smaller: the Foundation cron script can be retuned weekly. In Phase 3 the rebase has to come from governance, which is slower.
+In Phase 1 (manual funding) this issue is much smaller: the Foundation cron script can be retuned monthly. In Phase 3 the rebase has to come from governance, which is slower.
 
 ### 12.4 Worked numerical example
 

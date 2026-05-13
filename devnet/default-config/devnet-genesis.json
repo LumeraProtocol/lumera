@@ -413,7 +413,7 @@
     "supernode": {
       "params": {
         "reward_distribution": {
-          "payment_period_blocks": "100800",
+          "payment_period_blocks": "432000",
           "registration_fee_share_bps": "200",
           "min_cascade_bytes_for_payment": "1073741824",
           "new_sn_ramp_up_periods": "4",

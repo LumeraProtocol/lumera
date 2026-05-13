@@ -28,7 +28,10 @@ def compute_sn_reward(sn_storage_gib, hw_rate, storage_apr, p_lume,
                       period_blocks, block_time_sec):
     """Return per-SN reward dict at the given chain-wide policy."""
     seconds_per_period = period_blocks * block_time_sec
-    seconds_per_month = (365.25 / 12) * 86400  # ~= 2,629,800 s
+    # 30-day reference month, so the default period (432000 blocks * 6s = 30 d)
+    # gives sn_period_usd == sn_monthly_usd exactly. The funding model doc uses
+    # HW_rate in $/GiB/month and treats one period as one month at default.
+    seconds_per_month = 30 * 86400
 
     per_byte_monthly_usd = hw_rate * (1 + storage_apr)
 

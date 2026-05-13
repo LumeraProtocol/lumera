@@ -22,7 +22,10 @@ def compute_budget(hw_rate, storage_apr, p_lume, n_sn, b_sn_gib,
     """Return a dict with all derived budget numbers."""
     seconds_per_period = period_blocks * block_time_sec
     seconds_per_year = 365.25 * 86400
-    seconds_per_month = seconds_per_year / 12
+    # 30-day reference month, so the default period (432000 blocks * 6s = 30 d)
+    # gives pool_period_usd == pool_monthly_usd exactly. The funding model doc
+    # uses HW_rate in $/GiB/month and treats one period as one month at default.
+    seconds_per_month = 30 * 86400
     periods_per_year = seconds_per_year / seconds_per_period
 
     per_byte_monthly_usd = hw_rate * (1 + storage_apr)

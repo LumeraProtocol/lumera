@@ -23,9 +23,12 @@ import argparse
 
 def compute_endowment(hw_rate, storage_apr, p_lume, n_sn, b_sn_gib,
                       staking_apr, risk_buffer_bps,
-                      period_blocks, block_time_sec,
                       p_lume_at_sizing=None):
-    """Return a dict with annual outflow and principal sizing."""
+    """Return a dict with annual outflow and principal sizing.
+
+    Note: principal sizing is purely annualized — payout cadence
+    (payment_period_blocks) does not affect the required principal.
+    """
     p_lume_sizing = p_lume_at_sizing if p_lume_at_sizing is not None else p_lume
 
     per_byte_monthly_usd = hw_rate * (1 + storage_apr)
@@ -87,16 +90,11 @@ def main():
                    help="Validator staking APR (LUME yield earned by principal)")
     p.add_argument("--risk-buffer-bps", type=int, default=0,
                    help="Slashing risk buffer in basis points (e.g., 500 = 5%%)")
-    p.add_argument("--period-blocks", type=int, default=432000,
-                   help="payment_period_blocks")
-    p.add_argument("--block-time-sec", type=float, default=6.0,
-                   help="Average block time in seconds")
     args = p.parse_args()
 
     r = compute_endowment(args.hw_rate, args.storage_apr, args.p_lume,
                           args.n_sn, args.b_sn_gib,
                           args.staking_apr, args.risk_buffer_bps,
-                          args.period_blocks, args.block_time_sec,
                           args.p_lume_at_sizing)
 
     print("Inputs:")

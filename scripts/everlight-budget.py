@@ -22,12 +22,16 @@ def compute_budget(hw_rate, storage_apr, p_lume, n_sn, b_sn_gib,
     """Return a dict with all derived budget numbers."""
     seconds_per_period = period_blocks * block_time_sec
     seconds_per_year = 365.25 * 86400
+    # 30-day reference month, so the default period (432000 blocks * 6s = 30 d)
+    # gives pool_period_usd == pool_monthly_usd exactly. The funding model doc
+    # uses HW_rate in $/GiB/month and treats one period as one month at default.
+    seconds_per_month = 30 * 86400
     periods_per_year = seconds_per_year / seconds_per_period
-    weeks_per_month = (365.25 / 12) / 7  # ~= 4.348
 
     per_byte_monthly_usd = hw_rate * (1 + storage_apr)
     pool_monthly_usd = n_sn * b_sn_gib * per_byte_monthly_usd
-    pool_period_usd = pool_monthly_usd / weeks_per_month
+    # Per-period budget scales with the period length, independent of week/month assumptions.
+    pool_period_usd = pool_monthly_usd * (seconds_per_period / seconds_per_month)
     pool_period_lume = pool_period_usd / p_lume
     pool_annual_usd = pool_monthly_usd * 12
     pool_annual_lume = pool_annual_usd / p_lume
@@ -35,7 +39,6 @@ def compute_budget(hw_rate, storage_apr, p_lume, n_sn, b_sn_gib,
     return {
         "seconds_per_period": seconds_per_period,
         "periods_per_year": periods_per_year,
-        "weeks_per_month": weeks_per_month,
         "per_byte_monthly_usd": per_byte_monthly_usd,
         "total_fleet_gib": n_sn * b_sn_gib,
         "pool_monthly_usd": pool_monthly_usd,
@@ -61,7 +64,7 @@ def main():
                    help="Active eligible SuperNode count")
     p.add_argument("--b-sn-gib", type=float, default=3072,
                    help="Average per-SN cascade bytes in GiB (default 3072 = 3 TiB)")
-    p.add_argument("--period-blocks", type=int, default=100800,
+    p.add_argument("--period-blocks", type=int, default=432000,
                    help="payment_period_blocks")
     p.add_argument("--block-time-sec", type=float, default=6.0,
                    help="Average block time in seconds")
@@ -85,7 +88,6 @@ def main():
     print(f"  Total fleet bytes:  {r['total_fleet_gib']:,.0f} GiB "
           f"({r['total_fleet_gib'] / 1024:.2f} TiB / {r['total_fleet_gib'] / 1024 / 1024:.2f} PiB)")
     print(f"  Periods per year:   {r['periods_per_year']:.2f}")
-    print(f"  Weeks per month:    {r['weeks_per_month']:.4f}")
     print()
     print("Pool budget:")
     print(f"  Per period:         ${r['pool_period_usd']:,.2f}  "

@@ -28,9 +28,12 @@ const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 type HashAlgo int32
 
 const (
+	// HASH_ALGO_UNSPECIFIED is the zero value; rejected by validation.
 	HashAlgo_HASH_ALGO_UNSPECIFIED HashAlgo = 0
-	HashAlgo_HASH_ALGO_BLAKE3      HashAlgo = 1
-	HashAlgo_HASH_ALGO_SHA256      HashAlgo = 2
+	// HASH_ALGO_BLAKE3 selects BLAKE3 as the chunk/leaf hash function.
+	HashAlgo_HASH_ALGO_BLAKE3 HashAlgo = 1
+	// HASH_ALGO_SHA256 selects SHA-256 as the chunk/leaf hash function.
+	HashAlgo_HASH_ALGO_SHA256 HashAlgo = 2
 )
 
 var HashAlgo_name = map[int32]string{

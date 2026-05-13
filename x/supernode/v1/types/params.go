@@ -82,7 +82,7 @@ const (
 var DefaultRequiredOpenPorts = []uint32{4444, 4445, 8002}
 
 var DefaultRewardDistribution = &RewardDistribution{
-	PaymentPeriodBlocks:         100800,     // ~7 days at 6s blocks
+	PaymentPeriodBlocks:         432000,     // ~30 days at 6s blocks
 	RegistrationFeeShareBps:     200,        // 2%
 	MinCascadeBytesForPayment:   1073741824, // 1 GiB
 	NewSnRampUpPeriods:          4,

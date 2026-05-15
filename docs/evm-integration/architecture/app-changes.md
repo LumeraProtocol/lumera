@@ -326,7 +326,9 @@ Files:
 - `app/openrpc/http.go`
 - `app/app.go`
 - `tools/openrpcgen/main.go`
-- `docs/openrpc_examples_overrides.json`
+- `docs/openrpc/examples_overrides.json`
+- `docs/openrpc/param_overrides.json`
+- `docs/openrpc/type_overrides.json`
 - `Makefile`
 
 Changes:

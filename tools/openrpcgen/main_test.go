@@ -32,7 +32,7 @@ func TestCollectMethodsPrefersOverrideExamples(t *testing.T) {
 
 	methods := collectMethods([]serviceSpec{
 		{Namespace: "test", Type: reflect.TypeOf((*testAPI)(nil))},
-	}, override)
+	}, override, nil, nil)
 
 	var echo methodObject
 	found := false
@@ -102,7 +102,7 @@ func TestCollectMethodsExamplesAlwaysIncludeParamsField(t *testing.T) {
 
 	methods := collectMethods([]serviceSpec{
 		{Namespace: "test", Type: reflect.TypeOf((*testAPI)(nil))},
-	}, nil)
+	}, nil, nil, nil)
 
 	var ping methodObject
 	found := false
@@ -141,7 +141,7 @@ func TestCollectMethodsUsesCuratedTransactionArgsSchema(t *testing.T) {
 
 	methods := collectMethods([]serviceSpec{
 		{Namespace: "eth", Type: reflect.TypeOf((*evmeth.PublicAPI)(nil))},
-	}, nil)
+	}, nil, nil, nil)
 
 	var call methodObject
 	found := false
@@ -199,7 +199,7 @@ func TestCollectMethodsUsesCuratedFilterCriteriaSchema(t *testing.T) {
 
 	methods := collectMethods([]serviceSpec{
 		{Namespace: "eth", Type: reflect.TypeOf((*evmfilters.PublicFilterAPI)(nil))},
-	}, nil)
+	}, nil, nil, nil)
 
 	var getLogs methodObject
 	found := false
@@ -244,7 +244,7 @@ func TestCollectMethodsUsesCuratedStateOverrideSchema(t *testing.T) {
 
 	methods := collectMethods([]serviceSpec{
 		{Namespace: "eth", Type: reflect.TypeOf((*evmeth.PublicAPI)(nil))},
-	}, nil)
+	}, nil, nil, nil)
 
 	var call methodObject
 	found := false

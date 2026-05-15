@@ -119,14 +119,17 @@ build-openapi:
 
 OPENRPC_GENERATOR_INPUTS := \
 	tools/openrpcgen/main.go \
-	docs/openrpc_examples_overrides.json
+	docs/openrpc/examples_overrides.json \
+	docs/openrpc/param_overrides.json \
+	docs/openrpc/type_overrides.json \
+	docs/openrpc/result_overrides.json
 
 app/openrpc/openrpc.json.gz docs/openrpc.json: $(OPENRPC_GENERATOR_INPUTS)
 	@echo "Generating OpenRPC spec..."
 	@# Create a placeholder .gz so the //go:embed directive in spec.go is
 	@# satisfied during compilation of the generator (same Go module).
 	@test -f app/openrpc/openrpc.json.gz || echo '{}' | gzip > app/openrpc/openrpc.json.gz
-	${GO} run ./tools/openrpcgen -out docs/openrpc.json -examples docs/openrpc_examples_overrides.json
+	${GO} run ./tools/openrpcgen -out docs/openrpc.json -examples docs/openrpc/examples_overrides.json -params docs/openrpc/param_overrides.json -types docs/openrpc/type_overrides.json -results docs/openrpc/result_overrides.json
 	gzip -c docs/openrpc.json > app/openrpc/openrpc.json.gz
 	@echo "OpenRPC spec written to docs/openrpc.json (embedded as app/openrpc/openrpc.json.gz)"
 

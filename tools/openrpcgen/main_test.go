@@ -15,6 +15,10 @@ type testAPI struct{}
 func (*testAPI) Echo(input string) string { return input }
 func (*testAPI) Ping() string             { return "pong" }
 
+type combinedTypeOverrideFixture struct {
+	Payload string `json:"payload"`
+}
+
 func TestCollectMethodsPrefersOverrideExamples(t *testing.T) {
 	t.Parallel()
 
@@ -276,5 +280,41 @@ func TestCollectMethodsUsesCuratedStateOverrideSchema(t *testing.T) {
 	}
 	if _, ok := schema["additionalProperties"].(map[string]any); !ok {
 		t.Fatalf("expected account override schema in additionalProperties, got %#v", schema["additionalProperties"])
+	}
+}
+
+func TestTypeOverrideSchemaPreservesCuratedDescription(t *testing.T) {
+	previous := activeTypeOverrides
+	t.Cleanup(func() {
+		activeTypeOverrides = previous
+	})
+
+	typeName := reflect.TypeOf(combinedTypeOverrideFixture{}).String()
+	activeTypeOverrides = typeOverrideFile{
+		typeName: {
+			"payload": {
+				Description: "Curated payload description.",
+				Schema: map[string]any{
+					"type":   "string",
+					"format": "hex",
+				},
+			},
+		},
+	}
+
+	schema := schemaForType(reflect.TypeOf(combinedTypeOverrideFixture{}))
+	props, ok := schema["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected object properties, got %#v", schema["properties"])
+	}
+	payload, ok := props["payload"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected payload property schema, got %#v", props["payload"])
+	}
+	if got := payload["description"]; got != "Curated payload description." {
+		t.Fatalf("expected curated description to survive schema override, got %#v", got)
+	}
+	if got := payload["format"]; got != "hex" {
+		t.Fatalf("expected schema override format, got %#v", got)
 	}
 }

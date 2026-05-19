@@ -515,11 +515,11 @@ func structProperties(t reflect.Type, depth int) (map[string]any, []string) {
 		// the AST-derived description and the auto-generated "Go type: ..."
 		// fallback. Lookup is by the *parent* struct's Go type + field name.
 		if ovr := activeTypeOverrides.lookup(parentTypeName, name); ovr != nil {
-			if ovr.Description != "" {
-				fieldSchema["description"] = ovr.Description
-			}
 			if ovr.Schema != nil {
 				fieldSchema = ovr.Schema
+			}
+			if ovr.Description != "" {
+				fieldSchema["description"] = ovr.Description
 			}
 			if ovr.Required != nil {
 				if *ovr.Required {

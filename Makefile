@@ -118,7 +118,7 @@ build-openapi:
 	${GO} run ./tools/openapigen -config tools/openapigen/config.toml -out docs/static/openapi.yml
 
 OPENRPC_GENERATOR_INPUTS := \
-	tools/openrpcgen/main.go \
+	$(filter-out %_test.go,$(wildcard tools/openrpcgen/*.go)) \
 	docs/openrpc/examples_overrides.json \
 	docs/openrpc/param_overrides.json \
 	docs/openrpc/type_overrides.json \

@@ -283,6 +283,81 @@ func TestCollectMethodsUsesCuratedStateOverrideSchema(t *testing.T) {
 	}
 }
 
+func TestCollectMethodsAppliesParamOverride(t *testing.T) {
+	t.Parallel()
+
+	requiredTrue := true
+	paramOverrides := paramOverrideFile{
+		"test_echo": {
+			"input": {
+				Description: "Curated echo input.",
+				Schema:      map[string]any{"type": "string", "format": "hex"},
+				Required:    &requiredTrue,
+			},
+		},
+	}
+
+	methods := collectMethods([]serviceSpec{
+		{Namespace: "test", Type: reflect.TypeOf((*testAPI)(nil))},
+	}, nil, paramOverrides, nil)
+
+	var echo methodObject
+	for _, m := range methods {
+		if m.Name == "test_echo" {
+			echo = m
+			break
+		}
+	}
+	if echo.Name == "" {
+		t.Fatalf("expected test_echo method in generated list")
+	}
+	if len(echo.Params) != 1 {
+		t.Fatalf("expected 1 param, got %d", len(echo.Params))
+	}
+	p := echo.Params[0]
+	if p.Description != "Curated echo input." {
+		t.Fatalf("expected curated description, got %q", p.Description)
+	}
+	if got := p.Schema["format"]; got != "hex" {
+		t.Fatalf("expected curated schema format=hex, got %#v", got)
+	}
+	if !p.Required {
+		t.Fatalf("expected required=true from override")
+	}
+}
+
+func TestCollectMethodsAppliesResultOverride(t *testing.T) {
+	t.Parallel()
+
+	resultOverrides := resultOverrideFile{
+		"test_echo": {
+			Description: "Echoed payload.",
+			Schema:      map[string]any{"type": "string", "format": "hex"},
+		},
+	}
+
+	methods := collectMethods([]serviceSpec{
+		{Namespace: "test", Type: reflect.TypeOf((*testAPI)(nil))},
+	}, nil, nil, resultOverrides)
+
+	var echo methodObject
+	for _, m := range methods {
+		if m.Name == "test_echo" {
+			echo = m
+			break
+		}
+	}
+	if echo.Name == "" {
+		t.Fatalf("expected test_echo method in generated list")
+	}
+	if echo.Result.Description != "Echoed payload." {
+		t.Fatalf("expected curated result description, got %q", echo.Result.Description)
+	}
+	if got := echo.Result.Schema["format"]; got != "hex" {
+		t.Fatalf("expected curated result schema format=hex, got %#v", got)
+	}
+}
+
 func TestTypeOverrideSchemaPreservesCuratedDescription(t *testing.T) {
 	previous := activeTypeOverrides
 	t.Cleanup(func() {

@@ -16,14 +16,14 @@ The core Everlight idea is simple: **registration fees are one-time action reven
 
 The doc is split into two parts:
 
-- **Part 1 (sections 2-8)** covers Phase 1 manual pool funding. It shows how large the extra monthly SN retention payout pool should be, what per-byte storage economics that implies, and how the Foundation tops up the pool until protocol-native funding grows.
+- **Part 1 (sections 2-8)** covers Phase 1 pool funding. Two rails feed the pool from day one — an automatic 2% registration fee share (routed by the action module's `DistributeFees`, `registration_fee_share_bps = 200` by default) and manual Foundation top-ups that close the gap until adoption-driven fee inflow grows. Part 1 shows how large the extra monthly SN retention payout pool should be, what per-byte storage economics that implies, and how the Foundation sizes its top-ups.
 - **Part 2 (sections 9-14)** covers Phase 3 endowment self-sufficiency. It shows how big a permanently-staked principal has to be so the extra recurring SN payouts can run from staking yield, ending the Foundation's ongoing top-up obligation. It also explains how the endowment behaves when LUME price moves.
 
 Part 1 is needed to ship the upgrade. Part 2 is needed to plan toward exiting Foundation funding. Both share the same input set in section 2.
 
 ---
 
-# Part 1 — Phase 1: Manual Pool Funding
+# Part 1 — Phase 1: Pool Funding (Registration Fee Share + Foundation Top-up)
 
 ## 2. Inputs (tune these)
 
@@ -103,6 +103,7 @@ The all-pool-at-once behavior is the central operational fact behind the rest of
 - Whatever LUME enters the pool by the period boundary leaves the pool at that boundary.
 - To pay SNs `X` LUME this period, the pool must contain `X` LUME at period's end.
 - Funding cadence and amount can be irregular intra-period (transfer once, transfer multiple times, top up mid-month, etc.); only the cumulative balance at the boundary matters.
+- Two inflows are continuous and automatic: the 2% registration fee share (per action) and any Community Pool grant funded by an active proposal. The Foundation top-up is the discretionary lever that closes the gap to the target.
 - Forgetting a top-up is a missed period of pay, not a deferred payment. Operators should expect monthly payouts and the funder should expect to top up monthly.
 
 The rest of Part 1 is the math for choosing the right top-up amount.
@@ -203,12 +204,12 @@ The chain-wide reference `HW_rate = $0.04` is anchored to the *most expensive* t
 
 ## 5. Phase 1 funding sources
 
-In Phase 1 the pool is fed almost entirely by the Foundation, with two minor protocol-native streams that grow over time:
+Two protocol-native rails are active from day one in Phase 1 — the 2% registration fee share routed automatically on every action's `DistributeFees`, and episodic Community Pool governance transfers. At devnet launch and early mainnet both produce close to 0 LUME per period because Cascade volume is low; the Foundation closes the gap manually until adoption grows:
 
 | Source | Expected share at devnet launch | Driver |
 |---|---|---|
 | Foundation direct transfers | ~95-100% | Manual `MsgSend` per the runbook in section 7. |
-| Registration fee share (2%) | 0-5% | Grows with adoption. At devnet launch, ~0. |
+| Registration fee share (2%) | ~0-5% | **Active from day one.** `registration_fee_share_bps = 200` (default) routes 2% of every action's fee in `x/action/v1/keeper.DistributeFees` to the supernode module account. Share grows with Cascade adoption; no governance action required to switch it on. |
 | Community Pool transfers | episodic | One-off governance proposals. |
 
 Phase 1 sustainability depends entirely on Foundation willingness. The point of Part 2 is to get out of this regime by sizing an endowment that replaces the Foundation top-up.

@@ -85,7 +85,7 @@ func (k Keeper) EnforceEpochEnd(ctx sdk.Context, epochID uint64, params types.Pa
 			continue
 		}
 
-		if err := k.recoverSupernodeActive(ctx, sn); err != nil {
+		if err := k.recoverSupernodeFromPostponed(ctx, sn, epochID); err != nil {
 			return err
 		}
 		k.clearActionFinalizationPostponedAtEpochID(ctx, sn.SupernodeAccount)
@@ -413,14 +413,12 @@ func (k Keeper) selfHostViolatesMinimums(ctx sdk.Context, supernodeAccount strin
 		return false, nil
 	}
 
-	// If any known metric is below minimum free%, postpone.
+	// If any known non-storage metric is below minimum free%, postpone.
+	// Disk pressure is modeled as STORAGE_FULL by audit SetReport, not POSTPONED.
 	if violatesMinFree(r.HostReport.CpuUsagePercent, params.MinCpuFreePercent) {
 		return true, nil
 	}
 	if violatesMinFree(r.HostReport.MemUsagePercent, params.MinMemFreePercent) {
-		return true, nil
-	}
-	if violatesMinFree(r.HostReport.DiskUsagePercent, params.MinDiskFreePercent) {
 		return true, nil
 	}
 
@@ -437,9 +435,6 @@ func (k Keeper) selfHostCompliant(ctx sdk.Context, supernodeAccount string, epoc
 		return false, nil
 	}
 	if !compliesMinFree(r.HostReport.MemUsagePercent, params.MinMemFreePercent) {
-		return false, nil
-	}
-	if !compliesMinFree(r.HostReport.DiskUsagePercent, params.MinDiskFreePercent) {
 		return false, nil
 	}
 
@@ -565,6 +560,36 @@ func (k Keeper) recoverSupernodeActive(ctx sdk.Context, sn sntypes.SuperNode) er
 		return err
 	}
 	return k.supernodeKeeper.RecoverSuperNodeFromPostponed(ctx, valAddr)
+}
+
+func (k Keeper) recoverSupernodeFromPostponed(ctx sdk.Context, sn sntypes.SuperNode, epochID uint64) error {
+	r, found := k.GetReport(ctx, epochID, sn.SupernodeAccount)
+	if !found || r.HostReport.DiskUsagePercent == 0 {
+		return k.recoverSupernodeActive(ctx, sn)
+	}
+
+	maxStorage := float64(k.supernodeKeeper.GetParams(ctx).MaxStorageUsagePercent)
+	if r.HostReport.DiskUsagePercent <= maxStorage {
+		return k.recoverSupernodeActive(ctx, sn)
+	}
+
+	if len(sn.States) == 0 {
+		return fmt.Errorf("supernode %q has no state history", sn.SupernodeAccount)
+	}
+	sn.States = append(sn.States, &sntypes.SuperNodeStateRecord{
+		State:  sntypes.SuperNodeStateStorageFull,
+		Height: ctx.BlockHeight(),
+	})
+	if err := k.supernodeKeeper.SetSuperNode(ctx, sn); err != nil {
+		return err
+	}
+	ctx.EventManager().EmitEvent(sdk.NewEvent(
+		sntypes.EventTypeSupernodeRecovered,
+		sdk.NewAttribute(sntypes.AttributeKeyValidatorAddress, sn.ValidatorAddress),
+		sdk.NewAttribute(sntypes.AttributeKeyOldState, sntypes.SuperNodeStatePostponed.String()),
+		sdk.NewAttribute(sntypes.AttributeKeyHeight, strconv.FormatInt(ctx.BlockHeight(), 10)),
+	))
+	return nil
 }
 
 // storageTruthBand represents a node suspicion severity level.

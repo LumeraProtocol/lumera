@@ -115,23 +115,29 @@ func TestAuditEmptyActiveSetBootstrap_HostOnlyReportsRecover(t *testing.T) {
 
 // TestAuditEmptyActiveSetBootstrap_NonCompliantHostStaysPostponed verifies
 // the bootstrap-recovery exception still gates on self-compliance. A
-// POSTPONED supernode that submits a host report violating a min-free
-// threshold MUST remain POSTPONED even when the active set is empty.
+// POSTPONED supernode that submits a host report violating a non-storage
+// min-free threshold (CPU here) MUST remain POSTPONED even when the active
+// set is empty.
 //
 // This guards against the exception turning into a "free pass" for
 // misbehaving SNs and complements the unit-level tests in
 // x/audit/v1/keeper/enforcement_empty_active_set_test.go.
+//
+// Note: per LEP-6 §17 disk pressure is owned exclusively by the STORAGE_FULL
+// transition path (audit SetReport) and is no longer a postpone reason, so
+// this test exercises the non-storage CPU path. The disk-pressure bootstrap
+// case is covered by TestAuditEmptyActiveSetBootstrap_DiskPressureGoesToStorageFull.
 func TestAuditEmptyActiveSetBootstrap_NonCompliantHostStaysPostponed(t *testing.T) {
 	const (
 		epochLengthBlocks = uint64(10)
 		originHeight      = int64(1)
 	)
 
-	// Set a non-zero MinDiskFreePercent so non-compliant disk usage in the host
+	// Set a non-zero MinCpuFreePercent so non-compliant CPU usage in the host
 	// report blocks self-compliance.
 	sut.ModifyGenesisJSON(t,
 		setSupernodeParamsForAuditTests(t),
-		setAuditParamsForFastEpochsWithMinDiskFree(t, epochLengthBlocks, 1, 1, 1, []uint32{4444}, 20),
+		setAuditParamsForFastEpochsWithMinCpuFree(t, epochLengthBlocks, 1, 1, 1, []uint32{4444}, 20),
 	)
 	sut.StartChain(t)
 
@@ -153,10 +159,10 @@ func TestAuditEmptyActiveSetBootstrap_NonCompliantHostStaysPostponed(t *testing.
 	require.Equal(t, "SUPERNODE_STATE_POSTPONED", querySupernodeLatestState(t, cli, n0.valAddr))
 	require.Equal(t, "SUPERNODE_STATE_POSTPONED", querySupernodeLatestState(t, cli, n1.valAddr))
 
-	// Epoch 1: empty active set. Both submit host reports with disk usage 95%
-	// (5% free, below the 20% MinDiskFreePercent). Self-compliance fails.
+	// Epoch 1: empty active set. Both submit host reports with CPU usage 95%
+	// (5% free, below the 20% MinCpuFreePercent). Self-compliance fails.
 	epochID1 := uint64((epoch1Start - originHeight) / int64(epochLengthBlocks))
-	hostNonCompliant := auditHostReportWithDiskUsageJSON([]string{"PORT_STATE_OPEN"}, 95.0)
+	hostNonCompliant := auditHostReportWithCpuUsageJSON([]string{"PORT_STATE_OPEN"}, 95.0)
 	RequireTxSuccess(t, submitEpochReport(t, cli, n0.nodeName, epochID1, hostNonCompliant, nil))
 	RequireTxSuccess(t, submitEpochReport(t, cli, n1.nodeName, epochID1, hostNonCompliant, nil))
 
@@ -167,4 +173,74 @@ func TestAuditEmptyActiveSetBootstrap_NonCompliantHostStaysPostponed(t *testing.
 		"node0 should remain POSTPONED — self-compliance gate blocks the bootstrap exception")
 	require.Equal(t, "SUPERNODE_STATE_POSTPONED", querySupernodeLatestState(t, cli, n1.valAddr),
 		"node1 should remain POSTPONED — self-compliance gate blocks the bootstrap exception")
+}
+
+// TestAuditEmptyActiveSetBootstrap_DiskPressureGoesToStorageFull verifies the
+// LEP-6 §17 invariant that disk pressure is owned exclusively by the
+// STORAGE_FULL transition path, not by audit_host_requirements POSTPONE.
+//
+// Scenario:
+//  1. Two SNs register and miss epoch 0 reports → both POSTPONED for
+//     audit_missing_reports.
+//  2. Epoch 1: empty active set. Both submit host reports with disk usage
+//     above the supernode module's MaxStorageUsagePercent (default 90).
+//  3. Epoch 1 end: the bootstrap-recovery exception fires because
+//     selfHostCompliant ignores disk (only cpu/mem gate the bootstrap
+//     exception). The new recoverSupernodeFromPostponed helper observes
+//     disk > MaxStorageUsagePercent in the same epoch's report and steers
+//     recovery to STORAGE_FULL instead of ACTIVE.
+//
+// Invariant locked in: disk pressure never produces ACTIVE in this branch,
+// never produces POSTPONED via audit_host_requirements, and produces
+// STORAGE_FULL exactly when disk > MaxStorageUsagePercent.
+func TestAuditEmptyActiveSetBootstrap_DiskPressureGoesToStorageFull(t *testing.T) {
+	const (
+		epochLengthBlocks = uint64(10)
+		originHeight      = int64(1)
+	)
+
+	// No MinCpuFreePercent / MinMemFreePercent override → only disk pressure
+	// is in play. The supernode module's default MaxStorageUsagePercent (90)
+	// gates the STORAGE_FULL transition; we report 95% to cross it.
+	sut.ModifyGenesisJSON(t,
+		setSupernodeParamsForAuditTests(t),
+		setAuditParamsForFastEpochs(t, epochLengthBlocks, 1, 1, 1, []uint32{4444}),
+	)
+	sut.StartChain(t)
+
+	cli := NewLumeradCLI(t, sut, true)
+	n0 := getNodeIdentity(t, cli, "node0")
+	n1 := getNodeIdentity(t, cli, "node1")
+
+	registerSupernode(t, cli, n0, "192.168.1.1")
+	registerSupernode(t, cli, n1, "192.168.1.2")
+
+	// Epoch 0: no reports → both POSTPONED for audit_missing_reports.
+	currentHeight := sut.AwaitNextBlock(t)
+	_, epoch0Start := nextEpochAfterHeight(originHeight, epochLengthBlocks, currentHeight)
+	epoch1Start := epoch0Start + int64(epochLengthBlocks)
+	epoch2Start := epoch1Start + int64(epochLengthBlocks)
+
+	awaitAtLeastHeightWithSlack(t, epoch1Start)
+
+	require.Equal(t, "SUPERNODE_STATE_POSTPONED", querySupernodeLatestState(t, cli, n0.valAddr))
+	require.Equal(t, "SUPERNODE_STATE_POSTPONED", querySupernodeLatestState(t, cli, n1.valAddr))
+
+	// Epoch 1: empty active set. Both submit host reports with disk usage
+	// 95% (> MaxStorageUsagePercent=90). Self-compliance passes (no
+	// cpu/mem floor configured), so the bootstrap exception fires; the
+	// recovery helper observes the high disk and steers to STORAGE_FULL.
+	epochID1 := uint64((epoch1Start - originHeight) / int64(epochLengthBlocks))
+	hostHighDisk := auditHostReportWithDiskUsageJSON([]string{"PORT_STATE_OPEN"}, 95.0)
+	RequireTxSuccess(t, submitEpochReport(t, cli, n0.nodeName, epochID1, hostHighDisk, nil))
+	RequireTxSuccess(t, submitEpochReport(t, cli, n1.nodeName, epochID1, hostHighDisk, nil))
+
+	awaitAtLeastHeightWithSlack(t, epoch2Start)
+
+	// LEP-6 §17 invariant: disk pressure routes POSTPONED → STORAGE_FULL,
+	// never POSTPONED → ACTIVE, never stuck POSTPONED on audit_host_requirements.
+	require.Equal(t, "SUPERNODE_STATE_STORAGE_FULL", querySupernodeLatestState(t, cli, n0.valAddr),
+		"node0 should transition POSTPONED → STORAGE_FULL via the audit recovery helper (disk > MaxStorageUsagePercent)")
+	require.Equal(t, "SUPERNODE_STATE_STORAGE_FULL", querySupernodeLatestState(t, cli, n1.valAddr),
+		"node1 should transition POSTPONED → STORAGE_FULL via the audit recovery helper (disk > MaxStorageUsagePercent)")
 }

@@ -584,7 +584,7 @@ func (k Keeper) recoverSupernodeFromPostponed(ctx sdk.Context, sn sntypes.SuperN
 		return err
 	}
 	ctx.EventManager().EmitEvent(sdk.NewEvent(
-		sntypes.EventTypeSupernodeRecovered,
+		sntypes.EventTypeSupernodeStorageFull,
 		sdk.NewAttribute(sntypes.AttributeKeyValidatorAddress, sn.ValidatorAddress),
 		sdk.NewAttribute(sntypes.AttributeKeyOldState, sntypes.SuperNodeStatePostponed.String()),
 		sdk.NewAttribute(sntypes.AttributeKeyHeight, strconv.FormatInt(ctx.BlockHeight(), 10)),

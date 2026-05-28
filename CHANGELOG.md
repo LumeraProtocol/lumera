@@ -75,7 +75,7 @@ Changes included since `v1.11.1` (range: `v1.11.1..v1.11.1-hotfix`).
 
 Changes included since `v1.11.0` (range: `v1.11.0..v1.11.1`).
 
-- Added the v1.11.1 audit upgrade handler to enforce a `min_disk_free_percent` floor and repair missing audit params during upgrade.
+- Added the v1.11.1 audit upgrade handler to repair missing audit params during upgrade.
 - Added audit store-loader selection and tests for safe v1.11.1 upgrade startup.
 
 ---

@@ -33,10 +33,11 @@ This is evaluated by checking for a stored report in each of the last `N` epochs
 
 ### 2) Host Report requirements
 
-If a submitted host report violates any enabled minimum free% threshold, the supernode is set to `POSTPONED`.
+If a submitted host report violates any enabled CPU or memory minimum free% threshold, the supernode is set to `POSTPONED`.
 
-- Params: `min_cpu_free_percent`, `min_mem_free_percent`, `min_disk_free_percent` (`free% = 100 - usage%`).
+- Params: `min_cpu_free_percent`, `min_mem_free_percent` (`free% = 100 - usage%`).
 - Special case: if `*_usage_percent == 0`, that metric is treated as **unknown** and does not trigger postponement.
+- Disk pressure is not a postponement criterion; it is handled by the `STORAGE_FULL` state path.
 
 The following host-report fields are currently ignored by postponement logic:
 - `failed_actions_count`

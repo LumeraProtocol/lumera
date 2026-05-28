@@ -65,6 +65,8 @@ func TestEnforceEpochEnd_RecoversPostponedToStorageFullWhenDiskStillHigh(t *test
 
 	err = f.keeper.EnforceEpochEnd(f.ctx, 1, params)
 	require.NoError(t, err)
+	require.True(t, hasEventType(f.ctx.EventManager().Events(), sntypes.EventTypeSupernodeStorageFull))
+	require.False(t, hasEventType(f.ctx.EventManager().Events(), sntypes.EventTypeSupernodeRecovered))
 }
 
 func TestEnforceEpochEnd_RecoversPostponedToActiveWhenDiskBelowThreshold(t *testing.T) {
@@ -115,6 +117,15 @@ func TestEnforceEpochEnd_RecoversPostponedToActiveWhenDiskBelowThreshold(t *test
 
 	err = f.keeper.EnforceEpochEnd(f.ctx, 1, params)
 	require.NoError(t, err)
+}
+
+func hasEventType(events sdk.Events, eventType string) bool {
+	for _, event := range events {
+		if event.Type == eventType {
+			return true
+		}
+	}
+	return false
 }
 
 // TestEnforceEpochEnd_DiskPressureDoesNotPostponeStorageFull verifies that StorageFull nodes

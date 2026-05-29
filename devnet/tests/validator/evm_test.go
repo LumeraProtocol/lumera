@@ -372,6 +372,29 @@ func (s *lumeraValidatorSuite) TestEVMContractDeployCallAndLogsDevnet() {
 	s.Require().NotEmpty(logs, "expected deployment log for topic %s", topic)
 }
 
+func (s *lumeraValidatorSuite) TestEVMContractPersistsAcrossLocalLumeradRestart() {
+	s.requireEVMVersionOrSkip()
+	s.requireRestartTestsEnabledOrSkip()
+
+	rpc := resolveLumeraJSONRPC(s.lumeraRPC)
+	txHash := s.mustSendDynamicContractCreation(rpc, loggingConstantContractCreationCode("0x"+strings.Repeat("55", 32)), 500_000)
+	receipt := s.mustWaitReceipt(rpc, txHash, 60*time.Second)
+	s.requireSuccessfulReceipt(receipt, txHash)
+
+	contractAddress, _ := receipt["contractAddress"].(string)
+	s.Require().True(strings.HasPrefix(contractAddress, "0x"), "unexpected contract address: %#v", receipt)
+	s.requireContractReturnsUint64(rpc, contractAddress, 42)
+
+	s.mustRestartLocalLumerad()
+	s.mustWaitJSONRPCReady(rpc, 90*time.Second)
+
+	var codeHex string
+	err := callJSONRPC(rpc, "eth_getCode", []any{contractAddress, "latest"}, &codeHex)
+	s.Require().NoError(err, "eth_getCode after restart")
+	s.Require().NotEqual("0x", strings.ToLower(strings.TrimSpace(codeHex)), "contract code missing after restart")
+	s.requireContractReturnsUint64(rpc, contractAddress, 42)
+}
+
 func (s *lumeraValidatorSuite) TestEVMActionPrecompileQueryDevnet() {
 	s.requireEVMVersionOrSkip()
 
@@ -446,6 +469,13 @@ func (s *lumeraValidatorSuite) requireEVMVersionOrSkip() {
 	}
 	if !pkgversion.GTE(ver, firstEVMVersion) {
 		s.T().Skipf("skip EVM runtime tests: %s version %s < %s", s.lumeraBin, ver, firstEVMVersion)
+	}
+}
+
+func (s *lumeraValidatorSuite) requireRestartTestsEnabledOrSkip() {
+	enabled := parseBool(os.Getenv("LUMERA_DEVNET_RESTART_TESTS"), false)
+	if !enabled {
+		s.T().Skip("skip restart-persistence test: set LUMERA_DEVNET_RESTART_TESTS=true to restart local lumerad")
 	}
 }
 
@@ -647,6 +677,19 @@ func (s *lumeraValidatorSuite) requireSuccessfulReceipt(receipt map[string]any, 
 	s.Require().NotEmpty(receipt["blockNumber"], "receipt missing blockNumber")
 }
 
+func (s *lumeraValidatorSuite) requireContractReturnsUint64(rpcAddr, contractAddress string, want uint64) {
+	var callResult string
+	err := callJSONRPC(rpcAddr, "eth_call", []any{
+		map[string]any{
+			"to":   contractAddress,
+			"data": "0x",
+		},
+		"latest",
+	}, &callResult)
+	s.Require().NoError(err, "eth_call contract %s", contractAddress)
+	s.requireUint256Hex(callResult, want)
+}
+
 func (s *lumeraValidatorSuite) requireReceiptHasTopic(receipt map[string]any, topic string) {
 	logs, ok := receipt["logs"].([]any)
 	s.Require().True(ok, "receipt logs has unexpected type: %#v", receipt["logs"])
@@ -707,6 +750,33 @@ func (s *lumeraValidatorSuite) mustGetLatestBaseFee(rpcAddr string) *big.Int {
 	baseFee := mustParseHexBigInt(baseFeeHex)
 	s.Require().Greater(baseFee.Sign(), 0, "baseFeePerGas should be > 0")
 	return baseFee
+}
+
+func (s *lumeraValidatorSuite) mustRestartLocalLumerad() {
+	script := strings.TrimSpace(os.Getenv("LUMERA_RESTART_SCRIPT"))
+	if script == "" {
+		script = "/root/scripts/restart.sh"
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, script, "lumera")
+	out, err := cmd.CombinedOutput()
+	s.Require().NoError(err, "restart local lumerad with %s: %s", script, strings.TrimSpace(string(out)))
+}
+
+func (s *lumeraValidatorSuite) mustWaitJSONRPCReady(rpcAddr string, timeout time.Duration) {
+	deadline := time.Now().Add(timeout)
+	var lastErr error
+	for time.Now().Before(deadline) {
+		var blockNumber string
+		lastErr = callJSONRPC(rpcAddr, "eth_blockNumber", []any{}, &blockNumber)
+		if lastErr == nil && strings.HasPrefix(blockNumber, "0x") {
+			return
+		}
+		time.Sleep(2 * time.Second)
+	}
+	s.T().Fatalf("timed out waiting for EVM JSON-RPC after restart: %v", lastErr)
 }
 
 func resolveLumeraJSONRPC(rpcAddr string) string {

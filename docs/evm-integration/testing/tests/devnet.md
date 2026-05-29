@@ -19,6 +19,7 @@ Test source: `devnet/tests/validator/evm_test.go`
 | `TestEVMTransactionVisibleAcrossPeerValidator` | Sends a tx to one validator and verifies the receipt is visible on a peer validator with matching `blockHash`; exercises the broadcast worker re-gossip path. |
 | `TestEVMWebSocketNewHeadsSubscription` | Subscribes to `newHeads` over the EVM WebSocket endpoint, sends a transaction, and verifies a header notification arrives. |
 | `TestEVMContractDeployCallAndLogsDevnet` | Deploys a small EVM contract, verifies deployment logs, calls the runtime with `eth_call`, and queries logs by topic. |
+| `TestEVMContractPersistsAcrossLocalLumeradRestart` | Opt-in destructive check gated by `LUMERA_DEVNET_RESTART_TESTS=true`; deploys a contract, restarts local `lumerad`, waits for JSON-RPC, and verifies code plus call behavior persist. |
 | `TestEVMActionPrecompileQueryDevnet` | Calls the Lumera Action precompile through `eth_call` and verifies ABI-shaped fee output. |
 | `TestEVMGovPrecompileTxPathDevnet` | Sends a transaction to the governance precompile and verifies an unknown-proposal failure is returned as an EVM receipt failure. |
 
@@ -48,6 +49,6 @@ The current devnet coverage does not yet explicitly exercise:
 | Scenario | Current coverage |
 | --- | --- |
 | Public JSON-RPC rate-limit profile | Conditional devnet coverage when rate limiting is enabled |
-| JSON-RPC restart persistence | Integration coverage only |
+| JSON-RPC restart persistence | Opt-in destructive devnet coverage gated by `LUMERA_DEVNET_RESTART_TESTS=true` |
 | Full standard and custom precompile tx matrix | Devnet covers gov tx smoke and Action query; integration covers broader tx/query paths |
 | ERC20 wrong-provenance rejection | Integration coverage only |

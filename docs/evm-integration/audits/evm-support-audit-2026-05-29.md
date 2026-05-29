@@ -143,7 +143,7 @@ Status on `evm-audit`:
 | Fee market base fee and min floor | Covered | Covered | Covered | N/A | Covered |
 | Precisebank send/query/fractional accounting | Covered | Covered | Missing | N/A | Partially covered |
 | ERC20/IBC exact and provenance-bound allowlist | Covered | Covered | IBC transfer only | N/A | Partially covered |
-| Contract deploy/call/logs/storage persistence | N/A | Covered | Deploy/call/logs covered; restart missing | N/A | Partially covered |
+| Contract deploy/call/logs/storage persistence | N/A | Covered | Deploy/call/logs plus opt-in restart persistence | N/A | Partially covered |
 | Standard precompiles | N/A | Covered | Gov tx smoke | N/A | Partially covered |
 | Action/Supernode/Wasm precompiles | Covered/partial | Covered | Action query covered | N/A | Partially covered |
 | CosmWasm -> EVM bridge | Covered | Covered | Missing | N/A | Partially covered |
@@ -155,7 +155,7 @@ Status on `evm-audit`:
 | Invalid/replay migration negative paths | Covered | Covered | Partial | Covered | Partially covered |
 | Devnet pre-EVM -> EVM upgrade | N/A | N/A | Covered by target | N/A | Covered |
 | Devnet JSON-RPC across validators | N/A | N/A | Covered | N/A | Covered |
-| Devnet EVM contract deploy/call/log/precompile | N/A | Covered single-node | Deploy/call/logs, Action query, Gov tx smoke | N/A | Partially covered |
+| Devnet EVM contract deploy/call/log/restart/precompile | N/A | Covered single-node | Deploy/call/logs, opt-in restart persistence, Action query, Gov tx smoke | N/A | Partially covered |
 
 ## Migration Guide Review
 
@@ -232,7 +232,7 @@ Recommended fix:
 | IBC transfer in EVM mode | Hermes `TestIBCTransferWithEVMModeStillRelays` | Covered |
 | Wrong-provenance ERC20 rejection | Integration only | Missing |
 | JSON-RPC from multiple validators | `TestEVMTransactionVisibleAcrossPeerValidator` | Covered |
-| JSON-RPC restart persistence | Integration only | Missing |
+| JSON-RPC restart persistence | `TestEVMContractPersistsAcrossLocalLumeradRestart` gated by `LUMERA_DEVNET_RESTART_TESTS=true` | Partially covered |
 | WebSocket subscriptions | `TestEVMWebSocketNewHeadsSubscription` | Covered |
 | Public JSON-RPC rate-limit profile | `TestEVMJSONRPCRateLimitPublicProfileIfEnabled` when enabled in devnet `app.toml` | Partially covered |
 | Contract deploy/call/logs | `TestEVMContractDeployCallAndLogsDevnet` | Covered |
@@ -275,5 +275,5 @@ Recommended fix:
 ## Recommended Backlog
 
 1. Re-run full `make integration-tests NOCACHE=1`; the earlier contracts failure did not reproduce in focused or package-level runs.
-2. Add devnet scenarios for restart persistence, broader precompile coverage, and ERC20 wrong-provenance rejection.
+2. Add devnet scenarios for broader precompile coverage and ERC20 wrong-provenance rejection.
 3. Run `make simulation-tests` and `make devnet-evm-upgrade` as release-gate validation after the focused fixes land.

@@ -21,6 +21,7 @@ Test source: `devnet/tests/validator/evm_test.go`
 | `TestEVMContractDeployCallAndLogsDevnet` | Deploys a small EVM contract, verifies deployment logs, calls the runtime with `eth_call`, and queries logs by topic. |
 | `TestEVMContractPersistsAcrossLocalLumeradRestart` | Opt-in destructive check gated by `LUMERA_DEVNET_RESTART_TESTS=true`; deploys a contract, restarts local `lumerad`, waits for JSON-RPC, and verifies code plus call behavior persist. |
 | `TestEVMActionPrecompileQueryDevnet` | Calls the Lumera Action precompile through `eth_call` and verifies ABI-shaped fee output. |
+| `TestEVMBankPrecompileTotalSupplyQueryDevnet` | Calls the standard Bank precompile `totalSupply()` query and verifies ABI-shaped output. |
 | `TestEVMGovPrecompileTxPathDevnet` | Sends a transaction to the governance precompile and verifies an unknown-proposal failure is returned as an EVM receipt failure. |
 
 ## EVM Migration Devnet Tests
@@ -58,5 +59,5 @@ The current devnet coverage does not yet explicitly exercise:
 | --- | --- |
 | Public JSON-RPC rate-limit profile | Conditional devnet coverage when rate limiting is enabled |
 | JSON-RPC restart persistence | Opt-in destructive devnet coverage gated by `LUMERA_DEVNET_RESTART_TESTS=true` |
-| Full standard and custom precompile tx matrix | Devnet covers gov tx smoke and Action query; integration covers broader tx/query paths |
+| Full standard and custom precompile tx matrix | Devnet covers Bank query, gov tx smoke, and Action query; integration covers broader tx/query paths |
 | ERC20 wrong-provenance rejection for an allowlisted base denom on the wrong channel | Devnet covers unapproved base-denom rejection; integration covers provenance-bound policy branches |

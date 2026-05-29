@@ -29,6 +29,7 @@ import (
 const (
 	defaultLumeraJSONRPC    = "http://supernova_validator_1:8545"
 	actionPrecompileAddress = "0x0000000000000000000000000000000000000901"
+	bankPrecompileAddress   = "0x0000000000000000000000000000000000000804"
 	govPrecompileAddress    = "0x0000000000000000000000000000000000000805"
 	defaultTipCapWei        = int64(1_000_000_000) // 1 gwei
 	defaultRPCTimeout       = 30 * time.Second
@@ -414,6 +415,23 @@ func (s *lumeraValidatorSuite) TestEVMActionPrecompileQueryDevnet() {
 	s.Require().GreaterOrEqual(len(result), 96, "getActionFee should return three uint256 words, got %d bytes", len(result))
 	totalFee := new(big.Int).SetBytes(result[:32])
 	s.Require().Greater(totalFee.Sign(), 0, "unexpected total fee result: %s", totalFee)
+}
+
+func (s *lumeraValidatorSuite) TestEVMBankPrecompileTotalSupplyQueryDevnet() {
+	s.requireEVMVersionOrSkip()
+
+	input := abiCallNoArgs("totalSupply()")
+	var resultHex string
+	err := callJSONRPC(resolveLumeraJSONRPC(s.lumeraRPC), "eth_call", []any{
+		map[string]any{
+			"to":   bankPrecompileAddress,
+			"data": "0x" + hex.EncodeToString(input),
+		},
+		"latest",
+	}, &resultHex)
+	s.Require().NoError(err, "eth_call bank precompile totalSupply")
+	s.Require().True(strings.HasPrefix(resultHex, "0x"), "unexpected totalSupply result: %s", resultHex)
+	s.Require().GreaterOrEqual(len(common.FromHex(resultHex)), 64, "totalSupply should return ABI offset and array length words")
 }
 
 func (s *lumeraValidatorSuite) TestEVMGovPrecompileTxPathDevnet() {
@@ -857,6 +875,10 @@ func abiCallUint64(signature string, value uint64) []byte {
 	arg := make([]byte, 32)
 	big.NewInt(0).SetUint64(value).FillBytes(arg)
 	return append(selector, arg...)
+}
+
+func abiCallNoArgs(signature string) []byte {
+	return crypto.Keccak256([]byte(signature))[:4]
 }
 
 func abiCallAddressUint64(signature string, addr common.Address, value uint64) []byte {

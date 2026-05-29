@@ -187,10 +187,10 @@ Severity: Medium
 
 Evidence:
 
-- `docs/evm-integration/testing/security-audit.md:17` says one finding remains open.
-- `docs/evm-integration/testing/security-audit.md:21` calls ERC20 provenance still open.
-- `docs/evm-integration/testing/security-audit.md:49` describes the old separate-port rate-limit bypass even though code now wraps the alias proxy.
-- `docs/evm-integration/testing/security-audit.md:210` later says the ERC20 finding is fixed, contradicting the executive summary.
+- `docs/evm-integration/audits/security-audit-2026-03-20.md:17` said one finding remained open before this branch refreshed it.
+- `docs/evm-integration/audits/security-audit-2026-03-20.md:21` called ERC20 provenance still open before this branch refreshed it.
+- `docs/evm-integration/audits/security-audit-2026-03-20.md:49` described the old separate-port rate-limit bypass before this branch refreshed it.
+- `docs/evm-integration/audits/security-audit-2026-03-20.md:210` later said the ERC20 finding was fixed, contradicting the old executive summary.
 - `cmd/lumera/cmd/config.go:40` says rate limiting is a reverse proxy listening on `proxy-address`, but `app/app.go:422` and `app/evm_jsonrpc_ratelimit.go` route alias-active traffic through the public alias proxy and use `proxy-address` only as standalone fallback.
 
 Recommended fix:

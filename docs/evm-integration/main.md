@@ -30,7 +30,7 @@ Lumera's EVM integration is designed as a deeply integrated, production-ready la
 
 - [tests.md](testing/tests.md) — Full test inventory (unit, integration, devnet), coverage assessment, gaps, and next steps
 - [bugs.md](testing/bugs.md) — Bugs found and fixed during EVM integration
-- [security-audit.md](testing/security-audit.md) — Security audit findings and recommendations
+- [security-audit-2026-03-20.md](audits/security-audit-2026-03-20.md) — Security audit findings and recommendations
 
 ### User Guides
 

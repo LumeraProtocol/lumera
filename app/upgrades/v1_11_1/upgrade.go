@@ -16,7 +16,12 @@ import (
 // UpgradeName is the on-chain name used for this upgrade.
 const UpgradeName = "v1.11.1"
 
-// CreateUpgradeHandler runs module migrations.
+// auditMinDiskFreePercentFloor is the minimum acceptable value for
+// audit.params.min_disk_free_percent after this upgrade.
+const auditMinDiskFreePercentFloor = uint32(15)
+
+// CreateUpgradeHandler runs module migrations and enforces a floor for
+// audit.params.min_disk_free_percent.
 //
 // This handler supports both:
 //   - direct upgrades from pre-audit binaries (e.g. v1.10.1), and
@@ -45,6 +50,22 @@ func CreateUpgradeHandler(p appParams.AppUpgradeParams) upgradetypes.UpgradeHand
 			if err := initializeAuditForDirectUpgrade(ctx, p); err != nil {
 				return nil, err
 			}
+		}
+
+		params := p.AuditKeeper.GetParams(ctx).WithDefaults()
+		updatedParams, changed := withMinDiskFreePercentFloor(params, auditMinDiskFreePercentFloor)
+		if changed {
+			if err := p.AuditKeeper.SetParams(ctx, updatedParams); err != nil {
+				return nil, fmt.Errorf("set audit params: %w", err)
+			}
+			p.Logger.Info("Updated audit params min_disk_free_percent floor",
+				"previous", params.MinDiskFreePercent,
+				"current", updatedParams.MinDiskFreePercent,
+			)
+		} else {
+			p.Logger.Info("Audit min_disk_free_percent already satisfies floor",
+				"current", params.MinDiskFreePercent,
+			)
 		}
 
 		p.Logger.Info(fmt.Sprintf("Successfully completed upgrade %s", UpgradeName))
@@ -84,4 +105,13 @@ func initializeAuditForDirectUpgrade(ctx sdk.Context, p appParams.AppUpgradePara
 	}
 
 	return nil
+}
+
+func withMinDiskFreePercentFloor(params audittypes.Params, floor uint32) (audittypes.Params, bool) {
+	params = params.WithDefaults()
+	if params.MinDiskFreePercent >= floor {
+		return params, false
+	}
+	params.MinDiskFreePercent = floor
+	return params, true
 }

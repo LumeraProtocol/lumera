@@ -54,9 +54,29 @@ type HandlerOptions struct {
 	EVMAccountKeeper  anteinterfaces.AccountKeeper
 	FeeMarketKeeper   anteinterfaces.FeeMarketKeeper
 	EvmKeeper         anteinterfaces.EVMKeeper
+	EVMigrationKeeper EVMigrationProofVerifier
 	PendingTxListener func(common.Hash)
 	MaxTxGasWanted    uint64
 	DynamicFeeChecker bool
+}
+
+// EVMigrationProofVerifier verifies evmigration message-embedded proofs before
+// fee-free, unsigned migration txs are admitted to the mempool.
+type EVMigrationProofVerifier interface {
+	VerifyMigrationProofsForAnte(ctx sdk.Context, msg sdk.Msg) error
+}
+
+type evmigrationProofVerificationDecorator struct {
+	verifier EVMigrationProofVerifier
+}
+
+func (d evmigrationProofVerificationDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, simulate bool, next sdk.AnteHandler) (sdk.Context, error) {
+	for _, msg := range tx.GetMsgs() {
+		if err := d.verifier.VerifyMigrationProofsForAnte(ctx, msg); err != nil {
+			return ctx, err
+		}
+	}
+	return next(ctx, tx, simulate)
 }
 
 // NewAnteHandler returns an ante handler that routes EVM transactions to the
@@ -88,6 +108,9 @@ func NewAnteHandler(options HandlerOptions) (sdk.AnteHandler, error) {
 	}
 	if options.EVMAccountKeeper == nil {
 		return nil, errors.New("evm account keeper is required for ante builder")
+	}
+	if options.EVMigrationKeeper == nil {
+		return nil, errors.New("evmigration keeper is required for ante builder")
 	}
 
 	return func(ctx sdk.Context, tx sdk.Tx, sim bool) (sdk.Context, error) {
@@ -205,6 +228,7 @@ func newLumeraCosmosAnteHandler(ctx sdk.Context, options HandlerOptions) sdk.Ant
 		// Migration txs authenticate via message payload proofs and intentionally
 		// skip the standard fee/signature/sequence subchain.
 		lumante.EVMigrationValidateBasicDecorator{},
+		evmigrationProofVerificationDecorator{verifier: options.EVMigrationKeeper},
 		ante.NewTxTimeoutHeightDecorator(),
 		ante.NewValidateMemoDecorator(options.AccountKeeper),
 		ante.NewConsumeGasForTxSizeDecorator(options.AccountKeeper),

@@ -722,6 +722,7 @@ func (app *App) setAnteHandler(appOpts servertypes.AppOptions) error {
 			EVMAccountKeeper:  app.AuthKeeper,
 			FeeMarketKeeper:   app.FeeMarketKeeper,
 			EvmKeeper:         app.EVMKeeper,
+			EVMigrationKeeper: app.EvmigrationKeeper,
 			PendingTxListener: app.onPendingTx,
 			// no max gas limit in the ante handler, as the EVM mempool will enforce its own max gas limit for transactions entering the mempool
 			MaxTxGasWanted: 0,

@@ -2,6 +2,7 @@ package hermes
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -278,6 +279,44 @@ func (s *lumeraHermesSuite) TestIBCUnapprovedBaseDenomDoesNotRegisterERC20Pair()
 	)
 }
 
+func (s *lumeraHermesSuite) TestIBCAllowlistedBaseDenomWrongChannelDoesNotRegisterERC20Pair() {
+	s.requireLumeraEVMModeOrSkip()
+	s.requireERC20WrongChannelPolicyProfileOrSkip()
+
+	baseDenom := s.simd.Denom
+	allowedChannel := strings.TrimSpace(os.Getenv("LUMERA_ERC20_ALLOWED_TRACE_CHANNEL"))
+	s.Require().NotEmpty(allowedChannel, "LUMERA_ERC20_ALLOWED_TRACE_CHANNEL must name the channel pre-bound by governance")
+	s.Require().NotEqual(
+		allowedChannel,
+		s.channel.ChannelID,
+		"wrong-channel profile must bind %s to a different channel than the live simd->Lumera channel",
+		baseDenom,
+	)
+
+	ibcDenom := ibcutil.IBCDenom(s.portID, s.channel.ChannelID, baseDenom)
+	pairsBefore, err := ibcutil.QueryERC20TokenPairsREST(s.lumera.REST)
+	if err != nil {
+		s.T().Skipf("skip wrong-channel ERC20 rejection check: %v", err)
+		return
+	}
+	if erc20TokenPairExists(pairsBefore, ibcDenom) {
+		s.T().Skipf("skip wrong-channel ERC20 rejection check: token pair already exists for %s", ibcDenom)
+		return
+	}
+
+	s.transferFromSimdToLumeraAndAssert("23" + baseDenom)
+
+	pairsAfter, err := ibcutil.QueryERC20TokenPairsREST(s.lumera.REST)
+	s.Require().NoError(err, "query erc20 token pairs after wrong-channel IBC transfer")
+	s.Require().False(
+		erc20TokenPairExists(pairsAfter, ibcDenom),
+		"base denom %s sent over unbound channel %s should not auto-register ERC20 pair %s",
+		baseDenom,
+		s.channel.ChannelID,
+		ibcDenom,
+	)
+}
+
 func TestIBCSimdSideSuite(t *testing.T) {
 	suite.Run(t, new(lumeraHermesSuite))
 }
@@ -314,6 +353,13 @@ func erc20TokenPairExists(pairs []ibcutil.ERC20TokenPair, denom string) bool {
 		}
 	}
 	return false
+}
+
+func (s *lumeraHermesSuite) requireERC20WrongChannelPolicyProfileOrSkip() {
+	if strings.EqualFold(strings.TrimSpace(os.Getenv("LUMERA_ERC20_WRONG_CHANNEL_POLICY_TESTS")), "true") {
+		return
+	}
+	s.T().Skip("skip wrong-channel ERC20 provenance test: set LUMERA_ERC20_WRONG_CHANNEL_POLICY_TESTS=true with a pre-bound policy profile")
 }
 
 func (s *lumeraHermesSuite) requireLumeraEVMModeOrSkip() {

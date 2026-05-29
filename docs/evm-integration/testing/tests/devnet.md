@@ -51,14 +51,15 @@ Test source: `devnet/tests/hermes/ibc_test.go`
 | Test | Description |
 | --- | --- |
 | `TestIBCUnapprovedBaseDenomDoesNotRegisterERC20Pair` | In EVM mode, sends the simd base denom to Lumera over IBC, verifies the bank voucher arrives, and confirms the unapproved voucher denom does not auto-register an ERC20 token pair. Skips if the devnet profile has already registered that pair. |
+| `TestIBCAllowlistedBaseDenomWrongChannelDoesNotRegisterERC20Pair` | Profile-gated by `LUMERA_ERC20_WRONG_CHANNEL_POLICY_TESTS=true`; with governance having pre-bound the simd base denom to a different channel named by `LUMERA_ERC20_ALLOWED_TRACE_CHANNEL`, sends over the live channel and verifies no ERC20 token pair is auto-registered. |
 
-## Coverage Gaps
+## Conditional Coverage Notes
 
-The current devnet coverage does not yet explicitly exercise:
+These scenarios are covered only when the matching devnet profile or opt-in flag is enabled:
 
 | Scenario | Current coverage |
 | --- | --- |
 | Public JSON-RPC rate-limit profile | Conditional devnet coverage when rate limiting is enabled |
 | JSON-RPC restart persistence | Opt-in destructive devnet coverage gated by `LUMERA_DEVNET_RESTART_TESTS=true` |
 | Full custom precompile tx matrix | Devnet covers standard Staking/Distribution/Bank/Slashing queries, Gov tx smoke, and Action query; integration covers broader custom precompile tx/query paths |
-| ERC20 wrong-provenance rejection for an allowlisted base denom on the wrong channel | Devnet covers unapproved base-denom rejection; integration covers provenance-bound policy branches |
+| Default-profile exact wrong-channel ERC20 allowlist rejection | Covered by profile-gated devnet test when the policy profile is enabled; integration covers provenance-bound policy branches |

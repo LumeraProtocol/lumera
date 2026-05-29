@@ -19,13 +19,17 @@ import (
 	pkgversion "github.com/LumeraProtocol/lumera/pkg/version"
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
+	evmprogram "github.com/ethereum/go-ethereum/core/vm/program"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/gorilla/websocket"
 )
 
 const (
-	defaultLumeraJSONRPC = "http://supernova_validator_1:8545"
-	defaultTipCapWei     = int64(1_000_000_000) // 1 gwei
-	defaultRPCTimeout    = 30 * time.Second
+	defaultLumeraJSONRPC    = "http://supernova_validator_1:8545"
+	actionPrecompileAddress = "0x0000000000000000000000000000000000000901"
+	defaultTipCapWei        = int64(1_000_000_000) // 1 gwei
+	defaultRPCTimeout       = 30 * time.Second
 )
 
 type rpcRequest struct {
@@ -240,6 +244,97 @@ func (s *lumeraValidatorSuite) TestEVMTransactionVisibleAcrossPeerValidator() {
 	)
 }
 
+func (s *lumeraValidatorSuite) TestEVMWebSocketNewHeadsSubscription() {
+	s.requireEVMVersionOrSkip()
+
+	wsAddr := resolveLumeraJSONWS(s.lumeraRPC)
+	conn, _, err := websocket.DefaultDialer.Dial(wsAddr, nil)
+	s.Require().NoError(err, "dial EVM JSON-RPC websocket %s", wsAddr)
+	defer conn.Close()
+
+	subscribe := rpcRequest{
+		JSONRPC: "2.0",
+		ID:      1,
+		Method:  "eth_subscribe",
+		Params:  []any{"newHeads"},
+	}
+	s.Require().NoError(conn.WriteJSON(subscribe), "eth_subscribe newHeads")
+
+	subscriptionID := s.mustReadSubscriptionID(conn, 15*time.Second)
+	s.Require().NotEmpty(subscriptionID, "subscription id should not be empty")
+
+	rpc := resolveLumeraJSONRPC(s.lumeraRPC)
+	txHash, _, _ := s.mustSendDynamicSelfTx(rpc, big.NewInt(1))
+	s.mustWaitReceipt(rpc, txHash, 60*time.Second)
+
+	header := s.mustReadNewHeadsNotification(conn, subscriptionID, 45*time.Second)
+	number, _ := header["number"].(string)
+	s.Require().True(strings.HasPrefix(number, "0x"), "newHeads notification missing block number: %#v", header)
+	hash, _ := header["hash"].(string)
+	s.Require().True(strings.HasPrefix(hash, "0x"), "newHeads notification missing block hash: %#v", header)
+}
+
+func (s *lumeraValidatorSuite) TestEVMContractDeployCallAndLogsDevnet() {
+	s.requireEVMVersionOrSkip()
+
+	rpc := resolveLumeraJSONRPC(s.lumeraRPC)
+	topic := "0x" + strings.Repeat("44", 32)
+	txHash := s.mustSendDynamicContractCreation(rpc, loggingConstantContractCreationCode(topic), 500_000)
+	receipt := s.mustWaitReceipt(rpc, txHash, 60*time.Second)
+	s.requireSuccessfulReceipt(receipt, txHash)
+
+	contractAddress, _ := receipt["contractAddress"].(string)
+	s.Require().True(
+		strings.HasPrefix(contractAddress, "0x") && !strings.EqualFold(contractAddress, "0x0000000000000000000000000000000000000000"),
+		"unexpected contract address in receipt: %#v",
+		receipt,
+	)
+	s.requireReceiptHasTopic(receipt, topic)
+
+	var callResult string
+	err := callJSONRPC(rpc, "eth_call", []any{
+		map[string]any{
+			"to":   contractAddress,
+			"data": "0x",
+		},
+		"latest",
+	}, &callResult)
+	s.Require().NoError(err, "eth_call deployed contract")
+	s.requireUint256Hex(callResult, 42)
+
+	blockNumber, _ := receipt["blockNumber"].(string)
+	var logs []map[string]any
+	err = callJSONRPC(rpc, "eth_getLogs", []any{map[string]any{
+		"fromBlock": blockNumber,
+		"toBlock":   blockNumber,
+		"address":   contractAddress,
+		"topics":    []any{topic},
+	}}, &logs)
+	s.Require().NoError(err, "eth_getLogs for deployment topic")
+	s.Require().NotEmpty(logs, "expected deployment log for topic %s", topic)
+}
+
+func (s *lumeraValidatorSuite) TestEVMActionPrecompileQueryDevnet() {
+	s.requireEVMVersionOrSkip()
+
+	input := abiCallUint64("getActionFee(uint64)", 100)
+
+	var resultHex string
+	err := callJSONRPC(resolveLumeraJSONRPC(s.lumeraRPC), "eth_call", []any{
+		map[string]any{
+			"to":   actionPrecompileAddress,
+			"data": "0x" + hex.EncodeToString(input),
+		},
+		"latest",
+	}, &resultHex)
+	s.Require().NoError(err, "eth_call action precompile getActionFee")
+
+	result := common.FromHex(resultHex)
+	s.Require().GreaterOrEqual(len(result), 96, "getActionFee should return three uint256 words, got %d bytes", len(result))
+	totalFee := new(big.Int).SetBytes(result[:32])
+	s.Require().Greater(totalFee.Sign(), 0, "unexpected total fee result: %s", totalFee)
+}
+
 // resolvePeerJSONRPC picks a peer validator's JSON-RPC endpoint that differs
 // from the local validator. Returns "" if no peer can be determined.
 func (s *lumeraValidatorSuite) resolvePeerJSONRPC() string {
@@ -319,24 +414,57 @@ func (s *lumeraValidatorSuite) mustWaitReceipt(rpcAddr, txHash string, timeout t
 }
 
 func (s *lumeraValidatorSuite) mustSendDynamicSelfTx(rpcAddr string, value *big.Int) (string, common.Address, uint64) {
+	txHash, sender, nonce := s.mustSendDynamicTx(rpcAddr, &senderTx{
+		Value: value,
+		Gas:   21_000,
+	})
+	return txHash, sender, nonce
+}
+
+type senderTx struct {
+	To    *common.Address
+	Value *big.Int
+	Gas   uint64
+	Data  []byte
+}
+
+func (s *lumeraValidatorSuite) mustSendDynamicContractCreation(rpcAddr string, data []byte, gas uint64) string {
+	txHash, _, _ := s.mustSendDynamicTx(rpcAddr, &senderTx{
+		Value: big.NewInt(0),
+		Gas:   gas,
+		Data:  data,
+	})
+	return txHash
+}
+
+func (s *lumeraValidatorSuite) mustSendDynamicTx(rpcAddr string, p *senderTx) (string, common.Address, uint64) {
 	privKey, sender := s.mustLoadSenderPrivKey()
 	nonce := s.mustGetTransactionCount(rpcAddr, sender, "pending")
 	chainID := s.mustGetChainID(rpcAddr)
 	baseFee := s.mustGetLatestBaseFee(rpcAddr)
+	to := p.To
+	if to == nil && len(p.Data) == 0 {
+		to = &sender
+	}
+
+	value := p.Value
+	if value == nil {
+		value = big.NewInt(0)
+	}
 
 	tipCap := big.NewInt(defaultTipCapWei)
 	feeCap := new(big.Int).Mul(baseFee, big.NewInt(2))
 	feeCap.Add(feeCap, tipCap)
 
-	to := sender
 	tx := ethtypes.NewTx(&ethtypes.DynamicFeeTx{
 		ChainID:   chainID,
 		Nonce:     nonce,
 		GasTipCap: tipCap,
 		GasFeeCap: feeCap,
-		Gas:       21_000,
-		To:        &to,
+		Gas:       p.Gas,
+		To:        to,
 		Value:     value,
+		Data:      p.Data,
 	})
 
 	signer := ethtypes.LatestSignerForChainID(chainID)
@@ -383,6 +511,95 @@ func (s *lumeraValidatorSuite) mustSendDynamicSelfTx(rpcAddr string, value *big.
 	}
 	s.Require().True(strings.HasPrefix(txHash, "0x"), "unexpected tx hash: %s", txHash)
 	return txHash, sender, nonce
+}
+
+func (s *lumeraValidatorSuite) mustReadSubscriptionID(conn *websocket.Conn, timeout time.Duration) string {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+		var msg map[string]any
+		if err := conn.ReadJSON(&msg); err != nil {
+			continue
+		}
+		if errObj, ok := msg["error"].(map[string]any); ok {
+			s.T().Fatalf("eth_subscribe returned error: %#v", errObj)
+		}
+		if result, ok := msg["result"].(string); ok {
+			return result
+		}
+	}
+	s.T().Fatalf("timed out waiting for eth_subscribe response")
+	return ""
+}
+
+func (s *lumeraValidatorSuite) mustReadNewHeadsNotification(conn *websocket.Conn, subscriptionID string, timeout time.Duration) map[string]any {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+		var msg map[string]any
+		if err := conn.ReadJSON(&msg); err != nil {
+			continue
+		}
+		if method, _ := msg["method"].(string); method != "eth_subscription" {
+			continue
+		}
+		params, _ := msg["params"].(map[string]any)
+		if params == nil {
+			continue
+		}
+		if got, _ := params["subscription"].(string); got != subscriptionID {
+			continue
+		}
+		result, _ := params["result"].(map[string]any)
+		if result != nil {
+			return result
+		}
+	}
+	s.T().Fatalf("timed out waiting for newHeads notification on subscription %s", subscriptionID)
+	return nil
+}
+
+func (s *lumeraValidatorSuite) requireSuccessfulReceipt(receipt map[string]any, txHash string) {
+	statusHex, _ := receipt["status"].(string)
+	s.Require().Equal("0x1", statusHex, "expected successful tx status")
+	gotHash, _ := receipt["transactionHash"].(string)
+	s.Require().Equal(strings.ToLower(txHash), strings.ToLower(gotHash), "receipt tx hash mismatch")
+	s.Require().NotEmpty(receipt["blockHash"], "receipt missing blockHash")
+	s.Require().NotEmpty(receipt["blockNumber"], "receipt missing blockNumber")
+}
+
+func (s *lumeraValidatorSuite) requireReceiptHasTopic(receipt map[string]any, topic string) {
+	logs, ok := receipt["logs"].([]any)
+	s.Require().True(ok, "receipt logs has unexpected type: %#v", receipt["logs"])
+	for _, rawLog := range logs {
+		logObj, _ := rawLog.(map[string]any)
+		topics, _ := logObj["topics"].([]any)
+		for _, rawTopic := range topics {
+			if got, _ := rawTopic.(string); strings.EqualFold(got, topic) {
+				return
+			}
+		}
+	}
+	s.T().Fatalf("receipt did not contain topic %s: %#v", topic, receipt)
+}
+
+func (s *lumeraValidatorSuite) requireUint256Hex(hexValue string, want uint64) {
+	got := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(hexValue)), "0x")
+	if got == "" {
+		s.T().Fatalf("eth_call returned empty result")
+	}
+	if len(got)%2 != 0 {
+		got = "0" + got
+	}
+	if len(got) < 16 {
+		got = strings.Repeat("0", 16-len(got)) + got
+	}
+	low64 := got[len(got)-16:]
+	wantLow64 := hex.EncodeToString([]byte{
+		byte(want >> 56), byte(want >> 48), byte(want >> 40), byte(want >> 32),
+		byte(want >> 24), byte(want >> 16), byte(want >> 8), byte(want),
+	})
+	s.Require().Equal(wantLow64, low64, "unexpected uint256 return value: %s", hexValue)
 }
 
 func (s *lumeraValidatorSuite) mustGetTransactionCount(rpcAddr string, addr common.Address, blockTag string) uint64 {
@@ -440,6 +657,57 @@ func resolveLumeraJSONRPC(rpcAddr string) string {
 		u.Scheme = "http"
 	}
 	return u.String()
+}
+
+func resolveLumeraJSONWS(rpcAddr string) string {
+	if explicit := strings.TrimSpace(os.Getenv("LUMERA_JSONWS_ADDR")); explicit != "" {
+		return explicit
+	}
+
+	if ports, err := loadLocalLumeradPorts(); err == nil && ports.JSONWS > 0 {
+		return fmt.Sprintf("ws://127.0.0.1:%d", ports.JSONWS)
+	}
+
+	if strings.TrimSpace(rpcAddr) == "" {
+		return "ws://supernova_validator_1:8546"
+	}
+	if strings.Contains(rpcAddr, ":26657") {
+		return strings.Replace(strings.Replace(rpcAddr, "http://", "ws://", 1), ":26657", ":8546", 1)
+	}
+
+	u, err := url.Parse(rpcAddr)
+	if err != nil || u.Host == "" {
+		return "ws://supernova_validator_1:8546"
+	}
+	host := u.Hostname()
+	u.Host = host + ":8546"
+	switch u.Scheme {
+	case "https", "wss":
+		u.Scheme = "wss"
+	default:
+		u.Scheme = "ws"
+	}
+	return u.String()
+}
+
+func loggingConstantContractCreationCode(topicHex string) []byte {
+	topic := common.FromHex(topicHex)
+	runtime := evmprogram.New().
+		Push(42).Push(0).Op(vm.MSTORE).
+		Return(0, 32).
+		Bytes()
+
+	return evmprogram.New().
+		Push(topic).Push(0).Push(0).Op(vm.LOG1).
+		ReturnViaCodeCopy(runtime).
+		Bytes()
+}
+
+func abiCallUint64(signature string, value uint64) []byte {
+	selector := crypto.Keccak256([]byte(signature))[:4]
+	arg := make([]byte, 32)
+	big.NewInt(0).SetUint64(value).FillBytes(arg)
+	return append(selector, arg...)
 }
 
 func callJSONRPC(rpcAddr, method string, params any, out any) error {

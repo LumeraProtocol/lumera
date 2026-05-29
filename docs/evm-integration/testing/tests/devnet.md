@@ -16,6 +16,9 @@ Test source: `devnet/tests/validator/evm_test.go`
 | `TestEVMNonceIncrementsAfterMinedTx` | Verifies account nonce increments after a mined EVM transaction. |
 | `TestEVMBlockLookupByHashAndNumberConsistent` | Compares block lookup by hash and by number for consistent block metadata. |
 | `TestEVMTransactionVisibleAcrossPeerValidator` | Sends a tx to one validator and verifies the receipt is visible on a peer validator with matching `blockHash`; exercises the broadcast worker re-gossip path. |
+| `TestEVMWebSocketNewHeadsSubscription` | Subscribes to `newHeads` over the EVM WebSocket endpoint, sends a transaction, and verifies a header notification arrives. |
+| `TestEVMContractDeployCallAndLogsDevnet` | Deploys a small EVM contract, verifies deployment logs, calls the runtime with `eth_call`, and queries logs by topic. |
+| `TestEVMActionPrecompileQueryDevnet` | Calls the Lumera Action precompile through `eth_call` and verifies ABI-shaped fee output. |
 
 ## EVM Migration Devnet Tests
 
@@ -43,8 +46,6 @@ The current devnet coverage does not yet explicitly exercise:
 | Scenario | Current coverage |
 | --- | --- |
 | Public JSON-RPC rate-limit profile | Unit/config coverage only |
-| WebSocket subscriptions across validators | Integration coverage only |
 | JSON-RPC restart persistence | Integration coverage only |
-| EVM contract deploy/call/log scenarios | Integration coverage only |
-| Standard and custom precompile tx/query paths | Integration coverage only |
+| Standard and custom precompile tx paths | Integration coverage only |
 | ERC20 wrong-provenance rejection | Integration coverage only |

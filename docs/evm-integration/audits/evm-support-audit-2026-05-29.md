@@ -139,13 +139,13 @@ Status on `evm-audit`:
 | Async EVM broadcast worker re-gossip | Covered | Covered | Covered | N/A | Covered |
 | JSON-RPC basic methods, tx lookup, receipts | Covered | Covered | Covered | N/A | Covered |
 | JSON-RPC rate limiting public alias path | Unit covered | Missing/unclear | Missing | N/A | Partially covered |
-| WebSocket subscriptions | Covered | Covered | Missing | N/A | Partially covered |
+| WebSocket subscriptions | Covered | Covered | `newHeads` covered | N/A | Covered |
 | Fee market base fee and min floor | Covered | Covered | Covered | N/A | Covered |
 | Precisebank send/query/fractional accounting | Covered | Covered | Missing | N/A | Partially covered |
 | ERC20/IBC exact and provenance-bound allowlist | Covered | Covered | IBC transfer only | N/A | Partially covered |
-| Contract deploy/call/logs/storage persistence | N/A | Covered | Missing | N/A | Partially covered |
-| Standard precompiles | N/A | Covered | Missing | N/A | Partially covered |
-| Action/Supernode/Wasm precompiles | Covered/partial | Covered | Missing | N/A | Partially covered |
+| Contract deploy/call/logs/storage persistence | N/A | Covered | Deploy/call/logs covered; restart missing | N/A | Partially covered |
+| Standard precompiles | N/A | Covered | Query missing | N/A | Partially covered |
+| Action/Supernode/Wasm precompiles | Covered/partial | Covered | Action query covered | N/A | Partially covered |
 | CosmWasm -> EVM bridge | Covered | Covered | Missing | N/A | Partially covered |
 | EVM -> CosmWasm precompile | Covered/partial | Covered | Missing | N/A | Partially covered |
 | EVMigration single-key account | Covered | Covered | Covered | Covered | Covered |
@@ -233,10 +233,10 @@ Recommended fix:
 | Wrong-provenance ERC20 rejection | Integration only | Missing |
 | JSON-RPC from multiple validators | `TestEVMTransactionVisibleAcrossPeerValidator` | Covered |
 | JSON-RPC restart persistence | Integration only | Missing |
-| WebSocket subscriptions | Integration only | Missing |
+| WebSocket subscriptions | `TestEVMWebSocketNewHeadsSubscription` | Covered |
 | Public JSON-RPC rate-limit profile | Unit only | Missing |
-| Contract deploy/call/logs | Integration only | Missing |
-| Precompile tx/query paths | Integration only | Missing |
+| Contract deploy/call/logs | `TestEVMContractDeployCallAndLogsDevnet` | Covered |
+| Precompile tx/query paths | `TestEVMActionPrecompileQueryDevnet`; tx paths integration only | Partially covered |
 
 ### TEST-01: Devnet inventory doc is stale and understates/omits scenarios
 
@@ -245,7 +245,7 @@ Severity: Medium
 Evidence:
 
 - `docs/evm-integration/testing/tests/devnet.md` lists only three EVM devnet tests.
-- `devnet/tests/validator/evm_test.go` actually contains eight EVM JSON-RPC/fee/tx/cross-peer tests.
+- `devnet/tests/validator/evm_test.go` now contains EVM JSON-RPC/fee/tx/cross-peer, WebSocket, contract, and precompile query tests.
 - `devnet/tests/evmigration/main.go` lists additional modes: `migrate-all`, `verify`, `multisig-vesting`, and `multisig-validator`, but `devnet/tests/evmigration/README.md` names a non-existent relative doc path.
 
 Recommended fix:
@@ -264,6 +264,7 @@ Recommended fix:
 | `make lint-scripts` | Passed |
 | `make test-scripts` | Passed, 119 Bats tests |
 | `go test -tags='integration test' ./tests/integration/evm/... ./tests/integration/evmigration/... -run 'TestNonExistent'` | Passed compile/no-test smoke |
+| `cd devnet && go test -mod=mod ./tests/validator -run TestNonExistent` | Passed compile/no-test smoke for expanded validator devnet EVM scenarios |
 | `make integration-tests NOCACHE=1` | Interrupted after one full-suite attempt failed in `tests/integration/evm/contracts`: `TestContractCodePersistsAcrossRestart` hit `send legacy tx ... exceeds block gas limit`; follow-up focused and package-level contracts runs passed |
 | `go test -tags='integration test' ./tests/integration/evm/contracts -run TestContractCodePersistsAcrossRestart -count=1 -v` | Passed |
 | `go test -tags='integration test' ./tests/integration/evm/contracts -count=1` | Passed in 262.693s |

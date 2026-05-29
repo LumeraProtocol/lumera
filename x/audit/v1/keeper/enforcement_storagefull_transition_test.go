@@ -16,13 +16,15 @@ func TestEnforceEpochEnd_RecoversPostponedToStorageFullWhenDiskStillHigh(t *test
 
 	reporter := sdk.AccAddress([]byte("reporter_address_20b")).String()
 	reporterVal := sdk.ValAddress([]byte("reporter_val_addr_20")).String()
+	valAddr, err := sdk.ValAddressFromBech32(reporterVal)
+	require.NoError(t, err)
 
 	sn := sntypes.SuperNode{ValidatorAddress: reporterVal, SupernodeAccount: reporter, States: []*sntypes.SuperNodeStateRecord{{State: sntypes.SuperNodeStatePostponed, Height: 9, Reason: "audit_missing_reports"}}}
 
 	// Persist a compliant report for epoch 1.
 	f.supernodeKeeper.EXPECT().GetSuperNodeByAccount(gomock.Any(), reporter).Return(sn, true, nil).Times(1)
 	f.supernodeKeeper.EXPECT().GetParams(gomock.Any()).Return(sntypes.DefaultParams()).Times(2)
-	err := f.keeper.SetReport(f.ctx, types.EpochReport{SupernodeAccount: reporter, EpochId: 1, ReportHeight: f.ctx.BlockHeight(), HostReport: types.HostReport{DiskUsagePercent: 95}})
+	err = f.keeper.SetReport(f.ctx, types.EpochReport{SupernodeAccount: reporter, EpochId: 1, ReportHeight: f.ctx.BlockHeight(), HostReport: types.HostReport{DiskUsagePercent: 95}})
 	require.NoError(t, err)
 
 	peer := sdk.AccAddress([]byte("peer_for_recovery_____")).String()
@@ -55,18 +57,64 @@ func TestEnforceEpochEnd_RecoversPostponedToStorageFullWhenDiskStillHigh(t *test
 		Return([]sntypes.SuperNode{sn}, nil).
 		Times(1)
 	f.supernodeKeeper.EXPECT().
-		SetSuperNode(gomock.AssignableToTypeOf(f.ctx), gomock.Any()).
-		DoAndReturn(func(_ sdk.Context, updated sntypes.SuperNode) error {
-			require.NotEmpty(t, updated.States)
-			require.Equal(t, sntypes.SuperNodeStateStorageFull, updated.States[len(updated.States)-1].State)
-			return nil
-		}).
+		MarkSuperNodeStorageFull(gomock.AssignableToTypeOf(f.ctx), valAddr).
+		Return(nil).
 		Times(1)
 
 	err = f.keeper.EnforceEpochEnd(f.ctx, 1, params)
 	require.NoError(t, err)
-	require.True(t, hasEventType(f.ctx.EventManager().Events(), sntypes.EventTypeSupernodeStorageFull))
 	require.False(t, hasEventType(f.ctx.EventManager().Events(), sntypes.EventTypeSupernodeRecovered))
+}
+
+func TestEnforceEpochEnd_InvalidDiskReportDoesNotRecoverPostponedToActive(t *testing.T) {
+	f := initFixture(t)
+	f.ctx = f.ctx.WithBlockHeight(10)
+
+	reporter := sdk.AccAddress([]byte("reporter_address_20g")).String()
+	reporterVal := sdk.ValAddress([]byte("reporter_val_addr_25")).String()
+	valAddr, err := sdk.ValAddressFromBech32(reporterVal)
+	require.NoError(t, err)
+
+	sn := sntypes.SuperNode{ValidatorAddress: reporterVal, SupernodeAccount: reporter, States: []*sntypes.SuperNodeStateRecord{{State: sntypes.SuperNodeStatePostponed, Height: 9, Reason: "audit_missing_reports"}}}
+
+	err = f.keeper.SetReportRaw(f.ctx, types.EpochReport{SupernodeAccount: reporter, EpochId: 1, ReportHeight: f.ctx.BlockHeight(), HostReport: types.HostReport{DiskUsagePercent: -1}})
+	require.NoError(t, err)
+
+	peer := sdk.AccAddress([]byte("peer_for_recovery_____")).String()
+	err = f.keeper.SetReport(f.ctx, types.EpochReport{
+		SupernodeAccount: peer,
+		EpochId:          1,
+		ReportHeight:     f.ctx.BlockHeight(),
+		HostReport:       types.HostReport{},
+		StorageChallengeObservations: []*types.StorageChallengeObservation{{
+			TargetSupernodeAccount: reporter,
+			PortStates:             []types.PortState{types.PortState_PORT_STATE_OPEN},
+		}},
+	})
+	require.NoError(t, err)
+	f.keeper.SetStorageChallengeReportIndex(f.ctx, reporter, 1, peer)
+
+	params := types.DefaultParams()
+	params.RequiredOpenPorts = []uint32{4444}
+
+	f.supernodeKeeper.EXPECT().
+		GetAllSuperNodes(gomock.AssignableToTypeOf(f.ctx), sntypes.SuperNodeStateActive).
+		Return([]sntypes.SuperNode{}, nil).
+		Times(1)
+	f.supernodeKeeper.EXPECT().
+		GetAllSuperNodes(gomock.AssignableToTypeOf(f.ctx), sntypes.SuperNodeStatePostponed).
+		Return([]sntypes.SuperNode{sn}, nil).
+		Times(1)
+	f.supernodeKeeper.EXPECT().
+		RecoverSuperNodeFromPostponed(gomock.Any(), gomock.Any()).
+		Times(0)
+	f.supernodeKeeper.EXPECT().
+		MarkSuperNodeStorageFull(gomock.AssignableToTypeOf(f.ctx), valAddr).
+		Return(nil).
+		Times(1)
+
+	err = f.keeper.EnforceEpochEnd(f.ctx, 1, params)
+	require.NoError(t, err)
 }
 
 func TestEnforceEpochEnd_RecoversPostponedToActiveWhenDiskBelowThreshold(t *testing.T) {

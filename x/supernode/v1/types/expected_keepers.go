@@ -28,6 +28,7 @@ type SupernodeKeeper interface {
 	SetSuperNodeActive(ctx sdk.Context, valAddr sdk.ValAddress, reason string) error
 	SetSuperNodePostponed(ctx sdk.Context, valAddr sdk.ValAddress, reason string) error
 	RecoverSuperNodeFromPostponed(ctx sdk.Context, valAddr sdk.ValAddress) error
+	MarkSuperNodeStorageFull(ctx sdk.Context, valAddr sdk.ValAddress) error
 	SetMetricsState(ctx sdk.Context, state SupernodeMetricsState) error
 	GetMetricsState(ctx sdk.Context, valAddr sdk.ValAddress) (SupernodeMetricsState, bool)
 	DeleteMetricsState(ctx sdk.Context, valAddr sdk.ValAddress)

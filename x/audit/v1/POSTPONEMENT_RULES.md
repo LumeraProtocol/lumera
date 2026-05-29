@@ -1,6 +1,6 @@
 # Postponement and Recovery Rules (audit/v1)
 
-This document describes the on-chain rules implemented by the audit module (v1) for switching a supernode between `ACTIVE` and `POSTPONED`, and for recovering back to `ACTIVE`.
+This document describes the on-chain rules implemented by the audit module (v1) for switching a supernode between `ACTIVE` and `POSTPONED`, and for recovering out of `POSTPONED`.
 
 ## Definitions
 
@@ -51,8 +51,12 @@ An epoch counts toward the consecutive requirement only if:
 - there is at least **1** peer reporter about the target in that epoch, and
 - the share of peer reporters about the target in that epoch that report `PORT_STATE_CLOSED` for port index `i` meets or exceeds `peer_port_postpone_threshold_percent`.
 
-## Recovery rule (POSTPONED → ACTIVE)
+## Recovery rule (POSTPONED → ACTIVE or STORAGE_FULL)
 
-In a single epoch, a `POSTPONED` supernode becomes `ACTIVE` if:
+In a single epoch, a `POSTPONED` supernode recovers if:
 - it submits one compliant host report (Host Report requirements), and
 - there exists at least **1** peer report about that supernode in the same epoch where **all** required ports are `PORT_STATE_OPEN`.
+
+The recovery target is determined from the same-epoch self HostReport:
+- if `disk_usage_percent` is omitted/zero or is at or below `supernode.max_storage_usage_percent`, the supernode becomes `ACTIVE`;
+- if `disk_usage_percent` is above `supernode.max_storage_usage_percent`, the supernode becomes `STORAGE_FULL`.

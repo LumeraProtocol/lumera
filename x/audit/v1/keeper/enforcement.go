@@ -562,10 +562,25 @@ func (k Keeper) recoverSupernodeActive(ctx sdk.Context, sn sntypes.SuperNode) er
 	return k.supernodeKeeper.RecoverSuperNodeFromPostponed(ctx, valAddr)
 }
 
+func (k Keeper) markSupernodeStorageFull(ctx sdk.Context, sn sntypes.SuperNode) error {
+	if sn.ValidatorAddress == "" {
+		return fmt.Errorf("missing validator address for supernode %q", sn.SupernodeAccount)
+	}
+	valAddr, err := sdk.ValAddressFromBech32(sn.ValidatorAddress)
+	if err != nil {
+		return err
+	}
+	return k.supernodeKeeper.MarkSuperNodeStorageFull(ctx, valAddr)
+}
+
 func (k Keeper) recoverSupernodeFromPostponed(ctx sdk.Context, sn sntypes.SuperNode, epochID uint64) error {
 	r, found := k.GetReport(ctx, epochID, sn.SupernodeAccount)
 	if !found || r.HostReport.DiskUsagePercent == 0 {
 		return k.recoverSupernodeActive(ctx, sn)
+	}
+
+	if !isValidHostUsagePercent(r.HostReport.DiskUsagePercent) {
+		return k.markSupernodeStorageFull(ctx, sn)
 	}
 
 	maxStorage := float64(k.supernodeKeeper.GetParams(ctx).MaxStorageUsagePercent)
@@ -573,23 +588,7 @@ func (k Keeper) recoverSupernodeFromPostponed(ctx sdk.Context, sn sntypes.SuperN
 		return k.recoverSupernodeActive(ctx, sn)
 	}
 
-	if len(sn.States) == 0 {
-		return fmt.Errorf("supernode %q has no state history", sn.SupernodeAccount)
-	}
-	sn.States = append(sn.States, &sntypes.SuperNodeStateRecord{
-		State:  sntypes.SuperNodeStateStorageFull,
-		Height: ctx.BlockHeight(),
-	})
-	if err := k.supernodeKeeper.SetSuperNode(ctx, sn); err != nil {
-		return err
-	}
-	ctx.EventManager().EmitEvent(sdk.NewEvent(
-		sntypes.EventTypeSupernodeStorageFull,
-		sdk.NewAttribute(sntypes.AttributeKeyValidatorAddress, sn.ValidatorAddress),
-		sdk.NewAttribute(sntypes.AttributeKeyOldState, sntypes.SuperNodeStatePostponed.String()),
-		sdk.NewAttribute(sntypes.AttributeKeyHeight, strconv.FormatInt(ctx.BlockHeight(), 10)),
-	))
-	return nil
+	return k.markSupernodeStorageFull(ctx, sn)
 }
 
 // storageTruthBand represents a node suspicion severity level.

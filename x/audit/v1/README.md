@@ -90,12 +90,14 @@ At epoch end, a supernode can be postponed for:
 - **Self Report minimum failures** (CPU/mem free% thresholds),
 - **Peer port thresholds**: a required port is treated as CLOSED if peer observations meet `peer_port_postpone_threshold_percent`, and this happens for `consecutive_epochs_to_postpone` consecutive epochs.
 
-### Recovery (`POSTPONED -> ACTIVE`)
+### Recovery (`POSTPONED -> ACTIVE` or `STORAGE_FULL`)
 
 At epoch end, a supernode can recover:
 
 - If postponed due to action-finalization evidence: by the action-finalization recovery window and total-bad-evidence constraint.
 - Otherwise: if it has a compliant self report and at least one peer observation in the epoch where all required ports are `OPEN`.
+
+If the same-epoch self HostReport still has `disk_usage_percent` above `supernode.max_storage_usage_percent`, recovery routes to `STORAGE_FULL` instead of `ACTIVE`.
 
 Detailed behavior is implemented in the module's epoch-end enforcement logic.
 

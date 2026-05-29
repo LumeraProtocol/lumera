@@ -261,7 +261,9 @@ Recommended fix:
 | `make lint-scripts` | Passed |
 | `make test-scripts` | Passed, 119 Bats tests |
 | `go test -tags='integration test' ./tests/integration/evm/... ./tests/integration/evmigration/... -run 'TestNonExistent'` | Passed compile/no-test smoke |
-| `make integration-tests NOCACHE=1` | Interrupted after failing in `tests/integration/evm/contracts`: `TestContractCodePersistsAcrossRestart` hit `send legacy tx ... exceeds block gas limit` |
+| `make integration-tests NOCACHE=1` | Interrupted after one full-suite attempt failed in `tests/integration/evm/contracts`: `TestContractCodePersistsAcrossRestart` hit `send legacy tx ... exceeds block gas limit`; follow-up focused and package-level contracts runs passed |
+| `go test -tags='integration test' ./tests/integration/evm/contracts -run TestContractCodePersistsAcrossRestart -count=1 -v` | Passed |
+| `go test -tags='integration test' ./tests/integration/evm/contracts -count=1` | Passed in 262.693s |
 | `make unit-tests NOCACHE=1` | Not run separately because the narrower EVM baseline already failed in `app` |
 | `make simulation-tests` | Not run in this pass; should run after baseline unit failure is resolved |
 | `make devnet-evm-upgrade` | Not run in this pass; Docker devnet run is long and should be scheduled as release-gate validation |
@@ -269,6 +271,6 @@ Recommended fix:
 ## Recommended Backlog
 
 1. Add direct keeper-level tests for both invalid legacy proof and invalid new proof rejection in `VerifyMigrationProofsForAnte`.
-2. Investigate `TestContractCodePersistsAcrossRestart` exceeding the block gas limit during the broader integration suite.
+2. Re-run full `make integration-tests NOCACHE=1`; the earlier contracts failure did not reproduce in focused or package-level runs.
 3. Add devnet scenarios for rate-limit profile, WebSocket, restart persistence, contracts, precompiles, and ERC20 wrong-provenance rejection.
 4. Run `make simulation-tests` and `make devnet-evm-upgrade` as release-gate validation after the focused fixes land.

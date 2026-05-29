@@ -138,13 +138,13 @@ Status on `evm-audit`:
 | EVM mempool nonce gaps/replacement/ordering/capacity | Covered | Covered | Cross-peer tx | N/A | Covered |
 | Async EVM broadcast worker re-gossip | Covered | Covered | Covered | N/A | Covered |
 | JSON-RPC basic methods, tx lookup, receipts | Covered | Covered | Covered | N/A | Covered |
-| JSON-RPC rate limiting public alias path | Unit covered | Missing/unclear | Missing | N/A | Partially covered |
+| JSON-RPC rate limiting public alias path | Unit covered | Missing/unclear | Conditional profile coverage | N/A | Partially covered |
 | WebSocket subscriptions | Covered | Covered | `newHeads` covered | N/A | Covered |
 | Fee market base fee and min floor | Covered | Covered | Covered | N/A | Covered |
 | Precisebank send/query/fractional accounting | Covered | Covered | Missing | N/A | Partially covered |
 | ERC20/IBC exact and provenance-bound allowlist | Covered | Covered | IBC transfer only | N/A | Partially covered |
 | Contract deploy/call/logs/storage persistence | N/A | Covered | Deploy/call/logs covered; restart missing | N/A | Partially covered |
-| Standard precompiles | N/A | Covered | Query missing | N/A | Partially covered |
+| Standard precompiles | N/A | Covered | Gov tx smoke | N/A | Partially covered |
 | Action/Supernode/Wasm precompiles | Covered/partial | Covered | Action query covered | N/A | Partially covered |
 | CosmWasm -> EVM bridge | Covered | Covered | Missing | N/A | Partially covered |
 | EVM -> CosmWasm precompile | Covered/partial | Covered | Missing | N/A | Partially covered |
@@ -155,7 +155,7 @@ Status on `evm-audit`:
 | Invalid/replay migration negative paths | Covered | Covered | Partial | Covered | Partially covered |
 | Devnet pre-EVM -> EVM upgrade | N/A | N/A | Covered by target | N/A | Covered |
 | Devnet JSON-RPC across validators | N/A | N/A | Covered | N/A | Covered |
-| Devnet EVM contract deploy/call/log/precompile | N/A | Covered single-node | Missing | N/A | Missing |
+| Devnet EVM contract deploy/call/log/precompile | N/A | Covered single-node | Deploy/call/logs, Action query, Gov tx smoke | N/A | Partially covered |
 
 ## Migration Guide Review
 
@@ -234,9 +234,9 @@ Recommended fix:
 | JSON-RPC from multiple validators | `TestEVMTransactionVisibleAcrossPeerValidator` | Covered |
 | JSON-RPC restart persistence | Integration only | Missing |
 | WebSocket subscriptions | `TestEVMWebSocketNewHeadsSubscription` | Covered |
-| Public JSON-RPC rate-limit profile | Unit only | Missing |
+| Public JSON-RPC rate-limit profile | `TestEVMJSONRPCRateLimitPublicProfileIfEnabled` when enabled in devnet `app.toml` | Partially covered |
 | Contract deploy/call/logs | `TestEVMContractDeployCallAndLogsDevnet` | Covered |
-| Precompile tx/query paths | `TestEVMActionPrecompileQueryDevnet`; tx paths integration only | Partially covered |
+| Precompile tx/query paths | `TestEVMActionPrecompileQueryDevnet`, `TestEVMGovPrecompileTxPathDevnet`; broader tx paths integration only | Partially covered |
 
 ### TEST-01: Devnet inventory doc is stale and understates/omits scenarios
 
@@ -275,5 +275,5 @@ Recommended fix:
 ## Recommended Backlog
 
 1. Re-run full `make integration-tests NOCACHE=1`; the earlier contracts failure did not reproduce in focused or package-level runs.
-2. Add devnet scenarios for rate-limit profile, WebSocket, restart persistence, contracts, precompiles, and ERC20 wrong-provenance rejection.
+2. Add devnet scenarios for restart persistence, broader precompile coverage, and ERC20 wrong-provenance rejection.
 3. Run `make simulation-tests` and `make devnet-evm-upgrade` as release-gate validation after the focused fixes land.

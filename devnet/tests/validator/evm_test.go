@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	pkgversion "github.com/LumeraProtocol/lumera/pkg/version"
@@ -28,6 +29,7 @@ import (
 const (
 	defaultLumeraJSONRPC    = "http://supernova_validator_1:8545"
 	actionPrecompileAddress = "0x0000000000000000000000000000000000000901"
+	govPrecompileAddress    = "0x0000000000000000000000000000000000000805"
 	defaultTipCapWei        = int64(1_000_000_000) // 1 gwei
 	defaultRPCTimeout       = 30 * time.Second
 )
@@ -95,6 +97,62 @@ func (s *lumeraValidatorSuite) TestEVMJSONRPCNamespacesExposed() {
 		s.Require().True(ok, "expected JSON-RPC namespace %q to be exposed (modules=%v)", ns, modules)
 		s.Require().NotEmpty(version, "namespace %q version should not be empty", ns)
 	}
+}
+
+func (s *lumeraValidatorSuite) TestEVMJSONRPCRateLimitPublicProfileIfEnabled() {
+	s.requireEVMVersionOrSkip()
+
+	cfg, err := loadLocalJSONRPCRateLimitConfig()
+	if err != nil {
+		s.T().Skipf("skip rate-limit profile test: %v", err)
+		return
+	}
+	if !cfg.Enabled {
+		s.T().Skip("skip rate-limit profile test: lumera.json-rpc-ratelimit.enable is false")
+		return
+	}
+	if cfg.Burst > 400 || cfg.RequestsPerSecond > 250 {
+		s.T().Skipf("skip rate-limit profile test: configured burst/RPS too high for bounded probe (burst=%d rps=%d)", cfg.Burst, cfg.RequestsPerSecond)
+		return
+	}
+
+	rpc := resolveLumeraJSONRPC(s.lumeraRPC)
+	totalRequests := cfg.Burst + cfg.RequestsPerSecond + 25
+	if totalRequests < cfg.Burst*3 {
+		totalRequests = cfg.Burst * 3
+	}
+	if totalRequests < 50 {
+		totalRequests = 50
+	}
+	if totalRequests > 800 {
+		totalRequests = 800
+	}
+
+	var wg sync.WaitGroup
+	start := make(chan struct{})
+	statuses := make(chan int, totalRequests)
+	for i := 0; i < totalRequests; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			status, err := postJSONRPCStatus(rpc, "eth_chainId", []any{})
+			if err == nil {
+				statuses <- status
+			}
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(statuses)
+
+	tooManyRequests := 0
+	for status := range statuses {
+		if status == http.StatusTooManyRequests {
+			tooManyRequests++
+		}
+	}
+	s.Require().Greater(tooManyRequests, 0, "expected at least one HTTP 429 from enabled JSON-RPC rate limiter")
 }
 
 func (s *lumeraValidatorSuite) TestEVMFeeMarketBaseFeeActive() {
@@ -333,6 +391,27 @@ func (s *lumeraValidatorSuite) TestEVMActionPrecompileQueryDevnet() {
 	s.Require().GreaterOrEqual(len(result), 96, "getActionFee should return three uint256 words, got %d bytes", len(result))
 	totalFee := new(big.Int).SetBytes(result[:32])
 	s.Require().Greater(totalFee.Sign(), 0, "unexpected total fee result: %s", totalFee)
+}
+
+func (s *lumeraValidatorSuite) TestEVMGovPrecompileTxPathDevnet() {
+	s.requireEVMVersionOrSkip()
+
+	rpc := resolveLumeraJSONRPC(s.lumeraRPC)
+	_, proposer := s.mustLoadSenderPrivKey()
+	to := common.HexToAddress(govPrecompileAddress)
+	input := abiCallAddressUint64("cancelProposal(address,uint64)", proposer, 9_999_999)
+
+	txHash, _, _ := s.mustSendDynamicTx(rpc, &senderTx{
+		To:    &to,
+		Value: big.NewInt(0),
+		Gas:   500_000,
+		Data:  input,
+	})
+	receipt := s.mustWaitReceipt(rpc, txHash, 60*time.Second)
+	gotHash, _ := receipt["transactionHash"].(string)
+	s.Require().Equal(strings.ToLower(txHash), strings.ToLower(gotHash), "receipt tx hash mismatch")
+	statusHex, _ := receipt["status"].(string)
+	s.Require().Equal("0x0", statusHex, "expected gov cancelProposal for unknown proposal to fail in EVM receipt")
 }
 
 // resolvePeerJSONRPC picks a peer validator's JSON-RPC endpoint that differs
@@ -708,6 +787,46 @@ func abiCallUint64(signature string, value uint64) []byte {
 	arg := make([]byte, 32)
 	big.NewInt(0).SetUint64(value).FillBytes(arg)
 	return append(selector, arg...)
+}
+
+func abiCallAddressUint64(signature string, addr common.Address, value uint64) []byte {
+	selector := crypto.Keccak256([]byte(signature))[:4]
+	addrArg := make([]byte, 32)
+	copy(addrArg[12:], addr.Bytes())
+	valueArg := make([]byte, 32)
+	big.NewInt(0).SetUint64(value).FillBytes(valueArg)
+
+	out := append([]byte{}, selector...)
+	out = append(out, addrArg...)
+	out = append(out, valueArg...)
+	return out
+}
+
+func postJSONRPCStatus(rpcAddr, method string, params any) (int, error) {
+	body := rpcRequest{
+		JSONRPC: "2.0",
+		ID:      1,
+		Method:  method,
+		Params:  params,
+	}
+	bz, err := json.Marshal(body)
+	if err != nil {
+		return 0, fmt.Errorf("marshal %s request: %w", method, err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, rpcAddr, bytes.NewReader(bz))
+	if err != nil {
+		return 0, fmt.Errorf("build %s request: %w", method, err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: defaultRPCTimeout}
+	resp, err := client.Do(req)
+	if err != nil {
+		return 0, fmt.Errorf("call %s: %w", method, err)
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode, nil
 }
 
 func callJSONRPC(rpcAddr, method string, params any, out any) error {

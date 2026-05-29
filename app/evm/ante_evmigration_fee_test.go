@@ -7,6 +7,7 @@ import (
 
 	"cosmossdk.io/math"
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
+	abci "github.com/cometbft/cometbft/abci/types"
 	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
@@ -26,6 +27,7 @@ import (
 )
 
 const anteMigrationTestChainID = "lumera-test-1"
+const anteMigrationAppChainID = "testing"
 
 // TestNewAnteHandlerMigrationOnlyCosmosTxUsesReducedAntePath verifies the
 // Cosmos ante builder branches once for migration-only txs and skips the
@@ -78,14 +80,14 @@ func TestNewAnteHandlerMigrationOnlyCosmosTxUsesReducedAntePath(t *testing.T) {
 		})
 
 	t.Run("migration-only unsigned zero-fee tx is accepted", func(t *testing.T) {
-		tx := newUnsignedMigrationTx(t, app, validMigrationMsg(t))
+		tx := newUnsignedMigrationTx(t, app, validMigrationMsg(t, anteMigrationTestChainID))
 
 		_, err := anteHandler(ctx, tx, false)
 		require.NoError(t, err)
 	})
 
 	t.Run("migration-only invalid embedded proof is rejected in ante", func(t *testing.T) {
-		msg := validMigrationMsg(t)
+		msg := validMigrationMsg(t, anteMigrationTestChainID)
 		msg.LegacyProof.GetSingle().Signature[0] ^= 0x01
 		tx := newUnsignedMigrationTx(t, app, msg)
 
@@ -95,7 +97,7 @@ func TestNewAnteHandlerMigrationOnlyCosmosTxUsesReducedAntePath(t *testing.T) {
 	})
 
 	t.Run("mixed tx still uses standard cosmos ante path", func(t *testing.T) {
-		migrationMsg := validMigrationMsg(t)
+		migrationMsg := validMigrationMsg(t, anteMigrationTestChainID)
 		bankFrom := sdk.MustAccAddressFromBech32(migrationMsg.LegacyAddress)
 		bankTo := sdk.MustAccAddressFromBech32(migrationMsg.NewAddress)
 		tx := newUnsignedMigrationTx(
@@ -110,6 +112,27 @@ func TestNewAnteHandlerMigrationOnlyCosmosTxUsesReducedAntePath(t *testing.T) {
 	})
 }
 
+func TestEVMigrationInvalidEmbeddedProofRejectedInCheckTx(t *testing.T) {
+	app := lumeraapp.Setup(t)
+
+	msg := validMigrationMsg(t, anteMigrationAppChainID)
+	msg.NewProof.GetSingle().Signature[0] ^= 0x01
+
+	tx := newUnsignedMigrationTx(t, app, msg)
+	txBytes, err := app.TxConfig().TxEncoder()(tx)
+	require.NoError(t, err)
+
+	resp, err := app.CheckTx(&abci.RequestCheckTx{
+		Tx:   txBytes,
+		Type: abci.CheckTxType_New,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.NotZero(t, resp.Code)
+	require.Contains(t, resp.Log, "signature")
+}
+
 func newUnsignedMigrationTx(t *testing.T, app *lumeraapp.App, msgs ...sdk.Msg) sdk.Tx {
 	t.Helper()
 
@@ -122,7 +145,7 @@ func newUnsignedMigrationTx(t *testing.T, app *lumeraapp.App, msgs ...sdk.Msg) s
 
 // validMigrationMsg builds a MsgClaimLegacyAccount whose embedded proofs pass
 // ante-level cryptographic verification.
-func validMigrationMsg(t *testing.T) *evmigrationtypes.MsgClaimLegacyAccount {
+func validMigrationMsg(t *testing.T, chainID string) *evmigrationtypes.MsgClaimLegacyAccount {
 	t.Helper()
 
 	legacyPriv := secp256k1.GenPrivKey()
@@ -136,7 +159,7 @@ func validMigrationMsg(t *testing.T) *evmigrationtypes.MsgClaimLegacyAccount {
 
 	payload := []byte(fmt.Sprintf(
 		"lumera-evm-migration:%s:%d:claim:%s:%s",
-		anteMigrationTestChainID,
+		chainID,
 		lcfg.EVMChainID,
 		legacy.String(),
 		newAddr.String(),

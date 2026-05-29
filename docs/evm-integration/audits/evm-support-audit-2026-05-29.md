@@ -67,6 +67,8 @@ Status on `evm-audit`:
 - `app/evm/ante.go` now requires an `EVMigrationKeeper` proof verifier and runs it immediately after migration `ValidateBasic`.
 - `x/evmigration/keeper/ante.go` reuses the existing migration proof verification helpers for `MsgClaimLegacyAccount` and `MsgMigrateValidator`.
 - `app/evm/ante_evmigration_fee_test.go` now constructs real legacy and EVM keys and asserts a corrupted embedded proof is rejected in ante.
+- `x/evmigration/keeper/ante_test.go` now covers valid claim/validator proofs, invalid legacy proof rejection, invalid new proof rejection, and unsupported message rejection.
+- `app/evm/ante_evmigration_fee_test.go` now also encodes an unsigned migration tx and submits it through `app.CheckTx`, proving invalid embedded proofs are rejected at admission.
 
 ### Existing Security Posture
 
@@ -132,14 +134,14 @@ Status on `evm-audit`:
 | EVM app wiring, genesis modules, store keys | Covered | Partial | Upgrade flow | N/A | Covered |
 | Dual ante routing | Covered | Covered | Indirect | N/A | Covered |
 | Migration tx fee-free envelope | Covered | Covered | Covered | Covered | Covered |
-| Invalid migration embedded signatures rejected before mempool admission | Missing | Missing | Missing | N/A | Missing |
+| Invalid migration embedded signatures rejected before mempool admission | Covered | App CheckTx covered | Missing | N/A | Partially covered |
 | EVM mempool nonce gaps/replacement/ordering/capacity | Covered | Covered | Cross-peer tx | N/A | Covered |
 | Async EVM broadcast worker re-gossip | Covered | Covered | Covered | N/A | Covered |
 | JSON-RPC basic methods, tx lookup, receipts | Covered | Covered | Covered | N/A | Covered |
 | JSON-RPC rate limiting public alias path | Unit covered | Missing/unclear | Missing | N/A | Partially covered |
 | WebSocket subscriptions | Covered | Covered | Missing | N/A | Partially covered |
 | Fee market base fee and min floor | Covered | Covered | Covered | N/A | Covered |
-| Precisebank send/query/fractional accounting | Covered but currently red | Covered | Missing | N/A | Partially covered |
+| Precisebank send/query/fractional accounting | Covered | Covered | Missing | N/A | Partially covered |
 | ERC20/IBC exact and provenance-bound allowlist | Covered | Covered | IBC transfer only | N/A | Partially covered |
 | Contract deploy/call/logs/storage persistence | N/A | Covered | Missing | N/A | Partially covered |
 | Standard precompiles | N/A | Covered | Missing | N/A | Partially covered |
@@ -257,7 +259,8 @@ Recommended fix:
 | Command | Result |
 | --- | --- |
 | `go version` | `go version go1.26.2 linux/amd64` |
-| `go test -tags=test ./app ./app/evm ./config ./precompiles/... ./x/evmigration/... ./x/erc20policy/...` | Failed: `app` precisebank burn test panic |
+| `go test -tags=test ./app ./app/evm ./config ./precompiles/... ./x/evmigration/... ./x/erc20policy/...` | Passed after the `evm-audit` precisebank test fixes |
+| `go test -tags=test ./app/evm ./x/evmigration/keeper` | Passed with focused ante proof and CheckTx coverage |
 | `make lint-scripts` | Passed |
 | `make test-scripts` | Passed, 119 Bats tests |
 | `go test -tags='integration test' ./tests/integration/evm/... ./tests/integration/evmigration/... -run 'TestNonExistent'` | Passed compile/no-test smoke |
@@ -270,7 +273,6 @@ Recommended fix:
 
 ## Recommended Backlog
 
-1. Add direct keeper-level tests for both invalid legacy proof and invalid new proof rejection in `VerifyMigrationProofsForAnte`.
-2. Re-run full `make integration-tests NOCACHE=1`; the earlier contracts failure did not reproduce in focused or package-level runs.
-3. Add devnet scenarios for rate-limit profile, WebSocket, restart persistence, contracts, precompiles, and ERC20 wrong-provenance rejection.
-4. Run `make simulation-tests` and `make devnet-evm-upgrade` as release-gate validation after the focused fixes land.
+1. Re-run full `make integration-tests NOCACHE=1`; the earlier contracts failure did not reproduce in focused or package-level runs.
+2. Add devnet scenarios for rate-limit profile, WebSocket, restart persistence, contracts, precompiles, and ERC20 wrong-provenance rejection.
+3. Run `make simulation-tests` and `make devnet-evm-upgrade` as release-gate validation after the focused fixes land.

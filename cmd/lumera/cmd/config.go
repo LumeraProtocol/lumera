@@ -72,6 +72,38 @@ func initCometBFTConfig() *cmtcfg.Config {
 	// cfg.P2P.MaxNumInboundPeers = 100
 	// cfg.P2P.MaxNumOutboundPeers = 40
 
+	// RPC hardening — defense-in-depth against misbehaving WebSocket clients.
+	//
+	// Default CometBFT behaviour keeps a WebSocket connection open even when the
+	// client is not draining its subscription buffer, relying on the OS / peer to
+	// eventually close the socket. In practice this can take hours, and a buggy
+	// client (or one with a goroutine/socket leak — see sdk-go PR #17) can
+	// accumulate thousands of dormant subscriptions on `:26657` and saturate the
+	// listen backlog of a validator's RPC.
+	//
+	// Observed on lumera-devnet-1 val3: ~5,000 ESTABLISHED WS connections, listen
+	// queue full (Recv-Q=4097/4096), external RPC port unresponsive — while the
+	// chain itself kept producing blocks. Root cause was a client-side leak in
+	// sdk-go's wait-tx subscriber (fixed in sdk-go PR #17), but the server had no
+	// circuit breaker: it accepted, kept, and buffered for every slow subscriber
+	// indefinitely.
+	//
+	// Setting CloseOnSlowClient=true tells CometBFT to forcibly close any WS
+	// subscriber that cannot keep up with its subscription buffer. This is the
+	// upstream-recommended defense against the failure mode and protects mainnet
+	// validators from any third-party client (indexer, relayer, custom tooling)
+	// that exhibits the same pattern — sdk-go-based or otherwise.
+	//
+	// Trade-off: well-behaved clients that subscribe to a high-volume query and
+	// briefly stall (network blip, GC pause >subscription_buffer_size events)
+	// will be disconnected and must reconnect. They already had to handle
+	// reconnect for normal operational reasons (validator restart, network), so
+	// this is not a new client-side requirement.
+	//
+	// Subscription caps are left at CometBFT defaults (100 clients × 5 subs each),
+	// which are appropriate; no live evidence justifies changing them.
+	cfg.RPC.CloseOnSlowClient = true
+
 	return cfg
 }
 

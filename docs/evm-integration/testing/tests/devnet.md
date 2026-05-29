@@ -42,6 +42,14 @@ See [devnet-tests.md](../../evmigration/devnet-tests.md) for full details on the
 | `multisig-validator` | Exercises validator migration from a multisig legacy account. |
 | `cleanup` | Removes generated test keys from the local keyring. |
 
+## Hermes EVM/IBC Tests
+
+Test source: `devnet/tests/hermes/ibc_test.go`
+
+| Test | Description |
+| --- | --- |
+| `TestIBCUnapprovedBaseDenomDoesNotRegisterERC20Pair` | In EVM mode, sends the simd base denom to Lumera over IBC, verifies the bank voucher arrives, and confirms the unapproved voucher denom does not auto-register an ERC20 token pair. Skips if the devnet profile has already registered that pair. |
+
 ## Coverage Gaps
 
 The current devnet coverage does not yet explicitly exercise:
@@ -51,4 +59,4 @@ The current devnet coverage does not yet explicitly exercise:
 | Public JSON-RPC rate-limit profile | Conditional devnet coverage when rate limiting is enabled |
 | JSON-RPC restart persistence | Opt-in destructive devnet coverage gated by `LUMERA_DEVNET_RESTART_TESTS=true` |
 | Full standard and custom precompile tx matrix | Devnet covers gov tx smoke and Action query; integration covers broader tx/query paths |
-| ERC20 wrong-provenance rejection | Integration coverage only |
+| ERC20 wrong-provenance rejection for an allowlisted base denom on the wrong channel | Devnet covers unapproved base-denom rejection; integration covers provenance-bound policy branches |

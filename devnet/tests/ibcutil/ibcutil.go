@@ -61,6 +61,13 @@ type ConnectionsResponse struct {
 	Connections []Connection `json:"connections"`
 }
 
+type ERC20TokenPair struct {
+	Erc20Address  string `json:"erc20_address"`
+	Denom         string `json:"denom"`
+	Enabled       bool   `json:"enabled"`
+	ContractOwner string `json:"contract_owner"`
+}
+
 func LoadChannelInfo(path string) (ChannelInfo, error) {
 	var info ChannelInfo
 	data, err := os.ReadFile(path)
@@ -320,6 +327,36 @@ func QueryBalanceREST(restAddr, address, denom string) (int64, error) {
 		}
 	}
 	return 0, nil
+}
+
+func QueryERC20TokenPairsREST(restAddr string) ([]ERC20TokenPair, error) {
+	if restAddr == "" {
+		return nil, fmt.Errorf("rest address is required")
+	}
+
+	url := strings.TrimSuffix(restAddr, "/") + "/cosmos/evm/erc20/v1/token_pairs"
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("query erc20 token pairs: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read erc20 token pairs response: %w", err)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("query erc20 token pairs status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	var payload struct {
+		TokenPairs []ERC20TokenPair `json:"token_pairs"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return nil, fmt.Errorf("parse erc20 token pairs response: %w", err)
+	}
+	return payload.TokenPairs, nil
 }
 
 func WaitForBalanceIncreaseREST(restAddr, address, denom string, baseline int64, retries int, delay time.Duration) (int64, error) {

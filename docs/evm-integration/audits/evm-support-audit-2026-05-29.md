@@ -142,7 +142,7 @@ Status on `evm-audit`:
 | WebSocket subscriptions | Covered | Covered | `newHeads` covered | N/A | Covered |
 | Fee market base fee and min floor | Covered | Covered | Covered | N/A | Covered |
 | Precisebank send/query/fractional accounting | Covered | Covered | Missing | N/A | Partially covered |
-| ERC20/IBC exact and provenance-bound allowlist | Covered | Covered | IBC transfer only | N/A | Partially covered |
+| ERC20/IBC exact and provenance-bound allowlist | Covered | Covered | IBC transfer plus unapproved denom rejection | N/A | Partially covered |
 | Contract deploy/call/logs/storage persistence | N/A | Covered | Deploy/call/logs plus opt-in restart persistence | N/A | Partially covered |
 | Standard precompiles | N/A | Covered | Gov tx smoke | N/A | Partially covered |
 | Action/Supernode/Wasm precompiles | Covered/partial | Covered | Action query covered | N/A | Partially covered |
@@ -230,7 +230,7 @@ Recommended fix:
 | Validator migration with delegations/redelegations/unbonding | `migrate-validator`, `migrate-all`, verify scan | Covered |
 | Validator distribution/commission and supernode linkage | verify scan | Covered |
 | IBC transfer in EVM mode | Hermes `TestIBCTransferWithEVMModeStillRelays` | Covered |
-| Wrong-provenance ERC20 rejection | Integration only | Missing |
+| Unapproved/wrong-provenance ERC20 rejection | Hermes `TestIBCUnapprovedBaseDenomDoesNotRegisterERC20Pair`; exact wrong-channel allowlist branches in integration | Partially covered |
 | JSON-RPC from multiple validators | `TestEVMTransactionVisibleAcrossPeerValidator` | Covered |
 | JSON-RPC restart persistence | `TestEVMContractPersistsAcrossLocalLumeradRestart` gated by `LUMERA_DEVNET_RESTART_TESTS=true` | Partially covered |
 | WebSocket subscriptions | `TestEVMWebSocketNewHeadsSubscription` | Covered |
@@ -275,5 +275,5 @@ Recommended fix:
 ## Recommended Backlog
 
 1. Re-run full `make integration-tests NOCACHE=1`; the earlier contracts failure did not reproduce in focused or package-level runs.
-2. Add devnet scenarios for broader precompile coverage and ERC20 wrong-provenance rejection.
+2. Add devnet scenarios for broader precompile coverage and exact wrong-channel ERC20 allowlist rejection.
 3. Run `make simulation-tests` and `make devnet-evm-upgrade` as release-gate validation after the focused fixes land.

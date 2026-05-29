@@ -253,6 +253,31 @@ func (s *lumeraHermesSuite) TestIBCTransferWithEVMModeStillRelays() {
 	s.transferFromSimdToLumeraAndAssert(amount)
 }
 
+func (s *lumeraHermesSuite) TestIBCUnapprovedBaseDenomDoesNotRegisterERC20Pair() {
+	s.requireLumeraEVMModeOrSkip()
+
+	ibcDenom := ibcutil.IBCDenom(s.portID, s.channel.ChannelID, s.simd.Denom)
+	pairsBefore, err := ibcutil.QueryERC20TokenPairsREST(s.lumera.REST)
+	if err != nil {
+		s.T().Skipf("skip ERC20 auto-registration rejection check: %v", err)
+		return
+	}
+	if erc20TokenPairExists(pairsBefore, ibcDenom) {
+		s.T().Skipf("skip ERC20 auto-registration rejection check: token pair already exists for %s", ibcDenom)
+		return
+	}
+
+	s.transferFromSimdToLumeraAndAssert("19" + s.simd.Denom)
+
+	pairsAfter, err := ibcutil.QueryERC20TokenPairsREST(s.lumera.REST)
+	s.Require().NoError(err, "query erc20 token pairs after IBC transfer")
+	s.Require().False(
+		erc20TokenPairExists(pairsAfter, ibcDenom),
+		"unapproved IBC denom %s should not auto-register an ERC20 token pair",
+		ibcDenom,
+	)
+}
+
 func TestIBCSimdSideSuite(t *testing.T) {
 	suite.Run(t, new(lumeraHermesSuite))
 }
@@ -282,10 +307,18 @@ func (s *lumeraHermesSuite) transferFromSimdToLumeraAndAssert(amount string) {
 	s.T().Logf("lumera recipient balance increased: %d -> %d", before, after)
 }
 
+func erc20TokenPairExists(pairs []ibcutil.ERC20TokenPair, denom string) bool {
+	for _, pair := range pairs {
+		if strings.EqualFold(pair.Denom, denom) {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *lumeraHermesSuite) requireLumeraEVMModeOrSkip() {
 	if strings.EqualFold(strings.TrimSpace(s.lumeraKeyStyle), "evm") {
 		return
 	}
 	s.T().Skipf("skip EVM-mode transfer assertion: lumera key style is %q", s.lumeraKeyStyle)
 }
-

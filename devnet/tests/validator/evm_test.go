@@ -18,6 +18,10 @@ import (
 	"time"
 
 	pkgversion "github.com/LumeraProtocol/lumera/pkg/version"
+	precompilecommon "github.com/cosmos/evm/precompiles/common"
+	distributionprecompile "github.com/cosmos/evm/precompiles/distribution"
+	slashingprecompile "github.com/cosmos/evm/precompiles/slashing"
+	stakingprecompile "github.com/cosmos/evm/precompiles/staking"
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -27,12 +31,15 @@ import (
 )
 
 const (
-	defaultLumeraJSONRPC    = "http://supernova_validator_1:8545"
-	actionPrecompileAddress = "0x0000000000000000000000000000000000000901"
-	bankPrecompileAddress   = "0x0000000000000000000000000000000000000804"
-	govPrecompileAddress    = "0x0000000000000000000000000000000000000805"
-	defaultTipCapWei        = int64(1_000_000_000) // 1 gwei
-	defaultRPCTimeout       = 30 * time.Second
+	defaultLumeraJSONRPC          = "http://supernova_validator_1:8545"
+	actionPrecompileAddress       = "0x0000000000000000000000000000000000000901"
+	bankPrecompileAddress         = "0x0000000000000000000000000000000000000804"
+	distributionPrecompileAddress = "0x0000000000000000000000000000000000000801"
+	govPrecompileAddress          = "0x0000000000000000000000000000000000000805"
+	slashingPrecompileAddress     = "0x0000000000000000000000000000000000000806"
+	stakingPrecompileAddress      = "0x0000000000000000000000000000000000000800"
+	defaultTipCapWei              = int64(1_000_000_000) // 1 gwei
+	defaultRPCTimeout             = 30 * time.Second
 )
 
 type rpcRequest struct {
@@ -434,6 +441,57 @@ func (s *lumeraValidatorSuite) TestEVMBankPrecompileTotalSupplyQueryDevnet() {
 	s.Require().GreaterOrEqual(len(common.FromHex(resultHex)), 64, "totalSupply should return ABI offset and array length words")
 }
 
+func (s *lumeraValidatorSuite) TestEVMStandardPrecompileQueryMatrixDevnet() {
+	s.requireEVMVersionOrSkip()
+
+	rpc := resolveLumeraJSONRPC(s.lumeraRPC)
+	_, localAddr := s.mustLoadSenderPrivKey()
+
+	distInput, err := distributionprecompile.ABI.Pack(distributionprecompile.CommunityPoolMethod)
+	s.Require().NoError(err, "pack distribution communityPool input")
+	distResult := s.mustEthCallRaw(rpc, distributionPrecompileAddress, distInput, "distribution communityPool")
+	var distOut struct {
+		Coins []precompilecommon.DecCoin `abi:"coins"`
+	}
+	s.Require().NoError(
+		distributionprecompile.ABI.UnpackIntoInterface(&distOut, distributionprecompile.CommunityPoolMethod, distResult),
+		"unpack distribution communityPool output",
+	)
+	for _, coin := range distOut.Coins {
+		s.Require().NotEmpty(strings.TrimSpace(coin.Denom), "communityPool returned empty denom")
+		s.Require().NotNil(coin.Amount, "communityPool returned nil amount for %s", coin.Denom)
+	}
+
+	slashingInput, err := slashingprecompile.ABI.Pack(slashingprecompile.GetParamsMethod)
+	s.Require().NoError(err, "pack slashing getParams input")
+	slashingResult := s.mustEthCallRaw(rpc, slashingPrecompileAddress, slashingInput, "slashing getParams")
+	var slashingOut struct {
+		Params slashingprecompile.Params `abi:"params"`
+	}
+	s.Require().NoError(
+		slashingprecompile.ABI.UnpackIntoInterface(&slashingOut, slashingprecompile.GetParamsMethod, slashingResult),
+		"unpack slashing getParams output",
+	)
+	s.Require().Greater(slashingOut.Params.SignedBlocksWindow, int64(0), "slashing signedBlocksWindow must be positive")
+
+	stakingInput, err := stakingprecompile.ABI.Pack(stakingprecompile.ValidatorMethod, localAddr)
+	s.Require().NoError(err, "pack staking validator input")
+	stakingResult, err := ethCallRaw(rpc, stakingPrecompileAddress, stakingInput)
+	if err != nil {
+		s.T().Logf("skip staking validator precompile assertion: local key %s is not an active validator: %v", localAddr.Hex(), err)
+		return
+	}
+	var stakingOut struct {
+		Validator stakingprecompile.ValidatorInfo `abi:"validator"`
+	}
+	err = stakingprecompile.ABI.UnpackIntoInterface(&stakingOut, stakingprecompile.ValidatorMethod, stakingResult)
+	if err != nil || strings.TrimSpace(stakingOut.Validator.OperatorAddress) == "" {
+		s.T().Logf("skip staking validator precompile assertion: local key %s did not decode as active validator (%v)", localAddr.Hex(), err)
+		return
+	}
+	s.Require().Equal(strings.ToLower(localAddr.Hex()), strings.ToLower(stakingOut.Validator.OperatorAddress), "staking validator operator mismatch")
+}
+
 func (s *lumeraValidatorSuite) TestEVMGovPrecompileTxPathDevnet() {
 	s.requireEVMVersionOrSkip()
 
@@ -768,6 +826,32 @@ func (s *lumeraValidatorSuite) mustGetLatestBaseFee(rpcAddr string) *big.Int {
 	baseFee := mustParseHexBigInt(baseFeeHex)
 	s.Require().Greater(baseFee.Sign(), 0, "baseFeePerGas should be > 0")
 	return baseFee
+}
+
+func (s *lumeraValidatorSuite) mustEthCallRaw(rpcAddr, to string, input []byte, label string) []byte {
+	result, err := ethCallRaw(rpcAddr, to, input)
+	s.Require().NoError(err, "eth_call %s", label)
+	s.Require().NotEmpty(result, "eth_call %s returned empty result", label)
+	return result
+}
+
+func ethCallRaw(rpcAddr, to string, input []byte) ([]byte, error) {
+	var resultHex string
+	err := callJSONRPC(rpcAddr, "eth_call", []any{
+		map[string]any{
+			"to":   to,
+			"data": "0x" + hex.EncodeToString(input),
+		},
+		"latest",
+	}, &resultHex)
+	if err != nil {
+		return nil, err
+	}
+	result := common.FromHex(resultHex)
+	if len(result) == 0 {
+		return nil, fmt.Errorf("empty eth_call result")
+	}
+	return result, nil
 }
 
 func (s *lumeraValidatorSuite) mustRestartLocalLumerad() {

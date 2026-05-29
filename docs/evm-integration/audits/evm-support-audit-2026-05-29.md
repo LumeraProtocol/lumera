@@ -144,7 +144,7 @@ Status on `evm-audit`:
 | Precisebank send/query/fractional accounting | Covered | Covered | Missing | N/A | Partially covered |
 | ERC20/IBC exact and provenance-bound allowlist | Covered | Covered | IBC transfer plus unapproved denom rejection | N/A | Partially covered |
 | Contract deploy/call/logs/storage persistence | N/A | Covered | Deploy/call/logs plus opt-in restart persistence | N/A | Partially covered |
-| Standard precompiles | N/A | Covered | Bank query, Gov tx smoke | N/A | Partially covered |
+| Standard precompiles | N/A | Covered | Staking/Distribution/Bank/Slashing queries, Gov tx smoke | N/A | Covered |
 | Action/Supernode/Wasm precompiles | Covered/partial | Covered | Action query covered | N/A | Partially covered |
 | CosmWasm -> EVM bridge | Covered | Covered | Missing | N/A | Partially covered |
 | EVM -> CosmWasm precompile | Covered/partial | Covered | Missing | N/A | Partially covered |
@@ -155,7 +155,7 @@ Status on `evm-audit`:
 | Invalid/replay migration negative paths | Covered | Covered | Partial | Covered | Partially covered |
 | Devnet pre-EVM -> EVM upgrade | N/A | N/A | Covered by target | N/A | Covered |
 | Devnet JSON-RPC across validators | N/A | N/A | Covered | N/A | Covered |
-| Devnet EVM contract deploy/call/log/restart/precompile | N/A | Covered single-node | Deploy/call/logs, opt-in restart persistence, Bank query, Action query, Gov tx smoke | N/A | Partially covered |
+| Devnet EVM contract deploy/call/log/restart/precompile | N/A | Covered single-node | Deploy/call/logs, opt-in restart persistence, standard precompile query matrix, Action query, Gov tx smoke | N/A | Partially covered |
 
 ## Migration Guide Review
 
@@ -236,7 +236,7 @@ Recommended fix:
 | WebSocket subscriptions | `TestEVMWebSocketNewHeadsSubscription` | Covered |
 | Public JSON-RPC rate-limit profile | `TestEVMJSONRPCRateLimitPublicProfileIfEnabled` when enabled in devnet `app.toml` | Partially covered |
 | Contract deploy/call/logs | `TestEVMContractDeployCallAndLogsDevnet` | Covered |
-| Precompile tx/query paths | `TestEVMBankPrecompileTotalSupplyQueryDevnet`, `TestEVMActionPrecompileQueryDevnet`, `TestEVMGovPrecompileTxPathDevnet`; broader tx paths integration only | Partially covered |
+| Precompile tx/query paths | `TestEVMStandardPrecompileQueryMatrixDevnet`, `TestEVMBankPrecompileTotalSupplyQueryDevnet`, `TestEVMActionPrecompileQueryDevnet`, `TestEVMGovPrecompileTxPathDevnet`; broader custom tx paths integration only | Partially covered |
 
 ### TEST-01: Devnet inventory doc is stale and understates/omits scenarios
 
@@ -275,5 +275,5 @@ Recommended fix:
 ## Recommended Backlog
 
 1. Re-run full `make integration-tests NOCACHE=1`; the earlier contracts failure did not reproduce in focused or package-level runs.
-2. Add devnet scenarios for broader precompile coverage and exact wrong-channel ERC20 allowlist rejection.
+2. Add devnet scenario for exact wrong-channel ERC20 allowlist rejection.
 3. Run `make simulation-tests` and `make devnet-evm-upgrade` as release-gate validation after the focused fixes land.

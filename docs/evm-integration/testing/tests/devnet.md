@@ -1,14 +1,50 @@
 # Devnet Tests
 
 Devnet tests run inside the Docker multi-validator testnet (`make devnet-new`).
+
+## Validator EVM Tests
+
 Test source: `devnet/tests/validator/evm_test.go`
 
 | Test | Description |
 | --- | --- |
+| `TestEVMJSONRPCBasicMethods` | Verifies basic JSON-RPC health and chain metadata methods on a validator RPC endpoint. |
+| `TestEVMJSONRPCNamespacesExposed` | Verifies the expected public EVM JSON-RPC namespaces are exposed. |
 | `TestEVMFeeMarketBaseFeeActive` | Validates `eth_gasPrice` returns a non-zero base fee on an active devnet. |
-| `TestEVMDynamicFeeTxE2E` | Sends a type-2 (EIP-1559) self-transfer and verifies receipt status 0x1. |
-| `TestEVMTransactionVisibleAcrossPeerValidator` | Sends a tx to the local validator and verifies the receipt is visible on a peer validator with matching blockHash — exercises the broadcast worker re-gossip path. |
+| `TestEVMSendRawTransactionAndReceipt` | Sends a raw EVM transaction and verifies the successful receipt. |
+| `TestEVMGetTransactionByHashRoundTrip` | Sends a transaction and verifies it can be fetched by hash. |
+| `TestEVMNonceIncrementsAfterMinedTx` | Verifies account nonce increments after a mined EVM transaction. |
+| `TestEVMBlockLookupByHashAndNumberConsistent` | Compares block lookup by hash and by number for consistent block metadata. |
+| `TestEVMTransactionVisibleAcrossPeerValidator` | Sends a tx to one validator and verifies the receipt is visible on a peer validator with matching `blockHash`; exercises the broadcast worker re-gossip path. |
 
 ## EVM Migration Devnet Tests
 
-See [devnet-tests.md](../../evmigration/devnet-tests.md) for full details on the EVM migration devnet test binary (modes, usage, and coverage).
+Tool source: `devnet/tests/evmigration/`
+
+See [devnet-tests.md](../../evmigration/devnet-tests.md) for full details on the EVM migration devnet test binary, Makefile targets, upgrade walkthrough, and module coverage.
+
+| Mode | Description |
+| --- | --- |
+| `prepare` | Creates legacy coin-type 118 accounts and module state before the EVM upgrade. |
+| `estimate` | Queries migration readiness and touched-state counts after the EVM upgrade. |
+| `migrate` | Migrates regular legacy accounts with `MsgClaimLegacyAccount`. |
+| `migrate-validator` | Migrates a validator operator with `MsgMigrateValidator`. |
+| `migrate-all` | Interleaves account and validator migrations in randomized batches. |
+| `verify` | Scans modules to confirm migrated legacy addresses no longer own live state. |
+| `multisig` | Exercises the focused multisig account migration proof flow. |
+| `multisig-vesting` | Exercises multisig migration for a vesting account fixture. |
+| `multisig-validator` | Exercises validator migration from a multisig legacy account. |
+| `cleanup` | Removes generated test keys from the local keyring. |
+
+## Coverage Gaps
+
+The current devnet coverage does not yet explicitly exercise:
+
+| Scenario | Current coverage |
+| --- | --- |
+| Public JSON-RPC rate-limit profile | Unit/config coverage only |
+| WebSocket subscriptions across validators | Integration coverage only |
+| JSON-RPC restart persistence | Integration coverage only |
+| EVM contract deploy/call/log scenarios | Integration coverage only |
+| Standard and custom precompile tx/query paths | Integration coverage only |
+| ERC20 wrong-provenance rejection | Integration coverage only |

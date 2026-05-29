@@ -37,14 +37,16 @@ const lumeraConfigTemplate = `
 broadcast-debug = {{ .Lumera.EVMMempool.BroadcastDebug }}
 
 [lumera.json-rpc-ratelimit]
-# Rate-limiting reverse proxy for the EVM JSON-RPC endpoint.
-# When enabled, a proxy server listens on proxy-address and forwards requests
-# to the internal JSON-RPC server with per-IP token bucket rate limiting.
+# Per-IP token bucket rate limiting for the EVM JSON-RPC endpoint.
+# When the public JSON-RPC alias proxy is active (the default startup topology),
+# enabling this wraps the public json-rpc.address listener directly. proxy-address
+# is used only for the standalone fallback topology when the alias proxy is inactive.
 
-# Enable the rate-limiting proxy (default: false).
+# Enable JSON-RPC rate limiting (default: false).
 enable = {{ .Lumera.JSONRPCRateLimit.Enable }}
 
-# Address the rate-limiting proxy listens on.
+# Standalone fallback proxy listen address. Not used when the public alias proxy
+# is active and rate limiting wraps json-rpc.address directly.
 proxy-address = "{{ .Lumera.JSONRPCRateLimit.ProxyAddress }}"
 
 # Sustained requests per second allowed per IP.

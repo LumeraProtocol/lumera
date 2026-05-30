@@ -335,6 +335,7 @@ func GenerateDockerCompose(config *confg.ChainConfig, validators []confg.Validat
 			},
 			Environment: map[string]string{
 				"HERMES_CONFIG":            "/root/.hermes/config.toml",
+				"LUMERA_HERMES_CONTAINER":  "true",
 				"LUMERA_VERSION":           chainVersion,
 				"LUMERA_FIRST_EVM_VERSION": evmFromVersion,
 			},

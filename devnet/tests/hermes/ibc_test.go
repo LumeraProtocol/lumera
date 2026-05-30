@@ -37,6 +37,7 @@ const (
 	defaultLumeraREST      = "http://supernova_validator_1:1317"
 	defaultLumeraICAFund   = "1000000"
 	defaultLumeraICAFeeBuf = "10000"
+	hermesContainerEnv     = "LUMERA_HERMES_CONTAINER"
 	actionPollRetries      = 40
 	actionPollDelay        = 3 * time.Second
 	simdQueryTimeout       = 20 * time.Second
@@ -99,6 +100,11 @@ func formatTestLog(level, msg string) string {
 }
 
 func (s *lumeraHermesSuite) SetupSuite() {
+	if !isHermesContainerRuntime() {
+		s.T().Skipf("skip Hermes IBC suite: set %s=true only inside the Hermes container", hermesContainerEnv)
+		return
+	}
+
 	// Load environment-driven configuration and shared chain metadata.
 	s.channelInfoPath = textutil.EnvOrDefault("CHANNEL_INFO_FILE", defaultChannelInfoPath)
 	s.simdBin = textutil.EnvOrDefault("SIMD_BIN", defaultSimdBin)
@@ -326,6 +332,11 @@ func normalizeGRPCAddr(addr string) string {
 	out = strings.TrimPrefix(out, "http://")
 	out = strings.TrimPrefix(out, "https://")
 	return out
+}
+
+func isHermesContainerRuntime() bool {
+	value := strings.TrimSpace(os.Getenv(hermesContainerEnv))
+	return value == "1" || strings.EqualFold(value, "true")
 }
 
 func (s *lumeraHermesSuite) transferFromSimdToLumeraAndAssert(amount string) {

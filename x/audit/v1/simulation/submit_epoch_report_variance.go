@@ -32,7 +32,7 @@ func SimulateMsgSubmitEpochReportVariance(k keeper.Keeper) simtypes.Operation {
 		host := types.HostReport{
 			CpuUsagePercent:    10 + r.Float64()*20,
 			MemUsagePercent:    10 + r.Float64()*20,
-			DiskUsagePercent:   70 + r.Float64()*35, // exercises both sides of 90% threshold
+			DiskUsagePercent:   70 + r.Float64()*30, // exercises both sides of 90% threshold
 			FailedActionsCount: uint32(r.Intn(3)),
 		}
 		msg := &types.MsgSubmitEpochReport{

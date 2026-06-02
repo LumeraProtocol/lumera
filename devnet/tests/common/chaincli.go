@@ -189,14 +189,15 @@ func (c *ChainCLI) AddKey(name string) (GeneratedKey, error) {
 // AddKeyWithStyle creates a new key in the keyring using explicit coin-type
 // and algorithm flags so generated accounts match the detected chain runtime.
 func (c *ChainCLI) AddKeyWithStyle(name string, style KeyStyle) (GeneratedKey, error) {
+	// Pass --algo explicitly for BOTH styles: an EVM-enabled binary defaults its
+	// signing algo to eth_secp256k1, so omitting --algo for a legacy (coin-118)
+	// account would wrongly derive an eth_secp256k1 address on that binary.
 	args := []string{
 		"keys", "add", name,
 		"--keyring-backend", c.keyringBackend(),
 		"--output", "json",
 		"--coin-type", strconv.FormatUint(uint64(style.CoinType), 10),
-	}
-	if style.EVM {
-		args = append(args, "--algo", style.Algo)
+		"--algo", style.Algo,
 	}
 	args = append(args, c.homeArgs()...)
 	out, err := exec.Command(c.Bin, args...).CombinedOutput()

@@ -25,7 +25,7 @@
       "params": [
         {
           "name": "file",
-          "description": "Parameter `file`. Go type: string",
+          "description": "Filesystem path on the node where the pprof block-contention profile will be written. Existing files are overwritten.",
           "required": true,
           "schema": {
             "type": "string",
@@ -34,7 +34,7 @@
         },
         {
           "name": "nsec",
-          "description": "Parameter `nsec`. Go type: uint",
+          "description": "Sampling duration in seconds. Profiling runs for this long, then the buffer is flushed to `file`.",
           "required": true,
           "schema": {
             "type": "string",
@@ -83,7 +83,7 @@
       "params": [
         {
           "name": "file",
-          "description": "Parameter `file`. Go type: string",
+          "description": "Filesystem path on the node where the pprof CPU profile will be written. Existing files are overwritten.",
           "required": true,
           "schema": {
             "type": "string",
@@ -92,7 +92,7 @@
         },
         {
           "name": "nsec",
-          "description": "Parameter `nsec`. Go type: uint",
+          "description": "Profiling duration in seconds. CPU sampling runs for this long before the file is written.",
           "required": true,
           "schema": {
             "type": "string",
@@ -171,7 +171,7 @@
       "params": [],
       "result": {
         "name": "result",
-        "description": "Go type: *debug.GCStats",
+        "description": "Go runtime garbage-collector statistics: last/2nd-last GC times, total pause durations, pause histogram, and pause-end timestamps.",
         "schema": {
           "nullable": true,
           "properties": {
@@ -263,7 +263,7 @@
       "params": [
         {
           "name": "number",
-          "description": "Parameter `number`. Go type: uint64",
+          "description": "Block height to fetch. Returns the RLP-encoded bytes of that block.",
           "required": true,
           "schema": {
             "type": "string",
@@ -273,7 +273,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: hexutil.Bytes",
+        "description": "RLP-encoded bytes of the requested block (hex).",
         "schema": {
           "description": "Hex-encoded byte array",
           "pattern": "^0x[0-9a-fA-F]*$",
@@ -311,7 +311,7 @@
       "params": [
         {
           "name": "number",
-          "description": "Parameter `number`. Go type: uint64",
+          "description": "Block height to fetch. Returns the RLP-encoded bytes of that header.",
           "required": true,
           "schema": {
             "type": "string",
@@ -321,7 +321,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: hexutil.Bytes",
+        "description": "RLP-encoded bytes of the requested header (hex).",
         "schema": {
           "description": "Hex-encoded byte array",
           "pattern": "^0x[0-9a-fA-F]*$",
@@ -359,7 +359,7 @@
       "params": [
         {
           "name": "blockNrOrHash",
-          "description": "Parameter `blockNrOrHash`. Go type: types.BlockNumberOrHash",
+          "description": "Block height tag (hex or `latest`/`earliest`/`pending`/`safe`/`finalized`) or block hash to fetch as raw RLP.",
           "required": true,
           "schema": {
             "description": "Block number (hex) or block hash (0x-prefixed 32-byte hex), optionally with requireCanonical flag",
@@ -370,7 +370,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: hexutil.Bytes",
+        "description": "RLP-encoded bytes of the requested block (hex). Equivalent to `debug_getBlockRlp`.",
         "schema": {
           "description": "Hex-encoded byte array",
           "pattern": "^0x[0-9a-fA-F]*$",
@@ -408,7 +408,7 @@
       "params": [
         {
           "name": "file",
-          "description": "Parameter `file`. Go type: string",
+          "description": "Filesystem path on the node where the Go execution trace will be written (consume with `go tool trace`).",
           "required": true,
           "schema": {
             "type": "string",
@@ -417,7 +417,7 @@
         },
         {
           "name": "nsec",
-          "description": "Parameter `nsec`. Go type: uint",
+          "description": "Trace capture duration in seconds.",
           "required": true,
           "schema": {
             "type": "string",
@@ -466,7 +466,7 @@
       "params": [
         {
           "name": "hash",
-          "description": "Parameter `hash`. Go type: common.Hash",
+          "description": "Hash of the block to re-execute. The endpoint returns the intermediate state roots after each transaction.",
           "required": true,
           "schema": {
             "description": "Hex-encoded 256-bit hash",
@@ -477,180 +477,180 @@
         },
         {
           "name": "config",
-          "description": "Parameter `config`. Go type: *types.TraceConfig",
+          "description": "Optional tracer configuration (tracer name, timeout, reexec depth, state overrides). Pass null for defaults.",
           "schema": {
             "nullable": true,
             "properties": {
               "debug": {
-                "description": "Go type: bool",
+                "description": "If true, tracer-side diagnostic output is included when the trace ends. Intended for tracer development, not normal use.",
                 "type": "boolean",
                 "x-go-type": "bool"
               },
               "disableStack": {
-                "description": "Go type: bool",
+                "description": "If true, EVM stack snapshots are omitted from the trace output. Reduces payload size significantly.",
                 "type": "boolean",
                 "x-go-type": "bool"
               },
               "disableStorage": {
-                "description": "Go type: bool",
+                "description": "If true, storage-slot reads/writes are omitted from the trace output. Reduces payload size and avoids storage-trie lookups.",
                 "type": "boolean",
                 "x-go-type": "bool"
               },
               "enableMemory": {
-                "description": "Go type: bool",
+                "description": "If true, the EVM memory snapshot is included at each captured step. Significantly increases payload size.",
                 "type": "boolean",
                 "x-go-type": "bool"
               },
               "enableReturnData": {
-                "description": "Go type: bool",
+                "description": "If true, the EVM RETURN/REVERT data buffer is included at each captured step.",
                 "type": "boolean",
                 "x-go-type": "bool"
               },
               "limit": {
-                "description": "Go type: int32",
+                "description": "Maximum number of trace steps to retain (oldest steps are dropped past the cap). 0 means unlimited.",
                 "type": "string",
                 "x-go-type": "int32"
               },
               "overrides": {
-                "description": "Go type: *types.ChainConfig",
+                "description": "Optional chain-config overrides applied only to this trace — lets you simulate execution under future hard-fork rules without forking the chain.",
                 "nullable": true,
                 "properties": {
                   "arrow_glacier_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Arrow Glacier fork — EIP-4345 difficulty-bomb delay. Cosmetic on PoS chains; included for cross-chain trace compatibility.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "berlin_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Berlin fork (EIP-2929 cold/warm access costs, EIP-2930 optional access lists). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "byzantium_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Byzantium fork (REVERT, RETURNDATA, modexp/bn256 precompiles). `null` = never; `\"0\"` = active from genesis.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "cancun_time": {
-                    "description": "Go type: *math.Int",
+                    "description": "Unix timestamp at which the Cancun fork activates (EIP-4844 blob txs, EIP-1153 transient storage, EIP-5656 MCOPY). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "chain_id": {
-                    "description": "Go type: uint64",
+                    "description": "EIP-155 chain identifier baked into transaction signatures. On Lumera the EVM chain ID is `76857769`.",
                     "type": "string",
                     "x-go-type": "uint64"
                   },
                   "constantinople_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Constantinople fork (CREATE2, SHL/SHR/SAR, EXTCODEHASH). `null` = never; `\"0\"` = active from genesis.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "dao_fork_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the TheDAO hard-fork. `null` to disable. Lumera does not replay Ethereum's DAO state changes; this controls only fork-rule activation in EVM simulation.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "dao_fork_support": {
-                    "description": "Go type: bool",
+                    "description": "Whether this node sides with the DAO hard-fork (`true`) or with the original chain (`false`). Affects header-validity checks during `dao_fork_block`.",
                     "type": "boolean",
                     "x-go-type": "bool"
                   },
                   "decimals": {
-                    "description": "Go type: uint64",
+                    "description": "Decimal precision of the configured `denom`. Lumera uses 18 decimals on the EVM side (`alume`) bridged to 6 decimals (`ulume`) via the precisebank module.",
                     "type": "string",
                     "x-go-type": "uint64"
                   },
                   "denom": {
-                    "description": "Go type: string",
+                    "description": "Bank denomination used as the EVM's native gas/value token. On Lumera this is `alume` (the 18-decimal representation of `ulume`).",
                     "type": "string",
                     "x-go-type": "string"
                   },
                   "eip150_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height activating EIP-150 (gas-cost repricing of IO-heavy opcodes). `null` = never; `\"0\"` = active from genesis.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "eip155_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height activating EIP-155 (chain-ID-bound signing, replay-attack protection). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "eip158_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height activating EIP-158 (state-clearing of empty accounts). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "gray_glacier_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Gray Glacier fork — EIP-5133 difficulty-bomb delay. Cosmetic on PoS chains; included for cross-chain trace compatibility.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "homestead_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height at which the Homestead hard fork activates. `null` = never; `\"0\"` = already active from genesis.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "istanbul_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Istanbul fork (CHAINID, SELFBALANCE, gas repricing — EIP-1344/1884/2200). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "london_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the London fork (EIP-1559 dynamic base fee, EIP-3198 BASEFEE opcode, EIP-3529 refund cap). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "merge_netsplit_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Virtual block height marking the Paris/Merge transition to proof-of-stake. Used as a network-split sentinel; no consensus rules change at this height on its own.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "muir_glacier_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Muir Glacier fork — EIP-2384 difficulty-bomb delay. Cosmetic on PoS chains like Lumera; primarily relevant for cross-chain trace fidelity.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "osaka_time": {
-                    "description": "Go type: *math.Int",
+                    "description": "Unix timestamp at which the Osaka/Fusaka fork activates. `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "petersburg_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Petersburg fork (Constantinople minus EIP-1283 reentrancy issue). `null` reuses the Constantinople block.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "prague_time": {
-                    "description": "Go type: *math.Int",
+                    "description": "Unix timestamp at which the Prague/Pectra fork activates (EIP-7702 set-code authorizations, EIP-2537 BLS12-381 precompiles, etc.). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "shanghai_time": {
-                    "description": "Go type: *math.Int",
+                    "description": "Unix timestamp at which the Shanghai fork activates (EIP-3855 PUSH0, EIP-3651 warm coinbase, EIP-4895 withdrawals). `null` = never; `\"0\"` = active from genesis.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "verkle_time": {
-                    "description": "Go type: *math.Int",
+                    "description": "Unix timestamp at which a Verkle-trees transition activates. `null` = never; on Lumera this is typically `null`.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
@@ -660,22 +660,22 @@
                 "x-go-type": "types.ChainConfig"
               },
               "reexec": {
-                "description": "Go type: uint64",
+                "description": "How many ancestor blocks the node may re-execute to reconstruct the requested pre-state. Higher values allow tracing further back at the cost of CPU.",
                 "type": "string",
                 "x-go-type": "uint64"
               },
               "timeout": {
-                "description": "Go type: string",
+                "description": "Maximum wall-clock duration for the trace, e.g. `\"5s\"`, `\"500ms\"`. Default 5s. Applies mainly to JavaScript tracers.",
                 "type": "string",
                 "x-go-type": "string"
               },
               "tracer": {
-                "description": "Go type: string",
+                "description": "Name of a built-in tracer (e.g. `callTracer`, `prestateTracer`, `4byteTracer`) or a JavaScript tracer source string. Omit to use the default opcode tracer.",
                 "type": "string",
                 "x-go-type": "string"
               },
               "tracerConfig": {
-                "description": "Go type: string",
+                "description": "Tracer-specific JSON configuration, passed through to the named `tracer`. Shape depends on the tracer (e.g. `{ \"withLog\": true }` for `callTracer`).",
                 "type": "string",
                 "x-go-type": "string"
               }
@@ -694,7 +694,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: []common.Hash",
+        "description": "Ordered list of intermediate state roots — one per transaction in the block — produced while re-executing it. Index N is the root after applying tx N.",
         "schema": {
           "items": {
             "description": "Hex-encoded 256-bit hash",
@@ -745,7 +745,7 @@
       "params": [],
       "result": {
         "name": "result",
-        "description": "Go type: *runtime.MemStats",
+        "description": "Go runtime memory-allocator statistics: heap size, allocation counts, GC overhead, and span-class breakdown.",
         "schema": {
           "nullable": true,
           "properties": {
@@ -1012,7 +1012,7 @@
       "params": [
         {
           "name": "file",
-          "description": "Parameter `file`. Go type: string",
+          "description": "Filesystem path on the node where the pprof mutex-contention profile will be written.",
           "required": true,
           "schema": {
             "type": "string",
@@ -1021,7 +1021,7 @@
         },
         {
           "name": "nsec",
-          "description": "Parameter `nsec`. Go type: uint",
+          "description": "Sampling duration in seconds.",
           "required": true,
           "schema": {
             "type": "string",
@@ -1070,7 +1070,7 @@
       "params": [
         {
           "name": "number",
-          "description": "Parameter `number`. Go type: uint64",
+          "description": "Block height to dump. Returns a human-readable representation of the block.",
           "required": true,
           "schema": {
             "type": "string",
@@ -1080,7 +1080,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: string",
+        "description": "Human-readable string dump of the block (header fields, transactions, uncles).",
         "schema": {
           "type": "string",
           "x-go-type": "string"
@@ -1116,7 +1116,7 @@
       "params": [
         {
           "name": "rate",
-          "description": "Parameter `rate`. Go type: int",
+          "description": "Block-profile sampling rate. 0 disables profiling; 1 samples every blocking event; higher values sample 1-in-N.",
           "required": true,
           "schema": {
             "type": "string",
@@ -1161,7 +1161,7 @@
       "params": [
         {
           "name": "v",
-          "description": "Parameter `v`. Go type: int",
+          "description": "New `GOGC` value as a percentage. Returns the previous setting. Negative values disable GC.",
           "required": true,
           "schema": {
             "type": "string",
@@ -1171,7 +1171,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: int",
+        "description": "Previous `GOGC` value before this call applied the new one.",
         "schema": {
           "type": "string",
           "x-go-type": "int"
@@ -1207,7 +1207,7 @@
       "params": [
         {
           "name": "rate",
-          "description": "Parameter `rate`. Go type: int",
+          "description": "Mutex-profile sampling fraction. 0 disables; N samples 1-in-N contention events.",
           "required": true,
           "schema": {
             "type": "string",
@@ -1252,7 +1252,7 @@
       "params": [],
       "result": {
         "name": "result",
-        "description": "Go type: string",
+        "description": "All goroutine stack traces from the running node, formatted as a single text blob (same shape as `go tool pprof`'s goroutine dump).",
         "schema": {
           "type": "string",
           "x-go-type": "string"
@@ -1283,7 +1283,7 @@
       "params": [
         {
           "name": "file",
-          "description": "Parameter `file`. Go type: string",
+          "description": "Filesystem path that CPU profile samples will stream to until `debug_stopCPUProfile` is called.",
           "required": true,
           "schema": {
             "type": "string",
@@ -1328,7 +1328,7 @@
       "params": [
         {
           "name": "file",
-          "description": "Parameter `file`. Go type: string",
+          "description": "Filesystem path that Go execution trace events will stream to until `debug_stopGoTrace` is called.",
           "required": true,
           "schema": {
             "type": "string",
@@ -1433,7 +1433,7 @@
       "params": [
         {
           "name": "tblockRlp",
-          "description": "Parameter `tblockRlp`. Go type: hexutil.Bytes",
+          "description": "RLP-encoded block bytes to trace. The block is executed against the parent state without committing.",
           "required": true,
           "schema": {
             "description": "Hex-encoded byte array",
@@ -1444,180 +1444,180 @@
         },
         {
           "name": "config",
-          "description": "Parameter `config`. Go type: *types.TraceConfig",
+          "description": "Optional tracer configuration. Pass null for the default `callTracer`.",
           "schema": {
             "nullable": true,
             "properties": {
               "debug": {
-                "description": "Go type: bool",
+                "description": "If true, tracer-side diagnostic output is included when the trace ends. Intended for tracer development, not normal use.",
                 "type": "boolean",
                 "x-go-type": "bool"
               },
               "disableStack": {
-                "description": "Go type: bool",
+                "description": "If true, EVM stack snapshots are omitted from the trace output. Reduces payload size significantly.",
                 "type": "boolean",
                 "x-go-type": "bool"
               },
               "disableStorage": {
-                "description": "Go type: bool",
+                "description": "If true, storage-slot reads/writes are omitted from the trace output. Reduces payload size and avoids storage-trie lookups.",
                 "type": "boolean",
                 "x-go-type": "bool"
               },
               "enableMemory": {
-                "description": "Go type: bool",
+                "description": "If true, the EVM memory snapshot is included at each captured step. Significantly increases payload size.",
                 "type": "boolean",
                 "x-go-type": "bool"
               },
               "enableReturnData": {
-                "description": "Go type: bool",
+                "description": "If true, the EVM RETURN/REVERT data buffer is included at each captured step.",
                 "type": "boolean",
                 "x-go-type": "bool"
               },
               "limit": {
-                "description": "Go type: int32",
+                "description": "Maximum number of trace steps to retain (oldest steps are dropped past the cap). 0 means unlimited.",
                 "type": "string",
                 "x-go-type": "int32"
               },
               "overrides": {
-                "description": "Go type: *types.ChainConfig",
+                "description": "Optional chain-config overrides applied only to this trace — lets you simulate execution under future hard-fork rules without forking the chain.",
                 "nullable": true,
                 "properties": {
                   "arrow_glacier_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Arrow Glacier fork — EIP-4345 difficulty-bomb delay. Cosmetic on PoS chains; included for cross-chain trace compatibility.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "berlin_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Berlin fork (EIP-2929 cold/warm access costs, EIP-2930 optional access lists). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "byzantium_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Byzantium fork (REVERT, RETURNDATA, modexp/bn256 precompiles). `null` = never; `\"0\"` = active from genesis.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "cancun_time": {
-                    "description": "Go type: *math.Int",
+                    "description": "Unix timestamp at which the Cancun fork activates (EIP-4844 blob txs, EIP-1153 transient storage, EIP-5656 MCOPY). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "chain_id": {
-                    "description": "Go type: uint64",
+                    "description": "EIP-155 chain identifier baked into transaction signatures. On Lumera the EVM chain ID is `76857769`.",
                     "type": "string",
                     "x-go-type": "uint64"
                   },
                   "constantinople_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Constantinople fork (CREATE2, SHL/SHR/SAR, EXTCODEHASH). `null` = never; `\"0\"` = active from genesis.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "dao_fork_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the TheDAO hard-fork. `null` to disable. Lumera does not replay Ethereum's DAO state changes; this controls only fork-rule activation in EVM simulation.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "dao_fork_support": {
-                    "description": "Go type: bool",
+                    "description": "Whether this node sides with the DAO hard-fork (`true`) or with the original chain (`false`). Affects header-validity checks during `dao_fork_block`.",
                     "type": "boolean",
                     "x-go-type": "bool"
                   },
                   "decimals": {
-                    "description": "Go type: uint64",
+                    "description": "Decimal precision of the configured `denom`. Lumera uses 18 decimals on the EVM side (`alume`) bridged to 6 decimals (`ulume`) via the precisebank module.",
                     "type": "string",
                     "x-go-type": "uint64"
                   },
                   "denom": {
-                    "description": "Go type: string",
+                    "description": "Bank denomination used as the EVM's native gas/value token. On Lumera this is `alume` (the 18-decimal representation of `ulume`).",
                     "type": "string",
                     "x-go-type": "string"
                   },
                   "eip150_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height activating EIP-150 (gas-cost repricing of IO-heavy opcodes). `null` = never; `\"0\"` = active from genesis.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "eip155_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height activating EIP-155 (chain-ID-bound signing, replay-attack protection). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "eip158_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height activating EIP-158 (state-clearing of empty accounts). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "gray_glacier_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Gray Glacier fork — EIP-5133 difficulty-bomb delay. Cosmetic on PoS chains; included for cross-chain trace compatibility.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "homestead_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height at which the Homestead hard fork activates. `null` = never; `\"0\"` = already active from genesis.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "istanbul_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Istanbul fork (CHAINID, SELFBALANCE, gas repricing — EIP-1344/1884/2200). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "london_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the London fork (EIP-1559 dynamic base fee, EIP-3198 BASEFEE opcode, EIP-3529 refund cap). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "merge_netsplit_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Virtual block height marking the Paris/Merge transition to proof-of-stake. Used as a network-split sentinel; no consensus rules change at this height on its own.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "muir_glacier_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Muir Glacier fork — EIP-2384 difficulty-bomb delay. Cosmetic on PoS chains like Lumera; primarily relevant for cross-chain trace fidelity.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "osaka_time": {
-                    "description": "Go type: *math.Int",
+                    "description": "Unix timestamp at which the Osaka/Fusaka fork activates. `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "petersburg_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Petersburg fork (Constantinople minus EIP-1283 reentrancy issue). `null` reuses the Constantinople block.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "prague_time": {
-                    "description": "Go type: *math.Int",
+                    "description": "Unix timestamp at which the Prague/Pectra fork activates (EIP-7702 set-code authorizations, EIP-2537 BLS12-381 precompiles, etc.). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "shanghai_time": {
-                    "description": "Go type: *math.Int",
+                    "description": "Unix timestamp at which the Shanghai fork activates (EIP-3855 PUSH0, EIP-3651 warm coinbase, EIP-4895 withdrawals). `null` = never; `\"0\"` = active from genesis.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "verkle_time": {
-                    "description": "Go type: *math.Int",
+                    "description": "Unix timestamp at which a Verkle-trees transition activates. `null` = never; on Lumera this is typically `null`.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
@@ -1627,22 +1627,22 @@
                 "x-go-type": "types.ChainConfig"
               },
               "reexec": {
-                "description": "Go type: uint64",
+                "description": "How many ancestor blocks the node may re-execute to reconstruct the requested pre-state. Higher values allow tracing further back at the cost of CPU.",
                 "type": "string",
                 "x-go-type": "uint64"
               },
               "timeout": {
-                "description": "Go type: string",
+                "description": "Maximum wall-clock duration for the trace, e.g. `\"5s\"`, `\"500ms\"`. Default 5s. Applies mainly to JavaScript tracers.",
                 "type": "string",
                 "x-go-type": "string"
               },
               "tracer": {
-                "description": "Go type: string",
+                "description": "Name of a built-in tracer (e.g. `callTracer`, `prestateTracer`, `4byteTracer`) or a JavaScript tracer source string. Omit to use the default opcode tracer.",
                 "type": "string",
                 "x-go-type": "string"
               },
               "tracerConfig": {
-                "description": "Go type: json.RawMessage",
+                "description": "Tracer-specific JSON configuration, passed through to the named `tracer`. Shape depends on the tracer (e.g. `{ \"withLog\": true }` for `callTracer`).",
                 "items": {
                   "type": "string",
                   "x-go-type": "uint8"
@@ -1665,7 +1665,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: []*types.TxTraceResult",
+        "description": "Per-transaction trace results for the supplied RLP-encoded block. Each entry contains the tx hash and the tracer-specific result (or an error).",
         "schema": {
           "items": {
             "nullable": true,
@@ -1735,7 +1735,7 @@
       "params": [
         {
           "name": "hash",
-          "description": "Parameter `hash`. Go type: common.Hash",
+          "description": "Hash of the canonical block to re-execute and trace.",
           "required": true,
           "schema": {
             "description": "Hex-encoded 256-bit hash",
@@ -1746,180 +1746,180 @@
         },
         {
           "name": "config",
-          "description": "Parameter `config`. Go type: *types.TraceConfig",
+          "description": "Optional tracer configuration. Pass null for the default `callTracer`.",
           "schema": {
             "nullable": true,
             "properties": {
               "debug": {
-                "description": "Go type: bool",
+                "description": "If true, tracer-side diagnostic output is included when the trace ends. Intended for tracer development, not normal use.",
                 "type": "boolean",
                 "x-go-type": "bool"
               },
               "disableStack": {
-                "description": "Go type: bool",
+                "description": "If true, EVM stack snapshots are omitted from the trace output. Reduces payload size significantly.",
                 "type": "boolean",
                 "x-go-type": "bool"
               },
               "disableStorage": {
-                "description": "Go type: bool",
+                "description": "If true, storage-slot reads/writes are omitted from the trace output. Reduces payload size and avoids storage-trie lookups.",
                 "type": "boolean",
                 "x-go-type": "bool"
               },
               "enableMemory": {
-                "description": "Go type: bool",
+                "description": "If true, the EVM memory snapshot is included at each captured step. Significantly increases payload size.",
                 "type": "boolean",
                 "x-go-type": "bool"
               },
               "enableReturnData": {
-                "description": "Go type: bool",
+                "description": "If true, the EVM RETURN/REVERT data buffer is included at each captured step.",
                 "type": "boolean",
                 "x-go-type": "bool"
               },
               "limit": {
-                "description": "Go type: int32",
+                "description": "Maximum number of trace steps to retain (oldest steps are dropped past the cap). 0 means unlimited.",
                 "type": "string",
                 "x-go-type": "int32"
               },
               "overrides": {
-                "description": "Go type: *types.ChainConfig",
+                "description": "Optional chain-config overrides applied only to this trace — lets you simulate execution under future hard-fork rules without forking the chain.",
                 "nullable": true,
                 "properties": {
                   "arrow_glacier_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Arrow Glacier fork — EIP-4345 difficulty-bomb delay. Cosmetic on PoS chains; included for cross-chain trace compatibility.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "berlin_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Berlin fork (EIP-2929 cold/warm access costs, EIP-2930 optional access lists). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "byzantium_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Byzantium fork (REVERT, RETURNDATA, modexp/bn256 precompiles). `null` = never; `\"0\"` = active from genesis.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "cancun_time": {
-                    "description": "Go type: *math.Int",
+                    "description": "Unix timestamp at which the Cancun fork activates (EIP-4844 blob txs, EIP-1153 transient storage, EIP-5656 MCOPY). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "chain_id": {
-                    "description": "Go type: uint64",
+                    "description": "EIP-155 chain identifier baked into transaction signatures. On Lumera the EVM chain ID is `76857769`.",
                     "type": "string",
                     "x-go-type": "uint64"
                   },
                   "constantinople_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Constantinople fork (CREATE2, SHL/SHR/SAR, EXTCODEHASH). `null` = never; `\"0\"` = active from genesis.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "dao_fork_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the TheDAO hard-fork. `null` to disable. Lumera does not replay Ethereum's DAO state changes; this controls only fork-rule activation in EVM simulation.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "dao_fork_support": {
-                    "description": "Go type: bool",
+                    "description": "Whether this node sides with the DAO hard-fork (`true`) or with the original chain (`false`). Affects header-validity checks during `dao_fork_block`.",
                     "type": "boolean",
                     "x-go-type": "bool"
                   },
                   "decimals": {
-                    "description": "Go type: uint64",
+                    "description": "Decimal precision of the configured `denom`. Lumera uses 18 decimals on the EVM side (`alume`) bridged to 6 decimals (`ulume`) via the precisebank module.",
                     "type": "string",
                     "x-go-type": "uint64"
                   },
                   "denom": {
-                    "description": "Go type: string",
+                    "description": "Bank denomination used as the EVM's native gas/value token. On Lumera this is `alume` (the 18-decimal representation of `ulume`).",
                     "type": "string",
                     "x-go-type": "string"
                   },
                   "eip150_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height activating EIP-150 (gas-cost repricing of IO-heavy opcodes). `null` = never; `\"0\"` = active from genesis.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "eip155_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height activating EIP-155 (chain-ID-bound signing, replay-attack protection). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "eip158_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height activating EIP-158 (state-clearing of empty accounts). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "gray_glacier_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Gray Glacier fork — EIP-5133 difficulty-bomb delay. Cosmetic on PoS chains; included for cross-chain trace compatibility.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "homestead_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height at which the Homestead hard fork activates. `null` = never; `\"0\"` = already active from genesis.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "istanbul_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Istanbul fork (CHAINID, SELFBALANCE, gas repricing — EIP-1344/1884/2200). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "london_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the London fork (EIP-1559 dynamic base fee, EIP-3198 BASEFEE opcode, EIP-3529 refund cap). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "merge_netsplit_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Virtual block height marking the Paris/Merge transition to proof-of-stake. Used as a network-split sentinel; no consensus rules change at this height on its own.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "muir_glacier_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Muir Glacier fork — EIP-2384 difficulty-bomb delay. Cosmetic on PoS chains like Lumera; primarily relevant for cross-chain trace fidelity.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "osaka_time": {
-                    "description": "Go type: *math.Int",
+                    "description": "Unix timestamp at which the Osaka/Fusaka fork activates. `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "petersburg_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Petersburg fork (Constantinople minus EIP-1283 reentrancy issue). `null` reuses the Constantinople block.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "prague_time": {
-                    "description": "Go type: *math.Int",
+                    "description": "Unix timestamp at which the Prague/Pectra fork activates (EIP-7702 set-code authorizations, EIP-2537 BLS12-381 precompiles, etc.). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "shanghai_time": {
-                    "description": "Go type: *math.Int",
+                    "description": "Unix timestamp at which the Shanghai fork activates (EIP-3855 PUSH0, EIP-3651 warm coinbase, EIP-4895 withdrawals). `null` = never; `\"0\"` = active from genesis.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "verkle_time": {
-                    "description": "Go type: *math.Int",
+                    "description": "Unix timestamp at which a Verkle-trees transition activates. `null` = never; on Lumera this is typically `null`.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
@@ -1929,22 +1929,22 @@
                 "x-go-type": "types.ChainConfig"
               },
               "reexec": {
-                "description": "Go type: uint64",
+                "description": "How many ancestor blocks the node may re-execute to reconstruct the requested pre-state. Higher values allow tracing further back at the cost of CPU.",
                 "type": "string",
                 "x-go-type": "uint64"
               },
               "timeout": {
-                "description": "Go type: string",
+                "description": "Maximum wall-clock duration for the trace, e.g. `\"5s\"`, `\"500ms\"`. Default 5s. Applies mainly to JavaScript tracers.",
                 "type": "string",
                 "x-go-type": "string"
               },
               "tracer": {
-                "description": "Go type: string",
+                "description": "Name of a built-in tracer (e.g. `callTracer`, `prestateTracer`, `4byteTracer`) or a JavaScript tracer source string. Omit to use the default opcode tracer.",
                 "type": "string",
                 "x-go-type": "string"
               },
               "tracerConfig": {
-                "description": "Go type: json.RawMessage",
+                "description": "Tracer-specific JSON configuration, passed through to the named `tracer`. Shape depends on the tracer (e.g. `{ \"withLog\": true }` for `callTracer`).",
                 "items": {
                   "type": "string",
                   "x-go-type": "uint8"
@@ -1967,7 +1967,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: []*types.TxTraceResult",
+        "description": "Per-transaction trace results for the canonical block identified by hash. Each entry contains the tx hash and the tracer-specific result (or an error).",
         "schema": {
           "items": {
             "nullable": true,
@@ -2036,7 +2036,7 @@
       "params": [
         {
           "name": "height",
-          "description": "Parameter `height`. Go type: types.BlockNumber",
+          "description": "Block height tag (hex integer or `latest`/`earliest`/`pending`/`safe`/`finalized`) of the block to trace.",
           "required": true,
           "schema": {
             "description": "Block number: hex integer or tag (\"latest\", \"earliest\", \"pending\", \"safe\", \"finalized\")",
@@ -2046,180 +2046,180 @@
         },
         {
           "name": "config",
-          "description": "Parameter `config`. Go type: *types.TraceConfig",
+          "description": "Optional tracer configuration. Pass null for the default `callTracer`.",
           "schema": {
             "nullable": true,
             "properties": {
               "debug": {
-                "description": "Go type: bool",
+                "description": "If true, tracer-side diagnostic output is included when the trace ends. Intended for tracer development, not normal use.",
                 "type": "boolean",
                 "x-go-type": "bool"
               },
               "disableStack": {
-                "description": "Go type: bool",
+                "description": "If true, EVM stack snapshots are omitted from the trace output. Reduces payload size significantly.",
                 "type": "boolean",
                 "x-go-type": "bool"
               },
               "disableStorage": {
-                "description": "Go type: bool",
+                "description": "If true, storage-slot reads/writes are omitted from the trace output. Reduces payload size and avoids storage-trie lookups.",
                 "type": "boolean",
                 "x-go-type": "bool"
               },
               "enableMemory": {
-                "description": "Go type: bool",
+                "description": "If true, the EVM memory snapshot is included at each captured step. Significantly increases payload size.",
                 "type": "boolean",
                 "x-go-type": "bool"
               },
               "enableReturnData": {
-                "description": "Go type: bool",
+                "description": "If true, the EVM RETURN/REVERT data buffer is included at each captured step.",
                 "type": "boolean",
                 "x-go-type": "bool"
               },
               "limit": {
-                "description": "Go type: int32",
+                "description": "Maximum number of trace steps to retain (oldest steps are dropped past the cap). 0 means unlimited.",
                 "type": "string",
                 "x-go-type": "int32"
               },
               "overrides": {
-                "description": "Go type: *types.ChainConfig",
+                "description": "Optional chain-config overrides applied only to this trace — lets you simulate execution under future hard-fork rules without forking the chain.",
                 "nullable": true,
                 "properties": {
                   "arrow_glacier_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Arrow Glacier fork — EIP-4345 difficulty-bomb delay. Cosmetic on PoS chains; included for cross-chain trace compatibility.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "berlin_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Berlin fork (EIP-2929 cold/warm access costs, EIP-2930 optional access lists). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "byzantium_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Byzantium fork (REVERT, RETURNDATA, modexp/bn256 precompiles). `null` = never; `\"0\"` = active from genesis.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "cancun_time": {
-                    "description": "Go type: *math.Int",
+                    "description": "Unix timestamp at which the Cancun fork activates (EIP-4844 blob txs, EIP-1153 transient storage, EIP-5656 MCOPY). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "chain_id": {
-                    "description": "Go type: uint64",
+                    "description": "EIP-155 chain identifier baked into transaction signatures. On Lumera the EVM chain ID is `76857769`.",
                     "type": "string",
                     "x-go-type": "uint64"
                   },
                   "constantinople_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Constantinople fork (CREATE2, SHL/SHR/SAR, EXTCODEHASH). `null` = never; `\"0\"` = active from genesis.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "dao_fork_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the TheDAO hard-fork. `null` to disable. Lumera does not replay Ethereum's DAO state changes; this controls only fork-rule activation in EVM simulation.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "dao_fork_support": {
-                    "description": "Go type: bool",
+                    "description": "Whether this node sides with the DAO hard-fork (`true`) or with the original chain (`false`). Affects header-validity checks during `dao_fork_block`.",
                     "type": "boolean",
                     "x-go-type": "bool"
                   },
                   "decimals": {
-                    "description": "Go type: uint64",
+                    "description": "Decimal precision of the configured `denom`. Lumera uses 18 decimals on the EVM side (`alume`) bridged to 6 decimals (`ulume`) via the precisebank module.",
                     "type": "string",
                     "x-go-type": "uint64"
                   },
                   "denom": {
-                    "description": "Go type: string",
+                    "description": "Bank denomination used as the EVM's native gas/value token. On Lumera this is `alume` (the 18-decimal representation of `ulume`).",
                     "type": "string",
                     "x-go-type": "string"
                   },
                   "eip150_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height activating EIP-150 (gas-cost repricing of IO-heavy opcodes). `null` = never; `\"0\"` = active from genesis.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "eip155_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height activating EIP-155 (chain-ID-bound signing, replay-attack protection). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "eip158_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height activating EIP-158 (state-clearing of empty accounts). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "gray_glacier_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Gray Glacier fork — EIP-5133 difficulty-bomb delay. Cosmetic on PoS chains; included for cross-chain trace compatibility.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "homestead_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height at which the Homestead hard fork activates. `null` = never; `\"0\"` = already active from genesis.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "istanbul_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Istanbul fork (CHAINID, SELFBALANCE, gas repricing — EIP-1344/1884/2200). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "london_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the London fork (EIP-1559 dynamic base fee, EIP-3198 BASEFEE opcode, EIP-3529 refund cap). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "merge_netsplit_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Virtual block height marking the Paris/Merge transition to proof-of-stake. Used as a network-split sentinel; no consensus rules change at this height on its own.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "muir_glacier_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Muir Glacier fork — EIP-2384 difficulty-bomb delay. Cosmetic on PoS chains like Lumera; primarily relevant for cross-chain trace fidelity.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "osaka_time": {
-                    "description": "Go type: *math.Int",
+                    "description": "Unix timestamp at which the Osaka/Fusaka fork activates. `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "petersburg_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Petersburg fork (Constantinople minus EIP-1283 reentrancy issue). `null` reuses the Constantinople block.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "prague_time": {
-                    "description": "Go type: *math.Int",
+                    "description": "Unix timestamp at which the Prague/Pectra fork activates (EIP-7702 set-code authorizations, EIP-2537 BLS12-381 precompiles, etc.). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "shanghai_time": {
-                    "description": "Go type: *math.Int",
+                    "description": "Unix timestamp at which the Shanghai fork activates (EIP-3855 PUSH0, EIP-3651 warm coinbase, EIP-4895 withdrawals). `null` = never; `\"0\"` = active from genesis.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "verkle_time": {
-                    "description": "Go type: *math.Int",
+                    "description": "Unix timestamp at which a Verkle-trees transition activates. `null` = never; on Lumera this is typically `null`.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
@@ -2229,22 +2229,22 @@
                 "x-go-type": "types.ChainConfig"
               },
               "reexec": {
-                "description": "Go type: uint64",
+                "description": "How many ancestor blocks the node may re-execute to reconstruct the requested pre-state. Higher values allow tracing further back at the cost of CPU.",
                 "type": "string",
                 "x-go-type": "uint64"
               },
               "timeout": {
-                "description": "Go type: string",
+                "description": "Maximum wall-clock duration for the trace, e.g. `\"5s\"`, `\"500ms\"`. Default 5s. Applies mainly to JavaScript tracers.",
                 "type": "string",
                 "x-go-type": "string"
               },
               "tracer": {
-                "description": "Go type: string",
+                "description": "Name of a built-in tracer (e.g. `callTracer`, `prestateTracer`, `4byteTracer`) or a JavaScript tracer source string. Omit to use the default opcode tracer.",
                 "type": "string",
                 "x-go-type": "string"
               },
               "tracerConfig": {
-                "description": "Go type: json.RawMessage",
+                "description": "Tracer-specific JSON configuration, passed through to the named `tracer`. Shape depends on the tracer (e.g. `{ \"withLog\": true }` for `callTracer`).",
                 "items": {
                   "type": "string",
                   "x-go-type": "uint8"
@@ -2267,7 +2267,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: []*types.TxTraceResult",
+        "description": "Per-transaction trace results for the canonical block at the given height. Each entry contains the tx hash and the tracer-specific result (or an error).",
         "schema": {
           "items": {
             "nullable": true,
@@ -2336,7 +2336,7 @@
       "params": [
         {
           "name": "args",
-          "description": "Parameter `args`. Go type: types.TransactionArgs",
+          "description": "Transaction call object (from, to, gas, gasPrice, value, data, etc.) describing the call to simulate and trace.",
           "required": true,
           "schema": {
             "description": "Arguments for message calls and transaction submission, using Ethereum JSON-RPC hex encoding. Use either legacy `gasPrice` or EIP-1559 fee fields. If you provide blob sidecar fields, provide `blobs`, `commitments`, and `proofs` together.",
@@ -2550,7 +2550,7 @@
         },
         {
           "name": "blockNrOrHash",
-          "description": "Parameter `blockNrOrHash`. Go type: types.BlockNumberOrHash",
+          "description": "Block tag or block hash whose post-state should be used as the starting point for the simulated call.",
           "required": true,
           "schema": {
             "description": "Block number (hex) or block hash (0x-prefixed 32-byte hex), optionally with requireCanonical flag",
@@ -2560,180 +2560,180 @@
         },
         {
           "name": "config",
-          "description": "Parameter `config`. Go type: *types.TraceConfig",
+          "description": "Optional tracer configuration including state overrides. Pass null for defaults.",
           "schema": {
             "nullable": true,
             "properties": {
               "debug": {
-                "description": "Go type: bool",
+                "description": "If true, tracer-side diagnostic output is included when the trace ends. Intended for tracer development, not normal use.",
                 "type": "boolean",
                 "x-go-type": "bool"
               },
               "disableStack": {
-                "description": "Go type: bool",
+                "description": "If true, EVM stack snapshots are omitted from the trace output. Reduces payload size significantly.",
                 "type": "boolean",
                 "x-go-type": "bool"
               },
               "disableStorage": {
-                "description": "Go type: bool",
+                "description": "If true, storage-slot reads/writes are omitted from the trace output. Reduces payload size and avoids storage-trie lookups.",
                 "type": "boolean",
                 "x-go-type": "bool"
               },
               "enableMemory": {
-                "description": "Go type: bool",
+                "description": "If true, the EVM memory snapshot is included at each captured step. Significantly increases payload size.",
                 "type": "boolean",
                 "x-go-type": "bool"
               },
               "enableReturnData": {
-                "description": "Go type: bool",
+                "description": "If true, the EVM RETURN/REVERT data buffer is included at each captured step.",
                 "type": "boolean",
                 "x-go-type": "bool"
               },
               "limit": {
-                "description": "Go type: int32",
+                "description": "Maximum number of trace steps to retain (oldest steps are dropped past the cap). 0 means unlimited.",
                 "type": "string",
                 "x-go-type": "int32"
               },
               "overrides": {
-                "description": "Go type: *types.ChainConfig",
+                "description": "Optional chain-config overrides applied only to this trace — lets you simulate execution under future hard-fork rules without forking the chain.",
                 "nullable": true,
                 "properties": {
                   "arrow_glacier_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Arrow Glacier fork — EIP-4345 difficulty-bomb delay. Cosmetic on PoS chains; included for cross-chain trace compatibility.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "berlin_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Berlin fork (EIP-2929 cold/warm access costs, EIP-2930 optional access lists). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "byzantium_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Byzantium fork (REVERT, RETURNDATA, modexp/bn256 precompiles). `null` = never; `\"0\"` = active from genesis.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "cancun_time": {
-                    "description": "Go type: *math.Int",
+                    "description": "Unix timestamp at which the Cancun fork activates (EIP-4844 blob txs, EIP-1153 transient storage, EIP-5656 MCOPY). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "chain_id": {
-                    "description": "Go type: uint64",
+                    "description": "EIP-155 chain identifier baked into transaction signatures. On Lumera the EVM chain ID is `76857769`.",
                     "type": "string",
                     "x-go-type": "uint64"
                   },
                   "constantinople_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Constantinople fork (CREATE2, SHL/SHR/SAR, EXTCODEHASH). `null` = never; `\"0\"` = active from genesis.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "dao_fork_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the TheDAO hard-fork. `null` to disable. Lumera does not replay Ethereum's DAO state changes; this controls only fork-rule activation in EVM simulation.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "dao_fork_support": {
-                    "description": "Go type: bool",
+                    "description": "Whether this node sides with the DAO hard-fork (`true`) or with the original chain (`false`). Affects header-validity checks during `dao_fork_block`.",
                     "type": "boolean",
                     "x-go-type": "bool"
                   },
                   "decimals": {
-                    "description": "Go type: uint64",
+                    "description": "Decimal precision of the configured `denom`. Lumera uses 18 decimals on the EVM side (`alume`) bridged to 6 decimals (`ulume`) via the precisebank module.",
                     "type": "string",
                     "x-go-type": "uint64"
                   },
                   "denom": {
-                    "description": "Go type: string",
+                    "description": "Bank denomination used as the EVM's native gas/value token. On Lumera this is `alume` (the 18-decimal representation of `ulume`).",
                     "type": "string",
                     "x-go-type": "string"
                   },
                   "eip150_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height activating EIP-150 (gas-cost repricing of IO-heavy opcodes). `null` = never; `\"0\"` = active from genesis.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "eip155_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height activating EIP-155 (chain-ID-bound signing, replay-attack protection). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "eip158_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height activating EIP-158 (state-clearing of empty accounts). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "gray_glacier_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Gray Glacier fork — EIP-5133 difficulty-bomb delay. Cosmetic on PoS chains; included for cross-chain trace compatibility.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "homestead_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height at which the Homestead hard fork activates. `null` = never; `\"0\"` = already active from genesis.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "istanbul_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Istanbul fork (CHAINID, SELFBALANCE, gas repricing — EIP-1344/1884/2200). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "london_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the London fork (EIP-1559 dynamic base fee, EIP-3198 BASEFEE opcode, EIP-3529 refund cap). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "merge_netsplit_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Virtual block height marking the Paris/Merge transition to proof-of-stake. Used as a network-split sentinel; no consensus rules change at this height on its own.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "muir_glacier_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Muir Glacier fork — EIP-2384 difficulty-bomb delay. Cosmetic on PoS chains like Lumera; primarily relevant for cross-chain trace fidelity.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "osaka_time": {
-                    "description": "Go type: *math.Int",
+                    "description": "Unix timestamp at which the Osaka/Fusaka fork activates. `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "petersburg_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Petersburg fork (Constantinople minus EIP-1283 reentrancy issue). `null` reuses the Constantinople block.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "prague_time": {
-                    "description": "Go type: *math.Int",
+                    "description": "Unix timestamp at which the Prague/Pectra fork activates (EIP-7702 set-code authorizations, EIP-2537 BLS12-381 precompiles, etc.). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "shanghai_time": {
-                    "description": "Go type: *math.Int",
+                    "description": "Unix timestamp at which the Shanghai fork activates (EIP-3855 PUSH0, EIP-3651 warm coinbase, EIP-4895 withdrawals). `null` = never; `\"0\"` = active from genesis.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "verkle_time": {
-                    "description": "Go type: *math.Int",
+                    "description": "Unix timestamp at which a Verkle-trees transition activates. `null` = never; on Lumera this is typically `null`.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
@@ -2743,22 +2743,22 @@
                 "x-go-type": "types.ChainConfig"
               },
               "reexec": {
-                "description": "Go type: uint64",
+                "description": "How many ancestor blocks the node may re-execute to reconstruct the requested pre-state. Higher values allow tracing further back at the cost of CPU.",
                 "type": "string",
                 "x-go-type": "uint64"
               },
               "timeout": {
-                "description": "Go type: string",
+                "description": "Maximum wall-clock duration for the trace, e.g. `\"5s\"`, `\"500ms\"`. Default 5s. Applies mainly to JavaScript tracers.",
                 "type": "string",
                 "x-go-type": "string"
               },
               "tracer": {
-                "description": "Go type: string",
+                "description": "Name of a built-in tracer (e.g. `callTracer`, `prestateTracer`, `4byteTracer`) or a JavaScript tracer source string. Omit to use the default opcode tracer.",
                 "type": "string",
                 "x-go-type": "string"
               },
               "tracerConfig": {
-                "description": "Go type: json.RawMessage",
+                "description": "Tracer-specific JSON configuration, passed through to the named `tracer`. Shape depends on the tracer (e.g. `{ \"withLog\": true }` for `callTracer`).",
                 "items": {
                   "type": "string",
                   "x-go-type": "uint8"
@@ -2781,7 +2781,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: interface {}",
+        "description": "Tracer output for a simulated call. Shape depends on the tracer: opcode tracer returns step-by-step EVM state, `callTracer` returns the call tree, `prestateTracer` returns touched accounts, etc.",
         "schema": {
           "type": "object",
           "x-go-type": "interface {}"
@@ -2837,7 +2837,7 @@
       "params": [
         {
           "name": "hash",
-          "description": "Parameter `hash`. Go type: common.Hash",
+          "description": "Hash of an already-mined transaction to re-execute and trace.",
           "required": true,
           "schema": {
             "description": "Hex-encoded 256-bit hash",
@@ -2848,180 +2848,180 @@
         },
         {
           "name": "config",
-          "description": "Parameter `config`. Go type: *types.TraceConfig",
+          "description": "Optional tracer configuration. Pass null for the default `callTracer`.",
           "schema": {
             "nullable": true,
             "properties": {
               "debug": {
-                "description": "Go type: bool",
+                "description": "If true, tracer-side diagnostic output is included when the trace ends. Intended for tracer development, not normal use.",
                 "type": "boolean",
                 "x-go-type": "bool"
               },
               "disableStack": {
-                "description": "Go type: bool",
+                "description": "If true, EVM stack snapshots are omitted from the trace output. Reduces payload size significantly.",
                 "type": "boolean",
                 "x-go-type": "bool"
               },
               "disableStorage": {
-                "description": "Go type: bool",
+                "description": "If true, storage-slot reads/writes are omitted from the trace output. Reduces payload size and avoids storage-trie lookups.",
                 "type": "boolean",
                 "x-go-type": "bool"
               },
               "enableMemory": {
-                "description": "Go type: bool",
+                "description": "If true, the EVM memory snapshot is included at each captured step. Significantly increases payload size.",
                 "type": "boolean",
                 "x-go-type": "bool"
               },
               "enableReturnData": {
-                "description": "Go type: bool",
+                "description": "If true, the EVM RETURN/REVERT data buffer is included at each captured step.",
                 "type": "boolean",
                 "x-go-type": "bool"
               },
               "limit": {
-                "description": "Go type: int32",
+                "description": "Maximum number of trace steps to retain (oldest steps are dropped past the cap). 0 means unlimited.",
                 "type": "string",
                 "x-go-type": "int32"
               },
               "overrides": {
-                "description": "Go type: *types.ChainConfig",
+                "description": "Optional chain-config overrides applied only to this trace — lets you simulate execution under future hard-fork rules without forking the chain.",
                 "nullable": true,
                 "properties": {
                   "arrow_glacier_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Arrow Glacier fork — EIP-4345 difficulty-bomb delay. Cosmetic on PoS chains; included for cross-chain trace compatibility.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "berlin_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Berlin fork (EIP-2929 cold/warm access costs, EIP-2930 optional access lists). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "byzantium_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Byzantium fork (REVERT, RETURNDATA, modexp/bn256 precompiles). `null` = never; `\"0\"` = active from genesis.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "cancun_time": {
-                    "description": "Go type: *math.Int",
+                    "description": "Unix timestamp at which the Cancun fork activates (EIP-4844 blob txs, EIP-1153 transient storage, EIP-5656 MCOPY). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "chain_id": {
-                    "description": "Go type: uint64",
+                    "description": "EIP-155 chain identifier baked into transaction signatures. On Lumera the EVM chain ID is `76857769`.",
                     "type": "string",
                     "x-go-type": "uint64"
                   },
                   "constantinople_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Constantinople fork (CREATE2, SHL/SHR/SAR, EXTCODEHASH). `null` = never; `\"0\"` = active from genesis.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "dao_fork_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the TheDAO hard-fork. `null` to disable. Lumera does not replay Ethereum's DAO state changes; this controls only fork-rule activation in EVM simulation.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "dao_fork_support": {
-                    "description": "Go type: bool",
+                    "description": "Whether this node sides with the DAO hard-fork (`true`) or with the original chain (`false`). Affects header-validity checks during `dao_fork_block`.",
                     "type": "boolean",
                     "x-go-type": "bool"
                   },
                   "decimals": {
-                    "description": "Go type: uint64",
+                    "description": "Decimal precision of the configured `denom`. Lumera uses 18 decimals on the EVM side (`alume`) bridged to 6 decimals (`ulume`) via the precisebank module.",
                     "type": "string",
                     "x-go-type": "uint64"
                   },
                   "denom": {
-                    "description": "Go type: string",
+                    "description": "Bank denomination used as the EVM's native gas/value token. On Lumera this is `alume` (the 18-decimal representation of `ulume`).",
                     "type": "string",
                     "x-go-type": "string"
                   },
                   "eip150_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height activating EIP-150 (gas-cost repricing of IO-heavy opcodes). `null` = never; `\"0\"` = active from genesis.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "eip155_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height activating EIP-155 (chain-ID-bound signing, replay-attack protection). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "eip158_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height activating EIP-158 (state-clearing of empty accounts). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "gray_glacier_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Gray Glacier fork — EIP-5133 difficulty-bomb delay. Cosmetic on PoS chains; included for cross-chain trace compatibility.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "homestead_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height at which the Homestead hard fork activates. `null` = never; `\"0\"` = already active from genesis.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "istanbul_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Istanbul fork (CHAINID, SELFBALANCE, gas repricing — EIP-1344/1884/2200). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "london_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the London fork (EIP-1559 dynamic base fee, EIP-3198 BASEFEE opcode, EIP-3529 refund cap). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "merge_netsplit_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Virtual block height marking the Paris/Merge transition to proof-of-stake. Used as a network-split sentinel; no consensus rules change at this height on its own.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "muir_glacier_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Muir Glacier fork — EIP-2384 difficulty-bomb delay. Cosmetic on PoS chains like Lumera; primarily relevant for cross-chain trace fidelity.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "osaka_time": {
-                    "description": "Go type: *math.Int",
+                    "description": "Unix timestamp at which the Osaka/Fusaka fork activates. `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "petersburg_block": {
-                    "description": "Go type: *math.Int",
+                    "description": "Block height of the Petersburg fork (Constantinople minus EIP-1283 reentrancy issue). `null` reuses the Constantinople block.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "prague_time": {
-                    "description": "Go type: *math.Int",
+                    "description": "Unix timestamp at which the Prague/Pectra fork activates (EIP-7702 set-code authorizations, EIP-2537 BLS12-381 precompiles, etc.). `null` = never.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "shanghai_time": {
-                    "description": "Go type: *math.Int",
+                    "description": "Unix timestamp at which the Shanghai fork activates (EIP-3855 PUSH0, EIP-3651 warm coinbase, EIP-4895 withdrawals). `null` = never; `\"0\"` = active from genesis.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
                   },
                   "verkle_time": {
-                    "description": "Go type: *math.Int",
+                    "description": "Unix timestamp at which a Verkle-trees transition activates. `null` = never; on Lumera this is typically `null`.",
                     "nullable": true,
                     "type": "object",
                     "x-go-type": "math.Int"
@@ -3031,22 +3031,22 @@
                 "x-go-type": "types.ChainConfig"
               },
               "reexec": {
-                "description": "Go type: uint64",
+                "description": "How many ancestor blocks the node may re-execute to reconstruct the requested pre-state. Higher values allow tracing further back at the cost of CPU.",
                 "type": "string",
                 "x-go-type": "uint64"
               },
               "timeout": {
-                "description": "Go type: string",
+                "description": "Maximum wall-clock duration for the trace, e.g. `\"5s\"`, `\"500ms\"`. Default 5s. Applies mainly to JavaScript tracers.",
                 "type": "string",
                 "x-go-type": "string"
               },
               "tracer": {
-                "description": "Go type: string",
+                "description": "Name of a built-in tracer (e.g. `callTracer`, `prestateTracer`, `4byteTracer`) or a JavaScript tracer source string. Omit to use the default opcode tracer.",
                 "type": "string",
                 "x-go-type": "string"
               },
               "tracerConfig": {
-                "description": "Go type: json.RawMessage",
+                "description": "Tracer-specific JSON configuration, passed through to the named `tracer`. Shape depends on the tracer (e.g. `{ \"withLog\": true }` for `callTracer`).",
                 "items": {
                   "type": "string",
                   "x-go-type": "uint8"
@@ -3069,7 +3069,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: interface {}",
+        "description": "Tracer output for an already-mined transaction, re-executed against its parent state. Shape depends on the tracer (same options as `debug_traceCall`).",
         "schema": {
           "type": "object",
           "x-go-type": "interface {}"
@@ -3117,7 +3117,7 @@
       "params": [
         {
           "name": "file",
-          "description": "Parameter `file`. Go type: string",
+          "description": "Filesystem path where the current block-contention profile snapshot will be written.",
           "required": true,
           "schema": {
             "type": "string",
@@ -3162,7 +3162,7 @@
       "params": [
         {
           "name": "file",
-          "description": "Parameter `file`. Go type: string",
+          "description": "Filesystem path where the current heap profile snapshot will be written.",
           "required": true,
           "schema": {
             "type": "string",
@@ -3207,7 +3207,7 @@
       "params": [
         {
           "name": "file",
-          "description": "Parameter `file`. Go type: string",
+          "description": "Filesystem path where the current mutex profile snapshot will be written.",
           "required": true,
           "schema": {
             "type": "string",
@@ -3252,7 +3252,7 @@
       "params": [],
       "result": {
         "name": "result",
-        "description": "Go type: []common.Address",
+        "description": "List of 20-byte addresses currently held in the node's keystore. Empty on nodes without unlocked accounts (which is the typical Lumera deployment).",
         "schema": {
           "items": {
             "description": "Hex-encoded Ethereum address (20 bytes)",
@@ -3289,7 +3289,7 @@
       "params": [],
       "result": {
         "name": "result",
-        "description": "Go type: hexutil.Uint64",
+        "description": "Height of the latest committed block on this node, as a hex-encoded integer.",
         "schema": {
           "description": "Hex-encoded uint64",
           "pattern": "^0x[0-9a-fA-F]+$",
@@ -3322,7 +3322,7 @@
       "params": [
         {
           "name": "args",
-          "description": "Parameter `args`. Go type: types.TransactionArgs",
+          "description": "Call object describing the message (from, to, gas, gasPrice/maxFeePerGas, value, data, etc.). Executed as `eth_call` without modifying state.",
           "required": true,
           "schema": {
             "description": "Arguments for message calls and transaction submission, using Ethereum JSON-RPC hex encoding. Use either legacy `gasPrice` or EIP-1559 fee fields. If you provide blob sidecar fields, provide `blobs`, `commitments`, and `proofs` together.",
@@ -3536,7 +3536,7 @@
         },
         {
           "name": "blockNrOrHash",
-          "description": "Parameter `blockNrOrHash`. Go type: types.BlockNumberOrHash",
+          "description": "Block tag or block hash supplying the state context for the call.",
           "required": true,
           "schema": {
             "description": "Block number (hex) or block hash (0x-prefixed 32-byte hex), optionally with requireCanonical flag",
@@ -3615,7 +3615,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: hexutil.Bytes",
+        "description": "Return data from the simulated message call (hex). Empty bytes if the call returned nothing; reverts surface as a JSON-RPC error with the revert payload.",
         "schema": {
           "description": "Hex-encoded byte array",
           "pattern": "^0x[0-9a-fA-F]*$",
@@ -3665,7 +3665,7 @@
       "params": [],
       "result": {
         "name": "result",
-        "description": "Go type: *hexutil.Big",
+        "description": "EIP-155 chain ID as hex. On Lumera mainnet this is `0x494c1a9` (76857769).",
         "schema": {
           "description": "Hex-encoded big integer",
           "nullable": true,
@@ -3699,7 +3699,7 @@
       "params": [
         {
           "name": "args",
-          "description": "Parameter `args`. Go type: types.TransactionArgs",
+          "description": "Call object whose execution is simulated to determine the optimal EIP-2930 access list.",
           "required": true,
           "schema": {
             "description": "Arguments for message calls and transaction submission, using Ethereum JSON-RPC hex encoding. Use either legacy `gasPrice` or EIP-1559 fee fields. If you provide blob sidecar fields, provide `blobs`, `commitments`, and `proofs` together.",
@@ -3913,7 +3913,7 @@
         },
         {
           "name": "blockNrOrHash",
-          "description": "Parameter `blockNrOrHash`. Go type: types.BlockNumberOrHash",
+          "description": "Block tag or block hash supplying the state context for the simulation.",
           "required": true,
           "schema": {
             "description": "Block number (hex) or block hash (0x-prefixed 32-byte hex), optionally with requireCanonical flag",
@@ -3992,7 +3992,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: *types.AccessListResult",
+        "description": "Optimal EIP-2930 access list for the call plus the gas it would consume with that access list applied. Includes any error returned by the simulated execution.",
         "schema": {
           "nullable": true,
           "properties": {
@@ -4085,7 +4085,7 @@
       "params": [
         {
           "name": "args",
-          "description": "Parameter `args`. Go type: types.TransactionArgs",
+          "description": "Call object to estimate. Optional `from`, `to`, `value`, `data`, `gas`, `gasPrice`. The node finds the minimum gas that makes the call succeed.",
           "required": true,
           "schema": {
             "description": "Arguments for message calls and transaction submission, using Ethereum JSON-RPC hex encoding. Use either legacy `gasPrice` or EIP-1559 fee fields. If you provide blob sidecar fields, provide `blobs`, `commitments`, and `proofs` together.",
@@ -4299,7 +4299,7 @@
         },
         {
           "name": "blockNrOptional",
-          "description": "Parameter `blockNrOptional`. Go type: *types.BlockNumber",
+          "description": "Optional block tag for the state context. Defaults to `pending` when omitted.",
           "schema": {
             "description": "Block number: hex integer or tag (\"latest\", \"earliest\", \"pending\", \"safe\", \"finalized\")",
             "nullable": true,
@@ -4310,7 +4310,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: hexutil.Uint64",
+        "description": "Minimum gas (hex) that makes the supplied call succeed against the chosen block's post-state.",
         "schema": {
           "description": "Hex-encoded uint64",
           "pattern": "^0x[0-9a-fA-F]+$",
@@ -4357,7 +4357,7 @@
       "params": [
         {
           "name": "blockCount",
-          "description": "Parameter `blockCount`. Go type: math.HexOrDecimal64",
+          "description": "Number of historical blocks to include (1–1024). Encoded as a hex or decimal string.",
           "required": true,
           "schema": {
             "type": "string",
@@ -4366,7 +4366,7 @@
         },
         {
           "name": "lastBlock",
-          "description": "Parameter `lastBlock`. Go type: rpc.BlockNumber",
+          "description": "Highest block of the requested range — hex height or tag (`latest`, `pending`, etc.).",
           "required": true,
           "schema": {
             "type": "string",
@@ -4375,7 +4375,7 @@
         },
         {
           "name": "rewardPercentiles",
-          "description": "Parameter `rewardPercentiles`. Go type: []float64",
+          "description": "Optional priority-fee percentiles (0–100, monotonically increasing). For each block, the node returns the effective priority fee at each percentile.",
           "required": true,
           "schema": {
             "items": {
@@ -4389,7 +4389,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: *types.FeeHistoryResult",
+        "description": "Per-block base fees, gas-used ratios, blob base fees, and (if `rewardPercentiles` was supplied) priority-fee percentiles across the requested range.",
         "schema": {
           "nullable": true,
           "properties": {
@@ -4520,7 +4520,7 @@
       "params": [
         {
           "name": "args",
-          "description": "Parameter `args`. Go type: types.TransactionArgs",
+          "description": "Partial transaction object. Missing fields (nonce, gas, gas price/cap) are filled in by the node using current chain state.",
           "required": true,
           "schema": {
             "description": "Arguments for message calls and transaction submission, using Ethereum JSON-RPC hex encoding. Use either legacy `gasPrice` or EIP-1559 fee fields. If you provide blob sidecar fields, provide `blobs`, `commitments`, and `proofs` together.",
@@ -4735,7 +4735,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: *types.SignTransactionResult",
+        "description": "The fully-populated transaction object (nonce, gas, fees set by the node) along with its RLP-encoded raw form ready to sign and broadcast.",
         "schema": {
           "nullable": true,
           "properties": {
@@ -4797,7 +4797,7 @@
       "params": [],
       "result": {
         "name": "result",
-        "description": "Go type: *hexutil.Big",
+        "description": "Suggested legacy gas price as hex wei. Reflects `baseFee + suggested priority fee` on London-and-later chains.",
         "schema": {
           "description": "Hex-encoded big integer",
           "nullable": true,
@@ -4831,7 +4831,7 @@
       "params": [
         {
           "name": "address",
-          "description": "Parameter `address`. Go type: common.Address",
+          "description": "20-byte Ethereum address whose native-token balance is queried.",
           "required": true,
           "schema": {
             "description": "Hex-encoded Ethereum address (20 bytes)",
@@ -4842,7 +4842,7 @@
         },
         {
           "name": "blockNrOrHash",
-          "description": "Parameter `blockNrOrHash`. Go type: types.BlockNumberOrHash",
+          "description": "Block tag or block hash whose post-state balance should be returned.",
           "required": true,
           "schema": {
             "description": "Block number (hex) or block hash (0x-prefixed 32-byte hex), optionally with requireCanonical flag",
@@ -4853,7 +4853,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: *hexutil.Big",
+        "description": "Account balance in wei (hex). Lumera's EVM uses 18-decimal `alume` bridged from 6-decimal `ulume`.",
         "schema": {
           "description": "Hex-encoded big integer",
           "nullable": true,
@@ -4896,7 +4896,7 @@
       "params": [
         {
           "name": "hash",
-          "description": "Parameter `hash`. Go type: common.Hash",
+          "description": "Hash of the block to fetch.",
           "required": true,
           "schema": {
             "description": "Hex-encoded 256-bit hash",
@@ -4907,7 +4907,7 @@
         },
         {
           "name": "fullTx",
-          "description": "Parameter `fullTx`. Go type: bool",
+          "description": "If true, the response includes full transaction objects; if false, only the transaction hashes.",
           "required": true,
           "schema": {
             "type": "boolean",
@@ -4917,7 +4917,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: map[string]interface {}",
+        "description": "Block object: header fields, transactions (full objects or hashes per the `fullTx` flag), and uncles array (always empty on Lumera). `null` if the block is unknown.",
         "schema": {
           "type": "object",
           "x-go-type": "map[string]interface {}"
@@ -4960,7 +4960,7 @@
       "params": [
         {
           "name": "ethBlockNum",
-          "description": "Parameter `ethBlockNum`. Go type: types.BlockNumber",
+          "description": "Block tag (hex height or `latest`/`earliest`/`pending`/`safe`/`finalized`) identifying the block to fetch.",
           "required": true,
           "schema": {
             "description": "Block number: hex integer or tag (\"latest\", \"earliest\", \"pending\", \"safe\", \"finalized\")",
@@ -4970,7 +4970,7 @@
         },
         {
           "name": "fullTx",
-          "description": "Parameter `fullTx`. Go type: bool",
+          "description": "If true, the response includes full transaction objects; if false, only the transaction hashes.",
           "required": true,
           "schema": {
             "type": "boolean",
@@ -4980,7 +4980,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: map[string]interface {}",
+        "description": "Block object: header fields, transactions (full objects or hashes per the `fullTx` flag), and uncles array (always empty on Lumera). `null` if the height is not yet mined.",
         "schema": {
           "type": "object",
           "x-go-type": "map[string]interface {}"
@@ -5024,7 +5024,7 @@
       "params": [
         {
           "name": "blockNrOrHash",
-          "description": "Parameter `blockNrOrHash`. Go type: types.BlockNumberOrHash",
+          "description": "Block tag or block hash whose transaction receipts should be returned.",
           "required": true,
           "schema": {
             "description": "Block number (hex) or block hash (0x-prefixed 32-byte hex), optionally with requireCanonical flag",
@@ -5035,7 +5035,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: []map[string]interface {}",
+        "description": "Receipts for every transaction in the requested block, in execution order. Each entry has status, gas used, cumulative gas used, logs, and (for contract creations) the new contract address.",
         "schema": {
           "items": {
             "type": "object",
@@ -5078,7 +5078,7 @@
       "params": [
         {
           "name": "hash",
-          "description": "Parameter `hash`. Go type: common.Hash",
+          "description": "Hash of the block whose transaction count is requested.",
           "required": true,
           "schema": {
             "description": "Hex-encoded 256-bit hash",
@@ -5090,7 +5090,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: *hexutil.Uint",
+        "description": "Number of transactions in the block (hex). `null` if the block hash is unknown.",
         "schema": {
           "description": "Hex-encoded unsigned integer",
           "nullable": true,
@@ -5129,7 +5129,7 @@
       "params": [
         {
           "name": "blockNum",
-          "description": "Parameter `blockNum`. Go type: types.BlockNumber",
+          "description": "Block tag (hex height or `latest`/`earliest`/`pending`/`safe`/`finalized`) whose transaction count is requested.",
           "required": true,
           "schema": {
             "description": "Block number: hex integer or tag (\"latest\", \"earliest\", \"pending\", \"safe\", \"finalized\")",
@@ -5140,7 +5140,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: *hexutil.Uint",
+        "description": "Number of transactions in the block (hex). `null` if the height is not yet mined.",
         "schema": {
           "description": "Hex-encoded unsigned integer",
           "nullable": true,
@@ -5179,7 +5179,7 @@
       "params": [
         {
           "name": "address",
-          "description": "Parameter `address`. Go type: common.Address",
+          "description": "20-byte address whose deployed bytecode is requested.",
           "required": true,
           "schema": {
             "description": "Hex-encoded Ethereum address (20 bytes)",
@@ -5190,7 +5190,7 @@
         },
         {
           "name": "blockNrOrHash",
-          "description": "Parameter `blockNrOrHash`. Go type: types.BlockNumberOrHash",
+          "description": "Block tag or block hash whose post-state should be queried.",
           "required": true,
           "schema": {
             "description": "Block number (hex) or block hash (0x-prefixed 32-byte hex), optionally with requireCanonical flag",
@@ -5201,7 +5201,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: hexutil.Bytes",
+        "description": "Deployed contract bytecode at the address (hex). Empty `0x` for externally-owned accounts and for not-yet-deployed contracts.",
         "schema": {
           "description": "Hex-encoded byte array",
           "pattern": "^0x[0-9a-fA-F]*$",
@@ -5243,7 +5243,7 @@
       "params": [
         {
           "name": "id",
-          "description": "Parameter `id`. Go type: rpc.ID",
+          "description": "Filter ID previously returned by `eth_newFilter`, `eth_newBlockFilter`, or `eth_newPendingTransactionFilter`.",
           "required": true,
           "schema": {
             "type": "string",
@@ -5253,7 +5253,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: interface {}",
+        "description": "Polling result for an active filter. Logs filter → array of log objects; block filter → array of block hashes; pending-tx filter → array of transaction hashes. Empty array if nothing new since the last poll.",
         "schema": {
           "type": "object",
           "x-go-type": "interface {}"
@@ -5289,7 +5289,7 @@
       "params": [
         {
           "name": "id",
-          "description": "Parameter `id`. Go type: rpc.ID",
+          "description": "Filter ID previously returned by `eth_newFilter`. Returns all logs matching the filter since its creation.",
           "required": true,
           "schema": {
             "type": "string",
@@ -5299,7 +5299,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: []*types.Log",
+        "description": "All log objects matching the filter's criteria since it was installed. Unlike `eth_getFilterChanges`, this returns the full history rather than only new entries.",
         "schema": {
           "items": {
             "nullable": true,
@@ -5417,7 +5417,7 @@
       "params": [
         {
           "name": "hash",
-          "description": "Parameter `hash`. Go type: common.Hash",
+          "description": "Hash of the block whose header is requested.",
           "required": true,
           "schema": {
             "description": "Hex-encoded 256-bit hash",
@@ -5429,7 +5429,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: map[string]interface {}",
+        "description": "Block header fields only — no transactions or uncles. `null` if the hash is unknown.",
         "schema": {
           "type": "object",
           "x-go-type": "map[string]interface {}"
@@ -5465,7 +5465,7 @@
       "params": [
         {
           "name": "ethBlockNum",
-          "description": "Parameter `ethBlockNum`. Go type: types.BlockNumber",
+          "description": "Block tag (hex height or `latest`/`earliest`/`pending`/`safe`/`finalized`) identifying the header to fetch.",
           "required": true,
           "schema": {
             "description": "Block number: hex integer or tag (\"latest\", \"earliest\", \"pending\", \"safe\", \"finalized\")",
@@ -5476,7 +5476,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: map[string]interface {}",
+        "description": "Block header fields only — no transactions or uncles. `null` if the height is not yet mined.",
         "schema": {
           "type": "object",
           "x-go-type": "map[string]interface {}"
@@ -5512,7 +5512,7 @@
       "params": [
         {
           "name": "crit",
-          "description": "Parameter `crit`. Go type: filters.FilterCriteria",
+          "description": "Filter criteria: `fromBlock`/`toBlock` range or `blockHash`, optional `address`(es), and optional `topics`. Returns all matching logs.",
           "required": true,
           "schema": {
             "description": "Log filter query used by eth_getLogs and filter subscription methods. Use either `blockHash` or a `fromBlock`/`toBlock` range.",
@@ -5591,7 +5591,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: []*types.Log",
+        "description": "Log objects matching the criteria. Each log carries the emitting address, indexed topics, raw `data` bytes, and block/tx identifiers.",
         "schema": {
           "items": {
             "nullable": true,
@@ -5713,7 +5713,7 @@
       "params": [
         {
           "name": "address",
-          "description": "Parameter `address`. Go type: common.Address",
+          "description": "Account address for which to produce a Merkle-Patricia proof.",
           "required": true,
           "schema": {
             "description": "Hex-encoded Ethereum address (20 bytes)",
@@ -5724,7 +5724,7 @@
         },
         {
           "name": "storageKeys",
-          "description": "Parameter `storageKeys`. Go type: []string",
+          "description": "Storage slots (32-byte hex strings) to additionally include in the proof.",
           "required": true,
           "schema": {
             "items": {
@@ -5737,7 +5737,7 @@
         },
         {
           "name": "blockNrOrHash",
-          "description": "Parameter `blockNrOrHash`. Go type: types.BlockNumberOrHash",
+          "description": "Block tag or block hash whose state root the proof is rooted at.",
           "required": true,
           "schema": {
             "description": "Block number (hex) or block hash (0x-prefixed 32-byte hex), optionally with requireCanonical flag",
@@ -5748,7 +5748,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: *types.AccountResult",
+        "description": "Merkle-Patricia proof bundle: account proof, balance, code hash, nonce, storage hash, and one storage proof per requested key. Rooted at the chosen block's state root.",
         "schema": {
           "nullable": true,
           "properties": {
@@ -5876,7 +5876,7 @@
       "params": [
         {
           "name": "address",
-          "description": "Parameter `address`. Go type: common.Address",
+          "description": "Account address whose storage is queried.",
           "required": true,
           "schema": {
             "description": "Hex-encoded Ethereum address (20 bytes)",
@@ -5887,7 +5887,7 @@
         },
         {
           "name": "key",
-          "description": "Parameter `key`. Go type: string",
+          "description": "32-byte storage slot key (hex).",
           "required": true,
           "schema": {
             "type": "string",
@@ -5896,7 +5896,7 @@
         },
         {
           "name": "blockNrOrHash",
-          "description": "Parameter `blockNrOrHash`. Go type: types.BlockNumberOrHash",
+          "description": "Block tag or block hash whose post-state should be queried.",
           "required": true,
           "schema": {
             "description": "Block number (hex) or block hash (0x-prefixed 32-byte hex), optionally with requireCanonical flag",
@@ -5907,7 +5907,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: hexutil.Bytes",
+        "description": "32-byte value (hex) stored at the requested slot, or `0x000...00` if unset.",
         "schema": {
           "description": "Hex-encoded byte array",
           "pattern": "^0x[0-9a-fA-F]*$",
@@ -5953,7 +5953,7 @@
       "params": [
         {
           "name": "hash",
-          "description": "Parameter `hash`. Go type: common.Hash",
+          "description": "Block hash containing the transaction.",
           "required": true,
           "schema": {
             "description": "Hex-encoded 256-bit hash",
@@ -5964,7 +5964,7 @@
         },
         {
           "name": "idx",
-          "description": "Parameter `idx`. Go type: hexutil.Uint",
+          "description": "Zero-based transaction index within the block (hex).",
           "required": true,
           "schema": {
             "description": "Hex-encoded unsigned integer",
@@ -5976,7 +5976,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: *types.RPCTransaction",
+        "description": "Transaction object at the given position in the block, or `null` if the index is out of range.",
         "schema": {
           "nullable": true,
           "properties": {
@@ -6254,7 +6254,7 @@
       "params": [
         {
           "name": "blockNum",
-          "description": "Parameter `blockNum`. Go type: types.BlockNumber",
+          "description": "Block tag (hex height or `latest`/`earliest`/`pending`/`safe`/`finalized`) containing the transaction.",
           "required": true,
           "schema": {
             "description": "Block number: hex integer or tag (\"latest\", \"earliest\", \"pending\", \"safe\", \"finalized\")",
@@ -6264,7 +6264,7 @@
         },
         {
           "name": "idx",
-          "description": "Parameter `idx`. Go type: hexutil.Uint",
+          "description": "Zero-based transaction index within the block (hex).",
           "required": true,
           "schema": {
             "description": "Hex-encoded unsigned integer",
@@ -6276,7 +6276,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: *types.RPCTransaction",
+        "description": "Transaction object at the given position in the block, or `null` if the index is out of range.",
         "schema": {
           "nullable": true,
           "properties": {
@@ -6554,7 +6554,7 @@
       "params": [
         {
           "name": "hash",
-          "description": "Parameter `hash`. Go type: common.Hash",
+          "description": "Transaction hash to look up.",
           "required": true,
           "schema": {
             "description": "Hex-encoded 256-bit hash",
@@ -6566,7 +6566,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: *types.RPCTransaction",
+        "description": "Transaction object as it lives on-chain or in the mempool, or `null` if unknown. Includes `from`/`to`/value/input plus EIP-1559 fee fields and (for confirmed txs) `blockNumber`/`blockHash`/`transactionIndex`.",
         "schema": {
           "nullable": true,
           "properties": {
@@ -6842,7 +6842,7 @@
       "params": [
         {
           "name": "address",
-          "description": "Parameter `address`. Go type: common.Address",
+          "description": "Address whose nonce (number of transactions sent) is requested.",
           "required": true,
           "schema": {
             "description": "Hex-encoded Ethereum address (20 bytes)",
@@ -6853,7 +6853,7 @@
         },
         {
           "name": "blockNrOrHash",
-          "description": "Parameter `blockNrOrHash`. Go type: types.BlockNumberOrHash",
+          "description": "Block tag or block hash whose post-state nonce should be returned.",
           "required": true,
           "schema": {
             "description": "Block number (hex) or block hash (0x-prefixed 32-byte hex), optionally with requireCanonical flag",
@@ -6864,7 +6864,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: *hexutil.Uint64",
+        "description": "Number of transactions sent from the address (i.e. the next nonce), hex-encoded. Reflects the chosen block's post-state.",
         "schema": {
           "description": "Hex-encoded uint64",
           "nullable": true,
@@ -6907,7 +6907,7 @@
       "params": [
         {
           "name": "txHash",
-          "description": "Parameter `txHash`. Go type: common.Hash",
+          "description": "Transaction hash whose emitted logs are requested.",
           "required": true,
           "schema": {
             "description": "Hex-encoded 256-bit hash",
@@ -6919,7 +6919,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: []*types.Log",
+        "description": "All log objects emitted by the transaction, in emission order. Empty array if the transaction emitted no events.",
         "schema": {
           "items": {
             "nullable": true,
@@ -7039,7 +7039,7 @@
       "params": [
         {
           "name": "hash",
-          "description": "Parameter `hash`. Go type: common.Hash",
+          "description": "Transaction hash whose receipt (status, gas used, logs, contract address) is requested.",
           "required": true,
           "schema": {
             "description": "Hex-encoded 256-bit hash",
@@ -7051,7 +7051,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: map[string]interface {}",
+        "description": "Receipt object: status (`0x0` failure, `0x1` success), gas used, cumulative gas, logs, logs bloom, effective gas price, and (for contract creations) the new contract address. `null` if the tx is still pending.",
         "schema": {
           "type": "object",
           "x-go-type": "map[string]interface {}"
@@ -7091,7 +7091,7 @@
       "params": [
         {
           "name": "blockHash",
-          "description": "Parameter `blockHash`. Go type: common.Hash",
+          "description": "Block hash whose uncle is requested. Note: post-merge Ethereum has no uncles; the response is null on Lumera.",
           "required": true,
           "schema": {
             "description": "Hex-encoded 256-bit hash",
@@ -7102,7 +7102,7 @@
         },
         {
           "name": "index",
-          "description": "Parameter `index`. Go type: hexutil.Uint",
+          "description": "Zero-based uncle index within the block (hex).",
           "required": true,
           "schema": {
             "description": "Hex-encoded unsigned integer",
@@ -7114,7 +7114,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: map[string]interface {}",
+        "description": "Always `null` on Lumera — post-merge chains have no uncles.",
         "schema": {
           "type": "object",
           "x-go-type": "map[string]interface {}"
@@ -7154,7 +7154,7 @@
       "params": [
         {
           "name": "blockNumber",
-          "description": "Parameter `blockNumber`. Go type: hexutil.Uint",
+          "description": "Block height (hex) whose uncle is requested. Note: post-merge Ethereum has no uncles; the response is null on Lumera.",
           "required": true,
           "schema": {
             "description": "Hex-encoded unsigned integer",
@@ -7165,7 +7165,7 @@
         },
         {
           "name": "index",
-          "description": "Parameter `index`. Go type: hexutil.Uint",
+          "description": "Zero-based uncle index within the block (hex).",
           "required": true,
           "schema": {
             "description": "Hex-encoded unsigned integer",
@@ -7177,7 +7177,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: map[string]interface {}",
+        "description": "Always `null` on Lumera — post-merge chains have no uncles.",
         "schema": {
           "type": "object",
           "x-go-type": "map[string]interface {}"
@@ -7217,7 +7217,7 @@
       "params": [
         {
           "name": "blockHash",
-          "description": "Parameter `blockHash`. Go type: common.Hash",
+          "description": "Block hash whose uncle count is requested. Always 0 on Lumera (no uncles).",
           "required": true,
           "schema": {
             "description": "Hex-encoded 256-bit hash",
@@ -7229,7 +7229,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: hexutil.Uint",
+        "description": "Always `0x0` on Lumera — post-merge chains have no uncles.",
         "schema": {
           "description": "Hex-encoded unsigned integer",
           "pattern": "^0x[0-9a-fA-F]+$",
@@ -7267,7 +7267,7 @@
       "params": [
         {
           "name": "blockNumber",
-          "description": "Parameter `blockNumber`. Go type: types.BlockNumber",
+          "description": "Block height tag whose uncle count is requested. Always 0 on Lumera (no uncles).",
           "required": true,
           "schema": {
             "description": "Block number: hex integer or tag (\"latest\", \"earliest\", \"pending\", \"safe\", \"finalized\")",
@@ -7278,7 +7278,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: hexutil.Uint",
+        "description": "Always `0x0` on Lumera — post-merge chains have no uncles.",
         "schema": {
           "description": "Hex-encoded unsigned integer",
           "pattern": "^0x[0-9a-fA-F]+$",
@@ -7316,7 +7316,7 @@
       "params": [],
       "result": {
         "name": "result",
-        "description": "Go type: *hexutil.Big",
+        "description": "Suggested priority-fee (tip) in wei (hex), based on recent block tips. Use as `maxPriorityFeePerGas` for EIP-1559 transactions.",
         "schema": {
           "description": "Hex-encoded big integer",
           "nullable": true,
@@ -7350,7 +7350,7 @@
       "params": [],
       "result": {
         "name": "result",
-        "description": "Go type: rpc.ID",
+        "description": "Filter ID. Poll via `eth_getFilterChanges` to receive block hashes as new blocks are committed.",
         "schema": {
           "type": "string",
           "x-go-type": "rpc.ID"
@@ -7381,7 +7381,7 @@
       "params": [
         {
           "name": "criteria",
-          "description": "Parameter `criteria`. Go type: filters.FilterCriteria",
+          "description": "Filter criteria: `fromBlock`/`toBlock`, optional `address`(es), optional `topics`. Returns a filter ID poll-able via `eth_getFilterChanges`.",
           "required": true,
           "schema": {
             "description": "Log filter query used by eth_getLogs and filter subscription methods. Use either `blockHash` or a `fromBlock`/`toBlock` range.",
@@ -7460,7 +7460,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: rpc.ID",
+        "description": "Filter ID. Poll via `eth_getFilterChanges` for incremental matches or `eth_getFilterLogs` for the full history.",
         "schema": {
           "type": "string",
           "x-go-type": "rpc.ID"
@@ -7500,7 +7500,7 @@
       "params": [],
       "result": {
         "name": "result",
-        "description": "Go type: rpc.ID",
+        "description": "Filter ID. Poll via `eth_getFilterChanges` to receive pending-transaction hashes as they enter the mempool.",
         "schema": {
           "type": "string",
           "x-go-type": "rpc.ID"
@@ -7531,7 +7531,7 @@
       "params": [],
       "result": {
         "name": "result",
-        "description": "Go type: hexutil.Uint",
+        "description": "Ethereum wire-protocol version implemented by the node (hex). Largely historical on Cosmos EVM.",
         "schema": {
           "description": "Hex-encoded unsigned integer",
           "pattern": "^0x[0-9a-fA-F]+$",
@@ -7564,7 +7564,7 @@
       "params": [
         {
           "name": "args",
-          "description": "Parameter `args`. Go type: types.TransactionArgs",
+          "description": "Original transaction object identified by its `from` and `nonce`. The pending transaction is replaced with this content.",
           "required": true,
           "schema": {
             "description": "Arguments for message calls and transaction submission, using Ethereum JSON-RPC hex encoding. Use either legacy `gasPrice` or EIP-1559 fee fields. If you provide blob sidecar fields, provide `blobs`, `commitments`, and `proofs` together.",
@@ -7778,7 +7778,7 @@
         },
         {
           "name": "gasPrice",
-          "description": "Parameter `gasPrice`. Go type: *hexutil.Big",
+          "description": "New gas price (or `maxFeePerGas`) for the replacement transaction. Typically must be higher than the original to be accepted.",
           "schema": {
             "description": "Hex-encoded big integer",
             "nullable": true,
@@ -7789,7 +7789,7 @@
         },
         {
           "name": "gasLimit",
-          "description": "Parameter `gasLimit`. Go type: *hexutil.Uint64",
+          "description": "Optional new gas limit. Pass null to keep the original.",
           "schema": {
             "description": "Hex-encoded uint64",
             "nullable": true,
@@ -7801,7 +7801,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: common.Hash",
+        "description": "Hash of the newly submitted replacement transaction.",
         "schema": {
           "description": "Hex-encoded 256-bit hash",
           "pattern": "^0x[0-9a-fA-F]{64}$",
@@ -7853,7 +7853,7 @@
       "params": [
         {
           "name": "data",
-          "description": "Parameter `data`. Go type: hexutil.Bytes",
+          "description": "Signed, RLP-encoded transaction bytes (`0x`-prefixed hex). Returns the transaction hash on successful submission.",
           "required": true,
           "schema": {
             "description": "Hex-encoded byte array",
@@ -7865,7 +7865,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: common.Hash",
+        "description": "Hash of the submitted transaction. Inclusion in a block is not yet guaranteed at the time of return.",
         "schema": {
           "description": "Hex-encoded 256-bit hash",
           "pattern": "^0x[0-9a-fA-F]{64}$",
@@ -7903,7 +7903,7 @@
       "params": [
         {
           "name": "args",
-          "description": "Parameter `args`. Go type: types.TransactionArgs",
+          "description": "Transaction object to sign with one of the node's unlocked accounts and submit. Requires `personal_unlockAccount` first.",
           "required": true,
           "schema": {
             "description": "Arguments for message calls and transaction submission, using Ethereum JSON-RPC hex encoding. Use either legacy `gasPrice` or EIP-1559 fee fields. If you provide blob sidecar fields, provide `blobs`, `commitments`, and `proofs` together.",
@@ -8118,7 +8118,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: common.Hash",
+        "description": "Hash of the submitted transaction. Requires an unlocked sender account on the node.",
         "schema": {
           "description": "Hex-encoded 256-bit hash",
           "pattern": "^0x[0-9a-fA-F]{64}$",
@@ -8163,7 +8163,7 @@
       "params": [
         {
           "name": "address",
-          "description": "Parameter `address`. Go type: common.Address",
+          "description": "Address (must be unlocked on the node) whose key signs the data using the Ethereum signed-message prefix.",
           "required": true,
           "schema": {
             "description": "Hex-encoded Ethereum address (20 bytes)",
@@ -8174,7 +8174,7 @@
         },
         {
           "name": "data",
-          "description": "Parameter `data`. Go type: hexutil.Bytes",
+          "description": "Arbitrary bytes to sign. The node prepends `\\x19Ethereum Signed Message:\\n\u003clen\u003e` before hashing.",
           "required": true,
           "schema": {
             "description": "Hex-encoded byte array",
@@ -8186,7 +8186,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: hexutil.Bytes",
+        "description": "65-byte signature (hex) over `keccak256(\\x19Ethereum Signed Message:\\n\u003clen\u003edata)` using the address's key. Layout: `r||s||v`.",
         "schema": {
           "description": "Hex-encoded byte array",
           "pattern": "^0x[0-9a-fA-F]*$",
@@ -8228,7 +8228,7 @@
       "params": [
         {
           "name": "address",
-          "description": "Parameter `address`. Go type: common.Address",
+          "description": "Address (must be unlocked on the node) whose key signs the EIP-712 typed data.",
           "required": true,
           "schema": {
             "description": "Hex-encoded Ethereum address (20 bytes)",
@@ -8239,7 +8239,7 @@
         },
         {
           "name": "typedData",
-          "description": "Parameter `typedData`. Go type: apitypes.TypedData",
+          "description": "EIP-712 typed-data object: `types`, `primaryType`, `domain`, and `message`.",
           "required": true,
           "schema": {
             "properties": {
@@ -8311,7 +8311,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: hexutil.Bytes",
+        "description": "65-byte EIP-712 signature (hex) over the typed-data domain-separated digest. Layout: `r||s||v`.",
         "schema": {
           "description": "Hex-encoded byte array",
           "pattern": "^0x[0-9a-fA-F]*$",
@@ -8369,7 +8369,7 @@
       "params": [],
       "result": {
         "name": "result",
-        "description": "Go type: interface {}",
+        "description": "`false` when the node is fully synced, otherwise an object with `startingBlock`/`currentBlock`/`highestBlock` describing sync progress.",
         "schema": {
           "type": "object",
           "x-go-type": "interface {}"
@@ -8400,7 +8400,7 @@
       "params": [
         {
           "name": "id",
-          "description": "Parameter `id`. Go type: rpc.ID",
+          "description": "Filter ID to remove. Returns true if the filter was found and removed.",
           "required": true,
           "schema": {
             "type": "string",
@@ -8410,7 +8410,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: bool",
+        "description": "`true` if the filter was found and removed; `false` if it had already expired or never existed.",
         "schema": {
           "type": "boolean",
           "x-go-type": "bool"
@@ -8446,7 +8446,7 @@
       "params": [],
       "result": {
         "name": "result",
-        "description": "Go type: uint64",
+        "description": "Reported mining hashrate. Effectively meaningless on Cosmos EVM (no proof-of-work).",
         "schema": {
           "type": "string",
           "x-go-type": "uint64"
@@ -8477,7 +8477,7 @@
       "params": [
         {
           "name": "etherbase",
-          "description": "Parameter `etherbase`. Go type: common.Address",
+          "description": "Address that should receive block rewards / coinbase output for this node.",
           "required": true,
           "schema": {
             "description": "Hex-encoded Ethereum address (20 bytes)",
@@ -8489,7 +8489,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: bool",
+        "description": "Always `true` on Lumera — block rewards are distributed by the Cosmos staking module, not by the EVM coinbase address.",
         "schema": {
           "type": "boolean",
           "x-go-type": "bool"
@@ -8525,7 +8525,7 @@
       "params": [
         {
           "name": "extra",
-          "description": "Parameter `extra`. Go type: string",
+          "description": "Extra-data string included in mined block headers (max 32 bytes).",
           "required": true,
           "schema": {
             "type": "string",
@@ -8535,7 +8535,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: bool",
+        "description": "Always `true` on Lumera — block production is driven by CometBFT, not by EVM miner settings.",
         "schema": {
           "type": "boolean",
           "x-go-type": "bool"
@@ -8571,7 +8571,7 @@
       "params": [
         {
           "name": "gasLimit",
-          "description": "Parameter `gasLimit`. Go type: hexutil.Uint64",
+          "description": "Target gas limit for blocks produced by this node (hex).",
           "required": true,
           "schema": {
             "description": "Hex-encoded uint64",
@@ -8583,7 +8583,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: bool",
+        "description": "Always `true` on Lumera — block gas limit is set by the consensus params, not by an EVM miner config.",
         "schema": {
           "type": "boolean",
           "x-go-type": "bool"
@@ -8619,7 +8619,7 @@
       "params": [
         {
           "name": "gasPrice",
-          "description": "Parameter `gasPrice`. Go type: hexutil.Big",
+          "description": "Minimum gas price (hex) for transactions accepted into this node's mempool/built blocks.",
           "required": true,
           "schema": {
             "description": "Hex-encoded big integer",
@@ -8631,7 +8631,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: bool",
+        "description": "Always `true` on Lumera — local minimum gas prices are configured via app.toml / mempool settings, not via this method.",
         "schema": {
           "type": "boolean",
           "x-go-type": "bool"
@@ -8667,7 +8667,7 @@
       "params": [
         {
           "name": "threads",
-          "description": "Parameter `threads`. Go type: *int",
+          "description": "Optional number of mining threads to start. Pass null/omit to use the node default.",
           "schema": {
             "nullable": true,
             "type": "string",
@@ -8742,7 +8742,7 @@
       "params": [],
       "result": {
         "name": "result",
-        "description": "Go type: bool",
+        "description": "`true` while the node is actively listening for peers.",
         "schema": {
           "type": "boolean",
           "x-go-type": "bool"
@@ -8773,7 +8773,7 @@
       "params": [],
       "result": {
         "name": "result",
-        "description": "Go type: int",
+        "description": "Number of currently-connected peers (decimal integer).",
         "schema": {
           "type": "string",
           "x-go-type": "int"
@@ -8804,7 +8804,7 @@
       "params": [],
       "result": {
         "name": "result",
-        "description": "Go type: string",
+        "description": "Network ID as a decimal string. Equal to the EVM chain ID on Lumera (`\"76857769\"`).",
         "schema": {
           "type": "string",
           "x-go-type": "string"
@@ -8835,7 +8835,7 @@
       "params": [
         {
           "name": "data",
-          "description": "Parameter `data`. Go type: hexutil.Bytes",
+          "description": "Original data that was signed via `personal_sign` (Ethereum signed-message prefix is reapplied during recovery).",
           "required": true,
           "schema": {
             "description": "Hex-encoded byte array",
@@ -8846,7 +8846,7 @@
         },
         {
           "name": "sig",
-          "description": "Parameter `sig`. Go type: hexutil.Bytes",
+          "description": "65-byte signature (`r||s||v`) produced by `personal_sign`.",
           "required": true,
           "schema": {
             "description": "Hex-encoded byte array",
@@ -8858,7 +8858,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: common.Address",
+        "description": "Address that produced the signature, recovered using the Ethereum signed-message prefix.",
         "schema": {
           "description": "Hex-encoded Ethereum address (20 bytes)",
           "pattern": "^0x[0-9a-fA-F]{40}$",
@@ -8900,7 +8900,7 @@
       "params": [
         {
           "name": "privkey",
-          "description": "Parameter `privkey`. Go type: string",
+          "description": "32-byte secp256k1 private key as hex (no `0x` prefix). Imported into the node's keystore.",
           "required": true,
           "schema": {
             "type": "string",
@@ -8909,7 +8909,7 @@
         },
         {
           "name": "password",
-          "description": "Parameter `password`. Go type: string",
+          "description": "Passphrase used to encrypt the imported key in the keystore.",
           "required": true,
           "schema": {
             "type": "string",
@@ -8919,7 +8919,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: common.Address",
+        "description": "Address derived from the imported private key.",
         "schema": {
           "description": "Hex-encoded Ethereum address (20 bytes)",
           "pattern": "^0x[0-9a-fA-F]{40}$",
@@ -8961,7 +8961,7 @@
       "params": [
         {
           "name": "url",
-          "description": "Parameter `url`. Go type: string",
+          "description": "Hardware-wallet URL (e.g. `ledger://...`) identifying the device to initialize.",
           "required": true,
           "schema": {
             "type": "string",
@@ -8971,7 +8971,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: string",
+        "description": "Recovery mnemonic / status string returned by the hardware wallet driver after initialization.",
         "schema": {
           "type": "string",
           "x-go-type": "string"
@@ -9007,7 +9007,7 @@
       "params": [],
       "result": {
         "name": "result",
-        "description": "Go type: []common.Address",
+        "description": "All addresses held in the node's keystore.",
         "schema": {
           "items": {
             "description": "Hex-encoded Ethereum address (20 bytes)",
@@ -9047,7 +9047,7 @@
       "params": [],
       "result": {
         "name": "result",
-        "description": "Go type: []personal.RawWallet",
+        "description": "Detailed entries for each detected wallet backend (keystore, USB hardware wallet, etc.) including its status and contained accounts.",
         "schema": {
           "items": {
             "properties": {
@@ -9112,7 +9112,7 @@
       "params": [
         {
           "name": "address",
-          "description": "Parameter `address`. Go type: common.Address",
+          "description": "Address whose previously unlocked key should be re-encrypted and locked.",
           "required": true,
           "schema": {
             "description": "Hex-encoded Ethereum address (20 bytes)",
@@ -9124,7 +9124,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: bool",
+        "description": "`true` if a previously unlocked key was locked; `false` if no key was unlocked for that address.",
         "schema": {
           "type": "boolean",
           "x-go-type": "bool"
@@ -9160,7 +9160,7 @@
       "params": [
         {
           "name": "password",
-          "description": "Parameter `password`. Go type: string",
+          "description": "Passphrase used to encrypt the newly generated keystore entry.",
           "required": true,
           "schema": {
             "type": "string",
@@ -9170,7 +9170,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: common.Address",
+        "description": "Address of the newly generated keystore account.",
         "schema": {
           "description": "Hex-encoded Ethereum address (20 bytes)",
           "pattern": "^0x[0-9a-fA-F]{40}$",
@@ -9208,7 +9208,7 @@
       "params": [
         {
           "name": "args",
-          "description": "Parameter `args`. Go type: types.TransactionArgs",
+          "description": "Transaction object to sign and submit using a temporarily-unlocked keystore account.",
           "required": true,
           "schema": {
             "description": "Arguments for message calls and transaction submission, using Ethereum JSON-RPC hex encoding. Use either legacy `gasPrice` or EIP-1559 fee fields. If you provide blob sidecar fields, provide `blobs`, `commitments`, and `proofs` together.",
@@ -9422,7 +9422,7 @@
         },
         {
           "name": "password",
-          "description": "Parameter `password`. Go type: string",
+          "description": "Passphrase of the sender's keystore account; used to unlock just for this call.",
           "required": true,
           "schema": {
             "type": "string",
@@ -9432,7 +9432,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: common.Hash",
+        "description": "Hash of the submitted transaction.",
         "schema": {
           "description": "Hex-encoded 256-bit hash",
           "pattern": "^0x[0-9a-fA-F]{64}$",
@@ -9479,7 +9479,7 @@
       "params": [
         {
           "name": "data",
-          "description": "Parameter `data`. Go type: hexutil.Bytes",
+          "description": "Arbitrary bytes to sign with the Ethereum signed-message prefix.",
           "required": true,
           "schema": {
             "description": "Hex-encoded byte array",
@@ -9490,7 +9490,7 @@
         },
         {
           "name": "addr",
-          "description": "Parameter `addr`. Go type: common.Address",
+          "description": "Address whose keystore key signs the data (unlocked just for this call).",
           "required": true,
           "schema": {
             "description": "Hex-encoded Ethereum address (20 bytes)",
@@ -9501,7 +9501,7 @@
         },
         {
           "name": "password",
-          "description": "Parameter `password`. Go type: string",
+          "description": "Passphrase of the keystore account.",
           "required": true,
           "schema": {
             "type": "string",
@@ -9511,7 +9511,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: hexutil.Bytes",
+        "description": "65-byte signature (hex) layout `r||s||v` over the Ethereum-prefixed digest of `data`.",
         "schema": {
           "description": "Hex-encoded byte array",
           "pattern": "^0x[0-9a-fA-F]*$",
@@ -9557,7 +9557,7 @@
       "params": [
         {
           "name": "addr",
-          "description": "Parameter `addr`. Go type: common.Address",
+          "description": "Address to unlock for subsequent `eth_sendTransaction` calls.",
           "required": true,
           "schema": {
             "description": "Hex-encoded Ethereum address (20 bytes)",
@@ -9568,7 +9568,7 @@
         },
         {
           "name": "password",
-          "description": "Parameter `password`. Go type: string",
+          "description": "Passphrase of the keystore account.",
           "required": true,
           "schema": {
             "type": "string",
@@ -9577,7 +9577,7 @@
         },
         {
           "name": "duration",
-          "description": "Parameter `duration`. Go type: *uint64",
+          "description": "Optional unlock duration in seconds (default 300, 0 means unlock until process exit). Pass null for the default.",
           "schema": {
             "nullable": true,
             "type": "string",
@@ -9587,7 +9587,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: bool",
+        "description": "`true` if the passphrase was correct and the key was unlocked; `false` otherwise.",
         "schema": {
           "type": "boolean",
           "x-go-type": "bool"
@@ -9631,7 +9631,7 @@
       "params": [
         {
           "name": "url",
-          "description": "Parameter `url`. Go type: string",
+          "description": "Hardware-wallet URL identifying the device to unpair.",
           "required": true,
           "schema": {
             "type": "string",
@@ -9640,7 +9640,7 @@
         },
         {
           "name": "pin",
-          "description": "Parameter `pin`. Go type: string",
+          "description": "Device PIN required to unpair.",
           "required": true,
           "schema": {
             "type": "string",
@@ -9725,7 +9725,7 @@
       "params": [],
       "result": {
         "name": "result",
-        "description": "Go type: map[string]map[string]map[string]*types.RPCTransaction",
+        "description": "Full mempool dump grouped as `{ pending|queued: { address: { nonce: transaction } } }`.",
         "schema": {
           "type": "object",
           "x-go-type": "map[string]map[string]map[string]*types.RPCTransaction"
@@ -9756,7 +9756,7 @@
       "params": [
         {
           "name": "address",
-          "description": "Parameter `address`. Go type: common.Address",
+          "description": "Address whose pending and queued transactions should be returned from this node's mempool view.",
           "required": true,
           "schema": {
             "description": "Hex-encoded Ethereum address (20 bytes)",
@@ -9768,7 +9768,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: map[string]map[string]*types.RPCTransaction",
+        "description": "Mempool entries for one address grouped as `{ pending|queued: { nonce: transaction } }`.",
         "schema": {
           "type": "object",
           "x-go-type": "map[string]map[string]*types.RPCTransaction"
@@ -9804,7 +9804,7 @@
       "params": [],
       "result": {
         "name": "result",
-        "description": "Go type: map[string]map[string]map[string]string",
+        "description": "Compact mempool dump grouped as `{ pending|queued: { address: { nonce: summary-string } } }`. The summary string has the form `to: value wei + gas × gasPrice wei`.",
         "schema": {
           "type": "object",
           "x-go-type": "map[string]map[string]map[string]string"
@@ -9835,7 +9835,7 @@
       "params": [],
       "result": {
         "name": "result",
-        "description": "Go type: map[string]hexutil.Uint",
+        "description": "Counts of pending and queued transactions in the mempool (hex).",
         "schema": {
           "type": "object",
           "x-go-type": "map[string]hexutil.Uint"
@@ -9869,7 +9869,7 @@
       "params": [],
       "result": {
         "name": "result",
-        "description": "Go type: string",
+        "description": "Human-readable node identification string (client name, version, OS, Go version).",
         "schema": {
           "type": "string",
           "x-go-type": "string"
@@ -9900,7 +9900,7 @@
       "params": [
         {
           "name": "input",
-          "description": "Parameter `input`. Go type: string",
+          "description": "Hex-encoded bytes to Keccak-256 hash. Returns the 32-byte digest as hex.",
           "required": true,
           "schema": {
             "type": "string",
@@ -9910,7 +9910,7 @@
       ],
       "result": {
         "name": "result",
-        "description": "Go type: hexutil.Bytes",
+        "description": "Keccak-256 digest of the input bytes as 32 hex bytes.",
         "schema": {
           "description": "Hex-encoded byte array",
           "pattern": "^0x[0-9a-fA-F]*$",
@@ -9938,6 +9938,6 @@
   ],
   "externalDocs": {
     "description": "Cosmos EVM Ethereum JSON-RPC reference",
-    "url": "https://cosmos-docs.mintlify.app/docs/api-reference/ethereum-json-rpc"
+    "url": "https://docs.cosmos.network/evm/latest/api-reference/ethereum-json-rpc"
   }
 }

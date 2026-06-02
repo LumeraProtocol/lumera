@@ -56,8 +56,6 @@ func recoverFromPostponed(ctx sdk.Context, keeper types.SupernodeKeeper, sn *typ
 // markStorageFull transitions a supernode into STORAGE_FULL and emits the associated event.
 // Reserved for future use by audit enforcement; currently retained to lock in the state
 // machine contract while the triggering call sites land.
-//
-//nolint:unused // wired up in a follow-up audit/supernode integration.
 func markStorageFull(ctx sdk.Context, keeper types.SupernodeKeeper, sn *types.SuperNode) error {
 	if len(sn.States) == 0 {
 		return errorsmod.Wrap(sdkerrors.ErrInvalidRequest, "supernode state missing")

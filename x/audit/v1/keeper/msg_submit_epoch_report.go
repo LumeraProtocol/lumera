@@ -243,6 +243,15 @@ func (k Keeper) applyIncompleteReportPenalty(ctx sdk.Context, epochID uint64, re
 // This is the single enforcement point for HostReport host-metric invariants
 // (LEP-6 §12 — see proto/lumera/audit/v1/audit.proto::HostReport).
 func validateHostMetricFields(h types.HostReport) error {
+	if err := validateHostUsagePercent("cpu_usage_percent", h.CpuUsagePercent); err != nil {
+		return err
+	}
+	if err := validateHostUsagePercent("mem_usage_percent", h.MemUsagePercent); err != nil {
+		return err
+	}
+	if err := validateHostUsagePercent("disk_usage_percent", h.DiskUsagePercent); err != nil {
+		return err
+	}
 	if math.IsNaN(h.CascadeKademliaDbBytes) || math.IsInf(h.CascadeKademliaDbBytes, 0) {
 		return errorsmod.Wrap(types.ErrInvalidHostMetric, "cascade_kademlia_db_bytes must be a finite number")
 	}
@@ -250,6 +259,17 @@ func validateHostMetricFields(h types.HostReport) error {
 		return errorsmod.Wrapf(types.ErrInvalidHostMetric, "cascade_kademlia_db_bytes must be >= 0, got %v", h.CascadeKademliaDbBytes)
 	}
 	return nil
+}
+
+func validateHostUsagePercent(name string, value float64) error {
+	if !isValidHostUsagePercent(value) {
+		return errorsmod.Wrapf(types.ErrInvalidHostMetric, "%s must be a finite percentage in [0,100], got %v", name, value)
+	}
+	return nil
+}
+
+func isValidHostUsagePercent(value float64) bool {
+	return !math.IsNaN(value) && !math.IsInf(value, 0) && value >= 0 && value <= 100
 }
 
 // bridgeCascadeBytesToSupernodeMetrics writes the cascade_kademlia_db_bytes

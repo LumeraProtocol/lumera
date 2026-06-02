@@ -7,10 +7,10 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"os/exec"
 	"time"
@@ -66,6 +66,14 @@ func run(cfg *Config) error {
 	keyStyle := detectKeyStyle(cfg.Bin, cfg.EVMCutoverVer)
 	log.Printf("key style: %s (algo=%s coin-type=%d)", keyStyle.Name(), keyStyle.Algo, keyStyle.CoinType)
 
+	cli := newChainCLI(cfg)
+
+	// Steps 3-4: query validators and resolve the funder address. These are
+	// read-only; in dry-run they are best-effort so planning works without a
+	// node, but a live run requires both.
+	validators := queryValidators(cli, cfg.DryRun)
+	funderAddr := resolveFunder(cli, cfg.FundingKey, cfg.DryRun)
+
 	// Step 5: load the registry if present, else start a new one.
 	now := time.Now().UTC().Format(time.RFC3339)
 	reg, err := loadOrCreateRegistry(cfg, keyStyle, now)
@@ -76,6 +84,12 @@ func run(cfg *Config) error {
 	// Step 6: reconcile envelope metadata with the current run. An existing
 	// account's recorded key style is never rewritten.
 	reconcile(reg, cfg, keyStyle)
+	if len(validators) > 0 {
+		reg.Validators = validators
+	}
+	if funderAddr != "" {
+		reg.FunderAddress = funderAddr
+	}
 
 	// Decide how many new accounts to allocate this run.
 	newCount := plannedNewAccountCount(cfg, reg)
@@ -86,12 +100,91 @@ func run(cfg *Config) error {
 		return nil
 	}
 
-	// Step 7: persist any planned accounts, then run funding and activity.
-	// The live submission layer (funder batcher + per-account activity workers,
-	// built on the evmigration chain primitives) is the next implementation
-	// slice; until it lands, a non-dry-run is a hard error rather than a
-	// silent no-op.
-	return errors.New("live activity submission is not yet wired; re-run with -dry-run to preview the plan")
+	// Beyond this point the run mutates the keyring, chain, and registry, so the
+	// read-only preconditions must hold.
+	if len(validators) == 0 {
+		return fmt.Errorf("no validators found on chain %s", cfg.ChainID)
+	}
+	if funderAddr == "" {
+		return fmt.Errorf("could not resolve funder key %q address", cfg.FundingKey)
+	}
+
+	// Step 7-8: generate keys for the planned accounts and persist before any
+	// funding so an interrupted run can resume.
+	newRecs := generateAccounts(cli, plannedNames, keyStyle.Name())
+	for _, rec := range newRecs {
+		reg.UpsertAccount(rec)
+	}
+	if err := reg.Save(cfg.AccountsPath, time.Now().UTC().Format(time.RFC3339)); err != nil {
+		return fmt.Errorf("save registry after key generation: %w", err)
+	}
+	log.Printf("generated %d new account(s); registry saved", len(newRecs))
+
+	// Step 9: fund unfunded accounts via the single-funder batcher.
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	chain := &cliFundingChain{cli: cli, funderKey: cfg.FundingKey, funderAddr: funderAddr, blockWait: 30 * time.Second}
+	targets := unfundedTargets(reg)
+	amountFor := func(*AccountRecord) string {
+		return common.Coin{Amount: randomFundingAmount(cfg.maxAmount.Amount, rng), Denom: common.ChainDenom}.String()
+	}
+	funded, fundErr := FundAccounts(chain, targets, amountFor, cfg.FundingBatchSize, 3)
+	log.Printf("funded %d/%d account(s)", funded, len(targets))
+
+	// Step 11: persist after funding regardless of partial failure.
+	if err := reg.Save(cfg.AccountsPath, time.Now().UTC().Format(time.RFC3339)); err != nil {
+		return fmt.Errorf("save registry after funding: %w", err)
+	}
+	if fundErr != nil {
+		return fmt.Errorf("funding phase: %w", fundErr)
+	}
+
+	// Step 10 (activity mix) and action generation are the next implementation
+	// slice. Accounts created and funded by this run are persisted and ready.
+	log.Printf("account generation and funding complete; activity-mix and CASCADE action generation are the next slice")
+	return nil
+}
+
+// newChainCLI builds a common.ChainCLI from the configuration.
+func newChainCLI(cfg *Config) *common.ChainCLI {
+	return &common.ChainCLI{
+		Bin:            cfg.Bin,
+		ChainID:        cfg.ChainID,
+		RPC:            cfg.RPC,
+		Home:           cfg.Home,
+		KeyringBackend: cfg.KeyringBackend,
+		Gas:            "auto",
+		GasPrices:      "0.025" + common.ChainDenom,
+		GasAdjustment:  "1.4",
+	}
+}
+
+// queryValidators returns the validator set. In dry-run a query failure is a
+// warning; a live run treats an empty set as fatal at the call site.
+func queryValidators(cli *common.ChainCLI, dryRun bool) []string {
+	vals, err := cli.Validators()
+	if err != nil {
+		if dryRun {
+			log.Printf("WARN: validator query failed (dry-run, continuing): %v", err)
+			return nil
+		}
+		log.Printf("validator query failed: %v", err)
+		return nil
+	}
+	return vals
+}
+
+// resolveFunder resolves the funder key's address, best-effort in dry-run.
+func resolveFunder(cli *common.ChainCLI, key string, dryRun bool) string {
+	addr, err := cli.ShowAddress(key)
+	if err != nil {
+		if dryRun {
+			log.Printf("WARN: funder address lookup failed (dry-run, continuing): %v", err)
+		} else {
+			log.Printf("funder address lookup failed: %v", err)
+		}
+		return ""
+	}
+	return addr
 }
 
 // detectKeyStyle probes `lumerad version` and maps it to a KeyStyle. On failure

@@ -2,3 +2,6 @@ docker-compose.yml
 bin/
 bin-*/
 logs/
+
+# Stray binary from `go build ./tests/gen-activity` without -o
+/gen-activity

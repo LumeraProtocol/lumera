@@ -138,10 +138,61 @@ func run(cfg *Config) error {
 		return fmt.Errorf("funding phase: %w", fundErr)
 	}
 
-	// Step 10 (activity mix) and action generation are the next implementation
-	// slice. Accounts created and funded by this run are persisted and ready.
-	log.Printf("account generation and funding complete; activity-mix and CASCADE action generation are the next slice")
+	// Step 10: per-account activity mix. Only funded accounts can transact, and
+	// they serve as each other's peers for transfers and grants.
+	generateActivity(cli, reg, validators, cfg, rng)
+	reconcileReceivedGrants(reg.Accounts)
+	if err := reg.Save(cfg.AccountsPath, time.Now().UTC().Format(time.RFC3339)); err != nil {
+		return fmt.Errorf("save registry after activity: %w", err)
+	}
+
+	// CASCADE action generation (which requires the sdk-go client and live
+	// supernodes) is the next implementation slice.
+	log.Printf("activity generation complete; CASCADE action generation is the next slice")
 	return nil
+}
+
+// generateActivity plans and runs the per-account activity mix across all
+// funded accounts, using them as each other's peers.
+func generateActivity(cli *common.ChainCLI, reg *ActivityRegistry, validators []string, cfg *Config, rng *rand.Rand) {
+	var active []*AccountRecord
+	for _, rec := range reg.Accounts {
+		if rec.Funded {
+			active = append(active, rec)
+		}
+	}
+	if len(active) == 0 {
+		log.Printf("no funded accounts; skipping activity generation")
+		return
+	}
+
+	addrs := make([]string, len(active))
+	for i, rec := range active {
+		addrs[i] = rec.Address
+	}
+	// Activity amounts are sized well below per-account funding.
+	unit := cfg.maxAmount.Amount / 100
+	if unit < 1 {
+		unit = 1
+	}
+
+	chain := &cliActivityChain{cli: cli}
+	planFor := func(rec *AccountRecord) []plannedActivity {
+		return planActivities(validators, peersExcluding(addrs, rec.Address), rng, unit)
+	}
+	log.Printf("generating activity for %d account(s) with parallelism %d", len(active), cfg.Parallelism)
+	runActivityWorkers(chain, active, planFor, cfg.Parallelism)
+}
+
+// peersExcluding returns all addresses except the given one.
+func peersExcluding(addrs []string, self string) []string {
+	peers := make([]string, 0, len(addrs))
+	for _, a := range addrs {
+		if a != self {
+			peers = append(peers, a)
+		}
+	}
+	return peers
 }
 
 // newChainCLI builds a common.ChainCLI from the configuration.

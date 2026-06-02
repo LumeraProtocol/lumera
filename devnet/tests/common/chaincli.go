@@ -275,6 +275,92 @@ func (c *ChainCLI) SendBankNoWait(funderKey string, accNum, seq uint64, to, amou
 	return resp.TxHash, nil
 }
 
+// SubmitTx broadcasts a tx (online, sync) signed by the --from key contained in
+// args, waits for inclusion so a dependent tx from the same signer sees the
+// advanced sequence, and retries on account-sequence mismatch. Callers pass the
+// command and --from but not the gas/broadcast flags. Returns the tx hash.
+func (c *ChainCLI) SubmitTx(args ...string) (string, error) {
+	full := append(append([]string{}, args...),
+		"--gas", c.gas(),
+		"--gas-prices", c.GasPrices,
+		"--yes",
+		"--broadcast-mode", "sync",
+	)
+	if c.gas() == "auto" {
+		full = append(full, "--gas-adjustment", c.GasAdjustment)
+	}
+
+	var lastErr error
+	for attempt := range 3 {
+		out, err := c.Run(full...)
+		if err != nil {
+			lastErr = fmt.Errorf("broadcast: %s: %w", truncate(out, 200), err)
+			if _, _, isSeq := ParseIncorrectAccountSequence(lastErr); isSeq && attempt < 2 {
+				_ = c.WaitForNextBlock(15 * time.Second)
+				continue
+			}
+			return "", lastErr
+		}
+		txHash, code, rawLog, ok := parseSyncBroadcast(out)
+		if !ok {
+			return "", nil
+		}
+		if code != 0 {
+			rejErr := fmt.Errorf("tx rejected code=%d raw_log=%s", code, rawLog)
+			if _, _, isSeq := ParseIncorrectAccountSequence(rejErr); isSeq && attempt < 2 {
+				lastErr = rejErr
+				_ = c.WaitForNextBlock(15 * time.Second)
+				continue
+			}
+			return txHash, rejErr
+		}
+		if txHash != "" {
+			if werr := c.WaitForTxInclusion(txHash, 30*time.Second); werr != nil {
+				return txHash, werr
+			}
+		}
+		return txHash, nil
+	}
+	return "", lastErr
+}
+
+// WaitForTxInclusion polls `query tx <hash>` until the tx is committed (or the
+// timeout elapses), returning an error if the committed tx failed.
+func (c *ChainCLI) WaitForTxInclusion(txHash string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		out, err := c.Run("query", "tx", txHash)
+		if err == nil {
+			if _, code, rawLog, ok := parseSyncBroadcast(out); ok {
+				if code != 0 {
+					return fmt.Errorf("tx %s failed code=%d raw_log=%s", txHash, code, rawLog)
+				}
+				return nil
+			}
+		}
+		time.Sleep(time.Second)
+	}
+	return fmt.Errorf("timeout waiting for tx %s inclusion", txHash)
+}
+
+// parseSyncBroadcast extracts the tx hash, result code, and raw log from a CLI
+// broadcast or `query tx` JSON response.
+func parseSyncBroadcast(out string) (txHash string, code uint32, rawLog string, ok bool) {
+	payload, has := ExtractJSONPayload(out)
+	if !has {
+		return "", 0, "", false
+	}
+	var resp struct {
+		Code   uint32 `json:"code"`
+		RawLog string `json:"raw_log"`
+		TxHash string `json:"txhash"`
+	}
+	if json.Unmarshal([]byte(payload), &resp) != nil {
+		return "", 0, "", false
+	}
+	return resp.TxHash, resp.Code, resp.RawLog, true
+}
+
 func (c *ChainCLI) gas() string {
 	if c.Gas == "" {
 		return "auto"

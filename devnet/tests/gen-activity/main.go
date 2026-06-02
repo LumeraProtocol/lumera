@@ -146,9 +146,24 @@ func run(cfg *Config) error {
 		return fmt.Errorf("save registry after activity: %w", err)
 	}
 
-	// CASCADE action generation (which requires the sdk-go client and live
-	// supernodes) is the next implementation slice.
-	log.Printf("activity generation complete; CASCADE action generation is the next slice")
+	// Step: CASCADE action generation via the sdk-go client. Non-fatal by
+	// default; -require-actions makes supernode unavailability or creation
+	// failures fatal.
+	if cfg.Actions {
+		actionAccts := activityTargets(reg, newRecs, cfg.ActivityExisting)
+		creator := newSDKActionCreator(cfg, cli)
+		if err := generateActions(creator, cli, actionAccts, validators, cfg.actionStates,
+			cfg.MaxActionsPerRun, cfg.RequireActions, cfg.ActionReadinessTimeout); err != nil {
+			// Persist whatever actions were recorded before failing.
+			_ = reg.Save(cfg.AccountsPath, time.Now().UTC().Format(time.RFC3339))
+			return fmt.Errorf("action generation: %w", err)
+		}
+		if err := reg.Save(cfg.AccountsPath, time.Now().UTC().Format(time.RFC3339)); err != nil {
+			return fmt.Errorf("save registry after actions: %w", err)
+		}
+	}
+
+	log.Printf("gen-activity run complete")
 	return nil
 }
 

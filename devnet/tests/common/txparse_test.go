@@ -130,6 +130,54 @@ func TestParseBankBalance(t *testing.T) {
 	}
 }
 
+func TestParseRedelegationCount(t *testing.T) {
+	cases := []struct {
+		name string
+		out  string
+		want int
+	}{
+		{"plural responses", `{"redelegation_responses":[{"x":1},{"y":2}]}`, 2},
+		{"singular non-null", `{"redelegation":{"delegator_address":"a"}}`, 1},
+		{"singular null", `{"redelegation":null}`, 0},
+		{"empty", `{"redelegation_responses":[]}`, 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := ParseRedelegationCount(tc.out)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tc.want {
+				t.Errorf("got %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestParseAuthzGrantCount(t *testing.T) {
+	if n, _ := ParseAuthzGrantCount(`{"grants":[{"authorization":{}}]}`); n != 1 {
+		t.Errorf("got %d, want 1", n)
+	}
+	if n, _ := ParseAuthzGrantCount(`{"grants":[]}`); n != 0 {
+		t.Errorf("got %d, want 0", n)
+	}
+	if _, err := ParseAuthzGrantCount("not json"); err == nil {
+		t.Error("expected error for invalid JSON")
+	}
+}
+
+func TestParseFeegrantExists(t *testing.T) {
+	if ok, _ := ParseFeegrantExists(`{"allowance":{"granter":"g","grantee":"e"}}`); !ok {
+		t.Error("expected allowance to exist")
+	}
+	if ok, _ := ParseFeegrantExists(`{"allowance":null}`); ok {
+		t.Error("expected no allowance")
+	}
+	if _, err := ParseFeegrantExists("not json"); err == nil {
+		t.Error("expected error for invalid JSON")
+	}
+}
+
 func TestParseValidatorAddresses(t *testing.T) {
 	jsonOut := `{"validators":[{"operator_address":"lumeravaloper1aaa"},{"operator_address":"lumeravaloper1bbb"}]}`
 	got, err := ParseValidatorAddresses([]byte(jsonOut))

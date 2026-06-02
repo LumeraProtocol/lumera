@@ -169,6 +169,49 @@ func truncate(s string, maxLen int) string {
 	return s[:maxLen] + "..."
 }
 
+// ParseRedelegationCount counts redelegations in the output of
+// `query staking redelegation`, tolerating both the plural
+// (redelegation_responses) and singular (redelegation) shapes.
+func ParseRedelegationCount(out string) (int, error) {
+	var resp struct {
+		RedelegationResponses []json.RawMessage `json:"redelegation_responses"`
+		Redelegation          json.RawMessage   `json:"redelegation"`
+	}
+	if err := json.Unmarshal([]byte(out), &resp); err != nil {
+		return 0, fmt.Errorf("parse redelegation: %s: %w", truncate(out, 200), err)
+	}
+	if len(resp.RedelegationResponses) > 0 {
+		return len(resp.RedelegationResponses), nil
+	}
+	if len(resp.Redelegation) > 0 && string(resp.Redelegation) != "null" {
+		return 1, nil
+	}
+	return 0, nil
+}
+
+// ParseAuthzGrantCount counts grants in the output of `query authz grants`.
+func ParseAuthzGrantCount(out string) (int, error) {
+	var resp struct {
+		Grants []json.RawMessage `json:"grants"`
+	}
+	if err := json.Unmarshal([]byte(out), &resp); err != nil {
+		return 0, fmt.Errorf("parse authz grants: %s: %w", truncate(out, 200), err)
+	}
+	return len(resp.Grants), nil
+}
+
+// ParseFeegrantExists reports whether `query feegrant grant` returned a
+// non-null allowance.
+func ParseFeegrantExists(out string) (bool, error) {
+	var resp struct {
+		Allowance json.RawMessage `json:"allowance"`
+	}
+	if err := json.Unmarshal([]byte(out), &resp); err != nil {
+		return false, fmt.Errorf("parse feegrant allowance: %s: %w", truncate(out, 200), err)
+	}
+	return len(resp.Allowance) > 0 && string(resp.Allowance) != "null", nil
+}
+
 // ParseValidatorAddresses extracts validator operator addresses from the JSON
 // output of `lumerad query staking validators`.
 func ParseValidatorAddresses(data []byte) ([]string, error) {

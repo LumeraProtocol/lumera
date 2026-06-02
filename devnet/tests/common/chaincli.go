@@ -369,6 +369,49 @@ func parseSyncBroadcast(out string) (txHash string, code uint32, rawLog string, 
 	return resp.TxHash, resp.Code, resp.RawLog, true
 }
 
+// HasRedelegation reports whether a redelegation from src to dst already exists
+// for the delegator (an in-progress redelegation blocks a new one).
+func (c *ChainCLI) HasRedelegation(delegator, src, dst string) (bool, error) {
+	out, err := c.Run("query", "staking", "redelegation", delegator, src, dst)
+	if err != nil {
+		low := strings.ToLower(out)
+		if strings.Contains(low, "not found") || strings.Contains(low, "no redelegation") {
+			return false, nil
+		}
+		return false, fmt.Errorf("query redelegation: %s: %w", truncate(out, 200), err)
+	}
+	n, err := ParseRedelegationCount(out)
+	return n > 0, err
+}
+
+// HasAuthzGrant reports whether granter already granted grantee an authorization
+// for the given message type.
+func (c *ChainCLI) HasAuthzGrant(granter, grantee, msgType string) (bool, error) {
+	out, err := c.Run("query", "authz", "grants", granter, grantee, msgType)
+	if err != nil {
+		low := strings.ToLower(out)
+		if strings.Contains(low, "not found") || strings.Contains(low, "no authorization") {
+			return false, nil
+		}
+		return false, fmt.Errorf("query authz grants: %s: %w", truncate(out, 200), err)
+	}
+	n, err := ParseAuthzGrantCount(out)
+	return n > 0, err
+}
+
+// HasFeegrant reports whether granter already issued a fee allowance to grantee.
+func (c *ChainCLI) HasFeegrant(granter, grantee string) (bool, error) {
+	out, err := c.Run("query", "feegrant", "grant", granter, grantee)
+	if err != nil {
+		low := strings.ToLower(out)
+		if strings.Contains(low, "not found") || strings.Contains(low, "no allowance") {
+			return false, nil
+		}
+		return false, fmt.Errorf("query feegrant: %s: %w", truncate(out, 200), err)
+	}
+	return ParseFeegrantExists(out)
+}
+
 func (c *ChainCLI) gas() string {
 	if c.Gas == "" {
 		return "auto"

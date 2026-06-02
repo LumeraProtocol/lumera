@@ -17,9 +17,19 @@ type fakeActivityChain struct {
 	failKind activityKind
 	fail     bool
 
+	done    map[activityKind]bool // kinds reported as already on-chain
+	doneErr error                 // pre-check query error
+
 	inFlight    int32
 	maxInFlight int32
 	delay       time.Duration
+}
+
+func (f *fakeActivityChain) AlreadyDone(_ *AccountRecord, act plannedActivity) (bool, error) {
+	if f.doneErr != nil {
+		return false, f.doneErr
+	}
+	return f.done[act.Kind], nil
 }
 
 func (f *fakeActivityChain) track(name string) func() {
@@ -123,6 +133,39 @@ func TestExecuteActivityErrorIsNotRecorded(t *testing.T) {
 	}
 	if len(a.Delegations) != 0 {
 		t.Errorf("failed delegation must not be recorded, got %v", a.Delegations)
+	}
+}
+
+func TestExecuteActivitySkipsWhenAlreadyDone(t *testing.T) {
+	chain := &fakeActivityChain{done: map[activityKind]bool{actFeegrant: true}}
+	a := acct("u1")
+
+	if err := executeActivity(chain, a, plannedActivity{Kind: actFeegrant, Peer: "addr-u2", Amount: "2ulume"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// No submit call should have been made...
+	if len(chain.calls) != 0 {
+		t.Errorf("expected no submit call when already done, got %v", chain.calls)
+	}
+	// ...but the existing state is recorded.
+	if len(a.Feegrants) != 1 {
+		t.Errorf("expected existing feegrant to be recorded, got %v", a.Feegrants)
+	}
+}
+
+func TestExecuteActivityProceedsWhenPreCheckErrors(t *testing.T) {
+	chain := &fakeActivityChain{doneErr: fmt.Errorf("query timeout")}
+	a := acct("u1")
+
+	if err := executeActivity(chain, a, plannedActivity{Kind: actDelegate, Validator: "valA", Amount: "10ulume"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// A pre-check error must not block submission.
+	if len(chain.calls) != 1 || chain.calls[0] != "delegate" {
+		t.Errorf("expected delegate submit despite pre-check error, got %v", chain.calls)
+	}
+	if len(a.Delegations) != 1 {
+		t.Errorf("expected delegation recorded, got %v", a.Delegations)
 	}
 }
 

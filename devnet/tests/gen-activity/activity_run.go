@@ -19,54 +19,74 @@ type activityChain interface {
 	GrantAuthzSend(fromKey, granteeAddr string) (txHash string, err error)
 	GrantFeegrant(fromKey, granteeAddr, spendLimit string) (txHash string, err error)
 	BankSend(fromKey, toAddr, amount string) (txHash string, err error)
+	// AlreadyDone reports whether the activity's resulting on-chain state already
+	// exists, so a rerun can skip a redundant (and conflict-prone) resubmission.
+	AlreadyDone(acct *AccountRecord, act plannedActivity) (bool, error)
 }
 
-// executeActivity submits one planned activity for an account (signing with the
-// account's key name) and, only on success, records it into the account's
-// activity log. Recording the actor's side only; reciprocal received-grant
-// arrays are filled by reconcileReceivedGrants after all workers finish.
+// executeActivity carries out one planned activity for an account. On a rerun
+// where the on-chain state already exists, it records the existing state and
+// skips the tx; otherwise it submits (signing with the account's key) and
+// records only on success. Recording the actor's side only; reciprocal
+// received-grant arrays are filled by reconcileReceivedGrants afterward.
 func executeActivity(chain activityChain, acct *AccountRecord, act plannedActivity) error {
+	// Best-effort pre-query: a query error doesn't block the submission.
+	if done, err := chain.AlreadyDone(acct, act); err != nil {
+		log.Printf("  WARN: %s %s pre-check failed (will attempt): %v", acct.Name, act.Kind, err)
+	} else if done {
+		recordActivity(acct, act, "")
+		return nil
+	}
+	txHash, err := submitActivity(chain, acct, act)
+	if err != nil {
+		return err
+	}
+	recordActivity(acct, act, txHash)
+	return nil
+}
+
+// submitActivity issues the chain transaction for an activity, returning the tx
+// hash where the operation produces one.
+func submitActivity(chain activityChain, acct *AccountRecord, act plannedActivity) (string, error) {
 	switch act.Kind {
 	case actDelegate:
-		if _, err := chain.Delegate(acct.Name, act.Validator, act.Amount); err != nil {
-			return err
-		}
+		return chain.Delegate(acct.Name, act.Validator, act.Amount)
+	case actUnbond:
+		return chain.Unbond(acct.Name, act.Validator, act.Amount)
+	case actRedelegate:
+		return chain.Redelegate(acct.Name, act.SrcValidator, act.DstValidator, act.Amount)
+	case actWithdrawAddr:
+		return chain.SetWithdrawAddress(acct.Name, act.Peer)
+	case actAuthzGrant:
+		return chain.GrantAuthzSend(acct.Name, act.Peer)
+	case actFeegrant:
+		return chain.GrantFeegrant(acct.Name, act.Peer, act.Amount)
+	case actBankSend:
+		return chain.BankSend(acct.Name, act.Peer, act.Amount)
+	default:
+		return "", fmt.Errorf("unknown activity kind %v", act.Kind)
+	}
+}
+
+// recordActivity records an activity into the account's log. ActivityLog dedup
+// makes this idempotent across reruns.
+func recordActivity(acct *AccountRecord, act plannedActivity, txHash string) {
+	switch act.Kind {
+	case actDelegate:
 		acct.AddDelegation(act.Validator, act.Amount)
 	case actUnbond:
-		if _, err := chain.Unbond(acct.Name, act.Validator, act.Amount); err != nil {
-			return err
-		}
 		acct.AddUnbonding(act.Validator, act.Amount)
 	case actRedelegate:
-		if _, err := chain.Redelegate(acct.Name, act.SrcValidator, act.DstValidator, act.Amount); err != nil {
-			return err
-		}
 		acct.AddRedelegation(act.SrcValidator, act.DstValidator, act.Amount)
 	case actWithdrawAddr:
-		if _, err := chain.SetWithdrawAddress(acct.Name, act.Peer); err != nil {
-			return err
-		}
 		acct.AddWithdrawAddress(act.Peer)
 	case actAuthzGrant:
-		if _, err := chain.GrantAuthzSend(acct.Name, act.Peer); err != nil {
-			return err
-		}
 		acct.AddAuthzGrant(act.Peer, common.BankSendMsgType)
 	case actFeegrant:
-		if _, err := chain.GrantFeegrant(acct.Name, act.Peer, act.Amount); err != nil {
-			return err
-		}
 		acct.AddFeegrant(act.Peer, act.Amount)
 	case actBankSend:
-		txHash, err := chain.BankSend(acct.Name, act.Peer, act.Amount)
-		if err != nil {
-			return err
-		}
 		acct.AddBankSend(common.BankSendActivity{To: act.Peer, Amount: act.Amount, TxHash: txHash})
-	default:
-		return fmt.Errorf("unknown activity kind %v", act.Kind)
 	}
-	return nil
 }
 
 // runActivityWorkers runs each account's planned activities, with accounts

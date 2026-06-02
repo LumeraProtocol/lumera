@@ -48,4 +48,21 @@ func (a *cliActivityChain) BankSend(fromKey, to, amount string) (string, error) 
 	return a.cli.SubmitTx("tx", "bank", "send", fromKey, to, amount, "--from", fromKey)
 }
 
+// AlreadyDone pre-checks the conflict-prone activities (redelegation in
+// progress, duplicate authz grant, existing fee allowance) so reruns skip them.
+// The additive/idempotent kinds (delegate, unbond, withdraw-address, bank send)
+// are always re-attempted.
+func (a *cliActivityChain) AlreadyDone(acct *AccountRecord, act plannedActivity) (bool, error) {
+	switch act.Kind {
+	case actRedelegate:
+		return a.cli.HasRedelegation(acct.Address, act.SrcValidator, act.DstValidator)
+	case actAuthzGrant:
+		return a.cli.HasAuthzGrant(acct.Address, act.Peer, common.BankSendMsgType)
+	case actFeegrant:
+		return a.cli.HasFeegrant(acct.Address, act.Peer)
+	default:
+		return false, nil
+	}
+}
+
 var _ activityChain = (*cliActivityChain)(nil)

@@ -351,12 +351,20 @@ func parseSyncBroadcast(out string) (txHash string, code uint32, rawLog string, 
 		return "", 0, "", false
 	}
 	var resp struct {
-		Code   uint32 `json:"code"`
-		RawLog string `json:"raw_log"`
-		TxHash string `json:"txhash"`
+		Code       uint32 `json:"code"`
+		RawLog     string `json:"raw_log"`
+		TxHash     string `json:"txhash"`
+		TxResponse *struct {
+			Code   uint32 `json:"code"`
+			RawLog string `json:"raw_log"`
+			TxHash string `json:"txhash"`
+		} `json:"tx_response"`
 	}
 	if json.Unmarshal([]byte(payload), &resp) != nil {
 		return "", 0, "", false
+	}
+	if resp.TxResponse != nil {
+		return resp.TxResponse.TxHash, resp.TxResponse.Code, resp.TxResponse.RawLog, true
 	}
 	return resp.TxHash, resp.Code, resp.RawLog, true
 }

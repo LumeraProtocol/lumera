@@ -33,6 +33,24 @@ func TestAddKeyWithStylePassesExplicitKeyStyleFlags(t *testing.T) {
 	})
 }
 
+func TestParseSyncBroadcastHandlesQueryTxResponse(t *testing.T) {
+	out := `{
+		"tx_response": {
+			"txhash": "ABC123",
+			"code": 7,
+			"raw_log": "failed in deliver"
+		}
+	}`
+
+	txHash, code, rawLog, ok := parseSyncBroadcast(out)
+	if !ok {
+		t.Fatal("parseSyncBroadcast did not recognize query tx response")
+	}
+	if txHash != "ABC123" || code != 7 || rawLog != "failed in deliver" {
+		t.Fatalf("got hash=%q code=%d raw_log=%q", txHash, code, rawLog)
+	}
+}
+
 func recordingLumerad(t *testing.T) (scriptPath, argsPath string) {
 	t.Helper()
 

@@ -77,8 +77,8 @@ func planActivities(validators, peers []string, rng *rand.Rand, unit int64) []pl
 		if len(chosen) > 0 {
 			plan = append(plan, plannedActivity{Kind: actUnbond, Validator: chosen[0], Amount: amount(1)})
 		}
-		// Redelegate when at least two validators exist.
-		if src, dst, ok := SelectRedelegationPair(validators, rng); ok {
+		// Redelegate from a validator this account just delegated to.
+		if src, dst, ok := selectRedelegationFromDelegations(chosen, validators, rng); ok {
 			plan = append(plan, plannedActivity{Kind: actRedelegate, SrcValidator: src, DstValidator: dst, Amount: amount(1)})
 		}
 	}
@@ -94,6 +94,54 @@ func planActivities(validators, peers []string, rng *rand.Rand, unit int64) []pl
 	return plan
 }
 
+func buildActivityPlans(accounts []*AccountRecord, validators []string, rng *rand.Rand, unit int64) map[*AccountRecord][]plannedActivity {
+	addrs := make([]string, len(accounts))
+	for i, rec := range accounts {
+		addrs[i] = rec.Address
+	}
+	plans := make(map[*AccountRecord][]plannedActivity, len(accounts))
+	for _, rec := range accounts {
+		plans[rec] = planActivities(validators, peersExcluding(addrs, rec.Address), rng, unit)
+	}
+	return plans
+}
+
+func activityTargets(reg *ActivityRegistry, newRecords []*AccountRecord, includeExisting bool) []*AccountRecord {
+	if includeExisting {
+		var out []*AccountRecord
+		for _, rec := range reg.Accounts {
+			if rec.Funded {
+				out = append(out, rec)
+			}
+		}
+		return out
+	}
+	var out []*AccountRecord
+	for _, rec := range newRecords {
+		if rec.Funded {
+			out = append(out, rec)
+		}
+	}
+	return out
+}
+
 func randomPeer(peers []string, rng *rand.Rand) string {
 	return peers[rng.Intn(len(peers))]
+}
+
+func selectRedelegationFromDelegations(delegated, validators []string, rng *rand.Rand) (src, dst string, ok bool) {
+	if len(delegated) == 0 || len(validators) < 2 {
+		return "", "", false
+	}
+	src = delegated[rng.Intn(len(delegated))]
+	var candidates []string
+	for _, v := range validators {
+		if v != src {
+			candidates = append(candidates, v)
+		}
+	}
+	if len(candidates) == 0 {
+		return "", "", false
+	}
+	return src, candidates[rng.Intn(len(candidates))], true
 }

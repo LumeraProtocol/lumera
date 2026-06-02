@@ -62,6 +62,24 @@ func TestPlanActivitiesValidatorsOnly(t *testing.T) {
 	}
 }
 
+func TestPlanActivitiesRedelegatesFromPlannedDelegation(t *testing.T) {
+	vals := []string{"valA", "valB", "valC", "valD"}
+	for seed := int64(0); seed < 100; seed++ {
+		plan := planActivities(vals, nil, rand.New(rand.NewSource(seed)), 1000)
+		delegated := map[string]bool{}
+		for _, a := range plan {
+			if a.Kind == actDelegate {
+				delegated[a.Validator] = true
+			}
+		}
+		for _, a := range plan {
+			if a.Kind == actRedelegate && !delegated[a.SrcValidator] {
+				t.Fatalf("seed %d planned redelegation from %q without a planned delegation; plan=%v", seed, a.SrcValidator, plan)
+			}
+		}
+	}
+}
+
 func TestPlanActivitiesSingleValidatorHasNoRedelegation(t *testing.T) {
 	plan := planActivities([]string{"valA"}, nil, planRNG(), 1000)
 	if kindsIn(plan)[actRedelegate] != 0 {
@@ -104,5 +122,51 @@ func TestPlanActivitiesAmountsArePositiveUlume(t *testing.T) {
 		if c.Amount <= 0 || c.Denom != common.ChainDenom {
 			t.Errorf("activity %v amount %q not a positive ulume amount", a.Kind, a.Amount)
 		}
+	}
+}
+
+func TestBuildActivityPlansExcludesSelfPeers(t *testing.T) {
+	accounts := []*AccountRecord{
+		{AccountIdentity: common.AccountIdentity{Name: "a", Address: "addr-a"}},
+		{AccountIdentity: common.AccountIdentity{Name: "b", Address: "addr-b"}},
+		{AccountIdentity: common.AccountIdentity{Name: "c", Address: "addr-c"}},
+	}
+	plans := buildActivityPlans(accounts, []string{"valA", "valB"}, rand.New(rand.NewSource(3)), 1000)
+
+	if len(plans) != len(accounts) {
+		t.Fatalf("plans = %d, want %d", len(plans), len(accounts))
+	}
+	for _, acct := range accounts {
+		for _, act := range plans[acct] {
+			switch act.Kind {
+			case actBankSend, actAuthzGrant, actFeegrant, actWithdrawAddr:
+				if act.Peer == acct.Address {
+					t.Fatalf("account %s planned self-targeting activity %v", acct.Name, act)
+				}
+			}
+		}
+	}
+}
+
+func TestActivityTargetsRespectExistingFlag(t *testing.T) {
+	existing := &AccountRecord{AccountIdentity: common.AccountIdentity{Name: "old", Address: "addr-old"}, Funded: true}
+	created := &AccountRecord{AccountIdentity: common.AccountIdentity{Name: "new", Address: "addr-new"}, Funded: true}
+	unfunded := &AccountRecord{AccountIdentity: common.AccountIdentity{Name: "dry", Address: "addr-dry"}}
+	reg := NewRegistry("c", "f", "addr-f", "evm", "t0")
+	reg.UpsertAccount(existing)
+	reg.UpsertAccount(created)
+	reg.UpsertAccount(unfunded)
+
+	onlyNew := activityTargets(reg, []*AccountRecord{created}, false)
+	if len(onlyNew) != 1 || onlyNew[0] != created {
+		t.Fatalf("targets without existing activity = %v, want only newly created funded account", onlyNew)
+	}
+
+	withExisting := activityTargets(reg, []*AccountRecord{created}, true)
+	if len(withExisting) != 2 {
+		t.Fatalf("targets with existing activity = %d, want 2 funded accounts", len(withExisting))
+	}
+	if withExisting[0] != existing || withExisting[1] != created {
+		t.Fatalf("targets with existing activity = %v, want existing then created", withExisting)
 	}
 }

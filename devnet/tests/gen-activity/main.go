@@ -140,7 +140,7 @@ func run(cfg *Config) error {
 
 	// Step 10: per-account activity mix. Only funded accounts can transact, and
 	// they serve as each other's peers for transfers and grants.
-	generateActivity(cli, reg, validators, cfg, rng)
+	generateActivity(cli, reg, newRecs, validators, cfg, rng)
 	reconcileReceivedGrants(reg.Accounts)
 	if err := reg.Save(cfg.AccountsPath, time.Now().UTC().Format(time.RFC3339)); err != nil {
 		return fmt.Errorf("save registry after activity: %w", err)
@@ -154,31 +154,23 @@ func run(cfg *Config) error {
 
 // generateActivity plans and runs the per-account activity mix across all
 // funded accounts, using them as each other's peers.
-func generateActivity(cli *common.ChainCLI, reg *ActivityRegistry, validators []string, cfg *Config, rng *rand.Rand) {
-	var active []*AccountRecord
-	for _, rec := range reg.Accounts {
-		if rec.Funded {
-			active = append(active, rec)
-		}
-	}
+func generateActivity(cli *common.ChainCLI, reg *ActivityRegistry, newRecs []*AccountRecord, validators []string, cfg *Config, rng *rand.Rand) {
+	active := activityTargets(reg, newRecs, cfg.ActivityExisting)
 	if len(active) == 0 {
 		log.Printf("no funded accounts; skipping activity generation")
 		return
 	}
 
-	addrs := make([]string, len(active))
-	for i, rec := range active {
-		addrs[i] = rec.Address
-	}
 	// Activity amounts are sized well below per-account funding.
 	unit := cfg.maxAmount.Amount / 100
 	if unit < 1 {
 		unit = 1
 	}
 
+	plans := buildActivityPlans(active, validators, rng, unit)
 	chain := &cliActivityChain{cli: cli}
 	planFor := func(rec *AccountRecord) []plannedActivity {
-		return planActivities(validators, peersExcluding(addrs, rec.Address), rng, unit)
+		return plans[rec]
 	}
 	log.Printf("generating activity for %d account(s) with parallelism %d", len(active), cfg.Parallelism)
 	runActivityWorkers(chain, active, planFor, cfg.Parallelism)

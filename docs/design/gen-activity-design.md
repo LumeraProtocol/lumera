@@ -119,9 +119,17 @@ Top-level fields:
 - `updated_at`
 - `funder_key`
 - `funder_address`
-- `key_style`
+- `key_style` (the key style detected for the *current* run)
 - `validators`
 - `accounts`
+
+The top-level `key_style` and the per-account `key_style` are deliberately
+distinct: the envelope records the style of the most recent run, while each
+account records the style it was *created* with. They can differ when a registry
+is reused across an EVM cutover — accounts generated before the cutover keep
+their original (`secp256k1`/coin-118) style even though later runs detect the
+EVM (`eth_secp256k1`/coin-60) style. Reconciliation (step 6) updates the
+envelope but never rewrites an existing account's recorded style.
 
 Each account record includes:
 
@@ -189,6 +197,13 @@ Tool-specific types:
 9. Fund unfunded accounts up to `-max-account-amount`.
 10. Generate account activity for eligible existing and new accounts.
 11. Save the registry after each major phase and at the end of the run.
+
+When `-dry-run=true`, the run is side-effect free: steps 1–6 execute normally
+(flags, key-style detection, validator and funder queries, registry load and
+reconciliation are all read-only), then the tool prints the accounts it *would*
+generate and the activity it *would* submit and exits. It does not import keys
+into the keyring (step 7), fund accounts (step 9), submit activity txs
+(step 10), or write the registry to disk (steps 8 and 11).
 
 ## Concurrency Model
 

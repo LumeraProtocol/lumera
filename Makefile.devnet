@@ -95,6 +95,8 @@ devnet-tests-build:
 	@cd devnet && $(GO) test -c -o "${DEVNET_BIN_DIR_ABS}/tests_hermes" ./tests/hermes
 	@echo "  -> building tests_evmigration (${DEVNET_BIN_DIR_ABS}/tests_evmigration)"
 	@cd devnet && $(GO) build -o "${DEVNET_BIN_DIR_ABS}/tests_evmigration" ./tests/evmigration
+	@echo "  -> building tests_gen_activity (${DEVNET_BIN_DIR_ABS}/tests_gen_activity)"
+	@cd devnet && $(GO) build -o "${DEVNET_BIN_DIR_ABS}/tests_gen_activity" ./tests/gen-activity
 	@echo "Devnet test binaries built successfully"
 
 # Mirror the public migration helper scripts from the repo-root scripts/ into

@@ -59,6 +59,9 @@ func LoadRegistry(path string) (*ActivityRegistry, error) {
 	if err := common.ReadJSON(path, &reg); err != nil {
 		return nil, err
 	}
+	if reg.SchemaVersion != schemaVersion {
+		return nil, fmt.Errorf("unsupported gen-activity registry schema_version %d (want %d)", reg.SchemaVersion, schemaVersion)
+	}
 	return &reg, nil
 }
 

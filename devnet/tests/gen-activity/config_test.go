@@ -86,6 +86,14 @@ func TestConfigValidate(t *testing.T) {
 		}
 	})
 
+	t.Run("funding batch size must be at least 1", func(t *testing.T) {
+		c := validConfig()
+		c.FundingBatchSize = 0
+		if err := c.Validate(); err == nil {
+			t.Error("expected error for funding batch size < 1")
+		}
+	})
+
 	t.Run("negative num-accounts fails", func(t *testing.T) {
 		c := validConfig()
 		c.NumAccounts = -1

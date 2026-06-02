@@ -111,7 +111,7 @@ func run(cfg *Config) error {
 
 	// Step 7-8: generate keys for the planned accounts and persist before any
 	// funding so an interrupted run can resume.
-	newRecs := generateAccounts(cli, plannedNames, keyStyle.Name())
+	newRecs := generateAccounts(cli, plannedNames, keyStyle)
 	for _, rec := range newRecs {
 		reg.UpsertAccount(rec)
 	}
@@ -152,7 +152,7 @@ func newChainCLI(cfg *Config) *common.ChainCLI {
 		RPC:            cfg.RPC,
 		Home:           cfg.Home,
 		KeyringBackend: cfg.KeyringBackend,
-		Gas:            "auto",
+		Gas:            "500000",
 		GasPrices:      "0.025" + common.ChainDenom,
 		GasAdjustment:  "1.4",
 	}

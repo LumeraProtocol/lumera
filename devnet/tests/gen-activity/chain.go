@@ -56,7 +56,7 @@ func randomFundingAmount(maxAmount int64, rng *rand.Rand) int64 {
 // generateAccounts creates fresh keyring keys for the given names and returns
 // new account records carrying their mnemonics. Existing keys (from an
 // interrupted prior run) are adopted with a warning rather than failing.
-func generateAccounts(cli *common.ChainCLI, names []string, keyStyle string) []*AccountRecord {
+func generateAccounts(cli *common.ChainCLI, names []string, keyStyle common.KeyStyle) []*AccountRecord {
 	now := time.Now().UTC().Format(time.RFC3339)
 	recs := make([]*AccountRecord, 0, len(names))
 	for _, name := range names {
@@ -67,15 +67,15 @@ func generateAccounts(cli *common.ChainCLI, names []string, keyStyle string) []*
 				continue
 			}
 			log.Printf("  WARN: key %s already exists; adopting (mnemonic unknown)", name)
-			recs = append(recs, newAccountRecord(name, addr, "", "", keyStyle, now))
+			recs = append(recs, newAccountRecord(name, addr, "", "", keyStyle.Name(), now))
 			continue
 		}
-		gk, err := cli.AddKey(name)
+		gk, err := cli.AddKeyWithStyle(name, keyStyle)
 		if err != nil {
 			log.Printf("  WARN: generate key %s failed: %v", name, err)
 			continue
 		}
-		recs = append(recs, newAccountRecord(name, gk.Address, gk.Mnemonic, gk.PubKey, keyStyle, now))
+		recs = append(recs, newAccountRecord(name, gk.Address, gk.Mnemonic, gk.PubKey, keyStyle.Name(), now))
 	}
 	return recs
 }

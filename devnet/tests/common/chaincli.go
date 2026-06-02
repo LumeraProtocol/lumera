@@ -180,10 +180,25 @@ type GeneratedKey struct {
 	Mnemonic string `json:"mnemonic"`
 }
 
-// AddKey creates a new key in the keyring using the binary's default key type
-// (which matches the runtime key style) and returns its address and mnemonic.
+// AddKey creates a new key in the keyring using the legacy Cosmos key style.
+// New callers that know the runtime style should prefer AddKeyWithStyle.
 func (c *ChainCLI) AddKey(name string) (GeneratedKey, error) {
-	args := append([]string{"keys", "add", name, "--keyring-backend", c.keyringBackend(), "--output", "json"}, c.homeArgs()...)
+	return c.AddKeyWithStyle(name, KeyStyleLegacy)
+}
+
+// AddKeyWithStyle creates a new key in the keyring using explicit coin-type
+// and algorithm flags so generated accounts match the detected chain runtime.
+func (c *ChainCLI) AddKeyWithStyle(name string, style KeyStyle) (GeneratedKey, error) {
+	args := []string{
+		"keys", "add", name,
+		"--keyring-backend", c.keyringBackend(),
+		"--output", "json",
+		"--coin-type", strconv.FormatUint(uint64(style.CoinType), 10),
+	}
+	if style.EVM {
+		args = append(args, "--algo", style.Algo)
+	}
+	args = append(args, c.homeArgs()...)
 	out, err := exec.Command(c.Bin, args...).CombinedOutput()
 	if err != nil {
 		return GeneratedKey{}, fmt.Errorf("keys add %s: %s: %w", name, strings.TrimSpace(string(out)), err)

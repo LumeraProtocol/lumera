@@ -64,6 +64,27 @@ func TestLoadRegistryRejectsUnparseable(t *testing.T) {
 	}
 }
 
+func TestLoadRegistryRejectsWrongSchemaVersion(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "accounts.json")
+	// This is valid JSON and resembles an evmigration registry envelope, but it
+	// is not a gen-activity registry and must not be silently overwritten.
+	data := []byte(`{"chain_id":"lumera-devnet-1","funder":"validator","accounts":[]}`)
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatalf("seed file: %v", err)
+	}
+	if _, err := LoadRegistry(path); err == nil {
+		t.Error("expected error loading registry without schema_version, got nil")
+	}
+
+	data = []byte(`{"schema_version":2,"chain_id":"lumera-devnet-1","accounts":[]}`)
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatalf("seed file: %v", err)
+	}
+	if _, err := LoadRegistry(path); err == nil {
+		t.Error("expected error loading unsupported schema_version, got nil")
+	}
+}
+
 func TestLoadRegistryMissingFileIsDistinguishable(t *testing.T) {
 	_, err := LoadRegistry(filepath.Join(t.TempDir(), "absent.json"))
 	if !os.IsNotExist(err) {

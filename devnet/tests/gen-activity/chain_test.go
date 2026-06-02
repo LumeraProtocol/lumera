@@ -44,3 +44,19 @@ func TestUnfundedTargets(t *testing.T) {
 		t.Errorf("unfunded = %v, want [b]", got)
 	}
 }
+
+func TestNewChainCLIUsesFixedGasForOfflineFunding(t *testing.T) {
+	cli := newChainCLI(&Config{
+		Bin:            "lumerad",
+		ChainID:        "lumera-devnet-1",
+		RPC:            "tcp://localhost:26657",
+		KeyringBackend: "test",
+	})
+
+	if cli.Gas == "auto" {
+		t.Fatal("newChainCLI must not use gas=auto with offline sequence-signed funding txs")
+	}
+	if cli.Gas == "" {
+		t.Fatal("newChainCLI should set an explicit funding-safe gas limit")
+	}
+}

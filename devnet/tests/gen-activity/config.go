@@ -70,6 +70,9 @@ func (c *Config) Validate() error {
 	if c.Parallelism < 1 {
 		return fmt.Errorf("-parallelism must be >= 1, got %d", c.Parallelism)
 	}
+	if c.FundingBatchSize < 1 {
+		return fmt.Errorf("-funding-batch-size must be >= 1, got %d", c.FundingBatchSize)
+	}
 	if c.MaxActionsPerRun < 0 {
 		return fmt.Errorf("-max-actions-per-run must be >= 0, got %d", c.MaxActionsPerRun)
 	}

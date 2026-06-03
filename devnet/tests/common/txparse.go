@@ -128,13 +128,19 @@ func ParseAuthAccountNumberAndSequence(out string) (uint64, uint64, error) {
 	return num, seq, nil
 }
 
-// ParseBankBalance parses the JSON from `lumerad query bank balance` (singular
-// or flat shape) and returns the integer amount. An absent balance is 0.
+// ParseBankBalance parses the JSON from `lumerad query bank balance` and returns
+// the integer amount. It tolerates the shapes emitted across SDK/CLI versions:
+// singular (`{"balance":{"amount":...}}`), flat coin (`{"amount":...}`), and the
+// all-balances envelope (`{"balances":[{"denom":...,"amount":...}]}`) that some
+// builds return for the `bank balances --denom` fallback. An absent balance is 0.
 func ParseBankBalance(out string) (int64, error) {
 	var resp struct {
 		Balance *struct {
 			Amount string `json:"amount"`
 		} `json:"balance"`
+		Balances []struct {
+			Amount string `json:"amount"`
+		} `json:"balances"`
 		Amount string `json:"amount"`
 	}
 	if err := json.Unmarshal([]byte(out), &resp); err != nil {
@@ -143,6 +149,9 @@ func ParseBankBalance(out string) (int64, error) {
 	amtStr := resp.Amount
 	if resp.Balance != nil && resp.Balance.Amount != "" {
 		amtStr = resp.Balance.Amount
+	}
+	if amtStr == "" && len(resp.Balances) > 0 {
+		amtStr = resp.Balances[0].Amount
 	}
 	if amtStr == "" {
 		return 0, nil

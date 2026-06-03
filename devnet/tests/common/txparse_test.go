@@ -111,7 +111,9 @@ func TestParseBankBalance(t *testing.T) {
 	}{
 		{"singular balance shape", `{"balance":{"denom":"ulume","amount":"1000"}}`, 1000},
 		{"flat amount shape", `{"amount":"500","denom":"ulume"}`, 500},
+		{"balances-array shape", `{"balances":[{"denom":"ulume","amount":"750"}]}`, 750},
 		{"zero/empty balance", `{"balance":null}`, 0},
+		{"empty balances array", `{"balances":[]}`, 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

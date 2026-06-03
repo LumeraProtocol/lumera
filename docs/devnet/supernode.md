@@ -170,19 +170,19 @@ Host port mapping per validator (N = 1..5):
 | `SUPERNODE_PORT` | `4444` | Supernode gRPC port |
 | `SUPERNODE_P2P_PORT` | `4445` | Supernode P2P port |
 | `SUPERNODE_GATEWAY_PORT` | `8002` | Supernode HTTP gateway port |
-| `TX_GAS_PRICES` | `0.03ulume` | Gas prices (auto-updated for EVM feemarket) |
+| `TX_GAS_PRICES` | `0.03ulume` | Cosmos tx gas prices in `ulume` (numeric price auto-updated for EVM feemarket) |
 | `LUMERA_VERSION` | auto-detected | Lumerad version hint |
 | `LUMERA_FIRST_EVM_VERSION` | `v1.20.0` | EVM cutover version |
 | `INTEGRATION_TEST` | `true` (in compose) | Integration test mode flag |
 
 ## EVM feemarket integration
 
-When EVM is active, the feemarket module enforces dynamic base fees. The setup script queries the feemarket parameters and adjusts `TX_GAS_PRICES` to 2x the current base fee to ensure transactions are accepted under fee fluctuations.
+When EVM is active, the feemarket module enforces dynamic base fees. The setup script queries the feemarket parameters and adjusts the numeric `TX_GAS_PRICES` value to 2x the current base fee to ensure transactions are accepted under fee fluctuations. Cosmos tx fees remain in `ulume`; `alume` is the EVM-side 18-decimal representation.
 
 ```bash
 # The script queries:
 lumerad query feemarket params --output json
-# And sets TX_GAS_PRICES = 2 * base_fee + fee_denom
+# And sets TX_GAS_PRICES = 2 * base_fee + ulume
 ```
 
 ## Devnet tests

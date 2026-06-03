@@ -1,4 +1,4 @@
-// Command tests_gen_activity generates realistic account activity against a
+// Command tests-gen-activity generates realistic account activity against a
 // live Lumera devnet chain. It creates and reuses test accounts, funds them
 // from a local keyring funder, submits activity transactions, and persists all
 // generated metadata in a rerunnable JSON registry.
@@ -20,6 +20,8 @@ import (
 
 const defaultEVMCutoverVer = "v1.20.0"
 
+const usageDescription = "tests-gen-activity generates realistic account activity against a live Lumera devnet chain."
+
 func main() {
 	cfg := parseFlags()
 	if err := cfg.Validate(); err != nil {
@@ -32,30 +34,42 @@ func main() {
 
 func parseFlags() *Config {
 	c := &Config{}
-	flag.StringVar(&c.Bin, "bin", "lumerad", "lumerad binary path")
-	flag.StringVar(&c.RPC, "rpc", "tcp://localhost:26657", "CometBFT RPC endpoint")
-	flag.StringVar(&c.GRPC, "grpc", "localhost:9090", "gRPC endpoint")
-	flag.StringVar(&c.ChainID, "chain-id", "", "chain ID (required)")
-	flag.StringVar(&c.Home, "home", "", "lumerad home directory")
-	flag.StringVar(&c.KeyringBackend, "keyring-backend", "test", "local funder keyring backend")
-	flag.StringVar(&c.EVMCutoverVer, "evm-cutover-version", defaultEVMCutoverVer, "lumerad version where accounts switch to coin-type 60")
-	flag.StringVar(&c.FundingKey, "funding-key", "", "funder key name in the local keyring (required)")
-	flag.StringVar(&c.AccountsPath, "accounts", "devnet/tests/gen-activity/accounts.json", "registry file path")
-	flag.IntVar(&c.NumAccounts, "num-accounts", 10, "number of accounts to generate")
-	flag.StringVar(&c.MaxAccountAmount, "max-account-amount", "10000000ulume", "upper bound for per-account funding")
-	flag.StringVar(&c.AccountPrefix, "account-prefix", "gen", "name prefix for generated accounts")
-	flag.BoolVar(&c.AddAccounts, "add-accounts", false, "add -num-accounts new users to an existing registry")
-	flag.BoolVar(&c.ActivityExisting, "activity-existing", false, "generate more activity for existing accounts")
-	flag.BoolVar(&c.Actions, "actions", true, "include CASCADE action activity")
-	flag.BoolVar(&c.RequireActions, "require-actions", false, "fail the run if action activity cannot be created")
-	flag.IntVar(&c.MaxActionsPerRun, "max-actions-per-run", 3, "cap action uploads/registrations per run")
-	flag.StringVar(&c.ActionStates, "action-states", "pending,done,approved", "target action states to generate")
-	flag.DurationVar(&c.ActionReadinessTimeout, "action-readiness-timeout", 180*time.Second, "time to wait for usable active supernodes")
-	flag.IntVar(&c.FundingBatchSize, "funding-batch-size", 10, "funder transfers to pipeline before waiting for inclusion")
-	flag.IntVar(&c.Parallelism, "parallelism", 5, "maximum concurrent per-account activity workers")
-	flag.BoolVar(&c.DryRun, "dry-run", false, "print planned accounts/activity without submitting txs")
+	configureFlags(flag.CommandLine, c)
 	flag.Parse()
 	return c
+}
+
+func configureFlags(fs *flag.FlagSet, c *Config) {
+	fs.Usage = func() {
+		out := fs.Output()
+		_, _ = fmt.Fprintf(out, "%s\n\n", usageDescription)
+		_, _ = fmt.Fprintf(out, "Usage: %s [flags]\n\n", fs.Name())
+		_, _ = fmt.Fprintln(out, "Flags:")
+		fs.PrintDefaults()
+	}
+
+	fs.StringVar(&c.Bin, "bin", "lumerad", "lumerad binary path")
+	fs.StringVar(&c.RPC, "rpc", "tcp://localhost:26657", "CometBFT RPC endpoint")
+	fs.StringVar(&c.GRPC, "grpc", "localhost:9090", "gRPC endpoint")
+	fs.StringVar(&c.ChainID, "chain-id", "", "chain ID (required)")
+	fs.StringVar(&c.Home, "home", "", "lumerad home directory")
+	fs.StringVar(&c.KeyringBackend, "keyring-backend", "test", "local funder keyring backend")
+	fs.StringVar(&c.EVMCutoverVer, "evm-cutover-version", defaultEVMCutoverVer, "lumerad version where accounts switch to coin-type 60")
+	fs.StringVar(&c.FundingKey, "funding-key", "", "funder key name in the local keyring (required)")
+	fs.StringVar(&c.AccountsPath, "accounts", "devnet/tests/gen-activity/accounts.json", "registry file path")
+	fs.IntVar(&c.NumAccounts, "num-accounts", 10, "number of accounts to generate")
+	fs.StringVar(&c.MaxAccountAmount, "max-account-amount", "10000000ulume", "upper bound for per-account funding")
+	fs.StringVar(&c.AccountPrefix, "account-prefix", "gen", "name prefix for generated accounts")
+	fs.BoolVar(&c.AddAccounts, "add-accounts", false, "add -num-accounts new users to an existing registry")
+	fs.BoolVar(&c.ActivityExisting, "activity-existing", false, "generate more activity for existing accounts")
+	fs.BoolVar(&c.Actions, "actions", true, "include CASCADE action activity")
+	fs.BoolVar(&c.RequireActions, "require-actions", false, "fail the run if action activity cannot be created")
+	fs.IntVar(&c.MaxActionsPerRun, "max-actions-per-run", 3, "cap action uploads/registrations per run")
+	fs.StringVar(&c.ActionStates, "action-states", "pending,done,approved", "target action states to generate")
+	fs.DurationVar(&c.ActionReadinessTimeout, "action-readiness-timeout", 180*time.Second, "time to wait for usable active supernodes")
+	fs.IntVar(&c.FundingBatchSize, "funding-batch-size", 10, "funder transfers to pipeline before waiting for inclusion")
+	fs.IntVar(&c.Parallelism, "parallelism", 5, "maximum concurrent per-account activity workers")
+	fs.BoolVar(&c.DryRun, "dry-run", false, "print planned accounts/activity without submitting txs")
 }
 
 // run executes the runtime flow described in the design. Steps 1-6 are

@@ -2,7 +2,7 @@
 
 ## Goal
 
-Build a standalone `tests_gen_activity` binary that generates realistic account
+Build a standalone `tests-gen-activity` binary that generates realistic account
 activity against an actual Lumera devnet chain. The tool should create and reuse
 test user accounts, fund them from a local keyring funder, submit activity
 transactions against the live validator and supernode set, and persist all
@@ -44,7 +44,7 @@ fixtures, but use the shared package for common primitives where practical.
 
 ### `devnet/tests/gen-activity`
 
-Create a new standalone command package built as `tests_gen_activity`. It owns
+Create a new standalone command package built as `tests-gen-activity`. It owns
 the real-devnet activity workflow, command-line flags, logging, and registry
 update policy.
 
@@ -53,7 +53,7 @@ update policy.
 Initial flags:
 
 ```sh
-tests_gen_activity \
+tests-gen-activity \
   -bin=lumerad \
   -rpc=tcp://devnet-host:26657 \
   -grpc=devnet-host:9090 \
@@ -317,11 +317,11 @@ Unit tests should cover:
 
 Integration smoke tests should cover:
 
-- building `tests_gen_activity`
+- building `tests-gen-activity`
 - dry-run registry planning
 - live-chain execution against a local devnet when available
 
-`devnet-tests-build` should build `tests_gen_activity` alongside
+`devnet-tests-build` should build `tests-gen-activity` alongside
 `tests_evmigration`.
 
 ## Open Implementation Notes

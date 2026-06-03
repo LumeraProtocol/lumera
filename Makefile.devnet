@@ -3,8 +3,8 @@
 .PHONY: devnet-build-version devnet-new-version devnet-upgrade-version
 .PHONY: _check-devnet-version-bin _check-devnet-build-version-cfg
 .PHONY: devnet-download-binaries
-.PHONY: devnet-evmigration-sync-bin devnet-evmigration-prepare devnet-evmigration-estimate devnet-evmigration-migrate devnet-evmigration-migrate-validator devnet-evmigration-cleanup
-.PHONY: devnet-evmigrationp-prepare devnet-evmigrationp-estimate devnet-evmigrationp-migrate devnet-evmigrationp-migrate-validator devnet-evmigrationp-migrate-all devnet-evmigrationp-cleanup
+.PHONY: devnet-evmigration-sync-bin devnet-evmigration-prepare devnet-evmigration-estimate devnet-evmigration-migrate devnet-evmigration-migrate-validator devnet-evmigration-verify devnet-evmigration-cleanup
+.PHONY: devnet-evmigrationp-prepare devnet-evmigrationp-estimate devnet-evmigrationp-migrate devnet-evmigrationp-migrate-validator devnet-evmigrationp-migrate-all devnet-evmigrationp-verify devnet-evmigrationp-cleanup
 .PHONY: devnet-tests-everlight devnet-tests-lep6 devnet-new-no-hermes
 
 ##### Devnet Makefile ########################################
@@ -12,15 +12,18 @@
 # Targets for managing a local Dockerized devnet (5 validators + Hermes
 # relayer). State lives in /tmp/lumera-devnet-1/ and devnet/bin*/.
 #
-# ── Build from local source ───────────────────────────────────
+# -- Build from local source -----------------------------------
+#   make devnet-tests-build                         # build tests_validator/tests_hermes/tests_evmigration/tests-gen-activity
 #   make devnet-build-default                       # build + configure using locally compiled lumerad
 #   make devnet-refresh-bin                         # rebuild lumerad and copy into devnet/bin/
 #
-# ── Build from a pre-downloaded release (devnet/config/binaries.json) ───────────────────────
-#   make devnet-download-binaries VERSION=v1.12.0   # fetch release binaries into devnet/bin-<VERSION>/
+# -- Release binaries (devnet/config/binaries.json) -----------------------------------------
+#   make devnet-download-binaries VERSION=v1.12.0   # download lumerad/supernode/uploader/sncli into devnet/bin-<VERSION>/
 #   make devnet-build-version     VERSION=v1.12.0   # build + configure using those binaries
+#   make devnet-new-version       VERSION=v1.12.0   # clean + build-version + up
+#   make devnet-upgrade-version   VERSION=v1.12.0   # update running devnet to those binaries
 #
-# ── Lifecycle (on an already-built devnet) ────────────────────
+# -- Lifecycle (on an already-built devnet) --------------------
 #   make devnet-up                                  # start containers (foreground)
 #   make devnet-up-detach                           # start containers (background)
 #   make devnet-stop / make devnet-start            # stop / start without wiping state
@@ -28,29 +31,34 @@
 #   make devnet-clean                               # wipe all devnet state (requires sudo)
 #   make devnet-reset                               # reset validator keys, keep config
 #
-# ── Full reset + rebuild + start ──────────────────────────────
+# -- Full reset + rebuild + start ------------------------------
 #   make devnet-new                                 # down + clean + build-default + up
 #   make devnet-new-version VERSION=v1.12.0         # same, using a pre-downloaded release
 #
-# ── In-place upgrade (while devnet is running) ────────────────
+# -- In-place upgrade (while devnet is running) ----------------
 #   make devnet-upgrade-version VERSION=v1.12.0     # upgrade to a pre-downloaded release
 #   make devnet-upgrade-1200                        # upgrade to locally-built v1.20.0 (EVM)
 #   make devnet-evm-upgrade                         # scripted v1.12.0 -> v1.20.0 evmigration flow
 #
-# ── External genesis / claims (override inputs to devnet-build) ──
+# -- External genesis / claims (override inputs to devnet-build) --
 #   make devnet-build \
 #       EXTERNAL_CLAIMS_FILE=~/claims.csv \
 #       EXTERNAL_GENESIS_FILE=~/genesis.json
 #   # Optional: CONFIG_JSON=path/to/config.json VALIDATORS_JSON=path/to/validators.json
 #
-# ── Container maintenance ─────────────────────────────────────
+# -- Container maintenance -------------------------------------
 #   make devnet-update-scripts                      # push updated devnet/scripts/*.sh + scripts/migrate-*.sh into running containers
 #   make devnet-update-binaries                     # push updated lumera binaries into running containers
+#   make devnet-update-binaries-default             # push binaries from devnet/bin/ into running containers
+#   make devnet-deploy-tar                          # stage a built release tar into /shared/release/
 #
-# ── EVM migration (per-validator tools) ───────────────────────
+# -- EVM migration (per-validator tools) -----------------------
 #   make devnet-evmigration-prepare                 # one-at-a-time per validator
+#   make devnet-evmigration-verify                  # verify one-at-a-time migration state
 #   make devnet-evmigrationp-prepare                # parallel across validators
-#   # estimate / migrate / migrate-validator / migrate-all / verify / cleanup
+#   make devnet-evmigrationp-migrate-all            # parallel account + validator migration flow
+#   make devnet-evmigrationp-verify                 # parallel migration state verification
+#   # also available: estimate / migrate / migrate-validator / cleanup
 #
 # Tip: any `devnet-*-<N>` alias (e.g. devnet-build-1111, devnet-new-1120)
 # is a thin delegator to the corresponding `-version VERSION=vX.Y.Z` target.
@@ -95,8 +103,8 @@ devnet-tests-build:
 	@cd devnet && $(GO) test -c -o "${DEVNET_BIN_DIR_ABS}/tests_hermes" ./tests/hermes
 	@echo "  -> building tests_evmigration (${DEVNET_BIN_DIR_ABS}/tests_evmigration)"
 	@cd devnet && $(GO) build -o "${DEVNET_BIN_DIR_ABS}/tests_evmigration" ./tests/evmigration
-	@echo "  -> building tests_gen_activity (${DEVNET_BIN_DIR_ABS}/tests_gen_activity)"
-	@cd devnet && $(GO) build -o "${DEVNET_BIN_DIR_ABS}/tests_gen_activity" ./tests/gen-activity
+	@echo "  -> building tests-gen-activity (${DEVNET_BIN_DIR_ABS}/tests-gen-activity)"
+	@cd devnet && $(GO) build -o "${DEVNET_BIN_DIR_ABS}/tests-gen-activity" ./tests/gen-activity
 	@echo "Devnet test binaries built successfully"
 
 # Mirror the public migration helper scripts from the repo-root scripts/ into
@@ -674,7 +682,7 @@ EVMIGRATION_NUM_ACCOUNTS ?= 7
 EVMIGRATION_NUM_EXTRA ?= 7
 # Cross-process serialization for cascade action creation. When non-empty,
 # tests_evmigration takes an exclusive flock on this path before each
-# request-action call and waits one block before releasing — preventing the
+# request-action call and waits one block before releasing - preventing the
 # parallel-prepare run from landing multiple MsgRequestAction txs in the same
 # block, which exposes a known supernode race on MsgFinalizeAction sequences.
 # Set to "" (empty) to disable. The path must live on a volume shared by all
